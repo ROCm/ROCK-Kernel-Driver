@@ -206,7 +206,7 @@ struct s_drive_stuff {
 	int status;		/* last operation's error / status */
 	int readerrs;		/* # of blocks read w/o error */
 	struct cdrom_device_info info;
-	struct gendisk disk;
+	struct gendisk *disk;
 };
 
 
@@ -1021,11 +1021,12 @@ void __exit mcdx_exit(void)
 		struct s_drive_stuff *stuffp = mcdx_stuffp[i];
 		if (!stuffp)
 			continue;
-		del_gendisk(&stuffp->disk);
+		del_gendisk(stuffp->disk);
 		if (unregister_cdrom(&stuffp->info)) {
 			printk(KERN_WARNING "Can't unregister cdrom mcdx\n");
-			return;
+			continue;
 		}
+		put_disk(stuffp->disk);
 		release_region((unsigned long) stuffp->wreg_data,
 			       MCDX_IO_SIZE);
 		free_irq(stuffp->irq, NULL);
@@ -1075,6 +1076,13 @@ int __init mcdx_init_drive(int drive)
 		return 1;
 	}
 
+	disk = alloc_disk();
+	if (!disk) {
+		xwarn("init() malloc failed\n");
+		kfree(stuffp);
+		return 1;
+	}
+
 	xtrace(INIT, "init() got %d bytes for drive stuff @ %p\n",
 	       sizeof(*stuffp), stuffp);
 
@@ -1106,6 +1114,7 @@ int __init mcdx_init_drive(int drive)
 		      stuffp->wreg_data + MCDX_IO_SIZE - 1);
 		xtrace(MALLOC, "init() free stuffp @ %p\n", stuffp);
 		kfree(stuffp);
+		put_disk(disk);
 		xtrace(INIT, "init() continue at next drive\n");
 		return 0;	/* next drive */
 	}
@@ -1124,6 +1133,7 @@ int __init mcdx_init_drive(int drive)
 		      MCDX, stuffp->wreg_data, stuffp->irq);
 		xtrace(MALLOC, "init() free stuffp @ %p\n", stuffp);
 		kfree(stuffp);
+		put_disk(disk);
 		xtrace(INIT, "init() continue at next drive\n");
 		return 0;
 	}
@@ -1154,6 +1164,7 @@ int __init mcdx_init_drive(int drive)
 		xwarn("%s=0x%3p,%d: Init failed. No Mitsumi CD-ROM?.\n",
 		      MCDX, stuffp->wreg_data, stuffp->irq);
 		kfree(stuffp);
+		put_disk(disk);
 		return 0;	/* next drive */
 	}
 
@@ -1164,6 +1175,7 @@ int __init mcdx_init_drive(int drive)
 		xwarn("%s=0x%3p,%d: Init failed. Can't get major %d.\n",
 		      MCDX, stuffp->wreg_data, stuffp->irq, MAJOR_NR);
 		kfree(stuffp);
+		put_disk(disk);
 		return 1;
 	}
 
@@ -1180,6 +1192,7 @@ int __init mcdx_init_drive(int drive)
 		stuffp->irq = 0;
 		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 		kfree(stuffp);
+		put_disk(disk);
 		return 0;
 	}
 
@@ -1206,13 +1219,13 @@ int __init mcdx_init_drive(int drive)
 	stuffp->info.handle = stuffp;
 	sprintf(stuffp->info.name, "mcdx%d", drive);
 	stuffp->info.dev = mk_kdev(MAJOR_NR, drive);
-	disk = &stuffp->disk;
 	disk->major = MAJOR_NR;
 	disk->first_minor = drive;
 	disk->minor_shift = 0;
 	strcpy(disk->disk_name, stuffp->info.name);
 	disk->fops = &mcdx_bdops;
 	disk->flags = GENHD_FL_CD;
+	stuffp->disk = disk;
 
 	sprintf(msg, " mcdx: Mitsumi CD-ROM installed at 0x%3p, irq %d."
 		" (Firmware version %c %x)\n",
@@ -1225,6 +1238,7 @@ int __init mcdx_init_drive(int drive)
 			       MCDX_IO_SIZE);
 		free_irq(stuffp->irq, NULL);
 		kfree(stuffp);
+		put_disk(disk);
 		if (unregister_blkdev(MAJOR_NR, "mcdx") != 0)
 			xwarn("cleanup() unregister_blkdev() failed\n");
 		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));

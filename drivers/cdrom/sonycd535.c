@@ -1454,14 +1454,7 @@ static struct block_device_operations cdu_fops =
 	.check_media_change	= cdu535_check_media_change,
 };
 
-static struct gendisk cdu_disk =
-{
-	.major = MAJOR_NR,
-	.first_minor = 0,
-	.minor_shift = 0,
-	.fops = &cdu_fops,
-	.disk_name = "cdu",
-};
+static struct gendisk *cdu_disk;
 
 /*
  * Initialize the driver.
@@ -1477,6 +1470,7 @@ static int __init sony535_init(void)
 	int  tmp_irq;
 	int  i;
 	devfs_handle_t sony_devfs_handle;
+	int err;
 
 	/* Setting the base I/O address to 0 will disable it. */
 	if ((sony535_cd_base_io == 0xffff)||(sony535_cd_base_io == 0))
@@ -1518,145 +1512,142 @@ static int __init sony535_init(void)
 		sony_sleep();
 	}
 
-	if (got_result && (check_drive_status() != TIME_OUT)) {
-		/* CD-ROM drive responded --  get the drive configuration */
-		cmd_buff[0] = SONY535_INQUIRY;
-		if (do_sony_cmd(cmd_buff, 1, status,
-						(Byte *)&drive_config, 28, 1) == 0) {
-			/* was able to get the configuration,
-			 * set drive mode as rest of init
-			 */
+	if (!got_result || check_drive_status() == TIME_OUT)
+		goto Enodev;
+
+	/* CD-ROM drive responded --  get the drive configuration */
+	cmd_buff[0] = SONY535_INQUIRY;
+	if (do_sony_cmd(cmd_buff, 1, status, (Byte *)&drive_config, 28, 1) != 0)
+		goto Enodev;
+
+	/* was able to get the configuration,
+	 * set drive mode as rest of init
+	 */
 #if DEBUG > 0
-			/* 0x50 == CADDY_NOT_INSERTED | NOT_SPINNING */
-			if ( (status[0] & 0x7f) != 0 && (status[0] & 0x7f) != 0x50 )
-				printk(CDU535_MESSAGE_NAME
-						"Inquiry command returned status = 0x%x\n", status[0]);
+	/* 0x50 == CADDY_NOT_INSERTED | NOT_SPINNING */
+	if ( (status[0] & 0x7f) != 0 && (status[0] & 0x7f) != 0x50 )
+		printk(CDU535_MESSAGE_NAME
+				"Inquiry command returned status = 0x%x\n", status[0]);
 #endif
-			/* now ready to use interrupts, if available */
-			sony535_irq_used = tmp_irq;
+	/* now ready to use interrupts, if available */
+	sony535_irq_used = tmp_irq;
 
-			/* A negative sony535_irq_used will attempt an autoirq. */
-			if (sony535_irq_used < 0) {
-				unsigned long irq_mask, delay;
+	/* A negative sony535_irq_used will attempt an autoirq. */
+	if (sony535_irq_used < 0) {
+		unsigned long irq_mask, delay;
 
-				irq_mask = probe_irq_on();
-				enable_interrupts();
-				outb(0, read_status_reg);	/* does a reset? */
-				delay = jiffies + HZ/10;
-				while (time_before(jiffies, delay)) ;
+		irq_mask = probe_irq_on();
+		enable_interrupts();
+		outb(0, read_status_reg);	/* does a reset? */
+		delay = jiffies + HZ/10;
+		while (time_before(jiffies, delay)) ;
 
-				sony535_irq_used = probe_irq_off(irq_mask);
-				disable_interrupts();
-			}
-			if (sony535_irq_used > 0) {
-			    if (request_irq(sony535_irq_used, cdu535_interrupt,
-								SA_INTERRUPT, CDU535_HANDLE, NULL)) {
-					printk("Unable to grab IRQ%d for the " CDU535_MESSAGE_NAME
-							" driver; polling instead.\n", sony535_irq_used);
-					sony535_irq_used = 0;
-				}
-			}
-			cmd_buff[0] = SONY535_SET_DRIVE_MODE;
-			cmd_buff[1] = 0x0;	/* default audio */
-			if (do_sony_cmd(cmd_buff, 2, status, ret_buff, 1, 1) == 0) {
-				/* set the drive mode successful, we are set! */
-				sony_buffer_size = SONY535_BUFFER_SIZE;
-				sony_buffer_sectors = sony_buffer_size / CDU535_BLOCK_SIZE;
-
-				printk(KERN_INFO CDU535_MESSAGE_NAME " I/F CDROM : %8.8s %16.16s %4.4s",
-					   drive_config.vendor_id,
-					   drive_config.product_id,
-					   drive_config.product_rev_level);
-				printk("  base address %03X, ", sony535_cd_base_io);
-				if (tmp_irq > 0)
-					printk("IRQ%d, ", tmp_irq);
-				printk("using %d byte buffer\n", sony_buffer_size);
-
-				sony_devfs_handle = devfs_register (NULL, CDU535_HANDLE,
-								DEVFS_FL_DEFAULT,
-								MAJOR_NR, 0,
-								S_IFBLK | S_IRUGO | S_IWUGO,
-								&cdu_fops, NULL);
-				if (register_blkdev(MAJOR_NR, CDU535_HANDLE, &cdu_fops)) {
-					printk("Unable to get major %d for %s\n",
-							MAJOR_NR, CDU535_MESSAGE_NAME);
-					return -EIO;
-				}
-				blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR),
-						do_cdu535_request,
-						&sonycd535_lock);
-				blk_queue_hardsect_size(BLK_DEFAULT_QUEUE(MAJOR_NR), CDU535_BLOCK_SIZE);
-				sony_toc = (struct s535_sony_toc *)
-					kmalloc(sizeof *sony_toc, GFP_KERNEL);
-				if (sony_toc == NULL) {
-					blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
-					unregister_blkdev(MAJOR_NR, CDU535_HANDLE);
-					devfs_unregister(sony_devfs_handle);
-					return -ENOMEM;
-				}
-				last_sony_subcode = (struct s535_sony_subcode *)
-					kmalloc(sizeof *last_sony_subcode, GFP_KERNEL);
-				if (last_sony_subcode == NULL) {
-					blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
-					kfree(sony_toc);
-					unregister_blkdev(MAJOR_NR, CDU535_HANDLE);
-					devfs_unregister(sony_devfs_handle);
-					return -ENOMEM;
-				}
-				sony_buffer = (Byte **)
-					kmalloc(4 * sony_buffer_sectors, GFP_KERNEL);
-				if (sony_buffer == NULL) {
-					blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
-					kfree(sony_toc);
-					kfree(last_sony_subcode);
-					unregister_blkdev(MAJOR_NR, CDU535_HANDLE);
-					devfs_unregister(sony_devfs_handle);
-					return -ENOMEM;
-				}
-				for (i = 0; i < sony_buffer_sectors; i++) {
-					sony_buffer[i] =
-								(Byte *)kmalloc(CDU535_BLOCK_SIZE, GFP_KERNEL);
-					if (sony_buffer[i] == NULL) {
-						while (--i>=0)
-							kfree(sony_buffer[i]);
-						blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
-						kfree(sony_buffer);
-						kfree(sony_toc);
-						kfree(last_sony_subcode);
-						unregister_blkdev(MAJOR_NR, CDU535_HANDLE);
-						devfs_unregister(sony_devfs_handle);
-						return -ENOMEM;
-					}
-				}
-				initialized = 1;
-			}
+		sony535_irq_used = probe_irq_off(irq_mask);
+		disable_interrupts();
+	}
+	if (sony535_irq_used > 0) {
+	    if (request_irq(sony535_irq_used, cdu535_interrupt,
+						SA_INTERRUPT, CDU535_HANDLE, NULL)) {
+			printk("Unable to grab IRQ%d for the " CDU535_MESSAGE_NAME
+					" driver; polling instead.\n", sony535_irq_used);
+			sony535_irq_used = 0;
 		}
 	}
+	cmd_buff[0] = SONY535_SET_DRIVE_MODE;
+	cmd_buff[1] = 0x0;	/* default audio */
+	if (do_sony_cmd(cmd_buff, 2, status, ret_buff, 1, 1) != 0)
+		goto Enodev_irq;
 
-	if (!initialized) {
-		printk("Did not find a " CDU535_MESSAGE_NAME " drive\n");
-		return -EIO;
+	/* set the drive mode successful, we are set! */
+	sony_buffer_size = SONY535_BUFFER_SIZE;
+	sony_buffer_sectors = sony_buffer_size / CDU535_BLOCK_SIZE;
+
+	printk(KERN_INFO CDU535_MESSAGE_NAME " I/F CDROM : %8.8s %16.16s %4.4s",
+		   drive_config.vendor_id,
+		   drive_config.product_id,
+		   drive_config.product_rev_level);
+	printk("  base address %03X, ", sony535_cd_base_io);
+	if (tmp_irq > 0)
+		printk("IRQ%d, ", tmp_irq);
+	printk("using %d byte buffer\n", sony_buffer_size);
+
+	sony_devfs_handle = devfs_register (NULL, CDU535_HANDLE,
+					DEVFS_FL_DEFAULT,
+					MAJOR_NR, 0,
+					S_IFBLK | S_IRUGO | S_IWUGO,
+					&cdu_fops, NULL);
+	if (register_blkdev(MAJOR_NR, CDU535_HANDLE, &cdu_fops)) {
+		printk("Unable to get major %d for %s\n",
+				MAJOR_NR, CDU535_MESSAGE_NAME);
+		err = -EIO;
+		goto out1;
 	}
-	if (!request_region(sony535_cd_base_io, 4, CDU535_HANDLE))
-		{
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_cdu535_request,
+			&sonycd535_lock);
+	blk_queue_hardsect_size(BLK_DEFAULT_QUEUE(MAJOR_NR), CDU535_BLOCK_SIZE);
+	sony_toc = kamlloc(sizeof(struct s535_sony_toc), GFP_KERNEL);
+	err = -ENOMEM;
+	if (!sony_toc)
+		goto out2;
+	last_sony_subcode = kmalloc(sizeof(struct s535_sony_subcode), GFP_KERNEL);
+	if (!last_sony_subcode)
+		goto out3;
+	sony_buffer = kmalloc(sizeof(Byte *) * sony_buffer_sectors, GFP_KERNEL);
+	if (!sony_buffer)
+		goto out4;
+	for (i = 0; i < sony_buffer_sectors; i++) {
+		sony_buffer[i] = kmalloc(CDU535_BLOCK_SIZE, GFP_KERNEL);
+		if (!sony_buffer[i]) {
+			while (--i>=0)
+				kfree(sony_buffer[i]);
+			goto out5;
+		}
+	}
+	initialized = 1;
+
+	cdu_disk = alloc_disk();
+	if (!cdu_disk)
+		goto out6;
+	cdu_disk->major = MAJOR_NR;
+	cdu_disk->first_minor = 0;
+	cdu_disk->minor_shift = 0;
+	cdu_disk->fops = &cdu_fops;
+	sprintf(cdu_disk->disk_name, "cdu");
+
+	if (!request_region(sony535_cd_base_io, 4, CDU535_HANDLE)) {
 		printk(KERN_WARNING"sonycd535: Unable to request region 0x%x\n",
 			sony535_cd_base_io);
-		for (i = 0; i < sony_buffer_sectors; i++)
-			if (sony_buffer[i]) 
-				kfree(sony_buffer[i]);
-		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
-		kfree(sony_buffer);
-		kfree(sony_toc);
-		kfree(last_sony_subcode);
-		unregister_blkdev(MAJOR_NR, CDU535_HANDLE);
-		devfs_unregister(sony_devfs_handle);
-		if (sony535_irq_used)
-			free_irq(sony535_irq_used, NULL);
-
-		return -EIO;
-		}
-	add_disk(&cdu_disk);
+		goto out7;
+	}
+	add_disk(cdu_disk);
 	return 0;
+
+out7:
+	put_disk(cdu_disk);
+out6:
+	for (i = 0; i < sony_buffer_sectors; i++)
+		if (sony_buffer[i]) 
+			kfree(sony_buffer[i]);
+out5:
+	kfree(sony_buffer);
+out4:
+	kfree(last_sony_subcode);
+out3:
+	kfree(sony_toc);
+out2:
+	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+	unregister_blkdev(MAJOR_NR, CDU535_HANDLE);
+out1:
+	devfs_unregister(sony_devfs_handle);
+	if (sony535_irq_used)
+		free_irq(sony535_irq_used, NULL);
+	return err;
+Enodev_irq:
+	if (sony535_irq_used)
+		free_irq(sony535_irq_used, NULL);
+Enodev:
+	printk("Did not find a " CDU535_MESSAGE_NAME " drive\n");
+	return -EIO;
 }
 
 #ifndef MODULE
@@ -1707,7 +1698,8 @@ static sony535_exit(void)
 	kfree(sony_toc);
 	devfs_find_and_unregister(NULL, CDU535_HANDLE, 0, 0,
 				  DEVFS_SPECIAL_BLK, 0);
-	del_gendisk(&cdu_disk);
+	del_gendisk(cdu_disk);
+	put_disk(cdu_disk);
 	if (unregister_blkdev(MAJOR_NR, CDU535_HANDLE) == -EINVAL)
 		printk("Uh oh, couldn't unregister " CDU535_HANDLE "\n");
 	else

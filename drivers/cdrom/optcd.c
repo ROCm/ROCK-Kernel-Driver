@@ -1997,13 +1997,7 @@ __setup("optcd=", optcd_setup);
 
 #endif /* MODULE */
 
-static struct gendisk optcd_disk = {
-	.major = MAJOR_NR,
-	.first_minor = 0,
-	.minor_shift = 0,
-	.fops = &opt_fops,
-	.disk_name = "optcd"
-};
+static struct gendisk *optcd_disk;
 
 /* Test for presence of drive and initialize it. Called at boot time
    or during module initialisation. */
@@ -2016,20 +2010,33 @@ static int __init optcd_init(void)
 			"optcd: no Optics Storage CDROM Initialization\n");
 		return -EIO;
 	}
+	optcd_disk = alloc_disk();
+	if (!optcd_disk) {
+		printk(KERN_ERR "optcd: can't allocate disk\n");
+		return -ENOMEM;
+	}
+	optcd_disk->major = MAJOR_NR;
+	optcd_disk->first_minor = 0;
+	optcd_disk->minor_shift = 0;
+	optcd_disk->fops = &opt_fops;
+	sprintf(optcd_disk->disk_name, "optcd");
 	if (!request_region(optcd_port, 4, "optcd")) {
 		printk(KERN_ERR "optcd: conflict, I/O port 0x%x already used\n",
 			optcd_port);
+		put_disk(optcd_disk);
 		return -EIO;
 	}
 
 	if (!reset_drive()) {
 		printk(KERN_ERR "optcd: drive at 0x%x not ready\n", optcd_port);
 		release_region(optcd_port, 4);
+		put_disk(optcd_disk);
 		return -EIO;
 	}
 	if (!version_ok()) {
 		printk(KERN_ERR "optcd: unknown drive detected; aborting\n");
 		release_region(optcd_port, 4);
+		put_disk(optcd_disk);
 		return -EIO;
 	}
 	status = exec_cmd(COMINITDOUBLE);
@@ -2037,11 +2044,13 @@ static int __init optcd_init(void)
 		printk(KERN_ERR "optcd: cannot init double speed mode\n");
 		release_region(optcd_port, 4);
 		DEBUG((DEBUG_VFS, "exec_cmd COMINITDOUBLE: %02x", -status));
+		put_disk(optcd_disk);
 		return -EIO;
 	}
 	if (register_blkdev(MAJOR_NR, "optcd", &opt_fops) != 0) {
 		printk(KERN_ERR "optcd: unable to get major %d\n", MAJOR_NR);
 		release_region(optcd_port, 4);
+		put_disk(optcd_disk);
 		return -EIO;
 	}
 	devfs_register (NULL, "optcd", DEVFS_FL_DEFAULT, MAJOR_NR, 0,
@@ -2049,7 +2058,7 @@ static int __init optcd_init(void)
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_optcd_request,
 		       &optcd_lock);
 	blk_queue_hardsect_size(BLK_DEFAULT_QUEUE(MAJOR_NR), 2048);
-	add_disk(&optcd_disk);
+	add_disk(optcd_disk);
 
 	printk(KERN_INFO "optcd: DOLPHIN 8000 AT CDROM at 0x%x\n", optcd_port);
 	return 0;
@@ -2059,7 +2068,8 @@ static int __init optcd_init(void)
 static void __exit optcd_exit(void)
 {
 	devfs_find_and_unregister(NULL, "optcd", 0, 0, DEVFS_SPECIAL_BLK, 0);
-	del_gendisk(&optcd_disk);
+	del_gendisk(optcd_disk);
+	put_disk(optcd_disk);
 	if (unregister_blkdev(MAJOR_NR, "optcd") == -EINVAL) {
 		printk(KERN_ERR "optcd: what's that: can't unregister\n");
 		return;
