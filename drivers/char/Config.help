@@ -425,6 +425,24 @@ CONFIG_ISTALLION
   read <file:Documentation/modules.txt>. The module will be called
   istallion.o.
 
+CONFIG_SERIAL_TX3912
+  The TX3912 is a Toshiba RISC processor based o the MIPS 3900 core;
+  see <http://www.toshiba.com/taec/components/Generic/risc/tx3912.htm>.
+  Say Y here to enable kernel support for the on-board serial port.
+
+CONFIG_SERIAL_TX3912_CONSOLE
+  The TX3912 is a Toshiba RISC processor based o the MIPS 3900 core;
+  see <http://www.toshiba.com/taec/components/Generic/risc/tx3912.htm>.
+  Say Y here to direct console I/O to the on-board serial port.
+
+CONFIG_AU1000_SERIAL_CONSOLE
+  If you have an Alchemy AU1000 processor (MIPS based) and you want
+  to use a console on a serial port, say Y.  Otherwise, say N.
+
+CONFIG_AU1000_UART
+  If you have an Alchemy AU1000 processor (MIPS based) and you want
+  to use serial ports, say Y.  Otherwise, say N.
+
 CONFIG_SYNCLINK
   Provides support for the SyncLink ISA and PCI multiprotocol serial
   adapters. These adapters support asynchronous and HDLC bit
@@ -941,6 +959,11 @@ CONFIG_W83877F_WDT
   The module is called mixcomwd.o.  If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.  Most
   people will say N.
+
+CONFIG_EUROTECH_WDT
+  Enable support for the watchdog timer on the Eurotech CPU-1220 and
+  CPU-1410 cards.  These are PC/104 SBCs. Spec sheets and product
+  information are at <http://www.eurotech.it/>.
 
 CONFIG_IB700_WDT
   This is the driver for the hardware watchdog on the IB700 Single
