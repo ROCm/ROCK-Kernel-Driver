@@ -6,7 +6,7 @@
  */
 #include <linux/config.h>
 #include <linux/errno.h>
-#include <linux/sched.h>
+#include <linux/thread_info.h>
 #include <linux/prefetch.h>
 #include <asm/page.h>
 
