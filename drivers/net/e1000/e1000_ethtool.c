@@ -249,7 +249,8 @@ e1000_set_pauseparam(struct net_device *netdev,
 			e1000_reset(adapter);
 	}
 	else
-		return e1000_force_mac_fc(hw);
+		return ((hw->media_type == e1000_media_type_fiber) ?
+			e1000_setup_link(hw) : e1000_force_mac_fc(hw));
 	
 	return 0;
 }
