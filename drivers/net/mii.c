@@ -130,14 +130,14 @@ int mii_ethtool_sset(struct mii_if_info *mii, struct ethtool_cmd *ecmd)
 		bmcr = mii->mdio_read(dev, mii->phy_id, MII_BMCR);
 		tmp = bmcr & ~(BMCR_ANENABLE | BMCR_SPEED100 | BMCR_FULLDPLX);
 		if (ecmd->speed == SPEED_100)
-			bmcr |= BMCR_SPEED100;
+			tmp |= BMCR_SPEED100;
 		if (ecmd->duplex == DUPLEX_FULL) {
-			bmcr |= BMCR_FULLDPLX;
+			tmp |= BMCR_FULLDPLX;
 			mii->full_duplex = 1;
 		} else
 			mii->full_duplex = 0;
 		if (bmcr != tmp)
-			mii->mdio_write(dev, mii->phy_id, MII_BMCR, bmcr);
+			mii->mdio_write(dev, mii->phy_id, MII_BMCR, tmp);
 
 		mii->duplex_lock = 1;
 	}
