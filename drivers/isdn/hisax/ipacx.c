@@ -432,13 +432,7 @@ dch_int(struct IsdnCardState *cs)
         cs->tx_cnt = 0;
       }
     }
-    if ((cs->tx_skb = skb_dequeue(&cs->sq))) {
-      cs->tx_cnt = 0;
-      dch_fill_fifo(cs);
-    } 
-    else {
-      sched_d_event(cs, D_XMTBUFREADY);
-    }  
+    xmit_ready(cs);
   }  
   afterXPR:
 
@@ -472,7 +466,7 @@ dch_init(struct IsdnCardState *cs)
 
 	INIT_WORK(&cs->work, dch_bh, cs);
 	cs->setstack_d      = dch_setstack;
-  
+	cs->DC_Send_Data = dch_fill_fifo;
 	cs->dbusytimer.function = (void *) dbusy_timer_handler;
 	cs->dbusytimer.data = (long) cs;
 	init_timer(&cs->dbusytimer);

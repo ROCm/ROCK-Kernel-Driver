@@ -73,6 +73,19 @@ xmit_ready_b(struct BCState *bcs)
 	}
 }
 
+/* called with the card lock held */
+static inline void
+xmit_ready_d(struct IsdnCardState *cs)
+{
+	cs->tx_skb = skb_dequeue(&cs->sq);
+	if (cs->tx_skb) {
+		cs->tx_cnt = 0;
+		cs->DC_Send_Data(cs);
+	} else {
+		sched_d_event(cs, D_XMTBUFREADY);
+	}
+}
+
 static inline void
 xmit_data_req_b(struct BCState *bcs, struct sk_buff *skb)
 {

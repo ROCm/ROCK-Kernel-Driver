@@ -868,16 +868,7 @@ hfcsx_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 					cs->tx_skb = NULL;
 				}
 			}
-			if ((cs->tx_skb = skb_dequeue(&cs->sq))) {
-				cs->tx_cnt = 0;
-				if (!test_and_set_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags)) {
-					hfcsx_fill_dfifo(cs);
-					test_and_clear_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags);
-				} else {
-					debugl1(cs, "hfcsx_fill_dfifo irq blocked");
-				}
-			} else
-				sched_d_event(cs, D_XMTBUFREADY);
+			xmit_ready_d(cs);
 		}
 	      afterXPR:
 		if (cs->hw.hfcsx.int_s1 && count--) {
@@ -1349,6 +1340,7 @@ inithfcsx(struct IsdnCardState *cs)
 	init_timer(&cs->dbusytimer);
 	INIT_WORK(&cs->work, hfcsx_bh, cs);
 	cs->BC_Send_Data = &hfcsx_send_data;
+	cs->DC_Send_Data = &hfcsx_fill_dfifo;
 	cs->bcs[0].BC_SetStack = setstack_2b;
 	cs->bcs[1].BC_SetStack = setstack_2b;
 	cs->bcs[0].BC_Close = close_hfcsx;

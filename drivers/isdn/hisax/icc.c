@@ -237,11 +237,7 @@ icc_interrupt(struct IsdnCardState *cs, u_char val)
 				cs->tx_skb = NULL;
 			}
 		}
-		if ((cs->tx_skb = skb_dequeue(&cs->sq))) {
-			cs->tx_cnt = 0;
-			icc_fill_fifo(cs);
-		} else
-			sched_d_event(cs, D_XMTBUFREADY);
+		xmit_ready_d(cs);
 	}
       afterXPR:
 	if (val & 0x04) {	/* CISQ */
@@ -599,6 +595,7 @@ initicc(struct IsdnCardState *cs)
 
 	INIT_WORK(&cs->work, icc_bh, cs);
 	cs->setstack_d = setstack_icc;
+	cs->DC_Send_Data = icc_fill_fifo;
 	cs->DC_Close = DC_Close_icc;
 	cs->dc.icc.mon_tx = NULL;
 	cs->dc.icc.mon_rx = NULL;

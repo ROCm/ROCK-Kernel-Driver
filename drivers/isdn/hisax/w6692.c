@@ -369,11 +369,7 @@ W6692_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 				cs->tx_skb = NULL;
 			}
 		}
-		if ((cs->tx_skb = skb_dequeue(&cs->sq))) {
-			cs->tx_cnt = 0;
-			W6692_fill_fifo(cs);
-		} else
-			sched_d_event(cs, D_XMTBUFREADY);
+		xmit_ready_d(cs);
 	}
       afterXFR:
 	if (val & (W_INT_XINT0 | W_INT_XINT1)) {	/* XINT0/1 - never */
@@ -946,6 +942,7 @@ setup_w6692(struct IsdnCard *card)
 	cs->BC_Read_Reg = &ReadW6692B;
 	cs->BC_Write_Reg = &WriteW6692B;
 	cs->BC_Send_Data = &W6692B_fill_fifo;
+	cs->DC_Send_Data = &W6692_fill_fifo;
 	cs->cardmsg = &w6692_card_msg;
 	cs->irq_func = &W6692_interrupt;
 	cs->irq_flags |= SA_SHIRQ;

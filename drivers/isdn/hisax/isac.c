@@ -22,7 +22,6 @@
 
 #define DBUSY_TIMER_VALUE 80
 #define ARCOFI_USE 1
-static spinlock_t isac_lock = SPIN_LOCK_UNLOCKED;
 
 static char *ISACVer[] __devinitdata =
 {"2086/2186 V1.1", "2085 B1", "2085 B2",
@@ -118,7 +117,6 @@ void
 isac_empty_fifo(struct IsdnCardState *cs, int count)
 {
 	u_char *ptr;
-	unsigned long flags;
 
 	if ((cs->debug & L1_DEB_ISAC) && !(cs->debug & L1_DEB_ISAC_FIFO))
 		debugl1(cs, "isac_empty_fifo");
@@ -133,10 +131,8 @@ isac_empty_fifo(struct IsdnCardState *cs, int count)
 	}
 	ptr = cs->rcvbuf + cs->rcvidx;
 	cs->rcvidx += count;
-	spin_lock_irqsave(&isac_lock, flags);
 	cs->readisacfifo(cs, ptr, count);
 	cs->writeisac(cs, ISAC_CMDR, 0x80);
-	spin_unlock_irqrestore(&isac_lock, flags);
 	if (cs->debug & L1_DEB_ISAC_FIFO) {
 		char *t = cs->dlog;
 
@@ -151,13 +147,11 @@ isac_fill_fifo(struct IsdnCardState *cs)
 {
 	int count, more;
 	unsigned char *p;
-	unsigned long flags;
 
 	p = xmit_fill_fifo_d(cs, 32, &count, &more);
 	if (!p)
 		return;
 
-	spin_lock_irqsave(&isac_lock, flags);
 	cs->writeisacfifo(cs, p, count);
 	cs->writeisac(cs, ISAC_CMDR, more ? 0x8 : 0xa);
 	if (test_and_set_bit(FLG_DBUSY_TIMER, &cs->HW_Flags)) {
@@ -167,7 +161,6 @@ isac_fill_fifo(struct IsdnCardState *cs)
 	init_timer(&cs->dbusytimer);
 	cs->dbusytimer.expires = jiffies + ((DBUSY_TIMER_VALUE * HZ)/1000);
 	add_timer(&cs->dbusytimer);
-	spin_unlock_irqrestore(&isac_lock, flags);
 }
 
 void
@@ -176,7 +169,6 @@ isac_interrupt(struct IsdnCardState *cs, u_char val)
 	u_char exval, v1;
 	struct sk_buff *skb;
 	unsigned int count;
-	unsigned long flags;
 
 	if (cs->debug & L1_DEB_ISAC)
 		debugl1(cs, "ISAC interrupt %x", val);
@@ -203,7 +195,6 @@ isac_interrupt(struct IsdnCardState *cs, u_char val)
 			if (count == 0)
 				count = 32;
 			isac_empty_fifo(cs, count);
-			spin_lock_irqsave(&isac_lock, flags);
 			if ((count = cs->rcvidx) > 0) {
 				cs->rcvidx = 0;
 				if (!(skb = alloc_skb(count, GFP_ATOMIC)))
@@ -213,7 +204,6 @@ isac_interrupt(struct IsdnCardState *cs, u_char val)
 					skb_queue_tail(&cs->rq, skb);
 				}
 			}
-			spin_unlock_irqrestore(&isac_lock, flags);
 		}
 		cs->rcvidx = 0;
 		sched_d_event(cs, D_RCVBUFREADY);
@@ -241,11 +231,7 @@ isac_interrupt(struct IsdnCardState *cs, u_char val)
 				cs->tx_skb = NULL;
 			}
 		}
-		if ((cs->tx_skb = skb_dequeue(&cs->sq))) {
-			cs->tx_cnt = 0;
-			isac_fill_fifo(cs);
-		} else
-			sched_d_event(cs, D_XMTBUFREADY);
+		xmit_ready_d(cs);
 	}
       afterXPR:
 	if (val & 0x04) {	/* CISQ */
@@ -616,6 +602,7 @@ initisac(struct IsdnCardState *cs)
 
 	INIT_WORK(&cs->work, isac_bh, cs);
 	cs->setstack_d = setstack_isac;
+	cs->DC_Send_Data = isac_fill_fifo;
 	cs->DC_Close = DC_Close_isac;
 	cs->dc.isac.mon_tx = NULL;
 	cs->dc.isac.mon_rx = NULL;

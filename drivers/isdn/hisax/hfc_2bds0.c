@@ -916,16 +916,7 @@ hfc2bds0_interrupt(struct IsdnCardState *cs, u_char val)
 					cs->tx_skb = NULL;
 				}
 			}
-			if ((cs->tx_skb = skb_dequeue(&cs->sq))) {
-				cs->tx_cnt = 0;
-				if (!test_and_set_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags)) {
-					hfc_fill_dfifo(cs);
-					test_and_clear_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags);
-				} else {
-					debugl1(cs, "hfc_fill_dfifo irq blocked");
-				}
-			} else
-				sched_d_event(cs, D_XMTBUFREADY);
+			xmit_ready(cs);
 		}
       afterXPR:
 		if (cs->hw.hfcD.int_s1 && count--) {
@@ -1073,7 +1064,8 @@ init2bds0(struct IsdnCardState *cs)
 		cs->bcs[0].hw.hfc.send = init_send_hfcd(32);
 	if (!cs->bcs[1].hw.hfc.send)
 		cs->bcs[1].hw.hfc.send = init_send_hfcd(32);
-	cs->BC_Send_Data = &hfc_send_data;
+	cs->BC_Send_Data = hfc_send_data;
+	cs->DC_Send_Data = hfc_fill_dfifo;
 	cs->bcs[0].BC_SetStack = setstack_2b;
 	cs->bcs[1].BC_SetStack = setstack_2b;
 	cs->bcs[0].BC_Close = close_2bs0;

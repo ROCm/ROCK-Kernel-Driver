@@ -1143,7 +1143,6 @@ isar_int_main(struct IsdnCardState *cs)
 	struct isar_reg *ireg = cs->bcs[0].hw.isar.reg;
 	struct BCState *bcs;
 
-	spin_lock(&cs->lock);
 	get_irq_infos(cs, ireg);
 	switch (ireg->iis & ISAR_IIS_MSCMSD) {
 		case ISAR_IIS_RDATA:
@@ -1229,7 +1228,6 @@ isar_int_main(struct IsdnCardState *cs)
 					ireg->iis, ireg->cmsb, ireg->clsb);
 			break;
 	}
-	spin_unlock(&cs->lock);
 }
 
 static void

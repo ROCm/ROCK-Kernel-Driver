@@ -925,6 +925,7 @@ struct IsdnCardState {
 	void   (*BC_Send_Data) (struct BCState *);
 	int    (*cardmsg) (struct IsdnCardState *, int, void *);
 	void   (*setstack_d) (struct PStack *, struct IsdnCardState *);
+	void   (*DC_Send_Data) (struct IsdnCardState *);
 	void   (*DC_Close) (struct IsdnCardState *);
 	void   (*irq_func) (int, void *, struct pt_regs *);
 	int    (*auxcmd) (struct IsdnCardState *, isdn_ctrl *);

@@ -133,10 +133,7 @@ saphir_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	struct IsdnCardState *cs = dev_id;
 	u_char val;
 
-	if (!cs) {
-		printk(KERN_WARNING "saphir: Spurious interrupt!\n");
-		return;
-	}
+	spin_lock(&cs->lock);
 	val = readreg(cs->hw.saphir.ale, cs->hw.saphir.hscx, HSCX_ISTA + 0x40);
       Start_HSCX:
 	if (val)
@@ -168,6 +165,7 @@ saphir_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	writereg(cs->hw.saphir.ale, cs->hw.saphir.isac, ISAC_MASK, 0);
 	writereg(cs->hw.saphir.ale, cs->hw.saphir.hscx, HSCX_MASK, 0);
 	writereg(cs->hw.saphir.ale, cs->hw.saphir.hscx, HSCX_MASK + 0x40, 0);
+	spin_unlock(&cs->lock);
 }
 
 static void

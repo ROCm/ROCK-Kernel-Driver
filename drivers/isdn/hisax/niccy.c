@@ -147,11 +147,8 @@ niccy_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
 	u_char val;
-
-	if (!cs) {
-		printk(KERN_WARNING "Niccy: Spurious interrupt!\n");
-		return;
-	}
+	
+	spin_lock(&cs->lock);
 	if (cs->subtyp == NICCY_PCI) {
 		int ival;
 		ival = inl(cs->hw.niccy.cfg_reg + PCI_IRQ_CTRL_REG);
@@ -185,6 +182,7 @@ niccy_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	writereg(cs->hw.niccy.isac_ale, cs->hw.niccy.isac, ISAC_MASK, 0);
 	writereg(cs->hw.niccy.hscx_ale, cs->hw.niccy.hscx, HSCX_MASK, 0);
 	writereg(cs->hw.niccy.hscx_ale, cs->hw.niccy.hscx, HSCX_MASK + 0x40, 0);
+	spin_unlock(&cs->lock);
 }
 
 void

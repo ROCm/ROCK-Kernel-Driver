@@ -106,10 +106,7 @@ avm_a1_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	struct IsdnCardState *cs = dev_id;
 	u_char val, sval;
 
-	if (!cs) {
-		printk(KERN_WARNING "AVM A1: Spurious interrupt!\n");
-		return;
-	}
+	spin_lock(&cs->lock);
 	while (((sval = bytein(cs->hw.avm.cfg_reg)) & 0xf) != 0x7) {
 		if (!(sval & AVM_A1_STAT_TIMER)) {
 			byteout(cs->hw.avm.cfg_reg, 0x1E);
@@ -133,6 +130,7 @@ avm_a1_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	writereg(cs->hw.avm.isac, ISAC_MASK, 0x0);
 	writereg(cs->hw.avm.hscx[0], HSCX_MASK, 0x0);
 	writereg(cs->hw.avm.hscx[1], HSCX_MASK, 0x0);
+	spin_unlock(&cs->lock);
 }
 
 inline static void

@@ -172,10 +172,7 @@ TeleInt_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	struct IsdnCardState *cs = dev_id;
 	u_char val;
 
-	if (!cs) {
-		printk(KERN_WARNING "TeleInt: Spurious interrupt!\n");
-		return;
-	}
+	spin_lock(&cs->lock);
 	val = readreg(cs->hw.hfc.addr | 1, cs->hw.hfc.addr, ISAC_ISTA);
       Start_ISAC:
 	if (val)
@@ -188,6 +185,7 @@ TeleInt_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	}
 	writereg(cs->hw.hfc.addr | 1, cs->hw.hfc.addr, ISAC_MASK, 0xFF);
 	writereg(cs->hw.hfc.addr | 1, cs->hw.hfc.addr, ISAC_MASK, 0x0);
+	spin_unlock(&cs->lock);
 }
 
 static void

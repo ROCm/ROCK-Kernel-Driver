@@ -369,11 +369,7 @@ sedlbauer_interrupt_isar(int intno, void *dev_id, struct pt_regs *regs)
 	u_char val;
 	int cnt = 5;
 
-	if (!cs) {
-		printk(KERN_WARNING "Sedlbauer: Spurious interrupt!\n");
-		return;
-	}
-
+	spin_lock(&cs->lock);
 	val = readreg(cs->hw.sedl.adr, cs->hw.sedl.hscx, ISAR_IRQBIT);
       Start_ISAR:
 	if (val & ISAR_IRQSTA)
@@ -402,6 +398,7 @@ sedlbauer_interrupt_isar(int intno, void *dev_id, struct pt_regs *regs)
 	writereg(cs->hw.sedl.adr, cs->hw.sedl.isac, ISAC_MASK, 0xFF);
 	writereg(cs->hw.sedl.adr, cs->hw.sedl.isac, ISAC_MASK, 0x0);
 	writereg(cs->hw.sedl.adr, cs->hw.sedl.hscx, ISAR_IRQBIT, ISAR_IRQMSK);
+	spin_unlock(&cs->lock);
 }
 
 void

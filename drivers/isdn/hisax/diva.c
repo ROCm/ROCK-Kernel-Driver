@@ -307,10 +307,7 @@ diva_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	u_char val, sval;
 	int cnt=5;
 
-	if (!cs) {
-		printk(KERN_WARNING "Diva: Spurious interrupt!\n");
-		return;
-	}
+	spin_lock(&cs->lock);
 	while (((sval = bytein(cs->hw.diva.ctrl)) & DIVA_IRQ_REQ) && cnt) {
 		val = readreg(cs->hw.diva.hscx_adr, cs->hw.diva.hscx, HSCX_ISTA + 0x40);
 		if (val)
@@ -328,6 +325,7 @@ diva_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	writereg(cs->hw.diva.isac_adr, cs->hw.diva.isac, ISAC_MASK, 0x0);
 	writereg(cs->hw.diva.hscx_adr, cs->hw.diva.hscx, HSCX_MASK, 0x0);
 	writereg(cs->hw.diva.hscx_adr, cs->hw.diva.hscx, HSCX_MASK + 0x40, 0x0);
+	spin_unlock(&cs->lock);
 }
 
 static void

@@ -170,7 +170,6 @@ jade_int_main(struct IsdnCardState *cs, u_char val, int jade)
 	struct BCState *bcs;
 	bcs = cs->bcs + jade;
 	
-	spin_lock(&cs->lock);
 	if (val & jadeISR_RFO) {
 		/* handled with RDO */
 		val &= ~jadeISR_RFO;
@@ -183,5 +182,4 @@ jade_int_main(struct IsdnCardState *cs, u_char val, int jade)
 			debugl1(cs, "JADE %c interrupt %x", 'A'+jade, val);
 		jade_interrupt(cs, val, jade);
 	}
-	spin_unlock(&cs->lock);
 }

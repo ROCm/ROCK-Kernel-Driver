@@ -137,10 +137,7 @@ mic_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	struct IsdnCardState *cs = dev_id;
 	u_char val;
 
-	if (!cs) {
-		printk(KERN_WARNING "mic: Spurious interrupt!\n");
-		return;
-	}
+	spin_lock(&cs->lock);
 	val = readreg(cs->hw.mic.adr, cs->hw.mic.hscx, HSCX_ISTA + 0x40);
       Start_HSCX:
 	if (val)
@@ -167,6 +164,7 @@ mic_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	writereg(cs->hw.mic.adr, cs->hw.mic.isac, ISAC_MASK, 0x0);
 	writereg(cs->hw.mic.adr, cs->hw.mic.hscx, HSCX_MASK, 0x0);
 	writereg(cs->hw.mic.adr, cs->hw.mic.hscx, HSCX_MASK + 0x40, 0x0);
+	spin_unlock(&cs->lock);
 }
 
 void

@@ -89,11 +89,7 @@ isurf_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	u_char val;
 	int cnt = 5;
 
-	if (!cs) {
-		printk(KERN_WARNING "ISurf: Spurious interrupt!\n");
-		return;
-	}
-
+	spin_lock(&cs->lock);
 	val = readb(cs->hw.isurf.isar + ISAR_IRQBIT);
       Start_ISAR:
 	if (val & ISAR_IRQSTA)
@@ -121,6 +117,7 @@ isurf_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	writeb(0xFF, cs->hw.isurf.isac + ISAC_MASK);mb();
 	writeb(0, cs->hw.isurf.isac + ISAC_MASK);mb();
 	writeb(ISAR_IRQMSK, cs->hw.isurf.isar + ISAR_IRQBIT); mb();
+	spin_unlock(&cs->lock);
 }
 
 void

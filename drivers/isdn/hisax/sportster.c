@@ -104,10 +104,7 @@ sportster_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	struct IsdnCardState *cs = dev_id;
 	u_char val;
 
-	if (!cs) {
-		printk(KERN_WARNING "Sportster: Spurious interrupt!\n");
-		return;
-	}
+	spin_lock(&cs->lock);
 	val = READHSCX(cs, 1, HSCX_ISTA);
       Start_HSCX:
 	if (val)
@@ -130,6 +127,7 @@ sportster_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	}
 	/* get a new irq impulse if there any pending */
 	bytein(cs->hw.spt.cfg_reg + SPORTSTER_RES_IRQ +1);
+	spin_unlock(&cs->lock);
 }
 
 void
