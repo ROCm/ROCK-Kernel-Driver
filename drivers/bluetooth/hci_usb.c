@@ -76,14 +76,15 @@ static struct usb_device_id bluetooth_ids[] = {
 	/* AVM BlueFRITZ! USB v2.0 */
 	{ USB_DEVICE(0x057c, 0x3800) },
 
-	/* Ericsson with non-standard id */
-	{ USB_DEVICE(0x0bdb, 0x1002) },
-
-	/* ALPS Module with non-standard id */
-	{ USB_DEVICE(0x044e, 0x3002) },
-
 	/* Bluetooth Ultraport Module from IBM */
 	{ USB_DEVICE(0x04bf, 0x030a) },
+
+	/* ALPS Modules with non-standard id */
+	{ USB_DEVICE(0x044e, 0x3001) },
+	{ USB_DEVICE(0x044e, 0x3002) },
+
+	/* Ericsson with non-standard id */
+	{ USB_DEVICE(0x0bdb, 0x1002) },
 
 	{ }	/* Terminating entry */
 };
