@@ -1827,14 +1827,16 @@ generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
 		 */
 		if (written >= 0 && file->f_flags & O_SYNC)
 			status = generic_osync_inode(inode, mapping, OSYNC_METADATA);
-		if (written >= 0 && !is_sync_kiocb(iocb))
+		if (written == count && !is_sync_kiocb(iocb))
 			written = -EIOCBQUEUED;
-		if (written != -ENOTBLK)
+		if (written < 0 || written == count)
 			goto out_status;
 		/*
 		 * direct-io write to a hole: fall through to buffered I/O
+		 * for completing the rest of the request.
 		 */
-		written = 0;
+		pos += written;
+		count -= written;
 	}
 
 	buf = iov->iov_base;
