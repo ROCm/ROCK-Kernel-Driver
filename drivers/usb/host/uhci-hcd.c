@@ -1,7 +1,7 @@
 /*
  * Universal Host Controller Interface driver for USB.
  *
- * Maintainer: Johannes Erdfelt <johannes@erdfelt.com>
+ * Maintainer: Alan Stern <stern@rowland.harvard.edu>
  *
  * (C) Copyright 1999 Linus Torvalds
  * (C) Copyright 1999-2002 Johannes Erdfelt, johannes@erdfelt.com
