@@ -34,8 +34,8 @@
 #include <linux/slab.h>
 #include <linux/random.h>
 #include <linux/jhash.h>
-/* For ERR_PTR().  Yeah, I know... --RR */
-#include <linux/fs.h>
+#include <linux/err.h>
+#include <linux/moduleparam.h>
 
 /* This rwlock protects the main hash table, protocol/helper/expected
    registrations, conntrack timers*/
@@ -1373,7 +1373,7 @@ void ip_conntrack_cleanup(void)
 }
 
 static int hashsize;
-MODULE_PARM(hashsize, "i");
+module_param(hashsize, int, 0400);
 
 int __init ip_conntrack_init(void)
 {

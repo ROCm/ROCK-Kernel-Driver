@@ -34,8 +34,8 @@
  * by that factor.
  *
  * flushtimeout:
- *   Specify, after how many clock ticks (intel: 100 per second) the queue
- * should be flushed even if it is not full yet.
+ *   Specify, after how many hundredths of a second the queue should be
+ *   flushed even if it is not full yet.
  *
  * ipt_ULOG.c,v 1.22 2002/10/30 09:07:31 laforge Exp
  */
@@ -50,6 +50,7 @@
 #include <linux/netlink.h>
 #include <linux/netdevice.h>
 #include <linux/mm.h>
+#include <linux/moduleparam.h>
 #include <linux/netfilter.h>
 #include <linux/netfilter_ipv4/ip_tables.h>
 #include <linux/netfilter_ipv4/ipt_ULOG.h>
@@ -74,15 +75,15 @@ MODULE_DESCRIPTION("iptables userspace logging module");
 #define PRINTR(format, args...) do { if (net_ratelimit()) printk(format , ## args); } while (0)
 
 static unsigned int nlbufsiz = 4096;
-MODULE_PARM(nlbufsiz, "i");
+module_param(nlbufsiz, uint, 0600); /* FIXME: Check size < 128k --RR */
 MODULE_PARM_DESC(nlbufsiz, "netlink buffer size");
 
-static unsigned int flushtimeout = 10 * HZ;
-MODULE_PARM(flushtimeout, "i");
-MODULE_PARM_DESC(flushtimeout, "buffer flush timeout");
+static unsigned int flushtimeout = 10;
+module_param(flushtimeout, int, 0600);
+MODULE_PARM_DESC(flushtimeout, "buffer flush timeout (hundredths of a second)");
 
 static unsigned int nflog = 1;
-MODULE_PARM(nflog, "i");
+module_param(nflog, int, 0400);
 MODULE_PARM_DESC(nflog, "register as internal netfilter logging module");
 
 /* global data structures */
@@ -264,7 +265,7 @@ static void ipt_ulog_packet(unsigned int hooknum,
 
 	/* if timer isn't already running, start it */
 	if (!timer_pending(&ub->timer)) {
-		ub->timer.expires = jiffies + flushtimeout;
+		ub->timer.expires = jiffies + flushtimeout * HZ / 100;
 		add_timer(&ub->timer);
 	}
 

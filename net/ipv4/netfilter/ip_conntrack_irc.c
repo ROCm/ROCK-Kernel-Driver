@@ -32,6 +32,7 @@
 #include <linux/netfilter_ipv4/lockhelp.h>
 #include <linux/netfilter_ipv4/ip_conntrack_helper.h>
 #include <linux/netfilter_ipv4/ip_conntrack_irc.h>
+#include <linux/moduleparam.h>
 
 #define MAX_PORTS 8
 static int ports[MAX_PORTS];
@@ -44,11 +45,11 @@ static char irc_buffer[65536];
 MODULE_AUTHOR("Harald Welte <laforge@netfilter.org>");
 MODULE_DESCRIPTION("IRC (DCC) connection tracking helper");
 MODULE_LICENSE("GPL");
-MODULE_PARM(ports, "1-" __MODULE_STRING(MAX_PORTS) "i");
+module_param_array(ports, int, ports_c, 0400);
 MODULE_PARM_DESC(ports, "port numbers of IRC servers");
-MODULE_PARM(max_dcc_channels, "i");
+module_param(max_dcc_channels, int, 0400);
 MODULE_PARM_DESC(max_dcc_channels, "max number of expected DCC channels per IRC session");
-MODULE_PARM(dcc_timeout, "i");
+module_param(dcc_timeout, int, 0400);
 MODULE_PARM_DESC(dcc_timeout, "timeout on for unestablished DCC channels");
 
 static char *dccprotos[] = { "SEND ", "CHAT ", "MOVE ", "TSEND ", "SCHAT " };
@@ -252,10 +253,10 @@ static int __init init(void)
 	}
 	
 	/* If no port given, default to standard irc port */
-	if (ports[0] == 0)
-		ports[0] = IRC_PORT;
+	if (ports_c == 0)
+		ports[ports_c++] = IRC_PORT;
 
-	for (i = 0; (i < MAX_PORTS) && ports[i]; i++) {
+	for (i = 0; i < ports_c; i++) {
 		hlpr = &irc_helpers[i];
 		hlpr->tuple.src.u.tcp.port = htons(ports[i]);
 		hlpr->tuple.dst.protonum = IPPROTO_TCP;
@@ -284,7 +285,6 @@ static int __init init(void)
 			fini();
 			return -EBUSY;
 		}
-		ports_c++;
 	}
 	return 0;
 }

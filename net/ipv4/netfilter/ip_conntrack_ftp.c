@@ -19,6 +19,7 @@
 #include <linux/netfilter_ipv4/lockhelp.h>
 #include <linux/netfilter_ipv4/ip_conntrack_helper.h>
 #include <linux/netfilter_ipv4/ip_conntrack_ftp.h>
+#include <linux/moduleparam.h>
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Rusty Russell <rusty@rustcorp.com.au>");
@@ -33,10 +34,10 @@ struct module *ip_conntrack_ftp = THIS_MODULE;
 #define MAX_PORTS 8
 static int ports[MAX_PORTS];
 static int ports_c;
-MODULE_PARM(ports, "1-" __MODULE_STRING(MAX_PORTS) "i");
+module_param_array(ports, int, ports_c, 0400);
 
 static int loose;
-MODULE_PARM(loose, "i");
+module_param(loose, int, 0600);
 
 #if 0
 #define DEBUGP printk
@@ -420,10 +421,10 @@ static int __init init(void)
 	int i, ret;
 	char *tmpname;
 
-	if (ports[0] == 0)
-		ports[0] = FTP_PORT;
+	if (ports_c == 0)
+		ports[ports_c++] = FTP_PORT;
 
-	for (i = 0; (i < MAX_PORTS) && ports[i]; i++) {
+	for (i = 0; i < ports_c; i++) {
 		ftp[i].tuple.src.u.tcp.port = htons(ports[i]);
 		ftp[i].tuple.dst.protonum = IPPROTO_TCP;
 		ftp[i].mask.src.u.tcp.port = 0xFFFF;
@@ -449,7 +450,6 @@ static int __init init(void)
 			fini();
 			return ret;
 		}
-		ports_c++;
 	}
 	return 0;
 }

@@ -28,7 +28,7 @@ MODULE_AUTHOR("Netfilter Core Team <coreteam@netfilter.org>");
 MODULE_DESCRIPTION("iptables syslog logging module");
 
 static unsigned int nflog = 1;
-MODULE_PARM(nflog, "i");
+module_param(nflog, int, 0400);
 MODULE_PARM_DESC(nflog, "register as internal netfilter logging module");
  
 #if 0

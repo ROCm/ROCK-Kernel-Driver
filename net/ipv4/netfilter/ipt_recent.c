@@ -15,6 +15,7 @@
 #include <linux/ctype.h>
 #include <linux/ip.h>
 #include <linux/vmalloc.h>
+#include <linux/moduleparam.h>
 
 #include <linux/netfilter_ipv4/ip_tables.h>
 #include <linux/netfilter_ipv4/ipt_recent.h>
@@ -37,12 +38,12 @@ KERN_INFO RECENT_NAME " " RECENT_VER ": Stephen Frost <sfrost@snowman.net>.  htt
 MODULE_AUTHOR("Stephen Frost <sfrost@snowman.net>");
 MODULE_DESCRIPTION("IP tables recently seen matching module " RECENT_VER);
 MODULE_LICENSE("GPL");
-MODULE_PARM(ip_list_tot,"i");
-MODULE_PARM(ip_pkt_list_tot,"i");
-MODULE_PARM(ip_list_hash_size,"i");
-MODULE_PARM(ip_list_perms,"i");
+module_param(ip_list_tot, int, 0400);
+module_param(ip_pkt_list_tot, int, 0400);
+module_param(ip_list_hash_size, int, 0400);
+module_param(ip_list_perms, int, 0400);
 #ifdef DEBUG
-MODULE_PARM(debug,"i");
+module_param(debug, int, 0600);
 MODULE_PARM_DESC(debug,"debugging level, defaults to 1");
 #endif
 MODULE_PARM_DESC(ip_list_tot,"number of IPs to remember per list");
