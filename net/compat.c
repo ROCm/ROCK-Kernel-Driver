@@ -125,7 +125,7 @@ int verify_compat_iovec(struct msghdr *kern_msg, struct iovec *kern_iov,
 	 (struct compat_cmsghdr __user *)NULL)
 
 #define CMSG_COMPAT_OK(ucmlen, ucmsg, mhdr) \
-	((ucmlen) >= sizeof(struct cmsghdr) && \
+	((ucmlen) >= sizeof(struct compat_cmsghdr) && \
 	 (ucmlen) <= (unsigned long) \
 	 ((mhdr)->msg_controllen - \
 	  ((char *)(ucmsg) - (char *)(mhdr)->msg_control)))
