@@ -1579,43 +1579,43 @@ typedef struct {
 } FILE_SYSTEM_ATTRIBUTE_INFO;
 
 typedef struct {		/* data block encoding of response to level 263 QPathInfo */
-	__u64 CreationTime;
-	__u64 LastAccessTime;
-	__u64 LastWriteTime;
-	__u64 ChangeTime;
-	__u32 Attributes;
+	__le64 CreationTime;
+	__le64 LastAccessTime;
+	__le64 LastWriteTime;
+	__le64 ChangeTime;
+	__le32 Attributes;
 	__u32 Pad1;
-	__u64 AllocationSize;
-	__u64 EndOfFile;	/* size ie offset to first free byte in file */
-	__u32 NumberOfLinks;	/* hard links */
+	__le64 AllocationSize;
+	__le64 EndOfFile;	/* size ie offset to first free byte in file */
+	__le32 NumberOfLinks;	/* hard links */
 	__u8 DeletePending;
 	__u8 Directory;
 	__u16 Pad2;
 	__u64 IndexNumber;
-	__u32 EASize;
-	__u32 AccessFlags;
+	__le32 EASize;
+	__le32 AccessFlags;
 	__u64 IndexNumber1;
-	__u64 CurrentByteOffset;
-	__u32 Mode;
-	__u32 AlignmentRequirement;
-	__u32 FileNameLength;
+	__le64 CurrentByteOffset;
+	__le32 Mode;
+	__le32 AlignmentRequirement;
+	__le32 FileNameLength;
 	char FileName[1];
 } FILE_ALL_INFO;		/* level 263 QPathInfo */
 
 typedef struct {
-	__u64 EndOfFile;
-	__u64 NumOfBytes;
-	__u64 LastStatusChange;	/*SNIA spec says DCE time for the three time fields */
-	__u64 LastAccessTime;
-	__u64 LastModificationTime;
-	__u64 Uid;
-	__u64 Gid;
-	__u32 Type;
-	__u64 DevMajor;
-	__u64 DevMinor;
+	__le64 EndOfFile;
+	__le64 NumOfBytes;
+	__le64 LastStatusChange;	/*SNIA spec says DCE time for the three time fields */
+	__le64 LastAccessTime;
+	__le64 LastModificationTime;
+	__le64 Uid;
+	__le64 Gid;
+	__le32 Type;
+	__le64 DevMajor;
+	__le64 DevMinor;
 	__u64 UniqueId;
-	__u64 Permissions;
-	__u64 Nlinks;
+	__le64 Permissions;
+	__le64 Nlinks;
 } FILE_UNIX_BASIC_INFO;		/* level 512 QPathInfo */
 
 typedef struct {
@@ -1645,30 +1645,30 @@ typedef struct {
 #define UNIX_SOCKET    6
 
 typedef struct {
-	__u32 NextEntryOffset;
-	__u32 ResumeKey;
-	__u64 EndOfFile;
-	__u64 NumOfBytes;
-	__u64 LastStatusChange;	/*SNIA spec says DCE time for the three time fields */
-	__u64 LastAccessTime;
-	__u64 LastModificationTime;
-	__u64 Uid;
-	__u64 Gid;
-	__u32 Type;
-	__u64 DevMajor;
-	__u64 DevMinor;
-	__u64 UniqueId;
-	__u64 Permissions;
-	__u64 Nlinks;
+	__le32 NextEntryOffset;
+	__le32 ResumeKey;
+	__le64 EndOfFile;
+	__le64 NumOfBytes;
+	__le64 LastStatusChange;	/*SNIA spec says DCE time for the three time fields */
+	__le64 LastAccessTime;
+	__le64 LastModificationTime;
+	__le64 Uid;
+	__le64 Gid;
+	__le32 Type;
+	__le64 DevMajor;
+	__le64 DevMinor;
+	__le64 UniqueId;
+	__le64 Permissions;
+	__le64 Nlinks;
 	char FileName[1];
 } FILE_UNIX_INFO;
 
 typedef struct {
-	__u64 CreationTime;
-	__u64 LastAccessTime;
-	__u64 LastWriteTime;
-	__u64 ChangeTime;
-	__u32 Attributes;
+	__le64 CreationTime;
+	__le64 LastAccessTime;
+	__le64 LastWriteTime;
+	__le64 ChangeTime;
+	__le32 Attributes;
 	__u32 Pad;
 } FILE_BASIC_INFO;		/* size info, level 0x101 */
 

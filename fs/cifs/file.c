@@ -1441,6 +1441,9 @@ unix_fill_in_inode(struct inode *tmp_inode,
 		   FILE_UNIX_INFO * pfindData, int *pobject_type)
 {
 	struct cifsInodeInfo *cifsInfo = CIFS_I(tmp_inode);
+	__u32 type = le32_to_cpu(pfindData->Type);
+	__u64 num_of_bytes = le64_to_cpu(pfindData->NumOfBytes);
+	__u64 end_of_file = le64_to_cpu(pfindData->EndOfFile);
 	cifsInfo->time = jiffies;
 	atomic_inc(&cifsInfo->inUse);
 
@@ -1452,30 +1455,29 @@ unix_fill_in_inode(struct inode *tmp_inode,
 	    cifs_NTtimeToUnix(le64_to_cpu(pfindData->LastStatusChange));
 
 	tmp_inode->i_mode = le64_to_cpu(pfindData->Permissions);
-	pfindData->Type = le32_to_cpu(pfindData->Type);
-	if (pfindData->Type == UNIX_FILE) {
+	if (type == UNIX_FILE) {
 		*pobject_type = DT_REG;
 		tmp_inode->i_mode |= S_IFREG;
-	} else if (pfindData->Type == UNIX_SYMLINK) {
+	} else if (type == UNIX_SYMLINK) {
 		*pobject_type = DT_LNK;
 		tmp_inode->i_mode |= S_IFLNK;
-	} else if (pfindData->Type == UNIX_DIR) {
+	} else if (type == UNIX_DIR) {
 		*pobject_type = DT_DIR;
 		tmp_inode->i_mode |= S_IFDIR;
-	} else if (pfindData->Type == UNIX_CHARDEV) {
+	} else if (type == UNIX_CHARDEV) {
 		*pobject_type = DT_CHR;
 		tmp_inode->i_mode |= S_IFCHR;
 		tmp_inode->i_rdev = MKDEV(le64_to_cpu(pfindData->DevMajor),
 				le64_to_cpu(pfindData->DevMinor) & MINORMASK);
-	} else if (pfindData->Type == UNIX_BLOCKDEV) {
+	} else if (type == UNIX_BLOCKDEV) {
 		*pobject_type = DT_BLK;
 		tmp_inode->i_mode |= S_IFBLK;
 		tmp_inode->i_rdev = MKDEV(le64_to_cpu(pfindData->DevMajor),
 				le64_to_cpu(pfindData->DevMinor) & MINORMASK);
-	} else if (pfindData->Type == UNIX_FIFO) {
+	} else if (type == UNIX_FIFO) {
 		*pobject_type = DT_FIFO;
 		tmp_inode->i_mode |= S_IFIFO;
-	} else if (pfindData->Type == UNIX_SOCKET) {
+	} else if (type == UNIX_SOCKET) {
 		*pobject_type = DT_SOCK;
 		tmp_inode->i_mode |= S_IFSOCK;
 	}
@@ -1484,17 +1486,15 @@ unix_fill_in_inode(struct inode *tmp_inode,
 	tmp_inode->i_gid = le64_to_cpu(pfindData->Gid);
 	tmp_inode->i_nlink = le64_to_cpu(pfindData->Nlinks);
 
-	pfindData->NumOfBytes = le64_to_cpu(pfindData->NumOfBytes);
 
 	if(is_size_safe_to_change(cifsInfo)) {
 		/* can not safely change the file size here if the 
 		client is writing to it due to potential races */
-		pfindData->EndOfFile = le64_to_cpu(pfindData->EndOfFile);
-		i_size_write(tmp_inode,pfindData->EndOfFile);
+		i_size_write(tmp_inode,end_of_file);
 
 	/* 512 bytes (2**9) is the fake blocksize that must be used */
 	/* for this calculation, not the real blocksize */
-		tmp_inode->i_blocks = (512 - 1 + pfindData->NumOfBytes) >> 9;
+		tmp_inode->i_blocks = (512 - 1 + num_of_bytes) >> 9;
 	}
 
 	if (S_ISREG(tmp_inode->i_mode)) {
