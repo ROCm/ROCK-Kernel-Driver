@@ -9,8 +9,8 @@
 	a complete program and may only be used when the entire operating
 	system is licensed under the GPL.
 
-	This driver is designed for the VIA VT86c100A Rhine-II PCI Fast Ethernet
-	controller.  It also works with the older 3043 Rhine-I chip.
+	This driver is designed for the VIA VT86C100A Rhine-I. 
+	It also works with the 6102 Rhine-II, and 6105/6105M Rhine-III.   
 
 	The author may be reached as becker@scyld.com, or C/O
 	Scyld Computing Corporation
@@ -81,14 +81,24 @@
 	- Add ethtool support
 	- Replace some MII-related magic numbers with constants
 	
-	LK1.1.14 (jgarzik):
-	- Merge new PCI id from 'linuxfet' driver.
+	LK1.1.14 (Ivan G.):
+ 	- fixes comments for Rhine-III
+	- removes W_MAX_TIMEOUT (unused)
+	- adds HasDavicomPhy for Rhine-I (basis: linuxfet driver; my card
+	  is R-I and has Davicom chip, flag is referenced in kernel driver)
+	- sends chip_id as a parameter to wait_for_reset since np is not
+	  initialized on first call
+	- changes mmio "else if (chip_id==VT6102)" to "else" so it will work
+	  for Rhine-III's (documentation says same bit is correct)		
+	- transmit frame queue message is off by one - fixed
+	- adds IntrNormalSummary to "Something Wicked" exclusion list
+	  so normal interrupts will not trigger the message (src: Donald Becker)
 
 */
 
 #define DRV_NAME	"via-rhine"
 #define DRV_VERSION	"1.1.14"
-#define DRV_RELDATE	"Feb-12-2002"
+#define DRV_RELDATE	"May-3-2002"
 
 
 /* A few user-configurable values.
@@ -139,9 +149,6 @@ static const int multicast_filter_limit = 32;
 
 #define PKT_BUF_SZ		1536			/* Size of each temporary Rx buffer.*/
 
-/* max time out delay time */
-#define W_MAX_TIMEOUT	0x0FFFU
-
 #if !defined(__OPTIMIZE__)  ||  !defined(__KERNEL__)
 #warning  You must compile this file with the correct options!
 #warning  See the last lines of the source file.
@@ -176,7 +183,7 @@ static char version[] __devinitdata =
 KERN_INFO DRV_NAME ".c:v1.10-LK" DRV_VERSION "  " DRV_RELDATE "  Written by Donald Becker\n"
 KERN_INFO "  http://www.scyld.com/network/via-rhine.html\n";
 
-static char shortname[] __devinitdata = DRV_NAME;
+static char shortname[] = DRV_NAME;
 
 
 /* This driver was written to use PCI memory space, however most versions
@@ -320,8 +327,8 @@ enum pci_flags_bit {
 enum via_rhine_chips {
 	VT86C100A = 0,
 	VT6102,
-	VT3043,
 	VT6105,
+	VT6105M
 };
 
 struct via_rhine_chip_info {
@@ -346,21 +353,21 @@ enum chip_capability_flags {
 static struct via_rhine_chip_info via_rhine_chip_info[] __devinitdata =
 {
 	{ "VIA VT86C100A Rhine", RHINE_IOTYPE, 128,
-	  CanHaveMII | ReqTxAlign },
+	  CanHaveMII | ReqTxAlign | HasDavicomPhy },
 	{ "VIA VT6102 Rhine-II", RHINE_IOTYPE, 256,
 	  CanHaveMII | HasWOL },
-	{ "VIA VT3043 Rhine",    RHINE_IOTYPE, 128,
-	  CanHaveMII | ReqTxAlign },
 	{ "VIA VT6105 Rhine-III", RHINE_IOTYPE, 256,
-	  CanHaveMII | HasWOL },
+	  CanHaveMII | HasWOL },	  
+	{ "VIA VT6105M Rhine-III", RHINE_IOTYPE, 256,
+	  CanHaveMII | HasWOL },	  	  	 
 };
 
 static struct pci_device_id via_rhine_pci_tbl[] __devinitdata =
 {
-	{0x1106, 0x6100, PCI_ANY_ID, PCI_ANY_ID, 0, 0, VT86C100A},
+	{0x1106, 0x3043, PCI_ANY_ID, PCI_ANY_ID, 0, 0, VT86C100A},
 	{0x1106, 0x3065, PCI_ANY_ID, PCI_ANY_ID, 0, 0, VT6102},
-	{0x1106, 0x3043, PCI_ANY_ID, PCI_ANY_ID, 0, 0, VT3043},
 	{0x1106, 0x3106, PCI_ANY_ID, PCI_ANY_ID, 0, 0, VT6105},
+	{0x1106, 0x3053, PCI_ANY_ID, PCI_ANY_ID, 0, 0, VT6105M},	
 	{0,}			/* terminate list */
 };
 MODULE_DEVICE_TABLE(pci, via_rhine_pci_tbl);
@@ -509,15 +516,13 @@ static int via_rhine_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
 static int  via_rhine_close(struct net_device *dev);
 static inline void clear_tally_counters(long ioaddr);
 
-static void wait_for_reset(struct net_device *dev, char *name)
+static void wait_for_reset(struct net_device *dev, int chip_id, char *name)
 {
-	struct netdev_private *np = dev->priv;
 	long ioaddr = dev->base_addr;
-	int chip_id = np->chip_id;
 	int i;
 
-	/* 3043 may need long delay after reset (dlink) */
-	if (chip_id == VT3043 || chip_id == VT86C100A)
+	/* VT86C100A may need long delay after reset (dlink) */
+	if (chip_id == VT86C100A)
 		udelay(100);
 
 	i = 0;
@@ -538,11 +543,11 @@ static void wait_for_reset(struct net_device *dev, char *name)
 static void __devinit enable_mmio(long ioaddr, int chip_id)
 {
 	int n;
-	if (chip_id == VT3043 || chip_id == VT86C100A) {
+	if (chip_id == VT86C100A) {
 		/* More recent docs say that this bit is reserved ... */
 		n = inb(ioaddr + ConfigA) | 0x20;
 		outb(n, ioaddr + ConfigA);
-	} else if (chip_id == VT6102) {
+	} else {
 		n = inb(ioaddr + ConfigD) | 0x80;
 		outb(n, ioaddr + ConfigD);
 	}
@@ -666,7 +671,7 @@ static int __devinit via_rhine_init_one (struct pci_dev *pdev,
 	writew(CmdReset, ioaddr + ChipCmd);
 
 	dev->base_addr = ioaddr;
-	wait_for_reset(dev, shortname);
+	wait_for_reset(dev, chip_id, shortname);
 
 	/* Reload the station address from the EEPROM. */
 #ifdef USE_IO
@@ -1077,7 +1082,7 @@ static int via_rhine_open(struct net_device *dev)
 		return i;
 	alloc_rbufs(dev);
 	alloc_tbufs(dev);
-	wait_for_reset(dev, dev->name);
+	wait_for_reset(dev, np->chip_id, dev->name);
 	init_registers(dev);
 	if (debug > 2)
 		printk(KERN_DEBUG "%s: Done via_rhine_open(), status %4.4x "
@@ -1184,7 +1189,7 @@ static void via_rhine_tx_timeout (struct net_device *dev)
 	alloc_rbufs(dev);
 
 	/* Reinitialize the hardware. */
-	wait_for_reset(dev, dev->name);
+	wait_for_reset(dev, np->chip_id, dev->name);
 	init_registers(dev);
 	
 	spin_unlock(&np->lock);
@@ -1254,7 +1259,7 @@ static int via_rhine_start_tx(struct sk_buff *skb, struct net_device *dev)
 
 	if (debug > 4) {
 		printk(KERN_DEBUG "%s: Transmit frame #%d queued in slot %d.\n",
-			   dev->name, np->cur_tx, entry);
+			   dev->name, np->cur_tx-1, entry);
 	}
 	return 0;
 }
@@ -1505,8 +1510,8 @@ static void via_rhine_error(struct net_device *dev, int intr_status)
 			printk(KERN_INFO "%s: Transmitter underrun, increasing Tx "
 				   "threshold setting to %2.2x.\n", dev->name, np->tx_thresh);
 	}
-	if ((intr_status & ~( IntrLinkChange | IntrStatsMax |
-						  IntrTxAbort | IntrTxAborted))) {
+	if (intr_status & ~( IntrLinkChange | IntrStatsMax |
+ 						 IntrTxAbort | IntrTxAborted | IntrNormalSummary)) {
 		if (debug > 1)
 			printk(KERN_ERR "%s: Something Wicked happened! %4.4x.\n",
 			   dev->name, intr_status);
