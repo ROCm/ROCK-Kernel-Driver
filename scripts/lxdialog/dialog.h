@@ -26,6 +26,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef __sun__
+#define CURS_MACROS
+#endif
 #include CURSES_LOC
 
 /*

@@ -225,10 +225,10 @@ void parse_config_file(signed char *map, size_t len)
 	signed char *p, *q;
 
 	for (; m < end; m++) {
-		if (*m == INT_CONF) { p = (char *) m  ; goto conf; }
-		if (*m == INT_ONFI) { p = (char *) m-1; goto conf; }
-		if (*m == INT_NFIG) { p = (char *) m-2; goto conf; }
-		if (*m == INT_FIG_) { p = (char *) m-3; goto conf; }
+		if (*m == INT_CONF) { p = (signed char *) m  ; goto conf; }
+		if (*m == INT_ONFI) { p = (signed char *) m-1; goto conf; }
+		if (*m == INT_NFIG) { p = (signed char *) m-2; goto conf; }
+		if (*m == INT_FIG_) { p = (signed char *) m-3; goto conf; }
 		continue;
 	conf:
 		if (p > map + len - 7)

@@ -7,7 +7,7 @@ src := $(obj)
 .PHONY: __clean
 __clean:
 
-include $(obj)/Makefile
+include $(if $(wildcard $(obj)/Kbuild), $(obj)/Kbuild, $(obj)/Makefile)
 
 # Figure out what we need to build from the various variables
 # ==========================================================================
