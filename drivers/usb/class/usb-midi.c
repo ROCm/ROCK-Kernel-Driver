@@ -1806,22 +1806,6 @@ static int detect_yamaha_device( struct usb_device *d, unsigned int ifnum, struc
 	printk(KERN_INFO "usb-midi: Found YAMAHA USB-MIDI device on dev %04x:%04x, iface %d\n",
 	       d->descriptor.idVendor, d->descriptor.idProduct, ifnum);
 
-	for ( i=0 ; i < d->descriptor.bNumConfigurations ; i++ ) {
-		if ( d->config+i == c ) goto configfound;
-	}
-
-	printk(KERN_INFO "usb-midi: Config not found.\n");
-
-	return -EINVAL;
-
- configfound:
-
-	/* this may not be necessary. */
-	if ( usb_set_configuration( d, c->desc.bConfigurationValue ) < 0 ) {
-		printk(KERN_INFO "usb-midi: Could not set config.\n");
-		return -EINVAL;
-	}
-
 	ret = usb_get_descriptor( d, USB_DT_CONFIG, i, buf, USB_DT_CONFIG_SIZE );
 	if ( ret < 0 ) {
 		printk(KERN_INFO "usb-midi: Could not get config (error=%d).\n", ret);
@@ -1916,21 +1900,6 @@ static int detect_midi_subclass(struct usb_device *d, unsigned int ifnum, struct
 	printk(KERN_INFO "usb-midi: Found MIDISTREAMING on dev %04x:%04x, iface %d\n",
 	       d->descriptor.idVendor, d->descriptor.idProduct, ifnum);
 
-	for ( i=0 ; i < d->descriptor.bNumConfigurations ; i++ ) {
-		if ( d->config+i == c ) goto configfound;
-	}
-
-	printk(KERN_INFO "usb-midi: Config not found.\n");
-
-	return -EINVAL;
-
- configfound:
-
-	/* this may not be necessary. */
-	if ( usb_set_configuration( d, c->desc.bConfigurationValue ) < 0 ) {
-		printk(KERN_INFO "usb-midi: Could not set config.\n");
-		return -EINVAL;
-	}
 
 	/* From USB Spec v2.0, Section 9.5.
 	   If the class or vendor specific descriptors use the same format

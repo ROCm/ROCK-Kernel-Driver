@@ -142,6 +142,17 @@ config I2C_ELEKTOR
 	  <file:Documentation/modules.txt>.
 	  The module will be called i2c-elektor.
 
+config I2C_KEYWEST
+	tristate "Powermac Keywest I2C interface"
+	depends on I2C && ALL_PPC
+	help
+	  This supports the use of the I2C interface in the combo-I/O
+	  chip on recent Apple machines.  Say Y if you have such a machine.
+
+	  This driver is also available as a module.  If you want to compile
+	  it as a module, say M here and read Documentation/modules.txt.
+	  The module will be called i2c-keywest.
+
 config ITE_I2C_ALGO
 	tristate "ITE I2C Algorithm"
 	depends on MIPS_ITE8172 && I2C

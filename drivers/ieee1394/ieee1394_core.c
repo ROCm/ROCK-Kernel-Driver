@@ -28,6 +28,7 @@
 #include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/proc_fs.h>
 #include <linux/bitops.h>
 #include <asm/byteorder.h>
@@ -48,13 +49,9 @@
 /*
  * Disable the nodemgr detection and config rom reading functionality.
  */
-MODULE_PARM(disable_nodemgr, "i");
-MODULE_PARM_DESC(disable_nodemgr, "Disable nodemgr functionality.");
 static int disable_nodemgr = 0;
-
-MODULE_PARM(disable_hotplug, "i");
-MODULE_PARM_DESC(disable_hotplug, "Disable hotplug for detected nodes.");
-static int disable_hotplug = 0;
+module_param(disable_nodemgr, int, 0444);
+MODULE_PARM_DESC(disable_nodemgr, "Disable nodemgr functionality.");
 
 /* We are GPL, so treat us special */
 MODULE_LICENSE("GPL");
@@ -62,7 +59,7 @@ MODULE_LICENSE("GPL");
 static kmem_cache_t *hpsb_packet_cache;
 
 /* Some globals used */
-const char *hpsb_speedto_str[] = { "S100", "S200", "S400" };
+const char *hpsb_speedto_str[] = { "S100", "S200", "S400", "S800", "S1600", "S3200" };
 
 static void dump_packet(const char *text, quadlet_t *data, int size)
 {
@@ -130,9 +127,8 @@ struct hpsb_packet *alloc_hpsb_packet(size_t data_size)
 {
         struct hpsb_packet *packet = NULL;
         void *data = NULL;
-        int kmflags = in_interrupt() ? GFP_ATOMIC : GFP_KERNEL;
 
-        packet = kmem_cache_alloc(hpsb_packet_cache, kmflags);
+        packet = kmem_cache_alloc(hpsb_packet_cache, GFP_ATOMIC);
         if (packet == NULL)
                 return NULL;
 
@@ -140,7 +136,7 @@ struct hpsb_packet *alloc_hpsb_packet(size_t data_size)
         packet->header = packet->embedded_header;
 
         if (data_size) {
-                data = kmalloc(data_size + 8, kmflags);
+                data = kmalloc(data_size + 8, GFP_ATOMIC);
                 if (data == NULL) {
 			kmem_cache_free(hpsb_packet_cache, packet);
                         return NULL;
@@ -496,8 +492,7 @@ int hpsb_send_packet(struct hpsb_packet *packet)
                 quadlet_t *data;
                 size_t size=packet->data_size+packet->header_size;
 
-                int kmflags = in_interrupt() ? GFP_ATOMIC : GFP_KERNEL;
-                data = kmalloc(packet->header_size + packet->data_size, kmflags);
+                data = kmalloc(packet->header_size + packet->data_size, GFP_ATOMIC);
                 if (!data) {
                         HPSB_ERR("unable to allocate memory for concatenating header and data");
                         return 0;
@@ -1120,7 +1115,7 @@ static int ieee1394_dispatch_open(struct inode *inode, struct file *file)
 	/* follow through with the open() */
 	retval = file_ops->open(inode, file);
 
-	if(retval == 0) {
+	if (retval == 0) {
 		
 		/* If the open() succeeded, then ieee1394 will be left
 		 * with an extra module reference, so we discard it here.
@@ -1166,7 +1161,7 @@ static int __init ieee1394_init(void)
 #ifdef CONFIG_PROC_FS
 	/* Must be done before we start everything else, since the drivers
 	 * may use it.  */
-	ieee1394_procfs_entry = proc_mkdir( "ieee1394", proc_bus);
+	ieee1394_procfs_entry = proc_mkdir("ieee1394", proc_bus);
 	if (ieee1394_procfs_entry == NULL) {
 		HPSB_ERR("unable to create /proc/bus/ieee1394\n");
 		unregister_chrdev(IEEE1394_MAJOR, "ieee1394");
@@ -1179,7 +1174,7 @@ static int __init ieee1394_init(void)
 	init_hpsb_highlevel();
 	init_csr();
 	if (!disable_nodemgr)
-		init_ieee1394_nodemgr(disable_hotplug);
+		init_ieee1394_nodemgr();
 	else
 		HPSB_INFO("nodemgr functionality disabled");
 
@@ -1273,7 +1268,7 @@ EXPORT_SYMBOL(hpsb_node_write);
 EXPORT_SYMBOL(hpsb_node_lock);
 EXPORT_SYMBOL(hpsb_register_protocol);
 EXPORT_SYMBOL(hpsb_unregister_protocol);
-EXPORT_SYMBOL(hpsb_release_unit_directory);
+EXPORT_SYMBOL(ieee1394_bus_type);
 
 /** csr.c **/
 EXPORT_SYMBOL(hpsb_update_config_rom);

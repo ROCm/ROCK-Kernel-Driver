@@ -45,7 +45,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v0.5.9 (2002/12/31)"
+#define DRIVER_VERSION "v0.5.10 (2003/04/01)"
 #define DRIVER_AUTHOR "Petko Manolov <petkan@users.sourceforge.net>"
 #define DRIVER_DESC "Pegasus/Pegasus II USB Ethernet driver"
 
@@ -121,7 +121,7 @@ static int get_registers(pegasus_t * pegasus, __u16 indx, __u16 size,
 	char *buffer;
 	DECLARE_WAITQUEUE(wait, current);
 
-	buffer = kmalloc(size, GFP_KERNEL);
+	buffer = kmalloc(size, GFP_DMA);
 	if (!buffer) {
 		warn("%s: looks like we're out of memory", __FUNCTION__);
 		return -ENOMEM;
@@ -170,7 +170,7 @@ static int set_registers(pegasus_t * pegasus, __u16 indx, __u16 size,
 	char *buffer;
 	DECLARE_WAITQUEUE(wait, current);
 
-	buffer = kmalloc(size, GFP_KERNEL);
+	buffer = kmalloc(size, GFP_DMA);
 	if (!buffer) {
 		warn("%s: looks like we're out of memory", __FUNCTION__);
 		return -ENOMEM;
@@ -218,7 +218,7 @@ static int set_register(pegasus_t * pegasus, __u16 indx, __u8 data)
 	char *tmp;
 	DECLARE_WAITQUEUE(wait, current);
 
-	tmp = kmalloc(1, GFP_KERNEL);
+	tmp = kmalloc(1, GFP_DMA);
 	if (!tmp) {
 		warn("%s: looks like we're out of memory", __FUNCTION__);
 		return -ENOMEM;
@@ -233,7 +233,7 @@ static int set_register(pegasus_t * pegasus, __u16 indx, __u8 data)
 
 	pegasus->dr.bRequestType = PEGASUS_REQT_WRITE;
 	pegasus->dr.bRequest = PEGASUS_REQ_SET_REG;
-	pegasus->dr.wValue = cpu_to_le16p(&data);
+	pegasus->dr.wValue = cpu_to_le16(data);
 	pegasus->dr.wIndex = cpu_to_le16p(&indx);
 	pegasus->dr.wLength = cpu_to_le16(1);
 	pegasus->ctrl_urb->transfer_buffer_length = 1;
@@ -711,11 +711,11 @@ static void intr_callback(struct urb *urb, struct pt_regs *regs)
 			pegasus->stats.tx_aborted_errors++;
 		if (d[0] & LATE_COL)
 			pegasus->stats.tx_window_errors++;
-		if (d[0] & (NO_CARRIER | LOSS_CARRIER)) {
-			pegasus->stats.tx_carrier_errors++;
-			netif_carrier_off(net);
-		} else {
+		if (d[5] & LINK_STATUS) {
 			netif_carrier_on(net);
+		} else {
+			pegasus->stats.tx_carrier_errors++;
+			netif_carrier_off(net);	
 		}
 	}
 
@@ -1171,10 +1171,6 @@ static int pegasus_probe(struct usb_interface *intf,
 	pegasus_t *pegasus;
 	int dev_index = id - pegasus_ids;
 
-	if (usb_set_configuration(dev, dev->config[0].desc.bConfigurationValue)) {
-		err("usb_set_configuration() failed");
-		return -ENODEV;
-	}
 	if (!(pegasus = kmalloc(sizeof (struct pegasus), GFP_KERNEL))) {
 		err("out of memory allocating device structure");
 		return -ENOMEM;

@@ -298,6 +298,8 @@ static inline struct sock *udp_v4_mcast_next(struct sock *sk,
 		    ipv6_only_sock(s)					||
 		    (s->bound_dev_if && s->bound_dev_if != dif))
 			continue;
+		if (!ip_mc_sf_allow(sk, loc_addr, rmt_addr, dif))
+			continue;
 		break;
   	}
   	return s;

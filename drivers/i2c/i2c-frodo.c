@@ -59,9 +59,11 @@ static struct i2c_algo_bit_data bit_frodo_data = {
 
 static struct i2c_adapter frodo_ops = {
 	.owner			= THIS_MODULE,
-	.name			= "Frodo adapter driver",
 	.id			= I2C_HW_B_FRODO,
 	.algo_data		= &bit_frodo_data,
+	.dev			= {
+		.name		= "Frodo adapter driver",
+	},
 };
 
 static int __init i2c_frodo_init (void)

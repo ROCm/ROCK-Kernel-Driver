@@ -1,6 +1,8 @@
 #ifndef _IEEE1394_HOTPLUG_H
 #define _IEEE1394_HOTPLUG_H
 
+#include <linux/device.h>
+
 #include "ieee1394_core.h"
 #include "nodemgr.h"
 
@@ -32,26 +34,6 @@ struct hpsb_protocol_driver {
 	struct ieee1394_device_id *id_table;
 
 	/* 
-	 * The probe function is called when a device is added to the
-	 * bus and the nodemgr finds a matching entry in the drivers
-	 * device id table or when registering this driver and a
-	 * previously unhandled device can be handled.  The driver may
-	 * decline to handle the device based on further investigation
-	 * of the device (or whatever reason) in which case a negative
-	 * error code should be returned, otherwise 0 should be
-	 * returned. The driver may use the driver_data field in the
-	 * unit directory to store per device driver specific data.
-	 */
-	int (*probe)(struct unit_directory *ud);
-
-	/* 
-	 * The disconnect function is called when a device is removed
-	 * from the bus or if it wasn't possible to read the guid
-	 * after the last bus reset.
-	 */
-	void (*disconnect)(struct unit_directory *ud);
-
-	/* 
 	 * The update function is called when the node has just
 	 * survived a bus reset, i.e. it is still present on the bus.
 	 * However, it may be necessary to reestablish the connection
@@ -59,18 +41,12 @@ struct hpsb_protocol_driver {
 	 */
 	void (*update)(struct unit_directory *ud);
 
-	/* Driver in list of all registered drivers */
-	struct list_head list;
 
-	/* The list of unit directories managed by this driver */
-	struct list_head unit_directories;
+	/* Our LDM structure */
+	struct device_driver driver;
 };
 
 int hpsb_register_protocol(struct hpsb_protocol_driver *driver);
 void hpsb_unregister_protocol(struct hpsb_protocol_driver *driver);
-
-int hpsb_claim_unit_directory(struct unit_directory *ud,
-			      struct hpsb_protocol_driver *driver);
-void hpsb_release_unit_directory(struct unit_directory *ud);
 
 #endif /* _IEEE1394_HOTPLUG_H */

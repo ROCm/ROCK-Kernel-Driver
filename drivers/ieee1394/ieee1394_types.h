@@ -72,19 +72,20 @@
 
 /* Transaction Label handling */
 struct hpsb_tlabel_pool {
-	u64 pool;
+	DECLARE_BITMAP(pool, 64);
 	spinlock_t lock;
 	u8 next;
 	u32 allocations;
 	struct semaphore count;
 };
 
-#define HPSB_TPOOL_INIT(_tp)            \
-do {                                    \
-	sema_init(&(_tp)->count, 63);   \
-	spin_lock_init(&(_tp)->lock);   \
-	(_tp)->next = 0;                \
-	(_tp)->pool = 0;                \
+#define HPSB_TPOOL_INIT(_tp)            	\
+do {                                    	\
+	CLEAR_BITMAP((_tp)->pool, 64);		\
+	spin_lock_init(&(_tp)->lock);   	\
+	(_tp)->next = 0;                	\
+	(_tp)->allocations = 0;			\
+	sema_init(&(_tp)->count, 63);   	\
 } while(0)
 
 

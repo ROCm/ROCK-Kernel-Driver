@@ -21,6 +21,7 @@
 #include <sound/driver.h>
 #include <linux/time.h>
 #include <linux/fs.h>
+#include <linux/compat.h>
 #include <sound/core.h>
 #include <sound/rawmidi.h>
 #include <asm/uaccess.h>
@@ -42,14 +43,9 @@ struct sndrv_rawmidi_params32 {
 	COPY(no_active_sensing);\
 }
 
-struct timeval32 {
-	s32 tv_sec;
-	s32 tv_usec;
-} __attribute__((packed));
-
 struct sndrv_rawmidi_status32 {
 	s32 stream;
-	struct timeval32 tstamp;
+	struct compat_timespec tstamp;
 	u32 avail;
 	u32 xruns;
 	unsigned char reserved[16];
@@ -59,7 +55,7 @@ struct sndrv_rawmidi_status32 {
 {\
 	COPY(stream);\
 	COPY(tstamp.tv_sec);\
-	COPY(tstamp.tv_usec);\
+	COPY(tstamp.tv_nsec);\
 	COPY(avail);\
 	COPY(xruns);\
 }

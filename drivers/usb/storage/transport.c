@@ -297,10 +297,11 @@ static int interpret_urb_result(struct us_data *us, unsigned int pipe,
 
 	/* stalled */
 	case -EPIPE:
-		/* for control endpoints, a stall indicates a protocol error */
+		/* for control endpoints, (used by CB[I]) a stall indicates
+		 * a failed command */
 		if (usb_pipecontrol(pipe)) {
 			US_DEBUGP("-- stall on control pipe\n");
-			return USB_STOR_XFER_ERROR;
+			return USB_STOR_XFER_STALLED;
 		}
 
 		/* for other sorts of endpoint, clear the stall */
@@ -691,7 +692,7 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 
 /* Abort the currently running scsi command or device reset.
  * This must be called with scsi_lock(us->srb->host) held */
-void usb_stor_abort_transport(struct us_data *us)
+int usb_stor_abort_transport(struct us_data *us)
 {
 	struct Scsi_Host *host;
 	int state = atomic_read(&us->sm_state);
@@ -701,7 +702,11 @@ void usb_stor_abort_transport(struct us_data *us)
 	/* Normally the current state is RUNNING.  If the control thread
 	 * hasn't even started processing this command, the state will be
 	 * IDLE.  Anything else is a bug. */
-	BUG_ON((state != US_STATE_RUNNING && state != US_STATE_IDLE));
+	if (state != US_STATE_RUNNING && state != US_STATE_IDLE) {
+		printk(KERN_ERR USB_STORAGE "Error in %s: "
+			"invalid state %d\n", __FUNCTION__, state);
+		return FAILED;
+	}
 
 	/* set state to abort and release the lock */
 	atomic_set(&us->sm_state, US_STATE_ABORTING);
@@ -730,6 +735,7 @@ void usb_stor_abort_transport(struct us_data *us)
 
 	/* Reacquire the lock: note that us->srb is now NULL */
 	scsi_lock(host);
+	return SUCCESS;
 }
 
 /*
@@ -750,8 +756,14 @@ int usb_stor_CBI_transport(Scsi_Cmnd *srb, struct us_data *us)
 
 	/* check the return code for the command */
 	US_DEBUGP("Call to usb_stor_ctrl_transfer() returned %d\n", result);
+
+	/* if we stalled the command, it means command failed */
+	if (result == USB_STOR_XFER_STALLED) {
+		return USB_STOR_TRANSPORT_FAILED;
+	}
+
+	/* Uh oh... serious problem here */
 	if (result != USB_STOR_XFER_GOOD) {
-		/* Uh oh... serious problem here */
 		return USB_STOR_TRANSPORT_ERROR;
 	}
 
@@ -834,8 +846,14 @@ int usb_stor_CB_transport(Scsi_Cmnd *srb, struct us_data *us)
 
 	/* check the return code for the command */
 	US_DEBUGP("Call to usb_stor_ctrl_transfer() returned %d\n", result);
+
+	/* if we stalled the command, it means command failed */
+	if (result == USB_STOR_XFER_STALLED) {
+		return USB_STOR_TRANSPORT_FAILED;
+	}
+
+	/* Uh oh... serious problem here */
 	if (result != USB_STOR_XFER_GOOD) {
-		/* Uh oh... serious problem here */
 		return USB_STOR_TRANSPORT_ERROR;
 	}
 

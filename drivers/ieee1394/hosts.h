@@ -1,6 +1,7 @@
 #ifndef _IEEE1394_HOSTS_H
 #define _IEEE1394_HOSTS_H
 
+#include <linux/device.h>
 #include <linux/wait.h>
 #include <linux/list.h>
 #include <asm/semaphore.h>
@@ -64,6 +65,8 @@ struct hpsb_host {
         struct hpsb_host_driver *driver;
 
 	struct pci_dev *pdev;
+
+	struct device device;
 };
 
 

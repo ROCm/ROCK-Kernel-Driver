@@ -85,6 +85,14 @@ struct in_addr {
 #define IP_MULTICAST_LOOP 		34
 #define IP_ADD_MEMBERSHIP		35
 #define IP_DROP_MEMBERSHIP		36
+#define IP_UNBLOCK_SOURCE		37
+#define IP_BLOCK_SOURCE			38
+#define IP_ADD_SOURCE_MEMBERSHIP	39
+#define IP_DROP_SOURCE_MEMBERSHIP	40
+#define IP_MSFILTER			41
+
+#define MCAST_EXCLUDE	0
+#define MCAST_INCLUDE	1
 
 /* These need to appear somewhere around here */
 #define IP_DEFAULT_MULTICAST_TTL        1
@@ -104,6 +112,24 @@ struct ip_mreqn
 	struct in_addr	imr_address;		/* local IP address of interface */
 	int		imr_ifindex;		/* Interface index */
 };
+
+struct ip_mreq_source {
+	__u32		imr_multiaddr;
+	__u32		imr_interface;
+	__u32		imr_sourceaddr;
+};
+
+struct ip_msfilter {
+	__u32		imsf_multiaddr;
+	__u32		imsf_interface;
+	__u32		imsf_fmode;
+	__u32		imsf_numsrc;
+	__u32		imsf_slist[1];
+};
+
+#define IP_MSFILTER_SIZE(numsrc) \
+	(sizeof(struct ip_msfilter) - sizeof(__u32) \
+	+ (numsrc) * sizeof(__u32))
 
 struct in_pktinfo
 {

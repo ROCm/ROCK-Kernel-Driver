@@ -49,7 +49,9 @@ static struct kobj_type ktype_devclass = {
 	.sysfs_ops	= &class_sysfs_ops,
 };
 
-static decl_subsys(class,&ktype_devclass);
+/* Classes can't use the kobject hotplug logic, as
+ * they do not add new kobjects to the system */
+static decl_subsys(class,&ktype_devclass,NULL);
 
 
 static int devclass_dev_link(struct device_class * cls, struct device * dev)

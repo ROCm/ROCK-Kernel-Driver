@@ -32,13 +32,60 @@ struct igmphdr
 	__u32 group;
 };
 
+/* V3 group record types [grec_type] */
+#define IGMPV3_MODE_IS_INCLUDE		1
+#define IGMPV3_MODE_IS_EXCLUDE		2
+#define IGMPV3_CHANGE_TO_INCLUDE	3
+#define IGMPV3_CHANGE_TO_EXCLUDE	4
+#define IGMPV3_ALLOW_NEW_SOURCES	5
+#define IGMPV3_BLOCK_OLD_SOURCES	6
+
+struct igmpv3_grec {
+	__u8	grec_type;
+	__u8	grec_auxwords;
+	__u16	grec_nsrcs;
+	__u32	grec_mca;
+	__u32	grec_src[0];
+};
+
+struct igmpv3_report {
+	__u8 type;
+	__u8 resv1;
+	__u16 csum;
+	__u16 resv2;
+	__u16 ngrec;
+	struct igmpv3_grec grec[0];
+};
+
+struct igmpv3_query {
+	__u8 type;
+	__u8 code;
+	__u16 csum;
+	__u32 group;
+#if defined(__LITTLE_ENDIAN_BITFIELD)
+	__u8 qrv:3,
+	     suppress:1,
+	     resv:4;
+#elif defined(__BIG_ENDIAN_BITFIELD)
+	__u8 resv:4,
+	     suppress:1,
+	     qrv:3;
+#else
+#error "Please fix <asm/byteorder.h>"
+#endif
+	__u8 qqic;
+	__u16 nsrcs;
+	__u32 srcs[0];
+};
+
 #define IGMP_HOST_MEMBERSHIP_QUERY	0x11	/* From RFC1112 */
 #define IGMP_HOST_MEMBERSHIP_REPORT	0x12	/* Ditto */
 #define IGMP_DVMRP			0x13	/* DVMRP routing */
 #define IGMP_PIM			0x14	/* PIM routing */
 #define IGMP_TRACE			0x15
-#define IGMP_HOST_NEW_MEMBERSHIP_REPORT 0x16	/* New version of 0x11 */
+#define IGMPV2_HOST_MEMBERSHIP_REPORT	0x16	/* V2 version of 0x11 */
 #define IGMP_HOST_LEAVE_MESSAGE 	0x17
+#define IGMPV3_HOST_MEMBERSHIP_REPORT	0x22	/* V3 version of 0x11 */
 
 #define IGMP_MTRACE_RESP		0x1e
 #define IGMP_MTRACE			0x1f
@@ -68,6 +115,7 @@ struct igmphdr
 
 #define IGMP_ALL_HOSTS		htonl(0xE0000001L)
 #define IGMP_ALL_ROUTER 	htonl(0xE0000002L)
+#define IGMPV3_ALL_MCR	 	htonl(0xE0000016L)
 #define IGMP_LOCAL_GROUP	htonl(0xE0000000L)
 #define IGMP_LOCAL_GROUP_MASK	htonl(0xFFFFFF00L)
 
@@ -79,6 +127,18 @@ struct igmphdr
 #include <linux/skbuff.h>
 #include <linux/in.h>
 
+struct ip_sf_socklist
+{
+	unsigned int		sl_max;
+	unsigned int		sl_count;
+	__u32			sl_addr[0];
+};
+
+#define IP_SFLSIZE(count)	(sizeof(struct ip_sf_socklist) + \
+	(count) * sizeof(__u32))
+
+#define IP_SFBLOCK	10	/* allocate this many at once */
+
 /* ip_mc_socklist is real list now. Speed is not argument;
    this list never used in fast path code
  */
@@ -88,12 +148,28 @@ struct ip_mc_socklist
 	struct ip_mc_socklist	*next;
 	int			count;
 	struct ip_mreqn		multi;
+	unsigned int		sfmode;		/* MCAST_{INCLUDE,EXCLUDE} */
+	struct ip_sf_socklist	*sflist;
+};
+
+struct ip_sf_list
+{
+	struct ip_sf_list	*sf_next;
+	__u32			sf_inaddr;
+	unsigned long		sf_count[2];	/* include/exclude counts */
+	unsigned char		sf_gsresp;	/* include in g & s response? */
+	unsigned char		sf_oldin;	/* change state */
+	unsigned char		sf_crcount;	/* retrans. left to send */
 };
 
 struct ip_mc_list
 {
 	struct in_device	*interface;
 	unsigned long		multiaddr;
+	struct ip_sf_list	*sources;
+	struct ip_sf_list	*tomb;
+	unsigned int		sfmode;
+	unsigned long		sfcount[2];
 	struct ip_mc_list	*next;
 	struct timer_list	timer;
 	int			users;
@@ -103,13 +179,31 @@ struct ip_mc_list
 	char			reporter;
 	char			unsolicit_count;
 	char			loaded;
+	unsigned char		gsquery;	/* check source marks? */
+	unsigned char		crcount;
 };
 
-extern int ip_check_mc(struct in_device *dev, u32 mc_addr);
+/* V3 exponential field decoding */
+#define IGMPV3_MASK(value, nb) ((nb)>=32 ? (value) : ((1<<(nb))-1) & (value))
+#define IGMPV3_EXP(thresh, nbmant, nbexp, value) \
+	((value) < (thresh) ? (value) : \
+        ((IGMPV3_MASK(value, nbmant) | (1<<(nbmant+nbexp))) << \
+         (IGMPV3_MASK((value) >> (nbmant), nbexp) + (nbexp))))
+
+#define IGMPV3_QQIC(value) IGMPV3_EXP(0x80, 4, 3, value)
+#define IGMPV3_MRC(value) IGMPV3_EXP(0x8000, 12, 3, value)
+
+extern int ip_check_mc(struct in_device *dev, u32 mc_addr, u32 src_addr, u16 proto);
 extern int igmp_rcv(struct sk_buff *);
 extern int ip_mc_join_group(struct sock *sk, struct ip_mreqn *imr);
 extern int ip_mc_leave_group(struct sock *sk, struct ip_mreqn *imr);
 extern void ip_mc_drop_socket(struct sock *sk);
+extern int ip_mc_source(int add, int omode, struct sock *sk,
+		struct ip_mreq_source *mreqs);
+extern int ip_mc_msfilter(struct sock *sk, struct ip_msfilter *msf);
+extern int ip_mc_msfget(struct sock *sk, struct ip_msfilter *msf,
+		struct ip_msfilter *optval, int *optlen);
+extern int ip_mc_sf_allow(struct sock *sk, u32 local, u32 rmt, int dif);
 extern void ip_mr_init(void);
 extern void ip_mc_init_dev(struct in_device *);
 extern void ip_mc_destroy_dev(struct in_device *);

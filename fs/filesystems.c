@@ -61,7 +61,7 @@ static struct file_system_type **find_filesystem(const char *name)
 
 
 /* define fs_subsys */
-static decl_subsys(fs, NULL);
+static decl_subsys(fs, NULL, NULL);
 
 static int register_fs_subsys(struct file_system_type * fs)
 {

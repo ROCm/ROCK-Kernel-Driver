@@ -46,9 +46,13 @@
 #define ACKX_TIMEOUT             (-4)
 
 
-#define SPEED_100                0x0
-#define SPEED_200                0x1
-#define SPEED_400                0x2
+#define SPEED_100		0x00
+#define SPEED_200		0x01
+#define SPEED_400		0x02
+#define SPEED_800		0x03
+#define SPEED_1600		0x04
+#define SPEED_3200		0x05
+
 
 /* Maps speed values above to a string representation */
 extern const char *hpsb_speedto_str[];

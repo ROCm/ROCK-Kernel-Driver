@@ -99,6 +99,8 @@
  *              for abs. Bug report by Andrew Morton <andrewm@uow.edu.au>
  * 2001-06-16:  Bryce Nesbitt <bryce@obviously.com>
  *              Fix SNDCTL_DSP_STEREO API violation
+ * 2003-04-08:	Oliver Neukum (oliver@neukum.name):
+ *		Setting a configuration is done by usbcore and must not be overridden
  */
 
 /*
@@ -3790,10 +3792,6 @@ static int usb_audio_probe(struct usb_interface *intf,
 	 */
 	i = dev->actconfig - config;
 
-	if (usb_set_configuration(dev, config->desc.bConfigurationValue) < 0) {
-		printk(KERN_ERR "usbaudio: set_configuration failed (ConfigValue 0x%x)\n", config->desc.bConfigurationValue);
-		return -EIO;
-	}
 	ret = usb_get_descriptor(dev, USB_DT_CONFIG, i, buf, 8);
 	if (ret < 0) {
 		printk(KERN_ERR "usbaudio: cannot get first 8 bytes of config descriptor %d of device %d (error %d)\n", i, dev->devnum, ret);
