@@ -159,7 +159,7 @@ ide_startstop_t do_rw_taskfile (ide_drive_t *drive, ide_task_t *task)
 	hwif->OUTB(taskfile->high_cylinder, IDE_HCYL_REG);
 
 	hwif->OUTB((taskfile->device_head & HIHI) | drive->select.all, IDE_SELECT_REG);
-#ifdef CONFIG_IDE_TASKFILE_IO
+
 	if (task->handler != NULL) {
 		if (task->prehandler != NULL) {
 			hwif->OUTBSYNC(drive, taskfile->command, IDE_COMMAND_REG);
@@ -169,14 +169,6 @@ ide_startstop_t do_rw_taskfile (ide_drive_t *drive, ide_task_t *task)
 		ide_execute_command(drive, taskfile->command, task->handler, WAIT_WORSTCASE, NULL);
 		return ide_started;
 	}
-#else
-	if (task->handler != NULL) {
-		ide_execute_command(drive, taskfile->command, task->handler, WAIT_WORSTCASE, NULL);
-		if (task->prehandler != NULL)
-			return task->prehandler(drive, task->rq);
-		return ide_started;
-	}
-#endif
 
 	if (!drive->using_dma)
 		return ide_stopped;
@@ -395,7 +387,9 @@ ide_startstop_t pre_task_out_intr (ide_drive_t *drive, struct request *rq)
 		return startstop;
 	}
 	/* For Write_sectors we need to stuff the first sector */
+	ide_set_handler(drive, &task_out_intr, WAIT_WORSTCASE, NULL);
 	task_buffer_sectors(drive, rq, 1, IDE_PIO_OUT);
+
 	return ide_started;
 }
 
@@ -433,7 +427,6 @@ EXPORT_SYMBOL(task_out_intr);
 
 ide_startstop_t pre_task_mulout_intr (ide_drive_t *drive, struct request *rq)
 {
-	ide_task_t *args = rq->special;
 	ide_startstop_t startstop;
 
 	if (ide_wait_stat(&startstop, drive, DATA_READY,
@@ -451,19 +444,16 @@ ide_startstop_t pre_task_mulout_intr (ide_drive_t *drive, struct request *rq)
 		}
 	}
 
-	/*
-	 * WARNING :: if the drive as not acked good status we may not
-	 * move the DATA-TRANSFER T-Bar as BSY != 0. <andre@linux-ide.org>
-	 */
-	return args->handler(drive);
+	ide_set_handler(drive, &task_mulout_intr, WAIT_WORSTCASE, NULL);
+	task_buffer_multi_sectors(drive, rq, IDE_PIO_OUT);
+
+	return ide_started;
 }
 
 EXPORT_SYMBOL(pre_task_mulout_intr);
 
 /*
  * Handler for command write multiple
- * Called directly from execute_drive_cmd for the first bunch of sectors,
- * afterwards only by the ISR
  */
 ide_startstop_t task_mulout_intr (ide_drive_t *drive)
 {
@@ -481,22 +471,13 @@ ide_startstop_t task_mulout_intr (ide_drive_t *drive)
 			return ide_stopped;
 		}
 		/* no data yet, so wait for another interrupt */
-		if (HWGROUP(drive)->handler == NULL)
-			ide_set_handler(drive, &task_mulout_intr, WAIT_WORSTCASE, NULL);
+		ide_set_handler(drive, &task_mulout_intr, WAIT_WORSTCASE, NULL);
 		return ide_started;
 	}
 
-	if (HWGROUP(drive)->handler != NULL) {
-		unsigned long lflags;
-		spin_lock_irqsave(&ide_lock, lflags);
-		HWGROUP(drive)->handler = NULL;
-		del_timer(&HWGROUP(drive)->timer);
-		spin_unlock_irqrestore(&ide_lock, lflags);
-	}
-
 	task_buffer_multi_sectors(drive, rq, IDE_PIO_OUT);
-	if (HWGROUP(drive)->handler == NULL)
-		ide_set_handler(drive, &task_mulout_intr, WAIT_WORSTCASE, NULL);
+	ide_set_handler(drive, &task_mulout_intr, WAIT_WORSTCASE, NULL);
+
 	return ide_started;
 }
 
