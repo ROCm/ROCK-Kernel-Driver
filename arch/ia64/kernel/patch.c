@@ -87,15 +87,6 @@ ia64_patch_imm60 (u64 insn_addr, u64 val)
  * at execution time, but sometimes (either for performance reasons
  * or during error recovery) we cannot to this.  Patch the marked
  * bundles to load the physical address.
- * The 64-bit value in a "movl reg=value" is scattered between the
- * two words of the bundle like this:
- *
- * 6  6         5         4         3         2         1
- * 3210987654321098765432109876543210987654321098765432109876543210
- * ABBBBBBBBBBBBBBBBBBBBBBBCCCCCCCCCCCCCCCCCCDEEEEEFFFFFFFFFGGGGGGG
- *
- * CCCCCCCCCCCCCCCCCCxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
- * xxxxAFFFFFFFFFEEEEEDxGGGGGGGxxxxxxxxxxxxxBBBBBBBBBBBBBBBBBBBBBBB
  */
 void __init
 ia64_patch_vtop (unsigned long start, unsigned long end)
@@ -108,8 +99,14 @@ ia64_patch_vtop (unsigned long start, unsigned long end)
 
 		/* replace virtual address with corresponding physical address: */
 		ia64_patch_imm64(ip, ia64_tpa(get_imm64(ip)));
+		ia64_fc(ip);
 		++offp;
 	}
+	ia64_insn_group_barrier();
+	ia64_sync_i();
+	ia64_insn_group_barrier();
+	ia64_srlz_i();
+	ia64_insn_group_barrier();
 }
 
 void
