@@ -171,6 +171,7 @@ DECLARE_MUTEX(jfs_log_sem);
 extern void txLazyUnlock(struct tblock * tblk);
 extern int jfs_stop_threads;
 extern struct completion jfsIOwait;
+extern int jfs_tlocks_low;
 
 /*
  * forward references
@@ -524,12 +525,7 @@ lmWriteRecord(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
 			tblk->eor = log->eor;
 
 			/* enqueue transaction to commit queue */
-			tblk->cqnext = NULL;
-			if (log->cqueue.head) {
-				log->cqueue.tail->cqnext = tblk;
-				log->cqueue.tail = tblk;
-			} else
-				log->cqueue.head = log->cqueue.tail = tblk;
+			list_add_tail(&tblk->cqueue, &log->cqueue);
 
 			LOGGC_UNLOCK(log);
 		}
@@ -587,7 +583,10 @@ static int lmNextPage(struct jfs_log * log)
 	 *      write or queue the full page at the tail of write queue
 	 */
 	/* get the tail tblk on commit queue */
-	tblk = log->cqueue.tail;
+	if (list_empty(&log->cqueue))
+		tblk = NULL;
+	else
+		tblk = list_entry(log->cqueue.prev, struct tblock, cqueue);
 
 	/* every tblk who has COMMIT record on the current page,
 	 * and has not been committed, must be on commit queue
@@ -688,8 +687,9 @@ int lmGroupCommit(struct jfs_log * log, struct tblock * tblk)
 	if (tblk->xflag & COMMIT_LAZY)
 		tblk->flag |= tblkGC_LAZY;
 
-	if ((!(log->cflag & logGC_PAGEOUT)) && log->cqueue.head &&
-	    (!(tblk->xflag & COMMIT_LAZY) || test_bit(log_FLUSH, &log->flag))) {
+	if ((!(log->cflag & logGC_PAGEOUT)) && (!list_empty(&log->cqueue)) &&
+	    (!(tblk->xflag & COMMIT_LAZY) || test_bit(log_FLUSH, &log->flag)
+	     || jfs_tlocks_low)) {
 		/*
 		 * No pageout in progress
 		 *
@@ -753,7 +753,7 @@ static void lmGCwrite(struct jfs_log * log, int cant_write)
 	struct logpage *lp;
 	int gcpn;		/* group commit page number */
 	struct tblock *tblk;
-	struct tblock *xtblk;
+	struct tblock *xtblk = NULL;
 
 	/*
 	 * build the commit group of a log page
@@ -762,15 +762,16 @@ static void lmGCwrite(struct jfs_log * log, int cant_write)
 	 * transactions with COMMIT records on the same log page.
 	 */
 	/* get the head tblk on the commit queue */
-	tblk = xtblk = log->cqueue.head;
-	gcpn = tblk->pn;
+	gcpn = list_entry(log->cqueue.next, struct tblock, cqueue)->pn;
 
-	while (tblk && tblk->pn == gcpn) {
+	list_for_each_entry(tblk, &log->cqueue, cqueue) {
+		if (tblk->pn != gcpn)
+			break;
+
 		xtblk = tblk;
 
 		/* state transition: (QUEUE, READY) -> COMMIT */
 		tblk->flag |= tblkGC_COMMIT;
-		tblk = tblk->cqnext;
 	}
 	tblk = xtblk;		/* last tblk of the page */
 
@@ -816,7 +817,7 @@ static void lmPostGC(struct lbuf * bp)
 	unsigned long flags;
 	struct jfs_log *log = bp->l_log;
 	struct logpage *lp;
-	struct tblock *tblk;
+	struct tblock *tblk, *temp;
 
 	//LOGGC_LOCK(log);
 	spin_lock_irqsave(&log->gclock, flags);
@@ -826,7 +827,9 @@ static void lmPostGC(struct lbuf * bp)
 	 * remove/wakeup transactions from commit queue who were
 	 * group committed with the current log page
 	 */
-	while ((tblk = log->cqueue.head) && (tblk->flag & tblkGC_COMMIT)) {
+	list_for_each_entry_safe(tblk, temp, &log->cqueue, cqueue) {
+		if (!(tblk->flag & tblkGC_COMMIT))
+			break;
 		/* if transaction was marked GC_COMMIT then
 		 * it has been shipped in the current pageout
 		 * and made it to disk - it is committed.
@@ -836,11 +839,8 @@ static void lmPostGC(struct lbuf * bp)
 			tblk->flag |= tblkGC_ERROR;
 
 		/* remove it from the commit queue */
-		log->cqueue.head = tblk->cqnext;
-		if (log->cqueue.head == NULL)
-			log->cqueue.tail = NULL;
+		list_del(&tblk->cqueue);
 		tblk->flag &= ~tblkGC_QUEUE;
-		tblk->cqnext = 0;
 
 		if (tblk == log->flush_tblk) {
 			/* we can stop flushing the log now */
@@ -893,9 +893,9 @@ static void lmPostGC(struct lbuf * bp)
 	 * select the latest ready transaction as new group leader and
 	 * wake her up to lead her group.
 	 */
-	if ((tblk = log->cqueue.head) &&
+	if ((!list_empty(&log->cqueue)) &&
 	    ((log->gcrtc > 0) || (tblk->bp->l_wqnext != NULL) ||
-	     test_bit(log_FLUSH, &log->flag)))
+	     test_bit(log_FLUSH, &log->flag) || jfs_tlocks_low))
 		/*
 		 * Call lmGCwrite with new group leader
 		 */
@@ -1288,7 +1288,7 @@ int lmLogInit(struct jfs_log * log)
 
 	init_waitqueue_head(&log->syncwait);
 
-	log->cqueue.head = log->cqueue.tail = NULL;
+	INIT_LIST_HEAD(&log->cqueue);
 	log->flush_tblk = NULL;
 
 	log->count = 0;
@@ -1486,6 +1486,7 @@ int lmLogClose(struct super_block *sb)
 		 *      in-line log in host file system
 		 */
 		rc = lmLogShutdown(log);
+		kfree(log);
 		goto out;
 	}
 
@@ -1515,6 +1516,8 @@ int lmLogClose(struct super_block *sb)
 	bd_release(bdev);
 	blkdev_put(bdev);
 
+	kfree(log);
+
       out:
 	up(&jfs_log_sem);
 	jfs_info("lmLogClose: exit(%d)", rc);
@@ -1535,7 +1538,7 @@ int lmLogClose(struct super_block *sb)
 void jfs_flush_journal(struct jfs_log *log, int wait)
 {
 	int i;
-	struct tblock *target;
+	struct tblock *target = NULL;
 
 	/* jfs_write_inode may call us during read-only mount */
 	if (!log)
@@ -1545,13 +1548,12 @@ void jfs_flush_journal(struct jfs_log *log, int wait)
 
 	LOGGC_LOCK(log);
 
-	target = log->cqueue.head;
-
-	if (target) {
+	if (!list_empty(&log->cqueue)) {
 		/*
 		 * This ensures that we will keep writing to the journal as long
 		 * as there are unwritten commit records
 		 */
+		target = list_entry(log->cqueue.prev, struct tblock, cqueue);
 
 		if (test_bit(log_FLUSH, &log->flag)) {
 			/*
@@ -1602,16 +1604,16 @@ void jfs_flush_journal(struct jfs_log *log, int wait)
 	 * If there was recent activity, we may need to wait
 	 * for the lazycommit thread to catch up
 	 */
-	if (log->cqueue.head || !list_empty(&log->synclist)) {
+	if ((!list_empty(&log->cqueue)) || !list_empty(&log->synclist)) {
 		for (i = 0; i < 800; i++) {	/* Too much? */
 			current->state = TASK_INTERRUPTIBLE;
 			schedule_timeout(HZ / 4);
-			if ((log->cqueue.head == NULL) &&
+			if (list_empty(&log->cqueue) &&
 			    list_empty(&log->synclist))
 				break;
 		}
 	}
-	assert(log->cqueue.head == NULL);
+	assert(list_empty(&log->cqueue));
 	assert(list_empty(&log->synclist));
 	clear_bit(log_FLUSH, &log->flag);
 }

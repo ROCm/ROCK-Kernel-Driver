@@ -91,7 +91,7 @@ krb5_make_token(struct krb5_ctx *ctx, int qop_req,
 
 	dprintk("RPC:     gss_krb5_seal\n");
 
-	now = jiffies;
+	now = get_seconds();
 
 	if (qop_req != 0)
 		goto out_err;
@@ -101,12 +101,12 @@ krb5_make_token(struct krb5_ctx *ctx, int qop_req,
 			checksum_type = CKSUMTYPE_RSA_MD5;
 			break;
 		default:
-			dprintk("RPC: gss_krb5_seal: ctx->signalg %d not"
+			dprintk("RPC:      gss_krb5_seal: ctx->signalg %d not"
 				" supported\n", ctx->signalg);
 			goto out_err;
 	}
 	if (ctx->sealalg != SEAL_ALG_NONE && ctx->sealalg != SEAL_ALG_DES) {
-		dprintk("RPC: gss_krb5_seal: ctx->sealalg %d not supported\n",
+		dprintk("RPC:      gss_krb5_seal: ctx->sealalg %d not supported\n",
 			ctx->sealalg);
 		goto out_err;
 	}
@@ -122,7 +122,10 @@ krb5_make_token(struct krb5_ctx *ctx, int qop_req,
 	token->len = g_token_size(&ctx->mech_used, 22 + tmsglen);
 
 	ptr = token->data;
-	g_make_token_header(&ctx->mech_used, 22 + tmsglen, &ptr, toktype);
+	g_make_token_header(&ctx->mech_used, 22 + tmsglen, &ptr);
+
+	*ptr++ = (unsigned char) ((toktype>>8)&0xff);
+	*ptr++ = (unsigned char) (toktype&0xff);
 
 	/* ptr now at byte 2 of header described in rfc 1964, section 1.2.1: */
 	krb5_hdr = ptr - 2;
@@ -137,7 +140,7 @@ krb5_make_token(struct krb5_ctx *ctx, int qop_req,
 		/* XXX removing support for now */
 		goto out_err;
 	} else { /* Sign only.  */
-		if (krb5_make_checksum(checksum_type, krb5_hdr, text,
+		if (make_checksum(checksum_type, krb5_hdr, 8, text,
 				       &md5cksum))
 			goto out_err;
 	}
@@ -151,7 +154,7 @@ krb5_make_token(struct krb5_ctx *ctx, int qop_req,
 		       md5cksum.data + md5cksum.len - KRB5_CKSUM_LENGTH,
 		       KRB5_CKSUM_LENGTH);
 
-		dprintk("make_seal_token: cksum data: \n");
+		dprintk("RPC:      make_seal_token: cksum data: \n");
 		print_hexl((u32 *) (krb5_hdr + 16), KRB5_CKSUM_LENGTH, 0);
 		break;
 	default:

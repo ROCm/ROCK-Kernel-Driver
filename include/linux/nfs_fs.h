@@ -306,6 +306,10 @@ nfs_file_cred(struct file *file)
  */
 extern ssize_t nfs_direct_IO(int, struct kiocb *, const struct iovec *, loff_t,
 			unsigned long);
+extern ssize_t nfs_file_direct_read(struct kiocb *iocb, char *buf,
+			size_t count, loff_t pos);
+extern ssize_t nfs_file_direct_write(struct kiocb *iocb, const char *buf,
+			size_t count, loff_t pos);
 
 /*
  * linux/fs/nfs/dir.c

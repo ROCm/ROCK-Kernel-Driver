@@ -36,9 +36,11 @@
 #include <linux/types.h>
 #include <linux/slab.h>
 #include <linux/socket.h>
+#include <linux/module.h>
 #include <linux/sunrpc/msg_prot.h>
 #include <linux/sunrpc/gss_asn1.h>
 #include <linux/sunrpc/auth_gss.h>
+#include <linux/sunrpc/svcauth_gss.h>
 #include <linux/sunrpc/gss_err.h>
 #include <linux/sunrpc/sched.h>
 #include <linux/sunrpc/gss_api.h>
@@ -51,115 +53,94 @@
 static LIST_HEAD(registered_mechs);
 static spinlock_t registered_mechs_lock = SPIN_LOCK_UNLOCKED;
 
-/* Reference counting: The reference count includes the reference in the
- * global registered_mechs list.  That reference will never diseappear
- * (so the reference count will never go below 1) until after the mech
- * is removed from the list.  Nothing can be removed from the list without
- * first getting the registered_mechs_lock, so a gss_api_mech won't diseappear
- * from underneath us while we hold the registered_mech_lock.  */
-
-int
-gss_mech_register(struct xdr_netobj * mech_type, struct gss_api_ops * ops)
+static void
+gss_mech_free(struct gss_api_mech *gm)
 {
-	struct gss_api_mech *gm;
+	struct pf_desc *pf;
+	int i;
 
-	if (!(gm = kmalloc(sizeof(*gm), GFP_KERNEL))) {
-		printk("Failed to allocate memory in gss_mech_register");
-		return -1;
+	for (i = 0; i < gm->gm_pf_num; i++) {
+		pf = &gm->gm_pfs[i];
+		if (pf->auth_domain_name)
+			kfree(pf->auth_domain_name);
+		pf->auth_domain_name = NULL;
 	}
-	gm->gm_oid.len = mech_type->len;
-	if (!(gm->gm_oid.data = kmalloc(mech_type->len, GFP_KERNEL))) {
-		kfree(gm);
-		printk("Failed to allocate memory in gss_mech_register");
-		return -1;
+}
+
+static inline char *
+make_auth_domain_name(char *name)
+{
+	static char	*prefix = "gss/";
+	char		*new;
+
+	new = kmalloc(strlen(name) + strlen(prefix) + 1, GFP_KERNEL);
+	if (new) {
+		strcpy(new, prefix);
+		strcat(new, name);
 	}
-	memcpy(gm->gm_oid.data, mech_type->data, mech_type->len);
-	/* We're counting the reference in the registered_mechs list: */
-	atomic_set(&gm->gm_count, 1);
-	gm->gm_ops = ops;
-	
-	spin_lock(&registered_mechs_lock);
-	list_add(&gm->gm_list, &registered_mechs);
-	spin_unlock(&registered_mechs_lock);
-	dprintk("RPC: gss_mech_register: registered mechanism with oid:\n");
-	print_hexl((u32 *)mech_type->data, mech_type->len, 0);
+	return new;
+}
+
+static int
+gss_mech_svc_setup(struct gss_api_mech *gm)
+{
+	struct pf_desc *pf;
+	int i, status;
+
+	for (i = 0; i < gm->gm_pf_num; i++) {
+		pf = &gm->gm_pfs[i];
+		pf->auth_domain_name = make_auth_domain_name(pf->name);
+		status = -ENOMEM;
+		if (pf->auth_domain_name == NULL)
+			goto out;
+		status = svcauth_gss_register_pseudoflavor(pf->pseudoflavor,
+							pf->auth_domain_name);
+		if (status)
+			goto out;
+	}
 	return 0;
-}
-
-/* The following must be called with spinlock held: */
-int
-do_gss_mech_unregister(struct gss_api_mech *gm)
-{
-
-	list_del(&gm->gm_list);
-
-	dprintk("RPC: unregistered mechanism with oid:\n");
-	print_hexl((u32 *)gm->gm_oid.data, gm->gm_oid.len, 0);
-	if (!gss_mech_put(gm)) {
-		dprintk("RPC: We just unregistered a gss_mechanism which"
-				" someone is still using.\n");
-		return -1;
-	} else {
-		return 0;
-	}
+out:
+	gss_mech_free(gm);
+	return status;
 }
 
 int
-gss_mech_unregister(struct gss_api_mech *gm)
+gss_mech_register(struct gss_api_mech *gm)
 {
 	int status;
 
+	status = gss_mech_svc_setup(gm);
+	if (status)
+		return status;
 	spin_lock(&registered_mechs_lock);
-	status = do_gss_mech_unregister(gm);
+	list_add(&gm->gm_list, &registered_mechs);
 	spin_unlock(&registered_mechs_lock);
-	return status;
+	dprintk("RPC:      registered gss mechanism %s\n", gm->gm_name);
+	return 0;
 }
 
-int
-gss_mech_unregister_all(void)
+EXPORT_SYMBOL(gss_mech_register);
+
+void
+gss_mech_unregister(struct gss_api_mech *gm)
 {
-	struct list_head	*pos;
-	struct gss_api_mech	*gm;
-	int			status = 0;
-
 	spin_lock(&registered_mechs_lock);
-	while (!list_empty(&registered_mechs)) {
-		pos = registered_mechs.next;
-		gm = list_entry(pos, struct gss_api_mech, gm_list);
-		if (do_gss_mech_unregister(gm))
-			status = -1;
-	}
+	list_del(&gm->gm_list);
 	spin_unlock(&registered_mechs_lock);
-	return status;
+	dprintk("RPC:      unregistered gss mechanism %s\n", gm->gm_name);
+	gss_mech_free(gm);
 }
+
+EXPORT_SYMBOL(gss_mech_unregister);
 
 struct gss_api_mech *
 gss_mech_get(struct gss_api_mech *gm)
 {
-	atomic_inc(&gm->gm_count);
+	__module_get(gm->gm_owner);
 	return gm;
 }
 
-struct gss_api_mech *
-gss_mech_get_by_OID(struct xdr_netobj *mech_type)
-{
-	struct gss_api_mech 	*pos, *gm = NULL;
-
-	dprintk("RPC: gss_mech_get_by_OID searching for mechanism with OID:\n");
-	print_hexl((u32 *)mech_type->data, mech_type->len, 0);
-	spin_lock(&registered_mechs_lock);
-	list_for_each_entry(pos, &registered_mechs, gm_list) {
-		if ((pos->gm_oid.len == mech_type->len)
-			&& !memcmp(pos->gm_oid.data, mech_type->data,
-							mech_type->len)) {
-			gm = gss_mech_get(pos);
-			break;
-		}
-	}
-	spin_unlock(&registered_mechs_lock);
-	dprintk("RPC: gss_mech_get_by_OID %s it\n", gm ? "found" : "didn't find");
-	return gm;
-}
+EXPORT_SYMBOL(gss_mech_get);
 
 struct gss_api_mech *
 gss_mech_get_by_name(char *name)
@@ -168,8 +149,10 @@ gss_mech_get_by_name(char *name)
 
 	spin_lock(&registered_mechs_lock);
 	list_for_each_entry(pos, &registered_mechs, gm_list) {
-		if (0 == strcmp(name, pos->gm_ops->name)) {
-			gm = gss_mech_get(pos);
+		if (0 == strcmp(name, pos->gm_name)) {
+			if (!try_module_get(pos->gm_owner))
+				continue;
+			gm = pos;
 			break;
 		}
 	}
@@ -178,18 +161,77 @@ gss_mech_get_by_name(char *name)
 
 }
 
-int
+EXPORT_SYMBOL(gss_mech_get_by_name);
+
+static inline int
+mech_supports_pseudoflavor(struct gss_api_mech *gm, u32 pseudoflavor)
+{
+	int i;
+
+	for (i = 0; i < gm->gm_pf_num; i++) {
+		if (gm->gm_pfs[i].pseudoflavor == pseudoflavor)
+			return 1;
+	}
+	return 0;
+}
+
+struct gss_api_mech *
+gss_mech_get_by_pseudoflavor(u32 pseudoflavor)
+{
+	struct gss_api_mech *pos, *gm = NULL;
+
+	spin_lock(&registered_mechs_lock);
+	list_for_each_entry(pos, &registered_mechs, gm_list) {
+		if (!try_module_get(pos->gm_owner))
+			continue;
+		if (!mech_supports_pseudoflavor(pos, pseudoflavor)) {
+			module_put(pos->gm_owner);
+			continue;
+		}
+		gm = pos;
+		break;
+	}
+	spin_unlock(&registered_mechs_lock);
+	return gm;
+}
+
+EXPORT_SYMBOL(gss_mech_get_by_pseudoflavor);
+
+u32
+gss_pseudoflavor_to_service(struct gss_api_mech *gm, u32 pseudoflavor)
+{
+	int i;
+
+	for (i = 0; i < gm->gm_pf_num; i++) {
+		if (gm->gm_pfs[i].pseudoflavor == pseudoflavor)
+			return gm->gm_pfs[i].service;
+	}
+	return 0;
+}
+
+EXPORT_SYMBOL(gss_pseudoflavor_to_service);
+
+char *
+gss_service_to_auth_domain_name(struct gss_api_mech *gm, u32 service)
+{
+	int i;
+
+	for (i = 0; i < gm->gm_pf_num; i++) {
+		if (gm->gm_pfs[i].service == service)
+			return gm->gm_pfs[i].auth_domain_name;
+	}
+	return NULL;
+}
+
+EXPORT_SYMBOL(gss_service_to_auth_domain_name);
+
+void
 gss_mech_put(struct gss_api_mech * gm)
 {
-	if (atomic_dec_and_test(&gm->gm_count)) {
-		if (gm->gm_oid.len >0)
-			kfree(gm->gm_oid.data);
-		kfree(gm);
-		return 1;
-	} else {
-		return 0;
-	}
+	module_put(gm->gm_owner);
 }
+
+EXPORT_SYMBOL(gss_mech_put);
 
 /* The mech could probably be determined from the token instead, but it's just
  * as easy for now to pass it in. */
@@ -244,7 +286,8 @@ gss_verify_mic(struct gss_ctx		*context_handle,
 u32
 gss_delete_sec_context(struct gss_ctx	**context_handle)
 {
-	dprintk("gss_delete_sec_context deleting %p\n",*context_handle);
+	dprintk("RPC:      gss_delete_sec_context deleting %p\n",
+			*context_handle);
 
 	if (!*context_handle)
 		return(GSS_S_NO_CONTEXT);

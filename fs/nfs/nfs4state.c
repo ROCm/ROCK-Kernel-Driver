@@ -731,6 +731,8 @@ nfs4_reclaim_open_state(struct nfs4_state_owner *sp)
 	int status = 0;
 
 	list_for_each_entry(state, &sp->so_states, open_states) {
+		if (state->state == 0)
+			continue;
 		status = nfs4_open_reclaim(sp, state);
 		if (status >= 0)
 			continue;

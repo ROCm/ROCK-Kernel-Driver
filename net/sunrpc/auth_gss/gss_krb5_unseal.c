@@ -99,6 +99,10 @@ krb5_read_token(struct krb5_ctx *ctx,
 	if (g_verify_token_header(&ctx->mech_used, &bodysize, &ptr, toktype,
 					read_token->len))
 		goto out;
+
+	if ((*ptr++ != ((toktype>>8)&0xff)) || (*ptr++ != (toktype&0xff)))
+		goto out;
+
 	/* XXX sanity-check bodysize?? */
 
 	if (toktype == KG_TOK_WRAP_MSG) {
@@ -149,7 +153,7 @@ krb5_read_token(struct krb5_ctx *ctx,
 
 	switch (signalg) {
 	case SGN_ALG_DES_MAC_MD5:
-		ret = krb5_make_checksum(checksum_type, ptr - 2,
+		ret = make_checksum(checksum_type, ptr - 2, 8,
 					 message_buffer, &md5cksum);
 		if (ret)
 			goto out;
@@ -174,7 +178,7 @@ krb5_read_token(struct krb5_ctx *ctx,
 	if (qop_state)
 		*qop_state = GSS_C_QOP_DEFAULT;
 
-	now = jiffies;
+	now = get_seconds();
 
 	ret = GSS_S_CONTEXT_EXPIRED;
 	if (now > ctx->endtime)
