@@ -117,16 +117,24 @@ struct nfs4_replay {
 };
 
 /*
-* nfs4_stateowner can either be an open_owner, or (eventually) a lock_owner
+* nfs4_stateowner can either be an open_owner, or a lock_owner
 *
-*    o so_perfilestate list is used to ensure no dangling nfs4_stateid
-*              reverences when we release a stateowner.
+*    so_idhash:  stateid_hashtbl[] for open owner, lockstateid_hashtbl[]
+*         for lock_owner
+*    so_strhash: ownerstr_hashtbl[] for open_owner, lock_ownerstr_hashtbl[]
+*         for lock_owner
+*    so_perclient: nfs4_client->cl_perclient entry - used when nfs4_client
+*         struct is reaped.
+*    so_perfilestate: heads the list of nfs4_stateid (either open or lock) 
+*         and is used to ensure no dangling nfs4_stateid references when we 
+*         release a stateowner.
 */
 struct nfs4_stateowner {
 	struct list_head        so_idhash;   /* hash by so_id */
 	struct list_head        so_strhash;   /* hash by op_name */
 	struct list_head        so_perclient; /* nfs4_client->cl_perclient */
 	struct list_head        so_perfilestate; /* list: nfs4_stateid */
+	int			so_is_open_owner; /* 1=openowner,0=lockowner */
 	u32                     so_id;
 	struct nfs4_client *    so_client;
 	u32                     so_seqid;    
@@ -152,12 +160,18 @@ struct nfs4_file {
 * nfs4_stateid can either be an open stateid or (eventually) a lock stateid
 *
 * (open)nfs4_stateid: one per (open)nfs4_stateowner, nfs4_file
+*
+* 	st_hash: stateid_hashtbl[] entry or lockstateid_hashtbl entry
+* 	st_perfile: file_hashtbl[] entry.
+* 	st_perfile_state: nfs4_stateowner->so_perfilestate
+* 	st_share_access: used only for open stateid
+* 	st_share_deny: used only for open stateid
 */
 
 struct nfs4_stateid {
-	struct list_head              st_hash;
+	struct list_head              st_hash; 
 	struct list_head              st_perfile;
-	struct list_head              st_perfilestate;
+	struct list_head              st_perfilestate; 
 	struct nfs4_stateowner      * st_stateowner;
 	struct nfs4_file            * st_file;
 	stateid_t                     st_stateid;
@@ -170,6 +184,9 @@ struct nfs4_stateid {
 /* flags for preprocess_seqid_op() */
 #define CHECK_FH                0x00000001
 #define CONFIRM                 0x00000002
+#define OPEN_STATE              0x00000004
+#define LOCK_STATE              0x00000008
+#define RDWR_STATE              0x00000010
 
 #define seqid_mutating_err(err)                       \
 	(((err) != nfserr_stale_clientid) &&    \

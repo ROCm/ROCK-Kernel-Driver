@@ -568,6 +568,44 @@ nfsd4_decode_link(struct nfsd4_compoundargs *argp, struct nfsd4_link *link)
 }
 
 static int
+nfsd4_decode_lock(struct nfsd4_compoundargs *argp, struct nfsd4_lock *lock)
+{
+	DECODE_HEAD;
+
+	/*
+	* type, reclaim(boolean), offset, length, new_lock_owner(boolean)
+	*/
+	READ_BUF(28);
+	READ32(lock->lk_type);
+	if ((lock->lk_type < NFS4_READ_LT) || (lock->lk_type > NFS4_WRITEW_LT))
+		goto xdr_error;
+	READ32(lock->lk_reclaim);
+	READ64(lock->lk_offset);
+	READ64(lock->lk_length);
+	READ32(lock->lk_is_new);
+
+	if (lock->lk_is_new) {
+		READ_BUF(36);
+		READ32(lock->lk_new_open_seqid);
+		READ32(lock->lk_new_open_stateid.si_generation);
+
+		COPYMEM(&lock->lk_new_open_stateid.si_opaque, sizeof(stateid_opaque_t));
+		READ32(lock->lk_new_lock_seqid);
+		COPYMEM(&lock->lk_new_clientid, sizeof(clientid_t));
+		READ32(lock->lk_new_owner.len);
+		READ_BUF(lock->lk_new_owner.len);
+		READMEM(lock->lk_new_owner.data, lock->lk_new_owner.len);
+	} else {
+		READ_BUF(20);
+		READ32(lock->lk_old_lock_stateid.si_generation);
+		COPYMEM(&lock->lk_old_lock_stateid.si_opaque, sizeof(stateid_opaque_t));
+		READ32(lock->lk_old_lock_seqid);
+	}
+
+	DECODE_TAIL;
+}
+
+static int
 nfsd4_decode_lookup(struct nfsd4_compoundargs *argp, struct nfsd4_lookup *lookup)
 {
 	DECODE_HEAD;
@@ -988,6 +1026,9 @@ nfsd4_decode_compound(struct nfsd4_compoundargs *argp)
 			break;
 		case OP_LINK:
 			op->status = nfsd4_decode_link(argp, &op->u.link);
+			break;
+		case OP_LOCK:
+			op->status = nfsd4_decode_lock(argp, &op->u.lock);
 			break;
 		case OP_LOOKUP:
 			op->status = nfsd4_decode_lookup(argp, &op->u.lookup);
@@ -1709,6 +1750,42 @@ nfsd4_encode_getfh(struct nfsd4_compoundres *resp, int nfserr, struct svc_fh *fh
 	}
 }
 
+/*
+* Including all fields other than the name, a LOCK4denied structure requires
+*   8(clientid) + 4(namelen) + 8(offset) + 8(length) + 4(type) = 32 bytes.
+*/
+static void
+nfsd4_encode_lock_denied(struct nfsd4_compoundres *resp, struct nfsd4_lock_denied *ld)
+{
+	ENCODE_HEAD;
+
+	RESERVE_SPACE(32 + XDR_LEN(ld->ld_sop->so_owner.len));
+	WRITE64(ld->ld_start);
+	WRITE64(ld->ld_length);
+	WRITE32(ld->ld_type);
+	WRITEMEM(&ld->ld_sop->so_client->cl_clientid, 8);
+	WRITE32(ld->ld_sop->so_owner.len);
+	WRITEMEM(ld->ld_sop->so_owner.data, ld->ld_sop->so_owner.len);
+	ADJUST_ARGS();
+}
+
+static void
+nfsd4_encode_lock(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_lock *lock)
+{
+
+	ENCODE_SEQID_OP_HEAD;
+
+	if (!nfserr) {
+		RESERVE_SPACE(4 + sizeof(stateid_t));
+		WRITE32(lock->lk_resp_stateid.si_generation);
+		WRITEMEM(&lock->lk_resp_stateid.si_opaque, sizeof(stateid_opaque_t));
+		ADJUST_ARGS();
+	} else if (nfserr == nfserr_denied)
+		nfsd4_encode_lock_denied(resp, &lock->lk_denied);
+
+	ENCODE_SEQID_OP_TAIL(lock->lk_stateowner);
+}
+
 static void
 nfsd4_encode_link(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_link *link)
 {
@@ -2118,6 +2195,9 @@ nfsd4_encode_operation(struct nfsd4_compoundres *resp, struct nfsd4_op *op)
 		break;
 	case OP_LINK:
 		nfsd4_encode_link(resp, op->status, &op->u.link);
+		break;
+	case OP_LOCK:
+		nfsd4_encode_lock(resp, op->status, &op->u.lock);
 		break;
 	case OP_LOOKUP:
 		break;

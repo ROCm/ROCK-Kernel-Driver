@@ -40,6 +40,7 @@
 #define _LINUX_NFSD_XDR4_H
 
 #define NFSD4_MAX_TAGLEN	128
+#define XDR_LEN(n)                     (((n) + 3) & ~3)
 
 typedef u32 delegation_zero_t;
 typedef u32 delegation_boot_t;
@@ -110,6 +111,56 @@ struct nfsd4_link {
 	char *		li_name;            /* request */
 	struct nfsd4_change_info  li_cinfo; /* response */
 };
+
+struct nfsd4_lock_denied {
+	struct nfs4_stateowner   *ld_sop;
+	u64             ld_start;
+	u64             ld_length;
+	u32             ld_type;
+};
+
+struct nfsd4_lock {
+	/* request */
+	u32             lk_type;
+	u32             lk_reclaim;         /* boolean */
+	u64             lk_offset;
+	u64             lk_length;
+	u32             lk_is_new;
+	union {
+		struct {
+			u32             open_seqid;
+			stateid_t       open_stateid;
+			u32             lock_seqid;
+			clientid_t      clientid;
+			struct xdr_netobj owner;
+		} new;
+		struct {
+			stateid_t       lock_stateid;
+			u32             lock_seqid;
+		} old;
+	} v;
+
+	/* response */
+	union {
+		struct {
+			stateid_t               stateid;
+		} ok;
+		struct nfsd4_lock_denied        denied;
+	} u;
+
+	struct nfs4_stateowner *lk_stateowner;
+};
+#define lk_new_open_seqid       v.new.open_seqid
+#define lk_new_open_stateid     v.new.open_stateid
+#define lk_new_lock_seqid       v.new.lock_seqid
+#define lk_new_clientid         v.new.clientid
+#define lk_new_owner            v.new.owner
+#define lk_old_lock_stateid     v.old.lock_stateid
+#define lk_old_lock_seqid       v.old.lock_seqid
+
+#define lk_rflags       u.ok.rflags
+#define lk_resp_stateid u.ok.stateid
+#define lk_denied       u.denied
 
 struct nfsd4_lookup {
 	u32		lo_len;             /* request */
@@ -266,6 +317,7 @@ struct nfsd4_op {
 		struct nfsd4_getattr		getattr;
 		struct svc_fh *			getfh;
 		struct nfsd4_link		link;
+		struct nfsd4_lock		lock;
 		struct nfsd4_lookup		lookup;
 		struct nfsd4_verify		nverify;
 		struct nfsd4_open		open;
@@ -357,6 +409,8 @@ extern  int nfsd4_close(struct svc_rqst *rqstp, struct svc_fh *current_fh,
 		struct nfsd4_close *close);
 extern int nfsd4_open_downgrade(struct svc_rqst *rqstp, 
 		struct svc_fh *current_fh, struct nfsd4_open_downgrade *od);
+extern int nfsd4_lock(struct svc_rqst *rqstp, struct svc_fh *current_fh, 
+		struct nfsd4_lock *lock);
 #endif
 
 /*

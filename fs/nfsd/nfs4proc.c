@@ -377,7 +377,7 @@ nfsd4_read(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_read 
 	}
 	/* check stateid */
 	if ((status = nfs4_preprocess_stateid_op(current_fh, &read->rd_stateid, 
-					CHECK_FH, &stp))) {
+					CHECK_FH | RDWR_STATE, &stp))) {
 		dprintk("NFSD: nfsd4_read: couldn't process stateid!\n");
 		goto out;
 	}
@@ -467,7 +467,7 @@ nfsd4_setattr(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_se
 		nfs4_lock_state();
 		if ((status = nfs4_preprocess_stateid_op(current_fh, 
 						&setattr->sa_stateid, 
-						CHECK_FH, &stp))) {
+						CHECK_FH | RDWR_STATE, &stp))) {
 			dprintk("NFSD: nfsd4_setattr: couldn't process stateid!\n");
 			goto out;
 		}
@@ -507,7 +507,7 @@ nfsd4_write(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_writ
 		goto zero_stateid;
 	}
 	if ((status = nfs4_preprocess_stateid_op(current_fh, stateid, 
-					CHECK_FH, &stp))) {
+					CHECK_FH | RDWR_STATE, &stp))) {
 		dprintk("NFSD: nfsd4_write: couldn't process stateid!\n");
 		goto out;
 	}
@@ -680,6 +680,9 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 			break;
 		case OP_LINK:
 			op->status = nfsd4_link(rqstp, &current_fh, &save_fh, &op->u.link);
+			break;
+		case OP_LOCK:
+			op->status = nfsd4_lock(rqstp, &current_fh, &op->u.lock);
 			break;
 		case OP_LOOKUP:
 			op->status = nfsd4_lookup(rqstp, &current_fh, &op->u.lookup);
