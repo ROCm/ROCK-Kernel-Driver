@@ -52,13 +52,13 @@ static int frodo_getscl (void *data)
 }
 
 static struct i2c_algo_bit_data bit_frodo_data = {
-	setsda:		frodo_setsda,
-	setscl:		frodo_setscl,
-	getsda:		frodo_getsda,
-	getscl:		frodo_getscl,
-	udelay:		80,
-	mdelay:		80,
-	timeout:	100
+	.setsda		= frodo_setsda,
+	.setscl		= frodo_setscl,
+	.getsda		= frodo_getsda,
+	.getscl		= frodo_getscl,
+	.udelay		= 80,
+	.mdelay		= 80,
+	.timeout	= 100
 };
 
 static int frodo_client_register (struct i2c_client *client)
@@ -82,14 +82,13 @@ static void frodo_dec_use (struct i2c_adapter *adapter)
 }
 
 static struct i2c_adapter frodo_ops = {
-	name:				"Frodo adapter driver",
-	id:					I2C_HW_B_FRODO,
-	algo:				NULL,
-	algo_data:			&bit_frodo_data,
-	inc_use:			frodo_inc_use,
-	dec_use:			frodo_dec_use,
-	client_register:	frodo_client_register,
-	client_unregister:	frodo_client_unregister
+	.name			= "Frodo adapter driver",
+	.id			= I2C_HW_B_FRODO,
+	.algo_data		= &bit_frodo_data,
+	.inc_use		= frodo_inc_use,
+	.dec_use		= frodo_dec_use,
+	.client_register	= frodo_client_register,
+	.client_unregister	= frodo_client_unregister
 };
 
 static int __init i2c_frodo_init (void)
