@@ -247,6 +247,13 @@ ChangeLog
 
 Note, a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
 
+2.1.2:
+	- Major bug fixes aleviating the hangs in statfs experienced by some
+	  users.
+2.1.1:
+	- Update handling of compressed files so people no longer get the
+	  frequently reported warning messages about initialized_size !=
+	  data_size.
 2.1.0:
 	- Add configuration option for developmental write support.
 	- Initial implementation of file overwriting. (Writes to resident files
