@@ -33,7 +33,7 @@
 /* This lock protects the commac list. On today UP implementations, it's
  * really only used as IRQ protection in mal_{register,unregister}_commac()
  */
-static rwlock_t mal_list_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(mal_list_lock);
 
 int mal_register_commac(struct ibm_ocp_mal *mal, struct mal_commac *commac)
 {

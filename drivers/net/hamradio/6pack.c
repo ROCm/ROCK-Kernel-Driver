@@ -422,7 +422,7 @@ out_mem:
  * best way to fix this is to use a rwlock in the tty struct, but for now we
  * use a single global rwlock for all ttys in ppp line discipline.
  */
-static rwlock_t disc_data_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(disc_data_lock);
                                                                                 
 static struct sixpack *sp_get(struct tty_struct *tty)
 {

@@ -72,7 +72,7 @@ static char version[] __devinitdata =
 static BCSR * const bcsr = (BCSR *)0xAE000000;
 #endif
 
-static spinlock_t ir_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(ir_lock);
 
 /*
  * IrDA peripheral bug. You have to read the register

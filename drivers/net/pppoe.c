@@ -86,7 +86,7 @@ static int pppoe_xmit(struct ppp_channel *chan, struct sk_buff *skb);
 static int __pppoe_xmit(struct sock *sk, struct sk_buff *skb);
 
 static struct proto_ops pppoe_ops;
-static rwlock_t pppoe_hash_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(pppoe_hash_lock);
 
 static struct ppp_channel_ops pppoe_chan_ops;
 

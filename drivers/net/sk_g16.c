@@ -457,7 +457,7 @@ struct priv
 /* static variables */
 
 static SK_RAM *board;  /* pointer to our memory mapped board components */
-static spinlock_t SK_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(SK_lock);
 
 /* Macros */
 

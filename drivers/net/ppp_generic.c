@@ -210,7 +210,7 @@ static atomic_t ppp_unit_count = ATOMIC_INIT(0);
  * and the atomicity of find a channel and updating its file.refcnt
  * field.
  */
-static spinlock_t all_channels_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(all_channels_lock);
 static LIST_HEAD(all_channels);
 static LIST_HEAD(new_channels);
 static int last_channel_index;
@@ -2218,7 +2218,7 @@ ppp_ccp_closed(struct ppp *ppp)
 
 /* List of compressors. */
 static LIST_HEAD(compressor_list);
-static spinlock_t compressor_list_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(compressor_list_lock);
 
 struct compressor_entry {
 	struct list_head list;

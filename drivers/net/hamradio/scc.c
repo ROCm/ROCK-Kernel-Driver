@@ -237,7 +237,7 @@ static io_port Vector_Latch;
 
 /* These provide interrupt save 2-step access to the Z8530 registers */
 
-static spinlock_t iolock = SPIN_LOCK_UNLOCKED;	/* Guards paired accesses */
+static DEFINE_SPINLOCK(iolock);	/* Guards paired accesses */
 
 static inline unsigned char InReg(io_port port, unsigned char reg)
 {
