@@ -343,7 +343,7 @@ static int cycx_data_boot(u32 addr, u8 *code, u32 len)
 
 	for (i = 0 ; i < len ; i += CFM_LOAD_BUFSZ)
 		if (buffer_load(addr, code + i,
-				MIN(CFM_LOAD_BUFSZ, (len - i))) < 0) {
+				min_t(u32, CFM_LOAD_BUFSZ, (len - i))) < 0) {
 			printk(KERN_ERR "%s: Error !!\n", modname);
 			return -1;
 		}
@@ -374,7 +374,7 @@ static int cycx_code_boot(u32 addr, u8 *code, u32 len)
 
 	for (i = 0 ; i < len ; i += CFM_LOAD_BUFSZ)
 		if (buffer_load(addr, code + i,
-				MIN(CFM_LOAD_BUFSZ, (len - i)))) {
+				min_t(u32, CFM_LOAD_BUFSZ, (len - i)))) {
 			printk(KERN_ERR "%s: Error !!\n", modname);
 			return -1;
 		}
