@@ -93,9 +93,11 @@ xfs_qm_dquot_logitem_pin(
  * anyone in xfs_dqwait_unpin() if the count goes to 0.	 The
  * dquot must have been previously pinned with a call to xfs_dqpin().
  */
+/* ARGSUSED */
 STATIC void
 xfs_qm_dquot_logitem_unpin(
-	xfs_dq_logitem_t *logitem)
+	xfs_dq_logitem_t *logitem,
+	int		  stale)
 {
 	unsigned long	s;
 	xfs_dquot_t *dqp;
@@ -116,7 +118,7 @@ xfs_qm_dquot_logitem_unpin_remove(
 	xfs_dq_logitem_t *logitem,
 	xfs_trans_t	 *tp)
 {
-	xfs_qm_dquot_logitem_unpin(logitem);
+	xfs_qm_dquot_logitem_unpin(logitem, 0);
 }
 
 /*
@@ -396,7 +398,8 @@ struct xfs_item_ops xfs_dquot_item_ops = {
 	.iop_format	= (void(*)(xfs_log_item_t*, xfs_log_iovec_t*))
 					xfs_qm_dquot_logitem_format,
 	.iop_pin	= (void(*)(xfs_log_item_t*))xfs_qm_dquot_logitem_pin,
-	.iop_unpin	= (void(*)(xfs_log_item_t*))xfs_qm_dquot_logitem_unpin,
+	.iop_unpin	= (void(*)(xfs_log_item_t*, int))
+					xfs_qm_dquot_logitem_unpin,
 	.iop_unpin_remove = (void(*)(xfs_log_item_t*, xfs_trans_t*))
 					xfs_qm_dquot_logitem_unpin_remove,
 	.iop_trylock	= (uint(*)(xfs_log_item_t*))
@@ -492,7 +495,7 @@ xfs_qm_qoff_logitem_pin(xfs_qoff_logitem_t *qf)
  */
 /*ARGSUSED*/
 STATIC void
-xfs_qm_qoff_logitem_unpin(xfs_qoff_logitem_t *qf)
+xfs_qm_qoff_logitem_unpin(xfs_qoff_logitem_t *qf, int stale)
 {
 	return;
 }
@@ -613,7 +616,8 @@ struct xfs_item_ops xfs_qm_qoffend_logitem_ops = {
 	.iop_format	= (void(*)(xfs_log_item_t*, xfs_log_iovec_t*))
 					xfs_qm_qoff_logitem_format,
 	.iop_pin	= (void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_pin,
-	.iop_unpin	= (void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_unpin,
+	.iop_unpin	= (void(*)(xfs_log_item_t* ,int))
+					xfs_qm_qoff_logitem_unpin,
 	.iop_unpin_remove = (void(*)(xfs_log_item_t*,xfs_trans_t*))
 					xfs_qm_qoff_logitem_unpin_remove,
 	.iop_trylock	= (uint(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_trylock,
@@ -635,7 +639,8 @@ struct xfs_item_ops xfs_qm_qoff_logitem_ops = {
 	.iop_format	= (void(*)(xfs_log_item_t*, xfs_log_iovec_t*))
 					xfs_qm_qoff_logitem_format,
 	.iop_pin	= (void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_pin,
-	.iop_unpin	= (void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_unpin,
+	.iop_unpin	= (void(*)(xfs_log_item_t*, int))
+					xfs_qm_qoff_logitem_unpin,
 	.iop_unpin_remove = (void(*)(xfs_log_item_t*,xfs_trans_t*))
 					xfs_qm_qoff_logitem_unpin_remove,
 	.iop_trylock	= (uint(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_trylock,
