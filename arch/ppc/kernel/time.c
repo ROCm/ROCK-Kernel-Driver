@@ -76,7 +76,6 @@ extern struct timezone sys_tz;
 
 /* keep track of when we need to update the rtc */
 time_t last_rtc_update;
-extern rwlock_t xtime_lock;
 
 /* The decrementer counts down by 128 every 128ns on a 601. */
 #define DECREMENTER_COUNT_601	(1000000000 / HZ)
@@ -161,7 +160,7 @@ void timer_interrupt(struct pt_regs * regs)
 			continue;
 
 		/* We are in an interrupt, no need to save/restore flags */
-		write_lock(&xtime_lock);
+		write_seqlock(&xtime_lock);
 		tb_last_stamp = jiffy_stamp;
 		do_timer(regs);
 
@@ -191,7 +190,7 @@ void timer_interrupt(struct pt_regs * regs)
 				/* Try again one minute later */
 				last_rtc_update += 60;
 		}
-		write_unlock(&xtime_lock);
+		write_sequnlock(&xtime_lock);
 	}
 	if ( !disarm_decr[smp_processor_id()] )
 		set_dec(next_dec);
@@ -213,21 +212,23 @@ void timer_interrupt(struct pt_regs * regs)
 void do_gettimeofday(struct timeval *tv)
 {
 	unsigned long flags;
+	unsigned long seq;
 	unsigned delta, lost_ticks, usec, sec;
 
-	read_lock_irqsave(&xtime_lock, flags);
-	sec = xtime.tv_sec;
-	usec = (xtime.tv_nsec / 1000);
-	delta = tb_ticks_since(tb_last_stamp);
+	do {
+		seq = read_seqbegin_irqsave(&xtime_lock, flags);
+		sec = xtime.tv_sec;
+		usec = (xtime.tv_nsec / 1000);
+		delta = tb_ticks_since(tb_last_stamp);
 #ifdef CONFIG_SMP
-	/* As long as timebases are not in sync, gettimeofday can only
-	 * have jiffy resolution on SMP.
-	 */
-	if (!smp_tb_synchronized)
-		delta = 0;
+		/* As long as timebases are not in sync, gettimeofday can only
+		 * have jiffy resolution on SMP.
+		 */
+		if (!smp_tb_synchronized)
+			delta = 0;
 #endif /* CONFIG_SMP */
-	lost_ticks = jiffies - wall_jiffies;
-	read_unlock_irqrestore(&xtime_lock, flags);
+		lost_ticks = jiffies - wall_jiffies;
+	} while (read_seqretry_irqrestore(&xtime_lock, seq, flags));
 
 	usec += mulhwu(tb_to_us, tb_ticks_per_jiffy * lost_ticks + delta);
 	while (usec >= 1000000) {
@@ -243,7 +244,7 @@ void do_settimeofday(struct timeval *tv)
 	unsigned long flags;
 	int tb_delta, new_usec, new_sec;
 
-	write_lock_irqsave(&xtime_lock, flags);
+	write_seqlock_irqsave(&xtime_lock, flags);
 	/* Updating the RTC is not the job of this code. If the time is
 	 * stepped under NTP, the RTC will be update after STA_UNSYNC
 	 * is cleared. Tool like clock/hwclock either copy the RTC
@@ -283,7 +284,7 @@ void do_settimeofday(struct timeval *tv)
 	time_state = TIME_ERROR;        /* p. 24, (a) */
 	time_maxerror = NTP_PHASE_LIMIT;
 	time_esterror = NTP_PHASE_LIMIT;
-	write_unlock_irqrestore(&xtime_lock, flags);
+	write_sequnlock_irqrestore(&xtime_lock, flags);
 }
 
 /* This function is only called on the boot processor */

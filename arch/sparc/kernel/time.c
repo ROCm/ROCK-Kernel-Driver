@@ -23,6 +23,7 @@
 #include <linux/string.h>
 #include <linux/mm.h>
 #include <linux/interrupt.h>
+#include <linux/time.h>
 #include <linux/timex.h>
 #include <linux/init.h>
 #include <linux/pci.h>
@@ -41,8 +42,6 @@
 #include <asm/sun4paddr.h>
 #include <asm/page.h>
 #include <asm/pcic.h>
-
-extern rwlock_t xtime_lock;
 
 extern unsigned long wall_jiffies;
 
@@ -131,7 +130,7 @@ void timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 #endif
 
 	/* Protect counter clear so that do_gettimeoffset works */
-	write_lock(&xtime_lock);
+	write_seqlock(&xtime_lock);
 #ifdef CONFIG_SUN4
 	if((idprom->id_machtype == (SM_SUN4 | SM_4_260)) ||
 	   (idprom->id_machtype == (SM_SUN4 | SM_4_110))) {
@@ -155,7 +154,7 @@ void timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	  else
 	    last_rtc_update = xtime.tv_sec - 600; /* do it again in 60 s */
 	}
-	write_unlock(&xtime_lock);
+	write_sequnlock(&xtime_lock);
 }
 
 /* Kick start a stopped clock (procedure from the Sun NVRAM/hostid FAQ). */
@@ -470,18 +469,20 @@ extern __inline__ unsigned long do_gettimeoffset(void)
 void do_gettimeofday(struct timeval *tv)
 {
 	unsigned long flags;
+	unsigned long seq;
 	unsigned long usec, sec;
 
-	read_lock_irqsave(&xtime_lock, flags);
-	usec = do_gettimeoffset();
-	{
-		unsigned long lost = jiffies - wall_jiffies;
-		if (lost)
-			usec += lost * (1000000 / HZ);
-	}
-	sec = xtime.tv_sec;
-	usec += (xtime.tv_nsec / 1000);
-	read_unlock_irqrestore(&xtime_lock, flags);
+	do {
+		seq = read_seqbegin_irqsave(&xtime_lock, flags);
+		usec = do_gettimeoffset();
+		{
+			unsigned long lost = jiffies - wall_jiffies;
+			if (lost)
+				usec += lost * (1000000 / HZ);
+		}
+		sec = xtime.tv_sec;
+		usec += (xtime.tv_nsec / 1000);
+	} while (read_seqretry_irqrestore(&xtime_lock, seq, flags));
 
 	while (usec >= 1000000) {
 		usec -= 1000000;
@@ -494,9 +495,9 @@ void do_gettimeofday(struct timeval *tv)
 
 void do_settimeofday(struct timeval *tv)
 {
-	write_lock_irq(&xtime_lock);
+	write_seqlock_irq(&xtime_lock);
 	bus_do_settimeofday(tv);
-	write_unlock_irq(&xtime_lock);
+	write_sequnlock_irq(&xtime_lock);
 }
 
 static void sbus_do_settimeofday(struct timeval *tv)

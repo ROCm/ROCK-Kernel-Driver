@@ -793,7 +793,7 @@ acpi_rs_get_pci_routing_table_length (
 				 * The length String.Length field does not include the
 				 * terminating NULL, add 1
 				 */
-				temp_size_needed += ((*sub_object_list)->string.length + 1);
+				temp_size_needed += ((acpi_size) (*sub_object_list)->string.length + 1);
 			}
 			else {
 				temp_size_needed += acpi_ns_get_pathname_length (

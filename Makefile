@@ -53,8 +53,10 @@ HOSTCXXFLAGS	= -O2
 CROSS_COMPILE 	=
 
 # 	That's our default target when none is given on the command line
+#	Note that 'modules' will be added as a prerequisite as well, 
+#	in the CONFIG_MODULES part below
 
-all:	vmlinux modules
+all:	vmlinux
 
 # 	Decide whether to build built-in, modular, or both.
 #	Normally, just do built-in.
@@ -507,6 +509,10 @@ depend dep:
 # Modules
 
 ifdef CONFIG_MODULES
+
+# 	By default, build modules as well
+
+all: modules
 
 #	Build modules
 

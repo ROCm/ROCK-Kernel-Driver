@@ -458,6 +458,11 @@ config ALPHA_SRM
 
 	  If unsure, say N.
 
+config EARLY_PRINTK
+	bool
+	depends on ALPHA_GENERIC || ALPHA_SRM
+	default y
+
 config ALPHA_EISA
 	bool
 	depends on ALPHA_ALCOR || ALPHA_MIKASA || ALPHA_SABLE || ALPHA_NORITAKE || ALPHA_RAWHIDE

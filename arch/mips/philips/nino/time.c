@@ -19,12 +19,12 @@
 #include <linux/string.h>
 #include <linux/mm.h>
 #include <linux/interrupt.h>
+#include <linux/time.h>
 #include <linux/timex.h>
 #include <linux/delay.h>
 #include <asm/tx3912.h>
 
 extern volatile unsigned long wall_jiffies;
-extern rwlock_t xtime_lock;
 
 static struct timeval xbase;
 
@@ -62,29 +62,31 @@ void inline readRTC(unsigned long *high, unsigned long *low)
 void do_gettimeofday(struct timeval *tv)
 {
     unsigned long flags;
+    unsigned long seq;
     unsigned long high, low;
 
-    read_lock_irqsave(&xtime_lock, flags);
-    // 40 bit RTC, driven by 32khz source:
-    // +-----------+-----------------------------------------+
-    // | HHHH.HHHH | LLLL.LLLL.LLLL.LLLL.LMMM.MMMM.MMMM.MMMM |
-    // +-----------+-----------------------------------------+
-    readRTC(&high,&low);
-    tv->tv_sec  = (high << 17) | (low >> 15);
-    tv->tv_usec = (low % 32768) * 1953 / 64;
-    tv->tv_sec += xbase.tv_sec;
-    tv->tv_usec += xbase.tv_usec;
+    do {
+	    seq = read_seqbegin_irqsave(&xtime_lock, flags);
 
-    tv->tv_usec += do_gettimeoffset();
+	    // 40 bit RTC, driven by 32khz source:
+	    // +-----------+-----------------------------------------+
+	    // | HHHH.HHHH | LLLL.LLLL.LLLL.LLLL.LMMM.MMMM.MMMM.MMMM |
+	    // +-----------+-----------------------------------------+
+	    readRTC(&high,&low);
+	    tv->tv_sec  = (high << 17) | (low >> 15);
+	    tv->tv_usec = (low % 32768) * 1953 / 64;
+	    tv->tv_sec += xbase.tv_sec;
+	    tv->tv_usec += xbase.tv_usec;
 
-    /*
-     * xtime is atomically updated in timer_bh. lost_ticks is
-     * nonzero if the timer bottom half hasnt executed yet.
-     */
-    if (jiffies - wall_jiffies)
-	tv->tv_usec += USECS_PER_JIFFY;
+	    tv->tv_usec += do_gettimeoffset();
 
-    read_unlock_irqrestore(&xtime_lock, flags);
+	    /*
+	     * xtime is atomically updated in timer_bh. lost_ticks is
+	     * nonzero if the timer bottom half hasnt executed yet.
+	     */
+	    if (jiffies - wall_jiffies)
+		    tv->tv_usec += USECS_PER_JIFFY;
+    } while (read_seqretry_irqrestore(&xtime_lock, seq, flags));
 
     if (tv->tv_usec >= 1000000) {
 	tv->tv_usec -= 1000000;
@@ -94,7 +96,7 @@ void do_gettimeofday(struct timeval *tv)
 
 void do_settimeofday(struct timeval *tv)
 {
-    write_lock_irq(&xtime_lock);
+    write_seqlock_irq(&xtime_lock);
     /* This is revolting. We need to set the xtime.tv_usec
      * correctly. However, the value in this location is
      * is value at the last tick.
@@ -118,7 +120,7 @@ void do_settimeofday(struct timeval *tv)
     time_state = TIME_BAD;
     time_maxerror = MAXPHASE;
     time_esterror = MAXPHASE;
-    write_unlock_irq(&xtime_lock);
+    write_sequnlock_irq(&xtime_lock);
 }
 
 static int set_rtc_mmss(unsigned long nowtime)

@@ -7,6 +7,7 @@
 #include "linux/unistd.h"
 #include "linux/stddef.h"
 #include "linux/spinlock.h"
+#include "linux/time.h"
 #include "linux/sched.h"
 #include "linux/interrupt.h"
 #include "linux/init.h"
@@ -20,8 +21,6 @@
 #include "mode.h"
 
 u64 jiffies_64;
-
-extern rwlock_t xtime_lock;
 
 int hz(void)
 {
@@ -57,9 +56,9 @@ void boot_timer_handler(int sig)
 void um_timer(int irq, void *dev, struct pt_regs *regs)
 {
 	do_timer(regs);
-	write_lock(&xtime_lock);
+	write_seqlock(&xtime_lock);
 	timer();
-	write_unlock(&xtime_lock);
+	write_sequnlock(&xtime_lock);
 }
 
 long um_time(int * tloc)

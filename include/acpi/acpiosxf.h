@@ -312,7 +312,14 @@ acpi_os_get_line (
 void *
 acpi_os_open_directory (
 	char                            *pathname,
-	char                            *wildcard_spec);
+	char                            *wildcard_spec,
+	char                            requested_file_type);
+
+/* requeste_file_type values */
+
+#define REQUEST_FILE_ONLY                   0
+#define REQUEST_DIR_ONLY                    1
+
 
 char *
 acpi_os_get_next_filename (

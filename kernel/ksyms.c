@@ -55,6 +55,7 @@
 #include <linux/dnotify.h>
 #include <linux/mount.h>
 #include <linux/ptrace.h>
+#include <linux/time.h>
 #include <asm/checksum.h>
 
 #if defined(CONFIG_PROC_FS)
@@ -485,6 +486,7 @@ EXPORT_SYMBOL(kernel_flag);
 EXPORT_SYMBOL(jiffies);
 EXPORT_SYMBOL(jiffies_64);
 EXPORT_SYMBOL(xtime);
+EXPORT_SYMBOL(xtime_lock);
 EXPORT_SYMBOL(do_gettimeofday);
 EXPORT_SYMBOL(do_settimeofday);
 #ifdef CONFIG_DEBUG_SPINLOCK_SLEEP
