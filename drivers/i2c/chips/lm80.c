@@ -68,7 +68,7 @@ SENSORS_INSMOD_1(lm80);
    these macros are called: arguments may be evaluated more than once.
    Fixing this is just not worth it. */
 
-#define IN_TO_REG(val)		(SENSORS_LIMIT((val)/10,0,255))
+#define IN_TO_REG(val)		(SENSORS_LIMIT(((val)+5)/10,0,255))
 #define IN_FROM_REG(val)	((val)*10)
 
 static inline unsigned char FAN_TO_REG(unsigned rpm, unsigned div)
