@@ -9,6 +9,9 @@
  *
  * Copyright (C) 2000-2001 Toshiba Corporation 
  *
+ * Copyright (C) 2004 MontaVista Software Inc.
+ * Author: Manish Lachwani (mlachwani@mvista.com)
+ *
  *  This program is free software; you can redistribute  it and/or modify it
  *  under  the terms of  the GNU General  Public License as published by the
  *  Free Software Foundation;  either version 2 of the  License, or (at your
@@ -116,108 +119,22 @@ int pci_get_irq(struct pci_dev *dev, int pin)
 	return irq;
 }
 
-
-#ifdef  TX4927_SUPPORT_PCI_66
-extern int tx4927_pci66;
-extern void tx4927_pci66_setup(void);
-#endif
-extern void tx4927_pci_setup(void);
-
-#ifdef  TX4927_SUPPORT_PCI_66
-int tx4927_pci66_check(void)
+int __init pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 {
-	struct pci_dev *dev;
-	unsigned short stat;
-	int cap66 = 1;
-
-	if (tx4927_pci66 < 0)
-		return 0;
-
-	/* check 66MHz capability */
-	pci_for_each_dev(dev) {
-		if (cap66) {
-			pci_read_config_word(dev, PCI_STATUS, &stat);
-			if (!(stat & PCI_STATUS_66MHZ)) {
-				printk(KERN_INFO
-				       "PCI: %02x:%02x not 66MHz capable.\n",
-				       dev->bus->number, dev->devfn);
-				cap66 = 0;
-			}
-		}
-	}
-	return cap66;
-}
-#endif
-
-void __init pcibios_fixup_irqs(void)
-{
-	unsigned char pin;
 	unsigned char irq;
-	struct pci_dev *dev;
-	unsigned int id;
 
-#ifdef  TX4927_SUPPORT_PCI_66
-	if (tx4927_pci66_check()) {
-		tx4927_pci66_setup();
-		tx4927_pci_setup();	/* Reinitialize PCIC */
-	}
-#endif
+	printk("PCI Setup for pin %d \n", pin);
 
-	pci_for_each_dev(dev) {
-		DBG("FIXUP:\n");
-		DBG(" devfn=0x%02x (0x%02x:0x%02x)\n",
-		    dev->devfn, PCI_SLOT(dev->devfn),
-		    PCI_FUNC(dev->devfn));
+	if (dev->device == 0x9130) /* IDE */
+		irq = 14;
+	else
+		irq = pci_get_irq(dev, pin);
 
-		pci_read_config_dword(dev, PCI_VENDOR_ID, &id);
-		DBG(" id=0x%08x\n", id);
+	return irq;
+}
 
-		pci_read_config_byte(dev, PCI_INTERRUPT_LINE, &irq);
-		DBG(" line=0x%02x/%d\n", irq, irq);
-
-		pci_read_config_byte(dev, PCI_INTERRUPT_PIN, &pin);
-		DBG(" pin=%d\n", pin);
-
-#ifdef DEBUG
-		{
-			unsigned int tmp;
-			pci_read_config_dword(dev, 0x10, &tmp);
-			DBG(" bar0:0x10=0x%08x\n", tmp);
-			pci_read_config_dword(dev, 0x14, &tmp);
-			DBG(" bar1:0x14=0x%08x\n", tmp);
-			pci_read_config_dword(dev, 0x1c, &tmp);
-			DBG(" bar2:0x1c=0x%08x\n", tmp);
-			pci_read_config_dword(dev, 0x20, &tmp);
-			DBG(" bar3:0x20=0x%08x\n", tmp);
-			pci_read_config_dword(dev, 0x24, &tmp);
-			DBG(" bar4:0x24=0x%08x\n", tmp);
-		}
-#endif
-
-		irq = 0;
-
-		if (id == 0x91301055) {	/* ide */
-			irq = 14;
-		}
-
-		if (pin == 0) {
-			DBG(" auto irq (now=%d) -- skipping pin=0\n", irq);
-		} else if (irq) {
-			DBG(" auto irq (now=%d) -- skipping hardcoded irq\n", irq);
-		} else {
-			DBG(" auto irq (was=%d)\n", irq);
-			irq = pci_get_irq(dev, pin);
-			pci_write_config_byte(dev, PCI_INTERRUPT_LINE,
-					      irq);
-			dev->irq = irq;
-			DBG(" auto irq (now=%d)\n", irq);
-		}
-
-		pci_read_config_byte(dev, PCI_INTERRUPT_LINE, &irq);
-		printk(KERN_INFO
-		       "PCI: 0x%02x:0x%02x(0x%02x,0x%02x) IRQ=%d\n",
-		       dev->bus->number, dev->devfn, PCI_SLOT(dev->devfn),
-		       PCI_FUNC(dev->devfn), irq);
-
-	}
+/* Do platform specific device initialization at pci_enable_device() time */
+int pcibios_plat_dev_init(struct pci_dev *dev)
+{
+	return 0;
 }

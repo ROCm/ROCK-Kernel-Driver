@@ -2,7 +2,7 @@
  * BRIEF MODULE DESCRIPTION
  * Momentum Computer Jaguar-ATX board dependent boot routines
  *
- * Copyright (C) 1996, 1997, 2001  Ralf Baechle
+ * Copyright (C) 1996, 1997, 2001, 2004  Ralf Baechle (ralf@linux-mips.org)
  * Copyright (C) 2000 RidgeRun, Inc.
  * Copyright (C) 2001 Red Hat, Inc.
  * Copyright (C) 2002 Momentum Computer
@@ -59,7 +59,6 @@
 #include <asm/page.h>
 #include <asm/io.h>
 #include <asm/irq.h>
-#include <asm/pci_channel.h>
 #include <asm/processor.h>
 #include <asm/ptrace.h>
 #include <asm/reboot.h>

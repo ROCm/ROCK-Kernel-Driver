@@ -12,7 +12,6 @@
 #include <linux/init.h>
 #include <linux/ioport.h>
 #include <linux/sched.h>
-#include <linux/kernel.h>
 #include <linux/linkage.h>
 #include <linux/types.h>
 #include <linux/mm.h>

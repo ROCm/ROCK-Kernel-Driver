@@ -4,9 +4,11 @@
  * Free Software Foundation;  either version 2 of the  License, or (at your
  * option) any later version.
  *
- * Copyright (C) 2003 PMC-Sierra Inc.
+ * Copyright (C) 2003, 2004 PMC-Sierra Inc.
  * Author: Manish Lachwani (lachwani@pmc-sierra.com)
+ * Copyright (C) 2004 Ralf Baechle
  */
+#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/sched.h>
 #include <linux/mm.h>
@@ -20,6 +22,12 @@
 #include <asm/system.h>
 #include <asm/bootinfo.h>
 #include <asm/pmon.h>
+
+#ifdef CONFIG_SMP
+extern void prom_grab_secondary(void);
+#else
+#define prom_grab_secondary() do { } while (0)
+#endif
 
 #include "setup.h"
 
@@ -116,14 +124,10 @@ void __init prom_init(void)
 	}
 #endif /* CONFIG_MIPS32 */
 
-#ifdef CONFIG_MIPS64
-
-	/* Do nothing for the 64-bit for now. Just implement for the 32-bit */
-
-#endif /* CONFIG_MIPS64 */
-
 	mips_machgroup = MACH_GROUP_TITAN;
 	mips_machtype = MACH_TITAN_YOSEMITE;
+
+	prom_grab_secondary();
 }
 
 void __init prom_free_prom_memory(void)

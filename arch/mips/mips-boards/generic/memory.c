@@ -77,7 +77,7 @@ struct prom_pmemblock * __init prom_getmdesc(void)
 	mdesc[1].base = 0x00001000;
 	mdesc[1].size = 0x000ef000;
 
-#if (CONFIG_MIPS_MALTA)
+#ifdef CONFIG_MIPS_MALTA
 	/*
 	 * The area 0x000f0000-0x000fffff is allocated for BIOS memory by the
 	 * south bridge and PCI access always forwarded to the ISA Bus and

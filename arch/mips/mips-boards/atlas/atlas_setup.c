@@ -84,7 +84,7 @@ static void __init serial_init(void)
 #endif
 	s.irq = ATLASINT_UART;
 	s.uartclk = ATLAS_BASE_BAUD * 16;
-	s.flags = ASYNC_BOOT_AUTOCONF | ASYNC_SKIP_TEST | UPF_RESOURCES | ASYNC_AUTO_IRQ;
+	s.flags = ASYNC_BOOT_AUTOCONF | ASYNC_SKIP_TEST | ASYNC_AUTO_IRQ;
 	s.iotype = SERIAL_IO_PORT;
 	s.regshift = 3;
 

@@ -484,9 +484,9 @@ void __init ld_mmu_tx39(void)
 	current_cpu_data.icache.waybit = 0;
 	current_cpu_data.dcache.waybit = 0;
 
-	printk("Primary instruction cache %ldkb, linesize %d bytes\n",
+	printk("Primary instruction cache %ldkB, linesize %d bytes\n",
 		icache_size >> 10, current_cpu_data.icache.linesz);
-	printk("Primary data cache %ldkb, linesize %d bytes\n",
+	printk("Primary data cache %ldkB, linesize %d bytes\n",
 		dcache_size >> 10, current_cpu_data.dcache.linesz);
 
 	build_clear_page();

@@ -28,9 +28,9 @@ struct statfs {
 	long		f_bfree;
 	long		f_files;
 	long		f_ffree;
+	long		f_bavail;
 
 	/* Linux specials */
-	long	f_bavail;
 	__kernel_fsid_t	f_fsid;
 	long		f_namelen;
 	long		f_spare[6];
@@ -44,15 +44,16 @@ struct statfs {
 struct statfs64 {
 	__u32	f_type;
 	__u32	f_bsize;
+	__u32	f_frsize;	/* Fragment size - unsupported */
+	__u32	__pad;
 	__u64	f_blocks;
 	__u64	f_bfree;
-	__u64	f_bavail;
 	__u64	f_files;
 	__u64	f_ffree;
+	__u64	f_bavail;
 	__kernel_fsid_t f_fsid;
 	__u32	f_namelen;
-	__u32	f_frsize;
-	__u32	f_spare[5];
+	__u32	f_spare[6];
 };
 
 #endif /* _MIPS_SIM == _MIPS_SIM_ABI32 */
@@ -67,26 +68,27 @@ struct statfs64 {			/* Same as struct statfs */
 	long		f_bfree;
 	long		f_files;
 	long		f_ffree;
+	long		f_bavail;
 
 	/* Linux specials */
-	long	f_bavail;
 	__kernel_fsid_t	f_fsid;
 	long		f_namelen;
 	long		f_spare[6];
 };
 
 struct compat_statfs64 {
-	__u32 f_type;
-	__u32 f_bsize;
-	__u64 f_blocks;
-	__u64 f_bfree;
-	__u64 f_bavail;
-	__u64 f_files;
-	__u64 f_ffree;
+	__u32	f_type;
+	__u32	f_bsize;
+	__u32	f_frsize;	/* Fragment size - unsupported */
+	__u32	__pad;
+	__u64	f_blocks;
+	__u64	f_bfree;
+	__u64	f_files;
+	__u64	f_ffree;
+	__u64	f_bavail;
 	__kernel_fsid_t f_fsid;
-	__u32 f_namelen;
-	__u32 f_frsize;
-	__u32 f_spare[5];
+	__u32	f_namelen;
+	__u32	f_spare[6];
 };
 
 #endif /* _MIPS_SIM == _MIPS_SIM_ABI64 */

@@ -100,10 +100,8 @@ hw_irq_controller vrc5477_irq_controller = {
 	NULL			/* no affinity stuff for UP */
 };
 
-void
-vrc5477_irq_init(u32 irq_base)
+void __init vrc5477_irq_init(u32 irq_base)
 {
-	extern irq_desc_t irq_desc[];
 	u32 i;
 
 	for (i= irq_base; i< irq_base+ NUM_5477_IRQ; i++) {

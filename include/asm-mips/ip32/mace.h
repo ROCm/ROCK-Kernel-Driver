@@ -12,41 +12,13 @@
 #ifndef __ASM_MACE_H__
 #define __ASM_MACE_H__
 
-#include <linux/config.h>
-#include <asm/io.h>
-
 /*
  * Address map
  */
 #define MACE_BASE	0x1f000000	/* physical */
 
 #undef BIT
-#define BIT(x) (1ULL << (x))
-
-#ifdef CONFIG_MIPS32
-typedef struct {
-	volatile unsigned long long reg;
-} mace64_t;
-
-typedef struct {
-	unsigned long pad;
-	volatile unsigned long reg;
-} mace32_t;
-#endif
-#ifdef CONFIG_MIPS64
-typedef struct {
-	volatile unsigned long reg;
-} mace64_t;
-
-typedef struct {
-	volatile unsigned long reg;
-} mace32_t;
-#endif
-
-#define mace_read(r)	\
-	(sizeof(r.reg) == 4 ? readl(&r.reg) : readq(&r.reg))
-#define mace_write(v,r)	\
-	(sizeof(r.reg) == 4 ? writel(v,&r.reg) : writeq(v,&r.reg))
+#define BIT(x) (1UL << (x))
 
 /*
  * PCI interface
@@ -119,48 +91,43 @@ struct mace_pci {
  * Video interface
  */
 struct mace_video {
-	mace32_t xxx;	/* later... */
+	unsigned long xxx;	/* later... */
 };
 
 /* 
  * Ethernet interface
  */
 struct mace_ethernet {
-	mace32_t mac_ctrl;
-	mace32_t int_stat;
-	mace32_t dma_ctrl;
-	mace32_t timer;
-	mace32_t tx_int_al;
-	mace32_t rx_int_al;
-	mace32_t tx_info;
-	mace32_t tx_info_al;
-	mace32_t rx_buff;
-	mace32_t rx_buff_al1;
-	mace32_t rx_buff_al2;
-	mace64_t diag;
-	mace32_t phy_data;
-	mace32_t phy_regs;
-	mace32_t phy_trans_go;
-	mace32_t backoff_seed;
+	volatile unsigned long mac_ctrl;
+	volatile unsigned long int_stat;
+	volatile unsigned long dma_ctrl;
+	volatile unsigned long timer;
+	volatile unsigned long tx_int_al;
+	volatile unsigned long rx_int_al;
+	volatile unsigned long tx_info;
+	volatile unsigned long tx_info_al;
+	volatile unsigned long rx_buff;
+	volatile unsigned long rx_buff_al1;
+	volatile unsigned long rx_buff_al2;
+	volatile unsigned long diag;
+	volatile unsigned long phy_data;
+	volatile unsigned long phy_regs;
+	volatile unsigned long phy_trans_go;
+	volatile unsigned long backoff_seed;
 	/*===================================*/
-	mace64_t imq_reserved[4];
-	mace64_t mac_addr;
-	mace64_t mac_addr2;
-	mace64_t mcast_filter;
-	mace32_t tx_ring_base;
+	volatile unsigned long imq_reserved[4];
+	volatile unsigned long mac_addr;
+	volatile unsigned long mac_addr2;
+	volatile unsigned long mcast_filter;
+	volatile unsigned long tx_ring_base;
 	/* Following are read-only registers for debugging */
-	mace64_t tx_pkt1_hdr;
-	mace64_t tx_pkt1_ptr[3];
-	mace64_t tx_pkt2_hdr;
-	mace64_t tx_pkt2_ptr[3];
+	volatile unsigned long tx_pkt1_hdr;
+	volatile unsigned long tx_pkt1_ptr[3];
+	volatile unsigned long tx_pkt2_hdr;
+	volatile unsigned long tx_pkt2_ptr[3];
 	/*===================================*/
-	mace32_t rx_fifo;
+	volatile unsigned long rx_fifo;
 };
-#define mace_eth_read(r)	\
-	mace_read(mace->eth.r)
-#define mace_eth_write(v,r)	\
-	mace_write(v,mace->eth.r)
-
 
 /* 
  * Peripherals
@@ -168,28 +135,24 @@ struct mace_ethernet {
 
 /* Audio registers */
 struct mace_audio {
-	mace32_t control;
-	mace32_t codec_control;		/* codec status control */
-	mace32_t codec_mask;		/* codec status input mask */
-	mace32_t codec_read;		/* codec status read data */
+	volatile unsigned long control;
+	volatile unsigned long codec_control;		/* codec status control */
+	volatile unsigned long codec_mask;		/* codec status input mask */
+	volatile unsigned long codec_read;		/* codec status read data */
 	struct {
-		mace32_t control;	/* channel control */
-		mace32_t read_ptr;	/* channel read pointer */
-		mace32_t write_ptr;	/* channel write pointer */
-		mace32_t depth;		/* channel depth */
-	} channel[3];
+		volatile unsigned long control;		/* channel control */
+		volatile unsigned long read_ptr;	/* channel read pointer */
+		volatile unsigned long write_ptr;	/* channel write pointer */
+		volatile unsigned long depth;		/* channel depth */
+	} chan[3];
 };
-#define mace_perif_audio_read(r)	\
-	mace_read(mace->perif.audio.r)
-#define mace_perif_audio_write(v,r)	\
-	mace_write(v,mace->perif.audio.r)
 
 /* ISA Control and DMA registers */
 struct mace_isactrl {
-	mace32_t ringbase;
+	volatile unsigned long ringbase;
 #define MACEISA_RINGBUFFERS_SIZE	(8 * 4096)
 
-	mace32_t misc;
+	volatile unsigned long misc;
 #define MACEISA_FLASH_WE		BIT(0)	/* 1=> Enable FLASH writes */
 #define MACEISA_PWD_CLEAR		BIT(1)	/* 1=> PWD CLEAR jumper detected */
 #define MACEISA_NIC_DEASSERT		BIT(2)
@@ -198,8 +161,8 @@ struct mace_isactrl {
 #define MACEISA_LED_GREEN		BIT(5)	/* 0=> Illuminate green LED */
 #define MACEISA_DP_RAM_ENABLE		BIT(6)
 
-	mace32_t istat;
-	mace32_t imask;
+	volatile unsigned long istat;
+	volatile unsigned long imask;
 #define MACEISA_AUDIO_SW_INT		BIT(0)
 #define MACEISA_AUDIO_SC_INT		BIT(1)
 #define MACEISA_AUDIO1_DMAT_INT		BIT(2)
@@ -233,22 +196,18 @@ struct mace_isactrl {
 #define MACEISA_SERIAL2_RDMAT_INT	BIT(30)
 #define MACEISA_SERIAL2_RDMAOR_INT	BIT(31)
 
-	mace64_t _pad[0x2000/8 - 4];
+	volatile unsigned long _pad[0x2000/8 - 4];
 
-	mace64_t dp_ram[0x400];
+	volatile unsigned long dp_ram[0x400];
 };
-#define mace_perif_ctrl_read(r)		\
-	mace_read(mace->perif.ctrl.r)
-#define mace_perif_ctrl_write(v,r)	\
-	mace_write(v,mace->perif.ctrl.r)
 
 /* Keyboard & Mouse registers
  * -> drivers/input/serio/maceps2.c */
 struct mace_ps2port {
-	mace32_t tx;
-	mace32_t rx;
-	mace32_t control;
-	mace32_t status;
+	volatile unsigned long tx;
+	volatile unsigned long rx;
+	volatile unsigned long control;
+	volatile unsigned long status;
 };
 
 struct mace_ps2 {
@@ -259,20 +218,20 @@ struct mace_ps2 {
 /* I2C registers
  * -> drivers/i2c/algos/i2c-algo-sgi.c */
 struct mace_i2c {
-	mace32_t config;
+	volatile unsigned long config;
 #define MACEI2C_RESET           BIT(0)
 #define MACEI2C_FAST            BIT(1)
 #define MACEI2C_DATA_OVERRIDE   BIT(2)
 #define MACEI2C_CLOCK_OVERRIDE  BIT(3)
 #define MACEI2C_DATA_STATUS     BIT(4)
 #define MACEI2C_CLOCK_STATUS    BIT(5)
-	mace32_t control;
-	mace32_t data;
+	volatile unsigned long control;
+	volatile unsigned long data;
 };
 
 /* Timer registers */
 typedef union {
-	mace64_t ust_msc;
+	volatile unsigned long ust_msc;
 	struct reg {
 		volatile unsigned int ust;
 		volatile unsigned int msc;
@@ -280,12 +239,12 @@ typedef union {
 } timer_reg;
 
 struct mace_timers {
-	mace32_t ust;
+	volatile unsigned long ust;
 #define MACE_UST_PERIOD_NS	960
 
-	mace32_t compare1;
-	mace32_t compare2;
-	mace32_t compare3;
+	volatile unsigned long compare1;
+	volatile unsigned long compare2;
+	volatile unsigned long compare3;
 
 	timer_reg audio_in;
 	timer_reg audio_out1;
@@ -326,7 +285,7 @@ struct mace_ecp1284 {	/* later... */
 
 /* Serial port */
 struct mace_serial {
-	mace64_t xxx;	/* later... */
+	volatile unsigned long xxx;	/* later... */
 };
 
 struct mace_isa {

@@ -52,7 +52,7 @@
 extern asmlinkage void ocelot_handle_int(void);
 extern void gt64240_irq_init(void);
 
-void __init init_IRQ(void)
+void __init arch_init_irq(void)
 {
 	/*
 	 * Clear all of the interrupts while we change the able around a bit.
@@ -63,15 +63,8 @@ void __init init_IRQ(void)
 
 	/* Sets the first-level interrupt dispatcher. */
 	set_except_vector(0, ocelot_handle_int);
-	init_generic_irq();
 	mips_cpu_irq_init(0);
 	rm7k_cpu_irq_init(8);
 
 	gt64240_irq_init();
-
-#ifdef CONFIG_KGDB
-	printk("start kgdb ...\n");
-	set_debug_traps();
-	breakpoint();	/* you may move this line to whereever you want :-) */
-#endif
 }

@@ -125,11 +125,9 @@ void lasat_hw0_irqdispatch(struct pt_regs *regs)
 	}
 }
 
-void __init init_IRQ(void)
+void __init arch_init_irq(void)
 {
 	int i;
-
-	init_generic_irq();
 
 	switch (mips_machtype) {
 	case MACH_LASAT_100:
@@ -147,7 +145,7 @@ void __init init_IRQ(void)
 		*lasat_int_mask &= 0xffff;
 		break;
 	default:
-		panic("init_IRQ: mips_machtype incorrect");
+		panic("arch_init_irq: mips_machtype incorrect");
 	}
 
 	/* Now safe to set the exception vector. */

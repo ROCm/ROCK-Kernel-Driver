@@ -288,10 +288,18 @@ static int config_read(struct pci_bus *bus, unsigned int devfn,
 		       int where, int size, u32 * val)
 {
 	switch (size) {
-	case 1:
-		return read_config_byte(bus, devfn, where, (u8 *) val);
-	case 2:
-		return read_config_word(bus, devfn, where, (u16 *) val);
+	case 1: {
+			u8 _val;
+			int rc = read_config_byte(bus, devfn, where, &_val);
+			*val = _val;
+			return rc;
+		}
+       case 2: {
+			u16 _val;
+			int rc = read_config_word(bus, devfn, where, &_val);
+			*val = _val;
+			return rc;
+		}
 	default:
 		return read_config_dword(bus, devfn, where, val);
 	}

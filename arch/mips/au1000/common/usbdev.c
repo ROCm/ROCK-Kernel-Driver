@@ -61,8 +61,6 @@
 #define vdbg(fmt, arg...) do {} while (0)
 #endif
 
-#define MAX(a,b)	(((a)>(b))?(a):(b))
-
 #define ALLOC_FLAGS (in_interrupt () ? GFP_ATOMIC : GFP_KERNEL)
 
 #define EP_FIFO_DEPTH 8
@@ -211,9 +209,8 @@ dump_setup(struct usb_ctrlrequest* s)
 static inline usbdev_pkt_t *
 alloc_packet(endpoint_t * ep, int data_size, void* data)
 {
-	usbdev_pkt_t* pkt =
-		(usbdev_pkt_t *)kmalloc(sizeof(usbdev_pkt_t) + data_size,
-					ALLOC_FLAGS);
+	usbdev_pkt_t* pkt = kmalloc(sizeof(usbdev_pkt_t) + data_size,
+				    ALLOC_FLAGS);
 	if (!pkt)
 		return NULL;
 	pkt->ep_addr = ep->address;

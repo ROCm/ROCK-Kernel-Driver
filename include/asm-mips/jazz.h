@@ -107,6 +107,8 @@ typedef struct {
 	unsigned char command;
 } jazz_keyboard_hardware;
 
+#define jazz_kh ((keyboard_hardware *) JAZZ_KEYBOARD_ADDRESS)
+
 typedef struct {
 	unsigned char pad0[3];
 	unsigned char data;

@@ -48,6 +48,12 @@
     !!! I shall not define symbols starting with CONFIG_ !!!
 #endif
 
+void board_reset (void)
+{
+    /* Hit BCSR.SYSTEM_CONTROL[SW_RST] */
+    au_writel(0x00000000, 0xAE00001C);
+}
+
 void __init board_setup(void)
 {
 	u32 pin_func;

@@ -4,6 +4,7 @@
  *              ahennessy@mvista.com
  *
  * Copyright (C) 2000-2001 Toshiba Corporation
+ * Copyright (C) 2004 by Ralf Baechle (ralf@linux-mips.org)
  *
  *  This program is free software; you can redistribute  it and/or modify it
  *  under  the terms of  the GNU General  Public License as published by the
@@ -30,7 +31,6 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 
-#include <asm/pci_channel.h>
 #include <asm/jmr3927/jmr3927.h>
 #include <asm/debug.h>
 

@@ -90,15 +90,35 @@
 	.endm
 
 	/*
-	 * For the moment set ST0_KU so the CPU will not spit fire when
-	 * executing 64-bit instructions.  The full initialization of the
-	 * CPU's status register is done later in per_cpu_trap_init().
+	 * For the moment disable interrupts, mark the kernel mode and
+	 * set ST0_KX so that the CPU does not spit fire when using
+	 * 64-bit addresses.  A full initialization of the CPU's status
+	 * register is done later in per_cpu_trap_init().
 	 */
-	.macro	setup_c0_status
-#ifdef CONFIG_MIPS64
+	.macro	setup_c0_status set clr
+	.set	push
 	mfc0	t0, CP0_STATUS
-	or	t0, ST0_KX
+	or	t0, ST0_CU0|\set|0x1f|\clr
+	xor	t0, 0x1f|\clr
 	mtc0	t0, CP0_STATUS
+	.set	noreorder
+	sll	zero,3				# ehb
+	.set	pop
+	.endm
+
+	.macro	setup_c0_status_pri
+#ifdef CONFIG_MIPS64
+	setup_c0_status ST0_KX 0
+#else
+	setup_c0_status 0 0
+#endif
+	.endm
+
+	.macro	setup_c0_status_sec
+#ifdef CONFIG_MIPS64
+	setup_c0_status ST0_KX ST0_BEV
+#else
+	setup_c0_status 0 ST0_BEV
 #endif
 	.endm
 
@@ -114,7 +134,7 @@ EXPORT(_stext)
 	__INIT
 
 NESTED(kernel_entry, 16, sp)			# kernel entry point
-	setup_c0_status
+	setup_c0_status_pri
 
 #ifdef CONFIG_SGI_IP27
 	GET_NASID_ASM	t1
@@ -123,8 +143,6 @@ NESTED(kernel_entry, 16, sp)			# kernel entry point
 #endif /* IP27 */
 
 	ARC64_TWIDDLE_PC
-
-	CLI					# disable interrupts
 
 	PTR_LA		t0, __bss_start		# clear .bss
 	LONG_S		zero, (t0)
@@ -144,7 +162,7 @@ NESTED(kernel_entry, 16, sp)			# kernel entry point
 	set_saved_sp	sp, t0, t1
 	PTR_SUBU	sp, 4 * SZREG		# init stack pointer
 
-	jal		start_kernel
+	j		start_kernel
 	END(kernel_entry)
 
 #ifdef CONFIG_SMP
@@ -153,6 +171,8 @@ NESTED(kernel_entry, 16, sp)			# kernel entry point
  * function after setting up the stack and gp registers.
  */
 NESTED(smp_bootstrap, 16, sp)
+	setup_c0_status_sec
+
 #ifdef CONFIG_SGI_IP27
 	GET_NASID_ASM	t1
 	dli	t0, KLDIR_OFFSET + (KLI_KERN_VARS * KLDIR_ENT_SIZE) + \
@@ -166,9 +186,7 @@ NESTED(smp_bootstrap, 16, sp)
 	ARC64_TWIDDLE_PC
 #endif /* CONFIG_SGI_IP27 */
 
-	CLI
-	setup_c0_status
-	jal	start_secondary
+	j	start_secondary
 	END(smp_bootstrap)
 #endif /* CONFIG_SMP */
 
@@ -201,13 +219,3 @@ NESTED(smp_bootstrap, 16, sp)
 	page	invalid_pmd_table, _PMD_ORDER
 #endif
 	page	invalid_pte_table, _PTE_ORDER
-
-#ifdef CONFIG_MIPS64
-	/*
-	 * 64-bit kernel mappings are really screwed up ...
-	 */
-	page	kptbl, _PGD_ORDER
-	.globl	ekptbl
-	page	kpmdtbl, 0
-ekptbl:
-#endif

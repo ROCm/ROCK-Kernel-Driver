@@ -4,6 +4,7 @@
  *              ahennessy@mvista.com       
  *
  * Copyright (C) 2000-2001 Toshiba Corporation 
+ * Copyright (C) 2004 by Ralf Baechle (ralf@linux-mips.org)
  *
  * Based on arch/mips/ddb5xxx/ddb5477/pci_ops.c
  *
@@ -11,6 +12,9 @@
  *
  * Much of the code is derived from the original DDB5074 port by 
  * Geert Uytterhoeven <geert@sonycom.com>
+ *
+ * Copyright 2004 MontaVista Software Inc.
+ * Author: Manish Lachwani (mlachwani@mvista.com)
  *
  *  This program is free software; you can redistribute  it and/or modify it
  *  under  the terms of  the GNU General  Public License as published by the
@@ -38,39 +42,26 @@
 #include <linux/init.h>
 
 #include <asm/addrspace.h>
-#include <asm/pci_channel.h>
 #include <asm/tx4927/tx4927_pci.h>
 #include <asm/debug.h>
 
 /* initialize in setup */
 struct resource pci_io_resource = {
-	"pci IO space",
-	(PCIBIOS_MIN_IO),
-	((PCIBIOS_MIN_IO) + (TX4927_PCIIO_SIZE)) - 1,
-	IORESOURCE_IO
+	.name	= "TX4927 PCI IO SPACE",
+	.start	= 0x1000,
+	.end	= (0x1000 + (TX4927_PCIIO_SIZE)) - 1,
+	.flags	= IORESOURCE_IO
 };
 
 /* initialize in setup */
 struct resource pci_mem_resource = {
-	"pci memory space",
-	TX4927_PCIMEM,
-	TX4927_PCIMEM + TX4927_PCIMEM_SIZE - 1,
-	IORESOURCE_MEM
+	.name	= "TX4927 PCI MEM SPACE",
+	.start	= TX4927_PCIMEM,
+	.end	= TX4927_PCIMEM + TX4927_PCIMEM_SIZE - 1,
+	.flags	= IORESOURCE_MEM
 };
 
-extern struct pci_ops tx4927_pci_ops;
-
-/*
- * h/w only supports devices 0x00 to 0x14
- */
-struct pci_controller tx4927_controller = {
-	.pci_ops	= &tx4927_pci_ops,
-	.io_resource	= &pci_io_resource,
-	.mem_resource	= &pci_mem_resource,
-};
-
-static int mkaddr(unsigned char bus, unsigned char dev_fn,
-	unsigned char where, int *flagsp)
+static int mkaddr(int bus, int dev_fn, int where, int *flagsp)
 {
 	if (bus > 0) {
 		/* Type 1 configuration */
@@ -107,107 +98,49 @@ static int check_abort(int flags)
 	return code;
 }
 
-/*
- * We can't address 8 and 16 bit words directly.  Instead we have to
- * read/write a 32bit word and mask/modify the data we actually want.
- */
-static int tx4927_pcibios_read_config_byte(struct pci_dev *dev,
-					   int where, unsigned char *val)
+static int tx4927_pcibios_read_config(struct pci_bus *bus, unsigned int devfn, int where,
+		int size, u32 * val)
 {
-	int flags, retval;
-	unsigned char bus, func_num;
+	int flags, retval, dev, busno, func;
 
-	db_assert((where & 3) == 0);
-	db_assert(where < (1 << 8));
+	busno = bus->number;
+        dev = PCI_SLOT(devfn);
+        func = PCI_FUNC(devfn);
 
-	/* check if the bus is top-level */
-	if (dev->bus->parent != NULL) {
-		bus = dev->bus->number;
-		db_assert(bus != 0);
-	} else {
-		bus = 0;
+	if (size == 2) {
+		if (where & 1)
+	                return PCIBIOS_BAD_REGISTER_NUMBER;
 	}
 
-	func_num = PCI_FUNC(dev->devfn);
-	if (mkaddr(bus, dev->devfn, where, &flags))
-		return -1;
-#ifdef __BIG_ENDIAN
-	*val =
-	    *(volatile u8 *) ((ulong) & tx4927_pcicptr->
-			      g2pcfgdata | ((where & 3) ^ 3));
-#else
-	*val =
-	    *(volatile u8 *) ((ulong) & tx4927_pcicptr->
-			      g2pcfgdata | (where & 3));
-#endif
-	retval = check_abort(flags);
-	if (retval == PCIBIOS_DEVICE_NOT_FOUND)
-		*val = 0xff;
-	return retval;
-}
-
-static int tx4927_pcibios_read_config_word(struct pci_dev *dev,
-					   int where, unsigned short *val)
-{
-	int flags, retval;
-	unsigned char bus, func_num;
-
-	if (where & 1)
-		return PCIBIOS_BAD_REGISTER_NUMBER;
-
-	db_assert((where & 3) == 0);
-	db_assert(where < (1 << 8));
-
-	/* check if the bus is top-level */
-	if (dev->bus->parent != NULL) {
-		bus = dev->bus->number;
-		db_assert(bus != 0);
-	} else {
-		bus = 0;
+	if (size == 4) {
+		if (where & 3)
+			return PCIBIOS_BAD_REGISTER_NUMBER;
 	}
 
-	func_num = PCI_FUNC(dev->devfn);
-	if (mkaddr(bus, dev->devfn, where, &flags))
-		return -1;
-#ifdef __BIG_ENDIAN
-	*val =
-	    *(volatile u16 *) ((ulong) & tx4927_pcicptr->
-			       g2pcfgdata | ((where & 3) ^ 2));
-#else
-	*val =
-	    *(volatile u16 *) ((ulong) & tx4927_pcicptr->
-			       g2pcfgdata | (where & 3));
-#endif
-	retval = check_abort(flags);
-	if (retval == PCIBIOS_DEVICE_NOT_FOUND)
-		*val = 0xffff;
-	return retval;
-}
-
-static int tx4927_pcibios_read_config_dword(struct pci_dev *dev,
-					    int where, unsigned int *val)
-{
-	int flags, retval;
-	unsigned char bus, func_num;
-
-	if (where & 3)
-		return PCIBIOS_BAD_REGISTER_NUMBER;
-
-	db_assert((where & 3) == 0);
-	db_assert(where < (1 << 8));
-
 	/* check if the bus is top-level */
-	if (dev->bus->parent != NULL) {
-		bus = dev->bus->number;
-		db_assert(bus != 0);
+	if (bus->parent != NULL) {
+		busno = bus->number;
 	} else {
-		bus = 0;
+		busno = 0;
 	}
 
-	func_num = PCI_FUNC(dev->devfn);
-	if (mkaddr(bus, dev->devfn, where, &flags))
+	if (mkaddr(busno, devfn, where, &flags))
 		return -1;
-	*val = tx4927_pcicptr->g2pcfgdata;
+
+	switch (size) {
+	case 1:
+		*val = *(volatile u8 *) ((ulong) & tx4927_pcicptr->
+                              g2pcfgdata | (where & 3));
+		break;
+	case 2:
+		*val = *(volatile u16 *) ((ulong) & tx4927_pcicptr->
+                               g2pcfgdata | (where & 3));
+		break;
+	case 4:
+		*val = tx4927_pcicptr->g2pcfgdata;
+		break;
+	}
+
 	retval = check_abort(flags);
 	if (retval == PCIBIOS_DEVICE_NOT_FOUND)
 		*val = 0xffffffff;
@@ -215,92 +148,62 @@ static int tx4927_pcibios_read_config_dword(struct pci_dev *dev,
 	return retval;
 }
 
-static int tx4927_pcibios_write_config_byte(struct pci_dev *dev,
-					    int where, unsigned char val)
+static int tx4927_pcibios_write_config(struct pci_bus *bus, unsigned int devfn, int where,
+				int size, u32 val)
 {
-	int flags;
-	unsigned char bus, func_num;
+	int flags, dev, busno, func;
+	busno = bus->number;
+        dev = PCI_SLOT(devfn);
+        func = PCI_FUNC(devfn);
 
-	/* check if the bus is top-level */
-	if (dev->bus->parent != NULL) {
-		bus = dev->bus->number;
-		db_assert(bus != 0);
-	} else {
-		bus = 0;
+	if (size == 1) {
+		if (where & 1)
+			return PCIBIOS_BAD_REGISTER_NUMBER;
 	}
 
-	func_num = PCI_FUNC(dev->devfn);
-	if (mkaddr(bus, dev->devfn, where, &flags))
-		return -1;
-#ifdef __BIG_ENDIAN
-	*(volatile u8 *) ((ulong) & tx4927_pcicptr->
-			  g2pcfgdata | ((where & 3) ^ 3)) = val;
-#else
-	*(volatile u8 *) ((ulong) & tx4927_pcicptr->
-			  g2pcfgdata | (where & 3)) = val;
-#endif
-	return check_abort(flags);
-}
-
-static int tx4927_pcibios_write_config_word(struct pci_dev *dev,
-					    int where, unsigned short val)
-{
-	int flags;
-	unsigned char bus, func_num;
-
-	if (where & 1)
-		return PCIBIOS_BAD_REGISTER_NUMBER;
-
-	/* check if the bus is top-level */
-	if (dev->bus->parent != NULL) {
-		bus = dev->bus->number;
-		db_assert(bus != 0);
-	} else {
-		bus = 0;
+	if (size == 4) {
+		if (where & 3)
+			return PCIBIOS_BAD_REGISTER_NUMBER;
 	}
 
-	func_num = PCI_FUNC(dev->devfn);
-	if (mkaddr(bus, dev->devfn, where, &flags))
-		return -1;
-#ifdef __BIG_ENDIAN
-	*(volatile u16 *) ((ulong) & tx4927_pcicptr->
-			   g2pcfgdata | ((where & 3) ^ 2)) = val;
-#else
-	*(volatile u16 *) ((ulong) & tx4927_pcicptr->
-			   g2pcfgdata | (where & 3)) = val;
-#endif
-	return check_abort(flags);
-}
-
-static int tx4927_pcibios_write_config_dword(struct pci_dev *dev,
-					     int where, unsigned int val)
-{
-	int flags;
-	unsigned char bus, func_num;
-
-	if (where & 3)
-		return PCIBIOS_BAD_REGISTER_NUMBER;
-
 	/* check if the bus is top-level */
-	if (dev->bus->parent != NULL) {
-		bus = dev->bus->number;
-		db_assert(bus != 0);
+	if (bus->parent != NULL) {
+		busno = bus->number;
 	} else {
-		bus = 0;
+		busno = 0;
 	}
 
-	func_num = PCI_FUNC(dev->devfn);
-	if (mkaddr(bus, dev->devfn, where, &flags))
+	if (mkaddr(busno, devfn, where, &flags))
 		return -1;
-	tx4927_pcicptr->g2pcfgdata = val;
+
+	switch (size) {
+	case 1:
+		 *(volatile u8 *) ((ulong) & tx4927_pcicptr->
+                          g2pcfgdata | (where & 3)) = val;
+		break;
+
+	case 2:
+		*(volatile u16 *) ((ulong) & tx4927_pcicptr->
+                           g2pcfgdata | (where & 3)) = val;
+		break;
+	case 4:
+		tx4927_pcicptr->g2pcfgdata = val;
+		break;
+	}
+
 	return check_abort(flags);
 }
 
 struct pci_ops tx4927_pci_ops = {
-	tx4927_pcibios_read_config_byte,
-	tx4927_pcibios_read_config_word,
-	tx4927_pcibios_read_config_dword,
-	tx4927_pcibios_write_config_byte,
-	tx4927_pcibios_write_config_word,
-	tx4927_pcibios_write_config_dword
+	tx4927_pcibios_read_config,
+	tx4927_pcibios_write_config
+};
+
+/*
+ * h/w only supports devices 0x00 to 0x14
+ */
+struct pci_controller tx4927_controller = {
+	.pci_ops        = &tx4927_pci_ops,
+	.io_resource    = &pci_io_resource,
+	.mem_resource   = &pci_mem_resource,
 };
