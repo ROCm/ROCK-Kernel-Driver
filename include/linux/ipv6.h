@@ -174,7 +174,6 @@ enum {
 #include <net/if_inet6.h>       /* struct ipv6_mc_socklist */
 #include <linux/tcp.h>
 #include <linux/udp.h>
-#include <net/flow.h>
 
 /* 
    This structure contains results of exthdrs parsing
@@ -235,7 +234,6 @@ struct ipv6_pinfo {
 	struct {
 		struct ipv6_txoptions *opt;
 		struct rt6_info	*rt;
-		struct flowi fl;
 		int hop_limit;
 	} cork;
 };

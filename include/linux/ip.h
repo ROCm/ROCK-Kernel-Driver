@@ -83,6 +83,7 @@
 #include <linux/types.h>
 #include <net/sock.h>
 #include <linux/igmp.h>
+#include <net/flow.h>
 
 struct ip_options {
   __u32		faddr;				/* Saved first hop address */
@@ -141,6 +142,7 @@ struct inet_opt {
 		struct rtable		*rt;
 		int			length; /* Total length of all frames */
 		u32			addr;
+		struct flowi		fl;
 	} cork;
 };
 

@@ -720,8 +720,8 @@ static int udp_v6_push_pending_frames(struct sock *sk, struct udp_opt *up)
 {
 	struct sk_buff *skb;
 	struct udphdr *uh;
-	struct ipv6_pinfo *np = inet6_sk(sk);
-	struct flowi *fl = &np->cork.fl;
+	struct inet_opt *inet = inet_sk(sk);
+	struct flowi *fl = &inet->cork.fl;
 	int err = 0;
 
 	/* Grab the skbuff where UDP header space exists. */
@@ -783,7 +783,7 @@ static int udpv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 	struct in6_addr *daddr;
 	struct ipv6_txoptions *opt = NULL;
 	struct ip6_flowlabel *flowlabel = NULL;
-	struct flowi *fl = &np->cork.fl;
+	struct flowi *fl = &inet->cork.fl;
 	struct dst_entry *dst;
 	int addr_len = msg->msg_namelen;
 	int ulen = len;
@@ -830,7 +830,7 @@ static int udpv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 		if (sin6->sin6_port == 0)
 			return -EINVAL;
 
-		up->dport = sin6->sin6_port;
+		fl->fl_ip_dport = sin6->sin6_port;
 		daddr = &sin6->sin6_addr;
 
 		if (np->sndflow) {
@@ -859,7 +859,7 @@ static int udpv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 		if (sk->sk_state != TCP_ESTABLISHED)
 			return -EDESTADDRREQ;
 
-		up->dport = inet->dport;
+		fl->fl_ip_dport = inet->dport;
 		daddr = &np->daddr;
 		fl->fl6_flowlabel = np->flow_label;
 	}
@@ -874,7 +874,7 @@ static int udpv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 
 		sin.sin_family = AF_INET;
 		sin.sin_addr.s_addr = daddr->s6_addr32[3];
-		sin.sin_port = up->dport;
+		sin.sin_port = inet->cork.fl.fl_ip_dport;
 		msg->msg_name = (struct sockaddr *)(&sin);
 		msg->msg_namelen = sizeof(sin);
 		fl6_sock_release(flowlabel);
@@ -911,7 +911,6 @@ static int udpv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 	ipv6_addr_copy(&fl->fl6_dst, daddr);
 	if (ipv6_addr_any(&fl->fl6_src) && !ipv6_addr_any(&np->saddr))
 		ipv6_addr_copy(&fl->fl6_src, &np->saddr);
-	fl->fl_ip_dport = up->dport;
 	fl->fl_ip_sport = inet->sport;
 	
 	/* merge ip6_build_xmit from ip6_output */

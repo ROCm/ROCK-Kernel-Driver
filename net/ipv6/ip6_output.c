@@ -1239,7 +1239,7 @@ int ip6_append_data(struct sock *sk, int getfrag(void *from, char *to, int offse
 		}
 		dst_hold(&rt->u.dst);
 		np->cork.rt = rt;
-		np->cork.fl = *fl;
+		inet->cork.fl = *fl;
 		np->cork.hop_limit = hlimit;
 		inet->cork.fragsize = mtu = dst_pmtu(&rt->u.dst);
 		inet->cork.length = 0;
@@ -1250,6 +1250,7 @@ int ip6_append_data(struct sock *sk, int getfrag(void *from, char *to, int offse
 		transhdrlen += exthdrlen;
 	} else {
 		rt = np->cork.rt;
+		fl = &inet->cork.fl;
 		if (inet->cork.flags & IPCORK_OPT)
 			opt = np->cork.opt;
 		transhdrlen = 0;
@@ -1423,7 +1424,7 @@ int ip6_push_pending_frames(struct sock *sk)
 	struct ipv6hdr *hdr;
 	struct ipv6_txoptions *opt = np->cork.opt;
 	struct rt6_info *rt = np->cork.rt;
-	struct flowi *fl = &np->cork.fl;
+	struct flowi *fl = &inet->cork.fl;
 	unsigned char proto = fl->proto;
 	int err = 0;
 
@@ -1487,7 +1488,7 @@ out:
 		dst_release(&np->cork.rt->u.dst);
 		np->cork.rt = NULL;
 	}
-	memset(&np->cork.fl, 0, sizeof(np->cork.fl));
+	memset(&inet->cork.fl, 0, sizeof(inet->cork.fl));
 	return err;
 error:
 	goto out;
@@ -1512,5 +1513,5 @@ void ip6_flush_pending_frames(struct sock *sk)
 		dst_release(&np->cork.rt->u.dst);
 		np->cork.rt = NULL;
 	}
-	memset(&np->cork.fl, 0, sizeof(np->cork.fl));
+	memset(&inet->cork.fl, 0, sizeof(inet->cork.fl));
 }
