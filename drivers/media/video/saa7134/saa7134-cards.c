@@ -420,20 +420,14 @@ struct saa7134_board saa7134_boards[] = {
 			.vmux   = 1,
 			.amux   = TV,
 			.tv     = 1,
-#if 0
 		},{
 			.name   = name_comp1,
 			.vmux   = 0,
 			.amux   = LINE2,
 		},{
-			.name   = name_comp2,
-			.vmux   = 3,
-			.amux   = LINE2,
-		},{
 			.name   = name_svideo,
 			.vmux   = 8,
 			.amux   = LINE2,
-#endif
 		}},
 		.radio = {
 			.name   = name_radio,
@@ -732,7 +726,9 @@ struct saa7134_board saa7134_boards[] = {
         [SAA7134_BOARD_ASUSTEK_TVFM7133] = {
                 .name           = "ASUS TV-FM 7133",
                 .audio_clock    = 0x00187de7,
-                .tuner_type     = TUNER_PHILIPS_FM1236_MK3,
+		// probably wrong, the 7133 one is the NTSC version ...
+		// .tuner_type     = TUNER_PHILIPS_FM1236_MK3
+                .tuner_type     = TUNER_LG_NTSC_NEW_TAPC,
                 .need_tda9887   = 1,
                 .inputs         = {{
                         .name = name_tv,
