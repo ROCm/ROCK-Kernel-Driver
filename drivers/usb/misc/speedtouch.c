@@ -202,6 +202,7 @@ static int udsl_print_packet (const unsigned char *data, int len);
  * atm driver prototypes and stuctures
  */
 
+static void udsl_atm_dev_close (struct atm_dev *dev);
 static int udsl_atm_open (struct atm_vcc *vcc, short vpi, int vci);
 static void udsl_atm_close (struct atm_vcc *vcc);
 static int udsl_atm_ioctl (struct atm_dev *dev, unsigned int cmd, void *arg);
@@ -209,6 +210,7 @@ static int udsl_atm_send (struct atm_vcc *vcc, struct sk_buff *skb);
 static int udsl_atm_proc_read (struct atm_dev *atm_dev, loff_t *pos, char *page);
 
 static struct atmdev_ops udsl_atm_devops = {
+	.dev_close =	udsl_atm_dev_close,
 	.open =		udsl_atm_open,
 	.close =	udsl_atm_close,
 	.ioctl =	udsl_atm_ioctl,
@@ -691,24 +693,21 @@ static int udsl_atm_send (struct atm_vcc *vcc, struct sk_buff *skb)
 *
 ****************************************************************************/
 
-static void udsl_atm_stopdevice (struct udsl_instance_data *instance)
+static void udsl_atm_dev_close (struct atm_dev *dev)
 {
-	struct atm_vcc *walk;
-	struct atm_dev *atm_dev;
+	struct udsl_instance_data *instance = dev->dev_data;
 
-	if (!instance->atm_dev)
+	if (!instance) {
+		PDEBUG ("udsl_atm_dev_close: NULL instance!\n");
 		return;
+	}
 
-	atm_dev = instance->atm_dev;
+	PDEBUG ("udsl_atm_dev_close: queue has %u elements\n", instance->sndqueue.qlen);
 
-	atm_dev->signal = ATM_PHY_SIG_LOST;
-	walk = atm_dev->vccs;
-	shutdown_atm_dev (atm_dev);
-
-	for (; walk; walk = walk->next)
-		wake_up (&walk->sleep);
-
-	instance->atm_dev = NULL;
+	PDEBUG ("udsl_atm_dev_close: killing tasklet\n");
+	tasklet_kill (&instance->receive_tasklet);
+	PDEBUG ("udsl_atm_dev_close: freeing instance\n");
+	kfree (instance);
 }
 
 
@@ -1038,7 +1037,7 @@ static void udsl_usb_disconnect (struct usb_interface *intf)
 
 	tasklet_disable (&instance->receive_tasklet);
 
-	/* flush spare receivers */
+	/* receive finalize */
 	down (&instance->serialize); /* vs udsl_fire_receivers */
 	/* no need to take the spinlock */
 	list_for_each (pos, &instance->spare_receivers)
@@ -1088,8 +1087,7 @@ static void udsl_usb_disconnect (struct usb_interface *intf)
 		kfree_skb (rcv->skb);
 	}
 
-	udsl_atm_stopdevice (instance);
-
+	/* send finalize */
 	tasklet_disable (&instance->send_tasklet);
 
 	for (i = 0; i < UDSL_NUMBER_SND_URBS; i++)
@@ -1120,7 +1118,6 @@ static void udsl_usb_disconnect (struct usb_interface *intf)
 	instance->current_buffer = NULL;
 
 	tasklet_enable (&instance->receive_tasklet);
-	tasklet_kill (&instance->receive_tasklet);
 
 	PDEBUG ("udsl_usb_disconnect: freeing senders\n");
 	for (i = 0; i < UDSL_NUMBER_SND_URBS; i++)
@@ -1130,8 +1127,8 @@ static void udsl_usb_disconnect (struct usb_interface *intf)
 	for (i = 0; i < UDSL_NUMBER_SND_BUFS; i++)
 		kfree (instance->all_buffers[i].base);
 
-	PDEBUG ("udsl_usb_disconnect: freeing instance\n");
-	kfree (instance);
+	/* atm finalize */
+	shutdown_atm_dev (instance->atm_dev);
 }
 
 
