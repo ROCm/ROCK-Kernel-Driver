@@ -45,6 +45,7 @@
 #include <linux/bio.h>
 #include <linux/moduleparam.h>
 #include <linux/capability.h>
+#include <linux/list.h>
 
 #include <asm/system.h>
 
@@ -62,6 +63,8 @@
 
 #include <scsi/scsicam.h>
 #include <scsi/scsi_ioctl.h>
+#include <scsi/scsi_transport.h>
+#include <scsi/scsi_transport_fc.h>
 
 //TODO Fix this!!!
 /*

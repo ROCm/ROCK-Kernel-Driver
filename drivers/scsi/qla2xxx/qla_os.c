@@ -180,6 +180,8 @@ static struct scsi_host_template qla2x00_driver_template = {
 	.max_sectors		= 0xFFFF,
 };
 
+static struct scsi_transport_template *qla2xxx_transport_template = NULL;
+
 static void qla2x00_display_fc_names(scsi_qla_host_t *);
 
 void qla2x00_blink_led(scsi_qla_host_t *);
@@ -1763,7 +1765,7 @@ qla2x00_device_reset(scsi_qla_host_t *ha, fc_port_t *reset_fcport)
 }
 
 /**************************************************************************
-* qla2x00_slave_configure
+* qla2xxx_slave_configure
 *
 * Description:
 **************************************************************************/
@@ -2058,6 +2060,8 @@ int qla2x00_probe_one(struct pci_dev *pdev, struct qla_board_info *brd_info)
 	host->max_cmd_len = MAX_CMDSZ;
 	host->max_channel = ha->ports - 1;
 	host->max_lun = ha->max_luns;
+	BUG_ON(qla2xxx_transport_template == NULL);
+	host->transportt = qla2xxx_transport_template;
 	host->unique_id = ha->instance;
 	host->max_id = ha->max_targets;
 
@@ -4430,6 +4434,64 @@ qla2x00_down_timeout(struct semaphore *sema, unsigned long timeout)
 	return -ETIMEDOUT;
 }
 
+static void
+qla2xxx_get_port_id(struct scsi_device *sdev)
+{
+	scsi_qla_host_t *ha = to_qla_host(sdev->host);
+	struct fc_port *fc;
+
+	list_for_each_entry(fc, &ha->fcports, list) {
+		if (fc->os_target_id == sdev->id) {
+			fc_port_id(sdev) = fc->d_id.b.domain << 16 |
+				fc->d_id.b.area << 8 | 
+				fc->d_id.b.al_pa;
+			return;
+		}
+	}
+	fc_port_id(sdev) = -1;
+}
+
+static void
+qla2xxx_get_port_name(struct scsi_device *sdev)
+{
+	scsi_qla_host_t *ha = to_qla_host(sdev->host);
+	struct fc_port *fc;
+
+	list_for_each_entry(fc, &ha->fcports, list) {
+		if (fc->os_target_id == sdev->id) {
+			fc_port_name(sdev) =
+				__be64_to_cpu(*(uint64_t *)fc->port_name);
+			return;
+		}
+	}
+	fc_port_name(sdev) = -1;
+}
+
+static void
+qla2xxx_get_node_name(struct scsi_device *sdev)
+{
+	scsi_qla_host_t *ha = to_qla_host(sdev->host);
+	struct fc_port *fc;
+
+	list_for_each_entry(fc, &ha->fcports, list) {
+		if (fc->os_target_id == sdev->id) {
+			fc_node_name(sdev) =
+				__be64_to_cpu(*(uint64_t *)fc->node_name);
+			return;
+		}
+	}
+	fc_node_name(sdev) = -1;
+}
+
+static struct fc_function_template qla2xxx_transport_functions = {
+	.get_port_id = qla2xxx_get_port_id,
+	.show_port_id = 1,
+	.get_port_name = qla2xxx_get_port_name,
+	.show_port_name = 1,
+	.get_node_name = qla2xxx_get_node_name,
+	.show_node_name = 1,
+};
+
 /**
  * qla2x00_module_init - Module initialization.
  **/
@@ -4452,6 +4514,10 @@ qla2x00_module_init(void)
 	strcat(qla2x00_version_str, "-debug");
 #endif
 
+	qla2xxx_transport_template = fc_attach_transport(&qla2xxx_transport_functions);
+	if (!qla2xxx_transport_template)
+		return -ENODEV;
+
 	printk(KERN_INFO
 	    "QLogic Fibre Channel HBA Driver (%p)\n", qla2x00_set_info);
 
@@ -4473,6 +4539,8 @@ qla2x00_module_exit(void)
 		}
 		srb_cachep = NULL;
 	}
+
+	fc_release_transport(qla2xxx_transport_template);
 }
 
 module_init(qla2x00_module_init);
