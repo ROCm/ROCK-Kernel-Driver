@@ -1720,8 +1720,9 @@ part2:
 	hostdata->connected = cmd;
 	hostdata->busy[cmd->device->id] |= (1 << cmd->device->lun);
 
-	initialize_SCp(cmd);
-
+	if (cmd->SCp.ptr != (char *)cmd->sense_buffer) {
+		initialize_SCp(cmd);
+	}
 
 	return 0;
 
