@@ -8,12 +8,9 @@
 #
 
 export-objs := bbc_i2c.o
-obj-y := sunkbdmap.o
 
 vfc-objs := vfc_dev.o vfc_i2c.o
 bbc-objs := bbc_i2c.o bbc_envctrl.o
-
-obj-$(CONFIG_PCI) += pcikbd.o
 
 obj-$(CONFIG_ENVCTRL)			+= envctrl.o
 obj-$(CONFIG_DISPLAY7SEG)		+= display7seg.o
