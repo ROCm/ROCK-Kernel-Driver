@@ -4,6 +4,7 @@
 
 #include <linux/init.h>
 #include <linux/acpi.h>
+#include <linux/module.h>
 
 #include <acpi/acpi_drivers.h>
 #include <acpi/acinterp.h>	/* for acpi_ex_eisa_id_to_string() */
@@ -17,6 +18,10 @@ ACPI_MODULE_NAME		("scan")
 extern struct acpi_device		*acpi_root;
 struct acpi_device 		*acpi_fixed_pwr_button;
 struct acpi_device 		*acpi_fixed_sleep_button;
+
+EXPORT_SYMBOL(acpi_fixed_pwr_button);
+EXPORT_SYMBOL(acpi_fixed_sleep_button);
+
 
 
 #define ACPI_BUS_CLASS			"system_bus"
