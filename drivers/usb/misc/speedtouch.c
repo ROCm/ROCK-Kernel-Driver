@@ -106,6 +106,8 @@
 #define UDSL_ENDPOINT_DATA_OUT		0x07
 #define UDSL_ENDPOINT_DATA_IN		0x87
 
+#define hex2int(c) ( (c >= '0')&&(c <= '9') ?  (c - '0') : ((c & 0xf)+9) )
+
 /* usb_device_id struct */
 
 static struct usb_device_id udsl_usb_ids [] = {
@@ -253,14 +255,6 @@ static void udsl_atm_stopdevice (struct udsl_instance_data *instance)
 
 	instance->atm_dev = NULL;
 	MOD_DEC_USE_COUNT;
-}
-
-static void udsl_atm_set_mac (struct udsl_instance_data *instance, const char mac [6])
-{
-	if (!instance->atm_dev)
-		return;
-
-	memcpy (instance->atm_dev->esi, mac, 6);
 }
 
 
@@ -806,8 +800,6 @@ static int udsl_usb_data_exit (struct udsl_instance_data *instance)
 * usb driver entries
 *
 ****************************************************************************/
-#define hex2int(c) ( (c >= '0')&&(c <= '9') ?  (c - '0') : ((c & 0xf)+9) )
-
 
 static int udsl_usb_ioctl (struct usb_interface *intf, unsigned int code, void *user_data)
 {
@@ -873,7 +865,8 @@ static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_i
 
 	PDEBUG ("MAC is %02x:%02x:%02x:%02x:%02x:%02x\n", mac[0], mac[1], mac[2], mac[3], mac[4],
 		mac[5]);
-	udsl_atm_set_mac (instance, mac);
+
+	memcpy (instance->atm_dev->esi, mac, 6);
 
 	usb_set_intfdata (intf, instance);
 	return 0;
