@@ -598,6 +598,19 @@ static int dummy_sem_semop (struct sem_array *sma,
 }
 
 #ifdef CONFIG_SECURITY_NETWORK
+static int dummy_unix_stream_connect (struct socket *sock,
+				      struct socket *other,
+				      struct sock *newsk)
+{
+	return 0;
+}
+
+static int dummy_unix_may_send (struct socket *sock,
+				struct socket *other)
+{
+	return 0;
+}
+
 static int dummy_socket_create (int family, int type, int protocol)
 {
 	return 0;
@@ -809,6 +822,8 @@ void security_fixup_ops (struct security_operations *ops)
 	set_to_dummy_if_null(ops, register_security);
 	set_to_dummy_if_null(ops, unregister_security);
 #ifdef CONFIG_SECURITY_NETWORK
+	set_to_dummy_if_null(ops, unix_stream_connect);
+	set_to_dummy_if_null(ops, unix_may_send);
 	set_to_dummy_if_null(ops, socket_create);
 	set_to_dummy_if_null(ops, socket_post_create);
 	set_to_dummy_if_null(ops, socket_bind);
