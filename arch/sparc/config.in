@@ -239,7 +239,10 @@ endmenu
 mainmenu_option next_comment
 comment 'Kernel hacking'
 
+bool 'Debug memory allocations' CONFIG_DEBUG_SLAB
 bool 'Magic SysRq key' CONFIG_MAGIC_SYSRQ
+bool 'Spinlock debugging' CONFIG_DEBUG_SPINLOCK
+
 endmenu
 
 source lib/Config.in

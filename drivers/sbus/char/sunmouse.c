@@ -587,13 +587,13 @@ sun_mouse_ioctl (struct inode *inode, struct file *file, unsigned int cmd, unsig
 }
 
 struct file_operations sun_mouse_fops = {
-	read:		sun_mouse_read,
-	write:		sun_mouse_write,
-	poll:		sun_mouse_poll,
-	ioctl:		sun_mouse_ioctl,
-	open:		sun_mouse_open,
-	release:	sun_mouse_close,
-	fasync:		sun_mouse_fasync,
+	.read =		sun_mouse_read,
+	.write =	sun_mouse_write,
+	.poll =		sun_mouse_poll,
+	.ioctl =	sun_mouse_ioctl,
+	.open =		sun_mouse_open,
+	.release =	sun_mouse_close,
+	.fasync =	sun_mouse_fasync,
 };
 
 static struct miscdevice sun_mouse_mouse = {

@@ -44,6 +44,8 @@
  */
 #define TASK_SIZE	PAGE_OFFSET
 
+struct task_struct;
+
 struct fpq {
 	unsigned long *insn_addr;
 	unsigned long insn;
@@ -55,14 +57,7 @@ typedef struct {
 
 /* The Sparc processor specific thread struct. */
 struct thread_struct {
-	unsigned long uwinmask __attribute__ ((aligned (8)));
 	struct pt_regs *kregs;
-
-	/* Context switch saved kernel state. */
-	unsigned long ksp __attribute__ ((aligned (8)));
-	unsigned long kpc;
-	unsigned long kpsr;
-	unsigned long kwim;
 
 	/* Special child fork kpsr/kwim values. */
 	unsigned long fork_kpsr __attribute__ ((aligned (8)));
@@ -92,8 +87,8 @@ struct thread_struct {
 #define SPARC_FLAG_UNALIGNED    0x2    /* is allowed to do unaligned accesses */
 
 #define INIT_THREAD  { \
-/* uwinmask, kregs, ksp, kpc, kpsr, kwim */ \
-   0,        0,     0,   0,   0,    0, \
+/* kregs, */ \
+   0,  \
 /* fork_kpsr, fork_kwim */ \
    0,         0, \
 /* reg_window */  \
@@ -115,10 +110,7 @@ struct thread_struct {
 }
 
 /* Return saved PC of a blocked thread. */
-extern __inline__ unsigned long thread_saved_pc(struct thread_struct *t)
-{
-	return t->kpc;
-}
+extern unsigned long thread_saved_pc(struct task_struct *t);
 
 /* Do necessary setup to start up a newly executed thread. */
 extern __inline__ void start_thread(struct pt_regs * regs, unsigned long pc,
@@ -163,7 +155,7 @@ extern pid_t kernel_thread(int (*fn)(void *), void * arg, unsigned long flags);
 	if (!(__TSK) || (__TSK) == current || \
             (__TSK)->state == TASK_RUNNING) \
 		goto __out; \
-	fp = (__TSK)->thread.ksp + bias; \
+	fp = (__TSK)->thread_info->ksp + bias; \
 	do { \
 		/* Bogus frame pointer? */ \
 		if (fp < (task_base + sizeof(struct task_struct)) || \
@@ -185,21 +177,8 @@ __out:	__ret; \
 #define KSTK_ESP(tsk)  ((tsk)->thread.kregs->u_regs[UREG_FP])
 
 #ifdef __KERNEL__
-#define THREAD_SIZE (2*PAGE_SIZE)
 
 extern struct task_struct *last_task_used_math;
-
-/* Allocation and freeing of basic task resources. */
-BTFIXUPDEF_CALL(struct task_struct *, alloc_task_struct, void)
-BTFIXUPDEF_CALL(void, free_task_struct, struct task_struct *)
-BTFIXUPDEF_CALL(void, get_task_struct, struct task_struct *)
-
-#define alloc_task_struct() BTFIXUP_CALL(alloc_task_struct)()
-#define free_task_struct(tsk) BTFIXUP_CALL(free_task_struct)(tsk)
-#define get_task_struct(tsk) BTFIXUP_CALL(get_task_struct)(tsk)
-
-#define init_task	(init_task_union.task)
-#define init_stack	(init_task_union.stack)
 
 #define cpu_relax()	do { } while (0)
 

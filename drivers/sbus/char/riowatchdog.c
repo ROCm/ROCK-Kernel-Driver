@@ -185,12 +185,12 @@ static ssize_t riowd_read(struct file *file, char *buffer, size_t count, loff_t 
 }
 
 static struct file_operations riowd_fops = {
-	owner:		THIS_MODULE,
-	ioctl:		riowd_ioctl,
-	open:		riowd_open,
-	write:		riowd_write,
-	read:		riowd_read,
-	release:	riowd_release,
+	.owner =	THIS_MODULE,
+	.ioctl =	riowd_ioctl,
+	.open =		riowd_open,
+	.write =	riowd_write,
+	.read =		riowd_read,
+	.release =	riowd_release,
 };
 
 static struct miscdevice riowd_miscdev = { RIOWD_MINOR, RIOWD_NAME, &riowd_fops };

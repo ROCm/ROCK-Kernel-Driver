@@ -76,6 +76,7 @@ static int macaddr[6];
 /* accept MAC address of the form macaddr=0x08,0x00,0x20,0x30,0x40,0x50 */
 MODULE_PARM(macaddr, "6i");
 MODULE_PARM_DESC(macaddr, "Happy Meal MAC address to set");
+MODULE_LICENSE("GPL");
 
 static struct happy_meal *root_happy_dev;
 
@@ -192,7 +193,6 @@ struct pci_device_id happymeal_pci_ids[] __initdata = {
 };
 
 MODULE_DEVICE_TABLE(pci, happymeal_pci_ids);
-MODULE_LICENSE("GPL");
 
 #endif
 

@@ -140,10 +140,10 @@ prom_console_write(struct console *con, const char *s, unsigned n)
 }
 
 static struct console prom_debug_console = {
-	name:		"debug",
-	write:		prom_console_write,
-	flags:		CON_PRINTBUFFER,
-	index:		-1,
+	.name =		"debug",
+	.write =	prom_console_write,
+	.flags =	CON_PRINTBUFFER,
+	.index =	-1,
 };
 
 int obp_system_intr(void)
@@ -481,7 +481,7 @@ static int show_cpuinfo(struct seq_file *m, void *__unused)
 		   (short) romvec->pv_printrev,
 		   &cputypval,
 		   linux_num_cpus,
-		   smp_num_cpus
+		   num_online_cpus()
 #ifndef CONFIG_SMP
 		   , loops_per_jiffy/(500000/HZ),
 		   (loops_per_jiffy/(5000/HZ)) % 100
@@ -518,8 +518,8 @@ static void c_stop(struct seq_file *m, void *v)
 }
 
 struct seq_operations cpuinfo_op = {
-	start:	c_start,
-	next:	c_next,
-	stop:	c_stop,
-	show:	show_cpuinfo,
+	.start =c_start,
+	.next =	c_next,
+	.stop =	c_stop,
+	.show =	show_cpuinfo,
 };

@@ -165,8 +165,8 @@ static unsigned int socksys_poll(struct file * filp, poll_table * wait)
 }
 	
 static struct file_operations socksys_fops = {
-	open:		socksys_open,
-	release:	socksys_release,
+	.open =		socksys_open,
+	.release =	socksys_release,
 };
 
 static devfs_handle_t devfs_handle;

@@ -650,8 +650,9 @@ void __global_cli(void)
 
 	__save_flags(flags);
 	if(flags == 0) {
-		int cpu = smp_processor_id();
+		int cpu;
 		__cli();
+		cpu = smp_processor_id();
 		if (! local_irq_count(cpu))
 			get_irqlock(cpu);
 	}
@@ -659,11 +660,14 @@ void __global_cli(void)
 
 void __global_sti(void)
 {
-	int cpu = smp_processor_id();
+	int cpu;
 
+	preempt_disable();
+	cpu = smp_processor_id();
 	if (! local_irq_count(cpu))
 		release_irqlock(cpu);
 	__sti();
+	preempt_enable();
 }
 
 unsigned long __global_save_flags(void)

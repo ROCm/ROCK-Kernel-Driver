@@ -3,6 +3,7 @@
 /* sparc32 semaphore implementation, based on i386 version */
 
 #include <linux/sched.h>
+#include <linux/errno.h>
 
 #include <asm/semaphore.h>
 

@@ -23,6 +23,7 @@
 #include <asm/page.h>
 #include <asm/kdebug.h>
 #include <asm/winmacro.h>
+#include <asm/thread_info.h>	/* TI_UWINMASK */
 #include <asm/errno.h>
 
 	.data
@@ -749,7 +750,7 @@ go_to_highmem:
 		jmpl	%g1, %g0
 		 nop
 
-	/* This is to align init_task_union properly, be careful. -DaveM */
+	/* This is to align init_thread_union properly, be careful. -DaveM */
 	.align	8192
 
 /* The code above should be at beginning and we have to take care about
@@ -1010,8 +1011,8 @@ sun4c_continue_boot:
 		WRITE_PAUSE
 
 		/* I want a kernel stack NOW! */
-		set	C_LABEL(init_task_union), %g1
-		set	(TASK_UNION_SIZE - REGWIN_SZ), %g2
+		set	C_LABEL(init_thread_union), %g1
+		set	(THREAD_SIZE - REGWIN_SZ), %g2
 		add	%g1, %g2, %sp
 		mov	0, %fp			/* And for good luck */
 
@@ -1025,10 +1026,10 @@ sun4c_continue_boot:
 		bl	1b
 		 add	%o0, 0x1, %o0
 
-		/* Initialize the umask value for init_task just in case.
+		/* Initialize the uwinmask value for init task just in case.
 		 * But first make current_set[boot_cpu_id] point to something useful.
 		 */
-		set	C_LABEL(init_task_union), %g6
+		set	C_LABEL(init_thread_union), %g6
 		set	C_LABEL(current_set), %g2
 #ifdef CONFIG_SMP
 		sethi	%hi(C_LABEL(boot_cpu_id4)), %g3
@@ -1038,7 +1039,7 @@ sun4c_continue_boot:
 #endif
 		st	%g6, [%g2]
 
-		st	%g0, [%g6 + AOFF_task_thread + AOFF_thread_uwinmask]
+		st	%g0, [%g6 + TI_UWINMASK]
 
 /* Compute NWINDOWS and stash it away. Now uses %wim trick explained
  * in the V8 manual. Ok, this method seems to work, Sparc is cool...
