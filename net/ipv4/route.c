@@ -2288,7 +2288,7 @@ int inet_rtm_getroute(struct sk_buff *in_skb, struct nlmsghdr* nlh, void *arg)
 		struct net_device *dev = __dev_get_by_index(iif);
 		err = -ENODEV;
 		if (!dev)
-			goto out;
+			goto out_free;
 		skb->protocol	= htons(ETH_P_IP);
 		skb->dev	= dev;
 		local_bh_disable();
@@ -2307,10 +2307,8 @@ int inet_rtm_getroute(struct sk_buff *in_skb, struct nlmsghdr* nlh, void *arg)
 		fl.oif = oif;
 		err = ip_route_output_key(&rt, &fl);
 	}
-	if (err) {
-		kfree_skb(skb);
-		goto out;
-	}
+	if (err)
+		goto out_free;
 
 	skb->dst = &rt->u.dst;
 	if (rtm->rtm_flags & RTM_F_NOTIFY)
@@ -2321,16 +2319,20 @@ int inet_rtm_getroute(struct sk_buff *in_skb, struct nlmsghdr* nlh, void *arg)
 	err = rt_fill_info(skb, NETLINK_CB(in_skb).pid, nlh->nlmsg_seq,
 				RTM_NEWROUTE, 0);
 	if (!err)
-		goto out;
+		goto out_free;
 	if (err < 0) {
 		err = -EMSGSIZE;
-		goto out;
+		goto out_free;
 	}
 
 	err = netlink_unicast(rtnl, skb, NETLINK_CB(in_skb).pid, MSG_DONTWAIT);
 	if (err > 0)
 		err = 0;
 out:	return err;
+
+out_free:
+	kfree_skb(skb);
+	goto out;
 }
 
 int ip_rt_dump(struct sk_buff *skb,  struct netlink_callback *cb)
