@@ -112,6 +112,7 @@ config I2C_I801
 	    82801EB
 	    6300ESB
 	    ICH6
+	    ICH7
 
 	  This driver can also be built as a module.  If so, the module
 	  will be called i2c-i801.
@@ -208,7 +209,7 @@ config I2C_KEYWEST
 
 config I2C_MPC
 	tristate "MPC107/824x/85xx/52xx"
-	depends on I2C && FSL_OCP
+	depends on I2C && PPC
 	help
 	  If you say yes to this option, support will be included for the
 	  built-in I2C interface on the MPC107/Tsi107/MPC8240/MPC8245 and

@@ -865,6 +865,14 @@ UNUSUAL_DEV( 0x0ed1, 0x6660, 0x0100, 0x0300,
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_INQUIRY ),
 
+/* Submitted by Daniel Drake <dsd@gentoo.org>
+ * Reported by dayul on the Gentoo Forums */
+UNUSUAL_DEV(  0x0ea0, 0x2168, 0x0110, 0x0110,
+		"Ours Technology",
+		"Flash Disk",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_IGNORE_RESIDUE ),
+
 /* Reported by Rastislav Stanik <rs_kernel@yahoo.com> */
 UNUSUAL_DEV(  0x0ea0, 0x6828, 0x0110, 0x0110,
 		"USB",

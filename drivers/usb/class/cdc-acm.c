@@ -544,24 +544,24 @@ static int acm_probe (struct usb_interface *intf,
 	
 	/* normal probing*/
 	if (!buffer) {
-		err("Wierd descriptor references");
+		err("Wierd descriptor references\n");
 		return -EINVAL;
 	}
 
 	if (!buflen) {
 		if (intf->cur_altsetting->endpoint->extralen && intf->cur_altsetting->endpoint->extra) {
-			dev_dbg(&intf->dev,"Seeking extra descriptors on endpoint");
+			dev_dbg(&intf->dev,"Seeking extra descriptors on endpoint\n");
 			buflen = intf->cur_altsetting->endpoint->extralen;
 			buffer = intf->cur_altsetting->endpoint->extra;
 		} else {
-			err("Zero length descriptor references");
+			err("Zero length descriptor references\n");
 			return -EINVAL;
 		}
 	}
 
 	while (buflen > 0) {
 		if (buffer [1] != USB_DT_CS_INTERFACE) {
-			err("skipping garbage");
+			err("skipping garbage\n");
 			goto next_desc;
 		}
 
@@ -614,14 +614,10 @@ next_desc:
 		}
 	}
 	
-		if (data_interface_num != call_interface_num)
-			dev_dbg(&intf->dev,"Seperate call control interface. That is not fully supported.");
+	if (data_interface_num != call_interface_num)
+		dev_dbg(&intf->dev,"Seperate call control interface. That is not fully supported.\n");
 
 skip_normal_probe:
-	if (usb_interface_claimed(data_interface)) { /* valid in this context */
-		dev_dbg(&intf->dev,"The data interface isn't available\n");
-		return -EBUSY;
-	}
 
 	/*workaround for switched interfaces */
 	if (data_interface->cur_altsetting->desc.bInterfaceClass != CDC_DATA_INTERFACE_TYPE) {
@@ -636,6 +632,13 @@ skip_normal_probe:
 			return -EINVAL;
 		}
 	}
+	
+	if (usb_interface_claimed(data_interface)) { /* valid in this context */
+		dev_dbg(&intf->dev,"The data interface isn't available\n");
+		return -EBUSY;
+	}
+
+
 	if (data_interface->cur_altsetting->desc.bNumEndpoints < 2)
 		return -EINVAL;
 

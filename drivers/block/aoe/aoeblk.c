@@ -12,14 +12,9 @@
 #include <linux/netdevice.h>
 #include "aoe.h"
 
-/* add attributes for our block devices in sysfs
- * (see drivers/block/genhd.c:disk_attr_show, etc.)
- */
-struct disk_attribute {
-	struct attribute attr;
-	ssize_t (*show)(struct gendisk *, char *);
-};
+static kmem_cache_t *buf_pool_cache;
 
+/* add attributes for our block devices in sysfs */
 static ssize_t aoedisk_show_state(struct gendisk * disk, char *page)
 {
 	struct aoedev *d = disk->private_data;
@@ -74,9 +69,18 @@ static int
 aoeblk_open(struct inode *inode, struct file *filp)
 {
 	struct aoedev *d;
+	ulong flags;
 
 	d = inode->i_bdev->bd_disk->private_data;
-	return (d->flags & DEVFL_UP) ? 0 : -ENODEV;
+
+	spin_lock_irqsave(&d->lock, flags);
+	if (d->flags & DEVFL_UP) {
+		d->nopen++;
+		spin_unlock_irqrestore(&d->lock, flags);
+		return 0;
+	}
+	spin_unlock_irqrestore(&d->lock, flags);
+	return -ENODEV;
 }
 
 static int
@@ -89,7 +93,7 @@ aoeblk_release(struct inode *inode, struct file *filp)
 
 	spin_lock_irqsave(&d->lock, flags);
 
-	if (inode->i_bdev->bd_openers == 0 && (d->flags & DEVFL_CLOSEWAIT)) {
+	if (--d->nopen == 0 && (d->flags & DEVFL_CLOSEWAIT)) {
 		d->flags &= ~DEVFL_CLOSEWAIT;
 		spin_unlock_irqrestore(&d->lock, flags);
 		aoecmd_cfg(d->aoemajor, d->aoeminor);
@@ -192,23 +196,34 @@ aoeblk_gdalloc(void *vp)
 	struct aoedev *d = vp;
 	struct gendisk *gd;
 	ulong flags;
-	enum { NPARTITIONS = 16 };
 
-	gd = alloc_disk(NPARTITIONS);
-
-	spin_lock_irqsave(&d->lock, flags);
-
+	gd = alloc_disk(AOE_PARTITIONS);
 	if (gd == NULL) {
-		printk(KERN_CRIT "aoe: aoeblk_gdalloc: cannot allocate disk "
+		printk(KERN_ERR "aoe: aoeblk_gdalloc: cannot allocate disk "
 			"structure for %ld.%ld\n", d->aoemajor, d->aoeminor);
+		spin_lock_irqsave(&d->lock, flags);
 		d->flags &= ~DEVFL_WORKON;
 		spin_unlock_irqrestore(&d->lock, flags);
 		return;
 	}
 
+	d->bufpool = mempool_create(MIN_BUFS,
+				    mempool_alloc_slab, mempool_free_slab,
+				    buf_pool_cache);
+	if (d->bufpool == NULL) {
+		printk(KERN_ERR "aoe: aoeblk_gdalloc: cannot allocate bufpool "
+			"for %ld.%ld\n", d->aoemajor, d->aoeminor);
+		put_disk(gd);
+		spin_lock_irqsave(&d->lock, flags);
+		d->flags &= ~DEVFL_WORKON;
+		spin_unlock_irqrestore(&d->lock, flags);
+		return;
+	}
+
+	spin_lock_irqsave(&d->lock, flags);
 	blk_queue_make_request(&d->blkq, aoeblk_make_request);
 	gd->major = AOE_MAJOR;
-	gd->first_minor = d->sysminor * NPARTITIONS;
+	gd->first_minor = d->sysminor * AOE_PARTITIONS;
 	gd->fops = &aoe_bdops;
 	gd->private_data = d;
 	gd->capacity = d->ssize;
@@ -233,13 +248,19 @@ aoeblk_gdalloc(void *vp)
 void __exit
 aoeblk_exit(void)
 {
-	unregister_blkdev(AOE_MAJOR, DEVICE_NAME);
+	kmem_cache_destroy(buf_pool_cache);
 }
 
 int __init
 aoeblk_init(void)
 {
 	int n;
+
+	buf_pool_cache = kmem_cache_create("aoe_bufs", 
+					   sizeof(struct buf),
+					   0, 0, NULL, NULL);
+	if (buf_pool_cache == NULL)
+		return -ENOMEM;
 
 	n = register_blkdev(AOE_MAJOR, DEVICE_NAME);
 	if (n < 0) {

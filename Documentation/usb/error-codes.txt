@@ -83,7 +83,18 @@ one or more packets could finish before an error stops further endpoint I/O.
 			   prescribed bus turn-around time
 			c) unknown USB error 
 
--EILSEQ (*, **)		CRC mismatch
+-EILSEQ (*, **)		a) CRC mismatch
+			b) no response packet received within the
+			   prescribed bus turn-around time
+			c) unknown USB error 
+
+			In cases b) and c) either -EPROTO or -EILSEQ
+			may be returned.  Note that often the controller
+			hardware does not distinguish among cases a),
+			b), and c), so a driver cannot tell whether
+			there was a protocol error, a failure to respond
+			(often caused by device disconnect), or some
+			other fault.
 
 -EPIPE (**)		Endpoint stalled.  For non-control endpoints,
 			reset this status with usb_clear_halt().
@@ -103,8 +114,6 @@ one or more packets could finish before an error stops further endpoint I/O.
 -EREMOTEIO		The data read from the endpoint did not fill the
 			specified buffer, and URB_SHORT_NOT_OK was set in
 			urb->transfer_flags.
-
--ETIMEDOUT (**)		transfer timed out, NAK
 
 -ENODEV			Device was removed.  Often preceded by a burst of
 			other errors, since the hub driver does't detect
@@ -143,4 +152,4 @@ usb_register():
 usb_get_*/usb_set_*():
 usb_control_msg():
 usb_bulk_msg():
-			All USB errors (submit/status) can occur
+-ETIMEDOUT		timeout expired before the transfer completed

@@ -316,7 +316,7 @@ static int pkt_add(struct garmin_data * garmin_data_p,
 		garmin_data_p->flags |= FLAGS_QUEUING;
 		pkt = kmalloc(sizeof(struct garmin_packet)+data_length,
 		              GFP_ATOMIC);
-		if (pkt == 0) {
+		if (pkt == NULL) {
 			dev_err(&garmin_data_p->port->dev, "out of memory\n");
 			return 0;
 		}
@@ -739,7 +739,7 @@ static void gsp_next_packet(struct garmin_data * garmin_data_p)
 {
 	struct garmin_packet *pkt = NULL;
 
-	while ((pkt = pkt_pop(garmin_data_p)) != 0) {
+	while ((pkt = pkt_pop(garmin_data_p)) != NULL) {
 		dbg("%s - next pkt: %d", __FUNCTION__, pkt->seq);
 		if (gsp_send(garmin_data_p, pkt->data, pkt->size) > 0) {
 			kfree(pkt);
@@ -877,7 +877,7 @@ static int garmin_clear(struct garmin_data * garmin_data_p)
 
 	struct usb_serial_port *port = garmin_data_p->port;
 
-	if (port != 0 && garmin_data_p->flags & FLAGS_APP_RESP_SEEN) {
+	if (port != NULL && garmin_data_p->flags & FLAGS_APP_RESP_SEEN) {
 		/* send a terminate command */
 		status = garmin_write_bulk(port, GARMIN_STOP_TRANSFER_REQ,
 		                           sizeof(GARMIN_STOP_TRANSFER_REQ));
@@ -1366,7 +1366,7 @@ static int garmin_flush_queue(struct garmin_data * garmin_data_p)
 
 	if ((garmin_data_p->flags & FLAGS_THROTTLED) == 0) {
 		pkt = pkt_pop(garmin_data_p);
-		if (pkt != 0) {
+		if (pkt != NULL) {
 
 			send_to_tty(garmin_data_p->port, pkt->data, pkt->size);
 			kfree(pkt);

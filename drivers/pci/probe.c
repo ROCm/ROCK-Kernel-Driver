@@ -62,7 +62,7 @@ static void pci_create_legacy_files(struct pci_bus *b)
 	}
 }
 
-static void pci_remove_legacy_files(struct pci_bus *b)
+void pci_remove_legacy_files(struct pci_bus *b)
 {
 	class_device_remove_bin_file(&b->class_dev, b->legacy_io);
 	class_device_remove_bin_file(&b->class_dev, b->legacy_mem);
@@ -70,7 +70,7 @@ static void pci_remove_legacy_files(struct pci_bus *b)
 }
 #else /* !HAVE_PCI_LEGACY */
 static inline void pci_create_legacy_files(struct pci_bus *bus) { return; }
-static inline void pci_remove_legacy_files(struct pci_bus *bus) { return; }
+void pci_remove_legacy_files(struct pci_bus *bus) { return; }
 #endif /* HAVE_PCI_LEGACY */
 
 /*
@@ -86,7 +86,7 @@ static ssize_t pci_bus_show_cpuaffinity(struct class_device *class_dev, char *bu
 		buf[ret++] = '\n';
 	return ret;
 }
-static CLASS_DEVICE_ATTR(cpuaffinity, S_IRUGO, pci_bus_show_cpuaffinity, NULL);
+CLASS_DEVICE_ATTR(cpuaffinity, S_IRUGO, pci_bus_show_cpuaffinity, NULL);
 
 /*
  * PCI Bus Class
@@ -95,10 +95,6 @@ static void release_pcibus_dev(struct class_device *class_dev)
 {
 	struct pci_bus *pci_bus = to_pci_bus(class_dev);
 
-	pci_remove_legacy_files(pci_bus);
-	class_device_remove_file(&pci_bus->class_dev,
-				 &class_device_attr_cpuaffinity);
-	sysfs_remove_link(&pci_bus->class_dev.kobj, "bridge");
 	if (pci_bus->bridge)
 		put_device(pci_bus->bridge);
 	kfree(pci_bus);

@@ -1,9 +1,10 @@
 #!/bin/sh
 
-n_shelves=10
+n_shelves=${n_shelves:-10}
+n_partitions=${n_partitions:-16}
 
 if test "$#" != "1"; then
-	echo "Usage: sh mkdevs.sh {dir}" 1>&2
+	echo "Usage: sh `basename $0` {dir}" 1>&2
 	exit 1
 fi
 dir=$1
@@ -26,8 +27,10 @@ mknod -m 0200 $dir/discover c $MAJOR 3
 rm -f $dir/interfaces
 mknod -m 0200 $dir/interfaces c $MAJOR 4
 
+export n_partitions
+mkshelf=`echo $0 | sed 's!mkdevs!mkshelf!'`
 i=0
 while test $i -lt $n_shelves; do
-	sh -xc "sh `dirname $0`/mkshelf.sh $dir $i"
+	sh -xc "sh $mkshelf $dir $i"
 	i=`expr $i + 1`
 done

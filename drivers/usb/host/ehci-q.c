@@ -218,7 +218,7 @@ ehci_urb_done (struct ehci_hcd *ehci, struct urb *urb, struct pt_regs *regs)
 __releases(ehci->lock)
 __acquires(ehci->lock)
 {
-	if (likely (urb->hcpriv != 0)) {
+	if (likely (urb->hcpriv != NULL)) {
 		struct ehci_qh	*qh = (struct ehci_qh *) urb->hcpriv;
 
 		/* S-mask in a QH means it's an interrupt urb */
@@ -404,7 +404,7 @@ halt:
 	}
 
 	/* last urb's completion might still need calling */
-	if (likely (last != 0)) {
+	if (likely (last != NULL)) {
 		ehci_urb_done (ehci, last->urb, regs);
 		count++;
 		ehci_qtd_free (ehci, last);
@@ -846,7 +846,7 @@ static struct ehci_qh *qh_append_tds (
 		/* just one way to queue requests: swap with the dummy qtd.
 		 * only hc or qh_refresh() ever modify the overlay.
 		 */
-		if (likely (qtd != 0)) {
+		if (likely (qtd != NULL)) {
 			struct ehci_qtd		*dummy;
 			dma_addr_t		dma;
 			__le32			token;
@@ -921,12 +921,12 @@ submit_async (
 	/* Control/bulk operations through TTs don't need scheduling,
 	 * the HC and TT handle it when the TT has a buffer ready.
 	 */
-	if (likely (qh != 0)) {
+	if (likely (qh != NULL)) {
 		if (likely (qh->qh_state == QH_STATE_IDLE))
 			qh_link_async (ehci, qh_get (qh));
 	}
 	spin_unlock_irqrestore (&ehci->lock, flags);
-	if (unlikely (qh == 0)) {
+	if (unlikely (qh == NULL)) {
 		qtd_list_free (ehci, urb, qtd_list);
 		return -ENOMEM;
 	}
@@ -967,7 +967,7 @@ static void end_unlink_async (struct ehci_hcd *ehci, struct pt_regs *regs)
 		 * active but idle for a while once it empties.
 		 */
 		if (HCD_IS_RUNNING (ehci_to_hcd(ehci)->state)
-				&& ehci->async->qh_next.qh == 0)
+				&& ehci->async->qh_next.qh == NULL)
 			timer_action (ehci, TIMER_ASYNC_OFF);
 	}
 
@@ -1048,7 +1048,7 @@ scan_async (struct ehci_hcd *ehci, struct pt_regs *regs)
 	timer_action_done (ehci, TIMER_ASYNC_SHRINK);
 rescan:
 	qh = ehci->async->qh_next.qh;
-	if (likely (qh != 0)) {
+	if (likely (qh != NULL)) {
 		do {
 			/* clean any finished work for this qh */
 			if (!list_empty (&qh->qtd_list)

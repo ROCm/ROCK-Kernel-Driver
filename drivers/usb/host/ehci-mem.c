@@ -51,7 +51,7 @@ static struct ehci_qtd *ehci_qtd_alloc (struct ehci_hcd *ehci, int flags)
 	dma_addr_t		dma;
 
 	qtd = dma_pool_alloc (ehci->qtd_pool, flags, &dma);
-	if (qtd != 0) {
+	if (qtd != NULL) {
 		ehci_qtd_init (qtd, dma);
 	}
 	return qtd;
@@ -98,7 +98,7 @@ static struct ehci_qh *ehci_qh_alloc (struct ehci_hcd *ehci, int flags)
 
 	/* dummy td enables safe urb queuing */
 	qh->dummy = ehci_qtd_alloc (ehci, flags);
-	if (qh->dummy == 0) {
+	if (qh->dummy == NULL) {
 		ehci_dbg (ehci, "no dummy td\n");
 		dma_pool_free (ehci->qh_pool, qh, qh->qh_dma);
 		qh = NULL;
@@ -215,7 +215,7 @@ static int ehci_mem_init (struct ehci_hcd *ehci, int flags)
 		dma_alloc_coherent (ehci_to_hcd(ehci)->self.controller,
 			ehci->periodic_size * sizeof(__le32),
 			&ehci->periodic_dma, 0);
-	if (ehci->periodic == 0) {
+	if (ehci->periodic == NULL) {
 		goto fail;
 	}
 	for (i = 0; i < ehci->periodic_size; i++)
@@ -223,7 +223,7 @@ static int ehci_mem_init (struct ehci_hcd *ehci, int flags)
 
 	/* software shadow of hardware table */
 	ehci->pshadow = kmalloc (ehci->periodic_size * sizeof (void *), flags);
-	if (ehci->pshadow == 0) {
+	if (ehci->pshadow == NULL) {
 		goto fail;
 	}
 	memset (ehci->pshadow, 0, ehci->periodic_size * sizeof (void *));

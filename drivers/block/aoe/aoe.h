@@ -1,7 +1,10 @@
 /* Copyright (c) 2004 Coraid, Inc.  See COPYING for GPL terms. */
-#define VERSION "4"
+#define VERSION "5"
 #define AOE_MAJOR 152
 #define DEVICE_NAME "aoe"
+#ifndef AOE_PARTITIONS
+#define AOE_PARTITIONS 16
+#endif
 #define SYSMINOR(aoemajor, aoeminor) ((aoemajor) * 10 + (aoeminor))
 #define AOEMAJOR(sysminor) ((sysminor) / 10)
 #define AOEMINOR(sysminor) ((sysminor) % 10)
@@ -101,7 +104,7 @@ struct frame {
 	int ndata;
 
 	/* largest possible */
-	char data[sizeof(struct aoe_hdr) + sizeof(struct aoe_atahdr)];
+	unsigned char data[sizeof(struct aoe_hdr) + sizeof(struct aoe_atahdr)];
 };
 
 struct aoedev {
@@ -111,6 +114,7 @@ struct aoedev {
 	ulong sysminor;
 	ulong aoemajor;
 	ulong aoeminor;
+	ulong nopen;		/* (bd_openers isn't available without sleeping) */
 	ulong rttavg;		/* round trip average of requests/responses */
 	u16 fw_ver;		/* version of blade's firmware */
 	struct work_struct work;/* disk create work struct */

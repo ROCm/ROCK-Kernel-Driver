@@ -119,9 +119,19 @@ struct uhci_qh {
 } __attribute__((aligned(16)));
 
 /*
+ * We need a special accessor for the element pointer because it is
+ * subject to asynchronous updates by the controller
+ */
+static __le32 inline qh_element(struct uhci_qh *qh) {
+	__le32 element = qh->element;
+
+	barrier();
+	return element;
+}
+
+/*
  * for TD <status>:
  */
-#define td_status(td)		le32_to_cpu((td)->status)
 #define TD_CTRL_SPD		(1 << 29)	/* Short Packet Detect */
 #define TD_CTRL_C_ERR_MASK	(3 << 27)	/* Error Counter bits */
 #define TD_CTRL_C_ERR_SHIFT	27
@@ -202,6 +212,18 @@ struct uhci_td {
 	int frame;			/* for iso: what frame? */
 	struct list_head fl_list;	/* P: uhci->frame_list_lock */
 } __attribute__((aligned(16)));
+
+/*
+ * We need a special accessor for the control/status word because it is
+ * subject to asynchronous updates by the controller
+ */
+static u32 inline td_status(struct uhci_td *td) {
+	__le32 status = td->status;
+
+	barrier();
+	return le32_to_cpu(status);
+}
+
 
 /*
  * The UHCI driver places Interrupt, Control and Bulk into QH's both
