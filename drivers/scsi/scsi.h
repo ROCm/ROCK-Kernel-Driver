@@ -619,6 +619,8 @@ struct scsi_device {
 	unsigned remap:1;	/* support remapping  */
 	unsigned starved:1;	/* unable to process commands because
 				   host busy */
+	unsigned sync:1;	/* Sync transfer state, managed by host */
+	unsigned wide:1;	/* WIDE transfer state, managed by host */
 
 	unsigned int device_blocked;	/* Device returned QUEUE_FULL. */
 

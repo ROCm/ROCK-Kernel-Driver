@@ -346,7 +346,7 @@ paging_init(void)
 	 */
 
 	free_area_init_node(0, &contig_page_data, 0, zones_size, PAGE_OFFSET >> PAGE_SHIFT, 0);
-
+	mem_map = contig_page_data.node_mem_map;
 }
 
 extern unsigned long loops_per_jiffy; /* init/main.c */

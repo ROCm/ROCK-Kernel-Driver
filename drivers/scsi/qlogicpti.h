@@ -6,6 +6,8 @@
 #ifndef _QLOGICPTI_H
 #define _QLOGICPTI_H
 
+#include <linux/config.h>
+
 /* Qlogic/SBUS controller registers. */
 #define SBUS_CFG1	0x006UL
 #define SBUS_CTRL	0x008UL
@@ -512,6 +514,7 @@ struct qlogicpti {
 #define HCCTRL_B1ENAB           0x0008      /* Breakpoint 1 enable              */
 #define HCCTRL_B0ENAB           0x0004      /* Breakpoint 0 enable              */
 
+#ifdef CONFIG_SPARC64
 #define QLOGICPTI {						   \
 	detect:		qlogicpti_detect,			   \
 	release:	qlogicpti_release,			   \
@@ -526,6 +529,22 @@ struct qlogicpti {
 	use_clustering:	ENABLE_CLUSTERING,			   \
 	highmem_io:	1,			   		   \
 }
+#else
+/* Sparc32's iommu code cannot handle highmem pages yet. */
+#define QLOGICPTI {						   \
+	detect:		qlogicpti_detect,			   \
+	release:	qlogicpti_release,			   \
+	info:		qlogicpti_info,				   \
+	queuecommand:	qlogicpti_queuecommand_slow,		   \
+	abort:		qlogicpti_abort,			   \
+	reset:		qlogicpti_reset,			   \
+	can_queue:	QLOGICPTI_REQ_QUEUE_LEN,		   \
+	this_id:	7,					   \
+	sg_tablesize:	QLOGICPTI_MAX_SG(QLOGICPTI_REQ_QUEUE_LEN), \
+	cmd_per_lun:	1,					   \
+	use_clustering:	ENABLE_CLUSTERING,			   \
+}
+#endif
 
 /* For our interrupt engine. */
 #define for_each_qlogicpti(qp) \
