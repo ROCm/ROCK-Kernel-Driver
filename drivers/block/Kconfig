@@ -372,7 +372,7 @@ config INITRAMFS_SOURCE
 	    <maj>       major number of nod
 	    <min>       minor number of nod
 
-	If you are not sure, leave it blank.
+	  If you are not sure, leave it blank.
 
 config LBD
 	bool "Support for Large Block Devices"
