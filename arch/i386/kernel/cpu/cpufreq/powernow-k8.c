@@ -136,7 +136,7 @@ static void fidvid_msr_init(void)
 	fid = lo & MSR_S_LO_CURRENT_FID;
 	lo = fid | (vid << MSR_C_LO_VID_SHIFT);
 	hi = MSR_C_HI_STP_GNT_BENIGN;
-	dprintk(PFX "cpu%d, init lo %x, hi %x\n", smp_processor_id(), lo, hi);
+	dprintk(PFX "cpu%d, init lo 0x%x, hi 0x%x\n", smp_processor_id(), lo, hi);
 	wrmsr(MSR_FIDVID_CTL, lo, hi);
 }
 
@@ -154,7 +154,7 @@ static int write_new_fid(struct powernow_k8_data *data, u32 fid)
 
 	lo = fid | (data->currvid << MSR_C_LO_VID_SHIFT) | MSR_C_LO_INIT_FID_VID;
 
-	dprintk(KERN_DEBUG PFX "writing fid %x, lo %x, hi %x\n",
+	dprintk(KERN_DEBUG PFX "writing fid 0x%x, lo 0x%x, hi 0x%x\n",
 		fid, lo, data->plllock * PLL_LOCK_CONVERSION);
 
 	wrmsr(MSR_FIDVID_CTL, lo, data->plllock * PLL_LOCK_CONVERSION);
@@ -165,13 +165,13 @@ static int write_new_fid(struct powernow_k8_data *data, u32 fid)
 	count_off_irt(data);
 
 	if (savevid != data->currvid) {
-		printk(KERN_ERR PFX "vid change on fid trans, old %x, new %x\n",
+		printk(KERN_ERR PFX "vid change on fid trans, old 0x%x, new 0x%x\n",
 		       savevid, data->currvid);
 		return 1;
 	}
 
 	if (fid != data->currfid) {
-		printk(KERN_ERR PFX "fid trans failed, fid %x, curr %x\n", fid,
+		printk(KERN_ERR PFX "fid trans failed, fid 0x%x, curr 0x%x\n", fid,
 		        data->currfid);
 		return 1;
 	}
@@ -192,7 +192,7 @@ static int write_new_vid(struct powernow_k8_data *data, u32 vid)
 
 	lo = data->currfid | (vid << MSR_C_LO_VID_SHIFT) | MSR_C_LO_INIT_FID_VID;
 
-	dprintk(KERN_DEBUG PFX "writing vid %x, lo %x, hi %x\n",
+	dprintk(KERN_DEBUG PFX "writing vid 0x%x, lo 0x%x, hi 0x%x\n",
 		vid, lo, STOP_GRANT_5NS);
 
 	wrmsr(MSR_FIDVID_CTL, lo, STOP_GRANT_5NS);
@@ -201,13 +201,13 @@ static int write_new_vid(struct powernow_k8_data *data, u32 vid)
 		return 1;
 
 	if (savefid != data->currfid) {
-		printk(KERN_ERR PFX "fid changed on vid trans, old %x new %x\n",
+		printk(KERN_ERR PFX "fid changed on vid trans, old 0x%x new 0x%x\n",
 		       savefid, data->currfid);
 		return 1;
 	}
 
 	if (vid != data->currvid) {
-		printk(KERN_ERR PFX "vid trans failed, vid %x, curr %x\n", vid,
+		printk(KERN_ERR PFX "vid trans failed, vid 0x%x, curr 0x%x\n", vid,
 				data->currvid);
 		return 1;
 	}
@@ -371,7 +371,7 @@ static int core_frequency_transition(struct powernow_k8_data *data, u32 reqfid)
 	}
 
 	if (savevid != data->currvid) {
-		printk(KERN_ERR PFX "ph2: vid changed, save %x, curr %x\n",
+		printk(KERN_ERR PFX "ph2: vid changed, save 0x%x, curr 0x%x\n",
 			savevid, data->currvid);
 		return 1;
 	}
@@ -398,14 +398,14 @@ static int core_voltage_post_transition(struct powernow_k8_data *data, u32 reqvi
 
 		if (savefid != data->currfid) {
 			printk(KERN_ERR PFX
-			       "ph3: bad fid change, save %x, curr %x\n",
+			       "ph3: bad fid change, save 0x%x, curr 0x%x\n",
 			       savefid, data->currfid);
 			return 1;
 		}
 
 		if (data->currvid != reqvid) {
 			printk(KERN_ERR PFX
-			       "ph3: failed vid transition\n, req %x, curr %x",
+			       "ph3: failed vid transition\n, req 0x%x, curr 0x%x",
 			       reqvid, data->currvid);
 			return 1;
 		}
@@ -579,7 +579,7 @@ static int fill_powernow_table(struct powernow_k8_data *data, struct pst_s *pst,
 		return -EIO;
 	}
 
-	dprintk(KERN_INFO PFX "cfid %x, cvid %x\n", data->currfid, data->currvid);
+	dprintk(KERN_INFO PFX "cfid 0x%x, cvid 0x%x\n", data->currfid, data->currvid);
 	data->powernow_table = powernow_table;
 	print_basics(data);
 
@@ -633,7 +633,7 @@ static int find_psb_table(struct powernow_k8_data *data)
 
 		dprintk(KERN_INFO PFX "ramp voltage offset: %d\n", data->rvo);
 		dprintk(KERN_INFO PFX "isochronous relief time: %d\n", data->irt);
-		dprintk(KERN_INFO PFX "maximum voltage step: %d - %x\n", mvs, data->vidmvs);
+		dprintk(KERN_INFO PFX "maximum voltage step: %d - 0x%x\n", mvs, data->vidmvs);
 
 		dprintk(KERN_DEBUG PFX "numpst: 0x%x\n", psb->numpst);
 		if (psb->numpst != 1) {
@@ -642,13 +642,13 @@ static int find_psb_table(struct powernow_k8_data *data)
 		}
 
 		data->plllock = psb->plllocktime;
-		dprintk(KERN_INFO PFX "plllocktime: %x (units 1us)\n", psb->plllocktime);
-		dprintk(KERN_INFO PFX "maxfid: %x\n", psb->maxfid);
-		dprintk(KERN_INFO PFX "maxvid: %x\n", psb->maxvid);
+		dprintk(KERN_INFO PFX "plllocktime: 0x%x (units 1us)\n", psb->plllocktime);
+		dprintk(KERN_INFO PFX "maxfid: 0x%x\n", psb->maxfid);
+		dprintk(KERN_INFO PFX "maxvid: 0x%x\n", psb->maxvid);
 		maxvid = psb->maxvid;
 
 		data->numps = psb->numpstates;
-		dprintk(KERN_INFO PFX "numpstates: %x\n", data->numps);
+		dprintk(KERN_INFO PFX "numpstates: 0x%x\n", data->numps);
 		return fill_powernow_table(data, (struct pst_s *)(psb+1), maxvid);
 	}
 	/*
@@ -714,7 +714,7 @@ static int powernow_k8_cpu_init_acpi(struct powernow_k8_data *data)
 		u32 fid = data->acpi_data.states[i].control & FID_MASK;
 		u32 vid = (data->acpi_data.states[i].control >> VID_SHIFT) & VID_MASK;
 
-		dprintk(KERN_INFO PFX "   %d : fid %x, vid %x\n", i, fid, vid);
+		dprintk(KERN_INFO PFX "   %d : fid 0x%x, vid 0x%x\n", i, fid, vid);
 
 		powernow_table[i].index = fid; /* lower 8 bits */
 		powernow_table[i].index |= (vid << 8); /* upper 8 bits */
@@ -807,7 +807,7 @@ static int transition_frequency(struct powernow_k8_data *data, unsigned int inde
 
 	if ((fid < HI_FID_TABLE_BOTTOM) && (data->currfid < HI_FID_TABLE_BOTTOM)) {
 		printk(KERN_ERR PFX
-		       "ignoring illegal change in lo freq table-%x to %x\n",
+		       "ignoring illegal change in lo freq table-%x to 0x%x\n",
 		       data->currfid, fid);
 		return 1;
 	}
