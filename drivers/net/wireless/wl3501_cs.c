@@ -638,10 +638,12 @@ static int wl3501_mgmt_scan(struct wl3501_card *this, u16 chan_time)
 static int wl3501_mgmt_join(struct wl3501_card *this, u16 stas)
 {
 	struct wl3501_join_req sig = {
-		.sig_id	  = WL3501_SIG_JOIN_REQ,
-		.timeout  = 10,
-		.phy_pset = {
-			[2] = this->chan,
+		.sig_id		  = WL3501_SIG_JOIN_REQ,
+		.timeout	  = 10,
+		.ds_parameter_set = {
+			.id  = IW_MGMT_INFO_ELEMENT_DS_PARAMETER_SET,
+			.len = 1,
+			.data[0] = this->chan,
 		},
 	};
 
@@ -655,8 +657,10 @@ static int wl3501_mgmt_start(struct wl3501_card *this)
 		.sig_id			= WL3501_SIG_START_REQ,
 		.beacon_period		= 400,
 		.dtim_period		= 1,
-		.phy_pset		= {
-			[0] = 3, [1] = 1, [2] = this->chan,
+		.ds_parameter_set = {
+			.id   = IW_MGMT_INFO_ELEMENT_DS_PARAMETER_SET,
+			.len  = 1,
+			.data = { [0] = this->chan, },
 		},
 		.bss_basic_rate_set	= {
 			[0] = 0x01, [1] = 0x02, [2] = 0x82, [3] = 0x84,
@@ -694,7 +698,7 @@ static void wl3501_mgmt_scan_confirm(struct wl3501_card *this, u16 addr)
 			if (!this->essid.len)
 				matchflag = 1;
 			else if (this->essid.len == 3 &&
-				 !strncmp(this->essid.data, "ANY", 3))
+				 !memcmp(this->essid.data, "ANY", 3))
 				matchflag = 1;
 			else if (this->essid.len != sig.ssid.len)
 				matchflag = 0;
@@ -911,7 +915,8 @@ static void wl3501_mgmt_join_confirm(struct net_device *dev, u16 addr)
 				const int i = this->join_sta_bss;
 				memcpy(this->bssid,
 				       this->bss_set[i].bssid, ETH_ALEN);
-				this->chan = this->bss_set[i].phy_pset[2];
+				this->chan =
+				      this->bss_set[i].ds_parameter_set.data[0];
 				iw_copy_mgmt_info_element(&this->keep_essid,
 							&this->bss_set[i].ssid);
 				wl3501_mgmt_auth(this);
@@ -920,7 +925,7 @@ static void wl3501_mgmt_join_confirm(struct net_device *dev, u16 addr)
 			const int i = this->join_sta_bss;
 
 			memcpy(&this->bssid, &this->bss_set[i].bssid, ETH_ALEN);
-			this->chan = this->bss_set[i].phy_pset[2];
+			this->chan = this->bss_set[i].ds_parameter_set.data[0];
 			iw_copy_mgmt_info_element(&this->keep_essid,
 						  &this->bss_set[i].ssid);
 			wl3501_online(dev);

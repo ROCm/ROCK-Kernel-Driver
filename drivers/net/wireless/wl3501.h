@@ -276,7 +276,7 @@ struct wl3501_start_req {
 	u8			    bss_basic_rate_set[10];
 	u8			    operational_rate_set[10];
 	u8			    cf_pset[8];
-	u8			    phy_pset[3];
+	struct iw_mgmt_info_element ds_parameter_set;
 	u8			    ibss_pset[4];
 };
 
@@ -353,7 +353,7 @@ struct wl3501_join_req {
 	u8			    bss_type;
 	u8			    bssid[ETH_ALEN];
 	struct iw_mgmt_info_element ssid;
-	u8			    phy_pset[3];
+	struct iw_mgmt_info_element ds_parameter_set;
 	u8			    cf_pset[8];
 	u8			    ibss_pset[4];
 	u8			    bss_basic_rate_set[10];
@@ -407,7 +407,7 @@ struct wl3501_scan_confirm {
 	u8			    bss_type;
 	u8			    bssid[ETH_ALEN];
 	struct iw_mgmt_info_element ssid;
-	u8			    phy_pset[3];
+	struct iw_mgmt_info_element ds_parameter_set;
 	u8			    cf_pset[8];
 	u8			    ibss_pset[4];
 	u8			    bss_basic_rate_set[10];
