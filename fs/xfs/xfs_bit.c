@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2004 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -154,14 +154,17 @@ int
 xfs_lowbit64(
 	__uint64_t	v)
 {
-	int n;
-	n = ffs((unsigned)v);
-	if (n <= 0) {
-		n = ffs(v >> 32);
-		if (n >= 0)
-			n+=32;
+	__uint32_t	w = (__uint32_t)v;
+	int		n = 0;
+
+	if (w) {	/* lower bits */
+		n = ffs(w);
+	} else {	/* upper bits */
+		w = (__uint32_t)(v >> 32);
+		if (w && (n = ffs(w)))
+			n += 32;
 	}
-	return (n <= 0) ? n : n-1;
+	return n - 1;
 }
 
 /*
@@ -171,10 +174,11 @@ int
 xfs_highbit64(
 	__uint64_t	v)
 {
-	__uint32_t h = v >> 32;
+	__uint32_t	h = (__uint32_t)(v >> 32);
+
 	if (h)
 		return xfs_highbit32(h) + 32;
-	return xfs_highbit32((__u32)v);
+	return xfs_highbit32((__uint32_t)v);
 }
 
 
