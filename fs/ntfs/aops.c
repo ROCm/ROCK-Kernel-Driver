@@ -341,7 +341,7 @@ handle_zblock:
  */
 static int ntfs_readpage(struct file *file, struct page *page)
 {
-	s64 attr_pos;
+	loff_t i_size;
 	ntfs_inode *ni, *base_ni;
 	u8 *kaddr;
 	ntfs_attr_search_ctx *ctx;
@@ -350,7 +350,6 @@ static int ntfs_readpage(struct file *file, struct page *page)
 	int err = 0;
 
 	BUG_ON(!PageLocked(page));
-
 	/*
 	 * This can potentially happen because we clear PageUptodate() during
 	 * ntfs_writepage() of MstProtected() attributes.
@@ -359,7 +358,6 @@ static int ntfs_readpage(struct file *file, struct page *page)
 		unlock_page(page);
 		return 0;
 	}
-
 	ni = NTFS_I(page->mapping->host);
 
 	/* NInoNonResident() == NInoIndexAllocPresent() */
@@ -381,12 +379,23 @@ static int ntfs_readpage(struct file *file, struct page *page)
 		/* Normal data stream. */
 		return ntfs_read_block(page);
 	}
-	/* Attribute is resident, implying it is not compressed or encrypted. */
+	/*
+	 * Attribute is resident, implying it is not compressed or encrypted.
+	 * This also means the attribute is smaller than an mft record and
+	 * hence smaller than a page, so can simply zero out any pages with
+	 * index above 0.  We can also do this if the file size is 0.
+	 */
+	if (unlikely(page->index > 0 || !i_size_read(VFS_I(ni)))) {
+		kaddr = kmap_atomic(page, KM_USER0);
+		memset(kaddr, 0, PAGE_CACHE_SIZE);
+		flush_dcache_page(page);
+		kunmap_atomic(kaddr, KM_USER0);
+		goto done;
+	}
 	if (!NInoAttr(ni))
 		base_ni = ni;
 	else
 		base_ni = ni->ext.base_ntfs_ino;
-
 	/* Map, pin, and lock the mft record. */
 	mrec = map_mft_record(base_ni);
 	if (IS_ERR(mrec)) {
@@ -402,35 +411,25 @@ static int ntfs_readpage(struct file *file, struct page *page)
 			CASE_SENSITIVE, 0, NULL, 0, ctx);
 	if (unlikely(err))
 		goto put_unm_err_out;
-
-	/* Starting position of the page within the attribute value. */
-	attr_pos = page->index << PAGE_CACHE_SHIFT;
-
-	/* The total length of the attribute value. */
 	attr_len = le32_to_cpu(ctx->attr->data.resident.value_length);
-
+	i_size = i_size_read(VFS_I(ni));
+	if (unlikely(attr_len > i_size))
+		attr_len = i_size;
 	kaddr = kmap_atomic(page, KM_USER0);
-	/* Copy over in bounds data, zeroing the remainder of the page. */
-	if (attr_pos < attr_len) {
-		u32 bytes = attr_len - attr_pos;
-		if (bytes > PAGE_CACHE_SIZE)
-			bytes = PAGE_CACHE_SIZE;
-		else if (bytes < PAGE_CACHE_SIZE)
-			memset(kaddr + bytes, 0, PAGE_CACHE_SIZE - bytes);
-		/* Copy the data to the page. */
-		memcpy(kaddr, attr_pos + (char*)ctx->attr +
-				le16_to_cpu(
-				ctx->attr->data.resident.value_offset), bytes);
-	} else
-		memset(kaddr, 0, PAGE_CACHE_SIZE);
+	/* Copy the data to the page. */
+	memcpy(kaddr, (u8*)ctx->attr +
+			le16_to_cpu(ctx->attr->data.resident.value_offset),
+			attr_len);
+	/* Zero the remainder of the page. */
+	memset(kaddr + attr_len, 0, PAGE_CACHE_SIZE - attr_len);
 	flush_dcache_page(page);
 	kunmap_atomic(kaddr, KM_USER0);
-
-	SetPageUptodate(page);
 put_unm_err_out:
 	ntfs_attr_put_search_ctx(ctx);
 unm_err_out:
 	unmap_mft_record(base_ni);
+done:
+	SetPageUptodate(page);
 err_out:
 	unlock_page(page);
 	return err;
@@ -1223,21 +1222,22 @@ done:
  */
 static int ntfs_writepage(struct page *page, struct writeback_control *wbc)
 {
-	s64 attr_pos;
+	loff_t i_size;
 	struct inode *vi;
 	ntfs_inode *ni, *base_ni;
 	char *kaddr;
 	ntfs_attr_search_ctx *ctx;
 	MFT_RECORD *m;
-	u32 attr_len, bytes;
+	u32 attr_len;
 	int err;
 
 	BUG_ON(!PageLocked(page));
 
 	vi = page->mapping->host;
+	i_size = i_size_read(vi);
 
 	/* Is the page fully outside i_size? (truncate in progress) */
-	if (unlikely(page->index >= (vi->i_size + PAGE_CACHE_SIZE - 1) >>
+	if (unlikely(page->index >= (i_size + PAGE_CACHE_SIZE - 1) >>
 			PAGE_CACHE_SHIFT)) {
 		/*
 		 * The page may have dirty, unmapped buffers.  Make them
@@ -1248,7 +1248,6 @@ static int ntfs_writepage(struct page *page, struct writeback_control *wbc)
 		ntfs_debug("Write outside i_size - truncated?");
 		return 0;
 	}
-
 	ni = NTFS_I(vi);
 
 	/* NInoNonResident() == NInoIndexAllocPresent() */
@@ -1284,9 +1283,9 @@ static int ntfs_writepage(struct page *page, struct writeback_control *wbc)
 			}
 		}
 		/* We have to zero every time due to mmap-at-end-of-file. */
-		if (page->index >= (vi->i_size >> PAGE_CACHE_SHIFT)) {
+		if (page->index >= (i_size >> PAGE_CACHE_SHIFT)) {
 			/* The page straddles i_size. */
-			unsigned int ofs = vi->i_size & ~PAGE_CACHE_MASK;
+			unsigned int ofs = i_size & ~PAGE_CACHE_MASK;
 			kaddr = kmap_atomic(page, KM_USER0);
 			memset(kaddr + ofs, 0, PAGE_CACHE_SIZE - ofs);
 			flush_dcache_page(page);
@@ -1300,16 +1299,25 @@ static int ntfs_writepage(struct page *page, struct writeback_control *wbc)
 	}
 	/*
 	 * Attribute is resident, implying it is not compressed, encrypted,
-	 * sparse, or mst protected.
+	 * sparse, or mst protected.  This also means the attribute is smaller
+	 * than an mft record and hence smaller than a page, so can simply
+	 * return error on any pages with index above 0.
 	 */
 	BUG_ON(page_has_buffers(page));
 	BUG_ON(!PageUptodate(page));
-
+	if (unlikely(page->index > 0)) {
+		ntfs_error(vi->i_sb, "BUG()! page->index (0x%lx) > 0.  "
+				"Aborting write.", page->index);
+		BUG_ON(PageWriteback(page));
+		set_page_writeback(page);
+		unlock_page(page);
+		end_page_writeback(page);
+		return -EIO;
+	}
 	if (!NInoAttr(ni))
 		base_ni = ni;
 	else
 		base_ni = ni->ext.base_ntfs_ino;
-
 	/* Map, pin, and lock the mft record. */
 	m = map_mft_record(base_ni);
 	if (IS_ERR(m)) {
@@ -1327,32 +1335,6 @@ static int ntfs_writepage(struct page *page, struct writeback_control *wbc)
 			CASE_SENSITIVE, 0, NULL, 0, ctx);
 	if (unlikely(err))
 		goto err_out;
-
-	/* Starting position of the page within the attribute value. */
-	attr_pos = page->index << PAGE_CACHE_SHIFT;
-
-	/* The total length of the attribute value. */
-	attr_len = le32_to_cpu(ctx->attr->data.resident.value_length);
-
-	if (unlikely(vi->i_size != attr_len)) {
-		ntfs_error(vi->i_sb, "BUG()! i_size (0x%llx) doesn't match "
-				"attr_len (0x%x). Aborting write.", vi->i_size,
-				attr_len);
-		err = -EIO;
-		goto err_out;
-	}
-	if (unlikely(attr_pos >= attr_len)) {
-		ntfs_error(vi->i_sb, "BUG()! attr_pos (0x%llx) > attr_len "
-				"(0x%x). Aborting write.",
-				(unsigned long long)attr_pos, attr_len);
-		err = -EIO;
-		goto err_out;
-	}
-
-	bytes = attr_len - attr_pos;
-	if (unlikely(bytes > PAGE_CACHE_SIZE))
-		bytes = PAGE_CACHE_SIZE;
-
 	/*
 	 * Keep the VM happy.  This must be done otherwise the radix-tree tag
 	 * PAGECACHE_TAG_DIRTY remains set even though the page is clean.
@@ -1384,26 +1366,30 @@ static int ntfs_writepage(struct page *page, struct writeback_control *wbc)
 	 * TODO: ntfs_truncate(), others?
 	 */
 
+	attr_len = le32_to_cpu(ctx->attr->data.resident.value_length);
+	i_size = i_size_read(VFS_I(ni));
 	kaddr = kmap_atomic(page, KM_USER0);
-	/* Copy the data from the page to the mft record. */
-	memcpy((u8*)ctx->attr + le16_to_cpu(
-			ctx->attr->data.resident.value_offset) + attr_pos,
-			kaddr, bytes);
-	flush_dcache_mft_record_page(ctx->ntfs_ino);
-#if 0
-	/* Zero out of bounds area. */
-	if (likely(bytes < PAGE_CACHE_SIZE)) {
-		memset(kaddr + bytes, 0, PAGE_CACHE_SIZE - bytes);
-		flush_dcache_page(page);
+	if (unlikely(attr_len > i_size)) {
+		/* Zero out of bounds area in the mft record. */
+		memset((u8*)ctx->attr + le16_to_cpu(
+				ctx->attr->data.resident.value_offset) +
+				i_size, 0, attr_len - i_size);
+		attr_len = i_size;
 	}
-#endif
+	/* Copy the data from the page to the mft record. */
+	memcpy((u8*)ctx->attr +
+			le16_to_cpu(ctx->attr->data.resident.value_offset),
+			kaddr, attr_len);
+	flush_dcache_mft_record_page(ctx->ntfs_ino);
+	/* Zero out of bounds area in the page cache page. */
+	memset(kaddr + attr_len, 0, PAGE_CACHE_SIZE - attr_len);
+	flush_dcache_page(page);
 	kunmap_atomic(kaddr, KM_USER0);
 
 	end_page_writeback(page);
 
 	/* Mark the mft record dirty, so it gets written back. */
 	mark_mft_record_dirty(ctx->ntfs_ino);
-
 	ntfs_attr_put_search_ctx(ctx);
 	unmap_mft_record(base_ni);
 	return 0;
@@ -1413,13 +1399,13 @@ err_out:
 				"page so we try again later.");
 		/*
 		 * Put the page back on mapping->dirty_pages, but leave its
-		 * buffer's dirty state as-is.
+		 * buffers' dirty state as-is.
 		 */
 		redirty_page_for_writepage(wbc, page);
 		err = 0;
 	} else {
 		ntfs_error(vi->i_sb, "Resident attribute write failed with "
-				"error %i. Setting page error flag.", -err);
+				"error %i.  Setting page error flag.", err);
 		SetPageError(page);
 	}
 	unlock_page(page);
