@@ -93,6 +93,11 @@ static void zone_adj_pressure(struct zone *zone, int priority)
 			(DEF_PRIORITY - priority) << 10);
 }
 
+static int pressure_to_priority(int pressure)
+{
+	return DEF_PRIORITY - (pressure >> 10);
+}
+
 /*
  * The list of shrinker callbacks used by to apply pressure to
  * ageable caches.
@@ -611,7 +616,7 @@ refill_inactive_zone(struct zone *zone, const int nr_pages_in,
 	 * `distress' is a measure of how much trouble we're having reclaiming
 	 * pages.  0 -> no problems.  100 -> great trouble.
 	 */
-	distress = 100 >> priority;
+	distress = 100 >> pressure_to_priority(zone->pressure);
 
 	/*
 	 * The point of this algorithm is to decide when to start reclaiming
