@@ -391,7 +391,7 @@ static void deferred_cad(void *dummy)
 void ctrl_alt_del(void)
 {
 	static struct tq_struct cad_tq = {
-		routine: deferred_cad,
+		.routine = deferred_cad,
 	};
 
 	if (C_A_D)

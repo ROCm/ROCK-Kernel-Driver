@@ -1819,7 +1819,7 @@ out:
 static int migration_thread(void * bind_cpu)
 {
 	int cpu = (int) (long) bind_cpu;
-	struct sched_param param = { sched_priority: MAX_RT_PRIO-1 };
+	struct sched_param param = { .sched_priority = MAX_RT_PRIO-1 };
 	runqueue_t *rq;
 	int ret;
 
