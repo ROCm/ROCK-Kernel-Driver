@@ -23,31 +23,13 @@ core-y			+= $(ARCH_DIR)/kernel/		 \
 			   $(ARCH_DIR)/drivers/          \
 			   $(ARCH_DIR)/sys-$(SUBARCH)/
 
-ARCH_INCLUDE = -I$(ARCH_DIR)/include
-
-# -Derrno=kernel_errno - This turns all kernel references to errno into
-# kernel_errno to separate them from the libc errno.  This allows -fno-common
-# in CFLAGS.  Otherwise, it would cause ld to complain about the two different
-# errnos.
-
-CFLAGS += $(CFLAGS-y) -D__arch_um__ -DSUBARCH=\"$(SUBARCH)\" \
-	-D_LARGEFILE64_SOURCE $(ARCH_INCLUDE) -Derrno=kernel_errno \
-	$(MODE_INCLUDE)
-
-LINK_WRAPS = -Wl,--wrap,malloc -Wl,--wrap,free -Wl,--wrap,calloc
-
-SIZE = (($(CONFIG_NEST_LEVEL) + $(CONFIG_KERNEL_HALF_GIGS)) * 0x20000000)
-
+# Have to precede the include because the included Makefiles reference them.
 SYMLINK_HEADERS = include/asm-um/archparam.h include/asm-um/system.h \
 	include/asm-um/sigcontext.h include/asm-um/processor.h \
 	include/asm-um/ptrace.h include/asm-um/arch-signal.h
 
 ARCH_SYMLINKS = include/asm-um/arch $(ARCH_DIR)/include/sysdep $(ARCH_DIR)/os \
 	$(SYMLINK_HEADERS) $(ARCH_DIR)/include/uml-config.h
-
-ifeq ($(CONFIG_MODE_SKAS), y)
-$(SYS_HEADERS) : $(ARCH_DIR)/kernel/skas/include/skas_ptregs.h
-endif
 
 GEN_HEADERS += $(ARCH_DIR)/include/task.h $(ARCH_DIR)/include/kern_constants.h
 
@@ -63,6 +45,25 @@ endif
 
 EXTRAVERSION := $(EXTRAVERSION)-1um
 
+ARCH_INCLUDE = -I$(ARCH_DIR)/include
+
+# -Derrno=kernel_errno - This turns all kernel references to errno into
+# kernel_errno to separate them from the libc errno.  This allows -fno-common
+# in CFLAGS.  Otherwise, it would cause ld to complain about the two different
+# errnos.
+
+CFLAGS += $(CFLAGS-y) -D__arch_um__ -DSUBARCH=\"$(SUBARCH)\" \
+	-D_LARGEFILE64_SOURCE $(ARCH_INCLUDE) -Derrno=kernel_errno \
+	$(MODE_INCLUDE)
+
+LINK_WRAPS = -Wl,--wrap,malloc -Wl,--wrap,free -Wl,--wrap,calloc
+
+SIZE = (($(CONFIG_NEST_LEVEL) + $(CONFIG_KERNEL_HALF_GIGS)) * 0x20000000)
+
+ifeq ($(CONFIG_MODE_SKAS), y)
+$(SYS_HEADERS) : $(ARCH_DIR)/kernel/skas/include/skas_ptregs.h
+endif
+
 include/linux/version.h: arch/$(ARCH)/Makefile
 
 $(ARCH_DIR)/vmlinux.lds.S :
@@ -74,14 +75,11 @@ LDFLAGS_vmlinux = -r
 
 vmlinux: $(ARCH_DIR)/main.o 
 
-$(ARCH_DIR)/uml.lds.s : $(ARCH_DIR)/uml.lds.S scripts FORCE
-	$(call if_changed_dep,as_s_S)
-
 # These aren't in Makefile-tt because they are needed in the !CONFIG_MODE_TT +
 # CONFIG_MODE_SKAS + CONFIG_STATIC_LINK case.
 
 LINK_TT = -static
-LD_SCRIPT_TT := uml.lds.S
+LD_SCRIPT_TT := uml.lds.s
 
 ifeq ($(CONFIG_STATIC_LINK),y)
   LINK-y += $(LINK_TT)
@@ -98,18 +96,23 @@ endif
 endif
 endif
 
-LD_SCRIPT-y := $(ARCH_DIR)/$(LD_SCRIPT-y)
 CPP_MODE_TT := $(shell [ "$(CONFIG_MODE_TT)" = "y" ] && echo -DMODE_TT)
-STACK_SIZE := $(shell $$[ 4096 * (1 << $(CONFIG_KERNEL_STACK_ORDER)) ] )
+CONFIG_KERNEL_STACK_ORDER ?= 2
+STACK_SIZE := $(shell echo $$[ 4096 * (1 << $(CONFIG_KERNEL_STACK_ORDER)) ] )
 
-AFLAGS_uml.lds.o = -U$(SUBARCH) -DSTART=$$(($(TOP_ADDR) - $(SIZE))) \
-	-DELF_ARCH=$(ELF_ARCH) -DELF_FORMAT=\"$(ELF_FORMAT)\" \
-	$(CPP_MODE_TT) -DKERNEL_STACK_SIZE=$(STACK_SIZE) -P -C -Uum
+AFLAGS_$(LD_SCRIPT-y:.s=).o = -U$(SUBARCH) \
+	-DSTART=$$(($(TOP_ADDR) - $(SIZE))) -DELF_ARCH=$(ELF_ARCH) \
+	-DELF_FORMAT=\"$(ELF_FORMAT)\" $(CPP_MODE_TT) \
+	-DKERNEL_STACK_SIZE=$(STACK_SIZE) -P -C -Uum
+
+LD_SCRIPT-y := $(ARCH_DIR)/$(LD_SCRIPT-y)
+
+$(LD_SCRIPT-y) : $(LD_SCRIPT-y:.s=.S) scripts FORCE
+	$(call if_changed_dep,as_s_S)
 
 linux: vmlinux $(LD_SCRIPT-y)
 	$(CC) -Wl,-T,$(LD_SCRIPT-y) $(LINK-y) $(LINK_WRAPS) \
 		-o linux $(ARCH_DIR)/main.o vmlinux -L/usr/lib -lutil
-
 
 USER_CFLAGS := $(patsubst -I%,,$(CFLAGS))
 USER_CFLAGS := $(patsubst -Derrno=kernel_errno,,$(USER_CFLAGS))
@@ -119,8 +122,8 @@ USER_CFLAGS := $(patsubst -D__KERNEL__,,$(USER_CFLAGS)) $(ARCH_INCLUDE) \
 # To get a definition of F_SETSIG
 USER_CFLAGS += -D_GNU_SOURCE
 
-CLEAN_FILES += linux x.i gmon.out $(ARCH_DIR)/uml.lds.S \
-	$(ARCH_DIR)/dyn_link.ld $(GEN_HEADERS)
+CLEAN_FILES += linux x.i gmon.out $(ARCH_DIR)/uml.lds.s \
+	$(ARCH_DIR)/dyn_link.ld.s $(GEN_HEADERS)
 
 $(ARCH_DIR)/main.o: $(ARCH_DIR)/main.c
 	$(CC) $(USER_CFLAGS) $(EXTRA_CFLAGS) -c -o $@ $<
