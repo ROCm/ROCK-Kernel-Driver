@@ -1005,6 +1005,10 @@ static int sd_init_onedisk(int i)
 		 * we're only interested in the header anyway, this should
 		 * be fine.
 		 *   -- Matthew Dharm (mdharm-scsi@one-eyed-alien.net)
+		 *
+		 * As it turns out, some devices return an error for
+		 * every MODE_SENSE request except one for page 0.
+		 * So, we should also try that. --aeb
 		 */
 
 		memset((void *) &cmd[0], 0, 8);
@@ -1025,7 +1029,9 @@ static int sd_init_onedisk(int i)
 		the_result = SRpnt->sr_result;
 
 		if (the_result) {
-			printk("%s: test WP failed, assume Write Enabled\n", nbuff);
+			printk("%s: test WP failed, assume Write Enabled\n",
+			       nbuff);
+			/* alternatively, try page 0 */
 		} else {
 			rscsi_disks[i].write_prot = ((buffer[2] & 0x80) != 0);
 			printk("%s: Write Protect is %s\n", nbuff,
