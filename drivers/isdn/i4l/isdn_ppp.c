@@ -968,8 +968,12 @@ void isdn_ppp_receive(isdn_net_dev * net_dev, isdn_net_local * lp, struct sk_buf
 	int slot;
 	int proto;
 
-	if (net_dev->local.master)
-		BUG(); // we're called with the master device always
+	/*
+	 * If encapsulation is syncppp, don't reset
+	 * huptimer on LCP packets.
+	 */
+	if (PPP_PROTOCOL(skb->data) != PPP_LCP)
+		isdn_net_reset_huptimer(&net_dev->local,lp);
 
 	slot = lp->ppp_slot;
 	if (slot < 0 || slot > ISDN_MAX_CHANNELS) {

@@ -213,6 +213,7 @@ static int isdn_iptyp_setup(isdn_net_dev *p);
 static void isdn_rawip_receive(isdn_net_dev *p, isdn_net_local *olp, struct sk_buff *skb);
 static void isdn_ether_receive(isdn_net_dev *p, isdn_net_local *olp, struct sk_buff *skb);
 static void isdn_uihdlc_receive(isdn_net_dev *p, isdn_net_local *olp, struct sk_buff *skb);
+static void isdn_iptyp_receive(isdn_net_dev *p, isdn_net_local *olp, struct sk_buff *skb);
 
 char *isdn_net_revision = "$Revision: 1.140.6.11 $";
 
@@ -1230,42 +1231,31 @@ isdn_net_receive(struct net_device *ndev, struct sk_buff *skb)
 	switch (lp->p_encap) {
 		case ISDN_NET_ENCAP_ETHER:
 			isdn_ether_receive(lp->netdev, olp, skb);
-			return;
+			break;
 		case ISDN_NET_ENCAP_UIHDLC:
 			isdn_uihdlc_receive(lp->netdev, olp, skb);
-			return;
+			break;
 		case ISDN_NET_ENCAP_RAWIP:
 			isdn_rawip_receive(lp->netdev, olp, skb);
 			break;
 		case ISDN_NET_ENCAP_CISCOHDLCK:
 		case ISDN_NET_ENCAP_CISCOHDLC:
 			isdn_ciscohdlck_receive(lp->netdev, olp, skb);
-			return;
+			break;
 		case ISDN_NET_ENCAP_IPTYP:
 			isdn_iptyp_receive(lp->netdev, olp, skb);
-			return;
+			break;
 		case ISDN_NET_ENCAP_SYNCPPP:
-			/*
-			 * If encapsulation is syncppp, don't reset
-			 * huptimer on LCP packets.
-			 */
-			if (PPP_PROTOCOL(skb->data) != PPP_LCP) {
-				olp->huptimer = 0;
-				lp->huptimer = 0;
-			}
 			isdn_ppp_receive(lp->netdev, olp, skb);
-			return;
+			break;
 		case ISDN_NET_ENCAP_X25IFACE:
-			isdn_x25_receive(lp, skb);
-			return;
+			isdn_x25_receive(lp->netdev, olp, skb);
+			break;
 		default:
 			isdn_BUG();
 			kfree_skb(skb);
-			return;
+			break;
 	}
-
-	netif_rx(skb);
-	return;
 }
 
 /*
@@ -2512,7 +2502,7 @@ isdn_iptyp_receive(isdn_net_dev *p, isdn_net_local *olp,
 	isdn_net_local *lp = &p->local;
 
 	isdn_net_reset_huptimer(lp, olp);
-	skb->protocol = get_u16(skb->data);
+	get_u16(skb->data, &skb->protocol);
 	skb_pull(skb, 2);
 	netif_rx(skb);
 }

@@ -247,8 +247,9 @@ int isdn_x25_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	return ret;
 }
 
-void isdn_x25_receive(isdn_net_local *lp, struct sk_buff *skb)
+void isdn_x25_receive(isdn_net_dev *p, isdn_net_local *olp, struct sk_buff *skb)
 {
+	isdn_net_local *lp = &p->local;
 	struct concap_proto *cprot = lp -> netdev -> cprot;
 
 	/* try if there are generic sync_device receiver routines */
