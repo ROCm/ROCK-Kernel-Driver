@@ -5977,6 +5977,72 @@ do {	p = (u32 *)(orig_p + (reg));		\
 	spin_unlock_irq(&tp->lock);
 }
 
+static int tg3_get_eeprom_len(struct net_device *dev)
+{
+	return EEPROM_CHIP_SIZE;
+}
+
+static int __devinit tg3_nvram_read_using_eeprom(struct tg3 *tp,
+						 u32 offset, u32 *val);
+static int tg3_get_eeprom(struct net_device *dev, struct ethtool_eeprom *eeprom, u8 *data)
+{
+	struct tg3 *tp = dev->priv;
+	int ret;
+	u8  *pd;
+	u32 i, offset, len, val, b_offset, b_count;
+
+	offset = eeprom->offset;
+	len = eeprom->len;
+	eeprom->len = 0;
+
+	ret = tg3_nvram_read_using_eeprom(tp, 0, &eeprom->magic);
+	if (ret)
+		return ret;
+	eeprom->magic = swab32(eeprom->magic);
+
+	if (offset & 3) {
+		/* adjustments to start on required 4 byte boundary */
+		b_offset = offset & 3;
+		b_count = 4 - b_offset;
+		if (b_count > len) {
+			/* i.e. offset=1 len=2 */
+			b_count = len;
+		}
+		ret = tg3_nvram_read_using_eeprom(tp, offset-b_offset, &val);
+		if (ret)
+			return ret;
+		memcpy(data, ((char*)&val) + b_offset, b_count);
+		len -= b_count;
+		offset += b_count;
+	        eeprom->len += b_count;
+	}
+
+	/* read bytes upto the last 4 byte boundary */
+	pd = &data[eeprom->len];
+	for (i = 0; i < (len - (len & 3)); i += 4) {
+		ret = tg3_nvram_read_using_eeprom(tp, offset + i, 
+				(u32*)(pd + i));
+		if (ret) {
+			eeprom->len += i;
+			return ret;
+		}
+	}
+	eeprom->len += i;
+
+	if (len & 3) {
+		/* read last bytes not ending on 4 byte boundary */
+		pd = &data[eeprom->len];
+		b_count = len & 3;
+		b_offset = offset + len - b_count;
+		ret = tg3_nvram_read_using_eeprom(tp, b_offset, &val);
+		if (ret)
+			return ret;
+		memcpy(pd, ((char*)&val), b_count);
+		eeprom->len += b_count;
+	}
+	return 0;
+}
+
 static int tg3_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 {
   	struct tg3 *tp = dev->priv;
@@ -6369,6 +6435,8 @@ static struct ethtool_ops tg3_ethtool_ops = {
 	.set_msglevel		= tg3_set_msglevel,
 	.nway_reset		= tg3_nway_reset,
 	.get_link		= ethtool_op_get_link,
+	.get_eeprom_len		= tg3_get_eeprom_len,
+	.get_eeprom		= tg3_get_eeprom,
 	.get_ringparam		= tg3_get_ringparam,
 	.set_ringparam		= tg3_set_ringparam,
 	.get_pauseparam		= tg3_get_pauseparam,
