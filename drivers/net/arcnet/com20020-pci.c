@@ -97,7 +97,7 @@ static int __devinit com20020pci_probe(struct pci_dev *pdev, const struct pci_de
 	dev->base_addr = ioaddr;
 	dev->irq = pdev->irq;
 	dev->dev_addr[0] = node;
-	lp->card_name = pdev->dev.name;
+	lp->card_name = "PCI COM20020";
 	lp->card_flags = id->driver_data;
 	lp->backplane = backplane;
 	lp->clockp = clockp & 7;
@@ -105,7 +105,7 @@ static int __devinit com20020pci_probe(struct pci_dev *pdev, const struct pci_de
 	lp->timeout = timeout;
 	lp->hw.owner = THIS_MODULE;
 
-	if (check_region(ioaddr, ARCNET_TOTAL_SIZE)) {
+	if (!request_region(ioaddr, ARCNET_TOTAL_SIZE, "com20020-pci")) {
 		BUGMSG(D_INIT, "IO region %xh-%xh already allocated.\n",
 		       ioaddr, ioaddr + ARCNET_TOTAL_SIZE - 1);
 		err = -EBUSY;
@@ -121,6 +121,8 @@ static int __devinit com20020pci_probe(struct pci_dev *pdev, const struct pci_de
 		err = -EIO;
 		goto out_priv;
 	}
+
+	release_region(ioaddr, ARCNET_TOTAL_SIZE);
 
 	if ((err = com20020_found(dev, SA_SHIRQ)) != 0)
 	        goto out_priv;
