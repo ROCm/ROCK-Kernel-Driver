@@ -169,16 +169,18 @@ struct NCR_D700_private {
 	struct Scsi_Host	*hosts[2];
 };
 
-static int NCR_D700_probe_one(struct NCR_D700_private *p, int chan,
+static int 
+NCR_D700_probe_one(struct NCR_D700_private *p, int siop,
 		int irq, int slot, u32 region, int differential)
 {
 	struct NCR_700_Host_Parameters *hostdata;
 	struct Scsi_Host *host;
+	int ret;
 
 	hostdata = kmalloc(sizeof(*hostdata), GFP_KERNEL);
 	if (!hostdata) {
-		printk(KERN_ERR "NCR D700: Failed to allocate host data "
-				"for channel %d, detatching\n", chan);
+		printk(KERN_ERR "NCR D700: SIOP%d: Failed to allocate host"
+		       "data, detatching\n", siop);
 		return -ENOMEM;
 	}
 	memset(hostdata, 0, sizeof(*hostdata));
@@ -186,41 +188,49 @@ static int NCR_D700_probe_one(struct NCR_D700_private *p, int chan,
 	if (!request_region(region, 64, "NCR_D700")) {
 		printk(KERN_ERR "NCR D700: Failed to reserve IO region 0x%x\n",
 				region);
-		kfree(hostdata);
-		return -ENODEV;
+		ret = -ENODEV;
+		goto region_failed;
 	}
 		
 	/* Fill in the three required pieces of hostdata */
 	hostdata->base = region;
-	hostdata->differential = (((1<<chan) & differential) != 0);
+	hostdata->differential = (((1<<siop) & differential) != 0);
 	hostdata->clock = NCR_D700_CLOCK_MHZ;
 
-	/* and register the chip */
+	/* and register the siop */
 	host = NCR_700_detect(&NCR_D700_driver_template, hostdata);
 	if (!host) {
-		kfree(hostdata);
-		release_region(host->base, 64);
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto detect_failed;
 	}
 
 	host->irq = irq;
 	/* FIXME: Read this from SUS */
-	host->this_id = id_array[slot * 2 + chan];
+	host->this_id = id_array[slot * 2 + siop];
 	printk(KERN_NOTICE "NCR D700: SIOP%d, SCSI id is %d\n",
-			chan, host->this_id);
+			siop, host->this_id);
 	if (request_irq(irq, NCR_700_intr, SA_SHIRQ, "NCR_D700", host)) {
-		printk(KERN_ERR "NCR D700, channel %d: irq problem, "
-				"detatching\n", chan);
-		scsi_unregister(host);
-		NCR_700_release(host);
-		return -ENODEV;
+		printk(KERN_ERR "NCR D700: SIOP%d: irq problem, "
+				"detatching\n", siop);
+		ret = -ENODEV;
+		goto irq_failed;
 	}
 
-	scsi_add_host(host, NULL);
+	scsi_add_host(host, p->dev);
 
-	p->hosts[chan] = host;
+	p->hosts[siop] = host;
 	hostdata->dev = p->dev;
 	return 0;
+
+ irq_failed:
+	scsi_unregister(host);
+	NCR_700_release(host);
+ detect_failed:
+	release_region(host->base, 64);
+ region_failed:
+	kfree(hostdata);
+
+	return ret;
 }
 
 /* Detect a D700 card.  Note, because of the setup --- the chips are
@@ -305,8 +315,15 @@ NCR_D700_probe(struct device *dev)
 
 	/* plumb in both 700 chips */
 	for (i = 0; i < 2; i++) {
-		found |= NCR_D700_probe_one(p, i, irq, slot,
-				offset_addr | (0x80 * i), differential);
+		int err;
+
+		if ((err = NCR_D700_probe_one(p, i, irq, slot,
+					      offset_addr + (0x80 * i),
+					      differential)) != 0)
+			printk("D700: SIOP%d: probe failed, error = %d\n",
+			       i, err);
+		else
+			found++;
 	}
 
 	if (!found) {
