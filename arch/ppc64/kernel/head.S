@@ -946,7 +946,7 @@ _GLOBAL(do_hash_page_DSI)
 	 */
 	mfmsr	r0
 	li	r4,0
-	ori	r4,r4,MSR_EE+MSR_RI
+	ori	r4,r4,MSR_EE
 	andc	r0,r0,r4
 	mtmsrd	r0			/* Hard Disable, RI off */
 
