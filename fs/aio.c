@@ -777,19 +777,11 @@ static inline void init_timeout(struct timeout *to)
 static inline void set_timeout(long start_jiffies, struct timeout *to,
 			       const struct timespec *ts)
 {
-	unsigned long how_long;
-
-	if (ts->tv_sec < 0 || (!ts->tv_sec && !ts->tv_nsec)) {
+	to->timer.expires = start_jiffies + timespec_to_jiffies(ts);
+	if (time_after(to->timer.expires, jiffies))
+		add_timer(&to->timer);
+	else
 		to->timed_out = 1;
-		return;
-	}
-
-	how_long = ts->tv_sec * HZ;
-#define HZ_NS (1000000000 / HZ)
-	how_long += (ts->tv_nsec + HZ_NS - 1) / HZ_NS;
-	
-	to->timer.expires = jiffies + how_long;
-	add_timer(&to->timer);
 }
 
 static inline void clear_timeout(struct timeout *to)
