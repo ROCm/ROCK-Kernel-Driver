@@ -47,13 +47,6 @@ MODULE_PARM_DESC(checksum, "Only accept eeproms whose checksum is correct");
 /* EEPROM registers */
 #define EEPROM_REG_CHECKSUM	0x3f
 
-/* EEPROM memory types: */
-#define ONE_K			1
-#define TWO_K			2
-#define FOUR_K			3
-#define EIGHT_K			4
-#define SIXTEEN_K		5
-
 /* Size of EEPROM in bytes */
 #define EEPROM_SIZE		256
 
