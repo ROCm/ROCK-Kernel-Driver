@@ -18,6 +18,7 @@
 #include <linux/netdevice.h>
 #include <linux/slab.h>
 #include <linux/string.h>
+#include <linux/init.h>
 #include <net/llc.h>
 
 LIST_HEAD(llc_sap_list);
