@@ -440,14 +440,16 @@ static struct ed *ep_add_ed (
 			spin_unlock_irqrestore (&ohci->lock, flags);
 			return NULL;
 		}
+		ed->dummy = td;
 		ed->hwTailP = cpu_to_le32 (td->td_dma);
-		ed->hwHeadP = ed->hwTailP;	
+		ed->hwHeadP = ed->hwTailP;	/* ED_C, ED_H zeroed */
 		ed->state = ED_UNLINK;
 		ed->type = usb_pipetype (pipe);
 	}
 
-// FIXME:  don't do this if it's linked to the HC,
-// we might clobber data toggle or other state ...
+// FIXME:  don't do this if it's linked to the HC, or without knowing it's
+// safe to clobber state/mode info tied to (previous) config/altsetting.
+// (but dev0/ep0, used by set_address, must get clobbered)
 
 	ed->hwINFO = cpu_to_le32 (usb_pipedevice (pipe)
 			| usb_pipeendpoint (pipe) << 7
@@ -523,27 +525,31 @@ td_fill (struct ohci_hcd *ohci, unsigned int info,
 	dma_addr_t data, int len,
 	struct urb *urb, int index)
 {
-	volatile struct td	*td, *td_pt;
+	struct td		*td, *td_pt;
 	urb_priv_t		*urb_priv = urb->hcpriv;
+	int			is_iso = info & TD_ISO;
 
 	if (index >= urb_priv->length) {
 		err ("internal OHCI error: TD index > length");
 		return;
 	}
 
-#if 0
-	/* no interrupt needed except for URB's last TD */
+	/* aim for only one interrupt per urb.  mostly applies to control
+	 * and iso; other urbs rarely need more than one TD per urb.
+	 *
+	 * NOTE: could delay interrupts even for the last TD, and get fewer
+	 * interrupts ... increasing per-urb latency by sharing interrupts.
+	 */
 	if (index != (urb_priv->length - 1))
-		info |= TD_DI;
-#endif
+		info |= is_iso ? TD_DI_SET (7) : TD_DI_SET (1);
 
 	/* use this td as the next dummy */
 	td_pt = urb_priv->td [index];
 	td_pt->hwNextTD = 0;
 
 	/* fill the old dummy TD */
-	td = urb_priv->td [index] = dma_to_td (ohci,
-			le32_to_cpup (&urb_priv->ed->hwTailP));
+	td = urb_priv->td [index] = urb_priv->ed->dummy;
+	urb_priv->ed->dummy = td_pt;
 
 	td->ed = urb_priv->ed;
 	td->next_dl_td = NULL;
@@ -554,7 +560,7 @@ td_fill (struct ohci_hcd *ohci, unsigned int info,
 		data = 0;
 
 	td->hwINFO = cpu_to_le32 (info);
-	if ((td->ed->type) == PIPE_ISOCHRONOUS) {
+	if (is_iso) {
 		td->hwCBP = cpu_to_le32 (data & 0xFFFFF000);
 		td->ed->intriso.last_iso = info & 0xffff;
 	} else {
@@ -901,6 +907,7 @@ static void finish_unlinks (struct ohci_hcd *ohci, u16 tick)
 		 *     [a2] some (earlier) URBs still linked, re-enable
 		 * (b) finishing ED unlink
 		 *     [b1] no URBs queued, ED is truly idle now
+		 *          ... we could set state ED_NEW and free dummy
 		 *     [b2] URBs now queued, link ED back into schedule
 		 * right now we only have (a)
 		 */
@@ -910,9 +917,6 @@ static void finish_unlinks (struct ohci_hcd *ohci, u16 tick)
 		if (tdHeadP == tdTailP) {
 			if (ed->state == ED_OPER)
 				start_ed_unlink (ohci, ed);
-			td_free (ohci, tdTailP);
-			ed->hwINFO = ED_SKIP;
-			ed->state = ED_NEW;
 		} else
 			ed->hwINFO &= ~ED_SKIP;
 
