@@ -94,13 +94,13 @@ static struct notifier_block userspace_cpufreq_notifier_block = {
 
 
 /** 
- * cpufreq_set - set the CPU frequency
+ * _cpufreq_set - set the CPU frequency
  * @freq: target frequency in kHz
  * @cpu: CPU for which the frequency is to be set
  *
  * Sets the CPU frequency to freq.
  */
-int cpufreq_set(unsigned int freq, unsigned int cpu)
+static int _cpufreq_set(unsigned int freq, unsigned int cpu)
 {
 	int ret = -EINVAL;
 
@@ -129,6 +129,18 @@ int cpufreq_set(unsigned int freq, unsigned int cpu)
 	up(&userspace_sem);
 	return ret;
 }
+
+
+#ifdef CONFIG_CPU_FREQ_24_API
+
+#warning The /proc/sys/cpu/ and sysctl interface to cpufreq will be removed from the 2.6. kernel series soon after 2005-01-01
+
+static unsigned int warning_print = 0;
+
+int __deprecated cpufreq_set(unsigned int freq, unsigned int cpu)
+{
+	return _cpufreq_set(freq, cpu);
+}
 EXPORT_SYMBOL_GPL(cpufreq_set);
 
 
@@ -139,20 +151,13 @@ EXPORT_SYMBOL_GPL(cpufreq_set);
  * Sets the CPU frequency to the maximum frequency supported by
  * this CPU.
  */
-int cpufreq_setmax(unsigned int cpu)
+int __deprecated cpufreq_setmax(unsigned int cpu)
 {
 	if (!cpu_is_managed[cpu] || !cpu_online(cpu))
 		return -EINVAL;
-	return cpufreq_set(cpu_max_freq[cpu], cpu);
+	return _cpufreq_set(cpu_max_freq[cpu], cpu);
 }
 EXPORT_SYMBOL_GPL(cpufreq_setmax);
-
-
-#ifdef CONFIG_CPU_FREQ_24_API
-
-#warning The /proc/sys/cpu/ and sysctl interface to cpufreq will be removed from the 2.6. kernel series soon after 2005-01-01
-
-static unsigned int warning_print = 0;
 
 /*********************** cpufreq_sysctl interface ********************/
 static int
@@ -186,7 +191,7 @@ cpufreq_procctl(ctl_table *ctl, int write, struct file *filp,
 		buf[sizeof(buf) - 1] = '\0';
 
 		freq = simple_strtoul(buf, &p, 0);
-		cpufreq_set(freq, cpu);
+		_cpufreq_set(freq, cpu);
 	} else {
 		len = sprintf(buf, "%d\n", cpufreq_get(cpu));
 		if (len > left)
@@ -239,7 +244,7 @@ cpufreq_sysctl(ctl_table *table, int __user *name, int nlen,
 		if (get_user(freq, (unsigned int __user *)newval))
 			return -EFAULT;
 
-		cpufreq_set(freq, cpu);
+		_cpufreq_set(freq, cpu);
 	}
 	return 1;
 }
@@ -494,7 +499,7 @@ store_speed (struct cpufreq_policy *policy, const char *buf, size_t count)
 	if (ret != 1)
 		return -EINVAL;
 
-	cpufreq_set(freq, policy->cpu);
+	_cpufreq_set(freq, policy->cpu);
 
 	return count;
 }

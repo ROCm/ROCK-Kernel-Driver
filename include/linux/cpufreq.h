@@ -261,8 +261,8 @@ int cpufreq_parse_governor (char *str_governor, unsigned int *policy, struct cpu
  *********************************************************************/
 #ifdef CONFIG_CPU_FREQ_24_API
 
-int cpufreq_setmax(unsigned int cpu);
-int cpufreq_set(unsigned int kHz, unsigned int cpu);
+int __deprecated cpufreq_setmax(unsigned int cpu);
+int __deprecated cpufreq_set(unsigned int kHz, unsigned int cpu);
 
 
 /* /proc/sys/cpu */
