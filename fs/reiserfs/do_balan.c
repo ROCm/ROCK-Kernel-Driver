@@ -1343,7 +1343,8 @@ static void check_internal_node (struct super_block * s, struct buffer_head * bh
 
 static int locked_or_not_in_tree (struct buffer_head * bh, char * which)
 {
-  if ( buffer_locked (bh) || !B_IS_IN_TREE (bh) ) {
+  if ( (!reiserfs_buffer_prepared(bh) && buffer_locked (bh)) ||
+        !B_IS_IN_TREE (bh) ) {
     reiserfs_warning ("vs-12339: locked_or_not_in_tree: %s (%b)\n", which, bh);
     return 1;
   } 
