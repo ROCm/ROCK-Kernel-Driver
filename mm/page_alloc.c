@@ -1115,6 +1115,8 @@ static int __init find_next_best_node(int node, void *used_node_mask)
 	int best_node = -1;
 
 	for (i = 0; i < numnodes; i++) {
+		cpumask_t tmp;
+
 		/* Start from local node */
 		n = (node+i)%numnodes;
 
@@ -1126,7 +1128,8 @@ static int __init find_next_best_node(int node, void *used_node_mask)
 		val = node_distance(node, n);
 
 		/* Give preference to headless and unused nodes */
-		if (!cpus_empty(node_to_cpumask(n)))
+		tmp = node_to_cpumask(n);
+		if (!cpus_empty(tmp))
 			val += PENALTY_FOR_NODE_WITH_CPUS;
 
 		/* Slight preference for less loaded node */
