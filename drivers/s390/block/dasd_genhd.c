@@ -195,7 +195,6 @@ dasd_gendisk_alloc(int devindex)
 		return ERR_PTR(-ENOMEM);
 
 	/* Initialize gendisk structure. */
-	memset(gdp, 0, sizeof(struct gendisk));
 	gdp->major = mi->major;
 	gdp->first_minor = index << DASD_PARTN_BITS;
 	gdp->minor_shift = DASD_PARTN_BITS;
