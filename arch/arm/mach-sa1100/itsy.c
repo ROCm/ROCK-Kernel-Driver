@@ -37,5 +37,5 @@ MACHINE_START(ITSY, "Compaq Itsy")
 	BOOT_PARAMS(0xc0000100)
 	MAPIO(itsy_map_io)
 	INITIRQ(sa1100_init_irq)
-	INITTIME(sa1100_init_time)
+	.timer		= &sa1100_timer,
 MACHINE_END

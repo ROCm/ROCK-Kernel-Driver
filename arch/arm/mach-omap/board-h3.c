@@ -32,8 +32,6 @@
 #include <asm/mach-types.h>
 #include "common.h"
 
-extern void __init omap_init_time(void);
-
 void h3_init_irq(void)
 {
 	omap_init_irq();
@@ -86,5 +84,5 @@ MACHINE_START(OMAP_H3, "TI OMAP1710 H3 board")
 	MAPIO(h3_map_io)
 	INITIRQ(h3_init_irq)
 	INIT_MACHINE(h3_init)
-	INITTIME(omap_init_time)
+	.timer		= &omap_timer,
 MACHINE_END

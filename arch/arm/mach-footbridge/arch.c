@@ -22,7 +22,8 @@
 
 extern void footbridge_map_io(void);
 extern void footbridge_init_irq(void);
-extern void footbridge_init_time(void);
+extern struct sys_timer footbridge_timer;
+extern struct sys_timer isa_timer;
 
 unsigned int mem_fclk_21285 = 50000000;
 
@@ -44,7 +45,7 @@ MACHINE_START(EBSA285, "EBSA285")
 	VIDEO(0x000a0000, 0x000bffff)
 	MAPIO(footbridge_map_io)
 	INITIRQ(footbridge_init_irq)
-	INITTIME(footbridge_init_time)
+	.timer		= &footbridge_timer,
 MACHINE_END
 #endif
 
@@ -80,7 +81,7 @@ MACHINE_START(NETWINDER, "Rebel-NetWinder")
 	FIXUP(fixup_netwinder)
 	MAPIO(footbridge_map_io)
 	INITIRQ(footbridge_init_irq)
-	INITTIME(footbridge_init_time)
+	.timer		= &isa_timer,
 MACHINE_END
 #endif
 
@@ -106,7 +107,7 @@ MACHINE_START(CATS, "Chalice-CATS")
 	FIXUP(fixup_cats)
 	MAPIO(footbridge_map_io)
 	INITIRQ(footbridge_init_irq)
-	INITTIME(footbridge_init_time)
+	.timer		= &isa_timer,
 MACHINE_END
 #endif
 
@@ -133,7 +134,7 @@ MACHINE_START(CO285, "co-EBSA285")
 	FIXUP(fixup_coebsa285)
 	MAPIO(footbridge_map_io)
 	INITIRQ(footbridge_init_irq)
-	INITTIME(footbridge_init_time)
+	.timer		= &footbridge_timer,
 MACHINE_END
 #endif
 
@@ -144,6 +145,6 @@ MACHINE_START(PERSONAL_SERVER, "Compaq-PersonalServer")
 	BOOT_PARAMS(0x00000100)
 	MAPIO(footbridge_map_io)
 	INITIRQ(footbridge_init_irq)
-	INITTIME(footbridge_init_time)
+	.timer		= &footbridge_timer,
 MACHINE_END
 #endif

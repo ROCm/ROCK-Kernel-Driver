@@ -213,7 +213,7 @@ static struct irqaction footbridge_timer_irq = {
 /*
  * Set up timer interrupt.
  */
-void __init footbridge_init_time(void)
+static void __init footbridge_timer_init(void)
 {
 	if (machine_is_co285() ||
 	    machine_is_personal_server())
@@ -266,8 +266,6 @@ void __init footbridge_init_time(void)
 	if (machine_is_ebsa285() ||
 	    machine_is_co285() ||
 	    machine_is_personal_server()) {
-		gettimeoffset = timer1_gettimeoffset;
-
 		timer1_latch = (mem_fclk_21285 + 8 * HZ) / (16 * HZ);
 
 		*CSR_TIMER1_CLR  = 0;
@@ -286,11 +284,19 @@ void __init footbridge_init_time(void)
 		outb((mSEC_10_from_14/6) & 0xFF, 0x40);
 		outb((mSEC_10_from_14/6) >> 8, 0x40);
 
-		gettimeoffset = isa_gettimeoffset;
-
 		footbridge_timer_irq.name = "ISA Timer Tick";
 		footbridge_timer_irq.handler = isa_timer_interrupt;
 		
 		setup_irq(IRQ_ISA_TIMER, &footbridge_timer_irq);
 	}
 }
+
+struct sys_timer footbridge_timer = {
+	.init		= footbridge_timer_init,
+	.offset		= timer1_gettimeoffset,
+};
+
+struct sys_timer isa_timer = {
+	.init		= footbridge_timer_init,
+	.offset		= isa_gettimeoffset,
+};

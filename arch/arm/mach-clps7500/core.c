@@ -267,6 +267,7 @@ static void __init clps7500_map_io(void)
 }
 
 extern void ioctime_init(void);
+extern unsigned long ioc_timer_gettimeoffset(void);
 
 static irqreturn_t
 clps7500_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
@@ -295,18 +296,23 @@ static struct irqaction clps7500_timer_irq = {
 /*
  * Set up timer interrupt.
  */
-void __init clps7500_init_time(void)
+static void __init clps7500_timer_init(void)
 {
 	ioctime_init();
 
 	setup_irq(IRQ_TIMER, &clps7500_timer_irq);
 }
 
+static struct clps7500_timer = {
+	.init		= clps7500_timer_init,
+	.offset		= ioc_timer_gettimeoffset,
+};
+
 MACHINE_START(CLPS7500, "CL-PS7500")
 	MAINTAINER("Philip Blundell")
 	BOOT_MEM(0x10000000, 0x03000000, 0xe0000000)
 	MAPIO(clps7500_map_io)
 	INITIRQ(clps7500_init_irq)
-	INITTIME(clps7500_init_time)
+	.timer		= &clps7500_timer,
 MACHINE_END
 

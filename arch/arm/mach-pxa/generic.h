@@ -9,9 +9,11 @@
  * published by the Free Software Foundation.
  */
 
+struct sys_timer;
+
+extern struct sys_timer pxa_timer;
 extern void __init pxa_map_io(void);
 extern void __init pxa_init_irq(void);
-extern void __init pxa_init_time(void);
 
 extern unsigned int get_clk_frequency_khz(int info);
 
