@@ -180,8 +180,10 @@ static int usb_kbd_open(struct input_dev *dev)
 		return 0;
 
 	kbd->irq->dev = kbd->usbdev;
-	if (usb_submit_urb(kbd->irq, GFP_KERNEL))
+	if (usb_submit_urb(kbd->irq, GFP_KERNEL)) {
+		kbd->open--;
 		return -EIO;
+	}
 
 	return 0;
 }
