@@ -56,6 +56,7 @@
 /* For SOCKET_I */
 #include <linux/socket.h>
 #include <net/sock.h>
+#include <net/compat.h>
 
 /* Use this to get at 32-bit user passed pointers. */
 #define A(__x)				\

@@ -15,6 +15,7 @@
 #include <linux/file.h>
 #include <linux/net.h>
 #include <linux/compat.h>
+#include <net/compat.h>
 
 #include <asm/uaccess.h>
 #include <asm/string.h>
