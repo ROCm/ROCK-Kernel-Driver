@@ -319,6 +319,7 @@ ohci_endpoint_disable (struct usb_hcd *hcd, struct hcd_dev *dev, int ep)
 	int			epnum = ep & USB_ENDPOINT_NUMBER_MASK;
 	unsigned long		flags;
 	struct ed		*ed;
+	unsigned		limit = 1000;
 
 	/* ASSERT:  any requests/urbs are being unlinked */
 	/* ASSERT:  nobody can be submitting urbs for this any more */
@@ -337,6 +338,8 @@ rescan:
 		ed->state = ED_IDLE;
 	switch (ed->state) {
 	case ED_UNLINK:		/* wait for hw to finish? */
+		/* major IRQ delivery trouble loses INTR_SF too... */
+		WARN_ON (limit-- == 0);
 		spin_unlock_irqrestore (&ohci->lock, flags);
 		set_current_state (TASK_UNINTERRUPTIBLE);
 		schedule_timeout (1);
