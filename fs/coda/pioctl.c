@@ -32,7 +32,7 @@ static int coda_pioctl(struct inode * inode, struct file * filp,
 struct inode_operations coda_ioctl_inode_operations =
 {
 	permission:	coda_ioctl_permission,
-	setattr:	coda_notify_change,
+	setattr:	coda_setattr,
 };
 
 struct file_operations coda_ioctl_operations = {

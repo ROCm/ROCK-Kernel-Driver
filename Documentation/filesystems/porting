@@ -187,3 +187,14 @@ e.g.
                unlock_new_inode(inode);
        }
 
+---
+[recommended]
+
+->getattr() finally getting used.  See instances in nfs, minix, etc.
+
+---
+[mandatory]
+
+->revalidate() is gone.  If your filesystem had it - provide ->getattr()
+and let it call whatever you had as ->revlidate() + (for symlinks that
+had ->revalidate()) add calls in ->follow_link()/->readlink().

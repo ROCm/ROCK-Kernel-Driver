@@ -730,7 +730,7 @@ out_no_inode:
 }
 
 int
-nfs_notify_change(struct dentry *dentry, struct iattr *attr)
+nfs_setattr(struct dentry *dentry, struct iattr *attr)
 {
 	struct inode *inode = dentry->d_inode;
 	struct nfs_fattr fattr;
@@ -744,7 +744,7 @@ nfs_notify_change(struct dentry *dentry, struct iattr *attr)
 	error = nfs_revalidate_inode(NFS_SERVER(inode),inode);
 	if (error) {
 #ifdef NFS_PARANOIA
-printk("nfs_notify_change: revalidate failed, error=%d\n", error);
+printk("nfs_setattr: revalidate failed, error=%d\n", error);
 #endif
 		goto out;
 	}
@@ -768,7 +768,7 @@ printk("nfs_notify_change: revalidate failed, error=%d\n", error);
 	 */
 	if (attr->ia_valid & ATTR_SIZE) {
 		if (attr->ia_size != fattr.size)
-			printk("nfs_notify_change: attr=%Ld, fattr=%Ld??\n",
+			printk("nfs_setattr: attr=%Ld, fattr=%Ld??\n",
 			       (long long) attr->ia_size, (long long)fattr.size);
 		vmtruncate(inode, attr->ia_size);
 	}
@@ -808,14 +808,13 @@ nfs_wait_on_inode(struct inode *inode, int flag)
 	return error;
 }
 
-/*
- * Externally visible revalidation function
- */
-int
-nfs_revalidate(struct dentry *dentry)
+int nfs_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat)
 {
 	struct inode *inode = dentry->d_inode;
-	return nfs_revalidate_inode(NFS_SERVER(inode), inode);
+	int err = nfs_revalidate_inode(NFS_SERVER(inode), inode);
+	if (!err)
+		generic_fillattr(inode, stat);
+	return err;
 }
 
 /*

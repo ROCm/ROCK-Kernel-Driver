@@ -611,6 +611,14 @@ smb_statfs(struct super_block *sb, struct statfs *buf)
 	return result;
 }
 
+int smb_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat)
+{
+	int err = smb_revalidate_inode(dentry);
+	if (!err)
+		generic_fillattr(dentry->d_inode, stat);
+	return err;
+}
+
 int
 smb_notify_change(struct dentry *dentry, struct iattr *attr)
 {

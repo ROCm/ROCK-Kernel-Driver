@@ -14,18 +14,6 @@
 
 #include <asm/uaccess.h>
 
-/*
- * Revalidate the inode. This is required for proper NFS attribute caching.
- */
-static __inline__ int
-do_revalidate(struct dentry *dentry)
-{
-	struct inode *inode = dentry->d_inode;
-	if (inode->i_op->revalidate)
-		return inode->i_op->revalidate(dentry);
-	return 0;
-}
-
 void generic_fillattr(struct inode *inode, struct kstat *stat)
 {
 	stat->dev = kdev_t_to_nr(inode->i_dev);
@@ -46,15 +34,10 @@ void generic_fillattr(struct inode *inode, struct kstat *stat)
 
 static int do_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat)
 {
-	int res = 0;
 	struct inode *inode = dentry->d_inode;
 
 	if (inode->i_op->getattr)
 		return inode->i_op->getattr(mnt, dentry, stat);
-
-	res = do_revalidate(dentry);
-	if (res)
-		return res;
 
 	generic_fillattr(inode, stat);
 	if (!stat->blksize) {
@@ -247,8 +230,7 @@ asmlinkage long sys_readlink(const char * path, char * buf, int bufsiz)
 		struct inode * inode = nd.dentry->d_inode;
 
 		error = -EINVAL;
-		if (inode->i_op && inode->i_op->readlink &&
-		    !(error = do_revalidate(nd.dentry))) {
+		if (inode->i_op && inode->i_op->readlink) {
 			UPDATE_ATIME(inode);
 			error = inode->i_op->readlink(nd.dentry, buf, bufsiz);
 		}

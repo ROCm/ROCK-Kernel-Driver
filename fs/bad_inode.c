@@ -60,7 +60,6 @@ struct inode_operations bad_inode_ops =
 	follow_link:	bad_follow_link,
 	truncate:	EIO_ERROR,
 	permission:	EIO_ERROR,
-	revalidate:	EIO_ERROR,
 	getattr:	EIO_ERROR,
 };
 
