@@ -42,6 +42,8 @@ static char *action_to_string(enum kobject_action action)
 		return "umount";
 	case KOBJ_OFFLINE:
 		return "offline";
+	case KOBJ_ONLINE:
+		return "online";
 	default:
 		return NULL;
 	}
