@@ -56,12 +56,12 @@
 static int zr36060_codecs = 0;
 
 static int low_bitrate = 0;
-MODULE_PARM(low_bitrate, "i");
+module_param(low_bitrate, bool, 0);
 MODULE_PARM_DESC(low_bitrate, "Buz compatibility option, halves bitrate");
 
 /* debugging is available via module parameter */
 static int debug = 0;
-MODULE_PARM(debug, "i");
+module_param(debug, int, 0);
 MODULE_PARM_DESC(debug, "Debug level (0-4)");
 
 #define dprintk(num, format, args...) \

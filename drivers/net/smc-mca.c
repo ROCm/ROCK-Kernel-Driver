@@ -95,8 +95,8 @@ static int ultra_io[MAX_ULTRAMCA_CARDS];
 static int ultra_irq[MAX_ULTRAMCA_CARDS];
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(ultra_io, "1-" __MODULE_STRING(MAX_ULTRAMCA_CARDS) "i");
-MODULE_PARM(ultra_irq, "1-" __MODULE_STRING(MAX_ULTRAMCA_CARDS) "i");
+module_param_array(ultra_io, int, NULL, 0);
+module_param_array(ultra_irq, int, NULL, 0);
 MODULE_PARM_DESC(ultra_io, "SMC Ultra/EtherEZ MCA I/O base address(es)");
 MODULE_PARM_DESC(ultra_irq, "SMC Ultra/EtherEZ MCA IRQ number(s)");
 

@@ -279,7 +279,7 @@ int gs_chars_in_buffer(struct tty_struct *tty)
 }
 
 
-int gs_real_chars_in_buffer(struct tty_struct *tty)
+static int gs_real_chars_in_buffer(struct tty_struct *tty)
 {
 	struct gs_port *port;
 	func_enter ();
@@ -457,7 +457,7 @@ void gs_start(struct tty_struct * tty)
 }
 
 
-void gs_shutdown_port (struct gs_port *port)
+static void gs_shutdown_port (struct gs_port *port)
 {
 	unsigned long flags;
 
@@ -507,27 +507,6 @@ void gs_hangup(struct tty_struct *tty)
 	port->count = 0;
 
 	wake_up_interruptible(&port->open_wait);
-	func_exit ();
-}
-
-
-void gs_do_softint(void *private_)
-{
-	struct gs_port *port = private_;
-	struct tty_struct *tty;
-
-	func_enter ();
-
-	if (!port) return;
-
-	tty = port->tty;
-
-	if (!tty) return;
-
-	if (test_and_clear_bit(RS_EVENT_WRITE_WAKEUP, &port->event)) {
-		tty_wakeup(tty);
-		wake_up_interruptible(&tty->write_wait);
-	}
 	func_exit ();
 }
 
@@ -996,7 +975,6 @@ EXPORT_SYMBOL(gs_flush_chars);
 EXPORT_SYMBOL(gs_stop);
 EXPORT_SYMBOL(gs_start);
 EXPORT_SYMBOL(gs_hangup);
-EXPORT_SYMBOL(gs_do_softint);
 EXPORT_SYMBOL(gs_block_til_ready);
 EXPORT_SYMBOL(gs_close);
 EXPORT_SYMBOL(gs_set_termios);

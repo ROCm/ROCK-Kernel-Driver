@@ -125,7 +125,7 @@ tconInfoAlloc(void)
 		INIT_LIST_HEAD(&ret_buf->openFileList);
 		init_MUTEX(&ret_buf->tconSem);
 #ifdef CONFIG_CIFS_STATS
-		ret_buf->stat_lock = SPIN_LOCK_UNLOCKED;
+		spin_lock_init(&ret_buf->stat_lock);
 #endif
 		write_unlock(&GlobalSMBSeslock);
 	}

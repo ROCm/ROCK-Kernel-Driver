@@ -186,7 +186,7 @@ static char *setup_args[] = { "", "", "", "", "", "", "", "", "" };
 /* filled in by 'insmod' */
 static char *setup_strings;
 
-MODULE_PARM(setup_strings, "s");
+module_param(setup_strings, charp, 0);
 
 static inline uchar read_3393(struct IN2000_hostdata *hostdata, uchar reg_num)
 {

@@ -1113,15 +1113,15 @@ static void btaudio_cleanup_module(void)
 module_init(btaudio_init_module);
 module_exit(btaudio_cleanup_module);
 
-MODULE_PARM(dsp1,"i");
-MODULE_PARM(dsp2,"i");
-MODULE_PARM(mixer,"i");
-MODULE_PARM(debug,"i");
-MODULE_PARM(irq_debug,"i");
-MODULE_PARM(digital,"i");
-MODULE_PARM(analog,"i");
-MODULE_PARM(rate,"i");
-MODULE_PARM(latency,"i");
+module_param(dsp1, int, S_IRUGO);
+module_param(dsp2, int, S_IRUGO);
+module_param(mixer, int, S_IRUGO);
+module_param(debug, int, S_IRUGO | S_IWUSR);
+module_param(irq_debug, int, S_IRUGO | S_IWUSR);
+module_param(digital, int, S_IRUGO);
+module_param(analog, int, S_IRUGO);
+module_param(rate, int, S_IRUGO);
+module_param(latency, int, S_IRUGO);
 MODULE_PARM_DESC(latency,"pci latency timer");
 
 MODULE_DEVICE_TABLE(pci, btaudio_pci_tbl);

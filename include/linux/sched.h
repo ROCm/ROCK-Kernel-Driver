@@ -86,9 +86,6 @@ extern unsigned long avenrun[];		/* Load averages */
 	load += n*(FIXED_1-exp); \
 	load >>= FSHIFT;
 
-#define CT_TO_SECS(x)	((x) / HZ)
-#define CT_TO_USECS(x)	(((x) % HZ) * 1000000/HZ)
-
 extern unsigned long total_forks;
 extern int nr_threads;
 extern int last_pid;
@@ -538,7 +535,6 @@ struct task_struct {
 	prio_array_t *array;
 
 	unsigned long sleep_avg;
-	long interactive_credit;
 	unsigned long long timestamp, last_ran;
 	int activated;
 
@@ -756,12 +752,19 @@ extern void sched_exec(void);
 #define sched_exec()   {}
 #endif
 
+#ifdef CONFIG_HOTPLUG_CPU
+extern void idle_task_exit(void);
+#else
+static inline void idle_task_exit(void) {}
+#endif
+
 extern void sched_idle_next(void);
 extern void set_user_nice(task_t *p, long nice);
 extern int task_prio(const task_t *p);
 extern int task_nice(const task_t *p);
 extern int task_curr(const task_t *p);
 extern int idle_cpu(int cpu);
+extern int sched_setscheduler(struct task_struct *, int, struct sched_param *);
 
 void yield(void);
 
@@ -1064,29 +1067,36 @@ static inline int need_resched(void)
 	return unlikely(test_thread_flag(TIF_NEED_RESCHED));
 }
 
-extern void __cond_resched(void);
-static inline void cond_resched(void)
-{
-	if (need_resched())
-		__cond_resched();
-}
+/*
+ * cond_resched() and cond_resched_lock(): latency reduction via
+ * explicit rescheduling in places that are safe. The return
+ * value indicates whether a reschedule was done in fact.
+ * cond_resched_lock() will drop the spinlock before scheduling,
+ * cond_resched_softirq() will enable bhs before scheduling.
+ */
+extern int cond_resched(void);
+extern int cond_resched_lock(spinlock_t * lock);
+extern int cond_resched_softirq(void);
 
 /*
- * cond_resched_lock() - if a reschedule is pending, drop the given lock,
- * call schedule, and on return reacquire the lock.
- *
- * This works OK both with and without CONFIG_PREEMPT.  We do strange low-level
- * operations here to prevent schedule() from being called twice (once via
- * spin_unlock(), once by hand).
+ * Does a critical section need to be broken due to another
+ * task waiting?:
  */
-static inline void cond_resched_lock(spinlock_t * lock)
+#if defined(CONFIG_PREEMPT) && defined(CONFIG_SMP)
+# define need_lockbreak(lock) ((lock)->break_lock)
+#else
+# define need_lockbreak(lock) 0
+#endif
+
+/*
+ * Does a critical section need to be broken due to another
+ * task waiting or preemption being signalled:
+ */
+static inline int lock_need_resched(spinlock_t *lock)
 {
-	if (need_resched()) {
-		_raw_spin_unlock(lock);
-		preempt_enable_no_resched();
-		__cond_resched();
-		spin_lock(lock);
-	}
+	if (need_lockbreak(lock) || need_resched())
+		return 1;
+	return 0;
 }
 
 /* Reevaluate whether the task has signals pending delivery.

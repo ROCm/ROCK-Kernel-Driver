@@ -1,3 +1,13 @@
+***NOTE*** - The driver included in the kernel is not maintained by Moxa.  They
+have a version 1.8 driver available from:
+
+http://www.moxa.com
+
+that works with 2.6 kernels.  Currently, Moxa has no plans to have their updated
+driver merged into the kernel.
+
+James Nelson <james4765@gmail.com> - 12-12-2004
+
 =============================================================================
 
 	MOXA Smartio Family Device Driver Ver 1.1 Installation Guide

@@ -2741,11 +2741,11 @@ static int amplifier[NR_DEVICE];
 
 static unsigned int devindex;
 
-MODULE_PARM(spdif, "1-" __MODULE_STRING(NR_DEVICE) "i");
+module_param_array(spdif, bool, NULL, 0);
 MODULE_PARM_DESC(spdif, "if 1 the output is in S/PDIF digital mode");
-MODULE_PARM(nomix, "1-" __MODULE_STRING(NR_DEVICE) "i");
+module_param_array(nomix, bool, NULL, 0);
 MODULE_PARM_DESC(nomix, "if 1 no analog audio is mixed to the digital output");
-MODULE_PARM(amplifier, "1-" __MODULE_STRING(NR_DEVICE) "i");
+module_param_array(amplifier, bool, NULL, 0);
 MODULE_PARM_DESC(amplifier, "Set to 1 if the machine needs the amp control enabling (many laptops)");
 
 MODULE_AUTHOR("Thomas M. Sailer, sailer@ife.ee.ethz.ch, hb9jnx@hb9w.che.eu");

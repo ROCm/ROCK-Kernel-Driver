@@ -975,6 +975,6 @@ module_exit(n_hdlc_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Paul Fulghum paulkf@microgate.com");
-MODULE_PARM(debuglevel, "i");
-MODULE_PARM(maxframe, "i");
+module_param(debuglevel, int, 0);
+module_param(maxframe, int, 0);
 MODULE_ALIAS_LDISC(N_HDLC);

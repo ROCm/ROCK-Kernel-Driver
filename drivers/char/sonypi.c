@@ -739,7 +739,7 @@ static int __devinit sonypi_probe(void)
 	sonypi_device.model = pcidev ?
 		SONYPI_DEVICE_MODEL_TYPE1 : SONYPI_DEVICE_MODEL_TYPE2;
 
-	sonypi_device.fifo_lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&sonypi_device.fifo_lock);
 	sonypi_device.fifo = kfifo_alloc(SONYPI_BUF_SIZE, GFP_KERNEL,
 					 &sonypi_device.fifo_lock);
 	if (IS_ERR(sonypi_device.fifo)) {
@@ -852,7 +852,7 @@ static int __devinit sonypi_probe(void)
 		printk(KERN_INFO "%s input method installed.\n",
 		       sonypi_device.input_key_dev.name);
 
-		sonypi_device.input_fifo_lock = SPIN_LOCK_UNLOCKED;
+		spin_lock_init(&sonypi_device.input_fifo_lock);
 		sonypi_device.input_fifo =
 			kfifo_alloc(SONYPI_BUF_SIZE, GFP_KERNEL,
 				    &sonypi_device.input_fifo_lock);

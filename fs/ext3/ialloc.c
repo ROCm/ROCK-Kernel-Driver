@@ -737,6 +737,7 @@ unsigned long ext3_count_free_inodes (struct super_block * sb)
 		if (!gdp)
 			continue;
 		desc_count += le16_to_cpu(gdp->bg_free_inodes_count);
+		cond_resched();
 	}
 	return desc_count;
 #endif

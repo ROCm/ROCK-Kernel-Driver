@@ -78,9 +78,9 @@ MODULE_LICENSE("GPL");
 
 static uid_t asus_uid;
 static gid_t asus_gid;
-MODULE_PARM(asus_uid, "i");
+module_param(asus_uid, uint, 0);
 MODULE_PARM_DESC(uid, "UID for entries in /proc/acpi/asus.\n");
-MODULE_PARM(asus_gid, "i");
+module_param(asus_gid, uint, 0);
 MODULE_PARM_DESC(gid, "GID for entries in /proc/acpi/asus.\n");
 
 

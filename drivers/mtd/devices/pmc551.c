@@ -630,10 +630,6 @@ static u32 fixup_pmc551 (struct pci_dev *dev)
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Mark Ferrell <mferrell@mvista.com>");
 MODULE_DESCRIPTION(PMC551_VERSION);
-MODULE_PARM(msize, "i");
-MODULE_PARM_DESC(msize, "memory size in Megabytes [1 - 1024]");
-MODULE_PARM(asize, "i");
-MODULE_PARM_DESC(asize, "aperture size, must be <= memsize [1-1024]");
 
 /*
  * Stuff these outside the ifdef so as to not bust compiled in driver support
@@ -644,6 +640,11 @@ static int asize=CONFIG_MTD_PMC551_APERTURE_SIZE
 #else
 static int asize=0;
 #endif
+
+module_param(msize, int, 0);
+MODULE_PARM_DESC(msize, "memory size in Megabytes [1 - 1024]");
+module_param(asize, int, 0);
+MODULE_PARM_DESC(asize, "aperture size, must be <= memsize [1-1024]");
 
 /*
  * PMC551 Card Initialization

@@ -40,10 +40,10 @@ MODULE_PARM_DESC(act_bus, "BusType of first card, 1=ISA, 2=MCA, 3=PCMCIA, curren
 MODULE_PARM_DESC(membase, "Base port address of first card");
 MODULE_PARM_DESC(act_irq, "IRQ of first card");
 MODULE_PARM_DESC(act_id,  "ID-String of first card");
-MODULE_PARM(act_bus,  "i");
-MODULE_PARM(act_port, "i");
-MODULE_PARM(act_irq,  "i");
-MODULE_PARM(act_id,   "s");
+module_param(act_bus,  int, 0);
+module_param(act_port, int, 0);
+module_param(act_irq, int, 0);
+module_param(act_id, charp, 0);
 
 static int act2000_addcard(int, int, int, char *);
 

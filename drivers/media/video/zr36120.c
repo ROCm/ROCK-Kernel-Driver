@@ -1950,7 +1950,7 @@ int __init init_zoran(int card)
 	ztv->tuner_type = 0;
 	ztv->running = 0;
 	ztv->users = 0;
-	ztv->lock = RW_LOCK_UNLOCKED;
+	rwlock_init(&ztv->lock);
 	ztv->workqueue = 0;
 	ztv->fieldnr = 0;
 	ztv->lastfieldnr = 0;

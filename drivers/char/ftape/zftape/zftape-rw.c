@@ -45,7 +45,6 @@ __u8 *zft_hseg_buf;
 int zft_deblock_segment = -1;
 zft_status_enum zft_io_state = zft_idle;
 int zft_header_changed;
-int zft_bad_sector_map_changed;
 int zft_qic113; /* conform to old specs. and old zftape */
 int zft_use_compression;
 zft_position zft_pos = {

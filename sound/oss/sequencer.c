@@ -1091,7 +1091,7 @@ int sequencer_open(int dev, struct file *file)
 	return 0;
 }
 
-void seq_drain_midi_queues(void)
+static void seq_drain_midi_queues(void)
 {
 	int i, n;
 

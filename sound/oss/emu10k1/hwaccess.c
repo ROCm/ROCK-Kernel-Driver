@@ -105,31 +105,6 @@ u32 srToPitch(u32 sampleRate)
 	return 0;		/* Should never reach this point */
 }
 
-/* Returns an attenuation based upon a cumulative volume value */
-
-/* Algorithm calculates 0x200 - 0x10 log2 (input) */
-u8 sumVolumeToAttenuation(u32 value)
-{
-	u16 count = 16;
-	s16 ans;
-
-	if (value == 0)
-		return 0xFF;
-
-	/* Find first SET bit. This is the integer part of the value */
-	while ((value & 0x10000) == 0) {
-		value <<= 1;
-		count--;
-	}
-
-	/* The REST of the data is the fractional part. */
-	ans = (s16) (0x110 - ((count << 4) + ((value & 0x0FFFFL) >> 12)));
-	if (ans > 0xFF)
-		ans = 0xFF;
-
-	return (u8) ans;
-}
-
 /*******************************************
 * write/read PCI function 0 registers      *
 ********************************************/
@@ -160,6 +135,7 @@ void emu10k1_writefn0(struct emu10k1_card *card, u32 reg, u32 data)
 	return;
 }
 
+#ifdef DBGEMU
 void emu10k1_writefn0_2(struct emu10k1_card *card, u32 reg, u32 data, int size)
 {
 	unsigned long flags;
@@ -177,6 +153,7 @@ void emu10k1_writefn0_2(struct emu10k1_card *card, u32 reg, u32 data, int size)
 
 	return;
 }
+#endif  /*  DBGEMU  */
 
 u32 emu10k1_readfn0(struct emu10k1_card * card, u32 reg)
 {
@@ -338,17 +315,6 @@ void emu10k1_irq_disable(struct emu10k1_card *card, u32 irq_mask)
         outl(val, card->iobase + INTE);
         spin_unlock_irqrestore(&card->lock, flags);
         return;
-}
-
-void emu10k1_set_stop_on_loop(struct emu10k1_card *card, u32 voicenum)
-{
-	/* Voice interrupt */
-	if (voicenum >= 32)
-		sblive_writeptr(card, SOLEH | ((0x0100 | (voicenum - 32)) << 16), 0, 1);
-	else
-		sblive_writeptr(card, SOLEL | ((0x0100 | voicenum) << 16), 0, 1);
-
-	return;
 }
 
 void emu10k1_clear_stop_on_loop(struct emu10k1_card *card, u32 voicenum)

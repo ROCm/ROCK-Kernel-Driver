@@ -228,12 +228,6 @@ extern void parport_pc_release_resources(struct parport *p);
 
 extern int parport_pc_claim_resources(struct parport *p);
 
-extern void parport_pc_init_state(struct pardevice *, struct parport_state *s);
-
-extern void parport_pc_save_state(struct parport *p, struct parport_state *s);
-
-extern void parport_pc_restore_state(struct parport *p, struct parport_state *s);
-
 /* PCMCIA code will want to get us to look at a port.  Provide a mechanism. */
 extern struct parport *parport_pc_probe_port (unsigned long base,
 					      unsigned long base_hi,

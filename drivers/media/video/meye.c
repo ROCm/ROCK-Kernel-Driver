@@ -1829,14 +1829,14 @@ static int __devinit meye_probe(struct pci_dev *pcidev,
 		goto outvmalloc;
 	}
 
-	meye.grabq_lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&meye.grabq_lock);
 	meye.grabq = kfifo_alloc(sizeof(int) * MEYE_MAX_BUFNBRS, GFP_KERNEL,
 				 &meye.grabq_lock);
 	if (IS_ERR(meye.grabq)) {
 		printk(KERN_ERR "meye: fifo allocation failed\n");
 		goto outkfifoalloc1;
 	}
-	meye.doneq_lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&meye.doneq_lock);
 	meye.doneq = kfifo_alloc(sizeof(int) * MEYE_MAX_BUFNBRS, GFP_KERNEL,
 				 &meye.doneq_lock);
 	if (IS_ERR(meye.doneq)) {

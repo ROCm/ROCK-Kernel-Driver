@@ -27,10 +27,10 @@ static __u8  pxm2node[256] __initdata = { [0 ... 255] = 0xff };
 static __init int setup_node(int pxm)
 {
 	if (pxm2node[pxm] == 0xff) {
-		if (numnodes > MAX_NUMNODES)
+		if (num_online_nodes() >= MAX_NUMNODES)
 			return -1;
-		pxm2node[pxm] = numnodes - 1;
-		numnodes++;
+		pxm2node[pxm] = num_online_nodes();
+		node_set_online(num_online_nodes());
 	}
 	return pxm2node[pxm];
 }
@@ -38,7 +38,7 @@ static __init int setup_node(int pxm)
 static __init int conflicting_nodes(unsigned long start, unsigned long end)
 {
 	int i;
-	for (i = 0; i < numnodes; i++) {
+	for_each_online_node(i) {
 		struct node *nd = &nodes[i];
 		if (nd->start == nd->end)
 			continue;
@@ -155,10 +155,7 @@ acpi_numa_memory_affinity_init(struct acpi_table_memory_affinity *ma)
 	       nd->start, nd->end);
 }
 
-void __init acpi_numa_arch_fixup(void)
-{
-	numnodes--;
-}
+void __init acpi_numa_arch_fixup(void) {}
 
 /* Use the information discovered above to actually set up the nodes. */
 int __init acpi_scan_nodes(unsigned long start, unsigned long end)

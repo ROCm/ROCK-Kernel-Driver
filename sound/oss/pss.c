@@ -118,9 +118,9 @@
 
 /* If compiled into kernel, it enable or disable pss mixer */
 #ifdef CONFIG_PSS_MIXER
-static unsigned char pss_mixer = 1;
+static int pss_mixer = 1;
 #else
-static unsigned char pss_mixer;
+static int pss_mixer;
 #endif
 
 
@@ -649,7 +649,7 @@ static struct mixer_operations pss_mixer_operations =
 	.ioctl	= pss_mixer_ioctl
 };
 
-void disable_all_emulations(void)
+static void disable_all_emulations(void)
 {
 	outw(0x0000, REG(CONF_PSS));	/* 0x0400 enables joystick */
 	outw(0x0000, REG(CONF_WSS));
@@ -658,7 +658,7 @@ void disable_all_emulations(void)
 	outw(0x0000, REG(CONF_CDROM));
 }
 
-void configure_nonsound_components(void)
+static void configure_nonsound_components(void)
 {
 	/* Configure Joystick port */
 
@@ -1153,29 +1153,29 @@ static int pss_no_sound __initdata = 0;	/* Just configure non-sound components *
 static int pss_keep_settings  = 1;	/* Keep hardware settings at module exit */
 static char *pss_firmware = "/etc/sound/pss_synth";
 
-MODULE_PARM(pss_io, "i");
+module_param(pss_io, int, 0);
 MODULE_PARM_DESC(pss_io, "Set i/o base of PSS card (probably 0x220 or 0x240)");
-MODULE_PARM(mss_io, "i");
+module_param(mss_io, int, 0);
 MODULE_PARM_DESC(mss_io, "Set WSS (audio) i/o base (0x530, 0x604, 0xE80, 0xF40, or other. Address must end in 0 or 4 and must be from 0x100 to 0xFF4)");
-MODULE_PARM(mss_irq, "i");
+module_param(mss_irq, int, 0);
 MODULE_PARM_DESC(mss_irq, "Set WSS (audio) IRQ (3, 5, 7, 9, 10, 11, 12)");
-MODULE_PARM(mss_dma, "i");
+module_param(mss_dma, int, 0);
 MODULE_PARM_DESC(mss_dma, "Set WSS (audio) DMA (0, 1, 3)");
-MODULE_PARM(mpu_io, "i");
+module_param(mpu_io, int, 0);
 MODULE_PARM_DESC(mpu_io, "Set MIDI i/o base (0x330 or other. Address must be on 4 location boundaries and must be from 0x100 to 0xFFC)");
-MODULE_PARM(mpu_irq, "i");
+module_param(mpu_irq, int, 0);
 MODULE_PARM_DESC(mpu_irq, "Set MIDI IRQ (3, 5, 7, 9, 10, 11, 12)");
-MODULE_PARM(pss_cdrom_port, "i");
+module_param(pss_cdrom_port, int, 0);
 MODULE_PARM_DESC(pss_cdrom_port, "Set the PSS CDROM port i/o base (0x340 or other)");
-MODULE_PARM(pss_enable_joystick, "i");
+module_param(pss_enable_joystick, bool, 0);
 MODULE_PARM_DESC(pss_enable_joystick, "Enables the PSS joystick port (1 to enable, 0 to disable)");
-MODULE_PARM(pss_no_sound, "i");
+module_param(pss_no_sound, bool, 0);
 MODULE_PARM_DESC(pss_no_sound, "Configure sound compoents (0 - no, 1 - yes)");
-MODULE_PARM(pss_keep_settings, "i");
+module_param(pss_keep_settings, bool, 0);
 MODULE_PARM_DESC(pss_keep_settings, "Keep hardware setting at driver unloading (0 - no, 1 - yes)");
-MODULE_PARM(pss_firmware, "s");
+module_param(pss_firmware, charp, 0);
 MODULE_PARM_DESC(pss_firmware, "Location of the firmware file (default - /etc/sound/pss_synth)");
-MODULE_PARM(pss_mixer, "b");
+module_param(pss_mixer, bool, 0);
 MODULE_PARM_DESC(pss_mixer, "Enable (1) or disable (0) PSS mixer (controlling of output volume, bass, treble, synth volume). The mixer is not available on all PSS cards.");
 MODULE_AUTHOR("Hannu Savolainen, Vladimir Michl");
 MODULE_DESCRIPTION("Module for PSS sound cards (based on AD1848, ADSP-2115 and ESC614). This module includes control of output amplifier and synth volume of the Beethoven ADSP-16 card (this may work with other PSS cards).");

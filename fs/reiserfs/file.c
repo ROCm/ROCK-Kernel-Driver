@@ -147,7 +147,7 @@ static int reiserfs_sync_file(
 /* Allocates blocks for a file to fulfil write request.
    Maps all unmapped but prepared pages from the list.
    Updates metadata with newly allocated blocknumbers as needed */
-int reiserfs_allocate_blocks_for_region(
+static int reiserfs_allocate_blocks_for_region(
 				struct reiserfs_transaction_handle *th,
 				struct inode *inode, /* Inode we work with */
 				loff_t pos, /* Writing position */
@@ -587,7 +587,7 @@ error_exit:
 }
 
 /* Unlock pages prepared by reiserfs_prepare_file_region_for_write */
-void reiserfs_unprepare_pages(struct page **prepared_pages, /* list of locked pages */
+static void reiserfs_unprepare_pages(struct page **prepared_pages, /* list of locked pages */
 			      int num_pages /* amount of pages */) {
     int i; // loop counter
 
@@ -602,7 +602,7 @@ void reiserfs_unprepare_pages(struct page **prepared_pages, /* list of locked pa
 
 /* This function will copy data from userspace to specified pages within
    supplied byte range */
-int reiserfs_copy_from_user_to_file_region(
+static int reiserfs_copy_from_user_to_file_region(
 				loff_t pos, /* In-file position */
 				int num_pages, /* Number of pages affected */
 				int write_bytes, /* Amount of bytes to write */
@@ -714,7 +714,7 @@ drop_write_lock:
 /* Submit pages for write. This was separated from actual file copying
    because we might want to allocate block numbers in-between.
    This function assumes that caller will adjust file size to correct value. */
-int reiserfs_submit_file_region_for_write(
+static int reiserfs_submit_file_region_for_write(
 				struct reiserfs_transaction_handle *th,
 				struct inode *inode,
 				loff_t pos, /* Writing position offset */
@@ -795,7 +795,7 @@ int reiserfs_submit_file_region_for_write(
 
 /* Look if passed writing region is going to touch file's tail
    (if it is present). And if it is, convert the tail to unformatted node */
-int reiserfs_check_for_tail_and_convert( struct inode *inode, /* inode to deal with */
+static int reiserfs_check_for_tail_and_convert( struct inode *inode, /* inode to deal with */
 					 loff_t pos, /* Writing position */
 					 int write_bytes /* amount of bytes to write */
 				        )
@@ -851,7 +851,7 @@ int reiserfs_check_for_tail_and_convert( struct inode *inode, /* inode to deal w
    append), it is zeroed, then. 
    Returns number of unallocated blocks that should be allocated to cover
    new file data.*/
-int reiserfs_prepare_file_region_for_write(
+static int reiserfs_prepare_file_region_for_write(
 				struct inode *inode /* Inode of the file */,
 				loff_t pos, /* position in the file */
 				int num_pages, /* number of pages to
@@ -1148,7 +1148,7 @@ failed_read:
    Future Features: providing search_by_key with hints.
 
 */
-ssize_t reiserfs_file_write( struct file *file, /* the file we are going to write into */
+static ssize_t reiserfs_file_write( struct file *file, /* the file we are going to write into */
                              const char __user *buf, /*  pointer to user supplied data
 (in userspace) */
                              size_t count, /* amount of bytes to write */

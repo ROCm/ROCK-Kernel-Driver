@@ -85,7 +85,7 @@ static inline u64  mpy_l_X_l_ll(unsigned long mpy1,unsigned long mpy2)
  */
 static kmem_cache_t *posix_timers_cache;
 static struct idr posix_timers_id;
-static spinlock_t idr_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(idr_lock);
 
 /*
  * Just because the timer is not in the timer list does NOT mean it is

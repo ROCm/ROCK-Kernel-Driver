@@ -56,8 +56,8 @@
  */
 
 #define IXGB_PARAM(X, S) \
-static const int __devinitdata X[IXGB_MAX_NIC + 1] = IXGB_PARAM_INIT; \
-MODULE_PARM(X, "1-" __MODULE_STRING(IXGB_MAX_NIC) "i"); \
+static int __devinitdata X[IXGB_MAX_NIC + 1] = IXGB_PARAM_INIT; \
+module_param_array(X, int, NULL, 0); \
 MODULE_PARM_DESC(X, S);
 
 /* Transmit Descriptor Count

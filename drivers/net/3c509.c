@@ -1535,16 +1535,16 @@ static int debug = -1;
 static int irq[] = {-1, -1, -1, -1, -1, -1, -1, -1};
 static int xcvr[] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
 
-MODULE_PARM(debug,"i");
-MODULE_PARM(irq,"1-8i");
-MODULE_PARM(xcvr,"1-12i");
-MODULE_PARM(max_interrupt_work, "i");
+module_param(debug,int, 0);
+module_param_array(irq, int, NULL, 0);
+module_param_array(xcvr, int, NULL, 0);
+module_param(max_interrupt_work, int, 0);
 MODULE_PARM_DESC(debug, "debug level (0-6)");
 MODULE_PARM_DESC(irq, "IRQ number(s) (assigned)");
 MODULE_PARM_DESC(xcvr,"transceiver(s) (0=internal, 1=external)");
 MODULE_PARM_DESC(max_interrupt_work, "maximum events handled per interrupt");
 #if defined(__ISAPNP__)
-MODULE_PARM(nopnp, "i");
+module_param(nopnp, int, 0);
 MODULE_PARM_DESC(nopnp, "disable ISA PnP support (0-1)");
 MODULE_DEVICE_TABLE(isapnp, el3_isapnp_adapters);
 #endif	/* __ISAPNP__ */

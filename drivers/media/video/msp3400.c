@@ -633,14 +633,6 @@ struct REGISTER_DUMP {
 	char *name;
 };
 
-struct REGISTER_DUMP d1[] = {
-	{ 0x007e, "autodetect" },
-	{ 0x0023, "C_AD_BITS " },
-	{ 0x0038, "ADD_BITS  " },
-	{ 0x003e, "CIB_BITS  " },
-	{ 0x0057, "ERROR_RATE" },
-};
-
 static int
 autodetect_stereo(struct i2c_client *client)
 {

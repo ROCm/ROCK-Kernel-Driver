@@ -23,6 +23,9 @@ typedef struct {
 	struct task_struct * task;
 	const char *base_file;
 #endif
+#ifdef CONFIG_PREEMPT
+	unsigned int break_lock;
+#endif
 } spinlock_t;
 
 #ifdef CONFIG_DEBUG_SPINLOCK
@@ -96,6 +99,9 @@ static inline int _raw_spin_trylock(spinlock_t *lock)
 
 typedef struct {
 	volatile unsigned int write_lock:1, read_counter:31;
+#ifdef CONFIG_PREEMPT
+	unsigned int break_lock;
+#endif
 } /*__attribute__((aligned(32)))*/ rwlock_t;
 
 #define RW_LOCK_UNLOCKED (rwlock_t) { 0, 0 }

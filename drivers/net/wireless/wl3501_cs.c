@@ -79,7 +79,7 @@
 #define PCMCIA_DEBUG 0
 #ifdef PCMCIA_DEBUG
 static int pc_debug = PCMCIA_DEBUG;
-MODULE_PARM(pc_debug, "i");
+module_param(pc_debug, int, 0);
 #define dprintk(n, format, args...) \
 	{ if (pc_debug > (n)) \
 		printk(KERN_INFO "%s: " format "\n", __FUNCTION__ , ##args); }
@@ -2279,8 +2279,8 @@ static void __exit wl3501_exit_module(void)
 module_init(wl3501_init_module);
 module_exit(wl3501_exit_module);
 
-MODULE_PARM(wl3501_irq_mask, "i");
-MODULE_PARM(wl3501_irq_list, "1-4i");
+module_param(wl3501_irq_mask, int, 0);
+module_param_array(wl3501_irq_list, int, NULL, 0);
 MODULE_AUTHOR("Fox Chen <mhchen@golf.ccl.itri.org.tw>, "
 	      "Arnaldo Carvalho de Melo <acme@conectiva.com.br>,"
 	      "Gustavo Niemeyer <niemeyer@conectiva.com>");

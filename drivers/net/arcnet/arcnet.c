@@ -110,7 +110,7 @@ static struct net_device_stats *arcnet_get_stats(struct net_device *dev);
 static int go_tx(struct net_device *dev);
 
 static int debug = ARCNET_DEBUG;
-MODULE_PARM(debug, "i");
+module_param(debug, int, 0);
 MODULE_LICENSE("GPL");
 
 static int __init arcnet_init(void)

@@ -177,10 +177,10 @@ static int cyl[MAX_HD] = {-1,-1};
 static int head[MAX_HD] = {-1, -1};
 static int sect[MAX_HD] = {-1, -1};
 
-MODULE_PARM(tp720esdi, "i");
-MODULE_PARM(cyl, "i");
-MODULE_PARM(head, "i");
-MODULE_PARM(sect, "i");
+module_param(tp720esdi, bool, 0);
+module_param_array(cyl, int, NULL, 0);
+module_param_array(head, int, NULL, 0);
+module_param_array(sect, int, NULL, 0);
 MODULE_LICENSE("GPL");
 
 int init_module(void) {

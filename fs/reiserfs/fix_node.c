@@ -724,7 +724,7 @@ else \
 }
 
 
-void free_buffers_in_tb (
+static void free_buffers_in_tb (
 		       struct tree_balance * p_s_tb
 		       ) {
   int n_counter;

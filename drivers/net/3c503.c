@@ -673,9 +673,9 @@ static struct net_device *dev_el2[MAX_EL2_CARDS];
 static int io[MAX_EL2_CARDS];
 static int irq[MAX_EL2_CARDS];
 static int xcvr[MAX_EL2_CARDS];	/* choose int. or ext. xcvr */
-MODULE_PARM(io, "1-" __MODULE_STRING(MAX_EL2_CARDS) "i");
-MODULE_PARM(irq, "1-" __MODULE_STRING(MAX_EL2_CARDS) "i");
-MODULE_PARM(xcvr, "1-" __MODULE_STRING(MAX_EL2_CARDS) "i");
+module_param_array(io, int, NULL, 0);
+module_param_array(irq, int, NULL, 0);
+module_param_array(xcvr, int, NULL, 0);
 MODULE_PARM_DESC(io, "I/O base address(es)");
 MODULE_PARM_DESC(irq, "IRQ number(s) (assigned)");
 MODULE_PARM_DESC(xcvr, "transceiver(s) (0=internal, 1=external)");

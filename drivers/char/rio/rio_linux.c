@@ -32,11 +32,6 @@
  *
  * */
 
-
-#define RCS_ID "$Id: rio.c,v 1.1 1999/07/11 10:13:54 wolff Exp wolff $"
-#define RCS_REV "$Revision: 1.1 $"
-
-
 #include <linux/module.h>
 #include <linux/config.h> 
 #include <linux/kdev_t.h>
@@ -198,7 +193,7 @@ static int rio_fw_ioctl (struct inode *inode, struct file *filp,
 		         unsigned int cmd, unsigned long arg);
 static int rio_init_drivers(void);
 
-void my_hd (void *addr, int len);
+static void my_hd (void *addr, int len);
 
 static struct tty_driver *rio_driver, *rio_driver2;
 
@@ -206,11 +201,6 @@ static struct tty_driver *rio_driver, *rio_driver2;
 sources use all over the place. */
 struct rio_info *p;
 
-/* struct rio_board boards[RIO_HOSTS]; */
-struct rio_port *rio_ports;
-
-int rio_initialized;
-int rio_nports;
 int rio_debug;
 
 
@@ -218,12 +208,12 @@ int rio_debug;
     - Set rio_poll to 1 to poll every timer tick (10ms on Intel). 
       This is used when the card cannot use an interrupt for some reason.
 */
-int rio_poll = 1;
+static int rio_poll = 1;
 
 
 /* These are the only open spaces in my computer. Yours may have more
    or less.... */
-int rio_probe_addrs[]= {0xc0000, 0xd0000, 0xe0000};
+static int rio_probe_addrs[]= {0xc0000, 0xd0000, 0xe0000};
 
 #define NR_RIO_ADDRS (sizeof(rio_probe_addrs)/sizeof (int))
 
@@ -264,7 +254,7 @@ static struct file_operations rio_fw_fops = {
 	.ioctl		= rio_fw_ioctl,
 };
 
-struct miscdevice rio_fw_device = {
+static struct miscdevice rio_fw_device = {
 	RIOCTL_MISC_MINOR, "rioctl", &rio_fw_fops
 };
 
@@ -302,7 +292,7 @@ static inline int rio_paranoia_check(struct rio_port const * port,
 
 
 #ifdef DEBUG
-void my_hd (void *ad, int len)
+static void my_hd (void *ad, int len)
 {
   int i, j, ch;
   unsigned char *addr = ad;
@@ -387,7 +377,7 @@ static int rio_set_real_termios (void *ptr)
 }
 
 
-void rio_reset_interrupt (struct Host *HostP)
+static void rio_reset_interrupt (struct Host *HostP)
 {
   func_enter();
 
@@ -824,7 +814,7 @@ static void rio_unthrottle (struct tty_struct * tty)
  * ********************************************************************** */
 
 
-struct vpd_prom *get_VPD_PROM (struct Host *hp)
+static struct vpd_prom *get_VPD_PROM (struct Host *hp)
 {
   static struct vpd_prom vpdp;
   char *p;
@@ -979,7 +969,7 @@ static int rio_init_datastructures (void)
     port->gs.close_delay = HZ/2;
     port->gs.closing_wait = 30 * HZ;
     port->gs.rd = &rio_real_driver;
-    port->portSem = SPIN_LOCK_UNLOCKED;
+    spin_lock_init(&port->portSem);
     /*
      * Initializing wait queue
      */
@@ -1045,7 +1035,7 @@ static void  __exit rio_release_drivers(void)
    EEprom.  As the bit is read/write for the CPU, we can fix it here,
    if we detect that it isn't set correctly. -- REW */
 
-void fix_rio_pci (struct pci_dev *pdev)
+static void fix_rio_pci (struct pci_dev *pdev)
 {
   unsigned int hwbase;
   unsigned long rebase;
@@ -1141,7 +1131,7 @@ static int __init rio_init(void)
       hp->Type  = RIO_PCI;
       hp->Copy  = rio_pcicopy; 
       hp->Mode  = RIO_PCI_BOOT_FROM_RAM;
-      hp->HostLock = SPIN_LOCK_UNLOCKED;
+      spin_lock_init(&hp->HostLock);
       rio_reset_interrupt (hp);
       rio_start_card_running (hp);
 
@@ -1199,7 +1189,7 @@ static int __init rio_init(void)
       hp->Type  = RIO_PCI;
       hp->Copy  = rio_pcicopy;
       hp->Mode  = RIO_PCI_BOOT_FROM_RAM;
-      hp->HostLock = SPIN_LOCK_UNLOCKED;
+      spin_lock_init(&hp->HostLock);
 
       rio_dprintk (RIO_DEBUG_PROBE, "Ivec: %x\n", hp->Ivec);
       rio_dprintk (RIO_DEBUG_PROBE, "Mode: %x\n", hp->Mode);
@@ -1249,7 +1239,7 @@ static int __init rio_init(void)
                              * Moreover, the ISA card will work with the 
                              * special PCI copy anyway. -- REW */
     hp->Mode = 0;
-    hp->HostLock = SPIN_LOCK_UNLOCKED;
+    spin_lock_init(&hp->HostLock);
 
     vpdp = get_VPD_PROM (hp);
     rio_dprintk (RIO_DEBUG_PROBE, "Got VPD ROM\n");

@@ -16,7 +16,7 @@
  *    along with this program; if not, write to the Free Software
  *    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- *    Questions/Comments/Bugfixes to arrays@compaq.com
+ *    Questions/Comments/Bugfixes to iss_storagedev@hp.com
  *    
  *    Author: Stephen M. Cameron
  */
@@ -534,7 +534,7 @@ cciss_scsi_setup(int cntl_num)
 	if (shba == NULL)
 		return;
 	shba->scsi_host = NULL;
-	shba->lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&shba->lock);
 	shba->registered = 0;
 	if (scsi_cmd_stack_setup(cntl_num, shba) != 0) {
 		kfree(shba);

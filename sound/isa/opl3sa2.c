@@ -711,7 +711,7 @@ static int __devinit snd_opl3sa2_probe(int dev,
 		chip->single_dma = 1;
 	if ((err = snd_opl3sa2_detect(chip)) < 0)
 		goto __error;
-	if (request_irq(xirq, snd_opl3sa2_interrupt, SA_INTERRUPT, "OPL3-SA2/3", (void *)chip)) {
+	if (request_irq(xirq, snd_opl3sa2_interrupt, SA_INTERRUPT, "OPL3-SA2", (void *)chip)) {
 		snd_printk(KERN_ERR "opl3sa2: can't grab IRQ %d\n", xirq);
 		err = -ENODEV;
 		goto __error;

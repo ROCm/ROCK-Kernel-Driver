@@ -61,12 +61,16 @@
 #define in_softirq()		(softirq_count())
 #define in_interrupt()		(irq_count())
 
-#ifdef CONFIG_PREEMPT
+#if defined(CONFIG_PREEMPT) && !defined(CONFIG_PREEMPT_BKL)
 # define in_atomic()	((preempt_count() & ~PREEMPT_ACTIVE) != kernel_locked())
+#else
+# define in_atomic()	((preempt_count() & ~PREEMPT_ACTIVE) != 0)
+#endif
+
+#ifdef CONFIG_PREEMPT
 # define preemptible()	(preempt_count() == 0 && !irqs_disabled())
 # define IRQ_EXIT_OFFSET (HARDIRQ_OFFSET-1)
 #else
-# define in_atomic()	(preempt_count() != 0)
 # define preemptible()	0
 # define IRQ_EXIT_OFFSET HARDIRQ_OFFSET
 #endif
@@ -77,10 +81,10 @@ extern void synchronize_irq(unsigned int irq);
 # define synchronize_irq(irq)	barrier()
 #endif
 
-#define nmi_enter()		(preempt_count() += HARDIRQ_OFFSET)
-#define nmi_exit()		(preempt_count() -= HARDIRQ_OFFSET)
+#define nmi_enter()		irq_enter()
+#define nmi_exit()		sub_preempt_count(HARDIRQ_OFFSET)
 
-#define irq_enter()		(preempt_count() += HARDIRQ_OFFSET)
+#define irq_enter()		add_preempt_count(HARDIRQ_OFFSET)
 extern void irq_exit(void);
 
 #endif /* LINUX_HARDIRQ_H */

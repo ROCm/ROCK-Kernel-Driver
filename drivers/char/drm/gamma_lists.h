@@ -45,8 +45,8 @@ int DRM(waitlist_create)(drm_waitlist_t *bl, int count)
 	bl->rp	       = bl->bufs;
 	bl->wp	       = bl->bufs;
 	bl->end	       = &bl->bufs[bl->count+1];
-	bl->write_lock = SPIN_LOCK_UNLOCKED;
-	bl->read_lock  = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&bl->write_lock);
+	spin_lock_init(&bl->read_lock);
 	return 0;
 }
 
@@ -110,7 +110,7 @@ int DRM(freelist_create)(drm_freelist_t *bl, int count)
 	bl->low_mark  = 0;
 	bl->high_mark = 0;
 	atomic_set(&bl->wfh,   0);
-	bl->lock      = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&bl->lock);
 	++bl->initialized;
 	return 0;
 }

@@ -40,8 +40,6 @@ RCU/
 	- directory with info on RCU (read-copy update).
 README.DAC960
 	- info on Mylex DAC960/DAC1100 PCI RAID Controller Driver for Linux.
-README.moxa
-	- release notes for Moxa mutiport serial card.
 SAK.txt
 	- info on Secure Attention Keys.
 SubmittingDrivers
@@ -174,8 +172,6 @@ memory.txt
 	- info on typical Linux memory problems.
 mips/
 	- directory with info about Linux on MIPS architecture.
-mkdev.cciss
-	- script to make /dev entries for SMART controllers (see cciss.txt).
 mono.txt
 	- how to execute Mono-based .NET binaries with the help of BINFMT_MISC.
 moxa-smartio

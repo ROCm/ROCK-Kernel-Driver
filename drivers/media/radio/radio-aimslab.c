@@ -130,7 +130,7 @@ static int rt_setvol(struct rt_device *dev, int vol)
  * and bit 4 (+16) is to keep the signal strength meter enabled
  */
 
-void send_0_byte(int port, struct rt_device *dev)
+static void send_0_byte(int port, struct rt_device *dev)
 {
 	if ((dev->curvol == 0) || (dev->muted)) {
 		outb_p(128+64+16+  1, port);   /* wr-enable + data low */
@@ -143,7 +143,7 @@ void send_0_byte(int port, struct rt_device *dev)
 	sleep_delay(1000); 
 }
 
-void send_1_byte(int port, struct rt_device *dev)
+static void send_1_byte(int port, struct rt_device *dev)
 {
 	if ((dev->curvol == 0) || (dev->muted)) {
 		outb_p(128+64+16+4  +1, port);   /* wr-enable+data high */
@@ -353,9 +353,9 @@ MODULE_AUTHOR("M.Kirkwood");
 MODULE_DESCRIPTION("A driver for the RadioTrack/RadioReveal radio card.");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(io, "i");
+module_param(io, int, 0);
 MODULE_PARM_DESC(io, "I/O address of the RadioTrack card (0x20f or 0x30f)");
-MODULE_PARM(radio_nr, "i");
+module_param(radio_nr, int, 0);
 
 static void __exit cleanup_rtrack_module(void)
 {

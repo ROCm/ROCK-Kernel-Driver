@@ -12,14 +12,10 @@
  *  This file contains functions dealing with S+tree
  *
  * B_IS_IN_TREE
- * copy_short_key
  * copy_item_head
  * comp_short_keys
  * comp_keys
- * comp_cpu_keys
  * comp_short_le_keys
- * comp_short_cpu_keys
- * cpu_key2cpu_key
  * le_key2cpu_key
  * comp_le_keys
  * bin_search
@@ -72,11 +68,6 @@ inline int B_IS_IN_TREE (const struct buffer_head * p_s_bh)
   return ( B_LEVEL (p_s_bh) != FREE_LEVEL );
 }
 
-inline void copy_short_key (void * to, const void * from)
-{
-    memcpy (to, from, SHORT_KEY_SIZE);
-}
-
 //
 // to gets item head in le form
 //
@@ -117,7 +108,7 @@ inline int  comp_short_keys (const struct reiserfs_key * le_key,
    Compare keys using all 4 key fields.
    Returns: -1 if key1 < key2 0
    if key1 = key2 1 if key1 > key2 */
-inline int  comp_keys (const struct reiserfs_key * le_key, const struct cpu_key * cpu_key)
+static inline int  comp_keys (const struct reiserfs_key * le_key, const struct cpu_key * cpu_key)
 {
   int retval;
 
@@ -143,37 +134,6 @@ inline int  comp_keys (const struct reiserfs_key * le_key, const struct cpu_key 
 }
 
 
-//
-// FIXME: not used yet
-//
-inline int comp_cpu_keys (const struct cpu_key * key1, 
-			  const struct cpu_key * key2)
-{
-    if (key1->on_disk_key.k_dir_id < key2->on_disk_key.k_dir_id)
-	return -1;
-    if (key1->on_disk_key.k_dir_id > key2->on_disk_key.k_dir_id)
-	return 1;
-
-    if (key1->on_disk_key.k_objectid < key2->on_disk_key.k_objectid)
-	return -1;
-    if (key1->on_disk_key.k_objectid > key2->on_disk_key.k_objectid)
-	return 1;
-
-    if (cpu_key_k_offset (key1) < cpu_key_k_offset (key2))
-	return -1;
-    if (cpu_key_k_offset (key1) > cpu_key_k_offset (key2))
-	return 1;
-
-    reiserfs_warning (NULL, "comp_cpu_keys: type are compared for %K and %K",
-		      key1, key2);
-
-    if (cpu_key_k_type (key1) < cpu_key_k_type (key2))
-	return -1;
-    if (cpu_key_k_type (key1) > cpu_key_k_type (key2))
-	return 1;
-    return 0;
-}
-
 inline int comp_short_le_keys (const struct reiserfs_key * key1, const struct reiserfs_key * key2)
 {
   __u32 * p_s_1_u32, * p_s_2_u32;
@@ -189,32 +149,6 @@ inline int comp_short_le_keys (const struct reiserfs_key * key1, const struct re
   }
   return 0;
 }
-
-inline int comp_short_cpu_keys (const struct cpu_key * key1, 
-				const struct cpu_key * key2)
-{
-  __u32 * p_s_1_u32, * p_s_2_u32;
-  int n_key_length = REISERFS_SHORT_KEY_LEN;
-
-  p_s_1_u32 = (__u32 *)key1;
-  p_s_2_u32 = (__u32 *)key2;
-
-  for( ; n_key_length--; ++p_s_1_u32, ++p_s_2_u32 ) {
-    if ( *p_s_1_u32 < *p_s_2_u32 )
-      return -1;
-    if ( *p_s_1_u32 > *p_s_2_u32 )
-      return 1;
-  }
-  return 0;
-}
-
-
-
-inline void cpu_key2cpu_key (struct cpu_key * to, const struct cpu_key * from)
-{
-    memcpy (to, from, sizeof (struct cpu_key));
-}
-
 
 inline void le_key2cpu_key (struct cpu_key * to, const struct reiserfs_key * from)
 {
@@ -255,7 +189,7 @@ inline int comp_le_keys (const struct reiserfs_key * k1, const struct reiserfs_k
  there are no possible items, and we have not found it. With each examination we
  cut the number of possible items it could be by one more than half rounded down,
  or we find it. */
-inline	int bin_search (
+static inline	int bin_search (
               const void * p_v_key, /* Key to search for.                   */
 	      const void * p_v_base,/* First item in the array.             */
 	      int       p_n_num,    /* Number of items in the array.        */
@@ -272,7 +206,7 @@ inline	int bin_search (
     int   n_rbound, n_lbound, n_j;
 
    for ( n_j = ((n_rbound = p_n_num - 1) + (n_lbound = 0))/2; n_lbound <= n_rbound; n_j = (n_rbound + n_lbound)/2 )
-     switch( COMP_KEYS((struct reiserfs_key *)((char * )p_v_base + n_j * p_n_width), (struct cpu_key *)p_v_key) )  {
+     switch( comp_keys((struct reiserfs_key *)((char * )p_v_base + n_j * p_n_width), (struct cpu_key *)p_v_key) )  {
      case -1: n_lbound = n_j + 1; continue;
      case  1: n_rbound = n_j - 1; continue;
      case  0: *p_n_pos = n_j;     return ITEM_FOUND; /* Key found in the array.  */
@@ -301,7 +235,7 @@ const struct reiserfs_key  MAX_KEY = {0xffffffff, 0xffffffff, {{0xffffffff, 0xff
    of the path, and going upwards.  We must check the path's validity at each step.  If the key is not in
    the path, there is no delimiting key in the tree (buffer is first or last buffer in tree), and in this
    case we return a special key, either MIN_KEY or MAX_KEY. */
-inline	const struct  reiserfs_key * get_lkey  (
+static inline	const struct  reiserfs_key * get_lkey  (
 	                const struct path         * p_s_chk_path,
                         const struct super_block  * p_s_sb
                       ) {
@@ -396,11 +330,11 @@ static  inline  int key_in_buffer (
   RFALSE( !PATH_PLAST_BUFFER(p_s_chk_path)->b_bdev,
 	  "PAP-5060: device must not be NODEV");
 
-  if ( COMP_KEYS(get_lkey(p_s_chk_path, p_s_sb), p_s_key) == 1 )
+  if ( comp_keys(get_lkey(p_s_chk_path, p_s_sb), p_s_key) == 1 )
     /* left delimiting key is bigger, that the key we look for */
     return 0;
-  //  if ( COMP_KEYS(p_s_key, get_rkey(p_s_chk_path, p_s_sb)) != -1 )
-  if ( COMP_KEYS(get_rkey(p_s_chk_path, p_s_sb), p_s_key) != 1 )
+  //  if ( comp_keys(p_s_key, get_rkey(p_s_chk_path, p_s_sb)) != -1 )
+  if ( comp_keys(get_rkey(p_s_chk_path, p_s_sb), p_s_key) != 1 )
     /* p_s_key must be less than right delimitiing key */
     return 0;
   return 1;
@@ -745,7 +679,7 @@ io_error:
         /* only check that the key is in the buffer if p_s_key is not
            equal to the MAX_KEY. Latter case is only possible in
            "finish_unfinished()" processing during mount. */
-        RFALSE( COMP_KEYS( &MAX_KEY, p_s_key ) && 
+        RFALSE( comp_keys( &MAX_KEY, p_s_key ) &&
                 ! key_in_buffer(p_s_search_path, p_s_key, p_s_sb),
 		"PAP-5130: key is not in the buffer");
 #ifdef CONFIG_REISERFS_CHECK
@@ -1192,7 +1126,7 @@ static char  prepare_for_delete_or_cut(
 }
 
 /* Calculate number of bytes which will be deleted or cut during balance */
-int calc_deleted_bytes_number(
+static int calc_deleted_bytes_number(
     struct  tree_balance  * p_s_tb,
     char                    c_mode
     ) {

@@ -94,20 +94,20 @@ MODULE_DESCRIPTION("3Com 3C359 Velocity XL Token Ring Adapter Driver \n") ;
 
 static int ringspeed[XL_MAX_ADAPTERS] = {0,} ;
 
-MODULE_PARM(ringspeed, "1-" __MODULE_STRING(XL_MAX_ADAPTERS) "i");
+module_param_array(ringspeed, int, NULL, 0);
 MODULE_PARM_DESC(ringspeed,"3c359: Ringspeed selection - 4,16 or 0") ; 
 
 /* Packet buffer size */
 
 static int pkt_buf_sz[XL_MAX_ADAPTERS] = {0,} ;
  
-MODULE_PARM(pkt_buf_sz, "1-" __MODULE_STRING(XL_MAX_ADAPTERS) "i") ; 
+module_param_array(pkt_buf_sz, int, NULL, 0) ;
 MODULE_PARM_DESC(pkt_buf_sz,"3c359: Initial buffer size") ; 
 /* Message Level */
 
 static int message_level[XL_MAX_ADAPTERS] = {0,} ; 
 
-MODULE_PARM(message_level, "1-" __MODULE_STRING(XL_MAX_ADAPTERS) "i") ; 
+module_param_array(message_level, int, NULL, 0) ;
 MODULE_PARM_DESC(message_level, "3c359: Level of reported messages \n") ; 
 /* 
  *	This is a real nasty way of doing this, but otherwise you

@@ -148,7 +148,7 @@ struct pci_ops rtas_pci_ops = {
 	rtas_pci_write_config
 };
 
-static int is_python(struct device_node *dev)
+int is_python(struct device_node *dev)
 {
 	char *model = (char *)get_property(dev, "model", NULL);
 
@@ -553,9 +553,6 @@ void __init pSeries_final_fixup(void)
 	phbs_remap_io();
 	pSeries_request_regions();
 	pci_fix_bus_sysdata();
-
-	if (!of_chosen || !get_property(of_chosen, "linux,iommu-off", NULL))
-		iommu_setup_pSeries();
 
 	pci_addr_cache_build();
 }

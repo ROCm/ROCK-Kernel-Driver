@@ -649,7 +649,7 @@ int kcopyd_client_create(unsigned int nr_pages, struct kcopyd_client **result)
 		return -ENOMEM;
 	}
 
-	kc->lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&kc->lock);
 	kc->pages = NULL;
 	kc->nr_pages = kc->nr_free_pages = 0;
 	r = client_alloc_pages(kc, nr_pages);

@@ -23,10 +23,16 @@
 
 typedef struct {
 	volatile unsigned int lock;
+#ifdef CONFIG_PREEMPT
+	unsigned int break_lock;
+#endif
 } spinlock_t;
 
 typedef struct {
 	volatile signed int lock;
+#ifdef CONFIG_PREEMPT
+	unsigned int break_lock;
+#endif
 } rwlock_t;
 
 #ifdef __KERNEL__
@@ -215,6 +221,8 @@ static void __inline__ _raw_read_unlock(rwlock_t *rw)
 	: "r"(&rw->lock)
 	: "cr0", "memory");
 }
+
+#define _raw_read_trylock(lock) generic_raw_read_trylock(lock)
 
 /*
  * This returns the old value in the lock,

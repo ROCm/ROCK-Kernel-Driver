@@ -1302,18 +1302,18 @@ MODULE_AUTHOR("Ard van Breemen <ard@cstmel.nl.eu.org>");
 MODULE_DESCRIPTION("Intel Panther onboard i82596 driver");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(debug, "i");
-//MODULE_PARM(max_interrupt_work, "i");
-//MODULE_PARM(reverse_probe, "i");
-//MODULE_PARM(rx_copybreak, "i");
-MODULE_PARM(options, "1-" __MODULE_STRING(MAX_UNITS) "i");
-MODULE_PARM(full_duplex, "1-" __MODULE_STRING(MAX_UNITS) "i");
-
 static struct net_device *dev_lp486e;
 static int full_duplex;
 static int options;
 static int io = IOADDR;
 static int irq = IRQ;
+
+module_param(debug, int, 0);
+//module_param(max_interrupt_work, int, 0);
+//module_param(reverse_probe, int, 0);
+//module_param(rx_copybreak, int, 0);
+module_param(options, int, 0);
+module_param(full_duplex, int, 0);
 
 static int __init lp486e_init_module(void) {
 	int err;

@@ -78,7 +78,7 @@ static void pci_direct_unmap_sg(struct pci_dev *hwdev, struct scatterlist *sg,
 {
 }
 
-void __init pci_dma_init_direct(void)
+void __init pci_direct_iommu_init(void)
 {
 	pci_dma_ops.pci_alloc_consistent = pci_direct_alloc_consistent;
 	pci_dma_ops.pci_free_consistent = pci_direct_free_consistent;

@@ -37,14 +37,14 @@ MODULE_AUTHOR("Frode Isaksen");
 MODULE_LICENSE("GPL");
 
 static int protocol = 2;       /* EURO-ISDN Default */
-MODULE_PARM(protocol, "i");
+module_param(protocol, int, 0);
 
 static int number_of_leds = 2;       /* 2 LEDs on the adpater default */
-MODULE_PARM(number_of_leds, "i");
+module_param(number_of_leds, int, 0);
 
 #ifdef CONFIG_HISAX_DEBUG
 static int debug = 0x1;
-MODULE_PARM(debug, "i");
+module_param(debug, int, 0);
 int st5481_debug;
 #endif
 

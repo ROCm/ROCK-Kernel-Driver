@@ -438,7 +438,7 @@ struct	d_hcfg {
 	int cdrombase;
 };
 
-struct d_hcfg decoded_hcfg __initdata = {0, };
+static struct d_hcfg decoded_hcfg __initdata = {0, };
 
 #endif /* CONFIG_SC6600 */
 
@@ -610,7 +610,7 @@ void __init aedsp16_pinfo(void) {
 }
 #endif
 
-void __init aedsp16_hard_decode(void) {
+static void __init aedsp16_hard_decode(void) {
 
 	DBG((" aedsp16_hard_decode: 0x%x, 0x%x\n", hard_cfg[0], hard_cfg[1]));
 
@@ -654,7 +654,7 @@ void __init aedsp16_hard_decode(void) {
 	DBG(("success.\n"));
 }
 
-void __init aedsp16_hard_encode(void) {
+static void __init aedsp16_hard_encode(void) {
 
 	DBG((" aedsp16_hard_encode: 0x%x, 0x%x\n", hard_cfg[0], hard_cfg[1]));
 
@@ -1252,7 +1252,7 @@ static void __init uninit_aedsp16_mpu(void)
 	DBG(("done.\n"));
 }
 
-int __init init_aedsp16(void)
+static int __init init_aedsp16(void)
 {
 	int initialized = FALSE;
 
@@ -1294,7 +1294,7 @@ int __init init_aedsp16(void)
 	return initialized;
 }
 
-void __init uninit_aedsp16(void)
+static void __init uninit_aedsp16(void)
 {
 	if (ae_config.mss_base != -1)
 		uninit_aedsp16_mss();
@@ -1311,17 +1311,17 @@ static int __initdata mpu_irq = -1;
 static int __initdata mss_base = -1;
 static int __initdata mpu_base = -1;
 
-MODULE_PARM(io, "i");
+module_param(io, int, 0);
 MODULE_PARM_DESC(io, "I/O base address (0x220 0x240)");
-MODULE_PARM(irq, "i");
+module_param(irq, int, 0);
 MODULE_PARM_DESC(irq, "IRQ line (5 7 9 10 11)");
-MODULE_PARM(dma, "i");
+module_param(dma, int, 0);
 MODULE_PARM_DESC(dma, "dma line (0 1 3)");
-MODULE_PARM(mpu_irq, "i");
+module_param(mpu_irq, int, 0);
 MODULE_PARM_DESC(mpu_irq, "MPU-401 IRQ line (5 7 9 10 0)");
-MODULE_PARM(mss_base, "i");
+module_param(mss_base, int, 0);
 MODULE_PARM_DESC(mss_base, "MSS emulation I/O base address (0x530 0xE80)");
-MODULE_PARM(mpu_base, "i");
+module_param(mpu_base, int, 0);
 MODULE_PARM_DESC(mpu_base,"MPU-401 I/O base address (0x300 0x310 0x320 0x330)");
 MODULE_AUTHOR("Riccardo Facchetti <fizban@tin.it>");
 MODULE_DESCRIPTION("Audio Excel DSP 16 Driver Version " VERSION);

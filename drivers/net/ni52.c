@@ -1314,10 +1314,10 @@ static void set_multicast_list(struct net_device *dev)
 #ifdef MODULE
 static struct net_device *dev_ni52;
 
-MODULE_PARM(io, "i");
-MODULE_PARM(irq, "i");
-MODULE_PARM(memstart, "l");
-MODULE_PARM(memend, "l");
+module_param(io, int, 0);
+module_param(irq, int, 0);
+module_param(memstart, long, 0);
+module_param(memend, long, 0);
 MODULE_PARM_DESC(io, "NI5210 I/O base address,required");
 MODULE_PARM_DESC(irq, "NI5210 IRQ number,required");
 MODULE_PARM_DESC(memstart, "NI5210 memory base address,required");

@@ -2738,7 +2738,7 @@ DAC960_DetectController(struct pci_dev *PCI_Device,
   }
   init_waitqueue_head(&Controller->CommandWaitQueue);
   init_waitqueue_head(&Controller->HealthStatusWaitQueue);
-  Controller->queue_lock = SPIN_LOCK_UNLOCKED; 
+  spin_lock_init(&Controller->queue_lock);
   DAC960_AnnounceDriver(Controller);
   /*
     Map the Controller Register Window.

@@ -60,7 +60,7 @@ static struct saa7146 saa7146s[SAA7146_MAX];
 static int saa_num = 0;		/* number of SAA7146s in use */
 
 static int video_nr = -1;
-MODULE_PARM(video_nr,"i");
+module_param(video_nr, int, 0);
 MODULE_LICENSE("GPL");
 
 
@@ -96,13 +96,6 @@ MODULE_LICENSE("GPL");
 #define debVideo	(NewCard ? nDebVideo : oDebVideo)
 #define debAudio	(NewCard ? nDebAudio : oDebAudio)
 #define debDMA		(NewCard ? nDebDMA : oDebDMA)
-
-#ifdef DEBUG
-int stradis_driver(void)	/* for the benefit of ksymoops */
-{
-	return 1;
-}
-#endif
 
 #ifdef USE_RESCUE_EEPROM_SDM275
 static unsigned char rescue_eeprom[64] = {

@@ -382,7 +382,7 @@ void hubdev_init_node(nodepda_t * npda, cnodeid_t node)
 
 	struct hubdev_info *hubdev_info;
 
-	if (node >= numnodes)	/* Headless/memless IO nodes */
+	if (node >= num_online_nodes())	/* Headless/memless IO nodes */
 		hubdev_info =
 		    (struct hubdev_info *)alloc_bootmem_node(NODE_DATA(0),
 							     sizeof(struct

@@ -9,7 +9,7 @@
  * undefined" opcode for parsing in the trap handler.
  */
 
-#if 1	/* Set to zero for a slightly smaller kernel */
+#ifdef CONFIG_DEBUG_BUGVERBOSE
 #define BUG()				\
  __asm__ __volatile__(	"ud2\n"		\
 			"\t.word %c0\n"	\

@@ -324,7 +324,6 @@ static struct blockmtd_dev *add_device(char *devname, int erase_size)
 		goto devinit_err;
 	}
 
-	atomic_set(&bdev->bd_inode->i_mapping->truncate_count, 0);
 	init_MUTEX(&dev->write_mutex);
 
 	/* Setup the MTD structure */

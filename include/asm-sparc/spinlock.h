@@ -16,6 +16,9 @@
 struct _spinlock_debug {
 	unsigned char lock;
 	unsigned long owner_pc;
+#ifdef CONFIG_PREEMPT
+	unsigned int break_lock;
+#endif
 };
 typedef struct _spinlock_debug spinlock_t;
 
@@ -36,6 +39,9 @@ struct _rwlock_debug {
 	volatile unsigned int lock;
 	unsigned long owner_pc;
 	unsigned long reader_pc[NR_CPUS];
+#ifdef CONFIG_PREEMPT
+	unsigned int break_lock;
+#endif
 };
 typedef struct _rwlock_debug rwlock_t;
 
@@ -79,8 +85,14 @@ do {	unsigned long flags; \
 
 #else /* !CONFIG_DEBUG_SPINLOCK */
 
-typedef unsigned char spinlock_t;
-#define SPIN_LOCK_UNLOCKED	0
+typedef struct {
+	unsigned char lock;
+#ifdef CONFIG_PREEMPT
+	unsigned int break_lock;
+#endif
+} spinlock_t;
+
+#define SPIN_LOCK_UNLOCKED	{ 0, }
 
 #define spin_lock_init(lock)   (*((unsigned char *)(lock)) = 0)
 #define spin_is_locked(lock)    (*((volatile unsigned char *)(lock)) != 0)
@@ -137,7 +149,12 @@ extern __inline__ void _raw_spin_unlock(spinlock_t *lock)
  * XXX This might create some problems with my dual spinlock
  * XXX scheme, deadlocks etc. -DaveM
  */
-typedef struct { volatile unsigned int lock; } rwlock_t;
+typedef struct {
+	volatile unsigned int lock;
+#ifdef CONFIG_PREEMPT
+	unsigned int break_lock;
+#endif
+} rwlock_t;
 
 #define RW_LOCK_UNLOCKED (rwlock_t) { 0 }
 

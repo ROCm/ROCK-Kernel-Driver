@@ -66,7 +66,7 @@ static inline int num_booting_cpus(void)
 	return cpus_weight(cpu_callout_map);
 }
 
-#define smp_processor_id() read_pda(cpunumber)
+#define __smp_processor_id() read_pda(cpunumber)
 
 extern __inline int hard_smp_processor_id(void)
 {

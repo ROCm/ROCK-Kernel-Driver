@@ -68,7 +68,7 @@ static int ds1286_set_time(struct rtc_time *rtc_tm);
 
 static inline unsigned char ds1286_is_updating(void);
 
-static spinlock_t ds1286_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(ds1286_lock);
 
 static int ds1286_read_proc(char *page, char **start, off_t off,
                             int count, int *eof, void *data);

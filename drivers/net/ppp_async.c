@@ -84,7 +84,7 @@ struct asyncppp {
 #define SC_RCV_BITS	(SC_RCV_B7_1|SC_RCV_B7_0|SC_RCV_ODDP|SC_RCV_EVNP)
 
 static int flag_time = HZ;
-MODULE_PARM(flag_time, "i");
+module_param(flag_time, int, 0);
 MODULE_PARM_DESC(flag_time, "ppp_async: interval between flagged packets (in clock ticks)");
 MODULE_LICENSE("GPL");
 MODULE_ALIAS_LDISC(N_PPP);

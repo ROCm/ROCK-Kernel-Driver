@@ -220,7 +220,7 @@ static char *if_names[] = { "Auto", "10BaseT", "10Base2", "AUI", "100BaseT" };
  */
 #ifdef PCMCIA_DEBUG
 static int pc_debug = PCMCIA_DEBUG;
-MODULE_PARM(pc_debug, "i");
+module_param(pc_debug, int, 0);
 #define DEBUG(n, args...) if (pc_debug>(n)) printk(KDBG_XIRC args)
 #else
 #define DEBUG(n, args...)
@@ -255,10 +255,10 @@ MODULE_PARM(pc_debug, "i");
 MODULE_DESCRIPTION("Xircom PCMCIA ethernet driver");
 MODULE_LICENSE("Dual MPL/GPL");
 
-#define INT_MODULE_PARM(n, v) static int n = v; MODULE_PARM(n, "i")
+#define INT_MODULE_PARM(n, v) static int n = v; module_param(n, int, 0)
 
 static int irq_list[4] = { -1 };
-MODULE_PARM(irq_list, "1-4i");
+module_param_array(irq_list, int, NULL, 0);
 INT_MODULE_PARM(irq_mask,	0xdeb8);
 INT_MODULE_PARM(if_port,	0);
 INT_MODULE_PARM(full_duplex,	0);

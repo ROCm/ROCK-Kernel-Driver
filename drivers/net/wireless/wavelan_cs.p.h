@@ -804,14 +804,14 @@ static int 	irq_list[4] = { -1 };
 static int	mem_speed = 0;
 
 /* New module interface */
-MODULE_PARM(irq_mask, "i");
-MODULE_PARM(irq_list, "1-4i");
-MODULE_PARM(mem_speed, "i");
+module_param(irq_mask, int, 0);
+module_param_array(irq_list, int, NULL, 0);
+module_param(mem_speed, int, 0);
 
 #ifdef WAVELAN_ROAMING		/* Conditional compile, see above in options */
 /* Enable roaming mode ? No ! Please keep this to 0 */
 static int	do_roaming = 0;
-MODULE_PARM(do_roaming, "i");
+module_param(do_roaming, bool, 0);
 #endif	/* WAVELAN_ROAMING */
 
 MODULE_LICENSE("GPL");

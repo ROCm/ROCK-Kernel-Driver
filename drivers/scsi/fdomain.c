@@ -409,7 +409,7 @@ static irqreturn_t       do_fdomain_16x0_intr( int irq, void *dev_id,
 /* Allow insmod parameters to be like LILO parameters.  For example:
    insmod fdomain fdomain=0x140,11 */
 static char * fdomain = NULL;
-MODULE_PARM(fdomain, "s");
+module_param(fdomain, charp, 0);
 
 static unsigned long addresses[] = {
    0xc8000,

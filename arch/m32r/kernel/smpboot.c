@@ -247,7 +247,7 @@ static void __init init_ipi_lock(void)
 	int ipi;
 
 	for (ipi = 0 ; ipi < NR_IPIS ; ipi++)
-		ipi_lock[ipi] = SPIN_LOCK_UNLOCKED;
+		spin_lock_init(&ipi_lock[ipi]);
 }
 
 /*==========================================================================*

@@ -82,14 +82,14 @@ static int synchronous = 1;
 static int reset_delay = 100;
 static int ext_trans = 0;
 
-MODULE_PARM(irq_mask, "i");
-MODULE_PARM(irq_list, "1-4i");
-MODULE_PARM(host_id, "i");
-MODULE_PARM(reconnect, "i");
-MODULE_PARM(parity, "i");
-MODULE_PARM(synchronous, "i");
-MODULE_PARM(reset_delay, "i");
-MODULE_PARM(ext_trans, "i");
+module_param(irq_mask, int, 0);
+module_param_array(irq_list, int, NULL, 0);
+module_param(host_id, int, 0);
+module_param(reconnect, int, 0);
+module_param(parity, int, 0);
+module_param(synchronous, int, 0);
+module_param(reset_delay, int, 0);
+module_param(ext_trans, int, 0);
 
 MODULE_LICENSE("Dual MPL/GPL");
 

@@ -161,7 +161,7 @@ static const unsigned int txConfLoop   = 0x01; /* Loopback mode */
 
 #ifdef PCMCIA_DEBUG
 static int pc_debug = PCMCIA_DEBUG;
-MODULE_PARM(pc_debug, "i");
+module_param(pc_debug, int, 0);
 #define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args)
 static char *version =
 "netwave_cs.c 0.3.0 Thu Jul 17 14:36:02 1997 (John Markus Bjørndalen)\n";
@@ -195,11 +195,11 @@ static int mem_speed;
 static u_int irq_mask = 0xdeb8;
 static int irq_list[4] = { -1 };
 
-MODULE_PARM(domain, "i");
-MODULE_PARM(scramble_key, "i");
-MODULE_PARM(mem_speed, "i");
-MODULE_PARM(irq_mask, "i");
-MODULE_PARM(irq_list, "1-4i");
+module_param(domain, int, 0);
+module_param(scramble_key, int, 0);
+module_param(mem_speed, int, 0);
+module_param(irq_mask, int, 0);
+module_param_array(irq_list, int, NULL, 0);
 
 /*====================================================================*/
 

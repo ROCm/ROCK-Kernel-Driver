@@ -22,11 +22,12 @@
 MODULE_DESCRIPTION("ISDN4Linux: Driver for PCBIT-T card");
 MODULE_AUTHOR("Pedro Roque Marques");
 MODULE_LICENSE("GPL");
-MODULE_PARM(mem, "1-" __MODULE_STRING(MAX_PCBIT_CARDS) "i");
-MODULE_PARM(irq, "1-" __MODULE_STRING(MAX_PCBIT_CARDS) "i");
 
 static int mem[MAX_PCBIT_CARDS];
 static int irq[MAX_PCBIT_CARDS];
+
+module_param_array(mem, int, NULL, 0);
+module_param_array(irq, int, NULL, 0);
 
 static int num_boards;
 struct pcbit_dev * dev_pcbit[MAX_PCBIT_CARDS];

@@ -313,12 +313,12 @@ const struct bttv_tvnorm bttv_tvnorms[] = {
 		.sram           = -1,
 	}
 };
-const unsigned int BTTV_TVNORMS = ARRAY_SIZE(bttv_tvnorms);
+static const unsigned int BTTV_TVNORMS = ARRAY_SIZE(bttv_tvnorms);
 
 /* ----------------------------------------------------------------------- */
 /* bttv format list
    packed pixel formats must come first */
-const struct bttv_format bttv_formats[] = {
+static const struct bttv_format bttv_formats[] = {
 	{
 		.name     = "8 bpp, gray",
 		.palette  = VIDEO_PALETTE_GREY,
@@ -470,7 +470,7 @@ const struct bttv_format bttv_formats[] = {
 		.flags    = FORMAT_FLAGS_RAW,
 	}
 };
-const unsigned int BTTV_FORMATS = ARRAY_SIZE(bttv_formats);
+static const unsigned int BTTV_FORMATS = ARRAY_SIZE(bttv_formats);
 
 /* ----------------------------------------------------------------------- */
 
@@ -619,7 +619,7 @@ static const struct v4l2_queryctrl bttv_ctls[] = {
 	}
 
 };
-const int BTTV_CTLS = ARRAY_SIZE(bttv_ctls);
+static const int BTTV_CTLS = ARRAY_SIZE(bttv_ctls);
 
 /* ----------------------------------------------------------------------- */
 /* resource management                                                     */
@@ -755,7 +755,7 @@ static void set_pll(struct bttv *btv)
 }
 
 /* used to switch between the bt848's analog/digital video capture modes */
-void bt848A_set_timing(struct bttv *btv)
+static void bt848A_set_timing(struct bttv *btv)
 {
 	int i, len;
 	int table_idx = bttv_tvnorms[btv->tvnorm].sram;
@@ -3030,7 +3030,7 @@ static struct video_device bttv_video_template =
 	.minor    = -1,
 };
 
-struct video_device bttv_vbi_template =
+static struct video_device bttv_vbi_template =
 {
 	.name     = "bt848/878 vbi",
 	.type     = VID_TYPE_TUNER|VID_TYPE_TELETEXT,
@@ -3717,8 +3717,8 @@ static int __devinit bttv_probe(struct pci_dev *dev,
 	/* initialize structs / fill in defaults */
         init_MUTEX(&btv->lock);
         init_MUTEX(&btv->reslock);
-        btv->s_lock    = SPIN_LOCK_UNLOCKED;
-        btv->gpio_lock = SPIN_LOCK_UNLOCKED;
+        spin_lock_init(&btv->s_lock);
+        spin_lock_init(&btv->gpio_lock);
         init_waitqueue_head(&btv->gpioq);
         init_waitqueue_head(&btv->i2c_queue);
         INIT_LIST_HEAD(&btv->c.subs);

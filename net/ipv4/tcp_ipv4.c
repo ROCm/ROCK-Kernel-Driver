@@ -2220,7 +2220,10 @@ static void *established_get_first(struct seq_file *seq)
 		struct sock *sk;
 		struct hlist_node *node;
 		struct tcp_tw_bucket *tw;
-	       
+
+		/* We can reschedule _before_ having picked the target: */
+		cond_resched_softirq();
+
 		read_lock(&tcp_ehash[st->bucket].lock);
 		sk_for_each(sk, node, &tcp_ehash[st->bucket].chain) {
 			if (sk->sk_family != st->family) {
@@ -2267,6 +2270,10 @@ get_tw:
 		}
 		read_unlock(&tcp_ehash[st->bucket].lock);
 		st->state = TCP_SEQ_STATE_ESTABLISHED;
+
+		/* We can reschedule between buckets: */
+		cond_resched_softirq();
+
 		if (++st->bucket < tcp_ehash_size) {
 			read_lock(&tcp_ehash[st->bucket].lock);
 			sk = sk_head(&tcp_ehash[st->bucket].chain);

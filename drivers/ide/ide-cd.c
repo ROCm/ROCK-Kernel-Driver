@@ -559,62 +559,6 @@ static void cdrom_queue_request_sense(ide_drive_t *drive, void *sense,
 	(void) ide_do_drive_cmd(drive, rq, ide_preempt);
 }
 
-/*
- * ide_error() takes action based on the error returned by the drive.
- */
-static ide_startstop_t ide_cdrom_error (ide_drive_t *drive, const char *msg, byte stat)
-{
-	struct request *rq;
-	byte err;
-
-	err = ide_dump_atapi_status(drive, msg, stat);
-	if (drive == NULL || (rq = HWGROUP(drive)->rq) == NULL)
-		return ide_stopped;
-	/* retry only "normal" I/O: */
-	if (rq->flags & (REQ_DRIVE_CMD | REQ_DRIVE_TASK | REQ_DRIVE_TASKFILE)) {
-		rq->errors = 1;
-		ide_end_drive_cmd(drive, stat, err);
-		return ide_stopped;
-	}
-
-	if (stat & BUSY_STAT || ((stat & WRERR_STAT) && !drive->nowerr)) {
-		/* other bits are useless when BUSY */
-		rq->errors |= ERROR_RESET;
-	} else {
-		/* add decoding error stuff */
-	}
-	if (HWIF(drive)->INB(IDE_STATUS_REG) & (BUSY_STAT|DRQ_STAT))
-		/* force an abort */
-		HWIF(drive)->OUTB(WIN_IDLEIMMEDIATE,IDE_COMMAND_REG);
-	if (rq->errors >= ERROR_MAX) {
-		DRIVER(drive)->end_request(drive, 0, 0);
-	} else {
-		if ((rq->errors & ERROR_RESET) == ERROR_RESET) {
-			++rq->errors;
-			return ide_do_reset(drive);
-		}
-		++rq->errors;
-	}
-	return ide_stopped;
-}
-
-static ide_startstop_t ide_cdrom_abort (ide_drive_t *drive, const char *msg)
-{
-	struct request *rq;
-
-	if (drive == NULL || (rq = HWGROUP(drive)->rq) == NULL)
-		return ide_stopped;
-	/* retry only "normal" I/O: */
-	if (rq->flags & (REQ_DRIVE_CMD | REQ_DRIVE_TASK | REQ_DRIVE_TASKFILE)) {
-		rq->errors = 1;
-		ide_end_drive_cmd(drive, BUSY_STAT, 0);
-		return ide_stopped;
-	}
-	rq->errors |= ERROR_RESET;
-	DRIVER(drive)->end_request(drive, 0, 0);
-	return ide_stopped;
-}
-
 static void cdrom_end_request (ide_drive_t *drive, int uptodate)
 {
 	struct request *rq = HWGROUP(drive)->rq;
@@ -690,7 +634,7 @@ static int cdrom_decode_status(ide_drive_t *drive, int good_stat, int *stat_ret)
 
 		rq->flags |= REQ_FAILED;
 		cdrom_end_request(drive, 0);
-		DRIVER(drive)->error(drive, "request sense failure", stat);
+		ide_error(drive, "request sense failure", stat);
 		return 1;
 
 	} else if (rq->flags & (REQ_PC | REQ_BLOCK_PC)) {
@@ -801,7 +745,7 @@ static int cdrom_decode_status(ide_drive_t *drive, int good_stat, int *stat_ret)
 		} else if ((err & ~ABRT_ERR) != 0) {
 			/* Go to the default handler
 			   for other errors. */
-			DRIVER(drive)->error(drive, "cdrom_decode_status",stat);
+			ide_error(drive, "cdrom_decode_status", stat);
 			return 1;
 		} else if ((++rq->errors > ERROR_MAX)) {
 			/* We've racked up too many retries.  Abort. */
@@ -1070,7 +1014,7 @@ static ide_startstop_t cdrom_read_intr (ide_drive_t *drive)
 			ide_end_request(drive, 1, rq->nr_sectors);
 			return ide_stopped;
 		} else
-			return DRIVER(drive)->error(drive, "dma error", stat);
+			return ide_error(drive, "dma error", stat);
 	}
 
 	/* Read the interrupt reason and the transfer length. */
@@ -1673,7 +1617,7 @@ static ide_startstop_t cdrom_newpc_intr(ide_drive_t *drive)
 		if (dma_error) {
 			printk("ide-cd: dma error\n");
 			__ide_dma_off(drive);
-			return DRIVER(drive)->error(drive, "dma error", stat);
+			return ide_error(drive, "dma error", stat);
 		}
 
 		end_that_request_chunk(rq, 1, rq->data_len);
@@ -1811,7 +1755,7 @@ static ide_startstop_t cdrom_write_intr(ide_drive_t *drive)
 	 */
 	if (dma) {
 		if (dma_error)
-			return DRIVER(drive)->error(drive, "dma error", stat);
+			return ide_error(drive, "dma error", stat);
 
 		ide_end_request(drive, 1, rq->nr_sectors);
 		return ide_stopped;
@@ -2744,9 +2688,9 @@ int ide_cdrom_drive_status (struct cdrom_device_info *cdi, int slot_nr)
 	 */
 	if (sense.sense_key == NOT_READY) {
 		if (sense.asc == 0x3a) {
-			if (sense.ascq == 0 || sense.ascq == 1)
+			if (sense.ascq == 1)
 				return CDS_NO_DISC;
-			else if (sense.ascq == 2)
+			else if (sense.ascq == 0 || sense.ascq == 2)
 				return CDS_TRAY_OPEN;
 		}
 	}
@@ -3369,9 +3313,6 @@ static ide_driver_t ide_cdrom_driver = {
 	.supports_dsc_overlap	= 1,
 	.cleanup		= ide_cdrom_cleanup,
 	.do_request		= ide_do_rw_cdrom,
-	.sense			= ide_dump_atapi_status,
-	.error			= ide_cdrom_error,
-	.abort			= ide_cdrom_abort,
 	.capacity		= ide_cdrom_capacity,
 	.attach			= ide_cdrom_attach,
 	.drives			= LIST_HEAD_INIT(ide_cdrom_driver.drives),

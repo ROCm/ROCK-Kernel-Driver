@@ -177,7 +177,7 @@ const struct zoran_format zoran_formats[] = {
 			 ZORAN_FORMAT_COMPRESSED,
 	}
 };
-const int zoran_num_formats =
+static const int zoran_num_formats =
     (sizeof(zoran_formats) / sizeof(struct zoran_format));
 
 // RJ: Test only - want to test BUZ_USE_HIMEM even when CONFIG_BIGPHYS_AREA is defined
@@ -205,7 +205,7 @@ extern int jpg_bufsize;
 extern int pass_through;
 
 static int lock_norm = 0;	/* 1=Don't change TV standard (norm) */
-MODULE_PARM(lock_norm, "i");
+module_param(lock_norm, int, 0);
 MODULE_PARM_DESC(lock_norm, "Users can't change norm");
 
 #ifdef HAVE_V4L2

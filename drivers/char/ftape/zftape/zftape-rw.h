@@ -79,7 +79,6 @@ extern __u8 *zft_hseg_buf;
 extern int zft_deblock_segment;
 extern zft_status_enum zft_io_state;
 extern int zft_header_changed;
-extern int zft_bad_sector_map_changed;
 extern int zft_qic113; /* conform to old specs. and old zftape */
 extern int zft_use_compression;
 extern unsigned int zft_blk_sz;

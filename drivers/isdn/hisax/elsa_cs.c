@@ -69,7 +69,7 @@ MODULE_LICENSE("Dual MPL/GPL");
 
 #ifdef PCMCIA_DEBUG
 static int pc_debug = PCMCIA_DEBUG;
-MODULE_PARM(pc_debug, "i");
+module_param(pc_debug, int, 0);
 #define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args);
 static char *version =
 "elsa_cs.c $Revision: 1.2.2.4 $ $Date: 2004/01/25 15:07:06 $ (K.Lichtenwalder)";
@@ -88,11 +88,11 @@ static u_long irq_mask = 0xdeb8;
 /* Newer, simpler way of listing specific interrupts */
 static int irq_list[4] = { -1 };
 
-MODULE_PARM(irq_mask, "i");
-MODULE_PARM(irq_list, "1-4i");
+module_param(irq_mask, ulong, 0);
+module_param_array(irq_list, int, NULL, 0);
 
 static int protocol = 2;        /* EURO-ISDN Default */
-MODULE_PARM(protocol, "i");
+module_param(protocol, int, 0);
 
 /*====================================================================*/
 

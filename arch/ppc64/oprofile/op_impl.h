@@ -14,44 +14,6 @@
 
 #define OP_MAX_COUNTER 8
 
-#define MSR_PMM		(1UL << (63 - 61))
-
-/* freeze counters. set to 1 on a perfmon exception */
-#define MMCR0_FC	(1UL << (31 - 0))
-
-/* freeze in supervisor state */
-#define MMCR0_KERNEL_DISABLE (1UL << (31 - 1))
-
-/* freeze in problem state */
-#define MMCR0_PROBLEM_DISABLE (1UL << (31 - 2))
-
-/* freeze counters while MSR mark = 1 */
-#define MMCR0_FCM1	(1UL << (31 - 3))
-
-/* performance monitor exception enable */
-#define MMCR0_PMXE	(1UL << (31 - 5))
-
-/* freeze counters on enabled condition or event */
-#define MMCR0_FCECE	(1UL << (31 - 6))
-
-/* PMC1 count enable*/
-#define MMCR0_PMC1INTCONTROL	(1UL << (31 - 16))
-
-/* PMCn count enable*/
-#define MMCR0_PMCNINTCONTROL	(1UL << (31 - 17))
-
-/* performance monitor alert has occurred, set to 0 after handling exception */
-#define MMCR0_PMAO	(1UL << (31 - 24))
-
-/* state of MSR HV when SIAR set */
-#define MMCRA_SIHV	(1UL << (63 - 35))
-
-/* state of MSR PR when SIAR set */
-#define MMCRA_SIPR	(1UL << (63 - 36))
-
-/* enable sampling */
-#define MMCRA_SAMPLE_ENABLE	(1UL << (63 - 63))
-
 /* Per-counter configuration as set via oprofilefs.  */
 struct op_counter_config {
 	unsigned long valid;

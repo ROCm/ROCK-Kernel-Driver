@@ -157,7 +157,7 @@ static char preaction[16] = "pre_none";
 static unsigned char preop_val = WDOG_PREOP_NONE;
 
 static char preop[16] = "preop_none";
-static spinlock_t ipmi_read_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(ipmi_read_lock);
 static char data_to_read = 0;
 static DECLARE_WAIT_QUEUE_HEAD(read_q);
 static struct fasync_struct *fasync_q = NULL;
@@ -504,9 +504,9 @@ static void panic_halt_ipmi_heartbeat(void)
 
 static struct watchdog_info ident=
 {
-	0, /* WDIOF_SETTIMEOUT, */
-	1,
-	"IPMI"
+	.options	= 0,	/* WDIOF_SETTIMEOUT, */
+	.firmware_version = 1,
+	.identity	= "IPMI"
 };
 
 static int ipmi_ioctl(struct inode *inode, struct file *file,
@@ -734,9 +734,9 @@ static struct file_operations ipmi_wdog_fops = {
 };
 
 static struct miscdevice ipmi_wdog_miscdev = {
-	WATCHDOG_MINOR,
-	"watchdog",
-	&ipmi_wdog_fops
+	.minor		= WATCHDOG_MINOR,
+	.name		= "watchdog",
+	.fops		= &ipmi_wdog_fops
 };
 
 static DECLARE_RWSEM(register_sem);
@@ -871,9 +871,9 @@ static int wdog_reboot_handler(struct notifier_block *this,
 }
 
 static struct notifier_block wdog_reboot_notifier = {
-	wdog_reboot_handler,
-	NULL,
-	0
+	.notifier_call	= wdog_reboot_handler,
+	.next		= NULL,
+	.priority	= 0
 };
 
 static int wdog_panic_handler(struct notifier_block *this,
@@ -899,9 +899,9 @@ static int wdog_panic_handler(struct notifier_block *this,
 }
 
 static struct notifier_block wdog_panic_notifier = {
-	wdog_panic_handler,
-	NULL,
-	150   /* priority: INT_MAX >= x >= 0 */
+	.notifier_call	= wdog_panic_handler,
+	.next		= NULL,
+	.priority	= 150	/* priority: INT_MAX >= x >= 0 */
 };
 
 

@@ -69,18 +69,16 @@ union tce_entry {
 
 struct iommu_table {
 	unsigned long  it_busno;     /* Bus number this table belongs to */
-	unsigned long  it_size;      /* Size in pages of iommu table */
+	unsigned long  it_size;      /* Size of iommu table in entries */
 	unsigned long  it_offset;    /* Offset into global table */
 	unsigned long  it_base;      /* mapped address of tce table */
 	unsigned long  it_index;     /* which iommu table this is */
 	unsigned long  it_type;      /* type: PCI or Virtual Bus */
-	unsigned long  it_entrysize; /* Size of an entry in bytes */
 	unsigned long  it_blocksize; /* Entries in each block (cacheline) */
 	unsigned long  it_hint;      /* Hint for next alloc */
 	unsigned long  it_largehint; /* Hint for large allocs */
 	unsigned long  it_halfpoint; /* Breaking point for small/large allocs */
 	spinlock_t     it_lock;      /* Protects it_map */
-	unsigned long  it_mapsize;   /* Size of map in # of entries (bits) */
 	unsigned long *it_map;       /* A simple allocation bitmap for now */
 };
 
@@ -156,14 +154,13 @@ extern dma_addr_t iommu_map_single(struct iommu_table *tbl, void *vaddr,
 extern void iommu_unmap_single(struct iommu_table *tbl, dma_addr_t dma_handle,
 		size_t size, enum dma_data_direction direction);
 
-extern void tce_init_pSeries(void);
-extern void tce_init_iSeries(void);
+extern void iommu_init_early_pSeries(void);
+extern void iommu_init_early_iSeries(void);
+extern void iommu_init_early_u3(void);
 
 extern void pci_iommu_init(void);
-extern void pci_dma_init_direct(void);
+extern void pci_direct_iommu_init(void);
 
 extern void alloc_u3_dart_table(void);
-
-extern int ppc64_iommu_off;
 
 #endif /* _ASM_IOMMU_H */

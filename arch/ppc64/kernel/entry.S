@@ -54,8 +54,8 @@ exception_marker:
 
 #undef SHOW_SYSCALLS
 
-	.globl SystemCall_common
-SystemCall_common:
+	.globl system_call_common
+system_call_common:
 	andi.	r10,r12,MSR_PR
 	mr	r10,r1
 	addi	r1,r1,-INT_FRAME_SIZE
@@ -100,7 +100,7 @@ SystemCall_common:
 	cmpdi	cr1,r0,0x5555		/* syscall 0x5555 */
 	andi.	r10,r12,MSR_PR		/* from kernel */
 	crand	4*cr0+eq,4*cr1+eq,4*cr0+eq
-	beq	HardwareInterrupt_entry
+	beq	hardware_interrupt_entry
 	lbz	r10,PACAPROCENABLED(r13)
 	std	r10,SOFTE(r1)
 #endif

@@ -87,7 +87,7 @@ static unsigned long iommu_range_alloc(struct iommu_table *tbl,
 		start = largealloc ? tbl->it_largehint : tbl->it_hint;
 
 	/* Use only half of the table for small allocs (15 pages or less) */
-	limit = largealloc ? tbl->it_mapsize : tbl->it_halfpoint;
+	limit = largealloc ? tbl->it_size : tbl->it_halfpoint;
 
 	if (largealloc && start < tbl->it_halfpoint)
 		start = tbl->it_halfpoint;
@@ -114,7 +114,7 @@ static unsigned long iommu_range_alloc(struct iommu_table *tbl,
 			 * Second failure, rescan the other half of the table.
 			 */
 			start = (largealloc ^ pass) ? tbl->it_halfpoint : 0;
-			limit = pass ? tbl->it_mapsize : limit;
+			limit = pass ? tbl->it_size : limit;
 			pass++;
 			goto again;
 		} else {
@@ -194,7 +194,7 @@ static void __iommu_free(struct iommu_table *tbl, dma_addr_t dma_addr,
 	entry = dma_addr >> PAGE_SHIFT;
 	free_entry = entry - tbl->it_offset;
 
-	if (((free_entry + npages) > tbl->it_mapsize) ||
+	if (((free_entry + npages) > tbl->it_size) ||
 	    (entry < tbl->it_offset)) {
 		if (printk_ratelimit()) {
 			printk(KERN_INFO "iommu_free: invalid entry\n");
@@ -202,7 +202,7 @@ static void __iommu_free(struct iommu_table *tbl, dma_addr_t dma_addr,
 			printk(KERN_INFO "\tdma_addr  = 0x%lx\n", (u64)dma_addr);
 			printk(KERN_INFO "\tTable     = 0x%lx\n", (u64)tbl);
 			printk(KERN_INFO "\tbus#      = 0x%lx\n", (u64)tbl->it_busno);
-			printk(KERN_INFO "\tmapsize   = 0x%lx\n", (u64)tbl->it_mapsize);
+			printk(KERN_INFO "\tsize      = 0x%lx\n", (u64)tbl->it_size);
 			printk(KERN_INFO "\tstartOff  = 0x%lx\n", (u64)tbl->it_offset);
 			printk(KERN_INFO "\tindex     = 0x%lx\n", (u64)tbl->it_index);
 			WARN_ON(1);
@@ -407,14 +407,11 @@ struct iommu_table *iommu_init_table(struct iommu_table *tbl)
 	unsigned long sz;
 	static int welcomed = 0;
 
-	/* it_size is in pages, it_mapsize in number of entries */
-	tbl->it_mapsize = (tbl->it_size << PAGE_SHIFT) / tbl->it_entrysize;
-
 	/* Set aside 1/4 of the table for large allocations. */
-	tbl->it_halfpoint = tbl->it_mapsize * 3 / 4;
+	tbl->it_halfpoint = tbl->it_size * 3 / 4;
 
 	/* number of bytes needed for the bitmap */
-	sz = (tbl->it_mapsize + 7) >> 3;
+	sz = (tbl->it_size + 7) >> 3;
 
 	tbl->it_map = (unsigned long *)__get_free_pages(GFP_ATOMIC, get_order(sz));
 	if (!tbl->it_map)
@@ -448,8 +445,8 @@ void iommu_free_table(struct device_node *dn)
 	}
 
 	/* verify that table contains no entries */
-	/* it_mapsize is in entries, and we're examining 64 at a time */
-	for (i = 0; i < (tbl->it_mapsize/64); i++) {
+	/* it_size is in entries, and we're examining 64 at a time */
+	for (i = 0; i < (tbl->it_size/64); i++) {
 		if (tbl->it_map[i] != 0) {
 			printk(KERN_WARNING "%s: Unexpected TCEs for %s\n",
 				__FUNCTION__, dn->full_name);
@@ -458,7 +455,7 @@ void iommu_free_table(struct device_node *dn)
 	}
 
 	/* calculate bitmap size in bytes */
-	bitmap_sz = (tbl->it_mapsize + 7) / 8;
+	bitmap_sz = (tbl->it_size + 7) / 8;
 
 	/* free bitmap */
 	order = get_order(bitmap_sz);

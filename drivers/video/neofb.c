@@ -152,11 +152,6 @@ static biosMode bios32[] = {
 };
 #endif
 
-static inline u32 read_le32(int regindex, const struct neofb_par *par)
-{
-	return readl(par->neo2200 + par->cursorOff + regindex);
-}
-
 static inline void write_le32(int regindex, u32 val, const struct neofb_par *par)
 {
 	writel(val, par->neo2200 + par->cursorOff + regindex);

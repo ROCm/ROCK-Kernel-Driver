@@ -9,6 +9,8 @@
 #include <linux/pagemap.h>
 #include <linux/smp_lock.h>
 
+static int reiserfs_unpack (struct inode * inode, struct file * filp);
+
 /*
 ** reiserfs_ioctl - handler for ioctl for inode
 ** supported commands:
@@ -87,7 +89,7 @@ int reiserfs_ioctl (struct inode * inode, struct file * filp, unsigned int cmd,
 ** Function try to convert tail from direct item into indirect.
 ** It set up nopack attribute in the REISERFS_I(inode)->nopack
 */
-int reiserfs_unpack (struct inode * inode, struct file * filp)
+static int reiserfs_unpack (struct inode * inode, struct file * filp)
 {
     int retval = 0;
     int index ;

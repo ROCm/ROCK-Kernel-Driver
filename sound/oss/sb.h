@@ -176,11 +176,8 @@ int sb_common_mixer_set(sb_devc * devc, int dev, int left, int right);
 int sb_audio_open(int dev, int mode);
 void sb_audio_close(int dev);
 
-extern sb_devc *last_sb;
-
 /*	From sb_common.c */
 void sb_dsp_disable_midi(int port);
-void sb_dsp_disable_recording(int port);
 int probe_sbmpu (struct address_info *hw_config, struct module *owner);
 void unload_sbmpu (struct address_info *hw_config);
 

@@ -942,6 +942,15 @@ static void __release_sock(struct sock *sk)
 
 			skb->next = NULL;
 			sk->sk_backlog_rcv(sk, skb);
+
+			/*
+			 * We are in process context here with softirqs
+			 * disabled, use cond_resched_softirq() to preempt.
+			 * This is safe to do because we've taken the backlog
+			 * queue private:
+			 */
+			cond_resched_softirq();
+
 			skb = next;
 		} while (skb != NULL);
 

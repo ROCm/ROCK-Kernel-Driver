@@ -82,9 +82,9 @@ static unsigned int maxpoll=250;   /* Maximum busy-loop count for qcam I/O */
 static unsigned int yieldlines=4;  /* Yield after this many during capture */
 static int video_nr = -1;
 
-MODULE_PARM(maxpoll,"i");
-MODULE_PARM(yieldlines,"i");   
-MODULE_PARM(video_nr,"i");
+module_param(maxpoll, int, 0);
+module_param(yieldlines, int, 0);
+module_param(video_nr, int, 0);
 
 static inline int read_lpstatus(struct qcam_device *q)
 {
@@ -441,7 +441,7 @@ static int qc_setscanmode(struct qcam_device *q)
 /* Reset the QuickCam and program for brightness, contrast,
  * white-balance, and resolution. */
 
-void qc_set(struct qcam_device *q)
+static void qc_set(struct qcam_device *q)
 {
 	int val;
 	int val2;
@@ -591,7 +591,7 @@ static inline int qc_readbytes(struct qcam_device *q, char buffer[])
  * n=2^(bit depth)-1.  Ask me for more details if you don't understand
  * this. */
 
-long qc_capture(struct qcam_device * q, char __user *buf, unsigned long len)
+static long qc_capture(struct qcam_device * q, char __user *buf, unsigned long len)
 {
 	int i, j, k, yield;
 	int bytes;
@@ -891,7 +891,7 @@ static struct video_device qcam_template=
 static struct qcam_device *qcams[MAX_CAMS];
 static unsigned int num_cams = 0;
 
-int init_bwqcam(struct parport *port)
+static int init_bwqcam(struct parport *port)
 {
 	struct qcam_device *qcam;
 
@@ -934,7 +934,7 @@ int init_bwqcam(struct parport *port)
 	return 0;
 }
 
-void close_bwqcam(struct qcam_device *qcam)
+static void close_bwqcam(struct qcam_device *qcam)
 {
 	video_unregister_device(&qcam->vdev);
 	parport_unregister_device(qcam->pdev);
@@ -946,7 +946,7 @@ void close_bwqcam(struct qcam_device *qcam)
  *       -- March 14, 1999  Billy Donahue <billy@escape.com> */
 #ifdef MODULE
 static char *parport[MAX_CAMS] = { NULL, };
-MODULE_PARM(parport, "1-" __MODULE_STRING(MAX_CAMS) "s");
+module_param_array(parport, charp, NULL, 0);
 #endif
 
 static int accept_bwqcam(struct parport *port)

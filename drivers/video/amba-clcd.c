@@ -16,6 +16,7 @@
 #include <linux/string.h>
 #include <linux/slab.h>
 #include <linux/delay.h>
+#include <linux/mm.h>
 #include <linux/fb.h>
 #include <linux/init.h>
 #include <linux/ioport.h>
@@ -300,6 +301,22 @@ static int clcdfb_blank(int blank_mode, struct fb_info *info)
 	return 0;
 }
 
+static int clcdfb_mmap(struct fb_info *info, struct file *file,
+		       struct vm_area_struct *vma)
+{
+	struct clcd_fb *fb = to_clcd(info);
+	unsigned long len, off = vma->vm_pgoff << PAGE_SHIFT;
+	int ret = -EINVAL;
+
+	len = info->fix.smem_len;
+
+	if (off <= len && vma->vm_end - vma->vm_start <= len - off &&
+	    fb->board->mmap)
+		ret = fb->board->mmap(fb, vma);
+
+	return ret;
+}
+
 static struct fb_ops clcdfb_ops = {
 	.owner		= THIS_MODULE,
 	.fb_check_var	= clcdfb_check_var,
@@ -310,6 +327,7 @@ static struct fb_ops clcdfb_ops = {
 	.fb_copyarea	= cfb_copyarea,
 	.fb_imageblit	= cfb_imageblit,
 	.fb_cursor	= soft_cursor,
+	.fb_mmap	= clcdfb_mmap,
 };
 
 static int clcdfb_register(struct clcd_fb *fb)

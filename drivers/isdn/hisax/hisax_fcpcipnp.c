@@ -45,8 +45,8 @@
 #ifdef CONFIG_HISAX_DEBUG
 static int debug = 0;
 /* static int hdlcfifosize = 32; */
-MODULE_PARM(debug, "i");
-/* MODULE_PARM(hdlcfifosize, "i"); */
+module_param(debug, int, 0);
+/* module_param(hdlcfifosize, int, 0); */
 #endif
 
 MODULE_AUTHOR("Kai Germaschewski <kai.germaschewski@gmx.de>/Karsten Keil <kkeil@suse.de>");
@@ -81,7 +81,7 @@ MODULE_DEVICE_TABLE(isapnp, fcpnp_ids);
 #endif
 
 static int protocol = 2;       /* EURO-ISDN Default */
-MODULE_PARM(protocol, "i");
+module_param(protocol, int, 0);
 MODULE_LICENSE("GPL");
 
 // ----------------------------------------------------------------------

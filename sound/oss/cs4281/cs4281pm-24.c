@@ -30,8 +30,8 @@
 #define cs_pm_register(a, b, c) pm_register((a), (b), (c));
 #define cs_pm_unregister_all(a) pm_unregister_all((a));
 
-int cs4281_suspend(struct cs4281_state *s);
-int cs4281_resume(struct cs4281_state *s);
+static int cs4281_suspend(struct cs4281_state *s);
+static int cs4281_resume(struct cs4281_state *s);
 /* 
 * for now (12/22/00) only enable the pm_register PM support.
 * allow these table entries to be null.
@@ -41,7 +41,7 @@ int cs4281_resume(struct cs4281_state *s);
 #define CS4281_SUSPEND_TBL cs4281_suspend_null
 #define CS4281_RESUME_TBL cs4281_resume_null
 
-int cs4281_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
+static int cs4281_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
 {
 	struct cs4281_state *state;
 

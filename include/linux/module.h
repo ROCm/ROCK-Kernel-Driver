@@ -206,10 +206,6 @@ void *__symbol_get_gpl(const char *symbol);
 
 #endif
 
-/* We don't mangle the actual symbol anymore, so no need for
- * special casing EXPORT_SYMBOL_NOVERS.  FIXME: Deprecated */
-#define EXPORT_SYMBOL_NOVERS(sym) EXPORT_SYMBOL(sym)
-
 struct module_ref
 {
 	local_t count;
@@ -449,7 +445,6 @@ void module_remove_driver(struct device_driver *);
 #else /* !CONFIG_MODULES... */
 #define EXPORT_SYMBOL(sym)
 #define EXPORT_SYMBOL_GPL(sym)
-#define EXPORT_SYMBOL_NOVERS(sym)
 
 /* Given an address, look for it in the exception tables. */
 static inline const struct exception_table_entry *

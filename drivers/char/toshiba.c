@@ -81,7 +81,7 @@ static int tosh_fan = 0;
 
 static int tosh_fn = 0;
 
-MODULE_PARM(tosh_fn, "i");
+module_param(tosh_fn, int, 0);
 
 
 static int tosh_ioctl(struct inode *, struct file *, unsigned int,

@@ -203,6 +203,27 @@ pipe_writev(struct file *filp, const struct iovec *_iov,
 	ret = 0;
 	down(PIPE_SEM(*inode));
 	info = inode->i_pipe;
+
+	/* We try to merge small writes */
+	if (info->nrbufs && total_len < PAGE_SIZE) {
+		int lastbuf = (info->curbuf + info->nrbufs - 1) & (PIPE_BUFFERS-1);
+		struct pipe_buffer *buf = info->bufs + lastbuf;
+		int offset = buf->offset + buf->len;
+		if (offset + total_len <= PAGE_SIZE) {
+			struct page *page = buf->page;
+			int error = pipe_iov_copy_from_user(offset + kmap(page), iov, total_len);
+			kunmap(page);
+			ret = error;
+			do_wakeup = 1;
+			if (error)
+				goto out;
+			buf->len += total_len;
+			ret = total_len;
+			goto out;
+		}
+			
+	}
+
 	for (;;) {
 		int bufs;
 		if (!PIPE_READERS(*inode)) {
@@ -270,6 +291,7 @@ pipe_writev(struct file *filp, const struct iovec *_iov,
 		pipe_wait(inode);
 		PIPE_WAITING_WRITERS(*inode)--;
 	}
+out:
 	up(PIPE_SEM(*inode));
 	if (do_wakeup) {
 		wake_up_interruptible(PIPE_WAIT(*inode));

@@ -972,6 +972,11 @@ P:	Oliver Neukum
 M:	oliver@neukum.name
 S:	Maintained
 
+HUGETLB FILESYSTEM
+P:	William Irwin
+M:	wli@holomorphy.com
+S:	Maintained
+
 I2C AND SENSORS DRIVERS
 P:	Greg Kroah-Hartman
 M:	greg@kroah.com
@@ -1871,9 +1876,7 @@ L:	linux-hams@vger.kernel.org
 S:	Maintained
 
 RISCOM8 DRIVER
-P:	Dmitry Gorodchanin
-L:	linux-kernel@vger.kernel.org
-S:	Maintained
+S:	Orphan
 
 RTLINUX  REALTIME  LINUX
 P:	Victor Yodaiken
@@ -2082,7 +2085,6 @@ S:	Maintained
 SPECIALIX IO8+ MULTIPORT SERIAL CARD DRIVER
 P:	Roger Wolff
 M:	R.E.Wolff@BitWizard.nl
-M:	io8-linux@specialix.co.uk
 L:	linux-kernel@vger.kernel.org ?
 S:	Supported
 

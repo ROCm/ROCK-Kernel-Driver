@@ -108,18 +108,22 @@ void cpu_node_probe(void)
 	for (i = 0; i < MAXCPUS; i++)
 		cpuid_to_compact_node[i] = INVALID_CNODEID;
 
-	numnodes = 0;
+	/*
+	 * MCD - this whole "compact node" stuff can probably be dropped,
+	 * as we can handle sparse numbering now
+	 */
+	nodes_clear(node_online_map);
 	for (i = 0; i < MAX_COMPACT_NODES; i++) {
 		nasid_t nasid = gdap->g_nasidtable[i];
 		if (nasid == INVALID_NASID)
 			break;
 		compact_to_nasid_node[i] = nasid;
 		nasid_to_compact_node[nasid] = i;
-		numnodes++;
+		node_set_online(num_online_nodes());
 		highest = do_cpumask(i, nasid, highest);
 	}
 
-	printk("Discovered %d cpus on %d nodes\n", highest + 1, numnodes);
+	printk("Discovered %d cpus on %d nodes\n", highest + 1, num_online_nodes());
 }
 
 static void intr_clear_bits(nasid_t nasid, volatile hubreg_t *pend,
@@ -151,10 +155,10 @@ void __init prom_prepare_cpus(unsigned int max_cpus)
 {
 	cnodeid_t	cnode;
 
-	for (cnode = 0; cnode < numnodes; cnode++)
+	for_each_online_node(cnode)
 		intr_clear_all(COMPACT_TO_NASID_NODEID(cnode));
 
-	replicate_kernel_text(numnodes);
+	replicate_kernel_text();
 
 	/*
 	 * Assumption to be fixed: we're always booted on logical / physical

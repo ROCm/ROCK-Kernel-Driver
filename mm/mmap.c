@@ -308,8 +308,10 @@ static void vma_link(struct mm_struct *mm, struct vm_area_struct *vma,
 	if (vma->vm_file)
 		mapping = vma->vm_file->f_mapping;
 
-	if (mapping)
+	if (mapping) {
 		spin_lock(&mapping->i_mmap_lock);
+		vma->vm_truncate_count = mapping->truncate_count;
+	}
 	anon_vma_lock(vma);
 
 	__vma_link(mm, vma, prev, rb_link, rb_parent);
@@ -380,6 +382,7 @@ void vma_adjust(struct vm_area_struct *vma, unsigned long start,
 again:			remove_next = 1 + (end > next->vm_end);
 			end = next->vm_end;
 			anon_vma = next->anon_vma;
+			importer = vma;
 		} else if (end > next->vm_start) {
 			/*
 			 * vma expands, overlapping part of the next:
@@ -405,7 +408,16 @@ again:			remove_next = 1 + (end > next->vm_end);
 		if (!(vma->vm_flags & VM_NONLINEAR))
 			root = &mapping->i_mmap;
 		spin_lock(&mapping->i_mmap_lock);
+		if (importer &&
+		    vma->vm_truncate_count != next->vm_truncate_count) {
+			/*
+			 * unmap_mapping_range might be in progress:
+			 * ensure that the expanding vma is rescanned.
+			 */
+			importer->vm_truncate_count = 0;
+		}
 		if (insert) {
+			insert->vm_truncate_count = vma->vm_truncate_count;
 			/*
 			 * Put into prio_tree now, so instantiated pages
 			 * are visible to arm/parisc __flush_dcache_page
@@ -1483,6 +1495,9 @@ static void free_pgtables(struct mmu_gather *tlb, struct vm_area_struct *prev,
 	unsigned long first = start & PGDIR_MASK;
 	unsigned long last = end + PGDIR_SIZE - 1;
 	struct mm_struct *mm = tlb->mm;
+
+	if (last > TASK_SIZE || last < end)
+		last = TASK_SIZE;
 
 	if (!prev) {
 		prev = mm->mmap;
