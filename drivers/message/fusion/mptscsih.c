@@ -199,8 +199,8 @@ static void	mptscsih_fillbuf(char *buffer, int size, int index, int width);
 static int	mptscsih_setup(char *str);
 
 /* module entry point */
-static int  __init    mptscsih_init  (void);
-static void __exit    mptscsih_exit  (void);
+static int  __init   mptscsih_init  (void);
+static void __exit   mptscsih_exit  (void);
 
 static int  mptscsih_probe (struct pci_dev *, const struct pci_device_id *);
 static void mptscsih_remove(struct pci_dev *);
@@ -1067,10 +1067,14 @@ mptscsih_reset_timeouts (MPT_SCSI_HOST *hd)
 	Scsi_Cmnd	*SCpnt;
 	int		 ii;
 	int		 max = hd->ioc->req_depth;
+		
 
 	for (ii= 0; ii < max; ii++) {
 		if ((SCpnt = hd->ScsiLookup[ii]) != NULL) {
-			mod_timer(&SCpnt->eh_timeout, jiffies + (HZ * 60));
+	/* calling mod_timer() panics in 2.6 kernel...
+	 * need to investigate
+	 */
+//			mod_timer(&SCpnt->eh_timeout, jiffies + (HZ * 60));
 			dtmprintk((MYIOC_s_WARN_FMT "resetting SCpnt=%p timeout + 60HZ",
 				(hd && hd->ioc) ? hd->ioc->name : "ioc?", SCpnt));
 		}
@@ -1978,8 +1982,8 @@ mptscsih_init(void)
  *	mptscsih_exit - Unregisters MPT adapter(s)
  *
  */
-static void
-__exit mptscsih_exit(void)
+static void __exit
+mptscsih_exit(void)
 {
 	MPT_ADAPTER	*ioc;
 
@@ -3339,6 +3343,7 @@ mptscsih_slave_destroy(Scsi_Device *device)
 	struct Scsi_Host	*host = device->host;
 	MPT_SCSI_HOST		*hd;
 	VirtDevice		*vdev;
+	int 			raid_volume=0;
 
 	hd = (MPT_SCSI_HOST *)host->hostdata;
 
@@ -3361,25 +3366,33 @@ mptscsih_slave_destroy(Scsi_Device *device)
 			kfree(hd->Targets[device->id]);
 			hd->Targets[device->id] = NULL;
 
-			if (hd->is_spi) {
+			if (!hd->is_spi) 
+				return;
+
+			if((hd->ioc->spi_data.isRaid) && (hd->ioc->spi_data.pIocPg3)) {
+			int i;
+				for(i=0;i<hd->ioc->spi_data.pIocPg3->NumPhysDisks &&
+					raid_volume==0;i++)
+						
+					if(device->id == 
+					  hd->ioc->spi_data.pIocPg3->PhysDisk[i].PhysDiskNum) {
+						raid_volume=1;
+						hd->ioc->spi_data.forceDv |=
+						  MPT_SCSICFG_RELOAD_IOC_PG3;
+					}
+			}
+
+			if(!raid_volume){
 				hd->ioc->spi_data.dvStatus[device->id] =
 				MPT_SCSICFG_NEGOTIATE;
 
 				if (hd->negoNvram == 0)
 					hd->ioc->spi_data.dvStatus[device->id]
 					|= MPT_SCSICFG_DV_NOT_DONE;
-
-				/* Don't alter isRaid, not allowed to move
-				 * volumes on a running system.
-				 */
-				if (hd->ioc->spi_data.isRaid & (1 <<
-					(device->id)))
-					hd->ioc->spi_data.forceDv |=
-					MPT_SCSICFG_RELOAD_IOC_PG3;
 			}
 		}
 	}
-
+	
 	return;
 }
 
@@ -3693,12 +3706,8 @@ mptscsih_ioc_reset(MPT_ADAPTER *ioc, int reset_phase)
 		 */
 		hd->resetPending = 1;
 
-#if 0		
-		/* calling mod_timer() panics in 2.6 kernel...
-		 * need to investigate
-		 */
 		mptscsih_reset_timeouts (hd);
-#endif
+	
 	} else if (reset_phase == MPT_IOC_PRE_RESET) {
 		dtmprintk((MYIOC_s_WARN_FMT "Pre-Diag Reset\n", ioc->name));
 
