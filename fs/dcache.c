@@ -1558,14 +1558,11 @@ static void __init dcache_init(unsigned long mempages)
 	 * A constructor could be added for stable state like the lists,
 	 * but it is probably not worth it because of the cache nature
 	 * of the dcache. 
-	 * If fragmentation is too bad then the SLAB_HWCACHE_ALIGN
-	 * flag could be removed here, to hint to the allocator that
-	 * it should not try to get multiple page regions.  
 	 */
 	dentry_cache = kmem_cache_create("dentry_cache",
 					 sizeof(struct dentry),
 					 0,
-					 SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT,
+					 SLAB_RECLAIM_ACCOUNT,
 					 NULL, NULL);
 	if (!dentry_cache)
 		panic("Cannot create dentry cache");

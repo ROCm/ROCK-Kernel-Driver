@@ -74,14 +74,14 @@ full_name_hash(const unsigned char *name, unsigned int len)
 	return end_name_hash(hash);
 }
 
-#define DNAME_INLINE_LEN_MIN 16
+#define DNAME_INLINE_LEN_MIN 24
 
 struct dcookie_struct;
  
 struct dentry {
 	atomic_t d_count;
-	unsigned long d_vfs_flags;	/* moved here to be on same cacheline */
 	spinlock_t d_lock;		/* per dentry lock */
+	unsigned long d_vfs_flags;	/* moved here to be on same cacheline */
 	struct inode  * d_inode;	/* Where the name belongs to - NULL is negative */
 	struct list_head d_lru;		/* LRU list */
 	struct list_head d_child;	/* child of parent list */
@@ -102,7 +102,7 @@ struct dentry {
 	struct hlist_node d_hash;	/* lookup hash list */	
 	struct hlist_head * d_bucket;	/* lookup hash bucket */
 	unsigned char d_iname[DNAME_INLINE_LEN_MIN]; /* small names */
-} ____cacheline_aligned;
+};
 
 #define DNAME_INLINE_LEN	(sizeof(struct dentry)-offsetof(struct dentry,d_iname))
  
