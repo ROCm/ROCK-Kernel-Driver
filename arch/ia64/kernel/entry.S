@@ -100,12 +100,18 @@ GLOBAL_ENTRY(sys_clone2)
 	mov out1=in1
 	mov out3=in2
 	adds out2=IA64_SWITCH_STACK_SIZE+16,sp	// out2 = &regs
-	mov out0=in0				// out0 = clone_flags
-	br.call.sptk.many rp=do_fork_WITHOUT_CLONE_IDLETASK // FIXME: mask out CLONE_IDLETASK from flags, and now returns task_struct *.
+	dep out0=0,in0,CLONE_IDLETASK_BIT,1	// out0 = clone_flags & ~CLONE_IDLETASK
+	br.call.sptk.many rp=do_fork
 .ret1:	.restore sp
 	adds sp=IA64_SWITCH_STACK_SIZE,sp	// pop the switch stack
+	mov r2=-1000
+	adds r3=IA64_TASK_PID_OFFSET,r8
+	;;
+	cmp.leu p6,p0=r8,r2
 	mov ar.pfs=loc1
 	mov rp=loc0
+	;;
+(p6)	ld4 r8=[r3]
 	br.ret.sptk.many rp
 END(sys_clone2)
 
@@ -119,12 +125,18 @@ GLOBAL_ENTRY(sys_clone)
 	mov out1=in1
 	mov out3=16				// stacksize (compensates for 16-byte scratch area)
 	adds out2=IA64_SWITCH_STACK_SIZE+16,sp	// out2 = &regs
-	mov out0=in0				// out0 = clone_flags
-	br.call.sptk.many rp=do_fork_WITHOUT_CLONE_IDLETASK // FIXME: mask out CLONE_IDLETASK from flags, and now return task_struct *.
+	dep out0=0,in0,CLONE_IDLETASK_BIT,1	// out0 = clone_flags & ~CLONE_IDLETASK
+	br.call.sptk.many rp=do_fork
 .ret2:	.restore sp
 	adds sp=IA64_SWITCH_STACK_SIZE,sp	// pop the switch stack
+	mov r2=-1000
+	adds r3=IA64_TASK_PID_OFFSET,r8
+	;;
+	cmp.leu p6,p0=r8,r2
 	mov ar.pfs=loc1
 	mov rp=loc0
+	;;
+(p6)	ld4 r8=[r3]
 	br.ret.sptk.many rp
 END(sys_clone)
 

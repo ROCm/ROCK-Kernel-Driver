@@ -7,7 +7,7 @@
 
 HOSTCFLAGS += -I$(TOPDIR)/arch/$(ARCH)/boot/include
 
-all: dummy
+all: FORCE
 
 # Simple programs with 1 file and no extra CFLAGS
 UTILS = addnote hack-coff mkprep mknote mkbugboot mktree \

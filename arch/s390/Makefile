@@ -44,15 +44,6 @@ all: image listing
 listing: vmlinux
 	@$(MAKEBOOT) listing
 
-arch/s390/kernel: dummy
-	$(MAKE) linuxsubdirs SUBDIRS=arch/s390/kernel
-
-arch/s390/mm: dummy
-	$(MAKE) linuxsubdirs SUBDIRS=arch/s390/mm
-
-drivers/s390: dummy
-	$(MAKE) linuxsubdirs SUBDIRS=drivers/s390
-
 MAKEBOOT = $(MAKE) -C arch/$(ARCH)/boot
 
 image: vmlinux 

@@ -239,5 +239,5 @@ FILES_BOOT_CHANGED := $(strip \
 	maui_boot.h pss_boot.h trix_boot.h))
 
 ifneq ($(FILES_BOOT_CHANGED),)
-$(FILES_BOOT_CHANGED): dummy
+$(FILES_BOOT_CHANGED): FORCE
 endif

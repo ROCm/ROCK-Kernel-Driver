@@ -395,7 +395,7 @@ show_cpuinfo (struct seq_file *m, void *v)
 
 	switch (c->family) {
 	      case 0x07:	memcpy(family, "Itanium", 8); break;
-	      case 0x1f:	memcpy(family, "Itanium 2", 9); break;
+	      case 0x1f:	memcpy(family, "Itanium 2", 10); break;
 	      default:		sprintf(family, "%u", c->family); break;
 	}
 
@@ -559,6 +559,20 @@ cpu_init (void)
 	 */
 	identify_cpu(my_cpu_info);
 
+#ifdef CONFIG_MCKINLEY
+	{
+#define FEATURE_SET 16
+		struct ia64_pal_retval iprv;
+
+		if (my_cpu_info->family == 0x1f) {
+			PAL_CALL_PHYS(iprv, PAL_PROC_GET_FEATURES, 0, FEATURE_SET, 0);
+			if ((iprv.status == 0) && (iprv.v0 & 0x80) && (iprv.v2 & 0x80))
+				PAL_CALL_PHYS(iprv, PAL_PROC_SET_FEATURES,
+				              (iprv.v1 | 0x80), FEATURE_SET, 0);
+		}
+	}
+#endif
+
 	/* Clear the stack memory reserved for pt_regs: */
 	memset(ia64_task_regs(current), 0, sizeof(struct pt_regs));
 
@@ -570,7 +584,7 @@ cpu_init (void)
 	 * shouldn't be affected by this (moral: keep your ia32 locks aligned and you'll
 	 * be fine).
 	 */
-	ia64_set_dcr(  IA64_DCR_DM | IA64_DCR_DP | IA64_DCR_DK | IA64_DCR_DX | IA64_DCR_DR
+	ia64_set_dcr(  IA64_DCR_DP | IA64_DCR_DK | IA64_DCR_DX | IA64_DCR_DR
 		     | IA64_DCR_DA | IA64_DCR_DD | IA64_DCR_LC);
 #ifndef CONFIG_SMP
 	ia64_set_fpu_owner(0);

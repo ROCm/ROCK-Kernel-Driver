@@ -53,6 +53,7 @@ tab[] =
     { "UNW_FRAME_INFO_SIZE",		sizeof (struct unw_frame_info) },
     { "", 0 },			/* spacer */
     { "IA64_TASK_THREAD_KSP_OFFSET",	offsetof (struct task_struct, thread.ksp) },
+    { "IA64_TASK_PID_OFFSET",		offsetof (struct task_struct, pid) },
     { "IA64_PT_REGS_CR_IPSR_OFFSET",	offsetof (struct pt_regs, cr_ipsr) },
     { "IA64_PT_REGS_CR_IIP_OFFSET",	offsetof (struct pt_regs, cr_iip) },
     { "IA64_PT_REGS_CR_IFS_OFFSET",	offsetof (struct pt_regs, cr_ifs) },
@@ -161,6 +162,7 @@ tab[] =
     { "IA64_SIGFRAME_ARG2_OFFSET",		offsetof (struct sigframe, arg2) },
     { "IA64_SIGFRAME_HANDLER_OFFSET",		offsetof (struct sigframe, handler) },
     { "IA64_SIGFRAME_SIGCONTEXT_OFFSET",	offsetof (struct sigframe, sc) },
+    /* for assembly files which can't include sched.h: */
     { "IA64_CLONE_VFORK",		CLONE_VFORK },
     { "IA64_CLONE_VM",			CLONE_VM },
 };
@@ -198,6 +200,8 @@ main (int argc, char **argv)
 		  tab[i].name, space, tab[i].value, tab[i].value);
 	}
     }
+
+  printf ("\n#define CLONE_IDLETASK_BIT	%ld\n", ia64_fls (CLONE_IDLETASK));
 
   printf ("\n#endif /* _ASM_IA64_OFFSETS_H */\n");
   return 0;

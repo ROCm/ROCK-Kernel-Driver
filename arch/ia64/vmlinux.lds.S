@@ -41,7 +41,8 @@ SECTIONS
 
   /* Read-only data */
 
-  __gp = ALIGN(16) + 0x200000;	/* gp must be 16-byte aligned for exc. table */
+  . = ALIGN(16);
+  __gp = . + 0x200000;	/* gp must be 16-byte aligned for exc. table */
 
   /* Global data */
   _data = .;

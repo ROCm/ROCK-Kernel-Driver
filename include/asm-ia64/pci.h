@@ -58,6 +58,7 @@ pcibios_penalize_isa_irq (int irq)
 #define pci_dma_sync_single		platform_pci_dma_sync_single
 #define pci_dma_sync_sg			platform_pci_dma_sync_sg
 #define sg_dma_address			platform_pci_dma_address
+#define pci_dma_supported		platform_pci_dma_supported
 
 /* pci_unmap_{single,page} is not a nop, thus... */
 #define DECLARE_PCI_UNMAP_ADDR(ADDR_NAME)	\
@@ -72,17 +73,6 @@ pcibios_penalize_isa_irq (int irq)
 	((PTR)->LEN_NAME)
 #define pci_unmap_len_set(PTR, LEN_NAME, VAL)		\
 	(((PTR)->LEN_NAME) = (VAL))
-
-/*
- * Return whether the given PCI device DMA address mask can be supported properly.  For
- * example, if your device can only drive the low 24-bits during PCI bus mastering, then
- * you would pass 0x00ffffff as the mask to this function.
- */
-static inline int
-pci_dma_supported (struct pci_dev *hwdev, u64 mask)
-{
-	return 1;
-}
 
 #define pci_map_page(dev,pg,off,size,dir)				\
 	pci_map_single((dev), page_address(pg) + (off), (size), (dir))

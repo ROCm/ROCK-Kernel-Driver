@@ -5,7 +5,7 @@
  *
  * Copyright (C) 1999 VA Linux Systems
  * Copyright (C) 1999 Walt Drummond <drummond@valinux.com>
- * Copyright (C) 1999-2001 Hewlett-Packard Co.
+ * Copyright (C) 1999-2002 Hewlett-Packard Co.
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  *	Stephane Eranian <eranian@hpl.hp.com>
  *
@@ -212,8 +212,8 @@ efi_map_pal_code (void)
 	void *efi_map_start, *efi_map_end, *p;
 	efi_memory_desc_t *md;
 	u64 efi_desc_size;
-	int pal_code_count=0;
-	u64 mask, flags;
+	int pal_code_count = 0;
+	u64 mask, psr;
 	u64 vaddr;
 
 	efi_map_start = __va(ia64_boot_param->efi_memmap);
@@ -266,10 +266,10 @@ efi_map_pal_code (void)
 		/*
 		 * Cannot write to CRx with PSR.ic=1
 		 */
-		ia64_clear_ic(flags);
+		psr = ia64_clear_ic();
 		ia64_itr(0x1, IA64_TR_PALCODE, vaddr & mask,
 			 pte_val(pfn_pte(md->phys_addr >> PAGE_SHIFT, PAGE_KERNEL)), IA64_GRANULE_SHIFT);
-		local_irq_restore(flags);
+		ia64_set_psr(psr);
 		ia64_srlz_i();
 	}
 }
@@ -485,7 +485,7 @@ efi_get_iobase (void)
 }
 
 u32
-efi_mem_type (u64 phys_addr)
+efi_mem_type (unsigned long phys_addr)
 {
 	void *efi_map_start, *efi_map_end, *p;
 	efi_memory_desc_t *md;
@@ -506,7 +506,7 @@ efi_mem_type (u64 phys_addr)
 }
 
 u64
-efi_mem_attributes (u64 phys_addr)
+efi_mem_attributes (unsigned long phys_addr)
 {
 	void *efi_map_start, *efi_map_end, *p;
 	efi_memory_desc_t *md;

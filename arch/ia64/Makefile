@@ -69,13 +69,6 @@ ifdef CONFIG_IA64_SGI_SN
 				$(CORE_FILES)
 endif
 
-ifdef CONFIG_IA64_SOFTSDV
-        SUBDIRS         :=      arch/$(ARCH)/dig	\
-				$(SUBDIRS)
-        CORE_FILES      :=      arch/$(ARCH)/dig/dig.a	\
-				$(CORE_FILES)
-endif
-
 ifdef CONFIG_IA64_DIG
         SUBDIRS         :=      arch/$(ARCH)/dig	\
 				$(SUBDIRS)
@@ -105,8 +98,6 @@ vmlinux: arch/$(ARCH)/vmlinux.lds
 arch/$(ARCH)/vmlinux.lds: arch/$(ARCH)/vmlinux.lds.S FORCE
 	$(CPP) -D__ASSEMBLY__ -C -P -I$(HPATH) -I$(HPATH)/asm-$(ARCH) \
 		-traditional arch/$(ARCH)/vmlinux.lds.S > $@
-
-FORCE: ;
 
 compressed: vmlinux
 	$(OBJCOPY) --strip-all vmlinux vmlinux-tmp

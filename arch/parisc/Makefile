@@ -55,16 +55,7 @@ endif
 ifdef CONFIG_KWDB
 SUBDIRS := $(SUBDIRS) arch/parisc/kdb
 DRIVERS := $(DRIVERS) arch/parisc/kdb/kdb.o
-
-arch/parisc/kdb: dummy
-	$(MAKE) linuxsubdirs SUBDIRS=arch/parisc/kdb
 endif
-
-arch/parisc/kernel: dummy
-	$(MAKE) linuxsubdirs SUBDIRS=arch/parisc/kernel
-
-arch/parisc/mm: dummy
-	$(MAKE) linuxsubdirs SUBDIRS=arch/parisc/mm
 
 palo: vmlinux
 	export TOPDIR=`pwd`; export CONFIG_STI_CONSOLE=$(CONFIG_STI_CONSOLE); \

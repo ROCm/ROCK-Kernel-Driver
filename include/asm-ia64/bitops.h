@@ -326,6 +326,12 @@ ia64_fls (unsigned long x)
 	return exp - 0xffff;
 }
 
+static int
+fls (int x)
+{
+	return ia64_fls((unsigned int) x);
+}
+
 /*
  * ffs: find first bit set. This is defined the same way as the libc and compiler builtin
  * ffs routines, therefore differs in spirit from the above ffz (man ffs): it operates on
