@@ -60,10 +60,11 @@ static int bfs_get_block(struct inode * inode, sector_t block,
 	long phys;
 	int err;
 	struct super_block *sb = inode->i_sb;
+	struct bfs_sb_info *info = BFS_SB(sb);
 	struct bfs_inode_info *bi = BFS_I(inode);
-	struct buffer_head *sbh = sb->su_sbh;
+	struct buffer_head *sbh = info->si_sbh;
 
-	if (block < 0 || block > sb->su_blocks)
+	if (block < 0 || block > info->si_blocks)
 		return -EIO;
 
 	phys = bi->i_sblock + block;
@@ -89,12 +90,12 @@ static int bfs_get_block(struct inode * inode, sector_t block,
 
 	/* if the last data block for this file is the last allocated block, we can
 	   extend the file trivially, without moving it anywhere */
-	if (bi->i_eblock == sb->su_lf_eblk) {
+	if (bi->i_eblock == info->si_lf_eblk) {
 		dprintf("c=%d, b=%08lx, phys=%08lx (simple extension)\n", 
 				create, block, phys);
 		map_bh(bh_result, sb, phys);
-		sb->su_freeb -= phys - bi->i_eblock;
-		sb->su_lf_eblk = bi->i_eblock = phys;
+		info->si_freeb -= phys - bi->i_eblock;
+		info->si_lf_eblk = bi->i_eblock = phys;
 		mark_inode_dirty(inode);
 		mark_buffer_dirty(sbh);
 		err = 0;
@@ -102,7 +103,7 @@ static int bfs_get_block(struct inode * inode, sector_t block,
 	}
 
 	/* Ok, we have to move this entire file to the next free block */
-	phys = sb->su_lf_eblk + 1;
+	phys = info->si_lf_eblk + 1;
 	if (bi->i_sblock) { /* if data starts on block 0 then there is no data */
 		err = bfs_move_blocks(inode->i_sb, bi->i_sblock, 
 				bi->i_eblock, phys);
@@ -116,11 +117,11 @@ static int bfs_get_block(struct inode * inode, sector_t block,
 	dprintf("c=%d, b=%08lx, phys=%08lx (moved)\n", create, block, phys);
 	bi->i_sblock = phys;
 	phys += block;
-	sb->su_lf_eblk = bi->i_eblock = phys;
+	info->si_lf_eblk = bi->i_eblock = phys;
 
 	/* this assumes nothing can write the inode back while we are here
 	 * and thus update inode->i_blocks! (XXX)*/
-	sb->su_freeb -= bi->i_eblock - bi->i_sblock + 1 - inode->i_blocks;
+	info->si_freeb -= bi->i_eblock - bi->i_sblock + 1 - inode->i_blocks;
 	mark_inode_dirty(inode);
 	mark_buffer_dirty(sbh);
 	map_bh(bh_result, sb, phys);

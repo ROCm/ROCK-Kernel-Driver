@@ -78,20 +78,21 @@ static int bfs_create(struct inode * dir, struct dentry * dentry, int mode)
 	int err;
 	struct inode * inode;
 	struct super_block * s = dir->i_sb;
+	struct bfs_sb_info * info = BFS_SB(s);
 	unsigned long ino;
 
 	inode = new_inode(s);
 	if (!inode)
 		return -ENOSPC;
 	lock_kernel();
-	ino = find_first_zero_bit(s->su_imap, s->su_lasti);
-	if (ino > s->su_lasti) {
+	ino = find_first_zero_bit(info->si_imap, info->si_lasti);
+	if (ino > info->si_lasti) {
 		unlock_kernel();
 		iput(inode);
 		return -ENOSPC;
 	}
-	set_bit(ino, s->su_imap);	
-	s->su_freei--;
+	set_bit(ino, info->si_imap);	
+	info->si_freei--;
 	inode->i_uid = current->fsuid;
 	inode->i_gid = (dir->i_mode & S_ISGID) ? dir->i_gid : current->fsgid;
 	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
@@ -318,11 +319,9 @@ static struct buffer_head * bfs_find_entry(struct inode * dir,
 {
 	unsigned long block, offset;
 	struct buffer_head * bh;
-	struct bfs_sb_info * info;
 	struct bfs_dirent * de;
 
 	*res_dir = NULL;
-	info = &dir->i_sb->u.bfs_sb;
 	if (namelen > BFS_NAMELEN)
 		return NULL;
 	bh = NULL;
