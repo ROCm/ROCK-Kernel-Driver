@@ -314,7 +314,6 @@ static int proc_ide_read_imodel
 		case ide_qd65xx:	name = "qd65xx";	break;
 		case ide_umc8672:	name = "umc8672";	break;
 		case ide_ht6560b:	name = "ht6560b";	break;
-		case ide_pdc4030:	name = "pdc4030";	break;
 		case ide_rz1000:	name = "rz1000";	break;
 		case ide_trm290:	name = "trm290";	break;
 		case ide_cmd646:	name = "cmd646";	break;

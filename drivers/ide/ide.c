@@ -668,7 +668,6 @@ static void ide_hwif_restore(ide_hwif_t *hwif, ide_hwif_t *tmp_hwif)
 	hwif->cds			= tmp_hwif->cds;
 #endif
 
-	hwif->identify			= tmp_hwif->identify;
 	hwif->tuneproc			= tmp_hwif->tuneproc;
 	hwif->speedproc			= tmp_hwif->speedproc;
 	hwif->selectproc		= tmp_hwif->selectproc;
@@ -1778,9 +1777,6 @@ static int __init match_parm (char *s, const char *keywords[], int vals[], int m
 	return 0;	/* zero = nothing matched */
 }
 
-#ifdef CONFIG_BLK_DEV_PDC4030
-static int __initdata probe_pdc4030;
-#endif
 #ifdef CONFIG_BLK_DEV_ALI14XX
 static int __initdata probe_ali14xx;
 extern int ali14xx_init(void);
@@ -1949,7 +1945,7 @@ int __init ide_setup (char *s)
 			"noprobe", "serialize", "autotune", "noautotune", 
 			"reset", "dma", "ata66", "minus8", "minus9",
 			"minus10", "four", "qd65xx", "ht6560b", "cmd640_vlb",
-			"dtc2278", "umc8672", "ali14xx", "dc4030", NULL };
+			"dtc2278", "umc8672", "ali14xx", NULL };
 		hw = s[3] - '0';
 		hwif = &ide_hwifs[hw];
 		i = match_parm(&s[4], ide_words, vals, 3);
@@ -1975,11 +1971,6 @@ int __init ide_setup (char *s)
 		}
 
 		switch (i) {
-#ifdef CONFIG_BLK_DEV_PDC4030
-			case -18: /* "dc4030" */
-				probe_pdc4030 = 1;
-				goto done;
-#endif
 #ifdef CONFIG_BLK_DEV_ALI14XX
 			case -17: /* "ali14xx" */
 				probe_ali14xx = 1;
@@ -2114,13 +2105,6 @@ static void __init probe_for_hwifs (void)
 		ide_probe_for_cmd640x();
 	}
 #endif /* CONFIG_BLK_DEV_CMD640 */
-#ifdef CONFIG_BLK_DEV_PDC4030
-	{
-		extern int pdc4030_init(void);
-		if (probe_pdc4030)
-			(void)pdc4030_init();
-	}
-#endif /* CONFIG_BLK_DEV_PDC4030 */
 #ifdef CONFIG_BLK_DEV_IDE_PMAC
 	{
 		extern void pmac_ide_probe(void);

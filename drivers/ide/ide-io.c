@@ -1587,18 +1587,6 @@ int ide_do_drive_cmd (ide_drive_t *drive, struct request *rq, ide_action_t actio
 	int where = ELEVATOR_INSERT_BACK, err;
 	int must_wait = (action == ide_wait || action == ide_head_wait);
 
-#ifdef CONFIG_BLK_DEV_PDC4030
-	/*
-	 *	FIXME: there should be a drive or hwif->special
-	 *	handler that points here by default, not hacks
-	 *	in the ide-io.c code
-	 *
-	 *	FIXME2: That code breaks power management if used with
-	 *	this chipset, that really doesn't belong here !
-	 */
-	if (HWIF(drive)->chipset == ide_pdc4030 && rq->buffer != NULL)
-		return -ENOSYS;  /* special drive cmds not supported */
-#endif
 	rq->errors = 0;
 	rq->rq_status = RQ_ACTIVE;
 

@@ -71,10 +71,6 @@
 #include <asm/io.h>
 #include <asm/div64.h>
 
-/* FIXME: some day we shouldn't need to look in here! */
-
-#include "legacy/pdc4030.h"
-
 /*
  * lba_capacity_is_ok() performs a sanity check on the claimed "lba_capacity"
  * value for this drive (from its reported identification information).
@@ -862,6 +858,8 @@ static sector_t idedisk_capacity (ide_drive_t *drive)
 {
 	return drive->capacity64 - drive->sect0;
 }
+
+#define IS_PDC4030_DRIVE	0
 
 static ide_startstop_t idedisk_special (ide_drive_t *drive)
 {
