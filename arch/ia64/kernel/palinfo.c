@@ -479,7 +479,7 @@ static const char *proc_features[]={
 	"Enable CMCI promotion",
 	"Enable MCA to BINIT promotion",
 	"Enable MCA promotion",
-	"Enable BEER promotion"
+	"Enable BERR promotion"
 };
 
 
