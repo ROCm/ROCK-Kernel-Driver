@@ -223,15 +223,7 @@ chrp_setup_arch(void)
 	/* init to some ~sane value until calibrate_delay() runs */
 	loops_per_jiffy = 50000000/HZ;
 
-#ifdef CONFIG_BLK_DEV_INITRD
-	/* this is fine for chrp */
-	initrd_below_start_ok = 1;
-
-	if (initrd_start)
-		ROOT_DEV = Root_RAM0;
-	else
-#endif
-		ROOT_DEV = Root_SDA2; /* sda2 (sda1 is for the kernel) */
+	ROOT_DEV = Root_SDA3; /* sda3 (sda1 is for the kernel) */
 
 	/* Lookup PCI host bridges */
 	chrp_find_bridges();
