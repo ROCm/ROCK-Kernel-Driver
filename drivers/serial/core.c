@@ -396,7 +396,7 @@ uart_get_divisor(struct uart_port *port, struct termios *termios,
 		baud = uart_get_baud_rate(port, termios);
 		quot = uart_calculate_quot(port, baud);
 		if (quot)
-			break;
+			return quot;
 
 		/*
 		 * Oops, the quotient was zero.  Try again with

@@ -558,8 +558,11 @@ asmlinkage int sys_execve(struct pt_regs regs)
 	if (IS_ERR(filename))
 		goto out;
 	error = do_execve(filename, (char **) regs.ecx, (char **) regs.edx, &regs);
-	if (error == 0)
+	if (error == 0) {
 		current->ptrace &= ~PT_DTRACE;
+		/* Make sure we don't return using sysenter.. */
+		set_thread_flag(TIF_SIGPENDING);
+	}
 	putname(filename);
 out:
 	return error;

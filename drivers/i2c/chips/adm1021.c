@@ -26,7 +26,6 @@
 #include <linux/sensors.h>
 #include <linux/init.h>
 
-MODULE_LICENSE("GPL");
 
 /* Addresses to scan */
 static unsigned short normal_i2c[] = { SENSORS_I2C_END };
@@ -108,10 +107,6 @@ struct adm1021_data {
 	   remote_temp_offset, remote_temp_offset_prec;
 };
 
-int __init sensors_adm1021_init(void);
-void __exit sensors_adm1021_exit(void);
-static int adm1021_cleanup(void);
-
 static int adm1021_attach_adapter(struct i2c_adapter *adapter);
 static int adm1021_detect(struct i2c_adapter *adapter, int address,
 			  unsigned short flags, int kind);
@@ -177,9 +172,6 @@ static ctl_table adm1021_max_dir_table_template[] = {
 	 &i2c_sysctl_real, NULL, &adm1021_alarms},
 	{0}
 };
-
-/* Used by init/cleanup */
-static int __initdata adm1021_initialized = 0;
 
 /* I choose here for semi-static allocation. Complete dynamic
    allocation could also be used; the code needed for this would probably
@@ -585,46 +577,21 @@ void adm1021_alarms(struct i2c_client *client, int operation, int ctl_name,
 	}
 }
 
-int __init sensors_adm1021_init(void)
+static int __init sensors_adm1021_init(void)
 {
-	int res;
 
-	printk("adm1021.o version %s (%s)\n", LM_VERSION, LM_DATE);
-	adm1021_initialized = 0;
-	if ((res = i2c_add_driver(&adm1021_driver))) {
-		printk
-		    ("adm1021.o: Driver registration failed, module not inserted.\n");
-		adm1021_cleanup();
-		return res;
-	}
-	adm1021_initialized++;
-	return 0;
+	return i2c_add_driver(&adm1021_driver);
 }
 
-void __exit sensors_adm1021_exit(void)
+static void __exit sensors_adm1021_exit(void)
 {
-	adm1021_cleanup();
-}
-
-static int adm1021_cleanup(void)
-{
-	int res;
-
-	if (adm1021_initialized >= 1) {
-		if ((res = i2c_del_driver(&adm1021_driver))) {
-			printk
-			    ("adm1021.o: Driver deregistration failed, module not removed.\n");
-			return res;
-		}
-		adm1021_initialized--;
-	}
-
-	return 0;
+	i2c_del_driver(&adm1021_driver);
 }
 
 MODULE_AUTHOR
     ("Frodo Looijaard <frodol@dds.nl> and Philip Edelbrock <phil@netroedge.com>");
 MODULE_DESCRIPTION("adm1021 driver");
+MODULE_LICENSE("GPL");
 
 MODULE_PARM(read_only, "i");
 MODULE_PARM_DESC(read_only, "Don't set any values, read only mode");

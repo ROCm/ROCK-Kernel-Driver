@@ -172,7 +172,7 @@ __set_personality(u_long personality)
 
 		fsp = copy_fs_struct(current->fs);
 		if (fsp == NULL) {
-			put_exec_domain(ep);
+			module_put(ep->module);
 			return -ENOMEM;;
 		}
 
@@ -194,10 +194,7 @@ __set_personality(u_long personality)
 	current_thread_info()->exec_domain = ep;
 	set_fs_altroot();
 
-	put_exec_domain(oep);
-
-	printk(KERN_DEBUG "[%s:%d]: set personality to %lx\n",
-			current->comm, current->pid, personality);
+	module_put(oep->module);
 	return 0;
 }
 

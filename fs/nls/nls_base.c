@@ -245,8 +245,7 @@ struct nls_table *load_nls(char *charset)
 
 void unload_nls(struct nls_table *nls)
 {
-	if (nls->owner)
-		__MOD_DEC_USE_COUNT(nls->owner);
+	module_put(nls->owner);
 }
 
 wchar_t charset2uni[256] = {

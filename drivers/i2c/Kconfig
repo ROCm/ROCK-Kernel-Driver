@@ -166,8 +166,6 @@ config I2C_IBM_OCP_ADAP
 	tristate "IBM on-chip I2C Adapter"
 	depends on I2C_IBM_OCP_ALGO
 
-# This is needed for automatic patch generation: sensors code starts here
-# This is needed for automatic patch generation: sensors code ends here
 config I2C_CHARDEV
 	tristate "I2C device interface"
 	depends on I2C
