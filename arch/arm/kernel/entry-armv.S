@@ -490,13 +490,16 @@ ENTRY(ret_from_exception)
  */
 ENTRY(__switch_to)
 	add	ip, r1, #TI_CPU_SAVE
-	ldr	r3, [r2, #TI_CPU_DOMAIN]!
+	ldr	r3, [r2, #TI_TP_VALUE]
 	stmia	ip!, {r4 - sl, fp, sp, lr}	@ Store most regs on stack
+	ldr	r6, [r2, #TI_CPU_DOMAIN]!
 #if defined(CONFIG_CPU_XSCALE) && !defined(CONFIG_IWMMXT)
 	mra	r4, r5, acc0
 	stmia   ip, {r4, r5}
 #endif
-	mcr	p15, 0, r3, c3, c0, 0		@ Set domain register
+	mov	r4, #0xffff0fff
+	str	r3, [r4, #-3]			@ Set TLS ptr
+	mcr	p15, 0, r6, c3, c0, 0		@ Set domain register
 #ifdef CONFIG_VFP
 	@ Always disable VFP so we can lazily save/restore the old
 	@ state. This occurs in the context of the previous thread.

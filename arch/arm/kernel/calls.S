@@ -270,7 +270,7 @@ __syscall_start:
 	 	.long	sys_remap_file_pages
 		.long	sys_ni_syscall	/* sys_set_thread_area */
 /* 255 */	.long	sys_ni_syscall	/* sys_get_thread_area */
- 		.long	sys_ni_syscall	/* sys_set_tid_address */
+ 		.long	sys_set_tid_address
 		.long	sys_timer_create
 		.long	sys_timer_settime
 		.long	sys_timer_gettime

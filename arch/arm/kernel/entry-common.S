@@ -212,7 +212,8 @@ sys_execve_wrapper:
 		b	sys_execve
 
 sys_clone_wapper:
-		add	r2, sp, #S_OFF
+		add	ip, sp, #S_OFF
+		str	ip, [sp, #4]
 		b	sys_clone
 
 sys_sigsuspend_wrapper:
