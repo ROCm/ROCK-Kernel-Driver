@@ -46,6 +46,7 @@ unsigned long pci_io_base     = 0;
 static void pcibios_fixup_resources(struct pci_dev* dev);
 static void fixup_broken_pcnet32(struct pci_dev* dev);
 static void fixup_windbond_82c105(struct pci_dev* dev);
+void fixup_resources(struct pci_dev* dev);
 
 void   iSeries_pcibios_init(void);
 void   pSeries_pcibios_init(void);
