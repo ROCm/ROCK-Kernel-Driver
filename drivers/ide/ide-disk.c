@@ -264,8 +264,6 @@ static ide_startstop_t lba48_do_request(struct ata_device *drive, struct request
 	args.hobfile.high_cylinder = (block >>= 8);	/* hi  lba */
 	args.hobfile.device_head = drive->select.all;
 
-	args.hobfile.control = 0x80;
-
 	args.taskfile.command = get_command(drive, rq_data_dir(rq));
 
 #ifdef DEBUG
@@ -728,7 +726,6 @@ static u64 set_max_address_ext(struct ata_device *drive, u64 addr_req)
 	args.hobfile.high_cylinder = (addr_req >>= 8);
 
 	args.hobfile.device_head = 0x40;
-	args.hobfile.control = 0x80;
 
         args.handler = task_no_data_intr;
 	/* submit command request */

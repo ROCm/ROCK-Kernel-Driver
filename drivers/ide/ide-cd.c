@@ -535,7 +535,7 @@ static void cdrom_queue_request_sense(struct ata_device *drive,
 
 	/* stuff the sense request in front of our current request */
 	rq = &info->request_sense_request;
-	ide_init_drive_cmd(rq);
+	memset(rq, 0, sizeof(*rq));
 	rq->cmd[0] = GPCMD_REQUEST_SENSE;
 	rq->cmd[4] = pc->buflen;
 	rq->flags = REQ_SENSE;
@@ -1389,9 +1389,8 @@ int cdrom_queue_packet_command(struct ata_device *drive, unsigned char *cmd,
 
 	/* Start of retry loop. */
 	do {
-		ide_init_drive_cmd(&rq);
+		memset(&rq, 0, sizeof(rq));
 		memcpy(rq.cmd, cmd, CDROM_PACKET_SIZE);
-
 		rq.flags = REQ_PC;
 
 		/* FIXME --mdcki */
@@ -2276,7 +2275,7 @@ int ide_cdrom_reset (struct cdrom_device_info *cdi)
 	struct request req;
 	int ret;
 
-	ide_init_drive_cmd(&req);
+	memset(&req, 0, sizeof(req));
 	req.flags = REQ_SPECIAL;
 	ret = ide_do_drive_cmd(drive, &req, ide_wait);
 

@@ -253,11 +253,11 @@ typedef union {
 	unsigned all			: 8;	/* all of the bits together */
 	struct {
 #if defined(__LITTLE_ENDIAN_BITFIELD)
-		unsigned head		: 4;	/* always zeros here */
+		unsigned XXX_head	: 4;	/* always zeros here */
 		unsigned unit		: 1;	/* drive select number: 0/1 */
-		unsigned bit5		: 1;	/* always 1 */
+		unsigned XXX_bit5	: 1;	/* always 1 */
 		unsigned lba		: 1;	/* using LBA instead of CHS */
-		unsigned bit7		: 1;	/* always 1 */
+		unsigned XXX_bit7	: 1;	/* always 1 */
 #elif defined(__BIG_ENDIAN_BITFIELD)
 		unsigned bit7		: 1;
 		unsigned lba		: 1;
@@ -269,29 +269,6 @@ typedef union {
 #endif
 	} b;
 } select_t;
-
-typedef union {
-	unsigned all			: 8;	/* all of the bits together */
-	struct {
-#if defined(__LITTLE_ENDIAN_BITFIELD)
-		unsigned bit0		: 1;
-		unsigned nIEN		: 1;	/* device INTRQ to host */
-		unsigned SRST		: 1;	/* host soft reset bit */
-		unsigned bit3		: 1;	/* ATA-2 thingy */
-		unsigned reserved456	: 3;
-		unsigned HOB		: 1;	/* 48-bit address ordering */
-#elif defined(__BIG_ENDIAN_BITFIELD)
-		unsigned HOB		: 1;
-		unsigned reserved456	: 3;
-		unsigned bit3		: 1;
-		unsigned SRST		: 1;
-		unsigned nIEN		: 1;
-		unsigned bit0		: 1;
-#else
-#error "Please fix <asm/byteorder.h>"
-#endif
-	} b;
-} control_t;
 
 /*
  * ATA/ATAPI device structure :
@@ -530,7 +507,7 @@ struct ata_channel {
  * Register new hardware with ide
  */
 extern int ide_register_hw(hw_regs_t *hw);
-extern void ide_unregister(struct ata_channel *hwif);
+extern void ide_unregister(struct ata_channel *);
 
 struct ata_taskfile;
 
@@ -671,11 +648,6 @@ struct ata_device *get_info_ptr(kdev_t i_rdev);
 ide_startstop_t restart_request(struct ata_device *);
 
 /*
- * This function is intended to be used prior to invoking ide_do_drive_cmd().
- */
-extern void ide_init_drive_cmd(struct request *rq);
-
-/*
  * "action" parameter type for ide_do_drive_cmd() below.
  */
 typedef enum {
@@ -698,7 +670,7 @@ extern void ide_end_drive_cmd(struct ata_device *, struct request *, u8);
 
 struct ata_taskfile {
 	struct hd_drive_task_hdr taskfile;
-	struct hd_drive_hob_hdr  hobfile;
+	struct hd_drive_task_hdr  hobfile;
 	int command_type;
 	ide_startstop_t (*prehandler)(struct ata_device *, struct request *);
 	ide_startstop_t (*handler)(struct ata_device *, struct request *);
@@ -717,20 +689,17 @@ extern ide_startstop_t ata_taskfile(struct ata_device *,
 extern ide_startstop_t recal_intr(struct ata_device *, struct request *);
 extern ide_startstop_t task_no_data_intr(struct ata_device *, struct request *);
 
-
-/* This is setting up all fields in args, which depend upon the command type.
- */
 extern void ide_cmd_type_parser(struct ata_taskfile *args);
 extern int ide_raw_taskfile(struct ata_device *, struct ata_taskfile *);
-extern int ide_cmd_ioctl(struct ata_device *drive, unsigned long arg);
 
 extern void ide_fix_driveid(struct hd_driveid *id);
 extern int ide_config_drive_speed(struct ata_device *, byte);
 extern byte eighty_ninty_three(struct ata_device *);
 
-extern int system_bus_speed;
 
 extern void ide_stall_queue(struct ata_device *, unsigned long);
+
+extern int system_bus_speed;
 
 /*
  * CompactFlash cards and their brethern pretend to be removable hard disks,
@@ -873,5 +842,6 @@ extern void ata_mask(struct ata_device *);
 extern int ata_status(struct ata_device *, u8, u8);
 extern int ata_irq_enable(struct ata_device *, int);
 extern void ata_reset(struct ata_channel *);
+extern void ata_out_regfile(struct ata_device *, struct hd_drive_task_hdr *);
 
 #endif

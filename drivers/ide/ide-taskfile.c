@@ -314,7 +314,6 @@ ide_startstop_t ata_taskfile(struct ata_device *drive,
 		struct ata_taskfile *args, struct request *rq)
 {
 	struct hd_driveid *id = drive->id;
-	u8 HIHI = (drive->addressing) ? 0xE0 : 0xEF;
 
 	/* (ks/hs): Moved to start, do not use for multiple out commands */
 	if (args->handler != task_mulout_intr) {
@@ -322,25 +321,16 @@ ide_startstop_t ata_taskfile(struct ata_device *drive,
 		ata_mask(drive);
 	}
 
-	if ((id->command_set_2 & 0x0400) &&
-	    (id->cfs_enable_2 & 0x0400) &&
-	    (drive->addressing == 1)) {
-		OUT_BYTE(args->hobfile.feature, IDE_FEATURE_REG);
-		OUT_BYTE(args->hobfile.sector_count, IDE_NSECTOR_REG);
-		OUT_BYTE(args->hobfile.sector_number, IDE_SECTOR_REG);
-		OUT_BYTE(args->hobfile.low_cylinder, IDE_LCYL_REG);
-		OUT_BYTE(args->hobfile.high_cylinder, IDE_HCYL_REG);
+	if ((id->command_set_2 & 0x0400) && (id->cfs_enable_2 & 0x0400) &&
+	    (drive->addressing == 1))
+		ata_out_regfile(drive, &args->hobfile);
+
+	ata_out_regfile(drive, &args->taskfile);
+
+	{
+		u8 HIHI = (drive->addressing) ? 0xE0 : 0xEF;
+		OUT_BYTE((args->taskfile.device_head & HIHI) | drive->select.all, IDE_SELECT_REG);
 	}
-
-	OUT_BYTE(args->taskfile.feature, IDE_FEATURE_REG);
-	OUT_BYTE(args->taskfile.sector_count, IDE_NSECTOR_REG);
-	/* refers to number of sectors to transfer */
-	OUT_BYTE(args->taskfile.sector_number, IDE_SECTOR_REG);
-	/* refers to sector offset or start sector */
-	OUT_BYTE(args->taskfile.low_cylinder, IDE_LCYL_REG);
-	OUT_BYTE(args->taskfile.high_cylinder, IDE_HCYL_REG);
-
-	OUT_BYTE((args->taskfile.device_head & HIHI) | drive->select.all, IDE_SELECT_REG);
 	if (args->handler != NULL) {
 
 		/* This is apparently supposed to reset the wait timeout for
@@ -361,8 +351,7 @@ ide_startstop_t ata_taskfile(struct ata_device *drive,
 	} else {
 		/*
 		 * FIXME: this is a gross hack, need to unify tcq dma proc and
-		 * regular dma proc -- basically split stuff that needs to act
-		 * on a request from things like ide_dma_check etc.
+		 * regular dma proc.
 		 */
 
 		if (!drive->using_dma)
@@ -761,15 +750,6 @@ void ide_cmd_type_parser(struct ata_taskfile *args)
 }
 
 /*
- * This function is intended to be used prior to invoking ide_do_drive_cmd().
- */
-void ide_init_drive_cmd(struct request *rq)
-{
-	memset(rq, 0, sizeof(*rq));
-	rq->flags = REQ_DRIVE_CMD;
-}
-
-/*
  * This function issues a special IDE device request onto the request queue.
  *
  * If action is ide_wait, then the rq is queued at the end of the request
@@ -849,139 +829,12 @@ int ide_raw_taskfile(struct ata_device *drive, struct ata_taskfile *args)
 	return ide_do_drive_cmd(drive, &rq, ide_wait);
 }
 
-/*
- * Implement generic ioctls invoked from userspace to imlpement specific
- * functionality.
- *
- * Unfortunately every single low level programm out there is using this
- * interface.
- */
-
-/*
- * Backside of HDIO_DRIVE_CMD call of SETFEATURES_XFER.
- * 1 : Safe to update drive->id DMA registers.
- * 0 : OOPs not allowed.
- */
-static int set_transfer(struct ata_device *drive, struct ata_taskfile *args)
-{
-	if ((args->taskfile.command == WIN_SETFEATURES) &&
-	    (args->taskfile.sector_number >= XFER_SW_DMA_0) &&
-	    (args->taskfile.feature == SETFEATURES_XFER) &&
-	    (drive->id->dma_ultra ||
-	     drive->id->dma_mword ||
-	     drive->id->dma_1word))
-		return 1;
-
-	return 0;
-}
-
-/*
- * Verify that we are doing an approved SETFEATURES_XFER with respect
- * to the hardware being able to support request.  Since some hardware
- * can improperly report capabilties, we check to see if the host adapter
- * in combination with the device (usually a disk) properly detect
- * and acknowledge each end of the ribbon.
- */
-static int ata66_check(struct ata_device *drive, struct ata_taskfile *args)
-{
-	if ((args->taskfile.command == WIN_SETFEATURES) &&
-	    (args->taskfile.sector_number > XFER_UDMA_2) &&
-	    (args->taskfile.feature == SETFEATURES_XFER)) {
-		if (!drive->channel->udma_four) {
-			printk("%s: Speed warnings UDMA 3/4/5 is not functional.\n", drive->channel->name);
-			return 1;
-		}
-#ifndef CONFIG_IDEDMA_IVB
-		if ((drive->id->hw_config & 0x6000) == 0) {
-#else
-		if (((drive->id->hw_config & 0x2000) == 0) ||
-		    ((drive->id->hw_config & 0x4000) == 0)) {
-#endif
-			printk("%s: Speed warnings UDMA 3/4/5 is not functional.\n", drive->name);
-			return 1;
-		}
-	}
-	return 0;
-}
-
-int ide_cmd_ioctl(struct ata_device *drive, unsigned long arg)
-{
-	int err = 0;
-	u8 vals[4];
-	u8 *argbuf = vals;
-	u8 pio = 0;
-	int argsize = 4;
-	struct ata_taskfile args;
-	struct request rq;
-
-	ide_init_drive_cmd(&rq);
-
-	/* Wait for drive ready.
-	 */
-	if (!arg)
-		return ide_do_drive_cmd(drive, &rq, ide_wait);
-
-	/* Second phase.
-	 */
-	if (copy_from_user(vals, (void *)arg, 4))
-		return -EFAULT;
-
-	args.taskfile.feature = vals[2];
-	args.taskfile.sector_count = vals[3];
-	args.taskfile.sector_number = vals[1];
-	args.taskfile.low_cylinder = 0x00;
-	args.taskfile.high_cylinder = 0x00;
-	args.taskfile.device_head = 0x00;
-	args.taskfile.command = vals[0];
-
-	if (vals[3]) {
-		argsize = 4 + (SECTOR_WORDS * 4 * vals[3]);
-		argbuf = kmalloc(argsize, GFP_KERNEL);
-		if (argbuf == NULL)
-			return -ENOMEM;
-		memcpy(argbuf, vals, 4);
-		memset(argbuf + 4, 0, argsize - 4);
-	}
-
-	/* Always make sure the transfer reate has been setup.
-	 * FIXME: what about setting up the drive with ->tuneproc?
-	 */
-	if (set_transfer(drive, &args)) {
-		pio = vals[1];
-		if (ata66_check(drive, &args))
-			goto abort;
-	}
-
-	/* Issue ATA command and wait for completion.
-	 */
-	rq.buffer = argbuf;
-	err = ide_do_drive_cmd(drive, &rq, ide_wait);
-
-	if (!err && pio) {
-		/* active-retuning-calls future */
-		/* FIXME: what about the setup for the drive?! */
-		if (drive->channel->speedproc)
-			drive->channel->speedproc(drive, pio);
-	}
-
-abort:
-	if (copy_to_user((void *)arg, argbuf, argsize))
-		err = -EFAULT;
-
-	if (argsize > 4)
-		kfree(argbuf);
-
-	return err;
-}
-
 EXPORT_SYMBOL(drive_is_ready);
 EXPORT_SYMBOL(ata_read);
 EXPORT_SYMBOL(ata_write);
 EXPORT_SYMBOL(ata_taskfile);
 EXPORT_SYMBOL(recal_intr);
 EXPORT_SYMBOL(task_no_data_intr);
-EXPORT_SYMBOL(ide_init_drive_cmd);
 EXPORT_SYMBOL(ide_do_drive_cmd);
 EXPORT_SYMBOL(ide_raw_taskfile);
 EXPORT_SYMBOL(ide_cmd_type_parser);
-EXPORT_SYMBOL(ide_cmd_ioctl);

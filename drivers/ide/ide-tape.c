@@ -1921,7 +1921,7 @@ static void idetape_create_request_sense_cmd(struct atapi_packet_command *pc)
  */
 static void idetape_queue_pc_head(struct ata_device *drive, struct atapi_packet_command *pc, struct request *rq)
 {
-	ide_init_drive_cmd (rq);
+	memset(rq, 0, sizeof(*rq));
 	rq->buffer = (char *) pc;
 	rq->flags = IDETAPE_PC_RQ1;
 	ide_do_drive_cmd(drive, rq, ide_preempt);
@@ -3153,7 +3153,7 @@ static int __idetape_queue_pc_tail(struct ata_device *drive, struct atapi_packet
 {
 	struct request rq;
 
-	ide_init_drive_cmd (&rq);
+	memset(&rq, 0, sizeof(rq));
 	/* FIXME: --mdcki */
 	rq.buffer = (char *) pc;
 	rq.flags = IDETAPE_PC_RQ1;
@@ -3414,17 +3414,17 @@ static int idetape_queue_rw_tail(struct ata_device *drive, int cmd, int blocks, 
 #if IDETAPE_DEBUG_LOG
 	if (tape->debug_level >= 2)
 		printk (KERN_INFO "ide-tape: idetape_queue_rw_tail: cmd=%d\n",cmd);
-#endif /* IDETAPE_DEBUG_LOG */
+#endif
 #if IDETAPE_DEBUG_BUGS
 	if (idetape_pipeline_active (tape)) {
 		printk (KERN_ERR "ide-tape: bug: the pipeline is active in idetape_queue_rw_tail\n");
 		return (0);
 	}
-#endif /* IDETAPE_DEBUG_BUGS */	
+#endif
 
-	ide_init_drive_cmd (&rq);
-	rq.bio = bio;
+	memset(&rq, 0, sizeof(rq));
 	rq.flags = cmd;
+	rq.bio = bio;
 	rq.sector = tape->first_frame_position;
 	rq.nr_sectors = rq.current_nr_sectors = blocks;
 	if (tape->onstream)
@@ -3472,7 +3472,7 @@ static void idetape_onstream_read_back_buffer(struct ata_device *drive)
 			printk(KERN_INFO "ide-tape: %s: read back logical block %d, data %x %x %x %x\n", tape->name, logical_blk_num, *p++, *p++, *p++, *p++);
 #endif
 		rq = &stage->rq;
-		ide_init_drive_cmd (rq);
+		memset(rq, 0, sizeof(*rq));
 		rq->flags = IDETAPE_WRITE_RQ;
 		rq->sector = tape->first_frame_position;
 		rq->nr_sectors = rq->current_nr_sectors = tape->capabilities.ctl;
@@ -3748,7 +3748,7 @@ static int idetape_add_chrdev_write_request(struct ata_device *drive, int blocks
 		}
 	}
 	rq = &new_stage->rq;
-	ide_init_drive_cmd (rq);
+	memset(rq, 0, sizeof(*rq));
 	rq->flags = IDETAPE_WRITE_RQ;
 	rq->sector = tape->first_frame_position;	/* Doesn't actually matter - We always assume sequential access */
 	rq->nr_sectors = rq->current_nr_sectors = blocks;
@@ -3938,7 +3938,8 @@ static int idetape_initiate_read(struct ata_device *drive, int max_stages)
 	}
 	if (tape->restart_speed_control_req)
 		idetape_restart_speed_control(drive);
-	ide_init_drive_cmd (&rq);
+
+	memset(&rq, 0, sizeof(rq));
 	rq.flags = IDETAPE_READ_RQ;
 	rq.sector = tape->first_frame_position;
 	rq.nr_sectors = rq.current_nr_sectors = blocks;

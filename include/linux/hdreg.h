@@ -81,18 +81,9 @@ struct hd_drive_task_hdr {
 	u8 low_cylinder;
 	u8 high_cylinder;
 	u8 device_head;
-	u8 command;
-} __attribute__((packed));
 
-struct hd_drive_hob_hdr {
-	u8 data;
-	u8 feature;
-	u8 sector_count;
-	u8 sector_number;
-	u8 low_cylinder;
-	u8 high_cylinder;
-	u8 device_head;
-	u8 control;
+	/* FXIME: Consider moving this out from here. */
+	u8 command;
 } __attribute__((packed));
 
 /*

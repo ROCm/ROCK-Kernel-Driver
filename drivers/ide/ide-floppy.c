@@ -712,10 +712,10 @@ static void idefloppy_update_buffers(struct ata_device *drive, struct request *r
 static void idefloppy_queue_pc_head(struct ata_device *drive,
 		struct atapi_packet_command *pc, struct request *rq)
 {
-	ide_init_drive_cmd (rq);
+	memset(rq, 0, sizeof(*rq));
+	rq->flags = IDEFLOPPY_RQ;
 	/* FIXME: --mdcki */
 	rq->buffer = (char *) pc;
-	rq->flags = IDEFLOPPY_RQ;
 	(void) ide_do_drive_cmd (drive, rq, ide_preempt);
 }
 
@@ -1065,10 +1065,10 @@ static ide_startstop_t idefloppy_issue_pc(struct ata_device *drive, struct reque
 #endif
 
 	ata_irq_enable(drive, 1);
-	OUT_BYTE (dma_ok ? 1:0,IDE_FEATURE_REG);			/* Use PIO/DMA */
-	OUT_BYTE (bcount.b.high,IDE_BCOUNTH_REG);
-	OUT_BYTE (bcount.b.low,IDE_BCOUNTL_REG);
-	OUT_BYTE (drive->select.all,IDE_SELECT_REG);
+	OUT_BYTE(dma_ok ? 1:0,IDE_FEATURE_REG);			/* Use PIO/DMA */
+	OUT_BYTE(bcount.b.high,IDE_BCOUNTH_REG);
+	OUT_BYTE(bcount.b.low,IDE_BCOUNTL_REG);
+	OUT_BYTE(drive->select.all,IDE_SELECT_REG);
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (dma_ok) {							/* Begin DMA, if necessary */
@@ -1271,11 +1271,12 @@ static int idefloppy_queue_pc_tail(struct ata_device *drive, struct atapi_packet
 {
 	struct request rq;
 
-	ide_init_drive_cmd (&rq);
+	memset(&rq, 0, sizeof(rq));
 	/* FIXME: --mdcki */
 	rq.buffer = (char *) pc;
 	rq.flags = IDEFLOPPY_RQ;
-	return ide_do_drive_cmd (drive, &rq, ide_wait);
+
+	return ide_do_drive_cmd(drive, &rq, ide_wait);
 }
 
 /*

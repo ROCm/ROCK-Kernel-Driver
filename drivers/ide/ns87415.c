@@ -193,7 +193,7 @@ static void __init ide_init_ns87415(struct ata_channel *hwif)
 		 * XXX: Reset the device, if we don't it will not respond
 		 *      to select properly during first probe.
 		 */
-		ata_reset(struct ata_channel *hwif);
+		ata_reset(hwif);
 #endif
 	}
 

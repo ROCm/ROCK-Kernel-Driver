@@ -673,19 +673,6 @@ static ide_startstop_t drive_cmd_intr(struct ata_device *drive, struct request *
 }
 
 /*
- * Issue a simple drive command.  The drive must be selected beforehand.
- */
-static void drive_cmd(struct ata_device *drive, u8 cmd, u8 nsect)
-{
-	ide_set_handler(drive, drive_cmd_intr, WAIT_CMD, NULL);
-	ata_irq_enable(drive, 1);
-	ata_mask(drive);
-	OUT_BYTE(nsect, IDE_NSECTOR_REG);
-	OUT_BYTE(cmd, IDE_COMMAND_REG);
-}
-
-
-/*
  * Busy-wait for the drive status to be not "busy".  Check then the status for
  * all of the "good" bits and none of the "bad" bits, and if all is okay it
  * returns 0.  All other cases return 1 after invoking error handler -- caller
@@ -815,21 +802,26 @@ static ide_startstop_t start_request(struct ata_device *drive, struct request *r
 #ifdef DEBUG
 		printk("%s: DRIVE_CMD ", drive->name);
 		printk("cmd=0x%02x ", args[0]);
-		printk("sc=0x%02x ", args[1]);
-		printk("fr=0x%02x ", args[2]);
-		printk("xx=0x%02x\n", args[3]);
+		printk(" sc=0x%02x ", args[1]);
+		printk(" fr=0x%02x ", args[2]);
+		printk(" xx=0x%02x\n", args[3]);
 #endif
+		ide_set_handler(drive, drive_cmd_intr, WAIT_CMD, NULL);
+		ata_irq_enable(drive, 1);
+		ata_mask(drive);
 		if (args[0] == WIN_SMART) {
-			OUT_BYTE(0x4f, IDE_LCYL_REG);
-			OUT_BYTE(0xc2, IDE_HCYL_REG);
-			OUT_BYTE(args[2],IDE_FEATURE_REG);
-			OUT_BYTE(args[1],IDE_SECTOR_REG);
-			drive_cmd(drive, args[0], args[3]);
-
-			return ide_started;
+			struct hd_drive_task_hdr regfile;
+			regfile.feature = args[2];
+			regfile.sector_count = args[3];
+			regfile.sector_number = args[1];
+			regfile.low_cylinder = 0x4f;
+			regfile.high_cylinder = 0xc2;
+			ata_out_regfile(drive, &regfile);
+		} else {
+			OUT_BYTE(args[2], IDE_FEATURE_REG);
+			OUT_BYTE(args[1], IDE_NSECTOR_REG);
 		}
-		OUT_BYTE(args[2],IDE_FEATURE_REG);
-		drive_cmd(drive, args[0], args[1]);
+		OUT_BYTE(args[0], IDE_COMMAND_REG);
 
 		return ide_started;
 	}

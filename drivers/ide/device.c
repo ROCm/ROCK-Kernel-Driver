@@ -142,4 +142,18 @@ void ata_reset(struct ata_channel *ch)
 
 EXPORT_SYMBOL(ata_reset);
 
+/*
+ * Output a complete register file.
+ */
+void ata_out_regfile(struct ata_device *drive, struct hd_drive_task_hdr *rf)
+{
+	struct ata_channel *ch = drive->channel;
+
+	OUT_BYTE(rf->feature, ch->io_ports[IDE_FEATURE_OFFSET]);
+	OUT_BYTE(rf->sector_count, ch->io_ports[IDE_NSECTOR_OFFSET]);
+	OUT_BYTE(rf->sector_number, ch->io_ports[IDE_SECTOR_OFFSET]);
+	OUT_BYTE(rf->low_cylinder, ch->io_ports[IDE_LCYL_OFFSET]);
+	OUT_BYTE(rf->high_cylinder, ch->io_ports[IDE_HCYL_OFFSET]);
+}
+
 MODULE_LICENSE("GPL");
