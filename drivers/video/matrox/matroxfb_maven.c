@@ -957,7 +957,7 @@ static int maven_detect_client(struct i2c_adapter* adapter, int address, unsigne
 					      I2C_FUNC_SMBUS_BYTE_DATA |
 					      I2C_FUNC_PROTOCOL_MANGLING))
 		goto ERROR0;
-	if (!(new_client = (struct i2c_client*)kmalloc(sizeof(struct i2c_client) + sizeof(struct maven_data),
+	if (!(new_client = (struct i2c_client*)kmalloc(sizeof(*new_client) + sizeof(*data),
 			GFP_KERNEL))) {
 		err = -ENOMEM;
 		goto ERROR0;

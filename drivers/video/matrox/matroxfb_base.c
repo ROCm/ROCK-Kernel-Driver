@@ -661,7 +661,7 @@ static int matroxfb_get_fix(struct fb_fix_screeninfo *fix, int con,
 	else
 		p = ACCESS_FBINFO(fbcon.disp);
 
-	memset(fix, 0, sizeof(struct fb_fix_screeninfo));
+	memset(fix, 0, sizeof(*fix));
 	strcpy(fix->id,"MATROX");
 
 	fix->smem_start = ACCESS_FBINFO(video.base) + ACCESS_FBINFO(curr.ydstorg.bytes);
