@@ -55,51 +55,24 @@ int platform_get_irq(struct platform_device *dev, unsigned int num)
 }
 
 /**
- *	platform_add_device - add one platform device
- *	@dev: platform device
- *
- *	Adds one platform device, claiming the memory resources
- */
-int platform_add_device(struct platform_device *dev)
-{
-	int i;
-
-	for (i = 0; i < dev->num_resources; i++) {
-		struct resource *p, *r = &dev->resource[i];
-
-		r->name = dev->dev.bus_id;
-
-		p = NULL;
-		if (r->flags & IORESOURCE_MEM)
-			p = &iomem_resource;
-		else if (r->flags & IORESOURCE_IO)
-			p = &ioport_resource;
-
-		if (p && request_resource(p, r)) {
-			printk(KERN_ERR
-			       "%s%d: failed to claim resource %d\n",
-			       dev->name, dev->id, i);
-			break;
-		}
-	}
-	if (i == dev->num_resources)
-		platform_device_register(dev);
-	return 0;
-}
-
-/**
  *	platform_add_devices - add a numbers of platform devices
  *	@devs: array of platform devices to add
  *	@num: number of platform devices in array
  */
 int platform_add_devices(struct platform_device **devs, int num)
 {
-	int i;
+	int i, ret = 0;
 
-	for (i = 0; i < num; i++)
-		platform_add_device(devs[i]);
+	for (i = 0; i < num; i++) {
+		ret = platform_device_register(devs[i]);
+		if (ret) {
+			while (--i >= 0)
+				platform_device_unregister(devs[i]);
+			break;
+		}
+	}
 
-	return 0;
+	return ret;
 }
 
 /**
@@ -109,6 +82,8 @@ int platform_add_devices(struct platform_device **devs, int num)
  */
 int platform_device_register(struct platform_device * pdev)
 {
+	int i, ret = 0;
+
 	if (!pdev)
 		return -EINVAL;
 
@@ -122,15 +97,53 @@ int platform_device_register(struct platform_device * pdev)
 	else
 		strlcpy(pdev->dev.bus_id, pdev->name, BUS_ID_SIZE);
 
+	for (i = 0; i < pdev->num_resources; i++) {
+		struct resource *p, *r = &pdev->resource[i];
+
+		r->name = pdev->dev.bus_id;
+
+		p = NULL;
+		if (r->flags & IORESOURCE_MEM)
+			p = &iomem_resource;
+		else if (r->flags & IORESOURCE_IO)
+			p = &ioport_resource;
+
+		if (p && request_resource(p, r)) {
+			printk(KERN_ERR
+			       "%s: failed to claim resource %d\n",
+			       pdev->dev.bus_id, i);
+			ret = -EBUSY;
+			goto failed;
+		}
+	}
+
 	pr_debug("Registering platform device '%s'. Parent at %s\n",
 		 pdev->dev.bus_id, pdev->dev.parent->bus_id);
-	return device_register(&pdev->dev);
+
+	ret = device_register(&pdev->dev);
+	if (ret == 0)
+		return ret;
+
+ failed:
+	while (--i >= 0)
+		if (pdev->resource[i].flags & (IORESOURCE_MEM|IORESOURCE_IO))
+			release_resource(&pdev->resource[i]);
+	return ret;
 }
 
 void platform_device_unregister(struct platform_device * pdev)
 {
-	if (pdev)
+	int i;
+
+	if (pdev) {
 		device_unregister(&pdev->dev);
+
+		for (i = 0; i < pdev->num_resources; i++) {
+			struct resource *r = &pdev->resource[i];
+			if (r->flags & (IORESOURCE_MEM|IORESOURCE_IO))
+				release_resource(r);
+		}
+	}
 }
 
 
