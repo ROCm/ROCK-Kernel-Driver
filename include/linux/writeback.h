@@ -13,6 +13,15 @@ extern struct list_head inode_in_use;
 extern struct list_head inode_unused;
 
 /*
+ * Yes, writeback.h requires sched.h
+ * No, sched.h is not included from here.
+ */
+static inline int current_is_pdflush(void)
+{
+	return current->flags & PF_FLUSHER;
+}
+
+/*
  * fs/fs-writeback.c
  */
 #define WB_SYNC_NONE	0	/* Don't wait on anything */

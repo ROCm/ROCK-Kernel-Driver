@@ -187,6 +187,9 @@ static void __sync_single_inode(struct inode *inode, int wait, int *nr_to_write)
 static void
 __writeback_single_inode(struct inode *inode, int sync, int *nr_to_write)
 {
+	if (current_is_pdflush() && (inode->i_state & I_LOCK))
+		return;
+
 	while (inode->i_state & I_LOCK) {
 		__iget(inode);
 		spin_unlock(&inode_lock);
@@ -213,6 +216,9 @@ void writeback_single_inode(struct inode *inode, int sync, int *nr_to_write)
  * had their first dirtying at a time earlier than *older_than_this.
  *
  * Called under inode_lock.
+ *
+ * If we're a pdlfush thread, then implement pdlfush collision avoidance
+ * against the entire list.
  */
 static void __sync_list(struct list_head *head, int sync_mode,
 		int *nr_to_write, unsigned long *older_than_this)
@@ -223,6 +229,8 @@ static void __sync_list(struct list_head *head, int sync_mode,
 	while ((tmp = head->prev) != head) {
 		struct inode *inode = list_entry(tmp, struct inode, i_list);
 		struct address_space *mapping = inode->i_mapping;
+		struct backing_dev_info *bdi;
+
 		int really_sync;
 
 		/* Was this inode dirtied after __sync_list was called? */
@@ -233,10 +241,18 @@ static void __sync_list(struct list_head *head, int sync_mode,
 			time_after(mapping->dirtied_when, *older_than_this))
 			break;
 
+		bdi = mapping->backing_dev_info;
+		if (current_is_pdflush() && !writeback_acquire(bdi))
+			break;
+
 		really_sync = (sync_mode == WB_SYNC_ALL);
 		if ((sync_mode == WB_SYNC_LAST) && (head->prev == head))
 			really_sync = 1;
 		__writeback_single_inode(inode, really_sync, nr_to_write);
+
+		if (current_is_pdflush())
+			writeback_release(bdi);
+
 		if (nr_to_write && *nr_to_write == 0)
 			break;
 	}
@@ -255,6 +271,8 @@ static void __sync_list(struct list_head *head, int sync_mode,
  *
  * If `older_than_this' is non-zero then only flush inodes which have a
  * flushtime older than *older_than_this.
+ *
+ * This is a "memory cleansing" operation, not a "data integrity" operation.
  */
 void writeback_unlocked_inodes(int *nr_to_write, int sync_mode,
 				unsigned long *older_than_this)
@@ -276,29 +294,12 @@ void writeback_unlocked_inodes(int *nr_to_write, int sync_mode,
 		if (sb->s_writeback_gen == writeback_gen)
 			continue;
 		sb->s_writeback_gen = writeback_gen;
-
-		if (current->flags & PF_FLUSHER) {
-			if (sb->s_flags & MS_FLUSHING) {
-				/*
-				 * There's no point in two pdflush threads
-				 * flushing the same device.  But for other
-				 * callers, we want to perform the flush
-				 * because the fdatasync is how we implement
-				 * writer throttling.
-				 */
-				continue;
-			}
-			sb->s_flags |= MS_FLUSHING;
-		}
-
 		if (!list_empty(&sb->s_dirty)) {
 			spin_unlock(&sb_lock);
 			__sync_list(&sb->s_dirty, sync_mode,
 					nr_to_write, older_than_this);
 			spin_lock(&sb_lock);
 		}
-		if (current->flags & PF_FLUSHER)
-			sb->s_flags &= ~MS_FLUSHING;
 		if (nr_to_write && *nr_to_write == 0)
 			break;
 	}
@@ -307,7 +308,7 @@ void writeback_unlocked_inodes(int *nr_to_write, int sync_mode,
 }
 
 /*
- * Called under inode_lock
+ * Called under inode_lock.
  */
 static int __try_to_writeback_unused_list(struct list_head *head, int nr_inodes)
 {
@@ -318,7 +319,17 @@ static int __try_to_writeback_unused_list(struct list_head *head, int nr_inodes)
 		inode = list_entry(tmp, struct inode, i_list);
 
 		if (!atomic_read(&inode->i_count)) {
+			struct backing_dev_info *bdi;
+
+			bdi = inode->i_mapping->backing_dev_info;
+			if (current_is_pdflush() && !writeback_acquire(bdi))
+				goto out;
+
 			__sync_single_inode(inode, 0, NULL);
+
+			if (current_is_pdflush())
+				writeback_release(bdi);
+
 			nr_inodes--;
 
 			/* 
@@ -328,7 +339,7 @@ static int __try_to_writeback_unused_list(struct list_head *head, int nr_inodes)
 			tmp = head;
 		}
 	}
-
+out:
 	return nr_inodes;
 }
 
@@ -421,7 +432,11 @@ void sync_inodes(void)
 	}
 }
 
-void try_to_writeback_unused_inodes(unsigned long pexclusive)
+/*
+ * FIXME: the try_to_writeback_unused functions look dreadfully similar to
+ * writeback_unlocked_inodes...
+ */
+void try_to_writeback_unused_inodes(unsigned long unused)
 {
 	struct super_block * sb;
 	int nr_inodes = inodes_stat.nr_unused;
@@ -440,7 +455,6 @@ void try_to_writeback_unused_inodes(unsigned long pexclusive)
 	}
 	spin_unlock(&sb_lock);
 	spin_unlock(&inode_lock);
-	clear_bit(0, (unsigned long *)pexclusive);
 }
 
 /**

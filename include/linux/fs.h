@@ -112,7 +112,6 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 #define MS_MOVE		8192
 #define MS_REC		16384
 #define MS_VERBOSE	32768
-#define MS_FLUSHING	(1<<16)	/* inodes are currently under writeout */
 #define MS_ACTIVE	(1<<30)
 #define MS_NOUSER	(1<<31)
 
@@ -156,7 +155,6 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 #define IS_RDONLY(inode) ((inode)->i_sb->s_flags & MS_RDONLY)
 #define IS_SYNC(inode)		(__IS_FLG(inode, MS_SYNCHRONOUS) || ((inode)->i_flags & S_SYNC))
 #define IS_MANDLOCK(inode)	__IS_FLG(inode, MS_MANDLOCK)
-#define IS_FLUSHING(inode)	__IS_FLG(inode, MS_FLUSHING)
 
 #define IS_QUOTAINIT(inode)	((inode)->i_flags & S_QUOTA)
 #define IS_NOQUOTA(inode)	((inode)->i_flags & S_NOQUOTA)

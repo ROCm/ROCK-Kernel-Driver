@@ -404,21 +404,14 @@ void prune_icache(int goal)
 	dispose_list(freeable);
 
 	/* 
-	 * If we didn't freed enough clean inodes schedule
-	 * a sync of the dirty inodes, we cannot do it
-	 * from here or we're either synchronously dogslow
-	 * or we deadlock with oom.
+	 * If we didn't free enough clean inodes then schedule writeback of
+	 * the dirty inodes.  We cannot do it from here or we're either
+	 * synchronously dogslow or we deadlock with oom.
 	 */
-	if (goal) {
-		static unsigned long exclusive;
-
-		if (!test_and_set_bit(0, &exclusive)) {
-			if (pdflush_operation(try_to_writeback_unused_inodes,
-						(unsigned long)&exclusive))
-				clear_bit(0, &exclusive);
-		}
-	}
+	if (goal)
+		pdflush_operation(try_to_writeback_unused_inodes, 0);
 }
+
 /*
  * This is called from kswapd when we think we need some
  * more memory, but aren't really sure how much. So we

@@ -20,6 +20,7 @@
 #include <linux/writeback.h>
 #include <linux/init.h>
 #include <linux/sysrq.h>
+#include <linux/backing-dev.h>
 
 /*
  * Memory thresholds, in percentages
@@ -86,10 +87,7 @@ void balance_dirty_pages(struct address_space *mapping)
 		wake_pdflush = 1;
 	}
 
-	if (wake_pdflush && !IS_FLUSHING(mapping->host)) {
-		/*
-		 * There is no flush thread against this device. Start one now.
-		 */
+	if (wake_pdflush && !writeback_in_progress(mapping->backing_dev_info)) {
 		if (dirty_and_writeback > async_thresh) {
 			pdflush_flush(dirty_and_writeback - async_thresh);
 			yield();
