@@ -29,7 +29,7 @@ int vfs_statfs(struct super_block *sb, struct statfs *buf)
 
 	if (sb) {
 		retval = -ENOSYS;
-		if (sb->s_op && sb->s_op->statfs) {
+		if (sb->s_op->statfs) {
 			memset(buf, 0, sizeof(struct statfs));
 			retval = security_sb_statfs(sb);
 			if (retval)

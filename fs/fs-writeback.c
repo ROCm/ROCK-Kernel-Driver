@@ -57,7 +57,7 @@ void __mark_inode_dirty(struct inode *inode, int flags)
 	 * dirty the inode itself
 	 */
 	if (flags & (I_DIRTY_SYNC | I_DIRTY_DATASYNC)) {
-		if (sb->s_op && sb->s_op->dirty_inode)
+		if (sb->s_op->dirty_inode)
 			sb->s_op->dirty_inode(inode);
 	}
 
@@ -101,8 +101,7 @@ out:
 
 static void write_inode(struct inode *inode, int sync)
 {
-	if (inode->i_sb->s_op && inode->i_sb->s_op->write_inode &&
-			!is_bad_inode(inode))
+	if (inode->i_sb->s_op->write_inode && !is_bad_inode(inode))
 		inode->i_sb->s_op->write_inode(inode, sync);
 }
 
