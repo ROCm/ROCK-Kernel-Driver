@@ -47,6 +47,7 @@ void agp_generic_resume(void);
 void agp_free_key(int key);
 
 /* chipset specific init routines. */
+/*
 int __init ali_generic_setup (struct pci_dev *pdev);
 int __init amd_irongate_setup (struct pci_dev *pdev);
 int __init amd_8151_setup (struct pci_dev *pdev);
@@ -65,10 +66,12 @@ int __init intel_860_setup (struct pci_dev *pdev);
 int __init serverworks_setup (struct pci_dev *pdev);
 int __init sis_generic_setup (struct pci_dev *pdev);
 int __init via_generic_setup (struct pci_dev *pdev);
+*/
 
-#define AGPGART_MODULE_NAME	"agpgart"
-#define PFX			AGPGART_MODULE_NAME ": "
+#define PFX "agpgart: "
 
+int agp_register_driver (struct pci_dev *dev);
+int agp_unregister_driver(void);
 
 #ifdef CONFIG_SMP
 static void ipi_handler(void *null)
@@ -380,5 +383,27 @@ struct agp_bridge_data {
 #define HP_ZX1_TCNFG		0x318
 #define HP_ZX1_PDIR_BASE	0x320
 #define HP_ZX1_CACHE_FLUSH	0x428
+
+struct agp_device_ids {
+	unsigned short device_id; /* first, to make table easier to read */
+	enum chipset_type chipset;
+	const char *chipset_name;
+	int (*chipset_setup) (struct pci_dev *pdev);	/* used to override generic */
+};
+
+struct agp_bridge_info {
+	unsigned short vendor_id;
+	const char *vendor_name;
+	int (*chipset_setup) (struct pci_dev *pdev);
+	struct agp_device_ids *ids;
+};
+
+extern struct agp_bridge_info ali_agp_bridge_info;
+extern struct agp_bridge_info amd_k8_agp_bridge_info;
+extern struct agp_bridge_info amd_agp_bridge_info;
+extern struct agp_bridge_info intel_agp_bridge_info;
+extern struct agp_bridge_info sis_agp_bridge_info;
+extern struct agp_bridge_info via_agp_bridge_info;
+extern struct agp_bridge_info hp_agp_bridge_info;
 
 #endif				/* _AGP_BACKEND_PRIV_H */

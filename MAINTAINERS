@@ -198,6 +198,11 @@ P:	Roman Zippel
 M:	zippel@linux-m68k.org
 S:	Maintained
 
+AGPGART DRIVER
+P:	Dave Jones
+M:	davej@codemonkey.org.uk
+S:	Maintained
+
 AHA152X SCSI DRIVER
 P:	Juergen E. Fischer
 M:	Juergen Fischer <fischer@norbit.de>

@@ -1063,7 +1063,7 @@ static struct file_operations agp_fops =
 static struct miscdevice agp_miscdev =
 {
 	AGPGART_MINOR,
-	AGPGART_MODULE_NAME,
+	"agpgart",
 	&agp_fops
 };
 

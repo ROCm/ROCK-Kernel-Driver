@@ -1,38 +1,15 @@
 /*
- * AGPGART module version 0.99
- * Copyright (C) 1999 Jeff Hartmann
- * Copyright (C) 1999 Precision Insight, Inc.
- * Copyright (C) 1999 Xi Graphics, Inc.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the "Software"),
- * to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense,
- * and/or sell copies of the Software, and to permit persons to whom the
- * Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included
- * in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
- * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
- * JEFF HARTMANN, OR ANY OTHER CONTRIBUTORS BE LIABLE FOR ANY CLAIM, 
- * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR 
- * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE 
- * OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- *
- * TODO: 
- * - Allocate more than order 0 pages to avoid too much linear map splitting.
+ * VIA AGPGART routines. 
  */
-#include <linux/config.h>
+
 #include <linux/types.h>
-#include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/init.h>
 #include <linux/agp_backend.h>
 #include "agp.h"
 
+static int agp_try_unsupported __initdata = 0;
 
 static int via_fetch_size(void)
 {
@@ -144,8 +121,159 @@ int __init via_generic_setup (struct pci_dev *pdev)
 	agp_bridge.suspend = agp_generic_suspend;
 	agp_bridge.resume = agp_generic_resume;
 	agp_bridge.cant_use_aperture = 0;
-
 	return 0;
-	
-	(void) pdev; /* unused */
 }
+
+struct agp_device_ids via_agp_device_ids[] __initdata =
+{
+	{
+		.device_id	= PCI_DEVICE_ID_VIA_8501_0,
+		.chipset	= VIA_MVP4,
+		.chipset_name	= "MVP4",
+	},
+	{
+		.device_id	= PCI_DEVICE_ID_VIA_82C597_0,
+		.chipset	= VIA_VP3,
+		.chipset_name	= "VP3",
+	},
+	{
+		.device_id	= PCI_DEVICE_ID_VIA_82C598_0,
+		.chipset	= VIA_MVP3,
+		.chipset_name	= "MVP3",
+	},
+	{
+		.device_id	= PCI_DEVICE_ID_VIA_82C691,
+		.chipset	= VIA_APOLLO_PRO,
+		.chipset_name	= "Apollo Pro",
+	},
+	{
+		.device_id	= PCI_DEVICE_ID_VIA_8371_0,
+		.chipset	= VIA_APOLLO_KX133,
+		.chipset_name	= "Apollo Pro KX133",
+	},
+	{
+		.device_id	= PCI_DEVICE_ID_VIA_8633_0,
+		.chipset	= VIA_APOLLO_PRO_266,
+		.chipset_name	= "Apollo Pro 266",
+	},
+	{
+		.device_id	= PCI_DEVICE_ID_VIA_8363_0,
+		.chipset	= VIA_APOLLO_KT133,
+		.chipset_name	= "Apollo Pro KT133",
+	},
+	{
+		.device_id	= PCI_DEVICE_ID_VIA_8367_0,
+		.chipset	= VIA_APOLLO_KT133,
+		.chipset_name	= "Apollo Pro KT266",
+	},
+	{
+		.device_id	= PCI_DEVICE_ID_VIA_8377_0,
+		.chipset	= VIA_APOLLO_KT400,
+		.chipset_name	= "Apollo Pro KT400",
+	},
+	{
+		.device_id	= PCI_DEVICE_ID_VIA_8653_0,
+		.chipset	= VIA_APOLLO_PRO,
+		.chipset_name	= "Apollo Pro266T",
+	},
+	{
+		.device_id	= PCI_DEVICE_ID_VIA_82C694X_0,
+		.chipset	= VIA_VT8605,
+		.chipset_name	= "PM133"
+	},
+	{ }, /* dummy final entry, always present */
+};
+
+
+/* scan table above for supported devices */
+static int __init agp_lookup_host_bridge (struct pci_dev *pdev)
+{
+	int j=0;
+	struct agp_device_ids *devs;
+	
+	devs = via_agp_device_ids;
+
+	while (devs[j].chipset_name != NULL) {
+		if (pdev->device == devs[j].device_id) {
+			printk (KERN_INFO PFX "Detected VIA %s chipset\n", devs[j].chipset_name);
+			agp_bridge.type = devs[j].chipset;
+
+			if (devs[j].chipset_setup != NULL)
+				return devs[j].chipset_setup(pdev);
+			else
+				return via_generic_setup(pdev);
+		}
+		j++;
+	}
+
+	/* try init anyway, if user requests it */
+	if (agp_try_unsupported) {
+		printk(KERN_WARNING PFX "Trying generic VIA routines"
+		       " for device id: %04x\n", pdev->device);
+		agp_bridge.type = VIA_GENERIC;
+		return via_generic_setup(pdev);
+	}
+
+	printk(KERN_ERR PFX "Unsupported VIA chipset (device id: %04x),"
+		" you might want to try agp_try_unsupported=1.\n", pdev->device);
+	return -ENODEV;
+}
+
+
+static int agp_via_probe (struct pci_dev *dev, const struct pci_device_id *ent)
+{
+	if (pci_find_capability(dev, PCI_CAP_ID_AGP)==0)
+		return -ENODEV;
+
+	agp_bridge.dev = dev;
+
+	/* probe for known chipsets */
+	if (agp_lookup_host_bridge (dev) != -ENODEV) {
+		agp_register_driver(dev);
+		return 0;
+	}
+	return -ENODEV;	
+}
+
+static struct pci_device_id agp_via_pci_table[] __initdata = {
+	{
+	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
+	.class_mask	= ~0,
+	.vendor		= PCI_VENDOR_ID_VIA,
+	.device		= PCI_ANY_ID,
+	.subvendor	= PCI_ANY_ID,
+	.subdevice	= PCI_ANY_ID,
+	},
+	{ }
+};
+
+MODULE_DEVICE_TABLE(pci, agp_via_pci_table);
+
+static struct pci_driver agp_via_pci_driver = {
+	.name		= "agpgart-via",
+	.id_table	= agp_via_pci_table,
+	.probe		= agp_via_probe,
+};
+
+static int __init agp_via_init(void)
+{
+	int ret_val;
+
+	ret_val = pci_module_init(&agp_via_pci_driver);
+	if (ret_val)
+		agp_bridge.type = NOT_SUPPORTED;
+
+	return ret_val;
+}
+
+static void __exit agp_via_cleanup(void)
+{
+	agp_unregister_driver();
+	pci_unregister_driver(&agp_via_pci_driver);
+}
+
+module_init(agp_via_init);
+module_exit(agp_via_cleanup);
+
+MODULE_PARM(agp_try_unsupported, "1i");
+MODULE_LICENSE("GPL and additional rights");
