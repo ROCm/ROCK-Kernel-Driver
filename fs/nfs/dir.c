@@ -1022,16 +1022,23 @@ nfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 	struct nfs_fattr sym_attr;
 	struct nfs_fh sym_fh;
 	struct qstr qsymname;
-	unsigned int maxlen;
 	int error;
 
 	dfprintk(VFS, "NFS: symlink(%s/%ld, %s, %s)\n", dir->i_sb->s_id,
 		dir->i_ino, dentry->d_name.name, symname);
 
 	error = -ENAMETOOLONG;
-	maxlen = (NFS_PROTO(dir)->version==2) ? NFS2_MAXPATHLEN : NFS3_MAXPATHLEN;
-	if (strlen(symname) > maxlen)
-		goto out;
+	switch (NFS_PROTO(dir)->version) {
+		case 2:
+			if (strlen(symname) > NFS2_MAXPATHLEN)
+				goto out;
+			break;
+		case 3:
+			if (strlen(symname) > NFS3_MAXPATHLEN)
+				goto out;
+		default:
+			break;
+	}
 
 #ifdef NFS_PARANOIA
 if (dentry->d_inode)
