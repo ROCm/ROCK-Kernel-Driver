@@ -84,6 +84,10 @@ endif
 LDFLAGS_vmlinux += -p --no-undefined -X \
 	$(shell $(CC) $(CFLAGS) --print-libgcc-file-name) -T
 
+# Don't allow any static data in misc.o, which
+# would otherwise mess up our GOT table
+CFLAGS_misc.o := -Dstatic=
+
 $(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/$(HEAD) $(obj)/piggy.o \
 	 	$(addprefix $(obj)/, $(OBJS)) FORCE
 	$(call if_changed,ld)
