@@ -679,6 +679,13 @@ acpi_battery_remove_fs (
 	ACPI_FUNCTION_TRACE("acpi_battery_remove_fs");
 
 	if (acpi_device_dir(device)) {
+		remove_proc_entry(ACPI_BATTERY_FILE_ALARM,
+				  acpi_device_dir(device));
+		remove_proc_entry(ACPI_BATTERY_FILE_STATUS,
+				  acpi_device_dir(device));
+		remove_proc_entry(ACPI_BATTERY_FILE_INFO,
+				  acpi_device_dir(device));
+
 		remove_proc_entry(acpi_device_bid(device), acpi_battery_dir);
 		acpi_device_dir(device) = NULL;
 	}
