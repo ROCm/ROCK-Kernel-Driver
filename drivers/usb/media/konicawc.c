@@ -29,7 +29,7 @@
 
 #define MAX_CAMERAS	1
 
-#define DRIVER_VERSION	"v1.3"
+#define DRIVER_VERSION	"v1.4"
 #define DRIVER_DESC	"Konica Webcam driver"
 
 enum ctrl_req {
@@ -562,6 +562,97 @@ static void konicawc_process_isoc(uvd_t *uvd, usbvideo_frame_t *frame)
 }
 
 
+static int konicawc_find_fps(int size, int fps)
+{
+	int i;
+
+	fps *= 3;
+	DEBUG(1, "konica_find_fps: size = %d fps = %d", size, fps);
+	if(fps <= spd_to_fps[size][0])
+		return 0;
+
+	if(fps >= spd_to_fps[size][MAX_SPEED])
+		return MAX_SPEED;
+
+	for(i = 0; i < MAX_SPEED; i++) {
+		if((fps >= spd_to_fps[size][i]) && (fps <= spd_to_fps[size][i+1])) {
+			DEBUG(2, "fps %d between %d and %d", fps, i, i+1);
+			if( (fps - spd_to_fps[size][i]) < (spd_to_fps[size][i+1] - fps))
+				return i;
+			else
+				return i+1;
+		}
+	}
+	return MAX_SPEED+1;
+}
+
+
+static int konicawc_set_video_mode(uvd_t *uvd, struct video_window *vw)
+{
+	struct konicawc *cam = (struct konicawc *)uvd->user_data;
+	int newspeed = cam->speed;
+	int newsize;
+	int x = vw->width;
+	int y = vw->height;
+	int fps = vw->flags;
+
+	if(x > 0 && y > 0) {
+		DEBUG(2, "trying to find size %d,%d", x, y);
+		for(newsize = 0; newsize <= MAX_FRAME_SIZE; newsize++) {
+			if((camera_sizes[newsize].width == x) && (camera_sizes[newsize].height == y))
+				break;
+		}
+	} else {
+		newsize = cam->size;
+	}
+
+	if(newsize > MAX_FRAME_SIZE) {
+		DEBUG(1, "couldnt find size %d,%d", x, y);
+		return -EINVAL;
+	}
+
+	if(fps > 0) {
+		DEBUG(1, "trying to set fps to %d", fps);
+		newspeed = konicawc_find_fps(newsize, fps);
+		DEBUG(1, "find_fps returned %d (%d)", newspeed, spd_to_fps[newsize][newspeed]);
+	}
+
+	if(newspeed > MAX_SPEED)
+		return -EINVAL;
+
+	DEBUG(1, "setting size to %d speed to %d", newsize, newspeed);
+	if((newsize == cam->size) && (newspeed == cam->speed)) {
+		DEBUG(1, "Nothing to do");
+		return 0;
+	}
+	DEBUG(0, "setting to  %dx%d @ %d fps", camera_sizes[newsize].width,
+	     camera_sizes[newsize].height, spd_to_fps[newsize][newspeed]/3);
+
+	konicawc_stop_data(uvd);
+	uvd->ifaceAltActive = spd_to_iface[newspeed];
+	DEBUG(1, "new interface = %d", uvd->ifaceAltActive);
+	cam->speed = newspeed;
+
+	if(cam->size != newsize) {
+		cam->size = newsize;
+		konicawc_set_camera_size(uvd);
+	}
+
+	/* Flush the input queue and clear any current frame in progress */
+
+	RingQueue_Flush(&uvd->dp);
+	cam->lastframe = -2;
+	if(uvd->curframe != -1) {
+	  uvd->frame[uvd->curframe].curline = 0;
+	  uvd->frame[uvd->curframe].seqRead_Length = 0;
+	  uvd->frame[uvd->curframe].seqRead_Index = 0;
+	}
+
+	konicawc_start_data(uvd);
+	return 0;
+}
+
+
 static int konicawc_calculate_fps(uvd_t *uvd)
 {
 	struct konicawc *cam = uvd->user_data;
@@ -602,10 +693,10 @@ static void konicawc_configure_video(uvd_t *uvd)
 	uvd->vcap.type = VID_TYPE_CAPTURE;
 	uvd->vcap.channels = 1;
 	uvd->vcap.audios = 0;
-	uvd->vcap.minwidth = camera_sizes[cam->size].width;
-	uvd->vcap.minheight = camera_sizes[cam->size].height;
-	uvd->vcap.maxwidth = camera_sizes[cam->size].width;
-	uvd->vcap.maxheight = camera_sizes[cam->size].height;
+	uvd->vcap.minwidth = camera_sizes[SIZE_160X120].width;
+	uvd->vcap.minheight = camera_sizes[SIZE_160X120].height;
+	uvd->vcap.maxwidth = camera_sizes[SIZE_320X240].width;
+	uvd->vcap.maxheight = camera_sizes[SIZE_320X240].height;
 
 	memset(&uvd->vchan, 0, sizeof(uvd->vchan));
 	uvd->vchan.flags = 0 ;
@@ -731,14 +822,14 @@ static void *konicawc_probe(struct usb_device *dev, unsigned int ifnum, const st
 		uvd->iso_packet_len = maxPS;
 		uvd->paletteBits = 1L << VIDEO_PALETTE_YUV420P;
 		uvd->defaultPalette = VIDEO_PALETTE_YUV420P;
-		uvd->canvas = VIDEOSIZE(cam->width, cam->height);
-		uvd->videosize = uvd->canvas;
+		uvd->canvas = VIDEOSIZE(320, 240);
+		uvd->videosize = VIDEOSIZE(cam->width, cam->height);
 
 		/* Initialize konicawc specific data */
 		konicawc_configure_video(uvd);
 
 		i = usbvideo_RegisterVideoDevice(uvd);
-		uvd->max_frame_size = (cam->width * cam->height * 3)/2;
+		uvd->max_frame_size = (320 * 240 * 3)/2;
 		if (i != 0) {
 			err("usbvideo_RegisterVideoDevice() failed.");
 			uvd = NULL;
@@ -797,6 +888,7 @@ static int __init konicawc_init(void)
 	cbTbl.setupOnOpen = konicawc_setup_on_open;
 	cbTbl.processData = konicawc_process_isoc;
 	cbTbl.getFPS = konicawc_calculate_fps;
+	cbTbl.setVideoMode = konicawc_set_video_mode;
 	cbTbl.startDataPump = konicawc_start_data;
 	cbTbl.stopDataPump = konicawc_stop_data;
 	cbTbl.adjustPicture = konicawc_adjust_picture;
