@@ -29,6 +29,7 @@ extern __u32 sysctl_rmem_default;
 
 extern int sysctl_core_destroy_delay;
 extern int sysctl_optmem_max;
+extern int sysctl_somaxconn;
 
 #ifdef CONFIG_NET_DIVERT
 extern char sysctl_divert_version[];
@@ -174,6 +175,14 @@ ctl_table core_table[] = {
 	},
 #endif /* CONFIG_NET_DIVERT */
 #endif /* CONFIG_NET */
+	{
+		.ctl_name	= NET_CORE_SOMAXCONN,
+		.procname	= "somaxconn",
+		.data		= &sysctl_somaxconn,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec
+	},
 	{ .ctl_name = 0 }
 };
 
