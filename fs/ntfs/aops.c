@@ -260,7 +260,7 @@ lock_retry_remap:
 				 * the duration.
 				 */
 				up_read(&ni->runlist.lock);
-				if (!map_runlist(ni, vcn))
+				if (!ntfs_map_runlist(ni, vcn))
 					goto lock_retry_remap;
 				rl = NULL;
 			}
@@ -667,7 +667,7 @@ lock_retry_remap:
 			 * the duration.
 			 */
 			up_read(&ni->runlist.lock);
-			err = map_runlist(ni, vcn);
+			err = ntfs_map_runlist(ni, vcn);
 			if (likely(!err))
 				goto lock_retry_remap;
 			rl = NULL;
@@ -1443,7 +1443,7 @@ lock_retry_remap:
 					 * lock for the duration.
 					 */
 					up_read(&ni->runlist.lock);
-					err = map_runlist(ni, vcn);
+					err = ntfs_map_runlist(ni, vcn);
 					if (likely(!err))
 						goto lock_retry_remap;
 					rl = NULL;

@@ -932,7 +932,7 @@ err_out:
 }
 
 /**
- * map_runlist - map (a part of) a run list of an ntfs inode
+ * ntfs_map_runlist - map (a part of) a run list of an ntfs inode
  * @ni:		ntfs inode for which to map (part of) a run list
  * @vcn:	map run list part containing this vcn
  *
@@ -940,7 +940,7 @@ err_out:
  *
  * Return 0 on success and -errno on error.
  */
-int map_runlist(ntfs_inode *ni, VCN vcn)
+int ntfs_map_runlist(ntfs_inode *ni, VCN vcn)
 {
 	ntfs_inode *base_ni;
 	attr_search_context *ctx;

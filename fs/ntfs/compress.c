@@ -621,7 +621,7 @@ lock_retry_remap:
 			 * duration.
 			 */
 			up_read(&ni->runlist.lock);
-			if (!map_runlist(ni, vcn))
+			if (!ntfs_map_runlist(ni, vcn))
 				goto lock_retry_remap;
 			goto map_rl_err;
 		}
@@ -920,8 +920,8 @@ read_err:
 	goto err_out;
 
 map_rl_err:
-	ntfs_error(vol->sb, "map_runlist() failed. Cannot read compression "
-			"block.");
+	ntfs_error(vol->sb, "ntfs_map_runlist() failed. Cannot read "
+			"compression block.");
 	goto err_out;
 
 rl_err:

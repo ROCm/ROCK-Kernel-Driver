@@ -75,7 +75,7 @@ typedef struct {
 extern runlist_element *decompress_mapping_pairs(const ntfs_volume *vol,
 		const ATTR_RECORD *attr, runlist_element *old_rl);
 
-extern int map_runlist(ntfs_inode *ni, VCN vcn);
+extern int ntfs_map_runlist(ntfs_inode *ni, VCN vcn);
 
 extern LCN vcn_to_lcn(const runlist_element *rl, const VCN vcn);
 
