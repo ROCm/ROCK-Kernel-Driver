@@ -600,9 +600,22 @@ static inline int NCR5380_pwrite (struct Scsi_Host *instance, unsigned char *src
 
 #include "NCR5380.c"
 
+static int pas16_release(struct Scsi_Host *shost)
+{
+	if (shost->irq)
+		free_irq(shost->irq, NULL);
+	if (shost->dma_channel != 0xff)
+		free_dma(shost->dma_channel);
+	if (shost->io_port && shost->n_io_port)
+		release_region(shost->io_port, shost->n_io_port);
+	scsi_unregister(shost);
+	return 0;
+}
+
 static Scsi_Host_Template driver_template = {
 	.name           = "Pro Audio Spectrum-16 SCSI",
 	.detect         = pas16_detect,
+	.release        = pas16_release,
 	.queuecommand   = pas16_queue_command,
 	.eh_abort_handler = pas16_abort,
 	.eh_bus_reset_handler = pas16_bus_reset,

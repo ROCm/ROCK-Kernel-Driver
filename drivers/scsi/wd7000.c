@@ -1031,14 +1031,6 @@ static int make_code(unsigned hosterr, unsigned scsierr)
 	return (scsierr | (hosterr << 16));
 }
 
-
-static void wd7000_scsi_done(Scsi_Cmnd * SCpnt)
-{
-	dprintk("wd7000_scsi_done: 0x%06lx\n", (long) SCpnt);
-	SCpnt->SCp.phase = 0;
-}
-
-
 #define wd7000_intr_ack(host)   outb (0, host->iobase + ASC_INTR_ACK)
 
 static void wd7000_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
@@ -1187,20 +1179,6 @@ static int wd7000_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 
 	return 0;
 }
-
-
-static int wd7000_command(Scsi_Cmnd * SCpnt)
-{
-	wd7000_queuecommand(SCpnt, wd7000_scsi_done);
-
-	while (SCpnt->SCp.phase > 0) {
-		cpu_relax();
-		barrier();	/* phase counts scbs down to 0 */
-	}
-
-	return (SCpnt->result);
-}
-
 
 static int wd7000_diagnostics(Adapter * host, int code)
 {
@@ -1616,6 +1594,15 @@ static int wd7000_detect(Scsi_Host_Template * tpnt)
 	return (present);
 }
 
+static int wd7000_release(struct Scsi_Host *shost)
+{
+	if (shost->irq)
+		free_irq(shost->irq, NULL);
+	if (shost->io_port && shost->n_io_port)
+		release_region(shost->io_port, shost->n_io_port);
+	scsi_unregister(shost);
+	return 0;
+}
 
 /*
  *  I have absolutely NO idea how to do an abort with the WD7000...
@@ -1722,7 +1709,7 @@ static Scsi_Host_Template driver_template = {
 	.proc_info		= wd7000_proc_info,
 	.name			= "Western Digital WD-7000",
 	.detect			= wd7000_detect,
-	.command		= wd7000_command,
+	.release		= wd7000_release,
 	.queuecommand		= wd7000_queuecommand,
 	.eh_bus_reset_handler	= wd7000_bus_reset,
 	.eh_device_reset_handler = wd7000_device_reset,

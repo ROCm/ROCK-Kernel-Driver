@@ -255,11 +255,6 @@
  be increased by changing this value to values which are close to 2.
  Please let me know if you try any different values.
 
- DO_DETECT: This activates some old scan code which was needed before the
- high level drivers got fixed.  If you are having trouble with the driver,
- turning this on should not hurt, and might help.  Please let me know if
- this is the case, since this code will be removed from future drivers.
-
  RESELECTION: This is no longer an option, since I gave up trying to
  implement it in version 4.x of this driver.  It did not improve
  performance at all and made the driver unstable (because I never found one
@@ -303,7 +298,6 @@ MODULE_LICENSE("GPL");
 #define DEBUG            0	/* Enable debugging output */
 #define ENABLE_PARITY    1	/* Enable SCSI Parity */
 #define FIFO_COUNT       2	/* Number of 512 byte blocks before INTR */
-#define DO_DETECT        0	/* Do device detection here (see scsi.c) */
 
 /* END OF USER DEFINABLE OPTIONS */
 
@@ -863,17 +857,6 @@ struct Scsi_Host *__fdomain_16x0_detect( Scsi_Host_Template *tpnt )
    int              retcode;
    struct Scsi_Host *shpnt;
    struct pci_dev *pdev = NULL;
-#if DO_DETECT
-   int i = 0;
-   int j = 0;
-   const int        buflen = 255;
-   Scsi_Cmnd        SCinit;
-   unsigned char    do_inquiry[] =       { INQUIRY, 0, 0, 0, buflen, 0 };
-   unsigned char    do_request_sense[] = { REQUEST_SENSE, 0, 0, 0, buflen, 0 };
-   unsigned char    do_read_capacity[] = { READ_CAPACITY,
-					   0, 0, 0, 0, 0, 0, 0, 0, 0 };
-   unsigned char    buf[buflen];
-#endif
 
    if (setup_called) {
 #if DEBUG_DETECT
@@ -983,59 +966,6 @@ struct Scsi_Host *__fdomain_16x0_detect( Scsi_Host_Template *tpnt )
 
    /* Log I/O ports with kernel */
    request_region( port_base, 0x10, "fdomain" );
-
-#if DO_DETECT
-
-   /* These routines are here because of the way the SCSI bus behaves after
-      a reset.  This appropriate behavior was not handled correctly by the
-      higher level SCSI routines when I first wrote this driver.  Now,
-      however, correct scan routines are part of scsi.c and these routines
-      are no longer needed.  However, this code is still good for
-      debugging.  */
-
-   SCinit.request_buffer  = SCinit.buffer = buf;
-   SCinit.request_bufflen = SCinit.bufflen = sizeof(buf)-1;
-   SCinit.use_sg          = 0;
-   SCinit.lun             = 0;
-
-   printk( "scsi: <fdomain> detection routine scanning for devices:\n" );
-   for (i = 0; i < 8; i++) {
-      SCinit.target = i;
-      if (i == tpnt->this_id)	/* Skip host adapter */
-	    continue;
-      memcpy(SCinit.cmnd, do_request_sense, sizeof(do_request_sense));
-      retcode = fdomain_16x0_command(&SCinit);
-      if (!retcode) {
-	 memcpy(SCinit.cmnd, do_inquiry, sizeof(do_inquiry));
-	 retcode = fdomain_16x0_command(&SCinit);
-	 if (!retcode) {
-	    printk( "     SCSI ID %d: ", i );
-	    for (j = 8; j < (buf[4] < 32 ? buf[4] : 32); j++)
-		  printk( "%c", buf[j] >= 20 ? buf[j] : ' ' );
-	    memcpy(SCinit.cmnd, do_read_capacity, sizeof(do_read_capacity));
-	    retcode = fdomain_16x0_command(&SCinit);
-	    if (!retcode) {
-	       unsigned long blocks, size, capacity;
-	       
-	       blocks = (buf[0] << 24) | (buf[1] << 16)
-		     | (buf[2] << 8) | buf[3];
-	       size = (buf[4] << 24) | (buf[5] << 16) | (buf[6] << 8) | buf[7];
-	       capacity = +( +(blocks / 1024L) * +(size * 10L)) / 1024L;
-	       
-	       printk( "%lu MB (%lu byte blocks)",
-		       ((capacity + 5L) / 10L), size );
-	    } else {
-	       memcpy(SCinit.cmnd, do_request_sense, sizeof(do_request_sense));
-	       retcode = fdomain_16x0_command(&SCinit);
-	    }
-	    printk ("\n" );
-	 } else {
-	    memcpy(SCinit.cmnd, do_request_sense, sizeof(do_request_sense));
-	    retcode = fdomain_16x0_command(&SCinit);
-	 }
-      }
-   }
-#endif
 
    return shpnt;
 }
@@ -1508,31 +1438,6 @@ static int fdomain_16x0_queue( Scsi_Cmnd * SCpnt, void (*done)(Scsi_Cmnd *))
    return 0;
 }
 
-/* The following code, which simulates the old-style command function, was
-   taken from Tommy Thorn's aha1542.c file.  This code is Copyright (C)
-   1992 Tommy Thorn. */
-
-static volatile int internal_done_flag    = 0;
-static volatile int internal_done_errcode = 0;
-
-static void internal_done(Scsi_Cmnd *SCpnt)
-{
-    internal_done_errcode = SCpnt->result;
-    ++internal_done_flag;
-}
-
-static int fdomain_16x0_command(Scsi_Cmnd *SCpnt)
-{
-    fdomain_16x0_queue(SCpnt, internal_done);
-
-    while (!internal_done_flag)
-	  cpu_relax();
-    internal_done_flag = 0;
-    return internal_done_errcode;
-}
-
-/* End of code derived from Tommy Thorn's work. */
-
 #if DEBUG_ABORT
 static void print_info(Scsi_Cmnd *SCpnt)
 {
@@ -1833,7 +1738,6 @@ Scsi_Host_Template fdomain_driver_template = {
 	.proc_name		= "fdomain",
 	.detect			= fdomain_16x0_detect,
 	.info			= fdomain_16x0_info,
-	.command		= fdomain_16x0_command,
 	.queuecommand		= fdomain_16x0_queue,
 	.eh_abort_handler	= fdomain_16x0_abort,
 	.eh_bus_reset_handler	= fdomain_16x0_bus_reset,

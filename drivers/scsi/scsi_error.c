@@ -44,6 +44,16 @@
 #define BUS_RESET_SETTLE_TIME   10*HZ
 #define HOST_RESET_SETTLE_TIME  10*HZ
 
+/* called with shost->host_lock held */
+void scsi_eh_wakeup(struct Scsi_Host *shost)
+{
+	if (shost->host_busy == shost->host_failed) {
+		up(shost->eh_wait);
+		SCSI_LOG_ERROR_RECOVERY(5,
+				printk("Waking error handler thread\n"));
+	}
+}
+
 /**
  * scsi_eh_scmd_add - add scsi cmd to error handling.
  * @scmd:	scmd to run eh on.
@@ -76,14 +86,8 @@ int scsi_eh_scmd_add(struct scsi_cmnd *scmd, int eh_flag)
 	list_add_tail(&scmd->eh_entry, &shost->eh_cmd_q);
 	shost->in_recovery = 1;
 	shost->host_failed++;
-	if (shost->host_busy == shost->host_failed) {
-		up(shost->eh_wait);
-		SCSI_LOG_ERROR_RECOVERY(5, printk("Waking error handler"
-					  " thread\n"));
-	}
-
+	scsi_eh_wakeup(shost);
 	spin_unlock_irqrestore(shost->host_lock, flags);
-
 	return 1;
 }
 
@@ -431,6 +435,7 @@ static void scsi_eh_done(struct scsi_cmnd *scmd)
 static int scsi_send_eh_cmnd(struct scsi_cmnd *scmd, int timeout)
 {
 	struct Scsi_Host *host = scmd->device->host;
+	DECLARE_MUTEX_LOCKED(sem);
 	unsigned long flags;
 	int rtn = SUCCESS;
 
@@ -444,71 +449,53 @@ static int scsi_send_eh_cmnd(struct scsi_cmnd *scmd, int timeout)
 		scmd->cmnd[1] = (scmd->cmnd[1] & 0x1f) |
 			(scmd->device->lun << 5 & 0xe0);
 
-	if (host->can_queue) {
-		DECLARE_MUTEX_LOCKED(sem);
+	scsi_add_timer(scmd, timeout, scsi_eh_times_out);
 
-		scsi_add_timer(scmd, timeout, scsi_eh_times_out);
+	/*
+	 * set up the semaphore so we wait for the command to complete.
+	 */
+	scmd->device->host->eh_action = &sem;
+	scmd->request->rq_status = RQ_SCSI_BUSY;
+
+	spin_lock_irqsave(scmd->device->host->host_lock, flags);
+	host->hostt->queuecommand(scmd, scsi_eh_done);
+	spin_unlock_irqrestore(scmd->device->host->host_lock, flags);
+
+	down(&sem);
+
+	scmd->device->host->eh_action = NULL;
+
+	/*
+	 * see if timeout.  if so, tell the host to forget about it.
+	 * in other words, we don't want a callback any more.
+	 */
+	if (scsi_eh_eflags_chk(scmd, SCSI_EH_REC_TIMEOUT)) {
+		scsi_eh_eflags_clr(scmd,  SCSI_EH_REC_TIMEOUT);
+		scmd->owner = SCSI_OWNER_LOWLEVEL;
 
 		/*
-		 * set up the semaphore so we wait for the command to complete.
+		 * as far as the low level driver is
+		 * concerned, this command is still active, so
+		 * we must give the low level driver a chance
+		 * to abort it. (db) 
+		 *
+		 * FIXME(eric) - we are not tracking whether we could
+		 * abort a timed out command or not.  not sure how
+		 * we should treat them differently anyways.
 		 */
-		scmd->device->host->eh_action = &sem;
-		scmd->request->rq_status = RQ_SCSI_BUSY;
-
 		spin_lock_irqsave(scmd->device->host->host_lock, flags);
-		host->hostt->queuecommand(scmd, scsi_eh_done);
+		if (scmd->device->host->hostt->eh_abort_handler)
+			scmd->device->host->hostt->eh_abort_handler(scmd);
 		spin_unlock_irqrestore(scmd->device->host->host_lock, flags);
-
-		down(&sem);
-
-		scmd->device->host->eh_action = NULL;
-
-		/*
-		 * see if timeout.  if so, tell the host to forget about it.
-		 * in other words, we don't want a callback any more.
-		 */
-		if (scsi_eh_eflags_chk(scmd, SCSI_EH_REC_TIMEOUT)) {
-			scsi_eh_eflags_clr(scmd,  SCSI_EH_REC_TIMEOUT);
-                        scmd->owner = SCSI_OWNER_LOWLEVEL;
-
-			/*
-			 * as far as the low level driver is
-			 * concerned, this command is still active, so
-			 * we must give the low level driver a chance
-			 * to abort it. (db) 
-			 *
-			 * FIXME(eric) - we are not tracking whether we could
-			 * abort a timed out command or not.  not sure how
-			 * we should treat them differently anyways.
-			 */
-			spin_lock_irqsave(scmd->device->host->host_lock, flags);
-			if (scmd->device->host->hostt->eh_abort_handler)
-				scmd->device->host->hostt->eh_abort_handler(scmd);
-			spin_unlock_irqrestore(scmd->device->host->host_lock,
-					       flags);
 			
-			scmd->request->rq_status = RQ_SCSI_DONE;
-			scmd->owner = SCSI_OWNER_ERROR_HANDLER;
+		scmd->request->rq_status = RQ_SCSI_DONE;
+		scmd->owner = SCSI_OWNER_ERROR_HANDLER;
 			
-			rtn = FAILED;
-		}
-		SCSI_LOG_ERROR_RECOVERY(3, printk("%s: scmd: %p, rtn:%x\n",
-						  __FUNCTION__, scmd, rtn));
-	} else {
-		int temp;
-
-		/*
-		 * we damn well had better never use this code.  there is no
-		 * timeout protection here, since we would end up waiting in
-		 * the actual low level driver, we don't know how to wake it up.
-		 */
-		spin_lock_irqsave(host->host_lock, flags);
-		temp = host->hostt->command(scmd);
-		spin_unlock_irqrestore(host->host_lock, flags);
-
-		scmd->result = temp;
-		/* fall through to code below to examine status. */
+		rtn = FAILED;
 	}
+
+	SCSI_LOG_ERROR_RECOVERY(3, printk("%s: scmd: %p, rtn:%x\n",
+					  __FUNCTION__, scmd, rtn));
 
 	/*
 	 * now examine the actual status codes to see whether the command

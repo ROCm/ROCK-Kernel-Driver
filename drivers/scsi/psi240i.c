@@ -496,31 +496,6 @@ int Psi240i_QueueCommand (Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 	return 0;
 	}
 
-static void internal_done(Scsi_Cmnd * SCpnt)
-	{
-	SCpnt->SCp.Status++;
-	}
-/****************************************************************
- *	Name:	Psi240i_Command
- *
- *	Description:	Process a command from the SCSI manager.
- *
- *	Parameters:		SCpnt - Pointer to SCSI command structure.
- *
- *	Returns:		Status code.
- *
- ****************************************************************/
-int Psi240i_Command (Scsi_Cmnd *SCpnt)
-	{
-	DEB(printk("psi240i_command: ..calling psi240i_queuecommand\n"));
-
-	Psi240i_QueueCommand (SCpnt, internal_done);
-
-    SCpnt->SCp.Status = 0;
-	while (!SCpnt->SCp.Status)
-		barrier ();
-	return SCpnt->result;
-	}
 /***************************************************************************
  *	Name:			ReadChipMemory
  *
@@ -655,6 +630,17 @@ host_init_failure:
 		}
 	return count;
 	}
+
+static int Psi240i_Release(struct Scsi_Host *shost)
+{
+	if (shost->irq)
+		free_irq(shost->irq, NULL);
+	if (shost->io_port && shost->n_io_port)
+		release_region(shost->io_port, shost->n_io_port);
+	scsi_unregister(shost);
+	return 0;
+}
+
 /****************************************************************
  *	Name:	Psi240i_Abort
  *
@@ -722,7 +708,7 @@ static Scsi_Host_Template driver_template = {
 	.proc_name		= "psi240i", 
 	.name			= "PSI-240I EIDE Disk Controller",
 	.detect			= Psi240i_Detect,
-	.command		= Psi240i_Command,
+	.release		= Psi240i_Release,
 	.queuecommand		= Psi240i_QueueCommand,
 	.abort	  		= Psi240i_Abort,
 	.reset	  		= Psi240i_Reset,

@@ -104,7 +104,7 @@ hpusbscsi_usb_probe(struct usb_interface *intf,
 		goto out_free_controlurb;
 
 	/* In host->hostdata we store a pointer to desc */
-	new->host = scsi_register(&hpusbscsi_scsi_host_template, sizeof(new));
+	new->host = scsi_host_alloc(&hpusbscsi_scsi_host_template, sizeof(new));
 	if (!new->host)
 		goto out_unlink_controlurb;
 
@@ -137,7 +137,7 @@ hpusbscsi_usb_disconnect(struct usb_interface *intf)
 
 	scsi_remove_host(desc->host);
 	usb_unlink_urb(desc->controlurb);
-	scsi_unregister(desc->host);
+	scsi_host_put(desc->host);
 
 	usb_free_urb(desc->controlurb);
 	usb_free_urb(desc->dataurb);

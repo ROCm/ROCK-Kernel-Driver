@@ -53,9 +53,22 @@ int mvme16x_scsi_detect(Scsi_Host_Template *tpnt)
     return 1;
 }
 
+static int mvme16x_scsi_release(struct Scsi_Host *shost)
+{
+	if (shost->irq)
+		free_irq(shost->irq, NULL);
+	if (shost->dma_channel != 0xff)
+		free_dma(shost->dma_channel);
+	if (shost->io_port && shost->n_io_port)
+		release_region(shost->io_port, shost->n_io_port);
+	scsi_unregister(shost);
+	return 0;
+}
+
 static Scsi_Host_Template driver_template = {
 	.name			= "MVME16x NCR53c710 SCSI",
 	.detect			= mvme16x_scsi_detect,
+	.release		= mvme16x_scsi_release,
 	.queuecommand		= NCR53c7xx_queue_command,
 	.abort			= NCR53c7xx_abort,
 	.reset			= NCR53c7xx_reset,
