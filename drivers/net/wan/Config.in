@@ -9,11 +9,12 @@ bool 'Wan interfaces support' CONFIG_WAN
 if [ "$CONFIG_WAN" = "y" ]; then
 # There is no way to detect a comtrol sv11 - force it modular for now.
 
+   if [ "$CONFIG_ISA" = "y" ]; then
    dep_tristate '  Comtrol Hostess SV-11 support' CONFIG_HOSTESS_SV11 m
-
 # The COSA/SRP driver has not been tested as non-modular yet.
 
    dep_tristate '  COSA/SRP sync serial boards support' CONFIG_COSA m
+   fi
 
 #
 # COMX drivers
