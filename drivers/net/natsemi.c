@@ -360,6 +360,18 @@ enum pcistuff {
 #define PCI_IOTYPE (PCI_USES_MASTER | PCI_USES_MEM | PCI_ADDR1)
 
 
+/*
+ * Support for fibre connections on Am79C874:
+ * This phy needs a special setup when connected to a fibre cable.
+ * http://www.amd.com/files/connectivitysolutions/networking/archivednetworking/22235.pdf
+ */
+#define PHYID_AM79C874	0x0022561b
+
+#define MII_MCTRL	0x15	/* mode control register */
+#define MII_FX_SEL	0x0001	/* 100BASE-FX (fiber) */
+#define MII_EN_SCRM	0x0004	/* enable scrambler (tp) */
+
+ 
 /* array of board data directly indexed by pci_tbl[x].driver_data */
 static struct {
 	const char *name;
@@ -463,6 +475,9 @@ enum EECtrl_bits {
 	EE_DataIn		= 0x01,
 	EE_ChipSelect		= 0x08,
 	EE_DataOut		= 0x02,
+	MII_Data 		= 0x10,
+	MII_Write		= 0x20,
+	MII_ShiftClk		= 0x40,
 };
 
 enum PCIBusCfg_bits {
@@ -594,8 +609,11 @@ enum MIntrCtrl_bits {
 };
 
 enum PhyCtrl_bits {
-	PhyAddrMask		= 0xf,
+	PhyAddrMask		= 0x1f,
 };
+
+#define PHY_ADDR_NONE		32
+#define PHY_ADDR_INTERNAL	1
 
 /* values we might find in the silicon revision register */
 #define SRR_DP83815_C	0x0302
@@ -656,7 +674,9 @@ struct netdev_private {
 	int oom;
 	/* Do not touch the nic registers */
 	int hands_off;
-	/* These values are keep track of the transceiver/media in use */
+	/* external phy that is used: only valid if dev->if_port != PORT_TP */
+	int mii;
+	int phy_addr_external;
 	unsigned int full_duplex;
 	/* Rx filter */
 	u32 cur_rx_mode;
@@ -669,6 +689,10 @@ struct netdev_private {
 	u32 srr;
 	/* expected DSPCFG value */
 	u16 dspcfg;
+	/* parms saved in ethtool format */
+	u16	speed;		/* The forced speed, 10Mb, 100Mb, gigabit */
+	u8	duplex;		/* Duplex, half or full */
+	u8	autoneg;	/* Autonegotiation enabled */
 	/* MII transceiver section */
 	u16 advertising;
 	unsigned int iosize;
@@ -676,9 +700,14 @@ struct netdev_private {
 	u32 msg_enable;
 };
 
+static void move_int_phy(struct net_device *dev, int addr);
 static int eeprom_read(long ioaddr, int location);
-static int mdio_read(struct net_device *dev, int phy_id, int reg);
-static void mdio_write(struct net_device *dev, int phy_id, int reg, u16 data);
+static int mdio_read(struct net_device *dev, int reg);
+static void mdio_write(struct net_device *dev, int reg, u16 data);
+static void init_phy_fixup(struct net_device *dev);
+static int miiport_read(struct net_device *dev, int phy_id, int reg);
+static void miiport_write(struct net_device *dev, int phy_id, int reg, u16 data);
+static int find_mii(struct net_device *dev);
 static void natsemi_reset(struct net_device *dev);
 static void natsemi_reload_eeprom(struct net_device *dev);
 static void natsemi_stop_rxtx(struct net_device *dev);
@@ -718,6 +747,29 @@ static int netdev_close(struct net_device *dev);
 static int netdev_get_regs(struct net_device *dev, u8 *buf);
 static int netdev_get_eeprom(struct net_device *dev, u8 *buf);
 
+static void move_int_phy(struct net_device *dev, int addr)
+{
+	struct netdev_private *np = dev->priv;
+	int target = 31;
+
+	/* 
+	 * The internal phy is visible on the external mii bus. Therefore we must
+	 * move it away before we can send commands to an external phy.
+	 * There are two addresses we must avoid:
+	 * - the address on the external phy that is used for transmission.
+	 * - the address that we want to access. User space can access phys
+	 *   on the mii bus with SIOCGMIIREG/SIOCSMIIREG, independant from the
+	 *   phy that is used for transmission.
+	 */
+
+	if (target == addr)
+		target--;
+	if (target == np->phy_addr_external)
+		target--;
+	writew(target, dev->base_addr + PhyCtrl);
+	readw(dev->base_addr + PhyCtrl);
+	udelay(1);
+}
 
 static int __devinit natsemi_probe1 (struct pci_dev *pdev,
 	const struct pci_device_id *ent)
@@ -797,9 +849,31 @@ static int __devinit natsemi_probe1 (struct pci_dev *pdev,
 	np->msg_enable = (debug >= 0) ? (1<<debug)-1 : NATSEMI_DEF_MSG;
 	np->hands_off = 0;
 
+	/* Initial port:
+	 * - If the nic was configured to use an external phy and if find_mii
+	 *   finds a phy: use external port, first phy that replies.
+	 * - Otherwise: internal port.
+	 * Note that the phy address for the internal phy doesn't matter:
+	 * The address would be used to access a phy over the mii bus, but
+	 * the internal phy is accessed through mapped registers.
+	 */
+	if (readl(dev->base_addr + ChipConfig) & CfgExtPhy)
+		dev->if_port = PORT_MII;
+	else
+		dev->if_port = PORT_TP;
 	/* Reset the chip to erase previous misconfiguration. */
 	natsemi_reload_eeprom(dev);
 	natsemi_reset(dev);
+
+	if (dev->if_port != PORT_TP) {
+		np->phy_addr_external = find_mii(dev);
+		if (np->phy_addr_external == PHY_ADDR_NONE) {
+			dev->if_port = PORT_TP;
+			np->phy_addr_external = PHY_ADDR_INTERNAL;
+		}
+	} else {
+		np->phy_addr_external = PHY_ADDR_INTERNAL;
+	}
 
 	option = find_cnt < MAX_UNITS ? options[find_cnt] : 0;
 	if (dev->mem_start)
@@ -811,8 +885,8 @@ static int __devinit natsemi_probe1 (struct pci_dev *pdev,
 			np->full_duplex = 1;
 		if (option & 15)
 			printk(KERN_INFO
-				"%s: ignoring user supplied media type %d",
-				dev->name, option & 15);
+				"natsemi %s: ignoring user supplied media type %d",
+				pci_name(np->pci_dev), option & 15);
 	}
 	if (find_cnt < MAX_UNITS  &&  full_duplex[find_cnt])
 		np->full_duplex = 1;
@@ -830,45 +904,57 @@ static int __devinit natsemi_probe1 (struct pci_dev *pdev,
 	if (mtu)
 		dev->mtu = mtu;
 
-	i = register_netdev(dev);
-	if (i)
-		goto err_register_netdev;
-
 	netif_carrier_off(dev);
 
-	if (netif_msg_drv(np)) {
-		printk(KERN_INFO "%s: %s at %#08lx, ",
-			dev->name, natsemi_pci_info[chip_idx].name, ioaddr);
-		for (i = 0; i < ETH_ALEN-1; i++)
-				printk("%02x:", dev->dev_addr[i]);
-		printk("%02x, IRQ %d.\n", dev->dev_addr[i], irq);
-	}
+	/* get the initial settings from hardware */
+	tmp            = mdio_read(dev, MII_BMCR);
+	np->speed      = (tmp & BMCR_SPEED100)? SPEED_100     : SPEED_10;
+	np->duplex     = (tmp & BMCR_FULLDPLX)? DUPLEX_FULL   : DUPLEX_HALF;
+	np->autoneg    = (tmp & BMCR_ANENABLE)? AUTONEG_ENABLE: AUTONEG_DISABLE;
+	np->advertising= mdio_read(dev, MII_ADVERTISE);
 
-	np->advertising = mdio_read(dev, 1, MII_ADVERTISE);
-	if ((readl(ioaddr + ChipConfig) & 0xe000) != 0xe000
+	if ((np->advertising & ADVERTISE_ALL) != ADVERTISE_ALL
 	 && netif_msg_probe(np)) {
-		u32 chip_config = readl(ioaddr + ChipConfig);
-		printk(KERN_INFO "%s: Transceiver default autonegotiation %s "
+		printk(KERN_INFO "natsemi %s: Transceiver default autonegotiation %s "
 			"10%s %s duplex.\n",
-			dev->name,
-			chip_config & CfgAnegEnable ?
+			pci_name(np->pci_dev),
+			(mdio_read(dev, MII_BMCR) & BMCR_ANENABLE)?
 			  "enabled, advertise" : "disabled, force",
-			chip_config & CfgAneg100 ? "0" : "",
-			chip_config & CfgAnegFull ? "full" : "half");
+			(np->advertising &
+			  (ADVERTISE_100FULL|ADVERTISE_100HALF))?
+			    "0" : "",
+			(np->advertising &
+			  (ADVERTISE_100FULL|ADVERTISE_10FULL))?
+			    "full" : "half");
 	}
 	if (netif_msg_probe(np))
 		printk(KERN_INFO
-			"%s: Transceiver status %#04x advertising %#04x.\n",
-			dev->name, mdio_read(dev, 1, MII_BMSR),
+			"natsemi %s: Transceiver status %#04x advertising %#04x.\n",
+			pci_name(np->pci_dev), mdio_read(dev, MII_BMSR),
 			np->advertising);
 
 	/* save the silicon revision for later querying */
 	np->srr = readl(ioaddr + SiliconRev);
 	if (netif_msg_hw(np))
-		printk(KERN_INFO "%s: silicon revision %#04x.\n",
-				dev->name, np->srr);
+		printk(KERN_INFO "natsemi %s: silicon revision %#04x.\n",
+				pci_name(np->pci_dev), np->srr);
 
+	i = register_netdev(dev);
+	if (i)
+		goto err_register_netdev;
 
+	if (netif_msg_drv(np)) {
+		printk(KERN_INFO "natsemi %s: %s at %#08lx (%s), ",
+			dev->name, natsemi_pci_info[chip_idx].name, ioaddr,
+			pci_name(np->pci_dev));
+		for (i = 0; i < ETH_ALEN-1; i++)
+				printk("%02x:", dev->dev_addr[i]);
+		printk("%02x, IRQ %d", dev->dev_addr[i], irq);
+		if (dev->if_port == PORT_TP)
+			printk(", port TP.\n");
+		else
+			printk(", port MII, phy ad %d.\n", np->phy_addr_external);
+	}
 	return 0;
 
  err_register_netdev:
@@ -939,25 +1025,335 @@ static int eeprom_read(long addr, int location)
 
 /* MII transceiver control section.
  * The 83815 series has an internal transceiver, and we present the
- * management registers as if they were MII connected. */
+ * internal management registers as if they were MII connected.
+ * External Phy registers are referenced through the MII interface.
+ */
 
-static int mdio_read(struct net_device *dev, int phy_id, int reg)
+/* clock transitions >= 20ns (25MHz)
+ * One readl should be good to PCI @ 100MHz
+ */
+#define mii_delay(dev)  readl(dev->base_addr + EECtrl)
+
+static int mii_getbit (struct net_device *dev)
 {
-	if (phy_id == 1 && reg < 32)
-		return readl(dev->base_addr+BasicControl+(reg<<2))&0xffff;
-	else
-		return 0xffff;
+	int data;
+
+	writel(MII_ShiftClk, dev->base_addr + EECtrl);
+	data = readl(dev->base_addr + EECtrl);
+	writel(0, dev->base_addr + EECtrl);
+	mii_delay(dev);
+	return (data & MII_Data)? 1 : 0;
 }
 
-static void mdio_write(struct net_device *dev, int phy_id, int reg, u16 data)
+static void mii_send_bits (struct net_device *dev, u32 data, int len)
+{
+	u32 i;
+
+	for (i = (1 << (len-1)); i; i >>= 1)
+	{
+		u32 mdio_val = MII_Write | ((data & i)? MII_Data : 0);
+		writel(mdio_val, dev->base_addr + EECtrl);
+		mii_delay(dev);
+		writel(mdio_val | MII_ShiftClk, dev->base_addr + EECtrl);
+		mii_delay(dev);
+	}
+	writel(0, dev->base_addr + EECtrl);
+	mii_delay(dev);
+}
+
+static int miiport_read(struct net_device *dev, int phy_id, int reg)
+{
+	u32 cmd;
+	int i;
+	u32 retval = 0;
+
+	/* Ensure sync */
+	mii_send_bits (dev, 0xffffffff, 32);
+	/* ST(2), OP(2), ADDR(5), REG#(5), TA(2), Data(16) total 32 bits */
+	/* ST,OP = 0110'b for read operation */
+	cmd = (0x06 << 10) | (phy_id << 5) | reg;
+	mii_send_bits (dev, cmd, 14);
+	/* Turnaround */
+	if (mii_getbit (dev))
+		return 0;
+	/* Read data */
+	for (i = 0; i < 16; i++) {
+		retval <<= 1;
+		retval |= mii_getbit (dev);
+	}
+	/* End cycle */
+	mii_getbit (dev);
+	return retval;
+}
+
+static void miiport_write(struct net_device *dev, int phy_id, int reg, u16 data)
+{
+	u32 cmd;
+
+	/* Ensure sync */
+	mii_send_bits (dev, 0xffffffff, 32);
+	/* ST(2), OP(2), ADDR(5), REG#(5), TA(2), Data(16) total 32 bits */
+	/* ST,OP,AAAAA,RRRRR,TA = 0101xxxxxxxxxx10'b = 0x5002 for write */
+	cmd = (0x5002 << 16) | (phy_id << 23) | (reg << 18) | data;
+	mii_send_bits (dev, cmd, 32);
+	/* End cycle */
+	mii_getbit (dev);
+}
+
+static int mdio_read(struct net_device *dev, int reg)
 {
 	struct netdev_private *np = dev->priv;
-	if (phy_id == 1 && reg < 32) {
+
+	/* The 83815 series has two ports:
+	 * - an internal transceiver
+	 * - an external mii bus
+	 */
+	if (dev->if_port == PORT_TP)
+		return readw(dev->base_addr+BasicControl+(reg<<2));
+	else
+		return miiport_read(dev, np->phy_addr_external, reg);
+}
+
+static void mdio_write(struct net_device *dev, int reg, u16 data)
+{
+	struct netdev_private *np = dev->priv;
+
+	/* The 83815 series has an internal transceiver; handle separately */
+	if (dev->if_port == PORT_TP)
 		writew(data, dev->base_addr+BasicControl+(reg<<2));
-		switch (reg) {
-			case MII_ADVERTISE: np->advertising = data; break;
+	else
+		miiport_write(dev, np->phy_addr_external, reg, data);
+}
+
+static void init_phy_fixup(struct net_device *dev)
+{
+	struct netdev_private *np = dev->priv;
+	long ioaddr = dev->base_addr;
+	int i;
+	u32 cfg;
+	u16 tmp;
+
+	/* restore stuff lost when power was out */
+	tmp = mdio_read(dev, MII_BMCR);
+	if (np->autoneg == AUTONEG_ENABLE) {
+		/* renegotiate if something changed */
+		if ((tmp & BMCR_ANENABLE) == 0
+		 || np->advertising != mdio_read(dev, MII_ADVERTISE))
+		{
+			/* turn on autonegotiation and force negotiation */
+			tmp |= (BMCR_ANENABLE | BMCR_ANRESTART);
+			mdio_write(dev, MII_ADVERTISE, np->advertising);
+		}
+	} else {
+		/* turn off auto negotiation, set speed and duplexity */
+		tmp &= ~(BMCR_ANENABLE | BMCR_SPEED100 | BMCR_FULLDPLX);
+		if (np->speed == SPEED_100)
+			tmp |= BMCR_SPEED100;
+		if (np->duplex == DUPLEX_FULL)
+			tmp |= BMCR_FULLDPLX;
+		/* 
+		 * Note: there is no good way to inform the link partner
+		 * that our capabilities changed. The user has to unplug
+		 * and replug the network cable after some changes, e.g.
+		 * after switching from 10HD, autoneg off to 100 HD,
+		 * autoneg off.
+		 */
+	}
+	mdio_write(dev, MII_BMCR, tmp);
+	readl(dev->base_addr + ChipConfig);
+	udelay(1);
+
+	/* find out what phy this is */
+	np->mii = (mdio_read(dev, MII_PHYSID1) << 16)
+				+ mdio_read(dev, MII_PHYSID2);
+
+	/* handle external phys here */
+	switch (np->mii) {
+	case PHYID_AM79C874:
+		/* phy specific configuration for fibre/tp operation */
+		tmp = mdio_read(dev, MII_MCTRL);
+		tmp &= ~(MII_FX_SEL | MII_EN_SCRM);
+		if (dev->if_port == PORT_FIBRE)
+			tmp |= MII_FX_SEL;
+		else
+			tmp |= MII_EN_SCRM;
+		mdio_write(dev, MII_MCTRL, tmp);
+		break;
+	default:
+		break;
+	}
+	cfg = readl(dev->base_addr + ChipConfig);
+	if (cfg & CfgExtPhy)
+		return;
+
+	/* On page 78 of the spec, they recommend some settings for "optimum
+	   performance" to be done in sequence.  These settings optimize some
+	   of the 100Mbit autodetection circuitry.  They say we only want to
+	   do this for rev C of the chip, but engineers at NSC (Bradley
+	   Kennedy) recommends always setting them.  If you don't, you get
+	   errors on some autonegotiations that make the device unusable.
+
+	   It seems that the DSP needs a few usec to reinitialize after
+	   the start of the phy. Just retry writing these values until they
+	   stick.
+	*/
+	for (i=0;i<NATSEMI_HW_TIMEOUT;i++) {
+
+		int dspcfg;
+		writew(1, ioaddr + PGSEL);
+		writew(PMDCSR_VAL, ioaddr + PMDCSR);
+		writew(TSTDAT_VAL, ioaddr + TSTDAT);
+		np->dspcfg = DSPCFG_VAL;
+		writew(np->dspcfg, ioaddr + DSPCFG);
+		writew(SDCFG_VAL, ioaddr + SDCFG);
+		writew(0, ioaddr + PGSEL);
+		readl(ioaddr + ChipConfig);
+		udelay(10);
+
+		writew(1, ioaddr + PGSEL);
+		dspcfg = readw(ioaddr + DSPCFG);
+		writew(0, ioaddr + PGSEL);
+		if (np->dspcfg == dspcfg)
+			break;
+	}
+
+	if (netif_msg_link(np)) {
+		if (i==NATSEMI_HW_TIMEOUT) {
+			printk(KERN_INFO
+				"%s: DSPCFG mismatch after retrying for %d usec.\n",
+				dev->name, i*10);
+		} else {
+			printk(KERN_INFO
+				"%s: DSPCFG accepted after %d usec.\n",
+				dev->name, i*10);
 		}
 	}
+	/*
+	 * Enable PHY Specific event based interrupts.  Link state change
+	 * and Auto-Negotiation Completion are among the affected.
+	 * Read the intr status to clear it (needed for wake events).
+	 */
+	readw(ioaddr + MIntrStatus);
+	writew(MICRIntEn, ioaddr + MIntrCtrl);
+}
+
+static int switch_port_external(struct net_device *dev)
+{
+	struct netdev_private *np = dev->priv;
+	u32 cfg;
+
+	cfg = readl(dev->base_addr + ChipConfig);
+	if (cfg & CfgExtPhy)
+		return 0;
+
+	if (netif_msg_link(np)) {
+		printk(KERN_INFO "%s: switching to external transceiver.\n",
+				dev->name);
+	}
+
+	/* 1) switch back to external phy */
+	writel(cfg | (CfgExtPhy | CfgPhyDis), dev->base_addr + ChipConfig);
+	readl(dev->base_addr + ChipConfig);
+	udelay(1);
+
+	/* 2) reset the external phy: */
+	/* resetting the external PHY has been known to cause a hub supplying
+	 * power over Ethernet to kill the power.  We don't want to kill
+	 * power to this computer, so we avoid resetting the phy.
+	 */
+
+	/* 3) reinit the phy fixup, it got lost during power down. */
+	move_int_phy(dev, np->phy_addr_external);
+	init_phy_fixup(dev);
+
+	return 1;
+}
+
+static int switch_port_internal(struct net_device *dev)
+{
+	struct netdev_private *np = dev->priv;
+	int i;
+	u32 cfg;
+	u16 bmcr;
+
+	cfg = readl(dev->base_addr + ChipConfig);
+	if (!(cfg &CfgExtPhy))
+		return 0;
+
+	if (netif_msg_link(np)) {
+		printk(KERN_INFO "%s: switching to internal transceiver.\n",
+				dev->name);
+	}
+	/* 1) switch back to internal phy: */
+	cfg = cfg & ~(CfgExtPhy | CfgPhyDis);
+	writel(cfg, dev->base_addr + ChipConfig);
+	readl(dev->base_addr + ChipConfig);
+	udelay(1);
+	
+	/* 2) reset the internal phy: */
+	bmcr = readw(dev->base_addr+BasicControl+(MII_BMCR<<2));
+	writel(bmcr | BMCR_RESET, dev->base_addr+BasicControl+(MII_BMCR<<2));
+	readl(dev->base_addr + ChipConfig);
+	udelay(10);
+	for (i=0;i<NATSEMI_HW_TIMEOUT;i++) {
+		bmcr = readw(dev->base_addr+BasicControl+(MII_BMCR<<2));
+		if (!(bmcr & BMCR_RESET))
+			break;
+		udelay(10);
+	}
+	if (i==NATSEMI_HW_TIMEOUT && netif_msg_link(np)) {
+		printk(KERN_INFO
+			"%s: phy reset did not complete in %d usec.\n",
+			dev->name, i*10);
+	}
+	/* 3) reinit the phy fixup, it got lost during power down. */
+	init_phy_fixup(dev);
+
+	return 1;
+}
+
+/* Scan for a PHY on the external mii bus.
+ * There are two tricky points:
+ * - Do not scan while the internal phy is enabled. The internal phy will
+ *   crash: e.g. reads from the DSPCFG register will return odd values and
+ *   the nasty random phy reset code will reset the nic every few seconds.
+ * - The internal phy must be moved around, an external phy could
+ *   have the same address as the internal phy.
+ */
+static int find_mii(struct net_device *dev)
+{
+	struct netdev_private *np = dev->priv;
+	int tmp;
+	int i;
+	int did_switch;
+
+	/* Switch to external phy */
+	did_switch = switch_port_external(dev);
+		
+	/* Scan the possible phy addresses:
+	 *
+	 * PHY address 0 means that the phy is in isolate mode. Not yet
+	 * supported due to lack of test hardware. User space should
+	 * handle it through ethtool.
+	 */
+	for (i = 1; i <= 31; i++) {
+		move_int_phy(dev, i);
+		tmp = miiport_read(dev, i, MII_BMSR);
+		if (tmp != 0xffff && tmp != 0x0000) {
+			/* found something! */
+			np->mii = (mdio_read(dev, MII_PHYSID1) << 16)
+					+ mdio_read(dev, MII_PHYSID2);
+	 		if (netif_msg_probe(np)) {
+				printk(KERN_INFO "natsemi %s: found external phy %08x at address %d.\n",
+						pci_name(np->pci_dev), np->mii, i);
+			}
+			break;
+		}
+	}
+	/* And switch back to internal phy: */
+	if (did_switch)
+		switch_port_internal(dev);
+	return i;
 }
 
 /* CFG bits [13:16] [18:23] */
@@ -1019,6 +1415,11 @@ static void natsemi_reset(struct net_device *dev)
 
 	/* restore CFG */
 	cfg |= readl(dev->base_addr + ChipConfig) & ~CFG_RESET_SAVE;
+	/* turn on external phy if it was selected */
+	if (dev->if_port == PORT_TP)
+		cfg &= ~(CfgExtPhy | CfgPhyDis);
+	else
+		cfg |= (CfgExtPhy | CfgPhyDis);
 	writel(cfg, dev->base_addr + ChipConfig);
 	/* restore WCSR */
 	wcsr |= readl(dev->base_addr + WOLCmd) & ~WCSR_RESET_SAVE;
@@ -1050,11 +1451,11 @@ static void natsemi_reload_eeprom(struct net_device *dev)
 			break;
 	}
 	if (i==NATSEMI_HW_TIMEOUT) {
-		printk(KERN_WARNING "%s: EEPROM did not reload in %d usec.\n",
-			dev->name, i*50);
+		printk(KERN_WARNING "natsemi %s: EEPROM did not reload in %d usec.\n",
+			pci_name(np->pci_dev), i*50);
 	} else if (netif_msg_hw(np)) {
-		printk(KERN_DEBUG "%s: EEPROM reloaded in %d usec.\n",
-			dev->name, i*50);
+		printk(KERN_DEBUG "natsemi %s: EEPROM reloaded in %d usec.\n",
+			pci_name(np->pci_dev), i*50);
 	}
 }
 
@@ -1132,6 +1533,9 @@ static void do_cable_magic(struct net_device *dev)
 {
 	struct netdev_private *np = dev->priv;
 
+	if (dev->if_port != PORT_TP)
+		return;
+
 	if (np->srr >= SRR_DP83816_A5)
 		return;
 
@@ -1173,6 +1577,9 @@ static void undo_cable_magic(struct net_device *dev)
 	u16 data;
 	struct netdev_private *np = dev->priv;
 
+	if (dev->if_port != PORT_TP)
+		return;
+
 	if (np->srr >= SRR_DP83816_A5)
 		return;
 
@@ -1189,9 +1596,16 @@ static void check_link(struct net_device *dev)
 	struct netdev_private *np = dev->priv;
 	long ioaddr = dev->base_addr;
 	int duplex;
-	int chipcfg = readl(ioaddr + ChipConfig);
+	u16 bmsr;
+       
+	/* The link status field is latched: it remains low after a temporary
+	 * link failure until it's read. We need the current link status,
+	 * thus read twice.
+	 */
+	mdio_read(dev, MII_BMSR);
+	bmsr = mdio_read(dev, MII_BMSR);
 
-	if (!(chipcfg & CfgLink)) {
+	if (!(bmsr & BMSR_LSTATUS)) {
 		if (netif_carrier_ok(dev)) {
 			if (netif_msg_link(np))
 				printk(KERN_NOTICE "%s: link down.\n",
@@ -1208,7 +1622,16 @@ static void check_link(struct net_device *dev)
 		do_cable_magic(dev);
 	}
 
-	duplex = np->full_duplex || (chipcfg & CfgFullDuplex ? 1 : 0);
+	duplex = np->full_duplex;
+	if (!duplex) {
+		if (bmsr & BMSR_ANEGCOMPLETE) {
+			int tmp = mii_nway_result(
+				np->advertising & mdio_read(dev, MII_LPA));
+			if (tmp == LPA_100FULL || tmp == LPA_10FULL)
+				duplex = 1;
+		} else if (mdio_read(dev, MII_BMCR) & BMCR_FULLDPLX)
+			duplex = 1;
+	}
 
 	/* if duplex is set then bit 28 must be set, too */
 	if (duplex ^ !!(np->rx_config & RxAcceptTx)) {
@@ -1233,40 +1656,8 @@ static void init_registers(struct net_device *dev)
 {
 	struct netdev_private *np = dev->priv;
 	long ioaddr = dev->base_addr;
-	int i;
 
-	for (i=0;i<NATSEMI_HW_TIMEOUT;i++) {
-		if (readl(dev->base_addr + ChipConfig) & CfgAnegDone)
-			break;
-		udelay(10);
-	}
-	if (i==NATSEMI_HW_TIMEOUT && netif_msg_link(np)) {
-		printk(KERN_INFO
-			"%s: autonegotiation did not complete in %d usec.\n",
-			dev->name, i*10);
-	}
-
-	/* On page 78 of the spec, they recommend some settings for "optimum
-	   performance" to be done in sequence.  These settings optimize some
-	   of the 100Mbit autodetection circuitry.  They say we only want to
-	   do this for rev C of the chip, but engineers at NSC (Bradley
-	   Kennedy) recommends always setting them.  If you don't, you get
-	   errors on some autonegotiations that make the device unusable.
-	*/
-	writew(1, ioaddr + PGSEL);
-	writew(PMDCSR_VAL, ioaddr + PMDCSR);
-	writew(TSTDAT_VAL, ioaddr + TSTDAT);
-	writew(DSPCFG_VAL, ioaddr + DSPCFG);
-	writew(SDCFG_VAL, ioaddr + SDCFG);
-	writew(0, ioaddr + PGSEL);
-	np->dspcfg = DSPCFG_VAL;
-
-	/* Enable PHY Specific event based interrupts.  Link state change
-	   and Auto-Negotiation Completion are among the affected.
-	   Read the intr status to clear it (needed for wake events).
-	*/
-	readw(ioaddr + MIntrStatus);
-	writew(MICRIntEn, ioaddr + MIntrCtrl);
+	init_phy_fixup(dev);
 
 	/* clear any interrupts that are pending, such as wake events */
 	readl(ioaddr + IntrStatus);
@@ -1296,6 +1687,10 @@ static void init_registers(struct net_device *dev)
 	 * MXDMA 0: up to 256 byte bursts
 	 */
 	np->rx_config = RxMxdma_256 | 0x20;
+	/* if receive ring now has bigger buffers than normal, enable jumbo */
+	if (np->rx_buf_sz > PKT_BUF_SZ)
+		np->rx_config |= RxAcceptLong;
+
 	writel(np->rx_config, ioaddr + RxConfig);
 
 	/* Disable PME:
@@ -1339,8 +1734,6 @@ static void netdev_timer(unsigned long data)
 	struct net_device *dev = (struct net_device *)data;
 	struct netdev_private *np = dev->priv;
 	int next_tick = 5*HZ;
-	long ioaddr = dev->base_addr;
-	u16 dspcfg;
 
 	if (netif_msg_timer(np)) {
 		/* DO NOT read the IntrStatus register,
@@ -1350,33 +1743,41 @@ static void netdev_timer(unsigned long data)
 			dev->name);
 	}
 
-	spin_lock_irq(&np->lock);
+	if (dev->if_port == PORT_TP) {
+		long ioaddr = dev->base_addr;
+		u16 dspcfg;
 
-	/* check for a nasty random phy-reset - use dspcfg as a flag */
-	writew(1, ioaddr+PGSEL);
-	dspcfg = readw(ioaddr+DSPCFG);
-	writew(0, ioaddr+PGSEL);
-	if (dspcfg != np->dspcfg) {
-		if (!netif_queue_stopped(dev)) {
-			spin_unlock_irq(&np->lock);
-			if (netif_msg_hw(np))
-				printk(KERN_NOTICE "%s: possible phy reset: "
-					"re-initializing\n", dev->name);
-			disable_irq(dev->irq);
-			spin_lock_irq(&np->lock);
-			natsemi_stop_rxtx(dev);
-			dump_ring(dev);
-			reinit_ring(dev);
-			init_registers(dev);
-			spin_unlock_irq(&np->lock);
-			enable_irq(dev->irq);
+		spin_lock_irq(&np->lock);
+		/* check for a nasty random phy-reset - use dspcfg as a flag */
+		writew(1, ioaddr+PGSEL);
+		dspcfg = readw(ioaddr+DSPCFG);
+		writew(0, ioaddr+PGSEL);
+		if (dspcfg != np->dspcfg) {
+			if (!netif_queue_stopped(dev)) {
+				spin_unlock_irq(&np->lock);
+				if (netif_msg_hw(np))
+					printk(KERN_NOTICE "%s: possible phy reset: "
+						"re-initializing\n", dev->name);
+				disable_irq(dev->irq);
+				spin_lock_irq(&np->lock);
+				natsemi_stop_rxtx(dev);
+				dump_ring(dev);
+				reinit_ring(dev);
+				init_registers(dev);
+				spin_unlock_irq(&np->lock);
+				enable_irq(dev->irq);
+			} else {
+				/* hurry back */
+				next_tick = HZ;
+				spin_unlock_irq(&np->lock);
+			}
 		} else {
-			/* hurry back */
-			next_tick = HZ;
+			/* init_registers() calls check_link() for the above case */
+			check_link(dev);
 			spin_unlock_irq(&np->lock);
 		}
 	} else {
-		/* init_registers() calls check_link() for the above case */
+		spin_lock_irq(&np->lock);
 		check_link(dev);
 		spin_unlock_irq(&np->lock);
 	}
@@ -1507,8 +1908,10 @@ static void init_ring(struct net_device *dev)
 	/* 2) RX ring */
 	np->dirty_rx = 0;
 	np->cur_rx = RX_RING_SIZE;
-	np->rx_buf_sz = (dev->mtu <= 1500 ? PKT_BUF_SZ : dev->mtu + 32);
 	np->oom = 0;
+	np->rx_buf_sz = PKT_BUF_SZ;
+	if (dev->mtu > ETH_DATA_LEN)
+		np->rx_buf_sz += dev->mtu - ETH_DATA_LEN;
 	np->rx_head_desc = &np->rx_ring[0];
 
 	/* Please be carefull before changing this loop - at least gcc-2.95.1
@@ -1755,12 +2158,14 @@ static void netdev_rx(struct net_device *dev)
 
 	/* If the driver owns the next entry it's a new packet. Send it up. */
 	while (desc_status < 0) { /* e.g. & DescOwn */
+		int pkt_len;
 		if (netif_msg_rx_status(np))
 			printk(KERN_DEBUG
 				"  netdev_rx() entry %d status was %#08x.\n",
 				entry, desc_status);
 		if (--boguscnt < 0)
 			break;
+		pkt_len = (desc_status & DescSizeMask) - 4;
 		if ((desc_status&(DescMore|DescPktOK|DescRxLong)) != DescPktOK){
 			if (desc_status & DescMore) {
 				if (netif_msg_rx_err(np))
@@ -1783,10 +2188,14 @@ static void netdev_rx(struct net_device *dev)
 				if (desc_status & DescRxCRC)
 					np->stats.rx_crc_errors++;
 			}
+		} else if (pkt_len > np->rx_buf_sz) {
+			/* if this is the tail of a double buffer
+			 * packet, we've already counted the error
+			 * on the first part.  Ignore the second half.
+			 */
 		} else {
 			struct sk_buff *skb;
 			/* Omit CRC size. */
-			int pkt_len = (desc_status & DescSizeMask) - 4;
 			/* Check if the packet is long enough to accept
 			 * without copying to a minimally-sized skbuff. */
 			if (pkt_len < rx_copybreak
@@ -1837,14 +2246,13 @@ static void netdev_error(struct net_device *dev, int intr_status)
 
 	spin_lock(&np->lock);
 	if (intr_status & LinkChange) {
-		u16 adv = mdio_read(dev, 1, MII_ADVERTISE);
-		u16 lpa = mdio_read(dev, 1, MII_LPA);
-		if (mdio_read(dev, 1, MII_BMCR) & BMCR_ANENABLE
+		u16 lpa = mdio_read(dev, MII_LPA);
+		if (mdio_read(dev, MII_BMCR) & BMCR_ANENABLE
 		 && netif_msg_link(np)) {
 			printk(KERN_INFO
 				"%s: Autonegotiation advertising"
 				" %#04x  partner %#04x.\n", dev->name,
-				adv, lpa);
+				np->advertising, lpa);
 		}
 
 		/* read MII int status to clear the flag */
@@ -2072,10 +2480,10 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 		int tmp;
 		int r = -EINVAL;
 		/* if autoneg is off, it's an error */
-		tmp = mdio_read(dev, 1, MII_BMCR);
+		tmp = mdio_read(dev, MII_BMCR);
 		if (tmp & BMCR_ANENABLE) {
 			tmp |= (BMCR_ANRESTART);
-			mdio_write(dev, 1, MII_BMCR, tmp);
+			mdio_write(dev, MII_BMCR, tmp);
 			r = 0;
 		}
 		return r;
@@ -2084,8 +2492,8 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 	case ETHTOOL_GLINK: {
 		struct ethtool_value edata = {ETHTOOL_GLINK};
 		/* LSTATUS is latched low until a read - so read twice */
-		mdio_read(dev, 1, MII_BMSR);
-		edata.data = (mdio_read(dev, 1, MII_BMSR)&BMSR_LSTATUS) ? 1:0;
+		mdio_read(dev, MII_BMSR);
+		edata.data = (mdio_read(dev, MII_BMSR)&BMSR_LSTATUS) ? 1:0;
 		if (copy_to_user(useraddr, &edata, sizeof(edata)))
 			return -EFAULT;
 		return 0;
@@ -2252,56 +2660,75 @@ static int netdev_get_sopass(struct net_device *dev, u8 *data)
 
 static int netdev_get_ecmd(struct net_device *dev, struct ethtool_cmd *ecmd)
 {
+	struct netdev_private *np = dev->priv;
 	u32 tmp;
 
-	ecmd->supported =
-		(SUPPORTED_10baseT_Half | SUPPORTED_10baseT_Full |
-		SUPPORTED_100baseT_Half | SUPPORTED_100baseT_Full |
-		SUPPORTED_Autoneg | SUPPORTED_TP | SUPPORTED_MII);
-
-	/* only supports twisted-pair or MII */
-	tmp = readl(dev->base_addr + ChipConfig);
-	if (tmp & CfgExtPhy)
-		ecmd->port = PORT_MII;
-	else
-		ecmd->port = PORT_TP;
-
-	/* only supports internal transceiver */
-	ecmd->transceiver = XCVR_INTERNAL;
-
-	/* not sure what this is for */
-	ecmd->phy_address = readw(dev->base_addr + PhyCtrl) & PhyAddrMask;
-
-	ecmd->advertising = ADVERTISED_TP | ADVERTISED_MII;
-	tmp = mdio_read(dev, 1, MII_ADVERTISE);
-	if (tmp & ADVERTISE_10HALF)
+	ecmd->port        = dev->if_port;
+	ecmd->speed       = np->speed;
+	ecmd->duplex      = np->duplex;
+	ecmd->autoneg     = np->autoneg;
+	ecmd->advertising = 0;
+	if (np->advertising & ADVERTISE_10HALF)
 		ecmd->advertising |= ADVERTISED_10baseT_Half;
-	if (tmp & ADVERTISE_10FULL)
+	if (np->advertising & ADVERTISE_10FULL)
 		ecmd->advertising |= ADVERTISED_10baseT_Full;
-	if (tmp & ADVERTISE_100HALF)
+	if (np->advertising & ADVERTISE_100HALF)
 		ecmd->advertising |= ADVERTISED_100baseT_Half;
-	if (tmp & ADVERTISE_100FULL)
+	if (np->advertising & ADVERTISE_100FULL)
 		ecmd->advertising |= ADVERTISED_100baseT_Full;
+	ecmd->supported   = (SUPPORTED_Autoneg |
+		SUPPORTED_10baseT_Half  | SUPPORTED_10baseT_Full  |
+		SUPPORTED_100baseT_Half | SUPPORTED_100baseT_Full |
+		SUPPORTED_TP | SUPPORTED_MII | SUPPORTED_FIBRE);
+	ecmd->phy_address = np->phy_addr_external;
+	/*
+	 * We intentionally report the phy address of the external
+	 * phy, even if the internal phy is used. This is necessary
+	 * to work around a deficiency of the ethtool interface:
+	 * It's only possible to query the settings of the active
+	 * port. Therefore 
+	 * # ethtool -s ethX port mii
+	 * actually sends an ioctl to switch to port mii with the
+	 * settings that are used for the current active port.
+	 * If we would report a different phy address in this
+	 * command, then
+	 * # ethtool -s ethX port tp;ethtool -s ethX port mii
+	 * would unintentionally change the phy address.
+	 *
+	 * Fortunately the phy address doesn't matter with the
+	 * internal phy...
+	 */
 
-	tmp = mdio_read(dev, 1, MII_BMCR);
-	if (tmp & BMCR_ANENABLE) {
+	/* set information based on active port type */
+	switch (ecmd->port) {
+	default:
+	case PORT_TP:
+		ecmd->advertising |= ADVERTISED_TP;
+		ecmd->transceiver = XCVR_INTERNAL;
+		break;
+	case PORT_MII:
+		ecmd->advertising |= ADVERTISED_MII;
+		ecmd->transceiver = XCVR_EXTERNAL;
+		break;
+	case PORT_FIBRE:
+		ecmd->advertising |= ADVERTISED_FIBRE;
+		ecmd->transceiver = XCVR_EXTERNAL;
+		break;
+	}
+
+	/* if autonegotiation is on, try to return the active speed/duplex */
+	if (ecmd->autoneg == AUTONEG_ENABLE) {
 		ecmd->advertising |= ADVERTISED_Autoneg;
-		ecmd->autoneg = AUTONEG_ENABLE;
-	} else {
-		ecmd->autoneg = AUTONEG_DISABLE;
-	}
-
-	tmp = readl(dev->base_addr + ChipConfig);
-	if (tmp & CfgSpeed100) {
-		ecmd->speed = SPEED_100;
-	} else {
-		ecmd->speed = SPEED_10;
-	}
-
-	if (tmp & CfgFullDuplex) {
-		ecmd->duplex = DUPLEX_FULL;
-	} else {
-		ecmd->duplex = DUPLEX_HALF;
+		tmp = mii_nway_result(
+			np->advertising & mdio_read(dev, MII_LPA));
+		if (tmp == LPA_100FULL || tmp == LPA_100HALF)
+			ecmd->speed  = SPEED_100;
+		else
+			ecmd->speed  = SPEED_10;
+		if (tmp == LPA_100FULL || tmp == LPA_10FULL)
+			ecmd->duplex = DUPLEX_FULL;
+		else
+			ecmd->duplex = DUPLEX_HALF;
 	}
 
 	/* ignore maxtxpkt, maxrxpkt for now */
@@ -2312,38 +2739,74 @@ static int netdev_get_ecmd(struct net_device *dev, struct ethtool_cmd *ecmd)
 static int netdev_set_ecmd(struct net_device *dev, struct ethtool_cmd *ecmd)
 {
 	struct netdev_private *np = dev->priv;
-	u32 tmp;
 
-	if (ecmd->speed != SPEED_10 && ecmd->speed != SPEED_100)
+	if (ecmd->port != PORT_TP && ecmd->port != PORT_MII && ecmd->port != PORT_FIBRE)
 		return -EINVAL;
-	if (ecmd->duplex != DUPLEX_HALF && ecmd->duplex != DUPLEX_FULL)
+	if (ecmd->transceiver != XCVR_INTERNAL && ecmd->transceiver != XCVR_EXTERNAL)
 		return -EINVAL;
-	if (ecmd->port != PORT_TP && ecmd->port != PORT_MII)
+	if (ecmd->autoneg == AUTONEG_ENABLE) {
+		if ((ecmd->advertising & (ADVERTISED_10baseT_Half |
+					  ADVERTISED_10baseT_Full |
+					  ADVERTISED_100baseT_Half |
+					  ADVERTISED_100baseT_Full)) == 0) {
+			return -EINVAL;
+		}
+	} else if (ecmd->autoneg == AUTONEG_DISABLE) {
+		if (ecmd->speed != SPEED_10 && ecmd->speed != SPEED_100)
+			return -EINVAL;
+		if (ecmd->duplex != DUPLEX_HALF && ecmd->duplex != DUPLEX_FULL)
+			return -EINVAL;
+	} else {
 		return -EINVAL;
-	if (ecmd->transceiver != XCVR_INTERNAL)
-		return -EINVAL;
-	if (ecmd->autoneg != AUTONEG_DISABLE && ecmd->autoneg != AUTONEG_ENABLE)
-		return -EINVAL;
-	/* ignore phy_address, maxtxpkt, maxrxpkt for now */
+	}
+
+	/*
+	 * maxtxpkt, maxrxpkt: ignored for now.
+	 *
+	 * transceiver:
+	 * PORT_TP is always XCVR_INTERNAL, PORT_MII and PORT_FIBRE are always
+	 * XCVR_EXTERNAL. The implementation thus ignores ecmd->transceiver and
+	 * selects based on ecmd->port.
+	 *
+	 * Actually PORT_FIBRE is nearly identical to PORT_MII: it's for fibre
+	 * phys that are connected to the mii bus. It's used to apply fibre
+	 * specific updates.
+	 */
 
 	/* WHEW! now lets bang some bits */
 
-	tmp = mdio_read(dev, 1, MII_BMCR);
-	if (ecmd->autoneg == AUTONEG_ENABLE) {
-		/* turn on autonegotiation */
-		tmp |= BMCR_ANENABLE;
-		np->advertising = mdio_read(dev, 1, MII_ADVERTISE);
+	/* save the parms */
+	dev->if_port          = ecmd->port;
+	np->autoneg           = ecmd->autoneg;
+	np->phy_addr_external = ecmd->phy_address & PhyAddrMask;
+	if (np->autoneg == AUTONEG_ENABLE) {
+		/* advertise only what has been requested */
+		np->advertising &= ~(ADVERTISE_ALL | ADVERTISE_100BASE4);
+		if (ecmd->advertising & ADVERTISED_10baseT_Half)
+			np->advertising |= ADVERTISE_10HALF;
+		if (ecmd->advertising & ADVERTISED_10baseT_Full)
+			np->advertising |= ADVERTISE_10FULL;
+		if (ecmd->advertising & ADVERTISED_100baseT_Half)
+			np->advertising |= ADVERTISE_100HALF;
+		if (ecmd->advertising & ADVERTISED_100baseT_Full)
+			np->advertising |= ADVERTISE_100FULL;
 	} else {
-		/* turn off auto negotiation, set speed and duplexity */
-		tmp &= ~(BMCR_ANENABLE | BMCR_SPEED100 | BMCR_FULLDPLX);
-		if (ecmd->speed == SPEED_100)
-			tmp |= BMCR_SPEED100;
-		if (ecmd->duplex == DUPLEX_FULL)
-			tmp |= BMCR_FULLDPLX;
-		else
+		np->speed  = ecmd->speed;
+		np->duplex = ecmd->duplex;
+		/* user overriding the initial full duplex parm? */
+		if (np->duplex == DUPLEX_HALF)
 			np->full_duplex = 0;
 	}
-	mdio_write(dev, 1, MII_BMCR, tmp);
+
+	/* get the right phy enabled */
+	if (ecmd->port == PORT_TP)
+		switch_port_internal(dev);
+	else
+		switch_port_external(dev);
+
+	/* set parms and see how this affected our link status */
+	init_phy_fixup(dev);
+	check_link(dev);
 	return 0;
 }
 
@@ -2354,10 +2817,14 @@ static int netdev_get_regs(struct net_device *dev, u8 *buf)
 	u32 rfcr;
 	u32 *rbuf = (u32 *)buf;
 
-	/* read all of page 0 of registers */
-	for (i = 0; i < NATSEMI_PG0_NREGS; i++) {
+	/* read non-mii page 0 of registers */
+	for (i = 0; i < NATSEMI_PG0_NREGS/2; i++) {
 		rbuf[i] = readl(dev->base_addr + i*4);
 	}
+
+	/* read current mii registers */
+	for (i = NATSEMI_PG0_NREGS/2; i < NATSEMI_PG0_NREGS; i++)
+		rbuf[i] = mdio_read(dev, i & 0x1f);
 
 	/* read only the 'magic' registers from page 1 */
 	writew(1, dev->base_addr + PGSEL);
@@ -2409,31 +2876,59 @@ static int netdev_get_eeprom(struct net_device *dev, u8 *buf)
 	}
 	return 0;
 }
-
 static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct mii_ioctl_data *data = if_mii(rq);
+	struct netdev_private *np = dev->priv;
 
 	switch(cmd) {
 	case SIOCETHTOOL:
 		return netdev_ethtool_ioctl(dev, rq->ifr_data);
 	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
 	case SIOCDEVPRIVATE:		/* for binary compat, remove in 2.5 */
-		data->phy_id = 1;
+		data->phy_id = np->phy_addr_external;
 		/* Fall Through */
 
 	case SIOCGMIIREG:		/* Read MII PHY register. */
 	case SIOCDEVPRIVATE+1:		/* for binary compat, remove in 2.5 */
-		data->val_out = mdio_read(dev, data->phy_id & 0x1f,
-			data->reg_num & 0x1f);
+		/* The phy_id is not enough to uniquely identify
+		 * the intended target. Therefore the command is sent to
+		 * the given mii on the current port.
+		 */
+		if (dev->if_port == PORT_TP) {
+			if ((data->phy_id & 0x1f) == np->phy_addr_external)
+				data->val_out = mdio_read(dev,
+							data->reg_num & 0x1f);
+			else
+				data->val_out = 0;
+		} else {
+			move_int_phy(dev, data->phy_id & 0x1f);
+			data->val_out = miiport_read(dev, data->phy_id & 0x1f,
+							data->reg_num & 0x1f);
+		}
 		return 0;
 
 	case SIOCSMIIREG:		/* Write MII PHY register. */
 	case SIOCDEVPRIVATE+2:		/* for binary compat, remove in 2.5 */
 		if (!capable(CAP_NET_ADMIN))
 			return -EPERM;
-		mdio_write(dev, data->phy_id & 0x1f, data->reg_num & 0x1f,
-			data->val_in);
+		if (dev->if_port == PORT_TP) {
+			if ((data->phy_id & 0x1f) == np->phy_addr_external) {
+ 				if ((data->reg_num & 0x1f) == MII_ADVERTISE)
+					np->advertising = data->val_in;
+				mdio_write(dev, data->reg_num & 0x1f,
+							data->val_in);
+			}
+		} else {
+			if ((data->phy_id & 0x1f) == np->phy_addr_external) {
+ 				if ((data->reg_num & 0x1f) == MII_ADVERTISE)
+					np->advertising = data->val_in;
+			}
+			move_int_phy(dev, data->phy_id & 0x1f);
+			miiport_write(dev, data->phy_id & 0x1f,
+						data->reg_num & 0x1f,
+						data->val_in);
+		}
 		return 0;
 	default:
 		return -EOPNOTSUPP;
