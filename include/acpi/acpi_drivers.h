@@ -73,6 +73,10 @@ struct pci_bus;
 int acpi_pci_bind (struct acpi_device *device);
 int acpi_pci_bind_root (struct acpi_device *device, struct acpi_pci_id *id, struct pci_bus *bus);
 
+/* Arch-defined function to add a bus to the system */
+
+struct pci_bus *pci_acpi_scan_root(struct acpi_device *device, int domain, int bus);
+
 #endif /*CONFIG_ACPI_PCI*/
 
 
