@@ -192,7 +192,7 @@ static unsigned long get_purr(void);
  * is coming, but at this time is still problematic, so for now this
  * function will return 0.
  */
-static unsigned long get_purr()
+static unsigned long get_purr(void)
 {
 	unsigned long sum_purr = 0;
 	return sum_purr;
@@ -524,10 +524,10 @@ static int lparcfg_open(struct inode *inode, struct file *file)
 }
 
 struct file_operations lparcfg_fops = {
-      owner:THIS_MODULE,
-      read:seq_read,
-      open:lparcfg_open,
-      release:single_release,
+      .owner	= THIS_MODULE,
+      .read	= seq_read,
+      .open	= lparcfg_open,
+      .release	= single_release,
 };
 
 int __init lparcfg_init(void)

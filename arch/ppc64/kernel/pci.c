@@ -576,7 +576,7 @@ void pcibios_add_platform_entries(struct pci_dev *pdev)
 
 static void __devinit pci_process_ISA_OF_ranges(struct device_node *isa_node,
 				      unsigned long phb_io_base_phys,
-				      void * phb_io_base_virt)
+				      void __iomem * phb_io_base_virt)
 {
 	struct isa_range *range;
 	unsigned long pci_addr;
@@ -795,7 +795,7 @@ int unmap_bus_range(struct pci_bus *bus)
 	
 	if (get_bus_io_range(bus, &start_phys, &start_virt, &size))
 		return 1;
-	if (iounmap_explicit((void *) start_virt, size))
+	if (iounmap_explicit((void __iomem *) start_virt, size))
 		return 1;
 
 	return 0;
