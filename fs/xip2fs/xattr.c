@@ -3,6 +3,7 @@
  *
  * (C) Copyright IBM Corp. 2002,2004
  * Author(s): Carsten Otte <cotte@de.ibm.com>
+ *            Gerald Schaefer <geraldsc@de.ibm.com>
  * derived from second extended filesystem (ext2)
  */
 
@@ -367,7 +368,7 @@ bad_block:	xip2_error(inode->i_sb, "xip2_xattr_list",
 	for (entry = FIRST_ENTRY(block_ptr); !IS_LAST_ENTRY(entry);
 	     entry = XIP2_XATTR_NEXT(entry)) {
 		struct xip2_xattr_handler *handler;
-		
+
 		handler = xip2_xattr_handler(entry->e_name_index);
 		if (handler)
 			buf += handler->list(buf, inode, entry->e_name,
@@ -423,7 +424,7 @@ int __init
 init_xip2_xattr(void)
 {
 	int	err;
-	
+
 	err = xip2_xattr_register(XIP2_XATTR_INDEX_USER,
 				  &xip2_xattr_user_handler);
 	if (err)

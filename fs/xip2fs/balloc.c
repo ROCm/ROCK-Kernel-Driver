@@ -3,6 +3,7 @@
  *
  * (C) Copyright IBM Corp. 2002,2004
  * Author(s): Carsten Otte <cotte@de.ibm.com>
+ *            Gerald Schaefer <geraldsc@de.ibm.com>
  * derived from second extended filesystem (ext2)
  */
 
@@ -46,7 +47,7 @@ struct ext2_group_desc * xip2_get_group_desc(struct super_block * sb,
 
 		return NULL;
 	}
-	
+
 	group_desc = block_group / XIP2_DESC_PER_BLOCK(sb);
 	offset = block_group % XIP2_DESC_PER_BLOCK(sb);
 	if (!sbi->s_group_desc[group_desc]) {
@@ -56,7 +57,7 @@ struct ext2_group_desc * xip2_get_group_desc(struct super_block * sb,
 			     block_group, group_desc, offset);
 		return NULL;
 	}
-	
+
 	desc = (struct ext2_group_desc *) sbi->s_group_desc[group_desc];
 	if (block_ptr)
 		*block_ptr = sbi->s_group_desc[group_desc];
@@ -64,7 +65,7 @@ struct ext2_group_desc * xip2_get_group_desc(struct super_block * sb,
 }
 
 /*
- * Read the bitmap for a given block_group, reading into the specified 
+ * Read the bitmap for a given block_group, reading into the specified
  * slot in the superblock's bitmap cache.
  *
  * Return buffer_head on success or NULL in case of failure.
@@ -74,7 +75,7 @@ read_block_bitmap(struct super_block *sb, unsigned int block_group)
 {
 	struct ext2_group_desc * desc;
 	void *bitmap_data = NULL;
-	
+
 	desc = xip2_get_group_desc (sb, block_group, NULL);
 	if (!desc)
 		goto error_out;
@@ -112,7 +113,7 @@ unsigned long xip2_count_free_blocks (struct super_block * sb)
 		bitmap_data = read_block_bitmap(sb, i);
 		if (!bitmap_data)
 			continue;
-		
+
 		x = xip2_count_free(bitmap_data, sb->s_blocksize);
 		printk ("group %d: stored = %d, counted = %lu\n",
 			i, le16_to_cpu(desc->bg_free_blocks_count), x);
@@ -137,7 +138,7 @@ unsigned long xip2_count_free_blocks (struct super_block * sb)
 static inline int
 block_in_use(unsigned long block, struct super_block *sb, unsigned char *map)
 {
-	return xip2_test_bit((block - 
+	return xip2_test_bit((block -
 			le32_to_cpu(XIP2_SB(sb)->s_es->s_first_data_block)) %
 			XIP2_BLOCKS_PER_GROUP(sb), map);
 }

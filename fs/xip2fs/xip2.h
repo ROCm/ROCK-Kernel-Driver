@@ -3,6 +3,7 @@
  *
  * (C) Copyright IBM Corp. 2002,2004
  * Author(s): Carsten Otte <cotte@de.ibm.com>
+ *            Gerald Schaefer <geraldsc@de.ibm.com>
  * derived from second extended filesystem (ext2)
  */
 
@@ -103,7 +104,7 @@ extern unsigned long xip2_count_free (void *, unsigned);
 /* inode.c */
 extern void xip2_read_inode (struct inode *);
 extern void xip2_set_inode_flags(struct inode *inode);
-extern int  xip2_get_block (struct inode *inode, unsigned long iblock, 
+extern int  xip2_get_block (struct inode *inode, unsigned long iblock,
 			    sector_t *blockno_result, int create);
 
 /* ioctl.c */

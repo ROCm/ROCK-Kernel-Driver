@@ -3,6 +3,7 @@
  *
  * (C) Copyright IBM Corp. 2002,2004
  * Author(s): Carsten Otte <cotte@de.ibm.com>
+ *            Gerald Schaefer <geraldsc@de.ibm.com>
  * derived from second extended filesystem (ext2)
  */
 #ifndef _LINUX_XIP2_FS_SB

@@ -3,6 +3,7 @@
  *
  * (C) Copyright IBM Corp. 2002,2004
  * Author(s): Carsten Otte <cotte@de.ibm.com>
+ *            Gerald Schaefer <geraldsc@de.ibm.com>
  * derived from second extended filesystem (ext2)
  */
 
@@ -62,7 +63,7 @@ struct inode_operations xip2_symlink_inode_operations = {
 	.getxattr	= xip2_getxattr,
 	.listxattr	= xip2_listxattr,
 };
- 
+
 struct inode_operations xip2_fast_symlink_inode_operations = {
 	.readlink	= xip2_fast_readlink,
 	.follow_link	= xip2_fast_follow_link,

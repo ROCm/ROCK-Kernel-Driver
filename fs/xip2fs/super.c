@@ -3,6 +3,7 @@
  *
  * (C) Copyright IBM Corp. 2002,2004
  * Author(s): Carsten Otte <cotte@de.ibm.com>
+ *            Gerald Schaefer <geraldsc@de.ibm.com>
  * derived from second extended filesystem (ext2)
  */
 
@@ -109,7 +110,7 @@ static inline int xip2_mem_area_get (struct xip2_sb_info * sbi, char* data)
 		/* found 8) */
 		p+=8;
 		for (i=0; i<8; i++) {
-			if (*(p+i) == '\0') 
+			if (*(p+i) == '\0')
 				break;
 			if (*(p+i) == ',')
 				break;
@@ -122,17 +123,17 @@ static inline int xip2_mem_area_get (struct xip2_sb_info * sbi, char* data)
 		if (sbi->mem_area.name == NULL)
 			return -ENOMEM;
 		memcpy (sbi->mem_area.name, dcss_name, strlen(dcss_name)+1);
-		rc = segment_load (sbi->mem_area.name, SEGMENT_SHARED_RO, 
+		rc = segment_load (sbi->mem_area.name, SEGMENT_SHARED_RO,
 				  (&sbi->mem_area.start), &(sbi->mem_area.end));
 		if (rc<0) {
-			printk (KERN_WARNING 
+			printk (KERN_WARNING
 				"xip2: cannot load segment %s\n",dcss_name);
 			kfree (sbi->mem_area.name);
 			return rc;
 		}
-		printk (KERN_WARNING 
-			"xip2: loaded segment %s successfully from %p to %p\n", 
-			dcss_name, (void*) sbi->mem_area.start, 
+		printk (KERN_WARNING
+			"xip2: loaded segment %s successfully from %p to %p\n",
+			dcss_name, (void*) sbi->mem_area.start,
 			(void*) sbi->mem_area.end);
 		return 0;
 	}
@@ -201,7 +202,7 @@ static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
 		inode_init_once(&ei->vfs_inode);
 	}
 }
- 
+
 static int init_inodecache(void)
 {
 	xip2_inode_cachep = kmem_cache_create("xip2_inode_cache",
@@ -495,7 +496,7 @@ static int xip2_check_descriptors (struct super_block * sb)
 }
 
 #define log2(n) ffz(~(n))
- 
+
 /*
  * Maximal file size.  There is a direct, and {,double-,triple-}indirect
  * block limit, and also a limit of (2^32 - 1) 512-byte sectors in i_blocks.
@@ -520,7 +521,7 @@ static unsigned long descriptor_loc(struct super_block *sb,
 	struct xip2_sb_info *sbi = XIP2_SB(sb);
 	unsigned long bg, first_data_block, first_meta_bg;
 	int has_super = 0;
-	
+
 	first_data_block = le32_to_cpu(sbi->s_es->s_first_data_block);
 	first_meta_bg = le32_to_cpu(sbi->s_es->s_first_meta_bg);
 
@@ -568,7 +569,7 @@ static int xip2_fill_super(struct super_block *sb, void *data, int silent)
 	int db_count;
 	int i;
 
-	if (!(sb->s_flags & MS_RDONLY)) 
+	if (!(sb->s_flags & MS_RDONLY))
 		return -EROFS;
 
 	sbi = kmalloc(sizeof(*sbi), GFP_KERNEL);
@@ -617,7 +618,7 @@ static int xip2_fill_super(struct super_block *sb, void *data, int silent)
 		set_opt(sbi->s_mount_opt, XATTR_USER);
 	if (def_mount_opts & EXT2_DEFM_ACL)
 		set_opt(sbi->s_mount_opt, POSIX_ACL);
-	
+
 	if (le16_to_cpu(sbi->s_es->s_errors) == EXT2_ERRORS_PANIC)
 		set_opt(sbi->s_mount_opt, ERRORS_PANIC);
 	else if (le16_to_cpu(sbi->s_es->s_errors) == EXT2_ERRORS_RO)
@@ -625,7 +626,7 @@ static int xip2_fill_super(struct super_block *sb, void *data, int silent)
 
 	sbi->s_resuid = le16_to_cpu(es->s_def_resuid);
 	sbi->s_resgid = le16_to_cpu(es->s_def_resgid);
-	
+
 	if (!parse_options ((char *) data, sbi))
 		goto failed_mount;
 

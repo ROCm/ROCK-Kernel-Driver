@@ -3,6 +3,7 @@
  *
  * (C) Copyright IBM Corp. 2002,2004
  * Author(s): Carsten Otte <cotte@de.ibm.com>
+ *            Gerald Schaefer <geraldsc@de.ibm.com>
  * derived from second extended filesystem (ext2)
  */
 
@@ -20,7 +21,7 @@ static struct dentry
 {
 	struct inode * inode;
 	ino_t ino;
-	
+
 	if (dentry->d_name.len > EXT2_NAME_LEN)
 		return ERR_PTR(-ENAMETOOLONG);
 
@@ -60,7 +61,7 @@ struct dentry *xip2_get_parent(struct dentry *child)
 		parent = ERR_PTR(-ENOMEM);
 	}
 	return parent;
-} 
+}
 
 struct inode_operations xip2_dir_inode_operations = {
 	.lookup		= xip2_lookup,

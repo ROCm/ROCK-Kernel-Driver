@@ -3,6 +3,7 @@
  *
  * (C) Copyright IBM Corp. 2002,2004
  * Author(s): Carsten Otte <cotte@de.ibm.com>
+ *            Gerald Schaefer <geraldsc@de.ibm.com>
  * derived from second extended filesystem (ext2)
  */
 
@@ -276,7 +277,7 @@ xip2_readpages(struct file *file, struct address_space *mapping,
 	unsigned page_idx;
 	int rc;
 	struct pagevec lru_pvec;
-	
+
 	printk("XIP2-error: xip2_readpages was called, "
 		"stack trace will follow\n");
 	dump_stack();
@@ -285,7 +286,7 @@ xip2_readpages(struct file *file, struct address_space *mapping,
 	pagevec_init(&lru_pvec, 0);
 	for (page_idx = 0; page_idx < nr_pages; page_idx++) {
 		struct page *page = list_entry (pages->prev, struct page, lru);
-		
+
 		prefetchw(&page->flags);
 		list_del (&page->lru);
 		if (!add_to_page_cache(page, mapping,
@@ -503,13 +504,13 @@ void xip2_read_inode (struct inode * inode)
 		if (raw_inode->i_block[0])
 			init_special_inode(inode, inode->i_mode,
 			   old_decode_dev(le32_to_cpu(raw_inode->i_block[0])));
-		else 
+		else
 			init_special_inode(inode, inode->i_mode,
 			   new_decode_dev(le32_to_cpu(raw_inode->i_block[1])));
 	}
 	xip2_set_inode_flags(inode);
 	return;
-	
+
 bad_inode:
 	make_bad_inode(inode);
 	return;

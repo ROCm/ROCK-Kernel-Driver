@@ -3,6 +3,7 @@
  *
  * (C) Copyright IBM Corp. 2002,2004
  * Author(s): Carsten Otte <cotte@de.ibm.com>
+ *            Gerald Schaefer <geraldsc@de.ibm.com>
  * derived from second extended filesystem (ext2)
  */
 
@@ -20,30 +21,30 @@
  * ialloc.c contains the inodes allocation and deallocation routines
  */
 
-/* 
- * Orlov's allocator for directories. 
- * 
+/*
+ * Orlov's allocator for directories.
+ *
  * We always try to spread first-level directories.
  *
- * If there are blockgroups with both free inodes and free blocks counts 
- * not worse than average we return one with smallest directory count. 
- * Otherwise we simply return a random group. 
- * 
- * For the rest rules look so: 
- * 
- * It's OK to put directory into a group unless 
- * it has too many directories already (max_dirs) or 
- * it has too few free inodes left (min_inodes) or 
- * it has too few free blocks left (min_blocks) or 
- * it's already running too large debt (max_debt). 
- * Parent's group is prefered, if it doesn't satisfy these 
- * conditions we search cyclically through the rest. If none 
- * of the groups look good we just look for a group with more 
- * free inodes than average (starting at parent's group). 
- * 
- * Debt is incremented each time we allocate a directory and decremented 
- * when we allocate an inode, within 0--255. 
- */ 
+ * If there are blockgroups with both free inodes and free blocks counts
+ * not worse than average we return one with smallest directory count.
+ * Otherwise we simply return a random group.
+ *
+ * For the rest rules look so:
+ *
+ * It's OK to put directory into a group unless
+ * it has too many directories already (max_dirs) or
+ * it has too few free inodes left (min_inodes) or
+ * it has too few free blocks left (min_blocks) or
+ * it's already running too large debt (max_debt).
+ * Parent's group is prefered, if it doesn't satisfy these
+ * conditions we search cyclically through the rest. If none
+ * of the groups look good we just look for a group with more
+ * free inodes than average (starting at parent's group).
+ *
+ * Debt is incremented each time we allocate a directory and decremented
+ * when we allocate an inode, within 0--255.
+ */
 
 #ifdef EXT2FS_DEBUG
 /*
@@ -77,7 +78,7 @@ unsigned long xip2_count_free_inodes (struct super_block * sb)
 {
 	struct ext2_group_desc *desc;
 	unsigned long desc_count = 0;
-	int i;	
+	int i;
 
 #ifdef EXT2FS_DEBUG
 	struct ext2_super_block *es;
@@ -153,7 +154,7 @@ void xip2_check_inodes_bitmap (struct super_block * sb)
 		bitmap_data = read_inode_bitmap(sb, i);
 		if (!bitmap_data)
 			continue;
-		
+
 		x = xip2_count_free(bitmap_data, XIP2_INODES_PER_GROUP(sb) / 8);
 		if (le16_to_cpu(desc->bg_free_inodes_count) != x)
 			xip2_error (sb, "xip2_check_inodes_bitmap",

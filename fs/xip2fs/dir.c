@@ -3,6 +3,7 @@
  *
  * (C) Copyright IBM Corp. 2002,2004
  * Author(s): Carsten Otte <cotte@de.ibm.com>
+ *            Gerald Schaefer <geraldsc@de.ibm.com>
  * derived from second extended filesystem (ext2)
  */
 
@@ -112,7 +113,7 @@ static void* xip2_dir_bread (struct inode *dir, unsigned long n)
 	if (rc)
 		return NULL;
 	result = xip2_sb_bread (dir->i_sb, blockno);
-	if (xip2_check_page (dir, result)) 
+	if (xip2_check_page (dir, result))
 		return NULL;
 	return result;
 }
@@ -140,7 +141,7 @@ static inline ext2_dirent *xip2_next_entry(ext2_dirent *p)
 	return (ext2_dirent *)((char*)p + le16_to_cpu(p->rec_len));
 }
 
-static inline unsigned 
+static inline unsigned
 xip2_validate_entry(char *base, unsigned offset, unsigned mask)
 {
 	ext2_dirent *de = (ext2_dirent*)(base + offset);
@@ -307,7 +308,7 @@ ino_t xip2_inode_by_name(struct inode * dir, struct dentry *dentry)
 {
 	ino_t res = 0;
 	struct ext2_dir_entry_2 * de;
-	
+
 	de = xip2_find_entry (dir, dentry);
 	if (de) {
 		res = le32_to_cpu(de->inode);
