@@ -41,6 +41,7 @@ ldd
 Debugging modules
 The proc file system
 Starting points for debugging scripting languages etc.
+Dumptool & Lcrash
 SysRq
 References
 Special Thanks
@@ -237,10 +238,9 @@ they go to 64 Bit.
 
 
 On 390 our limitations & strengths make us slightly different.
-For backward compatibility ( because of the psw address hi bit which
-indicates whether we are in 31 or 64 bit mode ) we are only allowed 
-use 31 bits (2GB) of our 32 bit addresses. However, 
-we use entirely separate address  spaces for the user & kernel.
+For backward compatibility we are only allowed use 31 bits (2GB)
+of our 32 bit addresses,however, we use entirely separate address 
+spaces for the user & kernel.
 
 This means we can support 2GB of non Extended RAM on s/390, & more
 with the Extended memory managment swap device & 
@@ -1288,14 +1288,10 @@ this can make debugging a particular process under VM painful under normal
 circumstances as the process may change when doing a 
 TR I R <address range>.
 Thankfully after reading VM's online help I figured out how to debug
-particular processes in 31 bit mode, however, according to the current 
-VM online help documentation the method described below uses 
-TR STO or STD which don't currently work on  z/Series while in 
-64-bit mode.
+I particular process.
 
 Your first problem is to find the STD ( segment table designation )
 of the program you wish to debug.
-
 There are several ways you can do this here are a few
 1) objdump --syms <program to be debugged> | grep main
 To get the address of main in the program.
@@ -1475,12 +1471,6 @@ Now display what gpr2 is pointing to
 D 00014CB4.20
 V00014CB4  2F646576 2F636F6E 736F6C65 00001BF5
 V00014CC4  FC00014C B4001001 E0001000 B8070707
-
-Alternatively you can do the more elegant
-D 0.20;BASE2
-BASE2 telling VM to use GPR2 as the base register.
-
-
 Now copy the text till the first 00 hex ( which is the end of the string
 to an xterm & do hex2ascii on it.
 hex2ascii 2F646576 2F636F6E 736F6C65 00 
@@ -1517,7 +1507,7 @@ int main(int argc,char *argv[])
 	  c=c-'0';
        if(c>='A'&&c<='F')
 	  c=c-'A'+10;
-       if(c>='a'&&c<='F')
+       if(c>='a'&&c<='f')
 	  c=c-'a'+10;
        switch(toggle)
        {
@@ -2131,12 +2121,6 @@ now do
 p/x (*(**$sp+56))&0x7fffffff
 & so on.
 
-Another good trick to look at addresses on the stack if you've somehow lost 
-the backchain is.
-x/500xa $sp
-This displays anything the name of any known functions above the stack pointer
-for 500 bytes.
-
 Disassembling instructions without debug info
 ---------------------------------------------
 gdb typically compains if there is a lack of debugging
@@ -2472,12 +2456,48 @@ jdb <filename> another fully interactive gdb style debugger.
 
 
 
+Dumptool & Lcrash ( lkcd )
+==========================
+Michael Holzheu & others here at IBM have a fairly mature port of 
+SGI's lcrash tool which allows one to look at kernel structures in a
+running kernel.
+
+It also complements a tool called dumptool which dumps all the kernels
+memory pages & registers to either a tape or a disk.
+This can be used by tech support or an ambitous end user do
+post mortem debugging of a machine like gdb core dumps.
+
+Going into how to use this tool in detail will be explained
+in other documentation supplied by IBM with the patches & the 
+lcrash homepage http://oss.sgi.com/projects/lkcd/ & the lcrash manpage.
+
+How they work
+-------------
+Lcrash is a perfectly normal program,however, it requires 2 
+additional files, Kerntypes which is built using a patch to the 
+linux kernel sources in the linux root directory & the System.map.
+
+Kerntypes is an an objectfile whose sole purpose in life
+is to provide stabs debug info to lcrash, to do this
+Kerntypes is built from kerntypes.c which just includes the most commonly
+referenced header files used when debugging, lcrash can then read the
+.stabs section of this file.
+
+Debugging a live system it uses /dev/mem
+alternatively for post mortem debugging it uses the data 
+collected by dumptool.
+
+
+
 SysRq
 =====
 This is now supported by linux for s/390 & z/Architecture.
 To enable it do compile the kernel with 
 Kernel Hacking -> Magic SysRq Key Enabled
-echo "1" > /proc/sys/kernel/sysrq.
+echo "1" > /proc/sys/kernel/sysrq
+also type
+echo "8" >/proc/sys/kernel/printk
+To make printk output go to console.
 On 390 all commands are prefixed with
 ^-
 e.g.
@@ -2513,4 +2533,4 @@ Special Thanks
 Special thanks to Neale Ferguson who maintains a much
 prettier HTML version of this page at
 http://penguinvm.princeton.edu/notes.html#Debug390
-
+Bob Grainger Stefan Bader & others for reporting bugs
