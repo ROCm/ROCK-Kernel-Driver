@@ -17,7 +17,8 @@
 
 asmlinkage long
 sys_pciconfig_read(unsigned long bus, unsigned long dfn,
-		   unsigned long off, unsigned long len, void *buf)
+		   unsigned long off, unsigned long len,
+		   void __user *buf)
 {
 	struct pci_dev *dev;
 	u8 byte;
@@ -89,7 +90,8 @@ error:
 
 asmlinkage long
 sys_pciconfig_write(unsigned long bus, unsigned long dfn,
-		    unsigned long off, unsigned long len, void *buf)
+		    unsigned long off, unsigned long len,
+		    void __user *buf)
 {
 	struct pci_dev *dev;
 	u8 byte;
