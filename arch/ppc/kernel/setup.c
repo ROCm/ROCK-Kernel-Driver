@@ -622,7 +622,7 @@ int __init ppc_setup_l2cr(char *str)
 }
 __setup("l2cr=", ppc_setup_l2cr);
 
-#ifdef CONFIG_NVRAM
+#ifdef CONFIG_GENERIC_NVRAM
 
 /* Generic nvram hooks used by drivers/char/gen_nvram.c */
 unsigned char nvram_read_byte(int addr)
