@@ -95,18 +95,6 @@ static struct ipx_interface *ipx_internal_net;
 atomic_t ipx_sock_nr;
 #endif
 
-static void ipxcfg_set_auto_create(char val)
-{
-	if (ipxcfg_auto_create_interfaces != val) {
-		if (val)
-			MOD_INC_USE_COUNT;
-		else
-			MOD_DEC_USE_COUNT;
-
-		ipxcfg_auto_create_interfaces = val;
-	}
-}
-
 static void ipxcfg_set_auto_select(char val)
 {
 	ipxcfg_auto_select_primary = val;
@@ -373,7 +361,6 @@ static void __ipxitf_down(struct ipx_interface *intrfc)
 	if (intrfc->if_dev)
 		dev_put(intrfc->if_dev);
 	kfree(intrfc);
-	MOD_DEC_USE_COUNT;
 }
 
 static void ipxitf_down(struct ipx_interface *intrfc)
@@ -949,7 +936,6 @@ static struct ipx_interface *ipxitf_alloc(struct net_device *dev, __u32 netnum,
 		intrfc->if_sklist 	= NULL;
 		atomic_set(&intrfc->refcnt, 1);
 		spin_lock_init(&intrfc->if_sklist_lock);
-		MOD_INC_USE_COUNT;
 	}
 
 	return intrfc;
@@ -1272,7 +1258,7 @@ static int ipxitf_ioctl(unsigned int cmd, void *arg)
 		case SIOCAIPXITFCRT: 
 			if (get_user(val, (unsigned char *) arg))
 				return -EFAULT;
-			ipxcfg_set_auto_create(val);
+			ipxcfg_auto_create_interfaces = val;
 			break;
 
 		case SIOCAIPXPRISLT: 
@@ -1690,13 +1676,12 @@ static int ipx_create(struct socket *sock, int protocol)
 	struct ipx_opt *ipx = NULL;
 	struct sock *sk;
 
-	MOD_INC_USE_COUNT;
 	switch (sock->type) {
 		case SOCK_DGRAM:
 			sk = sk_alloc(PF_IPX, GFP_KERNEL, 1, NULL);
                 	ret = -ENOMEM;
 			if (!sk)
-				goto decmod;
+				goto out;
 			ipx = ipx_sk(sk) = kmalloc(sizeof(*ipx), GFP_KERNEL);
 			if (!ipx)
 				goto outsk;
@@ -1713,7 +1698,7 @@ static int ipx_create(struct socket *sock, int protocol)
 			 */
 		case SOCK_STREAM:       /* Allow higher levels to piggyback */
 		default:
-			goto decmod;
+			goto out;
 	}
 #ifdef IPX_REFCNT_DEBUG
         atomic_inc(&ipx_sock_nr);
@@ -1727,8 +1712,6 @@ out:
 	return ret;
 outsk:
 	sk_free(sk);
-decmod:
-	MOD_DEC_USE_COUNT;
 	goto out;
 }
 
@@ -1745,10 +1728,6 @@ static int ipx_release(struct socket *sock)
 	__set_bit(SOCK_DEAD, &sk->flags);
 	sock->sk = NULL;
 	ipx_destroy_socket(sk);
-
-	if (sock->type == SOCK_DGRAM)
-		MOD_DEC_USE_COUNT;
-
 out:
 	return 0;
 }
@@ -2252,6 +2231,7 @@ static int ipx_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 static struct net_proto_family ipx_family_ops = {
 	.family		= PF_IPX,
 	.create		= ipx_create,
+	.owner		= THIS_MODULE,
 };
 
 static struct proto_ops SOCKOPS_WRAPPED(ipx_dgram_ops) = {

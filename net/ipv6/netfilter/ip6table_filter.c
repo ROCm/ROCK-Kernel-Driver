@@ -123,18 +123,21 @@ ip6t_local_out_hook(unsigned int hook,
 static struct nf_hook_ops ip6t_ops[] = {
 	{
 		.hook		= ip6t_hook,
+		.owner		= THIS_MODULE,
 		.pf		= PF_INET6,
 		.hooknum	= NF_IP6_LOCAL_IN,
 		.priority	= NF_IP6_PRI_FILTER,
 	},
 	{
 		.hook		= ip6t_hook,
+		.owner		= THIS_MODULE,
 		.pf		= PF_INET6,
 		.hooknum	= NF_IP6_FORWARD,
 		.priority	= NF_IP6_PRI_FILTER,
 	},
 	{
 		.hook		= ip6t_local_out_hook,
+		.owner		= THIS_MODULE,
 		.pf		= PF_INET6,
 		.hooknum	= NF_IP6_LOCAL_OUT,
 		.priority	= NF_IP6_PRI_FILTER,

@@ -137,7 +137,7 @@ ebt_check_vlan(const char *tablename,
 	 */
 	if (datalen != sizeof(struct ebt_vlan_info)) {
 		DEBUG_MSG
-		    ("passed size %d is not eq to ebt_vlan_info (%d)\n",
+		    ("passed size %d is not eq to ebt_vlan_info (%Zd)\n",
 		     datalen, sizeof(struct ebt_vlan_info));
 		return -EINVAL;
 	}

@@ -11,7 +11,6 @@
 #include <net/icmp.h>
 #include <net/ip.h>
 #include <net/tcp.h>
-struct in_device;
 #include <net/route.h>
 #include <linux/netfilter_ipv4/ip_tables.h>
 #include <linux/netfilter_ipv4/ipt_REJECT.h>
@@ -71,8 +70,7 @@ static void send_reset(struct sk_buff *oldskb, int local)
 						.saddr = (local ?
 							  oldskb->nh.iph->daddr :
 							  0),
-						.tos = (RT_TOS(oldskb->nh.iph->tos) |
-							RTO_CONN) } } };
+						.tos = RT_TOS(oldskb->nh.iph->tos) } } };
 
 		/* Routing: if not headed for us, route won't like source */
 		if (ip_route_output_key(&rt, &fl))
@@ -88,8 +86,10 @@ static void send_reset(struct sk_buff *oldskb, int local)
 	   hh_len of incoming interface < hh_len of outgoing interface */
 	nskb = skb_copy_expand(oldskb, hh_len, skb_tailroom(oldskb),
 			       GFP_ATOMIC);
-	if (!nskb)
+	if (!nskb) {
+		dst_release(&rt->u.dst);
 		return;
+	}
 
 	dst_release(nskb->dst);
 	nskb->dst = &rt->u.dst;

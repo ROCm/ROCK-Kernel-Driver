@@ -224,9 +224,8 @@ struct sock *llc_sk_alloc(int family, int priority)
 {
 	struct sock *sk = sk_alloc(family, priority, 1, NULL);
 
-	MOD_INC_USE_COUNT;
 	if (!sk)
-		goto decmod;
+		goto out;
 	if (llc_sk_init(sk))
 		goto outsk;
 	sock_init_data(NULL, sk);
@@ -240,8 +239,6 @@ out:
 outsk:
 	sk_free(sk);
 	sk = NULL;
-decmod:
-	MOD_DEC_USE_COUNT;
 	goto out;
 }
 
@@ -279,7 +276,6 @@ void llc_sk_free(struct sock *sk)
 	}
 #endif
 	sock_put(sk);
-	MOD_DEC_USE_COUNT;
 }
 
 /**
