@@ -286,8 +286,8 @@ static int __init longhaul_get_ranges (void)
 
 		maxmult=longhaul_get_cpu_mult();
 
-		printk(KERN_INFO PFX " invalue: %ld  maxmult: %d \n", invalue, maxmult);
-		printk(KERN_INFO PFX " invalue2: %ld \n", invalue2);
+		dprintk(KERN_INFO PFX " invalue: %ld  maxmult: %d \n", invalue, maxmult);
+		dprintk(KERN_INFO PFX " invalue2: %ld \n", invalue2);
 
 		minmult=50;
 
