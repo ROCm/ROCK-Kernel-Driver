@@ -1167,7 +1167,6 @@ cycles_t cacheflush_time;
 unsigned long cache_decay_ticks;
 
 extern unsigned long cheetah_tune_scheduling(void);
-extern unsigned long timer_ticks_per_usec_quotient;
 
 static void __init smp_tune_scheduling(void)
 {
@@ -1210,24 +1209,39 @@ static void __init smp_tune_scheduling(void)
 			*((volatile unsigned long *)p);
 
 		/* Now the real measurement. */
-		__asm__ __volatile__("
-		b,pt	%%xcc, 1f
-		 rd	%%tick, %0
-
-		.align	64
-1:		ldx	[%2 + 0x000], %%g1
-		ldx	[%2 + 0x040], %%g2
-		ldx	[%2 + 0x080], %%g3
-		ldx	[%2 + 0x0c0], %%g5
-		add	%2, 0x100, %2
-		cmp	%2, %4
-		bne,pt	%%xcc, 1b
-		 nop
-	
-		rd	%%tick, %1"
-		: "=&r" (tick1), "=&r" (tick2), "=&r" (flush_base)
-		: "2" (flush_base), "r" (flush_base + ecache_size)
-		: "g1", "g2", "g3", "g5");
+		if (!SPARC64_USE_STICK) {
+		__asm__ __volatile__("b,pt	%%xcc, 1f\n\t"
+				     " rd	%%tick, %0\n\t"
+				     ".align	64\n"
+				     "1:\tldx	[%2 + 0x000], %%g1\n\t"
+				     "ldx	[%2 + 0x040], %%g2\n\t"
+				     "ldx	[%2 + 0x080], %%g3\n\t"
+				     "ldx	[%2 + 0x0c0], %%g5\n\t"
+				     "add	%2, 0x100, %2\n\t"
+				     "cmp	%2, %4\n\t"
+				     "bne,pt	%%xcc, 1b\n\t"
+				     " nop\n\t"
+				     "rd	%%tick, %1\n\t"
+				     : "=&r" (tick1), "=&r" (tick2), "=&r" (flush_base)
+				     : "2" (flush_base), "r" (flush_base + ecache_size)
+				     : "g1", "g2", "g3", "g5");
+		} else {
+		__asm__ __volatile__("b,pt	%%xcc, 1f\n\t"
+				     " rd	%%asr24, %0\n\t"
+				     ".align	64\n"
+				     "1:\tldx	[%2 + 0x000], %%g1\n\t"
+				     "ldx	[%2 + 0x040], %%g2\n\t"
+				     "ldx	[%2 + 0x080], %%g3\n\t"
+				     "ldx	[%2 + 0x0c0], %%g5\n\t"
+				     "add	%2, 0x100, %2\n\t"
+				     "cmp	%2, %4\n\t"
+				     "bne,pt	%%xcc, 1b\n\t"
+				     " nop\n\t"
+				     "rd	%%asr24, %1\n\t"
+				     : "=&r" (tick1), "=&r" (tick2), "=&r" (flush_base)
+				     : "2" (flush_base), "r" (flush_base + ecache_size)
+				     : "g1", "g2", "g3", "g5");
+		}
 
 		__restore_flags(flags);
 
@@ -1244,10 +1258,8 @@ static void __init smp_tune_scheduling(void)
 				   (ecache_size << 1));
 	}
 report:
-	/* Convert cpu ticks to jiffie ticks. */
-	cache_decay_ticks = ((long)cacheflush_time * timer_ticks_per_usec_quotient);
-	cache_decay_ticks >>= 32UL;
-	cache_decay_ticks = (cache_decay_ticks * HZ) / 1000;
+	/* Convert ticks/sticks to jiffies. */
+	cache_decay_ticks = cacheflush_time / timer_tick_offset;
 
 	printk("Using heuristic of %ld cycles, %ld ticks.\n",
 	       cacheflush_time, cache_decay_ticks);
