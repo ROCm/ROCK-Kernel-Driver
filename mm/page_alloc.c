@@ -569,11 +569,6 @@ unsigned int nr_free_highpages (void)
 }
 #endif
 
-unsigned long nr_buffermem_pages(void)
-{
-	return atomic_read(&buffermem_pages);
-}
-
 /*
  * Accumulate the page_state information across all CPUs.
  * The result is unavoidably approximate - it can change
@@ -613,7 +608,7 @@ void si_meminfo(struct sysinfo *val)
 	val->totalram = totalram_pages;
 	val->sharedram = 0;
 	val->freeram = nr_free_pages();
-	val->bufferram = atomic_read(&buffermem_pages);
+	val->bufferram = get_page_cache_size();
 #ifdef CONFIG_HIGHMEM
 	val->totalhigh = totalhigh_pages;
 	val->freehigh = nr_free_highpages();

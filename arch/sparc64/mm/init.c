@@ -341,7 +341,6 @@ void show_mem(void)
 #ifndef CONFIG_SMP
 	printk("%d entries in page dir cache\n",pgd_cache_size);
 #endif	
-	printk("%ld buffermem pages\n", nr_buffermem_pages());
 }
 
 void mmu_info(struct seq_file *m)
