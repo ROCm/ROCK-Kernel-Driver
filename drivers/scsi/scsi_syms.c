@@ -32,6 +32,8 @@ EXPORT_SYMBOL(scsi_register_device);
 EXPORT_SYMBOL(scsi_unregister_device);
 EXPORT_SYMBOL(scsi_register_host);
 EXPORT_SYMBOL(scsi_unregister_host);
+EXPORT_SYMBOL(scsi_add_host);
+EXPORT_SYMBOL(scsi_remove_host);
 EXPORT_SYMBOL(scsi_register);
 EXPORT_SYMBOL(scsi_unregister);
 EXPORT_SYMBOL(scsicam_bios_param);
@@ -80,6 +82,8 @@ EXPORT_SYMBOL(scsi_end_request);
 
 EXPORT_SYMBOL(scsi_register_blocked_host);
 EXPORT_SYMBOL(scsi_deregister_blocked_host);
+EXPORT_SYMBOL(scsi_slave_attach);
+EXPORT_SYMBOL(scsi_slave_detach);
 
 /*
  * This symbol is for the highlevel drivers (e.g. sg) only.
@@ -92,7 +96,6 @@ EXPORT_SYMBOL(scsi_reset_provider);
 EXPORT_SYMBOL(scsi_host_get_next);
 EXPORT_SYMBOL(scsi_host_hn_get);
 EXPORT_SYMBOL(scsi_host_put);
-EXPORT_SYMBOL(scsi_devicelist);
 EXPORT_SYMBOL(scsi_device_types);
 
 /*

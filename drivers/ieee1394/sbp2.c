@@ -3137,7 +3137,7 @@ static int sbp2scsi_reset (Scsi_Cmnd *SCpnt)
 /*
  * Called by scsi stack to get bios parameters (used by fdisk, and at boot).
  */
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,44)
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,43)
 static int sbp2scsi_biosparam (struct scsi_device *sdev,
 		struct block_device *dev, sector_t capacity, int geom[]) 
 {

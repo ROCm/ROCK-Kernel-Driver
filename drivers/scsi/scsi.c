@@ -133,6 +133,12 @@ struct softscsi_data {
 static struct softscsi_data softscsi_data[NR_CPUS] __cacheline_aligned;
 
 /*
+ * List of all highlevel drivers.
+ */
+static struct Scsi_Device_Template *scsi_devicelist;
+static DECLARE_RWSEM(scsi_devicelist_mutex);
+
+/*
  * Note - the initial logging level can be set here to log events at boot time.
  * After the system is up, you may enable logging via the /proc interface.
  */
@@ -1660,10 +1666,6 @@ void scsi_adjust_queue_depth(Scsi_Device *SDpnt, int tagged, int tags)
 			break;
 	}
 	spin_unlock_irqrestore(&device_request_lock, flags);
-	if(SDpnt->current_queue_depth == 0)
-	{
-		scsi_build_commandblocks(SDpnt);
-	}
 }
 
 #ifdef CONFIG_PROC_FS
@@ -1720,7 +1722,6 @@ stop_output:
 static int proc_scsi_gen_write(struct file * file, const char * buf,
                               unsigned long length, void *data)
 {
-	struct Scsi_Device_Template *SDTpnt;
 	Scsi_Device *scd;
 	struct Scsi_Host *HBA_ptr;
 	char *p;
@@ -1926,24 +1927,10 @@ static int proc_scsi_gen_write(struct file * file, const char * buf,
 		if (scd->access_count)
 			goto out;
 
-		SDTpnt = scsi_devicelist;
-		while (SDTpnt != NULL) {
-			if (SDTpnt->detach)
-				(*SDTpnt->detach) (scd);
-			SDTpnt = SDTpnt->next;
-		}
+		scsi_detach_device(scd);
 
 		if (scd->attached == 0) {
-			/*
-			 * Nobody is using this device any more.
-			 * Free all of the command structures.
-			 */
-                        if (HBA_ptr->hostt->revoke)
-                                HBA_ptr->hostt->revoke(scd);
-			if (HBA_ptr->hostt->slave_detach)
-				(*HBA_ptr->hostt->slave_detach) (scd);
 			devfs_unregister (scd->de);
-			scsi_release_commandblocks(scd);
 
 			/* Now we can remove the device structure */
 			if (scd->next != NULL)
@@ -1971,6 +1958,109 @@ out:
 }
 #endif
 
+void scsi_detect_device(struct scsi_device *sdev)
+{
+	struct Scsi_Device_Template *sdt;
+
+	down_read(&scsi_devicelist_mutex);
+	for (sdt = scsi_devicelist; sdt; sdt = sdt->next)
+		if (sdt->detect)
+			(*sdt->detect)(sdev);
+	up_read(&scsi_devicelist_mutex);
+}
+
+int scsi_attach_device(struct scsi_device *sdev)
+{
+	struct Scsi_Device_Template *sdt;
+
+	down_read(&scsi_devicelist_mutex);
+	for (sdt = scsi_devicelist; sdt; sdt = sdt->next)
+		if (sdt->attach)
+			/*
+			 * XXX check result when the upper level attach
+			 * return values are fixed, and on failure goto
+			 * fail.
+			 */
+			(*sdt->attach) (sdev);
+	up_read(&scsi_devicelist_mutex);
+	return 0;
+
+fail:
+	printk(KERN_ERR "%s: Allocation failure during SCSI scanning, "
+			"some SCSI devices might not be configured\n",
+			__FUNCTION__);
+	return -ENOMEM;
+}
+
+void scsi_detach_device(struct scsi_device *sdev)
+{
+	struct Scsi_Device_Template *sdt;
+
+	down_read(&scsi_devicelist_mutex);
+	for (sdt = scsi_devicelist; sdt; sdt = sdt->next)
+		if (sdt->detach)
+			(*sdt->detach)(sdev);
+	up_read(&scsi_devicelist_mutex);
+}
+
+/*
+ * Function:	scsi_slave_attach()
+ *
+ * Purpose:	Called from the upper level driver attach to handle common
+ * 		attach code.
+ *
+ * Arguments:	sdev - scsi_device to attach
+ *
+ * Returns:	1 on error, 0 on succes
+ *
+ * Lock Status:	Protected via scsi_devicelist_mutex.
+ */
+int scsi_slave_attach(struct scsi_device *sdev)
+{
+	if (sdev->attached++ == 0) {
+		/*
+		 * No one was attached.
+		 */
+		scsi_build_commandblocks(sdev);
+		if (sdev->current_queue_depth == 0) {
+			printk(KERN_ERR "scsi: Allocation failure during"
+			       " attach, some SCSI devices might not be"
+			       " configured\n");
+			return 1;
+		}
+		if (sdev->host->hostt->slave_attach != NULL) {
+			if (sdev->host->hostt->slave_attach(sdev) != 0) {
+				printk(KERN_INFO "scsi: failed low level driver"
+				       " attach, some SCSI device might not be"
+				       " configured\n");
+				scsi_release_commandblocks(sdev);
+				return 1;
+			}
+		} else if (sdev->host->cmd_per_lun != 0)
+			scsi_adjust_queue_depth(sdev, 0,
+						sdev->host->cmd_per_lun);
+	}
+	return 0;
+}
+
+/*
+ * Function:	scsi_slave_detach()
+ *
+ * Purpose:	Called from the upper level driver attach to handle common
+ * 		detach code.
+ *
+ * Arguments:	sdev - struct scsi_device to detach
+ *
+ * Lock Status:	Protected via scsi_devicelist_mutex.
+ */
+void scsi_slave_detach(struct scsi_device *sdev)
+{
+	if (--sdev->attached == 0) {
+		if (sdev->host->hostt->slave_detach != NULL)
+			sdev->host->hostt->slave_detach(sdev);
+		scsi_release_commandblocks(sdev);
+	}
+}
 /*
  * This entry point should be called by a loadable module if it is trying
  * add a high level scsi driver to the system.
@@ -1989,8 +2079,10 @@ int scsi_register_device(struct Scsi_Device_Template *tpnt)
 	if (tpnt->next)
 		return 1;
 
+	down_write(&scsi_devicelist_mutex);
 	tpnt->next = scsi_devicelist;
 	scsi_devicelist = tpnt;
+	up_write(&scsi_devicelist_mutex);
 
 	tpnt->scsi_driverfs_driver.name = (char *)tpnt->tag;
 	tpnt->scsi_driverfs_driver.bus = &scsi_driverfs_bus_type;
@@ -2006,17 +2098,9 @@ int scsi_register_device(struct Scsi_Device_Template *tpnt)
 		for (SDpnt = shpnt->host_queue; SDpnt;
 		     SDpnt = SDpnt->next) {
 			if (tpnt->detect)
-				SDpnt->attached += (*tpnt->detect) (SDpnt);
+				(*tpnt->detect) (SDpnt);
 		}
 	}
-
-	/*
-	 * If any of the devices would match this driver, then perform the
-	 * init function.
-	 */
-	if (tpnt->init && tpnt->dev_noticed)
-		if ((*tpnt->init) ())
-			return 1;
 
 	/*
 	 * Now actually connect the devices to the new driver.
@@ -2025,22 +2109,14 @@ int scsi_register_device(struct Scsi_Device_Template *tpnt)
 	     shpnt = scsi_host_get_next(shpnt)) {
 		for (SDpnt = shpnt->host_queue; SDpnt;
 		     SDpnt = SDpnt->next) {
-			scsi_build_commandblocks(SDpnt);
-			if (SDpnt->current_queue_depth == 0) {
-				out_of_space = 1;
-				continue;
-			}
 			if (tpnt->attach)
+				/*
+				 * XXX check result when the upper level
+				 * attach return values are fixed, and
+				 * stop attaching on failure.
+				 */
 				(*tpnt->attach) (SDpnt);
 
-			/*
-			 * If this driver attached to the device, and don't have any
-			 * command blocks for this device, allocate some.
-			 */
-			if (SDpnt->attached)
-				SDpnt->online = TRUE;
-			else
-				scsi_release_commandblocks(SDpnt);
 		}
 	}
 
@@ -2080,22 +2156,12 @@ int scsi_unregister_device(struct Scsi_Device_Template *tpnt)
 		     SDpnt = SDpnt->next) {
 			if (tpnt->detach)
 				(*tpnt->detach) (SDpnt);
-			if (SDpnt->attached == 0) {
-				SDpnt->online = FALSE;
-
-				/*
-				 * Nobody is using this device any more.  Free all of the
-				 * command structures.
-				 */
-				if (shpnt->hostt->slave_detach)
-					(*shpnt->hostt->slave_detach) (SDpnt);
-				scsi_release_commandblocks(SDpnt);
-			}
 		}
 	}
 	/*
 	 * Extract the template from the linked list.
 	 */
+	down_write(&scsi_devicelist_mutex);
 	spnt = scsi_devicelist;
 	prev_spnt = NULL;
 	while (spnt != tpnt) {
@@ -2106,6 +2172,7 @@ int scsi_unregister_device(struct Scsi_Device_Template *tpnt)
 		scsi_devicelist = tpnt->next;
 	else
 		prev_spnt->next = spnt->next;
+	up_write(&scsi_devicelist_mutex);
 
 	MOD_DEC_USE_COUNT;
 	unlock_kernel();
