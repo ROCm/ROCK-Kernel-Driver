@@ -1,16 +1,11 @@
 #
 # Makefile for the Linux/MIPS kernel.
 #
-# Note! Dependencies are done automagically by 'make dep', which also
-# removes any old dependencies. DON'T put your own dependencies here
-# unless it's something special (ie not a .c file).
-#
 
 # EXTRA_AFLAGS = -mips3 -mcpu=r4000 # not used?
 
-all:	kernel.o head.o init_task.o
-
-O_TARGET := kernel.o
+O_TARGET	:= kernel.o
+EXTRA_TARGETS	:= head.o init_task.o
 
 obj-y				+= branch.o process.o signal.o entry.o \
 				   traps.o ptrace.o vm86.o ioport.o reset.o \
@@ -53,8 +48,5 @@ ifdef CONFIG_PCI
 obj-$(CONFIG_NEW_PCI)          += pci.o
 obj-$(CONFIG_PCI_AUTO)         += pci_auto.o
 endif
-
-entry.o: entry.S
-head.o: head.S
 
 include $(TOPDIR)/Rules.make

@@ -3,11 +3,6 @@
 #
 # Makefile for the linux kernel.
 #
-# Note! Dependencies are done automagically by 'make dep', which also
-# removes any old dependencies. DON'T put your own dependencies here
-# unless it's something special (ie not a .c file).
-#
-# Note 2! The CFLAGS definitions are now in the main makefile...
 
 ifdef CONFIG_PPC64BRIDGE
 EXTRA_AFLAGS		:= -Wa,-mppc64bridge
@@ -25,9 +20,8 @@ HEAD-$(CONFIG_4xx)		:= head_4xx.o
 HEAD-$(CONFIG_8xx)		:= head_8xx.o
 HEAD-$(CONFIG_PPC_ISERIES)	:= iSeries_head.o
 
-all: $(HEAD-y) kernel.o
-
-O_TARGET := kernel.o
+O_TARGET 	:= kernel.o
+EXTRA_TARGETS	:= $(HEAD-y)
 
 export-objs			:= ppc_ksyms.o time.o ppc405_dma.o
 

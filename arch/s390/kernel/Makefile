@@ -1,17 +1,9 @@
 #
 # Makefile for the linux kernel.
 #
-# Note! Dependencies are done automagically by 'make dep', which also
-# removes any old dependencies. DON'T put your own dependencies here
-# unless it's something special (ie not a .c file).
-#
-# Note 2! The CFLAGS definitions are now in the main makefile...
 
-all: kernel.o head.o init_task.o
-
-O_TARGET := kernel.o
-
-EXTRA_AFLAGS := -traditional
+O_TARGET	:= kernel.o
+EXTRA_TARGETS	:= head.o init_task.o
 
 export-objs	:= debug.o ebcdic.o irq.o s390_ext.o smp.o s390_ksyms.o
 obj-y	:= entry.o bitmap.o traps.o time.o process.o irq.o \
@@ -25,6 +17,8 @@ obj-$(CONFIG_SMP)		+= smp.o
 # Kernel debugging
 #
 obj-$(CONFIG_REMOTE_DEBUG)	+= gdb-stub.o #gdb-low.o 
+
+EXTRA_AFLAGS := -traditional
 
 include $(TOPDIR)/Rules.make
 

@@ -4,17 +4,11 @@
 # License.  See the file "README.legal" in the main directory of this archive
 # for more details.
 
+O_TARGET := ifpsp.o
+
+obj-y := fskeleton.o iskeleton.o os.o
+
 EXTRA_AFLAGS := -traditional
-
-OS_TARGET := ifpsp.o
-
-OS_OBJS	  := fskeleton.o iskeleton.o os.o
-
-all:	$(OS_TARGET)
+EXTRA_LDFLAGS := -x
 
 include $(TOPDIR)/Rules.make
-
-$(OS_OBJS):
-
-$(OS_TARGET): $(OS_OBJS)
-	$(LD) -x -r -o $(OS_TARGET) $(OS_OBJS)
