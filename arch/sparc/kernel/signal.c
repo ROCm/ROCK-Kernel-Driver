@@ -1019,19 +1019,22 @@ static inline void syscall_restart(unsigned long orig_i0, struct pt_regs *regs,
 				   struct sigaction *sa)
 {
 	switch(regs->u_regs[UREG_I0]) {
-		case ERESTARTNOHAND:
-		no_system_call_restart:
-			regs->u_regs[UREG_I0] = EINTR;
-			regs->psr |= PSR_C;
-			break;
-		case ERESTARTSYS:
-			if(!(sa->sa_flags & SA_RESTART))
-				goto no_system_call_restart;
+	case ERESTART_RESTARTBLOCK:
+		current_thread_info()->restart_block.fn = do_no_restart_syscall;
 		/* fallthrough */
-		case ERESTARTNOINTR:
-			regs->u_regs[UREG_I0] = orig_i0;
-			regs->pc -= 4;
-			regs->npc -= 4;
+	case ERESTARTNOHAND:
+	no_system_call_restart:
+		regs->u_regs[UREG_I0] = EINTR;
+		regs->psr |= PSR_C;
+		break;
+	case ERESTARTSYS:
+		if(!(sa->sa_flags & SA_RESTART))
+			goto no_system_call_restart;
+		/* fallthrough */
+	case ERESTARTNOINTR:
+		regs->u_regs[UREG_I0] = orig_i0;
+		regs->pc -= 4;
+		regs->npc -= 4;
 	}
 }
 
@@ -1080,6 +1083,13 @@ asmlinkage int do_signal(sigset_t *oldset, struct pt_regs * regs,
 			     regs->u_regs[UREG_I0] == ERESTARTNOINTR)) {
 				/* replay the system call when we are done */
 				regs->u_regs[UREG_I0] = orig_i0;
+				regs->pc -= 4;
+				regs->npc -= 4;
+				restart_syscall = 0;
+			}
+			if (restart_syscall &&
+			    regs->u_regs[UREG_I0] == ERESTART_RESTARTBLOCK) {
+				regs->u_regs[UREG_G1] = __NR_restart_syscall;
 				regs->pc -= 4;
 				regs->npc -= 4;
 				restart_syscall = 0;
@@ -1181,6 +1191,12 @@ asmlinkage int do_signal(sigset_t *oldset, struct pt_regs * regs,
 	     regs->u_regs[UREG_I0] == ERESTARTNOINTR)) {
 		/* replay the system call when we are done */
 		regs->u_regs[UREG_I0] = orig_i0;
+		regs->pc -= 4;
+		regs->npc -= 4;
+	}
+	if (restart_syscall &&
+	    regs->u_regs[UREG_I0] == ERESTART_RESTARTBLOCK) {
+		regs->u_regs[UREG_G1] = __NR_restart_syscall;
 		regs->pc -= 4;
 		regs->npc -= 4;
 	}
