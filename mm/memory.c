@@ -718,19 +718,24 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 			pte_t *pte;
 			if (write) /* user gate pages are read-only */
 				return i ? : -EFAULT;
-			pgd = pgd_offset_k(pg);
+			pgd = pgd_offset(mm, pg);
 			if (!pgd)
 				return i ? : -EFAULT;
 			pmd = pmd_offset(pgd, pg);
 			if (!pmd)
 				return i ? : -EFAULT;
-			pte = pte_offset_kernel(pmd, pg);
-			if (!pte || !pte_present(*pte))
+			pte = pte_offset_map(pmd, pg);
+			if (!pte)
 				return i ? : -EFAULT;
+			if (!pte_present(*pte)) {
+				pte_unmap(pte);
+				return i ? : -EFAULT;
+			}
 			if (pages) {
 				pages[i] = pte_page(*pte);
 				get_page(pages[i]);
 			}
+			pte_unmap(pte);
 			if (vmas)
 				vmas[i] = gate_vma;
 			i++;
