@@ -925,6 +925,7 @@ static struct super_block *get_sb_bdev(struct file_system_type *fs_type,
 	error = -EACCES;
 	if (nd.mnt->mnt_flags & MNT_NODEV)
 		goto out;
+	bd_acquire(inode);
 	bdev = inode->i_bdev;
 	bdops = devfs_get_ops ( devfs_get_handle_from_inode (inode) );
 	if (bdops) bdev->bd_op = bdops;
@@ -982,8 +983,6 @@ restart:
 	if (!fs_type->read_super(s, data, 0))
 		goto out_fail;
 	unlock_super(s);
-	/* tell bdcache that we are going to keep this one */
-	atomic_inc(&bdev->bd_count);
 	get_filesystem(fs_type);
 	path_release(&nd);
 	return s;
@@ -1128,10 +1127,9 @@ static void kill_super(struct super_block *sb)
 	sb->s_type = NULL;
 	unlock_super(sb);
 	unlock_kernel();
-	if (bdev) {
+	if (bdev)
 		blkdev_put(bdev, BDEV_FS);
-		bdput(bdev);
-	} else
+	else
 		put_unnamed_dev(dev);
 	spin_lock(&sb_lock);
 	list_del(&sb->s_list);
@@ -1718,6 +1716,7 @@ skip_nfs:
 	if (!ROOT_DEV)
 		panic("I have no root and I want to scream");
 
+retry:
 	bdev = bdget(kdev_t_to_nr(ROOT_DEV));
 	if (!bdev)
 		panic(__FUNCTION__ ": unable to allocate root device");
@@ -1729,7 +1728,7 @@ skip_nfs:
 	retval = blkdev_get(bdev, mode, 0, BDEV_FS);
 	if (retval == -EROFS) {
 		root_mountflags |= MS_RDONLY;
-		retval = blkdev_get(bdev, FMODE_READ, 0, BDEV_FS);
+		goto retry;
 	}
 	if (retval) {
 	        /*
@@ -1977,6 +1976,7 @@ int __init change_root(kdev_t new_root_dev,const char *put_old)
 		int blivet;
 		struct block_device *ramdisk = old_rootmnt->mnt_sb->s_bdev;
 
+		atomic_inc(&ramdisk->bd_count);
 		blivet = blkdev_get(ramdisk, FMODE_READ, 0, BDEV_FS);
 		printk(KERN_NOTICE "Trying to unmount old root ... ");
 		if (!blivet) {

@@ -31,28 +31,65 @@
 int use_coda_close;
 
 static ssize_t
-coda_file_write(struct file *file,const char *buf,size_t count,loff_t *ppos)
+coda_file_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 {
-	struct file *cfile;
-	struct inode *cinode, *inode = file->f_dentry->d_inode;
+	struct inode *inode = file->f_dentry->d_inode;
 	struct coda_inode_info *cii = ITOC(inode);
-	ssize_t n;
+	struct file *cfile;
 
 	cfile = cii->c_container;
 	if (!cfile) BUG();
 
-	if (!cfile->f_op || cfile->f_op->write != generic_file_write)
-		BUG();
+	if (!cfile->f_op || !cfile->f_op->read)
+		return -EINVAL;
+
+	return cfile->f_op->read(cfile, buf, count, ppos);
+}
+
+static ssize_t
+coda_file_write(struct file *file,const char *buf,size_t count,loff_t *ppos)
+{
+	struct inode *cinode, *inode = file->f_dentry->d_inode;
+	struct coda_inode_info *cii = ITOC(inode);
+	struct file *cfile;
+	ssize_t ret;
+	int flags;
+
+	cfile = cii->c_container;
+	if (!cfile) BUG();
+
+	if (!cfile->f_op || !cfile->f_op->write)
+		return -EINVAL;
 
 	cinode = cfile->f_dentry->d_inode;
-	down(&cinode->i_sem);
+	down(&inode->i_sem);
+	flags = cfile->f_flags;
+        cfile->f_flags |= file->f_flags & (O_APPEND | O_SYNC);
 
-	n = generic_file_write(file, buf, count, ppos);
+	ret = cfile->f_op->write(cfile, buf, count, ppos);
+
+	cfile->f_flags = flags;
 	inode->i_size = cinode->i_size;
+	up(&inode->i_sem);
 
-	up(&cinode->i_sem);
+	return ret;
+}
 
-	return n;
+static int
+coda_file_mmap(struct file *file, struct vm_area_struct *vma)
+{
+	struct inode *inode = file->f_dentry->d_inode;
+	struct coda_inode_info *cii = ITOC(inode);
+	struct file *cfile;
+
+	cfile = cii->c_container;
+
+	if (!cfile) BUG();
+
+	if (!cfile->f_op || !cfile->f_op->mmap)
+		return -ENODEV;
+
+	return cfile->f_op->mmap(cfile, vma);
 }
 
 int coda_open(struct inode *i, struct file *f)
@@ -237,9 +274,9 @@ int coda_fsync(struct file *file, struct dentry *dentry, int datasync)
 
 struct file_operations coda_file_operations = {
 	llseek:		generic_file_llseek,
-	read:		generic_file_read,
+	read:		coda_file_read,
 	write:		coda_file_write,
-	mmap:		generic_file_mmap,
+	mmap:		coda_file_mmap,
 	open:		coda_open,
 	flush:  	coda_flush,
 	release:	coda_release,

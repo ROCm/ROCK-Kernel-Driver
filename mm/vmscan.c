@@ -52,13 +52,8 @@ static inline int try_to_swap_out(struct mm_struct * mm, struct vm_area_struct* 
 	/* Don't look at this pte if it's been accessed recently. */
 	if (ptep_test_and_clear_young(page_table)) {
 		flush_tlb_page(vma, address);
-		mark_page_accessed(page);
 		return 0;
 	}
-
-	/* Don't bother with it if the page is otherwise active */
-	if (PageActive(page))
-		return 0;
 
 	if (TryLockPage(page))
 		return 0;
@@ -85,8 +80,8 @@ static inline int try_to_swap_out(struct mm_struct * mm, struct vm_area_struct* 
 		entry.val = page->index;
 		if (pte_dirty(pte))
 			set_page_dirty(page);
-set_swap_pte:
 		swap_duplicate(entry);
+set_swap_pte:
 		set_pte(page_table, swp_entry_to_pte(entry));
 drop_pte:
 		mm->rss--;
@@ -130,16 +125,18 @@ drop_pte:
 	 * we have the swap cache set up to associate the
 	 * page with that swap entry.
 	 */
+	swap_list_lock();
 	entry = get_swap_page();
-	if (!entry.val)
-		goto out_unlock_restore; /* No swap space left */
+	if (entry.val) {
+		/* Add it to the swap cache and mark it dirty */
+		add_to_swap_cache(page, entry);
+		swap_list_unlock();
+		set_page_dirty(page);
+		goto set_swap_pte;
+	}
 
-	/* Add it to the swap cache and mark it dirty */
-	add_to_swap_cache(page, entry);
-	set_page_dirty(page);
-	goto set_swap_pte;
-
-out_unlock_restore:
+	/* No swap space left */
+	swap_list_unlock();
 	set_pte(page_table, pte);
 	UnlockPage(page);
 	return 0;
@@ -243,9 +240,9 @@ static inline int swap_out_vma(struct mm_struct * mm, struct vm_area_struct * vm
 struct mm_struct *swap_mm = &init_mm;
 
 /*
- * Returns non-zero if we scanned all `count' pages
+ * Returns remaining count of pages to be swapped out by followup call.
  */
-static inline int swap_out_mm(struct mm_struct * mm, int count, int * race, zone_t * classzone)
+static inline int swap_out_mm(struct mm_struct * mm, int count, int * mmcounter, zone_t * classzone)
 {
 	unsigned long address;
 	struct vm_area_struct* vma;
@@ -255,11 +252,12 @@ static inline int swap_out_mm(struct mm_struct * mm, int count, int * race, zone
 	 * and ptes.
 	 */
 	spin_lock(&mm->page_table_lock);
-	*race = 1;
-	if (swap_mm != mm)
-		goto out_unlock;
-	*race = 0;
 	address = mm->swap_address;
+	if (address == TASK_SIZE || swap_mm != mm) {
+		/* We raced: don't count this mm but try again */
+		++*mmcounter;
+		goto out_unlock;
+	}
 	vma = find_vma(mm, address);
 	if (vma) {
 		if (address < vma->vm_start)
@@ -267,31 +265,26 @@ static inline int swap_out_mm(struct mm_struct * mm, int count, int * race, zone
 
 		for (;;) {
 			count = swap_out_vma(mm, vma, address, count, classzone);
-			if (!count)
-				goto out_unlock;
 			vma = vma->vm_next;
 			if (!vma)
 				break;
+			if (!count)
+				goto out_unlock;
 			address = vma->vm_start;
 		}
 	}
-	/* Reset to 0 when we reach the end of address space */
-	mm->swap_address = 0;
-
-	spin_lock(&mmlist_lock);
-	swap_mm = list_entry(mm->mmlist.next, struct mm_struct, mmlist);
-	spin_unlock(&mmlist_lock);
+	/* Indicate that we reached the end of address space */
+	mm->swap_address = TASK_SIZE;
 
 out_unlock:
 	spin_unlock(&mm->page_table_lock);
-
 	return count;
 }
 
 static int FASTCALL(swap_out(unsigned int priority, zone_t * classzone, unsigned int gfp_mask, int nr_pages));
 static int swap_out(unsigned int priority, zone_t * classzone, unsigned int gfp_mask, int nr_pages)
 {
-	int counter, race;
+	int counter;
 	struct mm_struct *mm;
 
 	/* Then, look at the other mm's */
@@ -304,9 +297,10 @@ static int swap_out(unsigned int priority, zone_t * classzone, unsigned int gfp_
 
 		spin_lock(&mmlist_lock);
 		mm = swap_mm;
-		if (mm == &init_mm) {
+		while (mm->swap_address == TASK_SIZE || mm == &init_mm) {
+			mm->swap_address = 0;
 			mm = list_entry(mm->mmlist.next, struct mm_struct, mmlist);
-			if (mm == &init_mm)
+			if (mm == swap_mm)
 				goto empty;
 			swap_mm = mm;
 		}
@@ -315,13 +309,13 @@ static int swap_out(unsigned int priority, zone_t * classzone, unsigned int gfp_
 		atomic_inc(&mm->mm_users);
 		spin_unlock(&mmlist_lock);
 
-		nr_pages = swap_out_mm(mm, nr_pages, &race, classzone);
+		nr_pages = swap_out_mm(mm, nr_pages, &counter, classzone);
 
 		mmput(mm);
 
 		if (!nr_pages)
 			return 1;
-	} while (race || --counter >= 0);
+	} while (--counter >= 0);
 
 	return 0;
 
@@ -330,15 +324,15 @@ empty:
 	return 0;
 }
 
-static int FASTCALL(shrink_cache(struct list_head * lru, int * max_scan, int this_max_scan, int nr_pages, zone_t * classzone, unsigned int gfp_mask));
-static int shrink_cache(struct list_head * lru, int * max_scan, int this_max_scan, int nr_pages, zone_t * classzone, unsigned int gfp_mask)
+static int FASTCALL(shrink_cache(int nr_pages, int max_scan, zone_t * classzone, unsigned int gfp_mask));
+static int shrink_cache(int nr_pages, int max_scan, zone_t * classzone, unsigned int gfp_mask)
 {
 	struct list_head * entry;
-	int __max_scan = *max_scan;
 
 	spin_lock(&pagemap_lru_lock);
-	while (__max_scan && this_max_scan && (entry = lru->prev) != lru) {
+	while (max_scan && (entry = inactive_list.prev) != &inactive_list) {
 		struct page * page;
+		swp_entry_t swap;
 
 		if (unlikely(current->need_resched)) {
 			spin_unlock(&pagemap_lru_lock);
@@ -353,17 +347,15 @@ static int shrink_cache(struct list_head * lru, int * max_scan, int this_max_sca
 		if (unlikely(!PageInactive(page) && !PageActive(page)))
 			BUG();
 
-		this_max_scan--;
-
 		list_del(entry);
-		list_add(entry, lru);
+		list_add(entry, &inactive_list);
 		if (PageTestandClearReferenced(page))
 			continue;
 
+		max_scan--;
+
 		if (unlikely(!memclass(page->zone, classzone)))
 			continue;
-
-		__max_scan--;
 
 		/* Racy check to avoid trylocking when not worthwhile */
 		if (!page->buffers && page_count(page) != 1)
@@ -479,13 +471,23 @@ static int shrink_cache(struct list_head * lru, int * max_scan, int this_max_sca
 		}
 
 		/* point of no return */
-		if (likely(!PageSwapCache(page)))
+		if (likely(!PageSwapCache(page))) {
+			swap.val = 0;
 			__remove_inode_page(page);
-		else
+		} else {
+			swap.val = page->index;
 			__delete_from_swap_cache(page);
+		}
 		spin_unlock(&pagecache_lock);
 
 		__lru_cache_del(page);
+
+		if (unlikely(swap.val != 0)) {
+			/* must drop lru lock if getting swap_list lock */
+			spin_unlock(&pagemap_lru_lock);
+			swap_free(swap);
+			spin_lock(&pagemap_lru_lock);
+		}
 
 		UnlockPage(page);
 
@@ -498,7 +500,6 @@ static int shrink_cache(struct list_head * lru, int * max_scan, int this_max_sca
 	}
 	spin_unlock(&pagemap_lru_lock);
 
-	*max_scan = __max_scan;
 	return nr_pages;
 }
 
@@ -509,13 +510,9 @@ static int shrink_cache(struct list_head * lru, int * max_scan, int this_max_sca
  * We move them the other way when we see the
  * reference bit on the page.
  */
-static void balance_inactive(int nr_pages)
+static void refill_inactive(int nr_pages)
 {
 	struct list_head * entry;
-
-	/* If we have more inactive pages than active don't do anything */
-	if (nr_active_pages < nr_inactive_pages)
-		return;
 
 	spin_lock(&pagemap_lru_lock);
 	entry = active_list.prev;
@@ -541,14 +538,17 @@ static void balance_inactive(int nr_pages)
 static int FASTCALL(shrink_caches(int priority, zone_t * classzone, unsigned int gfp_mask, int nr_pages));
 static int shrink_caches(int priority, zone_t * classzone, unsigned int gfp_mask, int nr_pages)
 {
-	int max_scan = (nr_inactive_pages + nr_active_pages / DEF_PRIORITY) / priority;
+	int max_scan = nr_inactive_pages / priority;
 
 	nr_pages -= kmem_cache_reap(gfp_mask);
 	if (nr_pages <= 0)
 		return 0;
 
-	balance_inactive(nr_pages);
-	nr_pages = shrink_cache(&inactive_list, &max_scan, nr_inactive_pages, nr_pages, classzone, gfp_mask);
+	/* Do we want to age the active list? */
+	if (nr_inactive_pages < nr_active_pages*2)
+		refill_inactive(nr_pages);
+
+	nr_pages = shrink_cache(nr_pages, max_scan, classzone, gfp_mask);
 	if (nr_pages <= 0)
 		return 0;
 

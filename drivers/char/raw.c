@@ -103,6 +103,7 @@ int raw_open(struct inode *inode, struct file *filp)
 	if (!bdev)
 		goto out;
 
+	atomic_inc(&bdev->bd_count);
 	rdev = to_kdev_t(bdev->bd_dev);
 	err = blkdev_get(bdev, filp->f_mode, 0, BDEV_RAW);
 	if (err)

@@ -404,7 +404,6 @@ static int get_inode(struct block_device *bdev)
 		if (!inode)
 			return -ENOMEM;
 		inode->i_rdev = to_kdev_t(bdev->bd_dev);
-		atomic_inc(&bdev->bd_count);	/* will go away */
 		inode->i_bdev = bdev;
 		inode->i_data.a_ops = &def_blk_aops;
 		bdev->bd_inode = inode;
@@ -437,6 +436,7 @@ static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
 	{
 		memset(bdev, 0, sizeof(*bdev));
 		sema_init(&bdev->bd_sem, 1);
+		INIT_LIST_HEAD(&bdev->bd_inodes);
 	}
 }
 
@@ -522,16 +522,57 @@ struct block_device *bdget(dev_t dev)
 
 void bdput(struct block_device *bdev)
 {
-	if (atomic_dec_and_test(&bdev->bd_count)) {
+	if (atomic_dec_and_lock(&bdev->bd_count, &bdev_lock)) {
+		struct list_head *p;
 		if (bdev->bd_openers)
 			BUG();
 		if (bdev->bd_cache_openers)
 			BUG();
-		spin_lock(&bdev_lock);
 		list_del(&bdev->bd_hash);
+		while ( (p = bdev->bd_inodes.next) != &bdev->bd_inodes ) {
+			struct inode *inode;
+			inode = list_entry(p, struct inode, i_devices);
+			list_del_init(p);
+			inode->i_bdev = NULL;
+		}
 		spin_unlock(&bdev_lock);
 		destroy_bdev(bdev);
 	}
+}
+ 
+int bd_acquire(struct inode *inode)
+{
+	struct block_device *bdev;
+	spin_lock(&bdev_lock);
+	if (inode->i_bdev) {
+		atomic_inc(&inode->i_bdev->bd_count);
+		spin_unlock(&bdev_lock);
+		return 0;
+	}
+	spin_unlock(&bdev_lock);
+	bdev = bdget(kdev_t_to_nr(inode->i_rdev));
+	if (!bdev)
+		return -ENOMEM;
+	spin_lock(&bdev_lock);
+	if (!inode->i_bdev) {
+		inode->i_bdev = bdev;
+		list_add(&inode->i_devices, &bdev->bd_inodes);
+	} else if (inode->i_bdev != bdev)
+		BUG();
+	spin_unlock(&bdev_lock);
+	return 0;
+}
+
+/* Call when you free inode */
+
+void bd_forget(struct inode *inode)
+{
+	spin_lock(&bdev_lock);
+	if (inode->i_bdev) {
+		list_del_init(&inode->i_devices);
+		inode->i_bdev = NULL;
+	}
+	spin_unlock(&bdev_lock);
 }
 
 static struct {
@@ -706,13 +747,15 @@ int blkdev_get(struct block_device *bdev, mode_t mode, unsigned flags, int kind)
 	}
 	unlock_kernel();
 	up(&bdev->bd_sem);
+	if (ret)
+		bdput(bdev);
 	return ret;
 }
 
 int blkdev_open(struct inode * inode, struct file * filp)
 {
-	int ret = -ENXIO;
-	struct block_device *bdev = inode->i_bdev;
+	int ret;
+	struct block_device *bdev;
 
 	/*
 	 * Preserve backwards compatibility and allow large file access
@@ -722,13 +765,15 @@ int blkdev_open(struct inode * inode, struct file * filp)
 	 */
 	filp->f_flags |= O_LARGEFILE;
 
+	bd_acquire(inode);
+	bdev = inode->i_bdev;
 	down(&bdev->bd_sem);
 
-	if (get_inode(bdev)) {
-		up(&bdev->bd_sem);
-		return -ENOMEM;
-	}
+	ret = get_inode(bdev);
+	if (ret)
+		goto out;
 
+	ret = -ENXIO;
 	lock_kernel();
 	if (!bdev->bd_op)
 		bdev->bd_op = get_blkfops(MAJOR(inode->i_rdev));
@@ -749,7 +794,10 @@ int blkdev_open(struct inode * inode, struct file * filp)
 		}
 	}	
 	unlock_kernel();
+out:
 	up(&bdev->bd_sem);
+	if (ret)
+		bdput(bdev);
 	return ret;
 }	
 
@@ -777,6 +825,7 @@ int blkdev_put(struct block_device *bdev, int kind)
 	}
 	unlock_kernel();
 	up(&bdev->bd_sem);
+	bdput(bdev);
 	return ret;
 }
 
@@ -841,6 +890,7 @@ int blkdev_close(struct inode * inode, struct file * filp)
 	}
 	unlock_kernel();
 	up(&bdev->bd_sem);
+	bdput(bdev);
 
 	return ret;
 }

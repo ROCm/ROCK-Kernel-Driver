@@ -491,7 +491,6 @@ static void __exit rd_cleanup (void)
 			bdev->bd_cache_openers--;
 			truncate_inode_pages(bdev->bd_inode->i_mapping, 0);
 			blkdev_put(bdev, BDEV_FILE);
-			bdput(bdev);
 		}
 		destroy_buffers(MKDEV(MAJOR_NR, i));
 	}
@@ -780,7 +779,7 @@ static void __init rd_load_image(kdev_t device, int offset, int unit)
 		if (i && (i % devblocks == 0)) {
 			printk("done disk #%d.\n", i/devblocks);
 			rotate = 0;
-			if (blkdev_close(inode, &infile) != 0) {
+			if (infile.f_op->release(inode, &infile) != 0) {
 				printk("Error closing the disk.\n");
 				goto noclose_input;
 			}

@@ -23,17 +23,11 @@
  */
 static int swap_writepage(struct page *page)
 {
-	/* One for the page cache, one for this user, one for page->buffers */
-	if (page_count(page) > 2 + !!page->buffers)
-		goto in_use;
-	if (swap_count(page) > 1)
-		goto in_use;
-
-	delete_from_swap_cache_nolock(page);
-	UnlockPage(page);
-	return 0;
-
-in_use:
+	if (exclusive_swap_page(page)) {
+		delete_from_swap_cache(page);
+		UnlockPage(page);
+		return 0;
+	}
 	rw_swap_page(WRITE, page);
 	return 0;
 }
@@ -75,8 +69,6 @@ void add_to_swap_cache(struct page *page, swp_entry_t entry)
 #endif
 	if (!PageLocked(page))
 		BUG();
-	if (PageTestandSetSwapCache(page))
-		BUG();
 	if (page->mapping)
 		BUG();
 
@@ -92,51 +84,42 @@ void add_to_swap_cache(struct page *page, swp_entry_t entry)
  */
 void __delete_from_swap_cache(struct page *page)
 {
-	struct address_space *mapping = page->mapping;
-	swp_entry_t entry;
-
 #ifdef SWAP_CACHE_INFO
 	swap_cache_del_total++;
 #endif
-	if (mapping != &swapper_space)
+	if (!PageLocked(page))
 		BUG();
-	if (!PageSwapCache(page) || !PageLocked(page))
+	if (!PageSwapCache(page))
 		BUG();
 
-	entry.val = page->index;
-	PageClearSwapCache(page);
 	ClearPageDirty(page);
 	__remove_inode_page(page);
-	swap_free(entry);
 }
 
 /*
- * This will never put the page into the free list, the caller has
- * a reference on the page.
+ * This must be called only on pages that have
+ * been verified to be in the swap cache and locked.
+ * It will never put the page into the free list,
+ * the caller has a reference on the page.
  */
-void delete_from_swap_cache_nolock(struct page *page)
+void delete_from_swap_cache(struct page *page)
 {
+	swp_entry_t entry;
+
 	if (!PageLocked(page))
 		BUG();
 
 	if (block_flushpage(page, 0))
 		lru_cache_del(page);
 
+	entry.val = page->index;
+
 	spin_lock(&pagecache_lock);
 	__delete_from_swap_cache(page);
 	spin_unlock(&pagecache_lock);
-	page_cache_release(page);
-}
 
-/*
- * This must be called only on pages that have
- * been verified to be in the swap cache and locked.
- */
-void delete_from_swap_cache(struct page *page)
-{
-	lock_page(page);
-	delete_from_swap_cache_nolock(page);
-	UnlockPage(page);
+	swap_free(entry);
+	page_cache_release(page);
 }
 
 /* 
@@ -156,7 +139,7 @@ void free_page_and_swap_cache(struct page *page)
 	 */
 	if (PageSwapCache(page) && !TryLockPage(page)) {
 		if (exclusive_swap_page(page))
-			delete_from_swap_cache_nolock(page);
+			delete_from_swap_cache(page);
 		UnlockPage(page);
 	}
 	page_cache_release(page);
@@ -213,19 +196,24 @@ struct page * read_swap_cache_async(swp_entry_t entry)
 	new_page = alloc_page(GFP_HIGHUSER);
 	if (!new_page)
 		goto out;		/* Out of memory */
+	if (TryLockPage(new_page))
+		BUG();
 
 	/*
 	 * Check the swap cache again, in case we stalled above.
-	 * The BKL is guarding against races between this check
+	 * swap_list_lock is guarding against races between this check
 	 * and where the new page is added to the swap cache below.
+	 * It is also guarding against race where try_to_swap_out
+	 * allocates entry with get_swap_page then adds to cache.
 	 */
+	swap_list_lock();
 	found_page = __find_get_page(&swapper_space, entry.val, hash);
 	if (found_page)
 		goto out_free_page;
 
 	/*
 	 * Make sure the swap entry is still in use.  It could have gone
-	 * while caller waited for BKL, or while allocating page above,
+	 * since caller dropped page_table_lock, while allocating page above,
 	 * or while allocating page in prior call via swapin_readahead.
 	 */
 	if (!swap_duplicate(entry))	/* Account for the swap cache */
@@ -234,13 +222,15 @@ struct page * read_swap_cache_async(swp_entry_t entry)
 	/* 
 	 * Add it to the swap cache and read its contents.
 	 */
-	if (TryLockPage(new_page))
-		BUG();
 	add_to_swap_cache(new_page, entry);
+	swap_list_unlock();
+
 	rw_swap_page(READ, new_page);
 	return new_page;
 
 out_free_page:
+	swap_list_unlock();
+	UnlockPage(new_page);
 	page_cache_release(new_page);
 out:
 	return found_page;

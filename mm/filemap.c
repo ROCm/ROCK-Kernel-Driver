@@ -1704,6 +1704,7 @@ success:
 	 * and possibly copy it over to another page..
 	 */
 	old_page = page;
+	mark_page_accessed(page);
 	if (no_share) {
 		struct page *new_page = alloc_page(GFP_HIGHUSER);
 
@@ -2553,7 +2554,6 @@ repeat:
 	}
 	if (cached_page)
 		page_cache_release(cached_page);
-	mark_page_accessed(page);
 	return page;
 }
 
@@ -2571,7 +2571,10 @@ struct page *read_cache_page(struct address_space *mapping,
 
 retry:
 	page = __read_cache_page(mapping, index, filler, data);
-	if (IS_ERR(page) || Page_Uptodate(page))
+	if (IS_ERR(page))
+		goto out;
+	mark_page_accessed(page);
+	if (Page_Uptodate(page))
 		goto out;
 
 	lock_page(page);
@@ -2835,6 +2838,7 @@ generic_file_write(struct file *file,const char *buf,size_t count, loff_t *ppos)
 unlock:
 		kunmap(page);
 		/* Mark it unlocked again and drop the page.. */
+		SetPageReferenced(page);
 		UnlockPage(page);
 		page_cache_release(page);
 

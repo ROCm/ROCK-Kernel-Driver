@@ -279,6 +279,7 @@ static void __init probedisk(int major, int minor,int device)
 	int i;
         struct highpoint_raid_conf *prom;
 	static unsigned char block[4096];
+	struct block_device *bdev;
 	
 	if (maxsectors(major,minor)==0)
 		return;
@@ -301,12 +302,12 @@ static void __init probedisk(int major, int minor,int device)
 	if (i>8) 
 		return;
 
-	raid[device].disk[i].bdev = bdget(MKDEV(major,minor));
-        if (raid[device].disk[i].bdev != NULL) {
+	bdev = bdget(MKDEV(major,minor));
+	if (bdev && blkdev_get(bdev,FMODE_READ|FMODE_WRITE,0,BDEV_RAW) == 0) {
         	int j=0;
         	struct gendisk *gd;
-        	/* This is supposed to prevent others from stealing our underlying disks */
-		blkdev_get(raid[device].disk[i].bdev, FMODE_READ|FMODE_WRITE, 0, BDEV_RAW);
+
+		raid[device].disk[i].bdev = bdev;
 		/* now blank the /proc/partitions table for the wrong partition table,
 		   so that scripts don't accidentally mount it and crash the kernel */
 		 /* XXX: the 0 is an utter hack  --hch */
@@ -408,12 +409,12 @@ static void __exit hptraid_exit (void)
 {
 	int i,device;
 	for (device = 0; device<16; device++) {
-		for (i=0;i<8;i++) 
-			if (raid[device].disk[i].bdev) {
-				blkdev_put(raid[device].disk[i].bdev, BDEV_RAW);
-				bdput(raid[device].disk[i].bdev);
-				raid[device].disk[i].bdev = NULL;
-			}       
+		for (i=0;i<8;i++) {
+			struct block_device *bdev = raid[device].disk[i].bdev;
+			raid[device].disk[i].bdev = NULL;
+			if (bdev)
+				blkdev_put(bdev, BDEV_RAW);
+		}
 		if (raid[device].sectors)
 			ataraid_release_device(device);
 	}

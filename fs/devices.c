@@ -207,7 +207,6 @@ void init_special_inode(struct inode *inode, umode_t mode, int rdev)
 	} else if (S_ISBLK(mode)) {
 		inode->i_fop = &def_blk_fops;
 		inode->i_rdev = to_kdev_t(rdev);
-		inode->i_bdev = bdget(rdev);
 	} else if (S_ISFIFO(mode))
 		inode->i_fop = &def_fifo_fops;
 	else if (S_ISSOCK(mode))

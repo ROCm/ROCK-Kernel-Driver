@@ -274,7 +274,6 @@ typedef struct page {
 #define PG_active		 6
 #define PG_inactive		 7
 #define PG_slab			 8
-#define PG_swap_cache		 9
 #define PG_skip			10
 #define PG_highmem		11
 #define PG_checked		12	/* kill me in 2.5.<early>. */
@@ -326,18 +325,9 @@ static inline void set_page_dirty(struct page * page)
 #define SetPageDecrAfter(page)	set_bit(PG_decr_after, &(page)->flags)
 #define PageTestandClearDecrAfter(page)	test_and_clear_bit(PG_decr_after, &(page)->flags)
 #define PageSlab(page)		test_bit(PG_slab, &(page)->flags)
-#define PageSwapCache(page)	test_bit(PG_swap_cache, &(page)->flags)
-#define PageReserved(page)	test_bit(PG_reserved, &(page)->flags)
-
 #define PageSetSlab(page)	set_bit(PG_slab, &(page)->flags)
-#define PageSetSwapCache(page)	set_bit(PG_swap_cache, &(page)->flags)
-
-#define PageTestandSetSwapCache(page)	test_and_set_bit(PG_swap_cache, &(page)->flags)
-
-#define PageClearSlab(page)		clear_bit(PG_slab, &(page)->flags)
-#define PageClearSwapCache(page)	clear_bit(PG_swap_cache, &(page)->flags)
-
-#define PageTestandClearSwapCache(page)	test_and_clear_bit(PG_swap_cache, &(page)->flags)
+#define PageClearSlab(page)	clear_bit(PG_slab, &(page)->flags)
+#define PageReserved(page)	test_bit(PG_reserved, &(page)->flags)
 
 #define PageActive(page)	test_bit(PG_active, &(page)->flags)
 #define SetPageActive(page)	set_bit(PG_active, &(page)->flags)
@@ -465,6 +455,9 @@ extern void show_mem(void);
 extern void si_meminfo(struct sysinfo * val);
 extern void swapin_readahead(swp_entry_t);
 
+extern struct address_space swapper_space;
+#define PageSwapCache(page) ((page)->mapping == &swapper_space)
+
 static inline int is_page_cache_freeable(struct page * page)
 {
 	return page_count(page) - !!page->buffers == 1;
@@ -476,15 +469,13 @@ static inline int is_page_cache_freeable(struct page * page)
  */
 static inline int exclusive_swap_page(struct page *page)
 {
-	unsigned int count;
-
 	if (!PageLocked(page))
 		BUG();
 	if (!PageSwapCache(page))
 		return 0;
-	count = page_count(page) - !!page->buffers;	/*  2: us + swap cache */
-	count += swap_count(page);			/* +1: just swap cache */
-	return count == 3;				/* =3: total */
+	if (page_count(page) - !!page->buffers != 2)	/* 2: us + cache */
+		return 0;
+	return swap_count(page) == 1;			/* 1: just cache */
 }
 
 extern void __free_pte(pte_t);
@@ -565,11 +556,10 @@ extern struct page *filemap_nopage(struct vm_area_struct *, unsigned long, int);
 #define GFP_NOFS	(__GFP_HIGH | __GFP_WAIT | __GFP_IO | __GFP_HIGHIO)
 #define GFP_ATOMIC	(__GFP_HIGH)
 #define GFP_USER	(             __GFP_WAIT | __GFP_IO | __GFP_HIGHIO | __GFP_FS)
-#define GFP_HIGHUSER	(             __GFP_WAIT | __GFP_IO | __GFP_HIGHIO \
-	       	| __GFP_FS | __GFP_HIGHMEM)
+#define GFP_HIGHUSER	(             __GFP_WAIT | __GFP_IO | __GFP_HIGHIO | __GFP_FS | __GFP_HIGHMEM)
 #define GFP_KERNEL	(__GFP_HIGH | __GFP_WAIT | __GFP_IO | __GFP_HIGHIO | __GFP_FS)
-#define GFP_NFS	(__GFP_HIGH | __GFP_WAIT | __GFP_IO | __GFP_HIGHIO | __GFP_FS)
-#define GFP_KSWAPD	(                          __GFP_IO | __GFP_HIGHIO | __GFP_FS)
+#define GFP_NFS		(__GFP_HIGH | __GFP_WAIT | __GFP_IO | __GFP_HIGHIO | __GFP_FS)
+#define GFP_KSWAPD	(             __GFP_WAIT | __GFP_IO | __GFP_HIGHIO | __GFP_FS)
 
 /* Flag - indicates that the buffer will be suitable for DMA.  Ignored on some
    platforms, used as appropriate on others */

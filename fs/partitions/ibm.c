@@ -47,9 +47,10 @@ get_drive_geometry(int kdev,struct hd_geometry *geo)
 {
 	struct block_device *bdev = bdget(kdev_t_to_nr(kdev));
 	int rc = blkdev_get(bdev, 0, 1, BDEV_FILE);
-        if ( rc == 0 )
+        if ( rc == 0 ) {
 		rc = ioctl_by_bdev(bdev, HDIO_GETGEO, (unsigned long)geo);
-	blkdev_put(bdev,BDEV_FILE);
+		blkdev_put(bdev, BDEV_FILE);
+	}
 	return rc;
 }
 
@@ -58,9 +59,10 @@ get_drive_info(int kdev,dasd_information_t *info)
 {
 	struct block_device *bdev = bdget(kdev_t_to_nr(kdev));
 	int rc = blkdev_get(bdev, 0, 1, BDEV_FILE);
-        if ( rc == 0 )
+        if ( rc == 0 ) {
 		rc = ioctl_by_bdev(bdev, BIODASDINFO, (unsigned long)(info));
-	blkdev_put(bdev,BDEV_FILE);
+		blkdev_put(bdev, BDEV_FILE);
+	}
 	return rc;
 }
 

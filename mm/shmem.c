@@ -234,45 +234,55 @@ static int shmem_writepage(struct page * page)
 	int error;
 	struct shmem_inode_info *info;
 	swp_entry_t *entry, swap;
+	struct address_space *mapping;
+	unsigned long index;
 	struct inode *inode;
 
 	if (!PageLocked(page))
 		BUG();
-	
-	inode = page->mapping->host;
+
+	mapping = page->mapping;
+	index = page->index;
+	inode = mapping->host;
 	info = &inode->u.shmem_i;
-	swap = __get_swap_page(2);
-	error = -ENOMEM;
-	if (!swap.val) {
-		activate_page(page);
-		SetPageDirty(page);
-		goto out;
-	}
 
 	spin_lock(&info->lock);
-	entry = shmem_swp_entry(info, page->index);
-	if (IS_ERR(entry))	/* this had been allocted on page allocation */
+	entry = shmem_swp_entry(info, index);
+	if (IS_ERR(entry))	/* this had been allocated on page allocation */
 		BUG();
-	shmem_recalc_inode(page->mapping->host);
-	error = -EAGAIN;
+	shmem_recalc_inode(inode);
 	if (entry->val)
 		BUG();
 
-	*entry = swap;
-	error = 0;
-	/* Remove the from the page cache */
+	/* Remove it from the page cache */
 	lru_cache_del(page);
 	remove_inode_page(page);
 
+	swap_list_lock();
+	swap = get_swap_page();
+
+	if (!swap.val) {
+		swap_list_unlock();
+		/* Add it back to the page cache */
+		add_to_page_cache_locked(page, mapping, index);
+		activate_page(page);
+		SetPageDirty(page);
+		error = -ENOMEM;
+		goto out;
+	}
+
 	/* Add it to the swap cache */
 	add_to_swap_cache(page, swap);
-	page_cache_release(page);
-	info->swapped++;
+	swap_list_unlock();
 
-	spin_unlock(&info->lock);
 	set_page_dirty(page);
+	info->swapped++;
+	*entry = swap;
+	error = 0;
 out:
+	spin_unlock(&info->lock);
 	UnlockPage(page);
+	page_cache_release(page);
 	return error;
 }
 
@@ -356,7 +366,7 @@ repeat:
 
 		swap_free(*entry);
 		*entry = (swp_entry_t) {0};
-		delete_from_swap_cache_nolock(page);
+		delete_from_swap_cache(page);
 		flags = page->flags & ~(1 << PG_uptodate | 1 << PG_error | 1 << PG_referenced | 1 << PG_arch_1);
 		page->flags = flags | (1 << PG_dirty);
 		add_to_page_cache_locked(page, mapping, idx);

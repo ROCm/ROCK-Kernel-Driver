@@ -2291,9 +2291,16 @@ static int devfs_statfs (struct super_block *sb, struct statfs *buf)
     return 0;
 }   /*  End Function devfs_statfs  */
 
+static void devfs_clear_inode(struct inode *inode)
+{
+	if (S_ISBLK(inode->i_mode))
+		bdput(inode->i_bdev);
+}
+
 static struct super_operations devfs_sops =
 { 
     put_inode:     force_delete,
+    clear_inode:   devfs_clear_inode,
     statfs:        devfs_statfs,
 };
 
@@ -2351,9 +2358,7 @@ static struct inode *get_vfs_inode (struct super_block *sb,
     {
 	inode->i_rdev = MKDEV (de->u.fcb.u.device.major,
 			       de->u.fcb.u.device.minor);
-	inode->i_bdev = bdget ( kdev_t_to_nr (inode->i_rdev) );
-	inode->i_mapping->a_ops = &def_blk_aops;
-	if (inode->i_bdev)
+	if (bd_acquire(inode) == 0)
 	{
 	    if (!inode->i_bdev->bd_op && de->u.fcb.ops)
 		inode->i_bdev->bd_op = de->u.fcb.ops;

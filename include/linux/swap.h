@@ -84,7 +84,6 @@ extern unsigned int nr_free_buffer_pages(void);
 extern int nr_active_pages;
 extern int nr_inactive_pages;
 extern atomic_t nr_async_pages;
-extern struct address_space swapper_space;
 extern atomic_t page_cache_size;
 extern atomic_t buffermem_pages;
 extern spinlock_t pagecache_lock;
@@ -122,35 +121,27 @@ extern void rw_swap_page_nolock(int, swp_entry_t, char *);
 /* linux/mm/swap_state.c */
 extern void show_swap_cache_info(void);
 extern void add_to_swap_cache(struct page *, swp_entry_t);
-extern int swap_check_entry(unsigned long);
+extern void __delete_from_swap_cache(struct page *page);
+extern void delete_from_swap_cache(struct page *page);
+extern void free_page_and_swap_cache(struct page *page);
 extern struct page * lookup_swap_cache(swp_entry_t);
 extern struct page * read_swap_cache_async(swp_entry_t);
 
 /* linux/mm/oom_kill.c */
 extern void oom_kill(void);
 
-/*
- * Make these inline later once they are working properly.
- */
-extern void __delete_from_swap_cache(struct page *page);
-extern void delete_from_swap_cache(struct page *page);
-extern void delete_from_swap_cache_nolock(struct page *page);
-extern void free_page_and_swap_cache(struct page *page);
-
 /* linux/mm/swapfile.c */
 extern unsigned int nr_swapfiles;
 extern struct swap_info_struct swap_info[];
 extern int is_swap_partition(kdev_t);
 extern void si_swapinfo(struct sysinfo *);
-extern swp_entry_t __get_swap_page(unsigned short);
+extern swp_entry_t get_swap_page(void);
 extern void get_swaphandle_info(swp_entry_t, unsigned long *, kdev_t *, 
 					struct inode **);
 extern int swap_duplicate(swp_entry_t);
 extern int swap_count(struct page *);
 extern int valid_swaphandles(swp_entry_t, unsigned long *);
-#define get_swap_page() __get_swap_page(1)
-extern void __swap_free(swp_entry_t, unsigned short);
-#define swap_free(entry) __swap_free((entry), 1)
+extern void swap_free(swp_entry_t);
 struct swap_list_t {
 	int head;	/* head of priority-ordered swapfile list */
 	int next;	/* swapfile to be used next */

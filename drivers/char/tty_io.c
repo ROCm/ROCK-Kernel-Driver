@@ -270,6 +270,8 @@ int tty_register_ldisc(int disc, struct tty_ldisc *new_ldisc)
 	return 0;
 }
 
+EXPORT_SYMBOL(tty_register_ldisc);
+
 /* Set the discipline of a tty line. */
 static int tty_set_ldisc(struct tty_struct *tty, int ldisc)
 {

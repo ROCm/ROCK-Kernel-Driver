@@ -311,12 +311,12 @@ static void __init probedisk(int major, int minor,int device)
         for (i=0;(i<prom->raid.total_disks)&&(i<8);i++) {
         	if ( (prom->raid.disk[i].channel== prom->raid.channel) &&
         	     (prom->raid.disk[i].device == prom->raid.device) ) {
-        	        raid[device].disk[i].bdev = bdget(MKDEV(major,minor));
-        	        if (raid[device].disk[i].bdev != NULL) {
+			struct block_device *bdev = bdget(MKDEV(major,minor));
+			if (bdev && blkdev_get(bdev,FMODE_READ|FMODE_WRITE,0,BDEV_RAW) == 0) {
         	        	struct gendisk *gd;
         	        	int j;
         	        	/* This is supposed to prevent others from stealing our underlying disks */
-        	        	blkdev_get(raid[device].disk[i].bdev, FMODE_READ|FMODE_WRITE, 0, BDEV_RAW);
+				raid[device].disk[i].bdev = bdev;
 				gd=get_gendisk(major);
 				if (gd!=NULL) {
 					for (j=1+(minor<<gd->minor_shift);j<((minor+1)<<gd->minor_shift);j++) 
@@ -418,13 +418,12 @@ static void __exit pdcraid_exit (void)
 {
 	int i,device;
 	for (device = 0; device<16; device++) {
-		for (i=0;i<8;i++) 
-			if (raid[device].disk[i].bdev) {
-				blkdev_put(raid[device].disk[i].bdev, BDEV_RAW);
-				bdput(raid[device].disk[i].bdev);
-				raid[device].disk[i].bdev = NULL;
-
-			}	
+		for (i=0;i<8;i++)  {
+			struct block_device *bdev = raid[device].disk[i].bdev;
+			raid[device].disk[i].bdev = NULL;
+			if (bdev)
+				blkdev_put(bdev, BDEV_RAW);
+		}	
 		if (raid[device].sectors)
 			ataraid_release_device(device);
 	}

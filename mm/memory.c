@@ -85,8 +85,6 @@ void __free_pte(pte_t pte)
 	if (page->mapping) {
 		if (pte_dirty(pte))
 			set_page_dirty(page);
-		if (pte_young(pte))
-			mark_page_accessed(page);
 	}
 		
 	free_page_and_swap_cache(page);
@@ -939,10 +937,8 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 			break;
 		/* Recheck swapcachedness once the page is locked */
 		can_reuse = exclusive_swap_page(old_page);
-#if 1
 		if (can_reuse)
-			delete_from_swap_cache_nolock(old_page);
-#endif
+			delete_from_swap_cache(old_page);
 		UnlockPage(old_page);
 		if (!can_reuse)
 			break;
@@ -1088,23 +1084,19 @@ void swapin_readahead(swp_entry_t entry)
 	unsigned long offset;
 
 	/*
-	 * Get the number of handles we should do readahead io to. Also,
-	 * grab temporary references on them, releasing them as io completes.
+	 * Get the number of handles we should do readahead io to.
 	 */
 	num = valid_swaphandles(entry, &offset);
 	for (i = 0; i < num; offset++, i++) {
 		/* Don't block on I/O for read-ahead */
-		if (atomic_read(&nr_async_pages) >= pager_daemon.swap_cluster
-				* (1 << page_cluster)) {
-			while (i++ < num)
-				swap_free(SWP_ENTRY(SWP_TYPE(entry), offset++));
+		if (atomic_read(&nr_async_pages) >=
+		    pager_daemon.swap_cluster << page_cluster)
 			break;
-		}
 		/* Ok, do the async read-ahead now */
 		new_page = read_swap_cache_async(SWP_ENTRY(SWP_TYPE(entry), offset));
-		if (new_page != NULL)
-			page_cache_release(new_page);
-		swap_free(SWP_ENTRY(SWP_TYPE(entry), offset));
+		if (!new_page)
+			break;
+		page_cache_release(new_page);
 	}
 	return;
 }
@@ -1164,11 +1156,12 @@ static int do_swap_page(struct mm_struct * mm,
 	pte = mk_pte(page, vma->vm_page_prot);
 
 	swap_free(entry);
+	mark_page_accessed(page);
 	if (exclusive_swap_page(page)) {
 		if (vma->vm_flags & VM_WRITE)
 			pte = pte_mkwrite(pte);
 		pte = pte_mkdirty(pte);
-		delete_from_swap_cache_nolock(page);
+		delete_from_swap_cache(page);
 	}
 	UnlockPage(page);
 

@@ -414,7 +414,7 @@ MODULE_AUTHOR("Peter J. Braam <braam@cs.cmu.edu>");
 static int __init init_coda(void)
 {
 	int status;
-	printk(KERN_INFO "Coda Kernel/Venus communications, v5.3.14, coda@cs.cmu.edu\n");
+	printk(KERN_INFO "Coda Kernel/Venus communications, v5.3.15, coda@cs.cmu.edu\n");
 
 	status = init_coda_psdev();
 	if ( status ) {

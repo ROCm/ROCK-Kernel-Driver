@@ -106,6 +106,7 @@ static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
 		INIT_LIST_HEAD(&inode->i_dentry);
 		INIT_LIST_HEAD(&inode->i_dirty_buffers);
 		INIT_LIST_HEAD(&inode->i_dirty_data_buffers);
+		INIT_LIST_HEAD(&inode->i_devices);
 		sema_init(&inode->i_sem, 1);
 		sema_init(&inode->i_zombie, 1);
 		spin_lock_init(&inode->i_data.i_shared_lock);
@@ -516,11 +517,9 @@ void clear_inode(struct inode *inode)
 	DQUOT_DROP(inode);
 	if (inode->i_sb && inode->i_sb->s_op && inode->i_sb->s_op->clear_inode)
 		inode->i_sb->s_op->clear_inode(inode);
-	if (inode->i_bdev) {
-		bdput(inode->i_bdev);
-		inode->i_bdev = NULL;
-	}
-	if (inode->i_cdev) {
+	if (inode->i_bdev)
+		bd_forget(inode);
+	else if (inode->i_cdev) {
 		cdput(inode->i_cdev);
 		inode->i_cdev = NULL;
 	}

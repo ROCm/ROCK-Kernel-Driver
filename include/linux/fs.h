@@ -415,6 +415,7 @@ struct block_device {
 	int			bd_cache_openers;
 	const struct block_device_operations *bd_op;
 	struct semaphore	bd_sem;	/* open/close mutex */
+	struct list_head	bd_inodes;
 };
 
 struct inode {
@@ -452,6 +453,7 @@ struct inode {
 	int			i_mapping_overload;
 	struct dquot		*i_dquot[MAXQUOTAS];
 	/* These three should probably be a union */
+	struct list_head	i_devices;
 	struct pipe_inode_info	*i_pipe;
 	struct block_device	*i_bdev;
 	struct char_device	*i_cdev;
@@ -1046,6 +1048,8 @@ enum {BDEV_FILE, BDEV_SWAP, BDEV_FS, BDEV_RAW};
 extern int register_blkdev(unsigned int, const char *, struct block_device_operations *);
 extern int unregister_blkdev(unsigned int, const char *);
 extern struct block_device *bdget(dev_t);
+extern int bd_acquire(struct inode *inode);
+extern void bd_forget(struct inode *inode);
 extern void bdput(struct block_device *);
 extern struct char_device *cdget(dev_t);
 extern void cdput(struct char_device *);

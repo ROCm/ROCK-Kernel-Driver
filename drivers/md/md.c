@@ -649,11 +649,11 @@ static int lock_rdev (mdk_rdev_t *rdev)
 
 static void unlock_rdev (mdk_rdev_t *rdev)
 {
-	if (!rdev->bdev)
-		MD_BUG();
-	blkdev_put(rdev->bdev, BDEV_RAW);
-	bdput(rdev->bdev);
+	struct block_device *bdev = rdev->bdev;
 	rdev->bdev = NULL;
+	if (!bdev)
+		MD_BUG();
+	blkdev_put(bdev, BDEV_RAW);
 }
 
 void md_autodetect_dev (kdev_t dev);
