@@ -231,6 +231,8 @@ static void __init init_intel(struct cpuinfo_x86 *c)
 			printk (KERN_INFO "CPU: L1 I cache: %dK", l1i);
 		if ( l1d )
 			printk(", L1 D cache: %dK\n", l1d);
+		else
+			printk("\n");
 		if ( l2 )
 			printk(KERN_INFO "CPU: L2 cache: %dK\n", l2);
 		if ( l3 )
