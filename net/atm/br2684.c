@@ -294,7 +294,7 @@ static inline unsigned short br_type_trans(struct sk_buff *skb,
 {
 	struct ethhdr *eth;
 	unsigned char *rawp;
-	eth = skb->mac.ethernet;
+	eth = eth_hdr(skb);
 
 	if (*eth->h_dest & 1) {
 		if (memcmp(eth->h_dest, dev->broadcast, ETH_ALEN) == 0)

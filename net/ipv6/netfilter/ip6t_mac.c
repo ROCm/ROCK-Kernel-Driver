@@ -35,7 +35,7 @@ match(const struct sk_buff *skb,
     return (skb->mac.raw >= skb->head
 	    && (skb->mac.raw + ETH_HLEN) <= skb->data
 	    /* If so, compare... */
-	    && ((memcmp(skb->mac.ethernet->h_source, info->srcaddr, ETH_ALEN)
+	    && ((memcmp(eth_hdr(skb)->h_source, info->srcaddr, ETH_ALEN)
 		== 0) ^ info->invert));
 }
 
