@@ -499,7 +499,7 @@ static void bluecard_receive(bluecard_info_t *info, unsigned int offset)
 }
 
 
-void bluecard_interrupt(int irq, void *dev_inst, struct pt_regs *regs)
+static irqreturn_t bluecard_interrupt(int irq, void *dev_inst, struct pt_regs *regs)
 {
 	bluecard_info_t *info = dev_inst;
 	unsigned int iobase;
@@ -507,11 +507,11 @@ void bluecard_interrupt(int irq, void *dev_inst, struct pt_regs *regs)
 
 	if (!info) {
 		printk(KERN_WARNING "bluecard_cs: Call of irq %d for unknown device.\n", irq);
-		return;
+		return IRQ_NONE;
 	}
 
 	if (!test_bit(CARD_READY, &(info->hw_state)))
-		return;
+		return IRQ_NONE;
 
 	iobase = info->link.io.BasePort1;
 
@@ -556,6 +556,8 @@ void bluecard_interrupt(int irq, void *dev_inst, struct pt_regs *regs)
 	outb(info->ctrl_reg, iobase + REG_CONTROL);
 
 	spin_unlock(&(info->lock));
+
+	return IRQ_HANDLED;
 }
 
 

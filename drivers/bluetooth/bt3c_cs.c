@@ -355,7 +355,7 @@ static void bt3c_receive(bt3c_info_t *info)
 }
 
 
-void bt3c_interrupt(int irq, void *dev_inst, struct pt_regs *regs)
+static irqreturn_t bt3c_interrupt(int irq, void *dev_inst, struct pt_regs *regs)
 {
 	bt3c_info_t *info = dev_inst;
 	unsigned int iobase;
@@ -363,7 +363,7 @@ void bt3c_interrupt(int irq, void *dev_inst, struct pt_regs *regs)
 
 	if (!info) {
 		printk(KERN_WARNING "bt3c_cs: Call of irq %d for unknown device.\n", irq);
-		return;
+		return IRQ_NONE;
 	}
 
 	iobase = info->link.io.BasePort1;
@@ -396,6 +396,8 @@ void bt3c_interrupt(int irq, void *dev_inst, struct pt_regs *regs)
 	}
 
 	spin_unlock(&(info->lock));
+
+	return IRQ_HANDLED;
 }
 
 
