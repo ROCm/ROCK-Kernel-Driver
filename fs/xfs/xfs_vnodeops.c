@@ -82,7 +82,7 @@ xfs_open(
 /*
  * xfs_getattr
  */
-STATIC int
+int
 xfs_getattr(
 	bhv_desc_t	*bdp,
 	vattr_t		*vap,
@@ -4057,6 +4057,49 @@ xfs_finish_reclaim(
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 
 	xfs_ireclaim(ip);
+	return 0;
+}
+
+int
+xfs_finish_reclaim_all(xfs_mount_t *mp)
+{
+	int		purged;
+	xfs_inode_t	*ip;
+	vnode_t		*vp;
+	int		done = 0;
+
+	while (!done) {
+		purged = 0;
+		XFS_MOUNT_ILOCK(mp);
+		ip = mp->m_inodes;
+		if (ip == NULL) {
+			break;
+		}
+		do {
+			/* Make sure we skip markers inserted by sync */
+			if (ip->i_mount == NULL) {
+				ip = ip->i_mnext;
+				continue;
+			}
+	
+			/*
+			 * It's up to our caller to purge the root
+			 * and quota vnodes later.
+			 */
+			vp = XFS_ITOV_NULL(ip);
+	
+			if (!vp) {
+				XFS_MOUNT_IUNLOCK(mp);	
+				xfs_finish_reclaim(ip, 0, XFS_IFLUSH_ASYNC);
+				purged = 1;
+				break;
+			}
+		} while (ip != mp->m_inodes);
+	
+		done = !purged;
+	}
+
+	XFS_MOUNT_IUNLOCK(mp);
 	return 0;
 }
 
