@@ -228,41 +228,25 @@ static void i2c_parport_detach (struct parport *port)
 }
 
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,4)
 static struct parport_driver i2c_driver = {
 	"i2c-philips-par",
 	i2c_parport_attach,
 	i2c_parport_detach,
 	NULL
 };
-#endif
 
 int __init i2c_bitlp_init(void)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,4)
-	struct parport *port;
-#endif
 	printk(KERN_INFO "i2c-philips-par.o: i2c Philips parallel port adapter module version %s (%s)\n", I2C_VERSION, I2C_DATE);
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,4)
 	parport_register_driver(&i2c_driver);
-#else
-	for (port = parport_enumerate(); port; port=port->next)
-		i2c_parport_attach(port);
-#endif
 	
 	return 0;
 }
 
 void __exit i2c_bitlp_exit(void)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,4)
 	parport_unregister_driver(&i2c_driver);
-#else
-	struct parport *port;
-	for (port = parport_enumerate(); port; port=port->next)
-		i2c_parport_detach(port);
-#endif
 }
 
 MODULE_AUTHOR("Simon G. Vogl <simon@tk.uni-linz.ac.at>");

@@ -25,31 +25,17 @@
 
 /* $Id: i2c.h,v 1.59 2002/07/19 20:53:45 phil Exp $ */
 
-#ifndef I2C_H
-#define I2C_H
+#ifndef _LINUX_I2C_H
+#define _LINUX_I2C_H
 
 #define I2C_DATE "20020719"
 #define I2C_VERSION "2.6.4"
 
 #include <linux/i2c-id.h>	/* id values of adapters et. al. 	*/
 #include <linux/types.h>
-
-
-struct i2c_msg;
-
-
-#ifdef __KERNEL__
-
-/* --- Includes and compatibility declarations ------------------------ */
-
-#include <linux/version.h>
-#ifndef KERNEL_VERSION
-#define KERNEL_VERSION(a,b,c) (((a) << 16) | ((b) << 8) | (c))
-#endif
-
-#include <asm/page.h>			/* for 2.2.xx 			*/
-#include <asm/semaphore.h>
 #include <linux/config.h>
+#include <asm/semaphore.h>
+
 
 /* --- General options ------------------------------------------------	*/
 
@@ -59,6 +45,7 @@ struct i2c_msg;
 #define I2C_CLIENT_MAX	32
 #define I2C_DUMMY_MAX 4
 
+struct i2c_msg;
 struct i2c_algorithm;
 struct i2c_adapter;
 struct i2c_client;
@@ -212,10 +199,6 @@ struct i2c_algorithm {
 	u32 (*functionality) (struct i2c_adapter *);
 };
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,1,29)
-struct proc_dir_entry;
-#endif
-
 /*
  * i2c_adapter is the structure used to identify a physical i2c bus along
  * with the access algorithms necessary to access it.
@@ -250,9 +233,6 @@ struct i2c_adapter {
 #ifdef CONFIG_PROC_FS 
 	/* No need to set this when you initialize the adapter          */
 	int inode;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,1,29)
-	struct proc_dir_entry *proc_entry;
-#endif
 #endif /* def CONFIG_PROC_FS */
 };
 
@@ -354,8 +334,6 @@ extern u32 i2c_get_functionality (struct i2c_adapter *adap);
 
 /* Return 1 if adapter supports everything we need, 0 if not. */
 extern int i2c_check_functionality (struct i2c_adapter *adap, u32 func);
-
-#endif /* __KERNEL__ */
 
 /*
  * I2C Message - used for pure i2c transaction, also from /dev interface
@@ -506,8 +484,6 @@ union i2c_smbus_data {
 
 #define I2C_MAJOR	89		/* Device major number		*/
 
-#ifdef __KERNEL__
-
 #  ifndef NULL
 #    define NULL ( (void *) 0 )
 #  endif
@@ -577,5 +553,4 @@ union i2c_smbus_data {
 #define i2c_is_isa_adapter(adapptr) \
         ((adapptr)->algo->id == I2C_ALGO_ISA)
 
-#endif /* def __KERNEL__ */
-#endif /* I2C_H */
+#endif /* _LINUX_I2C_H */

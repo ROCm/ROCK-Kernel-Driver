@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC7xxx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#163 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#166 $
  *
  * Copyright (c) 1994 John Aycock
  *   The University of Calgary Department of Computer Science.
@@ -2336,8 +2336,25 @@ ahc_linux_dv_thread(void *data)
 		printf("Launching DV Thread\n");
 #endif
 
+	/*
+	 * Don't care about any signals.
+	 */
+	siginitsetinv(&current->blocked, 0);
+
+	/*
+	 * Complete thread creation.
+	 */
+	lock_kernel();
+	daemonize();
+	sprintf(current->comm, "ahc_dv_%d", ahc->unit);
+	unlock_kernel();
+
 	while (1) {
-		down(&ahc->platform_data->dv_sem);
+		/*
+		 * Use down_interruptible() rather than down() to
+		 * avoid inclusion in the load average.
+		 */
+		down_interruptible(&ahc->platform_data->dv_sem);
 
 		/* Check to see if we've been signaled to exit */
 		ahc_lock(ahc, &s);
@@ -2360,7 +2377,7 @@ ahc_linux_dv_thread(void *data)
 		while (LIST_FIRST(&ahc->pending_scbs) != NULL) {
 			ahc->platform_data->flags |= AHC_DV_WAIT_SIMQ_EMPTY;
 			ahc_unlock(ahc, &s);
-			down(&ahc->platform_data->dv_sem);
+			down_interruptible(&ahc->platform_data->dv_sem);
 			ahc_lock(ahc, &s);
 		}
 
@@ -2371,7 +2388,7 @@ ahc_linux_dv_thread(void *data)
 		while (AHC_DV_SIMQ_FROZEN(ahc) == 0) {
 			ahc->platform_data->flags |= AHC_DV_WAIT_SIMQ_RELEASE;
 			ahc_unlock(ahc, &s);
-			down(&ahc->platform_data->dv_sem);
+			down_interruptible(&ahc->platform_data->dv_sem);
 			ahc_lock(ahc, &s);
 		}
 		ahc_unlock(ahc, &s);
@@ -2473,6 +2490,7 @@ ahc_linux_dv_target(struct ahc_softc *ahc, u_int target_offset)
 				      AHC_TRANS_GOAL, /*paused*/FALSE);
 			ahc_unlock(ahc, &s);
 			timeout = 10 * HZ;
+			targ->flags &= ~AHC_INQ_VALID;
 			/* FALLTHROUGH */
 		case AHC_DV_STATE_INQ_VERIFY:
 		{
@@ -2536,7 +2554,7 @@ ahc_linux_dv_target(struct ahc_softc *ahc, u_int target_offset)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 		ahc_unlock(ahc, &s);
 #endif
-		down(&ahc->platform_data->dv_cmd_sem);
+		down_interruptible(&ahc->platform_data->dv_cmd_sem);
 		/*
 		 * Wait for the SIMQ to be released so that DV is the
 		 * only reason the queue is frozen.
@@ -2545,7 +2563,7 @@ ahc_linux_dv_target(struct ahc_softc *ahc, u_int target_offset)
 		while (AHC_DV_SIMQ_FROZEN(ahc) == 0) {
 			ahc->platform_data->flags |= AHC_DV_WAIT_SIMQ_RELEASE;
 			ahc_unlock(ahc, &s);
-			down(&ahc->platform_data->dv_sem);
+			down_interruptible(&ahc->platform_data->dv_sem);
 			ahc_lock(ahc, &s);
 		}
 		ahc_unlock(ahc, &s);
@@ -2554,6 +2572,25 @@ ahc_linux_dv_target(struct ahc_softc *ahc, u_int target_offset)
 	}
 
 out:
+	if ((targ->flags & AHC_INQ_VALID) != 0
+	 && ahc_linux_get_device(ahc, devinfo.channel - 'A',
+				 devinfo.target, devinfo.lun,
+				 /*alloc*/FALSE) == NULL) {
+		/*
+		 * The DV state machine failed to configure this device.  
+		 * This is normal if DV is disabled.  Since we have inquiry
+		 * data, filter it and use the "optimistic" negotiation
+		 * parameters found in the inquiry string.
+		 */
+		ahc_linux_filter_inquiry(ahc, &devinfo);
+		if ((targ->flags & (AHC_BASIC_DV|AHC_ENHANCED_DV)) != 0) {
+			ahc_print_devinfo(ahc, &devinfo);
+			printf("DV failed to configure device.  "
+			       "Please file a bug report against "
+			       "this driver.\n");
+		}
+	}
+
 	if (cmd != NULL)
 		free(cmd, M_DEVBUF);
 
@@ -2639,24 +2676,21 @@ ahc_linux_dv_transition(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
 				break;
 			}
 
-			if (ahc_linux_user_dv_setting(ahc) == 0) {
-				ahc_linux_filter_inquiry(ahc, devinfo);
-				AHC_SET_DV_STATE(ahc, targ, AHC_DV_STATE_EXIT);
+			AHC_SET_DV_STATE(ahc, targ, targ->dv_state+1);
+			targ->flags |= AHC_INQ_VALID;
+			if (ahc_linux_user_dv_setting(ahc) == 0)
 				break;
-			}
 
 			spi3data = targ->inq_data->spi3data;
 			switch (spi3data & SID_SPI_CLOCK_DT_ST) {
 			default:
 			case SID_SPI_CLOCK_ST:
 				/* Assume only basic DV is supported. */
-				ahc_linux_filter_inquiry(ahc, devinfo);
-				AHC_SET_DV_STATE(ahc, targ,
-						 AHC_DV_STATE_INQ_VERIFY);
+				targ->flags |= AHC_BASIC_DV;
 				break;
 			case SID_SPI_CLOCK_DT:
 			case SID_SPI_CLOCK_DT_ST:
-				AHC_SET_DV_STATE(ahc, targ, AHC_DV_STATE_REBD);
+				targ->flags |= AHC_ENHANCED_DV;
 				break;
 			}
 			break;
@@ -2752,8 +2786,15 @@ ahc_linux_dv_transition(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
 	case AHC_DV_STATE_TUR:
 		switch (status & SS_MASK) {
 		case SS_NOP:
-			AHC_SET_DV_STATE(ahc, targ,
-					 AHC_DV_STATE_INQ_ASYNC);
+			if ((targ->flags & AHC_BASIC_DV) != 0) {
+				ahc_linux_filter_inquiry(ahc, devinfo);
+				AHC_SET_DV_STATE(ahc, targ,
+						 AHC_DV_STATE_INQ_VERIFY);
+			} else if ((targ->flags & AHC_ENHANCED_DV) != 0) {
+				AHC_SET_DV_STATE(ahc, targ, AHC_DV_STATE_REBD);
+			} else {
+				AHC_SET_DV_STATE(ahc, targ, AHC_DV_STATE_EXIT);
+			}
 			break;
 		case SS_RETRY:
 		case SS_TUR:
@@ -4373,6 +4414,17 @@ ahc_linux_handle_scsi_status(struct ahc_softc *ahc,
 				memset(&cmd->sense_buffer[sense_size], 0,
 				       sizeof(cmd->sense_buffer) - sense_size);
 			cmd->result |= (DRIVER_SENSE << 24);
+#ifdef AHC_DEBUG
+			if (ahc_debug & AHC_SHOW_SENSE) {
+				int i;
+
+				printf("Copied %d bytes of sense data:",
+				       sense_size);
+				for (i = 0; i < sense_size; i++)
+					printf(" 0x%x", cmd->sense_buffer[i]);
+				printf("\n");
+			}
+#endif
 		}
 		break;
 	}
