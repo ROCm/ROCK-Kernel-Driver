@@ -181,9 +181,7 @@ MODULE_PARM(drive3,"1-6i");
 
 #define MAJOR_NR	major
 #define DEVICE_NAME "PCD"
-#define DEVICE_REQUEST do_pcd_request
 #define DEVICE_NR(device) (minor(device))
-#define DEVICE_ON(device)
 #define DEVICE_OFF(device)
 
 #include <linux/blk.h>
@@ -357,7 +355,7 @@ int pcd_init (void)	/* preliminary initialisation */
 		}
 	}
 
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST, &pcd_lock);
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_pcd_request, &pcd_lock);
 
 	for (i=0;i<PCD_UNITS;i++) pcd_blocksizes[i] = 1024;
         blksize_size[MAJOR_NR] = pcd_blocksizes;

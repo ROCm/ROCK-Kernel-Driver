@@ -1596,7 +1596,9 @@ sony535_init(void)
 							MAJOR_NR, CDU535_MESSAGE_NAME);
 					return -EIO;
 				}
-				blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST, &sonycd535_lock);
+				blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR),
+						do_cdu535_request,
+						&sonycd535_lock);
 				blksize_size[MAJOR_NR] = &sonycd535_block_size;
 
 				sony_toc = (struct s535_sony_toc *)

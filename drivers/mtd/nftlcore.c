@@ -40,7 +40,6 @@
 
 /* NFTL block device stuff */
 #define MAJOR_NR NFTL_MAJOR
-#define DEVICE_REQUEST nftl_request
 #define DEVICE_OFF(device)
 
 
