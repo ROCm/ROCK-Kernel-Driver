@@ -341,8 +341,6 @@ init_e100_ide (void)
 		hwif->INB = &etrax100_ide_inb;
 		hwif->INW = &etrax100_ide_inw;
 		hwif->ide_dma_off_quietly = &e100_dma_off;
-		hwif->sg_table =
-		  kmalloc(sizeof(struct scatterlist) * PRD_ENTRIES, GFP_KERNEL);
 	}
 
 	/* actually reset and configure the etrax100 ide/ata interface */
