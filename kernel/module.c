@@ -1188,7 +1188,7 @@ struct seq_operations modules_op = {
 	.show	= m_show
 };
 
-static int __init init(void)
+void __init extable_init(void)
 {
 	/* Add kernel symbols to symbol table */
 	kernel_symbols.num_syms = (__stop___ksymtab - __start___ksymtab);
@@ -1199,12 +1199,8 @@ static int __init init(void)
 	kernel_extable.num_entries = (__stop___ex_table -__start___ex_table);
 	kernel_extable.entry = __start___ex_table;
 	list_add(&kernel_extable.list, &extables);
-	return 0;
 }
 
 /* Obsolete lvalue for broken code which asks about usage */
 int module_dummy_usage = 1;
 EXPORT_SYMBOL(module_dummy_usage);
-
-/* Call this at boot */
-__initcall(init);

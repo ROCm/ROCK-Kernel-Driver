@@ -63,6 +63,7 @@ extern void init_IRQ(void);
 extern void init_modules(void);
 extern void sock_init(void);
 extern void fork_init(unsigned long);
+extern void extable_init(void);
 extern void mca_init(void);
 extern void sbus_init(void);
 extern void sysctl_init(void);
@@ -394,6 +395,7 @@ asmlinkage void __init start_kernel(void)
 	printk("Kernel command line: %s\n", saved_command_line);
 	parse_options(command_line);
 	trap_init();
+	extable_init();
 	rcu_init();
 	init_IRQ();
 	sched_init();
