@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic79xx.c#185 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic79xx.c#186 $
  *
  * $FreeBSD$
  */
@@ -2194,7 +2194,7 @@ ahd_clear_critical_section(struct ahd_softc *ahd)
   		ahd_outb(ahd, SIMODE1, simode1);
 		/*
 		 * SCSIINT seems to glitch occassionally when
-		 * the interrupt masks are cleared.  Clear SCSIINT
+		 * the interrupt masks are restored.  Clear SCSIINT
 		 * one more time so that only persistent errors
 		 * are seen as a real interrupt.
 		 */
@@ -6636,6 +6636,7 @@ ahd_pause_and_flushwork(struct ahd_softc *ahd)
 	ahd_outw(ahd, QFREEZE_COUNT, ahd_inw(ahd, QFREEZE_COUNT) + 1);
 	ahd_outb(ahd, SEQ_FLAGS2, ahd_inb(ahd, SEQ_FLAGS2) | SELECTOUT_QFROZEN);
 	do {
+		struct scb *waiting_scb;
 
 		ahd_unpause(ahd);
 		ahd_intr(ahd);
@@ -6643,6 +6644,21 @@ ahd_pause_and_flushwork(struct ahd_softc *ahd)
 		ahd_clear_critical_section(ahd);
 		intstat = ahd_inb(ahd, INTSTAT);
 		ahd_set_modes(ahd, AHD_MODE_SCSI, AHD_MODE_SCSI);
+		if ((ahd_inb(ahd, SSTAT0) & (SELDO|SELINGO)) == 0)
+			ahd_outb(ahd, SCSISEQ0,
+				 ahd_inb(ahd, SCSISEQ0) & ~ENSELO);
+		/*
+		 * In the non-packetized case, the sequencer (for Rev A),
+		 * relies on ENSELO remaining set after SELDO.  The hardware
+		 * auto-clears ENSELO in the packetized case.
+		 */
+		waiting_scb = ahd_lookup_scb(ahd,
+					     ahd_inw(ahd, WAITING_TID_HEAD));
+		if (waiting_scb != NULL
+		 && (waiting_scb->flags & SCB_PACKETIZED) == 0
+		 && (ahd_inb(ahd, SSTAT0) & (SELDO|SELINGO)) != 0)
+			ahd_outb(ahd, SCSISEQ0,
+				 ahd_inb(ahd, SCSISEQ0) | ENSELO);
 	} while (--maxloops
 	      && (intstat != 0xFF || (ahd->features & AHD_REMOVABLE) == 0)
 	      && ((intstat & INT_PEND) != 0
