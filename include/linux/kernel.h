@@ -91,6 +91,9 @@ extern int oops_in_progress;		/* If set, an oops, panic(), BUG() or die() is in 
 
 extern int tainted;
 extern const char *print_tainted(void);
+#define TAINT_PROPRIETORY_MODULE	(1<<0)
+#define TAINT_FORCED_MODULE		(1<<1)
+#define TAINT_UNSAFE_SMP		(1<<2)
 
 #if DEBUG
 #define pr_debug(fmt,arg...) \

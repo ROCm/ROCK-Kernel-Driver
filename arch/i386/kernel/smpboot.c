@@ -30,10 +30,12 @@
  *		Tigran Aivazian	:	fixed "0.00 in /proc/uptime on SMP" bug.
  *	Maciej W. Rozycki	:	Bits for genuine 82489DX APICs
  *		Martin J. Bligh	: 	Added support for multi-quad systems
+ *		Dave Jones	:	Report invalid combinations of Athlon CPUs.
  */
 
 #include <linux/config.h>
 #include <linux/init.h>
+#include <linux/kernel.h>
 
 #include <linux/mm.h>
 #include <linux/kernel_stat.h>
@@ -160,6 +162,35 @@ void __init smp_store_cpu_info(int id)
 		 * Remember we have B step Pentia with bugs
 		 */
 		smp_b_stepping = 1;
+
+	/*
+	 * Certain Athlons might work (for various values of 'work') in SMP
+	 * but they are not certified as MP capable.
+	 */
+	if ((c->x86_vendor == X86_VENDOR_AMD) && (c->x86 == 6)) {
+
+		/* Athlon 660/661 is valid. */	
+		if ((c->x86_model==6) && ((c->x86_mask==0) || (c->x86_mask==1)))
+			goto valid_k7;
+
+		/* Duron 670 is valid */
+		if ((c->x86_model==7) && (c->x86_mask==0))
+			goto valid_k7;
+
+		/* Athlon 662, Duron 671, and Athlon >model 7 have capability bit */
+		if (((c->x86_model==6) && (c->x86_mask>=2)) ||
+		    ((c->x86_model==7) && (c->x86_mask>=1)) ||
+		     (c->x86_model> 7))
+			if (cpu_has_mp)
+				goto valid_k7;
+
+		/* If we get here, it's not a certified SMP capable AMD system. */
+		printk (KERN_INFO "WARNING: This combination of AMD processors is not suitable for SMP.\n");
+		tainted |= TAINT_UNSAFE_SMP;
+		
+	}
+valid_k7:
+
 }
 
 /*
