@@ -1722,7 +1722,7 @@ unsigned int cmd;
 	}
 	if (cmd & PL_EBUF_ERR) {	/* elastic buff. det. over-|underflow*/
 		/*
-		 * Check whether the SRF Condition occured.
+		 * Check whether the SRF Condition occurred.
 		 */
 		if (!plc->ebuf_cont && phy->mib->fddiPORTPCMState == PC8_ACTIVE){
 			/*

@@ -503,10 +503,11 @@ static void outl_CSR6 (u32 newcsr6, long ioaddr, int chip_idx)
 }
 
 static struct net_device *tulip_probe1(struct pci_dev *pdev,
-				       struct net_device *dev, long ioaddr, int irq,
+				       long ioaddr, int irq,
 				       int chip_idx, int board_idx)
 {
 	static int did_version;			/* Already printed version info. */
+	struct net_device *dev;
 	struct tulip_private *tp;
 	/* See note below on the multiport cards. */
 	static unsigned char last_phys_addr[6] = {0x00, 'L', 'i', 'n', 'u', 'x'};
@@ -519,7 +520,9 @@ static struct net_device *tulip_probe1(struct pci_dev *pdev,
 	if (tulip_debug > 0  &&  did_version++ == 0)
 		printk(KERN_INFO "%s", version);
 
-	dev = init_etherdev(dev, 0);
+	dev = init_etherdev(NULL, 0);
+	if (!dev)
+		return NULL;
 
 	pci_read_config_byte(pdev, PCI_REVISION_ID, &chip_rev);
 	/* Bring the 21143 out of sleep mode.
@@ -3081,8 +3084,7 @@ static int __devinit tulip_pci_probe(struct pci_dev *pdev, const struct pci_devi
 	if (pci_enable_device (pdev))
 		return -ENODEV;
 	pci_set_master (pdev);
-	dev = tulip_probe1(pdev, NULL,
-			   pci_resource_start (pdev, 0), pdev->irq,
+	dev = tulip_probe1(pdev, pci_resource_start (pdev, 0), pdev->irq,
 			   id->driver_data, board_idx++);
 	if (dev) {
 		pdev->driver_data = dev;

@@ -20,6 +20,7 @@
 
 		ultra_probe()	 	Detecting and initializing the card.
 		ultra_probe1()
+		ultra_probe_isapnp()
 
 		ultra_open()		The card-specific details of starting, stopping
 		ultra_reset_8390()	and resetting the 8390 NIC core.
@@ -43,11 +44,19 @@
 	Paul Gortmaker	: multiple card support for module users.
 	Donald Becker	: 4/17/96 PIO support, minor potential problems avoided.
 	Donald Becker	: 6/6/96 correctly set auto-wrap bit.
+	Alexander Sotirov : 1/20/01 Added support for ISAPnP cards
+
+	Note about the ISA PnP support:
+
+	This driver can not autoprobe for more than one SMC EtherEZ PnP card.
+	You have to configure the second card manually through the /proc/isapnp
+	interface and then load the module with an explicit io=0x___ option.
 */
 
 static const char *version =
 	"smc-ultra.c:v2.02 2/3/98 Donald Becker (becker@cesdis.gsfc.nasa.gov)\n";
 
+#include <linux/config.h>
 #include <linux/module.h>
 
 #include <linux/kernel.h>
@@ -55,6 +64,7 @@ static const char *version =
 #include <linux/errno.h>
 #include <linux/string.h>
 #include <linux/init.h>
+#include <linux/isapnp.h>
 #include <asm/io.h>
 #include <asm/system.h>
 
@@ -68,6 +78,10 @@ static unsigned int ultra_portlist[] __initdata =
 
 int ultra_probe(struct net_device *dev);
 static int ultra_probe1(struct net_device *dev, int ioaddr);
+
+#if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
+static int ultra_probe_isapnp(struct net_device *dev);
+#endif
 
 static int ultra_open(struct net_device *dev);
 static void ultra_reset_8390(struct net_device *dev);
@@ -84,6 +98,17 @@ static void ultra_pio_input(struct net_device *dev, int count,
 static void ultra_pio_output(struct net_device *dev, int count,
 							 const unsigned char *buf, const int start_page);
 static int ultra_close_card(struct net_device *dev);
+
+#if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
+static struct isapnp_device_id ultra_device_ids[] __initdata = {
+        {       ISAPNP_VENDOR('S','M','C'), ISAPNP_FUNCTION(0x8416),
+                ISAPNP_VENDOR('S','M','C'), ISAPNP_FUNCTION(0x8416),
+                (long) "SMC EtherEZ (8416)" },
+        { }	/* terminate list */
+};
+
+MODULE_DEVICE_TABLE(isapnp, ultra_device_ids);
+#endif
 
 
 #define START_PG		0x00	/* First page of TX buffer */
@@ -113,6 +138,14 @@ int __init ultra_probe(struct net_device *dev)
 		return ultra_probe1(dev, base_addr);
 	else if (base_addr != 0)	/* Don't probe at all. */
 		return -ENXIO;
+
+#if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
+	/* Look for any installed ISAPnP cards */
+	if (isapnp_present() && (ultra_probe_isapnp(dev) == 0))
+		return 0;
+
+	printk(KERN_NOTICE "smc-ultra.c: No ISAPnP cards found, trying standard ones...\n");
+#endif
 
 	for (i = 0; ultra_portlist[i]; i++)
 		if (ultra_probe1(dev, ultra_portlist[i]) == 0)
@@ -244,6 +277,48 @@ out:
 	release_region(ioaddr, ULTRA_IO_EXTENT);
 	return retval;
 }
+
+#if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
+static int __init ultra_probe_isapnp(struct net_device *dev)
+{
+        int i;
+
+        for (i = 0; ultra_device_ids[i].vendor != 0; i++) {
+                struct pci_dev *idev = NULL;
+
+                while ((idev = isapnp_find_dev(NULL,
+                                               ultra_device_ids[i].vendor,
+                                               ultra_device_ids[i].function,
+                                               idev))) {
+                        /* Avoid already found cards from previous calls */
+                        if (idev->prepare(idev))
+                                continue;
+                        if (idev->activate(idev))
+                                continue;
+                        /* if no irq, search for next */
+                        if (idev->irq_resource[0].start == 0)
+                                continue;
+                        /* found it */
+                        dev->base_addr = idev->resource[0].start;
+                        dev->irq = idev->irq_resource[0].start;
+                        printk(KERN_INFO "smc-ultra.c: ISAPnP reports %s at i/o %#lx, irq %d.\n",
+                                (char *) ultra_device_ids[i].driver_data,
+
+                                dev->base_addr, dev->irq);
+                        if (ultra_probe1(dev, dev->base_addr) != 0) {      /* Shouldn't happen. */
+                                printk(KERN_ERR "smc-ultra.c: Probe of ISAPnP card at %#lx failed.\n", dev->base_addr);                                return -ENXIO;
+                        }
+                        ei_status.priv = (unsigned long)idev;
+                        break;
+                }
+                if (!idev)
+                        continue;
+                return 0;
+        }
+
+        return -ENODEV;
+}
+#endif
 
 static int
 ultra_open(struct net_device *dev)
@@ -465,6 +540,13 @@ cleanup_module(void)
 		if (dev->priv != NULL) {
 			/* NB: ultra_close_card() does free_irq */
 			int ioaddr = dev->base_addr - ULTRA_NIC_OFFSET;
+
+#if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
+			struct pci_dev *idev = (struct pci_dev *)ei_status.priv;
+			if (idev)
+				idev->deactivate(idev);
+#endif
+
 			unregister_netdev(dev);
 			release_region(ioaddr, ULTRA_IO_EXTENT);
 			kfree(dev->priv);

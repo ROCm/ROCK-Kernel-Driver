@@ -15,7 +15,10 @@
  *
  * See Documentation/usb/usb-serial.txt for more information on using this driver
  *
- * (11/06/2000) gkh
+ * 12-Mar-2001 gkh
+ *	Added GoHubs GO-COM232 device id.
+ *
+ * 06-Nov-2000 gkh
  *	Added old Belkin and Peracom device ids, which this driver supports
  *
  * 12-Oct-2000 William Greathouse
@@ -38,6 +41,9 @@
 
 #define PERACOM_VID	0x0565	/* Peracom's vendor id */
 #define PERACOM_PID	0x0001	/* Peracom's single port serial converter's id */
+
+#define GOHUBS_VID	0x0921	/* GoHubs vendor id */
+#define GOHUBS_PID	0x0100	/* GoHubs single port serial converter's id (identical to the Peracom device) */
 
 /* Vendor Request Interface */
 #define BELKIN_SA_SET_BAUDRATE_REQUEST	0  /* Set baud rate */

@@ -87,7 +87,7 @@ static void __mace_set_address(struct net_device *dev, void *addr);
 /*
  * If we can't get a skbuff when we need it, we use this area for DMA.
  */
-static unsigned char dummy_buf[RX_BUFLEN+2];
+static unsigned char *dummy_buf;
 
 /* Bit-reverse one byte of an ethernet hardware address. */
 static inline int
@@ -106,7 +106,7 @@ static int __init mace_probe(void)
 
 	for (mace = find_devices("mace"); mace != NULL; mace = mace->next)
 		mace_probe1(mace);
-	return 0;
+	return mace_devs? 0: -ENODEV;
 }
 
 static void __init mace_probe1(struct device_node *mace)
@@ -128,6 +128,14 @@ static void __init mace_probe1(struct device_node *mace)
 		if (addr == NULL) {
 			printk(KERN_ERR "Can't get mac-address for MACE %s\n",
 			       mace->full_name);
+			return;
+		}
+	}
+
+	if (dummy_buf == NULL) {
+		dummy_buf = kmalloc(RX_BUFLEN+2, GFP_KERNEL);
+		if (dummy_buf == NULL) {
+			printk(KERN_ERR "MACE: couldn't allocate dummy buffer\n");
 			return;
 		}
 	}
@@ -897,6 +905,10 @@ static void __exit mace_cleanup (void)
 
 	unregister_netdev(dev);
 	kfree(dev);
+    }
+    if (dummy_buf != NULL) {
+	kfree(dummy_buf);
+	dummy_buf = NULL;
     }
 }
 

@@ -619,7 +619,7 @@ static int __devinit emu10k1_probe(struct pci_dev *pci_dev, const struct pci_dev
 	}
 	memset(card, 0, sizeof(struct emu10k1_card));
 
-	if (!pci_dma_supported(pci_dev, EMU10K1_DMA_MASK)) {
+	if (pci_set_dma_mask(pci_dev, EMU10K1_DMA_MASK)) {
 		printk(KERN_ERR "emu10k1: architecture does not support 32bit PCI busmaster DMA\n");
 		kfree(card);
 		return -ENODEV;

@@ -2524,9 +2524,10 @@ static int __devinit es1370_probe(struct pci_dev *pcidev, const struct pci_devic
 		return -1;
 	if (pcidev->irq == 0) 
 		return -1;
-	if (!pci_dma_supported(pcidev, 0xffffffff)) {
+	i = pci_set_dma_mask(pcidev, 0xffffffff);
+	if (i) {
 		printk(KERN_WARNING "es1370: architecture does not support 32bit PCI busmaster DMA\n");
-		return -1;
+		return i;
 	}
 	if (!(s = kmalloc(sizeof(struct es1370_state), GFP_KERNEL))) {
 		printk(KERN_WARNING "es1370: out of memory\n");
@@ -2608,7 +2609,6 @@ static int __devinit es1370_probe(struct pci_dev *pcidev, const struct pci_devic
 	set_fs(fs);
 	/* store it in the driver field */
 	pci_set_drvdata(pcidev, s);
-	pcidev->dma_mask = 0xffffffff;
 	/* put it into driver list */
 	list_add_tail(&s->devs, &devs);
 	/* increment devindex */

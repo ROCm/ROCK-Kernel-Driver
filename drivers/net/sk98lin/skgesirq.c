@@ -695,14 +695,14 @@ SK_U32	Istatus)	/* Interrupt status word */
 	/* Check whether XMACs are correctly initialized */
 	if ((Istatus & (IS_PA_TO_RX1 | IS_PA_TO_TX1)) &&
 	    !pAC->GIni.GP[MAC_1].PState) {
-		/* XMAC was not initialized but Packet timeout occured */
+		/* XMAC was not initialized but Packet timeout occurred */
 		SK_ERR_LOG(pAC, SK_ERRCL_SW | SK_ERRCL_INIT, SKERR_SIRQ_E004,
 			SKERR_SIRQ_E004MSG) ;
 	}
 
 	if ((Istatus & (IS_PA_TO_RX2 | IS_PA_TO_TX2)) &&
 	    !pAC->GIni.GP[MAC_2].PState) {
-		/* XMAC was not initialized but Packet timeout occured */
+		/* XMAC was not initialized but Packet timeout occurred */
 		SK_ERR_LOG(pAC, SK_ERRCL_SW | SK_ERRCL_INIT, SKERR_SIRQ_E005,
 			SKERR_SIRQ_E005MSG) ;
 	}
@@ -1012,7 +1012,7 @@ int	Port)		/* Which port should be checked */
 			 */
 			/*
 			 * we received a bunch of frames or no
-			 * CRC error occured on the network ->
+			 * CRC error occurred on the network ->
 			 * ok.
 			 */
 			pPrt->PPrevRx = RxCts;
@@ -1255,7 +1255,7 @@ int	Port)		/* Which port should be checked */
 			SkHWLinkUp(pAC, IoC, Port) ;
 			Done = SkXmAutoNegDone(pAC,IoC,Port);
 			if (Done != SK_AND_OK) {
-				/* Get PHY parameters, for debuging only */
+				/* Get PHY parameters, for debugging only */
 				PHY_READ(IoC, pPrt, Port, PHY_XMAC_AUNE_LP,
 					&LpAb);
 				PHY_READ(IoC, pPrt, Port, PHY_XMAC_RES_ABI,
@@ -1294,7 +1294,7 @@ int	Port)		/* Which port should be checked */
 		pPrt->PAutoNegTimeOut ++;
 		if (pPrt->PAutoNegTimeOut >= SK_AND_MAX_TO) {
 			/*
-			 * Timeout occured.
+			 * Timeout occurred.
 			 * What do we need now?
 			 */
 			SK_DBG_MSG(pAC,SK_DBGMOD_HWM,
@@ -1304,7 +1304,7 @@ int	Port)		/* Which port should be checked */
 			if (pPrt->PLinkModeConf == SK_LMODE_AUTOSENSE &&
 				pPrt->PLipaAutoNeg != SK_LIPA_AUTO) {
 				/*
-				 * Timeout occured
+				 * Timeout occurred
 				 * Set Link manually up.
 				 */
 				SkHWSenseSetNext(pAC, IoC, Port,
@@ -1445,7 +1445,7 @@ int	Port)		/* Which port should be checked */
 			SkHWLinkUp(pAC, IoC, Port);
 			Done = SkXmAutoNegDone(pAC,IoC,Port);
 			if (Done != SK_AND_OK) {
-				/* Get PHY parameters, for debuging only */
+				/* Get PHY parameters, for debugging only */
 				PHY_READ(IoC, pPrt, Port,
 					PHY_BCOM_AUNE_LP,
 					&LpAb);
@@ -1583,7 +1583,7 @@ int	Port)		/* Which port should be checked */
 			SkHWLinkUp(pAC, IoC, Port) ;
 			Done = SkXmAutoNegDone(pAC,IoC,Port);
 			if (Done != SK_AND_OK) {
-				/* Get PHY parameters, for debuging only */
+				/* Get PHY parameters, for debugging only */
 				PHY_READ(IoC, pPrt, Port,
 					PHY_LONE_AUNE_LP,
 					&LpAb);
@@ -1624,7 +1624,7 @@ int	Port)		/* Which port should be checked */
 		pPrt->PAutoNegTimeOut ++;
 		if (pPrt->PAutoNegTimeOut >= SK_AND_MAX_TO) {
 			/*
-			 * Timeout occured.
+			 * Timeout occurred.
 			 * What do we need now?
 			 */
 			SK_DBG_MSG(pAC,SK_DBGMOD_HWM,
@@ -1634,7 +1634,7 @@ int	Port)		/* Which port should be checked */
 			if (pPrt->PLinkModeConf == SK_LMODE_AUTOSENSE &&
 				pPrt->PLipaAutoNeg != SK_LIPA_AUTO) {
 				/*
-				 * Timeout occured
+				 * Timeout occurred
 				 * Set Link manually up.
 				 */
 				SkHWSenseSetNext(pAC, IoC, Port,

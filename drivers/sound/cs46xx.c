@@ -4020,8 +4020,8 @@ static int __init cs_install(struct pci_dev *pci_dev)
 	}
 	memset(card, 0, sizeof(*card));
 
-	card->ba0_addr = pci_dev->resource[0].start&PCI_BASE_ADDRESS_MEM_MASK;
-	card->ba1_addr = pci_dev->resource[1].start&PCI_BASE_ADDRESS_MEM_MASK;
+	card->ba0_addr = pci_resource_start(pci_dev, 0);
+	card->ba1_addr = pci_resource_start(pci_dev, 1);
 	card->pci_dev = pci_dev;
 	card->irq = pci_dev->irq;
 	card->magic = CS_CARD_MAGIC;

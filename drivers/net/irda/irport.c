@@ -609,7 +609,7 @@ static void irport_timeout(struct net_device *dev)
  *
  *    Transmits the current frame until FIFO is full, then
  *    waits until the next transmitt interrupt, and continues until the
- *    frame is transmited.
+ *    frame is transmitted.
  */
 int irport_hard_xmit(struct sk_buff *skb, struct net_device *dev)
 {
@@ -1008,7 +1008,7 @@ static struct net_device_stats *irport_net_get_stats(struct net_device *dev)
 
 #ifdef MODULE
 MODULE_PARM(io, "1-4i");
-MODULE_PARM_DESC(io, "Base I/O adresses");
+MODULE_PARM_DESC(io, "Base I/O addresses");
 MODULE_PARM(irq, "1-4i");
 MODULE_PARM_DESC(irq, "IRQ lines");
 

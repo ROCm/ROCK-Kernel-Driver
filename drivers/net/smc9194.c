@@ -1400,9 +1400,6 @@ static void smc_rcv(struct net_device *dev)
 done:
 	/*  error or good, tell the card to get rid of this packet */
 	outw( MC_RELEASE, ioaddr + MMU_CMD );
-
-
-	return;
 }
 
 

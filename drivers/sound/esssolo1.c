@@ -2244,7 +2244,6 @@ static int __devinit solo1_probe(struct pci_dev *pcidev, const struct pci_device
 {
 	struct solo1_state *s;
 	struct pm_dev *pmdev;
-	dma_addr_t dma_mask;
 
 	if (!RSRCISIOREGION(pcidev, 0) ||
 	    !RSRCISIOREGION(pcidev, 1) ||
@@ -2253,14 +2252,16 @@ static int __devinit solo1_probe(struct pci_dev *pcidev, const struct pci_device
 		return -1;
 	if (pcidev->irq == 0)
 		return -1;
-	if (pci_dma_supported(pcidev, 0x00ffffff)) {
-		dma_mask = 0x00ffffff; /* this enables playback and recording */
-	} else if (pci_dma_supported(pcidev, 0xffffffff)) {
-		dma_mask = 0xffffffff; /* this enables only playback, as the recording BMDMA can handle only 24bits  */
-	} else {
+
+	/* Recording requires 24-bit DMA, so attempt to set dma mask
+	 * to 24 bits first, then 32 bits (playback only) if that fails.
+	 */
+	if (pci_set_dma_mask(pcidev, 0x00ffffff) &&
+	    pci_set_dma_mask(pcidev, 0xffffffff)) {
 		printk(KERN_WARNING "solo1: architecture does not support 24bit or 32bit PCI busmaster DMA\n");
 		return -1;
 	}
+
 	if (!(s = kmalloc(sizeof(struct solo1_state), GFP_KERNEL))) {
 		printk(KERN_WARNING "solo1: out of memory\n");
 		return -1;
@@ -2318,7 +2319,6 @@ static int __devinit solo1_probe(struct pci_dev *pcidev, const struct pci_device
 		goto err;
 	/* store it in the driver field */
 	pci_set_drvdata(pcidev, s);
-	pcidev->dma_mask = dma_mask;
 	/* put it into driver list */
 	list_add_tail(&s->devs, &devs);
 

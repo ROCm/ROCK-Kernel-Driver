@@ -149,7 +149,7 @@
  *	Fixed: Couldnot delete VPD keys on UNIX.
  *	
  *	Revision 1.48  1998/12/09 14:11:10  mhaveman
- *	-Add: Debugmessage for XMAC_RESET supressed to minimize output.
+ *	-Add: Debugmessage for XMAC_RESET suppressed to minimize output.
  *	-Fixed: RlmtChangeThreshold will now be initialized.
  *	-Fixed: VPD_ENTRIES_LIST extended value with unnecessary space char.
  *	-Fixed: On VPD key creation an invalid key name could be created
@@ -206,7 +206,7 @@
  *	-Fixed bug for RX counters. On an RX overflow interrupt the high
  *	 words of all RX counters were incremented.
  *	-SET operations on FLOWCTRL_MODE and LINK_MODE accept now the
- *	 value 0, which has no effect. It is usefull for multiple instance
+ *	 value 0, which has no effect. It is useful for multiple instance
  *	 SETs.
  *	
  *	Revision 1.37  1998/11/20 08:02:04  mhaveman
@@ -1600,7 +1600,7 @@ int Level)		/* Initialization level */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occured
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to take
  *	                         the data.
  *	SK_PNMI_ERR_UNKNOWN_OID  The requested OID is unknown
@@ -1632,13 +1632,13 @@ SK_U32 Instance)	/* Instance (1..n) that is to be queried or -1 */
  * Description:
  *	Calls a general sub-function for all this stuff. The preset does
  *	the same as a set, but returns just before finally setting the
- *	new value. This is usefull to check if a set might be successfull.
+ *	new value. This is useful to check if a set might be successful.
  *	If as instance a -1 is passed, an array of values is supposed and
  *	all instance of the OID will be set.
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -1674,13 +1674,13 @@ SK_U32 Instance)	/* Instance (1..n) that is to be set or -1 */
  * Description:
  *	Calls a general sub-function for all this stuff. The preset does
  *	the same as a set, but returns just before finally setting the
- *	new value. This is usefull to check if a set might be successfull.
+ *	new value. This is useful to check if a set might be successful.
  *	If as instance a -1 is passed, an array of values is supposed and
  *	all instance of the OID will be set.
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -1723,7 +1723,7 @@ SK_U32 Instance)	/* Instance (1..n) that is to be set or -1 */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occured
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to take
  *	                         the data.
  */
@@ -1884,7 +1884,7 @@ unsigned int *pLen)	/* Length of buffer */
  * Description:
  *	Calls a general sub-function for all this set stuff. The preset does
  *	the same as a set, but returns just before finally setting the
- *	new value. This is usefull to check if a set might be successfull.
+ *	new value. This is useful to check if a set might be successful.
  *	The sub-function runs through the IdTable, checks which OIDs are able
  *	to set, and calls the handler function of the OID to perform the
  *	preset. The return value of the function will also be stored in
@@ -1893,7 +1893,7 @@ unsigned int *pLen)	/* Length of buffer */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -1929,7 +1929,7 @@ unsigned int *pLen)	/* Length of buffer */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -2816,7 +2816,7 @@ SK_U32 Id)		/* Object identifier to be searched */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -2883,7 +2883,7 @@ unsigned int TableIndex) /* Index to the Id table */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -3017,7 +3017,7 @@ unsigned int TableIndex) /* Index to the Id table */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -3159,7 +3159,7 @@ unsigned int TableIndex) /* Index to the Id table */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -3299,7 +3299,7 @@ unsigned int TableIndex) /* Index to the Id table */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -3509,7 +3509,7 @@ unsigned int TableIndex) /* Index to the Id table */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -3628,7 +3628,7 @@ unsigned int TableIndex) /* Index to the Id table */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -3872,7 +3872,7 @@ unsigned int TableIndex) /* Index to the Id table */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -4352,7 +4352,7 @@ unsigned int TableIndex) /* Index to the Id table */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -4956,7 +4956,7 @@ unsigned int TableIndex) /* Index to the Id table */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -5264,7 +5264,7 @@ unsigned int TableIndex) /* Index to the Id table */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -5449,7 +5449,7 @@ unsigned int TableIndex) /* Index to the Id table */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -6052,7 +6052,7 @@ unsigned int TableIndex) /* Index to the Id table */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -6502,7 +6502,7 @@ unsigned int PhysPortIndex)	/* Physical port index */
  *
  * Description:
  *	The COMMON module only tells us if the mode is half or full duplex.
- *	But in the decade of auto sensing it is usefull for the user to
+ *	But in the decade of auto sensing it is useful for the user to
  *	know if the mode was negotiated or forced. Therefore we have a
  *	look to the mode, which was last used by the negotiation process.
  *
@@ -6764,7 +6764,7 @@ unsigned int LastMac)	/* Index of the last Mac to be updated */
 
 		/*
 		 * It is an auto-clearing register. If the command bits
-		 * went to zero again, the statistics are transfered.
+		 * went to zero again, the statistics are transferred.
 		 * Normally the command should be executed immediately.
 		 * But just to be sure we execute a loop.
 		 */
@@ -7037,7 +7037,7 @@ SK_IOC IoC)		/* IO context handle */
  *
  * Description:
  *	The trap buffer stores various events. A user application somehow
- *	gets notified that an event occured and retrieves the trap buffer
+ *	gets notified that an event occurred and retrieves the trap buffer
  *	contens (or simply polls the buffer). The buffer is organized as
  *	a ring which stores the newest traps at the beginning. The oldest
  *	traps are overwritten by the newest ones. Each trap entry has a

@@ -824,7 +824,7 @@ int irtty_set_mode(struct net_device *dev, int mode)
 /*
  * Function irtty_raw_read (self, buf, len)
  *
- *    Receive incomming data. This function sleeps, so it must only be
+ *    Receive incoming data. This function sleeps, so it must only be
  *    called with a process context. Timeout is currently defined to be
  *    a multiple of 10 ms.
  */

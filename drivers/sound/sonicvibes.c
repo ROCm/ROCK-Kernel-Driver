@@ -2478,7 +2478,7 @@ static int __devinit sv_probe(struct pci_dev *pcidev, const struct pci_device_id
 		return -1;
 	if (pcidev->irq == 0)
 		return -1;
-	if (!pci_dma_supported(pcidev, 0x00ffffff)) {
+	if (pci_set_dma_mask(pcidev, 0x00ffffff)) {
 		printk(KERN_WARNING "sonicvibes: architecture does not support 24bit PCI busmaster DMA\n");
 		return -1;
 	}
@@ -2602,7 +2602,6 @@ static int __devinit sv_probe(struct pci_dev *pcidev, const struct pci_device_id
 	set_fs(fs);
        /* store it in the driver field */
 	pci_set_drvdata(pcidev, s);
-	pcidev->dma_mask = 0x00ffffff;
 	/* put it into driver list */
 	list_add_tail(&s->devs, &devs);
 	/* increment devindex */

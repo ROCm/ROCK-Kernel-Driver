@@ -255,12 +255,16 @@ static void __init HWPrtChanID (__u32 pcid, short stride)
  *
  *	We expect ibmtr_probe to be called once for each device entry
  *	which references it.
+ *
+ *	Argument 'dev' should never be NULL.  If we are built into
+ *	the kernel, Space.c passed up a net_device.  If we are
+ *	-DMODULE, init_module allocates net_devices for us.
  */
  
 int __init ibmtr_probe(struct net_device *dev)
 {
         int i;
-        int base_addr = dev ? dev->base_addr : 0;
+        int base_addr = dev->base_addr;
 
         if (base_addr > 0x1ff) 
         { 
@@ -301,7 +305,7 @@ static int __init ibmtr_probe1(struct net_device *dev, int PIOaddr)
 
 #ifndef MODULE
 #ifndef PCMCIA
-	dev = init_trdev(dev,0);
+	dev = init_trdev(dev, 0);
 #endif
 #endif
 
@@ -1877,8 +1881,11 @@ int init_module(void)
 		mem[i] = 0;
 		dev_ibmtr[i] = NULL;
                 dev_ibmtr[i] = init_trdev(dev_ibmtr[i], 0);
-                if (dev_ibmtr[i] == NULL)
-                        return -ENOMEM;
+                if (dev_ibmtr[i] == NULL) {
+			if (i == 0)
+                        	return -ENOMEM;
+			break;
+		}
 
 	        dev_ibmtr[i]->base_addr = io[i];
 	        dev_ibmtr[i]->irq       = irq[i];

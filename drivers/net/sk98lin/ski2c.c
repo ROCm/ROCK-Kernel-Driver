@@ -1000,7 +1000,7 @@ SK_SENSOR	*pSen)
 	/* Get the current time */
 	CurrTime = SkOsGetTime(pAC);
 
-	/* Set para to the most usefull setting:
+	/* Set para to the most useful setting:
 	 * The current sensor.
 	 */
 	ParaLocal.Para64 = (SK_U64) pAC->I2c.CurrSens;

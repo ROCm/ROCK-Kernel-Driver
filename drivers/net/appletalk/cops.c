@@ -752,8 +752,8 @@ static void cops_rx(struct net_device *dev)
 {
         int pkt_len = 0;
         int rsp_type = 0;
-        struct sk_buff *skb;
-        struct cops_local *lp = (struct cops_local *)dev->priv;
+        struct sk_buff *skb = NULL;
+        struct cops_local *lp = dev->priv;
         int ioaddr = dev->base_addr;
         int boguscount = 0;
         unsigned long flags;
@@ -771,6 +771,7 @@ static void cops_rx(struct net_device *dev)
                 /* Wait for DMA to turn around. */
                 while(++boguscount<1000000)
                 {
+			barrier();
                         if((inb(ioaddr+DAYNA_CARD_STATUS)&0x03)==DAYNA_RX_READY)
                                 break;
                 }
@@ -801,6 +802,7 @@ static void cops_rx(struct net_device *dev)
                 lp->stats.rx_dropped++;
                 while(pkt_len--)        /* Discard packet */
                         inb(ioaddr);
+		restore_flags(flags);
                 return;
         }
         skb->dev = dev;
@@ -820,7 +822,7 @@ static void cops_rx(struct net_device *dev)
 		printk(KERN_WARNING "%s: Bad packet length of %d bytes.\n", 
 			dev->name, pkt_len);
                 lp->stats.tx_errors++;
-                kfree_skb(skb);
+                dev_kfree_skb_any(skb);
                 return;
         }
 
@@ -828,7 +830,7 @@ static void cops_rx(struct net_device *dev)
         if(rsp_type == LAP_INIT_RSP)
         {	/* Nodeid taken from received packet. */
                 lp->node_acquire = skb->data[0];
-                kfree_skb(skb);
+                dev_kfree_skb_any(skb);
                 return;
         }
 
@@ -837,7 +839,7 @@ static void cops_rx(struct net_device *dev)
         {
                 printk(KERN_WARNING "%s: Bad packet type %d.\n", dev->name, rsp_type);
                 lp->stats.tx_errors++;
-                kfree_skb(skb);
+                dev_kfree_skb_any(skb);
                 return;
         }
 

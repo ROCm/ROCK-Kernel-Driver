@@ -1282,12 +1282,10 @@ priv->dp_port_num, count, from_user, in_interrupt() );
 	|| priv->dp_write_urb_in_use ) {
 
 		/* buffer data if count is 1 (probably put_char) if possible */
-		if( count == 1 ) {
-			new_len = MIN( count,
-				DIGI_OUT_BUF_SIZE-priv->dp_out_buf_len );
-			memcpy( priv->dp_out_buf+priv->dp_out_buf_len, buf,
-				new_len );
-			priv->dp_out_buf_len += new_len;
+		if( count == 1 && priv->dp_out_buf_len < DIGI_OUT_BUF_SIZE ) {
+			priv->dp_out_buf[priv->dp_out_buf_len++]
+				= *(from_user ? user_buf : buf);
+			new_len = 1;
 		} else {
 			new_len = 0;
 		}

@@ -7,7 +7,7 @@
  *  Dedicated to my girlfriend Steffi Bopp
  *
  *  This software may be used and distributed according to the terms
- *  of the GNU Public License, incorporated herein by reference.
+ *  of the GNU General Public License, incorporated herein by reference.
  *
  *  This driver module supports the following cards:
  *	- SysKonnect TR4/16(+) ISA	(SK-4190)

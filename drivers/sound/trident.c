@@ -3309,7 +3309,7 @@ static int __init trident_probe(struct pci_dev *pci_dev, const struct pci_device
 	struct trident_card *card;
 	u8 revision;
 
-	if (!pci_dma_supported(pci_dev, TRIDENT_DMA_MASK)) {
+	if (pci_set_dma_mask(pci_dev, TRIDENT_DMA_MASK)) {
 		printk(KERN_ERR "trident: architecture does not support"
 		       " 30bit PCI busmaster DMA\n");
 		return -ENODEV;
@@ -3429,7 +3429,6 @@ static int __init trident_probe(struct pci_dev *pci_dev, const struct pci_device
 	}
 
 	pci_set_drvdata(pci_dev, card);
-	pci_dev->dma_mask = TRIDENT_DMA_MASK;
 
 	/* Enable Address Engine Interrupts */
 	trident_enable_loop_interrupts(card);

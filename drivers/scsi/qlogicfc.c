@@ -732,7 +732,7 @@ int isp2x00_detect(Scsi_Host_Template * tmpt)
 	int wait_time;
 	struct Scsi_Host *host = NULL;
 	struct isp2x00_hostdata *hostdata;
-	struct pci_dev *pdev = NULL;
+	struct pci_dev *pdev;
 	unsigned short device_ids[2];
 	dma64_addr_t busaddr;
 	int i;
@@ -751,6 +751,7 @@ int isp2x00_detect(Scsi_Host_Template * tmpt)
 	}
 
 	for (i=0; i<2; i++){
+		pdev = NULL;
 	        while ((pdev = pci_find_device(PCI_VENDOR_ID_QLOGIC, device_ids[i], pdev))) {
 			if (pci_enable_device(pdev))
 				continue;
@@ -1428,7 +1429,22 @@ static void redo_port_db(unsigned long arg)
 	        for (i = 0; i < QLOGICFC_REQ_QUEUE_LEN; i++){ 
 		        if (hostdata->handle_ptrs[i] && (hostdata->port_db[hostdata->handle_ptrs[i]->target].loop_id > QLOGICFC_MAX_LOOP_ID || hostdata->adapter_state & AS_REDO_LOOP_PORTDB)){
                                 if (hostdata->port_db[hostdata->handle_ptrs[i]->target].loop_id != hostdata->port_db[0].loop_id){
+					Scsi_Cmnd *Cmnd = hostdata->handle_ptrs[i];
+
+					 if (Cmnd->use_sg)
+						 pci64_unmap_sg(hostdata->pci_dev,
+								(struct scatterlist *)Cmnd->buffer,
+								Cmnd->use_sg,
+								scsi_to_pci_dma_dir(Cmnd->sc_data_direction));
+					 else if (Cmnd->request_bufflen &&
+						  Cmnd->sc_data_direction != PCI_DMA_NONE)
+						 pci64_unmap_single(hostdata->pci_dev,
+								    *(dma64_addr_t *)&Cmnd->SCp,
+								    Cmnd->request_bufflen,
+								    scsi_to_pci_dma_dir(Cmnd->sc_data_direction));
+
 					 hostdata->handle_ptrs[i]->result = DID_SOFT_ERROR << 16;
+
 					 if (hostdata->handle_ptrs[i]->scsi_done){
 					   (*hostdata->handle_ptrs[i]->scsi_done) (hostdata->handle_ptrs[i]);
 					 }
@@ -1521,6 +1537,17 @@ void isp2x00_intr_handler(int irq, void *dev_id, struct pt_regs *regs)
 			hostdata->handle_serials[handle] = 0;
 			hostdata->queued--;
 			if (Cmnd != NULL) {
+				if (Cmnd->use_sg)
+					pci64_unmap_sg(hostdata->pci_dev,
+						       (struct scatterlist *)Cmnd->buffer,
+						       Cmnd->use_sg,
+						       scsi_to_pci_dma_dir(Cmnd->sc_data_direction));
+				else if (Cmnd->request_bufflen &&
+					 Cmnd->sc_data_direction != PCI_DMA_NONE)
+					pci64_unmap_single(hostdata->pci_dev,
+							   *(dma64_addr_t *)&Cmnd->SCp,
+							   Cmnd->request_bufflen,
+							   scsi_to_pci_dma_dir(Cmnd->sc_data_direction));
 				Cmnd->result = 0x0;
 				(*Cmnd->scsi_done) (Cmnd);
 			} else

@@ -4546,20 +4546,24 @@ static int smctr_rx_frame(struct net_device *dev)
                                 struct sk_buff *skb;
 
                                 skb = dev_alloc_skb(rx_size);
-                                skb_put(skb, rx_size);
+				if (skb) {
+                                	skb_put(skb, rx_size);
 
-                                memcpy(skb->data, pbuff, rx_size);
-                                sti();
+                                	memcpy(skb->data, pbuff, rx_size);
+                                	sti();
 
-                                /* Update Counters */
-                                tp->MacStat.rx_packets++;
-                                tp->MacStat.rx_bytes += skb->len;
+                                	/* Update Counters */
+                                	tp->MacStat.rx_packets++;
+                                	tp->MacStat.rx_bytes += skb->len;
 
-                                /* Kick the packet on up. */
-                                skb->dev = dev;
-                                skb->protocol = tr_type_trans(skb, dev);
-                                netif_rx(skb);
-				dev->last_rx = jiffies;
+                                	/* Kick the packet on up. */
+                                	skb->dev = dev;
+                                	skb->protocol = tr_type_trans(skb, dev);
+                                	netif_rx(skb);
+					dev->last_rx = jiffies;
+				} else {
+                                	sti();
+				}
                         }
                         else
                                 smctr_process_rx_packet((MAC_HEADER *)pbuff,

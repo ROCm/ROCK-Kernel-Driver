@@ -87,7 +87,7 @@ static const u_short my_sagp = 0xffff ;	/* short group address (n.u.) */
 
 
 /*
- * usefull interrupt bits
+ * useful interrupt bits
  */
 static int mac_imsk1u = FM_STXABRS | FM_STXABRA0 | FM_SXMTABT ;
 static int mac_imsk1l = FM_SQLCKS | FM_SQLCKA0 | FM_SPCEPDS | FM_SPCEPDA0|
@@ -1381,7 +1381,7 @@ struct s_smc *smc ;
 			CHECK_CAM() ;
 
 			/*
-			 * wirte the multicast addres into the CAM
+			 * write the multicast address into the CAM
 			 */
 			outpw(FM_A(FM_AFCOMP2),
 				(u_short)((tb->a.a[0]<<8)+tb->a.a[1])) ;

@@ -284,8 +284,8 @@ RCopen(struct net_device *dev)
     dprintk("(rcpci45 driver:) RCopen\n");
 
     /* Request a shared interrupt line. */
-    if ( (error=request_irq(dev->irq, (void *)RCinterrupt,
-                     SA_INTERRUPT|SA_SHIRQ, "RedCreek VPN Adapter", dev)) ) {
+    error=request_irq(dev->irq, RCinterrupt, SA_SHIRQ, dev->name, dev);
+    if (error) {
         printk(KERN_ERR "(rcpci45 driver:) %s: unable to get IRQ %d\n", dev->name, dev->irq );
 	goto err_out;
     }

@@ -215,7 +215,11 @@ static int __init olympic_scan(struct net_device *dev)
 			init_waitqueue_head(&olympic_priv->srb_wait);
 			init_waitqueue_head(&olympic_priv->trb_wait);
 #ifndef MODULE
-			dev=init_trdev(dev, 0);
+			dev = init_trdev(NULL, 0);
+			if (!dev) {
+				kfree(olympic_priv);
+				return 0;
+			}
 #endif
 			dev->priv=(void *)olympic_priv;
 #if OLYMPIC_DEBUG  
@@ -225,6 +229,7 @@ static int __init olympic_scan(struct net_device *dev)
 			dev->base_addr=pci_resource_start(pci_device, 0);
 			dev->init=&olympic_init;	/* AKPM: Not needed */
 			olympic_priv->olympic_card_name = (char *)pci_device->resource[0].name ; 
+			/* FIXME: check ioremap return val, handle cleanup */
 			olympic_priv->olympic_mmio = 
 				ioremap(pci_resource_start(pci_device,1),256);
 			olympic_priv->olympic_lap = 
@@ -240,6 +245,10 @@ static int __init olympic_scan(struct net_device *dev)
 	
 			if(olympic_init(dev)==-1) {
 				kfree(dev->priv);
+#ifndef MODULE
+				unregister_netdev(dev);
+				kfree(dev);
+#endif
 				return 0;
 			}				
 
@@ -1261,6 +1270,11 @@ static void olympic_arb_cmd(struct net_device *dev)
 }
 #endif 
 		mac_frame = dev_alloc_skb(frame_len) ; 
+		if (!mac_frame) {
+			printk(KERN_WARNING "%s: Memory squeeze, dropping "
+			       "frame.\n", dev->name);
+			goto drop_frame;
+		}
 
 		/* Walk the buffer chain, creating the frame */
 
@@ -1283,6 +1297,7 @@ static void olympic_arb_cmd(struct net_device *dev)
 		netif_rx(mac_frame) ; 	
 		dev->last_rx = jiffies ;
 
+drop_frame:
 		/* Now tell the card we have dealt with the received frame */
 
 		/* Set LISR Bit 1 */
@@ -1635,8 +1650,11 @@ int init_module(void)
         for (i = 0; (i<OLYMPIC_MAX_ADAPTERS); i++) {
 		dev_olympic[i] = NULL;
                 dev_olympic[i] = init_trdev(dev_olympic[i], 0);
-                if (dev_olympic[i] == NULL)
-                        return -ENOMEM;
+                if (dev_olympic[i] == NULL) {
+			if (i == 0)
+                        	return -ENOMEM;
+			break;
+		}
 
 		dev_olympic[i]->init      = &olympic_probe;
 

@@ -8,10 +8,10 @@
  *  by James Banks
  *
  *  (C) 1997-1998 Caldera, Inc.
- *  (C) 1999-2000 Torben Mathiasen
+ *  (C) 1999-2001 Torben Mathiasen
  * 
  *  This software may be used and distributed according to the terms
- *  of the GNU Public License, incorporated herein by reference.
+ *  of the GNU General Public License, incorporated herein by reference.
  *
  ** This file is best viewed/edited with tabstop=4, colums>=132
  *
@@ -36,11 +36,11 @@
 #define FALSE			0
 #define TRUE			1
 
-#define TLAN_MIN_FRAME_SIZE	60
-#define TLAN_MAX_FRAME_SIZE	1536
+#define TLAN_MIN_FRAME_SIZE	64
+#define TLAN_MAX_FRAME_SIZE	1600
 
-#define TLAN_NUM_RX_LISTS	4
-#define TLAN_NUM_TX_LISTS	8
+#define TLAN_NUM_RX_LISTS	32
+#define TLAN_NUM_TX_LISTS	64
 
 #define TLAN_IGNORE		0
 #define TLAN_RECORD		1
@@ -53,7 +53,7 @@
 #define TLAN_DEBUG_PROBE	0x0010
 
 #define TX_TIMEOUT		(10*HZ)	 /* We need time for auto-neg */
-
+#define MAX_TLAN_BOARDS		8	 /* Max number of boards installed at a time */
 
 
 	/*****************************************************************
@@ -209,6 +209,8 @@ typedef struct tlan_private_tag {
 	spinlock_t		lock;
 	u8			link;
 	u8			is_eisa;
+	struct tq_struct	tlan_tqueue;
+	u8			neg_be_verbose;
 } TLanPrivateInfo;
 
 

@@ -1074,11 +1074,11 @@ int wrap_around = FALSE, no_of_wrap_buffs = NO_OF_ENTRIES - 1;
 			fi->fc_stats.rx_dropped++;
 			fi->g.mfs_buffer_count += no_of_buffers;
 			if (fi->g.mfs_buffer_count >= NO_OF_ENTRIES) {
-			int count = fi->g.mfs_buffer_count / NO_OF_ENTRIES;
+				int count = fi->g.mfs_buffer_count / NO_OF_ENTRIES;
 				fi->g.mfs_buffer_count -= NO_OF_ENTRIES * count;
 				update_MFSBQ_indx(fi, count);
-				return;
 			}
+			return;
 		}
 		if (wrap_around) {
 		int wrap_size = no_of_wrap_buffs * MFS_BUFFER_SIZE;

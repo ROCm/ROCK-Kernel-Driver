@@ -455,8 +455,7 @@ try_again:
 			memory_pressure++;
 			try_to_free_pages(gfp_mask);
 			wakeup_bdflush(0);
-			if (!order)
-				goto try_again;
+			goto try_again;
 		}
 	}
 

@@ -260,15 +260,16 @@ static int __devinit sis900_probe (struct pci_dev *pci_dev, const struct pci_dev
 	u8 revision;
 	char *card_name = card_names[pci_id->driver_data];
 
-	if (!pci_dma_supported(pci_dev, SIS900_DMA_MASK)) {
-		printk(KERN_ERR "sis900.c: architecture does not support "
-		       "32bit PCI busmaster DMA\n");
-		return -ENODEV;
-	}
-
 	/* setup various bits in PCI command register */
 	ret = pci_enable_device (pci_dev);
 	if (ret) return ret;
+
+	i = pci_set_dma_mask(pci_dev, SIS900_DMA_MASK);
+	if (i) {
+		printk(KERN_ERR "sis900.c: architecture does not support "
+		       "32bit PCI busmaster DMA\n");
+		return i;
+	}
 
 	pci_set_master(pci_dev);
 
@@ -321,7 +322,6 @@ static int __devinit sis900_probe (struct pci_dev *pci_dev, const struct pci_dev
 	}
 
 	pci_set_drvdata(pci_dev, net_dev);
-	pci_dev->dma_mask = SIS900_DMA_MASK;
 
 	/* The SiS900-specific entries in the device structure. */
 	net_dev->open = &sis900_open;

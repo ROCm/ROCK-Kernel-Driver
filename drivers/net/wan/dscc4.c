@@ -2,7 +2,7 @@
  * drivers/net/wan/dscc4/dscc4_main.c: a DSCC4 HDLC driver for Linux
  *
  * This software may be used and distributed according to the terms of the 
- * GNU Public License. 
+ * GNU General Public License. 
  *
  * The author may be reached as romieu@cogenit.fr.
  * Specific bug reports/asian food will be welcome.

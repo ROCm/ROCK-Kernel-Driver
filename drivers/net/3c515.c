@@ -46,6 +46,7 @@ static int max_interrupt_work = 20;
 #define RX_RING_SIZE	16
 #define PKT_BUF_SZ		1536	/* Size of each temporary Rx buffer. */
 
+#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/version.h>
 #include <linux/isapnp.h>
@@ -418,7 +419,7 @@ int init_module(void)
 		printk(version);
 
 	root_corkscrew_dev = NULL;
-	cards_found = corkscrew_scan(0);
+	cards_found = corkscrew_scan(NULL);
 	return cards_found ? 0 : -ENODEV;
 }
 
@@ -589,11 +590,11 @@ static struct net_device *corkscrew_found_device(struct net_device *dev,
 	ether_setup(dev);
 	vp->next_module = root_corkscrew_dev;
 	root_corkscrew_dev = dev;
+	SET_MODULE_OWNER(dev);
 	if (register_netdev(dev) != 0) {
 		kfree(dev);
 		return NULL;
 	}
-	SET_MODULE_OWNER(dev);
 #else				/* not a MODULE */
 	/* Caution: quad-word alignment required for rings! */
 	dev->priv =

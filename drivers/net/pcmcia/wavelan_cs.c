@@ -1404,7 +1404,7 @@ wv_init_info(device *	dev)
 	  printk("2430.5");
 	  break;
 	default:
-	  printk("???");
+	  printk("unknown");
 	}
     }
 
@@ -1719,7 +1719,7 @@ wv_set_frequency(u_long		base,	/* i/o port of the card */
 	 memcmp(dac, dac_verify, 2 * 2))
 	{
 #ifdef DEBUG_IOCTL_ERROR
-	  printk(KERN_INFO "Wavelan: wv_set_frequency : unable to write new frequency to EEprom (??)\n");
+	  printk(KERN_INFO "Wavelan: wv_set_frequency : unable to write new frequency to EEprom (?)\n");
 #endif
 	  return -EOPNOTSUPP;
 	}
@@ -1968,7 +1968,7 @@ wavelan_ioctl(struct net_device *	dev,	/* Device on wich the ioctl apply */
 
     case SIOCGIWFREQ:
       /* Attempt to recognise 2.00 cards (2.4 GHz frequency selectable)
-       * (does it work for everybody ??? - especially old cards...) */
+       * (does it work for everybody XXX - especially old cards...) */
       if(!(mmc_in(base, mmroff(0, mmr_fee_status)) &
 	   (MMR_FEE_STATUS_DWLD | MMR_FEE_STATUS_BUSY)))
 	{
@@ -2530,11 +2530,12 @@ wavelan_get_wireless_stats(device *	dev)
   printk(KERN_DEBUG "%s: ->wavelan_get_wireless_stats()\n", dev->name);
 #endif
 
+  if (lp == NULL) /* XXX will this ever occur? */
+    return NULL;
+
   /* Disable interrupts & save flags */
   spin_lock_irqsave (&lp->lock, flags);
 
-  if(lp == (net_local *) NULL)
-    return (iw_stats *) NULL;
   wstats = &lp->wstats;
 
   /* Get data from the mmc */
@@ -3151,7 +3152,7 @@ wv_mmc_init(device *	dev)
    */
 
   /* Attempt to recognise 2.00 cards (2.4 GHz frequency selectable)
-   * (does it work for everybody ??? - especially old cards...) */
+   * (does it work for everybody XXX - especially old cards...) */
   /* Note : WFREQSEL verify that it is able to read from EEprom
    * a sensible frequency (address 0x00) + that MMR_FEE_STATUS_ID
    * is 0xA (Xilinx version) or 0xB (Ariadne version).
@@ -3829,7 +3830,7 @@ wv_pcmcia_config(dev_link_t *	link)
       return FALSE;
     }
 
-  /* ???? Could you explain me this, Dave ? */
+  /* XXX Could you explain me this, Dave ? */
   link->dev = &((net_local *) dev->priv)->node;
 
 #ifdef DEBUG_CONFIG_TRACE
@@ -4706,7 +4707,7 @@ wavelan_event(event_t		event,		/* The event received */
 	 * obliged to close nicely the wavelan here. David, could you
 	 * close the device before suspending them ? And, by the way,
 	 * could you, on resume, add a "route add -net ..." after the
-	 * ifconfig up ??? Thanks... */
+	 * ifconfig up XXX Thanks... */
 
 	/* Stop receiving new messages and wait end of transmission */
 	wv_ru_stop(dev);
@@ -4734,7 +4735,7 @@ wavelan_event(event_t		event,		/* The event received */
 	if(link->state & DEV_CONFIG)
 	  {
       	    CardServices(RequestConfiguration, link->handle, &link->conf);
-      	    if(link->open)	/* If RESET -> True, If RESUME -> False ??? */
+      	    if(link->open)	/* If RESET -> True, If RESUME -> False XXX */
 	      {
 		wv_hw_reset(dev);
 		netif_device_attach(dev);

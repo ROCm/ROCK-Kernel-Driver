@@ -470,8 +470,6 @@ static int lynx_initialize(struct hpsb_host *host)
         lynx->phy_reg0 = -1;
 
         lynx->async.queue = NULL;
-        spin_lock_init(&lynx->async.queue_lock);
-        spin_lock_init(&lynx->phy_reg_lock);
         
         pcl.next = pcl_bus(lynx, lynx->rcv_pcl);
         put_pcl(lynx, lynx->rcv_pcl_start, &pcl);
@@ -1357,7 +1355,10 @@ static int add_card(struct pci_dev *dev)
         lynx->id = num_of_cards-1;
         lynx->dev = dev;
 
-        if (!pci_dma_supported(dev, 0xffffffff)) {
+	lynx->lock = SPIN_LOCK_UNLOCKED;
+	lynx->phy_reg_lock = SPIN_LOCK_UNLOCKED;
+
+        if (pci_set_dma_mask(dev, 0xffffffff)) {
                 FAIL("DMA address limits not supported for PCILynx hardware %d",
                      lynx->id);
         }
@@ -1456,8 +1457,6 @@ static int add_card(struct pci_dev *dev)
         lynx->iso_rcv.pcl_start = alloc_pcl(lynx);
 
         /* all allocations successful - simple init stuff follows */
-
-        lynx->lock = SPIN_LOCK_UNLOCKED;
 
         reg_write(lynx, PCI_INT_ENABLE, PCI_INT_DMA_ALL);
 

@@ -257,6 +257,8 @@ struct streamer_private {
 	__u16 arb;
 	__u16 asb;
 
+        struct streamer_private *next;
+        struct pci_dev *pci_dev;
 	__u8 *streamer_mmio;
         char *streamer_card_name;
  

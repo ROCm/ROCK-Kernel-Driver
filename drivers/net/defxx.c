@@ -2652,28 +2652,6 @@ static int dfx_hw_dma_uninit(DFX_board_t *bp, PI_UINT32 type)
 	}
 
 /*
- * =================
- * = dfx_alloc_skb =
- * =================
- *
- * Overview:
- *   Allocate an skbuff for sending.
- *
- * Functional Description:
- *  Same as dev_alloc_skb(), but it may sleep.
- */
-
-static inline struct sk_buff *dfx_alloc_skb(unsigned int length)
-{
-	struct sk_buff *skb;
-
-	skb = alloc_skb(length + 16, GFP_BUFFER);
-	if (skb)
-		skb_reserve(skb, 16);
-	return skb;
-}
-
-/*
  *	Align an sk_buff to a boundary power of 2
  *
  */
@@ -2751,7 +2729,7 @@ static int dfx_rcv_init(DFX_board_t *bp, int get_buffers)
 	for (i = 0; i < (int)(bp->rcv_bufs_to_post); i++)
 		for (j = 0; (i + j) < (int)PI_RCV_DATA_K_NUM_ENTRIES; j += bp->rcv_bufs_to_post)
 		{
-			struct sk_buff *newskb = dfx_alloc_skb(NEW_SKB_SIZE);
+			struct sk_buff *newskb = __dev_alloc_skb(NEW_SKB_SIZE, GFP_BUFFER);
 			if (!newskb)
 				return -ENOMEM;
 			bp->descr_block_virt->rcv_data[i+j].long_0 = (u32) (PI_RCV_DESCR_M_SOP |
@@ -2761,7 +2739,7 @@ static int dfx_rcv_init(DFX_board_t *bp, int get_buffers)
 			 * the old EISA boards.
 			 */
 			 
-			my_skb_align(newskb,128);
+			my_skb_align(newskb, 128);
 			bp->descr_block_virt->rcv_data[i+j].long_1 = virt_to_bus(newskb->data);
 			/*
 			 * p_rcv_buff_va is only used inside the

@@ -130,9 +130,9 @@
 #define DMFE_TIMER_WUT  (HZ)	/* timer wakeup time : 1 second */
 #define DMFE_TX_TIMEOUT ((HZ*3)/2)	/* tx packet time-out time 1.5 s" */
 
-#define DMFE_DBUG(dbug_now, msg, vaule)	\
+#define DMFE_DBUG(dbug_now, msg, value)	\
 	if (dmfe_debug || dbug_now)	\
-		printk("DBUG: %s %x\n", msg, vaule)
+		printk("DBUG: %s %x\n", msg, value)
 
 #define SHOW_MEDIA_TYPE(mode) \
  	printk(KERN_WARNING "dmfe: Change Speed to %sMhz %s duplex\n",	\
@@ -1139,7 +1139,7 @@ static void dmfe_descriptor_init(struct dmfe_board_info *db, u32 ioaddr)
 }
 
 /*
-   Update CR6 vaule
+   Update CR6 value
    Firstly stop DM910X , then written value and start
  */
 static void update_cr6(u32 cr6_data, u32 ioaddr)

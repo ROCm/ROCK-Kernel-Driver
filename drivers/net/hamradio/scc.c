@@ -582,7 +582,7 @@ static inline void scc_spint(struct scc_channel *scc)
 		
 		if (skb != NULL) 
 			dev_kfree_skb_irq(skb);
-		scc->rx_buff = NULL;
+		scc->rx_buff = skb = NULL;
 	}
 
 	if(status & END_FR && skb != NULL)	/* end of frame */

@@ -601,15 +601,16 @@ static void receive_packet(struct net_device *dev, int len)
 		printk("%s: memory squeeze, dropping packet\n", dev->name);
 		target = adapter->dma_buffer;
 		adapter->current_dma.target = NULL;
+		return;
+	}
+
+	skb_reserve(skb, 2);
+	target = skb_put(skb, rlen);
+	if (virt_to_bus(target + rlen) >= MAX_DMA_ADDRESS) {
+		adapter->current_dma.target = target;
+		target = adapter->dma_buffer;
 	} else {
-		skb_reserve(skb, 2);
-		target = skb_put(skb, rlen);
-		if (virt_to_bus(target + rlen) >= MAX_DMA_ADDRESS) {
-			adapter->current_dma.target = target;
-			target = adapter->dma_buffer;
-		} else {
-			adapter->current_dma.target = NULL;
-		}
+		adapter->current_dma.target = NULL;
 	}
 
 	/* if this happens, we die */

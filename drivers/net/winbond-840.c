@@ -390,7 +390,7 @@ static int __devinit w840_probe1 (struct pci_dev *pdev,
 
 	irq = pdev->irq;
 
-	if(!pci_dma_supported(pdev,0xFFFFffff)) {
+	if(pci_set_dma_mask(pdev,0xFFFFffff)) {
 		printk(KERN_WARNING "Winbond-840: Device %s disabled due to DMA limitations.\n",
 				pdev->name);
 		return -EIO;
@@ -438,7 +438,7 @@ static int __devinit w840_probe1 (struct pci_dev *pdev,
 	
 	pci_set_drvdata(pdev, dev);
 
-	if (dev->mem_start && dev->mem_start != ~0)
+	if (dev->mem_start)
 		option = dev->mem_start;
 
 	/* The lower four bits are the media type. */

@@ -1263,7 +1263,7 @@ static void nsc_ircc_dma_xmit(struct nsc_ircc_cb *self, int iobase)
  * Function nsc_ircc_pio_xmit (self, iobase)
  *
  *    Transmit data using PIO. Returns the number of bytes that actually
- *    got transfered
+ *    got transferred
  *
  */
 static int nsc_ircc_pio_write(int iobase, __u8 *buf, int len, int fifo_size)

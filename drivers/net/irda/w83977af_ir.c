@@ -875,7 +875,7 @@ int w83977af_dma_receive_complete(struct w83977af_ir *self)
 				self->stats.rx_fifo_errors++;
 			
 		} else {
-			/* Check if we have transfered all data to memory */
+			/* Check if we have transferred all data to memory */
 			switch_bank(iobase, SET0);
 			if (inb(iobase+USR) & USR_RDR) {
 #ifdef CONFIG_USE_INTERNAL_TIMER

@@ -499,7 +499,7 @@ extern "C" {
 /*
  * The HW-Spec. call this registers Timeout Value 0..11. But this names are
  * not usable in SW. Please notice these are NOT real timeouts, these are
- * the number of qWords transfered continously.
+ * the number of qWords transferred continously.
  */
 #define B3_RI_WTO_R1	0x0190	/* 8 bit RAM Iface WR Timeout Queue R1	(TO0) */
 #define B3_RI_WTO_XA1	0x0191	/* 8 bit RAM Iface WR Timeout Queue XA1	(TO1) */
@@ -984,7 +984,7 @@ extern "C" {
 
 /*	B3_RI_TEST	 8 bit	RAM Iface Test Register */
 				/* Bit 15..4:	reserved */
-#define RI_T_EV		(1<<3)	/* Bit	3:	Timeout Event occured */
+#define RI_T_EV		(1<<3)	/* Bit	3:	Timeout Event occurred */
 #define RI_T_ON		(1<<2)	/* Bit	2:	Timeout Timer Test On */
 #define RI_T_OFF	(1<<1)	/* Bit	1:	Timeout Timer Test Off */
 #define RI_T_STEP	(1<<0)	/* Bit	0:	Timeout Timer Step */
@@ -1034,19 +1034,19 @@ extern "C" {
 /*	B3_MA_RC_TEST	16 bit	MAC Arbiter Recovery Test Reg */
 /*	B3_PA_TEST	16 bit	Packet Arbiter Test Register */
 /*			Bit 15, 11, 7, and 3 are reserved in B3_PA_TEST */
-#define TX2_T_EV	(1<<15)	/* Bit 15: 	TX2 Timeout/Recv Event occured*/
+#define TX2_T_EV	(1<<15)	/* Bit 15: 	TX2 Timeout/Recv Event occurred*/
 #define TX2_T_ON	(1<<14)	/* Bit 14:	TX2 Timeout/Recv Timer Test On*/
 #define TX2_T_OFF	(1<<13)	/* Bit 13:	TX2 Timeout/Recv Timer Tst Off*/
 #define TX2_T_STEP	(1<<12)	/* Bit 12:	TX2 Timeout/Recv Timer Step */
-#define TX1_T_EV	(1<<11)	/* Bit 11:	TX1 Timeout/Recv Event occured*/
+#define TX1_T_EV	(1<<11)	/* Bit 11:	TX1 Timeout/Recv Event occurred*/
 #define TX1_T_ON	(1<<10)	/* Bit 10:	TX1 Timeout/Recv Timer Test On*/
 #define TX1_T_OFF	(1<<9)	/* Bit	9:	TX1 Timeout/Recv Timer Tst Off*/
 #define TX1_T_STEP	(1<<8)	/* Bit	8:	TX1 Timeout/Recv Timer Step */
-#define RX2_T_EV	(1<<7)	/* Bit	7:	RX2 Timeout/Recv Event occured*/
+#define RX2_T_EV	(1<<7)	/* Bit	7:	RX2 Timeout/Recv Event occurred*/
 #define RX2_T_ON	(1<<6)	/* Bit	6:	RX2 Timeout/Recv Timer Test On*/
 #define RX2_T_OFF	(1<<5)	/* Bit	5:	RX2 Timeout/Recv Timer Tst Off*/
 #define RX2_T_STEP	(1<<4)	/* Bit	4:	RX2 Timeout/Recv Timer Step */
-#define RX1_T_EV	(1<<3)	/* Bit	3:	RX1 Timeout/Recv Event occured*/
+#define RX1_T_EV	(1<<3)	/* Bit	3:	RX1 Timeout/Recv Event occurred*/
 #define RX1_T_ON	(1<<2)	/* Bit	2:	RX1 Timeout/Recv Timer Test On*/
 #define RX1_T_OFF	(1<<1)	/* Bit	1:	RX1 Timeout/Recv Timer Tst Off*/
 #define RX1_T_STEP	(1<<0)	/* Bit	0:	RX1 Timeout/Recv Timer Step */

@@ -24,7 +24,11 @@
  * -- Add support for flush commands
  * -- Add everything that is missing :)
  *
- * (11/06/2000) gkh
+ * 12-Mar-2001 gkh
+ *	- Added support for the GoHubs GO-COM232 device which is the same as the
+ *	  Peracom device.
+ *
+ * 06-Nov-2000 gkh
  *	- Added support for the old Belkin and Peracom devices.
  *	- Made the port able to be opened multiple times.
  *	- Added some defaults incase the line settings are things these devices
@@ -90,6 +94,7 @@ static __devinitdata struct usb_device_id id_table_combined [] = {
 	{ USB_DEVICE(BELKIN_SA_VID, BELKIN_SA_PID) },
 	{ USB_DEVICE(BELKIN_OLD_VID, BELKIN_OLD_PID) },
 	{ USB_DEVICE(PERACOM_VID, PERACOM_PID) },
+	{ USB_DEVICE(GOHUBS_VID, GOHUBS_PID) },
 	{ }							/* Terminating entry */
 };
 
@@ -105,6 +110,11 @@ static __devinitdata struct usb_device_id belkin_old_table [] = {
 
 static __devinitdata struct usb_device_id peracom_table [] = {
 	{ USB_DEVICE(PERACOM_VID, PERACOM_PID) },
+	{ }							/* Terminating entry */
+};
+
+static __devinitdata struct usb_device_id gocom232_table [] = {
+	{ USB_DEVICE(GOHUBS_VID, GOHUBS_PID) },
 	{ }							/* Terminating entry */
 };
 
@@ -157,6 +167,27 @@ struct usb_serial_device_type belkin_old_device = {
 struct usb_serial_device_type peracom_device = {
 	name:			"Peracom single port USB Serial Adapter",
 	id_table:		peracom_table,			/* the Peracom device */
+	needs_interrupt_in:	MUST_HAVE,			/* this device must have an interrupt in endpoint */
+	needs_bulk_in:		MUST_HAVE,			/* this device must have a bulk in endpoint */
+	needs_bulk_out:		MUST_HAVE,			/* this device must have a bulk out endpoint */
+	num_interrupt_in:	1,
+	num_bulk_in:		1,
+	num_bulk_out:		1,
+	num_ports:		1,
+	open:			belkin_sa_open,
+	close:			belkin_sa_close,
+	read_int_callback:	belkin_sa_read_int_callback,	/* How we get the status info */
+	ioctl:			belkin_sa_ioctl,
+	set_termios:		belkin_sa_set_termios,
+	break_ctl:		belkin_sa_break_ctl,
+	startup:		belkin_sa_startup,
+	shutdown:		belkin_sa_shutdown,
+};
+
+/* the GoHubs Go-COM232 device is the same as the Peracom single port adapter */
+struct usb_serial_device_type gocom232_device = {
+	name:			"GO-COM232 USB Serial Converter",
+	id_table:		gocom232_table,			/* the GO-COM232 device */
 	needs_interrupt_in:	MUST_HAVE,			/* this device must have an interrupt in endpoint */
 	needs_bulk_in:		MUST_HAVE,			/* this device must have a bulk in endpoint */
 	needs_bulk_out:		MUST_HAVE,			/* this device must have a bulk out endpoint */
@@ -558,6 +589,7 @@ static int __init belkin_sa_init (void)
 	usb_serial_register (&belkin_sa_device);
 	usb_serial_register (&belkin_old_device);
 	usb_serial_register (&peracom_device);
+	usb_serial_register (&gocom232_device);
 	return 0;
 }
 
@@ -567,6 +599,7 @@ static void __exit belkin_sa_exit (void)
 	usb_serial_deregister (&belkin_sa_device);
 	usb_serial_deregister (&belkin_old_device);
 	usb_serial_deregister (&peracom_device);
+	usb_serial_deregister (&gocom232_device);
 }
 
 

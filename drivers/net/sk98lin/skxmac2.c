@@ -278,7 +278,7 @@ static int	SkXmAutoNegDoneNat (SK_AC*, SK_IOC, int);
  *	 o don't set XMR_FS_ERR in frame	SK_BIG_PK_OK_ON/OFF
  *	   status for frames > 1514 bytes
  *
- *	for incomming packets may be enabled/disabled by this function.
+ *	for incoming packets may be enabled/disabled by this function.
  *	Additional modes may be added later.
  *	Multiple modes can be enabled/disabled at the same time.
  *	The new configuration is stored into the HWAC port configuration
@@ -755,8 +755,8 @@ int	Port)		/* Port Index (MAC_1 + n) */
 
 	/*
 	 * configure the XMACs Station Address
-	 * B2_MAC_2 = xx xx xx xx xx x1 is programed to XMAC A
-	 * B2_MAC_3 = xx xx xx xx xx x2 is programed to XMAC B
+	 * B2_MAC_2 = xx xx xx xx xx x1 is programmed to XMAC A
+	 * B2_MAC_3 = xx xx xx xx xx x2 is programmed to XMAC B
 	 */
 	for (i = 0; i < 3; i++) {
 		/*

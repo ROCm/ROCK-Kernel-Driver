@@ -122,7 +122,7 @@
  *	chg: Default is autosensing with AUTOFULL mode
  *
  *	Revision 1.31  1998/11/25 15:36:16  gklug
- *	fix: do NOT stop LED Timer when port should be stoped
+ *	fix: do NOT stop LED Timer when port should be stopped
  *
  *	Revision 1.30  1998/11/24 13:15:28  gklug
  *	add: Init PCkeckPar struct member
@@ -1118,10 +1118,10 @@ int		QuIoOffs)	/* Queue IO Address Offset */
  *
  *	Dir =	SK_STOP_TX 	Stops the transmit path only and resets
  *				the XMAC. The receive queue is still and
- *				the pending rx frames may still transfered
+ *				the pending rx frames may still transferred
  *				into the RxD.
  *		SK_STOP_RX	Stop the receive path. The tansmit path
- *				has to be stoped once before.
+ *				has to be stopped once before.
  *		SK_STOP_ALL	SK_STOP_TX + SK_STOP_RX
  *
  *	RstMode=SK_SOFT_RST	Resets the XMAC. The PHY is still alive.
@@ -1129,7 +1129,7 @@ int		QuIoOffs)	/* Queue IO Address Offset */
  *
  * Example:
  *	1) A Link Down event was signaled for a port. Therefore the activity
- *	of this port should be stoped and a hardware reset should be issued
+ *	of this port should be stopped and a hardware reset should be issued
  *	to enable the workaround of XMAC errata #2. But the received frames
  *	should not be discarded.
  *		...

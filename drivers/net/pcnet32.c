@@ -12,6 +12,14 @@
  *
  *	This driver is for PCnet32 and PCnetPCI based ethercards
  */
+/**************************************************************************
+ *  23 Oct, 2000.
+ *  Fixed a few bugs, related to running the controller in 32bit mode.
+ *
+ *  Carsten Langgaard, carstenl@mips.com
+ *  Copyright (C) 2000 MIPS Technologies, Inc.  All rights reserved.
+ *
+ *************************************************************************/
 
 static const char *version = "pcnet32.c:v1.25kf 26.9.1999 tsbogend@alpha.franken.de\n";
 
@@ -421,7 +429,7 @@ static void pcnet32_dwio_reset (unsigned long addr)
 static int pcnet32_dwio_check (unsigned long addr)
 {
     outl (88, addr+PCNET32_DWIO_RAP);
-    return (inl (addr+PCNET32_DWIO_RAP) == 88);
+    return ((inl (addr+PCNET32_DWIO_RAP) & 0xffff) == 88);
 }
 
 static struct pcnet32_access pcnet32_dwio = {
@@ -482,6 +490,12 @@ pcnet32_probe_pci(struct pci_dev *pdev, const struct pci_device_id *ent)
 
     printk(KERN_INFO "pcnet32_probe_pci: found device %#08x.%#08x\n", ent->vendor, ent->device);
 
+    if ((err = pci_enable_device(pdev)) < 0) {
+	printk(KERN_ERR "pcnet32.c: failed to enable device -- err=%d\n", err);
+	return err;
+    }
+    pci_set_master(pdev);
+
     ioaddr = pci_resource_start (pdev, 0);
     printk(KERN_INFO "    ioaddr=%#08lx  resource_flags=%#08lx\n", ioaddr, pci_resource_flags (pdev, 0));
     if (!ioaddr) {
@@ -494,13 +508,6 @@ pcnet32_probe_pci(struct pci_dev *pdev, const struct pci_device_id *ent)
 	return -ENODEV;
     }
 
-    if ((err = pci_enable_device(pdev)) < 0) {
-	printk(KERN_ERR "pcnet32.c: failed to enable device -- err=%d\n", err);
-	return err;
-    }
-    
-    pci_set_master(pdev);
-    
     return pcnet32_probe1(ioaddr, pdev->irq, 1, card_idx, pdev);
 }
 
@@ -528,11 +535,13 @@ pcnet32_probe1(unsigned long ioaddr, unsigned char irq_line, int shared, int car
     pcnet32_dwio_reset(ioaddr);
     pcnet32_wio_reset(ioaddr);
 
-    if (pcnet32_wio_read_csr (ioaddr, 0) == 4 && pcnet32_wio_check (ioaddr)) {
-	a = &pcnet32_wio;
+    /* Important to do the check for dwio mode first. */
+    if (pcnet32_dwio_read_csr(ioaddr, 0) == 4 && pcnet32_dwio_check(ioaddr)) {
+        a = &pcnet32_dwio;
     } else {
-	if (pcnet32_dwio_read_csr (ioaddr, 0) == 4 && pcnet32_dwio_check(ioaddr)) {
-	    a = &pcnet32_dwio;
+        if (pcnet32_wio_read_csr(ioaddr, 0) == 4 && 
+	    pcnet32_wio_check(ioaddr)) {
+	    a = &pcnet32_wio;
 	} else
 	    return -ENODEV;
     }
@@ -624,10 +633,35 @@ pcnet32_probe1(unsigned long ioaddr, unsigned char irq_line, int shared, int car
 
     printk(KERN_INFO "%s: %s at %#3lx,", dev->name, chipname, ioaddr);
 
-    /* There is a 16 byte station address PROM at the base address.
-       The first six bytes are the station address. */
+    /* In most chips, after a chip reset, the ethernet address is read from the
+     * station address PROM at the base address and programmed into the
+     * "Physical Address Registers" CSR12-14.
+     * As a precautionary measure, we read the PROM values and complain if
+     * they disagree with the CSRs.  Either way, we use the CSR values, and
+     * double check that they are valid.
+     */
+    for (i = 0; i < 3; i++) {
+	unsigned int val;
+	val = a->read_csr(ioaddr, i+12) & 0x0ffff;
+	/* There may be endianness issues here. */
+	dev->dev_addr[2*i] = val & 0x0ff;
+	dev->dev_addr[2*i+1] = (val >> 8) & 0x0ff;
+    }
+    {
+	u8 promaddr[6];
+	for (i = 0; i < 6; i++) {
+	    promaddr[i] = inb(ioaddr + i);
+	}
+	if( memcmp( promaddr, dev->dev_addr, 6) )
+	    printk(" warning: PROM address does not match CSR address");
+    }
+    /* if the ethernet address is not valid, force to 00:00:00:00:00:00 */
+    if( !is_valid_ether_addr(dev->dev_addr) )
+	for (i = 0; i < 6; i++)
+	    dev->dev_addr[i]=0;
+
     for (i = 0; i < 6; i++)
-	printk(" %2.2x", dev->dev_addr[i] = inb(ioaddr + i));
+	printk(" %2.2x", dev->dev_addr[i] );
 
     if (((chip_version + 1) & 0xfffe) == 0x2624) { /* Version 0x2623 or 0x2624 */
 	i = a->read_csr(ioaddr, 80) & 0x0C00;  /* Check tx_start_pt */
@@ -775,6 +809,10 @@ pcnet32_open(struct net_device *dev)
 	return -EAGAIN;
     }
 
+    /* Check for a valid station address */
+    if( !is_valid_ether_addr(dev->dev_addr) )
+	return -EINVAL;
+
     /* Reset the PCNET32 */
     lp->a.reset (ioaddr);
 
@@ -818,6 +856,12 @@ pcnet32_open(struct net_device *dev)
 	if (lp->options & PORT_100)
 	    val |= 0x08;
 	lp->a.write_bcr (ioaddr, 32, val);
+    } else {
+	if (lp->options & PORT_ASEL) {  /* enable auto negotiate, setup, disable fd */
+		val = lp->a.read_bcr(ioaddr, 32) & ~0x98;
+		val |= 0x20;
+		lp->a.write_bcr(ioaddr, 32, val);
+	}
     }
 
 #ifdef DO_DXSUFLO 

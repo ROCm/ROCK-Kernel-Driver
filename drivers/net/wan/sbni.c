@@ -283,7 +283,7 @@ int sbni_header_cache(struct neighbour *neigh, struct hh_cache *hh)
 	struct net_device *dev = neigh->dev;
   
   
-	if (type == __constant_htons(ETH_P_802_3))
+	if (type == htons(ETH_P_802_3))
 		return -1;
   
 	sbni->h_proto = type;
@@ -742,7 +742,7 @@ static inline unsigned short sbni_recv(struct net_device *dev)
 					 */
 					DP( printk("%s: sbni_recv SendComplete\n",dev->name); );
 					/*
-					 *	We sucessfully sent current packet
+					 *	We successfully sent current packet
 					 */
 	      
 					if(lp->waitack)
@@ -1014,6 +1014,8 @@ static inline void sbni_get_packet(struct net_device* dev)
 
 		skb_pull(skb,SBNI_HH_SZ);
    
+		skb->dev->last_rx = jiffies;
+		lp->stats.rx_bytes += skb->len;
 		netif_rx(skb);
 		lp->stats.rx_packets++;
 	}
@@ -1148,7 +1150,7 @@ static void sbni_drop_tx_queue(struct net_device *dev)
 	lp->waitack=0;
 	netif_wake_queue(dev);
 	
-	DP( printk("%s: queue dropping stoped\n",dev->name); );	
+	DP( printk("%s: queue dropping stopped\n",dev->name); );	
 }
 
 /*

@@ -592,7 +592,7 @@ static void eexp_timeout(struct net_device *dev)
 
 	status = scb_status(dev);
 	unstick_cu(dev);
-	printk(KERN_INFO "%s: transmit timed out, %s?", dev->name,
+	printk(KERN_INFO "%s: transmit timed out, %s?\n", dev->name,
 	       (SCB_complete(status)?"lost interrupt":
 		"board on fire"));
 	lp->stats.tx_errors++;

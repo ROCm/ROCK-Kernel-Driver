@@ -849,7 +849,7 @@ int	dma;
 
 #ifdef	EISA
 
-/*arrays with io adresses of dma controller length and adress registers*/
+/*arrays with io addresses of dma controller length and address registers*/
 static const int cntr[8] = { 0x001,0x003,0x005,0x007,0,0x0c6,0x0ca,0x0ce } ;
 static const int base[8] = { 0x000,0x002,0x004,0x006,0,0x0c4,0x0c8,0x0cc } ;
 static const int page[8] = { 0x087,0x083,0x081,0x082,0,0x08b,0x089,0x08a } ;

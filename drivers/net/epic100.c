@@ -425,7 +425,7 @@ static int __devinit epic_init_one (struct pci_dev *pdev,
 	outl(0x0008, ioaddr + TEST1);
 
 	/* Turn on the MII transceiver. */
-	outl(0x12, ioaddr + MIICfg);
+	outl(dev->if_port == 1 ? 0x13 : 0x12, ioaddr + MIICfg);
 	if (chip_idx == 1)
 		outl((inl(ioaddr + NVCTL) & ~0x003C) | 0x4800, ioaddr + NVCTL);
 	outl(0x0200, ioaddr + GENCTL);
@@ -638,7 +638,7 @@ static int epic_open(struct net_device *dev)
 	   required by the details of which bits are reset and the transceiver
 	   wiring on the Ositech CardBus card.
 	*/
-	outl(0x12, ioaddr + MIICfg);
+	outl(dev->if_port == 1 ? 0x13 : 0x12, ioaddr + MIICfg);
 	if (ep->chip_flags & MII_PWRDWN)
 		outl((inl(ioaddr + NVCTL) & ~0x003C) | 0x4800, ioaddr + NVCTL);
 
@@ -666,7 +666,6 @@ static int epic_open(struct net_device *dev)
 				printk(KERN_INFO "%s: Using the 10base2 transceiver, MII "
 					   "status %4.4x.\n",
 					   dev->name, mdio_read(dev, ep->phys[0], 1));
-			outl(0x13, ioaddr + MIICfg);
 		}
 	} else {
 		int mii_reg5 = mdio_read(dev, ep->phys[0], 5);
@@ -1403,6 +1402,8 @@ static void epic_suspend (struct pci_dev *pdev)
 	struct net_device *dev = pci_get_drvdata(pdev);
 	long ioaddr = dev->base_addr;
 
+	if (!netif_running(dev))
+		return;
 	epic_pause(dev);
 	/* Put the chip into low-power mode. */
 	outl(0x0008, ioaddr + GENCTL);
@@ -1414,6 +1415,8 @@ static void epic_resume (struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
 
+	if (!netif_running(dev))
+		return;
 	epic_restart(dev);
 	/* pci_power_on(pdev); */
 }

@@ -560,7 +560,7 @@ static void ircc_change_speed(void *priv, __u32 speed)
 		 */
 		/* outb(UART_MCR_OUT2, self->io.sir_base + UART_MCR); */
 
-		/* Be ready for incomming frames */
+		/* Be ready for incoming frames */
 		ircc_dma_receive(self, iobase);
 	} else {
 		/* Install SIR transmit handler */

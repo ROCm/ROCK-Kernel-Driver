@@ -59,12 +59,10 @@
  *  03/03/00 - Merged to kernel, indented -kr -i8 -bri0, fixed some missing
  *		malloc free checks, reviewed code. <alan@redhat.com>
  *  03/13/00 - Added spinlocks for smp
+ *  03/08/01 - Added support for module_init() and module_exit()
  *  
  *  To Do:
  *
- *  1) Test Network Monitor Mode
- *  2) Add auto reset logic on adapter errors
- *  3) Test with varying options
  *
  *  If Problems do Occur
  *  Most problems can be rectified by either closing and opening the interface
@@ -123,7 +121,14 @@
  * Official releases will only have an a.b.c version number format.
  */
 
-static char *version = "LanStreamer.c v0.3.1 03/13/99 - Mike Sullivan";
+static char *version = "LanStreamer.c v0.4.0 03/08/01 - Mike Sullivan";
+
+static struct pci_device_id streamer_pci_tbl[] __initdata = {
+	{ PCI_VENDOR_ID_IBM, PCI_DEVICE_ID_IBM_TR, PCI_ANY_ID, PCI_ANY_ID,},
+	{}	/* terminating entry */
+};
+MODULE_DEVICE_TABLE(pci,streamer_pci_tbl);
+
 
 static char *open_maj_error[] = {
 	"No error", "Lobe Media Test", "Physical Insertion",
@@ -170,8 +175,7 @@ static int message_level[STREAMER_MAX_ADAPTERS] = { 1, };
 MODULE_PARM(message_level,
 	    "1-" __MODULE_STRING(STREAMER_MAX_ADAPTERS) "i");
 
-static int streamer_scan(struct net_device *dev);
-static int streamer_init(struct net_device *dev);
+static int streamer_reset(struct net_device *dev);
 static int streamer_open(struct net_device *dev);
 static int streamer_xmit(struct sk_buff *skb, struct net_device *dev);
 static int streamer_close(struct net_device *dev);
@@ -186,98 +190,190 @@ static void streamer_srb_bh(struct net_device *dev);
 static void streamer_asb_bh(struct net_device *dev);
 #if STREAMER_NETWORK_MONITOR
 #ifdef CONFIG_PROC_FS
+static int streamer_proc_info(char *buffer, char **start, off_t offset,
+			      int length, int *eof, void *data);
 static int sprintf_info(char *buffer, struct net_device *dev);
+struct streamer_private *dev_streamer=NULL;
 #endif
 #endif
 
-int __init streamer_probe(struct net_device *dev)
+static int __devinit streamer_init_one(struct pci_dev *pdev,
+				       const struct pci_device_id *ent)
 {
-	int cards_found;
-
-	cards_found = streamer_scan(dev);
-	return cards_found ? 0 : -ENODEV;
-}
-
-static int __init streamer_scan(struct net_device *dev)
-{
-	struct pci_dev *pci_device = NULL;
+  struct net_device *dev=NULL;
 	struct streamer_private *streamer_priv;
-	int card_no = 0;
-	if (pci_present()) 
-	{
-		while ((pci_device = pci_find_device(PCI_VENDOR_ID_IBM,	PCI_DEVICE_ID_IBM_TR, pci_device))) 
-		{
-			if (pci_enable_device(pci_device))
-				continue;
-			pci_set_master(pci_device);
+  __u32 pio_start, pio_end, pio_flags, pio_len;
+  __u32 mmio_start, mmio_end, mmio_flags, mmio_len;
+  int rc=0;
+  static int card_no=-1;
 
-			/* Check to see if io has been allocated, if so, we've already done this card,
-			   so continue on the card discovery loop  */
+#if STREAMER_DEBUG
+  printk("lanstreamer::streamer_init_one, entry pdev %p\n",pdev);
+#endif
 
-			if (check_region(pci_resource_start(pci_device,0), STREAMER_IO_SPACE)) 
-			{
 				card_no++;
-				continue;
-			}
-
-			streamer_priv = kmalloc(sizeof(struct streamer_private), GFP_KERNEL);
-			if(streamer_priv==NULL)
-			{
+  dev=init_trdev(dev, sizeof(*streamer_priv));
+  if(dev==NULL) {
 				printk(KERN_ERR "lanstreamer: out of memory.\n");
-				break;
-			}
-			memset(streamer_priv, 0, sizeof(struct streamer_private));
-			init_waitqueue_head(&streamer_priv->srb_wait);
-			init_waitqueue_head(&streamer_priv->trb_wait);
-#ifndef MODULE
-			dev = init_trdev(dev, 0);
-			if(dev==NULL)
-			{
-				kfree(streamer_priv);
-				printk(KERN_ERR "lanstreamer: out of memory.\n");
-				break;
+    return -ENOMEM;
 			}
 			SET_MODULE_OWNER(dev);
+  streamer_priv=dev->priv;
+
+#if STREAMER_NETWORK_MONITOR
+#ifdef CONFIG_PROC_FS
+  if (!dev_streamer) {
+    create_proc_read_entry("net/streamer_tr",0,0,streamer_proc_info,NULL); 
+  }
+  streamer_priv->next=dev_streamer;
+  dev_streamer=streamer_priv;
 #endif
-			dev->priv = (void *) streamer_priv;
+#endif
+  
+  if (pci_enable_device(pdev)) {
+    printk(KERN_ERR "lanstreamer: unable to enable pci device\n");
+    rc=-EIO;
+    goto err_out;
+  }
+  
+  pci_set_master(pdev);
+  
+  pio_start = pci_resource_start(pdev, 0);
+  pio_end = pci_resource_end(pdev, 0);
+  pio_flags = pci_resource_flags(pdev, 0);
+  pio_len = pci_resource_len(pdev, 0);
+  
+  mmio_start = pci_resource_start(pdev, 1);
+  mmio_end = pci_resource_end(pdev, 1);
+  mmio_flags = pci_resource_flags(pdev, 1);
+  mmio_len = pci_resource_len(pdev, 1);
+  
 #if STREAMER_DEBUG
-			printk("pci_device: %p, dev:%p, dev->priv: %p\n",
-			       pci_device, dev, dev->priv);
+  printk("lanstreamer: pio_start %x pio_end %x pio_len %x pio_flags %x\n",
+	 pio_start, pio_end, pio_len, pio_flags);
+  printk("lanstreamer: mmio_start %x mmio_end %x mmio_len %x mmio_flags %x\n",
+	 mmio_start, mmio_end, mmio_flags, mmio_len);
 #endif
-			dev->irq = pci_device->irq;
-			dev->base_addr = pci_resource_start(pci_device, 0);
-			dev->init = &streamer_init;
-			streamer_priv->streamer_card_name = (char *)pci_device->resource[0].name;
-			streamer_priv->streamer_mmio = 
-				ioremap(pci_resource_start(pci_device, 1), 256);
 
-			if ((pkt_buf_sz[card_no] < 100) || (pkt_buf_sz[card_no] > 18000))
-				streamer_priv->pkt_buf_sz = PKT_BUF_SZ;
-			else
-				streamer_priv->pkt_buf_sz = pkt_buf_sz[card_no];
+  if (!request_region(pio_start, pio_len, "lanstreamer")) {
+    printk(KERN_ERR "lanstreamer: unable to get pci io addr %x\n",pio_start);
+    rc= -EBUSY;
+    goto err_out;
+  }
 
-			streamer_priv->streamer_ring_speed = ringspeed[card_no];
-			streamer_priv->streamer_message_level = message_level[card_no];
+  if (!request_mem_region(mmio_start, mmio_len, "lanstreamer")) {
+    printk(KERN_ERR "lanstreamer: unable to get pci mmio addr %x\n",mmio_start);
+    rc= -EBUSY;
+    goto err_out_free_pio;
+  }
 
-			if (streamer_init(dev) == -1) {
-				unregister_netdevice(dev);
-				kfree(dev->priv);
-				return 0;
+  streamer_priv->streamer_mmio=ioremap(mmio_start, mmio_len);
+  if (streamer_priv->streamer_mmio == NULL) {
+    printk(KERN_ERR "lanstreamer: unable to remap MMIO %x\n",mmio_start);
+    rc= -EIO;
+    goto err_out_free_mmio;
 			}
+
+  init_waitqueue_head(&streamer_priv->srb_wait);
+  init_waitqueue_head(&streamer_priv->trb_wait);
 
 			dev->open = &streamer_open;
 			dev->hard_start_xmit = &streamer_xmit;
 			dev->change_mtu = &streamer_change_mtu;
-
 			dev->stop = &streamer_close;
 			dev->do_ioctl = NULL;
 			dev->set_multicast_list = &streamer_set_rx_mode;
 			dev->get_stats = &streamer_get_stats;
 			dev->set_mac_address = &streamer_set_mac_address;
-			return 1;
+  dev->irq = pdev->irq;
+  dev->base_addr=pio_start;
+  
+  streamer_priv->streamer_card_name = (char *)pdev->resource[0].name;
+  streamer_priv->pci_dev=pdev;
+  
+  if ((pkt_buf_sz[card_no] < 100) || (pkt_buf_sz[card_no] > 18000))
+    streamer_priv->pkt_buf_sz = PKT_BUF_SZ;
+  else
+    streamer_priv->pkt_buf_sz = pkt_buf_sz[card_no];
+  
+  streamer_priv->streamer_ring_speed = ringspeed[card_no];
+  streamer_priv->streamer_message_level = message_level[card_no];
+
+  pdev->driver_data=dev;
+
+  spin_lock_init(&streamer_priv->streamer_lock);
+  
+  printk("%s \n", version);
+  printk("%s: %s. I/O at %hx, MMIO at %p, using irq %d\n",dev->name,
+	 streamer_priv->streamer_card_name,
+	 (unsigned int) dev->base_addr,
+	 streamer_priv->streamer_mmio, 
+	 dev->irq);
+
+  if (!streamer_reset(dev)) {
+    return 0;
+  }
+
+  iounmap(streamer_priv->streamer_mmio);
+err_out_free_mmio:
+  release_mem_region(mmio_start, mmio_len);
+err_out_free_pio:
+  release_region(pio_start, pio_len);
+err_out:
+  unregister_trdev(dev);
+  kfree(dev);
+#if STREAMER_DEBUG
+  printk("lanstreamer: Exit error %x\n",rc);
+#endif
+  return rc;
+}
+
+static void __devexit streamer_remove_one(struct pci_dev *pdev) {
+  struct net_device *dev=pdev->driver_data;
+  struct streamer_private *streamer_priv;
+
+#if STREAMER_DEBUG
+  printk("lanstreamer::streamer_remove_one entry pdev %p\n",pdev);
+#endif
+
+  if (dev == NULL) {
+    printk(KERN_ERR "lanstreamer::streamer_remove_one, ERROR dev is NULL\n");
+    return;
 		}
+
+  streamer_priv=dev->priv;
+  if (streamer_priv == NULL) {
+    printk(KERN_ERR "lanstreamer::streamer_remove_one, ERROR dev->priv is NULL\n");
+    return;
 	}
-	return 0;
+
+#if STREAMER_NETWORK_MONITOR
+#ifdef CONFIG_PROC_FS
+  {
+    struct streamer_private *slast;
+    struct streamer_private *scurrent;
+    if (streamer_priv == dev_streamer) {
+      dev_streamer=dev_streamer->next;
+    } else {
+      for(slast=scurrent=dev_streamer; dev_streamer; slast=scurrent, scurrent=scurrent->next) {
+	if (scurrent == streamer_priv) {
+	  slast->next=scurrent->next;
+	  break;
+	}
+      }
+    }
+    if (!dev_streamer) {
+      remove_proc_entry("net/streamer_tr", NULL);
+    }
+  }
+#endif
+#endif
+
+  unregister_trdev(dev);
+  release_region(pci_resource_start(pdev, 0), pci_resource_len(pdev,0));
+  release_mem_region(pci_resource_start(pdev, 1), pci_resource_len(pdev,1));
+  kfree(dev);
+  pdev->driver_data=NULL;
 }
 
 
@@ -424,32 +520,6 @@ static int streamer_reset(struct net_device *dev)
 	return 0;
 }
 
-static int __init streamer_init(struct net_device *dev) 
-{
-        struct streamer_private *streamer_priv;
-	__u8 *streamer_mmio;
-	int rc;
-  
-	streamer_priv=(struct streamer_private *)dev->priv;
-	streamer_mmio=streamer_priv->streamer_mmio;
-
-	spin_lock_init(&streamer_priv->streamer_lock);
-  
-	printk("%s \n", version);
-	printk("%s: %s. I/O at %hx, MMIO at %p, using irq %d\n",dev->name,
-	       streamer_priv->streamer_card_name,
-	       (unsigned int) dev->base_addr,
-	       streamer_priv->streamer_mmio, 
-	       dev->irq);
-
-	request_region(dev->base_addr, STREAMER_IO_SPACE, "streamer");
-
-	rc=streamer_reset(dev);
-	return rc;
-}
-  
-
-
 static int streamer_open(struct net_device *dev)
 {
 	struct streamer_private *streamer_priv = (struct streamer_private *) dev->priv;
@@ -465,7 +535,7 @@ static int streamer_open(struct net_device *dev)
 	        rc=streamer_reset(dev);
 	}
 
-	if (request_irq(dev->irq, &streamer_interrupt, SA_SHIRQ, "streamer", dev)) {
+	if (request_irq(dev->irq, &streamer_interrupt, SA_SHIRQ, "lanstreamer", dev)) {
 		return -EAGAIN;
 	}
 #if STREAMER_DEBUG
@@ -563,7 +633,7 @@ static int streamer_open(struct net_device *dev)
 		 * timed out.
 		 */
 		writew(srb_open + 2, streamer_mmio + LAPA);
-		srb_word = ntohs(readw(streamer_mmio + LAPD)) & 0xFF;
+		srb_word = ntohs(readw(streamer_mmio + LAPD)) >> 8;
 		if (srb_word == STREAMER_CLEAR_RET_CODE) {
 			printk(KERN_WARNING "%s: Adapter Open time out or error.\n",
 			       dev->name);
@@ -1618,27 +1688,24 @@ static int streamer_change_mtu(struct net_device *dev, int mtu)
 static int streamer_proc_info(char *buffer, char **start, off_t offset,
 			      int length, int *eof, void *data)
 {
+  struct streamer_private *sdev=NULL;
 	struct pci_dev *pci_device = NULL;
 	int len = 0;
 	off_t begin = 0;
 	off_t pos = 0;
 	int size;
 
-	struct device *dev;
-
+  struct net_device *dev;
 
 	size = sprintf(buffer, "IBM LanStreamer/MPC Chipset Token Ring Adapters\n");
 
 	pos += size;
 	len += size;
 
-	while ((pci_device = pci_find_device(PCI_VENDOR_ID_IBM, PCI_DEVICE_ID_IBM_TR, pci_device))) 
-	{
+  for(sdev=dev_streamer; sdev; sdev=sdev->next) {
+    pci_device=sdev->pci_dev;
+    dev=pci_device->driver_data;
 
-		for (dev = dev_base; dev != NULL; dev = dev->next) 
-		{
-		        if (dev->base_addr == pci_device->resource[0].start) 
-			{       /* Yep, a Streamer device */
 				size = sprintf_info(buffer + len, dev);
 				len += size;
 				pos = begin + len;
@@ -1649,9 +1716,7 @@ static int streamer_proc_info(char *buffer, char **start, off_t offset,
 				}
 				if (pos > offset + length)
 					break;
-			}	/* if */
 		}		/* for */
-	}			/* While */
 
 	*start = buffer + (offset - begin);	/* Start of wanted data */
 	len -= (offset - begin);	/* Start slop */
@@ -1743,66 +1808,34 @@ static int sprintf_info(char *buffer, struct net_device *dev)
 #endif
 #endif
 
-#ifdef MODULE
-
-static struct net_device *dev_streamer[STREAMER_MAX_ADAPTERS];
-
-int init_module(void)
-{
-	int i;
-
-#if STREAMER_NETWORK_MONITOR
-#ifdef CONFIG_PROC_FS
-	create_proc_read_entry("net/streamer_tr",0,0,streamer_proc_info,NULL); 
-#endif
-#endif
-	for (i = 0; (i < STREAMER_MAX_ADAPTERS); i++) 
-	{
-		dev_streamer[i] = NULL;
-		dev_streamer[i] = init_trdev(dev_streamer[i], 0);
-		SET_MODULE_OWNER(dev_streamer[i]);
-		if (dev_streamer[i] == NULL)
-			return -ENOMEM;
-
-		dev_streamer[i]->init = &streamer_probe;
-
-		if (register_trdev(dev_streamer[i]) != 0) {
-			kfree(dev_streamer[i]);
-			dev_streamer[i] = NULL;
-			if (i == 0) 
-			{
-				printk(KERN_INFO "Streamer: No IBM LanStreamer PCI Token Ring cards found in system.\n");
-				return -EIO;
-			} else {
-				printk(KERN_INFO "Streamer: %d IBM LanStreamer PCI Token Ring card(s) found in system.\n", i);
-				return 0;
-			}
-		}
-	}
-
-	return 0;
-}
-
-void cleanup_module(void)
-{
-	int i;
-	struct streamer_private *streamer_priv;
-
-	for (i = 0; i < STREAMER_MAX_ADAPTERS; i++)
-		if (dev_streamer[i]) {
-			unregister_trdev(dev_streamer[i]);
-			release_region(dev_streamer[i]->base_addr, STREAMER_IO_SPACE);
-			streamer_priv=(struct streamer_private *)dev_streamer[i]->priv;
-			kfree(streamer_priv->streamer_rx_ring);
-			kfree(streamer_priv->streamer_tx_ring);
-			kfree(dev_streamer[i]->priv);
-			kfree(dev_streamer[i]);
-			dev_streamer[i] = NULL;
-		}
-#if STREAMER_NETWORK_MONITOR
-#ifdef CONFIG_PROC_FS
-	remove_proc_entry("net/streamer_tr", NULL);
-#endif
+static void streamer_suspend(struct pci_dev *pdev) {
+#if STREAMER_DEBUG
+  printk("lanstreamer::streamer_suspend entry pdev %p\n",pdev);
 #endif
 }
-#endif				/* MODULE */
+
+static void streamer_resume(struct pci_dev *pdev) {
+#if STREAMER_DEBUG
+  printk("lanstreamer::streamer_resume entry pdev %p\n",pdev);
+#endif
+}
+
+static struct pci_driver streamer_pci_driver = {
+  name:       "lanstreamer",
+  id_table:   streamer_pci_tbl,
+  probe:      streamer_init_one,
+  remove:     streamer_remove_one,
+  suspend:    streamer_suspend,
+  resume:     streamer_resume,
+};
+
+static int __init streamer_init_module(void) {
+  return pci_module_init(&streamer_pci_driver);
+}
+
+static void __exit streamer_cleanup_module(void) {
+  pci_unregister_driver(&streamer_pci_driver);
+}
+
+module_init(streamer_init_module);
+module_exit(streamer_cleanup_module);

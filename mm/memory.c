@@ -160,6 +160,7 @@ int copy_page_range(struct mm_struct *dst, struct mm_struct *src,
 	src_pgd = pgd_offset(src, address)-1;
 	dst_pgd = pgd_offset(dst, address)-1;
 	
+	spin_lock(&dst->page_table_lock);		
 	for (;;) {
 		pmd_t * src_pmd, * dst_pmd;
 
@@ -178,7 +179,6 @@ skip_copy_pmd_range:	address = (address + PGDIR_SIZE) & PGDIR_MASK;
 			continue;
 		}
 
-		spin_lock(&dst->page_table_lock);		
 		src_pmd = pmd_offset(src_pgd, address);
 		dst_pmd = pmd_alloc(dst, dst_pgd, address);
 		if (!dst_pmd)
@@ -247,13 +247,10 @@ cont_copy_pte_range_noset:	address += PAGE_SIZE;
 cont_copy_pmd_range:	src_pmd++;
 			dst_pmd++;
 		} while ((unsigned long)src_pmd & PMD_TABLE_MASK);
-		spin_unlock(&dst->page_table_lock);
 	}
-out:
-	return 0;
-
 out_unlock:
 	spin_unlock(&src->page_table_lock);
+out:
 	spin_unlock(&dst->page_table_lock);
 	return 0;
 
@@ -878,9 +875,9 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 	 */
 	spin_unlock(&mm->page_table_lock);
 	new_page = alloc_page(GFP_HIGHUSER);
+	spin_lock(&mm->page_table_lock);
 	if (!new_page)
 		return -1;
-	spin_lock(&mm->page_table_lock);
 
 	/*
 	 * Re-check the pte - we dropped the lock

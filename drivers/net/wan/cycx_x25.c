@@ -1460,6 +1460,7 @@ static void chan_x25_send_event(struct net_device *dev, u8 event)
         skb->pkt_type = PACKET_HOST;
 
         netif_rx(skb);
+	dev->last_rx = jiffies;		/* timestamp */
 }
 
 /* Convert line speed in bps to a number used by cyclom 2x code. */
