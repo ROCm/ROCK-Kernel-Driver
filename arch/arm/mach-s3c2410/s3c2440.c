@@ -10,7 +10,8 @@
  * published by the Free Software Foundation.
  *
  * Modifications:
- *     24-Aug-2004 BJD  Start of s3c2440 support
+ *	24-Aug-2004 BJD  Start of s3c2440 support
+ *	12-Oct-2004 BJD	 Moved clock info out to clock.c
 */
 
 #include <linux/kernel.h>
@@ -33,18 +34,13 @@
 #include <asm/arch/regs-serial.h>
 
 #include "s3c2440.h"
+#include "clock.h"
 #include "cpu.h"
 
 int s3c2440_clock_tick_rate = 12*1000*1000;  /* current timers at 12MHz */
 
 /* clock info */
-
-unsigned long s3c2440_baseclk = 12*1000*1000;  /* assume base is 12MHz */
 unsigned long s3c2440_hdiv;
-
-unsigned long s3c2440_fclk;
-unsigned long s3c2440_hclk;
-unsigned long s3c2440_pclk;
 
 static struct map_desc s3c2440_iodesc[] __initdata = {
 	IODESC_ENT(USBHOST),
@@ -126,7 +122,7 @@ static struct platform_device *uart_devices[] __initdata = {
 
 void __init s3c2440_map_io(struct map_desc *mach_desc, int size)
 {
-	unsigned long tmp;
+	unsigned long clkdiv;
 	unsigned long camdiv;
 
 	/* register our io-tables */
@@ -137,15 +133,15 @@ void __init s3c2440_map_io(struct map_desc *mach_desc, int size)
 	/* now we've got our machine bits initialised, work out what
 	 * clocks we've got */
 
-	s3c2440_fclk = s3c2410_get_pll(__raw_readl(S3C2410_MPLLCON),
-				       s3c2440_baseclk);
+	s3c24xx_fclk = s3c2410_get_pll(__raw_readl(S3C2410_MPLLCON),
+				       s3c24xx_xtal) * 2;
 
-	tmp = __raw_readl(S3C2410_CLKDIVN);
+	clkdiv = __raw_readl(S3C2410_CLKDIVN);
 	camdiv = __raw_readl(S3C2440_CAMDIVN);
 
 	/* work out clock scalings */
 
-	switch (tmp & S3C2440_CLKDIVN_HDIVN_MASK) {
+	switch (clkdiv & S3C2440_CLKDIVN_HDIVN_MASK) {
 	case S3C2440_CLKDIVN_HDIVN_1:
 		s3c2440_hdiv = 1;
 		break;
@@ -159,18 +155,18 @@ void __init s3c2440_map_io(struct map_desc *mach_desc, int size)
 		break;
 
 	case S3C2440_CLKDIVN_HDIVN_3_6:
-		s3c2440_hdiv = (camdiv & S3C2440_CAMDIVN_HCLK4_HALF) ? 6 : 3;
+		s3c2440_hdiv = (camdiv & S3C2440_CAMDIVN_HCLK3_HALF) ? 6 : 3;
 		break;
 	}
 
-	s3c2440_hclk = s3c2440_fclk / s3c2440_hdiv;
-	s3c2440_pclk = s3c2440_hclk / ((tmp & S3C2440_CLKDIVN_PDIVN) ? 2 : 1);
+	s3c24xx_hclk = s3c24xx_fclk / s3c2440_hdiv;
+	s3c24xx_pclk = s3c24xx_hclk / ((clkdiv & S3C2440_CLKDIVN_PDIVN)? 2:1);
 
 	/* print brieft summary of clocks, etc */
 
 	printk("S3C2440: core %ld.%03ld MHz, memory %ld.%03ld MHz, peripheral %ld.%03ld MHz\n",
-	       print_mhz(s3c2440_fclk), print_mhz(s3c2440_hclk),
-	       print_mhz(s3c2440_pclk));
+	       print_mhz(s3c24xx_fclk), print_mhz(s3c24xx_hclk),
+	       print_mhz(s3c24xx_pclk));
 }
 
 

@@ -18,3 +18,10 @@ struct clk {
 	unsigned long         rate;
 	unsigned long         ctrlbit;
 };
+
+/* processor clock settings, in Hz */
+
+extern unsigned long s3c24xx_xtal;
+extern unsigned long s3c24xx_pclk;
+extern unsigned long s3c24xx_hclk;
+extern unsigned long s3c24xx_fclk;

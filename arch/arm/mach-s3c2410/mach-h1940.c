@@ -41,6 +41,7 @@
 #include <asm/arch/regs-serial.h>
 
 #include "s3c2410.h"
+#include "clock.h"
 #include "devs.h"
 #include "cpu.h"
 
@@ -56,7 +57,7 @@ static struct s3c2410_uartcfg h1940_uartcfgs[] = {
 	[0] = {
 		.hwport	     = 0,
 		.flags	     = 0,
-		.clock	     = &s3c2410_pclk,
+		.clock	     = &s3c24xx_pclk,
 		.ucon	     = 0x3c5,
 		.ulcon	     = 0x03,
 		.ufcon	     = 0x51,
@@ -64,7 +65,7 @@ static struct s3c2410_uartcfg h1940_uartcfgs[] = {
 	[1] = {
 		.hwport	     = 1,
 		.flags	     = 0,
-		.clock	     = &s3c2410_pclk,
+		.clock	     = &s3c24xx_pclk,
 		.ucon	     = 0x245,
 		.ulcon	     = 0x03,
 		.ufcon	     = 0x00,
@@ -73,7 +74,7 @@ static struct s3c2410_uartcfg h1940_uartcfgs[] = {
 	[2] = {
 		.hwport	     = 2,
 		.flags	     = 0,
-		.clock	     = &s3c2410_pclk,
+		.clock	     = &s3c24xx_pclk,
 		.ucon	     = 0x3c5,
 		.ulcon	     = 0x43,
 		.ufcon	     = 0x51,
