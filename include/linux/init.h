@@ -64,6 +64,7 @@ typedef int (*initcall_t)(void);
 typedef void (*exitcall_t)(void);
 
 extern initcall_t __con_initcall_start, __con_initcall_end;
+extern initcall_t __security_initcall_start, __security_initcall_end;
 #endif
   
 #ifndef MODULE
@@ -95,6 +96,9 @@ extern initcall_t __con_initcall_start, __con_initcall_end;
 
 #define console_initcall(fn) \
 	static initcall_t __initcall_##fn __attribute__ ((unused,__section__ (".con_initcall.init")))=fn
+
+#define security_initcall(fn) \
+	static initcall_t __initcall_##fn __attribute__ ((unused,__section__ (".security_initcall.init"))) = fn
 
 struct obs_kernel_param {
 	const char *str;
@@ -142,6 +146,8 @@ struct obs_kernel_param {
 #define fs_initcall(fn)			module_init(fn)
 #define device_initcall(fn)		module_init(fn)
 #define late_initcall(fn)		module_init(fn)
+
+#define security_initcall(fn)		module_init(fn)
 
 /* These macros create a dummy inline: gcc 2.9x does not count alias
  as usage, hence the `unused function' warning when __init functions

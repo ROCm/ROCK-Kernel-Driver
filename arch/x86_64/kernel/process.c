@@ -150,7 +150,7 @@ __setup("idle=", idle_setup);
 
 
 /* Prints also some state that isn't saved in the pt_regs */ 
-void show_regs(struct pt_regs * regs)
+void __show_regs(struct pt_regs * regs)
 {
 	unsigned long cr0 = 0L, cr2 = 0L, cr3 = 0L, cr4 = 0L, fs, gs, shadowgs;
 	unsigned int fsindex,gsindex;
@@ -192,7 +192,11 @@ void show_regs(struct pt_regs * regs)
 	       fs,fsindex,gs,gsindex,shadowgs); 
 	printk("CS:  %04x DS: %04x ES: %04x CR0: %016lx\n", cs, ds, es, cr0); 
 	printk("CR2: %016lx CR3: %016lx CR4: %016lx\n", cr2, cr3, cr4);
+}
 
+void show_regs(struct pt_regs *regs)
+{
+	__show_regs(regs);
 	show_trace(&regs->rsp);
 }
 

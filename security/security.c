@@ -38,12 +38,22 @@ static inline int verify (struct security_operations *ops)
 	return 0;
 }
 
+static void __init do_security_initcalls(void)
+{
+	initcall_t *call;
+	call = &__security_initcall_start;
+	while (call < &__security_initcall_end) {
+		(*call)();
+		call++;
+	}
+}
+
 /**
  * security_scaffolding_startup - initialzes the security scaffolding framework
  *
  * This should be called early in the kernel initialization sequence.
  */
-int security_scaffolding_startup (void)
+int __init security_scaffolding_startup (void)
 {
 	printk (KERN_INFO "Security Scaffold v" SECURITY_SCAFFOLD_VERSION
 		" initialized\n");
@@ -55,6 +65,7 @@ int security_scaffolding_startup (void)
 	}
 
 	security_ops = &dummy_security_ops;
+	do_security_initcalls();
 
 	return 0;
 }

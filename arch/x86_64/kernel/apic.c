@@ -690,7 +690,13 @@ static void setup_APIC_timer(unsigned int clocks)
 	} 
 
 	/* wait for irq slice */
-	{
+ 	if (vxtime.hpet_address) {
+ 		int trigger = hpet_readl(HPET_T0_CMP);
+ 		while (hpet_readl(HPET_COUNTER) >= trigger)
+ 			/* do nothing */ ;
+ 		while (hpet_readl(HPET_COUNTER) <  trigger)
+ 			/* do nothing */ ;
+ 	} else {
 		int c1, c2;
 		outb_p(0x00, 0x43);
 		c2 = inb_p(0x40);

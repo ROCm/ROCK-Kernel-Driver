@@ -52,6 +52,18 @@ config EARLY_PRINTK
 	  klogd/syslogd or the X server. You should normally N here, unless
 	  you want to debug such a crash.
 	  
+config HPET_TIMER
+	bool
+	default y
+	help
+	  Use the IA-PC HPET (High Precision Event Timer) to manage
+	  time in preference to the PIT and RTC, if a HPET is
+	  present.  The HPET provides a stable time base on SMP
+	  systems, unlike the RTC, but it is more expensive to access,
+	  as it is off-chip.  You can find the HPET spec at
+	  <http://www.intel.com/labs/platcomp/hpet/hpetspec.htm>.
+
+	  If unsure, say Y.
 
 config GENERIC_ISA_DMA
 	bool

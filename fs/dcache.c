@@ -1221,10 +1221,14 @@ void d_move(struct dentry * dentry, struct dentry * target)
 	}
 
 	/* Move the dentry to the target hash queue, if on different bucket */
+	if (dentry->d_vfs_flags & DCACHE_UNHASHED)
+		goto already_unhashed;
 	if (dentry->d_bucket != target->d_bucket) {
-		dentry->d_bucket = target->d_bucket;
 		hlist_del_rcu(&dentry->d_hash);
+already_unhashed:
+		dentry->d_bucket = target->d_bucket;
 		hlist_add_head_rcu(&dentry->d_hash, target->d_bucket);
+		dentry->d_vfs_flags &= ~DCACHE_UNHASHED;
 	}
 
 	/* Unhash the target: dput() will then get rid of it */

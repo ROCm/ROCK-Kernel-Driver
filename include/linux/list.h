@@ -152,14 +152,17 @@ static inline void list_del(struct list_head *entry)
 /**
  * list_del_rcu - deletes entry from list without re-initialization
  * @entry: the element to delete from the list.
+ *
  * Note: list_empty on entry does not return true after this, 
  * the entry is in an undefined state. It is useful for RCU based
  * lockfree traversal.
+ *
+ * In particular, it means that we can not poison the forward 
+ * pointers that may still be used for walking the list.
  */
 static inline void list_del_rcu(struct list_head *entry)
 {
 	__list_del(entry->prev, entry->next);
-	entry->next = LIST_POISON1;
 	entry->prev = LIST_POISON2;
 }
 
@@ -431,7 +434,22 @@ static __inline__ void hlist_del(struct hlist_node *n)
 	n->pprev = LIST_POISON2;
 }
 
-#define hlist_del_rcu hlist_del  /* list_del_rcu is identical too? */
+/**
+ * hlist_del_rcu - deletes entry from hash list without re-initialization
+ * @entry: the element to delete from the hash list.
+ *
+ * Note: list_unhashed() on entry does not return true after this, 
+ * the entry is in an undefined state. It is useful for RCU based
+ * lockfree traversal.
+ *
+ * In particular, it means that we can not poison the forward
+ * pointers that may still be used for walking the hash list.
+ */
+static inline void hlist_del_rcu(struct hlist_node *n)
+{
+	__hlist_del(n);
+	n->pprev = LIST_POISON2;
+}
 
 static __inline__ void hlist_del_init(struct hlist_node *n) 
 {
