@@ -423,7 +423,9 @@ struct snd_ac97_build_ops {
 	int (*build_specific) (ac97_t *ac97);
 	int (*build_spdif) (ac97_t *ac97);
 	int (*build_post_spdif) (ac97_t *ac97);
+#ifdef CONFIG_PM
 	void (*resume) (ac97_t *ac97);
+#endif
 };
 
 struct _snd_ac97_bus_ops {

@@ -775,6 +775,7 @@ int patch_conexant(ac97_t * ac97)
 /*
  * Analog Device AD18xx, AD19xx codecs
  */
+#ifdef CONFIG_PM
 static void ad18xx_resume(ac97_t *ac97)
 {
 	static unsigned short setup_regs[] = {
@@ -837,6 +838,7 @@ static void ad18xx_resume(ac97_t *ac97)
 
 	snd_ac97_restore_iec958(ac97);
 }
+#endif
 
 int patch_ad1819(ac97_t * ac97)
 {
@@ -907,7 +909,9 @@ static void patch_ad1881_chained(ac97_t * ac97, int unchained_idx, int cidx1, in
 }
 
 static struct snd_ac97_build_ops patch_ad1881_build_ops = {
+#ifdef CONFIG_PM
 	.resume = &ad18xx_resume
+#endif
 };
 
 int patch_ad1881(ac97_t * ac97)
@@ -988,7 +992,9 @@ static int patch_ad1885_specific(ac97_t * ac97)
 
 static struct snd_ac97_build_ops patch_ad1885_build_ops = {
 	.build_specific = &patch_ad1885_specific,
+#ifdef CONFIG_PM
 	.resume = &ad18xx_resume
+#endif
 };
 
 int patch_ad1885(ac97_t * ac97)
@@ -1096,7 +1102,9 @@ static int patch_ad1981a_specific(ac97_t * ac97)
 static struct snd_ac97_build_ops patch_ad1981a_build_ops = {
 	.build_post_spdif = patch_ad198x_post_spdif,
 	.build_specific = patch_ad1981a_specific,
+#ifdef CONFIG_PM
 	.resume = ad18xx_resume
+#endif
 };
 
 int patch_ad1981a(ac97_t *ac97)
@@ -1125,7 +1133,9 @@ static int patch_ad1981b_specific(ac97_t *ac97)
 static struct snd_ac97_build_ops patch_ad1981b_build_ops = {
 	.build_post_spdif = patch_ad198x_post_spdif,
 	.build_specific = patch_ad1981b_specific,
+#ifdef CONFIG_PM
 	.resume = ad18xx_resume
+#endif
 };
 
 int patch_ad1981b(ac97_t *ac97)
@@ -1241,7 +1251,9 @@ static int patch_ad1888_specific(ac97_t *ac97)
 static struct snd_ac97_build_ops patch_ad1888_build_ops = {
 	.build_post_spdif = patch_ad198x_post_spdif,
 	.build_specific = patch_ad1888_specific,
+#ifdef CONFIG_PM
 	.resume = ad18xx_resume
+#endif
 };
 
 int patch_ad1888(ac97_t * ac97)
@@ -1276,7 +1288,9 @@ static int patch_ad1980_specific(ac97_t *ac97)
 static struct snd_ac97_build_ops patch_ad1980_build_ops = {
 	.build_post_spdif = patch_ad198x_post_spdif,
 	.build_specific = patch_ad1980_specific,
+#ifdef CONFIG_PM
 	.resume = ad18xx_resume
+#endif
 };
 
 int patch_ad1980(ac97_t * ac97)
@@ -1303,7 +1317,9 @@ static int patch_ad1985_specific(ac97_t *ac97)
 static struct snd_ac97_build_ops patch_ad1985_build_ops = {
 	.build_post_spdif = patch_ad198x_post_spdif,
 	.build_specific = patch_ad1985_specific,
+#ifdef CONFIG_PM
 	.resume = ad18xx_resume
+#endif
 };
 
 int patch_ad1985(ac97_t * ac97)
