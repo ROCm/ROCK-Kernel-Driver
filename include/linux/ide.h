@@ -15,6 +15,7 @@
 #include <linux/devfs_fs_kernel.h>
 #include <linux/interrupt.h>
 #include <linux/bitops.h>
+#include <linux/bio.h>
 #include <asm/byteorder.h>
 #include <asm/hdreg.h>
 

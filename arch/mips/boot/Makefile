@@ -35,9 +35,6 @@ elf2ecoff: elf2ecoff.c
 addinitrd: addinitrd.c
 	$(HOSTCC) -o $@ $^
 
-# Don't build dependencies, this may die if $(CC) isn't gcc
-dep:
-
 clean:
 	rm -f vmlinux.ecoff
 	rm -f zImage zImage.tmp

@@ -2,7 +2,7 @@
 # Makefile for the Linux networking core.
 #
 
-export-objs := netfilter.o profile.o
+export-objs := ext8022.o netfilter.o profile.o
 
 obj-y := sock.o skbuff.o iovec.o datagram.o scm.o
 
@@ -15,6 +15,10 @@ endif
 obj-$(CONFIG_FILTER) += filter.o
 
 obj-$(CONFIG_NET) += dev.o dev_mcast.o dst.o neighbour.o rtnetlink.o utils.o
+
+ifneq ($(CONFIG_LLC),n)
+obj-y += ext8022.o
+endif
 
 obj-$(CONFIG_NETFILTER) += netfilter.o
 obj-$(CONFIG_NET_DIVERT) += dv.o

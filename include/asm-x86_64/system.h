@@ -13,7 +13,10 @@
 #define LOCK_PREFIX ""
 #endif
 
-#define prepare_to_switch() do {} while(0)
+#define prepare_arch_schedule(prev)            do { } while(0)
+#define finish_arch_schedule(prev)             do { } while(0)
+#define prepare_arch_switch(rq)                        do { } while(0)
+#define finish_arch_switch(rq)                 spin_unlock_irq(&(rq)->lock)
 
 #define __STR(x) #x
 #define STR(x) __STR(x)
@@ -41,7 +44,7 @@
 	__POP(rax) __POP(r15) __POP(r14) __POP(r13) __POP(r12) __POP(r11) __POP(r10) \
 	__POP(r9) __POP(r8)
 
-#define switch_to(prev,next) \
+#define switch_to(prev,next,last) \
 	asm volatile(SAVE_CONTEXT						    \
 		     "movq %%rsp,%[prevrsp]\n\t"				    \
 		     "movq %[nextrsp],%%rsp\n\t"				    \

@@ -25,8 +25,6 @@ install: Image
 zinstall: zImage
 	sh -x ./install.sh $(KERNELRELEASE) zImage $(TOPDIR)/System.map "$(INSTALL_PATH)"
 
-dep:
-
 clean:
 	rm -f tools/build
 	rm -f setup bootsect zImage compressed/vmlinux.out

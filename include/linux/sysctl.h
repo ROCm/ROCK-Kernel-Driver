@@ -130,16 +130,21 @@ enum
 /* CTL_VM names: */
 enum
 {
-	VM_SWAPCTL=1,		/* struct: Set vm swapping control */
-	VM_SWAPOUT=2,		/* int: Linear or sqrt() swapout for hogs */
-	VM_FREEPG=3,		/* struct: Set free page thresholds */
+	VM_UNUSED1=1,		/* was: struct: Set vm swapping control */
+	VM_UNUSED2=2,		/* was; int: Linear or sqrt() swapout for hogs */
+	VM_UNUSED3=3,		/* was: struct: Set free page thresholds */
 	VM_BDFLUSH_UNUSED=4,	/* Spare */
 	VM_OVERCOMMIT_MEMORY=5,	/* Turn off the virtual memory safety limit */
-	VM_BUFFERMEM=6,		/* struct: Set buffer memory thresholds */
-	VM_PAGECACHE=7,		/* struct: Set cache memory thresholds */
+	VM_UNUSED4=6,		/* was: struct: Set buffer memory thresholds */
+	VM_UNUSED5=7,		/* was: struct: Set cache memory thresholds */
 	VM_PAGERDAEMON=8,	/* struct: Control kswapd behaviour */
-	VM_PGT_CACHE=9,		/* struct: Set page table cache parameters */
-	VM_PAGE_CLUSTER=10	/* int: set number of pages to swap together */
+	VM_UNUSED6=9,		/* was: struct: Set page table cache parameters */
+	VM_PAGE_CLUSTER=10,	/* int: set number of pages to swap together */
+	VM_DIRTY_BACKGROUND=11,	/* dirty_background_ratio */
+	VM_DIRTY_ASYNC=12,	/* dirty_async_ratio */
+	VM_DIRTY_SYNC=13,	/* dirty_sync_ratio */
+	VM_DIRTY_WB_CS=14,	/* dirty_writeback_centisecs */
+	VM_DIRTY_EXPIRE_CS=15,	/* dirty_expire_centisecs */
 };
 
 

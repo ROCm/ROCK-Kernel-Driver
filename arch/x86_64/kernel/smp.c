@@ -25,8 +25,6 @@
 /* The 'big kernel lock' */
 spinlock_t kernel_flag __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 
-struct tlb_state cpu_tlbstate[NR_CPUS] = {[0 ... NR_CPUS-1] = { &init_mm, 0 }};
-
 /*
  * the following functions deal with sending IPIs between CPUs.
  *
@@ -147,9 +145,9 @@ static spinlock_t tlbstate_lock = SPIN_LOCK_UNLOCKED;
  */
 static void inline leave_mm (unsigned long cpu)
 {
-	if (cpu_tlbstate[cpu].state == TLBSTATE_OK)
+	if (read_pda(mmu_state) == TLBSTATE_OK)
 		BUG();
-	clear_bit(cpu, &cpu_tlbstate[cpu].active_mm->cpu_vm_mask);
+	clear_bit(cpu, &read_pda(active_mm)->cpu_vm_mask);
 	__flush_tlb();
 }
 
@@ -164,18 +162,18 @@ static void inline leave_mm (unsigned long cpu)
  * 	the other cpus, but smp_invalidate_interrupt ignore flush ipis
  * 	for the wrong mm, and in the worst case we perform a superflous
  * 	tlb flush.
- * 1a2) set cpu_tlbstate to TLBSTATE_OK
+ * 1a2) set cpu mmu_state to TLBSTATE_OK
  * 	Now the smp_invalidate_interrupt won't call leave_mm if cpu0
  *	was in lazy tlb mode.
- * 1a3) update cpu_tlbstate[].active_mm
+ * 1a3) update cpu active_mm
  * 	Now cpu0 accepts tlb flushes for the new mm.
  * 1a4) set_bit(cpu, &new_mm->cpu_vm_mask);
  * 	Now the other cpus will send tlb flush ipis.
  * 1a4) change cr3.
  * 1b) thread switch without mm change
- *	cpu_tlbstate[].active_mm is correct, cpu0 already handles
+ *	cpu active_mm is correct, cpu0 already handles
  *	flush ipis.
- * 1b1) set cpu_tlbstate to TLBSTATE_OK
+ * 1b1) set cpu mmu_state to TLBSTATE_OK
  * 1b2) test_and_set the cpu bit in cpu_vm_mask.
  * 	Atomically set the bit [other cpus will start sending flush ipis],
  * 	and test the bit.
@@ -188,7 +186,7 @@ static void inline leave_mm (unsigned long cpu)
  *   runs in kernel space, the cpu could load tlb entries for user space
  *   pages.
  *
- * The good news is that cpu_tlbstate is local to each cpu, no
+ * The good news is that cpu mmu_state is local to each cpu, no
  * write/read ordering problems.
  */
 
@@ -216,8 +214,8 @@ asmlinkage void smp_invalidate_interrupt (void)
 		 * BUG();
 		 */
 		 
-	if (flush_mm == cpu_tlbstate[cpu].active_mm) {
-		if (cpu_tlbstate[cpu].state == TLBSTATE_OK) {
+	if (flush_mm == read_pda(active_mm)) {
+		if (read_pda(mmu_state) == TLBSTATE_OK) {
 			if (flush_va == FLUSH_ALL)
 				local_flush_tlb();
 			else
@@ -335,7 +333,7 @@ static inline void do_flush_tlb_all_local(void)
 	unsigned long cpu = smp_processor_id();
 
 	__flush_tlb_all();
-	if (cpu_tlbstate[cpu].state == TLBSTATE_LAZY)
+	if (read_pda(mmu_state) == TLBSTATE_LAZY)
 		leave_mm(cpu);
 }
 

@@ -33,6 +33,7 @@
 #include <linux/interrupt.h>
 #include <linux/kmod.h>
 #include <linux/delay.h>
+#include <linux/tqueue.h>
 #include <asm/io.h>
 #include "acpi.h"
 

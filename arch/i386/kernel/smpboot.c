@@ -58,9 +58,6 @@ static int smp_b_stepping;
 /* Setup configured maximum number of CPUs to activate */
 static int max_cpus = -1;
 
-/* Total count of live CPUs */
-int smp_num_cpus = 1;
-
 /* Number of siblings per CPU package */
 int smp_num_siblings = 1;
 int __initdata phys_proc_id[NR_CPUS]; /* Package ID of each logical CPU */
@@ -294,7 +291,8 @@ static void __init synchronize_tsc_bp (void)
 		/*
 		 * all APs synchronize but they loop on '== num_cpus'
 		 */
-		while (atomic_read(&tsc_count_start) != smp_num_cpus-1) mb();
+		while (atomic_read(&tsc_count_start) != num_online_cpus()-1)
+			mb();
 		atomic_set(&tsc_count_stop, 0);
 		wmb();
 		/*
@@ -312,21 +310,26 @@ static void __init synchronize_tsc_bp (void)
 		/*
 		 * Wait for all APs to leave the synchronization point:
 		 */
-		while (atomic_read(&tsc_count_stop) != smp_num_cpus-1) mb();
+		while (atomic_read(&tsc_count_stop) != num_online_cpus()-1)
+			mb();
 		atomic_set(&tsc_count_start, 0);
 		wmb();
 		atomic_inc(&tsc_count_stop);
 	}
 
 	sum = 0;
-	for (i = 0; i < smp_num_cpus; i++) {
-		t0 = tsc_values[i];
-		sum += t0;
+	for (i = 0; i < NR_CPUS; i++) {
+		if (cpu_online(i)) {
+			t0 = tsc_values[i];
+			sum += t0;
+		}
 	}
-	avg = div64(sum, smp_num_cpus);
+	avg = div64(sum, num_online_cpus());
 
 	sum = 0;
-	for (i = 0; i < smp_num_cpus; i++) {
+	for (i = 0; i < NR_CPUS; i++) {
+		if (!cpu_online(i))
+			continue;
 		delta = tsc_values[i] - avg;
 		if (delta < 0)
 			delta = -delta;
@@ -358,7 +361,7 @@ static void __init synchronize_tsc_ap (void)
 	int i;
 
 	/*
-	 * smp_num_cpus is not necessarily known at the time
+	 * num_online_cpus is not necessarily known at the time
 	 * this gets called, so we first wait for the BP to
 	 * finish SMP initialization:
 	 */
@@ -366,14 +369,15 @@ static void __init synchronize_tsc_ap (void)
 
 	for (i = 0; i < NR_LOOPS; i++) {
 		atomic_inc(&tsc_count_start);
-		while (atomic_read(&tsc_count_start) != smp_num_cpus) mb();
+		while (atomic_read(&tsc_count_start) != num_online_cpus())
+			mb();
 
 		rdtscll(tsc_values[smp_processor_id()]);
 		if (i == NR_LOOPS-1)
 			write_tsc(0, 0);
 
 		atomic_inc(&tsc_count_stop);
-		while (atomic_read(&tsc_count_stop) != smp_num_cpus) mb();
+		while (atomic_read(&tsc_count_stop) != num_online_cpus()) mb();
 	}
 }
 #undef NR_LOOPS
@@ -1072,7 +1076,6 @@ void __init smp_boot_cpus(void)
 		io_apic_irqs = 0;
 #endif
 		cpu_online_map = phys_cpu_present_map = 1;
-		smp_num_cpus = 1;
 		if (APIC_init_uniprocessor())
 			printk(KERN_NOTICE "Local APIC not detected."
 					   " Using dummy APIC emulation.\n");
@@ -1102,7 +1105,6 @@ void __init smp_boot_cpus(void)
 		io_apic_irqs = 0;
 #endif
 		cpu_online_map = phys_cpu_present_map = 1;
-		smp_num_cpus = 1;
 		goto smp_done;
 	}
 
@@ -1118,7 +1120,6 @@ void __init smp_boot_cpus(void)
 		io_apic_irqs = 0;
 #endif
 		cpu_online_map = phys_cpu_present_map = 1;
-		smp_num_cpus = 1;
 		goto smp_done;
 	}
 
@@ -1199,7 +1200,6 @@ void __init smp_boot_cpus(void)
 			(bogosum/(5000/HZ))%100);
 		Dprintk("Before bogocount - setting activated=1.\n");
 	}
-	smp_num_cpus = cpucount + 1;
 
 	if (smp_b_stepping)
 		printk(KERN_WARNING "WARNING: SMP operation may be unreliable with B stepping processors.\n");
@@ -1213,11 +1213,12 @@ void __init smp_boot_cpus(void)
 		for (cpu = 0; cpu < NR_CPUS; cpu++)
 			cpu_sibling_map[cpu] = NO_PROC_ID;
 		
-		for (cpu = 0; cpu < smp_num_cpus; cpu++) {
+		for (cpu = 0; cpu < NR_CPUS; cpu++) {
 			int 	i;
-			
-			for (i = 0; i < smp_num_cpus; i++) {
-				if (i == cpu)
+			if (!cpu_online(cpu)) continue;
+
+			for (i = 0; i < NR_CPUS; i++) {
+				if (i == cpu || !cpu_online(i))
 					continue;
 				if (phys_proc_id[cpu] == phys_proc_id[i]) {
 					cpu_sibling_map[cpu] = i;

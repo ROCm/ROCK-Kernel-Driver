@@ -44,6 +44,8 @@ unsigned long mstk48t02_regs = 0UL;
 unsigned long ds1287_regs = 0UL;
 #endif
 
+u64 jiffies_64;
+
 static unsigned long mstk48t08_regs = 0UL;
 static unsigned long mstk48t59_regs = 0UL;
 

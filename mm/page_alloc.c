@@ -574,10 +574,13 @@ void get_page_state(struct page_state *ret)
 	int pcpu;
 
 	memset(ret, 0, sizeof(*ret));
-	for (pcpu = 0; pcpu < smp_num_cpus; pcpu++) {
+	for (pcpu = 0; pcpu < NR_CPUS; pcpu++) {
 		struct page_state *ps;
 
-		ps = &page_states[cpu_logical_map(pcpu)];
+		if (!cpu_online(pcpu))
+			continue;
+
+		ps = &page_states[pcpu];
 		ret->nr_dirty += ps->nr_dirty;
 		ret->nr_writeback += ps->nr_writeback;
 		ret->nr_pagecache += ps->nr_pagecache;

@@ -427,11 +427,13 @@ int
 cnodeid_to_cpuid(int cnode) {
 	int cpu;
 
-	for (cpu = 0; cpu < smp_num_cpus; cpu++)
+	for (cpu = 0; cpu < NR_CPUS; cpu++) {
+		if (!cpu_online(cpu)) continue;
 		if (cpuid_to_cnodeid(cpu) == cnode)
 			break;
+	}
 
-	if (cpu == smp_num_cpus) 
+	if (cpu == NR_CPUS) 
 		cpu = -1;
 
 	return cpu;

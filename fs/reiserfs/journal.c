@@ -689,7 +689,7 @@ retry:
   count = 0 ;
   for (i = 0 ; atomic_read(&(jl->j_commit_left)) > 1 && i < (jl->j_len + 1) ; i++) {  /* everything but commit_bh */
     bn = SB_ONDISK_JOURNAL_1st_BLOCK(s) + (jl->j_start+i) %  SB_ONDISK_JOURNAL_SIZE(s);
-    tbh = journal_get_hash_table(s, bn) ;
+    tbh = journal_find_get_block(s, bn) ;
 
 /* kill this sanity check */
 if (count > (orig_commit_left + 2)) {
@@ -718,7 +718,7 @@ reiserfs_panic(s, "journal-539: flush_commit_list: BAD count(%d) > orig_commit_l
     for (i = 0 ; atomic_read(&(jl->j_commit_left)) > 1 && 
                  i < (jl->j_len + 1) ; i++) {  /* everything but commit_bh */
       bn = SB_ONDISK_JOURNAL_1st_BLOCK(s) + (jl->j_start + i) % SB_ONDISK_JOURNAL_SIZE(s) ;
-      tbh = journal_get_hash_table(s, bn) ;
+      tbh = journal_find_get_block(s, bn) ;
 
       wait_on_buffer(tbh) ;
       if (!buffer_uptodate(tbh)) {
@@ -2764,7 +2764,7 @@ int journal_mark_freed(struct reiserfs_transaction_handle *th, struct super_bloc
   int cleaned = 0 ;
   
   if (reiserfs_dont_log(th->t_super)) {
-    bh = sb_get_hash_table(p_s_sb, blocknr) ;
+    bh = sb_find_get_block(p_s_sb, blocknr) ;
     if (bh && buffer_dirty (bh)) {
       printk ("journal_mark_freed(dont_log): dirty buffer on hash list: %lx %ld\n", bh->b_state, blocknr);
       BUG ();
@@ -2772,7 +2772,7 @@ int journal_mark_freed(struct reiserfs_transaction_handle *th, struct super_bloc
     brelse (bh);
     return 0 ;
   }
-  bh = sb_get_hash_table(p_s_sb, blocknr) ;
+  bh = sb_find_get_block(p_s_sb, blocknr) ;
   /* if it is journal new, we just remove it from this transaction */
   if (bh && buffer_journal_new(bh)) {
     mark_buffer_notjournal_new(bh) ;

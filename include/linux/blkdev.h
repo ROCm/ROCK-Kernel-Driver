@@ -246,12 +246,7 @@ extern unsigned long blk_max_low_pfn, blk_max_pfn;
 #define BLK_BOUNCE_ISA		(ISA_DMA_THRESHOLD)
 
 extern int init_emergency_isa_pool(void);
-extern void create_bounce(unsigned long pfn, int gfp, struct bio **bio_orig);
-
-extern inline void blk_queue_bounce(request_queue_t *q, struct bio **bio)
-{
-	create_bounce(q->bounce_pfn, q->bounce_gfp, bio);
-}
+void blk_queue_bounce(request_queue_t *q, struct bio **bio);
 
 #define rq_for_each_bio(bio, rq)	\
 	if ((rq->bio))			\
@@ -328,11 +323,11 @@ extern void generic_unplug_device(void *);
 /*
  * tag stuff
  */
-#define blk_queue_tag_request(q, tag)	((q)->queue_tags->tag_index[(tag)])
 #define blk_queue_tag_depth(q)		((q)->queue_tags->busy)
 #define blk_queue_tag_queue(q)		((q)->queue_tags->busy < (q)->queue_tags->max_depth)
 #define blk_rq_tagged(rq)		((rq)->flags & REQ_QUEUED)
 extern int blk_queue_start_tag(request_queue_t *, struct request *);
+extern struct request *blk_queue_find_tag(request_queue_t *, int);
 extern void blk_queue_end_tag(request_queue_t *, struct request *);
 extern int blk_queue_init_tags(request_queue_t *, int);
 extern void blk_queue_free_tags(request_queue_t *);

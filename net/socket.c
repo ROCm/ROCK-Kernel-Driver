@@ -1750,8 +1750,8 @@ int socket_get_info(char *buffer, char **start, off_t offset, int length)
 	int len, cpu;
 	int counter = 0;
 
-	for (cpu=0; cpu<smp_num_cpus; cpu++)
-		counter += sockets_in_use[cpu_logical_map(cpu)].counter;
+	for (cpu=0; cpu<NR_CPUS; cpu++)
+		counter += sockets_in_use[cpu].counter;
 
 	/* It can be negative, by the way. 8) */
 	if (counter < 0)

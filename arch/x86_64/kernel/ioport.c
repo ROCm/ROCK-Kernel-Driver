@@ -14,6 +14,7 @@
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 #include <linux/stddef.h>
+#include <linux/slab.h>
 
 /* Set EXTENT bits starting at BASE in BITMAP to value TURN_ON. */
 static void set_bitmap(unsigned long *bitmap, short base, short extent, int new_value)
@@ -61,27 +62,19 @@ asmlinkage int sys_ioperm(unsigned long from, unsigned long num, int turn_on)
 		return -EINVAL;
 	if (turn_on && !capable(CAP_SYS_RAWIO))
 		return -EPERM;
-	/*
-	 * If it's the first ioperm() call in this thread's lifetime, set the
-	 * IO bitmap up. ioperm() is much less timing critical than clone(),
-	 * this is why we delay this operation until now:
-	 */
- 	if (!t->ioperm) {
-		/*
-		 * just in case ...
-		 */
-		memset(t->io_bitmap,0xff,(IO_BITMAP_SIZE+1)*4);
-		t->ioperm = 1;
-		/*
-		 * this activates it in the TSS
-		 */
+
+	if (!t->io_bitmap_ptr) { 
+		t->io_bitmap_ptr = kmalloc((IO_BITMAP_SIZE+1)*4, GFP_KERNEL);
+		if (!t->io_bitmap_ptr) 
+			return -ENOMEM; 
+		memset(t->io_bitmap_ptr,0xff,(IO_BITMAP_SIZE+1)*4);
 		tss->io_map_base = IO_BITMAP_OFFSET;
 	}
 
 	/*
 	 * do it in the per-thread copy and in the TSS ...
 	 */
-	set_bitmap((unsigned long *) t->io_bitmap, from, num, !turn_on);
+	set_bitmap((unsigned long *) t->io_bitmap_ptr, from, num, !turn_on);
 	set_bitmap((unsigned long *) tss->io_bitmap, from, num, !turn_on);
 
 	return 0;

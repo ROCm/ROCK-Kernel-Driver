@@ -68,6 +68,7 @@ extern spinlock_t i8259A_lock;
  */
 #include <linux/irq.h>
 
+u64 jiffies_64;
 
 unsigned long cpu_khz;	/* Detected as we calibrate the TSC */
 

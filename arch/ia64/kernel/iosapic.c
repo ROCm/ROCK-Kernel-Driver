@@ -256,7 +256,7 @@ iosapic_set_affinity (unsigned int irq, unsigned long mask)
 	char *addr;
 	int redir = (irq & (1<<31)) ? 1 : 0;
 
-	mask &= (1UL << smp_num_cpus) - 1;
+	mask &= cpu_online_map;
 
 	if (!mask || irq >= IA64_NUM_VECTORS)
 		return;
@@ -759,9 +759,8 @@ iosapic_pci_fixup (int phase)
 
 					set_rte(vector, cpu_physical_id(cpu_index) & 0xffff);
 
-					cpu_index++;
-					if (cpu_index >= smp_num_cpus)
-						cpu_index = 0;
+					for (cpu_index++; !cpu_online(cpu_index % NR_CPUS); cpu_index++);
+                                        cpu_index %= NR_CPUS;
 				} else {
 					/*
 					 * Direct the interrupt vector to the current cpu,

@@ -785,13 +785,15 @@ int presto_permission(struct inode *inode, int mask)
 {
         unsigned short mode = inode->i_mode;
         struct presto_cache *cache;
-        int rc;
+        int rc = 0;
 
+	lock_kernel();
         ENTRY;
+
         if ( presto_can_ilookup() && !(mask & S_IWOTH)) {
                 CDEBUG(D_CACHE, "ilookup on %ld OK\n", inode->i_ino);
-                EXIT;
-                return 0;
+		EXIT;
+		goto out;
         }
 
         cache = presto_get_cache(inode);
@@ -803,25 +805,22 @@ int presto_permission(struct inode *inode, int mask)
 
                 if ( S_ISREG(mode) && fiops && fiops->permission ) {
                         EXIT;
-                        return fiops->permission(inode, mask);
+                        rc = fiops->permission(inode, mask);
+			goto out;
                 }
                 if ( S_ISDIR(mode) && diops && diops->permission ) {
                         EXIT;
-                        return diops->permission(inode, mask);
+                        rc = diops->permission(inode, mask);
+			goto out;
                 }
         }
 
-        /* The cache filesystem doesn't have its own permission function,
-         * but we don't want to duplicate the VFS code here.  In order
-         * to avoid looping from permission calling this function again,
-         * we temporarily override the permission operation while we call
-         * the VFS permission function.
-         */
-        inode->i_op->permission = NULL;
-        rc = permission(inode, mask);
-        inode->i_op->permission = &presto_permission;
+        rc = vfs_permission(inode, mask);
 
         EXIT;
+
+ out:
+	unlock_kernel();
         return rc;
 }
 

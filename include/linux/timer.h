@@ -25,10 +25,8 @@ extern int del_timer(struct timer_list * timer);
 
 #ifdef CONFIG_SMP
 extern int del_timer_sync(struct timer_list * timer);
-extern void sync_timers(void);
 #else
 #define del_timer_sync(t)	del_timer(t)
-#define sync_timers()		do { } while (0)
 #endif
 
 /*

@@ -165,6 +165,7 @@ static int print_unex=1;
 #include <linux/errno.h>
 #include <linux/slab.h>
 #include <linux/mm.h>
+#include <linux/bio.h>
 #include <linux/string.h>
 #include <linux/fcntl.h>
 #include <linux/delay.h>

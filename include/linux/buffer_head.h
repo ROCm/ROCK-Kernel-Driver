@@ -108,12 +108,7 @@ BUFFER_FNS(Async_Read, async_read)
 BUFFER_FNS(Async_Write, async_write)
 BUFFER_FNS(Boundary, boundary)
 
-/*
- * FIXME: this is used only by bh_kmap, which is used only by RAID5.
- * Move all that stuff into raid5.c
- */
 #define bh_offset(bh)		((unsigned long)(bh)->b_data & ~PAGE_MASK)
-
 #define touch_buffer(bh)	mark_page_accessed(bh->b_page)
 
 /* If we *know* page->private refers to buffer_heads */
@@ -124,16 +119,6 @@ BUFFER_FNS(Boundary, boundary)
 		((struct buffer_head *)(page)->private);	\
 	})
 #define page_has_buffers(page)	PagePrivate(page)
-#define set_page_buffers(page, buffers)				\
-	do {							\
-		SetPagePrivate(page);				\
-		page->private = (unsigned long)buffers;		\
-	} while (0)
-#define clear_page_buffers(page)				\
-	do {							\
-		ClearPagePrivate(page);				\
-		page->private = 0;				\
-	} while (0)
 
 #define invalidate_buffers(dev)	__invalidate_buffers((dev), 0)
 #define destroy_buffers(dev)	__invalidate_buffers((dev), 1)
@@ -175,15 +160,14 @@ int fsync_dev(kdev_t);
 int fsync_bdev(struct block_device *);
 int fsync_super(struct super_block *);
 int fsync_no_super(struct block_device *);
-struct buffer_head *__get_hash_table(struct block_device *, sector_t, int);
+struct buffer_head *__find_get_block(struct block_device *, sector_t, int);
 struct buffer_head * __getblk(struct block_device *, sector_t, int);
 void __brelse(struct buffer_head *);
 void __bforget(struct buffer_head *);
 struct buffer_head * __bread(struct block_device *, int, int);
 void wakeup_bdflush(void);
-struct buffer_head *alloc_buffer_head(int async);
+struct buffer_head *alloc_buffer_head(void);
 void free_buffer_head(struct buffer_head * bh);
-int brw_page(int, struct page *, struct block_device *, sector_t [], int);
 void FASTCALL(unlock_buffer(struct buffer_head *bh));
 
 /*
@@ -270,9 +254,9 @@ static inline struct buffer_head * sb_getblk(struct super_block *sb, int block)
 }
 
 static inline struct buffer_head *
-sb_get_hash_table(struct super_block *sb, int block)
+sb_find_get_block(struct super_block *sb, int block)
 {
-	return __get_hash_table(sb->s_bdev, block, sb->s_blocksize);
+	return __find_get_block(sb->s_bdev, block, sb->s_blocksize);
 }
 
 static inline void

@@ -43,6 +43,8 @@
 
 extern rwlock_t xtime_lock;
 
+u64 jiffies_64;
+
 enum sparc_clock_type sp_clock_typ;
 spinlock_t mostek_lock = SPIN_LOCK_UNLOCKED;
 unsigned long mstk48t02_regs = 0UL;

@@ -32,6 +32,8 @@
 #include <asm/sysmips.h>
 #include <asm/uaccess.h>
 
+u64 jiffies_64;
+
 extern asmlinkage void syscall_trace(void);
 
 asmlinkage int sys_pipe(abi64_no_regargs, struct pt_regs regs)

@@ -1573,6 +1573,7 @@ dasd_end_request_cb(dasd_ccw_req_t * cqr, void *data)
 static inline void
 __dasd_process_blk_queue(dasd_device_t * device)
 {
+	struct block_device *bdev;
 	request_queue_t *queue;
 	struct list_head *l;
 	struct request *req;
@@ -1601,11 +1602,14 @@ __dasd_process_blk_queue(dasd_device_t * device)
 		if (cqr->status == DASD_CQR_QUEUED)
 			nr_queued++;
 	}
+	bdev = bdget(kdev_t_to_nr(device->kdev));
+	if (!bdev)
+		return;
 	while (!blk_queue_plugged(queue) &&
 	       !blk_queue_empty(queue) &&
 		nr_queued < DASD_CHANQ_MAX_SIZE) {
 		req = elv_next_request(queue);
-		if (is_read_only(device->kdev) && rq_data_dir(req) == WRITE) {
+		if (bdev_read_only(bdev) && rq_data_dir(req) == WRITE) {
 			DBF_EVENT(DBF_ERR,
 				  "(%04x) Rejecting write request %p",
 				  device->devinfo.devno, req);
@@ -1632,6 +1636,7 @@ __dasd_process_blk_queue(dasd_device_t * device)
 		dasd_profile_start(device, cqr, req);
 		nr_queued++;
 	}
+	bdput(bdev);
 }
 
 /*

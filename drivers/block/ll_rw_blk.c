@@ -18,6 +18,7 @@
 #include <linux/errno.h>
 #include <linux/string.h>
 #include <linux/config.h>
+#include <linux/bio.h>
 #include <linux/mm.h>
 #include <linux/swap.h>
 #include <linux/init.h>
@@ -160,6 +161,7 @@ void blk_queue_make_request(request_queue_t * q, make_request_fn * mfn)
 	blk_queue_bounce_limit(q, BLK_BOUNCE_HIGH);
 
 	init_waitqueue_head(&q->queue_wait);
+	INIT_LIST_HEAD(&q->plug_list);
 }
 
 /**
@@ -2002,8 +2004,8 @@ int __init blk_dev_init(void)
 	queue_nr_requests = (total_ram >> 8) & ~15;	/* One per quarter-megabyte */
 	if (queue_nr_requests < 32)
 		queue_nr_requests = 32;
-	if (queue_nr_requests > 512)
-		queue_nr_requests = 512;
+	if (queue_nr_requests > 256)
+		queue_nr_requests = 256;
 
 	/*
 	 * Batch frees according to queue length

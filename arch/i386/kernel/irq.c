@@ -138,8 +138,9 @@ int show_interrupts(struct seq_file *p, void *v)
 	struct irqaction * action;
 
 	seq_printf(p, "           ");
-	for (j=0; j<smp_num_cpus; j++)
-		seq_printf(p, "CPU%d       ",j);
+	for (j=0; j<NR_CPUS; j++)
+		if (cpu_online(j))
+			p += seq_printf(p, "CPU%d       ",j);
 	seq_putc(p, '\n');
 
 	for (i = 0 ; i < NR_IRQS ; i++) {
@@ -150,9 +151,10 @@ int show_interrupts(struct seq_file *p, void *v)
 #ifndef CONFIG_SMP
 		seq_printf(p, "%10u ", kstat_irqs(i));
 #else
-		for (j = 0; j < smp_num_cpus; j++)
-			seq_printf(p, "%10u ",
-				kstat.irqs[cpu_logical_map(j)][i]);
+		for (j = 0; j < NR_CPUS; j++)
+			if (cpu_online(j))
+				p += seq_printf(p, "%10u ",
+					     kstat.irqs[j][i]);
 #endif
 		seq_printf(p, " %14s", irq_desc[i].handler->typename);
 		seq_printf(p, "  %s", action->name);
@@ -162,13 +164,15 @@ int show_interrupts(struct seq_file *p, void *v)
 		seq_putc(p, '\n');
 	}
 	seq_printf(p, "NMI: ");
-	for (j = 0; j < smp_num_cpus; j++)
-		seq_printf(p, "%10u ", nmi_count(cpu_logical_map(j)));
+	for (j = 0; j < NR_CPUS; j++)
+		if (cpu_online(j))
+			p += seq_printf(p, "%10u ", nmi_count(j));
 	seq_putc(p, '\n');
 #if CONFIG_X86_LOCAL_APIC
 	seq_printf(p, "LOC: ");
-	for (j = 0; j < smp_num_cpus; j++)
-		seq_printf(p, "%10u ", apic_timer_irqs[cpu_logical_map(j)]);
+	for (j = 0; j < NR_CPUS; j++)
+		if (cpu_online(j))
+			p += seq_printf(p, "%10u ", apic_timer_irqs[j]);
 	seq_putc(p, '\n');
 #endif
 	seq_printf(p, "ERR: %10u\n", atomic_read(&irq_err_count));
@@ -198,14 +202,14 @@ static void show(char * str)
 
 	printk("\n%s, CPU %d:\n", str, cpu);
 	printk("irq:  %d [",irqs_running());
-	for(i=0;i < smp_num_cpus;i++)
+	for(i=0;i < NR_CPUS;i++)
 		printk(" %d",local_irq_count(i));
 	printk(" ]\nbh:   %d [",spin_is_locked(&global_bh_lock) ? 1 : 0);
-	for(i=0;i < smp_num_cpus;i++)
+	for(i=0;i < NR_CPUS;i++)
 		printk(" %d",local_bh_count(i));
 
 	printk(" ]\nStack dumps:");
-	for(i = 0; i < smp_num_cpus; i++) {
+	for(i = 0; i < NR_CPUS; i++) {
 		unsigned long esp;
 		if (i == cpu)
 			continue;
@@ -356,8 +360,9 @@ void __global_cli(void)
 
 	__save_flags(flags);
 	if (flags & (1 << EFLAGS_IF_SHIFT)) {
-		int cpu = smp_processor_id();
+		int cpu;
 		__cli();
+		cpu = smp_processor_id();
 		if (!local_irq_count(cpu))
 			get_irqlock(cpu);
 	}
@@ -365,11 +370,12 @@ void __global_cli(void)
 
 void __global_sti(void)
 {
-	int cpu = smp_processor_id();
+	int cpu = get_cpu();
 
 	if (!local_irq_count(cpu))
 		release_irqlock(cpu);
 	__sti();
+	put_cpu();
 }
 
 /*

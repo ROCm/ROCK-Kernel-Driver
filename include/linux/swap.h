@@ -5,6 +5,7 @@
 #include <linux/kdev_t.h>
 #include <linux/linkage.h>
 #include <linux/mmzone.h>
+#include <linux/list.h>
 #include <asm/page.h>
 
 #define SWAP_FLAG_PREFER	0x8000	/* set if swap priority specified */
@@ -62,6 +63,21 @@ typedef struct {
 #ifdef __KERNEL__
 
 /*
+ * A swap extent maps a range of a swapfile's PAGE_SIZE pages onto a range of
+ * disk blocks.  A list of swap extents maps the entire swapfile.  (Where the
+ * term `swapfile' refers to either a blockdevice or an IS_REG file.  Apart
+ * from setup, they're handled identically.
+ *
+ * We always assume that blocks are of size PAGE_SIZE.
+ */
+struct swap_extent {
+	struct list_head list;
+	pgoff_t start_page;
+	pgoff_t nr_pages;
+	sector_t start_block;
+};
+
+/*
  * Max bad pages in the new format..
  */
 #define __swapoffset(x) ((unsigned long)&((union swap_header *)0)->x)
@@ -83,11 +99,17 @@ enum {
 
 /*
  * The in-memory structure used to track swap areas.
+ * extent_list.prev points at the lowest-index extent.  That list is
+ * sorted.
  */
 struct swap_info_struct {
 	unsigned int flags;
 	spinlock_t sdev_lock;
 	struct file *swap_file;
+	struct block_device *bdev;
+	struct list_head extent_list;
+	int nr_extents;
+	struct swap_extent *curr_swap_extent;
 	unsigned old_block_size;
 	unsigned short * swap_map;
 	unsigned int lowest_bit;
@@ -134,8 +156,9 @@ extern wait_queue_head_t kswapd_wait;
 extern int FASTCALL(try_to_free_pages(zone_t *, unsigned int, unsigned int));
 
 /* linux/mm/page_io.c */
-extern void rw_swap_page(int, struct page *);
-extern void rw_swap_page_nolock(int, swp_entry_t, char *);
+int swap_readpage(struct file *file, struct page *page);
+int swap_writepage(struct page *page);
+int rw_swap_page_sync(int rw, swp_entry_t entry, struct page *page);
 
 /* linux/mm/page_alloc.c */
 
@@ -163,12 +186,13 @@ extern unsigned int nr_swapfiles;
 extern struct swap_info_struct swap_info[];
 extern void si_swapinfo(struct sysinfo *);
 extern swp_entry_t get_swap_page(void);
-extern void get_swaphandle_info(swp_entry_t, unsigned long *, struct inode **);
 extern int swap_duplicate(swp_entry_t);
-extern int swap_count(struct page *);
 extern int valid_swaphandles(swp_entry_t, unsigned long *);
 extern void swap_free(swp_entry_t);
 extern void free_swap_and_cache(swp_entry_t);
+sector_t map_swap_page(struct swap_info_struct *p, pgoff_t offset);
+struct swap_info_struct *get_swap_info_struct(unsigned type);
+
 struct swap_list_t {
 	int head;	/* head of priority-ordered swapfile list */
 	int next;	/* swapfile to be used next */

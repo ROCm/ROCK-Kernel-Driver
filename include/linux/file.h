@@ -33,6 +33,7 @@ struct files_struct {
         struct file * fd_array[NR_OPEN_DEFAULT];
 };
 
+extern void FASTCALL(__fput(struct file *));
 extern void FASTCALL(fput(struct file *));
 extern struct file * FASTCALL(fget(unsigned int fd));
 extern void FASTCALL(set_close_on_exec(unsigned int fd, int flag));

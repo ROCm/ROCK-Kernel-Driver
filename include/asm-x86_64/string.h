@@ -40,18 +40,9 @@ extern void *__memcpy(void *to, const void *from, size_t len);
 		 __ret = __builtin_memcpy((dst),(src),__len);	\
 	   __ret; }) 
 
-#if 0
+
 #define __HAVE_ARCH_MEMSET
-extern void *__memset(void *mem, int val, size_t len); 
-#define memset(dst,val,len)					\
-	({ size_t __len = (len);				\
-	   void *__ret;						\
-	   if (__builtin_constant_p(len) && __len >= 64)	\
-		   __ret = __memset((dst),(val),__len);		\
-	   else							\
-		   __ret = __builtin_memset((dst),(val),__len);	\
-	   __ret; }) 
-#endif	   
+#define memset __builtin_memset
 
 #define __HAVE_ARCH_MEMMOVE
 void * memmove(void * dest,const void *src,size_t count);

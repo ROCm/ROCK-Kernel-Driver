@@ -20,6 +20,7 @@
 
 #include <linux/module.h>
 #include <linux/raid/raid0.h>
+#include <linux/bio.h>
 
 #define MAJOR_NR MD_MAJOR
 #define MD_DRIVER
@@ -28,21 +29,26 @@
 
 static int create_strip_zones (mddev_t *mddev)
 {
-	int i, c, j, j1, j2;
+	int i, c, j;
 	unsigned long current_offset, curr_zone_offset;
 	raid0_conf_t *conf = mddev_to_conf(mddev);
 	mdk_rdev_t *smallest, *rdev1, *rdev2, *rdev;
+	struct list_head *tmp1, *tmp2;
+	struct strip_zone *zone;
+	int cnt;
  
 	/*
 	 * The number of 'same size groups'
 	 */
 	conf->nr_strip_zones = 0;
  
-	ITERATE_RDEV_ORDERED(mddev,rdev1,j1) {
+	ITERATE_RDEV(mddev,rdev1,tmp1) {
 		printk("raid0: looking at %s\n", partition_name(rdev1->dev));
 		c = 0;
-		ITERATE_RDEV_ORDERED(mddev,rdev2,j2) {
-			printk("raid0:   comparing %s(%ld) with %s(%ld)\n", partition_name(rdev1->dev), rdev1->size, partition_name(rdev2->dev), rdev2->size);
+		ITERATE_RDEV(mddev,rdev2,tmp2) {
+			printk("raid0:   comparing %s(%ld) with %s(%ld)\n",
+			       partition_name(rdev1->dev), rdev1->size,
+			       partition_name(rdev2->dev), rdev2->size);
 			if (rdev2 == rdev1) {
 				printk("raid0:   END\n");
 				break;
@@ -50,7 +56,7 @@ static int create_strip_zones (mddev_t *mddev)
 			if (rdev2->size == rdev1->size)
 			{
 				/*
-				 * Not unique, dont count it as a new
+				 * Not unique, don't count it as a new
 				 * group
 				 */
 				printk("raid0:   EQUAL\n");
@@ -65,29 +71,62 @@ static int create_strip_zones (mddev_t *mddev)
 			printk("raid0: %d zones\n", conf->nr_strip_zones);
 		}
 	}
-		printk("raid0: FINAL %d zones\n", conf->nr_strip_zones);
+	printk("raid0: FINAL %d zones\n", conf->nr_strip_zones);
 
 	conf->strip_zone = vmalloc(sizeof(struct strip_zone)*
 				conf->nr_strip_zones);
 	if (!conf->strip_zone)
 		return 1;
 
+	memset(conf->strip_zone, 0,sizeof(struct strip_zone)*
+				   conf->nr_strip_zones);
+	/* The first zone must contain all devices, so here we check that
+	 * there is a properly alignment of slots to devices and find them all
+	 */
+	zone = &conf->strip_zone[0];
+	cnt = 0;
+	smallest = NULL;
+	ITERATE_RDEV(mddev, rdev1, tmp1) {
+		int j = rdev1->sb->this_disk.raid_disk;
 
-	conf->smallest = NULL;
-	current_offset = 0;
-	curr_zone_offset = 0;
+		if (j < 0 || j >= mddev->sb->raid_disks) {
+			printk("raid0: bad disk number %d - aborting!\n", j);
+			goto abort;
+		}
+		if (zone->dev[j]) {
+			printk("raid0: multiple devices for %d - aborting!\n", j);
+			goto abort;
+		}
+		zone->dev[j] = rdev1;
+		if (!smallest || (rdev1->size <smallest->size))
+			smallest = rdev1;
+		cnt++;
+	}
+	if (cnt != mddev->sb->raid_disks) {
+		printk("raid0: too few disks (%d of %d) - aborting!\n", cnt, 
+		       mddev->sb->raid_disks);
+		goto abort;
+	}
+	zone->nb_dev = cnt;
+	zone->size = smallest->size * cnt;
+	zone->zone_offset = 0;
 
-	for (i = 0; i < conf->nr_strip_zones; i++)
+	conf->smallest = zone;
+	current_offset = smallest->size;
+	curr_zone_offset = zone->size;
+
+	/* now do the other zones */
+	for (i = 1; i < conf->nr_strip_zones; i++)
 	{
-		struct strip_zone *zone = conf->strip_zone + i;
+		zone = conf->strip_zone + i;
 
 		printk("raid0: zone %d\n", i);
 		zone->dev_offset = current_offset;
 		smallest = NULL;
 		c = 0;
 
-		ITERATE_RDEV_ORDERED(mddev,rdev,j) {
-
+		for (j=0; j<cnt; j++) {
+			rdev = conf->strip_zone[0].dev[j];
 			printk("raid0: checking %s ...", partition_name(rdev->dev));
 			if (rdev->size > current_offset)
 			{
@@ -117,6 +156,9 @@ static int create_strip_zones (mddev_t *mddev)
 	}
 	printk("raid0: done.\n");
 	return 0;
+ abort:
+	vfree(conf->strip_zone);
+	return 1;
 }
 
 static int raid0_run (mddev_t *mddev)
@@ -131,11 +173,6 @@ static int raid0_run (mddev_t *mddev)
 		goto out;
 	mddev->private = (void *)conf;
  
-	if (md_check_ordering(mddev)) {
-		printk("raid0: disks are not ordered, aborting!\n");
-		goto out_free_conf;
-	}
-
 	if (create_strip_zones (mddev)) 
 		goto out_free_conf;
 
@@ -224,8 +261,9 @@ static int raid0_stop (mddev_t *mddev)
  * Of course, those facts may not be valid anymore (and surely won't...)
  * Hey guys, there's some work out there ;-)
  */
-static int raid0_make_request (mddev_t *mddev, int rw, struct bio *bio)
+static int raid0_make_request (request_queue_t *q, struct bio *bio)
 {
+	mddev_t *mddev = q->queuedata;
 	unsigned int sect_in_chunk, chunksize_bits,  chunk_size;
 	raid0_conf_t *conf = mddev_to_conf(mddev);
 	struct raid0_hash *hash;
@@ -233,7 +271,7 @@ static int raid0_make_request (mddev_t *mddev, int rw, struct bio *bio)
 	mdk_rdev_t *tmp_dev;
 	unsigned long chunk, block, rsect;
 
-	chunk_size = mddev->param.chunk_size >> 10;
+	chunk_size = mddev->sb->chunk_size >> 10;
 	chunksize_bits = ffz(~chunk_size);
 	block = bio->bi_sector >> 1;
 	hash = conf->hash_table + block / conf->smallest->size;
@@ -322,7 +360,7 @@ static int raid0_status (char *page, mddev_t *mddev)
 				conf->strip_zone[j].size);
 	}
 #endif
-	sz += sprintf(page + sz, " %dk chunks", mddev->param.chunk_size/1024);
+	sz += sprintf(page + sz, " %dk chunks", mddev->sb->chunk_size/1024);
 	return sz;
 }
 

@@ -702,19 +702,14 @@ printk(KERN_INFO "my ip: %d.%d.%d.%d\n", NIPQUAD(ipaddress));
   </sect1>
 
   <sect1 id="routines-processorids">
-   <title><function>smp_processor_id</function>()/<function>cpu_[number/logical]_map()</function>
+   <title><function>smp_processor_id</function>()
     <filename class=headerfile>include/asm/smp.h</filename></title>
    
    <para>
     <function>smp_processor_id()</function> returns the current
     processor number, between 0 and <symbol>NR_CPUS</symbol> (the
     maximum number of CPUs supported by Linux, currently 32).  These
-    values are not necessarily continuous: to get a number between 0
-    and <function>smp_num_cpus()</function> (the number of actual
-    processors in this machine), the
-    <function>cpu_number_map()</function> function is used to map the
-    processor id to a logical number.
-    <function>cpu_logical_map()</function> does the reverse.
+    values are not necessarily continuous.
    </para>
   </sect1>
 

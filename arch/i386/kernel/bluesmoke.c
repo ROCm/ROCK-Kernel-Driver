@@ -298,7 +298,9 @@ static void mce_timerfunc (unsigned long data)
 {
 	unsigned int i;
 
-	for (i=0; i<smp_num_cpus; i++) {
+	for (i=0; i<NR_CPUS; i++) {
+		if (!cpu_online(i))
+			continue;
 		if (i == smp_processor_id())
 			mce_checkregs(&i);
 		else

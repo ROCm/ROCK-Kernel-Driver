@@ -103,9 +103,10 @@ struct us_unusual_dev {
 #define US_FL_SCM_MULT_TARG   0x00000020 /* supports multiple targets */
 #define US_FL_FIX_INQUIRY     0x00000040 /* INQUIRY response needs fixing */
 
-/* device attached/detached states */
-#define US_STATE_DETACHED	1
-#define US_STATE_ATTACHED	2
+
+/* kernel thread actions */
+#define US_ACT_COMMAND		1
+#define US_ACT_EXIT		5
 
 /* processing state machine states */
 #define US_STATE_IDLE		1
@@ -127,10 +128,9 @@ struct us_data {
 	/* The device we're working with
 	 * It's important to note:
 	 *    (o) you must hold dev_semaphore to change pusb_dev
-	 *    (o) device_state should change whenever pusb_dev does
+	 *    (o) DEV_ATTACHED in bitflags should change whenever pusb_dev does
 	 */
 	struct semaphore	dev_semaphore;	 /* protect pusb_dev */
-	atomic_t		device_state;	 /* attached or detached */
 	struct usb_device	*pusb_dev;	 /* this usb_device */
 
 	unsigned int		flags;		 /* from filter initially */
@@ -174,6 +174,7 @@ struct us_data {
 	struct semaphore	ip_waitq;	 /* for CBI interrupts	 */
 	unsigned long		bitflags;	 /* single-bit flags:	 */
 #define IP_WANTED	1			 /* is an IRQ expected?	 */
+#define DEV_ATTACHED	2			 /* is the dev. attached?*/
 
 	/* interrupt communications data */
 	struct semaphore	irq_urb_sem;	 /* to protect irq_urb	 */

@@ -941,8 +941,8 @@ static void drain_cpu_caches(kmem_cache_t *cachep)
 	down(&cache_chain_sem);
 	smp_call_function_all_cpus(do_ccupdate_local, (void *)&new);
 
-	for (i = 0; i < smp_num_cpus; i++) {
-		cpucache_t* ccold = new.new[cpu_logical_map(i)];
+	for (i = 0; i < NR_CPUS; i++) {
+		cpucache_t* ccold = new.new[i];
 		if (!ccold || (ccold->avail == 0))
 			continue;
 		local_irq_disable();
@@ -1675,16 +1675,18 @@ static int kmem_tune_cpucache (kmem_cache_t* cachep, int limit, int batchcount)
 
 	memset(&new.new,0,sizeof(new.new));
 	if (limit) {
-		for (i = 0; i< smp_num_cpus; i++) {
+		for (i = 0; i < NR_CPUS; i++) {
 			cpucache_t* ccnew;
 
 			ccnew = kmalloc(sizeof(void*)*limit+
 					sizeof(cpucache_t), GFP_KERNEL);
-			if (!ccnew)
-				goto oom;
+			if (!ccnew) {
+				for (i--; i >= 0; i--) kfree(new.new[i]);
+				return -ENOMEM;
+			}
 			ccnew->limit = limit;
 			ccnew->avail = 0;
-			new.new[cpu_logical_map(i)] = ccnew;
+			new.new[i] = ccnew;
 		}
 	}
 	new.cachep = cachep;
@@ -1694,8 +1696,8 @@ static int kmem_tune_cpucache (kmem_cache_t* cachep, int limit, int batchcount)
 
 	smp_call_function_all_cpus(do_ccupdate_local, (void *)&new);
 
-	for (i = 0; i < smp_num_cpus; i++) {
-		cpucache_t* ccold = new.new[cpu_logical_map(i)];
+	for (i = 0; i < NR_CPUS; i++) {
+		cpucache_t* ccold = new.new[i];
 		if (!ccold)
 			continue;
 		local_irq_disable();
@@ -1704,10 +1706,6 @@ static int kmem_tune_cpucache (kmem_cache_t* cachep, int limit, int batchcount)
 		kfree(ccold);
 	}
 	return 0;
-oom:
-	for (i--; i >= 0; i--)
-		kfree(new.new[cpu_logical_map(i)]);
-	return -ENOMEM;
 }
 
 static void enable_cpucache (kmem_cache_t *cachep)

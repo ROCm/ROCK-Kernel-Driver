@@ -74,9 +74,9 @@ static void urb_print (struct urb * urb, char * str, int small)
 static inline struct ed *
 dma_to_ed (struct ohci_hcd *hc, dma_addr_t ed_dma);
 
-#ifdef OHCI_VERBOSE_DEBUG
 /* print non-empty branches of the periodic ed tree */
-void ohci_dump_periodic (struct ohci_hcd *ohci, char *label)
+static void __attribute__ ((unused))
+ohci_dump_periodic (struct ohci_hcd *ohci, char *label)
 {
 	int i, j;
 	u32 *ed_p;
@@ -101,7 +101,6 @@ void ohci_dump_periodic (struct ohci_hcd *ohci, char *label)
 		printk (KERN_DEBUG "%s, ohci %s, empty periodic schedule\n",
 				label, ohci->hcd.self.bus_name);
 }
-#endif
 
 static void ohci_dump_intr_mask (char *label, __u32 mask)
 {
@@ -241,6 +240,97 @@ static void ohci_dump (struct ohci_hcd *controller, int verbose)
 	ohci_dump_roothub (controller, 1);
 }
 
+static void ohci_dump_td (char *label, struct td *td)
+{
+	u32	tmp = le32_to_cpup (&td->hwINFO);
+
+	dbg ("%s td %p; urb %p index %d; hw next td %08x",
+		label, td,
+		td->urb, td->index,
+		le32_to_cpup (&td->hwNextTD));
+	if ((tmp & TD_ISO) == 0) {
+		char	*toggle, *pid;
+		u32	cbp, be;
+
+		switch (tmp & TD_T) {
+		case TD_T_DATA0: toggle = "DATA0"; break;
+		case TD_T_DATA1: toggle = "DATA1"; break;
+		case TD_T_TOGGLE: toggle = "(CARRY)"; break;
+		default: toggle = "(?)"; break;
+		}
+		switch (tmp & TD_DP) {
+		case TD_DP_SETUP: pid = "SETUP"; break;
+		case TD_DP_IN: pid = "IN"; break;
+		case TD_DP_OUT: pid = "OUT"; break;
+		default: pid = "(bad pid)"; break;
+		}
+		dbg ("     info %08x CC=%x %s DI=%d %s %s", tmp,
+			TD_CC_GET(tmp), /* EC, */ toggle,
+			(tmp & TD_DI) >> 21, pid,
+			(tmp & TD_R) ? "R" : "");
+		cbp = le32_to_cpup (&td->hwCBP);
+		be = le32_to_cpup (&td->hwBE);
+		dbg ("     cbp %08x be %08x (len %d)", cbp, be,
+			cbp ? (be + 1 - cbp) : 0);
+	} else {
+		unsigned	i;
+		dbg ("     info %08x CC=%x DI=%d START=%04x", tmp,
+			TD_CC_GET(tmp), /* FC, */
+			(tmp & TD_DI) >> 21,
+			tmp & 0x0000ffff);
+		dbg ("     bp0 %08x be %08x",
+			le32_to_cpup (&td->hwCBP) & ~0x0fff,
+			le32_to_cpup (&td->hwBE));
+		for (i = 0; i < MAXPSW; i++) {
+			dbg ("       psw [%d] = %2x", i,
+				le16_to_cpu (td->hwPSW [i]));
+		}
+	}
+}
+
+/* caller MUST own hcd spinlock if verbose is set! */
+static void __attribute__((unused))
+ohci_dump_ed (struct ohci_hcd *ohci, char *label, struct ed *ed, int verbose)
+{
+	u32	tmp = ed->hwINFO;
+	char	*type = "";
+
+	dbg ("%s: %s, ed %p state 0x%x type %d; next ed %08x",
+		ohci->hcd.self.bus_name, label,
+		ed, ed->state, ed->type,
+		le32_to_cpup (&ed->hwNextED));
+	switch (tmp & (ED_IN|ED_OUT)) {
+	case ED_OUT: type = "-OUT"; break;
+	case ED_IN: type = "-IN"; break;
+	/* else from TDs ... control */
+	}
+	dbg ("  info %08x MAX=%d%s%s%s EP=%d%s DEV=%d", le32_to_cpu (tmp),
+		0x0fff & (le32_to_cpu (tmp) >> 16),
+		(tmp & ED_ISO) ? " ISO" : "",
+		(tmp & ED_SKIP) ? " SKIP" : "",
+		(tmp & ED_LOWSPEED) ? " LOW" : "",
+		0x000f & (le32_to_cpu (tmp) >> 7),
+		type,
+		0x007f & le32_to_cpu (tmp));
+	dbg ("  tds: head %08x%s%s tail %08x%s",
+		tmp = le32_to_cpup (&ed->hwHeadP),
+		(ed->hwHeadP & ED_H) ? " HALT" : "",
+		(ed->hwHeadP & ED_C) ? " CARRY" : "",
+		le32_to_cpup (&ed->hwTailP),
+		verbose ? "" : " (not listing)");
+	if (verbose) {
+		struct list_head	*tmp;
+
+		/* use ed->td_list because HC concurrently modifies
+		 * hwNextTD as it accumulates ed_donelist.
+		 */
+		list_for_each (tmp, &ed->td_list) {
+			struct td		*td;
+			td = list_entry (tmp, struct td, td_list);
+			ohci_dump_td ("  ->", td);
+		}
+	}
+}
 
 #endif
 

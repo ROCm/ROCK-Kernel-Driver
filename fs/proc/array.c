@@ -695,12 +695,14 @@ int proc_pid_cpu(struct task_struct *task, char * buffer)
 		task->times.tms_utime,
 		task->times.tms_stime);
 		
-	for (i = 0 ; i < smp_num_cpus; i++)
+	for (i = 0 ; i < NR_CPUS; i++) {
+		if (cpu_online(i))
 		len += sprintf(buffer + len, "cpu%d %lu %lu\n",
 			i,
-			task->per_cpu_utime[cpu_logical_map(i)],
-			task->per_cpu_stime[cpu_logical_map(i)]);
+				       task->per_cpu_utime[i],
+				       task->per_cpu_stime[i]);
 
+	}
 	return len;
 }
 #endif

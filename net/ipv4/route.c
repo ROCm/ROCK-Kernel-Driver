@@ -280,12 +280,10 @@ done:
 static int rt_cache_stat_get_info(char *buffer, char **start, off_t offset, int length)
 {
 	unsigned int dst_entries = atomic_read(&ipv4_dst_ops.entries);
-	int i, lcpu;
+	int i;
 	int len = 0;
 
-        for (lcpu = 0; lcpu < smp_num_cpus; lcpu++) {
-                i = cpu_logical_map(lcpu);
-
+	for (i = 0; i < NR_CPUS; i++) {
 		len += sprintf(buffer+len, "%08x  %08x %08x %08x %08x %08x %08x %08x  %08x %08x %08x %08x %08x %08x %08x \n",
 			       dst_entries,		       
 			       rt_cache_stat[i].in_hit,
@@ -2418,10 +2416,15 @@ ctl_table ipv4_route_table[] = {
 #ifdef CONFIG_NET_CLS_ROUTE
 struct ip_rt_acct *ip_rt_acct;
 
+/* This code sucks.  But you should have seen it before! --RR */
+
+/* IP route accounting ptr for this logical cpu number. */
+#define IP_RT_ACCT_CPU(i) (ip_rt_acct + i * 256)
+
 static int ip_rt_acct_read(char *buffer, char **start, off_t offset,
 			   int length, int *eof, void *data)
 {
-	*start = buffer;
+	unsigned int i;
 
 	if ((offset & 3) || (length & 3))
 		return -EIO;
@@ -2430,35 +2433,20 @@ static int ip_rt_acct_read(char *buffer, char **start, off_t offset,
 		length = sizeof(struct ip_rt_acct) * 256 - offset;
 		*eof = 1;
 	}
-	if (length > 0) {
-		u32 *dst = (u32*)buffer;
-		u32 *src = (u32*)(((u8*)ip_rt_acct) + offset);
 
-		memcpy(dst, src, length);
+	/* Copy first cpu. */
+	*start = buffer;
+	memcpy(buffer, IP_RT_ACCT_CPU(0), length);
 
-#ifdef CONFIG_SMP
-		if (smp_num_cpus > 1 || cpu_logical_map(0) != 0) {
-			int i;
-			int cnt = length / 4;
-
-			for (i = 0; i < smp_num_cpus; i++) {
-				int cpu = cpu_logical_map(i);
-				int k;
-
-				if (cpu == 0)
-					continue;
-
-				src = (u32*)(((u8*)ip_rt_acct) + offset +
-					cpu * 256 * sizeof(struct ip_rt_acct));
-
-				for (k = 0; k < cnt; k++)
-					dst[k] += src[k];
-			}
-		}
-#endif
-		return length;
+	/* Add the other cpus in, one int at a time */
+	for (i = 1; i < NR_CPUS; i++) {
+		unsigned int j;
+		if (!cpu_online(i))
+			continue;
+		for (j = 0; j < length/4; j++)
+			((u32*)buffer)[j] += ((u32*)IP_RT_ACCT_CPU(i))[j];
 	}
-	return 0;
+	return length;
 }
 #endif
 

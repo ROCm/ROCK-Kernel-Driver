@@ -426,15 +426,22 @@ found:
 	swap_free(entry);
 	ptr[offset] = (swp_entry_t) {0};
 
-	while (inode && move_from_swap_cache(page, idx, inode->i_mapping)) {
+	while (inode && (PageWriteback(page) ||
+			move_from_swap_cache(page, idx, inode->i_mapping))) {
 		/*
 		 * Yield for kswapd, and try again - but we're still
 		 * holding the page lock - ugh! fix this up later on.
 		 * Beware of inode being unlinked or truncated: just
 		 * leave try_to_unuse to delete_from_swap_cache if so.
+		 *
+		 * AKPM: We now wait on writeback too.  Note that it's
+		 * the page lock which prevents new writeback from starting.
 		 */
 		spin_unlock(&info->lock);
-		yield();
+		if (PageWriteback(page))
+			wait_on_page_writeback(page);
+		else
+			yield();
 		spin_lock(&info->lock);
 		ptr = shmem_swp_entry(info, idx, 0);
 		if (IS_ERR(ptr))
@@ -594,9 +601,14 @@ repeat:
 		}
 
 		/* We have to do this with page locked to prevent races */
-		if (TestSetPageLocked(page)) 
+		if (TestSetPageLocked(page))
 			goto wait_retry;
-
+		if (PageWriteback(page)) {
+			spin_unlock(&info->lock);
+			wait_on_page_writeback(page);
+			unlock_page(page);
+			goto repeat;
+		}
 		error = move_from_swap_cache(page, idx, mapping);
 		if (error < 0) {
 			unlock_page(page);
@@ -651,7 +663,7 @@ no_space:
 	return ERR_PTR(-ENOSPC);
 
 wait_retry:
-	spin_unlock (&info->lock);
+	spin_unlock(&info->lock);
 	wait_on_page_locked(page);
 	page_cache_release(page);
 	goto repeat;
