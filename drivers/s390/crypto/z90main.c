@@ -25,12 +25,16 @@
  */
 
 #include <asm/uaccess.h>       // copy_(from|to)_user
+#include <linux/compat.h>
 #include <linux/compiler.h>
 #include <linux/delay.h>       // mdelay
+#include <linux/init.h>
 #include <linux/interrupt.h>   // for tasklets
+#include <linux/ioctl32.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/proc_fs.h>
+#include <linux/syscalls.h>
 #include <linux/version.h>
 #include "z90crypt.h"
 #include "z90common.h"
@@ -46,13 +50,13 @@
 #  error "This kernel is too recent: not supported by this file"
 #endif
 
-#define VERSION_Z90MAIN_C "$Revision: 1.15 $"
+#define VERSION_Z90MAIN_C "$Revision: 1.31 $"
 
-static const char version[] __attribute_used__ =
-	"z90crypt.o: z90main.o ("
-	"z90main.c "   VERSION_Z90MAIN_C   "/"
-	"z90common.h " VERSION_Z90COMMON_H "/"
-	"z90crypt.h "  VERSION_Z90CRYPT_H  ")";
+static char z90cmain_version[] __initdata =
+	"z90main.o (" VERSION_Z90MAIN_C "/"
+                      VERSION_Z90COMMON_H "/" VERSION_Z90CRYPT_H ")";
+
+extern char z90chardware_version[];
 
 /**
  * Defaults that may be modified.
@@ -142,7 +146,7 @@ static const char version[] __attribute_used__ =
 #define STAT_FAILED	0x40 // bit 6: this bit is set if the request failed
 			     //	       before being sent to the hardware.
 #define STAT_WRITTEN	0x30 // bits 5-4: work to be done, not sent to device
-#define STAT_QUEUED	0x20 // bits 5-4: work has been sent to a device
+//			0x20 // UNUSED state
 #define STAT_READPEND	0x10 // bits 5-4: work done, we're returning data now
 #define STAT_NOWORK	0x00 // bits off: no work on any queue
 #define STAT_RDWRMASK	0x30 // mask for bits 5-4
@@ -311,8 +315,7 @@ enum devstat send_to_AP(int, int, int, unsigned char *);
 enum devstat receive_from_AP(int, int, int, unsigned char *, unsigned char *);
 int convert_request(unsigned char *, int, short, int, int, int *,
 		    unsigned char *);
-int convert_response(unsigned char *, int, unsigned char *, int *,
-		     unsigned char *);
+int convert_response(unsigned char *, unsigned char *, int *, unsigned char *);
 
 /**
  * Low level function prototypes
@@ -329,7 +332,7 @@ static int probe_device_type(struct device *);
 /**
  * proc fs definitions
  */
-struct proc_dir_entry *z90crypt_entry;
+static struct proc_dir_entry *z90crypt_entry;
 
 /**
  * data structures
@@ -424,7 +427,7 @@ static struct timer_list cleanup_timer;
 static atomic_t total_open;
 static atomic_t z90crypt_step;
 
-struct file_operations z90crypt_fops = {
+static struct file_operations z90crypt_fops = {
 	.owner	 = THIS_MODULE,
 	.read	 = z90crypt_read,
 	.write	 = z90crypt_write,
@@ -434,7 +437,7 @@ struct file_operations z90crypt_fops = {
 };
 
 #ifndef Z90CRYPT_USE_HOTPLUG
-struct miscdevice z90crypt_misc_device = {
+static struct miscdevice z90crypt_misc_device = {
 	.minor	    = Z90CRYPT_MINOR,
 	.name	    = DEV_NAME,
 	.fops	    = &z90crypt_fops,
@@ -452,6 +455,150 @@ MODULE_DESCRIPTION("zLinux Cryptographic Coprocessor device driver, "
 MODULE_LICENSE("GPL");
 module_param(domain, int, 0);
 MODULE_PARM_DESC(domain, "domain index for device");
+
+#ifdef CONFIG_COMPAT
+/**
+ * ioctl32 conversion routines
+ */
+struct ica_rsa_modexpo_32 { // For 32-bit callers
+	compat_uptr_t	inputdata;
+	unsigned int	inputdatalength;
+	compat_uptr_t	outputdata;
+	unsigned int	outputdatalength;
+	compat_uptr_t	b_key;
+	compat_uptr_t	n_modulus;
+};
+
+static int
+trans_modexpo32(unsigned int fd, unsigned int cmd, unsigned long arg,
+		struct file *file)
+{
+	struct ica_rsa_modexpo_32 *mex32u = compat_ptr(arg);
+	struct ica_rsa_modexpo_32  mex32k;
+	struct ica_rsa_modexpo    *mex64;
+	int ret = 0;
+	unsigned int i;
+
+	if (!access_ok(VERIFY_WRITE, mex32u, sizeof(struct ica_rsa_modexpo_32)))
+		return -EFAULT;
+	mex64 = compat_alloc_user_space(sizeof(struct ica_rsa_modexpo));
+	if (!access_ok(VERIFY_WRITE, mex64, sizeof(struct ica_rsa_modexpo)))
+		return -EFAULT;
+	if (copy_from_user(&mex32k, mex32u, sizeof(struct ica_rsa_modexpo_32)))
+		return -EFAULT;
+	if (__put_user(compat_ptr(mex32k.inputdata), &mex64->inputdata)   ||
+	    __put_user(mex32k.inputdatalength, &mex64->inputdatalength)   ||
+	    __put_user(compat_ptr(mex32k.outputdata), &mex64->outputdata) ||
+	    __put_user(mex32k.outputdatalength, &mex64->outputdatalength) ||
+	    __put_user(compat_ptr(mex32k.b_key), &mex64->b_key)           ||
+	    __put_user(compat_ptr(mex32k.n_modulus), &mex64->n_modulus))
+		return -EFAULT;
+	ret = sys_ioctl(fd, cmd, (unsigned long)mex64);
+	if (!ret)
+		if (__get_user(i, &mex64->outputdatalength) ||
+		    __put_user(i, &mex32u->outputdatalength))
+			ret = -EFAULT;
+	return ret;
+}
+
+struct ica_rsa_modexpo_crt_32 { // For 32-bit callers
+	compat_uptr_t	inputdata;
+	unsigned int	inputdatalength;
+	compat_uptr_t	outputdata;
+	unsigned int	outputdatalength;
+	compat_uptr_t	bp_key;
+	compat_uptr_t	bq_key;
+	compat_uptr_t	np_prime;
+	compat_uptr_t	nq_prime;
+	compat_uptr_t	u_mult_inv;
+};
+
+static int
+trans_modexpo_crt32(unsigned int fd, unsigned int cmd, unsigned long arg,
+		    struct file *file)
+{
+	struct ica_rsa_modexpo_crt_32 *crt32u = compat_ptr(arg);
+	struct ica_rsa_modexpo_crt_32  crt32k;
+	struct ica_rsa_modexpo_crt    *crt64;
+	int ret = 0;
+	unsigned int i;
+
+	if (!access_ok(VERIFY_WRITE, crt32u,
+		       sizeof(struct ica_rsa_modexpo_crt_32)))
+		return -EFAULT;
+	crt64 = compat_alloc_user_space(sizeof(struct ica_rsa_modexpo_crt));
+	if (!access_ok(VERIFY_WRITE, crt64, sizeof(struct ica_rsa_modexpo_crt)))
+		return -EFAULT;
+	if (copy_from_user(&crt32k, crt32u,
+			   sizeof(struct ica_rsa_modexpo_crt_32)))
+		return -EFAULT;
+	if (__put_user(compat_ptr(crt32k.inputdata), &crt64->inputdata)   ||
+	    __put_user(crt32k.inputdatalength, &crt64->inputdatalength)   ||
+	    __put_user(compat_ptr(crt32k.outputdata), &crt64->outputdata) ||
+	    __put_user(crt32k.outputdatalength, &crt64->outputdatalength) ||
+	    __put_user(compat_ptr(crt32k.bp_key), &crt64->bp_key)         ||
+	    __put_user(compat_ptr(crt32k.bq_key), &crt64->bq_key)         ||
+	    __put_user(compat_ptr(crt32k.np_prime), &crt64->np_prime)     ||
+	    __put_user(compat_ptr(crt32k.nq_prime), &crt64->nq_prime)     ||
+	    __put_user(compat_ptr(crt32k.u_mult_inv), &crt64->u_mult_inv))
+		ret = -EFAULT;
+	if (!ret)
+		ret = sys_ioctl(fd, cmd, (unsigned long)crt64);
+	if (!ret)
+		if (__get_user(i, &crt64->outputdatalength) ||
+		    __put_user(i, &crt32u->outputdatalength))
+			ret = -EFAULT;
+	return ret;
+}
+
+static int compatible_ioctls[] = {
+	ICAZ90STATUS, Z90QUIESCE, Z90STAT_TOTALCOUNT, Z90STAT_PCICACOUNT,
+	Z90STAT_PCICCCOUNT, Z90STAT_PCIXCCCOUNT, Z90STAT_REQUESTQ_COUNT,
+	Z90STAT_PENDINGQ_COUNT, Z90STAT_TOTALOPEN_COUNT, Z90STAT_DOMAIN_INDEX,
+	Z90STAT_STATUS_MASK, Z90STAT_QDEPTH_MASK, Z90STAT_PERDEV_REQCNT,
+};
+
+static void z90_unregister_ioctl32s(void)
+{
+	int i;
+
+	unregister_ioctl32_conversion(ICARSAMODEXPO);
+	unregister_ioctl32_conversion(ICARSACRT);
+
+	for(i = 0; i < ARRAY_SIZE(compatible_ioctls); i++)
+		unregister_ioctl32_conversion(compatible_ioctls[i]);
+}
+
+static int z90_register_ioctl32s(void)
+{
+	int result, i;
+
+	result = register_ioctl32_conversion(ICARSAMODEXPO, trans_modexpo32);
+	if (result)
+		return result;
+	result = register_ioctl32_conversion(ICARSACRT, trans_modexpo_crt32);
+	if (result)
+		return result;
+
+	for(i = 0; i < ARRAY_SIZE(compatible_ioctls); i++) {
+		result = register_ioctl32_conversion(compatible_ioctls[i],NULL);
+		if (result) {
+			z90_unregister_ioctl32s();
+			return result;
+		}
+	}
+	return result;
+}
+#else // !CONFIG_COMPAT
+static inline void z90_unregister_ioctl32s(void)
+{
+}
+
+static inline int z90_register_ioctl32s(void)
+{
+	return 0;
+}
+#endif
 
 /**
  * The module initialization code.
@@ -499,6 +646,8 @@ z90crypt_init_module(void)
 		PRINTKN("Version %d.%d.%d loaded, built on %s %s\n",
 			z90crypt_VERSION, z90crypt_RELEASE, z90crypt_VARIANT,
 			__DATE__, __TIME__);
+		PRINTKN("%s\n", z90cmain_version);
+		PRINTKN("%s\n", z90chardware_version);
 		PDEBUG("create_z90crypt (domain index %d) successful.\n",
 		       domain);
 	} else
@@ -557,9 +706,14 @@ z90crypt_init_module(void)
 	reader_timer.expires = jiffies + (READERTIME * HZ / 1000);
 	add_timer(&reader_timer);
 
+	if ((result = z90_register_ioctl32s()))
+		goto init_module_cleanup;
+
 	return 0; // success
 
 init_module_cleanup:
+	z90_unregister_ioctl32s();
+
 #ifndef Z90CRYPT_USE_HOTPLUG
 	if ((nresult = misc_deregister(&z90crypt_misc_device)))
 		PRINTK("misc_deregister failed with %d.\n", nresult);
@@ -585,6 +739,8 @@ z90crypt_cleanup_module(void)
 
 	PDEBUG("PID %d\n", PID());
 
+	z90_unregister_ioctl32s();
+
 	remove_proc_entry("driver/z90crypt", 0);
 
 #ifndef Z90CRYPT_USE_HOTPLUG
@@ -608,6 +764,8 @@ z90crypt_cleanup_module(void)
 	del_timer(&cleanup_timer);
 
 	destroy_z90crypt();
+
+	PRINTKN("Unloaded.\n");
 }
 
 /**
@@ -642,8 +800,10 @@ z90crypt_open(struct inode *inode, struct file *filp)
 		return -EQUIESCE;
 
 	private_data_p = kmalloc(sizeof(struct priv_data), GFP_KERNEL);
-	if (!private_data_p)
+	if (!private_data_p) {
+		PRINTK("Memory allocate failed\n");
 		return -ENOMEM;
+	}
 
 	memset((void *)private_data_p, 0, sizeof(struct priv_data));
 	private_data_p->status = STAT_OPEN;
@@ -713,8 +873,10 @@ z90crypt_read(struct file *filp, char *buf, size_t count, loff_t *f_pos)
 	if (count == 0)
 		return 0;
 	temp_buff = kmalloc(RESPBUFFSIZE, GFP_KERNEL);
-	if (!temp_buff)
+	if (!temp_buff) {
+		PRINTK("Memory allocate failed\n");
 		return -ENOMEM;
+	}
 	get_random_bytes(temp_buff, count);
 
 	if (copy_to_user(buf, temp_buff, count) != 0) {
@@ -974,29 +1136,27 @@ select_device(int *dev_type_p, int *device_nr_p)
 }
 
 static inline int
-send_to_crypto_device(unsigned char *psmid, int func, int buff_len,
-		      unsigned char *buff_ptr, int devType,
-		      int *devNr_p, unsigned char *reqBuff)
+send_to_crypto_device(struct work_element *we_p)
 {
 	struct caller *caller_p;
 	struct device *device_p;
 	int dev_nr;
 
-	if (!reqBuff)
+	if (!we_p->requestptr)
 		return SEN_FATAL_ERROR;
-	caller_p = (struct caller *)reqBuff;
-	dev_nr = *devNr_p;
-	if (select_device(&devType, &dev_nr) == -1) {
+	caller_p = (struct caller *)we_p->requestptr;
+	dev_nr = we_p->devindex;
+	if (select_device(&we_p->devtype, &dev_nr) == -1) {
 		if (z90crypt.hdware_info->hdware_mask.st_count != 0)
 			return SEN_RETRY;
 		else
 			return SEN_NOT_AVAIL;
 	}
-	*devNr_p = dev_nr;
+	we_p->devindex = dev_nr;
 	device_p = z90crypt.device_p[dev_nr];
 	if (!device_p)
 		return SEN_NOT_AVAIL;
-	if (device_p->dev_type != devType)
+	if (device_p->dev_type != we_p->devtype)
 		return SEN_RETRY;
 	if (device_p->dev_caller_count >= device_p->dev_q_depth)
 		return SEN_QUEUE_FULL;
@@ -1048,9 +1208,7 @@ z90crypt_send(struct work_element *we_p, const char *buf)
 	}
 	we_p->devindex = -1; // Reset device number
 	spin_lock_irq(&queuespinlock);
-	rv = send_to_crypto_device(we_p->caller_id, we_p->funccode,
-				   we_p->buff_size, we_p->buffer, we_p->devtype,
-				   &we_p->devindex, we_p->requestptr);
+	rv = send_to_crypto_device(we_p);
 	switch (rv) {
 	case 0:
 		we_p->requestsent = jiffies;
@@ -1196,27 +1354,34 @@ is_PKCS12_padded(unsigned char *buffer, int length)
  * function is PCI_FUNC_KEY_ENCRYPT or PCI_FUNC_KEY_DECRYPT
  */
 static inline int
-build_caller(char *psmid, int func, short function, int buff_len,
-	     char *buff_ptr, int dev_type, struct caller *caller_p)
+build_caller(struct work_element *we_p, short function)
 {
 	int rv;
+	struct caller *caller_p = (struct caller *)we_p->requestptr;
 
-	if ((dev_type != PCICC) && (dev_type != PCICA) && (dev_type != PCIXCC))
+	if ((we_p->devtype != PCICC) && (we_p->devtype != PCICA) &&
+	    (we_p->devtype != PCIXCC))
 		return SEN_NOT_AVAIL;
 
-	memcpy(caller_p->caller_id, psmid, sizeof(caller_p->caller_id));
+	memcpy(caller_p->caller_id, we_p->caller_id,
+	       sizeof(caller_p->caller_id));
 	caller_p->caller_dev_dep_req_p = caller_p->caller_dev_dep_req;
 	caller_p->caller_dev_dep_req_l = MAX_RESPONSE_SIZE;
-	caller_p->caller_buf_p = buff_ptr;
+	caller_p->caller_buf_p = we_p->buffer;
 	INIT_LIST_HEAD(&(caller_p->caller_liste));
 
-	rv = convert_request(buff_ptr, func, function, z90crypt.cdx, dev_type,
+	rv = convert_request(we_p->buffer, we_p->funccode, function,
+			     z90crypt.cdx, we_p->devtype,
 			     &caller_p->caller_dev_dep_req_l,
 			     caller_p->caller_dev_dep_req_p);
-	if (rv)
-		PRINTK("Error from convert_request: %d\n", rv);
+	if (rv) {
+		if (rv == SEN_NOT_AVAIL)
+			PDEBUG("request can't be processed on hdwr avail\n");
+		else
+			PRINTK("Error from convert_request: %d\n", rv);
+	}
 	else
-		memcpy(&(caller_p->caller_dev_dep_req_p[4]), psmid, 8);
+		memcpy(&(caller_p->caller_dev_dep_req_p[4]), we_p->caller_id,8);
 	return rv;
 }
 
@@ -1235,9 +1400,7 @@ unbuild_caller(struct device *device_p, struct caller *caller_p)
 }
 
 static inline int
-get_crypto_request_buffer(unsigned char *psmid, int func, int buff_len,
-			  unsigned char *buff_ptr, int *dev_type_p,
-			  unsigned char *caller_p)
+get_crypto_request_buffer(struct work_element *we_p)
 {
 	struct ica_rsa_modexpo *mex_p;
 	struct ica_rsa_modexpo_crt *crt_p;
@@ -1245,39 +1408,29 @@ get_crypto_request_buffer(unsigned char *psmid, int func, int buff_len,
 	short function;
 	int rv;
 
-	mex_p =	(struct ica_rsa_modexpo *) buff_ptr;
-	crt_p = (struct ica_rsa_modexpo_crt *) buff_ptr;
+	mex_p =	(struct ica_rsa_modexpo *) we_p->buffer;
+	crt_p = (struct ica_rsa_modexpo_crt *) we_p->buffer;
 
-	PDEBUG("device type input = %d\n", *dev_type_p);
+	PDEBUG("device type input = %d\n", we_p->devtype);
 
 	if (z90crypt.terminating)
 		return REC_NO_RESPONSE;
-
-	temp_buffer = kmalloc(256, GFP_KERNEL);
-	if (!temp_buffer) {
-		PRINTK("kmalloc for temp_buffer failed!\n");
-		return SEN_NOT_AVAIL;
-	}
-	if (memcmp(psmid, NULL_psmid, 8) == 0) {
+	if (memcmp(we_p->caller_id, NULL_psmid, 8) == 0) {
 		PRINTK("psmid zeroes\n");
-		kfree(temp_buffer);
 		return SEN_FATAL_ERROR;
 	}
-	if (!buff_ptr) {
+	if (!we_p->buffer) {
 		PRINTK("buffer pointer NULL\n");
-		kfree(temp_buffer);
 		return SEN_USER_ERROR;
 	}
-	if (!caller_p) {
+	if (!we_p->requestptr) {
 		PRINTK("caller pointer NULL\n");
-		kfree(temp_buffer);
 		return SEN_USER_ERROR;
 	}
 
-	if ((*dev_type_p != PCICA) && (*dev_type_p != PCICC) &&
-	    (*dev_type_p != PCIXCC) && (*dev_type_p != ANYDEV)) {
+	if ((we_p->devtype != PCICA) && (we_p->devtype != PCICC) &&
+	    (we_p->devtype != PCIXCC) && (we_p->devtype != ANYDEV)) {
 		PRINTK("invalid device type\n");
-		kfree(temp_buffer);
 		return SEN_USER_ERROR;
 	}
 
@@ -1285,21 +1438,18 @@ get_crypto_request_buffer(unsigned char *psmid, int func, int buff_len,
 	    (mex_p->inputdatalength > MAX_MOD_SIZE)) {
 		PRINTK("inputdatalength[%d] is not valid\n",
 		       mex_p->inputdatalength);
-		kfree(temp_buffer);
 		return SEN_USER_ERROR;
 	}
 
 	if (mex_p->outputdatalength < mex_p->inputdatalength) {
 		PRINTK("outputdatalength[%d] < inputdatalength[%d]\n",
 		       mex_p->outputdatalength, mex_p->inputdatalength);
-		kfree(temp_buffer);
 		return SEN_USER_ERROR;
 	}
 
 	if (!mex_p->inputdata || !mex_p->outputdata) {
 		PRINTK("inputdata[%p] or outputdata[%p] is NULL\n",
 		       mex_p->outputdata, mex_p->inputdata);
-		kfree(temp_buffer);
 		return SEN_USER_ERROR;
 	}
 
@@ -1311,7 +1461,7 @@ get_crypto_request_buffer(unsigned char *psmid, int func, int buff_len,
 	mex_p->outputdatalength = mex_p->inputdatalength;
 
 	rv = 0;
-	switch (func) {
+	switch (we_p->funccode) {
 	case ICARSAMODEXPO:
 		if (!mex_p->b_key || !mex_p->n_modulus)
 			rv = SEN_USER_ERROR;
@@ -1336,28 +1486,24 @@ get_crypto_request_buffer(unsigned char *psmid, int func, int buff_len,
 		}
 		break;
 	default:
-		PRINTK("bad func = %d\n", func);
+		PRINTK("bad func = %d\n", we_p->funccode);
 		rv = SEN_USER_ERROR;
 		break;
 	}
-	if (rv != 0) {
-		kfree(temp_buffer);
+	if (rv != 0)
 		return rv;
-	}
 
-	if (select_device_type(dev_type_p) < 0) {
-		kfree(temp_buffer);
+	if (select_device_type(&we_p->devtype) < 0)
 		return SEN_NOT_AVAIL;
-	}
 
+	temp_buffer = (unsigned char *)we_p + sizeof(struct work_element) +
+		      sizeof(struct caller);
 	if (copy_from_user(temp_buffer, mex_p->inputdata,
-			   mex_p->inputdatalength) != 0) {
-		kfree(temp_buffer);
+			   mex_p->inputdatalength) != 0)
 		return SEN_RELEASED;
-	}
 
 	function = PCI_FUNC_KEY_ENCRYPT;
-	switch (*dev_type_p) {
+	switch (we_p->devtype) {
 	/* PCICA does everything with a simple RSA mod-expo operation */
 	case PCICA:
 		function = PCI_FUNC_KEY_ENCRYPT;
@@ -1368,11 +1514,9 @@ get_crypto_request_buffer(unsigned char *psmid, int func, int buff_len,
 	 */
 	case PCIXCC:
 		/* Anything less than MIN_MOD_SIZE MUST go to a PCICA */
-		if (mex_p->inputdatalength < MIN_MOD_SIZE) {
-			kfree(temp_buffer);
+		if (mex_p->inputdatalength < MIN_MOD_SIZE)
 			return SEN_NOT_AVAIL;
-		}
-		if (func == ICARSAMODEXPO)
+		if (we_p->funccode == ICARSAMODEXPO)
 			function = PCI_FUNC_KEY_ENCRYPT;
 		else
 			function = PCI_FUNC_KEY_DECRYPT;
@@ -1383,20 +1527,17 @@ get_crypto_request_buffer(unsigned char *psmid, int func, int buff_len,
 	case PCICC:
 		/* Anything less than MIN_MOD_SIZE MUST go to a PCICA */
 		if (mex_p->inputdatalength < MIN_MOD_SIZE) {
-			kfree(temp_buffer);
 			return SEN_NOT_AVAIL;
 		}
 		/* Anythings over MAX_PCICC_MOD_SIZE MUST go to a PCICA */
 		if (mex_p->inputdatalength > MAX_PCICC_MOD_SIZE) {
-			kfree(temp_buffer);
 			return SEN_NOT_AVAIL;
 		}
 		/* PCICC cannot handle input that is is PKCS#1.1 padded */
 		if (is_PKCS11_padded(temp_buffer, mex_p->inputdatalength)) {
-			kfree(temp_buffer);
 			return SEN_NOT_AVAIL;
 		}
-		if (func == ICARSAMODEXPO) {
+		if (we_p->funccode == ICARSAMODEXPO) {
 			if (is_PKCS12_padded(temp_buffer,
 					     mex_p->inputdatalength))
 				function = PCI_FUNC_KEY_ENCRYPT;
@@ -1408,10 +1549,8 @@ get_crypto_request_buffer(unsigned char *psmid, int func, int buff_len,
 		break;
 	}
 	PDEBUG("function: %04x\n", function);
-	rv = build_caller(psmid, func, function, buff_len, buff_ptr,
-			  *dev_type_p, (struct caller *)caller_p);
+	rv = build_caller(we_p, function);
 	PDEBUG("rv from build_caller = %d\n", rv);
-	kfree(temp_buffer);
 	return rv;
 }
 
@@ -1435,9 +1574,7 @@ z90crypt_prepare(struct work_element *we_p, unsigned int funccode,
 	we_p->funccode = funccode;
 	we_p->devtype = -1;
 	we_p->audit[0] |= FP_BUFFREQ;
-	rv = get_crypto_request_buffer(we_p->caller_id, we_p->funccode,
-				       we_p->buff_size, we_p->buffer,
-				       &we_p->devtype, we_p->requestptr);
+	rv = get_crypto_request_buffer(we_p);
 	switch (rv) {
 	case 0:
 		we_p->audit[0] |= FP_BUFFGOT;
@@ -1455,6 +1592,8 @@ z90crypt_prepare(struct work_element *we_p, unsigned int funccode,
 		rv = -ENODEV;
 		break;
 	case SEN_NOT_AVAIL:
+		rv = -EGETBUFF;
+		break;
 	default:
 		PRINTK("rv = %d\n", rv);
 		rv = -EGETBUFF;
@@ -1496,16 +1635,14 @@ z90crypt_rsa(struct priv_data *private_data_p, pid_t pid,
 	     unsigned int cmd, unsigned long arg)
 {
 	struct work_element *we_p;
-	int keep_work_element;
 	int rv;
 
-	if ((rv = allocate_work_element(&we_p, private_data_p, pid)))
-		return rv;
-	if ((rv = z90crypt_prepare(we_p, cmd, (const char *)arg))) {
-		PDEBUG("PID %d: rv = %d from z90crypt_prepare\n",
-		       pid, rv);
+	if ((rv = allocate_work_element(&we_p, private_data_p, pid))) {
+		PDEBUG("PID %d: allocate_work_element returned ENOMEM\n", pid);
 		return rv;
 	}
+	if ((rv = z90crypt_prepare(we_p, cmd, (const char *)arg)))
+		PDEBUG("PID %d: rv = %d from z90crypt_prepare\n", pid, rv);
 	if (!rv)
 		if ((rv = z90crypt_send(we_p, (const char *)arg)))
 			PDEBUG("PID %d: rv %d from z90crypt_send.\n", pid, rv);
@@ -1518,7 +1655,6 @@ z90crypt_rsa(struct priv_data *private_data_p, pid_t pid,
 	if (!rv)
 		rv = z90crypt_process_results(we_p, (char *)arg);
 
-	keep_work_element = 0;
 	if ((we_p->status[0] & STAT_FAILED)) {
 		switch (rv) {
 		/**
@@ -1544,9 +1680,6 @@ z90crypt_rsa(struct priv_data *private_data_p, pid_t pid,
 			case STAT_WRITTEN:
 				purge_work_element(we_p);
 				break;
-			case STAT_QUEUED:
-				keep_work_element = 1;
-				break;
 			case STAT_READPEND:
 			case STAT_NOWORK:
 			default:
@@ -1558,8 +1691,7 @@ z90crypt_rsa(struct priv_data *private_data_p, pid_t pid,
 			break;
 		}
 	}
-	if (!keep_work_element)
-		free_page((long)we_p);
+	free_page((long)we_p);
 	return rv;
 }
 
@@ -1577,6 +1709,7 @@ z90crypt_ioctl(struct inode *inode, struct file *filp,
 	unsigned int *reqcnt;
 	struct ica_z90_status *pstat;
 	int ret, i, loopLim, tempstat;
+	static int deprecated_msg_count = 0;
 
 	PDEBUG("filp %p (PID %d), cmd 0x%08X\n", filp, PID(), cmd);
 	PDEBUG("cmd 0x%08X: dir %s, size 0x%04X, type 0x%02X, nr 0x%02X\n",
@@ -1612,55 +1745,55 @@ z90crypt_ioctl(struct inode *inode, struct file *filp,
 		if (ret == -ERESTARTSYS)
 			ret = -ENODEV;
 		break;
-		
+
 	case Z90STAT_TOTALCOUNT:
 		tempstat = get_status_totalcount();
 		if (copy_to_user((int *)arg, &tempstat,sizeof(int)) != 0)
 			ret = -EFAULT;
 		break;
-		
+
 	case Z90STAT_PCICACOUNT:
 		tempstat = get_status_PCICAcount();
 		if (copy_to_user((int *)arg, &tempstat, sizeof(int)) != 0)
 			ret = -EFAULT;
 		break;
-		
+
 	case Z90STAT_PCICCCOUNT:
 		tempstat = get_status_PCICCcount();
 		if (copy_to_user((int *)arg, &tempstat, sizeof(int)) != 0)
 			ret = -EFAULT;
 		break;
-		
+
 	case Z90STAT_PCIXCCCOUNT:
 		tempstat = get_status_PCIXCCcount();
 		if (copy_to_user((int *)arg, &tempstat, sizeof(int)) != 0)
 			ret = -EFAULT;
 		break;
-		
+
 	case Z90STAT_REQUESTQ_COUNT:
 		tempstat = get_status_requestq_count();
 		if (copy_to_user((int *)arg, &tempstat, sizeof(int)) != 0)
 			ret = -EFAULT;
 		break;
-		
+
 	case Z90STAT_PENDINGQ_COUNT:
 		tempstat = get_status_pendingq_count();
 		if (copy_to_user((int *)arg, &tempstat, sizeof(int)) != 0)
 			ret = -EFAULT;
 		break;
-		
+
 	case Z90STAT_TOTALOPEN_COUNT:
 		tempstat = get_status_totalopen_count();
 		if (copy_to_user((int *)arg, &tempstat, sizeof(int)) != 0)
 			ret = -EFAULT;
 		break;
-		
+
 	case Z90STAT_DOMAIN_INDEX:
 		tempstat = get_status_domain_index();
 		if (copy_to_user((int *)arg, &tempstat, sizeof(int)) != 0)
 			ret = -EFAULT;
 		break;
-		
+
 	case Z90STAT_STATUS_MASK:
 		status = kmalloc(Z90CRYPT_NUM_APS, GFP_KERNEL);
 		if (!status) {
@@ -1673,7 +1806,7 @@ z90crypt_ioctl(struct inode *inode, struct file *filp,
 			ret = -EFAULT;
 		kfree(status);
 		break;
-		
+
 	case Z90STAT_QDEPTH_MASK:
 		qdepth = kmalloc(Z90CRYPT_NUM_APS, GFP_KERNEL);
 		if (!qdepth) {
@@ -1686,7 +1819,7 @@ z90crypt_ioctl(struct inode *inode, struct file *filp,
 			ret = -EFAULT;
 		kfree(qdepth);
 		break;
-		
+
 	case Z90STAT_PERDEV_REQCNT:
 		reqcnt = kmalloc(sizeof(int) * Z90CRYPT_NUM_APS, GFP_KERNEL);
 		if (!reqcnt) {
@@ -1700,18 +1833,24 @@ z90crypt_ioctl(struct inode *inode, struct file *filp,
 			ret = -EFAULT;
 		kfree(reqcnt);
 		break;
-		
+
 		/* THIS IS DEPRECATED.	USE THE NEW STATUS CALLS */
 	case ICAZ90STATUS:
-		PRINTK("deprecated call to ioctl (ICAZ90STATUS)!\n");
-		
+		if (deprecated_msg_count < 100) {
+			PRINTK("deprecated call to ioctl (ICAZ90STATUS)!\n");
+			deprecated_msg_count++;
+			if (deprecated_msg_count == 100)
+				PRINTK("No longer issuing messages related to "
+				       "deprecated call to ICAZ90STATUS.\n");
+		}
+
 		pstat = kmalloc(sizeof(struct ica_z90_status), GFP_KERNEL);
 		if (!pstat) {
 			PRINTK("kmalloc for pstat failed!\n");
 			ret = -ENOMEM;
 			break;
 		}
-		
+
 		pstat->totalcount	 = get_status_totalcount();
 		pstat->leedslitecount	 = get_status_PCICAcount();
 		pstat->leeds2count	 = get_status_PCICCcount();
@@ -1721,13 +1860,13 @@ z90crypt_ioctl(struct inode *inode, struct file *filp,
 		pstat->cryptoDomain	 = get_status_domain_index();
 		get_status_status_mask(pstat->status);
 		get_status_qdepth_mask(pstat->qdepth);
-		
+
 		if (copy_to_user((struct ica_z90_status *) arg, pstat,
 				 sizeof(struct ica_z90_status)) != 0)
 			ret = -EFAULT;
 		kfree(pstat);
 		break;
-		
+
 	case Z90QUIESCE:
 		if (current->euid != 0) {
 			PRINTK("QUIESCE fails: euid %d\n",
@@ -1738,14 +1877,14 @@ z90crypt_ioctl(struct inode *inode, struct file *filp,
 			quiesce_z90crypt = 1;
 		}
 		break;
-		
+
 	default:
 		/* user passed an invalid IOCTL number */
 		PDEBUG("cmd 0x%08X contains invalid ioctl code\n", cmd);
 		ret = -ENOTTY;
 		break;
 	}
-	
+
 	return ret;
 }
 
@@ -2130,10 +2269,12 @@ receive_from_crypto_device(int index, unsigned char *psmid, int *buff_len_p,
 			rv = REC_NO_RESPONSE;
 			break;
 		}
-		if (dev_ptr->dev_caller_count <= 0)
-			rv = REC_USER_GONE;
 		if (rv)
 			break;
+		if (dev_ptr->dev_caller_count <= 0) {
+			rv = REC_USER_GONE;
+			break;
+	        }
 
 		list_for_each_safe(ptr, tptr, &dev_ptr->dev_caller_list) {
 			caller_p = list_entry(ptr, struct caller, caller_liste);
@@ -2154,7 +2295,7 @@ receive_from_crypto_device(int index, unsigned char *psmid, int *buff_len_p,
 		}
 
 		PDEBUG("caller_p after successful receive: %p\n", caller_p);
-		rv = convert_response(dev_ptr->dev_resp_p, dev_ptr->dev_type,
+		rv = convert_response(dev_ptr->dev_resp_p,
 				      caller_p->caller_buf_p, buff_len_p, buff);
 		switch (rv) {
 		case REC_OPERAND_INV:
@@ -2189,7 +2330,7 @@ receive_from_crypto_device(int index, unsigned char *psmid, int *buff_len_p,
 		remove_device(dev_ptr);
 		break;
 	}
-	
+
 	if (caller_p)
 		unbuild_caller(dev_ptr, caller_p);
 
@@ -2210,13 +2351,7 @@ helper_send_work(int index)
 	rq_p->audit[1] |= FP_REMREQUEST;
 	if (rq_p->devtype == SHRT2DEVPTR(index)->dev_type) {
 		rq_p->devindex = SHRT2LONG(index);
-		rv = send_to_crypto_device(rq_p->caller_id,
-					   rq_p->funccode,
-					   rq_p->buff_size,
-					   rq_p->buffer,
-					   rq_p->devtype,
-					   &rq_p->devindex,
-					   rq_p->requestptr);
+		rv = send_to_crypto_device(rq_p);
 		if (rv == 0) {
 			rq_p->requestsent = jiffies;
 			rq_p->audit[0] |= FP_SENT;
@@ -2333,18 +2468,18 @@ helper_receive_rc(int index, int *rc_p, int *workavail_p)
 	case REC_EVEN_MOD:
 	case REC_INVALID_PAD:
 		return 1;
-		
+
 	case REC_BUSY:
 	case REC_NO_WORK:
 	case REC_EMPTY:
 	case REC_RETRY_DEV:
 	case REC_FATAL_ERROR:
 		break;
-		
+
 	case REC_NO_RESPONSE:
 		*workavail_p = 0;
 		break;
-		
+
 	default:
 		PRINTK("rc %d, device %d\n", *rc_p, SHRT2LONG(index));
 		*rc_p = REC_NO_RESPONSE;
@@ -2433,7 +2568,7 @@ z90crypt_schedule_config_task(unsigned int expiration)
 		PRINTK("Timer pending while modifying config timer\n");
 }
 
-static void 
+static void
 z90crypt_config_task(unsigned long ptr)
 {
 	int rc;
@@ -2604,9 +2739,9 @@ helper_scan_devices(int cdx_array[16], int *cdx_p, int *correct_cdx_found)
 	q_depth = dev_type = k = 0;
 	for (i = 0; i < z90crypt.max_count; i++) {
 		hd_stat = HD_NOT_THERE;
-		for (j = 0; j < 15; cdx_array[j++] = -1);
+		for (j = 0; j <= 15; cdx_array[j++] = -1);
 		k = 0;
-		for (j = 0; j < 15; j++) {
+		for (j = 0; j <= 15; j++) {
 			hd_stat = query_online(i, j, MAX_RESET,
 					       &q_depth, &dev_type);
 			if (hd_stat == HD_TSQ_EXCEPTION) {
@@ -2854,6 +2989,8 @@ create_crypto_device(int index)
 		if (dev_ptr->dev_type == NILDEV) {
 			rv = probe_device_type(dev_ptr);
 			if (rv) {
+				PRINTK("rv = %d from probe_device_type %d\n",
+				       rv, index);
 				kfree(dev_ptr->dev_resp_p);
 				kfree(dev_ptr);
 				return rv;
@@ -2977,26 +3114,16 @@ static int
 probe_device_type(struct device *devPtr)
 {
 	int rv, dv, i, index, length;
-	unsigned char psmid[8], *dyn_testmsg;
-
-	dyn_testmsg = kmalloc(384, GFP_KERNEL);
-	if (!dyn_testmsg) {
-		PRINTK("kmalloc for dyn_testmsg failed in probe_device_type\n");
-		/**
-		 * Strange to return 0, but it will work. Since we didn't
-		 * update the device type, the next time around, we will
-		 * reprobe and hopefully have enough memory.
-		 */
-		return 0;
-	}
+	unsigned char psmid[8];
+	static unsigned char loc_testmsg[384];
 
 	index = devPtr->dev_self_x;
 	rv = 0;
 	do {
-		memcpy(dyn_testmsg, static_testmsg, sizeof(static_testmsg));
+		memcpy(loc_testmsg, static_testmsg, sizeof(static_testmsg));
 		length = sizeof(static_testmsg) - 24;
 		/* the -24 allows for the header */
-		dv = send_to_AP(index, z90crypt.cdx, length, dyn_testmsg);
+		dv = send_to_AP(index, z90crypt.cdx, length, loc_testmsg);
 		if (dv) {
 			PDEBUG("dv returned by send during probe: %d\n", dv);
 			if (dv == DEV_SEN_EXCEPTION) {
@@ -3024,8 +3151,10 @@ probe_device_type(struct device *devPtr)
 				break;
 			case DEV_QUEUE_FULL:
 				rv = SEN_QUEUE_FULL;
-					break;
+				break;
 			default:
+				PRINTK("unknown dv=%d for dev %d\n", dv, index);
+				rv = SEN_NOT_AVAIL;
 				break;
 			}
 		}
@@ -3069,16 +3198,14 @@ probe_device_type(struct device *devPtr)
 		if (rv)
 			break;
 		rv = (devPtr->dev_resp_p[0] == 0x00) &&
-		     (devPtr->dev_resp_p[0] == 0x86);
-		if (rv) {
+		     (devPtr->dev_resp_p[1] == 0x86);
+		if (rv)
 			devPtr->dev_type = PCICC;
-			break;
-		}
-		devPtr->dev_type = PCICA;
+		else
+			devPtr->dev_type = PCICA;
 		rv = 0;
 	} while (0);
 	/* In a general error case, the card is not marked online */
-	kfree(dyn_testmsg);
 	return rv;
 }
 

@@ -31,7 +31,7 @@
 #define ZFCP_LOG_AREA			ZFCP_LOG_AREA_SCSI
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_SCSI_REVISION "$Revision: 1.57 $"
+#define ZFCP_SCSI_REVISION "$Revision: 1.59 $"
 
 #include <linux/blkdev.h>
 
@@ -48,7 +48,8 @@ static int zfcp_scsi_eh_bus_reset_handler(struct scsi_cmnd *);
 static int zfcp_scsi_eh_host_reset_handler(struct scsi_cmnd *);
 static int zfcp_task_management_function(struct zfcp_unit *, u8);
 
-static struct zfcp_unit *zfcp_unit_lookup(struct zfcp_adapter *, int, int, int);
+static struct zfcp_unit *zfcp_unit_lookup(struct zfcp_adapter *, int, scsi_id_t,
+					  scsi_lun_t);
 
 static struct device_attribute *zfcp_sysfs_sdev_attrs[];
 
@@ -297,12 +298,9 @@ zfcp_scsi_command_async(struct zfcp_adapter *adapter, struct zfcp_unit *unit,
 		ZFCP_LOG_DEBUG("error: initiation of Send FCP Cmnd failed\n");
 		retval = SCSI_MLQUEUE_HOST_BUSY;
 	} else {
-
-#ifdef ZFCP_DEBUG_REQUESTS
 		debug_text_event(adapter->req_dbf, 3, "q_scpnt");
 		debug_event(adapter->req_dbf, 3, &scpnt,
 			    sizeof (unsigned long));
-#endif				/* ZFCP_DEBUG_REQUESTS */
 	}
 
 out:
@@ -374,7 +372,8 @@ zfcp_scsi_queuecommand(struct scsi_cmnd *scpnt,
  * context:	
  */
 static struct zfcp_unit *
-zfcp_unit_lookup(struct zfcp_adapter *adapter, int channel, int id, int lun)
+zfcp_unit_lookup(struct zfcp_adapter *adapter, int channel, scsi_id_t id,
+		 scsi_lun_t lun)
 {
 	struct zfcp_port *port;
 	struct zfcp_unit *unit, *retval = NULL;
@@ -424,8 +423,6 @@ zfcp_scsi_eh_abort_handler(struct scsi_cmnd *scpnt)
 	unsigned long flags;
 	u32 status = 0;
 
-
-#ifdef ZFCP_DEBUG_ABORTS
 	/* the components of a abort_dbf record (fixed size record) */
 	u64 dbf_scsi_cmnd = (unsigned long) scpnt;
 	char dbf_opcode[ZFCP_ABORT_DBF_LENGTH];
@@ -443,7 +440,6 @@ zfcp_scsi_eh_abort_handler(struct scsi_cmnd *scpnt)
 	memcpy(dbf_opcode,
 	       scpnt->cmnd,
 	       min(scpnt->cmd_len, (unsigned char) ZFCP_ABORT_DBF_LENGTH));
-#endif
 
 	ZFCP_LOG_INFO("aborting scsi_cmnd=%p on adapter %s\n",
 		      scpnt, zfcp_get_busid_by_adapter(adapter));
@@ -483,11 +479,11 @@ zfcp_scsi_eh_abort_handler(struct scsi_cmnd *scpnt)
 
 	/* Figure out which fsf_req needs to be aborted. */
 	old_fsf_req = req_data->send_fcp_command_task.fsf_req;
-#ifdef ZFCP_DEBUG_ABORTS
+
 	dbf_fsf_req = (unsigned long) old_fsf_req;
 	dbf_timeout =
 	    (jiffies - req_data->send_fcp_command_task.start_jiffies) / HZ;
-#endif
+
 	ZFCP_LOG_DEBUG("old_fsf_req=%p\n", old_fsf_req);
 	if (!old_fsf_req) {
 		write_unlock_irqrestore(&adapter->abort_lock, flags);
@@ -541,7 +537,7 @@ zfcp_scsi_eh_abort_handler(struct scsi_cmnd *scpnt)
 
 	/* wait for completion of abort */
 	ZFCP_LOG_DEBUG("waiting for cleanup...\n");
-#ifdef ZFCP_DEBUG_ABORTS
+#if 1
 	/*
 	 * FIXME:
 	 * copying zfcp_fsf_req_wait_and_cleanup code is not really nice
@@ -577,8 +573,7 @@ zfcp_scsi_eh_abort_handler(struct scsi_cmnd *scpnt)
 		strncpy(dbf_result, "##fail", ZFCP_ABORT_DBF_LENGTH);
 	}
 
-      out:
-#ifdef ZFCP_DEBUG_ABORTS
+ out:
 	debug_event(adapter->abort_dbf, 1, &dbf_scsi_cmnd, sizeof (u64));
 	debug_event(adapter->abort_dbf, 1, &dbf_opcode, ZFCP_ABORT_DBF_LENGTH);
 	debug_event(adapter->abort_dbf, 1, &dbf_wwn, sizeof (wwn_t));
@@ -591,7 +586,7 @@ zfcp_scsi_eh_abort_handler(struct scsi_cmnd *scpnt)
 	debug_event(adapter->abort_dbf, 1, &dbf_fsf_qual[0], sizeof (u64));
 	debug_event(adapter->abort_dbf, 1, &dbf_fsf_qual[1], sizeof (u64));
 	debug_text_event(adapter->abort_dbf, 1, dbf_result);
-#endif
+
 	spin_lock_irq(scsi_host->host_lock);
 	return retval;
 }

@@ -45,10 +45,6 @@
 #include <linux/rcupdate.h>
 #include <linux/cpu.h>
 
-#ifdef CONFIG_NO_IDLE_HZ
-extern cpumask_t idle_cpu_mask;
-#endif
-
 /* Definition for rcupdate control block. */
 struct rcu_ctrlblk rcu_ctrlblk = 
 	{ .mutex = SPIN_LOCK_UNLOCKED, .curbatch = 1, 
@@ -114,22 +110,8 @@ static void rcu_start_batch(long newbatch)
 	    !cpus_empty(rcu_ctrlblk.rcu_cpu_mask)) {
 		return;
 	}
-
-#ifdef CONFIG_NO_IDLE_HZ
-	/* 
-	 * RCU is build for ticking systems. Without the HZ timer 
-	 * we have not enought state changes which may result in a 
-	 * never finished RCU request.
-	 * In a tickless system we don't want to wake idle CPUs just 
-	 * to finish the RCU request. That is possible because the 
-	 * idle CPUs satisfy the quiescilant RCU condition anyway.          
-	 * FIXME: Is this correct? 
-	 */
-	rcu_ctrlblk.rcu_cpu_mask = cpu_online_map & ~idle_cpu_mask;
-#else
 	/* Can't change, since spin lock held. */
-	rcu_ctrlblk.rcu_cpu_mask = cpu_online_map;
-#endif
+	rcu_set_active_cpu_map(&rcu_ctrlblk.rcu_cpu_mask);
 }
 
 /*

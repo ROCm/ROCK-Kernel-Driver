@@ -266,6 +266,7 @@ void stop_hz_timer(void)
 }
 #endif
 
+
 /*
  * timer_interrupt() needs to keep up the real-time clock,
  * as well as call the "do_timer()" routine every clocktick

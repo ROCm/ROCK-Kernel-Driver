@@ -26,7 +26,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#define ZFCP_CCW_C_REVISION "$Revision: 1.51 $"
+#define ZFCP_CCW_C_REVISION "$Revision: 1.52 $"
 
 #include <linux/init.h>
 #include <linux/module.h>
@@ -159,12 +159,15 @@ zfcp_ccw_set_online(struct ccw_device *ccw_device)
 	down(&zfcp_data.config_sema);
 	adapter = dev_get_drvdata(&ccw_device->dev);
 
+	retval = zfcp_adapter_debug_register(adapter);
+	if (retval)
+		goto out;
 	retval = zfcp_erp_thread_setup(adapter); 
 	if (retval) {
 		ZFCP_LOG_INFO("error: start of error recovery thread for "
 			      "adapter %s failed\n",
 			      zfcp_get_busid_by_adapter(adapter));
-		goto out;
+		goto out_erp_thread;
 	}
 
 	retval = zfcp_adapter_scsi_register(adapter);
@@ -178,6 +181,8 @@ zfcp_ccw_set_online(struct ccw_device *ccw_device)
 
  out_scsi_register:
 	zfcp_erp_thread_kill(adapter);
+ out_erp_thread:
+	zfcp_adapter_debug_unregister(adapter);
  out:
 	up(&zfcp_data.config_sema);
 	return retval;
@@ -203,6 +208,7 @@ zfcp_ccw_set_offline(struct ccw_device *ccw_device)
 	zfcp_erp_wait(adapter);
 	zfcp_adapter_scsi_unregister(adapter);
 	zfcp_erp_thread_kill(adapter);
+	zfcp_adapter_debug_unregister(adapter);
 	up(&zfcp_data.config_sema);
 	return 0;
 }

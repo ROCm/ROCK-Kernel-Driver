@@ -121,6 +121,29 @@ static inline int rcu_pending(int cpu)
 		return 0;
 }
 
+#ifdef CONFIG_NO_IDLE_HZ
+extern cpumask_t idle_cpu_mask;
+#endif
+
+/* 
+ * RCU is build for ticking systems. Without the HZ timer 
+ * we have not enought state changes which may result in a 
+ * never finished RCU request.
+ * In a tickless system we don't want to wake idle CPUs just 
+ * to finish the RCU request. That is possible because the 
+ * idle CPUs satisfy the quiescilant RCU condition anyway.          
+ */
+static inline void rcu_set_active_cpu_map(cpumask_t *mask) 
+{
+#ifdef CONFIG_NO_IDLE_HZ
+	cpumask_t active = idle_cpu_mask;
+	cpus_complement(active);
+	cpus_and(*mask, cpu_online_map, active);
+#else
+	*mask = cpu_online_map;
+#endif
+}
+
 #define rcu_read_lock()		preempt_disable()
 #define rcu_read_unlock()	preempt_enable()
 

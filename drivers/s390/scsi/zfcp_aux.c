@@ -29,42 +29,9 @@
  */
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_AUX_REVISION "$Revision: 1.101 $"
-
-/********************** INCLUDES *********************************************/
-
-#include <linux/init.h>
-#include <linux/config.h>
-#include <linux/kernel.h>
-#include <linux/string.h>
-#include <linux/errno.h>
-#include <linux/ctype.h>
-#include <linux/mm.h>
-#include <linux/timer.h>
-#include <linux/delay.h>
-#include <linux/slab.h>
-#include <linux/version.h>
-#include <linux/list.h>
-#include <linux/interrupt.h>
-#include <linux/init.h>
-#include <linux/proc_fs.h>
-#include <linux/time.h>
-#include <linux/module.h>
-#include <linux/moduleparam.h>
-#include <linux/workqueue.h>
-#include <linux/syscalls.h>
+#define ZFCP_AUX_REVISION "$Revision: 1.105 $"
 
 #include "zfcp_ext.h"
-
-#include <asm/semaphore.h>
-#include <asm/io.h>
-#include <asm/irq.h>
-#include <asm/ebcdic.h>
-#include <asm/cpcmd.h>		/* Debugging only */
-#include <asm/processor.h>	/* Debugging only */
-
-#include <linux/miscdevice.h>
-#include <linux/major.h>
 
 /* accumulated log level (module parameter) */
 static u32 loglevel = ZFCP_LOG_LEVEL_DEFAULTS;
@@ -272,7 +239,6 @@ void
 zfcp_cmd_dbf_event_fsf(const char *text, struct zfcp_fsf_req *fsf_req,
 		       void *add_data, int add_length)
 {
-#ifdef ZFCP_DEBUG_COMMANDS
 	struct zfcp_adapter *adapter = fsf_req->adapter;
 	struct scsi_cmnd *scsi_cmnd;
 	int level = 3;
@@ -299,7 +265,6 @@ zfcp_cmd_dbf_event_fsf(const char *text, struct zfcp_fsf_req *fsf_req,
 				    min(ZFCP_CMD_DBF_LENGTH, add_length - i));
 	}
 	write_unlock_irqrestore(&adapter->cmd_dbf_lock, flags);
-#endif
 }
 
 /* XXX additionally log unit if available */
@@ -307,7 +272,6 @@ zfcp_cmd_dbf_event_fsf(const char *text, struct zfcp_fsf_req *fsf_req,
 void
 zfcp_cmd_dbf_event_scsi(const char *text, struct scsi_cmnd *scsi_cmnd)
 {
-#ifdef ZFCP_DEBUG_COMMANDS
 	struct zfcp_adapter *adapter;
 	union zfcp_req_data *req_data;
 	struct zfcp_fsf_req *fsf_req;
@@ -335,14 +299,12 @@ zfcp_cmd_dbf_event_scsi(const char *text, struct scsi_cmnd *scsi_cmnd)
 		debug_text_event(adapter->cmd_dbf, level, "");
 	}
 	write_unlock_irqrestore(&adapter->cmd_dbf_lock, flags);
-#endif
 }
 
 void
 zfcp_in_els_dbf_event(struct zfcp_adapter *adapter, const char *text,
 		      struct fsf_status_read_buffer *status_buffer, int length)
 {
-#ifdef ZFCP_DEBUG_INCOMING_ELS
 	int level = 1;
 	int i;
 
@@ -353,7 +315,6 @@ zfcp_in_els_dbf_event(struct zfcp_adapter *adapter, const char *text,
 			    level,
 			    (char *) status_buffer->payload + i,
 			    min(ZFCP_IN_ELS_DBF_LENGTH, length - i));
-#endif
 }
 
 /**
@@ -748,7 +709,7 @@ static inline int
 zfcp_sg_list_alloc(struct zfcp_sg_list *sg_list, size_t size)
 {
 	struct scatterlist *sg;
-	int i;
+	unsigned int i;
 	int retval = 0;
 
 	sg_list->count = size >> PAGE_SHIFT;
@@ -790,7 +751,7 @@ static inline int
 zfcp_sg_list_free(struct zfcp_sg_list *sg_list)
 {
 	struct scatterlist *sg;
-	int i;
+	unsigned int i;
 	int retval = 0;
 
 	BUG_ON((sg_list->sg == NULL) || (sg_list == NULL));
@@ -1123,6 +1084,91 @@ zfcp_free_low_mem_buffers(struct zfcp_adapter *adapter)
 		mempool_destroy(adapter->pool.data_gid_pn);
 }
 
+/**
+ * zfcp_adapter_debug_register - registers debug feature for an adapter
+ * @adapter: pointer to adapter for which debug features should be registered
+ * return: -ENOMEM on error, 0 otherwise
+ */
+int
+zfcp_adapter_debug_register(struct zfcp_adapter *adapter)
+{
+	char dbf_name[20];
+
+	/* debug feature area which records fsf request sequence numbers */
+	sprintf(dbf_name, ZFCP_REQ_DBF_NAME "%s",
+		zfcp_get_busid_by_adapter(adapter));
+	adapter->req_dbf = debug_register(dbf_name,
+					  ZFCP_REQ_DBF_INDEX,
+					  ZFCP_REQ_DBF_AREAS,
+					  ZFCP_REQ_DBF_LENGTH);
+	debug_register_view(adapter->req_dbf, &debug_hex_ascii_view);
+	debug_set_level(adapter->req_dbf, ZFCP_REQ_DBF_LEVEL);
+	debug_text_event(adapter->req_dbf, 1, "zzz");
+
+	/* debug feature area which records SCSI command failures (hostbyte) */
+	rwlock_init(&adapter->cmd_dbf_lock);
+	sprintf(dbf_name, ZFCP_CMD_DBF_NAME "%s",
+		zfcp_get_busid_by_adapter(adapter));
+	adapter->cmd_dbf = debug_register(dbf_name,
+					  ZFCP_CMD_DBF_INDEX,
+					  ZFCP_CMD_DBF_AREAS,
+					  ZFCP_CMD_DBF_LENGTH);
+	debug_register_view(adapter->cmd_dbf, &debug_hex_ascii_view);
+	debug_set_level(adapter->cmd_dbf, ZFCP_CMD_DBF_LEVEL);
+
+	/* debug feature area which records SCSI command aborts */
+	sprintf(dbf_name, ZFCP_ABORT_DBF_NAME "%s",
+		zfcp_get_busid_by_adapter(adapter));
+	adapter->abort_dbf = debug_register(dbf_name,
+					    ZFCP_ABORT_DBF_INDEX,
+					    ZFCP_ABORT_DBF_AREAS,
+					    ZFCP_ABORT_DBF_LENGTH);
+	debug_register_view(adapter->abort_dbf, &debug_hex_ascii_view);
+	debug_set_level(adapter->abort_dbf, ZFCP_ABORT_DBF_LEVEL);
+
+	/* debug feature area which records SCSI command aborts */
+	sprintf(dbf_name, ZFCP_IN_ELS_DBF_NAME "%s",
+		zfcp_get_busid_by_adapter(adapter));
+	adapter->in_els_dbf = debug_register(dbf_name,
+					     ZFCP_IN_ELS_DBF_INDEX,
+					     ZFCP_IN_ELS_DBF_AREAS,
+					     ZFCP_IN_ELS_DBF_LENGTH);
+	debug_register_view(adapter->in_els_dbf, &debug_hex_ascii_view);
+	debug_set_level(adapter->in_els_dbf, ZFCP_IN_ELS_DBF_LEVEL);
+
+
+	/* debug feature area which records erp events */
+	sprintf(dbf_name, ZFCP_ERP_DBF_NAME "%s",
+		zfcp_get_busid_by_adapter(adapter));
+	adapter->erp_dbf = debug_register(dbf_name,
+					  ZFCP_ERP_DBF_INDEX,
+					  ZFCP_ERP_DBF_AREAS,
+					  ZFCP_ERP_DBF_LENGTH);
+	debug_register_view(adapter->erp_dbf, &debug_hex_ascii_view);
+	debug_set_level(adapter->erp_dbf, ZFCP_ERP_DBF_LEVEL);
+
+	if (adapter->req_dbf && adapter->cmd_dbf && adapter->abort_dbf &&
+	    adapter->in_els_dbf && adapter->erp_dbf)
+		return 0;
+
+	zfcp_adapter_debug_unregister(adapter);
+	return -ENOMEM;
+}
+
+/**
+ * zfcp_adapter_debug_unregister - unregisters debug feature for an adapter
+ * @adapter: pointer to adapter for which debug features should be unregistered
+ */
+void
+zfcp_adapter_debug_unregister(struct zfcp_adapter *adapter)
+{
+	debug_unregister(adapter->erp_dbf);
+	debug_unregister(adapter->req_dbf);
+	debug_unregister(adapter->cmd_dbf);
+	debug_unregister(adapter->abort_dbf);
+	debug_unregister(adapter->in_els_dbf);
+}
+
 /*
  * Enqueues an adapter at the end of the adapter list in the driver data.
  * All adapter internal structures are set up.
@@ -1138,7 +1184,6 @@ zfcp_adapter_enqueue(struct ccw_device *ccw_device)
 {
 	int retval = 0;
 	struct zfcp_adapter *adapter;
-	char dbf_name[20];
 
 	/*
 	 * Note: It is safe to release the list_lock, as any list changes 
@@ -1215,95 +1260,6 @@ zfcp_adapter_enqueue(struct ccw_device *ccw_device)
 	if (zfcp_sysfs_adapter_create_files(&ccw_device->dev))
 		goto sysfs_failed;
 
-#ifdef ZFCP_DEBUG_REQUESTS
-	/* debug feature area which records fsf request sequence numbers */
-	sprintf(dbf_name, ZFCP_REQ_DBF_NAME "%s",
-		zfcp_get_busid_by_adapter(adapter));
-	adapter->req_dbf = debug_register(dbf_name,
-					  ZFCP_REQ_DBF_INDEX,
-					  ZFCP_REQ_DBF_AREAS,
-					  ZFCP_REQ_DBF_LENGTH);
-	if (!adapter->req_dbf) {
-		ZFCP_LOG_INFO("registration of dbf for adapter %s failed\n",
-			      zfcp_get_busid_by_adapter(adapter));
-		retval = -ENOMEM;
-		goto failed_req_dbf;
-	}
-	debug_register_view(adapter->req_dbf, &debug_hex_ascii_view);
-	debug_set_level(adapter->req_dbf, ZFCP_REQ_DBF_LEVEL);
-	debug_text_event(adapter->req_dbf, 1, "zzz");
-#endif				/* ZFCP_DEBUG_REQUESTS */
-
-#ifdef ZFCP_DEBUG_COMMANDS
-	/* debug feature area which records SCSI command failures (hostbyte) */
-	rwlock_init(&adapter->cmd_dbf_lock);
-	sprintf(dbf_name, ZFCP_CMD_DBF_NAME "%s",
-		zfcp_get_busid_by_adapter(adapter));
-	adapter->cmd_dbf = debug_register(dbf_name,
-					  ZFCP_CMD_DBF_INDEX,
-					  ZFCP_CMD_DBF_AREAS,
-					  ZFCP_CMD_DBF_LENGTH);
-	if (!adapter->cmd_dbf) {
-		ZFCP_LOG_INFO("registration of dbf for adapter %s failed\n",
-			      zfcp_get_busid_by_adapter(adapter));
-		retval = -ENOMEM;
-		goto failed_cmd_dbf;
-	}
-	debug_register_view(adapter->cmd_dbf, &debug_hex_ascii_view);
-	debug_set_level(adapter->cmd_dbf, ZFCP_CMD_DBF_LEVEL);
-#endif				/* ZFCP_DEBUG_COMMANDS */
-
-#ifdef ZFCP_DEBUG_ABORTS
-	/* debug feature area which records SCSI command aborts */
-	sprintf(dbf_name, ZFCP_ABORT_DBF_NAME "%s",
-		zfcp_get_busid_by_adapter(adapter));
-	adapter->abort_dbf = debug_register(dbf_name,
-					    ZFCP_ABORT_DBF_INDEX,
-					    ZFCP_ABORT_DBF_AREAS,
-					    ZFCP_ABORT_DBF_LENGTH);
-	if (!adapter->abort_dbf) {
-		ZFCP_LOG_INFO("registration of dbf for adapter %s failed\n",
-			      zfcp_get_busid_by_adapter(adapter));
-		retval = -ENOMEM;
-		goto failed_abort_dbf;
-	}
-	debug_register_view(adapter->abort_dbf, &debug_hex_ascii_view);
-	debug_set_level(adapter->abort_dbf, ZFCP_ABORT_DBF_LEVEL);
-#endif				/* ZFCP_DEBUG_ABORTS */
-
-#ifdef ZFCP_DEBUG_INCOMING_ELS
-	/* debug feature area which records SCSI command aborts */
-	sprintf(dbf_name, ZFCP_IN_ELS_DBF_NAME "%s",
-		zfcp_get_busid_by_adapter(adapter));
-	adapter->in_els_dbf = debug_register(dbf_name,
-					     ZFCP_IN_ELS_DBF_INDEX,
-					     ZFCP_IN_ELS_DBF_AREAS,
-					     ZFCP_IN_ELS_DBF_LENGTH);
-	if (!adapter->in_els_dbf) {
-		ZFCP_LOG_INFO("registration of dbf for adapter %s failed\n",
-			      zfcp_get_busid_by_adapter(adapter));
-		retval = -ENOMEM;
-		goto failed_in_els_dbf;
-	}
-	debug_register_view(adapter->in_els_dbf, &debug_hex_ascii_view);
-	debug_set_level(adapter->in_els_dbf, ZFCP_IN_ELS_DBF_LEVEL);
-#endif				/* ZFCP_DEBUG_INCOMING_ELS */
-
-	sprintf(dbf_name, ZFCP_ERP_DBF_NAME "%s",
-		zfcp_get_busid_by_adapter(adapter));
-	adapter->erp_dbf = debug_register(dbf_name,
-					  ZFCP_ERP_DBF_INDEX,
-					  ZFCP_ERP_DBF_AREAS,
-					  ZFCP_ERP_DBF_LENGTH);
-	if (!adapter->erp_dbf) {
-		ZFCP_LOG_INFO("registration of dbf for adapter %s failed\n",
-			      zfcp_get_busid_by_adapter(adapter));
-		retval = -ENOMEM;
-		goto failed_erp_dbf;
-	}
-	debug_register_view(adapter->erp_dbf, &debug_hex_ascii_view);
-	debug_set_level(adapter->erp_dbf, ZFCP_ERP_DBF_LEVEL);
-
 	/* put allocated adapter at list tail */
 	write_lock_irq(&zfcp_data.config_lock);
 	atomic_clear_mask(ZFCP_STATUS_COMMON_REMOVE, &adapter->status);
@@ -1314,27 +1270,6 @@ zfcp_adapter_enqueue(struct ccw_device *ccw_device)
 
 	goto out;
 
- failed_erp_dbf:
-#ifdef ZFCP_DEBUG_INCOMING_ELS
-	debug_unregister(adapter->in_els_dbf);
- failed_in_els_dbf:
-#endif
-
-#ifdef ZFCP_DEBUG_ABORTS
-	debug_unregister(adapter->abort_dbf);
- failed_abort_dbf:
-#endif
-
-#ifdef ZFCP_DEBUG_COMMANDS
-	debug_unregister(adapter->cmd_dbf);
- failed_cmd_dbf:
-#endif
-
-#ifdef ZFCP_DEBUG_REQUESTS
-	debug_unregister(adapter->req_dbf);
- failed_req_dbf:
-#endif
-	zfcp_sysfs_adapter_remove_files(&ccw_device->dev);
  sysfs_failed:
 	dev_set_drvdata(&ccw_device->dev, NULL);
  failed_low_mem_buffers:
@@ -1397,23 +1332,6 @@ zfcp_adapter_dequeue(struct zfcp_adapter *adapter)
 	if (retval)
 		ZFCP_LOG_NORMAL("bug: qdio_free for adapter %s failed\n",
 				zfcp_get_busid_by_adapter(adapter));
-
-	debug_unregister(adapter->erp_dbf);
-
-#ifdef ZFCP_DEBUG_REQUESTS
-	debug_unregister(adapter->req_dbf);
-#endif
-
-#ifdef ZFCP_DEBUG_COMMANDS
-	debug_unregister(adapter->cmd_dbf);
-#endif
-#ifdef ZFCP_DEBUG_ABORTS
-	debug_unregister(adapter->abort_dbf);
-#endif
-
-#ifdef ZFCP_DEBUG_INCOMING_ELS
-	debug_unregister(adapter->in_els_dbf);
-#endif
 
 	zfcp_free_low_mem_buffers(adapter);
 	/* free memory of adapter data structure and queues */

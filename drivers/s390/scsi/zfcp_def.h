@@ -33,25 +33,29 @@
 #define ZFCP_DEF_H
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_DEF_REVISION "$Revision: 1.66 $"
+#define ZFCP_DEF_REVISION "$Revision: 1.71 $"
 
 /*************************** INCLUDES *****************************************/
 
+#include <linux/init.h>
+#include <linux/moduleparam.h>
+#include <linux/miscdevice.h>
+#include <linux/major.h>
 #include <linux/blkdev.h>
 #include <scsi/scsi.h>
 #include <scsi/scsi_tcq.h>
 #include <scsi/scsi_cmnd.h>
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_host.h>
-#include "../../scsi/scsi.h"
 #include "../../fc4/fc.h"
-#include "zfcp_fsf.h"			/* FSF SW Interface */
+#include "zfcp_fsf.h"
 #include <asm/ccwdev.h>
 #include <asm/qdio.h>
 #include <asm/debug.h>
 #include <asm/ebcdic.h>
 #include <linux/reboot.h>
 #include <linux/mempool.h>
+#include <linux/syscalls.h>
 #include <linux/ioctl.h>
 #ifdef CONFIG_S390_SUPPORT
 #include <linux/ioctl32.h>
@@ -60,10 +64,6 @@
 /************************ DEBUG FLAGS *****************************************/
 
 #define	ZFCP_PRINT_FLAGS
-#define	ZFCP_DEBUG_REQUESTS     /* fsf_req tracing */
-#define ZFCP_DEBUG_COMMANDS     /* host_byte tracing */
-#define ZFCP_DEBUG_ABORTS       /* scsi_cmnd abort tracing */
-#define ZFCP_DEBUG_INCOMING_ELS /* incoming ELS tracing */
 #define	ZFCP_STAT_REQSIZES
 #define	ZFCP_STAT_QUEUES
 
@@ -723,11 +723,6 @@ struct zfcp_cfdc_sense_data {
 
 #define ZFCP_CFDC_MAX_CONTROL_FILE_SIZE		127 * 1024
 
-static const char zfcp_act_subtable_type[5][8] = {
-	{"unknown"}, {"OS"}, {"WWPN"}, {"DID"}, {"LUN"}
-};
-
-
 /************************* STRUCTURE DEFINITIONS *****************************/
 
 struct zfcp_fsf_req;
@@ -1037,7 +1032,6 @@ struct zfcp_unit {
 						  refcount drop to zero */
 	struct zfcp_port       *port;	       /* remote port of unit */
 	atomic_t	       status;	       /* status of this logical unit */
-	u32		       lun_access;     /* access flags for this unit */
 	scsi_lun_t	       scsi_lun;       /* own SCSI LUN */
 	fcp_lun_t	       fcp_lun;	       /* own FCP_LUN */
 	u32		       handle;	       /* handle assigned by FSF */

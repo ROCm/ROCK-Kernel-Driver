@@ -456,13 +456,13 @@ struct net_device
 						     unsigned char *haddr);
 	int			(*neigh_setup)(struct net_device *dev, struct neigh_parms *);
 	int			(*accept_fastpath)(struct net_device *, struct dst_entry*);
+	int                     (*generate_eui64)(u8 *eui, struct net_device *dev);
 #ifdef CONFIG_NETPOLL_RX
 	int			netpoll_rx;
 #endif
 #ifdef CONFIG_NET_POLL_CONTROLLER
 	void                    (*poll_controller)(struct net_device *dev);
 #endif
-	int                     (*generate_eui64)(u8 *eui, struct net_device *dev);
 
 	/* bridge stuff */
 	struct net_bridge_port	*br_port;

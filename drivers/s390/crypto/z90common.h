@@ -23,12 +23,17 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
+
 #ifndef _Z90COMMON_
 #define _Z90COMMON_
-#define VERSION_Z90COMMON_H "$Revision: 1.6 $"
+
+#define VERSION_Z90COMMON_H "$Revision: 1.8 $"
+
+
 #define RESPBUFFSIZE 256
 #define PCI_FUNC_KEY_DECRYPT 0x5044
 #define PCI_FUNC_KEY_ENCRYPT 0x504B
+
 enum devstat {
 	DEV_GONE,		
 	DEV_ONLINE,		
@@ -41,6 +46,7 @@ enum devstat {
 	DEV_SEN_EXCEPTION,	
 	DEV_REC_EXCEPTION	
 };
+
 enum hdstat {
 	HD_NOT_THERE,		
 	HD_BUSY,		
@@ -49,9 +55,11 @@ enum hdstat {
 	HD_ONLINE,		
 	HD_TSQ_EXCEPTION	
 };
+
 #define Z90C_AMBIGUOUS_DOMAIN	2
 #define Z90C_INCORRECT_DOMAIN	3
 #define ENOTINIT		4
+
 #define SEN_BUSY	 7	
 #define SEN_USER_ERROR	 8	
 #define SEN_QUEUE_FULL	11	
@@ -59,6 +67,7 @@ enum hdstat {
 #define SEN_PAD_ERROR	17	
 #define SEN_RETRY	18	
 #define SEN_RELEASED	24	
+
 #define REC_EMPTY	 4	
 #define REC_BUSY	 6	
 #define REC_OPERAND_INV	 8	
@@ -72,22 +81,28 @@ enum hdstat {
 #define REC_BAD_MESSAGE 16	
 #define REC_INVALID_PAD 17	
 #define REC_RELEASED	28	
+
 #define WRONG_DEVICE_TYPE 20	
+
 #define REC_FATAL_ERROR 32	
 #define SEN_FATAL_ERROR 33	
 #define TSQ_FATAL_ERROR 34
 #define RSQ_FATAL_ERROR 35
+
 #define PCICA	0
 #define PCICC	1
 #define PCIXCC	2
 #define NILDEV	-1
 #define ANYDEV	-1
+
 enum hdevice_type {
 	PCICC_HW  = 3,
 	PCICA_HW  = 4,
 	PCIXCC_HW = 5,
-	OTHER_HW  = 6	
+	OTHER_HW  = 6,	
+	OTHER2_HW = 7	
 };
+
 #ifndef DEV_NAME
 #define DEV_NAME	"z90crypt"
 #endif
@@ -99,12 +114,16 @@ enum hdevice_type {
 	printk(KERN_WARNING DEV_NAME ": %s -> " fmt, __FUNCTION__ , ## args)
 #define PRINTKC(fmt, args...) \
 	printk(KERN_CRIT DEV_NAME ": %s -> " fmt, __FUNCTION__ , ## args)
+
 #ifdef Z90CRYPT_DEBUG
 #define PDEBUG(fmt, args...) \
 	printk(KERN_DEBUG DEV_NAME ": %s -> " fmt, __FUNCTION__ , ## args)
 #else
 #define PDEBUG(fmt, args...) do {} while (0)
 #endif
-#define UMIN(a,b) ((a) > (b) ? (a) : (b))
+
+#define UMIN(a,b) ((a) < (b) ? (a) : (b))
 #define IS_EVEN(x) ((x) == (2 * ((x) / 2)))
+
+
 #endif

@@ -8,7 +8,7 @@ COMPILE_VERSION := __linux_compile_version_id__`hostname |  \
 
 EXTRA_CFLAGS  := -DCOMPILE_VERSION=$(COMPILE_VERSION) -gstabs -I.
 
-targets := image
+targets := image kerntypes.o
 
 $(obj)/image: vmlinux FORCE
 	$(call if_changed,objcopy)

@@ -1,5 +1,5 @@
 /*
- * linux/drivers/s390/block/dasd_cmb.c ($Revision: 1.6 $)
+ * linux/drivers/s390/block/dasd_cmb.c ($Revision: 1.7.2.1 $)
  *
  * Linux on zSeries Channel Measurement Facility support
  *  (dasd device driver interface)
