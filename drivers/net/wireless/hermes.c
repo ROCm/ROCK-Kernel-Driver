@@ -53,17 +53,18 @@
 
 #include "hermes.h"
 
-static char version[] __initdata = "hermes.c: 3 Oct 2001 David Gibson <hermes@gibson.dropbear.id.au>";
+static char version[] __initdata = "hermes.c: 5 Apr 2002 David Gibson <hermes@gibson.dropbear.id.au>";
 MODULE_DESCRIPTION("Low-level driver helper for Lucent Hermes chipset and Prism II HFA384x wireless MAC controller");
 MODULE_AUTHOR("David Gibson <hermes@gibson.dropbear.id.au>");
+#ifdef MODULE_LICENSE
 MODULE_LICENSE("Dual MPL/GPL");
+#endif
 
 /* These are maximum timeouts. Most often, card wil react much faster */
 #define CMD_BUSY_TIMEOUT (100) /* In iterations of ~1us */
 #define CMD_INIT_TIMEOUT (50000) /* in iterations of ~10us */
 #define CMD_COMPL_TIMEOUT (20000) /* in iterations of ~10us */
 #define ALLOC_COMPL_TIMEOUT (1000) /* in iterations of ~10us */
-#define BAP_BUSY_TIMEOUT (500) /* In iterations of ~1us */
 
 /*
  * Debugging helpers
@@ -75,15 +76,17 @@ MODULE_LICENSE("Dual MPL/GPL");
 #include <stdarg.h>
 
 #define DMSG(stuff...) do {printk(KERN_DEBUG "hermes @ 0x%x: " , hw->iobase); \
-			printk(#stuff);} while (0)
+			printk(stuff);} while (0)
 
-#define DEBUG(lvl, stuff...) if ( (lvl) <= HERMES_DEBUG) DMSG(#stuff)
+#define DEBUG(lvl, stuff...) if ( (lvl) <= HERMES_DEBUG) DMSG(stuff)
 
 #else /* ! HERMES_DEBUG */
 
 #define DEBUG(lvl, stuff...) do { } while (0)
 
 #endif /* ! HERMES_DEBUG */
+
+#define IO_TYPE(hw)	((hw)->io_space ? "IO " : "MEM ")
 
 /*
  * Internal functions
@@ -98,10 +101,17 @@ MODULE_LICENSE("Dual MPL/GPL");
 */
 static int hermes_issue_cmd(hermes_t *hw, u16 cmd, u16 param0)
 {
+	int k = CMD_BUSY_TIMEOUT;
 	u16 reg;
 
-	/* First check that the command register is not busy */
+	/* First wait for the command register to unbusy */
 	reg = hermes_read_regn(hw, CMD);
+	while ( (reg & HERMES_CMD_BUSY) && k ) {
+		k--;
+		udelay(1);
+		reg = hermes_read_regn(hw, CMD);
+	}
+	DEBUG(3, "hermes_issue_cmd: did %d retries.\n", CMD_BUSY_TIMEOUT-k);
 	if (reg & HERMES_CMD_BUSY) {
 		return -EBUSY;
 	}
@@ -118,10 +128,19 @@ static int hermes_issue_cmd(hermes_t *hw, u16 cmd, u16 param0)
  * Function definitions
  */
 
-void hermes_struct_init(hermes_t *hw, uint io)
+void hermes_struct_init(hermes_t *hw, ulong address,
+			int io_space, int reg_spacing)
 {
-	hw->iobase = io;
+	hw->iobase = address;
+	hw->io_space = io_space;
+	hw->reg_spacing = reg_spacing;
 	hw->inten = 0x0;
+
+#ifdef HERMES_DEBUG_BUFFER
+	hw->dbufp = 0;
+	memset(&hw->dbuf, 0xff, sizeof(hw->dbuf));
+	memset(&hw->profile, 0, sizeof(hw->profile));
+#endif
 }
 
 int hermes_reset(hermes_t *hw)
@@ -188,8 +207,9 @@ int hermes_reset(hermes_t *hw)
 	}
 		
 	if (! (reg & HERMES_EV_CMD)) {
-		printk(KERN_ERR "hermes @ 0x%x: Timeout waiting for card to reset (reg=0x%04x)!\n",
-		       hw->iobase, reg);
+		printk(KERN_ERR "hermes @ %s0x%lx: " 
+		       "Timeout waiting for card to reset (reg=0x%04x)!\n",
+		       IO_TYPE(hw), hw->iobase, reg);
 		err = -ETIMEDOUT;
 		goto out;
 	}
@@ -198,7 +218,8 @@ int hermes_reset(hermes_t *hw)
 
 	hermes_write_regn(hw, EVACK, HERMES_EV_CMD);
 
-	err = status & HERMES_STATUS_RESULT;
+	if (status & HERMES_STATUS_RESULT)
+		err = -EIO;
 
  out:
 	return err;
@@ -215,16 +236,18 @@ int hermes_docmd_wait(hermes_t *hw, u16 cmd, u16 parm0, hermes_response_t *resp)
 	int err;
 	int k;
 	u16 reg;
+	u16 status;
 
 	err = hermes_issue_cmd(hw, cmd, parm0);
 	if (err) {
 		if (! hermes_present(hw)) {
-			printk(KERN_WARNING "hermes @ 0x%x: Card removed while issuing command.\n",
-			       hw->iobase);
+			printk(KERN_WARNING "hermes @ %s0x%lx: "
+			       "Card removed while issuing command.\n",
+			       IO_TYPE(hw), hw->iobase);
 			err = -ENODEV;
 		} else 
-			printk(KERN_ERR "hermes @ 0x%x: CMD register busy in hermes_issue_command().\n",
-			       hw->iobase);
+			printk(KERN_ERR "hermes @ %s0x%lx: Error %d issuing command.\n",
+			       IO_TYPE(hw), hw->iobase, err);
 		goto out;
 	}
 
@@ -237,27 +260,33 @@ int hermes_docmd_wait(hermes_t *hw, u16 cmd, u16 parm0, hermes_response_t *resp)
 	}
 
 	if (! hermes_present(hw)) {
-		printk(KERN_WARNING "hermes @ 0x%x: Card removed while waiting for command completion.\n",
-		       hw->iobase);
+		printk(KERN_WARNING "hermes @ %s0x%lx: "
+		       "Card removed while waiting for command completion.\n",
+		       IO_TYPE(hw), hw->iobase);
 		err = -ENODEV;
 		goto out;
 	}
 		
 	if (! (reg & HERMES_EV_CMD)) {
-		printk(KERN_ERR "hermes @ 0x%x: Timeout waiting for command completion.\n",
-		       hw->iobase);
+		printk(KERN_ERR "hermes @ %s0x%lx: "
+		       "Timeout waiting for command completion.\n",
+		       IO_TYPE(hw), hw->iobase);
 		err = -ETIMEDOUT;
 		goto out;
 	}
 
-	resp->status = hermes_read_regn(hw, STATUS);
-	resp->resp0 = hermes_read_regn(hw, RESP0);
-	resp->resp1 = hermes_read_regn(hw, RESP1);
-	resp->resp2 = hermes_read_regn(hw, RESP2);
+	status = hermes_read_regn(hw, STATUS);
+	if (resp) {
+		resp->status = status;
+		resp->resp0 = hermes_read_regn(hw, RESP0);
+		resp->resp1 = hermes_read_regn(hw, RESP1);
+		resp->resp2 = hermes_read_regn(hw, RESP2);
+	}
 
 	hermes_write_regn(hw, EVACK, HERMES_EV_CMD);
 
-	err = resp->status & HERMES_STATUS_RESULT;
+	if (status & HERMES_STATUS_RESULT)
+		err = -EIO;
 
  out:
 	return err;
@@ -266,17 +295,17 @@ int hermes_docmd_wait(hermes_t *hw, u16 cmd, u16 parm0, hermes_response_t *resp)
 int hermes_allocate(hermes_t *hw, u16 size, u16 *fid)
 {
 	int err = 0;
-	hermes_response_t resp;
 	int k;
 	u16 reg;
 	
 	if ( (size < HERMES_ALLOC_LEN_MIN) || (size > HERMES_ALLOC_LEN_MAX) )
 		return -EINVAL;
 
-	err = hermes_docmd_wait(hw, HERMES_CMD_ALLOC, size, &resp);
+	err = hermes_docmd_wait(hw, HERMES_CMD_ALLOC, size, NULL);
 	if (err) {
-		printk(KERN_WARNING "hermes @ 0x%x: Frame allocation command failed (0x%X).\n",
-		       hw->iobase, err);
+		printk(KERN_WARNING "hermes @ %s0x%lx: "
+		       "Frame allocation command failed (0x%X).\n",
+		       IO_TYPE(hw), hw->iobase, err);
 		return err;
 	}
 
@@ -289,14 +318,16 @@ int hermes_allocate(hermes_t *hw, u16 size, u16 *fid)
 	}
 	
 	if (! hermes_present(hw)) {
-		printk(KERN_WARNING "hermes @ 0x%x: Card removed waiting for frame allocation.\n",
-		       hw->iobase);
+		printk(KERN_WARNING "hermes @ %s0x%lx: "
+		       "Card removed waiting for frame allocation.\n",
+		       IO_TYPE(hw), hw->iobase);
 		return -ENODEV;
 	}
 		
 	if (! (reg & HERMES_EV_ALLOC)) {
-		printk(KERN_ERR "hermes @ 0x%x: Timeout waiting for frame allocation\n",
-		       hw->iobase);
+		printk(KERN_ERR "hermes @ %s0x%lx: "
+		       "Timeout waiting for frame allocation\n",
+		       IO_TYPE(hw), hw->iobase);
 		return -ETIMEDOUT;
 	}
 
@@ -306,13 +337,14 @@ int hermes_allocate(hermes_t *hw, u16 size, u16 *fid)
 	return 0;
 }
 
+
 /* Set up a BAP to read a particular chunk of data from card's internal buffer.
  *
  * Returns: < 0 on internal failure (errno), 0 on success, >0 on error
  * from firmware
  *
  * Callable from any context */
-int hermes_bap_seek(hermes_t *hw, int bap, u16 id, u16 offset)
+static int hermes_bap_seek(hermes_t *hw, int bap, u16 id, u16 offset)
 {
 	int sreg = bap ? HERMES_SELECT1 : HERMES_SELECT0;
 	int oreg = bap ? HERMES_OFFSET1 : HERMES_OFFSET0;
@@ -323,13 +355,26 @@ int hermes_bap_seek(hermes_t *hw, int bap, u16 id, u16 offset)
 	if ( (offset > HERMES_BAP_OFFSET_MAX) || (offset % 2) )
 		return -EINVAL;
 
-	k = BAP_BUSY_TIMEOUT;
+	k = HERMES_BAP_BUSY_TIMEOUT;
 	reg = hermes_read_reg(hw, oreg);
-	while ((reg & HERMES_OFFSET_BUSY) & k) {
+	while ((reg & HERMES_OFFSET_BUSY) && k) {
 		k--;
 		udelay(1);
 		reg = hermes_read_reg(hw, oreg);
 	}
+
+#ifdef HERMES_DEBUG_BUFFER
+	hw->profile[HERMES_BAP_BUSY_TIMEOUT - k]++;
+
+	if (k < HERMES_BAP_BUSY_TIMEOUT) {
+		struct hermes_debug_entry *e = 
+			&hw->dbuf[(hw->dbufp++) % HERMES_DEBUG_BUFSIZE];
+		e->bap = bap;
+		e->id = id;
+		e->offset = offset;
+		e->cycles = HERMES_BAP_BUSY_TIMEOUT - k;
+	}
+#endif
 
 	if (reg & HERMES_OFFSET_BUSY)
 		return -ETIMEDOUT;
@@ -339,7 +384,7 @@ int hermes_bap_seek(hermes_t *hw, int bap, u16 id, u16 offset)
 	hermes_write_reg(hw, oreg, offset);
 
 	/* Wait for the BAP to be ready */
-	k = BAP_BUSY_TIMEOUT;
+	k = HERMES_BAP_BUSY_TIMEOUT;
 	reg = hermes_read_reg(hw, oreg);
 	while ( (reg & (HERMES_OFFSET_BUSY | HERMES_OFFSET_ERR)) && k) {
 		k--;
@@ -373,7 +418,7 @@ int hermes_bap_pread(hermes_t *hw, int bap, void *buf, int len,
 	int dreg = bap ? HERMES_DATA1 : HERMES_DATA0;
 	int err = 0;
 
-	if (len % 2)
+	if ( (len < 0) || (len % 2) )
 		return -EINVAL;
 
 	err = hermes_bap_seek(hw, bap, id, offset);
@@ -399,7 +444,7 @@ int hermes_bap_pwrite(hermes_t *hw, int bap, const void *buf, int len,
 	int dreg = bap ? HERMES_DATA1 : HERMES_DATA0;
 	int err = 0;
 
-	if (len % 2)
+	if ( (len < 0) || (len % 2) )
 		return -EINVAL;
 
 	err = hermes_bap_seek(hw, bap, id, offset);
@@ -427,12 +472,11 @@ int hermes_read_ltv(hermes_t *hw, int bap, u16 rid, int bufsize,
 	int err = 0;
 	int dreg = bap ? HERMES_DATA1 : HERMES_DATA0;
 	u16 rlength, rtype;
-	hermes_response_t resp;
 
-	if (bufsize % 2)
+	if ( (bufsize < 0) || (bufsize % 2) )
 		return -EINVAL;
 
-	err = hermes_docmd_wait(hw, HERMES_CMD_ACCESS, rid, &resp);
+	err = hermes_docmd_wait(hw, HERMES_CMD_ACCESS, rid, NULL);
 	if (err)
 		goto out;
 
@@ -447,11 +491,14 @@ int hermes_read_ltv(hermes_t *hw, int bap, u16 rid, int bufsize,
 		*length = rlength;
 
 	if (rtype != rid)
-		printk(KERN_WARNING "hermes_read_ltv(): rid  (0x%04x) does "
-		       "not match type (0x%04x)\n", rid, rtype);
+		printk(KERN_WARNING "hermes @ %s0x%lx: "
+		       "hermes_read_ltv(): rid  (0x%04x) does not match type (0x%04x)\n",
+		       IO_TYPE(hw), hw->iobase, rid, rtype);
 	if (HERMES_RECLEN_TO_BYTES(rlength) > bufsize)
-		printk(KERN_WARNING "hermes @ 0x%x: Truncating LTV record from %d to %d bytes. "
-		       "(rid=0x%04x, len=0x%04x)\n", hw->iobase,
+		printk(KERN_WARNING "hermes @ %s0x%lx: "
+		       "Truncating LTV record from %d to %d bytes. "
+		       "(rid=0x%04x, len=0x%04x)\n",
+		       IO_TYPE(hw), hw->iobase,
 		       HERMES_RECLEN_TO_BYTES(rlength), bufsize, rid, rlength);
 	
 	/* FIXME: we should read the min of the requested length and
@@ -467,7 +514,6 @@ int hermes_write_ltv(hermes_t *hw, int bap, u16 rid,
 {
 	int dreg = bap ? HERMES_DATA1 : HERMES_DATA0;
 	int err = 0;
-	hermes_response_t resp;
 	int count;
 	
 	DEBUG(3, "write_ltv(): bap=%d rid=0x%04x length=%d (value=0x%04x)\n",
@@ -485,7 +531,7 @@ int hermes_write_ltv(hermes_t *hw, int bap, u16 rid,
 	hermes_write_words(hw, dreg, value, count);
 
 	err = hermes_docmd_wait(hw, HERMES_CMD_ACCESS | HERMES_CMD_WRITE, 
-				rid, &resp);
+				rid, NULL);
 
  out:
 	return err;
