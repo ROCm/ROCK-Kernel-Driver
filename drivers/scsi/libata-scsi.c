@@ -498,7 +498,9 @@ void ata_scsi_rbuf_fill(struct ata_scsi_args *args,
 unsigned int ata_scsiop_inq_std(struct ata_scsi_args *args, u8 *rbuf,
 			       unsigned int buflen)
 {
-	const u8 hdr[] = {
+	struct ata_device *dev = args->dev;
+
+	u8 hdr[] = {
 		TYPE_DISK,
 		0,
 		0x5,	/* claim SPC-3 version compatibility */
@@ -506,14 +508,20 @@ unsigned int ata_scsiop_inq_std(struct ata_scsi_args *args, u8 *rbuf,
 		96 - 4
 	};
 
+	/* set scsi removeable (RMB) bit per ata bit */
+	if (ata_id_removeable(dev))
+		hdr[1] |= (1 << 7);
+
 	VPRINTK("ENTER\n");
 
 	memcpy(rbuf, hdr, sizeof(hdr));
 
 	if (buflen > 36) {
-		memcpy(&rbuf[8], args->dev->vendor, 8);
-		memcpy(&rbuf[16], args->dev->product, 16);
-		memcpy(&rbuf[32], DRV_VERSION, 4);
+		memcpy(&rbuf[8], "ATA     ", 8);
+		ata_dev_id_string(dev, &rbuf[16], ATA_ID_PROD_OFS, 16);
+		ata_dev_id_string(dev, &rbuf[32], ATA_ID_FW_REV_OFS, 4);
+		if (rbuf[32] == 0 || rbuf[32] == ' ')
+			memcpy(&rbuf[32], "n/a ", 4);
 	}
 
 	if (buflen > 63) {
@@ -687,9 +695,17 @@ static void ata_msense_push(u8 **ptr_io, const u8 *last,
 static unsigned int ata_msense_caching(struct ata_device *dev, u8 **ptr_io,
 				       const u8 *last)
 {
-	u8 page[7] = { 0xf, 0, 0x10, 0, 0x8, 0xa, 0 };
-	if (dev->flags & ATA_DFLAG_WCACHE)
-		page[6] = 0x4;
+	u8 page[] = {
+		0x8,				/* page code */
+		0x12,				/* page length */
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,	/* 10 zeroes */
+		0, 0, 0, 0, 0, 0, 0, 0		/* 8 zeroes */
+	};
+
+	if (ata_id_wcache_enabled(dev))
+		page[2] |= (1 << 2);	/* write cache enable */
+	if (!ata_id_rahead_enabled(dev))
+		page[12] |= (1 << 5);	/* disable read ahead */
 
 	ata_msense_push(ptr_io, last, page, sizeof(page));
 	return sizeof(page);
@@ -710,6 +726,31 @@ static unsigned int ata_msense_caching(struct ata_device *dev, u8 **ptr_io,
 static unsigned int ata_msense_ctl_mode(u8 **ptr_io, const u8 *last)
 {
 	const u8 page[] = {0xa, 0xa, 2, 0, 0, 0, 0, 0, 0xff, 0xff, 0, 30};
+
+	ata_msense_push(ptr_io, last, page, sizeof(page));
+	return sizeof(page);
+}
+
+/**
+ *	ata_msense_rw_recovery - Simulate MODE SENSE r/w error recovery page
+ *	@dev: Device associated with this MODE SENSE command
+ *	@ptr_io: (input/output) Location to store more output data
+ *	@last: End of output data buffer
+ *
+ *	Generate a generic MODE SENSE r/w error recovery page.
+ *
+ *	LOCKING:
+ *	None.
+ */
+
+static unsigned int ata_msense_rw_recovery(u8 **ptr_io, const u8 *last)
+{
+	const u8 page[] = {
+		0x1,			  /* page code */
+		0xa,			  /* page length */
+		(1 << 7) | (1 << 6),	  /* note auto r/w reallocation */
+		0, 0, 0, 0, 0, 0, 0, 0, 0 /* 9 zeroes */
+	};
 
 	ata_msense_push(ptr_io, last, page, sizeof(page));
 	return sizeof(page);
@@ -754,6 +795,10 @@ unsigned int ata_scsiop_mode_sense(struct ata_scsi_args *args, u8 *rbuf,
 	last = rbuf + buflen - 1;
 
 	switch(scsicmd[2] & 0x3f) {
+	case 0x01:		/* r/w error recovery */
+		output_len += ata_msense_rw_recovery(&p, last);
+		break;
+
 	case 0x08:		/* caching */
 		output_len += ata_msense_caching(dev, &p, last);
 		break;
@@ -764,6 +809,7 @@ unsigned int ata_scsiop_mode_sense(struct ata_scsi_args *args, u8 *rbuf,
 		}
 
 	case 0x3f:		/* all pages */
+		output_len += ata_msense_rw_recovery(&p, last);
 		output_len += ata_msense_caching(dev, &p, last);
 		output_len += ata_msense_ctl_mode(&p, last);
 		break;
@@ -804,20 +850,23 @@ unsigned int ata_scsiop_read_cap(struct ata_scsi_args *args, u8 *rbuf,
 
 	VPRINTK("ENTER\n");
 
-	n_sectors--;		/* one off */
+	n_sectors--;		/* ATA TotalUserSectors - 1 */
 
 	tmp = n_sectors;	/* note: truncates, if lba48 */
 	if (args->cmd->cmnd[0] == READ_CAPACITY) {
+		/* sector count, 32-bit */
 		rbuf[0] = tmp >> (8 * 3);
 		rbuf[1] = tmp >> (8 * 2);
 		rbuf[2] = tmp >> (8 * 1);
 		rbuf[3] = tmp;
 
+		/* sector size */
 		tmp = ATA_SECT_SIZE;
 		rbuf[6] = tmp >> 8;
 		rbuf[7] = tmp;
 
 	} else {
+		/* sector count, 64-bit */
 		rbuf[2] = n_sectors >> (8 * 7);
 		rbuf[3] = n_sectors >> (8 * 6);
 		rbuf[4] = n_sectors >> (8 * 5);
@@ -827,6 +876,7 @@ unsigned int ata_scsiop_read_cap(struct ata_scsi_args *args, u8 *rbuf,
 		rbuf[8] = tmp >> (8 * 1);
 		rbuf[9] = tmp;
 
+		/* sector size */
 		tmp = ATA_SECT_SIZE;
 		rbuf[12] = tmp >> 8;
 		rbuf[13] = tmp;
@@ -900,8 +950,6 @@ void ata_scsi_badcmd(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *), u8
 static unsigned int atapi_xlat(struct ata_queued_cmd *qc, u8 *scsicmd)
 {
 	struct scsi_cmnd *cmd = qc->scsicmd;
-
-	qc->flags |= ATA_QCFLAG_ATAPI;
 
 	qc->tf.flags |= ATA_TFLAG_ISADDR | ATA_TFLAG_DEVICE;
 	if (cmd->sc_data_direction == SCSI_DATA_WRITE) {
@@ -1106,7 +1154,11 @@ static void ata_scsi_simulate(struct ata_port *ap, struct ata_device *dev,
 	args.done = done;
 
 	switch(scsicmd[0]) {
-		case TEST_UNIT_READY:		/* FIXME: correct? */
+		/* no-op's, complete with success */
+		case REZERO_UNIT:
+		case SEEK_6:
+		case SEEK_10:
+		case TEST_UNIT_READY:
 		case FORMAT_UNIT:		/* FIXME: correct? */
 		case SEND_DIAGNOSTIC:		/* FIXME: correct? */
 			ata_scsi_rbuf_fill(&args, ata_scsiop_noop);
