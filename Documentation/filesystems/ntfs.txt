@@ -247,6 +247,12 @@ ChangeLog
 
 Note, a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
 
+2.0.12:
+	- Internal cleanups in address space operations made possible by the
+	  changes introduced in the previous release.
+2.0.11:
+	- Internal updates and cleanups introducing the first step towards
+	  fake inode based attribute i/o.
 2.0.10:
 	- Microsoft says that the maximum number of inodes is 2^32 - 1. Update
 	  the driver accordingly to only use 32-bits to store inode numbers on
