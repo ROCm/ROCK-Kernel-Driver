@@ -655,7 +655,8 @@ sys_timer_create(clockid_t which_clock,
 				list_add(&new_timer->list,
 					 &process->signal->posix_timers);
 				spin_unlock_irqrestore(&process->sighand->siglock, flags);
-				get_task_struct(process);
+				if (new_timer->it_sigev_notify == (SIGEV_SIGNAL|SIGEV_THREAD_ID))
+					get_task_struct(process);
 			} else {
 				spin_unlock_irqrestore(&process->sighand->siglock, flags);
 				process = NULL;
@@ -1107,7 +1108,7 @@ retry_delete:
 	if (timer->it_process) {
 		if (timer->it_sigev_notify == (SIGEV_SIGNAL|SIGEV_THREAD_ID))
 			put_task_struct(timer->it_process);
-	timer->it_process = NULL;
+		timer->it_process = NULL;
 	}
 	unlock_timer(timer, flags);
 	release_posix_timer(timer, IT_ID_SET);
