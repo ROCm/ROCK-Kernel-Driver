@@ -1108,6 +1108,22 @@ extern void	       skb_split(struct sk_buff *skb,
 extern void skb_init(void);
 extern void skb_add_mtu(int mtu);
 
+struct skb_iter {
+	/* Iteration functions set these */
+	unsigned char *data;
+	unsigned int len;
+
+	/* Private to iteration */
+	unsigned int nextfrag;
+	struct sk_buff *fraglist;
+};
+
+/* Keep iterating until skb_iter_next returns false. */
+extern void skb_iter_first(const struct sk_buff *skb, struct skb_iter *i);
+extern int skb_iter_next(const struct sk_buff *skb, struct skb_iter *i);
+/* Call this if aborting loop before !skb_iter_next */
+extern void skb_iter_abort(const struct sk_buff *skb, struct skb_iter *i);
+
 #ifdef CONFIG_NETFILTER
 static inline void nf_conntrack_put(struct nf_ct_info *nfct)
 {
