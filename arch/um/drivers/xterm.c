@@ -37,13 +37,13 @@ void *xterm_init(char *str, int device, struct chan_opts *opts)
 	struct xterm_chan *data;
 
 	if((data = malloc(sizeof(*data))) == NULL) return(NULL);
-	*data = ((struct xterm_chan) { pid :		-1, 
-				       helper_pid :	-1,
-				       device :		device, 
-				       title :		opts->xterm_title,
-				       raw : 		opts->raw,
-				       stack :		opts->tramp_stack,
-				       direct_rcv :	!opts->in_kernel } );
+	*data = ((struct xterm_chan) { .pid 		= -1, 
+				       .helper_pid 	= -1,
+				       .device 		= device, 
+				       .title 		= opts->xterm_title,
+				       .raw  		= opts->raw,
+				       .stack 		= opts->tramp_stack,
+				       .direct_rcv 	= !opts->in_kernel } );
 	return(data);
 }
 
@@ -172,16 +172,16 @@ int xterm_console_write(int fd, const char *buf, int n, void *d)
 }
 
 struct chan_ops xterm_ops = {
-	type:		"xterm",
-	init:		xterm_init,
-	open:		xterm_open,
-	close:		xterm_close,
-	read:		generic_read,
-	write:		generic_write,
-	console_write:	xterm_console_write,
-	window_size:	generic_window_size,
-	free:		xterm_free,
-	winch:		1,
+	.type		= "xterm",
+	.init		= xterm_init,
+	.open		= xterm_open,
+	.close		= xterm_close,
+	.read		= generic_read,
+	.write		= generic_write,
+	.console_write	= xterm_console_write,
+	.window_size	= generic_window_size,
+	.free		= xterm_free,
+	.winch		= 1,
 };
 
 /*

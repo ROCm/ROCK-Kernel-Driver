@@ -276,8 +276,8 @@ int os_rcv_fd(int fd, int *helper_pid_out)
 
 	msg.msg_name = NULL;
 	msg.msg_namelen = 0;
-	iov = ((struct iovec) { iov_base : helper_pid_out,
-				iov_len :  sizeof(*helper_pid_out) });
+	iov = ((struct iovec) { .iov_base  = helper_pid_out,
+				.iov_len   = sizeof(*helper_pid_out) });
 	msg.msg_iov = &iov;
 	msg.msg_iovlen = 1;
 	msg.msg_control = buf;

@@ -75,15 +75,15 @@ static void not_configged_free(void *data)
 }
 
 static struct chan_ops not_configged_ops = {
-	init:		not_configged_init,
-	open:		not_configged_open,
-	close:		not_configged_close,
-	read:		not_configged_read,
-	write:		not_configged_write,
-	console_write:	not_configged_console_write,
-	window_size:	not_configged_window_size,
-	free:		not_configged_free,
-	winch:		0,
+	.init		= not_configged_init,
+	.open		= not_configged_open,
+	.close		= not_configged_close,
+	.read		= not_configged_read,
+	.write		= not_configged_write,
+	.console_write	= not_configged_console_write,
+	.window_size	= not_configged_window_size,
+	.free		= not_configged_free,
+	.winch		= 0,
 };
 
 static void tty_receive_char(struct tty_struct *tty, char ch)
@@ -395,15 +395,15 @@ static struct chan *parse_chan(char *str, int pri, int device,
 
 	chan = kmalloc(sizeof(*chan), GFP_KERNEL);
 	if(chan == NULL) return(NULL);
-	*chan = ((struct chan) { list :	 	LIST_HEAD_INIT(chan->list),
-				 primary :	1,
-				 input :	0,
-				 output :	0,
-				 opened : 	0,
-				 fd :		-1,
-				 pri :		pri,
-				 ops :		ops,
-				 data :		data });
+	*chan = ((struct chan) { .list	 	= LIST_HEAD_INIT(chan->list),
+				 .primary	= 1,
+				 .input		= 0,
+				 .output 	= 0,
+				 .opened  	= 0,
+				 .fd 		= -1,
+				 .pri 		= pri,
+				 .ops 		= ops,
+				 .data 		= data });
 	return(chan);
 }
 

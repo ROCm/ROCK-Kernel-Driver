@@ -159,9 +159,9 @@ static int winch_tramp(int fd, void *device_data, int *fd_out)
 		return(err);
 	}
 
-	data = ((struct winch_data) { pty_fd :		fd,
-				      pipe_fd :		fds[1],
-				      close_me :	fds[0] } );
+	data = ((struct winch_data) { .pty_fd 		= fd,
+				      .pipe_fd 		= fds[1],
+				      .close_me 	= fds[0] } );
 	pid = run_helper_thread(winch_thread, &data, 0, &stack, 0);
 	if(pid < 0){
 		printk("fork of winch_thread failed - errno = %d\n", errno);

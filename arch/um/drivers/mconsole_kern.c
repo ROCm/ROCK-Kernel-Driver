@@ -36,8 +36,8 @@ static int do_unlink_socket(struct notifier_block *notifier,
 
 
 static struct notifier_block reboot_notifier = {
-	notifier_call:		do_unlink_socket,
-	priority:		0,
+	.notifier_call		= do_unlink_socket,
+	.priority		= 0,
 };
 
 /* Safe without explicit locking for now.  Tasklets provide their own 
@@ -418,9 +418,9 @@ static int notify_panic(struct notifier_block *self, unsigned long unused1,
 }
 
 static struct notifier_block panic_exit_notifier = {
-	notifier_call :		notify_panic,
-	next :			NULL,
-	priority :		1
+	.notifier_call 		= notify_panic,
+	.next 			= NULL,
+	.priority 		= 1
 };
 
 static int add_notifier(void)
