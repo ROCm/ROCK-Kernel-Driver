@@ -55,6 +55,8 @@ static int proc_do_kdb(ctl_table *table, int write, struct file *filp, void *buf
 
 #if defined(CONFIG_SYSCTL)
 
+extern int sysctl_no_oomkill;
+
 /* External variables not in a header file. */
 extern int panic_timeout;
 extern int C_A_D;
@@ -864,6 +866,15 @@ static ctl_table vm_table[] = {
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
 	},
+	{
+		.ctl_name	= 998,
+		.procname	= "local-oom-kill", 
+		.data		= &sysctl_no_oomkill,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+
 	{ .ctl_name = 0 }
 };
 

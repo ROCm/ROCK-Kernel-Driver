@@ -21,6 +21,8 @@
 #include <linux/timex.h>
 #include <linux/jiffies.h>
 
+int sysctl_no_oomkill;
+
 /* #define DEBUG */
 
 /**
@@ -229,6 +231,10 @@ void out_of_memory(int gfp_mask)
 	static spinlock_t oom_lock = SPIN_LOCK_UNLOCKED;
 	static unsigned long first, last, count, lastkill;
 	unsigned long now, since;
+
+	WARN_ON(1);
+	if (sysctl_no_oomkill)
+		return;
 
 	spin_lock(&oom_lock);
 	now = jiffies;
