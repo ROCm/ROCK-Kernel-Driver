@@ -937,9 +937,13 @@ static unsigned long atalk_sum_partial(const unsigned char *data,
 {
 	/* This ought to be unwrapped neatly. I'll trust gcc for now */
 	while (len--) {
-		sum += *data++;
+		sum += *data;
 		sum <<= 1;
-		sum = ((sum >> 16) + sum) & 0xFFFF;
+		if (sum & 0x10000) {
+			sum++;
+			sum &= 0xffff;
+		}
+		data++;
 	}
 	return sum;
 }
