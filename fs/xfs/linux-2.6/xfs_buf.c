@@ -914,6 +914,7 @@ pagebuf_cond_lock(			/* lock buffer, if not locked	*/
 	return(locked ? 0 : -EBUSY);
 }
 
+#ifdef DEBUG
 /*
  *	pagebuf_lock_value
  *
@@ -925,6 +926,7 @@ pagebuf_lock_value(
 {
 	return(atomic_read(&pb->pb_sema.count));
 }
+#endif
 
 /*
  *	pagebuf_lock
