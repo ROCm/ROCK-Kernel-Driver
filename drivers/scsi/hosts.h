@@ -560,13 +560,7 @@ struct Scsi_Device_Template
     const char * tag;
     struct module * module;	  /* Used for loadable modules */
     unsigned char scsi_type;
-    unsigned int nr_dev;	  /* Number currently attached */
-    unsigned int dev_noticed;	  /* Number of devices detected. */
-    unsigned int dev_max;	  /* Current size of arrays */
-    unsigned blk:1;		  /* 0 if character device */
     int (*detect)(Scsi_Device *); /* Returns 1 if we can attach this device */
-    int (*init)(void);		  /* Sizes arrays based upon number of devices
-		   *  detected */
     int (*attach)(Scsi_Device *); /* Attach devices to arrays */
     void (*detach)(Scsi_Device *);
     int (*init_command)(Scsi_Cmnd *);     /* Used by new queueing code. 

@@ -1990,9 +1990,6 @@ int scsi_attach_device(struct scsi_device *sdev)
 
 	down_read(&scsi_devicelist_mutex);
 	for (sdt = scsi_devicelist; sdt; sdt = sdt->next)
-		if (sdt->init && sdt->dev_noticed)
-			(*sdt->init) ();
-	for (sdt = scsi_devicelist; sdt; sdt = sdt->next)
 		if (sdt->attach)
 			(*sdt->attach) (sdev);
 	up_read(&scsi_devicelist_mutex);
@@ -2059,14 +2056,6 @@ int scsi_register_device(struct Scsi_Device_Template *tpnt)
 				SDpnt->attached += (*tpnt->detect) (SDpnt);
 		}
 	}
-
-	/*
-	 * If any of the devices would match this driver, then perform the
-	 * init function.
-	 */
-	if (tpnt->init && tpnt->dev_noticed)
-		if ((*tpnt->init) ())
-			return 1;
 
 	/*
 	 * Now actually connect the devices to the new driver.

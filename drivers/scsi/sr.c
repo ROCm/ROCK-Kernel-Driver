@@ -68,7 +68,6 @@ MODULE_PARM(xa_test, "i");	/* see sr_ioctl.c */
 static int sr_attach(struct scsi_device *);
 static int sr_detect(struct scsi_device *);
 static void sr_detach(struct scsi_device *);
-
 static int sr_init_command(struct scsi_cmnd *);
 
 static struct Scsi_Device_Template sr_template = {
@@ -76,13 +75,13 @@ static struct Scsi_Device_Template sr_template = {
 	.name		= "cdrom",
 	.tag		= "sr",
 	.scsi_type	= TYPE_ROM,
-	.blk		= 1,
 	.detect		= sr_detect,
 	.attach		= sr_attach,
 	.detach		= sr_detach,
 	.init_command	= sr_init_command
 };
 
+static int sr_nr_dev;	/* XXX(hch) bad hack, we want a bitmap instead */
 static LIST_HEAD(sr_devlist);
 static spinlock_t sr_devlist_lock = SPIN_LOCK_UNLOCKED;
 
@@ -495,7 +494,6 @@ static int sr_detect(struct scsi_device * SDp)
 
 	if (SDp->type != TYPE_ROM && SDp->type != TYPE_WORM)
 		return 0;
-	sr_template.dev_noticed++;
 	return 1;
 }
 
@@ -524,7 +522,7 @@ static int sr_attach(struct scsi_device *sdev)
 	 * XXX  use find_first_zero_bit on it.  This will happen at the
 	 * XXX  same time template->nr_* goes away.		--hch
 	 */
-	minor = sr_template.nr_dev++;
+	minor = sr_nr_dev++;
 
 	disk->major = MAJOR_NR;
 	disk->first_minor = minor;
@@ -810,7 +808,7 @@ static void sr_detach(struct scsi_device * SDp)
 	unregister_cdrom(&cd->cdi);
 
 	SDp->attached--;
-	sr_template.nr_dev--;
+	sr_nr_dev--;
 
 	kfree(cd);
 }

@@ -83,6 +83,7 @@ struct scsi_disk {
 	unsigned	RCD : 1;	/* state of disk RCD bit */
 };
 
+static int sd_nr_dev;	/* XXX(hch) bad hack, we want a bitmap instead */
 static LIST_HEAD(sd_devlist);
 static spinlock_t sd_devlist_lock = SPIN_LOCK_UNLOCKED;
 
@@ -106,7 +107,6 @@ static struct Scsi_Device_Template sd_template = {
 	.name		= "disk",
 	.tag		= "sd",
 	.scsi_type	= TYPE_DISK,
-	.blk		= 1,
 	.detect		= sd_detect,
 	.attach		= sd_attach,
 	.detach		= sd_detach,
@@ -1179,7 +1179,6 @@ static int sd_detect(struct scsi_device * sdp)
 	SCSI_LOG_HLQUEUE(3, printk("sd_detect: type=%d\n", sdp->type));
 	if (sdp->type != TYPE_DISK && sdp->type != TYPE_MOD)
 		return 0;
-	sd_template.dev_noticed++;
 	return 1;
 }
 
@@ -1228,7 +1227,7 @@ static int sd_attach(struct scsi_device * sdp)
 	 * XXX  use find_first_zero_bit on it.  This will happen at the
 	 * XXX  same time template->nr_* goes away.		--hch
 	 */
-	dsk_nr = sd_template.nr_dev++;
+	dsk_nr = sd_nr_dev++;
 
 	sdkp->device = sdp;
 	sdkp->driver = &sd_template;
@@ -1314,8 +1313,7 @@ static void sd_detach(struct scsi_device * sdp)
 	sd_devlist_remove(sdkp);
 	del_gendisk(sdkp->disk);
 	sdp->attached--;
-	sd_template.dev_noticed--;
-	sd_template.nr_dev--;
+	sd_nr_dev--;
 	put_disk(sdkp->disk);
 	kfree(sdkp);
 }

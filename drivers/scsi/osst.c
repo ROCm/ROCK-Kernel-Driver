@@ -156,6 +156,10 @@ static int osst_attach(Scsi_Device *);
 static int osst_detect(Scsi_Device *);
 static void osst_detach(Scsi_Device *);
 
+static int osst_dev_noticed;
+static int osst_nr_dev;
+static int osst_dev_max;
+
 struct Scsi_Device_Template osst_template =
 {
        module:		THIS_MODULE,
@@ -4154,7 +4158,7 @@ static int os_scsi_tape_open(struct inode * inode, struct file * filp)
 	char *name;
 	int mode = TAPE_MODE(inode->i_rdev);
 
-	if (dev >= osst_template.dev_max || (STp = os_scsi_tapes[dev]) == NULL || !STp->device)
+	if (dev >= osst_dev_max || (STp = os_scsi_tapes[dev]) == NULL || !STp->device)
 		return (-ENXIO);
 
 	filp->private_data = STp;
@@ -4979,7 +4983,7 @@ static OSST_buffer * new_tape_buffer( int from_initialization, int need_dma )
 	int i, priority, b_size, order, got = 0, segs = 0;
 	OSST_buffer *tb;
 
-	if (osst_nbr_buffers >= osst_template.dev_max)
+	if (osst_nbr_buffers >= osst_dev_max)
 		return NULL;  /* Should never happen */
 
 	if (from_initialization)
@@ -5416,15 +5420,15 @@ static int osst_attach(Scsi_Device * SDp)
 	if (!disk)
 		return 1;
 
-	if (osst_template.nr_dev >= osst_template.dev_max) {
+	if (osst_nr_dev >= osst_dev_max) {
 		 SDp->attached--;
 		 put_disk(disk);
 		 return 1;
 	}
 	
 	/* find a free minor number */
-	for (i=0; os_scsi_tapes[i] && i<osst_template.dev_max; i++);
-	if(i >= osst_template.dev_max) panic ("Scsi_devices corrupt (osst)");
+	for (i=0; os_scsi_tapes[i] && i<osst_dev_max; i++);
+	if(i >= osst_dev_max) panic ("Scsi_devices corrupt (osst)");
 
 	/* allocate a OS_Scsi_Tape for this device */
 	tpnt = (OS_Scsi_Tape *)kmalloc(sizeof(OS_Scsi_Tape), GFP_ATOMIC);
@@ -5548,7 +5552,7 @@ static int osst_attach(Scsi_Device * SDp)
 	tpnt->density_changed = tpnt->compression_changed = tpnt->blksize_changed = FALSE;
 	init_MUTEX(&tpnt->lock);
 
-	osst_template.nr_dev++;
+	osst_nr_dev++;
 
 	printk(KERN_INFO
 		"osst :I: Attached OnStream %.5s tape at scsi%d, channel %d, id %d, lun %d as %s\n",
@@ -5562,7 +5566,7 @@ static int osst_detect(Scsi_Device * SDp)
 	if (SDp->type != TYPE_TAPE) return 0;
 	if ( ! osst_supports(SDp) ) return 0;
 	
-	osst_template.dev_noticed++;
+	osst_dev_noticed++;
 	return 1;
 }
 
@@ -5573,7 +5577,7 @@ static int osst_init()
 {
 	int i;
 
-	if (osst_template.dev_noticed == 0)
+	if (osst_dev_noticed == 0)
 		return 0;
 
 	if (!osst_registered) {
@@ -5586,10 +5590,10 @@ static int osst_init()
 
 	if (os_scsi_tapes)
 		return 0;
-	osst_template.dev_max = OSST_MAX_TAPES;
-	if (osst_template.dev_max > 128 / ST_NBR_MODES)
+	osst_dev_max = OSST_MAX_TAPES;
+	if (osst_dev_max > 128 / ST_NBR_MODES)
 		printk(KERN_INFO "osst :I: Only %d tapes accessible.\n", 128 / ST_NBR_MODES);
-	os_scsi_tapes = kmalloc(osst_template.dev_max * sizeof(OS_Scsi_Tape *),
+	os_scsi_tapes = kmalloc(osst_dev_max * sizeof(OS_Scsi_Tape *),
 								GFP_ATOMIC);
 	if (!os_scsi_tapes) {
 		printk(KERN_ERR "osst :W: Unable to allocate array for OnStream SCSI tapes.\n");
@@ -5597,11 +5601,11 @@ static int osst_init()
 		return 1;
 	}
 
-	for (i=0; i < osst_template.dev_max; ++i)
+	for (i=0; i < osst_dev_max; ++i)
 		os_scsi_tapes[i] = NULL;
 
 	/* Allocate the buffer pointers */
-	osst_buffers = kmalloc(osst_template.dev_max * sizeof(OSST_buffer *),
+	osst_buffers = kmalloc(osst_dev_max * sizeof(OSST_buffer *),
 								GFP_ATOMIC);
 	if (!osst_buffers) {
 		printk(KERN_ERR "osst :W: Unable to allocate tape buffer pointers.\n");
@@ -5629,7 +5633,7 @@ static void osst_detach(Scsi_Device * SDp)
   int mode;
 #endif
 
-  for(i=0; i<osst_template.dev_max; i++) {
+  for(i=0; i<osst_dev_max; i++) {
 	tpnt = os_scsi_tapes[i];
 	if(tpnt != NULL && tpnt->device == SDp) {
 		tpnt->device = NULL;
@@ -5645,8 +5649,8 @@ static void osst_detach(Scsi_Device * SDp)
 		kfree(tpnt);
 		os_scsi_tapes[i] = NULL;
 		SDp->attached--;
-		osst_template.nr_dev--;
-		osst_template.dev_noticed--;
+		osst_nr_dev--;
+		osst_dev_noticed--;
 		return;
 	}
   }
@@ -5668,7 +5672,7 @@ static void __exit exit_osst (void)
 	unregister_chrdev(MAJOR_NR, "osst");
 	osst_registered--;
 	if (os_scsi_tapes) {
-		for (i=0; i < osst_template.dev_max; ++i) {
+		for (i=0; i < osst_dev_max; ++i) {
 			STp = os_scsi_tapes[i];
 			if (!STp)
 				continue;
@@ -5690,7 +5694,7 @@ static void __exit exit_osst (void)
 			kfree(osst_buffers);
 		}
 	}
-	osst_template.dev_max = 0;
+	osst_dev_max = 0;
 	printk(KERN_INFO "osst :I: Unloaded.\n");
 }
 
