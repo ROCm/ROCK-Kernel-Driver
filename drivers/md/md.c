@@ -2408,9 +2408,10 @@ static int md_ioctl(struct inode *inode, struct file *file,
 		}
 
 		default:
-			printk(KERN_WARNING "md: %s(pid %d) used obsolete MD ioctl, "
-			       "upgrade your software to use new ictls.\n",
-			       current->comm, current->pid);
+			if (_IOC_TYPE(cmd) == MD_MAJOR)
+				printk(KERN_WARNING "md: %s(pid %d) used obsolete MD ioctl, "
+				       "upgrade your software to use new ictls.\n",
+				       current->comm, current->pid);
 			err = -EINVAL;
 			goto abort_unlock;
 	}
