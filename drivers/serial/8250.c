@@ -1976,7 +1976,7 @@ static int __init serial8250_console_setup(struct console *co, char *options)
 	if (co->index >= UART_NR)
 		co->index = 0;
 	port = &serial8250_ports[co->index].port;
-	if (port->type == PORT_UNKNOWN)
+	if (!port->ops)
 		return -ENODEV;
 
 	/*

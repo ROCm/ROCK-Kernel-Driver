@@ -1874,9 +1874,6 @@ uart_set_options(struct uart_port *port, struct console *co,
 	if (flow == 'r')
 		termios.c_cflag |= CRTSCTS;
 
-	if (!port->ops)
-		return 0;	/* "console=" on ia64 */
-
 	port->ops->set_termios(port, &termios, NULL);
 	co->cflag = termios.c_cflag;
 
