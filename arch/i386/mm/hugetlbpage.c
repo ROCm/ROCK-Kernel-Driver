@@ -482,9 +482,7 @@ int hugetlb_report_meminfo(char *buf)
 
 int is_hugepage_mem_enough(size_t size)
 {
-	if (size > (htlbpagemem << HPAGE_SHIFT))
-		return 0;
-	return 1;
+	return (size + ~HPAGE_MASK)/HPAGE_SIZE <= htlbpagemem;
 }
 
 /*
