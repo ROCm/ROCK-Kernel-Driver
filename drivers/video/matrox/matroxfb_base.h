@@ -288,6 +288,8 @@ static inline void mga_iounmap(vaddr_t va) {
 
 struct my_timming {
 	unsigned int pixclock;
+	int mnp;
+	unsigned int crtc;
 	unsigned int HDisplay;
 	unsigned int HSyncStart;
 	unsigned int HSyncEnd;
@@ -364,6 +366,10 @@ struct mavenregs {
 	u_int16_t hcorr;
 };
 
+struct matrox_crtc2 {
+	u_int32_t ctl;
+};
+
 struct matrox_hw_state {
 	u_int32_t	MXoptionReg;
 	unsigned char	DACclk[6];
@@ -381,10 +387,7 @@ struct matrox_hw_state {
 	/* TVOut only */
 	struct mavenregs	maven;
 
-	/* CRTC2 only */
-	/* u_int32_t	TBD */
-
-	unsigned int	vidclk;
+	struct matrox_crtc2	crtc2;
 };
 
 struct matrox_accel_data {
@@ -441,7 +444,13 @@ struct matrox_fb_info {
 	struct pci_dev*		pcidev;
 
 	struct {
-	struct matroxfb_dh_fb_info*		info;
+		unsigned int	pixclock;
+		int		mnp;
+			      } crtc1;
+	struct {
+		unsigned int 	pixclock;
+		int		mnp;
+	struct matroxfb_dh_fb_info*	info;
 	struct rw_semaphore	lock;
 			      } crtc2;
 	struct {

@@ -146,6 +146,7 @@ void matroxfb_var2my(struct fb_var_screeninfo* var, struct my_timming* mt) {
 	if (!pixclock) pixclock = 10000;	/* 10ns = 100MHz */
 	mt->pixclock = 1000000000 / pixclock;
 	if (mt->pixclock < 1) mt->pixclock = 1;
+	mt->mnp = -1;
 	mt->dblscan = var->vmode & FB_VMODE_DOUBLE;
 	mt->interlaced = var->vmode & FB_VMODE_INTERLACED;
 	mt->HDisplay = var->xres;

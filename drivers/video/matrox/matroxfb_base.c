@@ -796,6 +796,7 @@ static int matroxfb_set_var(struct fb_var_screeninfo *var, int con,
 			int out;
 
 			matroxfb_var2my(var, &mt);
+			mt.crtc = MATROXFB_SRC_CRTC1;
 			/* CRTC1 delays */
 			switch (var->bits_per_pixel) {
 				case  0:	mt.delay = 31 + 0; break;
@@ -818,6 +819,8 @@ static int matroxfb_set_var(struct fb_var_screeninfo *var, int con,
 				}
 			}
 			up_read(&ACCESS_FBINFO(altout).lock);
+			ACCESS_FBINFO(crtc1).pixclock = mt.pixclock;
+			ACCESS_FBINFO(crtc1).mnp = mt.mnp;
 			ACCESS_FBINFO(hw_switch->init(PMINFO &mt, display));
 			if (display->type == FB_TYPE_TEXT) {
 				if (fontheight(display))

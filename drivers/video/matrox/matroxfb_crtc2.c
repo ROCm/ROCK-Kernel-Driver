@@ -142,7 +142,7 @@ static void matroxfb_dh_restore(struct matroxfb_dh_fb_info* m2info,
 		mt->VSyncEnd >>= 1;
 		mt->VTotal >>= 1;
 	}
-	mga_outl(0x3C10, tmp | 0x10000000);	/* depth and so on... 0x10000000 is VIDRST polarity */
+	tmp |= 0x10000000;	/* 0x10000000 is VIDRST polarity */
 	mga_outl(0x3C14, ((mt->HDisplay - 8) << 16) | (mt->HTotal - 8));
 	mga_outl(0x3C18, ((mt->HSyncEnd - 8) << 16) | (mt->HSyncStart - 8));
 	mga_outl(0x3C1C, ((mt->VDisplay - 1) << 16) | (mt->VTotal - 1));
@@ -150,7 +150,7 @@ static void matroxfb_dh_restore(struct matroxfb_dh_fb_info* m2info,
 	mga_outl(0x3C24, ((mt->VSyncStart) << 16) | (mt->HSyncStart));	/* preload */
 	{
 		u_int32_t linelen = p->var.xres_virtual * (p->var.bits_per_pixel >> 3);
-		if (mt->interlaced) {
+		if (tmp & 0x02000000) {
 			/* field #0 is smaller, so... */
 			mga_outl(0x3C2C, pos);			/* field #1 vmemory start */
 			mga_outl(0x3C28, pos + linelen);	/* field #0 vmemory start */
@@ -160,19 +160,36 @@ static void matroxfb_dh_restore(struct matroxfb_dh_fb_info* m2info,
 		}
 		mga_outl(0x3C40, linelen);
 	}
+	mga_outl(0x3C4C, 0);		/* data control */
+	if (tmp & 0x02000000) {
+		int i;
+
+		mga_outl(0x3C10, tmp & ~0x02000000);
+		for (i = 0; i < 2; i++) {
+			unsigned int nl;
+			unsigned int lastl = 0;
+
+			while ((nl = mga_inl(0x3C48) & 0xFFF) >= lastl) {
+				lastl = nl;
+			}
+		}
+	}
+	mga_outl(0x3C10, tmp);
+	ACCESS_FBINFO(hw).crtc2.ctl = tmp;
+
 	tmp = 0x0FFF0000;		/* line compare */
 	if (mt->sync & FB_SYNC_HOR_HIGH_ACT)
 		tmp |= 0x00000100;
 	if (mt->sync & FB_SYNC_VERT_HIGH_ACT)
 		tmp |= 0x00000200;
 	mga_outl(0x3C44, tmp);
-	mga_outl(0x3C4C, 0);		/* data control */
 }
 
 static void matroxfb_dh_disable(struct matroxfb_dh_fb_info* m2info) {
 	MINFO_FROM(m2info->primary_dev);
 
 	mga_outl(0x3C10, 0x00000004);	/* disable CRTC2, CRTC1->DAC1, PLL as clock source */
+	ACCESS_FBINFO(hw).crtc2.ctl = 0x00000004;
 }
 
 static void matroxfb_dh_cfbX_init(struct matroxfb_dh_fb_info* m2info,
@@ -417,6 +434,7 @@ static int matroxfb_dh_set_var(struct fb_var_screeninfo* var, int con,
 		int cnt;
 
 		matroxfb_var2my(var, &mt);
+		mt.crtc = MATROXFB_SRC_CRTC2;
 		/* CRTC2 delay */
 		mt.delay = 34;
 
@@ -432,6 +450,8 @@ static int matroxfb_dh_set_var(struct fb_var_screeninfo* var, int con,
 				}
 			}
 		}
+		ACCESS_FBINFO(crtc2).pixclock = mt.pixclock;
+		ACCESS_FBINFO(crtc2).mnp = mt.mnp;
 		up_read(&ACCESS_FBINFO(altout).lock);
 		if (cnt) {
 			matroxfb_dh_restore(m2info, &mt, p, mode, pos);
