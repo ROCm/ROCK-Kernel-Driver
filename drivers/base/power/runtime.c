@@ -14,7 +14,10 @@ static void runtime_resume(struct device * dev)
 {
 	if (!dev->power.power_state)
 		return;
-	resume_device(dev);
+	if (! resume_device(dev))
+		dev->power.power_state = 0;
+
+	return;
 }
 
 
