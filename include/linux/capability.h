@@ -316,6 +316,8 @@ extern kernel_cap_t cap_bset;
 #define cap_lower(c, flag)   (cap_t(c) &= ~CAP_TO_MASK(flag))
 #define cap_raised(c, flag)  (cap_t(c) & CAP_TO_MASK(flag))
 
+extern int disable_cap_mlock;
+
 static inline kernel_cap_t cap_combine(kernel_cap_t a, kernel_cap_t b)
 {
      kernel_cap_t dest;

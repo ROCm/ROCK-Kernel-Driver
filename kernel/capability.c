@@ -14,6 +14,7 @@
 
 unsigned securebits = SECUREBITS_DEFAULT; /* systemwide security settings */
 kernel_cap_t cap_bset = CAP_INIT_EFF_SET;
+int disable_cap_mlock = 0;
 
 EXPORT_SYMBOL(securebits);
 EXPORT_SYMBOL(cap_bset);

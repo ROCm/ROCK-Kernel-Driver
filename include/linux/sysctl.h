@@ -166,6 +166,7 @@ enum
 	VM_MIN_FREE_KBYTES=21,	/* Minimum free kilobytes to maintain */
 	VM_LAPTOP_MODE=22,      /* vm laptop mode */
 	VM_BLOCK_DUMP=23,       /* block dump mode */
+	VM_DISABLE_CAP_MLOCK=24,/* disable CAP_IPC_LOCK checking */
 };
 
 

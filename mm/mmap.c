@@ -569,7 +569,7 @@ unsigned long __do_mmap_pgoff(struct mm_struct *mm, struct file * file,
 			mm->def_flags | VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC;
 
 	if (flags & MAP_LOCKED) {
-		if (!capable(CAP_IPC_LOCK))
+		if (!disable_cap_mlock && !capable(CAP_IPC_LOCK))
 			return -EPERM;
 		vm_flags |= VM_LOCKED;
 	}

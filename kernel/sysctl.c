@@ -814,6 +814,14 @@ static ctl_table vm_table[] = {
 		.strategy	= &sysctl_intvec,
 		.extra1		= &zero,
 	},
+	{
+		.ctl_name	= VM_DISABLE_CAP_MLOCK,
+		.procname	= "disable_cap_mlock",
+		.data		= &disable_cap_mlock,
+		.maxlen		= sizeof(disable_cap_mlock),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
 	{ .ctl_name = 0 }
 };
 
