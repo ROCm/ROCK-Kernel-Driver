@@ -76,7 +76,7 @@ EXPORT_SYMBOL(__lock_buffer);
 void fastcall unlock_buffer(struct buffer_head *bh)
 {
 	clear_buffer_locked(bh);
-	smp_mb();
+	smp_mb__after_clear_bit();
 	wake_up_bit(&bh->b_state, BH_Lock);
 }
 
