@@ -1247,10 +1247,11 @@ static inline int uhci_submit_bulk(struct uhci_hcd *uhci, struct urb *urb, struc
 
 static inline int uhci_submit_interrupt(struct uhci_hcd *uhci, struct urb *urb, struct urb *eurb)
 {
-	/* Interrupt-IN can't be more than 1 packet */
-	if (usb_pipein(urb->pipe) && urb->transfer_buffer_length > usb_maxpacket(urb->dev, urb->pipe, usb_pipeout(urb->pipe)))
-		return -EINVAL;
-
+	/* USB 1.1 interrupt transfers only involve one packet per interval;
+	 * that's the uhci_submit_common() "breadth first" policy.  Drivers
+	 * can submit urbs of any length, but longer ones might need many
+	 * intervals to complete.
+	 */
 	return uhci_submit_common(uhci, urb, eurb, uhci->skelqh[__interval_to_skel(urb->interval)]);
 }
 
@@ -1804,44 +1805,19 @@ static void uhci_free_pending_qhs(struct uhci_hcd *uhci)
 static void uhci_finish_urb(struct usb_hcd *hcd, struct urb *urb)
 {
 	struct urb_priv *urbp = (struct urb_priv *)urb->hcpriv;
-	struct usb_device *dev = urb->dev;
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
-	int killed, resubmit_interrupt, status, ret;
+	int status;
 	unsigned long flags;
 
 	spin_lock_irqsave(&urb->lock, flags);
-
- 	killed = (urb->status == -ENOENT || urb->status == -ECONNRESET);
-	resubmit_interrupt = (usb_pipetype(urb->pipe) == PIPE_INTERRUPT &&
-			urb->interval && !killed);
-
 	status = urbp->status;
 	uhci_destroy_urb_priv(uhci, urb);
 
-	if (!killed)
+ 	if (urb->status != -ENOENT && urb->status != -ECONNRESET)
 		urb->status = status;
 	spin_unlock_irqrestore(&urb->lock, flags);
 
-	if (resubmit_interrupt) {
-		urb->complete(urb);
-
-		/* Recheck the status. The completion handler may have */
-		/* unlinked the resubmitting interrupt URB */
-		/* Note that this doesn't do what usb_hcd_giveback_urb() */
-		/* normally does, so that doesn't ever get done. */
-		if (urb->status == -ECONNRESET) {
-			usb_put_urb(urb);
-			return;
-		}
-
-		urb->dev = dev;
-		urb->status = -EINPROGRESS;
-		urb->actual_length = 0;
-		urb->bandwidth = 0;
-		if ((ret = uhci_urb_enqueue(&uhci->hcd, urb, 0)))
-			printk(KERN_ERR __FILE__ ": could not resubmit interrupt URB : %d\n", ret);		  
-	} else
-		usb_hcd_giveback_urb(hcd, urb);
+	usb_hcd_giveback_urb(hcd, urb);
 }
 
 static void uhci_finish_completion(struct usb_hcd *hcd)

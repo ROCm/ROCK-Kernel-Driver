@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exfldio - Aml Field I/O
- *              $Revision: 88 $
+ *              $Revision: 89 $
  *
  *****************************************************************************/
 
@@ -338,7 +338,7 @@ acpi_ex_field_datum_io (
 		break;
 
 
-	case INTERNAL_TYPE_BANK_FIELD:
+	case ACPI_TYPE_LOCAL_BANK_FIELD:
 
 		/* Ensure that the Bank_value is not beyond the capacity of the register */
 
@@ -366,7 +366,7 @@ acpi_ex_field_datum_io (
 		/*lint -fallthrough */
 
 
-	case INTERNAL_TYPE_REGION_FIELD:
+	case ACPI_TYPE_LOCAL_REGION_FIELD:
 		/*
 		 * For simple Region_fields, we just directly access the owning
 		 * Operation Region.
@@ -381,7 +381,7 @@ acpi_ex_field_datum_io (
 		break;
 
 
-	case INTERNAL_TYPE_INDEX_FIELD:
+	case ACPI_TYPE_LOCAL_INDEX_FIELD:
 
 
 		/* Ensure that the Index_value is not beyond the capacity of the register */

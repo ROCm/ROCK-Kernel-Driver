@@ -22,15 +22,21 @@
 
 /*
  * hotplugging invokes what /proc/sys/kernel/hotplug says (normally
- * /sbin/hotplug) when devices get added or removed.
+ * /sbin/hotplug) when devices or classes get added or removed.
  *
  * This invokes a user mode policy agent, typically helping to load driver
  * or other modules, configure the device, and more.  Drivers can provide
  * a MODULE_DEVICE_TABLE to help with module loading subtasks.
+ *
+ * See the documentation at http://linux-hotplug.sf.net for more info.
+ * 
  */
+
 #define BUFFER_SIZE	1024	/* should be enough memory for the env */
 #define NUM_ENVP	32	/* number of env pointers */
-int dev_hotplug (struct device *dev, const char *action)
+
+static int do_hotplug (struct device *dev, char *argv1, const char *action,
+			int (* hotplug) (struct device *, char **, int, char *, int))
 {
 	char *argv [3], **envp, *buffer, *scratch;
 	char *dev_path;
@@ -39,11 +45,6 @@ int dev_hotplug (struct device *dev, const char *action)
 	int dev_length;
 
 	pr_debug ("%s\n", __FUNCTION__);
-	if (!dev)
-		return -ENODEV;
-
-	if (!dev->bus)
-		return -ENODEV;
 
 	if (!hotplug_path [0])
 		return -ENODEV;
@@ -82,9 +83,8 @@ int dev_hotplug (struct device *dev, const char *action)
 	strcpy (dev_path, "root");
 	fill_devpath (dev, dev_path, dev_length);
 
-	/* only one standardized param to hotplug command: the bus name */
 	argv [0] = hotplug_path;
-	argv [1] = dev->bus->name;
+	argv [1] = argv1;
 	argv [2] = 0;
 
 	/* minimal command environment */
@@ -99,11 +99,10 @@ int dev_hotplug (struct device *dev, const char *action)
 	envp [i++] = scratch;
 	scratch += sprintf (scratch, "DEVPATH=%s", dev_path) + 1;
 	
-	if (dev->bus->hotplug) {
+	if (hotplug) {
 		/* have the bus specific function add its stuff */
-		retval = dev->bus->hotplug (dev, &envp[i], NUM_ENVP - i,
-					    scratch,
-					    BUFFER_SIZE - (scratch - buffer));
+		retval = hotplug (dev, &envp[i], NUM_ENVP - i, scratch,
+				  BUFFER_SIZE - (scratch - buffer));
 		if (retval) {
 			pr_debug ("%s - hotplug() returned %d\n",
 				  __FUNCTION__, retval);
@@ -123,4 +122,43 @@ exit:
 	kfree (buffer);
 	kfree (envp);
 	return retval;
+}
+
+
+/*
+ * dev_hotplug - called when any device is added or removed from a bus
+ */
+int dev_hotplug (struct device *dev, const char *action)
+{
+	pr_debug ("%s\n", __FUNCTION__);
+	if (!dev)
+		return -ENODEV;
+
+	if (!dev->bus)
+		return -ENODEV;
+
+	return do_hotplug (dev, dev->bus->name, action, dev->bus->hotplug);
+}
+
+
+/*
+ * class_hotplug - called when a class is added or removed from a device
+ */
+int class_hotplug (struct device *dev, const char *action)
+{
+	struct device_class * cls;
+
+	pr_debug ("%s\n", __FUNCTION__);
+
+	if (!dev)
+		return -ENODEV;
+
+	if (!dev->bus)
+		return -ENODEV;
+
+	cls = get_devclass(dev->driver->devclass);
+	if (!cls)
+		return -ENODEV;
+
+	return do_hotplug (dev, cls->name, action, cls->hotplug);
 }

@@ -44,7 +44,6 @@
 #include <linux/kernel.h>	/* printk(), and other useful stuff */
 #include <linux/module.h>	/* support for loadable modules */
 #include <linux/ioport.h>	/* request_region(), release_region() */
-#include <linux/tqueue.h>	/* for kernel task queues */
 #include <linux/wanrouter.h>	/* WAN router definitions */
 #include <linux/cyclomx.h>	/* cyclomx common user API definitions */
 #include <asm/uaccess.h>	/* kernel <-> user copy */

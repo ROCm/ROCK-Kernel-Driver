@@ -1,0 +1,9 @@
+
+comment 'Supported Frontend Modules'
+
+dep_tristate '  Alps BSRU6 (QPSK)' CONFIG_DVB_ALPS_BSRU6 $CONFIG_DVB_CORE
+dep_tristate '  Alps BSRV2 (QPSK)' CONFIG_DVB_ALPS_BSRV2 $CONFIG_DVB_CORE
+dep_tristate '  Grundig 29504-491 (QPSK)' CONFIG_DVB_GRUNDIG_29504_491 $CONFIG_DVB_CORE
+dep_tristate '  Grundig 29504-401 (OFDM)' CONFIG_DVB_GRUNDIG_29504_401 $CONFIG_DVB_CORE
+dep_tristate '  Frontends with external VES1820 demodulator (QAM)' CONFIG_DVB_VES1820 $CONFIG_DVB_CORE
+

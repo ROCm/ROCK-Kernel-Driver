@@ -31,7 +31,7 @@ struct list_head hpusbscsi_devices;
 /* USB related parts */
 
 static int
-hpusbscsi_usb_probe (struct usb_interface *intf, 
+hpusbscsi_usb_probe (struct usb_interface *intf,
 		     const struct usb_device_id *id)
 {
 	struct hpusbscsi *new;
@@ -109,11 +109,6 @@ hpusbscsi_usb_probe (struct usb_interface *intf,
 	switch (result) {
 	case 0:		/* no error */
 		break;
-
-	case -EPIPE:
-		usb_clear_halt (dev, usb_sndctrlpipe (dev, 0));
-		break;
-
 	default:
 		printk (KERN_ERR "unknown error %d from usb_set_interface\n",
 			 result);

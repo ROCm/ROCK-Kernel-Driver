@@ -62,15 +62,9 @@ int scsi_init_io(Scsi_Cmnd *SCpnt)
 	int count, gfp_mask;
 
 	/*
-	 * non-sg block request. FIXME: check bouncing for isa hosts!
+	 * if this is a rq->data based REQ_BLOCK_PC, setup for a non-sg xfer
 	 */
 	if ((req->flags & REQ_BLOCK_PC) && !req->bio) {
-		/*
-		 * FIXME: isa bouncing
-		 */
-		if (SCpnt->host->unchecked_isa_dma)
-			goto fail;
-
 		SCpnt->request_bufflen = req->data_len;
 		SCpnt->request_buffer = req->data;
 		req->buffer = req->data;
@@ -100,6 +94,8 @@ int scsi_init_io(Scsi_Cmnd *SCpnt)
 
 	SCpnt->request_buffer = (char *) sgpnt;
 	SCpnt->request_bufflen = req->nr_sectors << 9;
+	if (blk_pc_request(req))
+		SCpnt->request_bufflen = req->data_len;
 	req->buffer = NULL;
 
 	/* 
@@ -123,7 +119,6 @@ int scsi_init_io(Scsi_Cmnd *SCpnt)
 	/*
 	 * kill it. there should be no leftover blocks in this request
 	 */
-fail:
 	SCpnt = scsi_end_request(SCpnt, 0, req->nr_sectors);
 	BUG_ON(SCpnt);
 	return 0;

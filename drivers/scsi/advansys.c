@@ -1570,7 +1570,6 @@ typedef struct asc_dvc_cfg {
     uchar               isa_dma_speed;
     uchar               isa_dma_channel;
     uchar               chip_version;
-    ushort              pci_device_id;
     ushort              lib_serial_no;
     ushort              lib_version;
     ushort              mcode_date;
@@ -1580,6 +1579,7 @@ typedef struct asc_dvc_cfg {
     uchar               sdtr_period_offset[ASC_MAX_TID + 1];
     ushort              pci_slot_info;
     uchar               adapter_info[6];
+    struct pci_dev	*pci_dev;
 } ASC_DVC_CFG;
 
 #define ASC_DEF_DVC_CNTL       0xFFFF
@@ -3075,7 +3075,6 @@ typedef struct adv_dvc_cfg {
   ushort disc_enable;       /* enable disconnection */
   uchar  chip_version;      /* chip version */
   uchar  termination;       /* Term. Ctrl. bits 6-5 of SCSI_CFG1 register */
-  ushort pci_device_id;     /* PCI device code number */
   ushort lib_version;       /* Adv Library version number */
   ushort control_flag;      /* Microcode Control Flag */
   ushort mcode_date;        /* Microcode date */
@@ -3086,6 +3085,7 @@ typedef struct adv_dvc_cfg {
   ushort serial1;           /* EEPROM serial number word 1 */
   ushort serial2;           /* EEPROM serial number word 2 */
   ushort serial3;           /* EEPROM serial number word 3 */
+  struct pci_dev *pci_dev;  /* pointer to the pci dev structure for this board */
 } ADV_DVC_CFG;
 
 struct adv_dvc_var;
@@ -4957,7 +4957,7 @@ advansys_detect(Scsi_Host_Template *tpnt)
 #ifdef CONFIG_PCI
                 case ASC_IS_PCI:
                     shp->irq = asc_dvc_varp->irq_no = pci_devp->irq;
-                    asc_dvc_varp->cfg->pci_device_id = pci_devp->device;
+                    asc_dvc_varp->cfg->pci_dev = pci_devp;
                     asc_dvc_varp->cfg->pci_slot_info =
                         ASC_PCI_MKID(pci_devp->bus->number,
                             PCI_SLOT(pci_devp->devfn),
@@ -4981,7 +4981,7 @@ advansys_detect(Scsi_Host_Template *tpnt)
                  */
 #ifdef CONFIG_PCI
                 shp->irq = adv_dvc_varp->irq_no = pci_devp->irq;
-                adv_dvc_varp->cfg->pci_device_id = pci_devp->device;
+                adv_dvc_varp->cfg->pci_dev = pci_devp;
                 adv_dvc_varp->cfg->pci_slot_info =
                     ASC_PCI_MKID(pci_devp->bus->number,
                         PCI_SLOT(pci_devp->devfn),
@@ -9040,10 +9040,7 @@ DvcReadPCIConfigByte(
 {
 #ifdef CONFIG_PCI
     uchar byte_data;
-    pcibios_read_config_byte(ASC_PCI_ID2BUS(asc_dvc->cfg->pci_slot_info),
-        PCI_DEVFN(ASC_PCI_ID2DEV(asc_dvc->cfg->pci_slot_info),
-            ASC_PCI_ID2FUNC(asc_dvc->cfg->pci_slot_info)),
-        offset, &byte_data);
+    pci_read_config_byte(asc_dvc->cfg->pci_dev, offset, &byte_data);
     return byte_data;
 #else /* !defined(CONFIG_PCI) */
     return 0;
@@ -9062,10 +9059,7 @@ DvcWritePCIConfigByte(
 )
 {
 #ifdef CONFIG_PCI
-    pcibios_write_config_byte(ASC_PCI_ID2BUS(asc_dvc->cfg->pci_slot_info),
-        PCI_DEVFN(ASC_PCI_ID2DEV(asc_dvc->cfg->pci_slot_info),
-            ASC_PCI_ID2FUNC(asc_dvc->cfg->pci_slot_info)),
-        offset, byte_data);
+    pci_write_config_byte(asc_dvc->cfg->pci_dev, offset, byte_data);
 #endif /* CONFIG_PCI */
 }
 
@@ -9163,10 +9157,7 @@ DvcAdvReadPCIConfigByte(
 {
 #ifdef CONFIG_PCI
     uchar byte_data;
-    pcibios_read_config_byte(ASC_PCI_ID2BUS(asc_dvc->cfg->pci_slot_info),
-        PCI_DEVFN(ASC_PCI_ID2DEV(asc_dvc->cfg->pci_slot_info),
-            ASC_PCI_ID2FUNC(asc_dvc->cfg->pci_slot_info)),
-        offset, &byte_data);
+    pci_read_config_byte(asc_dvc->cfg->pci_dev, offset, &byte_data);
     return byte_data;
 #else /* CONFIG_PCI */
     return 0;
@@ -9185,10 +9176,7 @@ DvcAdvWritePCIConfigByte(
 )
 {
 #ifdef CONFIG_PCI
-    pcibios_write_config_byte(ASC_PCI_ID2BUS(asc_dvc->cfg->pci_slot_info),
-        PCI_DEVFN(ASC_PCI_ID2DEV(asc_dvc->cfg->pci_slot_info),
-            ASC_PCI_ID2FUNC(asc_dvc->cfg->pci_slot_info)),
-        offset, byte_data);
+    pci_write_config_byte(asc_dvc->cfg->pci_dev, offset, byte_data);
 #else /* CONFIG_PCI */
     return 0;
 #endif /* CONFIG_PCI */
@@ -9548,7 +9536,7 @@ asc_prt_asc_dvc_cfg(ASC_DVC_CFG *h)
 
     printk(
 " pci_device_id %d, lib_serial_no %u, lib_version %u, mcode_date 0x%x,\n",
-          h->pci_device_id, h->lib_serial_no, h->lib_version, h->mcode_date);
+          h->pci_dev->device, h->lib_serial_no, h->lib_version, h->mcode_date);
 
     printk(
 " mcode_version %d, overrun_buf 0x%lx\n",
@@ -9673,7 +9661,7 @@ asc_prt_adv_dvc_cfg(ADV_DVC_CFG *h)
 
     printk(
 "  mcode_version 0x%x, pci_device_id 0x%x, lib_version %u\n",
-       h->mcode_version, h->pci_device_id, h->lib_version);
+       h->mcode_version, h->pci_dev->device, h->lib_version);
 
     printk(
 "  control_flag 0x%x, pci_slot_info 0x%x\n",
@@ -12342,7 +12330,7 @@ AscInitFromAscDvcVar(
     ushort              pci_device_id;
 
     iop_base = asc_dvc->iop_base;
-    pci_device_id = asc_dvc->cfg->pci_device_id;
+    pci_device_id = asc_dvc->cfg->pci_dev->device;
     warn_code = 0;
     cfg_msw = AscGetChipCfgMsw(iop_base);
     if ((cfg_msw & ASC_CFG_MSW_CLR_MASK) != 0) {

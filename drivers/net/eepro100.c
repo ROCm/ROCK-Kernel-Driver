@@ -122,8 +122,7 @@ static int options[] = {-1, -1, -1, -1, -1, -1, -1, -1};
 
 static int debug = -1;
 #define DEBUG_DEFAULT		(NETIF_MSG_DRV		| \
-				 NETIF_MSG_IFDOWN	| \
-				 NETIF_MSG_IFUP		| \
+				 NETIF_MSG_HW		| \
 				 NETIF_MSG_RX_ERR	| \
 				 NETIF_MSG_TX_ERR)
 #define DEBUG			((debug >= 0) ? (1<<debug)-1 : DEBUG_DEFAULT)
@@ -568,10 +567,8 @@ static inline unsigned char wait_for_cmd_done(struct net_device *dev)
 		r = inb(cmd_ioaddr);
 	} while(r && --wait >= 0);
 
-#ifndef final_version
 	if (wait < 0)
 		printk(KERN_ALERT "%s: wait_for_cmd_done timeout!\n", dev->name);
-#endif
 	return r;
 }
 
@@ -852,7 +849,9 @@ static int __devinit speedo_found1(struct pci_dev *pdev,
 	sp->phy[0] = eeprom[6];
 	sp->phy[1] = eeprom[7];
 
-	sp->mii_if.phy_id = eeprom[6];
+	sp->mii_if.phy_id = eeprom[6] & 0x1f;
+	sp->mii_if.phy_id_mask = 0x1f;
+	sp->mii_if.reg_num_mask = 0x1f;
 	sp->mii_if.dev = dev;
 	sp->mii_if.mdio_read = mdio_read;
 	sp->mii_if.mdio_write = mdio_write;
@@ -1207,7 +1206,7 @@ static void speedo_timer(unsigned long data)
 		/* We haven't received a packet in a Long Time.  We might have been
 		   bitten by the receiver hang bug.  This can be cleared by sending
 		   a set multicast list command. */
-		if (netif_msg_rx_err(sp))
+		if (netif_msg_timer(sp))
 			printk(KERN_DEBUG "%s: Sending a multicast list set command"
 				   " from a timer routine,"
 				   " m=%d, j=%ld, l=%ld.\n",
@@ -1224,25 +1223,26 @@ static void speedo_show_state(struct net_device *dev)
 	struct speedo_private *sp = (struct speedo_private *)dev->priv;
 	int i;
 
-	/* Print a few items for debugging. */
-	printk(KERN_DEBUG "%s: Tx ring dump,  Tx queue %u / %u:\n", dev->name,
-		   sp->cur_tx, sp->dirty_tx);
-	for (i = 0; i < TX_RING_SIZE; i++)
-		printk(KERN_DEBUG "%s:  %c%c%2d %8.8x.\n", dev->name,
-			   i == sp->dirty_tx % TX_RING_SIZE ? '*' : ' ',
-			   i == sp->cur_tx % TX_RING_SIZE ? '=' : ' ',
-			   i, sp->tx_ring[i].status);
+	if (netif_msg_pktdata(sp)) {
+		printk(KERN_DEBUG "%s: Tx ring dump,  Tx queue %u / %u:\n", 
+		    dev->name, sp->cur_tx, sp->dirty_tx);
+		for (i = 0; i < TX_RING_SIZE; i++)
+			printk(KERN_DEBUG "%s:  %c%c%2d %8.8x.\n", dev->name,
+			    i == sp->dirty_tx % TX_RING_SIZE ? '*' : ' ',
+			    i == sp->cur_tx % TX_RING_SIZE ? '=' : ' ',
+			    i, sp->tx_ring[i].status);
 
-	printk(KERN_DEBUG "%s: Printing Rx ring"
-		   " (next to receive into %u, dirty index %u).\n",
-		   dev->name, sp->cur_rx, sp->dirty_rx);
-	for (i = 0; i < RX_RING_SIZE; i++)
-		printk(KERN_DEBUG "%s: %c%c%c%2d %8.8x.\n", dev->name,
-			   sp->rx_ringp[i] == sp->last_rxf ? 'l' : ' ',
-			   i == sp->dirty_rx % RX_RING_SIZE ? '*' : ' ',
-			   i == sp->cur_rx % RX_RING_SIZE ? '=' : ' ',
-			   i, (sp->rx_ringp[i] != NULL) ?
-					   (unsigned)sp->rx_ringp[i]->status : 0);
+		printk(KERN_DEBUG "%s: Printing Rx ring"
+		    " (next to receive into %u, dirty index %u).\n",
+		    dev->name, sp->cur_rx, sp->dirty_rx);
+		for (i = 0; i < RX_RING_SIZE; i++)
+			printk(KERN_DEBUG "%s: %c%c%c%2d %8.8x.\n", dev->name,
+			    sp->rx_ringp[i] == sp->last_rxf ? 'l' : ' ',
+			    i == sp->dirty_rx % RX_RING_SIZE ? '*' : ' ',
+			    i == sp->cur_rx % RX_RING_SIZE ? '=' : ' ',
+			    i, (sp->rx_ringp[i] != NULL) ?
+			    (unsigned)sp->rx_ringp[i]->status : 0);
+	}
 
 #if 0
 	{
@@ -1378,8 +1378,8 @@ static void speedo_tx_timeout(struct net_device *dev)
 		   sp->dirty_tx, sp->cur_tx,
 		   sp->tx_ring[sp->dirty_tx % TX_RING_SIZE].status);
 
-		speedo_show_state(dev);
 	}
+	speedo_show_state(dev);
 #if 0
 	if ((status & 0x00C0) != 0x0080
 		&&  (status & 0x003C) == 0x0010) {
@@ -1564,13 +1564,6 @@ static void speedo_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 	long ioaddr, boguscnt = max_interrupt_work;
 	unsigned short status;
 
-#ifndef final_version
-	if (dev == NULL) {
-		printk(KERN_ERR "speedo_interrupt(): irq %d for unknown device.\n", irq);
-		return;
-	}
-#endif
-
 	ioaddr = dev->base_addr;
 	sp = (struct speedo_private *)dev->priv;
 
@@ -1717,9 +1710,9 @@ static int speedo_refill_rx_buf(struct net_device *dev, int force)
 			if (netif_msg_rx_err(sp) || !(sp->rx_ring_state & RrOOMReported)) {
 				printk(KERN_WARNING "%s: can't fill rx buffer (force %d)!\n",
 						dev->name, force);
-				speedo_show_state(dev);
 				sp->rx_ring_state |= RrOOMReported;
 			}
+			speedo_show_state(dev);
 			if (!force)
 				return -1;	/* Better luck next time!  */
 			/* Borrow an skb from one of next entries. */
@@ -1792,7 +1785,7 @@ speedo_rx(struct net_device *dev)
 			break;
 		}
 
-		if (netif_msg_intr(sp))
+		if (netif_msg_rx_status(sp))
 			printk(KERN_DEBUG "  speedo_rx() status %8.8x len %d.\n", status,
 				   pkt_len);
 		if ((status & (RxErrTooBig|RxOK|0x0f90)) != RxOK) {
@@ -1894,10 +1887,7 @@ speedo_close(struct net_device *dev)
 	udelay(10);
 
 	free_irq(dev->irq, dev);
-
-	/* Print a few items for debugging. */
-	if (netif_msg_ifdown(sp))
-		speedo_show_state(dev);
+	speedo_show_state(dev);
 
     /* Free all the skbuffs in the Rx and Tx queues. */
 	for (i = 0; i < RX_RING_SIZE; i++) {

@@ -1159,12 +1159,12 @@ struct NCR53c7x0_hostdata {
 					   700-66, rest are last three
 					   digits of part number */
     /*
-     * PCI bus, device, function, only for NCR53c8x0 chips.
+     * PCI device, only for NCR53c8x0 chips.
      * pci_valid indicates that the PCI configuration information
      * is valid, and we can twiddle MAX_LAT, etc. as recommended
      * for maximum performance in the NCR documentation.
      */
-    unsigned char pci_bus, pci_device_fn;
+    struct pci_dev *pci_dev;
     unsigned pci_valid:1;
 
     u32 *dsp;				/* dsp to restart with after

@@ -185,20 +185,32 @@ static void acm_ctrl_irq(struct urb *urb)
 	struct usb_ctrlrequest *dr = urb->transfer_buffer;
 	unsigned char *data = (unsigned char *)(dr + 1);
 	int newctrl;
+	int status;
 
-	if (!ACM_READY(acm)) return;
-
-	if (urb->status < 0) {
-		dbg("nonzero ctrl irq status received: %d", urb->status);
+	switch (urb->status) {
+	case 0:
+		/* success */
+		break;
+	case -ECONNRESET:
+	case -ENOENT:
+	case -ESHUTDOWN:
+		/* this urb is terminated, clean up */
+		dbg("%s - urb shutting down with status: %d", __FUNCTION__, urb->status);
 		return;
+	default:
+		dbg("%s - nonzero urb status received: %d", __FUNCTION__, urb->status);
+		goto exit;
 	}
+
+	if (!ACM_READY(acm))
+		goto exit;
 
 	switch (dr->bRequest) {
 
 		case ACM_IRQ_NETWORK:
 
 			dbg("%s network", data[0] ? "connected to" : "disconnected from");
-			return;
+			break;
 
 		case ACM_IRQ_LINE_STATE:
 
@@ -217,13 +229,18 @@ static void acm_ctrl_irq(struct urb *urb)
 				acm->ctrlin & ACM_CTRL_FRAMING ? '+' : '-',	acm->ctrlin & ACM_CTRL_PARITY ? '+' : '-',
 				acm->ctrlin & ACM_CTRL_OVERRUN ? '+' : '-');
 
-			return;
+			break;
 
 		default:
 			dbg("unknown control event received: request %d index %d len %d data0 %d data1 %d",
 				dr->bRequest, dr->wIndex, dr->wLength, data[0], data[1]);
-			return;
+			break;
 	}
+exit:
+	status = usb_submit_urb (urb, GFP_ATOMIC);
+	if (status)
+		err ("%s - usb_submit_urb failed with result %d",
+		     __FUNCTION__, status);
 }
 
 static void acm_read_bulk(struct urb *urb)

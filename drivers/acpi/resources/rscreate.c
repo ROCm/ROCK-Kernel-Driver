@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rscreate - Create resource lists/tables
- *              $Revision: 58 $
+ *              $Revision: 61 $
  *
  ******************************************************************************/
 
@@ -66,7 +66,8 @@ acpi_rs_create_resource_list (
 	ACPI_FUNCTION_TRACE ("Rs_create_resource_list");
 
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Byte_stream_buffer = %p\n", byte_stream_buffer));
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Byte_stream_buffer = %p\n",
+		byte_stream_buffer));
 
 	/*
 	 * Params already validated, so we don't re-validate here
@@ -135,13 +136,13 @@ acpi_rs_create_pci_routing_table (
 	acpi_buffer             *output_buffer)
 {
 	u8                      *buffer;
-	acpi_operand_object     **top_object_list = NULL;
-	acpi_operand_object     **sub_object_list = NULL;
-	acpi_operand_object     *package_element = NULL;
+	acpi_operand_object     **top_object_list;
+	acpi_operand_object     **sub_object_list;
+	acpi_operand_object     *obj_desc;
 	ACPI_SIZE               buffer_size_needed = 0;
-	u32                     number_of_elements = 0;
-	u32                     index = 0;
-	acpi_pci_routing_table  *user_prt = NULL;
+	u32                     number_of_elements;
+	u32                     index;
+	acpi_pci_routing_table  *user_prt;
 	acpi_namespace_node     *node;
 	acpi_status             status;
 	acpi_buffer             path_buffer;
@@ -161,7 +162,8 @@ acpi_rs_create_pci_routing_table (
 		return_ACPI_STATUS (status);
 	}
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Buffer_size_needed = %X\n", (u32) buffer_size_needed));
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Buffer_size_needed = %X\n",
+		(u32) buffer_size_needed));
 
 	/* Validate/Allocate/Clear caller buffer */
 
@@ -171,7 +173,8 @@ acpi_rs_create_pci_routing_table (
 	}
 
 	/*
-	 * Loop through the ACPI_INTERNAL_OBJECTS - Each object should contain an
+	 * Loop through the ACPI_INTERNAL_OBJECTS - Each object
+	 * should be a package that in turn contains an
 	 * acpi_integer Address, a u8 Pin, a Name and a u8 Source_index.
 	 */
 	top_object_list  = package_object->package.elements;
@@ -194,81 +197,98 @@ acpi_rs_create_pci_routing_table (
 		 * The minus four is to subtract the size of the u8 Source[4] member
 		 * because it is added below.
 		 */
-		user_prt->length = (sizeof (acpi_pci_routing_table) -4);
+		user_prt->length = (sizeof (acpi_pci_routing_table) - 4);
 
 		/*
-		 * Dereference the sub-package
+		 * Each element of the top-level package must also be a package
 		 */
-		package_element = *top_object_list;
+		if (ACPI_GET_OBJECT_TYPE (*top_object_list) != ACPI_TYPE_PACKAGE) {
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+				"(PRT[%X]) Need sub-package, found %s\n",
+				index, acpi_ut_get_object_type_name (*top_object_list)));
+			return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
+		}
+
+		/* Each sub-package must be of length 4 */
+
+		if ((*top_object_list)->package.count != 4) {
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+				"(PRT[%X]) Need package of length 4, found length %d\n",
+				index, (*top_object_list)->package.count));
+			return_ACPI_STATUS (AE_AML_PACKAGE_LIMIT);
+		}
 
 		/*
+		 * Dereference the sub-package.
 		 * The Sub_object_list will now point to an array of the four IRQ
-		 * elements: Address, Pin, Source and Source_index
+		 * elements: [Address, Pin, Source, Source_index]
 		 */
-		sub_object_list = package_element->package.elements;
+		sub_object_list = (*top_object_list)->package.elements;
 
 		/*
-		 * 1) First subobject:  Dereference the Address
+		 * 1) First subobject: Dereference the PRT.Address
 		 */
-		if (ACPI_GET_OBJECT_TYPE (*sub_object_list) == ACPI_TYPE_INTEGER) {
-			user_prt->address = (*sub_object_list)->integer.value;
+		obj_desc = sub_object_list[0];
+		if (ACPI_GET_OBJECT_TYPE (obj_desc) == ACPI_TYPE_INTEGER) {
+			user_prt->address = obj_desc->integer.value;
 		}
 		else {
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Need Integer, found %s\n",
-				acpi_ut_get_object_type_name (*sub_object_list)));
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+				"(PRT[%X].Address) Need Integer, found %s\n",
+				index, acpi_ut_get_object_type_name (obj_desc)));
 			return_ACPI_STATUS (AE_BAD_DATA);
 		}
 
 		/*
-		 * 2) Second subobject: Dereference the Pin
+		 * 2) Second subobject: Dereference the PRT.Pin
 		 */
-		sub_object_list++;
-
-		if (ACPI_GET_OBJECT_TYPE (*sub_object_list) == ACPI_TYPE_INTEGER) {
-			user_prt->pin = (u32) (*sub_object_list)->integer.value;
+		obj_desc = sub_object_list[1];
+		if (ACPI_GET_OBJECT_TYPE (obj_desc) == ACPI_TYPE_INTEGER) {
+			user_prt->pin = (u32) obj_desc->integer.value;
 		}
 		else {
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Need Integer, found %s\n",
-				acpi_ut_get_object_type_name (*sub_object_list)));
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+				"(PRT[%X].Pin) Need Integer, found %s\n",
+				index, acpi_ut_get_object_type_name (obj_desc)));
 			return_ACPI_STATUS (AE_BAD_DATA);
 		}
 
 		/*
-		 * 3) Third subobject: Dereference the Source Name
+		 * 3) Third subobject: Dereference the PRT.Source_name
 		 */
-		sub_object_list++;
+		obj_desc = sub_object_list[2];
+		switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {
+		case ACPI_TYPE_LOCAL_REFERENCE:
 
-		switch (ACPI_GET_OBJECT_TYPE (*sub_object_list)) {
-		case INTERNAL_TYPE_REFERENCE:
-
-			if ((*sub_object_list)->reference.opcode != AML_INT_NAMEPATH_OP) {
-				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Need name, found reference op %X\n",
-					(*sub_object_list)->reference.opcode));
+			if (obj_desc->reference.opcode != AML_INT_NAMEPATH_OP) {
+				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+					"(PRT[%X].Source) Need name, found reference op %X\n",
+					index, obj_desc->reference.opcode));
 				return_ACPI_STATUS (AE_BAD_DATA);
 			}
 
-			node = (*sub_object_list)->reference.node;
+			node = obj_desc->reference.node;
 
 			/* Use *remaining* length of the buffer as max for pathname */
 
 			path_buffer.length = output_buffer->length -
-					   (u32) ((u8 *) user_prt->source - (u8 *) output_buffer->pointer);
+					   (u32) ((u8 *) user_prt->source -
+					   (u8 *) output_buffer->pointer);
 			path_buffer.pointer = user_prt->source;
 
 			status = acpi_ns_handle_to_pathname ((acpi_handle) node, &path_buffer);
 
-			user_prt->length += ACPI_STRLEN (user_prt->source) + 1; /* include null terminator */
+			user_prt->length += (u32) ACPI_STRLEN (user_prt->source) + 1; /* include null terminator */
 			break;
 
 
 		case ACPI_TYPE_STRING:
 
-			ACPI_STRCPY (user_prt->source,
-				  (*sub_object_list)->string.pointer);
+			ACPI_STRCPY (user_prt->source, obj_desc->string.pointer);
 
 			/* Add to the Length field the length of the string */
 
-			user_prt->length += (*sub_object_list)->string.length;
+			user_prt->length += obj_desc->string.length;
 			break;
 
 
@@ -285,8 +305,9 @@ acpi_rs_create_pci_routing_table (
 
 		default:
 
-		   ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Need Integer, found %s\n",
-				acpi_ut_get_object_type_name (*sub_object_list)));
+		   ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+			   "(PRT[%X].Source) Need Ref/String/Integer, found %s\n",
+				index, acpi_ut_get_object_type_name (obj_desc)));
 		   return_ACPI_STATUS (AE_BAD_DATA);
 		}
 
@@ -295,20 +316,20 @@ acpi_rs_create_pci_routing_table (
 		user_prt->length = ACPI_ROUND_UP_TO_64_bITS (user_prt->length);
 
 		/*
-		 * 4) Fourth subobject: Dereference the Source Index
+		 * 4) Fourth subobject: Dereference the PRT.Source_index
 		 */
-		sub_object_list++;
-
-		if (ACPI_GET_OBJECT_TYPE (*sub_object_list) == ACPI_TYPE_INTEGER) {
-			user_prt->source_index = (u32) (*sub_object_list)->integer.value;
+		obj_desc = sub_object_list[3];
+		if (ACPI_GET_OBJECT_TYPE (obj_desc) == ACPI_TYPE_INTEGER) {
+			user_prt->source_index = (u32) obj_desc->integer.value;
 		}
 		else {
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Need Integer, found %s\n",
-				acpi_ut_get_object_type_name (*sub_object_list)));
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+				"(PRT[%X].Source_index) Need Integer, found %s\n",
+				index, acpi_ut_get_object_type_name (obj_desc)));
 			return_ACPI_STATUS (AE_BAD_DATA);
 		}
 
-		/* Point to the next acpi_operand_object */
+		/* Point to the next acpi_operand_object in the top level package */
 
 		top_object_list++;
 	}
@@ -349,7 +370,8 @@ acpi_rs_create_byte_stream (
 	ACPI_FUNCTION_TRACE ("Rs_create_byte_stream");
 
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Linked_list_buffer = %p\n", linked_list_buffer));
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Linked_list_buffer = %p\n",
+		linked_list_buffer));
 
 	/*
 	 * Params already validated, so we don't re-validate here

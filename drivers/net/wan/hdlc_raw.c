@@ -37,15 +37,19 @@ static void raw_rx(struct sk_buff *skb)
 
 int hdlc_raw_ioctl(hdlc_device *hdlc, struct ifreq *ifr)
 {
-	raw_hdlc_proto *raw_s = &ifr->ifr_settings->ifs_hdlc.raw_hdlc;
+	raw_hdlc_proto *raw_s = ifr->ifr_settings.ifs_ifsu.raw_hdlc;
 	const size_t size = sizeof(raw_hdlc_proto);
 	raw_hdlc_proto new_settings;
 	struct net_device *dev = hdlc_to_dev(hdlc);
 	int result;
 
-	switch (ifr->ifr_settings->type) {
+	switch (ifr->ifr_settings.type) {
 	case IF_GET_PROTO:
-		ifr->ifr_settings->type = IF_PROTO_HDLC;
+		ifr->ifr_settings.type = IF_PROTO_HDLC;
+		if (ifr->ifr_settings.size < size) {
+			ifr->ifr_settings.size = size; /* data size wanted */
+			return -ENOBUFS;
+		}
 		if (copy_to_user(raw_s, &hdlc->state.raw_hdlc.settings, size))
 			return -EFAULT;
 		return 0;

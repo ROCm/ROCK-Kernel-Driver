@@ -34,7 +34,6 @@ Qua Jun 27 15:02:26 BRT 2001
 #include <linux/mm.h>
 #include <linux/major.h>
 #include <linux/param.h>
-#include <linux/tqueue.h>
 #include <linux/interrupt.h>
 #include <linux/serial.h>
 #include <linux/serialP.h>

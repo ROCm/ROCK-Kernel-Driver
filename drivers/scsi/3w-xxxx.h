@@ -468,7 +468,6 @@ void tw_unmask_command_interrupt(TW_Device_Extension *tw_dev);
 
 /* Scsi_Host_Template Initializer */
 #define TWXXXX {					\
-	next : NULL,					\
 	module : NULL,					\
 	proc_name : "3w-xxxx",				\
 	proc_info : tw_scsi_proc_info,			\

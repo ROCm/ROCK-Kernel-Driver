@@ -6,7 +6,7 @@
    the GNU General Public License.
  */
 
-/* $Id: nsp_message.c,v 1.7 2001/09/07 04:33:01 elca Exp $ */
+/* $Id: nsp_message.c,v 1.2 2002/09/20 04:06:58 gotom Exp $ */
 
 static void nsp_message_in(Scsi_Cmnd *SCpnt, nsp_hw_data *data)
 {
@@ -64,7 +64,7 @@ static void nsp_message_out(Scsi_Cmnd *SCpnt, nsp_hw_data *data)
 	DEBUG(0, " msgout loop\n");
 	do {
 		if (nsp_xfer(SCpnt, data, BUSPHASE_MESSAGE_OUT)) {
-			printk(KERN_DEBUG " " __FUNCTION__ " msgout: xfer short\n");
+			printk(KERN_DEBUG " %s msgout: xfer short\n", __FUNCTION__);
 		}
 
 		/* catch a next signal */

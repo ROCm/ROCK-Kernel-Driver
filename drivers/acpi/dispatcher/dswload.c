@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dswload - Dispatcher namespace load callbacks
- *              $Revision: 75 $
+ *              $Revision: 78 $
  *
  *****************************************************************************/
 
@@ -151,49 +151,27 @@ acpi_ds_load1_begin_op (
 	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
 		"State=%p Op=%p [%s] ", walk_state, op, acpi_ut_get_type_name (object_type)));
 
-	/*
-	 * Setup the search flags.
-	 *
-	 * Since we are entering a name into the namespace, we do not want to
-	 *    enable the search-to-root upsearch.
-	 *
-	 * There are only two conditions where it is acceptable that the name
-	 *    already exists:
-	 *    1) the Scope() operator can reopen a scoping object that was
-	 *       previously defined (Scope, Method, Device, etc.)
-	 *    2) Whenever we are parsing a deferred opcode (Op_region, Buffer,
-	 *       Buffer_field, or Package), the name of the object is already
-	 *       in the namespace.
-	 */
-	flags = ACPI_NS_NO_UPSEARCH;
-	if ((walk_state->opcode != AML_SCOPE_OP) &&
-		(!(walk_state->parse_flags & ACPI_PARSE_DEFERRED_OP))) {
-		flags |= ACPI_NS_ERROR_IF_FOUND;
-		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DISPATCH, "Cannot already exist\n"));
-	}
-	else {
-		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DISPATCH, "Both Find or Create allowed\n"));
-	}
+	switch (walk_state->opcode) {
+	case AML_SCOPE_OP:
 
-	/*
-	 * Enter the named type into the internal namespace.  We enter the name
-	 * as we go downward in the parse tree.  Any necessary subobjects that involve
-	 * arguments to the opcode must be created as we go back up the parse tree later.
-	 */
-	status = acpi_ns_lookup (walk_state->scope_info, path, object_type,
-			  ACPI_IMODE_LOAD_PASS1, flags, walk_state, &(node));
-	if (ACPI_FAILURE (status)) {
-		ACPI_REPORT_NSERROR (path, status);
-		return (status);
-	}
+		/*
+		 * The target name of the Scope() operator must exist at this point so
+		 * that we can actually open the scope to enter new names underneath it.
+		 * Allow search-to-root for single namesegs.
+		 */
+		status = acpi_ns_lookup (walk_state->scope_info, path, object_type,
+				  ACPI_IMODE_EXECUTE, ACPI_NS_SEARCH_PARENT, walk_state, &(node));
+		if (ACPI_FAILURE (status)) {
+			ACPI_REPORT_NSERROR (path, status);
+			return (status);
+		}
 
-	/*
-	 * For the scope op, we must check to make sure that the target is
-	 * one of the opcodes that actually opens a scope
-	 */
-	if (walk_state->opcode == AML_SCOPE_OP) {
+		/*
+		 * Check to make sure that the target is
+		 * one of the opcodes that actually opens a scope
+		 */
 		switch (node->type) {
-		case ACPI_TYPE_ANY:         /* Scope nodes are untyped (ANY) */
+		case ACPI_TYPE_LOCAL_SCOPE:         /* Scope  */
 		case ACPI_TYPE_DEVICE:
 		case ACPI_TYPE_POWER:
 		case ACPI_TYPE_PROCESSOR:
@@ -223,7 +201,7 @@ acpi_ds_load1_begin_op (
 			walk_state->scope_info->common.value = ACPI_TYPE_ANY;
 			break;
 
-	   default:
+		default:
 
 			/* All other types are an error */
 
@@ -232,7 +210,52 @@ acpi_ds_load1_begin_op (
 
 			return (AE_AML_OPERAND_TYPE);
 		}
+		break;
+
+
+	default:
+
+		/*
+		 * For all other named opcodes, we will enter the name into the namespace.
+		 *
+		 * Setup the search flags.
+		 * Since we are entering a name into the namespace, we do not want to
+		 * enable the search-to-root upsearch.
+		 *
+		 * There are only two conditions where it is acceptable that the name
+		 * already exists:
+		 *    1) the Scope() operator can reopen a scoping object that was
+		 *       previously defined (Scope, Method, Device, etc.)
+		 *    2) Whenever we are parsing a deferred opcode (Op_region, Buffer,
+		 *       Buffer_field, or Package), the name of the object is already
+		 *       in the namespace.
+		 */
+		flags = ACPI_NS_NO_UPSEARCH;
+		if ((walk_state->opcode != AML_SCOPE_OP) &&
+			(!(walk_state->parse_flags & ACPI_PARSE_DEFERRED_OP))) {
+			flags |= ACPI_NS_ERROR_IF_FOUND;
+			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DISPATCH, "Cannot already exist\n"));
+		}
+		else {
+			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DISPATCH, "Both Find or Create allowed\n"));
+		}
+
+		/*
+		 * Enter the named type into the internal namespace.  We enter the name
+		 * as we go downward in the parse tree.  Any necessary subobjects that involve
+		 * arguments to the opcode must be created as we go back up the parse tree later.
+		 */
+		status = acpi_ns_lookup (walk_state->scope_info, path, object_type,
+				  ACPI_IMODE_LOAD_PASS1, flags, walk_state, &(node));
+		if (ACPI_FAILURE (status)) {
+			ACPI_REPORT_NSERROR (path, status);
+			return (status);
+		}
+		break;
 	}
+
+
+	/* Common exit */
 
 	if (!op) {
 		/* Create a new op */
@@ -419,59 +442,43 @@ acpi_ds_load2_begin_op (
 		"State=%p Op=%p Type=%X\n", walk_state, op, object_type));
 
 
-	if (walk_state->opcode == AML_FIELD_OP         ||
-		walk_state->opcode == AML_BANK_FIELD_OP    ||
-		walk_state->opcode == AML_INDEX_FIELD_OP) {
+	switch (walk_state->opcode) {
+	case AML_FIELD_OP:
+	case AML_BANK_FIELD_OP:
+	case AML_INDEX_FIELD_OP:
+
 		node = NULL;
 		status = AE_OK;
-	}
-	else if (walk_state->opcode == AML_INT_NAMEPATH_OP) {
+		break;
+
+	case AML_INT_NAMEPATH_OP:
+
 		/*
 		 * The Name_path is an object reference to an existing object. Don't enter the
 		 * name into the namespace, but look it up for use later
 		 */
 		status = acpi_ns_lookup (walk_state->scope_info, buffer_ptr, object_type,
 				  ACPI_IMODE_EXECUTE, ACPI_NS_SEARCH_PARENT, walk_state, &(node));
-	}
-	else {
-		/* All other opcodes */
+		break;
 
-		if (op && op->common.node) {
-			/* This op/node was previously entered into the namespace */
-
-			node = op->common.node;
-
-			if (acpi_ns_opens_scope (object_type)) {
-				status = acpi_ds_scope_stack_push (node, object_type, walk_state);
-				if (ACPI_FAILURE (status)) {
-					return_ACPI_STATUS (status);
-				}
-
-			}
-			return_ACPI_STATUS (AE_OK);
-		}
+	case AML_SCOPE_OP:
 
 		/*
-		 * Enter the named type into the internal namespace.  We enter the name
-		 * as we go downward in the parse tree.  Any necessary subobjects that involve
-		 * arguments to the opcode must be created as we go back up the parse tree later.
+		 * The Path is an object reference to an existing object.  Don't enter the
+		 * name into the namespace, but look it up for use later
 		 */
 		status = acpi_ns_lookup (walk_state->scope_info, buffer_ptr, object_type,
-				  ACPI_IMODE_EXECUTE, ACPI_NS_NO_UPSEARCH, walk_state, &(node));
-	}
-
-	if (ACPI_FAILURE (status)) {
-		ACPI_REPORT_NSERROR (buffer_ptr, status);
-		return_ACPI_STATUS (status);
-	}
-
-	/*
-	 * For the scope op, we must check to make sure that the target is
-	 * one of the opcodes that actually opens a scope
-	 */
-	if (walk_state->opcode == AML_SCOPE_OP) {
+				  ACPI_IMODE_EXECUTE, ACPI_NS_SEARCH_PARENT, walk_state, &(node));
+		if (ACPI_FAILURE (status)) {
+			ACPI_REPORT_NSERROR (buffer_ptr, status);
+			return_ACPI_STATUS (status);
+		}
+		/*
+		 * We must check to make sure that the target is
+		 * one of the opcodes that actually opens a scope
+		 */
 		switch (node->type) {
-		case ACPI_TYPE_ANY:         /* Scope nodes are untyped (ANY) */
+		case ACPI_TYPE_LOCAL_SCOPE:         /* Scope */
 		case ACPI_TYPE_DEVICE:
 		case ACPI_TYPE_POWER:
 		case ACPI_TYPE_PROCESSOR:
@@ -499,7 +506,7 @@ acpi_ds_load2_begin_op (
 			walk_state->scope_info->common.value = ACPI_TYPE_ANY;
 			break;
 
-	   default:
+		default:
 
 			/* All other types are an error */
 
@@ -508,7 +515,42 @@ acpi_ds_load2_begin_op (
 
 			return (AE_AML_OPERAND_TYPE);
 		}
+		break;
+
+	default:
+
+		/* All other opcodes */
+
+		if (op && op->common.node) {
+			/* This op/node was previously entered into the namespace */
+
+			node = op->common.node;
+
+			if (acpi_ns_opens_scope (object_type)) {
+				status = acpi_ds_scope_stack_push (node, object_type, walk_state);
+				if (ACPI_FAILURE (status)) {
+					return_ACPI_STATUS (status);
+				}
+
+			}
+			return_ACPI_STATUS (AE_OK);
+		}
+
+		/*
+		 * Enter the named type into the internal namespace.  We enter the name
+		 * as we go downward in the parse tree.  Any necessary subobjects that involve
+		 * arguments to the opcode must be created as we go back up the parse tree later.
+		 */
+		status = acpi_ns_lookup (walk_state->scope_info, buffer_ptr, object_type,
+				  ACPI_IMODE_EXECUTE, ACPI_NS_NO_UPSEARCH, walk_state, &(node));
+		break;
 	}
+
+	if (ACPI_FAILURE (status)) {
+		ACPI_REPORT_NSERROR (buffer_ptr, status);
+		return_ACPI_STATUS (status);
+	}
+
 
 	if (!op) {
 		/* Create a new op */

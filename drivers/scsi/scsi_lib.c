@@ -240,7 +240,7 @@ void scsi_queue_next_request(request_queue_t * q, Scsi_Cmnd * SCpnt)
 		SCpnt->request->special = (void *) SCpnt;
 		if(blk_rq_tagged(SCpnt->request))
 			blk_queue_end_tag(q, SCpnt->request);
-		_elv_add_request(q, SCpnt->request, 0, 0);
+		__elv_add_request(q, SCpnt->request, 0, 0);
 	}
 
 	/*
@@ -514,6 +514,12 @@ void scsi_io_completion(Scsi_Cmnd * SCpnt, int good_sectors,
 		}
 	}
 
+	if (blk_pc_request(req)) {
+		req->errors = result & 0xff;
+		if (!result)
+			req->data_len -= SCpnt->bufflen;
+	}
+
 	/*
 	 * Zero these out.  They now point to freed memory, and it is
 	 * dangerous to hang onto the pointers.
@@ -527,7 +533,7 @@ void scsi_io_completion(Scsi_Cmnd * SCpnt, int good_sectors,
 	 * Next deal with any sectors which we were able to correctly
 	 * handle.
 	 */
-	if (good_sectors > 0) {
+	if (good_sectors >= 0) {
 		SCSI_LOG_HLCOMPLETE(1, printk("%ld sectors total, %d sectors done.\n",
 					      req->nr_sectors, good_sectors));
 		SCSI_LOG_HLCOMPLETE(1, printk("use_sg is %d\n ", SCpnt->use_sg));
@@ -951,7 +957,7 @@ void scsi_request_fn(request_queue_t * q)
 				SCpnt->request->flags |= REQ_SPECIAL;
 				if(blk_rq_tagged(SCpnt->request))
 					blk_queue_end_tag(q, SCpnt->request);
-				_elv_add_request(q, SCpnt->request, 0, 0);
+				__elv_add_request(q, SCpnt->request, 0, 0);
 				break;
 			}
 

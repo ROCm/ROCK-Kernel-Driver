@@ -12,7 +12,7 @@
 #ifndef __HDLC_H
 #define __HDLC_H
 
-#define GENERIC_HDLC_VERSION 3	/* For synchronization with sethdlc utility */
+#define GENERIC_HDLC_VERSION 4	/* For synchronization with sethdlc utility */
 
 #define CLOCK_DEFAULT   0	/* Default setting */
 #define CLOCK_EXT	1	/* External TX and RX clock - DTE */

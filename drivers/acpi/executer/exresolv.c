@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exresolv - AML Interpreter object resolution
- *              $Revision: 116 $
+ *              $Revision: 117 $
  *
  *****************************************************************************/
 
@@ -132,7 +132,7 @@ acpi_ex_resolve_object_to_value (
 	/* This is an acpi_operand_object  */
 
 	switch (ACPI_GET_OBJECT_TYPE (stack_desc)) {
-	case INTERNAL_TYPE_REFERENCE:
+	case ACPI_TYPE_LOCAL_REFERENCE:
 
 		opcode = stack_desc->reference.opcode;
 
@@ -262,9 +262,9 @@ acpi_ex_resolve_object_to_value (
 	 * These cases may never happen here, but just in case..
 	 */
 	case ACPI_TYPE_BUFFER_FIELD:
-	case INTERNAL_TYPE_REGION_FIELD:
-	case INTERNAL_TYPE_BANK_FIELD:
-	case INTERNAL_TYPE_INDEX_FIELD:
+	case ACPI_TYPE_LOCAL_REGION_FIELD:
+	case ACPI_TYPE_LOCAL_BANK_FIELD:
+	case ACPI_TYPE_LOCAL_INDEX_FIELD:
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Field_read Source_desc=%p Type=%X\n",
 			stack_desc, ACPI_GET_OBJECT_TYPE (stack_desc)));
@@ -309,7 +309,7 @@ acpi_ex_resolve_multiple (
 	acpi_object_type        type;
 
 
-	ACPI_FUNCTION_TRACE ("Ex_get_object_type");
+	ACPI_FUNCTION_TRACE ("Acpi_ex_resolve_multiple");
 
 
 	/*
@@ -318,7 +318,7 @@ acpi_ex_resolve_multiple (
 	 * of the Object_type and Size_of operators). This means traversing
 	 * the list of possibly many nested references.
 	 */
-	while (ACPI_GET_OBJECT_TYPE (obj_desc) == INTERNAL_TYPE_REFERENCE) {
+	while (ACPI_GET_OBJECT_TYPE (obj_desc) == ACPI_TYPE_LOCAL_REFERENCE) {
 		switch (obj_desc->reference.opcode) {
 		case AML_REF_OF_OP:
 
@@ -427,11 +427,18 @@ exit:
 	/* Convert internal types to external types */
 
 	switch (type) {
-	case INTERNAL_TYPE_REGION_FIELD:
-	case INTERNAL_TYPE_BANK_FIELD:
-	case INTERNAL_TYPE_INDEX_FIELD:
+	case ACPI_TYPE_LOCAL_REGION_FIELD:
+	case ACPI_TYPE_LOCAL_BANK_FIELD:
+	case ACPI_TYPE_LOCAL_INDEX_FIELD:
 
 		type = ACPI_TYPE_FIELD_UNIT;
+		break;
+
+	case ACPI_TYPE_LOCAL_SCOPE:
+
+		/* Per ACPI Specification, Scope is untyped */
+
+		type = ACPI_TYPE_ANY;
 		break;
 
 	default:

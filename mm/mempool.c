@@ -259,8 +259,25 @@ void mempool_free(void *element, mempool_t *pool)
 	pool->free(element, pool->pool_data);
 }
 
+/*
+ * A commonly used alloc and free fn.
+ */
+void *mempool_alloc_slab(int gfp_mask, void *pool_data)
+{
+	kmem_cache_t *mem = (kmem_cache_t *) pool_data;
+	return kmem_cache_alloc(mem, gfp_mask);
+}
+
+void mempool_free_slab(void *element, void *pool_data)
+{
+	kmem_cache_t *mem = (kmem_cache_t *) pool_data;
+	kmem_cache_free(mem, element);
+}
+
 EXPORT_SYMBOL(mempool_create);
 EXPORT_SYMBOL(mempool_resize);
 EXPORT_SYMBOL(mempool_destroy);
 EXPORT_SYMBOL(mempool_alloc);
 EXPORT_SYMBOL(mempool_free);
+EXPORT_SYMBOL(mempool_alloc_slab);
+EXPORT_SYMBOL(mempool_free_slab);

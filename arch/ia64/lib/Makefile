@@ -32,26 +32,26 @@ AFLAGS___udivsi3.o	= -DUNSIGNED
 AFLAGS___modsi3.o	=	     -DMODULO
 AFLAGS___umodsi3.o	= -DUNSIGNED -DMODULO
 
-__divdi3.o: idiv64.S
+$(obj)/__divdi3.o: $(src)/idiv64.S
 	$(cmd_as_o_S)
 
-__udivdi3.o: idiv64.S
+$(obj)/__udivdi3.o: $(src)/idiv64.S
 	$(cmd_as_o_S)
 
-__moddi3.o: idiv64.S
+$(obj)/__moddi3.o: $(src)/idiv64.S
 	$(cmd_as_o_S)
 
-__umoddi3.o: idiv64.S
+$(obj)/__umoddi3.o: $(src)/idiv64.S
 	$(cmd_as_o_S)
 
-__divsi3.o: idiv32.S
+$(obj)/__divsi3.o: $(src)/idiv32.S
 	$(cmd_as_o_S)
 
-__udivsi3.o: idiv32.S
+$(obj)/__udivsi3.o: $(src)/idiv32.S
 	$(cmd_as_o_S)
 
-__modsi3.o: idiv32.S
+$(obj)/__modsi3.o: $(src)/idiv32.S
 	$(cmd_as_o_S)
 
-__umodsi3.o: idiv32.S
+$(obj)/__umodsi3.o: $(src)/idiv32.S
 	$(cmd_as_o_S)

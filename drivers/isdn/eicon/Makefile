@@ -23,5 +23,3 @@ eicon-objs-$(CONFIG_ISDN_DRV_EICON_PCI) += common.o idi.o bri.o pri.o log.o \
 		   linsys.o linio.o
 
 eicon-objs 	+= $(eicon-objs-y)
-
-include $(TOPDIR)/Rules.make

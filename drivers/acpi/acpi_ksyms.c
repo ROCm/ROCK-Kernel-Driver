@@ -86,6 +86,7 @@ EXPORT_SYMBOL(acpi_get_register);
 EXPORT_SYMBOL(acpi_set_register);
 EXPORT_SYMBOL(acpi_enter_sleep_state);
 EXPORT_SYMBOL(acpi_get_system_info);
+EXPORT_SYMBOL(acpi_get_devices);
 
 /* ACPI OS Services Layer (acpi_osl.c) */
 
@@ -99,6 +100,8 @@ EXPORT_SYMBOL(acpi_os_signal_semaphore);
 EXPORT_SYMBOL(acpi_os_create_semaphore);
 EXPORT_SYMBOL(acpi_os_delete_semaphore);
 EXPORT_SYMBOL(acpi_os_wait_semaphore);
+
+EXPORT_SYMBOL(acpi_os_read_pci_configuration);
 
 /* ACPI Utilities (acpi_utils.c) */
 
@@ -126,3 +129,15 @@ EXPORT_SYMBOL(acpi_bus_register_driver);
 EXPORT_SYMBOL(acpi_bus_unregister_driver);
 
 #endif /*CONFIG_ACPI_BUS*/
+
+
+/* ACPI PCI Driver (pci_irq.c) */
+
+#ifdef CONFIG_ACPI_PCI
+
+#include <linux/pci.h>
+extern int acpi_pci_irq_enable(struct pci_dev *dev);
+EXPORT_SYMBOL(acpi_pci_irq_enable);
+extern int acpi_pci_irq_lookup (int segment, int bus, int device, int pin);
+EXPORT_SYMBOL(acpi_pci_irq_lookup);
+#endif /*CONFIG_ACPI_PCI */

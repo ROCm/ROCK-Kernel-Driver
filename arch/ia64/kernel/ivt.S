@@ -116,8 +116,8 @@ ENTRY(vhpt_miss)
 	;;
 (p8)	dep r25=r18,r25,2,6
 (p8)	shr r22=r22,HPAGE_SHIFT-PAGE_SHIFT
-	;;
 #endif
+	;;
 	cmp.eq p6,p7=5,r17			// is IFA pointing into to region 5?
 	shr.u r18=r22,PGDIR_SHIFT		// get bits 33-63 of the faulting address
 	;;

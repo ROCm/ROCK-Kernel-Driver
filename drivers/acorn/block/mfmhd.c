@@ -105,7 +105,6 @@
 #include <linux/interrupt.h>
 #include <linux/kernel.h>
 #include <linux/timer.h>
-#include <linux/tqueue.h>
 #include <linux/mm.h>
 #include <linux/errno.h>
 #include <linux/genhd.h>

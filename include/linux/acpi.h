@@ -90,7 +90,7 @@ struct acpi_table_header {
 typedef struct {
 	u8			type;
 	u8			length;
-} acpi_table_entry_header __attribute__ ((packed));
+} __attribute__ ((packed)) acpi_table_entry_header;
 
 /* Root System Description Table (RSDT) */
 
@@ -143,7 +143,7 @@ typedef struct {
 	u16			polarity:2;
 	u16			trigger:2;
 	u16			reserved:12;
-} acpi_interrupt_flags __attribute__ ((packed));
+} __attribute__ ((packed)) acpi_interrupt_flags;
 
 struct acpi_table_lapic {
 	acpi_table_entry_header	header;
@@ -330,7 +330,7 @@ struct acpi_table_ecdt {
 	acpi_generic_address	ec_data;
 	u32			uid;
 	u8			gpe_bit;
-	char			*ec_id;
+	char			ec_id[0];
 } __attribute__ ((packed));
 
 /* Table Handlers */

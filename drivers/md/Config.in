@@ -14,5 +14,6 @@ dep_tristate '  RAID-4/RAID-5 mode' CONFIG_MD_RAID5 $CONFIG_BLK_DEV_MD
 dep_tristate '  Multipath I/O support' CONFIG_MD_MULTIPATH $CONFIG_BLK_DEV_MD
 
 dep_tristate ' Logical volume manager (LVM) support' CONFIG_BLK_DEV_LVM $CONFIG_MD
+dep_tristate ' Device mapper support' CONFIG_BLK_DEV_DM $CONFIG_MD
 
 endmenu

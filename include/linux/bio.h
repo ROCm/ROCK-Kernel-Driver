@@ -101,6 +101,7 @@ struct bio {
 #define BIO_EOF		2	/* out-out-bounds error */
 #define BIO_SEG_VALID	3	/* nr_hw_seg valid */
 #define BIO_CLONED	4	/* doesn't own data */
+#define BIO_BOUNCED	5	/* bio is a bounce bio */
 #define bio_flagged(bio, flag)	((bio)->bi_flags & (1 << (flag)))
 
 /*
@@ -131,6 +132,7 @@ struct bio {
 #define bio_page(bio)		bio_iovec((bio))->bv_page
 #define bio_offset(bio)		bio_iovec((bio))->bv_offset
 #define bio_sectors(bio)	((bio)->bi_size >> 9)
+#define bio_cur_sectors(bio)	(bio_iovec(bio)->bv_len >> 9)
 #define bio_data(bio)		(page_address(bio_page((bio))) + bio_offset((bio)))
 #define bio_barrier(bio)	((bio)->bi_rw & (1 << BIO_RW_BARRIER))
 
@@ -201,7 +203,7 @@ struct bio {
 extern struct bio *bio_alloc(int, int);
 extern void bio_put(struct bio *);
 
-extern int bio_endio(struct bio *, unsigned int, int);
+extern void bio_endio(struct bio *, unsigned int, int);
 struct request_queue;
 extern inline int bio_phys_segments(struct request_queue *, struct bio *);
 extern inline int bio_hw_segments(struct request_queue *, struct bio *);
@@ -214,6 +216,9 @@ extern inline void bio_init(struct bio *);
 
 extern int bio_add_page(struct bio *, struct page *, unsigned int,unsigned int);
 extern int bio_get_nr_vecs(struct block_device *);
+extern struct bio *bio_map_user(struct block_device *, unsigned long,
+				unsigned int, int);
+extern void bio_unmap_user(struct bio *, int);
 
 #ifdef CONFIG_HIGHMEM
 /*

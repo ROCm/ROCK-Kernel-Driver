@@ -428,16 +428,37 @@ static void se401_auto_resetlevel(struct usb_se401 *se401)
 static void se401_button_irq(struct urb *urb)
 {
 	struct usb_se401 *se401 = urb->context;
+	int status;
 	
 	if (!se401->dev) {
 		info("ohoh: device vapourished");
 		return;
 	}
 	
-	if (urb->actual_length >=2 && !urb->status) {
+	switch (urb->status) {
+	case 0:
+		/* success */
+		break;
+	case -ECONNRESET:
+	case -ENOENT:
+	case -ESHUTDOWN:
+		/* this urb is terminated, clean up */
+		dbg("%s - urb shutting down with status: %d", __FUNCTION__, urb->status);
+		return;
+	default:
+		dbg("%s - nonzero urb status received: %d", __FUNCTION__, urb->status);
+		goto exit;
+	}
+
+	if (urb->actual_length >=2) {
 		if (se401->button)
 			se401->buttonpressed=1;
 	}
+exit:
+	status = usb_submit_urb (urb, GFP_ATOMIC);
+	if (status)
+		err ("%s - usb_submit_urb failed with result %d",
+		     __FUNCTION__, status);
 }
 
 static void se401_video_irq(struct urb *urb)
@@ -676,7 +697,8 @@ static int se401_set_size(struct usb_se401 *se401, int width, int height)
 static inline void enhance_picture(unsigned char *frame, int len)
 {
 	while (len--) {
-		*frame++=(((*frame^255)*(*frame^255))/255)^255;
+		*frame=(((*frame^255)*(*frame^255))/255)^255;
+		frame++;
 	}
 }
 
@@ -910,7 +932,8 @@ static inline void decode_bayer (struct usb_se401 *se401, struct se401_scratch *
 		/* Fix the top line */
 		framedata+=linelength;
 		for (i=0; i<linelength; i++) {
-			*--framedata=*(framedata+linelength);
+			framedata--;
+			*framedata=*(framedata+linelength);
 		}
 		/* Fix the left side (green is already present) */
 		for (i=0; i<se401->cheight; i++) {
