@@ -246,7 +246,7 @@ static int convert_fxsr_to_user( struct _fpstate __user *buf,
 	to = &buf->_st[0];
 	from = (struct _fpxreg *) &fxsave->st_space[0];
 	for ( i = 0 ; i < 8 ; i++, to++, from++ ) {
-		unsigned long *t = (unsigned long *)to;
+		unsigned long __user *t = (unsigned long __user *)to;
 		unsigned long *f = (unsigned long *)from;
 
 		if (__put_user(*f, t) ||
@@ -281,7 +281,7 @@ static int convert_fxsr_from_user( struct i387_fxsave_struct *fxsave,
 	from = &buf->_st[0];
 	for ( i = 0 ; i < 8 ; i++, to++, from++ ) {
 		unsigned long *t = (unsigned long *)to;
-		unsigned long *f = (unsigned long *)from;
+		unsigned long __user *f = (unsigned long __user *)from;
 
 		if (__get_user(*t, f) ||
 				__get_user(*(t + 1), f + 1) ||
