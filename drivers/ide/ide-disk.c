@@ -555,6 +555,8 @@ static ide_startstop_t lba48_do_request(struct ata_device *drive, struct request
  * Issue a READ or WRITE command to a disk, using LBA if supported, or CHS
  * otherwise, to address sectors.  It also takes care of issuing special
  * DRIVE_CMDs.
+ *
+ * Channel lock should be held.
  */
 static ide_startstop_t idedisk_do_request(struct ata_device *drive, struct request *rq, sector_t block)
 {
@@ -562,29 +564,15 @@ static ide_startstop_t idedisk_do_request(struct ata_device *drive, struct reque
 	struct ata_channel *ch = drive->channel;
 	int ret;
 
-	/* make sure all request have bin finished
-	 * FIXME: this check doesn't make sense go! */
-	while (drive->blocked) {
-		yield();
-		printk(KERN_ERR "ide: Request while drive blocked?");
-	}
-
-	/* FIXME: Move this lock entiery upstream. */
-	spin_lock_irqsave(ch->lock, flags);
-
 	/* FIXME: this check doesn't make sense */
 	if (!(rq->flags & REQ_CMD)) {
 		blk_dump_rq_flags(rq, "idedisk_do_request - bad command");
 		__ata_end_request(drive, rq, 0, 0);
-		spin_unlock_irqrestore(ch->lock, flags);
-
 		return ide_stopped;
 	}
 
 	if (IS_PDC4030_DRIVE) {
 		extern ide_startstop_t promise_do_request(struct ata_device *, struct request *, sector_t);
-
-		spin_unlock_irqrestore(drive->channel->lock, flags);
 
 		return promise_do_request(drive, rq, block);
 	}
@@ -593,33 +581,25 @@ static ide_startstop_t idedisk_do_request(struct ata_device *drive, struct reque
 	 * start a tagged operation
 	 */
 	if (drive->using_tcq) {
-		int ret;
-
-		ret = blk_queue_start_tag(&drive->queue, rq);
+		int st = blk_queue_start_tag(&drive->queue, rq);
 
 		if (ata_pending_commands(drive) > drive->max_depth)
 			drive->max_depth = ata_pending_commands(drive);
 		if (ata_pending_commands(drive) > drive->max_last_depth)
 			drive->max_last_depth = ata_pending_commands(drive);
 
-		if (ret) {
+		if (st) {
 			BUG_ON(!ata_pending_commands(drive));
-			spin_unlock_irqrestore(ch->lock, flags);
-
 			return ide_started;
 		}
 	}
 
 	if ((drive->id->cfs_enable_2 & 0x0400) && (drive->addressing))
-		ret = lba48_do_request(drive, rq, block);
+		return lba48_do_request(drive, rq, block);
 	else if (drive->select.b.lba)
-		ret = lba28_do_request(drive, rq, block);
+		return lba28_do_request(drive, rq, block);
 	else
-		ret = chs_do_request(drive, rq, block);
-
-	spin_unlock_irqrestore(ch->lock, flags);
-
-	return ret;
+		return chs_do_request(drive, rq, block);
 }
 
 static int idedisk_open(struct inode *inode, struct file *filp, struct ata_device *drive)
@@ -868,9 +848,10 @@ static int idedisk_resume(struct device *dev, u32 level)
 /* This is just a hook for the overall driver tree.
  */
 
-static struct device_driver idedisk_devdrv = {
-	suspend: idedisk_suspend,
-	resume: idedisk_resume,
+static struct device_driver disk_devdrv = {
+	.lock = RW_LOCK_UNLOCKED,
+	.suspend = idedisk_suspend,
+	.resume = idedisk_resume,
 };
 
 /*
@@ -1011,6 +992,7 @@ static void idedisk_setup(struct ata_device *drive)
 	sector_t capacity;
 	sector_t set_max;
 	int drvid = -1;
+	struct ata_channel *ch = drive->channel;
 
 	if (id == NULL)
 		return;
@@ -1020,35 +1002,31 @@ static void idedisk_setup(struct ata_device *drive)
 	 * to us, but they are removable and don't have a doorlock mechanism.
 	 */
 	if (drive->removable && !drive_is_flashcard(drive)) {
-		/*
-		 * Removable disks (eg. SYQUEST); ignore 'WD' drives.
+		/* Removable disks (eg. SYQUEST); ignore 'WD' drives.
 		 */
-		if (id->model[0] != 'W' || id->model[1] != 'D') {
+		if (!strncmp(id->model, "WD", 2))
 			drive->doorlocking = 1;
-		}
 	}
-	for (i = 0; i < MAX_DRIVES; ++i) {
-		struct ata_channel *hwif = drive->channel;
 
-		if (drive != &hwif->drives[i])
+	for (i = 0; i < MAX_DRIVES; ++i) {
+		if (drive != &ch->drives[i])
 		    continue;
 		drvid = i;
-		hwif->gd->de_arr[i] = drive->de;
+		ch->gd->de_arr[i] = drive->de;
 		if (drive->removable)
-			hwif->gd->flags[i] |= GENHD_FL_REMOVABLE;
+			ch->gd->flags[i] |= GENHD_FL_REMOVABLE;
 		break;
 	}
 
 	/* Register us within the device tree.
 	 */
-
 	if (drvid != -1) {
-		sprintf(drive->device.bus_id, "%d", drvid);
-		sprintf(drive->device.name, "ide-disk");
-		drive->device.driver = &idedisk_devdrv;
-		drive->device.parent = &drive->channel->dev;
-		drive->device.driver_data = drive;
-		device_register(&drive->device);
+		sprintf(drive->dev.bus_id, "sd@%x,%x", ch->unit, drvid);
+		strcpy(drive->dev.name, "ATA-Disk");
+		drive->dev.driver = &disk_devdrv;
+		drive->dev.parent = &ch->dev;
+		drive->dev.driver_data = drive;
+		device_register(&drive->dev);
 	}
 
 	/* Extract geometry if we did not already have one for the drive */
@@ -1173,7 +1151,6 @@ static void idedisk_setup(struct ata_device *drive)
 	printk(KERN_INFO " %s: %ld sectors", drive->name, capacity);
 
 #if 0
-
 	/* Right now we avoid this calculation, since it can result in the
 	 * usage of not supported compiler internal functions on 32 bit hosts.
 	 * However since the calculation appears to be an interesting piece of
@@ -1428,7 +1405,7 @@ static struct ata_operations idedisk_driver = {
 	attach:			idedisk_attach,
 	cleanup:		idedisk_cleanup,
 	standby:		idedisk_standby,
-	do_request:		idedisk_do_request,
+	XXX_do_request:		idedisk_do_request,
 	end_request:		NULL,
 	ioctl:			idedisk_ioctl,
 	open:			idedisk_open,

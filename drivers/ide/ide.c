@@ -635,15 +635,16 @@ ide_startstop_t ata_error(struct ata_device *drive, struct request *rq,	const ch
  */
 static ide_startstop_t start_request(struct ata_device *drive, struct request *rq)
 {
+	struct ata_channel *ch = drive->channel;
 	sector_t block;
 	unsigned int minor = minor(rq->rq_dev);
 	unsigned int unit = minor >> PARTN_BITS;
-	struct ata_channel *ch = drive->channel;
+	ide_startstop_t ret;
 
 	BUG_ON(!(rq->flags & REQ_STARTED));
 
 #ifdef DEBUG
-	printk("%s: start_request: current=0x%08lx\n", ch->name, (unsigned long) rq);
+	printk("%s: %s: current=0x%08lx\n", ch->name, __FUNCTION__, (unsigned long) rq);
 #endif
 
 	/* bail early if we've exceeded max_failures */
@@ -663,55 +664,63 @@ static ide_startstop_t start_request(struct ata_device *drive, struct request *r
 		if (drive->type == ATA_DISK || drive->type == ATA_FLOPPY)
 			block += drive->sect0;
 
-
 	/* Yecch - this will shift the entire interval, possibly killing some
 	 * innocent following sector.
 	 */
 	if (block == 0 && drive->remap_0_to_1 == 1)
 		block = 1;  /* redirect MBR access to EZ-Drive partn table */
-	{
-		ide_startstop_t res;
 
-		ata_select(drive, 0);
-		if (ata_status_poll(drive, drive->ready_stat, BUSY_STAT | DRQ_STAT,
-					WAIT_READY, rq, &res)) {
-			printk(KERN_WARNING "%s: drive not ready for command\n", drive->name);
+	ata_select(drive, 0);
+	spin_unlock_irq(ch->lock);
+	if (ata_status_poll(drive, drive->ready_stat, BUSY_STAT | DRQ_STAT,
+				WAIT_READY, rq, &ret)) {
+		printk(KERN_WARNING "%s: drive not ready for command\n", drive->name);
+		spin_lock_irq(ch->lock);
 
-			return res;
-		}
+		return ret;
 	}
+	spin_lock_irq(ch->lock);
 
 	/* This issues a special drive command.
+	 *
+	 * FIXME: move this down to idedisk_do_request().
 	 */
 	if (rq->flags & REQ_SPECIAL)
-		if (drive->type == ATA_DISK)
-			return ata_taskfile(drive, rq->special, NULL);
+		if (drive->type == ATA_DISK) {
+			spin_unlock_irq(ch->lock);
+			ret = ata_taskfile(drive, rq->special, NULL);
+			spin_lock_irq(ch->lock);
+
+			return ret;
+		}
+
+	if (!ata_ops(drive)) {
+		printk(KERN_WARNING "%s: device type %d not supported\n",
+				drive->name, drive->type);
+		goto kill_rq;
+	}
 
 	/* The normal way of execution is to pass and execute the request
 	 * handler down to the device type driver.
 	 */
-	if (ata_ops(drive)) {
-		if (ata_ops(drive)->do_request)
-			return ata_ops(drive)->do_request(drive, rq, block);
-		else {
-			ata_end_request(drive, rq, 0);
 
-			return ide_stopped;
-		}
+	if (ata_ops(drive)->XXX_do_request) {
+		ret = ata_ops(drive)->XXX_do_request(drive, rq, block);
+	} else {
+		__ata_end_request(drive, rq, 0, 0);
+		ret = ide_stopped;
 	}
-
-	/*
-	 * Error handling:
-	 */
-
-	printk(KERN_WARNING "%s: device type %d not supported\n",
-			drive->name, drive->type);
+	return ret;
 
 kill_rq:
-	if (ata_ops(drive) && ata_ops(drive)->end_request)
-		ata_ops(drive)->end_request(drive, rq, 0);
-	else
-		ata_end_request(drive, rq, 0);
+	if (ata_ops(drive)) {
+		if (ata_ops(drive)->end_request) {
+			spin_unlock_irq(ch->lock);
+			ata_ops(drive)->end_request(drive, rq, 0);
+			spin_lock_irq(ch->lock);
+		}
+	} else
+		__ata_end_request(drive, rq, 0, 0);
 
 	return ide_stopped;
 }
@@ -726,13 +735,8 @@ ide_startstop_t restart_request(struct ata_device *drive)
 
 	ch->handler = NULL;
 	del_timer(&ch->timer);
-
-	spin_unlock_irqrestore(ch->lock, flags);
-
-	/* FIXME make start_request do the unlock itself and
-	 * push this locking further down. */
-
 	ret = start_request(drive, drive->rq);
+	spin_unlock_irqrestore(ch->lock, flags);
 
 	return ret;
 }
@@ -902,11 +906,8 @@ static void queue_commands(struct ata_device *drive)
 
 		drive->rq = rq;
 
-		/* FIXME: push this locaing further down */
-		spin_unlock(drive->channel->lock);
 		ide__sti();	/* allow other IRQs while we start this request */
 		startstop = start_request(drive, rq);
-		spin_lock_irq(drive->channel->lock);
 
 		/* command started, we are busy */
 		if (startstop == ide_started)

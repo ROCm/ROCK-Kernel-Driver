@@ -357,7 +357,7 @@ struct ata_device {
 	byte		queue_depth;	/* max queue depth */
 	unsigned int	failures;	/* current failure count */
 	unsigned int	max_failures;	/* maximum allowed failure count */
-	struct device	device;		/* global device tree handle */
+	struct device	dev;		/* global device tree handle */
 
 	/*
 	 * tcq statistics
@@ -545,7 +545,7 @@ struct ata_operations {
 	void (*attach) (struct ata_device *);
 	int (*cleanup)(struct ata_device *);
 	int (*standby)(struct ata_device *);
-	ide_startstop_t	(*do_request)(struct ata_device *, struct request *, sector_t);
+	ide_startstop_t	(*XXX_do_request)(struct ata_device *, struct request *, sector_t);
 	int (*end_request)(struct ata_device *, struct request *, int);
 
 	int (*ioctl)(struct ata_device *, struct inode *, struct file *, unsigned int, unsigned long);

@@ -482,6 +482,9 @@ static ide_startstop_t idescsi_issue_pc(struct ata_device *drive, struct request
  */
 static ide_startstop_t idescsi_do_request(struct ata_device *drive, struct request *rq, sector_t block)
 {
+	struct ata_channel *ch = drive->channel;
+	int ret;
+
 #ifdef DEBUG
 	printk(KERN_INFO "rq_status: %d, cmd: %d, errors: %d\n",
 			rq->rq_status,
@@ -494,12 +497,18 @@ static ide_startstop_t idescsi_do_request(struct ata_device *drive, struct reque
 			rq->current_nr_sectors);
 #endif
 
+	/* FIXME: make this unlocking go away*/
+	spin_unlock_irq(ch->lock);
 	if (rq->flags & REQ_PC) {
-		return idescsi_issue_pc(drive, rq, (struct atapi_packet_command *) rq->special);
+		ret = idescsi_issue_pc(drive, rq, (struct atapi_packet_command *) rq->special);
+	} else {
+	    blk_dump_rq_flags(rq, "ide-scsi: unsup command");
+	    idescsi_end_request(drive, rq, 0);
+	    ret = ide_stopped;
 	}
-	blk_dump_rq_flags(rq, "ide-scsi: unsup command");
-	idescsi_end_request(drive, rq, 0);
-	return ide_stopped;
+	spin_lock_irq(ch->lock);
+
+	return ret;
 }
 
 static int idescsi_open(struct inode *inode, struct file *filp, struct ata_device *drive)
@@ -540,7 +549,7 @@ static struct ata_operations ata_ops = {
 	owner:			THIS_MODULE,
 	attach:			idescsi_attach,
 	cleanup:		idescsi_cleanup,
-	do_request:		idescsi_do_request,
+	XXX_do_request:		idescsi_do_request,
 	end_request:		idescsi_end_request,
 	open:			idescsi_open,
 	release:		idescsi_release,

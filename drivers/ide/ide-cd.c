@@ -804,6 +804,7 @@ static ide_startstop_t cdrom_transfer_packet_command(struct ata_device *drive,
 	}
 
 	/* Arm the interrupt handler and send the command to the device. */
+	/* FIXME: make this locking go away */
 	spin_lock_irqsave(ch->lock, flags);
 	ata_set_handler(drive, handler, timeout, cdrom_timer_expiry);
 	atapi_write(drive, cmd, CDROM_PACKET_SIZE);
@@ -1648,7 +1649,8 @@ static ide_startstop_t cdrom_start_write(struct ata_device *drive, struct reques
 static ide_startstop_t
 ide_cdrom_do_request(struct ata_device *drive, struct request *rq, sector_t block)
 {
-	ide_startstop_t action;
+	struct ata_channel *ch = drive->channel;
+	int ret;
 	struct cdrom_info *info = drive->driver_data;
 
 	if (rq->flags & REQ_CMD) {
@@ -1664,19 +1666,29 @@ ide_cdrom_do_request(struct ata_device *drive, struct request *rq, sector_t bloc
 			}
 			CDROM_CONFIG_FLAGS(drive)->seeking = 0;
 		}
-		if (IDE_LARGE_SEEK(info->last_block, block, IDECD_SEEK_THRESHOLD) && drive->dsc_overlap)
-			action = cdrom_start_seek(drive, rq, block);
-		else {
+		/* FIXME: make this unlocking go away*/
+		spin_unlock_irq(ch->lock);
+		if (IDE_LARGE_SEEK(info->last_block, block, IDECD_SEEK_THRESHOLD) && drive->dsc_overlap) {
+			ret = cdrom_start_seek(drive, rq, block);
+		} else {
 			if (rq_data_dir(rq) == READ)
-				action = cdrom_start_read(drive, rq, block);
+				ret = cdrom_start_read(drive, rq, block);
 			else
-				action = cdrom_start_write(drive, rq);
+				ret = cdrom_start_write(drive, rq);
 		}
 		info->last_block = block;
-		return action;
+		spin_lock_irq(ch->lock);
+		return ret;
 	} else if (rq->flags & (REQ_PC | REQ_SENSE)) {
-		return cdrom_do_packet_command(drive, rq);
+		/* FIXME: make this unlocking go away*/
+		spin_unlock_irq(ch->lock);
+		ret = cdrom_do_packet_command(drive, rq);
+		spin_lock_irq(ch->lock);
+
+		return ret;
 	} else if (rq->flags & REQ_SPECIAL) {
+	        /* FIXME: make this unlocking go away*/
+		spin_unlock_irq(ch->lock);
 		/*
 		 * FIXME: Kill REQ_SEPCIAL and replace it with commands queued
 		 * at the request queue instead as suggested by Linus.
@@ -1685,11 +1697,15 @@ ide_cdrom_do_request(struct ata_device *drive, struct request *rq, sector_t bloc
 		 */
 
 		cdrom_end_request(drive, rq, 1);
+		spin_lock_irq(ch->lock);
+
 		return ide_stopped;
 	} else if (rq->flags & REQ_BLOCK_PC) {
 		struct packet_command pc;
 		ide_startstop_t startstop;
 
+		/* FIXME: make this unlocking go away*/
+		spin_unlock_irq(ch->lock);
 		memset(&pc, 0, sizeof(pc));
 		pc.quiet = 1;
 		pc.timeout = 60 * HZ;
@@ -1700,12 +1716,17 @@ ide_cdrom_do_request(struct ata_device *drive, struct request *rq, sector_t bloc
 		startstop = cdrom_do_packet_command(drive, rq);
 		if (pc.stat)
 			++rq->errors;
+		spin_lock_irq(ch->lock);
 
 		return startstop;
 	}
 
 	blk_dump_rq_flags(rq, "ide-cd bad flags");
+	/* FIXME: make this unlocking go away*/
+	spin_unlock_irq(ch->lock);
 	cdrom_end_request(drive, rq, 0);
+	spin_lock_irq(ch->lock);
+
 	return ide_stopped;
 }
 
@@ -2969,7 +2990,7 @@ static struct ata_operations ide_cdrom_driver = {
 	attach:			ide_cdrom_attach,
 	cleanup:		ide_cdrom_cleanup,
 	standby:		NULL,
-	do_request:		ide_cdrom_do_request,
+	XXX_do_request:		ide_cdrom_do_request,
 	end_request:		NULL,
 	ioctl:			ide_cdrom_ioctl,
 	open:			ide_cdrom_open,

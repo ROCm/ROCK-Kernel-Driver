@@ -1279,8 +1279,10 @@ static void idefloppy_create_rw_cmd(idefloppy_floppy_t *floppy,
  */
 static ide_startstop_t idefloppy_do_request(struct ata_device *drive, struct request *rq, sector_t block)
 {
+	struct ata_channel *ch = drive->channel;
 	idefloppy_floppy_t *floppy = drive->driver_data;
 	struct atapi_packet_command *pc;
+	int ret;
 
 #if IDEFLOPPY_DEBUG_LOG
 	printk (KERN_INFO "rq_status: %d, rq_dev: %u, flags: %lx, errors: %d\n",rq->rq_status,(unsigned int) rq->rq_dev,rq->flags,rq->errors);
@@ -1293,13 +1295,22 @@ static ide_startstop_t idefloppy_do_request(struct ata_device *drive, struct req
 				drive->name, floppy->failed_pc->c[0], floppy->sense_key, floppy->asc, floppy->ascq);
 		else
 			printk (KERN_ERR "ide-floppy: %s: I/O error\n", drive->name);
+
+		/* FIXME: make this unlocking go away*/
+		spin_unlock_irq(ch->lock);
 		idefloppy_end_request(drive, rq, 0);
+		spin_lock_irq(ch->lock);
+
 		return ide_stopped;
 	}
 	if (rq->flags & REQ_CMD) {
 		if (rq->sector % floppy->bs_factor || rq->nr_sectors % floppy->bs_factor) {
 			printk ("%s: unsupported r/w request size\n", drive->name);
+			/* FIXME: make this unlocking go away*/
+			spin_unlock_irq(ch->lock);
 			idefloppy_end_request(drive, rq, 0);
+			spin_lock_irq(ch->lock);
+
 			return ide_stopped;
 		}
 		pc = idefloppy_next_pc_storage(drive);
@@ -1309,11 +1320,20 @@ static ide_startstop_t idefloppy_do_request(struct ata_device *drive, struct req
 		pc = (struct atapi_packet_command *) rq->buffer;
 	} else {
 		blk_dump_rq_flags(rq, "ide-floppy: unsupported command in queue");
+		/* FIXME: make this unlocking go away*/
+		spin_unlock_irq(ch->lock);
 		idefloppy_end_request(drive, rq, 0);
+		spin_lock_irq(ch->lock);
+
 		return ide_stopped;
 	}
 
-	return idefloppy_issue_pc(drive, rq, pc);
+	/* FIXME: make this unlocking go away*/
+	spin_unlock_irq(ch->lock);
+	ret = idefloppy_issue_pc(drive, rq, pc);
+	spin_lock_irq(ch->lock);
+
+	return ret;
 }
 
 /*
@@ -2027,7 +2047,7 @@ static struct ata_operations idefloppy_driver = {
 	attach:			idefloppy_attach,
 	cleanup:		idefloppy_cleanup,
 	standby:		NULL,
-	do_request:		idefloppy_do_request,
+	XXX_do_request:		idefloppy_do_request,
 	end_request:		idefloppy_end_request,
 	ioctl:			idefloppy_ioctl,
 	open:			idefloppy_open,

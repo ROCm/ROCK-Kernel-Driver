@@ -159,7 +159,10 @@ static int pdc202xx_tune_chipset(struct ata_device *drive, byte speed)
 {
 	struct pci_dev *dev = drive->channel->pci_dev;
 	u32 drive_conf;
-	u8 drive_pci, AP, BP, CP, DP, TA = 0, TB, TC = 0;
+	u8 drive_pci, AP, BP, CP, TA = 0, TB, TC = 0;
+#if PDC202XX_DECODE_REGISTER_INFO
+	u8 DP;
+#endif
 
 	if (drive->dn > 3) /* FIXME: remove this --bkz */
 		return -1;
@@ -188,7 +191,7 @@ static int pdc202xx_tune_chipset(struct ata_device *drive, byte speed)
 		case XFER_SW_DMA_2:	TB = 0x60; TC = 0x05; break;
 		case XFER_SW_DMA_1:	TB = 0x80; TC = 0x06; break;
 		case XFER_SW_DMA_0:	TB = 0xC0; TC = 0x0B; break;
-#endif /* CONFIG_BLK_DEV_IDEDMA */
+#endif
 		case XFER_PIO_4:	TA = 0x01; TB = 0x04; break;
 		case XFER_PIO_3:	TA = 0x02; TB = 0x06; break;
 		case XFER_PIO_2:	TA = 0x03; TB = 0x08; break;
