@@ -367,7 +367,6 @@ static int acsi_release( struct inode * inode, struct file * file );
 static void acsi_prevent_removal( int target, int flag );
 static int acsi_change_blk_size( int target, int lun);
 static int acsi_mode_sense( int target, int lun, SENSE_DATA *sd );
-static void acsi_geninit(void);
 static int acsi_revalidate (kdev_t);
 
 /************************* End of Prototypes **************************/
@@ -974,12 +973,12 @@ static void redo_acsi_request( void )
 	dev = DEVICE_NR(CURRENT->rq_dev);
 	block = CURRENT->sector;
 	if (dev >= NDevices ||
-		block+CURRENT->nr_sectors >= get_capacity(acsi_gendisk + dev)) {
+		block+CURRENT->nr_sectors >= get_capacity(acsi_gendisk[dev])) {
 #ifdef DEBUG
 		printk( "ad%c: attempted access for blocks %d...%ld past end of device at block %ld.\n",
 		       dev+'a',
 		       block, block + CURRENT->nr_sectors - 1,
-		       get_capacity(acsi_gendisk + dev));
+		       get_capacity(acsi_gendisk[dev]));
 #endif
 		end_request(CURRENT, 0);
 		goto repeat;
@@ -1340,7 +1339,7 @@ static int acsi_mode_sense( int target, int lun, SENSE_DATA *sd )
 
 extern struct block_device_operations acsi_fops;
 
-static struct gendisk acsi_gendisk[MAX_DEV];
+static struct gendisk *acsi_gendisk[MAX_DEV];
 
 #define MAX_SCSI_DEVICE_CODE 10
 
@@ -1607,13 +1606,53 @@ static struct block_device_operations acsi_fops = {
 	revalidate:		acsi_revalidate,
 };
 
-static void acsi_geninit(void)
+#ifdef CONFIG_ATARI_SLM_MODULE
+/* call attach_slm() for each device that is a printer; needed for init of SLM
+ * driver as a module, since it's not yet present if acsi.c is inited and thus
+ * the bus gets scanned. */
+void acsi_attach_SLMs( int (*attach_func)( int, int ) )
 {
+	int i, n = 0;
+
+	for( i = 0; i < 8; ++i )
+		if (SLM_devices[i] >= 0)
+			n += (*attach_func)( i, SLM_devices[i] );
+	printk( KERN_INFO "Found %d SLM printer(s) total.\n", n );
+}
+#endif /* CONFIG_ATARI_SLM_MODULE */
+
+
+int acsi_init( void )
+
+{
+	int err = 0;
 	int i, target, lun;
 	struct acsi_info_struct *aip;
 #ifdef CONFIG_ATARI_SLM
 	int n_slm = 0;
 #endif
+	if (!MACH_IS_ATARI || !ATARIHW_PRESENT(ACSI))
+		return 0;
+	if (register_blkdev( MAJOR_NR, "ad", &acsi_fops )) {
+		printk( KERN_ERR "Unable to get major %d for ACSI\n", MAJOR_NR );
+		err = -EBUSY;
+		goto out1;
+	}
+	if (!(acsi_buffer =
+		  (char *)atari_stram_alloc(ACSI_BUFFER_SIZE, "acsi"))) {
+		err = -ENOMEM;
+		printk( KERN_ERR "Unable to get ACSI ST-Ram buffer.\n" );
+		goto out2;
+	}
+	phys_acsi_buffer = virt_to_phys( acsi_buffer );
+	STramMask = ATARIHW_PRESENT(EXTD_DMA) ? 0x00000000 : 0xff000000;
+	
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_acsi_request, &acsi_lock);
+#ifdef CONFIG_ATARI_SLM
+	err = slm_init();
+#endif
+	if (err)
+		goto out3;
 
 	printk( KERN_INFO "Probing ACSI devices:\n" );
 	NDevices = 0;
@@ -1688,9 +1727,15 @@ static void acsi_geninit(void)
 	printk( KERN_INFO "Found %d ACSI device(s) and %d SLM printer(s) total.\n",
 			NDevices, n_slm );
 #endif
-					 
+	err = -ENOMEM;
 	for( i = 0; i < NDevices; ++i ) {
-		struct gendisk *disk = acsi_gendisk + i;
+		acsi_gendisk[i] = alloc_disk();
+		if (!acsi_gendisk[i])
+			goto out4;
+	}
+
+	for( i = 0; i < NDevices; ++i ) {
+		struct gendisk *disk = acsi_gendisk[i];
 		sprintf(disk->disk_name, "ad%c", 'a'+i);
 		disk->major = MAJOR_NR;
 		disk->first_minor = i << 4;
@@ -1699,49 +1744,16 @@ static void acsi_geninit(void)
 		set_capacity(disk, acsi_info[i].size);
 		add_disk(disk);
 	}
-}
-
-#ifdef CONFIG_ATARI_SLM_MODULE
-/* call attach_slm() for each device that is a printer; needed for init of SLM
- * driver as a module, since it's not yet present if acsi.c is inited and thus
- * the bus gets scanned. */
-void acsi_attach_SLMs( int (*attach_func)( int, int ) )
-{
-	int i, n = 0;
-
-	for( i = 0; i < 8; ++i )
-		if (SLM_devices[i] >= 0)
-			n += (*attach_func)( i, SLM_devices[i] );
-	printk( KERN_INFO "Found %d SLM printer(s) total.\n", n );
-}
-#endif /* CONFIG_ATARI_SLM_MODULE */
-
-
-int acsi_init( void )
-
-{
-	int err = 0;
-	if (!MACH_IS_ATARI || !ATARIHW_PRESENT(ACSI))
-		return 0;
-	if (register_blkdev( MAJOR_NR, "ad", &acsi_fops )) {
-		printk( KERN_ERR "Unable to get major %d for ACSI\n", MAJOR_NR );
-		return -EBUSY;
-	}
-	if (!(acsi_buffer =
-		  (char *)atari_stram_alloc(ACSI_BUFFER_SIZE, "acsi"))) {
-		printk( KERN_ERR "Unable to get ACSI ST-Ram buffer.\n" );
-		unregister_blkdev( MAJOR_NR, "ad" );
-		return -ENOMEM;
-	}
-	phys_acsi_buffer = virt_to_phys( acsi_buffer );
-	STramMask = ATARIHW_PRESENT(EXTD_DMA) ? 0x00000000 : 0xff000000;
-	
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_acsi_request, &acsi_lock);
-#ifdef CONFIG_ATARI_SLM
-	err = slm_init();
-#endif
-	if (!err)
-		acsi_geninit();
+	return 0;
+out4:
+	while (i--)
+		put_disk(acsi_gendisk[i]);
+out3:
+	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+	atari_stram_free( acsi_buffer );
+out2:
+	unregister_blkdev( MAJOR_NR, "ad" );
+out1:
 	return err;
 }
 
@@ -1770,8 +1782,10 @@ void cleanup_module(void)
 	if (unregister_blkdev( MAJOR_NR, "ad" ) != 0)
 		printk( KERN_ERR "acsi: cleanup_module failed\n");
 
-	for (i = 0; i < NDevices; i++)
-		del_gendisk(acsi_gendisk + i);
+	for (i = 0; i < NDevices; i++) {
+		del_gendisk(acsi_gendisk[i]);
+		put_disk(acsi_gendisk[i]);
+	}
 }
 #endif
 
@@ -1810,6 +1824,6 @@ static int acsi_revalidate(kdev_t dev)
 
 	ENABLE_IRQ();
 	stdma_release();
-	set_capacity(acsi_gendisk + unit, aip->size);
+	set_capacity(acsi_gendisk[unit], aip->size);
 	return 0;
 }
