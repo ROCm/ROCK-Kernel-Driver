@@ -92,6 +92,11 @@ SECTIONS
   .uml.exitcall : { *(.uml.exitcall.exit) }
   __uml_exitcall_end = .;
 
+   . = ALIGN(4096);
+   __initramfs_start = .;
+   .init.ramfs : { *(.init.ramfs) }
+   __initramfs_end = .;
+ 
   .data.init : { *(.data.init) }
   .data    :
   {

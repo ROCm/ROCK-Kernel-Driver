@@ -85,6 +85,7 @@ extern syscall_handler_t sys_setgroups16;
 extern syscall_handler_t sys_symlink;
 extern syscall_handler_t sys_lstat;
 extern syscall_handler_t sys_readlink;
+extern syscall_handler_t sys_swapon;
 extern syscall_handler_t sys_uselib;
 extern syscall_handler_t sys_reboot;
 extern syscall_handler_t old_readdir;
@@ -111,6 +112,7 @@ extern syscall_handler_t sys_ni_syscall;
 extern syscall_handler_t sys_vhangup;
 extern syscall_handler_t sys_ni_syscall;
 extern syscall_handler_t sys_ni_syscall;
+extern syscall_handler_t sys_swapoff;
 extern syscall_handler_t sys_sysinfo;
 extern syscall_handler_t sys_ipc;
 extern syscall_handler_t sys_fsync;
@@ -233,6 +235,7 @@ extern syscall_handler_t sys_lookup_dcookie;
 extern syscall_handler_t sys_epoll_create;
 extern syscall_handler_t sys_epoll_ctl;
 extern syscall_handler_t sys_epoll_wait;
+extern syscall_handler_t sys_remap_file_pages;
 
 #if CONFIG_NFSD
 #define NFSSERVCTL sys_nfsserctl
@@ -244,7 +247,7 @@ extern syscall_handler_t um_mount;
 extern syscall_handler_t um_time;
 extern syscall_handler_t um_stime;
 
-#define LAST_GENERIC_SYSCALL __NR_sys_epoll_wait
+#define LAST_GENERIC_SYSCALL __NR_remap_file_pages
 
 #if LAST_GENERIC_SYSCALL > LAST_ARCH_SYSCALL
 #define LAST_SYSCALL LAST_GENERIC_SYSCALL
@@ -487,6 +490,7 @@ syscall_handler_t *sys_call_table[] = {
 	[ __NR_sys_epoll_create ] = sys_epoll_create,
 	[ __NR_sys_epoll_ctl ] = sys_epoll_ctl,
 	[ __NR_sys_epoll_wait ] = sys_epoll_wait,
+        [ __NR_remap_file_pages ] = sys_remap_file_pages,
 
 	ARCH_SYSCALLS
 	[ LAST_SYSCALL + 1 ... NR_syscalls ] = 

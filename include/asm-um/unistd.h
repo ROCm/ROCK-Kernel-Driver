@@ -23,7 +23,7 @@ extern long sys_select(int n, fd_set *inp, fd_set *outp, fd_set *exp,
 		       struct timeval *tvp);
 extern long sys_lseek(unsigned int fildes, unsigned long offset, int whence);
 extern long sys_read(unsigned int fildes, char *buf, int len);
-extern long sys_write(unsigned int fildes, char *buf, int len);
+extern long sys_write(int fildes, const char *buf, size_t len);
 
 #ifdef __KERNEL_SYSCALLS__
 
