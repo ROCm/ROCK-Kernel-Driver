@@ -36,11 +36,11 @@ struct file;
 				   member of a struct __sysctl_args to have? */
 
 struct __sysctl_args {
-	int *name;
+	int __user *name;
 	int nlen;
-	void *oldval;
-	size_t *oldlenp;
-	void *newval;
+	void __user *oldval;
+	size_t __user *oldlenp;
+	void __user *newval;
 	size_t newlen;
 	unsigned long __unused[4];
 };
@@ -674,40 +674,40 @@ enum
 
 #ifdef __KERNEL__
 
-extern asmlinkage long sys_sysctl(struct __sysctl_args *);
+extern asmlinkage long sys_sysctl(struct __sysctl_args __user *);
 extern void sysctl_init(void);
 
 typedef struct ctl_table ctl_table;
 
-typedef int ctl_handler (ctl_table *table, int *name, int nlen,
+typedef int ctl_handler (ctl_table *table, int __user *name, int nlen,
 			 void __user *oldval, size_t __user *oldlenp,
 			 void __user *newval, size_t newlen, 
 			 void **context);
 
 typedef int proc_handler (ctl_table *ctl, int write, struct file * filp,
-			  void *buffer, size_t *lenp);
+			  void __user *buffer, size_t *lenp);
 
 extern int proc_dostring(ctl_table *, int, struct file *,
-			 void *, size_t *);
+			 void __user *, size_t *);
 extern int proc_dointvec(ctl_table *, int, struct file *,
-			 void *, size_t *);
+			 void __user *, size_t *);
 extern int proc_dointvec_bset(ctl_table *, int, struct file *,
-			      void *, size_t *);
+			      void __user *, size_t *);
 extern int proc_dointvec_minmax(ctl_table *, int, struct file *,
-				void *, size_t *);
+				void __user *, size_t *);
 extern int proc_dointvec_jiffies(ctl_table *, int, struct file *,
-				 void *, size_t *);
+				 void __user *, size_t *);
 extern int proc_doulongvec_minmax(ctl_table *, int, struct file *,
-				  void *, size_t *);
+				  void __user *, size_t *);
 extern int proc_doulongvec_ms_jiffies_minmax(ctl_table *table, int,
-				      struct file *, void *, size_t *);
+				      struct file *, void __user *, size_t *);
 
-extern int do_sysctl (int *name, int nlen,
-		      void *oldval, size_t *oldlenp,
-		      void *newval, size_t newlen);
+extern int do_sysctl (int __user *name, int nlen,
+		      void __user *oldval, size_t __user *oldlenp,
+		      void __user *newval, size_t newlen);
 
 extern int do_sysctl_strategy (ctl_table *table, 
-			       int *name, int nlen,
+			       int __user *name, int nlen,
 			       void __user *oldval, size_t __user *oldlenp,
 			       void __user *newval, size_t newlen, void ** context);
 
