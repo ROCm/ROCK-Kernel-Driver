@@ -22,7 +22,6 @@
  * 				midi emulation.
  */
 
-#define __NO_VERSION__
 #include <sound/driver.h>
 
 #ifdef CONFIG_SND_SEQUENCER_OSS
@@ -45,12 +44,12 @@ static void fake_event(snd_emux_t *emu, snd_emux_port_t *port, int ch, int param
 
 /* operators */
 static snd_seq_oss_callback_t oss_callback = {
-	owner: THIS_MODULE,
-	open: snd_emux_open_seq_oss,
-	close: snd_emux_close_seq_oss,
-	ioctl: snd_emux_ioctl_seq_oss,
-	load_patch: snd_emux_load_patch_seq_oss,
-	reset: snd_emux_reset_seq_oss,
+	.owner = THIS_MODULE,
+	.open = snd_emux_open_seq_oss,
+	.close = snd_emux_close_seq_oss,
+	.ioctl = snd_emux_ioctl_seq_oss,
+	.load_patch = snd_emux_load_patch_seq_oss,
+	.reset = snd_emux_reset_seq_oss,
 };
 
 

@@ -19,10 +19,10 @@
  *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
 
-#define __NO_VERSION__
 #include <sound/driver.h>
 #include <asm/io.h>
 #include <linux/init.h>
+#include <linux/slab.h>
 #include <sound/core.h>
 #include "pmac.h"
 #include "burgundy.h"
@@ -196,11 +196,11 @@ static int snd_pmac_burgundy_put_volume(snd_kcontrol_t *kcontrol, snd_ctl_elem_v
 }
 
 #define BURGUNDY_VOLUME(xname, xindex, addr, shift) \
-{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex,\
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex,\
   .info = snd_pmac_burgundy_info_volume,\
   .get = snd_pmac_burgundy_get_volume,\
   .put = snd_pmac_burgundy_put_volume,\
-  private_value: ((ADDR2BASE(addr) & 0xff) | ((shift) << 8)) }
+  .private_value = ((ADDR2BASE(addr) & 0xff) | ((shift) << 8)) }
 
 /* lineout/speaker */
 
@@ -245,11 +245,11 @@ static int snd_pmac_burgundy_put_switch_out(snd_kcontrol_t *kcontrol, snd_ctl_el
 }
 
 #define BURGUNDY_OUTPUT_SWITCH(xname, xindex, lmask, rmask, stereo) \
-{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex,\
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex,\
   .info = snd_pmac_burgundy_info_switch_out,\
   .get = snd_pmac_burgundy_get_switch_out,\
   .put = snd_pmac_burgundy_put_switch_out,\
-  private_value: ((lmask) | ((rmask) << 8) | ((stereo) << 24)) }
+  .private_value = ((lmask) | ((rmask) << 8) | ((stereo) << 24)) }
 
 /* line/speaker output volume */
 static int snd_pmac_burgundy_info_volume_out(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
@@ -295,11 +295,11 @@ static int snd_pmac_burgundy_put_volume_out(snd_kcontrol_t *kcontrol, snd_ctl_el
 }
 
 #define BURGUNDY_OUTPUT_VOLUME(xname, xindex, addr, stereo) \
-{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex,\
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex,\
   .info = snd_pmac_burgundy_info_volume_out,\
   .get = snd_pmac_burgundy_get_volume_out,\
   .put = snd_pmac_burgundy_put_volume_out,\
-  private_value: (ADDR2BASE(addr) | ((stereo) << 24)) }
+  .private_value = (ADDR2BASE(addr) | ((stereo) << 24)) }
 
 static snd_kcontrol_new_t snd_pmac_burgundy_mixers[] __initdata = {
 	BURGUNDY_VOLUME("Master Playback Volume", 0, MASK_ADDR_BURGUNDY_MASTER_VOLUME, 8),

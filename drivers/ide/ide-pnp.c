@@ -52,6 +52,7 @@ struct pnp_dev_t {
 static int __init pnpide_generic_init(struct pci_dev *dev, int enable)
 {
 	hw_regs_t hw;
+	ide_hwif_t *hwif;
 	int index;
 
 	if (!enable)
@@ -67,10 +68,11 @@ static int __init pnpide_generic_init(struct pci_dev *dev, int enable)
 //			generic_pnp_ide_iops,
 			DEV_IRQ(dev, 0));
 
-	index = ide_register_hw(&hw, NULL);
+	index = ide_register_hw(&hw, &hwif);
 
 	if (index != -1) {
 	    	printk(KERN_INFO "ide%d: %s IDE interface\n", index, DEV_NAME(dev));
+		hwif->pci_dev = dev;
 		return 0;
 	}
 

@@ -19,7 +19,6 @@
  *
  */
 
-#define __NO_VERSION__
 #include <sound/driver.h>
 
 #ifdef CONFIG_SND_OSSEMUL

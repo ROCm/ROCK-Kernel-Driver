@@ -18,7 +18,6 @@
  *
  */
 
-#define __NO_VERSION__
 #include <sound/driver.h>
 #include <linux/time.h>
 #include <sound/core.h>
@@ -190,30 +189,26 @@ static int _snd_ioctl32_xferi(unsigned int fd, unsigned int cmd, unsigned long a
 {
 	struct sndrv_xferi32 data32;
 	struct sndrv_xferi data;
-	mm_segment_t oldseg = get_fs();
+	mm_segment_t oldseg;
 	int err;
 
-	set_fs(KERNEL_DS);
-	if (copy_from_user(&data32, (void*)arg, sizeof(data32))) {
-		err = -EFAULT;
-		goto __err;
-	}
+	if (copy_from_user(&data32, (void*)arg, sizeof(data32)))
+		return -EFAULT;
 	memset(&data, 0, sizeof(data));
 	data.result = data32.result;
 	data.buf = A(data32.buf);
 	data.frames = data32.frames;
+	oldseg = get_fs();
+	set_fs(KERNEL_DS);
 	err = file->f_op->ioctl(file->f_dentry->d_inode, file, native_ctl, (unsigned long)&data);
+	set_fs(oldseg);
 	if (err < 0)
-		goto __err;
+		return err;
 	/* copy the result */
 	data32.result = data.result;
-	if (copy_to_user((void*)arg, &data32, sizeof(data32))) {
-		err = -EFAULT;
-		goto __err;
-	}
- __err:
-	set_fs(oldseg);
-	return err;
+	if (copy_to_user((void*)arg, &data32, sizeof(data32)))
+		return -EFAULT;
+	return 0;
 }
 
 
@@ -238,9 +233,7 @@ static int _snd_ioctl32_xfern(unsigned int fd, unsigned int cmd, unsigned long a
 	void *bufs[128];
 	int err = 0, ch, i;
 	u32 *bufptr;
-	mm_segment_t oldseg = get_fs();
-
-	set_fs(KERNEL_DS);
+	mm_segment_t oldseg;
 
 	/* FIXME: need to check whether fop->ioctl is sane */
 
@@ -251,41 +244,31 @@ static int _snd_ioctl32_xfern(unsigned int fd, unsigned int cmd, unsigned long a
 	/* check validty of the command */
 	switch (native_ctl) {
 	case SNDRV_PCM_IOCTL_WRITEN_FRAMES:
-		if (substream->stream  != SNDRV_PCM_STREAM_PLAYBACK) {
-			err = -EINVAL;
-			goto __err;
-		}
-		if (substream->runtime->status->state == SNDRV_PCM_STATE_OPEN) {
-			err = -EBADFD;
-			goto __err;
-		}
+		if (substream->stream  != SNDRV_PCM_STREAM_PLAYBACK)
+			return -EINVAL;
+		if (substream->runtime->status->state == SNDRV_PCM_STATE_OPEN)
+			return -EBADFD;
 		break;
 	case SNDRV_PCM_IOCTL_READN_FRAMES:
-		if (substream->stream  != SNDRV_PCM_STREAM_CAPTURE) {
-			err = -EINVAL;
-			goto __err;
-		}
+		if (substream->stream  != SNDRV_PCM_STREAM_CAPTURE)
+			return -EINVAL;
 		break;
 	}
-	if ((ch = substream->runtime->channels) > 128) {
-		err = -EINVAL;
-		goto __err;
-	}
-	if (get_user(data32.frames, &srcptr->frames)) {
-		err = -EFAULT;
-		goto __err;
-	}
+	if ((ch = substream->runtime->channels) > 128)
+		return -EINVAL;
+	if (get_user(data32.frames, &srcptr->frames))
+		return -EFAULT;
 	__get_user(data32.bufs, &srcptr->bufs);
 	bufptr = (u32*)TO_PTR(data32.bufs);
 	for (i = 0; i < ch; i++) {
 		u32 ptr;
-		if (get_user(ptr, bufptr)) {
-			err = -EFAULT;
-			goto __err;
-		}
+		if (get_user(ptr, bufptr))
+			return -EFAULT;
 		bufs[ch] = (void*)TO_PTR(ptr);
 		bufptr++;
 	}
+	oldseg = get_fs();
+	set_fs(KERNEL_DS);
 	switch (native_ctl) {
 	case SNDRV_PCM_IOCTL_WRITEN_FRAMES:
 		err = snd_pcm_lib_writev(substream, bufs, data32.frames);
@@ -294,14 +277,12 @@ static int _snd_ioctl32_xfern(unsigned int fd, unsigned int cmd, unsigned long a
 		err = snd_pcm_lib_readv(substream, bufs, data32.frames);
 		break;
 	}
-	
-	if (err < 0)
-		goto __err;
-	if (put_user(err, &srcptr->result))
-		err = -EFAULT;
- __err:
 	set_fs(oldseg);
-	return err < 0 ? err : 0;
+	if (err < 0)
+		return err;
+	if (put_user(err, &srcptr->result))
+		return -EFAULT;
+	return 0;
 }
 
 
@@ -364,24 +345,22 @@ static int _snd_ioctl32_pcm_hw_params_old(unsigned int fd, unsigned int cmd, uns
 {
 	struct sndrv_pcm_hw_params_old32 data32;
 	struct sndrv_pcm_hw_params data;
-	mm_segment_t oldseg = get_fs();
+	mm_segment_t oldseg;
 	int err;
-	set_fs(KERNEL_DS);
-	if (copy_from_user(&data32, (void*)arg, sizeof(data32))) {
-		err = -EFAULT;
-		goto __err;
-	}
+
+	if (copy_from_user(&data32, (void*)arg, sizeof(data32)))
+		return -EFAULT;
 	snd_pcm_hw_convert_from_old_params(&data, &data32);
+	oldseg = get_fs();
+	set_fs(KERNEL_DS);
 	err = file->f_op->ioctl(file->f_dentry->d_inode, file, native_ctl, (unsigned long)&data);
+	set_fs(oldseg);
 	if (err < 0)
-		goto __err;
+		return err;
 	snd_pcm_hw_convert_to_old_params(&data32, &data);
-	if (copy_to_user((void*)arg, &data32, sizeof(data32))) {
-	  err = -EFAULT;
-	  goto __err;
-	}
- __err: set_fs(oldseg);
-	return err;
+	if (copy_to_user((void*)arg, &data32, sizeof(data32)))
+		return  -EFAULT;
+	return 0;
 }
 
 
@@ -451,10 +430,6 @@ struct ioctl32_mapper pcm_mappers[] = {
 	{ SNDRV_PCM_IOCTL_READN_FRAMES32, AP(pcm_readn) },
 	{ SNDRV_PCM_IOCTL_LINK, NULL },
 	{ SNDRV_PCM_IOCTL_UNLINK, NULL },
-
-	{ SNDRV_CTL_IOCTL_PCM_NEXT_DEVICE, NULL },
-	{ SNDRV_CTL_IOCTL_PCM_INFO, NULL },
-	{ SNDRV_CTL_IOCTL_PCM_PREFER_SUBDEVICE, NULL },
 
 	{ 0 },
 };

@@ -46,6 +46,7 @@
 #include <linux/delay.h>
 #include <linux/ide.h>
 #include <linux/spinlock.h>
+#include <linux/pci.h>
 
 #include <asm/byteorder.h>
 #include <asm/irq.h>
@@ -566,6 +567,11 @@ static void hwif_register (ide_hwif_t *hwif)
 	/* register with global device tree */
 	strncpy(hwif->gendev.bus_id,hwif->name,BUS_ID_SIZE);
 	snprintf(hwif->gendev.name,DEVICE_NAME_SIZE,"IDE Controller");
+	hwif->gendev.driver_data = hwif;
+	if (hwif->pci_dev)
+		hwif->gendev.parent = &hwif->pci_dev->dev;
+	else
+		hwif->gendev.parent = NULL; /* Would like to do = &device_legacy */
 	device_register(&hwif->gendev);
 
 	if (hwif->mmio == 2)

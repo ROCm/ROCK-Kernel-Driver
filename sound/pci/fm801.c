@@ -270,9 +270,9 @@ static unsigned int rates[] = {
 #define RATES sizeof(rates) / sizeof(rates[0])
 
 static snd_pcm_hw_constraint_list_t hw_constraints_rates = {
-	count: RATES,
-	list: rates,
-	mask: 0,
+	.count = RATES,
+	.list = rates,
+	.mask = 0,
 };
 
 static unsigned int channels[] = {
@@ -282,9 +282,9 @@ static unsigned int channels[] = {
 #define CHANNELS sizeof(channels) / sizeof(channels[0])
 
 static snd_pcm_hw_constraint_list_t hw_constraints_channels = {
-	count: CHANNELS,
-	list: channels,
-	mask: 0,
+	.count = CHANNELS,
+	.list = channels,
+	.mask = 0,
 };
 
 /*
@@ -512,7 +512,7 @@ static void snd_fm801_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 static snd_pcm_hardware_t snd_fm801_playback =
 {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				 SNDRV_PCM_INFO_MMAP_VALID),
 	formats:		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
@@ -531,7 +531,7 @@ static snd_pcm_hardware_t snd_fm801_playback =
 
 static snd_pcm_hardware_t snd_fm801_capture =
 {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				 SNDRV_PCM_INFO_MMAP_VALID),
 	formats:		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
@@ -597,25 +597,25 @@ static int snd_fm801_capture_close(snd_pcm_substream_t * substream)
 }
 
 static snd_pcm_ops_t snd_fm801_playback_ops = {
-	open:		snd_fm801_playback_open,
-	close:		snd_fm801_playback_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	hw_params:	snd_fm801_hw_params,
-	hw_free:	snd_fm801_hw_free,
-	prepare:	snd_fm801_playback_prepare,
-	trigger:	snd_fm801_playback_trigger,
-	pointer:	snd_fm801_playback_pointer,
+	.open =		snd_fm801_playback_open,
+	.close =	snd_fm801_playback_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_fm801_hw_params,
+	.hw_free =	snd_fm801_hw_free,
+	.prepare =	snd_fm801_playback_prepare,
+	.trigger =	snd_fm801_playback_trigger,
+	.pointer =	snd_fm801_playback_pointer,
 };
 
 static snd_pcm_ops_t snd_fm801_capture_ops = {
-	open:		snd_fm801_capture_open,
-	close:		snd_fm801_capture_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	hw_params:	snd_fm801_hw_params,
-	hw_free:	snd_fm801_hw_free,
-	prepare:	snd_fm801_capture_prepare,
-	trigger:	snd_fm801_capture_trigger,
-	pointer:	snd_fm801_capture_pointer,
+	.open =		snd_fm801_capture_open,
+	.close =	snd_fm801_capture_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_fm801_hw_params,
+	.hw_free =	snd_fm801_hw_free,
+	.prepare =	snd_fm801_capture_prepare,
+	.trigger =	snd_fm801_capture_trigger,
+	.pointer =	snd_fm801_capture_pointer,
 };
 
 static void snd_fm801_pcm_free(snd_pcm_t *pcm)
@@ -656,9 +656,9 @@ static int __devinit snd_fm801_pcm(fm801_t *chip, int device, snd_pcm_t ** rpcm)
  */
 
 #define FM801_SINGLE(xname, reg, shift, mask, invert) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, info: snd_fm801_info_single, \
-  get: snd_fm801_get_single, put: snd_fm801_put_single, \
-  private_value: reg | (shift << 8) | (mask << 16) | (invert << 24) }
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .info = snd_fm801_info_single, \
+  .get = snd_fm801_get_single, .put = snd_fm801_put_single, \
+  .private_value = reg | (shift << 8) | (mask << 16) | (invert << 24) }
 
 static int snd_fm801_info_single(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -701,9 +701,9 @@ static int snd_fm801_put_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
 }
 
 #define FM801_DOUBLE(xname, reg, shift_left, shift_right, mask, invert) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, info: snd_fm801_info_double, \
-  get: snd_fm801_get_double, put: snd_fm801_put_double, \
-  private_value: reg | (shift_left << 8) | (shift_right << 12) | (mask << 16) | (invert << 24) }
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .info = snd_fm801_info_double, \
+  .get = snd_fm801_get_double, .put = snd_fm801_put_double, \
+  .private_value = reg | (shift_left << 8) | (shift_right << 12) | (mask << 16) | (invert << 24) }
 
 static int snd_fm801_info_double(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -804,11 +804,11 @@ FM801_SINGLE("I2S Playback Switch", FM801_I2S_VOL, 15, 1, 1),
 FM801_DOUBLE("FM Playback Volume", FM801_FM_VOL, 0, 8, 31, 1),
 FM801_SINGLE("FM Playback Switch", FM801_FM_VOL, 15, 1, 1),
 {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "Digital Capture Source",
-	info: snd_fm801_info_mux,
-	get: snd_fm801_get_mux,
-	put: snd_fm801_put_mux,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "Digital Capture Source",
+	.info = snd_fm801_info_mux,
+	.get = snd_fm801_get_mux,
+	.put = snd_fm801_put_mux,
 }
 };
 
@@ -903,7 +903,7 @@ static int __devinit snd_fm801_create(snd_card_t * card,
 	signed long timeout;
 	int err;
 	static snd_device_ops_t ops = {
-		dev_free:	snd_fm801_dev_free,
+		.dev_free =	snd_fm801_dev_free,
 	};
 	
 	*rchip = NULL;
@@ -1091,10 +1091,10 @@ static void __devexit snd_card_fm801_remove(struct pci_dev *pci)
 }
 
 static struct pci_driver driver = {
-	name: "FM801",
-	id_table: snd_fm801_ids,
-	probe: snd_card_fm801_probe,
-	remove: __devexit_p(snd_card_fm801_remove),
+	.name = "FM801",
+	.id_table = snd_fm801_ids,
+	.probe = snd_card_fm801_probe,
+	.remove = __devexit_p(snd_card_fm801_remove),
 };
                                                                 
 static int __init alsa_card_fm801_init(void)

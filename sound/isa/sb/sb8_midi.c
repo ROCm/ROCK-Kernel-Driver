@@ -23,7 +23,6 @@
  *   working.
  */
 
-#define __NO_VERSION__
 #include <sound/driver.h>
 #include <asm/io.h>
 #include <linux/time.h>
@@ -229,16 +228,16 @@ static void snd_sb8dsp_midi_output_trigger(snd_rawmidi_substream_t * substream, 
 
 static snd_rawmidi_ops_t snd_sb8dsp_midi_output =
 {
-	open:           snd_sb8dsp_midi_output_open,
-	close:          snd_sb8dsp_midi_output_close,
-	trigger:	snd_sb8dsp_midi_output_trigger,
+	.open =		snd_sb8dsp_midi_output_open,
+	.close =	snd_sb8dsp_midi_output_close,
+	.trigger =	snd_sb8dsp_midi_output_trigger,
 };
 
 static snd_rawmidi_ops_t snd_sb8dsp_midi_input =
 {
-	open:           snd_sb8dsp_midi_input_open,
-	close:          snd_sb8dsp_midi_input_close,
-	trigger:        snd_sb8dsp_midi_input_trigger,
+	.open =		snd_sb8dsp_midi_input_open,
+	.close =	snd_sb8dsp_midi_input_close,
+	.trigger =	snd_sb8dsp_midi_input_trigger,
 };
 
 int snd_sb8dsp_midi(sb_t *chip, int device, snd_rawmidi_t ** rrawmidi)

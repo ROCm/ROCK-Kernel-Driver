@@ -21,7 +21,6 @@
  *
  */
 
-#define __NO_VERSION__
 #include <sound/driver.h>
 #include <linux/time.h>
 #include <sound/core.h>
@@ -129,20 +128,20 @@ static void snd_gf1_interrupt_timer2(snd_gus_card_t * gus)
 
 static struct _snd_timer_hardware snd_gf1_timer1 =
 {
-	flags:          SNDRV_TIMER_HW_STOP,
-	resolution:     80000,
-	ticks:          256,
-	start:          snd_gf1_timer1_start,
-	stop:           snd_gf1_timer1_stop,
+	.flags =	SNDRV_TIMER_HW_STOP,
+	.resolution =	80000,
+	.ticks =	256,
+	.start =	snd_gf1_timer1_start,
+	.stop =		snd_gf1_timer1_stop,
 };
 
 static struct _snd_timer_hardware snd_gf1_timer2 =
 {
-	flags:          SNDRV_TIMER_HW_STOP,
-	resolution:     320000,
-	ticks:          256,
-	start:          snd_gf1_timer2_start,
-	stop:           snd_gf1_timer2_stop,
+	.flags =	SNDRV_TIMER_HW_STOP,
+	.resolution =	320000,
+	.ticks =	256,
+	.start =	snd_gf1_timer2_start,
+	.stop =		snd_gf1_timer2_stop,
 };
 
 static void snd_gf1_timer1_free(snd_timer_t *timer)

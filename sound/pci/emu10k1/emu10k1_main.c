@@ -25,7 +25,6 @@
  *
  */
 
-#define __NO_VERSION__
 #include <sound/driver.h>
 #include <linux/delay.h>
 #include <linux/init.h>
@@ -534,24 +533,31 @@ int __devinit snd_emu10k1_create(snd_card_t * card,
 {
 	emu10k1_t *emu;
 	int err;
+	int is_audigy;
 	static snd_device_ops_t ops = {
-		dev_free:	snd_emu10k1_dev_free,
+		.dev_free =	snd_emu10k1_dev_free,
 	};
 	
 	*remu = NULL;
 
+	// is_audigy = (int)pci->driver_data;
+	is_audigy = (pci->device == 0x0004);
+
 	/* enable PCI device */
 	if ((err = pci_enable_device(pci)) < 0)
 		return err;
-	/* check, if we can restrict PCI DMA transfers to 31 bits */
-	if (!pci_dma_supported(pci, 0x7fffffff)) {
-		snd_printk("architecture does not support 31bit PCI busmaster DMA\n");
-		return -ENXIO;
+	/* set the DMA transfer mask */
+	if (is_audigy) {
+		if (pci_set_dma_mask(pci, 0xffffffff) < 0) {
+			snd_printk(KERN_ERR "architecture does not support 32bit PCI busmaster DMA\n");
+			return -ENXIO;
+		}
+	} else {
+		if (pci_set_dma_mask(pci, 0x1fffffff) < 0) {
+			snd_printk(KERN_ERR "architecture does not support 29bit PCI busmaster DMA\n");
+			return -ENXIO;
+		}
 	}
-	if (pci_get_drvdata(pci))
-		pci_set_dma_mask(pci, 0xffffffff); /* audigy */
-	else
-		pci_set_dma_mask(pci, 0x7fffffff);
 
 	emu = snd_magic_kcalloc(emu10k1_t, 0, GFP_KERNEL);
 	if (emu == NULL)
@@ -572,11 +578,8 @@ int __devinit snd_emu10k1_create(snd_card_t * card,
 	emu->get_synth_voice = NULL;
 	emu->port = pci_resource_start(pci, 0);
 
-	// emu->audigy = (int)pci->driver_data;
-	if (pci->device == 0x0004)
-		emu->audigy = 1;
-
-	if (emu->audigy)
+	emu->audigy = is_audigy;
+	if (is_audigy)
 		emu->gpr_base = A_FXGPREGBASE;
 	else
 		emu->gpr_base = FXGPREGBASE;

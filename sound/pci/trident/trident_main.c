@@ -25,7 +25,6 @@
  *
  */
 
-#define __NO_VERSION__
 #include <sound/driver.h>
 #include <asm/io.h>
 #include <linux/delay.h>
@@ -1695,23 +1694,23 @@ static snd_pcm_uframes_t snd_trident_spdif_pointer(snd_pcm_substream_t * substre
 
 static snd_pcm_hardware_t snd_trident_playback =
 {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				 SNDRV_PCM_INFO_MMAP_VALID | SNDRV_PCM_INFO_SYNC_START |
 				 SNDRV_PCM_INFO_PAUSE | SNDRV_PCM_INFO_RESUME),
-	formats:		(SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE |
+	.formats =		(SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE |
 				 SNDRV_PCM_FMTBIT_S8 | SNDRV_PCM_FMTBIT_U16_LE),
-	rates:			SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		4000,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	(256*1024),
-	period_bytes_min:	64,
-	period_bytes_max:	(256*1024),
-	periods_min:		1,
-	periods_max:		1024,
-	fifo_size:		0,
+	.rates =		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		4000,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	(256*1024),
+	.period_bytes_min =	64,
+	.period_bytes_max =	(256*1024),
+	.periods_min =		1,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 /*
@@ -1720,23 +1719,23 @@ static snd_pcm_hardware_t snd_trident_playback =
 
 static snd_pcm_hardware_t snd_trident_capture =
 {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				 SNDRV_PCM_INFO_MMAP_VALID | SNDRV_PCM_INFO_SYNC_START |
 				 SNDRV_PCM_INFO_PAUSE | SNDRV_PCM_INFO_RESUME),
-	formats:		(SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE |
+	.formats =		(SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE |
 				 SNDRV_PCM_FMTBIT_S8 | SNDRV_PCM_FMTBIT_U16_LE),
-	rates:			SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		4000,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	(128*1024),
-	period_bytes_min:	64,
-	period_bytes_max:	(128*1024),
-	periods_min:		1,
-	periods_max:		1024,
-	fifo_size:		0,
+	.rates =		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		4000,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	(128*1024),
+	.period_bytes_min =	64,
+	.period_bytes_max =	(128*1024),
+	.periods_min =		1,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 /*
@@ -1745,22 +1744,22 @@ static snd_pcm_hardware_t snd_trident_capture =
 
 static snd_pcm_hardware_t snd_trident_foldback =
 {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				 SNDRV_PCM_INFO_MMAP_VALID | SNDRV_PCM_INFO_SYNC_START |
 				 SNDRV_PCM_INFO_PAUSE | SNDRV_PCM_INFO_RESUME),
-	formats:		SNDRV_PCM_FMTBIT_S16_LE,
-	rates:			SNDRV_PCM_RATE_48000,
-	rate_min:		48000,
-	rate_max:		48000,
-	channels_min:		2,
-	channels_max:		2,
-	buffer_bytes_max:	(128*1024),
-	period_bytes_min:	64,
-	period_bytes_max:	(128*1024),
-	periods_min:		1,
-	periods_max:		1024,
-	fifo_size:		0,
+	.formats =		SNDRV_PCM_FMTBIT_S16_LE,
+	.rates =		SNDRV_PCM_RATE_48000,
+	.rate_min =		48000,
+	.rate_max =		48000,
+	.channels_min =		2,
+	.channels_max =		2,
+	.buffer_bytes_max =	(128*1024),
+	.period_bytes_min =	64,
+	.period_bytes_max =	(128*1024),
+	.periods_min =		1,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 /*
@@ -1769,23 +1768,23 @@ static snd_pcm_hardware_t snd_trident_foldback =
 
 static snd_pcm_hardware_t snd_trident_spdif =
 {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				 SNDRV_PCM_INFO_MMAP_VALID | SNDRV_PCM_INFO_SYNC_START |
 				 SNDRV_PCM_INFO_PAUSE | SNDRV_PCM_INFO_RESUME),
-	formats:		SNDRV_PCM_FMTBIT_S16_LE,
-	rates:			(SNDRV_PCM_RATE_32000 | SNDRV_PCM_RATE_44100 |
+	.formats =		SNDRV_PCM_FMTBIT_S16_LE,
+	.rates =		(SNDRV_PCM_RATE_32000 | SNDRV_PCM_RATE_44100 |
 				 SNDRV_PCM_RATE_48000),
-	rate_min:		32000,
-	rate_max:		48000,
-	channels_min:		2,
-	channels_max:		2,
-	buffer_bytes_max:	(128*1024),
-	period_bytes_min:	64,
-	period_bytes_max:	(128*1024),
-	periods_min:		1,
-	periods_max:		1024,
-	fifo_size:		0,
+	.rate_min =		32000,
+	.rate_max =		48000,
+	.channels_min =		2,
+	.channels_max =		2,
+	.buffer_bytes_max =	(128*1024),
+	.period_bytes_min =	64,
+	.period_bytes_max =	(128*1024),
+	.periods_min =		1,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 static void snd_trident_pcm_free_substream(snd_pcm_runtime_t *runtime)
@@ -2026,58 +2025,58 @@ static int snd_trident_foldback_close(snd_pcm_substream_t * substream)
   ---------------------------------------------------------------------------*/
 
 static snd_pcm_ops_t snd_trident_playback_ops = {
-	open:		snd_trident_playback_open,
-	close:		snd_trident_playback_close,
-	ioctl:		snd_trident_ioctl,
-	hw_params:	snd_trident_playback_hw_params,
-	hw_free:	snd_trident_playback_hw_free,
-	prepare:	snd_trident_playback_prepare,
-	trigger:	snd_trident_trigger,
-	pointer:	snd_trident_playback_pointer,
+	.open =		snd_trident_playback_open,
+	.close =	snd_trident_playback_close,
+	.ioctl =	snd_trident_ioctl,
+	.hw_params =	snd_trident_playback_hw_params,
+	.hw_free =	snd_trident_playback_hw_free,
+	.prepare =	snd_trident_playback_prepare,
+	.trigger =	snd_trident_trigger,
+	.pointer =	snd_trident_playback_pointer,
 };
 
 static snd_pcm_ops_t snd_trident_capture_ops = {
-	open:		snd_trident_capture_open,
-	close:		snd_trident_capture_close,
-	ioctl:		snd_trident_ioctl,
-	hw_params:	snd_trident_capture_hw_params,
-	hw_free:	snd_trident_capture_hw_free,
-	prepare:	snd_trident_capture_prepare,
-	trigger:	snd_trident_trigger,
-	pointer:	snd_trident_capture_pointer,
+	.open =		snd_trident_capture_open,
+	.close =	snd_trident_capture_close,
+	.ioctl =	snd_trident_ioctl,
+	.hw_params =	snd_trident_capture_hw_params,
+	.hw_free =	snd_trident_capture_hw_free,
+	.prepare =	snd_trident_capture_prepare,
+	.trigger =	snd_trident_trigger,
+	.pointer =	snd_trident_capture_pointer,
 };
 
 static snd_pcm_ops_t snd_trident_si7018_capture_ops = {
-	open:		snd_trident_capture_open,
-	close:		snd_trident_capture_close,
-	ioctl:		snd_trident_ioctl,
-	hw_params:	snd_trident_si7018_capture_hw_params,
-	hw_free:	snd_trident_si7018_capture_hw_free,
-	prepare:	snd_trident_si7018_capture_prepare,
-	trigger:	snd_trident_trigger,
-	pointer:	snd_trident_playback_pointer,
+	.open =		snd_trident_capture_open,
+	.close =	snd_trident_capture_close,
+	.ioctl =	snd_trident_ioctl,
+	.hw_params =	snd_trident_si7018_capture_hw_params,
+	.hw_free =	snd_trident_si7018_capture_hw_free,
+	.prepare =	snd_trident_si7018_capture_prepare,
+	.trigger =	snd_trident_trigger,
+	.pointer =	snd_trident_playback_pointer,
 };
 
 static snd_pcm_ops_t snd_trident_foldback_ops = {
-	open:		snd_trident_foldback_open,
-	close:		snd_trident_foldback_close,
-	ioctl:		snd_trident_ioctl,
-	hw_params:	snd_trident_foldback_hw_params,
-	hw_free:	snd_trident_foldback_hw_free,
-	prepare:	snd_trident_foldback_prepare,
-	trigger:	snd_trident_trigger,
-	pointer:	snd_trident_playback_pointer,
+	.open =		snd_trident_foldback_open,
+	.close =	snd_trident_foldback_close,
+	.ioctl =	snd_trident_ioctl,
+	.hw_params =	snd_trident_foldback_hw_params,
+	.hw_free =	snd_trident_foldback_hw_free,
+	.prepare =	snd_trident_foldback_prepare,
+	.trigger =	snd_trident_trigger,
+	.pointer =	snd_trident_playback_pointer,
 };
 
 static snd_pcm_ops_t snd_trident_spdif_ops = {
-	open:		snd_trident_spdif_open,
-	close:		snd_trident_spdif_close,
-	ioctl:		snd_trident_ioctl,
-	hw_params:	snd_trident_spdif_hw_params,
-	hw_free:	snd_trident_spdif_hw_free,
-	prepare:	snd_trident_spdif_prepare,
-	trigger:	snd_trident_trigger,
-	pointer:	snd_trident_spdif_pointer,
+	.open =		snd_trident_spdif_open,
+	.close =	snd_trident_spdif_close,
+	.ioctl =	snd_trident_ioctl,
+	.hw_params =	snd_trident_spdif_hw_params,
+	.hw_free =	snd_trident_spdif_hw_free,
+	.prepare =	snd_trident_spdif_prepare,
+	.trigger =	snd_trident_trigger,
+	.pointer =	snd_trident_spdif_pointer,
 };
 
 /*---------------------------------------------------------------------------
@@ -2294,12 +2293,12 @@ static int snd_trident_spdif_control_put(snd_kcontrol_t * kcontrol,
 
 static snd_kcontrol_new_t snd_trident_spdif_control __devinitdata =
 {
-	iface:		SNDRV_CTL_ELEM_IFACE_MIXER,
-	name:           SNDRV_CTL_NAME_IEC958("",PLAYBACK,SWITCH),
-	info:		snd_trident_spdif_control_info,
-	get:		snd_trident_spdif_control_get,
-	put:		snd_trident_spdif_control_put,
-	private_value:  0x28,
+	.iface =	SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name =         SNDRV_CTL_NAME_IEC958("",PLAYBACK,SWITCH),
+	.info =		snd_trident_spdif_control_info,
+	.get =		snd_trident_spdif_control_get,
+	.put =		snd_trident_spdif_control_put,
+	.private_value = 0x28,
 };
 
 /*---------------------------------------------------------------------------
@@ -2353,11 +2352,11 @@ static int snd_trident_spdif_default_put(snd_kcontrol_t * kcontrol,
 
 static snd_kcontrol_new_t snd_trident_spdif_default __devinitdata =
 {
-	iface:		SNDRV_CTL_ELEM_IFACE_PCM,
-	name:           SNDRV_CTL_NAME_IEC958("",PLAYBACK,DEFAULT),
-	info:		snd_trident_spdif_default_info,
-	get:		snd_trident_spdif_default_get,
-	put:		snd_trident_spdif_default_put
+	.iface =		SNDRV_CTL_ELEM_IFACE_PCM,
+	.name =           SNDRV_CTL_NAME_IEC958("",PLAYBACK,DEFAULT),
+	.info =		snd_trident_spdif_default_info,
+	.get =		snd_trident_spdif_default_get,
+	.put =		snd_trident_spdif_default_put
 };
 
 /*---------------------------------------------------------------------------
@@ -2385,11 +2384,11 @@ static int snd_trident_spdif_mask_get(snd_kcontrol_t * kcontrol,
 
 static snd_kcontrol_new_t snd_trident_spdif_mask __devinitdata =
 {
-	access:		SNDRV_CTL_ELEM_ACCESS_READ,
-	iface:		SNDRV_CTL_ELEM_IFACE_PCM,
-	name:           SNDRV_CTL_NAME_IEC958("",PLAYBACK,MASK),
-	info:		snd_trident_spdif_mask_info,
-	get:		snd_trident_spdif_mask_get,
+	.access =	SNDRV_CTL_ELEM_ACCESS_READ,
+	.iface =	SNDRV_CTL_ELEM_IFACE_PCM,
+	.name =         SNDRV_CTL_NAME_IEC958("",PLAYBACK,MASK),
+	.info =		snd_trident_spdif_mask_info,
+	.get =		snd_trident_spdif_mask_get,
 };
 
 /*---------------------------------------------------------------------------
@@ -2443,12 +2442,12 @@ static int snd_trident_spdif_stream_put(snd_kcontrol_t * kcontrol,
 
 static snd_kcontrol_new_t snd_trident_spdif_stream __devinitdata =
 {
-	access:		SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_INACTIVE,
-	iface:		SNDRV_CTL_ELEM_IFACE_PCM,
-	name:           SNDRV_CTL_NAME_IEC958("",PLAYBACK,PCM_STREAM),
-	info:		snd_trident_spdif_stream_info,
-	get:		snd_trident_spdif_stream_get,
-	put:		snd_trident_spdif_stream_put
+	.access =	SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_INACTIVE,
+	.iface =	SNDRV_CTL_ELEM_IFACE_PCM,
+	.name =         SNDRV_CTL_NAME_IEC958("",PLAYBACK,PCM_STREAM),
+	.info =		snd_trident_spdif_stream_info,
+	.get =		snd_trident_spdif_stream_get,
+	.put =		snd_trident_spdif_stream_put
 };
 
 /*---------------------------------------------------------------------------
@@ -2502,12 +2501,12 @@ static int snd_trident_ac97_control_put(snd_kcontrol_t * kcontrol,
 
 static snd_kcontrol_new_t snd_trident_ac97_rear_control __devinitdata =
 {
-	iface:		SNDRV_CTL_ELEM_IFACE_MIXER,
-	name:           "Rear Path",
-	info:		snd_trident_ac97_control_info,
-	get:		snd_trident_ac97_control_get,
-	put:		snd_trident_ac97_control_put,
-	private_value:  4,
+	.iface =	SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name =         "Rear Path",
+	.info =		snd_trident_ac97_control_info,
+	.get =		snd_trident_ac97_control_get,
+	.put =		snd_trident_ac97_control_put,
+	.private_value = 4,
 };
 
 /*---------------------------------------------------------------------------
@@ -2558,22 +2557,22 @@ static int snd_trident_vol_control_put(snd_kcontrol_t * kcontrol,
 
 static snd_kcontrol_new_t snd_trident_vol_music_control __devinitdata =
 {
-	iface:		SNDRV_CTL_ELEM_IFACE_MIXER,
-	name:           "Music Playback Volume",
-	info:		snd_trident_vol_control_info,
-	get:		snd_trident_vol_control_get,
-	put:		snd_trident_vol_control_put,
-	private_value:  16,
+	.iface =	SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name =         "Music Playback Volume",
+	.info =		snd_trident_vol_control_info,
+	.get =		snd_trident_vol_control_get,
+	.put =		snd_trident_vol_control_put,
+	.private_value = 16,
 };
 
 static snd_kcontrol_new_t snd_trident_vol_wave_control __devinitdata =
 {
-	iface:		SNDRV_CTL_ELEM_IFACE_MIXER,
-	name:           "Wave Playback Volume",
-	info:		snd_trident_vol_control_info,
-	get:		snd_trident_vol_control_get,
-	put:		snd_trident_vol_control_put,
-	private_value:  0,
+	.iface =	SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name =         "Wave Playback Volume",
+	.info =		snd_trident_vol_control_info,
+	.get =		snd_trident_vol_control_get,
+	.put =		snd_trident_vol_control_put,
+	.private_value = 0,
 };
 
 /*---------------------------------------------------------------------------
@@ -2634,12 +2633,12 @@ static int snd_trident_pcm_vol_control_put(snd_kcontrol_t * kcontrol,
 
 static snd_kcontrol_new_t snd_trident_pcm_vol_control __devinitdata =
 {
-	iface:		SNDRV_CTL_ELEM_IFACE_MIXER,
-	name:           "PCM Front Playback Volume",
-	access:		SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_INACTIVE,
-	info:		snd_trident_pcm_vol_control_info,
-	get:		snd_trident_pcm_vol_control_get,
-	put:		snd_trident_pcm_vol_control_put,
+	.iface =	SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name =         "PCM Front Playback Volume",
+	.access =	SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_INACTIVE,
+	.info =		snd_trident_pcm_vol_control_info,
+	.get =		snd_trident_pcm_vol_control_get,
+	.put =		snd_trident_pcm_vol_control_put,
 };
 
 /*---------------------------------------------------------------------------
@@ -2695,12 +2694,12 @@ static int snd_trident_pcm_pan_control_put(snd_kcontrol_t * kcontrol,
 
 static snd_kcontrol_new_t snd_trident_pcm_pan_control __devinitdata =
 {
-	iface:		SNDRV_CTL_ELEM_IFACE_MIXER,
-	name:           "PCM Pan Playback Control",
-	access:		SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_INACTIVE,
-	info:		snd_trident_pcm_pan_control_info,
-	get:		snd_trident_pcm_pan_control_get,
-	put:		snd_trident_pcm_pan_control_put,
+	.iface =	SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name =         "PCM Pan Playback Control",
+	.access =	SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_INACTIVE,
+	.info =		snd_trident_pcm_pan_control_info,
+	.get =		snd_trident_pcm_pan_control_get,
+	.put =		snd_trident_pcm_pan_control_put,
 };
 
 /*---------------------------------------------------------------------------
@@ -2748,12 +2747,12 @@ static int snd_trident_pcm_rvol_control_put(snd_kcontrol_t * kcontrol,
 
 static snd_kcontrol_new_t snd_trident_pcm_rvol_control __devinitdata =
 {
-	iface:		SNDRV_CTL_ELEM_IFACE_MIXER,
-	name:           "PCM Reverb Playback Volume",
-	access:		SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_INACTIVE,
-	info:		snd_trident_pcm_rvol_control_info,
-	get:		snd_trident_pcm_rvol_control_get,
-	put:		snd_trident_pcm_rvol_control_put,
+	.iface =	SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name =         "PCM Reverb Playback Volume",
+	.access =	SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_INACTIVE,
+	.info =		snd_trident_pcm_rvol_control_info,
+	.get =		snd_trident_pcm_rvol_control_get,
+	.put =		snd_trident_pcm_rvol_control_put,
 };
 
 /*---------------------------------------------------------------------------
@@ -2801,12 +2800,12 @@ static int snd_trident_pcm_cvol_control_put(snd_kcontrol_t * kcontrol,
 
 static snd_kcontrol_new_t snd_trident_pcm_cvol_control __devinitdata =
 {
-	iface:		SNDRV_CTL_ELEM_IFACE_MIXER,
-	name:           "PCM Chorus Playback Volume",
-	access:		SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_INACTIVE,
-	info:		snd_trident_pcm_cvol_control_info,
-	get:		snd_trident_pcm_cvol_control_get,
-	put:		snd_trident_pcm_cvol_control_put,
+	.iface =	SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name =         "PCM Chorus Playback Volume",
+	.access =	SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_INACTIVE,
+	.info =		snd_trident_pcm_cvol_control_info,
+	.get =		snd_trident_pcm_cvol_control_get,
+	.put =		snd_trident_pcm_cvol_control_put,
 };
 
 static void snd_trident_notify_pcm_change1(snd_card_t * card, snd_kcontrol_t *kctl, int activate)
@@ -3153,7 +3152,7 @@ int __devinit snd_trident_create(snd_card_t * card,
 	snd_trident_voice_t *voice;
 	snd_trident_pcm_mixer_t *tmix;
 	static snd_device_ops_t ops = {
-		dev_free:	snd_trident_dev_free,
+		.dev_free =	snd_trident_dev_free,
 	};
 
 	*rtrident = NULL;

@@ -637,9 +637,9 @@ int snd_timer_new(snd_card_t *card, char *id, snd_timer_id_t *tid, snd_timer_t *
 	snd_timer_t *timer;
 	int err;
 	static snd_device_ops_t ops = {
-		dev_free:	snd_timer_dev_free,
-		dev_register:	snd_timer_dev_register,
-		dev_unregister:	snd_timer_dev_unregister
+		.dev_free = snd_timer_dev_free,
+		.dev_register = snd_timer_dev_register,
+		.dev_unregister = snd_timer_dev_unregister
 	};
 
 	snd_assert(tid != NULL, return -EINVAL);
@@ -821,11 +821,11 @@ static int snd_timer_s_stop(snd_timer_t * timer)
 
 static struct _snd_timer_hardware snd_timer_system =
 {
-	flags:		SNDRV_TIMER_HW_FIRST,
-	resolution:	1000000000L / HZ,
-	ticks:		10000000L,
-	start:		snd_timer_s_start,
-	stop:		snd_timer_s_stop
+	.flags =	SNDRV_TIMER_HW_FIRST,
+	.resolution =	1000000000L / HZ,
+	.ticks =	10000000L,
+	.start =	snd_timer_s_start,
+	.stop =		snd_timer_s_stop
 };
 
 static void snd_timer_free_system(snd_timer_t *timer)
@@ -1330,19 +1330,19 @@ static unsigned int snd_timer_user_poll(struct file *file, poll_table * wait)
 static struct file_operations snd_timer_f_ops =
 {
 #ifndef LINUX_2_2
-	owner:		THIS_MODULE,
+	.owner =	THIS_MODULE,
 #endif
-	read:		snd_timer_user_read,
-	open:		snd_timer_user_open,
-	release:	snd_timer_user_release,
-	poll:		snd_timer_user_poll,
-	ioctl:		snd_timer_user_ioctl,
+	.read =		snd_timer_user_read,
+	.open =		snd_timer_user_open,
+	.release =	snd_timer_user_release,
+	.poll =		snd_timer_user_poll,
+	.ioctl =	snd_timer_user_ioctl,
 };
 
 static snd_minor_t snd_timer_reg =
 {
-	comment:	"timer",
-	f_ops:		&snd_timer_f_ops,
+	.comment =	"timer",
+	.f_ops =	&snd_timer_f_ops,
 };
 
 /*

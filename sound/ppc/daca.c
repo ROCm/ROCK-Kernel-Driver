@@ -19,12 +19,12 @@
  */
 
 
-#define __NO_VERSION__
 #include <sound/driver.h>
 #include <linux/init.h>
 #include <linux/i2c.h>
 #include <linux/i2c-dev.h>
 #include <linux/kmod.h>
+#include <linux/slab.h>
 #include <sound/core.h>
 #include "pmac.h"
 
@@ -201,19 +201,19 @@ static snd_kcontrol_new_t daca_mixers[] = {
 	  .name = "Deemphasis Switch",
 	  .info = daca_info_deemphasis,
 	  .get = daca_get_deemphasis,
-	  put: daca_put_deemphasis
+	  .put = daca_put_deemphasis
 	},
 	{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 	  .name = "Master Playback Volume",
 	  .info = daca_info_volume,
 	  .get = daca_get_volume,
-	  put: daca_put_volume
+	  .put = daca_put_volume
 	},
 	{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 	  .name = "Power Amplifier Switch",
 	  .info = daca_info_amp,
 	  .get = daca_get_amp,
-	  put: daca_put_amp
+	  .put = daca_put_amp
 	},
 };
 

@@ -47,7 +47,7 @@
 #include <linux/fs.h>
 #include <linux/buffer_head.h>
 #include <linux/uio.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 
 enum xfs_buffer_state { BH_Delay = BH_PrivateStart };
 BUFFER_FNS(Delay, delay);
@@ -214,7 +214,7 @@ typedef struct page_buf_s {
 	size_t			pb_buffer_length; /* size of buffer in bytes */
 	size_t			pb_count_desired; /* desired transfer size */
 	void			*pb_addr;	/* virtual address of buffer */
-	struct tq_struct	pb_iodone_sched;
+	struct work_struct	pb_iodone_work;
 	page_buf_iodone_t	pb_iodone;	/* I/O completion function */
 	page_buf_relse_t	pb_relse;	/* releasing function */
 	page_buf_bdstrat_t	pb_strat;	/* pre-write function */
@@ -394,5 +394,7 @@ static __inline__ int __pagebuf_iorequest(page_buf_t *pb)
 		return pb->pb_strat(pb);
 	return pagebuf_iorequest(pb);
 }
+
+extern struct workqueue_struct *pagebuf_workqueue;
 
 #endif /* __PAGE_BUF_H__ */

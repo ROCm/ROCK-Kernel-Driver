@@ -317,6 +317,8 @@ void destroy_workqueue(struct workqueue_struct *wq)
 	struct cpu_workqueue_struct *cwq;
 	int cpu;
 
+	flush_workqueue(wq);
+
 	for (cpu = 0; cpu < NR_CPUS; cpu++) {
 		if (!cpu_online(cpu))
 			continue;

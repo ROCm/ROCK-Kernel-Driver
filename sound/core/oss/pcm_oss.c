@@ -2083,21 +2083,21 @@ static void snd_pcm_oss_proc_done(snd_pcm_t *pcm)
 static struct file_operations snd_pcm_oss_f_reg =
 {
 #ifndef LINUX_2_2
-	owner:		THIS_MODULE,
+	.owner =	THIS_MODULE,
 #endif
-	read:		snd_pcm_oss_read,
-	write:		snd_pcm_oss_write,
-	open:		snd_pcm_oss_open,
-	release:	snd_pcm_oss_release,
-	poll:		snd_pcm_oss_poll,
-	ioctl:		snd_pcm_oss_ioctl,
-	mmap:		snd_pcm_oss_mmap,
+	.read =		snd_pcm_oss_read,
+	.write =	snd_pcm_oss_write,
+	.open =		snd_pcm_oss_open,
+	.release =	snd_pcm_oss_release,
+	.poll =		snd_pcm_oss_poll,
+	.ioctl =	snd_pcm_oss_ioctl,
+	.mmap =		snd_pcm_oss_mmap,
 };
 
 static snd_minor_t snd_pcm_oss_reg =
 {
-	comment:	"digital audio",
-	f_ops:		&snd_pcm_oss_f_reg,
+	.comment =	"digital audio",
+	.f_ops =	&snd_pcm_oss_f_reg,
 };
 
 static void register_oss_dsp(unsigned short native_minor, snd_pcm_t *pcm, int index)
@@ -2159,8 +2159,8 @@ static int snd_pcm_oss_unregister_minor(unsigned short native_minor,
 
 static snd_pcm_notify_t snd_pcm_oss_notify =
 {
-	n_register:	snd_pcm_oss_register_minor,
-	n_unregister:	snd_pcm_oss_unregister_minor,
+	.n_register =	snd_pcm_oss_register_minor,
+	.n_unregister =	snd_pcm_oss_unregister_minor,
 };
 
 static int __init alsa_pcm_oss_init(void)

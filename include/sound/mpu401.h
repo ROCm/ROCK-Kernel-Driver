@@ -40,6 +40,7 @@
 #define MPU401_HW_YMFPCI		14	/* YMF DS-XG PCI */
 #define MPU401_HW_CMIPCI		15	/* CMIPCI MPU-401 UART */
 #define MPU401_HW_ALS4000		16	/* Avance Logic ALS4000 */
+#define MPU401_HW_INTEL8X0		17	/* Intel8x0 driver */
 
 #define MPU401_MODE_BIT_INPUT		0
 #define MPU401_MODE_BIT_OUTPUT		1

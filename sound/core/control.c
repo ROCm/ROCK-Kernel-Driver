@@ -19,7 +19,6 @@
  *
  */
 
-#define __NO_VERSION__
 #include <sound/driver.h>
 #include <linux/threads.h>
 #include <linux/interrupt.h>
@@ -161,7 +160,7 @@ void snd_ctl_notify(snd_card_t *card, unsigned int mask, snd_ctl_elem_id_t *id)
 				goto _found;
 			}
 		}
-		ev = snd_kcalloc(sizeof(*ev), in_interrupt() ? GFP_ATOMIC : GFP_KERNEL);
+		ev = snd_kcalloc(sizeof(*ev), GFP_ATOMIC);
 		if (ev) {
 			ev->id = *id;
 			ev->mask = mask;
@@ -487,12 +486,15 @@ static int snd_ctl_elem_write(snd_ctl_file_t *file, snd_ctl_elem_value_t *_contr
 			}
 			read_unlock(&card->control_owner_lock);
 			if (result > 0) {
-				result = 0;
+				read_unlock(&card->control_rwlock);
 				snd_ctl_notify(card, SNDRV_CTL_EVENT_MASK_VALUE, &kctl->id);
+				result = 0;
+				goto __unlocked;
 			}
 		}
 	}
 	read_unlock(&card->control_rwlock);
+      __unlocked:
 	if (result >= 0)
 		if (copy_to_user(_control, &control, sizeof(control)))
 			return -EFAULT;
@@ -767,20 +769,20 @@ static int snd_ctl_fasync(int fd, struct file * file, int on)
 static struct file_operations snd_ctl_f_ops =
 {
 #ifndef LINUX_2_2
-	owner:		THIS_MODULE,
+	.owner =	THIS_MODULE,
 #endif
-	read:		snd_ctl_read,
-	open:		snd_ctl_open,
-	release:	snd_ctl_release,
-	poll:		snd_ctl_poll,
-	ioctl:		snd_ctl_ioctl,
-	fasync:		snd_ctl_fasync,
+	.read =		snd_ctl_read,
+	.open =		snd_ctl_open,
+	.release =	snd_ctl_release,
+	.poll =		snd_ctl_poll,
+	.ioctl =	snd_ctl_ioctl,
+	.fasync =	snd_ctl_fasync,
 };
 
 static snd_minor_t snd_ctl_reg =
 {
-	comment:	"ctl",
-	f_ops:		&snd_ctl_f_ops,
+	.comment =	"ctl",
+	.f_ops =	&snd_ctl_f_ops,
 };
 
 int snd_ctl_register(snd_card_t *card)

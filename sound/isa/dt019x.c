@@ -104,7 +104,7 @@ static struct isapnp_card_id snd_dt019x_pnpids[] __devinitdata = {
 	/* DT197A30 */
 	{
 		ISAPNP_CARD_ID('R','W','B',0x1688),
-		devs: { ISAPNP_DEVICE_ID('@','@','@',0x0001),
+		.devs = { ISAPNP_DEVICE_ID('@','@','@',0x0001),
 			ISAPNP_DEVICE_ID('@','X','@',0x0001),
 			ISAPNP_DEVICE_ID('@','H','@',0x0001) }
 	},

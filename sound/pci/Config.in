@@ -6,7 +6,7 @@ comment 'PCI devices'
 dep_tristate 'ALi PCI Audio M5451' CONFIG_SND_ALI5451 $CONFIG_SND
 dep_tristate 'Cirrus Logic (Sound Fusion) CS4280/CS461x/CS462x/CS463x' CONFIG_SND_CS46XX $CONFIG_SND
 dep_mbool '  Cirrus Logic (Sound Fusion) New DSP support (EXPERIMENTAL)' CONFIG_SND_CS46XX_NEW_DSP $CONFIG_SND_CS46XX $CONFIG_EXPERIMENTAL
-dep_tristate 'Cirrus Logic CS4281' CONFIG_SND_CS4281 $CONFIG_SND
+dep_tristate 'Cirrus Logic (Sound Fusion) CS4281' CONFIG_SND_CS4281 $CONFIG_SND
 dep_tristate 'EMU10K1 (SB Live!, E-mu APS)' CONFIG_SND_EMU10K1 $CONFIG_SND
 dep_tristate 'Korg 1212 IO' CONFIG_SND_KORG1212 $CONFIG_SND
 dep_tristate 'NeoMagic NM256AV/ZX' CONFIG_SND_NM256 $CONFIG_SND
@@ -27,8 +27,7 @@ dep_tristate 'ForteMedia FM801' CONFIG_SND_FM801 $CONFIG_SND
 dep_tristate 'ICEnsemble ICE1712 (Envy24)' CONFIG_SND_ICE1712 $CONFIG_SND
 dep_tristate 'Intel i810/i820/i830/i840/MX440 integrated audio' CONFIG_SND_INTEL8X0 $CONFIG_SND
 dep_tristate 'S3 SonicVibes' CONFIG_SND_SONICVIBES $CONFIG_SND
-dep_tristate 'VIA 82C686A/B South Bridge' CONFIG_SND_VIA686 $CONFIG_SND
-dep_tristate 'VIA 8233 South Bridge' CONFIG_SND_VIA8233 $CONFIG_SND
+dep_tristate 'VIA 82C686A/B, 8233 South Bridge' CONFIG_SND_VIA82XX $CONFIG_SND
 
 # define gameport if necessary
 if [ "$CONFIG_INPUT_GAMEPORT" != "n" ]; then

@@ -339,10 +339,10 @@ static void snd_opl3sa2_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 }
 
 #define OPL3SA2_SINGLE(xname, xindex, reg, shift, mask, invert) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
-  info: snd_opl3sa2_info_single, \
-  get: snd_opl3sa2_get_single, put: snd_opl3sa2_put_single, \
-  private_value: reg | (shift << 8) | (mask << 16) | (invert << 24) }
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex, \
+  .info = snd_opl3sa2_info_single, \
+  .get = snd_opl3sa2_get_single, .put = snd_opl3sa2_put_single, \
+  .private_value = reg | (shift << 8) | (mask << 16) | (invert << 24) }
 
 static int snd_opl3sa2_info_single(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -397,10 +397,10 @@ int snd_opl3sa2_put_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * uco
 }
 
 #define OPL3SA2_DOUBLE(xname, xindex, left_reg, right_reg, shift_left, shift_right, mask, invert) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
-  info: snd_opl3sa2_info_double, \
-  get: snd_opl3sa2_get_double, put: snd_opl3sa2_put_double, \
-  private_value: left_reg | (right_reg << 8) | (shift_left << 16) | (shift_right << 19) | (mask << 24) | (invert << 22) }
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex, \
+  .info = snd_opl3sa2_info_double, \
+  .get = snd_opl3sa2_get_double, .put = snd_opl3sa2_put_double, \
+  .private_value = left_reg | (right_reg << 8) | (shift_left << 16) | (shift_right << 19) | (mask << 24) | (invert << 22) }
 
 int snd_opl3sa2_info_double(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -725,7 +725,7 @@ static int __init snd_opl3sa2_probe(int dev)
 	cs4231_t *cs4231;
 	opl3_t *opl3;
 	static snd_device_ops_t ops = {
-		dev_free:	snd_opl3sa2_dev_free,
+		.dev_free =	snd_opl3sa2_dev_free,
 	};
 	int err;
 

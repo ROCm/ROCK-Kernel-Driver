@@ -103,9 +103,10 @@ enum sndrv_hwdep_iface {
 	SNDRV_HWDEP_IFACE_EMU10K1,	/* FX8010 processor in EMU10K1 chip */
 	SNDRV_HWDEP_IFACE_YSS225,	/* Yamaha FX processor */
 	SNDRV_HWDEP_IFACE_ICS2115,	/* Wavetable synth */
+	SNDRV_HWDEP_IFACE_SSCAPE,	/* Ensoniq SoundScape ISA card (MC68EC000) */
 
 	/* Don't forget to change the following: */
-	SNDRV_HWDEP_IFACE_LAST = SNDRV_HWDEP_IFACE_ICS2115,
+	SNDRV_HWDEP_IFACE_LAST = SNDRV_HWDEP_IFACE_SSCAPE,
 };
 
 struct sndrv_hwdep_info {

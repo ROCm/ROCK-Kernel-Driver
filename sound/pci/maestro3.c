@@ -1,5 +1,5 @@
 /*
- * Driver for ESS Maestro3/Allegro soundcards.
+ * Driver for ESS Maestro3/Allegro (ES1988) soundcards.
  * Copyright (c) 2000 by Zach Brown <zab@zabbo.net>
  *                       Takashi Iwai <tiwai@suse.de>
  *
@@ -52,6 +52,7 @@ MODULE_DESCRIPTION("ESS Maestro3 PCI");
 MODULE_LICENSE("GPL");
 MODULE_CLASSES("{sound}");
 MODULE_DEVICES("{{ESS,Maestro3 PCI},"
+		"{ESS,ES1988},"
 		"{ESS,Allegro PCI},"
 		"{ESS,Allegro-1 PCI},"
 	        "{ESS,Canyon3D-2/LE PCI}}");
@@ -776,6 +777,15 @@ typedef struct snd_m3 m3_t;
 #define chip_t m3_t
 
 
+/* quirk lists */
+struct m3_quirk {
+	const char *name;	/* device name */
+	u16 vendor, device;	/* subsystem ids */
+	int amp_gpio;		/* gpio pin #  for external amp, -1 = default */
+	int irda_workaround;	/* non-zero if avoid to touch 0x10 on GPIO_DIRECTION
+				   (e.g. for IrDA on Dell Inspirons) */
+};
+
 struct m3_list {
 	int curlen;
 	int mem_addr;
@@ -825,9 +835,7 @@ struct snd_m3 {
 	snd_pcm_t *pcm;
 
 	struct pci_dev *pci;
-	/* pci_dev in 2.2 kernel doesn't have them, so we keep them private */
-	u16 subsystem_vendor;
-	u16 subsystem_device;
+	struct m3_quirk *quirk;
 
 	int dacs_active;
 	int timer_users;
@@ -907,6 +915,43 @@ static struct pci_device_id snd_m3_ids[] __devinitdata = {
 };
 
 MODULE_DEVICE_TABLE(pci, snd_m3_ids);
+
+static struct m3_quirk m3_quirk_list[] = {
+	/* panasonic CF-28 "toughbook" */
+	{
+		.name = "Panasonic CF-28",
+		.vendor = 0x10f7,
+		.device = 0x833e,
+		.amp_gpio = 0x0d,
+	},
+	/* panasonic CF-72 "toughbook" */
+	{
+		.name = "Panasonic CF-72",
+		.vendor = 0x10f7,
+		.device = 0x833d,
+		.amp_gpio = 0x0d,
+	},
+	/* Dell Inspiron 4000 */
+	{
+		.name = "Dell Inspiron 4000",
+		.vendor = 0x1028,
+		.device = 0x00b0,
+		.amp_gpio = -1,
+		.irda_workaround = 1,
+	},
+	/* Dell Inspiron 8000 */
+	{
+		.name = "Dell Insprion 8000",
+		.vendor = 0x1028,
+		.device = 0x00a4,
+		.amp_gpio = -1,
+		.irda_workaround = 1,
+	},
+	/* FIXME: Inspiron 8100 and 8200 ids should be here, too */
+	/* END */
+	{ 0 }
+};
+
 
 /*
  * lowlevel functions
@@ -1547,44 +1592,44 @@ snd_m3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 static snd_pcm_hardware_t snd_m3_playback =
 {
-	info:			(SNDRV_PCM_INFO_MMAP |
+	.info =			(SNDRV_PCM_INFO_MMAP |
 				 SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_MMAP_VALID |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				 /*SNDRV_PCM_INFO_PAUSE |*/
 				 SNDRV_PCM_INFO_RESUME),
-	formats:		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
-	rates:			SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		8000,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	(512*1024),
-	period_bytes_min:	64,
-	period_bytes_max:	(512*1024),
-	periods_min:		1,
-	periods_max:		1024,
+	.formats =		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
+	.rates =		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		8000,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	(512*1024),
+	.period_bytes_min =	64,
+	.period_bytes_max =	(512*1024),
+	.periods_min =		1,
+	.periods_max =		1024,
 };
 
 static snd_pcm_hardware_t snd_m3_capture =
 {
-	info:			(SNDRV_PCM_INFO_MMAP |
+	.info =			(SNDRV_PCM_INFO_MMAP |
 				 SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_MMAP_VALID |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				 /*SNDRV_PCM_INFO_PAUSE |*/
 				 SNDRV_PCM_INFO_RESUME),
-	formats:		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
-	rates:			SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		8000,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	(512*1024),
-	period_bytes_min:	64,
-	period_bytes_max:	(512*1024),
-	periods_min:		1,
-	periods_max:		1024,
+	.formats =		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
+	.rates =		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		8000,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	(512*1024),
+	.period_bytes_min =	64,
+	.period_bytes_max =	(512*1024),
+	.periods_min =		1,
+	.periods_max =		1024,
 };
 
 
@@ -1703,25 +1748,25 @@ snd_m3_capture_close(snd_pcm_substream_t *subs)
  */
 
 static snd_pcm_ops_t snd_m3_playback_ops = {
-	open:		snd_m3_playback_open,
-	close:		snd_m3_playback_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	hw_params:	snd_m3_pcm_hw_params,
-	hw_free:	snd_m3_pcm_hw_free,
-	prepare:	snd_m3_pcm_prepare,
-	trigger:	snd_m3_pcm_trigger,
-	pointer:	snd_m3_pcm_pointer,
+	.open =		snd_m3_playback_open,
+	.close =	snd_m3_playback_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_m3_pcm_hw_params,
+	.hw_free =	snd_m3_pcm_hw_free,
+	.prepare =	snd_m3_pcm_prepare,
+	.trigger =	snd_m3_pcm_trigger,
+	.pointer =	snd_m3_pcm_pointer,
 };
 
 static snd_pcm_ops_t snd_m3_capture_ops = {
-	open:		snd_m3_capture_open,
-	close:		snd_m3_capture_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	hw_params:	snd_m3_pcm_hw_params,
-	hw_free:	snd_m3_pcm_hw_free,
-	prepare:	snd_m3_pcm_prepare,
-	trigger:	snd_m3_pcm_trigger,
-	pointer:	snd_m3_pcm_pointer,
+	.open =		snd_m3_capture_open,
+	.close =	snd_m3_capture_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_m3_pcm_hw_params,
+	.hw_free =	snd_m3_pcm_hw_free,
+	.prepare =	snd_m3_pcm_prepare,
+	.trigger =	snd_m3_pcm_trigger,
+	.pointer =	snd_m3_pcm_pointer,
 };
 
 static int __devinit
@@ -1859,10 +1904,7 @@ static void snd_m3_ac97_reset(m3_t *chip, int busywait)
 
 	for (i = 0; i < 5; i++) {
 		dir = inw(io + GPIO_DIRECTION);
-		if (chip->subsystem_vendor == 0x1028 &&
-		    chip->subsystem_device == 0x00b0) /* Dell Inspiron 4000 */
-			; /* seems conflicting with IrDA */
-		else
+		if (! chip->quirk || ! chip->quirk->irda_workaround)
 			dir |= 0x10; /* assuming pci bus master? */
 
 		snd_m3_remote_codec_config(io, 0);
@@ -2470,8 +2512,10 @@ snd_m3_create(snd_card_t *card, struct pci_dev *pci,
 {
 	m3_t *chip;
 	int i, err;
+	struct m3_quirk *quirk;
+	u16 subsystem_vendor, subsystem_device;
 	static snd_device_ops_t ops = {
-		dev_free:	snd_m3_dev_free,
+		.dev_free =	snd_m3_dev_free,
 	};
 
 	*chip_ret = NULL;
@@ -2500,29 +2544,36 @@ snd_m3_create(snd_card_t *card, struct pci_dev *pci,
 		break;
 	}
 
-#ifndef LINUX_2_2
-	chip->subsystem_vendor = pci->subsystem_vendor;
-	chip->subsystem_device = pci->subsystem_device;
-#else
-	pci_read_config_word(pci, PCI_SUBSYSTEM_VENDOR_ID, &chip->subsystem_vendor);
-	pci_read_config_word(pci, PCI_SUBSYSTEM_ID, &chip->subsystem_device);
-#endif
-
 	chip->card = card;
 	chip->pci = pci;
 	chip->irq = -1;
+
+#ifndef LINUX_2_2
+	subsystem_vendor = pci->subsystem_vendor;
+	subsystem_device = pci->subsystem_device;
+#else
+	pci_read_config_word(pci, PCI_SUBSYSTEM_VENDOR_ID, &subsystem_vendor);
+	pci_read_config_word(pci, PCI_SUBSYSTEM_ID, &subsystem_device);
+#endif
+	for (quirk = m3_quirk_list; quirk->vendor; quirk++) {
+		if (subsystem_vendor == quirk->vendor &&
+		    subsystem_device == quirk->device) {
+			printk(KERN_INFO "maestro3: enabled hack for '%s'\n", quirk->name);
+			chip->quirk = quirk;
+			break;
+		}
+	}
+
 	chip->external_amp = enable_amp;
 	if (amp_gpio >= 0 && amp_gpio <= 0x0f)
 		chip->amp_gpio = amp_gpio;
-	else if (chip->allegro_flag) {
-		/* panasonic CF-28 "toughbook" has different GPIO connection.. */
-		if (chip->subsystem_vendor == 0x10f7 &&
-		    chip->subsystem_device == 0x833e)
-			chip->amp_gpio = 0x0d;
-		else
-			chip->amp_gpio = GPO_EXT_AMP_ALLEGRO;
-	} else
-		chip->amp_gpio = GPO_EXT_AMP_M3; /* presumably this is for all 'maestro3's.. */
+	else if (chip->quirk && chip->quirk->amp_gpio >= 0)
+		chip->amp_gpio = chip->quirk->amp_gpio;
+	else if (chip->allegro_flag)
+		chip->amp_gpio = GPO_EXT_AMP_ALLEGRO;
+	else /* presumably this is for all 'maestro3's.. */
+		chip->amp_gpio = GPO_EXT_AMP_M3;
+
 	chip->num_substreams = NR_DSPS;
 	chip->substreams = kmalloc(sizeof(m3_dma_t) * chip->num_substreams, GFP_KERNEL);
 	if (chip->substreams == NULL) {
@@ -2668,13 +2719,13 @@ static void __devexit snd_m3_remove(struct pci_dev *pci)
 }
 
 static struct pci_driver driver = {
-	name: "Maestro3",
-	id_table: snd_m3_ids,
-	probe: snd_m3_probe,
-	remove: __devexit_p(snd_m3_remove),
+	.name = "Maestro3",
+	.id_table = snd_m3_ids,
+	.probe = snd_m3_probe,
+	.remove = __devexit_p(snd_m3_remove),
 #ifdef CONFIG_PM
-	suspend: snd_m3_suspend,
-	resume: snd_m3_resume,
+	.suspend = snd_m3_suspend,
+	.resume = snd_m3_resume,
 #endif
 };
 	

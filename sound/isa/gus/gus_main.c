@@ -93,11 +93,11 @@ static int snd_gus_joystick_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
 }
 
 static snd_kcontrol_new_t snd_gus_joystick_control = {
-	iface: SNDRV_CTL_ELEM_IFACE_CARD,
-	name: "Joystick Speed",
-	info: snd_gus_joystick_info,
-	get: snd_gus_joystick_get,
-	put: snd_gus_joystick_put
+	.iface = SNDRV_CTL_ELEM_IFACE_CARD,
+	.name = "Joystick Speed",
+	.info = snd_gus_joystick_info,
+	.get = snd_gus_joystick_get,
+	.put = snd_gus_joystick_put
 };
 
 static void snd_gus_init_control(snd_gus_card_t *gus)
@@ -163,7 +163,7 @@ int snd_gus_create(snd_card_t * card,
 	snd_gus_card_t *gus;
 	int err;
 	static snd_device_ops_t ops = {
-		dev_free:	snd_gus_dev_free,
+		.dev_free =	snd_gus_dev_free,
 	};
 
 	*rgus = NULL;

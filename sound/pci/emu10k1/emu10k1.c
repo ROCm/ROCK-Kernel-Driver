@@ -199,10 +199,10 @@ static void __devexit snd_card_emu10k1_remove(struct pci_dev *pci)
 }
 
 static struct pci_driver driver = {
-	name: "EMU10K1/Audigy",
-	id_table: snd_emu10k1_ids,
-	probe: snd_card_emu10k1_probe,
-	remove: __devexit_p(snd_card_emu10k1_remove),
+	.name = "EMU10K1/Audigy",
+	.id_table = snd_emu10k1_ids,
+	.probe = snd_card_emu10k1_probe,
+	.remove = __devexit_p(snd_card_emu10k1_remove),
 };
 
 static int __init alsa_card_emu10k1_init(void)

@@ -37,9 +37,9 @@ static int snd_i2c_bit_readbytes(snd_i2c_device_t *device, unsigned char *bytes,
 static int snd_i2c_bit_probeaddr(snd_i2c_bus_t *bus, unsigned short addr);
 
 static snd_i2c_ops_t snd_i2c_bit_ops = {
-	sendbytes: snd_i2c_bit_sendbytes,
-	readbytes: snd_i2c_bit_readbytes,
-	probeaddr: snd_i2c_bit_probeaddr,
+	.sendbytes = snd_i2c_bit_sendbytes,
+	.readbytes = snd_i2c_bit_readbytes,
+	.probeaddr = snd_i2c_bit_probeaddr,
 };
 
 static int snd_i2c_bus_free(snd_i2c_bus_t *bus)
@@ -77,7 +77,7 @@ int snd_i2c_bus_create(snd_card_t *card, const char *name, snd_i2c_bus_t *master
 	snd_i2c_bus_t *bus;
 	int err;
 	static snd_device_ops_t ops = {
-		dev_free:       snd_i2c_bus_dev_free,
+		.dev_free =	snd_i2c_bus_dev_free,
 	};
 
 	*ri2c = NULL;
@@ -220,7 +220,7 @@ static int snd_i2c_bit_ack(snd_i2c_bus_t *bus)
 	ack = snd_i2c_bit_data(bus, 1);
 	snd_i2c_bit_direction(bus, 1, 1);	/* SCL - wr, SDA - wr */
 	snd_i2c_bit_set(bus, 0, 1);
-	return ack ? -EREMOTEIO : 0;
+	return ack ? -EIO : 0;
 }
 
 static int snd_i2c_bit_sendbyte(snd_i2c_bus_t *bus, unsigned char data)
@@ -260,11 +260,15 @@ static int snd_i2c_bit_sendbytes(snd_i2c_device_t *device, unsigned char *bytes,
 	if (device->flags & SND_I2C_DEVICE_ADDRTEN)
 		return -EIO;		/* not yet implemented */
 	snd_i2c_bit_start(bus);
-	if ((err = snd_i2c_bit_sendbyte(bus, device->addr << 1)) < 0)
+	if ((err = snd_i2c_bit_sendbyte(bus, device->addr << 1)) < 0) {
+		snd_i2c_bit_hw_stop(bus);
 		return err;
+	}
 	while (count-- > 0) {
-		if ((err = snd_i2c_bit_sendbyte(bus, *bytes++)) < 0)
+		if ((err = snd_i2c_bit_sendbyte(bus, *bytes++)) < 0) {
+			snd_i2c_bit_hw_stop(bus);
 			return err;
+		}
 		res++;
 	}
 	snd_i2c_bit_stop(bus);
@@ -279,11 +283,15 @@ static int snd_i2c_bit_readbytes(snd_i2c_device_t *device, unsigned char *bytes,
 	if (device->flags & SND_I2C_DEVICE_ADDRTEN)
 		return -EIO;		/* not yet implemented */
 	snd_i2c_bit_start(bus);
-	if ((err = snd_i2c_bit_sendbyte(bus, (device->addr << 1) | 1)) < 0)
+	if ((err = snd_i2c_bit_sendbyte(bus, (device->addr << 1) | 1)) < 0) {
+		snd_i2c_bit_hw_stop(bus);
 		return err;
+	}
 	while (count-- > 0) {
-		if ((err = snd_i2c_bit_readbyte(bus, count == 0)) < 0)
+		if ((err = snd_i2c_bit_readbyte(bus, count == 0)) < 0) {
+			snd_i2c_bit_hw_stop(bus);
 			return err;
+		}
 		*bytes++ = (unsigned char)err;
 		res++;
 	}
@@ -300,10 +308,9 @@ static int snd_i2c_bit_probeaddr(snd_i2c_bus_t *bus, unsigned short addr)
 	if (addr & 0x7f80)	/* invalid address */
 		return -EINVAL;
 	snd_i2c_bit_start(bus);
-	if ((err = snd_i2c_bit_sendbyte(bus, addr << 1)) < 0)
-		return err;
+	err = snd_i2c_bit_sendbyte(bus, addr << 1);
 	snd_i2c_bit_stop(bus);
-	return 1;		/* present */
+	return err;
 }
 
 EXPORT_SYMBOL(snd_i2c_bus_create);

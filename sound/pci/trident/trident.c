@@ -210,13 +210,13 @@ static void snd_card_trident_resume(struct pci_dev *pci)
 #endif
 
 static struct pci_driver driver = {
-	name: "Trident4DWaveAudio",
-	id_table: snd_trident_ids,
-	probe: snd_trident_probe,
-	remove: __devexit_p(snd_trident_remove),
+	.name = "Trident4DWaveAudio",
+	.id_table = snd_trident_ids,
+	.probe = snd_trident_probe,
+	.remove = __devexit_p(snd_trident_remove),
 #ifdef CONFIG_PM
-	suspend: snd_card_trident_suspend,
-	resume: snd_card_trident_resume,
+	.suspend = snd_card_trident_suspend,
+	.resume = snd_card_trident_resume,
 #endif
 };
 
