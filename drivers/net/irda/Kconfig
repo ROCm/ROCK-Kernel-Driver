@@ -289,6 +289,10 @@ config TOSHIBA_FIR
 	  <file:Documentation/modules.txt>.
 	  The module will be called donauboe.
 
+config AU1000_FIR
+	tristate "Alchemy Au1000 SIR/FIR"
+	depends on MIPS_AU1000 && IRDA
+
 config SMC_IRCC_OLD
 	tristate "SMC IrCC (old driver) (EXPERIMENTAL)"
 	depends on EXPERIMENTAL && IRDA

@@ -2481,9 +2481,6 @@ static int happy_meal_ioctl(struct net_device *dev,
 			return -EFAULT;
 		return 0;
 	} else if (ecmd.cmd == ETHTOOL_SSET) {
-		if (!capable(CAP_NET_ADMIN))
-			return -EPERM;
-
 		/* Verify the settings we care about. */
 		if (ecmd.autoneg != AUTONEG_ENABLE &&
 		    ecmd.autoneg != AUTONEG_DISABLE)

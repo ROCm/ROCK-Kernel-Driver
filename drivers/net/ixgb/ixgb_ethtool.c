@@ -448,8 +448,6 @@ ixgb_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
 	case ETHTOOL_SSET:{
 			struct ethtool_cmd ecmd;
 
-			if (!capable(CAP_NET_ADMIN))
-				return -EPERM;
 			if (copy_from_user(&ecmd, addr, sizeof (ecmd)))
 				return -EFAULT;
 			return ixgb_ethtool_sset(adapter, &ecmd);
@@ -482,9 +480,6 @@ ixgb_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
 #endif				/* ETHTOOL_GREGS */
 	case ETHTOOL_NWAY_RST:{
 			IXGB_DBG("ETHTOOL_NWAY_RST\n");
-			if (!capable(CAP_NET_ADMIN))
-				return -EPERM;
-
 			ixgb_down(adapter);
 			ixgb_up(adapter);
 
@@ -539,9 +534,6 @@ ixgb_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
 			struct ethtool_eeprom eeprom;
 
 			IXGB_DBG("ETHTOOL_SEEPROM\n");
-			if (!capable(CAP_NET_ADMIN))
-				return -EPERM;
-
 			if (copy_from_user(&eeprom, addr, sizeof (eeprom)))
 				return -EFAULT;
 

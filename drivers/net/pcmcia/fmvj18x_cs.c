@@ -130,7 +130,6 @@ typedef enum { MBH10302, MBH10304, TDK, CONTEC, LA501, UNGERMANN,
 */
 typedef struct local_info_t {
     dev_link_t link;
-    struct net_device dev;
     dev_node_t node;
     struct net_device_stats stats;
     long open_time;
@@ -273,11 +272,12 @@ static dev_link_t *fmvj18x_attach(void)
     flush_stale_links();
 
     /* Make up a FMVJ18x specific data structure */
-    lp = kmalloc(sizeof(*lp), GFP_KERNEL);
-    if (!lp) return NULL;
-    memset(lp, 0, sizeof(*lp));
-    link = &lp->link; dev = &lp->dev;
-    link->priv = dev->priv = link->irq.Instance = lp;
+    dev = alloc_etherdev(sizeof(local_info_t));
+    if (!dev)
+	return NULL;
+    lp = dev->priv;
+    link = &lp->link;
+    link->priv = dev;
 
     init_timer(&link->release);
     link->release.function = &fmvj18x_release;
@@ -297,6 +297,7 @@ static dev_link_t *fmvj18x_attach(void)
 	for (i = 0; i < 4; i++)
 	    link->irq.IRQInfo2 |= 1 << irq_list[i];
     link->irq.Handler = &fjn_interrupt;
+    link->irq.Instance = dev;
     
     /* General socket configuration */
     link->conf.Attributes = CONF_ENABLE_IRQ;
@@ -309,7 +310,6 @@ static dev_link_t *fmvj18x_attach(void)
     dev->set_config = &fjn_config;
     dev->get_stats = &fjn_get_stats;
     dev->set_multicast_list = &set_rx_mode;
-    ether_setup(dev);
     dev->open = &fjn_open;
     dev->stop = &fjn_close;
 #ifdef HAVE_TX_TIMEOUT
@@ -344,7 +344,7 @@ static dev_link_t *fmvj18x_attach(void)
 
 static void fmvj18x_detach(dev_link_t *link)
 {
-    local_info_t *lp = link->priv;
+    struct net_device *dev = link->priv;
     dev_link_t **linkp;
     
     DEBUG(0, "fmvj18x_detach(0x%p)\n", link);
@@ -371,8 +371,8 @@ static void fmvj18x_detach(dev_link_t *link)
     /* Unlink device structure, free pieces */
     *linkp = link->next;
     if (link->dev)
-	unregister_netdev(&lp->dev);
-    kfree(lp);
+	unregister_netdev(dev);
+    kfree(dev);
     
 } /* fmvj18x_detach */
 
@@ -423,8 +423,8 @@ static int ungermann_try_io_port(dev_link_t *link)
 static void fmvj18x_config(dev_link_t *link)
 {
     client_handle_t handle = link->handle;
-    local_info_t *lp = link->priv;
-    struct net_device *dev = &lp->dev;
+    struct net_device *dev = link->priv;
+    local_info_t *lp = dev->priv;
     tuple_t tuple;
     cisparse_t parse;
     u_short buf[32];
@@ -704,8 +704,7 @@ static int fmvj18x_setup_mfc(dev_link_t *link)
     memreq_t mem;
     u_char *base;
     int i, j;
-    local_info_t *lp = link->priv;
-    struct net_device *dev = &lp->dev;
+    struct net_device *dev = link->priv;
     ioaddr_t ioaddr;
 
     /* Allocate a small memory window */
@@ -776,8 +775,7 @@ static int fmvj18x_event(event_t event, int priority,
 			  event_callback_args_t *args)
 {
     dev_link_t *link = args->client_data;
-    local_info_t *lp = link->priv;
-    struct net_device *dev = &lp->dev;
+    struct net_device *dev = link->priv;
 
     DEBUG(1, "fmvj18x_event(0x%06x)\n", event);
     
@@ -847,8 +845,8 @@ module_exit(exit_fmvj18x_cs);
 
 static irqreturn_t fjn_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-    local_info_t *lp = dev_id;
-    struct net_device *dev = &lp->dev;
+    struct net_device *dev = dev_id;
+    local_info_t *lp = dev->priv;
     ioaddr_t ioaddr;
     unsigned short tx_stat, rx_stat;
 

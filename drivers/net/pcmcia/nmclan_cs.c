@@ -359,7 +359,6 @@ typedef struct _mace_statistics {
 
 typedef struct _mace_private {
     dev_link_t link;
-    struct net_device dev;
     dev_node_t node;
     struct net_device_stats linux_stats; /* Linux statistics counters */
     mace_statistics mace_stats; /* MACE chip statistics counters */
@@ -476,12 +475,13 @@ static dev_link_t *nmclan_attach(void)
     flush_stale_links();
 
     /* Create new ethernet device */
-    lp = kmalloc(sizeof(*lp), GFP_KERNEL);
-    if (!lp) return NULL;
-    memset(lp, 0, sizeof(*lp));
-    link = &lp->link; dev = &lp->dev;
-    link->priv = dev->priv = link->irq.Instance = lp;
-
+    dev = alloc_etherdev(sizeof(mace_private));
+    if (!dev)
+	return NULL;
+    lp = dev->priv;
+    link = &lp->link;
+    link->priv = dev;
+    
     init_timer(&link->release);
     link->release.function = &nmclan_release;
     link->release.data = (u_long)link;
@@ -496,6 +496,7 @@ static dev_link_t *nmclan_attach(void)
 	for (i = 0; i < 4; i++)
 	    link->irq.IRQInfo2 |= 1 << irq_list[i];
     link->irq.Handler = &mace_interrupt;
+    link->irq.Instance = dev;
     link->conf.Attributes = CONF_ENABLE_IRQ;
     link->conf.Vcc = 50;
     link->conf.IntType = INT_MEMORY_AND_IO;
@@ -510,7 +511,6 @@ static dev_link_t *nmclan_attach(void)
     dev->get_stats = &mace_get_stats;
     dev->set_multicast_list = &set_multicast_list;
     dev->do_ioctl = &mace_ioctl;
-    ether_setup(dev);
     dev->open = &mace_open;
     dev->stop = &mace_close;
 #ifdef HAVE_TX_TIMEOUT
@@ -550,7 +550,7 @@ nmclan_detach
 
 static void nmclan_detach(dev_link_t *link)
 {
-    mace_private *lp = link->priv;
+    struct net_device *dev = link->priv;
     dev_link_t **linkp;
 
     DEBUG(0, "nmclan_detach(0x%p)\n", link);
@@ -576,8 +576,8 @@ static void nmclan_detach(dev_link_t *link)
     /* Unlink device structure, free bits */
     *linkp = link->next;
     if (link->dev)
-	unregister_netdev(&lp->dev);
-    kfree(lp);
+	unregister_netdev(dev);
+    kfree(dev);
 
 } /* nmclan_detach */
 
@@ -710,8 +710,8 @@ while ((last_ret=CardServices(last_fn=(fn), args))!=0) goto cs_failed
 static void nmclan_config(dev_link_t *link)
 {
   client_handle_t handle = link->handle;
-  mace_private *lp = link->priv;
-  struct net_device *dev = &lp->dev;
+  struct net_device *dev = link->priv;;
+  mace_private *lp = dev->priv;
   tuple_t tuple;
   cisparse_t parse;
   u_char buf[64];
@@ -836,8 +836,7 @@ static int nmclan_event(event_t event, int priority,
 		       event_callback_args_t *args)
 {
   dev_link_t *link = args->client_data;
-  mace_private *lp = link->priv;
-  struct net_device *dev = &lp->dev;
+  struct net_device *dev = link->priv;
 
   DEBUG(1, "nmclan_event(0x%06x)\n", event);
 
@@ -1145,8 +1144,8 @@ mace_interrupt
 ---------------------------------------------------------------------------- */
 static irqreturn_t mace_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-  mace_private *lp = (mace_private *)dev_id;
-  struct net_device *dev = &lp->dev;
+  struct net_device *dev = (struct net_device *) dev_id;
+  mace_private *lp = dev->priv;
   ioaddr_t ioaddr = dev->base_addr;
   int status;
   int IntrCnt = MACE_MAX_IR_ITERATIONS;
