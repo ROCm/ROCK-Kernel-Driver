@@ -170,15 +170,6 @@ static spinlock_t dv1394_cards_lock = SPIN_LOCK_UNLOCKED;
 
 static struct hpsb_highlevel *hl_handle; /* = NULL; */
 
-static LIST_HEAD(dv1394_devfs);
-struct dv1394_devfs_entry {
-	struct list_head list;
-    devfs_handle_t devfs;
-	char name[32];
-	struct dv1394_devfs_entry *parent;
-};
-static spinlock_t dv1394_devfs_lock = SPIN_LOCK_UNLOCKED;
-
 /* translate from a struct file* to the corresponding struct video_card* */
 
 static inline struct video_card* file_to_video_card(struct file *file)
@@ -2565,6 +2556,16 @@ static struct file_operations dv1394_fops=
 /*** DEVFS HELPERS *********************************************************/
 
 #ifdef CONFIG_DEVFS_FS
+
+static LIST_HEAD(dv1394_devfs);
+struct dv1394_devfs_entry {
+	struct list_head list;
+    devfs_handle_t devfs;
+	char name[32];
+	struct dv1394_devfs_entry *parent;
+};
+static spinlock_t dv1394_devfs_lock = SPIN_LOCK_UNLOCKED;
+
 struct dv1394_devfs_entry *
 dv1394_devfs_find( char *name)
 {
