@@ -2206,22 +2206,27 @@ int __ip_route_output_key(struct rtable **rp, const struct flowi *flp)
 	return ip_route_output_slow(rp, flp);
 }
 
-int ip_route_output_key(struct rtable **rp, struct flowi *flp)
-{
-	int err;
-
-	if ((err = __ip_route_output_key(rp, flp)) != 0)
-		return err;
-	return flp->proto ? xfrm_lookup((struct dst_entry**)rp, flp, NULL, 0) : 0;
-}
-
 int ip_route_output_flow(struct rtable **rp, struct flowi *flp, struct sock *sk, int flags)
 {
 	int err;
 
 	if ((err = __ip_route_output_key(rp, flp)) != 0)
 		return err;
-	return flp->proto ? xfrm_lookup((struct dst_entry**)rp, flp, sk, flags) : 0;
+
+	if (flp->proto) {
+		if (!flp->fl4_src)
+			flp->fl4_src = (*rp)->rt_src;
+		if (!flp->fl4_dst)
+			flp->fl4_dst = (*rp)->rt_dst;
+		return xfrm_lookup((struct dst_entry **)rp, flp, sk, flags);
+	}
+
+	return 0;
+}
+
+int ip_route_output_key(struct rtable **rp, struct flowi *flp)
+{
+	return ip_route_output_flow(rp, flp, NULL, 0);
 }
 
 static int rt_fill_info(struct sk_buff *skb, u32 pid, u32 seq, int event,

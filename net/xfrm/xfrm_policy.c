@@ -711,25 +711,11 @@ int xfrm_lookup(struct dst_entry **dst_p, struct flowi *fl,
 {
 	struct xfrm_policy *policy;
 	struct xfrm_state *xfrm[XFRM_MAX_DEPTH];
-	struct rtable *rt = (struct rtable*)*dst_p;
-	struct dst_entry *dst;
+	struct dst_entry *dst, *dst_orig = *dst_p;
 	int nx = 0;
 	int err;
 	u32 genid;
-	u16 family = (*dst_p)->ops->family;
-
-	switch (family) {
-	case AF_INET:
-		if (!fl->fl4_src)
-			fl->fl4_src = rt->rt_src;
-		if (!fl->fl4_dst)
-			fl->fl4_dst = rt->rt_dst;
-	case AF_INET6:
-		/* Still not clear... */
-	default:
-		/* nothing */;
-	}
-
+	u16 family = dst_orig->ops->family;
 restart:
 	genid = atomic_read(&flow_cache_genid);
 	policy = NULL;
@@ -738,7 +724,7 @@ restart:
 
 	if (!policy) {
 		/* To accelerate a bit...  */
-		if ((rt->u.dst.flags & DST_NOXFRM) || !xfrm_policy_list[XFRM_POLICY_OUT])
+		if ((dst_orig->flags & DST_NOXFRM) || !xfrm_policy_list[XFRM_POLICY_OUT])
 			return 0;
 
 		policy = flow_cache_lookup(fl, family,
@@ -813,7 +799,7 @@ restart:
 			return 0;
 		}
 
-		dst = &rt->u.dst;
+		dst = dst_orig;
 		err = xfrm_bundle_create(policy, xfrm, nx, fl, &dst, family);
 
 		if (unlikely(err)) {
@@ -843,12 +829,12 @@ restart:
 		write_unlock_bh(&policy->lock);
 	}
 	*dst_p = dst;
-	ip_rt_put(rt);
+	dst_release(dst_orig);
 	xfrm_pol_put(policy);
 	return 0;
 
 error:
-	ip_rt_put(rt);
+	dst_release(dst_orig);
 	xfrm_pol_put(policy);
 	*dst_p = NULL;
 	return err;
