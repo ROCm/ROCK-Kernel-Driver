@@ -14,6 +14,7 @@
 #include <linux/init.h>
 
 #include <asm/assembler.h>
+#include <asm/domain.h>
 #include <asm/mach-types.h>
 #include <asm/procinfo.h>
 #include <asm/ptrace.h>
@@ -166,7 +167,9 @@ __mmap_switched:
 
 
 /*
- * Setup common bits before finally enabling the MMU.
+ * Setup common bits before finally enabling the MMU.  Essentially
+ * this is just loading the page table pointer and domain access
+ * registers.
  */
 	.type	__enable_mmu, %function
 __enable_mmu:
@@ -175,6 +178,21 @@ __enable_mmu:
 #else
 	bic	r0, r0, #CR_A
 #endif
+#ifdef CONFIG_CPU_DCACHE_DISABLE
+	bic	r0, r0, #CR_C
+#endif
+#ifdef CONFIG_CPU_BPREDICT_DISABLE
+	bic	r0, r0, #CR_Z
+#endif
+#ifdef CONFIG_CPU_ICACHE_DISABLE
+	bic	r0, r0, #CR_I
+#endif
+	mov	r5, #(domain_val(DOMAIN_USER, DOMAIN_MANAGER) | \
+		      domain_val(DOMAIN_KERNEL, DOMAIN_MANAGER) | \
+		      domain_val(DOMAIN_TABLE, DOMAIN_MANAGER) | \
+		      domain_val(DOMAIN_IO, DOMAIN_CLIENT))
+	mcr	p15, 0, r5, c3, c0, 0		@ load domain access register
+	mcr	p15, 0, r4, c2, c0, 0		@ load page table pointer
 	b	__turn_mmu_on
 
 /*

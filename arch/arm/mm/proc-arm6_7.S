@@ -15,7 +15,6 @@
 #include <asm/assembler.h>
 #include <asm/constants.h>
 #include <asm/pgtable.h>
-#include <asm/domain.h>
 #include <asm/procinfo.h>
 #include <asm/ptrace.h>
 
@@ -254,12 +253,6 @@ ENTRY(cpu_arm7_reset)
 __arm6_setup:	mov	r0, #0
 		mcr	p15, 0, r0, c7, c0		@ flush caches on v3
 		mcr	p15, 0, r0, c5, c0		@ flush TLBs on v3
-		mcr	p15, 0, r4, c2, c0		@ load page table pointer
-		mov	r0, #(domain_val(DOMAIN_USER, DOMAIN_MANAGER) | \
-			      domain_val(DOMAIN_KERNEL, DOMAIN_MANAGER) | \
-			      domain_val(DOMAIN_TABLE, DOMAIN_MANAGER) | \
-			      domain_val(DOMAIN_IO, DOMAIN_CLIENT))
-		mcr	p15, 0, r0, c3, c0		@ load domain access register
 		mov	r0, #0x3d			@ . ..RS BLDP WCAM
 		orr	r0, r0, #0x100			@ . ..01 0011 1101
 		mov	pc, lr
@@ -269,11 +262,6 @@ __arm6_setup:	mov	r0, #0
 __arm7_setup:	mov	r0, #0
 		mcr	p15, 0, r0, c7, c0		@ flush caches on v3
 		mcr	p15, 0, r0, c5, c0		@ flush TLBs on v3
-		mcr	p15, 0, r4, c2, c0		@ load page table pointer
-		mov	r0, #(domain_val(DOMAIN_IO, DOMAIN_CLIENT) | \
-			      domain_val(DOMAIN_KERNEL, DOMAIN_MANAGER) | \
-			      domain_val(DOMAIN_TABLE, DOMAIN_MANAGER) | \
-			      domain_val(DOMAIN_USER, DOMAIN_MANAGER))
 		mcr	p15, 0, r0, c3, c0		@ load domain access register
 		mov	r0, #0x7d			@ . ..RS BLDP WCAM
 		orr	r0, r0, #0x100			@ . ..01 0111 1101

@@ -35,7 +35,6 @@
 #include <asm/assembler.h>
 #include <asm/constants.h>
 #include <asm/pgtable.h>
-#include <asm/domain.h>
 #include <asm/procinfo.h>
 #include <asm/ptrace.h>
 #include <asm/hardware.h>
@@ -125,43 +124,59 @@ ENTRY(cpu_arm720_reset)
 		mcr	p15, 0, ip, c1, c0, 0		@ ctrl register
 		mov	pc, r0
 
-		__INIT
+	__INIT
 
-		.type	__arm710_setup, #function
-__arm710_setup:	mov	r0, #0
-		mcr	p15, 0, r0, c7, c7, 0		@ invalidate caches
-		mcr	p15, 0, r0, c8, c7, 0		@ flush TLB (v4)
-		mcr	p15, 0, r4, c2, c0		@ load page table pointer
-		mov	r0, #(domain_val(DOMAIN_USER, DOMAIN_MANAGER) | \
-			      domain_val(DOMAIN_KERNEL, DOMAIN_MANAGER) | \
-			      domain_val(DOMAIN_TABLE, DOMAIN_MANAGER) | \
-			      domain_val(DOMAIN_IO, DOMAIN_CLIENT))
-		mcr	p15, 0, r0, c3, c0		@ load domain access register
+	.type	__arm710_setup, #function
+__arm710_setup:
+	mov	r0, #0
+	mcr	p15, 0, r0, c7, c7, 0		@ invalidate caches
+	mcr	p15, 0, r0, c8, c7, 0		@ flush TLB (v4)
+	mrc	p15, 0, r0, c1, c0		@ get control register
+	ldr	r5, arm710_cr1_clear
+	bic	r0, r0, r5
+	ldr	r5, arm710_cr1_set
+	orr	r0, r0, r5
+	mov	pc, lr				@ __ret (head.S)
+	.size	__arm710_setup, . - __arm710_setup
 
-		mrc	p15, 0, r0, c1, c0		@ get control register
-		bic	r0, r0, #0x0e00			@ ..V. ..RS BLDP WCAM
-		orr	r0, r0, #0x0100			@ .... .... .111 .... (old)
-		orr	r0, r0, #0x003d			@ .... ..01 ..11 1101 (new)
-		mov	pc, lr				@ __ret (head.S)
-		.size	__arm710_setup, . - __arm710_setup
+	/*
+	 *  R
+	 * .RVI ZFRS BLDP WCAM
+	 * .... 0001 ..11 1101
+	 * 
+	 */
+	.type	arm710_cr1_clear, #object
+	.type	arm710_cr1_set, #object
+arm710_cr1_clear:
+	.word	0x0f3f
+arm710_cr1_set:
+	.word	0x013d
 
-		.type	__arm720_setup, #function
-__arm720_setup:	mov	r0, #0
-		mcr	p15, 0, r0, c7, c7, 0		@ invalidate caches
-		mcr	p15, 0, r0, c8, c7, 0		@ flush TLB (v4)
-		mcr	p15, 0, r4, c2, c0		@ load page table pointer
-		mov	r0, #(domain_val(DOMAIN_USER, DOMAIN_MANAGER) | \
-			      domain_val(DOMAIN_KERNEL, DOMAIN_MANAGER) | \
-			      domain_val(DOMAIN_TABLE, DOMAIN_MANAGER) | \
-			      domain_val(DOMAIN_IO, DOMAIN_CLIENT))
-		mcr	p15, 0, r0, c3, c0		@ load domain access register
+	.type	__arm720_setup, #function
+__arm720_setup:
+	mov	r0, #0
+	mcr	p15, 0, r0, c7, c7, 0		@ invalidate caches
+	mcr	p15, 0, r0, c8, c7, 0		@ flush TLB (v4)
+	mrc	p15, 0, r0, c1, c0		@ get control register
+	ldr	r5, arm720_cr1_clear
+	bic	r0, r0, r5
+	ldr	r5, arm720_cr1_set
+	orr	r0, r0, r5
+	mov	pc, lr				@ __ret (head.S)
+	.size	__arm720_setup, . - __arm720_setup
 
-		mrc	p15, 0, r0, c1, c0		@ get control register
-		bic	r0, r0, #0x0e00			@ ..V. ..RS BLDP WCAM
-		orr	r0, r0, #0x2100			@ .... .... .111 .... (old)
-		orr	r0, r0, #0x003d			@ ..1. ..01 ..11 1101 (new)
-		mov	pc, lr				@ __ret (head.S)
-		.size	__arm720_setup, . - __arm720_setup
+	/*
+	 *  R
+	 * .RVI ZFRS BLDP WCAM
+	 * ..1. 1001 ..11 1101
+	 * 
+	 */
+	.type	arm720_cr1_clear, #object
+	.type	arm720_cr1_set, #object
+arm720_cr1_clear:
+	.word	0x2f3f
+arm720_cr1_set:
+	.word	0x213d
 
 		__INITDATA
 
