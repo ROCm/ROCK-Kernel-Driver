@@ -83,7 +83,7 @@ int hid_ff_init(struct hid_device* hid)
 			       hid->dev->descriptor.idProduct);
 
 	if (!init) {
-		warn("hid_ff_init could not find initializer");
+		dbg("hid_ff_init could not find initializer");
 		return -ENOSYS;
 	}
 	return init->init(hid);
