@@ -13,6 +13,7 @@
  *  kill the offending process.
  */
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/signal.h>
@@ -206,6 +207,7 @@ NORET_TYPE void die(const char *str, struct pt_regs *regs, int err)
 	bust_spinlocks(1);
 
 	printk("Internal error: %s: %x\n", str, err);
+	print_modules();
 	printk("CPU: %d\n", smp_processor_id());
 	show_regs(regs);
 	printk("Process %s (pid: %d, stack limit = 0x%p)\n",
