@@ -927,7 +927,7 @@ set_it:
 	return 0;
 }
 
-void set_fs_altroot()
+void set_fs_altroot(void)
 {
 	char *emul = __emul_prefix();
 
