@@ -1,5 +1,5 @@
 /*
- *	Watchdog driver for the SA11x0
+ *	Watchdog driver for the SA11x0/PXA2xx
  *
  *      (c) Copyright 2000 Oleg Drokin <green@crimea.edu>
  *          Based on SoftDog driver by Alan Cox <alan@redhat.com>
@@ -174,7 +174,7 @@ static struct file_operations sa1100dog_fops =
 static struct miscdevice sa1100dog_miscdev =
 {
 	.minor		= WATCHDOG_MINOR,
-	.name		= "SA1100 watchdog",
+	.name		= "SA1100/PXA2xx watchdog",
 	.fops		= &sa1100dog_fops,
 };
 
@@ -194,7 +194,7 @@ static int __init sa1100dog_init(void)
 
 	ret = misc_register(&sa1100dog_miscdev);
 	if (ret == 0)
-		printk("SA1100 Watchdog Timer: timer margin %d sec\n",
+		printk("SA1100/PXA2xx Watchdog Timer: timer margin %d sec\n",
 		       margin);
 
 	return ret;
@@ -209,7 +209,7 @@ module_init(sa1100dog_init);
 module_exit(sa1100dog_exit);
 
 MODULE_AUTHOR("Oleg Drokin <green@crimea.edu>");
-MODULE_DESCRIPTION("SA1100 Watchdog");
+MODULE_DESCRIPTION("SA1100/PXA2xx Watchdog");
 
 module_param(margin, int, 0);
 MODULE_PARM_DESC(margin, "Watchdog margin in seconds (default 60s)");
