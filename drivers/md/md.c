@@ -2503,36 +2503,6 @@ static int set_array_info(mddev_t * mddev, mdu_array_info_t *info)
 }
 #undef SET_SB
 
-static int set_disk_info(mddev_t * mddev, void * arg)
-{
-	printk(KERN_INFO "md: not yet");
-	return -EINVAL;
-}
-
-static int clear_array(mddev_t * mddev)
-{
-	printk(KERN_INFO "md: not yet");
-	return -EINVAL;
-}
-
-static int write_raid_info(mddev_t * mddev)
-{
-	printk(KERN_INFO "md: not yet");
-	return -EINVAL;
-}
-
-static int protect_array(mddev_t * mddev)
-{
-	printk(KERN_INFO "md: not yet");
-	return -EINVAL;
-}
-
-static int unprotect_array(mddev_t * mddev)
-{
-	printk(KERN_INFO "md: not yet");
-	return -EINVAL;
-}
-
 static int set_disk_faulty(mddev_t *mddev, kdev_t dev)
 {
 	mdk_rdev_t *rdev;
@@ -2767,10 +2737,6 @@ static int md_ioctl(struct inode *inode, struct file *file,
 
 	switch (cmd)
 	{
-		case CLEAR_ARRAY:
-			err = clear_array(mddev);
-			goto done_unlock;
-
 		case ADD_NEW_DISK:
 		{
 			mdu_disk_info_t info;
@@ -2789,22 +2755,6 @@ static int md_ioctl(struct inode *inode, struct file *file,
 
 		case HOT_ADD_DISK:
 			err = hot_add_disk(mddev, val_to_kdev(arg));
-			goto done_unlock;
-
-		case SET_DISK_INFO:
-			err = set_disk_info(mddev, (void *)arg);
-			goto done_unlock;
-
-		case WRITE_RAID_INFO:
-			err = write_raid_info(mddev);
-			goto done_unlock;
-
-		case UNPROTECT_ARRAY:
-			err = unprotect_array(mddev);
-			goto done_unlock;
-
-		case PROTECT_ARRAY:
-			err = protect_array(mddev);
 			goto done_unlock;
 
 		case SET_DISK_FAULTY:
