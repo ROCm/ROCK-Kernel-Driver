@@ -925,7 +925,12 @@ struct sa_subdev_info {
 
 #define NR_SUBMTD 4
 
-static struct sa_subdev_info info[NR_SUBMTD];
+struct sa_info {
+	struct mtd_partition	*parts;
+	struct mtd_info		*mtd;
+	int			num_subdev;
+	struct sa_subdev_info	subdev[NR_SUBMTD];
+};
 
 static void sa1100_destroy_subdev(struct sa_subdev_info *subdev)
 {
@@ -1002,38 +1007,36 @@ static int sa1100_probe_subdev(struct sa_subdev_info *subdev)
 	return ret;
 }
 
-static struct mtd_partition *parsed_parts;
-
-static void sa1100_destroy(struct mtd_info *mtd)
+static void sa1100_destroy(struct sa_info *info)
 {
 	int i;
 
-	if (mtd) {
-		del_mtd_partitions(mtd);
+	if (info->mtd) {
+		del_mtd_partitions(info->mtd);
 
 #ifdef CONFIG_MTD_CONCAT
-		if (mtd != sa[i].mtd)
-			mtd_concat_destroy(mtd);
+		if (info->mtd != info->subdev[0].mtd)
+			mtd_concat_destroy(info->mtd);
 #endif
 	}
 
-	if (parsed_parts)
-		kfree(parsed_parts);
+	if (info->parts)
+		kfree(info->parts);
 
-	for (i = NR_SUBMTD; i >= 0; i--)
-		sa1100_destroy_subdev(&sa[i]);
+	for (i = info->num_subdev - 1; i >= 0; i--)
+		sa1100_destroy_subdev(&info->subdev[i]);
 }
 
-static int __init sa1100_setup_mtd(struct sa_subdev_info *sa, int nr, struct mtd_info **rmtd)
+static int __init sa1100_setup_mtd(struct sa_info *info, int nr)
 {
 	struct mtd_info *cdev[nr];
-	int i, found = 0, ret = 0;
+	int i, ret = 0;
 
 	/*
 	 * Claim and then map the memory regions.
 	 */
 	for (i = 0; i < nr; i++) {
-		struct sa_subdev_info *subdev = &sa[i];
+		struct sa_subdev_info *subdev = &info->subdev[i];
 		if (subdev->base == (unsigned long)-1)
 			break;
 
@@ -1045,46 +1048,50 @@ static int __init sa1100_setup_mtd(struct sa_subdev_info *sa, int nr, struct mtd
 			break;
 
 		cdev[i] = subdev->mtd;
-		found += 1;
 	}
 
+	info->num_subdev = i;
+
 	/*
-	 * If we found one device, don't bother with concat support.
-	 * If we found multiple devices, use concat if we have it
-	 * available, otherwise fail.
+	 * ENXIO is special.  It means we didn't find a chip when we probed.
 	 */
-	if (ret == 0 || ret == -ENXIO) {
-		if (found == 1) {
-			*rmtd = cdev[0];
-			ret = 0;
-		} else if (found > 1) {
-			/*
-			 * We detected multiple devices.  Concatenate
-			 * them together.
-			 */
+	if (ret != 0 && !(ret == -ENXIO && info->num_subdev > 0))
+		goto err;
+
+	/*
+	 * If we found one device, don't bother with concat support.  If
+	 * we found multiple devices, use concat if we have it available,
+	 * otherwise fail.  Either way, it'll be called "sa1100".
+	 */
+	if (info->num_subdev == 1) {
+		strcpy(info->subdev[0].name, "sa1100");
+		info->mtd = info->subdev[0].mtd;
+		ret = 0;
+	} else if (info->num_subdev > 1) {
+		/*
+		 * We detected multiple devices.  Concatenate them together.
+		 */
 #ifdef CONFIG_MTD_CONCAT
-			*rmtd = mtd_concat_create(cdev, found,
-						  "sa1100");
-			if (*rmtd == NULL)
-				ret = -ENXIO;
-#else
-			printk(KERN_ERR "SA1100 flash: multiple devices "
-			       "found but MTD concat support disabled.\n");
+		info->mtd = mtd_concat_create(cdev, info->num_subdev,
+					      "sa1100");
+		if (info->mtd == NULL)
 			ret = -ENXIO;
+#else
+		printk(KERN_ERR "SA1100 flash: multiple devices "
+		       "found but MTD concat support disabled.\n");
+		ret = -ENXIO;
 #endif
-		}
 	}
 
-	/*
-	 * If we failed, clean up.
-	 */
-	if (ret)
-		sa1100_destroy(NULL);
+	if (ret == 0)
+		return 0;
 
+ err:
+	sa1100_destroy(info);
 	return ret;
 }
 
-static int __init sa1100_locate_flash(void)
+static int __init sa1100_locate_flash(struct sa_info *info)
 {
 	int i, nr = -ENODEV;
 
@@ -1262,65 +1269,61 @@ static int __init sa1100_locate_flash(void)
 
 const char *part_probes[] = { "cmdlinepart", "RedBoot", NULL };
 
-static void __init sa1100_locate_partitions(struct mtd_info *mtd)
+static void __init sa1100_locate_partitions(struct sa_info *info)
 {
+	struct mtd_partition *parts;
 	const char *part_type = NULL;
 	int nr_parts = 0;
 
-	do {
-		/*
-		 * Partition selection stuff.
-		 */
+	/*
+	 * Partition selection stuff.
+	 */
 #ifdef CONFIG_MTD_PARTITIONS
-		nr_parts = parse_mtd_partitions(mtd, part_probes, &parsed_parts, 0);
-		if (nr_parts > 0) {
-			part_type = "dynamic";
-			break;
-		}
+	nr_parts = parse_mtd_partitions(info->mtd, part_probes, &parts, 0);
+	if (nr_parts > 0) {
+		info->parts = parts;
+		part_type = "dynamic";
+	} else
 #endif
-#ifdef CONFIG_MTD_SA1100_STATICMAP
-		nr_parts = sa1100_static_partitions(&parsed_parts);
-		if (nr_parts > 0) {
-			part_type = "static";
-			break;
-		}
-#endif
-	} while (0);
+	{
+		nr_parts = sa1100_static_partitions(&parts);
+		part_type = "static";
+	}
 
 	if (nr_parts == 0) {
 		printk(KERN_NOTICE "SA1100 flash: no partition info "
 			"available, registering whole flash\n");
-		add_mtd_device(mtd);
+		add_mtd_device(info->mtd);
 	} else {
 		printk(KERN_NOTICE "SA1100 flash: using %s partition "
 			"definition\n", part_type);
-		add_mtd_partitions(mtd, parsed_parts, nr_parts);
+		add_mtd_partitions(info->mtd, parts, nr_parts);
 	}
 
 	/* Always succeeds. */
 }
 
-static struct mtd_info *mymtd;
+static struct sa_info sa_info;
 
 static int __init sa1100_mtd_probe(struct device *dev)
 {
 	int err;
 	int nr;
 
-	nr = sa1100_locate_flash();
+	nr = sa1100_locate_flash(&sa_info);
 	if (nr < 0)
 		return nr;
 
-	err = sa1100_setup_mtd(info, nr, &mymtd);
+	err = sa1100_setup_mtd(&sa_info, nr);
 	if (err == 0)
-		sa1100_locate_partitions(mymtd);
+		sa1100_locate_partitions(&sa_info);
 
 	return err;
 }
 
 static int __exit sa1100_mtd_remove(struct device *dev)
 {
-	sa1100_destroy(mymtd);
+	sa1100_destroy(&sa_info);
 	return 0;
 }
 
