@@ -75,7 +75,7 @@ typedef struct {
 
 
 typedef struct pvc_device_struct {
-	struct hdlc_device_struct *master;
+	struct net_device *master;
 	struct net_device *main;
 	struct net_device *ether; /* bridged Ethernet interface */
 	struct pvc_device_struct *next;	/* Sorted in ascending DLCI order */
@@ -175,7 +175,7 @@ int hdlc_raw_ioctl(hdlc_device *hdlc, struct ifreq *ifr);
 int hdlc_raw_eth_ioctl(hdlc_device *hdlc, struct ifreq *ifr);
 int hdlc_cisco_ioctl(struct net_device *dev, struct ifreq *ifr);
 int hdlc_ppp_ioctl(hdlc_device *hdlc, struct ifreq *ifr);
-int hdlc_fr_ioctl(hdlc_device *hdlc, struct ifreq *ifr);
+int hdlc_fr_ioctl(struct net_device *dev, struct ifreq *ifr);
 int hdlc_x25_ioctl(hdlc_device *hdlc, struct ifreq *ifr);
 
 
