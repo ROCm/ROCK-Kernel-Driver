@@ -70,7 +70,7 @@ config BRIDGE_EBT_ARPF
 	  <file:Documentation/modules.txt>.  If unsure, say `N'.
 
 config BRIDGE_EBT_VLANF
-	tristate "ebt: 802.1Q VLAN filter support (EXPERIMENTAL)"
+	tristate "ebt: 802.1Q VLAN filter support"
 	depends on BRIDGE_NF_EBTABLES
 	help
 	  This option adds the 802.1Q vlan match, which allows the filtering of
