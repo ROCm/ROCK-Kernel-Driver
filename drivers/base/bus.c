@@ -13,6 +13,7 @@
 #include <linux/module.h>
 #include <linux/errno.h>
 #include <linux/stat.h>
+#include <linux/init.h>
 #include "base.h"
 
 static LIST_HEAD(bus_driver_list);

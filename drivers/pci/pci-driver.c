@@ -5,6 +5,7 @@
 
 #include <linux/pci.h>
 #include <linux/module.h>
+#include <linux/init.h>
 
 /*
  *  Registration of PCI drivers and handling of hot-pluggable devices.
