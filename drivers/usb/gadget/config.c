@@ -52,7 +52,7 @@ usb_descriptor_fillbuf(void *buf, unsigned buflen,
 	for (; 0 != *src; src++) {
 		unsigned		len = (*src)->bLength;
 
-		if (len > buflen);
+		if (len > buflen)
 			return -EINVAL;
 		memcpy(dest, *src, len);
 		buflen -= len;
