@@ -27,6 +27,8 @@ struct ncp_server {
 
 	struct file *ncp_filp;	/* File pointer to ncp socket */
 	struct socket *ncp_sock;/* ncp socket */
+	struct file *info_filp;
+	struct socket *info_sock;
 
 	u8 sequence;
 	u8 task;
@@ -115,6 +117,10 @@ struct ncp_server {
 	struct tq_struct timeout_tq;		/* DGRAM only: associated queue, we run timers from process context */
 	int timeout_last;			/* DGRAM only: current timeout length */
 	int timeout_retries;			/* DGRAM only: retries left */
+	struct {
+		size_t len;
+		__u8 data[128];
+	} unexpected_packet;
 };
 
 extern void ncp_tcp_rcv_proc(void *server);

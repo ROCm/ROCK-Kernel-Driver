@@ -66,6 +66,8 @@ struct ncp_mount_data_v4 {
 	unsigned long dir_mode;
 };
 
+#define NCP_MOUNT_VERSION_V5	(5)	/* Text only */
+
 #ifdef __KERNEL__
 
 struct ncp_mount_data_kernel {
@@ -83,6 +85,7 @@ struct ncp_mount_data_kernel {
 	__kernel_gid32_t gid;
 	__kernel_mode_t  file_mode;
 	__kernel_mode_t  dir_mode;
+	int		 info_fd;
 };
 
 #endif /* __KERNEL__ */

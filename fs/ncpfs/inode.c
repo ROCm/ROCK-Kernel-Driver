@@ -307,6 +307,7 @@ static const struct ncp_option ncp_opts[] = {
 	{ "flags",	OPT_INT,	'f' },
 	{ "wdogpid",	OPT_INT,	'w' },
 	{ "ncpfd",	OPT_INT,	'n' },
+	{ "infofd",	OPT_INT,	'i' },	/* v5 */
 	{ "version",	OPT_INT,	'v' },
 	{ NULL,		0,		0 } };
 
@@ -327,6 +328,7 @@ static int ncp_parse_options(struct ncp_mount_data_kernel *data, char *options) 
 	data->gid = 0;
 	data->file_mode = 0600;
 	data->dir_mode = 0700;
+	data->info_fd = -1;
 	data->mounted_vol[0] = 0;
 	
 	while ((optval = ncp_getopt("ncpfs", &options, ncp_opts, NULL, &optarg, &optint)) != 0) {
@@ -363,11 +365,14 @@ static int ncp_parse_options(struct ncp_mount_data_kernel *data, char *options) 
 			case 'n':
 				data->ncp_fd = optint;
 				break;
+			case 'i':
+				data->info_fd = optint;
+				break;
 			case 'v':
 				if (optint < NCP_MOUNT_VERSION_V4) {
 					return -ECHRNG;
 				}
-				if (optint > NCP_MOUNT_VERSION_V4) {
+				if (optint > NCP_MOUNT_VERSION_V5) {
 					return -ECHRNG;
 				}
 				version = optint;
@@ -418,6 +423,7 @@ static int ncp_fill_super(struct super_block *sb, void *raw_data, int silent)
 				data.gid = md->gid;
 				data.file_mode = md->file_mode;
 				data.dir_mode = md->dir_mode;
+				data.info_fd = -1;
 				memcpy(data.mounted_vol, md->mounted_vol,
 					NCP_VOLNAME_LEN+1);
 			}
@@ -437,6 +443,7 @@ static int ncp_fill_super(struct super_block *sb, void *raw_data, int silent)
 				data.gid = md->gid;
 				data.file_mode = md->file_mode;
 				data.dir_mode = md->dir_mode;
+				data.info_fd = -1;
 				data.mounted_vol[0] = 0;
 			}
 			break;
@@ -478,6 +485,26 @@ static int ncp_fill_super(struct super_block *sb, void *raw_data, int silent)
 	server->ncp_filp = ncp_filp;
 	server->ncp_sock = sock;
 	
+	if (data.info_fd != -1) {
+		struct socket *info_sock;
+
+		error = -EBADF;
+		server->info_filp = fget(data.info_fd);
+		if (!server->info_filp)
+			goto out_fput;
+		error = -ENOTSOCK;
+		sock_inode = server->info_filp->f_dentry->d_inode;
+		if (!S_ISSOCK(sock_inode->i_mode))
+			goto out_fput2;
+		info_sock = SOCKET_I(sock_inode);
+		if (!info_sock)
+			goto out_fput2;
+		error = -EBADFD;
+		if (info_sock->type != SOCK_STREAM)
+			goto out_fput2;
+		server->info_sock = info_sock;
+	}
+
 /*	server->lock = 0;	*/
 	init_MUTEX(&server->sem);
 	server->packet = NULL;
@@ -630,6 +657,9 @@ out_nls:
 	unload_nls(server->nls_io);
 	unload_nls(server->nls_vol);
 #endif
+out_fput2:
+	if (server->info_filp)
+		fput(server->info_filp);
 out_fput:
 	/* 23/12/1998 Marcin Dalecki <dalecki@cs.net.pl>:
 	 * 
@@ -667,6 +697,8 @@ static void ncp_put_super(struct super_block *sb)
 	}
 #endif /* CONFIG_NCPFS_NLS */
 
+	if (server->info_filp)
+		fput(server->info_filp);
 	fput(server->ncp_filp);
 	kill_proc(server->m.wdog_pid, SIGTERM, 1);
 

@@ -336,6 +336,31 @@ static void __ncp_next_request(struct ncp_server *server) {
 	__ncp_start_request(server, req);
 }
 
+static void info_server(struct ncp_server *server, unsigned int id, const void * data, size_t len) {
+	if (server->info_sock) {
+		struct iovec iov[2];
+		struct msghdr msg;
+		__u32 hdr[2];
+	
+		hdr[0] = cpu_to_be32(len + 8);
+		hdr[1] = cpu_to_be32(id);
+	
+		iov[0].iov_base = hdr;
+		iov[0].iov_len = 8;
+		iov[1].iov_base = (void *) data;
+		iov[1].iov_len = len;
+
+		msg.msg_name = NULL;
+		msg.msg_namelen = 0;
+		msg.msg_control = NULL;
+		msg.msg_iov = iov;
+		msg.msg_iovlen = 2;
+		msg.msg_flags = MSG_NOSIGNAL;
+
+		sock_sendmsg(server->info_sock, &msg, len + 8);
+	}
+}
+
 static void __ncpdgram_rcv_proc(void *s) {
 	struct ncp_server *server = s;
 	struct socket* sock;
@@ -374,6 +399,14 @@ static void __ncpdgram_rcv_proc(void *s) {
 				}
 				buf[9] = 'Y';
 				_send(sock, buf, sizeof(buf));
+				continue;
+			}
+			if (reply.type != NCP_POSITIVE_ACK && reply.type != NCP_REPLY) {
+				result = _recv(sock, server->unexpected_packet.data, sizeof(server->unexpected_packet.data), MSG_DONTWAIT);
+				if (result < 0) {
+					continue;
+				}
+				info_server(server, 0, server->unexpected_packet.data, result);
 				continue;
 			}
 			down(&server->rcv.creq_sem);		
@@ -556,6 +589,15 @@ static int __ncptcp_rcv_proc(struct ncp_server *server) {
 				type = ntohs(server->rcv.buf.type);
 cont:;				
 				if (type != NCP_REPLY) {
+					if (datalen - 8 <= sizeof(server->unexpected_packet.data)) {
+						*(__u16*)(server->unexpected_packet.data) = htons(type);
+						server->unexpected_packet.len = datalen - 8;
+
+						server->rcv.state = 5;
+						server->rcv.ptr = server->unexpected_packet.data + 2;
+						server->rcv.len = datalen - 10;
+						break;
+					}					
 					DPRINTK("ncpfs: tcp: Unexpected NCP type %02X\n", type);
 skipdata2:;
 					server->rcv.state = 2;
@@ -613,6 +655,7 @@ skipdata:;
 			nextreq:;
 				__ncp_next_request(server);
 			case 2:
+			next:;
 				server->rcv.ptr = (unsigned char*)&server->rcv.buf;
 				server->rcv.len = 10;
 				server->rcv.state = 0;
@@ -620,6 +663,9 @@ skipdata:;
 			case 3:
 				ncp_finish_request(server->rcv.creq, -EIO);
 				goto nextreq;
+			case 5:
+				info_server(server, 0, server->unexpected_packet.data, server->unexpected_packet.len);
+				goto next;
 		}
 	}
 }
