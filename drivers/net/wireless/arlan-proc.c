@@ -866,7 +866,6 @@ static int arlan_sysctl_reset(ctl_table * ctl, int write, struct file *filp,
 	CTBLN(32,cardNo,lParameter),\
 	CTBLN(33,cardNo,_15),\
 	CTBLN(34,cardNo,headerSize),\
-	CTBLN(35,cardNo,async),\
 	CTBLN(36,cardNo,tx_delay_ms),\
 	CTBLN(37,cardNo,retries),\
 	CTBLN(38,cardNo,ReTransmitPacketMaxSize),\

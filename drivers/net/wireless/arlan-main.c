@@ -16,15 +16,12 @@
 static const char *arlan_version = "C.Jennigs 97 & Elmer.Joandi@ut.ee  Oct'98, http://www.ylenurme.ee/~elmer/655/";
 
 struct net_device *arlan_device[MAX_ARLANS];
-int last_arlan;
 
 static int SID = SIDUNKNOWN;
 static int radioNodeId = radioNodeIdUNKNOWN;
 static char encryptionKey[12] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'};
-static char *siteName = siteNameUNKNOWN;
 static int mem = memUNKNOWN;
 int arlan_debug = debugUNKNOWN;
-static int probe = probeUNKNOWN;
 static int numDevices = numDevicesUNKNOWN;
 static int spreadingCode = spreadingCodeUNKNOWN;
 static int channelNumber = channelNumberUNKNOWN;
@@ -34,7 +31,6 @@ static int registrationMode = registrationModeUNKNOWN;
 static int keyStart;
 static int tx_delay_ms;
 static int retries = 5;
-static int async = 1;
 static int tx_queue_len = 1;
 static int arlan_EEPROM_bad;
 
@@ -91,16 +87,8 @@ MODULE_PARM_DESC(arlan_exit_debug, "(ignored)");
 MODULE_PARM_DESC(arlan_entry_and_exit_debug, "(ignored)");
 #endif
 
-//        #warning kernel 2.1.110 tested
-#define myATOMIC_INIT(a,b) atomic_set(&(a),b)
-
 #else
 #define test_and_set_bit	set_bit
-#if LINUX_VERSION_CODE != 0x20024
- //        #warning kernel  2.0.36  tested
-#endif
-#define myATOMIC_INIT(a,b) a = b;
-
 #endif
 
 struct arlan_conf_stru arlan_conf[MAX_ARLANS];
@@ -120,7 +108,6 @@ static  void 	arlan_tx_done_interrupt		(struct net_device * dev, int status);
 static  void	arlan_rx_interrupt		(struct net_device * dev, u_char rxStatus, u_short, u_short);
 static  void	arlan_process_interrupt		(struct net_device * dev);
 static	void	arlan_tx_timeout		(struct net_device *dev);
-int	arlan_command(struct net_device * dev, int command);
 
 static inline long long arlan_time(void)
 {
@@ -153,32 +140,6 @@ static inline long long arlan_time(void)
 #define arlan_interrupt_ack(dev)\
         clearClearInterrupt(dev);\
         setClearInterrupt(dev);
-
-
-#define ARLAN_COMMAND_LOCK(dev) \
-	if (atomic_dec_and_test(&((struct arlan_private * )dev->priv)->card_users))\
-   		arlan_wait_command_complete_short(dev,__LINE__);
-#define ARLAN_COMMAND_UNLOCK(dev) \
-	atomic_inc(&((struct arlan_private * )dev->priv)->card_users);
-
-
-#define ARLAN_COMMAND_INC(dev) \
- 	{((struct arlan_private *) dev->priv)->under_command++;}
-#define ARLAN_COMMAND_ZERO(dev) \
- 	{((struct arlan_private *) dev->priv)->under_command =0;}
-#define ARLAN_UNDER_COMMAND(dev)\
-	(((struct arlan_private *) dev->priv)->under_command)
-
-#define ARLAN_COMMAND_START(dev) ARLAN_COMMAND_INC(dev)
-#define ARLAN_COMMAND_END(dev) ARLAN_COMMAND_ZERO(dev)
-#define ARLAN_TOGGLE_START(dev)\
- 	{((struct arlan_private *) dev->priv)->under_toggle++;}
-#define ARLAN_TOGGLE_END(dev)\
- 	{((struct arlan_private *) dev->priv)->under_toggle=0;}
-#define ARLAN_UNDER_TOGGLE(dev)\
- 	(((struct arlan_private *) dev->priv)->under_toggle)
-
-
 
 static inline int arlan_drop_tx(struct net_device *dev)
 {
@@ -366,7 +327,6 @@ int arlan_command(struct net_device *dev, int command_p)
 		WRITESHM(arlan->resetFlag, 0xff, u_char);
 		clearChannelAttention(dev);
 		clearHardwareReset(dev);
-		priv->numResets++;
 		priv->card_polling_interval = HZ / 4;
 		priv->waiting_command_mask &= ~ARLAN_COMMAND_RESET;
 		priv->waiting_command_mask |= ARLAN_COMMAND_INT_RACK;
@@ -597,8 +557,6 @@ static inline void arlan_retransmit_now(struct net_device *dev)
 	}
 	arlan_command(dev, ARLAN_COMMAND_TX);
 
-	priv->nof_tx++;
-
 	priv->Conf->driverRetransmissions++;
 	priv->retransmissions++;
 
@@ -796,6 +754,7 @@ static int arlan_hw_tx(struct net_device *dev, char *buf, int length)
 		IFDEBUG(ARLAN_DEBUG_TX_CHAIN)
 			printk(KERN_ERR "TX TAIL & HEAD full, return, tailStart %d headEnd %d\n", tailStarts, headEnds);
 	}
+
 	priv->out_bytes += length;
 	priv->out_bytes10 += length;
 	if (conf->measure_rate < 1)
@@ -833,7 +792,6 @@ static int arlan_hw_tx(struct net_device *dev, char *buf, int length)
 
 	priv->last_command_was_rx = 0;
 	priv->tx_last_sent = jiffies;
-	priv->nof_tx++;
 
 	IFDEBUG(ARLAN_DEBUG_TX_CHAIN) printk("%s TX Qued %d bytes \n", dev->name, length);
 
@@ -1029,7 +987,6 @@ static int arlan_read_card_configuration(struct net_device *dev)
 	conf->siteName[16] = '\0';
 	conf->retries = retries;
 	conf->tx_delay_ms = tx_delay_ms;
-	conf->async = async;
 	conf->ReTransmitPacketMaxSize = 200;
 	conf->waitReTransmitPacketMaxSize = 200;
 	conf->txAckTimeoutMs = 900;
@@ -1284,7 +1241,6 @@ static int arlan_open(struct net_device *dev)
 	priv->bad = 0;
 	priv->lastReset = 0;
 	priv->reset = 0;
-	priv->open_time = jiffies;
 	memcpy_fromio(dev->dev_addr, arlan->lanCardNodeId, 6);
 	memset(dev->broadcast, 0xff, 6);
 	priv->txOffset = 0;
@@ -1294,8 +1250,6 @@ static int arlan_open(struct net_device *dev)
 
 	netif_start_queue (dev);
 
-	init_MUTEX(&priv->card_lock);
-	myATOMIC_INIT(priv->card_users, 1);	/* damn 2.0.33 */
 	priv->registrationLostCount = 0;
 	priv->registrationLastSeen = jiffies;
 	priv->txLast = 0;
@@ -1303,8 +1257,6 @@ static int arlan_open(struct net_device *dev)
 	priv->rx_command_given = 0;
 	
 	priv->reRegisterExp = 1;
-	priv->nof_tx = 0;
-	priv->nof_tx_ack = 0;
 	priv->last_command_was_rx = 0;
 	priv->tx_last_sent = jiffies - 1;
 	priv->tx_last_cleared = jiffies;
@@ -1435,7 +1387,6 @@ static void arlan_tx_done_interrupt(struct net_device *dev, int status)
 
 	priv->tx_last_cleared = jiffies;
 	priv->tx_command_given = 0;
-	priv->nof_tx_ack++;
 	switch (status)
 	{
 		case 1:
@@ -1876,7 +1827,6 @@ static int arlan_close(struct net_device *dev)
 	IFDEBUG(ARLAN_DEBUG_STARTUP)
 		printk(KERN_NOTICE "%s: Closing device\n", dev->name);
 
-	priv->open_time = 0;
 	netif_stop_queue(dev);
 	free_irq(dev->irq, dev);
 
@@ -1969,9 +1919,6 @@ int __init arlan_probe(struct net_device *dev)
 		return -ENODEV;
 
 	arlans_found++;
-
-	if (arlans_found == 1)
-		siteName = kmalloc(100, GFP_KERNEL);
 	return 0;
 }
 
@@ -2007,10 +1954,6 @@ int init_module(void)
 	numDevices = arlan_find_devices();
 	if (numDevices == 0)
 		return -ENODEV;
-
-	siteName = kmalloc(100, GFP_KERNEL);
-	if(siteName==NULL)
-		return -ENOMEM;
 
 	for (i = 0; i < numDevices && i < MAX_ARLANS; i++)
 	{
