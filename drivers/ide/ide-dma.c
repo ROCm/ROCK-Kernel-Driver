@@ -270,16 +270,15 @@ static int build_sglist(struct ata_channel *ch, struct request *rq)
 }
 
 /*
- * ide_build_dmatable() prepares a dma request.
- * Returns 0 if all went okay, returns 1 otherwise.
- * May also be invoked from trm290.c
+ * This prepares a dma request.  Returns 0 if all went okay, returns 1
+ * otherwise.  May also be invoked from trm290.c
  */
-int ide_build_dmatable (ide_drive_t *drive, ide_dma_action_t func)
+int ide_build_dmatable(struct ata_device *drive, ide_dma_action_t func)
 {
-	struct ata_channel *hwif = drive->channel;
-	unsigned int *table = hwif->dmatable_cpu;
+	struct ata_channel *ch = drive->channel;
+	unsigned int *table = ch->dmatable_cpu;
 #ifdef CONFIG_BLK_DEV_TRM290
-	unsigned int is_trm290_chipset = (hwif->chipset == ide_trm290);
+	unsigned int is_trm290_chipset = (ch->chipset == ide_trm290);
 #else
 	const int is_trm290_chipset = 0;
 #endif
@@ -287,11 +286,11 @@ int ide_build_dmatable (ide_drive_t *drive, ide_dma_action_t func)
 	int i;
 	struct scatterlist *sg;
 
-	hwif->sg_nents = i = build_sglist(hwif, HWGROUP(drive)->rq);
+	ch->sg_nents = i = build_sglist(ch, HWGROUP(drive)->rq);
 	if (!i)
 		return 0;
 
-	sg = hwif->sg_table;
+	sg = ch->sg_table;
 	while (i) {
 		u32 cur_addr;
 		u32 cur_len;
@@ -309,8 +308,8 @@ int ide_build_dmatable (ide_drive_t *drive, ide_dma_action_t func)
 			u32 xcount, bcount = 0x10000 - (cur_addr & 0xffff);
 
 			if (count++ >= PRD_ENTRIES) {
-				printk("ide-dma: req %p\n", HWGROUP(drive)->rq);
-				printk("count %d, sg_nents %d, cur_len %d, cur_addr %u\n", count, hwif->sg_nents, cur_len, cur_addr);
+				printk("ide-dma: count %d, sg_nents %d, cur_len %d, cur_addr %u\n",
+						count, ch->sg_nents, cur_len, cur_addr);
 				BUG();
 			}
 
@@ -328,9 +327,9 @@ int ide_build_dmatable (ide_drive_t *drive, ide_dma_action_t func)
 			 * the 64KB entry into two 32KB entries instead.
 			 */
 				if (count++ >= PRD_ENTRIES) {
-					pci_unmap_sg(hwif->pci_dev, sg,
-						     hwif->sg_nents,
-						     hwif->sg_dma_direction);
+					pci_unmap_sg(ch->pci_dev, sg,
+						     ch->sg_nents,
+						     ch->sg_dma_direction);
 					return 0;
 				}
 

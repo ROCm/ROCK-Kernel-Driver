@@ -1187,12 +1187,12 @@ void ide_stall_queue(ide_drive_t *drive, unsigned long timeout)
 {
 	if (timeout > WAIT_WORSTCASE)
 		timeout = WAIT_WORSTCASE;
-	drive->PADAM_sleep = timeout + jiffies;
+	drive->sleep = timeout + jiffies;
 }
 
 
 /*
- * Determine the longes sleep time for the devices in our hwgroup.
+ * Determine the longest sleep time for the devices at this channel.
  */
 static unsigned long longest_sleep(struct ata_channel *channel)
 {
@@ -1218,8 +1218,8 @@ static unsigned long longest_sleep(struct ata_channel *channel)
 			/* This device is sleeping and waiting to be serviced
 			 * later than any other device we checked thus far.
 			 */
-			if (drive->PADAM_sleep && (!sleep || time_after(sleep, drive->PADAM_sleep)))
-				sleep = drive->PADAM_sleep;
+			if (drive->sleep && (!sleep || time_after(sleep, drive->sleep)))
+				sleep = drive->sleep;
 		}
 	}
 
@@ -1256,16 +1256,15 @@ static struct ata_device *choose_urgent_device(struct ata_channel *channel)
 			if (list_empty(&drive->queue.queue_head))
 				continue;
 
-			/* This device still want's to remain idle.
+			/* This device still wants to remain idle.
 			 */
-			if (drive->PADAM_sleep && time_after(jiffies, drive->PADAM_sleep))
+			if (drive->sleep && time_after(jiffies, drive->sleep))
 				continue;
 
 			/* Take this device, if there is no device choosen thus far or
 			 * it's more urgent.
 			 */
-			if (!choice || (drive->PADAM_sleep && (!choice->PADAM_sleep || time_after(choice->PADAM_sleep, drive->PADAM_sleep))))
-			{
+			if (!choice || (drive->sleep && (!choice->sleep || time_after(choice->sleep, drive->sleep)))) {
 				if (!blk_queue_plugged(&drive->queue))
 					choice = drive;
 			}
@@ -1315,7 +1314,6 @@ static struct ata_device *choose_urgent_device(struct ata_channel *channel)
  * Feed commands to a drive until it barfs.  Called with ide_lock/DRIVE_LOCK
  * held and busy channel.
  */
-
 static void queue_commands(struct ata_device *drive, int masked_irq)
 {
 	ide_hwgroup_t *hwgroup = drive->channel->hwgroup;
@@ -1325,7 +1323,7 @@ static void queue_commands(struct ata_device *drive, int masked_irq)
 		struct request *rq = NULL;
 
 		if (!test_bit(IDE_BUSY, &hwgroup->flags))
-			printk(KERN_ERR"%s: hwgroup not busy while queueing\n", drive->name);
+			printk(KERN_ERR"%s: error: not busy while queueing!\n", drive->name);
 
 		/* Abort early if we can't queue another command. for non
 		 * tcq, ata_can_queue is always 1 since we never get here
@@ -1337,7 +1335,7 @@ static void queue_commands(struct ata_device *drive, int masked_irq)
 			break;
 		}
 
-		drive->PADAM_sleep = 0;
+		drive->sleep = 0;
 
 		if (test_bit(IDE_DMA, &hwgroup->flags)) {
 			printk("ide_do_request: DMA in progress...\n");
@@ -1825,10 +1823,9 @@ void ide_init_drive_cmd(struct request *rq)
  * completed. This is again intended for careful use by the ATAPI tape/cdrom
  * driver code.
  */
-int ide_do_drive_cmd(ide_drive_t *drive, struct request *rq, ide_action_t action)
+int ide_do_drive_cmd(struct ata_device *drive, struct request *rq, ide_action_t action)
 {
 	unsigned long flags;
-	ide_hwgroup_t *hwgroup = HWGROUP(drive);
 	unsigned int major = drive->channel->major;
 	request_queue_t *q = &drive->queue;
 	struct list_head *queue_head = &q->queue_head;
@@ -1846,7 +1843,7 @@ int ide_do_drive_cmd(ide_drive_t *drive, struct request *rq, ide_action_t action
 	spin_lock_irqsave(&ide_lock, flags);
 	if (blk_queue_empty(&drive->queue) || action == ide_preempt) {
 		if (action == ide_preempt)
-			hwgroup->rq = NULL;
+			HWGROUP(drive)->rq = NULL;
 	} else {
 		if (action == ide_wait || action == ide_end)
 			queue_head = queue_head->prev;
@@ -1873,21 +1870,22 @@ int ide_do_drive_cmd(ide_drive_t *drive, struct request *rq, ide_action_t action
  * usage == 1 (we need an open channel to use an ioctl :-), so this
  * is our limit.
  */
-int ide_revalidate_disk (kdev_t i_rdev)
+int ide_revalidate_disk(kdev_t i_rdev)
 {
-	ide_drive_t *drive;
-	ide_hwgroup_t *hwgroup;
+	struct ata_device *drive;
 	unsigned long flags;
 	int res;
 
 	if ((drive = get_info_ptr(i_rdev)) == NULL)
 		return -ENODEV;
-	hwgroup = HWGROUP(drive);
+
 	spin_lock_irqsave(&ide_lock, flags);
+
 	if (drive->busy || (drive->usage > 1)) {
 		spin_unlock_irqrestore(&ide_lock, flags);
 		return -EBUSY;
 	}
+
 	drive->busy = 1;
 	MOD_INC_USE_COUNT;
 	spin_unlock_irqrestore(&ide_lock, flags);
@@ -2032,71 +2030,18 @@ ide_proc_entry_t generic_subdriver_entries[] = {
 };
 #endif
 
-/*
- * Note that we only release the standard ports, and do not even try to handle
- * any extra ports allocated for weird IDE interface chipsets.
- */
-static void hwif_unregister(struct ata_channel *ch)
-{
-	int i;
-	ide_hwgroup_t *hwgroup = ch->hwgroup;
-
-	/*
-	 * Free the irq if we were the only channel using it.
-	 */
-	int n = 0;
-
-	for (i = 0; i < MAX_HWIFS; ++i) {
-		struct ata_channel *tmp = &ide_hwifs[i];
-
-		if (!tmp->present)
-			continue;
-
-		if (tmp->irq == ch->irq)
-			++n;
-	}
-	if (n == 1)
-		free_irq(ch->irq, hwgroup);
-
-
-	if (ch->straight8) {
-		release_region(ch->io_ports[IDE_DATA_OFFSET], 8);
-	} else {
-		if (ch->io_ports[IDE_DATA_OFFSET])
-			release_region(ch->io_ports[IDE_DATA_OFFSET], 1);
-		if (ch->io_ports[IDE_ERROR_OFFSET])
-			release_region(ch->io_ports[IDE_ERROR_OFFSET], 1);
-		if (ch->io_ports[IDE_NSECTOR_OFFSET])
-			release_region(ch->io_ports[IDE_NSECTOR_OFFSET], 1);
-		if (ch->io_ports[IDE_SECTOR_OFFSET])
-			release_region(ch->io_ports[IDE_SECTOR_OFFSET], 1);
-		if (ch->io_ports[IDE_LCYL_OFFSET])
-			release_region(ch->io_ports[IDE_LCYL_OFFSET], 1);
-		if (ch->io_ports[IDE_HCYL_OFFSET])
-			release_region(ch->io_ports[IDE_HCYL_OFFSET], 1);
-		if (ch->io_ports[IDE_SELECT_OFFSET])
-			release_region(ch->io_ports[IDE_SELECT_OFFSET], 1);
-		if (ch->io_ports[IDE_STATUS_OFFSET])
-			release_region(ch->io_ports[IDE_STATUS_OFFSET], 1);
-	}
-	if (ch->io_ports[IDE_CONTROL_OFFSET])
-		release_region(ch->io_ports[IDE_CONTROL_OFFSET], 1);
-#if defined(CONFIG_AMIGA) || defined(CONFIG_MAC)
-	if (ch->io_ports[IDE_IRQ_OFFSET])
-		release_region(ch->io_ports[IDE_IRQ_OFFSET], 1);
-#endif
-}
-
 void ide_unregister(struct ata_channel *ch)
 {
 	struct gendisk *gd;
 	struct ata_device *d;
 	ide_hwgroup_t *hwgroup;
-	int unit, i;
+	int unit;
+	int i;
 	unsigned long flags;
 	unsigned int p, minor;
 	struct ata_channel old;
-	int n = 0;
+	int n_irq;
+	int n_ch;
 
 	spin_lock_irqsave(&ide_lock, flags);
 
@@ -2146,10 +2091,40 @@ void ide_unregister(struct ata_channel *ch)
 #endif
 	spin_lock_irqsave(&ide_lock, flags);
 
-	hwif_unregister(ch);
+	/*
+	 * Note that we only release the standard ports, and do not even try to
+	 * handle any extra ports allocated for weird IDE interface chipsets.
+	 */
+
+	if (ch->straight8) {
+		release_region(ch->io_ports[IDE_DATA_OFFSET], 8);
+	} else {
+		if (ch->io_ports[IDE_DATA_OFFSET])
+			release_region(ch->io_ports[IDE_DATA_OFFSET], 1);
+		if (ch->io_ports[IDE_ERROR_OFFSET])
+			release_region(ch->io_ports[IDE_ERROR_OFFSET], 1);
+		if (ch->io_ports[IDE_NSECTOR_OFFSET])
+			release_region(ch->io_ports[IDE_NSECTOR_OFFSET], 1);
+		if (ch->io_ports[IDE_SECTOR_OFFSET])
+			release_region(ch->io_ports[IDE_SECTOR_OFFSET], 1);
+		if (ch->io_ports[IDE_LCYL_OFFSET])
+			release_region(ch->io_ports[IDE_LCYL_OFFSET], 1);
+		if (ch->io_ports[IDE_HCYL_OFFSET])
+			release_region(ch->io_ports[IDE_HCYL_OFFSET], 1);
+		if (ch->io_ports[IDE_SELECT_OFFSET])
+			release_region(ch->io_ports[IDE_SELECT_OFFSET], 1);
+		if (ch->io_ports[IDE_STATUS_OFFSET])
+			release_region(ch->io_ports[IDE_STATUS_OFFSET], 1);
+	}
+	if (ch->io_ports[IDE_CONTROL_OFFSET])
+		release_region(ch->io_ports[IDE_CONTROL_OFFSET], 1);
+#if defined(CONFIG_AMIGA) || defined(CONFIG_MAC)
+	if (ch->io_ports[IDE_IRQ_OFFSET])
+		release_region(ch->io_ports[IDE_IRQ_OFFSET], 1);
+#endif
 
 	/*
-	 * Remove us from the hwgroup
+	 * Remove us from the hwgroup.
 	 */
 
 	hwgroup = ch->hwgroup;
@@ -2177,20 +2152,30 @@ void ide_unregister(struct ata_channel *ch)
 	if (d->present)
 		hwgroup->XXX_drive = d;
 
-	/* Free the hwgroup if we were the only member.
+
+	/*
+	 * Free the irq if we were the only channel using it.
+	 *
+	 * Free the hwgroup if we were the only member.
 	 */
-	n = 0;
+	n_irq = n_ch = 0;
 	for (i = 0; i < MAX_HWIFS; ++i) {
 		struct ata_channel *tmp = &ide_hwifs[i];
 
 		if (!tmp->present)
 			continue;
 
+		if (tmp->irq == ch->irq)
+			++n_irq;
 		if (tmp->hwgroup == ch->hwgroup)
-			++n;
+			++n_ch;
 	}
-	if (n == 1)
+	if (n_irq == 1)
+		free_irq(ch->irq, ch->hwgroup);
+	if (n_ch == 1) {
 		kfree(ch->hwgroup);
+		ch->hwgroup = NULL;
+	}
 
 #if defined(CONFIG_BLK_DEV_IDEDMA) && !defined(CONFIG_DMA_NONPCI)
 	ide_release_dma(ch);

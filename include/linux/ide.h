@@ -283,10 +283,8 @@ struct ata_device {
 	 */
 	request_queue_t	queue;	/* per device request queue */
 
-	/* Those are directly injected jiffie values. They should go away and
-	 * we should use generic timers instead!!!
-	 */
-	unsigned long PADAM_sleep;	/* sleep until this time */
+
+	unsigned long sleep;	/* sleep until this time */
 
 	/* Flags requesting/indicating one of the following special commands
 	 * executed on the request queue.

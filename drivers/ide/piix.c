@@ -471,7 +471,9 @@ unsigned int __init pci_init_piix(struct pci_dev *dev, const char *name)
 				break;
 			}
 
+#ifndef CONFIG_BLK_DEV_PIIX_TRY133
 		case PIIX_UDMA_100:
+#endif
 		case PIIX_UDMA_133:
 			pci_read_config_dword(dev, PIIX_IDECFG, &u);
 			piix_80w = ((u & 0x30) ? 1 : 0) | ((u & 0xc0) ? 2 : 0);
@@ -484,7 +486,7 @@ unsigned int __init pci_init_piix(struct pci_dev *dev, const char *name)
 
 	if (piix_config->flags & PIIX_PINGPONG) {
 		pci_read_config_dword(dev, PIIX_IDECFG, &u);
-		u |= 0x400; 
+		u |= 0x400;
 		pci_write_config_dword(dev, PIIX_IDECFG, u);
 	}
 

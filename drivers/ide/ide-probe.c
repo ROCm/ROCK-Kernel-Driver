@@ -745,7 +745,7 @@ static int init_irq(struct ata_channel *ch)
 #else
 	printk("%s at %p on irq 0x%08x", ch->name,
 		ch->io_ports[IDE_DATA_OFFSET], ch->irq);
-#endif /* __mc68000__ && CONFIG_APUS */
+#endif
 	if (match)
 		printk(" (%sed with %s)",
 			ch->sharing_irq ? "shar" : "serializ", match->name);

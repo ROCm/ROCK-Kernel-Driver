@@ -173,7 +173,7 @@ static void trm290_selectproc (ide_drive_t *drive)
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-static int trm290_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
+static int trm290_dmaproc (ide_dma_action_t func, struct ata_device *drive, struct request *rq)
 {
 	struct ata_channel *hwif = drive->channel;
 	unsigned int count, reading = 2, writing = 0;
@@ -206,12 +206,12 @@ static int trm290_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 		case ide_dma_test_irq:
 			return (inw(hwif->dma_base+2) == 0x00ff);
 		default:
-			return ide_dmaproc(func, drive);
+			return ide_dmaproc(func, drive, rq);
 	}
 	trm290_prepare_drive(drive, 0);	/* select PIO xfer */
 	return 1;
 }
-#endif /* CONFIG_BLK_DEV_IDEDMA */
+#endif
 
 /*
  * Invoked from ide-dma.c at boot time.
@@ -263,8 +263,8 @@ void __init ide_init_trm290(struct ata_channel *hwif)
 	ide_setup_dma(hwif, (hwif->config_data + 4) ^ (hwif->unit ? 0x0080 : 0x0000), 3);
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-	hwif->dmaproc = &trm290_dmaproc;
-#endif /* CONFIG_BLK_DEV_IDEDMA */
+	hwif->udma = trm290_dmaproc;
+#endif
 
 	hwif->selectproc = &trm290_selectproc;
 	hwif->autodma = 0;				/* play it safe for now */
