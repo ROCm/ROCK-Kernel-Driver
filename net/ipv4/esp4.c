@@ -301,28 +301,14 @@ int esp_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_bu
 			switch (decap->decap_type) {
 			case UDP_ENCAP_ESPINUDP:
 			case UDP_ENCAP_ESPINUDP_NON_IKE:
-
-				if ((void*)uh == (void*)esph) {
-					printk(KERN_DEBUG
-					       "esp_input(): Got ESP; expecting ESPinUDP\n");
-					break;
-				}
-
 				encap_data->proto = AF_INET;
 				encap_data->saddr.a4 = iph->saddr;
 				encap_data->sport = uh->source;
 				encap_len = (void*)esph - (void*)uh;
-				if (encap_len != sizeof(*uh))
-				  printk(KERN_DEBUG
-					 "esp_input(): UDP -> ESP: too much room: %d\n",
-					 encap_len);
 				break;
 
 			default:
-				printk(KERN_INFO
-			       "esp_input(): processing unknown encap type: %u\n",
-				       decap->decap_type);
-				break;
+				goto out;
 			}
 		}
 
