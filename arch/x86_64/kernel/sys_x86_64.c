@@ -18,6 +18,7 @@
 
 #include <asm/uaccess.h>
 #include <asm/ipc.h>
+#include <asm/ia32.h>
 
 /*
  * sys_pipe() is the normal C calling standard for creating
@@ -70,18 +71,27 @@ unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr, unsi
 	struct vm_area_struct *vma;
 	unsigned long end = TASK_SIZE;
 
-	if (test_thread_flag(TIF_IA32))
-		flags |= MAP_32BIT; 
-	if (flags & MAP_32BIT) 
-		end = 0xffffffff-1;
+	if (test_thread_flag(TIF_IA32)) { 
+		if (!addr) 
+			addr = TASK_UNMAPPED_32;
+		end = IA32_PAGE_OFFSET; 
+	} else if (flags & MAP_32BIT) { 
+		/* This is usually used needed to map code in small model, so it needs to 
+		   be in the first 31bit. Limit it to that.
+		   This means we need to move the unmapped base down for this case. This can 
+		   give conflicts with the heap, but we assume that glibc malloc knows how 
+		   to fall back to mmap. Give it 1GB of playground for now. -AK */ 
+		if (!addr) 
+			addr = 0x40000000; 
+		end = 0x80000000;		
+	} else { 
+		if (!addr) 
+			addr = TASK_UNMAPPED_64; 
+		end = TASK_SIZE; 
+		}
+
 	if (len > end)
 		return -ENOMEM;
-	if (!addr) { 
-		addr = TASK_UNMAPPED_64;
-		if (flags & MAP_32BIT) {
-			addr = TASK_UNMAPPED_32;
-		}
-	} 
 	addr = PAGE_ALIGN(addr);
 
 	for (vma = find_vma(current->mm, addr); ; vma = vma->vm_next) {

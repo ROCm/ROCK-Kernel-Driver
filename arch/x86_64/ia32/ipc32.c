@@ -40,10 +40,10 @@ struct ipc_perm32 {
 
 struct ipc64_perm32 {
         unsigned key;
-	__kernel_uid32_t32 uid;
-	__kernel_gid32_t32 gid;
-	__kernel_uid32_t32 cuid;
-	__kernel_gid32_t32 cgid;
+	compat_uid32_t uid;
+	compat_gid32_t gid;
+	compat_uid32_t cuid;
+	compat_gid32_t cgid;
 	unsigned short mode;
 	unsigned short __pad1;
 	unsigned short seq;
@@ -86,8 +86,8 @@ struct msqid_ds32 {
 	unsigned short msg_cbytes;
 	unsigned short msg_qnum;
 	unsigned short msg_qbytes;
-	__kernel_ipc_pid_t32 msg_lspid;
-	__kernel_ipc_pid_t32 msg_lrpid;
+	compat_ipc_pid_t msg_lspid;
+	compat_ipc_pid_t msg_lrpid;
 };
 
 struct msqid64_ds32 {
@@ -113,8 +113,8 @@ struct shmid_ds32 {
 	compat_time_t shm_atime;
 	compat_time_t shm_dtime;
 	compat_time_t shm_ctime;
-	__kernel_ipc_pid_t32 shm_cpid;
-	__kernel_ipc_pid_t32 shm_lpid;
+	compat_ipc_pid_t shm_cpid;
+	compat_ipc_pid_t shm_lpid;
 	unsigned short shm_nattch;
 };
 
@@ -613,6 +613,31 @@ shmctl32 (int first, int second, void *uptr)
 	return err;
 }
 
+extern int sem_ctls[];
+
+static long semtimedop32(int semid, struct sembuf *sb, 
+			 unsigned nsops, struct compat_timespec *ts32)
+{ 
+	struct timespec ts;
+	mm_segment_t oldfs = get_fs(); 
+	long ret;
+
+	if (nsops > sem_ctls[2]) 
+		return -E2BIG;
+	if (!access_ok(VERIFY_READ, sb, nsops * sizeof(struct sembuf)))
+		return -EFAULT; 
+	if (ts32 && 
+	    (get_user(ts.tv_sec, &ts32->tv_sec)  || 
+	     __get_user(ts.tv_nsec, &ts32->tv_nsec)))
+		return -EFAULT;
+
+	set_fs(KERNEL_DS);  
+	ret = sys_semtimedop(semid, sb, nsops, ts32 ? &ts : NULL);
+	set_fs(oldfs); 
+	return ret;
+}
+
+
 asmlinkage long
 sys32_ipc (u32 call, int first, int second, int third, u32 ptr, u32 fifth)
 {
@@ -627,9 +652,8 @@ sys32_ipc (u32 call, int first, int second, int third, u32 ptr, u32 fifth)
 		return sys_semtimedop(first, (struct sembuf *)AA(ptr), second,
 				      NULL);
 	      case TIMEDSEMOP:
-		/* struct sembuf is the same on 32 and 64bit :)) */
-		return sys_semtimedop(first, (struct sembuf *)AA(ptr), second,
-				      (const struct timespec *)AA(fifth));
+		return semtimedop32(first, (struct sembuf *)AA(ptr), second,
+				  (struct compat_timespec *)AA(fifth)); 
 	      case SEMGET:
 		return sys_semget(first, second, third);
 	      case SEMCTL:

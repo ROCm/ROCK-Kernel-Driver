@@ -11,17 +11,6 @@
  * 32 bit structures for IA32 support.
  */
 
-/* 32bit compatibility types */
-typedef unsigned short	       __kernel_ipc_pid_t32;
-typedef unsigned 				__kernel_uid32_t32;
-typedef unsigned 				__kernel_gid32_t32;
-typedef unsigned short	       __kernel_umode_t32;
-typedef int		       __kernel_daddr_t32;
-typedef unsigned int	       __kernel_caddr_t32;
-typedef long		       __kernel_loff_t32;
-typedef __kernel_fsid_t	       __kernel_fsid_t32;
-
-
 /* fcntl.h */
 struct flock32 {
        short l_type;
@@ -130,7 +119,7 @@ struct statfs32 {
        int f_bavail;
        int f_files;
        int f_ffree;
-       __kernel_fsid_t32 f_fsid;
+       compat_fsid_t f_fsid;
        int f_namelen;  /* SunOS ignores this field. */
        int f_spare[6];
 };

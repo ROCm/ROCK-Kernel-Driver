@@ -83,15 +83,16 @@ extern inline int find_first_cpu(void)
 	return ffz(~cpu_online_map); 	
 } 
 
+/* RED-PEN different from i386 */
 #define for_each_cpu(i) \
 	for((i) = find_first_cpu(); (i)>=0; (i)=find_next_cpu(i))
 
-extern volatile unsigned long cpu_callout_map;
-/* We don't mark CPUs online until __cpu_up(), so we need another measure */
 static inline int num_booting_cpus(void)
 {
 	return hweight32(cpu_callout_map);
 }
+
+extern volatile unsigned long cpu_callout_map;
 
 /*
  * Some lowlevel functions might want to know about

@@ -79,7 +79,7 @@ static inline int rdmsr_eio(u32 reg, u32 *eax, u32 *edx)
 	       "	jmp 2b\n"
 	       ".previous\n"
 	       ".section __ex_table,\"a\"\n"
-	       "	.align 4\n"
+	       "	.align 8\n"
 	       "	.quad 1b,3b\n"
 	       ".previous"
 	       : "=&bDS" (err), "=a" (*eax), "=d" (*edx)
