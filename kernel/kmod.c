@@ -159,9 +159,14 @@ static int exec_modprobe(void * module_name)
 
 	ret = exec_usermodehelper(modprobe_path, argv, envp);
 	if (ret) {
-		printk(KERN_DEBUG
-		       "kmod: failed to exec %s -s -k %s, errno = %d\n",
-		       modprobe_path, (char*) module_name, errno);
+		static unsigned long last;
+		unsigned long now = jiffies;
+		if (now - last > HZ) {
+			last = now;
+			printk(KERN_DEBUG
+			       "kmod: failed to exec %s -s -k %s, errno = %d\n",
+			       modprobe_path, (char*) module_name, errno);
+		}
 	}
 	return ret;
 }
