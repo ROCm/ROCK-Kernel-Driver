@@ -125,4 +125,36 @@ extern void ipx_proc_exit(void);
 
 extern const char *ipx_frame_name(unsigned short);
 extern const char *ipx_device_name(struct ipx_interface *intrfc);
+
+static __inline__ void ipxitf_hold(struct ipx_interface *intrfc)
+{
+	atomic_inc(&intrfc->refcnt);
+}
+
+extern void ipxitf_down(struct ipx_interface *intrfc);
+
+static __inline__ void ipxitf_put(struct ipx_interface *intrfc)
+{
+	if (atomic_dec_and_test(&intrfc->refcnt))
+		ipxitf_down(intrfc);
+}
+
+extern void __ipxitf_down(struct ipx_interface *intrfc);
+
+static __inline__ void __ipxitf_put(struct ipx_interface *intrfc)
+{
+	if (atomic_dec_and_test(&intrfc->refcnt))
+		__ipxitf_down(intrfc);
+}
+
+static __inline__ void ipxrtr_hold(struct ipx_route *rt)
+{
+	        atomic_inc(&rt->refcnt);
+}
+
+static __inline__ void ipxrtr_put(struct ipx_route *rt)
+{
+	        if (atomic_dec_and_test(&rt->refcnt))
+			                kfree(rt);
+}
 #endif /* _NET_INET_IPX_H_ */
