@@ -63,8 +63,8 @@ and the first two patches to this driver (0.1, 0.2, and 0.3).
 Thanks also to Eberhard Moenkeberg (emoenke@gwdg.de) for prodding
 me to place this code into the mainstream Linux source tree
 (as of Linux version 1.1.91), as well as some patches to make
-it a better device citizen.  Further thanks to "S. Joel Katz"
-<stimpson@panix.com> for his MODULE patches (see details below),
+it a better device citizen.  Further thanks to Joel Katz
+<joelkatz@webchat.org> for his MODULE patches (see details below),
 Porfiri Claudio <C.Porfiri@nisms.tei.ericsson.se> for patches
 to make the driver work with the older CDU-510/515 series, and
 Heiko Eissfeldt <heiko@colossus.escape.de> for pointing out that
@@ -79,7 +79,7 @@ Ken Pizzini
 ken@halcyon.com
 
 ------------------------------------------------------------------------------
-(The following is from Joel Katz <Stimpson@Panix.COM>.)
+(The following is from Joel Katz <joelkatz@webchat.org>.)
 
 	To build a version of sony535.o that can be installed as a module,
 use the following command:
@@ -103,7 +103,7 @@ exactly as it used to if compiled into the kernel.
 	I have an external drive, and I usually leave it powered off. I used
 to have to reboot if I needed to use the CDROM drive. Now I don't.
 
-	Even if you have an internal drive, why waste the 268K of memory
+	Even if you have an internal drive, why waste the 96K of memory
 (unswappable) that the driver uses if you use your CD-ROM drive infrequently?
 
 	This driver will not install (whether compiled in or loaded as a
