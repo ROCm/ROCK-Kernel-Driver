@@ -495,6 +495,7 @@ void scsi_io_completion(Scsi_Cmnd * SCpnt, int good_sectors,
 	int this_count = SCpnt->bufflen >> 9;
 	request_queue_t *q = SCpnt->device->request_queue;
 	struct request *req = SCpnt->request;
+	int clear_errors = 1;
 
 	/*
 	 * We must do one of several things here:
@@ -528,10 +529,22 @@ void scsi_io_completion(Scsi_Cmnd * SCpnt, int good_sectors,
 		kfree(SCpnt->buffer);
 	}
 
-	if (blk_pc_request(req)) {
-		req->errors = result & 0xff;
-		if (!result)
+	if (blk_pc_request(req)) { /* SG_IO ioctl from block level */
+		req->errors = (driver_byte(result) & DRIVER_SENSE) ?
+			      (CHECK_CONDITION << 1) : (result & 0xff);
+		if (!result) 
 			req->data_len -= SCpnt->bufflen;
+		else {
+			clear_errors = 0;
+			if (SCpnt->sense_buffer[0] & 0x70) {
+				int len = 8 + SCpnt->sense_buffer[7];
+
+				if (len > SCSI_SENSE_BUFFERSIZE)
+					len = SCSI_SENSE_BUFFERSIZE;
+				memcpy(req->sense, SCpnt->sense_buffer,  len);
+				req->sense_len = len;
+			}
+		}
 	}
 
 	/*
@@ -552,7 +565,8 @@ void scsi_io_completion(Scsi_Cmnd * SCpnt, int good_sectors,
 					      req->nr_sectors, good_sectors));
 		SCSI_LOG_HLCOMPLETE(1, printk("use_sg is %d\n ", SCpnt->use_sg));
 
-		req->errors = 0;
+		if (clear_errors)
+			req->errors = 0;
 		/*
 		 * If multiple sectors are requested in one buffer, then
 		 * they will have been finished off by the first command.
