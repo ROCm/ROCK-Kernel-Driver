@@ -165,6 +165,24 @@ typedef enum {
 
 #define DM_FLAGS_NDELAY		0x001	/* return EAGAIN after dm_pending() */
 #define DM_FLAGS_UNWANTED	0x002	/* event not in fsys dm_eventset_t */
+#define DM_FLAGS_ISEM		0x004	/* thread holds i_sem */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2,4,21)
+/* i_alloc_sem was added in 2.4.22-pre1 */
+#define DM_FLAGS_IALLOCSEM	0x010	/* thread holds i_alloc_sem */
+#endif
+#endif
+
+/*
+ *	Based on IO_ISDIRECT, decide which i_ flag is set.
+ */
+#ifdef DM_FLAGS_IALLOCSEM
+#define DM_SEM_FLAG(ioflags) (((ioflags) & IO_ISDIRECT) ? \
+			      DM_FLAGS_IALLOCSEM : DM_FLAGS_ISEM)
+#else
+#define DM_SEM_FLAG(ioflags) (((ioflags) & IO_ISDIRECT) ? \
+			      0 : DM_FLAGS_ISEM)
+#endif
 
 /*
  *	Macros to turn caller specified delay/block flags into

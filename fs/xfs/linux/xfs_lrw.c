@@ -730,11 +730,12 @@ start:
 	if ((DM_EVENT_ENABLED(vp->v_vfsp, xip, DM_EVENT_WRITE) &&
 	    !(ioflags & IO_INVIS) && !eventsent)) {
 		loff_t		savedsize = *offset;
+		int dmflags = FILP_DELAY_FLAG(file) | DM_SEM_FLAG(ioflags);
 
 		xfs_iunlock(xip, XFS_ILOCK_EXCL);
 		error = XFS_SEND_DATA(xip->i_mount, DM_EVENT_WRITE, vp,
 				      *offset, size,
-				      FILP_DELAY_FLAG(file), &locktype);
+				      dmflags, &locktype);
 		if (error) {
 			xfs_iunlock(xip, iolock);
 			return -error;
