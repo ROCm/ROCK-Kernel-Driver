@@ -20,22 +20,6 @@ pcibios_present(void)
 }
 
 int
-pcibios_find_class(unsigned int class, unsigned short index, unsigned char *bus, unsigned char *devfn)
-{
-	const struct pci_dev *dev = NULL;
-	int cnt = 0;
-
-	while ((dev = pci_find_class(class, dev)))
-		if (index == cnt++) {
-			*bus = dev->bus->number;
-			*devfn = dev->devfn;
-			return PCIBIOS_SUCCESSFUL;
-		}
-	return PCIBIOS_DEVICE_NOT_FOUND;
-}
-
-
-int
 pcibios_find_device(unsigned short vendor, unsigned short device, unsigned short index,
 		    unsigned char *bus, unsigned char *devfn)
 {
@@ -75,5 +59,4 @@ EXPORT_SYMBOL(pcibios_read_config_dword);
 EXPORT_SYMBOL(pcibios_write_config_byte);
 EXPORT_SYMBOL(pcibios_write_config_word);
 EXPORT_SYMBOL(pcibios_write_config_dword);
-EXPORT_SYMBOL(pcibios_find_class);
 EXPORT_SYMBOL(pcibios_find_device);

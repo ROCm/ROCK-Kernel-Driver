@@ -533,7 +533,6 @@ int pcibios_write_config_word (unsigned char bus, unsigned char dev_fn,
 			       unsigned char where, unsigned short val);
 int pcibios_write_config_dword (unsigned char bus, unsigned char dev_fn,
 				unsigned char where, unsigned int val);
-int pcibios_find_class (unsigned int class_code, unsigned short index, unsigned char *bus, unsigned char *dev_fn);
 int pcibios_find_device (unsigned short vendor, unsigned short dev_id,
 			 unsigned short index, unsigned char *bus,
 			 unsigned char *dev_fn);
@@ -661,8 +660,6 @@ void pci_pool_free (struct pci_pool *pool, void *vaddr, dma_addr_t addr);
 
 #ifndef CONFIG_PCI
 static inline int pcibios_present(void) { return 0; }
-static inline int pcibios_find_class (unsigned int class_code, unsigned short index, unsigned char *bus, unsigned char *dev_fn) 
-{ 	return PCIBIOS_DEVICE_NOT_FOUND; }
 
 #define _PCI_NOP(o,s,t) \
 	static inline int pcibios_##o##_config_##s (u8 bus, u8 dfn, u8 where, t val) \
