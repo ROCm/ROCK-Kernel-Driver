@@ -874,6 +874,46 @@ static irqreturn_t psycho_ce_intr(int irq, void *dev_id, struct pt_regs *regs)
 #define PSYCHO_PCI_AFAR_A	0x2018UL
 #define PSYCHO_PCI_AFAR_B	0x4018UL
 
+static irqreturn_t psycho_pcierr_intr_other(struct pci_pbm_info *pbm, int is_pbm_a)
+{
+	unsigned long csr_reg, csr, csr_error_bits;
+	irqreturn_t ret = IRQ_NONE;
+	u16 stat;
+
+	if (is_pbm_a) {
+		csr_reg = pbm->controller_regs + PSYCHO_PCIA_CTRL;
+	} else {
+		csr_reg = pbm->controller_regs + PSYCHO_PCIB_CTRL;
+	}
+	csr = psycho_read(csr_reg);
+	csr_error_bits =
+		csr & (PSYCHO_PCICTRL_SBH_ERR | PSYCHO_PCICTRL_SERR);
+	if (csr_error_bits) {
+		/* Clear the errors.  */
+		psycho_write(csr_reg, csr);
+
+		/* Log 'em.  */
+		if (csr_error_bits & PSYCHO_PCICTRL_SBH_ERR)
+			printk("%s: PCI streaming byte hole error asserted.\n",
+			       pbm->name);
+		if (csr_error_bits & PSYCHO_PCICTRL_SERR)
+			printk("%s: PCI SERR signal asserted.\n", pbm->name);
+		ret = IRQ_HANDLED;
+	}
+	pci_read_config_word(pbm->pci_bus->self, PCI_STATUS, &stat);
+	if (stat & (PCI_STATUS_PARITY |
+		    PCI_STATUS_SIG_TARGET_ABORT |
+		    PCI_STATUS_REC_TARGET_ABORT |
+		    PCI_STATUS_REC_MASTER_ABORT |
+		    PCI_STATUS_SIG_SYSTEM_ERROR)) {
+		printk("%s: PCI bus error, PCI_STATUS[%04x]\n",
+		       pbm->name, stat);
+		pci_write_config_word(pbm->pci_bus->self, PCI_STATUS, 0xffff);
+		ret = IRQ_HANDLED;
+	}
+	return ret;
+}
+
 static irqreturn_t psycho_pcierr_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct pci_pbm_info *pbm = dev_id;
@@ -902,7 +942,7 @@ static irqreturn_t psycho_pcierr_intr(int irq, void *dev_id, struct pt_regs *reg
 		 PSYCHO_PCIAFSR_SMA | PSYCHO_PCIAFSR_STA |
 		 PSYCHO_PCIAFSR_SRTRY | PSYCHO_PCIAFSR_SPERR);
 	if (!error_bits)
-		return IRQ_NONE;
+		return psycho_pcierr_intr_other(pbm, is_pbm_a);
 	psycho_write(afsr_reg, error_bits);
 
 	/* Log the error. */
@@ -1008,6 +1048,7 @@ static void __init psycho_register_error_handlers(struct pci_controller_info *p)
 		prom_halt();
 	}
 
+	pbm = &p->pbm_A;
 	irq = psycho_irq_build(pbm, NULL, (portid << 6) | PSYCHO_PCIERR_A_INO);
 	if (request_irq(irq, psycho_pcierr_intr,
 			SA_SHIRQ, "PSYCHO PCIERR", &p->pbm_A) < 0) {
@@ -1016,6 +1057,7 @@ static void __init psycho_register_error_handlers(struct pci_controller_info *p)
 		prom_halt();
 	}
 
+	pbm = &p->pbm_B;
 	irq = psycho_irq_build(pbm, NULL, (portid << 6) | PSYCHO_PCIERR_B_INO);
 	if (request_irq(irq, psycho_pcierr_intr,
 			SA_SHIRQ, "PSYCHO PCIERR", &p->pbm_B) < 0) {

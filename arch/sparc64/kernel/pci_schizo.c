@@ -845,6 +845,88 @@ static irqreturn_t schizo_ce_intr(int irq, void *dev_id, struct pt_regs *regs)
 #define SCHIZO_PCIAFSR_MEM	0x0000000020000000UL /* Schizo/Tomatillo */
 #define SCHIZO_PCIAFSR_IO	0x0000000010000000UL /* Schizo/Tomatillo */
 
+#define SCHIZO_PCI_CTRL		(0x2000UL)
+#define SCHIZO_PCICTRL_BUS_UNUS	(1UL << 63UL) /* Safari */
+#define SCHIZO_PCICTRL_ARB_PRIO (0x1ff << 52UL) /* Tomatillo */
+#define SCHIZO_PCICTRL_ESLCK	(1UL << 51UL) /* Safari */
+#define SCHIZO_PCICTRL_ERRSLOT	(7UL << 48UL) /* Safari */
+#define SCHIZO_PCICTRL_TTO_ERR	(1UL << 38UL) /* Safari/Tomatillo */
+#define SCHIZO_PCICTRL_RTRY_ERR	(1UL << 37UL) /* Safari/Tomatillo */
+#define SCHIZO_PCICTRL_DTO_ERR	(1UL << 36UL) /* Safari/Tomatillo */
+#define SCHIZO_PCICTRL_SBH_ERR	(1UL << 35UL) /* Safari */
+#define SCHIZO_PCICTRL_SERR	(1UL << 34UL) /* Safari/Tomatillo */
+#define SCHIZO_PCICTRL_PCISPD	(1UL << 33UL) /* Safari */
+#define SCHIZO_PCICTRL_MRM_PREF	(1UL << 28UL) /* Tomatillo */
+#define SCHIZO_PCICTRL_RDO_PREF	(1UL << 27UL) /* Tomatillo */
+#define SCHIZO_PCICTRL_RDL_PREF	(1UL << 26UL) /* Tomatillo */
+#define SCHIZO_PCICTRL_PTO	(3UL << 24UL) /* Safari/Tomatillo */
+#define SCHIZO_PCICTRL_PTO_SHIFT 24UL
+#define SCHIZO_PCICTRL_TRWSW	(7UL << 21UL) /* Tomatillo */
+#define SCHIZO_PCICTRL_F_TGT_A	(1UL << 20UL) /* Tomatillo */
+#define SCHIZO_PCICTRL_S_DTO_INT (1UL << 19UL) /* Safari */
+#define SCHIZO_PCICTRL_F_TGT_RT	(1UL << 19UL) /* Tomatillo */
+#define SCHIZO_PCICTRL_SBH_INT	(1UL << 18UL) /* Safari */
+#define SCHIZO_PCICTRL_T_DTO_INT (1UL << 18UL) /* Tomatillo */
+#define SCHIZO_PCICTRL_EEN	(1UL << 17UL) /* Safari/Tomatillo */
+#define SCHIZO_PCICTRL_PARK	(1UL << 16UL) /* Safari/Tomatillo */
+#define SCHIZO_PCICTRL_PCIRST	(1UL <<  8UL) /* Safari */
+#define SCHIZO_PCICTRL_ARB_S	(0x3fUL << 0UL) /* Safari */
+#define SCHIZO_PCICTRL_ARB_T	(0xffUL << 0UL) /* Tomatillo */
+
+static irqreturn_t schizo_pcierr_intr_other(struct pci_pbm_info *pbm)
+{
+	unsigned long csr_reg, csr, csr_error_bits;
+	irqreturn_t ret = IRQ_NONE;
+	u16 stat;
+
+	csr_reg = pbm->pbm_regs + SCHIZO_PCI_CTRL;
+	csr = schizo_read(csr_reg);
+	csr_error_bits =
+		csr & (SCHIZO_PCICTRL_BUS_UNUS |
+		       SCHIZO_PCICTRL_TTO_ERR |
+		       SCHIZO_PCICTRL_RTRY_ERR |
+		       SCHIZO_PCICTRL_DTO_ERR |
+		       SCHIZO_PCICTRL_SBH_ERR |
+		       SCHIZO_PCICTRL_SERR);
+	if (csr_error_bits) {
+		/* Clear the errors.  */
+		schizo_write(csr_reg, csr);
+
+		/* Log 'em.  */
+		if (csr_error_bits & SCHIZO_PCICTRL_BUS_UNUS)
+			printk("%s: Bus unusable error asserted.\n",
+			       pbm->name);
+		if (csr_error_bits & SCHIZO_PCICTRL_TTO_ERR)
+			printk("%s: PCI TRDY# timeout error asserted.\n",
+			       pbm->name);
+		if (csr_error_bits & SCHIZO_PCICTRL_RTRY_ERR)
+			printk("%s: PCI excessive retry error asserted.\n",
+			       pbm->name);
+		if (csr_error_bits & SCHIZO_PCICTRL_DTO_ERR)
+			printk("%s: PCI discard timeout error asserted.\n",
+			       pbm->name);
+		if (csr_error_bits & SCHIZO_PCICTRL_SBH_ERR)
+			printk("%s: PCI streaming byte hole error asserted.\n",
+			       pbm->name);
+		if (csr_error_bits & SCHIZO_PCICTRL_SERR)
+			printk("%s: PCI SERR signal asserted.\n",
+			       pbm->name);
+		ret = IRQ_HANDLED;
+	}
+	pci_read_config_word(pbm->pci_bus->self, PCI_STATUS, &stat);
+	if (stat & (PCI_STATUS_PARITY |
+		    PCI_STATUS_SIG_TARGET_ABORT |
+		    PCI_STATUS_REC_TARGET_ABORT |
+		    PCI_STATUS_REC_MASTER_ABORT |
+		    PCI_STATUS_SIG_SYSTEM_ERROR)) {
+		printk("%s: PCI bus error, PCI_STATUS[%04x]\n",
+		       pbm->name, stat);
+		pci_write_config_word(pbm->pci_bus->self, PCI_STATUS, 0xffff);
+		ret = IRQ_HANDLED;
+	}
+	return ret;
+}
+
 static irqreturn_t schizo_pcierr_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct pci_pbm_info *pbm = dev_id;
@@ -871,7 +953,7 @@ static irqreturn_t schizo_pcierr_intr(int irq, void *dev_id, struct pt_regs *reg
 		 SCHIZO_PCIAFSR_SRTRY | SCHIZO_PCIAFSR_SPERR |
 		 SCHIZO_PCIAFSR_STTO | SCHIZO_PCIAFSR_SUNUS);
 	if (!error_bits)
-		return IRQ_NONE;
+		return schizo_pcierr_intr_other(pbm);
 	schizo_write(afsr_reg, error_bits);
 
 	/* Log the error. */
@@ -1043,34 +1125,6 @@ static irqreturn_t schizo_safarierr_intr(int irq, void *dev_id, struct pt_regs *
 #define SCHIZO_PCIERR_A_INO	0x32 /* PBM A PCI bus error */
 #define SCHIZO_PCIERR_B_INO	0x33 /* PBM B PCI bus error */
 #define SCHIZO_SERR_INO		0x34 /* Safari interface error */
-
-#define SCHIZO_PCI_CTRL		(0x2000UL)
-#define SCHIZO_PCICTRL_BUS_UNUS	(1UL << 63UL) /* Safari */
-#define SCHIZO_PCICTRL_ARB_PRIO (0x1ff << 52UL) /* Tomatillo */
-#define SCHIZO_PCICTRL_ESLCK	(1UL << 51UL) /* Safari */
-#define SCHIZO_PCICTRL_ERRSLOT	(7UL << 48UL) /* Safari */
-#define SCHIZO_PCICTRL_TTO_ERR	(1UL << 38UL) /* Safari/Tomatillo */
-#define SCHIZO_PCICTRL_RTRY_ERR	(1UL << 37UL) /* Safari/Tomatillo */
-#define SCHIZO_PCICTRL_DTO_ERR	(1UL << 36UL) /* Safari/Tomatillo */
-#define SCHIZO_PCICTRL_SBH_ERR	(1UL << 35UL) /* Safari */
-#define SCHIZO_PCICTRL_SERR	(1UL << 34UL) /* Safari/Tomatillo */
-#define SCHIZO_PCICTRL_PCISPD	(1UL << 33UL) /* Safari */
-#define SCHIZO_PCICTRL_MRM_PREF	(1UL << 28UL) /* Tomatillo */
-#define SCHIZO_PCICTRL_RDO_PREF	(1UL << 27UL) /* Tomatillo */
-#define SCHIZO_PCICTRL_RDL_PREF	(1UL << 26UL) /* Tomatillo */
-#define SCHIZO_PCICTRL_PTO	(3UL << 24UL) /* Safari/Tomatillo */
-#define SCHIZO_PCICTRL_PTO_SHIFT 24UL
-#define SCHIZO_PCICTRL_TRWSW	(7UL << 21UL) /* Tomatillo */
-#define SCHIZO_PCICTRL_F_TGT_A	(1UL << 20UL) /* Tomatillo */
-#define SCHIZO_PCICTRL_S_DTO_INT (1UL << 19UL) /* Safari */
-#define SCHIZO_PCICTRL_F_TGT_RT	(1UL << 19UL) /* Tomatillo */
-#define SCHIZO_PCICTRL_SBH_INT	(1UL << 18UL) /* Safari */
-#define SCHIZO_PCICTRL_T_DTO_INT (1UL << 18UL) /* Tomatillo */
-#define SCHIZO_PCICTRL_EEN	(1UL << 17UL) /* Safari/Tomatillo */
-#define SCHIZO_PCICTRL_PARK	(1UL << 16UL) /* Safari/Tomatillo */
-#define SCHIZO_PCICTRL_PCIRST	(1UL <<  8UL) /* Safari */
-#define SCHIZO_PCICTRL_ARB_S	(0x3fUL << 0UL) /* Safari */
-#define SCHIZO_PCICTRL_ARB_T	(0xffUL << 0UL) /* Tomatillo */
 
 struct pci_pbm_info *pbm_for_ino(struct pci_controller_info *p, u32 ino)
 {
