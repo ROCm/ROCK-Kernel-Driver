@@ -15,26 +15,22 @@
  * fat_fs_panic reports a severe file system problem and sets the file system
  * read-only. The file system can be made writable again by remounting it.
  */
-
-static char panic_msg[512];
-
 void fat_fs_panic(struct super_block *s, const char *fmt, ...)
 {
-	int not_ro;
 	va_list args;
 
-	va_start (args, fmt);
-	vsnprintf (panic_msg, sizeof(panic_msg), fmt, args);
-	va_end (args);
+	printk(KERN_ERR "FAT: Filesystem panic (dev %s)\n", s->s_id);
 
-	not_ro = !(s->s_flags & MS_RDONLY);
-	if (not_ro)
+	printk(KERN_ERR "    ");
+	va_start(args, fmt);
+	vprintk(fmt, args);
+	va_end(args);
+	printk("\n");
+
+	if (!(s->s_flags & MS_RDONLY)) {
 		s->s_flags |= MS_RDONLY;
-
-	printk(KERN_ERR "FAT: Filesystem panic (dev %s)\n"
-	       "    %s\n", s->s_id, panic_msg);
-	if (not_ro)
 		printk(KERN_ERR "    File system has been set read-only\n");
+	}
 }
 
 void lock_fat(struct super_block *sb)
