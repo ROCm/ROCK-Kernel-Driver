@@ -166,6 +166,14 @@ static int queuecommand(struct scsi_cmnd *srb,
 		return SCSI_MLQUEUE_HOST_BUSY;
 	}
 
+	/* fail the command if we are disconnecting */
+	if (test_bit(US_FLIDX_DISCONNECTING, &us->flags)) {
+		US_DEBUGP("Command failed for disconnect\n");
+		srb->result = DID_NO_CONNECT << 16;
+		done(srb);
+		return 0;
+	}
+
 	srb->scsi_done = done;
 	us->srb = srb;
 
