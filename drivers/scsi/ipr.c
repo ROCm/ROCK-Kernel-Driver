@@ -2884,6 +2884,7 @@ static int ipr_slave_alloc(struct scsi_device *sdev)
 		    (res->cfgte.res_addr.lun == sdev->lun)) {
 			res->sdev = sdev;
 			res->add_to_ml = 0;
+			res->in_erp = 0;
 			sdev->hostdata = res;
 			res->needs_sync_complete = 1;
 			break;
@@ -3435,8 +3436,10 @@ static void ipr_erp_done(struct ipr_cmnd *ipr_cmd)
 		       SCSI_SENSE_BUFFERSIZE);
 	}
 
-	if (res)
+	if (res) {
 		res->needs_sync_complete = 1;
+		res->in_erp = 0;
+	}
 	ipr_unmap_sglist(ioa_cfg, ipr_cmd);
 	list_add_tail(&ipr_cmd->queue, &ioa_cfg->free_q);
 	scsi_cmd->scsi_done(scsi_cmd);
@@ -3756,6 +3759,7 @@ static void ipr_erp_start(struct ipr_ioa_cfg *ioa_cfg,
 			ipr_erp_cancel_all(ipr_cmd);
 			return;
 		}
+		res->needs_sync_complete = 1;
 		break;
 	case IPR_IOASC_NR_INIT_CMD_REQUIRED:
 		break;
