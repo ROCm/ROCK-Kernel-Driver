@@ -655,6 +655,7 @@ embed_config(bd_t **bdp)
 }
 #endif /* WILLOW */
 
+#ifdef CONFIG_XILINX_ML300
 void
 embed_config(bd_t ** bdp)
 {
@@ -688,6 +689,7 @@ embed_config(bd_t ** bdp)
 	bd->bi_intfreq = XPAR_CORE_CLOCK_FREQ_HZ;
 	bd->bi_busfreq = XPAR_PLB_CLOCK_FREQ_HZ;
 }
+#endif /* CONFIG_XILINX_ML300 */
 
 #ifdef CONFIG_IBM_OPENBIOS
 /* This could possibly work for all treeboot roms.
@@ -801,7 +803,7 @@ embed_config(bd_t **bdp)
 	 * just to be sure. */
 	mtdcr(DCRN_MALCR(DCRN_MAL_BASE), MALCR_MMSR);     /* 1st reset MAL */
 	while (mfdcr(DCRN_MALCR(DCRN_MAL_BASE)) & MALCR_MMSR) {}; /* wait for the reset */	
-	out_be32(EMAC0_BASE,0x20000000);        /* then reset EMAC */
+	out_be32((unsigned *)EMAC0_BASE,0x20000000);        /* then reset EMAC */
 
 	bd = &bdinfo;
 	*bdp = bd;

@@ -217,17 +217,17 @@ $(images)/zImage.initrd-STRIPELF: $(obj)/zvmlinux.initrd
 	dd if=$(obj)/zvmlinux.initrd of=$(images)/zImage.initrd.$(END) \
 		skip=64 bs=1k
 
-$(images)/zImage-TREE: $(obj)/zvmlinux
+$(images)/zImage-TREE: $(obj)/zvmlinux $(MKTREE)
 	$(MKTREE) $(obj)/zvmlinux $(images)/zImage.$(END) $(ENTRYPOINT)
 
-$(images)/zImage.initrd-TREE: $(obj)/zvmlinux.initrd
+$(images)/zImage.initrd-TREE: $(obj)/zvmlinux.initrd $(MKTREE)
 	$(MKTREE) $(obj)/zvmlinux.initrd $(images)/zImage.initrd.$(END) \
 		$(ENTRYPOINT)
 
-$(images)/zImage-MENF1: $(obj)/zvmlinux
+$(images)/zImage-MENF1: $(obj)/zvmlinux $(MKPREP)
 	$(MKPREP) -pbp $(obj)/zvmlinux $(images)/zImage.menf1
 
-$(images)/zImage.initrd-MENF1: $(obj)/zvmlinux.initrd
+$(images)/zImage.initrd-MENF1: $(obj)/zvmlinux.initrd $(MKPREP)
 	$(MKPREP) -pbp $(obj)/zvmlinux.initrd $(images)/zImage.initrd.menf1
 
 $(images)/zImage-PPLUS: $(obj)/zvmlinux $(MKPREP) $(MKBUGBOOT)

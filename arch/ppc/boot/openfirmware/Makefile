@@ -143,7 +143,9 @@ $(images)/zImage.initrd.chrp-rs6k: $(images)/zImage.initrd.chrp $(ADDNOTE)
 	$(ADDNOTE) $@
 
 zImage: $(images)/vmlinux.coff $(images)/vmlinux.elf-pmac \
-		$(images)/zImage.chrp $(images)/miboot.image
+		$(images)/zImage.chrp $(images)/zImage.chrp-rs6k \
+		$(images)/miboot.image
 
 zImage.initrd: $(images)/vmlinux.initrd.coff $(images)/vmlinux.initrd.elf-pmac\
-		$(images)/zImage.initrd.chrp $(images)/miboot.initrd.image
+		$(images)/zImage.initrd.chrp $(images)/zImage.initrd.chrp-rs6k\
+		$(images)/miboot.initrd.image

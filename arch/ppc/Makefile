@@ -56,8 +56,6 @@ drivers-$(CONFIG_8xx)		+= arch/ppc/8xx_io/
 drivers-$(CONFIG_4xx)		+= arch/ppc/4xx_io/
 drivers-$(CONFIG_8260)		+= arch/ppc/8260_io/
 
-makeboot =$(Q)$(MAKE) -f scripts/Makefile.build obj=arch/ppc/boot $(1)
-
 BOOT_TARGETS = zImage zImage.initrd znetboot znetboot.initrd pImage vmlinux.sm
 
 .PHONY: $(BOOT_TARGETS) clean archclean archmrproper
@@ -70,14 +68,14 @@ AFLAGS_vmlinux.lds.o	:= -Upowerpc
 bzImage: zImage
 
 $(BOOT_TARGETS): vmlinux
-	@$(call makeboot,$@)
+	$(Q)$(MAKE) $(build)=arch/ppc/boot $@
 
 %_config: arch/ppc/configs/%_defconfig
 	rm -f .config arch/ppc/defconfig
 	cp -f arch/ppc/configs/$(@:config=defconfig) .config
 
 archclean:
-	+$(MAKE) -f scripts/Makefile.clean obj=arch/ppc/boot
+	$(Q)$(MAKE) $(clean)=arch/ppc/boot
 
 archmrproper:
 
