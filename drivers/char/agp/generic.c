@@ -374,10 +374,6 @@ static void agp_v2_parse_one(u32 *mode, u32 *cmd, u32 *tmp)
 	if (!((*cmd & AGPSTAT_SBA) && (*tmp & AGPSTAT_SBA) && (*mode & AGPSTAT_SBA)))
 		*cmd &= ~AGPSTAT_SBA;
 
-	/* disable FW if it's not supported */
-	if (!((*cmd & AGPSTAT_FW) && (*tmp & AGPSTAT_FW) && (*mode & AGPSTAT_FW)))
-		*cmd &= ~AGPSTAT_FW;
-
 	/* Set speed */
 	if (!((*cmd & AGPSTAT2_4X) && (*tmp & AGPSTAT2_4X) && (*mode & AGPSTAT2_4X)))
 		*cmd &= ~AGPSTAT2_4X;
@@ -414,10 +410,6 @@ static void agp_v3_parse_one(u32 *mode, u32 *cmd, u32 *tmp)
 
 	/* SBA *must* be supported for AGP v3 */
 	*cmd |= AGPSTAT_SBA;
-
-	/* disable FW if it's not supported */
-	if (!((*cmd & AGPSTAT_FW) && (*tmp & AGPSTAT_FW) && (*mode & AGPSTAT_FW)))
-		*cmd &= ~AGPSTAT_FW;
 
 	/*
 	 * Set speed.
@@ -486,9 +478,12 @@ u32 agp_collect_device_status(u32 mode, u32 cmd)
 		     min_t(u32, (mode & AGPSTAT_RQ_DEPTH),
 			 min_t(u32, (cmd & AGPSTAT_RQ_DEPTH), (tmp & AGPSTAT_RQ_DEPTH))));
 		
-		pci_read_config_dword(device, cap_ptr+AGPSTAT, &agp3);
+		/* disable FW if it's not supported */
+		if (!((cmd & AGPSTAT_FW) && (tmp & AGPSTAT_FW) && (mode & AGPSTAT_FW)))
+			cmd &= ~AGPSTAT_FW;
 
 		/* Check to see if we are operating in 3.0 mode */
+		pci_read_config_dword(device, cap_ptr+AGPSTAT, &agp3);
 		if (agp3 & AGPSTAT_MODE_3_0) {
 			agp_v3_parse_one(&mode, &cmd, &tmp);
 		} else {
