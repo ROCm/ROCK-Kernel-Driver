@@ -76,4 +76,3 @@ EXPORT_SYMBOL(console_device);
 EXPORT_SYMBOL_NOVERS(do_call_softirq);
 EXPORT_SYMBOL(sys_wait4);
 EXPORT_SYMBOL(cpcmd);
-EXPORT_SYMBOL(sys_ioctl);

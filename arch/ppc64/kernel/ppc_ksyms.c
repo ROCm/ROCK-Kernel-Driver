@@ -50,7 +50,6 @@ extern int do_signal(sigset_t *, struct pt_regs *);
 int abs(int);
 
 EXPORT_SYMBOL(do_signal);
-EXPORT_SYMBOL(sys_ioctl);
 
 EXPORT_SYMBOL(isa_io_base);
 EXPORT_SYMBOL(pci_io_base);
