@@ -69,7 +69,7 @@ config USB_KAWETH
 
 config USB_PEGASUS
 	tristate "USB Pegasus/Pegasus-II based ethernet device support"
-	depends on USB && NET
+	depends on USB && NET_ETHERNET
 	select MII
 	---help---
 	  Say Y here if you know you have Pegasus or Pegasus-II based adapter.
@@ -96,8 +96,6 @@ config USB_RTL8150
 config USB_USBNET
 	tristate "Multi-purpose USB Networking Framework"
 	depends on USB && NET
-	select CRC32
-	select MII
 	---help---
 	  This driver supports several kinds of network links over USB,
 	  with "minidrivers" built around a common network driver core
@@ -206,6 +204,7 @@ config USB_EPSON2888
 config USB_ZAURUS
 	boolean "Sharp Zaurus (stock ROMs)"
 	depends on USB_USBNET
+	select CRC32
 	default y
 	help
 	  Choose this option to support the usb networking links used by
@@ -217,9 +216,7 @@ config USB_ZAURUS
 
 config USB_CDCETHER
 	boolean "CDC Ethernet support (smart devices such as cable modems)"
-	# experimental primarily because cdc-ether was.
-	# make it non-experimental after more interop testing
-	depends on USB_USBNET && EXPERIMENTAL
+	depends on USB_USBNET
 	default y
 	help
 	  This option supports devices conforming to the Communication Device
@@ -247,7 +244,9 @@ comment "USB Network Adapters"
 
 config USB_AX8817X
 	boolean "ASIX AX88172 Based USB 2.0 Ethernet Devices"
-	depends on USB_USBNET
+	depends on USB_USBNET && NET_ETHERNET
+	select CRC32
+	select MII
 	default y
 	help
 
