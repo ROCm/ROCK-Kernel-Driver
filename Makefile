@@ -690,7 +690,7 @@ modules_install: _modinst_ _modinst_post
 _modinst_:
 	@if [ -z "`$(DEPMOD) -V | grep module-init-tools`" ]; then \
 		echo "Warning: you may need to install module-init-tools"; \
-		echo "See http://www.codemonkey.org.uk/post-halloween-2.5.txt";\
+		echo "See http://www.codemonkey.org.uk/docs/post-halloween-2.6.txt";\
 		sleep 1; \
 	fi
 	@rm -rf $(MODLIB)/kernel
