@@ -40,6 +40,7 @@
 struct dly_sched_data {
 	u32	latency;
 	u32	limit;
+	u32	loss;
 	struct timer_list timer;
 	struct Qdisc *qdisc;
 };
@@ -57,6 +58,12 @@ static int dly_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 	struct dly_sched_data *q = (struct dly_sched_data *)sch->data;
 	struct dly_skb_cb *cb = (struct dly_skb_cb *)skb->cb;
 	int ret;
+
+	/* Random packet drop 0 => none, ~0 => all */
+	if (q->loss >= net_random()) {
+		sch->stats.drops++;
+		return 0;	/* lie about loss so TCP doesn't know */
+	}
 
 	PSCHED_GET_TIME(cb->queuetime);
 
@@ -197,6 +204,7 @@ static int dly_change(struct Qdisc *sch, struct rtattr *opt)
 	} else {
 		q->latency = qopt->latency;
 		q->limit = qopt->limit;
+		q->loss = qopt->loss;
 	}
 	return err;
 }
@@ -233,6 +241,7 @@ static int dly_dump(struct Qdisc *sch, struct sk_buff *skb)
 
 	qopt.latency = q->latency;
 	qopt.limit = q->limit;
+	qopt.loss = q->loss;
 
 	RTA_PUT(skb, TCA_OPTIONS, sizeof(qopt), &qopt);
 
