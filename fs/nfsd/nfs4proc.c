@@ -346,14 +346,49 @@ nfsd4_lookup(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_loo
 static inline int
 nfsd4_read(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_read *read)
 {
+	struct nfs4_stateid *stp;
+	int status;
+
 	/* no need to check permission - this will be done in nfsd_read() */
 
 	if (read->rd_offset >= OFFSET_MAX)
 		return nfserr_inval;
 
+	status = nfs_ok;
+	/* For stateid -1, we don't check share reservations.  */
+	if (ONE_STATEID(&read->rd_stateid)) {
+		dprintk("NFSD: nfsd4_read: -1 stateid...\n");
+		goto out;
+	}
+	/*
+	* For stateid 0, the client doesn't have to have the file open, but
+	* we still check for share reservation conflicts. 
+	*/
+	if (ZERO_STATEID(&read->rd_stateid)) {
+		dprintk("NFSD: nfsd4_read: zero stateid...\n");
+		if ((status = nfs4_share_conflict(current_fh, NFS4_SHARE_DENY_READ))) {
+			dprintk("NFSD: nfsd4_read: conflicting share reservation!\n");
+			goto out;
+		}
+		status = nfs_ok;
+		goto out;
+	}
+	/* check stateid */
+	if ((status = nfs4_preprocess_stateid_op(current_fh, &read->rd_stateid, 
+					CHECK_FH, &stp))) {
+		dprintk("NFSD: nfsd4_read: couldn't process stateid!\n");
+		goto out;
+	}
+	status = nfserr_openmode;
+	if (!(stp->st_share_access & NFS4_SHARE_ACCESS_READ)) {
+		dprintk("NFSD: nfsd4_read: file not opened for read!\n");
+		goto out;
+	}
+	status = nfs_ok;
+out:
 	read->rd_rqstp = rqstp;
 	read->rd_fhp = current_fh;
-	return nfs_ok;
+	return status;
 }
 
 static inline int
