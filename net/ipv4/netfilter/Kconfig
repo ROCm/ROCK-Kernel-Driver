@@ -631,14 +631,35 @@ config IP_NF_MATCH_REALM
 config IP_NF_CT_ACCT
 	bool "Connection tracking flow accounting"
 	depends on IP_NF_CONNTRACK
+	help
+	  If this option is enabled, the connection tracking code will
+	  keep per-flow packet and byte counters.
+
+	  Those counters can be used for flow-based accounting or the
+	  `connbytes' match.
+
+	  If unsure, say `N'.
 
 config IP_NF_MATCH_SCTP
 	tristate  'SCTP protocol match support'
 	depends on IP_NF_IPTABLES
+	help
+	  With this option enabled, you will be able to use the iptables
+	  `sctp' match in order to match on SCTP source/destination ports
+	  and SCTP chunk types.
+
+	  If you want to compile it as a module, say M here and read
+	  Documentation/modules.txt.  If unsure, say `N'.
 
 config IP_NF_CT_PROTO_SCTP
 	tristate  'SCTP protocol connection tracking support (EXPERIMENTAL)'
 	depends on IP_NF_CONNTRACK && EXPERIMENTAL
+	help
+	  With this option enabled, the connection tracking code will
+	  be able to do state tracking on SCTP connections.
+
+	  If you want to compile it as a module, say M here and read
+	  Documentation/modules.txt.  If unsure, say `N'.
 
 endmenu
 
