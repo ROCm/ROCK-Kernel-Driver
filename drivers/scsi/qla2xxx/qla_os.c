@@ -810,7 +810,7 @@ qla2x00_queuecommand(struct scsi_cmnd *cmd, void (*fn)(struct scsi_cmnd *))
 	    atomic_read(&ha2->loop_state) == LOOP_DEAD) {
 		/*
 		 * Add the command to the done-queue for later failover
-		 * processing
+		 * processing.
 		 */
 		cmd->result = DID_NO_CONNECT << 16;
 		if (atomic_read(&ha2->loop_state) == LOOP_DOWN) 
@@ -1786,10 +1786,9 @@ qla2xxx_slave_configure(struct scsi_device *sdev)
 		queue_depth = 32;
 
 	if (sdev->tagged_supported) {
-#if defined(MODULE)
-		if (!(ql2xmaxqdepth == 0 || ql2xmaxqdepth > 256))
+		if (ql2xmaxqdepth != 0 && ql2xmaxqdepth <= 0xffffU)
 			queue_depth = ql2xmaxqdepth;
-#endif 
+
 		ql2xmaxqdepth = queue_depth;
 
 		scsi_adjust_queue_depth(sdev, MSG_ORDERED_TAG, queue_depth);

@@ -987,7 +987,6 @@ qla2x00_abort_command(scsi_qla_host_t *ha, srb_t *sp)
 
 	if (atomic_read(&ha->loop_state) == LOOP_DOWN ||
 	    atomic_read(&fcport->state) == FCS_DEVICE_LOST) {
-		/* v2.19.8 Ignore abort request if port is down */
 		return 1;
 	}
 

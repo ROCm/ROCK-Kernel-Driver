@@ -285,7 +285,7 @@ qla2x00_pci_config(scsi_qla_host_t *ha)
 		/* PCI Specification Revision 2.3 changes */
 		if (IS_QLA2322(ha) || IS_QLA6322(ha))
 			/* Command Register - Reset Interrupt Disable. */
-			w &= ~BIT_10;
+			w &= ~PCI_COMMAND_INTX_DISABLE;
 
 		/*
 		 * If this is a 2300 card and not 2312, reset the
