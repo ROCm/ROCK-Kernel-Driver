@@ -656,7 +656,6 @@ driverfs_create_file(struct driver_file_entry * entry,
 		/* Still good? Ok, then fill in the blanks: */
 		if (!error) {
 			dentry->d_inode->u.generic_ip = (void *)entry;
-			entry->dentry = dentry;
 			entry->parent = parent;
 		}
 	} else
@@ -701,7 +700,6 @@ int driverfs_create_symlink(struct driver_dir_entry * parent,
 		error = driverfs_symlink(parent->dentry->d_inode,dentry,target);
 		if (!error) {
 			dentry->d_inode->u.generic_ip = (void *)entry;
-			entry->dentry = dentry;
 			entry->parent = parent;
 		}
 	} else

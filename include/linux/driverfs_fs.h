@@ -38,7 +38,6 @@ struct driver_file_entry {
 	struct driver_dir_entry * parent;
 	char			* name;
 	mode_t			mode;
-	struct dentry		* dentry;
 
 	ssize_t (*show)(struct device * dev, char * buf, size_t count, loff_t off);
 	ssize_t (*store)(struct device * dev, const char * buf, size_t count, loff_t off);
