@@ -37,10 +37,10 @@ obj-$(CONFIG_RCPCI) += rcpci.o
 obj-$(CONFIG_VORTEX) += 3c59x.o
 obj-$(CONFIG_TYPHOON) += typhoon.o
 obj-$(CONFIG_NE2K_PCI) += ne2k-pci.o 8390.o
-obj-$(CONFIG_PCNET32) += pcnet32.o mii.o
-obj-$(CONFIG_EEPRO100) += eepro100.o mii.o
+obj-$(CONFIG_PCNET32) += pcnet32.o
+obj-$(CONFIG_EEPRO100) += eepro100.o
 obj-$(CONFIG_TLAN) += tlan.o
-obj-$(CONFIG_EPIC100) += epic100.o mii.o
+obj-$(CONFIG_EPIC100) += epic100.o
 obj-$(CONFIG_SIS190) += sis190.o
 obj-$(CONFIG_SIS900) += sis900.o
 obj-$(CONFIG_YELLOWFIN) += yellowfin.o
@@ -49,13 +49,13 @@ obj-$(CONFIG_VETH) += veth.o
 obj-$(CONFIG_NATSEMI) += natsemi.o
 obj-$(CONFIG_NS83820) += ns83820.o
 obj-$(CONFIG_STNIC) += stnic.o 8390.o
-obj-$(CONFIG_FEALNX) += fealnx.o mii.o
+obj-$(CONFIG_FEALNX) += fealnx.o
 obj-$(CONFIG_TIGON3) += tg3.o
 obj-$(CONFIG_TC35815) += tc35815.o
 obj-$(CONFIG_SK98LIN) += sk98lin/
 obj-$(CONFIG_SKFP) += skfp/
-obj-$(CONFIG_VIA_RHINE) += via-rhine.o mii.o
-obj-$(CONFIG_ADAPTEC_STARFIRE) += starfire.o mii.o
+obj-$(CONFIG_VIA_RHINE) += via-rhine.o
+obj-$(CONFIG_ADAPTEC_STARFIRE) += starfire.o
 
 #
 # end link order section
@@ -63,9 +63,8 @@ obj-$(CONFIG_ADAPTEC_STARFIRE) += starfire.o mii.o
 
 obj-$(CONFIG_MII) += mii.o
 
-obj-$(CONFIG_WINBOND_840) += mii.o
-obj-$(CONFIG_SUNDANCE) += sundance.o mii.o
-obj-$(CONFIG_HAMACHI) += hamachi.o mii.o
+obj-$(CONFIG_SUNDANCE) += sundance.o
+obj-$(CONFIG_HAMACHI) += hamachi.o
 obj-$(CONFIG_NET) += Space.o net_init.o loopback.o
 obj-$(CONFIG_SEEQ8005) += seeq8005.o
 obj-$(CONFIG_ETHERTAP) += ethertap.o
@@ -131,8 +130,8 @@ obj-$(CONFIG_EL3) += 3c509.o
 obj-$(CONFIG_3C515) += 3c515.o
 obj-$(CONFIG_EEXPRESS) += eexpress.o
 obj-$(CONFIG_EEXPRESS_PRO) += eepro.o
-obj-$(CONFIG_8139CP) += 8139cp.o mii.o
-obj-$(CONFIG_8139TOO) += 8139too.o mii.o
+obj-$(CONFIG_8139CP) += 8139cp.o
+obj-$(CONFIG_8139TOO) += 8139too.o
 obj-$(CONFIG_ZNET) += znet.o
 obj-$(CONFIG_LAN_SAA9730) += saa9730.o
 obj-$(CONFIG_DEPCA) += depca.o
@@ -175,10 +174,7 @@ obj-$(CONFIG_MAC89x0) += mac89x0.o
 obj-$(CONFIG_TUN) += tun.o
 obj-$(CONFIG_DL2K) += dl2k.o
 obj-$(CONFIG_R8169) += r8169.o
-obj-$(CONFIG_AMD8111_ETH) += amd8111e.o mii.o
-
-# non-drivers/net drivers who want mii lib
-obj-$(CONFIG_PCMCIA_SMC91C92) += mii.o
+obj-$(CONFIG_AMD8111_ETH) += amd8111e.o
 
 obj-$(CONFIG_ARM) += arm/
 obj-$(CONFIG_NET_FC) += fc/
@@ -192,5 +188,3 @@ obj-$(CONFIG_NET_TULIP) += tulip/
 obj-$(CONFIG_HAMRADIO) += hamradio/
 obj-$(CONFIG_IRDA) += irda/
 
-
-include $(TOPDIR)/drivers/usb/net/Makefile.mii
