@@ -73,6 +73,16 @@ UNUSUAL_DEV(  0x03f0, 0x0307, 0x0001, 0x0001,
 		US_SC_8070, US_PR_SCM_ATAPI, init_8200e, 0), 
 #endif
 
+/* <torsten.scherer@uni-bielefeld.de>: I don't know the name of the bridge
+ * manufacturer, but I've got an external USB drive by the Revoltec company
+ * that needs this. otherwise the drive is recognized as /dev/sda, but any
+ * access to it blocks indefinitely.
+ */
+UNUSUAL_DEV(  0x0402, 0x5621, 0x0103, 0x0103,
+		"Revoltec",
+		"USB/IDE Bridge (ATA/ATAPI)",
+		US_SC_DEVICE, US_PR_DEVICE, NULL, US_FL_FIX_INQUIRY),
+
 /* Deduced by Jonathan Woithe <jwoithe@physics.adelaide.edu.au>
  * Entry needed for flags: US_FL_FIX_INQUIRY because initial inquiry message
  * always fails and confuses drive.
