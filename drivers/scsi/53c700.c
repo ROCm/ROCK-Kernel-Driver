@@ -51,6 +51,14 @@
 
 /* CHANGELOG
  *
+ * Version 2.7
+ *
+ * Fixed scripts problem which caused certain devices (notably CDRWs)
+ * to hang on initial INQUIRY.  Updated NCR_700_readl/writel to use
+ * __raw_readl/writel for parisc compatibility (Thomas
+ * Bogendoerfer). Added missing SCp->request_bufflen initialisation
+ * for sense requests (Ryan Bradetich).
+ *
  * Version 2.6
  *
  * Following test of the 64 bit parisc kernel by Richard Hirst,
@@ -96,7 +104,7 @@
  * Initial modularisation from the D700.  See NCR_D700.c for the rest of
  * the changelog.
  * */
-#define NCR_700_VERSION "2.6"
+#define NCR_700_VERSION "2.7"
 
 #include <linux/config.h>
 #include <linux/version.h>
@@ -310,7 +318,6 @@ NCR_700_detect(Scsi_Host_Template *tpnt,
 	hostdata->pScript = pScript;
 	NCR_700_dma_cache_wback((unsigned long)script, sizeof(SCRIPT));
 	hostdata->state = NCR_700_HOST_FREE;
-	spin_lock_init(&hostdata->lock);
 	hostdata->cmd = NULL;
 	host->max_id = 7;
 	host->max_lun = NCR_700_MAX_LUNS;
@@ -1048,6 +1055,7 @@ process_script_interrupt(__u32 dsps, __u32 dsp, Scsi_Cmnd *SCp,
 						    slot->pCmd,
 						    SCp->cmd_len,
 						    PCI_DMA_TODEVICE);
+				SCp->request_bufflen = sizeof(SCp->sense_buffer);
 				slot->dma_handle = pci_map_single(hostdata->pci_dev, SCp->sense_buffer, sizeof(SCp->sense_buffer), PCI_DMA_FROMDEVICE);
 				slot->SG[0].ins = bS_to_host(SCRIPT_MOVE_DATA_IN | sizeof(SCp->sense_buffer));
 				slot->SG[0].pAddr = bS_to_host(slot->dma_handle);
@@ -1508,6 +1516,11 @@ NCR_700_intr(int irq, void *dev_id, struct pt_regs *regs)
 	__u8 pun = 0xff, lun = 0xff;
 	unsigned long flags;
 
+	/* Use the host lock to serialise acess to the 53c700
+	 * hardware.  Note: In future, we may need to take the queue
+	 * lock to enter the done routines.  When that happens, we
+	 * need to ensure that for this driver, the host lock and the
+	 * queue lock point to the same thing. */
 	spin_lock_irqsave(host->host_lock, flags);
 	if((istat = NCR_700_readb(host, ISTAT_REG))
 	      & (SCSI_INT_PENDING | DMA_INT_PENDING)) {

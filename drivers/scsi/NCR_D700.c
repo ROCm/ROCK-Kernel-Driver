@@ -36,6 +36,10 @@
 
 /* CHANGELOG 
  *
+ * Version 2.2
+ *
+ * Added mca_set_adapter_name().
+ *
  * Version 2.1
  *
  * Modularise the driver into a Board piece (this file) and a chip
@@ -86,7 +90,7 @@
  * disconnections and reselections are being processed correctly.
  * */
 
-#define NCR_D700_VERSION "2.1"
+#define NCR_D700_VERSION "2.2"
 
 #include <linux/config.h>
 #include <linux/version.h>
@@ -299,6 +303,7 @@ D700_detect(Scsi_Host_Template *tpnt)
 				continue;
 			}
 			found++;
+			mca_set_adapter_name(slot, "NCR D700 SCSI Adapter (version " NCR_D700_VERSION ")");
 		}
 	}
 
