@@ -5,6 +5,20 @@
 
 menu "I2C Hardware Sensors Mainboard support"
 
+config I2C_ALI15X3
+	tristate "  ALI 15x3"
+	depends on I2C && I2C_PROC && PCI && EXPERIMENTAL
+	help
+	  If you say yes to this option, support will be included for the
+	  Acer Labs Inc. (ALI) M1514 and M1543 motherboard I2C interfaces.
+
+	  This can also be built as a module.  If so, the module will be
+	  called i2c-ali15x3.
+
+	  You will also need the latest user-space utilties: you can find them
+	  in the lm_sensors package, which you can download at
+	  http://www.lm-sensors.nu
+
 config I2C_AMD756
 	tristate "  AMD 756/766"
 	depends on I2C && I2C_PROC
