@@ -739,7 +739,7 @@ CIFSSMBWrite(const int xid, struct cifsTconInfo *tcon,
 	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
 			 (struct smb_hdr *) pSMBr, &bytes_returned, long_op);
 	if (rc) {
-		cERROR(1, ("Send error in write = %d", rc));
+		cFYI(1, ("Send error in write = %d", rc));
 		*nbytes = 0;
 	} else
 		*nbytes = le16_to_cpu(pSMBr->Count);
@@ -803,7 +803,7 @@ CIFSSMBLock(const int xid, struct cifsTconInfo *tcon,
 			 (struct smb_hdr *) pSMBr, &bytes_returned, timeout);
 
 	if (rc) {
-		cERROR(1, ("Send error in Lock = %d", rc));
+		cFYI(1, ("Send error in Lock = %d", rc));
 	}
 	if (pSMB)
 		cifs_buf_release(pSMB);
