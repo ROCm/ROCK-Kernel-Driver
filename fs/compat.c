@@ -291,8 +291,8 @@ static int __init init_sys32_ioctl(void)
 
 __initcall(init_sys32_ioctl);
 
-int register_ioctl32_conversion(unsigned int cmd, int (*handler)(unsigned int,
-				unsigned int, unsigned long, struct file *))
+int register_ioctl32_conversion(unsigned int cmd,
+				ioctl_trans_handler_t handler)
 {
 	struct ioctl_trans *t;
 	struct ioctl_trans *new_t;
