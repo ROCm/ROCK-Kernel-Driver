@@ -61,8 +61,4 @@ struct nfs_mount_data {
 #define NFS_MOUNT_SECFLAVOUR	0x2000	/* 5 */
 #define NFS_MOUNT_FLAGMASK	0xFFFF
 
-/* Feature flags for the NFS_ACL GETACL and SETACL RPC's */
-#define NFSACL_GETACL		0x10000
-#define NFSACL_SETACL		0x20000
-
 #endif

@@ -107,21 +107,6 @@ struct rpc_program		nfs_program = {
 	.pipe_dir_name		= "/nfs",
 };
 
-#ifdef CONFIG_NFS_ACL
-static struct rpc_stat		nfsacl_rpcstat = { &nfsacl_program };
-static struct rpc_version *	nfsacl_version[] = {
-	[3]			= &nfsacl_version3,
-};
-
-struct rpc_program		nfsacl_program = {
-	.name =			"nfsacl",
-	.number =		NFS3_ACL_PROGRAM,
-	.nrvers =		sizeof(nfsacl_version) / sizeof(nfsacl_version[0]),
-	.version =		nfsacl_version,
-	.stats =		&nfsacl_rpcstat,
-};
-#endif  /* CONFIG_NFS_ACL */
-
 static inline unsigned long
 nfs_fattr_to_ino_t(struct nfs_fattr *fattr)
 {
@@ -180,10 +165,6 @@ nfs_put_super(struct super_block *sb)
 
 	if (server->client != NULL)
 		rpc_shutdown_client(server->client);
-#ifdef CONFIG_NFS_ACL
-	if (server->acl_client != NULL)
-		rpc_shutdown_client(server->acl_client);
-#endif  /* CONFIG_NFS_ACL */
 	if (server->client_sys != NULL)
 		rpc_shutdown_client(server->client_sys);
 
@@ -205,10 +186,6 @@ nfs_umount_begin(struct super_block *sb)
 	/* -EIO all pending I/O */
 	if ((rpc = server->client) != NULL)
 		rpc_killall_tasks(rpc);
-#ifdef CONFIG_NFS_ACL
-	if (server->acl_client != NULL)
-		rpc_killall_tasks(server->acl_client);
-#endif  /* CONFIG_NFS_ACL */
 }
 
 
@@ -408,9 +385,7 @@ out_no_root:
  * Create an RPC client handle.
  */
 static struct rpc_clnt *
-__nfs_create_client(struct nfs_server *server,
-		    const struct nfs_mount_data *data,
-		    struct rpc_program *program)
+nfs_create_client(struct nfs_server *server, const struct nfs_mount_data *data)
 {
 	struct rpc_timeout	timeparms;
 	struct rpc_xprt		*xprt = NULL;
@@ -435,7 +410,7 @@ __nfs_create_client(struct nfs_server *server,
 		printk(KERN_WARNING "NFS: cannot create RPC transport.\n");
 		goto out_fail;
 	}
-	clnt = rpc_create_client(xprt, server->hostname, program,
+	clnt = rpc_create_client(xprt, server->hostname, &nfs_program,
 				 server->rpc_ops->version, data->pseudoflavor);
 	if (clnt == NULL) {
 		printk(KERN_WARNING "NFS: cannot create RPC client.\n");
@@ -453,12 +428,6 @@ out_fail:
 	if (xprt)
 		xprt_destroy(xprt);
 	return NULL;
-}
-
-static struct rpc_clnt *
-nfs_create_client(struct nfs_server *server, const struct nfs_mount_data *data)
-{
-	return __nfs_create_client(server, data, &nfs_program);
 }
 
 /*
@@ -524,16 +493,6 @@ nfs_fill_super(struct super_block *sb, struct nfs_mount_data *data, int silent)
 	server->client = nfs_create_client(server, data);
 	if (server->client == NULL)
 		goto out_fail;
-#ifdef CONFIG_NFS_ACL
-	if (server->flags & NFS_MOUNT_VER3) {
-		server->acl_client = __nfs_create_client(server, data,
-							 &nfsacl_program);
-		if (server->acl_client == NULL)
-			goto out_shutdown;
-		/* Initially assume the nfsacl program is supported */
-		server->flags |= (NFSACL_GETACL | NFSACL_SETACL);
-	}
-#endif  /* CONFIG_NFS_ACL */
 	data->pseudoflavor = RPC_AUTH_UNIX;	/* RFC 2623, sec 2.3.2 */
 	server->client_sys = nfs_create_client(server, data);
 	if (server->client_sys == NULL)
@@ -566,10 +525,6 @@ out_noinit:
 out_shutdown:
 	if (server->client)
 		rpc_shutdown_client(server->client);
-#ifdef CONFIG_NFS_ACL
-	if (server->acl_client)
-		rpc_shutdown_client(server->acl_client);
-#endif  /* CONFIG_NFS_ACL */
 	if (server->client_sys)
 		rpc_shutdown_client(server->client_sys);
 out_fail:
@@ -736,15 +691,6 @@ nfs_init_locked(struct inode *inode, void *opaque)
 /* Don't use READDIRPLUS on directories that we believe are too large */
 #define NFS_LIMIT_READDIRPLUS (8*PAGE_SIZE)
 
-#ifdef CONFIG_NFS_ACL
-static struct inode_operations nfs_special_inode_operations = {
-	.listxattr =	nfs_listxattr,
-	.getxattr =	nfs_getxattr,
-	.setxattr =	nfs_setxattr,
-	.removexattr =	nfs_removexattr,
-};
-#endif  /* CONFIG_NFS_ACL */
-
 /*
  * This is our front-end to iget that looks up inodes by file handle
  * instead of inode number.
@@ -798,12 +744,8 @@ nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 				NFS_FLAGS(inode) |= NFS_INO_ADVISE_RDPLUS;
 		} else if (S_ISLNK(inode->i_mode))
 			inode->i_op = &nfs_symlink_inode_operations;
-		else {
-#ifdef CONFIG_NFS_ACL
-			inode->i_op = &nfs_special_inode_operations;
-#endif  /* CONFIG_NFS_ACL */
+		else
 			init_special_inode(inode, inode->i_mode, fattr->rdev);
-		}
 
 		nfsi->read_cache_jiffies = fattr->timestamp;
 		inode->i_atime = fattr->atime;
