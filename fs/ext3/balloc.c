@@ -504,8 +504,7 @@ int ext3_should_retry_alloc(struct super_block *sb, int *retries)
  * This function also updates quota and i_blocks field.
  */
 int
-ext3_new_block(handle_t *handle, struct inode *inode, unsigned long goal,
-		u32 *prealloc_count, u32 *prealloc_block, int *errp)
+ext3_new_block(handle_t *handle, struct inode *inode, unsigned long goal, int *errp)
 {
 	struct buffer_head *bitmap_bh = NULL;	/* bh */
 	struct buffer_head *gdp_bh;		/* bh2 */

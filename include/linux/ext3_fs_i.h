@@ -57,10 +57,6 @@ struct ext3_inode_info {
 	 * allocation when we detect linearly ascending requests.
 	 */
 	__u32	i_next_alloc_goal;
-#ifdef EXT3_PREALLOCATE
-	__u32	i_prealloc_block;
-	__u32	i_prealloc_count;
-#endif
 	__u32	i_dir_start_lookup;
 #ifdef CONFIG_EXT3_FS_XATTR
 	/*

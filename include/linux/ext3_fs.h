@@ -33,12 +33,6 @@ struct statfs;
 #undef EXT3FS_DEBUG
 
 /*
- * Define EXT3_PREALLOCATE to preallocate data blocks for expanding files
- */
-#undef  EXT3_PREALLOCATE /* @@@ Fix this! */
-#define EXT3_DEFAULT_PREALLOC_BLOCKS	8
-
-/*
  * Always enable hashed directories
  */
 #define CONFIG_EXT3_INDEX
@@ -681,8 +675,7 @@ struct dir_private_info {
 /* balloc.c */
 extern int ext3_bg_has_super(struct super_block *sb, int group);
 extern unsigned long ext3_bg_num_gdb(struct super_block *sb, int group);
-extern int ext3_new_block (handle_t *, struct inode *, unsigned long,
-					    __u32 *, __u32 *, int *);
+extern int ext3_new_block (handle_t *, struct inode *, unsigned long, int *);
 extern void ext3_free_blocks (handle_t *, struct inode *, unsigned long,
 			      unsigned long);
 extern unsigned long ext3_count_free_blocks (struct super_block *);
