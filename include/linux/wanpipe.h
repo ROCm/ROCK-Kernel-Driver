@@ -358,7 +358,7 @@ typedef struct sdla
 	char in_isr;			/* interrupt-in-service flag */
 	char buff_int_mode_unbusy;	/* flag for carrying out dev_tint */  
 	char dlci_int_mode_unbusy;	/* flag for carrying out dev_tint */
-	char configured;		/* flag for previous configurations */
+	long configured;		/* flag for previous configurations */
 	
 	unsigned short irq_dis_if_send_count; /* Disabling irqs in if_send*/
 	unsigned short irq_dis_poll_count;   /* Disabling irqs in poll routine*/
