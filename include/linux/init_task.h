@@ -80,6 +80,7 @@ extern struct group_info init_groups;
 	.mm		= NULL,						\
 	.active_mm	= &init_mm,					\
 	.run_list	= LIST_HEAD_INIT(tsk.run_list),			\
+	.ioprio		= 0,						\
 	.time_slice	= HZ,						\
 	.tasks		= LIST_HEAD_INIT(tsk.tasks),			\
 	.ptrace_children= LIST_HEAD_INIT(tsk.ptrace_children),		\
@@ -115,6 +116,7 @@ extern struct group_info init_groups;
  	.map_base	= __TASK_UNMAPPED_BASE,				\
 	.private_pages	= LIST_HEAD_INIT(tsk.private_pages),		\
 	.private_pages_count = 0,					\
+	.fs_excl	= ATOMIC_INIT(0),				\
 }
 
 

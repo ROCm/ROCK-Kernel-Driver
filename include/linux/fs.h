@@ -18,6 +18,7 @@
 #include <linux/cache.h>
 #include <linux/prio_tree.h>
 #include <linux/kobject.h>
+#include <linux/sched.h>
 #include <asm/atomic.h>
 
 struct iovec;
@@ -818,16 +819,34 @@ enum {
 #define vfs_check_frozen(sb, level) \
 	wait_event((sb)->s_wait_unfrozen, ((sb)->s_frozen < (level)))
 
+static inline void get_fs_excl(void)
+{
+	atomic_inc(&current->fs_excl);
+}
+
+static inline void put_fs_excl(void)
+{
+	atomic_dec(&current->fs_excl);
+}
+
+static inline int has_fs_excl(void)
+{
+	return atomic_read(&current->fs_excl);
+}
+
+
 /*
  * Superblock locking.
  */
 static inline void lock_super(struct super_block * sb)
 {
+	get_fs_excl();
 	down(&sb->s_lock);
 }
 
 static inline void unlock_super(struct super_block * sb)
 {
+	put_fs_excl();
 	up(&sb->s_lock);
 }
 

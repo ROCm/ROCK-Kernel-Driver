@@ -538,6 +538,8 @@ struct task_struct {
 	struct list_head run_list;
 	prio_array_t *array;
 
+	unsigned short ioprio;
+
 	unsigned long sleep_avg;
 	unsigned long long timestamp, last_ran;
 	int activated;
@@ -691,6 +693,7 @@ struct task_struct {
 
 	struct list_head private_pages;	/* per-process private pages */
 	int private_pages_count;
+	atomic_t fs_excl;	/* holding fs exclusive resources */
 };
 
 static inline pid_t process_group(struct task_struct *tsk)
