@@ -3445,8 +3445,8 @@ void md_check_recovery(mddev_t *mddev)
 			if (rdev->raid_disk >= 0 &&
 			    rdev->faulty &&
 			    atomic_read(&rdev->nr_pending)==0) {
-				mddev->pers->hot_remove_disk(mddev, rdev->raid_disk);
-				rdev->raid_disk = -1;
+				if (mddev->pers->hot_remove_disk(mddev, rdev->raid_disk)==0)
+					rdev->raid_disk = -1;
 			}
 			if (!rdev->faulty && rdev->raid_disk >= 0 && !rdev->in_sync)
 				spares++;
