@@ -1106,14 +1106,11 @@ xfs_fsync(
 	xfs_off_t	stop)
 {
 	xfs_inode_t	*ip;
-	int		error;
-	int		error2;
-	int		syncall;
-	vnode_t		*vp;
 	xfs_trans_t	*tp;
+	int		error;
 
-	vp = BHV_TO_VNODE(bdp);
-	vn_trace_entry(vp, __FUNCTION__, (inst_t *)__return_address);
+	vn_trace_entry(BHV_TO_VNODE(bdp),
+			__FUNCTION__, (inst_t *)__return_address);
 
 	ip = XFS_BHVTOI(bdp);
 
@@ -1121,44 +1118,6 @@ xfs_fsync(
 
 	if (XFS_FORCED_SHUTDOWN(ip->i_mount))
 		return XFS_ERROR(EIO);
-
-	xfs_ilock(ip, XFS_IOLOCK_EXCL);
-
-	syncall = error = error2 = 0;
-
-	if (stop == -1)  {
-		ASSERT(start >= 0);
-		if (start == 0)
-			syncall = 1;
-		stop = xfs_file_last_byte(ip);
-	}
-
-	/*
-	 * If we're invalidating, always flush since we want to
-	 * tear things down.  Otherwise, don't flush anything if
-	 * we're not dirty.
-	 */
-	if (flag & FSYNC_INVAL) {
-		if (ip->i_df.if_flags & XFS_IFEXTENTS &&
-		    ip->i_df.if_bytes > 0) {
-			VOP_FLUSHINVAL_PAGES(vp, start, -1, FI_REMAPF_LOCKED);
-		}
-		ASSERT(syncall == 0 || (VN_CACHED(vp) == 0));
-	} else {
-		/*
-		 * In the non-invalidating case, calls to fsync() do not
-		 * flush all the dirty mmap'd pages.  That requires a
-		 * call to msync().
-		 */
-		VOP_FLUSH_PAGES(vp, start, -1,
-				(flag & FSYNC_WAIT) ? 0 : XFS_B_ASYNC,
-				FI_NONE, error2);
-	}
-
-	if (error2) {
-		xfs_iunlock(ip, XFS_IOLOCK_EXCL);
-		return XFS_ERROR(error2);
-	}
 
 	/*
 	 * We always need to make sure that the required inode state
@@ -1199,7 +1158,7 @@ xfs_fsync(
 		 * be pinned.  If it is, force the log.
 		 */
 
-		xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_SHARED);
+		xfs_iunlock(ip, XFS_ILOCK_SHARED);
 
 		if (xfs_ipincount(ip)) {
 			xfs_log_force(ip->i_mount, (xfs_lsn_t)0,
@@ -1222,7 +1181,6 @@ xfs_fsync(
 				XFS_FSYNC_TS_LOG_RES(ip->i_mount),
 				0, 0, 0)))  {
 			xfs_trans_cancel(tp, 0);
-			xfs_iunlock(ip, XFS_IOLOCK_EXCL);
 			return error;
 		}
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
@@ -1237,67 +1195,17 @@ xfs_fsync(
 		 * inode in another recent transaction.	 So we
 		 * play it safe and fire off the transaction anyway.
 		 */
-		xfs_trans_ijoin(tp, ip, XFS_IOLOCK_EXCL|XFS_ILOCK_EXCL);
+		xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
 		xfs_trans_ihold(tp, ip);
 		xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 		if (flag & FSYNC_WAIT)
 			xfs_trans_set_sync(tp);
 		error = xfs_trans_commit(tp, 0, NULL);
 
-		xfs_iunlock(ip, XFS_IOLOCK_EXCL|XFS_ILOCK_EXCL);
+		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	}
 	return error;
 }
-
-
-#if 0
-/*
- * This is a utility routine for xfs_inactive.  It is called when a
- * transaction attempting to free up the disk space for a file encounters
- * an error.  It cancels the old transaction and starts up a new one
- * to be used to free up the inode.  It also sets the inode size and extent
- * counts to 0 and frees up any memory being used to store inline data,
- * extents, or btree roots.
- */
-STATIC void
-xfs_itruncate_cleanup(
-	xfs_trans_t	**tpp,
-	xfs_inode_t	*ip,
-	int		commit_flags,
-	int		fork)
-{
-	xfs_mount_t	*mp;
-	/* REFERENCED */
-	int		error;
-
-	mp = ip->i_mount;
-	if (*tpp) {
-		xfs_trans_cancel(*tpp, commit_flags | XFS_TRANS_ABORT);
-	}
-	xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
-	*tpp = xfs_trans_alloc(mp, XFS_TRANS_INACTIVE);
-	error = xfs_trans_reserve(*tpp, 0, XFS_IFREE_LOG_RES(mp), 0, 0,
-				  XFS_DEFAULT_LOG_COUNT);
-	if (error) {
-		return;
-	}
-
-	xfs_ilock(ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
-	xfs_trans_ijoin(*tpp, ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
-	xfs_trans_ihold(*tpp, ip);
-
-	xfs_idestroy_fork(ip, fork);
-
-	if (fork == XFS_DATA_FORK) {
-		ip->i_d.di_nblocks = 0;
-		ip->i_d.di_nextents = 0;
-		ip->i_d.di_size = 0;
-	} else {
-		ip->i_d.di_anextents = 0;
-	}
-	xfs_trans_log_inode(*tpp, ip, XFS_ILOG_CORE);
-}
-#endif
 
 /*
  * This is called by xfs_inactive to free any blocks beyond eof,

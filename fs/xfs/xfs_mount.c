@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2004 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -117,6 +117,7 @@ static struct {
     { offsetof(xfs_sb_t, sb_logsectlog), 0 },
     { offsetof(xfs_sb_t, sb_logsectsize),0 },
     { offsetof(xfs_sb_t, sb_logsunit),	 0 },
+    { offsetof(xfs_sb_t, sb_features2),	 0 },
     { sizeof(xfs_sb_t),			 0 }
 };
 
