@@ -99,7 +99,7 @@ static int scsi_get_bus(request_queue_t *q, int *p)
 
 static int sg_get_timeout(request_queue_t *q)
 {
-	return q->sg_timeout;
+	return q->sg_timeout/(HZ/USER_HZ);
 }
 
 static int sg_set_timeout(request_queue_t *q, int *p)
@@ -107,7 +107,7 @@ static int sg_set_timeout(request_queue_t *q, int *p)
 	int timeout, err = get_user(timeout, p);
 
 	if (!err)
-		q->sg_timeout = timeout;
+		q->sg_timeout = timeout*(HZ/USER_HZ);
 
 	return err;
 }
@@ -246,7 +246,7 @@ static int sg_io(request_queue_t *q, struct block_device *bdev,
 	rq->data_len = hdr.dxfer_len;
 	rq->data = buffer;
 
-	rq->timeout = hdr.timeout;
+	rq->timeout = (hdr.timeout*HZ)/1000;
 	if (!rq->timeout)
 		rq->timeout = q->sg_timeout;
 	if (!rq->timeout)
@@ -273,7 +273,7 @@ static int sg_io(request_queue_t *q, struct block_device *bdev,
 	if (hdr.masked_status || hdr.host_status || hdr.driver_status)
 		hdr.info |= SG_INFO_CHECK;
 	hdr.resid = rq->data_len;
-	hdr.duration = (jiffies - start_time) * (1000 / HZ);
+	hdr.duration = ((jiffies - start_time) * 1000) / HZ;
 	hdr.sb_len_wr = 0;
 
 	if (rq->sense_len && hdr.sbp) {
