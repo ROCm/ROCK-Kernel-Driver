@@ -137,7 +137,7 @@ static int vx_hwdep_dsp_status(snd_hwdep_t *hw, snd_hwdep_dsp_status_t *info)
 	return 0;
 }
 
-static void free_fw(struct firmware *fw)
+static void free_fw(const struct firmware *fw)
 {
 	if (fw) {
 		vfree(fw->data);
@@ -180,7 +180,7 @@ static int vx_hwdep_dsp_load(snd_hwdep_t *hw, snd_hwdep_dsp_image_t *dsp)
 		return err;
 	}
 #ifdef CONFIG_PM
-	chip->firmware[index] = fw;
+	vx->firmware[index] = fw;
 #else
 	free_fw(fw);
 #endif

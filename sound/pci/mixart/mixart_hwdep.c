@@ -525,8 +525,6 @@ static int mixart_dsp_load(mixart_mgr_t* mgr, int index, const struct firmware *
 
 #ifdef SND_MIXART_FW_LOADER
 
-#include <linux/firmware.h>
-
 int snd_mixart_setup_firmware(mixart_mgr_t *mgr)
 {
 	static char *fw_files[3] = {
@@ -588,19 +586,19 @@ static int mixart_hwdep_dsp_load(snd_hwdep_t *hw, snd_hwdep_dsp_image_t *dsp)
 	struct firmware fw;
 	int err;
 
-	fw->size = dsp->length;
-	fw->data = vmalloc(dsp->length);
-	if (! fw->data) {
+	fw.size = dsp->length;
+	fw.data = vmalloc(dsp->length);
+	if (! fw.data) {
 		snd_printk(KERN_ERR "miXart: cannot allocate image size %d\n",
 			   (int)dsp->length);
 		return -ENOMEM;
 	}
-	if (copy_from_user(fw->data, dsp->image, dsp->length)) {
-		vfree(fw->data);
+	if (copy_from_user(fw.data, dsp->image, dsp->length)) {
+		vfree(fw.data);
 		return -EFAULT;
 	}
 	err = mixart_dsp_load(mgr, dsp->index, &fw);
-	vfree(fw->data);
+	vfree(fw.data);
 	return err;
 }
 
