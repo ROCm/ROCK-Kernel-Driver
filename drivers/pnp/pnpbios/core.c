@@ -538,6 +538,12 @@ int __init pnpbios_init(void)
 		return -ENODEV;
 	}
 
+	if (!acpi_disabled) {
+		pnpbios_disabled = 1;
+		printk(KERN_INFO "PnPBIOS: Disabled by ACPI\n");
+		return -ENODEV;
+	}
+
 	/* scan the system for pnpbios support */
 	if (!pnpbios_probe_system())
 		return -ENODEV;
