@@ -56,6 +56,7 @@ void (*pm_idle) (void);
 void (*pm_power_off) (void);
 
 unsigned char acpi_kbd_controller_present = 1;
+unsigned char acpi_legacy_devices;
 
 int acpi_disabled;	/* XXX this shouldn't be needed---we can't boot without ACPI! */
 
@@ -508,6 +509,9 @@ acpi_parse_fadt (unsigned long phys_addr, unsigned long size)
 
 	if (!(fadt->iapc_boot_arch & BAF_8042_KEYBOARD_CONTROLLER))
 		acpi_kbd_controller_present = 0;
+
+	if (fadt->iapc_boot_arch & BAF_LEGACY_DEVICES)
+		acpi_legacy_devices = 1;
 
 	acpi_register_irq(fadt->sci_int, ACPI_ACTIVE_LOW, ACPI_LEVEL_SENSITIVE);
 	return 0;

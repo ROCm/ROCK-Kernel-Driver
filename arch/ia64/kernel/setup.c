@@ -30,6 +30,8 @@
 #include <linux/string.h>
 #include <linux/threads.h>
 #include <linux/tty.h>
+#include <linux/serial.h>
+#include <linux/serial_core.h>
 #include <linux/efi.h>
 #include <linux/initrd.h>
 
@@ -43,6 +45,7 @@
 #include <asm/processor.h>
 #include <asm/sal.h>
 #include <asm/sections.h>
+#include <asm/serial.h>
 #include <asm/smp.h>
 #include <asm/system.h>
 #include <asm/unistd.h>
@@ -221,6 +224,25 @@ find_initrd (void)
 #endif
 }
 
+#ifdef CONFIG_SERIAL_8250_CONSOLE
+static void __init
+setup_serial_legacy (void)
+{
+	struct uart_port port;
+	unsigned int i, iobase[] = {0x3f8, 0x2f8};
+
+	printk(KERN_INFO "Registering legacy COM ports for serial console\n");
+	memset(&port, 0, sizeof(port));
+	port.iotype = SERIAL_IO_PORT;
+	port.uartclk = BASE_BAUD * 16;
+	for (i = 0; i < ARRAY_SIZE(iobase); i++) {
+		port.line = i;
+		port.iobase = iobase[i];
+		early_serial_setup(&port);
+	}
+}
+#endif
+
 void __init
 setup_arch (char **cmdline_p)
 {
@@ -294,11 +316,22 @@ setup_arch (char **cmdline_p)
 #ifdef CONFIG_SERIAL_8250_HCDP
 	if (efi.hcdp) {
 		void setup_serial_hcdp(void *);
-
-		/* Setup the serial ports described by HCDP */
 		setup_serial_hcdp(efi.hcdp);
 	}
 #endif
+#ifdef CONFIG_SERIAL_8250_CONSOLE
+	/*
+	 * Without HCDP, we won't discover any serial ports until the serial driver looks
+	 * in the ACPI namespace.  If ACPI claims there are some legacy devices, register
+	 * the legacy COM ports so serial console works earlier.  This is slightly dangerous
+	 * because we don't *really* know whether there's anything there, but we hope that
+	 * all new boxes will implement HCDP.
+	 */
+	extern unsigned char acpi_legacy_devices;
+	if (!efi.hcdp && acpi_legacy_devices)
+		setup_serial_legacy();
+#endif
+
 #ifdef CONFIG_VT
 # if defined(CONFIG_DUMMY_CONSOLE)
 	conswitchp = &dummy_con;
