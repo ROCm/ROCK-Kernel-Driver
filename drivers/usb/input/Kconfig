@@ -20,10 +20,8 @@ config USB_HID
 
 	  If unsure, say Y.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called hid. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, say M here: the
+	  module will be called hid.
 
 comment "Input core support is needed for USB HID input layer or HIDBP support"
 	depends on USB && INPUT=n
@@ -104,10 +102,8 @@ config USB_KBD
 	  This is almost certainly not what you want.  This is mostly
 	  useful for embedded applications or simple keyboards.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called usbkbd. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, say M here: the
+	  module will be called usbkbd.
 
 	  If even remotely unsure, say N.
 
@@ -122,10 +118,8 @@ config USB_MOUSE
 	  This is almost certainly not what you want.  This is mostly
 	  useful for embedded applications or simple mice.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called usbmouse. If you want to compile it as
-	  a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, say M here: the
+	  module will be called usbmouse.
 
 	  If even remotely unsure, say N.
 
@@ -140,10 +134,8 @@ config USB_AIPTEK
 	  (CONFIG_INPUT_MOUSEDEV) and/or "Event interface support"
 	  (CONFIG_INPUT_EVDEV) as well.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called aiptek. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, say M here: the
+	  module will be called aiptek.
 
 config USB_WACOM
 	tristate "Wacom Intuos/Graphire tablet support"
@@ -154,10 +146,8 @@ config USB_WACOM
 	  (CONFIG_INPUT_MOUSEDEV) and/or "Event interface support"
 	  (CONFIG_INPUT_EVDEV) as well.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called wacom.  If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, say M here: the
+	  module will be called wacom.
 
 config USB_KBTAB
 	tristate "KB Gear JamStudio tablet support"
@@ -168,10 +158,8 @@ config USB_KBTAB
 	  (CONFIG_INPUT_MOUSEDEV) and/or "Event interface support"
 	  (CONFIG_INPUT_EVDEV) as well.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called kbtab.o.  If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, say M here: the
+	  module will be called kbtab.
 
 config USB_POWERMATE
 	tristate "Griffin PowerMate and Contour Jog support"
@@ -184,10 +172,8 @@ config USB_POWERMATE
 
 	  You can download userspace tools from http://sowerbutts.com/powermate/
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called powermate. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, say M here: the
+	  module will be called powermate.
 
 config USB_XPAD
 	tristate "X-Box gamepad support"
@@ -200,8 +186,6 @@ config USB_XPAD
 	  For information about how to connect the X-Box pad to USB, see
 	  Documentation/input/xpad.txt.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called xpad.  If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, say M here: the
+	  module will be called xpad.
 

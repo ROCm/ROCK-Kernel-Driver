@@ -209,7 +209,7 @@ static int skel_probe(struct usb_interface *interface,
      The driver now needs to verify that this device is actually one that it
      can accept. If so, it returns 0.
      If not, or if any error occurs during initialization, an errorcode
-     (such as <literal>-ENOMEM<literal> or <literal>-ENODEV<literal>)
+     (such as <literal>-ENOMEM</literal> or <literal>-ENODEV</literal>)
      is returned from the probe function.
   </para>
   <para>
@@ -327,6 +327,7 @@ if (!retval) {
      talk to the device, the release function in the driver is called. In this
      function we decrement our private usage count and wait for possible
      pending writes:
+  </para>
   <programlisting>
 /* decrement our usage count for the device */
 --skel->open_count;
