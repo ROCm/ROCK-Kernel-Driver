@@ -30,7 +30,6 @@
 #include <linux/interrupt.h>  /* for in_interrupt() */
 #include <linux/kmod.h>
 #include <linux/init.h>
-#include <linux/devfs_fs_kernel.h>
 #include <linux/spinlock.h>
 #include <linux/errno.h>
 
@@ -45,6 +44,8 @@
 
 extern int  usb_hub_init(void);
 extern void usb_hub_cleanup(void);
+extern int usb_major_init(void);
+extern void usb_major_cleanup(void);
 
 /*
  * Prototypes for the device driver probing/loading functions
@@ -58,75 +59,23 @@ static void usb_check_support(struct usb_device *);
  */
 LIST_HEAD(usb_driver_list);
 
-devfs_handle_t usb_devfs_handle;	/* /dev/usb dir. */
-
-#define MAX_USB_MINORS	256
-static struct usb_driver *usb_minors[MAX_USB_MINORS];
-static spinlock_t minor_lock = SPIN_LOCK_UNLOCKED;
-
-static int usb_register_minors (struct usb_driver *driver, int num_minors, int start_minor)
-{
-	int i;
-
-	dbg("registering %d minors, starting at %d", num_minors, start_minor);
-
-	if (start_minor + num_minors >= MAX_USB_MINORS)
-		return -EINVAL;
-
-	spin_lock (&minor_lock);
-	for (i = start_minor; i < (start_minor + num_minors); ++i)
-		if (usb_minors[i]) {
-			spin_unlock (&minor_lock);
-			err("minor %d is already in use, error registering %s driver",
-			    i, driver->name);
-			return -EINVAL;
-		}
-		
-	for (i = start_minor; i < (start_minor + num_minors); ++i)
-		usb_minors[i] = driver;
-
-	spin_unlock (&minor_lock);
-	return 0;
-}
-
-static void usb_deregister_minors (struct usb_driver *driver, int num_minors, int start_minor)
-{
-	int i;
-
-	dbg ("%s is removing %d minors starting at %d", driver->name,
-	     num_minors, start_minor);
-
-	spin_lock (&minor_lock);
-	for (i = start_minor; i < (start_minor + num_minors); ++i)
-		usb_minors[i] = NULL;
-	spin_unlock (&minor_lock);
-}
 
 /**
- *	usb_register - register a USB driver
- *	@new_driver: USB operations for the driver
+ * usb_register - register a USB driver
+ * @new_driver: USB operations for the driver
  *
- *	Registers a USB driver with the USB core.  The list of unattached
- *	interfaces will be rescanned whenever a new driver is added, allowing
- *	the new driver to attach to any recognized devices.
- *	Returns a negative error code on failure and 0 on success.
+ * Registers a USB driver with the USB core.  The list of unattached
+ * interfaces will be rescanned whenever a new driver is added, allowing
+ * the new driver to attach to any recognized devices.
+ * Returns a negative error code on failure and 0 on success.
+ * 
+ * NOTE: if you want your driver to use the USB major number, you must call
+ * usb_register_dev() to enable that functionality.  This function no longer
+ * takes care of that.
  */
 int usb_register(struct usb_driver *new_driver)
 {
 	int retval = 0;
-	
-	if ((new_driver->fops) && (new_driver->num_minors == 0)) {
-		err ("%s driver must specify num_minors", new_driver->name);
-		return -EINVAL;
-	}
-
-#ifndef CONFIG_USB_DYNAMIC_MINORS
-	if (new_driver->fops != NULL) {
-		retval = usb_register_minors (new_driver, new_driver->num_minors, new_driver->minor);
-		if (retval)
-			return retval;
-	}
-#endif
 
 	info("registered new driver %s", new_driver->name);
 
@@ -141,92 +90,6 @@ int usb_register(struct usb_driver *new_driver)
 
 	return retval;
 }
-
-
-/**
- * usb_register_dev - register a USB device, and ask for a minor number
- * @new_driver: USB operations for the driver
- * @num_minors: number of minor numbers requested for this device
- * @start_minor: place to put the new starting minor number
- *
- * Used to ask the USB core for a new minor number for a device that has
- * just showed up.  This is used to dynamically allocate minor numbers
- * from the pool of USB reserved minor numbers.
- *
- * This should be called by all drivers that use the USB major number.
- * This only returns a good value of CONFIG_USB_DYNAMIC_MINORS is
- * selected by the user.
- *
- * usb_deregister_dev() should be called when the driver is done with
- * the minor numbers given out by this function.
- *
- * Returns -ENODEV if CONFIG_USB_DYNAMIC_MINORS is not enabled in this
- * kernel, -EINVAL if something bad happens with trying to register a
- * device, and 0 on success, alone with a value that the driver should
- * use in start_minor.
- */
-#ifdef CONFIG_USB_DYNAMIC_MINORS
-int usb_register_dev (struct usb_driver *new_driver, int num_minors, int *start_minor)
-{
-	int i;
-	int j;
-	int good_spot;
-	int retval = -EINVAL;
-
-	dbg ("%s is asking for %d minors", new_driver->name, num_minors);
-
-	if (new_driver->fops == NULL)
-		goto exit;
-
-	*start_minor = 0; 
-	spin_lock (&minor_lock);
-	for (i = 0; i < MAX_USB_MINORS; ++i) {
-		if (usb_minors[i])
-			continue;
-
-		good_spot = 1;
-		for (j = 1; j <= num_minors-1; ++j)
-			if (usb_minors[i+j]) {
-				good_spot = 0;
-				break;
-			}
-		if (good_spot == 0)
-			continue;
-
-		*start_minor = i;
-		spin_unlock (&minor_lock);
-		retval = usb_register_minors (new_driver, num_minors, *start_minor);
-		if (retval) {
-			/* someone snuck in here, so let's start looking all over again */
-			spin_lock (&minor_lock);
-			i = 0;
-			continue;
-		}
-		goto exit;
-	}
-	spin_unlock (&minor_lock);
-exit:
-	return retval;
-}
-
-/**
- * usb_deregister_dev - deregister a USB device's dynamic minor.
- * @driver: USB operations for the driver
- * @num_minors: number of minor numbers to put back.
- * @start_minor: the starting minor number
- *
- * Used in conjunction with usb_register_dev().  This function is called
- * when the USB driver is finished with the minor numbers gotten from a
- * call to usb_register_dev() (usually when the device is disconnected
- * from the system.)
- * 
- * This should be called by all drivers that use the USB major number.
- */
-void usb_deregister_dev (struct usb_driver *driver, int num_minors, int start_minor)
-{
-	usb_deregister_minors (driver, num_minors, start_minor);
-}
-#endif	/* CONFIG_USB_DYNAMIC_MINORS */
 
 
 /**
@@ -298,22 +161,21 @@ static void usb_drivers_purge(struct usb_driver *driver,struct usb_device *dev)
 }
 
 /**
- *	usb_deregister - unregister a USB driver
- *	@driver: USB operations of the driver to unregister
- *	Context: !in_interrupt ()
+ * usb_deregister - unregister a USB driver
+ * @driver: USB operations of the driver to unregister
+ * Context: !in_interrupt ()
  *
- *	Unlinks the specified driver from the internal USB driver list.
+ * Unlinks the specified driver from the internal USB driver list.
+ * 
+ * NOTE: If you called usb_register_dev(), you still need to call
+ * usb_deregister_dev() to clean up your driver's allocated minor numbers,
+ * this * call will no longer do it for you.
  */
 void usb_deregister(struct usb_driver *driver)
 {
 	struct list_head *tmp;
 
 	info("deregistering driver %s", driver->name);
-
-#ifndef CONFIG_USB_DYNAMIC_MINORS
-	if (driver->fops != NULL)
-		usb_deregister_minors (driver, driver->num_minors, driver->minor);
-#endif
 
 	/*
 	 * first we remove the driver, to be sure it doesn't get used by
@@ -1357,55 +1219,6 @@ int usb_new_device(struct usb_device *dev)
 	return 0;
 }
 
-static int usb_open(struct inode * inode, struct file * file)
-{
-	int minor = minor(inode->i_rdev);
-	struct usb_driver *c;
-	int err = -ENODEV;
-	struct file_operations *old_fops, *new_fops = NULL;
-
-	spin_lock (&minor_lock);
-	c = usb_minors[minor];
-	spin_unlock (&minor_lock);
-
-	if (!c || !(new_fops = fops_get(c->fops)))
-		return err;
-	old_fops = file->f_op;
-	file->f_op = new_fops;
-	/* Curiouser and curiouser... NULL ->open() as "no device" ? */
-	if (file->f_op->open)
-		err = file->f_op->open(inode,file);
-	if (err) {
-		fops_put(file->f_op);
-		file->f_op = fops_get(old_fops);
-	}
-	fops_put(old_fops);
-	return err;
-}
-
-static struct file_operations usb_fops = {
-	owner:		THIS_MODULE,
-	open:		usb_open,
-};
-
-int usb_major_init(void)
-{
-	if (devfs_register_chrdev(USB_MAJOR, "usb", &usb_fops)) {
-		err("unable to get major %d for usb devices", USB_MAJOR);
-		return -EBUSY;
-	}
-
-	usb_devfs_handle = devfs_mk_dir(NULL, "usb", NULL);
-
-	return 0;
-}
-
-void usb_major_cleanup(void)
-{
-	devfs_unregister(usb_devfs_handle);
-	devfs_unregister_chrdev(USB_MAJOR, "usb");
-}
-
 
 #ifdef CONFIG_PROC_FS
 struct list_head *usb_driver_get_list(void)
@@ -1463,11 +1276,6 @@ EXPORT_SYMBOL(usb_register);
 EXPORT_SYMBOL(usb_deregister);
 EXPORT_SYMBOL(usb_scan_devices);
 
-#ifdef CONFIG_USB_DYNAMIC_MINORS
-EXPORT_SYMBOL(usb_register_dev);
-EXPORT_SYMBOL(usb_deregister_dev);
-#endif
-
 EXPORT_SYMBOL(usb_alloc_dev);
 EXPORT_SYMBOL(usb_free_dev);
 EXPORT_SYMBOL(usb_get_dev);
@@ -1489,5 +1297,4 @@ EXPORT_SYMBOL(__usb_get_extra_descriptor);
 
 EXPORT_SYMBOL(usb_get_current_frame_number);
 
-EXPORT_SYMBOL(usb_devfs_handle);
 MODULE_LICENSE("GPL");
