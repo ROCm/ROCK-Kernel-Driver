@@ -61,6 +61,7 @@
 #include <linux/if_tun.h>
 #include <linux/dirent.h>
 #include <linux/ctype.h>
+#include <net/sock.h>		/* siocdevprivate_ioctl */
 #include <net/bluetooth/bluetooth.h>
 #include <net/bluetooth/rfcomm.h>
 

@@ -944,4 +944,6 @@ static inline void sock_valbool_flag(struct sock *sk, int bit, int valbool)
 extern __u32 sysctl_wmem_max;
 extern __u32 sysctl_rmem_max;
 
+int siocdevprivate_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg);
+
 #endif	/* _SOCK_H */

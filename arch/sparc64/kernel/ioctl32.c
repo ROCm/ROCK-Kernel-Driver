@@ -56,6 +56,7 @@
 #include <linux/rtc.h>
 #include <linux/pci.h>
 #include <linux/dm-ioctl.h>
+#include <net/sock.h>		/* siocdevprivate_ioctl */
 
 #include <scsi/scsi.h>
 /* Ugly hack. */
