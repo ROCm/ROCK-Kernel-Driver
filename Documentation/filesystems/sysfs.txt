@@ -6,12 +6,6 @@ Patrick Mochel	<mochel@osdl.org>
 10 January 2003
 
 
-Note (17 Oct 2002): the name has just been changed from sysfs to
-sysfs. Updates to the documentation will come soon; after the
-conversion to use it is completely finished.
-
-
-
 What it is:
 ~~~~~~~~~~~
 
