@@ -142,6 +142,7 @@ static unsigned int __init longrun_determine_freqs(unsigned int *low_freq,
 	u32 msr_lo, msr_hi;
 	u32 save_lo, save_hi;
 	u32 eax, ebx, ecx, edx;
+	u32 try_hi;
 	struct cpuinfo_x86 *c = cpu_data;
 
 	if (!low_freq || !high_freq)
@@ -184,12 +185,14 @@ static unsigned int __init longrun_determine_freqs(unsigned int *low_freq,
 	 * upper limit to make the calculation more accurate.
 	 */
 	cpuid(0x80860007, &eax, &ebx, &ecx, &edx);
-	if (ecx > 90) {
-		/* set to 0 to 80 perf_pctg */
+	/* try decreasing in 10% steps, some processors react only
+	 * on some barrier values */
+	for (try_hi = 80; try_hi > 0 && ecx > 90; try_hi -=10) {
+		/* set to 0 to try_hi perf_pctg */
 		msr_lo &= 0xFFFFFF80;
 		msr_hi &= 0xFFFFFF80;
 		msr_lo |= 0;
-		msr_hi |= 80;
+		msr_hi |= try_hi;
 		wrmsr(MSR_TMTA_LONGRUN_CTRL, msr_lo, msr_hi);
 
 		/* read out current core MHz and current perf_pctg */
