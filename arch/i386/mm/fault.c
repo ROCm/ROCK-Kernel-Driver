@@ -155,7 +155,6 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	struct vm_area_struct * vma;
 	unsigned long address;
 	unsigned long page;
-	const struct exception_table_entry *fixup;
 	int write;
 	siginfo_t info;
 
@@ -311,10 +310,8 @@ bad_area:
 
 no_context:
 	/* Are we prepared to handle this kernel fault?  */
-	if ((fixup = search_exception_tables(regs->eip)) != NULL) {
-		regs->eip = fixup->fixup;
+	if (fixup_exception(regs))
 		return;
-	}
 
 /*
  * Oops. The kernel tried to access some bad page. We'll have to
