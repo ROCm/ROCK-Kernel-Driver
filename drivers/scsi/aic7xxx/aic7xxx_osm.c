@@ -2300,6 +2300,7 @@ ahc_linux_dv_thread(void *data)
 	sprintf(current->comm, "ahc_dv_%d", ahc->unit);
 #else
 	daemonize("ahc_dv_%d", ahc->unit);
+	current->flags |= PF_FREEZE;
 #endif
 	unlock_kernel();
 
