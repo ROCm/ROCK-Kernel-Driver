@@ -1,8 +1,8 @@
 /*********************************************************************
  *                
- * Filename:      irsyms.c
+ * Filename:      irmod.c
  * Version:       0.9
- * Description:   IrDA module symbols
+ * Description:   IrDA stack main entry points
  * Status:        Experimental.
  * Author:        Dag Brattli <dagb@cs.uit.no>
  * Created at:    Mon Dec 15 13:55:39 1997
@@ -10,7 +10,7 @@
  * Modified by:   Dag Brattli <dagb@cs.uit.no>
  * 
  *     Copyright (c) 1997, 1999-2000 Dag Brattli, All Rights Reserved.
- *     Copyright (c) 2000-2001 Jean Tourrilhes <jt@hpl.hp.com>
+ *     Copyright (c) 2000-2004 Jean Tourrilhes <jt@hpl.hp.com>
  *      
  *     This program is free software; you can redistribute it and/or 
  *     modify it under the terms of the GNU General Public License as 
@@ -23,62 +23,47 @@
  *     
  ********************************************************************/
 
+/*
+ * This file contains the main entry points of the IrDA stack.
+ * They are in this file and not af_irda.c because some developpers
+ * are using the IrDA stack without the socket API (compiling out
+ * af_irda.c).
+ * Jean II
+ */
+
 #include <linux/config.h>
 #include <linux/module.h>
-
-#include <linux/init.h>
-#include <linux/poll.h>
-#include <linux/proc_fs.h>
-#include <linux/smp_lock.h>
-#include <linux/if_arp.h>		/* ARPHRD_IRDA */
+#include <linux/moduleparam.h>
 
 #include <net/irda/irda.h>
-#include <net/irda/irlap.h>
-#include <net/irda/irlmp.h>
-#include <net/irda/iriap.h>
-#include <net/irda/irias_object.h>
-#include <net/irda/irttp.h>
-#include <net/irda/irda_device.h>
-#include <net/irda/wrapper.h>
-#include <net/irda/timer.h>
-#include <net/irda/parameters.h>
-#include <net/irda/crc.h>
+#include <net/irda/irmod.h>		/* notify_t */
+#include <net/irda/irlap.h>		/* irlap_init */
+#include <net/irda/irlmp.h>		/* irlmp_init */
+#include <net/irda/iriap.h>		/* iriap_init */
+#include <net/irda/irttp.h>		/* irttp_init */
+#include <net/irda/irda_device.h>	/* irda_device_init */
 
-extern struct proc_dir_entry *proc_irda;
-
+/* irproc.c */
 extern void irda_proc_register(void);
 extern void irda_proc_unregister(void);
+/* irsysctl.c */
 extern int  irda_sysctl_register(void);
 extern void irda_sysctl_unregister(void);
-
-extern int irda_proto_init(void);
-extern void irda_proto_cleanup(void);
-
-extern int irda_device_init(void);
-extern int irlan_init(void);
-extern int irlan_client_init(void);
-extern int irlan_server_init(void);
-extern int ircomm_init(void);
-extern int ircomm_tty_init(void);
-extern int irlpt_client_init(void);
-extern int irlpt_server_init(void);
-
+/* af_irda.c */
 extern int  irsock_init(void);
 extern void irsock_cleanup(void);
+/* irlap_frame.c */
 extern int  irlap_driver_rcv(struct sk_buff *, struct net_device *, 
 			     struct packet_type *);
 
-/* Main IrDA module */
+/*
+ * Module parameters
+ */
 #ifdef CONFIG_IRDA_DEBUG
+unsigned int irda_debug = IRDA_DEBUG_LEVEL;
+module_param_named(debug, irda_debug, uint, 0);
+MODULE_PARM_DESC(irda_debug, "IRDA debugging level");
 EXPORT_SYMBOL(irda_debug);
-#endif
-EXPORT_SYMBOL(irda_notify_init);
-
-/* IrLAP */
-
-
-#ifdef CONFIG_IRDA_DEBUG
-__u32 irda_debug = IRDA_DEBUG_LEVEL;
 #endif
 
 /* Packet type handler.
@@ -107,6 +92,7 @@ void irda_notify_init(notify_t *notify)
 	notify->instance = NULL;
 	strlcpy(notify->name, "Unknown", sizeof(notify->name));
 }
+EXPORT_SYMBOL(irda_notify_init);
 
 /*
  * Function irda_init (void)
@@ -196,7 +182,4 @@ module_exit(irda_cleanup);
 MODULE_AUTHOR("Dag Brattli <dagb@cs.uit.no> & Jean Tourrilhes <jt@hpl.hp.com>");
 MODULE_DESCRIPTION("The Linux IrDA Protocol Stack"); 
 MODULE_LICENSE("GPL");
-#ifdef CONFIG_IRDA_DEBUG
-MODULE_PARM(irda_debug, "1l");
-#endif
 MODULE_ALIAS_NETPROTO(PF_IRDA);
