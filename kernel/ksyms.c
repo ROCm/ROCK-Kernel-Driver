@@ -166,7 +166,7 @@ EXPORT_SYMBOL(d_alloc);
 EXPORT_SYMBOL(d_alloc_anon);
 EXPORT_SYMBOL(d_splice_alias);
 EXPORT_SYMBOL(d_lookup);
-EXPORT_SYMBOL(__d_path);
+EXPORT_SYMBOL(d_path);
 EXPORT_SYMBOL(mark_buffer_dirty);
 EXPORT_SYMBOL(end_buffer_io_sync);
 EXPORT_SYMBOL(__mark_inode_dirty);

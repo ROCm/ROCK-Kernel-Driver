@@ -41,6 +41,13 @@ extern void put_filp(struct file *);
 extern int get_unused_fd(void);
 extern void FASTCALL(put_unused_fd(unsigned int fd));
 
+extern struct file ** alloc_fd_array(int);
+extern int expand_fd_array(struct files_struct *, int nr);
+extern void free_fd_array(struct file **, int);
+
+extern fd_set *alloc_fdset(int);
+extern int expand_fdset(struct files_struct *, int nr);
+extern void free_fdset(fd_set *, int);
 
 static inline struct file * fcheck_files(struct files_struct *files, unsigned int fd)
 {
