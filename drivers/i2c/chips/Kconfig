@@ -276,6 +276,18 @@ config SENSORS_VIA686A
 	  This driver can also be built as a module.  If so, the module
 	  will be called via686a.
 
+config SENSORS_VT1211
+	tristate "Via VT1211 SuperIO and HW monitoring chip"
+	depends on I2C && EXPERIMENTAL
+	select I2C_SENSOR
+	help
+	  If you say yes here you get read-only access to all the sensors
+	  accessible via the VT1211 HW monitoring chip (temperature, fan speed,
+	  voltage etc.)	  
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called vt1211.
+
 config SENSORS_W83781D
 	tristate "Winbond W83781D, W83782D, W83783S, W83627HF, Asus AS99127F"
 	depends on I2C && EXPERIMENTAL
