@@ -9,4 +9,4 @@
 # Makefile for the sn ia64 subplatform
 #
 
-obj-y += kernel/ io/
+obj-y += kernel/
