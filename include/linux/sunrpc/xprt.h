@@ -99,6 +99,7 @@ struct rpc_rqst {
 	u32			rq_bytes_sent;	/* Bytes we have sent */
 
 	long			rq_xtime;	/* when transmitted */
+	int			rq_ntimeo;
 	int			rq_nresend;
 };
 #define rq_svec			rq_snd_buf.head
