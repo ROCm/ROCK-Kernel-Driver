@@ -2445,7 +2445,7 @@ static int ata_qc_issue_prot(struct ata_queued_cmd *qc)
 
 	case ATA_PROT_DMA:
 		ap->ops->tf_load(ap, &qc->tf);	 /* load tf registers */
-		ap->ops->bmdma_setup(qc);	    /* initiate bmdma */
+		ap->ops->bmdma_setup(qc);	    /* set up bmdma */
 		ap->ops->bmdma_start(qc);	    /* initiate bmdma */
 		break;
 
@@ -2455,6 +2455,13 @@ static int ata_qc_issue_prot(struct ata_queued_cmd *qc)
 		ata_tf_to_host_nolock(ap, &qc->tf);
 		ap->pio_task_state = PIO_ST;
 		queue_work(ata_wq, &ap->pio_task);
+		break;
+
+	case ATA_PROT_ATAPI:
+	case ATA_PROT_ATAPI_DMA:
+		ap->ops->tf_load(ap, &qc->tf);	 /* load tf registers */
+		ap->ops->bmdma_setup(qc);	    /* set up bmdma */
+		queue_work(ata_wq, &ap->packet_task);
 		break;
 
 	default:
@@ -2843,7 +2850,7 @@ static void atapi_packet_task(void *_data)
 
 	/* if we are DMA'ing, irq handler takes over from here */
 	if (qc->tf.protocol == ATA_PROT_ATAPI_DMA) {
-		/* FIXME: start DMA here */
+		ap->ops->bmdma_start(qc);	    /* initiate bmdma */
 	} else {
 		ap->pio_task_state = PIO_ST;
 		queue_work(ata_wq, &ap->pio_task);
