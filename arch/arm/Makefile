@@ -64,28 +64,14 @@ AFLAGS		+=$(apcs-y) $(arch-y) $(tune-y) -msoft-float -Wa,-mno-fpu
 #Default value
 DATAADDR	:= .
 
-ifeq ($(CONFIG_CPU_26),y)
-PROCESSOR	:= armo
-head-y		:= arch/arm/mach-arc/head.o arch/arm/kernel/init_task.o
-LDFLAGS_BLOB	+= --oformat elf26-littlearm
-  ifeq ($(CONFIG_ROM_KERNEL),y)
-    DATAADDR	 := 0x02080000
-    textaddr-y	 := 0x03800000
-  else
-    textaddr-y	 := 0x02080000
-  endif
-endif
-
-ifeq ($(CONFIG_CPU_32),y)
 PROCESSOR	:= armv
 head-y		:= arch/arm/kernel/head.o arch/arm/kernel/init_task.o
-  ifeq ($(CONFIG_CPU_BIG_ENDIAN),y)
-    LDFLAGS_BLOB	+= --oformat elf32-bigarm
-  else
-    LDFLAGS_BLOB	+= --oformat elf32-littlearm
-  endif
-textaddr-y	:= 0xC0008000
+ifeq ($(CONFIG_CPU_BIG_ENDIAN),y)
+  LDFLAGS_BLOB	+= --oformat elf32-bigarm
+else
+  LDFLAGS_BLOB	+= --oformat elf32-littlearm
 endif
+textaddr-y	:= 0xC0008000
 
  machine-$(CONFIG_ARCH_ARCA5K)	   := arc
  machine-$(CONFIG_ARCH_RPC)	   := rpc
@@ -160,10 +146,10 @@ include/asm-arm/.arch: $(wildcard include/config/arch/*.h)
 	@ln -sf arch-$(INCDIR) include/asm-arm/arch
 	@touch $@
 
-include/asm-arm/.proc: $(wildcard include/config/cpu/32.h) $(wildcard include/config/cpu/26.h)
-	@echo '  Making asm-arm/proc -> asm-arm/proc-$(PROCESSOR) symlink'
+include/asm-arm/.proc: $(wildcard include/config/cpu/32.h)
+	@echo '  Making asm-arm/proc -> asm-arm/proc-armv symlink'
 	@rm -f include/asm-arm/proc
-	@ln -sf proc-$(PROCESSOR) include/asm-arm/proc
+	@ln -sf proc-armv include/asm-arm/proc
 	@touch $@
 
 prepare: maketools
