@@ -124,7 +124,7 @@ void print_context_stack(struct task_struct *task, unsigned long *stack,
 
 	while (!kstack_end(stack)) {
 		addr = *stack++;
-		if (kernel_text_address(addr)) {
+		if (__kernel_text_address(addr)) {
 			printk(" [<%08lx>] ", addr);
 			print_symbol("%s\n", addr);
 		}

@@ -118,7 +118,7 @@ void show_trace(struct task_struct *task, unsigned long *stack)
 #endif
 	while (!kstack_end(stack)) {
 		addr = *stack++;
-		if (kernel_text_address(addr)) {
+		if (__kernel_text_address(addr)) {
 			printk(" [<%0*lx>] ", field, addr);
 			print_symbol("%s\n", addr);
 		}
