@@ -69,18 +69,26 @@ static int powerd(void *__unused)
 {
 	static char *envp[] = { "HOME=/", "TERM=linux", "PATH=/sbin:/usr/sbin:/bin:/usr/bin", NULL };
 	char *argv[] = { "/sbin/shutdown", "-h", "now", NULL };
+	DECLARE_WAITQUEUE(wait, current);
 
 	daemonize("powerd");
 
+	add_wait_queue(&powerd_wait, &wait);
 again:
-	while (button_pressed == 0) {
+	for (;;) {
+		set_task_state(current, TASK_INTERRUPTIBLE);
+		if (button_pressed)
+			break;
 		flush_signals(current);
-		interruptible_sleep_on(&powerd_wait);
+		schedule();
 	}
+	__set_current_state(TASK_RUNNING);
+	remove_wait_queue(&powerd_wait, &wait);
 
 	/* Ok, down we go... */
 	if (execve("/sbin/shutdown", argv, envp) < 0) {
 		printk("powerd: shutdown execution failed\n");
+		add_wait_queue(&powerd_wait, &wait);
 		button_pressed = 0;
 		goto again;
 	}
