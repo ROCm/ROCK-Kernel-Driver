@@ -266,6 +266,10 @@ typedef struct srb {
 	uint8_t	fo_retry_cnt;		/* Retry count this request */
 	uint8_t	err_id;			/* error id */
 
+	/* Segment/entries counts */
+	uint16_t	req_cnt;	/* !0 indicates counts determined */
+	uint16_t	tot_dsds;
+
 	/* SRB magic number */
 	uint16_t magic;
 #define SRB_MAGIC       0x10CB
