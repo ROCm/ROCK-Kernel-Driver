@@ -22,6 +22,7 @@
 #include <asm/system.h>
 #include <asm/hdreg.h>
 #include <asm/io.h>
+#include <asm/semaphore.h>
 
 #define DEBUG_PM
 
@@ -774,6 +775,7 @@ typedef struct ide_drive_s {
 	int		crc_count;	/* crc counter to reduce drive speed */
 	struct list_head list;
 	struct device	gendev;
+	struct semaphore gendev_rel_sem;	/* to deal with device release() */
 	struct gendisk *disk;
 } ide_drive_t;
 
@@ -1040,6 +1042,7 @@ typedef struct hwif_s {
 	unsigned	auto_poll  : 1; /* supports nop auto-poll */
 
 	struct device	gendev;
+	struct semaphore gendev_rel_sem; /* To deal with device release() */
 
 	void		*hwif_data;	/* extra hwif data */
 
