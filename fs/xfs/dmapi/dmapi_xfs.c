@@ -228,13 +228,25 @@ prohibited_mr_events(
 	struct address_space *mapping = LINVFS_GET_IP(vp)->i_mapping;
 	int prohibited = (1 << DM_EVENT_READ);
 	struct vm_area_struct *vma;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+	struct prio_tree_iter iter;
+#endif
 
 	if (!VN_MAPPED(vp))
 		return 0;
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 	down(&mapping->i_shared_sem);
-	list_for_each_entry(vma, &mapping->i_mmap_shared, shared) {
+	vma = __vma_prio_tree_first(&mapping->i_mmap_shared, &iter, 0, ULONG_MAX);
+	while (vma) {
+		if (!(vma->vm_flags & VM_DENYWRITE)) {
+			prohibited |= (1 << DM_EVENT_WRITE);
+			break;
+		}
+
+		vma = __vma_prio_tree_next(vma, &mapping->i_mmap_shared, &iter, 0, ULONG_MAX);
+	}
+	list_for_each_entry(vma, &mapping->i_mmap_nonlinear, shared.vm_set.list) {
 		if (!(vma->vm_flags & VM_DENYWRITE)) {
 			prohibited |= (1 << DM_EVENT_WRITE);
 			break;

@@ -191,9 +191,11 @@ static inline int page_mapping_inuse(struct page *page)
 		return 1;
 
 	/* File is mmap'd by somebody. */
-	if (!list_empty(&mapping->i_mmap))
+	if (!prio_tree_empty(&mapping->i_mmap))
 		return 1;
-	if (!list_empty(&mapping->i_mmap_shared))
+	if (!prio_tree_empty(&mapping->i_mmap_shared))
+		return 1;
+	if (!list_empty(&mapping->i_mmap_nonlinear))
 		return 1;
 
 	return 0;
