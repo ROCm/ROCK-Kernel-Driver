@@ -24,6 +24,7 @@ typedef enum {
     i_link_saved_unlink_mask   =  0x0010,
     i_link_saved_truncate_mask =  0x0020,
     i_priv_object              =  0x0080,
+    i_has_xattr_dir            =  0x0100,
 } reiserfs_inode_flags;
 
 
@@ -55,6 +56,7 @@ struct reiserfs_inode_info {
 
     struct posix_acl *i_acl_access;
     struct posix_acl *i_acl_default;
+    struct rw_semaphore xattr_sem;
     struct inode vfs_inode;
 };
 

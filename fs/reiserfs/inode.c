@@ -979,6 +979,7 @@ static void init_inode (struct inode * inode, struct path * path)
     REISERFS_I(inode)->i_jl = NULL;
     REISERFS_I(inode)->i_acl_access = NULL;
     REISERFS_I(inode)->i_acl_default = NULL;
+    init_rwsem (&REISERFS_I(inode)->xattr_sem);
 
     if (stat_data_v1 (ih)) {
 	struct stat_data_v1 * sd = (struct stat_data_v1 *)B_I_PITEM (bh, ih);
@@ -1642,6 +1643,7 @@ int reiserfs_new_inode (struct reiserfs_transaction_handle *th,
     sd_attrs_to_i_attrs( REISERFS_I(inode) -> i_attrs, inode );
     REISERFS_I(inode)->i_acl_access = NULL;
     REISERFS_I(inode)->i_acl_default = NULL;
+    init_rwsem (&REISERFS_I(inode)->xattr_sem);
 
     if (old_format_only (sb))
 	make_le_item_head (&ih, 0, KEY_FORMAT_3_5, SD_OFFSET, TYPE_STAT_DATA, SD_V1_SIZE, MAX_US_INT);

@@ -32,6 +32,7 @@ struct reiserfs_xattr_handler {
 
 #ifdef CONFIG_REISERFS_FS_XATTR
 #define is_reiserfs_priv_object(inode) (REISERFS_I(inode)->i_flags & i_priv_object)
+#define has_xattr_dir(inode) (REISERFS_I(inode)->i_flags & i_has_xattr_dir)
 ssize_t reiserfs_getxattr (struct dentry *dentry, const char *name,
 			   void *buffer, size_t size);
 int reiserfs_setxattr (struct dentry *dentry, const char *name,
@@ -78,6 +79,28 @@ static inline void
 reiserfs_read_unlock_xattrs(struct super_block *sb)
 {
     up_read (&REISERFS_XATTR_DIR_SEM(sb));
+}
+
+static inline void
+reiserfs_write_lock_xattr_i(struct inode *inode)
+{
+    down_write (&REISERFS_I(inode)->xattr_sem);
+}
+static inline void
+reiserfs_write_unlock_xattr_i(struct inode *inode)
+{
+    up_write (&REISERFS_I(inode)->xattr_sem);
+}
+static inline void
+reiserfs_read_lock_xattr_i(struct inode *inode)
+{
+    down_read (&REISERFS_I(inode)->xattr_sem);
+}
+
+static inline void
+reiserfs_read_unlock_xattr_i(struct inode *inode)
+{
+    up_read (&REISERFS_I(inode)->xattr_sem);
 }
 
 #else

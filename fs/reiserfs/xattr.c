@@ -521,6 +521,7 @@ open_file:
     }
 
     xinode = fp->f_dentry->d_inode;
+    REISERFS_I(inode)->i_flags |= i_has_xattr_dir;
 
     /* we need to copy it off.. */
     if (xinode->i_nlink > 1) {
@@ -631,6 +632,7 @@ reiserfs_xattr_get (const struct inode *inode, const char *name, void *buffer,
 
     xinode = fp->f_dentry->d_inode;
     isize = xinode->i_size;
+    REISERFS_I(inode)->i_flags |= i_has_xattr_dir;
 
     /* Just return the size needed */
     if (buffer == NULL) {
@@ -834,6 +836,8 @@ out_dir:
     fput(fp);
 
 out:
+    if (!err)
+        REISERFS_I(inode)->i_flags = REISERFS_I(inode)->i_flags & ~i_has_xattr_dir;
     return err;
 }
 
@@ -945,11 +949,11 @@ reiserfs_getxattr (struct dentry *dentry, const char *name, void *buffer,
         get_inode_sd_version (dentry->d_inode) == STAT_DATA_V1)
         return -EOPNOTSUPP;
 
-    down (&dentry->d_inode->i_sem);
+    reiserfs_read_lock_xattr_i (dentry->d_inode);
     reiserfs_read_lock_xattrs (dentry->d_sb);
     err = xah->get (dentry->d_inode, name, buffer, size);
     reiserfs_read_unlock_xattrs (dentry->d_sb);
-    up (&dentry->d_inode->i_sem);
+    reiserfs_read_unlock_xattr_i (dentry->d_inode);
     return err;
 }
 
@@ -965,6 +969,7 @@ reiserfs_setxattr (struct dentry *dentry, const char *name, const void *value,
 {
     struct reiserfs_xattr_handler *xah = find_xattr_handler_prefix (name);
     int err;
+    int lock;
 
     if (!xah || !reiserfs_xattrs(dentry->d_sb) ||
         get_inode_sd_version (dentry->d_inode) == STAT_DATA_V1)
@@ -976,9 +981,18 @@ reiserfs_setxattr (struct dentry *dentry, const char *name, const void *value,
     if (IS_IMMUTABLE (dentry->d_inode) || IS_APPEND (dentry->d_inode))
         return -EROFS;
 
-    reiserfs_write_lock_xattrs (dentry->d_sb);
+    reiserfs_write_lock_xattr_i (dentry->d_inode);
+    lock = !has_xattr_dir (dentry->d_inode);
+    if (lock)
+        reiserfs_write_lock_xattrs (dentry->d_sb);
+    else
+        reiserfs_read_lock_xattrs (dentry->d_sb);
     err = xah->set (dentry->d_inode, name, value, size, flags);
-    reiserfs_write_unlock_xattrs (dentry->d_sb);
+    if (lock)
+        reiserfs_write_unlock_xattrs (dentry->d_sb);
+    else
+        reiserfs_read_unlock_xattrs (dentry->d_sb);
+    reiserfs_write_unlock_xattr_i (dentry->d_inode);
     return err;
 }
 
@@ -1003,6 +1017,7 @@ reiserfs_removexattr (struct dentry *dentry, const char *name)
     if (IS_IMMUTABLE (dentry->d_inode) || IS_APPEND (dentry->d_inode))
         return -EPERM;
 
+    reiserfs_write_lock_xattr_i (dentry->d_inode);
     reiserfs_read_lock_xattrs (dentry->d_sb);
 
     /* Deletion pre-operation */
@@ -1019,6 +1034,7 @@ reiserfs_removexattr (struct dentry *dentry, const char *name)
 
 out:
     reiserfs_read_unlock_xattrs (dentry->d_sb);
+    reiserfs_write_unlock_xattr_i (dentry->d_inode);
     return err;
 }
 
@@ -1081,7 +1097,7 @@ reiserfs_listxattr (struct dentry *dentry, char *buffer, size_t size)
         get_inode_sd_version (dentry->d_inode) == STAT_DATA_V1)
         return -EOPNOTSUPP;
 
-    down (&dentry->d_inode->i_sem);
+    reiserfs_read_lock_xattr_i (dentry->d_inode);
     reiserfs_read_lock_xattrs (dentry->d_sb);
     dir = open_xa_dir (dentry->d_inode, FL_READONLY);
     reiserfs_read_unlock_xattrs (dentry->d_sb);
@@ -1104,6 +1120,8 @@ reiserfs_listxattr (struct dentry *dentry, char *buffer, size_t size)
     buf.r_pos = 0;
     buf.r_inode = dentry->d_inode;
 
+    REISERFS_I(dentry->d_inode)->i_flags |= i_has_xattr_dir;
+
     err = xattr_readdir (fp, reiserfs_listxattr_filler, &buf);
     if (err)
         goto out_dir;
@@ -1117,7 +1135,7 @@ out_dir:
     fput(fp);
 
 out:
-    up (&dentry->d_inode->i_sem);
+    reiserfs_read_unlock_xattr_i (dentry->d_inode);
     return err;
 }
 
@@ -1352,11 +1370,13 @@ __reiserfs_permission (struct inode *inode, int mask, struct nameidata *nd,
 		if (!(mode & S_IRWXG))
 			goto check_groups;
 
+                reiserfs_read_lock_xattr_i (inode);
                 if (need_lock)
                     reiserfs_read_lock_xattrs (inode->i_sb);
                 acl = reiserfs_get_acl (inode, ACL_TYPE_ACCESS);
                 if (need_lock)
                     reiserfs_read_unlock_xattrs (inode->i_sb);
+                reiserfs_read_unlock_xattr_i (inode);
                 if (IS_ERR (acl)) {
                     if (PTR_ERR (acl) == -ENODATA)
                         goto check_groups;
