@@ -4240,10 +4240,7 @@ static inline unsigned long get_stat64(tg3_stat64_t *val)
 	unsigned long ret;
 
 #if (BITS_PER_LONG == 32)
-	if (val->high != 0)
-		ret = ~0UL;
-	else
-		ret = val->low;
+	ret = val->low;
 #else
 	ret = ((u64)val->high << 32) | ((u64)val->low);
 #endif
