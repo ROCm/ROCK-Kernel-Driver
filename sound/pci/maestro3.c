@@ -51,8 +51,7 @@
 MODULE_AUTHOR("Zach Brown <zab@zabbo.net>, Takashi Iwai <tiwai@suse.de>");
 MODULE_DESCRIPTION("ESS Maestro3 PCI");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{ESS,Maestro3 PCI},"
+MODULE_SUPPORTED_DEVICE("{{ESS,Maestro3 PCI},"
 		"{ESS,ES1988},"
 		"{ESS,Allegro PCI},"
 		"{ESS,Allegro-1 PCI},"
@@ -67,19 +66,14 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for " CARD_NAME " soundcard.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for " CARD_NAME " soundcard.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable this soundcard.");
-MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 module_param_array(external_amp, bool, boot_devs, 0444);
 MODULE_PARM_DESC(external_amp, "Enable external amp for " CARD_NAME " soundcard.");
-MODULE_PARM_SYNTAX(external_amp, SNDRV_ENABLED "," SNDRV_BOOLEAN_TRUE_DESC);
 module_param_array(amp_gpio, int, boot_devs, 0444);
 MODULE_PARM_DESC(amp_gpio, "GPIO pin number for external amp. (default = -1)");
-MODULE_PARM_SYNTAX(amp_gpio, SNDRV_ENABLED);
 
 #define MAX_PLAYBACKS	2
 #define MAX_CAPTURES	1

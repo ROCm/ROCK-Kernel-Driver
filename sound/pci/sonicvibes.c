@@ -44,8 +44,7 @@
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("S3 SonicVibes PCI");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{S3,SonicVibes PCI}}");
+MODULE_SUPPORTED_DEVICE("{{S3,SonicVibes PCI}}");
 
 #ifndef PCI_VENDOR_ID_S3
 #define PCI_VENDOR_ID_S3             0x5333
@@ -64,22 +63,16 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for S3 SonicVibes soundcard.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for S3 SonicVibes soundcard.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable S3 SonicVibes soundcard.");
-MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 module_param_array(reverb, bool, boot_devs, 0444);
 MODULE_PARM_DESC(reverb, "Enable reverb (SRAM is present) for S3 SonicVibes soundcard.");
-MODULE_PARM_SYNTAX(reverb, SNDRV_ENABLED "," SNDRV_ENABLE_DESC);
 module_param_array(mge, bool, boot_devs, 0444);
 MODULE_PARM_DESC(mge, "MIC Gain Enable for S3 SonicVibes soundcard.");
-MODULE_PARM_SYNTAX(mge, SNDRV_ENABLED "," SNDRV_ENABLE_DESC);
 module_param(dmaio, uint, 0444);
 MODULE_PARM_DESC(dmaio, "DDMA i/o base address for S3 SonicVibes soundcard.");
-MODULE_PARM_SYNTAX(dmaio, "global," SNDRV_PORT_DESC);
 
 /*
  * Enhanced port direct registers

@@ -66,8 +66,7 @@
 MODULE_AUTHOR("Jaromir Koutek <miri@punknet.cz>");
 MODULE_DESCRIPTION("ESS Solo-1");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{ESS,ES1938},"
+MODULE_SUPPORTED_DEVICE("{{ESS,ES1938},"
                 "{ESS,ES1946},"
                 "{ESS,ES1969},"
 		"{TerraTec,128i PCI}}");
@@ -86,13 +85,10 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for ESS Solo-1 soundcard.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for ESS Solo-1 soundcard.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable ESS Solo-1 soundcard.");
-MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 
 #define SLIO_REG(chip, x) ((chip)->io_port + ESSIO_REG_##x)
 

@@ -111,8 +111,7 @@
 MODULE_AUTHOR("Andreas Mohr <hw7oshyuv3001@sneakemail.com>");
 MODULE_DESCRIPTION("Aztech AZF3328 (PCI168)");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{Aztech,AZF3328}}");
+MODULE_SUPPORTED_DEVICE("{{Aztech,AZF3328}}");
 
 #if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
 #define SUPPORT_JOYSTICK 1
@@ -170,17 +169,13 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for AZF3328 soundcard.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for AZF3328 soundcard.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable AZF3328 soundcard.");
-MODULE_PARM_SYNTAX(enable, SNDRV_INDEX_DESC);
 #ifdef SUPPORT_JOYSTICK
 module_param_array(joystick, bool, boot_devs, 0444);
 MODULE_PARM_DESC(joystick, "Enable joystick for AZF3328 soundcard.");
-MODULE_PARM_SYNTAX(joystick, SNDRV_BOOLEAN_FALSE_DESC);
 #endif
 
 typedef struct _snd_azf3328 azf3328_t;

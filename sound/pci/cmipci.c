@@ -43,8 +43,7 @@
 MODULE_AUTHOR("Takashi Iwai <tiwai@suse.de>");
 MODULE_DESCRIPTION("C-Media CMI8x38 PCI");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{C-Media,CMI8738},"
+MODULE_SUPPORTED_DEVICE("{{C-Media,CMI8738},"
 		"{C-Media,CMI8738B},"
 		"{C-Media,CMI8338A},"
 		"{C-Media,CMI8338B}}");
@@ -66,25 +65,19 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for C-Media PCI soundcard.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for C-Media PCI soundcard.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable C-Media PCI soundcard.");
-MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 module_param_array(mpu_port, long, boot_devs, 0444);
 MODULE_PARM_DESC(mpu_port, "MPU-401 port.");
-MODULE_PARM_SYNTAX(mpu_port, SNDRV_ENABLED ",allows:{{0},{0x330},{0x320},{0x310},{0x300}},dialog:list");
 module_param_array(fm_port, long, boot_devs, 0444);
 MODULE_PARM_DESC(fm_port, "FM port.");
-MODULE_PARM_SYNTAX(fm_port, SNDRV_ENABLED ",allows:{{0},{0x388},{0x3c8},{0x3e0},{0x3e8}},dialog:list");
 module_param_array(soft_ac3, bool, boot_devs, 0444);
 MODULE_PARM_DESC(soft_ac3, "Sofware-conversion of raw SPDIF packets (model 033 only).");
 #ifdef SUPPORT_JOYSTICK
 module_param_array(joystick_port, int, boot_devs, 0444);
 MODULE_PARM_DESC(joystick_port, "Joystick port address.");
-MODULE_PARM_SYNTAX(joystick_port, SNDRV_ENABLED ",allows:{{0},{1},{0x200},{0x201}},dialog:list");
 #endif
 
 #ifndef PCI_DEVICE_ID_CMEDIA_CM8738

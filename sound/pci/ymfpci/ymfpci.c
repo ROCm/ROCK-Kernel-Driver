@@ -33,8 +33,7 @@
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("Yamaha DS-XG PCI");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{Yamaha,YMF724},"
+MODULE_SUPPORTED_DEVICE("{{Yamaha,YMF724},"
 		"{Yamaha,YMF724F},"
 		"{Yamaha,YMF740},"
 		"{Yamaha,YMF740C},"
@@ -54,27 +53,20 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for the Yamaha DS-XG PCI soundcard.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for the Yamaha DS-XG PCI soundcard.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable Yamaha DS-XG soundcard.");
-MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 module_param_array(mpu_port, long, boot_devs, 0444);
 MODULE_PARM_DESC(mpu_port, "MPU-401 Port.");
-MODULE_PARM_SYNTAX(mpu_port, SNDRV_ENABLED);
 module_param_array(fm_port, long, boot_devs, 0444);
 MODULE_PARM_DESC(fm_port, "FM OPL-3 Port.");
-MODULE_PARM_SYNTAX(fm_port, SNDRV_ENABLED);
 #ifdef SUPPORT_JOYSTICK
 module_param_array(joystick_port, long, boot_devs, 0444);
 MODULE_PARM_DESC(joystick_port, "Joystick port address");
-MODULE_PARM_SYNTAX(joystick_port, SNDRV_ENABLED);
 #endif
 module_param_array(rear_switch, bool, boot_devs, 0444);
 MODULE_PARM_DESC(rear_switch, "Enable shared rear/line-in switch");
-MODULE_PARM_SYNTAX(rear_switch, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 
 static struct pci_device_id snd_ymfpci_ids[] = {
         { 0x1073, 0x0004, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },   /* YMF724 */

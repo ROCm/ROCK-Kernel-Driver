@@ -43,8 +43,7 @@
 MODULE_AUTHOR("Matt Wu <Matt_Wu@acersoftech.com.cn>");
 MODULE_DESCRIPTION("ALI M5451");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{ALI,M5451,pci},{ALI,M5451}}");
+MODULE_SUPPORTED_DEVICE("{{ALI,M5451,pci},{ALI,M5451}}");
 
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
@@ -55,19 +54,14 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for ALI M5451 PCI Audio.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for ALI M5451 PCI Audio.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable ALI 5451 PCI Audio.");
-MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 module_param_array(pcm_channels, int, boot_devs, 0444);
 MODULE_PARM_DESC(pcm_channels, "PCM Channels");
-MODULE_PARM_SYNTAX(pcm_channels, SNDRV_ENABLED ",default:32,allows:{{1,32}}");
 module_param_array(spdif, bool, boot_devs, 0444);
 MODULE_PARM_DESC(spdif, "Support SPDIF I/O");
-MODULE_PARM_SYNTAX(spdif, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 
 /*
  *  Debug part definitions

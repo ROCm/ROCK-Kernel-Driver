@@ -76,8 +76,7 @@
 MODULE_AUTHOR("Bart Hartgers <bart@etpmod.phys.tue.nl>");
 MODULE_DESCRIPTION("Avance Logic ALS4000");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{Avance Logic,ALS4000}}");
+MODULE_SUPPORTED_DEVICE("{{Avance Logic,ALS4000}}");
 
 #if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
 #define SUPPORT_JOYSTICK 1
@@ -93,17 +92,13 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for ALS4000 soundcard.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for ALS4000 soundcard.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable ALS4000 soundcard.");
-MODULE_PARM_SYNTAX(enable, SNDRV_INDEX_DESC);
 #ifdef SUPPORT_JOYSTICK
 module_param_array(joystick_port, int, boot_devs, 0444);
 MODULE_PARM_DESC(joystick_port, "Joystick port address for ALS4000 soundcard. (0 = disabled)");
-MODULE_PARM_SYNTAX(joystick_port, SNDRV_ENABLED);
 #endif
 
 typedef struct {

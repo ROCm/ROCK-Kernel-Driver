@@ -37,8 +37,7 @@
 MODULE_AUTHOR("Takashi Iwai <tiwai@suse.de>");
 MODULE_DESCRIPTION("ATI IXP AC97 controller");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{ATI,IXP150/200/250/300}}");
+MODULE_SUPPORTED_DEVICE("{{ATI,IXP150/200/250/300}}");
 
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
@@ -49,19 +48,14 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for ATI IXP controller.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for ATI IXP controller.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable audio part of ATI IXP controller.");
-MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 module_param_array(ac97_clock, int, boot_devs, 0444);
 MODULE_PARM_DESC(ac97_clock, "AC'97 codec clock (default 48000Hz).");
-MODULE_PARM_SYNTAX(ac97_clock, SNDRV_ENABLED ",default:48000");
 module_param_array(spdif_aclink, bool, boot_devs, 0444);
 MODULE_PARM_DESC(spdif_aclink, "S/PDIF over AC-link.");
-MODULE_PARM_SYNTAX(spdif_aclink, SNDRV_ENABLED "," SNDRV_BOOLEAN_TRUE_DESC);
 
 
 /*

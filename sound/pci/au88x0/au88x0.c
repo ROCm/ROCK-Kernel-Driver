@@ -31,23 +31,16 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for " CARD_NAME " soundcard.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for " CARD_NAME " soundcard.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable " CARD_NAME " soundcard.");
-MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 module_param_array(pcifix, int, boot_devs, 0444);
 MODULE_PARM_DESC(pcifix, "Enable VIA-workaround for " CARD_NAME " soundcard.");
-MODULE_PARM_SYNTAX(pcifix,
-		   SNDRV_ENABLED
-		   ",allows:{{0,Disabled},{1,Latency},{2,Bridge},{3,Both},{255,Auto}},default:4,dialog:check");
 
 MODULE_DESCRIPTION("Aureal vortex");
-MODULE_CLASSES("{sound}");
 MODULE_LICENSE("GPL");
-MODULE_DEVICES("{{Aureal Semiconductor Inc., Aureal Vortex Sound Processor}}");
+MODULE_SUPPORTED_DEVICE("{{Aureal Semiconductor Inc., Aureal Vortex Sound Processor}}");
 
 MODULE_DEVICE_TABLE(pci, snd_vortex_ids);
 

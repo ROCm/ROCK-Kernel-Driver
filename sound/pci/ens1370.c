@@ -54,15 +54,14 @@
 
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>, Thomas Sailer <sailer@ife.ee.ethz.ch>");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
 #ifdef CHIP1370
 MODULE_DESCRIPTION("Ensoniq AudioPCI ES1370");
-MODULE_DEVICES("{{Ensoniq,AudioPCI-97 ES1370},"
+MODULE_SUPPORTED_DEVICE("{{Ensoniq,AudioPCI-97 ES1370},"
 	        "{Creative Labs,SB PCI64/128 (ES1370)}}");
 #endif
 #ifdef CHIP1371
 MODULE_DESCRIPTION("Ensoniq/Creative AudioPCI ES1371+");
-MODULE_DEVICES("{{Ensoniq,AudioPCI ES1371/73},"
+MODULE_SUPPORTED_DEVICE("{{Ensoniq,AudioPCI ES1371/73},"
 		"{Ensoniq,AudioPCI ES1373},"
 		"{Creative Labs,Ectiva EV1938},"
 		"{Creative Labs,SB PCI64/128 (ES1371/73)},"
@@ -88,22 +87,17 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for Ensoniq AudioPCI soundcard.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for Ensoniq AudioPCI soundcard.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable Ensoniq AudioPCI soundcard.");
-MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 #ifdef SUPPORT_JOYSTICK
 #ifdef CHIP1371
 module_param_array(joystick_port, int, boot_devs, 0444);
 MODULE_PARM_DESC(joystick_port, "Joystick port address.");
-MODULE_PARM_SYNTAX(joystick_port, SNDRV_ENABLED ",allows:{{0},{1},{0x200},{0x208},{0x210},{0x218}},dialog:list");
 #else
 module_param_array(joystick, bool, boot_devs, 0444);
 MODULE_PARM_DESC(joystick, "Enable joystick.");
-MODULE_PARM_SYNTAX(joystick, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 #endif
 #endif /* SUPPORT_JOYSTICK */
 

@@ -43,8 +43,7 @@
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("ForteMedia FM801");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{ForteMedia,FM801},"
+MODULE_SUPPORTED_DEVICE("{{ForteMedia,FM801},"
 		"{Genius,SoundMaker Live 5.1}}");
 
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
@@ -62,16 +61,12 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for the FM801 soundcard.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for the FM801 soundcard.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable FM801 soundcard.");
-MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 module_param_array(tea575x_tuner, bool, boot_devs, 0444);
 MODULE_PARM_DESC(tea575x_tuner, "Enable TEA575x tuner.");
-MODULE_PARM_SYNTAX(tea575x_tuner, SNDRV_ENABLE_DESC);
 
 /*
  *  Direct registers

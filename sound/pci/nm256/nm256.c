@@ -45,8 +45,7 @@
 MODULE_AUTHOR("Takashi Iwai <tiwai@suse.de>");
 MODULE_DESCRIPTION("NeoMagic NM256AV/ZX");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{NeoMagic,NM256AV},"
+MODULE_SUPPORTED_DEVICE("{{NeoMagic,NM256AV},"
 		"{NeoMagic,NM256ZX}}");
 
 /*
@@ -66,31 +65,22 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for " CARD_NAME " soundcard.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for " CARD_NAME " soundcard.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable this soundcard.");
-MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 module_param_array(playback_bufsize, int, boot_devs, 0444);
 MODULE_PARM_DESC(playback_bufsize, "DAC frame size in kB for " CARD_NAME " soundcard.");
-MODULE_PARM_SYNTAX(playback_bufsize, SNDRV_ENABLED);
 module_param_array(capture_bufsize, int, boot_devs, 0444);
 MODULE_PARM_DESC(capture_bufsize, "ADC frame size in kB for " CARD_NAME " soundcard.");
-MODULE_PARM_SYNTAX(capture_bufsize, SNDRV_ENABLED);
 module_param_array(force_ac97, bool, boot_devs, 0444);
 MODULE_PARM_DESC(force_ac97, "Force to use AC97 codec for " CARD_NAME " soundcard.");
-MODULE_PARM_SYNTAX(force_ac97, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 module_param_array(buffer_top, int, boot_devs, 0444);
 MODULE_PARM_DESC(buffer_top, "Set the top address of audio buffer for " CARD_NAME " soundcard.");
-MODULE_PARM_SYNTAX(buffer_top, SNDRV_ENABLED);
 module_param_array(use_cache, bool, boot_devs, 0444);
 MODULE_PARM_DESC(use_cache, "Enable the cache for coefficient table access.");
-MODULE_PARM_SYNTAX(use_cache, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 module_param_array(vaio_hack, bool, boot_devs, 0444);
 MODULE_PARM_DESC(vaio_hack, "Enable workaround for Sony VAIO notebooks.");
-MODULE_PARM_SYNTAX(vaio_hack, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 
 /*
  * hw definitions

@@ -113,9 +113,8 @@
 #define DRIVER_NAME "ES1968"
 
 MODULE_DESCRIPTION("ESS Maestro");
-MODULE_CLASSES("{sound}");
 MODULE_LICENSE("GPL");
-MODULE_DEVICES("{{ESS,Maestro 2e},"
+MODULE_SUPPORTED_DEVICE("{{ESS,Maestro 2e},"
 		"{ESS,Maestro 2},"
 		"{ESS,Maestro 1},"
 		"{TerraTec,DMX}}");
@@ -140,35 +139,25 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for " CARD_NAME " soundcard.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for " CARD_NAME " soundcard.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable " CARD_NAME " soundcard.");
-MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 module_param_array(total_bufsize, int, boot_devs, 0444);
 MODULE_PARM_DESC(total_bufsize, "Total buffer size in kB.");
-MODULE_PARM_SYNTAX(total_bufsize, SNDRV_ENABLED ",allows:{{1,4096}},skill:advanced");
 module_param_array(pcm_substreams_p, int, boot_devs, 0444);
 MODULE_PARM_DESC(pcm_substreams_p, "PCM Playback substreams for " CARD_NAME " soundcard.");
-MODULE_PARM_SYNTAX(pcm_substreams_p, SNDRV_ENABLED ",allows:{{1,8}}");
 module_param_array(pcm_substreams_c, int, boot_devs, 0444);
 MODULE_PARM_DESC(pcm_substreams_c, "PCM Capture substreams for " CARD_NAME " soundcard.");
-MODULE_PARM_SYNTAX(pcm_substreams_c, SNDRV_ENABLED ",allows:{{0,8}}");
 module_param_array(clock, int, boot_devs, 0444);
 MODULE_PARM_DESC(clock, "Clock on " CARD_NAME " soundcard.  (0 = auto-detect)");
-MODULE_PARM_SYNTAX(clock, SNDRV_ENABLED);
 module_param_array(use_pm, int, boot_devs, 0444);
 MODULE_PARM_DESC(use_pm, "Toggle power-management.  (0 = off, 1 = on, 2 = auto)");
-MODULE_PARM_SYNTAX(use_pm, SNDRV_ENABLED ",allows:{{0,1,2}},default:2,skill:advanced");
 module_param_array(enable_mpu, int, boot_devs, 0444);
 MODULE_PARM_DESC(enable_mpu, "Enable MPU401.  (0 = off, 1 = on, 2 = auto)");
-MODULE_PARM_SYNTAX(enable_mpu, SNDRV_ENABLED ",allows:{{0,2}},default:2");
 #ifdef SUPPORT_JOYSTICK
 module_param_array(joystick, bool, boot_devs, 0444);
 MODULE_PARM_DESC(joystick, "Enable joystick.");
-MODULE_PARM_SYNTAX(joystick, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 #endif
 
 
