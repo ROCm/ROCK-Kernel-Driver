@@ -561,8 +561,8 @@ extern void __lock_sock(struct sock *sk);
 extern void __release_sock(struct sock *sk);
 #define sock_owned_by_user(sk)	((sk)->sk_lock.owner)
 
-extern void lock_sock(struct sock *sk);
-extern void release_sock(struct sock *sk);
+extern void FASTCALL(lock_sock(struct sock *sk));
+extern void FASTCALL(release_sock(struct sock *sk));
 
 /* BH context may only use the following locking interface. */
 #define bh_lock_sock(__sk)	spin_lock(&((__sk)->sk_lock.slock))
