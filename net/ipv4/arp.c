@@ -1269,162 +1269,10 @@ static char *ax2asc2(ax25_address *a, char *buf)
 }
 #endif /* CONFIG_AX25 */
 
-struct arp_iter_state {
-	int is_pneigh, bucket;
-};
-
-static struct neighbour *neigh_get_first(struct seq_file *seq)
-{
-	struct arp_iter_state* state = seq->private;
-	struct neighbour *n = NULL;
-
-	state->is_pneigh = 0;
-
-	for (state->bucket = 0;
-	     state->bucket <= NEIGH_HASHMASK;
-	     ++state->bucket) {
-		n = arp_tbl.hash_buckets[state->bucket];
-		while (n && !(n->nud_state & ~NUD_NOARP))
-			n = n->next;
-		if (n)
-			break;
-	}
-
-	return n;
-}
-
-static struct neighbour *neigh_get_next(struct seq_file *seq,
-					struct neighbour *n)
-{
-	struct arp_iter_state* state = seq->private;
-
-	do {
-		n = n->next;
-		/* Don't confuse "arp -a" w/ magic entries */
-try_again:
-		;
-	} while (n && !(n->nud_state & ~NUD_NOARP));
-
-	if (n)
-		goto out;
-	if (++state->bucket > NEIGH_HASHMASK)
-		goto out;
-	n = arp_tbl.hash_buckets[state->bucket];
-	goto try_again;
-out:
-	return n;
-}
-
-static struct neighbour *neigh_get_idx(struct seq_file *seq, loff_t *pos)
-{
-	struct neighbour *n = neigh_get_first(seq);
-
-	if (n)
-		while (*pos && (n = neigh_get_next(seq, n)))
-			--*pos;
-	return *pos ? NULL : n;
-}
-
-static struct pneigh_entry *pneigh_get_first(struct seq_file *seq)
-{
-	struct arp_iter_state* state = seq->private;
-	struct pneigh_entry *pn;
-
-	state->is_pneigh = 1;
-
-	for (state->bucket = 0;
-	     state->bucket <= PNEIGH_HASHMASK;
-	     ++state->bucket) {
-		pn = arp_tbl.phash_buckets[state->bucket];
-		if (pn)
-			break;
-	}
-	return pn;
-}
-
-static struct pneigh_entry *pneigh_get_next(struct seq_file *seq,
-					    struct pneigh_entry *pn)
-{
-	struct arp_iter_state* state = seq->private;
-
-	pn = pn->next;
-	while (!pn) {
-		if (++state->bucket > PNEIGH_HASHMASK)
-			break;
-		pn = arp_tbl.phash_buckets[state->bucket];
-	}
-	return pn;
-}
-
-static struct pneigh_entry *pneigh_get_idx(struct seq_file *seq, loff_t pos)
-{
-	struct pneigh_entry *pn = pneigh_get_first(seq);
-
-	if (pn)
-		while (pos && (pn = pneigh_get_next(seq, pn)))
-			--pos;
-	return pos ? NULL : pn;
-}
-
-static void *arp_get_idx(struct seq_file *seq, loff_t pos)
-{
-	void *rc;
-
-	read_lock_bh(&arp_tbl.lock);
-	rc = neigh_get_idx(seq, &pos);
-
-	if (!rc) {
-		read_unlock_bh(&arp_tbl.lock);
-		rc = pneigh_get_idx(seq, pos);
-	}
-	return rc;
-}
-
-static void *arp_seq_start(struct seq_file *seq, loff_t *pos)
-{
-	struct arp_iter_state* state = seq->private;
-
-	state->is_pneigh = 0;
-	state->bucket = 0;
-	return *pos ? arp_get_idx(seq, *pos - 1) : SEQ_START_TOKEN;
-}
-
-static void *arp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
-{
-	void *rc;
-	struct arp_iter_state* state;
-
-	if (v == SEQ_START_TOKEN) {
-		rc = arp_get_idx(seq, 0);
-		goto out;
-	}
-
-	state = seq->private;
-	if (!state->is_pneigh) {
-		rc = neigh_get_next(seq, v);
-		if (rc)
-			goto out;
-		read_unlock_bh(&arp_tbl.lock);
-		rc = pneigh_get_first(seq);
-	} else
-		rc = pneigh_get_next(seq, v);
-out:
-	++*pos;
-	return rc;
-}
-
-static void arp_seq_stop(struct seq_file *seq, void *v)
-{
-	struct arp_iter_state* state = seq->private;
-
-	if (!state->is_pneigh && v != SEQ_START_TOKEN)
-		read_unlock_bh(&arp_tbl.lock);
-}
-
 #define HBUFFERLEN 30
 
-static __inline__ void arp_format_neigh_entry(struct seq_file *seq,
-					      struct neighbour *n)
+static void arp_format_neigh_entry(struct seq_file *seq,
+				   struct neighbour *n)
 {
 	char hbuffer[HBUFFERLEN];
 	const char hexbuf[] = "0123456789ABCDEF";
@@ -1455,8 +1303,8 @@ static __inline__ void arp_format_neigh_entry(struct seq_file *seq,
 	read_unlock(&n->lock);
 }
 
-static __inline__ void arp_format_pneigh_entry(struct seq_file *seq,
-					       struct pneigh_entry *n)
+static void arp_format_pneigh_entry(struct seq_file *seq,
+				    struct pneigh_entry *n)
 {
 	struct net_device *dev = n->dev;
 	int hatype = dev ? dev->type : 0;
@@ -1470,13 +1318,13 @@ static __inline__ void arp_format_pneigh_entry(struct seq_file *seq,
 
 static int arp_seq_show(struct seq_file *seq, void *v)
 {
-	if (v == SEQ_START_TOKEN)
+	if (v == SEQ_START_TOKEN) {
 		seq_puts(seq, "IP address       HW type     Flags       "
 			      "HW address            Mask     Device\n");
-	else {
-		struct arp_iter_state* state = seq->private;
+	} else {
+		struct neigh_seq_state *state = seq->private;
 
-		if (state->is_pneigh)
+		if (state->flags & NEIGH_SEQ_IS_PNEIGH)
 			arp_format_pneigh_entry(seq, v);
 		else
 			arp_format_neigh_entry(seq, v);
@@ -1485,12 +1333,20 @@ static int arp_seq_show(struct seq_file *seq, void *v)
 	return 0;
 }
 
+static void *arp_seq_start(struct seq_file *seq, loff_t *pos)
+{
+	/* Don't want to confuse "arp -a" w/ magic entries,
+	 * so we tell the generic iterator to skip NUD_NOARP.
+	 */
+	return neigh_seq_start(seq, pos, &arp_tbl, NEIGH_SEQ_SKIP_NOARP);
+}
+
 /* ------------------------------------------------------------------------ */
 
 static struct seq_operations arp_seq_ops = {
 	.start  = arp_seq_start,
-	.next   = arp_seq_next,
-	.stop   = arp_seq_stop,
+	.next   = neigh_seq_next,
+	.stop   = neigh_seq_stop,
 	.show   = arp_seq_show,
 };
 
@@ -1498,11 +1354,12 @@ static int arp_seq_open(struct inode *inode, struct file *file)
 {
 	struct seq_file *seq;
 	int rc = -ENOMEM;
-	struct arp_iter_state *s = kmalloc(sizeof(*s), GFP_KERNEL);
+	struct neigh_seq_state *s = kmalloc(sizeof(*s), GFP_KERNEL);
        
 	if (!s)
 		goto out;
 
+	memset(s, 0, sizeof(*s));
 	rc = seq_open(file, &arp_seq_ops);
 	if (rc)
 		goto out_kfree;

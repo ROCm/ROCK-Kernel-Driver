@@ -1489,6 +1489,266 @@ int neigh_dump_info(struct sk_buff *skb, struct netlink_callback *cb)
 	return skb->len;
 }
 
+void neigh_for_each(struct neigh_table *tbl, void (*cb)(struct neighbour *, void *), void *cookie)
+{
+	int chain;
+
+	read_lock_bh(&tbl->lock);
+	for (chain = 0; chain <= NEIGH_HASHMASK; chain++) {
+		struct neighbour *n;
+
+		for (n = tbl->hash_buckets[chain]; n; n = n->next)
+			cb(n, cookie);
+	}
+	read_unlock_bh(&tbl->lock);
+}
+EXPORT_SYMBOL(neigh_for_each);
+
+/* The tbl->lock must be held as a writer and BH disabled. */
+void __neigh_for_each_release(struct neigh_table *tbl,
+			      int (*cb)(struct neighbour *))
+{
+	int chain;
+
+	for (chain = 0; chain <= NEIGH_HASHMASK; chain++) {
+		struct neighbour *n, **np;
+
+		np = &tbl->hash_buckets[chain];
+		while ((n = *np) != NULL) {
+			int release;
+
+			write_lock(&n->lock);
+			release = cb(n);
+			if (release) {
+				*np = n->next;
+				n->dead = 1;
+			} else
+				np = &n->next;
+			write_unlock(&n->lock);
+			if (release)
+				neigh_release(n);
+		}
+	}
+}
+EXPORT_SYMBOL(__neigh_for_each_release);
+
+#ifdef CONFIG_PROC_FS
+
+static struct neighbour *neigh_get_first(struct seq_file *seq)
+{
+	struct neigh_seq_state *state = seq->private;
+	struct neigh_table *tbl = state->tbl;
+	struct neighbour *n = NULL;
+	int bucket = state->bucket;
+
+	state->flags &= ~NEIGH_SEQ_IS_PNEIGH;
+	for (bucket = 0; bucket <= NEIGH_HASHMASK; bucket++) {
+		n = tbl->hash_buckets[bucket];
+
+		while (n) {
+			if (state->neigh_sub_iter) {
+				loff_t fakep = 0;
+				void *v;
+
+				v = state->neigh_sub_iter(state, n, &fakep);
+				if (!v)
+					goto next;
+			}
+			if (!(state->flags & NEIGH_SEQ_SKIP_NOARP))
+				break;
+			if (n->nud_state & ~NUD_NOARP)
+				break;
+		next:
+			n = n->next;
+		}
+
+		if (n)
+			break;
+	}
+	state->bucket = bucket;
+
+	return n;
+}
+
+static struct neighbour *neigh_get_next(struct seq_file *seq,
+					struct neighbour *n,
+					loff_t *pos)
+{
+	struct neigh_seq_state *state = seq->private;
+	struct neigh_table *tbl = state->tbl;
+
+	if (state->neigh_sub_iter) {
+		void *v = state->neigh_sub_iter(state, n, pos);
+		if (v)
+			return n;
+	}
+	n = n->next;
+
+	while (1) {
+		while (n) {
+			if (state->neigh_sub_iter) {
+				void *v = state->neigh_sub_iter(state, n, pos);
+				if (v)
+					return n;
+				goto next;
+			}
+			if (!(state->flags & NEIGH_SEQ_SKIP_NOARP))
+				break;
+
+			if (n->nud_state & ~NUD_NOARP)
+				break;
+		next:
+			n = n->next;
+		}
+
+		if (n)
+			break;
+
+		if (++state->bucket > NEIGH_HASHMASK)
+			break;
+
+		n = tbl->hash_buckets[state->bucket];
+	}
+
+	if (n && pos)
+		--(*pos);
+	return n;
+}
+
+static struct neighbour *neigh_get_idx(struct seq_file *seq, loff_t *pos)
+{
+	struct neighbour *n = neigh_get_first(seq);
+
+	if (n) {
+		while (*pos) {
+			n = neigh_get_next(seq, n, pos);
+			if (!n)
+				break;
+		}
+	}
+	return *pos ? NULL : n;
+}
+
+static struct pneigh_entry *pneigh_get_first(struct seq_file *seq)
+{
+	struct neigh_seq_state *state = seq->private;
+	struct neigh_table *tbl = state->tbl;
+	struct pneigh_entry *pn = NULL;
+	int bucket = state->bucket;
+
+	state->flags |= NEIGH_SEQ_IS_PNEIGH;
+	for (bucket = 0; bucket <= PNEIGH_HASHMASK; bucket++) {
+		pn = tbl->phash_buckets[bucket];
+		if (pn)
+			break;
+	}
+	state->bucket = bucket;
+
+	return pn;
+}
+
+static struct pneigh_entry *pneigh_get_next(struct seq_file *seq,
+					    struct pneigh_entry *pn,
+					    loff_t *pos)
+{
+	struct neigh_seq_state *state = seq->private;
+	struct neigh_table *tbl = state->tbl;
+
+	pn = pn->next;
+	while (!pn) {
+		if (++state->bucket > PNEIGH_HASHMASK)
+			break;
+		pn = tbl->phash_buckets[state->bucket];
+		if (pn)
+			break;
+	}
+
+	if (pn && pos)
+		--(*pos);
+
+	return pn;
+}
+
+static struct pneigh_entry *pneigh_get_idx(struct seq_file *seq, loff_t *pos)
+{
+	struct pneigh_entry *pn = pneigh_get_first(seq);
+
+	if (pn) {
+		while (*pos) {
+			pn = pneigh_get_next(seq, pn, pos);
+			if (!pn)
+				break;
+		}
+	}
+	return *pos ? NULL : pn;
+}
+
+static void *neigh_get_idx_any(struct seq_file *seq, loff_t *pos)
+{
+	struct neigh_seq_state *state = seq->private;
+	void *rc;
+
+	rc = neigh_get_idx(seq, pos);
+	if (!rc && !(state->flags & NEIGH_SEQ_NEIGH_ONLY))
+		rc = pneigh_get_idx(seq, pos);
+
+	return rc;
+}
+
+void *neigh_seq_start(struct seq_file *seq, loff_t *pos, struct neigh_table *tbl, unsigned int neigh_seq_flags)
+{
+	struct neigh_seq_state *state = seq->private;
+	loff_t pos_minus_one;
+
+	state->tbl = tbl;
+	state->bucket = 0;
+	state->flags = (neigh_seq_flags & ~NEIGH_SEQ_IS_PNEIGH);
+
+	read_lock_bh(&tbl->lock);
+
+	pos_minus_one = *pos - 1;
+	return *pos ? neigh_get_idx_any(seq, &pos_minus_one) : SEQ_START_TOKEN;
+}
+EXPORT_SYMBOL(neigh_seq_start);
+
+void *neigh_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	struct neigh_seq_state *state;
+	void *rc;
+
+	if (v == SEQ_START_TOKEN) {
+		rc = neigh_get_idx(seq, pos);
+		goto out;
+	}
+
+	state = seq->private;
+	if (!(state->flags & NEIGH_SEQ_IS_PNEIGH)) {
+		rc = neigh_get_next(seq, v, NULL);
+		if (rc)
+			goto out;
+		if (!(state->flags & NEIGH_SEQ_NEIGH_ONLY))
+			rc = pneigh_get_first(seq);
+	} else {
+		BUG_ON(state->flags & NEIGH_SEQ_NEIGH_ONLY);
+		rc = pneigh_get_next(seq, v, NULL);
+	}
+out:
+	++(*pos);
+	return rc;
+}
+EXPORT_SYMBOL(neigh_seq_next);
+
+void neigh_seq_stop(struct seq_file *seq, void *v)
+{
+	struct neigh_seq_state *state = seq->private;
+	struct neigh_table *tbl = state->tbl;
+
+	read_unlock_bh(&tbl->lock);
+}
+EXPORT_SYMBOL(neigh_seq_stop);
+
+#endif /* CONFIG_PROC_FS */
+
 #ifdef CONFIG_ARPD
 void neigh_app_ns(struct neighbour *n)
 {
