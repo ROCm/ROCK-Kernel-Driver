@@ -41,7 +41,7 @@
 unsigned long parport_default_timeslice = PARPORT_DEFAULT_TIMESLICE;
 int parport_default_spintime =  DEFAULT_SPIN_TIME;
 
-static struct parport *portlist = NULL, *portlist_tail = NULL;
+static LIST_HEAD(portlist);
 static spinlock_t parportlist_lock = SPIN_LOCK_UNLOCKED;
 
 /* list of all allocated ports, sorted by ->number */
@@ -155,19 +155,11 @@ int parport_register_driver (struct parport_driver *drv)
 {
 	struct parport *port;
 
-	if (!portlist)
+	if (list_empty(&portlist))
 		get_lowlevel_driver ();
 
-	/* We have to take the portlist lock for this to be sure
-	 * that port is valid for the duration of the callback. */
-
-	/* This is complicated by the fact that attach must be allowed
-	 * to block, so we can't be holding any spinlocks when we call
-	 * it.  But we need to hold a spinlock to iterate over the
-	 * list of ports.. */
-
 	down(&registration_lock);
-	for (port = portlist; port; port = port->next)
+	list_for_each_entry(port, &portlist, list)
 		drv->attach(port);
 	drv->next = driver_chain;
 	driver_chain = drv;
@@ -196,30 +188,27 @@ int parport_register_driver (struct parport_driver *drv)
 void parport_unregister_driver (struct parport_driver *arg)
 {
 	struct parport_driver *drv, *olddrv = NULL;
+	struct parport *port;
 
 	down(&registration_lock);
 	drv = driver_chain;
 	while (drv) {
 		if (drv == arg) {
-			struct parport *port;
-
 			if (olddrv)
 				olddrv->next = drv->next;
 			else
 				driver_chain = drv->next;
-
-			/* Call the driver's detach routine for each
-			 * port to clean up any resources that the
-			 * attach routine acquired. */
-			for (port = portlist; port; port = port->next)
-				drv->detach (port);
-			up(&registration_lock);
-
-			return;
+			break;
 		}
 		olddrv = drv;
 		drv = drv->next;
 	}
+
+	/* Call the driver's detach routine for each
+	 * port to clean up any resources that the
+	 * attach routine acquired. */
+	list_for_each_entry(port, &portlist, list)
+		drv->detach(port);
 	up(&registration_lock);
 }
 
@@ -278,28 +267,6 @@ void parport_put_port (struct parport *port)
 }
 
 /**
- *	parport_enumerate - return a list of the system's parallel ports
- *
- *	This returns the head of the list of parallel ports in the
- *	system, as a &struct parport.  The structure that is returned
- *	describes the first port in the list, and its 'next' member
- *	points to the next port, or %NULL if it's the last port.
- *
- *	If there are no parallel ports in the system,
- *	parport_enumerate() will return %NULL.
- **/
-
-struct parport *parport_enumerate(void)
-{
-	/* Don't use this: use parport_register_driver instead. */
-
-	if (!portlist)
-		get_lowlevel_driver ();
-
-	return portlist;
-}
-
-/**
  *	parport_register_port - register a parallel port
  *	@base: base I/O address
  *	@irq: IRQ line
@@ -350,7 +317,7 @@ struct parport *parport_register_port(unsigned long base, int irq, int dma,
 	tmp->dma = dma;
 	tmp->muxport = tmp->daisy = tmp->muxsel = -1;
 	tmp->modes = 0;
- 	tmp->next = NULL;
+ 	INIT_LIST_HEAD(&tmp->list);
 	tmp->devices = tmp->cad = NULL;
 	tmp->flags = 0;
 	tmp->ops = ops;
@@ -422,27 +389,12 @@ void parport_announce_port (struct parport *port)
 
 	parport_proc_register(port);
 	down(&registration_lock);
-	/* We are locked against anyone else performing alterations, but
-	 * because of parport_enumerate people can still _read_ the list
-	 * while we are changing it; so be careful..
-	 *
-	 * It's okay to have portlist_tail a little bit out of sync
-	 * since it's only used for changing the list, not for reading
-	 * from it.
-	 */
-
 	spin_lock_irq(&parportlist_lock);
-	if (portlist_tail)
-		portlist_tail->next = port;
-	portlist_tail = port;
-	if (!portlist)
-		portlist = port;
+	list_add_tail(&port->list, &portlist);
 	for (i = 1; i < 3; i++) {
 		struct parport *slave = port->slaves[i-1];
-		if (slave) {
-			portlist_tail->next = slave;
-			portlist_tail = slave;
-		}
+		if (slave)
+			list_add_tail(&slave->list, &portlist);
 	}
 	spin_unlock_irq(&parportlist_lock);
 
@@ -454,29 +406,6 @@ void parport_announce_port (struct parport *port)
 			attach_driver_chain(slave);
 	}
 	up(&registration_lock);
-}
-
-static void unlink_from_list(struct parport *port)
-{
-	struct parport *p;
-	spin_lock(&parportlist_lock);
-	/* We are protected from other people changing the list, but
-	 * they can still see it (using parport_enumerate).  So be
-	 * careful about the order of writes.. */
-	if (portlist == port) {
-		if ((portlist = port->next) == NULL)
-			portlist_tail = NULL;
-	} else {
-		for (p = portlist; (p != NULL) && (p->next != port); 
-		     p=p->next);
-		if (p) {
-			if ((p->next = port->next) == NULL)
-				portlist_tail = p;
-		}
-		else printk (KERN_WARNING
-			     "%s not found in port list!\n", port->name);
-	}
-	spin_unlock(&parportlist_lock);
 }
 
 /**
@@ -520,18 +449,19 @@ void parport_remove_port(struct parport *port)
 #endif
 
 	port->ops = &dead_ops;
-	unlink_from_list(port);
+	spin_lock(&parportlist_lock);
+	list_del_init(&port->list);
 	for (i = 1; i < 3; i++) {
 		struct parport *slave = port->slaves[i-1];
 		if (slave)
-			unlink_from_list(slave);
+			list_del_init(&slave->list);
 	}
+	spin_unlock(&parportlist_lock);
 
 	up(&registration_lock);
 
 	parport_proc_unregister(port);
 
-	/* Yes, parport_enumerate _is_ unsafe.  Don't use it. */
 	for (i = 1; i < 3; i++) {
 		struct parport *slave = port->slaves[i-1];
 		if (slave)
@@ -633,9 +563,8 @@ parport_register_device(struct parport *port, const char *name,
 	/* We up our own module reference count, and that of the port
            on which a device is to be registered, to ensure that
            neither of us gets unloaded while we sleep in (e.g.)
-           kmalloc.  To be absolutely safe, we have to require that
-           our caller doesn't sleep in between parport_enumerate and
-           parport_register_device.. */
+           kmalloc.
+         */
 	if (!try_module_get(port->ops->owner)) {
 		return NULL;
 	}
@@ -777,11 +706,6 @@ void parport_unregister_device(struct pardevice *dev)
 
 	module_put(port->ops->owner);
 	parport_put_port (port);
-
-	/* Yes, that's right, someone _could_ still have a pointer to
-	 * port, if they used parport_enumerate.  That's why they
-	 * shouldn't use it (and use parport_register_driver instead)..
-	 */
 }
 
 /**
@@ -800,15 +724,16 @@ struct parport *parport_find_number (int number)
 {
 	struct parport *port, *result = NULL;
 
-	if (!portlist)
+	if (list_empty(&portlist))
 		get_lowlevel_driver ();
 
 	spin_lock (&parportlist_lock);
-	for (port = portlist; port; port = port->next)
+	list_for_each_entry(port, &portlist, list) {
 		if (port->number == number) {
 			result = parport_get_port (port);
 			break;
 		}
+	}
 	spin_unlock (&parportlist_lock);
 	return result;
 }
@@ -829,15 +754,16 @@ struct parport *parport_find_base (unsigned long base)
 {
 	struct parport *port, *result = NULL;
 
-	if (!portlist)
+	if (list_empty(&portlist))
 		get_lowlevel_driver ();
 
 	spin_lock (&parportlist_lock);
-	for (port = portlist; port; port = port->next)
+	list_for_each_entry(port, &portlist, list) {
 		if (port->base == base) {
 			result = parport_get_port (port);
 			break;
 		}
+	}
 	spin_unlock (&parportlist_lock);
 	return result;
 }
@@ -1098,7 +1024,6 @@ EXPORT_SYMBOL(parport_register_driver);
 EXPORT_SYMBOL(parport_unregister_driver);
 EXPORT_SYMBOL(parport_register_device);
 EXPORT_SYMBOL(parport_unregister_device);
-EXPORT_SYMBOL(parport_enumerate);
 EXPORT_SYMBOL(parport_get_port);
 EXPORT_SYMBOL(parport_put_port);
 EXPORT_SYMBOL(parport_find_number);

@@ -294,7 +294,7 @@ struct parport {
 	struct pardevice *waithead;
 	struct pardevice *waittail;
 	
-	struct parport *next;
+	struct list_head list;
 	unsigned int flags;
 
 	void *sysctl_table;
@@ -341,11 +341,6 @@ void parport_announce_port (struct parport *port);
 
 /* Unregister a port. */
 extern void parport_remove_port(struct parport *port);
-
-/* parport_enumerate returns a pointer to the linked list of all the
-   ports in this machine.  DON'T USE THIS.  Use
-   parport_register_driver instead. */
-struct parport *parport_enumerate(void);
 
 /* Register a new high-level driver. */
 extern int parport_register_driver (struct parport_driver *);

@@ -853,11 +853,6 @@ int init_module(void)
 			}
 		}
 	}
-#if defined(CONFIG_KMOD) && defined(CONFIG_PNP_PARPORT_MODULE)
-	if(parport_enumerate() && !parport_enumerate()->probe_info.model) {
-		request_module("parport_probe");
-	}
-#endif
 	return cpia_pp_init();
 }
 
