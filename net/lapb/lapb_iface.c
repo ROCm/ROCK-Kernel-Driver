@@ -280,7 +280,7 @@ int lapb_connect_request(struct net_device *dev)
 	lapb_establish_data_link(lapb);
 
 #if LAPB_DEBUG > 0
-	printk(KERN_DEBUG "lapb: (%p) S0 -> S1\n", lapb->token);
+	printk(KERN_DEBUG "lapb: (%p) S0 -> S1\n", lapb->dev);
 #endif
 	lapb->state = LAPB_STATE_1;
 
@@ -306,10 +306,10 @@ int lapb_disconnect_request(struct net_device *dev)
 
 		case LAPB_STATE_1:
 #if LAPB_DEBUG > 1
-			printk(KERN_DEBUG "lapb: (%p) S1 TX DISC(1)\n", lapb->token);
+			printk(KERN_DEBUG "lapb: (%p) S1 TX DISC(1)\n", lapb->dev);
 #endif
 #if LAPB_DEBUG > 0
-			printk(KERN_DEBUG "lapb: (%p) S1 -> S0\n", lapb->token);
+			printk(KERN_DEBUG "lapb: (%p) S1 -> S0\n", lapb->dev);
 #endif
 			lapb_send_control(lapb, LAPB_DISC, LAPB_POLLON, LAPB_COMMAND);
 			lapb->state = LAPB_STATE_0;
@@ -330,10 +330,10 @@ int lapb_disconnect_request(struct net_device *dev)
 	lapb->state = LAPB_STATE_2;
 
 #if LAPB_DEBUG > 1
-	printk(KERN_DEBUG "lapb: (%p) S3 DISC(1)\n", lapb->token);
+	printk(KERN_DEBUG "lapb: (%p) S3 DISC(1)\n", lapb->dev);
 #endif
 #if LAPB_DEBUG > 0
-	printk(KERN_DEBUG "lapb: (%p) S3 -> S2\n", lapb->token);
+	printk(KERN_DEBUG "lapb: (%p) S3 -> S2\n", lapb->dev);
 #endif
 
 	rc = LAPB_OK;
