@@ -1,7 +1,7 @@
 Version 1.14
 ------------
 Fix incomplete listings of large directories on Samba servers when Unix
-extensions enabled.
+extensions enabled.  Fix oops when smb_buffer can not be allocated
 
 Version 1.13
 ------------

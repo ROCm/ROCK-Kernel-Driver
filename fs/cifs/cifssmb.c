@@ -143,7 +143,7 @@ smb_init(int smb_command, int wct, struct cifsTconInfo *tcon,
 		return rc;
 
 	*request_buf = cifs_buf_get();
-	if (request_buf == 0) {
+	if (*request_buf == 0) {
 		return -ENOMEM;
 	}
     /* Although the original thought was we needed the response buf for  */
