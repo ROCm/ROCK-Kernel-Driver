@@ -276,10 +276,15 @@ static void ipcomp6_destroy(struct xfrm_state *x)
 
 static int ipcomp6_init_state(struct xfrm_state *x, void *args)
 {
-	int err = -ENOMEM;
+	int err;
 	struct ipcomp_data *ipcd;
 	struct xfrm_algo_desc *calg_desc;
 
+	err = -EINVAL;
+	if (!x->calg)
+		goto out;
+
+	err = -ENOMEM;
 	ipcd = kmalloc(sizeof(*ipcd), GFP_KERNEL);
 	if (!ipcd)
 		goto error;
