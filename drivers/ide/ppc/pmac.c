@@ -61,7 +61,7 @@ typedef struct pmac_ide_hwif {
 #ifdef CONFIG_BLK_DEV_IDEDMA_PMAC
 	/* Those fields are duplicating what is in hwif. We currently
 	 * can't use the hwif ones because of some assumptions that are
-	 * beeing done by the generic code about the kind of dma controller
+	 * being done by the generic code about the kind of dma controller
 	 * and format of the dma table. This will have to be fixed though.
 	 */
 	volatile struct dbdma_regs*	dma_regs;
@@ -1392,7 +1392,7 @@ pmac_ide_dma_test_irq (ide_drive_t *drive)
 	/* We have to things to deal with here:
 	 * 
 	 * - The dbdma won't stop if the command was started
-	 * but completed with an error without transfering all
+	 * but completed with an error without transferring all
 	 * datas. This happens when bad blocks are met during
 	 * a multi-block transfer.
 	 * 
