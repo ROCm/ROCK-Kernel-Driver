@@ -55,7 +55,7 @@ static struct device_node *find_php_slot_vio_node(char *drc_name)
 	for (child = of_get_next_child(parent, NULL);
 	     child; child = of_get_next_child(parent, child)) {
 		loc_code = get_property(child, "ibm,loc-code", NULL);
-		if (loc_code && !strcmp(loc_code, drc_name))
+		if (loc_code && !strncmp(loc_code, drc_name, strlen(drc_name)))
 			return child;
 	}
 
