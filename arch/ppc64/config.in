@@ -1,0 +1,214 @@
+# 
+# For a description of the syntax of this configuration file,
+# see Documentation/kbuild/config-language.txt.
+#
+define_bool CONFIG_UID16 n
+define_bool CONFIG_RWSEM_GENERIC_SPINLOCK n
+define_bool CONFIG_RWSEM_XCHGADD_ALGORITHM y
+define_bool CONFIG_GENERIC_BUST_SPINLOCK n
+define_bool CONFIG_GENERIC_ISA_DMA y
+define_bool CONFIG_HAVE_DEC_LOCK y
+
+source init/Config.in
+
+mainmenu_option next_comment
+comment 'Platform support'
+choice 'Platform Type'	\
+	 "iSeries               CONFIG_PPC_ISERIES \
+	 pSeries                CONFIG_PPC_PSERIES " pSeries
+define_bool CONFIG_PPC y
+define_bool CONFIG_PPC64 y
+
+bool 'Symmetric multi-processing support' CONFIG_SMP
+if [ "$CONFIG_SMP" = "y" ]; then
+  bool '  Distribute interrupts on all CPUs by default' CONFIG_IRQ_ALL_CPUS
+  if [ "$CONFIG_PPC_PSERIES" = "y" ]; then
+    bool '  Hardware multithreading' CONFIG_HMT
+    bool '  PCI Enhanced Error Handling' CONFIG_PPC_EEH
+  fi
+fi
+define_bool CONFIG_PREEMPT n
+
+if [ "$CONFIG_PPC_ISERIES" = "y" ]; then
+   define_bool CONFIG_MSCHUNKS y
+else
+bool 'MsChunks Physical to Absolute address translation support' CONFIG_MSCHUNKS
+fi
+
+endmenu
+
+mainmenu_option next_comment
+comment 'General setup'
+
+define_bool CONFIG_ISA n
+define_bool CONFIG_SBUS n
+define_bool CONFIG_MCA n
+define_bool CONFIG_EISA n
+define_bool CONFIG_PCI y
+
+# only elf supported, a.out is not -- Cort
+if [ "$CONFIG_PROC_FS" = "y" ]; then
+   define_bool CONFIG_KCORE_ELF y
+fi
+
+bool 'Kernel Support for 64 bit ELF binaries' CONFIG_BINFMT_ELF
+
+tristate 'Kernel support for 32 bit binaries' CONFIG_BINFMT_ELF32
+
+tristate 'Kernel support for MISC binaries' CONFIG_BINFMT_MISC
+
+source drivers/pci/Config.in
+
+bool 'Support for hot-pluggable devices' CONFIG_HOTPLUG
+
+if [ "$CONFIG_HOTPLUG" = "y" ]; then
+   source drivers/pcmcia/Config.in
+else
+   define_bool CONFIG_PCMCIA n
+fi
+
+source drivers/parport/Config.in
+
+if [ "$CONFIG_PPC_ISERIES" != "y" ]; then
+   bool 'Support for Open Firmware device tree in /proc' CONFIG_PROC_DEVICETREE
+fi
+
+endmenu
+
+source drivers/mtd/Config.in
+source drivers/pnp/Config.in
+source drivers/block/Config.in
+source drivers/md/Config.in
+
+if [ "$CONFIG_NET" = "y" ]; then
+   source net/Config.in
+fi
+
+mainmenu_option next_comment
+comment 'ATA/IDE/MFM/RLL support'
+
+tristate 'ATA/IDE/MFM/RLL support' CONFIG_IDE
+
+if [ "$CONFIG_IDE" != "n" ]; then
+  source drivers/ide/Config.in
+else
+  define_bool CONFIG_BLK_DEV_IDE_MODES n
+  define_bool CONFIG_BLK_DEV_HD n
+fi
+endmenu
+
+mainmenu_option next_comment
+comment 'SCSI support'
+tristate 'SCSI support' CONFIG_SCSI
+if [ "$CONFIG_SCSI" != "n" ]; then
+   source drivers/scsi/Config.in
+fi
+endmenu
+
+source drivers/ieee1394/Config.in
+
+if [ "$CONFIG_NET" = "y" ]; then
+   mainmenu_option next_comment
+   comment 'Network device support'
+
+   bool 'Network device support' CONFIG_NETDEVICES
+   if [ "$CONFIG_NETDEVICES" = "y" ]; then
+      source drivers/net/Config.in
+      if [ "$CONFIG_ATM" = "y" ]; then
+         source drivers/atm/Config.in
+      fi
+   fi
+   endmenu
+fi
+
+source net/ax25/Config.in
+
+source net/irda/Config.in
+
+mainmenu_option next_comment
+comment 'ISDN subsystem'
+
+tristate 'ISDN support' CONFIG_ISDN
+if [ "$CONFIG_ISDN" != "n" ]; then
+   source drivers/isdn/Config.in
+fi
+endmenu
+
+mainmenu_option next_comment
+comment 'Old CD-ROM drivers (not SCSI, not IDE)'
+
+bool 'Support non-SCSI/IDE/ATAPI CDROM drives' CONFIG_CD_NO_IDESCSI
+if [ "$CONFIG_CD_NO_IDESCSI" != "n" ]; then
+   source drivers/cdrom/Config.in
+fi
+endmenu
+
+mainmenu_option next_comment
+comment 'Console drivers'
+source drivers/video/Config.in
+endmenu
+
+
+if [ "$CONFIG_PPC_ISERIES" = "y" ]; then
+mainmenu_option next_comment
+comment 'iSeries device drivers'
+   dep_tristate 'iSeries Virtual Console Support' CONFIG_VIOCONS $CONFIG_PPC_ISERIES
+   dep_tristate 'iSeries Virtual I/O disk support' CONFIG_VIODASD $CONFIG_PPC_ISERIES
+   if [ "$CONFIG_VIODASD" = "y" -o "$CONFIG_VIODASD" = "m" ]; then
+      bool 'iSeries Virtual disk IDE emulation' CONFIG_VIODASD_IDE
+   fi
+   dep_tristate 'iSeries Virtual I/O CD support' CONFIG_VIOCD $CONFIG_PPC_ISERIES
+   if [ "$CONFIG_VIOCD" = "y" -o "$CONFIG_VIOCD" = "m" ]; then
+      bool 'iSeries Virtual CD Aztech emulation' CONFIG_VIOCD_AZTECH
+   fi
+   dep_tristate 'iSeries Virtual Tape Support' CONFIG_VIOTAPE  $CONFIG_PPC_ISERIES
+   dep_tristate 'iSeries Virtual Ethernet driver support' CONFIG_VETH $CONFIG_PPC_ISERIES
+endmenu
+fi
+
+if [ "$CONFIG_VIOCONS" = "n" ]; then
+   if [ "$CONFIG_VIODASD" = "n" ]; then
+      if [ "$CONFIG_VIOTAPE" = "n" ]; then
+         if [ "$CONFIG_VIOCD" = "n" ]; then
+		    define_bool CONFIG_VIOPATH n
+		 else
+		    define_bool CONFIG_VIOPATH y
+         fi
+	  else
+	     define_bool CONFIG_VIOPATH y
+      fi
+   else
+      define_bool CONFIG_VIOPATH y
+   fi
+else
+   define_bool CONFIG_VIOPATH y
+fi
+
+if [ "$CONFIG_VIOCD" = "y" ]; then
+   define_bool CONFIG_CD_NO_IDESCSI y
+fi
+
+source drivers/char/Config.in
+source fs/Config.in
+
+mainmenu_option next_comment
+comment 'Sound'
+tristate 'Sound card support' CONFIG_SOUND
+if [ "$CONFIG_SOUND" != "n" ]; then
+   source sound/Config.in
+fi
+
+endmenu
+
+source drivers/usb/Config.in
+
+mainmenu_option next_comment
+comment 'Kernel hacking'
+
+bool 'Magic SysRq key' CONFIG_MAGIC_SYSRQ
+bool 'Include kgdb kernel debugger' CONFIG_KGDB
+bool 'Include xmon kernel debugger' CONFIG_XMON
+bool 'Include PPCDBG realtime debugging' CONFIG_PPCDBG
+endmenu
+
+source lib/Config.in
