@@ -46,6 +46,6 @@ extern int linvfs_get_block(struct inode *, sector_t, struct buffer_head *, int)
 extern void linvfs_unwritten_done(struct buffer_head *, int);
 
 extern int xfs_ioctl(struct bhv_desc *, struct inode *, struct file *,
-                        int, unsigned int, unsigned long);
+                        int, unsigned int, void __user *);
 
 #endif /* __XFS_IOPS_H__ */

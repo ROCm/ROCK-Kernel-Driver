@@ -1586,6 +1586,8 @@ L:	oprofile-list@lists.sf.net
 S:	Maintained
 
 ORINOCO DRIVER
+P:	Pavel Roskin
+M:	proski@gnu.org
 P:	David Gibson
 M:	hermes@gibson.dropbear.id.au
 W:	http://www.ozlabs.org/people/dgibson/dldwd

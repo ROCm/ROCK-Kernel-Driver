@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2003,2004 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -42,6 +42,7 @@ typedef enum {				/* iomap_flags values */
 	IOMAP_EOF =		0x01,	/* mapping contains EOF   */
 	IOMAP_HOLE =		0x02,	/* mapping covers a hole  */
 	IOMAP_DELAY =		0x04,	/* mapping covers delalloc region  */
+	IOMAP_REALTIME =	0x10,	/* mapping on the realtime device  */
 	IOMAP_UNWRITTEN =	0x20,	/* mapping covers allocated */
 					/* but uninitialized file data  */
 	IOMAP_NEW =		0x40	/* just allocate */
@@ -57,7 +58,7 @@ typedef enum {
 	BMAPI_IGNSTATE = (1 << 4),	/* ignore unwritten state on read */
 	BMAPI_DIRECT = (1 << 5),		/* direct instead of buffered write */
 	BMAPI_MMAP = (1 << 6),		/* allocate for mmap write */
-	BMAPI_SYNC = (1 << 7),		/* sync write */
+	BMAPI_SYNC = (1 << 7),		/* sync write to flush delalloc space */
 	BMAPI_TRYLOCK = (1 << 8),	/* non-blocking request */
 	BMAPI_DEVICE = (1 << 9),	/* we only want to know the device */
 } bmapi_flags_t;

@@ -180,6 +180,7 @@ watchdog_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 static struct file_operations watchdog_fops = {
 	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
 	.write		= watchdog_write,
 	.ioctl		= watchdog_ioctl,
 	.open		= watchdog_open,

@@ -192,9 +192,9 @@ typedef ssize_t (*vop_write_t)(bhv_desc_t *, struct kiocb *,
 				loff_t *, int, struct cred *);
 typedef ssize_t (*vop_sendfile_t)(bhv_desc_t *, struct file *,
 				loff_t *, int, size_t, read_actor_t,
-				void *, struct cred *);
+				void __user *, struct cred *);
 typedef int	(*vop_ioctl_t)(bhv_desc_t *, struct inode *, struct file *,
-				int, unsigned int, unsigned long);
+				int, unsigned int, void __user *);
 typedef int	(*vop_getattr_t)(bhv_desc_t *, struct vattr *, int,
 				struct cred *);
 typedef int	(*vop_setattr_t)(bhv_desc_t *, struct vattr *, int,
@@ -532,6 +532,7 @@ typedef struct vnode_map {
 extern void	vn_purge(struct vnode *, vmap_t *);
 extern vnode_t	*vn_get(struct vnode *, vmap_t *);
 extern int	vn_revalidate(struct vnode *);
+extern void	vn_revalidate_core(struct vnode *, vattr_t *);
 extern void	vn_remove(struct vnode *);
 
 static inline int vn_count(struct vnode *vp)

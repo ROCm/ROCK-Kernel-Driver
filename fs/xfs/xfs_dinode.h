@@ -456,6 +456,7 @@ xfs_dinode_t *xfs_buf_to_dinode(struct xfs_buf *bp);
 #define XFS_DIFLAG_SYNC_BIT      5	/* inode is written synchronously */
 #define XFS_DIFLAG_NOATIME_BIT   6	/* do not update atime */
 #define XFS_DIFLAG_NODUMP_BIT    7	/* do not dump */
+#define XFS_DIFLAG_RTINHERIT_BIT 8	/* create with realtime bit set */
 #define XFS_DIFLAG_REALTIME      (1 << XFS_DIFLAG_REALTIME_BIT)
 #define XFS_DIFLAG_PREALLOC      (1 << XFS_DIFLAG_PREALLOC_BIT)
 #define XFS_DIFLAG_NEWRTBM       (1 << XFS_DIFLAG_NEWRTBM_BIT)
@@ -464,5 +465,11 @@ xfs_dinode_t *xfs_buf_to_dinode(struct xfs_buf *bp);
 #define XFS_DIFLAG_SYNC          (1 << XFS_DIFLAG_SYNC_BIT)
 #define XFS_DIFLAG_NOATIME       (1 << XFS_DIFLAG_NOATIME_BIT)
 #define XFS_DIFLAG_NODUMP        (1 << XFS_DIFLAG_NODUMP_BIT)
+#define XFS_DIFLAG_RTINHERIT     (1 << XFS_DIFLAG_RTINHERIT_BIT)
+
+#define XFS_DIFLAG_ANY \
+	(XFS_DIFLAG_REALTIME | XFS_DIFLAG_PREALLOC | XFS_DIFLAG_NEWRTBM | \
+	 XFS_DIFLAG_IMMUTABLE | XFS_DIFLAG_APPEND | XFS_DIFLAG_SYNC | \
+	 XFS_DIFLAG_NOATIME | XFS_DIFLAG_NODUMP | XFS_DIFLAG_RTINHERIT)
 
 #endif	/* __XFS_DINODE_H__ */

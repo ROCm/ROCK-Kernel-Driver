@@ -41,6 +41,7 @@
 			  module by all drivers that require it.
   Alan Cox		: Spinlocking work, added 'BUG_83C690'
   Paul Gortmaker	: Separate out Tx timeout code from Tx path.
+  Paul Gortmaker	: Remove old unused single Tx buffer code.
 
   Sources:
   The National Semiconductor LAN Databook, and the 3Com 3c503 databook.
@@ -289,8 +290,6 @@ static int ei_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	send_length = ETH_ZLEN < length ? length : ETH_ZLEN;
     
-#ifdef EI_PINGPONG
-
 	/*
 	 * We have two Tx slots available for use. Find the first free
 	 * slot, and then perform some sanity checks. With two Tx bufs,
@@ -309,7 +308,7 @@ static int ei_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 	else if (ei_local->tx2 == 0) 
 	{
-		output_page = ei_local->tx_start_page + TX_1X_PAGES;
+		output_page = ei_local->tx_start_page + TX_PAGES/2;
 		ei_local->tx2 = send_length;
 		if (ei_debug  &&  ei_local->tx1 > 0)
 			printk(KERN_DEBUG "%s: idle transmitter, tx1=%d, lasttx=%d, txing=%d.\n",
@@ -365,28 +364,6 @@ static int ei_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		netif_stop_queue(dev);
 	else
 		netif_start_queue(dev);
-
-#else	/* EI_PINGPONG */
-
-	/*
-	 * Only one Tx buffer in use. You need two Tx bufs to come close to
-	 * back-to-back transmits. Expect a 20 -> 25% performance hit on
-	 * reasonable hardware if you only use one Tx buffer.
-	 */
-
-	if (length == send_length)
-		ei_block_output(dev, length, skb->data, ei_local->tx_start_page);
-	else {
-		memset(scratch, 0, ETH_ZLEN);
-		memcpy(scratch, skb->data, skb->len);
-		ei_block_output(dev, ETH_ZLEN, scratch, ei_local->tx_start_page);
-	}
-	ei_local->txing = 1;
-	NS8390_trigger_send(dev, send_length, ei_local->tx_start_page);
-	dev->trans_start = jiffies;
-	netif_stop_queue(dev);
-
-#endif	/* EI_PINGPONG */
 
 	/* Turn 8390 interrupts back on. */
 	ei_local->irqlock = 0;
@@ -590,8 +567,6 @@ static void ei_tx_intr(struct net_device *dev)
     
 	outb_p(ENISR_TX, e8390_base + EN0_ISR); /* Ack intr. */
 
-#ifdef EI_PINGPONG
-
 	/*
 	 * There are two Tx buffers, see which one finished, and trigger
 	 * the send of another one if it exists.
@@ -633,13 +608,6 @@ static void ei_tx_intr(struct net_device *dev)
 	}
 //	else printk(KERN_WARNING "%s: unexpected TX-done interrupt, lasttx=%d.\n",
 //			dev->name, ei_local->lasttx);
-
-#else	/* EI_PINGPONG */
-	/*
-	 *  Single Tx buffer: mark it free so another packet can be loaded.
-	 */
-	ei_local->txing = 0;
-#endif
 
 	/* Minimize Tx latency: update the statistics after we restart TXing. */
 	if (status & ENTSR_COL)

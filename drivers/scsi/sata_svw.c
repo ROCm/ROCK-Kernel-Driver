@@ -205,6 +205,7 @@ static int k2_sata_proc_info(struct Scsi_Host *shost, char *page, char **start,
 static Scsi_Host_Template k2_sata_sht = {
 	.module			= THIS_MODULE,
 	.name			= DRV_NAME,
+	.ioctl			= ata_scsi_ioctl,
 	.queuecommand		= ata_scsi_queuecmd,
 	.eh_strategy_handler	= ata_scsi_error,
 	.can_queue		= ATA_DEF_QUEUE,
@@ -343,6 +344,7 @@ static int k2_sata_init_one (struct pci_dev *pdev, const struct pci_device_id *e
 	 * if we don't fill these
 	 */
 	probe_ent->pio_mask = 0x1f;
+	probe_ent->mwdma_mask = 0x7;
 	probe_ent->udma_mask = 0x7f;
 
 	/* We have 4 ports per PCI function */
@@ -387,6 +389,7 @@ static int __init k2_sata_init(void)
 {
 	return pci_module_init(&k2_sata_pci_driver);
 }
+
 
 static void __exit k2_sata_exit(void)
 {

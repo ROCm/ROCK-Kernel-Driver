@@ -578,7 +578,7 @@ static void p4_setup_ctrs(struct op_msrs const * const msrs)
 	
 	/* setup all counters */
 	for (i = 0 ; i < num_counters ; ++i) {
-		if (counter_config[i].event) {
+		if (counter_config[i].enabled) {
 			reset_value[i] = counter_config[i].count;
 			pmc_setup_one_p4_counter(i);
 			CTR_WRITE(counter_config[i].count, VIRT_CTR(stag, i));

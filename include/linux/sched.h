@@ -425,7 +425,7 @@ struct task_struct {
 	int pdeath_signal;  /*  The signal sent when the parent dies  */
 	/* ??? */
 	unsigned long personality;
-	int did_exec:1;
+	unsigned did_exec:1;
 	pid_t pid;
 	pid_t tgid;
 	/* 
@@ -465,7 +465,7 @@ struct task_struct {
 	gid_t gid,egid,sgid,fsgid;
 	struct group_info *group_info;
 	kernel_cap_t   cap_effective, cap_inheritable, cap_permitted;
-	int keep_capabilities:1;
+	unsigned keep_capabilities:1;
 	struct user_struct *user;
 /* limits */
 	struct rlimit rlim[RLIM_NLIMITS];

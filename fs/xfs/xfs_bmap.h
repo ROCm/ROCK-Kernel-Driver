@@ -328,7 +328,7 @@ int						/* error code */
 xfs_getbmap(
 	bhv_desc_t		*bdp,		/* XFS behavior descriptor*/
 	struct getbmap		*bmv,		/* user bmap structure */
-	void			*ap,		/* pointer to user's array */
+	void			__user *ap,	/* pointer to user's array */
 	int			iflags);	/* interface flags */
 
 /*

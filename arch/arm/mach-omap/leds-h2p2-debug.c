@@ -1,5 +1,5 @@
 /*
- * linux/arch/arm/mach-omap/leds-perseus2.c
+ * linux/arch/arm/mach-omap/leds-h2p2-debug.c
  *
  * Copyright 2003 by Texas Instruments Incorporated
  *
@@ -15,9 +15,11 @@
 #include <asm/leds.h>
 #include <asm/system.h>
 
+#include <asm/arch/fpga.h>
+
 #include "leds.h"
 
-void perseus2_leds_event(led_event_t evt)
+void h2p2_dbg_leds_event(led_event_t evt)
 {
 	unsigned long flags;
 	static unsigned long hw_led_state = 0;
@@ -26,19 +28,19 @@ void perseus2_leds_event(led_event_t evt)
 
 	switch (evt) {
 	case led_start:
-		hw_led_state |= OMAP730_FPGA_LED_STARTSTOP;
+		hw_led_state |= H2P2_DBG_FPGA_LED_STARTSTOP;
 		break;
 
 	case led_stop:
-		hw_led_state &= ~OMAP730_FPGA_LED_STARTSTOP;
+		hw_led_state &= ~H2P2_DBG_FPGA_LED_STARTSTOP;
 		break;
 
 	case led_claim:
-		hw_led_state |= OMAP730_FPGA_LED_CLAIMRELEASE;
+		hw_led_state |= H2P2_DBG_FPGA_LED_CLAIMRELEASE;
 		break;
 
 	case led_release:
-		hw_led_state &= ~OMAP730_FPGA_LED_CLAIMRELEASE;
+		hw_led_state &= ~H2P2_DBG_FPGA_LED_CLAIMRELEASE;
 		break;
 
 #ifdef CONFIG_LEDS_TIMER
@@ -46,28 +48,28 @@ void perseus2_leds_event(led_event_t evt)
 		/*
 		 * Toggle Timer LED
 		 */
-		if (hw_led_state & OMAP730_FPGA_LED_TIMER)
-			hw_led_state &= ~OMAP730_FPGA_LED_TIMER;
+		if (hw_led_state & H2P2_DBG_FPGA_LED_TIMER)
+			hw_led_state &= ~H2P2_DBG_FPGA_LED_TIMER;
 		else
-			hw_led_state |= OMAP730_FPGA_LED_TIMER;
+			hw_led_state |= H2P2_DBG_FPGA_LED_TIMER;
 		break;
 #endif
 
 #ifdef CONFIG_LEDS_CPU
 	case led_idle_start:
-		hw_led_state |= OMAP730_FPGA_LED_IDLE;
+		hw_led_state |= H2P2_DBG_FPGA_LED_IDLE;
 		break;
 
 	case led_idle_end:
-		hw_led_state &= ~OMAP730_FPGA_LED_IDLE;
+		hw_led_state &= ~H2P2_DBG_FPGA_LED_IDLE;
 		break;
 #endif
 
 	case led_halted:
-		if (hw_led_state & OMAP730_FPGA_LED_HALTED)
-			hw_led_state &= ~OMAP730_FPGA_LED_HALTED;
+		if (hw_led_state & H2P2_DBG_FPGA_LED_HALTED)
+			hw_led_state &= ~H2P2_DBG_FPGA_LED_HALTED;
 		else
-			hw_led_state |= OMAP730_FPGA_LED_HALTED;
+			hw_led_state |= H2P2_DBG_FPGA_LED_HALTED;
 		break;
 
 	case led_green_on:
@@ -96,7 +98,7 @@ void perseus2_leds_event(led_event_t evt)
 	/*
 	 *  Actually burn the LEDs
 	 */
-	__raw_writew(~hw_led_state & 0xffff, OMAP730_FPGA_LEDS);
+	__raw_writew(~hw_led_state & 0xffff, H2P2_DBG_FPGA_LEDS);
 
 	local_irq_restore(flags);
 }

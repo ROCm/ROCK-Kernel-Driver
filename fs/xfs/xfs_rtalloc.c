@@ -2353,13 +2353,7 @@ xfs_rtmount_inodes(
 	ASSERT(sbp->sb_rsumino != NULLFSINO);
 	error = xfs_iget(mp, NULL, sbp->sb_rsumino, 0, &mp->m_rsumip, 0);
 	if (error) {
-		vnode_t		*rbmvp;		/* vnode for bitmap file */
-		vmap_t		vmap;		/* vmap to delete vnode */
-
-		rbmvp = XFS_ITOV(mp->m_rbmip);
-		VMAP(rbmvp, vmap);
-		VN_RELE(rbmvp);
-		vn_purge(rbmvp, &vmap);
+		VN_RELE(XFS_ITOV(mp->m_rbmip));
 		return error;
 	}
 	ASSERT(mp->m_rsumip != NULL);

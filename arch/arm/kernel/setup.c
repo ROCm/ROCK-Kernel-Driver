@@ -57,7 +57,6 @@ extern unsigned int mem_fclk_21285;
 extern void paging_init(struct meminfo *, struct machine_desc *desc);
 extern void convert_to_tag_list(struct tag *tags);
 extern void squash_mem_tags(struct tag *tag);
-extern void bootmem_init(struct meminfo *);
 extern void reboot_setup(char *str);
 extern int root_mountflags;
 extern int _stext, _text, _etext, _edata, _end;
@@ -720,7 +719,6 @@ void __init setup_arch(char **cmdline_p)
 	memcpy(saved_command_line, from, COMMAND_LINE_SIZE);
 	saved_command_line[COMMAND_LINE_SIZE-1] = '\0';
 	parse_cmdline(cmdline_p, from);
-	bootmem_init(&meminfo);
 	paging_init(&meminfo, mdesc);
 	request_standard_resources(&meminfo, mdesc);
 

@@ -32,59 +32,34 @@
 
 	.global	__get_user_1
 __get_user_1:
-	bic	r1, sp, #0x1f00
-	bic	r1, r1, #0x00ff
-	ldr	r1, [r1, #TI_ADDR_LIMIT]
-	sub	r1, r1, #1
-	cmp	r0, r1
-1:	ldrlsbt	r1, [r0]
-	movls	r0, #0
-	movls	pc, lr
-	b	__get_user_bad
+1:	ldrbt	r1, [r0]
+	mov	r0, #0
+	mov	pc, lr
 
 	.global	__get_user_2
 __get_user_2:
-	bic	r2, sp, #0x1f00
-	bic	r2, r2, #0x00ff
-	ldr	r2, [r2, #TI_ADDR_LIMIT]
-	sub	r2, r2, #2
-	cmp	r0, r2
-2:	ldrlsbt	r1, [r0], #1
-3:	ldrlsbt	r2, [r0]
+2:	ldrbt	r1, [r0], #1
+3:	ldrbt	r2, [r0]
 #ifndef __ARMEB__
-	orrls	r1, r1, r2, lsl #8
+	orr	r1, r1, r2, lsl #8
 #else
-	orrls	r1, r2, r1, lsl #8
+	orr	r1, r2, r1, lsl #8
 #endif
-	movls	r0, #0
-	movls	pc, lr
-	b	__get_user_bad
+	mov	r0, #0
+	mov	pc, lr
 
 	.global	__get_user_4
 __get_user_4:
-	bic	r1, sp, #0x1f00
-	bic	r1, r1, #0x00ff
-	ldr	r1, [r1, #TI_ADDR_LIMIT]
-	sub	r1, r1, #4
-	cmp	r0, r1
-4:	ldrlst	r1, [r0]
-	movls	r0, #0
-	movls	pc, lr
-	b	__get_user_bad
+4:	ldrt	r1, [r0]
+	mov	r0, #0
+	mov	pc, lr
 
 	.global	__get_user_8
 __get_user_8:
-	bic	r2, sp, #0x1f00
-	bic	r2, r2, #0x00ff
-	ldr	r2, [r2, #TI_ADDR_LIMIT]
-	sub	r2, r2, #8
-	cmp	r0, r2
-5:	ldrlst	r1, [r0], #4
-6:	ldrlst	r2, [r0]
-	movls	r0, #0
-	movls	pc, lr
-
-	/* fall through */
+5:	ldrt	r1, [r0], #4
+6:	ldrt	r2, [r0]
+	mov	r0, #0
+	mov	pc, lr
 
 __get_user_bad_8:
 	mov	r2, #0

@@ -30,13 +30,7 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#include <linux/string.h>
-#include <linux/errno.h>
-#include <asm/uaccess.h>
-
-#include <xfs_types.h>
-#include "debug.h"
-#include "move.h"
+#include <xfs.h>
 
 /* Read from kernel buffer at src to user/kernel buffer defined
  * by the uio structure. Advance the pointer in the uio struct

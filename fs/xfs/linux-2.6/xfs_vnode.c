@@ -188,13 +188,51 @@ vn_get(
 }
 
 /*
+ * Revalidate the Linux inode from the vattr.
+ * Note: i_size _not_ updated; we must hold the inode
+ * semaphore when doing that - callers responsibility.
+ */
+void
+vn_revalidate_core(
+	struct vnode	*vp,
+	vattr_t		*vap)
+{
+	struct inode	*inode = LINVFS_GET_IP(vp);
+
+	inode = LINVFS_GET_IP(vp);
+	inode->i_mode	    = VTTOIF(vap->va_type) | vap->va_mode;
+	inode->i_nlink	    = vap->va_nlink;
+	inode->i_uid	    = vap->va_uid;
+	inode->i_gid	    = vap->va_gid;
+	inode->i_blocks	    = vap->va_nblocks;
+	inode->i_mtime	    = vap->va_mtime;
+	inode->i_ctime	    = vap->va_ctime;
+	inode->i_atime	    = vap->va_atime;
+	if (vap->va_xflags & XFS_XFLAG_IMMUTABLE)
+		inode->i_flags |= S_IMMUTABLE;
+	else
+		inode->i_flags &= ~S_IMMUTABLE;
+	if (vap->va_xflags & XFS_XFLAG_APPEND)
+		inode->i_flags |= S_APPEND;
+	else
+		inode->i_flags &= ~S_APPEND;
+	if (vap->va_xflags & XFS_XFLAG_SYNC)
+		inode->i_flags |= S_SYNC;
+	else
+		inode->i_flags &= ~S_SYNC;
+	if (vap->va_xflags & XFS_XFLAG_NOATIME)
+		inode->i_flags |= S_NOATIME;
+	else
+		inode->i_flags &= ~S_NOATIME;
+}
+
+/*
  * Revalidate the Linux inode from the vnode.
  */
 int
 vn_revalidate(
 	struct vnode	*vp)
 {
-	struct inode	*inode;
 	vattr_t		va;
 	int		error;
 
@@ -204,31 +242,7 @@ vn_revalidate(
 	va.va_mask = XFS_AT_STAT|XFS_AT_XFLAGS;
 	VOP_GETATTR(vp, &va, 0, NULL, error);
 	if (!error) {
-		inode = LINVFS_GET_IP(vp);
-		inode->i_mode	    = VTTOIF(va.va_type) | va.va_mode;
-		inode->i_nlink	    = va.va_nlink;
-		inode->i_uid	    = va.va_uid;
-		inode->i_gid	    = va.va_gid;
-		inode->i_blocks	    = va.va_nblocks;
-		inode->i_mtime	    = va.va_mtime;
-		inode->i_ctime	    = va.va_ctime;
-		inode->i_atime	    = va.va_atime;
-		if (va.va_xflags & XFS_XFLAG_IMMUTABLE)
-			inode->i_flags |= S_IMMUTABLE;
-		else
-			inode->i_flags &= ~S_IMMUTABLE;
-		if (va.va_xflags & XFS_XFLAG_APPEND)
-			inode->i_flags |= S_APPEND;
-		else
-			inode->i_flags &= ~S_APPEND;
-		if (va.va_xflags & XFS_XFLAG_SYNC)
-			inode->i_flags |= S_SYNC;
-		else
-			inode->i_flags &= ~S_SYNC;
-		if (va.va_xflags & XFS_XFLAG_NOATIME)
-			inode->i_flags |= S_NOATIME;
-		else
-			inode->i_flags &= ~S_NOATIME;
+		vn_revalidate_core(vp, &va);
 		VUNMODIFY(vp);
 	}
 	return -error;

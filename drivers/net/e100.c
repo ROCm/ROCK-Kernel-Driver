@@ -87,9 +87,8 @@
  *	cb_to_use is the next CB to use for queuing a command; cb_to_clean
  *	is the next CB to check for completion; cb_to_send is the first
  *	CB to start on in case of a previous failure to resume.  CB clean
- *	up happens in interrupt context in response to a CU interrupt, or
- *	in dev->poll in the case where NAPI is enabled.  cbs_avail keeps
- *	track of number of free CB resources available.
+ *	up happens in interrupt context in response to a CU interrupt.
+ *	cbs_avail keeps track of number of free CB resources available.
  *
  * 	Hardware padding of short packets to minimum packet size is
  * 	enabled.  82557 pads with 7Eh, while the later controllers pad
@@ -112,9 +111,8 @@
  *	replacement RFDs cannot be allocated, or the RU goes non-active,
  *	the RU must be restarted.  Frame arrival generates an interrupt,
  *	and Rx indication and re-allocation happen in the same context,
- *	therefore no locking is required.  If NAPI is enabled, this work
- *	happens in dev->poll.  A software-generated interrupt is gen-
- *	erated from the watchdog to recover from a failed allocation
+ *	therefore no locking is required.  A software-generated interrupt
+ *	is generated from the watchdog to recover from a failed allocation
  *	senario where all Rx resources have been indicated and none re-
  *	placed.
  *
@@ -125,8 +123,6 @@
  * 	for processing by upper layers.  Tx/Rx Checksum offloading is not
  * 	supported.  Tx Scatter/Gather is not supported.  Jumbo Frames is
  * 	not supported (hardware limitation).
- *
- * 	NAPI support is enabled with CONFIG_E100_NAPI.
  *
  * 	MagicPacket(tm) WoL support is enabled/disabled via ethtool.
  *
@@ -158,7 +154,8 @@
 
 
 #define DRV_NAME		"e100"
-#define DRV_VERSION		"3.0.18"
+#define DRV_EXT			"-NAPI"
+#define DRV_VERSION		"3.0.27-k2"DRV_EXT
 #define DRV_DESCRIPTION		"Intel(R) PRO/100 Network Driver"
 #define DRV_COPYRIGHT		"Copyright(c) 1999-2004 Intel Corporation"
 #define PFX			DRV_NAME ": "
@@ -201,6 +198,8 @@ static struct pci_device_id e100_id_table[] = {
 	INTEL_8255X_ETHERNET_DEVICE(0x1053, 5),
 	INTEL_8255X_ETHERNET_DEVICE(0x1054, 5),
 	INTEL_8255X_ETHERNET_DEVICE(0x1055, 5),
+	INTEL_8255X_ETHERNET_DEVICE(0x1056, 5),
+	INTEL_8255X_ETHERNET_DEVICE(0x1057, 5),
 	INTEL_8255X_ETHERNET_DEVICE(0x1064, 6),
 	INTEL_8255X_ETHERNET_DEVICE(0x1065, 6),
 	INTEL_8255X_ETHERNET_DEVICE(0x1066, 6),
@@ -242,6 +241,7 @@ enum phy {
 	phy_nsc_tx   = 0x5C002000,
 	phy_82562_et = 0x033002A8,
 	phy_82562_em = 0x032002A8,
+	phy_82562_ek = 0x031002A8,
 	phy_82562_eh = 0x017002A8,
 	phy_unknown  = 0xFFFFFFFF,
 };
@@ -330,9 +330,14 @@ enum eeprom_op {
 };
 
 enum eeprom_offsets {
+	eeprom_cnfg_mdix  = 0x03,
 	eeprom_id         = 0x0A,
 	eeprom_config_asf = 0x0D,
 	eeprom_smbus_addr = 0x90,
+};
+
+enum eeprom_cnfg_mdix {
+	eeprom_mdix_enabled = 0x0080,
 };
 
 enum eeprom_id {
@@ -350,10 +355,12 @@ enum cb_status {
 };
 
 enum cb_command {
+	cb_nop    = 0x0000,
 	cb_iaaddr = 0x0001,
 	cb_config = 0x0002,
 	cb_multi  = 0x0003,
 	cb_tx     = 0x0004,
+	cb_ucode  = 0x0005,
 	cb_dump   = 0x0006,
 	cb_tx_sf  = 0x0008,
 	cb_cid    = 0x1f00,
@@ -428,12 +435,14 @@ struct multi {
 };
 
 /* Important: keep total struct u32-aligned */
+#define UCODE_SIZE			134
 struct cb {
 	u16 status;
 	u16 command;
 	u32 link;
 	union {
 		u8 iaaddr[ETH_ALEN];
+		u32 ucode[UCODE_SIZE];
 		struct config config;
 		struct multi multi;
 		struct {
@@ -548,6 +557,7 @@ struct nic {
 	u32 rx_fc_pause;
 	u32 rx_fc_unsupported;
 	u32 rx_tco_frames;
+	u32 rx_over_length_errors;
 
 	u8 rev_id;
 	u16 leds;
@@ -980,6 +990,27 @@ static void e100_configure(struct nic *nic, struct cb *cb, struct sk_buff *skb)
 		c[16], c[17], c[18], c[19], c[20], c[21], c[22], c[23]);
 }
 
+static void e100_load_ucode(struct nic *nic, struct cb *cb, struct sk_buff *skb)
+{
+	int i;
+	static const u32 ucode[UCODE_SIZE] = {
+		/* NFS packets are misinterpreted as TCO packets and
+		 * incorrectly routed to the BMC over SMBus.  This
+		 * microcode patch checks the fragmented IP bit in the
+		 * NFS/UDP header to distinguish between NFS and TCO. */
+		0x0EF70E36, 0x1FFF1FFF, 0x1FFF1FFF, 0x1FFF1FFF, 0x1FFF1FFF,
+		0x1FFF1FFF, 0x00906E41, 0x00800E3C, 0x00E00E39, 0x00000000,
+		0x00906EFD, 0x00900EFD,	0x00E00EF8,
+	};
+
+	if(nic->mac == mac_82551_F || nic->mac == mac_82551_10) {
+		for(i = 0; i < UCODE_SIZE; i++)
+			cb->u.ucode[i] = cpu_to_le32(ucode[i]);
+		cb->command = cpu_to_le16(cb_ucode);
+	} else
+		cb->command = cpu_to_le16(cb_nop);
+}
+
 static void e100_setup_iaaddr(struct nic *nic, struct cb *cb,
 	struct sk_buff *skb)
 {
@@ -1045,7 +1076,9 @@ static int e100_phy_init(struct nic *nic)
 		mdio_write(netdev, nic->mii.phy_id, MII_NSC_CONG, cong);
 	}
 
-	if(nic->mac >= mac_82550_D102)
+	if((nic->mac >= mac_82550_D102) || ((nic->flags & ich) && 
+		(mdio_read(netdev, nic->mii.phy_id, MII_TPISTATUS) & 0x8000) && 
+		(nic->eeprom[eeprom_cnfg_mdix] & eeprom_mdix_enabled)))
 		/* enable/disable MDI/MDI-X auto-switching */
 		mdio_write(netdev, nic->mii.phy_id, MII_NCONFIG,
 			nic->mii.force_media ? 0 : NCONFIG_AUTO_SWITCH);
@@ -1068,6 +1101,8 @@ static int e100_hw_init(struct nic *nic)
 	if((err = e100_exec_cmd(nic, cuc_load_base, 0)))
 		return err;
 	if((err = e100_exec_cmd(nic, ruc_load_base, 0)))
+		return err;
+	if((err = e100_exec_cb(nic, NULL, e100_load_ucode)))
 		return err;
 	if((err = e100_exec_cb(nic, NULL, e100_configure)))
 		return err;
@@ -1143,9 +1178,11 @@ static void e100_update_stats(struct nic *nic)
 		ns->tx_errors += le32_to_cpu(s->tx_max_collisions) +
 			le32_to_cpu(s->tx_lost_crs);
 		ns->rx_dropped += le32_to_cpu(s->rx_resource_errors);
-		ns->rx_length_errors += le32_to_cpu(s->rx_short_frame_errors);
+		ns->rx_length_errors += le32_to_cpu(s->rx_short_frame_errors) +
+			nic->rx_over_length_errors;
 		ns->rx_crc_errors += le32_to_cpu(s->rx_crc_errors);
 		ns->rx_frame_errors += le32_to_cpu(s->rx_alignment_errors);
+		ns->rx_over_errors += le32_to_cpu(s->rx_overrun_errors);
 		ns->rx_fifo_errors += le32_to_cpu(s->rx_overrun_errors);
 		ns->rx_errors += le32_to_cpu(s->rx_crc_errors) +
 			le32_to_cpu(s->rx_alignment_errors) +
@@ -1456,18 +1493,14 @@ static inline int e100_rx_indicate(struct nic *nic, struct rx *rx,
 		dev_kfree_skb_any(skb);
 	} else if(actual_size > nic->netdev->mtu + VLAN_ETH_HLEN) {
 		/* Don't indicate oversized frames */
-		nic->net_stats.rx_over_errors++;
+		nic->rx_over_length_errors++;
 		nic->net_stats.rx_dropped++;
 		dev_kfree_skb_any(skb);
 	} else {
 		nic->net_stats.rx_packets++;
 		nic->net_stats.rx_bytes += actual_size;
 		nic->netdev->last_rx = jiffies;
-#ifdef CONFIG_E100_NAPI
 		netif_receive_skb(skb);
-#else
-		netif_rx(skb);
-#endif
 		if(work_done)
 			(*work_done)++;
 	}
@@ -1562,20 +1595,12 @@ static irqreturn_t e100_intr(int irq, void *dev_id, struct pt_regs *regs)
 	if(stat_ack & stat_ack_rnr)
 		nic->ru_running = 0;
 
-#ifdef CONFIG_E100_NAPI
 	e100_disable_irq(nic);
 	netif_rx_schedule(netdev);
-#else
-	if(stat_ack & stat_ack_rx)
-		e100_rx_clean(nic, NULL, 0);
-	if(stat_ack & stat_ack_tx)
-		e100_tx_clean(nic);
-#endif
 
 	return IRQ_HANDLED;
 }
 
-#ifdef CONFIG_E100_NAPI
 static int e100_poll(struct net_device *netdev, int *budget)
 {
 	struct nic *nic = netdev_priv(netdev);
@@ -1598,7 +1623,6 @@ static int e100_poll(struct net_device *netdev, int *budget)
 
 	return 1;
 }
-#endif
 
 #ifdef CONFIG_NET_POLL_CONTROLLER
 static void e100_netpoll(struct net_device *netdev)
@@ -1641,7 +1665,7 @@ static int e100_change_mtu(struct net_device *netdev, int new_mtu)
 static int e100_asf(struct nic *nic)
 {
 	/* ASF can be enabled from eeprom */
-	return((nic->pdev->device >= 0x1050) && (nic->pdev->device <= 0x1055) &&
+	return((nic->pdev->device >= 0x1050) && (nic->pdev->device <= 0x1057) &&
 	   (nic->eeprom[eeprom_config_asf] & eeprom_asf) &&
 	   !(nic->eeprom[eeprom_config_asf] & eeprom_gcl) &&
 	   ((nic->eeprom[eeprom_smbus_addr] & 0xFF) != 0xFE));
@@ -1961,18 +1985,27 @@ static int e100_diag_test_count(struct net_device *netdev)
 static void e100_diag_test(struct net_device *netdev,
 	struct ethtool_test *test, u64 *data)
 {
+	struct ethtool_cmd cmd;
 	struct nic *nic = netdev_priv(netdev);
-	int i;
+	int i, err;
 
 	memset(data, 0, E100_TEST_LEN * sizeof(u64));
 	data[0] = !mii_link_ok(&nic->mii);
 	data[1] = e100_eeprom_load(nic);
 	if(test->flags & ETH_TEST_FL_OFFLINE) {
+
+		/* save speed, duplex & autoneg settings */
+		err = mii_ethtool_gset(&nic->mii, &cmd);
+
 		if(netif_running(netdev))
 			e100_down(nic);
 		data[2] = e100_self_test(nic);
 		data[3] = e100_loopback_test(nic, lb_mac);
 		data[4] = e100_loopback_test(nic, lb_phy);
+
+		/* restore speed, duplex & autoneg settings */
+		err = mii_ethtool_sset(&nic->mii, &cmd);
+
 		if(netif_running(netdev))
 			e100_up(nic);
 	}
@@ -2135,10 +2168,8 @@ static int __devinit e100_probe(struct pci_dev *pdev,
 	SET_ETHTOOL_OPS(netdev, &e100_ethtool_ops);
 	netdev->tx_timeout = e100_tx_timeout;
 	netdev->watchdog_timeo = E100_WATCHDOG_PERIOD;
-#ifdef CONFIG_E100_NAPI
 	netdev->poll = e100_poll;
 	netdev->weight = E100_NAPI_WEIGHT;
-#endif
 #ifdef CONFIG_NET_POLL_CONTROLLER
 	netdev->poll_controller = e100_netpoll;
 #endif

@@ -32,4 +32,26 @@ config MACH_VR1000
 
 endmenu
 
+comment "S3C2410 Setup"
+
+config S3C2410_DMA
+	bool "S3C2410 DMA support"
+	depends on ARCH_S3C2410
+	help
+	  S3C2410 DMA support. This is needed for drivers like sound which
+	  use the S3C2410's DMA system to move data to and from the
+	  peripheral blocks.
+
+config S3C2410_DMA_DEBUG
+	bool "S3C2410 DMA support debug"
+	depends on ARCH_S3C2410 && S3C2410_DMA
+	help
+	  Enable debugging output for the DMA code. This option sends info
+	  to the kernel log, at priority KERN_DEBUG.
+
+	  Note, it is easy to create and fill the log buffer in a small
+	  amount of time, as well as using an significant percantage of
+	  the CPU time doing so.
+
+
 endif

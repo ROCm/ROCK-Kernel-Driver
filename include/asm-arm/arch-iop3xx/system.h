@@ -1,5 +1,5 @@
 /*
- * linux/include/asm-arm/arch-iop80310/system.h
+ * linux/include/asm-arm/arch-iop3xx/system.h
  *
  *  Copyright (C) 2001 MontaVista Software, Inc.
  *

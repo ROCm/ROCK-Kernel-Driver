@@ -309,23 +309,27 @@ typedef struct xfs_dqtrxops {
 } xfs_dqtrxops_t;
 
 #define XFS_DQTRXOP(mp, tp, op, args...) \
-			((mp)->m_qm_ops.xfs_dqtrxops ? \
-			((mp)->m_qm_ops.xfs_dqtrxops->op)(tp, ## args) : 0)
+		((mp)->m_qm_ops.xfs_dqtrxops ? \
+		((mp)->m_qm_ops.xfs_dqtrxops->op)(tp, ## args) : 0)
+
+#define XFS_DQTRXOP_VOID(mp, tp, op, args...) \
+		((mp)->m_qm_ops.xfs_dqtrxops ? \
+		((mp)->m_qm_ops.xfs_dqtrxops->op)(tp, ## args) : (void)0)
 
 #define XFS_TRANS_DUP_DQINFO(mp, otp, ntp) \
-	XFS_DQTRXOP(mp, otp, qo_dup_dqinfo, ntp)
+	XFS_DQTRXOP_VOID(mp, otp, qo_dup_dqinfo, ntp)
 #define XFS_TRANS_FREE_DQINFO(mp, tp) \
-	XFS_DQTRXOP(mp, tp, qo_free_dqinfo)
+	XFS_DQTRXOP_VOID(mp, tp, qo_free_dqinfo)
 #define XFS_TRANS_MOD_DQUOT_BYINO(mp, tp, ip, field, delta) \
-	XFS_DQTRXOP(mp, tp, qo_mod_dquot_byino, ip, field, delta)
+	XFS_DQTRXOP_VOID(mp, tp, qo_mod_dquot_byino, ip, field, delta)
 #define XFS_TRANS_APPLY_DQUOT_DELTAS(mp, tp) \
-	XFS_DQTRXOP(mp, tp, qo_apply_dquot_deltas)
+	XFS_DQTRXOP_VOID(mp, tp, qo_apply_dquot_deltas)
 #define XFS_TRANS_RESERVE_QUOTA_NBLKS(mp, tp, ip, nblks, ninos, fl) \
 	XFS_DQTRXOP(mp, tp, qo_reserve_quota_nblks, mp, ip, nblks, ninos, fl)
 #define XFS_TRANS_RESERVE_QUOTA_BYDQUOTS(mp, tp, ud, gd, nb, ni, fl) \
 	XFS_DQTRXOP(mp, tp, qo_reserve_quota_bydquots, mp, ud, gd, nb, ni, fl)
 #define XFS_TRANS_UNRESERVE_AND_MOD_DQUOTS(mp, tp) \
-	XFS_DQTRXOP(mp, tp, qo_unreserve_and_mod_dquots)
+	XFS_DQTRXOP_VOID(mp, tp, qo_unreserve_and_mod_dquots)
 
 #define XFS_TRANS_RESERVE_BLKQUOTA(mp, tp, ip, nblks) \
 	XFS_TRANS_RESERVE_QUOTA_NBLKS(mp, tp, ip, nblks, 0, \

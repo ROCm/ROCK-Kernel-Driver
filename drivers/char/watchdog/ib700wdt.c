@@ -263,6 +263,7 @@ ibwdt_notify_sys(struct notifier_block *this, unsigned long code,
 
 static struct file_operations ibwdt_fops = {
 	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
 	.write		= ibwdt_write,
 	.ioctl		= ibwdt_ioctl,
 	.open		= ibwdt_open,

@@ -211,7 +211,7 @@ xfs_dir2_trace_args_s(
 		(void *)((unsigned long)(args->inumber >> 32)),
 		(void *)((unsigned long)(args->inumber & 0xFFFFFFFF)),
 		(void *)args->dp, (void *)args->trans,
-		(void *)(unsigned long)args->justcheck, (void *)(long)s, 0);
+		(void *)(unsigned long)args->justcheck, (void *)(long)s, NULL);
 }
 
 void

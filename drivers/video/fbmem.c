@@ -56,6 +56,7 @@
 
 extern int acornfb_init(void);
 extern int acornfb_setup(char*);
+extern int amba_clcdfb_init(void);
 extern int amifb_init(void);
 extern int amifb_setup(char*);
 extern int atafb_init(void);
@@ -197,6 +198,9 @@ static struct {
 #endif
 #ifdef CONFIG_FB_CYBER2000
 	{ "cyber2000fb", cyber2000fb_init, cyber2000fb_setup },
+#endif
+#ifdef CONFIG_FB_ARMCLCD
+	{ "ambaclcdfb", amba_clcdfb_init, NULL },
 #endif
 #ifdef CONFIG_FB_PM2
 	{ "pm2fb", pm2fb_init, pm2fb_setup },

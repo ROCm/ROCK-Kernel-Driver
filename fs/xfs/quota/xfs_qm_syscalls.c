@@ -1114,7 +1114,7 @@ mutex_t	      qcheck_lock;
 	  cmn_err(CE_DEBUG, "%s (#%d)", title, (int) (l)->qh_nelems); \
 	  for (dqp = (xfs_dqtest_t *)(l)->qh_next; dqp != NULL; \
 	       dqp = (xfs_dqtest_t *)dqp->NXT) { \
-		cmn_err(CE_DEBUG, "  %d\. \"%d (%s)\"  bcnt = %d, icnt = %d", \
+		cmn_err(CE_DEBUG, "  %d. \"%d (%s)\"  bcnt = %d, icnt = %d", \
 			 ++i, dqp->d_id, DQFLAGTO_TYPESTR(dqp),	     \
 			 dqp->d_bcount, dqp->d_icount); } \
 }
@@ -1299,7 +1299,7 @@ STATIC int
 xfs_qm_internalqcheck_adjust(
 	xfs_mount_t	*mp,		/* mount point for filesystem */
 	xfs_ino_t	ino,		/* inode number to get data for */
-	void		*buffer,	/* not used */
+	void		__user *buffer,	/* not used */
 	int		ubsize,		/* not used */
 	void		*private_data,	/* not used */
 	xfs_daddr_t	bno,		/* starting block of inode cluster */

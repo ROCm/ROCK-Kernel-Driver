@@ -44,6 +44,7 @@
 
 #define NV_PORTS			2
 #define NV_PIO_MASK			0x1f
+#define NV_MWDMA_MASK			0x07
 #define NV_UDMA_MASK			0x7f
 #define NV_PORT0_BMDMA_REG_OFFSET	0x00
 #define NV_PORT1_BMDMA_REG_OFFSET	0x08
@@ -177,6 +178,7 @@ static struct pci_driver nv_pci_driver = {
 static Scsi_Host_Template nv_sht = {
 	.module			= THIS_MODULE,
 	.name			= DRV_NAME,
+	.ioctl			= ata_scsi_ioctl,
 	.queuecommand		= ata_scsi_queuecmd,
 	.eh_strategy_handler	= ata_scsi_error,
 	.can_queue		= ATA_DEF_QUEUE,
@@ -343,6 +345,7 @@ static int nv_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	probe_ent->irq = pdev->irq;
 	probe_ent->irq_flags = SA_SHIRQ;
 	probe_ent->pio_mask = NV_PIO_MASK;
+	probe_ent->mwdma_mask = NV_MWDMA_MASK;
 	probe_ent->udma_mask = NV_UDMA_MASK;
 
 	probe_ent->port[0].cmd_addr = pci_resource_start(pdev, 0);
@@ -369,7 +372,7 @@ static int nv_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 		probe_ent->mmio_base = ioremap(pci_resource_start(pdev, 5),
 				pci_resource_len(pdev, 5));
 		if (probe_ent->mmio_base == NULL)
-			goto err_out_free_ent;
+			goto err_out_iounmap;
 
 		base = (unsigned long)probe_ent->mmio_base;
 
@@ -393,11 +396,15 @@ static int nv_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	rc = ata_device_add(probe_ent);
 	if (rc != NV_PORTS)
-		goto err_out_free_ent;
+		goto err_out_iounmap;
 
 	kfree(probe_ent);
 
 	return 0;
+
+err_out_iounmap:
+	if (host->host_desc->host_flags & NV_HOST_FLAGS_SCR_MMIO)
+		iounmap(probe_ent->mmio_base);
 
 err_out_free_ent:
 	kfree(probe_ent);

@@ -162,7 +162,10 @@ config SOUND_ICH
 
 config SOUND_HARMONY
 	tristate "PA Harmony audio driver"
-	depends on GSC_LASI && SOUND
+	depends on GSC_LASI && SOUND_PRIME!=n
+	help
+	  Say 'Y' or 'M' to include support for Harmony soundchip
+	  on HP 712, 715/new and many other GSC based machines.
 
 config SOUND_SONICVIBES
 	tristate "S3 SonicVibes"

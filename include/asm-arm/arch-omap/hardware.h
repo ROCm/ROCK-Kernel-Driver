@@ -178,6 +178,7 @@
 #define IRQ_CONTROL_REG_OFFSET	0x18
 #define IRQ_ISR_REG_OFFSET	0x9c
 #define IRQ_ILR0_REG_OFFSET	0x1c
+#define IRQ_GMR_REG_OFFSET	0xa0
 
 /*
  * ---------------------------------------------------------------------------
@@ -185,22 +186,23 @@
  * ---------------------------------------------------------------------------
  */
 #define TCMIF_BASE		0xfffecc00
-#define IMIF_PRIO		(TCMIF_BASE + 0x00)
-#define EMIFS_PRIO		(TCMIF_BASE + 0x04)
-#define EMIFF_PRIO		(TCMIF_BASE + 0x08)
-#define EMIFS_CONFIG		(TCMIF_BASE + 0x0c)
-#define EMIFS_CS0_CONFIG	(TCMIF_BASE + 0x10)
-#define EMIFS_CS1_CONFIG	(TCMIF_BASE + 0x14)
-#define EMIFS_CS2_CONFIG	(TCMIF_BASE + 0x18)
-#define EMIFS_CS3_CONFIG	(TCMIF_BASE + 0x1c)
-#define EMIFF_SDRAM_CONFIG	(TCMIF_BASE + 0x20)
-#define EMIFF_MRS		(TCMIF_BASE + 0x24)
-#define TC_TIMEOUT1		(TCMIF_BASE + 0x28)
-#define TC_TIMEOUT2		(TCMIF_BASE + 0x2c)
-#define TC_TIMEOUT3		(TCMIF_BASE + 0x30)
-#define TC_ENDIANISM		(TCMIF_BASE + 0x34)
-#define EMIFF_SDRAM_CONFIG_2	(TCMIF_BASE + 0x3c)
-#define EMIF_CFG_DYNAMIC_WS	(TCMIF_BASE + 0x40)
+#define IMIF_PRIO_REG		__REG32(TCMIF_BASE + 0x00)
+#define EMIFS_PRIO_REG		__REG32(TCMIF_BASE + 0x04)
+#define EMIFF_PRIO_REG		__REG32(TCMIF_BASE + 0x08)
+#define EMIFS_CONFIG_REG	__REG32(TCMIF_BASE + 0x0c)
+#define EMIFS_CS0_CONFIG_REG	__REG32(TCMIF_BASE + 0x10)
+#define EMIFS_CS1_CONFIG_REG	__REG32(TCMIF_BASE + 0x14)
+#define EMIFS_CS2_CONFIG_REG	__REG32(TCMIF_BASE + 0x18)
+#define EMIFS_CS3_CONFIG_REG	__REG32(TCMIF_BASE + 0x1c)
+#define EMIFF_SDRAM_CONFIG_REG	__REG32(TCMIF_BASE + 0x20)
+#define EMIFF_MRS_REG		__REG32(TCMIF_BASE + 0x24)
+#define TC_TIMEOUT1_REG		__REG32(TCMIF_BASE + 0x28)
+#define TC_TIMEOUT2_REG		__REG32(TCMIF_BASE + 0x2c)
+#define TC_TIMEOUT3_REG		__REG32(TCMIF_BASE + 0x30)
+#define TC_ENDIANISM_REG	__REG32(TCMIF_BASE + 0x34)
+#define EMIFF_SDRAM_CONFIG_2_REG __REG32(TCMIF_BASE + 0x3c)
+#define EMIF_CFG_DYNAMIC_WS_REG	__REG32(TCMIF_BASE + 0x40)
+
 /*
  * ----------------------------------------------------------------------------
  * System control registers
@@ -290,6 +292,7 @@
 #define OMAP_ID_1610		0x3576
 #define OMAP_ID_1710		0x35F7
 #define OMAP_ID_5912		0x358C
+#define OMAP_ID_1611            0x358C
 
 #ifdef CONFIG_ARCH_OMAP730
 #include "omap730.h"
@@ -307,12 +310,16 @@
 
 #ifdef CONFIG_ARCH_OMAP1610
 #include "omap1610.h"
-#define cpu_is_omap1710()       (((OMAP_ID_REG >> ID_SHIFT) & ID_MASK) == OMAP_ID_1710)
-/* Detect 1710 as 1610 for now */
-#define cpu_is_omap1610()	(((OMAP_ID_REG >> ID_SHIFT) & ID_MASK) == OMAP_ID_1610 \
-				|| cpu_is_omap1710())
+#define cpu_is_omap1610()	(((OMAP_ID_REG >> ID_SHIFT) & ID_MASK) == OMAP_ID_1610) || \
+				(((OMAP_ID_REG >> ID_SHIFT) & ID_MASK) == OMAP_ID_1611)
 #else
 #define cpu_is_omap1610()	0
+#endif
+
+#ifdef CONFIG_ARCH_OMAP1710
+#include "omap1610.h"
+#define cpu_is_omap1710()       (((OMAP_ID_REG >> ID_SHIFT) & ID_MASK) == OMAP_ID_1710)
+#else
 #define cpu_is_omap1710()	0
 #endif
 
@@ -343,7 +350,6 @@
 
 #ifdef CONFIG_MACH_OMAP_H3
 #include "board-h3.h"
-#error "Support for H3 board not yet implemented."
 #endif
 
 #ifdef CONFIG_MACH_OMAP_H4

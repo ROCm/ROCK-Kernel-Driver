@@ -37,7 +37,6 @@
 #define OPTION_DEFAULT      { [0 ... MAX_UNITS-1] = -1}
 
 #define REV_ID_VT6110       (0)
-#define DEVICE_ID           (0x3119)
 
 #define BYTE_REG_BITS_ON(x,p)       do { writeb(readb((p))|(x),(p));} while (0)
 #define WORD_REG_BITS_ON(x,p)       do { writew(readw((p))|(x),(p));} while (0)
@@ -1772,7 +1771,8 @@ struct velocity_info {
 	struct velocity_td_info *td_infos[TX_QUEUE_NO];
 
 	int rd_curr;
-	int rd_used;
+	int rd_dirty;
+	u32 rd_filled;
 	struct rx_desc *rd_ring;
 	struct velocity_rd_info *rd_info;	/* It's an array */
 

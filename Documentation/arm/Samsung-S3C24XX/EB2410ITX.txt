@@ -1,0 +1,29 @@
+		Simtec Electronics EB2410ITX (BAST)
+		===================================
+
+	http://www.simtec.co.uk/products/EB2410ITX/
+
+Introduction
+------------
+
+  The EB2410ITX is a S3C2410 based development board with a variety of
+  peripherals and expansion connectors. This board is also known by
+  the shortened name of Bast.
+
+
+Configuration
+-------------
+
+  To set the default configuration, use `make bast_defconfig` which
+  supports the commonly used features of this board
+
+
+Support
+-------
+
+  Official support information can be found on the Simtec Electronics
+  website, at the product page http://www.simtec.co.uk/products/EB2410ITX/
+  and http://www.simtec.co.uk/products/EB2410ITX/resources.html
+
+
+(c) 2004 Ben Dooks, Simtec Electronics
