@@ -1414,7 +1414,7 @@ static int bond_enslave(struct net_device *master_dev,
 			 * The application already set the master's
 			 * mac address to that of the first slave
 			 */
-			memcpy(addr.sa_data, master_dev->dev_addr, ETH_ALEN);
+			memcpy(addr.sa_data, master_dev->dev_addr, master_dev->addr_len);
 			addr.sa_family = slave_dev->type;
 			err = slave_dev->set_mac_address(slave_dev, &addr);
 			if (err) {
@@ -1985,12 +1985,12 @@ static int bond_release(struct net_device *master, struct net_device *slave)
 				"of %s to a different address "
 				"to avoid conflicts.\n",
 				       slave->name,
-				       slave->dev_addr[0],
-				       slave->dev_addr[1],
-				       slave->dev_addr[2],
-				       slave->dev_addr[3],
-				       slave->dev_addr[4],
-				       slave->dev_addr[5],
+				       our_slave->perm_hwaddr[0],
+				       our_slave->perm_hwaddr[1],
+				       our_slave->perm_hwaddr[2],
+				       our_slave->perm_hwaddr[3],
+				       our_slave->perm_hwaddr[4],
+				       our_slave->perm_hwaddr[5],
 				       bond->device->name,
 				       slave->name);
 			}
@@ -3673,12 +3673,15 @@ static int __init bond_init(struct net_device *dev)
 	rwlock_init(&bond->lock);
 	rwlock_init(&bond->ptrlock);
 
+	/* Initialize pointers */
 	bond->next = bond->prev = (slave_t *)bond;
 	bond->current_slave = NULL;
 	bond->current_arp_slave = NULL;
 	bond->device = dev;
 
 	/* Initialize the device structure. */
+	dev->set_mac_address = bond_set_mac_address;
+
 	switch (bond_mode) {
 	case BOND_MODE_ACTIVEBACKUP:
 		dev->hard_start_xmit = bond_xmit_activebackup;
@@ -3698,6 +3701,7 @@ static int __init bond_init(struct net_device *dev)
 	case BOND_MODE_TLB:
 	case BOND_MODE_ALB:
 		dev->hard_start_xmit = bond_alb_xmit;
+		dev->set_mac_address = bond_alb_set_mac_address;
 		break;
 	default:
 		printk(KERN_ERR "Unknown bonding mode %d\n", bond_mode);
@@ -3710,7 +3714,6 @@ static int __init bond_init(struct net_device *dev)
 	dev->set_multicast_list = set_multicast_list;
 	dev->do_ioctl = bond_ioctl;
 	dev->change_mtu = bond_change_mtu;
-	dev->set_mac_address = bond_set_mac_address;
 	dev->tx_queue_len = 0;
 	dev->flags |= IFF_MASTER|IFF_MULTICAST;
 #ifdef CONFIG_NET_FASTROUTE
