@@ -364,7 +364,7 @@ typedef struct sal_processor_static_info {
 	u64 cr[128];
 	u64 ar[128];
 	u64 rr[8];
-	struct ia64_fpreg fr[128];
+	struct ia64_fpreg __attribute__ ((packed)) fr[128];
 } sal_processor_static_info_t;
 
 struct sal_cpuid_info {
