@@ -42,11 +42,11 @@ initrd_phys-$(CONFIG_ARCH_CDB89712)	:= 0x00700000
 ifeq ($(CONFIG_ARCH_SA1100),y)
    zreladdr-$(CONFIG_SA1111)		:= 0xc0208000
 endif
-  zreladdr-$(CONFIG_ARCH_PXA)		:= 0xa0008000
-  zreladdr-$(CONFIG_ARCH_ANAKIN)	:= 0x20008000
-  zreladdr-$(CONFIG_ARCH_IQ80310)	:= 0xa0008000
-  zreladdr-$(CONFIG_ARCH_IQ80321)	:= 0xa0008000
-  zreladdr-$(CONFIG_ARCH_ADIFCC)	:= 0xc0008000
+   zreladdr-$(CONFIG_ARCH_PXA)		:= 0xa0008000
+   zreladdr-$(CONFIG_ARCH_ANAKIN)	:= 0x20008000
+   zreladdr-$(CONFIG_ARCH_IQ80310)	:= 0xa0008000
+   zreladdr-$(CONFIG_ARCH_IQ80321)	:= 0xa0008000
+   zreladdr-$(CONFIG_ARCH_ADIFCC)	:= 0xc0008000
 
 ZRELADDR    := $(zreladdr-y)
 ZTEXTADDR   := $(ztextaddr-y)
