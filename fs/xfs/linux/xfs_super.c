@@ -183,7 +183,7 @@ xfs_parseargs(
 		} else if (!strcmp(this_char, MNTOPT_DMAPI) ||
 			   !strcmp(this_char, MNTOPT_XDSM)) {
 			printk("XFS: this kernel does not support dmapi/xdsm.\n");
-			return rval;
+			return -EINVAL;
 #endif
 		} else if (!strcmp(this_char, MNTOPT_RTDEV)) {
 			if (!value || !*value) {
