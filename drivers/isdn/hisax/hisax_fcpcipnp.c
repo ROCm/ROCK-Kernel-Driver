@@ -20,6 +20,7 @@
  *
  * o POWER PC
  * o clean up debugging
+ * o tx_skb at PH_DEACTIVATE time
  */
 
 #include <linux/version.h>
@@ -368,10 +369,7 @@ static void hdlc_fill_fifo(struct fritz_bcs *bcs)
 	unsigned long flags;
 	unsigned char *p;
 
-	DBG(0x40, "hdlc_fill_fifo");
-
-	if (!skb)
-		BUG();
+	DBG(0x40, "");
 
 	if (skb->len == 0)
 		BUG();
@@ -581,14 +579,14 @@ static void modehdlc(struct fritz_bcs *bcs, int mode)
 		adapter->write_ctrl(bcs, 5);
 		break;
 	case L1_MODE_TRANS:
-		bcs->ctrl.sr.mode = HDLC_MODE_TRANS;
-		adapter->write_ctrl(bcs, 5);
-		bcs->ctrl.sr.cmd = HDLC_CMD_XRS;
-		adapter->write_ctrl(bcs, 1);
-		bcs->ctrl.sr.cmd = 0;
-		break;
 	case L1_MODE_HDLC:
-		bcs->ctrl.sr.mode = HDLC_MODE_ITF_FLG;
+		bcs->rcvidx = 0;
+		bcs->tx_cnt = 0;
+		bcs->tx_skb = NULL;
+		if (mode == L1_MODE_TRANS)
+			bcs->ctrl.sr.mode = HDLC_MODE_TRANS;
+		else
+			bcs->ctrl.sr.mode = HDLC_MODE_ITF_FLG;
 		adapter->write_ctrl(bcs, 5);
 		bcs->ctrl.sr.cmd = HDLC_CMD_XRS;
 		adapter->write_ctrl(bcs, 1);
