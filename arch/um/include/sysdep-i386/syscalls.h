@@ -11,13 +11,9 @@ typedef long syscall_handler_t(struct pt_regs);
 #define EXECUTE_SYSCALL(syscall, regs) \
 	((long (*)(struct syscall_args)) (*sys_call_table[syscall]))(SYSCALL_ARGS(&regs->regs))
 
-extern syscall_handler_t sys_modify_ldt;
-extern syscall_handler_t old_mmap_i386;
-extern syscall_handler_t old_select;
-
 #define ARCH_SYSCALLS \
-	[ __NR_mmap ] = old_mmap_i386, \
-	[ __NR_select ] = old_select, \
+	[ __NR_mmap ] = (syscall_handler_t *) old_mmap_i386, \
+	[ __NR_select ] = (syscall_handler_t *) old_select, \
 	[ __NR_vm86old ] = (syscall_handler_t *) sys_ni_syscall, \
         [ __NR_modify_ldt ] = (syscall_handler_t *) sys_modify_ldt, \
 	[ __NR_lchown32 ] = (syscall_handler_t *) sys_lchown, \

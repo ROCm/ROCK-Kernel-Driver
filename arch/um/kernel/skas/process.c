@@ -26,6 +26,7 @@
 #include "proc_mm.h"
 #include "skas_ptrace.h"
 #include "chan_user.h"
+#include "signal_user.h"
 
 int is_skas_winch(int pid, int fd, void *data)
 {
@@ -188,13 +189,25 @@ void userspace(union uml_pt_regs *regs)
 void new_thread(void *stack, void **switch_buf_ptr, void **fork_buf_ptr,
 		void (*handler)(int))
 {
+	unsigned long flags;
 	jmp_buf switch_buf, fork_buf;
 
 	*switch_buf_ptr = &switch_buf;
 	*fork_buf_ptr = &fork_buf;
 
+	/* Somewhat subtle - siglongjmp restores the signal mask before doing
+	 * the longjmp.  This means that when jumping from one stack to another
+	 * when the target stack has interrupts enabled, an interrupt may occur
+	 * on the source stack.  This is bad when starting up a process because
+	 * it's not supposed to get timer ticks until it has been scheduled.
+	 * So, we disable interrupts around the sigsetjmp to ensure that 
+	 * they can't happen until we get back here where they are safe.
+	 */
+	flags = get_signals();
+	block_signals();
 	if(sigsetjmp(fork_buf, 1) == 0)
 		new_thread_proc(stack, handler);
+	set_signals(flags);
 
 	remove_sigstack();
 }

@@ -111,8 +111,7 @@ void mconsole_log(struct mc_request *req)
 	int len;
 	char *ptr = req->request.data;
 	
-	ptr += strlen("log");
-	while(isspace(*ptr)) ptr++;
+	ptr += strlen("log ");
 
 	len = req->len - (ptr - req->request.data);
 	printk("%.*s", len, ptr);

@@ -102,12 +102,11 @@ void sig_handler(int sig, struct sigcontext sc)
 			 sig, &sc);
 }
 
-extern int timer_irq_inited, missed_ticks[];
+extern int timer_irq_inited;
 
 void alarm_handler(int sig, struct sigcontext sc)
 {
 	if(!timer_irq_inited) return;
-	missed_ticks[cpu()]++;
 
 	if(sig == SIGALRM)
 		switch_timers(0);

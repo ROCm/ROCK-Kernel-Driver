@@ -95,10 +95,11 @@ void fork_handler(int sig)
 		    current->thread.mode.skas.fork_buf);
   	
 	force_flush_all();
-	if(current->thread.prev_sched != NULL)
-		schedule_tail(current->thread.prev_sched);
+	if(current->thread.prev_sched == NULL)
+		panic("blech");
+	
+	schedule_tail(current->thread.prev_sched);
 	current->thread.prev_sched = NULL;
-	unblock_signals();
 
 	userspace(&current->thread.regs.regs);
 }

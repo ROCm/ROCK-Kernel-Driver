@@ -35,8 +35,6 @@ void sig_handler_common_skas(int sig, void *sc_ptr)
 	errno = save_errno;
 }
 
-extern int missed_ticks[];
-
 void user_signal(int sig, union uml_pt_regs *regs)
 {
 	struct signal_info *info;

@@ -41,12 +41,6 @@ unsigned long long sched_clock(void)
 /* Changed at early boot */
 int timer_irq_inited = 0;
 
-/* missed_ticks will be modified after kernel memory has been 
- * write-protected, so this puts it in a section which will be left 
- * write-enabled.
- */
-int __attribute__ ((__section__ (".unprotected"))) missed_ticks[NR_CPUS];
-
 static int first_tick;
 static unsigned long long prev_tsc;
 static long long delta;   		/* Deviation per interval */
@@ -102,10 +96,12 @@ void boot_timer_handler(int sig)
 
 irqreturn_t um_timer(int irq, void *dev, struct pt_regs *regs)
 {
+	unsigned long flags;
+
 	do_timer(regs);
-	write_seqlock_irq(&xtime_lock);
+	write_seqlock_irqsave(&xtime_lock, flags);
 	timer();
-	write_sequnlock_irq(&xtime_lock);
+	write_sequnlock_irqrestore(&xtime_lock, flags);
 	return(IRQ_HANDLED);
 }
 

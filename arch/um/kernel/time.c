@@ -88,7 +88,8 @@ void uml_idle_timer(void)
 static unsigned long long get_host_hz(void)
 {
 	char mhzline[16], *end;
-	int ret, mult, mhz, rest, len;
+	unsigned long long mhz;
+	int ret, mult, rest, len;
 
 	ret = cpu_feature("cpu MHz", mhzline, 
 			  sizeof(mhzline) / sizeof(mhzline[0]));
@@ -135,6 +136,9 @@ void time_init(void)
 	wall_to_monotonic.tv_sec = -now.tv_sec;
 	wall_to_monotonic.tv_nsec = -now.tv_nsec;
 }
+
+/* Declared in linux/time.h, which can't be included here */
+extern void clock_was_set(void);
 
 void do_gettimeofday(struct timeval *tv)
 {

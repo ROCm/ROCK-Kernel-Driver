@@ -221,11 +221,8 @@ inline void synchronize_irq(unsigned int irq)
  
 void disable_irq(unsigned int irq)
 {
-	irq_desc_t *desc = irq_desc + irq;
-
 	disable_irq_nosync(irq);
-	if(desc->action)
-		synchronize_irq(irq);
+	synchronize_irq(irq);
 }
 
 /**
@@ -246,7 +243,7 @@ void enable_irq(unsigned int irq)
 	spin_lock_irqsave(&desc->lock, flags);
 	switch (desc->depth) {
 	case 1: {
-		unsigned int status = desc->status & IRQ_DISABLED;
+		unsigned int status = desc->status & ~IRQ_DISABLED;
 		desc->status = status;
 		if ((status & (IRQ_PENDING | IRQ_REPLAY)) == IRQ_PENDING) {
 			desc->status = status | IRQ_REPLAY;
@@ -602,7 +599,7 @@ static int irq_affinity_write_proc (struct file *file, const char *buffer,
 	{ cpumask_t tmp;
 	  cpus_and(tmp, new_value, cpu_online_map);
 	  if (cpus_empty(tmp))
-		return -EINVAL;
+		  return -EINVAL;
 	}
 #endif
 

@@ -18,7 +18,7 @@ struct mm_struct;
 
 #define current_text_addr() ((void *) 0)
 
-#define cpu_relax()	do ; while (0)
+#define cpu_relax()   barrier()
 
 struct thread_struct {
 	int forking;

@@ -59,7 +59,7 @@ typedef elf_greg_t elf_gregset_t[ELF_NGREG];
 #if 0 /* Turn this back on when UML has VSYSCALL working */
 #define VSYSCALL_BASE	(__fix_to_virt(FIX_VSYSCALL))
 #else
-#define VSYSCALL_BASE	NULL
+#define VSYSCALL_BASE	0
 #endif
 
 #define VSYSCALL_EHDR	((const struct elfhdr *) VSYSCALL_BASE)
@@ -87,7 +87,11 @@ do {								\
  * Dumping its extra ELF program headers includes all the other information
  * a debugger needs to easily find how the vsyscall DSO was being used.
  */
+#if 0
 #define ELF_CORE_EXTRA_PHDRS		(VSYSCALL_EHDR->e_phnum)
+#endif
+
+#define ELF_CORE_EXTRA_PHDRS		0
 #define ELF_CORE_WRITE_EXTRA_PHDRS					      \
 do {									      \
 	const struct elf_phdr *const vsyscall_phdrs =			      \

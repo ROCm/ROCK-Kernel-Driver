@@ -1,5 +1,5 @@
 /* 
- * Copyright (C) 2001 - 2003 Jeff Dike (jdike@addtoit.com)
+ * Copyright (C) 2001 - 2004 Jeff Dike (jdike@addtoit.com)
  * Licensed under the GPL
  */
 
@@ -8,7 +8,7 @@
 #include "linux/string.h"
 #include "linux/smp_lock.h"
 #include "linux/spinlock.h"
-#include <linux/highmem.h>
+#include "linux/highmem.h"
 #include "asm/current.h"
 #include "asm/delay.h"
 #include "asm/processor.h"
@@ -19,6 +19,7 @@
 #include "asm/tlbflush.h"
 #include "kern_util.h"
 #include "user_util.h"
+#include "mem_user.h"
 #include "os.h"
 #include "helper.h"
 
@@ -46,6 +47,7 @@ EXPORT_SYMBOL(to_phys);
 EXPORT_SYMBOL(to_virt);
 EXPORT_SYMBOL(mode_tt);
 EXPORT_SYMBOL(handle_page_fault);
+EXPORT_SYMBOL(find_iomem);
 
 #ifdef CONFIG_MODE_TT
 EXPORT_SYMBOL(copy_from_user_tt);

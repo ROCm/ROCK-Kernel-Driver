@@ -11,6 +11,8 @@ extern int signal_stack_size;
 extern int change_sig(int signal, int on);
 extern void set_sigstack(void *stack, int size);
 extern void set_handler(int sig, void (*handler)(int), int flags, ...);
+extern int set_signals(int enable);
+extern int get_signals(void);
 
 #endif
 
