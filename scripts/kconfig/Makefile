@@ -107,7 +107,7 @@ clean-files	:= libkconfig.so lkc_defs.h qconf.moc .tmp_qtcheck \
 HOSTCFLAGS_lex.zconf.o	:= -I$(src)
 HOSTCFLAGS_zconf.tab.o	:= -I$(src)
 
-HOSTLOADLIBES_qconf	= -L$(QTDIR)/lib -Wl,-rpath,$(QTDIR)/lib -l$(QTLIB) -ldl
+HOSTLOADLIBES_qconf	= -L$(QTDIR)/$(QTLIBDIR) -Wl,-rpath,$(QTDIR)/$(QTLIBDIR) -l$(QTLIB) -ldl
 HOSTCXXFLAGS_qconf.o	= -I$(QTDIR)/include 
 
 HOSTLOADLIBES_gconf	= `pkg-config gtk+-2.0 gmodule-2.0 libglade-2.0 --libs`
@@ -123,7 +123,7 @@ MOC = $(QTDIR)/bin/moc
 
 # QT needs some extra effort...
 $(obj)/.tmp_qtcheck:
-	@set -e; for d in $$QTDIR /usr/share/qt* /usr/lib/qt*; do \
+	@set -e; for d in $$QTDIR /usr/share/qt* /usr/lib64/qt* /usr/lib/qt*; do \
 	  if [ -f $$d/include/qconfig.h ]; then DIR=$$d; break; fi; \
 	done; \
 	if [ -z "$$DIR" ]; then \
@@ -134,9 +134,12 @@ $(obj)/.tmp_qtcheck:
 	  echo "*"; \
 	  false; \
 	fi; \
+	LIBDIR=lib; \
 	LIB=qt; \
-	if [ -f $$DIR/lib/libqt-mt.so ]; then LIB=qt-mt; fi; \
-	echo "QTDIR=$$DIR" > $@; echo "QTLIB=$$LIB" >> $@; \
+	if [ -f $$DIR/lib64/libqt-mt.so ]; then LIB=qt-mt; LIBDIR=lib64; else \
+	if [ -f $$DIR/lib64/libqt.so ]; then LIBDIR=lib64; else \
+	if [ -f $$DIR/lib/libqt-mt.so ]; then LIB=qt-mt; fi; fi; fi; \
+	echo "QTDIR=$$DIR" > $@; echo "QTLIB=$$LIB" >> $@; echo "QTLIBDIR=$$LIBDIR" >> $@; \
 	if [ ! -x $$DIR/bin/moc -a -x /usr/bin/moc ]; then \
 	  echo "*"; \
 	  echo "* Unable to find $$DIR/bin/moc, using /usr/bin/moc instead."; \
