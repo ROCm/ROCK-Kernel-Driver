@@ -68,7 +68,7 @@
 
 /* Embedded module documentation macros - see module.h */
 MODULE_AUTHOR("Compaq Computer Corporation");
-MODULE_DESCRIPTION("Driver for Compaq 64-bit/66Mhz PCI Fibre Channel HBA v. 2.5.3");
+MODULE_DESCRIPTION("Driver for Compaq 64-bit/66Mhz PCI Fibre Channel HBA v. 2.5.4");
 MODULE_LICENSE("GPL");
   
 int cpqfcTS_TargetDeviceReset( Scsi_Device *ScsiDev, unsigned int reset_flags);
@@ -668,7 +668,11 @@ int cpqfcTS_ioctl( Scsi_Device *ScsiDev, int Cmnd, void *arg)
 	{
 	  memcpy( vendor_cmd->sense_data, // see struct def - size=40
 		  ScsiPassThruReq->sr_sense_buffer, 
-		  sizeof(ScsiPassThruReq->sr_sense_buffer)); 
+		  sizeof(ScsiPassThruReq->sr_sense_buffer) <
+                  sizeof(vendor_cmd->sense_data)           ?
+                  sizeof(ScsiPassThruReq->sr_sense_buffer) :
+                  sizeof(vendor_cmd->sense_data)
+                ); 
 	}
         SDpnt = ScsiPassThruReq->sr_device;
 	/* upper_private_data is already freed in call_scsi_done() */
