@@ -133,52 +133,6 @@ acpi_container_remove(struct acpi_device *device, int type)
 
 
 static int
-container_run_sbin_hotplug(struct acpi_device *device, char *action)
-{
-	char *argv[3], *envp[6], action_str[32];
-	int i, ret;
-	int len;
-	char pathname[ACPI_PATHNAME_MAX] = {0};
-	acpi_status status;
-	char *container_str;
-	struct acpi_buffer buffer = {ACPI_PATHNAME_MAX, pathname};
-
-	ACPI_FUNCTION_TRACE("container_run_sbin_hotplug");
-
-
-	status = acpi_get_name(device->handle, ACPI_FULL_PATHNAME, &buffer);
-	if (ACPI_FAILURE(status)) {
-		return(-ENODEV);
-	}
-
-	len = strlen("CONTAINER=") + strlen(pathname) + 1;
-	container_str = kmalloc(len, GFP_KERNEL);
-	if (!container_str)
-		return(-ENOMEM);
-
-	sprintf(container_str, "CONTAINER=%s",pathname);
-	sprintf(action_str, "ACTION=%s", action);
-
-	i = 0;
-	argv[i++] = hotplug_path;
-	argv[i++] = "container";
-	argv[i] = NULL;
-
-	i = 0;
-	envp[i++] = "HOME=/";
-	envp[i++] = "PATH=/sbin;/bin;/usr/sbin;/usr/bin";
-	envp[i++] = action_str;
-	envp[i++] = container_str;
-	envp[i++] = "PLATFORM=ACPI";
-	envp[i] = NULL;
-
-	ret = call_usermodehelper(argv[0], argv, envp, 0);
-
-	kfree(container_str);
-	return_VALUE(ret);
-}
-
-static int
 container_device_add(struct acpi_device **device, acpi_handle handle)
 {
 	acpi_handle phandle;
@@ -228,16 +182,16 @@ container_notify_cb(acpi_handle handle, u32 type, void *context)
 			if (ACPI_FAILURE(status) || !device) {
 				result = container_device_add(&device, handle);
 				if (!result)
-					container_run_sbin_hotplug(device, "add");
+					kobject_hotplug(&device->kobj, KOBJ_ONLINE);
 			} else {
 				/* device exist and this is a remove request */
-				container_run_sbin_hotplug(device, "remove");
+				kobject_hotplug(&device->kobj, KOBJ_OFFLINE);
 			}
 		}
 		break;
 	case ACPI_NOTIFY_EJECT_REQUEST:
 		if (!acpi_bus_get_device(handle, &device) && device) {
-			container_run_sbin_hotplug(device, "remove");
+			kobject_hotplug(&device->kobj, KOBJ_OFFLINE);
 		}
 		break;
 	default:

@@ -2628,56 +2628,6 @@ static struct dmi_system_id __initdata processor_dmi_table[] = {
 static int is_processor_present(acpi_handle handle);
 
 static int
-processor_run_sbin_hotplug(struct acpi_device *device,
-	       int cpu, char *action)
-{
-	char *argv[3], *envp[7], action_str[32], cpu_str[15];
-	int i, ret;
-	int len;
-	char pathname[ACPI_PATHNAME_MAX] = {0};
-	acpi_status status;
-	char *processor_str;
-	struct acpi_buffer buffer = {ACPI_PATHNAME_MAX, pathname};
-
-	ACPI_FUNCTION_TRACE("processor_run_sbin_hotplug");
-
-
-	status = acpi_get_name(device->handle, ACPI_FULL_PATHNAME, &buffer);
-	if (ACPI_FAILURE(status)) {
-		return(-ENODEV);
-	}
-
-	len = strlen("PROCESSOR=") + strlen(pathname) + 1;
-	processor_str = kmalloc(len, GFP_KERNEL);
-	if (!processor_str)
-		return(-ENOMEM);
-
-	sprintf(processor_str, "PROCESSOR=%s",pathname);
-	sprintf(action_str, "ACTION=%s", action);
-	sprintf(cpu_str, "CPU=%d", cpu);
-
-	i = 0;
-	argv[i++] = hotplug_path;
-	argv[i++] = "cpu";
-	argv[i] = NULL;
-
-	i = 0;
-	envp[i++] = "HOME=/";
-	envp[i++] = "PATH=/sbin;/bin;/usr/sbin;/usr/bin";
-	envp[i++] = action_str;
-	envp[i++] = processor_str;
-	envp[i++] = cpu_str;
-	envp[i++] = "PLATFORM=ACPI";
-	envp[i] = NULL;
-
-	ret = call_usermodehelper(argv[0], argv, envp, 0);
-
-	kfree(processor_str);
-	return_VALUE(ret);
-}
-
-
-static int
 is_processor_present(
 	acpi_handle handle)
 {
@@ -2726,7 +2676,7 @@ int acpi_processor_device_add(
 		return_VALUE(-ENODEV);
 
 	if ((pr->id >=0) && (pr->id < NR_CPUS)) {
-		processor_run_sbin_hotplug(*device, pr->id, "add");
+		kobject_hotplug(&(*device)->kobj, KOBJ_ONLINE);
 	}
 	return_VALUE(0);
 }
@@ -2770,13 +2720,13 @@ acpi_processor_hotplug_notify (
 		}
 		
 		if (pr->id >= 0 && (pr->id < NR_CPUS)) {
-			processor_run_sbin_hotplug(device, pr->id, "remove");
+			kobject_hotplug(&device->kobj, KOBJ_OFFLINE);
 			break;
 		}
 
 		result = acpi_processor_start(device);
 		if ((!result) && ((pr->id >=0) && (pr->id < NR_CPUS))) {
-			processor_run_sbin_hotplug(device, pr->id, "add");
+			kobject_hotplug(&device->kobj, KOBJ_ONLINE);
 		} else {
 			ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
 				"Device [%s] failed to start\n",
@@ -2797,7 +2747,7 @@ acpi_processor_hotplug_notify (
 		}
 
 		if ((pr->id < NR_CPUS) && (cpu_present(pr->id)))
-			processor_run_sbin_hotplug(device, pr->id, "remove");
+			kobject_hotplug(&device->kobj, KOBJ_OFFLINE);
 		break;
 	default:
 		ACPI_DEBUG_PRINT((ACPI_DB_INFO,
