@@ -315,7 +315,6 @@ int wd33c93_queuecommand (Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *))
 {
    struct WD33C93_hostdata *hostdata;
    Scsi_Cmnd *tmp;
-   unsigned long flags;
 
    hostdata = (struct WD33C93_hostdata *)cmd->host->hostdata;
 
@@ -385,8 +384,7 @@ DB(DB_QUEUE_COMMAND,printk("Q-%d-%02x-%ld( ",cmd->target,cmd->cmnd[0],cmd->pid))
     * sense data is not lost before REQUEST_SENSE executes.
     */
 
-   save_flags(flags);
-   cli();
+   spin_lock_irq(&hostdata->lock);
 
    if (!(hostdata->input_Q) || (cmd->cmnd[0] == REQUEST_SENSE)) {
       cmd->host_scribble = (uchar *)hostdata->input_Q;
@@ -407,7 +405,7 @@ DB(DB_QUEUE_COMMAND,printk("Q-%d-%02x-%ld( ",cmd->target,cmd->cmnd[0],cmd->pid))
 
 DB(DB_QUEUE_COMMAND,printk(")Q-%ld ",cmd->pid))
 
-   restore_flags(flags);
+   spin_unlock_irq(&hostdata->lock);
    return 0;
 }
 
@@ -765,7 +763,7 @@ unsigned long length, flags;
    if (!(asr & ASR_INT) || (asr & ASR_BSY))
       return;
 
-   save_flags(flags);
+   spin_lock_irqsave(&hostdata->lock, flags);
 
 #ifdef PROC_STATISTICS
    hostdata->int_cnt++;
@@ -831,7 +829,7 @@ DB(DB_INTR,printk("TIMEOUT"))
      * is here...
      */
 
-    restore_flags(flags);
+         spin_unlock_irqrestore(&hostdata->lock, flags);
 
 /* We are not connected to a target - check to see if there
  * are commands waiting to be executed.
@@ -885,7 +883,8 @@ printk(" sending SDTR ");
             hostdata->outgoing_len = 1;
 
          hostdata->state = S_CONNECTED;
-         break;
+         spin_unlock_irqrestore(&hostdata->lock, flags);
+	 break;
 
 
       case CSR_XFER_DONE|PHS_DATA_IN:
@@ -895,7 +894,8 @@ DB(DB_INTR,printk("IN-%d.%d",cmd->SCp.this_residual,cmd->SCp.buffers_residual))
          transfer_bytes(regs, cmd, DATA_IN_DIR);
          if (hostdata->state != S_RUNNING_LEVEL2)
             hostdata->state = S_CONNECTED;
-         break;
+         spin_unlock_irqrestore(&hostdata->lock, flags);
+	 break;
 
 
       case CSR_XFER_DONE|PHS_DATA_OUT:
@@ -905,7 +905,8 @@ DB(DB_INTR,printk("OUT-%d.%d",cmd->SCp.this_residual,cmd->SCp.buffers_residual))
          transfer_bytes(regs, cmd, DATA_OUT_DIR);
          if (hostdata->state != S_RUNNING_LEVEL2)
             hostdata->state = S_CONNECTED;
-         break;
+         spin_unlock_irqrestore(&hostdata->lock, flags);
+	 break;
 
 
 /* Note: this interrupt should not occur in a LEVEL2 command */
@@ -916,7 +917,8 @@ DB(DB_INTR,printk("OUT-%d.%d",cmd->SCp.this_residual,cmd->SCp.buffers_residual))
 DB(DB_INTR,printk("CMND-%02x,%ld",cmd->cmnd[0],cmd->pid))
          transfer_pio(regs, cmd->cmnd, cmd->cmd_len, DATA_OUT_DIR, hostdata);
          hostdata->state = S_CONNECTED;
-         break;
+         spin_unlock_irqrestore(&hostdata->lock, flags);
+	 break;
 
 
       case CSR_XFER_DONE|PHS_STATUS:
@@ -935,7 +937,8 @@ DB(DB_INTR,printk("%02x",cmd->SCp.Status))
          else {
             hostdata->state = S_CONNECTED;
             }
-         break;
+         spin_unlock_irqrestore(&hostdata->lock, flags);
+	 break;
 
 
       case CSR_XFER_DONE|PHS_MESS_IN:
@@ -1085,7 +1088,7 @@ printk("sync_xfer=%02x",hostdata->sync_xfer[cmd->target]);
                write_wd33c93_cmd(regs, WD_CMD_NEGATE_ACK);
                hostdata->state = S_CONNECTED;
             }
-         restore_flags(flags);
+         spin_unlock_irqrestore(&hostdata->lock, flags);
          break;
 
 
@@ -1117,12 +1120,13 @@ DB(DB_INTR,printk(":%d.%d",cmd->SCp.Status,lun))
 /* We are no longer  connected to a target - check to see if
  * there are commands waiting to be executed.
  */
-       restore_flags(flags);
+            spin_unlock_irqrestore(&hostdata->lock, flags);
             wd33c93_execute(instance);
             }
          else {
             printk("%02x:%02x:%02x-%ld: Unknown SEL_XFER_DONE phase!!---",asr,sr,phs,cmd->pid);
-            }
+            spin_unlock_irqrestore(&hostdata->lock, flags);
+	 }
          break;
 
 
@@ -1133,7 +1137,8 @@ DB(DB_INTR,printk("SDP"))
             hostdata->state = S_RUNNING_LEVEL2;
             write_wd33c93(regs, WD_COMMAND_PHASE, 0x41);
             write_wd33c93_cmd(regs, WD_CMD_SEL_ATN_XFER);
-         break;
+         spin_unlock_irqrestore(&hostdata->lock, flags);
+	 break;
 
 
       case CSR_XFER_DONE|PHS_MESS_OUT:
@@ -1163,7 +1168,8 @@ DB(DB_INTR,printk("MSG_OUT="))
 DB(DB_INTR,printk("%02x",hostdata->outgoing_msg[0]))
          hostdata->outgoing_len = 0;
          hostdata->state = S_CONNECTED;
-         break;
+         spin_unlock_irqrestore(&hostdata->lock, flags);
+	 break;
 
 
       case CSR_UNEXP_DISC:
@@ -1184,7 +1190,8 @@ DB(DB_INTR,printk("%02x",hostdata->outgoing_msg[0]))
          if (cmd == NULL) {
             printk(" - Already disconnected! ");
             hostdata->state = S_UNCONNECTED;
-            return;
+            spin_unlock_irqrestore(&hostdata->lock, flags);
+	    return;
             }
 DB(DB_INTR,printk("UNEXP_DISC-%ld",cmd->pid))
          hostdata->connected = NULL;
@@ -1200,7 +1207,7 @@ DB(DB_INTR,printk("UNEXP_DISC-%ld",cmd->pid))
  * there are commands waiting to be executed.
  */
     /* look above for comments on scsi_done() */
-    restore_flags(flags);
+         spin_unlock_irqrestore(&hostdata->lock, flags);
          wd33c93_execute(instance);
          break;
 
@@ -1228,7 +1235,6 @@ DB(DB_INTR,printk(":%d",cmd->SCp.Status))
                else
                   cmd->result = cmd->SCp.Status | (cmd->SCp.Message << 8);
                cmd->scsi_done(cmd);
-          restore_flags(flags);
                break;
             case S_PRE_TMP_DISC:
             case S_RUNNING_LEVEL2:
@@ -1250,6 +1256,7 @@ DB(DB_INTR,printk(":%d",cmd->SCp.Status))
 /* We are no longer connected to a target - check to see if
  * there are commands waiting to be executed.
  */
+         spin_unlock_irqrestore(&hostdata->lock, flags);
          wd33c93_execute(instance);
          break;
 
@@ -1367,7 +1374,8 @@ DB(DB_INTR,printk("RESEL%s", sr == CSR_RESEL_AM ? "_AM" : ""))
 
          if (!cmd) {
             printk("---TROUBLE: target %d.%d not in disconnect queue---",id,lun);
-            return;
+            spin_unlock_irqrestore(&hostdata->lock, flags);
+	    return;
             }
 
    /* Ok, found the command - now start it up again. */
@@ -1397,10 +1405,12 @@ DB(DB_INTR,printk("RESEL%s", sr == CSR_RESEL_AM ? "_AM" : ""))
             hostdata->state = S_CONNECTED;
 
 DB(DB_INTR,printk("-%ld",cmd->pid))
-         break;
+         spin_unlock_irqrestore(&hostdata->lock, flags);
+ break;
          
       default:
          printk("--UNKNOWN INTERRUPT:%02x:%02x:%02x--",asr,sr,phs);
+         spin_unlock_irqrestore(&hostdata->lock, flags);
       }
 
 DB(DB_INTR,printk("} "))
@@ -1830,12 +1840,9 @@ char buf[32];
 #endif
 
 
-   { unsigned long flags;
-     save_flags(flags);
-     cli();
-     reset_wd33c93(instance);
-     restore_flags(flags);
-   }
+   spin_lock_irq(&hostdata->lock);
+   reset_wd33c93(instance);
+   spin_unlock_irq(&hostdata->lock);
 
    printk("wd33c93-%d: chip=%s/%d no_sync=0x%x no_dma=%d",instance->host_no,
          (hostdata->chip==C_WD33C93)?"WD33c93":
@@ -1863,7 +1870,6 @@ int wd33c93_proc_info(char *buf, char **start, off_t off, int len, int hn, int i
 
 char *bp;
 char tbuf[128];
-unsigned long flags;
 struct Scsi_Host *instance;
 struct WD33C93_hostdata *hd;
 Scsi_Cmnd *cmd;
@@ -1928,8 +1934,7 @@ static int stop = 0;
       return len;
       }
 
-   save_flags(flags);
-   cli();
+   spin_lock_irq(&hd->lock);
    bp = buf;
    *bp = '\0';
    if (hd->proc & PR_VERSION) {
@@ -2004,7 +2009,7 @@ static int stop = 0;
          }
       }
    strcat(bp,"\n");
-   restore_flags(flags);
+   spin_unlock_irq(&hd->lock);
    *start = buf;
    if (stop) {
       stop = 0;
