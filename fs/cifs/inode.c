@@ -628,18 +628,50 @@ void
 cifs_truncate_file(struct inode *inode)
 {				/* BB remove - may not need this function after all BB */
 	int xid;
-	int rc = 0;
+	int rc = -EIO;
+	int found = FALSE;
 	struct cifsFileInfo *open_file = NULL;
 	struct cifs_sb_info *cifs_sb;
 	struct cifsTconInfo *pTcon;
 	struct cifsInodeInfo *cifsInode;
 	struct dentry *dirent;
+	struct list_head * tmp;
 	char *full_path = NULL;   
 
 	xid = GetXid();
 
 	cifs_sb = CIFS_SB(inode->i_sb);
 	pTcon = cifs_sb->tcon;
+
+	/* To avoid spurious oplock breaks from server, in the case
+		of inodes that we already have open, avoid doing path
+		based setting of file size if we can do it by handle.
+		This keeps our caching token (oplock) and avoids
+		timeouts when the local oplock break takes longer to flush
+		writebehind data than the SMB timeout for the SetPathInfo 
+		request would allow */
+	read_lock(&GlobalSMBSeslock); 
+	cifsInode = CIFS_I(inode);
+	list_for_each(tmp, &cifsInode->openFileList) {            
+		open_file = list_entry(tmp,struct cifsFileInfo, flist);
+		/* We check if file is open for writing first */
+		if((open_file->pfile) && 
+		   ((open_file->pfile->f_flags & O_RDWR) || 
+			(open_file->pfile->f_flags & O_WRONLY))) {
+			read_unlock(&GlobalSMBSeslock);
+			found = TRUE;
+			rc = CIFSSMBSetFileSize(xid, pTcon, inode->i_size,
+			   open_file->netfid,open_file->pid,FALSE);
+			if(rc == 0) {
+				FreeXid(xid);
+				return;
+			}
+			break;  /* now that we found one valid file handle no
+				sense continuing to loop trying others */
+		}
+	}
+	if(found == FALSE)
+		read_unlock(&GlobalSMBSeslock);
 
 	if (list_empty(&inode->i_dentry)) {
 		cERROR(1,
@@ -648,24 +680,13 @@ cifs_truncate_file(struct inode *inode)
 		FreeXid(xid);
 		return;
 	}
+
 	dirent = list_entry(inode->i_dentry.next, struct dentry, d_alias);
 	if (dirent) {
 		full_path = build_path_from_dentry(dirent);
 		rc = CIFSSMBSetEOF(xid, pTcon, full_path, inode->i_size,FALSE,
 				   cifs_sb->local_nls);
 		cFYI(1,(" SetEOF (truncate) rc = %d",rc));
-		if(rc == -ETXTBSY) {        
-			cifsInode = CIFS_I(inode);
-			if(!list_empty(&(cifsInode->openFileList))) {            
-				open_file = list_entry(cifsInode->openFileList.next,
-					struct cifsFileInfo, flist);           
-            /* We could check if file is open for writing first */
-				 rc = CIFSSMBSetFileSize(xid, pTcon, inode->i_size,
-					open_file->netfid,open_file->pid,FALSE);
-			} else {
-				  cFYI(1,(" No open files to get file handle from"));
-			}
-		}
 		if (!rc)
 			CIFSSMBSetEOF(xid,pTcon,full_path,inode->i_size,TRUE,cifs_sb->local_nls);
            /* allocation size setting seems optional so ignore return code */
@@ -706,6 +727,7 @@ cifs_setattr(struct dentry *direntry, struct iattr *attrs)
 	struct cifsTconInfo *pTcon;
 	char *full_path = NULL;
 	int rc = -EACCES;
+	int found = FALSE;
 	struct cifsFileInfo *open_file = NULL;
 	FILE_BASIC_INFO time_buf;
 	int set_time = FALSE;
@@ -713,6 +735,7 @@ cifs_setattr(struct dentry *direntry, struct iattr *attrs)
 	__u64 uid = 0xFFFFFFFFFFFFFFFFULL;
 	__u64 gid = 0xFFFFFFFFFFFFFFFFULL;
 	struct cifsInodeInfo *cifsInode;
+	struct list_head * tmp;
 
 	xid = GetXid();
 
@@ -730,28 +753,45 @@ cifs_setattr(struct dentry *direntry, struct iattr *attrs)
 	cFYI(1, (" Changing attributes 0x%x", attrs->ia_valid));
 
 	if (attrs->ia_valid & ATTR_SIZE) {
-		rc = CIFSSMBSetEOF(xid, pTcon, full_path, attrs->ia_size,FALSE,
-				   cifs_sb->local_nls);
-		cFYI(1,(" SetEOF (setattrs) rc = %d",rc));
-
-		if(rc == -ETXTBSY) {
-			if(!list_empty(&(cifsInode->openFileList))) {            
-				open_file = list_entry(cifsInode->openFileList.next, 
-					   struct cifsFileInfo, flist);           
-    /* We could check if file is open for writing first */
+		read_lock(&GlobalSMBSeslock); 
+		/* To avoid spurious oplock breaks from server, in the case
+			of inodes that we already have open, avoid doing path
+			based setting of file size if we can do it by handle.
+			This keeps our caching token (oplock) and avoids
+			timeouts when the local oplock break takes longer to flush
+			writebehind data than the SMB timeout for the SetPathInfo 
+			request would allow */
+		list_for_each(tmp, &cifsInode->openFileList) {            
+			open_file = list_entry(tmp,struct cifsFileInfo, flist);
+			/* We check if file is open for writing first */
+			if((open_file->pfile) && 
+				((open_file->pfile->f_flags & O_RDWR) || 
+				 (open_file->pfile->f_flags & O_WRONLY))) {
+				read_unlock(&GlobalSMBSeslock);
+				found = TRUE;
 				rc = CIFSSMBSetFileSize(xid, pTcon, attrs->ia_size,
-					   open_file->netfid,open_file->pid,FALSE);           
-			} else {
-				cFYI(1,(" No open files to get file handle from"));
+					   open_file->netfid,open_file->pid,FALSE);
+				cFYI(1,("SetFileSize by handle (setattrs) rc = %d",rc));
+				break;  /* now that we found one valid file handle no
+						sense continuing to loop trying others */
 			}
 		}
+		if(found == FALSE)
+			read_unlock(&GlobalSMBSeslock);
+
+		if(rc != 0) {
+			rc = CIFSSMBSetEOF(xid, pTcon, full_path, attrs->ia_size,FALSE,
+				   cifs_sb->local_nls);
+			cFYI(1,(" SetEOF by path (setattrs) rc = %d",rc));
+		}
+
         /*  For Allocation Size - do not need to call the following
             it did not hurt if it fails but why bother */
 	/*	CIFSSMBSetEOF(xid, pTcon, full_path, attrs->ia_size, TRUE, cifs_sb->local_nls);*/
+
 		if (rc == 0) {
 			rc = vmtruncate(direntry->d_inode, attrs->ia_size);
 			cifs_trunc_page(direntry->d_inode->i_mapping, direntry->d_inode->i_size); 
-
 /*          cFYI(1,("truncate_page to 0x%lx \n",direntry->d_inode->i_size)); */
 		}
 	}
@@ -817,6 +857,8 @@ cifs_setattr(struct dentry *direntry, struct iattr *attrs)
 		/* BB what if setting one attribute fails  
 			(such as size) but time setting works */
 		time_buf.CreationTime = 0;	/* do not change */
+		/* In the future we should experiment - try setting timestamps
+			 via Handle (SetFileInfo) instead of by path */
 		rc = CIFSSMBSetTimes(xid, pTcon, full_path, &time_buf,
 				cifs_sb->local_nls);
 	}
