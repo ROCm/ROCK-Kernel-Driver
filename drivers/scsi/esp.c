@@ -1955,7 +1955,7 @@ int esp_abort(Scsi_Cmnd *SCptr)
 		esp->msgout_ctr = 0;
 		esp_cmd(esp, ESP_CMD_SATN);
 		spin_unlock_irqrestore(esp->ehost->host_lock, flags);
-		return SCSI_ABORT_PENDING;
+		return SUCCESS;
 	}
 
 	/* If it is still in the issue queue then we can safely
@@ -1984,7 +1984,7 @@ int esp_abort(Scsi_Cmnd *SCptr)
 					ESP_INTSON(esp->dregs);
 
 				spin_unlock_irqrestore(esp->ehost->host_lock, flags);
-				return SCSI_ABORT_SUCCESS;
+				return SUCCESS;
 			}
 		}
 	}
@@ -1998,20 +1998,20 @@ int esp_abort(Scsi_Cmnd *SCptr)
 		if (don)
 			ESP_INTSON(esp->dregs);
 		spin_unlock_irqrestore(esp->ehost->host_lock, flags);
-		return SCSI_ABORT_BUSY;
+		return FAILED;
 	}
 
 	/* It's disconnected, we have to reconnect to re-establish
 	 * the nexus and tell the device to abort.  However, we really
-	 * cannot 'reconnect' per se, therefore we tell the upper layer
-	 * the safest thing we can.  This is, wait a bit, if nothing
-	 * happens, we are really hung so reset the bus.
+	 * cannot 'reconnect' per se.  Don't try to be fancy, just
+	 * indicate failure, which causes our caller to reset the whole
+	 * bus.
 	 */
 
 	if (don)
 		ESP_INTSON(esp->dregs);
 	spin_unlock_irqrestore(esp->ehost->host_lock, flags);
-	return SCSI_ABORT_SNOOZE;
+	return FAILED;
 }
 
 /* We've sent ESP_CMD_RS to the ESP, the interrupt had just
