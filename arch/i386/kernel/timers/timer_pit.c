@@ -1,3 +1,28 @@
+/*
+ * This code largely moved from arch/i386/kernel/time.c.
+ * See comments there for proper credits.
+ */
+
+#include <linux/spinlock.h>
+#include <linux/module.h>
+#include <linux/device.h>
+#include <asm/timer.h>
+#include <asm/io.h>
+
+extern spinlock_t i8259A_lock;
+extern spinlock_t i8253_lock;
+#include "do_timer.h"
+
+static int init_pit(void)
+{
+	return 1;
+}
+
+static void mark_offset_pit(void)
+{
+	/* nothing needed */
+}
+
 
 /* This function must be called with interrupts disabled 
  * It was inspired by Steve McCanne's microtime-i386 for BSD.  -- jrs
@@ -31,7 +56,7 @@
  * comp.protocols.time.ntp!
  */
 
-static unsigned long do_slow_gettimeoffset(void)
+static unsigned long get_offset_pit(void)
 {
 	int count;
 
@@ -94,4 +119,10 @@ static unsigned long do_slow_gettimeoffset(void)
 	return count;
 }
 
-static unsigned long (*do_gettimeoffset)(void) = do_slow_gettimeoffset;
+
+/* tsc timer_opts struct */
+struct timer_opts timer_pit = {
+	init: init_pit, 
+	mark_offset: mark_offset_pit, 
+	get_offset: get_offset_pit
+};

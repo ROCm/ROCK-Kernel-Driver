@@ -2,11 +2,17 @@
 #include <asm/timer.h>
 
 /* list of externed timers */
-/* eg: extern struct timer_opts timer_XXX*/;
+#ifndef CONFIG_X86_TSC
+extern struct timer_opts timer_pit;
+#endif
+extern struct timer_opts timer_tsc;
 
 /* list of timers, ordered by preference */
 struct timer_opts* timers[] = {
-	/* eg: &timer_XXX */
+	&timer_tsc
+#ifndef CONFIG_X86_TSC
+	,&timer_pit
+#endif
 };
 
 #define NR_TIMERS (sizeof(timers)/sizeof(timers[0]))

@@ -1,3 +1,19 @@
+/*
+ * This code largely moved from arch/i386/kernel/time.c.
+ * See comments there for proper credits.
+ */
+
+#include <linux/spinlock.h>
+#include <linux/init.h>
+#include <linux/timex.h>
+
+#include <asm/timer.h>
+#include <asm/io.h>
+
+extern int x86_udelay_tsc;
+extern spinlock_t i8253_lock;
+
+static int use_tsc;
 /* Number of usecs that the last interrupt was delayed */
 static int delay_at_last_interrupt;
 
@@ -10,7 +26,7 @@ static unsigned long last_tsc_low; /* lsb 32 bits of Time Stamp Counter */
  */
 unsigned long fast_gettimeoffset_quotient;
 
-static inline unsigned long do_fast_gettimeoffset(void)
+static unsigned long get_offset_tsc(void)
 {
 	register unsigned long eax, edx;
 
@@ -39,36 +55,35 @@ static inline unsigned long do_fast_gettimeoffset(void)
 	return delay_at_last_interrupt + edx;
 }
 
+static void mark_offset_tsc(void)
+{
+	int count;
+	/*
+	 * It is important that these two operations happen almost at
+	 * the same time. We do the RDTSC stuff first, since it's
+	 * faster. To avoid any inconsistencies, we need interrupts
+	 * disabled locally.
+	 */
 
-
-if (use_tsc)
-	{
-		/*
-		 * It is important that these two operations happen almost at
-		 * the same time. We do the RDTSC stuff first, since it's
-		 * faster. To avoid any inconsistencies, we need interrupts
-		 * disabled locally.
-		 */
-
-		/*
-		 * Interrupts are just disabled locally since the timer irq
-		 * has the SA_INTERRUPT flag set. -arca
-		 */
+	/*
+	 * Interrupts are just disabled locally since the timer irq
+	 * has the SA_INTERRUPT flag set. -arca
+	 */
 	
-		/* read Pentium cycle counter */
+	/* read Pentium cycle counter */
 
-		rdtscl(last_tsc_low);
+	rdtscl(last_tsc_low);
 
-		spin_lock(&i8253_lock);
-		outb_p(0x00, 0x43);     /* latch the count ASAP */
+	spin_lock(&i8253_lock);
+	outb_p(0x00, 0x43);     /* latch the count ASAP */
 
-		count = inb_p(0x40);    /* read the latched count */
-		count |= inb(0x40) << 8;
-		spin_unlock(&i8253_lock);
+	count = inb_p(0x40);    /* read the latched count */
+	count |= inb(0x40) << 8;
+	spin_unlock(&i8253_lock);
 
-		count = ((LATCH-1) - count) * TICK_SIZE;
-		delay_at_last_interrupt = (count + LATCH/2) / LATCH;
-	}
+	count = ((LATCH-1) - count) * TICK_SIZE;
+	delay_at_last_interrupt = (count + LATCH/2) / LATCH;
+}
 
 
 /* ------ Calibrate the TSC ------- 
@@ -83,7 +98,6 @@ if (use_tsc)
 #define CALIBRATE_LATCH	(5 * LATCH)
 #define CALIBRATE_TIME	(5 * 1000020/HZ)
 
-#ifdef CONFIG_X86_TSC
 static unsigned long __init calibrate_tsc(void)
 {
        /* Set the Gate high, disable speaker */
@@ -148,7 +162,6 @@ static unsigned long __init calibrate_tsc(void)
 bad_ctc:
 	return 0;
 }
-#endif /* CONFIG_X86_TSC */
 
 
 #ifdef CONFIG_CPU_FREQ
@@ -196,26 +209,22 @@ static struct notifier_block time_cpufreq_notifier_block = {
 #endif
 
 
-
-#ifdef CONFIG_X86_TSC
-	extern int x86_udelay_tsc;
-#endif
-
-/*
- * If we have APM enabled or the CPU clock speed is variable
- * (CPU stops clock on HLT or slows clock to save power)
- * then the TSC timestamps may diverge by up to 1 jiffy from
- * 'real time' but nothing will break.
- * The most frequent case is that the CPU is "woken" from a halt
- * state by the timer interrupt itself, so we get 0 error. In the
- * rare cases where a driver would "wake" the CPU and request a
- * timestamp, the maximum error is < 1 jiffy. But timestamps are
- * still perfectly ordered.
- * Note that the TSC counter will be reset if APM suspends
- * to disk; this won't break the kernel, though, 'cuz we're
- * smart.  See arch/i386/kernel/apm.c.
- */
-#ifdef CONFIG_X86_TSC
+static int init_tsc(void)
+{
+	/*
+	 * If we have APM enabled or the CPU clock speed is variable
+	 * (CPU stops clock on HLT or slows clock to save power)
+	 * then the TSC timestamps may diverge by up to 1 jiffy from
+	 * 'real time' but nothing will break.
+	 * The most frequent case is that the CPU is "woken" from a halt
+	 * state by the timer interrupt itself, so we get 0 error. In the
+	 * rare cases where a driver would "wake" the CPU and request a
+	 * timestamp, the maximum error is < 1 jiffy. But timestamps are
+	 * still perfectly ordered.
+	 * Note that the TSC counter will be reset if APM suspends
+	 * to disk; this won't break the kernel, though, 'cuz we're
+	 * smart.  See arch/i386/kernel/apm.c.
+	 */
  	/*
  	 *	Firstly we have to do a CPU check for chips with
  	 * 	a potentially buggy TSC. At this point we haven't run
@@ -239,9 +248,6 @@ static struct notifier_block time_cpufreq_notifier_block = {
 			 *	and just enable this for the next intel chips ?
 			 */
 			x86_udelay_tsc = 1;
-#ifndef do_gettimeoffset
-			do_gettimeoffset = do_fast_gettimeoffset;
-#endif
 
 			/* report CPU clock rate in Hz.
 			 * The formula is (10^6 * 2^32) / (2^32 * 1 / (clocks/us)) =
@@ -257,6 +263,17 @@ static struct notifier_block time_cpufreq_notifier_block = {
 #ifdef CONFIG_CPU_FREQ
 			cpufreq_register_notifier(&time_cpufreq_notifier_block, CPUFREQ_TRANSITION_NOTIFIER);
 #endif
+			return 1;
 		}
 	}
-#endif /* CONFIG_X86_TSC */
+	return 0;
+}
+
+/************************************************************/
+
+/* tsc timer_opts struct */
+struct timer_opts timer_tsc = {
+	init: init_tsc, 
+	mark_offset: mark_offset_tsc, 
+	get_offset: get_offset_tsc
+};

@@ -9,6 +9,6 @@ struct timer_opts{
 	/* called by gettimeofday. returns # ms since the last timer interrupt */
 	unsigned long (*get_offset)(void);
 };
-
+#define TICK_SIZE (tick_nsec / 1000)
 struct timer_opts* select_timer(void);
 #endif

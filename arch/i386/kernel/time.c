@@ -53,6 +53,7 @@
 #include <asm/mpspec.h>
 #include <asm/uaccess.h>
 #include <asm/processor.h>
+#include <asm/timer.h>
 
 #include <linux/mc146818rtc.h>
 #include <linux/timex.h>
@@ -78,18 +79,10 @@ extern unsigned long wall_jiffies;
 
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 
-
-#define TICK_SIZE (tick_nsec / 1000)
-
 spinlock_t i8253_lock = SPIN_LOCK_UNLOCKED;
 EXPORT_SYMBOL(i8253_lock);
 
-#ifndef CONFIG_X86_TSC
-#else
-
-#define do_gettimeoffset()	do_fast_gettimeoffset()
-
-#endif
+struct timer_opts* timer;
 
 /*
  * This version of gettimeofday has microsecond resolution
@@ -101,7 +94,7 @@ void do_gettimeofday(struct timeval *tv)
 	unsigned long usec, sec;
 
 	read_lock_irqsave(&xtime_lock, flags);
-	usec = do_gettimeoffset();
+	usec = timer->get_offset();
 	{
 		unsigned long lost = jiffies - wall_jiffies;
 		if (lost)
@@ -129,7 +122,7 @@ void do_settimeofday(struct timeval *tv)
 	 * wall time.  Discover what correction gettimeofday() would have
 	 * made, and then undo it!
 	 */
-	tv->tv_usec -= do_gettimeoffset();
+	tv->tv_usec -= timer->get_offset();
 	tv->tv_usec -= (jiffies - wall_jiffies) * (1000000 / HZ);
 
 	while (tv->tv_usec < 0) {
@@ -295,7 +288,7 @@ void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	 */
 	write_lock(&xtime_lock);
 
-	
+	timer->mark_offset();
  
 	do_timer_interrupt(irq, NULL, regs);
 
@@ -345,6 +338,7 @@ unsigned long get_cmos_time(void)
 	return mktime(year, mon, day, hour, min, sec);
 }
 
+/* XXX this driverfs stuff should probably go elsewhere later -john */
 static struct sys_device device_i8253 = {
 	.name		= "rtc",
 	.id		= 0,
@@ -368,5 +362,6 @@ void __init time_init(void)
 	xtime.tv_nsec = 0;
 
 
+	timer = select_timer();
 	time_init_hook();
 }
