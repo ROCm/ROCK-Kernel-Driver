@@ -769,7 +769,6 @@ static int x25_accept(struct socket *sock, struct socket *newsock, int flags)
 	if (!skb->sk)
 		goto out2;
 	newsk		 = skb->sk;
-	newsk->sk_pair   = NULL;
 	newsk->sk_socket = newsock;
 	newsk->sk_sleep  = &newsock->wait;
 
@@ -887,7 +886,6 @@ int x25_rx_call_request(struct sk_buff *skb, struct x25_neigh *nb,
 	makex25->state = X25_STATE_3;
 
 	sk->sk_ack_backlog++;
-	make->sk_pair = sk;
 
 	x25_insert_socket(make);
 
