@@ -119,7 +119,7 @@ config ACPI_PROCESSOR
 
 config ACPI_PROCESSOR_PERF
 	bool "Processor Performance States"
-	depends on X86 && ACPI && !ACPI_HT_ONLY && CPU_FREQ
+	depends on X86 && ACPI && !ACPI_HT_ONLY && ACPI_PROCESSOR && CPU_FREQ
 	help
 	  This driver adds support for CPU frequency scaling, if this is supported
 	  by the hardware and the BIOS. If you are compiling for a mobile system,

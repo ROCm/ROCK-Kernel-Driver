@@ -255,6 +255,11 @@ config X86_GOOD_APIC
 	depends on MK7 || MPENTIUM4 || MPENTIUMIII || M686 || M586MMX
 	default y
 
+config X86_INTEL_USERCOPY
+	bool
+	depends on MPENTIUM4 || MPENTIUMIII || M586MMX
+	default y
+
 config X86_USE_PPRO_CHECKSUM
 	bool
 	depends on MWINCHIP3D || MWINCHIP2 || MWINCHIPC6 || MCYRIXIII || MK7 || MK6 || MPENTIUM4 || MPENTIUMIII || M686
