@@ -98,8 +98,8 @@ struct sun4c_vac_props {
 	unsigned int num_bytes;     /* Size of the cache */
 	unsigned int num_lines;     /* Number of cache lines */
 	unsigned int do_hwflushes;  /* Hardware flushing available? */
-	enum { NONE, WRITE_THROUGH,
-	    WRITE_BACK } type;      /* What type of VAC? */
+	enum { VAC_NONE, VAC_WRITE_THROUGH,
+	    VAC_WRITE_BACK } type;  /* What type of VAC? */
 	unsigned int linesize;      /* Size of each line in bytes */
 	unsigned int log2lsize;     /* log2(linesize) */
 	unsigned int on;            /* VAC is enabled */

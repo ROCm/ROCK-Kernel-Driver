@@ -42,7 +42,7 @@ sys32_mknod:
 	 and		%o2, %g2, %o2
 
 	.align		32
-	.globl		sys32_sendto, sys32_recvfrom, sys32_getsockopt
+	.globl		sys32_sendto, sys32_recvfrom
 sys32_sendto:
 	sethi		%hi(sys_sendto), %g1
 	jmpl		%g1 + %lo(sys_sendto), %g0
@@ -52,10 +52,6 @@ sys32_recvfrom:
 	sethi		%hi(sys_recvfrom), %g1
 	jmpl		%g1 + %lo(sys_recvfrom), %g0
 	 srl		%o5, 0, %o5
-sys32_getsockopt:
-	sethi		%hi(sys_getsockopt), %g1
-	jmpl		%g1 + %lo(sys_getsockopt), %g0
-	 srl		%o4, 0, %o4
 
 	.globl		sys32_bdflush
 sys32_bdflush:

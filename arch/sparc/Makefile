@@ -41,13 +41,20 @@ core-y += arch/sparc/kernel/ arch/sparc/mm/ arch/sparc/math-emu/
 libs-y += arch/sparc/prom/ arch/sparc/lib/
 
 # Export what is needed by arch/sparc/boot/Makefile
-export init-y core-y drivers-y net-y libs-y HEAD
+# Renaming is done to avoid confusing pattern matching rules in 2.5.45 (multy-)
+INIT_Y		:= $(patsubst %/, %/built-in.o, $(init-y))
+CORE_Y		:= $(core-y)
+CORE_Y		+= kernel/ mm/ fs/ ipc/ security/ crypto/
+CORE_Y		:= $(patsubst %/, %/built-in.o, $(CORE_Y))
+DRIVERS_Y	:= $(patsubst %/, %/built-in.o, $(drivers-y))
+NET_Y		:= $(patsubst %/, %/built-in.o, $(net-y))
+LIBS_Y		:= $(patsubst %/, %/lib.a, $(libs-y))
+export INIT_Y CORE_Y DRIVERS_Y NET_Y LIBS_Y HEAD
 
 image: vmlinux
 	$(MAKE) -C arch/sparc/boot image
 
 archclean:
-	rm -f arch/sparc/kernel/include
 	rm -f $(TOPDIR)/vmlinux.aout
 	-$(MAKE) -C arch/sparc/boot clean
 

@@ -2731,17 +2731,76 @@ static int do_set_icmpv6_filter(int fd, int level, int optname,
 	return ret;
 }
 
+static int do_set_sock_timeout(int fd, int level, int optname, char *optval, int optlen)
+{
+	struct timeval32 *up = (struct timeval32 *) optval;
+	struct timeval ktime;
+	mm_segment_t old_fs;
+	int err;
+
+	if (optlen < sizeof(*up))
+		return -EINVAL;
+	if (get_user(ktime.tv_sec, &up->tv_sec) ||
+	    __get_user(ktime.tv_usec, &up->tv_usec))
+		return -EFAULT;
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	err = sys_setsockopt(fd, level, optname, (char *) &ktime, sizeof(ktime));
+	set_fs(old_fs);
+
+	return err;
+}
+
 asmlinkage int sys32_setsockopt(int fd, int level, int optname,
 				char *optval, int optlen)
 {
 	if (optname == SO_ATTACH_FILTER)
 		return do_set_attach_filter(fd, level, optname,
 					    optval, optlen);
+	if (optname == SO_RCVTIMEO || optname == SO_SNDTIMEO)
+		return do_set_sock_timeout(fd, level, optname, optval, optlen);
 	if (level == SOL_ICMPV6 && optname == ICMPV6_FILTER)
 		return do_set_icmpv6_filter(fd, level, optname,
 					    optval, optlen);
 
 	return sys_setsockopt(fd, level, optname, optval, optlen);
+}
+
+extern asmlinkage long sys_getsockopt(int fd, int level, int optname,
+				      char *optval, int *optlen);
+
+static int do_get_sock_timeout(int fd, int level, int optname, char *optval, int *optlen)
+{
+	struct timeval32 *up = (struct timeval32 *) optval;
+	struct timeval ktime;
+	mm_segment_t old_fs;
+	int len, err;
+
+	if (get_user(len, optlen))
+		return -EFAULT;
+	if (len < sizeof(*up))
+		return -EINVAL;
+	len = sizeof(ktime);
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	err = sys_getsockopt(fd, level, optname, (char *) &ktime, &len);
+	set_fs(old_fs);
+
+	if (!err) {
+		if (put_user(sizeof(*up), optlen) ||
+		    put_user(ktime.tv_sec, &up->tv_sec) ||
+		    __put_user(ktime.tv_usec, &up->tv_usec))
+			err = -EFAULT;
+	}
+	return err;
+}
+
+asmlinkage int sys32_getsockopt(int fd, int level, int optname,
+				char *optval, int *optlen)
+{
+	if (optname == SO_RCVTIMEO || optname == SO_SNDTIMEO)
+		return do_get_sock_timeout(fd, level, optname, optval, optlen);
+	return sys_getsockopt(fd, level, optname, optval, optlen);
 }
 
 extern void check_pending(int signum);
