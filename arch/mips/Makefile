@@ -527,6 +527,7 @@ cflags-$(CONFIG_SGI_IP27)	+= -Iinclude/asm-mips/mach-ip27
 #load-$(CONFIG_SGI_IP27)	+= 0xa80000000001c000
 ifdef CONFIG_MAPPED_KERNEL
 load-$(CONFIG_SGI_IP27)		+= 0xc001c000
+dataoffset-$(CONFIG_SGI_IP27)	+= 0x01000000
 else
 load-$(CONFIG_SGI_IP27)		+= 0x8001c000
 endif
@@ -644,7 +645,7 @@ endif
 CPPFLAGS_vmlinux.lds := \
 	-D"LOADADDR=$(load-y)" \
 	-D"JIFFIES=$(JIFFIES)" \
-	-imacros $(srctree)/include/asm-$(ARCH)/sn/mapped_kernel.h
+	-D"DATAOFFSET=$(if $(dataoffset-y),$(dataoffset-y),0)"
 
 AFLAGS		+= $(cflags-y)
 CFLAGS		+= $(cflags-y)
