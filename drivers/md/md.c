@@ -1610,12 +1610,6 @@ static int do_md_run(mddev_t * mddev)
 	spin_unlock(&pers_lock);
 
 	blk_queue_make_request(mddev->queue, mddev->pers->make_request);
-	printk("%s: setting max_sectors to %d, segment boundary to %d\n",
-		disk->disk_name,
-		chunk_size >> 9,
-		(chunk_size>>1)-1);
-	blk_queue_max_sectors(mddev->queue, chunk_size >> 9);
-	blk_queue_segment_boundary(mddev->queue, (chunk_size>>1) - 1);
 	mddev->queue->queuedata = mddev;
 
 	err = mddev->pers->run(mddev);
