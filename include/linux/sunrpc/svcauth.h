@@ -13,6 +13,7 @@
 
 #include <linux/sunrpc/msg_prot.h>
 #include <linux/sunrpc/cache.h>
+#include <linux/string.h>
 
 struct svc_cred {
 	uid_t			cr_uid;
