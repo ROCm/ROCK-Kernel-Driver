@@ -126,9 +126,7 @@ struct hpsb_host *hpsb_alloc_host(struct hpsb_host_driver *drv, size_t extra,
 	h->hostdata = h + 1;
         h->driver = drv;
 
-        INIT_LIST_HEAD(&h->pending_packets);
-        spin_lock_init(&h->pending_pkt_lock);
-
+	skb_queue_head_init(&h->pending_packet_queue);
 	INIT_LIST_HEAD(&h->addr_space);
 
 	init_timer(&h->delayed_reset);

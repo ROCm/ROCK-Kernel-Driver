@@ -162,7 +162,7 @@ printk(level "%s: " fmt "\n" , OHCI1394_DRIVER_NAME , ## args)
 printk(level "%s: fw-host%d: " fmt "\n" , OHCI1394_DRIVER_NAME, ohci->host->id , ## args)
 
 static char version[] __devinitdata =
-	"$Rev: 1172 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 1191 $ Ben Collins <bcollins@debian.org>";
 
 /* Module Parameters */
 static int phys_dma = 1;
@@ -620,6 +620,39 @@ static void ohci_initialize(struct ti_ohci *ohci)
 		if (status & 0x20)
 			set_phy_reg(ohci, 8, status & ~1);
 	}
+
+        /* Serial EEPROM Sanity check. */
+        if ((ohci->max_packet_size < 512) ||
+	    (ohci->max_packet_size > 4096)) {
+		/* Serial EEPROM contents are suspect, set a sane max packet
+		 * size and print the raw contents for bug reports if verbose
+		 * debug is enabled. */
+#ifdef CONFIG_IEEE1394_VERBOSEDEBUG
+		int i;
+#endif
+
+		PRINT(KERN_DEBUG, "Serial EEPROM has suspicious values, "
+                      "attempting to setting max_packet_size to 512 bytes");
+		reg_write(ohci, OHCI1394_BusOptions,
+			  (reg_read(ohci, OHCI1394_BusOptions) & 0xf007) | 0x8002);
+		ohci->max_packet_size = 512;
+#ifdef CONFIG_IEEE1394_VERBOSEDEBUG
+		PRINT(KERN_DEBUG, "    EEPROM Present: %d",
+		      (reg_read(ohci, OHCI1394_Version) >> 24) & 0x1);
+		reg_write(ohci, OHCI1394_GUID_ROM, 0x80000000);
+
+		for (i = 0; 
+		     ((i < 1000) &&
+		      (reg_read(ohci, OHCI1394_GUID_ROM) & 0x80000000)); i++)
+			udelay(10);
+
+		for (i = 0; i < 0x20; i++) {
+			reg_write(ohci, OHCI1394_GUID_ROM, 0x02000000);
+			PRINT(KERN_DEBUG, "    EEPROM %02x: %02x", i,
+			      (reg_read(ohci, OHCI1394_GUID_ROM) >> 16) & 0xff);
+		}
+#endif
+	}
 }
 
 /* 
@@ -822,7 +855,7 @@ static int dma_trm_flush(struct ti_ohci *ohci, struct dma_trm_ctx *d)
 	/* insert the packets into the dma fifo */
 	while (d->free_prgs > 0 && !list_empty(&d->pending_list)) {
 		struct hpsb_packet *p = driver_packet(d->pending_list.next);
-		list_del(&p->driver_list);
+		list_del_init(&p->driver_list);
 		insert_packet(ohci, d, p);
 	}
 
@@ -2228,7 +2261,7 @@ static void dma_trm_reset(struct dma_trm_ctx *d)
 		struct hpsb_packet *p = driver_packet(packet_list.next);
 		PRINT(KERN_INFO,
 		      "AT dma reset ctx=%d, aborting transmission", d->ctx);
-		list_del(&p->driver_list);
+		list_del_init(&p->driver_list);
 		hpsb_packet_sent(ohci->host, p, ACKX_ABORTED);
 	}
 }
@@ -2818,7 +2851,7 @@ static void dma_trm_tasklet (unsigned long data)
 			}
 		}
 
-                list_del(&packet->driver_list);
+		list_del_init(&packet->driver_list);
 		hpsb_packet_sent(ohci->host, packet, ack);
 
 		if (datasize) {

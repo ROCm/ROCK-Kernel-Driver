@@ -89,7 +89,7 @@
 #define TRACE() printk(KERN_ERR "%s:%s[%d] ---- TRACE\n", driver_name, __FUNCTION__, __LINE__)
 
 static char version[] __devinitdata =
-	"$Rev: 1175 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 1188 $ Ben Collins <bcollins@debian.org>";
 
 struct fragment_info {
 	struct list_head list;
@@ -1538,7 +1538,6 @@ static inline void ether1394_free_packet(struct hpsb_packet *packet)
 {
 	if (packet->tcode != TCODE_STREAM_DATA)
 		hpsb_free_tlabel(packet);
-	packet->data = NULL;
 	hpsb_free_packet(packet);
 }
 
@@ -1797,7 +1796,7 @@ static int ether1394_ethtool_ioctl(struct net_device *dev, void *useraddr)
 		case ETHTOOL_GDRVINFO: {
 			struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
 			strcpy (info.driver, driver_name);
-			strcpy (info.version, "$Rev: 1175 $");
+			strcpy (info.version, "$Rev: 1188 $");
 			/* FIXME XXX provide sane businfo */
 			strcpy (info.bus_info, "ieee1394");
 			if (copy_to_user (useraddr, &info, sizeof (info)))

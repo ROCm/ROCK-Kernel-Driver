@@ -78,7 +78,7 @@
 #include "sbp2.h"
 
 static char version[] __devinitdata =
-	"$Rev: 1170 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 1183 $ Ben Collins <bcollins@debian.org>";
 
 /*
  * Module load parameter definitions
@@ -658,7 +658,7 @@ static int sbp2_update(struct unit_directory *ud)
 		if (sbp2_login_device(scsi_id)) {
 			/* Login failed too, just fail, and the backend
 			 * will call our sbp2_remove for us */
-			SBP2_INFO("sbp2_reconnect_device failed!");
+			SBP2_ERR("Failed to reconnect to sbp2 device!");
 			return -EBUSY;
 		}
 	}
@@ -1448,7 +1448,7 @@ static int sbp2_reconnect_device(struct scsi_id_instance_data *scsi_id)
 		return(-EIO);
 	}
 
-	SBP2_INFO("Reconnected to SBP-2 device");
+	HPSB_DEBUG("Reconnected to SBP-2 device");
 
 	return(0);
 
@@ -1638,10 +1638,10 @@ static int sbp2_max_speed_and_size(struct scsi_id_instance_data *scsi_id)
 	scsi_id->max_payload_size = min(sbp2_speedto_max_payload[scsi_id->speed_code],
 					(u8)(hi->host->csr.max_rec - 1));
 
-	SBP2_ERR("Node " NODE_BUS_FMT ": Max speed [%s] - Max payload [%u]",
-		 NODE_BUS_ARGS(hi->host, scsi_id->ne->nodeid),
-		 hpsb_speedto_str[scsi_id->speed_code],
-		 1 << ((u32)scsi_id->max_payload_size + 2));
+	HPSB_DEBUG("Node " NODE_BUS_FMT ": Max speed [%s] - Max payload [%u]",
+		   NODE_BUS_ARGS(hi->host, scsi_id->ne->nodeid),
+		   hpsb_speedto_str[scsi_id->speed_code],
+		   1 << ((u32)scsi_id->max_payload_size + 2));
 
 	return(0);
 }

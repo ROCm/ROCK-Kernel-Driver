@@ -5,6 +5,8 @@
 #include <linux/wait.h>
 #include <linux/list.h>
 #include <linux/timer.h>
+#include <linux/skbuff.h>
+
 #include <asm/semaphore.h>
 
 #include "ieee1394_types.h"
@@ -21,8 +23,8 @@ struct hpsb_host {
 
         atomic_t generation;
 
-        struct list_head pending_packets;
-        spinlock_t pending_pkt_lock;
+	struct sk_buff_head pending_packet_queue;
+
 	struct timer_list timeout;
 	unsigned long timeout_interval;
 

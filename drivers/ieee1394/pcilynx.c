@@ -767,7 +767,7 @@ static int lynx_devctl(struct hpsb_host *host, enum devctl_cmd cmd, int arg)
                         get_pcl(lynx, lynx->async.pcl, &pcl);
 
                         packet = driver_packet(lynx->async.pcl_queue.next);
-                        list_del(&packet->driver_list);
+			list_del_init(&packet->driver_list);
 
                         pci_unmap_single(lynx->dev, lynx->async.header_dma,
                                          packet->header_size, PCI_DMA_TODEVICE);
@@ -795,7 +795,7 @@ static int lynx_devctl(struct hpsb_host *host, enum devctl_cmd cmd, int arg)
 
 		while (!list_empty(&packet_list)) {
 			packet = driver_packet(packet_list.next);
-			list_del(&packet->driver_list);
+			list_del_init(&packet->driver_list);
 			hpsb_packet_sent(host, packet, ACKX_ABORTED);
 		}
 
@@ -1292,7 +1292,7 @@ static irqreturn_t lynx_irq_handler(int irq, void *dev_id,
                         get_pcl(lynx, lynx->async.pcl, &pcl);
 
                         packet = driver_packet(lynx->async.pcl_queue.next);
-                        list_del(&packet->driver_list);
+                        list_del_init(&packet->driver_list);
 
                         pci_unmap_single(lynx->dev, lynx->async.header_dma,
                                          packet->header_size, PCI_DMA_TODEVICE);
@@ -1338,7 +1338,7 @@ static irqreturn_t lynx_irq_handler(int irq, void *dev_id,
                         get_pcl(lynx, lynx->iso_send.pcl, &pcl);
 
                         packet = driver_packet(lynx->iso_send.pcl_queue.next);
-                        list_del(&packet->driver_list);
+                        list_del_init(&packet->driver_list);
 
                         pci_unmap_single(lynx->dev, lynx->iso_send.header_dma,
                                          packet->header_size, PCI_DMA_TODEVICE);
@@ -1460,7 +1460,7 @@ static void remove_card(struct pci_dev *dev)
                 reg_write(lynx, PCI_INT_ENABLE, 0);
                 free_irq(lynx->dev->irq, lynx);
 
-		/* Disable IRM Contender */
+		/* Disable IRM Contender and LCtrl */
 		if (lynx->phyic.reg_1394a)
 			set_phy_reg(lynx, 4, ~0xc0 & get_phy_reg(lynx, 4));
 
@@ -1788,12 +1788,12 @@ static int __devinit add_card(struct pci_dev *dev,
                 reg_set_bits(lynx, GPIO_CTRL_A, 0x1);
                 reg_write(lynx, GPIO_DATA_BASE + 0x3c, 0x1); 
         } else {
-                /* set the contender bit in the extended PHY register
+                /* set the contender and LCtrl bit in the extended PHY register
                  * set. (Should check that bis 0,1,2 (=0xE0) is set
                  * in register 2?)
                  */
                 i = get_phy_reg(lynx, 4);
-                if (i != -1) set_phy_reg(lynx, 4, i | 0x40);
+                if (i != -1) set_phy_reg(lynx, 4, i | 0xc0);
         }
 
 
