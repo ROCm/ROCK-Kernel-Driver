@@ -470,7 +470,6 @@ void dasd_devmap_exit(void);
 struct dasd_device *dasd_create_device(struct ccw_device *);
 void dasd_delete_device(struct dasd_device *);
 
-kdev_t dasd_get_kdev(struct dasd_device *);
 struct dasd_device *dasd_device_from_devindex(int);
 
 int dasd_parse(void);
