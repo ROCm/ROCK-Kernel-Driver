@@ -1447,7 +1447,6 @@ static void __exit video1394_exit_module (void)
 	hpsb_unregister_highlevel(&video1394_highlevel);
 
 	devfs_remove(VIDEO1394_DRIVER_NAME);
-	cdev_unmap(IEEE1394_VIDEO1394_DEV, 16);
 	cdev_del(&video1394_cdev);
 
 	PRINT_G(KERN_INFO, "Removed " VIDEO1394_DRIVER_NAME " module");

@@ -16,6 +16,7 @@
 
 #ifdef __KERNEL__
 #include <linux/sunrpc/xdr.h>
+#include <linux/uio.h>
 
 /* The mechanism-independent gss-api context: */
 struct gss_ctx {
@@ -39,11 +40,11 @@ u32 gss_import_sec_context(
 u32 gss_get_mic(
 		struct gss_ctx		*ctx_id,
 		u32			qop,
-		struct xdr_netobj	*message,
+		struct xdr_buf		*message,
 		struct xdr_netobj	*mic_token);
 u32 gss_verify_mic(
 		struct gss_ctx		*ctx_id,
-		struct xdr_netobj	*message,
+		struct xdr_buf		*message,
 		struct xdr_netobj	*mic_token,
 		u32			*qstate);
 u32 gss_delete_sec_context(
@@ -95,11 +96,11 @@ struct gss_api_ops {
 	u32 (*gss_get_mic)(
 			struct gss_ctx		*ctx_id,
 			u32			qop, 
-			struct xdr_netobj	*message,
+			struct xdr_buf		*message,
 			struct xdr_netobj	*mic_token);
 	u32 (*gss_verify_mic)(
 			struct gss_ctx		*ctx_id,
-			struct xdr_netobj	*message,
+			struct xdr_buf		*message,
 			struct xdr_netobj	*mic_token,
 			u32			*qstate);
 	void (*gss_delete_sec_context)(

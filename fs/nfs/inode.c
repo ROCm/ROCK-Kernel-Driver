@@ -158,10 +158,7 @@ nfs_put_super(struct super_block *sb)
 {
 	struct nfs_server *server = NFS_SB(sb);
 
-#ifdef CONFIG_NFS_V4
-	if (server->idmap != NULL)
-		nfs_idmap_delete(server);
-#endif /* CONFIG_NFS_V4 */
+	nfs4_renewd_prepare_shutdown(server);
 
 	if (server->client != NULL)
 		rpc_shutdown_client(server->client);
@@ -301,7 +298,6 @@ nfs_sb_init(struct super_block *sb, rpc_authflavor_t authflavor)
 	server = NFS_SB(sb);
 
 	sb->s_magic      = NFS_SUPER_MAGIC;
-	sb->s_op         = &nfs_sops;
 
 	/* Did getting the root inode fail? */
 	if (nfs_get_root(&root_inode, authflavor, sb, &server->fh) < 0)
@@ -310,7 +306,7 @@ nfs_sb_init(struct super_block *sb, rpc_authflavor_t authflavor)
 	if (!sb->s_root)
 		goto out_no_root;
 
-	sb->s_root->d_op = &nfs_dentry_operations;
+	sb->s_root->d_op = server->rpc_ops->dentry_ops;
 
 	/* Get some general file system info */
         if (server->rpc_ops->fsinfo(server, &server->fh, &fsinfo) < 0) {
@@ -493,10 +489,17 @@ nfs_fill_super(struct super_block *sb, struct nfs_mount_data *data, int silent)
 	server->client = nfs_create_client(server, data);
 	if (server->client == NULL)
 		goto out_fail;
-	data->pseudoflavor = RPC_AUTH_UNIX;	/* RFC 2623, sec 2.3.2 */
-	server->client_sys = nfs_create_client(server, data);
-	if (server->client_sys == NULL)
-		goto out_shutdown;
+	/* RFC 2623, sec 2.3.2 */
+	if (authflavor != RPC_AUTH_UNIX) {
+		server->client_sys = rpc_clone_client(server->client);
+		if (server->client_sys == NULL)
+			goto out_shutdown;
+		if (!rpcauth_create(RPC_AUTH_UNIX, server->client_sys))
+			goto out_shutdown;
+	} else {
+		atomic_inc(&server->client->cl_count);
+		server->client_sys = server->client;
+	}
 
 	/* Fire up rpciod if not yet running */
 	if (rpciod_up() != 0) {
@@ -504,6 +507,7 @@ nfs_fill_super(struct super_block *sb, struct nfs_mount_data *data, int silent)
 		goto out_shutdown;
 	}
 
+	sb->s_op = &nfs_sops;
 	err = nfs_sb_init(sb, authflavor);
 	if (err != 0)
 		goto out_noinit;
@@ -736,7 +740,7 @@ nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 			inode->i_data.a_ops = &nfs_file_aops;
 			inode->i_data.backing_dev_info = &NFS_SB(sb)->backing_dev_info;
 		} else if (S_ISDIR(inode->i_mode)) {
-			inode->i_op = &nfs_dir_inode_operations;
+			inode->i_op = NFS_SB(sb)->rpc_ops->dir_inode_ops;
 			inode->i_fop = &nfs_dir_operations;
 			if (nfs_server_capable(inode, NFS_CAP_READDIRPLUS)
 			    && fattr->size <= NFS_LIMIT_READDIRPLUS)
@@ -828,7 +832,12 @@ printk("nfs_setattr: revalidate failed, error=%d\n", error);
 		filemap_fdatawait(inode->i_mapping);
 		if (error)
 			goto out;
+		/* Optimize away unnecessary truncates */
+		if ((attr->ia_valid & ATTR_SIZE) && i_size_read(inode) == attr->ia_size)
+			attr->ia_valid &= ~ATTR_SIZE;
 	}
+	if (!attr->ia_valid)
+		goto out;
 
 	error = NFS_PROTO(inode)->setattr(dentry, &fattr, attr);
 	if (error)
@@ -1274,6 +1283,8 @@ static struct super_block *nfs_get_sb(struct file_system_type *fs_type,
 	if (!server)
 		return ERR_PTR(-ENOMEM);
 	memset(server, 0, sizeof(struct nfs_server));
+	/* Zero out the NFS state stuff */
+	init_nfsv4_state(server);
 
 	root = &server->fh;
 	memcpy(root, &data->root, sizeof(*root));
@@ -1346,9 +1357,52 @@ static struct file_system_type nfs_fs_type = {
 
 #ifdef CONFIG_NFS_V4
 
+static void nfs4_clear_inode(struct inode *);
+
+static struct super_operations nfs4_sops = { 
+	.alloc_inode	= nfs_alloc_inode,
+	.destroy_inode	= nfs_destroy_inode,
+	.write_inode	= nfs_write_inode,
+	.delete_inode	= nfs_delete_inode,
+	.put_super	= nfs_put_super,
+	.statfs		= nfs_statfs,
+	.clear_inode	= nfs4_clear_inode,
+	.umount_begin	= nfs_umount_begin,
+	.show_options	= nfs_show_options,
+};
+
+/*
+ * Clean out any remaining NFSv4 state that might be left over due
+ * to open() calls that passed nfs_atomic_lookup, but failed to call
+ * nfs_open().
+ */
+static void nfs4_clear_inode(struct inode *inode)
+{
+	struct nfs_inode *nfsi = NFS_I(inode);
+
+	while (!list_empty(&nfsi->open_states)) {
+		struct nfs4_state *state;
+		
+		state = list_entry(nfsi->open_states.next,
+				struct nfs4_state,
+				inode_states);
+		dprintk("%s(%s/%Ld): found unclaimed NFSv4 state %p\n",
+				__FUNCTION__,
+				inode->i_sb->s_id,
+				(long long)NFS_FILEID(inode),
+				state);
+		list_del(&state->inode_states);
+		nfs4_put_open_state(state);
+	}
+	/* Now call standard NFS clear_inode() code */
+	nfs_clear_inode(inode);
+}
+
+
 static int nfs4_fill_super(struct super_block *sb, struct nfs4_mount_data *data, int silent)
 {
 	struct nfs_server *server;
+	struct nfs4_client *clp = NULL;
 	struct rpc_xprt *xprt = NULL;
 	struct rpc_clnt *clnt = NULL;
 	struct rpc_timeout timeparms;
@@ -1398,13 +1452,13 @@ static int nfs4_fill_super(struct super_block *sb, struct nfs4_mount_data *data,
 		return -EINVAL;
 	}
 
-	/* Now create transport and client */
-	xprt = xprt_create_proto(proto, &server->addr, &timeparms);
-	if (xprt == NULL) {
-		printk(KERN_WARNING "NFS: cannot create RPC transport.\n");
+	clp = nfs4_get_client(&server->addr.sin_addr);
+	if (!clp) {
+		printk(KERN_WARNING "NFS: failed to create NFS4 client.\n");
 		goto out_fail;
 	}
 
+	/* Now create transport and client */
 	authflavour = RPC_AUTH_UNIX;
 	if (data->auth_flavourlen != 0) {
 		if (data->auth_flavourlen > 1)
@@ -1414,18 +1468,56 @@ static int nfs4_fill_super(struct super_block *sb, struct nfs4_mount_data *data,
 			goto out_fail;
 		}
 	}
-	clnt = rpc_create_client(xprt, server->hostname, &nfs_program,
-				 server->rpc_ops->version, authflavour);
+
+	down_write(&clp->cl_sem);
+	if (clp->cl_rpcclient == NULL) {
+		xprt = xprt_create_proto(proto, &server->addr, &timeparms);
+		if (xprt == NULL) {
+			up_write(&clp->cl_sem);
+			printk(KERN_WARNING "NFS: cannot create RPC transport.\n");
+			goto out_fail;
+		}
+		clnt = rpc_create_client(xprt, server->hostname, &nfs_program,
+				server->rpc_ops->version, authflavour);
+		if (clnt == NULL) {
+			up_write(&clp->cl_sem);
+			printk(KERN_WARNING "NFS: cannot create RPC client.\n");
+			xprt_destroy(xprt);
+			goto out_fail;
+		}
+		clnt->cl_chatty   = 1;
+		clp->cl_rpcclient = clnt;
+		clp->cl_cred = rpcauth_lookupcred(clnt->cl_auth, 0);
+		memcpy(clp->cl_ipaddr, server->ip_addr, sizeof(clp->cl_ipaddr));
+		nfs_idmap_new(clp);
+	}
+	if (list_empty(&clp->cl_superblocks))
+		clear_bit(NFS4CLNT_OK, &clp->cl_state);
+	list_add_tail(&server->nfs4_siblings, &clp->cl_superblocks);
+	clnt = rpc_clone_client(clp->cl_rpcclient);
+	server->nfs4_state = clp;
+	up_write(&clp->cl_sem);
+	clp = NULL;
+
 	if (clnt == NULL) {
 		printk(KERN_WARNING "NFS: cannot create RPC client.\n");
-		xprt_destroy(xprt);
-		goto out_fail;
+		goto out_remove_list;
+	}
+	if (server->nfs4_state->cl_idmap == NULL) {
+		printk(KERN_WARNING "NFS: failed to create idmapper.\n");
+		goto out_shutdown;
 	}
 
 	clnt->cl_intr     = (server->flags & NFS4_MOUNT_INTR) ? 1 : 0;
 	clnt->cl_softrtry = (server->flags & NFS4_MOUNT_SOFT) ? 1 : 0;
-	clnt->cl_chatty   = 1;
 	server->client    = clnt;
+
+	if (clnt->cl_auth->au_flavor != authflavour) {
+		if (rpcauth_create(authflavour, clnt) == NULL) {
+			printk(KERN_WARNING "NFS: couldn't create credcache!\n");
+			goto out_shutdown;
+		}
+	}
 
 	/* Fire up rpciod if not yet running */
 	if (rpciod_up() != 0) {
@@ -1433,22 +1525,21 @@ static int nfs4_fill_super(struct super_block *sb, struct nfs4_mount_data *data,
 		goto out_shutdown;
 	}
 
-	if (create_nfsv4_state(server, data))
-		goto out_shutdown;
-
-	if ((server->idmap = nfs_idmap_new(server)) == NULL)
-		printk(KERN_WARNING "NFS: couldn't start IDmap\n");
-
+	sb->s_op = &nfs4_sops;
 	err = nfs_sb_init(sb, authflavour);
 	if (err == 0)
 		return 0;
 	rpciod_down();
-	destroy_nfsv4_state(server);
-	if (server->idmap != NULL)
-		nfs_idmap_delete(server);
 out_shutdown:
 	rpc_shutdown_client(server->client);
+out_remove_list:
+	down_write(&server->nfs4_state->cl_sem);
+	list_del_init(&server->nfs4_siblings);
+	up_write(&server->nfs4_state->cl_sem);
+	destroy_nfsv4_state(server);
 out_fail:
+	if (clp)
+		nfs4_put_client(clp);
 	return err;
 }
 
@@ -1505,6 +1596,8 @@ static struct super_block *nfs4_get_sb(struct file_system_type *fs_type,
 	if (!server)
 		return ERR_PTR(-ENOMEM);
 	memset(server, 0, sizeof(struct nfs_server));
+	/* Zero out the NFS state stuff */
+	init_nfsv4_state(server);
 
 	if (data->version != NFS4_MOUNT_VERSION) {
 		printk("nfs warning: mount version %s than kernel\n",

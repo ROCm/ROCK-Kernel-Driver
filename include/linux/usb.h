@@ -274,7 +274,6 @@ struct usb_device {
 };
 #define	to_usb_device(d) container_of(d, struct usb_device, dev)
 
-extern struct usb_device *usb_alloc_dev(struct usb_device *parent, struct usb_bus *);
 extern struct usb_device *usb_get_dev(struct usb_device *dev);
 extern void usb_put_dev(struct usb_device *dev);
 
@@ -1015,16 +1014,6 @@ static inline unsigned int __create_pipe(struct usb_device *dev, unsigned int en
 #define usb_rcvintpipe(dev,endpoint)	((PIPE_INTERRUPT << 30) | __create_pipe(dev,endpoint) | USB_DIR_IN)
 
 /* -------------------------------------------------------------------------- */
-
-/*
- * Debugging and troubleshooting/diagnostic helpers.
- */
-void usb_show_device_descriptor(struct usb_device_descriptor *);
-void usb_show_config_descriptor(struct usb_config_descriptor *);
-void usb_show_interface_descriptor(struct usb_interface_descriptor *);
-void usb_show_endpoint_descriptor(struct usb_endpoint_descriptor *);
-void usb_show_device(struct usb_device *);
-void usb_show_string(struct usb_device *dev, char *id, int index);
 
 #ifdef DEBUG
 #define dbg(format, arg...) printk(KERN_DEBUG "%s: " format "\n" , __FILE__ , ## arg)

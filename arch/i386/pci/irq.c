@@ -943,12 +943,50 @@ int pirq_enable_irq(struct pci_dev *dev)
 {
 	u8 pin;
 	extern int interrupt_line_quirk;
+	struct pci_dev *temp_dev;
+
 	pci_read_config_byte(dev, PCI_INTERRUPT_PIN, &pin);
 	if (pin && !pcibios_lookup_irq(dev, 1) && !dev->irq) {
 		char *msg;
-		if (io_apic_assign_pci_irqs)
-			msg = " Probably buggy MP table.";
-		else if (pci_probe & PCI_BIOS_IRQ_SCAN)
+		msg = "";
+		if (io_apic_assign_pci_irqs) {
+			int irq;
+
+			if (pin) {
+				pin--;		/* interrupt pins are numbered starting from 1 */
+				irq = IO_APIC_get_PCI_irq_vector(dev->bus->number, PCI_SLOT(dev->devfn), pin);
+				/*
+				 * Busses behind bridges are typically not listed in the MP-table.
+				 * In this case we have to look up the IRQ based on the parent bus,
+				 * parent slot, and pin number. The SMP code detects such bridged
+				 * busses itself so we should get into this branch reliably.
+				 */
+				temp_dev = dev;
+				while (irq < 0 && dev->bus->parent) { /* go back to the bridge */
+					struct pci_dev * bridge = dev->bus->self;
+
+					pin = (pin + PCI_SLOT(dev->devfn)) % 4;
+					irq = IO_APIC_get_PCI_irq_vector(bridge->bus->number, 
+							PCI_SLOT(bridge->devfn), pin);
+					if (irq >= 0)
+						printk(KERN_WARNING "PCI: using PPB(B%d,I%d,P%d) to get irq %d\n", 
+							bridge->bus->number, PCI_SLOT(bridge->devfn), pin, irq);
+					dev = bridge;
+				}
+				dev = temp_dev;
+				if (irq >= 0) {
+#ifdef CONFIG_PCI_USE_VECTOR
+					if (!platform_legacy_irq(irq))
+						irq = IO_APIC_VECTOR(irq);
+#endif
+					printk(KERN_INFO "PCI->APIC IRQ transform: (B%d,I%d,P%d) -> %d\n",
+						dev->bus->number, PCI_SLOT(dev->devfn), pin, irq);
+					dev->irq = irq;
+					return 0;
+				} else
+					msg = " Probably buggy MP table.";
+			}
+		} else if (pci_probe & PCI_BIOS_IRQ_SCAN)
 			msg = "";
 		else
 			msg = " Please try using pci=biosirq.";

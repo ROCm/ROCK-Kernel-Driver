@@ -1394,7 +1394,7 @@ static irqreturn_t via_ircc_interrupt(int irq, void *dev_id,
 
 	}			//Rx Event
 	spin_unlock(&self->lock);
-	return IRQ_HANDLED;
+	return IRQ_RETVAL(iHostIntType);
 }
 
 void hwreset(struct via_ircc_cb *self)

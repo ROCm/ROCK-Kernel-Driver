@@ -1,12 +1,10 @@
 /*
- *	../include/linux/pci_msi.h
+ *	msi.h
  *
  */
 
-#ifndef _ASM_PCI_MSI_H
-#define _ASM_PCI_MSI_H
-
-#include <linux/pci.h>
+#ifndef MSI_H
+#define MSI_H
 
 #define MSI_AUTO -1
 #define NR_REPEATS	23
@@ -82,29 +80,6 @@ extern void restore_ioapic_irq_handler(int irq);
 #define msix_mask(address)		(address | PCI_MSIX_FLAGS_BITMASK)
 #define msix_is_pending(address) 	(address & PCI_MSIX_FLAGS_PENDMASK)
 
-extern char __dbg_str_buf[256];
-#define _DEFINE_DBG_BUFFER	char __dbg_str_buf[256];
-#define _DBG_K_TRACE_ENTRY	((unsigned int)0x00000001)
-#define _DBG_K_TRACE_EXIT	((unsigned int)0x00000002)
-#define _DBG_K_INFO		((unsigned int)0x00000004)
-#define _DBG_K_ERROR		((unsigned int)0x00000008)
-#define _DBG_K_TRACE	(_DBG_K_TRACE_ENTRY | _DBG_K_TRACE_EXIT)
-
-#define _DEBUG_LEVEL	(_DBG_K_INFO | _DBG_K_ERROR | _DBG_K_TRACE)
-#define _DBG_PRINT( dbg_flags, args... )		\
-if ( _DEBUG_LEVEL & (dbg_flags) )			\
-{							\
-	int len;					\
-	len = sprintf(__dbg_str_buf, "%s:%d: %s ", 	\
-		__FILE__, __LINE__, __FUNCTION__ ); 	\
-	sprintf(__dbg_str_buf + len, args);		\
-	printk(KERN_INFO "%s\n", __dbg_str_buf);	\
-}
-
-#define MSI_FUNCTION_TRACE_ENTER	\
-	_DBG_PRINT (_DBG_K_TRACE_ENTRY, "%s", "[Entry]");
-#define MSI_FUNCTION_TRACE_EXIT		\
-	_DBG_PRINT (_DBG_K_TRACE_EXIT, "%s", "[Entry]");
 
 /*
  * MSI Defined Data Structures
@@ -190,4 +165,4 @@ struct msi_desc {
 	struct pci_dev *dev;
 };
 
-#endif /* _ASM_PCI_MSI_H */
+#endif /* MSI_H */

@@ -116,7 +116,7 @@ static int pci_visit_bridge (struct pci_visit * fn,
 	}
 
 	bus = wrapped_dev->dev->subordinate;
-	if(bus) {
+	if (bus) {
 		memset(&wrapped_bus, 0, sizeof(struct pci_bus_wrapped));
 		wrapped_bus.bus = bus;
 
@@ -130,8 +130,8 @@ static int pci_visit_bridge (struct pci_visit * fn,
  * Every bus and every function is presented to a custom
  * function that can act upon it.
  */
-int pci_visit_dev (struct pci_visit *fn, struct pci_dev_wrapped *wrapped_dev,
-		   struct pci_bus_wrapped *wrapped_parent)
+int pci_visit_dev(struct pci_visit *fn, struct pci_dev_wrapped *wrapped_dev,
+		  struct pci_bus_wrapped *wrapped_parent)
 {
 	struct pci_dev* dev = wrapped_dev ? wrapped_dev->dev : NULL;
 	int result = 0;

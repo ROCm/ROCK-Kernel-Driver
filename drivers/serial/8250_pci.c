@@ -43,20 +43,12 @@
 #define FL_BASE4		0x0004
 #define FL_GET_BASE(x)		(x & FL_BASE_MASK)
 
-#define FL_IRQ_MASK		(0x0007 << 4)
-#define FL_IRQBASE0		(0x0000 << 4)
-#define FL_IRQBASE1		(0x0001 << 4)
-#define FL_IRQBASE2		(0x0002 << 4)
-#define FL_IRQBASE3		(0x0003 << 4)
-#define FL_IRQBASE4		(0x0004 << 4)
-#define FL_GET_IRQBASE(x)	((x & FL_IRQ_MASK) >> 4)
-
 /* Use successive BARs (PCI base address registers),
    else use offset into some specified BAR */
 #define FL_BASE_BARS		0x0008
 
-/* Use the irq resource table instead of dev->irq */
-#define FL_IRQRESOURCE		0x0080
+/* do not assign an irq */
+#define FL_NOIRQ		0x0080
 
 /* Use the Base address register size to cap number of ports */
 #define FL_REGION_SZ_CAP	0x0100
@@ -850,17 +842,10 @@ static struct pci_serial_quirk *find_quirk(struct pci_dev *dev)
 static _INLINE_ int
 get_pci_irq(struct pci_dev *dev, struct pci_board *board, int idx)
 {
-	int base_idx;
-
-	if ((board->flags & FL_IRQRESOURCE) == 0)
-		return dev->irq;
-
-	base_idx = FL_GET_IRQBASE(board->flags);
-
-	if (base_idx > DEVICE_COUNT_IRQ)
+	if (board->flags & FL_NOIRQ)
 		return 0;
-	
-	return dev->irq_resource[base_idx].start;
+	else
+		return dev->irq;
 }
 
 /*
@@ -1314,7 +1299,7 @@ static struct pci_board pci_boards[] __devinitdata = {
 		.first_offset	= 0x10000,
 	},
 	[pbn_sgi_ioc3] = {
-		.flags		= FL_BASE0|FL_IRQRESOURCE,
+		.flags		= FL_BASE0|FL_NOIRQ,
 		.num_ports	= 1,
 		.base_baud	= 458333,
 		.uart_offset	= 8,

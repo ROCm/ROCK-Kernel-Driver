@@ -128,6 +128,8 @@ ohci_hub_descriptor (
 	desc->bDescLength = 7 + 2 * temp;
 
 	temp = 0;
+	if (rh & RH_A_NPS)		/* no power switching? */
+	    temp |= 0x0002;
 	if (rh & RH_A_PSM) 		/* per-port power switching? */
 	    temp |= 0x0001;
 	if (rh & RH_A_NOCP)		/* no overcurrent reporting? */

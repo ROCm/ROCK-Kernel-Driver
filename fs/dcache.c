@@ -1035,20 +1035,11 @@ struct dentry * __d_lookup(struct dentry * parent, struct qstr * name)
  
 int d_validate(struct dentry *dentry, struct dentry *dparent)
 {
-	unsigned long dent_addr = (unsigned long) dentry;
-	unsigned long min_addr = PAGE_OFFSET;
-	unsigned long align_mask = 0x0F;
 	struct hlist_head *base;
 	struct hlist_node *lhp;
 
-	if (dent_addr < min_addr)
-		goto out;
-	if (dent_addr > (unsigned long)high_memory - sizeof(struct dentry))
-		goto out;
-	if (dent_addr & align_mask)
-		goto out;
-	if ((!kern_addr_valid(dent_addr)) || (!kern_addr_valid(dent_addr -1 +
-						sizeof(struct dentry))))
+	/* Check whether the ptr might be valid at all.. */
+	if (!kmem_ptr_validate(dentry_cache, dentry))
 		goto out;
 
 	if (dentry->d_parent != dparent)
