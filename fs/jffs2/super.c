@@ -3,11 +3,11 @@
  *
  * Copyright (C) 2001-2003 Red Hat, Inc.
  *
- * Created by David Woodhouse <dwmw2@redhat.com>
+ * Created by David Woodhouse <dwmw2@infradead.org>
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: super.c,v 1.102 2004/11/12 02:42:17 tpoynor Exp $
+ * $Id: super.c,v 1.103 2004/11/16 20:36:12 dwmw2 Exp $
  *
  */
 

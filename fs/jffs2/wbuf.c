@@ -4,12 +4,12 @@
  * Copyright (C) 2001-2003 Red Hat, Inc.
  * Copyright (C) 2004 Thomas Gleixner <tglx@linutronix.de>
  *
- * Created by David Woodhouse <dwmw2@redhat.com>
+ * Created by David Woodhouse <dwmw2@infradead.org>
  * Modified debugged and enhanced by Thomas Gleixner <tglx@linutronix.de>
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: wbuf.c,v 1.76 2004/11/05 12:41:10 jwboyer Exp $
+ * $Id: wbuf.c,v 1.77 2004/11/16 20:36:12 dwmw2 Exp $
  *
  */
 

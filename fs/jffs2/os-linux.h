@@ -3,11 +3,11 @@
  *
  * Copyright (C) 2002-2003 Red Hat, Inc.
  *
- * Created by David Woodhouse <dwmw2@redhat.com>
+ * Created by David Woodhouse <dwmw2@infradead.org>
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: os-linux.h,v 1.50 2004/11/04 22:10:28 jwboyer Exp $
+ * $Id: os-linux.h,v 1.51 2004/11/16 20:36:11 dwmw2 Exp $
  *
  */
 

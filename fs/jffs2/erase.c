@@ -3,11 +3,11 @@
  *
  * Copyright (C) 2001-2003 Red Hat, Inc.
  *
- * Created by David Woodhouse <dwmw2@redhat.com>
+ * Created by David Woodhouse <dwmw2@infradead.org>
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: erase.c,v 1.65 2004/11/13 10:51:47 dedekind Exp $
+ * $Id: erase.c,v 1.66 2004/11/16 20:36:11 dwmw2 Exp $
  *
  */
 
