@@ -264,19 +264,49 @@ static int pnpbios_set_resources(struct pnp_dev * dev, struct pnp_resource_table
 	return ret;
 }
 
+static void pnpbios_zero_data_stream(struct pnp_bios_node * node)
+{
+	unsigned char * p = (char *)node->data;
+	unsigned char * end = (char *)(node->data + node->size);
+	unsigned int len;
+	int i;
+	while ((char *)p < (char *)end) {
+		if(p[0] & 0x80) { /* large tag */
+			len = (p[2] << 8) | p[1];
+			p += 3;
+		} else {
+			if (((p[0]>>3) & 0x0f) == 0x0f)
+				return;
+			len = p[0] & 0x07;
+			p += 1;
+		}
+		for (i = 0; i < len; i++)
+			p[i] = 0;
+		p += len;
+	}
+	printk(KERN_ERR "PnPBIOS: Resource structure did not contain an end tag.\n");
+}
+
 static int pnpbios_disable_resources(struct pnp_dev *dev)
 {
 	struct pnp_bios_node * node;
+	u8 nodenum = dev->number;
 	int ret;
 
 	/* just in case */
 	if(dev->flags & PNPBIOS_NO_DISABLE || !pnpbios_is_dynamic(dev))
 		return -EPERM;
 
-	/* the value of this will be zero */
 	node = pnpbios_kmalloc(node_info.max_node_size, GFP_KERNEL);
 	if (!node)
 		return -ENOMEM;
+
+	if (pnp_bios_get_dev_node(&nodenum, (char )PNPMODE_DYNAMIC, node)) {
+		kfree(node);
+		return -ENODEV;
+	}
+	pnpbios_zero_data_stream(node);
+
 	ret = pnp_bios_set_dev_node(dev->number, (char)PNPMODE_DYNAMIC, node);
 	kfree(node);
 	if (ret > 0)
