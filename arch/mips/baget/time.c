@@ -52,6 +52,9 @@ void static timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	if (timer_intr_valid()) {
 		sti();
 		do_timer(regs);
+#ifndef CONFIG_SMP
+		update_process_times(user_mode(regs));
+#endif
 	}
 }
 

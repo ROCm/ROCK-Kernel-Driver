@@ -462,6 +462,7 @@ static irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	do {
 #ifndef CONFIG_SMP
 		profile_tick(CPU_PROFILING, regs);
+		update_process_times(user_mode(regs));
 #endif
 		do_timer(regs);
 

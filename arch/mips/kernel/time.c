@@ -418,10 +418,7 @@ void local_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	if (current->pid)
 		profile_tick(CPU_PROFILING, regs);
-#ifdef CONFIG_SMP
-	/* in UP mode, update_process_times() is invoked by do_timer() */
 	update_process_times(user_mode(regs));
-#endif
 }
 
 /*

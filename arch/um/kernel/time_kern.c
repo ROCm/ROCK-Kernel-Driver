@@ -169,11 +169,9 @@ void __const_udelay(um_udelay_t usecs)
 
 void timer_handler(int sig, union uml_pt_regs *regs)
 {
-#ifdef CONFIG_SMP
 	local_irq_disable();
 	update_process_times(user_context(UPT_SP(regs)));
 	local_irq_enable();
-#endif
 	if(current_thread->cpu == 0)
 		timer_irq(regs);
 }
