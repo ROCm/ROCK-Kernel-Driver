@@ -121,6 +121,7 @@ int hfs_cat_create(u32 cnid, struct inode *dir, struct qstr *str, struct inode *
 		goto err1;
 
 	dir->i_size++;
+	dir->i_mtime = dir->i_ctime = CURRENT_TIME;
 	mark_inode_dirty(dir);
 	hfs_find_exit(&fd);
 	return 0;
@@ -247,6 +248,7 @@ int hfs_cat_delete(u32 cnid, struct inode *dir, struct qstr *str)
 	}
 
 	dir->i_size--;
+	dir->i_mtime = dir->i_ctime = CURRENT_TIME;
 	mark_inode_dirty(dir);
 	res = 0;
 out:
@@ -299,6 +301,7 @@ int hfs_cat_move(u32 cnid, struct inode *src_dir, struct qstr *src_name,
 	if (err)
 		goto out;
 	dst_dir->i_size++;
+	dst_dir->i_mtime = dst_dir->i_ctime = CURRENT_TIME;
 	mark_inode_dirty(dst_dir);
 
 	/* finally remove the old entry */
@@ -310,6 +313,7 @@ int hfs_cat_move(u32 cnid, struct inode *src_dir, struct qstr *src_name,
 	if (err)
 		goto out;
 	src_dir->i_size--;
+	src_dir->i_mtime = src_dir->i_ctime = CURRENT_TIME;
 	mark_inode_dirty(src_dir);
 
 	type = entry.type;

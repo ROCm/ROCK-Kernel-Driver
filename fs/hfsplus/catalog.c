@@ -185,6 +185,7 @@ int hfsplus_create_cat(u32 cnid, struct inode *dir, struct qstr *str, struct ino
 		goto err1;
 
 	dir->i_size++;
+	dir->i_mtime = dir->i_ctime = CURRENT_TIME;
 	mark_inode_dirty(dir);
 	hfs_find_exit(&fd);
 	return 0;
@@ -266,6 +267,7 @@ int hfsplus_delete_cat(u32 cnid, struct inode *dir, struct qstr *str)
 		goto out;
 
 	dir->i_size--;
+	dir->i_mtime = dir->i_ctime = CURRENT_TIME;
 	mark_inode_dirty(dir);
 out:
 	hfs_find_exit(&fd);
@@ -311,6 +313,7 @@ int hfsplus_rename_cat(u32 cnid,
 	if (err)
 		goto out;
 	dst_dir->i_size++;
+	dst_dir->i_mtime = dst_dir->i_ctime = CURRENT_TIME;
 	mark_inode_dirty(dst_dir);
 
 	/* finally remove the old entry */
@@ -322,6 +325,7 @@ int hfsplus_rename_cat(u32 cnid,
 	if (err)
 		goto out;
 	src_dir->i_size--;
+	src_dir->i_mtime = src_dir->i_ctime = CURRENT_TIME;
 	mark_inode_dirty(src_dir);
 
 	/* remove old thread entry */
