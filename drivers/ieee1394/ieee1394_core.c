@@ -983,18 +983,6 @@ static LIST_HEAD(hpsbpkt_list);
 static DECLARE_MUTEX_LOCKED(khpsbpkt_sig);
 static spinlock_t khpsbpkt_lock = SPIN_LOCK_UNLOCKED;
 
-static void run_packet_complete(struct hpsb_packet *packet)
-{
-	void (*complete_routine)(void*) = packet->complete_routine;
-	void *complete_data = packet->complete_data;
-
-	packet->complete_routine = NULL;
-	packet->complete_data = NULL;
-
-	complete_routine(complete_data);
-
-	return;
-}
 
 static void queue_packet_complete(struct hpsb_packet *packet)
 {
@@ -1022,8 +1010,13 @@ static int hpsbpkt_thread(void *__hi)
 	while (!down_interruptible(&khpsbpkt_sig)) {
 		spin_lock_irqsave(&khpsbpkt_lock, flags);
 		list_for_each_entry_safe(packet, next, &hpsbpkt_list, list) {
+			void (*complete_routine)(void*) = packet->complete_routine;
+			void *complete_data = packet->complete_data;
+
 			list_del(&packet->list);
-			run_packet_complete(packet);
+			packet->complete_routine = packet->complete_data = NULL;
+
+			complete_routine(complete_data);
 		}
 		spin_unlock_irqrestore(&khpsbpkt_lock, flags);
 	}
