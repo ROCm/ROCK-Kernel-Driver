@@ -780,6 +780,15 @@ config SCSI_IPS
 	  To compile this driver as a module, choose M here: the
 	  module will be called ips.
 
+config SCSI_IBMVSCSI
+	tristate "IBM Virtual SCSI support"
+	depends on PPC_PSERIES || PPC_ISERIES
+	help
+	  This is the IBM POWER Virtual SCSI Client
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called ibmvscsic.
+
 config SCSI_INITIO
 	tristate "Initio 9100U(W) support"
 	depends on PCI && SCSI && BROKEN
