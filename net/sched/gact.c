@@ -75,51 +75,53 @@ static int tcf_gact_init(struct rtattr *rta, struct rtattr *est,
                          struct tc_action *a, int ovr, int bind)
 {
 	struct rtattr *tb[TCA_GACT_MAX];
-	struct tc_gact *parm = NULL;
-#ifdef CONFIG_GACT_PROB
-	struct tc_gact_p *p_parm = NULL;
-#endif
-	struct tcf_gact *p = NULL;
+	struct tc_gact *parm;
+	struct tcf_gact *p;
 	int ret = 0;
 
-	if (rtattr_parse(tb, TCA_GACT_MAX, RTA_DATA(rta), RTA_PAYLOAD(rta)) < 0)
-		return -1;
+	if (rta == NULL ||
+	    rtattr_parse(tb, TCA_GACT_MAX, RTA_DATA(rta), RTA_PAYLOAD(rta)) < 0)
+		return -EINVAL;
 
-	if (tb[TCA_GACT_PARMS - 1] == NULL) {
-		printk("BUG: tcf_gact_init called with NULL params\n");
-		return -1;
-	}
-
+	if (tb[TCA_GACT_PARMS - 1] == NULL ||
+	    RTA_PAYLOAD(tb[TCA_GACT_PARMS - 1]) < sizeof(*parm))
+		return -EINVAL;
 	parm = RTA_DATA(tb[TCA_GACT_PARMS - 1]);
+
+	if (tb[TCA_GACT_PROB-1] != NULL)
 #ifdef CONFIG_GACT_PROB
-	if (tb[TCA_GACT_PROB - 1] != NULL)
-		p_parm = RTA_DATA(tb[TCA_GACT_PROB - 1]);
+		if (RTA_PAYLOAD(tb[TCA_GACT_PROB-1]) < sizeof(struct tc_gact_p))
+			return -EINVAL;
+#else
+		return -EOPNOTSUPP;
 #endif
-	p = tcf_hash_check(parm, a, ovr, bind);
+
+	p = tcf_hash_check(parm->index, a, ovr, bind);
 	if (p == NULL) {
-		p = tcf_hash_create(parm, est, a, sizeof(*p), ovr, bind);
+		p = tcf_hash_create(parm->index, est, a, sizeof(*p), ovr, bind);
 		if (p == NULL)
-			return -1;
-		else {
-			p->refcnt = 1;
-			ret = 1;
-			goto override;
+			return -ENOMEM;
+		ret = ACT_P_CREATED;
+	} else {
+		if (!ovr) {
+			tcf_hash_release(p, bind);
+			return -EEXIST;
 		}
 	}
 
-	if (ovr) {
-override:
-		p->action = parm->action;
+	spin_lock_bh(&p->lock);
+	p->action = parm->action;
 #ifdef CONFIG_GACT_PROB
-		if (p_parm != NULL) {
-			p->paction = p_parm->paction;
-			p->pval = p_parm->pval;
-			p->ptype = p_parm->ptype;
-		} else {
-			p->paction = p->pval = p->ptype = 0;
-		}
-#endif
+	if (tb[TCA_GACT_PROB-1] != NULL) {
+		struct tc_gact_p *p_parm = RTA_DATA(tb[TCA_GACT_PROB-1]);
+		p->paction = p_parm->paction;
+		p->pval    = p_parm->pval;
+		p->ptype   = p_parm->ptype;
 	}
+#endif
+	spin_unlock_bh(&p->lock);
+	if (ret == ACT_P_CREATED)
+		tcf_hash_insert(p);
 	return ret;
 }
 
