@@ -699,16 +699,3 @@ static int init(void * unused)
 
 	panic("No init found.  Try passing init= option to kernel.");
 }
-
-static int early_param_test(char *rest)
-{
-	printk("early_parm_test: %s\n", rest ?: "(null)");
-	return rest ? 0 : -EINVAL;
-}
-early_param("testsetup", early_param_test);
-static int early_setup_test(char *rest)
-{
-	printk("early_setup_test: %s\n", rest ?: "(null)");
-	return 0;
-}
-__setup("testsetup_long", early_setup_test);
