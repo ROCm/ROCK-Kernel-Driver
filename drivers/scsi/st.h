@@ -12,6 +12,7 @@
 typedef struct {
 	unsigned char in_use;
 	unsigned char dma;	/* DMA-able buffer */
+	unsigned char do_dio;
 	int buffer_size;
 	int buffer_blocks;
 	int buffer_bytes;
@@ -21,7 +22,7 @@ typedef struct {
 	int syscall_result;
 	Scsi_Request *last_SRpnt;
 	unsigned char *b_data;
-	unsigned short use_sg;	/* zero or maximum number of s/g segments for this adapter */
+	unsigned short use_sg;	/* zero or max number of s/g segments for this adapter */
 	unsigned short sg_segs;		/* number of segments in s/g list */
 	unsigned short orig_frp_segs;	/* number of segments allocated at first try */
 	unsigned short frp_segs;	/* number of buffer segments */
@@ -91,11 +92,14 @@ typedef struct {
 	unsigned char cln_sense_value;
 	unsigned char cln_sense_mask;
 	unsigned char use_pf;			/* Set Page Format bit in all mode selects? */
+	unsigned char try_dio;			/* try direct i/o? */
 	unsigned char c_algo;			/* compression algorithm */
 	int tape_type;
 	int write_threshold;
 	int timeout;		/* timeout for normal commands */
 	int long_timeout;	/* timeout for commands known to take long time */
+
+	unsigned long max_pfn;	/* the maximum page number reachable by the HBA */
 
 	/* Mode characteristics */
 	ST_mode modes[ST_NBR_MODES];
@@ -135,6 +139,10 @@ typedef struct {
 	unsigned char write_pending;
 	int nbr_finished;
 	int nbr_waits;
+	int nbr_requests;
+	int nbr_dio;
+	int nbr_pages;
+	int nbr_combinable;
 	unsigned char last_cmnd[6];
 	unsigned char last_sense[16];
 #endif

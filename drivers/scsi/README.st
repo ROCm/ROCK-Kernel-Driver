@@ -2,7 +2,7 @@ This file contains brief information about the SCSI tape driver.
 The driver is currently maintained by Kai M{kisara (email
 Kai.Makisara@metla.fi)
 
-Last modified: Mon Jul 15 16:30:40 2002 by makisara
+Last modified: Fri Jul 26 16:01:39 2002 by makisara
 
 
 BASICS
@@ -105,22 +105,31 @@ The default is BSD semantics.
 
 BUFFERING
 
-The driver uses tape buffers allocated at run-time when needed and it
-is freed when the device file is closed. One buffer is used for each
-open tape device. 
+The driver tries to do tranfers directly to/from user space. If this
+is not possible, a driver buffer allocated at run-time is used. If
+direct i/o is not possible for the whole transfer, the driver buffer
+is used (i.e., bounce buffers for individual pages are not
+used). Direct i/o can be impossible because of several reasons, e.g.:
+- one or more pages are at addresses not reachable by the HBA
+- the number of pages in the transfer exceeds the number of
+  scatter/gather segments permitted by the HBA
+- one or more pages can't be locked into memory (should not happen in
+  any reasonable situation)
 
-The size of the buffers is always at least one tape block. In fixed
+The size of the driver buffers is always at least one tape block. In fixed
 block mode, the minimum buffer size is defined (in 1024 byte units) by
 ST_FIXED_BUFFER_BLOCKS. With small block size this allows buffering of
 several blocks and using one SCSI read or write to transfer all of the
 blocks. Buffering of data across write calls in fixed block mode is
-allowed if ST_BUFFER_WRITES is non-zero. Buffer allocation uses chunks of
-memory having sizes 2^n * (page size). Because of this the actual
-buffer size may be larger than the minimum allowable buffer size.
+allowed if ST_BUFFER_WRITES is non-zero and direct i/o is not used.
+Buffer allocation uses chunks of memory having sizes 2^n * (page
+size). Because of this the actual buffer size may be larger than the
+minimum allowable buffer size.
 
 Asynchronous writing. Writing the buffer contents to the tape is
 started and the write call returns immediately. The status is checked
-at the next tape operation.
+at the next tape operation. Asynchronous writes are not done with
+direct i/o.
 
 Buffered writes and asynchronous writes may in some rare cases cause
 problems in multivolume operations if there is not enough space on the
@@ -181,9 +190,10 @@ are configurable when the driver is loaded as a module. The keywords are:
 buffer_kbs=xxx             the buffer size for fixed block mode is set
 			   to xxx kilobytes
 write_threshold_kbs=xxx    the write threshold in kilobytes set to xxx
-max_buffers=xxx            the maximum number of tape buffer set to xxx
 max_sg_segs=xxx		   the maximum number of scatter/gather
 			   segments
+try_direct_io=x		   try direct transfer between user buffer and
+			   tape drive if this is non-zero
 
 Note that if the buffer size is changed but the write threshold is not
 set, the write threshold is set to the new buffer size - 2 kB.
