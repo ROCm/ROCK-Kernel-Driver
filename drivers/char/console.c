@@ -2382,6 +2382,7 @@ static int con_open(struct tty_struct *tty, struct file * filp)
 
 	vt_cons[currcons]->vc_num = currcons;
 	tty->driver_data = vt_cons[currcons];
+	vc_cons[currcons].d->vc_tty = tty;
 
 	if (!tty->winsize.ws_row && !tty->winsize.ws_col) {
 		tty->winsize.ws_row = video_num_lines;
