@@ -58,6 +58,7 @@ ToDo/Notes:
 	  include errors.
 	- Move the typedefs for runlist_element and runlist from types.h to
 	  runlist.h and fix resulting include errors.
+	- Remove unused {__,}format_mft_record() from fs/ntfs/mft.c.
 
 2.1.20 - Fix two stupid bugs introduced in 2.1.18 release.
 
