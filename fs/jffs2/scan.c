@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: scan.c,v 1.103 2003/10/07 14:46:23 dwmw2 Exp $
+ * $Id: scan.c,v 1.104 2003/10/11 14:52:48 dwmw2 Exp $
  *
  */
 #include <linux/kernel.h>
@@ -116,7 +116,7 @@ int jffs2_scan_medium(struct jffs2_sb_info *c)
 		ret = jffs2_scan_eraseblock(c, jeb, buf_size?flashbuf:(flashbuf+jeb->offset), buf_size);
 
 		if (ret < 0)
-			return ret;
+			goto out;
 
 		ACCT_PARANOIA_CHECK(jeb);
 
@@ -240,17 +240,20 @@ int jffs2_scan_medium(struct jffs2_sb_info *c)
 		if ( !c->used_size && ((empty_blocks+bad_blocks)!= c->nr_blocks || bad_blocks == c->nr_blocks) ) {
 			printk(KERN_NOTICE "Cowardly refusing to erase blocks on filesystem with no valid JFFS2 nodes\n");
 			printk(KERN_NOTICE "empty_blocks %d, bad_blocks %d, c->nr_blocks %d\n",empty_blocks,bad_blocks,c->nr_blocks);
-			return -EIO;
+			ret = -EIO;
+			goto out;
 		}
 		jffs2_erase_pending_trigger(c);
 	}
+	ret = 0;
+ out:
 	if (buf_size)
 		kfree(flashbuf);
 #ifndef __ECOS
 	else 
 		c->mtd->unpoint(c->mtd, flashbuf, 0, c->mtd->size);
 #endif
-	return 0;
+	return ret;
 }
 
 static int jffs2_fill_scan_buf (struct jffs2_sb_info *c, unsigned char *buf,
