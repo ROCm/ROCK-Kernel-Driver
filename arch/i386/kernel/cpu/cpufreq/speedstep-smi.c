@@ -19,6 +19,7 @@
 #include <linux/cpufreq.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
+#include <linux/delay.h>
 #include <asm/ist.h>
 
 #include "speedstep-lib.h"
@@ -50,6 +51,10 @@ static struct cpufreq_frequency_table speedstep_freqs[] = {
 #define GET_SPEEDSTEP_STATE 1
 #define SET_SPEEDSTEP_STATE 2
 #define GET_SPEEDSTEP_FREQS 4
+
+/* how often shall the SMI call be tried if it failed, e.g. because
+ * of DMA activity going on? */
+#define SMI_TRIES 5
 
 /* DEBUG
  *   Define it if you want verbose debug output, e.g. for bug reporting
@@ -140,10 +145,11 @@ static int speedstep_get_state (void)
  */
 static void speedstep_set_state (unsigned int state, unsigned int notify)
 {
-	unsigned int old_state, result, command, new_state;
+	unsigned int old_state, result = 0, command, new_state;
 	unsigned long flags;
 	struct cpufreq_freqs freqs;
 	unsigned int function=SET_SPEEDSTEP_STATE;
+	unsigned int retry = 0;
 
 	if (state > 0x1)
 		return;
@@ -163,20 +169,28 @@ static void speedstep_set_state (unsigned int state, unsigned int notify)
 	local_irq_save(flags);
 
 	command = (smi_sig & 0xffffff00) | (smi_cmd & 0xff);
-	__asm__ __volatile__(
-		"movl $0, %%edi\n"
-		"out %%al, (%%dx)\n"
-		: "=b" (new_state), "=D" (result)
-		: "a" (command), "b" (function), "c" (state), "d" (smi_port), "S" (0)
-	);
+
+	do {
+		if (retry) {
+			dprintk(KERN_INFO "cpufreq: retry %u, previous result %u\n", retry, result);
+			mdelay(retry * 50);
+		}
+		retry++;
+		__asm__ __volatile__(
+			"movl $0, %%edi\n"
+			"out %%al, (%%dx)\n"
+			: "=b" (new_state), "=D" (result)
+			: "a" (command), "b" (function), "c" (state), "d" (smi_port), "S" (0)
+			);
+	} while ((new_state != state) && (retry <= SMI_TRIES));
 
 	/* enable IRQs */
 	local_irq_restore(flags);
 
 	if (new_state == state) {
-		dprintk(KERN_INFO "cpufreq: change to %u MHz succeeded\n", (freqs.new / 1000));
+		dprintk(KERN_INFO "cpufreq: change to %u MHz succeeded after %u tries with result %u\n", (freqs.new / 1000), retry, result);
 	} else {
-		printk(KERN_ERR "cpufreq: change failed\n");
+		printk(KERN_ERR "cpufreq: change failed with new_state %u and result %u\n", new_state, result);
 	}
 
 	if (notify)
