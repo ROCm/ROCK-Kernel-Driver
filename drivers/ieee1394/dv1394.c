@@ -2681,7 +2681,6 @@ dv1394_devfs_add_dir( char *name,
  err:
 	return -ENOMEM;
 }
-#endif /* CONFIG_DEVFS */
 
 void dv1394_devfs_del( char *name)
 {
@@ -2695,6 +2694,7 @@ void dv1394_devfs_del( char *name)
 		kfree(p);
 	}
 }
+#endif /* CONFIG_DEVFS */
 
 /*** IEEE1394 HPSB CALLBACKS ***********************************************/
 
