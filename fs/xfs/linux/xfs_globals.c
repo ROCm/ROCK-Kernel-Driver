@@ -46,9 +46,9 @@ unsigned long xfs_physmem;
 
 /*
  * Tunable XFS parameters.  xfs_params is required even when CONFIG_SYSCTL=n,
- * other XFS code uses these values.
+ * other XFS code uses these values.  Times are measured in centisecs (i.e.
+ * 100ths of a second).
  */
-
 xfs_param_t xfs_params = {
 			  /*	MIN		DFLT		MAX	*/
 	.restrict_chown	= {	0,		1,		1	},
@@ -56,13 +56,13 @@ xfs_param_t xfs_params = {
 	.symlink_mode	= {	0,		0,		1	},
 	.panic_mask	= {	0,		0,		127	},
 	.error_level	= {	0,		3,		11	},
-	.sync_interval	= {	USER_HZ,	30*USER_HZ,	7200*USER_HZ },
+	.syncd_timer	= {	1*100,		30*100,		7200*100},
 	.stats_clear	= {	0,		0,		1	},
 	.inherit_sync	= {	0,		1,		1	},
 	.inherit_nodump	= {	0,		1,		1	},
 	.inherit_noatim = {	0,		1,		1	},
-	.flush_interval	= {	USER_HZ/2,	USER_HZ,	30*USER_HZ },
-	.age_buffer	= {	1*USER_HZ,	15*USER_HZ,	7200*USER_HZ },
+	.xfs_buf_timer	= {	100/2,		1*100,		30*100	},
+	.xfs_buf_age	= {	1*100,		15*100,		7200*100},
 };
 
 /*

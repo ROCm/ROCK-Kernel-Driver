@@ -392,7 +392,7 @@ xfssyncd(
 
 	for (;;) {
 		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(xfs_syncd_interval);
+		schedule_timeout((xfs_syncd_centisecs * HZ) / 100);
 		/* swsusp */
 		if (current->flags & PF_FREEZE)
 			refrigerator(PF_FREEZE);
