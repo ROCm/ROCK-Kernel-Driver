@@ -417,6 +417,10 @@ static inline __s32 sctp_jitter(__u32 rto)
 	static __u32 sctp_rand;
 	__s32 ret;
 
+	/* Avoid divide by zero. */
+	if (!rto)
+		rto = 1;
+
 	sctp_rand += jiffies;
 	sctp_rand ^= (sctp_rand << 12);
 	sctp_rand ^= (sctp_rand >> 20);
