@@ -37,7 +37,6 @@ void sig_handler_common_tt(int sig, void *sc_ptr)
 	if(sig != SIGUSR2) 
 		r->syscall = -1;
 
-	change_sig(SIGUSR1, 1);
 	info = &sig_info[sig];
 	if(!info->is_irq) unblock_signals();
 
@@ -46,7 +45,6 @@ void sig_handler_common_tt(int sig, void *sc_ptr)
 	if(is_user){
 		interrupt_end();
 		block_signals();
-		change_sig(SIGUSR1, 0);
 		set_user_mode(NULL);
 	}
 	*r = save_regs;

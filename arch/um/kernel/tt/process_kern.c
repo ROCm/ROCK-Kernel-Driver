@@ -201,6 +201,7 @@ static int new_thread_proc(void *stack)
 	local_irq_disable();
 	init_new_thread_stack(stack, new_thread_handler);
 	os_usr1_process(os_getpid());
+	change_sig(SIGUSR1, 1);
 	return(0);
 }
 
@@ -244,6 +245,7 @@ int fork_tramp(void *stack)
 	init_new_thread_stack(stack, finish_fork_handler);
 
 	os_usr1_process(os_getpid());
+	change_sig(SIGUSR1, 1);
 	return(0);
 }
 
@@ -295,19 +297,30 @@ int copy_thread_tt(int nr, unsigned long clone_flags, unsigned long sp,
 	current->thread.request.op = OP_FORK;
 	current->thread.request.u.fork.pid = new_pid;
 	os_usr1_process(os_getpid());
-	return(0);
+
+	/* Enable the signal and then disable it to ensure that it is handled
+	 * here, and nowhere else.
+	 */
+	change_sig(SIGUSR1, 1);
+
+	change_sig(SIGUSR1, 0);
+	err = 0;
+ out:
+	return(err);
 }
 
 void reboot_tt(void)
 {
 	current->thread.request.op = OP_REBOOT;
 	os_usr1_process(os_getpid());
+	change_sig(SIGUSR1, 1);
 }
 
 void halt_tt(void)
 {
 	current->thread.request.op = OP_HALT;
 	os_usr1_process(os_getpid());
+	change_sig(SIGUSR1, 1);
 }
 
 void kill_off_processes_tt(void)
@@ -334,6 +347,9 @@ void initial_thread_cb_tt(void (*proc)(void *), void *arg)
 		current->thread.request.u.cb.proc = proc;
 		current->thread.request.u.cb.arg = arg;
 		os_usr1_process(os_getpid());
+		change_sig(SIGUSR1, 1);
+
+		change_sig(SIGUSR1, 0);
 	}
 }
 
