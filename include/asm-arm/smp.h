@@ -53,6 +53,6 @@ extern void smp_cross_call(cpumask_t callmap);
  * Boot a secondary CPU, and assign it the specified idle task.
  * This also gives us the initial stack to use for this CPU.
  */
-extern int __init boot_secondary(unsigned int cpu, struct task_struct *);
+extern int boot_secondary(unsigned int cpu, struct task_struct *);
 
 #endif /* ifndef __ASM_ARM_SMP_H */
