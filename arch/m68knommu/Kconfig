@@ -72,15 +72,20 @@ config M5249
 	help
 	  Motorola ColdFire 5249 processor support.
 
+config M527x
+	bool "MCF527x"
+	help
+	  Freescale (Motorola) ColdFire 5270/5271/5274/5275 processor support.
+
 config M5272
 	bool "MCF5272"
 	help
 	  Motorola ColdFire 5272 processor support.
 
-config M5282
-	bool "MCF5282"
+config M528x
+	bool "MCF528x"
 	help
-	  Motorola ColdFire 5282 processor support.
+	  Motorola ColdFire 5280/5282 processor support.
 
 config M5307
 	bool "MCF5307"
@@ -96,7 +101,7 @@ endchoice
 
 config COLDFIRE
 	bool
-	depends on (M5206 || M5206e || M5249 || M5272 || M5282 || M5307 || M5407)
+	depends on (M5206 || M5206e || M5249 || M527x || M5272 || M528x || M5307 || M5407)
 	default y
 
 choice
@@ -117,82 +122,97 @@ config CLOCK_AUTO
 config CLOCK_11MHz
 	bool "11MHz"
 	help
-	  Select an 11MHz CPU clock frequency.
+	  Select a 11MHz CPU clock frequency.
 
 config CLOCK_16MHz
 	bool "16MHz"
 	help
-	  Select an 16MHz CPU clock frequency.
+	  Select a 16MHz CPU clock frequency.
 
 config CLOCK_20MHz
 	bool "20MHz"
 	help
-	  Select an 20MHz CPU clock frequency.
+	  Select a 20MHz CPU clock frequency.
 
 config CLOCK_24MHz
 	bool "24MHz"
 	help
-	  Select an 24MHz CPU clock frequency.
+	  Select a 24MHz CPU clock frequency.
 
 config CLOCK_25MHz
 	bool "25MHz"
 	help
-	  Select an 25MHz CPU clock frequency.
+	  Select a 25MHz CPU clock frequency.
 
 config CLOCK_33MHz
 	bool "33MHz"
 	help
-	  Select an 33MHz CPU clock frequency.
+	  Select a 33MHz CPU clock frequency.
 
 config CLOCK_40MHz
 	bool "40MHz"
 	help
-	  Select an 40MHz CPU clock frequency.
+	  Select a 40MHz CPU clock frequency.
 
 config CLOCK_45MHz
 	bool "45MHz"
 	help
-	  Select an 45MHz CPU clock frequency.
+	  Select a 45MHz CPU clock frequency.
 
 config CLOCK_48MHz
 	bool "48MHz"
 	help
-	  Select an 48MHz CPU clock frequency.
+	  Select a 48MHz CPU clock frequency.
 
 config CLOCK_50MHz
 	bool "50MHz"
 	help
-	  Select an 50MHz CPU clock frequency.
+	  Select a 50MHz CPU clock frequency.
 
 config CLOCK_54MHz
 	bool "54MHz"
 	help
-	  Select an 54MHz CPU clock frequency.
+	  Select a 54MHz CPU clock frequency.
 
 config CLOCK_60MHz
 	bool "60MHz"
 	help
-	  Select an 60MHz CPU clock frequency.
+	  Select a 60MHz CPU clock frequency.
 
 config CLOCK_64MHz
 	bool "64MHz"
 	help
-	  Select an 64MHz CPU clock frequency.
+	  Select a 64MHz CPU clock frequency.
 
 config CLOCK_66MHz
 	bool "66MHz"
 	help
-	  Select an 66MHz CPU clock frequency.
+	  Select a 66MHz CPU clock frequency.
 
 config CLOCK_70MHz
 	bool "70MHz"
 	help
-	  Select an 70MHz CPU clock frequency.
+	  Select a 70MHz CPU clock frequency.
+
+config CLOCK_100MHz
+	bool "100MHz"
+	help
+	  Select a 100MHz CPU clock frequency.
 
 config CLOCK_140MHz
 	bool "140MHz"
 	help
-	  Select an 140MHz CPU clock frequency.
+	  Select a 140MHz CPU clock frequency.
+
+config CLOCK_150MHz
+	bool "150MHz"
+	help
+	  Select a 150MHz CPU clock frequency.
+
+config CLOCK_166MHz
+	bool "166MHz"
+	help
+	  Select a 166MHz CPU clock frequency.
 
 endchoice
 
@@ -284,6 +304,18 @@ config M5249C3
 	help
 	  Support for the Motorola M5249C3 board.
 
+config M5271EVB
+	bool "Freescale (Motorola) M5271EVB board support"
+	depends on M527x
+	help
+	  Support for the Freescale (Motorola) M5271EVB board.
+
+config M5275EVB
+	bool "Freescale (Motorola) M5275EVB board support"
+	depends on M527x
+	help
+	  Support for the Freescale (Motorola) M5275EVB board.
+
 config M5272C3
 	bool "Motorola M5272C3 board support"
 	depends on M5272
@@ -296,15 +328,21 @@ config COBRA5272
 	help
 	  Support for the senTec COBRA5272 board.
 
-config M5282C3
-	bool "Motorola M5282C3 board support"
-	depends on M5282
+config M5275EVB
+	bool "Freescale (Motorola) M5275EVB board support"
+	depends on M527x
 	help
-	  Support for the Motorola M5282C3 board.
+	  Support for the Freescale (Motorola) M5275EVB board.
+
+config M5282EVB
+	bool "Motorola M5282EVB board support"
+	depends on M528x
+	help
+	  Support for the Motorola M5282EVB board.
 
 config COBRA5282
 	bool "senTec COBRA5282 board support"
-	depends on M5282
+	depends on M528x
 	help
 	  Support for the senTec COBRA5282 board.
 
@@ -344,6 +382,18 @@ config CLEOPATRA
 	help
 	  Support for the Feith Cleopatra boards.
 
+config CANCam
+	bool "Feith CANCam board support"
+	depends on M5272
+	help
+	  Support for the Feith CANCam board.
+
+config SCALES
+	bool "Feith SCALES board support"
+	depends on M5272
+	help
+	  Support for the Feith SCALES board.
+
 config NETtel
 	bool "SecureEdge/NETtel board support"
 	depends on (M5206e || M5272 || M5307)
@@ -355,6 +405,12 @@ config SNAPGEAR
 	depends on NETtel
 	help
 	  Special additional support for SnapGear router boards.
+
+config CPU16B
+	bool "Sneha Technologies S.L. Sarasvati board support"
+	depends on M5272
+	help
+	  Support for the SNEHA CPU16B board.
 
 config ROMFS_FROM_ROM
 	bool "  ROMFS image not RAM resident"
@@ -376,13 +432,23 @@ config ARNEWSH
 config MOTOROLA
 	bool
 	default y
-	depends on (M5206eC3 || M5249C3 || M5272C3 || M5282C3 || M5307C3 || M5407C3)
+	depends on (M5206eC3 || M5249C3 || M5271EVB || M5272C3 || M5275EVB || M5282EVB || M5307C3 || M5407C3)
+
+config HW_FEITH
+	bool
+	default y
+	depends on (CLEOPATRA || CANCam || SCALES)
 
 config senTec
 	bool
 	default y
 	depends on (COBRA5272 || COBRA5282)
 
+config SNEHA
+        bool
+	default y
+	depends on CPU16B
+	
 config LARGE_ALLOCS
 	bool "Allow allocating large blocks (> 1MB) of memory"
 	help
