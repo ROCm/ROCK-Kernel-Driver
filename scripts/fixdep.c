@@ -143,7 +143,7 @@ void grow_config(int len)
 			size_config = 2048;
 		str_config = realloc(str_config, size_config *= 2);
 		if (str_config == NULL)
-			{ perror("malloc"); exit(1); }
+			{ perror("fixdep:malloc"); exit(1); }
 	}
 }
 
@@ -259,6 +259,7 @@ void do_config_file(char *filename)
 
 	fd = open(filename, O_RDONLY);
 	if (fd < 0) {
+		fprintf(stderr, "fixdep: ");
 		perror(filename);
 		exit(2);
 	}
@@ -269,7 +270,7 @@ void do_config_file(char *filename)
 	}
 	map = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
 	if ((long) map == -1) {
-		perror("mmap");
+		perror("fixdep: mmap");
 		close(fd);
 		return;
 	}
@@ -292,7 +293,7 @@ void parse_dep_file(void *map, size_t len)
 		exit(1);
 	}
 	memcpy(s, m, p-m); s[p-m] = 0;
-	printf("%s: \\\n", target);
+	printf("deps_%s := \\\n", target);
 	m = p+1;
 
 	clear_config();
@@ -314,7 +315,8 @@ void parse_dep_file(void *map, size_t len)
 		}
 		m = p + 1;
 	}
-	printf("\n");
+	printf("\n%s: $(deps_%s)\n\n", target, target);
+	printf("$(deps_%s):\n", target);
 }
 
 void print_deps(void)
@@ -325,6 +327,7 @@ void print_deps(void)
 
 	fd = open(depfile, O_RDONLY);
 	if (fd < 0) {
+		fprintf(stderr, "fixdep: ");
 		perror(depfile);
 		exit(2);
 	}
@@ -336,7 +339,7 @@ void print_deps(void)
 	}
 	map = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
 	if ((long) map == -1) {
-		perror("mmap");
+		perror("fixdep: mmap");
 		close(fd);
 		return;
 	}

@@ -66,5 +66,5 @@ archclean:
 
 archmrproper:
 
-archdep:
-	$(MAKEBOOT) fastdep
+prepare:
+	$(MAKEBOOT) dep

@@ -23,5 +23,3 @@ bootloader: $(OBJECTS)
 
 clean:
 	rm -f $(TARGETS)
-
-dep:

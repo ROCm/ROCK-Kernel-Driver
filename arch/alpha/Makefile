@@ -127,10 +127,6 @@ archmrproper:
 	rm -f arch/alpha/vmlinux.lds
 	rm -f include/asm-alpha/asm_offsets.h
 
-archdep:
-	$(MAKE) -C arch/alpha/kernel asm_offsets
-	@$(MAKEBOOT) dep
-
 vmlinux: arch/alpha/vmlinux.lds
 
 arch/alpha/vmlinux.lds: arch/alpha/vmlinux.lds.in
@@ -138,3 +134,19 @@ arch/alpha/vmlinux.lds: arch/alpha/vmlinux.lds.in
 
 bootpfile:
 	@$(MAKEBOOT) bootpfile
+
+
+prepare: include/asm-$(ARCH)/asm_offsets.h
+
+arch/$(ARCH)/kernel/asm-offsets.s: include/asm include/linux/version.h \
+				   include/config/MARKER
+
+include/asm-$(ARCH)/asm_offsets.h.tmp: arch/$(ARCH)/kernel/asm-offsets.s
+	@$(generate-asm-offsets.h) < $< > $@
+
+include/asm-$(ARCH)/asm_offsets.h: include/asm-$(ARCH)/asm_offsets.h.tmp
+	@echo -n '  Generating $@'
+	@$(update-if-changed)
+
+CLEAN_FILES += include/asm-$(ARCH)/offset.h.tmp \
+	       include/asm-$(ARCH)/offset.h

@@ -85,7 +85,5 @@ archclean:
 
 archmrproper:
 
-archdep:
-
 tftpboot.img:
 	$(MAKE) -C arch/sparc64/boot tftpboot.img

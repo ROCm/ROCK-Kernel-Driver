@@ -172,5 +172,3 @@ archclean:
 	rm -f arch/m68k/kernel/m68k_defs.h arch/m68k/kernel/m68k_defs.d
 
 archmrproper:
-
-archdep:

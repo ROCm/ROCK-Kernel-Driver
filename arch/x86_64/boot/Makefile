@@ -96,12 +96,8 @@ bsetup.o: bsetup.s
 bsetup.s: setup.S video.S Makefile $(BOOT_INCL) $(TOPDIR)/include/linux/version.h $(TOPDIR)/include/linux/compile.h
 	$(IA32_CPP) $(CPPFLAGS) -D__BIG_KERNEL__ -D__ASSEMBLY__ -traditional $(SVGA_MODE) $(RAMDISK) $< -o $@
 
-dep:
-
 clean:
 	rm -f tools/build
 	rm -f setup bootsect zImage compressed/vmlinux.out
 	rm -f bsetup bbootsect bzImage compressed/bvmlinux.out
 	@$(MAKE) -C compressed clean
-
-

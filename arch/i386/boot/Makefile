@@ -97,8 +97,6 @@ bsetup.o: bsetup.s
 bsetup.s: setup.S video.S Makefile $(BOOT_INCL) $(TOPDIR)/include/linux/version.h $(TOPDIR)/include/linux/compile.h
 	$(CPP) $(CPPFLAGS) -D__BIG_KERNEL__ -D__ASSEMBLY__ -traditional $(SVGA_MODE) $(RAMDISK) $< -o $@
 
-dep:
-
 clean:
 	@echo 'Cleaning up (boot)'
 	@rm -f tools/build

@@ -96,6 +96,4 @@ clean:
 	rm -f tools/mkbb tools/bootlx tools/lxboot tools/bootph
 	rm -f vmlinux.nh ksize.h
 
-dep:
-
 FORCE:
