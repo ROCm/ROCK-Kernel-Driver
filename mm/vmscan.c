@@ -354,7 +354,7 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask, int *nr_scanned)
 				goto keep_locked;
 			if (!may_write_to_queue(mapping->backing_dev_info))
 				goto keep_locked;
-			if (test_clear_page_dirty(page)) {
+			if (clear_page_dirty_for_io(page)) {
 				int res;
 				struct writeback_control wbc = {
 					.sync_mode = WB_SYNC_NONE,

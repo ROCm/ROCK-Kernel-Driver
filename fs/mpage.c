@@ -643,7 +643,7 @@ mpage_writepages(struct address_space *mapping,
 				wait_on_page_writeback(page);
 
 			if (page->mapping == mapping && !PageWriteback(page) &&
-						test_clear_page_dirty(page)) {
+						clear_page_dirty_for_io(page)) {
 				if (writepage) {
 					ret = (*writepage)(page, wbc);
 					if (ret) {

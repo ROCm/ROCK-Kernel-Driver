@@ -472,7 +472,7 @@ int write_one_page(struct page *page, int wait)
 	if (wait)
 		wait_on_page_writeback(page);
 
-	if (test_clear_page_dirty(page)) {
+	if (clear_page_dirty_for_io(page)) {
 		page_cache_get(page);
 		ret = mapping->a_ops->writepage(page, &wbc);
 		if (ret == 0 && wait) {
@@ -574,6 +574,36 @@ int test_clear_page_dirty(struct page *page)
 EXPORT_SYMBOL(test_clear_page_dirty);
 
 /*
+ * Clear a page's dirty flag, while caring for dirty memory accounting.
+ * Returns true if the page was previously dirty.
+ *
+ * This is for preparing to put the page under writeout.  We leave the page
+ * tagged as dirty in the radix tree so that a concurrent write-for-sync
+ * can discover it via a PAGECACHE_TAG_DIRTY walk.  The ->writepage
+ * implementation will run either set_page_writeback() or set_page_dirty(),
+ * at which stage we bring the page's dirty flag and radix-tree dirty tag
+ * back into sync.
+ *
+ * This incoherency between the page's dirty flag and radix-tree tag is
+ * unfortunate, but it only exists while the page is locked.
+ */
+int clear_page_dirty_for_io(struct page *page)
+{
+	struct address_space *mapping = page->mapping;
+
+	if (mapping) {
+		if (TestClearPageDirty(page)) {
+			if (!mapping->backing_dev_info->memory_backed)
+				dec_page_state(nr_dirty);
+			return 1;
+		}
+		return 0;
+	}
+	return TestClearPageDirty(page);
+}
+EXPORT_SYMBOL(clear_page_dirty_for_io);
+
+/*
  * Clear a page's dirty flag while ignoring dirty memory accounting
  */
 int __clear_page_dirty(struct page *page)
@@ -629,6 +659,9 @@ int test_set_page_writeback(struct page *page)
 		if (!ret)
 			radix_tree_tag_set(&mapping->page_tree, page->index,
 						PAGECACHE_TAG_WRITEBACK);
+		if (!PageDirty(page))
+			radix_tree_tag_clear(&mapping->page_tree, page->index,
+						PAGECACHE_TAG_DIRTY);
 		spin_unlock_irqrestore(&mapping->tree_lock, flags);
 	} else {
 		ret = TestSetPageWriteback(page);
