@@ -473,10 +473,6 @@ static int tcp_fragment(struct sock *sk, struct sk_buff *skb, u32 len)
 	TCP_SKB_CB(buff)->sacked =
 		(TCP_SKB_CB(skb)->sacked &
 		 (TCPCB_LOST | TCPCB_EVER_RETRANS | TCPCB_AT_TAIL));
-	if (TCP_SKB_CB(buff)->sacked&TCPCB_LOST) {
-		tcp_inc_pcount(&tp->lost_out, buff);
-		tcp_inc_pcount(&tp->left_out, buff);
-	}
 	TCP_SKB_CB(skb)->sacked &= ~TCPCB_AT_TAIL;
 
 	if (!skb_shinfo(skb)->nr_frags && skb->ip_summed != CHECKSUM_HW) {
@@ -502,6 +498,11 @@ static int tcp_fragment(struct sock *sk, struct sk_buff *skb, u32 len)
 	/* Fix up tso_factor for both original and new SKB.  */
 	tcp_set_skb_tso_factor(skb, tp->mss_cache_std);
 	tcp_set_skb_tso_factor(buff, tp->mss_cache_std);
+
+	if (TCP_SKB_CB(buff)->sacked&TCPCB_LOST) {
+		tcp_inc_pcount(&tp->lost_out, buff);
+		tcp_inc_pcount(&tp->left_out, buff);
+	}
 
 	/* Link BUFF into the send queue. */
 	__skb_append(skb, buff);
