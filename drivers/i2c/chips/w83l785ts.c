@@ -38,6 +38,9 @@
 #include <linux/i2c.h>
 #include <linux/i2c-sensor.h>
 
+/* How many retries on register read error */
+#define MAX_RETRIES	5
+
 /*
  * Address to scan
  * Address is fully defined internally and cannot be changed.
@@ -82,6 +85,7 @@ static int w83l785ts_attach_adapter(struct i2c_adapter *adapter);
 static int w83l785ts_detect(struct i2c_adapter *adapter, int address,
 	int kind);
 static int w83l785ts_detach_client(struct i2c_client *client);
+static u8 w83l785ts_read_value(struct i2c_client *client, u8 reg, u8 defval);
 static void w83l785ts_update_client(struct i2c_client *client);
 
 /*
@@ -196,10 +200,10 @@ static int w83l785ts_detect(struct i2c_adapter *adapter, int address, int kind)
 	 * are skipped.
 	 */
 	if (kind < 0) { /* detection */
-		if (((i2c_smbus_read_byte_data(new_client,
-		      W83L785TS_REG_CONFIG) & 0x80) != 0x00)
-		 || ((i2c_smbus_read_byte_data(new_client,
-		      W83L785TS_REG_TYPE) & 0xFC) != 0x00)) {
+		if (((w83l785ts_read_value(new_client,
+		      W83L785TS_REG_CONFIG, 0) & 0x80) != 0x00)
+		 || ((w83l785ts_read_value(new_client,
+		      W83L785TS_REG_TYPE, 0) & 0xFC) != 0x00)) {
 			dev_dbg(&adapter->dev,
 				"W83L785TS-S detection failed at 0x%02x.\n",
 				address);
@@ -211,12 +215,12 @@ static int w83l785ts_detect(struct i2c_adapter *adapter, int address, int kind)
 		u16 man_id;
 		u8 chip_id;
 
-		man_id = (i2c_smbus_read_byte_data(new_client,
-			 W83L785TS_REG_MAN_ID1) << 8) +
-			 i2c_smbus_read_byte_data(new_client,
-			 W83L785TS_REG_MAN_ID2);
-		chip_id = i2c_smbus_read_byte_data(new_client,
-			  W83L785TS_REG_CHIP_ID);
+		man_id = (w83l785ts_read_value(new_client,
+			 W83L785TS_REG_MAN_ID1, 0) << 8) +
+			 w83l785ts_read_value(new_client,
+			 W83L785TS_REG_MAN_ID2, 0);
+		chip_id = w83l785ts_read_value(new_client,
+			  W83L785TS_REG_CHIP_ID, 0);
 
 		if (man_id == 0x5CA3) { /* Winbond */
 			if (chip_id == 0x70) { /* W83L785TS-S */
@@ -238,6 +242,9 @@ static int w83l785ts_detect(struct i2c_adapter *adapter, int address, int kind)
 	new_client->id = w83l785ts_id++;
 	data->valid = 0;
 	init_MUTEX(&data->update_lock);
+
+	/* Default values in case the first read fails (unlikely). */
+	data->temp_over = data->temp = 0;
 
 	/* Tell the I2C layer a new client has arrived. */
 	if ((err = i2c_attach_client(new_client))) 
@@ -274,6 +281,26 @@ static int w83l785ts_detach_client(struct i2c_client *client)
 	return 0;
 }
 
+static u8 w83l785ts_read_value(struct i2c_client *client, u8 reg, u8 defval)
+{
+	int value, i;
+
+	/* Frequent read errors have been reported on Asus boards, so we
+	 * retry on read errors. If it still fails (unlikely), return the
+	 * default value requested by the caller. */
+	for (i = 1; i <= MAX_RETRIES; i++) {
+		value = i2c_smbus_read_byte_data(client, reg);
+		if (value >= 0)
+			return value;
+		dev_dbg(&client->dev, "Read failed, will retry in %d.\n", i);
+		i2c_delay(i);
+	}
+
+	dev_err(&client->dev, "Couldn't read value from register. "
+		"Please report.\n");
+	return defval;
+}
+
 static void w83l785ts_update_client(struct i2c_client *client)
 {
 	struct w83l785ts_data *data = i2c_get_clientdata(client);
@@ -284,10 +311,10 @@ static void w83l785ts_update_client(struct i2c_client *client)
 	 || (jiffies - data->last_updated > HZ * 2)
 	 || (jiffies < data->last_updated)) {
 		dev_dbg(&client->dev, "Updating w83l785ts data.\n");
-		data->temp = i2c_smbus_read_byte_data(client,
-			     W83L785TS_REG_TEMP);
-		data->temp_over = i2c_smbus_read_byte_data(client,
-				  W83L785TS_REG_TEMP_OVER);
+		data->temp = w83l785ts_read_value(client,
+			     W83L785TS_REG_TEMP, data->temp);
+		data->temp_over = w83l785ts_read_value(client,
+				  W83L785TS_REG_TEMP_OVER, data->temp_over);
 
 		data->last_updated = jiffies;
 		data->valid = 1;
