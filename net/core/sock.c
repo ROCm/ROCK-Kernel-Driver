@@ -711,6 +711,27 @@ void sock_rfree(struct sk_buff *skb)
 	atomic_sub(skb->truesize, &sk->sk_rmem_alloc);
 }
 
+
+int sock_i_uid(struct sock *sk)
+{
+	int uid;
+
+	read_lock(&sk->sk_callback_lock);
+	uid = sk->sk_socket ? SOCK_INODE(sk->sk_socket)->i_uid : 0;
+	read_unlock(&sk->sk_callback_lock);
+	return uid;
+}
+
+unsigned long sock_i_ino(struct sock *sk)
+{
+	unsigned long ino;
+
+	read_lock(&sk->sk_callback_lock);
+	ino = sk->sk_socket ? SOCK_INODE(sk->sk_socket)->i_ino : 0;
+	read_unlock(&sk->sk_callback_lock);
+	return ino;
+}
+
 /*
  * Allocate a skb from the socket's send buffer.
  */
@@ -1379,6 +1400,8 @@ EXPORT_SYMBOL(sock_rmalloc);
 EXPORT_SYMBOL(sock_setsockopt);
 EXPORT_SYMBOL(sock_wfree);
 EXPORT_SYMBOL(sock_wmalloc);
+EXPORT_SYMBOL(sock_i_uid);
+EXPORT_SYMBOL(sock_i_ino);
 #ifdef CONFIG_SYSCTL
 EXPORT_SYMBOL(sysctl_optmem_max);
 EXPORT_SYMBOL(sysctl_rmem_max);
