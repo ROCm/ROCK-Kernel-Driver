@@ -1203,7 +1203,7 @@ static int __exit ircc_close(struct ircc_cb *self)
 	return 0;
 }
 
-int __init smc_init(void)
+static int __init smc_init(void)
 {
 	return ircc_init();
 }
