@@ -62,14 +62,14 @@ inline void sii_insl (u32 port, void *addr, u32 count)
 //	while (count--) { *(u32 *)addr = readl(port); addr += 4; }
 }
 
-inline void sii_outb (u8 addr, u32 port)
+inline void sii_outb (u8 value, u32 port)
 {
-	writeb(addr, port);
+	writeb(value, port);
 }
 
-inline void sii_outw (u16 addr, u32 port)
+inline void sii_outw (u16 value, u32 port)
 {
-	writew(addr, port);
+	writew(value, port);
 }
 
 inline void sii_outsw (u32 port, void *addr, u32 count)
@@ -77,9 +77,9 @@ inline void sii_outsw (u32 port, void *addr, u32 count)
 	while (count--) { writew(*(u16 *)addr, port); addr += 2; }
 }
 
-inline void sii_outl (u32 addr, u32 port)
+inline void sii_outl (u32 value, u32 port)
 {
-	writel(addr, port);
+	writel(value, port);
 }
 
 inline void sii_outsl (u32 port, void *addr, u32 count)
