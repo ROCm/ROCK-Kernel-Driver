@@ -234,7 +234,7 @@ extern ia64_mv_dma_sync_single_for_cpu	swiotlb_sync_single_for_cpu;
 extern ia64_mv_dma_sync_sg_for_cpu	swiotlb_sync_sg_for_cpu;
 extern ia64_mv_dma_sync_single_for_device swiotlb_sync_single_for_device;
 extern ia64_mv_dma_sync_sg_for_device	swiotlb_sync_sg_for_device;
-extern ia64_mv_dma_mapping_error		swiotlb_dma_mapping_error;
+extern ia64_mv_dma_mapping_error	swiotlb_dma_mapping_error;
 extern ia64_mv_dma_supported		swiotlb_dma_supported;
 
 /*

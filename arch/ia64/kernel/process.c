@@ -173,8 +173,8 @@ __setup("nohalt", nohalt_setup);
 void
 default_idle (void)
 {
-	unsigned long pmu_active = ia64_getreg(_IA64_REG_PSR) &
-				   (IA64_PSR_PP | IA64_PSR_UP);
+	unsigned long pmu_active = ia64_getreg(_IA64_REG_PSR) & (IA64_PSR_PP | IA64_PSR_UP);
+
 	while (!need_resched())
 		if (pal_halt && !pmu_active)
 			safe_halt();
