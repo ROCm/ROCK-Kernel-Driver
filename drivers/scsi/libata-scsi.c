@@ -46,8 +46,8 @@ static void ata_scsi_simulate(struct ata_port *ap, struct ata_device *dev,
  *	@geom: location to which geometry will be output
  *
  *	Generic bios head/sector/cylinder calculator
- *	used by sd. Most BIOSes nowadays expect a XXX/255/16  (CHS) 
- *	mapping. Some situations may arise where the disk is not 
+ *	used by sd. Most BIOSes nowadays expect a XXX/255/16  (CHS)
+ *	mapping. Some situations may arise where the disk is not
  *	bootable if this is not used.
  *
  *	LOCKING:
@@ -57,7 +57,7 @@ static void ata_scsi_simulate(struct ata_port *ap, struct ata_device *dev,
  *	Zero.
  */
 int ata_std_bios_param(struct scsi_device *sdev, struct block_device *bdev,
-		       sector_t capacity, int geom[]) 
+		       sector_t capacity, int geom[])
 {
 	geom[0] = 255;
 	geom[1] = 63;
@@ -362,19 +362,20 @@ static void ata_scsi_translate(struct ata_port *ap, struct ata_device *dev,
 
 	VPRINTK("ENTER\n");
 
-	if (unlikely(cmd->request_bufflen < 1)) {
-		printk(KERN_WARNING "ata%u(%u): empty request buffer\n",
-		       ap->id, dev->devno);
-		goto err_out;
-	}
-
 	qc = ata_scsi_qc_new(ap, dev, cmd, done);
 	if (!qc)
 		return;
 
 	if (cmd->sc_data_direction == SCSI_DATA_READ ||
-	    cmd->sc_data_direction == SCSI_DATA_WRITE)
+	    cmd->sc_data_direction == SCSI_DATA_WRITE) {
+		if (unlikely(cmd->request_bufflen < 1)) {
+			printk(KERN_WARNING "ata%u(%u): WARNING: zero len r/w req\n",
+			       ap->id, dev->devno);
+			goto err_out;
+		}
+
 		qc->flags |= ATA_QCFLAG_SG; /* data is present; dma-map it */
+	}
 
 	if (xlat_func(qc, scsicmd))
 		goto err_out;
@@ -910,12 +911,18 @@ static unsigned int atapi_xlat(struct ata_queued_cmd *qc, u8 *scsicmd)
 
 	qc->tf.command = ATA_CMD_PACKET;
 
-	if ((cmd->sc_data_direction == SCSI_DATA_NONE) ||
-	    ((qc->flags & ATA_QCFLAG_DMA) == 0)) {
+	/* no data - interrupt-driven */
+	if (cmd->sc_data_direction == SCSI_DATA_NONE)
+		qc->tf.protocol = ATA_PROT_ATAPI;
+
+	/* PIO data xfer - polling */
+	else if ((qc->flags & ATA_QCFLAG_DMA) == 0) {
 		ata_qc_set_polling(qc);
 		qc->tf.protocol = ATA_PROT_ATAPI;
 		qc->tf.lbam = (8 * 1024) & 0xff;
 		qc->tf.lbah = (8 * 1024) >> 8;
+
+	/* DMA data xfer - interrupt-driven */
 	} else {
 		qc->flags |= ATA_QCFLAG_SG; /* data is present; dma-map it */
 		qc->tf.protocol = ATA_PROT_ATAPI_DMA;
