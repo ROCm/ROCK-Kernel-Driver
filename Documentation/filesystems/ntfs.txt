@@ -1,18 +1,37 @@
-NTFS Overview
-=============
+The Linux NTFS filesystem driver
+================================
+
+
+Table of contents
+=================
+
+- Overview
+- Supported mount options
+- Features
+- Known bugs and (mis-)features
+- Using Software RAID with NTFS
+- Limitiations when using the MD driver
+- ChangeLog
+
+
+Overview
+========
 
 To mount an NTFS 1.2/3.x (Windows NT4/2000/XP) volume, use the filesystem
 type 'ntfs'. The driver currently works only in read-only mode, with no
-fault-tolerance supported.
+fault-tolerance or journalling supported.
 
-For ftdisk support, limited success was reported with volume sets on top of
-the md driver, although mirror and stripe sets should work as well - if the
-md driver can be talked into using the same layout as Windows NT. However,
-using the md driver will fail if any of your NTFS partitions have an odd
-number of sectors.
+For fault tolerance and raid support (i.e. volume and stripe sets), you can use
+the kernel's Software RAID / MD driver. See section "Using Software RAID with
+NTFS" for details.
+
 
 Supported mount options
 =======================
+
+In addition to the generic mount options described by the manual page for the
+mount command (man 8 mount, also see man 5 fstab), the NTFS driver supports the
+following mount options:
 
 iocharset=name		Deprecated option. Still supported but please use
 			nls=name in the future. See description for nls=name.
@@ -137,6 +156,7 @@ mft_zone_multiplier=	Set the MFT zone multiplier for the volume (this
 				4		50%
 			Note this option is irrelevant for read-only mounts.
 
+
 Features
 ========
 
@@ -155,6 +175,7 @@ Features
   was unchanged but the time spent in the kernel was decreased by a factor of
   2.5 (from 85 CPU seconds down to 33).
 
+
 Known bugs and (mis-)features
 =============================
 
@@ -163,11 +184,86 @@ Known bugs and (mis-)features
 Please send bug reports/comments/feedback/abuse to the Linux-NTFS development
 list at sourceforge: linux-ntfs-dev@lists.sourceforge.net
 
+
+Using Software RAID with NTFS
+=============================
+
+For support of volume and stripe sets, use the kernel's Software RAID / MD
+driver and set up your /etc/raidtab appropriately (see man 5 raidtab).
+
+Linear volume sets, i.e. linear raid, as well as stripe sets, i.e. raid level 0,
+have been tested and work fine (though see section "Limitiations when using the
+MD driver with NTFS volumes" especially if you want to use linear raid). Even
+though untested, there is no reason why mirrors, i.e. raid level 1, and stripes
+with parity, i.e. raid level 5, should not work, too.
+
+You have to use the "persistent-superblock 0" option for each raid-disk in the
+NTFS volume/stripe you are configuring in /etc/raidtab as the persistent
+superblock used by the MD driver would damange the NTFS volume.
+
+Windows by default uses a stripe chunk size of 64k, so you probably want the
+"chunk-size 64k" option for each raid-disk, too.
+
+For example, if you have a stripe set consisting of two partitions /dev/hda5
+and /dev/hdb1 your /etc/raidtab would look like this:
+
+raiddev /dev/md0
+	raid-level	0
+	nr-raid-disks	2
+	nr-spare-disks	0
+	persistent-superblock	0
+	chunk-size	64k
+	device		/dev/hda5
+	raid-disk	0
+	device		/dev/hdb1
+	raid-disl	1
+
+For linear raid, just change the raid-level above to "raid-level linear", for
+mirrors, change it to "raid-level 1", and for stripe sets with parity, change
+it to "raid-level 5".
+
+Note for stripe sets with parity you will also need to tell the MD driver which
+parity algorithm to use by specifying the option "parity-algorithm which",
+where you need to replace "which" with the name of the algorithm to use (see
+man 5 raidtab for available algorithms) and you will have to try the different
+available algorithms until you find one that works. Make sure you are working
+read-only when playing with this as you may damage your data otherwise. If you
+find which algorithm works please let us know (email the linux-ntfs developers
+list linux-ntfs-dev@lists.sourceforge.net or drop in on IRC in channel #ntfs
+on the irc.openprojects.net network) so we can update this documentation.
+
+Once the raidtab is setup, run for example raid0run -a to start all devices or
+raid0run /dev/md0 to start a particular md device, in this case /dev/md0.
+
+Then just use the mount command as usual to mount the ntfs volume using for
+example:	mount -t ntfs -o ro /dev/md0 /mnt/myntfsvolume
+
+It is advisable to do the mount read-only to see if the md volume has been
+setup correctly to avoid the possibility of causing damage to the data on the
+ntfs volume.
+
+
+Limitiations when using the MD driver
+=====================================
+
+Using the md driver will not work properly if any of your NTFS partitions have
+an odd number of sectors. This is especially important for linear raid as all
+data after the first partition with an odd number of sectors will be offset by
+one or more sectors so if you mount such a partition with write support you
+will cause massive damage to the data on the volume which will only become
+apparent when you try to use the volume again under Windows.
+
+So when using linear raid, make sure that all your partitions have an even
+number of sectors BEFORE attempting to use it. You have been warned!
+
+
 ChangeLog
 =========
 
 Note that a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
 
+2.0.4:
+	- Cleanups and updates for kernel 2.5.11.
 2.0.3:
 	- Small bug fixes, cleanups, and performance improvements.
 2.0.2:

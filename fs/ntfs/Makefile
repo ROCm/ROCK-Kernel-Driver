@@ -2,12 +2,12 @@
 
 O_TARGET := ntfs.o
 
-obj-y   := time.o unistr.o inode.o file.o mft.o super.o debug.o aops.o \
-		attrib.o dir.o namei.o mst.o upcase.o compress.o sysctl.o
+obj-y   := aops.o attrib.o compress.o debug.o dir.o file.o inode.o mft.o \
+		mst.o namei.o super.o sysctl.o time.o unistr.o upcase.o
 
 obj-m   := $(O_TARGET)
 
-EXTRA_CFLAGS = -DNTFS_VERSION=\"2.0.3\"
+EXTRA_CFLAGS = -DNTFS_VERSION=\"2.0.4\"
 
 ifeq ($(CONFIG_NTFS_DEBUG),y)
 EXTRA_CFLAGS += -DDEBUG

@@ -443,9 +443,9 @@ int ntfs_file_read_compressed_block(struct page *page)
 	struct address_space *mapping = page->mapping;
 	ntfs_inode *ni = NTFS_I(mapping->host);
 	ntfs_volume *vol = ni->vol;
-	kdev_t dev = vol->sb->s_dev;
-	unsigned long block_size = vol->sb->s_blocksize;
-	unsigned char block_size_bits = vol->sb->s_blocksize_bits;
+	struct super_block *sb = vol->sb;
+	unsigned long block_size = sb->s_blocksize;
+	unsigned char block_size_bits = sb->s_blocksize_bits;
 	u8 *cb, *cb_pos, *cb_end;
 	struct buffer_head **bhs;
 	unsigned long offset, index = page->index;
@@ -575,8 +575,7 @@ retry_remap:
 		max_block = block + (vol->cluster_size >> block_size_bits);
 		do {
 			ntfs_debug("block = 0x%x.", block);
-			if (unlikely(!(bhs[nr_bhs] = getblk(dev, block,
-					block_size))))
+			if (unlikely(!(bhs[nr_bhs] = sb_getblk(sb, block))))
 				goto getblk_err;
 			nr_bhs++;
 		} while (++block < max_block);

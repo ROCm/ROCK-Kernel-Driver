@@ -147,7 +147,7 @@ static int ntfs_file_read_block(struct page *page)
 			arr[nr++] = bh;
 			continue;
 		}
-		bh->b_dev = VFS_I(ni)->i_dev;
+		bh->b_bdev = vol->sb->s_bdev;
 		/* Is the block within the allowed limits? */
 		if (iblock < lblock) {
 			BOOL is_retry = FALSE;
@@ -437,7 +437,7 @@ static int ntfs_mftbmp_readpage(ntfs_volume *vol, struct page *page)
 			arr[nr++] = bh;
 			continue;
 		}
-		bh->b_dev = vol->mft_ino->i_dev;
+		bh->b_bdev = vol->sb->s_bdev;
 		/* Is the block within the allowed limits? */
 		if (iblock < lblock) {
 			/* Convert iblock into corresponding vcn and offset. */
@@ -681,7 +681,7 @@ int ntfs_mst_readpage(struct file *dir, struct page *page)
 			arr[nr++] = bh;
 			continue;
 		}
-		bh->b_dev = VFS_I(ni)->i_dev;
+		bh->b_bdev = vol->sb->s_bdev;
 		/* Is the block within the allowed limits? */
 		if (iblock < lblock) {
 			BOOL is_retry = FALSE;

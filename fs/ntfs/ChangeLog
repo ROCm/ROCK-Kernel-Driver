@@ -27,6 +27,20 @@ ToDo:
 	  quite big. Modularising them a bit, e.g. a-la get_block(), will make
 	  them cleaner and make code reuse easier.
 
+2.0.4 - Cleanups and updates for kernel 2.5.11.
+
+	- Add documentation on how to use the MD driver to be able to use NTFS
+	  stripe and volume sets in Linux and generally cleanup documentation
+	  a bit.
+	Remove all uses of kdev_t in favour of struct block_device *:
+	- Change compress.c::ntfs_file_read_compressed_block() to use
+	  sb_getblk() instead of getblk().
+	- Change super.c::ntfs_fill_suoer() to use bdev_hardsect_size() instead
+	  of get_hardsect_size().
+	- No need to get old blocksize in super.c::ntfs_fill_super() as
+	  fs/super.c::get_sb_bdev() already does this.
+	- Set bh->b_bdev instead of bh->b_dev throughout aops.c.
+
 2.0.3 - Small bug fixes, cleanups, and performance improvements.
 
 	- Remove some dead code from mft.c.

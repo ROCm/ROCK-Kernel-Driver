@@ -25,8 +25,7 @@
 #include <linux/string.h>
 #include <linux/locks.h>
 #include <linux/spinlock.h>
-#include <linux/genhd.h>	/* For gendisk stuff. */
-#include <linux/blkdev.h>	/* Fox get_hardsect_size. */
+#include <linux/blkdev.h>	/* For bdev_hardsect_size(). */
 
 #include "ntfs.h"
 #include "sysctl.h"
@@ -1474,12 +1473,10 @@ struct super_operations ntfs_sops = {
  */
 static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 {
-	extern int *blksize_size[];
 	ntfs_volume *vol;
 	struct buffer_head *bh;
 	struct inode *tmp_ino;
-	int old_blocksize, result;
-	kdev_t dev = sb->s_dev;
+	int result;
 
 	ntfs_debug("Entering.");
 	/* Allocate a new ntfs_volume and place it in sb->u.generic_sbp. */
@@ -1548,17 +1545,13 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	 * TODO: Fail safety check. In the future we should really be able to
 	 * cope with this being the case, but for now just bail out.
 	 */
-	if (get_hardsect_size(dev) > NTFS_BLOCK_SIZE) {
+	if (bdev_hardsect_size(sb->s_bdev) > NTFS_BLOCK_SIZE) {
 		if (!silent)
 			ntfs_error(sb, "Device has unsupported hardsect_size.");
 		goto err_out_now;
 	}
-	
+
 	/* Setup the device access block size to NTFS_BLOCK_SIZE. */
-	if (!blksize_size[major(dev)])
-		old_blocksize = BLOCK_SIZE;
-	else
-		old_blocksize = blksize_size[major(dev)][minor(dev)];
 	if (sb_set_blocksize(sb, NTFS_BLOCK_SIZE) != NTFS_BLOCK_SIZE) {
 		if (!silent)
 			ntfs_error(sb, "Unable to set block size.");
@@ -1759,7 +1752,8 @@ cond_iput_mft_ino_err_out_now:
 	}
 set_blk_size_err_out_now:
 	/* Errors at this stage are irrelevant. */
-	sb_set_blocksize(sb, old_blocksize);
+	// FIXME: This should be done in fs/super.c::get_sb_bdev() itself! (AIA)
+	sb_set_blocksize(sb, sb->s_old_blocksize);
 err_out_now:
 	sb->u.generic_sbp = NULL;
 	kfree(vol);
