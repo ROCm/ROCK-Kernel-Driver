@@ -104,6 +104,7 @@ struct synaptics_data {
 	/* Data for normal processing */
 	int old_w;				/* Previous w value */
 	unsigned char pkt_type;			/* packet type - old, new, etc */
+	unsigned char mode;			/* current mode byte */
 };
 
 #endif /* _SYNAPTICS_H */

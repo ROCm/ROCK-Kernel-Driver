@@ -36,11 +36,11 @@ static unsigned int psmouse_max_proto = -1U;
 module_param_named(proto, psmouse_proto, charp, 0);
 MODULE_PARM_DESC(proto, "Highest protocol extension to probe (bare, imps, exps). Useful for KVM switches.");
 
-int psmouse_resolution = 200;
+static unsigned int psmouse_resolution = 200;
 module_param_named(resolution, psmouse_resolution, uint, 0);
 MODULE_PARM_DESC(resolution, "Resolution, in dpi.");
 
-unsigned int psmouse_rate = 100;
+static unsigned int psmouse_rate = 100;
 module_param_named(rate, psmouse_rate, uint, 0);
 MODULE_PARM_DESC(rate, "Report rate, in reports per second.");
 
@@ -521,38 +521,29 @@ static int psmouse_probe(struct psmouse *psmouse)
  * Here we set the mouse resolution.
  */
 
-static void psmouse_set_resolution(struct psmouse *psmouse)
+void psmouse_set_resolution(struct psmouse *psmouse, unsigned int resolution)
 {
-	unsigned char param[1];
+	unsigned char params[] = { 0, 1, 2, 2, 3 };
 
-	if (psmouse->type == PSMOUSE_PS2PP && psmouse_resolution > 400) {
-		ps2pp_set_800dpi(psmouse);
-		return;
-	}
+	if (resolution == 0 || resolution > 200)
+		resolution = 200;
 
-	if (!psmouse_resolution || psmouse_resolution >= 200)
-		param[0] = 3;
-	else if (psmouse_resolution >= 100)
-		param[0] = 2;
-	else if (psmouse_resolution >= 50)
-		param[0] = 1;
-	else if (psmouse_resolution)
-		param[0] = 0;
-
-	ps2_command(&psmouse->ps2dev, param, PSMOUSE_CMD_SETRES);
+	ps2_command(&psmouse->ps2dev, &params[resolution / 50], PSMOUSE_CMD_SETRES);
+	psmouse->resolution = 25 << params[resolution / 50];
 }
 
 /*
  * Here we set the mouse report rate.
  */
 
-static void psmouse_set_rate(struct psmouse *psmouse)
+static void psmouse_set_rate(struct psmouse *psmouse, unsigned int rate)
 {
 	unsigned char rates[] = { 200, 100, 80, 60, 40, 20, 10, 0 };
 	int i = 0;
 
-	while (rates[i] > psmouse_rate) i++;
-	ps2_command(&psmouse->ps2dev, rates + i, PSMOUSE_CMD_SETRATE);
+	while (rates[i] > rate) i++;
+	ps2_command(&psmouse->ps2dev, &rates[i], PSMOUSE_CMD_SETRATE);
+	psmouse->rate = rates[i];
 }
 
 /*
@@ -568,8 +559,8 @@ static void psmouse_initialize(struct psmouse *psmouse)
  */
 
 	if (psmouse_max_proto != PSMOUSE_PS2) {
-		psmouse_set_rate(psmouse);
-		psmouse_set_resolution(psmouse);
+		psmouse->set_rate(psmouse, psmouse->rate);
+		psmouse->set_resolution(psmouse, psmouse->resolution);
 		ps2_command(&psmouse->ps2dev, NULL, PSMOUSE_CMD_SETSCALE11);
 	}
 
@@ -709,6 +700,8 @@ static void psmouse_connect(struct serio *serio, struct serio_driver *drv)
 		goto out;
 	}
 
+	psmouse->rate = psmouse_rate;
+	psmouse->resolution = psmouse_resolution;
 	psmouse->type = psmouse_extensions(psmouse, psmouse_max_proto, 1);
 	if (!psmouse->vendor)
 		psmouse->vendor = "Generic";
@@ -716,6 +709,10 @@ static void psmouse_connect(struct serio *serio, struct serio_driver *drv)
 		psmouse->name = "Mouse";
 	if (!psmouse->protocol_handler)
 		psmouse->protocol_handler = psmouse_process_byte;
+	if (!psmouse->set_rate)
+		psmouse->set_rate = psmouse_set_rate;
+	if (!psmouse->set_resolution)
+		psmouse->set_resolution = psmouse_set_resolution;
 
 	sprintf(psmouse->devname, "%s %s %s",
 		psmouse_protocols[psmouse->type], psmouse->vendor, psmouse->name);

@@ -137,15 +137,19 @@ static void ps2pp_set_smartscroll(struct psmouse *psmouse)
  * also good reasons to use it, let the user decide).
  */
 
-void ps2pp_set_800dpi(struct psmouse *psmouse)
+static void ps2pp_set_resolution(struct psmouse *psmouse, unsigned int resolution)
 {
-	struct ps2dev *ps2dev = &psmouse->ps2dev;
-	unsigned char param = 3;
+	if (resolution > 400) {
+		struct ps2dev *ps2dev = &psmouse->ps2dev;
+		unsigned char param = 3;
 
-	ps2_command(ps2dev, NULL, PSMOUSE_CMD_SETSCALE11);
-	ps2_command(ps2dev, NULL, PSMOUSE_CMD_SETSCALE11);
-	ps2_command(ps2dev, NULL, PSMOUSE_CMD_SETSCALE11);
-	ps2_command(ps2dev, &param, PSMOUSE_CMD_SETRES);
+		ps2_command(ps2dev, NULL, PSMOUSE_CMD_SETSCALE11);
+		ps2_command(ps2dev, NULL, PSMOUSE_CMD_SETSCALE11);
+		ps2_command(ps2dev, NULL, PSMOUSE_CMD_SETSCALE11);
+		ps2_command(ps2dev, &param, PSMOUSE_CMD_SETRES);
+		psmouse->resolution = 800;
+	} else
+		psmouse_set_resolution(psmouse, resolution);
 }
 
 static struct ps2pp_info *get_model_info(unsigned char model)
@@ -299,6 +303,8 @@ int ps2pp_init(struct psmouse *psmouse, int set_properties)
 		if (set_properties) {
 			psmouse->vendor = "Logitech";
 			psmouse->model = model;
+			if (protocol == PSMOUSE_PS2PP)
+				psmouse->set_resolution = ps2pp_set_resolution;
 
 			if (buttons < 3)
 				clear_bit(BTN_MIDDLE, psmouse->dev.keybit);

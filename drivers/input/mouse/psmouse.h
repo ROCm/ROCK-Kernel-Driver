@@ -50,7 +50,13 @@ struct psmouse {
 	char devname[64];
 	char phys[32];
 
+	unsigned int rate;
+	unsigned int resolution;
+
 	psmouse_ret_t (*protocol_handler)(struct psmouse *psmouse, struct pt_regs *regs);
+	void (*set_rate)(struct psmouse *psmouse, unsigned int rate);
+	void (*set_resolution)(struct psmouse *psmouse, unsigned int resolution);
+
 	int (*reconnect)(struct psmouse *psmouse);
 	void (*disconnect)(struct psmouse *psmouse);
 
@@ -73,8 +79,8 @@ enum psmouse_type {
 
 int psmouse_sliced_command(struct psmouse *psmouse, unsigned char command);
 int psmouse_reset(struct psmouse *psmouse);
+void psmouse_set_resolution(struct psmouse *psmouse, unsigned int resolution);
 
 extern int psmouse_smartscroll;
-extern unsigned int psmouse_rate;
 
 #endif /* _PSMOUSE_H */
