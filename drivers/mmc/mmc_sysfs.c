@@ -157,20 +157,26 @@ static ssize_t mmc_dev_show_##name (struct device *dev, char *buf)	\
 }									\
 static DEVICE_ATTR(name, S_IRUGO, mmc_dev_show_##name, NULL)
 
+MMC_ATTR(cid, "%08x%08x%08x%08x\n", card->raw_cid[0], card->raw_cid[1],
+	card->raw_cid[2], card->raw_cid[3]);
+MMC_ATTR(csd, "%08x%08x%08x%08x\n", card->raw_csd[0], card->raw_csd[1],
+	card->raw_csd[2], card->raw_csd[3]);
 MMC_ATTR(date, "%02d/%04d\n", card->cid.month, 1997 + card->cid.year);
 MMC_ATTR(fwrev, "0x%x\n", card->cid.fwrev);
 MMC_ATTR(hwrev, "0x%x\n", card->cid.hwrev);
 MMC_ATTR(manfid, "0x%03x\n", card->cid.manfid);
-MMC_ATTR(serial, "0x%06x\n", card->cid.serial);
 MMC_ATTR(name, "%s\n", card->cid.prod_name);
+MMC_ATTR(serial, "0x%06x\n", card->cid.serial);
 
 static struct device_attribute *mmc_dev_attributes[] = {
+	&dev_attr_cid,
+	&dev_attr_csd,
 	&dev_attr_date,
 	&dev_attr_fwrev,
 	&dev_attr_hwrev,
 	&dev_attr_manfid,
-	&dev_attr_serial,
 	&dev_attr_name,
+	&dev_attr_serial,
 };
 
 /*
