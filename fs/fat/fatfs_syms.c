@@ -24,7 +24,7 @@ EXPORT_SYMBOL(fat_put_super);
 EXPORT_SYMBOL(fat_attach);
 EXPORT_SYMBOL(fat_detach);
 EXPORT_SYMBOL(fat_build_inode);
-EXPORT_SYMBOL(fat_read_super);
+EXPORT_SYMBOL(fat_fill_super);
 EXPORT_SYMBOL(fat_search_long);
 EXPORT_SYMBOL(fat_readdir);
 EXPORT_SYMBOL(fat_scan);

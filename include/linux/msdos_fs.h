@@ -5,6 +5,7 @@
  * The MS-DOS filesystem constants/structures
  */
 #include <linux/msdos_fs_i.h>
+#include <linux/msdos_fs_sb.h>
 
 #include <asm/byteorder.h>
 
@@ -53,7 +54,11 @@
 #define MSDOS_VALID_MODE (S_IFREG | S_IFDIR | S_IRWXU | S_IRWXG | S_IRWXO)
 	/* valid file mode bits */
 
-#define MSDOS_SB(s) (&((s)->u.msdos_sb))
+static inline struct msdos_sb_info *MSDOS_SB(struct super_block *sb)
+{
+	return sb->u.generic_sbp;
+}
+
 static inline struct msdos_inode_info *MSDOS_I(struct inode *inode)
 {
 	return list_entry(inode, struct msdos_inode_info, vfs_inode);
@@ -282,9 +287,8 @@ extern struct inode *fat_build_inode(struct super_block *sb,
 extern void fat_delete_inode(struct inode *inode);
 extern void fat_clear_inode(struct inode *inode);
 extern void fat_put_super(struct super_block *sb);
-extern struct super_block *
-fat_read_super(struct super_block *sb, void *data, int silent,
-	       struct inode_operations *fs_dir_inode_ops);
+int fat_fill_super(struct super_block *sb, void *data, int silent,
+		   struct inode_operations *fs_dir_inode_ops, int isvfat);
 extern int fat_statfs(struct super_block *sb, struct statfs *buf);
 extern void fat_write_inode(struct inode *inode, int wait);
 extern int fat_notify_change(struct dentry * dentry, struct iattr * attr);
