@@ -36,10 +36,17 @@
 #define DEBUGP(format, args...)
 #endif
 
+struct sel_netif
+{
+	struct list_head list;
+	struct netif_security_struct nsec;
+	struct rcu_head rcu_head;
+};
+
 static u32 sel_netif_total;
 static LIST_HEAD(sel_netif_list);
 static spinlock_t sel_netif_lock = SPIN_LOCK_UNLOCKED;
-static struct sel_netif sel_netif_hash[SEL_NETIF_HASH_SIZE];
+static struct list_head sel_netif_hash[SEL_NETIF_HASH_SIZE];
 
 static inline u32 sel_netif_hasfn(struct net_device *dev)
 {
@@ -50,12 +57,12 @@ static inline u32 sel_netif_hasfn(struct net_device *dev)
  * All of the devices should normally fit in the hash, so we optimize
  * for that case.
  */
-static struct sel_netif *sel_netif_find(struct net_device *dev)
+static inline struct sel_netif *sel_netif_find(struct net_device *dev)
 {
 	struct list_head *pos;
 	int idx = sel_netif_hasfn(dev);
 
-	__list_for_each_rcu(pos, &sel_netif_hash[idx].list) {
+	__list_for_each_rcu(pos, &sel_netif_hash[idx]) {
 		struct sel_netif *netif = list_entry(pos,
 		                                     struct sel_netif, list);
 		if (likely(netif->nsec.dev == dev))
@@ -74,25 +81,38 @@ static int sel_netif_insert(struct sel_netif *netif)
 	}
 	
 	idx = sel_netif_hasfn(netif->nsec.dev);
-	list_add_rcu(&netif->list, &sel_netif_hash[idx].list);
-	atomic_set(&netif->users, 1);
+	list_add_rcu(&netif->list, &sel_netif_hash[idx]);
 	sel_netif_total++;
 out:
 	return ret;
 }
 
-struct sel_netif *sel_netif_lookup(struct net_device *dev)
+static void sel_netif_free(struct rcu_head *p)
+{
+	struct sel_netif *netif = container_of(p, struct sel_netif, rcu_head);
+
+	DEBUGP("%s: %s\n", __FUNCTION__, netif->nsec.dev->name);
+	kfree(netif);
+}
+
+static void sel_netif_destroy(struct sel_netif *netif)
+{
+	DEBUGP("%s: %s\n", __FUNCTION__, netif->nsec.dev->name);
+
+	list_del_rcu(&netif->list);
+	sel_netif_total--;
+	call_rcu(&netif->rcu_head, sel_netif_free);
+}
+
+static struct sel_netif *sel_netif_lookup(struct net_device *dev)
 {
 	int ret;
 	struct sel_netif *netif, *new;
 	struct netif_security_struct *nsec;
 
-	rcu_read_lock();
 	netif = sel_netif_find(dev);
-	rcu_read_unlock();
-	
 	if (likely(netif != NULL))
-		goto out_hold;
+		goto out;
 	
 	new = kmalloc(sizeof(*new), GFP_ATOMIC);
 	if (!new) {
@@ -118,76 +138,86 @@ struct sel_netif *sel_netif_lookup(struct net_device *dev)
 	if (netif) {
 		spin_unlock_bh(&sel_netif_lock);
 		kfree(new);
-		goto out_hold;
+		goto out;
 	}
 	
-	sel_netif_insert(new);
+	ret = sel_netif_insert(new);
 	spin_unlock_bh(&sel_netif_lock);
 	
+	if (ret) {
+		kfree(new);
+		netif = ERR_PTR(ret);
+		goto out;
+	}
+
 	netif = new;
 	
 	DEBUGP("new: ifindex=%u name=%s if_sid=%u msg_sid=%u\n", dev->ifindex, dev->name,
 	        nsec->if_sid, nsec->msg_sid);
-out_hold:
-	atomic_inc(&netif->users);
 out:
 	return netif;
 }
 
-static void sel_netif_free(struct rcu_head *p)
+static void sel_netif_assign_sids(u32 if_sid_in, u32 msg_sid_in, u32 *if_sid_out, u32 *msg_sid_out)
 {
-	struct sel_netif *netif = container_of(p, struct sel_netif, rcu_head);
-	
-	DEBUGP("%s: %s\n", __FUNCTION__, netif->nsec.dev->name);
-	kfree(netif);
+	if (if_sid_out)
+		*if_sid_out = if_sid_in;
+	if (msg_sid_out)
+		*msg_sid_out = msg_sid_in;
 }
 
-static void sel_netif_destroy(struct sel_netif *netif)
+static int sel_netif_sids_slow(struct net_device *dev, u32 *if_sid, u32 *msg_sid)
 {
-	DEBUGP("%s: %s\n", __FUNCTION__, netif->nsec.dev->name);
+	int ret = 0;
+	u32 tmp_if_sid, tmp_msg_sid;
 	
-	spin_lock_bh(&sel_netif_lock);
-	list_del_rcu(&netif->list);
-	sel_netif_total--;
-	spin_unlock_bh(&sel_netif_lock);
-
-	call_rcu(&netif->rcu_head, sel_netif_free);
+	ret = security_netif_sid(dev->name, &tmp_if_sid, &tmp_msg_sid);
+	if (!ret)
+		sel_netif_assign_sids(tmp_if_sid, tmp_msg_sid, if_sid, msg_sid);
+	return ret;
 }
 
-void sel_netif_put(struct sel_netif *netif)
+int sel_netif_sids(struct net_device *dev, u32 *if_sid, u32 *msg_sid)
 {
-	if (atomic_dec_and_test(&netif->users))
-		sel_netif_destroy(netif);
+	int ret = 0;
+	struct sel_netif *netif;
+
+	rcu_read_lock();
+	netif = sel_netif_lookup(dev);
+	if (IS_ERR(netif)) {
+		rcu_read_unlock();
+		ret = sel_netif_sids_slow(dev, if_sid, msg_sid);
+		goto out;
+	}
+	sel_netif_assign_sids(netif->nsec.if_sid, netif->nsec.msg_sid, if_sid, msg_sid);
+	rcu_read_unlock();
+out:
+	return ret;
 }
 
 static void sel_netif_kill(struct net_device *dev)
 {
 	struct sel_netif *netif;
-	
-	rcu_read_lock();
-	netif = sel_netif_find(dev);
-	rcu_read_unlock();
 
-	/* Drop internal reference */
+	spin_lock_bh(&sel_netif_lock);
+	netif = sel_netif_find(dev);
 	if (netif)
-		sel_netif_put(netif);
+		sel_netif_destroy(netif);
+	spin_unlock_bh(&sel_netif_lock);
 }
 
 static void sel_netif_flush(void)
 {
 	int idx;
 
+	spin_lock_bh(&sel_netif_lock);
 	for (idx = 0; idx < SEL_NETIF_HASH_SIZE; idx++) {
-		struct list_head *pos;
+		struct sel_netif *netif;
 		
-		list_for_each_rcu(pos, &sel_netif_hash[idx].list) {
-			struct sel_netif *netif;
-			
-			netif = list_entry(pos, struct sel_netif, list);
-			if (netif)
-				sel_netif_put(netif);
-		}
+		list_for_each_entry(netif, &sel_netif_hash[idx], list)
+			sel_netif_destroy(netif);
 	}
+	spin_unlock_bh(&sel_netif_lock);
 }
 
 static int sel_netif_avc_callback(u32 event, u32 ssid, u32 tsid,
@@ -223,7 +253,7 @@ static __init int sel_netif_init(void)
 		goto out;
 
 	for (i = 0; i < SEL_NETIF_HASH_SIZE; i++)
-		INIT_LIST_HEAD(&sel_netif_hash[i].list);
+		INIT_LIST_HEAD(&sel_netif_hash[i]);
 
 	register_netdevice_notifier(&sel_netif_netdev_notifier);
 	

@@ -3243,13 +3243,11 @@ static int selinux_socket_sock_rcv_skb(struct sock *sk, struct sk_buff *skb)
 	u16 family;
 	char *addrp;
 	int len, err = 0;
-	u32 netif_perm, node_perm, node_sid, recv_perm = 0;
+	u32 netif_perm, node_perm, node_sid, if_sid, recv_perm = 0;
 	u32 sock_sid = 0;
 	u16 sock_class = 0;
 	struct socket *sock;
 	struct net_device *dev;
-	struct sel_netif *netif;
-	struct netif_security_struct *nsec;
 	struct avc_audit_data ad;
 
 	family = sk->sk_family;
@@ -3280,13 +3278,9 @@ static int selinux_socket_sock_rcv_skb(struct sock *sk, struct sk_buff *skb)
 	if (!dev)
 		goto out;
 
-	netif = sel_netif_lookup(dev);
-	if (IS_ERR(netif)) {
-		err = PTR_ERR(netif);
+	err = sel_netif_sids(dev, &if_sid, NULL);
+	if (err)
 		goto out;
-	}
-	
-	nsec = &netif->nsec;
 
 	switch (sock_class) {
 	case SECCLASS_UDP_SOCKET:
@@ -3312,14 +3306,11 @@ static int selinux_socket_sock_rcv_skb(struct sock *sk, struct sk_buff *skb)
 	ad.u.net.family = family;
 
 	err = selinux_parse_skb(skb, &ad, &addrp, &len, 1);
-	if (err) {
-		sel_netif_put(netif);
+	if (err)
 		goto out;
-	}
 
-	err = avc_has_perm(sock_sid, nsec->if_sid, SECCLASS_NETIF,
-	                   netif_perm, &nsec->avcr, &ad);
-	sel_netif_put(netif);
+	err = avc_has_perm(sock_sid, if_sid, SECCLASS_NETIF,
+	                   netif_perm, NULL, &ad);
 	if (err)
 		goto out;
 	
@@ -3435,13 +3426,11 @@ static unsigned int selinux_ip_postroute_last(unsigned int hooknum,
 {
 	char *addrp;
 	int len, err = NF_ACCEPT;
-	u32 netif_perm, node_perm, node_sid, send_perm = 0;
+	u32 netif_perm, node_perm, node_sid, if_sid, send_perm = 0;
 	struct sock *sk;
 	struct socket *sock;
 	struct inode *inode;
-	struct sel_netif *netif;
 	struct sk_buff *skb = *pskb;
-	struct netif_security_struct *nsec;
 	struct inode_security_struct *isec;
 	struct avc_audit_data ad;
 	struct net_device *dev = (struct net_device *)out;
@@ -3458,13 +3447,10 @@ static unsigned int selinux_ip_postroute_last(unsigned int hooknum,
 	if (!inode)
 		goto out;
 
-	netif = sel_netif_lookup(dev);
-	if (IS_ERR(netif)) {
-		err = NF_DROP;
+	err = sel_netif_sids(dev, &if_sid, NULL);
+	if (err)
 		goto out;
-	}
-	
-	nsec = &netif->nsec;
+
 	isec = inode->i_security;
 	
 	switch (isec->sclass) {
@@ -3493,14 +3479,11 @@ static unsigned int selinux_ip_postroute_last(unsigned int hooknum,
 
 	err = selinux_parse_skb(skb, &ad, &addrp,
 				&len, 0) ? NF_DROP : NF_ACCEPT;
-	if (err != NF_ACCEPT) {
-		sel_netif_put(netif);
+	if (err != NF_ACCEPT)
 		goto out;
-	}
 
-	err = avc_has_perm(isec->sid, nsec->if_sid, SECCLASS_NETIF,
-	                   netif_perm, &nsec->avcr, &ad) ? NF_DROP : NF_ACCEPT;
-	sel_netif_put(netif);
+	err = avc_has_perm(isec->sid, if_sid, SECCLASS_NETIF,
+	                   netif_perm, NULL, &ad) ? NF_DROP : NF_ACCEPT;
 	if (err != NF_ACCEPT)
 		goto out;
 		
