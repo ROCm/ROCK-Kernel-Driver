@@ -169,9 +169,6 @@ extern __inline__ int hard_smp_processor_id(void)
 #endif
 
 #define smp_processor_id() hard_smp_processor_id()
-/* XXX We really need to implement this now.  -DaveM */
-extern __inline__ void smp_send_reschedule(int cpu) { }
-extern __inline__ void smp_send_stop(void) { }
 
 #endif /* !(__ASSEMBLY__) */
 

@@ -359,11 +359,11 @@ maybe_smp4m_msg:
 	andcc	%o1, %o4, %g0
 	be,a	smp4m_ticker
 	 cmp	%l7, 14
-	cmp	%l7, 13
+	sethi	%hi(0x40000000), %o2
 	add	%o5, %o3, %o5
-	bne,a	1f
-	 sethi	%hi(0x40000000), %o2
-	sethi	%hi(0x20000000), %o2
+	andcc	%o1, %o2, %g0
+	be,a	1f
+	 sethi	%hi(0x20000000), %o2
 1:
 	st	%o2, [%o5 + 0x4]
 	WRITE_PAUSE
@@ -374,7 +374,8 @@ maybe_smp4m_msg:
 	WRITE_PAUSE
 	wr	%l4, PSR_ET, %psr
 	WRITE_PAUSE
-	cmp	%l7, 13
+	srl	%o2, (16+14), %o2
+	tst	%o2
 	bne	2f
 	 nop
 	call	C_LABEL(smp_reschedule_irq)
