@@ -314,7 +314,7 @@ wildfire_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 		{ 56,    56,    56+1, 56+2, 56+3}, /* IdSel 6 PCI 1 slot 6 */
 		{ 60,    60,    60+1, 60+2, 60+3}, /* IdSel 7 PCI 1 slot 7 */
 	};
-	const long min_idsel = 0, max_idsel = 7, irqs_per_slot = 5;
+	long min_idsel = 0, max_idsel = 7, irqs_per_slot = 5;
 
 	struct pci_controller *hose = dev->sysdata;
 	int irq = COMMON_TABLE_LOOKUP;
