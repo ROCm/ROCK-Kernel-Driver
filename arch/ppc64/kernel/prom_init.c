@@ -159,8 +159,6 @@ extern void copy_and_flush(unsigned long dest, unsigned long src,
 
 extern unsigned long klimit;
 
-//int global_width = 640, global_height = 480, global_depth = 8, global_pitch;
-//unsigned global_address;
 /* prom structure */
 static struct prom_t __initdata prom;
 
@@ -705,46 +703,50 @@ static void __init prom_instantiate_rtas(void)
 	struct prom_t *_prom = PTRRELOC(&prom);
 	phandle prom_rtas;
 	u64 base, entry = 0;
-        u32 size;
+        u32 size = 0;
 
 	prom_debug("prom_instantiate_rtas: start...\n");
 
 	prom_rtas = call_prom("finddevice", 1, 1, ADDR("/rtas"));
-	if (prom_rtas != (phandle) -1) {
-		prom_getprop(prom_rtas, "rtas-size", &size, sizeof(size));
-		if (size != 0) {
-			base = alloc_down(size, PAGE_SIZE, 0);
-			if (base == 0) {
-				prom_printf("RTAS allocation failed !\n");
-				return;
-			}
-			prom_printf("instantiating rtas at 0x%x", base);
+	prom_debug("prom_rtas: %x\n", prom_rtas);
+	if (prom_rtas == (phandle) -1)
+		return;
 
-			prom_rtas = call_prom("open", 1, 1, ADDR("/rtas"));
-			prom_printf("...");
+	prom_getprop(prom_rtas, "rtas-size", &size, sizeof(size));
+	if (size == 0)
+		return;
 
-			if (call_prom("call-method", 3, 2,
-				      ADDR("instantiate-rtas"),
-				      prom_rtas, base) != PROM_ERROR) {
-				entry = (long)_prom->args.rets[1];
-			}
-			if (entry == 0) {
-				prom_printf(" failed\n");
-				return;
-			}
-			prom_printf(" done\n");
-
-	       		reserve_mem(base, size);
-		}
-
-		prom_setprop(_prom->chosen, "linux,rtas-base", &base, sizeof(base));
-		prom_setprop(_prom->chosen, "linux,rtas-entry", &entry, sizeof(entry));
-		prom_setprop(_prom->chosen, "linux,rtas-size", &size, sizeof(size));
-
-		prom_debug("rtas base     = 0x%x\n", base);
-		prom_debug("rtas entry    = 0x%x\n", entry);
-		prom_debug("rtas size     = 0x%x\n", (long)size);
+	base = alloc_down(size, PAGE_SIZE, 0);
+	if (base == 0) {
+		prom_printf("RTAS allocation failed !\n");
+		return;
 	}
+	prom_printf("instantiating rtas at 0x%x", base);
+
+	prom_rtas = call_prom("open", 1, 1, ADDR("/rtas"));
+	prom_printf("...");
+
+	if (call_prom("call-method", 3, 2,
+		      ADDR("instantiate-rtas"),
+		      prom_rtas, base) != PROM_ERROR) {
+		entry = (long)_prom->args.rets[1];
+	}
+	if (entry == 0) {
+		prom_printf(" failed\n");
+		return;
+	}
+	prom_printf(" done\n");
+
+	reserve_mem(base, size);
+
+	prom_setprop(_prom->chosen, "linux,rtas-base", &base, sizeof(base));
+	prom_setprop(_prom->chosen, "linux,rtas-entry", &entry, sizeof(entry));
+	prom_setprop(_prom->chosen, "linux,rtas-size", &size, sizeof(size));
+
+	prom_debug("rtas base     = 0x%x\n", base);
+	prom_debug("rtas entry    = 0x%x\n", entry);
+	prom_debug("rtas size     = 0x%x\n", (long)size);
+
 	prom_debug("prom_instantiate_rtas: end...\n");
 }
 
@@ -951,9 +953,9 @@ static void __init prom_hold_cpus(void)
 			continue;
 
 		/* Skip non-configured cpus. */
-		prom_getprop(node, "status", type, sizeof(type));
-		if (strcmp(type, RELOC("okay")) != 0)
-			continue;
+		if (prom_getprop(node, "status", type, sizeof(type)) > 0)
+			if (strcmp(type, RELOC("okay")) != 0)
+				continue;
 
 		reg = -1;
 		prom_getprop(node, "reg", &reg, sizeof(reg));
@@ -993,7 +995,8 @@ static void __init prom_hold_cpus(void)
 				  secondary_hold, cpuid);
 
 			for ( i = 0 ; (i < 100000000) && 
-			      (*acknowledge == ((unsigned long)-1)); i++ ) ;
+			      (*acknowledge == ((unsigned long)-1)); i++ )
+				mb();
 
 			if (*acknowledge == cpuid) {
 				prom_printf("done\n");
@@ -1160,7 +1163,7 @@ static int __init prom_set_color(ihandle ih, int i, int r, int g, int b)
  * So we check whether we will need to open the display,
  * and if so, open it now.
  */
-static unsigned long __init prom_check_displays(void)
+static void __init prom_check_displays(void)
 {
 	unsigned long offset = reloc_offset();
 	struct prom_t *_prom = PTRRELOC(&prom);
