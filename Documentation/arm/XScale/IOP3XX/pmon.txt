@@ -1,0 +1,71 @@
+
+Intel's XScale Microarchitecture 80312 companion processor provides a
+Performance Monitoring Unit (PMON) that can be utilized to provide
+information that can be useful for fine tuning of code.  This text
+file describes the API that's been developed for use by Linux kernel
+programmers.  Note that to get the most usage out of the PMON,
+I highly reccomend getting the XScale reference manual from Intel[1]
+and looking at chapter 12.
+
+To use the PMON, you must #include <asm-arm/arch-iop310/pmon.h> in your
+source file.
+
+Since there's only one PMON, only one user can currently use the PMON
+at a given time.  To claim the PMON for usage, call iop310_pmon_claim() which
+returns an identifier.  When you are done using the PMON, call
+iop310_pmon_release() with the id you were given earlier.
+
+The PMON consists of 14 registers that can be used for performance measurements.
+By combining different statistics, you can derive complex performance metrics.
+
+To start the PMON, just call iop310_pmon_start(mode).  Mode tells the PMON what
+statistics to capture and can each be one of:
+
+    IOP310_PMU_MODE0
+    Performance Monitoring Disabled
+
+    IOP310_PMU_MODE1
+    Primary PCI bus and internal agents (bridge, dma Ch0, dam Ch1, patu)
+
+    IOP310_PMU_MODE2
+    Secondary PCI bus and internal agents (bridge, dma Ch0, dam Ch1, patu)
+
+    IOP310_PMU_MODE3
+    Secondary PCI bus and internal agents (external masters 0..2 and Intel
+    80312 I/O companion chip)
+
+    IOP310_PMU_MODE4
+    Secondary PCI bus and internal agents (external masters 3..5 and Intel
+    80312 I/O companion chip)
+
+    IOP310_PMU_MODE5
+    Intel 80312 I/O companion chip internal bus, DMA Channels and Application
+    Accelerator
+
+    IOP310_PMU_MODE6
+    Intel 80312 I/O companion chip internal bus, PATU, SATU and Intel 80200
+    processor
+
+    IOP310_PMU_MODE7
+    Intel 80312 I/O companion chip internal bus, Primary PCI bus, Secondary
+    PCI bus and Secondary PCI agents (external masters 0..5 & Intel 80312 I/O
+    companion chip)
+
+To get the results back, call iop310_pmon_stop(&results) where results is
+defined as follows:
+
+typedef struct _iop310_pmon_result
+{
+	u32 timestamp;			/* Global Time Stamp Register */
+	u32 timestamp_overflow;		/* Time Stamp overflow count */
+	u32 event_count[14];		/* Programmable Event Counter
+					   Registers 1-14 */
+	u32 event_overflow[14];		/* Overflow counter for PECR1-14 */
+} iop310_pmon_res_t;
+
+
+--
+This code is still under development, so please feel free to send patches,
+questions, comments, etc to me.
+
+Deepak Saxena <dsaxena@mvista.com>
