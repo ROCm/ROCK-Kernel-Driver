@@ -1642,7 +1642,7 @@ static int __init sa1100fb_map_video_memory(struct sa1100fb_info *fbi)
 	 */
 	fbi->map_size = PAGE_ALIGN(fbi->fb.fix.smem_len + PAGE_SIZE);
 	fbi->map_cpu = consistent_alloc(GFP_KERNEL, fbi->map_size,
-					&fbi->map_dma);
+					&fbi->map_dma, PTE_BUFFERABLE);
 
 	if (fbi->map_cpu) {
 		fbi->fb.screen_base = fbi->map_cpu + PAGE_SIZE;
