@@ -949,6 +949,9 @@ static int __init alsa_card_interwave_init(void)
 #endif
 
 	if (!cards) {
+#ifdef CONFIG_PNP
+		pnp_unregister_card_driver(&interwave_pnpc_driver);
+#endif
 #ifdef MODULE
 		printk(KERN_ERR "InterWave soundcard not found or device busy\n");
 #endif

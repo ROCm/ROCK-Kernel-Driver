@@ -625,6 +625,9 @@ static int __init alsa_card_sb16_init(void)
 #endif
 
 	if (!cards) {
+#ifdef CONFIG_PNP
+		pnp_unregister_card_driver(&sb16_pnpc_driver);
+#endif
 #ifdef MODULE
 		snd_printk(KERN_ERR "Sound Blaster 16 soundcard not found or device busy\n");
 #ifdef SNDRV_SBAWE_EMU8000
