@@ -167,6 +167,8 @@ struct sock_common {
   *	@sk_socket - Identd and reporting IO signals
   *	@sk_user_data - RPC layer private data
   *	@sk_owner - module that owns this socket
+  *	@sk_sndmsg_page - cached page for sendmsg
+  *	@sk_sndmsg_off - cached offset for sendmsg
   *	@sk_send_head - front of stuff to transmit
   *	@sk_write_pending - a write to stream socket waits to start
   *	@sk_queue_shrunk - write queue has been shrunk recently
@@ -249,8 +251,10 @@ struct sock {
 	struct timeval		sk_stamp;
 	struct socket		*sk_socket;
 	void			*sk_user_data;
-	struct sk_buff		*sk_send_head;
 	struct module		*sk_owner;
+	struct page		*sk_sndmsg_page;
+	__u32			sk_sndmsg_off;
+	struct sk_buff		*sk_send_head;
 	int			sk_write_pending;
 	void			*sk_security;
 	__u8			sk_queue_shrunk;

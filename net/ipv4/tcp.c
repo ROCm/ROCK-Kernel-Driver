@@ -816,8 +816,8 @@ ssize_t tcp_sendpage(struct socket *sock, struct page *page, int offset,
 	return res;
 }
 
-#define TCP_PAGE(sk)	(inet_sk(sk)->sndmsg_page)
-#define TCP_OFF(sk)	(inet_sk(sk)->sndmsg_off)
+#define TCP_PAGE(sk)	(sk->sk_sndmsg_page)
+#define TCP_OFF(sk)	(sk->sk_sndmsg_off)
 
 static inline int select_size(struct sock *sk, struct tcp_opt *tp)
 {
