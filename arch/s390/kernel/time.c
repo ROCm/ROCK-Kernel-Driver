@@ -38,11 +38,18 @@
 #define USECS_PER_JIFFY     ((unsigned long) 1000000/HZ)
 #define CLK_TICKS_PER_JIFFY ((unsigned long) USECS_PER_JIFFY << 12)
 
+/*
+ * Create a small time difference between the timer interrupts
+ * on the different cpus to avoid lock contention.
+ */
+#define CPU_DEVIATION       (smp_processor_id() << 12)
+
 #define TICK_SIZE tick
 
 u64 jiffies_64;
 
 static ext_int_info_t ext_int_info_timer;
+static uint64_t xtime_cc;
 static uint64_t init_timer_cc;
 
 extern rwlock_t xtime_lock;
@@ -118,58 +125,90 @@ void do_settimeofday(struct timeval *tv)
 	write_unlock_irq(&xtime_lock);
 }
 
+static inline __u32 div64_32(__u64 dividend, __u32 divisor)
+{
+	register_pair rp;
+
+	rp.pair = dividend;
+	asm ("dr %0,%1" : "+d" (rp) : "d" (divisor));
+	return rp.subreg.odd;
+}
+
 /*
  * timer_interrupt() needs to keep up the real-time clock,
  * as well as call the "do_timer()" routine every clocktick
  */
-
-#ifdef CONFIG_SMP
-extern __u16 boot_cpu_addr;
-#endif
-
 static void do_comparator_interrupt(struct pt_regs *regs, __u16 error_code)
 {
 	int cpu = smp_processor_id();
+	__u64 tmp;
+	__u32 ticks;
+
+	/* Calculate how many ticks have passed. */
+	asm volatile ("STCK 0(%0)" : : "a" (&tmp) : "memory", "cc");
+	tmp = tmp - S390_lowcore.jiffy_timer;
+	if (tmp >= 2*CLK_TICKS_PER_JIFFY) {  /* more than one tick ? */
+		ticks = div64_32(tmp >> 1, CLK_TICKS_PER_JIFFY >> 1);
+		S390_lowcore.jiffy_timer +=
+			CLK_TICKS_PER_JIFFY * (__u64) ticks;
+	} else {
+		ticks = 1;
+		S390_lowcore.jiffy_timer += CLK_TICKS_PER_JIFFY;
+	}
+
+	/* set clock comparator for next tick */
+	tmp = S390_lowcore.jiffy_timer + CLK_TICKS_PER_JIFFY + CPU_DEVIATION;
+        asm volatile ("SCKC %0" : : "m" (tmp));
 
 	irq_enter();
 
-	/*
-	 * set clock comparator for next tick
-	 */
-        S390_lowcore.jiffy_timer += CLK_TICKS_PER_JIFFY;
-        asm volatile ("SCKC %0" : : "m" (S390_lowcore.jiffy_timer));
-
 #ifdef CONFIG_SMP
-	if (S390_lowcore.cpu_data.cpu_addr == boot_cpu_addr)
-		write_lock(&xtime_lock);
+	/*
+	 * Do not rely on the boot cpu to do the calls to do_timer.
+	 * Spread it over all cpus instead.
+	 */
+	write_lock(&xtime_lock);
+	if (S390_lowcore.jiffy_timer > xtime_cc) {
+		__u32 xticks;
 
-	update_process_times(user_mode(regs));
-
-	if (S390_lowcore.cpu_data.cpu_addr == boot_cpu_addr) {
-		do_timer(regs);
-		write_unlock(&xtime_lock);
+		tmp = S390_lowcore.jiffy_timer - xtime_cc;
+		if (tmp >= 2*CLK_TICKS_PER_JIFFY) {
+			xticks = div64_32(tmp >> 1, CLK_TICKS_PER_JIFFY >> 1);
+			xtime_cc += (__u64) xticks * CLK_TICKS_PER_JIFFY;
+		} else {
+			xticks = 1;
+			xtime_cc += CLK_TICKS_PER_JIFFY;
+		}
+		while (xticks--)
+			do_timer(regs);
 	}
+	write_unlock(&xtime_lock);
+	while (ticks--)
+		update_process_times(user_mode(regs));
 #else
-	do_timer(regs);
+	while (ticks--)
+		do_timer(regs);
 #endif
 
 	irq_exit();
 }
 
 /*
- * Start the clock comparator on the current CPU
+ * Start the clock comparator on the current CPU.
  */
 void init_cpu_timer(void)
 {
 	unsigned long cr0;
+	__u64 timer;
 
         /* allow clock comparator timer interrupt */
         asm volatile ("STCTL 0,0,%0" : "=m" (cr0) : : "memory");
         cr0 |= 0x800;
         asm volatile ("LCTL 0,0,%0" : : "m" (cr0) : "memory");
-	S390_lowcore.jiffy_timer = (__u64) jiffies * CLK_TICKS_PER_JIFFY;
-	S390_lowcore.jiffy_timer += init_timer_cc + CLK_TICKS_PER_JIFFY;
-	asm volatile ("SCKC %0" : : "m" (S390_lowcore.jiffy_timer));
+	timer = init_timer_cc + jiffies_64 * CLK_TICKS_PER_JIFFY;
+	S390_lowcore.jiffy_timer = timer;
+	timer += CLK_TICKS_PER_JIFFY + CPU_DEVIATION;
+	asm volatile ("SCKC %0" : : "m" (timer));
 }
 
 /*
@@ -178,7 +217,7 @@ void init_cpu_timer(void)
  */
 void __init time_init(void)
 {
-        __u64 set_time_cc;
+	__u64 set_time_cc;
 	int cc;
 
         /* kick the TOD clock */
@@ -201,8 +240,9 @@ void __init time_init(void)
         }
 
 	/* set xtime */
-        set_time_cc = init_timer_cc - 0x8126d60e46000000LL +
-                      (0x3c26700LL*1000000*4096);
+	xtime_cc = init_timer_cc;
+	set_time_cc = init_timer_cc - 0x8126d60e46000000LL +
+		(0x3c26700LL*1000000*4096);
         tod_to_timeval(set_time_cc, &xtime);
 
         /* request the 0x1004 external interrupt */

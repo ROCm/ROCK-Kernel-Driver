@@ -41,7 +41,6 @@
 /* prototypes */
 extern int cpu_idle(void * unused);
 
-extern __u16 boot_cpu_addr;
 extern volatile int __cpu_logical_map[];
 
 /*
@@ -426,6 +425,7 @@ void smp_ctl_clear_bit(int cr, int bit) {
 void __init smp_check_cpus(unsigned int max_cpus)
 {
         int curr_cpu, num_cpus;
+	__u16 boot_cpu_addr;
 
 	boot_cpu_addr = S390_lowcore.cpu_data.cpu_addr;
         current_thread_info()->cpu = 0;

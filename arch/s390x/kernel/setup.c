@@ -52,7 +52,6 @@ unsigned long machine_flags = 0;
 struct { unsigned long addr, size, type; } memory_chunk[16] = { { 0 } };
 #define CHUNK_READ_WRITE 0
 #define CHUNK_READ_ONLY 1
-__u16 boot_cpu_addr;
 int cpus_initialized = 0;
 unsigned long cpu_initialized = 0;
 volatile int __cpu_logical_map[NR_CPUS]; /* logical cpu to cpu address */
@@ -464,8 +463,7 @@ void __init setup_arch(char **cmdline_p)
 	lowcore->jiffy_timer = -1LL;
 	set_prefix((__u32)(__u64) lowcore);
         cpu_init();
-        boot_cpu_addr = S390_lowcore.cpu_data.cpu_addr;
-        __cpu_logical_map[0] = boot_cpu_addr;
+        __cpu_logical_map[0] = S390_lowcore.cpu_data.cpu_addr;
 
 	/*
 	 * Create kernel page tables and switch to virtual addressing.
