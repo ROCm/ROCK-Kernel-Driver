@@ -849,7 +849,7 @@ static int __devinit speedo_found1(struct pci_dev *pdev,
 	sp->phy[0] = eeprom[6];
 	sp->phy[1] = eeprom[7];
 
-	sp->mii_if.phy_id = eeprom[6];
+	sp->mii_if.phy_id = eeprom[6] & 0x1f;
 	sp->mii_if.dev = dev;
 	sp->mii_if.mdio_read = mdio_read;
 	sp->mii_if.mdio_write = mdio_write;
