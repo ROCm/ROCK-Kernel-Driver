@@ -108,11 +108,15 @@ extern int rd_prompt;		/* 1 = prompt for ramdisk, 0 = don't prompt */
 extern int rd_image_start;	/* starting block # of image */
 #endif
 
+extern unsigned long ppc_tb_freq;
+
 void 
 chrp_get_cpuinfo(struct seq_file *m)
 {
 	struct device_node *root;
 	const char *model = "";
+
+	seq_printf(m, "timebase\t: %lu\n", ppc_tb_freq);
 
 	root = find_path_device("/");
 	if (root)

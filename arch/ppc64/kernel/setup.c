@@ -337,7 +337,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	if (ppc_md.setup_residual != NULL)
 		ppc_md.setup_residual(m, cpu_id);
 
-	seq_printf(m, "revision\t: %hd.%hd\n", maj, min);
+	seq_printf(m, "revision\t: %hd.%hd\n\n", maj, min);
 	
 	return 0;
 }
