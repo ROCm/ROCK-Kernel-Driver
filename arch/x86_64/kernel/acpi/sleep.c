@@ -56,6 +56,7 @@
 
 /* address in low memory of the wakeup routine. */
 unsigned long acpi_wakeup_address = 0;
+unsigned long acpi_video_flags;
 extern char wakeup_start, wakeup_end;
 
 extern unsigned long FASTCALL(acpi_copy_wakeup_routine(unsigned long));
@@ -115,6 +116,22 @@ void __init acpi_reserve_bootmem(void)
 		printk(KERN_CRIT "ACPI: Wakeup code way too big, will crash on attempt to suspend\n");
 	printk(KERN_DEBUG "ACPI: have wakeup address 0x%8.8lx\n", acpi_wakeup_address);
 }
+
+static int __init acpi_sleep_setup(char *str)
+{
+	while ((str != NULL) && (*str != '\0')) {
+		if (strncmp(str, "s3_bios", 7) == 0)
+			acpi_video_flags = 1;
+		if (strncmp(str, "s3_mode", 7) == 0)
+			acpi_video_flags |= 2;
+		str = strchr(str, ',');
+		if (str != NULL)
+			str += strspn(str, ", \t");
+	}
+	return 1;
+}
+
+__setup("acpi_sleep=", acpi_sleep_setup);
 
 #endif /*CONFIG_ACPI_SLEEP*/
 

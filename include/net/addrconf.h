@@ -57,9 +57,11 @@ extern int			addrconf_del_ifaddr(void *arg);
 extern int			addrconf_set_dstaddr(void *arg);
 
 extern int			ipv6_chk_addr(struct in6_addr *addr,
-					      struct net_device *dev);
+					      struct net_device *dev,
+					      int strict);
 extern struct inet6_ifaddr *	ipv6_get_ifaddr(struct in6_addr *addr,
-						struct net_device *dev);
+						struct net_device *dev,
+						int strict);
 extern int			ipv6_get_saddr(struct dst_entry *dst, 
 					       struct in6_addr *daddr,
 					       struct in6_addr *saddr);

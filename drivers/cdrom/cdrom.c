@@ -493,7 +493,6 @@ int cdrom_mrw_probe_pc(struct cdrom_device_info *cdi)
 		return 0;
 	}
 
-	printk(KERN_ERR "cdrom: %s: unknown mrw mode page\n", cdi->name);
 	return 1;
 }
 

@@ -3,6 +3,7 @@
  */
 
 #include <asm-generic/vmlinux.lds.h>
+#include <linux/config.h>
 
 OUTPUT_FORMAT("elf64-x86-64", "elf64-x86-64", "elf64-x86-64")
 OUTPUT_ARCH(i386:x86-64)
@@ -137,7 +138,9 @@ SECTIONS
   /* Sections to be discarded */
   /DISCARD/ : {
 	*(.exitcall.exit)
+#ifndef CONFIG_DEBUG_INFO
 	*(.eh_frame)
+#endif
 	}
 
   /* DWARF 2 */

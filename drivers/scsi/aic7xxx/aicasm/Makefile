@@ -49,11 +49,19 @@ aicdb.h:
 clean:
 	rm -f $(clean-files)
 
+# Create a dependency chain in generated files
+# to avoid concurrent invocations of the single
+# rule that builds them all.
+aicasm_gram.c: aicasm_gram.h
 aicasm_gram.c aicasm_gram.h: aicasm_gram.y
 	$(YACC) $(YFLAGS) -b $(<:.y=) $<
 	mv $(<:.y=).tab.c $(<:.y=.c)
 	mv $(<:.y=).tab.h $(<:.y=.h)
 
+# Create a dependency chain in generated files
+# to avoid concurrent invocations of the single
+# rule that builds them all.
+aicasm_macro_gram.c: aicasm_macro_gram.h
 aicasm_macro_gram.c aicasm_macro_gram.h: aicasm_macro_gram.y
 	$(YACC) $(YFLAGS) -b $(<:.y=) -p mm $<
 	mv $(<:.y=).tab.c $(<:.y=.c)

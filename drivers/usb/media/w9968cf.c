@@ -98,7 +98,7 @@ static unsigned short debug = W9968CF_DEBUG_LEVEL;
 static int specific_debug = W9968CF_SPECIFIC_DEBUG;
 #endif
 
-static unsigned int param_nv[23]; /* number of values per paramater */
+static unsigned int param_nv[24]; /* number of values per parameter */
 
 module_param(vppmod_load, bool, 0444);
 module_param(simcams, ushort, 0444);

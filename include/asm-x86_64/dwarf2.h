@@ -14,7 +14,7 @@
    away for older version. 
  */
 
-#ifdef CONFIG_CFI_BINUTILS
+#ifdef CONFIG_DEBUG_INFO
 
 #define CFI_STARTPROC .cfi_startproc
 #define CFI_ENDPROC .cfi_endproc
@@ -27,23 +27,15 @@
 
 #else
 
-#ifdef __ASSEMBLY__
-	.macro nothing
-	.endm
-	.macro nothing1 a
-	.endm
-	.macro nothing2 a,b
-	.endm      
-#endif
-
-#define CFI_STARTPROC nothing
-#define CFI_ENDPROC nothing
-#define CFI_DEF_CFA nothing2
-#define CFI_DEF_CFA_REGISTER nothing1
-#define CFI_DEF_CFA_OFFSET nothing1
-#define CFI_ADJUST_CFA_OFFSET nothing1
-#define CFI_OFFSET nothing2
-#define CFI_REL_OFFSET nothing2
+/* use assembler line comment character # to ignore the arguments. */
+#define CFI_STARTPROC	#
+#define CFI_ENDPROC	#
+#define CFI_DEF_CFA	#
+#define CFI_DEF_CFA_REGISTER	#
+#define CFI_DEF_CFA_OFFSET	#
+#define CFI_ADJUST_CFA_OFFSET	#
+#define CFI_OFFSET	#
+#define CFI_REL_OFFSET	#
 
 #endif
 

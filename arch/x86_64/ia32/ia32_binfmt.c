@@ -197,6 +197,7 @@ static inline void elf_core_copy_regs(elf_gregset_t *elfregs, struct pt_regs *re
 static inline int elf_core_copy_task_regs(struct task_struct *t, elf_gregset_t* elfregs)
 {	
 	struct pt_regs *pp = (struct pt_regs *)(t->thread.rsp0);
+	--pp;
 	ELF_CORE_COPY_REGS((*elfregs), pp);
 	/* fix wrong segments */ 
 	(*elfregs)[7] = t->thread.ds; 
@@ -214,6 +215,8 @@ elf_core_copy_task_fpregs(struct task_struct *tsk, struct pt_regs *regs, elf_fpr
 
 	if (!tsk->used_math) 
 		return 0;
+	if (!regs)
+		regs = (struct pt_regs *)tsk->thread.rsp0;
 	--regs;
 	if (tsk == current)
 		unlazy_fpu(tsk);
@@ -250,6 +253,14 @@ elf_core_copy_task_xfpregs(struct task_struct *t, elf_fpxregset_t *xfpu)
 #define ELF_PLATFORM  ("i686")
 #define SET_PERSONALITY(ex, ibcs2)			\
 do {							\
+	unsigned long new_flags = 0;				\
+	if ((ex).e_ident[EI_CLASS] == ELFCLASS32)		\
+		new_flags = _TIF_IA32;				\
+	if ((current_thread_info()->flags & _TIF_IA32)		\
+	    != new_flags)					\
+		set_thread_flag(TIF_ABI_PENDING);		\
+	else							\
+		clear_thread_flag(TIF_ABI_PENDING);		\
 	set_personality((ibcs2)?PER_SVR4:current->personality);	\
 } while (0)
 
@@ -323,7 +334,6 @@ static void elf32_init(struct pt_regs *regs)
 	me->thread.gsindex = 0;
     me->thread.ds = __USER_DS; 
 	me->thread.es = __USER_DS;
-	set_thread_flag(TIF_IA32); 
 }
 
 int setup_arg_pages(struct linux_binprm *bprm)
@@ -392,7 +402,7 @@ elf32_map (struct file *filep, unsigned long addr, struct elf_phdr *eppnt, int p
 	down_write(&me->mm->mmap_sem);
 	map_addr = do_mmap(filep, ELF_PAGESTART(addr),
 			   eppnt->p_filesz + ELF_PAGEOFFSET(eppnt->p_vaddr), prot, 
-			   type|MAP_32BIT,
+			   type,
 			   eppnt->p_offset - ELF_PAGEOFFSET(eppnt->p_vaddr));
 	up_write(&me->mm->mmap_sem);
 	return(map_addr);

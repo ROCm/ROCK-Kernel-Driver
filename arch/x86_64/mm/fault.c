@@ -32,6 +32,7 @@
 #include <asm/tlbflush.h>
 #include <asm/proto.h>
 #include <asm/kdebug.h>
+#include <asm-generic/sections.h>
 
 void bust_spinlocks(int yes)
 {
@@ -169,8 +170,45 @@ bad:
 	printk("BAD\n");
 }
 
-static inline int unhandled_signal(struct task_struct *tsk, int sig)
+static const char errata93_warning[] = 
+KERN_ERR "******* Your BIOS seems to not contain a fix for K8 errata #93\n"
+KERN_ERR "******* Working around it, but it may cause SEGVs or burn power.\n"
+KERN_ERR "******* Please consider a BIOS update.\n"
+KERN_ERR "******* Disabling USB legacy in the BIOS may also help.\n";
+
+/* Workaround for K8 erratum #93 & buggy BIOS.
+   BIOS SMM functions are required to use a specific workaround
+   to avoid corruption of the 64bit RIP register on C stepping K8. 
+   A lot of BIOS that didn't get tested properly miss this. 
+   The OS sees this as a page fault with the upper 32bits of RIP cleared.
+   Try to work around it here.
+   Note we only handle faults in kernel here. */
+
+static int is_errata93(struct pt_regs *regs, unsigned long address) 
 {
+	static int warned;
+	if (address != regs->rip)
+		return 0;
+	if ((address >> 32) != 0) 
+		return 0;
+	address |= 0xffffffffUL << 32;
+	if ((address >= (u64)_stext && address <= (u64)_etext) || 
+	    (address >= MODULES_VADDR && address <= MODULES_END)) { 
+		if (!warned) {
+			printk(errata93_warning); 		
+			warned = 1;
+		}
+		regs->rip = address;
+		return 1;
+	}
+	return 0;
+} 
+
+int unhandled_signal(struct task_struct *tsk, int sig)
+{
+	/* Warn for strace, but not for gdb */
+	if ((tsk->ptrace & (PT_PTRACED|PT_TRACESYSGOOD)) == PT_PTRACED)
+		return 0;
 	return (tsk->sighand->action[sig-1].sa.sa_handler == SIG_IGN) ||
 		(tsk->sighand->action[sig-1].sa.sa_handler == SIG_DFL);
 }
@@ -331,8 +369,7 @@ bad_area_nosemaphore:
 		if (is_prefetch(regs, address))
 			return;
 
-		if (exception_trace && !(tsk->ptrace & PT_PTRACED) && 
-		    !unhandled_signal(tsk, SIGSEGV)) { 
+		if (exception_trace && !unhandled_signal(tsk, SIGSEGV)) { 
 		printk(KERN_INFO 
 		       "%s[%d]: segfault at %016lx rip %016lx rsp %016lx error %lx\n",
 					tsk->comm, tsk->pid, address, regs->rip,
@@ -360,8 +397,15 @@ no_context:
 		return;
 	}
 
+	/* 
+	 * Hall of shame of CPU/BIOS bugs.
+	 */
+
  	if (is_prefetch(regs, address))
  		return;
+
+	if (is_errata93(regs, address))
+		return; 
 
 /*
  * Oops. The kernel tried to access some bad page. We'll have to

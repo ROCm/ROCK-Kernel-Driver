@@ -19,62 +19,12 @@
 #define __SAVE(reg,offset) "movq %%" #reg ",(14-" #offset ")*8(%%rsp)\n\t"
 #define __RESTORE(reg,offset) "movq (14-" #offset ")*8(%%rsp),%%" #reg "\n\t"
 
-#ifdef CONFIG_X86_REMOTE_DEBUG
-
-/* full frame for the debug stub */
-/* Should be replaced with a dwarf2 cie/fde description, then gdb could
-   figure it out all by itself. */
-struct save_context_frame { 
-	unsigned long rbp; 
-	unsigned long rbx;
-	unsigned long r11;
-	unsigned long r10;
-	unsigned long r9;
-	unsigned long r8;
-	unsigned long rcx;
-	unsigned long rdx;	
-	unsigned long r15;
-	unsigned long r14;
-	unsigned long r13;
-	unsigned long r12;
-	unsigned long rdi;
-	unsigned long rsi;
-	unsigned long flags;
-}; 
-
-#define SAVE_CONTEXT \
-	"pushfq\n\t"							\
-	"subq $14*8,%%rsp\n\t" 						\
-	__SAVE(rbx, 12) __SAVE(rdi,  1)					\
-	__SAVE(rdx,  6) __SAVE(rcx,  7)					\
-	__SAVE(r8,   8) __SAVE(r9,   9)					\
-	__SAVE(r12,  2) __SAVE(r13,  3)					\
-	__SAVE(r14,  4) __SAVE(r15,  5)					\
-	__SAVE(r10, 10) __SAVE(r11, 11)					\
-	__SAVE(rsi, 0)  __SAVE(rbp, 13) 				\
-
-
-#define RESTORE_CONTEXT \
-	__RESTORE(rbx, 12) __RESTORE(rdi,  1) 					\
-	__RESTORE(rdx,  6) __RESTORE(rcx,  7)					\
-	__RESTORE(r12,  2) __RESTORE(r13,  3)					\
-	__RESTORE(r14,  4) __RESTORE(r15,  5)					\
-	__RESTORE(r10, 10) __RESTORE(r11, 11)					\
-	__RESTORE(r8,   8) __RESTORE(r9,   9)					\
-	__RESTORE(rbp, 13) __RESTORE(rsi, 0) 		   		        \
-	"addq $14*8,%%rsp\n\t" 							\
-	"popfq\n\t"
-
-#define __EXTRA_CLOBBER 
-
-#else
 /* frame pointer must be last for get_wchan */
 #define SAVE_CONTEXT    "pushfq ; pushq %%rbp ; movq %%rsi,%%rbp\n\t"
 #define RESTORE_CONTEXT "movq %%rbp,%%rsi ; popq %%rbp ; popfq\n\t" 
 
 #define __EXTRA_CLOBBER  \
 	,"rcx","rbx","rdx","r8","r9","r10","r11","r12","r13","r14","r15"
-#endif
 
 #define switch_to(prev,next,last) \
 	asm volatile(SAVE_CONTEXT						    \
@@ -321,20 +271,7 @@ static inline __u32 cmpxchg4_locked(__u32 *ptr, __u32 old, __u32 new)
 #define local_irq_disable() 	__asm__ __volatile__("cli": : :"memory")
 #define local_irq_enable()	__asm__ __volatile__("sti": : :"memory")
 /* used in the idle loop; sti takes one instruction cycle to complete */
-
-/* Work around BIOS that don't have K8 Errata #93 fixed. */
-#define safe_halt()	      \
-	asm volatile("   sti\n"					\
-		     "1: hlt\n"						\
-		     "2:\n"							\
-		     ".section .fixup,\"ax\"\n"		\
-		     "3: call idle_warning\n"		\
-		     "   jmp 2b\n"					\
-		     ".previous\n"					\
-		     ".section __ex_table,\"a\"\n\t"	\
-		     ".align 8\n\t"					\
-		     ".quad 1b,3b\n"				\
-		     ".previous" ::: "memory")
+#define safe_halt()		__asm__ __volatile__("sti; hlt": : :"memory")
 
 #define irqs_disabled()			\
 ({					\

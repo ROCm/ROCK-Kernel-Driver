@@ -405,9 +405,7 @@ static void do_trap(int trapnr, int signr, char *str,
 	if ((regs->cs & 3)  != 0) { 
 		struct task_struct *tsk = current;
 
-		if (exception_trace && !(tsk->ptrace & PT_PTRACED) && 
-		    (tsk->sighand->action[signr-1].sa.sa_handler == SIG_IGN ||
-		    (tsk->sighand->action[signr-1].sa.sa_handler == SIG_DFL)))
+		if (exception_trace && unhandled_signal(tsk, signr))
 			printk(KERN_INFO
 			       "%s[%d] trap %s rip:%lx rsp:%lx error:%lx\n",
 			       tsk->comm, tsk->pid, str,
@@ -491,9 +489,7 @@ asmlinkage void do_general_protection(struct pt_regs * regs, long error_code)
 	if ((regs->cs & 3)!=0) { 
 		struct task_struct *tsk = current;
 
-		if (exception_trace && !(tsk->ptrace & PT_PTRACED) && 
-		    (tsk->sighand->action[SIGSEGV-1].sa.sa_handler == SIG_IGN ||
-		    (tsk->sighand->action[SIGSEGV-1].sa.sa_handler == SIG_DFL)))
+		if (exception_trace && unhandled_signal(tsk, SIGSEGV))
 			printk(KERN_INFO
 		       "%s[%d] general protection rip:%lx rsp:%lx error:%lx\n",
 			       tsk->comm, tsk->pid,
@@ -553,6 +549,8 @@ asmlinkage void default_do_nmi(struct pt_regs * regs)
 	unsigned char reason = inb(0x61);
 
 	if (!(reason & 0xc0)) {
+		if (notify_die(DIE_NMI_IPI, "nmi_ipi", regs, reason, 0, SIGINT) == NOTIFY_BAD)
+			return;
 #ifdef CONFIG_X86_LOCAL_APIC
 		/*
 		 * Ok, so this is none of the documented NMI sources,

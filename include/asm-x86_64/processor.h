@@ -173,7 +173,7 @@ static inline void clear_in_cr4 (unsigned long mask)
  * space during mmap's.
  */
 #define IA32_PAGE_OFFSET ((current->personality & ADDR_LIMIT_3GB) ? 0xc0000000 : 0xFFFFe000)
-#define TASK_UNMAPPED_32 (IA32_PAGE_OFFSET / 3)
+#define TASK_UNMAPPED_32 (PAGE_ALIGN(IA32_PAGE_OFFSET / 3))
 #define TASK_UNMAPPED_64 PAGE_ALIGN(TASK_SIZE/3) 
 #define TASK_UNMAPPED_BASE	\
 	(test_thread_flag(TIF_IA32) ? TASK_UNMAPPED_32 : TASK_UNMAPPED_64)  

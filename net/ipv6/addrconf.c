@@ -910,7 +910,7 @@ static int ipv6_count_addresses(struct inet6_dev *idev)
 	return cnt;
 }
 
-int ipv6_chk_addr(struct in6_addr *addr, struct net_device *dev)
+int ipv6_chk_addr(struct in6_addr *addr, struct net_device *dev, int strict)
 {
 	struct inet6_ifaddr * ifp;
 	u8 hash = ipv6_addr_hash(addr);
@@ -920,7 +920,7 @@ int ipv6_chk_addr(struct in6_addr *addr, struct net_device *dev)
 		if (ipv6_addr_cmp(&ifp->addr, addr) == 0 &&
 		    !(ifp->flags&IFA_F_TENTATIVE)) {
 			if (dev == NULL || ifp->idev->dev == dev ||
-			    !(ifp->scope&(IFA_LINK|IFA_HOST)))
+			    !(ifp->scope&(IFA_LINK|IFA_HOST) || strict))
 				break;
 		}
 	}
@@ -945,7 +945,7 @@ int ipv6_chk_same_addr(const struct in6_addr *addr, struct net_device *dev)
 	return ifp != NULL;
 }
 
-struct inet6_ifaddr * ipv6_get_ifaddr(struct in6_addr *addr, struct net_device *dev)
+struct inet6_ifaddr * ipv6_get_ifaddr(struct in6_addr *addr, struct net_device *dev, int strict)
 {
 	struct inet6_ifaddr * ifp;
 	u8 hash = ipv6_addr_hash(addr);
@@ -954,7 +954,7 @@ struct inet6_ifaddr * ipv6_get_ifaddr(struct in6_addr *addr, struct net_device *
 	for(ifp = inet6_addr_lst[hash]; ifp; ifp=ifp->lst_next) {
 		if (ipv6_addr_cmp(&ifp->addr, addr) == 0) {
 			if (dev == NULL || ifp->idev->dev == dev ||
-			    !(ifp->scope&(IFA_LINK|IFA_HOST))) {
+			    !(ifp->scope&(IFA_LINK|IFA_HOST) || strict)) {
 				in6_ifa_hold(ifp);
 				break;
 			}
@@ -1338,7 +1338,7 @@ void addrconf_prefix_rcv(struct net_device *dev, u8 *opt, int len)
 	 *	2) Configure prefixes with the auto flag set
 	 */
 
-	/* Avoid arithemtic overflow. Really, we could
+	/* Avoid arithmetic overflow. Really, we could
 	   save rt_expires in seconds, likely valid_lft,
 	   but it would require division in fib gc, that it
 	   not good.
@@ -1393,7 +1393,7 @@ void addrconf_prefix_rcv(struct net_device *dev, u8 *opt, int len)
 
 ok:
 
-		ifp = ipv6_get_ifaddr(&addr, dev);
+		ifp = ipv6_get_ifaddr(&addr, dev, 1);
 
 		if (ifp == NULL && valid_lft) {
 			int max_addresses = in6_dev->cnf.max_addresses;
@@ -2952,7 +2952,7 @@ static void ipv6_ifa_notify(int event, struct inet6_ifaddr *ifp)
 			if (!ipv6_addr_any(&addr))
 				ipv6_dev_ac_dec(ifp->idev->dev, &addr);
 		}
-		if (!ipv6_chk_addr(&ifp->addr, NULL))
+		if (!ipv6_chk_addr(&ifp->addr, ifp->idev->dev, 1))
 			ip6_rt_addr_del(&ifp->addr, ifp->idev->dev);
 		break;
 	}
@@ -3030,6 +3030,9 @@ static int addrconf_sysctl_forward_strategy(ctl_table *table,
 			idev = NULL;
 		*valp = new;
 		addrconf_forward_change(idev);
+
+		if (*valp)
+			rt6_purge_dflt_routers(0);
 	} else
 		*valp = new;
 
@@ -3191,6 +3194,9 @@ static struct addrconf_sysctl_table
 			.mode		=	0555,
 			.child		=	addrconf_sysctl.addrconf_vars,
 		},
+		{
+			.ctl_name	=	0,	/* sentinel */
+		}
 	},
 	.addrconf_conf_dir = {
 		{
@@ -3199,6 +3205,9 @@ static struct addrconf_sysctl_table
 			.mode		=	0555,
 			.child		=	addrconf_sysctl.addrconf_dev,
 		},
+		{
+			.ctl_name	=	0,	/* sentinel */
+		}
 	},
 	.addrconf_proto_dir = {
 		{
@@ -3207,6 +3216,9 @@ static struct addrconf_sysctl_table
 			.mode		=	0555,
 			.child		=	addrconf_sysctl.addrconf_conf_dir,
 		},
+		{
+			.ctl_name	=	0,	/* sentinel */
+		}
 	},
 	.addrconf_root_dir = {
 		{
@@ -3215,6 +3227,9 @@ static struct addrconf_sysctl_table
 			.mode		=	0555,
 			.child		=	addrconf_sysctl.addrconf_proto_dir,
 		},
+		{
+			.ctl_name	=	0,	/* sentinel */
+		}
 	},
 };
 

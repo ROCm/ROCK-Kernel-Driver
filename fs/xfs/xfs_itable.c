@@ -330,7 +330,7 @@ xfs_bulkstat(
 	 * inode returned; 0 means start of the allocation group.
 	 */
 	rval = 0;
-	while ((ubleft/statstruct_size) > 0 && agno < mp->m_sb.sb_agcount) {
+	while (ubleft >= statstruct_size && agno < mp->m_sb.sb_agcount) {
 		bp = NULL;
 		down_read(&mp->m_peraglock);
 		error = xfs_ialloc_read_agi(mp, tp, agno, &agbp);
@@ -415,7 +415,7 @@ xfs_bulkstat(
 		 * Loop through inode btree records in this ag,
 		 * until we run out of inodes or space in the buffer.
 		 */
-		while (irbp < irbufend && icount < (ubleft/statstruct_size)) {
+		while (irbp < irbufend && icount < ubcount) {
 			/*
 			 * Loop as long as we're unable to read the
 			 * inode btree.
@@ -467,7 +467,7 @@ xfs_bulkstat(
 		 */
 		irbufend = irbp;
 		for (irbp = irbuf;
-		     irbp < irbufend && (ubleft/statstruct_size) > 0; irbp++) {
+		     irbp < irbufend && ubleft >= statstruct_size; irbp++) {
 			/*
 			 * Read-ahead the next chunk's worth of inodes.
 			 */

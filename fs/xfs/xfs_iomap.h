@@ -66,27 +66,26 @@ typedef enum {
 /*
  * xfs_iomap_t:  File system I/O map
  *
- * The iomap_bn, iomap_offset and iomap_length fields are expressed in disk blocks.
- * The iomap_length field specifies the size of the underlying backing store
- * for the particular mapping.
+ * The iomap_bn field is expressed in 512-byte blocks, and is where the 
+ * mapping starts on disk.
  *
- * The iomap_bsize, iomap_size and iomap_delta fields are in bytes and indicate
- * the size of the mapping, the number of bytes that are valid to access
- * (read or write), and the offset into the mapping, given the offset
- * supplied to the file I/O map routine.  iomap_delta is the offset of the
- * desired data from the beginning of the mapping.
+ * The iomap_offset, iomap_bsize and iomap_delta fields are in bytes.
+ * iomap_offset is the offset of the mapping in the file itself.
+ * iomap_bsize is the size of the mapping,  iomap_delta is the 
+ * desired data's offset into the mapping, given the offset supplied 
+ * to the file I/O map routine.
  *
  * When a request is made to read beyond the logical end of the object,
- * iomap_size may be set to 0, but iomap_offset and iomap_length should be set to
- * the actual amount of underlying storage that has been allocated, if any.
+ * iomap_size may be set to 0, but iomap_offset and iomap_length should be set
+ * to the actual amount of underlying storage that has been allocated, if any.
  */
 
 typedef struct xfs_iomap {
-	xfs_daddr_t		iomap_bn;
+	xfs_daddr_t		iomap_bn;	/* first 512b blk of mapping */
 	xfs_buftarg_t		*iomap_target;
-	loff_t			iomap_offset;
-	size_t			iomap_delta;
-	size_t			iomap_bsize;
+	loff_t			iomap_offset;	/* offset of mapping, bytes */
+	loff_t			iomap_bsize;	/* size of mapping, bytes */
+	size_t			iomap_delta;	/* offset into mapping, bytes */
 	iomap_flags_t		iomap_flags;
 } xfs_iomap_t;
 

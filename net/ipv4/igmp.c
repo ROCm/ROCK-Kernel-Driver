@@ -2084,16 +2084,19 @@ int ip_check_mc(struct in_device *in_dev, u32 mc_addr, u32 src_addr, u16 proto)
 	if (im && proto == IPPROTO_IGMP) {
 		rv = 1;
 	} else if (im) {
-		for (psf=im->sources; psf; psf=psf->sf_next) {
-			if (psf->sf_inaddr == src_addr)
-				break;
-		}
-		if (psf)
-			rv = psf->sf_count[MCAST_INCLUDE] ||
-				psf->sf_count[MCAST_EXCLUDE] !=
-				im->sfcount[MCAST_EXCLUDE];
-		else
-			rv = im->sfcount[MCAST_EXCLUDE] != 0;
+		if (src_addr) {
+			for (psf=im->sources; psf; psf=psf->sf_next) {
+				if (psf->sf_inaddr == src_addr)
+					break;
+			}
+			if (psf)
+				rv = psf->sf_count[MCAST_INCLUDE] ||
+					psf->sf_count[MCAST_EXCLUDE] !=
+					im->sfcount[MCAST_EXCLUDE];
+			else
+				rv = im->sfcount[MCAST_EXCLUDE] != 0;
+		} else
+			rv = 1; /* unspecified source; tentatively allow */
 	}
 	read_unlock(&in_dev->lock);
 	return rv;

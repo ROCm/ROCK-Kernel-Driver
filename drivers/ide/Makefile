@@ -8,6 +8,9 @@
 # In the future, some of these should be built conditionally.
 #
 # First come modules that register themselves with the core
+
+EXTRA_CFLAGS				+= -Idrivers/ide
+
 obj-$(CONFIG_BLK_DEV_IDE)		+= pci/
 
 # Core IDE code - must come before legacy

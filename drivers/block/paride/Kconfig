@@ -130,7 +130,7 @@ config PARIDE_BPCK
 
 config PARIDE_BPCK6
 	tristate "MicroSolutions backpack (Series 6) protocol"
-	depends on PARIDE
+	depends on PARIDE && !64BIT
 	---help---
 	  This option enables support for the Micro Solutions BACKPACK
 	  parallel port Series 6 IDE protocol.  (Most BACKPACK drives made
