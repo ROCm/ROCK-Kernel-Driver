@@ -339,10 +339,11 @@ typedef struct isdn_net_local_s {
 				       /* phone[1] = Outgoing Numbers      */
 
   struct list_head       slaves;       /* list of all bundled channels     */
-  struct list_head       online;       /* circular list of all bundled
-					  channels, which are currently
-					  online                           */
-  spinlock_t             online_lock;  /* lock to protect queue            */
+  struct list_head       online;       /* list of all bundled channels, 
+					  which are currently online       */
+  spinlock_t             online_lock;  /* lock to protect online list      */
+  struct list_head       running_devs; /* member of global running_devs    */
+  atomic_t               refcnt;       /* references held by ISDN code     */
 
 #ifdef CONFIG_ISDN_X25
   struct concap_device_ops *dops;      /* callbacks used by encapsulator   */
@@ -403,8 +404,8 @@ typedef struct isdn_net_dev_s {
 
   isdn_net_local        *mlp;          /* Ptr to master device for all devs*/
 
-  struct list_head       slaves;       /* Members of local->slaves         */
-  struct list_head       online;       /* Members of local->online         */
+  struct list_head       slaves;       /* member of local->slaves          */
+  struct list_head       online;       /* member of local->online          */
 
   char                   name[10];     /* Name of device                   */
   struct list_head       global_list;  /* global list of all isdn_net_devs */

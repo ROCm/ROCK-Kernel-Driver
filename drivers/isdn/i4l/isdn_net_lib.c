@@ -10,6 +10,33 @@
  * of the GNU General Public License, incorporated herein by reference.
  */
 
+/* Locking works as follows: 
+ *
+ * The configuration of isdn_net_devs works via ioctl on
+ * /dev/isdnctrl (for legacy reasons).
+ * All configuration accesses are globally serialized by means of
+ * the global semaphore &sem.
+ * 
+ * All other uses of isdn_net_dev will only happen when the corresponding
+ * struct net_device has been opened. So in the non-config code we can
+ * rely on the config data not changing under us.
+ *
+ * To achieve this, in the "writing" ioctls, that is those which may change
+ * data, additionally grep the rtnl semaphore and check to make sure
+ * that the net_device has not been openend ("netif_running()")
+ *
+ * isdn_net_dev's are added to the global list "isdn_net_devs" in the
+ * configuration ioctls, so accesses to that list are protected by
+ * &sem as well.
+ *
+ * Incoming calls are signalled in IRQ context, so we cannot take &sem
+ * while walking the list of devices. To handle this, we put devices
+ * onto a "running" list, which is protected by a spin lock and can thus
+ * be traversed in IRQ context. If a matching isdn_net_dev is found,
+ * it's ref count shall be incremented, to make sure no racing
+ * net_device::close() can take it away under us. 
+ */
+
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/skbuff.h>
@@ -360,6 +387,7 @@ isdn_net_addif(char *name, isdn_net_local *mlp)
 		}
 	}
 	list_add(&idev->global_list, &isdn_net_devs);
+
 	return 0;
 }
 
@@ -978,6 +1006,9 @@ isdn_net_exit(void)
 /* interface to network layer                                             */
 /* ====================================================================== */
 
+static spinlock_t running_devs_lock = SPIN_LOCK_UNLOCKED;
+static LIST_HEAD(running_devs);
+
 /* 
  * Open/initialize the board.
  */
@@ -985,6 +1016,7 @@ static int
 isdn_net_open(struct net_device *dev)
 {
 	isdn_net_local *lp = dev->priv;
+	unsigned long flags;
 	int retval = 0;
 
 	if (!lp->ops)
@@ -997,6 +1029,12 @@ isdn_net_open(struct net_device *dev)
 		return retval;
 	
 	netif_start_queue(dev);
+
+	atomic_set(&lp->refcnt, 1);
+	spin_lock_irqsave(&running_devs_lock, flags);
+	list_add(&lp->running_devs, &running_devs);
+	spin_unlock_irqrestore(&running_devs_lock, flags);
+
 	return 0;
 }
 
@@ -1008,8 +1046,9 @@ static int
 isdn_net_close(struct net_device *dev)
 {
 	isdn_net_local *lp = dev->priv;
-	struct list_head *l, *n;
 	isdn_net_dev *sdev;
+	struct list_head *l, *n;
+	unsigned long flags;
 
 	if (lp->ops->close)
 		lp->ops->close(lp);
@@ -1020,6 +1059,20 @@ isdn_net_close(struct net_device *dev)
 		sdev = list_entry(l, isdn_net_dev, online);
 		isdn_net_hangup(sdev);
 	}
+	/* The hangup will make the refcnt drop back to
+	 * 1 (referenced by list only) soon. */
+	spin_lock_irqsave(&running_devs_lock, flags);
+	while (atomic_read(&dev->refcnt) != 1) {
+		spin_unlock_irqrestore(&running_devs_lock, flags);
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout(HZ/10);
+		spin_lock_irqsave(&running_devs_lock, flags);
+	}
+	/* We have the only reference and list lock, so
+	 * nobody can get another reference. */
+	list_del(&lp->running_devs);
+	spin_unlock_irqrestore(&running_devs_lock, flags);
+
 	return 0;
 }
 
@@ -1190,7 +1243,7 @@ isdn_net_dial(isdn_net_dev *idev)
 	return -EAGAIN;
 }
 
-void
+int
 isdn_net_accept(isdn_net_dev *idev, int slot, char *nr)
 {
 	isdn_net_local *mlp = idev->mlp;
@@ -1215,6 +1268,7 @@ isdn_net_accept(isdn_net_dev *idev, int slot, char *nr)
 	idev->dial_event = EV_TIMER_INCOMING;
 	add_timer(&idev->dial_timer);
 	fsm_change_state(&idev->fi, ST_IN_WAIT_DCONN);
+	return 0;
 }
 
 int
@@ -1256,6 +1310,166 @@ isdn_net_do_callback(isdn_net_dev *idev)
 
  err:
 	return 0;
+}
+
+static int isdn_net_dev_icall(isdn_net_dev *idev, int di, int ch, int si1,
+			      char *eaz, char *nr)
+{
+	isdn_net_local *mlp = idev->mlp;
+	struct isdn_net_phone *ph;
+	int slot = isdn_dc2minor(di, ch);
+	char *my_eaz;
+	
+	/* check acceptable call types for DOV */
+	dbg_net_icall("n_fi: if='%s', l.msn=%s, l.flags=%#x, l.dstate=%d\n",
+		      idev->name, mlp->msn, mlp->flags, idev->fi.state);
+	
+	my_eaz = isdn_slot_map_eaz2msn(slot, mlp->msn);
+	if (si1 == 1) { /* it's a DOV call, check if we allow it */
+		if (*my_eaz == 'v' || *my_eaz == 'V' ||
+		    *my_eaz == 'b' || *my_eaz == 'B')
+			my_eaz++; /* skip to allow a match */
+		else
+			return 0; /* no match */
+	} else { /* it's a DATA call, check if we allow it */
+		if (*my_eaz == 'b' || *my_eaz == 'B')
+			my_eaz++; /* skip to allow a match */
+	}
+	if (!USG_NONE(isdn_slot_usage(slot)))  // FIXME?
+		return 0;
+
+	/* check called number */
+	switch (isdn_msncmp(eaz, my_eaz)) {
+	case 1: /* no match */
+		return 0;
+	case 2: /* matches so far */
+		return 5;
+	}
+
+	dbg_net_icall("%s: pdev=%d di=%d pch=%d ch = %d\n", idev->name,
+		      idev->pre_device, di, idev->pre_channel, ch);
+	
+	/* check if exclusive */
+	if ((isdn_slot_usage(slot) & ISDN_USAGE_EXCLUSIVE) &&
+	    (idev->pre_channel != ch || idev->pre_device != di)) {
+		dbg_net_icall("%s: excl check failed\n", idev->name);
+		return 0;
+	}
+	
+	/* check calling number */
+	dbg_net_icall("%s: secure\n", idev->name);
+	if (mlp->flags & ISDN_NET_SECURE) {
+		list_for_each_entry(ph, &mlp->phone[0], list) {
+			if (isdn_msncmp(nr, ph->num) == 0)
+					goto found;
+		}
+		return 0;
+	}
+ found:
+	/* check dial mode */
+	if (ISDN_NET_DIALMODE(*mlp) == ISDN_NET_DM_OFF) {
+		printk(KERN_INFO "%s: incoming call, stopped -> rejected\n",
+		       idev->name);
+		return 3;
+	}
+	/* check callback */
+	if (mlp->flags & ISDN_NET_CALLBACK) {
+		/* FIXME go via state machine, convert retval */
+		return isdn_net_do_callback(idev);
+	}
+	printk(KERN_INFO "%s: call from %s -> %s accepted\n",
+	       idev->name, nr, eaz);
+
+	/* FIXME go via state machine, convert retval */
+	return isdn_net_accept(idev, slot, nr);
+}
+
+/*
+ * An incoming call-request has arrived.
+ * Search the interface-chain for an appropriate interface.
+ * If found, connect the interface to the ISDN-channel and initiate
+ * D- and B-Channel-setup. If secure-flag is set, accept only
+ * configured phone-numbers. If callback-flag is set, initiate
+ * callback-dialing.
+ *
+ * Return-Value: 0 = No appropriate interface for this call.
+ *               1 = Call accepted
+ *               2 = Reject call, wait cbdelay, then call back
+ *               3 = Reject call
+ *               4 = Wait cbdelay, then call back
+ *               5 = No appropriate interface for this call,
+ *                   would eventually match if CID was longer.
+ */
+int
+isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
+{
+	isdn_net_local *lp;
+	isdn_net_dev *idev;
+	char *nr, *eaz;
+	unsigned char si1, si2;
+	int retval;
+	unsigned long flags;
+
+	/* fix up calling number */
+	if (!setup->phone[0]) {
+		printk(KERN_INFO
+		       "isdn_net: Incoming call without OAD, assuming '0'\n");
+		nr = "0";
+	} else {
+		nr = setup->phone;
+	}
+	/* fix up called number */
+	if (!setup->eazmsn[0]) {
+		printk(KERN_INFO
+		       "isdn_net: Incoming call without CPN, assuming '0'\n");
+		eaz = "0";
+	} else {
+		eaz = setup->eazmsn;
+	}
+	si1 = setup->si1;
+	si2 = setup->si2;
+	if (dev->net_verbose > 1)
+		printk(KERN_INFO "isdn_net: call from %s,%d,%d -> %s\n", 
+		       nr, si1, si2, eaz);
+	/* check service indicator */
+        /* Accept DATA and VOICE calls at this stage
+	   local eaz is checked later for allowed call types */
+        if ((si1 != 7) && (si1 != 1)) {
+                restore_flags(flags);
+                if (dev->net_verbose > 1)
+                        printk(KERN_INFO "isdn_net: "
+			       "Service-Indicator not 1 or 7, ignored\n");
+                return 0;
+        }
+
+	dbg_net_icall("n_fi: di=%d ch=%d idx=%d usg=%d\n", di, ch, idx,
+		      isdn_slot_usage(idx));
+
+	retval = 0;
+	spin_lock_irqsave(&running_devs_lock, flags);
+	list_for_each_entry(lp, &running_devs, running_devs) {
+		atomic_inc(&lp->refcnt);
+		spin_unlock_irqrestore(&running_devs_lock, flags);
+
+		list_for_each_entry(idev, &lp->slaves, slaves) {
+			retval = isdn_net_dev_icall(idev, di, ch, si1, eaz, nr);
+			if (retval > 0)
+				break;
+		}
+
+		spin_lock_irqsave(&running_devs_lock, flags);
+		atomic_dec(&lp->refcnt);
+		if (retval > 0)
+			break;
+		
+	}
+	spin_unlock_irqsave(&running_devs_lock, flags);
+	if (!retval) {
+		if (dev->net_verbose)
+			printk(KERN_INFO "isdn_net: call "
+			       "from %s -> %s ignored\n", nr, eaz);
+	}
+	return retval;
 }
 
 /* ---------------------------------------------------------------------- */
