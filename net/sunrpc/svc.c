@@ -458,6 +458,13 @@ err_bad_prog:
 	goto sendit;
 
 err_bad_vers:
+	if (prog == 100227 && vers == 2) {
+		/* If the nfs_acl program is available, Solaris clients expect
+		   both version 2 and version 3 to be available;
+		   RPC_PROG_MISMATCH leads to a mount failure. Fake
+		   RPC_PROG_UNAVAIL when asked for nfs_acl version 2. */
+		goto err_bad_prog;
+	}
 #ifdef RPC_PARANOIA
 	printk("svc: unknown version (%d)\n", vers);
 #endif
