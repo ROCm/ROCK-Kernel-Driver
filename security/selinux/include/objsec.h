@@ -100,6 +100,12 @@ struct netif_security_struct {
 	struct avc_entry_ref avcr;	/* reference to permissions */
 };
 
+struct sk_security_struct {
+	unsigned long magic;		/* magic number for this module */
+	struct sock *sk;		/* back pointer to sk object */
+	u32 peer_sid;			/* SID of peer */
+};
+
 extern int inode_security_set_sid(struct inode *inode, u32 sid);
 
 #endif /* _SELINUX_OBJSEC_H_ */

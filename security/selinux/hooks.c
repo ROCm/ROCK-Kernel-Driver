@@ -244,6 +244,39 @@ static void superblock_free_security(struct super_block *sb)
 	kfree(sbsec);
 }
 
+#ifdef CONFIG_SECURITY_NETWORK
+static int sk_alloc_security(struct sock *sk, int family, int priority)
+{
+	struct sk_security_struct *ssec;
+
+	if (family != PF_UNIX)
+		return 0;
+
+	ssec = kmalloc(sizeof(*ssec), priority);
+	if (!ssec)
+		return -ENOMEM;
+
+	memset(ssec, 0, sizeof(*ssec));
+	ssec->magic = SELINUX_MAGIC;
+	ssec->sk = sk;
+	ssec->peer_sid = SECINITSID_UNLABELED;
+	sk->sk_security = ssec;
+
+	return 0;
+}
+
+static void sk_free_security(struct sock *sk)
+{
+	struct task_security_struct *ssec = sk->sk_security;
+
+	if (sk->sk_family != PF_UNIX || ssec->magic != SELINUX_MAGIC)
+		return;
+
+	sk->sk_security = NULL;
+	kfree(ssec);
+}
+#endif	/* CONFIG_SECURITY_NETWORK */
+
 /* The security server must be initialized before
    any labeling or access decisions can be provided. */
 extern int ss_initialized;
@@ -2540,6 +2573,7 @@ static int selinux_socket_unix_stream_connect(struct socket *sock,
 					      struct socket *other,
 					      struct sock *newsk)
 {
+	struct sk_security_struct *ssec;
 	struct inode_security_struct *isec;
 	struct inode_security_struct *other_isec;
 	struct avc_audit_data ad;
@@ -2558,6 +2592,14 @@ static int selinux_socket_unix_stream_connect(struct socket *sock,
 	if (err)
 		return err;
 
+	/* connecting socket */
+	ssec = sock->sk->sk_security;
+	ssec->peer_sid = other_isec->sid;
+	
+	/* server child socket */
+	ssec = newsk->sk_security;
+	ssec->peer_sid = isec->sid;
+	
 	return 0;
 }
 
@@ -2664,6 +2706,54 @@ out:
 	return err;
 }
 
+static int selinux_socket_getpeersec(struct socket *sock, char __user *optval,
+				     int __user *optlen, unsigned len)
+{
+	int err = 0;
+	char *scontext;
+	u32 scontext_len;
+	struct sk_security_struct *ssec;
+	struct inode_security_struct *isec;
+
+	isec = SOCK_INODE(sock)->i_security;
+	if (isec->sclass != SECCLASS_UNIX_STREAM_SOCKET) {
+		err = -ENOPROTOOPT;
+		goto out;
+	}
+
+	ssec = sock->sk->sk_security;
+	
+	err = security_sid_to_context(ssec->peer_sid, &scontext, &scontext_len);
+	if (err)
+		goto out;
+
+	if (scontext_len > len) {
+		err = -ERANGE;
+		goto out_len;
+	}
+
+	if (copy_to_user(optval, scontext, scontext_len))
+		err = -EFAULT;
+
+out_len:
+	if (put_user(scontext_len, optlen))
+		err = -EFAULT;
+
+	kfree(scontext);
+out:	
+	return err;
+}
+
+static int selinux_sk_alloc_security(struct sock *sk, int family, int priority)
+{
+	return sk_alloc_security(sk, family, priority);
+}
+
+static void selinux_sk_free_security(struct sock *sk)
+{
+	sk_free_security(sk);
+}
+
 #ifdef CONFIG_NETFILTER
 static unsigned int selinux_ip_postroute_last(unsigned int hooknum,
                                               struct sk_buff **pskb,
@@ -2741,6 +2831,7 @@ static unsigned int selinux_ip_postroute_last(unsigned int hooknum,
 out:
 	return err;
 }
+
 #endif	/* CONFIG_NETFILTER */
 
 #endif	/* CONFIG_SECURITY_NETWORK */
@@ -3479,6 +3570,9 @@ struct security_operations selinux_ops = {
 	.socket_setsockopt =		selinux_socket_setsockopt,
 	.socket_shutdown =		selinux_socket_shutdown,
 	.socket_sock_rcv_skb =		selinux_socket_sock_rcv_skb,
+	.socket_getpeersec =		selinux_socket_getpeersec,
+	.sk_alloc_security =		selinux_sk_alloc_security,
+	.sk_free_security =		selinux_sk_free_security,
 #endif
 };
 

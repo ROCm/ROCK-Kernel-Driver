@@ -757,6 +757,22 @@ struct swap_info_struct;
  *	incoming sk_buff @skb has been associated with a particular socket, @sk.
  *	@sk contains the sock (not socket) associated with the incoming sk_buff.
  *	@skb contains the incoming network data.
+ * @socket_getpeersec:
+ *	This hook allows the security module to provide peer socket security
+ *	state to userspace via getsockopt SO_GETPEERSEC.
+ *	@sock is the local socket.
+ *	@optval userspace memory where the security state is to be copied.
+ *	@optlen userspace int where the module should copy the actual length
+ *	of the security state.
+ *	@len as input is the maximum length to copy to userspace provided
+ *	by the caller.
+ *	Return 0 if all is well, otherwise, typical getsockopt return
+ *	values.
+ * @sk_alloc_security:
+ *      Allocate and attach a security structure to the sk->sk_security field,
+ *      which is used to copy security attributes between local stream sockets.
+ * @sk_free_security:
+ *	Deallocate security structure.
  *
  * Security hooks affecting all System V IPC operations.
  *
@@ -1183,6 +1199,9 @@ struct security_operations {
 	int (*socket_setsockopt) (struct socket * sock, int level, int optname);
 	int (*socket_shutdown) (struct socket * sock, int how);
 	int (*socket_sock_rcv_skb) (struct sock * sk, struct sk_buff * skb);
+	int (*socket_getpeersec) (struct socket *sock, char __user *optval, int __user *optlen, unsigned len);
+	int (*sk_alloc_security) (struct sock *sk, int family, int priority);
+	void (*sk_free_security) (struct sock *sk);
 #endif	/* CONFIG_SECURITY_NETWORK */
 };
 
@@ -2564,6 +2583,22 @@ static inline int security_sock_rcv_skb (struct sock * sk,
 {
 	return security_ops->socket_sock_rcv_skb (sk, skb);
 }
+
+static inline int security_socket_getpeersec(struct socket *sock, char __user *optval,
+					     int __user *optlen, unsigned len)
+{
+	return security_ops->socket_getpeersec(sock, optval, optlen, len);
+}
+
+static inline int security_sk_alloc(struct sock *sk, int family, int priority)
+{
+	return security_ops->sk_alloc_security(sk, family, priority);
+}
+
+static inline void security_sk_free(struct sock *sk)
+{
+	return security_ops->sk_free_security(sk);
+}
 #else	/* CONFIG_SECURITY_NETWORK */
 static inline int security_unix_stream_connect(struct socket * sock,
 					       struct socket * other, 
@@ -2663,6 +2698,21 @@ static inline int security_sock_rcv_skb (struct sock * sk,
 					 struct sk_buff * skb)
 {
 	return 0;
+}
+
+static inline int security_socket_getpeersec(struct socket *sock, char __user *optval,
+					     int __user *optlen, unsigned len)
+{
+	return -ENOPROTOOPT;
+}
+
+static inline int security_sk_alloc(struct sock *sk, int family, int priority)
+{
+	return 0;
+}
+
+static inline void security_sk_free(struct sock *sk)
+{
 }
 #endif	/* CONFIG_SECURITY_NETWORK */
 
