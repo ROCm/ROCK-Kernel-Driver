@@ -81,12 +81,7 @@ void tcp_timewait_kill(struct tcp_tw_bucket *tw)
 		tw->bind_next->bind_pprev = tw->bind_pprev;
 	*(tw->bind_pprev) = tw->bind_next;
 	tw->tb = NULL;
-	if (tb->owners == NULL) {
-		if (tb->next)
-			tb->next->pprev = tb->pprev;
-		*(tb->pprev) = tb->next;
-		kmem_cache_free(tcp_bucket_cachep, tb);
-	}
+	tcp_bucket_destroy(tb);
 	spin_unlock(&bhead->lock);
 
 #ifdef INET_REFCNT_DEBUG
