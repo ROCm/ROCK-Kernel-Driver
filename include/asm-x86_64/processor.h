@@ -303,6 +303,67 @@ extern unsigned long get_wchan(struct task_struct *p);
 	(((struct pt_regs *)(tsk->thread.rsp0 - sizeof(struct pt_regs)))->rip)
 #define KSTK_ESP(tsk) -1 /* sorry. doesn't work for syscall. */
 
+
+struct microcode_header {
+	unsigned int hdrver;
+	unsigned int rev;
+	unsigned int date;
+	unsigned int sig;
+	unsigned int cksum;
+	unsigned int ldrver;
+	unsigned int pf;
+	unsigned int datasize;
+	unsigned int totalsize;
+	unsigned int reserved[3];
+};
+
+struct microcode {
+	struct microcode_header hdr;
+	unsigned int bits[0];
+};
+
+typedef struct microcode microcode_t;
+typedef struct microcode_header microcode_header_t;
+
+/* microcode format is extended from prescott processors */
+struct extended_signature {
+	unsigned int sig;
+	unsigned int pf;
+	unsigned int cksum;
+};
+
+struct extended_sigtable {
+	unsigned int count;
+	unsigned int cksum;
+	unsigned int reserved[3];
+	struct extended_signature sigs[0];
+};
+
+/* '6' because it used to be for P6 only (but now covers Pentium 4 as well) */
+#define MICROCODE_IOCFREE	_IO('6',0)
+
+
+#define ASM_NOP1 K8_NOP1
+#define ASM_NOP2 K8_NOP2
+#define ASM_NOP3 K8_NOP3
+#define ASM_NOP4 K8_NOP4
+#define ASM_NOP5 K8_NOP5
+#define ASM_NOP6 K8_NOP6
+#define ASM_NOP7 K8_NOP7
+#define ASM_NOP8 K8_NOP8
+
+/* Opteron nops */
+#define K8_NOP1 ".byte 0x90\n"
+#define K8_NOP2	".byte 0x66,0x90\n" 
+#define K8_NOP3	".byte 0x66,0x66,0x90\n" 
+#define K8_NOP4	".byte 0x66,0x66,0x66,0x90\n" 
+#define K8_NOP5	K8_NOP3 K8_NOP2 
+#define K8_NOP6	K8_NOP3 K8_NOP3
+#define K8_NOP7	K8_NOP4 K8_NOP3
+#define K8_NOP8	K8_NOP4 K8_NOP4
+
+#define ASM_NOP_MAX 8
+
 /* REP NOP (PAUSE) is a good thing to insert into busy-wait loops. */
 extern inline void rep_nop(void)
 {
@@ -318,31 +379,25 @@ extern inline void sync_core(void)
 
 #define cpu_has_fpu 1
 
-/* Some early Opteron versions incorrectly fault on prefetch (errata #91). 
-   If this happens just jump back. */
 #define ARCH_HAS_PREFETCH
 static inline void prefetch(void *x) 
 { 
-	asm volatile("2: prefetcht0 %0\n1:\t" 
-		    ".section __ex_table,\"a\"\n\t"
-		    "  .align 8\n\t"
-		    "  .quad  2b,1b\n\t"
-		    ".previous" :: "m" (*(unsigned long *)x));
+	asm volatile("prefetcht0 %0" :: "m" (*(unsigned long *)x));
 } 
 
-#define ARCH_HAS_PREFETCHW
+#define ARCH_HAS_PREFETCHW 1
 static inline void prefetchw(void *x) 
 { 
-	asm volatile("2: prefetchw %0\n1:\t" 
-		    ".section __ex_table,\"a\"\n\t"
-		    "  .align 8\n\t"
-		    "  .quad  2b,1b\n\t"
-		    ".previous" :: "m" (*(unsigned long *)x));
+	alternative_input(ASM_NOP4,
+			  "prefetchw (%1)",
+			  X86_FEATURE_3DNOW,
+			  "r" (x));
 } 
 
-#define ARCH_HAS_SPINLOCK_PREFETCH
+#define ARCH_HAS_SPINLOCK_PREFETCH 1
 
 #define spin_lock_prefetch(x)  prefetchw(x)
+
 #define cpu_relax()   rep_nop()
 
 /*
@@ -372,32 +427,28 @@ static inline void prefetchw(void *x)
 	outb((data), 0x23); \
 } while (0)
 
+static inline void __monitor(const void *eax, unsigned long ecx,
+		unsigned long edx)
+{
+	/* "monitor %eax,%ecx,%edx;" */
+	asm volatile(
+		".byte 0x0f,0x01,0xc8;"
+		: :"a" (eax), "c" (ecx), "d"(edx));
+}
+
+static inline void __mwait(unsigned long eax, unsigned long ecx)
+{
+	/* "mwait %eax,%ecx;" */
+	asm volatile(
+		".byte 0x0f,0x01,0xc9;"
+		: :"a" (eax), "c" (ecx));
+}
+
 #define stack_current() \
 ({								\
 	struct thread_info *ti;					\
 	asm("andq %%rsp,%0; ":"=r" (ti) : "0" (CURRENT_MASK));	\
 	ti->task;					\
 })
-
-#define ASM_NOP1 K8_NOP1
-#define ASM_NOP2 K8_NOP2
-#define ASM_NOP3 K8_NOP3
-#define ASM_NOP4 K8_NOP4
-#define ASM_NOP5 K8_NOP5
-#define ASM_NOP6 K8_NOP6
-#define ASM_NOP7 K8_NOP7
-#define ASM_NOP8 K8_NOP8
-
-/* Opteron nops */
-#define K8_NOP1 ".byte 0x90\n"
-#define K8_NOP2	".byte 0x66,0x90\n" 
-#define K8_NOP3	".byte 0x66,0x66,0x90\n" 
-#define K8_NOP4	".byte 0x66,0x66,0x66,0x90\n" 
-#define K8_NOP5	K8_NOP3 K8_NOP2 
-#define K8_NOP6	K8_NOP3 K8_NOP3
-#define K8_NOP7	K8_NOP4 K8_NOP3
-#define K8_NOP8	K8_NOP4 K8_NOP4
-
-#define ASM_NOP_MAX 8
 
 #endif /* __ASM_X86_64_PROCESSOR_H */

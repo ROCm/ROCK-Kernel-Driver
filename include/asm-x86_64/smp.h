@@ -39,6 +39,7 @@ extern void smp_alloc_memory(void);
 extern cpumask_t cpu_online_map;
 extern volatile unsigned long smp_invalidate_needed;
 extern int pic_mode;
+extern int smp_num_siblings;
 extern void smp_flush_tlb(void);
 extern void smp_message_irq(int cpl, void *dev_id, struct pt_regs *regs);
 extern void smp_send_reschedule(int cpu);
@@ -46,7 +47,7 @@ extern void smp_invalidate_rcv(void);		/* Process an NMI */
 extern void (*mtrr_hook) (void);
 extern void zap_low_mappings(void);
 void smp_stop_cpu(void);
-
+extern int cpu_sibling_map[];
 
 #define SMP_TRAMPOLINE_BASE 0x6000
 
