@@ -171,21 +171,12 @@ static void dummy_bprm_free_security (struct linux_binprm *bprm)
 	return;
 }
 
-static inline int must_not_trace_exec (struct task_struct *p)
+static void dummy_bprm_apply_creds (struct linux_binprm *bprm, int unsafe)
 {
-	return ((p->ptrace & PT_PTRACED) && !(p->ptrace & PT_PTRACE_CAP))
-		|| atomic_read(&p->fs->count) > 1
-		|| atomic_read(&p->files->count) > 1
-		|| atomic_read(&p->sighand->count) > 1;
-}
-
-static void dummy_bprm_apply_creds (struct linux_binprm *bprm)
-{
-	task_lock(current);
 	if (bprm->e_uid != current->uid || bprm->e_gid != current->gid) {
 		current->mm->dumpable = 0;
 
-		if (must_not_trace_exec(current) && !capable(CAP_SETUID)) {
+		if ((unsafe & ~LSM_UNSAFE_PTRACE_CAP) && !capable(CAP_SETUID)) {
 			bprm->e_uid = current->uid;
 			bprm->e_gid = current->gid;
 		}
@@ -193,8 +184,6 @@ static void dummy_bprm_apply_creds (struct linux_binprm *bprm)
 
 	current->suid = current->euid = current->fsuid = bprm->e_uid;
 	current->sgid = current->egid = current->fsgid = bprm->e_gid;
-
-	task_unlock(current);
 }
 
 static int dummy_bprm_set_security (struct linux_binprm *bprm)

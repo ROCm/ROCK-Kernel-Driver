@@ -44,7 +44,7 @@ extern int cap_capget (struct task_struct *target, kernel_cap_t *effective, kern
 extern int cap_capset_check (struct task_struct *target, kernel_cap_t *effective, kernel_cap_t *inheritable, kernel_cap_t *permitted);
 extern void cap_capset_set (struct task_struct *target, kernel_cap_t *effective, kernel_cap_t *inheritable, kernel_cap_t *permitted);
 extern int cap_bprm_set_security (struct linux_binprm *bprm);
-extern void cap_bprm_apply_creds (struct linux_binprm *bprm);
+extern void cap_bprm_apply_creds (struct linux_binprm *bprm, int unsafe);
 extern int cap_bprm_secureexec(struct linux_binprm *bprm);
 extern int cap_inode_setxattr(struct dentry *dentry, char *name, void *value, size_t size, int flags);
 extern int cap_inode_removexattr(struct dentry *dentry, char *name);
@@ -86,6 +86,11 @@ struct nfsctl_arg;
 struct sched_param;
 struct swap_info_struct;
 
+/* bprm_apply_creds unsafe reasons */
+#define LSM_UNSAFE_SHARE	1
+#define LSM_UNSAFE_PTRACE	2
+#define LSM_UNSAFE_PTRACE_CAP	4
+
 #ifdef CONFIG_SECURITY
 
 /**
@@ -112,6 +117,8 @@ struct swap_info_struct;
  *	also perform other state changes on the process (e.g.  closing open
  *	file descriptors to which access is no longer granted if the attributes
  *	were changed). 
+ *	bprm_apply_creds is called under task_lock.  @unsafe indicates various
+ *	reasons why it may be unsafe to change security state.
  *	@bprm contains the linux_binprm structure.
  * @bprm_set_security:
  *	Save security information in the bprm->security field, typically based
@@ -1026,7 +1033,7 @@ struct security_operations {
 
 	int (*bprm_alloc_security) (struct linux_binprm * bprm);
 	void (*bprm_free_security) (struct linux_binprm * bprm);
-	void (*bprm_apply_creds) (struct linux_binprm * bprm);
+	void (*bprm_apply_creds) (struct linux_binprm * bprm, int unsafe);
 	int (*bprm_set_security) (struct linux_binprm * bprm);
 	int (*bprm_check_security) (struct linux_binprm * bprm);
 	int (*bprm_secureexec) (struct linux_binprm * bprm);
@@ -1290,9 +1297,9 @@ static inline void security_bprm_free (struct linux_binprm *bprm)
 {
 	security_ops->bprm_free_security (bprm);
 }
-static inline void security_bprm_apply_creds (struct linux_binprm *bprm)
+static inline void security_bprm_apply_creds (struct linux_binprm *bprm, int unsafe)
 {
-	security_ops->bprm_apply_creds (bprm);
+	security_ops->bprm_apply_creds (bprm, unsafe);
 }
 static inline int security_bprm_set (struct linux_binprm *bprm)
 {
@@ -1962,9 +1969,9 @@ static inline int security_bprm_alloc (struct linux_binprm *bprm)
 static inline void security_bprm_free (struct linux_binprm *bprm)
 { }
 
-static inline void security_bprm_apply_creds (struct linux_binprm *bprm)
+static inline void security_bprm_apply_creds (struct linux_binprm *bprm, int unsafe)
 { 
-	cap_bprm_apply_creds (bprm);
+	cap_bprm_apply_creds (bprm, unsafe);
 }
 
 static inline int security_bprm_set (struct linux_binprm *bprm)

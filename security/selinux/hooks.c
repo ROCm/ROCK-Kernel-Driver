@@ -1745,7 +1745,7 @@ static inline void flush_unauthorized_files(struct files_struct * files)
 	spin_unlock(&files->file_lock);
 }
 
-static void selinux_bprm_apply_creds(struct linux_binprm *bprm)
+static void selinux_bprm_apply_creds(struct linux_binprm *bprm, int unsafe)
 {
 	struct task_security_struct *tsec, *psec;
 	struct bprm_security_struct *bsec;
@@ -1755,7 +1755,7 @@ static void selinux_bprm_apply_creds(struct linux_binprm *bprm)
 	struct rlimit *rlim, *initrlim;
 	int rc, i;
 
-	secondary_ops->bprm_apply_creds(bprm);
+	secondary_ops->bprm_apply_creds(bprm, unsafe);
 
 	tsec = current->security;
 
@@ -1766,22 +1766,22 @@ static void selinux_bprm_apply_creds(struct linux_binprm *bprm)
 	if (tsec->sid != sid) {
 		/* Check for shared state.  If not ok, leave SID
 		   unchanged and kill. */
-		if ((atomic_read(&current->fs->count) > 1 ||
-		     atomic_read(&current->files->count) > 1 ||
-		     atomic_read(&current->sighand->count) > 1)) {
-			rc = avc_has_perm(tsec->sid, sid,
+		if (unsafe & LSM_UNSAFE_SHARE) {
+			rc = avc_has_perm_noaudit(tsec->sid, sid,
 					  SECCLASS_PROCESS, PROCESS__SHARE,
-					  NULL, NULL);
+					  NULL, &avd);
 			if (rc) {
+				task_unlock(current);
+				avc_audit(tsec->sid, sid, SECCLASS_PROCESS,
+				    PROCESS__SHARE, &avd, rc, NULL);
 				force_sig_specific(SIGKILL, current);
-				return;
+				goto lock_out;
 			}
 		}
 
 		/* Check for ptracing, and update the task SID if ok.
 		   Otherwise, leave SID unchanged and kill. */
-		task_lock(current);
-		if (current->ptrace & PT_PTRACED) {
+		if (unsafe & (LSM_UNSAFE_PTRACE | LSM_UNSAFE_PTRACE_CAP)) {
 			psec = current->parent->security;
 			rc = avc_has_perm_noaudit(psec->sid, sid,
 					  SECCLASS_PROCESS, PROCESS__PTRACE,
@@ -1793,7 +1793,7 @@ static void selinux_bprm_apply_creds(struct linux_binprm *bprm)
 				  PROCESS__PTRACE, &avd, rc, NULL);
 			if (rc) {
 				force_sig_specific(SIGKILL, current);
-				return;
+				goto lock_out;
 			}
 		} else {
 			tsec->sid = sid;
@@ -1846,6 +1846,10 @@ static void selinux_bprm_apply_creds(struct linux_binprm *bprm)
 		/* Wake up the parent if it is waiting so that it can
 		   recheck wait permission to the new task SID. */
 		wake_up_interruptible(&current->parent->wait_chldexit);
+
+lock_out:
+		task_lock(current);
+		return;
 	}
 }
 

@@ -115,15 +115,7 @@ int cap_bprm_set_security (struct linux_binprm *bprm)
 	return 0;
 }
 
-static inline int must_not_trace_exec (struct task_struct *p)
-{
-	return ((p->ptrace & PT_PTRACED) && !(p->ptrace & PT_PTRACE_CAP))
-		|| atomic_read(&p->fs->count) > 1
-		|| atomic_read(&p->files->count) > 1
-		|| atomic_read(&p->sighand->count) > 1;
-}
-
-void cap_bprm_apply_creds (struct linux_binprm *bprm)
+void cap_bprm_apply_creds (struct linux_binprm *bprm, int unsafe)
 {
 	/* Derived from fs/exec.c:compute_creds. */
 	kernel_cap_t new_permitted, working;
@@ -133,29 +125,24 @@ void cap_bprm_apply_creds (struct linux_binprm *bprm)
 				 current->cap_inheritable);
 	new_permitted = cap_combine (new_permitted, working);
 
-	task_lock(current);
-
-	if (bprm->e_uid != current->uid || bprm->e_gid != current->gid) {
+	if (bprm->e_uid != current->uid || bprm->e_gid != current->gid ||
+	    !cap_issubset (new_permitted, current->cap_permitted)) {
 		current->mm->dumpable = 0;
 
-		if (must_not_trace_exec(current) && !capable(CAP_SETUID)) {
-			bprm->e_uid = current->uid;
-			bprm->e_gid = current->gid;
+		if (unsafe & ~LSM_UNSAFE_PTRACE_CAP) {
+			if (!capable(CAP_SETUID)) {
+				bprm->e_uid = current->uid;
+				bprm->e_gid = current->gid;
+			}
+			if (!capable (CAP_SETPCAP)) {
+				new_permitted = cap_intersect (new_permitted,
+							current->cap_permitted);
+			}
 		}
 	}
 
 	current->suid = current->euid = current->fsuid = bprm->e_uid;
 	current->sgid = current->egid = current->fsgid = bprm->e_gid;
-
-	if (!cap_issubset (new_permitted, current->cap_permitted)) {
-		current->mm->dumpable = 0;
-
-		if (must_not_trace_exec (current) && !capable (CAP_SETPCAP)) {
-			new_permitted = cap_intersect (new_permitted,
-						       current->
-						       cap_permitted);
-		}
-	}
 
 	/* For init, we want to retain the capabilities set
 	 * in the init_task struct. Thus we skip the usual
@@ -167,7 +154,6 @@ void cap_bprm_apply_creds (struct linux_binprm *bprm)
 	}
 
 	/* AUD: Audit candidate if current->cap_effective is set */
-	task_unlock(current);
 
 	current->keep_capabilities = 0;
 }
