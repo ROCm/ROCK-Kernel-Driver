@@ -540,6 +540,43 @@ inline int task_curr(task_t *p)
 }
 
 #ifdef CONFIG_SMP
+typedef struct {
+	struct list_head list;
+	task_t *task;
+	struct completion done;
+} migration_req_t;
+
+/*
+ * The task's runqueue lock must be held, and the new mask must be valid.
+ * Returns true if you have to wait for migration thread.
+ */
+static int __set_cpus_allowed(task_t *p, cpumask_t new_mask,
+				migration_req_t *req)
+{
+	runqueue_t *rq = task_rq(p);
+
+	p->cpus_allowed = new_mask;
+	/*
+	 * Can the task run on the task's current CPU? If not then
+	 * migrate the thread off to a proper CPU.
+	 */
+	if (cpu_isset(task_cpu(p), new_mask))
+		return 0;
+
+	/*
+	 * If the task is not on a runqueue (and not running), then
+	 * it is sufficient to simply update the task's cpu field.
+	 */
+	if (!p->array && !task_running(rq, p)) {
+		set_task_cpu(p, any_online_cpu(p->cpus_allowed));
+		return 0;
+	}
+
+	init_completion(&req->done);
+	req->task = p;
+	list_add(&req->list, &rq->migration_queue);
+	return 1;
+}
 
 /*
  * wait_task_inactive - wait for a thread to unschedule.
@@ -971,16 +1008,34 @@ static inline void double_rq_unlock(runqueue_t *rq1, runqueue_t *rq2)
  */
 static void sched_migrate_task(task_t *p, int dest_cpu)
 {
-	cpumask_t old_mask;
+	runqueue_t *rq;
+	migration_req_t req;
+	unsigned long flags;
+	cpumask_t old_mask, new_mask = cpumask_of_cpu(dest_cpu);
 
+	rq = task_rq_lock(p, &flags);
 	old_mask = p->cpus_allowed;
-	if (!cpu_isset(dest_cpu, old_mask))
-		return;
-	/* force the process onto the specified CPU */
-	set_cpus_allowed(p, cpumask_of_cpu(dest_cpu));
+	if (!cpu_isset(dest_cpu, old_mask) || !cpu_online(dest_cpu))
+		goto out;
 
-	/* restore the cpus allowed mask */
-	set_cpus_allowed(p, old_mask);
+	/* force the process onto the specified CPU */
+	if (__set_cpus_allowed(p, new_mask, &req)) {
+		/* Need to wait for migration thread. */
+		task_rq_unlock(rq, &flags);
+		wake_up_process(rq->migration_thread);
+		wait_for_completion(&req.done);
+
+		/* If we raced with sys_sched_setaffinity, don't
+		 * restore mask. */
+		rq = task_rq_lock(p, &flags);
+		if (likely(cpus_equal(p->cpus_allowed, new_mask))) {
+			/* Restore old mask: won't need migration
+			 * thread, since current cpu is allowed. */
+			BUG_ON(__set_cpus_allowed(p, old_mask, NULL));
+		}
+	}
+out:
+	task_rq_unlock(rq, &flags);
 }
 
 /*
@@ -2628,12 +2683,6 @@ void __init init_idle(task_t *idle, int cpu)
  * 7) we wake up and the migration is done.
  */
 
-typedef struct {
-	struct list_head list;
-	task_t *task;
-	struct completion done;
-} migration_req_t;
-
 /*
  * Change a given task's CPU affinity. Migrate the thread to a
  * proper CPU and schedule it away if the CPU it's executing on
@@ -2646,40 +2695,26 @@ typedef struct {
 int set_cpus_allowed(task_t *p, cpumask_t new_mask)
 {
 	unsigned long flags;
+	int ret = 0;
 	migration_req_t req;
 	runqueue_t *rq;
 
-	if (any_online_cpu(new_mask) == NR_CPUS)
-		return -EINVAL;
-
 	rq = task_rq_lock(p, &flags);
-	p->cpus_allowed = new_mask;
-	/*
-	 * Can the task run on the task's current CPU? If not then
-	 * migrate the thread off to a proper CPU.
-	 */
-	if (cpu_isset(task_cpu(p), new_mask)) {
+	if (any_online_cpu(new_mask) == NR_CPUS) {
+		ret = -EINVAL;
+		goto out;
+	}
+
+	if (__set_cpus_allowed(p, new_mask, &req)) {
+		/* Need help from migration thread: drop lock and wait. */
 		task_rq_unlock(rq, &flags);
+		wake_up_process(rq->migration_thread);
+		wait_for_completion(&req.done);
 		return 0;
 	}
-	/*
-	 * If the task is not on a runqueue (and not running), then
-	 * it is sufficient to simply update the task's cpu field.
-	 */
-	if (!p->array && !task_running(rq, p)) {
-		set_task_cpu(p, any_online_cpu(p->cpus_allowed));
-		task_rq_unlock(rq, &flags);
-		return 0;
-	}
-	init_completion(&req.done);
-	req.task = p;
-	list_add(&req.list, &rq->migration_queue);
+out:
 	task_rq_unlock(rq, &flags);
-
-	wake_up_process(rq->migration_thread);
-
-	wait_for_completion(&req.done);
-	return 0;
+	return ret;
 }
 
 EXPORT_SYMBOL_GPL(set_cpus_allowed);
