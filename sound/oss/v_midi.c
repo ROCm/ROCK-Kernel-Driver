@@ -21,7 +21,7 @@
 
 #include <linux/init.h>
 #include <linux/module.h>
-
+#include <linux/spinlock.h>
 #include "sound_config.h"
 
 #include "v_midi.h"
@@ -52,15 +52,14 @@ static int v_midi_open (int dev, int mode,
 	if (devc == NULL)
 		return -(ENXIO);
 
-	save_flags (flags);
-	cli();
+	spin_lock_irqsave(&devc->lock,flags);
 	if (devc->opened)
 	{
-		restore_flags (flags);
+		spin_unlock_irqrestore(&devc->lock,flags);
 		return -(EBUSY);
 	}
 	devc->opened = 1;
-	restore_flags (flags);
+	spin_unlock_irqrestore(&devc->lock,flags);
 
 	devc->intr_active = 1;
 
@@ -81,12 +80,11 @@ static void v_midi_close (int dev)
 	if (devc == NULL)
 		return;
 
-	save_flags (flags);
-	cli ();
+	spin_lock_irqsave(&devc->lock,flags);
 	devc->intr_active = 0;
 	devc->input_opened = 0;
 	devc->opened = 0;
-	restore_flags (flags);
+	spin_unlock_irqrestore(&devc->lock,flags);
 }
 
 static int v_midi_out (int dev, unsigned char midi_byte)
@@ -222,6 +220,7 @@ static void __init attach_v_midi (struct address_info *hw_config)
 	v_devc[0]->opened = v_devc[0]->input_opened = 0;
 	v_devc[0]->intr_active = 0;
 	v_devc[0]->midi_input_intr = NULL;
+	spin_lock_init(&v_devc[0]->lock);
 
 	midi_devs[midi1]->devc = v_devc[0];
 
@@ -242,6 +241,7 @@ static void __init attach_v_midi (struct address_info *hw_config)
 	v_devc[1]->opened = v_devc[1]->input_opened = 0;
 	v_devc[1]->intr_active = 0;
 	v_devc[1]->midi_input_intr = NULL;
+	spin_lock_init(&v_devc[1]->lock);
 
 	midi_devs[midi2]->devc = v_devc[1];
 	midi_devs[midi2]->converter = &m->s_ops[1];
