@@ -5,9 +5,27 @@
 #include <string.h>
 #include <unistd.h>
 #include <time.h>
+#include <fcntl.h>
 
 static unsigned int offset;
 static unsigned int ino = 721;
+
+static void push_string(const char *name)
+{
+	unsigned int name_len = strlen(name) + 1;
+
+	fputs(name, stdout);
+	putchar(0);
+	offset += name_len;
+}
+
+static void push_pad (void)
+{
+	while (offset & 3) {
+		putchar(0);
+		offset++;
+	}
+}
 
 static void push_rest(const char *name)
 {
@@ -118,6 +136,78 @@ static void cpio_mknod(const char *name, unsigned int mode,
 		0);			/* chksum */
 	push_hdr(s);
 	push_rest(name);
+}
+
+/* Not marked static to keep the compiler quiet, as no one uses this yet... */
+void cpio_mkfile(const char *filename, const char *location,
+			unsigned int mode, uid_t uid, gid_t gid)
+{
+	char s[256];
+	char *filebuf;
+	struct stat buf;
+	int file;
+	int retval;
+	int i;
+
+	mode |= S_IFREG;
+
+	retval = stat (filename, &buf);
+	if (retval) {
+		fprintf (stderr, "Filename %s could not be located\n", filename);
+		goto error;
+	}
+
+	file = open (filename, O_RDONLY);
+	if (file < 0) {
+		fprintf (stderr, "Filename %s could not be opened for reading\n", filename);
+		goto error;
+	}
+
+	filebuf = malloc(buf.st_size);
+	if (!filebuf) {
+		fprintf (stderr, "out of memory\n");
+		goto error_close;
+	}
+
+	retval = read (file, filebuf, buf.st_size);
+	if (retval < 0) {
+		fprintf (stderr, "Can not read %s file\n", filename);
+		goto error_free;
+	}
+
+	sprintf(s,"%s%08X%08X%08lX%08lX%08X%08lX"
+	       "%08X%08X%08X%08X%08X%08X%08X",
+		"070701",		/* magic */
+		ino++,			/* ino */
+		mode,			/* mode */
+		(long) uid,		/* uid */
+		(long) gid,		/* gid */
+		1,			/* nlink */
+		(long) buf.st_mtime,	/* mtime */
+		(int) buf.st_size,	/* filesize */
+		3,			/* major */
+		1,			/* minor */
+		0,			/* rmajor */
+		0,			/* rminor */
+		strlen(location) + 1,	/* namesize */
+		0);			/* chksum */
+	push_hdr(s);
+	push_string(location);
+	push_pad();
+
+	for (i = 0; i < buf.st_size; ++i)
+		fputc(filebuf[i], stdout);
+	close(file);
+	free(filebuf);
+	push_pad();
+	return;
+	
+error_free:
+	free(filebuf);
+error_close:
+	close(file);
+error:
+	exit(-1);
 }
 
 int main (int argc, char *argv[])
