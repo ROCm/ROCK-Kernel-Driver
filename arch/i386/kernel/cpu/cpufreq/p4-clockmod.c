@@ -181,11 +181,23 @@ static int cpufreq_p4_verify(struct cpufreq_policy *policy)
 static unsigned int cpufreq_p4_get_frequency(struct cpuinfo_x86 *c)
 {
 	if ((c->x86 == 0x06) && (c->x86_model == 0x09)) {
-		/* Pentium M */
+		/* Pentium M (Banias) */
 		printk(KERN_WARNING PFX "Warning: Pentium M detected. "
 		       "The speedstep_centrino module offers voltage scaling"
 		       " in addition of frequency scaling. You should use "
 		       "that instead of p4-clockmod, if possible.\n");
+		return speedstep_get_processor_frequency(SPEEDSTEP_PROCESSOR_PM);
+	}
+
+	if ((c->x86 == 0x06) && (c->x86_model == 0x13)) {
+		/* Pentium M (Dothan) */
+		printk(KERN_WARNING PFX "Warning: Pentium M detected. "
+		       "The speedstep_centrino module offers voltage scaling"
+		       " in addition of frequency scaling. You should use "
+		       "that instead of p4-clockmod, if possible.\n");
+		/* on P-4s, the TSC runs with constant frequency independent wether
+		 * throttling is active or not. */
+		p4clockmod_driver.flags |= CPUFREQ_CONST_LOOPS;
 		return speedstep_get_processor_frequency(SPEEDSTEP_PROCESSOR_PM);
 	}
 
