@@ -111,7 +111,7 @@ static int create_dir(struct kobject * k, struct dentry * p,
 				d_rehash(*d);
 			}
 		}
-		if (error)
+		if (error && (error != -EEXIST))
 			d_drop(*d);
 		dput(*d);
 	} else
