@@ -890,6 +890,8 @@ void ConfigView::loadConfig(void)
 		return;
 	if (conf_read(s.latin1()))
 		QMessageBox::information(this, "qconf", "Unable to load configuration!");
+	configList->updateListAll();
+	menuList->updateListAll();
 }
 
 void ConfigView::saveConfig(void)

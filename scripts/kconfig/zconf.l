@@ -162,7 +162,7 @@ n	[A-Za-z0-9_]
 		return T_STRING;
 	}
 	\\.?	{
-		append_string(yytext+1, yyleng);
+		append_string(yytext+1, yyleng - 1);
 	}
 	\'|\"	{
 		if (str == yytext[0]) {
