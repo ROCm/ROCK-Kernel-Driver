@@ -1189,10 +1189,6 @@ typedef struct ide_driver_s {
 	u8		(*sense)(ide_drive_t *, const char *, u8);
 	ide_startstop_t	(*error)(ide_drive_t *, const char *, u8);
 	int		(*ioctl)(ide_drive_t *, struct inode *, struct file *, unsigned int, unsigned long);
-	int		(*open)(struct inode *, struct file *, ide_drive_t *);
-	void		(*release)(struct inode *, struct file *, ide_drive_t *);
-	int		(*media_change)(ide_drive_t *);
-	void		(*revalidate)(ide_drive_t *);
 	void		(*pre_reset)(ide_drive_t *);
 	unsigned long	(*capacity)(ide_drive_t *);
 	ide_startstop_t	(*special)(ide_drive_t *);
@@ -1323,8 +1319,6 @@ extern int ide_xlate_1024(struct block_device *, int, int, const char *);
  * Return the current idea about the total capacity of this drive.
  */
 extern unsigned long current_capacity (ide_drive_t *drive);
-
-extern void ide_revalidate_drive (ide_drive_t *drive);
 
 /*
  * Start a reset operation for an IDE interface.

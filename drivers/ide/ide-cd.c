@@ -3205,56 +3205,6 @@ int ide_cdrom_setup (ide_drive_t *drive)
 	return 0;
 }
 
-/* Forwarding functions to generic routines. */
-static
-int ide_cdrom_ioctl (ide_drive_t *drive,
-		     struct inode *inode, struct file *file,
-		     unsigned int cmd, unsigned long arg)
-{
-	struct cdrom_info *info = drive->driver_data;
-
-	return cdrom_ioctl(&info->devinfo, inode, cmd, arg);
-}
-
-static
-int ide_cdrom_open (struct inode *ip, struct file *fp, ide_drive_t *drive)
-{
-	struct cdrom_info *info = drive->driver_data;
-	int rc = -ENOMEM;
-
-	MOD_INC_USE_COUNT;
-	if (!info->buffer)
-		info->buffer = (char *) kmalloc(SECTOR_BUFFER_SIZE, GFP_KERNEL);
-        if (!info->buffer || (rc = cdrom_open(&info->devinfo, ip, fp))) {
-		drive->usage--;
-		MOD_DEC_USE_COUNT;
-	}
-	return rc;
-}
-
-static
-void ide_cdrom_release (struct inode *inode, struct file *file,
-			ide_drive_t *drive)
-{
-	struct cdrom_info *info = drive->driver_data;
-	cdrom_release (&info->devinfo, file);
-	MOD_DEC_USE_COUNT;
-}
-
-static
-int ide_cdrom_check_media_change (ide_drive_t *drive)
-{
-	struct cdrom_info *info = drive->driver_data;
-	return cdrom_media_changed(&info->devinfo);
-}
-
-static
-void ide_cdrom_revalidate (ide_drive_t *drive)
-{
-	struct request_sense sense;
-	cdrom_read_toc(drive, &sense);
-}
-
 static
 unsigned long ide_cdrom_capacity (ide_drive_t *drive)
 {
@@ -3289,6 +3239,7 @@ int ide_cdrom_cleanup(ide_drive_t *drive)
 	kfree(info);
 	drive->driver_data = NULL;
 	del_gendisk(g);
+	g->fops = ide_fops;
 	return 0;
 }
 
@@ -3307,27 +3258,73 @@ static ide_driver_t ide_cdrom_driver = {
 #endif
 	.supports_dsc_overlap	= 1,
 	.cleanup		= ide_cdrom_cleanup,
-	.standby		= NULL,
-	.suspend		= NULL,
-	.resume			= NULL,
-	.flushcache		= NULL,
 	.do_request		= ide_do_rw_cdrom,
-	.end_request		= NULL,
 	.sense			= ide_cdrom_dump_status,
 	.error			= ide_cdrom_error,
-	.ioctl			= ide_cdrom_ioctl,
-	.open			= ide_cdrom_open,
-	.release		= ide_cdrom_release,
-	.media_change		= ide_cdrom_check_media_change,
-	.revalidate		= ide_cdrom_revalidate,
-	.pre_reset		= NULL,
 	.capacity		= ide_cdrom_capacity,
-	.special		= NULL,
-	.proc			= NULL,
 	.attach			= ide_cdrom_attach,
-	.ata_prebuilder		= NULL,
-	.atapi_prebuilder	= NULL,
 	.drives			= LIST_HEAD_INIT(ide_cdrom_driver.drives),
+};
+
+static int idecd_open(struct inode * inode, struct file * file)
+{
+	ide_drive_t *drive = inode->i_bdev->bd_disk->private_data;
+	struct cdrom_info *info = drive->driver_data;
+	int rc = -ENOMEM;
+	drive->usage++;
+
+	if (!info->buffer)
+		info->buffer = (char *) kmalloc(SECTOR_BUFFER_SIZE, GFP_KERNEL);
+        if (!info->buffer || (rc = cdrom_open(&info->devinfo, inode, file)))
+		drive->usage--;
+	return rc;
+}
+
+static int idecd_release(struct inode * inode, struct file * file)
+{
+	ide_drive_t *drive = inode->i_bdev->bd_disk->private_data;
+	struct cdrom_info *info = drive->driver_data;
+
+	cdrom_release (&info->devinfo, file);
+	drive->usage--;
+	return 0;
+}
+
+static int idecd_ioctl (struct inode *inode, struct file *file,
+			unsigned int cmd, unsigned long arg)
+{
+	struct block_device *bdev = inode->i_bdev;
+	ide_drive_t *drive = bdev->bd_disk->private_data;
+	int err = generic_ide_ioctl(bdev, cmd, arg);
+	if (err == -EINVAL) {
+		struct cdrom_info *info = drive->driver_data;
+		err = cdrom_ioctl(&info->devinfo, inode, cmd, arg);
+	}
+	return err;
+}
+
+static int idecd_media_changed(struct gendisk *disk)
+{
+	ide_drive_t *drive = disk->private_data;
+	struct cdrom_info *info = drive->driver_data;
+	return cdrom_media_changed(&info->devinfo);
+}
+
+static int idecd_revalidate_disk(struct gendisk *disk)
+{
+	ide_drive_t *drive = disk->private_data;
+	struct request_sense sense;
+	cdrom_read_toc(drive, &sense);
+	return  0;
+}
+
+static struct block_device_operations idecd_ops = {
+	.owner		= THIS_MODULE,
+	.open		= idecd_open,
+	.release	= idecd_release,
+	.ioctl		= idecd_ioctl,
+	.media_changed	= idecd_media_changed,
+	.revalidate_disk= idecd_revalidate_disk
 };
 
 /* options */
@@ -3397,6 +3394,7 @@ static int ide_cdrom_attach (ide_drive_t *drive)
 	DRIVER(drive)->busy--;
 
 	cdrom_read_toc(drive, &sense);
+	g->fops = &idecd_ops;
 	add_disk(g);
 	return 0;
 failed:

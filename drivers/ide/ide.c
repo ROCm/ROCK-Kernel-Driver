@@ -1565,29 +1565,6 @@ int ide_do_drive_cmd (ide_drive_t *drive, struct request *rq, ide_action_t actio
 
 EXPORT_SYMBOL(ide_do_drive_cmd);
 
-void ide_revalidate_drive (ide_drive_t *drive)
-{
-	set_capacity(drive->disk, current_capacity(drive));
-}
-
-EXPORT_SYMBOL(ide_revalidate_drive);
-
-/*
- * This routine is called to flush all partitions and partition tables
- * for a changed disk, and then re-read the new partition table.
- * If we are revalidating a disk because of a media change, then we
- * enter with usage == 0.  If we are using an ioctl, we automatically have
- * usage == 1 (we need an open channel to use an ioctl :-), so this
- * is our limit.
- */
-static int ide_revalidate_disk(struct gendisk *disk)
-{
-	ide_drive_t *drive = disk->private_data;
-	if (DRIVER(drive)->revalidate)
-		DRIVER(drive)->revalidate(drive);
-	return  0;
-}
-
 void ide_probe_module (void)
 {
 	if (!ide_probe) {
@@ -1603,21 +1580,7 @@ EXPORT_SYMBOL(ide_probe_module);
 
 static int ide_open (struct inode * inode, struct file * filp)
 {
-	ide_drive_t *drive = inode->i_bdev->bd_disk->private_data;
-	drive->usage++;
-	return DRIVER(drive)->open(inode, filp, drive);
-}
-
-/*
- * Releasing a block device means we sync() it, so that it can safely
- * be forgotten about...
- */
-static int ide_release (struct inode * inode, struct file * file)
-{
-	ide_drive_t *drive = inode->i_bdev->bd_disk->private_data;
-	DRIVER(drive)->release(inode, file, drive);
-	drive->usage--;
-	return 0;
+	return -ENXIO;
 }
 
 static LIST_HEAD(ata_unused);
@@ -2575,26 +2538,6 @@ int generic_ide_ioctl(struct block_device *bdev, unsigned int cmd,
 
 EXPORT_SYMBOL(generic_ide_ioctl);
 
-static int ide_ioctl (struct inode *inode, struct file *file,
-			unsigned int cmd, unsigned long arg)
-{
-	struct block_device *bdev = inode->i_bdev;
-	ide_drive_t *drive = bdev->bd_disk->private_data;
-	int err = generic_ide_ioctl(bdev, cmd, arg);
-
-	if (err == -EINVAL && drive->driver)
-		err = DRIVER(drive)->ioctl(drive, inode, file, cmd, arg);
-	return err;
-}
-
-static int ide_check_media_change(struct gendisk *disk)
-{
-	ide_drive_t *drive = disk->private_data;
-	if (drive->driver != NULL)
-		return DRIVER(drive)->media_change(drive);
-	return 0;
-}
-
 /*
  * stridx() returns the offset of c within s,
  * or -1 if c is '\0' or not found within s.
@@ -3168,11 +3111,6 @@ void __init ide_init_builtin_drivers (void)
 #endif
 }
 
-static int default_cleanup (ide_drive_t *drive)
-{
-	return ide_unregister_subdriver(drive);
-}
-
 static int default_standby (ide_drive_t *drive)
 {
 	return 0;
@@ -3214,27 +3152,6 @@ static ide_startstop_t default_error (ide_drive_t *drive, const char *msg, u8 st
 	return ide_error(drive, msg, stat);
 }
 
-static int default_ioctl (ide_drive_t *drive, struct inode *inode, struct file *file,
-			  unsigned int cmd, unsigned long arg)
-{
-	return -EINVAL;
-}
-
-static int default_open (struct inode *inode, struct file *filp, ide_drive_t *drive)
-{
-	drive->usage--;
-	return -EIO;
-}
-
-static void default_release (struct inode *inode, struct file *filp, ide_drive_t *drive)
-{
-}
-
-static int default_check_media_change (ide_drive_t *drive)
-{
-	return 1;
-}
-
 static void default_pre_reset (ide_drive_t *drive)
 {
 }
@@ -3265,7 +3182,6 @@ static void setup_driver_defaults (ide_drive_t *drive)
 {
 	ide_driver_t *d = drive->driver;
 
-	if (d->cleanup == NULL)		d->cleanup = default_cleanup;
 	if (d->standby == NULL)		d->standby = default_standby;
 	if (d->suspend == NULL)		d->suspend = default_suspend;
 	if (d->resume == NULL)		d->resume = default_resume;
@@ -3274,10 +3190,6 @@ static void setup_driver_defaults (ide_drive_t *drive)
 	if (d->end_request == NULL)	d->end_request = default_end_request;
 	if (d->sense == NULL)		d->sense = default_sense;
 	if (d->error == NULL)		d->error = default_error;
-	if (d->ioctl == NULL)		d->ioctl = default_ioctl;
-	if (d->open == NULL)		d->open = default_open;
-	if (d->release == NULL)		d->release = default_release;
-	if (d->media_change == NULL)	d->media_change = default_check_media_change;
 	if (d->pre_reset == NULL)	d->pre_reset = default_pre_reset;
 	if (d->capacity == NULL)	d->capacity = default_capacity;
 	if (d->special == NULL)		d->special = default_special;
@@ -3415,10 +3327,6 @@ EXPORT_SYMBOL(ide_unregister_driver);
 struct block_device_operations ide_fops[] = {{
 	.owner		= THIS_MODULE,
 	.open		= ide_open,
-	.release	= ide_release,
-	.ioctl		= ide_ioctl,
-	.media_changed	= ide_check_media_change,
-	.revalidate_disk= ide_revalidate_disk
 }};
 
 EXPORT_SYMBOL(ide_fops);
