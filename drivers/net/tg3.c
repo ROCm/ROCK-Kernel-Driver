@@ -5996,8 +5996,11 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 
 	/* Force the chip into D0. */
 	err = tg3_set_power_state(tp, 0);
-	if (err)
+	if (err) {
+		printk(KERN_ERR PFX "(%s) transition to D0 failed\n",
+		       tp->pdev->slot_name);
 		return err;
+	}
 
 	/* 5700 B0 chips do not support checksumming correctly due
 	 * to hardware bugs.
@@ -6106,8 +6109,11 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	    grc_misc_cfg != GRC_MISC_CFG_BOARD_ID_5703S &&
 	    grc_misc_cfg != GRC_MISC_CFG_BOARD_ID_5704 &&
 	    grc_misc_cfg != GRC_MISC_CFG_BOARD_ID_5704_A2 &&
-	    grc_misc_cfg != GRC_MISC_CFG_BOARD_ID_AC91002A1)
+	    grc_misc_cfg != GRC_MISC_CFG_BOARD_ID_AC91002A1) {
+		printk(KERN_ERR PFX "(%s) unknown board id 0x%x\n",
+		       tp->pdev->slot_name, grc_misc_cfg);
 		return -ENODEV;
+	}
 
 	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704 &&
 	    grc_misc_cfg == GRC_MISC_CFG_BOARD_ID_5704CIOBE) {
@@ -6123,6 +6129,11 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 		tp->tg3_flags |= TG3_FLAG_10_100_ONLY;
 
 	err = tg3_phy_probe(tp);
+	if (err) {
+		printk(KERN_ERR PFX "(%s) phy probe failed, err %d\n",
+		       tp->pdev->slot_name, err);
+		/* ... but do not return immediately ... */
+	}
 
 	tg3_read_partno(tp);
 
