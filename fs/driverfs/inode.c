@@ -150,7 +150,6 @@ static int driverfs_mknod(struct inode *dir, struct dentry *dentry, int mode, in
 	inode = driverfs_get_inode(dir->i_sb, mode, dev);
 	if (inode) {
 		d_instantiate(dentry, inode);
-		dget(dentry);
 		error = 0;
 	}
 	return error;
@@ -223,48 +222,10 @@ static int driverfs_unlink(struct inode *dir, struct dentry *dentry)
 	struct inode *inode = dentry->d_inode;
 	down(&inode->i_sem);
 	dentry->d_inode->i_nlink--;
-	dput(dentry);
 	up(&inode->i_sem);
-	d_delete(dentry);
+	d_invalidate(dentry);
+	dput(dentry);
 	return 0;
-}
-
-static void d_unhash(struct dentry *dentry)
-{
-	dget(dentry);
-	spin_lock(&dcache_lock);
-	switch (atomic_read(&dentry->d_count)) {
-	default:
-		spin_unlock(&dcache_lock);
-		shrink_dcache_parent(dentry);
-		spin_lock(&dcache_lock);
-		if (atomic_read(&dentry->d_count) != 2)
-			break;
-	case 2:
-		list_del_init(&dentry->d_hash);
-	}
-	spin_unlock(&dcache_lock);
-}
-
-static int driverfs_rmdir(struct inode *dir, struct dentry *dentry)
-{
-	int error = -ENOTEMPTY;
-	struct inode * inode = dentry->d_inode;
-
-	down(&inode->i_sem);
-	d_unhash(dentry);
-	if (driverfs_empty(dentry)) {
-		dentry->d_inode->i_nlink -= 2;
-		dput(dentry);
-		inode->i_flags |= S_DEAD;
-		dir->i_nlink--;
-		error = 0;
-	}
-	up(&inode->i_sem);
-	if (!error)
-		d_delete(dentry);
-	dput(dentry);
-	return error;
 }
 
 /**
@@ -622,9 +583,6 @@ driverfs_create_file(struct attribute * entry,
 	if (!entry || !parent)
 		return -EINVAL;
 
-	/* make sure we're mounted */
-	get_mount();
-
 	if (!parent->dentry) {
 		put_mount();
 		return -EINVAL;
@@ -638,8 +596,6 @@ driverfs_create_file(struct attribute * entry,
 	} else
 		error = PTR_ERR(dentry);
 	up(&parent->dentry->d_inode->i_sem);
-	if (error)
-		put_mount();
 	return error;
 }
 
@@ -659,8 +615,6 @@ int driverfs_create_symlink(struct driver_dir_entry * parent,
 	if (!parent)
 		return -EINVAL;
 
-	get_mount();
-
 	if (!parent->dentry) {
 		put_mount();
 		return -EINVAL;
@@ -672,8 +626,6 @@ int driverfs_create_symlink(struct driver_dir_entry * parent,
 	else
 		error = PTR_ERR(dentry);
 	up(&parent->dentry->d_inode->i_sem);
-	if (error)
-		put_mount();
 	return error;
 }
 
@@ -699,8 +651,6 @@ void driverfs_remove_file(struct driver_dir_entry * dir, const char * name)
 		if (dentry->d_inode && 
 		    (dentry->d_parent->d_inode == dir->dentry->d_inode)) {
 			driverfs_unlink(dir->dentry->d_inode,dentry);
-			dput(dentry);
-			put_mount();
 		}
 	}
 	up(&dir->dentry->d_inode->i_sem);
@@ -711,33 +661,39 @@ void driverfs_remove_file(struct driver_dir_entry * dir, const char * name)
  * @dir:	directory to remove
  *
  * To make sure we don't orphan anyone, first remove
- * all the children in the list, then do vfs_rmdir() to remove it
- * and decrement the refcount..
+ * all the children in the list, then do clean up the directory.
  */
 void driverfs_remove_dir(struct driver_dir_entry * dir)
 {
-	struct list_head * node;
+	struct list_head * node, * next;
 	struct dentry * dentry = dir->dentry;
+	struct dentry * parent;
 
 	if (!dentry)
 		goto done;
 
-	down(&dentry->d_parent->d_inode->i_sem);
+	parent = dget(dentry->d_parent);
+	down(&parent->d_inode->i_sem);
 	down(&dentry->d_inode->i_sem);
 
-	node = dentry->d_subdirs.next;
-	while (node != &dentry->d_subdirs) {
+	list_for_each_safe(node,next,&dentry->d_subdirs) {
 		struct dentry * d = list_entry(node,struct dentry,d_child);
+		/* make sure dentry is still there */
+		if (d->d_inode)
+			driverfs_unlink(dentry->d_inode,d);
+	}
 
-		node = node->next;
-		driverfs_unlink(dentry->d_inode,d);
-		dput(d);
-		put_mount();
+	d_invalidate(dentry);
+	if (driverfs_empty(dentry)) {
+		dentry->d_inode->i_nlink -= 2;
+		dentry->d_inode->i_flags |= S_DEAD;
+		parent->d_inode->i_nlink--;
 	}
 	up(&dentry->d_inode->i_sem);
-	driverfs_rmdir(dentry->d_parent->d_inode,dentry);
-	up(&dentry->d_parent->d_inode->i_sem);
 	dput(dentry);
+
+	up(&parent->d_inode->i_sem);
+	dput(parent);
  done:
 	put_mount();
 }

@@ -563,6 +563,7 @@ void get_page_state(struct page_state *ret)
 		ret->nr_page_table_pages += ps->nr_page_table_pages;
 		ret->nr_reverse_maps += ps->nr_reverse_maps;
 		ret->nr_mapped += ps->nr_mapped;
+		ret->nr_slab += ps->nr_slab;
 	}
 }
 

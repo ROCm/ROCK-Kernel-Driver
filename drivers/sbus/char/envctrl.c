@@ -1141,7 +1141,7 @@ static void __exit envctrl_cleanup(void)
 			int found = 0;
 
 			read_lock(&tasklist_lock);
-			for_each_task(p) {
+			for_each_process(p) {
 				if (p == kenvctrld_task) {
 					found = 1;
 					break;

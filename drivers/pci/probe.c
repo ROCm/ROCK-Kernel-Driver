@@ -444,6 +444,8 @@ struct pci_dev * __devinit pci_scan_device(struct pci_dev *temp)
 		return NULL;
 	}
 
+	pci_name_device(dev);
+
 	/* now put in global tree */
 	strcpy(dev->dev.name,dev->name);
 	strcpy(dev->dev.bus_id,dev->slot_name);
@@ -471,7 +473,6 @@ struct pci_dev * __devinit pci_scan_slot(struct pci_dev *temp)
 		dev = pci_scan_device(temp);
 		if (!dev)
 			continue;
-		pci_name_device(dev);
 		if (!func) {
 			is_multi = hdr_type & 0x80;
 			first_dev = dev;

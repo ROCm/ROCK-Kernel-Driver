@@ -485,8 +485,8 @@ static ssize_t bm_entry_write(struct file *file, const char *buffer,
 }
 
 static struct file_operations bm_entry_operations = {
-	read:		bm_entry_read,
-	write:		bm_entry_write,
+	.read		= bm_entry_read,
+	.write		= bm_entry_write,
 };
 
 static struct file_system_type bm_fs_type;
@@ -566,7 +566,7 @@ out:
 }
 
 static struct file_operations bm_register_operations = {
-	write:		bm_register_write,
+	.write		= bm_register_write,
 };
 
 /* /status */
@@ -613,21 +613,21 @@ static ssize_t bm_status_write(struct file * file, const char * buffer,
 }
 
 static struct file_operations bm_status_operations = {
-	read:		bm_status_read,
-	write:		bm_status_write,
+	.read		= bm_status_read,
+	.write		= bm_status_write,
 };
 
 /* Superblock handling */
 
 static struct super_operations s_ops = {
-	statfs:		simple_statfs,
-	drop_inode:	generic_delete_inode,
-	clear_inode:	bm_clear_inode,
+	.statfs		= simple_statfs,
+	.drop_inode	= generic_delete_inode,
+	.clear_inode	= bm_clear_inode,
 };
 
 static int bm_fill_super(struct super_block * sb, void * data, int silent)
 {
-	struct qstr names[2] = {{name:"status"}, {name:"register"}};
+	struct qstr names[2] = {{.name = "status"}, {.name = "register"}};
 	struct inode * inode;
 	struct dentry * dentry[3];
 	int i;
@@ -688,15 +688,15 @@ static struct super_block *bm_get_sb(struct file_system_type *fs_type,
 }
 
 static struct linux_binfmt misc_format = {
-	module: THIS_MODULE,
-	load_binary: load_misc_binary,
+	.module = THIS_MODULE,
+	.load_binary = load_misc_binary,
 };
 
 static struct file_system_type bm_fs_type = {
-	owner:		THIS_MODULE,
-	name:		"binfmt_misc",
-	get_sb:		bm_get_sb,
-	kill_sb:	kill_litter_super,
+	.owner		= THIS_MODULE,
+	.name		= "binfmt_misc",
+	.get_sb		= bm_get_sb,
+	.kill_sb	= kill_litter_super,
 };
 
 static int __init init_misc_binfmt(void)

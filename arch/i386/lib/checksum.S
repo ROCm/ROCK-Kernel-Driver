@@ -55,8 +55,21 @@ csum_partial:
 	movl 20(%esp),%eax	# Function arg: unsigned int sum
 	movl 16(%esp),%ecx	# Function arg: int len
 	movl 12(%esp),%esi	# Function arg: unsigned char *buff
-	testl $2, %esi		# Check alignment.
+	testl $3, %esi		# Check alignment.
 	jz 2f			# Jump if alignment is ok.
+	testl $1, %esi		# Check alignment.
+	jz 10f			# Jump if alignment is boundary of 2bytes.
+
+	# buf is odd
+	dec %ecx
+	jl 8f
+	movzbl (%esi), %ebx
+	adcl %ebx, %eax
+	roll $8, %eax
+	inc %esi
+	testl $2, %esi
+	jz 2f
+10:
 	subl $2, %ecx		# Alignment uses up two bytes.
 	jae 1f			# Jump if we had at least two bytes.
 	addl $2, %ecx		# ecx was < 2.  Deal with it.
@@ -111,6 +124,10 @@ csum_partial:
 6:	addl %ecx,%eax
 	adcl $0, %eax 
 7:	
+	testl $1, 12(%esp)
+	jz 8f
+	roll $8, %eax
+8:
 	popl %ebx
 	popl %esi
 	ret
@@ -126,8 +143,8 @@ csum_partial:
 	movl 16(%esp),%ecx	# Function arg: int len
 	movl 12(%esp),%esi	# Function arg:	const unsigned char *buf
 
-	testl $2, %esi         
-	jnz 30f                 
+	testl $3, %esi         
+	jnz 25f                 
 10:
 	movl %ecx, %edx
 	movl %ecx, %ebx
@@ -145,6 +162,19 @@ csum_partial:
 	lea 2(%esi), %esi
 	adcl $0, %eax
 	jmp 10b
+25:
+	testl $1, %esi         
+	jz 30f                 
+	# buf is odd
+	dec %ecx
+	jl 90f
+	movzbl (%esi), %ebx
+	addl %ebx, %eax
+	adcl $0, %eax
+	roll $8, %eax
+	inc %esi
+	testl $2, %esi
+	jz 10b
 
 30:	subl $2, %ecx          
 	ja 20b                 
@@ -211,6 +241,10 @@ csum_partial:
 	addl %ebx,%eax
 	adcl $0,%eax
 80: 
+	testl $1, 12(%esp)
+	jz 90f
+	roll $8, %eax
+90: 
 	popl %ebx
 	popl %esi
 	ret

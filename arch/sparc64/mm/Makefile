@@ -7,4 +7,6 @@ EXTRA_AFLAGS := -ansi
 O_TARGET := mm.o
 obj-y    := ultra.o fault.o init.o generic.o extable.o modutil.o
 
+obj-$(CONFIG_HUGETLB_PAGE) += hugetlbpage.o
+
 include $(TOPDIR)/Rules.make

@@ -418,7 +418,7 @@ iucv_exit(void)
 /**
  * grab_param: - Get a parameter buffer from the pre-allocated pool.
  *
- * This function searches for an unused element in the the pre-allocated pool
+ * This function searches for an unused element in the pre-allocated pool
  * of parameter buffers. If one is found, it marks it "in use" and returns
  * a pointer to it. The calling function is responsible for releasing it
  * when it has finished its usage.
@@ -1525,7 +1525,7 @@ iucv_reject (__u16 pathid, __u32 msgid, __u32 trgcls)
  *        buflen - length of reply buffer
  * Output: ipbfadr2 - Address of buffer updated by the number
  *                    of bytes you have moved.
- *         ipbfln2f - Contains on the the following values
+ *         ipbfln2f - Contains one of the following values:
  *              If the answer buffer is the same length as the reply, this field
  *               contains zero.
  *              If the answer buffer is longer than the reply, this field contains
@@ -1590,7 +1590,7 @@ iucv_reply (__u16 pathid,
  *        buffer - address of array of reply buffers
  *        buflen - total length of reply buffers
  * Output: ipbfadr2 - Address of buffer which IUCV is currently working on.
- *         ipbfln2f - Contains on the the following values
+ *         ipbfln2f - Contains one of the following values:
  *              If the answer buffer is the same length as the reply, this field
  *               contains zero.
  *              If the answer buffer is longer than the reply, this field contains

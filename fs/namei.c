@@ -2230,6 +2230,6 @@ fail:
 }
 
 struct inode_operations page_symlink_inode_operations = {
-	readlink:	page_readlink,
-	follow_link:	page_follow_link,
+	.readlink	= page_readlink,
+	.follow_link	= page_follow_link,
 };

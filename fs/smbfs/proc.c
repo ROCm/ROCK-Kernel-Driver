@@ -1882,8 +1882,8 @@ smb_proc_readdir_short(struct file *filp, void *dirent, filldir_t filldir,
 	__u16 count;
 	char status[SMB_STATUS_SIZE];
 	static struct qstr mask = {
-		name:	"*.*",
-		len:	3,
+		.name	= "*.*",
+		.len	= 3,
 	};
 	unsigned char *last_status;
 	struct smb_request *req;
@@ -2159,8 +2159,8 @@ smb_proc_readdir_long(struct file *filp, void *dirent, filldir_t filldir,
 	struct smb_request *req;
 	unsigned char *name_buf;
 	static struct qstr star = {
-		name:	"*",
-		len:	1,
+		.name	= "*",
+		.len	= 1,
 	};
 
 	lock_kernel();
@@ -2917,39 +2917,39 @@ install_ops(struct smb_ops *dst, struct smb_ops *src)
 /* < LANMAN2 */
 static struct smb_ops smb_ops_core =
 {
-	read:		smb_proc_read,
-	write:		smb_proc_write,
-	readdir:	smb_proc_readdir_short,
-	getattr:	smb_proc_getattr_core,
-	truncate:	smb_proc_trunc32,
+	.read		= smb_proc_read,
+	.write		= smb_proc_write,
+	.readdir	= smb_proc_readdir_short,
+	.getattr	= smb_proc_getattr_core,
+	.truncate	= smb_proc_trunc32,
 };
 
 /* LANMAN2, OS/2, others? */
 static struct smb_ops smb_ops_os2 =
 {
-	read:		smb_proc_read,
-	write:		smb_proc_write,
-	readdir:	smb_proc_readdir_long,
-	getattr:	smb_proc_getattr_trans2_std,
-	truncate:	smb_proc_trunc32,
+	.read		= smb_proc_read,
+	.write		= smb_proc_write,
+	.readdir	= smb_proc_readdir_long,
+	.getattr	= smb_proc_getattr_trans2_std,
+	.truncate	= smb_proc_trunc32,
 };
 
 /* Win95, and possibly some NetApp versions too */
 static struct smb_ops smb_ops_win95 =
 {
-	read:		smb_proc_read,	/* does not support 12word readX */
-	write:		smb_proc_write,
-	readdir:	smb_proc_readdir_long,
-	getattr:	smb_proc_getattr_95,
-	truncate:	smb_proc_trunc95,
+	.read		= smb_proc_read,    /* does not support 12word readX */
+	.write		= smb_proc_write,
+	.readdir	= smb_proc_readdir_long,
+	.getattr	= smb_proc_getattr_95,
+	.truncate	= smb_proc_trunc95,
 };
 
 /* Samba, NT4 and NT5 */
 static struct smb_ops smb_ops_winNT =
 {
-	read:		smb_proc_readX,
-	write:		smb_proc_writeX,
-	readdir:	smb_proc_readdir_long,
-	getattr:	smb_proc_getattr_trans2_all,
-	truncate:	smb_proc_trunc64,
+	.read		= smb_proc_readX,
+	.write		= smb_proc_writeX,
+	.readdir	= smb_proc_readdir_long,
+	.getattr	= smb_proc_getattr_trans2_all,
+	.truncate	= smb_proc_trunc64,
 };

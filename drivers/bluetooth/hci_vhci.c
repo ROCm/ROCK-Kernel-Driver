@@ -311,15 +311,15 @@ static int hci_vhci_chr_close(struct inode *inode, struct file *file)
 }
 
 static struct file_operations hci_vhci_fops = {
-	owner:	THIS_MODULE,	
-	llseek:	hci_vhci_chr_lseek,
-	read:	hci_vhci_chr_read,
-	write:	hci_vhci_chr_write,
-	poll:	hci_vhci_chr_poll,
-	ioctl:	hci_vhci_chr_ioctl,
-	open:	hci_vhci_chr_open,
-	release:hci_vhci_chr_close,
-	fasync:	hci_vhci_chr_fasync		
+	.owner	= THIS_MODULE,	
+	.llseek	= hci_vhci_chr_lseek,
+	.read	= hci_vhci_chr_read,
+	.write	= hci_vhci_chr_write,
+	.poll	= hci_vhci_chr_poll,
+	.ioctl	= hci_vhci_chr_ioctl,
+	.open	= hci_vhci_chr_open,
+	.release	= hci_vhci_chr_close,
+	.fasync	= hci_vhci_chr_fasync		
 };
 
 static struct miscdevice hci_vhci_miscdev=

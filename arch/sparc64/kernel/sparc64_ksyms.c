@@ -363,7 +363,6 @@ EXPORT_SYMBOL_NOVERS(VISenter);
 EXPORT_SYMBOL(sun_do_break);
 EXPORT_SYMBOL(serial_console);
 EXPORT_SYMBOL(stop_a_enabled);
-EXPORT_SYMBOL(kbd_pt_regs);
 
 #ifdef CONFIG_DEBUG_BUGVERBOSE
 EXPORT_SYMBOL(do_BUG);
