@@ -284,7 +284,6 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 		 */
 		if (page_mapped(page) && mapping) {
 			switch (try_to_unmap(page)) {
-			case SWAP_ERROR:
 			case SWAP_FAIL:
 				pte_chain_unlock(page);
 				goto activate_locked;

@@ -177,13 +177,11 @@ struct pte_chain *FASTCALL(page_add_rmap(struct page *, pte_t *,
 					struct pte_chain *));
 void FASTCALL(page_remove_rmap(struct page *, pte_t *));
 int FASTCALL(try_to_unmap(struct page *));
-int FASTCALL(page_over_rsslimit(struct page *));
 
 /* return values of try_to_unmap */
 #define	SWAP_SUCCESS	0
 #define	SWAP_AGAIN	1
 #define	SWAP_FAIL	2
-#define	SWAP_ERROR	3
 
 /* linux/mm/shmem.c */
 extern int shmem_unuse(swp_entry_t entry, struct page *page);
