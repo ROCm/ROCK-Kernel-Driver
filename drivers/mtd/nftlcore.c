@@ -1024,11 +1024,6 @@ static struct block_device_operations nftl_fops =
  *
  ****************************************************************************/
 
-#if LINUX_VERSION_CODE < 0x20212 && defined(MODULE)
-#define init_nftl init_module
-#define cleanup_nftl cleanup_module
-#endif
-
 static struct mtd_notifier nftl_notifier = {
 	add:	NFTL_notify_add,
 	remove:	NFTL_notify_remove
@@ -1045,14 +1040,12 @@ static int __init init_nftl(void)
 #endif
 
 	if (register_blkdev(MAJOR_NR, "nftl", &nftl_fops)){
-		printk("unable to register NFTL block device on major %d\n", MAJOR_NR);
+		printk("unable to register NFTL block device on major %d\n",
+		       MAJOR_NR);
 		return -EBUSY;
 	} else {
-#if LINUX_VERSION_CODE < 0x20320
-		blk_dev[MAJOR_NR].request_fn = nftl_request;
-#else
 		blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), &nftl_request);
-#endif
+
 		/* set block size to 1kB each */
 		for (i = 0; i < 256; i++) {
 			nftl_blocksizes[i] = 1024;
@@ -1069,20 +1062,12 @@ static int __init init_nftl(void)
 
 static void __exit cleanup_nftl(void)
 {
-	struct gendisk *gd, **gdp;
-
   	unregister_mtd_user(&nftl_notifier);
   	unregister_blkdev(MAJOR_NR, "nftl");
   	
-#if LINUX_VERSION_CODE < 0x20320
-  	blk_dev[MAJOR_NR].request_fn = 0;
-#else
   	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
-#endif	
 
-	/* remove ourself from generic harddisk list
-	   FIXME: why can't I found this partition on /proc/partition */
-	del_gendisk(&nftl_gendisk);:
+	del_gendisk(&nftl_gendisk);
 }
 
 module_init(init_nftl);

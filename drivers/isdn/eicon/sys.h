@@ -54,15 +54,6 @@ typedef volatile dword	vdword;
 #define NULL    ((void *) 0)
 #endif
 
-/* MIN and MAX */
-
-#if !defined(MIN)
-#define MIN(a,b) ((a)>(b) ? (b) : (a))
-#endif
-#if !defined(MAX)
-#define MAX(a,b) ((a)>(b) ? (a) : (b))
-#endif
-
 /* Return the dimension of an array */
 
 #if !defined(DIM)
@@ -85,6 +76,8 @@ void HwFatalError(void);
 /* void HwAssert(char *file, int line, char *condition); */
 
 #include <linux/kernel.h>
+#include <linux/string.h>
+
 #define _PRINTK printk
 
 #define _PRINTF	DivasPrintf

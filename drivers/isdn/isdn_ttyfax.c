@@ -1,4 +1,4 @@
-/* $Id: isdn_ttyfax.c,v 1.7 2000/05/11 22:29:21 kai Exp $
+/* $Id: isdn_ttyfax.c,v 1.7.6.1 2001/08/14 14:12:18 kai Exp $
 
  * Linux ISDN subsystem, tty_fax AT-command emulator (linklevel).
  *
@@ -33,7 +33,7 @@
 #include "isdn_ttyfax.h"
 
 
-static char *isdn_tty_fax_revision = "$Revision: 1.7 $";
+static char *isdn_tty_fax_revision = "$Revision: 1.7.6.1 $";
 
 #define PARSE_ERROR1 { isdn_tty_fax_modem_result(1, info); return 1; }
 
@@ -86,7 +86,7 @@ isdn_tty_fax_modem_result(int code, modem_info * info)
 			break;
 		case 2:	/* +FCON */
 			/* Append CPN, if enabled */
-			if ((m->mdmreg[REG_CPN] & BIT_CPNFCON) &&
+			if ((m->mdmreg[REG_CPNFCON] & BIT_CPNFCON) &&
 				(!(dev->usage[info->isdn_channel] & ISDN_USAGE_OUTGOING))) {
 				sprintf(rs, "/%s", m->cpn);
 				isdn_tty_at_cout(rs, info);

@@ -289,8 +289,8 @@ static inline unsigned long hash(struct vfsmount *mnt, struct dentry *dentry)
 {
 	unsigned long tmp = ((unsigned long) mnt / L1_CACHE_BYTES);
 	tmp += ((unsigned long) dentry / L1_CACHE_BYTES);
-	tmp = tmp + (tmp >> hash_mask);
-	return tmp & hash_bits;
+	tmp = tmp + (tmp >> hash_bits);
+	return tmp & hash_mask;
 }
 
 struct vfsmount *alloc_vfsmnt(void)
@@ -2000,27 +2000,36 @@ void __init mnt_init(unsigned long mempages)
 		;
 
 	do {
-		unsigned long tmp;
-
-		nr_hash = (1UL << order) * PAGE_SIZE /
-			sizeof(struct list_head);
-		hash_mask = (nr_hash - 1);
-
-		tmp = nr_hash;
-		hash_bits = 0;
-		while ((tmp >>= 1UL) != 0UL)
-			hash_bits++;
-
 		mount_hashtable = (struct list_head *)
 			__get_free_pages(GFP_ATOMIC, order);
 	} while (mount_hashtable == NULL && --order >= 0);
 
-	printk("Mount-cache hash table entries: %d (order: %ld, %ld bytes)\n",
-			nr_hash, order, (PAGE_SIZE << order));
-
 	if (!mount_hashtable)
 		panic("Failed to allocate mount hash table\n");
 
+	/*
+	 * Find the power-of-two list-heads that can fit into the allocation..
+	 * We don't guarantee that "sizeof(struct list_head)" is necessarily
+	 * a power-of-two.
+	 */
+	nr_hash = (1UL << order) * PAGE_SIZE / sizeof(struct list_head);
+	hash_bits = 0;
+	do {
+		hash_bits++;
+	} while ((nr_hash >> hash_bits) != 0);
+	hash_bits--;
+
+	/*
+	 * Re-calculate the actual number of entries and the mask
+	 * from the number of bits we can fit.
+	 */
+	nr_hash = 1UL << hash_bits;
+	hash_mask = nr_hash-1;
+
+	printk("Mount-cache hash table entries: %d (order: %ld, %ld bytes)\n",
+			nr_hash, order, (PAGE_SIZE << order));
+
+	/* And initialize the newly allocated array */
 	d = mount_hashtable;
 	i = nr_hash;
 	do {

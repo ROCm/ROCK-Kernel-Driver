@@ -19,7 +19,7 @@
 /*
  * Caching modes for the cachectl(2) call
  *
- * cachctl(2) is currently not supported and returns ENOSYS.
+ * cachectl(2) is currently not supported and returns ENOSYS.
  */
 #define CACHEABLE	0	/* make pages cacheable */
 #define UNCACHEABLE	1	/* make pages uncacheable */

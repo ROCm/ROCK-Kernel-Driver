@@ -417,5 +417,9 @@ void pcibios_align_resource(void *data, struct resource *res,
 	}
 }
 
+unsigned __init int pcibios_assign_all_busses(void)
+{
+	return 1;
+}
 
 struct pci_fixup pcibios_fixups[] = { };

@@ -153,8 +153,6 @@ static inline pgprot_t pgprot_noncached(pgprot_t _prot)
 	/* Use no-cache mode, serialized */
 	else if (MMU_IS_040 || MMU_IS_060)
 		prot = (prot & _CACHEMASK040) | _PAGE_NOCACHE_S;
-#elif defined(__mips__)
-	prot = (prot & ~_CACHE_MASK) | _CACHE_UNCACHED;
 #endif
 
 	return __pgprot(prot);

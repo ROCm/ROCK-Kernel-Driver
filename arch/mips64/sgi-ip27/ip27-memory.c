@@ -20,6 +20,7 @@
 #include <asm/bootinfo.h>
 #include <asm/addrspace.h>
 #include <asm/pgtable.h>
+#include <asm/pgalloc.h>
 #include <asm/sn/types.h>
 #include <asm/sn/addrs.h>
 #include <asm/sn/klconfig.h>
@@ -227,15 +228,24 @@ static pfn_t pagenr = 0;
 
 void __init paging_init(void)
 {
+	pmd_t *pmd = kpmdtbl;
+	pte_t *pte = kptbl;
+
 	cnodeid_t node;
 	unsigned long zones_size[MAX_NR_ZONES] = {0, 0, 0};
+	int i;
 
 	/* Initialize the entire pgd.  */
 	pgd_init((unsigned long)swapper_pg_dir);
 	pmd_init((unsigned long)invalid_pmd_table, (unsigned long)invalid_pte_table);
 	memset((void *)invalid_pte_table, 0, sizeof(pte_t) * PTRS_PER_PTE);
-	pmd_init((unsigned long)empty_bad_pmd_table, (unsigned long)empty_bad_page_table);
-	memset((void *)empty_bad_page_table, 0, sizeof(pte_t) * PTRS_PER_PTE);
+
+	/* This is for vmalloc  */
+	memset((void *)kptbl, 0, PAGE_SIZE << KPTBL_PAGE_ORDER);
+	memset((void *)kpmdtbl, 0, PAGE_SIZE);
+	pgd_set(swapper_pg_dir, kpmdtbl);
+	for (i = 0; i < (1 << KPTBL_PAGE_ORDER); pmd++,i++,pte+=PTRS_PER_PTE)
+		pmd_val(*pmd) = (unsigned long)pte;
 
 	for (node = 0; node < numnodes; node++) {
 		pfn_t start_pfn = slot_getbasepfn(node, 0);

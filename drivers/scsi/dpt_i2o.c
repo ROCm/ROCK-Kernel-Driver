@@ -1081,6 +1081,9 @@ static struct adpt_device* adpt_find_device(adpt_hba* pHba, u32 chan, u32 id, u3
 {
 	struct adpt_device* d;
 
+	if(chan < 0 || chan >= MAX_CHANNEL)
+		return NULL;
+	
 	if( pHba->channel[chan].device == NULL){
 		printk(KERN_DEBUG"Adaptec I2O RAID: Trying to find device before they are allocated\n");
 		return NULL;

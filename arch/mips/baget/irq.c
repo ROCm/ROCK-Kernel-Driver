@@ -4,8 +4,6 @@
  * Copyright (C) 1998 Vladimir Roganov & Gleb Raiko
  *      Code (mostly sleleton and comments) derived from DECstation IRQ
  *      handling.
- *
- * $Id: irq.c,v 1.6 2000/02/04 07:40:23 ralf Exp $
  */
 #include <linux/errno.h>
 #include <linux/init.h>
@@ -180,7 +178,7 @@ static void do_IRQ(int irq, struct pt_regs * regs)
 	int do_random, cpu;
 
 	cpu = smp_processor_id();
-	irq_enter(cpu);
+	irq_enter(cpu, irq);
 	kstat.irqs[cpu][irq]++;
 
 	mask_irq(irq);  
@@ -202,7 +200,7 @@ static void do_IRQ(int irq, struct pt_regs * regs)
 		printk("do_IRQ: Unregistered IRQ (0x%X) occurred\n", irq);
 	}
 	unmask_irq(irq);
-	irq_exit(cpu);
+	irq_exit(cpu, irq);
 
 	/* unmasking and bottom half handling is done magically for us. */
 }
@@ -358,13 +356,6 @@ void free_irq(unsigned int irq, void *dev_id)
 	}
 	printk("Trying to free free IRQ%d\n",irq);
 }
-
-static int baget_irq_canonicalize(int irq) 
-{
-	return irq;
-}
-
-int (*irq_cannonicalize)(int irq) = baget_irq_canonicalize; 
 
 unsigned long probe_irq_on (void)
 {

@@ -1,4 +1,4 @@
-/* $Id: hisax.h,v 2.52.6.7 2001/07/18 16:02:15 kai Exp $
+/* $Id: hisax.h,v 2.52.6.8 2001/08/23 19:44:23 kai Exp $
  *
  *   Basic declarations, defines and prototypes
  *
@@ -455,7 +455,6 @@ struct amd7930_hw {
 	struct tq_struct tq_xmt;
 };
 
-
 #define BC_FLG_INIT	1
 #define BC_FLG_ACTIV	2
 #define BC_FLG_BUSY	3
@@ -512,6 +511,7 @@ struct BCState {
 		struct tiger_hw tiger;
 		struct amd7930_hw  amd7930;
 		struct w6692B_hw w6692;
+		struct hisax_b_if *b_if;
 	} hw;
 };
 
@@ -897,6 +897,7 @@ struct IsdnCardState {
 		struct bkm_hw ax;
 		struct gazel_hw gazel;
 		struct w6692_hw w6692;
+		struct hisax_d_if *hisax_d_if;
 	} hw;
 	int myid;
 	isdn_if iif;
@@ -991,7 +992,8 @@ struct IsdnCardState {
 #define  ISDN_CTYPE_HFC_SX      37
 #define  ISDN_CTYPE_NETJET_U	38
 #define  ISDN_CTYPE_HFC_SP_PCMCIA      39
-#define  ISDN_CTYPE_COUNT	39
+#define  ISDN_CTYPE_DYNAMIC     40
+#define  ISDN_CTYPE_COUNT	40
 
 
 #ifdef ISDN_CHIP_ISAC

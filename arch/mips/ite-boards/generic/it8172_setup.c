@@ -5,7 +5,7 @@
  *
  * Copyright 2000 MontaVista Software Inc.
  * Author: MontaVista Software, Inc.
- *         	ppopov@mvista.com or support@mvista.com
+ *         	ppopov@mvista.com or source@mvista.com
  *
  *  This program is free software; you can redistribute  it and/or modify it
  *  under  the terms of  the GNU General  Public License as published by the
@@ -66,7 +66,7 @@ int init_8712_keyboard(void);
 extern int SearchIT8712(void);
 extern void InitLPCInterface(void);
 extern char * __init prom_getcmdline(void);
-extern void it8172_restart(void);
+extern void it8172_restart(char *command);
 extern void it8172_halt(void);
 extern void it8172_power_off(void);
 
@@ -114,19 +114,18 @@ void __init it8172_init_ram_resource(unsigned long memsize)
 
 void __init it8172_setup(void)
 {
-#ifdef CONFIG_BLK_DEV_IT8172
 	unsigned short dsr;
-#endif
 	char *argptr;
 
 	argptr = prom_getcmdline();
 #ifdef CONFIG_SERIAL_CONSOLE
-	if ((argptr = strstr(argptr, "console=ttyS0")) == NULL) {
-		strcpy(serial_console, "ttyS0,115200");
-		console_setup(serial_console, NULL);
+	if ((argptr = strstr(argptr, "console=")) == NULL) {
+		argptr = prom_getcmdline();
+		strcat(argptr, " console=ttyS0,115200");
 	}
 #endif	  
 
+	clear_cp0_status(ST0_FR);
 	rtc_ops = &it8172_rtc_ops;
 
 	_machine_restart = it8172_restart;
@@ -153,19 +152,25 @@ void __init it8172_setup(void)
 	ROOT_DEV = MKDEV(RAMDISK_MAJOR, 0);
 #endif
 
-#ifdef CONFIG_BLK_DEV_IT8172
 	/*
-	 * Pull IDE device out of standby mode.
+	 * Pull enabled devices out of standby
 	 */
 	IT_IO_READ16(IT_PM_DSR, dsr);
+#ifdef CONFIG_SOUND_IT8172
+	dsr &= ~IT_PM_DSR_ACSB;
+#else
+	dsr |= IT_PM_DSR_ACSB;
+#endif	
+#ifdef CONFIG_BLK_DEV_IT8172
 	dsr &= ~IT_PM_DSR_IDESB;
+	ide_ops = &std_ide_ops;
+#else
+	dsr |= IT_PM_DSR_IDESB;
+#endif
 	IT_IO_WRITE16(IT_PM_DSR, dsr);
 
-	ide_ops = &std_ide_ops;
-#endif
-
 #ifdef CONFIG_FB
-    conswitchp = &dummy_con;
+	conswitchp = &dummy_con;
 #endif
 
 	InitLPCInterface();
@@ -266,8 +271,6 @@ int init_8712_keyboard()
 	unsigned int data_port = 0x14000060;
 	unsigned char data;
 	int i;
-
-	printk("8712 keyboard init");
 
 	outb(0xaa, cmd_port); /* send self-test cmd */
 	i = 0;

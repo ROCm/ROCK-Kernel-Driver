@@ -1854,16 +1854,14 @@ static struct block_device_operations i2ob_fops =
 
 static struct gendisk i2ob_gendisk = 
 {
-	MAJOR_NR,
-	"i2o/hd",
-	4,
-	1<<4,
-	i2ob,
-	i2ob_sizes,
-	MAX_I2OB,
-	NULL,
-	NULL,
-	&i2ob_fops,
+	major:		MAJOR_NR,
+	major_name:	"i2o/hd",
+	minor_shift:	4,
+	max_p:		1<<4,
+	part:		i2ob,
+	sizes:		i2ob_sizes,
+	nr_real:	MAX_I2OB,
+	fops:		&i2ob_fops,
 };
 
 

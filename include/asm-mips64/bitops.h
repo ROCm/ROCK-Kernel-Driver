@@ -324,8 +324,9 @@ find_first_zero_bit (void *addr, unsigned size)
 		"blez\t$1,2f\n\t"
 		"lw\t$1,(%5)\n\t"
 		"addiu\t%5,4\n\t"
-#if (_MIPS_ISA == _MIPS_ISA_MIPS2) || (_MIPS_ISA == _MIPS_ISA_MIPS3) || \
-    (_MIPS_ISA == _MIPS_ISA_MIPS4) || (_MIPS_ISA == _MIPS_ISA_MIPS5)
+#if (_MIPS_ISA == _MIPS_ISA_MIPS2 ) || (_MIPS_ISA == _MIPS_ISA_MIPS3 ) || \
+    (_MIPS_ISA == _MIPS_ISA_MIPS4 ) || (_MIPS_ISA == _MIPS_ISA_MIPS5 ) || \
+    (_MIPS_ISA == _MIPS_ISA_MIPS32) || (_MIPS_ISA == _MIPS_ISA_MIPS64)
 		"beql\t%1,$1,1b\n\t"
 		"addiu\t%0,32\n\t"
 #else

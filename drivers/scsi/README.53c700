@@ -1,0 +1,17 @@
+This driver supports the 53c700 and 53c700-66 chips only.  It is full
+featured and does sync (-66 only), disconnects and tag command
+queueing.
+
+Since the 53c700 must be interfaced to a bus, you need to wrapper the
+card detector around this driver.  For an example, see the
+NCR_D700.[ch] files.
+
+The comments in the 53c700.[ch] files tell you which parts you need to
+fill in to get the driver working.
+
+The driver is currently I/O mapped only, but it should be easy enough
+to memory map (just make the port reads #defines with MEM_MAPPED for
+memory mapping or nothing for I/O mapping, specify an extra rule for
+53c700-mem.o with the -DMEM_MAPPED flag and make your driver use it,
+that way the make rules will generate the correct version).
+

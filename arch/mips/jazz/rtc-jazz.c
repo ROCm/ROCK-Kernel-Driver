@@ -1,12 +1,11 @@
-/* $Id: rtc-jazz.c,v 1.2 1998/06/25 20:19:14 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
  * RTC routines for Jazz style attached Dallas chip.
  *
- * Copyright (C) 1998 by Ralf Baechle
+ * Copyright (C) 1998, 2001 by Ralf Baechle
  */
 #include <linux/mc146818rtc.h>
 #include <asm/io.h>

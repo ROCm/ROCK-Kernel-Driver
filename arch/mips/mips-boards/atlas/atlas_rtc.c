@@ -22,7 +22,6 @@
  * RTC routines for Atlas style attached Dallas chip.
  *
  */
-#include <linux/spinlock.h>
 #include <linux/mc146818rtc.h>
 #include <asm/mips-boards/atlas.h>
 

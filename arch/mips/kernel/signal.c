@@ -464,10 +464,10 @@ setup_rt_frame(struct k_sigaction * ka, struct pt_regs *regs,
 		/*
 		 * Set up the return code ...
 		 *
-		 *         li      v0, __NR_sigreturn
+		 *         li      v0, __NR_rt_sigreturn
 		 *         syscall
 		 */
-		err |= __put_user(0x24020000 + __NR_sigreturn,
+		err |= __put_user(0x24020000 + __NR_rt_sigreturn,
 		                  frame->rs_code + 0);
 		err |= __put_user(0x0000000c                 ,
 		                  frame->rs_code + 1);

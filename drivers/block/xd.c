@@ -126,17 +126,16 @@ static int xd_maxsect[XD_MAXDRIVES << 6];
 extern struct block_device_operations xd_fops;
 
 static struct gendisk xd_gendisk = {
-	MAJOR_NR,	/* Major number */
-	"xd",		/* Major name */
-	6,		/* Bits to shift to get real from partition */
-	1 << 6,		/* Number of partitions per real */
-	xd_struct,	/* hd struct */
-	xd_sizes,	/* block sizes */
-	0,		/* number */
-	(void *) xd_info,	/* internal */
-	NULL,		/* next */
-	&xd_fops,	/* file operations */
+	major:		MAJOR_NR,
+	major_name:	"xd",
+	minor_shift:	6,
+	max_p:		1 << 6,
+	part:		xd_struct,
+	sizes:		xd_sizes,
+	real_devices:	(void *)xd_info,
+	fops:		&xd_fops,
 };
+
 static struct block_device_operations xd_fops = {
 	open:		xd_open,
 	release:	xd_release,

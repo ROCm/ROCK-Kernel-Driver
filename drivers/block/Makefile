@@ -10,7 +10,7 @@
 
 O_TARGET := block.o
 
-export-objs	:= ll_rw_blk.o blkpg.o loop.o DAC960.o
+export-objs	:= ll_rw_blk.o blkpg.o loop.o DAC960.o genhd.o
 
 obj-y	:= ll_rw_blk.o blkpg.o genhd.o elevator.o
 

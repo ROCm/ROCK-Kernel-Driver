@@ -1,10 +1,9 @@
-# $Id: Makefile,v 1.9 1999/04/07 18:45:23 harald Exp $
 #
 # This file is subject to the terms and conditions of the GNU General Public
 # License.  See the file "COPYING" in the main directory of this archive
 # for more details.
 #
-# Copyright (C) 1995, 1998 by Ralf Baechle
+# Copyright (C) 1995, 1998, 2001 by Ralf Baechle
 #
 
 .S.s:
@@ -46,25 +45,12 @@ dep:
 
 clean:
 	rm -f vmlinux.ecoff
-	rm -f zImage zImage.tmp mkboot
+	rm -f zImage zImage.tmp
 
 mrproper:
 	rm -f vmlinux.ecoff
 	rm -f addinitrd
 	rm -f elf2ecoff
-
-zImage:	$(CONFIGURE) mkboot $(TOPDIR)/vmlinux
-	$(OBJCOPY) $(strip-flags) $(TOPDIR)/vmlinux zImage.tmp
-	./mkboot zImage.tmp zImage
-	rm -f zImage.tmp
-
-mkboot: mkboot.c
-	$(HOSTCC) -o $@ $^
-
-zdisk: 	zImage
-	cp $(TOPDIR)/vmlinux $(TOPDIR)/vm
-	$(STRIP) $(TOPDIR)/vm
-	gzip -9f $(TOPDIR)/vm
 
 dummy:
 

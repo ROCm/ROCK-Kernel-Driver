@@ -145,6 +145,9 @@ again:
         }
 
 	write_unlock(&xtime_lock);
+
+	if (softirq_pending(cpu))
+		do_softirq();
 }
 
 unsigned long inline do_gettimeoffset(void)

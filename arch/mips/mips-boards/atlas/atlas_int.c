@@ -51,6 +51,11 @@ irq_desc_t irq_desc[NR_IRQS];
 #define DEBUG_INT(x...)
 #endif
 
+void inline disable_irq_nosync(unsigned int irq_nr)
+{
+	disable_atlas_irq(irq_nr);
+}
+
 void disable_atlas_irq(unsigned int irq_nr)
 {
 	atlas_hw0_icregs->intrsten = (1 << irq_nr);

@@ -157,16 +157,14 @@ static struct block_device_operations ps2esdi_fops =
 
 static struct gendisk ps2esdi_gendisk =
 {
-	MAJOR_NR,		/* Major number */
-	"ed",			/* Major name */
-	6,			/* Bits to shift to get real from partition */
-	1 << 6,			/* Number of partitions per real disk */
-	ps2esdi,		/* hd struct */
-	ps2esdi_sizes,		/* block sizes */
-	0,			/* number */
-	(void *) ps2esdi_info,	/* internal */
-	NULL,			/* next */
-	&ps2esdi_fops,          /* file operations */
+	major:		MAJOR_NR,
+	major_name:	"ed",
+	minor_shift:	6,
+	max_p:		1 << 6,
+	part:		ps2esdi,
+	sizes:		ps2esdi_sizes,
+	real_devices:	(void *)ps2esdi_info,
+	fops:		&ps2esdi_fops,
 };
 
 /* initialization routine called by ll_rw_blk.c   */
@@ -222,14 +220,13 @@ int init_module(void) {
 void
 cleanup_module(void)
 {
-	if(ps2esdi_slot)
-	{
+	if(ps2esdi_slot) {
 		mca_mark_as_unused(ps2esdi_slot);
 		mca_set_adapter_procfn(ps2esdi_slot, NULL, NULL);
 	}
 	release_region(io_base, 4);
 	free_dma(dma_arb_level);
-  	free_irq(PS2ESDI_IRQ, NULL)
+  	free_irq(PS2ESDI_IRQ, NULL);
 	devfs_unregister_blkdev(MAJOR_NR, "ed");
 	del_gendisk(&ps2esdi_gendisk);
 	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));

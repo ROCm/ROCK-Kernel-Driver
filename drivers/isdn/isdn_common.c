@@ -1,4 +1,4 @@
-/* $Id: isdn_common.c,v 1.114.6.13 2001/08/13 07:46:15 kai Exp $
+/* $Id: isdn_common.c,v 1.114.6.14 2001/08/17 12:34:25 kai Exp $
 
  * Linux ISDN subsystem, common used functions (linklevel).
  *
@@ -51,7 +51,7 @@
 
 isdn_dev *dev;
 
-static char *isdn_revision = "$Revision: 1.114.6.13 $";
+static char *isdn_revision = "$Revision: 1.114.6.14 $";
 
 extern char *isdn_net_revision;
 extern char *isdn_tty_revision;
@@ -792,7 +792,6 @@ isdn_getnum(char **p)
 int
 isdn_readbchan(int di, int channel, u_char * buf, u_char * fp, int len, wait_queue_head_t *sleep)
 {
-	int left;
 	int count;
 	int count_pull;
 	int count_put;
@@ -808,10 +807,11 @@ isdn_readbchan(int di, int channel, u_char * buf, u_char * fp, int len, wait_que
 		else
 			return 0;
 	}
-	left = MIN(len, dev->drv[di]->rcvcount[channel]);
+	if (len > dev->drv[di]->rcvcount[channel])
+		len = dev->drv[di]->rcvcount[channel];
 	cp = buf;
 	count = 0;
-	while (left) {
+	while (len) {
 		if (!(skb = skb_peek(&dev->drv[di]->rpqueue[channel])))
 			break;
 #ifdef CONFIG_ISDN_AUDIO
@@ -824,8 +824,8 @@ isdn_readbchan(int di, int channel, u_char * buf, u_char * fp, int len, wait_que
 
 			dflag = 0;
 			count_pull = count_put = 0;
-			while ((count_pull < skb->len) && (left > 0)) {
-				left--;
+			while ((count_pull < skb->len) && (len > 0)) {
+				len--;
 				if (dev->drv[di]->DLEflag & DLEmask) {
 					*cp++ = DLE;
 					dev->drv[di]->DLEflag &= ~DLEmask;
@@ -846,14 +846,14 @@ isdn_readbchan(int di, int channel, u_char * buf, u_char * fp, int len, wait_que
 #endif
 			/* No DLE's in buff, so simply copy it */
 			dflag = 1;
-			if ((count_pull = skb->len) > left) {
-				count_pull = left;
+			if ((count_pull = skb->len) > len) {
+				count_pull = len;
 				dflag = 0;
 			}
 			count_put = count_pull;
 			memcpy(cp, skb->data, count_put);
 			cp += count_put;
-			left -= count_put;
+			len -= count_put;
 #ifdef CONFIG_ISDN_AUDIO
 		}
 #endif
@@ -1048,12 +1048,15 @@ isdn_read(struct file *file, char *buf, size_t count, loff_t * off)
 			}
 			interruptible_sleep_on(&(dev->drv[drvidx]->st_waitq));
 		}
-		if (dev->drv[drvidx]->interface->readstat)
+		if (dev->drv[drvidx]->interface->readstat) {
+			if (count > dev->drv[drvidx]->stavail)
+				count = dev->drv[drvidx]->stavail;
 			len = dev->drv[drvidx]->interface->
-			    readstat(buf, MIN(count, dev->drv[drvidx]->stavail),
-				     1, drvidx, isdn_minor2chan(minor));
-		else
+				readstat(buf, count, 1, drvidx,
+					 isdn_minor2chan(minor));
+		} else {
 			len = 0;
+		}
 		save_flags(flags);
 		cli();
 		if (len)

@@ -5,7 +5,7 @@
  *
  * Copyright 2001 MontaVista Software Inc.
  * Author: MontaVista Software, Inc.
- *         	ppopov@mvista.com or support@mvista.com
+ *         	ppopov@mvista.com or source@mvista.com
  *
  *  This program is free software; you can redistribute  it and/or modify it
  *  under  the terms of  the GNU General  Public License as published by the
@@ -41,7 +41,7 @@
 #define FALSE 0
 #endif
 
-void LPCEnterMBPnP()
+void LPCEnterMBPnP(void)
 {
 	int i;
 	unsigned char key[4] = {0x87, 0x01, 0x55, 0x55};
@@ -51,7 +51,7 @@ void LPCEnterMBPnP()
 
 }
 
-void LPCExitMBPnP()
+void LPCExitMBPnP(void)
 {
 	outb(0x02, LPC_KEY_ADDR);
 	outb(0x02, LPC_DATA_ADDR);
@@ -80,7 +80,7 @@ char LPCGetConfig(char LdnNumber, char Index)
 	return rtn;
 }
 
-int SearchIT8712()
+int SearchIT8712(void)
 {
 	unsigned char Id1, Id2;
 	unsigned short Id;
@@ -98,7 +98,7 @@ int SearchIT8712()
 		return FALSE;
 }
 
-void InitLPCInterface()
+void InitLPCInterface(void)
 {
 	unsigned char bus, dev_fn;
 	unsigned long data;

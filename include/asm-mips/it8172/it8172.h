@@ -5,7 +5,7 @@
  *
  * Copyright 2000 MontaVista Software Inc.
  * Author: MontaVista Software, Inc.
- *         	ppopov@mvista.com or support@mvista.com
+ *         	ppopov@mvista.com or source@mvista.com
  *
  *  This program is free software; you can redistribute  it and/or modify it
  *  under  the terms of  the GNU General  Public License as published by the
@@ -321,66 +321,6 @@
 #define IT_AC_OPL3DW				0x6B
 #define IT_AC_BPDC				0x70
 
-// Audio : IT_AC_PCC bit definition & mask
-#define	PCC_SM					0x8000
-#define	PCC_SM_BIT				15
-#define	PCC_SM_STEREO				1
-#define PCC_SM_MONO				0
-
-#define	PCC_DF					0x4000
-#define PCC_DF_BIT				14
-#define	PCC_DF_8				0
-#define PCC_DF_16				1
-
-#define	PCC_CF					0x3000
-#define PCC_CF_BIT				12
-#define	PCC_CF_2				0
-#define PCC_CF_4				1
-#define PCC_CF_6				2
-
-#define PCC_SR					0x0F00
-#define PCC_SR_BIT				8
-#define	PCC_SR_5500				0
-#define	PCC_SR_8000				1
-#define	PCC_SR_9600				2
-#define	PCC_SR_11025				3
-#define	PCC_SR_16000				4
-#define	PCC_SR_19200				5
-#define	PCC_SR_22050				6
-#define	PCC_SR_32000				7
-#define	PCC_SR_38400				8
-#define	PCC_SR_44100				9
-#define	PCC_SR_48000				10
-
-#define PCC_CSP					0x0080
-#define PCC_CSP_BIT				7
-#define PCC_CSP_STOP				0
-#define PCC_CSP_STOP_NOW			1
-
-#define PCC_CP					0x0040
-#define	PCC_CP_BIT				6
-#define PCC_CP_NORMAL				0
-#define PCC_CP_PAUSE				1
-
-#define PCC_CA					0x0020
-#define PCC_CA_BIT				5
-#define PCC_CA_NO_START				0
-#define PCC_CA_START				1
-
-#define PCC_CB2L				0x0004
-#define PCC_CB2L_BIT				2
-#define PCC_CB2L_NO				0
-#define PCC_CB2L_YES				1
-
-#define PCC_CB1L				0x0002
-#define PCC_CB1L_BIT				1
-#define PCC_CB1L_NO				0
-#define PCC_CB1L_YES				1
-
-#define PCC_DE					0x0001
-#define PCC_DE_BIT				0
-#define PCC_DE_NOT_EMPTY			0
-#define PCC_DE_EMPTY				1
 
 // IT8172 Timer
 #define IT_TIMER_BASE				0x10800

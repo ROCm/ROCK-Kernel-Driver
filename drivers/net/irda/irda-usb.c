@@ -44,7 +44,6 @@
 
 #include <net/irda/irda-usb.h>
 
-static u32 min_turn_times[]  = { 10000, 5000, 1000, 500, 100, 50, 10, 0 }; /* us */
 static int qos_mtt_bits = 0;
 
 static void irda_usb_dump_class_desc(struct irda_class_desc *desc);

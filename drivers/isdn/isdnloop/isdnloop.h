@@ -1,4 +1,4 @@
-/* $Id: isdnloop.h,v 1.5.6.1 2001/02/10 14:41:23 kai Exp $
+/* $Id: isdnloop.h,v 1.5.6.2 2001/08/17 12:34:27 kai Exp $
 
  * Loopback lowlevel module for testing of linklevel.
  *
@@ -128,8 +128,6 @@ MODULE_PARM_DESC(isdnloop_id, "ID-String of first card");
 /* Utility-Macros */
 
 #define CID (card->interface.id)
-#define MIN(a,b) ((a<b)?a:b)
-#define MAX(a,b) ((a>b)?a:b)
 
 #endif                          /* defined(__KERNEL__) || defined(__DEBUGVAR__) */
 #endif                          /* isdnloop_h */

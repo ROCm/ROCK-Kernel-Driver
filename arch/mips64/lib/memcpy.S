@@ -5,7 +5,7 @@
  *
  * Unified implementation of memcpy, memmove and the __copy_user backend.
  *
- * Copyright (C) 1998, 1999, 2000 Ralf Baechle
+ * Copyright (C) 1998, 1999, 2000, 2001 Ralf Baechle
  * Copyright (C) 1999, 2000 Silicon Graphics, Inc.
  *
  * For __rmemcpy and memmove an exception is always a kernel bug, therefore
@@ -238,10 +238,8 @@ begin_movement:
 	 andi	ta2, a2, 0x40
 
 move_128bytes:
-#if (_MIPS_ISA == _MIPS_ISA_MIPS4)
-	pref	0, 2*128(a0)
-	pref	1, 2*128(a1)
-#endif
+	PREF	(0, 2*128(a0))
+	PREF	(1, 2*128(a1))
 	MOVE_BIGGERCHUNK(a1, a0, 0x00, ta0, ta1, ta3, t0)
 	MOVE_BIGGERCHUNK(a1, a0, 0x40, ta0, ta1, ta3, t0)
 	dsubu	t8, t8, 0x01
@@ -454,16 +452,21 @@ u_end_bytes:
 
 	.align	5
 LEAF(memmove)
-	sltu	ta0, a0, a1			# dst < src -> memcpy
-	bnez	ta0, memcpy
-	 daddu	v0, a0, a2
-	sltu	ta0, v0, a1			# dst + len < src -> non-
-	bnez	ta0, __memcpy			# overlapping, can use memcpy
+	daddu	t0, a0, a2
+	sltu	t0, a1, t0			# dst + len <= src -> memcpy
+	daddu	t1, a1, a2
+	sltu	t1, a0, t1			# dst >= src + len -> memcpy
+	and	t0, t1
+	beqz	t0, __memcpy
+
 	 move	v0, a0				/* return value */
 	beqz	a2, r_out
 	END(memmove)
 
 LEAF(__rmemcpy)					/* a0=dst a1=src a2=len */
+	sltu	t0, a1, a0
+	beqz	t0, r_end_bytes_up		# src >= dst
+	 nop
 	daddu	a0, a2				# dst = dst + len
 	daddu	a1, a2				# src = src + len
 
@@ -615,6 +618,17 @@ r_end_bytes:
 	 dsubu	a0, a0, 0x1
 
 r_out:
+	jr      ra
+	 move   a2, zero
+
+r_end_bytes_up:
+	lb	t0, (a1)
+	dsubu	a2, a2, 0x1
+	sb	t0, (a0)
+	daddu	a1, a1, 0x1
+	bnez	a2, r_end_bytes_up
+	 daddu	a0, a0, 0x1
+
 	jr	ra
 	 move	a2, zero
 

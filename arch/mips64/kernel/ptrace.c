@@ -104,6 +104,9 @@ asmlinkage int sys32_ptrace(int request, int pid, int addr, int data)
 			break;
 		case FPR_BASE ... FPR_BASE + 31:
 			if (child->used_math) {
+				unsigned long *fregs =
+					(void *) child->thread.fpu.hard.fp_regs;
+
 #ifndef CONFIG_SMP
 				if (last_task_used_math == child) {
 					set_cp0_status(ST0_CU1, ST0_CU1);
@@ -112,7 +115,15 @@ asmlinkage int sys32_ptrace(int request, int pid, int addr, int data)
 					last_task_used_math = NULL;
 				}
 #endif
-				tmp = child->thread.fpu.hard.fp_regs[addr - 32];
+				/*
+				 * The odd registers are actually the high
+				 * order bits of the values stored in the even
+				 * registers.
+				 */
+				if (addr & 1)
+					tmp = (unsigned long) (fregs[((addr & ~1) - 32)] >> 32);
+				else
+					tmp = (unsigned long) (fregs[(addr - 32)] & 0xffffffff);
 			} else {
 				tmp = -EIO;
 			}
@@ -171,7 +182,8 @@ asmlinkage int sys32_ptrace(int request, int pid, int addr, int data)
 			regs->regs[addr] = data;
 			break;
 		case FPR_BASE ... FPR_BASE + 31: {
-			unsigned long *fregs;
+			unsigned long *fregs =
+				(void *) child->thread.fpu.hard.fp_regs;
 			if (child->used_math) {
 #ifndef CONFIG_SMP
 				if (last_task_used_math == child) {
@@ -188,8 +200,18 @@ asmlinkage int sys32_ptrace(int request, int pid, int addr, int data)
 				       sizeof(child->thread.fpu.hard));
 				child->thread.fpu.hard.control = 0;
 			}
-			fregs = child->thread.fpu.hard.fp_regs;
-			fregs[addr - FPR_BASE] = data;
+			/*
+			 * The odd registers are actually the high order bits
+			 * of the values stored in the even registers - unless
+			 * we're using r2k_switch.S.
+			 */
+			if (addr & 1) {
+				fregs[(addr & ~1) - FPR_BASE] &= 0xffffffff;
+				fregs[(addr & ~1) - FPR_BASE] |= ((unsigned long) data) << 32;
+			} else {
+				fregs[addr - FPR_BASE] &= ~0xffffffffLL;
+				fregs[addr - FPR_BASE] |= data;
+			}
 			break;
 		}
 		case PC:
@@ -354,6 +376,9 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 			break;
 		case FPR_BASE ... FPR_BASE + 31:
 			if (child->used_math) {
+				unsigned long long *fregs
+					= (unsigned long long *)
+					&child->thread.fpu.hard.fp_regs[0];
 #ifndef CONFIG_SMP
 				if (last_task_used_math == child) {
 					set_cp0_status(ST0_CU1, ST0_CU1);
@@ -362,7 +387,15 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 					last_task_used_math = NULL;
 				}
 #endif
-				tmp = child->thread.fpu.hard.fp_regs[addr - 32];
+				/*
+				 * The odd registers are actually the high
+				 * order bits of the values stored in the even
+				 * registers.
+				 */
+				if (addr & 1)
+					tmp = (unsigned long) (fregs[((addr & ~1) - 32)] >> 32);
+				else
+					tmp = (unsigned long) (fregs[(addr - 32)] & 0xffffffff);
 			} else {
 				tmp = -EIO;
 			}
@@ -421,7 +454,8 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 			regs->regs[addr] = data;
 			break;
 		case FPR_BASE ... FPR_BASE + 31: {
-			unsigned long *fregs;
+			unsigned long *fregs =
+				(void *) child->thread.fpu.hard.fp_regs;
 			if (child->used_math) {
 #ifndef CONFIG_SMP
 				if (last_task_used_math == child) {
@@ -438,8 +472,18 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 				       sizeof(child->thread.fpu.hard));
 				child->thread.fpu.hard.control = 0;
 			}
-			fregs = child->thread.fpu.hard.fp_regs;
-			fregs[addr - FPR_BASE] = data;
+			/*
+			 * The odd registers are actually the high order bits
+			 * of the values stored in the even registers - unless
+			 * we're using r2k_switch.S.
+			 */
+			if (addr & 1) {
+				fregs[(addr & ~1) - FPR_BASE] &= 0xffffffff;
+				fregs[(addr & ~1) - FPR_BASE] |= ((unsigned long) data) << 32;
+			} else {
+				fregs[addr - FPR_BASE] &= ~0xffffffffLL;
+				fregs[addr - FPR_BASE] |= data;
+			}
 			break;
 		}
 		case PC:

@@ -376,17 +376,13 @@ static int lvm_size[MAX_LV] =
 {0,};
 static struct gendisk lvm_gendisk =
 {
-	MAJOR_NR,		/* major # */
-	LVM_NAME,		/* name of major */
-	0,			/* number of times minor is shifted
-				   to get real minor */
-	1,			/* maximum partitions per device */
-	lvm_hd_struct,		/* partition table */
-	lvm_size,		/* device size in blocks, copied
-				   to block_size[] */
-	MAX_LV,			/* number or real devices */
-	NULL,			/* internal */
-	NULL,			/* pointer to next gendisk struct (internal) */
+	major:		MAJOR_NR,
+	major_name:	LVM_NAME,
+	minor_shift:	0,
+	max_p:		1,
+	part:		lvm_hd_struct,
+	sizes:		lvm_size,
+	nr_real:	MAX_LV,
 };
 
 /*

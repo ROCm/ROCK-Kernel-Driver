@@ -1,13 +1,13 @@
-/* $Id: string.h,v 1.13 2000/02/19 14:12:14 harald Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (c) 1994, 1995, 1996, 1997, 1998 by Ralf Baechle
+ * Copyright (c) 1994, 1995, 1996, 1997, 1998, 2001 Ralf Baechle
+ * Copyright (c) 2001 MIPS Technologies, Inc.
  */
-#ifndef __ASM_MIPS_STRING_H
-#define __ASM_MIPS_STRING_H
+#ifndef __ASM_STRING_H
+#define __ASM_STRING_H
 
 #include <linux/config.h>
 
@@ -145,13 +145,13 @@ extern __inline__ void *memscan(void *__addr, int __c, size_t __size)
 		"1:\tbeq\t%0,%1,2f\n\t"
 		"addiu\t%0,1\n\t"
 		"lb\t$1,-1(%0)\n\t"
-		"bne\t$1,%4,1b\n"
+		"bne\t$1,%z4,1b\n"
 		"2:\t.set\tpop"
 		: "=r" (__addr), "=r" (__end)
-		: "0" (__addr), "1" (__end), "r" (__c)
+		: "0" (__addr), "1" (__end), "Jr" (__c)
 		: "$1");
 
 	return __addr;
 }
 
-#endif /* __ASM_MIPS_STRING_H */
+#endif /* __ASM_STRING_H */

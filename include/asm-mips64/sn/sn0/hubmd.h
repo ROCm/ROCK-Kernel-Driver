@@ -1,5 +1,4 @@
-/* $Id: hubmd.h,v 1.1 2000/01/13 00:17:02 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.

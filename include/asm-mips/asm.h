@@ -84,8 +84,16 @@ symbol:		.frame	sp, framesize, rpc
 /*
  * EXPORT - export definition of symbol
  */
-#define	EXPORT(symbol)                                  \
+#define EXPORT(symbol)					\
 		.globl	symbol;                         \
+symbol:
+
+/*
+ * FEXPORT - export definition of a function symbol
+ */
+#define FEXPORT(symbol)					\
+		.globl	symbol;				\
+		.type	symbol,@function;		\
 symbol:
 
 /*
@@ -105,7 +113,7 @@ symbol		=	value
 		TEXT(msg)
 
 /*
- * Print formated string
+ * Print formatted string
  */
 #define PRINT(string)                                   \
 		.set	push;				\
@@ -138,7 +146,8 @@ symbol		=	value
  * MIPS IV implementations are free to treat this as a nop.  The R5000
  * is one of them.  So we should have an option not to use this instruction.
  */
-#if (_MIPS_ISA == _MIPS_ISA_MIPS4) || (_MIPS_ISA == _MIPS_ISA_MIPS5)
+#if (_MIPS_ISA == _MIPS_ISA_MIPS4 ) || (_MIPS_ISA == _MIPS_ISA_MIPS5) || \
+    (_MIPS_ISA == _MIPS_ISA_MIPS64)
 #define PREF(hint,addr)                                 \
 		pref	hint,addr
 #define PREFX(hint,addr)                                \
@@ -183,22 +192,24 @@ symbol		=	value
 		.set	pop;				\
 9:
 #endif /* (_MIPS_ISA == _MIPS_ISA_MIPS2) || (_MIPS_ISA == _MIPS_ISA_MIPS3) */
-#if (_MIPS_ISA == _MIPS_ISA_MIPS4) || (_MIPS_ISA == _MIPS_ISA_MIPS5)
+#if (_MIPS_ISA == _MIPS_ISA_MIPS4 ) || (_MIPS_ISA == _MIPS_ISA_MIPS5) || \
+    (_MIPS_ISA == _MIPS_ISA_MIPS64)
 #define MOVN(rd,rs,rt)                                  \
 		movn	rd,rs,rt
 #define MOVZ(rd,rs,rt)                                  \
 		movz	rd,rs,rt
-#endif /* (_MIPS_ISA == _MIPS_ISA_MIPS4) || (_MIPS_ISA == _MIPS_ISA_MIPS5) */
+#endif /* MIPS IV, MIPS V or MIPS64 */
 
 /*
  * Stack alignment
  */
-#if (_MIPS_ISA == _MIPS_ISA_MIPS1) || (_MIPS_ISA == _MIPS_ISA_MIPS2)
+#if (_MIPS_ISA == _MIPS_ISA_MIPS1) || (_MIPS_ISA == _MIPS_ISA_MIPS2) || \
+    (_MIPS_ISA == _MIPS_ISA_MIPS32)
 #define ALSZ	7
 #define ALMASK	~7
 #endif
 #if (_MIPS_ISA == _MIPS_ISA_MIPS3) || (_MIPS_ISA == _MIPS_ISA_MIPS4) || \
-    (_MIPS_ISA == _MIPS_ISA_MIPS5)
+    (_MIPS_ISA == _MIPS_ISA_MIPS5) || (_MIPS_ISA == _MIPS_ISA_MIPS64)
 #define ALSZ	15
 #define ALMASK	~15
 #endif
@@ -216,14 +227,15 @@ symbol		=	value
  * Use the following macros in assemblercode to load/store registers,
  * pointers etc.
  */
-#if (_MIPS_ISA == _MIPS_ISA_MIPS1) || (_MIPS_ISA == _MIPS_ISA_MIPS2)
+#if (_MIPS_ISA == _MIPS_ISA_MIPS1) || (_MIPS_ISA == _MIPS_ISA_MIPS2) || \
+    (_MIPS_ISA == _MIPS_ISA_MIPS32)
 #define REG_S sw
 #define REG_L lw
 #define PTR_SUBU subu
 #define PTR_ADDU addu
 #endif
 #if (_MIPS_ISA == _MIPS_ISA_MIPS3) || (_MIPS_ISA == _MIPS_ISA_MIPS4) || \
-    (_MIPS_ISA == _MIPS_ISA_MIPS5)
+    (_MIPS_ISA == _MIPS_ISA_MIPS5) || (_MIPS_ISA == _MIPS_ISA_MIPS64)
 #define REG_S sd
 #define REG_L ld
 /* We still live in a 32 bit address space ...  */
@@ -361,12 +373,13 @@ symbol		=	value
 /*
  * Some cp0 registers were extended to 64bit for MIPS III.
  */
-#if (_MIPS_ISA == _MIPS_ISA_MIPS1) || (_MIPS_ISA == _MIPS_ISA_MIPS2)
+#if (_MIPS_ISA == _MIPS_ISA_MIPS1) || (_MIPS_ISA == _MIPS_ISA_MIPS2) || \
+    (_MIPS_ISA == _MIPS_ISA_MIPS32)
 #define MFC0	mfc0
 #define MTC0	mtc0
 #endif
 #if (_MIPS_ISA == _MIPS_ISA_MIPS3) || (_MIPS_ISA == _MIPS_ISA_MIPS4) || \
-    (_MIPS_ISA == _MIPS_ISA_MIPS5)
+    (_MIPS_ISA == _MIPS_ISA_MIPS5) || (_MIPS_ISA == _MIPS_ISA_MIPS64)
 #define MFC0	dmfc0
 #define MTC0	dmtc0
 #endif

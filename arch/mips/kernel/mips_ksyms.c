@@ -17,6 +17,7 @@
 #include <linux/pci.h>
 #include <linux/ide.h>
 
+#include <asm/bootinfo.h>
 #include <asm/checksum.h>
 #include <asm/dma.h>
 #include <asm/io.h>
@@ -40,6 +41,7 @@ extern long __strlen_user_asm(const char *s);
 extern long __strnlen_user_nocheck_asm(const char *s);
 extern long __strnlen_user_asm(const char *s);
 
+EXPORT_SYMBOL(mips_machtype);
 EXPORT_SYMBOL(EISA_bus);
 
 /*
@@ -125,12 +127,6 @@ EXPORT_SYMBOL(hpc3c0);
 
 int register_fpe(void (*handler)(struct pt_regs *regs, unsigned int fcr31));
 int unregister_fpe(void (*handler)(struct pt_regs *regs, unsigned int fcr31));
-
-#ifdef CONFIG_MIPS_FPE_MODULE
-EXPORT_SYMBOL(__compute_return_epc);
-EXPORT_SYMBOL(register_fpe);
-EXPORT_SYMBOL(unregister_fpe);
-#endif
 
 #ifdef CONFIG_VT
 EXPORT_SYMBOL(screen_info);

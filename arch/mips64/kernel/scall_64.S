@@ -3,8 +3,9 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 by Ralf Baechle
+ * Copyright (C) 1995, 96, 97, 98, 99, 2000, 01 by Ralf Baechle
  * Copyright (C) 1999, 2000 Silicon Graphics, Inc.
+ * Copyright (C) 2001 MIPS Technologies, Inc.
  */
 #include <linux/config.h>
 #include <asm/asm.h>
@@ -62,44 +63,39 @@ NESTED(handle_sys64, PT_SIZE, sp)
 	sd	v0, PT_R0(sp)		# set flag for syscall restarting
 1:	sd	v0, PT_R2(sp)		# result
 
-FEXPORT(ret_from_sys_call_64)
-	la	t1, irq_stat		# softirq_active
-#ifdef CONFIG_SMP
-	lwu	t0, TASK_PROCESSOR($28)
-	dsll	t0, t0, 5
-	daddu	t1, t0
-#endif
-	lw	t0, 0(t1)		# softirq_active
-	lw	t1, 4(t1)		# softirq_mask.  unused delay slot
-	and	t0, t1
-	bnez	t0, handle_softirq_64
+ret_from_sys_call:
+	mfc0	t0, CP0_STATUS
+	xori	t0, t0, 1
+	ori	t0, t0, 1
+	mtc0	t0, CP0_STATUS
 
-9:	ld	t0, PT_STATUS(sp)	# returning to kernel mode?
-	andi	t1, t0, 0x10
 	ld	t2, TASK_NEED_RESCHED($28)
-	beqz	t1, return_64		# -> yes
-	bnez	t2, reschedule_64
+	bnez	t2, reschedule
 	lw	v0, TASK_SIGPENDING($28)
-	move	a0, zero
-	beqz	v0, return_64
-	move	a1, sp
-	SAVE_STATIC
-	jal	do_signal
+	bnez	v0, signal_return
 
-return_64:
+restore_all:
 	RESTORE_SOME
 	RESTORE_SP
-	.set	mips3
 	eret
-	.set	mips0
 
-handle_softirq_64:
-	jal	do_softirq
-	b	9b
-reschedule_64:
+/* Put this behind restore_all for the sake of the branch prediction.  */
+signal_return:
+	.type	signal_return, @function
+
+	mfc0	t0, CP0_STATUS
+	ori	t0, t0, 1
+	mtc0	t0, CP0_STATUS
+
+	move	a0, zero
+	move	a1, sp
+	jal	do_signal
+	b	restore_all
+
+reschedule:
 	SAVE_STATIC
 	jal	schedule
-	b	ret_from_sys_call_64
+	b	ret_from_sys_call
 
 /* ------------------------------------------------------------------------ */
 

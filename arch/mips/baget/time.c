@@ -1,4 +1,4 @@
-/* $Id: time.c,v 1.3 1999/08/17 22:18:37 ralf Exp $
+/*
  * time.c: Baget/MIPS specific time handling details
  *
  * Copyright (C) 1998 Gleb Raiko & Vladimir Roganov
@@ -13,7 +13,7 @@
 #include <linux/mm.h>
 #include <linux/interrupt.h>
 #include <linux/timex.h>
-#include <linux/kernel_stat.h>
+#include <linux/spinlock.h>
 
 #include <asm/bootinfo.h>
 #include <asm/io.h>
@@ -23,11 +23,14 @@
 
 #include <asm/baget/baget.h>
 
+extern rwlock_t xtime_lock;
+
 /* 
  *  To have precision clock, we need to fix available clock frequency
  */
 #define FREQ_NOM  79125  /* Baget frequency ratio */
 #define FREQ_DEN  10000
+
 static inline int timer_intr_valid(void) 
 {
 	static unsigned long long ticks, valid_ticks;
@@ -47,8 +50,8 @@ static inline int timer_intr_valid(void)
 void static timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
 	if (timer_intr_valid()) {
-	sti();
-	do_timer(regs);
+		sti();
+		do_timer(regs);
 	}
 }
 
@@ -76,21 +79,20 @@ void __init time_init(void)
 
 void do_gettimeofday(struct timeval *tv)
 {
-        unsigned long flags;
+	unsigned long flags;
 
-        save_and_cli(flags);
-        *tv = xtime;
-        restore_flags(flags);
+	read_lock_irqsave (&xtime_lock, flags);
+	*tv = xtime;
+	read_unlock_irqrestore (&xtime_lock, flags);
 }
 
 void do_settimeofday(struct timeval *tv)
 {
-        unsigned long flags;
-  
-        save_and_cli(flags);
-        xtime = *tv;
-        time_state = TIME_BAD;
-        time_maxerror = MAXPHASE;
-        time_esterror = MAXPHASE;
-        restore_flags(flags);
-} 
+	write_lock_irq (&xtime_lock);
+	xtime = *tv;
+	time_adjust = 0;		/* stop active adjtime() */
+	time_status |= STA_UNSYNC;
+	time_maxerror = NTP_PHASE_LIMIT;
+	time_esterror = NTP_PHASE_LIMIT;
+	write_unlock_irq (&xtime_lock);
+}

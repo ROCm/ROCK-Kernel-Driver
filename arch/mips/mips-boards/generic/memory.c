@@ -50,6 +50,11 @@ static char *mtypes[3] = {
 };
 #endif
 
+/* References to section boundaries */
+extern char _end;
+
+#define PFN_ALIGN(x)    (((unsigned long)(x) + (PAGE_SIZE - 1)) & PAGE_MASK)
+
 
 struct prom_pmemblock * __init prom_getmdesc(void)
 {
@@ -94,9 +99,13 @@ struct prom_pmemblock * __init prom_getmdesc(void)
 	mdesc[2].size = 0x00010000;
 #endif
 
-	mdesc[3].type = yamon_free;
+	mdesc[3].type = yamon_dontuse;
 	mdesc[3].base = 0x00100000;
-	mdesc[3].size = memsize - mdesc[3].base;
+	mdesc[3].size = PHYSADDR(PFN_ALIGN(&_end)) - mdesc[3].base;
+
+	mdesc[4].type = yamon_free;
+	mdesc[4].base = PHYSADDR(PFN_ALIGN(&_end));
+	mdesc[4].size = memsize - mdesc[4].base;
 
 	return &mdesc[0];
 }
@@ -118,11 +127,10 @@ void __init prom_meminit(void)
 	struct prom_pmemblock *p;
 
 #ifdef DEBUG
-	int i = 0;
-
 	prom_printf("YAMON MEMORY DESCRIPTOR dump:\n");
 	p = prom_getmdesc();
 	while (p->size) {
+		int i = 0;
 		prom_printf("[%d,%p]: base<%08lx> size<%08lx> type<%s>\n",
 			    i, p, p->base, p->size, mtypes[p->type]);
 		p++;
@@ -130,24 +138,24 @@ void __init prom_meminit(void)
 	}
 #endif
 	p = prom_getmdesc();
+
 	while (p->size) {
-		unsigned long base, size;
 		long type;
+		unsigned long base, size;
 
 		type = prom_memtype_classify (p->type);
 		base = p->base;
 		size = p->size;
 
 		add_memory_region(base, size, type);
-
-		p++;
+                p++; 
 	}
 }
 
-void prom_free_prom_memory (void)
+void __init
+prom_free_prom_memory (void)
 {
 	int i;
-	struct prom_pmemblock *p;
 	unsigned long freed = 0;
 	unsigned long addr;
 
@@ -158,9 +166,9 @@ void prom_free_prom_memory (void)
 		addr = boot_mem_map.map[i].addr;
 		while (addr < boot_mem_map.map[i].addr
 			      + boot_mem_map.map[i].size) {
-		        ClearPageReserved(virt_to_page(phys_to_virt(addr)));
-			set_page_count(virt_to_page(phys_to_virt(addr)), 1);
-			free_page(phys_to_virt(addr));
+			ClearPageReserved(virt_to_page(__va(addr)));
+			set_page_count(virt_to_page(__va(addr)), 1);
+			free_page(__va(addr));
 			addr += PAGE_SIZE;
 			freed += PAGE_SIZE;
 		}

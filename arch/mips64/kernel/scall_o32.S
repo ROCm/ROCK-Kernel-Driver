@@ -3,8 +3,9 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1995 - 2000 by Ralf Baechle
+ * Copyright (C) 1995 - 2000, 2001 by Ralf Baechle
  * Copyright (C) 1999, 2000 Silicon Graphics, Inc.
+ * Copyright (C) 2001 MIPS Technologies, Inc.
  *
  * Hairy, the userspace application uses a different argument passing
  * convention than the kernel, so we have to translate things from o32
@@ -18,6 +19,7 @@
 #include <asm/regdef.h>
 #include <asm/stackframe.h>
 #include <asm/unistd.h>
+#include <asm/sysmips.h>
 
 /* This duplicates the definition from <linux/sched.h> */
 #define PT_TRACESYS	0x00000002	/* tracing system calls */
@@ -34,14 +36,6 @@ NESTED(handle_sys, PT_SIZE, sp)
 	SAVE_SOME
 	STI
 	.set	at
-#if DEBUG_MIPS64
- jal dodebug
- ld $4, PT_R4(sp)
- ld $5, PT_R5(sp)
- ld $6, PT_R6(sp)
- ld $7, PT_R7(sp)
- ld $2, PT_R2(sp)
-#endif
 	ld	t1, PT_EPC(sp)		# skip syscall on return
 
 	subu	t0, v0, __NR_Linux32	# check syscall number
@@ -60,59 +54,50 @@ NESTED(handle_sys, PT_SIZE, sp)
 	bgez	t0, stackargs
 
 stack_done:
-	ld	t0, TASK_PTRACE($28)	# syscall tracing enabled?
-	andi	t0, PT_TRACESYS
-	bnez	t0, trace_a_syscall
+		ld	t0, TASK_PTRACE($28)	# syscall tracing enabled?
+		andi	t0, PT_TRACESYS
+		bnez	t0, trace_a_syscall
 
-	jalr	t2			# Do The Real Thing (TM)
+		jalr	t2			# Do The Real Thing (TM)
 
-	li	t0, -EMAXERRNO - 1	# error?
-	sltu	t0, t0, v0
-	sd	t0, PT_R7(sp)		# set error flag
-	beqz	t0, 1f
+		li	t0, -EMAXERRNO - 1	# error?
+		sltu	t0, t0, v0
+		sd	t0, PT_R7(sp)		# set error flag
+		beqz	t0, 1f
 
-	negu	v0			# error
-	sd	v0, PT_R0(sp)		# set flag for syscall restarting
-1:	sd	v0, PT_R2(sp)		# result
-	
+		negu	v0			# error
+		sd	v0, PT_R0(sp)		# flag for syscall restarting
+1:		sd	v0, PT_R2(sp)		# result
+
 FEXPORT(o32_ret_from_sys_call)
-	la	t1, irq_stat		# softirq_active
-#ifdef CONFIG_SMP
-	lwu	t0, TASK_PROCESSOR($28)
-	dsll	t0, t0, 5
-	daddu	t1, t0
-#endif
-	lw	t0, 0(t1)		# softirq_active
-	lw	t1, 4(t1)		# softirq_mask.  unused delay slot
-	and	t0, t1
-	bnez	t0, o32_handle_softirq
+		mfc0	t0, CP0_STATUS	# need_resched and signals atomic test
+		ori	t0, t0, 1
+		xori	t0, t0, 1
+		mtc0	t0, CP0_STATUS
 
-9:	ld	t0,PT_STATUS(sp)	# returning to kernel mode?
-	andi	t1, t0, 0x10
-	ld	t2, TASK_NEED_RESCHED($28)
-	beqz	t1, o32_return		# -> yes
-	bnez	t2, o32_reschedule
-	lw	v0, TASK_SIGPENDING($28)
-	move	a0, zero
-	beqz	v0, o32_return
-	move	a1, sp
-	SAVE_STATIC
-	jal	do_signal
+		ld	t2, TASK_NEED_RESCHED($28)
+		bnez	t2, o32_reschedule
+		lw	v0, TASK_SIGPENDING($28)
+		bnez	v0, signal_return
 
-o32_return:
-	RESTORE_SOME
-	RESTORE_SP
-	.set	mips3
-	eret
-	.set	mips0
+restore_all:	RESTORE_SOME
+		RESTORE_SP
+		.set	mips3
+		eret
+		.set	mips0
 
-o32_handle_softirq:
-	jal	do_softirq
-	b	9b
+signal_return:	mfc0	t0, CP0_STATUS	# need_resched and signals atomic test
+		ori	t0, t0, 1
+		mtc0	t0, CP0_STATUS
+		move	a0, zero
+		move	a1, sp
+		SAVE_STATIC
+		jal	do_signal
+
 o32_reschedule:
-	SAVE_STATIC
-	jal	schedule
-	b	o32_ret_from_sys_call
+		SAVE_STATIC
+		jal	schedule
+		b	o32_ret_from_sys_call
 
 /* ------------------------------------------------------------------------ */
 
@@ -205,6 +190,47 @@ illegal_syscall:
 	sd	t0, PT_R7(sp)
 	j	ret_from_sys_call
 	END(handle_sys)
+
+	LEAF(mips_atomic_set)
+	ld	v1, THREAD_CURDS($28)
+	daddiu	a0, a1, 4
+	or	a0, a0, a1
+	li	v0, -EFAULT
+	and	a0, a0, v1
+	bltz	a0, 9f
+
+	/* Ok, this is the ll/sc case.  World is sane :-)  */
+1:	ll	v0, (a1)
+	move	a0, a2
+2:	sc	a0, (a1)
+	beqz	a0, 1b
+
+	.section __ex_table,"a"
+	PTR	1b, bad_stack
+	PTR	2b, bad_stack
+	.previous
+
+1:	sd	v0, PT_R2(sp)		# result
+
+	/* Success, so skip usual error handling garbage.  */
+	ld	t0, TASK_PTRACE($28)	# syscall tracing enabled?
+	andi	t0, PT_TRACESYS
+	bnez	t0, 1f
+	b	o32_ret_from_sys_call
+
+1:	SAVE_STATIC
+	jal	syscall_trace
+	li	a3, 0			# success
+	j	ret_from_sys_call
+
+9:	li	v0, -EFAULT
+	jr	ra
+	END(mips_atomic_set)
+
+	LEAF(sys_sysmips)
+	beq	a0, MIPS_ATOMIC_SET, mips_atomic_set
+	j	_sys_sysmips
+	END(sys_sysmips)
 
 	.macro	syscalltable
 	sys	sys_syscall	0			/* 4000 */

@@ -203,6 +203,11 @@ pcibios_align_resource(void *data, struct resource *res, unsigned long size)
 {
 }
 
+unsigned __init int pcibios_assign_all_busses(void)
+{
+	return 0;
+}
+
 char * __init
 pcibios_setup(char *str)
 {

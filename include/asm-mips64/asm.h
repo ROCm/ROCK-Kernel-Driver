@@ -1,11 +1,11 @@
-/* $Id: asm.h,v 1.2 1999/12/04 03:59:12 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1995, 1996, 1997, 1999 by Ralf Baechle
+ * Copyright (C) 1995, 1996, 1997, 1999, 2001 by Ralf Baechle
  * Copyright (C) 1999 by Silicon Graphics, Inc.
+ * Copyright (C) 2001 MIPS Technologies, Inc.
  *
  * Some useful macros for MIPS assembler code
  *
@@ -13,8 +13,8 @@
  * away by gas in -O mode. These nops are however required to fill delay
  * slots in noreorder mode.
  */
-#ifndef	_ASM_ASM_H
-#define	_ASM_ASM_H
+#ifndef	__ASM_ASM_H
+#define	__ASM_ASM_H
 
 #include <asm/sgidefs.h>
 
@@ -65,15 +65,15 @@ symbol:		.frame	sp, framesize, rpc
 /*
  * EXPORT - export definition of symbol
  */
-#define	EXPORT(symbol)					\
+#define EXPORT(symbol)					\
 		.globl	symbol;                         \
 symbol:
 
 /*
  * FEXPORT - export definition of a function symbol
  */
-#define	FEXPORT(symbol)					\
-		.globl	symbol;                         \
+#define FEXPORT(symbol)					\
+		.globl	symbol;				\
 		.type	symbol,@function;		\
 symbol:
 
@@ -94,24 +94,13 @@ symbol		=	value
 		TEXT(msg)
 
 /*
- * Print formated string
+ * Print formatted string
  */
 #define PRINT(string)                                   \
 		.set	push;				\
 		.set	reorder;                        \
 		la	a0,8f;                          \
 		jal	printk;                         \
-		.set	pop;				\
-		TEXT(string)
-
-/*
- * Print formated string
- */
-#define PROM_PRINT(string)                              \
-		.set	push;				\
-		.set	reorder;                        \
-		la	a0,8f;                          \
-		jal	prom_printf;                    \
 		.set	pop;				\
 		TEXT(string)
 
@@ -138,7 +127,8 @@ symbol		=	value
  * MIPS IV implementations are free to treat this as a nop.  The R5000
  * is one of them.  So we should have an option not to use this instruction.
  */
-#if (_MIPS_ISA == _MIPS_ISA_MIPS4) || (_MIPS_ISA == _MIPS_ISA_MIPS5)
+#if (_MIPS_ISA == _MIPS_ISA_MIPS4 ) || (_MIPS_ISA == _MIPS_ISA_MIPS5) || \
+    (_MIPS_ISA == _MIPS_ISA_MIPS64)
 #define PREF(hint,addr)                                 \
 		pref	hint,addr
 #define PREFX(hint,addr)                                \
@@ -183,22 +173,24 @@ symbol		=	value
 		.set	pop;				\
 9:
 #endif /* (_MIPS_ISA == _MIPS_ISA_MIPS2) || (_MIPS_ISA == _MIPS_ISA_MIPS3) */
-#if (_MIPS_ISA == _MIPS_ISA_MIPS4) || (_MIPS_ISA == _MIPS_ISA_MIPS5)
+#if (_MIPS_ISA == _MIPS_ISA_MIPS4 ) || (_MIPS_ISA == _MIPS_ISA_MIPS5) || \
+    (_MIPS_ISA == _MIPS_ISA_MIPS64)
 #define MOVN(rd,rs,rt)                                  \
 		movn	rd,rs,rt
 #define MOVZ(rd,rs,rt)                                  \
 		movz	rd,rs,rt
-#endif /* (_MIPS_ISA == _MIPS_ISA_MIPS4) || (_MIPS_ISA == _MIPS_ISA_MIPS5) */
+#endif /* MIPS IV, MIPS V or MIPS64 */
 
 /*
  * Stack alignment
  */
-#if (_MIPS_ISA == _MIPS_ISA_MIPS1) || (_MIPS_ISA == _MIPS_ISA_MIPS2)
+#if (_MIPS_ISA == _MIPS_ISA_MIPS1) || (_MIPS_ISA == _MIPS_ISA_MIPS2) || \
+    (_MIPS_ISA == _MIPS_ISA_MIPS32)
 #define ALSZ	7
 #define ALMASK	~7
 #endif
 #if (_MIPS_ISA == _MIPS_ISA_MIPS3) || (_MIPS_ISA == _MIPS_ISA_MIPS4) || \
-    (_MIPS_ISA == _MIPS_ISA_MIPS5)
+    (_MIPS_ISA == _MIPS_ISA_MIPS5) || (_MIPS_ISA == _MIPS_ISA_MIPS64)
 #define ALSZ	15
 #define ALMASK	~15
 #endif
@@ -216,14 +208,15 @@ symbol		=	value
  * Use the following macros in assemblercode to load/store registers,
  * pointers etc.
  */
-#if (_MIPS_ISA == _MIPS_ISA_MIPS1) || (_MIPS_ISA == _MIPS_ISA_MIPS2)
+#if (_MIPS_ISA == _MIPS_ISA_MIPS1) || (_MIPS_ISA == _MIPS_ISA_MIPS2) || \
+    (_MIPS_ISA == _MIPS_ISA_MIPS32)
 #define REG_S sw
 #define REG_L lw
 #define PTR_SUBU dsubu
 #define PTR_ADDU daddu
 #endif
 #if (_MIPS_ISA == _MIPS_ISA_MIPS3) || (_MIPS_ISA == _MIPS_ISA_MIPS4) || \
-    (_MIPS_ISA == _MIPS_ISA_MIPS5)
+    (_MIPS_ISA == _MIPS_ISA_MIPS5) || (_MIPS_ISA == _MIPS_ISA_MIPS64)
 #define REG_S sd
 #define REG_L ld
 /* We still live in a 32 bit address space ...  */
@@ -239,7 +232,7 @@ symbol		=	value
 #define INT_ADDI	addi
 #define INT_ADDU	addu
 #define INT_ADDIU	addiu
-#define INT_SUB	add
+#define INT_SUB		add
 #define INT_SUBI	subi
 #define INT_SUBU	subu
 #define INT_SUBIU	subu
@@ -252,7 +245,7 @@ symbol		=	value
 #define INT_ADDI	daddi
 #define INT_ADDU	daddu
 #define INT_ADDIU	daddiu
-#define INT_SUB	dadd
+#define INT_SUB		dadd
 #define INT_SUBI	dsubi
 #define INT_SUBU	dsubu
 #define INT_SUBIU	dsubu
@@ -357,14 +350,15 @@ symbol		=	value
 /*
  * Some cp0 registers were extended to 64bit for MIPS III.
  */
-#if (_MIPS_ISA == _MIPS_ISA_MIPS1) || (_MIPS_ISA == _MIPS_ISA_MIPS2)
+#if (_MIPS_ISA == _MIPS_ISA_MIPS1) || (_MIPS_ISA == _MIPS_ISA_MIPS2) || \
+    (_MIPS_ISA == _MIPS_ISA_MIPS32)
 #define MFC0	mfc0
 #define MTC0	mtc0
 #endif
 #if (_MIPS_ISA == _MIPS_ISA_MIPS3) || (_MIPS_ISA == _MIPS_ISA_MIPS4) || \
-    (_MIPS_ISA == _MIPS_ISA_MIPS5)
+    (_MIPS_ISA == _MIPS_ISA_MIPS5) || (_MIPS_ISA == _MIPS_ISA_MIPS64)
 #define MFC0	dmfc0
 #define MTC0	dmtc0
 #endif
 
-#endif /* _ASM_ASM_H */
+#endif /* __ASM_ASM_H */

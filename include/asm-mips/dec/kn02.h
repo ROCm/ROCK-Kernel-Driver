@@ -28,6 +28,8 @@
 #define KN02_RTC_BASE	KSEG1ADDR(0x1fe80000)
 #define KN02_DZ11_BASE	KSEG1ADDR(0x1fe00000)
 
+#define KN02_CSR_BNK32M	(1<<10)			/* 32M stride */
+
 /*
  * Interrupt enable Bits
  */

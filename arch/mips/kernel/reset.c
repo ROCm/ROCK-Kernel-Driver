@@ -1,7 +1,10 @@
 /*
- *  linux/arch/mips/sni/process.c
+ * This file is subject to the terms and conditions of the GNU General Public
+ * License.  See the file "COPYING" in the main directory of this archive
+ * for more details.
  *
- *  Reset the machine.
+ * Copyright (C) 2001 by Ralf Baechle
+ * Copyright (C) 2001 MIPS Technologies, Inc.
  */
 #include <linux/kernel.h>
 #include <linux/types.h>
@@ -13,6 +16,9 @@
  * So handle all using function pointers to machine specific
  * functions.
  */
+void (*_machine_restart)(char *command);
+void (*_machine_halt)(void);
+void (*_machine_power_off)(void);
 
 void machine_restart(char *command)
 {

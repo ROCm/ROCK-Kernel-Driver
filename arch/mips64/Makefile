@@ -84,7 +84,8 @@ LOADADDR      += 0x88004000
 endif
 
 ifdef CONFIG_SGI_IP27
-LIBS          += arch/mips64/sgi-ip27/ip27.a arch/mips64/arc/arclib.a
+CORE_FILES    += arch/mips64/sgi-ip27/ip27.o
+LIBS          += arch/mips64/arc/arclib.a
 SUBDIRS       += arch/mips64/sgi-ip27 arch/mips64/arc
 #
 # Set LOADADDR to >= 0xc000000000300000 if you want to leave space for
@@ -97,6 +98,17 @@ LOADADDR      += 0xc001c000
 else
 LOADADDR      += 0x8001c000
 endif
+endif
+
+ifdef CONFIG_SGI_IP32
+LIBS		+= arch/mips64/sgi-ip32/ip32-kern.a arch/mips64/arc/arclib.a
+SUBDIRS		+= arch/mips64/sgi-ip32 arch/mips64/arc
+#
+# Set LOADADDR to >= 0x????????? if you want to leave space for symmon,
+# 0x80002000 for production kernels.  Note that the value must be
+# 16kb aligned or the handling of the current variable will break.
+#
+LOADADDR	+= 0x80002000
 endif
 
 #

@@ -334,7 +334,11 @@ extern inline void pgd_clear(pgd_t *pgdp)	{ }
  * is simple.
  */
 #define page_address(page)	((page)->virtual)
+#ifdef CONFIG_CPU_VR41XX
+#define pte_page(x)             (mem_map+(unsigned long)((pte_val(x) >> (PAGE_SHIFT + 2))))
+#else
 #define pte_page(x)		(mem_map+(unsigned long)((pte_val(x) >> PAGE_SHIFT)))
+#endif
 
 /*
  * The following only work if pte_present() is true.
@@ -393,6 +397,23 @@ extern inline pte_t pte_mkdirty(pte_t pte)
 	return pte;
 }
 
+/*
+ * Macro to make mark a page protection value as "uncacheable".  Note
+ * that "protection" is really a misnomer here as the protection value
+ * contains the memory attribute bits, dirty bits, and various other
+ * bits as well.
+ */
+#define pgprot_noncached pgprot_noncached
+
+static inline pgprot_t pgprot_noncached(pgprot_t _prot)
+{
+	unsigned long prot = pgprot_val(_prot);
+
+	prot = (prot & ~_CACHE_MASK) | _CACHE_UNCACHED;
+
+	return __pgprot(prot);
+}
+
 extern inline pte_t pte_mkyoung(pte_t pte)
 {
 	pte_val(pte) |= _PAGE_ACCESSED;
@@ -405,6 +426,17 @@ extern inline pte_t pte_mkyoung(pte_t pte)
  * Conversion functions: convert a page and protection to a page entry,
  * and a page entry and page directory to the page they refer to.
  */
+#ifdef CONFIG_CPU_VR41XX
+#define mk_pte(page, pgprot)                                            \
+({                                                                      \
+        pte_t   __pte;                                                  \
+                                                                        \
+        pte_val(__pte) = ((unsigned long)(page - mem_map) << (PAGE_SHIFT + 2)) | \
+                         pgprot_val(pgprot);                            \
+                                                                        \
+        __pte;                                                          \
+})
+#else
 #define mk_pte(page, pgprot)						\
 ({									\
 	pte_t   __pte;							\
@@ -414,10 +446,15 @@ extern inline pte_t pte_mkyoung(pte_t pte)
 									\
 	__pte;								\
 })
+#endif
 
 extern inline pte_t mk_pte_phys(unsigned long physpage, pgprot_t pgprot)
 {
+#ifdef CONFIG_CPU_VR41XX
+        return __pte((physpage << 2) | pgprot_val(pgprot));
+#else
 	return __pte(physpage | pgprot_val(pgprot));
+#endif
 }
 
 extern inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
@@ -528,9 +565,9 @@ extern inline void set_pagemask(unsigned long val)
 	__asm__ __volatile__(
 		".set push\n\t"
 		".set reorder\n\t"
-		"mtc0 %0, $5\n\t"
+		"mtc0 %z0, $5\n\t"
 		".set pop"
-		: : "r" (val));
+		: : "Jr" (val));
 }
 
 /* CP0_ENTRYLO0 and CP0_ENTRYLO1 registers */
@@ -552,9 +589,9 @@ extern inline void set_entrylo0(unsigned long val)
 	__asm__ __volatile__(
 		".set push\n\t"
 		".set reorder\n\t"
-		"mtc0 %0, $2\n\t"
+		"mtc0 %z0, $2\n\t"
 		".set pop"
-		: : "r" (val));
+		: : "Jr" (val));
 }
 
 extern inline unsigned long get_entrylo1(void)
@@ -575,9 +612,9 @@ extern inline void set_entrylo1(unsigned long val)
 	__asm__ __volatile__(
 		".set push\n\t"
 		".set reorder\n\t"
-		"mtc0 %0, $3\n\t"
+		"mtc0 %z0, $3\n\t"
 		".set pop"
-		: : "r" (val));
+		: : "Jr" (val));
 }
 
 /* CP0_ENTRYHI register */
@@ -600,9 +637,9 @@ extern inline void set_entryhi(unsigned long val)
 	__asm__ __volatile__(
 		".set push\n\t"
 		".set reorder\n\t"
-		"mtc0 %0, $10\n\t"
+		"mtc0 %z0, $10\n\t"
 		".set pop"
-		: : "r" (val));
+		: : "Jr" (val));
 }
 
 /* CP0_INDEX register */
@@ -624,9 +661,9 @@ extern inline void set_index(unsigned long val)
 	__asm__ __volatile__(
 		".set push\n\t"
 		".set reorder\n\t"
-		"mtc0 %0, $0\n\t"
+		"mtc0 %z0, $0\n\t"
 		".set pop"
-		: : "r" (val));
+		: : "Jr" (val));
 }
 
 /* CP0_WIRED register */
@@ -648,9 +685,9 @@ extern inline void set_wired(unsigned long val)
 	__asm__ __volatile__(
 		".set push\n\t"
 		".set reorder\n\t"
-		"mtc0 %0, $6\n\t"
+		"mtc0 %z0, $6\n\t"
 		".set pop"
-		: : "r" (val));
+		: : "Jr" (val));
 }
 
 extern inline unsigned long get_info(void)
@@ -685,9 +722,9 @@ extern inline void set_taglo(unsigned long val)
 	__asm__ __volatile__(
 		".set push\n\t"
 		".set reorder\n\t"
-		"mtc0 %0, $28\n\t"
+		"mtc0 %z0, $28\n\t"
 		".set pop"
-		: : "r" (val));
+		: : "Jr" (val));
 }
 
 extern inline unsigned long get_taghi(void)
@@ -708,9 +745,9 @@ extern inline void set_taghi(unsigned long val)
 	__asm__ __volatile__(
 		".set push\n\t"
 		".set reorder\n\t"
-		"mtc0 %0, $29\n\t"
+		"mtc0 %z0, $29\n\t"
 		".set pop"
-		: : "r" (val));
+		: : "Jr" (val));
 }
 
 /* CP0_CONTEXT register */
@@ -733,9 +770,9 @@ extern inline void set_context(unsigned long val)
 	__asm__ __volatile__(
 		".set push\n\t"
 		".set reorder\n\t"
-		"mtc0 %0, $4\n\t"
+		"mtc0 %z0, $4\n\t"
 		".set pop"
-		: : "r" (val));
+		: : "Jr" (val));
 }
 
 #include <asm-generic/pgtable.h>
@@ -743,5 +780,10 @@ extern inline void set_context(unsigned long val)
 #endif /* !defined (_LANGUAGE_ASSEMBLY) */
 
 #define io_remap_page_range remap_page_range
+
+/*
+ * No page table caches to initialise
+ */
+#define pgtable_cache_init()	do { } while (0)
 
 #endif /* _ASM_PGTABLE_H */

@@ -1,4 +1,4 @@
-/* $Id: fsm.c,v 1.14.6.2 2001/05/26 15:19:57 kai Exp $
+/* $Id: fsm.c,v 1.14.6.3 2001/08/23 19:44:23 kai Exp $
  *
  * Author       Karsten Keil (keil@isdn4linux.de)
  *              based on the teles driver from Jan den Ouden
@@ -14,6 +14,14 @@
 #include "hisax.h"
 
 #define FSM_TIMER_DEBUG 0
+
+EXPORT_SYMBOL(FsmNew);
+EXPORT_SYMBOL(FsmFree);
+EXPORT_SYMBOL(FsmEvent);
+EXPORT_SYMBOL(FsmChangeState);
+EXPORT_SYMBOL(FsmInitTimer);
+EXPORT_SYMBOL(FsmDelTimer);
+EXPORT_SYMBOL(FsmRestartTimer);
 
 int __init
 FsmNew(struct Fsm *fsm, struct FsmNode *fnlist, int fncount)

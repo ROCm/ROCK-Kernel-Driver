@@ -9,6 +9,7 @@
  *	2 of the License, or (at your option) any later version.
  *
  *	(c) Copyright 1999 Building Number Three Ltd
+ *	(c) Copyright 2001 Alan Cox.
  *
  */
 
@@ -455,7 +456,8 @@ MODULE_PARM_DESC(irq, "The interrupt line setting for the SeaLevel card");
 MODULE_PARM(slow,"i");
 MODULE_PARM_DESC(slow, "Set this for an older Sealevel card such as the 4012");
 
-MODULE_AUTHOR("Bulding Number Three Ltd");
+MODULE_AUTHOR("Alan Cox");
+MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Modular driver for the SeaLevel 4021");
 #endif
 

@@ -142,7 +142,6 @@
 
 extern int putDebugChar(char c);    /* write a single character      */
 extern char getDebugChar(void);     /* read and return a single char */
-extern void fltr_set_mem_err(void);
 extern void trap_low(void);
 
 /*
@@ -175,6 +174,10 @@ static char output_buffer[BUFMAX];
 static int initialized;	/* !0 means we've been initialized */
 static const char hexchars[]="0123456789abcdef";
 
+/* Used to prevent crashes in memory access.  Note that they'll crash anyway if
+   we haven't set up fault handlers yet... */
+int kgdb_read_byte(unsigned *address, unsigned *dest);
+int kgdb_write_byte(unsigned val, unsigned *dest);
 
 /*
  * Convert ch from a hex digit to an int
@@ -294,42 +297,18 @@ static void putpacket(char *buffer)
 
 
 /*
- * Indicate to caller of mem2hex or hex2mem that there
- * has been an error.
- */
-static volatile int mem_err = 0;
-
-
-#if 0
-static void set_mem_fault_trap(int enable)
-{
-  mem_err = 0;
-
-#if 0
-  if (enable)
-    exceptionHandler(9, fltr_set_mem_err);
-  else
-    exceptionHandler(9, trap_low);
-#endif  
-}
-#endif /* dead code */
-
-/*
  * Convert the memory pointed to by mem into hex, placing result in buf.
  * Return a pointer to the last char put in buf (null), in case of mem fault,
  * return 0.
- * If MAY_FAULT is non-zero, then we will handle memory faults by returning
- * a 0, else treat a fault like any other fault in the stub.
+ * may_fault is non-zero if we are reading from arbitrary memory, but is currently
+ * not used.
  */
 static unsigned char *mem2hex(char *mem, char *buf, int count, int may_fault)
 {
 	unsigned char ch;
 
-/*	set_mem_fault_trap(may_fault); */
-
 	while (count-- > 0) {
-		ch = *(mem++);
-		if (mem_err)
+		if (kgdb_read_byte(mem++, &ch) != 0)
 			return 0;
 		*buf++ = hexchars[ch >> 4];
 		*buf++ = hexchars[ch & 0xf];
@@ -337,32 +316,27 @@ static unsigned char *mem2hex(char *mem, char *buf, int count, int may_fault)
 
 	*buf = 0;
 
-/*	set_mem_fault_trap(0); */
-
 	return buf;
 }
 
 /*
  * convert the hex array pointed to by buf into binary to be placed in mem
  * return a pointer to the character AFTER the last byte written
+ * may_fault is non-zero if we are reading from arbitrary memory, but is currently
+ * not used.
  */
 static char *hex2mem(char *buf, char *mem, int count, int may_fault)
 {
 	int i;
 	unsigned char ch;
 
-/*	set_mem_fault_trap(may_fault); */
-
 	for (i=0; i<count; i++)
 	{
 		ch = hex(*buf++) << 4;
 		ch |= hex(*buf++);
-		*(mem++) = ch;
-		if (mem_err)
+		if (kgdb_write_byte(ch, mem++) != 0)
 			return 0;
 	}
-
-/*	set_mem_fault_trap(0); */
 
 	return mem;
 }
@@ -390,6 +364,8 @@ static struct hard_trap_info {
 	{ 0, 0}				/* Must be last */
 };
 
+/* Save the normal trap handlers for user-mode traps. */
+void *saved_vectors[32];
 
 /*
  * Set up exception handlers for tracing and breakpoints
@@ -402,7 +378,7 @@ void set_debug_traps(void)
 
 	save_and_cli(flags);
 	for (ht = hard_trap_info; ht->tt && ht->signo; ht++)
-		set_except_vector(ht->tt, trap_low);
+		saved_vectors[ht->tt] = set_except_vector(ht->tt, trap_low);
   
 	putDebugChar('+'); /* 'hello world' */
 	/*
@@ -417,18 +393,6 @@ void set_debug_traps(void)
 
 	initialized = 1;
 	restore_flags(flags);
-}
-
-
-/*
- * Trap handler for memory errors.  This just sets mem_err to be non-zero.  It
- * assumes that %l1 is non-zero.  This should be safe, as it is doubtful that
- * 0 would ever contain code that could mem fault.  This routine will skip
- * past the faulting instruction after setting mem_err.
- */
-extern void fltr_set_mem_err(void)
-{
-	/* FIXME: Needs to be written... */
 }
 
 /*

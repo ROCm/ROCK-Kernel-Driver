@@ -1,5 +1,4 @@
-/* $Id: io.h,v 1.9 2000/02/04 07:40:53 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -114,7 +113,7 @@ extern inline void * phys_to_virt(unsigned long address)
 }
 
 /*
- * isa_slot_offset is the address where E(ISA) busaddress 0 is is mapped
+ * isa_slot_offset is the address where E(ISA) busaddress 0 is mapped
  * for the processor.  This implies the assumption that there is only
  * one of these busses.
  */

@@ -1,8 +1,7 @@
-/* $Id: indy_sc.c,v 1.14 2000/03/25 22:35:07 ralf Exp $
- *
+/*
  * indy_sc.c: Indy cache management functions.
  *
- * Copyright (C) 1997 Ralf Baechle (ralf@gnu.org),
+ * Copyright (C) 1997, 2001 Ralf Baechle (ralf@gnu.org),
  * derived from r4xx0.c by David S. Miller (dm@engr.sgi.com).
  */
 #include <linux/init.h>
@@ -34,30 +33,30 @@ static inline void indy_sc_wipe(unsigned long first, unsigned long last)
 {
 	unsigned long tmp;
 
-	__asm__ __volatile__("
-		.set	noreorder
-		.set	mips3
-		.set	noat
-		mfc0	%2, $12
-		li	$1, 0x80	# Go 64 bit
-		mtc0	$1, $12
+	__asm__ __volatile__(
+	".set\tnoreorder\t\t\t# indy_sc_wipe\n\t"
+	".set\tmips3\n\t"
+	".set\tnoat\n\t"
+	"mfc0\t%2, $12\n\t"
+	"li\t$1, 0x80\t\t\t# Go 64 bit\n\t"
+	"mtc0\t$1, $12\n\t"
 
-		dli	$1, 0x9000000080000000
-		or	%0, $1		# first line to flush
-		or	%1, $1		# last line to flush
-		.set	at
+	"dli\t$1, 0x9000000080000000\n\t"
+	"or\t%0, $1\t\t\t# first line to flush\n\t"
+	"or\t%1, $1\t\t\t# last line to flush\n\t"
+	".set\tat\n\t"
 
-1:		sw	$0, 0(%0)
-		bne	%0, %1, 1b
-		daddu	%0, 32
+	"1:\tsw\t$0, 0(%0)\n\t"
+	"bne\t%0, %1, 1b\n\t"
+	"daddu\t%0, 32\n\t"
 
-		mtc0	%2, $12		# Back to 32 bit
-		nop; nop; nop; nop;
-		.set mips0
-		.set reorder"
-		: "=r" (first), "=r" (last), "=&r" (tmp)
-		: "0" (first), "1" (last)
-		: "$1");
+	"mtc0\t%2, $12\t\t\t# Back to 32 bit\n\t"
+	"nop; nop; nop; nop;\n\t"
+	".set\tmips0\n\t"
+	".set\treorder"
+	: "=r" (first), "=r" (last), "=&r" (tmp)
+	: "0" (first), "1" (last)
+	: "$1");
 }
 
 static void indy_sc_wback_invalidate(unsigned long addr, unsigned long size)
@@ -96,27 +95,27 @@ static void indy_sc_enable(void)
 #ifdef DEBUG_CACHE
 	printk("Enabling R4600 SCACHE\n");
 #endif
-	__asm__ __volatile__("
-		.set	push
-		.set	noreorder
-		.set	mips3
-		mfc0	%2, $12
-		nop; nop; nop; nop;
-		li	%1, 0x80
-		mtc0	%1, $12
-		nop; nop; nop; nop;
-		li	%0, 0x1
-		dsll	%0, 31
-		lui	%1, 0x9000
-		dsll32	%1, 0
-		or	%0, %1, %0
-		sb	$0, 0(%0)
-		mtc0	$0, $12
-		nop; nop; nop; nop;
-		mtc0	%2, $12
-		nop; nop; nop; nop;
-		.set	pop"
-		: "=r" (tmp1), "=r" (tmp2), "=r" (addr));
+	__asm__ __volatile__(
+	".set\tpush\n\t"
+	".set\tnoreorder\n\t"
+	".set\tmips3\n\t"
+	"mfc0\t%2, $12\n\t"
+	"nop; nop; nop; nop;\n\t"
+	"li\t%1, 0x80\n\t"
+	"mtc0\t%1, $12\n\t"
+	"nop; nop; nop; nop;\n\t"
+	"li\t%0, 0x1\n\t"
+	"dsll\t%0, 31\n\t"
+	"lui\t%1, 0x9000\n\t"
+	"dsll32\t%1, 0\n\t"
+	"or\t%0, %1, %0\n\t"
+	"sb\t$0, 0(%0)\n\t"
+	"mtc0\t$0, $12\n\t"
+	"nop; nop; nop; nop;\n\t"
+	"mtc0\t%2, $12\n\t"
+	"nop; nop; nop; nop;\n\t"
+	".set\tpop"
+	: "=r" (tmp1), "=r" (tmp2), "=r" (addr));
 }
 
 static void indy_sc_disable(void)
@@ -126,27 +125,27 @@ static void indy_sc_disable(void)
 #ifdef DEBUG_CACHE
 	printk("Disabling R4600 SCACHE\n");
 #endif
-	__asm__ __volatile__("
-		.set	push
-		.set	noreorder
-		.set	mips3
-		li	%0, 0x1
-		dsll	%0, 31
-		lui	%1, 0x9000
-		dsll32	%1, 0
-		or	%0, %1, %0
-		mfc0	%2, $12
-		nop; nop; nop; nop;
-		li	%1, 0x80
-		mtc0	%1, $12
-		nop; nop; nop; nop;
-		sh	$0, 0(%0)
-		mtc0	$0, $12
-		nop; nop; nop; nop;
-		mtc0	%2, $12
-		nop; nop; nop; nop;
-		.set	pop"
-		: "=r" (tmp1), "=r" (tmp2), "=r" (tmp3));
+	__asm__ __volatile__(
+	".set\tpush\n\t"
+	".set\tnoreorder\n\t"
+	".set\tmips3\n\t"
+	"li\t%0, 0x1\n\t"
+	"dsll\t%0, 31\n\t"
+	"lui\t%1, 0x9000\n\t"
+	"dsll32\t%1, 0\n\t"
+	"or\t%0, %1, %0\n\t"
+	"mfc0\t%2, $12\n\t"
+	"nop; nop; nop; nop\n\t"
+	"li\t%1, 0x80\n\t"
+	"mtc0\t%1, $12\n\t"
+	"nop; nop; nop; nop\n\t"
+	"sh\t$0, 0(%0)\n\t"
+	"mtc0\t$0, $12\n\t"
+	"nop; nop; nop; nop\n\t"
+	"mtc0\t%2, $12\n\t"
+	"nop; nop; nop; nop\n\t"
+	".set\tpop"
+	: "=r" (tmp1), "=r" (tmp2), "=r" (tmp3));
 }
 
 static inline int __init indy_sc_probe(void)

@@ -33,7 +33,7 @@
 /* For R3000 cores with R4000 style caches */
 static unsigned long icache_size, dcache_size;		/* Size in bytes */
 static unsigned long icache_lsize, dcache_lsize;	/* Size in bytes */
-static unsigned long scache_size = 0;
+static unsigned long scache_size;
 
 #include <asm/cacheops.h>
 #include <asm/r4kcache.h>
@@ -134,31 +134,64 @@ unsigned long __init r3k_cache_size(unsigned long ca_flags)
 	dummy = *p;
 	status = read_32bit_cp0_register(CP0_STATUS);
 
-	if (dummy != 0xa5a55a5a || (status & (1<<19))) {
+	if (dummy != 0xa5a55a5a || (status & ST0_CM)) {
 		size = 0;
 	} else {
-		for (size = 512; size <= 0x40000; size <<= 1)
+		for (size = 128; size <= 0x40000; size <<= 1)
 			*(p + size) = 0;
 		*p = -1;
-		for (size = 512; 
+		for (size = 128; 
 		     (size <= 0x40000) && (*(p + size) == 0); 
 		     size <<= 1)
 			;
 		if (size > 0x40000)
 			size = 0;
 	}
+
 	write_32bit_cp0_register(CP0_STATUS, flags);
 
 	return size * sizeof(*p);
 }
 
+unsigned long __init r3k_cache_lsize(unsigned long ca_flags)
+{
+	unsigned long flags, status, lsize, i, j;
+	volatile unsigned long *p;
+
+	p = (volatile unsigned long *) KSEG0;
+
+	flags = read_32bit_cp0_register(CP0_STATUS);
+
+	/* isolate cache space */
+	write_32bit_cp0_register(CP0_STATUS, (ca_flags|flags)&~ST0_IEC);
+
+	for (i = 0; i < 128; i++)
+		*(p + i) = 0;
+	*(volatile unsigned char *)p = 0;
+	for (lsize = 1; lsize < 128; lsize <<= 1) {
+		*(p + lsize);
+		status = read_32bit_cp0_register(CP0_STATUS);
+		if (!(status & ST0_CM))
+			break;
+	}
+	for (i = 0; i < 128; i += lsize)
+		*(volatile unsigned char *)(p + i) = 0;
+
+	write_32bit_cp0_register(CP0_STATUS, flags);
+
+	return lsize * sizeof(*p);
+}
+
 static void __init r3k_probe_cache(void)
 {
 	dcache_size = r3k_cache_size(ST0_ISC);
-	dcache_lsize = 4;
+	if (dcache_size)
+		dcache_lsize = r3k_cache_lsize(ST0_ISC);
+	
 
 	icache_size = r3k_cache_size(ST0_ISC|ST0_SWC);
-	icache_lsize = 4;
+	if (icache_size)
+		icache_lsize = r3k_cache_lsize(ST0_ISC|ST0_SWC);
 }
 
 static void r3k_flush_icache_range(unsigned long start, unsigned long end)
@@ -391,11 +424,17 @@ static void r3k_flush_cache_sigtramp(unsigned long addr)
 
 	flags = read_32bit_cp0_register(CP0_STATUS);
 
+	write_32bit_cp0_register(CP0_STATUS, flags&~ST0_IEC);
+
+	/* Fill the TLB to avoid an exception with caches isolated. */
+	asm ( 	"lw\t$0,0x000(%0)\n\t"
+		"lw\t$0,0x004(%0)\n\t"
+		: : "r" (addr) );
+
 	write_32bit_cp0_register(CP0_STATUS, (ST0_ISC|ST0_SWC|flags)&~ST0_IEC);
 
 	asm ( 	"sb\t$0,0x000(%0)\n\t"
 		"sb\t$0,0x004(%0)\n\t"
-		"sb\t$0,0x008(%0)\n\t"
 		: : "r" (addr) );
 
 	write_32bit_cp0_register(CP0_STATUS, flags);

@@ -1,5 +1,4 @@
-/* $Id$
- *
+/*
  * include/asm-mips/linux_logo.h: This is a linux logo
  *                                to be displayed on boot.
  *

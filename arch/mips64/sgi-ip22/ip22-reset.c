@@ -1,12 +1,11 @@
-/* $Id: ip22-reset.c,v 1.3 1999/10/08 21:07:51 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
  * Reset an IP22.
  *
- * Copyright (C) 1997, 1998, 1999 by Ralf Baechle
+ * Copyright (C) 1997, 1998, 1999, 2001 by Ralf Baechle
  */
 #include <linux/kernel.h>
 #include <linux/sched.h>

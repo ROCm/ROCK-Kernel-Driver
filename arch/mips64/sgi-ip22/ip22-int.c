@@ -34,7 +34,6 @@
 #include <asm/sgi/sgi.h>
 #include <asm/sgi/sgihpc.h>
 #include <asm/sgi/sgint23.h>
-#include <asm/sgialib.h>
 
 /*
  * Linux has a controller-independent x86 interrupt architecture.
@@ -287,9 +286,7 @@ asmlinkage void do_IRQ(int irq, struct pt_regs * regs)
 	irq_enter(cpu, irq);
 	kstat.irqs[0][irq]++;
 
-	printk("Got irq %d, press a key.", irq);
-	prom_getchar();
-	ArcEnterInteractiveMode();
+	panic(KERN_DEBUG "Got irq %d, press a key.", irq);
 
 	/*
 	 * mask and ack quickly, we don't want the irq controller

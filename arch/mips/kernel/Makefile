@@ -35,15 +35,12 @@ endif
 endif
 
 obj-$(CONFIG_SMP)		+= smp.o
-obj-$(CONFIG_MIPS_FPE_MODULE)	+= fpe.o
-ifndef CONFIG_MIPS_FPU_EMULATOR
-  obj-y				+= softfp.o
-endif
 
 # Old style irq support, going to die in 2.5.
 export-objs			+= old-irq.o
 obj-$(CONFIG_NEW_IRQ)		+= irq.o
 obj-$(CONFIG_ROTTEN_IRQ)	+= old-irq.o
+obj-$(CONFIG_I8259)		+= i8259.o
 
 # transition from old time.c to new time.c
 # some boards uses old-time.c, some use time.c, and some use their own ones
@@ -56,6 +53,11 @@ obj-$(CONFIG_BINFMT_IRIX)	+= irixelf.o irixioctl.o irixsig.o sysirix.o \
 obj-$(CONFIG_REMOTE_DEBUG)	+= gdb-low.o gdb-stub.o 
 obj-$(CONFIG_PCI)		+= pci-dma.o
 obj-$(CONFIG_PROC_FS)		+= proc.o
+
+ifdef CONFIG_PCI
+obj-$(CONFIG_NEW_PCI)          += pci.o
+obj-$(CONFIG_PCI_AUTO)         += pci_auto.o
+endif
 
 entry.o: entry.S
 head.o: head.S

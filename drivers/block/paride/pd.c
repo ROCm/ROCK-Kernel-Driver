@@ -343,16 +343,13 @@ static char *pd_errs[17] = { "ERR","INDEX","ECC","DRQ","SEEK","WRERR",
 extern struct block_device_operations pd_fops;
 
 static struct gendisk pd_gendisk = {
-        PD_MAJOR,       /* Major number */
-        PD_NAME,        /* Major name */
-        PD_BITS,        /* Bits to shift to get real from partition */
-        PD_PARTNS,      /* Number of partitions per real */
-        pd_hd,          /* hd struct */
-        pd_sizes,       /* block sizes */
-        0,              /* number */
-        NULL,           /* internal */
-        NULL,           /* next */
-	&pd_fops,       /* block device operations */
+	major:		PD_MAJOR,
+	major_name:	PD_NAME,
+	minor_shift:	PD_BITS,
+	max_p:		PD_PARTNS,
+	part:		pd_hd,
+	sizes:		pd_sizes,
+	fops:		&pd_fops,
 };
 
 static struct block_device_operations pd_fops = {

@@ -9,6 +9,7 @@
  *
  * Copyright (C) 1995,1996 by Paul M. Antoine, some code and definitions
  * are by curteousy of Chris Fraser.
+ * Copyright (C) 2000  Maciej W. Rozycki
  *
  * These are addresses which have to be known early in the boot process.
  * For other addresses refer to tc.h ioasic_addrs.h and friends.
@@ -19,16 +20,12 @@
 #include <asm/addrspace.h>
 
 /*
- * Motherboard regs (kseg1 addresses)
- */
-#define KN02XA_SSR_ADDR		KSEG1ADDR(0x1c040100)	/* system control & status reg */
-#define KN02XA_SIR_ADDR		KSEG1ADDR(0x1c040110)	/* system interrupt reg */
-#define KN02XA_SIRM_ADDR	KSEG1ADDR(0x1c040120)	/* system interrupt mask reg */
-
-/*
  * Some port addresses...
  * FIXME: these addresses are incomplete and need tidying up!
  */
-#define KN02XA_RTC_BASE	(KSEG1ADDR(0x1c000000 + 0x200000)) /* ASIC + SL8 */
+#define KN02XA_IOASIC_BASE	KSEG1ADDR(0x1c040000)	/* I/O ASIC */
+#define KN02XA_RTC_BASE		KSEG1ADDR(0x1c200000)	/* RTC */
+
+#define KN02XA_IOASIC_REG(r)	(KN02XA_IOASIC_BASE+(r))
 
 #endif /* __ASM_MIPS_DEC_KN02XA_H */

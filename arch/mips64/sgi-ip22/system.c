@@ -1,5 +1,4 @@
-/* $Id: system.c,v 1.3 1999/10/19 20:51:52 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -7,6 +6,7 @@
  * system.c: Probe the system type using ARCS prom interface library.
  *
  * Copyright (C) 1996 David S. Miller (dm@engr.sgi.com)
+ * Copyright (C) 2000, 2001 Ralf Baechle (ralf@gnu.org)
  */
 #include <linux/init.h>
 #include <linux/kernel.h>
@@ -16,8 +16,6 @@
 #include <asm/sgi/sgi.h>
 #include <asm/sgialib.h>
 #include <asm/bootinfo.h>
-
-enum sgi_mach sgimach;
 
 struct smatch {
 	char *name;
@@ -46,10 +44,7 @@ static int __init string_to_cpu(char *s)
 		if(!strcmp(s, sgi_cputable[i].name))
 			return sgi_cputable[i].type;
 	}
-	prom_printf("\nYeee, could not determine MIPS cpu type <%s>\n", s);
-	prom_printf("press a key to reboot\n");
-	prom_getchar();
-	ArcEnterInteractiveMode();
+	panic("\nYeee, could not determine MIPS cpu type <%s>", s);
 	return 0;
 }
 
@@ -74,23 +69,16 @@ void __init sgi_sysinit(void)
 		int ncpus = 0;
 
 		if(p->type == Cpu) {
-			if(++ncpus > 1) {
-				prom_printf("\nYeee, SGI MP not ready yet\n");
-				prom_printf("press a key to reboot\n");
-				prom_getchar();
-				ArcEnterInteractiveMode();
-			}
+			if (++ncpus > 1)
+				panic("\nYeee, SGI MP not ready yet");
 			printk("CPU: %s ", p->iname);
 			cpup = p;
 			cputype = string_to_cpu(cpup->iname);
 		}
 		p = ArcGetPeer(p);
 	}
-	if(cputype == -1) {
-		prom_printf("\nYeee, could not find cpu ARCS component\n");
-		prom_printf("press a key to reboot\n");
-		prom_getchar();
-		ArcEnterInteractiveMode();
+	if (cputype == -1) {
+		panic("\nYeee, could not find cpu ARCS component");
 	}
 	p = ArcGetChild(cpup);
 	while(p) {

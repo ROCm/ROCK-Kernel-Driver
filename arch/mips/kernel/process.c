@@ -83,13 +83,10 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	childksp = (unsigned long)p + KERNEL_STACK_SIZE - 32;
 
 	if (last_task_used_math == current)
-#ifdef CONFIG_MIPS_FPU_EMULATOR
-		if (mips_cpu.options & MIPS_CPU_FPU)
-#endif
-	{
+		if (mips_cpu.options & MIPS_CPU_FPU) {
 			set_cp0_status(ST0_CU1);
 			save_fp(p);
-	}
+		}
 	/* set up new TSS. */
 	childregs = (struct pt_regs *) childksp - 1;
 	*childregs = *regs;
@@ -120,8 +117,8 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	 * switching for most programs since they don't use the fpu.
 	 */
 	p->thread.cp0_status = read_32bit_cp0_register(CP0_STATUS) &
-                            ~(ST0_CU3|ST0_CU2|ST0_CU1|KU_MASK);
-	childregs->cp0_status &= ~(ST0_CU3|ST0_CU2|ST0_CU1);
+                            ~(ST0_CU2|ST0_CU1|KU_MASK);
+	childregs->cp0_status &= ~(ST0_CU2|ST0_CU1);
 
 	return 0;
 }

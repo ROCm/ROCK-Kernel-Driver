@@ -1,4 +1,4 @@
-/* $Id: isdn_tty.c,v 1.94.6.4 2001/07/27 11:15:53 kai Exp $
+/* $Id: isdn_tty.c,v 1.94.6.7 2001/08/27 22:19:04 kai Exp $
 
  * Linux ISDN subsystem, tty functions and AT-command emulator (linklevel).
  *
@@ -66,7 +66,7 @@ static int bit2si[8] =
 static int si2bit[8] =
 {4, 1, 4, 4, 4, 4, 4, 4};
 
-char *isdn_tty_revision = "$Revision: 1.94.6.4 $";
+char *isdn_tty_revision = "$Revision: 1.94.6.7 $";
 
 
 /* isdn_tty_try_read() is called from within isdn_tty_rcv_skb()
@@ -727,9 +727,19 @@ void
 isdn_tty_modem_hup(modem_info * info, int local)
 {
 	isdn_ctrl cmd;
+	int di, ch;
 
 	if (!info)
 		return;
+
+	di = info->isdn_driver;
+	ch = info->isdn_channel;
+	if (di < 0 || ch < 0)
+		return;
+
+	info->isdn_driver = -1;
+	info->isdn_channel = -1;
+
 #ifdef ISDN_DEBUG_MODEM_HUP
 	printk(KERN_DEBUG "Mhup ttyI%d\n", info->line);
 #endif
@@ -770,19 +780,18 @@ isdn_tty_modem_hup(modem_info * info, int local)
 		isdn_tty_modem_result(RESULT_RUNG, info);
 	info->msr &= ~(UART_MSR_DCD | UART_MSR_RI);
 	info->lsr |= UART_LSR_TEMT;
-	if (info->isdn_driver >= 0) {
-		if (local) {
-			cmd.driver = info->isdn_driver;
-			cmd.command = ISDN_CMD_HANGUP;
-			cmd.arg = info->isdn_channel;
-			isdn_command(&cmd);
-		}
-		isdn_all_eaz(info->isdn_driver, info->isdn_channel);
-		info->emu.mdmreg[REG_RINGCNT] = 0;
-		isdn_free_channel(info->isdn_driver, info->isdn_channel, 0);
+
+	if (local) {
+		cmd.driver = di;
+		cmd.command = ISDN_CMD_HANGUP;
+		cmd.arg = ch;
+		isdn_command(&cmd);
 	}
-	info->isdn_driver = -1;
-	info->isdn_channel = -1;
+
+	isdn_all_eaz(di, ch);
+	info->emu.mdmreg[REG_RINGCNT] = 0;
+	isdn_free_channel(di, ch, 0);
+
 	if (info->drv_index >= 0) {
 		dev->m_idx[info->drv_index] = -1;
 		info->drv_index = -1;
@@ -1187,9 +1196,11 @@ isdn_tty_write(struct tty_struct *tty, int from_user, const u_char * buf, int co
 	/* See isdn_tty_senddown() */
 	atomic_inc(&info->xmit_lock);
 	while (1) {
-		c = MIN(count, info->xmit_size - info->xmit_count);
-		if (info->isdn_driver >= 0)
-			c = MIN(c, dev->drv[info->isdn_driver]->maxbufsize);
+		c = count;
+		if (c > info->xmit_size - info->xmit_count)
+			c = info->xmit_size - info->xmit_count;
+		if (info->isdn_driver >= 0 && c > dev->drv[info->isdn_driver]->maxbufsize)
+			c = dev->drv[info->isdn_driver]->maxbufsize;
 		if (c <= 0)
 			break;
 		if ((info->online > 1)
@@ -2709,6 +2720,10 @@ isdn_tty_modem_result(int code, modem_info * info)
 			    if (!(m->mdmreg[REG_CIDONCE] & BIT_CIDONCE)) {
 				    isdn_tty_at_cout("\r\nCALLER NUMBER: ", info);
 				    isdn_tty_at_cout(dev->num[info->drv_index], info);
+				    if (m->mdmreg[REG_CDN] & BIT_CDN) {
+					    isdn_tty_at_cout("\r\nCALLED NUMBER: ", info);
+					    isdn_tty_at_cout(info->emu.cpn, info);
+				    }
 			    }
 			}
 			isdn_tty_at_cout("\r\n", info);
@@ -2734,6 +2749,10 @@ isdn_tty_modem_result(int code, modem_info * info)
 						isdn_tty_at_cout("\r\n", info);
 						isdn_tty_at_cout("CALLER NUMBER: ", info);
 						isdn_tty_at_cout(dev->num[info->drv_index], info);
+						if (m->mdmreg[REG_CDN] & BIT_CDN) {
+							isdn_tty_at_cout("\r\nCALLED NUMBER: ", info);
+							isdn_tty_at_cout(info->emu.cpn, info);
+						}
 					}
 					break;
 				case RESULT_NO_CARRIER:

@@ -2088,42 +2088,28 @@ r4k_dma_cache_wback(unsigned long addr, unsigned long size)
  */
 static void r4k_flush_cache_sigtramp(unsigned long addr)
 {
-	unsigned long daddr, iaddr;
-
-	daddr = addr & ~(dc_lsize - 1);
 	__asm__ __volatile__("nop;nop;nop;nop");	/* R4600 V1.7 */
-	protected_writeback_dcache_line(daddr);
-	protected_writeback_dcache_line(daddr + dc_lsize);
-	iaddr = addr & ~(ic_lsize - 1);
-	protected_flush_icache_line(iaddr);
-	protected_flush_icache_line(iaddr + ic_lsize);
+	protected_writeback_dcache_line(addr & ~(dc_lsize - 1));
+	protected_flush_icache_line(addr & ~(ic_lsize - 1));
 }
 
 static void r4600v20k_flush_cache_sigtramp(unsigned long addr)
 {
-	unsigned long daddr, iaddr;
 	unsigned int flags;
 
-	daddr = addr & ~(dc_lsize - 1);
 	__save_and_cli(flags);
 
 	/* Clear internal cache refill buffer */
 	*(volatile unsigned int *)KSEG1;
 
-	protected_writeback_dcache_line(daddr);
-	protected_writeback_dcache_line(daddr + dc_lsize);
-	iaddr = addr & ~(ic_lsize - 1);
-	protected_flush_icache_line(iaddr);
-	protected_flush_icache_line(iaddr + ic_lsize);
+	protected_writeback_dcache_line(addr & ~(dc_lsize - 1));
+	protected_flush_icache_line(addr & ~(ic_lsize - 1));
+
 	__restore_flags(flags);
 }
 
 #undef DEBUG_TLB
 #undef DEBUG_TLBUPDATE
-
-#define NTLB_ENTRIES       48  /* Fixed on all R4XX0 variants... */
-
-#define NTLB_ENTRIES_HALF  24  /* Fixed on all R4XX0 variants... */
 
 void flush_tlb_all(void)
 {
@@ -2146,7 +2132,7 @@ void flush_tlb_all(void)
 	entry = get_wired();
 
 	/* Blast 'em all away. */
-	while(entry < NTLB_ENTRIES) {
+	while(entry < mips_cpu.tlbsize) {
 		set_index(entry);
 		BARRIER;
 		tlb_write_indexed();
@@ -2188,7 +2174,7 @@ void flush_tlb_range(struct mm_struct *mm, unsigned long start,
 		__save_and_cli(flags);
 		size = (end - start + (PAGE_SIZE - 1)) >> PAGE_SHIFT;
 		size = (size + 1) >> 1;
-		if(size <= NTLB_ENTRIES_HALF) {
+		if(size <= mips_cpu.tlbsize/2) {
 			int oldpid = (get_entryhi() & 0xff);
 			int newpid = (mm->context & 0xff);
 
@@ -2416,7 +2402,14 @@ void add_wired_entry(unsigned long entrylo0, unsigned long entrylo1,
 /* Detect and size the various r4k caches. */
 static void __init probe_icache(unsigned long config)
 {
-	icache_size = 1 << (12 + ((config >> 9) & 7));
+        switch (mips_cpu.cputype) {
+        case CPU_VR41XX:
+                icache_size = 1 << (10 + ((config >> 9) & 7));
+                break;
+        default:
+                icache_size = 1 << (12 + ((config >> 9) & 7));
+                break;
+        }
 	ic_lsize = 16 << ((config >> 5) & 1);
 
 	printk("Primary instruction cache %dkb, linesize %d bytes.\n",
@@ -2425,7 +2418,14 @@ static void __init probe_icache(unsigned long config)
 
 static void __init probe_dcache(unsigned long config)
 {
-	dcache_size = 1 << (12 + ((config >> 6) & 7));
+        switch (mips_cpu.cputype) {
+        case CPU_VR41XX:
+                dcache_size = 1 << (10 + ((config >> 6) & 7));
+                break;
+        default:
+                dcache_size = 1 << (12 + ((config >> 6) & 7));
+                break;
+        }
 	dc_lsize = 16 << ((config >> 4) & 1);
 
 	printk("Primary data cache %dkb, linesize %d bytes.\n",
@@ -2708,6 +2708,6 @@ void __init ld_mmu_r4xx0(void)
 	 *   - The entire mm handling assumes the c0_pagemask register to
 	 *     be set for 4kb pages.
 	 */
-	write_32bit_cp0_register(CP0_PAGEMASK, PM_4K);
+	set_pagemask(PM_4K);
 	flush_tlb_all();
 }

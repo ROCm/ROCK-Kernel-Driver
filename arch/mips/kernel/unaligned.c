@@ -72,6 +72,7 @@
  *       A store crossing a page boundary might be executed only partially.
  *       Undo the partial store in this case.
  */
+#include <linux/config.h>
 #include <linux/mm.h>
 #include <linux/signal.h>
 #include <linux/smp.h>
@@ -378,26 +379,26 @@ sigill:
 	return;
 }
 
+#ifdef CONFIG_PROC_FS
 unsigned long unaligned_instructions;
+#endif
 
 asmlinkage void do_ade(struct pt_regs *regs)
 {
 	unsigned long pc;
-#ifdef CONFIG_MIPS_FPU_EMULATOR
-        extern int do_dsemulret(struct pt_regs *);
+	extern int do_dsemulret(struct pt_regs *);
 
-        /* 
-         * Address errors may be deliberately induced
-         * by the FPU emulator to take retake control
-         * of the CPU after executing the instruction
-         * in the delay slot of an emulated branch.
-         */
+	/* 
+	 * Address errors may be deliberately induced
+	 * by the FPU emulator to take retake control
+	 * of the CPU after executing the instruction
+	 * in the delay slot of an emulated branch.
+	 */
 
-        if((unsigned long)regs->cp0_epc == current->thread.dsemul_aerpc) {
-                (void)do_dsemulret(regs);
-                return;
-        }
-#endif /* CONFIG_MIPS_FPU_EMULATOR */
+	if ((unsigned long)regs->cp0_epc == current->thread.dsemul_aerpc) {
+		do_dsemulret(regs);
+		return;
+	}
 
 	/*
 	 * Did we catch a fault trying to load an instruction?
@@ -414,7 +415,9 @@ asmlinkage void do_ade(struct pt_regs *regs)
 		goto sigbus;
 
 	emulate_load_store_insn(regs, regs->cp0_badvaddr, pc);
+#ifdef CONFIG_PROC_FS
 	unaligned_instructions++;
+#endif
 
 	return;
 

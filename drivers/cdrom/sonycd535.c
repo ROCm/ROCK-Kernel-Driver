@@ -1709,3 +1709,4 @@ module_init(sony535_init);
 module_exit(sony535_exit);
 
 
+MODULE_LICENSE("GPL");

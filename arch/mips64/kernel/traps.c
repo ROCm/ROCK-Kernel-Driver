@@ -258,58 +258,91 @@ void do_fpe(struct pt_regs *regs, unsigned long fcr31)
 	printk(KERN_DEBUG "Should send SIGFPE to %s\n", current->comm);
 }
 
-static inline int get_insn_opcode(struct pt_regs *regs, unsigned int *opcode)
-{
-	unsigned int *epc;
-
-	epc = (unsigned int *) (unsigned long) regs->cp0_epc;
-	if (regs->cp0_cause & CAUSEF_BD)
-		epc++;
-
-	if (verify_area(VERIFY_READ, epc, 4)) {
-		force_sig(SIGSEGV, current);
-		return 1;
-	}
-	*opcode = *epc;
-
-	return 0;
-}
-
 void do_bp(struct pt_regs *regs)
 {
 	unsigned int opcode, bcode;
+	unsigned int *epc;
+	siginfo_t info;
+
+	epc = (unsigned int *) regs->cp0_epc +
+	      ((regs->cp0_cause & CAUSEF_BD) != 0);
+	if (get_user(opcode, epc))
+		goto sigsegv;
 
 	/*
 	 * There is the ancient bug in the MIPS assemblers that the break
 	 * code starts left to bit 16 instead to bit 6 in the opcode.
 	 * Gas is bug-compatible ...
 	 */
-	if (get_insn_opcode(regs, &opcode))
-		return;
 	bcode = ((opcode >> 16) & ((1 << 20) - 1));
 
 	/*
 	 * (A short test says that IRIX 5.3 sends SIGTRAP for all break
 	 * insns, even for break codes that indicate arithmetic failures.
 	 * Weird ...)
+	 * But should we continue the brokenness???  --macro
 	 */
+	switch (bcode) {
+	case 6:
+	case 7:
+		if (bcode == 7)
+			info.si_code = FPE_INTDIV;
+		else
+			info.si_code = FPE_INTOVF;
+		info.si_signo = SIGFPE;
+		info.si_errno = 0;
+		info.si_addr = (void *)compute_return_epc(regs);
+		force_sig_info(SIGFPE, &info, current);
+		break;
+	default:
+		force_sig(SIGTRAP, current);
+	}
+
 	force_sig(SIGTRAP, current);
+	return;
+
+sigsegv:
+	force_sig(SIGSEGV, current);
 }
 
 void do_tr(struct pt_regs *regs)
 {
 	unsigned int opcode, bcode;
+	unsigned int *epc;
+	siginfo_t info;
 
-	if (get_insn_opcode(regs, &opcode))
-		return;
+	epc = (unsigned int *) regs->cp0_epc +
+	      ((regs->cp0_cause & CAUSEF_BD) != 0);
+	if (get_user(opcode, epc))
+		goto sigsegv;
+
 	bcode = ((opcode >> 6) & ((1 << 20) - 1));
 
 	/*
 	 * (A short test says that IRIX 5.3 sends SIGTRAP for all break
 	 * insns, even for break codes that indicate arithmetic failures.
 	 * Wiered ...)
+	 * But should we continue the brokenness???  --macro
 	 */
-	force_sig(SIGTRAP, current);
+	switch (bcode) {
+	case 6:
+	case 7:
+		if (bcode == 7)
+			info.si_code = FPE_INTDIV;
+		else
+			info.si_code = FPE_INTOVF;
+		info.si_signo = SIGFPE;
+		info.si_errno = 0;
+		info.si_addr = (void *)compute_return_epc(regs);
+		force_sig_info(SIGFPE, &info, current);
+		break;
+	default:
+		force_sig(SIGTRAP, current);
+	}
+	return;
+
+sigsegv:
+	force_sig(SIGSEGV, current);
 }
 
 void do_ri(struct pt_regs *regs)

@@ -8,6 +8,7 @@
 #define _ASM_CPU_H
 
 #include <asm/cache.h>
+
 /* Assigned Company values for bits 23:16 of the PRId Register  
    (CP0 register 15, select 0).  As of the MIPS32 and MIPS64 specs from 
    MTI, the PRId register is defined in this (backwards compatible)
@@ -44,6 +45,7 @@
 #define PRID_IMP_R6000A		0x0600
 #define PRID_IMP_R10000		0x0900
 #define PRID_IMP_R4300		0x0b00
+#define PRID_IMP_VR41XX		0x0c00
 #define PRID_IMP_R12000		0x0e00
 #define PRID_IMP_R8000		0x1000
 #define PRID_IMP_R4600		0x2000
@@ -52,11 +54,11 @@
 #define PRID_IMP_R4640		0x2200
 #define PRID_IMP_R4650		0x2200		/* Same as R4640 */
 #define PRID_IMP_R5000		0x2300
-#define PRID_IMP_R5432		0x5400
 #define PRID_IMP_SONIC		0x2400
 #define PRID_IMP_MAGIC		0x2500
 #define PRID_IMP_RM7000		0x2700
 #define PRID_IMP_NEVADA		0x2800		/* RM5260 ??? */
+#define PRID_IMP_R5432		0x5400
 #define PRID_IMP_4KC		0x8000
 #define PRID_IMP_5KC		0x8100
 #define PRID_IMP_4KEC		0x8400
@@ -122,7 +124,7 @@ struct mips_cpu {
 #define MIPS_CPU_4KTLB		0x00000008  /* "R4K" TLB handler */
 #define MIPS_CPU_FPU		0x00000010  /* CPU has FPU */
 #define MIPS_CPU_32FPR		0x00000020  /* 32 dbl. prec. FP registers */
-#define MIPS_CPU_COUNTER	0x00000040 /* Cycle count/compare */
+#define MIPS_CPU_COUNTER	0x00000040  /* Cycle count/compare */
 #define MIPS_CPU_WATCH		0x00000080  /* watchpoint registers */
 #define MIPS_CPU_MIPS16		0x00000100  /* code compression */
 #define MIPS_CPU_DIVEC		0x00000200  /* dedicated interrupt vector */

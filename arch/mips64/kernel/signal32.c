@@ -152,10 +152,6 @@ sys32_sigsuspend(abi64_no_regargs, struct pt_regs regs)
 	sigset32_t *uset;
 	sigset_t newset, saveset;
 
-#if DEBUG_MIPS64
-printk("%s called.\n", __FUNCTION__);
-#endif
-
 	save_static(&regs);
 	uset = (sigset32_t *) regs.regs[4];
 	if (get_sigset(&newset, uset))
@@ -184,10 +180,6 @@ sys32_rt_sigsuspend(abi64_no_regargs, struct pt_regs regs)
 	sigset32_t *uset;
 	sigset_t newset, saveset;
         size_t sigsetsize;
-
-#if DEBUG_MIPS64
-printk("%s called.\n", __FUNCTION__);
-#endif
 
 	save_static(&regs);
 	/* XXX Don't preclude handling different sized sigset_t's.  */
@@ -359,10 +351,6 @@ sys32_sigreturn(abi64_no_regargs, struct pt_regs regs)
 	struct sigframe *frame;
 	sigset_t blocked;
 
-#if DEBUG_MIPS64
-printk("%s called.\n", __FUNCTION__);
-#endif
-
 	frame = (struct sigframe *) regs.regs[29];
 	if (!access_ok(VERIFY_READ, frame, sizeof(*frame)))
 		goto badframe;
@@ -400,7 +388,6 @@ sys32_rt_sigreturn(abi64_no_regargs, struct pt_regs regs)
 	struct rt_sigframe *frame;
 	sigset_t set;
 	stack_t st;
-printk("%s called.\n", __FUNCTION__);
 
 	frame = (struct rt_sigframe *) regs.regs[29];
 	if (!access_ok(VERIFY_READ, frame, sizeof(*frame)))
@@ -580,10 +567,10 @@ setup_rt_frame(struct k_sigaction * ka, struct pt_regs *regs,
 		/*
 		 * Set up the return code ...
 		 *
-		 *         li      v0, __NR_Linux32_sigreturn
+		 *         li      v0, __NR_Linux32_rt_sigreturn
 		 *         syscall
 		 */
-		err |= __put_user(0x24020000 + __NR_Linux32_sigreturn,
+		err |= __put_user(0x24020000 + __NR_Linux32_rt_sigreturn,
 		                  frame->rs_code + 0);
 		err |= __put_user(0x0000000c                 ,
 		                  frame->rs_code + 1);
@@ -683,10 +670,6 @@ asmlinkage int do_signal32(sigset_t *oldset, struct pt_regs *regs)
 	struct k_sigaction *ka;
 	siginfo_t info;
 
-#if DEBUG_MIPS64
-printk("%s: delivering signal.\n", current->comm);
-#endif
-
 	if (!oldset)
 		oldset = &current->blocked;
 
@@ -785,9 +768,6 @@ printk("%s: delivering signal.\n", current->comm);
 		if (regs->regs[0])
 			syscall_restart(regs, ka);
 		/* Whee!  Actually deliver the signal.  */
-#if DEBUG_MIPS64
-printk("%s: delivering signal.\n", __FUNCTION__);
-#endif
 		handle_signal(signr, ka, &info, oldset, regs);
 		return 1;
 	}

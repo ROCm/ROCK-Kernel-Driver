@@ -295,7 +295,6 @@ void __init init_i8259_irqs (void)
 
 	request_resource(&ioport_resource, &pic1_io_resource);
 	request_resource(&ioport_resource, &pic2_io_resource);
-	setup_irq(2, &irq2);
 
 	init_8259A(0);
 
@@ -305,4 +304,6 @@ void __init init_i8259_irqs (void)
 		irq_desc[i].depth = 1;
 		irq_desc[i].handler = &i8259A_irq_type;
 	}
+
+	setup_irq(2, &irq2);
 }

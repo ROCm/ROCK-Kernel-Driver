@@ -2,6 +2,7 @@
  * memory.c: memory initialisation code.
  *
  * Copyright (C) 1998 Harald Koerfgen, Frieder Streffer and Paul M. Antoine
+ * Copyright (C) 2000 Maciej W. Rozycki
  *
  * $Id: memory.c,v 1.3 1999/10/09 00:00:58 ralf Exp $
  */
@@ -13,6 +14,8 @@
 
 #include <asm/addrspace.h>
 #include <asm/page.h>
+
+#include <asm/bootinfo.h>
 
 #include <asm/dec/machtype.h>
 
@@ -33,11 +36,6 @@ extern int (*prom_printf)(char *, ...);
 
 volatile unsigned long mem_err = 0;	/* So we know an error occurred */
 
-extern char _end;
-
-#define PFN_UP(x)	(((x) + PAGE_SIZE-1) >> PAGE_SHIFT)
-#define PFN_ALIGN(x)	(((unsigned long)(x) + (PAGE_SIZE - 1)) & PAGE_MASK)
-
 /*
  * Probe memory in 4MB chunks, waiting for an error to tell us we've fallen
  * off the end of real memory.  Only suitable for the 2100/3100's (PMAX).
@@ -45,7 +43,7 @@ extern char _end;
 
 #define CHUNK_SIZE 0x400000
 
-unsigned long __init pmax_get_memory_size(void)
+static void __init pmax_setup_memory_region(void)
 {
 	volatile unsigned char *memory_page, dummy;
 	char	old_handler[0x80];
@@ -66,17 +64,19 @@ unsigned long __init pmax_get_memory_size(void)
 		dummy = *memory_page;
 	}
 	memcpy((void *)(KSEG0 + 0x80), &old_handler, 0x80);
-	return (unsigned long)memory_page - KSEG1 - CHUNK_SIZE;
+
+	add_memory_region(0, (unsigned long)memory_page - KSEG1 - CHUNK_SIZE,
+			  BOOT_MEM_RAM);
 }
 
 /*
  * Use the REX prom calls to get hold of the memory bitmap, and thence
  * determine memory size.
  */
-unsigned long __init rex_get_memory_size(void)
+static void __init rex_setup_memory_region(void)
 {
 	int i, bitmap_size;
-	unsigned long mem_size = 0;
+	unsigned long mem_start = 0, mem_size = 0;
 	memmap *bm;
 
 	/* some free 64k */
@@ -88,46 +88,30 @@ unsigned long __init rex_get_memory_size(void)
 		/* FIXME: very simplistically only add full sets of pages */
 		if (bm->bitmap[i] == 0xff)
 			mem_size += (8 * bm->pagesize);
+		else if (!mem_size)
+			mem_start += (8 * bm->pagesize);
+		else {
+			add_memory_region(mem_start, mem_size, BOOT_MEM_RAM);
+			mem_start += mem_size + (8 * bm->pagesize);
+			mem_size = 0;
+		}
 	}
-
-	return (mem_size);
+	if (mem_size)
+		add_memory_region(mem_start, mem_size, BOOT_MEM_RAM);
 }
 
 void __init prom_meminit(unsigned int magic)
 {
-	unsigned long free_start, free_end, start_pfn, bootmap_size;
-	unsigned long mem_size = 0;
-
 	if (magic != REX_PROM_MAGIC)
-		mem_size = pmax_get_memory_size();
+		pmax_setup_memory_region();
 	else
-		mem_size = rex_get_memory_size();
-
-	free_start = PHYSADDR(PFN_ALIGN(&_end));
-	free_end = mem_size;
-	start_pfn = PFN_UP((unsigned long)&_end);
-
-#ifdef PROM_DEBUG
-	prom_printf("free_start: 0x%08x\n", free_start);
-	prom_printf("free_end: 0x%08x\n", free_end);
-	prom_printf("start_pfn: 0x%08x\n", start_pfn);
-#endif
-
-	/* Register all the contiguous memory with the bootmem allocator
-	   and free it.  Be careful about the bootmem freemap.  */
-	bootmap_size = init_bootmem(start_pfn, mem_size >> PAGE_SHIFT);
-	free_bootmem(free_start + bootmap_size, free_end - free_start - bootmap_size);
+		rex_setup_memory_region();
 }
 
-int __init page_is_ram(unsigned long pagenr)
-{
-        return 1;
-}
-
-void prom_free_prom_memory (void)
+void __init prom_free_prom_memory (void)
 {
 	unsigned long addr, end;
-	extern	char _ftext;
+	extern char _ftext;
 
 	/*
 	 * Free everything below the kernel itself but leave
@@ -142,16 +126,16 @@ void prom_free_prom_memory (void)
 	 * XXX: save this address for use in dec_lance.c?
 	 */
 	if (IOASIC)
-		end = PHYSADDR(&_ftext) - 0x00020000;
+		end = __pa(&_ftext) - 0x00020000;
 	else
 #endif
-		end = PHYSADDR(&_ftext);
+		end = __pa(&_ftext);
 
 	addr = PAGE_SIZE;
 	while (addr < end) {
-		ClearPageReserved(virt_to_page(addr));
-		set_page_count(virt_to_page(addr), 1);
-		free_page(addr);
+		ClearPageReserved(virt_to_page(__va(addr)));
+		set_page_count(virt_to_page(__va(addr)), 1);
+		free_page((unsigned long)__va(addr));
 		addr += PAGE_SIZE;
 	}
 

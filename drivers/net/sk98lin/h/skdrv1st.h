@@ -113,7 +113,7 @@ typedef struct s_AC	SK_AC;
 #include <linux/string.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <asm/byteorder.h>

@@ -1,5 +1,4 @@
-/* $Id: asmmacro.h,v 1.2 1999/10/19 20:51:53 ralf Exp $
- *
+/*
  * asmmacro.h: Assembler macros to make things easier to read.
  *
  * Copyright (C) 1996 David S. Miller (dm@engr.sgi.com)

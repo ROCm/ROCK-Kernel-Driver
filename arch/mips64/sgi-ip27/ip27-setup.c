@@ -14,6 +14,7 @@
 #include <linux/spinlock.h>
 #include <linux/sched.h>
 #include <linux/smp.h>
+#include <asm/io.h>
 #include <asm/sn/types.h>
 #include <asm/sn/sn0/addrs.h>
 #include <asm/sn/sn0/hubni.h>
@@ -39,6 +40,7 @@
 #define DBG(x...)
 #endif
 
+unsigned long mips_io_port_base = IO_BASE;
 
 /*
  * get_nasid() returns the physical node id number of the caller.

@@ -1,3 +1,12 @@
+/*
+ * This file is subject to the terms and conditions of the GNU General
+ * Public License.  See the file "COPYING" in the main directory of this
+ * archive for more details.
+ *
+ * Copyright (C) 2000 - 2001 by Kanoj Sarcar (kanoj@sgi.com)
+ * Copyright (C) 2000 - 2001 by Silicon Graphics, Inc.
+ */
+
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
@@ -23,14 +32,14 @@
 #include <asm/sn/sn_private.h>
 #include <asm/sn/sn0/ip27.h>
 #include <asm/sn/mapped_kernel.h>
+#include <asm/sn/sn0/addrs.h>
+#include <asm/sn/gda.h>
 
 #define CPU_NONE		(cpuid_t)-1
 
-#define	CPUMASK_CLRALL(p)	(p) = 0
-#define CPUMASK_SETB(p, bit)	(p) |= 1 << (bit)
-#define CPUMASK_CLRB(p, bit)	(p) &= ~(1ULL << (bit))
-#define CPUMASK_TSTB(p, bit)	((p) & (1ULL << (bit)))
-
+/*
+ * The following should work till 64 nodes, ie 128p SN0s.
+ */
 #define CNODEMASK_CLRALL(p)	(p) = 0
 #define CNODEMASK_TSTB(p, bit)	((p) & (1ULL << (bit)))
 #define CNODEMASK_SETB(p, bit)	((p) |= 1ULL << (bit))
@@ -42,11 +51,13 @@ int		maxcpus;
 static spinlock_t hub_mask_lock = SPIN_LOCK_UNLOCKED;
 static cnodemask_t hub_init_mask;
 static atomic_t numstarted = ATOMIC_INIT(1);
+static int router_distance;
 nasid_t master_nasid = INVALID_NASID;
 
 cnodeid_t	nasid_to_compact_node[MAX_NASIDS];
 nasid_t		compact_to_nasid_node[MAX_COMPACT_NODES];
 cnodeid_t	cpuid_to_compact_node[MAXCPUS];
+char		node_distances[MAX_COMPACT_NODES][MAX_COMPACT_NODES];
 
 hubreg_t get_region(cnodeid_t cnode)
 {
@@ -89,9 +100,13 @@ nasid_t get_actual_nasid(lboard_t *brd)
 		return brd->brd_nasid;
 }
 
+/* Tweak this for maximum number of CPUs to activate */
+static int max_cpus = NR_CPUS;
+
 int do_cpumask(cnodeid_t cnode, nasid_t nasid, cpumask_t *boot_cpumask, 
 							int *highest)
 {
+	static int tot_cpus_found = 0;
 	lboard_t *brd;
 	klcpu_t *acpu;
 	int cpus_found = 0;
@@ -109,9 +124,11 @@ int do_cpumask(cnodeid_t cnode, nasid_t nasid, cpumask_t *boot_cpumask,
 			if (cpuid > *highest)
 				*highest = cpuid;
 			/* Only let it join in if it's marked enabled */
-			if (acpu->cpu_info.flags & KLINFO_ENABLE) {
+			if ((acpu->cpu_info.flags & KLINFO_ENABLE) &&
+						(tot_cpus_found != max_cpus)) {
 				CPUMASK_SETB(*boot_cpumask, cpuid);
 				cpus_found++;
+				tot_cpus_found++;
 			}
 			acpu = (klcpu_t *)find_component(brd, (klinfo_t *)acpu, 
 								KLSTRUCT_CPU);
@@ -172,6 +189,9 @@ int cpu_enabled(cpuid_t cpu)
 void mlreset (void)
 {
 	int i;
+	void init_topology_matrix(void);
+	void dump_topology(void);
+
 
 	master_nasid = get_nasid();
 	fine_mode = is_fine_dirmode();
@@ -183,6 +203,9 @@ void mlreset (void)
 	CPUMASK_CLRALL(boot_cpumask);
 	maxcpus = cpu_node_probe(&boot_cpumask, &numnodes);
 	printk("Discovered %d cpus on %d nodes\n", maxcpus, numnodes);
+
+	init_topology_matrix();
+	dump_topology();
 
 	gen_region_mask(&region_mask, numnodes);
 	CNODEMASK_CLRALL(hub_init_mask);
@@ -534,3 +557,284 @@ void allowboot(void)
 #else /* CONFIG_SMP */
 void cboot(void) {}
 #endif /* CONFIG_SMP */
+
+
+#define	rou_rflag	rou_flags
+
+void
+router_recurse(klrou_t *router_a, klrou_t *router_b, int depth)
+{
+	klrou_t *router;
+	lboard_t *brd;
+	int	port;
+
+	if (router_a->rou_rflag == 1)
+		return;
+
+	if (depth >= router_distance)
+		return;
+
+	router_a->rou_rflag = 1;
+
+	for (port = 1; port <= MAX_ROUTER_PORTS; port++) {
+		if (router_a->rou_port[port].port_nasid == INVALID_NASID)
+			continue;
+
+		brd = (lboard_t *)NODE_OFFSET_TO_K0(
+			router_a->rou_port[port].port_nasid,
+			router_a->rou_port[port].port_offset);
+
+		if (brd->brd_type == KLTYPE_ROUTER) {
+			router = (klrou_t *)NODE_OFFSET_TO_K0(NASID_GET(brd), brd->brd_compts[0]);
+			if (router == router_b) {
+				if (depth < router_distance)
+					router_distance = depth;
+			}
+			else
+				router_recurse(router, router_b, depth + 1);
+		}
+	}
+
+	router_a->rou_rflag = 0;
+}
+
+int
+node_distance(nasid_t nasid_a, nasid_t nasid_b)
+{
+	nasid_t nasid;
+	cnodeid_t cnode;
+	lboard_t *brd, *dest_brd;
+	int port;
+	klrou_t *router, *router_a = NULL, *router_b = NULL;
+
+	/* Figure out which routers nodes in question are connected to */
+	for (cnode = 0; cnode < numnodes; cnode++) {
+		nasid = COMPACT_TO_NASID_NODEID(cnode);
+
+		if (nasid == -1) continue;
+
+		brd = find_lboard_class((lboard_t *)KL_CONFIG_INFO(nasid),
+					KLTYPE_ROUTER);
+
+		if (!brd)
+			continue;
+
+		do {
+			if (brd->brd_flags & DUPLICATE_BOARD)
+				continue;
+
+			router = (klrou_t *)NODE_OFFSET_TO_K0(NASID_GET(brd), brd->brd_compts[0]);
+			router->rou_rflag = 0;
+
+			for (port = 1; port <= MAX_ROUTER_PORTS; port++) {
+				if (router->rou_port[port].port_nasid == INVALID_NASID)
+					continue;
+
+				dest_brd = (lboard_t *)NODE_OFFSET_TO_K0(
+					router->rou_port[port].port_nasid,
+					router->rou_port[port].port_offset);
+
+				if (dest_brd->brd_type == KLTYPE_IP27) {
+					if (dest_brd->brd_nasid == nasid_a)
+						router_a = router;
+					if (dest_brd->brd_nasid == nasid_b)
+						router_b = router;
+				}
+			}
+			
+		} while ( (brd = find_lboard_class(KLCF_NEXT(brd), KLTYPE_ROUTER)) );
+	}
+
+	if (router_a == NULL) {
+		printk("node_distance: router_a NULL\n");
+		return -1;
+	}
+	if (router_b == NULL) {
+		printk("node_distance: router_b NULL\n");
+		return -1;
+	}
+
+	if (nasid_a == nasid_b)
+		return 0;
+
+	if (router_a == router_b)
+		return 1;
+
+	router_distance = 100;
+	router_recurse(router_a, router_b, 2);
+
+	return router_distance;
+}
+
+void
+init_topology_matrix(void)
+{
+	nasid_t nasid, nasid2;
+	cnodeid_t row, col;
+
+	for (row = 0; row < MAX_COMPACT_NODES; row++)
+		for (col = 0; col < MAX_COMPACT_NODES; col++)
+			node_distances[row][col] = -1;
+
+	for (row = 0; row < numnodes; row++) {
+		nasid = COMPACT_TO_NASID_NODEID(row);
+		for (col = 0; col < numnodes; col++) {
+			nasid2 = COMPACT_TO_NASID_NODEID(col);
+			node_distances[row][col] = node_distance(nasid, nasid2);
+		}
+	}
+}
+
+void
+dump_topology(void)
+{
+	nasid_t nasid;
+	cnodeid_t cnode;
+	lboard_t *brd, *dest_brd;
+	int port;
+	int router_num = 0;
+	klrou_t *router;
+	cnodeid_t row, col;
+
+	printk("************** Topology ********************\n");
+
+	printk("    ");
+	for (col = 0; col < numnodes; col++)
+		printk("%02d ", col);
+	printk("\n");
+	for (row = 0; row < numnodes; row++) {
+		printk("%02d  ", row);
+		for (col = 0; col < numnodes; col++)
+			printk("%2d ", node_distances[row][col]);
+		printk("\n");
+	}
+
+	for (cnode = 0; cnode < numnodes; cnode++) {
+		nasid = COMPACT_TO_NASID_NODEID(cnode);
+
+		if (nasid == -1) continue;
+
+		brd = find_lboard_class((lboard_t *)KL_CONFIG_INFO(nasid),
+					KLTYPE_ROUTER);
+
+		if (!brd)
+			continue;
+
+		do {
+			if (brd->brd_flags & DUPLICATE_BOARD)
+				continue;
+			printk("Router %d:", router_num);
+			router_num++;
+
+			router = (klrou_t *)NODE_OFFSET_TO_K0(NASID_GET(brd), brd->brd_compts[0]);
+
+			for (port = 1; port <= MAX_ROUTER_PORTS; port++) {
+				if (router->rou_port[port].port_nasid == INVALID_NASID)
+					continue;
+
+				dest_brd = (lboard_t *)NODE_OFFSET_TO_K0(
+					router->rou_port[port].port_nasid,
+					router->rou_port[port].port_offset);
+
+				if (dest_brd->brd_type == KLTYPE_IP27)
+					printk(" %d", dest_brd->brd_nasid);
+				if (dest_brd->brd_type == KLTYPE_ROUTER)
+					printk(" r");
+			}
+			printk("\n");
+			
+		} while ( (brd = find_lboard_class(KLCF_NEXT(brd), KLTYPE_ROUTER)) );
+	}
+}
+
+#if 0
+#define		brd_widgetnum	brd_slot
+#define NODE_OFFSET_TO_KLINFO(n,off)    ((klinfo_t*) TO_NODE_CAC(n,off))
+void
+dump_klcfg(void)
+{
+	cnodeid_t       cnode;
+	int i;
+	nasid_t         nasid;
+	lboard_t        *lbptr;
+	gda_t           *gdap;
+	
+	gdap = (gda_t *)GDA_ADDR(get_nasid());
+	if (gdap->g_magic != GDA_MAGIC) {
+		printk("dumpklcfg_cmd: Invalid GDA MAGIC\n");
+		return;
+	}
+
+	for (cnode = 0; cnode < MAX_COMPACT_NODES; cnode ++) {
+		nasid = gdap->g_nasidtable[cnode];
+
+		if (nasid == INVALID_NASID)
+			continue;
+
+		printk("\nDumpping klconfig Nasid %d:\n", nasid);
+	
+		lbptr = KL_CONFIG_INFO(nasid);
+
+		while (lbptr) {
+			printk("    %s, Nasid %d, Module %d, widget 0x%x, partition %d, NIC 0x%x lboard 0x%lx",
+				"board name here", /* BOARD_NAME(lbptr->brd_type), */
+				lbptr->brd_nasid, lbptr->brd_module, 
+				lbptr->brd_widgetnum,
+				lbptr->brd_partition, 
+				(lbptr->brd_nic), lbptr);
+			if (lbptr->brd_flags & DUPLICATE_BOARD)
+				printk(" -D");
+			printk("\n");
+			for (i = 0; i < lbptr->brd_numcompts; i++) {
+				klinfo_t *kli;
+				kli = NODE_OFFSET_TO_KLINFO(NASID_GET(lbptr), lbptr->brd_compts[i]);                       
+				printk("        type %2d, flags 0x%04x, diagval %3d, physid %4d, virtid %2d: %s\n", 
+					kli->struct_type, 
+					kli->flags,
+					kli->diagval,
+					kli->physid,
+					kli->virtid,
+					"comp. name here");
+					/* COMPONENT_NAME(kli->struct_type)); */
+			}
+			lbptr = KLCF_NEXT(lbptr);
+		}
+	}
+	printk("\n");
+
+	/* Useful to print router maps also */
+
+	for (cnode = 0; cnode < MAX_COMPACT_NODES; cnode ++) {
+		klrou_t *kr;
+		int i;
+
+        	nasid = gdap->g_nasidtable[cnode];
+        	if (nasid == INVALID_NASID)
+            		continue;
+        	lbptr = KL_CONFIG_INFO(nasid);
+
+        	while (lbptr) {
+			
+			lbptr = find_lboard_class(lbptr, KLCLASS_ROUTER);
+			if(!lbptr)
+				break;
+			if (!KL_CONFIG_DUPLICATE_BOARD(lbptr)) {
+				printk("%llx -> \n", lbptr->brd_nic);
+				kr = (klrou_t *)find_first_component(lbptr,
+					KLSTRUCT_ROU);
+				for (i = 1; i <= MAX_ROUTER_PORTS; i++) {
+					printk("[%d, %llx]; ",
+						kr->rou_port[i].port_nasid,
+						kr->rou_port[i].port_offset);
+				}
+				printk("\n");
+			}
+			lbptr = KLCF_NEXT(lbptr);
+        	}
+        	printk("\n");
+    	}
+
+	dump_topology();
+}
+#endif
+

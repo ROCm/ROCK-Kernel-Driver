@@ -431,7 +431,9 @@ void DivasOut(ADAPTER * a)
     i = this->XCurrent;
     X = PTR_X(a,this);
     while(i<this->XNum && length<270) {
-      clength = MIN((word)(270-length),X[i].PLength-this->XOffset);
+      clength = (word)(270-length);
+      if (clength > X[i].PLength-this->XOffset)
+	      clength = X[i].PLength-this->XOffset;
       a->ram_out_buffer(a,
                         &ReqOut->XBuffer.P[length],
                         PTR_P(a,this,&X[i].P[this->XOffset]),
@@ -837,8 +839,9 @@ byte isdn_ind(ADAPTER * a,
         this->ROffset = 0;
         this->RCurrent++;
       }
-      clength = MIN(a->ram_inw(a, &RBuffer->length)-offset,
-                    R[this->RCurrent].PLength-this->ROffset);
+      clength = a->ram_inw(a, &RBuffer->length)-offset;
+      if (clength > R[this->RCurrent].PLength-this->ROffset)
+	      clength = R[this->RCurrent].PLength-this->ROffset;
       if(R[this->RCurrent].P) {
         a->ram_in_buffer(a,
                          &RBuffer->P[offset],

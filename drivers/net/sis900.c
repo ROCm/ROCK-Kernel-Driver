@@ -600,7 +600,7 @@ static u16 sis900_default_phy(struct net_device * net_dev)
 /**
  * 	sis900_set_capability: - set the media capability of network adapter.
  *	@net_dev : the net device to probe for
- *	@mii_phy : default PHY
+ *	@phy : default PHY
  *
  *	Set the media capability of network adapter according to
  *	mii status register. It's necessary before auto-negotiate.
@@ -1190,6 +1190,7 @@ static void sis900_check_mode (struct net_device *net_dev, struct mii_phy *mii_p
 
 /**
  *	sis900_set_mode: - Set the media mode of mac register.
+ *	@ioaddr: the address of the device
  *	@speed : the transmit speed to be determined
  *	@duplex: the duplex mode to be determined
  *

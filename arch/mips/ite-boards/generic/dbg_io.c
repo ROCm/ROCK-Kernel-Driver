@@ -7,8 +7,8 @@
 
 /* we need uint32 uint8 */
 /* #include "types.h" */
-typedef         unsigned char uint8;
-typedef         unsigned int  uint32;
+typedef unsigned char uint8;
+typedef unsigned int uint32;
 
 /* --- END OF CONFIG --- */
 
@@ -39,7 +39,7 @@ typedef         unsigned int  uint32;
 /* === CONFIG === */
 
 /* [stevel] we use the IT8712 serial port for kgdb */
-#define	DEBUG_BASE  0xB40003F8 /* 8712 serial port 1 base address */
+#define	DEBUG_BASE  0xB40003F8	/* 8712 serial port 1 base address */
 #define MAX_BAUD    115200
 
 /* === END OF CONFIG === */
@@ -69,59 +69,57 @@ typedef         unsigned int  uint32;
 
 void debugInit(uint32 baud, uint8 data, uint8 parity, uint8 stop)
 {
-    /* disable interrupts */
-    UART16550_WRITE(OFS_INTR_ENABLE, 0);
+	/* disable interrupts */
+	UART16550_WRITE(OFS_INTR_ENABLE, 0);
 
-    /* set up buad rate */
-    { 
-        uint32 divisor;
-       
-        /* set DIAB bit */
-        UART16550_WRITE(OFS_LINE_CONTROL, 0x80);
-        
-        /* set divisor */
-        divisor = MAX_BAUD / baud;
-        UART16550_WRITE(OFS_DIVISOR_LSB, divisor & 0xff);
-        UART16550_WRITE(OFS_DIVISOR_MSB, (divisor & 0xff00)>>8);
+	/* set up buad rate */
+	{
+		uint32 divisor;
 
-        /* clear DIAB bit */
-        UART16550_WRITE(OFS_LINE_CONTROL, 0x0);
-    }
+		/* set DIAB bit */
+		UART16550_WRITE(OFS_LINE_CONTROL, 0x80);
 
-    /* set data format */
-    UART16550_WRITE(OFS_DATA_FORMAT, data | parity | stop);
+		/* set divisor */
+		divisor = MAX_BAUD / baud;
+		UART16550_WRITE(OFS_DIVISOR_LSB, divisor & 0xff);
+		UART16550_WRITE(OFS_DIVISOR_MSB, (divisor & 0xff00) >> 8);
+
+		/* clear DIAB bit */
+		UART16550_WRITE(OFS_LINE_CONTROL, 0x0);
+	}
+
+	/* set data format */
+	UART16550_WRITE(OFS_DATA_FORMAT, data | parity | stop);
 }
 
 static int remoteDebugInitialized = 0;
 
 uint8 getDebugChar(void)
 {
-    if (!remoteDebugInitialized) {
-	remoteDebugInitialized = 1;
-	debugInit(UART16550_BAUD_115200,
-		  UART16550_DATA_8BIT,
-		  UART16550_PARITY_NONE,
-		  UART16550_STOP_1BIT);
-    }
+	if (!remoteDebugInitialized) {
+		remoteDebugInitialized = 1;
+		debugInit(UART16550_BAUD_115200,
+			  UART16550_DATA_8BIT,
+			  UART16550_PARITY_NONE, UART16550_STOP_1BIT);
+	}
 
-    while((UART16550_READ(OFS_LINE_STATUS) & 0x1) == 0);
-    return UART16550_READ(OFS_RCV_BUFFER);
+	while ((UART16550_READ(OFS_LINE_STATUS) & 0x1) == 0);
+	return UART16550_READ(OFS_RCV_BUFFER);
 }
 
 
 int putDebugChar(uint8 byte)
 {
-    if (!remoteDebugInitialized) {
-	remoteDebugInitialized = 1;
-	debugInit(UART16550_BAUD_115200,
-		  UART16550_DATA_8BIT,
-		  UART16550_PARITY_NONE,
-		  UART16550_STOP_1BIT);
-    }
+	if (!remoteDebugInitialized) {
+		remoteDebugInitialized = 1;
+		debugInit(UART16550_BAUD_115200,
+			  UART16550_DATA_8BIT,
+			  UART16550_PARITY_NONE, UART16550_STOP_1BIT);
+	}
 
-    while ((UART16550_READ(OFS_LINE_STATUS) &0x20) == 0);
-    UART16550_WRITE(OFS_SEND_BUFFER, byte);
-    return 1;
+	while ((UART16550_READ(OFS_LINE_STATUS) & 0x20) == 0);
+	UART16550_WRITE(OFS_SEND_BUFFER, byte);
+	return 1;
 }
 
 #endif

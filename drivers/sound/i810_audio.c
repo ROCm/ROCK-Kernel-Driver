@@ -106,6 +106,7 @@
 static int ftsodell=0;
 static int strict_clocking=0;
 static unsigned int clocking=48000;
+static int spdif_locked=0;
 
 //#define DEBUG
 //#define DEBUG2
@@ -117,6 +118,11 @@ static unsigned int clocking=48000;
 #define I810_FMT_16BIT	1
 #define I810_FMT_STEREO	2
 #define I810_FMT_MASK	3
+
+#define SPDIF_ON	0x0004
+#define SURR_ON		0x0010
+#define CENTER_LFE_ON	0x0020
+#define VOL_MUTED	0x8000
 
 /* the 810's array of pointers to data buffers */
 
@@ -325,6 +331,8 @@ struct i810_card {
 	struct i810_state *states[NR_HW_CH];
 
 	u16 ac97_features;
+	u16 ac97_status;
+	u16 channels;
 	
 	/* hardware resources */
 	unsigned long iobase;
@@ -401,11 +409,164 @@ static void i810_free_pcm_channel(struct i810_card *card, int channel)
 	card->channel[channel].used=0;
 }
 
+static int i810_valid_spdif_rate ( struct ac97_codec *codec, int rate )
+{
+	unsigned long id = 0L;
+
+	id = (i810_ac97_get(codec, AC97_VENDOR_ID1) << 16);
+	id |= i810_ac97_get(codec, AC97_VENDOR_ID2) & 0xffff;
+#ifdef DEBUG
+	printk ( "i810_audio: codec = %s, codec_id = 0x%08lx\n", codec->name, id);
+#endif
+	switch ( id ) {
+		case 0x41445361: /* AD1886 */
+			if (rate == 48000) {
+				return 1;
+			}
+			break;
+		default: /* all other codecs, until we know otherwiae */
+			if (rate == 48000 || rate == 44100 || rate == 32000) {
+				return 1;
+			}
+			break;
+	}
+	return (0);
+}
+
+/* i810_set_spdif_output
+ * 
+ *  Configure the S/PDIF output transmitter. When we turn on
+ *  S/PDIF, we turn off the analog output. This may not be
+ *  the right thing to do.
+ *
+ *  Assumptions:
+ *     The DSP sample rate must already be set to a supported
+ *     S/PDIF rate (32kHz, 44.1kHz, or 48kHz) or we abort.
+ */
+static void i810_set_spdif_output(struct i810_state *state, int slots, int rate)
+{
+	int	vol;
+	int	aud_reg;
+	struct ac97_codec *codec = state->card->ac97_codec[0];
+
+	if(!(state->card->ac97_features & 4)) {
+#ifdef DEBUG
+		printk(KERN_WARNING "i810_audio: S/PDIF transmitter not avalible.\n");
+#endif
+		state->card->ac97_status &= ~SPDIF_ON;
+	} else {
+		if ( slots == -1 ) { /* Turn off S/PDIF */
+			aud_reg = i810_ac97_get(codec, AC97_EXTENDED_STATUS);
+			i810_ac97_set(codec, AC97_EXTENDED_STATUS, (aud_reg & ~AC97_EA_SPDIF));
+
+			/* If the volume wasn't muted before we turned on S/PDIF, unmute it */
+			if ( !(state->card->ac97_status & VOL_MUTED) ) {
+				aud_reg = i810_ac97_get(codec, AC97_MASTER_VOL_STEREO);
+				i810_ac97_set(codec, AC97_MASTER_VOL_STEREO, (aud_reg & ~VOL_MUTED));
+			}
+			state->card->ac97_status &= ~(VOL_MUTED | SPDIF_ON);
+			return;
+		}
+
+		vol = i810_ac97_get(codec, AC97_MASTER_VOL_STEREO);
+		state->card->ac97_status = vol & VOL_MUTED;
+
+		/* Set S/PDIF transmitter sample rate */
+		aud_reg = i810_ac97_get(codec, AC97_SPDIF_CONTROL);
+		switch ( rate ) {
+			case 32000:
+				aud_reg = (aud_reg & AC97_SC_SPSR_MASK) | AC97_SC_SPSR_32K; 
+				break;
+			 case 44100:
+			 	aud_reg = (aud_reg & AC97_SC_SPSR_MASK) | AC97_SC_SPSR_44K; 
+				break;
+			case 48000:
+			 	aud_reg = (aud_reg & AC97_SC_SPSR_MASK) | AC97_SC_SPSR_48K; 
+				break;
+			default:
+#ifdef DEBUG
+				printk(KERN_WARNING "i810_audio: %d sample rate not supported by S/PDIF.\n", rate);
+#endif
+				/* turn off S/PDIF */
+				aud_reg = i810_ac97_get(codec, AC97_EXTENDED_STATUS);
+				i810_ac97_set(codec, AC97_EXTENDED_STATUS, (aud_reg & ~AC97_EA_SPDIF));
+				state->card->ac97_status &= ~SPDIF_ON;
+				return;
+		}
+
+		i810_ac97_set(codec, AC97_SPDIF_CONTROL, aud_reg);
+		
+		aud_reg = i810_ac97_get(codec, AC97_EXTENDED_STATUS);
+		aud_reg = (aud_reg & AC97_EA_SLOT_MASK) | slots | AC97_EA_VRA | AC97_EA_SPDIF;
+		i810_ac97_set(codec, AC97_EXTENDED_STATUS, aud_reg);
+		state->card->ac97_status |= SPDIF_ON;
+
+		/* Check to make sure the configuration is valid */
+		aud_reg = i810_ac97_get(codec, AC97_EXTENDED_STATUS);
+		if ( ! (aud_reg & 0x0400) ) {
+#ifdef DEBUG
+			printk(KERN_WARNING "i810_audio: S/PDIF transmitter configuration not valid (0x%04x).\n", aud_reg);
+#endif
+
+			/* turn off S/PDIF */
+			i810_ac97_set(codec, AC97_EXTENDED_STATUS, (aud_reg & ~AC97_EA_SPDIF));
+			state->card->ac97_status &= ~SPDIF_ON;
+			return;
+		}
+		/* Mute the analog output */
+		/* Should this only mute the PCM volume??? */
+		i810_ac97_set(codec, AC97_MASTER_VOL_STEREO, (vol | VOL_MUTED));
+	}
+}
+
+/* i810_set_dac_channels
+ *
+ *  Configure the codec's multi-channel DACs
+ *
+ *  The logic is backwards. Setting the bit to 1 turns off the DAC. 
+ *
+ *  What about the ICH? We currently configure it using the
+ *  SNDCTL_DSP_CHANNELS ioctl.  If we're turnning on the DAC, 
+ *  does that imply that we want the ICH set to support
+ *  these channels?
+ *  
+ *  TODO:
+ *    vailidate that the codec really supports these DACs
+ *    before turning them on. 
+ */
+static void i810_set_dac_channels(struct i810_state *state, int channel)
+{
+	int	aud_reg;
+	struct ac97_codec *codec = state->card->ac97_codec[0];
+
+	aud_reg = i810_ac97_get(codec, AC97_EXTENDED_STATUS);
+	aud_reg |= AC97_EA_PRI | AC97_EA_PRJ | AC97_EA_PRK;
+	state->card->ac97_status &= ~(SURR_ON | CENTER_LFE_ON);
+
+	switch ( channel ) {
+		case 2: /* always enabled */
+			break;
+		case 4:
+			aud_reg &= ~AC97_EA_PRJ;
+			state->card->ac97_status |= SURR_ON;
+			break;
+		case 6:
+			aud_reg &= ~(AC97_EA_PRJ | AC97_EA_PRI | AC97_EA_PRK);
+			state->card->ac97_status |= SURR_ON | CENTER_LFE_ON;
+			break;
+		default:
+			break;
+	}
+	i810_ac97_set(codec, AC97_EXTENDED_STATUS, aud_reg);
+
+}
+
+
 /* set playback sample rate */
 static unsigned int i810_set_dac_rate(struct i810_state * state, unsigned int rate)
 {	
 	struct dmabuf *dmabuf = &state->dmabuf;
-	u32 dacp, new_rate;
+	u32 new_rate;
 	struct ac97_codec *codec=state->card->ac97_codec[0];
 	
 	if(!(state->card->ac97_features&0x0001))
@@ -445,7 +606,7 @@ static unsigned int i810_set_dac_rate(struct i810_state * state, unsigned int ra
 static unsigned int i810_set_adc_rate(struct i810_state * state, unsigned int rate)
 {
 	struct dmabuf *dmabuf = &state->dmabuf;
-	u32 dacp, new_rate;
+	u32 new_rate;
 	struct ac97_codec *codec=state->card->ac97_codec[0];
 	
 	if(!(state->card->ac97_features&0x0001))
@@ -1359,7 +1520,9 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 	unsigned long flags;
 	audio_buf_info abinfo;
 	count_info cinfo;
-	int val, mapped, ret;
+	unsigned int i_glob_cnt;
+	int val = 0, mapped, ret;
+	struct ac97_codec *codec = state->card->ac97_codec[0];
 
 	mapped = ((file->f_mode & FMODE_WRITE) && dmabuf->mapped) ||
 		((file->f_mode & FMODE_READ) && dmabuf->mapped);
@@ -1412,11 +1575,31 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 			return -EFAULT;
 		if (val >= 0) {
 			if (file->f_mode & FMODE_WRITE) {
-				stop_dac(state);
-				dmabuf->ready = 0;
-				spin_lock_irqsave(&state->card->lock, flags);
-				i810_set_dac_rate(state, val);
-				spin_unlock_irqrestore(&state->card->lock, flags);
+				if ( (state->card->ac97_status & SPDIF_ON) ) {  /* S/PDIF Enabled */
+					/* AD1886 only supports 48000, need to check that */
+					if ( i810_valid_spdif_rate ( codec, val ) ) {
+						/* Set DAC rate */
+                                        	i810_set_spdif_output ( state, -1, 0 );
+						stop_dac(state);
+						dmabuf->ready = 0;
+						spin_lock_irqsave(&state->card->lock, flags);
+						i810_set_dac_rate(state, val);
+						spin_unlock_irqrestore(&state->card->lock, flags);
+						/* Set S/PDIF transmitter rate. */
+						i810_set_spdif_output ( state, AC97_EA_SPSA_3_4, val );
+	                                        if ( ! (state->card->ac97_status & SPDIF_ON) ) {
+							val = dmabuf->rate;
+						}
+					} else { /* Not a valid rate for S/PDIF, ignore it */
+						val = dmabuf->rate;
+					}
+				} else {
+					stop_dac(state);
+					dmabuf->ready = 0;
+					spin_lock_irqsave(&state->card->lock, flags);
+					i810_set_dac_rate(state, val);
+					spin_unlock_irqrestore(&state->card->lock, flags);
+				}
 			}
 			if (file->f_mode & FMODE_READ) {
 				stop_adc(state);
@@ -1467,7 +1650,18 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 #ifdef DEBUG
 		printk("SNDCTL_DSP_SETFMT\n");
 #endif
-		return put_user(AFMT_S16_LE, (int *)arg);
+		if (get_user(val, (int *)arg))
+			return -EFAULT;
+
+		switch ( val ) {
+			case AFMT_S16_LE:
+				break;
+			case AFMT_QUERY:
+			default:
+				val = AFMT_S16_LE;
+				break;
+		}
+		return put_user(val, (int *)arg);
 
 	case SNDCTL_DSP_CHANNELS:
 #ifdef DEBUG
@@ -1477,14 +1671,61 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 			return -EFAULT;
 
 		if (val > 0) {
-	    		if (dmabuf->enable & DAC_RUNNING) {
+			if (dmabuf->enable & DAC_RUNNING) {
 				stop_dac(state);
 			}
 			if (dmabuf->enable & ADC_RUNNING) {
 				stop_adc(state);
 			}
+		} else {
+			return put_user(state->card->channels, (int *)arg);
 		}
-		return put_user(2, (int *)arg);
+
+		/* ICH and ICH0 only support 2 channels */
+		if ( state->card->pci_id == 0x2415 || state->card->pci_id == 0x2425 ) 
+			return put_user(2, (int *)arg);
+	
+		/* Multi-channel support was added with ICH2. Bits in */
+		/* Global Status and Global Control register are now  */
+		/* used to indicate this.                             */
+
+                i_glob_cnt = inl(state->card->iobase + GLOB_CNT);
+
+		/* Current # of channels enabled */
+		if ( i_glob_cnt & 0x0100000 )
+			ret = 4;
+		else if ( i_glob_cnt & 0x0200000 )
+			ret = 6;
+		else
+			ret = 2;
+
+		switch ( val ) {
+			case 2: /* 2 channels is always supported */
+				outl(state->card->iobase + GLOB_CNT, (i_glob_cnt & 0xcfffff));
+				/* Do we need to change mixer settings????  */
+				break;
+			case 4: /* Supported on some chipsets, better check first */
+				if ( state->card->channels >= 4 ) {
+					outl(state->card->iobase + GLOB_CNT, ((i_glob_cnt & 0xcfffff) | 0x0100000));
+					/* Do we need to change mixer settings??? */
+				} else {
+					val = ret;
+				}
+				break;
+			case 6: /* Supported on some chipsets, better check first */
+				if ( state->card->channels >= 6 ) {
+					outl(state->card->iobase + GLOB_CNT, ((i_glob_cnt & 0xcfffff) | 0x0200000));
+					/* Do we need to change mixer settings??? */
+				} else {
+					val = ret;
+				}
+				break;
+			default: /* nothing else is ever supported by the chipset */
+				val = ret;
+				break;
+		}
+
+		return put_user(val, (int *)arg);
 
 	case SNDCTL_DSP_POST: /* the user has sent all data and is notifying us */
 		/* we update the swptr to the end of the last sg segment then return */
@@ -1731,6 +1972,148 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 #endif
 		return put_user(AFMT_S16_LE, (int *)arg);
 
+	case SNDCTL_DSP_SETSPDIF: /* Set S/PDIF Control register */
+#ifdef DEBUG
+		printk("SNDCTL_DSP_SETSPDIF\n");
+#endif
+		if (get_user(val, (int *)arg))
+			return -EFAULT;
+
+		/* Check to make sure the codec supports S/PDIF transmitter */
+
+		if((state->card->ac97_features & 4)) {
+			/* mask out the transmitter speed bits so the user can't set them */
+			val &= ~0x3000;
+
+			/* Add the current transmitter speed bits to the passed value */
+			ret = i810_ac97_get(codec, AC97_SPDIF_CONTROL);
+			val |= (ret & 0x3000);
+
+			i810_ac97_set(codec, AC97_SPDIF_CONTROL, val);
+			if(i810_ac97_get(codec, AC97_SPDIF_CONTROL) != val ) {
+				printk(KERN_ERR "i810_audio: Unable to set S/PDIF configuration to 0x%04x.\n", val);
+				return -EFAULT;
+			}
+		}
+#ifdef DEBUG
+		else 
+			printk(KERN_WARNING "i810_audio: S/PDIF transmitter not avalible.\n");
+#endif
+		return put_user(val, (int *)arg);
+
+	case SNDCTL_DSP_GETSPDIF: /* Get S/PDIF Control register */
+#ifdef DEBUG
+		printk("SNDCTL_DSP_GETSPDIF\n");
+#endif
+		if (get_user(val, (int *)arg))
+			return -EFAULT;
+
+		/* Check to make sure the codec supports S/PDIF transmitter */
+
+		if(!(state->card->ac97_features & 4)) {
+#ifdef DEBUG
+			printk(KERN_WARNING "i810_audio: S/PDIF transmitter not avalible.\n");
+#endif
+			val = 0;
+		} else {
+			val = i810_ac97_get(codec, AC97_SPDIF_CONTROL);
+		}
+		//return put_user((val & 0xcfff), (int *)arg);
+		return put_user(val, (int *)arg);
+   			
+	case SNDCTL_DSP_GETCHANNELMASK:
+#ifdef DEBUG
+		printk("SNDCTL_DSP_GETCHANNELMASK\n");
+#endif
+		if (get_user(val, (int *)arg))
+			return -EFAULT;
+		
+		/* Based on AC'97 DAC support, not ICH hardware */
+		val = DSP_BIND_FRONT;
+		if ( state->card->ac97_features & 0x0004 )
+			val |= DSP_BIND_SPDIF;
+
+		if ( state->card->ac97_features & 0x0080 )
+			val |= DSP_BIND_SURR;
+		if ( state->card->ac97_features & 0x0140 )
+			val |= DSP_BIND_CENTER_LFE;
+
+		return put_user(val, (int *)arg);
+
+	case SNDCTL_DSP_BIND_CHANNEL:
+#ifdef DEBUG
+		printk("SNDCTL_DSP_BIND_CHANNEL\n");
+#endif
+		if (get_user(val, (int *)arg))
+			return -EFAULT;
+		if ( val == DSP_BIND_QUERY ) {
+			val = DSP_BIND_FRONT; /* Always report this as being enabled */
+			if ( state->card->ac97_status & SPDIF_ON ) 
+				val |= DSP_BIND_SPDIF;
+			else {
+				if ( state->card->ac97_status & SURR_ON )
+					val |= DSP_BIND_SURR;
+				if ( state->card->ac97_status & CENTER_LFE_ON )
+					val |= DSP_BIND_CENTER_LFE;
+			}
+		} else {  /* Not a query, set it */
+			if (!(file->f_mode & FMODE_WRITE))
+				return -EINVAL;
+			if ( dmabuf->enable == DAC_RUNNING ) {
+				stop_dac(state);
+			}
+			if ( val & DSP_BIND_SPDIF ) {  /* Turn on SPDIF */
+				/*  Ok, this should probably define what slots
+				 *  to use. For now, we'll only set it to the
+				 *  defaults:
+				 * 
+				 *   non multichannel codec maps to slots 3&4
+				 *   2 channel codec maps to slots 7&8
+				 *   4 channel codec maps to slots 6&9
+				 *   6 channel codec maps to slots 10&11
+				 *
+				 *  there should be some way for the app to
+				 *  select the slot assignment.
+				 */
+	
+				i810_set_spdif_output ( state, AC97_EA_SPSA_3_4, dmabuf->rate );
+				if ( !(state->card->ac97_status & SPDIF_ON) )
+					val &= ~DSP_BIND_SPDIF;
+			} else {
+				int mask;
+				int channels;
+
+				/* Turn off S/PDIF if it was on */
+				if ( state->card->ac97_status & SPDIF_ON ) 
+					i810_set_spdif_output ( state, -1, 0 );
+				
+				mask = val & (DSP_BIND_FRONT | DSP_BIND_SURR | DSP_BIND_CENTER_LFE);
+				switch (mask) {
+					case DSP_BIND_FRONT:
+						channels = 2;
+						break;
+					case DSP_BIND_FRONT|DSP_BIND_SURR:
+						channels = 4;
+						break;
+					case DSP_BIND_FRONT|DSP_BIND_SURR|DSP_BIND_CENTER_LFE:
+						channels = 6;
+						break;
+					default:
+						val = DSP_BIND_FRONT;
+						channels = 2;
+						break;
+				}
+				i810_set_dac_channels ( state, channels );
+
+				/* check that they really got turned on */
+				if ( !state->card->ac97_status & SURR_ON )
+					val &= ~DSP_BIND_SURR;
+				if ( !state->card->ac97_status & CENTER_LFE_ON )
+					val &= ~DSP_BIND_CENTER_LFE;
+			}
+		}
+		return put_user(val, (int *)arg);
+		
 	case SNDCTL_DSP_MAPINBUF:
 	case SNDCTL_DSP_MAPOUTBUF:
 	case SNDCTL_DSP_SETSYNCRO:
@@ -1796,7 +2179,15 @@ found_virt:
 			card->states[i] = NULL;;
 			return -EBUSY;
 		}
-		i810_set_dac_rate(state, 8000);
+		/* Initialize to 8kHz?  What if we don't support 8kHz? */
+		/*  Let's change this to check for S/PDIF stuff */
+	
+		if ( spdif_locked ) {
+			i810_set_dac_rate(state, spdif_locked);
+			i810_set_spdif_output(state, AC97_EA_SPSA_3_4, spdif_locked);
+		} else {
+			i810_set_dac_rate(state, 8000);
+		}
 		dmabuf->trigger |= PCM_ENABLE_OUTPUT;
 	}
 		
@@ -1866,20 +2257,23 @@ static u16 i810_ac97_get(struct ac97_codec *dev, u8 reg)
 {
 	struct i810_card *card = dev->private_data;
 	int count = 100;
+	u8 reg_set = ((dev->id)?((reg&0x7f)|0x80):(reg&0x7f));
 
 	while(count-- && (inb(card->iobase + CAS) & 1)) 
 		udelay(1);
-	return inw(card->ac97base + (reg&0x7f));
+	
+	return inw(card->ac97base + reg_set);
 }
 
 static void i810_ac97_set(struct ac97_codec *dev, u8 reg, u16 data)
 {
 	struct i810_card *card = dev->private_data;
 	int count = 100;
+	u8 reg_set = ((dev->id)?((reg&0x7f)|0x80):(reg&0x7f));
 
 	while(count-- && (inb(card->iobase + CAS) & 1)) 
 		udelay(1);
-	outw(data, card->ac97base + (reg&0x7f));
+	outw(data, card->ac97base + reg_set);
 }
 
 
@@ -1920,7 +2314,7 @@ static /*const*/ struct file_operations i810_mixer_fops = {
 static int __init i810_ac97_init(struct i810_card *card)
 {
 	int num_ac97 = 0;
-	int ready_2nd = 0;
+	int total_channels = 0;
 	struct ac97_codec *codec;
 	u16 eid;
 	int i=0;
@@ -1952,10 +2346,38 @@ static int __init i810_ac97_init(struct i810_card *card)
 
 	current->state = TASK_UNINTERRUPTIBLE;
 	schedule_timeout(HZ/5);
+
+	/* Number of channels supported */
+	/* What about the codec?  Just because the ICH supports */
+	/* multiple channels doesn't mean the codec does.       */
+	/* we'll have to modify this in the codec section below */
+	/* to reflect what the codec has.                       */
+	/* ICH and ICH0 only support 2 channels so don't bother */
+	/* to check....                                         */
+
+	card->channels = 2;
+	reg = inl(card->iobase + GLOB_STA);
+	if ( reg & 0x0200000 )
+		card->channels = 6;
+	else if ( reg & 0x0100000 )
+		card->channels = 4;
+	printk("i810_audio: Audio Controller supports %d channels.\n", card->channels);
 		
 	inw(card->ac97base);
 
 	for (num_ac97 = 0; num_ac97 < NR_AC97; num_ac97++) {
+
+		/* The ICH programmer's reference says you should   */
+		/* check the ready status before probing. So we chk */
+		/*   What do we do if it's not ready?  Wait and try */
+		/*   again, or abort?                               */
+		reg = inl(card->iobase + GLOB_STA);
+		if (!(reg & (0x100 << num_ac97))) {
+			if(num_ac97 == 0)
+				printk(KERN_ERR "i810_audio: Primary codec not ready.\n");
+			break; /* I think this works, if not ready stop */
+		}
+
 		if ((codec = kmalloc(sizeof(struct ac97_codec), GFP_KERNEL)) == NULL)
 			return -ENOMEM;
 		memset(codec, 0, sizeof(struct ac97_codec));
@@ -1982,6 +2404,9 @@ static int __init i810_ac97_init(struct i810_card *card)
 			current->state = TASK_UNINTERRUPTIBLE;
 			schedule_timeout(HZ/20);
 		}
+
+		/* Store state information about S/PDIF transmitter */
+		card->ac97_status = 0;
 
 		/* Don't attempt to get eid until powerup is complete */
 		eid = i810_ac97_get(codec, AC97_EXTENDED_ID);
@@ -2014,6 +2439,63 @@ static int __init i810_ac97_init(struct i810_card *card)
 			}
 		}
    		
+		/* Determine how many channels the codec(s) support   */
+		/*   - The primary codec always supports 2            */
+		/*   - If the codec supports AMAP, surround DACs will */
+		/*     automaticlly get assigned to slots.            */
+		/*     * Check for surround DACs and increment if     */
+		/*       found.                                       */
+		/*   - Else check if the codec is revision 2.2        */
+		/*     * If surround DACs exist, assign them to slots */
+		/*       and increment channel count.                 */
+
+		/* All of this only applies to ICH2 and above. ICH    */
+		/* and ICH0 only support 2 channels.  ICH2 will only  */
+		/* support multiple codecs in a "split audio" config. */
+		/* as described above.                                */
+
+		/* TODO: Remove all the debugging messages!           */
+
+		if((eid & 0xc000) == 0) /* primary codec */
+			total_channels += 2; 
+
+		if(eid & 0x200) { /* GOOD, AMAP support */
+			if (eid & 0x0080) /* L/R Surround channels */
+				total_channels += 2;
+			if (eid & 0x0140) /* LFE and Center channels */
+				total_channels += 2;
+			printk("i810_audio: AC'97 codec %d supports AMAP, total channels = %d\n", num_ac97, total_channels);
+		} else if (eid & 0x0400) {  /* this only works on 2.2 compliant codecs */
+			eid &= 0xffcf;
+			if((eid & 0xc000) != 0)	{
+				switch ( total_channels ) {
+					case 2:
+						/* Set dsa1, dsa0 to 01 */
+						eid |= 0x0010;
+						break;
+					case 4:
+						/* Set dsa1, dsa0 to 10 */
+						eid |= 0x0020;
+						break;
+					case 6:
+						/* Set dsa1, dsa0 to 11 */
+						eid |= 0x0030;
+						break;
+				}
+				total_channels += 2;
+			}
+			i810_ac97_set(codec, AC97_EXTENDED_ID, eid);
+			eid = i810_ac97_get(codec, AC97_EXTENDED_ID);
+			printk("i810_audio: AC'97 codec %d, new EID value = 0x%04x\n", num_ac97, eid);
+			if (eid & 0x0080) /* L/R Surround channels */
+				total_channels += 2;
+			if (eid & 0x0140) /* LFE and Center channels */
+				total_channels += 2;
+			printk("i810_audio: AC'97 codec %d, DAC map configured, total channels = %d\n", num_ac97, total_channels);
+		} else {
+			printk("i810_audio: AC'97 codec %d Unable to map surround DAC's (or DAC's not present), total channels = %d\n", num_ac97, total_channels);
+		}
+
 		if ((codec->dev_mixer = register_sound_mixer(&i810_mixer_fops, -1)) < 0) {
 			printk(KERN_ERR "i810_audio: couldn't register mixer!\n");
 			kfree(codec);
@@ -2021,11 +2503,11 @@ static int __init i810_ac97_init(struct i810_card *card)
 		}
 
 		card->ac97_codec[num_ac97] = codec;
-
-		/* if there is no secondary codec at all, don't probe any more */
-		if (!ready_2nd)
-			return num_ac97+1;
 	}
+
+	/* pick the minimum of channels supported by ICHx or codec(s) */
+	card->channels = (card->channels > total_channels)?total_channels:card->channels;
+
 	return num_ac97;
 }
 
@@ -2221,6 +2703,7 @@ MODULE_DESCRIPTION("Intel 810 audio support");
 MODULE_PARM(ftsodell, "i");
 MODULE_PARM(clocking, "i");
 MODULE_PARM(strict_clocking, "i");
+MODULE_PARM(spdif_locked, "i");
 
 #define I810_MODULE_NAME "intel810_audio"
 
@@ -2250,6 +2733,15 @@ static int __init i810_init_module (void)
 	if(clocking == 48000) {
 		i810_configure_clocking();
 	}
+	if(spdif_locked > 0 ) {
+		if(spdif_locked == 32000 || spdif_locked == 44100 || spdif_locked == 48000) {
+			printk("i810_audio: Enabling S/PDIF at sample rate %dHz.\n", spdif_locked);
+		} else {
+			printk("i810_audio: S/PDIF can only be locked to 32000, 441000, or 48000Hz.\n");
+			spdif_locked = 0;
+		}
+	}
+	
 	return 0;
 }
 

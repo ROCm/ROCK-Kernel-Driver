@@ -53,7 +53,9 @@
 
 #include <asm/asm.h>
 #include <asm/branch.h>
+#include <asm/bootinfo.h>
 #include <asm/byteorder.h>
+#include <asm/cpu.h>
 #include <asm/inst.h>
 #include <asm/uaccess.h>
 #include <asm/processor.h>
@@ -851,11 +853,8 @@ mips_dsemul(struct pt_regs *xcp, mips_instruction ir, vaddr_t cpc)
 	current->thread.dsemul_epc = (unsigned long) cpc;
 	current->thread.dsemul_aerpc = (unsigned long) &dsemul_insns[1];
 	xcp->cp0_epc = VA_TO_REG & dsemul_insns[0];
+	flush_cache_sigtramp((unsigned long) dsemul_insns);
 
-	/* What we'd really like to do is just flush the line(s) of the */
-	/* icache containing the dsemulret instructions, but there's no */
-	/* mechanism to do this yet...  */
-	flush_cache_all();
 	return SIGILL;		/* force out of emulation loop */
 }
 
@@ -1708,6 +1707,9 @@ int fpu_emulator_cop1Handler(int xcptno, struct pt_regs *xcp)
 
 	oldepc = xcp->cp0_epc;
 	do {
+		if (current->need_resched)
+			schedule();
+
 		prevepc = xcp->cp0_epc;
 		insn = mips_get_word(xcp, REG_TO_VA(xcp->cp0_epc), &err);
 		if (err) {
@@ -1718,6 +1720,9 @@ int fpu_emulator_cop1Handler(int xcptno, struct pt_regs *xcp)
 			sig = cop1Emulate(xcptno, xcp, ctx);
 		else
 			xcp->cp0_epc += 4;	/* skip nops */
+
+		if (mips_cpu.options & MIPS_CPU_FPU)
+			break;
 	} while (xcp->cp0_epc > prevepc && sig == 0);
 
 	/* SIGILL indicates a non-fpu instruction */

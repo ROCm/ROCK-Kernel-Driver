@@ -52,8 +52,9 @@ void __init loadmmu(void)
 {
 
 	if (mips_cpu.options & MIPS_CPU_4KTLB) {
-#if defined(CONFIG_CPU_R4X00) || defined(CONFIG_CPU_R4300) || \
-    defined(CONFIG_CPU_R5000) || defined(CONFIG_CPU_NEVADA)
+#if defined(CONFIG_CPU_R4X00) || defined(CONFIG_CPU_VR41XX) || \
+    defined(CONFIG_CPU_R4300) || defined(CONFIG_CPU_R5000) || \
+    defined(CONFIG_CPU_NEVADA)
 		printk("Loading R4000 MMU routines.\n");
 		ld_mmu_r4xx0();
 #endif
@@ -66,7 +67,7 @@ void __init loadmmu(void)
 		ld_mmu_r5432();
 #endif
 
-#if defined(CONFIG_CPU_MIPS32)
+#if defined(CONFIG_CPU_MIPS32) || defined(CONFIG_CPU_MIPS64)
 		printk("Loading MIPS32 MMU routines.\n");
 		ld_mmu_mips32();
 #endif

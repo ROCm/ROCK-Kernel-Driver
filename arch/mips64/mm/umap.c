@@ -25,8 +25,8 @@
 #include <asm/pgalloc.h>
 #include <asm/page.h>
 
-static inline void
-remove_mapping_pte_range (pmd_t *pmd, unsigned long address, unsigned long size)
+static inline void remove_mapping_pte_range (pmd_t *pmd, unsigned long address,
+					     unsigned long size)
 {
 	pte_t *pte;
 	unsigned long end;
@@ -34,7 +34,8 @@ remove_mapping_pte_range (pmd_t *pmd, unsigned long address, unsigned long size)
 	if (pmd_none (*pmd))
 		return;
 	if (pmd_bad (*pmd)){
-		printk ("remove_graphics_pte_range: bad pmd (%08lx)\n", pmd_val (*pmd));
+		printk ("remove_graphics_pte_range: bad pmd (%08lx)\n",
+			pmd_val (*pmd));
 		pmd_clear (pmd);
 		return;
 	}
@@ -53,8 +54,8 @@ remove_mapping_pte_range (pmd_t *pmd, unsigned long address, unsigned long size)
 						  
 }
 
-static inline void
-remove_mapping_pmd_range (pgd_t *pgd, unsigned long address, unsigned long size)
+static inline void remove_mapping_pmd_range (pgd_t *pgd, unsigned long address,
+					     unsigned long size)
 {
 	pmd_t *pmd;
 	unsigned long end;
@@ -63,7 +64,8 @@ remove_mapping_pmd_range (pgd_t *pgd, unsigned long address, unsigned long size)
 		return;
 
 	if (pgd_bad (*pgd)){
-		printk ("remove_graphics_pmd_range: bad pgd (%08lx)\n", pgd_val (*pgd));
+		printk ("remove_graphics_pmd_range: bad pgd (%08lx)\n",
+			pgd_val (*pgd));
 		pgd_clear (pgd);
 		return;
 	}
@@ -84,8 +86,8 @@ remove_mapping_pmd_range (pgd_t *pgd, unsigned long address, unsigned long size)
  * This routine is called from the page fault handler to remove a
  * range of active mappings at this point
  */
-void
-remove_mapping (struct task_struct *task, unsigned long start, unsigned long end)
+void remove_mapping (struct task_struct *task, unsigned long start,
+		     unsigned long end)
 {
 	unsigned long beg = start;
 	pgd_t *dir;
@@ -137,8 +139,8 @@ static inline void forget_pte(pte_t page)
  * maps a range of vmalloc()ed memory into the requested pages. the old
  * mappings are removed. 
  */
-static inline void
-vmap_pte_range (pte_t *pte, unsigned long address, unsigned long size, unsigned long vaddr)
+static inline void vmap_pte_range (pte_t *pte, unsigned long address,
+				   unsigned long size, unsigned long vaddr)
 {
 	unsigned long end;
 	pgd_t *vdir;
@@ -167,8 +169,8 @@ vmap_pte_range (pte_t *pte, unsigned long address, unsigned long size, unsigned 
 	} while (address < end);
 }
 
-static inline int
-vmap_pmd_range (pmd_t *pmd, unsigned long address, unsigned long size, unsigned long vaddr)
+static inline int vmap_pmd_range (pmd_t *pmd, unsigned long address,
+				  unsigned long size, unsigned long vaddr)
 {
 	unsigned long end;
 
@@ -178,7 +180,7 @@ vmap_pmd_range (pmd_t *pmd, unsigned long address, unsigned long size, unsigned 
 		end = PGDIR_SIZE;
 	vaddr -= address;
 	do {
-		pte_t * pte = pte_alloc(pmd, address);
+		pte_t * pte = pte_alloc(current->mm, pmd, address);
 		if (!pte)
 			return -ENOMEM;
 		vmap_pte_range(pte, address, end - address, address + vaddr);
@@ -188,8 +190,8 @@ vmap_pmd_range (pmd_t *pmd, unsigned long address, unsigned long size, unsigned 
 	return 0;
 }
 
-int
-vmap_page_range (unsigned long from, unsigned long size, unsigned long vaddr)
+int vmap_page_range (unsigned long from, unsigned long size,
+		     unsigned long vaddr)
 {
 	int error = 0;
 	pgd_t * dir;
@@ -200,7 +202,7 @@ vmap_page_range (unsigned long from, unsigned long size, unsigned long vaddr)
 	dir = pgd_offset(current->mm, from);
 	flush_cache_range(current->mm, beg, end);
 	while (from < end) {
-		pmd_t *pmd = pmd_alloc(dir, from);
+		pmd_t *pmd = pmd_alloc(current->mm, dir, from);
 		error = -ENOMEM;
 		if (!pmd)
 			break;

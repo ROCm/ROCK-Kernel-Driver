@@ -1292,6 +1292,7 @@ dgrs_found_device(
 		if (!devN) 
 			goto fail;
 		memcpy(devN, dev, dev_size);
+		memset(devN->name, 0, sizeof(devN->name));
 		devN->priv = ((void *)devN) + sizeof(struct net_device);
 		privN = (DGRS_PRIV *)devN->priv;
 			/* ... and zero out VM areas */

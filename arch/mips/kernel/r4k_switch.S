@@ -7,15 +7,10 @@
  * Copyright (C) 1996 David S. Miller (dm@engr.sgi.com)
  * Copyright (C) 1994, 1995, 1996, by Andreas Busse
  * Copyright (C) 1999 Silicon Graphics, Inc.
+ * Copyright (C) 2000 MIPS Technologies, Inc.
+ *    written by Carsten Langgaard, carstenl@mips.com
  */
-/**************************************************************************
- *  13 Nov, 2000.
- *  Made support for MIPS32 CPUs and restoring of fp registers.
- *
- *  Carsten Langgaard, carstenl@mips.com
- *  Copyright (C) 2000 MIPS Technologies, Inc.  All rights reserved.
- *************************************************************************/
-	
+#include <linux/config.h>
 #include <asm/asm.h>
 #include <asm/bootinfo.h>
 #include <asm/cachectl.h>

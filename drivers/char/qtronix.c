@@ -6,7 +6,7 @@
  *
  * Copyright 2001 MontaVista Software Inc.
  * Author: MontaVista Software, Inc.
- *         	ppopov@mvista.com or support@mvista.com
+ *         	ppopov@mvista.com or source@mvista.com
  *
  *
  *  The bottom portion of this driver was take from 
@@ -71,7 +71,7 @@
 #include <linux/random.h>
 #include <linux/poll.h>
 #include <linux/miscdevice.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/kbd_kern.h>
 #include <linux/smp_lock.h>
 #include <asm/io.h>
@@ -353,19 +353,19 @@ spinlock_t kbd_controller_lock = SPIN_LOCK_UNLOCKED;
 static unsigned char handle_kbd_event(void);
 
 
-int pckbd_setkeycode(unsigned int scancode, unsigned int keycode)
+int kbd_setkeycode(unsigned int scancode, unsigned int keycode)
 {
-	printk("pckbd_setkeycode scancode %x keycode %x\n", scancode, keycode);
+	printk("kbd_setkeycode scancode %x keycode %x\n", scancode, keycode);
 	return 0;
 }
 
-int pckbd_getkeycode(unsigned int scancode)
+int kbd_getkeycode(unsigned int scancode)
 {
 	return scancode;
 }
 
 
-int pckbd_translate(unsigned char scancode, unsigned char *keycode,
+int kbd_translate(unsigned char scancode, unsigned char *keycode,
 		    char raw_mode)
 {
 	static int prev_scancode = 0;
@@ -406,9 +406,9 @@ int pckbd_translate(unsigned char scancode, unsigned char *keycode,
  	return 1;
 }
 
-char pckbd_unexpected_up(unsigned char keycode)
+char kbd_unexpected_up(unsigned char keycode)
 {
-	//printk("pckbd_unexpected_up\n");
+	//printk("kbd_unexpected_up\n");
 	return 0;
 }
 
@@ -422,12 +422,12 @@ static inline void handle_keyboard_event(unsigned char scancode, int down)
 }	
 
 
-void pckbd_leds(unsigned char leds)
+void kbd_leds(unsigned char leds)
 {
 }
 
 /* dummy */
-void pckbd_init_hw(void)
+void kbd_init_hw(void)
 {
 }
 

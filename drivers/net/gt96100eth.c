@@ -1,7 +1,7 @@
 /*
  * Copyright 2000 MontaVista Software Inc.
  * Author: MontaVista Software, Inc.
- *         	stevel@mvista.com or support@mvista.com
+ *         	stevel@mvista.com or source@mvista.com
  *
  * ########################################################################
  *
@@ -29,7 +29,6 @@
 #endif
 
 
-#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -38,7 +37,7 @@
 #include <linux/errno.h>
 #include <linux/in.h>
 #include <linux/ioport.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/init.h>

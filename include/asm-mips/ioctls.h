@@ -1,19 +1,15 @@
-/* $Id: ioctls.h,v 1.5 1998/08/19 21:58:11 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1995, 1996 by Ralf Baechle
+ * Copyright (C) 1995, 1996, 2001 Ralf Baechle
+ * Copyright (C) 2001 MIPS Technologies, Inc.
  */
-#ifndef __ASM_MIPS_IOCTLS_H
-#define __ASM_MIPS_IOCTLS_H
+#ifndef __ASM_IOCTLS_H
+#define __ASM_IOCTLS_H
 
 #include <asm/ioctl.h>
-
-#if defined(__USE_MISC) || defined (__KERNEL__)
-#define tIOC		('t' << 8)
-#endif
 
 #define TCGETA		0x5401
 #define TCSETA		0x5402
@@ -38,21 +34,19 @@
 #define TIOCMBIC	0x741c		/* bic modem bits */
 #define TIOCMSET	0x741a		/* set all modem bits */
 #define TIOCPKT		0x5470		/* pty: set/clear packet mode */
-#define		TIOCPKT_DATA		0x00	/* data packet */
-#define		TIOCPKT_FLUSHREAD	0x01	/* flush packet */
-#define		TIOCPKT_FLUSHWRITE	0x02	/* flush packet */
-#define		TIOCPKT_STOP		0x04	/* stop output */
-#define		TIOCPKT_START		0x08	/* start output */
-#define		TIOCPKT_NOSTOP		0x10	/* no more ^S, ^Q */
-#define		TIOCPKT_DOSTOP		0x20	/* now do ^S ^Q */
-#if 0
-#define		TIOCPKT_IOCTL		0x40	/* state change of pty driver */
-#endif
+#define	 TIOCPKT_DATA		0x00	/* data packet */
+#define	 TIOCPKT_FLUSHREAD	0x01	/* flush packet */
+#define	 TIOCPKT_FLUSHWRITE	0x02	/* flush packet */
+#define	 TIOCPKT_STOP		0x04	/* stop output */
+#define	 TIOCPKT_START		0x08	/* start output */
+#define	 TIOCPKT_NOSTOP		0x10	/* no more ^S, ^Q */
+#define	 TIOCPKT_DOSTOP		0x20	/* now do ^S ^Q */
+/* #define  TIOCPKT_IOCTL		0x40	state change of pty driver */
 #define TIOCSWINSZ	_IOW('t', 103, struct winsize)	/* set window size */
 #define TIOCGWINSZ	_IOR('t', 104, struct winsize)	/* get window size */
 #define TIOCNOTTY	0x5471		/* void tty association */
-#define TIOCSETD	(tIOC | 1)
-#define TIOCGETD	(tIOC | 0)
+#define TIOCSETD	0x7401
+#define TIOCGETD	0x7400
 
 #define FIOCLEX		0x6601
 #define FIONCLEX	0x6602		/* these numbers need to be adjusted. */
@@ -60,10 +54,8 @@
 #define FIONBIO		0x667e
 #define FIOQSIZE	0x667f
 
-#if defined(__USE_MISC) || defined (__KERNEL__)
-#define TIOCGLTC	(tIOC | 116)		/* get special local chars */
-#define TIOCSLTC	(tIOC | 117)		/* set special local chars */
-#endif
+#define TIOCGLTC	0x7474			/* get special local chars */
+#define TIOCSLTC	0x7475			/* set special local chars */
 #define TIOCSPGRP	_IOW('t', 118, int)	/* set pgrp of tty */
 #define TIOCGPGRP	_IOR('t', 119, int)	/* get pgrp of tty */
 #define TIOCCONS	_IOW('t', 120, int)	/* become virtual console */
@@ -71,20 +63,16 @@
 #define FIONREAD	0x467f
 #define TIOCINQ		FIONREAD
 
-#if defined(__USE_MISC) || defined (__KERNEL__)
-#define TIOCGETP        (tIOC | 8)
-#define TIOCSETP        (tIOC | 9)
-#define TIOCSETN        (tIOC | 10)		/* TIOCSETP wo flush */
-#endif
+#define TIOCGETP        0x7408
+#define TIOCSETP        0x7409
+#define TIOCSETN        0x740a			/* TIOCSETP wo flush */
  
-#if 0
-#define	TIOCSETA	_IOW('t', 20, struct termios) /* set termios struct */
-#define	TIOCSETAW	_IOW('t', 21, struct termios) /* drain output, set */
-#define	TIOCSETAF	_IOW('t', 22, struct termios) /* drn out, fls in, set */
-#define	TIOCGETD	_IOR('t', 26, int)	/* get line discipline */
-#define	TIOCSETD	_IOW('t', 27, int)	/* set line discipline */
+/* #define TIOCSETA	_IOW('t', 20, struct termios) set termios struct */
+/* #define TIOCSETAW	_IOW('t', 21, struct termios) drain output, set */
+/* #define TIOCSETAF	_IOW('t', 22, struct termios) drn out, fls in, set */
+/* #define TIOCGETD	_IOR('t', 26, int)	get line discipline */
+/* #define TIOCSETD	_IOW('t', 27, int)	set line discipline */
 						/* 127-124 compat */
-#endif
 
 /* I hope the range from 0x5480 on is free ... */
 #define TIOCSCTTY	0x5480		/* become controlling tty */
@@ -116,4 +104,4 @@
 #define TIOCGHAYESESP	0x5493 /* Get Hayes ESP configuration */
 #define TIOCSHAYESESP	0x5494 /* Set Hayes ESP configuration */
 
-#endif /* __ASM_MIPS_IOCTLS_H */
+#endif /* __ASM_IOCTLS_H */

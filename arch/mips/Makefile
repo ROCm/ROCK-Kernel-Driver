@@ -36,8 +36,9 @@ endif
 # crossformat linking we rely on the elf2ecoff tool for format conversion.
 #
 GCCFLAGS	:= -G 0 -mno-abicalls -fno-pic
-LINKFLAGS	+= -static -G 0
+LINKFLAGS	+= -static
 MODFLAGS	+= -mlong-calls
+LD		:= $(LD) -G 0
 
 ifdef CONFIG_REMOTE_DEBUG
 CFLAGS		:= $(CFLAGS) -g
@@ -55,10 +56,16 @@ endif
 ifdef CONFIG_CPU_R4300
 GCCFLAGS	+= -mcpu=r4300 -mips2 -Wa,--trap
 endif
+ifdef CONFIG_CPU_VR41XX
+GCCFLAGS	+= -mcpu=r4600 -mips2 -Wa,--trap
+endif
 ifdef CONFIG_CPU_R4X00
 GCCFLAGS	+= -mcpu=r4600 -mips2 -Wa,--trap
 endif
 ifdef CONFIG_CPU_MIPS32
+GCCFLAGS	+= -mcpu=r4600 -mips2 -Wa,--trap
+endif
+ifdef CONFIG_CPU_MIPS64
 GCCFLAGS	+= -mcpu=r4600 -mips2 -Wa,--trap
 endif
 ifdef CONFIG_CPU_R5000
@@ -68,7 +75,8 @@ ifdef CONFIG_CPU_R5432
 GCCFLAGS        += -mcpu=r5000 -mips2 -Wa,--trap
 endif
 ifdef CONFIG_CPU_NEVADA
-GCCFLAGS	+= -mcpu=r5000 -mips2 -Wa,--trap -mmad
+# Cannot use -mmad with currently recommended tools
+GCCFLAGS	+= -mcpu=r5000 -mips2 -Wa,--trap
 endif
 ifdef CONFIG_CPU_RM7000
 GCCFLAGS	+= -mcpu=r5000 -mips2 -Wa,--trap
@@ -77,16 +85,17 @@ ifdef CONFIG_CPU_SB1
 GCCFLAGS	+= -mcpu=sb1 -mips2 -Wa,--trap
 endif
 
-ifdef CONFIG_MIPS_FPU_EMULATOR
-CORE_FILES	+=arch/mips/math-emu/fpu_emulator.o
-SUBDIRS		+=arch/mips/math-emu
-endif
-
 GCCFLAGS	+= -pipe
 
 CFLAGS		:= -I $(TOPDIR)/include/asm/gcc $(CFLAGS) $(GCCFLAGS)
 AFLAGS		+= $(GCCFLAGS)
 ASFLAGS		+= $(GCCFLAGS)
+
+#
+# We unconditionally build the math emulator
+#
+CORE_FILES	+=arch/mips/math-emu/fpu_emulator.o
+SUBDIRS		+=arch/mips/math-emu
 
 #
 # Board-dependent options and extra files
@@ -229,11 +238,27 @@ endif
 # ITE 8172 eval board with QED 5231 CPU
 #
 ifdef CONFIG_MIPS_ITE8172
-LIBS		+= arch/mips/ite-boards/qed-4n-s01b/ite.o		     \
-		   arch/mips/ite-boards/generic/it8172.o
-SUBDIRS		+= arch/mips/ite-boards/generic				     \
-		   arch/mips/ite-boards/qed-4n-s01b
-LOADADDR	+= 0x80100000
+LIBS          += arch/mips/ite-boards/qed-4n-s01b/ite.o arch/mips/ite-boards/generic/it8172.o
+SUBDIRS       += arch/mips/ite-boards/generic arch/mips/ite-boards/qed-4n-s01b
+LOADADDR      += 0x80100000
+endif
+
+#
+# Globespan IVR eval board with QED 5231 CPU
+#
+ifdef CONFIG_MIPS_IVR
+LIBS          += arch/mips/ite-boards/ivr/ivr.o arch/mips/ite-boards/generic/it8172.o
+SUBDIRS       += arch/mips/ite-boards/generic arch/mips/ite-boards/ivr
+LOADADDR      += 0x80100000
+endif
+
+#
+# Au1000 eval board
+#
+ifdef CONFIG_MIPS_PB1000
+LIBS          += arch/mips/au1000/pb1000/pb1000.o arch/mips/au1000/common/au1000.o
+SUBDIRS       += arch/mips/au1000/pb1000 arch/mips/au1000/common
+LOADADDR      += 0x80100000
 endif
 
 #
@@ -273,14 +298,6 @@ MAKEBOOT = $(MAKE) -C arch/$(ARCH)/boot
 
 vmlinux.ecoff: vmlinux
 	@$(MAKEBOOT) $@
-
-zImage: vmlinux
-	@$(MAKEBOOT) zImage
-
-compressed: zImage
-
-zdisk: vmlinux
-	@$(MAKEBOOT) zdisk
 
 archclean:
 	@$(MAKEBOOT) clean

@@ -1,9 +1,8 @@
-/* $Id: ip22-hpc.c,v 1.2 1999/10/19 20:51:52 ralf Exp $
- *
+/*
  * ip22-hpc.c: Routines for generic manipulation of the HPC controllers.
  *
  * Copyright (C) 1996 David S. Miller (dm@engr.sgi.com)
- * Copyright (C) 1998, 1999 Ralf Baechle
+ * Copyright (C) 1998, 1999, 2001 Ralf Baechle
  */
 #include <linux/init.h>
 #include <linux/types.h>
@@ -11,7 +10,6 @@
 #include <asm/addrspace.h>
 #include <asm/sgi/sgihpc.h>
 #include <asm/sgi/sgint23.h>
-#include <asm/sgialib.h>
 #include <asm/bootinfo.h>
 
 #undef DEBUG_SGIHPC

@@ -65,36 +65,32 @@ stack_done:
 1:	sw	v0, PT_R2(sp)		# result
 
 EXPORT(o32_ret_from_sys_call)
-	la	t1, irq_stat		# softirq_active
-#ifdef CONFIG_SMP
-	lw	t0, TASK_PROCESSOR($28)
-        sll	t0, t0, 5
-	addu	t1, t0
-#endif
-	lw	t0, 0(t1)		# softirq_active
-	lw	t1, 4(t1)		# softirq_mask.  unused delay slot
-	and	t0, t1
-	bnez	t0, o32_handle_softirq
+	mfc0	t0, CP0_STATUS		# need_resched and signals atomic test
+	ori	t0, t0, 1
+	xori	t0, t0, 1
+	mtc0	t0, CP0_STATUS
 
-9:	lw	t0,PT_STATUS(sp)	# returning to kernel mode?
-	andi	t1, t0, KU_USER
 	lw	t2, TASK_NEED_RESCHED($28)
-	beqz	t1, o32_return		# -> yes
 	bnez	t2, o32_reschedule
 	lw	v0, TASK_SIGPENDING($28)
-	move	a0, zero
-	beqz	v0, o32_return
-	move	a1, sp
-	SAVE_STATIC
-	jal	do_signal
-
-o32_return:
+	bnez	v0, signal_return
+restore_all:
 	RESTORE_SOME
 	RESTORE_SP_AND_RET
 
-o32_handle_softirq:
-	jal	do_softirq
-	b	9b
+/* Put this behind restore_all for the sake of the branch prediction.  */
+signal_return:
+	.type	signal_return, @function
+
+	mfc0	t0, CP0_STATUS
+	ori	t0, t0, 1
+	mtc0	t0, CP0_STATUS
+
+	move	a0, zero
+	move	a1, sp
+	jal	do_signal
+	b	restore_all
+
 o32_reschedule:
 	SAVE_STATIC
 	jal	schedule

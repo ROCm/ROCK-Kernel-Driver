@@ -36,7 +36,7 @@
 
 #define NR_INTS	11
 
-#ifndef _LANGUAGE_ASSEMBLY
+#ifndef __ASSEMBLY__
 /*
  * Data structure to hide the differences between the DECstation Interrupts
  *
@@ -49,6 +49,12 @@ typedef struct
 	unsigned int	cpu_mask;	/* checking and enabling interrupts in CP0	*/
 	unsigned int	iemask;		/* enabling interrupts in IRQ Controller	*/
 } decint_t;
+
+extern volatile unsigned int *isr;
+				/* address of the interrupt status register  */
+extern volatile unsigned int *imr;
+				/* address of the interrupt mask register    */
+extern decint_t dec_interrupt[NR_INTS];
 
 /*
  * Interrupt table structure to hide differences between different
@@ -68,10 +74,8 @@ extern void	dec_intr_fpu(void);
 extern void	dec_intr_rtc(void);
 
 extern void	kn02_io_int(void);
-extern void	kn02ba_io_int(void);
+extern void	kn02xa_io_int(void);
 extern void	kn03_io_int(void);
-
-extern void	intr_halt(void);
 
 extern void	asic_intr_unimplemented(void);
 

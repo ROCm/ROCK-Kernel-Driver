@@ -1503,6 +1503,10 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 #ifdef CONFIG_TULIP_MWI
 	if (!force_csr0 && (tp->flags & HAS_PCI_MWI))
 		tulip_mwi_config (pdev, dev);
+#else
+	/* MWI is broken for DC21143 rev 65... */
+	if (chip_idx == DC21143 && chip_rev == 65)
+		tp->csr0 &= ~MWI;
 #endif
 
 	/* Stop the chip's Tx and Rx processes. */

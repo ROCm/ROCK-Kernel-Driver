@@ -81,7 +81,6 @@ struct kbd_ops *kbd_ops;
  *
  * These are initialized so they are in the .data section
  */
-unsigned long mips_memory_upper = KSEG0;
 unsigned long mips_cputype = CPU_UNKNOWN;
 unsigned long mips_machtype = MACH_UNKNOWN;
 unsigned long mips_machgroup = MACH_GROUP_UNKNOWN;

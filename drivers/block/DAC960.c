@@ -1883,7 +1883,6 @@ static int DAC960_MergeRequestsFunction(RequestQueue_T *RequestQueue,
 static boolean DAC960_RegisterBlockDevice(DAC960_Controller_T *Controller)
 {
   int MajorNumber = DAC960_MAJOR + Controller->ControllerNumber;
-  GenericDiskInfo_T *GenericDiskInfo;
   RequestQueue_T *RequestQueue;
   int MinorNumber;
   /*

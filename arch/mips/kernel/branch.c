@@ -5,9 +5,9 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1996, 97, 2000 by Ralf Baechle
+ * Copyright (C) 1996, 97, 2000, 2001 by Ralf Baechle
+ * Copyright (C) 2001 MIPS Technologies, Inc.
  */
-#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/signal.h>
@@ -29,11 +29,8 @@ int __compute_return_epc(struct pt_regs *regs)
 	union mips_instruction insn;
 
 	epc = regs->cp0_epc;
-	if (epc & 3) {
-		printk("%s: unaligned epc - sending SIGBUS.\n", current->comm);
-		force_sig(SIGBUS, current);
-		return -EFAULT;
-	}
+	if (epc & 3)
+		goto unaligned;
 
 	/*
 	 * Read the instruction
@@ -167,12 +164,10 @@ int __compute_return_epc(struct pt_regs *regs)
 	 * And now the FPA/cp1 branch instructions.
 	 */
 	case cop1_op:
-#ifdef CONFIG_MIPS_FPU_EMULATOR
 		if(!(mips_cpu.options & MIPS_CPU_FPU))
 			fcr31 = current->thread.fpu.soft.sr;
 		else
-#endif
-		asm ("cfc1\t%0,$31":"=r" (fcr31));
+			asm ("cfc1\t%0,$31":"=r" (fcr31));
 		bit = (insn.i_format.rt >> 2);
 		bit += (bit != 0);
 		bit += 23;
@@ -199,4 +194,9 @@ int __compute_return_epc(struct pt_regs *regs)
 	}
 
 	return 0;
+
+unaligned:
+	printk("%s: unaligned epc - sending SIGBUS.\n", current->comm);
+	force_sig(SIGBUS, current);
+	return -EFAULT;
 }

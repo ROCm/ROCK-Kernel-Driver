@@ -72,6 +72,7 @@
  *       A store crossing a page boundary might be executed only partially.
  *       Undo the partial store in this case.
  */
+#include <linux/config.h>
 #include <linux/mm.h>
 #include <linux/signal.h>
 #include <linux/smp.h>
@@ -378,7 +379,9 @@ sigill:
 	return;
 }
 
+#ifdef CONFIG_PROC_FS
 unsigned long unaligned_instructions;
+#endif
 
 asmlinkage void do_ade(struct pt_regs *regs)
 {
@@ -399,7 +402,9 @@ asmlinkage void do_ade(struct pt_regs *regs)
 		goto sigbus;
 
 	emulate_load_store_insn(regs, regs->cp0_badvaddr, pc);
+#ifdef CONFIG_PROC_FS
 	unaligned_instructions++;
+#endif
 
 	return;
 

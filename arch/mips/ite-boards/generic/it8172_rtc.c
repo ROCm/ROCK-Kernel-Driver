@@ -1,7 +1,7 @@
 /*
  * Copyright 2000 MontaVista Software Inc.
  * Author: MontaVista Software, Inc.
- *         	ppopov@mvista.com or support@mvista.com
+ *         	ppopov@mvista.com or source@mvista.com
  *
  * Carsten Langgaard, carstenl@mips.com
  * Copyright (C) 1999,2000 MIPS Technologies, Inc.  All rights reserved.
@@ -26,7 +26,6 @@
  * RTC routines for ITE8172 MC146818-compatible rtc chip.
  *
  */
-#include <asm/spinlock.h>
 #include <linux/mc146818rtc.h>
 #include <asm/it8172/it8172.h>
 

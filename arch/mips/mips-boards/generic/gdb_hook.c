@@ -23,7 +23,6 @@
  *
  */
 
-#include <linux/config.h>
 #include <linux/serialP.h>
 #include <linux/serial_reg.h>
 
@@ -36,8 +35,8 @@ static struct serial_state rs_table[RS_TABLE_SIZE] = {
 
 static struct async_struct kdb_port_info = {0};
 
-int (*putDebugChar)(char);
-char (*getDebugChar)(void);
+int (*generic_putDebugChar)(char);
+char (*generic_getDebugChar)(void);
 
 static __inline__ unsigned int serial_in(struct async_struct *info, int offset)
 {
@@ -96,6 +95,16 @@ void rs_kgdb_hook(int tty_no) {
 	serial_out(&kdb_port_info, UART_DLM, t >> 8);  /* MS of divisor */
 	/* reset DLAB */
 	serial_out(&kdb_port_info, UART_LCR, UART_LCR_WLEN8);
+}
+
+int putDebugChar(char c)
+{
+	return generic_putDebugChar(c);
+}
+
+char getDebugChar(void) 
+{
+	return generic_getDebugChar();
 }
 
 int rs_putDebugChar(char c)

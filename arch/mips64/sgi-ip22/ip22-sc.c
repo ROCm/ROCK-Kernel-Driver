@@ -1,5 +1,4 @@
-/* $Id: ip22-sc.c,v 1.2 1999/12/04 03:59:01 ralf Exp $
- *
+/*
  * indy_sc.c: Indy cache management functions.
  *
  * Copyright (C) 1997 Ralf Baechle (ralf@gnu.org),
@@ -16,7 +15,6 @@
 #include <asm/pgtable.h>
 #include <asm/system.h>
 #include <asm/bootinfo.h>
-#include <asm/sgialib.h>
 #include <asm/mmu_context.h>
 
 /* Secondary cache size in bytes, if present.  */
@@ -31,17 +29,17 @@ static unsigned long scache_size;
 
 static inline void indy_sc_wipe(unsigned long first, unsigned long last)
 {
-	__asm__ __volatile__("
-		.set	noreorder
-		or	%0, %4		# first line to flush
-		or	%1, %4		# last line to flush
-1:		sw	$0, 0(%0)
-		bne	%0, %1, 1b
-		daddu	%0, 32
-		.set reorder"
-		: "=r" (first), "=r" (last)
-		: "0" (first), "1" (last), "r" (0x9000000080000000)
-		: "$1");
+	__asm__ __volatile__(
+	".set\tnoreorder\n\t"
+	"or\t%0, %4\t\t\t# first line to flush\n\t"
+	"or\t%1, %4\t\t\t# last line to flush\n"
+	"1:\tsw	$0, 0(%0)\n\t"
+	"bne\t%0, %1, 1b\n\t"
+	"daddu\t%0, 32\n\t"
+	".set reorder"
+	: "=r" (first), "=r" (last)
+	: "0" (first), "1" (last), "r" (0x9000000080000000)
+	: "$1");
 }
 
 static void indy_sc_wback_invalidate(unsigned long addr, unsigned long size)

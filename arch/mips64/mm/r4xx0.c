@@ -776,9 +776,9 @@ static inline void r4k_flush_cache_all_d32i32(void)
 	__restore_flags(flags);
 }
 
-static void
-r4k_flush_cache_range_s16d16i16(struct mm_struct *mm, unsigned long start,
-                                unsigned long end)
+static void r4k_flush_cache_range_s16d16i16(struct mm_struct *mm,
+					    unsigned long start,
+					    unsigned long end)
 {
 	struct vm_area_struct *vma;
 	unsigned long flags;
@@ -815,9 +815,9 @@ r4k_flush_cache_range_s16d16i16(struct mm_struct *mm, unsigned long start,
 	}
 }
 
-static void
-r4k_flush_cache_range_s32d16i16(struct mm_struct *mm, unsigned long start,
-                                unsigned long end)
+static void r4k_flush_cache_range_s32d16i16(struct mm_struct *mm,
+					    unsigned long start,
+					    unsigned long end)
 {
 	struct vm_area_struct *vma;
 	unsigned long flags;
@@ -854,9 +854,9 @@ r4k_flush_cache_range_s32d16i16(struct mm_struct *mm, unsigned long start,
 	}
 }
 
-static void
-r4k_flush_cache_range_s64d16i16(struct mm_struct *mm, unsigned long start,
-                                unsigned long end)
+static void r4k_flush_cache_range_s64d16i16(struct mm_struct *mm,
+					    unsigned long start,
+					    unsigned long end)
 {
 	struct vm_area_struct *vma;
 	unsigned long flags;
@@ -893,9 +893,9 @@ r4k_flush_cache_range_s64d16i16(struct mm_struct *mm, unsigned long start,
 	}
 }
 
-static void
-r4k_flush_cache_range_s128d16i16(struct mm_struct *mm, unsigned long start,
-                                 unsigned long end)
+static void r4k_flush_cache_range_s128d16i16(struct mm_struct *mm,
+					     unsigned long start,
+					     unsigned long end)
 {
 	struct vm_area_struct *vma;
 	unsigned long flags;
@@ -932,9 +932,9 @@ r4k_flush_cache_range_s128d16i16(struct mm_struct *mm, unsigned long start,
 	}
 }
 
-static void
-r4k_flush_cache_range_s32d32i32(struct mm_struct *mm, unsigned long start,
-                                unsigned long end)
+static void r4k_flush_cache_range_s32d32i32(struct mm_struct *mm,
+					    unsigned long start,
+					    unsigned long end)
 {
 	struct vm_area_struct *vma;
 	unsigned long flags;
@@ -971,9 +971,9 @@ r4k_flush_cache_range_s32d32i32(struct mm_struct *mm, unsigned long start,
 	}
 }
 
-static void
-r4k_flush_cache_range_s64d32i32(struct mm_struct *mm, unsigned long start,
-                                unsigned long end)
+static void r4k_flush_cache_range_s64d32i32(struct mm_struct *mm,
+					    unsigned long start,
+					    unsigned long end)
 {
 	struct vm_area_struct *vma;
 	unsigned long flags;
@@ -1010,9 +1010,9 @@ r4k_flush_cache_range_s64d32i32(struct mm_struct *mm, unsigned long start,
 	}
 }
 
-static void
-r4k_flush_cache_range_s128d32i32(struct mm_struct *mm, unsigned long start,
-                                 unsigned long end)
+static void r4k_flush_cache_range_s128d32i32(struct mm_struct *mm,
+					     unsigned long start,
+					     unsigned long end)
 {
 	struct vm_area_struct *vma;
 	unsigned long flags;
@@ -1049,9 +1049,9 @@ r4k_flush_cache_range_s128d32i32(struct mm_struct *mm, unsigned long start,
 	}
 }
 
-static void
-r4k_flush_cache_range_d16i16(struct mm_struct *mm, unsigned long start,
-                             unsigned long end)
+static void r4k_flush_cache_range_d16i16(struct mm_struct *mm,
+					 unsigned long start,
+					 unsigned long end)
 {
 	if (CPU_CONTEXT(smp_processor_id(), mm) != 0) {
 		unsigned long flags;
@@ -1065,9 +1065,9 @@ r4k_flush_cache_range_d16i16(struct mm_struct *mm, unsigned long start,
 	}
 }
 
-static void
-r4k_flush_cache_range_d32i32(struct mm_struct *mm, unsigned long start,
-                             unsigned long end)
+static void r4k_flush_cache_range_d32i32(struct mm_struct *mm,
+					 unsigned long start,
+					 unsigned long end)
 {
 	if (CPU_CONTEXT(smp_processor_id(), mm) != 0) {
 		unsigned long flags;
@@ -1176,8 +1176,8 @@ static void r4k_flush_cache_mm_d32i32(struct mm_struct *mm)
 	}
 }
 
-static void
-r4k_flush_cache_page_s16d16i16(struct vm_area_struct *vma, unsigned long page)
+static void r4k_flush_cache_page_s16d16i16(struct vm_area_struct *vma,
+					   unsigned long page)
 {
 	struct mm_struct *mm = vma->vm_mm;
 	unsigned long flags;
@@ -1213,8 +1213,8 @@ r4k_flush_cache_page_s16d16i16(struct vm_area_struct *vma, unsigned long page)
 	 * for every cache flush operation.  So we do indexed flushes
 	 * in that case, which doesn't overly flush the cache too much.
 	 */
-	if (CPU_CONTEXT(smp_processor_id(), mm) != 
-				CPU_CONTEXT(smp_processor_id(), current->mm)) {
+	if (CPU_CONTEXT(smp_processor_id(), mm) !=
+	    CPU_CONTEXT(smp_processor_id(), current->mm)) {
 		/* Do indexed flush, too much work to get the (possible)
 		 * tlb refills to work correctly.
 		 */
@@ -1227,8 +1227,8 @@ out:
 	__restore_flags(flags);
 }
 
-static void
-r4k_flush_cache_page_s32d16i16(struct vm_area_struct *vma, unsigned long page)
+static void r4k_flush_cache_page_s32d16i16(struct vm_area_struct *vma,
+					   unsigned long page)
 {
 	struct mm_struct *mm = vma->vm_mm;
 	unsigned long flags;
@@ -1263,8 +1263,8 @@ r4k_flush_cache_page_s32d16i16(struct vm_area_struct *vma, unsigned long page)
 	 * for every cache flush operation.  So we do indexed flushes
 	 * in that case, which doesn't overly flush the cache too much.
 	 */
-	if (CPU_CONTEXT(smp_processor_id(), mm) != 
-				CPU_CONTEXT(smp_processor_id(), current->mm)) {
+	if (CPU_CONTEXT(smp_processor_id(), mm) !=
+	    CPU_CONTEXT(smp_processor_id(), current->mm)) {
 		/* Do indexed flush, too much work to get the (possible)
 		 * tlb refills to work correctly.
 		 */
@@ -1277,8 +1277,8 @@ out:
 	__restore_flags(flags);
 }
 
-static void
-r4k_flush_cache_page_s64d16i16(struct vm_area_struct *vma, unsigned long page)
+static void r4k_flush_cache_page_s64d16i16(struct vm_area_struct *vma,
+					   unsigned long page)
 {
 	struct mm_struct *mm = vma->vm_mm;
 	unsigned long flags;
@@ -1315,7 +1315,7 @@ r4k_flush_cache_page_s64d16i16(struct vm_area_struct *vma, unsigned long page)
 	 * in that case, which doesn't overly flush the cache too much.
 	 */
 	if (CPU_CONTEXT(smp_processor_id(), mm) != 
-				CPU_CONTEXT(smp_processor_id(), current->mm)) {
+	    CPU_CONTEXT(smp_processor_id(), current->mm)) {
 		/* Do indexed flush, too much work to get the (possible)
 		 * tlb refills to work correctly.
 		 */
@@ -1328,8 +1328,8 @@ out:
 	__restore_flags(flags);
 }
 
-static void
-r4k_flush_cache_page_s128d16i16(struct vm_area_struct *vma, unsigned long page)
+static void r4k_flush_cache_page_s128d16i16(struct vm_area_struct *vma,
+					    unsigned long page)
 {
 	struct mm_struct *mm = vma->vm_mm;
 	unsigned long flags;
@@ -1366,7 +1366,7 @@ r4k_flush_cache_page_s128d16i16(struct vm_area_struct *vma, unsigned long page)
 	 * in that case, which doesn't overly flush the cache too much.
 	 */
 	if (CPU_CONTEXT(smp_processor_id(), mm) != 
-				CPU_CONTEXT(smp_processor_id(), current->mm)) {
+	    CPU_CONTEXT(smp_processor_id(), current->mm)) {
 		/*
 		 * Do indexed flush, too much work to get the (possible)
 		 * tlb refills to work correctly.
@@ -1380,8 +1380,8 @@ out:
 	__restore_flags(flags);
 }
 
-static void
-r4k_flush_cache_page_s32d32i32(struct vm_area_struct *vma, unsigned long page)
+static void r4k_flush_cache_page_s32d32i32(struct vm_area_struct *vma,
+					   unsigned long page)
 {
 	struct mm_struct *mm = vma->vm_mm;
 	unsigned long flags;
@@ -1419,7 +1419,7 @@ r4k_flush_cache_page_s32d32i32(struct vm_area_struct *vma, unsigned long page)
 	 * in that case, which doesn't overly flush the cache too much.
 	 */
 	if (CPU_CONTEXT(smp_processor_id(), mm) != 
-				CPU_CONTEXT(smp_processor_id(), current->mm)) {
+	    CPU_CONTEXT(smp_processor_id(), current->mm)) {
 		/*
 		 * Do indexed flush, too much work to get the (possible)
 		 * tlb refills to work correctly.
@@ -1433,8 +1433,8 @@ out:
 	__restore_flags(flags);
 }
 
-static void
-r4k_flush_cache_page_s64d32i32(struct vm_area_struct *vma, unsigned long page)
+static void r4k_flush_cache_page_s64d32i32(struct vm_area_struct *vma,
+					   unsigned long page)
 {
 	struct mm_struct *mm = vma->vm_mm;
 	unsigned long flags;
@@ -1472,7 +1472,7 @@ r4k_flush_cache_page_s64d32i32(struct vm_area_struct *vma, unsigned long page)
 	 * in that case, which doesn't overly flush the cache too much.
 	 */
 	if (CPU_CONTEXT(smp_processor_id(), mm) != 
-				CPU_CONTEXT(smp_processor_id(), current->mm)) {
+	    CPU_CONTEXT(smp_processor_id(), current->mm)) {
 		/*
 		 * Do indexed flush, too much work to get the (possible)
 		 * tlb refills to work correctly.
@@ -1486,8 +1486,8 @@ out:
 	__restore_flags(flags);
 }
 
-static void
-r4k_flush_cache_page_s128d32i32(struct vm_area_struct *vma, unsigned long page)
+static void r4k_flush_cache_page_s128d32i32(struct vm_area_struct *vma,
+					    unsigned long page)
 {
 	struct mm_struct *mm = vma->vm_mm;
 	unsigned long flags;
@@ -1524,7 +1524,7 @@ r4k_flush_cache_page_s128d32i32(struct vm_area_struct *vma, unsigned long page)
 	 * in that case, which doesn't overly flush the cache too much.
 	 */
 	if (CPU_CONTEXT(smp_processor_id(), mm) != 
-				CPU_CONTEXT(smp_processor_id(), current->mm)) {
+	    CPU_CONTEXT(smp_processor_id(), current->mm)) {
 		/* Do indexed flush, too much work to get the (possible)
 		 * tlb refills to work correctly.
 		 */
@@ -1537,8 +1537,8 @@ out:
 	__restore_flags(flags);
 }
 
-static void
-r4k_flush_cache_page_d16i16(struct vm_area_struct *vma, unsigned long page)
+static void r4k_flush_cache_page_d16i16(struct vm_area_struct *vma,
+					unsigned long page)
 {
 	struct mm_struct *mm = vma->vm_mm;
 	unsigned long flags;
@@ -1587,8 +1587,8 @@ out:
 	__restore_flags(flags);
 }
 
-static void
-r4k_flush_cache_page_d32i32(struct vm_area_struct *vma, unsigned long page)
+static void r4k_flush_cache_page_d32i32(struct vm_area_struct *vma,
+					unsigned long page)
 {
 	struct mm_struct *mm = vma->vm_mm;
 	unsigned long flags;
@@ -1639,9 +1639,8 @@ out:
 	__restore_flags(flags);
 }
 
-static void
-r4k_flush_cache_page_d32i32_r4600(struct vm_area_struct *vma,
-                                  unsigned long page)
+static void r4k_flush_cache_page_d32i32_r4600(struct vm_area_struct *vma,
+					      unsigned long page)
 {
 	struct mm_struct *mm = vma->vm_mm;
 	unsigned long flags;
@@ -1741,8 +1740,7 @@ static void r4k_flush_page_to_ram_d32(struct page *page)
  * (Revision 2.0 device errata from IDT available on http://www.idt.com/
  * in .pdf format.)
  */
-static void
-r4k_dma_cache_wback_inv_pc(unsigned long addr, unsigned long size)
+static void r4k_dma_cache_wback_inv_pc(unsigned long addr, unsigned long size)
 {
 	unsigned long end, a;
 	unsigned int flags;
@@ -1766,8 +1764,7 @@ r4k_dma_cache_wback_inv_pc(unsigned long addr, unsigned long size)
 	bc_wback_inv(addr, size);
 }
 
-static void
-r4k_dma_cache_wback_inv_sc(unsigned long addr, unsigned long size)
+static void r4k_dma_cache_wback_inv_sc(unsigned long addr, unsigned long size)
 {
 	unsigned long end, a;
 
@@ -1785,8 +1782,7 @@ r4k_dma_cache_wback_inv_sc(unsigned long addr, unsigned long size)
 	}
 }
 
-static void
-r4k_dma_cache_inv_pc(unsigned long addr, unsigned long size)
+static void r4k_dma_cache_inv_pc(unsigned long addr, unsigned long size)
 {
 	unsigned long end, a;
 	unsigned int flags;
@@ -1811,8 +1807,7 @@ r4k_dma_cache_inv_pc(unsigned long addr, unsigned long size)
 	bc_inv(addr, size);
 }
 
-static void
-r4k_dma_cache_inv_sc(unsigned long addr, unsigned long size)
+static void r4k_dma_cache_inv_sc(unsigned long addr, unsigned long size)
 {
 	unsigned long end, a;
 
@@ -1830,8 +1825,7 @@ r4k_dma_cache_inv_sc(unsigned long addr, unsigned long size)
 	}
 }
 
-static void
-r4k_dma_cache_wback(unsigned long addr, unsigned long size)
+static void r4k_dma_cache_wback(unsigned long addr, unsigned long size)
 {
 	panic("r4k_dma_cache called - should not happen.\n");
 }
@@ -1843,33 +1837,24 @@ r4k_dma_cache_wback(unsigned long addr, unsigned long size)
  */
 static void r4k_flush_cache_sigtramp(unsigned long addr)
 {
-	unsigned long daddr, iaddr;
-
-	daddr = addr & ~((unsigned long)dc_lsize - 1);
 	__asm__ __volatile__("nop;nop;nop;nop");	/* R4600 V1.7 */
-	protected_writeback_dcache_line(daddr);
-	protected_writeback_dcache_line(daddr + dc_lsize);
-	iaddr = addr & ~((unsigned long)ic_lsize - 1);
-	protected_flush_icache_line(iaddr);
-	protected_flush_icache_line(iaddr + ic_lsize);
+
+	protected_writeback_dcache_line(addr & ~(dc_lsize - 1));
+	protected_flush_icache_line(addr & ~(ic_lsize - 1));
 }
 
 static void r4600v20k_flush_cache_sigtramp(unsigned long addr)
 {
-	unsigned long daddr, iaddr;
 	unsigned int flags;
 
-	daddr = addr & ~((unsigned long)dc_lsize - 1);
 	__save_and_cli(flags);
 
 	/* Clear internal cache refill buffer */
 	*(volatile unsigned int *)KSEG1;
 
-	protected_writeback_dcache_line(daddr);
-	protected_writeback_dcache_line(daddr + dc_lsize);
-	iaddr = addr & ~((unsigned long)ic_lsize - 1);
-	protected_flush_icache_line(iaddr);
-	protected_flush_icache_line(iaddr + ic_lsize);
+	protected_writeback_dcache_line(addr & ~(dc_lsize - 1));
+	protected_flush_icache_line(addr & ~(ic_lsize - 1));
+
 	__restore_flags(flags);
 }
 
@@ -2011,8 +1996,7 @@ static void r4k_flush_tlb_page(struct vm_area_struct *vma, unsigned long page)
 	}
 }
 
-static void
-r4k_flush_cache_l2(void)
+static void r4k_flush_cache_l2(void)
 {
 }
 

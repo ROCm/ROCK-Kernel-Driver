@@ -688,16 +688,13 @@ static int hd_release(struct inode * inode, struct file * file)
 extern struct block_device_operations hd_fops;
 
 static struct gendisk hd_gendisk = {
-	MAJOR_NR,	/* Major number */	
-	"hd",		/* Major name */
-	6,		/* Bits to shift to get real from partition */
-	1 << 6,		/* Number of partitions per real */
-	hd,		/* hd struct */
-	hd_sizes,	/* block sizes */
-	0,		/* number */
-	NULL,		/* internal use, not presently used */
-	NULL,		/* next */
-	&hd_fops,       /* file operations */
+	major:		MAJOR_NR,
+	major_name:	"hd",
+	minor_shift:	6,
+	max_p:		1 << 6,
+	part:		hd,
+	sizes:		hd_sizes,
+	fops:		&hd_fops,
 };
 	
 static void hd_interrupt(int irq, void *dev_id, struct pt_regs *regs)
@@ -842,7 +839,7 @@ int __init hd_init(void)
 	}
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST);
 	read_ahead[MAJOR_NR] = 8;		/* 8 sector (4kB) read-ahead */
-	add_gendisk(&hd_gendisk, MAJOR_NR);
+	add_gendisk(&hd_gendisk);
 	init_timer(&device_timer);
 	device_timer.function = hd_times_out;
 	hd_geninit();

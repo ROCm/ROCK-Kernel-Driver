@@ -14,7 +14,7 @@
 
 #include <asm/baget/baget.h>
 
-extern long mips_memory_upper;
+long int vac_memory_upper;
 
 #define CACHEABLE_STR(val) ((val) ? "not cached" : "cached")
 #define MIN(a,b)           (((a)<(b)) ? (a):(b)) 
@@ -172,7 +172,7 @@ static void __init vac_show(void)
 
 static void __init vac_init(void)
 {
-	unsigned short mem_limit = ((mips_memory_upper-KSEG0) >> 16);
+	unsigned short mem_limit = (vac_memory_upper >> 16);
 
 	switch(vac_inw(VAC_ID)) {
 	case 0x1AC0:

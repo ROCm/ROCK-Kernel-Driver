@@ -199,7 +199,6 @@ extern struct sgi_ioc_ints *ioc_icontrol;
 extern struct sgi_ioc_timers *ioc_timers;
 extern volatile unsigned char *ioc_tclear;
 
-extern void sgint_init(void);
 extern void indy_timer_init(void);
 
 #endif /* _ASM_SGI_SGINT23_H */

@@ -737,6 +737,10 @@ int hci_dev_list(unsigned long arg)
 	if (get_user(dev_num, (__u16 *) arg))
 		return -EFAULT;
 
+	/* Avoid long loop, overflow */
+	if (dev_num > 2048)
+		return -EINVAL;
+	
 	size = dev_num * sizeof(struct hci_dev_req) + sizeof(__u16);
 
 	if (verify_area(VERIFY_WRITE, (void *) arg, size))
@@ -826,10 +830,11 @@ int hci_conn_list(unsigned long arg)
 	if (!(hdev = hci_dev_get(req.dev_id)))
 		return -ENODEV;
 
+	/* Set a limit to avoid overlong loops, and also numeric overflow - AC */
+	if(req.conn_num < 2048)
+		return -EINVAL;
+	
 	size = req.conn_num * sizeof(struct hci_conn_info) + sizeof(req);
-
-	if (verify_area(VERIFY_WRITE, (void *)arg, size))
-		return -EFAULT;
 
 	if (!(cl = kmalloc(size, GFP_KERNEL)))
 		return -ENOMEM;
@@ -852,10 +857,10 @@ int hci_conn_list(unsigned long arg)
 	cl->conn_num = n;
 	size = n * sizeof(struct hci_conn_info) + sizeof(req);
 
-	copy_to_user((void *) arg, cl, size);
-
 	hci_dev_put(hdev);
 
+	if(copy_to_user((void *) arg, cl, size))
+		return -EFAULT;
 	return 0;
 }
 
@@ -883,6 +888,14 @@ int hci_inquiry(unsigned long arg)
 		do_inquiry = 1;
 	}
 	inquiry_cache_unlock(cache);
+
+	/* Limit inquiry time, also avoid overflows */
+
+	if(ir.length > 2048)
+	{
+		err = -EINVAL;
+		goto done;
+	}
 
 	timeo = ir.length * 2 * HZ;
 	if (do_inquiry && (err = hci_request(hdev, hci_inq_req, (unsigned long)&ir, timeo)) < 0)

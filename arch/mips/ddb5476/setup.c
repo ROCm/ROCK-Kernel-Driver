@@ -24,6 +24,7 @@
 #include <asm/reboot.h>
 #include <asm/gdb-stub.h>
 #include <asm/nile4.h>
+#include <asm/time.h>
 
 
 #ifdef CONFIG_REMOTE_DEBUG
@@ -71,13 +72,27 @@ static void ddb_machine_power_off(void)
 
 extern void ddb_irq_setup(void);
 
-void (*board_time_init) (struct irqaction * irq);
-
-
 static void __init ddb_time_init(struct irqaction *irq)
 {
-	/* set the clock to 1 Hz */
-	nile4_out32(NILE4_T2CTRL, 1000000);
+	printk("ddb_time_init invoked.\n");
+	mips_counter_frequency = 83000000;
+}
+
+static void __init ddb_timer_setup(struct irqaction *irq)
+{
+	unsigned int count;
+
+	/* we are using the cpu counter for timer interrupts */
+	i8259_setup_irq(0, irq);
+	set_cp0_status(IE_IRQ5);
+
+	/* to generate the first timer interrupt */
+	count = read_32bit_cp0_register(CP0_COUNT);
+	write_32bit_cp0_register(CP0_COMPARE, count + 1000);
+
+#if 0		/* the old way to do timer interrupt */
+	/* set the clock to 100 Hz */
+	nile4_out32(NILE4_T2CTRL, 830000);
 	/* enable the General-Purpose Timer */
 	nile4_out32(NILE4_T2CTRL + 4, 0x00000001);
 	/* reset timer */
@@ -85,6 +100,7 @@ static void __init ddb_time_init(struct irqaction *irq)
 	/* enable interrupt */
 	nile4_enable_irq(NILE4_INT_GPT);
 	i8259_setup_irq(nile4_to_irq(NILE4_INT_GPT), irq);
+#endif
 }
 
 static struct {
@@ -119,7 +135,9 @@ void __init ddb_setup(void)
 	irq_setup = ddb_irq_setup;
 	mips_io_port_base = NILE4_PCI_IO_BASE;
 	isa_slot_offset = NILE4_PCI_MEM_BASE;
+
 	board_time_init = ddb_time_init;
+	board_timer_setup = ddb_timer_setup;
 
 	_machine_restart = ddb_machine_restart;
 	_machine_halt = ddb_machine_halt;

@@ -1739,7 +1739,7 @@ EXPORT_SYMBOL(z8530_get_stats);
 /*
  *	Module support
  */
-static const char banner[] __initdata = KERN_INFO "Generic Z85C30/Z85230 interface driver v0.02\n";
+static char banner[] __initdata = KERN_INFO "Generic Z85C30/Z85230 interface driver v0.02\n";
 
 static int __init z85230_init_driver(void)
 {
@@ -1752,3 +1752,7 @@ static void __exit z85230_cleanup_driver(void)
 {
 }
 module_exit(z85230_cleanup_driver);
+
+MODULE_AUTHOR("Red Hat Inc.");
+MODULE_DESCRIPTION("Z85x30 synchronous driver core");
+MODULE_LICENSE("GPL");

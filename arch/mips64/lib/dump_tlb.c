@@ -168,14 +168,12 @@ dump_list_process(struct task_struct *t, void *address)
 	printk("\n");
 }
 
-void
-dump_list_current(void *address)
+void dump_list_current(void *address)
 {
 	dump_list_process(current, address);
 }
 
-unsigned int
-vtop(void *address)
+unsigned int vtop(void *address)
 {
 	pgd_t	*pgd;
 	pmd_t	*pmd;
@@ -192,16 +190,17 @@ vtop(void *address)
 	return paddr;
 }
 
-void
-dump16(unsigned long *p)
+void dump16(unsigned long *p)
 {
 	int i;
 
 	for(i=0;i<8;i++)
 	{
 		printk("*%08lx == %08lx, ",
-		       (unsigned long)p, (unsigned long)*p++);
+		       (unsigned long)p, (unsigned long)*p);
+		p++;
 		printk("*%08lx == %08lx\n",
-		       (unsigned long)p, (unsigned long)*p++);
+		       (unsigned long)p, (unsigned long)*p);
+		p++;
 	}
 }

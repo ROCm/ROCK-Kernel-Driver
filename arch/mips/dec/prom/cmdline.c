@@ -2,8 +2,6 @@
  * cmdline.c: read the command line passed to us by the PROM.
  *
  * Copyright (C) 1998 Harald Koerfgen
- *
- * $Id: cmdline.c,v 1.2 1999/10/09 00:00:57 ralf Exp $
  */
 #include <linux/init.h>
 #include <linux/kernel.h>
@@ -19,7 +17,7 @@
 extern int (*prom_printf)(char *, ...);
 #endif
 
-char arcs_cmdline[CL_SIZE];
+char arcs_cmdline[COMMAND_LINE_SIZE];
 
 void __init prom_init_cmdline(int argc, char **argv, unsigned long magic)
 {

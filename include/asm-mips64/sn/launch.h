@@ -1,5 +1,4 @@
-/* $Id: launch.h,v 1.3 2000/04/21 04:09:13 pfg Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.

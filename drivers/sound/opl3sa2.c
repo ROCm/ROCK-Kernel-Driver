@@ -810,7 +810,7 @@ static void __exit unload_opl3sa2(struct address_info* hw_config, int card)
 struct isapnp_device_id isapnp_opl3sa2_list[] __initdata = {
 	{	ISAPNP_ANY_ID, ISAPNP_ANY_ID,
 		ISAPNP_VENDOR('Y','M','H'), ISAPNP_FUNCTION(0x0021),
-		NULL },
+		0 },
 	{0}
 };
 

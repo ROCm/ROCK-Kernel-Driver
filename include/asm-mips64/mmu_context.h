@@ -1,5 +1,4 @@
-/* $Id: mmu_context.h,v 1.4 2000/02/23 00:41:38 ralf Exp $
- *
+/*
  * Switch a MMU context.
  *
  * This file is subject to the terms and conditions of the GNU General Public

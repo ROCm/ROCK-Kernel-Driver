@@ -54,8 +54,8 @@ void __init atlas_setup(void)
 	char rs_getDebugChar(void);
 	int saa9730_putDebugChar(char);
 	char saa9730_getDebugChar(void);
-	extern int (*putDebugChar)(char);
-	extern char (*getDebugChar)(void);
+	extern int (*generic_putDebugChar)(char);
+	extern char (*generic_getDebugChar)(void);
 #endif
 	char *argptr;
 
@@ -89,12 +89,12 @@ void __init atlas_setup(void)
 
 		if(line == 0) {
 			rs_kgdb_hook(line);
-			putDebugChar = rs_putDebugChar;
-			getDebugChar = rs_getDebugChar;
+			generic_putDebugChar = rs_putDebugChar;
+			generic_getDebugChar = rs_getDebugChar;
 		} else {
 			saa9730_kgdb_hook();
-			putDebugChar = saa9730_putDebugChar;
-			getDebugChar = saa9730_getDebugChar;
+			generic_putDebugChar = saa9730_putDebugChar;
+			generic_getDebugChar = saa9730_getDebugChar;
 		}
 
 		prom_printf("KGDB: Using serial line /dev/ttyS%d for session, "

@@ -1,4 +1,4 @@
-/* $Id: vacserial.c,v 1.3 1999/08/17 22:18:37 ralf Exp $
+/*
  * vacserial.c: VAC UART serial driver
  *              This code stealed and adopted from linux/drivers/char/serial.c
  *              See that for author info
@@ -1300,7 +1300,7 @@ static int set_serial_info(struct async_struct * info,
 		goto check_and_exit;
 	}
 
-	new_serial.irq = irq_cannonicalize(new_serial.irq);
+	new_serial.irq = new_serial.irq;
 
 	if ((new_serial.irq >= NR_IRQS) || (new_serial.port > 0xffff) ||
 	    (new_serial.baud_base == 0) || (new_serial.type < PORT_UNKNOWN) ||
@@ -1417,12 +1417,10 @@ static int get_modem_info(struct async_struct * info, unsigned int *value)
 static int set_modem_info(struct async_struct * info, unsigned int cmd,
 			  unsigned int *value)
 {
-	int error;
 	unsigned int arg;
 
-	error = get_user(arg, value);
-	if (error)
-		return error;
+	if (get_user(arg, value))
+		return -EFAULT;
 	switch (cmd) {
 	default:
 		return -EINVAL;
@@ -2426,7 +2424,7 @@ int __init rs_init(void)
 		state->icount.rx = state->icount.tx = 0;
 		state->icount.frame = state->icount.parity = 0;
 		state->icount.overrun = state->icount.brk = 0;
-		state->irq = irq_cannonicalize(state->irq);
+		state->irq = state->irq;
 		if (check_region(state->port,8))
 			continue;
 	        if (state->flags & ASYNC_BOOT_AUTOCONF)

@@ -1,18 +1,11 @@
 /*
  * Copyright (C) 1991, 1992, 1995  Linus Torvalds
  * Copyright (C) 1996 - 2000  Ralf Baechle
+ * Kevin D. Kissell, kevink@mips.com and Carsten Langgaard, carstenl@mips
+ * Copyright (C) 2000 MIPS Technologies, Inc.  All rights reserved.
  *
- * This file contains the time handling details for PC-style clocks as
- * found in some MIPS systems.
+ * Don't use.  Deprecated.  Dead meat.
  */
-/**************************************************************************
- *  9 Nov, 2000.
- *  Changed init_cycle_counter() routine, use the mips_cpu structure.
- *
- *  Kevin D. Kissell, kevink@mips.com and Carsten Langgaard, carstenl@mips
- *  Copyright (C) 2000 MIPS Technologies, Inc.  All rights reserved.
- *************************************************************************/
-
 #include <linux/config.h>
 #include <linux/errno.h>
 #include <linux/init.h>
@@ -450,7 +443,12 @@ r4k_timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 void indy_r4k_timer_interrupt (struct pt_regs *regs)
 {
 	static const int INDY_R4K_TIMER_IRQ = 7;
+	int cpu = smp_processor_id();
+
 	r4k_timer_interrupt (INDY_R4K_TIMER_IRQ, NULL, regs);
+
+	if (softirq_pending(cpu))
+		do_softirq();
 }
 
 struct irqaction irq0  = { timer_interrupt, SA_INTERRUPT, 0,

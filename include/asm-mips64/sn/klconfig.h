@@ -936,6 +936,7 @@ extern lboard_t *find_lboard(lboard_t *start, unsigned char type);
 extern klinfo_t *find_component(lboard_t *brd, klinfo_t *kli, unsigned char type);
 extern klinfo_t *find_first_component(lboard_t *brd, unsigned char type);
 extern klcpu_t *nasid_slice_to_cpuinfo(nasid_t, int);
+extern lboard_t *find_lboard_class(lboard_t *start, unsigned char brd_class);
 
 
 #if defined(CONFIG_SGI_IO)
@@ -943,7 +944,6 @@ extern xwidgetnum_t nodevertex_widgetnum_get(vertex_hdl_t node_vtx);
 extern vertex_hdl_t nodevertex_xbow_peer_get(vertex_hdl_t node_vtx);
 extern lboard_t *find_gfxpipe(int pipenum);
 extern void setup_gfxpipe_link(vertex_hdl_t vhdl,int pipenum);
-extern lboard_t *find_lboard_class(lboard_t *start, unsigned char brd_class);
 extern lboard_t *find_lboard_module_class(lboard_t *start, moduleid_t mod,
                                                unsigned char brd_class);
 extern lboard_t *find_nic_lboard(lboard_t *, nic_t);

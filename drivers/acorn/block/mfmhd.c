@@ -1311,15 +1311,13 @@ void xd_set_geometry(kdev_t dev, unsigned char secsptrack, unsigned char heads,
 }
 
 static struct gendisk mfm_gendisk = {
-	MAJOR_NR,		/* Major number */
-	"mfm",			/* Major name */
-	6,			/* Bits to shift to get real from partition */
-	1 << 6,			/* Number of partitions per real */
-	mfm,			/* hd struct */
-	mfm_sizes,		/* block sizes */
-	0,			/* number */
-	(void *) mfm_info,	/* internal */
-	NULL			/* next */
+	major:		MAJOR_NR,
+	major_name:	"mfm",
+	minor_shift:	6,
+	max_p:		1 << 6,
+	part:		mfm,
+	sizes:		mfm_sizes,
+	real_devices:	(void *)mfm_info,
 };
 
 static struct block_device_operations mfm_fops =

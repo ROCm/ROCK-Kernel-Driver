@@ -1,5 +1,4 @@
-/* $Id$
- *
+/*
  * Copyright (C) 1999, 2000  Tim Waugh <tim@cyberelk.demon.co.uk>
  *
  * This file should only be included by drivers/parport/parport_pc.c.

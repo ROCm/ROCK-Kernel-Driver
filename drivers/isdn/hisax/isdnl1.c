@@ -1,4 +1,4 @@
-/* $Id: isdnl1.c,v 2.41.6.3 2001/05/26 15:19:57 kai Exp $
+/* $Id: isdnl1.c,v 2.41.6.4 2001/08/23 19:44:23 kai Exp $
  *
  * isdnl1.c     common low level stuff for Siemens Chipsetbased isdn cards
  *              based on the teles driver from Jan den Ouden
@@ -15,7 +15,7 @@
  *
  */
 
-const char *l1_revision = "$Revision: 2.41.6.3 $";
+const char *l1_revision = "$Revision: 2.41.6.4 $";
 
 #define __NO_VERSION__
 #include <linux/init.h>
@@ -895,7 +895,8 @@ setstack_HiSax(struct PStack *st, struct IsdnCardState *cs)
 	setstack_manager(st);
 	st->l1.stlistp = &(cs->stlist);
 	st->l2.l2l1  = dch_l2l1;
-	cs->setstack_d(st, cs);
+	if (cs->setstack_d)
+		cs->setstack_d(st, cs);
 }
 
 void

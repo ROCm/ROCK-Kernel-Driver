@@ -1386,16 +1386,14 @@ static int acsi_mode_sense( int target, int lun, SENSE_DATA *sd )
 extern struct block_device_operations acsi_fops;
 
 static struct gendisk acsi_gendisk = {
-	MAJOR_NR,		/* Major number */	
-	"ad",			/* Major name */
-	4,			/* Bits to shift to get real from partition */
-	1 << 4,			/* Number of partitions per real */
-	acsi_part,		/* hd struct */
-	acsi_sizes,		/* block sizes */
-	0,			/* number */
-	(void *)acsi_info,	/* internal */
-	NULL,			/* next */
-	&acsi_fops,		/* file operations */
+	major:		MAJOR_NR,
+	major_name:	"ad",
+	minor_shift:	4,
+	max_p:		1 << 4,
+	part:		acsi_part,
+	sizes:		acsi_sizes,
+	real_devices:	(void *)acsi_info,
+	fops:		&acsi_fops,
 };
 	
 #define MAX_SCSI_DEVICE_CODE 10

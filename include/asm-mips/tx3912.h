@@ -14,14 +14,6 @@
 
 #include <asm/addrspace.h>
 
-#define inb(addr)	(*(volatile unsigned char *)(addr))
-#define inw(addr)	(*(volatile unsigned short *)(addr))
-#define inl(addr)	(*(volatile unsigned int *)(addr))
-#define outb(b,addr)	(*(volatile unsigned char *)(addr)) = (b)
-#define outw(b,addr)	(*(volatile unsigned short *)(addr)) = (b)
-#define outl(b,addr)	(*(volatile unsigned int *)(addr)) = (b)
-
- 
 /******************************************************************************
 *
 * 	01  General macro definitions

@@ -31,18 +31,6 @@
 #include <asm/reboot.h>
 #include <asm/sni.h>
 
-/*
- * Initial irq handlers.
- */
-static void no_action(int cpl, void *dev_id, struct pt_regs *regs) { }
-
-/*
- * IRQ2 is cascade interrupt to second interrupt controller
- */
-static struct irqaction irq2  = { no_action, 0, 0, "cascade", NULL, NULL};
-
-extern asmlinkage void sni_rm200_pci_handle_int(void);
-
 extern void sni_machine_restart(char *command);
 extern void sni_machine_halt(void);
 extern void sni_machine_power_off(void);
@@ -50,20 +38,6 @@ extern void sni_machine_power_off(void);
 extern struct ide_ops std_ide_ops;
 extern struct rtc_ops std_rtc_ops;
 extern struct kbd_ops std_kbd_ops;
-
-static void __init sni_irq_setup(void)
-{
-	set_except_vector(0, sni_rm200_pci_handle_int);
-	request_region(0x20,0x20, "pic1");
-	request_region(0xa0,0x20, "pic2");	
-	i8259_setup_irq(2, &irq2);
-	/*
-	 * IRQ0 seems to be the irq for PC style stuff.
-	 * I don't know how to handle the debug button interrupt, so
-	 * don't use this button yet or bad things happen ...
-	 */
-	set_cp0_status(ST0_IM, IE_IRQ1 | IE_IRQ3 | IE_IRQ4);
-}
 
 void (*board_time_init)(struct irqaction *irq);
 
@@ -73,7 +47,7 @@ static void __init sni_rm200_pci_time_init(struct irqaction *irq)
 	outb_p(0x34,0x43);		/* binary, mode 2, LSB/MSB, ch 0 */
 	outb_p(LATCH & 0xff , 0x40);	/* LSB */
 	outb(LATCH >> 8 , 0x40);	/* MSB */
-	i8259_setup_irq(0, irq);
+	setup_irq(0, irq);
 }
 
 unsigned char aux_device_present;
@@ -101,45 +75,11 @@ static inline void sni_pcimt_detect(void)
 	printk("%s.\n", boardtype);
 }
 
-int __init page_is_ram(unsigned long pagenr)
-{
-	return 1;
-}
-
 void __init sni_rm200_pci_setup(void)
 {
-#if 0 /* XXX Tag me deeper  */
-	tag *atag;
-
-	/*
-	 * We just check if a tag_screen_info can be gathered
-	 * in setup_arch(), if yes we don't proceed futher...
-	 */
-	atag = bi_TagFind(tag_screen_info);
-	if (!atag) {
-		/*
-		 * If no, we try to find the tag_arc_displayinfo which is
-		 * always created by Milo for an ARC box (for now Milo only
-		 * works on ARC boxes :) -Stoned.
-		 */
-		atag = bi_TagFind(tag_arcdisplayinfo);
-		if (atag) {
-			screen_info.orig_x = 
-				((mips_arc_DisplayInfo*)TAGVALPTR(atag))->cursor_x;
-			screen_info.orig_y = 
-				((mips_arc_DisplayInfo*)TAGVALPTR(atag))->cursor_y;
-			screen_info.orig_video_cols  = 
-				((mips_arc_DisplayInfo*)TAGVALPTR(atag))->columns;
-			screen_info.orig_video_lines  = 
-				((mips_arc_DisplayInfo*)TAGVALPTR(atag))->lines;
-		}
-	}
-#endif
-
 	sni_pcimt_detect();
 	sni_pcimt_sc_init();
 
-	irq_setup = sni_irq_setup;
 	mips_io_port_base = SNI_PORT_BASE;
 
 	/*

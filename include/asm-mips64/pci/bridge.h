@@ -1,5 +1,4 @@
-/* $Id$
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -828,11 +827,11 @@ typedef union ate_u {
 
 #define BRIDGE_INTERNAL_ATES	128
 
-/* ========================================================================
- *    Linux pci bus mappings to sn physical id's
+/*
+ * Linux pci bus mappings to sn physical id's
  */
-unsigned char bus_to_wid[256];	/* widget id for linux pci bus */
-unsigned char bus_to_nid[256];	/* nasid for linux pci bus */
-unsigned char num_bridges;	/* number of bridges in the system */
+extern unsigned char bus_to_wid[];	/* widget id for linux pci bus */
+extern unsigned char bus_to_nid[];	/* nasid for linux pci bus */
+extern unsigned char num_bridges;	/* number of bridges in the system */
 
 #endif /* _ASM_PCI_BRIDGE_H */

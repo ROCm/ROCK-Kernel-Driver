@@ -1,12 +1,12 @@
-/* $Id: setup.c,v 1.24 1999/10/09 00:00:58 ralf Exp $
- *
+/*
  * Setup pointers to hardware-dependent routines.
  *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1996, 1997, 1998 by Ralf Baechle
+ * Copyright (C) 1996, 1997, 1998, 2001 by Ralf Baechle
+ * Copyright (C) 2001 MIPS Technologies, Inc.
  */
 #include <linux/config.h>
 #include <linux/hdreg.h>
@@ -72,17 +72,12 @@ static void __init jazz_irq_setup(void)
 			  JAZZ_IE_FLOPPY);
 	r4030_read_reg16(JAZZ_IO_IRQ_SOURCE); /* clear pending IRQs */
 	r4030_read_reg32(JAZZ_R4030_INVAL_ADDR); /* clear error bits */
-	set_cp0_status(ST0_IM, IE_IRQ4 | IE_IRQ3 | IE_IRQ2 | IE_IRQ1);
+	change_cp0_status(ST0_IM, IE_IRQ4 | IE_IRQ3 | IE_IRQ2 | IE_IRQ1);
 	/* set the clock to 100 Hz */
 	r4030_write_reg32(JAZZ_TIMER_INTERVAL, 9);
 	request_region(0x20, 0x20, "pic1");
 	request_region(0xa0, 0x20, "pic2");
 	i8259_setup_irq(2, &irq2);
-}
-
-int __init page_is_ram(unsigned long pagenr)
-{
-	return 1;
 }
 
 void __init jazz_setup(void)
@@ -93,6 +88,8 @@ void __init jazz_setup(void)
 
 	irq_setup = jazz_irq_setup;
 	mips_io_port_base = JAZZ_PORT_BASE;
+	if (mips_machtype == MACH_MIPS_MAGNUM_4000)
+		EISA_bus = 1;
 	isa_slot_offset = 0xe3000000;
 	request_region(0x00,0x20,"dma1");
 	request_region(0x40,0x20,"timer");

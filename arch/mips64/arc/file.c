@@ -1,5 +1,4 @@
-/* $Id: file.c,v 1.3 1999/10/19 20:51:44 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.

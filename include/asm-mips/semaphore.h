@@ -6,9 +6,9 @@
  * for more details.
  *
  * (C) Copyright 1996  Linus Torvalds
- * (C) Copyright 1998, 1999, 2000  Ralf Baechle
+ * (C) Copyright 1998, 99, 2000, 01  Ralf Baechle
  * (C) Copyright 1999, 2000  Silicon Graphics, Inc.
- *  Copyright (C) 2000 MIPS Technologies, Inc.  All rights reserved.
+ * Copyright (C) 2000, 01 MIPS Technologies, Inc.  All rights reserved.
  */
 #ifndef _ASM_SEMAPHORE_H
 #define _ASM_SEMAPHORE_H
@@ -106,7 +106,7 @@ static inline int down_interruptible(struct semaphore * sem)
 	return ret;
 }
 
-#if !defined(CONFIG_CPU_HAS_LLSC) || defined(CONFIG_CPU_MIPS32)
+#ifndef CONFIG_CPU_HAS_LLDSCD
 
 static inline int down_trylock(struct semaphore * sem)
 {
@@ -171,7 +171,7 @@ static inline int down_trylock(struct semaphore * sem)
 	return ret;
 }
 
-#endif
+#endif /* CONFIG_CPU_HAS_LLDSCD */
 
 /*
  * Note! This is subtle. We jump to wake people up only if

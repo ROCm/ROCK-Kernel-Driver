@@ -1111,7 +1111,7 @@ net_open(struct net_device *dev)
 					(unsigned long)lp->dma_buff,
 					(unsigned long)virt_to_bus(lp->dma_buff));
 			}
-			if ((unsigned long)virt_to_bus(lp->dma_buff) >= MAX_DMA_ADDRESS ||
+			if ((unsigned long) lp->dma_buff >= MAX_DMA_ADDRESS ||
 			    !dma_page_eq(lp->dma_buff, lp->dma_buff+lp->dmasize*1024-1)) {
 				printk(KERN_ERR "%s: not usable as DMA buffer\n", dev->name);
 				goto release_irq;

@@ -12,6 +12,9 @@
 
 #include <linux/config.h>
 
+#define sem_read(a) ((a)->counter)
+#define sem_inc(a) (((a)->counter)++)
+#define sem_dec(a) (((a)->counter)--)
 /*
  * These two _must_ execute atomically wrt each other.
  */
@@ -20,66 +23,7 @@ static inline void wake_one_more(struct semaphore * sem)
 	atomic_inc(&sem->waking);
 }
 
-#if !defined(CONFIG_CPU_HAS_LLSC) || defined(CONFIG_CPU_MIPS32)
-
-/*
- * It doesn't make sense, IMHO, to endlessly turn interrupts off and on again.
- * Do it once and that's it. ll/sc *has* it's advantages. HK
- */
-#define read(a) ((a)->counter)
-#define inc(a) (((a)->counter)++)
-#define dec(a) (((a)->counter)--)
-
-static inline int waking_non_zero(struct semaphore *sem)
-{
-	unsigned long flags;
-	int ret = 0;
-
-	save_and_cli(flags);
-	if (read(&sem->waking) > 0) {
-		dec(&sem->waking);
-		ret = 1;
-	}
-	restore_flags(flags);
-	return ret;
-}
-
-static inline int waking_non_zero_interruptible(struct semaphore *sem,
-						struct task_struct *tsk)
-{
-	int ret = 0;
-	unsigned long flags;
-
-	save_and_cli(flags);
-	if (read(&sem->waking) > 0) {
-		dec(&sem->waking);
-		ret = 1;
-	} else if (signal_pending(tsk)) {
-		inc(&sem->count);
-		ret = -EINTR;
-	}
-	restore_flags(flags);
-	return ret;
-}
-
-static inline int waking_non_zero_trylock(struct semaphore *sem)
-{
-        int ret = 1;
-	unsigned long flags;
-
-	save_and_cli(flags);
-	if (read(&sem->waking) <= 0)
-		inc(&sem->count);
-	else {
-		dec(&sem->waking);
-		ret = 0;
-	}
-	restore_flags(flags);
-
-	return ret;
-}
-
-#else /* CONFIG_CPU_HAS_LLSC */
+#ifdef CONFIG_CPU_HAS_LLSC
 
 static inline int
 waking_non_zero(struct semaphore *sem)
@@ -98,6 +42,30 @@ waking_non_zero(struct semaphore *sem)
 
 	return ret;
 }
+
+#else /* !CONFIG_CPU_HAS_LLSC */
+
+/*
+ * It doesn't make sense, IMHO, to endlessly turn interrupts off and on again.
+ * Do it once and that's it. ll/sc *has* it's advantages. HK
+ */
+
+static inline int waking_non_zero(struct semaphore *sem)
+{
+	unsigned long flags;
+	int ret = 0;
+
+	save_and_cli(flags);
+	if (sem_read(&sem->waking) > 0) {
+		sem_dec(&sem->waking);
+		ret = 1;
+	}
+	restore_flags(flags);
+	return ret;
+}
+#endif /* !CONFIG_CPU_HAS_LLSC */
+
+#ifdef CONFIG_CPU_HAS_LLDSCD
 
 /*
  * waking_non_zero_interruptible:
@@ -173,6 +141,43 @@ waking_non_zero_trylock(struct semaphore *sem)
 	return 0;
 }
 
-#endif /* CONFIG_CPU_HAS_LLSC */
+#else /* !CONFIG_CPU_HAS_LLDSCD */
+
+static inline int waking_non_zero_interruptible(struct semaphore *sem,
+						struct task_struct *tsk)
+{
+	int ret = 0;
+	unsigned long flags;
+
+	save_and_cli(flags);
+	if (sem_read(&sem->waking) > 0) {
+		sem_dec(&sem->waking);
+		ret = 1;
+	} else if (signal_pending(tsk)) {
+		sem_inc(&sem->count);
+		ret = -EINTR;
+	}
+	restore_flags(flags);
+	return ret;
+}
+
+static inline int waking_non_zero_trylock(struct semaphore *sem)
+{
+        int ret = 1;
+	unsigned long flags;
+
+	save_and_cli(flags);
+	if (sem_read(&sem->waking) <= 0)
+		sem_inc(&sem->count);
+	else {
+		sem_dec(&sem->waking);
+		ret = 0;
+	}
+	restore_flags(flags);
+
+	return ret;
+}
+
+#endif /* !CONFIG_CPU_HAS_LLDSCD */
 
 #endif /* _ASM_SEMAPHORE_HELPER_H */

@@ -275,7 +275,7 @@ void __init time_init(void)
 
 /* This is for machines which generate the exact clock. */
 #define USECS_PER_JIFFY (1000000/HZ)
-#define USECS_PER_JIFFY_FRAC (0x100000000*1000000/HZ&0xffffffff)
+#define USECS_PER_JIFFY_FRAC ((1000000 << 32) / HZ & 0xffffffff)
 
 /* Cycle counter value at the previous timer interrupt.. */
 

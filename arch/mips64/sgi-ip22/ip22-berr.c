@@ -1,5 +1,4 @@
-/* $Id: ip22-berr.c,v 1.1 2000/01/21 22:34:03 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -9,6 +8,9 @@
  */
 #include <linux/init.h>
 #include <linux/kernel.h>
+#include <linux/module.h>
+
+#include <asm/module.h>
 #include <asm/uaccess.h>
 #include <asm/paccess.h>
 #include <asm/addrspace.h>
@@ -41,16 +43,43 @@ search_one_table(const struct exception_table_entry *first,
 	return 0;
 }
 
+extern spinlock_t modlist_lock;
+
 static inline unsigned long
 search_dbe_table(unsigned long addr)
 {
-	unsigned long ret;
+	unsigned long ret = 0;
 
+#ifndef CONFIG_MODULES
 	/* There is only the kernel to search.  */
 	ret = search_one_table(__start___dbe_table, __stop___dbe_table-1, addr);
-	if (ret) return ret;
+	return ret;
+#else
+	unsigned long flags;
 
-	return 0;
+	/* The kernel is the last "module" -- no need to treat it special.  */
+	struct module *mp;
+	struct archdata *ap;
+
+	spin_lock_irqsave(&modlist_lock, flags);
+	for (mp = module_list; mp != NULL; mp = mp->next) {
+		if (!mod_member_present(mp, archdata_end) ||
+        	    !mod_archdata_member_present(mp, struct archdata,
+						 dbe_table_end))
+			continue;
+		ap = (struct archdata *)(mod->archdata_start);
+
+		if (ap->dbe_table_start == NULL ||
+		    !(mp->flags & (MOD_RUNNING | MOD_INITIALIZING)))
+			continue;
+		ret = search_one_table(ap->dbe_table_start,
+				       ap->dbe_table_end - 1, addr);
+		if (ret)
+			break;
+	}
+	spin_unlock_irqrestore(&modlist_lock, flags);
+	return ret;
+#endif
 }
 
 void do_ibe(struct pt_regs *regs)

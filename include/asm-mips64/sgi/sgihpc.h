@@ -1,5 +1,4 @@
-/* $Id: sgihpc.h,v 1.2 1999/10/19 20:51:54 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -333,8 +332,6 @@ extern struct hpc3_miscregs *hpc3mregs;
 
 /* We need software copies of these because they are write only. */
 extern unsigned int sgi_hpc_write1, sgi_hpc_write2;
-
-#define SGI_KEYBOARD_IRQ 20
 
 struct hpc_keyb {
 #ifdef __MIPSEB__

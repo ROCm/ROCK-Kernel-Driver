@@ -418,7 +418,7 @@ act2000_isa_getid(act2000_card * card)
 int
 act2000_isa_download(act2000_card * card, act2000_ddef * cb)
 {
-        int length;
+        unsigned int length;
         int ret;
         int l;
         int c;
@@ -431,9 +431,8 @@ act2000_isa_download(act2000_card * card, act2000_ddef * cb)
         if (!act2000_isa_reset(card->port))
                 return -ENXIO;
         act2000_isa_delay(HZ / 2);
-        if ((ret = verify_area(VERIFY_READ, (void *) cb, sizeof(cblock))))
-                return ret;
-        copy_from_user(&cblock, (char *) cb, sizeof(cblock));
+        if(copy_from_user(&cblock, (char *) cb, sizeof(cblock)))
+        	return -EFAULT;
         length = cblock.length;
         p = cblock.buffer;
         if ((ret = verify_area(VERIFY_READ, (void *) p, length)))

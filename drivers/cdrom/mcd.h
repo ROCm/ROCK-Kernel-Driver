@@ -70,17 +70,6 @@
 
 /* borrowed from hd.c */
 
-#define READ_DATA(port, buf, nr) \
-insb(port, buf, nr)
-
-#define SET_TIMER(func, jifs) 				\
-	do {						\
-		mcd_timer.function = func;		\
-		mod_timer(&mcd_timer, jiffies + jifs);	\
-	} while (0)
-
-#define CLEAR_TIMER		del_timer_async(&mcd_timer);
-
 #define MAX_TRACKS		104
 
 struct msf {
@@ -108,3 +97,10 @@ struct mcd_Toc {
 	struct msf	trackTime;
 	struct msf	diskTime;
 };
+
+#define test1(x)
+#define test2(x)
+#define test3(x)
+#define test4(x)
+#define test5(x)
+

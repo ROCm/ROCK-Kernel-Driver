@@ -41,7 +41,7 @@
 #define __bi_restore_flags(x)
 #endif /* __KERNEL__ */
 
-#if defined(CONFIG_CPU_HAS_LLSC)
+#ifdef CONFIG_CPU_HAS_LLSC
 
 #include <asm/mipsregs.h>
 
@@ -596,8 +596,9 @@ extern __inline__ int find_first_zero_bit (void *addr, unsigned size)
 		"blez\t$1,2f\n\t"
 		"lw\t$1,(%5)\n\t"
 		"addiu\t%5,4\n\t"
-#if (_MIPS_ISA == _MIPS_ISA_MIPS2) || (_MIPS_ISA == _MIPS_ISA_MIPS3) || \
-    (_MIPS_ISA == _MIPS_ISA_MIPS4) || (_MIPS_ISA == _MIPS_ISA_MIPS5)
+#if (_MIPS_ISA == _MIPS_ISA_MIPS2 ) || (_MIPS_ISA == _MIPS_ISA_MIPS3 ) || \
+    (_MIPS_ISA == _MIPS_ISA_MIPS4 ) || (_MIPS_ISA == _MIPS_ISA_MIPS5 ) || \
+    (_MIPS_ISA == _MIPS_ISA_MIPS32) || (_MIPS_ISA == _MIPS_ISA_MIPS64)
 		"beql\t%1,$1,1b\n\t"
 		"addiu\t%0,32\n\t"
 #else
@@ -795,11 +796,12 @@ extern int find_first_zero_bit (void *addr, unsigned size);
 /* Now for the ext2 filesystem bit operations and helper routines. */
 
 #ifdef __MIPSEB__
-extern __inline__ int ext2_set_bit(int nr,void * addr)
+extern __inline__ int ext2_set_bit(int nr, void * addr)
 {
 	int		mask, retval, flags;
 	unsigned char	*ADDR = (unsigned char *) addr;
 
+	ADDR += nr >> 3;
 	mask = 1 << (nr & 0x07);
 	save_and_cli(flags);
 	retval = (mask & *ADDR) != 0;

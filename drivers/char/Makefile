@@ -41,6 +41,12 @@ ifeq ($(ARCH),s390)
   SERIAL   =
 endif
 
+ifeq ($(ARCH),mips)
+  ifneq ($(CONFIG_PC_KEYB),y)
+    KEYBD    =
+  endif
+endif
+
 ifeq ($(ARCH),s390x)
   KEYMAP   =
   KEYBD    =
@@ -95,8 +101,9 @@ ifeq ($(ARCH),sh)
 endif
 
 ifeq ($(CONFIG_DECSTATION),y)
+  KEYMAP   =
   KEYBD    =
-  SERIAL   =
+  SERIAL   = decserial.o
 endif
 
 ifeq ($(CONFIG_BAGET_MIPS),y)
@@ -104,10 +111,18 @@ ifeq ($(CONFIG_BAGET_MIPS),y)
   SERIAL   =
 endif
 
+ifeq ($(CONFIG_NINO),y)
+  SERIAL   =
+endif
+
 ifneq ($(CONFIG_SUN_SERIAL),)
   SERIAL   =
 endif
 
+ifeq ($(CONFIG_QTRONIX_KEYBOARD),y)
+  KEYBD    = qtronix.o
+  KEYMAP   = qtronixmap.o
+endif
 
 obj-$(CONFIG_VT) += vt.o vc_screen.o consolemap.o consolemap_deftbl.o $(CONSOLE) selection.o
 obj-$(CONFIG_SERIAL) += $(SERIAL)
@@ -147,6 +162,7 @@ obj-$(CONFIG_SERIAL167) += serial167.o
 obj-$(CONFIG_MVME147_SCC) += generic_serial.o vme_scc.o
 obj-$(CONFIG_MVME162_SCC) += generic_serial.o vme_scc.o
 obj-$(CONFIG_BVME6000_SCC) += generic_serial.o vme_scc.o
+obj-$(CONFIG_SERIAL_TX3912) += generic_serial.o serial_tx3912.o
 
 subdir-$(CONFIG_RIO) += rio
 subdir-$(CONFIG_INPUT) += joystick
@@ -230,4 +246,7 @@ consolemap_deftbl.o: consolemap_deftbl.c $(TOPDIR)/include/linux/types.h
 .DELETE_ON_ERROR:
 
 defkeymap.c: defkeymap.map
+	set -e ; loadkeys --mktable $< | sed -e 's/^static *//' > $@
+
+qtronixmap.c: qtronixmap.map
 	set -e ; loadkeys --mktable $< | sed -e 's/^static *//' > $@

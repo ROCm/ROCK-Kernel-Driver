@@ -233,3 +233,34 @@ Generally, CONFIG_EXPERIMENTAL should surround all options not considered
 stable. All options that are known to trash data (experimental write-
 support for file-systems, for instance) should be denoted (DANGEROUS), other
 Experimental options should be denoted (EXPERIMENTAL).
+
+
+		Chapter 8: Data structures
+
+Data structures that have visibility outside the single-threaded
+environment they are created and destroyed in should always have
+reference counts.  In the kernel, garbage collection doesn't exist (and
+outside the kernel garbage collection is slow and inefficient), which
+means that you absolutely _have_ to reference count all your uses. 
+
+Reference counting means that you can avoid locking, and allows multiple
+users to have access to the data structure in parallel - and not having
+to worry about the structure suddenly going away from under them just
+because they slept or did something else for a while. 
+
+Note that locking is _not_ a replacement for reference counting. 
+Locking is used to keep data structures coherent, while reference
+counting is a memory management technique.  Usually both are needed, and
+they are not to be confused with each other.
+
+Many data structures can indeed have two levels of reference counting,
+when there are users of different "classes".  The subclass count counts
+the number of subclass users, and decrements the global count just once
+when the subclass count goes to zero.
+
+Examples of this kind of "multi-reference-counting" can be found in
+memory management ("struct mm_struct": mm_users and mm_count), and in
+filesystem code ("struct super_block": s_count and s_active).
+
+Remember: if another thread can find your data structure, and you don't
+have a reference count on it, you almost certainly have a bug.

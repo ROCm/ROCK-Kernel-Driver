@@ -1,4 +1,4 @@
-/* $Id: isdn_tty.h,v 1.22 2000/06/21 09:54:29 keil Exp $
+/* $Id: isdn_tty.h,v 1.22.6.1 2001/08/14 14:12:18 kai Exp $
 
  * header for Linux ISDN subsystem, tty related functions (linklevel).
  *
@@ -85,7 +85,10 @@
 
 #define REG_CPN      23
 #define BIT_CPN       1
+#define REG_CPNFCON  23
 #define BIT_CPNFCON   2
+#define REG_CDN      23
+#define BIT_CDN       4
 
 /* defines for result codes */
 #define RESULT_OK		0

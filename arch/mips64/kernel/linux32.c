@@ -1538,11 +1538,11 @@ do_sys32_semctl(int first, int second, int third, void *uptr)
 	err = -EFAULT;
 	if (get_user (pad, (u32 *)uptr))
 		return err;
-	if(third == SETVAL)
+	if ((third & ~IPC_64) == SETVAL)
 		fourth.val = (int)pad;
 	else
 		fourth.__pad = (void *)A(pad);
-	switch (third) {
+	switch (third & ~IPC_64) {
 
 	case IPC_INFO:
 	case IPC_RMID:

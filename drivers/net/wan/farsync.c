@@ -1830,3 +1830,4 @@ fst_cleanup_module(void)
 module_init ( fst_init );
 module_exit ( fst_cleanup_module );
 
+MODULE_LICENSE("GPL");

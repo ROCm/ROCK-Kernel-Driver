@@ -636,7 +636,7 @@ static int ppp_ioctl(struct inode *inode, struct file *file,
 
 		if (copy_from_user(&uprog, (void *) arg, sizeof(uprog)))
 			break;
-		if (uprog.len > 0) {
+		if (uprog.len > 0 && uprog.len < 65536) {
 			err = -ENOMEM;
 			len = uprog.len * sizeof(struct sock_filter);
 			code = kmalloc(len, GFP_KERNEL);

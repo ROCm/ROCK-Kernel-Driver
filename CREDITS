@@ -400,13 +400,12 @@ S: Columbus, Ohio 43210
 S: USA
 
 N: Peter Braam
-E: braam@cs.cmu.edu
-W: http://coda.cs.cmu.edu/~braam
-D: Coda Filesystem
-S: Dept of Computer Science
-S: 5000 Forbes Avenue
-S: Pittsburgh, Pennsylvania 15213
-S: USA
+E: braam@clusterfs.com
+W: http://www.clusterfs.com/
+D: Coda & InterMezzo filesystems
+S: 181 McNeil
+S: Canmore, AB
+S: Canada, T1W 2R9
 
 N: Ryan Bradetich
 E: rbradetich@uswest.net
@@ -535,6 +534,12 @@ S: Stanford University
 S: Stanford, California 94305
 S: USA
 
+N: Randolph Chung
+E: tausq@debian.org
+D: Linux/PA-RISC hacker
+S: Fremont, CA 94538
+S: USA
+
 N: Juan Jose Ciarlante
 W: http://juanjox.kernelnotes.org/
 E: jjciarla@raiz.uncu.edu.ar
@@ -633,10 +638,11 @@ S: Littleton, Massachusetts 01460
 S: USA
 
 N: Frank Davis
+E: fdavis@si.rr.com
 E: fdavis112@juno.com
 D: Various kernel patches
 S: 8 Lakeview Terr.
-S: Kerhonskon, NY 12446
+S: Kerhonkson, NY 12446
 S: USA
 
 N: Wayne Davison
@@ -714,7 +720,7 @@ D: PowerPC
 N: Oleg Drokin
 E: green@ccssu.crimea.ua
 W: http://www.ccssu.crimea.ua/~green
-D: Cleaning up sound drivers.
+D: Cleaning up sound drivers, SA1100 Watchdog.
 S: Skvoznoy per., 14a
 S: Evpatoria
 S: Crimea

@@ -1,5 +1,4 @@
-/* $Id$
- *
+/*
  *  Copyright (C) 1995 Waldorf Electronics
  *  Copyright (C) 1997, 1999 Ralf Baechle
  */

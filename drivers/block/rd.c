@@ -259,7 +259,7 @@ static int rd_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 			/* special: we want to release the ramdisk memory,
 			   it's not like with the other blockdevices where
 			   this ioctl only flushes away the buffer cache. */
-			if ((atomic_read(rd_bdev[minor]->bd_openers) > 2))
+			if ((atomic_read(&rd_bdev[minor]->bd_openers) > 2))
 				return -EBUSY;
 			destroy_buffers(inode->i_rdev);
 			rd_blocksizes[minor] = 0;
@@ -372,7 +372,7 @@ static void __exit rd_cleanup (void)
 		struct block_device *bdev = rd_bdev[i];
 		rd_bdev[i] = NULL;
 		if (bdev) {
-			blkdev_put(bdev);
+			blkdev_put(bdev, BDEV_FILE);
 			bdput(bdev);
 		}
 		destroy_buffers(MKDEV(MAJOR_NR, i));

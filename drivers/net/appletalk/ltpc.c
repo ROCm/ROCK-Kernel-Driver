@@ -1255,6 +1255,8 @@ __setup("ltpc=", ltpc_setup);
 static struct net_device dev_ltpc;
 
 #ifdef MODULE
+
+MODULE_LICENSE("GPL");
 MODULE_PARM(debug, "i");
 MODULE_PARM(io, "i");
 MODULE_PARM(irq, "i");

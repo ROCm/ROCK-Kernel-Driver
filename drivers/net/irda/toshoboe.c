@@ -695,7 +695,6 @@ toshoboe_probe (struct pci_dev *pci_dev, const struct pci_device_id *pdid)
 {
   struct toshoboe_cb *self;
   struct net_device *dev;
-  struct pm_dev *pmdev;
   int i = 0;
   int ok = 0;
   int err;
@@ -844,11 +843,6 @@ toshoboe_probe (struct pci_dev *pci_dev, const struct pci_device_id *pdid)
           goto freebufs;
   }
   pci_set_drvdata(pci_dev,self);
-
-/*  pmdev = pm_register (PM_PCI_DEV, PM_PCI_ID(pci_dev), toshoboe_pmproc);
-  if (pmdev)
-	  pmdev->data = self;
-	  */
 
   printk (KERN_WARNING "ToshOboe: Using ");
 #ifdef ONETASK

@@ -3,6 +3,7 @@
  *
  * Copyright (C) 1999, 2000 Ralf Baechle (ralf@gnu.org)
  * Copyright (C) 1999, 2000 Silicon Graphics, Inc.
+ * Copyright (C) 1999 - 2001 Kanoj Sarcar
  */
 #include <linux/config.h>
 #include <linux/init.h>
@@ -25,6 +26,7 @@
 #include <asm/io.h>
 #include <asm/mipsregs.h>
 #include <asm/system.h>
+#include <asm/irq.h>
 
 #include <asm/ptrace.h>
 #include <asm/processor.h>
@@ -42,6 +44,10 @@
 #define DBG(x...)
 #endif
 
+/* These should die */
+unsigned char bus_to_wid[256];	/* widget id for linux pci bus */
+unsigned char bus_to_nid[256];	/* nasid for linux pci bus */
+unsigned char num_bridges;	/* number of bridges in the system */
 
 /*
  * Linux has a controller-independent x86 interrupt architecture.
@@ -67,11 +73,11 @@ int intr_disconnect_level(int cpu, int bit);
 unsigned long spurious_count = 0;
 
 /*
- * we need to map irq's up to at least bit 7 of the INT_MASK0_A register
- * since bits 0-6 are pre-allocated for other purposes.
+ * There is a single intpend register per node, and we want to have
+ * distinct levels for intercpu intrs for both cpus A and B on a node.
  */
-#define IRQ_TO_SWLEVEL(cpu, i)	i + 7
-#define SWLEVEL_TO_IRQ(cpu, s)	s - 7
+int node_level_to_irq[MAX_COMPACT_NODES][PERNODE_LEVELS];
+
 /*
  * use these macros to get the encoded nasid and widget id
  * from the irq value
@@ -81,6 +87,41 @@ unsigned long spurious_count = 0;
 #define NASID_FROM_PCI_IRQ(i)		bus_to_nid[IRQ_TO_BUS(i)]
 #define WID_FROM_PCI_IRQ(i)		bus_to_wid[IRQ_TO_BUS(i)]
 #define	SLOT_FROM_PCI_IRQ(i)		irq_to_slot[i]
+
+static inline int alloc_level(cpuid_t cpunum, int irq)
+{
+	cnodeid_t nodenum = CPUID_TO_COMPACT_NODEID(cpunum);
+	int j = LEAST_LEVEL + 3;	/* resched & crosscall entries taken */
+
+	while (++j < PERNODE_LEVELS) {
+		if (node_level_to_irq[nodenum][j] == -1) {
+			node_level_to_irq[nodenum][j] = irq;
+			return j;
+		}
+	}
+	printk("Cpu %ld flooded with devices\n", cpunum);
+	while(1);
+	return -1;
+}
+
+static inline int find_level(cpuid_t *cpunum, int irq)
+{
+	int j;
+	cnodeid_t nodenum = INVALID_CNODEID;
+
+	while (++nodenum < MAX_COMPACT_NODES) {
+		j = LEAST_LEVEL + 3;	/* resched & crosscall entries taken */
+		while (++j < PERNODE_LEVELS)
+			if (node_level_to_irq[nodenum][j] == irq) {
+				*cpunum = 0;	/* XXX Fixme */
+				return(j);
+			}
+	}
+	printk("Could not identify cpu/level for irq %d\n", irq);
+	while(1);
+	return(-1);
+}
+
 
 void disable_irq(unsigned int irq_nr)
 {
@@ -146,7 +187,8 @@ static void do_IRQ(cpuid_t thiscpu, int irq, struct pt_regs * regs)
 	}
 	irq_exit(thiscpu, irq);
 
-	/* unmasking and bottom half handling is done magically for us. */
+	if (softirq_pending(thiscpu))
+		do_softirq();
 }
 
 /*
@@ -196,7 +238,7 @@ void ip27_do_irq(struct pt_regs *regs)
 				swlevel = ms1bit(pend0);
 				LOCAL_HUB_CLR_INTR(swlevel);
 				/* "map" swlevel to irq */
-				irq = SWLEVEL_TO_IRQ(thiscpu, swlevel);
+				irq = LEVEL_TO_IRQ(thiscpu, swlevel);
 				do_IRQ(thiscpu, irq, regs);
 				/* clear bit in pend0 */
 				pend0 ^= 1ULL << swlevel;
@@ -227,7 +269,7 @@ static unsigned int bridge_startup(unsigned int irq)
 	 * "map" irq to a swlevel greater than 6 since the first 6 bits
 	 * of INT_PEND0 are taken
 	 */
-	swlevel = IRQ_TO_SWLEVEL(cpu, irq);
+	swlevel = alloc_level(cpu, irq);
 	intr_connect_level(cpu, swlevel);
 
 	bridge->b_int_addr[pin].addr = (0x20000 | swlevel | (master << 8));
@@ -254,6 +296,7 @@ static unsigned int bridge_shutdown(unsigned int irq)
 {
 	bridge_t *bridge;
 	int pin, swlevel;
+	cpuid_t cpu;
 
 	bridge = (bridge_t *) NODE_SWIN_BASE(NASID_FROM_PCI_IRQ(irq), 
 	                                     WID_FROM_PCI_IRQ(irq));
@@ -264,8 +307,9 @@ static unsigned int bridge_shutdown(unsigned int irq)
 	 * map irq to a swlevel greater than 6 since the first 6 bits
 	 * of INT_PEND0 are taken
 	 */
-	swlevel = IRQ_TO_SWLEVEL(cpu, irq);
-	intr_disconnect_level(smp_processor_id(), swlevel);
+	swlevel = find_level(&cpu, irq);
+	intr_disconnect_level(cpu, swlevel);
+	LEVEL_TO_IRQ(cpu, swlevel) = -1;
 
 	bridge->b_int_enable &= ~(1 << pin);
 	bridge->b_widget.w_tflush;                      /* Flush */
@@ -423,7 +467,6 @@ static void show(char * str)
 
 	printk(" ]\nStack dumps:");
 	for(i = 0; i < smp_num_cpus; i++) {
-		unsigned long esp;
 		if (i == cpu)
 			continue;
 		printk("\nCPU %d:",i);
@@ -661,37 +704,50 @@ void install_cpuintr(int cpu)
 #ifdef CONFIG_SMP
 #if (CPUS_PER_NODE == 2)
 	static int done = 0;
-	int irq;
 
 	/*
 	 * This is a hack till we have a pernode irqlist. Currently,
 	 * just have the master cpu set up the handlers for the per
 	 * cpu irqs.
 	 */
+	if (done == 0) {
+		int j;
 
-	irq = CPU_RESCHED_A_IRQ + cputoslice(cpu);
-	intr_connect_level(cpu, IRQ_TO_SWLEVEL(cpu, irq));
-	if (done == 0)
-	if (request_irq(irq, handle_resched_intr, 0, "resched", 0))
-		panic("intercpu intr unconnectible\n");
-	irq = CPU_CALL_A_IRQ + cputoslice(cpu);
-	intr_connect_level(cpu, IRQ_TO_SWLEVEL(cpu, irq));
-	if (done == 0)
-	if (request_irq(irq, smp_call_function_interrupt, 0,
-						"callfunc", 0))
-		panic("intercpu intr unconnectible\n");
-	/* HACK STARTS */
-	if (done)
-		return;
-	irq = CPU_RESCHED_A_IRQ + cputoslice(cpu) + 1;
-	if (request_irq(irq, handle_resched_intr, 0, "resched", 0))
-		panic("intercpu intr unconnectible\n");
-	irq = CPU_CALL_A_IRQ + cputoslice(cpu) + 1;
-	if (request_irq(irq, smp_call_function_interrupt, 0,
-						"callfunc", 0))
-		panic("intercpu intr unconnectible\n");
-	done = 1;
-	/* HACK ENDS */
+		if (request_irq(CPU_RESCHED_A_IRQ, handle_resched_intr, 
+							0, "resched", 0))
+			panic("intercpu intr unconnectible\n");
+		if (request_irq(CPU_RESCHED_B_IRQ, handle_resched_intr, 
+							0, "resched", 0))
+			panic("intercpu intr unconnectible\n");
+		if (request_irq(CPU_CALL_A_IRQ, smp_call_function_interrupt,
+							0, "callfunc", 0))
+			panic("intercpu intr unconnectible\n");
+		if (request_irq(CPU_CALL_B_IRQ, smp_call_function_interrupt,
+							0, "callfunc", 0))
+			panic("intercpu intr unconnectible\n");
+
+		for (j = 0; j < PERNODE_LEVELS; j++)
+			LEVEL_TO_IRQ(0, j) = -1;
+		LEVEL_TO_IRQ(0, FAST_IRQ_TO_LEVEL(CPU_RESCHED_A_IRQ)) = 
+							CPU_RESCHED_A_IRQ;
+		LEVEL_TO_IRQ(0, FAST_IRQ_TO_LEVEL(CPU_RESCHED_B_IRQ)) = 
+							CPU_RESCHED_B_IRQ;
+		LEVEL_TO_IRQ(0, FAST_IRQ_TO_LEVEL(CPU_CALL_A_IRQ)) = 
+							CPU_CALL_A_IRQ;
+		LEVEL_TO_IRQ(0, FAST_IRQ_TO_LEVEL(CPU_CALL_B_IRQ)) = 
+							CPU_CALL_B_IRQ;
+		for (j = 1; j < MAX_COMPACT_NODES; j++)
+			memcpy(&node_level_to_irq[j][0], 
+			&node_level_to_irq[0][0], 
+			sizeof(node_level_to_irq[0][0])*PERNODE_LEVELS);
+
+		done = 1;
+	}
+
+	intr_connect_level(cpu, FAST_IRQ_TO_LEVEL(CPU_RESCHED_A_IRQ + 
+							cputoslice(cpu)));
+	intr_connect_level(cpu, FAST_IRQ_TO_LEVEL(CPU_CALL_A_IRQ +
+							cputoslice(cpu)));
 #else /* CPUS_PER_NODE */
 #error Must redefine this for more than 2 CPUS.
 #endif /* CPUS_PER_NODE */
@@ -700,7 +756,9 @@ void install_cpuintr(int cpu)
 
 void install_tlbintr(int cpu)
 {
+#if 0
 	int intr_bit = N_INTPEND_BITS + TLB_INTR_A + cputoslice(cpu);
 
 	intr_connect_level(cpu, intr_bit);
+#endif
 }

@@ -30,8 +30,6 @@
 #include "eicon.h"
 #include "sys.h"
 #include <stdarg.h>
-#undef MAX
-#undef MIN
 
 #include "divas.h"
 #include "divalog.h"

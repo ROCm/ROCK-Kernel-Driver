@@ -2,8 +2,6 @@
  * Carsten Langgaard, carstenl@mips.com
  * Copyright (C) 2000 MIPS Technologies, Inc.  All rights reserved.
  *
- * ########################################################################
- *
  *  This program is free software; you can distribute it and/or modify it
  *  under the terms of the GNU General Public License (Version 2) as
  *  published by the Free Software Foundation.
@@ -16,11 +14,6 @@
  *  You should have received a copy of the GNU General Public License along
  *  with this program; if not, write to the Free Software Foundation, Inc.,
  *  59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
- *
- * ########################################################################
- *
- * Malta specific setup, including init of the feature struct.
- *
  */
 #include <linux/config.h>
 #include <linux/init.h>
@@ -56,52 +49,32 @@ extern void breakpoint(void);
 static int remote_debug = 0;
 #endif
 
-#ifdef CONFIG_BLK_DEV_IDE
 extern struct ide_ops std_ide_ops;
-#endif
-#ifdef CONFIG_BLK_DEV_FD
 extern struct fd_ops std_fd_ops;
-#endif
 extern struct rtc_ops malta_rtc_ops;
+extern struct kbd_ops std_kbd_ops;
 
 extern void mips_reboot_setup(void);
 
 struct resource standard_io_resources[] = {
 	{ "dma1", 0x00, 0x1f, IORESOURCE_BUSY },
-	{ "pic1", 0x20, 0x3f, IORESOURCE_BUSY },
 	{ "timer", 0x40, 0x5f, IORESOURCE_BUSY },
 	{ "dma page reg", 0x80, 0x8f, IORESOURCE_BUSY },
-	{ "pic2", 0xa0, 0xbf, IORESOURCE_BUSY },
 	{ "dma2", 0xc0, 0xdf, IORESOURCE_BUSY },
 };
 
 #define STANDARD_IO_RESOURCES (sizeof(standard_io_resources)/sizeof(struct resource))
-
-static void __init malta_irq_setup(void)
-{
-  	maltaint_init();
-
-#ifdef CONFIG_REMOTE_DEBUG
-	if (remote_debug) {
-		set_debug_traps();
-		breakpoint(); 
-	}
-#endif
-}
-
 
 void __init malta_setup(void)
 {
 #ifdef CONFIG_REMOTE_DEBUG
 	int rs_putDebugChar(char);
 	char rs_getDebugChar(void);
-	extern int (*putDebugChar)(char);
-	extern char (*getDebugChar)(void);
+	extern int (*generic_putDebugChar)(char);
+	extern char (*generic_getDebugChar)(void);
 #endif
 	char *argptr;
 	int i;
-
-	irq_setup = malta_irq_setup;
 
 	/* Request I/O space for devices used on the Malta board. */
 	for (i = 0; i < STANDARD_IO_RESOURCES; i++)
@@ -133,14 +106,14 @@ void __init malta_setup(void)
 		       line ? 1 : 0);
 
 		rs_kgdb_hook(line);
-		putDebugChar = rs_putDebugChar;
-		getDebugChar = rs_getDebugChar;
+		generic_putDebugChar = rs_putDebugChar;
+		generic_getDebugChar = rs_getDebugChar;
 
 		prom_printf("KGDB: Using serial line /dev/ttyS%d for session, "
 			    "please connect your debugger\n", line ? 1 : 0);
 
 		remote_debug = 1;
-		/* Breakpoints and stuff are in malta_irq_setup() */
+		/* Breakpoints are in init_IRQ() */
 	}
 #endif
 
@@ -154,6 +127,9 @@ void __init malta_setup(void)
 #endif
 #ifdef CONFIG_BLK_DEV_FD
         fd_ops = &std_fd_ops;
+#endif
+#ifdef CONFIG_PC_KEYB
+	kbd_ops = &std_kbd_ops;
 #endif
 	mips_reboot_setup();
 }

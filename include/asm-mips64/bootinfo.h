@@ -1,5 +1,4 @@
-/* $Id: bootinfo.h,v 1.1 1999/08/18 23:37:50 ralf Exp $
- *
+/*
  * bootinfo.h -- Definition of the Linux/MIPS boot information structure
  *
  * Copyright (C) 1995 - 1999 by Ralf Baechle

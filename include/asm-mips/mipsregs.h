@@ -36,6 +36,7 @@
 #define CP0_CONTEXT $4
 #define CP0_PAGEMASK $5
 #define CP0_WIRED $6
+#define CP0_INFO $7
 #define CP0_BADVADDR $8
 #define CP0_COUNT $9
 #define CP0_ENTRYHI $10
@@ -139,6 +140,14 @@
 /*
  * Values for PageMask register
  */
+#include <linux/config.h>
+#ifdef CONFIG_CPU_VR41XX
+#define PM_1K   0x00000000
+#define PM_4K   0x00001800
+#define PM_16K  0x00007800
+#define PM_64K  0x0001f800
+#define PM_256K 0x0007f800
+#else
 #define PM_4K   0x00000000
 #define PM_16K  0x00006000
 #define PM_64K  0x0001e000
@@ -146,6 +155,7 @@
 #define PM_1M   0x001fe000
 #define PM_4M   0x007fe000
 #define PM_16M  0x01ffe000
+#endif
 
 /*
  * Values used for computation of new tlb entries
@@ -212,7 +222,6 @@
         ".set\tmips0"                                           \
         : : "r" (value))
 
-#ifdef CONFIG_CPU_MIPS32
 /* 
  * This should be changed when we get a compiler that support the MIPS32 ISA. 
  */
@@ -227,7 +236,6 @@
 	".set\treorder"                                         \
 	:"=r" (__res));                                         \
         __res;})
-#endif
 
 /*
  * R4x00 interrupt enable / cause bits
@@ -331,6 +339,7 @@ __BUILD_SET_CP0(config,CP0_CONFIG)
 /* bits 6 & 7 are reserved on R[23]000 */
 #define ST0_ISC			0x00010000
 #define ST0_SWC			0x00020000
+#define ST0_CM			0x00080000
 
 /*
  * Bits specific to the R4640/R4650
@@ -525,15 +534,5 @@ __BUILD_SET_CP0(config,CP0_CONFIG)
 #define CEB_SUPERVISOR	4	/* Count events in supvervisor mode EXL = ERL = 0 */
 #define CEB_KERNEL	2	/* Count events in kernel mode EXL = ERL = 0 */
 #define CEB_EXL		1	/* Count events with EXL = 1, ERL = 0 */
-
-#ifndef _LANGUAGE_ASSEMBLY
-/*
- * Functions to access the performance counter and control registers
- */
-extern asmlinkage unsigned int read_perf_cntr(unsigned int counter);
-extern asmlinkage void write_perf_cntr(unsigned int counter, unsigned int val);
-extern asmlinkage unsigned int read_perf_cntl(unsigned int counter);
-extern asmlinkage void write_perf_cntl(unsigned int counter, unsigned int val);
-#endif
 
 #endif /* _ASM_MIPSREGS_H */

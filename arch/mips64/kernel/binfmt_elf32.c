@@ -32,7 +32,7 @@ typedef elf_fpreg_t elf_fpregset_t[ELF_NFPREG];
 
 #define TASK32_SIZE		0x80000000UL
 #undef ELF_ET_DYN_BASE
-#define ELF_ET_DYN_BASE         (2 * TASK32_SIZE / 3)
+#define ELF_ET_DYN_BASE         (TASK32_SIZE / 3 * 2)
 
 #include <asm/processor.h>
 #include <linux/module.h>

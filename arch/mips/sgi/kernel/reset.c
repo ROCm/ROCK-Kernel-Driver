@@ -1,12 +1,9 @@
-/* $Id: reset.c,v 1.7 1999/08/11 20:26:51 andrewb Exp $
- *
- * Reset a SGI.
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1997, 1998 by Ralf Baechle
+ * Copyright (C) 1997, 1998, 2001 by Ralf Baechle
  */
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -54,7 +51,7 @@ static void sgi_machine_halt(void)
 {
 	if (shuting_down)
 		sgi_machine_power_off();
-	prom_imode();
+	ArcEnterInteractiveMode();
 }
 
 static void sgi_machine_power_off(void)

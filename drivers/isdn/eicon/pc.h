@@ -29,12 +29,6 @@
 #define byte unsigned char
 #define word unsigned short
 #define dword unsigned long
-#if !defined(MIN)
-#define MIN(a,b) ((a)>(b) ? (b) : (a))
-#endif
-#if !defined(MAX)
-#define MAX(a,b) ((a)>(b) ? (a) : (b))
-#endif
 
 /*------------------------------------------------------------------*/
 /* buffer definition                                                */

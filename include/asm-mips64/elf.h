@@ -93,7 +93,7 @@ typedef elf_fpreg_t elf_fpregset_t[ELF_NFPREG];
    that it will "exec", and that there is sufficient room for the brk.  */
 
 #ifndef ELF_ET_DYN_BASE
-#define ELF_ET_DYN_BASE         (2 * TASK_SIZE / 3)
+#define ELF_ET_DYN_BASE         (TASK_SIZE / 3 * 2)
 #endif
 
 #ifdef __KERNEL__

@@ -1,6 +1,7 @@
 /*
  * Ported from IRIX to Linux by Kanoj Sarcar, 06/08/00.
- * Copyright 2000 Silicon Graphics, Inc.
+ * Copyright 2000 - 2001 Silicon Graphics, Inc.
+ * Copyright 2000 - 2001 Kanoj Sarcar (kanoj@sgi.com)
  */
 #include <linux/config.h>
 #include <linux/init.h>
@@ -9,6 +10,7 @@
 #include <linux/string.h>
 
 #include <asm/page.h>
+#include <asm/smp.h>
 #include <asm/sn/types.h>
 #include <asm/sn/arch.h>
 #include <asm/sn/gda.h>
@@ -16,10 +18,6 @@
 #include <asm/sn/klkernvars.h>
 #include <asm/sn/mapped_kernel.h>
 #include <asm/sn/sn_private.h>
-
-#define CPUMASK_CLRALL(p)	(p) = 0
-#define CPUMASK_SETB(p, bit)	(p) |= 1 << (bit)
-#define CPUMASK_TSTB(p, bit)	((p) & (1ULL << (bit)))
 
 extern char _end;
 static cpumask_t ktext_repmask;

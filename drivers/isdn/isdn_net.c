@@ -1,4 +1,4 @@
-/* $Id: isdn_net.c,v 1.140.6.7 2001/07/27 11:15:53 kai Exp $
+/* $Id: isdn_net.c,v 1.140.6.8 2001/08/14 14:04:21 kai Exp $
 
  * Linux ISDN subsystem, network interfaces and related functions (linklevel).
  *
@@ -190,7 +190,7 @@ static int isdn_net_start_xmit(struct sk_buff *, struct net_device *);
 static void isdn_net_ciscohdlck_connected(isdn_net_local *lp);
 static void isdn_net_ciscohdlck_disconnected(isdn_net_local *lp);
 
-char *isdn_net_revision = "$Revision: 1.140.6.7 $";
+char *isdn_net_revision = "$Revision: 1.140.6.8 $";
 
  /*
   * Code for raw-networking over ISDN
@@ -1754,6 +1754,11 @@ isdn_net_ciscohdlck_receive(isdn_net_local *lp, struct sk_buff *skb)
 		break;
 	case CISCO_TYPE_SLARP:
 		isdn_net_ciscohdlck_slarp_in(lp, skb);
+		goto out_free;
+	case CISCO_TYPE_CDP:
+		if (lp->cisco_debserint)
+			printk(KERN_DEBUG "%s: Received CDP packet. use "
+				"\"no cdp enable\" on cisco.\n", lp->name);
 		goto out_free;
 	default:
 		printk(KERN_WARNING "%s: Unknown Cisco type 0x%04x\n",

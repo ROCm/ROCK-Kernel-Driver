@@ -54,7 +54,8 @@ static char *arc_mtypes[8] = {
 	"FirmwarePermanent",
 	"FreeContiguous"
 };
-#define mtypes(a) (prom_flags & PROM_FLAG_ARCS) ? arcs_mtypes[a.arcs] : arc_mtypes[a.arc]
+#define mtypes(a) (prom_flags & PROM_FLAG_ARCS) ? arcs_mtypes[a.arcs] \
+						: arc_mtypes[a.arc]
 #endif
 
 static inline int memtype_classify_arcs (union linux_memtypes type)
@@ -138,10 +139,8 @@ void __init prom_meminit(void)
 	}
 }
 
-void __init
-prom_free_prom_memory (void)
+void __init prom_free_prom_memory (void)
 {
-	struct prom_pmemblock *p;
 	unsigned long freed = 0;
 	unsigned long addr;
 	int i;
@@ -160,5 +159,5 @@ prom_free_prom_memory (void)
 			freed += PAGE_SIZE;
 		}
 	}
-	printk("Freeing prom memory: %ldkb freed\n", freed >> 10);
+	printk(KERN_INFO "Freeing prom memory: %ldkb freed\n", freed >> 10);
 }

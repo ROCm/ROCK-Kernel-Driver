@@ -2,9 +2,7 @@
  * Code to handle DECstation IRQs plus some generic interrupt stuff.
  *
  * Copyright (C) 1992 Linus Torvalds
- * Copyright (C) 1994, 1995, 1996, 1997 Ralf Baechle
- *
- * $Id: irq.c,v 1.6 2000/02/04 07:40:23 ralf Exp $
+ * Copyright (C) 1994, 1995, 1996, 1997, 2000 Ralf Baechle
  */
 #include <linux/errno.h>
 #include <linux/init.h>
@@ -27,9 +25,14 @@
 
 #include <asm/dec/interrupts.h>
 
-extern volatile unsigned int *isr;	/* address of the interrupt status register     */
-extern volatile unsigned int *imr;	/* address of the interrupt mask register       */
-extern decint_t dec_interrupt[NR_INTS];
+extern void dec_init_kn01(void);
+extern void dec_init_kn230(void);
+extern void dec_init_kn02(void);
+extern void dec_init_kn02ba(void);
+extern void dec_init_kn02ca(void);
+extern void dec_init_kn03(void);
+
+extern asmlinkage void decstation_handle_int(void);
 
 unsigned long spurious_count = 0;
 
@@ -42,7 +45,7 @@ static inline void mask_irq(unsigned int irq_nr)
 	dummy = *imr;
 	dummy = *imr;
     } else			/* This is a cpu interrupt        */
-	set_cp0_status(ST0_IM, read_32bit_cp0_register(CP0_STATUS) & ~dec_interrupt[irq_nr].cpu_mask);
+	change_cp0_status(ST0_IM, read_32bit_cp0_register(CP0_STATUS) & ~dec_interrupt[irq_nr].cpu_mask);
 }
 
 static inline void unmask_irq(unsigned int irq_nr)
@@ -54,7 +57,7 @@ static inline void unmask_irq(unsigned int irq_nr)
 	dummy = *imr;
 	dummy = *imr;
     }
-    set_cp0_status(ST0_IM, read_32bit_cp0_register(CP0_STATUS) | dec_interrupt[irq_nr].cpu_mask);
+    change_cp0_status(ST0_IM, read_32bit_cp0_register(CP0_STATUS) | dec_interrupt[irq_nr].cpu_mask);
 }
 
 void disable_irq(unsigned int irq_nr)
@@ -125,7 +128,7 @@ asmlinkage void do_IRQ(int irq, struct pt_regs *regs)
     int do_random, cpu;
 
     cpu = smp_processor_id();
-    irq_enter(cpu);
+    irq_enter(cpu, irq);
     kstat.irqs[cpu][irq]++;
 
     mask_irq(irq);
@@ -142,10 +145,10 @@ asmlinkage void do_IRQ(int irq, struct pt_regs *regs)
 	} while (action);
 	if (do_random & SA_SAMPLE_RANDOM)
 	    add_interrupt_randomness(irq);
-	unmask_irq(irq);
 	__cli();
+	unmask_irq(irq);
     }
-    irq_exit(cpu);
+    irq_exit(cpu, irq);
 
     /* unmasking and bottom half handling is done magically for us. */
 }
@@ -261,5 +264,34 @@ int probe_irq_off(unsigned long irqs)
 
 void __init init_IRQ(void)
 {
-    irq_setup();
+    switch (mips_machtype) {
+    case MACH_DS23100:
+	dec_init_kn01();
+	break;
+    case MACH_DS5100:		/*  DS5100 MIPSMATE */
+	dec_init_kn230();
+	break;
+    case MACH_DS5000_200:	/* DS5000 3max */
+	dec_init_kn02();
+	break;
+    case MACH_DS5000_1XX:	/* DS5000/100 3min */
+	dec_init_kn02ba();
+	break;
+    case MACH_DS5000_2X0:	/* DS5000/240 3max+ */
+	dec_init_kn03();
+	break;
+    case MACH_DS5000_XX:	/* Personal DS5000/2x */
+	dec_init_kn02ca();
+	break;
+    case MACH_DS5800:		/* DS5800 Isis */
+	panic("Don't know how to set this up!");
+	break;
+    case MACH_DS5400:		/* DS5400 MIPSfair */
+	panic("Don't know how to set this up!");
+	break;
+    case MACH_DS5500:		/* DS5500 MIPSfair-2 */
+	panic("Don't know how to set this up!");
+	break;
+    }
+    set_except_vector(0, decstation_handle_int);
 }

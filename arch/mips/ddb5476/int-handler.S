@@ -68,6 +68,8 @@
 	and	s0, s1, t2		# isolate allowed ones
 #endif
 	/* First we check for r4k counter/timer IRQ. */
+	andi	a0, s0, CAUSEF_IP7	# cpu timer */
+	bnez	a0, cpu_timer_irq
 	andi	a0, s0, CAUSEF_IP2	# delay slot, check local level zero
 	beq	a0, zero, 1f
 	 andi	a0, s0, CAUSEF_IP3	# delay slot, check local level one
@@ -119,6 +121,15 @@
 	/* phamtom interrupt */
 	move 	a0, s1
 	jal	ddb_phantom_irq
+	nop
+	j	ret_from_irq
+	nop
+
+cpu_timer_irq:
+	li	a0, 0
+	move	a1, sp
+	jal	do_IRQ 
+	/* jal	ll_timer_interrupt */
 	nop
 	j	ret_from_irq
 	nop

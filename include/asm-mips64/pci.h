@@ -6,13 +6,19 @@
 #ifndef _ASM_PCI_H
 #define _ASM_PCI_H
 
+#include <linux/config.h>
+
 #ifdef __KERNEL__
 
 /* Can be used to override the logic in pci_scan_bus for skipping
    already-configured bus numbers - to be used for buggy BIOSes
    or architectures with incomplete PCI setup by the loader */
 
+#ifdef CONFIG_PCI
+extern unsigned int pcibios_assign_all_busses(void);
+#else
 #define pcibios_assign_all_busses()	0
+#endif
 
 #define PCIBIOS_MIN_IO		0x1000
 #define PCIBIOS_MIN_MEM		0x10000000
@@ -64,6 +70,24 @@ extern void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
 extern void pci_free_consistent(struct pci_dev *hwdev, size_t size,
 				void *vaddr, dma_addr_t dma_handle);
 
+
+#ifdef CONFIG_MAPPED_PCI_IO
+
+extern dma_addr_t pci_map_single(struct pci_dev *hwdev, void *ptr, size_t size,
+                                 int direction);
+extern void pci_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr,
+                             size_t size, int direction);
+extern int pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nents,
+                      int direction);
+extern void pci_unmap_sg(struct pci_dev *hwdev, struct scatterlist *sg,
+                         int nents, int direction);
+extern void pci_dma_sync_single(struct pci_dev *hwdev, dma_addr_t dma_handle,
+                                size_t size, int direction);
+extern void pci_dma_sync_sg(struct pci_dev *hwdev, struct scatterlist *sg,
+                            int nelems, int direction);
+
+#else /* CONFIG_MAPPED_PCI_IO  */
+
 /*
  * Map a single buffer of the indicated size for DMA in streaming mode.
  * The 32-bit bus address to use is returned.
@@ -71,7 +95,7 @@ extern void pci_free_consistent(struct pci_dev *hwdev, size_t size,
  * Once the device is given the dma address, the device owns this memory
  * until either pci_unmap_single or pci_dma_sync_single is performed.
  */
-extern inline dma_addr_t pci_map_single(struct pci_dev *hwdev, void *ptr,
+static inline dma_addr_t pci_map_single(struct pci_dev *hwdev, void *ptr,
 					size_t size, int direction)
 {
 	if (direction == PCI_DMA_NONE)
@@ -80,7 +104,7 @@ extern inline dma_addr_t pci_map_single(struct pci_dev *hwdev, void *ptr,
 #ifndef CONFIG_COHERENT_IO
 	dma_cache_wback_inv((unsigned long)ptr, size);
 #endif
-	return (bus_to_baddr[hwdev->bus->number] | __pa(ptr));
+	return virt_to_bus(ptr);
 }
 
 /*
@@ -91,7 +115,7 @@ extern inline dma_addr_t pci_map_single(struct pci_dev *hwdev, void *ptr,
  * After this call, reads by the cpu to the buffer are guarenteed to see
  * whatever the device wrote there.
  */
-extern inline void pci_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr,
+static inline void pci_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr,
 				    size_t size, int direction)
 {
 	if (direction == PCI_DMA_NONE)
@@ -116,7 +140,7 @@ extern inline void pci_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr,
  * Device ownership issues as mentioned above for pci_map_single are
  * the same here.
  */
-extern inline int pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
+static inline int pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
 			     int nents, int direction)
 {
 	int i;
@@ -140,7 +164,7 @@ extern inline int pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
  * Again, cpu read rules concerning calls here are the same as for
  * pci_unmap_single() above.
  */
-extern inline void pci_unmap_sg(struct pci_dev *hwdev, struct scatterlist *sg,
+static inline void pci_unmap_sg(struct pci_dev *hwdev, struct scatterlist *sg,
 				int nents, int direction)
 {
 	if (direction == PCI_DMA_NONE)
@@ -159,7 +183,7 @@ extern inline void pci_unmap_sg(struct pci_dev *hwdev, struct scatterlist *sg,
  * next point you give the PCI dma address back to the card, the
  * device again owns the buffer.
  */
-extern inline void pci_dma_sync_single(struct pci_dev *hwdev,
+static inline void pci_dma_sync_single(struct pci_dev *hwdev,
 				       dma_addr_t dma_handle,
 				       size_t size, int direction)
 {
@@ -177,7 +201,7 @@ extern inline void pci_dma_sync_single(struct pci_dev *hwdev,
  * The same as pci_dma_sync_single but for a scatter-gather list,
  * same rules and usage.
  */
-extern inline void pci_dma_sync_sg(struct pci_dev *hwdev,
+static inline void pci_dma_sync_sg(struct pci_dev *hwdev,
 				   struct scatterlist *sg,
 				   int nelems, int direction)
 {
@@ -194,8 +218,9 @@ extern inline void pci_dma_sync_sg(struct pci_dev *hwdev,
 		dma_cache_wback_inv((unsigned long)sg->address, sg->length);
 #endif
 }
+#endif /* CONFIG_MAPPED_PCI_IO  */
 
-extern inline int pci_dma_supported(struct pci_dev *hwdev, dma_addr_t mask)
+static inline int pci_dma_supported(struct pci_dev *hwdev, dma_addr_t mask)
 {
 	/*
 	 * we fall back to GFP_DMA when the mask isn't all 1s,
@@ -208,7 +233,9 @@ extern inline int pci_dma_supported(struct pci_dev *hwdev, dma_addr_t mask)
 	return 1;
 }
 
-/* Return the index of the PCI controller for device. */
+/*
+ * Return the index of the PCI controller for device.
+ */
 #define pci_controller_num(pdev)	(0)
 
 /*

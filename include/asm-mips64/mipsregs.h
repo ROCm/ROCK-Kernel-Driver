@@ -1,5 +1,4 @@
-/* $Id: mipsregs.h,v 1.1 1999/08/18 23:37:51 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -34,6 +33,7 @@
 #define CP0_CONTEXT $4
 #define CP0_PAGEMASK $5
 #define CP0_WIRED $6
+#define CP0_INFO $7
 #define CP0_BADVADDR $8
 #define CP0_COUNT $9
 #define CP0_ENTRYHI $10

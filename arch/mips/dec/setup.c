@@ -6,11 +6,13 @@
  * for more details.
  *
  * Copyright (C) 1998 Harald Koerfgen
+ * Copyright (C) 2000 Maciej W. Rozycki
  */
 #include <linux/sched.h>
 #include <linux/interrupt.h>
 #include <linux/mc146818rtc.h>
 #include <linux/param.h>
+#include <linux/console.h>
 #include <asm/mipsregs.h>
 #include <asm/bootinfo.h>
 #include <linux/init.h>
@@ -22,25 +24,19 @@
 #include <asm/dec/kn02.h>
 #include <asm/dec/kn02xa.h>
 #include <asm/dec/kn03.h>
+#include <asm/dec/ioasic.h>
+#include <asm/dec/ioasic_addrs.h>
 #include <asm/dec/ioasic_ints.h>
 
-extern asmlinkage void decstation_handle_int(void);
 
-void dec_init_kn01(void);
-void dec_init_kn230(void);
-void dec_init_kn02(void);
-void dec_init_kn02ba(void);
-void dec_init_kn02ca(void);
-void dec_init_kn03(void);
+char *dec_rtc_base = (void *) KN01_RTC_BASE;	/* Assume DS2100/3100 initially */
 
-char *dec_rtc_base = (char *) KN01_RTC_BASE;	/* Assume DS2100/3100 initially */
+volatile unsigned int *ioasic_base;
 
 decint_t dec_interrupt[NR_INTS];
 
-/* 
+/*
  * Information regarding the IRQ Controller
- *
- * isr and imr are also hardcoded for different machines in int_handler.S
  */
 
 volatile unsigned int *isr = 0L;	/* address of the interrupt status register     */
@@ -49,50 +45,17 @@ volatile unsigned int *imr = 0L;	/* address of the interrupt mask register      
 extern void dec_machine_restart(char *command);
 extern void dec_machine_halt(void);
 extern void dec_machine_power_off(void);
+extern void dec_intr_halt(int irq, void *dev_id, struct pt_regs *regs);
 
 extern void wbflush_setup(void);
 
 extern struct rtc_ops dec_rtc_ops;
 
-extern void intr_halt(void);
-
 extern int setup_dec_irq(int, struct irqaction *);
 
 void (*board_time_init) (struct irqaction * irq);
 
-static void __init dec_irq_setup(void)
-{
-    switch (mips_machtype) {
-    case MACH_DS23100:
-	dec_init_kn01();
-	break;
-    case MACH_DS5100:		/*  DS5100 MIPSMATE */
-	dec_init_kn230();
-	break;
-    case MACH_DS5000_200:	/* DS5000 3max */
-	dec_init_kn02();
-	break;
-    case MACH_DS5000_1XX:	/* DS5000/100 3min */
-	dec_init_kn02ba();
-	break;
-    case MACH_DS5000_2X0:	/* DS5000/240 3max+ */
-	dec_init_kn03();
-	break;
-    case MACH_DS5000_XX:	/* Personal DS5000/2x */
-	dec_init_kn02ca();
-	break;
-    case MACH_DS5800:		/* DS5800 Isis */
-	panic("Don't know how to set this up!");
-	break;
-    case MACH_DS5400:		/* DS5400 MIPSfair */
-	panic("Don't know how to set this up!");
-	break;
-    case MACH_DS5500:		/* DS5500 MIPSfair-2 */
-	panic("Don't know how to set this up!");
-	break;
-    }
-    set_except_vector(0, decstation_handle_int);
-}
+static struct irqaction irq10 = {dec_intr_halt, 0, 0, "halt", NULL, NULL};
 
 /*
  * enable the periodic interrupts
@@ -112,9 +75,16 @@ static void __init dec_time_init(struct irqaction *irq)
     setup_dec_irq(CLOCK, irq);
 }
 
+/*
+ * Enable the halt interrupt.
+ */
+static void __init dec_halt_init(struct irqaction *irq)
+{
+    setup_dec_irq(HALT, irq);
+}
+
 void __init decstation_setup(void)
 {
-    irq_setup = dec_irq_setup;
     board_time_init = dec_time_init;
 
     wbflush_setup();
@@ -122,6 +92,10 @@ void __init decstation_setup(void)
     _machine_restart = dec_machine_restart;
     _machine_halt = dec_machine_halt;
     _machine_power_off = dec_machine_power_off;
+
+#ifdef CONFIG_FB
+    conswitchp = &dummy_con;
+#endif
 
     rtc_ops = &dec_rtc_ops;
 }
@@ -206,8 +180,8 @@ void __init dec_init_kn02(void)
      * Setup some memory addresses. FIXME: probably incomplete!
      */
     dec_rtc_base = (char *) KN02_RTC_BASE;
-    isr = (volatile unsigned int *) KN02_CSR_ADDR;
-    imr = (volatile unsigned int *) KN02_CSR_ADDR;
+    isr = (void *) KN02_CSR_ADDR;
+    imr = (void *) KN02_CSR_ADDR;
 
     /*
      * Setup IOASIC interrupt
@@ -275,16 +249,17 @@ void __init dec_init_kn02ba(void)
     /*
      * Setup some memory addresses.
      */
+    ioasic_base = (void *) KN02XA_IOASIC_BASE;
     dec_rtc_base = (char *) KN02XA_RTC_BASE;
-    isr = (volatile unsigned int *) KN02XA_SIR_ADDR;
-    imr = (volatile unsigned int *) KN02XA_SIRM_ADDR;
+    isr = (void *) KN02XA_IOASIC_REG(SIR);
+    imr = (void *) KN02XA_IOASIC_REG(SIMR);
 
     /*
      * Setup IOASIC interrupt
      */
     cpu_mask_tbl[0] = IE_IRQ3;
     cpu_irq_nr[0] = -1;
-    cpu_ivec_tbl[0] = kn02ba_io_int;
+    cpu_ivec_tbl[0] = kn02xa_io_int;
     *imr = 0;
 
     /*
@@ -345,6 +320,7 @@ void __init dec_init_kn02ba(void)
     cpu_mask_tbl[5] = IE_IRQ5;
     cpu_irq_nr[5] = FPU;
 
+    dec_halt_init(&irq10);
 }				/* dec_init_kn02ba */
 
 /*
@@ -355,14 +331,15 @@ void __init dec_init_kn02ca(void)
     /*
      * Setup some memory addresses. FIXME: probably incomplete!
      */
+    ioasic_base = (void *) KN02XA_IOASIC_BASE;
     dec_rtc_base = (char *) KN02XA_RTC_BASE;
-    isr = (volatile unsigned int *) KN02XA_SIR_ADDR;
-    imr = (volatile unsigned int *) KN02XA_SIRM_ADDR;
+    isr = (void *) KN02XA_IOASIC_REG(SIR);
+    imr = (void *) KN02XA_IOASIC_REG(SIMR);
 
     /*
      * Setup IOASIC interrupt
      */
-    cpu_ivec_tbl[1] = kn02ba_io_int;
+    cpu_ivec_tbl[1] = kn02xa_io_int;
     cpu_irq_nr[1] = -1;
     cpu_mask_tbl[1] = IE_IRQ3;
     *imr = 0;
@@ -420,6 +397,7 @@ void __init dec_init_kn02ca(void)
     cpu_mask_tbl[4] = IE_IRQ5;
     cpu_irq_nr[4] = FPU;
 
+    dec_halt_init(&irq10);
 }				/* dec_init_kn02ca */
 
 /*
@@ -430,9 +408,10 @@ void __init dec_init_kn03(void)
     /*
      * Setup some memory addresses. FIXME: probably incomplete!
      */
+    ioasic_base = (void *) KN03_IOASIC_BASE;
     dec_rtc_base = (char *) KN03_RTC_BASE;
-    isr = (volatile unsigned int *) KN03_SIR_ADDR;
-    imr = (volatile unsigned int *) KN03_SIRM_ADDR;
+    isr = (void *) KN03_IOASIC_REG(SIR);
+    imr = (void *) KN03_IOASIC_REG(SIMR);
 
     /*
      * Setup IOASIC interrupt
@@ -500,4 +479,5 @@ void __init dec_init_kn03(void)
     cpu_mask_tbl[4] = IE_IRQ5;
     cpu_irq_nr[4] = FPU;
 
+    dec_halt_init(&irq10);
 }				/* dec_init_kn03 */

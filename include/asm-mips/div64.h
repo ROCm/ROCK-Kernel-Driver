@@ -16,7 +16,8 @@
  * No traps on overflows for any of these...
  */
 
-#if (_MIPS_ISA == _MIPS_ISA_MIPS1) || (_MIPS_ISA == _MIPS_ISA_MIPS2)
+#if (_MIPS_ISA == _MIPS_ISA_MIPS1 ) || (_MIPS_ISA == _MIPS_ISA_MIPS2) || \
+    (_MIPS_ISA == _MIPS_ISA_MIPS32)
 
 #define do_div64_32(res, high, low, base) ({ \
 	unsigned long __quot, __mod; \

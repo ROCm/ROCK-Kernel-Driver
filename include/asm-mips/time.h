@@ -1,4 +1,4 @@
-/***********************************************************************
+/*
  * Copyright 2001 MontaVista Software Inc.
  * Author: Jun Sun, jsun@mvista.com or jsun@junsun.net
  *
@@ -9,7 +9,11 @@
  * under  the terms of  the GNU General  Public License as published by the
  * Free Software Foundation;  either version 2 of the  License, or (at your
  * option) any later version.
- ***********************************************************************
+ *
+ */
+
+/*
+ * Please refer to Documentation/MIPS/time.README.
  */
 
 #ifndef _ASM_TIME_H
@@ -17,19 +21,27 @@
 
 #include <linux/ptrace.h>               /* for struct pt_regs */
 #include <linux/linkage.h>              /* for asmlinkage */
+#include <linux/rtc.h>                  /* for struct rtc_time */
 
 /* 
  * RTC ops.  By default, they point a no-RTC functions.
  *	rtc_get_time - mktime(year, mon, day, hour, min, sec) in seconds.
- *	rtc_set_time - reverse the above translation
+ *	rtc_set_time - reverse the above translation and set time to RTC.
  */
 extern unsigned long (*rtc_get_time)(void);
 extern int (*rtc_set_time)(unsigned long);
 
 /*
+ * to_tm() converts system time back to (year, mon, day, hour, min, sec).
+ * It is intended to help implement rtc_set_time() functions.
+ * Copied from PPC implementation.
+ */
+extern void to_tm(unsigned long tim, struct rtc_time * tm);
+
+/*
  * do_gettimeoffset(). By default, this func pointer points to 
  * do_null_gettimeoffset(), which leads to the same resolution as HZ.
- * Higher resolution versions are vailable.
+ * Higher resolution versions are vailable, which gives ~1us resolution.
  */
 extern unsigned long (*do_gettimeoffset)(void);
 

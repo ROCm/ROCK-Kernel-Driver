@@ -1,4 +1,4 @@
-/* $Id: isdnloop.c,v 1.11.6.4 2001/07/13 09:20:12 kai Exp $
+/* $Id: isdnloop.c,v 1.11.6.5 2001/08/17 12:34:27 kai Exp $
 
  * ISDN low-level module implementing a dummy loop driver.
  *
@@ -26,7 +26,7 @@
 #include "isdnloop.h"
 
 static char
-*revision = "$Revision: 1.11.6.4 $";
+*revision = "$Revision: 1.11.6.5 $";
 
 static int isdnloop_addcard(char *);
 
@@ -985,10 +985,12 @@ isdnloop_writecmd(const u_char * buf, int len, int user, isdnloop_card * card)
 	isdn_ctrl cmd;
 
 	while (len) {
-		int count = MIN(255, len);
+		int count = len;
 		u_char *p;
 		u_char msg[0x100];
 
+		if (count > 255)
+			count = 255;
 		if (user)
 			copy_from_user(msg, buf, count);
 		else

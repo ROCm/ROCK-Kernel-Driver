@@ -1,5 +1,4 @@
-/* $Id: r2300_switch.S,v 1.8 1999/08/18 23:37:44 ralf Exp $
- *
+/*
  * r2300_switch.S: R2300 specific task switching code.
  *
  * Copyright (C) 1994, 1995, 1996, 1999 by Ralf Baechle

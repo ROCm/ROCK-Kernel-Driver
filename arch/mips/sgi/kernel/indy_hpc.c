@@ -12,6 +12,7 @@
 #include <asm/sgi/sgihpc.h>
 #include <asm/sgi/sgint23.h>
 #include <asm/sgialib.h>
+#include <asm/bootinfo.h>
 
 /* #define DEBUG_SGIHPC */
 
@@ -50,10 +51,12 @@ void __init sgihpc_init(void)
 		prom_printf("GUINESS ");
 #endif
 		sgi_guiness = 1;
+		mips_machtype = MACH_SGI_INDY;
 	} else {
 #ifdef DEBUG_SGIHPC
 		prom_printf("FULLHOUSE ");
 #endif
+                mips_machtype = MACH_SGI_INDIGO2;
 		sgi_guiness = 0;
 	}
 	sgi_boardid = brev;

@@ -76,8 +76,11 @@ if [ "$CONFIG_ISDN_DRV_HISAX" != "n" ]; then
 	 bool '  Am7930' CONFIG_HISAX_AMD7930
       fi
    fi
+   bool '  HiSax debugging' CONFIG_HISAX_DEBUG
+
    dep_tristate 'Sedlbauer PCMCIA cards' CONFIG_HISAX_SEDLBAUER_CS $CONFIG_PCMCIA
    dep_tristate 'ELSA PCMCIA MicroLink cards' CONFIG_HISAX_ELSA_CS $CONFIG_PCMCIA
+   dep_tristate 'ST5481 USB ISDN modem (EXPERIMENTAL)' CONFIG_HISAX_ST5481 $CONFIG_HISAX $CONFIG_USB $CONFIG_EXPERIMENTAL
 fi
 endmenu
 

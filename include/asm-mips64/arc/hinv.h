@@ -1,5 +1,4 @@
-/* $Id$
- *
+/*
  * ARCS hardware/memory inventory/configuration and system ID definitions.
  */
 #ifndef _ASM_ARC_HINV_H

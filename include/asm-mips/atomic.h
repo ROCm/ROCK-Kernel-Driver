@@ -40,7 +40,7 @@ typedef struct { volatile int counter; } atomic_t;
  */
 #define atomic_set(v,i)	((v)->counter = (i))
 
-#if !defined(CONFIG_CPU_HAS_LLSC)
+#ifndef CONFIG_CPU_HAS_LLSC
 
 #include <asm/system.h>
 

@@ -23,3 +23,7 @@ void dec_machine_power_off(void)
 	back_to_prom();
 }
 
+void dec_intr_halt(int irq, void *dev_id, struct pt_regs *regs)
+{
+	dec_machine_halt();
+}

@@ -1,5 +1,4 @@
-/* $Id: ip22-timer.c,v 1.6 2000/02/04 07:40:24 ralf Exp $
- *
+/*
  * indy_timer.c: Setting up the clock on the INDY 8254 controller.
  *
  * Copyright (C) 1996 David S. Miller (dm@engr.sgi.com)
@@ -238,9 +237,7 @@ void indy_8254timer_irq(void)
 
 	irq_enter(cpu, irq);
 	kstat.irqs[0][irq]++;
-	printk("indy_8254timer_irq: Whoops, should not have gotten this IRQ\n");
-	prom_getchar();
-	ArcEnterInteractiveMode();
+	panic("indy_8254timer_irq: Whoops, should not have gotten this IRQ\n");
 	irq_exit(cpu, irq);
 }
 

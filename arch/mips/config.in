@@ -76,6 +76,7 @@ define_bool CONFIG_RWSEM_XCHGADD_ALGORITHM n
 #
 unset CONFIG_ARC32
 unset CONFIG_BOARD_SCACHE
+unset CONFIG_COHERENT_IO
 unset CONFIG_HAVE_STD_PC_SERIAL_PORT
 unset CONFIG_I8259
 unset CONFIG_ISA
@@ -92,6 +93,8 @@ if [ "$CONFIG_MIPS_EV96100" = "y" ]; then
    define_bool CONFIG_PCI y
    define_bool CONFIG_MIPS_GT96100 y
    define_bool CONFIG_SWAP_IO_SPACE y
+   define_bool CONFIG_NEW_PCI y
+   define_bool CONFIG_PCI_AUTO y
 fi
 if [ "$CONFIG_MIPS_EV64120" = "y" ]; then
    define_bool CONFIG_PCI y
@@ -132,6 +135,7 @@ if [ "$CONFIG_MIPS_MALTA" = "y" ]; then
    define_bool CONFIG_I8259 y
    define_bool CONFIG_PCI y
    define_bool CONFIG_HAVE_STD_PC_SERIAL_PORT y
+   define_bool CONFIG_NEW_IRQ y
    define_bool CONFIG_SWAP_IO_SPACE y
 fi
 if [ "$CONFIG_MOMENCO_OCELOT" = "y" ]; then
@@ -158,7 +162,7 @@ if [ "$CONFIG_SNI_RM200_PCI" = "y" ]; then
    define_bool CONFIG_ROTTEN_IRQ y
    define_bool CONFIG_OLD_TIME_C y
 fi
-if [ "$CONFIG_DDB5074" = "y"]; then
+if [ "$CONFIG_DDB5074" = "y" ]; then
    define_bool CONFIG_I8259 y
    define_bool CONFIG_ISA y
    define_bool CONFIG_PCI y
@@ -168,7 +172,6 @@ if [ "$CONFIG_DDB5074" = "y"]; then
    define_bool CONFIG_OLD_TIME_C y
 fi
 if [ "$CONFIG_DDB5476"  = "y" ]; then
-   define_bool CONFIG_I8259 y
    define_bool CONFIG_ISA y
    define_bool CONFIG_PCI y
    define_bool CONFIG_PC_KEYB y
@@ -186,6 +189,8 @@ if [ "$CONFIG_MIPS_ITE8172" = "y" ]; then
    define_bool CONFIG_PCI y
    define_bool CONFIG_IT8712 y
    define_bool CONFIG_PC_KEYB y
+   define_bool CONFIG_NEW_PCI y
+   define_bool CONFIG_PCI_AUTO y
 fi
 if [ "$CONFIG_MIPS_IVR" = "y" ]; then
    define_bool CONFIG_PCI y
@@ -229,33 +234,45 @@ comment 'CPU selection'
 choice 'CPU type' \
 	"R3000 CONFIG_CPU_R3000	\
 	 R6000 CONFIG_CPU_R6000	\
+	 R41xx CONFIG_CPU_VR41XX \
 	 R4300 CONFIG_CPU_R4300	\
 	 R4x00 CONFIG_CPU_R4X00	\
 	 R5000 CONFIG_CPU_R5000	\
-         R5432 CONFIG_CPU_R5432 \
+	 R5432 CONFIG_CPU_R5432 \
 	 RM7000 CONFIG_CPU_RM7000 \
 	 R52xx CONFIG_CPU_NEVADA \
 	 R10000 CONFIG_CPU_R10000 \
 	 SB1    CONFIG_CPU_SB1    \
-	 MIPS32 CONFIG_CPU_MIPS32" R4x00
+	 MIPS32 CONFIG_CPU_MIPS32 \
+	 MIPS64 CONFIG_CPU_MIPS64" R4x00
 
 bool 'Override CPU Options' CONFIG_CPU_ADVANCED
 
 if [ "$CONFIG_CPU_ADVANCED" = "y" ]; then
    bool '  ll/sc Instructions available' CONFIG_CPU_HAS_LLSC
+   bool '  lld/scd Instructions available' CONFIG_CPU_HAS_LLDSCD
    bool '  Writeback Buffer available' CONFIG_CPU_HAS_WB
 else
-   if [ "$CONFIG_CPU_R3000" = "y" ]; then
-      if [ "$CONFIG_DECSTATION" = "y" ]; then
+   if [ "$CONFIG_CPU_R3000" = "y" -o "$CONFIG_CPU_VR41XX" = "y" ]; then
+      if [ "CONFIG_DECSTATION" = "y" ]; then
 	 define_bool CONFIG_CPU_HAS_LLSC n
+	 define_bool CONFIG_CPU_HAS_LLDSCD n
 	 define_bool CONFIG_CPU_HAS_WB y
       else
 	 define_bool CONFIG_CPU_HAS_LLSC n
+	 define_bool CONFIG_CPU_HAS_LLDSCD n
 	 define_bool CONFIG_CPU_HAS_WB n
       fi
    else
+      if [ "$CONFIG_CPU_MIPS32" = "y" ]; then
 	 define_bool CONFIG_CPU_HAS_LLSC y
+	 define_bool CONFIG_CPU_HAS_LLDSCD n
 	 define_bool CONFIG_CPU_HAS_WB n
+      else
+	 define_bool CONFIG_CPU_HAS_LLSC y
+	 define_bool CONFIG_CPU_HAS_LLDSCD y
+	 define_bool CONFIG_CPU_HAS_WB n
+      fi
    fi
 fi
 endmenu
@@ -270,7 +287,6 @@ if [ "$CONFIG_DECSTATION" = "y" -o \
 else
    bool 'Generate little endian code' CONFIG_CPU_LITTLE_ENDIAN
 fi
-bool 'Kernel floating-point emulation' CONFIG_MIPS_FPU_EMULATOR
 
 if [ "$CONFIG_PROC_FS" = "y" ]; then
    define_bool CONFIG_KCORE_ELF y
@@ -361,7 +377,7 @@ endmenu
 
 if [ "$CONFIG_DECSTATION" != "y" -a \
      "$CONFIG_SGI_IP22" != "y" ]; then
-   source drivers/message/i2o/Config.in
+   source drivers/i2o/Config.in
 fi
 
 if [ "$CONFIG_NET" = "y" ]; then
@@ -492,9 +508,6 @@ mainmenu_option next_comment
 comment 'Kernel hacking'
 
 bool 'Are you using a crosscompiler' CONFIG_CROSSCOMPILE
-if [ "$CONFIG_MODULES" = "y" ]; then
-   bool ' Build fp execption handler module' CONFIG_MIPS_FPE_MODULE
-fi
 if [ "$CONFIG_SERIAL" = "y" -o "$CONFIG_AU1000_UART" = "y" ]; then
   bool 'Remote GDB kernel debugging' CONFIG_REMOTE_DEBUG
   dep_bool 'Console output to GDB' CONFIG_GDB_CONSOLE $CONFIG_REMOTE_DEBUG

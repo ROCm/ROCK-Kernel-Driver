@@ -179,6 +179,7 @@ static int full_duplex[MAX_UNITS];
  * v1.25kf Added No Interrupt on successful Tx for some Tx's <kaf@fc.hp.com>
  * v1.26   Converted to pci_alloc_consistent, Jamey Hicks / George France
  *                                           <jamey@crl.dec.com>
+ * v1.26p Fix oops on rmmod+insmod; plug i/o resource leak - Paul Gortmaker
  */
 
 
@@ -471,7 +472,7 @@ static int __init pcnet32_probe_vlbus(int cards_found)
 
 
 
-static int __init
+static int __devinit
 pcnet32_probe_pci(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
     static int card_idx;
@@ -506,10 +507,11 @@ pcnet32_probe_pci(struct pci_dev *pdev, const struct pci_device_id *ent)
  *  Called from both pcnet32_probe_vlbus and pcnet_probe_pci.  
  *  pdev will be NULL when called from pcnet32_probe_vlbus.
  */
-static int __init
+static int __devinit
 pcnet32_probe1(unsigned long ioaddr, unsigned char irq_line, int shared, int card_idx, struct pci_dev *pdev)
 {
     struct pcnet32_private *lp;
+    struct resource *res;
     dma_addr_t lp_dma_addr;
     int i,media,fdx = 0, mii = 0, fset = 0;
 #ifdef DO_DXSUFLO
@@ -643,7 +645,7 @@ pcnet32_probe1(unsigned long ioaddr, unsigned char irq_line, int shared, int car
 	}
 	if( memcmp( promaddr, dev->dev_addr, 6) )
 	{
-	    printk(" warning PROM address does not match CSR address");
+	    printk(" warning PROM address does not match CSR address\n");
 #if defined(__i386__)
 	    printk(KERN_WARNING "%s: Probably a Compaq, using the PROM address of", dev->name);
 	    memcpy(dev->dev_addr, promaddr, 6);
@@ -682,11 +684,15 @@ pcnet32_probe1(unsigned long ioaddr, unsigned char irq_line, int shared, int car
     }
 
     dev->base_addr = ioaddr;
-    request_region(ioaddr, PCNET32_TOTAL_SIZE, chipname);
+    res = request_region(ioaddr, PCNET32_TOTAL_SIZE, chipname);
+    if (res == NULL)
+	return -EBUSY;
     
     /* pci_alloc_consistent returns page-aligned memory, so we do not have to check the alignment */
-    if ((lp = pci_alloc_consistent(pdev, sizeof(*lp), &lp_dma_addr)) == NULL)
+    if ((lp = pci_alloc_consistent(pdev, sizeof(*lp), &lp_dma_addr)) == NULL) {
+	release_resource(res);
 	return -ENOMEM;
+    }
 
     memset(lp, 0, sizeof(*lp));
     lp->dma_addr = lp_dma_addr;
@@ -715,6 +721,7 @@ pcnet32_probe1(unsigned long ioaddr, unsigned char irq_line, int shared, int car
     if (a == NULL) {
       printk(KERN_ERR "pcnet32: No access methods\n");
       pci_free_consistent(lp->pci_dev, sizeof(*lp), lp, lp->dma_addr);
+      release_resource(res);
       return -ENODEV;
     }
     lp->a = *a;
@@ -762,6 +769,7 @@ pcnet32_probe1(unsigned long ioaddr, unsigned char irq_line, int shared, int car
 	else {
 	    printk(", failed to detect IRQ line.\n");
 	    pci_free_consistent(lp->pci_dev, sizeof(*lp), lp, lp->dma_addr);
+	    release_resource(res);
 	    return -ENODEV;
 	}
     }
@@ -1579,6 +1587,8 @@ static void __exit pcnet32_cleanup_module(void)
 	next_dev = lp->next;
 	unregister_netdev(pcnet32_dev);
 	release_region(pcnet32_dev->base_addr, PCNET32_TOTAL_SIZE);
+	if (lp->pci_dev != NULL)
+	    pci_unregister_driver(&pcnet32_driver);
         pci_free_consistent(lp->pci_dev, sizeof(*lp), lp, lp->dma_addr);
 	kfree(pcnet32_dev);
 	pcnet32_dev = next_dev;

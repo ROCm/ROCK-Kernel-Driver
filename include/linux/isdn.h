@@ -1,4 +1,4 @@
-/* $Id: isdn.h,v 1.111.6.7 2001/06/30 19:47:51 kai Exp $
+/* $Id: isdn.h,v 1.111.6.8 2001/08/17 12:34:28 kai Exp $
 
  * Main header for the Linux ISDN subsystem (linklevel).
  *
@@ -656,9 +656,6 @@ typedef struct isdn_devt {
 extern isdn_dev *dev;
 
 
-/* Utility-Macros */
-#define MIN(a,b) ((a<b)?a:b)
-#define MAX(a,b) ((a>b)?a:b)
 #endif /* __KERNEL__ */
 
 #endif /* __ISDN_H__ */

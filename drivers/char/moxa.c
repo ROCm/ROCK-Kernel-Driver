@@ -205,12 +205,15 @@ static int numports[] 	=	{0, 0, 0, 0};
 
 MODULE_AUTHOR("William Chen");
 MODULE_DESCRIPTION("MOXA Intellio Family Multiport Board Device Driver");
+MODULE_LICENSE("GPL");
 MODULE_PARM(type, "1-4i");
 MODULE_PARM(baseaddr, "1-4i");
 MODULE_PARM(numports, "1-4i");
 MODULE_PARM(ttymajor, "i");
 MODULE_PARM(calloutmajor, "i");
 MODULE_PARM(verbose, "i");
+
+EXPORT_NO_SYMBOLS;
 
 #endif				//MODULE
 
@@ -1717,27 +1720,6 @@ int MoxaDriverIoctl(unsigned int cmd, unsigned long arg, int port)
 		if(copy_to_user((void *)arg, temp_queue, sizeof(struct moxaq_str) * MAX_PORTS))
 			return -EFAULT;
 		return (0);
-	case MOXA_LOAD_BIOS:
-		if(copy_from_user(&dltmp, (void *)arg, sizeof(struct dl_str)))
-			return -EFAULT;
-		i = moxaloadbios(dltmp.cardno, dltmp.buf, dltmp.len);
-		return (i);
-	case MOXA_FIND_BOARD:
-		if(copy_from_user(&dltmp, (void *)arg, sizeof(struct dl_str)))
-			return -EFAULT;
-		return moxafindcard(dltmp.cardno);
-	case MOXA_LOAD_C320B:
-		if(copy_from_user(&dltmp, (void *)arg, sizeof(struct dl_str)))
-			return -EFAULT;
-		moxaload320b(dltmp.cardno, dltmp.buf, dltmp.len);
-		return (0);
-	case MOXA_LOAD_CODE:
-		if(copy_from_user(&dltmp, (void *)arg, sizeof(struct dl_str)))
-			return -EFAULT; 
-		i = moxaloadcode(dltmp.cardno, dltmp.buf, dltmp.len);
-		if (i == -1)
-			return (-EFAULT);
-		return (i);
 	case MOXA_GET_OQUEUE:
 		i = MoxaPortTxQueue(port);
 		return put_user(i, (unsigned long *) arg);
@@ -1778,9 +1760,38 @@ int MoxaDriverIoctl(unsigned int cmd, unsigned long arg, int port)
 		if(copy_to_user((void *)arg, GMStatus, sizeof(struct mxser_mstatus) * MAX_PORTS))
 			return -EFAULT;
 		return 0;
+	default:
+		return (-ENOIOCTLCMD);
+	case MOXA_LOAD_BIOS:
+	case MOXA_FIND_BOARD:
+	case MOXA_LOAD_C320B:
+	case MOXA_LOAD_CODE:
+		break;
+	}
+
+	if(copy_from_user(&dltmp, (void *)arg, sizeof(struct dl_str)))
+		return -EFAULT;
+	if(dltmp.cardno < 0 || dltmp.cardno >= MAX_BOARDS)
+		return -EINVAL;
+
+	switch(cmd)
+	{
+	case MOXA_LOAD_BIOS:
+		i = moxaloadbios(dltmp.cardno, dltmp.buf, dltmp.len);
+		return (i);
+	case MOXA_FIND_BOARD:
+		return moxafindcard(dltmp.cardno);
+	case MOXA_LOAD_C320B:
+		moxaload320b(dltmp.cardno, dltmp.buf, dltmp.len);
+	default: /* to keep gcc happy */
+		return (0);
+	case MOXA_LOAD_CODE:
+		i = moxaloadcode(dltmp.cardno, dltmp.buf, dltmp.len);
+		if (i == -1)
+			return (-EFAULT);
+		return (i);
 
 	}
-	return (-ENOIOCTLCMD);
 }
 
 int MoxaDriverPoll(void)

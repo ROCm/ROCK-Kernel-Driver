@@ -1,13 +1,12 @@
-/* $Id: entry.S,v 1.19 1999/12/08 22:05:10 harald Exp $
- *
- * Low level exception handling
- *
+/*
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1994 - 2000 by Ralf Baechle
+ * Copyright (C) 1994 - 2000, 2001 by Ralf Baechle
  * Copyright (C) 1999, 2000 Silicon Graphics, Inc.
+ * Copyright (C) 2001 MIPS Technologies, Inc.
  */
 #include <linux/config.h>
 #include <linux/sys.h>
@@ -26,49 +25,63 @@
 #include <asm/unistd.h>
 #include <asm/isadep.h>
 
+/* This duplicates the definition from <linux/sched.h> */
+#define PT_TRACESYS	0x00000002		/* tracing system calls */
+
+
 		.text
 		.align 4
 		.set	push
 		.set	reorder
 EXPORT(ret_from_fork)
-		 move	a0, v0			# prev
+		move	a0, v0			# prev
 		jal	schedule_tail
+		lw	t0, TASK_PTRACE($28)	# syscall tracing enabled?
+		andi	t0, PT_TRACESYS
+		bnez	t0, tracesys_exit
 		j	ret_from_sys_call
 
-EXPORT(handle_softirq)
-		jal	do_softirq
-		b	9f
+tracesys_exit:	jal	syscall_trace
+		b	ret_from_sys_call
+
+EXPORT(ret_from_irq)
+EXPORT(ret_from_exception)
+		lw	t0, PT_STATUS(sp)	# returning to kernel mode?
+		andi	t0, t0, KU_USER
+		bnez	t0, ret_from_sys_call
+		j	restore_all
 
 reschedule:	jal	schedule 
 
 EXPORT(ret_from_sys_call)
-EXPORT(ret_from_irq)
 		.type	ret_from_irq,@function
-		la	t1, irq_stat		# softirq_active
-#ifdef CONFIG_SMP
-		lw	t0, TASK_PROCESSOR($28)
-		sll	t0, t0, 5
-		addu	t1, t0
-#endif
-		lw	t0, 0(t1)		# softirq_active
-		lw	t1, 4(t1)		# softirq_mask.  unused delay slot
-		and	t0, t1
-		bnez	t0, handle_softirq
 
-9:		lw	t0,PT_STATUS(sp)	# returning to kernel mode?
-		lw	t2, TASK_NEED_RESCHED($28)
-		andi	t1, t0, KU_USER
-		beqz	t1, return		# -> yes
-		bnez	t2, reschedule
-		lw	v0, TASK_SIGPENDING($28)
-		 move	a0, zero
-		beqz	v0, return
-		 move	a1, sp
-		jal	do_signal
+		mfc0	t0, CP0_STATUS	# need_resched and signals atomic test
+		ori	t0, t0, 1
+		xori	t0, t0, 1
+		mtc0	t0, CP0_STATUS
+		nop; nop; nop
 
-EXPORT(return)	.set	noat
+		lw	v0, TASK_NEED_RESCHED($28)
+		lw	v1, TASK_SIGPENDING($28)
+		bnez	v0, reschedule
+		bnez	v1, signal_return
+restore_all:	.set	noat
 		RESTORE_ALL_AND_RET
 		.set	at
+
+/* Put this behind restore_all for the sake of the branch prediction.  */
+signal_return:
+		.type	signal_return, @function
+
+		mfc0	t0, CP0_STATUS
+		ori	t0, t0, 1
+		mtc0	t0, CP0_STATUS
+
+		move	a0, zero
+		move	a1, sp
+		jal	do_signal
+		b	restore_all
 
 /*
  * Common spurious interrupt handler.
@@ -85,8 +98,8 @@ LEAF(spurious_interrupt)
 		lw      t0,%lo(spurious_count)(t1)
 		.set	noreorder
 		addiu   t0,1
+		sw      t0,%lo(spurious_count)(t1)
 		j	ret_from_irq
-		 sw      t0,%lo(spurious_count)(t1)
 		END(spurious_interrupt)
 
 /*
@@ -106,7 +119,7 @@ LEAF(spurious_interrupt)
 		ctc1	a2,fcr31;                                       \
 		STI
 #define __BUILD_clear_ade(exception)                                    \
-		.set	reorder;						\
+		.set	reorder;					\
 		MFC0	t0,CP0_BADVADDR;                                \
 		.set	noreorder;					\
 		REG_S	t0,PT_BVADDR(sp);                               \
@@ -139,8 +152,8 @@ EXPORT(exception_count_##exception);                                    \
 		.set	at;                                             \
 		__BUILD_##verbose(exception);                           \
 		jal	do_##handler;                                   \
-		 move	a0,sp;                                          \
-		j	ret_from_sys_call;                              \
+		 move	a0, sp;                                         \
+		j	ret_from_exception;                             \
 		 nop;                                                   \
 		END(handle_##exception)
 

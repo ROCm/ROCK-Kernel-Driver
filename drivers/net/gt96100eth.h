@@ -1,7 +1,7 @@
 /*
  * Copyright 2000 MontaVista Software Inc.
  * Author: MontaVista Software, Inc.
- *         	stevel@mvista.com or support@mvista.com
+ *         	stevel@mvista.com or source@mvista.com
  *
  * ########################################################################
  *
@@ -27,7 +27,6 @@
 #ifndef _GT96100ETH_H
 #define _GT96100ETH_H
 
-#include <linux/config.h>
 #include <asm/galileo-boards/gt96100.h>
 
 /* Keep the ring sizes a power of two for efficiency. */

@@ -191,6 +191,12 @@ static inline void cpu_probe(void)
 				           MIPS_CPU_WATCH | MIPS_CPU_VCE;
 			mips_cpu.tlbsize = 48;
 			break;
+                case PRID_IMP_VR41XX:
+                        mips_cpu.cputype = CPU_VR41XX;
+                        mips_cpu.isa_level = MIPS_CPU_ISA_III;
+                        mips_cpu.options = R4K_OPTS;
+                        mips_cpu.tlbsize = 32;
+                        break;
 		case PRID_IMP_R4600:
 			mips_cpu.cputype = CPU_R4600;
 			mips_cpu.isa_level = MIPS_CPU_ISA_III;
@@ -282,7 +288,7 @@ static inline void cpu_probe(void)
 			break;
 		case PRID_IMP_R10000:
 			mips_cpu.cputype = CPU_R10000;
-			mips_cpu.cputype = MIPS_CPU_ISA_IV;
+			mips_cpu.isa_level = MIPS_CPU_ISA_IV;
 			mips_cpu.options = MIPS_CPU_TLB | MIPS_CPU_4KEX | 
 				           MIPS_CPU_FPU | MIPS_CPU_32FPR | 
 				           MIPS_CPU_COUNTER | MIPS_CPU_WATCH;
@@ -719,8 +725,10 @@ void __init setup_arch(char **cmdline_p)
 #ifdef CONFIG_BLK_DEV_INITRD
 	/* Board specific code should have set up initrd_start and initrd_end */
 	ROOT_DEV = MKDEV(RAMDISK_MAJOR, 0);
-	initrd_start = (unsigned long)&__rd_start;
-	initrd_end = (unsigned long)&__rd_end;
+	if( __rd_start != __rd_end ) {
+		initrd_start = (unsigned long)&__rd_start;
+		initrd_end = (unsigned long)&__rd_end;
+	}
 	initrd_below_start_ok = 1;
 	if (initrd_start) {
 		unsigned long initrd_size = ((unsigned char *)initrd_end) - ((unsigned char *)initrd_start); 

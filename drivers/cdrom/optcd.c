@@ -2097,3 +2097,4 @@ module_init(optcd_init);
 module_exit(optcd_exit);
 
 
+MODULE_LICENSE("GPL");

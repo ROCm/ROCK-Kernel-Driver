@@ -22,7 +22,7 @@
 #ifdef DEBUG
 void ntfs_debug(int mask, const char *fmt, ...);
 #else
-#define ntfs_debug(mask, fmt, ...)	do {} while (0)
+#define ntfs_debug(mask, fmt...)	do {} while (0)
 #endif
 
 #include <linux/slab.h>

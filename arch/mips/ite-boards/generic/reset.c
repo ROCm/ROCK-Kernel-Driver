@@ -3,10 +3,9 @@
  * BRIEF MODULE DESCRIPTION
  *	ITE 8172 reset routines.
  *
- * Copyright (C) 1997, 2001 Ralf Baechle
  * Copyright 2001 MontaVista Software Inc.
  * Author: MontaVista Software, Inc.
- *         	ppopov@mvista.com or support@mvista.com
+ *         	ppopov@mvista.com or source@mvista.com
  *
  *  This program is free software; you can redistribute  it and/or modify it
  *  under  the terms of  the GNU General  Public License as published by the
@@ -37,7 +36,7 @@
 #include <asm/reboot.h>
 #include <asm/system.h>
 
-void it8172_restart(char *command)
+void it8172_restart()
 {
 	set_cp0_status(ST0_BEV | ST0_ERL);
 	change_cp0_config(CONF_CM_CMASK, CONF_CM_UNCACHED);

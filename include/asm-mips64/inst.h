@@ -1,5 +1,4 @@
-/* $Id: inst.h,v 1.1 1999/10/09 20:55:09 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.

@@ -9,13 +9,13 @@
 
 void indy_8254timer_irq(void)
 {
-        int cpu = smp_processor_id();
-        int irq = 4;
+	int cpu = smp_processor_id();
+	int irq = 4;
 
-        irq_enter(cpu);
-        kstat.irqs[0][irq]++;
-        printk("indy_8254timer_irq: Whoops, should not have gotten this IRQ\n");
-        prom_getchar();
-        prom_imode();
-        irq_exit(cpu);
+	irq_enter(cpu, irq);
+	kstat.irqs[0][irq]++;
+	printk("indy_8254timer_irq: Whoops, should not have gotten this IRQ\n");
+	prom_getchar();
+	ArcEnterInteractiveMode();
+	irq_exit(cpu, irq);
 }

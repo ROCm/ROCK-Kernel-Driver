@@ -28,7 +28,7 @@ struct irqaction;
 extern int i8259_setup_irq(int irq, struct irqaction * new);
 extern void disable_irq(unsigned int);
 
-#ifdef CONFIG_ROTTEN_IRQ
+#ifndef CONFIG_NEW_IRQ
 #define disable_irq_nosync	disable_irq
 #else
 extern void disable_irq_nosync(unsigned int);

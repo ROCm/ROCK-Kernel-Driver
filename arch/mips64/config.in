@@ -41,6 +41,7 @@ unset CONFIG_BOOT_ELF32
 unset CONFIG_BOOT_ELF64
 unset CONFIG_COHERENT_IO
 unset CONFIG_ISA
+unset CONFIG_MAPPED_PCI_IO
 unset CONFIG_PCI
 
 if [ "$CONFIG_SGI_IP22" = "y" ]; then
@@ -56,6 +57,7 @@ if [ "$CONFIG_SGI_IP27" = "y" ]; then
    define_bool CONFIG_BOOT_ELF64 y
    define_bool CONFIG_ARC64 y
    define_bool CONFIG_COHERENT_IO y
+   define_bool CONFIG_MAPPED_PCI_IO y
    define_bool CONFIG_PCI y
    define_bool CONFIG_QL_ISP_A64 y
    define_int CONFIG_L1_CACHE_SHIFT 7
@@ -177,7 +179,7 @@ if [ "$CONFIG_SCSI" != "n" ]; then
 fi
 endmenu
 
-source drivers/message/i2o/Config.in
+#source drivers/message/i2o/Config.in
 
 if [ "$CONFIG_NET" = "y" ]; then
    mainmenu_option next_comment
@@ -270,7 +272,7 @@ if [ "$CONFIG_MODULES" = "y" ]; then
 fi
 bool 'Remote GDB kernel debugging' CONFIG_REMOTE_DEBUG
 bool 'Magic SysRq key' CONFIG_MAGIC_SYSRQ
-if [ "$CONFIG_SMP" != "n" ]; then
+if [ "$CONFIG_SMP" != "y" ]; then
    bool 'Run uncached' CONFIG_MIPS_UNCACHED
 fi
 endmenu

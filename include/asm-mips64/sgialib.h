@@ -13,7 +13,6 @@
 
 #include <asm/sgiarcs.h>
 
-extern PSYSTEM_PARAMETER_BLOCK sgi_pblock;
 extern struct linux_romvec *romvec;
 extern int prom_argc;
 

@@ -9,6 +9,14 @@
  * Copyright (C) 1997 Thomas Bogendoerfer (tsbogend@alpha.franken.de)
  *
  * jazz_esp is based on David S. Miller's ESP driver and cyber_esp
+ *
+ * 20000819 - Small PMAZ-AA fixes by Florian Lohoff <flo@rfc822.org>
+ *            Be warned the PMAZ-AA works currently as a single card.
+ *            Dont try to put multiple cards in one machine - They are
+ *            both detected but it may crash under high load garbling your
+ *            data.
+ * 20001005	- Initialization fixes for 2.4.0-test9
+ * 			  Florian Lohoff <flo@rfc822.org>
  */
 
 #include <linux/kernel.h>
@@ -45,8 +53,6 @@
  * starting point. #define this an be prepared for tons
  * of warnings and errors :)
  */
-#undef PMAZ_A
-
 static int  dma_bytes_sent(struct NCR_ESP *esp, int fifo_count);
 static void dma_drain(struct NCR_ESP *esp);
 static int  dma_can_transfer(struct NCR_ESP *esp, Scsi_Cmnd * sp);
@@ -62,7 +68,6 @@ static void dma_mmu_get_scsi_one(struct NCR_ESP *esp, Scsi_Cmnd * sp);
 static void dma_mmu_get_scsi_sgl(struct NCR_ESP *esp, Scsi_Cmnd * sp);
 static void dma_advance_sg(Scsi_Cmnd * sp);
 
-#ifdef PMAZ_A
 static void pmaz_dma_drain(struct NCR_ESP *esp);
 static void pmaz_dma_init_read(struct NCR_ESP *esp, __u32 vaddress, int length);
 static void pmaz_dma_init_write(struct NCR_ESP *esp, __u32 vaddress, int length);
@@ -70,10 +75,6 @@ static void pmaz_dma_ints_off(struct NCR_ESP *esp);
 static void pmaz_dma_ints_on(struct NCR_ESP *esp);
 static void pmaz_dma_setup(struct NCR_ESP *esp, __u32 addr, int count, int write);
 static void pmaz_dma_mmu_get_scsi_one(struct NCR_ESP *esp, Scsi_Cmnd * sp);
-static void pmaz_dma_mmu_get_scsi_sgl(struct NCR_ESP *esp, Scsi_Cmnd * sp);
-
-volatile int *scsi_pmaz_dma_ptr_tc;
-#endif
 
 #define TC_ESP_RAM_SIZE 0x20000
 #define ESP_TGT_DMA_SIZE ((TC_ESP_RAM_SIZE/7) & ~(sizeof(int)-1))
@@ -83,9 +84,6 @@ volatile int *scsi_pmaz_dma_ptr_tc;
 #define TC_ESP_DMAR_WRITE 0x80000000
 #define TC_ESP_DMA_ADDR(x) ((unsigned)(x) & TC_ESP_DMAR_MASK)
 
-volatile unsigned char *scsi_pmaz_dma_ptrs_tc[ESP_NCMD];
-unsigned char scsi_pmaz_dma_buff_used[ESP_NCMD];
-unsigned char scsi_cur_buff = 1;	/* Leave space for command buffer */
 __u32 esp_virt_buffer;
 int scsi_current_length;
 
@@ -105,20 +103,21 @@ volatile unsigned long *scsi_sdr1;
 
 static void scsi_dma_int(int, void *, struct pt_regs *);
 
+static Scsi_Host_Template driver_template = SCSI_DEC_ESP;
+
+#include "scsi_module.c"
+
 /***************************************************************** Detection */
 int dec_esp_detect(Scsi_Host_Template * tpnt)
 {
 	struct NCR_ESP *esp;
 	struct ConfigDev *esp_dev;
-#ifdef PMAZ_A
-	int slot, i;
+	int slot;
 	unsigned long mem_start;
-	volatile unsigned char *buffer;
-#endif
 
 	if (IOASIC) {
-	esp_dev = 0;
-	esp = esp_allocate(tpnt, (void *) esp_dev);
+		esp_dev = 0;
+		esp = esp_allocate(tpnt, (void *) esp_dev);
 	
 		scsi_dma_ptr = (unsigned long *) (system_base + IOCTL + SCSI_DMA_P);
 		scsi_next_ptr = (unsigned long *) (system_base + IOCTL + SCSI_DMA_BP);
@@ -127,85 +126,88 @@ int dec_esp_detect(Scsi_Host_Template * tpnt)
 		scsi_sdr0 = (unsigned long *) (system_base + IOCTL + SCSI_SDR0);
 		scsi_sdr1 = (unsigned long *) (system_base + IOCTL + SCSI_SDR1);
 
-	/* Do command transfer with programmed I/O */
-	esp->do_pio_cmds = 1;
+		/* Do command transfer with programmed I/O */
+		esp->do_pio_cmds = 1;
 	
-	/* Required functions */
-	esp->dma_bytes_sent = &dma_bytes_sent;
-	esp->dma_can_transfer = &dma_can_transfer;
-	esp->dma_dump_state = &dma_dump_state;
-	esp->dma_init_read = &dma_init_read;
-	esp->dma_init_write = &dma_init_write;
-	esp->dma_ints_off = &dma_ints_off;
-	esp->dma_ints_on = &dma_ints_on;
-	esp->dma_irq_p = &dma_irq_p;
-	esp->dma_ports_p = &dma_ports_p;
-	esp->dma_setup = &dma_setup;
+		/* Required functions */
+		esp->dma_bytes_sent = &dma_bytes_sent;
+		esp->dma_can_transfer = &dma_can_transfer;
+		esp->dma_dump_state = &dma_dump_state;
+		esp->dma_init_read = &dma_init_read;
+		esp->dma_init_write = &dma_init_write;
+		esp->dma_ints_off = &dma_ints_off;
+		esp->dma_ints_on = &dma_ints_on;
+		esp->dma_irq_p = &dma_irq_p;
+		esp->dma_ports_p = &dma_ports_p;
+		esp->dma_setup = &dma_setup;
 
-	/* Optional functions */
-	esp->dma_barrier = 0;
+		/* Optional functions */
+		esp->dma_barrier = 0;
 		esp->dma_drain = &dma_drain;
-	esp->dma_invalidate = 0;
-	esp->dma_irq_entry = 0;
-	esp->dma_irq_exit = 0;
-	esp->dma_poll = 0;
-	esp->dma_reset = 0;
-	esp->dma_led_off = 0;
-	esp->dma_led_on = 0;
-	
-	/* virtual DMA functions */
-	esp->dma_mmu_get_scsi_one = &dma_mmu_get_scsi_one;
-	esp->dma_mmu_get_scsi_sgl = &dma_mmu_get_scsi_sgl;
+		esp->dma_invalidate = 0;
+		esp->dma_irq_entry = 0;
+		esp->dma_irq_exit = 0;
+		esp->dma_poll = 0;
+		esp->dma_reset = 0;
+		esp->dma_led_off = 0;
+		esp->dma_led_on = 0;
+		
+		/* virtual DMA functions */
+		esp->dma_mmu_get_scsi_one = &dma_mmu_get_scsi_one;
+		esp->dma_mmu_get_scsi_sgl = &dma_mmu_get_scsi_sgl;
 		esp->dma_mmu_release_scsi_one = 0;
 		esp->dma_mmu_release_scsi_sgl = 0;
-	esp->dma_advance_sg = &dma_advance_sg;
+		esp->dma_advance_sg = &dma_advance_sg;
 
 
-	/* SCSI chip speed */
+		/* SCSI chip speed */
 		esp->cfreq = 25000000;
 
-	/*
-	 * we don't give the address of DMA channel, but the number
-	 * of DMA channel, so we can use the jazz DMA functions
-	 *
-	 */
-	esp->dregs = JAZZ_SCSI_DMA;
+		/*
+		 * we don't give the address of DMA channel, but the number
+		 * of DMA channel, so we can use the jazz DMA functions
+		 *
+		 */
+		esp->dregs = JAZZ_SCSI_DMA;
 	
-	/* ESP register base */
+		/* ESP register base */
 		esp->eregs = (struct ESP_regs *) (system_base + SCSI);
 	
-	/* Set the command buffer */
+		/* Set the command buffer */
 		esp->esp_command = (volatile unsigned char *) cmd_buffer;
 	
-	/* get virtual dma address for command buffer */
+		/* get virtual dma address for command buffer */
 		esp->esp_command_dvma = (__u32) KSEG1ADDR((volatile unsigned char *) cmd_buffer);
 	
 		esp->irq = SCSI_INT;
+
+		esp->scsi_id = 7;
+		
+		/* Check for differential SCSI-bus */
+		esp->diff = 0;
+
+		esp_initialize(esp);
+
 		if (request_irq(esp->irq, esp_intr, SA_INTERRUPT, 
 				"NCR 53C94 SCSI", NULL))
 			goto err_dealloc;
 		if (request_irq(SCSI_DMA_INT, scsi_dma_int, SA_INTERRUPT, 
 				"JUNKIO SCSI DMA", NULL))
 			goto err_free_irq;
-			
-
-	esp->scsi_id = 7;
-		
-	/* Check for differential SCSI-bus */
-	esp->diff = 0;
-
-	esp_initialize(esp);
-	
+ 			
 	}
 
-#ifdef PMAZ_A	
 	if (TURBOCHANNEL) {
-		while ((slot = search_tc_card("PMAZ_AA")) >= 0) {
+		while ((slot = search_tc_card("PMAZ-AA")) >= 0) {
 			claim_tc_card(slot);
-			mem_start = get_tc_base_addr(slot);
 
 			esp_dev = 0;
 			esp = esp_allocate(tpnt, (void *) esp_dev);
+
+			mem_start = get_tc_base_addr(slot);
+
+			/* Store base addr into esp struct */
+			esp->slot = mem_start;
 
 			esp->dregs = 0;
 			esp->eregs = (struct ESP_regs *) (mem_start + DEC_SCSI_SREG);
@@ -216,16 +218,6 @@ int dec_esp_detect(Scsi_Host_Template * tpnt)
 
 			/* get virtual dma address for command buffer */
 			esp->esp_command_dvma = (__u32) KSEG0ADDR((volatile unsigned char *) pmaz_cmd_buffer);
-
-			buffer = (volatile unsigned char *) (mem_start + DEC_SCSI_SRAM);
-
-			scsi_pmaz_dma_ptr_tc = (volatile int *) (mem_start + DEC_SCSI_DMAREG);
-
-			for (i = 0; i < ESP_NCMD; i++) {
-				scsi_pmaz_dma_ptrs_tc[i] = (volatile unsigned char *) (buffer + ESP_TGT_DMA_SIZE * i);
-			}
-
-			scsi_pmaz_dma_buff_used[0] = 1;
 
 			esp->cfreq = get_tc_speed();
 
@@ -260,18 +252,17 @@ int dec_esp_detect(Scsi_Host_Template * tpnt)
 			esp->dma_mmu_release_scsi_sgl = 0;
 			esp->dma_advance_sg = 0;
 
-			if (request_irq(esp->irq, esp_intr, SA_INTERRUPT, 
-					 "PMAZ_AA", NULL)) {
-				esp_deallocate(esp);
-				release_tc_card(slot);
-				continue;
-			}
+ 			if (request_irq(esp->irq, esp_intr, SA_INTERRUPT, 
+ 					 "PMAZ_AA", NULL)) {
+ 				esp_deallocate(esp);
+ 				release_tc_card(slot);
+ 				continue;
+ 			}
 			esp->scsi_id = 7;
 			esp->diff = 0;
 			esp_initialize(esp);
 		}
 	}
-#endif
 
 	if(nesps) {
 		printk("ESP: Total of %d ESP hosts found, %d actually in use.\n", nesps, esps_in_use);
@@ -476,30 +467,35 @@ static void dma_advance_sg(Scsi_Cmnd * sp)
 	sp->SCp.ptr = (char *) ((unsigned long) sp->SCp.buffer->dvma_address);
 }
 
-#ifdef PMAZ_A
-
 static void pmaz_dma_drain(struct NCR_ESP *esp)
 {
 	memcpy((void *) (KSEG0ADDR(esp_virt_buffer)),
-		(void *) scsi_pmaz_dma_ptrs_tc[scsi_cur_buff], scsi_current_length);
+		(void *) ( esp->slot + DEC_SCSI_SRAM + ESP_TGT_DMA_SIZE),
+		scsi_current_length);
 }
 
 static void pmaz_dma_init_read(struct NCR_ESP *esp, __u32 vaddress, int length)
 {
+	volatile int *dmareg = (volatile int *) (esp->slot + DEC_SCSI_DMAREG);
 
 	if (length > ESP_TGT_DMA_SIZE)
 		length = ESP_TGT_DMA_SIZE;
 
-	*scsi_pmaz_dma_ptr_tc = TC_ESP_DMA_ADDR(scsi_pmaz_dma_ptrs_tc[scsi_cur_buff]);
+	*dmareg = TC_ESP_DMA_ADDR(esp->slot + DEC_SCSI_SRAM + ESP_TGT_DMA_SIZE);
+
 	esp_virt_buffer = vaddress;
 	scsi_current_length = length;
 }
 
 static void pmaz_dma_init_write(struct NCR_ESP *esp, __u32 vaddress, int length)
 {
-	memcpy((void *)scsi_pmaz_dma_ptrs_tc[scsi_cur_buff], KSEG0ADDR((void *) vaddress), length);
+	volatile int *dmareg = (volatile int *) ( esp->slot + DEC_SCSI_DMAREG );
 
-	*scsi_pmaz_dma_ptr_tc = TC_ESP_DMAR_WRITE | TC_ESP_DMA_ADDR(scsi_pmaz_dma_ptrs_tc[scsi_cur_buff]);
+	memcpy((void *) (esp->slot + DEC_SCSI_SRAM + ESP_TGT_DMA_SIZE),
+			KSEG0ADDR((void *) vaddress), length);
+
+	*dmareg = TC_ESP_DMAR_WRITE | 
+		TC_ESP_DMA_ADDR(esp->slot + DEC_SCSI_SRAM + ESP_TGT_DMA_SIZE);
 
 }
 
@@ -524,18 +520,9 @@ static void pmaz_dma_setup(struct NCR_ESP *esp, __u32 addr, int count, int write
 	}
 }
 
-static void pmaz_dma_mmu_release_scsi_one(struct NCR_ESP *esp, Scsi_Cmnd * sp)
-{
-	int x;
-	for (x = 1; x < 6; x++)
-		if (sp->SCp.have_data_in == PHYSADDR(scsi_pmaz_dma_ptrs_tc[x]))
-			scsi_pmaz_dma_buff_used[x] = 0;
-}
-
 static void pmaz_dma_mmu_get_scsi_one(struct NCR_ESP *esp, Scsi_Cmnd * sp)
 {
 	sp->SCp.have_data_in = (int) sp->SCp.ptr =
 	    (char *) KSEG0ADDR((sp->request_buffer));
 }
 
-#endif

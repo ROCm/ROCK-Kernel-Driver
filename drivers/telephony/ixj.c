@@ -6693,7 +6693,10 @@ static int ixj_ioctl(struct inode *inode, struct file *file_p, unsigned int cmd,
 		retval = ixj_init_filter_raw(j, &jfr);
 		break;
 	case IXJCTL_GET_FILTER_HIST:
-		retval = j->filter_hist[arg];
+		if(arg<0||arg>3)
+			retval = -EINVAL;
+		else
+			retval = j->filter_hist[arg];
 		break;
 	case IXJCTL_INIT_TONE:
 		copy_from_user(&ti, (char *) arg, sizeof(ti));

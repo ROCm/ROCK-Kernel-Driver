@@ -563,16 +563,11 @@ static struct block_device_operations sd_fops =
 
 static struct gendisk sd_gendisk =
 {
-	SCSI_DISK0_MAJOR,	/* Major number */
-	"sd",			/* Major name */
-	4,			/* Bits to shift to get real from partition */
-	1 << 4,			/* Number of partitions per real */
-	NULL,			/* hd struct */
-	NULL,			/* block sizes */
-	0,			/* number */
-	NULL,			/* internal */
-	NULL,			/* next */
-        &sd_fops,		/* file operations */
+	major:		SCSI_DISK0_MAJOR,
+	major_name:	"sd",
+	minor_shift:	4,
+	max_p:		1 << 4,
+	fops:		&sd_fops,
 };
 
 static struct gendisk *sd_gendisks = &sd_gendisk;
@@ -1021,7 +1016,7 @@ static int sd_init_onedisk(int i)
 		cmd[1] = (rscsi_disks[i].device->scsi_level <= SCSI_2) ?
 			 ((rscsi_disks[i].device->lun << 5) & 0xe0) : 0;
 		cmd[2] = 0x3f;	/* Get all pages */
-		cmd[4] = 255;     /* But we only want the 8 byte header */
+		cmd[4] = 255;   /* Ask for 255 bytes, even tho we want just the first 8 */
 		SRpnt->sr_cmd_len = 0;
 		SRpnt->sr_sense_buffer[0] = 0;
 		SRpnt->sr_sense_buffer[2] = 0;

@@ -276,6 +276,8 @@ README for the ISDN-subsystem
                                       1 = Add CPN to RING message on
                             Bit 1:    0 = Add CPN to FCON message off
                                       1 = Add CPN to FCON message on
+                            Bit 2:    0 = Add CDN to RING/FCON message off
+                                      1 = Add CDN to RING/FCON message on
 
   Last but not least a (at the moment fairly primitive) device to request
   the line-status (/dev/isdninfo) is made available.

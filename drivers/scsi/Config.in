@@ -33,7 +33,7 @@ mainmenu_option next_comment
 comment 'SCSI low-level drivers'
 
 if [ "$CONFIG_SGI_IP22" = "y" ]; then
-   dep_tristate 'SGI WD93C93 SCSI Driver' CONFIG_SCSI_SGIWD93 $CONFIG_SCSI
+   dep_tristate 'SGI WD93C93 SCSI Driver' CONFIG_SGIWD93_SCSI $CONFIG_SCSI
 fi
 if [ "$CONFIG_DECSTATION" = "y" ]; then
    if [ "$CONFIG_TC" = "y" ]; then
@@ -59,6 +59,7 @@ if [ "$CONFIG_SCSI_AIC7XXX" != "y" ]; then
       bool '  Collect statistics to report in /proc' CONFIG_AIC7XXX_OLD_PROC_STATS
    fi
 fi
+dep_tristate 'Adaptec I2O RAID support ' CONFIG_SCSI_DPT_I2O $CONFIG_SCSI
 dep_tristate 'AdvanSys SCSI support' CONFIG_SCSI_ADVANSYS $CONFIG_SCSI
 dep_tristate 'Always IN2000 SCSI support' CONFIG_SCSI_IN2000 $CONFIG_SCSI
 dep_tristate 'AM53/79C974 PCI SCSI support' CONFIG_SCSI_AM53C974 $CONFIG_SCSI $CONFIG_PCI
@@ -85,7 +86,7 @@ dep_tristate 'Future Domain 16xx SCSI/AHA-2920A support' CONFIG_SCSI_FUTURE_DOMA
 if [ "$CONFIG_MCA" = "y" ]; then
    dep_tristate 'Future Domain MCS-600/700 SCSI support' CONFIG_SCSI_FD_MCS $CONFIG_SCSI
 fi
-dep_tristate 'GDT SCSI Disk Array Controller support' CONFIG_SCSI_GDTH $CONFIG_SCSI
+dep_tristate 'Intel/ICP (former GDT SCSI Disk Array) RAID Controller support' CONFIG_SCSI_GDTH $CONFIG_SCSI
 dep_tristate 'Generic NCR5380/53c400 SCSI support' CONFIG_SCSI_GENERIC_NCR5380 $CONFIG_SCSI
 if [ "$CONFIG_SCSI_GENERIC_NCR5380" != "n" ]; then
    bool '  Enable NCR53c400 extensions' CONFIG_SCSI_GENERIC_NCR53C400
@@ -114,6 +115,10 @@ if [ "$CONFIG_PARPORT" != "n" ]; then
    fi
 fi
 dep_tristate 'NCR53c406a SCSI support' CONFIG_SCSI_NCR53C406A $CONFIG_SCSI
+dep_tristate 'NCR Dual 700 MCA SCSI support' CONFIG_SCSI_NCR_D700 $CONFIG_SCSI $CONFIG_MCA
+if [ "$CONFIG_PARISC" = "y" ]; then
+   dep_tristate 'HP LASI SCSI support for 53c700' CONFIG_SCSI_LASI70 $CONFIG_SCSI
+fi
 dep_tristate 'NCR53c7,8xx SCSI support'  CONFIG_SCSI_NCR53C7xx $CONFIG_SCSI $CONFIG_PCI
 if [ "$CONFIG_SCSI_NCR53C7xx" != "n" ]; then
    bool '  always negotiate synchronous transfers' CONFIG_SCSI_NCR53C7xx_sync
@@ -151,6 +156,9 @@ dep_tristate 'Qlogic FAS SCSI support' CONFIG_SCSI_QLOGIC_FAS $CONFIG_SCSI
 if [ "$CONFIG_PCI" = "y" ]; then
    dep_tristate 'Qlogic ISP SCSI support' CONFIG_SCSI_QLOGIC_ISP $CONFIG_SCSI
    dep_tristate 'Qlogic ISP FC SCSI support' CONFIG_SCSI_QLOGIC_FC $CONFIG_SCSI
+   if [ "$CONFIG_SCSI_QLOGIC_FC" != "n" ]; then
+      bool '   Include loadable firmware in driver' CONFIG_SCSI_QLOGIC_FC_FIRMWARE
+   fi
    dep_tristate 'Qlogic QLA 1280 SCSI support' CONFIG_SCSI_QLOGIC_1280 $CONFIG_SCSI
 fi
 if [ "$CONFIG_X86" = "y" ]; then

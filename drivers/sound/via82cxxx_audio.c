@@ -858,6 +858,7 @@ static void via_chan_pcm_fmt (struct via_channel *chan, int reset)
 
 /**
  *	via_chan_clear - Stop DMA channel operation, and reset pointers
+ *	@card: the chip to accessed
  *	@chan: Channel to be cleared
  *
  *	Call via_chan_stop to halt DMA operations, and then resets

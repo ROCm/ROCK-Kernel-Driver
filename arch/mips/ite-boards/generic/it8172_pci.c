@@ -1,11 +1,10 @@
 /*
- *
  * BRIEF MODULE DESCRIPTION
  *	IT8172 system controller specific pci support.
  *
  * Copyright 2000 MontaVista Software Inc.
  * Author: MontaVista Software, Inc.
- *         	ppopov@mvista.com or support@mvista.com
+ *         	ppopov@mvista.com or source@mvista.com
  *
  *  This program is free software; you can redistribute  it and/or modify it
  *  under  the terms of  the GNU General  Public License as published by the
@@ -271,6 +270,12 @@ pcibios_update_resource(struct pci_dev *dev, struct resource *root,
 
 void __init pcibios_fixup_bus(struct pci_bus *b)
 {
-	printk("pcibios_fixup_bus\n");
+	//printk("pcibios_fixup_bus\n");
 }
+
+unsigned __init int pcibios_assign_all_busses(void)
+{
+	return 1;
+}
+
 #endif /* CONFIG_PCI */

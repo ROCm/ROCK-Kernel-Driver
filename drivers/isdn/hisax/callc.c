@@ -1,4 +1,4 @@
-/* $Id: callc.c,v 2.51.6.4 2001/06/09 15:14:17 kai Exp $
+/* $Id: callc.c,v 2.51.6.5 2001/08/23 19:44:23 kai Exp $
  *
  * Author       Karsten Keil (keil@isdn4linux.de)
  *              based on the teles driver from Jan den Ouden
@@ -20,12 +20,12 @@
 #define MOD_USE_COUNT ( GET_USE_COUNT (&__this_module))
 #endif	/* MODULE */
 
-const char *lli_revision = "$Revision: 2.51.6.4 $";
+const char *lli_revision = "$Revision: 2.51.6.5 $";
 
 extern struct IsdnCard cards[];
 extern int nrcards;
-extern void HiSax_mod_dec_use_count(void);
-extern void HiSax_mod_inc_use_count(void);
+extern void HiSax_mod_dec_use_count(struct IsdnCardState *cs);
+extern void HiSax_mod_inc_use_count(struct IsdnCardState *cs);
 
 static int init_b_st(struct Channel *chanp, int incoming);
 static void release_b_st(struct Channel *chanp);
@@ -1584,7 +1584,7 @@ HiSax_command(isdn_ctrl * ic)
 			}
 			break;
 		case (ISDN_CMD_LOCK):
-			HiSax_mod_inc_use_count();
+			HiSax_mod_inc_use_count(csta);
 #ifdef MODULE
 			if (csta->channel[0].debug & 0x400)
 				HiSax_putstatus(csta, "   LOCK ", "modcnt %lx",
@@ -1592,7 +1592,7 @@ HiSax_command(isdn_ctrl * ic)
 #endif				/* MODULE */
 			break;
 		case (ISDN_CMD_UNLOCK):
-			HiSax_mod_dec_use_count();
+			HiSax_mod_dec_use_count(csta);
 #ifdef MODULE
 			if (csta->channel[0].debug & 0x400)
 				HiSax_putstatus(csta, " UNLOCK ", "modcnt %lx",
@@ -1624,11 +1624,11 @@ HiSax_command(isdn_ctrl * ic)
 					break;
 				case (3):
 					for (i = 0; i < *(unsigned int *) ic->parm.num; i++)
-						HiSax_mod_dec_use_count();
+						HiSax_mod_dec_use_count(NULL);
 					break;
 				case (4):
 					for (i = 0; i < *(unsigned int *) ic->parm.num; i++)
-						HiSax_mod_inc_use_count();
+						HiSax_mod_inc_use_count(NULL);
 					break;
 				case (5):	/* set card in leased mode */
 					num = *(unsigned int *) ic->parm.num;
@@ -1698,7 +1698,7 @@ HiSax_command(isdn_ctrl * ic)
 #ifdef MODULE
 				case (55):
 					MOD_USE_COUNT = 0;
-					HiSax_mod_inc_use_count();
+					HiSax_mod_inc_use_count(NULL);
 					break;
 #endif				/* MODULE */
 				case (11):
@@ -1810,6 +1810,7 @@ HiSax_writebuf_skb(int id, int chan, int ack, struct sk_buff *skb)
 		cli();
 		nskb = skb_clone(skb, GFP_ATOMIC);
 		if (nskb) {
+			nskb->truesize = nskb->len;
 			if (!ack)
 				nskb->pkt_type = PACKET_NOACK;
 			if (chanp->l2_active_protocol == ISDN_PROTO_L2_X75I)

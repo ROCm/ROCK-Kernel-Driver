@@ -10,46 +10,100 @@
  *  (linux@arm.uk.linux.org)
  */
 
+/*
+ * TODO:  rip out the remaining init crap from this file  --hch
+ */
+
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/genhd.h>
 #include <linux/kernel.h>
 #include <linux/blk.h>
 #include <linux/init.h>
+#include <linux/spinlock.h>
 
 
-struct gendisk *gendisk_head;
+static rwlock_t gendisk_lock;
 
+/*
+ * Global kernel list of partitioning information.
+ *
+ * XXX: you should _never_ access this directly.
+ *	the only reason this is exported is source compatiblity.
+ */
+/*static*/ struct gendisk *gendisk_head;
+
+EXPORT_SYMBOL(gendisk_head);
+
+
+/**
+ * add_gendisk - add partitioning information to kernel list
+ * @gp: per-device partitioning information
+ *
+ * This function registers the partitioning information in @gp
+ * with the kernel.
+ */
 void
 add_gendisk(struct gendisk *gp)
 {
+	write_lock(&gendisk_lock);
 	gp->next = gendisk_head;
 	gendisk_head = gp;
+	write_unlock(&gendisk_lock);
 }
 
+EXPORT_SYMBOL(add_gendisk);
+
+
+/**
+ * del_gendisk - remove partitioning information from kernel list
+ * @gp: per-device partitioning information
+ *
+ * This function unregisters the partitioning information in @gp
+ * with the kernel.
+ */
 void
 del_gendisk(struct gendisk *gp)
 {
 	struct gendisk **gpp;
 
+	write_lock(&gendisk_lock);
 	for (gpp = &gendisk_head; *gpp; gpp = &((*gpp)->next))
 		if (*gpp == gp)
 			break;
 	if (*gpp)
 		*gpp = (*gpp)->next;
+	write_unlock(&gendisk_lock);
 }
 
+EXPORT_SYMBOL(del_gendisk);
+
+
+/**
+ * get_gendisk - get partitioning information for a given device
+ * @dev: device to get partitioning information for
+ *
+ * This function gets the structure containing partitioning
+ * information for the given device @dev.
+ */
 struct gendisk *
 get_gendisk(kdev_t dev)
 {
 	struct gendisk *gp = NULL;
 	int maj = MAJOR(dev);
 
+	read_lock(&gendisk_lock);
 	for (gp = gendisk_head; gp; gp = gp->next)
 		if (gp->major == maj)
-			return gp;
-	return NULL;
+			break;
+	read_unlock(&gendisk_lock);
+
+	return gp;
 }
+
+EXPORT_SYMBOL(get_gendisk);
+
 
 #ifdef CONFIG_PROC_FS
 int
@@ -60,6 +114,7 @@ get_partition_list(char *page, char **start, off_t offset, int count)
 	int len, n;
 
 	len = sprintf(page, "major minor  #blocks  name\n\n");
+	read_lock(&gendisk_lock);
 	for (gp = gendisk_head; gp; gp = gp->next) {
 		for (n = 0; n < (gp->nr_real << gp->minor_shift); n++) {
 			if (gp->part[n].nr_sects == 0)
@@ -77,6 +132,7 @@ get_partition_list(char *page, char **start, off_t offset, int count)
 	}
 
 out:
+	read_unlock(&gendisk_lock);
 	*start = page + offset;
 	len -= offset;
 	if (len < 0)
@@ -102,6 +158,7 @@ extern int cpqarray_init(void);
 
 int __init device_init(void)
 {
+	rwlock_init(&gendisk_lock);
 	blk_dev_init();
 	sti();
 #ifdef CONFIG_I2O

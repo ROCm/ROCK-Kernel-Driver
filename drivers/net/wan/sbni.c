@@ -11,7 +11,7 @@
  *	at http://www.granch.com (English) or http://www.granch.ru (Russian)
  *
  *	This software may be used and distributed according to the terms
- *	of the GNU Public License.
+ *	of the GNU General Public License.
  *
  *
  *  5.0.1	Jun 22 2001
@@ -1473,6 +1473,8 @@ MODULE_PARM(	rxl,	"1-" __MODULE_STRING( SBNI_MAX_NUM_CARDS ) "i" );
 MODULE_PARM(	mac,	"1-" __MODULE_STRING( SBNI_MAX_NUM_CARDS ) "i" );
 
 MODULE_PARM(	skip_pci_probe,	"i" );
+
+MODULE_LICENSE("GPL");
 
 
 int

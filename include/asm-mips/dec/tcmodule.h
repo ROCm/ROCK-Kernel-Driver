@@ -15,21 +15,24 @@
  *
  * Jan.1998 Harald Koerfgen
  */
+#ifndef __ASM_DEC_TCMOULE_H
+#define __ASM_DEC_TCMOULE_H
  
 #define OLDCARD 0x3c0000
 
-#define ROM_WIDTH 0x3e0
-#define ROM_STRIDE 0x3e4
-#define ROM_SIZE 0x3e8
-#define SLOT_SIZE 0x3ec
-#define PATTERN0 0x3f0
-#define PATTERN1 0x3f4
-#define PATTERN2 0x3f8
-#define PATTERN3 0x3fc
-#define FIRM_VER 0x400
-#define VENDOR 0x420
-#define MODULE 0x440
-#define FIRM_TYPE 0x460
-#define FLAGS 0x470
+#define TC_ROM_WIDTH	0x3e0
+#define TC_ROM_STRIDE	0x3e4
+#define TC_ROM_SIZE	0x3e8
+#define TC_SLOT_SIZE	0x3ec
+#define TC_PATTERN0	0x3f0
+#define TC_PATTERN1	0x3f4
+#define TC_PATTERN2	0x3f8
+#define TC_PATTERN3	0x3fc
+#define TC_FIRM_VER	0x400
+#define TC_VENDOR	0x420
+#define TC_MODULE	0x440
+#define TC_FIRM_TYPE	0x460
+#define TC_FLAGS	0x470
+#define TC_ROM_OBJECTS	0x480
 
-#define ROM_OBJECTS 0x480
+#endif /* __ASM_DEC_TCMOULE_H */

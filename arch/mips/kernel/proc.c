@@ -1,8 +1,10 @@
 /*
  *  linux/arch/mips/kernel/proc.c
  *
- *  Copyright (C) 1995, 1996  Ralf Baechle
+ *  Copyright (C) 1995, 1996, 2001  Ralf Baechle
+ *  Copyright (C) 2001  MIPS Technologies, Inc.
  */
+#include <linux/config.h>
 #include <linux/delay.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -12,9 +14,9 @@
 #include <asm/processor.h>
 #include <asm/watch.h>
 
-unsigned long unaligned_instructions;
+extern unsigned long unaligned_instructions;
 unsigned int vced_count, vcei_count;
-#if !defined(CONFIG_CPU_HAS_LLSC)
+#ifndef CONFIG_CPU_HAS_LLSC
 unsigned long ll_ops, sc_ops;
 #endif
 
@@ -83,7 +85,7 @@ int get_cpuinfo(char *buffer)
 	len += sprintf(buffer + len, "microsecond timers\t: %s\n",
 	               (mips_cpu.options & MIPS_CPU_COUNTER) ? "yes" : "no");
 	len += sprintf(buffer + len, "extra interrupt vector\t: %s\n",
-	               dedicated_iv_available ? "yes" : "no");
+	               (mips_cpu.options & MIPS_CPU_DIVEC) ? "yes" : "no");
 	len += sprintf(buffer + len, "hardware watchpoint\t: %s\n",
 	               watch_available ? "yes" : "no");
 
@@ -92,7 +94,7 @@ int get_cpuinfo(char *buffer)
 	len += sprintf(buffer + len, fmt, 'D', vced_count);
 	len += sprintf(buffer + len, fmt, 'I', vcei_count);
 
-#if !defined(CONFIG_CPU_HAS_LLSC)
+#ifndef CONFIG_CPU_HAS_LLSC
 	len += sprintf(buffer + len, "ll emulations\t\t: %lu\n",
 		       ll_ops);
 	len += sprintf(buffer + len, "sc emulations\t\t: %lu\n",

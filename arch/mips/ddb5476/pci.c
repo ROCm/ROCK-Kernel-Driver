@@ -14,7 +14,6 @@
 
 #include <asm-mips/nile4.h>
 
-
 static u32 nile4_pre_pci_access0(int slot_num)
 {
 	u32 pci_addr = 0;
@@ -490,6 +489,11 @@ void pcibios_align_resource(void *data, struct resource *res,
 		start = (start + 1024 - 1) & ~(1024 - 1);
 		res->start = start;
 	}
+}
+
+unsigned __init int pcibios_assign_all_busses(void)
+{
+	return 1;
 }
 
 struct pci_fixup pcibios_fixups[] = { {0} };

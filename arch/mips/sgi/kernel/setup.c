@@ -24,6 +24,7 @@
 #include <asm/sgi/sgimc.h>
 #include <asm/sgi/sgihpc.h>
 #include <asm/sgi/sgint23.h>
+#include <asm/time.h>
 #include <asm/gdb-stub.h>
 
 #ifdef CONFIG_REMOTE_DEBUG
@@ -32,7 +33,7 @@ extern void breakpoint(void);
 static int remote_debug = 0;
 #endif
 
-#if defined(CONFIG_SERIAL_CONSOLE) || defined(CONFIG_SGI_PROM_CONSOLE)
+#if defined(CONFIG_SERIAL_CONSOLE) || defined(CONFIG_ARC_CONSOLE)
 extern void console_setup(char *);
 #endif
 
@@ -117,28 +118,6 @@ struct kbd_ops sgi_kbd_ops = {
 	sgi_read_status
 };
 
-static void __init sgi_irq_setup(void)
-{
-	sgint_init();
-
-#ifdef CONFIG_REMOTE_DEBUG
-	if (remote_debug)
-		set_debug_traps();
-	breakpoint(); /* you may move this line to whereever you want :-) */
-#endif
-}
-
-int __init page_is_ram(unsigned long pagenr)
-{
-	if ((pagenr<<PAGE_SHIFT) < 0x2000UL)
-		return 1;
-	if ((pagenr<<PAGE_SHIFT) > 0x08002000)
-		return 1;
-	return 0;
-}
-
-void (*board_time_init)(struct irqaction *irq);
-
 static unsigned long dosample(volatile unsigned char *tcwp,
                               volatile unsigned char *tc2p)
 {
@@ -161,14 +140,16 @@ static unsigned long dosample(volatile unsigned char *tcwp,
                 ct1 = read_32bit_cp0_register(CP0_COUNT);
         } while(msb);
 
-        /* Stop the counter. */
-        *tcwp = (SGINT_TCWORD_CNT2 | SGINT_TCWORD_CALL | SGINT_TCWORD_MSWST);
+	/* Stop the counter. */
+	*tcwp = (SGINT_TCWORD_CNT2 | SGINT_TCWORD_CALL | SGINT_TCWORD_MSWST);
 
-        /* Return the difference, this is how far the r4k counter increments
-         * for every 1/HZ seconds. We round off the nearest 1 MHz of
-	 * master clock (= 1000000 / 100 / 2 = 5000 count).
-         */
-        return ((ct1 - ct0) / 5000) * 5000;
+	/*
+	 * Return the difference, this is how far the r4k counter increments
+	 * for every 1/HZ seconds. We round off the nearest 1 MHz of master
+	 * clock (= 1000000 / 100 / 2 = 5000 count).
+	 */
+
+	return ((ct1 - ct0) / 5000) * 5000;
 }
 
 #define ALLINTS (IE_IRQ0 | IE_IRQ1 | IE_IRQ2 | IE_IRQ3 | IE_IRQ4 | IE_IRQ5)
@@ -180,7 +161,7 @@ void sgi_time_init (struct irqaction *irq) {
 	 */
         struct sgi_ioc_timers *p;
         volatile unsigned char *tcwp, *tc2p;
-	unsigned long r4k_ticks[3] = { 0, 0, 0 };
+	unsigned long r4k_ticks[3];
 	unsigned long r4k_next;
 
         /* Figure out the r4k offset, the algorithm is very simple
@@ -201,10 +182,12 @@ void sgi_time_init (struct irqaction *irq) {
         dosample(tcwp, tc2p);                   /* Prime cache. */
         dosample(tcwp, tc2p);                   /* Prime cache. */
 	/* Zero is NOT an option. */
-	while (!r4k_ticks[0])
+	do {
 		r4k_ticks[0] = dosample (tcwp, tc2p);
-	while (!r4k_ticks[1])
+	} while (!r4k_ticks[0]);
+	do {
 		r4k_ticks[1] = dosample (tcwp, tc2p);
+	} while (!r4k_ticks[1]);
 
 	if (r4k_ticks[0] != r4k_ticks[1]) {
 		printk ("warning: timer counts differ, retrying...");
@@ -226,7 +209,7 @@ void sgi_time_init (struct irqaction *irq) {
 	/* Set ourselves up for future interrupts */
         r4k_next = (read_32bit_cp0_register(CP0_COUNT) + r4k_interval);
         write_32bit_cp0_register(CP0_COMPARE, r4k_next);
-        set_cp0_status(ST0_IM, ALLINTS);
+        change_cp0_status(ST0_IM, ALLINTS);
 	sti ();
 }
 
@@ -239,8 +222,6 @@ void __init sgi_setup(void)
 	char *kgdb_ttyd;
 #endif
 
-
-	irq_setup = sgi_irq_setup;
 	board_time_init = sgi_time_init;
 
 	/* Init the INDY HPC I/O controller.  Need to call this before
@@ -282,7 +263,7 @@ void __init sgi_setup(void)
 		       line ? 1 : 2);
 		rs_kgdb_hook(line);
 
-		prom_printf("KGDB: Using serial line /dev/ttyd%d for session, "
+		printk("KGDB: Using serial line /dev/ttyd%d for session, "
 			    "please connect your debugger\n", line ? 1 : 2);
 
 		remote_debug = 1;
@@ -290,7 +271,7 @@ void __init sgi_setup(void)
 	}
 #endif
 
-#ifdef CONFIG_SGI_PROM_CONSOLE
+#ifdef CONFIG_ARC_CONSOLE
 	console_setup("ttyS0");
 #endif
  
@@ -324,5 +305,4 @@ void __init sgi_setup(void)
 #ifdef CONFIG_VIDEO_VINO
 	init_vino();
 #endif
-
 }

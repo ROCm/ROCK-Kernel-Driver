@@ -206,7 +206,7 @@ do { \
  */
 extern __inline__ unsigned long xchg_u32(volatile int * m, unsigned long val)
 {
-#if defined(CONFIG_CPU_HAS_LLSC)
+#ifdef CONFIG_CPU_HAS_LLSC
 	unsigned long dummy;
 
 	__asm__ __volatile__(
@@ -233,7 +233,6 @@ extern __inline__ unsigned long xchg_u32(volatile int * m, unsigned long val)
 	*m = val;
 	restore_flags(flags);
 	return retval;
-
 #endif /* Processor-dependent optimization */
 }
 

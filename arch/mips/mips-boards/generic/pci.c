@@ -325,4 +325,9 @@ void __init pcibios_fixup_bus(struct pci_bus *b)
 	pci_read_bridge_bases(b);
 }
 
+unsigned __init int pcibios_assign_all_busses(void)
+{
+	return 1;
+}
+
 #endif /* CONFIG_PCI */

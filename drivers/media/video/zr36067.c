@@ -3734,7 +3734,6 @@ static int do_zoran_ioctl(struct zoran *zr, unsigned int cmd,
 			zr->window.chromakey = 0;
 			zr->window.flags = 0;	// RJ: Is this intended for interlace on/off ?
 			zr->window.clips = NULL;
-			zr->window.clipcount = vw.clipcount;
 
 			/*
 			 * If an overlay is running, we have to switch it off
@@ -3775,7 +3774,8 @@ static int do_zoran_ioctl(struct zoran *zr, unsigned int cmd,
 				write_overlay_mask(zr, vcp, vw.clipcount);
 				vfree(vcp);
 			}
-
+			zr->window.clipcount = vw.clipcount;
+	
 			if (on)
 				zr36057_overlay(zr, 1);
 			zr->window_set = 1;

@@ -4272,6 +4272,12 @@ static int sbpcd_dev_ioctl(struct cdrom_device_info *cdi, u_int cmd,
 		D_S[d].aud_buf=NULL;
 		D_S[d].sbp_audsiz=arg;
 		
+		if (D_S[d].sbp_audsiz>16)
+		{
+			D_S[d].sbp_audsiz = 0;
+			RETURN_UP(D_S[d].sbp_audsiz);
+		}
+	
 		if (D_S[d].sbp_audsiz>0)
 		{
 			D_S[d].aud_buf=(u_char *) vmalloc(D_S[d].sbp_audsiz*CD_FRAMESIZE_RAW);
@@ -6016,6 +6022,9 @@ static int sbpcd_media_changed( struct cdrom_device_info *cdi, int disc_nr)
 {
    return sbpcd_chk_disk_change(cdi->dev);
 }
+
+MODULE_LICENSE("GPL");
+
 /*==========================================================================*/
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.
@@ -6033,3 +6042,4 @@ static int sbpcd_media_changed( struct cdrom_device_info *cdi, int disc_nr)
  * c-continued-brace-offset: 0
  * End:
  */
+

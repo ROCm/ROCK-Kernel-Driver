@@ -5,7 +5,7 @@
  *
  * Copyright 2000 MontaVista Software Inc.
  * Author: MontaVista Software, Inc.
- *         	ppopov@mvista.com or support@mvista.com
+ *         	ppopov@mvista.com or source@mvista.com
  *
  *  This program is free software; you can redistribute  it and/or modify it
  *  under  the terms of  the GNU General  Public License as published by the
@@ -34,8 +34,10 @@
 #include <linux/bootmem.h>
 #include <asm/addrspace.h>
 #include <asm/bootinfo.h>
+#include <linux/config.h>
 #include <linux/string.h>
 #include <linux/kernel.h>
+#include <linux/sched.h>
 #include <asm/it8172/it8172.h>
 #include <asm/it8172/it8172_dbg.h>
 
@@ -53,7 +55,7 @@ extern void __init it8172_init_ram_resource(unsigned long memsize);
 
 int __init prom_init(int argc, char **argv, char **envp, int *prom_vec)
 {
-	unsigned long mem_size, free_start, free_end, bootmap_size;
+	unsigned long mem_size;
 	unsigned long pcicr;
 
 	prom_argc = argc;
@@ -81,7 +83,7 @@ int __init prom_init(int argc, char **argv, char **envp, int *prom_vec)
 	IT_WRITE(IT_MC_PCICR, pcicr);
 
 	it8172_init_ram_resource(mem_size);
-	add_memory_region(0, 20 << 20, BOOT_MEM_RAM);
+	add_memory_region(0, mem_size, BOOT_MEM_RAM);
 
 	return 0;
 }

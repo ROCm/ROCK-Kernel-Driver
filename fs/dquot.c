@@ -670,8 +670,8 @@ restart:
 		struct file *filp = list_entry(p, struct file, f_list);
 		struct inode *inode = filp->f_dentry->d_inode;
 		if (filp->f_mode & FMODE_WRITE && dqinit_needed(inode, type)) {
-			struct vfsmount *mnt = mntget(file->f_vfsmnt);
-			struct dentry *dentry = dget(file->f_dentry);
+			struct vfsmount *mnt = mntget(filp->f_vfsmnt);
+			struct dentry *dentry = dget(filp->f_dentry);
 			file_list_unlock();
 			sb->dq_op->initialize(inode, type);
 			inode->i_flags |= S_QUOTA;

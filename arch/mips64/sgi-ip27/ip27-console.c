@@ -2,6 +2,8 @@
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
+ *
+ * Copyright (C) 2001 Ralf Baechle
  */
 #include <linux/init.h>
 #include <linux/console.h>
@@ -11,7 +13,6 @@
 #include <asm/sn/sn0/hub.h>
 #include <asm/sn/klconfig.h>
 #include <asm/sn/ioc3.h>
-#include <asm/sgialib.h>
 #include <asm/sn/sn_private.h>
 
 void prom_putchar(char c)
