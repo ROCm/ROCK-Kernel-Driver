@@ -489,7 +489,7 @@ static irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 #endif
 		do_timer(regs);
 
-		/* Guarentee that the following sequences execute
+		/* Guarantee that the following sequences execute
 		 * uninterrupted.
 		 */
 		__asm__ __volatile__("rdpr	%%pstate, %0\n\t"
@@ -972,7 +972,7 @@ static unsigned long sparc64_init_timers(irqreturn_t (*cfunc)(int, void *, struc
 		prom_halt();
 	}
 
-	/* Guarentee that the following sequences execute
+	/* Guarantee that the following sequences execute
 	 * uninterrupted.
 	 */
 	__asm__ __volatile__("rdpr	%%pstate, %0\n\t"

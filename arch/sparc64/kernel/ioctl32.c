@@ -3137,7 +3137,7 @@ typedef struct drm32_dma {
 #define DRM32_IOCTL_DMA	     DRM_IOWR(0x29, drm32_dma_t)
 
 /* RED PEN	The DRM layer blindly dereferences the send/request
- * 		indice/size arrays even though they are userland
+ * 		index/size arrays even though they are userland
  * 		pointers.  -DaveM
  */
 static int drm32_dma(unsigned int fd, unsigned int cmd, unsigned long arg)
