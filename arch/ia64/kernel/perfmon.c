@@ -26,6 +26,7 @@
 #include <linux/interrupt.h>
 #include <linux/smp_lock.h>
 #include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 #include <linux/init.h>
 #include <linux/vmalloc.h>
 #include <linux/mm.h>
@@ -5562,111 +5563,160 @@ pfm_interrupt_handler(int irq, void *arg, struct pt_regs *regs)
 	return IRQ_HANDLED;
 }
 
+/*
+ * /proc/perfmon interface, for debug only
+ */
 
-/* for debug only */
-static int
-pfm_proc_info(char *page)
+#define PFM_PROC_SHOW_HEADER	((void *)NR_CPUS+1)
+
+static void *
+pfm_proc_start(struct seq_file *m, loff_t *pos)
 {
-	char *p = page;
+	if (*pos == 0) {
+		return PFM_PROC_SHOW_HEADER;
+	}
+
+	while (*pos <= NR_CPUS) {
+		if (cpu_online(*pos - 1)) {
+			return (void *)*pos;
+		}
+		++*pos;
+	}
+	return NULL;
+}
+
+static void *
+pfm_proc_next(struct seq_file *m, void *v, loff_t *pos)
+{
+	++*pos;
+	return pfm_proc_start(m, pos);
+}
+
+static void
+pfm_proc_stop(struct seq_file *m, void *v)
+{
+}
+
+static void
+pfm_proc_show_header(struct seq_file *m)
+{
 	struct list_head * pos;
 	pfm_buffer_fmt_t * entry;
-	unsigned long psr, flags;
-	int online_cpus = 0;
-	int i;
+	unsigned long flags;
 
-		p += sprintf(p, "perfmon version           : %u.%u\n", PFM_VERSION_MAJ, PFM_VERSION_MIN);
-		p += sprintf(p, "model                     : %s\n", pmu_conf->pmu_name);
-		p += sprintf(p, "fastctxsw                 : %s\n", pfm_sysctl.fastctxsw > 0 ? "Yes": "No");
-		p += sprintf(p, "expert mode               : %s\n", pfm_sysctl.expert_mode > 0 ? "Yes": "No");
-		p += sprintf(p, "ovfl_mask                 : 0x%lx\n", pmu_conf->ovfl_val);
-		p += sprintf(p, "flags                     : 0x%x\n", pmu_conf->flags);
+ 	seq_printf(m,
+		"perfmon version           : %u.%u\n"
+		"model                     : %s\n"
+		"fastctxsw                 : %s\n"
+		"expert mode               : %s\n"
+		"ovfl_mask                 : 0x%lx\n"
+		"PMU flags                 : 0x%x\n",
+		PFM_VERSION_MAJ, PFM_VERSION_MIN,
+		pmu_conf->pmu_name,
+		pfm_sysctl.fastctxsw > 0 ? "Yes": "No",
+		pfm_sysctl.expert_mode > 0 ? "Yes": "No",
+		pmu_conf->ovfl_val,
+		pmu_conf->flags);
 
-	for(i=0; i < NR_CPUS; i++) {
-		if (cpu_online(i) == 0) continue;
-		p += sprintf(p, "CPU%-2d overflow intrs      : %lu\n", i, pfm_stats[i].pfm_ovfl_intr_count);
-		p += sprintf(p, "CPU%-2d overflow cycles     : %lu\n", i, pfm_stats[i].pfm_ovfl_intr_cycles);
-		p += sprintf(p, "CPU%-2d overflow min        : %lu\n", i, pfm_stats[i].pfm_ovfl_intr_cycles_min);
-		p += sprintf(p, "CPU%-2d overflow max        : %lu\n", i, pfm_stats[i].pfm_ovfl_intr_cycles_max);
-		p += sprintf(p, "CPU%-2d smpl handler calls  : %lu\n", i, pfm_stats[i].pfm_smpl_handler_calls);
-		p += sprintf(p, "CPU%-2d smpl handler cycles : %lu\n", i, pfm_stats[i].pfm_smpl_handler_cycles);
-		p += sprintf(p, "CPU%-2d spurious intrs      : %lu\n", i, pfm_stats[i].pfm_spurious_ovfl_intr_count);
-		p += sprintf(p, "CPU%-2d replay   intrs      : %lu\n", i, pfm_stats[i].pfm_replay_ovfl_intr_count);
-		p += sprintf(p, "CPU%-2d syst_wide           : %d\n" , i, pfm_get_cpu_data(pfm_syst_info, i) & PFM_CPUINFO_SYST_WIDE ? 1 : 0);
-		p += sprintf(p, "CPU%-2d dcr_pp              : %d\n" , i, pfm_get_cpu_data(pfm_syst_info, i) & PFM_CPUINFO_DCR_PP ? 1 : 0);
-		p += sprintf(p, "CPU%-2d exclude idle        : %d\n" , i, pfm_get_cpu_data(pfm_syst_info, i) & PFM_CPUINFO_EXCL_IDLE ? 1 : 0);
-		p += sprintf(p, "CPU%-2d owner               : %d\n" , i, pfm_get_cpu_data(pmu_owner, i) ? pfm_get_cpu_data(pmu_owner, i)->pid: -1);
-		p += sprintf(p, "CPU%-2d context             : %p\n" , i, pfm_get_cpu_data(pmu_ctx, i));
-		p += sprintf(p, "CPU%-2d activations         : %lu\n", i, pfm_get_cpu_data(pmu_activation_number,i));
-		online_cpus++;
-	}
+  	LOCK_PFS(flags);
 
-	if (online_cpus == 1)
-	{
-		psr = pfm_get_psr();
-		ia64_srlz_d();
-		p += sprintf(p, "CPU%-2d psr                 : 0x%lx\n", smp_processor_id(), psr);
-		p += sprintf(p, "CPU%-2d pmc0                : 0x%lx\n", smp_processor_id(), ia64_get_pmc(0));
-		for(i=4; i < 8; i++) {
-   			p += sprintf(p, "CPU%-2d pmc%u                : 0x%lx\n", smp_processor_id(), i, ia64_get_pmc(i));
-   			p += sprintf(p, "CPU%-2d pmd%u                : 0x%lx\n", smp_processor_id(), i, ia64_get_pmd(i));
-  		}
-	}
+ 	seq_printf(m,
+ 		"proc_sessions             : %u\n"
+ 		"sys_sessions              : %u\n"
+ 		"sys_use_dbregs            : %u\n"
+ 		"ptrace_use_dbregs         : %u\n",
+ 		pfm_sessions.pfs_task_sessions,
+ 		pfm_sessions.pfs_sys_sessions,
+ 		pfm_sessions.pfs_sys_use_dbregs,
+ 		pfm_sessions.pfs_ptrace_use_dbregs);
 
-	LOCK_PFS(flags);
-	p += sprintf(p, "proc_sessions             : %u\n"
-			"sys_sessions              : %u\n"
-			"sys_use_dbregs            : %u\n"
-			"ptrace_use_dbregs         : %u\n",
-			pfm_sessions.pfs_task_sessions,
-			pfm_sessions.pfs_sys_sessions,
-			pfm_sessions.pfs_sys_use_dbregs,
-			pfm_sessions.pfs_ptrace_use_dbregs);
-	UNLOCK_PFS(flags);
-
+  	UNLOCK_PFS(flags);
 	spin_lock(&pfm_buffer_fmt_lock);
 
 	list_for_each(pos, &pfm_buffer_fmt_list) {
 		entry = list_entry(pos, pfm_buffer_fmt_t, fmt_list);
-		p += sprintf(p, "format                    : %02x-%02x-%02x-%02x-%02x-%02x-%02x-%02x-%02x-%02x-%02x-%02x-%02x-%02x-%02x-%02x %s\n",
-				entry->fmt_uuid[0],
-				entry->fmt_uuid[1],
-				entry->fmt_uuid[2],
-				entry->fmt_uuid[3],
-				entry->fmt_uuid[4],
-				entry->fmt_uuid[5],
-				entry->fmt_uuid[6],
-				entry->fmt_uuid[7],
-				entry->fmt_uuid[8],
-				entry->fmt_uuid[9],
-				entry->fmt_uuid[10],
-				entry->fmt_uuid[11],
-				entry->fmt_uuid[12],
-				entry->fmt_uuid[13],
-				entry->fmt_uuid[14],
-				entry->fmt_uuid[15],
-				entry->fmt_name);
+		seq_printf(m, "format                    : %02x-%02x-%02x-%02x-%02x-%02x-%02x-%02x-%02x-%02x-%02x-%02x-%02x-%02x-%02x-%02x %s\n",
+			entry->fmt_uuid[0],
+			entry->fmt_uuid[1],
+			entry->fmt_uuid[2],
+			entry->fmt_uuid[3],
+			entry->fmt_uuid[4],
+			entry->fmt_uuid[5],
+			entry->fmt_uuid[6],
+			entry->fmt_uuid[7],
+			entry->fmt_uuid[8],
+			entry->fmt_uuid[9],
+			entry->fmt_uuid[10],
+			entry->fmt_uuid[11],
+			entry->fmt_uuid[12],
+			entry->fmt_uuid[13],
+			entry->fmt_uuid[14],
+			entry->fmt_uuid[15],
+			entry->fmt_name);
 	}
 	spin_unlock(&pfm_buffer_fmt_lock);
 
-	return p - page;
 }
 
-/* /proc interface, for debug only */
 static int
-perfmon_read_entry(char *page, char **start, off_t off, int count, int *eof, void *data)
+pfm_proc_show(struct seq_file *m, void *v)
 {
-	int len = pfm_proc_info(page);
+	int cpu;
 
-	if (len <= off+count) *eof = 1;
+	if (v == PFM_PROC_SHOW_HEADER) {
+		pfm_proc_show_header(m);
+		return 0;
+	}
 
-	*start = page + off;
-	len   -= off;
+	/* show info for CPU (v - 1) */
 
-	if (len>count) len = count;
-	if (len<0) len = 0;
+	cpu = (long)v - 1;
+	seq_printf(m,
+		"CPU%-2d overflow intrs      : %lu\n"
+		"CPU%-2d overflow cycles     : %lu\n"
+		"CPU%-2d overflow min        : %lu\n"
+		"CPU%-2d overflow max        : %lu\n"
+		"CPU%-2d smpl handler calls  : %lu\n"
+		"CPU%-2d smpl handler cycles : %lu\n"
+		"CPU%-2d spurious intrs      : %lu\n"
+		"CPU%-2d replay   intrs      : %lu\n"
+		"CPU%-2d syst_wide           : %d\n"
+		"CPU%-2d dcr_pp              : %d\n"
+		"CPU%-2d exclude idle        : %d\n"
+		"CPU%-2d owner               : %d\n"
+		"CPU%-2d context             : %p\n"
+		"CPU%-2d activations         : %lu\n",
+		cpu, pfm_stats[cpu].pfm_ovfl_intr_count,
+		cpu, pfm_stats[cpu].pfm_ovfl_intr_cycles,
+		cpu, pfm_stats[cpu].pfm_ovfl_intr_cycles_min,
+		cpu, pfm_stats[cpu].pfm_ovfl_intr_cycles_max,
+		cpu, pfm_stats[cpu].pfm_smpl_handler_calls,
+		cpu, pfm_stats[cpu].pfm_smpl_handler_cycles,
+		cpu, pfm_stats[cpu].pfm_spurious_ovfl_intr_count,
+		cpu, pfm_stats[cpu].pfm_replay_ovfl_intr_count,
+		cpu, pfm_get_cpu_data(pfm_syst_info, cpu) & PFM_CPUINFO_SYST_WIDE ? 1 : 0,
+		cpu, pfm_get_cpu_data(pfm_syst_info, cpu) & PFM_CPUINFO_DCR_PP ? 1 : 0,
+		cpu, pfm_get_cpu_data(pfm_syst_info, cpu) & PFM_CPUINFO_EXCL_IDLE ? 1 : 0,
+		cpu, pfm_get_cpu_data(pmu_owner, cpu) ? pfm_get_cpu_data(pmu_owner, cpu)->pid: -1,
+		cpu, pfm_get_cpu_data(pmu_ctx, cpu),
+		cpu, pfm_get_cpu_data(pmu_activation_number, cpu));
 
-	return len;
+	return 0;
 }
+
+struct seq_operations pfm_seq_ops = {
+	.start =	pfm_proc_start,
+ 	.next =		pfm_proc_next,
+ 	.stop =		pfm_proc_stop,
+ 	.show =		pfm_proc_show
+};
+
+static int
+pfm_proc_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &pfm_seq_ops);
+}
+
 
 /*
  * we come here as soon as local_cpu_data->pfm_syst_wide is set. this happens
@@ -6341,6 +6391,13 @@ found:
 	return 0;
 }
 
+static struct file_operations pfm_proc_fops = {
+	.open		= pfm_proc_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
+};
+
 int __init
 pfm_init(void)
 {
@@ -6412,12 +6469,16 @@ pfm_init(void)
 	/*
 	 * create /proc/perfmon (mostly for debugging purposes)
 	 */
-	perfmon_dir = create_proc_read_entry ("perfmon", 0, 0, perfmon_read_entry, NULL);
+ 	perfmon_dir = create_proc_entry("perfmon", S_IRUGO, NULL);
 	if (perfmon_dir == NULL) {
 		printk(KERN_ERR "perfmon: cannot create /proc entry, perfmon disabled\n");
 		pmu_conf = NULL;
 		return -1;
 	}
+  	/*
+ 	 * install customized file operations for /proc/perfmon entry
+ 	 */
+ 	perfmon_dir->proc_fops = &pfm_proc_fops;
 
 	/*
 	 * create /proc/sys/kernel/perfmon (for debugging purposes)
