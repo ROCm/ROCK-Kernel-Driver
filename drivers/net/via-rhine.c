@@ -321,6 +321,7 @@ enum via_rhine_chips {
 	VT86C100A = 0,
 	VT6102,
 	VT3043,
+	VT6105,
 };
 
 struct via_rhine_chip_info {
@@ -349,7 +350,7 @@ static struct via_rhine_chip_info via_rhine_chip_info[] __devinitdata =
 	{ "VIA VT6102 Rhine-II", RHINE_IOTYPE, 256,
 	  CanHaveMII | HasWOL },
 	{ "VIA VT3043 Rhine",    RHINE_IOTYPE, 128,
-	  CanHaveMII | ReqTxAlign }
+	  CanHaveMII | ReqTxAlign },
 	{ "VIA VT6105 Rhine-III", RHINE_IOTYPE, 256,
 	  CanHaveMII | HasWOL },
 };
