@@ -11,6 +11,7 @@ obj-y	:= process.o semaphore.o signal.o entry.o traps.o irq.o \
 obj-y += mce.o acpi/
 
 obj-$(CONFIG_MTRR)		+= ../../i386/kernel/cpu/mtrr/
+obj-$(CONFIG_ACPI_BOOT)		+= acpi/
 obj-$(CONFIG_X86_MSR)		+= msr.o
 obj-$(CONFIG_MICROCODE)		+= microcode.o
 obj-$(CONFIG_X86_CPUID)		+= cpuid.o

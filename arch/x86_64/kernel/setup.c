@@ -68,6 +68,7 @@ int acpi_disabled = 0;
 
 #ifdef	CONFIG_ACPI_BOOT
 extern int __initdata acpi_ht;
+extern acpi_interrupt_flags	acpi_sci_flags;
 /* int __initdata acpi_force = 0; */
 #endif
 
@@ -229,6 +230,17 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 		if (!memcmp(from, "acpi=ht", 7)) { 
 			acpi_ht = 1; 
 		}
+                else if (!memcmp(from, "pci=noacpi", 10)) 
+                        acpi_noirq_set();
+
+		else if (!memcmp(from, "acpi_sci=edge", 13))
+			acpi_sci_flags.trigger =  1;
+		else if (!memcmp(from, "acpi_sci=level", 14))
+			acpi_sci_flags.trigger = 3;
+		else if (!memcmp(from, "acpi_sci=high", 13))
+			acpi_sci_flags.polarity = 1;
+		else if (!memcmp(from, "acpi_sci=low", 12))
+			acpi_sci_flags.polarity = 3;
 
 		/* acpi=strict disables out-of-spec workarounds */
 		else if (!memcmp(from, "acpi=strict", 11)) {
