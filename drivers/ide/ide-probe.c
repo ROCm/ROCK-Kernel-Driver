@@ -390,6 +390,14 @@ static int try_to_identify (ide_drive_t *drive, u8 cmd)
 		cookie = probe_irq_on();
 		/* enable device irq */
 		hwif->OUTB(drive->ctl, IDE_CONTROL_REG);
+	} else {
+		/*
+		 * Disable device irq if we don't need to
+		 * probe for it. Otherwise we'll get spurious
+		 * interrupts during the identify-phase that
+		 * the irq handler isn't expecting.
+		 */
+		hwif->OUTB(drive->ctl|2, IDE_CONTROL_REG);
 	}
 
 	retval = actual_try_to_identify(drive, cmd);
