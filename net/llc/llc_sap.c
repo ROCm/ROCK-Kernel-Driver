@@ -90,32 +90,30 @@ void llc_sap_state_process(struct llc_sap *sap, struct sk_buff *skb,
 {
 	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
 
+	/*
+	 * We have to hold the skb, because llc_sap_next_state
+	 * will kfree it in the sending path and we need to
+	 * look at the skb->cb, where we encode llc_sap_state_ev.
+	 */
+	skb_get(skb);
+	ev->ind_cfm_flag = 0;
 	llc_sap_next_state(sap, skb);
 	if (ev->ind_cfm_flag == LLC_IND) {
-		if (sap->rcv_func) {
-			/* FIXME:
-			 * Ugly hack, still trying to figure it
-			 * out if this is a bug in IPX or here
-			 * in LLC Land... But hey, it even works,
-			 * no leaks 8)
-			 */
-			if (skb->list)
-				skb_get(skb);
+		if (sap->rcv_func)
 			sap->rcv_func(skb, skb->dev, pt);
-		} else {
+		else {
 			if (skb->sk->state == TCP_LISTEN)
-				goto drop;
-
-			llc_save_primitive(skb, ev->prim);
-
-			/* queue skb to the user. */
-			if (sock_queue_rcv_skb(skb->sk, skb))
 				kfree_skb(skb);
+			else {
+				llc_save_primitive(skb, ev->prim);
+
+				/* queue skb to the user. */
+				if (sock_queue_rcv_skb(skb->sk, skb))
+					kfree_skb(skb);
+			}
 		}
-	} else if (ev->type == LLC_SAP_EV_TYPE_PDU) {
-drop:
-		kfree_skb(skb);
-	}
+	} 
+	kfree_skb(skb);
 }
 
 /**
