@@ -34,6 +34,7 @@
 # include <asm/smp.h>
 #endif
 #include <asm/irq.h>
+#include <asm/hw_irq.h>
 
 
 #undef DEBUG
@@ -566,4 +567,13 @@ pcibios_prep_mwi (struct pci_dev *dev)
 		}
 	}
 	return rc;
+}
+
+int pci_vector_resources(int last, int nr_released)
+{
+	int count = nr_released;
+
+ 	count += (IA64_LAST_DEVICE_VECTOR - last);
+
+	return count;
 }

@@ -15,6 +15,7 @@
 #include <asm/io.h>
 #include <asm/smp.h>
 #include <asm/io_apic.h>
+#include <asm/hw_irq.h>
 
 #include "pci.h"
 
@@ -1004,4 +1005,34 @@ int pirq_enable_irq(struct pci_dev *dev)
 	else if (interrupt_line_quirk)
 		pci_write_config_byte(dev, PCI_INTERRUPT_LINE, dev->irq);
 	return 0;
+}
+
+int pci_vector_resources(int last, int nr_released)
+{
+	int count = nr_released;
+
+	int next = last;
+	int offset = (last % 8);
+
+	while (next < FIRST_SYSTEM_VECTOR) {
+		next += 8;
+#ifdef CONFIG_X86_64
+		if (next == IA32_SYSCALL_VECTOR)
+			continue;
+#else
+		if (next == SYSCALL_VECTOR)
+			continue;
+#endif
+		count++;
+		if (next >= FIRST_SYSTEM_VECTOR) {
+			if (offset%8) {
+				next = FIRST_DEVICE_VECTOR + offset;
+				offset++;
+				continue;
+			}
+			count--;
+		}
+	}
+
+	return count;
 }
