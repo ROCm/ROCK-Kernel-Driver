@@ -57,7 +57,9 @@
 #include <linux/module.h>
 #include <linux/spinlock.h>
 #include <scsi/scsi.h>
+
 #include "sym_glue.h"
+#include "sym_nvram.h"
 
 #define NAME53C		"sym53c"
 #define NAME53C8XX	"sym53c8xx"
@@ -532,7 +534,7 @@ static int sym_queue_command(struct sym_hcb *np, struct scsi_cmnd *ccb)
 /*
  *  Setup buffers and pointers that address the CDB.
  */
-static int __inline sym_setup_cdb(struct sym_hcb *np, struct scsi_cmnd *ccb, struct sym_ccb *cp)
+static inline int sym_setup_cdb(struct sym_hcb *np, struct scsi_cmnd *ccb, struct sym_ccb *cp)
 {
 	u32	cmd_ba;
 	int	cmd_len;
@@ -1281,7 +1283,7 @@ static int is_keyword(char *ptr, int len, char *verb)
 {
 	int verb_len = strlen(verb);
 
-	if (len >= strlen(verb) && !memcmp(verb, ptr, verb_len))
+	if (len >= verb_len && !memcmp(verb, ptr, verb_len))
 		return verb_len;
 	else
 		return 0;
@@ -1938,7 +1940,7 @@ int __init sym53c8xx_setup(char *str)
 	char *cur = str;
 	char *pc, *pv;
 	unsigned long val;
-	int i,  c;
+	unsigned int i,  c;
 	int xi = 0;
 
 	while (cur != NULL && (pc = strchr(cur, ':')) != NULL) {
@@ -2171,6 +2173,55 @@ sym53c8xx_pci_init(struct pci_dev *pdev, struct sym_device *device)
 	return 0;
 }
 
+/*
+ * The NCR PQS and PDS cards are constructed as a DEC bridge
+ * behind which sits a proprietary NCR memory controller and
+ * either four or two 53c875s as separate devices.  We can tell
+ * if an 875 is part of a PQS/PDS or not since if it is, it will
+ * be on the same bus as the memory controller.  In its usual
+ * mode of operation, the 875s are slaved to the memory
+ * controller for all transfers.  To operate with the Linux
+ * driver, the memory controller is disabled and the 875s
+ * freed to function independently.  The only wrinkle is that
+ * the preset SCSI ID (which may be zero) must be read in from
+ * a special configuration space register of the 875.
+ */
+void sym_config_pqs(struct pci_dev *pdev, struct sym_device *sym_dev)
+{
+	int slot;
+
+	for (slot = 0; slot < 256; slot++) {
+		u8 tmp;
+		struct pci_dev *memc = pci_get_slot(pdev->bus, slot);
+
+		if (!memc || memc->vendor != 0x101a || memc->device == 0x0009) {
+			pci_dev_put(memc);
+			continue;
+		}
+
+		/*
+		 * We set these bits in the memory controller once per 875.
+		 * This isn't a problem in practice.
+		 */
+
+		/* bit 1: allow individual 875 configuration */
+		pci_read_config_byte(memc, 0x44, &tmp);
+		tmp |= 0x2;
+		pci_write_config_byte(memc, 0x44, tmp);
+
+		/* bit 2: drive individual 875 interrupts to the bus */
+		pci_read_config_byte(memc, 0x45, &tmp);
+		tmp |= 0x4;
+		pci_write_config_byte(memc, 0x45, tmp);
+
+		pci_read_config_byte(pdev, 0x84, &tmp);
+		sym_dev->host_id = tmp;
+
+		pci_dev_put(memc);
+
+		break;
+	}
+}
 
 /*
  *  Called before unloading the module.
@@ -2221,79 +2272,6 @@ static struct scsi_host_template sym2_template = {
 #endif
 };
 
-#ifdef _SYM_CONF_PQS_PDS_SUPPORT
-#if 0
-/*
- *  Detect all NCR PQS/PDS boards and keep track of their bus nr.
- *
- *  The NCR PQS or PDS card is constructed as a DEC bridge
- *  behind which sit a proprietary NCR memory controller and
- *  four or two 53c875s as separate devices.  In its usual mode
- *  of operation, the 875s are slaved to the memory controller
- *  for all transfers.  We can tell if an 875 is part of a
- *  PQS/PDS or not since if it is, it will be on the same bus
- *  as the memory controller.  To operate with the Linux
- *  driver, the memory controller is disabled and the 875s
- *  freed to function independently.  The only wrinkle is that
- *  the preset SCSI ID (which may be zero) must be read in from
- *  a special configuration space register of the 875
- */
-#ifndef SYM_CONF_MAX_PQS_BUS
-#define SYM_CONF_MAX_PQS_BUS 16
-#endif
-static int pqs_bus[SYM_CONF_MAX_PQS_BUS] __initdata = { 0 };
-
-static void __init sym_detect_pqs_pds(void)
-{
-	short index;
-	struct pci_dev *dev = NULL;
-
-	for(index=0; index < SYM_CONF_MAX_PQS_BUS; index++) {
-		u_char tmp;
-
-		dev = pci_find_device(0x101a, 0x0009, dev);
-		if (dev == NULL) {
-			pqs_bus[index] = -1;
-			break;
-		}
-		printf_info(NAME53C8XX ": NCR PQS/PDS memory controller detected on bus %d\n", dev->bus->number);
-		pci_read_config_byte(dev, 0x44, &tmp);
-		/* bit 1: allow individual 875 configuration */
-		tmp |= 0x2;
-		pci_write_config_byte(dev, 0x44, tmp);
-		pci_read_config_byte(dev, 0x45, &tmp);
-		/* bit 2: drive individual 875 interrupts to the bus */
-		tmp |= 0x4;
-		pci_write_config_byte(dev, 0x45, tmp);
-
-		pqs_bus[index] = dev->bus->number;
-	}
-}
-#endif
-
-static int pqs_probe()
-{
-}
-
-static void pqs_remove()
-{
-}
-
-static struct pci_device_id pqs_id_table[] __devinitdata = {
-	{ 0x101a, 0x0009, },
-	{ 0, }
-};
-
-MODULE_DEVICE_TABLE(pci, pqs_id_table);
-
-static struct pci_driver pqs_driver = {
-	.name		= NAME53C8XX " (PQS)",
-	.id_table	= pqs_id_table,
-	.probe		= pqs_probe,
-	.remove		= __devexit_p(pqs_remove),
-};
-#endif /* PQS */
-
 static int attach_count;
 
 static int __devinit sym2_probe(struct pci_dev *pdev,
@@ -2317,6 +2295,8 @@ static int __devinit sym2_probe(struct pci_dev *pdev,
 	sym_dev.host_id = SYM_SETUP_HOST_ID;
 	if (sym53c8xx_pci_init(pdev, &sym_dev))
 		goto free;
+
+	sym_config_pqs(pdev, &sym_dev);
 
 	sym_get_nvram(&sym_dev, &nvram);
 
@@ -2406,9 +2386,6 @@ static struct pci_driver sym2_driver = {
 
 static int __init sym2_init(void)
 {
-#ifdef _SYM_CONF_PQS_PDS_SUPPORT
-	pci_register_driver(&pqs_driver);
-#endif
 	pci_register_driver(&sym2_driver);
 	return 0;
 }
@@ -2416,9 +2393,6 @@ static int __init sym2_init(void)
 static void __exit sym2_exit(void)
 {
 	pci_unregister_driver(&sym2_driver);
-#ifdef _SYM_CONF_PQS_PDS_SUPPORT
-	pci_unregister_driver(&pqs_driver);
-#endif
 }
 
 module_init(sym2_init);

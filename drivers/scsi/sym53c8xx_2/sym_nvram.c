@@ -50,11 +50,8 @@
  * SUCH DAMAGE.
  */
 
-#ifdef __FreeBSD__
-#include <dev/sym/sym_glue.h>
-#else
 #include "sym_glue.h"
-#endif
+#include "sym_nvram.h"
 
 /*
  *  Some poor and bogus sync table that refers to Tekram NVRAM layout.
@@ -246,8 +243,8 @@ static void sym_display_Tekram_nvram(struct sym_device *np, Tekram_nvram *nvram)
 	}
 }
 #else
-static void sym_display_Symbios_nvram(struct sym_device *np, Symbios_nvram *nvram) { }
-static void sym_display_Tekram_nvram(struct sym_device *np, Tekram_nvram *nvram) { }
+static void sym_display_Symbios_nvram(struct sym_device *np, Symbios_nvram *nvram) { (void)np; (void)nvram; }
+static void sym_display_Tekram_nvram(struct sym_device *np, Tekram_nvram *nvram) { (void)np; (void)nvram; }
 #endif	/* SYM_CONF_DEBUG_NVRAM */
 
 
@@ -382,6 +379,61 @@ static void S24C16_read_byte(struct sym_device *np, u_char *read_data, u_char ac
 
 	S24C16_write_ack(np, ack_data, gpreg, gpcntl);
 }
+
+#if SYM_CONF_NVRAM_WRITE_SUPPORT
+/*
+ *  Write 'len' bytes starting at 'offset'.
+ */
+static int sym_write_S24C16_nvram(struct sym_device *np, int offset,
+		u_char *data, int len)
+{
+	u_char	gpcntl, gpreg;
+	u_char	old_gpcntl, old_gpreg;
+	u_char	ack_data;
+	int	x;
+
+	/* save current state of GPCNTL and GPREG */
+	old_gpreg	= INB (nc_gpreg);
+	old_gpcntl	= INB (nc_gpcntl);
+	gpcntl		= old_gpcntl & 0x1c;
+
+	/* set up GPREG & GPCNTL to set GPIO0 and GPIO1 in to known state */
+	OUTB (nc_gpreg,  old_gpreg);
+	OUTB (nc_gpcntl, gpcntl);
+
+	/* this is to set NVRAM into a known state with GPIO0/1 both low */
+	gpreg = old_gpreg;
+	S24C16_set_bit(np, 0, &gpreg, CLR_CLK);
+	S24C16_set_bit(np, 0, &gpreg, CLR_BIT);
+		
+	/* now set NVRAM inactive with GPIO0/1 both high */
+	S24C16_stop(np, &gpreg);
+
+	/* NVRAM has to be written in segments of 16 bytes */
+	for (x = 0; x < len ; x += 16) {
+		do {
+			S24C16_start(np, &gpreg);
+			S24C16_write_byte(np, &ack_data,
+					  0xa0 | (((offset+x) >> 7) & 0x0e),
+					  &gpreg, &gpcntl);
+		} while (ack_data & 0x01);
+
+		S24C16_write_byte(np, &ack_data, (offset+x) & 0xff, 
+				  &gpreg, &gpcntl);
+
+		for (y = 0; y < 16; y++)
+			S24C16_write_byte(np, &ack_data, data[x+y], 
+					  &gpreg, &gpcntl);
+		S24C16_stop(np, &gpreg);
+	}
+
+	/* return GPIO0/1 to original states after having accessed NVRAM */
+	OUTB (nc_gpcntl, old_gpcntl);
+	OUTB (nc_gpreg,  old_gpreg);
+
+	return 0;
+}
+#endif /* SYM_CONF_NVRAM_WRITE_SUPPORT */
 
 /*
  *  Read 'len' bytes starting at 'offset'.
