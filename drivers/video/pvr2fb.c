@@ -1059,10 +1059,10 @@ int __init pvr2fb_init(void)
 	modememused = get_line_length(var.xres_virtual, var.bits_per_pixel);
 	modememused *= var.yres_virtual;
 	printk("fb%d: %s frame buffer device, using %ldk/%ldk of video memory\n",
-	       GET_FB_IDX(fb_info.node), fb_info.modename, modememused>>10,
+	       minor(fb_info.node), fb_info.modename, modememused>>10,
 	       videomemorysize>>10);
 	printk("fb%d: Mode %dx%d-%d pitch = %ld cable: %s video output: %s\n", 
-	       GET_FB_IDX(fb_info.node), var.xres, var.yres, var.bits_per_pixel, 
+	       minor(fb_info.node), var.xres, var.yres, var.bits_per_pixel, 
 	       get_line_length(var.xres, var.bits_per_pixel),
 	       (char *)pvr2_get_param(cables, NULL, cable_type, 3),
 	       (char *)pvr2_get_param(outputs, NULL, video_output, 3));

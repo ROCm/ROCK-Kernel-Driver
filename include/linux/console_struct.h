@@ -27,6 +27,7 @@ struct vc_data {
 	unsigned char	vc_halfcolor;		/* Color for half intensity mode */
 	unsigned short	vc_complement_mask;	/* [#] Xor mask for mouse pointer */
 	unsigned short	vc_hi_font_mask;	/* [#] Attribute set for upper 256 chars of font or 0 if not supported */
+	struct console_font_op vc_font;		/* Current VC font set */
 	unsigned short	vc_video_erase_char;	/* Background erase character */
 	unsigned short	vc_s_complement_mask;	/* Saved mouse pointer mask */
 	unsigned int	vc_x, vc_y;		/* Cursor position */
