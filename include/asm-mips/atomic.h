@@ -272,6 +272,12 @@ extern __inline__ int atomic_sub_return(int i, atomic_t * v)
  * Currently not implemented for MIPS.
  */
 
+/* Atomic operations are already serializing */
+#define smp_mb__before_atomic_dec()	barrier()
+#define smp_mb__after_atomic_dec()	barrier()
+#define smp_mb__before_atomic_inc()	barrier()
+#define smp_mb__after_atomic_inc()	barrier()
+
 #endif /* defined(__KERNEL__) */
 
 #endif /* __ASM_ATOMIC_H */

@@ -183,6 +183,12 @@ extern __inline__ int atomic_sub_return(int i, atomic_t * v)
  * atomic_add_negative is currently not implemented for mips64.
  */
 
+/* Atomic operations are already serializing */
+#define smp_mb__before_atomic_dec()	barrier()
+#define smp_mb__after_atomic_dec()	barrier()
+#define smp_mb__before_atomic_inc()	barrier()
+#define smp_mb__after_atomic_inc()	barrier()
+
 #endif /* defined(__KERNEL__) */
 
 #endif /* _ASM_ATOMIC_H */

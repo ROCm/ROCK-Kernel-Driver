@@ -101,7 +101,7 @@ obj-$(CONFIG_FB_SA1100)           += sa1100fb.o
 obj-$(CONFIG_FB_VIRTUAL)          += vfb.o  
 obj-$(CONFIG_FB_HIT)              += hitfb.o fbgen.o
 obj-$(CONFIG_FB_E1355)            += epson1355fb.o fbgen.o
-obj-$(CONFIG_FB_DC)               += dcfb.o fbgen.o
+obj-$(CONFIG_FB_PVR2)             += pvr2fb.o
 
 # Generic Low Level Drivers
 

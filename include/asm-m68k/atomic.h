@@ -49,4 +49,10 @@ static __inline__ int atomic_dec_and_test(volatile atomic_t *v)
 #define atomic_set_mask(mask, v) \
 	__asm__ __volatile__("orl %1,%0" : "=m" (*v) : "id" (mask),"0"(*v))
 
+/* Atomic operations are already serializing */
+#define smp_mb__before_atomic_dec()	barrier()
+#define smp_mb__after_atomic_dec()	barrier()
+#define smp_mb__before_atomic_inc()	barrier()
+#define smp_mb__after_atomic_inc()	barrier()
+
 #endif /* __ARCH_M68K_ATOMIC __ */

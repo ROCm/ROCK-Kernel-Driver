@@ -146,6 +146,11 @@ int __init stnic_probe(void)
 
   ei_status.name = dev->name;
   ei_status.word16 = 1;
+#ifdef __LITTLE_ENDIAN__ 
+  ei_status.bigendian = 0;
+#else
+  ei_status.bigendian = 1;
+#endif
   ei_status.tx_start_page = START_PG;
   ei_status.rx_start_page = START_PG + TX_PAGES;
   ei_status.stop_page = STOP_PG;
@@ -154,6 +159,7 @@ int __init stnic_probe(void)
   ei_status.get_8390_hdr = &stnic_get_hdr;
   ei_status.block_input = &stnic_block_input;
   ei_status.block_output = &stnic_block_output;
+
   stnic_init (dev);
 
   printk (KERN_INFO "NS ST-NIC 83902A\n");

@@ -1,3 +1,11 @@
+2001-06-20  Tim Waugh  <twaugh@redhat.com>
+
+	* parport_pc.c: Make 'io_hi=0' work.
+
+2001-05-31  Tim Waugh  <twaugh@redhat.com>
+
+	* parport_serial.c: New file.
+
 2001-06-05  Tim Waugh  <twaugh@redhat.com>
 
 	* parport_pc.c (parport_pc_unregister_port): New exported function.

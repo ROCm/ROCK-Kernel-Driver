@@ -3372,6 +3372,30 @@ CONFIG_FB_HGA
   As this card technology is 15 years old, most people will answer N
   here.
 
+NEC PowerVR 2 display support
+CONFIG_FB_PVR2
+  Say Y here if you have a PowerVR 2 card in your box. If you plan to
+  run linux on your Dreamcast, you will have to say Y here. This driver
+  may or may not work on other PowerVR 2 cards, but is totally untested.
+  Use at your own risk. If unsure, say N.
+
+  This driver is also available as a module ( = code which can be
+  inserted and removed from the running kernel whenever you want).
+  The module will be called pvr2fb.o. If you want to compile it as
+  a module, say M here and read Documentation/modules.txt.
+
+  You can pass several parameters to the driver at boot time or at
+  module load time. The parameters look like "video=pvr2:XXX", where
+  the meaning of XXX can be found at the end of the main source file
+  (drivers/video/pvr2fb.c). Please see the file
+  Documentation/fb/pvr2fb.txt.
+
+Debug pvr2fb
+CONFIG_FB_PVR2_DEBUG
+  Say Y here if you wish for the pvr2fb driver to print out debugging
+  messages. Most people will want to say N here. If unsure, you will
+  also want to say N.
+
 Matrox unified accelerated driver (EXPERIMENTAL)
 CONFIG_FB_MATROX
   Say Y here if you have a Matrox Millennium, Matrox Millennium II,
@@ -3711,6 +3735,12 @@ CONFIG_PARPORT_PC
   Documentation/modules.txt. The module will be called parport_pc.o.
   
   If unsure, say Y.
+
+Parallel+serial PCI card support
+CONFIG_PARPORT_SERIAL
+  This adds support for multi-IO PCI cards that have parallel and serial
+  ports.  You should say Y or M here.  If you say M, the module will be
+  called parport_serial.o.
 
 Use FIFO/DMA if available
 CONFIG_PARPORT_PC_FIFO
@@ -13492,10 +13522,12 @@ CONFIG_LP_CONSOLE
   doing that; to actually get it to happen you need to pass the
   option "console=lp0" to the kernel at boot time.
 
-  Note that kernel messages can get lost if the printer is out of
-  paper (or off, or unplugged, or too busy..), but this behaviour
-  can be changed. See drivers/char/lp.c (do this at your own risk).
-
+  If the printer is out of paper (or off, or unplugged, or too
+  busy..) the kernel will stall until the printer is ready again.
+  By defining CONSOLE_LP_STRICT to 0 (at your own risk) you
+  can make the kernel continue when this happens,
+  but it'll lose the kernel messages.
+  
   If unsure, say N.
 
 Support for user-space parallel port device drivers

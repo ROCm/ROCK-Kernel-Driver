@@ -567,17 +567,17 @@ int pppoe_connect(struct socket *sock, struct sockaddr *uservaddr,
 		if (!dev)
 			goto end;
 
+		po->pppoe_dev = dev;
+
 		if( ! (dev->flags & IFF_UP) )
-			goto end;
+			goto err_put;
 		memcpy(&po->pppoe_pa,
 		       &sp->sa_addr.pppoe,
 		       sizeof(struct pppoe_addr));
 
 		error = set_item(po);
 		if (error < 0)
-			goto end;
-
-		po->pppoe_dev = dev;
+			goto err_put;
 
 		po->chan.hdrlen = (sizeof(struct pppoe_hdr) +
 				   dev->hard_header_len);
@@ -586,6 +586,8 @@ int pppoe_connect(struct socket *sock, struct sockaddr *uservaddr,
 		po->chan.ops = &pppoe_chan_ops;
 
 		error = ppp_register_channel(&po->chan);
+		if (error)
+			goto err_put;
 
 		sk->state = PPPOX_CONNECTED;
 	}
@@ -595,6 +597,10 @@ int pppoe_connect(struct socket *sock, struct sockaddr *uservaddr,
  end:
 	release_sock(sk);
 	return error;
+err_put:
+	dev_put(po->pppoe_dev);
+	po->pppoe_dev = NULL;
+	goto end;
 }
 
 

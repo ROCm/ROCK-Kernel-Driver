@@ -609,8 +609,6 @@ static struct console lpcons = {
 
 /* --- initialisation code ------------------------------------- */
 
-#ifdef MODULE
-
 static int parport_nr[LP_NO] = { [0 ... LP_NO-1] = LP_PARPORT_UNSPEC };
 static char *parport[LP_NO] = { NULL,  };
 static int reset = 0;
@@ -618,21 +616,18 @@ static int reset = 0;
 MODULE_PARM(parport, "1-" __MODULE_STRING(LP_NO) "s");
 MODULE_PARM(reset, "i");
 
-#else
-
-static int parport_nr[LP_NO] = { [0 ... LP_NO-1] = LP_PARPORT_UNSPEC };
-static int reset = 0;
-
-static int parport_ptr = 0;
-
-void __init lp_setup(char *str, int *ints)
+static int __init lp_setup (char *str)
 {
-	if (!str) {
-		if (ints[0] == 0 || ints[1] == 0) {
+	static int parport_ptr; // initially zero
+	int x;
+
+	if (get_option (&str, &x)) {
+		if (x == 0) {
 			/* disable driver on "lp=" or "lp=0" */
 			parport_nr[0] = LP_PARPORT_OFF;
 		} else {
-			printk(KERN_WARNING "warning: 'lp=0x%x' is deprecated, ignored\n", ints[1]);
+			printk(KERN_WARNING "warning: 'lp=0x%x' is deprecated, ignored\n", x);
+			return 0;
 		}
 	} else if (!strncmp(str, "parport", 7)) {
 		int n = simple_strtoul(str+7, NULL, 10);
@@ -648,9 +643,8 @@ void __init lp_setup(char *str, int *ints)
 	} else if (!strcmp(str, "reset")) {
 		reset = 1;
 	}
+	return 1;
 }
-
-#endif
 
 static int lp_register(int nr, struct parport *port)
 {
@@ -782,8 +776,7 @@ int __init lp_init (void)
 	return 0;
 }
 
-#ifdef MODULE
-int init_module(void)
+static int __init lp_init_module (void)
 {
 	if (parport[0]) {
 		/* The user gave some parameters.  Let's see what they were.  */
@@ -811,7 +804,7 @@ int init_module(void)
 	return lp_init();
 }
 
-void cleanup_module(void)
+static void lp_cleanup_module (void)
 {
 	unsigned int offset;
 
@@ -829,4 +822,7 @@ void cleanup_module(void)
 		parport_unregister_device(lp_table[offset].dev);
 	}
 }
-#endif
+
+__setup("lp=", lp_setup);
+module_init(lp_init_module);
+module_exit(lp_cleanup_module);

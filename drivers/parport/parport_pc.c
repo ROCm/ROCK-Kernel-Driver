@@ -2824,7 +2824,8 @@ int __init parport_pc_init (int *io, int *io_hi, int *irq, int *dma)
 		/* Only probe the ports we were given. */
 		user_specified = 1;
 		do {
-			if (!*io_hi) *io_hi = 0x400 + *io;
+			if ((*io_hi) == PARPORT_IOHI_AUTO)
+			       *io_hi = 0x400 + *io;
 			if (parport_pc_probe_port(*(io++), *(io_hi++),
 						  *(irq++), *(dma++), NULL))
 				count++;
@@ -2842,7 +2843,8 @@ EXPORT_SYMBOL (parport_pc_unregister_port);
 
 #ifdef MODULE
 static int io[PARPORT_PC_MAX_PORTS+1] = { [0 ... PARPORT_PC_MAX_PORTS] = 0 };
-static int io_hi[PARPORT_PC_MAX_PORTS+1] = { [0 ... PARPORT_PC_MAX_PORTS] = 0 };
+static int io_hi[PARPORT_PC_MAX_PORTS+1] =
+	{ [0 ... PARPORT_PC_MAX_PORTS] = PARPORT_IOHI_AUTO };
 static int dmaval[PARPORT_PC_MAX_PORTS] = { [0 ... PARPORT_PC_MAX_PORTS-1] = PARPORT_DMA_AUTO };
 static int irqval[PARPORT_PC_MAX_PORTS] = { [0 ... PARPORT_PC_MAX_PORTS-1] = PARPORT_IRQ_PROBEONLY };
 static const char *irq[PARPORT_PC_MAX_PORTS] = { NULL, };

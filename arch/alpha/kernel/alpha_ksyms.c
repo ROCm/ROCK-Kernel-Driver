@@ -178,10 +178,6 @@ EXPORT_SYMBOL(down);
 EXPORT_SYMBOL(down_interruptible);
 EXPORT_SYMBOL(down_trylock);
 EXPORT_SYMBOL(up);
-EXPORT_SYMBOL(down_read);
-EXPORT_SYMBOL(down_write);
-EXPORT_SYMBOL(up_read);
-EXPORT_SYMBOL(up_write);
 
 /* 
  * SMP-specific symbols.

@@ -1058,6 +1058,7 @@ extern int fs_may_remount_ro(struct super_block *);
 
 extern int try_to_free_buffers(struct page *, unsigned int);
 extern void refile_buffer(struct buffer_head * buf);
+extern void end_buffer_io_sync(struct buffer_head *bh, int uptodate);
 
 /* reiserfs_writepage needs this */
 extern void set_buffer_async_io(struct buffer_head *bh) ;

@@ -5336,8 +5336,8 @@ aic7xxx_handle_seqint(struct aic7xxx_host *p, unsigned char intstat)
       if(!(scb->flags & SCB_ACTIVE) || (scb->cmd == NULL))
       {
         printk(WARN_LEAD "invalid scb during SEQ_SG_FIXUP flags:0x%x "
-               "scb->cmd:0x%x\n", p->host_no, CTL_OF_SCB(scb),
-               scb->flags, (unsigned int)scb->cmd);
+               "scb->cmd:0x%p\n", p->host_no, CTL_OF_SCB(scb),
+               scb->flags, scb->cmd);
         printk(INFO_LEAD "SCSISIGI 0x%x, SEQADDR 0x%x, SSTAT0 0x%x, SSTAT1 "
            "0x%x\n", p->host_no, CTL_OF_SCB(scb),
            aic_inb(p, SCSISIGI),

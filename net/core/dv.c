@@ -66,6 +66,7 @@ int alloc_divert_blk(struct net_device *dev)
 		} else {
 			memset(dev->divert, 0, sizeof(struct divert_blk));
 		}
+		dev_hold(dev);
 	} else {
 		printk(KERN_DEBUG "divert: not allocating divert_blk for non-ethernet device %s\n",
 		       dev->name);
@@ -84,6 +85,7 @@ void free_divert_blk(struct net_device *dev)
 	if (dev->divert) {
 		kfree(dev->divert);
 		dev->divert=NULL;
+		dev_put(dev);
 		printk(KERN_DEBUG "divert: freeing divert_blk for %s\n",
 		       dev->name);
 	} else {
@@ -151,7 +153,8 @@ int remove_port(u16 ports[], u16 port)
 int check_args(struct divert_cf *div_cf, struct net_device **dev)
 {
 	char devname[32];
-		
+	int ret;
+
 	if (dev == NULL)
 		return -EFAULT;
 	
@@ -170,16 +173,21 @@ int check_args(struct divert_cf *div_cf, struct net_device **dev)
 	/* dev should NOT be null */
 	if (*dev == NULL)
 		return -EINVAL;
-	
+
+	ret = 0;
+
 	/* user issuing the ioctl must be a super one :) */
-	if (!capable(CAP_SYS_ADMIN))
-		return -EPERM;
+	if (!capable(CAP_SYS_ADMIN)) {
+		ret = -EPERM;
+		goto out;
+	}
 
 	/* Device must have a divert_blk member NOT null */
 	if ((*dev)->divert == NULL)
-		return -EFAULT;
-
-	return 0;
+		ret = -EINVAL;
+out:
+	dev_put(*dev);
+	return ret;
 }
 
 /*

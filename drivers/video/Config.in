@@ -98,13 +98,12 @@ if [ "$CONFIG_FB" = "y" ]; then
          bool '    CGsix (GX,TurboGX) support' CONFIG_FB_CGSIX
       fi
    fi
+   tristate '  NEC PowerVR 2 display support' CONFIG_FB_PVR2
+   dep_bool '    Debug pvr2fb' CONFIG_FB_PVR2_DEBUG $CONFIG_FB_PVR2
    bool '  Epson 1355 framebuffer support' CONFIG_FB_E1355
    if [ "$CONFIG_FB_E1355" = "y" ]; then
       hex '    Register Base Address' CONFIG_E1355_REG_BASE a8000000
       hex '    Framebuffer Base Address' CONFIG_E1355_FB_BASE a8200000
-   fi
-   if [ "$CONFIG_SH_DREAMCAST" = "y" ]; then
-      tristate '  Dreamcast Frame Buffer support' CONFIG_FB_DC
    fi
    if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
       if [ "$CONFIG_PCI" != "n" ]; then
@@ -262,7 +261,8 @@ if [ "$CONFIG_FB" = "y" ]; then
 	   "$CONFIG_FB_PM2" = "y" -o "$CONFIG_FB_SGIVW" = "y" -o \
 	   "$CONFIG_FB_RIVA" = "y" -o "$CONFIG_FB_ATY128" = "y" -o \
 	   "$CONFIG_FB_CYBER2000" = "y" -o "$CONFIG_FB_3DFX" = "y"  -o \
-	   "$CONFIG_FB_SIS" = "y" -o "$CONFIG_FB_SA1100" = "y" ]; then
+	   "$CONFIG_FB_SIS" = "y" -o "$CONFIG_FB_SA1100" = "y" -o \
+	   "$CONFIG_FB_PVR2" = "y" ]; then
 	 define_tristate CONFIG_FBCON_CFB16 y
       else
 	 if [ "$CONFIG_FB_ATARI" = "m" -o "$CONFIG_FB_ATY" = "m" -o \
@@ -276,7 +276,7 @@ if [ "$CONFIG_FB" = "y" ]; then
 	      "$CONFIG_FB_PM2" = "m" -o "$CONFIG_FB_SGIVW" = "m" -o \
 	      "$CONFIG_FB_RIVA" = "m" -o "$CONFIG_FB_ATY128" = "m" -o \
 	      "$CONFIG_FB_CYBER2000" = "m" -o "$CONFIG_FB_SIS" = "m" -o \
-	      "$CONFIG_FB_SA1100" = "m" ]; then
+	      "$CONFIG_FB_SA1100" = "m" -o "$CONFIG_FB_PVR2" = "m" ]; then
 	    define_tristate CONFIG_FBCON_CFB16 m
 	 fi
       fi
@@ -284,14 +284,14 @@ if [ "$CONFIG_FB" = "y" ]; then
 	   "$CONFIG_FB_CLGEN" = "y" -o "$CONFIG_FB_VESA" = "y" -o \
 	   "$CONFIG_FB_MATROX" = "y" -o "$CONFIG_FB_PM2" = "y" -o \
            "$CONFIG_FB_ATY128" = "y" -o \
-	   "$CONFIG_FB_CYBER2000" = "y" ]; then
+	   "$CONFIG_FB_CYBER2000" = "y" -o "$CONFIG_FB_PVR2" = "y" ]; then
 	 define_tristate CONFIG_FBCON_CFB24 y
       else
 	 if [ "$CONFIG_FB_ATY" = "m" -o "$CONFIG_FB_VIRTUAL" = "m" -o \
 	      "$CONFIG_FB_CLGEN" = "m" -o "$CONFIG_FB_VESA" = "m" -o \
 	      "$CONFIG_FB_MATROX" = "m" -o "$CONFIG_FB_PM2" = "m" -o \
 	      "$CONFIG_FB_ATY128" = "m" -o \
-	      "$CONFIG_FB_CYBER2000" = "m" ]; then
+	      "$CONFIG_FB_CYBER2000" = "m" -o "$CONFIG_FB_PVR2" = "m" ]; then
 	    define_tristate CONFIG_FBCON_CFB24 m
 	 fi
       fi
@@ -302,7 +302,8 @@ if [ "$CONFIG_FB" = "y" ]; then
 	   "$CONFIG_FB_MATROX" = "y" -o "$CONFIG_FB_PM2" = "y" -o \
 	   "$CONFIG_FB_RIVA" = "y" -o "$CONFIG_FB_ATY128" = "y" -o \
 	   "$CONFIG_FB_FM2" = "y" -o "$CONFIG_FB_SGIVW" = "y" -o \
-	   "$CONFIG_FB_3DFX" = "y" -o "$CONFIG_FB_SIS" = "y" ]; then
+	   "$CONFIG_FB_3DFX" = "y" -o "$CONFIG_FB_SIS" = "y" -o \
+	   "$CONFIG_FB_PVR2" = "y" ]; then
 	 define_tristate CONFIG_FBCON_CFB32 y
       else
 	 if [ "$CONFIG_FB_ATARI" = "m" -o "$CONFIG_FB_ATY" = "m" -o \
@@ -312,7 +313,8 @@ if [ "$CONFIG_FB" = "y" ]; then
 	      "$CONFIG_FB_MATROX" = "m" -o "$CONFIG_FB_PM2" = "m" -o \
 	      "$CONFIG_FB_RIVA" = "m" -o "$CONFIG_FB_ATY128" = "m" -o \
 	      "$CONFIG_FB_3DFX" = "m" -o \
-	      "$CONFIG_FB_SGIVW" = "m" -o "$CONFIG_FB_SIS" = "m" ]; then
+	      "$CONFIG_FB_SGIVW" = "m" -o "$CONFIG_FB_SIS" = "m" -o \
+	      "$CONFIG_FB_PVR2" = "m" ]; then
 	    define_tristate CONFIG_FBCON_CFB32 m
 	 fi
       fi

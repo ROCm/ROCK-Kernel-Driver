@@ -17,6 +17,8 @@ clgenfb.txt
 	- info on the Cirrus Logic frame buffer driver
 matroxfb.txt
 	- info on the Matrox frame buffer driver
+pvr2fb.txt
+	- info on the PowerVR 2 frame buffer driver
 tgafb.txt
 	- info on the TGA (DECChip 21030) frame buffer driver
 vesafb.txt

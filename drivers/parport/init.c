@@ -21,7 +21,8 @@
 #ifndef MODULE
 static int io[PARPORT_MAX+1] __initdata = { [0 ... PARPORT_MAX] = 0 };
 #ifdef CONFIG_PARPORT_PC
-static int io_hi[PARPORT_MAX+1] __initdata = { [0 ... PARPORT_MAX] = 0 };
+static int io_hi[PARPORT_MAX+1] __initdata =
+	{ [0 ... PARPORT_MAX] = PARPORT_IOHI_AUTO };
 #endif
 static int irq[PARPORT_MAX] __initdata = { [0 ... PARPORT_MAX-1] = PARPORT_IRQ_PROBEONLY };
 static int dma[PARPORT_MAX] __initdata = { [0 ... PARPORT_MAX-1] = PARPORT_DMA_NONE };

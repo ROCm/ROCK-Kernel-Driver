@@ -112,7 +112,7 @@ static inline struct rw_semaphore *__rwsem_do_wake(struct rw_semaphore *sem)
  */
 static inline struct rw_semaphore *rwsem_down_failed_common(struct rw_semaphore *sem,
 								 struct rwsem_waiter *waiter,
-								 __s32 adjustment)
+								 signed long adjustment)
 {
 	struct task_struct *tsk = current;
 	signed long count;

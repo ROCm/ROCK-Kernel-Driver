@@ -4,7 +4,7 @@
  *	Authors:	Alan Cox <iiitac@pyr.swan.ac.uk>
  *			Florian La Roche <rzsfl@rz.uni-sb.de>
  *
- *	Version:	$Id: skbuff.c,v 1.87 2001/03/06 22:09:50 davem Exp $
+ *	Version:	$Id: skbuff.c,v 1.88 2001/07/09 23:19:14 davem Exp $
  *
  *	Fixes:	
  *		Alan Cox	:	Fixed the worst of the load balancer bugs.
@@ -1149,6 +1149,32 @@ unsigned int skb_copy_and_csum_bits(const struct sk_buff *skb, int offset, u8 *t
 	return csum;
 }
 
+void skb_copy_and_csum_dev(const struct sk_buff *skb, u8 *to)
+{
+	unsigned int csum;
+	long csstart;
+
+	if (skb->ip_summed == CHECKSUM_HW)
+		csstart = skb->h.raw - skb->data;
+	else
+		csstart = skb->len - skb->data_len;
+
+	if (csstart > skb->len - skb->data_len)
+		BUG();
+
+	memcpy(to, skb->data, csstart);
+
+	csum = 0;
+	if (csstart != skb->len)
+		csum = skb_copy_and_csum_bits(skb, csstart, to+csstart,
+				skb->len-csstart, 0);
+
+	if (skb->ip_summed == CHECKSUM_HW) {
+		long csstuff = csstart + skb->csum;
+
+		*((unsigned short *)(to + csstuff)) = csum_fold(csum);
+	}
+}
 
 #if 0
 /* 

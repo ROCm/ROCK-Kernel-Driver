@@ -34,7 +34,7 @@ struct nlmsghdr
 
 #define NLM_F_REQUEST		1	/* It is request message. 	*/
 #define NLM_F_MULTI		2	/* Multipart message, terminated by NLMSG_DONE */
-#define NLM_F_ACK		4	/* If succeed, reply with ack	*/
+#define NLM_F_ACK		4	/* Reply with ack, with zero or error code */
 #define NLM_F_ECHO		8	/* Echo this request 		*/
 
 /* Modifiers to GET request */

@@ -960,16 +960,6 @@ void submit_bh(int rw, struct buffer_head * bh)
 	}
 }
 
-/*
- * Default IO end handler, used by "ll_rw_block()".
- */
-static void end_buffer_io_sync(struct buffer_head *bh, int uptodate)
-{
-	mark_buffer_uptodate(bh, uptodate);
-	unlock_buffer(bh);
-	atomic_dec(&bh->b_count);
-}
-
 /**
  * ll_rw_block: low-level access to block devices
  * @rw: whether to %READ or %WRITE or maybe %READA (readahead)

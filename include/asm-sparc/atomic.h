@@ -100,6 +100,12 @@ static __inline__ int __atomic_sub(int i, atomic_t *v)
 
 #define atomic_add_negative(i, v) (__atomic_add((i), (v)) < 0)
 
+/* Atomic operations are already serializing */
+#define smp_mb__before_atomic_dec()	barrier()
+#define smp_mb__after_atomic_dec()	barrier()
+#define smp_mb__before_atomic_inc()	barrier()
+#define smp_mb__after_atomic_inc()	barrier()
+
 #endif /* !(__KERNEL__) */
 
 #endif /* !(__ARCH_SPARC_ATOMIC__) */

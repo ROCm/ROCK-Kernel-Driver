@@ -5,7 +5,7 @@
  *
  *		RAW - implementation of IP "raw" sockets.
  *
- * Version:	$Id: raw.c,v 1.62 2001/06/05 10:52:15 davem Exp $
+ * Version:	$Id: raw.c,v 1.63 2001/07/10 04:29:01 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -520,6 +520,7 @@ int raw_recvmsg(struct sock *sk, struct msghdr *msg, int len,
 	if (sin) {
 		sin->sin_family = AF_INET;
 		sin->sin_addr.s_addr = skb->nh.iph->saddr;
+		memset(&sin->sin_zero, 0, sizeof(sin->sin_zero));
 	}
 	if (sk->protinfo.af_inet.cmsg_flags)
 		ip_cmsg_recv(msg, skb);

@@ -170,5 +170,9 @@ if (atomic_compare_and_swap ((from), (to), (where))) {\
         atomic_set(where,(to));\
 }
 
-#endif                                 /* __ARCH_S390_ATOMIC __            */
+#define smp_mb__before_atomic_dec()	smp_mb()
+#define smp_mb__after_atomic_dec()	smp_mb()
+#define smp_mb__before_atomic_inc()	smp_mb()
+#define smp_mb__after_atomic_inc()	smp_mb()
 
+#endif                                 /* __ARCH_S390_ATOMIC __            */

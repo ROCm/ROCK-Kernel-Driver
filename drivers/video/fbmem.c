@@ -122,8 +122,9 @@ extern int radeonfb_init(void);
 extern int radeonfb_setup(char*);
 extern int e1355fb_init(void);
 extern int e1355fb_setup(char*);
-extern int dcfb_init(void);
-  
+extern int pvr2fb_init(void);
+extern int pvr2fb_setup(char*);
+
 static struct {
 	const char *name;
 	int (*init)(void);
@@ -270,8 +271,8 @@ static struct {
 #ifdef CONFIG_FB_E1355
 	{ "e1355fb", e1355fb_init, e1355fb_setup },
 #endif
-#ifdef CONFIG_FB_DC
-	{ "dcfb", dcfb_init, NULL },
+#ifdef CONFIG_FB_PVR2
+	{ "pvr2", pvr2fb_init, pvr2fb_setup },
 #endif
 
 	/*

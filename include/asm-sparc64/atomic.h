@@ -29,4 +29,10 @@ extern int __atomic_sub(int, atomic_t *);
 #define atomic_inc(v) ((void)__atomic_add(1, v))
 #define atomic_dec(v) ((void)__atomic_sub(1, v))
 
+/* Atomic operations are already serializing */
+#define smp_mb__before_atomic_dec()	barrier()
+#define smp_mb__after_atomic_dec()	barrier()
+#define smp_mb__before_atomic_inc()	barrier()
+#define smp_mb__after_atomic_inc()	barrier()
+
 #endif /* !(__ARCH_SPARC64_ATOMIC__) */

@@ -681,7 +681,7 @@ static int hs_set_io_map(unsigned int sock, struct pccard_io_map *io)
 	    hd64465_port_map(
 	    	io->start,
 		io->stop - io->start + 1,
-	    	vaddrbase + io->start);
+	    	vaddrbase + io->start,0);
 	} else {
 	    hd64465_port_unmap(
 	    	sio->start,

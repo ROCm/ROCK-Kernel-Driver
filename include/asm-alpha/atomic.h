@@ -106,4 +106,9 @@ static __inline__ long atomic_sub_return(int i, atomic_t * v)
 #define atomic_inc(v) atomic_add(1,(v))
 #define atomic_dec(v) atomic_sub(1,(v))
 
+#define smp_mb__before_atomic_dec()	smp_mb()
+#define smp_mb__after_atomic_dec()	smp_mb()
+#define smp_mb__before_atomic_inc()	smp_mb()
+#define smp_mb__after_atomic_inc()	smp_mb()
+
 #endif /* _ALPHA_ATOMIC_H */

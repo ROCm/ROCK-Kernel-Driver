@@ -145,6 +145,7 @@ EXPORT_SYMBOL(skb_copy_datagram_iovec);
 EXPORT_SYMBOL(skb_copy_and_csum_datagram_iovec);
 EXPORT_SYMBOL(skb_copy_bits);
 EXPORT_SYMBOL(skb_copy_and_csum_bits);
+EXPORT_SYMBOL(skb_copy_and_csum_dev);
 EXPORT_SYMBOL(skb_copy_expand);
 EXPORT_SYMBOL(___pskb_trim);
 EXPORT_SYMBOL(__pskb_pull_tail);

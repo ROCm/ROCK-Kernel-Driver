@@ -71,8 +71,16 @@ static char buffersize_index[65] =
 
 #define BH_ENTRY(list) list_entry((list), struct buffer_head, b_inode_buffers)
 
-#define get_bh(bh)	atomic_inc(&(bh)->b_count)
-#define put_bh(bh)	atomic_dec(&(bh)->b_count)
+static inline void get_bh(struct buffer_head * bh)
+{
+	atomic_inc(&(bh)->b_count);
+}
+
+static inline void put_bh(struct buffer_head *bh)
+{
+	smp_mb__before_atomic_dec();
+	atomic_dec(&bh->b_count);
+}
 
 /*
  * Hash table gook..
@@ -136,19 +144,12 @@ union bdflush_param {
 int bdflush_min[N_PARAM] = {  0,  10,    5,   25,  0,   1*HZ,   0, 0, 0};
 int bdflush_max[N_PARAM] = {100,50000, 20000, 20000,600*HZ, 6000*HZ, 100, 0, 0};
 
-static inline void __unlock_buffer(struct buffer_head *bh)
+inline void unlock_buffer(struct buffer_head *bh)
 {
 	clear_bit(BH_Lock, &bh->b_state);
 	smp_mb__after_clear_bit();
 	if (waitqueue_active(&bh->b_wait))
 		wake_up(&bh->b_wait);
-}
-
-void unlock_buffer(struct buffer_head *bh)
-{
-	get_bh(bh);
-	__unlock_buffer(bh);
-	put_bh(bh);
 }
 
 /*
@@ -179,11 +180,14 @@ void __wait_on_buffer(struct buffer_head * bh)
 	put_bh(bh);
 }
 
-/* End-of-write handler.. Just mark it up-to-date and unlock the buffer. */
-static void end_buffer_write(struct buffer_head *bh, int uptodate)
+/*
+ * Default synchronous end-of-IO handler..  Just mark it up-to-date and
+ * unlock the buffer. This is what ll_rw_block uses too.
+ */
+void end_buffer_io_sync(struct buffer_head *bh, int uptodate)
 {
 	mark_buffer_uptodate(bh, uptodate);
-	__unlock_buffer(bh);
+	unlock_buffer(bh);
 	put_bh(bh);
 }
 
@@ -201,7 +205,7 @@ static void write_locked_buffers(struct buffer_head **array, unsigned int count)
 	get_bh(wait);
 	do {
 		struct buffer_head * bh = *array++;
-		bh->b_end_io = end_buffer_write;
+		bh->b_end_io = end_buffer_io_sync;
 		submit_bh(WRITE, bh);
 	} while (--count);
 	wait_on_buffer(wait);
@@ -240,7 +244,7 @@ repeat:
 			write_locked_buffers(array, count);
 			goto repeat;
 		}
-		__unlock_buffer(bh);
+		unlock_buffer(bh);
 		put_bh(bh);
 	}
 	spin_unlock(&lru_list_lock);
@@ -823,7 +827,7 @@ static void end_buffer_io_async(struct buffer_head * bh, int uptodate)
 	 * that unlock the page..
 	 */
 	spin_lock_irqsave(&page_uptodate_lock, flags);
-	__unlock_buffer(bh);
+	unlock_buffer(bh);
 	tmp = bh->b_this_page;
 	while (tmp != bh) {
 		if (tmp->b_end_io == end_buffer_io_async && buffer_locked(tmp))
@@ -2005,8 +2009,7 @@ static void end_buffer_io_kiobuf(struct buffer_head *bh, int uptodate)
 	mark_buffer_uptodate(bh, uptodate);
 
 	kiobuf = bh->b_private;
-	__unlock_buffer(bh);
-	put_bh(bh);
+	unlock_buffer(bh);
 	end_kio_request(kiobuf, uptodate);
 }
 
@@ -2131,7 +2134,6 @@ int brw_kiovec(int rw, int nr, struct kiobuf *iovec[],
 				offset += size;
 
 				atomic_inc(&iobuf->io_count);
-				get_bh(tmp);
 				submit_bh(rw, tmp);
 				/* 
 				 * Wait for IO if we have got too much 
