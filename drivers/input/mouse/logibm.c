@@ -121,13 +121,14 @@ static void logibm_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	outb(LOGIBM_READ_Y_HIGH, LOGIBM_CONTROL_PORT);
 	buttons = inb(LOGIBM_DATA_PORT);
 	dy |= (buttons & 0xf) << 4;
-	buttons = ~buttons;
+	buttons = ~buttons >> 5;
 
 	input_report_rel(&logibm_dev, REL_X, dx);
-	input_report_rel(&logibm_dev, REL_Y, 255 - dy);
-	input_report_key(&logibm_dev, BTN_MIDDLE, buttons & 1);
-	input_report_key(&logibm_dev, BTN_LEFT,   buttons & 2);
-	input_report_key(&logibm_dev, BTN_RIGHT,  buttons & 4);
+	input_report_rel(&logibm_dev, REL_Y, dy);
+	input_report_key(&logibm_dev, BTN_RIGHT,  buttons & 1);
+	input_report_key(&logibm_dev, BTN_MIDDLE, buttons & 2);
+	input_report_key(&logibm_dev, BTN_LEFT,   buttons & 4);
+	outb(LOGIBM_ENABLE_IRQ, LOGIBM_CONTROL_PORT);
 }
 
 #ifndef MODULE
@@ -143,7 +144,7 @@ __setup("logibm_irq=", logibm_setup);
 
 static int __init logibm_init(void)
 {
-	if (request_region(LOGIBM_BASE, LOGIBM_EXTENT, "logibm")) {
+	if (!request_region(LOGIBM_BASE, LOGIBM_EXTENT, "logibm")) {
 		printk(KERN_ERR "logibm.c: Can't allocate ports at %#x\n", LOGIBM_BASE);
 		return -EBUSY;
 	}
