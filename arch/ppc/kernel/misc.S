@@ -207,8 +207,8 @@ _GLOBAL(call_setup_cpu)
 	bctr
 
 #ifndef CONFIG_PPC_ISERIES	/* iSeries version is in iSeries_misc.S */
-/* void __save_flags_ptr(unsigned long *flags) */
-_GLOBAL(__save_flags_ptr)
+/* void local_save_flags_ptr(unsigned long *flags) */
+_GLOBAL(local_save_flags_ptr)
 	mfmsr	r4
 	stw	r4,0(r3)
 	blr
@@ -234,10 +234,10 @@ _GLOBAL(__save_flags_ptr)
 	nop
 	nop
 	nop
-_GLOBAL(__save_flags_ptr_end)
+_GLOBAL(local_save_flags_ptr_end)
 
-/* void __restore_flags(unsigned long flags) */	
-_GLOBAL(__restore_flags)
+/* void local_irq_restore(unsigned long flags) */	
+_GLOBAL(local_irq_restore)
 /*
  * Just set/clear the MSR_EE bit through restore/flags but do not
  * change anything else.  This is needed by the RT system and makes
@@ -275,9 +275,9 @@ _GLOBAL(__restore_flags)
 	nop
 	nop
 	nop
-_GLOBAL(__restore_flags_end)
+_GLOBAL(local_irq_restore_end)
 
-_GLOBAL(__cli)
+_GLOBAL(local_irq_disable)
 	mfmsr	r0		/* Get current interrupt state */
 	rlwinm	r3,r0,16+1,32-1,31	/* Extract old value of 'EE' */
 	rlwinm	r0,r0,0,17,15	/* clear MSR_EE in r0 */
@@ -304,9 +304,9 @@ _GLOBAL(__cli)
 	nop
 	nop
 	nop
-_GLOBAL(__cli_end)
+_GLOBAL(local_irq_disable_end)
 
-_GLOBAL(__sti)
+_GLOBAL(local_irq_enable)
 	mfmsr	r3		/* Get current state */
 	ori	r3,r3,MSR_EE	/* Turn on 'EE' bit */
 	SYNC			/* Some chip revs have problems here... */
@@ -333,7 +333,7 @@ _GLOBAL(__sti)
 	nop
 	nop
 	nop
-_GLOBAL(__sti_end)
+_GLOBAL(local_irq_enable_end)
 #endif /* CONFIG_PPC_ISERIES */
 
 /*

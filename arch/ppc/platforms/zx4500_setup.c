@@ -191,7 +191,7 @@ zx4500_init_IRQ(void)
 static void
 zx4500_restart(char *cmd)
 {
-	__cli();
+	local_irq_disable();
 
 	out_8((volatile u_char *)ZX4500_CPLD_RESET, ZX4500_CPLD_RESET_XBUS);
 	for (;;);
@@ -203,7 +203,7 @@ zx4500_restart(char *cmd)
 static void
 zx4500_power_off(void)
 {
-	__cli();
+	local_irq_disable();
 	for(;;);  /* No way to shut power off with software */
 	/* NOTREACHED */
 }

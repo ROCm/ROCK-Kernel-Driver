@@ -20,7 +20,7 @@ int aha152x_release(struct Scsi_Host *shpnt);
 int aha152x_device_reset(Scsi_Cmnd *);
 int aha152x_bus_reset(Scsi_Cmnd *);
 int aha152x_host_reset(Scsi_Cmnd *);
-int aha152x_biosparam(Disk *, kdev_t, int*);
+int aha152x_biosparam(Disk *, struct block_device *, int*);
 int aha152x_proc_info(char *buffer, char **start, off_t offset, int length, int hostno, int inout);
 
 /* number of queueable commands

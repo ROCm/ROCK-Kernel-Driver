@@ -84,7 +84,7 @@ lopec_restart(char *cmd)
 	reg |= 0x80;
 	*((unsigned char *) LOPEC_SYSSTAT1) = reg;
 
-	__cli();
+	local_irq_disable();
 	while(1);
 #undef LOPEC_SYSSTAT1
 }
@@ -92,7 +92,7 @@ lopec_restart(char *cmd)
 static void
 lopec_halt(void)
 {
-	__cli();
+	local_irq_disable();
 	while(1);
 }
 

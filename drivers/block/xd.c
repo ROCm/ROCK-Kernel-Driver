@@ -122,7 +122,7 @@ static unsigned int xd_bases[] __initdata =
 };
 
 static struct hd_struct xd_struct[XD_MAXDRIVES << 6];
-static int xd_sizes[XD_MAXDRIVES << 6], xd_access[XD_MAXDRIVES];
+static int xd_sizes[XD_MAXDRIVES << 6];
 
 static spinlock_t xd_lock = SPIN_LOCK_UNLOCKED;
 
@@ -140,12 +140,9 @@ static struct gendisk xd_gendisk = {
 static struct block_device_operations xd_fops = {
 	owner:		THIS_MODULE,
 	open:		xd_open,
-	release:	xd_release,
 	ioctl:		xd_ioctl,
 };
 static DECLARE_WAIT_QUEUE_HEAD(xd_wait_int);
-static DECLARE_WAIT_QUEUE_HEAD(xd_wait_open);
-static u_char xd_valid[XD_MAXDRIVES] = { 0,0 };
 static u_char xd_drives, xd_irq = 5, xd_dma = 3, xd_maxsectors;
 static u_char xd_override __initdata = 0, xd_type __initdata = 0;
 static u_short xd_iobase = 0x320;
@@ -244,14 +241,11 @@ static void __init xd_geninit (void)
 	/* xd_maxsectors depends on controller - so set after detection */
 	blk_queue_max_sectors(BLK_DEFAULT_QUEUE(MAJOR_NR), xd_maxsectors);
 
-	for (i = 0; i < xd_drives; i++) {
-		xd_valid[i] = 1;
+	for (i = 0; i < xd_drives; i++)
 		register_disk(&xd_gendisk, mk_kdev(MAJOR_NR,i<<6), 1<<6,
 				&xd_fops,
 				xd_info[i].heads * xd_info[i].cylinders *
 				xd_info[i].sectors);
-	}
-
 	xd_gendisk.nr_real = xd_drives;
 }
 
@@ -259,17 +253,9 @@ static void __init xd_geninit (void)
 static int xd_open (struct inode *inode,struct file *file)
 {
 	int dev = DEVICE_NR(inode->i_rdev);
-
-	if (dev < xd_drives) {
-		while (!xd_valid[dev])
-			sleep_on(&xd_wait_open);
-
-		xd_access[dev]++;
-
-		return (0);
-	}
-
-	return -ENXIO;
+	if (dev >= xd_drives)
+		return -ENXIO;
+	return 0;
 }
 
 /* do_xd_request: handle an incoming request */
@@ -329,7 +315,7 @@ static int xd_ioctl (struct inode *inode,struct file *file,u_int cmd,u_long arg)
 			g.heads = xd_info[dev].heads;
 			g.sectors = xd_info[dev].sectors;
 			g.cylinders = xd_info[dev].cylinders;
-			g.start = get_start_sect(inode->i_rdev);
+			g.start = get_start_sect(inode->i_bdev);
 			return copy_to_user(geometry, &g, sizeof g) ? -EFAULT : 0;
 		}
 		case HDIO_SET_DMA:
@@ -351,50 +337,28 @@ static int xd_ioctl (struct inode *inode,struct file *file,u_int cmd,u_long arg)
 				return -EACCES;
 			return xd_reread_partitions(inode->i_rdev);
 
-		case BLKGETSIZE:
-		case BLKGETSIZE64:
-		case BLKFLSBUF:
-		case BLKROSET:
-		case BLKROGET:
-		case BLKPG:
-			return blk_ioctl(inode->i_bdev, cmd, arg);
-
 		default:
 			return -EINVAL;
 	}
 }
 
-/* xd_release: release the device */
-static int xd_release (struct inode *inode, struct file *file)
-{
-	int target = DEVICE_NR(inode->i_rdev);
-	if (target < xd_drives)
-		xd_access[target]--;
-	return 0;
-}
-
 /* xd_reread_partitions: rereads the partition table from a drive */
 static int xd_reread_partitions(kdev_t dev)
 {
-	int target;
-	int res;
+	int target = DEVICE_NR(dev);
+	kdev_t device = mk_kdev(MAJOR_NR, target << 6);
+	int res = dev_lock_part(device);
 	
-	target = DEVICE_NR(dev);
+	if (res < 0)
+		return 0;
 
-	cli();
-	xd_valid[target] = (xd_access[target] != 1);
-        sti();
-	if (xd_valid[target])
-		return -EBUSY;
-
-	res = wipe_partitions(dev);
+	res = wipe_partitions(device);
 	if (!res)
-		grok_partitions(dev, xd_info[target].heads
+		grok_partitions(device, xd_info[target].heads
 				* xd_info[target].cylinders
 				* xd_info[target].sectors);
 
-	xd_valid[target] = 1;
-	wake_up(&xd_wait_open);
+	dev_unlock_part(device);
 
 	return res;
 }

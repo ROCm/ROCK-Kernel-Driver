@@ -271,12 +271,12 @@ asmlinkage void do_IRQ(int irq, struct pt_regs *regs)
 		//mask_irq(1<<irq);
 		//printk("action->handler %x\n", action->handler);
 		disable_it8172_irq(irq);
-		//if (!(action->flags & SA_INTERRUPT)) __sti(); /* reenable ints */
+		//if (!(action->flags & SA_INTERRUPT)) local_irq_enable(); /* reenable ints */
 		do { 
 			action->handler(irq, action->dev_id, regs);
 			action = action->next;
 		} while ( action );
-		//__cli(); /* disable ints */
+		//local_irq_disable(); /* disable ints */
 		if (irq_desc[irq].handler)
 		{
 		}

@@ -28,11 +28,11 @@ ns87312_enable_ide(long ide_base)
 	int data;
 	unsigned long flags;
 
-	__save_and_cli(flags);
+	local_irq_save(flags);
 	outb(0, ide_base);		/* set the index register for reg #0 */
 	data = inb(ide_base+1);		/* read the current contents */
 	outb(0, ide_base);		/* set the index register for reg #0 */
 	outb(data | 0x40, ide_base+1);	/* turn on IDE */
 	outb(data | 0x40, ide_base+1);	/* turn on IDE, really! */
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }

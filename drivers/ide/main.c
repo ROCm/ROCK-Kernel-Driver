@@ -249,28 +249,22 @@ struct ata_device *get_info_ptr(kdev_t i_rdev)
  */
 int ata_revalidate(kdev_t i_rdev)
 {
+	kdev_t device = mk_kdev(major(i_rdev), minor(i_rdev) & ~PARTN_MASK);
 	struct ata_device *drive;
-	unsigned long flags;
 	int res;
 
-	if ((drive = get_info_ptr(i_rdev)) == NULL)
+	if ((drive = get_info_ptr(device)) == NULL)
 		return -ENODEV;
 
-	/* FIXME: The locking here doesn't make the slightest sense! */
-	spin_lock_irqsave(&ide_lock, flags);
-
-	if (drive->busy || (drive->usage > 1)) {
-		spin_unlock_irqrestore(&ide_lock, flags);
-
-		return -EBUSY;
-	}
-
-	drive->busy = 1;
 	MOD_INC_USE_COUNT;
 
-	spin_unlock_irqrestore(&ide_lock, flags);
+	res = dev_lock_part(device);
+	if (res < 0) {
+		MOD_DEC_USE_COUNT;
+		return res;
+	}
 
-	res = wipe_partitions(i_rdev);
+	res = wipe_partitions(device);
 	if (!res) {
 		if (ata_ops(drive) && ata_ops(drive)->revalidate) {
 			ata_get(ata_ops(drive));
@@ -281,14 +275,11 @@ int ata_revalidate(kdev_t i_rdev)
 			ata_ops(drive)->revalidate(drive);
 			ata_put(ata_ops(drive));
 		} else
-			grok_partitions(i_rdev, ata_capacity(drive));
+			grok_partitions(device, ata_capacity(drive));
 	}
 
-	drive->busy = 0;
-	wake_up(&drive->wqueue);
-
+	dev_unlock_part(device);
 	MOD_DEC_USE_COUNT;
-
 	return res;
 }
 
@@ -1091,18 +1082,18 @@ int ide_unregister_subdriver(struct ata_device *drive)
 {
 	unsigned long flags;
 
-	save_flags(flags);		/* all CPUs */
-	cli();				/* all CPUs */
+	local_save_flags(flags); // FIXME: is this safe?
+	local_irq_disable();
 
 #if 0
 	if (__MOD_IN_USE(ata_ops(drive)->owner)) {
-		restore_flags(flags);
+		local_irq_restore(flags); // FIXME: is this safe?
 		return 1;
 	}
 #endif
 
 	if (drive->usage || drive->busy || !ata_ops(drive)) {
-		restore_flags(flags);	/* all CPUs */
+		local_irq_restore(flags);	// FIXME: is this safe?
 		return 1;
 	}
 
@@ -1111,7 +1102,7 @@ int ide_unregister_subdriver(struct ata_device *drive)
 #endif
 	drive->driver = NULL;
 
-	restore_flags(flags);		/* all CPUs */
+	local_irq_restore(flags); // FIXME: is this safe?
 
 	return 0;
 }

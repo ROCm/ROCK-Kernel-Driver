@@ -740,8 +740,8 @@ struct task_struct *do_fork(unsigned long clone_flags,
 	 * total amount of pending timeslices in the system doesnt change,
 	 * resulting in more scheduling fairness.
 	 */
-	__save_flags(flags);
-	__cli();
+	local_save_flags(flags);
+	local_irq_disable();
 	p->time_slice = (current->time_slice + 1) >> 1;
 	current->time_slice >>= 1;
 	if (!current->time_slice) {
@@ -754,7 +754,7 @@ struct task_struct *do_fork(unsigned long clone_flags,
 		scheduler_tick(0, 0);
 	}
 	p->sleep_timestamp = jiffies;
-	__restore_flags(flags);
+	local_irq_restore(flags);
 
 	/*
 	 * Ok, add it to the run-queues and make it

@@ -437,7 +437,7 @@ void __init sbus_time_init(void)
 #endif
 
 	/* Now that OBP ticker has been silenced, it is safe to enable IRQ. */
-	__sti();
+	local_irq_enable();
 }
 
 void __init time_init(void)

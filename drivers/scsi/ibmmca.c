@@ -2382,7 +2382,7 @@ int ibmmca_reset (Scsi_Cmnd * cmd, unsigned int reset_flags)
      return SCSI_RESET_SUCCESS;
 }
 
-int ibmmca_biosparam (Disk * disk, kdev_t dev, int *info)
+int ibmmca_biosparam (Disk * disk, struct block_device *dev, int *info)
 {
    info[0] = 64;
    info[1] = 32;

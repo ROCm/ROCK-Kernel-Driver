@@ -113,7 +113,7 @@ conf_read(unsigned long addr, unsigned char type1)
 	int cia_cfg = 0;
 
 	DBGC(("conf_read(addr=0x%lx, type1=%d) ", addr, type1));
-	__save_and_cli(flags);
+	local_irq_save(flags);
 
 	/* Reset status register to avoid losing errors.  */
 	stat0 = *(vip)CIA_IOC_CIA_ERR;
@@ -154,7 +154,7 @@ conf_read(unsigned long addr, unsigned char type1)
 		*(vip)CIA_IOC_CFG;
 	}
 
-	__restore_flags(flags);
+	local_irq_restore(flags);
 	DBGC(("done\n"));
 
 	return value;
@@ -167,7 +167,7 @@ conf_write(unsigned long addr, unsigned int value, unsigned char type1)
 	int stat0, cia_cfg = 0;
 
 	DBGC(("conf_write(addr=0x%lx, type1=%d) ", addr, type1));
-	__save_and_cli(flags);
+	local_irq_save(flags);
 
 	/* Reset status register to avoid losing errors.  */
 	stat0 = *(vip)CIA_IOC_CIA_ERR;
@@ -204,7 +204,7 @@ conf_write(unsigned long addr, unsigned int value, unsigned char type1)
 		*(vip)CIA_IOC_CFG;
 	}
 
-	__restore_flags(flags);
+	local_irq_restore(flags);
 	DBGC(("done\n"));
 }
 

@@ -440,11 +440,11 @@ void
 xmon_irq(int irq, void *d, struct pt_regs *regs)
 {
 	unsigned long flags;
-	__save_flags(flags);
-	__cli();
+	local_save_flags(flags);
+	local_irq_disable();
 	printf("Keyboard interrupt\n");
 	xmon(regs);
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 int

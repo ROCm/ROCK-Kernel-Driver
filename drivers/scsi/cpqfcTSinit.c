@@ -1625,7 +1625,7 @@ int cpqfcTS_reset(Scsi_Cmnd *Cmnd, unsigned int reset_flags)
    (from hosts.h)
 */
 
-int cpqfcTS_biosparam(Disk *disk, kdev_t n, int ip[])
+int cpqfcTS_biosparam(Disk *disk, struct block_device *n, int ip[])
 {
   int size = disk->capacity;
   

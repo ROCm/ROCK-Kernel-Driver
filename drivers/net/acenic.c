@@ -3389,14 +3389,14 @@ static int __init read_eeprom_byte(struct net_device *dev,
 	 * Don't take interrupts on this CPU will bit banging
 	 * the %#%#@$ I2C device
 	 */
-	__save_flags(flags);
-	__cli();
+	local_save_flags(flags);
+	local_irq_disable();
 
 	eeprom_start(regs);
 
 	eeprom_prep(regs, EEPROM_WRITE_SELECT);
 	if (eeprom_check_ack(regs)) {
-		__restore_flags(flags);
+		local_irq_restore(flags);
 		printk(KERN_ERR "%s: Unable to sync eeprom\n", dev->name);
 		result = -EIO;
 		goto eeprom_read_error;
@@ -3404,7 +3404,7 @@ static int __init read_eeprom_byte(struct net_device *dev,
 
 	eeprom_prep(regs, (offset >> 8) & 0xff);
 	if (eeprom_check_ack(regs)) {
-		__restore_flags(flags);
+		local_irq_restore(flags);
 		printk(KERN_ERR "%s: Unable to set address byte 0\n",
 		       dev->name);
 		result = -EIO;
@@ -3413,7 +3413,7 @@ static int __init read_eeprom_byte(struct net_device *dev,
 
 	eeprom_prep(regs, offset & 0xff);
 	if (eeprom_check_ack(regs)) {
-		__restore_flags(flags);
+		local_irq_restore(flags);
 		printk(KERN_ERR "%s: Unable to set address byte 1\n",
 		       dev->name);
 		result = -EIO;
@@ -3423,7 +3423,7 @@ static int __init read_eeprom_byte(struct net_device *dev,
 	eeprom_start(regs);
 	eeprom_prep(regs, EEPROM_READ_SELECT);
 	if (eeprom_check_ack(regs)) {
-		__restore_flags(flags);
+		local_irq_restore(flags);
 		printk(KERN_ERR "%s: Unable to set READ_SELECT\n",
 		       dev->name);
 		result = -EIO;
@@ -3469,7 +3469,7 @@ static int __init read_eeprom_byte(struct net_device *dev,
 	udelay(ACE_SHORT_DELAY);
 	eeprom_stop(regs);
 
-	__restore_flags(flags);
+	local_irq_restore(flags);
  out:
 	return result;
 

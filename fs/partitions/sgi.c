@@ -4,22 +4,13 @@
  *  Code extracted from drivers/block/genhd.c
  */
 
-#include <linux/fs.h>
-#include <linux/genhd.h>
-#include <linux/kernel.h>
-#include <linux/major.h>
-#include <linux/string.h>
-#include <linux/blk.h>
-
-#include <asm/byteorder.h>
-#include <asm/system.h>
-
 #include "check.h"
 #include "sgi.h"
 
-int sgi_partition(struct gendisk *hd, struct block_device *bdev, unsigned long first_sector, int current_minor)
+int sgi_partition(struct parsed_partitions *state, struct block_device *bdev)
 {
 	int i, csum, magic;
+	int slot = 1;
 	unsigned int *ui, start, blocks, cs;
 	Sector sect;
 	struct sgi_disklabel {
@@ -73,10 +64,8 @@ int sgi_partition(struct gendisk *hd, struct block_device *bdev, unsigned long f
 	for(i = 0; i < 16; i++, p++) {
 		blocks = be32_to_cpu(p->num_blocks);
 		start  = be32_to_cpu(p->first_block);
-		if(!blocks)
-			continue;
-		add_gd_partition(hd, current_minor, start, blocks);
-		current_minor++;
+		if (blocks)
+			put_partition(state, slot++, start, blocks);
 	}
 	printk("\n");
 	put_dev_sector(sect);

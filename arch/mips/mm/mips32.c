@@ -161,18 +161,18 @@ static inline void mips32_flush_cache_all_sc(void)
 {
 	unsigned long flags;
 
-	__save_and_cli(flags);
+	local_irq_save(flags);
 	blast_dcache(); blast_icache(); blast_scache();
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static inline void mips32_flush_cache_all_pc(void)
 {
 	unsigned long flags;
 
-	__save_and_cli(flags);
+	local_irq_save(flags);
 	blast_dcache(); blast_icache();
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static void
@@ -198,7 +198,7 @@ mips32_flush_cache_range_sc(struct vm_area_struct *vma,
 			pmd_t *pmd;
 			pte_t *pte;
 
-			__save_and_cli(flags);
+			local_irq_save(flags);
 			while(start < end) {
 				pgd = pgd_offset(mm, start);
 				pmd = pmd_offset(pgd, start);
@@ -208,7 +208,7 @@ mips32_flush_cache_range_sc(struct vm_area_struct *vma,
 					blast_scache_page(start);
 				start += PAGE_SIZE;
 			}
-			__restore_flags(flags);
+			local_irq_restore(flags);
 		}
 	}
 }
@@ -225,9 +225,9 @@ static void mips32_flush_cache_range_pc(struct vm_area_struct *vma,
 #ifdef DEBUG_CACHE
 		printk("crange[%d,%08lx,%08lx]", (int)mm->context, start, end);
 #endif
-		__save_and_cli(flags);
+		local_irq_save(flags);
 		blast_dcache(); blast_icache();
-		__restore_flags(flags);
+		local_irq_restore(flags);
 	}
 }
 
@@ -279,7 +279,7 @@ static void mips32_flush_cache_page_sc(struct vm_area_struct *vma,
 #ifdef DEBUG_CACHE
 	printk("cpage[%d,%08lx]", (int)mm->context, page);
 #endif
-	__save_and_cli(flags);
+	local_irq_save(flags);
 	page &= PAGE_MASK;
 	pgdp = pgd_offset(mm, page);
 	pmdp = pmd_offset(pgdp, page);
@@ -309,7 +309,7 @@ static void mips32_flush_cache_page_sc(struct vm_area_struct *vma,
 	} else
 		blast_scache_page(page);
 out:
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static void mips32_flush_cache_page_pc(struct vm_area_struct *vma,
@@ -331,7 +331,7 @@ static void mips32_flush_cache_page_pc(struct vm_area_struct *vma,
 #ifdef DEBUG_CACHE
 	printk("cpage[%d,%08lx]", (int)mm->context, page);
 #endif
-	__save_and_cli(flags);
+	local_irq_save(flags);
 	page &= PAGE_MASK;
 	pgdp = pgd_offset(mm, page);
 	pmdp = pmd_offset(pgdp, page);
@@ -360,7 +360,7 @@ static void mips32_flush_cache_page_pc(struct vm_area_struct *vma,
 		blast_dcache_page_indexed(page);
 	}
 out:
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 /* If the addresses passed to these routines are valid, they are
@@ -420,7 +420,7 @@ mips32_dma_cache_wback_inv_pc(unsigned long addr, unsigned long size)
 	if (size >= dcache_size) {
 		flush_cache_all();
 	} else {
-	        __save_and_cli(flags);
+	        local_irq_save(flags);
 		a = addr & ~(dc_lsize - 1);
 		end = (addr + size) & ~(dc_lsize - 1);
 		while (1) {
@@ -428,7 +428,7 @@ mips32_dma_cache_wback_inv_pc(unsigned long addr, unsigned long size)
 			if (a == end) break;
 			a += dc_lsize;
 		}
-		__restore_flags(flags);
+		local_irq_restore(flags);
 	}
 	bc_wback_inv(addr, size);
 }
@@ -461,7 +461,7 @@ mips32_dma_cache_inv_pc(unsigned long addr, unsigned long size)
 	if (size >= dcache_size) {
 		flush_cache_all();
 	} else {
-	        __save_and_cli(flags);
+	        local_irq_save(flags);
 		a = addr & ~(dc_lsize - 1);
 		end = (addr + size) & ~(dc_lsize - 1);
 		while (1) {
@@ -469,7 +469,7 @@ mips32_dma_cache_inv_pc(unsigned long addr, unsigned long size)
 			if (a == end) break;
 			a += dc_lsize;
 		}
-		__restore_flags(flags);
+		local_irq_restore(flags);
 	}
 
 	bc_inv(addr, size);
@@ -524,7 +524,7 @@ void flush_tlb_all(void)
 	printk("[tlball]");
 #endif
 
-	__save_and_cli(flags);
+	local_irq_save(flags);
 	/* Save old context and create impossible VPN2 value */
 	old_ctx = (get_entryhi() & 0xff);
 	set_entryhi(KSEG0);
@@ -546,7 +546,7 @@ void flush_tlb_all(void)
 	}
 	BARRIER;
 	set_entryhi(old_ctx);
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 void flush_tlb_mm(struct mm_struct *mm)
@@ -557,11 +557,11 @@ void flush_tlb_mm(struct mm_struct *mm)
 #ifdef DEBUG_TLB
 		printk("[tlbmm<%d>]", mm->context);
 #endif
-		__save_and_cli(flags);
+		local_irq_save(flags);
 		get_new_mmu_context(mm, asid_cache);
 		if (mm == current->active_mm)
 			set_entryhi(mm->context & 0xff);
-		__restore_flags(flags);
+		local_irq_restore(flags);
 	}
 }
 
@@ -576,7 +576,7 @@ void flush_tlb_range(struct mm_struct *mm, unsigned long start,
 		printk("[tlbrange<%02x,%08lx,%08lx>]", (mm->context & 0xff),
 		       start, end);
 #endif
-		__save_and_cli(flags);
+		local_irq_save(flags);
 		size = (end - start + (PAGE_SIZE - 1)) >> PAGE_SHIFT;
 		size = (size + 1) >> 1;
 		if(size <= mips_cpu.tlbsize/2) {
@@ -611,7 +611,7 @@ void flush_tlb_range(struct mm_struct *mm, unsigned long start,
 			if (mm == current->active_mm)
 				set_entryhi(mm->context & 0xff);
 		}
-		__restore_flags(flags);
+		local_irq_restore(flags);
 	}
 }
 
@@ -626,7 +626,7 @@ void flush_tlb_page(struct vm_area_struct *vma, unsigned long page)
 #endif
 		newpid = (vma->vm_mm->context & 0xff);
 		page &= (PAGE_MASK << 1);
-		__save_and_cli(flags);
+		local_irq_save(flags);
 		oldpid = (get_entryhi() & 0xff);
 		set_entryhi(page | newpid);
 		BARRIER;
@@ -645,7 +645,7 @@ void flush_tlb_page(struct vm_area_struct *vma, unsigned long page)
 	finish:
 		BARRIER;
 		set_entryhi(oldpid);
-		__restore_flags(flags);
+		local_irq_restore(flags);
 	}
 }
 
@@ -693,7 +693,7 @@ void update_mmu_cache(struct vm_area_struct * vma,
 	}
 #endif
 
-	__save_and_cli(flags);
+	local_irq_save(flags);
 	address &= (PAGE_MASK << 1);
 	set_entryhi(address | (pid));
 	pgdp = pgd_offset(vma->vm_mm, address);
@@ -716,7 +716,7 @@ void update_mmu_cache(struct vm_area_struct * vma,
 	BARRIER;
 	set_entryhi(pid);
 	BARRIER;
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 void show_regs(struct pt_regs * regs)
@@ -752,7 +752,7 @@ void add_wired_entry(unsigned long entrylo0, unsigned long entrylo1,
         unsigned long old_pagemask;
         unsigned long old_ctx;
 
-        __save_and_cli(flags);
+        local_irq_save(flags);
         /* Save old context and create impossible VPN2 value */
         old_ctx = (get_entryhi() & 0xff);
         old_pagemask = get_pagemask();
@@ -772,7 +772,7 @@ void add_wired_entry(unsigned long entrylo0, unsigned long entrylo1,
         BARRIER;    
         set_pagemask (old_pagemask);
         flush_tlb_all();    
-        __restore_flags(flags);
+        local_irq_restore(flags);
 }
 
 /* Detect and size the various caches. */
@@ -895,7 +895,7 @@ static int __init probe_scache(unsigned long config)
 	/* This is such a bitch, you'd think they would make it
 	 * easy to do this.  Away you daemons of stupidity!
 	 */
-	__save_and_cli(flags);
+	local_irq_save(flags);
 
 	/* Fill each size-multiple cache line with a valid tag. */
 	pow2 = (64 * 1024);
@@ -939,7 +939,7 @@ static int __init probe_scache(unsigned long config)
 			break;
 		pow2 <<= 1;
 	}
-	__restore_flags(flags);
+	local_irq_restore(flags);
 	addr -= begin;
 	printk("Secondary cache sized at %dK linesize %d bytes.\n",
 	       (int) (addr >> 10), sc_lsize);

@@ -48,7 +48,6 @@ extern int mvme147_kbdrate (struct kbd_repeat *);
 extern unsigned long mvme147_gettimeoffset (void);
 extern int mvme147_hwclk (int, struct rtc_time *);
 extern int mvme147_set_clock_mmss (unsigned long);
-extern void mvme147_check_partition (struct gendisk *hd, unsigned int dev);
 extern void mvme147_reset (void);
 extern void mvme147_waitbut(void);
 

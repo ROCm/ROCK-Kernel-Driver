@@ -46,13 +46,13 @@ void cpu_idle(void *unused)
 			if (need_resched())
 				break;
 		} else {
-			__cli();
+			local_irq_disable();
 			while (!need_resched()) {
-				__sti();
+				local_irq_enable();
 				asm volatile("sleep" : : : "memory");
-				__cli();
+				local_irq_disable();
 			}
-			__sti();
+			local_irq_enable();
 		}
 		schedule();
 		check_pgt_cache();

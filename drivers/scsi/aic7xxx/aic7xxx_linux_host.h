@@ -47,7 +47,7 @@ int		 ahc_linux_queue(Scsi_Cmnd *, void (*)(Scsi_Cmnd *));
 int		 ahc_linux_detect(Scsi_Host_Template *);
 int		 ahc_linux_release(struct Scsi_Host *);
 const char	*ahc_linux_info(struct Scsi_Host *);
-int		 ahc_linux_biosparam(Disk *, kdev_t, int[]);
+int		 ahc_linux_biosparam(Disk *, struct block_device *, int[]);
 int		 ahc_linux_bus_reset(Scsi_Cmnd *);
 int		 ahc_linux_dev_reset(Scsi_Cmnd *);
 int		 ahc_linux_abort(Scsi_Cmnd *);

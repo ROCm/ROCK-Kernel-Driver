@@ -1104,7 +1104,7 @@ static int snd_intel8x0_free(intel8x0_t *chip)
 	outb(ICH_RESETREGS, ICHREG(chip, PO_CR));
 	outb(ICH_RESETREGS, ICHREG(chip, MC_CR));
 	/* --- */
-	synchronize_irq();
+	synchronize_irq(chip->irq);
       __hw_end:
 	if (chip->bdbars)
 		snd_free_pci_pages(chip->pci, 3 * sizeof(u32) * ICH_MAX_FRAGS * 2, chip->bdbars, chip->bdbars_addr);
@@ -1335,7 +1335,7 @@ static int __devinit snd_intel8x0_create(snd_card_t * card,
 	}
 	chip->irq = pci->irq;
 	pci_set_master(pci);
-	synchronize_irq();
+	synchronize_irq(chip->irq);
 
 	/* initialize offsets */
 	chip->reg_pi_sr = ICH_REG_PI_SR;

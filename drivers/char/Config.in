@@ -8,25 +8,6 @@ bool 'Virtual terminal' CONFIG_VT
 if [ "$CONFIG_VT" = "y" ]; then
    bool '  Support for console on virtual terminal' CONFIG_VT_CONSOLE
 fi
-tristate 'Standard/generic (8250/16550 and compatible UARTs) serial support' CONFIG_SERIAL
-if [ "$CONFIG_SERIAL" = "y" ]; then
-   bool '  Support for console on serial port' CONFIG_SERIAL_CONSOLE
-   if [ "$CONFIG_ARCH_ACORN" = "y" ]; then
-      tristate '   Atomwide serial port support' CONFIG_ATOMWIDE_SERIAL
-      tristate '   Dual serial port support' CONFIG_DUALSP_SERIAL
-   fi
-fi
-if [ "$CONFIG_ACPI" = "y" -a "$CONFIG_IA64" = "y" ]; then
-   bool '  Support for serial ports defined by ACPI tables' CONFIG_SERIAL_ACPI
-fi
-dep_mbool 'Extended dumb serial driver options' CONFIG_SERIAL_EXTENDED $CONFIG_SERIAL
-if [ "$CONFIG_SERIAL_EXTENDED" = "y" ]; then
-   bool '  Support more than 4 serial ports' CONFIG_SERIAL_MANY_PORTS
-   bool '  Support for sharing serial interrupts' CONFIG_SERIAL_SHARE_IRQ
-   bool '  Autodetect IRQ on standard ports (unsafe)' CONFIG_SERIAL_DETECT_IRQ
-   bool '  Support special multiport boards' CONFIG_SERIAL_MULTIPORT
-   bool '  Support the Bell Technologies HUB6 card' CONFIG_HUB6
-fi
 bool 'Non-standard serial port support' CONFIG_SERIAL_NONSTANDARD
 if [ "$CONFIG_SERIAL_NONSTANDARD" = "y" ]; then
    tristate '  Computone IntelliPort Plus serial support' CONFIG_COMPUTONE
@@ -85,15 +66,9 @@ fi
 if [ "$CONFIG_EXPERIMENTAL" = "y" -a "$CONFIG_ZORRO" = "y" ]; then
    tristate 'Commodore A2232 serial support (EXPERIMENTAL)' CONFIG_A2232
 fi
-if [ "$CONFIG_FOOTBRIDGE" = "y" ]; then
-   bool 'DC21285 serial port support' CONFIG_SERIAL_21285
-   if [ "$CONFIG_SERIAL_21285" = "y" ]; then
-      if [ "$CONFIG_OBSOLETE" = "y" ]; then
-         bool '  Use /dev/ttyS0 device (OBSOLETE)' CONFIG_SERIAL_21285_OLD
-      fi
-      bool '  Console on DC21285 serial port' CONFIG_SERIAL_21285_CONSOLE
-   fi
-fi
+
+source drivers/serial/Config.in
+
 bool 'Unix98 PTY support' CONFIG_UNIX98_PTYS
 if [ "$CONFIG_UNIX98_PTYS" = "y" ]; then
    int 'Maximum number of Unix98 PTYs in use (0-2048)' CONFIG_UNIX98_PTY_COUNT 256

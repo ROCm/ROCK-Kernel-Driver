@@ -447,11 +447,6 @@ static int dasd_ioctl_set_ro(void *inp, int no, long args)
 	return 0;
 }
 
-static int dasd_ioctl_blkioctl(void *inp, int no, long args)
-{
-	return blk_ioctl(((struct inode *) inp)->i_bdev, no, args);
-}
-
 /*
  * Return device size in number of sectors.
  */
@@ -517,12 +512,12 @@ static int dasd_ioctl_rr_partition(void *inp, int no, long args)
 static int dasd_ioctl_getgeo(void *inp, int no, long args)
 {
 	struct hd_geometry geo = { 0, };
+	struct inode *inode = inp;
 	dasd_devmap_t *devmap;
 	dasd_device_t *device;
-	kdev_t kdev;
+	kdev_t kdev = inode->i_rdev;
 	int rc;
 
-	kdev = ((struct inode *) inp)->i_rdev;
 	devmap = dasd_devmap_from_kdev(kdev);
 	device = (devmap != NULL) ?
 		dasd_get_device(devmap) : ERR_PTR(-ENODEV);
@@ -532,7 +527,7 @@ static int dasd_ioctl_getgeo(void *inp, int no, long args)
 	if (device != NULL && device->discipline != NULL &&
 	    device->discipline->fill_geometry != NULL) {
 		device->discipline->fill_geometry(device, &geo);
-		geo.start = get_start_sect(kdev);
+		geo.start = get_start_sect(inode->i_bdev);
 		if (copy_to_user((struct hd_geometry *) args, &geo,
 				 sizeof (struct hd_geometry)))
 			rc = -EFAULT;
@@ -554,16 +549,10 @@ static struct { int no; dasd_ioctl_fn_t fn; } dasd_ioctls[] =
 	{ BIODASDINFO2, dasd_ioctl_information },
 	{ BIODASDPRRD, dasd_ioctl_read_profile },
 	{ BIODASDPRRST, dasd_ioctl_reset_profile },
-	{ BLKELVGET, dasd_ioctl_blkioctl },
-	{ BLKELVSET, dasd_ioctl_blkioctl },
-	{ BLKFLSBUF, dasd_ioctl_blkioctl },
 	{ BLKGETSIZE, dasd_ioctl_blkgetsize },
 	{ BLKGETSIZE64, dasd_ioctl_blkgetsize64 },
-	{ BLKPG, dasd_ioctl_blkioctl },
-	{ BLKROGET, dasd_ioctl_blkioctl },
 	{ BLKROSET, dasd_ioctl_set_ro },
 	{ BLKRRPART, dasd_ioctl_rr_partition },
-	{ BLKSSZGET, dasd_ioctl_blkioctl },
 	{ DASDAPIVER, dasd_ioctl_api_version },
 	{ HDIO_GETGEO, dasd_ioctl_getgeo },
 	{ -1, NULL }

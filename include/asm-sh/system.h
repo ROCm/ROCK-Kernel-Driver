@@ -104,7 +104,7 @@ extern void __xchg_called_with_bad_pointer(void);
 #define set_wmb(var, value) do { var = value; wmb(); } while (0)
 
 /* Interrupt Control */
-static __inline__ void __sti(void)
+static __inline__ void local_irq_enable(void)
 {
 	unsigned long __dummy0, __dummy1;
 
@@ -118,7 +118,7 @@ static __inline__ void __sti(void)
 			     : "memory");
 }
 
-static __inline__ void __cli(void)
+static __inline__ void local_irq_disable(void)
 {
 	unsigned long __dummy;
 	__asm__ __volatile__("stc	sr, %0\n\t"
@@ -129,10 +129,10 @@ static __inline__ void __cli(void)
 			     : "memory");
 }
 
-#define __save_flags(x) \
+#define local_save_flags(x) \
 	__asm__("stc sr, %0; and #0xf0, %0" : "=&z" (x) :/**/: "memory" )
 
-static __inline__ unsigned long __save_and_cli(void)
+static __inline__ unsigned long local_irq_save(void)
 {
 	unsigned long flags, __dummy;
 
@@ -149,34 +149,34 @@ static __inline__ unsigned long __save_and_cli(void)
 }
 
 #ifdef DEBUG_CLI_STI
-static __inline__ void  __restore_flags(unsigned long x)
+static __inline__ void  local_irq_restore(unsigned long x)
 {
 	if ((x & 0x000000f0) != 0x000000f0)
-		__sti();
+		local_irq_enable();
 	else {
 		unsigned long flags;
-		__save_flags(flags);
+		local_save_flags(flags);
 
 		if (flags == 0) {
 			extern void dump_stack(void);
 			printk(KERN_ERR "BUG!\n");
 			dump_stack();
-			__cli();
+			local_irq_disable();
 		}
 	}
 }
 #else
-#define __restore_flags(x) do { 			\
+#define local_irq_restore(x) do { 			\
 	if ((x & 0x000000f0) != 0x000000f0)		\
-		__sti();				\
+		local_irq_enable();				\
 } while (0)
 #endif
 
 #define really_restore_flags(x) do { 			\
 	if ((x & 0x000000f0) != 0x000000f0)		\
-		__sti();				\
+		local_irq_enable();				\
 	else						\
-		__cli();				\
+		local_irq_disable();				\
 } while (0)
 
 /*
@@ -216,10 +216,7 @@ do {							\
 } while (0)
 
 /* For spinlocks etc */
-#define local_irq_save(x)	x = __save_and_cli()
-#define local_irq_restore(x)	__restore_flags(x)
-#define local_irq_disable()	__cli()
-#define local_irq_enable()	__sti()
+#define local_irq_save(x)	x = local_irq_save()
 
 #ifdef CONFIG_SMP
 
@@ -234,11 +231,11 @@ extern void __global_restore_flags(unsigned long);
 
 #else
 
-#define cli() __cli()
-#define sti() __sti()
-#define save_flags(x) __save_flags(x)
-#define save_and_cli(x) x = __save_and_cli()
-#define restore_flags(x) __restore_flags(x)
+#define cli() local_irq_disable()
+#define sti() local_irq_enable()
+#define save_flags(x) local_save_flags(x)
+#define save_and_cli(x) x = local_irq_save()
+#define restore_flags(x) local_irq_restore(x)
 
 #endif
 

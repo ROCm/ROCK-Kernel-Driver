@@ -2084,7 +2084,7 @@ int tw_reset_sequence(TW_Device_Extension *tw_dev)
 } /* End tw_reset_sequence() */
 
 /* This funciton returns unit geometry in cylinders/heads/sectors */
-int tw_scsi_biosparam(Disk *disk, kdev_t dev, int geom[]) 
+int tw_scsi_biosparam(Disk *disk, struct block_device *dev, int geom[]) 
 {
 	int heads, sectors, cylinders;
 	TW_Device_Extension *tw_dev;

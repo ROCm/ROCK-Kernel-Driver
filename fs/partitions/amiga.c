@@ -7,14 +7,7 @@
  *  Re-organised Feb 1998 Russell King
  */
 
-#include <linux/fs.h>
-#include <linux/genhd.h>
-#include <linux/kernel.h>
-#include <linux/major.h>
-#include <linux/string.h>
-#include <linux/blk.h>
-
-#include <asm/byteorder.h>
+#include <linux/types.h>
 #include <linux/affs_hardblocks.h>
 
 #include "check.h"
@@ -31,14 +24,14 @@ checksum_block(u32 *m, int size)
 }
 
 int
-amiga_partition(struct gendisk *hd, struct block_device *bdev,
-		unsigned long first_sector, int first_part_minor)
+amiga_partition(struct parsed_partitions *state, struct block_device *bdev)
 {
 	Sector sect;
 	unsigned char *data;
 	struct RigidDiskBlock *rdb;
 	struct PartitionBlock *pb;
 	int start_sect, nr_sects, blk, part, res = 0;
+	int slot = 1;
 
 	for (blk = 0; ; blk++, put_dev_sector(sect)) {
 		if (blk == RDB_ALLOCATION_LIMIT)
@@ -100,8 +93,7 @@ amiga_partition(struct gendisk *hd, struct block_device *bdev,
 		start_sect = be32_to_cpu(pb->pb_Environment[9]) *
 			     be32_to_cpu(pb->pb_Environment[3]) *
 			     be32_to_cpu(pb->pb_Environment[5]);
-		add_gd_partition(hd,first_part_minor,start_sect,nr_sects);
-		first_part_minor++;
+		put_partition(state,slot++,start_sect,nr_sects);
 		res = 1;
 	}
 	printk("\n");

@@ -117,8 +117,8 @@ static void set_mtrr_prepare (struct set_mtrr_context *ctxt)
 	u64 cr0;
 
 	/* Disable interrupts locally */
-	__save_flags(ctxt->flags);
-	__cli();
+	local_save_flags(ctxt->flags);
+	local_irq_disable();
 
     /*  Save value of CR4 and clear Page Global Enable (bit 7)  */
 	if (cpu_has_pge) { 
@@ -156,7 +156,7 @@ static void set_mtrr_done (struct set_mtrr_context *ctxt)
 		write_cr4 (ctxt->cr4val);
 
     /*  Re-enable interrupts locally (if enabled previously)  */
-	__restore_flags(ctxt->flags);
+	local_irq_restore(ctxt->flags);
 }
 
 

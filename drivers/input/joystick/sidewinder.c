@@ -149,8 +149,8 @@ static int sw_read_packet(struct gameport *gameport, unsigned char *buf, int len
 	pending = 0;
 	sched = 0;
 
-        __save_flags(flags);					/* Quiet, please */
-        __cli();
+        local_save_flags(flags);					/* Quiet, please */
+        local_irq_disable();
 
 	gameport_trigger(gameport);				/* Trigger */
 	v = gameport_read(gameport);
@@ -193,7 +193,7 @@ static int sw_read_packet(struct gameport *gameport, unsigned char *buf, int len
 		}
 	}
 
-	__restore_flags(flags);					/* Done - relax */
+	local_irq_restore(flags);					/* Done - relax */
 
 #ifdef SW_DEBUG
 	{
@@ -245,8 +245,8 @@ static void sw_init_digital(struct gameport *gameport)
 	unsigned long flags;
 	int i, t;
 
-        __save_flags(flags);
-        __cli();
+        local_save_flags(flags);
+        local_irq_disable();
 
 	i = 0;
         do {
@@ -258,7 +258,7 @@ static void sw_init_digital(struct gameport *gameport)
 
 	gameport_trigger(gameport);				/* Last trigger */
 
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 /*

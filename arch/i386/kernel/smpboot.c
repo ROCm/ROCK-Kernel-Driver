@@ -453,7 +453,7 @@ void __init smp_callin(void)
 		clear_local_APIC();
 	setup_local_APIC();
 
-	__sti();
+	local_irq_enable();
 
 #ifdef CONFIG_MTRR
 	/*
@@ -1060,7 +1060,6 @@ void __init smp_boot_cpus(void)
 	boot_cpu_logical_apicid = logical_smp_processor_id();
 	map_cpu_to_boot_apicid(0, boot_cpu_apicid);
 
-	global_irq_holder = NO_PROC_ID;
 	current_thread_info()->cpu = 0;
 	smp_tune_scheduling();
 

@@ -426,7 +426,7 @@ void __init cpu_init (void)
 
 	if (test_and_set_bit(nr, &cpu_initialized)) {
 		printk(KERN_WARNING "CPU#%d already initialized!\n", nr);
-		for (;;) __sti();
+		for (;;) local_irq_enable();
 	}
 	printk(KERN_INFO "Initializing CPU#%d\n", nr);
 

@@ -41,4 +41,4 @@ struct mac_driver_desc {
     /* ... more stuff */
 };
 
-int mac_partition(struct gendisk *hd, struct block_device *bdev, unsigned long fsec, int first_part_minor);
+int mac_partition(struct parsed_partitions *state, struct block_device *bdev);

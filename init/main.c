@@ -373,7 +373,7 @@ asmlinkage void __init start_kernel(void)
 	}
 
 	kmem_cache_init();
-	sti();
+	local_irq_enable();
 	calibrate_delay();
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (initrd_start && !initrd_below_start_ok &&

@@ -885,8 +885,8 @@ Usage Notes :
 
 Prior to call do_IO() the device driver must assure disabled state, i.e. the 
 I/O mask value in the PSW must be disabled. This can be accomplished by calling 
-__save_flags( flags). The current PSW flags are preserved and can be restored 
-by __restore_flags( flags) at a later time.
+local_save_flags( flags). The current PSW flags are preserved and can be restored 
+by local_irq_restore( flags) at a later time.
 
 If the device driver violates this rule while running in a uni-processor
 environment an interrupt might be presented prior to the do_IO() routine

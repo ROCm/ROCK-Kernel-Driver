@@ -226,7 +226,7 @@ mcpn765_map_io(void)
 static void
 mcpn765_reset_board(void)
 {
-	__cli();
+	local_irq_disable();
 
 	/* Set exception prefix high - to the firmware */
 	_nmask_and_or_msr(0, MSR_IP);
@@ -257,7 +257,7 @@ mcpn765_power_off(void)
 static void
 mcpn765_halt(void)
 {
-	__cli();
+	local_irq_disable();
 	while (1);
 	/* NOTREACHED */
 }

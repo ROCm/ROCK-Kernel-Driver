@@ -772,10 +772,6 @@ static int nfs_sillyrename(struct inode *dir, struct dentry *dentry)
 		dentry->d_parent->d_name.name, dentry->d_name.name, 
 		atomic_read(&dentry->d_count));
 
-	if (atomic_read(&dentry->d_count) == 1)
-		goto out;  /* No need to silly rename. */
-
-
 #ifdef NFS_PARANOIA
 if (!dentry->d_inode)
 printk("NFS: silly-renaming %s/%s, negative dentry??\n",
@@ -837,31 +833,15 @@ static int nfs_safe_remove(struct dentry *dentry)
 {
 	struct inode *dir = dentry->d_parent->d_inode;
 	struct inode *inode = dentry->d_inode;
-	int error = -EBUSY, rehash = 0;
+	int error = -EBUSY;
 		
 	dfprintk(VFS, "NFS: safe_remove(%s/%s)\n",
 		dentry->d_parent->d_name.name, dentry->d_name.name);
 
-	/*
-	 * Unhash the dentry while we remove the file ...
-	 */
-	if (!d_unhashed(dentry)) {
-		d_drop(dentry);
-		rehash = 1;
-	}
-	if (atomic_read(&dentry->d_count) > 1) {
-#ifdef NFS_PARANOIA
-		printk("nfs_safe_remove: %s/%s busy, d_count=%d\n",
-			dentry->d_parent->d_name.name, dentry->d_name.name,
-			atomic_read(&dentry->d_count));
-#endif
-		goto out;
-	}
-
 	/* If the dentry was sillyrenamed, we simply call d_delete() */
 	if (dentry->d_flags & DCACHE_NFSFS_RENAMED) {
 		error = 0;
-		goto out_delete;
+		goto out;
 	}
 
 	nfs_zap_caches(dir);
@@ -872,15 +852,7 @@ static int nfs_safe_remove(struct dentry *dentry)
 		goto out;
 	if (inode)
 		inode->i_nlink--;
-
- out_delete:
-	/*
-	 * Free the inode
-	 */
-	d_delete(dentry);
 out:
-	if (rehash)
-		d_rehash(dentry);
 	return error;
 }
 
@@ -892,18 +864,29 @@ out:
 static int nfs_unlink(struct inode *dir, struct dentry *dentry)
 {
 	int error;
+	int need_rehash = 0;
 
 	dfprintk(VFS, "NFS: unlink(%s/%ld, %s)\n", dir->i_sb->s_id,
 		dir->i_ino, dentry->d_name.name);
 
 	lock_kernel();
-	error = nfs_sillyrename(dir, dentry);
-	if (error && error != -EBUSY) {
-		error = nfs_safe_remove(dentry);
-		if (!error) {
-			nfs_renew_times(dentry);
-		}
+	spin_lock(&dcache_lock);
+	if (atomic_read(&dentry->d_count) > 1) {
+		spin_unlock(&dcache_lock);
+		error = nfs_sillyrename(dir, dentry);
+		unlock_kernel();
+		return error;
 	}
+	if (!d_unhashed(dentry)) {
+		list_del_init(&dentry->d_hash);
+		need_rehash = 1;
+	}
+	spin_unlock(&dcache_lock);
+	error = nfs_safe_remove(dentry);
+	if (!error)
+		nfs_renew_times(dentry);
+	else if (need_rehash)
+		d_rehash(dentry);
 	unlock_kernel();
 	return error;
 }

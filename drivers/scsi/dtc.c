@@ -295,7 +295,7 @@ int __init dtc_detect(Scsi_Host_Template * tpnt){
 }
 
 /*
- * Function : int dtc_biosparam(Disk * disk, kdev_t dev, int *ip)
+ * Function : int dtc_biosparam(Disk * disk, struct block_device *dev, int *ip)
  *
  * Purpose : Generates a BIOS / DOS compatible H-C-S mapping for 
  *	the specified device / size.
@@ -314,7 +314,7 @@ int __init dtc_detect(Scsi_Host_Template * tpnt){
  * and matching the H_C_S coordinates to what DOS uses.
 */
 
-int dtc_biosparam(Disk * disk, kdev_t dev, int * ip)
+int dtc_biosparam(Disk * disk, struct block_device *dev, int * ip)
 {
    int size = disk->capacity;
 

@@ -1025,7 +1025,7 @@ int_test() {
 	if (mycpu == NR_CPUS-1) {
 		printk("\nTight loop of cpu %d sending ints to cpu 0 (every 100 us)\n", mycpu);
 		udelay(IS_RUNNING_ON_SIMULATOR ? 1000 : 1000000);
-		__cli();
+		local_irq_disable();
 		while (1) {
 			smp_send_reschedule(0);
 			udelay(100);

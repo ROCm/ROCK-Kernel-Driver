@@ -26,6 +26,7 @@
 #define	FRPW_VERSION	"1.03" 
 
 #include <linux/module.h>
+#include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
@@ -291,35 +292,34 @@ static void frpw_release_proto( PIA *pi)
 {       MOD_DEC_USE_COUNT;
 }
 
-struct pi_protocol frpw = {"frpw",0,6,2,2,1,
-                           frpw_write_regr,
-                           frpw_read_regr,
-                           frpw_write_block,
-                           frpw_read_block,
-                           frpw_connect,
-                           frpw_disconnect,
-                           0,
-                           0,
-                           frpw_test_proto,
-                           frpw_log_adapter,
-                           frpw_init_proto,
-                           frpw_release_proto
-                          };
+static struct pi_protocol frpw = {
+	.name		= "frpw",
+	.max_mode	= 6,
+	.epp_first	= 2,
+	.default_delay	= 2,
+	.max_units	= 1,
+	.write_regr	= frpw_write_regr,
+	.read_regr	= frpw_read_regr,
+	.write_block	= frpw_write_block,
+	.read_block	= frpw_read_block,
+	.connect	= frpw_connect,
+	.disconnect	= frpw_disconnect,
+	.test_proto	= frpw_test_proto,
+	.log_adapter	= frpw_log_adapter,
+	.init_proto	= frpw_init_proto,
+	.release_proto	= frpw_release_proto,
+};
 
-
-#ifdef MODULE
-
-int     init_module(void)
-
-{       return pi_register( &frpw ) - 1;
+static int __init frpw_init(void)
+{
+	return pi_register(&frpw)-1;
 }
 
-void    cleanup_module(void)
-
-{       pi_unregister( &frpw );
+static void __exit frpw_exit(void)
+{
+	pi_unregister(&frpw);
 }
 
-#endif
-
-/* end of frpw.c */
 MODULE_LICENSE("GPL");
+module_init(frpw_init)
+module_exit(frpw_exit)

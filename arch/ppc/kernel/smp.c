@@ -164,7 +164,7 @@ void smp_send_xmon_break(int cpu)
 
 static void stop_this_cpu(void *dummy)
 {
-	__cli();
+	local_irq_disable();
 	while (1)
 		;
 }
@@ -488,9 +488,9 @@ void __init smp_commence(void)
 	/* FIXME: This doesn't work with hotplug CPUs --RR */
 	if (!smp_tb_synchronized && num_online_cpus() == 2) {
 		unsigned long flags;
-		__save_and_cli(flags);	
+		local_irq_save(flags);	
 		smp_software_tb_sync(0);
-		__restore_flags(flags);
+		local_irq_restore(flags);
 	}
 }
 
@@ -514,7 +514,7 @@ void __init smp_callin(void)
 	if (!smp_tb_synchronized && num_online_cpus() == 2) {
 		smp_software_tb_sync(cpu);
 	}
-	__sti();
+	local_irq_enable();
 }
 
 /* intel needs this */

@@ -52,7 +52,7 @@ int advansys_release(struct Scsi_Host *);
 const char *advansys_info(struct Scsi_Host *);
 int advansys_queuecommand(Scsi_Cmnd *, void (* done)(Scsi_Cmnd *));
 int advansys_reset(Scsi_Cmnd *);
-int advansys_biosparam(Disk *, kdev_t, int[]);
+int advansys_biosparam(Disk *, struct block_device *, int[]);
 #ifdef CONFIG_PROC_FS
 #if LINUX_VERSION_CODE < ASC_LINUX_VERSION(2,3,28)
 extern struct proc_dir_entry proc_scsi_advansys;

@@ -571,6 +571,8 @@ static struct vm86_irqs {
 	struct task_struct *tsk;
 	int sig;
 } vm86_irqs[16];
+
+static spinlock_t irqbits_lock = SPIN_LOCK_UNLOCKED;
 static int irqbits;
 
 #define ALLOWED_SIGS ( 1 /* 0 = don't send a signal */ \
@@ -580,9 +582,8 @@ static int irqbits;
 static void irq_handler(int intno, void *dev_id, struct pt_regs * regs) {
 	int irq_bit;
 	unsigned long flags;
-	
-	save_flags(flags);
-	cli();
+
+	spin_lock_irqsave(&irqbits_lock, flags);	
 	irq_bit = 1 << intno;
 	if ((irqbits & irq_bit) || ! vm86_irqs[intno].tsk)
 		goto out;
@@ -591,14 +592,19 @@ static void irq_handler(int intno, void *dev_id, struct pt_regs * regs) {
 		send_sig(vm86_irqs[intno].sig, vm86_irqs[intno].tsk, 1);
 	/* else user will poll for IRQs */
 out:
-	restore_flags(flags);
+	spin_unlock_irqrestore(&irqbits_lock, flags);	
 }
 
 static inline void free_vm86_irq(int irqnumber)
 {
+	unsigned long flags;
+
 	free_irq(irqnumber,0);
 	vm86_irqs[irqnumber].tsk = 0;
+
+	spin_lock_irqsave(&irqbits_lock, flags);	
 	irqbits &= ~(1 << irqnumber);
+	spin_unlock_irqrestore(&irqbits_lock, flags);	
 }
 
 static inline int task_valid(struct task_struct *tsk)
@@ -635,11 +641,10 @@ static inline int get_and_reset_irq(int irqnumber)
 	
 	if ( (irqnumber<3) || (irqnumber>15) ) return 0;
 	if (vm86_irqs[irqnumber].tsk != current) return 0;
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&irqbits_lock, flags);	
 	bit = irqbits & (1 << irqnumber);
 	irqbits &= ~bit;
-	restore_flags(flags);
+	spin_unlock_irqrestore(&irqbits_lock, flags);	
 	return bit;
 }
 

@@ -1874,7 +1874,7 @@ int fdomain_16x0_reset( Scsi_Cmnd *SCpnt, unsigned int ignored )
 #include "sd.h"
 #include <scsi/scsi_ioctl.h>
 
-int fdomain_16x0_biosparam( Scsi_Disk *disk, kdev_t dev, int *info_array )
+int fdomain_16x0_biosparam( Scsi_Disk *disk, struct block_device *bdev, int *info_array )
 {
    int              drive;
    unsigned char    buf[512 + sizeof (Scsi_Ioctl_Command)];
@@ -1933,11 +1933,11 @@ int fdomain_16x0_biosparam( Scsi_Disk *disk, kdev_t dev, int *info_array )
       0x0a bytes long.  Heads are one less than we need to report.
     */
 
-   if (major(dev) != SCSI_DISK0_MAJOR) {
+   if (MAJOR(bdev->bd_dev) != SCSI_DISK0_MAJOR) {
       printk("scsi: <fdomain> fdomain_16x0_biosparam: too many disks");
       return 0;
    }
-   drive = minor(dev) >> 4;
+   drive = MINOR(bdev->bd_dev) >> 4;
 
    if (bios_major == 2) {
       switch (Quantum) {
