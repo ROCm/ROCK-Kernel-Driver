@@ -41,10 +41,17 @@
 	- Autodetect where mii_preable_required is needed,
 	default to not needed.  (Donald Becker)
 
+	Version LK1.04b:
+	- Remove mii_preamble_required module parameter (Donald Becker)
+	- Add per-interface mii_preamble_required (setting is autodetected)
+	  (Donald Becker)
+	- Remove unnecessary cast from void pointer
+	- Re-align comments in private struct
+
 */
 
 #define DRV_NAME	"sundance"
-#define DRV_VERSION	"1.01+LK1.04a"
+#define DRV_VERSION	"1.01+LK1.04b"
 #define DRV_RELDATE	"19-Sep-2002"
 
 
@@ -81,10 +88,6 @@ static int flowctrl=1;
 #define MAX_UNITS 8	
 static char *media[MAX_UNITS];
 
-/* Set iff a MII transceiver on any interface requires mdio preamble.
-   This only set with older tranceivers, so the extra
-   code size of a per-interface flag is not worthwhile. */
-static int mii_preamble_required = 0;
 
 /* Operational parameters that are set at compile time. */
 
@@ -159,13 +162,11 @@ MODULE_PARM(debug, "i");
 MODULE_PARM(rx_copybreak, "i");
 MODULE_PARM(media, "1-" __MODULE_STRING(MAX_UNITS) "s");
 MODULE_PARM(flowctrl, "i");
-MODULE_PARM(mii_preamble_required, "i");
 MODULE_PARM_DESC(max_interrupt_work, "Sundance Alta maximum events handled per interrupt");
 MODULE_PARM_DESC(mtu, "Sundance Alta MTU (all boards)");
 MODULE_PARM_DESC(debug, "Sundance Alta debug level (0-5)");
 MODULE_PARM_DESC(rx_copybreak, "Sundance Alta copy breakpoint for copy-only-tiny-frames");
 MODULE_PARM_DESC(flowctrl, "Sundance Alta flow control [0|1]");
-MODULE_PARM_DESC(mii_preamble_required, "Set to send a preamble before MII management transactions");
 
 /*
 				Theory of Operation
@@ -418,17 +419,17 @@ struct netdev_private {
         dma_addr_t tx_ring_dma;
         dma_addr_t rx_ring_dma;
 	struct net_device_stats stats;
-	struct timer_list timer;	/* Media monitoring timer. */
+	struct timer_list timer;		/* Media monitoring timer. */
 	/* Frequently used values: keep some adjacent for cache effect. */
 	spinlock_t lock;
-	spinlock_t rx_lock;					/* Group with Tx control cache line. */
+	spinlock_t rx_lock;			/* Group with Tx control cache line. */
 	int chip_id;
 	unsigned int cur_rx, dirty_rx;		/* Producer/consumer ring indices */
-	unsigned int rx_buf_sz;				/* Based on MTU+slack. */
+	unsigned int rx_buf_sz;			/* Based on MTU+slack. */
 	struct netdev_desc *last_tx;		/* Last Tx descriptor used. */
 	unsigned int cur_tx, dirty_tx;
 	/* These values are keep track of the transceiver/media in use. */
-	unsigned int full_duplex:1;			/* Full-duplex operation requested. */
+	unsigned int full_duplex:1;		/* Full-duplex operation requested. */
 	unsigned int flowctrl:1;
 	unsigned int default_port:4;		/* Last dev->if_port value. */
 	unsigned int an_enable:1;
@@ -436,10 +437,11 @@ struct netdev_private {
 	struct tasklet_struct rx_tasklet;
 	int budget;
 	/* Multicast and receive mode. */
-	spinlock_t mcastlock;				/* SMP lock multicast updates. */
+	spinlock_t mcastlock;			/* SMP lock multicast updates. */
 	u16 mcast_filter[4];
 	/* MII transceiver section. */
-	u16 advertising;					/* NWay media advertisement */
+	int mii_preamble_required;
+	u16 advertising;			/* NWay media advertisement */
 	unsigned char phys[MII_CNT];		/* MII device addresses, only first one used. */
 	struct pci_dev *pci_dev;
 };
@@ -569,20 +571,20 @@ static int __devinit sundance_probe1 (struct pci_dev *pdev,
 	if (1) {
 		int phy, phy_idx = 0;
 		np->phys[0] = 1;		/* Default setting */
-		mii_preamble_required++;
+		np->mii_preamble_required++;
 		for (phy = 1; phy < 32 && phy_idx < MII_CNT; phy++) {
 			int mii_status = mdio_read(dev, phy, MII_BMSR);
 			if (mii_status != 0xffff  &&  mii_status != 0x0000) {
 				np->phys[phy_idx++] = phy;
 				np->advertising = mdio_read(dev, phy, MII_ADVERTISE);
 				if ((mii_status & 0x0040) == 0)
-					mii_preamble_required++;
+					np->mii_preamble_required++;
 				printk(KERN_INFO "%s: MII PHY found at address %d, status "
 					   "0x%4.4x advertising %4.4x.\n",
 					   dev->name, phy, mii_status, np->advertising);
 			}
 		}
-		mii_preamble_required--;
+		np->mii_preamble_required--;
 
 		if (phy_idx == 0) {
 			printk(KERN_INFO "%s: No MII transceiver found, aborting.  ASIC status %x\n",
@@ -722,11 +724,12 @@ static void mdio_sync(long mdio_addr)
 
 static int mdio_read(struct net_device *dev, int phy_id, int location)
 {
+	struct netdev_private *np = dev->priv;
 	long mdio_addr = dev->base_addr + MIICtrl;
 	int mii_cmd = (0xf6 << 10) | (phy_id << 5) | location;
 	int i, retval = 0;
 
-	if (mii_preamble_required)
+	if (np->mii_preamble_required)
 		mdio_sync(mdio_addr);
 
 	/* Shift the read command bits out. */
@@ -751,11 +754,12 @@ static int mdio_read(struct net_device *dev, int phy_id, int location)
 
 static void mdio_write(struct net_device *dev, int phy_id, int location, int value)
 {
+	struct netdev_private *np = dev->priv;
 	long mdio_addr = dev->base_addr + MIICtrl;
 	int mii_cmd = (0x5002 << 16) | (phy_id << 23) | (location<<18) | value;
 	int i;
 
-	if (mii_preamble_required)
+	if (np->mii_preamble_required)
 		mdio_sync(mdio_addr);
 
 	/* Shift the command bits out. */
@@ -969,7 +973,7 @@ static void init_ring(struct net_device *dev)
 static int
 start_tx (struct sk_buff *skb, struct net_device *dev)
 {
-	struct netdev_private *np = (struct netdev_private *) dev->priv;
+	struct netdev_private *np = dev->priv;
 	struct netdev_desc *txdesc;
 	unsigned entry;
 	long ioaddr = dev->base_addr;
