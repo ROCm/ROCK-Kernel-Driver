@@ -44,7 +44,9 @@ all:	vmlinux
 #	Print entire command lines instead of short version
 #	For now, leave the default
 
-#KBUILD_VERBOSE := 1
+ifndef KBUILD_VERBOSE
+  KBUILD_VERBOSE = 1
+endif
 
 # 	Decide whether to build built-in, modular, or both
 
