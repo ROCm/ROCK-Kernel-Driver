@@ -949,19 +949,6 @@ static int xfrm_send_notify(struct xfrm_state *x, int hard)
 	return netlink_broadcast(xfrm_nl, skb, 0, XFRMGRP_EXPIRE, GFP_ATOMIC);
 }
 
-/* XXX Make this xfrm_state.c:xfrm_get_acqseq() */
-static u32 get_acqseq(void)
-{
-	u32 res;
-	static u32 acqseq;
-	static spinlock_t acqseq_lock = SPIN_LOCK_UNLOCKED;
-
-	spin_lock_bh(&acqseq_lock);
-	res = (++acqseq ? : ++acqseq);
-	spin_unlock_bh(&acqseq_lock);
-	return res;
-}
-
 static int build_acquire(struct sk_buff *skb, struct xfrm_state *x,
 			 struct xfrm_tmpl *xt, struct xfrm_policy *xp,
 			 int dir)
@@ -969,7 +956,7 @@ static int build_acquire(struct sk_buff *skb, struct xfrm_state *x,
 	struct xfrm_user_acquire *ua;
 	struct nlmsghdr *nlh;
 	unsigned char *b = skb->tail;
-	__u32 seq = get_acqseq();
+	__u32 seq = xfrm_get_acqseq();
 
 	nlh = NLMSG_PUT(skb, 0, 0, XFRM_MSG_ACQUIRE,
 			sizeof(*ua));

@@ -2761,7 +2761,6 @@ ctc_init_netdevice(struct net_device * dev, int alloc_device,
 	dev->addr_len = 0;
 	dev->type = ARPHRD_SLIP;
 	dev->tx_queue_len = 100;
-	dev_init_buffers(dev);
 	dev->flags = IFF_POINTOPOINT | IFF_NOARP;
 	return dev;
 }

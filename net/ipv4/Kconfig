@@ -362,13 +362,5 @@ config INET_ESP
 
 	  If unsure, say Y.
 
-config XFRM_USER
-	tristate "IP: IPsec user configuration interface"
-	---help---
-	  Support for IPsec user configuration interface used
-	  by native Linux tools.
-
-	  If unsure, say Y.
-
 source "net/ipv4/netfilter/Kconfig"
 
