@@ -345,8 +345,10 @@ raw3270_irq (struct ccw_device *cdev, unsigned long intparm, struct irb *irb)
 	rq = (struct raw3270_request *) intparm;
 	view = rq ? rq->view : rp->view;
 
-	if (irb->scsw.dstat == 
-	    (DEV_STAT_CHN_END | DEV_STAT_DEV_END | DEV_STAT_UNIT_EXCEP)) {
+	if (IS_ERR(irb))
+		rc = RAW3270_IO_RETRY;
+	else if (irb->scsw.dstat ==  (DEV_STAT_CHN_END | DEV_STAT_DEV_END |
+				      DEV_STAT_UNIT_EXCEP)) {
 		/* Handle CE-DE-UE and subsequent UDE */
 		set_bit(RAW3270_FLAGS_BUSY, &rp->flags);
 		rc = RAW3270_IO_BUSY;
