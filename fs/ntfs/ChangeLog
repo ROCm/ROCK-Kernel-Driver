@@ -48,9 +48,9 @@ ToDo/Notes:
 	  Affected files are fs/ntfs/layout.h, logfile.h, and time.h.
 	- Do proper type casting when using ntfs_is_*_recordp() in
 	  fs/ntfs/logfile.c, mft.c, and super.c. 
-	- Fix all the sparse bitwise warnings.  Had to change all the enums
-	  storing little endian values to #defines because we cannot set enums
-	  to be little endian so we had lots of bitwise warnings from sparse.
+	- Fix all the sparse bitwise warnings.  Had to change all the typedef
+	  enums storing little endian values to simple enums plus a typedef for
+	  the datatype to make sparse happy.
 	- Fix a bug found by the new sparse bitwise warnings where the default
 	  upcase table was defined as a pointer to wchar_t rather than ntfschar
 	  in fs/ntfs/ntfs.h and super.c.
