@@ -2,9 +2,9 @@
 All rights reserved
 ===========================================================================
 
-sk98lin.txt created 23-Sep-2003
+sk98lin.txt created 15-Dec-2003
 
-Readme File for sk98lin v6.18
+Readme File for sk98lin v6.21
 Marvell Yukon/SysKonnect SK-98xx Gigabit Ethernet Adapter family driver for LINUX
 
 This file contains
@@ -466,7 +466,7 @@ The Marvell Yukon/SysKonnect Linux drivers are able to support VLAN and
 Link Aggregation according to IEEE standards 802.1, 802.1q, and 802.3ad. 
 These features are only available after installation of open source 
 modules available on the Internet:
-For VLAN go to: http://scry.wanfear.com/~greear/vlan.html
+For VLAN go to: http://www.candelatech.com/~greear/vlan.html
 For Link Aggregation go to: http://www.st.rim.or.jp/~yumo
 
 NOTE: SysKonnect GmbH does not offer any support for these open source 
