@@ -43,7 +43,7 @@ static int aty_dsp_gt(const struct fb_info *info, u32 bpp,
 	u32 memcntl, n, t_pfc, t_rp, t_ras, t_rcd, t_crd, t_rcc, t_lat;
 
 #ifdef DEBUG
-	printk(__FUNCTION__ ": mclk_fb_mult=%d\n", pll->mclk_fb_mult);
+	printk("%s: mclk_fb_mult=%d\n",__FUNCTION__, pll->mclk_fb_mult);
 #endif
     
 	/* (64*xclk/vclk/bpp)<<11 = xclocks_per_row<<11 */
@@ -164,7 +164,7 @@ static int aty_valid_pll_ct(const struct fb_info *info, u32 vclk_per,
 #ifdef DEBUG
     pllsclk = (1000000 * 2 * pll->sclk_fb_div) /
 	    (par->ref_clk_per * pll->pll_ref_div);
-    printk(__FUNCTION__ ": pllsclk=%d MHz, mclk=%d MHz\n",
+    printk("%s: pllsclk=%d MHz, mclk=%d MHz\n", __FUNCTION__,
 	   pllsclk, pllsclk / pll->mclk_post_div_real);
 #endif
     
@@ -188,8 +188,8 @@ static int aty_valid_pll_ct(const struct fb_info *info, u32 vclk_per,
     
 #ifdef DEBUG
     pllmclk = (1000000 * pll->mclk_fb_mult * pll->mclk_fb_div) /
-	    (info->ref_clk_per * pll->pll_ref_div);
-    printk(__FUNCTION__ ": pllmclk=%d MHz, xclk=%d MHz\n",
+	    (par->ref_clk_per * pll->pll_ref_div);
+    printk("%s: pllmclk=%d MHz, xclk=%d MHz\n", __FUNCTION__,
 	   pllmclk, pllmclk / pll->xclk_post_div_real);
 #endif
     
@@ -218,9 +218,9 @@ void aty_calc_pll_ct(const struct fb_info *info, struct pll_ct *pll)
 	u8 vpostdiv = 0;
 
 	if (M64_HAS(SDRAM_MAGIC_PLL) && (par->ram_type >= SDRAM))
-	    	pll->pll_gen_cntl = 0x64; /* mclk = sclk */
+	    	pll->pll_gen_cntl = 0x04; /* mclk = sclk */
 	else
-		pll->pll_gen_cntl = 0xe4; /* mclk = sclk */
+		pll->pll_gen_cntl = 0x84; /* mclk = sclk */
 
 	switch (pll->mclk_post_div_real) {
 	case 1:
@@ -237,6 +237,7 @@ void aty_calc_pll_ct(const struct fb_info *info, struct pll_ct *pll)
 		break;
 	}
 
+    pll->pll_gen_cntl |= mpostdiv << 4;
     pll->spll_cntl2 = mpostdiv << 4; /* sclk == pllsclk / mpostdiv */
     
     switch (pll->xclk_post_div_real) {
@@ -325,11 +326,11 @@ void aty_set_pll_ct(const struct fb_info *info,
 	struct atyfb_par *par = (struct atyfb_par *) info->par;
 
 #ifdef DEBUG
-    printk(__FUNCTION__ ": about to program:\n"
+    printk("%s: about to program:\n"
 	   "refdiv=%d, extcntl=0x%02x, mfbdiv=%d\n"
 	   "spllcntl2=0x%02x, sfbdiv=%d, gencntl=0x%02x\n"
 	   "vclkcntl=0x%02x, vpostdiv=0x%02x, vfbdiv=%d\n"
-	   "clocksel=%d\n",
+	   "clocksel=%d\n", __FUNCTION__,
 	   pll->ct.pll_ref_div, pll->ct.pll_ext_cntl,
 	   pll->ct.mclk_fb_div, pll->ct.spll_cntl2,
 	   pll->ct.sclk_fb_div, pll->ct.pll_gen_cntl,
