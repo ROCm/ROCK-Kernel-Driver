@@ -296,6 +296,22 @@ void rb_erase(struct rb_node *node, struct rb_root *root)
 }
 EXPORT_SYMBOL(rb_erase);
 
+/*
+ * This function returns the first node (in sort order) of the tree.
+ */
+struct rb_node *rb_first(struct rb_root *root)
+{
+	struct rb_node	*n;
+
+	n = root->rb_node;
+	if (!n)
+		return 0;
+	while (n->rb_left)
+		n = n->rb_left;
+	return n;
+}
+EXPORT_SYMBOL(rb_first);
+
 struct rb_node *rb_next(struct rb_node *node)
 {
 	/* If we have a right-hand child, go down and then left as far

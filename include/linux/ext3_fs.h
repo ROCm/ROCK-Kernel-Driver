@@ -41,6 +41,11 @@
 #define EXT3FS_VERSION		"2.4-0.9.16"
 
 /*
+ * Always enable hashed directories
+ */
+#define CONFIG_EXT3_INDEX
+
+/*
  * Debug code
  */
 #ifdef EXT3FS_DEBUG
@@ -440,8 +445,11 @@ struct ext3_super_block {
 /*E0*/	__u32	s_journal_inum;		/* inode number of journal file */
 	__u32	s_journal_dev;		/* device number of journal file */
 	__u32	s_last_orphan;		/* start of list of inodes to delete */
-
-/*EC*/	__u32	s_reserved[197];	/* Padding to the end of the block */
+	__u32	s_hash_seed[4];		/* HTREE hash seed */
+	__u8	s_def_hash_version;	/* Default hash version to use */
+	__u8	s_reserved_char_pad;
+	__u16	s_reserved_word_pad;
+	__u32	s_reserved[192];	/* Padding to the end of the block */
 };
 
 #ifdef __KERNEL__
@@ -584,8 +592,45 @@ struct ext3_dir_entry_2 {
 #define EXT3_DIR_ROUND			(EXT3_DIR_PAD - 1)
 #define EXT3_DIR_REC_LEN(name_len)	(((name_len) + 8 + EXT3_DIR_ROUND) & \
 					 ~EXT3_DIR_ROUND)
+/*
+ * Hash Tree Directory indexing
+ * (c) Daniel Phillips, 2001
+ */
+
+#ifdef CONFIG_EXT3_INDEX
+  #define is_dx(dir) (EXT3_HAS_COMPAT_FEATURE(dir->i_sb, \
+					      EXT3_FEATURE_COMPAT_DIR_INDEX) && \
+		      (EXT3_I(dir)->i_flags & EXT3_INDEX_FL))
+#define EXT3_DIR_LINK_MAX(dir) (!is_dx(dir) && (dir)->i_nlink >= EXT3_LINK_MAX)
+#define EXT3_DIR_LINK_EMPTY(dir) ((dir)->i_nlink == 2 || (dir)->i_nlink == 1)
+#else
+  #define is_dx(dir) 0
+#define EXT3_DIR_LINK_MAX(dir) ((dir)->i_nlink >= EXT3_LINK_MAX)
+#define EXT3_DIR_LINK_EMPTY(dir) ((dir)->i_nlink == 2)
+#endif
+
+/* Legal values for the dx_root hash_version field: */
+
+#define DX_HASH_LEGACY		0
+#define DX_HASH_HALF_MD4	1
+#define DX_HASH_TEA		2
+
+/* hash info structure used by the directory hash */
+struct dx_hash_info
+{
+	u32		hash;
+	u32		minor_hash;
+	int		hash_version;
+	u32		*seed;
+};
 
 #ifdef __KERNEL__
+/*
+ * Control parameters used by ext3_htree_next_block
+ */
+#define HASH_NB_ALWAYS		1
+
+
 /*
  * Describe an inode's exact location on disk and in memory
  */
@@ -595,6 +640,27 @@ struct ext3_iloc
 	struct ext3_inode *raw_inode;
 	unsigned long block_group;
 };
+
+
+/*
+ * This structure is stuffed into the struct file's private_data field
+ * for directories.  It is where we put information so that we can do
+ * readdir operations in hash tree order.
+ */
+struct dir_private_info {
+	struct rb_root	root;
+	struct rb_node	*curr_node;
+	struct fname	*extra_fname;
+	loff_t		last_pos;
+	__u32		curr_hash;
+	__u32		curr_minor_hash;
+	__u32		next_hash;
+};
+
+/*
+ * Special error return code only used by dx_probe() and its callers.
+ */
+#define ERR_BAD_DX_DIR	-75000
 
 /*
  * Function prototypes
@@ -623,10 +689,19 @@ extern struct ext3_group_desc * ext3_get_group_desc(struct super_block * sb,
 
 /* dir.c */
 extern int ext3_check_dir_entry(const char *, struct inode *,
-				struct ext3_dir_entry_2 *, struct buffer_head *,
-				unsigned long);
+				struct ext3_dir_entry_2 *,
+				struct buffer_head *, unsigned long);
+extern void ext3_htree_store_dirent(struct file *dir_file, __u32 hash,
+				    __u32 minor_hash,
+				    struct ext3_dir_entry_2 *dirent);
+extern void ext3_htree_free_dir_info(struct dir_private_info *p);
+
 /* fsync.c */
 extern int ext3_sync_file (struct file *, struct dentry *, int);
+
+/* hash.c */
+extern int ext3fs_dirhash(const char *name, int len, struct
+			  dx_hash_info *hinfo);
 
 /* ialloc.c */
 extern struct inode * ext3_new_inode (handle_t *, struct inode *, int);
@@ -635,6 +710,7 @@ extern struct inode * ext3_orphan_get (struct super_block *, ino_t);
 extern unsigned long ext3_count_free_inodes (struct super_block *);
 extern void ext3_check_inodes_bitmap (struct super_block *);
 extern unsigned long ext3_count_free (struct buffer_head *, unsigned);
+
 
 /* inode.c */
 extern struct buffer_head * ext3_getblk (handle_t *, struct inode *, long, int, int *);
@@ -659,6 +735,8 @@ extern int ext3_ioctl (struct inode *, struct file *, unsigned int,
 /* namei.c */
 extern int ext3_orphan_add(handle_t *, struct inode *);
 extern int ext3_orphan_del(handle_t *, struct inode *);
+extern int ext3_htree_fill_tree(struct file *dir_file, __u32 start_hash,
+				__u32 start_minor_hash, __u32 *next_hash);
 
 /* super.c */
 extern void ext3_error (struct super_block *, const char *, const char *, ...)

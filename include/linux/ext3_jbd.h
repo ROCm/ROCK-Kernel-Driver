@@ -63,6 +63,8 @@ extern int ext3_writepage_trans_blocks(struct inode *inode);
 
 #define EXT3_RESERVE_TRANS_BLOCKS	12
 
+#define EXT3_INDEX_EXTRA_TRANS_BLOCKS	8
+
 int
 ext3_mark_iloc_dirty(handle_t *handle, 
 		     struct inode *inode,

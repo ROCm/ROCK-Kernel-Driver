@@ -34,6 +34,9 @@ static int ext3_release_file (struct inode * inode, struct file * filp)
 {
 	if (filp->f_mode & FMODE_WRITE)
 		ext3_discard_prealloc (inode);
+	if (is_dx(inode) && filp->private_data)
+		ext3_htree_free_dir_info(filp->private_data);
+
 	return 0;
 }
 

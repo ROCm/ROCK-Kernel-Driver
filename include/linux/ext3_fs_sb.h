@@ -48,6 +48,8 @@ struct ext3_sb_info {
 	int s_inode_size;
 	int s_first_ino;
 	u32 s_next_generation;
+	u32 s_hash_seed[4];
+	int s_def_hash_version;
 
 	/* Journaling */
 	struct inode * s_journal_inode;

@@ -762,6 +762,7 @@ static int ext3_setup_super(struct super_block *sb, struct ext3_super_block *es,
 	es->s_mtime = cpu_to_le32(CURRENT_TIME);
 	ext3_update_dynamic_rev(sb);
 	EXT3_SET_INCOMPAT_FEATURE(sb, EXT3_FEATURE_INCOMPAT_RECOVER);
+
 	ext3_commit_super (sb, es, 1);
 	if (test_opt (sb, DEBUG))
 		printk (KERN_INFO
@@ -772,6 +773,7 @@ static int ext3_setup_super(struct super_block *sb, struct ext3_super_block *es,
 			EXT3_BLOCKS_PER_GROUP(sb),
 			EXT3_INODES_PER_GROUP(sb),
 			sbi->s_mount_opt);
+
 	printk(KERN_INFO "EXT3 FS " EXT3FS_VERSION ", " EXT3FS_DATE " on %s, ",
 				sb->s_id);
 	if (EXT3_SB(sb)->s_journal->j_inode == NULL) {
@@ -946,6 +948,7 @@ static loff_t ext3_max_size(int bits)
 	return res;
 }
 
+
 static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 {
 	struct buffer_head * bh;
@@ -1115,6 +1118,9 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 	sbi->s_mount_state = le16_to_cpu(es->s_state);
 	sbi->s_addr_per_block_bits = log2(EXT3_ADDR_PER_BLOCK(sb));
 	sbi->s_desc_per_block_bits = log2(EXT3_DESC_PER_BLOCK(sb));
+	for (i=0; i < 4; i++)
+		sbi->s_hash_seed[i] = le32_to_cpu(es->s_hash_seed[i]);
+	sbi->s_def_hash_version = es->s_def_hash_version;
 
 	if (sbi->s_blocks_per_group > blocksize * 8) {
 		printk (KERN_ERR

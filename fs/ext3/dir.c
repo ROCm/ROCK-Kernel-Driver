@@ -23,12 +23,16 @@
 #include <linux/ext3_fs.h>
 #include <linux/buffer_head.h>
 #include <linux/smp_lock.h>
+#include <linux/slab.h>
+#include <linux/rbtree.h>
 
 static unsigned char ext3_filetype_table[] = {
 	DT_UNKNOWN, DT_REG, DT_DIR, DT_CHR, DT_BLK, DT_FIFO, DT_SOCK, DT_LNK
 };
 
 static int ext3_readdir(struct file *, void *, filldir_t);
+static int ext3_dx_readdir(struct file * filp,
+			   void * dirent, filldir_t filldir);
 
 struct file_operations ext3_dir_operations = {
 	.read		= generic_read_dir,
@@ -36,6 +40,17 @@ struct file_operations ext3_dir_operations = {
 	.ioctl		= ext3_ioctl,		/* BKL held */
 	.fsync		= ext3_sync_file,		/* BKL held */
 };
+
+
+static unsigned char get_dtype(struct super_block *sb, int filetype)
+{
+	if (!EXT3_HAS_INCOMPAT_FEATURE(sb, EXT3_FEATURE_INCOMPAT_FILETYPE) ||
+	    (filetype >= EXT3_FT_MAX))
+		return DT_UNKNOWN;
+
+	return (ext3_filetype_table[filetype]);
+}
+			       
 
 int ext3_check_dir_entry (const char * function, struct inode * dir,
 			  struct ext3_dir_entry_2 * de,
@@ -83,6 +98,16 @@ static int ext3_readdir(struct file * filp,
 
 	sb = inode->i_sb;
 
+	if (is_dx(inode)) {
+		err = ext3_dx_readdir(filp, dirent, filldir);
+		if (err != ERR_BAD_DX_DIR)
+			return err;
+		/*
+		 * We don't set the inode dirty flag since it's not
+		 * critical that it get flushed back to the disk.
+		 */
+		EXT3_I(filp->f_dentry->d_inode)->i_flags &= ~EXT3_INDEX_FL;
+	}
 	stored = 0;
 	bh = NULL;
 	offset = filp->f_pos & (sb->s_blocksize - 1);
@@ -167,18 +192,12 @@ revalidate:
 				 * during the copy operation.
 				 */
 				unsigned long version = filp->f_version;
-				unsigned char d_type = DT_UNKNOWN;
 
-				if (EXT3_HAS_INCOMPAT_FEATURE(sb,
-						EXT3_FEATURE_INCOMPAT_FILETYPE)
-						&& de->file_type < EXT3_FT_MAX)
-					d_type =
-					  ext3_filetype_table[de->file_type];
 				error = filldir(dirent, de->name,
 						de->name_len,
 						filp->f_pos,
 						le32_to_cpu(de->inode),
-						d_type);
+						get_dtype(sb, de->file_type));
 				if (error)
 					break;
 				if (version != filp->f_version)
@@ -194,3 +213,269 @@ revalidate:
 	unlock_kernel();
 	return 0;
 }
+
+#ifdef CONFIG_EXT3_INDEX
+/*
+ * These functions convert from the major/minor hash to an f_pos
+ * value.
+ * 
+ * Currently we only use major hash numer.  This is unfortunate, but
+ * on 32-bit machines, the same VFS interface is used for lseek and
+ * llseek, so if we use the 64 bit offset, then the 32-bit versions of
+ * lseek/telldir/seekdir will blow out spectacularly, and from within
+ * the ext2 low-level routine, we don't know if we're being called by
+ * a 64-bit version of the system call or the 32-bit version of the
+ * system call.  Worse yet, NFSv2 only allows for a 32-bit readdir
+ * cookie.  Sigh.
+ */
+#define hash2pos(major, minor)	(major >> 1)
+#define pos2maj_hash(pos)	((pos << 1) & 0xffffffff)
+#define pos2min_hash(pos)	(0)
+
+/*
+ * This structure holds the nodes of the red-black tree used to store
+ * the directory entry in hash order.
+ */
+struct fname {
+	__u32		hash;
+	__u32		minor_hash;
+	struct rb_node	rb_hash; 
+	struct fname	*next;
+	__u32		inode;
+	__u8		name_len;
+	__u8		file_type;
+	char		name[0];
+};
+
+/*
+ * This functoin implements a non-recursive way of freeing all of the
+ * nodes in the red-black tree.
+ */
+static void free_rb_tree_fname(struct rb_root *root)
+{
+	struct rb_node	*n = root->rb_node;
+	struct rb_node	*parent;
+	struct fname	*fname;
+
+	while (n) {
+		/* Do the node's children first */
+		if ((n)->rb_left) {
+			n = n->rb_left;
+			continue;
+		}
+		if (n->rb_right) {
+			n = n->rb_right;
+			continue;
+		}
+		/*
+		 * The node has no children; free it, and then zero
+		 * out parent's link to it.  Finally go to the
+		 * beginning of the loop and try to free the parent
+		 * node.
+		 */
+		parent = n->rb_parent;
+		fname = rb_entry(n, struct fname, rb_hash);
+		kfree(fname);
+		if (!parent)
+			root->rb_node = 0;
+		else if (parent->rb_left == n)
+			parent->rb_left = 0;
+		else if (parent->rb_right == n)
+			parent->rb_right = 0;
+		n = parent;
+	}
+	root->rb_node = 0;
+}
+
+
+struct dir_private_info *create_dir_info(loff_t pos)
+{
+	struct dir_private_info *p;
+
+	p = kmalloc(sizeof(struct dir_private_info), GFP_KERNEL);
+	if (!p)
+		return NULL;
+	p->root.rb_node = 0;
+	p->curr_node = 0;
+	p->extra_fname = 0;
+	p->last_pos = 0;
+	p->curr_hash = pos2maj_hash(pos);
+	p->curr_minor_hash = pos2min_hash(pos);
+	p->next_hash = 0;
+	return p;
+}
+
+void ext3_htree_free_dir_info(struct dir_private_info *p)
+{
+	free_rb_tree_fname(&p->root);
+	kfree(p);
+}
+		
+/*
+ * Given a directory entry, enter it into the fname rb tree.
+ */
+void ext3_htree_store_dirent(struct file *dir_file, __u32 hash,
+			     __u32 minor_hash,
+			     struct ext3_dir_entry_2 *dirent)
+{
+	struct rb_node **p, *parent = NULL;
+	struct fname * fname, *new_fn;
+	struct dir_private_info *info;
+	int len;
+
+	info = (struct dir_private_info *) dir_file->private_data;
+	p = &info->root.rb_node;
+
+	/* Create and allocate the fname structure */
+	len = sizeof(struct fname) + dirent->name_len + 1;
+	new_fn = kmalloc(len, GFP_KERNEL);
+	memset(new_fn, 0, len);
+	new_fn->hash = hash;
+	new_fn->minor_hash = minor_hash;
+	new_fn->inode = le32_to_cpu(dirent->inode);
+	new_fn->name_len = dirent->name_len;
+	new_fn->file_type = dirent->file_type;
+	memcpy(new_fn->name, dirent->name, dirent->name_len);
+	new_fn->name[dirent->name_len] = 0;
+	
+	while (*p) {
+		parent = *p;
+		fname = rb_entry(parent, struct fname, rb_hash);
+
+		/*
+		 * If the hash and minor hash match up, then we put
+		 * them on a linked list.  This rarely happens...
+		 */
+		if ((new_fn->hash == fname->hash) &&
+		    (new_fn->minor_hash == fname->minor_hash)) {
+			new_fn->next = fname->next;
+			fname->next = new_fn;
+			return;
+		}
+			
+		if (new_fn->hash < fname->hash)
+			p = &(*p)->rb_left;
+		else if (new_fn->hash > fname->hash)
+			p = &(*p)->rb_right;
+		else if (new_fn->minor_hash < fname->minor_hash)
+			p = &(*p)->rb_left;
+		else /* if (new_fn->minor_hash > fname->minor_hash) */
+			p = &(*p)->rb_right;
+	}
+
+	rb_link_node(&new_fn->rb_hash, parent, p);
+	rb_insert_color(&new_fn->rb_hash, &info->root);
+}
+
+
+
+/*
+ * This is a helper function for ext3_dx_readdir.  It calls filldir
+ * for all entres on the fname linked list.  (Normally there is only
+ * one entry on the linked list, unless there are 62 bit hash collisions.)
+ */
+static int call_filldir(struct file * filp, void * dirent,
+			filldir_t filldir, struct fname *fname)
+{
+	struct dir_private_info *info = filp->private_data;
+	loff_t	curr_pos;
+	struct inode *inode = filp->f_dentry->d_inode;
+	struct super_block * sb;
+	int error;
+
+	sb = inode->i_sb;
+	
+	if (!fname) {
+		printk("call_filldir: called with null fname?!?\n");
+		return 0;
+	}
+	curr_pos = hash2pos(fname->hash, fname->minor_hash);
+	while (fname) {
+		error = filldir(dirent, fname->name,
+				fname->name_len, curr_pos, 
+				fname->inode,
+				get_dtype(sb, fname->file_type));
+		if (error) {
+			filp->f_pos = curr_pos;
+			info->extra_fname = fname->next;
+			return error;
+		}
+		fname = fname->next;
+	}
+	return 0;
+}
+
+static int ext3_dx_readdir(struct file * filp,
+			 void * dirent, filldir_t filldir)
+{
+	struct dir_private_info *info = filp->private_data;
+	struct inode *inode = filp->f_dentry->d_inode;
+	struct fname *fname;
+	int	ret;
+
+	if (!info) {
+		info = create_dir_info(filp->f_pos);
+		if (!info)
+			return -ENOMEM;
+		filp->private_data = info;
+	}
+
+	/* Some one has messed with f_pos; reset the world */
+	if (info->last_pos != filp->f_pos) {
+		free_rb_tree_fname(&info->root);
+		info->curr_node = 0;
+		info->extra_fname = 0;
+		info->curr_hash = pos2maj_hash(filp->f_pos);
+		info->curr_minor_hash = pos2min_hash(filp->f_pos);
+	}
+
+	/*
+	 * If there are any leftover names on the hash collision
+	 * chain, return them first.
+	 */
+	if (info->extra_fname &&
+	    call_filldir(filp, dirent, filldir, info->extra_fname))
+		goto finished;
+
+	if (!info->curr_node)
+		info->curr_node = rb_first(&info->root);
+
+	while (1) {
+		/*
+		 * Fill the rbtree if we have no more entries,
+		 * or the inode has changed since we last read in the
+		 * cached entries. 
+		 */
+		if ((!info->curr_node) ||
+		    (filp->f_version != inode->i_version)) {
+			info->curr_node = 0;
+			free_rb_tree_fname(&info->root);
+			filp->f_version = inode->i_version;
+			ret = ext3_htree_fill_tree(filp, info->curr_hash,
+						   info->curr_minor_hash,
+						   &info->next_hash);
+			if (ret < 0)
+				return ret;
+			if (ret == 0)
+				break;
+			info->curr_node = rb_first(&info->root);
+		}
+
+		fname = rb_entry(info->curr_node, struct fname, rb_hash);
+		info->curr_hash = fname->hash;
+		info->curr_minor_hash = fname->minor_hash;
+		if (call_filldir(filp, dirent, filldir, fname))
+			break;
+
+		info->curr_node = rb_next(info->curr_node);
+		if (!info->curr_node) {
+			info->curr_hash = info->next_hash;
+			info->curr_minor_hash = 0;
+		}
+	}
+finished:
+	info->last_pos = filp->f_pos;
+	UPDATE_ATIME(inode);
+	return 0;
+}
+#endif
