@@ -415,7 +415,8 @@ static void sctp_cmd_init_failed(sctp_cmd_seq_t *commands,
 	struct sctp_ulpevent *event;
 
 	event = sctp_ulpevent_make_assoc_change(asoc,0, SCTP_CANT_STR_ASSOC,
-						0, 0, 0, GFP_ATOMIC);
+						(__u16)error, 0, 0,
+						GFP_ATOMIC);
 
 	if (event)
 		sctp_add_cmd_sf(commands, SCTP_CMD_EVENT_ULP,

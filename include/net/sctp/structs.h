@@ -71,7 +71,7 @@ union sctp_addr {
 };
 
 /* Forward declarations for data structures. */
-struct sctp_protocol;
+struct sctp_globals;
 struct sctp_endpoint;
 struct sctp_association;
 struct sctp_transport;
@@ -92,28 +92,28 @@ struct sctp_ssnmap;
 
 /* Structures useful for managing bind/connect. */
 
-typedef struct sctp_bind_bucket {
+struct sctp_bind_bucket {
 	unsigned short 	port;
 	unsigned short	fastreuse;
 	struct sctp_bind_bucket *next;
 	struct sctp_bind_bucket **pprev;
 	struct sock	        *sk;
-} sctp_bind_bucket_t;
+};
 
-typedef struct sctp_bind_hashbucket {
+struct sctp_bind_hashbucket {
 	spinlock_t	lock;
 	struct sctp_bind_bucket	*chain;
-} sctp_bind_hashbucket_t;
+};
 
 /* Used for hashing all associations.  */
-typedef struct sctp_hashbucket {
+struct sctp_hashbucket {
 	rwlock_t	lock;
 	struct sctp_ep_common  *chain;
-} sctp_hashbucket_t __attribute__((__aligned__(8)));
+} __attribute__((__aligned__(8)));
 
 
-/* The SCTP protocol structure. */
-struct sctp_protocol {
+/* The SCTP globals structure. */
+extern struct sctp_globals {
 	/* RFC2960 Section 14. Suggested SCTP Protocol Parameter Values
 	 *
 	 * The following protocol parameters are RECOMMENDED:
@@ -167,17 +167,17 @@ struct sctp_protocol {
 
 	/* This is the hash of all endpoints. */
 	int ep_hashsize;
-	sctp_hashbucket_t *ep_hashbucket;
+	struct sctp_hashbucket *ep_hashbucket;
 
 	/* This is the hash of all associations. */
 	int assoc_hashsize;
-	sctp_hashbucket_t *assoc_hashbucket;
+	struct sctp_hashbucket *assoc_hashbucket;
 
 	/* This is the sctp port control hash.  */
 	int port_hashsize;
 	int port_rover;
 	spinlock_t port_alloc_lock;  /* Protects port_rover. */
-	sctp_bind_hashbucket_t *port_hashtable;
+	struct sctp_bind_hashbucket *port_hashtable;
 
 	/* This is the global local address list.
 	 * We actively maintain this complete list of interfaces on
@@ -187,8 +187,33 @@ struct sctp_protocol {
 	 */
 	struct list_head local_addr_list;
 	spinlock_t local_addr_lock;
-};
+} sctp_globals;
 
+#define sctp_rto_initial		(sctp_globals.rto_initial)
+#define sctp_rto_min			(sctp_globals.rto_min)
+#define sctp_rto_max			(sctp_globals.rto_max)
+#define sctp_rto_alpha			(sctp_globals.rto_alpha)
+#define sctp_rto_beta			(sctp_globals.rto_beta)
+#define sctp_max_burst			(sctp_globals.max_burst)
+#define sctp_valid_cookie_life		(sctp_globals.valid_cookie_life)
+#define sctp_cookie_preserve_enable	(sctp_globals.cookie_preserve_enable)
+#define sctp_max_retrans_association	(sctp_globals.max_retrans_association)
+#define sctp_max_retrans_path		(sctp_globals.max_retrans_path)
+#define sctp_max_retrans_init		(sctp_globals.max_retrans_init)
+#define sctp_hb_interval		(sctp_globals.hb_interval)
+#define sctp_max_instreams		(sctp_globals.max_instreams)
+#define sctp_max_outstreams		(sctp_globals.max_outstreams)
+#define sctp_address_families		(sctp_globals.address_families)
+#define sctp_ep_hashsize		(sctp_globals.ep_hashsize)
+#define sctp_ep_hashbucket		(sctp_globals.ep_hashbucket)
+#define sctp_assoc_hashsize		(sctp_globals.assoc_hashsize)
+#define sctp_assoc_hashbucket		(sctp_globals.assoc_hashbucket)
+#define sctp_port_hashsize		(sctp_globals.port_hashsize)
+#define sctp_port_rover			(sctp_globals.port_rover)
+#define sctp_port_alloc_lock		(sctp_globals.port_alloc_lock)
+#define sctp_port_hashtable		(sctp_globals.port_hashtable)
+#define sctp_local_addr_list		(sctp_globals.local_addr_list)
+#define sctp_local_addr_lock		(sctp_globals.local_addr_lock)
 
 /*
  * Pointers to address related SCTP functions.
@@ -239,7 +264,7 @@ struct sctp_af {
 	int             (*is_any)       (const union sctp_addr *);
 	int             (*available)    (const union sctp_addr *);
 	int             (*skb_iif)      (const struct sk_buff *sk);
-	int             (*is_ce)        (const struct sk_buff *sk); 
+	int             (*is_ce)        (const struct sk_buff *sk);
 	__u16		net_header_len;
 	int		sockaddr_len;
 	sa_family_t	sa_family;
@@ -289,6 +314,10 @@ struct sctp_opt {
 	/* Various Socket Options.  */
 	__u16 default_stream;
 	__u32 default_ppid;
+	__u16 default_flags;
+	__u32 default_context;
+	__u32 default_timetolive;
+
 	struct sctp_initmsg initmsg;
 	struct sctp_rtoinfo rtoinfo;
 	struct sctp_paddrparams paddrparam;
@@ -461,7 +490,7 @@ struct sctp_datamsg {
 	/* Reference counting. */
 	atomic_t refcnt;
 	/* When is this message no longer interesting to the peer? */
-	unsigned long expires_at; 
+	unsigned long expires_at;
 	/* Did the messenge fail to send? */
 	int send_error;
 	char send_failed;
@@ -1492,13 +1521,12 @@ struct sctp_association {
 	 */
 	int counters[SCTP_NUMBER_COUNTERS];
 
-	struct {
-		__u16 stream;
-		__u16 flags;
-		__u32 ppid;
-		__u32 context;
-		__u32 timetolive;
-	} defaults;
+	/* Default send parameters. */
+	__u16 default_stream;
+	__u16 default_flags;
+	__u32 default_ppid;
+	__u32 default_context;
+	__u32 default_timetolive;
 
 	/* This tracks outbound ssn for a given stream.  */
 	struct sctp_ssnmap *ssnmap;

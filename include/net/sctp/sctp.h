@@ -119,12 +119,10 @@
  */
 
 /*
- * sctp_protocol.c
+ * sctp/protocol.c
  */
-extern struct sctp_protocol sctp_proto;
 extern struct sock *sctp_get_ctl_sock(void);
-extern int sctp_copy_local_addr_list(struct sctp_protocol  *,
-				     struct sctp_bind_addr *,
+extern int sctp_copy_local_addr_list(struct sctp_bind_addr *,
 				     sctp_scope_t, int gfp, int flags);
 extern struct sctp_pf *sctp_get_pf_specific(sa_family_t family);
 extern int sctp_register_pf(struct sctp_pf *, sa_family_t);
@@ -275,6 +273,7 @@ extern atomic_t sctp_dbg_objcnt_assoc;
 extern atomic_t sctp_dbg_objcnt_transport;
 extern atomic_t sctp_dbg_objcnt_chunk;
 extern atomic_t sctp_dbg_objcnt_bind_addr;
+extern atomic_t sctp_dbg_objcnt_bind_bucket;
 extern atomic_t sctp_dbg_objcnt_addr;
 extern atomic_t sctp_dbg_objcnt_ssnmap;
 extern atomic_t sctp_dbg_objcnt_datamsg;
@@ -456,6 +455,18 @@ for (pos.v = chunk->member;\
      pos.v <= (void *)chunk + end - WORD_ROUND(ntohs(pos.p->length)); \
      pos.v += WORD_ROUND(ntohs(pos.p->length)))
 
+#define sctp_walk_errors(err, chunk_hdr)\
+_sctp_walk_errors((err), (chunk_hdr), ntohs((chunk_hdr)->length))
+
+#define _sctp_walk_errors(err, chunk_hdr, end)\
+for (err = (sctp_errhdr_t *)((void *)chunk_hdr + \
+	    sizeof(sctp_chunkhdr_t));\
+     (void *)err <= (void *)chunk_hdr + end - sizeof(sctp_errhdr_t) &&\
+     (void *)err <= (void *)chunk_hdr + end - \
+		    WORD_ROUND(ntohs(err->length));\
+     err = (sctp_errhdr_t *)((void *)err + \
+	    WORD_ROUND(ntohs(err->length))))
+     
 /* Round an int up to the next multiple of 4.  */
 #define WORD_ROUND(s) (((s)+3)&~3)
 
@@ -491,12 +502,6 @@ void sctp_put_port(struct sock *sk);
 
 /* Static inline functions. */
 
-/* Return the SCTP protocol structure. */
-static inline struct sctp_protocol *sctp_get_protocol(void)
-{
-	return &sctp_proto;
-}
-
 /* Convert from an IP version number to an Address Family symbol.  */
 static inline int ipver2af(__u8 ipver)
 {
@@ -524,24 +529,21 @@ static inline int sctp_sanity_check(void)
 /* This is the hash function for the SCTP port hash table. */
 static inline int sctp_phashfn(__u16 lport)
 {
-	struct sctp_protocol *sctp_proto = sctp_get_protocol();
-	return (lport & (sctp_proto->port_hashsize - 1));
+	return (lport & (sctp_port_hashsize - 1));
 }
 
 /* This is the hash function for the endpoint hash table. */
 static inline int sctp_ep_hashfn(__u16 lport)
 {
-	struct sctp_protocol *sctp_proto = sctp_get_protocol();
-	return (lport & (sctp_proto->ep_hashsize - 1));
+	return (lport & (sctp_ep_hashsize - 1));
 }
 
 /* This is the hash function for the association hash table. */
 static inline int sctp_assoc_hashfn(__u16 lport, __u16 rport)
 {
-	struct sctp_protocol *sctp_proto = sctp_get_protocol();
 	int h = (lport << 16) + rport;
 	h ^= h>>8;
-	return (h & (sctp_proto->assoc_hashsize - 1));
+	return (h & (sctp_assoc_hashsize - 1));
 }
 
 /* This is the hash function for the association hash table.  This is
@@ -550,10 +552,9 @@ static inline int sctp_assoc_hashfn(__u16 lport, __u16 rport)
  */
 static inline int sctp_vtag_hashfn(__u16 lport, __u16 rport, __u32 vtag)
 {
-	struct sctp_protocol *sctp_proto = sctp_get_protocol();
 	int h = (lport << 16) + rport;
 	h ^= vtag;
-	return (h & (sctp_proto->assoc_hashsize-1));
+	return (h & (sctp_assoc_hashsize-1));
 }
 
 /* WARNING: Do not change the layout of the members in sctp_sock! */

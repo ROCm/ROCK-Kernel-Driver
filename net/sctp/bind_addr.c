@@ -329,12 +329,10 @@ static int sctp_copy_one_addr(struct sctp_bind_addr *dest,
 			      union sctp_addr *addr,
 			      sctp_scope_t scope, int gfp, int flags)
 {
-	struct sctp_protocol *proto = sctp_get_protocol();
 	int error = 0;
 
 	if (sctp_is_any(addr)) {
-		error = sctp_copy_local_addr_list(proto, dest, scope,
-						  gfp, flags);
+		error = sctp_copy_local_addr_list(dest, scope, gfp, flags);
 	} else if (sctp_in_scope(addr, scope)) {
 		/* Now that the address is in scope, check to see if
 		 * the address type is supported by local sock as

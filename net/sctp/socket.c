@@ -99,6 +99,8 @@ static void sctp_sock_migrate(struct sock *, struct sock *,
 			      struct sctp_association *, sctp_socket_type_t);
 static char *sctp_hmac_alg = SCTP_COOKIE_HMAC_ALG;
 
+extern kmem_cache_t *sctp_bucket_cachep;
+
 /* Look up the association by its id.  If this is not a UDP-style
  * socket, the ID field is always ignored.
  */
@@ -106,10 +108,16 @@ struct sctp_association *sctp_id2assoc(struct sock *sk, sctp_assoc_t id)
 {
 	struct sctp_association *asoc = NULL;
 
-	/* If this is not a UDP-style socket, assoc id should be
-	 * ignored.
-	 */
+	/* If this is not a UDP-style socket, assoc id should be ignored. */
 	if (!sctp_style(sk, UDP)) {
+		/* Return NULL if the socket state is not ESTABLISHED. It 
+		 * could be a TCP-style listening socket or a socket which
+		 * hasn't yet called connect() to establish an association.
+		 */
+		if (!sctp_sstate(sk, ESTABLISHED))
+			return NULL;
+
+		/* Get the first and the only association from the list. */ 
 		if (!list_empty(&sctp_sk(sk)->ep->asocs))
 			asoc = list_entry(sctp_sk(sk)->ep->asocs.next,
 					  struct sctp_association, asocs);
@@ -130,6 +138,30 @@ struct sctp_association *sctp_id2assoc(struct sock *sk, sctp_assoc_t id)
 	}
 
 	return asoc;
+}
+
+/* Look up the transport from an address and an assoc id. If both address and
+ * id are specified, the associations matching the address and the id should be
+ * the same.
+ */
+struct sctp_transport *sctp_addr_id2transport(struct sock *sk,
+					      struct sockaddr_storage *addr,
+					      sctp_assoc_t id)
+{
+	struct sctp_association *addr_asoc = NULL, *id_asoc = NULL;
+	struct sctp_transport *transport;
+
+	addr_asoc = sctp_endpoint_lookup_assoc(sctp_sk(sk)->ep,
+					       (union sctp_addr *)addr,
+					       &transport);
+	if (!addr_asoc)
+		return NULL;
+
+	id_asoc = sctp_id2assoc(sk, id);
+	if (id_asoc && (id_asoc != addr_asoc))
+		return NULL;
+
+	return transport;
 }
 
 /* API 3.1.2 bind() - UDP Style Syntax
@@ -710,7 +742,7 @@ SCTP_STATIC void sctp_close(struct sock *sk, long timeout)
 	struct sctp_association *asoc;
 	struct list_head *pos, *temp;
 
-	printk("sctp_close(sk: 0x%p, timeout:%ld)\n", sk, timeout);
+	SCTP_DEBUG_PRINTK("sctp_close(sk: 0x%p, timeout:%ld)\n", sk, timeout);
 
 	sctp_lock_sock(sk);
 	sk->shutdown = SHUTDOWN_MASK;
@@ -1061,11 +1093,11 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 		/* If the user didn't specify SNDRCVINFO, make up one with
 		 * some defaults.
 		 */
-		default_sinfo.sinfo_stream = asoc->defaults.stream;
-		default_sinfo.sinfo_flags = asoc->defaults.flags;
-		default_sinfo.sinfo_ppid = asoc->defaults.ppid;
-		default_sinfo.sinfo_context = asoc->defaults.context;
-		default_sinfo.sinfo_timetolive = asoc->defaults.timetolive;
+		default_sinfo.sinfo_stream = asoc->default_stream;
+		default_sinfo.sinfo_flags = asoc->default_flags;
+		default_sinfo.sinfo_ppid = asoc->default_ppid;
+		default_sinfo.sinfo_context = asoc->default_context;
+		default_sinfo.sinfo_timetolive = asoc->default_timetolive;
 		default_sinfo.sinfo_assoc_id = sctp_assoc2id(asoc);
 		sinfo = &default_sinfo;
 	}
@@ -1333,6 +1365,13 @@ out:
 	return err;
 }
 
+/* 7.1.12 Enable/Disable message fragmentation (SCTP_DISABLE_FRAGMENTS)
+ *
+ * This option is a on/off flag.  If enabled no SCTP message
+ * fragmentation will be performed.  Instead if a message being sent
+ * exceeds the current PMTU size, the message will NOT be sent and
+ * instead a error will be indicated to the user.
+ */
 static int sctp_setsockopt_disable_fragments(struct sock *sk,
 						    char *optval, int optlen)
 {
@@ -1359,6 +1398,17 @@ static int sctp_setsockopt_events(struct sock *sk, char *optval,
 	return 0;
 }
 
+/* 7.1.8 Automatic Close of associations (SCTP_AUTOCLOSE)
+ *
+ * This socket option is applicable to the UDP-style socket only.  When
+ * set it will cause associations that are idle for more than the
+ * specified number of seconds to automatically close.  An association
+ * being idle is defined an association that has NOT sent or received
+ * user data.  The special value of '0' indicates that no automatic
+ * close of any associations should be performed.  The option expects an
+ * integer defining the number of seconds of idle time before an
+ * association is closed.
+ */
 static int sctp_setsockopt_autoclose(struct sock *sk, char *optval,
 					    int optlen)
 {
@@ -1376,12 +1426,41 @@ static int sctp_setsockopt_autoclose(struct sock *sk, char *optval,
 	return 0;
 }
 
+/* 7.1.13 Peer Address Parameters (SCTP_SET_PEER_ADDR_PARAMS)
+ *
+ * Applications can enable or disable heartbeats for any peer address of
+ * an association, modify an address's heartbeat interval, force a
+ * heartbeat to be sent immediately, and adjust the address's maximum
+ * number of retransmissions sent before an address is considered
+ * unreachable.  The following structure is used to access and modify an
+ * address's parameters:
+ *
+ *  struct sctp_paddrparams {
+ *      sctp_assoc_t            spp_assoc_id;
+ *      struct sockaddr_storage spp_address;
+ *      uint32_t                spp_hbinterval;
+ *      uint16_t                spp_pathmaxrxt;
+ *  };
+ *
+ *   spp_assoc_id    - (UDP style socket) This is filled in the application,
+ *                     and identifies the association for this query.
+ *   spp_address     - This specifies which address is of interest.
+ *   spp_hbinterval  - This contains the value of the heartbeat interval,
+ *                     in milliseconds.  A value of 0, when modifying the
+ *                     parameter, specifies that the heartbeat on this
+ *                     address should be disabled. A value of UINT32_MAX
+ *                     (4294967295), when modifying the parameter,
+ *                     specifies that a heartbeat should be sent
+ *                     immediately to the peer address, and the current
+ *                     interval should remain unchanged.
+ *   spp_pathmaxrxt  - This contains the maximum number of
+ *                     retransmissions before this address shall be
+ *                     considered unreachable.
+ */ 
 static int sctp_setsockopt_peer_addr_params(struct sock *sk,
 					    char *optval, int optlen)
 {
 	struct sctp_paddrparams params;
-	struct sctp_association *asoc;
-	union sctp_addr *addr;
 	struct sctp_transport *trans;
 	int error;
 
@@ -1390,15 +1469,10 @@ static int sctp_setsockopt_peer_addr_params(struct sock *sk,
 	if (copy_from_user(&params, optval, optlen))
 		return -EFAULT;
 
-	asoc = sctp_id2assoc(sk, params.spp_assoc_id);
-	if (!asoc)
-		return -EINVAL;
-
-	addr = (union sctp_addr *) &(params.spp_address);
-
-	trans = sctp_assoc_lookup_paddr(asoc, addr);
+	trans = sctp_addr_id2transport(sk, &params.spp_address,
+				       params.spp_assoc_id);
 	if (!trans)
-		return -ENOENT;
+		return -EINVAL;
 
 	/* Applications can enable or disable heartbeats for any peer address
 	 * of an association, modify an address's heartbeat interval, force a
@@ -1412,7 +1486,7 @@ static int sctp_setsockopt_peer_addr_params(struct sock *sk,
 	 * and the current interval should remain unchanged.
 	 */
 	if (0xffffffff == params.spp_hbinterval) {
-		error = sctp_primitive_REQUESTHEARTBEAT (asoc, trans);
+		error = sctp_primitive_REQUESTHEARTBEAT (trans->asoc, trans);
 		if (error)
 			return error;
 	} else {
@@ -1435,6 +1509,17 @@ static int sctp_setsockopt_peer_addr_params(struct sock *sk,
 	return 0;
 }
 
+/* 7.1.3 Initialization Parameters (SCTP_INITMSG)
+ *
+ * Applications can specify protocol parameters for the default association
+ * initialization.  The option name argument to setsockopt() and getsockopt()
+ * is SCTP_INITMSG.
+ *
+ * Setting initialization parameters is effective only on an unconnected
+ * socket (for UDP-style sockets only future associations are effected
+ * by the change).  With TCP-style sockets, this option is inherited by
+ * sockets derived from a listener socket.
+ */
 static int sctp_setsockopt_initmsg(struct sock *sk, char *optval, int optlen)
 {
 	if (optlen != sizeof(struct sctp_initmsg))
@@ -1445,7 +1530,7 @@ static int sctp_setsockopt_initmsg(struct sock *sk, char *optval, int optlen)
 }
 
 /*
- * 7.1.15 Set default send parameters (SET_DEFAULT_SEND_PARAM)
+ * 7.1.14 Set default send parameters (SET_DEFAULT_SEND_PARAM)
  *
  *   Applications that wish to use the sendto() system call may wish to
  *   specify a default set of parameters that would normally be supplied
@@ -1463,6 +1548,7 @@ static int sctp_setsockopt_default_send_param(struct sock *sk,
 {
 	struct sctp_sndrcvinfo info;
 	struct sctp_association *asoc;
+	struct sctp_opt *sp = sctp_sk(sk);
 
 	if (optlen != sizeof(struct sctp_sndrcvinfo))
 		return -EINVAL;
@@ -1470,14 +1556,23 @@ static int sctp_setsockopt_default_send_param(struct sock *sk,
 		return -EFAULT;
 
 	asoc = sctp_id2assoc(sk, info.sinfo_assoc_id);
-	if (!asoc)
+	if (!asoc && info.sinfo_assoc_id && sctp_style(sk, UDP))
 		return -EINVAL;
 
-	asoc->defaults.stream = info.sinfo_stream;
-	asoc->defaults.flags = info.sinfo_flags;
-	asoc->defaults.ppid = info.sinfo_ppid;
-	asoc->defaults.context = info.sinfo_context;
-	asoc->defaults.timetolive = info.sinfo_timetolive;
+	if (asoc) {
+		asoc->default_stream = info.sinfo_stream;
+		asoc->default_flags = info.sinfo_flags;
+		asoc->default_ppid = info.sinfo_ppid;
+		asoc->default_context = info.sinfo_context;
+		asoc->default_timetolive = info.sinfo_timetolive;
+	} else {
+		sp->default_stream = info.sinfo_stream;
+		sp->default_flags = info.sinfo_flags;
+		sp->default_ppid = info.sinfo_ppid;
+		sp->default_context = info.sinfo_context;
+		sp->default_timetolive = info.sinfo_timetolive;
+	}
+
 	return 0;
 }
 
@@ -1490,8 +1585,6 @@ static int sctp_setsockopt_default_send_param(struct sock *sk,
 static int sctp_setsockopt_peer_prim(struct sock *sk, char *optval, int optlen)
 {
 	struct sctp_setpeerprim prim;
-	struct sctp_association *asoc;
-	union sctp_addr *addr;
 	struct sctp_transport *trans;
 
 	if (optlen != sizeof(struct sctp_setpeerprim))
@@ -1500,18 +1593,11 @@ static int sctp_setsockopt_peer_prim(struct sock *sk, char *optval, int optlen)
 	if (copy_from_user(&prim, optval, sizeof(struct sctp_setpeerprim)))
 		return -EFAULT;
 
-	asoc = sctp_id2assoc(sk, prim.sspp_assoc_id);
-	if (!asoc)
+	trans = sctp_addr_id2transport(sk, &prim.sspp_addr, prim.sspp_assoc_id);
+	if (!trans)
 		return -EINVAL;
 
-	/* Find the requested address. */
-	addr = (union sctp_addr *) &(prim.sspp_addr);
-
-	trans = sctp_assoc_lookup_paddr(asoc, addr);
-	if (!trans)
-		return -ENOENT;
-
-	sctp_assoc_set_primary(asoc, trans);
+	sctp_assoc_set_primary(trans->asoc, trans);
 
 	return 0;
 }
@@ -1906,12 +1992,9 @@ SCTP_STATIC int sctp_ioctl(struct sock *sk, int cmd, unsigned long arg)
 SCTP_STATIC int sctp_init_sock(struct sock *sk)
 {
 	struct sctp_endpoint *ep;
-	struct sctp_protocol *proto;
 	struct sctp_opt *sp;
 
 	SCTP_DEBUG_PRINTK("sctp_init_sock(sk: %p)\n", sk);
-
-	proto = sctp_get_protocol();
 
 	sp = sctp_sk(sk);
 
@@ -1933,23 +2016,26 @@ SCTP_STATIC int sctp_init_sock(struct sock *sk)
 	 */
 	sp->default_stream = 0;
 	sp->default_ppid = 0;
+	sp->default_flags = 0;
+	sp->default_context = 0;
+	sp->default_timetolive = 0;
 
 	/* Initialize default setup parameters. These parameters
 	 * can be modified with the SCTP_INITMSG socket option or
 	 * overridden by the SCTP_INIT CMSG.
 	 */
-	sp->initmsg.sinit_num_ostreams   = proto->max_outstreams;
-	sp->initmsg.sinit_max_instreams  = proto->max_instreams;
-	sp->initmsg.sinit_max_attempts   = proto->max_retrans_init;
-	sp->initmsg.sinit_max_init_timeo = proto->rto_max / HZ;
+	sp->initmsg.sinit_num_ostreams   = sctp_max_outstreams;
+	sp->initmsg.sinit_max_instreams  = sctp_max_instreams;
+	sp->initmsg.sinit_max_attempts   = sctp_max_retrans_init;
+	sp->initmsg.sinit_max_init_timeo = sctp_rto_max / HZ;
 
 	/* Initialize default RTO related parameters.  These parameters can
 	 * be modified for with the SCTP_RTOINFO socket option.
 	 * FIXME: These are not used yet.
 	 */
-	sp->rtoinfo.srto_initial = proto->rto_initial;
-	sp->rtoinfo.srto_max     = proto->rto_max;
-	sp->rtoinfo.srto_min     = proto->rto_min;
+	sp->rtoinfo.srto_initial = sctp_rto_initial;
+	sp->rtoinfo.srto_max     = sctp_rto_max;
+	sp->rtoinfo.srto_min     = sctp_rto_min;
 
 	/* Initialize default event subscriptions.
 	 * the struct sock is initialized to zero, so only
@@ -1964,8 +2050,8 @@ SCTP_STATIC int sctp_init_sock(struct sock *sk)
 	/* Default Peer Address Parameters.  These defaults can
 	 * be modified via SCTP_SET_PEER_ADDR_PARAMS
 	 */
-	sp->paddrparam.spp_hbinterval = proto->hb_interval / HZ;
-	sp->paddrparam.spp_pathmaxrxt = proto->max_retrans_path;
+	sp->paddrparam.spp_hbinterval = sctp_hb_interval / HZ;
+	sp->paddrparam.spp_pathmaxrxt = sctp_max_retrans_path;
 
 	/* If enabled no SCTP message fragmentation will be performed.
 	 * Configure through SCTP_DISABLE_FRAGMENTS socket option.
@@ -2131,6 +2217,64 @@ out:
 	return (retval);
 }
 
+
+/* 7.2.2 Peer Address Information (SCTP_GET_PEER_ADDR_INFO)
+ *
+ * Applications can retrieve information about a specific peer address
+ * of an association, including its reachability state, congestion
+ * window, and retransmission timer values.  This information is
+ * read-only.
+ */
+static int sctp_getsockopt_peer_addr_info(struct sock *sk, int len,
+					  char *optval, int *optlen)
+{
+	struct sctp_paddrinfo pinfo;
+	struct sctp_transport *transport;
+	int retval = 0;
+
+	if (len != sizeof(pinfo)) {
+		retval = -EINVAL;
+		goto out;
+	}
+
+	if (copy_from_user(&pinfo, optval, sizeof(pinfo))) {
+		retval = -EFAULT;
+		goto out;
+	}
+
+	transport = sctp_addr_id2transport(sk, &pinfo.spinfo_address,
+					   pinfo.spinfo_assoc_id);
+	if (!transport)
+		return -EINVAL;
+
+	pinfo.spinfo_assoc_id = sctp_assoc2id(transport->asoc);
+	pinfo.spinfo_state = transport->active;
+	pinfo.spinfo_cwnd = transport->cwnd;
+	pinfo.spinfo_srtt = transport->srtt;
+	pinfo.spinfo_rto = transport->rto;
+	pinfo.spinfo_mtu = transport->pmtu;
+
+	if (put_user(len, optlen)) {
+		retval = -EFAULT;
+		goto out;
+	}
+
+	if (copy_to_user(optval, &pinfo, len)) {
+		retval = -EFAULT;
+		goto out;
+	}
+
+out:
+	return (retval);
+}
+
+/* 7.1.12 Enable/Disable message fragmentation (SCTP_DISABLE_FRAGMENTS)
+ *
+ * This option is a on/off flag.  If enabled no SCTP message
+ * fragmentation will be performed.  Instead if a message being sent
+ * exceeds the current PMTU size, the message will NOT be sent and
+ * instead a error will be indicated to the user.
+ */
 static int sctp_getsockopt_disable_fragments(struct sock *sk, int len,
 						    char *optval, int *optlen)
 {
@@ -2148,6 +2292,11 @@ static int sctp_getsockopt_disable_fragments(struct sock *sk, int len,
 	return 0;
 }
 
+/* 7.1.15 Set notification and ancillary events (SCTP_SET_EVENTS)
+ *
+ * This socket option is used to specify various notifications and
+ * ancillary data the user wishes to receive.
+ */
 static int sctp_getsockopt_set_events(struct sock *sk, int len, char *optval, int *optlen)
 {
 	if (len != sizeof(struct sctp_event_subscribe))
@@ -2157,6 +2306,17 @@ static int sctp_getsockopt_set_events(struct sock *sk, int len, char *optval, in
 	return 0;
 }
 
+/* 7.1.8 Automatic Close of associations (SCTP_AUTOCLOSE)
+ *
+ * This socket option is applicable to the UDP-style socket only.  When
+ * set it will cause associations that are idle for more than the
+ * specified number of seconds to automatically close.  An association
+ * being idle is defined an association that has NOT sent or received
+ * user data.  The special value of '0' indicates that no automatic
+ * close of any associations should be performed.  The option expects an
+ * integer defining the number of seconds of idle time before an
+ * association is closed.
+ */
 static int sctp_getsockopt_autoclose(struct sock *sk, int len, char *optval, int *optlen)
 {
 	/* Applicable to UDP-style socket only */
@@ -2240,12 +2400,41 @@ out:
 	return retval;
 }
 
+/* 7.1.13 Peer Address Parameters (SCTP_SET_PEER_ADDR_PARAMS)
+ *
+ * Applications can enable or disable heartbeats for any peer address of
+ * an association, modify an address's heartbeat interval, force a
+ * heartbeat to be sent immediately, and adjust the address's maximum
+ * number of retransmissions sent before an address is considered
+ * unreachable.  The following structure is used to access and modify an
+ * address's parameters:
+ *
+ *  struct sctp_paddrparams {
+ *      sctp_assoc_t            spp_assoc_id;
+ *      struct sockaddr_storage spp_address;
+ *      uint32_t                spp_hbinterval;
+ *      uint16_t                spp_pathmaxrxt;
+ *  };
+ *
+ *   spp_assoc_id    - (UDP style socket) This is filled in the application,
+ *                     and identifies the association for this query.
+ *   spp_address     - This specifies which address is of interest.
+ *   spp_hbinterval  - This contains the value of the heartbeat interval,
+ *                     in milliseconds.  A value of 0, when modifying the
+ *                     parameter, specifies that the heartbeat on this
+ *                     address should be disabled. A value of UINT32_MAX
+ *                     (4294967295), when modifying the parameter,
+ *                     specifies that a heartbeat should be sent
+ *                     immediately to the peer address, and the current
+ *                     interval should remain unchanged.
+ *   spp_pathmaxrxt  - This contains the maximum number of
+ *                     retransmissions before this address shall be
+ *                     considered unreachable.
+ */ 
 static int sctp_getsockopt_peer_addr_params(struct sock *sk, int len,
 						char *optval, int *optlen)
 {
 	struct sctp_paddrparams params;
-	struct sctp_association *asoc;
-	union sctp_addr *addr;
 	struct sctp_transport *trans;
 
 	if (len != sizeof(struct sctp_paddrparams))
@@ -2253,15 +2442,10 @@ static int sctp_getsockopt_peer_addr_params(struct sock *sk, int len,
 	if (copy_from_user(&params, optval, *optlen))
 		return -EFAULT;
 
-	asoc = sctp_id2assoc(sk, params.spp_assoc_id);
-	if (!asoc)
-		return -EINVAL;
-
-	addr = (union sctp_addr *) &(params.spp_address);
-
-	trans = sctp_assoc_lookup_paddr(asoc, addr);
+	trans = sctp_addr_id2transport(sk, &params.spp_address,
+				       params.spp_assoc_id);
 	if (!trans)
-		return -ENOENT;
+		return -EINVAL;
 
 	/* The value of the heartbeat interval, in milliseconds. A value of 0,
 	 * when modifying the parameter, specifies that the heartbeat on this
@@ -2286,6 +2470,17 @@ static int sctp_getsockopt_peer_addr_params(struct sock *sk, int len,
 	return 0;
 }
 
+/* 7.1.3 Initialization Parameters (SCTP_INITMSG)
+ *
+ * Applications can specify protocol parameters for the default association
+ * initialization.  The option name argument to setsockopt() and getsockopt()
+ * is SCTP_INITMSG.
+ *
+ * Setting initialization parameters is effective only on an unconnected
+ * socket (for UDP-style sockets only future associations are effected
+ * by the change).  With TCP-style sockets, this option is inherited by
+ * sockets derived from a listener socket.
+ */
 static int sctp_getsockopt_initmsg(struct sock *sk, int len, char *optval, int *optlen)
 {
 	if (len != sizeof(struct sctp_initmsg))
@@ -2491,7 +2686,7 @@ static int sctp_getsockopt_peer_prim(struct sock *sk, int len,
 
 /*
  *
- * 7.1.15 Set default send parameters (SET_DEFAULT_SEND_PARAM)
+ * 7.1.14 Set default send parameters (SET_DEFAULT_SEND_PARAM)
  *
  *   Applications that wish to use the sendto() system call may wish to
  *   specify a default set of parameters that would normally be supplied
@@ -2511,6 +2706,7 @@ static int sctp_getsockopt_default_send_param(struct sock *sk,
 {
 	struct sctp_sndrcvinfo info;
 	struct sctp_association *asoc;
+	struct sctp_opt *sp = sctp_sk(sk);
 
 	if (len != sizeof(struct sctp_sndrcvinfo))
 		return -EINVAL;
@@ -2518,14 +2714,22 @@ static int sctp_getsockopt_default_send_param(struct sock *sk,
 		return -EFAULT;
 
 	asoc = sctp_id2assoc(sk, info.sinfo_assoc_id);
-	if (!asoc)
+	if (!asoc && info.sinfo_assoc_id && sctp_style(sk, UDP))
 		return -EINVAL;
 
-	info.sinfo_stream = asoc->defaults.stream;
-	info.sinfo_flags = asoc->defaults.flags;
-	info.sinfo_ppid = asoc->defaults.ppid;
-	info.sinfo_context = asoc->defaults.context;
-	info.sinfo_timetolive = asoc->defaults.timetolive;
+	if (asoc) {
+		info.sinfo_stream = asoc->default_stream;
+		info.sinfo_flags = asoc->default_flags;
+		info.sinfo_ppid = asoc->default_ppid;
+		info.sinfo_context = asoc->default_context;
+		info.sinfo_timetolive = asoc->default_timetolive;
+	} else {
+		info.sinfo_stream = sp->default_stream;
+		info.sinfo_flags = sp->default_flags;
+		info.sinfo_ppid = sp->default_ppid;
+		info.sinfo_context = sp->default_context;
+		info.sinfo_timetolive = sp->default_timetolive;
+	}
 
 	if (copy_to_user(optval, &info, sizeof(struct sctp_sndrcvinfo)))
 		return -EFAULT;
@@ -2698,6 +2902,10 @@ SCTP_STATIC int sctp_getsockopt(struct sock *sk, int level, int optname,
 	case SCTP_MAXSEG:
 		retval = sctp_getsockopt_maxseg(sk, len, optval, optlen);
 		break;
+	case SCTP_GET_PEER_ADDR_INFO:
+		retval = sctp_getsockopt_peer_addr_info(sk, len, optval,
+							optlen);
+		break;
 	default:
 		retval = -ENOPROTOOPT;
 		break;
@@ -2721,7 +2929,7 @@ static void sctp_unhash(struct sock *sk)
  *
  * The port hash table (contained in the 'global' SCTP protocol storage
  * returned by struct sctp_protocol *sctp_get_protocol()). The hash
- * table is an array of 4096 lists (sctp_bind_hashbucket_t). Each
+ * table is an array of 4096 lists (sctp_bind_hashbucket). Each
  * list (the list number is the port number hashed out, so as you
  * would expect from a hash function, all the ports in a given list have
  * such a number that hashes out to the same list number; you were
@@ -2729,13 +2937,13 @@ static void sctp_unhash(struct sock *sk)
  * link to the socket (struct sock) that uses it, the port number and
  * a fastreuse flag (FIXME: NPI ipg).
  */
-static sctp_bind_bucket_t *sctp_bucket_create(sctp_bind_hashbucket_t *head,
-					      unsigned short snum);
+static struct sctp_bind_bucket *sctp_bucket_create(
+	struct sctp_bind_hashbucket *head, unsigned short snum);
+
 static long sctp_get_port_local(struct sock *sk, union sctp_addr *addr)
 {
-	sctp_bind_hashbucket_t *head; /* hash list */
-	sctp_bind_bucket_t *pp; /* hash list port iterator */
-	struct sctp_protocol *sctp = sctp_get_protocol();
+	struct sctp_bind_hashbucket *head; /* hash list */
+	struct sctp_bind_bucket *pp; /* hash list port iterator */
 	unsigned short snum;
 	int ret;
 
@@ -2750,8 +2958,8 @@ static long sctp_get_port_local(struct sock *sk, union sctp_addr *addr)
 	if (snum == 0) {
 		/* Search for an available port.
 		 *
-		 * 'sctp->port_rover' was the last port assigned, so
-		 * we start to search from 'sctp->port_rover +
+		 * 'sctp_port_rover' was the last port assigned, so
+		 * we start to search from 'sctp_port_rover +
 		 * 1'. What we do is first check if port 'rover' is
 		 * already in the hash table; if not, we use that; if
 		 * it is, we try next.
@@ -2762,14 +2970,14 @@ static long sctp_get_port_local(struct sock *sk, union sctp_addr *addr)
 		int rover;
 		int index;
 
-		sctp_spin_lock(&sctp->port_alloc_lock);
-		rover = sctp->port_rover;
+		sctp_spin_lock(&sctp_port_alloc_lock);
+		rover = sctp_port_rover;
 		do {
 			rover++;
 			if ((rover < low) || (rover > high))
 				rover = low;
 			index = sctp_phashfn(rover);
-			head = &sctp->port_hashtable[index];
+			head = &sctp_port_hashtable[index];
 			sctp_spin_lock(&head->lock);
 			for (pp = head->chain; pp; pp = pp->next)
 				if (pp->port == rover)
@@ -2778,8 +2986,8 @@ static long sctp_get_port_local(struct sock *sk, union sctp_addr *addr)
 		next:
 			sctp_spin_unlock(&head->lock);
 		} while (--remaining > 0);
-		sctp->port_rover = rover;
-		sctp_spin_unlock(&sctp->port_alloc_lock);
+		sctp_port_rover = rover;
+		sctp_spin_unlock(&sctp_port_alloc_lock);
 
 		/* Exhausted local port range during search? */
 		ret = 1;
@@ -2799,7 +3007,7 @@ static long sctp_get_port_local(struct sock *sk, union sctp_addr *addr)
 		 * to the port number (snum) - we detect that with the
 		 * port iterator, pp being NULL.
 		 */
-		head = &sctp->port_hashtable[sctp_phashfn(snum)];
+		head = &sctp_port_hashtable[sctp_phashfn(snum)];
 		sctp_spin_lock(&head->lock);
 		for (pp = head->chain; pp; pp = pp->next) {
 			if (pp->port == snum)
@@ -3105,12 +3313,13 @@ unsigned int sctp_poll(struct file *file, struct socket *sock, poll_table *wait)
  * 2nd Level Abstractions
  ********************************************************************/
 
-static sctp_bind_bucket_t *sctp_bucket_create(sctp_bind_hashbucket_t *head, unsigned short snum)
+static struct sctp_bind_bucket *sctp_bucket_create(
+	struct sctp_bind_hashbucket *head, unsigned short snum)
 {
-	sctp_bind_bucket_t *pp;
+	struct sctp_bind_bucket *pp;
 
-	SCTP_DEBUG_PRINTK( "sctp_bucket_create() begins, snum=%d\n", snum);
-	pp = kmalloc(sizeof(sctp_bind_bucket_t), GFP_ATOMIC);
+	pp = kmem_cache_alloc(sctp_bucket_cachep, SLAB_ATOMIC);
+	SCTP_DBG_OBJCNT_INC(bind_bucket);
 	if (pp) {
 		pp->port = snum;
 		pp->fastreuse = 0;
@@ -3120,31 +3329,36 @@ static sctp_bind_bucket_t *sctp_bucket_create(sctp_bind_hashbucket_t *head, unsi
 		head->chain = pp;
 		pp->pprev = &head->chain;
 	}
-	SCTP_DEBUG_PRINTK("sctp_bucket_create() ends, pp=%p\n", pp);
 	return pp;
+}
+
+/* Caller must hold hashbucket lock for this tb with local BH disabled */
+static void sctp_bucket_destroy(struct sctp_bind_bucket *pp)
+{
+	if (!pp->sk) {
+		if (pp->next)
+			pp->next->pprev = pp->pprev;
+		*(pp->pprev) = pp->next;
+		kmem_cache_free(sctp_bucket_cachep, pp);
+		SCTP_DBG_OBJCNT_DEC(bind_bucket);
+	}
 }
 
 /* FIXME: Comments! */
 static __inline__ void __sctp_put_port(struct sock *sk)
 {
-	struct sctp_protocol *sctp_proto = sctp_get_protocol();
-	sctp_bind_hashbucket_t *head =
-		&sctp_proto->port_hashtable[sctp_phashfn(inet_sk(sk)->num)];
-	sctp_bind_bucket_t *pp;
+	struct sctp_bind_hashbucket *head =
+		&sctp_port_hashtable[sctp_phashfn(inet_sk(sk)->num)];
+	struct sctp_bind_bucket *pp;
 
 	sctp_spin_lock(&head->lock);
-	pp = (sctp_bind_bucket_t *) sk->prev;
+	pp = (struct sctp_bind_bucket *) sk->prev;
 	if (sk->bind_next)
 		sk->bind_next->bind_pprev = sk->bind_pprev;
 	*(sk->bind_pprev) = sk->bind_next;
 	sk->prev = NULL;
 	inet_sk(sk)->num = 0;
-	if (pp->sk) {
-		if (pp->next)
-			pp->next->pprev = pp->pprev;
-		*(pp->pprev) = pp->next;
-		kfree(pp);
-	}
+	sctp_bucket_destroy(pp);
 	sctp_spin_unlock(&head->lock);
 }
 

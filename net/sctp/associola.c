@@ -96,7 +96,6 @@ struct sctp_association *sctp_association_init(struct sctp_association *asoc,
 					  int gfp)
 {
 	struct sctp_opt *sp;
-	struct sctp_protocol *proto = sctp_get_protocol();
 	int i;
 
 	/* Retrieve the SCTP per socket area.  */
@@ -129,26 +128,26 @@ struct sctp_association *sctp_association_init(struct sctp_association *asoc,
 	asoc->state_timestamp = jiffies;
 
 	/* Set things that have constant value.  */
-	asoc->cookie_life.tv_sec = sctp_proto.valid_cookie_life / HZ;
-	asoc->cookie_life.tv_usec = (sctp_proto.valid_cookie_life % HZ) *
+	asoc->cookie_life.tv_sec = sctp_valid_cookie_life / HZ;
+	asoc->cookie_life.tv_usec = (sctp_valid_cookie_life % HZ) *
 					1000000L / HZ;
 
 	asoc->pmtu = 0;
 	asoc->frag_point = 0;
 
 	/* Initialize the default association max_retrans and RTO values.  */
-	asoc->max_retrans = proto->max_retrans_association;
-	asoc->rto_initial = proto->rto_initial;
-	asoc->rto_max = proto->rto_max;
-	asoc->rto_min = proto->rto_min;
+	asoc->max_retrans = sctp_max_retrans_association;
+	asoc->rto_initial = sctp_rto_initial;
+	asoc->rto_max = sctp_rto_max;
+	asoc->rto_min = sctp_rto_min;
 
-	asoc->overall_error_threshold = 0;
+	asoc->overall_error_threshold = asoc->max_retrans;
 	asoc->overall_error_count = 0;
 
 	/* Initialize the maximum mumber of new data packets that can be sent
 	 * in a burst.
 	 */
-	asoc->max_burst = proto->max_burst;
+	asoc->max_burst = sctp_max_burst;
 
 	/* Copy things from the endpoint.  */
 	for (i = SCTP_EVENT_TIMEOUT_NONE; i < SCTP_NUM_TIMEOUT_TYPES; ++i) {
@@ -277,6 +276,12 @@ struct sctp_association *sctp_association_init(struct sctp_association *asoc,
 
 	asoc->autoclose = sp->autoclose;
 
+	asoc->default_stream = sp->default_stream;
+	asoc->default_ppid = sp->default_ppid;
+	asoc->default_flags = sp->default_flags;
+	asoc->default_context = sp->default_context;
+	asoc->default_timetolive = sp->default_timetolive;
+	
 	return asoc;
 
 fail_init:
@@ -478,15 +483,7 @@ struct sctp_transport *sctp_assoc_add_peer(struct sctp_association *asoc,
 
 	peer->partial_bytes_acked = 0;
 	peer->flight_size = 0;
-
 	peer->error_threshold = peer->max_retrans;
-
-	/* Update the overall error threshold value of the association
-	 * taking the new peer's error threshold into account.
-	 */
-	asoc->overall_error_threshold =
-		min(asoc->overall_error_threshold + peer->error_threshold,
-		    asoc->max_retrans);
 
 	/* By default, enable heartbeat for peer address. */
 	peer->hb_allowed = 1;
@@ -550,12 +547,12 @@ void sctp_assoc_control_transport(struct sctp_association *asoc,
 	/* Record the transition on the transport.  */
 	switch (command) {
 	case SCTP_TRANSPORT_UP:
-		transport->active = 1;
+		transport->active = SCTP_ACTIVE;
 		spc_state = ADDRESS_AVAILABLE;
 		break;
 
 	case SCTP_TRANSPORT_DOWN:
-		transport->active = 0;
+		transport->active = SCTP_INACTIVE;
 		spc_state = ADDRESS_UNREACHABLE;
 		break;
 
