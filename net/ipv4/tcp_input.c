@@ -1032,7 +1032,7 @@ tcp_sacktag_write_queue(struct sock *sk, struct sk_buff *ack_skb, u32 prior_snd_
 			if(!before(TCP_SKB_CB(skb)->seq, end_seq))
 				break;
 
-			fack_count++;
+			fack_count += TCP_SKB_CB(skb)->tso_factor;
 
 			in_sack = !after(start_seq, TCP_SKB_CB(skb)->seq) &&
 				!before(end_seq, TCP_SKB_CB(skb)->end_seq);
