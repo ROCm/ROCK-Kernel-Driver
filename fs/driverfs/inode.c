@@ -50,7 +50,6 @@
 static struct super_operations driverfs_ops;
 static struct file_operations driverfs_file_operations;
 static struct inode_operations driverfs_dir_inode_operations;
-static struct dentry_operations driverfs_dentry_file_ops;
 static struct address_space_operations driverfs_aops;
 
 static struct vfsmount *driverfs_mount;
@@ -161,7 +160,6 @@ static int driverfs_create(struct inode *dir, struct dentry *dentry, int mode)
 {
 	int res;
 	mode = (mode & S_IALLUGO) | S_IFREG;
-	dentry->d_op = &driverfs_dentry_file_ops;
  	res = driverfs_mknod(dir, dentry, mode, 0);
 	return res;
 }
@@ -441,16 +439,6 @@ static int driverfs_release(struct inode * inode, struct file * filp)
 	return 0;
 }
 
-static int driverfs_d_delete_file (struct dentry * dentry)
-{
-	struct driver_file_entry * entry;
-
-	entry = (struct driver_file_entry *)dentry->d_fsdata;
-	if (entry)
-		kfree(entry);
-	return 0;
-}
-
 static struct file_operations driverfs_file_operations = {
 	.read		= driverfs_read_file,
 	.write		= driverfs_write_file,
@@ -468,10 +456,6 @@ static struct address_space_operations driverfs_aops = {
 	.writepage	= fail_writepage,
 	.prepare_write	= driverfs_prepare_write,
 	.commit_write	= driverfs_commit_write
-};
-
-static struct dentry_operations driverfs_dentry_file_ops = {
-	.d_delete	= driverfs_d_delete_file,
 };
 
 static struct super_operations driverfs_ops = {

@@ -26,23 +26,13 @@ extern struct driver_file_entry * device_default_files[];
  */
 int device_create_file(struct device * dev, struct driver_file_entry * entry)
 {
-	struct driver_file_entry * new_entry;
-	int error = -ENOMEM;
+	int error = -EINVAL;
 
-	if (!dev)
-		return -EINVAL;
-	get_device(dev);
-
-	new_entry = kmalloc(sizeof(*new_entry),GFP_KERNEL);
-	if (!new_entry)
-		goto done;
-
-	memcpy(new_entry,entry,sizeof(*entry));
-	error = driverfs_create_file(new_entry,&dev->dir);
-	if (error)
-		kfree(new_entry);
- done:
-	put_device(dev);
+	if (dev) {
+		get_device(dev);
+		error = driverfs_create_file(entry,&dev->dir);
+		put_device(dev);
+	}
 	return error;
 }
 
