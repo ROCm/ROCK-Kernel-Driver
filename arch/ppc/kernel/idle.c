@@ -52,49 +52,45 @@ void power_save(void);
 unsigned long zero_paged_on;
 unsigned long powersave_nap;
 
-int idled(void)
+void default_idle(void)
 {
 	int do_power_save = 0;
 
 	if (cur_cpu_spec[smp_processor_id()]->cpu_features & CPU_FTR_CAN_DOZE)
 		do_power_save = 1;
 
-	/* endless loop with no priority at all */
-	for (;;) {
 #ifdef CONFIG_PPC_ISERIES
-		if (!current->need_resched) {
-			/* Turn off the run light */
-			run_light_on(0);
-                	yield_shared_processor(); 
-		}
-		HMT_low();
+	if (!current->need_resched) {
+		/* Turn off the run light */
+		run_light_on(0);
+		yield_shared_processor(); 
+	}
+	HMT_low();
 #endif
 #ifdef CONFIG_SMP
-		if (!do_power_save) {
-			if (!need_resched()) {
-				set_thread_flag(TIF_POLLING_NRFLAG);
-				while (!test_thread_flag(TIF_NEED_RESCHED))
-					barrier();
-				clear_thread_flag(TIF_POLLING_NRFLAG);
-			}
+	if (!do_power_save) {
+		if (!need_resched()) {
+			set_thread_flag(TIF_POLLING_NRFLAG);
+			while (!test_thread_flag(TIF_NEED_RESCHED))
+				barrier();
+			clear_thread_flag(TIF_POLLING_NRFLAG);
 		}
-#endif
-		if (do_power_save && !need_resched())
-			power_save();
-
-		if (need_resched()) {
-			run_light_on(1);
-			schedule();
-		}
-#ifdef CONFIG_PPC_ISERIES
-		else {
-			run_light_on(0);
-			yield_shared_processor();
-			HMT_low();
-		}
-#endif /* CONFIG_PPC_ISERIES */
 	}
-	return 0;
+#endif
+	if (do_power_save && !need_resched())
+		power_save();
+
+	if (need_resched()) {
+		run_light_on(1);
+		schedule();
+	}
+#ifdef CONFIG_PPC_ISERIES
+	else {
+		run_light_on(0);
+		yield_shared_processor();
+		HMT_low();
+	}
+#endif /* CONFIG_PPC_ISERIES */
 }
 
 /*
@@ -103,7 +99,8 @@ int idled(void)
  */
 int cpu_idle(void)
 {
-	idled();
+	for (;;)
+		default_idle();
 	return 0; 
 }
 
