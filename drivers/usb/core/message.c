@@ -781,17 +781,39 @@ void usb_disable_interface(struct usb_device *dev, struct usb_interface *intf)
  * @skip_ep0: 0 to disable endpoint 0, 1 to skip it.
  *
  * Disables all the device's endpoints, potentially including endpoint 0.
- * Deallocates hcd/hardware state for the endpoints ... and nukes all
- * pending urbs.
+ * Deallocates hcd/hardware state for the endpoints (nuking all or most
+ * pending urbs) and usbcore state for the interfaces, so that usbcore
+ * must usb_set_configuration() before any interfaces could be used.
  */
 void usb_disable_device(struct usb_device *dev, int skip_ep0)
 {
 	int i;
 
-	dbg("nuking URBs for device %s", dev->dev.bus_id);
+	dev_dbg(&dev->dev, "%s nuking %s URBs\n", __FUNCTION__,
+			skip_ep0 ? "non-ep0" : "all");
 	for (i = skip_ep0; i < 16; ++i) {
 		usb_disable_endpoint(dev, i);
 		usb_disable_endpoint(dev, i + USB_DIR_IN);
+	}
+	dev->toggle[0] = dev->toggle[1] = 0;
+	dev->halted[0] = dev->halted[1] = 0;
+
+	/* getting rid of interfaces will disconnect
+	 * any drivers bound to them (a key side effect)
+	 */
+	if (dev->actconfig) {
+		for (i = 0; i < dev->actconfig->desc.bNumInterfaces; i++) {
+			struct usb_interface	*interface;
+
+			/* remove this interface */
+			interface = dev->actconfig->interface[i];
+			dev_dbg (&dev->dev, "unregistering interface %s\n",
+				interface->dev.bus_id);
+			device_del(&interface->dev);
+		}
+		dev->actconfig = 0;
+		if (dev->state == USB_STATE_CONFIGURED)
+			dev->state = USB_STATE_ADDRESS;
 	}
 }
 
@@ -979,6 +1001,9 @@ int usb_reset_configuration(struct usb_device *dev)
 	int			i, retval;
 	struct usb_host_config	*config;
 
+	/* dev->serialize guards all config changes */
+	down(&dev->serialize);
+
 	for (i = 1; i < 16; ++i) {
 		usb_disable_endpoint(dev, i);
 		usb_disable_endpoint(dev, i + USB_DIR_IN);
@@ -989,8 +1014,10 @@ int usb_reset_configuration(struct usb_device *dev)
 			USB_REQ_SET_CONFIGURATION, 0,
 			config->desc.bConfigurationValue, 0,
 			NULL, 0, HZ * USB_CTRL_SET_TIMEOUT);
-	if (retval < 0)
-		return retval;
+	if (retval < 0) {
+		dev->state = USB_STATE_ADDRESS;
+		goto done;
+	}
 
 	dev->toggle[0] = dev->toggle[1] = 0;
 	dev->halted[0] = dev->halted[1] = 0;
@@ -1002,7 +1029,9 @@ int usb_reset_configuration(struct usb_device *dev)
 		intf->act_altsetting = 0;
 		usb_enable_interface(dev, intf);
 	}
-	return 0;
+done:
+	up(&dev->serialize);
+	return (retval < 0) ? retval : 0;
 }
 
 /**
@@ -1012,71 +1041,104 @@ int usb_reset_configuration(struct usb_device *dev)
  * Context: !in_interrupt ()
  *
  * This is used to enable non-default device modes.  Not all devices
- * support this kind of configurability.  By default, configuration
- * zero is selected after enumeration; many devices only have a single
+ * use this kind of configurability; many devices only have one
  * configuration.
  *
- * USB devices may support one or more configurations, which affect
+ * USB device configurations may affect Linux interoperability,
  * power consumption and the functionality available.  For example,
  * the default configuration is limited to using 100mA of bus power,
  * so that when certain device functionality requires more power,
- * and the device is bus powered, that functionality will be in some
+ * and the device is bus powered, that functionality should be in some
  * non-default device configuration.  Other device modes may also be
  * reflected as configuration options, such as whether two ISDN
- * channels are presented as independent 64Kb/s interfaces or as one
- * bonded 128Kb/s interface.
+ * channels are available independently; and choosing between open
+ * standard device protocols (like CDC) or proprietary ones.
  *
  * Note that USB has an additional level of device configurability,
  * associated with interfaces.  That configurability is accessed using
  * usb_set_interface().
  *
- * This call is synchronous, and may not be used in an interrupt context.
+ * This call is synchronous. The calling context must be able to sleep,
+ * and must not hold the driver model lock for USB; usb device driver
+ * probe() methods may not use this routine.
  *
  * Returns zero on success, or else the status code returned by the
- * underlying usb_control_msg() call.
+ * underlying call that failed.  On succesful completion, each interface
+ * in the original device configuration has been destroyed, and each one
+ * in the new configuration has been probed by all relevant usb device
+ * drivers currently known to the kernel.
  */
 int usb_set_configuration(struct usb_device *dev, int configuration)
 {
 	int i, ret;
 	struct usb_host_config *cp = NULL;
 	
+	/* dev->serialize guards all config changes */
+	down(&dev->serialize);
+
 	for (i=0; i<dev->descriptor.bNumConfigurations; i++) {
 		if (dev->config[i].desc.bConfigurationValue == configuration) {
 			cp = &dev->config[i];
 			break;
 		}
 	}
-	if ((!cp && configuration != 0) || (cp && configuration == 0)) {
-		warn("selecting invalid configuration %d", configuration);
-		return -EINVAL;
+	if ((!cp && configuration != 0)) {
+		ret = -EINVAL;
+		goto out;
 	}
+	if (cp && configuration == 0)
+		dev_warn(&dev->dev, "config 0 descriptor??\n");
 
-	/* if it's already configured, clear out old state first. */
+	/* if it's already configured, clear out old state first.
+	 * getting rid of old interfaces means unbinding their drivers.
+	 */
 	if (dev->state != USB_STATE_ADDRESS)
 		usb_disable_device (dev, 1);	// Skip ep0
-	dev->toggle[0] = dev->toggle[1] = 0;
-	dev->halted[0] = dev->halted[1] = 0;
-	dev->state = USB_STATE_ADDRESS;
 
 	if ((ret = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
 			USB_REQ_SET_CONFIGURATION, 0, configuration, 0,
 			NULL, 0, HZ * USB_CTRL_SET_TIMEOUT)) < 0)
-		return ret;
-	if (configuration)
-		dev->state = USB_STATE_CONFIGURED;
+		goto out;
+
 	dev->actconfig = cp;
+	if (!configuration)
+		dev->state = USB_STATE_ADDRESS;
+	else {
+		dev->state = USB_STATE_CONFIGURED;
 
-	/* reset more hc/hcd interface/endpoint state */
-	for (i = 0; i < cp->desc.bNumInterfaces; ++i) {
-		struct usb_interface *intf = cp->interface[i];
+		/* re-initialize hc/hcd/usbcore interface/endpoint state.
+		 * this triggers binding of drivers to interfaces; and
+		 * maybe probe() calls will choose different altsettings.
+		 */
+		for (i = 0; i < cp->desc.bNumInterfaces; ++i) {
+			struct usb_interface *intf = cp->interface[i];
+			struct usb_interface_descriptor *desc;
 
-		intf->act_altsetting = 0;
-		usb_enable_interface(dev, intf);
+			intf->act_altsetting = 0;
+			desc = &intf->altsetting [0].desc;
+			usb_enable_interface(dev, intf);
+
+			intf->dev.parent = &dev->dev;
+			intf->dev.driver = NULL;
+			intf->dev.bus = &usb_bus_type;
+			intf->dev.dma_mask = dev->dev.dma_mask;
+			sprintf (&intf->dev.bus_id[0], "%d-%s:%d.%d",
+				 dev->bus->busnum, dev->devpath,
+				 configuration,
+				 desc->bInterfaceNumber);
+			dev_dbg (&dev->dev,
+				"registering %s (config #%d, interface %d)\n",
+				intf->dev.bus_id, configuration,
+				desc->bInterfaceNumber);
+			device_add (&intf->dev);
+			usb_create_driverfs_intf_files (intf);
+		}
 	}
 
-	return 0;
+out:
+	up(&dev->serialize);
+	return ret;
 }
-
 
 /**
  * usb_string - returns ISO 8859-1 version of a string descriptor
