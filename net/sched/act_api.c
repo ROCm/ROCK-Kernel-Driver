@@ -283,55 +283,39 @@ struct tc_action *tcf_action_init_1(struct rtattr *rta, struct rtattr *est,
 		                 RTA_PAYLOAD(rta)) < 0)
 			goto err_out;
 		kind = tb[TCA_ACT_KIND-1];
-		if (kind != NULL) {
-			if (rtattr_strlcpy(act_name, kind,
-			                   IFNAMSIZ) >= IFNAMSIZ)
-				goto err_out;
-		} else {
-			printk("Action bad kind\n");
+		if (kind == NULL)
 			goto err_out;
-		}
-		a_o = tc_lookup_action(kind);
+		if (rtattr_strlcpy(act_name, kind, IFNAMSIZ) >= IFNAMSIZ)
+			goto err_out;
 	} else {
-		sprintf(act_name, "%s", name);
-		DPRINTK("tcf_action_init_1: finding %s\n", act_name);
-		a_o = tc_lookup_action_n(name);
+		if (strlcpy(act_name, name, IFNAMSIZ) >= IFNAMSIZ)
+			goto err_out;
 	}
+
+	*err = -ENOENT;
+	a_o = tc_lookup_action_n(act_name);
 #ifdef CONFIG_KMOD
 	if (a_o == NULL) {
-		DPRINTK("tcf_action_init_1: trying to load module %s\n",
-		        act_name);
 		request_module(act_name);
 		a_o = tc_lookup_action_n(act_name);
 	}
-
 #endif
-	if (a_o == NULL) {
-		printk("failed to find %s\n", act_name);
+	if (a_o == NULL)
 		goto err_out;
-	}
 
+	*err = -ENOMEM;
 	a = kmalloc(sizeof(*a), GFP_KERNEL);
-	if (a == NULL) {
-		*err = -ENOMEM;
+	if (a == NULL)
 		goto err_mod;
-	}
 	memset(a, 0, sizeof(*a));
 
 	/* backward compatibility for policer */
-	if (name == NULL) {
+	if (name == NULL)
 		*err = a_o->init(tb[TCA_ACT_OPTIONS-1], est, a, ovr, bind);
-		if (*err < 0) {
-			*err = -EINVAL;
-			goto err_free;
-		}
-	} else {
+	else
 		*err = a_o->init(rta, est, a, ovr, bind);
-		if (*err < 0) {
-			*err = -EINVAL;
-			goto err_free;
-		}
-	}
+	if (*err < 0)
+		goto err_free;
 
 	/* module count goes up only when brand new policy is created
 	   if it exists and is only bound to in a_o->init() then
@@ -370,10 +354,8 @@ struct tc_action *tcf_action_init(struct rtattr *rta, struct rtattr *est,
 		if (tb[i]) {
 			act = tcf_action_init_1(tb[i], est, name, ovr, bind,
 			                        err);
-			if (act == NULL) {
-				printk("Error processing action order %d\n", i);
+			if (act == NULL)
 				goto bad_ret;
-			}
 
 			act->order = i+1;
 			if (a == NULL)
@@ -838,8 +820,7 @@ static int tc_ctl_action(struct sk_buff *skb, struct nlmsghdr *n, void *arg)
 		ret = tca_action_gd(tca[TCA_ACT_TAB-1], n, pid, RTM_GETACTION);
 		break;
 	default:
-		printk("Unknown cmd was detected\n");
-		break;
+		BUG();
 	}
 
 	return ret;
