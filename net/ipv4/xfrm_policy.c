@@ -540,7 +540,7 @@ xfrm_bundle_create(struct xfrm_policy *policy, struct xfrm_state **xfrm,
 		dst_prev->flags		= DST_HOST;
 		dst_prev->lastuse	= jiffies;
 		dst_prev->header_len	= header_len;
-		memcpy(&dst_prev->metrics, &rt->u.dst.metrics, sizeof(&dst_prev->metrics));
+		memcpy(&dst_prev->metrics, &rt->u.dst.metrics, sizeof(dst_prev->metrics));
 		dst_prev->path		= &rt->u.dst;
 
 		/* Copy neighbout for reachability confirmation */
@@ -783,7 +783,7 @@ int __xfrm_policy_check(int dir, struct sk_buff *skb)
 	/* First, check used SA against their selectors. */
 	if (skb->sp) {
 		int i;
-		for (i=skb->sp->len-1; i>=0; i++) {
+		for (i=skb->sp->len-1; i>=0; i--) {
 			if (!xfrm4_selector_match(&skb->sp->xvec[i]->sel, &fl))
 				return 0;
 		}
