@@ -2746,6 +2746,9 @@ int sctp_inet_listen(struct socket *sock, int backlog)
 	err = -EINVAL;
 	if (sock->state != SS_UNCONNECTED)
 		goto out;
+	if (unlikely(backlog < 0))
+		goto out;
+
 	switch (sock->type) {
 	case SOCK_SEQPACKET:
 		err = sctp_seqpacket_listen(sk, backlog);

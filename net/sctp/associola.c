@@ -290,13 +290,17 @@ fail_init:
  */
 void sctp_association_free(sctp_association_t *asoc)
 {
+	struct sock *sk = asoc->base.sk;
 	struct sctp_transport *transport;
-	sctp_endpoint_t *ep;
 	struct list_head *pos, *temp;
 	int i;
 
-	ep = asoc->ep;
 	list_del(&asoc->asocs);
+
+	/* Decrement the backlog value for a TCP-style listening socket. */
+	if ((SCTP_SOCKET_TCP == sctp_sk(sk)->type) &&
+	    (SCTP_SS_LISTENING == sk->state))
+		sk->ack_backlog--;
 
 	/* Mark as dead, so other users can know this structure is
 	 * going away.
@@ -818,11 +822,16 @@ static void sctp_assoc_bh_rcv(sctp_association_t *asoc)
 void sctp_assoc_migrate(sctp_association_t *assoc, struct sock *newsk)
 {
 	struct sctp_opt *newsp = sctp_sk(newsk);
+	struct sock *oldsk = assoc->base.sk;
 
 	/* Delete the association from the old endpoint's list of
 	 * associations.
 	 */
 	list_del(&assoc->asocs);
+
+	/* Decrement the backlog value for a TCP-style socket. */
+	if (SCTP_SOCKET_TCP == sctp_sk(oldsk)->type)
+		oldsk->ack_backlog--;
 
 	/* Release references to the old endpoint and the sock.  */
 	sctp_endpoint_put(assoc->ep);
