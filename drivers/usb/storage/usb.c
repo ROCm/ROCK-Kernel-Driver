@@ -477,24 +477,21 @@ static int usb_stor_control_thread(void * __us)
 	return 0;
 }	
 
-/* Set up the URB, the usb_ctrlrequest, and the IRQ pipe and handler.
+/* Set up the URB and the usb_ctrlrequest.
  * ss->dev_semaphore must already be locked.
  * Note that this function assumes that all the data in the us_data
- * strucuture is current.  This includes the ep_int field, which gives us
- * the endpoint for the interrupt.
+ * structure is current.
  * Returns non-zero on failure, zero on success
  */ 
 static int usb_stor_allocate_urbs(struct us_data *ss)
 {
-	unsigned int pipe;
-	int maxp;
-	int result;
-
 	/* calculate and store the pipe values */
 	ss->send_bulk_pipe = usb_sndbulkpipe(ss->pusb_dev, ss->ep_out);
 	ss->recv_bulk_pipe = usb_rcvbulkpipe(ss->pusb_dev, ss->ep_in);
 	ss->send_ctrl_pipe = usb_sndctrlpipe(ss->pusb_dev, 0);
 	ss->recv_ctrl_pipe = usb_rcvctrlpipe(ss->pusb_dev, 0);
+	ss->recv_intr_pipe = usb_rcvintpipe(ss->pusb_dev,
+		    ss->ep_int->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK);
 
 	/* allocate the usb_ctrlrequest for control packets */
 	US_DEBUGP("Allocating usb_ctrlrequest\n");
@@ -519,45 +516,6 @@ static int usb_stor_allocate_urbs(struct us_data *ss)
 		return 5;
 	}
 
-	/* allocate the IRQ URB, if it is needed */
-	if (ss->protocol == US_PR_CBI) {
-		US_DEBUGP("Allocating IRQ for CBI transport\n");
-
-		/* lock access to the data structure */
-		down(&(ss->irq_urb_sem));
-
-		/* allocate the URB */
-		ss->irq_urb = usb_alloc_urb(0, GFP_KERNEL);
-		if (!ss->irq_urb) {
-			up(&(ss->irq_urb_sem));
-			US_DEBUGP("couldn't allocate interrupt URB");
-			return 3;
-		}
-
-		/* calculate the pipe and max packet size */
-		pipe = usb_rcvintpipe(ss->pusb_dev,
-		    ss->ep_int->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK);
-		maxp = usb_maxpacket(ss->pusb_dev, pipe, usb_pipeout(pipe));
-		if (maxp > sizeof(ss->irqbuf))
-			maxp = sizeof(ss->irqbuf);
-
-		/* fill in the URB with our data */
-		usb_fill_int_urb(ss->irq_urb, ss->pusb_dev, pipe, ss->irqbuf,
-			maxp, usb_stor_CBI_irq, ss, ss->ep_int->bInterval); 
-
-		/* submit the URB for processing */
-		result = usb_submit_urb(ss->irq_urb, GFP_KERNEL);
-		US_DEBUGP("usb_submit_urb() returns %d\n", result);
-		if (result) {
-			up(&(ss->irq_urb_sem));
-			return 4;
-		}
-
-		/* unlock the data structure */
-		up(&(ss->irq_urb_sem));
-
-	} /* ss->protocol == US_PR_CBI */
-
 	return 0;	/* success */
 }
 
@@ -567,17 +525,6 @@ static int usb_stor_allocate_urbs(struct us_data *ss)
 static void usb_stor_deallocate_urbs(struct us_data *ss)
 {
 	int result;
-
-	/* release the IRQ, if we have one */
-	down(&(ss->irq_urb_sem));
-	if (ss->irq_urb) {
-		US_DEBUGP("-- releasing irq URB\n");
-		result = usb_unlink_urb(ss->irq_urb);
-		US_DEBUGP("-- usb_unlink_urb() returned %d\n", result);
-		usb_free_urb(ss->irq_urb);
-		ss->irq_urb = NULL;
-	}
-	up(&(ss->irq_urb_sem));
 
 	/* free the scatter-gather request block */
 	if (ss->current_sg) {
@@ -810,8 +757,6 @@ static int storage_probe(struct usb_interface *intf,
 
 		/* Initialize the mutexes only when the struct is new */
 		init_completion(&(ss->notify));
-		init_MUTEX_LOCKED(&(ss->ip_waitq));
-		init_MUTEX(&(ss->irq_urb_sem));
 		init_MUTEX_LOCKED(&(ss->dev_semaphore));
 
 		/* copy over the subclass and protocol data */

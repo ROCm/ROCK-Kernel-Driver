@@ -105,7 +105,6 @@ struct us_unusual_dev {
 #define US_FL_FIX_CAPACITY    0x00000080 /* READ CAPACITY response too big  */
 
 #define US_FL_DEV_ATTACHED    0x00010000 /* is the device attached?	    */
-#define US_FLIDX_IP_WANTED   17  /* 0x00020000	is an IRQ expected?	    */
 #define US_FLIDX_CAN_CANCEL  18  /* 0x00040000  okay to cancel current_urb? */
 #define US_FLIDX_CANCEL_SG   19  /* 0x00080000	okay to cancel current_sg?  */
 
@@ -139,6 +138,7 @@ struct us_data {
 	unsigned int		recv_bulk_pipe;
 	unsigned int		send_ctrl_pipe;
 	unsigned int		recv_ctrl_pipe;
+	unsigned int		recv_intr_pipe;
 
 	/* information about the device -- always good */
 	char			vendor[USB_STOR_STRING_LEN];
@@ -173,13 +173,7 @@ struct us_data {
 	int			pid;		 /* control thread	 */
 	atomic_t		sm_state;	 /* what we are doing	 */
 
-	/* interrupt info for CBI devices -- only good if attached */
-	struct semaphore	ip_waitq;	 /* for CBI interrupts	 */
-
 	/* interrupt communications data */
-	struct semaphore	irq_urb_sem;	 /* to protect irq_urb	 */
-	struct urb		*irq_urb;	 /* for USB int requests */
-	unsigned char		irqbuf[2];	 /* buffer for USB IRQ	 */
 	unsigned char		irqdata[2];	 /* data from USB IRQ	 */
 
 	/* control and bulk communications data */

@@ -145,7 +145,6 @@ struct bulk_cs_wrap {
 
 #define US_CBI_ADSC		0
 
-extern void usb_stor_CBI_irq(struct urb*, struct pt_regs *);
 extern int usb_stor_CBI_transport(Scsi_Cmnd*, struct us_data*);
 
 extern int usb_stor_CB_transport(Scsi_Cmnd*, struct us_data*);
@@ -164,11 +163,15 @@ extern int usb_stor_bulk_msg(struct us_data *us, void *data,
 extern int usb_stor_control_msg(struct us_data *us, unsigned int pipe,
 		u8 request, u8 requesttype, u16 value, u16 index,
 		void *data, u16 size);
+extern int usb_stor_interrupt_msg(struct us_data *us, void *data,
+		unsigned int len, unsigned int *act_len);
 
 extern int usb_stor_clear_halt(struct us_data*, unsigned int pipe);
 extern int usb_stor_ctrl_transfer(struct us_data *us, unsigned int pipe,
 		u8 request, u8 requesttype, u16 value, u16 index,
 		void *data, u16 size);
+extern int usb_stor_intr_transfer(struct us_data *us, void *buf,
+		unsigned int length, unsigned int *act_len);
 extern int usb_stor_bulk_transfer_buf(struct us_data *us, unsigned int pipe,
 		void *buf, unsigned int length, unsigned int *act_len);
 extern int usb_stor_bulk_transfer_sglist(struct us_data *us, unsigned int pipe,
