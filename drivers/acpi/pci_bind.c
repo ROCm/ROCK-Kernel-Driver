@@ -276,17 +276,25 @@ int acpi_pci_unbind(
 	int                     result = 0;
 	acpi_status             status = AE_OK;
 	struct acpi_pci_data    *data = NULL;
-	char                    pathname[ACPI_PATHNAME_MAX] = {0};
-	struct acpi_buffer      buffer = {ACPI_PATHNAME_MAX, pathname};
+	char                    *pathname = NULL;
+	struct acpi_buffer      buffer = {0, NULL};
 
 	ACPI_FUNCTION_TRACE("acpi_pci_unbind");
 
 	if (!device || !device->parent)
 		return_VALUE(-EINVAL);
 
+	pathname = (char *) kmalloc(ACPI_PATHNAME_MAX, GFP_KERNEL);
+	if(!pathname)
+		return_VALUE(-ENOMEM);
+	memset(pathname, 0, ACPI_PATHNAME_MAX);
+
+	buffer.length = ACPI_PATHNAME_MAX;
+	buffer.pointer = pathname;
 	acpi_get_name(device->handle, ACPI_FULL_PATHNAME, &buffer);
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Unbinding PCI device [%s]...\n",
 		pathname));
+	kfree(pathname);
 
 	status = acpi_get_data(device->handle, acpi_pci_data_handler, (void**)&data);
 	if (ACPI_FAILURE(status)) {

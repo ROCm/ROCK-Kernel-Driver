@@ -241,10 +241,11 @@ static acpi_status __init pnpacpi_add_device_handler(acpi_handle handle,
 	return AE_OK;
 }
 
+int pnpacpi_disabled __initdata;
 int __init pnpacpi_init(void)
 {
-	if (acpi_disabled) {
-		pnp_info("PnP ACPI: ACPI disable");
+	if (acpi_disabled || pnpacpi_disabled) {
+		pnp_info("PnP ACPI: disabled");
 		return 0;
 	}
 	pnp_info("PnP ACPI init");
@@ -254,5 +255,15 @@ int __init pnpacpi_init(void)
 	return 0;
 }
 subsys_initcall(pnpacpi_init);
+
+static int __init pnpacpi_setup(char *str)
+{
+	if (str == NULL)
+		return 1;
+	if (!strncmp(str, "off", 3))
+		pnpacpi_disabled = 1;
+	return 1;
+}
+__setup("pnpacpi=", pnpacpi_setup);
 
 EXPORT_SYMBOL(pnpacpi_protocol);

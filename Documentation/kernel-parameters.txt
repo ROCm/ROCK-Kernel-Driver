@@ -1014,6 +1014,9 @@ running once the system is up.
 			Format: { parport<nr> | timid | 0 }
 			See also Documentation/parport.txt.
 
+	pnpacpi=	[ACPI]
+			{ off }
+
 	pnpbios=	[ISAPNP]
 			{ on | off | curr | res | no-curr | no-res }
 

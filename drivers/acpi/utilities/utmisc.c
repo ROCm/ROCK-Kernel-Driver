@@ -884,7 +884,7 @@ acpi_ut_create_update_state_and_push (
  * DESCRIPTION: Create a new state and push it
  *
  ******************************************************************************/
-
+#ifdef ACPI_FUTURE_USAGE
 acpi_status
 acpi_ut_create_pkg_state_and_push (
 	void                            *internal_object,
@@ -906,7 +906,7 @@ acpi_ut_create_pkg_state_and_push (
 	acpi_ut_push_generic_state (state_list, state);
 	return (AE_OK);
 }
-
+#endif  /*  ACPI_FUTURE_USAGE  */
 
 /*******************************************************************************
  *
