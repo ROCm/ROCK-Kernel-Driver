@@ -528,6 +528,9 @@ struct task_struct {
   	struct mempolicy *mempolicy;
   	short il_next;		/* could be shared with used_math */
 #endif
+
+/* TASK_UNMAPPED_BASE */
+	unsigned long map_base;
 };
 
 static inline pid_t process_group(struct task_struct *tsk)
@@ -539,6 +542,12 @@ extern void __put_task_struct(struct task_struct *tsk);
 #define get_task_struct(tsk) do { atomic_inc(&(tsk)->usage); } while(0)
 #define put_task_struct(tsk) \
 do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
+
+#ifndef __TASK_UNMAPPED_BASE
+#define __TASK_UNMAPPED_BASE 0UL
+#else
+#define __HAS_ARCH_PROC_MAPPED_BASE
+#endif
 
 /*
  * Per process flags

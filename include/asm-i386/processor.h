@@ -294,7 +294,8 @@ extern unsigned int mca_pentium_flag;
 /* This decides where the kernel will search for a free chunk of vm
  * space during mmap's.
  */
-#define TASK_UNMAPPED_BASE	(PAGE_ALIGN(TASK_SIZE / 3))
+#define TASK_UNMAPPED_BASE	(current->map_base)
+#define __TASK_UNMAPPED_BASE PAGE_ALIGN(TASK_SIZE/3)
 
 /*
  * Size of io_bitmap.

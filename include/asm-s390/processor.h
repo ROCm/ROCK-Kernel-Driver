@@ -62,7 +62,8 @@ extern struct task_struct *last_task_used_math;
 #ifndef __s390x__
 
 # define TASK_SIZE		(0x80000000UL)
-# define TASK_UNMAPPED_BASE	(TASK_SIZE / 2)
+# define TASK_UNMAPPED_BASE (current->map_base)
+# define __TASK_UNMAPPED_BASE	(TASK_SIZE / 2)
 # define DEFAULT_TASK_SIZE	(0x80000000UL)
 
 #else /* __s390x__ */
