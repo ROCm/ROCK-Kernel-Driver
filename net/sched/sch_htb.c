@@ -74,7 +74,7 @@
 #define HTB_HYSTERESIS 1/* whether to use mode hysteresis for speedup */
 #define HTB_QLOCK(S) spin_lock_bh(&(S)->dev->queue_lock)
 #define HTB_QUNLOCK(S) spin_unlock_bh(&(S)->dev->queue_lock)
-#define HTB_VER 0x3000d	/* major must be matched with number suplied by TC as version */
+#define HTB_VER 0x3000e	/* major must be matched with number suplied by TC as version */
 
 #if HTB_VER >> 16 != TC_HTB_PROTOVER
 #error "Mismatched sch_htb.c and pkt_sch.h"
@@ -290,6 +290,11 @@ static __inline__ struct htb_class *htb_find(u32 handle, struct Qdisc *sch)
  * then finish and return direct queue.
  */
 #define HTB_DIRECT (struct htb_class*)-1
+static inline u32 htb_classid(struct htb_class *cl)
+{
+	return (cl && cl != HTB_DIRECT) ? cl->classid : TC_H_UNSPEC;
+}
+
 static struct htb_class *htb_classify(struct sk_buff *skb, struct Qdisc *sch)
 {
 	struct htb_sched *q = (struct htb_sched *)sch->data;
@@ -703,7 +708,7 @@ static int htb_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 
     sch->q.qlen++;
     sch->stats.packets++; sch->stats.bytes += skb->len;
-    HTB_DBG(1,1,"htb_enq_ok cl=%X skb=%p\n",cl?cl->classid:0,skb);
+    HTB_DBG(1,1,"htb_enq_ok cl=%X skb=%p\n",htb_classid(cl),skb);
     return NET_XMIT_SUCCESS;
 }
 
@@ -731,7 +736,7 @@ static int htb_requeue(struct sk_buff *skb, struct Qdisc *sch)
 	    htb_activate (q,cl);
 
     sch->q.qlen++;
-    HTB_DBG(1,1,"htb_req_ok cl=%X skb=%p\n",cl?cl->classid:0,skb);
+    HTB_DBG(1,1,"htb_req_ok cl=%X skb=%p\n",htb_classid(cl),skb);
     return NET_XMIT_SUCCESS;
 }
 
@@ -1381,11 +1386,16 @@ static void htb_destroy(struct Qdisc* sch)
 #ifdef HTB_RATECM
 	del_timer_sync (&q->rttim);
 #endif
+	/* This line used to be after htb_destroy_class call below
+	   and surprisingly it worked in 2.4. But it must precede it 
+	   because filter need its target class alive to be able to call
+	   unbind_filter on it (without Oops). */
+	htb_destroy_filters(&q->filter_list);
+	
 	while (!list_empty(&q->root)) 
 		htb_destroy_class (sch,list_entry(q->root.next,
 					struct htb_class,sibling));
 
-	htb_destroy_filters(&q->filter_list);
 	__skb_queue_purge(&q->direct_queue);
 }
 
