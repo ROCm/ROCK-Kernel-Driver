@@ -16,6 +16,7 @@
 #define TBD 0
 #define BIT(loc)		(0x8000000000000000ULL >> (loc))
 #define vBIT(val, loc, sz)	(((u64)val) << (64-loc-sz))
+#define INV(d)  ((d&0xff)<<24) | (((d>>8)&0xff)<<16) | (((d>>16)&0xff)<<8)| ((d>>24)&0xff)
 
 #ifndef BOOL
 #define BOOL    int
@@ -49,11 +50,13 @@ typedef enum xena_max_outstanding_splits {
 #define ALIGN_SIZE  			127
 #define	PCIX_COMMAND_REGISTER	0x62
 
+#ifndef SET_ETHTOOL_OPS
+#define SUPPORTED_10000baseT_Full (1 << 12)
+#endif
+
 /*
  * Debug related variables.
  */
-#define DEBUG_ON TRUE
-
 /* different debug levels. */
 #define	ERR_DBG		0
 #define	INIT_DBG	1
@@ -312,7 +315,7 @@ typedef struct stat_block {
 /* Maintains Per FIFO related information. */
 typedef struct tx_fifo_config {
 #define	MAX_AVAILABLE_TXDS	8192
-	u32 FifoLen;		/* specifies len of FIFO upto 8192, ie no of TxDLs */
+	u32 fifo_len;		/* specifies len of FIFO upto 8192, ie no of TxDLs */
 /* Priority definition */
 #define TX_FIFO_PRI_0               0	/*Highest */
 #define TX_FIFO_PRI_1               1
@@ -322,9 +325,9 @@ typedef struct tx_fifo_config {
 #define TX_FIFO_PRI_5               5
 #define TX_FIFO_PRI_6               6
 #define TX_FIFO_PRI_7               7	/*lowest */
-	u8 FifoPriority;	/* specifies pointer level for FIFO */
+	u8 fifo_priority;	/* specifies pointer level for FIFO */
 	/* user should not set twos fifos with same pri */
-	u8 fNoSnoop;
+	u8 f_no_snoop;
 #define NO_SNOOP_TXD                0x01
 #define NO_SNOOP_TXD_BUFFER          0x02
 } tx_fifo_config_t;
@@ -332,7 +335,7 @@ typedef struct tx_fifo_config {
 
 /* Maintains per Ring related information */
 typedef struct rx_ring_config {
-	u32 NumRxd;		/*No of RxDs per Rx Ring */
+	u32 num_rxd;		/*No of RxDs per Rx Ring */
 #define RX_RING_PRI_0               0	/* highest */
 #define RX_RING_PRI_1               1
 #define RX_RING_PRI_2               2
@@ -342,70 +345,37 @@ typedef struct rx_ring_config {
 #define RX_RING_PRI_6               6
 #define RX_RING_PRI_7               7	/* lowest */
 
-	u8 RingPriority;	/*Specifies service priority of ring */
+	u8 ring_priority;	/*Specifies service priority of ring */
 	/* OSM should not set any two rings with same priority */
-	u8 RingOrg;		/*Organization of ring */
+	u8 ring_org;		/*Organization of ring */
 #define RING_ORG_BUFF1           0x01
 #define RX_RING_ORG_BUFF3           0x03
 #define RX_RING_ORG_BUFF5           0x05
 
-/* In case of 3 buffer recv. mode, size of three buffers is expected as.. */
-#define BUFF_SZ_1                   22	/* ethernet header */
-#define BUFF_SZ_2                   (64+64)	/* max. IP+TCP header size */
-#define BUFF_SZ_3                   (1500-20-20)	/* TCP payload */
-#define BUFF_SZ_3_JUMBO             (9600-20-20)	/* Jumbo TCP payload */
-
-	u32 RxdThresh;		/*No of used Rxds NIC can store before transfer to host */
-#define DEFAULT_RXD_THRESHOLD       0x1	/* TODO */
-	u8 fNoSnoop;
+	u8 f_no_snoop;
 #define NO_SNOOP_RXD                0x01
 #define NO_SNOOP_RXD_BUFFER         0x02
-	u32 RxD_BackOff_Interval;
-#define RXD_BACKOFF_INTERVAL_DEF        0x0
-#define RXD_BACKOFF_INTERVAL_MIN        0x0
-#define RXD_BACKOFF_INTERVAL_MAX        0x0
 } rx_ring_config_t;
 
 /* This structure provides contains values of the tunable parameters 
  * of the H/W 
  */
 struct config_param {
-
 /* Tx Side */
-	u32 TxFIFONum;		/*Number of Tx FIFOs */
+	u32 tx_fifo_num;	/*Number of Tx FIFOs */
 #define MAX_TX_FIFOS 8
 
-	tx_fifo_config_t TxCfg[MAX_TX_FIFOS];	/*Per-Tx FIFO config */
-	u32 MaxTxDs;		/*Max no. of Tx buffer descriptor per TxDL */
-	BOOL TxVLANEnable;	/*TRUE: Insert VLAN ID, FALSE: Don't insert */
-#define TX_REQ_TIMEOUT_DEFAULT          0x0
-#define TX_REQ_TIMEOUT_MIN              0x0
-#define TX_REQ_TIMEOUT_MAX              0x0
-	u32 TxReqTimeOut;
-	BOOL TxFlow;		/*Tx flow control enable */
-	BOOL RxFlow;
-	BOOL OverrideTxServiceState;	/* TRUE: Overide, FALSE: Do not override 
-					   Use the new priority information
-					   of service state. It is not recommended
-					   to change but OSM can opt to do so */
-#define MAX_SERVICE_STATES  36
-	u8 TxServiceState[MAX_SERVICE_STATES];
-	/* Array element represent 'priority' 
-	 * and array index represents
-	 *  'Service state' e.g. 
-	 *  TxServiceState[3]=7; it means 
-	 *  Service state 3 is associated 
-	 *  with priority 7 of a Tx FIFO */
-	u64 TxIntrType;		/* Specifies if Tx Intr is UTILZ or PER_LIST type. */
+	tx_fifo_config_t tx_cfg[MAX_TX_FIFOS];	/*Per-Tx FIFO config */
+	u32 max_txds;		/*Max no. of Tx buffer descriptor per TxDL */
+	u64 tx_intr_type;
+	/* Specifies if Tx Intr is UTILZ or PER_LIST type. */
 
 /* Rx Side */
-	u32 RxRingNum;		/*Number of receive rings */
+	u32 rx_ring_num;	/*Number of receive rings */
 #define MAX_RX_RINGS 8
 #define MAX_RX_BLOCKS_PER_RING  150
 
-	rx_ring_config_t RxCfg[MAX_RX_RINGS];	/*Per-Rx Ring config */
-	BOOL RxVLANEnable;	/*TRUE: Strip off VLAN tag from the frame,
-				   FALSE: Don't strip off VLAN tag */
+	rx_ring_config_t rx_cfg[MAX_RX_RINGS];	/*Per-Rx Ring config */
 
 #define HEADER_ETHERNET_II_802_3_SIZE 14
 #define HEADER_802_2_SIZE              3
@@ -419,23 +389,6 @@ struct config_param {
 #define MAX_PYLD_JUMBO              9600
 #define MAX_MTU_JUMBO               (MAX_PYLD_JUMBO+18)
 #define MAX_MTU_JUMBO_VLAN          (MAX_PYLD_JUMBO+22)
-	u32 MTU;		/*Maximum Payload */
-	BOOL JumboEnable;	/*Enable Jumbo frames recv/send */
-	BOOL OverrideRxServiceState;	/* TRUE: Overide, FALSE: Do not override 
-					   Use the new priority information
-					   of service state. It is not recommended
-					   to change but OSM can opt to do so */
-#define MAX_SERVICE_STATES  36
-	u8 RxServiceState[MAX_SERVICE_STATES];
-	/* Array element represent 'priority' 
-	 * and array index represents 
-	 * 'Service state'e.g. 
-	 * RxServiceState[3]=7; it means 
-	 * Service state 3 is associated 
-	 * with priority 7 of a Rx FIFO */
-	BOOL StatAutoRefresh;	/* When true, StatRefreshTime have valid value */
-	u32 StatRefreshTime;	/*Time for refreshing statistics */
-#define     STAT_TRSF_PER_1_SECOND      0x208D5
 };
 
 /* Structure representing MAC Addrs */
@@ -514,13 +467,8 @@ typedef struct _RxD_t {
 #define SET_NUM_TAG(val)       vBIT(val,16,32)
 
 #define RXD_GET_BUFFER0_SIZE(Control_2) (u64)((Control_2 & vBIT(0xFFFF,0,16)))
-/*    
-#define TXD_GET_BUFFER1_SIZE(Control_2) (u16)((Control_2 & MASK_BUFFER1_SIZE) >> (63-31))  
-#define TXD_GET_BUFFER2_SIZE(Control_2) (u16)((Control_2 & MASK_BUFFER2_SIZE) >> (63-47))  
-*/
 	u64 Buffer0_ptr;
 } RxD_t;
-
 
 /* Structure that represents the Rx descriptor block which contains 
  * 128 Rx descriptors.
@@ -531,11 +479,12 @@ typedef struct _RxD_block {
 
 	u64 reserved_0;
 #define END_OF_BLOCK    0xFEFFFFFFFFFFFFFFULL
-	u64 reserved_1;		/* 0xFEFFFFFFFFFFFFFF to mark last Rxd in this blk */
-	u64 reserved_2_pNext_RxD_block;	/*@ Logical ptr to next */
-	u64 pNext_RxD_Blk_physical;	/* Buff0_ptr.
-					   In a 32 bit arch the upper 32 bits 
-					   should be 0 */
+	u64 reserved_1;		/* 0xFEFFFFFFFFFFFFFF to mark last 
+				 * Rxd in this blk */
+	u64 reserved_2_pNext_RxD_block;	/* Logical ptr to next */
+	u64 pNext_RxD_Blk_physical;	/* Buff0_ptr.In a 32 bit arch
+					 * the upper 32 bits should 
+					 * be 0 */
 } RxD_block_t;
 
 /* Structure which stores all the MAC control parameters */
@@ -568,10 +517,6 @@ typedef tx_curr_get_info_t tx_curr_put_info_t;
  */
 typedef struct mac_info {
 /* rx side stuff */
-	u32 rxd_ring_mem_sz;
-	RxD_t *RxRing[MAX_RX_RINGS];	/* Logical Rx ring pointers */
-	dma_addr_t RxRing_Phy[MAX_RX_RINGS];
-
 	/* Put pointer info which indictes which RxD has to be replenished 
 	 * with a new buffer.
 	 */
@@ -583,41 +528,29 @@ typedef struct mac_info {
 	rx_curr_get_info_t rx_curr_get_info[MAX_RX_RINGS];
 
 	u16 rmac_pause_time;
-
-	/* this will be used in receive function, this decides which ring would
-	   be processed first. eg: ring with priority value 0 (highest) should
-	   be processed first. 
-	   first 3 LSB bits represent ring number which should be processed 
-	   first, similarly next 3 bits represent next ring to be processed.
-	   eg: value of _rx_ring_pri_map = 0x0000 003A means 
-	   ring #2 would be processed first and #7 would be processed next
-	 */
-	u32 _rx_ring_pri_map;
+	u16 mc_pause_threshold_q0q3;
+	u16 mc_pause_threshold_q4q7;
 
 /* tx side stuff */
-	void *txd_list_mem;	/* orignal pointer to allocated mem */
+	void *txd_list_mem;	/* original pointer to allocated mem */
 	dma_addr_t txd_list_mem_phy;
 	u32 txd_list_mem_sz;
 
 	/* logical pointer of start of each Tx FIFO */
 	TxFIFO_element_t *tx_FIFO_start[MAX_TX_FIFOS];
 
-	/* logical pointer of start of TxDL which corresponds to each Tx FIFO */
+	/* The Phy and virtual mem loactions of the Tx descriptors. */
 	TxD_t *txdl_start[MAX_TX_FIFOS];
-
-	/* Same as txdl_start but phy addr */
 	dma_addr_t txdl_start_phy[MAX_TX_FIFOS];
 
 /* Current offset within tx_FIFO_start, where driver would write new Tx frame*/
 	tx_curr_put_info_t tx_curr_put_info[MAX_TX_FIFOS];
 	tx_curr_get_info_t tx_curr_get_info[MAX_TX_FIFOS];
 
-	u16 txdl_len;		/* length of a TxDL, same for all */
-
 	void *stats_mem;	/* orignal pointer to allocated mem */
 	dma_addr_t stats_mem_phy;	/* Physical address of the stat block */
 	u32 stats_mem_sz;
-	StatInfo_t *StatsInfo;	/* Logical address of the stat block */
+	StatInfo_t *stats_info;	/* Logical address of the stat block */
 } mac_info_t;
 
 /* structure representing the user defined MAC addresses */
@@ -632,13 +565,20 @@ typedef struct rx_block_info {
 	dma_addr_t block_dma_addr;
 } rx_block_info_t;
 
+/* Default Tunable parameters of the NIC. */
+#define DEFAULT_FIFO_LEN 4096
+#define SMALL_RXD_CNT	30 * (MAX_RXDS_PER_BLOCK+1)
+#define LARGE_RXD_CNT	100 * (MAX_RXDS_PER_BLOCK+1)
+#define SMALL_BLK_CNT	30
+#define LARGE_BLK_CNT	100
+
 /* Structure representing one instance of the NIC */
 typedef struct s2io_nic {
 #define MAX_MAC_SUPPORTED   16
 #define MAX_SUPPORTED_MULTICASTS MAX_MAC_SUPPORTED
 
-	macaddr_t defMacAddr[MAX_MAC_SUPPORTED];
-	macaddr_t preMacAddr[MAX_MAC_SUPPORTED];
+	macaddr_t def_mac_addr[MAX_MAC_SUPPORTED];
+	macaddr_t pre_mac_addr[MAX_MAC_SUPPORTED];
 
 	struct net_device_stats stats;
 	caddr_t bar0;
@@ -671,8 +611,8 @@ typedef struct s2io_nic {
 	u32 irq;
 	atomic_t rx_bufs_left[MAX_RX_RINGS];
 
-	spinlock_t isr_lock;
 	spinlock_t tx_lock;
+	spinlock_t isr_lock;
 
 #define PROMISC     1
 #define ALL_MULTI   2
@@ -691,20 +631,11 @@ typedef struct s2io_nic {
 	u16 tx_err_count;
 	u16 rx_err_count;
 
-#if DEBUG_ON
-	u64 rxpkt_bytes;
-	u64 txpkt_bytes;
-	int int_cnt;
-	int rxint_cnt;
-	int txint_cnt;
-	u64 rxpkt_cnt;
-#endif
-
-	/*  Place holders for the virtual and physical addresses of 
+	/*
+	 *  Place holders for the virtual and physical addresses of 
 	 *  all the Rx Blocks
 	 */
-	struct rx_block_info
-	 rx_blocks[MAX_RX_RINGS][MAX_RX_BLOCKS_PER_RING];
+	rx_block_info_t rx_blocks[MAX_RX_RINGS][MAX_RX_BLOCKS_PER_RING];
 	int block_count[MAX_RX_RINGS];
 	int pkt_cnt[MAX_RX_RINGS];
 
@@ -742,19 +673,14 @@ typedef struct s2io_nic {
 #define RESET_ERROR 1;
 #define CMD_ERROR   2;
 
-/* Default Tunable parameters of the NIC. */
-#define DEFAULT_FIFO_LEN 4096
-#define SMALL_RXD_CNT	40 * (MAX_RXDS_PER_BLOCK+1)
-#define LARGE_RXD_CNT	100 * (MAX_RXDS_PER_BLOCK+1)
-
 /*  OS related system calls */
 #ifndef readq
 static inline u64 readq(void *addr)
 {
 	u64 ret = 0;
 	ret = readl(addr + 4);
-	ret <<= 32;
-	ret |= readl(addr);
+	(u64) ret <<= 32;
+	(u64) ret |= readl(addr);
 
 	return ret;
 }
@@ -816,8 +742,14 @@ static inline void writeq(u64 val, void *addr)
 
 /*  DMA level Inressupts */
 #define TXDMA_PFC_INT_M     BIT(0)
-    /*  PFC block interrupts */
+#define TXDMA_PCC_INT_M     BIT(2)
+
+/*  PFC block interrupts */
 #define PFC_MISC_ERR_1      BIT(0)	/* Interrupt to indicate FIFO full */
+
+/* PCC block interrupts. */
+#define	PCC_FB_ECC_ERR	   vBIT(0xff, 16, 8)	/* Interrupt to indicate
+						   PCC_FB_ECC Error. */
 
 /*
  * Prototype declaration.
@@ -825,21 +757,21 @@ static inline void writeq(u64 val, void *addr)
 static int __devinit s2io_init_nic(struct pci_dev *pdev,
 				   const struct pci_device_id *pre);
 static void __devexit s2io_rem_nic(struct pci_dev *pdev);
-static int initSharedMem(struct s2io_nic *sp);
-static void freeSharedMem(struct s2io_nic *sp);
-static int initNic(struct s2io_nic *nic);
+static int init_shared_mem(struct s2io_nic *sp);
+static void free_shared_mem(struct s2io_nic *sp);
+static int init_nic(struct s2io_nic *nic);
 #ifndef CONFIG_S2IO_NAPI
-static void rxIntrHandler(struct s2io_nic *sp);
+static void rx_intr_handler(struct s2io_nic *sp);
 #endif
-static void txIntrHandler(struct s2io_nic *sp);
-static void alarmIntrHandler(struct s2io_nic *sp);
+static void tx_intr_handler(struct s2io_nic *sp);
+static void alarm_intr_handler(struct s2io_nic *sp);
 
 static int s2io_starter(void);
 void s2io_closer(void);
 static void s2io_tx_watchdog(struct net_device *dev);
 static void s2io_tasklet(unsigned long dev_addr);
 static void s2io_set_multicast(struct net_device *dev);
-static int rxOsmHandler(nic_t * sp, u16 len, RxD_t * rxdp, int ring_no);
+static int rx_osm_handler(nic_t * sp, u16 len, RxD_t * rxdp, int ring_no);
 void s2io_link(nic_t * sp, int link);
 void s2io_reset(nic_t * sp);
 #ifdef CONFIG_S2IO_NAPI
@@ -849,6 +781,10 @@ static void s2io_init_pci(nic_t * sp);
 int s2io_set_mac_addr(struct net_device *dev, u8 * addr);
 static irqreturn_t s2io_isr(int irq, void *dev_id, struct pt_regs *regs);
 static int verify_xena_quiescence(u64 val64, int flag);
+int verify_load_parm(void);
+#ifdef SET_ETHTOOL_OPS
 static struct ethtool_ops netdev_ethtool_ops;
+#endif
+static void s2io_set_link(unsigned long data);
 
 #endif				/* _S2IO_H */
