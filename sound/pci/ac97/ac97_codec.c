@@ -1844,7 +1844,7 @@ int snd_ac97_bus(snd_card_t *card, int num, ac97_bus_ops_t *ops,
 	bus->clock = 48000;
 	spin_lock_init(&bus->bus_lock);
 	snd_ac97_bus_proc_init(bus);
-	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, bus, &dev_ops)) < 0) {
+	if ((err = snd_device_new(card, SNDRV_DEV_BUS, bus, &dev_ops)) < 0) {
 		snd_ac97_bus_free(bus);
 		return err;
 	}
@@ -2137,7 +2137,7 @@ int snd_ac97_mixer(ac97_bus_t *bus, ac97_template_t *template, ac97_t **rac97)
 		snd_ac97_write_cache(ac97, AC97_EXTENDED_STATUS, reg);
 	}
 	snd_ac97_proc_init(ac97);
-	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, ac97, &ops)) < 0) {
+	if ((err = snd_device_new(card, SNDRV_DEV_CODEC, ac97, &ops)) < 0) {
 		snd_ac97_free(ac97);
 		return err;
 	}

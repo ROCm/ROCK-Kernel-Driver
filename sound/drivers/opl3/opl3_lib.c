@@ -364,7 +364,7 @@ int snd_opl3_new(snd_card_t *card,
 	spin_lock_init(&opl3->timer_lock);
 	init_MUTEX(&opl3->access_mutex);
 
-	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, opl3, &ops)) < 0) {
+	if ((err = snd_device_new(card, SNDRV_DEV_CODEC, opl3, &ops)) < 0) {
 		snd_opl3_free(opl3);
 		return err;
 	}
