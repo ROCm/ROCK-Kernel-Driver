@@ -22,12 +22,7 @@
    SOFTWARE IS DISCLAIMED.
 */
 
-/*
- *  Bluetooth address family and sockets.
- *
- * $Id: af_bluetooth.c,v 1.3 2002/04/17 17:37:15 maxk Exp $
- */
-#define VERSION "2.4"
+/* Bluetooth address family and sockets. */
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -53,8 +48,10 @@
 
 #ifndef CONFIG_BT_SOCK_DEBUG
 #undef  BT_DBG
-#define BT_DBG( A... )
+#define BT_DBG(D...)
 #endif
+
+#define VERSION "2.4"
 
 struct proc_dir_entry *proc_bt;
 EXPORT_SYMBOL(proc_bt);
@@ -119,7 +116,7 @@ struct sock *bt_sock_alloc(struct socket *sock, int proto, int pi_size, int prio
 	sk = sk_alloc(PF_BLUETOOTH, prio, sizeof(struct bt_sock), bt_sock_cache);
 	if (!sk)
 		return NULL;
-	
+
 	if (pi_size) {
 		pi = kmalloc(pi_size, prio);
 		if (!pi) {
@@ -132,7 +129,7 @@ struct sock *bt_sock_alloc(struct socket *sock, int proto, int pi_size, int prio
 
 	sock_init_data(sock, sk);
 	INIT_LIST_HEAD(&bt_sk(sk)->accept_q);
-	
+
 	sk->sk_zapped   = 0;
 	sk->sk_protocol = proto;
 	sk->sk_state    = BT_OPEN;
@@ -182,19 +179,19 @@ struct sock *bt_accept_dequeue(struct sock *parent, struct socket *newsock)
 {
 	struct list_head *p, *n;
 	struct sock *sk;
-	
+
 	BT_DBG("parent %p", parent);
 
 	list_for_each_safe(p, n, &bt_sk(parent)->accept_q) {
 		sk = (struct sock *) list_entry(p, struct bt_sock, accept_q);
-		
+
 		lock_sock(sk);
 		if (sk->sk_state == BT_CLOSED) {
 			release_sock(sk);
 			bt_accept_unlink(sk);
 			continue;
 		}
-		
+
 		if (sk->sk_state == BT_CONNECTED || !newsock) {
 			bt_accept_unlink(sk);
 			if (newsock)
@@ -335,7 +332,7 @@ int bt_sock_wait_state(struct sock *sk, int state, unsigned long timeo)
 EXPORT_SYMBOL(bt_sock_wait_state);
 
 static struct net_proto_family bt_sock_family_ops = {
-	.owner  = THIS_MODULE,
+	.owner	= THIS_MODULE,
 	.family	= PF_BLUETOOTH,
 	.create	= bt_sock_create,
 };
@@ -353,7 +350,7 @@ static int __init bt_init(void)
 	proc_bt = proc_mkdir("bluetooth", NULL);
 	if (proc_bt)
 		proc_bt->owner = THIS_MODULE;
-	
+
 	/* Init socket cache */
 	bt_sock_cache = kmem_cache_create("bt_sock",
 			sizeof(struct bt_sock), 0,
@@ -363,7 +360,7 @@ static int __init bt_init(void)
 		BT_ERR("Socket cache creation failed");
 		return -ENOMEM;
 	}
-	
+
 	sock_register(&bt_sock_family_ops);
 
 	BT_INFO("HCI device and connection manager initialized");

@@ -22,11 +22,7 @@
    SOFTWARE IS DISCLAIMED.
 */
 
-/*
- * HCI Connection handling.
- *
- * $Id: hci_conn.c,v 1.2 2002/04/17 17:37:16 maxk Exp $
- */
+/* Bluetooth HCI connection handling. */
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -54,7 +50,7 @@
 
 #ifndef CONFIG_BT_HCI_CORE_DEBUG
 #undef  BT_DBG
-#define BT_DBG( A... )
+#define BT_DBG(D...)
 #endif
 
 void hci_acl_connect(struct hci_conn *conn)
@@ -178,10 +174,10 @@ struct hci_conn *hci_conn_add(struct hci_dev *hdev, int type, bdaddr_t *dst)
 
 int hci_conn_del(struct hci_conn *conn)
 {
-	struct hci_dev  *hdev = conn->hdev;
+	struct hci_dev *hdev = conn->hdev;
 
 	BT_DBG("%s conn %p handle %d", hdev->name, conn, conn->handle);
-	
+
 	hci_conn_del_timer(conn);
 
 	if (conn->type == SCO_LINK) {
@@ -226,14 +222,14 @@ struct hci_dev *hci_get_route(bdaddr_t *dst, bdaddr_t *src)
 
 	list_for_each(p, &hci_dev_list) {
 		struct hci_dev *d = list_entry(p, struct hci_dev, list);
-		
+
 		if (!test_bit(HCI_UP, &d->flags))
 			continue;
 
 		/* Simple routing: 
-	 	 * 	No source address - find interface with bdaddr != dst 
-	 	 *	Source address 	  - find interface with bdaddr == src 
-	 	 */
+		 *   No source address - find interface with bdaddr != dst
+		 *   Source address    - find interface with bdaddr == src
+		 */
 
 		if (use_src) {
 			if (!bacmp(&d->bdaddr, src)) {
@@ -301,10 +297,10 @@ EXPORT_SYMBOL(hci_connect);
 int hci_conn_auth(struct hci_conn *conn)
 {
 	BT_DBG("conn %p", conn);
-	
+
 	if (conn->link_mode & HCI_LM_AUTH)
 		return 1;
-	
+
 	if (!test_and_set_bit(HCI_CONN_AUTH_PEND, &conn->pend)) {
 		struct hci_cp_auth_requested cp;
 		cp.handle = __cpu_to_le16(conn->handle);
@@ -318,10 +314,10 @@ EXPORT_SYMBOL(hci_conn_auth);
 int hci_conn_encrypt(struct hci_conn *conn)
 {
 	BT_DBG("conn %p", conn);
-	
+
 	if (conn->link_mode & HCI_LM_ENCRYPT)
 		return 1;
-	
+
 	if (test_and_set_bit(HCI_CONN_ENCRYPT_PEND, &conn->pend))
 		return 0;
 
@@ -339,7 +335,7 @@ EXPORT_SYMBOL(hci_conn_encrypt);
 void hci_conn_hash_flush(struct hci_dev *hdev)
 {
 	struct hci_conn_hash *h = &hdev->conn_hash;
-        struct list_head *p;
+	struct list_head *p;
 
 	BT_DBG("hdev %s", hdev->name);
 

@@ -22,11 +22,7 @@
    SOFTWARE IS DISCLAIMED.
 */
 
-/*
- * HCI Events.
- *
- * $Id: hci_event.c,v 1.3 2002/04/17 17:37:16 maxk Exp $
- */
+/* Bluetooth HCI event handling. */
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -54,7 +50,7 @@
 
 #ifndef CONFIG_BT_HCI_CORE_DEBUG
 #undef  BT_DBG
-#define BT_DBG( A... )
+#define BT_DBG(D...)
 #endif
 
 /* Handle HCI Event packets */
@@ -98,9 +94,9 @@ static void hci_cc_link_policy(struct hci_dev *hdev, __u16 ocf, struct sk_buff *
 
 		if (rd->status)
 			break;
-		
+
 		hci_dev_lock(hdev);
-	
+
 		conn = hci_conn_hash_lookup_handle(hdev, __le16_to_cpu(rd->handle));
 		if (conn) {
 			if (rd->role)
@@ -355,7 +351,7 @@ static inline void hci_cs_create_conn(struct hci_dev *hdev, __u8 status)
 		return;
 
 	hci_dev_lock(hdev);
-	
+
 	conn = hci_conn_hash_lookup_ba(hdev, ACL_LINK, &cp->bdaddr);
 
 	BT_DBG("%s status 0x%x bdaddr %s conn %p", hdev->name,
@@ -572,7 +568,7 @@ static inline void hci_conn_complete_evt(struct hci_dev *hdev, struct sk_buff *s
 	BT_DBG("%s", hdev->name);
 
 	hci_dev_lock(hdev);
-	
+
 	conn = hci_conn_hash_lookup_ba(hdev, ev->link_type, &ev->bdaddr);
 	if (!conn) {
 		hci_dev_unlock(hdev);
@@ -585,7 +581,7 @@ static inline void hci_conn_complete_evt(struct hci_dev *hdev, struct sk_buff *s
 
 		if (test_bit(HCI_AUTH, &hdev->flags))
 			conn->link_mode |= HCI_LM_AUTH;
-		
+
 		if (test_bit(HCI_ENCRYPT, &hdev->flags))
 			conn->link_mode |= HCI_LM_ENCRYPT;
 
@@ -643,7 +639,7 @@ static inline void hci_disconn_complete_evt(struct hci_dev *hdev, struct sk_buff
 		return;
 
 	hci_dev_lock(hdev);
-	
+
 	conn = hci_conn_hash_lookup_handle(hdev, handle);
 	if (conn) {
 		conn->state = BT_CLOSED;
@@ -709,7 +705,7 @@ static inline void hci_role_change_evt(struct hci_dev *hdev, struct sk_buff *skb
 		return;
 
 	hci_dev_lock(hdev);
-	
+
 	conn = hci_conn_hash_lookup_ba(hdev, ACL_LINK, &ev->bdaddr);
 	if (conn) {
 		if (ev->role)
@@ -731,7 +727,7 @@ static inline void hci_auth_complete_evt(struct hci_dev *hdev, struct sk_buff *s
 	BT_DBG("%s status %d", hdev->name, ev->status);
 
 	hci_dev_lock(hdev);
-	
+
 	conn = hci_conn_hash_lookup_handle(hdev, handle);
 	if (conn) {
 		if (!ev->status)
@@ -739,7 +735,7 @@ static inline void hci_auth_complete_evt(struct hci_dev *hdev, struct sk_buff *s
 		clear_bit(HCI_CONN_AUTH_PEND, &conn->pend);
 
 		hci_proto_auth_cfm(conn, ev->status);
-		
+
 		if (test_bit(HCI_CONN_ENCRYPT_PEND, &conn->pend)) {
 			if (!ev->status) {
 				struct hci_cp_set_conn_encrypt cp;
@@ -768,11 +764,11 @@ static inline void hci_encrypt_change_evt(struct hci_dev *hdev, struct sk_buff *
 	BT_DBG("%s status %d", hdev->name, ev->status);
 
 	hci_dev_lock(hdev);
-	
+
 	conn = hci_conn_hash_lookup_handle(hdev, handle);
 	if (conn) {
 		if (!ev->status) {
-		       	if (ev->encrypt)
+			if (ev->encrypt)
 				conn->link_mode |= HCI_LM_ENCRYPT;
 			else
 				conn->link_mode &= ~HCI_LM_ENCRYPT;
@@ -840,7 +836,7 @@ void hci_event_packet(struct hci_dev *hdev, struct sk_buff *skb)
 	case HCI_EV_CMD_STATUS:
 		cs = (struct hci_ev_cmd_status *) skb->data;
 		skb_pull(skb, sizeof(cs));
-				
+
 		opcode = __le16_to_cpu(cs->opcode);
 		ogf = hci_opcode_ogf(opcode);
 		ocf = hci_opcode_ocf(opcode);
@@ -928,13 +924,13 @@ void hci_si_event(struct hci_dev *hdev, int type, int dlen, void *data)
 		return;
 
 	hdr = (void *) skb_put(skb, HCI_EVENT_HDR_SIZE);
-       	hdr->evt  = HCI_EV_STACK_INTERNAL;
+	hdr->evt  = HCI_EV_STACK_INTERNAL;
 	hdr->plen = sizeof(*ev) + dlen;
 
 	ev  = (void *) skb_put(skb, sizeof(*ev) + dlen);
 	ev->type = type;
 	memcpy(ev->data, data, dlen);
-	
+
 	skb->pkt_type = HCI_EVENT_PKT;
 	skb->dev = (void *) hdev;
 	hci_send_to_sock(hdev, skb);

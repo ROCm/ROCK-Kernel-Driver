@@ -22,10 +22,6 @@
    SOFTWARE IS DISCLAIMED.
 */
 
-/*
- *  $Id: bluetooth.h,v 1.8 2002/04/17 17:37:20 maxk Exp $
- */
-
 #ifndef __BLUETOOTH_H
 #define __BLUETOOTH_H
 
@@ -41,26 +37,26 @@
 #endif
 
 /* Reserv for core and drivers use */
-#define BT_SKB_RESERVE       8
+#define BT_SKB_RESERVE	8
 
-#define BTPROTO_L2CAP   0
-#define BTPROTO_HCI     1
-#define BTPROTO_SCO   	2
+#define BTPROTO_L2CAP	0
+#define BTPROTO_HCI	1
+#define BTPROTO_SCO	2
 #define BTPROTO_RFCOMM	3
 #define BTPROTO_BNEP	4
 #define BTPROTO_CMTP	5
 
-#define SOL_HCI     0
-#define SOL_L2CAP   6
-#define SOL_SCO     17
-#define SOL_RFCOMM  18
+#define SOL_HCI		0
+#define SOL_L2CAP	6
+#define SOL_SCO		17
+#define SOL_RFCOMM	18
 
 #define BT_INFO(fmt, arg...) printk(KERN_INFO "Bluetooth: " fmt "\n" , ## arg)
 #define BT_DBG(fmt, arg...)  printk(KERN_INFO "%s: " fmt "\n" , __FUNCTION__ , ## arg)
 #define BT_ERR(fmt, arg...)  printk(KERN_ERR  "%s: " fmt "\n" , __FUNCTION__ , ## arg)
 
 #ifdef HCI_DATA_DUMP
-#define BT_DMP(buf, len)    bt_dump(__FUNCTION__, buf, len)
+#define BT_DMP(buf, len) bt_dump(__FUNCTION__, buf, len)
 #else
 #define BT_DMP(D...)
 #endif
@@ -122,7 +118,7 @@ struct bt_sock {
 
 struct bt_sock_list {
 	struct hlist_head head;
-	rwlock_t	  lock;
+	rwlock_t          lock;
 };
 
 int  bt_sock_register(int proto, struct net_proto_family *ops);
@@ -139,7 +135,7 @@ struct sock *bt_accept_dequeue(struct sock *parent, struct socket *newsock);
 
 /* Skb helpers */
 struct bt_skb_cb {
-	int    incoming;
+	int incoming;
 };
 #define bt_cb(skb) ((struct bt_skb_cb *)(skb->cb)) 
 
@@ -155,7 +151,7 @@ static inline struct sk_buff *bt_skb_alloc(unsigned int len, int how)
 }
 
 static inline struct sk_buff *bt_skb_send_alloc(struct sock *sk, unsigned long len, 
-						       int nb, int *err)
+							int nb, int *err)
 {
 	struct sk_buff *skb;
 
@@ -178,6 +174,6 @@ static inline int skb_frags_no(struct sk_buff *skb)
 
 void bt_dump(char *pref, __u8 *buf, int count);
 
-int  bt_err(__u16 code);
+int bt_err(__u16 code);
 
 #endif /* __BLUETOOTH_H */

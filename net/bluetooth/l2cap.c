@@ -22,12 +22,7 @@
    SOFTWARE IS DISCLAIMED.
 */
 
-/*
- * Bluetooth L2CAP core and sockets.
- *
- * $Id: l2cap.c,v 1.15 2002/09/09 01:14:52 maxk Exp $
- */
-#define VERSION "2.1"
+/* Bluetooth L2CAP core and sockets. */
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -59,8 +54,10 @@
 
 #ifndef CONFIG_BT_L2CAP_DEBUG
 #undef  BT_DBG
-#define BT_DBG( A... )
+#define BT_DBG(D...)
 #endif
+
+#define VERSION "2.1"
 
 static struct proto_ops l2cap_sock_ops;
 
@@ -135,11 +132,11 @@ static struct l2cap_conn *l2cap_conn_add(struct hci_conn *hcon, u8 status)
 
 	hcon->l2cap_data = conn;
 	conn->hcon = hcon;
-	
+
 	conn->mtu = hcon->hdev->acl_mtu;
 	conn->src = &hcon->hdev->bdaddr;
 	conn->dst = &hcon->dst;
-	
+
 	spin_lock_init(&conn->lock);
 	conn->chan_list.lock = RW_LOCK_UNLOCKED;
 
@@ -374,10 +371,10 @@ static int l2cap_sock_create(struct socket *sock, int protocol)
 
 	if (sock->type != SOCK_SEQPACKET && sock->type != SOCK_DGRAM && sock->type != SOCK_RAW)
 		return -ESOCKTNOSUPPORT;
-	
+
 	if (sock->type == SOCK_RAW && !capable(CAP_NET_RAW))
 		return -EPERM;
-	
+
 	sock->ops = &l2cap_sock_ops;
 
 	sk = l2cap_sock_alloc(sock, protocol, GFP_KERNEL);
@@ -428,8 +425,8 @@ static int l2cap_do_connect(struct sock *sk)
 	bdaddr_t *src = &bt_sk(sk)->src;
 	bdaddr_t *dst = &bt_sk(sk)->dst;
 	struct l2cap_conn *conn;
-	struct hci_conn   *hcon;
-	struct hci_dev    *hdev;
+	struct hci_conn *hcon;
+	struct hci_dev *hdev;
 	int err = 0;
 
 	BT_DBG("%s -> %s psm 0x%2.2x", batostr(src), batostr(dst), l2cap_pi(sk)->psm);
@@ -834,7 +831,8 @@ static int l2cap_sock_shutdown(struct socket *sock, int how)
 
 	BT_DBG("sock %p, sk %p", sock, sk);
 
-	if (!sk) return 0;
+	if (!sk)
+		return 0;
 
 	lock_sock(sk);
 	if (!sk->sk_shutdown) {
@@ -856,7 +854,8 @@ static int l2cap_sock_release(struct socket *sock)
 
 	BT_DBG("sock %p, sk %p", sock, sk);
 
-	if (!sk) return 0;
+	if (!sk)
+		return 0;
 
 	err = l2cap_sock_shutdown(sock, 2);
 
@@ -988,7 +987,7 @@ static void l2cap_chan_del(struct sock *sk, int err)
 
 	sk->sk_state  = BT_CLOSED;
 	sk->sk_zapped = 1;
-	
+
 	if (err)
 		sk->sk_err = err;
 
@@ -1111,7 +1110,7 @@ static struct sk_buff *l2cap_build_cmd(struct l2cap_conn *conn,
 
 	len = L2CAP_HDR_SIZE + L2CAP_CMD_HDR_SIZE + dlen;
 	count = min_t(unsigned int, conn->mtu, len);
-	
+
 	skb = bt_skb_alloc(count, GFP_ATOMIC);
 	if (!skb)
 		return NULL;
@@ -1132,7 +1131,7 @@ static struct sk_buff *l2cap_build_cmd(struct l2cap_conn *conn,
 	}
 
 	len -= skb->len;
-	
+
 	/* Continuation fragments (no L2CAP header) */
 	frag = &skb_shinfo(skb)->frag_list;
 	while (len) {
@@ -1141,12 +1140,12 @@ static struct sk_buff *l2cap_build_cmd(struct l2cap_conn *conn,
 		*frag = bt_skb_alloc(count, GFP_ATOMIC);
 		if (!*frag)
 			goto fail;
-		
+
 		memcpy(skb_put(*frag, count), data, count);
 
 		len  -= count;
 		data += count;
-		
+
 		frag = &(*frag)->next;
 	}
 
@@ -1238,7 +1237,7 @@ static inline void l2cap_parse_conf_req(struct sock *sk, void *data, int len)
 
 		case L2CAP_CONF_QOS:
 			break;
-		
+
 		default:
 			if (hint)
 				break;
@@ -1306,8 +1305,7 @@ static inline int l2cap_conf_output(struct sock *sk, void **ptr)
 	int result = 0;
 
 	/* Configure output options and let the other side know
-	 * which ones we don't like.
-	 */
+	 * which ones we don't like. */
 	if (pi->conf_mtu < pi->omtu) {
 		l2cap_add_conf_opt(ptr, L2CAP_CONF_MTU, 2, pi->omtu);
 		result = L2CAP_CONF_UNACCEPT;
@@ -1533,13 +1531,11 @@ static inline int l2cap_config_rsp(struct l2cap_conn *conn, struct l2cap_cmd_hdr
 	case L2CAP_CONF_UNACCEPT:
 		if (++l2cap_pi(sk)->conf_retry < L2CAP_CONF_MAX_RETRIES) {
 			char req[128];
-			/* 
-			   It does not make sense to adjust L2CAP parameters 
-			   that are currently defined in the spec. We simply 
-			   resend config request that we sent earlier. It is
-			   stupid :) but it helps qualification testing
-			   which expects at least some response from us.
-			*/
+			/* It does not make sense to adjust L2CAP parameters
+			 * that are currently defined in the spec. We simply
+			 * resend config request that we sent earlier. It is
+			 * stupid, but it helps qualification testing which
+			 * expects at least some response from us. */
 			l2cap_send_req(conn, L2CAP_CONF_REQ,
 				l2cap_build_conf_req(sk, req), req);
 			goto done;
@@ -1594,7 +1590,7 @@ static inline int l2cap_disconnect_req(struct l2cap_conn *conn, struct l2cap_cmd
 	l2cap_send_rsp(conn, cmd->ident, L2CAP_DISCONN_RSP, sizeof(rsp), &rsp);
 
 	sk->sk_shutdown = SHUTDOWN_MASK;
-	
+
 	l2cap_chan_del(sk, ECONNRESET);
 	bh_unlock_sock(sk);
 
@@ -1723,11 +1719,11 @@ static inline int l2cap_data_channel(struct l2cap_conn *conn, u16 cid, struct sk
 	if (l2cap_pi(sk)->imtu < skb->len)
 		goto drop;
 
-	/* If socket recv buffers overflows we drop data here 
-	 * which is *bad* because L2CAP has to be reliable. 
-	 * But we don't have any other choice. L2CAP doesn't 
-	 * provide flow control mechanism */ 
-	
+	/* If socket recv buffers overflows we drop data here
+	 * which is *bad* because L2CAP has to be reliable.
+	 * But we don't have any other choice. L2CAP doesn't
+	 * provide flow control mechanism */
+
 	if (!sock_queue_rcv_skb(sk, skb))
 		goto done;
 
@@ -1787,7 +1783,7 @@ static void l2cap_recv_frame(struct l2cap_conn *conn, struct sk_buff *skb)
 		skb_pull(skb, 2);
 		l2cap_conless_channel(conn, psm, skb);
 		break;
-		
+
 	default:
 		l2cap_data_channel(conn, cid, skb);
 		break;
@@ -1839,7 +1835,7 @@ static int l2cap_connect_cfm(struct hci_conn *hcon, u8 status)
 			l2cap_conn_ready(conn);
 	} else 
 		l2cap_conn_del(hcon, bt_err(status));
-	
+
 	return 0;
 }
 
@@ -1861,7 +1857,7 @@ static int l2cap_auth_cfm(struct hci_conn *hcon, u8 status)
 	struct l2cap_conn_rsp rsp;
 	struct sock *sk;
 	int result;
-	
+
 	if (!(conn = hcon->l2cap_data))
 		return 0;
 	l = &conn->chan_list;
@@ -1908,7 +1904,7 @@ static int l2cap_encrypt_cfm(struct hci_conn *hcon, u8 status)
 	struct l2cap_conn_rsp rsp;
 	struct sock *sk;
 	int result;
-	
+
 	if (!(conn = hcon->l2cap_data))
 		return 0;
 	l = &conn->chan_list;
@@ -2069,10 +2065,10 @@ static int  l2cap_seq_show(struct seq_file *seq, void *e)
 }
 
 static struct seq_operations l2cap_seq_ops = {
-	.start  = l2cap_seq_start,
-	.next   = l2cap_seq_next,
-	.stop   = l2cap_seq_stop,
-	.show   = l2cap_seq_show 
+	.start	= l2cap_seq_start,
+	.next	= l2cap_seq_next,
+	.stop	= l2cap_seq_stop,
+	.show	= l2cap_seq_show 
 };
 
 static int l2cap_seq_open(struct inode *inode, struct file *file)
@@ -2081,76 +2077,76 @@ static int l2cap_seq_open(struct inode *inode, struct file *file)
 }
 
 static struct file_operations l2cap_seq_fops = {
-	.owner	 = THIS_MODULE,
-	.open    = l2cap_seq_open,
-	.read    = seq_read,
-	.llseek  = seq_lseek,
-	.release = seq_release,
+	.owner		= THIS_MODULE,
+	.open		= l2cap_seq_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
 };
 
-static int  __init l2cap_proc_init(void)
+static int __init l2cap_proc_init(void)
 {
-        struct proc_dir_entry *p = create_proc_entry("l2cap", S_IRUGO, proc_bt);
-        if (!p)
-                return -ENOMEM;
+	struct proc_dir_entry *p = create_proc_entry("l2cap", S_IRUGO, proc_bt);
+	if (!p)
+		return -ENOMEM;
 	p->owner     = THIS_MODULE;
-        p->proc_fops = &l2cap_seq_fops;
-        return 0;
+	p->proc_fops = &l2cap_seq_fops;
+	return 0;
 }
 
 static void __exit l2cap_proc_cleanup(void)
 {
-        remove_proc_entry("l2cap", proc_bt);
+	remove_proc_entry("l2cap", proc_bt);
 }
 
 #else /* CONFIG_PROC_FS */
 
-static int  __init l2cap_proc_init(void)
+static int __init l2cap_proc_init(void)
 {
-        return 0;
+	return 0;
 }
 
 static void __exit l2cap_proc_cleanup(void)
 {
-        return;
+	return;
 }
 #endif /* CONFIG_PROC_FS */
 
 static struct proto_ops l2cap_sock_ops = {
-	.family  =      PF_BLUETOOTH,
-	.owner   =	THIS_MODULE,
-	.release =      l2cap_sock_release,
-	.bind    =      l2cap_sock_bind,
-	.connect =      l2cap_sock_connect,
-	.listen  =      l2cap_sock_listen,
-	.accept  =      l2cap_sock_accept,
-	.getname =      l2cap_sock_getname,
-	.sendmsg =      l2cap_sock_sendmsg,
-	.recvmsg =      bt_sock_recvmsg,
-	.poll    =      bt_sock_poll,
-	.mmap    =      sock_no_mmap,
-	.socketpair =   sock_no_socketpair,
-	.ioctl      =   sock_no_ioctl,
-	.shutdown   =   l2cap_sock_shutdown,
-	.setsockopt =   l2cap_sock_setsockopt,
-	.getsockopt =   l2cap_sock_getsockopt
+	.family		= PF_BLUETOOTH,
+	.owner		= THIS_MODULE,
+	.release	= l2cap_sock_release,
+	.bind		= l2cap_sock_bind,
+	.connect	= l2cap_sock_connect,
+	.listen		= l2cap_sock_listen,
+	.accept		= l2cap_sock_accept,
+	.getname	= l2cap_sock_getname,
+	.sendmsg	= l2cap_sock_sendmsg,
+	.recvmsg	= bt_sock_recvmsg,
+	.poll		= bt_sock_poll,
+	.mmap		= sock_no_mmap,
+	.socketpair	= sock_no_socketpair,
+	.ioctl		= sock_no_ioctl,
+	.shutdown	= l2cap_sock_shutdown,
+	.setsockopt	= l2cap_sock_setsockopt,
+	.getsockopt	= l2cap_sock_getsockopt
 };
 
 static struct net_proto_family l2cap_sock_family_ops = {
-	.family =       PF_BLUETOOTH,
-	.create	=       l2cap_sock_create,
-	.owner	=	THIS_MODULE,
+	.family	= PF_BLUETOOTH,
+	.owner	= THIS_MODULE,
+	.create	= l2cap_sock_create,
 };
 
 static struct hci_proto l2cap_hci_proto = {
-	.name =         "L2CAP",
-	.id   =         HCI_PROTO_L2CAP,
-	.connect_ind =  l2cap_connect_ind,
-	.connect_cfm =  l2cap_connect_cfm,
-	.disconn_ind =  l2cap_disconn_ind,
-	.auth_cfm    =  l2cap_auth_cfm,
-	.encrypt_cfm =  l2cap_encrypt_cfm,
-	.recv_acldata =	l2cap_recv_acldata
+	.name		= "L2CAP",
+	.id		= HCI_PROTO_L2CAP,
+	.connect_ind	= l2cap_connect_ind,
+	.connect_cfm	= l2cap_connect_cfm,
+	.disconn_ind	= l2cap_disconn_ind,
+	.auth_cfm	= l2cap_auth_cfm,
+	.encrypt_cfm	= l2cap_encrypt_cfm,
+	.recv_acldata	= l2cap_recv_acldata
 };
 
 static int __init l2cap_init(void)
@@ -2168,7 +2164,7 @@ static int __init l2cap_init(void)
 	}
 
 	l2cap_proc_init();
-	
+
 	BT_INFO("L2CAP ver %s", VERSION);
 	BT_INFO("L2CAP socket layer initialized");
 
@@ -2189,9 +2185,9 @@ static void __exit l2cap_exit(void)
 
 void l2cap_load(void)
 {
-	/* Dummy function to trigger automatic L2CAP module loading by 
-	   other modules that use L2CAP sockets but don not use any other
-	   symbols from it. */
+	/* Dummy function to trigger automatic L2CAP module loading by
+	 * other modules that use L2CAP sockets but don not use any othe
+	 * symbols from it. */
 	return;
 }
 EXPORT_SYMBOL(l2cap_load);
