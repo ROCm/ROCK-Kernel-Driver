@@ -30,7 +30,7 @@
 
 EXPORT_NO_SYMBOLS;
 
-static char *main_revision = "$Revision: 1.1.2.2 $";
+static char *main_revision = "$Revision: 1.1.2.4 $";
 
 static int major = 241;
 
@@ -53,7 +53,8 @@ char *DRIVERRELEASE = "2.0";
 static devfs_handle_t devfs_handle;
 
 static wait_queue_head_t msgwaitq;
-static atomic_t opened; 
+static DECLARE_MUTEX(opened_sem);
+static int opened; 
 static struct timeval start_time;
 
 extern int mntfunc_init(int *, void **, unsigned long);
@@ -308,10 +309,14 @@ maint_poll(struct file *file, poll_table * wait)
 static int
 maint_open(struct inode *ino, struct file *filep)
 {
-  if (atomic_read(&opened))
+	down(&opened_sem);
+  if (opened)
+	{
+		up(&opened_sem);
       return(-EBUSY);
-  else
-    atomic_inc(&opened);
+	}
+	opened++;
+	up(&opened_sem);
 
   filep->private_data = 0;
 
@@ -326,19 +331,10 @@ maint_close(struct inode *ino, struct file *filep)
     filep->private_data = 0;
   }
 
-  atomic_dec(&opened);
+	down(&opened_sem);
+  opened--;
+	up(&opened_sem);
   return(0);
-}
-
-static int maint_ioctl (struct inode *inode, struct file *file, uint cmd, ulong arg)
-{
-		return(-EINVAL);
-}
-
-static loff_t
-maint_lseek(struct file *file, loff_t offset, int orig)
-{
-  return(-ESPIPE);
 }
 
 /*
@@ -346,14 +342,13 @@ maint_lseek(struct file *file, loff_t offset, int orig)
  */
 static struct file_operations maint_fops =
 {
-	owner:          THIS_MODULE,
-  llseek:         maint_lseek,
-  read:           maint_read,
-  write:          maint_write,
-  poll:           maint_poll,
-  ioctl:          maint_ioctl,
-  open:           maint_open,
-  release:        maint_close,
+	.owner   = THIS_MODULE,
+	.llseek  = no_llseek,
+	.read    = maint_read,
+	.write   = maint_write,
+	.poll    = maint_poll,
+	.open    = maint_open,
+	.release = maint_close
 };
 
 static int DIVA_INIT_FUNCTION
@@ -395,14 +390,13 @@ static ssize_t divas_maint_read(struct file * file, char * buf,
 
 static struct file_operations divas_maint_fops =
 {
-		owner:			THIS_MODULE,
-		llseek:			maint_lseek,
-		read:				divas_maint_read,
-		write:			divas_maint_write,
-		poll:				maint_poll,
-		ioctl:			maint_ioctl,
-		open:				maint_open,
-		release:		maint_close,
+	.owner   = THIS_MODULE,
+	.llseek  = no_llseek,
+	.read    = divas_maint_read,
+	.write   = divas_maint_write,
+	.poll    = maint_poll,
+	.open    = maint_open,
+	.release = maint_close
 };
 
 static void divas_maint_unregister_chrdev(void)

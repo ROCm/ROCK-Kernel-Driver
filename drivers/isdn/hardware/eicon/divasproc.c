@@ -1,4 +1,4 @@
-/* $Id: divasproc.c,v 1.1.2.2 2002/10/02 14:38:37 armin Exp $
+/* $Id: divasproc.c,v 1.1.2.4 2001/02/16 08:40:36 armin Exp $
  *
  * Low level driver for Eicon DIVA Server ISDN cards.
  * /proc functions
@@ -15,6 +15,7 @@
 #include <linux/kernel.h>
 #include <linux/poll.h>
 #include <linux/proc_fs.h>
+#include <linux/interrupt.h>
 
 #include "platform.h"
 #include "debuglib.h"
@@ -117,28 +118,15 @@ divas_close(struct inode *inode, struct file *file)
   return(0);
 }
 
-static int
-divas_ioctl(struct inode *inode, struct file *file, uint cmd, ulong arg)
-{
-		return(-EINVAL);
-}
-
-static loff_t
-divas_lseek(struct file *file, loff_t offset, int orig)
-{
-  return(-ESPIPE);
-}
-
 static struct file_operations divas_fops =
 {
-	owner: 					THIS_MODULE,
-  llseek:         divas_lseek,
-  read:           divas_read,
-  write:          divas_write,
-  poll:           divas_poll,
-  ioctl:          divas_ioctl,
-  open:           divas_open,
-  release:        divas_close,
+	.owner    = THIS_MODULE,
+	.llseek   = no_llseek,
+	.read     = divas_read,
+	.write    = divas_write,
+	.poll     = divas_poll,
+	.open     = divas_open,
+	.release  = divas_close
 };
 
 int
@@ -354,6 +342,11 @@ info_read(char *page, char **start, off_t off, int count, int *eof, void *data)
 int create_adapter_proc (diva_os_xdi_adapter_t* a) {
   struct proc_dir_entry *de, *pe;
   char tmp[16];
+
+	if(in_interrupt()) { /* FIXME */
+		printk(KERN_ERR "divasproc: create_proc in_interrupt, not creating\n");
+		return(1);
+	}
 
     sprintf(tmp, "%s%d", adapter_dir_name, a->controller);
     if(!(de = create_proc_entry(tmp, S_IFDIR, proc_net_isdn_eicon)))

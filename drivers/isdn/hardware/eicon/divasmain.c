@@ -1,4 +1,4 @@
-/* $Id: divasmain.c,v 1.1.2.2 2002/10/02 14:38:37 armin Exp $
+/* $Id: divasmain.c,v 1.1.2.8 2001/05/01 15:48:05 armin Exp $
  *
  * Low level driver for Eicon DIVA Server ISDN cards.
  *
@@ -46,7 +46,7 @@
 #include "diva_dma.h"
 
 EXPORT_NO_SYMBOLS;
-static char *main_revision = "$Revision: 1.1.2.2 $";
+static char *main_revision = "$Revision: 1.1.2.8 $";
 
 int errno = 0;
 static int major = 240;
@@ -72,8 +72,8 @@ static devfs_handle_t devfs_handle;
 
 typedef struct _diva_os_thread_dpc {
 	struct tasklet_struct divas_task;
-  diva_os_soft_isr_t*   psoft_isr;
 	struct work_struct      trap_script_task;
+  diva_os_soft_isr_t*   psoft_isr;
   int                   card_failed;
 } diva_os_thread_dpc_t;
 
@@ -685,12 +685,6 @@ static int divas_release(struct inode * inode, struct file * file)
 		return(0);
 }
 
-static int divas_ioctl(struct inode *inode, struct file *file,
-            unsigned int cmd, unsigned long arg)
-{
-		return(-EINVAL);
-}
-
 static ssize_t divas_write(struct file * file, const char * buf,
             size_t count, loff_t *ppos)
 {
@@ -759,22 +753,15 @@ static unsigned int divas_poll(struct file *file, poll_table * wait)
 		return (POLLIN | POLLRDNORM);
 }
 
-
-static loff_t divas_lseek(struct file *file, loff_t offset, int orig)
-{
-		return(-ESPIPE);
-}
-
 static struct file_operations divas_fops =
 {
-		owner:			THIS_MODULE,
-		llseek:			divas_lseek,
-		read:				divas_read,
-		write:			divas_write,
-		poll:				divas_poll,
-		ioctl:			divas_ioctl,
-		open:				divas_open,
-		release:		divas_release,
+	.owner   = THIS_MODULE,
+	.llseek  = no_llseek,
+	.read    = divas_read,
+	.write   = divas_write,
+	.poll    = divas_poll,
+	.open    = divas_open,
+	.release = divas_release
 };
 
 static void divas_unregister_chrdev(void)

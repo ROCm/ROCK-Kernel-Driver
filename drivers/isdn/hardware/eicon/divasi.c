@@ -1,4 +1,4 @@
-/* $Id: divasi.c,v 1.1.2.2 2002/10/02 14:38:37 armin Exp $
+/* $Id: divasi.c,v 1.1.2.7 2001/05/01 15:48:05 armin Exp $
  *
  * Driver for Eicon DIVA Server ISDN cards.
  * User Mode IDI Interface 
@@ -30,7 +30,7 @@
 
 EXPORT_NO_SYMBOLS;
 
-static char *main_revision = "$Revision: 1.1.2.2 $";
+static char *main_revision = "$Revision: 1.1.2.7 $";
 
 static int major = 242;
 
@@ -76,11 +76,9 @@ getrev(const char *revision)
 /*
  *  LOCALS
  */
-static loff_t um_idi_lseek (struct file *file, loff_t offset, int orig);
 static ssize_t um_idi_read (struct file *file, char *buf, size_t count, loff_t *offset);
 static ssize_t um_idi_write (struct file *file, const char *buf, size_t count, loff_t *offset);
 static unsigned int um_idi_poll (struct file *file, poll_table *wait);
-static int um_idi_ioctl (struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg);
 static int um_idi_open (struct inode *inode, struct file *file);
 static int um_idi_release (struct inode *inode, struct file *file);
 static int remove_entity (void* entity);
@@ -161,14 +159,13 @@ remove_um_idi_proc(void)
 
 static struct file_operations divas_idi_fops =
 {
-	owner:      THIS_MODULE,
-  llseek:      um_idi_lseek,
-  read:        um_idi_read,
-  write:       um_idi_write,
-  poll:        um_idi_poll,
-  ioctl:       um_idi_ioctl,
-  open:        um_idi_open,
-  release:     um_idi_release,
+	.owner   = THIS_MODULE,
+	.llseek  = no_llseek,
+	.read    = um_idi_read,
+	.write   = um_idi_write,
+	.poll    = um_idi_poll,
+	.open    = um_idi_open,
+	.release = um_idi_release
 };
 
 static void divas_idi_unregister_chrdev(void)
@@ -254,12 +251,6 @@ module_exit(divasi_exit);
 /*
  *  FILE OPERATIONS
  */
-
-static loff_t
-um_idi_lseek(struct file *file, loff_t offset, int orig)
-{
-  return (-ESPIPE);
-}
 
 static int
 divas_um_idi_copy_to_user (void* os_handle, void* dst, const void* src, int length)
@@ -426,12 +417,6 @@ um_idi_poll (struct file *file, poll_table *wait)
   }
 
   return (POLLIN | POLLRDNORM);
-}
-
-static int 
-um_idi_ioctl (struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
-{
-  return (-EINVAL);
 }
 
 static int

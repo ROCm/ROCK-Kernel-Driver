@@ -974,6 +974,7 @@ static u16 diva_send_message(struct capi_ctr *ctrl, diva_os_message_buffer_s *dm
   __u32 length = DIVA_MESSAGE_BUFFER_LEN(dmb);
 	word clength = READ_WORD(&msg->header.length);
 	word command = READ_WORD(&msg->header.command);
+	u16 retval = CAPI_NOERROR;
 
   if(diva_os_in_irq()) {
     DBG_ERR(("CAPI_SEND_MSG - in irq context !"))
@@ -1008,6 +1009,7 @@ static u16 diva_send_message(struct capi_ctr *ctrl, diva_os_message_buffer_s *dm
           READ_WORD(&msg->info.data_b3_req.Data_Length) > (length - clength))
       {
         DBG_ERR(("Write - invalid message size"))
+				retval = CAPI_ILLCMDORSUBCMDORMSGTOSMALL;
         goto write_end;
       }
 
@@ -1015,6 +1017,7 @@ static u16 diva_send_message(struct capi_ctr *ctrl, diva_os_message_buffer_s *dm
       if (i == (MAX_DATA_B3 * this->MaxNCCI))
       {
         DBG_ERR(("Write - too many data pending"))
+				retval = CAPI_SENDQUEUEFULL;
         goto write_end;
       }
       msg->info.data_b3_req.Data = i;
@@ -1052,19 +1055,22 @@ static u16 diva_send_message(struct capi_ctr *ctrl, diva_os_message_buffer_s *dm
       break;
     case _BAD_MSG:
       DBG_ERR(("Write - bad message"))
+			retval = CAPI_ILLCMDORSUBCMDORMSGTOSMALL;
       break;
     case _QUEUE_FULL:
       DBG_ERR(("Write - queue full"))
+			retval = CAPI_SENDQUEUEFULL;
       break;
     default:
       DBG_ERR(("Write - api_put returned unknown error"))
+			retval = CAPI_UNKNOWNNOTPAR;
       break;
   }
 
 write_end:
 	diva_os_leave_spin_lock (&api_lock, &old_irql, "send message");
   diva_os_free_message_buffer(dmb);
-	return CAPI_NOERROR;
+	return retval;
 }
 
 
