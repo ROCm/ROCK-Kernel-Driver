@@ -7,11 +7,9 @@
 
 #ifdef CONFIG_CRIS_LOW_MAP
 #define VMALLOC_START     KSEG_7
-#define VMALLOC_VMADDR(x) ((unsigned long)(x))
 #define VMALLOC_END       KSEG_8
 #else
 #define VMALLOC_START     KSEG_D
-#define VMALLOC_VMADDR(x) ((unsigned long)(x))
 #define VMALLOC_END       KSEG_E
 #endif
 

@@ -126,7 +126,7 @@ might already be working on.
 BUGS
 
 Send bug reports to:
-James Morris <jmorris@intercode.com.au>
+James Morris <jmorris@redhat.com>
 Cc: David S. Miller <davem@redhat.com>
 
 
@@ -220,5 +220,5 @@ CAST5 algorithm contributors:
 Generic scatterwalk code by Adam J. Richter <adam@yggdrasil.com>
 
 Please send any credits updates or corrections to:
-James Morris <jmorris@intercode.com.au>
+James Morris <jmorris@redhat.com>
 

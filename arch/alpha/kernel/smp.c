@@ -597,7 +597,7 @@ smp_cpus_done(unsigned int max_cpus)
 		if (cpu_online(cpu))
 			bogosum += cpu_data[cpu].loops_per_jiffy;
 	
-	printk(KERN_INFO "SMP: Total of %d processors activated "
+	printk(KERN_INFO "SMP: Total of %ld processors activated "
 	       "(%lu.%02lu BogoMIPS).\n",
 	       num_online_cpus(), 
 	       (bogosum + 2500) / (500000/HZ),

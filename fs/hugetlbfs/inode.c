@@ -648,11 +648,6 @@ hugetlbfs_fill_super(struct super_block *sb, void *data, int silent)
 	struct hugetlbfs_config config;
 	struct hugetlbfs_sb_info *sbinfo;
 
-	sbinfo = kmalloc(sizeof(struct hugetlbfs_sb_info), GFP_KERNEL);
-	if (!sbinfo)
-		return -ENOMEM;
-	sb->s_fs_info = sbinfo;
-
 	config.nr_blocks = -1; /* No limit on size by default */
 	config.nr_inodes = -1; /* No limit on number of inodes by default */
 	config.uid = current->fsuid;
@@ -663,6 +658,10 @@ hugetlbfs_fill_super(struct super_block *sb, void *data, int silent)
 	if (ret)
 		return ret;
 
+	sbinfo = kmalloc(sizeof(struct hugetlbfs_sb_info), GFP_KERNEL);
+	if (!sbinfo)
+		return -ENOMEM;
+	sb->s_fs_info = sbinfo;
 	spin_lock_init(&sbinfo->stat_lock);
 	sbinfo->max_blocks = config.nr_blocks;
 	sbinfo->free_blocks = config.nr_blocks;
@@ -675,15 +674,18 @@ hugetlbfs_fill_super(struct super_block *sb, void *data, int silent)
 	inode = hugetlbfs_get_inode(sb, config.uid, config.gid,
 					S_IFDIR | config.mode, 0);
 	if (!inode)
-		return -ENOMEM;
+		goto out_free;
 
 	root = d_alloc_root(inode);
 	if (!root) {
 		iput(inode);
-		return -ENOMEM;
+		goto out_free;
 	}
 	sb->s_root = root;
 	return 0;
+out_free:
+	kfree(sbinfo);
+	return -ENOMEM;
 }
 
 int hugetlb_get_quota(struct address_space *mapping)

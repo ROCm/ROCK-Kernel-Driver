@@ -132,6 +132,8 @@ static inline struct page *kmap_atomic_to_page(void *ptr)
 	return pte_page(kmap_pte[idx]);
 }
 
+#define flush_cache_kmaps()	flush_cache_all()
+
 #endif /* __KERNEL__ */
 
 #endif /* _ASM_HIGHMEM_H */

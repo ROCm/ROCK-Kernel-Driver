@@ -378,8 +378,6 @@ void irda_device_setup(struct net_device *dev)
         dev->hard_header_len = 0;
         dev->addr_len        = 0;
 
-	dev->destructor      = free_netdev;
-
         dev->type            = ARPHRD_IRDA;
         dev->tx_queue_len    = 8; /* Window size + 1 s-frame */
 
@@ -388,6 +386,17 @@ void irda_device_setup(struct net_device *dev)
 	dev->mtu = 2048;
 	dev->flags = IFF_NOARP;
 }
+
+/*
+ * Funciton  alloc_irdadev 
+ * 	Allocates and sets up an IRDA device in a manner similar to
+ * 	alloc_etherdev.
+ */
+struct net_device *alloc_irdadev(int sizeof_priv)
+{
+	return alloc_netdev(sizeof_priv, "irda%d", irda_device_setup);
+}
+
 
 /*
  * Function irda_device_txqueue_empty (dev)

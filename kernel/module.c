@@ -844,6 +844,7 @@ int set_obsolete(const char *val, struct kernel_param *kp)
 {
 	unsigned int min, max;
 	unsigned int size, maxsize;
+	int dummy;
 	char *endp;
 	const char *p;
 	struct obsolete_modparm *obsparm = kp->arg;
@@ -866,19 +867,19 @@ int set_obsolete(const char *val, struct kernel_param *kp)
 	switch (*endp) {
 	case 'b':
 		return param_array(kp->name, val, min, max, obsparm->addr,
-				   1, param_set_byte);
+				   1, param_set_byte, &dummy);
 	case 'h':
 		return param_array(kp->name, val, min, max, obsparm->addr,
-				   sizeof(short), param_set_short);
+				   sizeof(short), param_set_short, &dummy);
 	case 'i':
 		return param_array(kp->name, val, min, max, obsparm->addr,
-				   sizeof(int), param_set_int);
+				   sizeof(int), param_set_int, &dummy);
 	case 'l':
 		return param_array(kp->name, val, min, max, obsparm->addr,
-				   sizeof(long), param_set_long);
+				   sizeof(long), param_set_long, &dummy);
 	case 's':
 		return param_array(kp->name, val, min, max, obsparm->addr,
-				   sizeof(char *), param_set_charp);
+				   sizeof(char *), param_set_charp, &dummy);
 
 	case 'c':
 		/* Undocumented: 1-5c50 means 1-5 strings of up to 49 chars,
@@ -895,7 +896,7 @@ int set_obsolete(const char *val, struct kernel_param *kp)
 		if (size >= maxsize) 
 			goto oversize;
 		return param_array(kp->name, val, min, max, obsparm->addr,
-				   maxsize, obsparm_copy_string);
+				   maxsize, obsparm_copy_string, &dummy);
 	}
 	printk(KERN_ERR "Unknown obsolete parameter type %s\n", obsparm->type);
 	return -EINVAL;

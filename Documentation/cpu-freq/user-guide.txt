@@ -57,6 +57,8 @@ AMD mobile K6-2+
 AMD mobile K6-3+
 AMD mobile Duron
 AMD mobile Athlon
+AMD Opteron
+AMD Athlon 64
 Cyrix Media GXm
 Intel mobile PIII and Intel mobile PIII-M on certain chipsets
 Intel Pentium 4, Intel Xeon

@@ -334,6 +334,7 @@ struct swap_info_struct;
  *	called when the actual read/write operations are performed.
  *	@inode contains the inode structure to check.
  *	@mask contains the permission mask.
+ *     @nd contains the nameidata (may be NULL).
  *	Return 0 if permission is granted.
  * @inode_setattr:
  *	Check permission before setting file attributes.  Note that the kernel
@@ -1055,7 +1056,7 @@ struct security_operations {
 	                           struct dentry *new_dentry);
 	int (*inode_readlink) (struct dentry *dentry);
 	int (*inode_follow_link) (struct dentry *dentry, struct nameidata *nd);
-	int (*inode_permission) (struct inode *inode, int mask);
+	int (*inode_permission) (struct inode *inode, int mask, struct nameidata *nd);
 	int (*inode_setattr)	(struct dentry *dentry, struct iattr *attr);
 	int (*inode_getattr) (struct vfsmount *mnt, struct dentry *dentry);
         void (*inode_delete) (struct inode *inode);
@@ -1474,9 +1475,10 @@ static inline int security_inode_follow_link (struct dentry *dentry,
 	return security_ops->inode_follow_link (dentry, nd);
 }
 
-static inline int security_inode_permission (struct inode *inode, int mask)
+static inline int security_inode_permission (struct inode *inode, int mask,
+					     struct nameidata *nd)
 {
-	return security_ops->inode_permission (inode, mask);
+	return security_ops->inode_permission (inode, mask, nd);
 }
 
 static inline int security_inode_setattr (struct dentry *dentry,
@@ -2110,7 +2112,8 @@ static inline int security_inode_follow_link (struct dentry *dentry,
 	return 0;
 }
 
-static inline int security_inode_permission (struct inode *inode, int mask)
+static inline int security_inode_permission (struct inode *inode, int mask,
+					     struct nameidata *nd)
 {
 	return 0;
 }

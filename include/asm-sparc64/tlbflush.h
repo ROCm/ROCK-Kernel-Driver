@@ -70,7 +70,6 @@ extern void smp_flush_tlb_range(struct mm_struct *mm, unsigned long start,
 extern void smp_flush_tlb_kernel_range(unsigned long start, unsigned long end);
 extern void smp_flush_tlb_page(struct mm_struct *mm, unsigned long page);
 
-#define flush_cache_all()	smp_flush_cache_all()
 #define flush_tlb_all()		smp_flush_tlb_all()
 #define flush_tlb_mm(mm)	smp_flush_tlb_mm(mm)
 #define flush_tlb_range(vma, start, end) \

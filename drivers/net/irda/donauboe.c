@@ -1598,8 +1598,7 @@ toshoboe_open (struct pci_dev *pci_dev, const struct pci_device_id *pdid)
   if ((err=pci_enable_device(pci_dev)))
     return err;
 
-  dev = alloc_netdev(sizeof (struct toshoboe_cb), "irda%d",
-		     irda_device_setup);
+  dev = alloc_irdadev(sizeof (struct toshoboe_cb));
   if (dev == NULL)
     {
       printk (KERN_ERR DRIVER_NAME ": can't allocate memory for "

@@ -14,6 +14,7 @@
 #include <linux/slab.h>
 #include <linux/file.h>
 #include <linux/pagemap.h>
+#include <linux/parser.h>
 #include <asm/bitops.h>
 #include "autofs_i.h"
 #include <linux/module.h>
@@ -94,11 +95,25 @@ static struct super_operations autofs4_sops = {
 	.statfs		= simple_statfs,
 };
 
+enum {Opt_err, Opt_fd, Opt_uid, Opt_gid, Opt_pgrp, Opt_minproto, Opt_maxproto};
+
+static match_table_t tokens = {
+	{Opt_fd, "fd=%d"},
+	{Opt_uid, "uid=%d"},
+	{Opt_gid, "gid=%d"},
+	{Opt_pgrp, "pgrp=%d"},
+	{Opt_minproto, "minproto=%d"},
+	{Opt_maxproto, "maxproto=%d"},
+	{Opt_err, NULL}
+};
+
 static int parse_options(char *options, int *pipefd, uid_t *uid, gid_t *gid,
 			 pid_t *pgrp, int *minproto, int *maxproto)
 {
-	char *this_char, *value;
-	
+	char *p;
+	substring_t args[MAX_OPT_ARGS];
+	int option;
+
 	*uid = current->uid;
 	*gid = current->gid;
 	*pgrp = process_group(current);
@@ -108,55 +123,48 @@ static int parse_options(char *options, int *pipefd, uid_t *uid, gid_t *gid,
 
 	*pipefd = -1;
 
-	if ( !options ) return 1;
-	while ((this_char = strsep(&options,",")) != NULL) {
-		if (!*this_char)
+	if (!options)
+		return 1;
+
+	while ((p = strsep(&options, ",")) != NULL) {
+		int token;
+		if (!*p)
 			continue;
-		if ((value = strchr(this_char,'=')) != NULL)
-			*value++ = 0;
-		if (!strcmp(this_char,"fd")) {
-			if (!value || !*value)
+
+		token = match_token(p, tokens, args);
+		switch (token) {
+		case Opt_fd:
+			if (match_int(args, pipefd))
 				return 1;
-			*pipefd = simple_strtoul(value,&value,0);
-			if (*value)
+			break;
+		case Opt_uid:
+			if (match_int(args, &option))
 				return 1;
+			*uid = option;
+			break;
+		case Opt_gid:
+			if (match_int(args, &option))
+				return 1;
+			*gid = option;
+			break;
+		case Opt_pgrp:
+			if (match_int(args, &option))
+				return 1;
+			*pgrp = option;
+			break;
+		case Opt_minproto:
+			if (match_int(args, &option))
+				return 1;
+			*minproto = option;
+			break;
+		case Opt_maxproto:
+			if (match_int(args, &option))
+				return 1;
+			*maxproto = option;
+			break;
+		default:
+			return 1;
 		}
-		else if (!strcmp(this_char,"uid")) {
-			if (!value || !*value)
-				return 1;
-			*uid = simple_strtoul(value,&value,0);
-			if (*value)
-				return 1;
-		}
-		else if (!strcmp(this_char,"gid")) {
-			if (!value || !*value)
-				return 1;
-			*gid = simple_strtoul(value,&value,0);
-			if (*value)
-				return 1;
-		}
-		else if (!strcmp(this_char,"pgrp")) {
-			if (!value || !*value)
-				return 1;
-			*pgrp = simple_strtoul(value,&value,0);
-			if (*value)
-				return 1;
-		}
-		else if (!strcmp(this_char,"minproto")) {
-			if (!value || !*value)
-				return 1;
-			*minproto = simple_strtoul(value,&value,0);
-			if (*value)
-				return 1;
-		}
-		else if (!strcmp(this_char,"maxproto")) {
-			if (!value || !*value)
-				return 1;
-			*maxproto = simple_strtoul(value,&value,0);
-			if (*value)
-				return 1;
-		}
-		else break;
 	}
 	return (*pipefd < 0);
 }

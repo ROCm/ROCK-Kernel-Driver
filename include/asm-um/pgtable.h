@@ -69,7 +69,6 @@ extern unsigned long high_physmem;
 
 #define VMALLOC_OFFSET	(__va_space)
 #define VMALLOC_START	(((unsigned long) high_physmem + VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1))
-#define VMALLOC_VMADDR(x) ((unsigned long)(x))
 
 #ifdef CONFIG_HIGHMEM
 # define VMALLOC_END	(PKMAP_BASE-2*PAGE_SIZE)

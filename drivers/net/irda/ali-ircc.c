@@ -254,7 +254,7 @@ static int ali_ircc_open(int i, chipio_t *info)
 	if ((ali_ircc_setup(info)) == -1)
 		return -1;
 		
-	dev = alloc_netdev(sizeof(*self), "irda%d", irda_device_setup);
+	dev = alloc_irdadev(sizeof(*self));
 	if (dev == NULL) {
 		ERROR("%s(), can't allocate memory for control block!\n", __FUNCTION__);
 		return -ENOMEM;

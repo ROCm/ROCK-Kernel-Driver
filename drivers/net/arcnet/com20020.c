@@ -180,10 +180,6 @@ int com20020_found(struct net_device *dev, int shared)
 	if (!dev->dev_addr[0])
 		dev->dev_addr[0] = inb(ioaddr + 8);	/* FIXME: do this some other way! */
 
-	/* reserve the I/O region */
-	if (!request_region(ioaddr, ARCNET_TOTAL_SIZE, "arcnet (COM20020)"))
-		return -EBUSY;
-
 	SET_SUBADR(SUB_SETUP1);
 	outb(lp->setup, _XREG);
 
@@ -207,7 +203,6 @@ int com20020_found(struct net_device *dev, int shared)
 	if (request_irq(dev->irq, &arcnet_interrupt, shared,
 			"arcnet (COM20020)", dev)) {
 		BUGMSG(D_NORMAL, "Can't get IRQ %d!\n", dev->irq);
-		release_region(ioaddr, ARCNET_TOTAL_SIZE);
 		return -ENODEV;
 	}
 
@@ -227,7 +222,6 @@ int com20020_found(struct net_device *dev, int shared)
 	       clockrates[3 - ((lp->setup2 & 0xF0) >> 4) + ((lp->setup & 0x0F) >> 1)]);
 
 	if (!dev->init && register_netdev(dev)) {
-		release_region(ioaddr, ARCNET_TOTAL_SIZE);
 		free_irq(dev->irq, dev);
 		return -EIO;
 	}
@@ -342,7 +336,6 @@ void com20020_remove(struct net_device *dev)
 {
 	unregister_netdev(dev);
 	free_irq(dev->irq, dev);
-	release_region(dev->base_addr, ARCNET_TOTAL_SIZE);
 	kfree(dev->priv);
 	free_netdev(dev);
 }

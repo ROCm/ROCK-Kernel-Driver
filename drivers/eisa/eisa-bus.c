@@ -33,23 +33,22 @@ static struct eisa_device_info __initdata eisa_table[] = {
 #endif
 
 #define EISA_MAX_FORCED_DEV 16
-#define EISA_FORCED_OFFSET  2
 
-static int enable_dev[EISA_MAX_FORCED_DEV + EISA_FORCED_OFFSET]  = { 1, EISA_MAX_FORCED_DEV, };
-static int disable_dev[EISA_MAX_FORCED_DEV + EISA_FORCED_OFFSET] = { 1, EISA_MAX_FORCED_DEV, };
+static int enable_dev[EISA_MAX_FORCED_DEV];
+static int enable_dev_count;
+static int disable_dev[EISA_MAX_FORCED_DEV];
+static int disable_dev_count;
 
 static int is_forced_dev (int *forced_tab,
+			  int forced_count,
 			  struct eisa_root_device *root,
 			  struct eisa_device *edev)
 {
 	int i, x;
 
-	for (i = 0; i < EISA_MAX_FORCED_DEV; i++) {
-		if (!forced_tab[EISA_FORCED_OFFSET + i])
-			return 0;
-
+	for (i = 0; i < forced_count; i++) {
 		x = (root->bus_nr << 8) | edev->slot;
-		if (forced_tab[EISA_FORCED_OFFSET + i] == x)
+		if (forced_tab[i] == x)
 			return 1;
 	}
 
@@ -198,10 +197,10 @@ static int __init eisa_init_device (struct eisa_root_device *root,
 #endif
 	}
 
-	if (is_forced_dev (enable_dev, root, edev))
+	if (is_forced_dev (enable_dev, enable_dev_count, root, edev))
 		edev->state = EISA_CONFIG_ENABLED | EISA_CONFIG_FORCED;
 	
-	if (is_forced_dev (disable_dev, root, edev))
+	if (is_forced_dev (disable_dev, disable_dev_count, root, edev))
 		edev->state = EISA_CONFIG_FORCED;
 
 	return 0;
@@ -418,12 +417,8 @@ static int __init eisa_init (void)
 	return 0;
 }
 
-/* Couldn't use intarray with checking on... :-( */
-#undef  param_check_intarray
-#define param_check_intarray(name, p)
-
-module_param(enable_dev,  intarray, 0444);
-module_param(disable_dev, intarray, 0444);
+module_param_array(enable_dev, int, enable_dev_count, 0444);
+module_param_array(disable_dev, int, disable_dev_count, 0444);
 
 postcore_initcall (eisa_init);
 

@@ -210,7 +210,8 @@ callback_init(void * kernel_end)
 	/* Allocate one PGD and one PMD.  In the case of SRM, we'll need
 	   these to actually remap the console.  There is an assumption
 	   here that only one of each is needed, and this allows for 8MB.
-	   Currently (late 1999), big consoles are still under 4MB.
+	   On systems with larger consoles, additional pages will be
+	   allocated as needed during the mapping process.
 
 	   In the case of not SRM, but not CONFIG_ALPHA_LARGE_VMALLOC,
 	   we need to allocate the PGD we use for vmalloc before we start
@@ -237,6 +238,15 @@ callback_init(void * kernel_end)
 			unsigned long pfn = crb->map[i].pa >> PAGE_SHIFT;
 			crb->map[i].va = vaddr;
 			for (j = 0; j < crb->map[i].count; ++j) {
+				/* Newer console's (especially on larger
+				   systems) may require more pages of
+				   PTEs. Grab additional pages as needed. */
+				if (pmd != pmd_offset(pgd, vaddr)) {
+					memset(kernel_end, 0, PAGE_SIZE);
+					pmd = pmd_offset(pgd, vaddr);
+					pmd_set(pmd, (pte_t *)kernel_end);
+					kernel_end += PAGE_SIZE;
+				}
 				set_pte(pte_offset_kernel(pmd, vaddr),
 					pfn_pte(pfn, PAGE_KERNEL));
 				pfn++;

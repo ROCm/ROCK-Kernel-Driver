@@ -278,8 +278,9 @@
 #define __NR_tgkill		270
 #define __NR_utimes		271
 #define __NR_fadvise64_64	272
+#define __NR_vserver		273
 
-#define NR_syscalls 273
+#define NR_syscalls 274
 
 /* user-visible error numbers are in the range -1 - -124: see <asm-i386/errno.h> */
 

@@ -424,17 +424,17 @@ int ec_write(u8 addr, u8 val);
 
 #endif /*CONFIG_ACPI_EC*/
 
-#ifdef CONFIG_ACPI
+#ifdef CONFIG_ACPI_INTERPRETER
 
 int acpi_blacklisted(void);
 
-#else
+#else /*!CONFIG_ACPI_INTERPRETER*/
 
 static inline int acpi_blacklisted(void)
 {
 	return 0;
 }
 
-#endif /*CONFIG_ACPI*/
+#endif /*!CONFIG_ACPI_INTERPRETER*/
 
 #endif /*_LINUX_ACPI_H*/

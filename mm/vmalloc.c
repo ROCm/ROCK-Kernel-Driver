@@ -135,23 +135,23 @@ static int map_area_pmd(pmd_t *pmd, unsigned long address,
 
 void unmap_vm_area(struct vm_struct *area)
 {
-	unsigned long address = VMALLOC_VMADDR(area->addr);
+	unsigned long address = (unsigned long) area->addr;
 	unsigned long end = (address + area->size);
 	pgd_t *dir;
 
 	dir = pgd_offset_k(address);
-	flush_cache_all();
+	flush_cache_vunmap(address, end);
 	do {
 		unmap_area_pmd(dir, address, end - address);
 		address = (address + PGDIR_SIZE) & PGDIR_MASK;
 		dir++;
 	} while (address && (address < end));
-	flush_tlb_kernel_range(VMALLOC_VMADDR(area->addr), end);
+	flush_tlb_kernel_range((unsigned long) area->addr, end);
 }
 
 int map_vm_area(struct vm_struct *area, pgprot_t prot, struct page ***pages)
 {
-	unsigned long address = VMALLOC_VMADDR(area->addr);
+	unsigned long address = (unsigned long) area->addr;
 	unsigned long end = address + (area->size-PAGE_SIZE);
 	pgd_t *dir;
 	int err = 0;
@@ -174,7 +174,7 @@ int map_vm_area(struct vm_struct *area, pgprot_t prot, struct page ***pages)
 	} while (address && (address < end));
 
 	spin_unlock(&init_mm.page_table_lock);
-	flush_cache_all();
+	flush_cache_vmap((unsigned long) area->addr, end);
 	return err;
 }
 

@@ -51,7 +51,6 @@ extern unsigned long empty_zero_page[1024];
  * Currently only 4-enty (16kB) is used (see arch/sh/mm/cache.c)
  */
 #define VMALLOC_START	(P3SEG+0x00100000)
-#define VMALLOC_VMADDR(x) ((unsigned long)(x))
 #define VMALLOC_END	P4SEG
 
 /*			0x001     WT-bit on SH-4, 0 on SH-3 */

@@ -52,7 +52,6 @@ static int generic_NCR5380_bus_reset(Scsi_Cmnd *);
 static int generic_NCR5380_host_reset(Scsi_Cmnd *);
 static int generic_NCR5380_device_reset(Scsi_Cmnd *);
 static const char* generic_NCR5380_info(struct Scsi_Host *);
-static int generic_NCR5380_biosparam(struct scsi_device *, struct block_device *, sector_t, int *);
 
 #ifndef CMD_PER_LUN
 #define CMD_PER_LUN 2

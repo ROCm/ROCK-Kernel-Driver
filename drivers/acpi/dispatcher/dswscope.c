@@ -121,9 +121,8 @@ acpi_ds_scope_stack_push (
 	/* Make sure object type is valid */
 
 	if (!acpi_ut_valid_object_type (type)) {
-		ACPI_REPORT_WARNING (("ds_scope_stack_push: type code out of range\n"));
+		ACPI_REPORT_WARNING (("ds_scope_stack_push: Invalid object type: 0x%X\n", type));
 	}
-
 
 	/* Allocate a new scope object */
 
@@ -146,13 +145,13 @@ acpi_ds_scope_stack_push (
 	old_scope_info = walk_state->scope_info;
 	if (old_scope_info) {
 		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_EXEC,
-			"[%4.4s] (%10s)",
+			"[%4.4s] (%s)",
 			old_scope_info->scope.node->name.ascii,
 			acpi_ut_get_type_name (old_scope_info->common.value)));
 	}
 	else {
 		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_EXEC,
-			"[\\___] (%10s)", "ROOT"));
+			"[\\___] (%s)", "ROOT"));
 	}
 
 	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_EXEC,
@@ -163,7 +162,6 @@ acpi_ds_scope_stack_push (
 	/* Push new scope object onto stack */
 
 	acpi_ut_push_generic_state (&walk_state->scope_info, scope_info);
-
 	return_ACPI_STATUS (AE_OK);
 }
 
@@ -207,7 +205,7 @@ acpi_ds_scope_stack_pop (
 	walk_state->scope_depth--;
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
-		"[%.2d] Popped scope [%4.4s] (%10s), New scope -> ",
+		"[%.2d] Popped scope [%4.4s] (%s), New scope -> ",
 		(u32) walk_state->scope_depth,
 		scope_info->scope.node->name.ascii,
 		acpi_ut_get_type_name (scope_info->common.value)));
@@ -225,7 +223,6 @@ acpi_ds_scope_stack_pop (
 	}
 
 	acpi_ut_delete_generic_state (scope_info);
-
 	return_ACPI_STATUS (AE_OK);
 }
 

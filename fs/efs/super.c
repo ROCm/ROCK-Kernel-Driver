@@ -218,7 +218,11 @@ int efs_fill_super(struct super_block *s, void *d, int silent)
 	memset(sb, 0, sizeof(struct efs_sb_info));
  
 	s->s_magic		= EFS_SUPER_MAGIC;
-	sb_set_blocksize(s, EFS_BLOCKSIZE);
+	if (!sb_set_blocksize(s, EFS_BLOCKSIZE)) {
+		printk(KERN_ERR "EFS: device does not support %d byte blocks\n",
+			EFS_BLOCKSIZE);
+		goto out_no_fs_ul;
+	}
   
 	/* read the vh (volume header) block */
 	bh = sb_bread(s, 0);

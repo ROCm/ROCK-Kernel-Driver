@@ -1203,7 +1203,7 @@ show_cpuinfo(struct seq_file *f, void *slot)
 		       platform_string(), nr_processors);
 
 #ifdef CONFIG_SMP
-	seq_printf(f, "cpus active\t\t: %d\n"
+	seq_printf(f, "cpus active\t\t: %ld\n"
 		      "cpu active mask\t\t: %016lx\n",
 		       num_online_cpus(), cpu_present_mask);
 #endif

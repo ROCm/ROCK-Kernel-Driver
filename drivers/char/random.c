@@ -1735,7 +1735,7 @@ random_ioctl(struct inode * inode, struct file * file,
 		tmp = kmalloc(size * sizeof(__u32), GFP_KERNEL);
 
 		if (!tmp)
-			return -EFAULT;
+			return -ENOMEM;
 
 		spin_lock_irqsave(&random_state->lock, flags);
 		ent_count = random_state->entropy_count;

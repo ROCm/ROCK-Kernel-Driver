@@ -45,7 +45,6 @@
  * Define the address range of the vmalloc VM area.
  */
 #define VMALLOC_START (0xD000000000000000)
-#define VMALLOC_VMADDR(x) ((unsigned long)(x))
 #define VMALLOC_END   (VMALLOC_START + VALID_EA_BITS)
 
 /*

@@ -2679,6 +2679,7 @@ static int ext3_do_update_inode(handle_t *handle,
 			raw_inode->i_block[0] = 0;
 			raw_inode->i_block[1] =
 				cpu_to_le32(new_encode_dev(inode->i_rdev));
+			raw_inode->i_block[2] = 0;
 		}
 	} else for (block = 0; block < EXT3_N_BLOCKS; block++)
 		raw_inode->i_block[block] = ei->i_data[block];

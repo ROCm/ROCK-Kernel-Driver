@@ -2229,8 +2229,10 @@ static int __init isdn_init(void)
 	isdn_info_update();
 	return 0;
 
-/* err_tty_modem:*/
+#ifdef CONFIG_ISDN_PPP
+ err_tty_modem:
 	isdn_tty_exit();
+#endif
  err_cleanup_devfs:
 	isdn_cleanup_devfs();
 	unregister_chrdev(ISDN_MAJOR, "isdn");

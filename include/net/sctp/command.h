@@ -1,5 +1,6 @@
-/* SCTP kernel reference Implementation Copyright (C) 1999-2001
- * Cisco, Motorola, and IBM
+/* SCTP kernel reference Implementation
+ * (C) Copyright IBM Corp. 2001, 2003
+ * Copyright (C) 1999-2001 Cisco, Motorola
  *
  * This file is part of the SCTP kernel reference Implementation
  *
@@ -88,6 +89,7 @@ typedef enum {
 	SCTP_CMD_PART_DELIVER,	 /* Partial data delivery considerations. */
 	SCTP_CMD_RENEGE,         /* Renege data on an association. */
 	SCTP_CMD_SETUP_T4,	 /* ADDIP, setup T4 RTO timer parms. */
+	SCTP_CMD_PROCESS_OPERR,  /* Process an ERROR chunk. */
 	SCTP_CMD_LAST
 } sctp_verb_t;
 

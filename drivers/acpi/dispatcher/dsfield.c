@@ -105,27 +105,33 @@ acpi_ds_create_buffer_field (
 		return_ACPI_STATUS (AE_AML_NO_OPERAND);
 	}
 
-	/*
-	 * During the load phase, we want to enter the name of the field into
-	 * the namespace.  During the execute phase (when we evaluate the size
-	 * operand), we want to lookup the name
-	 */
-	if (walk_state->parse_flags & ACPI_PARSE_EXECUTE) {
-		flags = ACPI_NS_NO_UPSEARCH | ACPI_NS_DONT_OPEN_SCOPE;
+	if (walk_state->deferred_node) {
+		node = walk_state->deferred_node;
+		status = AE_OK;
 	}
 	else {
-		flags = ACPI_NS_NO_UPSEARCH | ACPI_NS_DONT_OPEN_SCOPE | ACPI_NS_ERROR_IF_FOUND;
-	}
+		/*
+		 * During the load phase, we want to enter the name of the field into
+		 * the namespace.  During the execute phase (when we evaluate the size
+		 * operand), we want to lookup the name
+		 */
+		if (walk_state->parse_flags & ACPI_PARSE_EXECUTE) {
+			flags = ACPI_NS_NO_UPSEARCH | ACPI_NS_DONT_OPEN_SCOPE;
+		}
+		else {
+			flags = ACPI_NS_NO_UPSEARCH | ACPI_NS_DONT_OPEN_SCOPE | ACPI_NS_ERROR_IF_FOUND;
+		}
 
-	/*
-	 * Enter the name_string into the namespace
-	 */
-	status = acpi_ns_lookup (walk_state->scope_info, arg->common.value.string,
-			 ACPI_TYPE_ANY, ACPI_IMODE_LOAD_PASS1,
-			 flags, walk_state, &(node));
-	if (ACPI_FAILURE (status)) {
-		ACPI_REPORT_NSERROR (arg->common.value.string, status);
-		return_ACPI_STATUS (status);
+		/*
+		 * Enter the name_string into the namespace
+		 */
+		status = acpi_ns_lookup (walk_state->scope_info, arg->common.value.string,
+				 ACPI_TYPE_ANY, ACPI_IMODE_LOAD_PASS1,
+				 flags, walk_state, &(node));
+		if (ACPI_FAILURE (status)) {
+			ACPI_REPORT_NSERROR (arg->common.value.string, status);
+			return_ACPI_STATUS (status);
+		}
 	}
 
 	/* We could put the returned object (Node) on the object stack for later, but

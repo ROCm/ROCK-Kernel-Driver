@@ -195,7 +195,7 @@ __ioremap(phys_addr_t addr, unsigned long size, unsigned long flags)
 		area = get_vm_area(size, VM_IOREMAP);
 		if (area == 0)
 			return NULL;
-		v = VMALLOC_VMADDR(area->addr);
+		v = (unsigned long) area->addr;
 	} else {
 		v = (ioremap_bot -= size);
 	}
