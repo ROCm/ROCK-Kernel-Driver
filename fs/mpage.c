@@ -671,6 +671,7 @@ mpage_writepages(struct address_space *mapping,
 			}
 		}
 		pagevec_release(&pvec);
+		cond_resched();
 	}
 	if (bio)
 		mpage_bio_submit(WRITE, bio);
