@@ -877,37 +877,33 @@ icmp_reply_translation(struct sk_buff **pskb,
 		if (info->manips[i].direction != dir)
 			continue;
 
-		/* Mapping the inner packet is just like a normal
-		   packet, except it was never src/dst reversed, so
-		   where we would normally apply a dst manip, we apply
-		   a src, and vice versa. */
-		if (info->manips[i].hooknum == hooknum) {
-			DEBUGP("icmp_reply: inner %s -> %u.%u.%u.%u %u\n",
-			       info->manips[i].maniptype == IP_NAT_MANIP_SRC
-			       ? "DST" : "SRC",
-			       NIPQUAD(info->manips[i].manip.ip),
-			       ntohs(info->manips[i].manip.u.udp.port));
-			if (!manip_pkt(inside->ip.protocol, pskb,
-				       (*pskb)->nh.iph->ihl*4
-				       + sizeof(inside->icmp),
-				       &info->manips[i].manip,
-				       !info->manips[i].maniptype))
-				goto unlock_fail;
+		/* Mapping the inner packet is just like a normal packet, except
+		 * it was never src/dst reversed, so where we would normally
+		 * apply a dst manip, we apply a src, and vice versa. */
+		if (info->manips[i].hooknum != hooknum)
+			continue;
 
-			/* Outer packet needs to have IP header NATed like
-	                   it's a reply. */
+		DEBUGP("icmp_reply: inner %s -> %u.%u.%u.%u %u\n",
+		       info->manips[i].maniptype == IP_NAT_MANIP_SRC
+		       ? "DST" : "SRC", NIPQUAD(info->manips[i].manip.ip),
+		       ntohs(info->manips[i].manip.u.udp.port));
+		if (!manip_pkt(inside->ip.protocol, pskb,
+			       (*pskb)->nh.iph->ihl*4 + sizeof(inside->icmp),
+			       &info->manips[i].manip,
+			       !info->manips[i].maniptype))
+			goto unlock_fail;
 
-			/* Use mapping to map outer packet: 0 give no
-                           per-proto mapping */
-			DEBUGP("icmp_reply: outer %s -> %u.%u.%u.%u\n",
-			       info->manips[i].maniptype == IP_NAT_MANIP_SRC
-			       ? "SRC" : "DST",
-			       NIPQUAD(info->manips[i].manip.ip));
-			if (!manip_pkt(0, pskb, 0,
-				       &info->manips[i].manip,
-				       info->manips[i].maniptype))
-				goto unlock_fail;
-		}
+		/* Outer packet needs to have IP header NATed like
+                   it's a reply. */
+
+		/* Use mapping to map outer packet: 0 give no
+                          per-proto mapping */
+		DEBUGP("icmp_reply: outer %s -> %u.%u.%u.%u\n",
+		       info->manips[i].maniptype == IP_NAT_MANIP_SRC
+		       ? "SRC" : "DST", NIPQUAD(info->manips[i].manip.ip));
+		if (!manip_pkt(0, pskb, 0, &info->manips[i].manip,
+			       info->manips[i].maniptype))
+			goto unlock_fail;
 	}
 	READ_UNLOCK(&ip_nat_lock);
 
