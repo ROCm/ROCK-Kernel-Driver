@@ -10,7 +10,7 @@ config MACH_MAINSTONE
 	bool "Intel HCDDBBVA0 Development Platform"
 	depends on ARCH_PXA
 	select PXA27x
-	select IWMMXT
+	#select IWMMXT
 
 config ARCH_PXA_IDP
 	bool "Accelent Xscale IDP"
