@@ -22,6 +22,7 @@
 #include <linux/compiler.h>
 #include <linux/module.h>
 #include <linux/suspend.h>
+#include <linux/pagevec.h>
 
 unsigned long totalram_pages;
 unsigned long totalhigh_pages;
@@ -456,6 +457,14 @@ void page_cache_release(struct page *page)
 			lru_cache_del(page);
 		__free_pages_ok(page, 0);
 	}
+}
+
+void __pagevec_free(struct pagevec *pvec)
+{
+	int i = pagevec_count(pvec);
+
+	while (--i >= 0)
+		__free_pages_ok(pvec->pages[i], 0);
 }
 
 void __free_pages(struct page *page, unsigned int order)
