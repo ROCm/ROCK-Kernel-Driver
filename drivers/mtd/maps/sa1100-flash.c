@@ -132,35 +132,13 @@ static void jornada56x_set_vpp(int vpp)
  */
 #endif
 
-#ifdef CONFIG_SA1100_H3XXX
-static void h3xxx_set_vpp(struct map_info *map, int vpp)
-{
-	assign_h3600_egpio(IPAQ_EGPIO_VPP_ON, vpp);
-}
-#else
-#define h3xxx_set_vpp NULL
-#endif
-
-#ifdef CONFIG_SA1100_JORNADA720
-static void jornada720_set_vpp(struct map_info *map, int vpp)
-{
-	if (vpp)
-		PPSR |= 0x80;
-	else
-		PPSR &= ~0x80;
-	PPDR |= 0x80;
-}
-#else
-#define jornada720_set_vpp NULL
-#endif
-
 struct sa_subdev_info {
 	unsigned long base;
 	unsigned long size;
-	void (*set_vpp)(struct map_info *, int);
 	char name[16];
 	struct map_info map;
 	struct mtd_info *mtd;
+	struct flash_platform_data *data;
 };
 
 #define NR_SUBMTD 4
@@ -171,6 +149,12 @@ struct sa_info {
 	int			num_subdev;
 	struct sa_subdev_info	subdev[NR_SUBMTD];
 };
+
+static void sa1100_set_vpp(struct map_info *map, int on)
+{
+	struct sa_subdev_info *subdev = container_of(map, struct sa_subdev_info, map);
+	subdev->data->set_vpp(on);
+}
 
 static void sa1100_destroy_subdev(struct sa_subdev_info *subdev)
 {
@@ -213,7 +197,9 @@ static int sa1100_probe_subdev(struct sa_subdev_info *subdev)
 		goto out;
 	}
 
-	subdev->map.set_vpp = subdev->set_vpp;
+	if (subdev->data->set_vpp)
+		subdev->map.set_vpp = sa1100_set_vpp;
+
 	subdev->map.phys = phys;
 	subdev->map.size = size;
 	subdev->map.virt = ioremap(phys, size);
@@ -267,7 +253,8 @@ static void sa1100_destroy(struct sa_info *info)
 		sa1100_destroy_subdev(&info->subdev[i]);
 }
 
-static int __init sa1100_setup_mtd(struct sa_info *info, int nr)
+static int __init
+sa1100_setup_mtd(struct sa_info *info, int nr, struct flash_platform_data *flash)
 {
 	struct mtd_info *cdev[nr];
 	int i, ret = 0;
@@ -282,6 +269,7 @@ static int __init sa1100_setup_mtd(struct sa_info *info, int nr)
 
 		subdev->map.name = subdev->name;
 		sprintf(subdev->name, "sa1100-%d", i);
+		subdev->data = flash;
 
 		ret = sa1100_probe_subdev(subdev);
 		if (ret)
@@ -388,10 +376,8 @@ static int __init sa1100_locate_flash(struct sa_info *info)
 		nr = 1;
 	}
 	if (machine_is_h3xxx()) {
-		info->subdev[0].set_vpp = h3xxx_set_vpp;
 		info->subdev[0].base = SA1100_CS0_PHYS;
 		info->subdev[0].size = SZ_32M;
-		info->set_vpp = h3xxx_set_vpp;
 		nr = 1;
 	}
 	if (machine_is_huw_webpanel()) {
@@ -405,16 +391,13 @@ static int __init sa1100_locate_flash(struct sa_info *info)
 		nr = 1;
 	}
 	if (machine_is_jornada56x()) {
-		info->subdev[0].set_vpp = jornada56x_set_vpp;
 		info->subdev[0].base = SA1100_CS0_PHYS;
 		info->subdev[0].size = SZ_32M;
 		nr = 1;
 	}
 	if (machine_is_jornada720()) {
-		info->subdev[0].set_vpp = jornada720_set_vpp;
 		info->subdev[0].base = SA1100_CS0_PHYS;
 		info->subdev[0].size = SZ_32M;
-		info->set_vpp = jornada720_set_vpp;
 		nr = 1;
 	}
 	if (machine_is_nanoengine()) {
@@ -508,7 +491,7 @@ static int __init sa1100_mtd_probe(struct device *dev)
 	if (nr < 0)
 		return nr;
 
-	err = sa1100_setup_mtd(info, nr);
+	err = sa1100_setup_mtd(info, nr, flash);
 	if (err != 0)
 		goto out;
 
