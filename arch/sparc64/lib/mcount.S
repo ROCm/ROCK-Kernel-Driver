@@ -36,7 +36,12 @@ mcount:
 	/*
 	 * Check whether %sp is dangerously low.
 	 */
-	add		%g6, (TI_FPREGS + 256 + 192), %g5! where does task_struct+frame end?
+	ldub		[%g6 + TI_FPDEPTH], %g1
+	srl		%g1, 1, %g5
+	add		%g5, 1, %g5
+	sllx		%g5, 8, %g5			! each fpregs frame is 256b
+	add		%g5, 192, %g5
+	add		%g6, %g5, %g5			! where does task_struct+frame end?
 	sub		%g5, STACK_BIAS, %g5
 	cmp		%sp, %g5
 	bg,pt		%xcc, 1f
