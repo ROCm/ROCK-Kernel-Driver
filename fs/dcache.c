@@ -975,12 +975,6 @@ struct dentry * __d_lookup(struct dentry * parent, struct qstr * name)
 		smp_read_barrier_depends();
 		dentry = hlist_entry(node, struct dentry, d_hash);
 
-		/* if lookup ends up in a different bucket 
-		 * due to concurrent rename, fail it
-		 */
-		if (unlikely(dentry->d_bucket != head))
-			break;
-
 		smp_rmb();
 
 		if (dentry->d_name.hash != hash)
@@ -989,6 +983,13 @@ struct dentry * __d_lookup(struct dentry * parent, struct qstr * name)
 			continue;
 
 		spin_lock(&dentry->d_lock);
+
+		/*
+		 * If lookup ends up in a different bucket due to concurrent
+		 * rename, fail it
+		 */
+		if (unlikely(dentry->d_bucket != head))
+			goto terminate;
 
 		/*
 		 * Recheck the dentry after taking the lock - d_move may have
@@ -1014,6 +1015,7 @@ struct dentry * __d_lookup(struct dentry * parent, struct qstr * name)
 			atomic_inc(&dentry->d_count);
 			found = dentry;
 		}
+terminate:
 		spin_unlock(&dentry->d_lock);
 		break;
 next:
