@@ -155,16 +155,6 @@ module_param(debug, int, 0644);    /* debug level (0,1,2) */
 
 /* ----------------------------------------------------------------------- */
 
-static inline int reverse(int data, int bits)
-{
-	int i,c;
-
-	for (c=0,i=0; i<bits; i++) {
-		c |= (((data & (1<<i)) ? 1:0)) << (bits-1-i);
-	}
-	return c;
-}
-
 static int get_key_haup(struct IR *ir, u32 *ir_key, u32 *ir_raw)
 {
 	unsigned char buf[3];
