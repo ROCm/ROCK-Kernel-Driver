@@ -10,7 +10,7 @@
  *  DMA uncached mapping support.
  */
 #include <linux/config.h>
-#include <linux/types.h>
+#include <linux/module.h>
 #include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/string.h>
@@ -145,6 +145,7 @@ void *consistent_alloc(int gfp, size_t size, dma_addr_t *handle,
 	struct vm_region *c;
 	unsigned long order, flags;
 	void *ret = NULL;
+	int res;
 
 	if (!consistent_pte) {
 		printk(KERN_ERR "consistent_alloc: not initialised\n");
@@ -177,14 +178,19 @@ void *consistent_alloc(int gfp, size_t size, dma_addr_t *handle,
 	if (!c)
 		goto no_remap;
 
-	spin_lock_irqsave(&consistent_lock, flags);
-	vm_region_dump(&consistent_head, "before alloc");
-
 	/*
 	 * Attempt to allocate a virtual address in the
 	 * consistent mapping region.
 	 */
-	if (!vm_region_alloc(&consistent_head, c, size)) {
+	spin_lock_irqsave(&consistent_lock, flags);
+	vm_region_dump(&consistent_head, "before alloc");
+
+	res = vm_region_alloc(&consistent_head, c, size);
+
+	vm_region_dump(&consistent_head, "after alloc");
+	spin_unlock_irqrestore(&consistent_lock, flags);
+
+	if (!res) {
 		pte_t *pte = consistent_pte + CONSISTENT_OFFSET(c->vm_start);
 		struct page *end = page + (1 << order);
 		pgprot_t prot = __pgprot(L_PTE_PRESENT | L_PTE_YOUNG |
@@ -218,9 +224,6 @@ void *consistent_alloc(int gfp, size_t size, dma_addr_t *handle,
 		ret = (void *)c->vm_start;
 	}
 
-	vm_region_dump(&consistent_head, "after alloc");
-	spin_unlock_irqrestore(&consistent_lock, flags);
-
  no_remap:
 	if (ret == NULL) {
 		kfree(c);
@@ -229,6 +232,22 @@ void *consistent_alloc(int gfp, size_t size, dma_addr_t *handle,
  no_page:
 	return ret;
 }
+
+/*
+ * Since we have the DMA mask available to us here, we could try to do
+ * a normal allocation, and only fall back to a "DMA" allocation if the
+ * resulting bus address does not satisfy the dma_mask requirements.
+ */
+void *
+dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *handle, int gfp)
+{
+	if (dev == NULL || *dev->dma_mask != 0xffffffff)
+		gfp |= GFP_DMA;
+
+	return consistent_alloc(gfp, size, handle, 0);
+}
+
+EXPORT_SYMBOL(dma_alloc_coherent);
 
 /*
  * free a page as defined by the above mapping.
