@@ -75,6 +75,11 @@ static int dummy_capable (struct task_struct *tsk, int cap)
 	return -EPERM;
 }
 
+static int dummy_sysctl (ctl_table * table, int op)
+{
+	return 0;
+}
+
 static int dummy_quotactl (int cmds, int type, int id, struct super_block *sb)
 {
 	return 0;
@@ -634,6 +639,7 @@ void security_fixup_ops (struct security_operations *ops)
 	set_to_dummy_if_null(ops, capable);
 	set_to_dummy_if_null(ops, quotactl);
 	set_to_dummy_if_null(ops, quota_on);
+	set_to_dummy_if_null(ops, sysctl);
 	set_to_dummy_if_null(ops, bprm_alloc_security);
 	set_to_dummy_if_null(ops, bprm_free_security);
 	set_to_dummy_if_null(ops, bprm_compute_creds);

@@ -767,6 +767,12 @@ struct swap_info_struct;
  *	is NULL.
  *	@file contains the file structure for the accounting file (may be NULL).
  *	Return 0 if permission is granted.
+ * @sysctl:
+ *	Check permission before accessing the @table sysctl variable in the
+ *	manner specified by @op.
+ *	@table contains the ctl_table structure for the sysctl variable.
+ *	@op contains the operation (001 = search, 002 = write, 004 = read).
+ *	Return 0 if permission is granted.
  * @capable:
  *	Check whether the @tsk process has the @cap capability.
  *	@tsk contains the task_struct for the process.
@@ -798,6 +804,7 @@ struct security_operations {
 			    kernel_cap_t * inheritable,
 			    kernel_cap_t * permitted);
 	int (*acct) (struct file * file);
+	int (*sysctl) (ctl_table * table, int op);
 	int (*capable) (struct task_struct * tsk, int cap);
 	int (*quotactl) (int cmds, int type, int id, struct super_block * sb);
 	int (*quota_on) (struct file * f);
@@ -988,6 +995,11 @@ static inline void security_capset_set (struct task_struct *target,
 static inline int security_acct (struct file *file)
 {
 	return security_ops->acct (file);
+}
+
+static inline int security_sysctl(ctl_table * table, int op)
+{
+	return security_ops->sysctl(table, op);
 }
 
 static inline int security_quotactl (int cmds, int type, int id,
@@ -1595,6 +1607,11 @@ static inline void security_capset_set (struct task_struct *target,
 }
 
 static inline int security_acct (struct file *file)
+{
+	return 0;
+}
+
+static inline int security_sysctl(ctl_table * table, int op)
 {
 	return 0;
 }
