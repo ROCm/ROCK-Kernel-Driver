@@ -690,17 +690,6 @@ static int attach_adapter (struct i2c_adapter *adapter)
 		kfree(state);
 		return ret;
 	}
-
-	BUG_ON(!state->dvb);
-
-	if ((ret = dvb_register_frontend(cx24110_ioctl, state->dvb, state,
-					     &cx24110_info, THIS_MODULE))) {
-		i2c_detach_client(client);
-		kfree(client);
-		kfree(state);
-		return ret;
-	}
-
 	return 0;
 }
 
@@ -708,7 +697,10 @@ static int detach_client (struct i2c_client *client)
 {
 	struct cx24110_state *state = i2c_get_clientdata(client);
 
-	dvb_unregister_frontend(cx24110_ioctl, state->dvb);
+	if (NULL != state->dvb) {
+		dvb_unregister_frontend(cx24110_ioctl, state->dvb);
+		state->dvb = NULL;
+	}
 	i2c_detach_client(client);
 	BUG_ON(state->dvb);
 	kfree(client);
@@ -719,12 +711,25 @@ static int detach_client (struct i2c_client *client)
 static int command(struct i2c_client *client, unsigned int cmd, void *arg)
 {
 	struct cx24110_state *state = i2c_get_clientdata(client);
+	int rc;
 
 	switch(cmd) {
 	case FE_REGISTER:
+		if (NULL != state->dvb)
+			break;
 		state->dvb = arg;
+		rc = dvb_register_frontend(cx24110_ioctl, state->dvb, state,
+					   &cx24110_info, THIS_MODULE);
+		if (0 != rc) {
+			printk("cx24110: dvb_register_frontend failed with rc=%d\n",rc);
+			state->dvb = NULL;
+			return rc;
+		}
 		break;
 	case FE_UNREGISTER:
+		if (NULL == state->dvb)
+			break;
+		dvb_unregister_frontend(cx24110_ioctl, state->dvb);
 		state->dvb = NULL;
 		break;
 	default:
