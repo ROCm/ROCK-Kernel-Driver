@@ -158,7 +158,7 @@ acpi_pci_irq_add_prt (
 	int			bus)
 {
 	acpi_status		status = AE_OK;
-	char			pathname[PATHNAME_MAX] = {0};
+	char			pathname[ACPI_PATHNAME_MAX] = {0};
 	acpi_buffer		buffer = {0, NULL};
 	acpi_pci_routing_table	*prt = NULL;
 	acpi_pci_routing_table	*entry = NULL;
