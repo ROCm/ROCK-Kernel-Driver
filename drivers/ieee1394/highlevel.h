@@ -182,7 +182,4 @@ int hpsb_set_hostinfo(struct hpsb_highlevel *hl, struct hpsb_host *host, void *d
 /* Retrieve hpsb_host using a highlevel handle and a key */
 struct hpsb_host *hpsb_get_host_bykey(struct hpsb_highlevel *hl, unsigned long key);
 
-/* Initialize the highlevel system */
-void init_hpsb_highlevel(struct hpsb_host *host);
-
 #endif /* IEEE1394_HIGHLEVEL_H */
