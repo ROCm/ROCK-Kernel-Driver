@@ -118,7 +118,7 @@ int rpaphp_get_pci_adapter_status(struct slot *slot, int is_init, u8 * value)
 {
 	int state, rc;
  	struct device_node *child_dn;
- 	struct pci_dev *child_dev;
+ 	struct pci_dev *child_dev = NULL;
 
 	*value = NOT_VALID;
 	rc = rpaphp_get_sensor_state(slot, &state);
@@ -369,7 +369,7 @@ static void rpaphp_eeh_remove_bus_device(struct pci_dev *dev)
 int rpaphp_unconfig_pci_adapter(struct slot *slot)
 {
 	int retval = 0;
-	struct list_head *ln;
+	struct list_head *ln, *tmp;
 
 	dbg("Entry %s: slot[%s]\n", __FUNCTION__, slot->name);
 	if (list_empty(&slot->dev.pci_funcs)) {
@@ -380,7 +380,7 @@ int rpaphp_unconfig_pci_adapter(struct slot *slot)
 		goto exit;
 	}
 	/* remove the devices from the pci core */
-	list_for_each (ln, &slot->dev.pci_funcs) {
+	list_for_each_safe (ln, tmp, &slot->dev.pci_funcs) {
 		struct rpaphp_pci_func *func;
 	
 		func = list_entry(ln, struct rpaphp_pci_func, sibling);
