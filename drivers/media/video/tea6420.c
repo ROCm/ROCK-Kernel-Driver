@@ -110,7 +110,8 @@ static int tea6420_detect(struct i2c_adapter *adapter, int address, int kind)
         if (0 == client) {
 		return -ENOMEM;
 	}
-	
+	memset(client, 0x0, sizeof(struct i2c_client));	
+
 	/* fill client structure */
 	sprintf(client->name,"tea6420 (0x%02x)", address);
 	client->id = tea6420_id++;
@@ -187,9 +188,7 @@ static int tea6420_command(struct i2c_client *client, unsigned int cmd, void* ar
 }
 
 static struct i2c_driver driver = {
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,54)
 	.owner		= THIS_MODULE,
-#endif
 	.name		= "tea6420 driver",
 	.id		= I2C_DRIVERID_TEA6420,
 	.flags		= I2C_DF_NOTIFY,

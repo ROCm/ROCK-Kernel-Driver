@@ -72,6 +72,9 @@ phys_to_virt (unsigned long address)
 	return (void *) (address + PAGE_OFFSET);
 }
 
+#define ARCH_HAS_VALID_PHYS_ADDR_RANGE
+extern int valid_phys_addr_range (unsigned long addr, size_t *count); /* efi.c */
+
 /*
  * The following two macros are deprecated and scheduled for removal.
  * Please use the PCI-DMA interface defined in <asm/pci.h> instead.

@@ -36,7 +36,7 @@
 #include <linux/kernel.h>
 #include <asm/uaccess.h>
 
-extern int max_threads, system_running;
+extern int max_threads;
 
 #ifdef CONFIG_KMOD
 

@@ -638,7 +638,7 @@ static int __init drm_init( void )
 			DRM_ERROR( "Cannot initialize the agpgart module.\n" );
 			DRM(stub_unregister)(DRM(minor)[i]);
 			DRM(takedown)( dev );
-			return -ENOMEM;
+			return -EINVAL;
 		}
 #endif
 #if __REALLY_HAVE_MTRR

@@ -122,10 +122,8 @@ static inline void free_one_pgd(struct mmu_gather *tlb, pgd_t * dir)
 	}
 	pmd = pmd_offset(dir, 0);
 	pgd_clear(dir);
-	for (j = 0; j < PTRS_PER_PMD ; j++) {
-		prefetchw(pmd + j + PREFETCH_STRIDE/sizeof(*pmd));
+	for (j = 0; j < PTRS_PER_PMD ; j++)
 		free_one_pmd(tlb, pmd+j);
-	}
 	pmd_free_tlb(tlb, pmd);
 }
 
@@ -528,7 +526,7 @@ int unmap_vmas(struct mmu_gather **tlbp, struct mm_struct *mm,
 		unsigned long end_addr, unsigned long *nr_accounted)
 {
 	unsigned long zap_bytes = ZAP_BLOCK_SIZE;
-	unsigned long tlb_start;	/* For tlb_finish_mmu */
+	unsigned long tlb_start = 0;	/* For tlb_finish_mmu */
 	int tlb_start_valid = 0;
 	int ret = 0;
 
@@ -683,6 +681,7 @@ static inline struct page *get_page_map(struct page *page)
 }
 
 
+#ifdef FIXADDR_USER_START
 static struct vm_area_struct fixmap_vma = {
 	/* Catch users - if there are any valid
 	   ones, we can make this be "&init_mm" or
@@ -700,6 +699,7 @@ static int init_fixmap_vma(void)
 }
 
 __initcall(init_fixmap_vma);
+#endif
 
 int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 		unsigned long start, int len, int write, int force,

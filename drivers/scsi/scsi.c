@@ -914,9 +914,7 @@ void scsi_device_put(struct scsi_device *sdev)
 		return;
 
 	module_put(sdev->host->hostt->module);
-	if (atomic_dec_and_test(&sdev->access_count))
-		if (test_bit(SDEV_DEL, &sdev->sdev_state))
-			device_del(&sdev->sdev_gendev);
+	atomic_dec(&sdev->access_count);
 	put_device(&sdev->sdev_gendev);
 	class_put(&sdev_class);
 }

@@ -409,11 +409,8 @@ int saa7146_i2c_adapter_prepare(struct saa7146_dev *dev, struct i2c_adapter *i2c
 	if( NULL != i2c_adapter ) {
 		memset(i2c_adapter,0,sizeof(struct i2c_adapter));
 		strcpy(i2c_adapter->name, dev->name);	
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0))
-		i2c_adapter->data = dev;
-#else
 		i2c_set_adapdata(i2c_adapter,dev);
-#endif
+		i2c_adapter->class	   = I2C_ADAP_CLASS_TV_ANALOG;
 		i2c_adapter->algo	   = &saa7146_algo;
 		i2c_adapter->algo_data     = NULL;
 		i2c_adapter->id 	   = I2C_ALGO_SAA7146;

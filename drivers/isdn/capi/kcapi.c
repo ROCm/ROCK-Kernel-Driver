@@ -79,7 +79,6 @@ capi_ctr_get(struct capi_ctr *card)
 {
 	if (!try_module_get(card->owner))
 		return NULL;
-	DBG("Reserve module: %s", card->owner->name);
 	return card;
 }
 
@@ -87,7 +86,6 @@ static inline void
 capi_ctr_put(struct capi_ctr *card)
 {
 	module_put(card->owner);
-	DBG("Release module: %s", card->owner->name);
 }
 
 /* ------------------------------------------------------------- */

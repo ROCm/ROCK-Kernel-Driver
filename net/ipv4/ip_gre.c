@@ -601,8 +601,7 @@ int ipgre_rcv(struct sk_buff *skb)
 
 	read_lock(&ipgre_lock);
 	if ((tunnel = ipgre_tunnel_lookup(iph->saddr, iph->daddr, key)) != NULL) {
-		secpath_put(skb->sp);
-		skb->sp = NULL;
+		secpath_reset(skb);
 
 		skb->mac.raw = skb->nh.raw;
 		skb->nh.raw = __pskb_pull(skb, offset);

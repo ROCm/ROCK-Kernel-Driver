@@ -278,10 +278,6 @@ void tulip_select_media(struct net_device *dev, int startup)
 				for (i = 0; i < init_length; i++)
 					outl(init_sequence[i], ioaddr + CSR12);
 			}
-
-			(void) inl(ioaddr + CSR6); /* flush CSR12 writes */
-			udelay(500);		/* Give MII time to recover */
-
 			tmp_info = get_u16(&misc_info[1]);
 			if (tmp_info)
 				tp->advertising[phy_num] = tmp_info | 1;

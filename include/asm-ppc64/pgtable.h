@@ -51,10 +51,11 @@
  * Define the address range of the imalloc VM area.
  * (used for ioremap)
  */
-#define IMALLOC_START (ioremap_bot)
+#define IMALLOC_START     (ioremap_bot)
 #define IMALLOC_VMADDR(x) ((unsigned long)(x))
-#define IMALLOC_BASE  (0xE000000000000000)
-#define IMALLOC_END   (IMALLOC_BASE + VALID_EA_BITS)
+#define PHBS_IO_BASE  	  (0xE000000000000000)	/* Reserve 2 gigs for PHBs */
+#define IMALLOC_BASE      (0xE000000080000000)  
+#define IMALLOC_END       (IMALLOC_BASE + VALID_EA_BITS)
 
 /*
  * Define the address range mapped virt <-> physical
@@ -398,6 +399,17 @@ void pgtable_cache_init(void);
 
 extern void hpte_init_pSeries(void);
 extern void hpte_init_iSeries(void);
+
+/* imalloc region types */
+#define IM_REGION_UNUSED	0x1
+#define IM_REGION_SUBSET	0x2
+#define IM_REGION_EXISTS	0x4
+#define IM_REGION_OVERLAP	0x8
+
+extern struct vm_struct * im_get_free_area(unsigned long size);
+extern struct vm_struct * im_get_area(unsigned long v_addr, unsigned long size,
+			int region_type);
+unsigned long im_free(void *addr);
 
 typedef pte_t *pte_addr_t;
 

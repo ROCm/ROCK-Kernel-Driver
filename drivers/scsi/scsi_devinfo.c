@@ -6,10 +6,11 @@
 #include <linux/moduleparam.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
+#include <scsi/scsi_devinfo.h>
 
 #include "scsi.h"
+#include "hosts.h"
 #include "scsi_priv.h"
-#include "scsi_devinfo.h"
 
 /*
  * scsi_dev_info_list: structure to hold black/white listed devices.
@@ -322,11 +323,17 @@ static int scsi_dev_info_list_add_str(char *dev_list)
  * Description:
  *     Search the scsi_dev_info_list for an entry matching @vendor and
  *     @model, if found, return the matching flags value, else return
- *     scsi_default_dev_flags.
+ *     the host or global default settings.
  **/
-int scsi_get_device_flags(unsigned char *vendor, unsigned char *model)
+int scsi_get_device_flags(struct scsi_device *sdev, unsigned char *vendor,
+			  unsigned char *model)
 {
 	struct scsi_dev_info_list *devinfo;
+	unsigned int bflags;
+
+	bflags = sdev->host->hostt->flags;
+	if (!bflags)
+		bflags = scsi_default_dev_flags;
 
 	list_for_each_entry(devinfo, &scsi_dev_info_list, dev_info_list) {
 		if (devinfo->compatible) {
@@ -378,7 +385,7 @@ int scsi_get_device_flags(unsigned char *vendor, unsigned char *model)
 				return devinfo->flags;
 		}
 	}
-	return scsi_default_dev_flags;
+	return bflags;
 }
 
 #ifdef CONFIG_SCSI_PROC_FS

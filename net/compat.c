@@ -317,12 +317,12 @@ static int do_netfilter_replace(int fd, int level, int optname,
 				char *optval, int optlen)
 {
 	struct compat_ipt_replace *urepl = (struct compat_ipt_replace *)optval;
-	struct ipt_replace *krepl;
-	u32 origsize;
-	unsigned int kreplsize;
-	mm_segment_t old_fs;
+	struct ipt_replace *repl_nat;
+	char name[IPT_TABLE_MAXNAMELEN];
+	u32 origsize, tmp32, num_counters;
+	unsigned int repl_nat_size;
 	int ret;
-	int i;
+	int i, num_ents;
 	compat_uptr_t ucntrs;
 
 	if (get_user(origsize, &urepl->size))
@@ -335,25 +335,53 @@ static int do_netfilter_replace(int fd, int level, int optname,
 	/* XXX Assumes that size of ipt_entry is the same both in
 	 *     native and compat environments.
 	 */
-	kreplsize = sizeof(*krepl) + origsize;
-	krepl = (struct ipt_replace *)kmalloc(kreplsize, GFP_KERNEL);
-	if (krepl == NULL)
-		return -ENOMEM;
+	repl_nat_size = sizeof(*repl_nat) + origsize;
+	repl_nat = compat_alloc_user_space(repl_nat_size);
 
 	ret = -EFAULT;
-	krepl->size = origsize;
+	if (put_user(origsize, &repl_nat->size))
+		goto out;
+
 	if (!access_ok(VERIFY_READ, urepl, optlen) ||
-	    __copy_from_user(krepl->name, urepl->name, sizeof(urepl->name)) ||
-	    __get_user(krepl->valid_hooks, &urepl->valid_hooks) ||
-	    __get_user(krepl->num_entries, &urepl->num_entries) ||
-	    __get_user(krepl->num_counters, &urepl->num_counters) ||
-	    __get_user(ucntrs, &urepl->counters) ||
-	    __copy_from_user(krepl->entries, &urepl->entries, origsize))
-		goto out_free;
+	    !access_ok(VERIFY_WRITE, repl_nat, optlen))
+		goto out;
+
+	if (__copy_from_user(name, urepl->name, sizeof(urepl->name)) ||
+	    __copy_to_user(repl_nat->name, name, sizeof(repl_nat->name)))
+		goto out;
+
+	if (__get_user(tmp32, &urepl->valid_hooks) ||
+	    __put_user(tmp32, &repl_nat->valid_hooks))
+		goto out;
+
+	if (__get_user(tmp32, &urepl->num_entries) ||
+	    __put_user(tmp32, &repl_nat->num_entries))
+		goto out;
+
+	if (__get_user(num_counters, &urepl->num_counters) ||
+	    __put_user(num_counters, &repl_nat->num_counters))
+		goto out;
+
+	if (__get_user(ucntrs, &urepl->counters) ||
+	    __put_user(compat_ptr(ucntrs), &repl_nat->counters))
+		goto out;
+
+	num_ents = origsize / sizeof(struct ipt_entry);
+
+	for (i = 0; i < num_ents; i++) {
+		struct ipt_entry ent;
+
+		if (__copy_from_user(&ent, &urepl->entries[i], sizeof(ent)) ||
+		    __copy_to_user(&repl_nat->entries[i], &ent, sizeof(ent)))
+			goto out;
+	}
+
 	for (i = 0; i < NF_IP_NUMHOOKS; i++) {
-		if (__get_user(krepl->hook_entry[i], &urepl->hook_entry[i]) ||
-		    __get_user(krepl->underflow[i], &urepl->underflow[i]))
-			goto out_free;
+		if (__get_user(tmp32, &urepl->hook_entry[i]) ||
+		    __put_user(tmp32, &repl_nat->hook_entry[i]) ||
+		    __get_user(tmp32, &urepl->underflow[i]) ||
+		    __put_user(tmp32, &repl_nat->underflow[i]))
+			goto out;
 	}
 
 	/*
@@ -362,18 +390,15 @@ static int do_netfilter_replace(int fd, int level, int optname,
 	 * pointer into the standard syscall.  We hope that the pointer is
 	 * not misaligned ...
 	 */
-	krepl->counters = compat_ptr(ucntrs);
-	if (!access_ok(VERIFY_WRITE, krepl->counters,
-			krepl->num_counters * sizeof(struct ipt_counters)))
-		goto out_free;
+	if (!access_ok(VERIFY_WRITE, compat_ptr(ucntrs),
+		       num_counters * sizeof(struct ipt_counters)))
+		goto out;
 
-	old_fs = get_fs();
-	set_fs(KERNEL_DS);
-	ret = sys_setsockopt(fd, level, optname, (char *)krepl, kreplsize);
-	set_fs(old_fs);
 
-out_free:
-	kfree(krepl);
+	ret = sys_setsockopt(fd, level, optname,
+			     (char *)repl_nat, repl_nat_size);
+
+out:
 	return ret;
 }
 

@@ -56,6 +56,7 @@
 #define VIC_CPU_BOOT_ERRATA_CPI		(VIC_CPI_LEVEL0 + 8)
 
 #define NR_IRQS 224
+#define NR_IRQ_VECTORS NR_IRQS
 
 #define FPU_IRQ				13
 

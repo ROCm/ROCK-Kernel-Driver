@@ -8,6 +8,7 @@
 #include <linux/mm.h>
 #include <linux/sysctl.h>
 #include <linux/config.h>
+#include <linux/module.h>
 
 #ifdef CONFIG_SYSCTL
 
@@ -32,6 +33,19 @@ extern int sysctl_optmem_max;
 #ifdef CONFIG_NET_DIVERT
 extern char sysctl_divert_version[];
 #endif /* CONFIG_NET_DIVERT */
+
+/*
+ * This strdup() is used for creating copies of network 
+ * device names to be handed over to sysctl.
+ */
+ 
+char *net_sysctl_strdup(const char *s)
+{
+	char *rv = kmalloc(strlen(s)+1, GFP_KERNEL);
+	if (rv)
+		strcpy(rv, s);
+	return rv;
+}
 
 ctl_table core_table[] = {
 #ifdef CONFIG_NET
@@ -162,4 +176,7 @@ ctl_table core_table[] = {
 #endif /* CONFIG_NET */
 	{ .ctl_name = 0 }
 };
+
+EXPORT_SYMBOL(net_sysctl_strdup);
+
 #endif

@@ -2358,7 +2358,11 @@ struct parport *parport_pc_probe_port (unsigned long int base,
 		release_region(base_hi, 3);
 		ECR_res = NULL;
 	}
-
+	/* Likewise for EEP ports */
+	if (EPP_res && (p->modes & PARPORT_MODE_EPP) == 0) {
+		release_region(base+3, 5);
+		EPP_res = NULL;
+	}
 	if (p->irq != PARPORT_IRQ_NONE) {
 		if (request_irq (p->irq, parport_pc_interrupt,
 				 0, p->name, p)) {

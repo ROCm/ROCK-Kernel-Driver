@@ -120,11 +120,15 @@ extern void _outsl_ns(volatile u32 *port, const void *buf, int nl);
  * Map in an area of physical address space, for accessing
  * I/O devices etc.
  */
+extern int __ioremap_explicit(unsigned long p_addr, unsigned long v_addr,
+		     	      unsigned long size, unsigned long flags);
 extern void *__ioremap(unsigned long address, unsigned long size,
 		       unsigned long flags);
 extern void *ioremap(unsigned long address, unsigned long size);
 #define ioremap_nocache(addr, size)	ioremap((addr), (size))
+extern int iounmap_explicit(void *addr, unsigned long size);
 extern void iounmap(void *addr);
+extern void * reserve_phb_iospace(unsigned long size);
 
 /*
  * Change virtual addresses to physical addresses and vv, for

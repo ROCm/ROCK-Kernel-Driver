@@ -39,7 +39,7 @@ extern int		eth_header_cache(struct neighbour *neigh,
 extern int		eth_header_parse(struct sk_buff *skb,
 					 unsigned char *haddr);
 extern struct net_device *__init_etherdev(struct net_device *dev, int sizeof_priv);
-static inline __deprecated struct net_device *init_etherdev(struct net_device *dev,
+static inline struct net_device *init_etherdev(struct net_device *dev,
 							    int sizeof_priv)
 {
 	return __init_etherdev(dev, sizeof_priv);

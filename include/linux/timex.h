@@ -302,6 +302,7 @@ extern long time_adj;		/* tick adjust (scaled 1 / HZ) */
 extern long time_reftime;	/* time at last adjustment (s) */
 
 extern long time_adjust;	/* The amount of adjtime left */
+extern long time_next_adjust;	/* Value for time_adjust at next tick */
 
 /* interface variables pps->timer interrupt */
 extern long pps_offset;		/* pps time offset (us) */

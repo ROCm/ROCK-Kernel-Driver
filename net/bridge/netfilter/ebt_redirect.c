@@ -34,11 +34,10 @@ static int ebt_target_redirect(struct sk_buff **pskb, unsigned int hooknr,
 	if (hooknr != NF_BR_BROUTING)
 		memcpy((**pskb).mac.ethernet->h_dest,
 		   in->br_port->br->dev->dev_addr, ETH_ALEN);
-	else {
+	else
 		memcpy((**pskb).mac.ethernet->h_dest,
 		   in->dev_addr, ETH_ALEN);
-		(*pskb)->pkt_type = PACKET_HOST;
-	}
+	(*pskb)->pkt_type = PACKET_HOST;
 	return info->target;
 }
 

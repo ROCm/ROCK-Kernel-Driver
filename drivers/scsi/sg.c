@@ -877,6 +877,8 @@ sg_ioctl(struct inode *inode, struct file *filp,
 		result = get_user(val, (int *) arg);
 		if (result)
 			return result;
+		if (val < 0)
+			return -EINVAL;
 		if (val != sfp->reserve.bufflen) {
 			if (sg_res_in_use(sfp) || sfp->mmap_called)
 				return -EBUSY;

@@ -49,6 +49,17 @@ struct pci_address {
 	u32 a_lo;
 };
 
+struct isa_address {
+	u32 a_hi;
+	u32 a_lo;
+};
+
+struct isa_range {
+	struct isa_address isa_addr;
+	struct pci_address pci_addr;
+	unsigned int size;
+};
+
 struct pci_range32 {
 	struct pci_address child_addr;
 	unsigned int  parent_addr;

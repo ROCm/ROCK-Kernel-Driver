@@ -877,8 +877,6 @@ setup_frame_ia32 (int sig, struct k_sigaction *ka, sigset_t *set, struct pt_regs
 	regs->cr_iip = IA32_SA_HANDLER(ka);
 
 	set_fs(USER_DS);
-	regs->r16 = (__USER_DS << 16) |  (__USER_DS); /* ES == DS, GS, FS are zero */
-	regs->r17 = (__USER_DS << 16) | __USER_CS;
 
 #if 0
 	regs->eflags &= ~TF_MASK;
@@ -949,9 +947,6 @@ setup_rt_frame_ia32 (int sig, struct k_sigaction *ka, siginfo_t *info,
 	regs->cr_iip = IA32_SA_HANDLER(ka);
 
 	set_fs(USER_DS);
-
-	regs->r16 = (__USER_DS << 16) |  (__USER_DS); /* ES == DS, GS, FS are zero */
-	regs->r17 = (__USER_DS << 16) | __USER_CS;
 
 #if 0
 	regs->eflags &= ~TF_MASK;

@@ -25,6 +25,7 @@
 
 #include <asm/delay.h>
 #include <asm/elf.h>
+#include <asm/ia32.h>
 #include <asm/pgalloc.h>
 #include <asm/processor.h>
 #include <asm/sal.h>
@@ -324,7 +325,7 @@ copy_thread (int nr, unsigned long clone_flags,
 	memcpy((void *) child_rbs, (void *) rbs, rbs_size);
 
 	if (user_mode(child_ptregs)) {
-		if (clone_flags & CLONE_SETTLS)
+		if ((clone_flags & CLONE_SETTLS) && !IS_IA32_PROCESS(regs))
 			child_ptregs->r13 = regs->r16;	/* see sys_clone2() in entry.S */
 		if (user_stack_base) {
 			child_ptregs->r12 = user_stack_base + user_stack_size - 16;
@@ -352,9 +353,13 @@ copy_thread (int nr, unsigned long clone_flags,
 	/* copy parts of thread_struct: */
 	p->thread.ksp = (unsigned long) child_stack - 16;
 
-	/* stop some PSR bits from being inherited: */
+	/* stop some PSR bits from being inherited.
+	 * the psr.up/psr.pp bits must be cleared on fork but inherited on execve()
+	 * therefore we must specify them explicitly here and not include them in
+	 * IA64_PSR_BITS_TO_CLEAR.
+	 */
 	child_ptregs->cr_ipsr =  ((child_ptregs->cr_ipsr | IA64_PSR_BITS_TO_SET)
-				  & ~IA64_PSR_BITS_TO_CLEAR);
+			      & ~(IA64_PSR_BITS_TO_CLEAR | IA64_PSR_PP | IA64_PSR_UP));
 
 	/*
 	 * NOTE: The calling convention considers all floating point
@@ -383,8 +388,11 @@ copy_thread (int nr, unsigned long clone_flags,
 	 * If we're cloning an IA32 task then save the IA32 extra
 	 * state from the current task to the new task
 	 */
-	if (IS_IA32_PROCESS(ia64_task_regs(current)))
+	if (IS_IA32_PROCESS(ia64_task_regs(current))) {
 		ia32_save_state(p);
+		if (clone_flags & CLONE_SETTLS)
+			retval = ia32_clone_tls(p, child_ptregs);
+	}
 #endif
 
 #ifdef CONFIG_PERFMON

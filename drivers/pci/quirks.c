@@ -277,6 +277,22 @@ static void __devinit quirk_piix4_acpi(struct pci_dev *dev)
 }
 
 /*
+ * ICH4, ICH4-M, ICH5, ICH5-M ACPI: Three IO regions pointed to by longwords at
+ *	0x40 (128 bytes of ACPI, GPIO & TCO registers)
+ *	0x58 (64 bytes of GPIO I/O space)
+ */
+static void __devinit quirk_ich4_lpc_acpi(struct pci_dev *dev)
+{
+	u32 region;
+
+	pci_read_config_dword(dev, 0x40, &region);
+	quirk_io_region(dev, region, 128, PCI_BRIDGE_RESOURCES);
+
+	pci_read_config_dword(dev, 0x58, &region);
+	quirk_io_region(dev, region, 64, PCI_BRIDGE_RESOURCES+1);
+}
+
+/*
  * VIA ACPI: One IO region pointed to by longword at
  *	0x48 or 0x20 (256 bytes of ACPI registers)
  */
@@ -748,6 +764,60 @@ static void __init quirk_sis_96x_compatible(struct pci_dev *dev)
 	sis_96x_compatible = 1;
 }
 
+#ifdef CONFIG_SCSI_SATA
+static void __init quirk_intel_ide_combined(struct pci_dev *pdev)
+{
+	u8 prog, comb, tmp;
+
+	/*
+	 * Narrow down to Intel SATA PCI devices.
+	 */
+	switch (pdev->device) {
+	/* PCI ids taken from drivers/scsi/ata_piix.c */
+	case 0x24d1:
+	case 0x24df:
+	case 0x25a3:
+	case 0x25b0:
+		break;
+	default:
+		/* we do not handle this PCI device */
+		return;
+	}
+
+	/*
+	 * Read combined mode register.
+	 */
+	pci_read_config_byte(pdev, 0x90, &tmp);	/* combined mode reg */
+	tmp &= 0x6;     /* interesting bits 2:1, PATA primary/secondary */
+	if (tmp == 0x4)		/* bits 10x */
+		comb = (1 << 0);		/* SATA port 0, PATA port 1 */
+	else if (tmp == 0x6)	/* bits 11x */
+		comb = (1 << 2);		/* PATA port 0, SATA port 1 */
+	else
+		return;				/* not in combined mode */
+
+	/*
+	 * Read programming interface register.
+	 * (Tells us if it's legacy or native mode)
+	 */
+	pci_read_config_byte(pdev, PCI_CLASS_PROG, &prog);
+
+	/* if SATA port is in native mode, we're ok. */
+	if (prog & comb)
+		return;
+
+	/* SATA port is in legacy mode.  Reserve port so that
+	 * IDE driver does not attempt to use it.  If request_region
+	 * fails, it will be obvious at boot time, so we don't bother
+	 * checking return values.
+	 */
+	if (comb == (1 << 0))
+		request_region(0x1f0, 8, "libata");	/* port 0 */
+	else
+		request_region(0x170, 8, "libata");	/* port 1 */
+}
+#endif /* CONFIG_SCSI_SATA */
+
 /*
  *  The main table of quirks.
  *
@@ -804,6 +874,7 @@ static struct pci_fixup pci_fixups[] __devinitdata = {
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C586_3,	quirk_vt82c586_acpi },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C686_4,	quirk_vt82c686_acpi },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82371AB_3,	quirk_piix4_acpi },
+	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82801DB_12,	quirk_ich4_lpc_acpi },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_AL,	PCI_DEVICE_ID_AL_M7101,		quirk_ali7101_acpi },
  	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82371SB_2,	quirk_piix3_usb },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82371AB_2,	quirk_piix3_usb },
@@ -850,6 +921,14 @@ static struct pci_fixup pci_fixups[] __devinitdata = {
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_7205_0,	asus_hides_smbus_hostbridge },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82801DB_0,	asus_hides_smbus_lpc },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82801BA_0,	asus_hides_smbus_lpc },
+
+#ifdef CONFIG_SCSI_SATA
+	/* Fixup BIOSes that configure Parallel ATA (PATA / IDE) and
+	 * Serial ATA (SATA) into the same PCI ID.
+	 */
+	{ PCI_FIXUP_FINAL,      PCI_VENDOR_ID_INTEL,    PCI_ANY_ID,
+	  quirk_intel_ide_combined },
+#endif /* CONFIG_SCSI_SATA */
 
 	{ 0 }
 };

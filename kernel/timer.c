@@ -474,6 +474,7 @@ long time_freq = (((NSEC_PER_SEC + HZ/2) % HZ - HZ/2) << SHIFT_USEC) / NSEC_PER_
 long time_adj;				/* tick adjust (scaled 1 / HZ)	*/
 long time_reftime;			/* time at last adjustment (s)	*/
 long time_adjust;
+long time_next_adjust;
 
 /*
  * this routine handles the overflow of the microsecond field
@@ -654,6 +655,12 @@ static void update_wall_time_one_tick(void)
 	}
 	xtime.tv_nsec += delta_nsec;
 	time_interpolator_update(delta_nsec);
+
+	/* Changes by adjtime() do not take effect till next tick. */
+	if (time_next_adjust != 0) {
+		time_adjust = time_next_adjust;
+		time_next_adjust = 0;
+	}
 }
 
 /*

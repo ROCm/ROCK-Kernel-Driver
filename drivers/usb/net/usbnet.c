@@ -493,8 +493,11 @@ static void ax8817x_write_cmd_async(struct usbnet *dev, u8 cmd, u16 value, u16 i
 			     (void *)req, data, size,
 			     ax8817x_async_cmd_callback, req);
 
-	if((status = usb_submit_urb(urb, GFP_ATOMIC)) < 0)
+	if((status = usb_submit_urb(urb, GFP_ATOMIC)) < 0) {
 		deverr(dev, "Error submitting the control message: status=%d", status);
+		kfree(req);
+		usb_free_urb(urb);
+	}
 }
 
 static void ax8817x_set_multicast(struct net_device *net)
@@ -514,7 +517,7 @@ static void ax8817x_set_multicast(struct net_device *net)
 		 * for our 8 byte filter buffer
 		 * to avoid allocating memory that
 		 * is tricky to free later */
-		u8 *multi_filter = (u8 *)dev->data;
+		u8 *multi_filter = (u8 *)&dev->data;
 		struct dev_mc_list *mc_list = net->mc_list;
 		u32 crc_bits;
 		int i;

@@ -483,8 +483,7 @@ static int ipip_rcv(struct sk_buff *skb)
 			return 0;
 		}
 
-		secpath_put(skb->sp);
-		skb->sp = NULL;
+		secpath_reset(skb);
 
 		skb->mac.raw = skb->nh.raw;
 		skb->nh.raw = skb->data;

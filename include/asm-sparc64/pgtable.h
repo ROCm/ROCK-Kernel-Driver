@@ -12,6 +12,7 @@
  * the SpitFire page tables.
  */
 
+#include <linux/config.h>
 #include <asm/spitfire.h>
 #include <asm/asi.h>
 #include <asm/system.h>
@@ -136,9 +137,17 @@
 #elif PAGE_SHIFT == 19
 #define _PAGE_SZBITS	_PAGE_SZ512K
 #elif PAGE_SHIFT == 22
-#define _PAGE_SZBITS	_PAGE_SZ4M
+#define _PAGE_SZBITS	_PAGE_SZ4MB
 #else
 #error Wrong PAGE_SHIFT specified
+#endif
+
+#if defined(CONFIG_HUGETLB_PAGE_SIZE_4MB)
+#define _PAGE_SZHUGE	_PAGE_SZ4MB
+#elif defined(CONFIG_HUGETLB_PAGE_SIZE_512K)
+#define _PAGE_SZHUGE	_PAGE_512K
+#elif defined(CONFIG_HUGETLB_PAGE_SIZE_64K)
+#define _PAGE_SZHUGE	_PAGE_64K
 #endif
 
 #define _PAGE_CACHE	(_PAGE_CP | _PAGE_CV)

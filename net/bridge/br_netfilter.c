@@ -217,6 +217,7 @@ bridged_dnat:
 			}
 			memcpy(skb->mac.ethernet->h_dest, dev->dev_addr,
 			       ETH_ALEN);
+			skb->pkt_type = PACKET_HOST;
 		}
 	} else {
 		skb->dst = (struct dst_entry *)&__fake_rtable;

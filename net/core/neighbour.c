@@ -1628,6 +1628,9 @@ int neigh_sysctl_register(struct net_device *dev, struct neigh_parms *p,
 			  int p_id, int pdev_id, char *p_name)
 {
 	struct neigh_sysctl_table *t = kmalloc(sizeof(*t), GFP_KERNEL);
+	const char *dev_name_source = NULL;
+	char *dev_name = NULL;
+	int err = 0;
 
 	if (!t)
 		return -ENOBUFS;
@@ -1644,8 +1647,10 @@ int neigh_sysctl_register(struct net_device *dev, struct neigh_parms *p,
 	t->neigh_vars[9].data  = &p->anycast_delay;
 	t->neigh_vars[10].data = &p->proxy_delay;
 	t->neigh_vars[11].data = &p->locktime;
+
+ 	dev_name_source = t->neigh_dev[0].procname;
 	if (dev) {
-		t->neigh_dev[0].procname = dev->name;
+		dev_name_source = dev->name;
 		t->neigh_dev[0].ctl_name = dev->ifindex;
 		memset(&t->neigh_vars[12], 0, sizeof(ctl_table));
 	} else {
@@ -1654,6 +1659,15 @@ int neigh_sysctl_register(struct net_device *dev, struct neigh_parms *p,
 		t->neigh_vars[14].data = (int *)(p + 1) + 2;
 		t->neigh_vars[15].data = (int *)(p + 1) + 3;
 	}
+
+	dev_name = net_sysctl_strdup(dev_name_source);
+	if (!dev_name) {
+		err = -ENOBUFS;
+		goto free;
+	}
+
+ 	t->neigh_dev[0].procname = dev_name;
+
 	t->neigh_neigh_dir[0].ctl_name = pdev_id;
 
 	t->neigh_proto_dir[0].procname = p_name;
@@ -1666,11 +1680,19 @@ int neigh_sysctl_register(struct net_device *dev, struct neigh_parms *p,
 
 	t->sysctl_header = register_sysctl_table(t->neigh_root_dir, 0);
 	if (!t->sysctl_header) {
-		kfree(t);
-		return -ENOBUFS;
+		err = -ENOBUFS;
+		goto free_procname;
 	}
 	p->sysctl_table = t;
 	return 0;
+
+	/* error path */
+ free_procname:
+	kfree(dev_name);
+ free:
+	kfree(t);
+
+	return err;
 }
 
 void neigh_sysctl_unregister(struct neigh_parms *p)
@@ -1679,6 +1701,7 @@ void neigh_sysctl_unregister(struct neigh_parms *p)
 		struct neigh_sysctl_table *t = p->sysctl_table;
 		p->sysctl_table = NULL;
 		unregister_sysctl_table(t->sysctl_header);
+		kfree(t->neigh_dev[0].procname);
 		kfree(t);
 	}
 }

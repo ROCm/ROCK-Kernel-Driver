@@ -81,6 +81,16 @@ steal_context(void)
 		next_mmu_context = FIRST_CONTEXT;
 	mm = context_mm[next_mmu_context];
 	flush_tlb_mm(mm);
+#ifdef CONFIG_44x
+	/*
+	 * PPC44x has a virtually tagged icache. It is necessary
+	 * to invalidate all icache lines that match the PID of
+	 * the stolen context.  Identifying these lines would
+	 * require too much overhead, so simply flush the entire
+	 * icache array. -Matt
+	 */
+	flush_instruction_cache();
+#endif
 	destroy_context(mm);
 }
 #endif /* FEW_CONTEXTS */

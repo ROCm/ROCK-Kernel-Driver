@@ -548,10 +548,10 @@ UNUSUAL_DEV(  0x07c4, 0xa400, 0x0000, 0xffff,
  * - They don't like the INQUIRY command. So we must handle this command
  *   of the SCSI layer ourselves.
  */
-UNUSUAL_DEV( 0x07cf, 0x1001, 0x1000, 0x5009,
+UNUSUAL_DEV( 0x07cf, 0x1001, 0x1000, 0x9999,
 		"Casio",
 		"QV DigitalCamera",
-		US_SC_8070, US_PR_CB, NULL,
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_INQUIRY ),
 
 /* Submitted by Hartmut Wahl <hwahl@hwahl.de>*/
@@ -631,6 +631,16 @@ UNUSUAL_DEV( 0x0d96, 0x410a, 0x0001, 0xffff,
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_INQUIRY),
 
+/*
+ * Entry for Jenoptik JD 5200z3
+ *
+ * email: car.busse@gmx.de
+ */
+UNUSUAL_DEV(  0x0d96, 0x5200, 0x0001, 0x0200,
+		"Jenoptik",
+		"JD 5200 z3",
+		US_SC_DEVICE, US_PR_DEVICE, NULL, US_FL_FIX_INQUIRY),
+		
 /* Reported by Kevin Cernekee <kpc-usbdev@gelato.uiuc.edu>
  * Tested on hardware version 1.10.
  * Entry is needed only for the initializer function override.

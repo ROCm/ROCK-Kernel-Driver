@@ -122,6 +122,12 @@ cifs_open(struct inode *inode, struct file *file)
 	   and calling get_inode_info with returned buf (at least 
 	   helps non-Unix server case */
         buf = kmalloc(sizeof(FILE_ALL_INFO),GFP_KERNEL);
+	if(buf==0) {
+		if (full_path)
+			kfree(full_path);
+		FreeXid(xid);
+		return -ENOMEM;
+	}
 	rc = CIFSSMBOpen(xid, pTcon, full_path, disposition, desiredAccess,
 			CREATE_NOT_DIR, &netfid, &oplock, buf, cifs_sb->local_nls);
 	if (rc) {
@@ -138,6 +144,8 @@ cifs_open(struct inode *inode, struct file *file)
 			pCifsFile->pid = current->pid;
 			pCifsFile->pfile = file; /* needed for writepage */
 			pCifsFile->pInode = inode;
+			pCifsFile->invalidHandle = FALSE;
+			pCifsFile->closePend     = FALSE;
 			write_lock(&file->f_owner.lock);
 			write_lock(&GlobalSMBSeslock);
 			list_add(&pCifsFile->tlist,&pTcon->openFileList);
@@ -200,48 +208,154 @@ int relock_files(struct cifsFileInfo * cifsFile)
 	return rc;
 }
 
+static int cifs_reopen_file(struct inode *inode, struct file *file)
+{
+        int rc = -EACCES;
+        int xid, oplock;
+        struct cifs_sb_info *cifs_sb;
+        struct cifsTconInfo *pTcon;
+        struct cifsFileInfo *pCifsFile;
+        struct cifsInodeInfo *pCifsInode;
+        char *full_path = NULL;
+        int desiredAccess = 0x20197;
+        int disposition = FILE_OPEN;
+        __u16 netfid;
+        FILE_ALL_INFO * buf = NULL;
+
+        xid = GetXid();
+
+        cifs_sb = CIFS_SB(inode->i_sb);
+        pTcon = cifs_sb->tcon;
+
+        full_path = build_path_from_dentry(file->f_dentry);
+
+        cFYI(1, (" inode = 0x%p file flags are 0x%x for %s", inode, file->f_flags,full_path));
+        if ((file->f_flags & O_ACCMODE) == O_RDONLY)
+                desiredAccess = GENERIC_READ;
+        else if ((file->f_flags & O_ACCMODE) == O_WRONLY)
+                desiredAccess = GENERIC_WRITE;
+        else if ((file->f_flags & O_ACCMODE) == O_RDWR)
+                desiredAccess = GENERIC_ALL;
+       if (oplockEnabled)
+                oplock = REQ_OPLOCK;
+        else
+                oplock = FALSE;
+
+        /* BB pass O_SYNC flag through on file attributes .. BB */
+
+        /* Also refresh inode by passing in file_info buf returned by SMBOpen
+           and calling get_inode_info with returned buf (at least
+           helps non-Unix server case */
+        buf = kmalloc(sizeof(FILE_ALL_INFO),GFP_KERNEL);
+        if(buf==0) {
+                if (full_path)
+                        kfree(full_path);
+                FreeXid(xid);
+                return -ENOMEM;
+        }
+        rc = CIFSSMBOpen(xid, pTcon, full_path, disposition, desiredAccess,
+                        CREATE_NOT_DIR, &netfid, &oplock, buf, cifs_sb->local_nls);
+        if (rc) {
+                cFYI(1, ("cifs_open returned 0x%x ", rc));
+                cFYI(1, ("oplock: %d ", oplock));
+        } else {
+                if (file->private_data) {
+			pCifsFile = (struct cifsFileInfo *) file->private_data;
+
+			pCifsFile->netfid = netfid;
+			pCifsFile->invalidHandle = FALSE;
+			pCifsInode = CIFS_I(file->f_dentry->d_inode);
+			if(pCifsInode) {
+                                if (pTcon->ses->capabilities & CAP_UNIX)
+                                        rc = cifs_get_inode_info_unix(&file->f_dentry->d_inode,
+                                                full_path, inode->i_sb);
+                                else
+                                        rc = cifs_get_inode_info(&file->f_dentry->d_inode,
+                                                full_path, buf, inode->i_sb);
+
+                                if(oplock == OPLOCK_EXCLUSIVE) {
+                                        pCifsInode->clientCanCacheAll =  TRUE;
+                                        pCifsInode->clientCanCacheRead = TRUE;
+                                        cFYI(1,("Exclusive Oplock granted on inode %p",file->f_dentry->d_inode));
+                                } else if(oplock == OPLOCK_READ) {
+					pCifsInode->clientCanCacheRead = TRUE;
+					pCifsInode->clientCanCacheAll =  FALSE;
+				} else {
+                                        pCifsInode->clientCanCacheRead = FALSE;
+                                        pCifsInode->clientCanCacheAll =  FALSE;
+				}
+                        }
+                } else
+			rc = -EBADF;
+        }
+
+        if (buf)
+                kfree(buf);
+        if (full_path)
+                kfree(full_path);
+        FreeXid(xid);
+        return rc;
+}
+
 /* Try to reopen files that were closed when session to server was lost */
 int reopen_files(struct cifsTconInfo * pTcon, struct nls_table * nlsinfo)
 {
 	int rc = 0;
 	struct cifsFileInfo *open_file = NULL;
 	struct file * file = NULL;
-	struct list_head *tmp;
-	struct list_head *tmp1;
+	struct list_head invalid_file_list;
+	struct list_head * tmp;
+	struct list_head * tmp1;
 
-/* list all files open on tree connection */
-	read_lock(&GlobalSMBSeslock);
+	INIT_LIST_HEAD(&invalid_file_list);
+
+/* list all files open on tree connection and mark them invalid */
+	write_lock(&GlobalSMBSeslock);
 	list_for_each_safe(tmp, tmp1, &pTcon->openFileList) {            
 		open_file = list_entry(tmp,struct cifsFileInfo, tlist);
 		if(open_file) {
-			if(open_file->search_resume_name) {
-				kfree(open_file->search_resume_name);
+			open_file->invalidHandle = TRUE;
+			list_move(&open_file->tlist,&invalid_file_list);
+		}
+	}
+
+	/* reopen files */
+	list_for_each_safe(tmp,tmp1, &invalid_file_list) {
+	/* BB need to fix above to check list end and skip entries we do not need to reopen */
+	        open_file = list_entry(tmp,struct cifsFileInfo, tlist);
+        	if(open_file == NULL) {
+			break;
+		} else {
+			if((open_file->invalidHandle == FALSE) && 
+			   (open_file->closePend     == FALSE)) {
+				list_move(&open_file->tlist,&pTcon->openFileList); 
+				continue;
 			}
 			file = open_file->pfile;
-			list_del(&open_file->flist);
-			list_del(&open_file->tlist);
-			kfree(open_file);
-			if(file) {                
-				file->private_data = NULL;
-				read_unlock(&GlobalSMBSeslock);
-				if(file->f_dentry == 0) {
-					cFYI(1,("Null dentry for file %p",file));
-					read_lock(&GlobalSMBSeslock);
+			if(file->f_dentry == 0) {
+				cFYI(1,("Null dentry for file %p",file));
+			} else {
+				write_unlock(&GlobalSMBSeslock);
+				rc = cifs_reopen_file(file->f_dentry->d_inode,file);
+				write_lock(&GlobalSMBSeslock);
+				if(file->private_data == NULL) {
+                                        tmp = invalid_file_list.next;
+                                        tmp1 = tmp->next;
+                                        continue;
+                                }
+
+				list_move(&open_file->tlist,&pTcon->openFileList);
+				if(rc) {
+					cFYI(1,("reconnecting file %s failed with %d",
+						file->f_dentry->d_name.name,rc));
 				} else {
-					rc = cifs_open(file->f_dentry->d_inode,file);
-					read_lock(&GlobalSMBSeslock);
-					if(rc) {
-						cFYI(1,("reconnecting file %s failed with %d",
-							file->f_dentry->d_name.name,rc));
-					} else {
-						cFYI(1,("reconnection of %s succeeded",
-							file->f_dentry->d_name.name));
-					}
-				} 
+					cFYI(1,("reconnection of %s succeeded",
+					file->f_dentry->d_name.name));
+				}
 			}
 		}
 	}
-	read_unlock(&GlobalSMBSeslock);
+	write_unlock(&GlobalSMBSeslock);
 	return rc;
 }
 
@@ -260,11 +374,20 @@ cifs_close(struct inode *inode, struct file *file)
 	cifs_sb = CIFS_SB(inode->i_sb);
 	pTcon = cifs_sb->tcon;
 	if (pSMBFile) {
+		pSMBFile->closePend    = TRUE;
 		write_lock(&file->f_owner.lock);
+		if(pTcon) {
+			/* no sense reconnecting to close a file that is
+				already closed */
+			if (pTcon->tidStatus != CifsNeedReconnect) {
+				write_unlock(&file->f_owner.lock);
+				rc = CIFSSMBClose(xid,pTcon,pSMBFile->netfid);
+				write_lock(&file->f_owner.lock);
+			}
+		}
 		list_del(&pSMBFile->flist);
 		list_del(&pSMBFile->tlist);
 		write_unlock(&file->f_owner.lock);
-		rc = CIFSSMBClose(xid, pTcon, pSMBFile->netfid);
 		if(pSMBFile->search_resume_name)
 			kfree(pSMBFile->search_resume_name);
 		kfree(file->private_data);
@@ -447,7 +570,6 @@ cifs_write(struct file * file, const char *write_data,
 				  &bytes_written,
 				  write_data + total_written, long_op);
 		if (rc || (bytes_written == 0)) {
-			FreeXid(xid);
 			if (total_written)
 				break;
 			else {
@@ -492,7 +614,6 @@ cifs_partialpagewrite(struct page *page,unsigned from, unsigned to)
 
 	/* figure out which file struct to use 
 	if (file->private_data == NULL) {
-		kunmap(page);
 		FreeXid(xid);
 		return -EBADF;
 	}     
@@ -528,7 +649,7 @@ cifs_partialpagewrite(struct page *page,unsigned from, unsigned to)
 		
 
 	cifsInode = CIFS_I(mapping->host);
-	read_lock(&GlobalSMBSeslock);
+	read_lock(&GlobalSMBSeslock); 
 	list_for_each_safe(tmp, tmp1, &cifsInode->openFileList) {            
 		open_file = list_entry(tmp,struct cifsFileInfo, flist);
 		/* We check if file is open for writing first */
@@ -546,6 +667,13 @@ cifs_partialpagewrite(struct page *page,unsigned from, unsigned to)
 			} else if(bytes_written < 0) {
 				rc = bytes_written;
 			}
+			break;  /* now that we found a valid file handle
+				and tried to write to it we are done, no
+				sense continuing to loop looking for another */
+		}
+		if(tmp->next == NULL) {
+			cFYI(1,("File instance %p removed",tmp));
+			break;
 		}
 	}
 	read_unlock(&GlobalSMBSeslock);
@@ -836,6 +964,7 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 	for(i = 0;i<num_pages;) {
 		spin_lock(&mapping->page_lock);
 		if(list_empty(page_list)) {
+			spin_unlock(&mapping->page_lock);
 			break;
 		}
 		page = list_entry(page_list->prev, struct page, list);
@@ -1236,8 +1365,10 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 					rc = 0;
 					break;
 				}
-			} else
+			} else {
+				cifsFile->invalidHandle = TRUE;
 				CIFSFindClose(xid, pTcon, cifsFile->netfid);
+			}
 			if(cifsFile->search_resume_name) {
 				kfree(cifsFile->search_resume_name);
 				cifsFile->search_resume_name = NULL;
@@ -1261,6 +1392,7 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 				cifsFile =
 				    (struct cifsFileInfo *) file->private_data;
 				cifsFile->netfid = searchHandle;
+				cifsFile->invalidHandle = FALSE;
 			} else {
 				rc = -ENOMEM;
 				break;

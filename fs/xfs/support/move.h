@@ -30,7 +30,7 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  * 
  * Portions Copyright (c) 1982, 1986, 1993, 1994
- *      The Regents of the University of California.  All rights reserved.
+ *	The Regents of the University of California.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -40,11 +40,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *      This product includes software developed by the University of
- *      California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -73,11 +69,11 @@ enum uio_seg {
 };
 
 struct uio {
-	struct iovec	*uio_iov;
-	int             uio_iovcnt;
-	xfs_off_t       uio_offset;
-	int		uio_resid;
-	enum uio_seg	uio_segflg;
+	struct iovec	*uio_iov;   /* pointer to array of iovecs */
+	int		uio_iovcnt; /* number of iovecs in array */
+	xfs_off_t	uio_offset; /* offset in file this uio corresponds to */
+	int		uio_resid;  /* residual i/o count */
+	enum uio_seg	uio_segflg; /* see above */
 };
 
 typedef struct uio uio_t;

@@ -1063,6 +1063,9 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 		goto fail;
 	}
 	if (dev->speed == USB_SPEED_FULL) {
+		usb_disable_endpoint(dev, 0);
+		usb_endpoint_running(dev, 0, 1);
+		usb_endpoint_running(dev, 0, 0);
 		dev->epmaxpacketin [0] = dev->descriptor.bMaxPacketSize0;
 		dev->epmaxpacketout[0] = dev->descriptor.bMaxPacketSize0;
 	}

@@ -111,6 +111,7 @@ static unsigned char atkbd_unxlate_table[128] = {
 #define ATKBD_CMD_SETREP	0x10f3
 #define ATKBD_CMD_ENABLE	0x00f4
 #define ATKBD_CMD_RESET_DIS	0x00f5
+#define ATKBD_CMD_SETALL_MBR	0x00fa
 #define ATKBD_CMD_RESET_BAT	0x02ff
 #define ATKBD_CMD_RESEND	0x00fe
 #define ATKBD_CMD_EX_ENABLE	0x10ea
@@ -519,6 +520,8 @@ static int atkbd_set_3(struct atkbd *atkbd)
 		if (atkbd_command(atkbd, param, ATKBD_CMD_SSCANSET))
 		return 2;
 	}
+
+	atkbd_command(atkbd, param, ATKBD_CMD_SETALL_MBR);
 
 	return 3;
 }

@@ -133,7 +133,7 @@ long sys32_sigsuspend(old_sigset_t mask, int p2, int p3, int p4, int p6, int p7,
 	regs->gpr[3] = EINTR;
 	regs->ccr |= 0x10000000;
 	while (1) {
-		current->state = TASK_INTERRUPTIBLE;
+		set_current_state(TASK_INTERRUPTIBLE);
 		schedule();
 		if (do_signal32(&saveset, regs))
 			/*
@@ -806,7 +806,7 @@ int sys32_rt_sigsuspend(compat_sigset_t* unewset, size_t sigsetsize, int p3,
 	regs->gpr[3] = EINTR;
 	regs->ccr |= 0x10000000;
 	while (1) {
-		current->state = TASK_INTERRUPTIBLE;
+		set_current_state(TASK_INTERRUPTIBLE);
 		schedule();
 		if (do_signal32(&saveset, regs))
 			/*

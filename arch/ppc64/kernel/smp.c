@@ -317,6 +317,8 @@ smp_xics_message_pass(int target, int msg, unsigned long data, int wait)
 	}
 }
 
+extern void xics_request_IPIs(void);
+
 static int __init smp_xics_probe(void)
 {
 	int i;
@@ -327,7 +329,6 @@ static int __init smp_xics_probe(void)
 			nr_cpus++;
 	}
 #ifdef CONFIG_SMP
-	extern void xics_request_IPIs(void);
 	xics_request_IPIs();
 #endif
 

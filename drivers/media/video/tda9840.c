@@ -196,6 +196,7 @@ static int tda9840_detect(struct i2c_adapter *adapter, int address, int kind)
 		printk("tda9840.o: not enough kernel memory.\n");
 		return -ENOMEM;
 	}
+	memset(client, 0, sizeof(struct i2c_client));
 	
 	/* fill client structure */
 	sprintf(client->name,"tda9840 (0x%02x)", address);
@@ -258,9 +259,7 @@ static int tda9840_detach(struct i2c_client *client)
 }
 
 static struct i2c_driver driver = {
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,54)
 	.owner		= THIS_MODULE,
-#endif
 	.name		= "tda9840 driver",
 	.id		= I2C_DRIVERID_TDA9840,
 	.flags		= I2C_DF_NOTIFY,

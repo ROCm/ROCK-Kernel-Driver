@@ -711,6 +711,7 @@ brlvger_ioctl(struct inode *inode, struct file *file,
 	case BRLVGER_GET_INFO: {
 		struct brlvger_info vi;
 
+		memset(&vi, 0, sizeof(vi));
 		strlcpy(vi.driver_version, DRIVER_VERSION,
 			sizeof(vi.driver_version));
 		strlcpy(vi.driver_banner, longbanner,

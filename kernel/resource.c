@@ -206,6 +206,18 @@ int request_resource(struct resource *root, struct resource *new)
 
 EXPORT_SYMBOL(request_resource);
 
+struct resource *____request_resource(struct resource *root, struct resource *new)
+{
+	struct resource *conflict;
+
+	write_lock(&resource_lock);
+	conflict = __request_resource(root, new);
+	write_unlock(&resource_lock);
+	return conflict;
+}
+
+EXPORT_SYMBOL(____request_resource);
+
 int release_resource(struct resource *old)
 {
 	int retval;

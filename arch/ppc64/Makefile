@@ -63,6 +63,8 @@ BOOTIMAGE := $(bootimage-y)
 install: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(BOOTIMAGE) $@
 
+all: $(BOOTIMAGE)
+
 archclean:
 	$(Q)$(MAKE) $(clean)=$(boot)
 

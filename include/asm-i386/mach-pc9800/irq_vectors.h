@@ -18,6 +18,9 @@
  *		The total number of interrupt vectors (including all the
  *		architecture specific interrupts) needed.
  *
+ *	NR_IRQ_VECTORS:
+ *		The total number of IO APIC vector inputs
+ *
  */			
 #ifndef _ASM_IRQ_VECTORS_H
 #define _ASM_IRQ_VECTORS_H
@@ -81,6 +84,8 @@
 #else
 #define NR_IRQS 16
 #endif
+
+#define NR_IRQ_VECTORS NR_IRQS
 
 #define FPU_IRQ			8
 

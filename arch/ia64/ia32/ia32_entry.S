@@ -32,7 +32,7 @@ END(ia32_execve)
 
 ENTRY(ia32_clone)
 	.prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(2)
-	alloc r16=ar.pfs,2,2,4,0
+	alloc r16=ar.pfs,5,2,6,0
 	DO_SAVE_SWITCH_STACK
 	mov loc0=rp
 	mov loc1=r16				// save ar.pfs across do_fork
@@ -41,6 +41,8 @@ ENTRY(ia32_clone)
 	mov out3=16				// stacksize (compensates for 16-byte scratch area)
 	adds out2=IA64_SWITCH_STACK_SIZE+16,sp	// out2 = &regs
 	dep out0=0,in0,CLONE_IDLETASK_BIT,1	// out0 = clone_flags & ~CLONE_IDLETASK
+	zxt4 out4=in2				// out4 = parent_tidptr
+	zxt4 out5=in4				// out5 = child_tidptr
 	br.call.sptk.many rp=do_fork
 .ret0:	.restore sp
 	adds sp=IA64_SWITCH_STACK_SIZE,sp	// pop the switch stack
@@ -142,6 +144,19 @@ GLOBAL_ENTRY(ia32_trace_syscall)
 	;;
 	st8 [r2]=r3				// initialize return code to -ENOSYS
 	br.call.sptk.few rp=invoke_syscall_trace // give parent a chance to catch syscall args
+	// Need to reload arguments (they may be changed by the tracing process)
+	adds r2=IA64_PT_REGS_R9_OFFSET+16,sp	// r2 = &pt_regs.r9
+	adds r3=IA64_PT_REGS_R13_OFFSET+16,sp	// r3 = &pt_regs.r13
+	;;
+	ld4 r33=[r2],8				// r9 == ecx
+	ld4 r37=[r3],16				// r13 == ebp
+	;;
+	ld4 r34=[r2],8				// r10 == edx
+	ld4 r36=[r3],8				// r15 == edi
+	;;
+	ld4 r32=[r2],8				// r11 == ebx
+	ld4 r35=[r3],8				// r14 == esi
+	;;
 .ret2:	br.call.sptk.few rp=b6			// do the syscall
 .ia32_strace_check_retval:
 	cmp.lt p6,p0=r8,r0			// syscall failed?
@@ -424,13 +439,13 @@ ia32_syscall_table:
 	data8 sys_ni_syscall	/* 235 */
 	data8 sys_ni_syscall
 	data8 sys_ni_syscall
-	data8 sys_ni_syscall
+	data8 sys_tkill
 	data8 sys_ni_syscall
 	data8 compat_sys_futex	/* 240 */
 	data8 compat_sys_sched_setaffinity
 	data8 compat_sys_sched_getaffinity
-	data8 sys_ni_syscall
-	data8 sys_ni_syscall
+	data8 sys32_set_thread_area
+	data8 sys32_get_thread_area
 	data8 sys_ni_syscall	/* 245 */
 	data8 sys_ni_syscall
 	data8 sys_ni_syscall
@@ -438,13 +453,13 @@ ia32_syscall_table:
 	data8 sys_ni_syscall
 	data8 sys_ni_syscall	/* 250 */
 	data8 sys_ni_syscall
-	data8 sys_ni_syscall
+	data8 sys_exit_group
 	data8 sys_ni_syscall
 	data8 sys_epoll_create
 	data8 sys32_epoll_ctl	/* 255 */
 	data8 sys32_epoll_wait
-	data8 sys_ni_syscall
-	data8 sys_ni_syscall
+	data8 sys_remap_file_pages
+	data8 sys_set_tid_address
 	data8 sys_ni_syscall
 	data8 sys_ni_syscall	/* 260 */
 	data8 sys_ni_syscall

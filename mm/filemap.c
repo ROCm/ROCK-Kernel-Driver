@@ -61,6 +61,9 @@
  *        ->swap_device_lock	(exclusive_swap_page, others)
  *          ->mapping->page_lock
  *
+ *  ->i_sem
+ *    ->i_shared_sem		(truncate->invalidate_mmap_range)
+ *
  *  ->mmap_sem
  *    ->i_shared_sem		(various places)
  *

@@ -145,7 +145,7 @@ struct pci_dev *pci_find_dev_by_addr(unsigned long addr)
 	return NULL;
 }
 
-void __devinit
+void 
 pcibios_resource_to_bus(struct pci_dev *dev, struct pci_bus_region *region,
 			struct resource *res)
 {

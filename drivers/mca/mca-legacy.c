@@ -123,7 +123,7 @@ int mca_find_unused_adapter(int id, int start)
 {
 	struct mca_find_adapter_info info = { 0 };
 
-	if(id == 0xffff)
+	if (!MCA_bus || id == 0xffff)
 		return MCA_NOTFOUND;
 
 	info.slot = start;

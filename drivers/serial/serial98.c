@@ -963,16 +963,17 @@ serial98_console_write(struct console *co, const char *s, unsigned int count)
 	 *	Now, do each character
 	 */
 	for (i = 0; i < count; i++, s++) {
+		wait_for_xmitr(port);
+
 		/*
 		 *	Send the character out.
 		 *	If a LF, also do CR...
 		 */
+		outb(*s, PORT.iobase);
 		if (*s == 10) {
 			wait_for_xmitr(port);
 			outb(13, PORT.iobase);
 		}
-		wait_for_xmitr(port);
-		outb(*s, PORT.iobase);
 	}
 
 	/*

@@ -2007,6 +2007,8 @@ static int usb_audio_ioctl_mixdev(struct inode *inode, struct file *file, unsign
   
 	if (cmd == SOUND_MIXER_INFO) {
 		mixer_info info;
+
+		memset(&info, 0, sizeof(info));
 		strncpy(info.id, "USB_AUDIO", sizeof(info.id));
 		strncpy(info.name, "USB Audio Class Driver", sizeof(info.name));
 		info.modify_counter = ms->modcnt;
@@ -2016,6 +2018,8 @@ static int usb_audio_ioctl_mixdev(struct inode *inode, struct file *file, unsign
 	}
 	if (cmd == SOUND_OLD_MIXER_INFO) {
 		_old_mixer_info info;
+
+		memset(&info, 0, sizeof(info));
 		strncpy(info.id, "USB_AUDIO", sizeof(info.id));
 		strncpy(info.name, "USB Audio Class Driver", sizeof(info.name));
 		if (copy_to_user((void __user *)arg, &info, sizeof(info)))

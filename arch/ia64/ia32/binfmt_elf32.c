@@ -62,14 +62,13 @@ extern unsigned long *ia32_gdt;
 struct page *
 ia32_install_shared_page (struct vm_area_struct *vma, unsigned long address, int no_share)
 {
-	struct page *pg = ia32_shared_page[(address - vma->vm_start)/PAGE_SIZE];
-
+	struct page *pg = ia32_shared_page[smp_processor_id()];
 	get_page(pg);
 	return pg;
 }
 
 static struct vm_operations_struct ia32_shared_page_vm_ops = {
-	.nopage =ia32_install_shared_page
+	.nopage = ia32_install_shared_page
 };
 
 void
@@ -78,7 +77,7 @@ ia64_elf32_init (struct pt_regs *regs)
 	struct vm_area_struct *vma;
 
 	/*
-	 * Map GDT and TSS below 4GB, where the processor can find them.  We need to map
+	 * Map GDT below 4GB, where the processor can find it.  We need to map
 	 * it with privilege level 3 because the IVE uses non-privileged accesses to these
 	 * tables.  IA-32 segmentation is used to protect against IA-32 accesses to them.
 	 */
@@ -86,7 +85,7 @@ ia64_elf32_init (struct pt_regs *regs)
 	if (vma) {
 		vma->vm_mm = current->mm;
 		vma->vm_start = IA32_GDT_OFFSET;
-		vma->vm_end = vma->vm_start + max(PAGE_SIZE, 2*IA32_PAGE_SIZE);
+		vma->vm_end = vma->vm_start + PAGE_SIZE;
 		vma->vm_page_prot = PAGE_SHARED;
 		vma->vm_flags = VM_READ|VM_MAYREAD;
 		vma->vm_ops = &ia32_shared_page_vm_ops;
