@@ -184,16 +184,6 @@ static unsigned int task_timeslice(task_t *p)
 #define task_hot(p, now, sd) ((long long) ((now) - (p)->last_ran)	\
 				< (long long) (sd)->cache_hot_time)
 
-enum idle_type
-{
-	IDLE,
-	NOT_IDLE,
-	NEWLY_IDLE,
-	MAX_IDLE_TYPES
-};
-
-struct sched_domain;
-
 /*
  * These are the runqueue data structures:
  */
@@ -291,139 +281,6 @@ struct runqueue {
 
 static DEFINE_PER_CPU(struct runqueue, runqueues);
 
-/*
- * sched-domains (multiprocessor balancing) declarations:
- */
-#ifdef CONFIG_SMP
-#define SCHED_LOAD_SCALE	128UL	/* increase resolution of load */
-
-#define SD_LOAD_BALANCE		1	/* Do load balancing on this domain. */
-#define SD_BALANCE_NEWIDLE	2	/* Balance when about to become idle */
-#define SD_BALANCE_EXEC		4	/* Balance on exec */
-#define SD_WAKE_IDLE		8	/* Wake to idle CPU on task wakeup */
-#define SD_WAKE_AFFINE		16	/* Wake task to waking CPU */
-#define SD_WAKE_BALANCE		32	/* Perform balancing at task wakeup */
-#define SD_SHARE_CPUPOWER	64	/* Domain members share cpu power */
-
-struct sched_group {
-	struct sched_group *next;	/* Must be a circular list */
-	cpumask_t cpumask;
-
-	/*
-	 * CPU power of this group, SCHED_LOAD_SCALE being max power for a
-	 * single CPU. This is read only (except for setup, hotplug CPU).
-	 */
-	unsigned long cpu_power;
-};
-
-struct sched_domain {
-	/* These fields must be setup */
-	struct sched_domain *parent;	/* top domain must be null terminated */
-	struct sched_group *groups;	/* the balancing groups of the domain */
-	cpumask_t span;			/* span of all CPUs in this domain */
-	unsigned long min_interval;	/* Minimum balance interval ms */
-	unsigned long max_interval;	/* Maximum balance interval ms */
-	unsigned int busy_factor;	/* less balancing by factor if busy */
-	unsigned int imbalance_pct;	/* No balance until over watermark */
-	unsigned long long cache_hot_time; /* Task considered cache hot (ns) */
-	unsigned int cache_nice_tries;	/* Leave cache hot tasks for # tries */
-	unsigned int per_cpu_gain;	/* CPU % gained by adding domain cpus */
-	int flags;			/* See SD_* */
-
-	/* Runtime fields. */
-	unsigned long last_balance;	/* init to jiffies. units in jiffies */
-	unsigned int balance_interval;	/* initialise to 1. units in ms. */
-	unsigned int nr_balance_failed; /* initialise to 0 */
-
-#ifdef CONFIG_SCHEDSTATS
-	/* load_balance() stats */
-	unsigned long lb_cnt[MAX_IDLE_TYPES];
-	unsigned long lb_failed[MAX_IDLE_TYPES];
-	unsigned long lb_imbalance[MAX_IDLE_TYPES];
-	unsigned long lb_nobusyg[MAX_IDLE_TYPES];
-	unsigned long lb_nobusyq[MAX_IDLE_TYPES];
-
-	/* sched_balance_exec() stats */
-	unsigned long sbe_attempts;
-	unsigned long sbe_pushed;
-
-	/* try_to_wake_up() stats */
-	unsigned long ttwu_wake_affine;
-	unsigned long ttwu_wake_balance;
-#endif
-};
-
-#ifndef ARCH_HAS_SCHED_TUNE
-#ifdef CONFIG_SCHED_SMT
-#define ARCH_HAS_SCHED_WAKE_IDLE
-/* Common values for SMT siblings */
-#define SD_SIBLING_INIT (struct sched_domain) {		\
-	.span			= CPU_MASK_NONE,	\
-	.parent			= NULL,			\
-	.groups			= NULL,			\
-	.min_interval		= 1,			\
-	.max_interval		= 2,			\
-	.busy_factor		= 8,			\
-	.imbalance_pct		= 110,			\
-	.cache_hot_time		= 0,			\
-	.cache_nice_tries	= 0,			\
-	.per_cpu_gain		= 25,			\
-	.flags			= SD_BALANCE_NEWIDLE	\
-				| SD_BALANCE_EXEC	\
-				| SD_WAKE_AFFINE	\
-				| SD_WAKE_IDLE		\
-				| SD_SHARE_CPUPOWER,	\
-	.last_balance		= jiffies,		\
-	.balance_interval	= 1,			\
-	.nr_balance_failed	= 0,			\
-}
-#endif
-
-/* Common values for CPUs */
-#define SD_CPU_INIT (struct sched_domain) {		\
-	.span			= CPU_MASK_NONE,	\
-	.parent			= NULL,			\
-	.groups			= NULL,			\
-	.min_interval		= 1,			\
-	.max_interval		= 4,			\
-	.busy_factor		= 64,			\
-	.imbalance_pct		= 125,			\
-	.cache_hot_time		= cache_decay_ticks*1000000 ? : (5*1000000/2),\
-	.cache_nice_tries	= 1,			\
-	.per_cpu_gain		= 100,			\
-	.flags			= SD_BALANCE_NEWIDLE	\
-				| SD_BALANCE_EXEC	\
-				| SD_WAKE_AFFINE	\
-				| SD_WAKE_BALANCE,	\
-	.last_balance		= jiffies,		\
-	.balance_interval	= 1,			\
-	.nr_balance_failed	= 0,			\
-}
-
-/* Arch can override this macro in processor.h */
-#if defined(CONFIG_NUMA) && !defined(SD_NODE_INIT)
-#define SD_NODE_INIT (struct sched_domain) {		\
-	.span			= CPU_MASK_NONE,	\
-	.parent			= NULL,			\
-	.groups			= NULL,			\
-	.min_interval		= 8,			\
-	.max_interval		= 32,			\
-	.busy_factor		= 32,			\
-	.imbalance_pct		= 125,			\
-	.cache_hot_time		= (10*1000000),		\
-	.cache_nice_tries	= 1,			\
-	.per_cpu_gain		= 100,			\
-	.flags			= SD_BALANCE_EXEC	\
-				| SD_WAKE_BALANCE,	\
-	.last_balance		= jiffies,		\
-	.balance_interval	= 1,			\
-	.nr_balance_failed	= 0,			\
-}
-#endif
-#endif /* ARCH_HAS_SCHED_TUNE */
-#endif
-
-
 #define for_each_domain(cpu, domain) \
 	for (domain = cpu_rq(cpu)->sd; domain; domain = domain->parent)
 
@@ -502,7 +359,7 @@ static int show_schedstat(struct seq_file *seq, void *v)
 		    rq->smt_cnt, rq->sbe_cnt, rq->rq_sched_info.cpu_time,
 		    rq->rq_sched_info.run_delay, rq->rq_sched_info.pcnt);
 
-		for (itype = IDLE; itype < MAX_IDLE_TYPES; itype++)
+		for (itype = SCHED_IDLE; itype < MAX_IDLE_TYPES; itype++)
 			seq_printf(seq, " %lu %lu", rq->pt_gained[itype],
 						    rq->pt_lost[itype]);
 		seq_printf(seq, "\n");
@@ -514,7 +371,8 @@ static int show_schedstat(struct seq_file *seq, void *v)
 
 			cpumask_scnprintf(mask_str, NR_CPUS, sd->span);
 			seq_printf(seq, "domain%d %s", dcnt++, mask_str);
-			for (itype = IDLE; itype < MAX_IDLE_TYPES; itype++) {
+			for (itype = SCHED_IDLE; itype < MAX_IDLE_TYPES;
+						itype++) {
 				seq_printf(seq, " %lu %lu %lu %lu %lu",
 				    sd->lb_cnt[itype],
 				    sd->lb_failed[itype],
@@ -2006,7 +1864,7 @@ nextgroup:
 
 out_balanced:
 	if (busiest && (idle == NEWLY_IDLE ||
-			(idle == IDLE && max_load > SCHED_LOAD_SCALE)) ) {
+			(idle == SCHED_IDLE && max_load > SCHED_LOAD_SCALE)) ) {
 		*imbalance = 1;
 		return busiest;
 	}
@@ -2248,7 +2106,7 @@ static void active_load_balance(runqueue_t *busiest, int busiest_cpu)
 		if (unlikely(busiest == rq))
 			goto next_group;
 		double_lock_balance(busiest, rq);
-		if (move_tasks(rq, push_cpu, busiest, 1, sd, IDLE)) {
+		if (move_tasks(rq, push_cpu, busiest, 1, sd, SCHED_IDLE)) {
 			schedstat_inc(busiest, alb_lost);
 			schedstat_inc(rq, alb_gained);
 		} else {
@@ -2298,7 +2156,7 @@ static void rebalance_tick(int this_cpu, runqueue_t *this_rq,
 			continue;
 
 		interval = sd->balance_interval;
-		if (idle != IDLE)
+		if (idle != SCHED_IDLE)
 			interval *= sd->busy_factor;
 
 		/* scale ms to jiffies */
@@ -2400,7 +2258,7 @@ void scheduler_tick(int user_ticks, int sys_ticks)
 			cpustat->idle += sys_ticks;
 		if (wake_priority_sleeper(rq))
 			goto out;
-		rebalance_tick(cpu, rq, IDLE);
+		rebalance_tick(cpu, rq, SCHED_IDLE);
 		return;
 	}
 	if (TASK_NICE(p) > 0)
@@ -4205,7 +4063,7 @@ EXPORT_SYMBOL(kernel_flag);
  * Attach the domain 'sd' to 'cpu' as its base domain.  Callers must
  * hold the hotplug lock.
  */
-static void cpu_attach_domain(struct sched_domain *sd, int cpu)
+void __devinit cpu_attach_domain(struct sched_domain *sd, int cpu)
 {
 	migration_req_t req;
 	unsigned long flags;
@@ -4232,38 +4090,8 @@ static void cpu_attach_domain(struct sched_domain *sd, int cpu)
 	}
 }
 
-#ifdef CONFIG_SCHED_SMT
-static DEFINE_PER_CPU(struct sched_domain, cpu_domains);
-static struct sched_group sched_group_cpus[NR_CPUS];
-static int __devinit cpu_to_cpu_group(int cpu)
-{
-	return cpu;
-}
-#endif
-
-static DEFINE_PER_CPU(struct sched_domain, phys_domains);
-static struct sched_group sched_group_phys[NR_CPUS];
-static int __devinit cpu_to_phys_group(int cpu)
-{
-#ifdef CONFIG_SCHED_SMT
-	return first_cpu(cpu_sibling_map[cpu]);
-#else
-	return cpu;
-#endif
-}
-
-#ifdef CONFIG_NUMA
-
-static DEFINE_PER_CPU(struct sched_domain, node_domains);
-static struct sched_group sched_group_nodes[MAX_NUMNODES];
-static int __devinit cpu_to_node_group(int cpu)
-{
-	return cpu_to_node(cpu);
-}
-#endif
-
 /* cpus with isolated domains */
-static cpumask_t __devinitdata cpu_isolated_map = CPU_MASK_NONE;
+cpumask_t __devinitdata cpu_isolated_map = CPU_MASK_NONE;
 
 /* Setup the mask of cpus configured for isolated domains */
 static int __init isolated_cpu_setup(char *str)
@@ -4290,7 +4118,7 @@ __setup ("isolcpus=", isolated_cpu_setup);
  * covered by the given span, and will set each group's ->cpumask correctly,
  * and ->cpu_power to 0.
  */
-static void __devinit init_sched_build_groups(struct sched_group groups[],
+void __devinit init_sched_build_groups(struct sched_group groups[],
 			cpumask_t span, int (*group_fn)(int cpu))
 {
 	struct sched_group *first = NULL, *last = NULL;
@@ -4323,6 +4151,41 @@ static void __devinit init_sched_build_groups(struct sched_group groups[],
 	}
 	last->next = first;
 }
+
+
+#ifdef ARCH_HAS_SCHED_DOMAIN
+extern void __devinit arch_init_sched_domains(void);
+extern void __devinit arch_destroy_sched_domains(void);
+#else
+#ifdef CONFIG_SCHED_SMT
+static DEFINE_PER_CPU(struct sched_domain, cpu_domains);
+static struct sched_group sched_group_cpus[NR_CPUS];
+static int __devinit cpu_to_cpu_group(int cpu)
+{
+	return cpu;
+}
+#endif
+
+static DEFINE_PER_CPU(struct sched_domain, phys_domains);
+static struct sched_group sched_group_phys[NR_CPUS];
+static int __devinit cpu_to_phys_group(int cpu)
+{
+#ifdef CONFIG_SCHED_SMT
+	return first_cpu(cpu_sibling_map[cpu]);
+#else
+	return cpu;
+#endif
+}
+
+#ifdef CONFIG_NUMA
+
+static DEFINE_PER_CPU(struct sched_domain, node_domains);
+static struct sched_group sched_group_nodes[MAX_NUMNODES];
+static int __devinit cpu_to_node_group(int cpu)
+{
+	return cpu_to_node(cpu);
+}
+#endif
 
 /*
  * Set up scheduler domains and groups.  Callers must hold the hotplug lock.
@@ -4452,9 +4315,11 @@ static void __devinit arch_destroy_sched_domains(void)
 }
 #endif
 
+#endif /* ARCH_HAS_SCHED_DOMAIN */
+
 #undef SCHED_DOMAIN_DEBUG
 #ifdef SCHED_DOMAIN_DEBUG
-void sched_domain_debug(void)
+static void sched_domain_debug(void)
 {
 	int i;
 
