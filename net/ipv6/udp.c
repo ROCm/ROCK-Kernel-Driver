@@ -293,6 +293,8 @@ ipv4_connected:
 				return -EINVAL;
 			}
 			sk->bound_dev_if = usin->sin6_scope_id;
+			if (!sk->bound_dev_if && (addr_type&IPV6_ADDR_MULTICAST))
+				fl.oif = np->mcast_oif;
 		}
 
 		/* Connect to link-local address requires an interface */
@@ -316,6 +318,9 @@ ipv4_connected:
 	fl.oif = sk->bound_dev_if;
 	fl.uli_u.ports.dport = inet->dport;
 	fl.uli_u.ports.sport = inet->sport;
+
+	if (!fl.oif && (addr_type&IPV6_ADDR_MULTICAST))
+		fl.oif = np->mcast_oif;
 
 	if (flowlabel) {
 		if (flowlabel->opt && flowlabel->opt->srcrt) {

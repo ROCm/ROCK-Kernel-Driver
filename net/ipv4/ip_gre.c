@@ -760,7 +760,10 @@ static int ipgre_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 
 	df = tiph->frag_off;
-	mtu = rt->u.dst.pmtu - tunnel->hlen;
+	if (df)
+		mtu = rt->u.dst.pmtu - tunnel->hlen;
+	else
+		mtu = skb->dst ? skb->dst->pmtu : dev->mtu;
 
 	if (skb->protocol == __constant_htons(ETH_P_IP)) {
 		if (skb->dst && mtu < skb->dst->pmtu && mtu >= 68)

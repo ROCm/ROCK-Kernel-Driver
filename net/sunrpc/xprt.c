@@ -1097,7 +1097,7 @@ udp_write_space(struct sock *sk)
 		return;
 
 	/* Wait until we have enough socket memory. */
-	if (sock_writeable(sk))
+	if (!sock_writeable(sk))
 		return;
 
 	if (!xprt_test_and_set_wspace(xprt)) {

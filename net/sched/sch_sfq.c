@@ -105,6 +105,7 @@ struct sfq_sched_data
 /* Parameters */
 	int		perturb_period;
 	unsigned	quantum;	/* Allotment per round: MUST BE >= MTU */
+	int		limit;
 
 /* Variables */
 	struct timer_list perturb_timer;
@@ -275,7 +276,7 @@ sfq_enqueue(struct sk_buff *skb, struct Qdisc* sch)
 			q->tail = x;
 		}
 	}
-	if (++sch->q.qlen < SFQ_DEPTH-1) {
+	if (++sch->q.qlen < q->limit-1) {
 		sch->stats.bytes += skb->len;
 		sch->stats.packets++;
 		return 0;
@@ -310,7 +311,7 @@ sfq_requeue(struct sk_buff *skb, struct Qdisc* sch)
 			q->tail = x;
 		}
 	}
-	if (++sch->q.qlen < SFQ_DEPTH-1)
+	if (++sch->q.qlen < q->limit - 1)
 		return 0;
 
 	sch->stats.drops++;
@@ -390,6 +391,11 @@ static int sfq_change(struct Qdisc *sch, struct rtattr *opt)
 	sch_tree_lock(sch);
 	q->quantum = ctl->quantum ? : psched_mtu(sch->dev);
 	q->perturb_period = ctl->perturb_period*HZ;
+	if (ctl->limit)
+		q->limit = min_t(u32, ctl->limit, SFQ_DEPTH);
+
+	while (sch->q.qlen >= q->limit-1)
+		sfq_drop(sch);
 
 	del_timer(&q->perturb_timer);
 	if (q->perturb_period) {
@@ -416,6 +422,7 @@ static int sfq_init(struct Qdisc *sch, struct rtattr *opt)
 		q->dep[i+SFQ_DEPTH].next = i+SFQ_DEPTH;
 		q->dep[i+SFQ_DEPTH].prev = i+SFQ_DEPTH;
 	}
+	q->limit = SFQ_DEPTH;
 	q->max_depth = 0;
 	q->tail = SFQ_DEPTH;
 	if (opt == NULL) {
@@ -448,9 +455,9 @@ static int sfq_dump(struct Qdisc *sch, struct sk_buff *skb)
 	opt.quantum = q->quantum;
 	opt.perturb_period = q->perturb_period/HZ;
 
-	opt.limit = SFQ_DEPTH;
+	opt.limit = q->limit;
 	opt.divisor = SFQ_HASH_DIVISOR;
-	opt.flows = SFQ_DEPTH;
+	opt.flows = q->limit;
 
 	RTA_PUT(skb, TCA_OPTIONS, sizeof(opt), &opt);
 

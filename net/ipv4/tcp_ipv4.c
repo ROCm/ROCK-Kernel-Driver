@@ -64,6 +64,8 @@
 #include <linux/ipsec.h>
 
 extern int sysctl_ip_dynaddr;
+extern int sysctl_ip_default_ttl;
+int sysctl_tcp_tw_reuse = 0;
 
 /* Check TCP sequence numbers in ICMP packets. */
 #define ICMP_MIN_LENGTH 8
@@ -163,18 +165,18 @@ __inline__ void tcp_inherit_port(struct sock *sk, struct sock *child)
 	local_bh_enable();
 }
 
-static inline void tcp_bind_hash(struct sock *sk, struct tcp_bind_bucket *tb, unsigned short snum) 
-{ 
-	inet_sk(sk)->num = snum; 
+static inline void tcp_bind_hash(struct sock *sk, struct tcp_bind_bucket *tb, unsigned short snum)
+{
+	inet_sk(sk)->num = snum;
 	if ((sk->bind_next = tb->owners) != NULL)
 		tb->owners->bind_pprev = &sk->bind_next;
 	tb->owners = sk;
 	sk->bind_pprev = &tb->owners;
 	sk->prev = (struct sock *) tb;
-} 
+}
 
 static inline int tcp_bind_conflict(struct sock *sk, struct tcp_bind_bucket *tb)
-{ 
+{
 	struct inet_opt *inet = inet_sk(sk);
 	struct sock *sk2 = tb->owners;
 	int sk_reuse = sk->reuse;
@@ -193,8 +195,8 @@ static inline int tcp_bind_conflict(struct sock *sk, struct tcp_bind_bucket *tb)
 			}
 		}
 	}
-	return sk2 != NULL; 
-} 
+	return sk2 != NULL;
+}
 
 /* Obtain a reference to a local port for the given sock,
  * if snum is zero it means select any available local port.
@@ -247,12 +249,14 @@ static int tcp_v4_get_port(struct sock *sk, unsigned short snum)
 				break;
 	}
 	if (tb != NULL && tb->owners != NULL) {
-		if (tb->fastreuse != 0 && sk->reuse != 0 && sk->state != TCP_LISTEN) {
+		if (sk->reuse > 1)
+			goto success;
+		if (tb->fastreuse > 0 && sk->reuse != 0 && sk->state != TCP_LISTEN) {
 			goto success;
 		} else {
-			ret = 1; 
+			ret = 1;
 			if (tcp_bind_conflict(sk, tb))
-				goto fail_unlock; 
+				goto fail_unlock;
 		}
 	}
 	ret = 1;
@@ -269,7 +273,7 @@ static int tcp_v4_get_port(struct sock *sk, unsigned short snum)
 		tb->fastreuse = 0;
 success:
 	if (sk->prev == NULL)
-		tcp_bind_hash(sk, tb, snum); 
+		tcp_bind_hash(sk, tb, snum);
 	BUG_TRAP(sk->prev == (struct sock *) tb);
  	ret = 0;
 
@@ -341,13 +345,13 @@ void tcp_listen_wlock(void)
 	}
 }
 
-static __inline__ void __tcp_v4_hash(struct sock *sk)
+static __inline__ void __tcp_v4_hash(struct sock *sk, const int listen_possible)
 {
 	struct sock **skp;
 	rwlock_t *lock;
 
 	BUG_TRAP(sk->pprev==NULL);
-	if(sk->state == TCP_LISTEN) {
+	if(listen_possible && sk->state == TCP_LISTEN) {
 		skp = &tcp_listening_hash[tcp_sk_listen_hashfn(sk)];
 		lock = &tcp_lhash_lock;
 		tcp_listen_wlock();
@@ -362,7 +366,7 @@ static __inline__ void __tcp_v4_hash(struct sock *sk)
 	sk->pprev = skp;
 	sock_prot_inc_use(sk->prot);
 	write_unlock(lock);
-	if (sk->state == TCP_LISTEN)
+	if (listen_possible && sk->state == TCP_LISTEN)
 		wake_up(&tcp_lhash_wait);
 }
 
@@ -370,7 +374,7 @@ static void tcp_v4_hash(struct sock *sk)
 {
 	if (sk->state != TCP_CLOSE) {
 		local_bh_disable();
-		__tcp_v4_hash(sk);
+		__tcp_v4_hash(sk, 1);
 		local_bh_enable();
 	}
 }
@@ -378,6 +382,9 @@ static void tcp_v4_hash(struct sock *sk)
 void tcp_unhash(struct sock *sk)
 {
 	rwlock_t *lock;
+
+	if (!sk->pprev)
+		goto ende;
 
 	if (sk->state == TCP_LISTEN) {
 		local_bh_disable();
@@ -397,6 +404,8 @@ void tcp_unhash(struct sock *sk)
 		sock_prot_dec_use(sk->prot);
 	}
 	write_unlock_bh(lock);
+
+ ende:
 	if (sk->state == TCP_LISTEN)
 		wake_up(&tcp_lhash_wait);
 }
@@ -538,20 +547,22 @@ static inline __u32 tcp_v4_init_sequence(struct sock *sk, struct sk_buff *skb)
 					  skb->h.th->source);
 }
 
-static int tcp_v4_check_established(struct sock *sk)
+/* called with local bh disabled */
+static int __tcp_v4_check_established(struct sock *sk, __u16 lport,
+				      struct tcp_tw_bucket **twp)
 {
 	struct inet_opt *inet = inet_sk(sk);
 	u32 daddr = inet->rcv_saddr;
 	u32 saddr = inet->daddr;
 	int dif = sk->bound_dev_if;
 	TCP_V4_ADDR_COOKIE(acookie, saddr, daddr)
-	__u32 ports = TCP_COMBINED_PORTS(inet->dport, inet->num);
-	int hash = tcp_hashfn(daddr, inet->num, saddr, inet->dport);
+	__u32 ports = TCP_COMBINED_PORTS(inet->dport, lport);
+	int hash = tcp_hashfn(daddr, lport, saddr, inet->dport);
 	struct tcp_ehash_bucket *head = &tcp_ehash[hash];
 	struct sock *sk2, **skp;
 	struct tcp_tw_bucket *tw;
 
-	write_lock_bh(&head->lock);
+	write_lock(&head->lock);
 
 	/* Check TIME-WAIT sockets first. */
 	for(skp = &(head + tcp_ehash_size)->chain; (sk2=*skp) != NULL;
@@ -575,7 +586,9 @@ static int tcp_v4_check_established(struct sock *sk)
 			   fall back to VJ's scheme and use initial
 			   timestamp retrieved from peer table.
 			 */
-			if (tw->ts_recent_stamp) {
+			if (tw->ts_recent_stamp &&
+			    (!twp || (sysctl_tcp_tw_reuse &&
+				      xtime.tv_sec - tw->ts_recent_stamp > 1))) {
 				if ((tp->write_seq =
 						tw->snd_nxt + 65535 + 2) == 0)
 					tp->write_seq = 1;
@@ -597,6 +610,10 @@ static int tcp_v4_check_established(struct sock *sk)
 	}
 
 unique:
+	/* Must record num and sport now. Otherwise we will see
+	 * in hash table socket with a funny identity. */
+	inet->num = lport;
+	inet->sport = htons(lport);
 	BUG_TRAP(sk->pprev==NULL);
 	if ((sk->next = *skp) != NULL)
 		(*skp)->pprev = &sk->next;
@@ -605,15 +622,16 @@ unique:
 	sk->pprev = skp;
 	sk->hashent = hash;
 	sock_prot_inc_use(sk->prot);
-	write_unlock_bh(&head->lock);
+	write_unlock(&head->lock);
 
-	if (tw) {
+	if (twp) {
+		*twp = tw;
+		NET_INC_STATS_BH(TimeWaitRecycled);
+	} else if (tw) {
 		/* Silly. Should hash-dance instead... */
-		local_bh_disable();
 		tcp_tw_deschedule(tw);
 		tcp_timewait_kill(tw);
 		NET_INC_STATS_BH(TimeWaitRecycled);
-		local_bh_enable();
 
 		tcp_tw_put(tw);
 	}
@@ -621,34 +639,120 @@ unique:
 	return 0;
 
 not_unique:
-	write_unlock_bh(&head->lock);
+	write_unlock(&head->lock);
 	return -EADDRNOTAVAIL;
 }
 
-/* Hash SYN-SENT socket to established hash table after
- * checking that it is unique. Note, that without kernel lock
- * we MUST make these two operations atomically.
- *
- * Optimization: if it is bound and tcp_bind_bucket has the only
- * owner (us), we need not to scan established bucket.
+/*
+ * Bind a port for a connect operation and hash it.
  */
-
-int tcp_v4_hash_connecting(struct sock *sk)
+static int tcp_v4_hash_connect(struct sock *sk)
 {
 	unsigned short snum = inet_sk(sk)->num;
-	struct tcp_bind_hashbucket *head = &tcp_bhash[tcp_bhashfn(snum)];
-	struct tcp_bind_bucket *tb = (struct tcp_bind_bucket *)sk->prev;
+ 	struct tcp_bind_hashbucket *head;
+ 	struct tcp_bind_bucket *tb;
+ 
+ 	if (snum == 0) {
+ 		int rover;
+ 		int low = sysctl_local_port_range[0];
+ 		int high = sysctl_local_port_range[1];
+ 		int remaining = (high - low) + 1;
+ 		struct tcp_tw_bucket *tw = NULL;
+ 
+ 		local_bh_disable();
+ 
+ 		/* TODO. Actually it is not so bad idea to remove
+ 		 * tcp_portalloc_lock before next submission to Linus.
+ 		 * As soon as we touch this place at all it is time to think.
+ 		 *
+ 		 * Now it protects single _advisory_ variable tcp_port_rover,
+ 		 * hence it is mostly useless.
+ 		 * Code will work nicely if we just delete it, but
+ 		 * I am afraid in contented case it will work not better or
+ 		 * even worse: another cpu just will hit the same bucket
+ 		 * and spin there.
+ 		 * So some cpu salt could remove both contention and
+ 		 * memory pingpong. Any ideas how to do this in a nice way?
+ 		 */
+ 		spin_lock(&tcp_portalloc_lock);
+ 		rover = tcp_port_rover;
+ 
+ 		do {
+ 			rover++;
+ 			if ((rover < low) || (rover > high))
+ 				rover = low;
+ 			head = &tcp_bhash[tcp_bhashfn(rover)];
+ 			spin_lock(&head->lock);		
+ 
+ 			/* Does not bother with rcv_saddr checks,
+ 			 * because the established check is already
+ 			 * unique enough.
+ 			 */
+ 			for (tb = head->chain; tb; tb = tb->next) {
+ 				if (tb->port == rover) {
+ 					BUG_TRAP(tb->owners != NULL);
+ 					if (tb->fastreuse >= 0)
+ 						goto next_port;
+ 					if (!__tcp_v4_check_established(sk, rover, &tw))
+ 						goto ok;
+ 					goto next_port;
+ 				}
+ 			}
+ 
+ 			tb = tcp_bucket_create(head, rover);
+ 			if (!tb) {
+ 				spin_unlock(&head->lock);
+ 				break;
+ 			}
+ 			tb->fastreuse = -1;
+ 			goto ok;
+ 
+ 		next_port:
+ 			spin_unlock(&head->lock);
+ 		} while (--remaining > 0);
+ 		tcp_port_rover = rover;
+ 		spin_unlock(&tcp_portalloc_lock);
+ 
+ 		local_bh_enable();
+ 
+ 		return -EADDRNOTAVAIL;
+ 
+ 	ok:
+ 		/* All locks still held and bhs disabled */
+ 		tcp_port_rover = rover;
+ 		spin_unlock(&tcp_portalloc_lock);
+ 
+ 		tcp_bind_hash(sk, tb, rover);
+ 		if (!sk->pprev) {
+ 			inet_sk(sk)->sport = htons(rover);
+ 			__tcp_v4_hash(sk, 0);
+ 		}
+ 		spin_unlock(&head->lock);
 
+ 		if (tw) {
+ 			tcp_tw_deschedule(tw);
+ 			tcp_timewait_kill(tw);
+ 			tcp_tw_put(tw);
+ 		}
+ 
+ 		local_bh_enable();
+ 		return 0;
+ 	}
+ 
+ 	head  = &tcp_bhash[tcp_bhashfn(snum)];
+ 	tb  = (struct tcp_bind_bucket *)sk->prev;
 	spin_lock_bh(&head->lock);
 	if (tb->owners == sk && sk->bind_next == NULL) {
-		__tcp_v4_hash(sk);
+		__tcp_v4_hash(sk, 0);
 		spin_unlock_bh(&head->lock);
 		return 0;
 	} else {
-		spin_unlock_bh(&head->lock);
-
+		int ret;
+		spin_unlock(&head->lock);
 		/* No definite answer... Walk to established hash table */
-		return tcp_v4_check_established(sk);
+		ret = __tcp_v4_check_established(sk, snum, NULL);
+		local_bh_enable();
+		return ret;
 	}
 }
 
@@ -658,7 +762,6 @@ int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	struct inet_opt *inet = inet_sk(sk);
 	struct tcp_opt *tp = tcp_sk(sk);
 	struct sockaddr_in *usin = (struct sockaddr_in *) uaddr;
-	struct sk_buff *buff;
 	struct rtable *rt;
 	u32 daddr, nexthop;
 	int tmp;
@@ -693,12 +796,6 @@ int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	if (!inet->opt || !inet->opt->srr)
 		daddr = rt->rt_dst;
 
-	err = -ENOBUFS;
-	buff = alloc_skb(MAX_TCP_HEADER + 15, sk->allocation);
-
-	if (buff == NULL)
-		goto failure;
-
 	if (!inet->saddr)
 		inet->saddr = rt->rt_src;
 	inet->rcv_saddr = inet->saddr;
@@ -729,24 +826,38 @@ int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	inet->dport = usin->sin_port;
 	inet->daddr = daddr;
 
+	tp->ext_header_len = 0;
+	if (inet->opt)
+		tp->ext_header_len = inet->opt->optlen;
+
+	tp->mss_clamp = 536;
+
+	/* Socket identity is still unknown (sport may be zero).
+	 * However we set state to SYN-SENT and not releasing socket
+	 * lock select source port, enter ourselves into the hash tables and
+	 * complete initalization after this.
+	 */
+	tcp_set_state(sk, TCP_SYN_SENT);
+	err = tcp_v4_hash_connect(sk);
+	if (err)
+		goto failure;
+
 	if (!tp->write_seq)
 		tp->write_seq = secure_tcp_sequence_number(inet->saddr,
 							   inet->daddr,
 							   inet->sport,
 							   usin->sin_port);
 
-	tp->ext_header_len = 0;
-	if (inet->opt)
-		tp->ext_header_len = inet->opt->optlen;
 	inet->id = tp->write_seq ^ jiffies;
 
-	tp->mss_clamp = 536;
+	err = tcp_connect(sk);
+	if (err)
+		goto failure;
 
-	err = tcp_connect(sk, buff);
-	if (err == 0)
-		return 0;
+	return 0;
 
 failure:
+	tcp_set_state(sk, TCP_CLOSE);
 	__sk_dst_reset(sk);
 	sk->route_caps = 0;
 	inet->dport = 0;
@@ -799,7 +910,6 @@ static void tcp_v4_synq_add(struct sock *sk, struct open_request *req)
 	req->expires = jiffies + TCP_TIMEOUT_INIT;
 	req->retrans = 0;
 	req->sk = NULL;
-	req->index = h;
 	req->dl_next = lopt->syn_table[h];
 
 	write_lock(&tp->syn_wait_lock);
@@ -1092,6 +1202,7 @@ static void tcp_v4_send_reset(struct sk_buff *skb)
 	arg.n_iov = 1;
 	arg.csumoffset = offsetof(struct tcphdr, check) / 2; 
 
+	tcp_socket->sk->protinfo.af_inet.ttl = sysctl_ip_default_ttl;
 	ip_send_reply(tcp_socket->sk, skb, &arg, sizeof rth);
 
 	TCP_INC_STATS_BH(TcpOutSegs);
@@ -1478,7 +1589,7 @@ struct sock * tcp_v4_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 	newtp->advmss = dst->advmss;
 	tcp_initialize_rcv_mss(newsk);
 
-	__tcp_v4_hash(newsk);
+	__tcp_v4_hash(newsk, 0);
 	__tcp_inherit_port(sk, newsk);
 
 	return newsk;
@@ -1902,7 +2013,6 @@ struct tcp_func ipv4_specific = {
 	tcp_v4_rebuild_header,
 	tcp_v4_conn_request,
 	tcp_v4_syn_recv_sock,
-	tcp_v4_hash_connecting,
 	tcp_v4_remember_stamp,
 	sizeof(struct iphdr),
 
