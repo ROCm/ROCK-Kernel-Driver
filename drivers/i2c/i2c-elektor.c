@@ -174,10 +174,12 @@ static struct i2c_algo_pcf_data pcf_isa_data = {
 };
 
 static struct i2c_adapter pcf_isa_ops = {
-	.owner		   = THIS_MODULE,
-	.name		   = "PCF8584 ISA adapter",
-	.id		   = I2C_HW_P_ELEK,
-	.algo_data	   = &pcf_isa_data,
+	.owner		= THIS_MODULE,
+	.id		= I2C_HW_P_ELEK,
+	.algo_data	= &pcf_isa_data,
+	.dev		= {
+		.name	= "PCF8584 ISA adapter",
+	},
 };
 
 static int __init i2c_pcfisa_init(void) 

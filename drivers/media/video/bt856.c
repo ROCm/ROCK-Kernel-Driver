@@ -106,6 +106,7 @@ static int bt856_attach(struct i2c_adapter *adap, int addr , unsigned long flags
 	client = kmalloc(sizeof(*client), GFP_KERNEL);
 	if(client == NULL)
 		return -ENOMEM;
+	memset(client, 0, sizeof(*client));
 	client_template.adapter = adap;
 	client_template.addr = addr;
 	memcpy(client, &client_template, sizeof(*client));	
@@ -123,14 +124,14 @@ static int bt856_attach(struct i2c_adapter *adap, int addr , unsigned long flags
 
 
 	memset(encoder, 0, sizeof(struct bt856));
-	strcpy(client->name, "bt856");
+	strncpy(client->dev.name, "bt856", DEVICE_NAME_SIZE);
 	encoder->client = client;
-	client->data = encoder;
+	i2c_set_clientdata(client, encoder);
 	encoder->addr = client->addr;
 	encoder->norm = VIDEO_MODE_NTSC;
 	encoder->enable = 1;
 
-	DEBUG(printk(KERN_INFO "%s-bt856: attach\n", encoder->client->name));
+	DEBUG(printk(KERN_INFO "%s-bt856: attach\n", encoder->client->dev.name));
 
 	i2c_smbus_write_byte_data(client, 0xdc, 0x18);
 	encoder->reg[0xdc] = 0x18;
@@ -171,7 +172,7 @@ static int bt856_probe(struct i2c_adapter *adap)
 static int bt856_detach(struct i2c_client *client)
 {
 	i2c_detach_client(client);
-	kfree(client->data);
+	i2c_get_clientdata(client);
 	kfree(client);
 	MOD_DEC_USE_COUNT;
 	return 0;
@@ -180,7 +181,7 @@ static int bt856_detach(struct i2c_client *client)
 static int bt856_command(struct i2c_client *client, unsigned int cmd,
 			 void *arg)
 {
-	struct bt856 *encoder = client->data;
+	struct bt856 *encoder = i2c_get_clientdata(client);
 
 	switch (cmd) {
 
@@ -190,7 +191,7 @@ static int bt856_command(struct i2c_client *client, unsigned int cmd,
 
 			DEBUG(printk
 			      (KERN_INFO "%s-bt856: get capabilities\n",
-			       encoder->client->name));
+			       encoder->client->dev.name));
 
 			cap->flags
 			    = VIDEO_ENCODER_PAL
@@ -205,7 +206,7 @@ static int bt856_command(struct i2c_client *client, unsigned int cmd,
 			int *iarg = arg;
 
 			DEBUG(printk(KERN_INFO "%s-bt856: set norm %d\n",
-				     encoder->client->name, *iarg));
+				     encoder->client->dev.name, *iarg));
 
 			switch (*iarg) {
 
@@ -232,7 +233,7 @@ static int bt856_command(struct i2c_client *client, unsigned int cmd,
 			int *iarg = arg;
 
 			DEBUG(printk(KERN_INFO "%s-bt856: set input %d\n",
-				     encoder->client->name, *iarg));
+				     encoder->client->dev.name, *iarg));
 
 			/*     We only have video bus.
 			   *iarg = 0: input is from bt819
@@ -268,7 +269,7 @@ static int bt856_command(struct i2c_client *client, unsigned int cmd,
 			int *iarg = arg;
 
 			DEBUG(printk(KERN_INFO "%s-bt856: set output %d\n",
-				     encoder->client->name, *iarg));
+				     encoder->client->dev.name, *iarg));
 
 			/* not much choice of outputs */
 			if (*iarg != 0) {
@@ -285,7 +286,7 @@ static int bt856_command(struct i2c_client *client, unsigned int cmd,
 
 			DEBUG(printk
 			      (KERN_INFO "%s-bt856: enable output %d\n",
-			       encoder->client->name, encoder->enable));
+			       encoder->client->dev.name, encoder->enable));
 		}
 		break;
 
@@ -309,9 +310,11 @@ static struct i2c_driver i2c_driver_bt856 = {
 };
 
 static struct i2c_client client_template = {
-	.name = "bt856_client",
 	.id = -1,
-	.driver = &i2c_driver_bt856
+	.driver = &i2c_driver_bt856,
+	.dev = {
+		.name = "bt856_client",
+	},
 };
 
 static int bt856_init(void)

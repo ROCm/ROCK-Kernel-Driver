@@ -23,6 +23,8 @@
     This driver puts entries in /proc/sys/dev/sensors for each I2C device
 */
 
+/* #define DEBUG 1 */
+
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
@@ -581,9 +583,9 @@ int i2c_detect(struct i2c_adapter *adapter,
 	    is_isa ? SENSORS_ISA_BUS : i2c_adapter_id(adapter);
 
 	/* Forget it if we can't probe using SMBUS_QUICK */
-	if ((!is_isa)
-	    && !i2c_check_functionality(adapter,
-					I2C_FUNC_SMBUS_QUICK)) return -1;
+	if ((!is_isa) &&
+	    !i2c_check_functionality(adapter, I2C_FUNC_SMBUS_QUICK))
+		return -1;
 
 	for (addr = 0x00; addr <= (is_isa ? 0xffff : 0x7f); addr++) {
 		/* XXX: WTF is going on here??? */
@@ -594,31 +596,14 @@ int i2c_detect(struct i2c_adapter *adapter,
 		/* If it is in one of the force entries, we don't do any
 		   detection at all */
 		found = 0;
-		for (i = 0;
-		     !found
-		     && (this_force =
-			 address_data->forces + i, this_force->force); i++) {
-			for (j = 0;
-			     !found
-			     && (this_force->force[j] != SENSORS_I2C_END);
-			     j += 2) {
-				if (
-				    ((adapter_id == this_force->force[j])
-				     ||
-				     ((this_force->
-				       force[j] == SENSORS_ANY_I2C_BUS)
-				      && !is_isa))
-				    && (addr == this_force->force[j + 1])) {
-#ifdef DEBUG
-					printk
-					    (KERN_DEBUG "i2c-proc.o: found force parameter for adapter %d, addr %04x\n",
-					     adapter_id, addr);
-#endif
-					if (
-					    (err =
-					     found_proc(adapter, addr, 0,
-							this_force->
-							kind))) return err;
+		for (i = 0; !found && (this_force = address_data->forces + i, this_force->force); i++) {
+			for (j = 0; !found && (this_force->force[j] != SENSORS_I2C_END); j += 2) {
+				if ( ((adapter_id == this_force->force[j]) ||
+				      ((this_force->force[j] == SENSORS_ANY_I2C_BUS) && !is_isa)) &&
+				      (addr == this_force->force[j + 1]) ) {
+					dev_dbg(&adapter->dev, "found force parameter for adapter %d, addr %04x\n", adapter_id, addr);
+					if ((err = found_proc(adapter, addr, 0, this_force->kind)))
+						return err;
 					found = 1;
 				}
 			}
@@ -628,42 +613,22 @@ int i2c_detect(struct i2c_adapter *adapter,
 
 		/* If this address is in one of the ignores, we can forget about it
 		   right now */
-		for (i = 0;
-		     !found
-		     && (address_data->ignore[i] != SENSORS_I2C_END);
-		     i += 2) {
-			if (
-			    ((adapter_id == address_data->ignore[i])
-			     ||
-			     ((address_data->
-			       ignore[i] == SENSORS_ANY_I2C_BUS)
-			      && !is_isa))
-			    && (addr == address_data->ignore[i + 1])) {
-#ifdef DEBUG
-				printk
-				    (KERN_DEBUG "i2c-proc.o: found ignore parameter for adapter %d, "
-				     "addr %04x\n", adapter_id, addr);
-#endif
+		for (i = 0; !found && (address_data->ignore[i] != SENSORS_I2C_END); i += 2) {
+			if ( ((adapter_id == address_data->ignore[i]) ||
+			      ((address_data->ignore[i] == SENSORS_ANY_I2C_BUS) &&
+			       !is_isa)) &&
+			      (addr == address_data->ignore[i + 1])) {
+				dev_dbg(&adapter->dev, "found ignore parameter for adapter %d, addr %04x\n", adapter_id, addr);
 				found = 1;
 			}
 		}
-		for (i = 0;
-		     !found
-		     && (address_data->ignore_range[i] != SENSORS_I2C_END);
-		     i += 3) {
-			if (
-			    ((adapter_id == address_data->ignore_range[i])
-			     ||
-			     ((address_data->
-			       ignore_range[i] ==
-			       SENSORS_ANY_I2C_BUS) & !is_isa))
-			    && (addr >= address_data->ignore_range[i + 1])
-			    && (addr <= address_data->ignore_range[i + 2])) {
-#ifdef DEBUG
-				printk
-				    (KERN_DEBUG "i2c-proc.o: found ignore_range parameter for adapter %d, "
-				     "addr %04x\n", adapter_id, addr);
-#endif
+		for (i = 0; !found && (address_data->ignore_range[i] != SENSORS_I2C_END); i += 3) {
+			if ( ((adapter_id == address_data->ignore_range[i]) ||
+			      ((address_data-> ignore_range[i] == SENSORS_ANY_I2C_BUS) & 
+			       !is_isa)) &&
+			     (addr >= address_data->ignore_range[i + 1]) &&
+			     (addr <= address_data->ignore_range[i + 2])) {
+				dev_dbg(&adapter->dev,  "found ignore_range parameter for adapter %d, addr %04x\n", adapter_id, addr);
 				found = 1;
 			}
 		}
@@ -673,68 +638,31 @@ int i2c_detect(struct i2c_adapter *adapter,
 		/* Now, we will do a detection, but only if it is in the normal or 
 		   probe entries */
 		if (is_isa) {
-			for (i = 0;
-			     !found
-			     && (address_data->normal_isa[i] !=
-				 SENSORS_ISA_END); i += 1) {
+			for (i = 0; !found && (address_data->normal_isa[i] != SENSORS_ISA_END); i += 1) {
 				if (addr == address_data->normal_isa[i]) {
-#ifdef DEBUG
-					printk
-					    (KERN_DEBUG "i2c-proc.o: found normal isa entry for adapter %d, "
-					     "addr %04x\n", adapter_id,
-					     addr);
-#endif
+					dev_dbg(&adapter->dev, "found normal isa entry for adapter %d, addr %04x\n", adapter_id, addr);
 					found = 1;
 				}
 			}
-			for (i = 0;
-			     !found
-			     && (address_data->normal_isa_range[i] !=
-				 SENSORS_ISA_END); i += 3) {
-				if ((addr >=
-				     address_data->normal_isa_range[i])
-				    && (addr <=
-					address_data->normal_isa_range[i + 1])
-				    &&
-				    ((addr -
-				      address_data->normal_isa_range[i]) %
-				     address_data->normal_isa_range[i + 2] ==
-				     0)) {
-#ifdef DEBUG
-					printk
-					    (KERN_DEBUG "i2c-proc.o: found normal isa_range entry for adapter %d, "
-					     "addr %04x", adapter_id, addr);
-#endif
+			for (i = 0; !found && (address_data->normal_isa_range[i] != SENSORS_ISA_END); i += 3) {
+				if ((addr >= address_data->normal_isa_range[i]) &&
+				    (addr <= address_data->normal_isa_range[i + 1]) &&
+				    ((addr - address_data->normal_isa_range[i]) % address_data->normal_isa_range[i + 2] == 0)) {
+					dev_dbg(&adapter->dev, "found normal isa_range entry for adapter %d, addr %04x", adapter_id, addr);
 					found = 1;
 				}
 			}
 		} else {
-			for (i = 0;
-			     !found && (address_data->normal_i2c[i] !=
-				 SENSORS_I2C_END); i += 1) {
+			for (i = 0; !found && (address_data->normal_i2c[i] != SENSORS_I2C_END); i += 1) {
 				if (addr == address_data->normal_i2c[i]) {
 					found = 1;
-#ifdef DEBUG
-					printk
-					    (KERN_DEBUG "i2c-proc.o: found normal i2c entry for adapter %d, "
-					     "addr %02x", adapter_id, addr);
-#endif
+					dev_dbg(&adapter->dev, "found normal i2c entry for adapter %d, addr %02x", adapter_id, addr);
 				}
 			}
-			for (i = 0;
-			     !found
-			     && (address_data->normal_i2c_range[i] !=
-				 SENSORS_I2C_END); i += 2) {
-				if ((addr >=
-				     address_data->normal_i2c_range[i])
-				    && (addr <=
-					address_data->normal_i2c_range[i + 1]))
-				{
-#ifdef DEBUG
-					printk
-					    (KERN_DEBUG "i2c-proc.o: found normal i2c_range entry for adapter %d, "
-					     "addr %04x\n", adapter_id, addr);
-#endif
+			for (i = 0; !found && (address_data->normal_i2c_range[i] != SENSORS_I2C_END); i += 2) {
+				if ((addr >= address_data->normal_i2c_range[i]) &&
+				    (addr <= address_data->normal_i2c_range[i + 1])) {
+					dev_dbg(&adapter->dev, "found normal i2c_range entry for adapter %d, addr %04x\n", adapter_id, addr);
 					found = 1;
 				}
 			}
@@ -747,30 +675,17 @@ int i2c_detect(struct i2c_adapter *adapter,
 			     ((address_data->
 			       probe[i] == SENSORS_ANY_I2C_BUS) & !is_isa))
 			    && (addr == address_data->probe[i + 1])) {
-#ifdef DEBUG
-				printk
-				    (KERN_DEBUG "i2c-proc.o: found probe parameter for adapter %d, "
-				     "addr %04x\n", adapter_id, addr);
-#endif
+				dev_dbg(&adapter->dev, "found probe parameter for adapter %d, addr %04x\n", adapter_id, addr);
 				found = 1;
 			}
 		}
-		for (i = 0; !found &&
-		           (address_data->probe_range[i] != SENSORS_I2C_END);
-		     i += 3) {
-			if (
-			    ((adapter_id == address_data->probe_range[i])
-			     ||
-			     ((address_data->probe_range[i] ==
-			       SENSORS_ANY_I2C_BUS) & !is_isa))
-			    && (addr >= address_data->probe_range[i + 1])
-			    && (addr <= address_data->probe_range[i + 2])) {
+		for (i = 0; !found && (address_data->probe_range[i] != SENSORS_I2C_END); i += 3) {
+			if ( ((adapter_id == address_data->probe_range[i]) ||
+			      ((address_data->probe_range[i] == SENSORS_ANY_I2C_BUS) & !is_isa)) &&
+			     (addr >= address_data->probe_range[i + 1]) &&
+			     (addr <= address_data->probe_range[i + 2])) {
 				found = 1;
-#ifdef DEBUG
-				printk
-				    (KERN_DEBUG "i2c-proc.o: found probe_range parameter for adapter %d, "
-				     "addr %04x\n", adapter_id, addr);
-#endif
+				dev_dbg(&adapter->dev, "found probe_range parameter for adapter %d, addr %04x\n", adapter_id, addr);
 			}
 		}
 		if (!found)
@@ -779,8 +694,7 @@ int i2c_detect(struct i2c_adapter *adapter,
 		/* OK, so we really should examine this address. First check
 		   whether there is some client here at all! */
 		if (is_isa ||
-		    (i2c_smbus_xfer
-		     (adapter, addr, 0, 0, 0, I2C_SMBUS_QUICK, NULL) >= 0))
+		    (i2c_smbus_xfer (adapter, addr, 0, 0, 0, I2C_SMBUS_QUICK, NULL) >= 0))
 			if ((err = found_proc(adapter, addr, 0, -1)))
 				return err;
 	}

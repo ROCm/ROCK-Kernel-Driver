@@ -1630,7 +1630,6 @@ netiucv_init_netdevice(int ifno, char *username)
 	dev->addr_len            = 0;
 	dev->type                = ARPHRD_SLIP;
 	dev->tx_queue_len        = NETIUCV_QUEUELEN_DEFAULT;
-	dev_init_buffers(dev);
 	dev->flags	         = IFF_POINTOPOINT | IFF_NOARP;
 	return dev;
 }

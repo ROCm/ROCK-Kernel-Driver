@@ -27,6 +27,8 @@
    messages, proper stop/repstart signaling during receive,
    added detect code */
 
+/* #define DEBUG 1 */		/* to pick up dev_dbg calls */
+
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/delay.h>
@@ -222,21 +224,19 @@ static int pcf_sendbytes(struct i2c_adapter *i2c_adap, const char *buf,
 	int wrcount, status, timeout;
     
 	for (wrcount=0; wrcount<count; ++wrcount) {
-		DEB2(printk(KERN_DEBUG "i2c-algo-pcf.o: %s i2c_write: writing %2.2X\n",
-		      i2c_adap->name, buf[wrcount]&0xff));
+		DEB2(dev_dbg(&i2c_adap->dev, "i2c_write: writing %2.2X\n",
+				buf[wrcount]&0xff));
 		i2c_outb(adap, buf[wrcount]);
 		timeout = wait_for_pin(adap, &status);
 		if (timeout) {
 			i2c_stop(adap);
-			printk(KERN_ERR "i2c-algo-pcf.o: %s i2c_write: "
-			       "error - timeout.\n", i2c_adap->name);
+			dev_err(&i2c_adap->dev, "i2c_write: error - timeout.\n");
 			return -EREMOTEIO; /* got a better one ?? */
 		}
 #ifndef STUB_I2C
 		if (status & I2C_PCF_LRB) {
 			i2c_stop(adap);
-			printk(KERN_ERR "i2c-algo-pcf.o: %s i2c_write: "
-			       "error - no ack.\n", i2c_adap->name);
+			dev_err(&i2c_adap->dev, "i2c_write: error - no ack.\n");
 			return -EREMOTEIO; /* got a better one ?? */
 		}
 #endif
@@ -263,14 +263,14 @@ static int pcf_readbytes(struct i2c_adapter *i2c_adap, char *buf,
 
 		if (wait_for_pin(adap, &status)) {
 			i2c_stop(adap);
-			printk(KERN_ERR "i2c-algo-pcf.o: pcf_readbytes timed out.\n");
+			dev_err(&i2c_adap->dev, "pcf_readbytes timed out.\n");
 			return (-1);
 		}
 
 #ifndef STUB_I2C
 		if ((status & I2C_PCF_LRB) && (i != count)) {
 			i2c_stop(adap);
-			printk(KERN_ERR "i2c-algo-pcf.o: i2c_read: i2c_inb, No ack.\n");
+			dev_err(&i2c_adap->dev, "i2c_read: i2c_inb, No ack.\n");
 			return (-1);
 		}
 #endif
@@ -445,8 +445,7 @@ int i2c_pcf_add_bus(struct i2c_adapter *adap)
 	struct i2c_algo_pcf_data *pcf_adap = adap->algo_data;
 	int rval;
 
-	DEB2(printk(KERN_DEBUG "i2c-algo-pcf.o: hw routines for %s registered.\n",
-	            adap->name));
+	DEB2(dev_dbg(&adap->dev, "hw routines registered.\n"));
 
 	/* register new adapter to i2c module... */
 

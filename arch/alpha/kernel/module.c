@@ -199,7 +199,9 @@ apply_relocate_add(Elf64_Shdr *sechdrs, const char *strtab,
 		case R_ALPHA_NONE:
 			break;
 		case R_ALPHA_REFQUAD:
-			*(u64 *)location = value;
+			/* BUG() can produce misaligned relocations. */
+			((u32 *)location)[0] = value;
+			((u32 *)location)[1] = value >> 32;
 			break;
 		case R_ALPHA_GPREL32:
 			value -= gp;

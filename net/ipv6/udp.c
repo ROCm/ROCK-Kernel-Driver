@@ -653,9 +653,6 @@ static int udpv6_rcv(struct sk_buff **pskb)
 	if (!pskb_may_pull(skb, sizeof(struct udphdr)))
 		goto short_packet;
 
-	if (!xfrm6_policy_check(NULL, XFRM_POLICY_IN, skb))
-                goto discard;
-
 	saddr = &skb->nh.ipv6h->saddr;
 	daddr = &skb->nh.ipv6h->daddr;
 	uh = skb->h.uh;
@@ -713,6 +710,9 @@ static int udpv6_rcv(struct sk_buff **pskb)
 	sk = udp_v6_lookup(saddr, uh->source, daddr, uh->dest, dev->ifindex);
 
 	if (sk == NULL) {
+		if (!xfrm6_policy_check(NULL, XFRM_POLICY_IN, skb))
+			goto discard;
+
 		if (skb->ip_summed != CHECKSUM_UNNECESSARY &&
 		    (unsigned short)csum_fold(skb_checksum(skb, 0, skb->len, skb->csum)))
 			goto discard;
