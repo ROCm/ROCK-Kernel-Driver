@@ -73,7 +73,7 @@ __ixp4xx_iounmap(void *addr)
 {
 	extern void __iounmap(void *addr);
 
-	if ((u32)addr > VMALLOC_START)
+	if ((u32)addr >= VMALLOC_START)
 		__iounmap(addr);
 }
 
@@ -101,7 +101,7 @@ __ixp4xx_writeb(u8 value, u32 addr)
 {
 	u32 n, byte_enables, data;
 
-	if (addr > VMALLOC_START) {
+	if (addr >= VMALLOC_START) {
 		__raw_writeb(value, addr);
 		return;
 	}
@@ -124,7 +124,7 @@ __ixp4xx_writew(u16 value, u32 addr)
 {
 	u32 n, byte_enables, data;
 
-	if (addr > VMALLOC_START) {
+	if (addr >= VMALLOC_START) {
 		__raw_writew(value, addr);
 		return;
 	}
@@ -145,7 +145,7 @@ __ixp4xx_writesw(u32 bus_addr, u16 *vaddr, int count)
 static inline void 
 __ixp4xx_writel(u32 value, u32 addr)
 {
-	if (addr > VMALLOC_START) {
+	if (addr >= VMALLOC_START) {
 		__raw_writel(value, addr);
 		return;
 	}
@@ -165,7 +165,7 @@ __ixp4xx_readb(u32 addr)
 {
 	u32 n, byte_enables, data;
 
-	if (addr > VMALLOC_START)
+	if (addr >= VMALLOC_START)
 		return __raw_readb(addr);
 
 	n = addr % 4;
@@ -188,7 +188,7 @@ __ixp4xx_readw(u32 addr)
 {
 	u32 n, byte_enables, data;
 
-	if (addr > VMALLOC_START)
+	if (addr >= VMALLOC_START)
 		return __raw_readw(addr);
 
 	n = addr % 4;
@@ -211,7 +211,7 @@ __ixp4xx_readl(u32 addr)
 {
 	u32 data;
 
-	if (addr > VMALLOC_START)
+	if (addr >= VMALLOC_START)
 		return __raw_readl(addr);
 
 	if (ixp4xx_pci_read(addr, NP_CMD_MEMREAD, &data))
