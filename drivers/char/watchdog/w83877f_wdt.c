@@ -1,38 +1,28 @@
 /*
- *	W83877F Computer Watchdog Timer driver for Linux 2.4.x
+ *	W83877F Computer Watchdog Timer driver
  *
  *      Based on acquirewdt.c by Alan Cox,
- *           and sbc60xxwdt.c by Jakob Oestergaard <jakob@ostenfeld.dk>
- *     
+ *           and sbc60xxwdt.c by Jakob Oestergaard <jakob@unthought.net>
+ *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License
  *	as published by the Free Software Foundation; either version
  *	2 of the License, or (at your option) any later version.
- *	
- *	The authors do NOT admit liability nor provide warranty for 
- *	any of this software. This material is provided "AS-IS" in 
+ *
+ *	The authors do NOT admit liability nor provide warranty for
+ *	any of this software. This material is provided "AS-IS" in
  *      the hope that it may be useful for others.
  *
  *	(c) Copyright 2001    Scott Jennings <linuxdrivers@oro.net>
  *
  *           4/19 - 2001      [Initial revision]
  *           9/27 - 2001      Added spinlocking
- *
- *
- *  Theory of operation:
- *  A Watchdog Timer (WDT) is a hardware circuit that can 
- *  reset the computer system in case of a software fault.
- *  You probably knew that already.
- *
- *  Usually a userspace daemon will notify the kernel WDT driver
- *  via the /proc/watchdog special device file that userspace is
- *  still alive, at regular intervals.  When such a notification
- *  occurs, the driver will usually tell the hardware watchdog
- *  that everything is in order, and that the watchdog should wait
- *  for yet another little while to reset the system.
- *  If userspace fails (RAM error, kernel bug, whatever), the
- *  notifications cease to occur, and the hardware watchdog will
- *  reset the system (causing a reboot) after the timeout occurs.
+ *           4/12 - 2002      [rob@osinvestor.com] Eliminate extra comments
+ *                            Eliminate fop_read
+ *                            Eliminate extra spin_unlock
+ *                            Added KERN_* tags to printks
+ *           09/8 - 2003      [wim@iguana.be] cleanup of trailing spaces
+ *                            added extra printk's for startup problems
  *
  *  This WDT driver is different from most other Linux WDT
  *  drivers in that the driver will ping the watchdog by itself,
@@ -42,6 +32,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/types.h>
 #include <linux/timer.h>
 #include <linux/jiffies.h>
@@ -57,6 +48,7 @@
 #include <asm/system.h>
 
 #define OUR_NAME "w83877f_wdt"
+#define PFX OUR_NAME ": "
 
 #define ENABLE_W83877F_PORT 0x3F0
 #define ENABLE_W83877F 0x87
@@ -95,9 +87,9 @@ static spinlock_t wdt_spinlock;
 static void wdt_timer_ping(unsigned long data)
 {
 	/* If we got a heartbeat pulse within the WDT_US_INTERVAL
-	 * we agree to ping the WDT 
+	 * we agree to ping the WDT
 	 */
-	if(time_before(jiffies, next_heartbeat)) 
+	if(time_before(jiffies, next_heartbeat))
 	{
 		/* Ping the WDT */
 		spin_lock(&wdt_spinlock);
@@ -112,11 +104,11 @@ static void wdt_timer_ping(unsigned long data)
 		spin_unlock(&wdt_spinlock);
 
 	} else {
-		printk(OUR_NAME ": Heartbeat lost! Will not ping the watchdog\n");
+		printk(KERN_WARNING PFX "Heartbeat lost! Will not ping the watchdog\n");
 	}
 }
 
-/* 
+/*
  * Utility routines
  */
 
@@ -147,12 +139,12 @@ static void wdt_startup(void)
 	next_heartbeat = jiffies + WDT_HEARTBEAT;
 
 	/* Start the timer */
-	timer.expires = jiffies + WDT_INTERVAL;	
+	timer.expires = jiffies + WDT_INTERVAL;
 	add_timer(&timer);
 
 	wdt_change(WDT_ENABLE);
 
-	printk(OUR_NAME ": Watchdog timer is now enabled.\n");  
+	printk(KERN_INFO PFX "Watchdog timer is now enabled.\n");
 }
 
 static void wdt_turnoff(void)
@@ -162,7 +154,7 @@ static void wdt_turnoff(void)
 
 	wdt_change(WDT_DISABLE);
 
-	printk(OUR_NAME ": Watchdog timer is now disabled...\n");
+	printk(KERN_INFO PFX "Watchdog timer is now disabled...\n");
 }
 
 
@@ -177,7 +169,7 @@ static ssize_t fop_write(struct file * file, const char * buf, size_t count, lof
 		return -ESPIPE;
 
 	/* See if we got the magic character */
-	if(count) 
+	if(count)
 	{
 		size_t ofs;
 
@@ -204,13 +196,11 @@ static ssize_t fop_write(struct file * file, const char * buf, size_t count, lof
 
 static int fop_open(struct inode * inode, struct file * file)
 {
-	switch(minor(inode->i_rdev)) 
+	switch(minor(inode->i_rdev))
 	{
 		case WATCHDOG_MINOR:
 			/* Just in case we're already talking to someone... */
 			if(test_and_set_bit(0, &wdt_is_open)) {
-				/* Davej: Is this unlock bogus? */
-				spin_unlock(&wdt_spinlock);
 				return -EBUSY;
 			}
 			/* Good, fire up the show */
@@ -224,13 +214,13 @@ static int fop_open(struct inode * inode, struct file * file)
 
 static int fop_close(struct inode * inode, struct file * file)
 {
-	if(minor(inode->i_rdev) == WATCHDOG_MINOR) 
+	if(minor(inode->i_rdev) == WATCHDOG_MINOR)
 	{
 		if(wdt_expect_close)
 			wdt_turnoff();
 		else {
 			del_timer(&timer);
-			printk(OUR_NAME ": device file closed unexpectedly. Will not stop the WDT!\n");
+			printk(KERN_CRIT PFX "device file closed unexpectedly. Will not stop the WDT!\n");
 		}
 	}
 	clear_bit(0, &wdt_is_open);
@@ -244,9 +234,9 @@ static int fop_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	{
 		.options = WDIOF_MAGICCLOSE,
 		.firmware_version = 1,
-		.identity = "W83877F"
+		.identity = "W83877F",
 	};
-	
+
 	switch(cmd)
 	{
 		default:
@@ -265,13 +255,13 @@ static struct file_operations wdt_fops = {
 	.write		= fop_write,
 	.open		= fop_open,
 	.release	= fop_close,
-	.ioctl		= fop_ioctl
+	.ioctl		= fop_ioctl,
 };
 
 static struct miscdevice wdt_miscdev = {
 	.minor	= WATCHDOG_MINOR,
 	.name	= "watchdog",
-	.fops	= &wdt_fops
+	.fops	= &wdt_fops,
 };
 
 /*
@@ -281,21 +271,21 @@ static struct miscdevice wdt_miscdev = {
 static int wdt_notify_sys(struct notifier_block *this, unsigned long code,
 	void *unused)
 {
-	if(code==SYS_DOWN || code==SYS_HALT) 
+	if(code==SYS_DOWN || code==SYS_HALT)
 		wdt_turnoff();
 	return NOTIFY_DONE;
 }
- 
+
 /*
  *	The WDT needs to learn about soft shutdowns in order to
- *	turn the timebomb registers off. 
+ *	turn the timebomb registers off.
  */
- 
+
 static struct notifier_block wdt_notifier=
 {
 	.notifier_call = wdt_notify_sys,
 	.next = NULL,
-	.priority = 0
+	.priority = 0,
 };
 
 static void __exit w83877f_wdt_unload(void)
@@ -317,9 +307,20 @@ static int __init w83877f_wdt_init(void)
 	spin_lock_init(&wdt_spinlock);
 
 	if (!request_region(ENABLE_W83877F_PORT, 2, "W83877F WDT"))
+	{
+		printk(KERN_ERR PFX "I/O address 0x%04x already in use\n",
+			ENABLE_W83877F_PORT);
+		rc = -EIO;
 		goto err_out;
+	}
+
 	if (!request_region(WDT_PING, 1, "W8387FF WDT"))
+	{
+		printk(KERN_ERR PFX "I/O address 0x%04x already in use\n",
+			WDT_PING);
+		rc = -EIO;
 		goto err_out_region1;
+	}
 
 	init_timer(&timer);
 	timer.function = wdt_timer_ping;
@@ -327,14 +328,22 @@ static int __init w83877f_wdt_init(void)
 
 	rc = misc_register(&wdt_miscdev);
 	if (rc)
+	{
+		printk(KERN_ERR PFX "cannot register miscdev on minor=%d (err=%d)\n",
+			wdt_miscdev.minor, rc);
 		goto err_out_region2;
+	}
 
 	rc = register_reboot_notifier(&wdt_notifier);
 	if (rc)
+	{
+		printk(KERN_ERR PFX "cannot register reboot notifier (err=%d)\n",
+			rc);
 		goto err_out_miscdev;
+	}
 
-	printk(KERN_INFO OUR_NAME ": WDT driver for W83877F initialised.\n");
-	
+	printk(KERN_INFO PFX "WDT driver for W83877F initialised.\n");
+
 	return 0;
 
 err_out_miscdev:
