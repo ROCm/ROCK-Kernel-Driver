@@ -196,7 +196,7 @@ struct acpi_namespace_node
 
 
 	union acpi_operand_object           *object;        /* Pointer to attached ACPI object (optional) */
-	struct acpi_namespace_node          *child;         /* first child */
+	struct acpi_namespace_node          *child;         /* First child */
 	struct acpi_namespace_node          *peer;          /* Next peer*/
 	u16                                 reference_count; /* Current count of references and children */
 	u8                                  flags;
@@ -476,10 +476,10 @@ struct acpi_scope_state
 struct acpi_pscope_state
 {
 	ACPI_STATE_COMMON
-	union acpi_parse_object             *op;                    /* current op being parsed */
-	u8                                  *arg_end;               /* current argument end */
-	u8                                  *pkg_end;               /* current package end */
-	u32                                 arg_list;               /* next argument to parse */
+	union acpi_parse_object             *op;                    /* Current op being parsed */
+	u8                                  *arg_end;               /* Current argument end */
+	u8                                  *pkg_end;               /* Current package end */
+	u32                                 arg_list;               /* Next argument to parse */
 	u32                                 arg_count;              /* Number of fixed arguments */
 };
 
@@ -585,11 +585,8 @@ struct acpi_opcode_info
 
 union acpi_parse_value
 {
-	acpi_integer                        integer;        /* integer constant (Up to 64 bits) */
+	acpi_integer                        integer;        /* Integer constant (Up to 64 bits) */
 	struct uint64_struct                integer64;      /* Structure overlay for 2 32-bit Dwords */
-	u32                                 integer32;      /* integer constant, 32 bits only */
-	u16                                 integer16;      /* integer constant, 16 bits only */
-	u8                                  integer8;       /* integer constant, 8 bits only */
 	u32                                 size;           /* bytelist or field size */
 	char                                *string;        /* NULL terminated string */
 	u8                                  *buffer;        /* buffer or string */
@@ -602,15 +599,15 @@ union acpi_parse_value
 	u8                                  data_type;      /* To differentiate various internal objs */\
 	u8                                  flags;          /* Type of Op */\
 	u16                                 aml_opcode;     /* AML opcode */\
-	u32                                 aml_offset;     /* offset of declaration in AML */\
-	union acpi_parse_object             *parent;        /* parent op */\
-	union acpi_parse_object             *next;          /* next op */\
+	u32                                 aml_offset;     /* Offset of declaration in AML */\
+	union acpi_parse_object             *parent;        /* Parent op */\
+	union acpi_parse_object             *next;          /* Next op */\
 	ACPI_DISASM_ONLY_MEMBERS (\
 	u8                                  disasm_flags;   /* Used during AML disassembly */\
 	u8                                  disasm_opcode;  /* Subtype used for disassembly */\
-	char                                aml_op_name[16]) /* op name (debug only) */\
+	char                                aml_op_name[16]) /* Op name (debug only) */\
 			   /* NON-DEBUG members below: */\
-	struct acpi_namespace_node          *node;          /* for use by interpreter */\
+	struct acpi_namespace_node          *node;          /* For use by interpreter */\
 	union acpi_parse_value              value;          /* Value or args associated with the opcode */\
 
 
@@ -691,14 +688,14 @@ union acpi_parse_object
 struct acpi_parse_state
 {
 	u32                                 aml_size;
-	u8                                  *aml_start;     /* first AML byte */
-	u8                                  *aml;           /* next AML byte */
+	u8                                  *aml_start;     /* First AML byte */
+	u8                                  *aml;           /* Next AML byte */
 	u8                                  *aml_end;       /* (last + 1) AML byte */
-	u8                                  *pkg_start;     /* current package begin */
-	u8                                  *pkg_end;       /* current package end */
-	union acpi_parse_object             *start_op;      /* root of parse tree */
+	u8                                  *pkg_start;     /* Current package begin */
+	u8                                  *pkg_end;       /* Current package end */
+	union acpi_parse_object             *start_op;      /* Root of parse tree */
 	struct acpi_namespace_node          *start_node;
-	union acpi_generic_state            *scope;         /* current scope */
+	union acpi_generic_state            *scope;         /* Current scope */
 	union acpi_parse_object             *start_scope;
 };
 

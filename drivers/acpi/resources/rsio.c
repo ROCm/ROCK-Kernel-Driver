@@ -106,7 +106,7 @@ acpi_rs_io_resource (
 	 * Check min_base Address
 	 */
 	buffer += 1;
-	ACPI_MOVE_UNALIGNED16_TO_16 (&temp16, buffer);
+	ACPI_MOVE_16_TO_16 (&temp16, buffer);
 
 	output_struct->data.io.min_base_address = temp16;
 
@@ -114,7 +114,7 @@ acpi_rs_io_resource (
 	 * Check max_base Address
 	 */
 	buffer += 2;
-	ACPI_MOVE_UNALIGNED16_TO_16 (&temp16, buffer);
+	ACPI_MOVE_16_TO_16 (&temp16, buffer);
 
 	output_struct->data.io.max_base_address = temp16;
 
@@ -196,7 +196,7 @@ acpi_rs_fixed_io_resource (
 	 * Check Range Base Address
 	 */
 	buffer += 1;
-	ACPI_MOVE_UNALIGNED16_TO_16 (&temp16, buffer);
+	ACPI_MOVE_16_TO_16 (&temp16, buffer);
 
 	output_struct->data.fixed_io.base_address = temp16;
 
@@ -270,7 +270,7 @@ acpi_rs_io_stream (
 	 */
 	temp16 = (u16) linked_list->data.io.min_base_address;
 
-	ACPI_MOVE_UNALIGNED16_TO_16 (buffer, &temp16);
+	ACPI_MOVE_16_TO_16 (buffer, &temp16);
 	buffer += 2;
 
 	/*
@@ -278,7 +278,7 @@ acpi_rs_io_stream (
 	 */
 	temp16 = (u16) linked_list->data.io.max_base_address;
 
-	ACPI_MOVE_UNALIGNED16_TO_16 (buffer, &temp16);
+	ACPI_MOVE_16_TO_16 (buffer, &temp16);
 	buffer += 2;
 
 	/*
@@ -347,7 +347,7 @@ acpi_rs_fixed_io_stream (
 	 */
 	temp16 = (u16) linked_list->data.fixed_io.base_address;
 
-	ACPI_MOVE_UNALIGNED16_TO_16 (buffer, &temp16);
+	ACPI_MOVE_16_TO_16 (buffer, &temp16);
 	buffer += 2;
 
 	/*

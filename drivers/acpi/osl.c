@@ -305,7 +305,7 @@ acpi_os_stall(u32 us)
 acpi_status
 acpi_os_read_port(
 	acpi_io_address	port,
-	void		*value,
+	u32		*value,
 	u32		width)
 {
 	u32 dummy;
@@ -334,7 +334,7 @@ acpi_os_read_port(
 acpi_status
 acpi_os_write_port(
 	acpi_io_address	port,
-	acpi_integer	value,
+	u32		value,
 	u32		width)
 {
 	switch (width)
@@ -358,7 +358,7 @@ acpi_os_write_port(
 acpi_status
 acpi_os_read_memory(
 	acpi_physical_address	phys_addr,
-	void			*value,
+	u32			*value,
 	u32			width)
 {
 	u32			dummy;
@@ -404,7 +404,7 @@ acpi_os_read_memory(
 acpi_status
 acpi_os_write_memory(
 	acpi_physical_address	phys_addr,
-	acpi_integer		value,
+	u32			value,
 	u32			width)
 {
 	void			*virt_addr;

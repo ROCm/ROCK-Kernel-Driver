@@ -164,15 +164,17 @@ void
 acpi_ex_get_buffer_datum(
 	acpi_integer                    *datum,
 	void                            *buffer,
+	u32                             buffer_length,
 	u32                             byte_granularity,
-	u32                             offset);
+	u32                             buffer_offset);
 
 void
 acpi_ex_set_buffer_datum (
 	acpi_integer                    merged_datum,
 	void                            *buffer,
+	u32                             buffer_length,
 	u32                             byte_granularity,
-	u32                             offset);
+	u32                             buffer_offset);
 
 acpi_status
 acpi_ex_read_data_from_field (
