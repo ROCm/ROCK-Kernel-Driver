@@ -366,60 +366,106 @@ EXPORT_SYMBOL(agp_unbind_memory);
 
 
 /* Generic Agp routines - Start */
+static void agp_v2_parse_one(u32 *mode, u32 *cmd, u32 *tmp)
+{
+	/* disable SBA if it's not supported */
+	if (!((*cmd & AGPSTAT_SBA) && (*tmp & AGPSTAT_SBA) && (*mode & AGPSTAT_SBA)))
+		*cmd &= ~AGPSTAT_SBA;
 
-u32 agp_collect_device_status(u32 mode, u32 command)
+	/* disable FW if it's not supported */
+	if (!((*cmd & AGPSTAT_FW) && (*tmp & AGPSTAT_FW) && (*mode & AGPSTAT_FW)))
+		*cmd &= ~AGPSTAT_FW;
+
+	/* Set speed */
+	if (!((*cmd & AGPSTAT2_4X) && (*tmp & AGPSTAT2_4X) && (*mode & AGPSTAT2_4X)))
+		*cmd &= ~AGPSTAT2_4X;
+
+	if (!((*cmd & AGPSTAT2_2X) && (*tmp & AGPSTAT2_2X) && (*mode & AGPSTAT2_2X)))
+		*cmd &= ~AGPSTAT2_2X;
+
+	if (!((*cmd & AGPSTAT2_1X) && (*tmp & AGPSTAT2_1X) && (*mode & AGPSTAT2_1X)))
+		*cmd &= ~AGPSTAT2_1X;
+
+	/* Now we know what mode it should be, clear out the unwanted bits. */
+	if (*cmd & AGPSTAT2_4X)
+		*cmd &= ~(AGPSTAT2_1X | AGPSTAT2_2X);	/* 4X */
+
+	if (*cmd & AGPSTAT2_2X)
+		*cmd &= ~(AGPSTAT2_1X | AGPSTAT2_4X);	/* 2X */
+
+	if (*cmd & AGPSTAT2_1X)
+		*cmd &= ~(AGPSTAT2_2X | AGPSTAT2_4X);	/* 1Xf */
+}
+
+
+static void agp_v3_parse_one(u32 *mode, u32 *cmd, u32 *tmp)
+{
+	/* ARQSZ - Set the value to the maximum one.
+	 * Don't allow the mode register to override values. */
+	*cmd = ((*cmd & ~AGPSTAT_ARQSZ) |
+		max_t(u32,(*cmd & AGPSTAT_ARQSZ),(*tmp & AGPSTAT_ARQSZ)));
+
+	/* Calibration cycle.
+	 * Don't allow the mode register to override values. */
+	*cmd = ((*cmd & ~AGPSTAT_CAL_MASK) |
+		min_t(u32,(*cmd & AGPSTAT_CAL_MASK),(*tmp & AGPSTAT_CAL_MASK)));
+
+	/* SBA *must* be supported for AGP v3 */
+	*cmd |= AGPSTAT_SBA;
+
+	/* disable FW if it's not supported */
+	if (!((*cmd & AGPSTAT_FW) && (*tmp & AGPSTAT_FW) && (*mode & AGPSTAT_FW)))
+		*cmd &= ~AGPSTAT_FW;
+
+	/* Set speed. */
+	if (!((*cmd & AGPSTAT3_8X) && (*tmp & AGPSTAT3_8X) && (*mode & AGPSTAT3_8X)))
+		*cmd &= ~AGPSTAT3_8X;
+
+	if (!((*cmd & AGPSTAT3_4X) && (*tmp & AGPSTAT3_4X) && (*mode & AGPSTAT3_4X)))
+		*cmd &= ~AGPSTAT3_4X;
+
+	/* Clear out unwanted bits. */
+	if (*cmd & AGPSTAT3_8X)
+		*cmd *= ~(AGPSTAT3_4X);
+	if (*cmd & AGPSTAT3_4X)
+		*cmd *= ~(AGPSTAT3_8X);
+}
+
+//FIXME: This doesn't smell right.
+//We need a function we pass an agp_device to.
+u32 agp_collect_device_status(u32 mode, u32 cmd)
 {
 	struct pci_dev *device;
-	u8 agp;
-	u32 scratch; 
+	u8 cap_ptr;
+	u32 tmp;
+	u32 agp3;
 
 	pci_for_each_dev(device) {
-		agp = pci_find_capability(device, PCI_CAP_ID_AGP);
-		if (!agp)
+		cap_ptr = pci_find_capability(device, PCI_CAP_ID_AGP);
+		if (!cap_ptr)
 			continue;
 
 		/*
 		 * Ok, here we have a AGP device. Disable impossible 
 		 * settings, and adjust the readqueue to the minimum.
 		 */
-		pci_read_config_dword(device, agp + PCI_AGP_STATUS, &scratch);
+		pci_read_config_dword(device, cap_ptr+PCI_AGP_STATUS, &tmp);
 
 		/* adjust RQ depth */
-		command = ((command & ~AGPSTAT_RQ_DEPTH) |
+		cmd = ((cmd & ~AGPSTAT_RQ_DEPTH) |
 		     min_t(u32, (mode & AGPSTAT_RQ_DEPTH),
-			 min_t(u32, (command & AGPSTAT_RQ_DEPTH),
-			     (scratch & AGPSTAT_RQ_DEPTH))));
+			 min_t(u32, (cmd & AGPSTAT_RQ_DEPTH), (tmp & AGPSTAT_RQ_DEPTH))));
+		
+		pci_read_config_dword(device, cap_ptr+AGPSTAT, &agp3);
 
-		/* disable SBA if it's not supported */
-		if (!((command & AGPSTAT_SBA) && (scratch & AGPSTAT_SBA) && (mode & AGPSTAT_SBA)))
-			command &= ~AGPSTAT_SBA;
-
-		/* disable FW if it's not supported */
-		if (!((command & AGPSTAT_FW) && (scratch & AGPSTAT_FW) && (mode & AGPSTAT_FW)))
-			command &= ~AGPSTAT_FW;
-
-		/* Set speed */
-		if (!((command & AGPSTAT2_4X) && (scratch & AGPSTAT2_4X) && (mode & AGPSTAT2_4X)))
-			command &= ~AGPSTAT2_4X;
-
-		if (!((command & AGPSTAT2_2X) && (scratch & AGPSTAT2_2X) && (mode & AGPSTAT2_2X)))
-			command &= ~AGPSTAT2_2X;
-
-		if (!((command & AGPSTAT2_1X) && (scratch & AGPSTAT2_1X) && (mode & AGPSTAT2_1X)))
-			command &= ~AGPSTAT2_1X;
+		/* Check to see if we are operating in 3.0 mode */
+		if (agp3 & AGPSTAT_MODE_3_0) {
+			agp_v3_parse_one(&mode, &cmd, &tmp);
+		} else {
+			agp_v2_parse_one(&mode, &cmd, &tmp);
+		}
 	}
-
-	/* Now we know what mode it should be, clear out the unwanted bits. */
-	if (command & AGPSTAT2_4X)
-		command &= ~(AGPSTAT2_1X | AGPSTAT2_2X);	/* 4X */
-
-	if (command & AGPSTAT2_2X)
-		command &= ~(AGPSTAT2_1X | AGPSTAT2_4X);	/* 2X */
-
-	if (command & AGPSTAT2_1X)
-		command &= ~(AGPSTAT2_2X | AGPSTAT2_4X);	/* 1Xf */
-
-	return command;
+	return cmd;
 }
 EXPORT_SYMBOL(agp_collect_device_status);
 
@@ -461,38 +507,18 @@ void get_agp_version(struct agp_bridge_data *bridge)
 EXPORT_SYMBOL(get_agp_version);
 
 
-static int agp_3_0_enable(struct agp_bridge_data *bridge, u32 mode)
-{
-	return 0;
-}
-
-
 void agp_generic_enable(u32 mode)
 {
 	u32 command;
+	u32 agp3;
 
 	get_agp_version(agp_bridge);
 
-	printk(KERN_INFO PFX "Found an AGP %d.%d compliant device.\n",
-				agp_bridge->major_version, agp_bridge->minor_version);
+	printk(KERN_INFO PFX "Found an AGP %d.%d compliant device at %s.\n",
+				agp_bridge->major_version,
+				agp_bridge->minor_version,
+				agp_bridge->dev->slot_name);
 
-	if(agp_bridge->major_version >= 3) {
-		u32 agp_3_0;
-
-		pci_read_config_dword(agp_bridge->dev, agp_bridge->capndx + 0x4, &agp_3_0);
-		/* Check to see if we are operating in 3.0 mode */
-		if((agp_3_0 >> 3) & 0x1) {
-			if (agp_bridge->minor_version < 5)
-				agp_3_0_enable(agp_bridge, mode);
-			else
-				agp_3_5_enable(agp_bridge, mode);
-			return;
-		} else {
-			printk (KERN_INFO PFX "not in AGP 3.0 mode, falling back to 2.x\n");
-		}
-	}
-
-	/* AGP v<3 */
 	pci_read_config_dword(agp_bridge->dev,
 		      agp_bridge->capndx + PCI_AGP_STATUS, &command);
 
@@ -501,7 +527,27 @@ void agp_generic_enable(u32 mode)
 
 	pci_write_config_dword(agp_bridge->dev,
 		       agp_bridge->capndx + PCI_AGP_COMMAND, command);
-	agp_device_command(command, 0);
+
+	/* Do AGP version specific frobbing. */
+	if(agp_bridge->major_version >= 3) {
+		pci_read_config_dword(agp_bridge->dev,
+			agp_bridge->capndx+AGPSTAT, &agp3);
+
+		/* Check to see if we are operating in 3.0 mode */
+		if (agp3 & AGPSTAT_MODE_3_0) {
+			/* If we have 3.5, we can do the isoch stuff. */
+			if (agp_bridge->minor_version >= 5)
+				agp_3_5_enable(agp_bridge, mode);
+			agp_device_command(command, TRUE);
+			return;
+		} else {
+			printk (KERN_INFO PFX "Device is in legacy mode,"
+				" falling back to 2.x\n");
+		}
+	}
+
+	/* AGP v<3 */
+	agp_device_command(command, FALSE);
 }
 EXPORT_SYMBOL(agp_generic_enable);
 

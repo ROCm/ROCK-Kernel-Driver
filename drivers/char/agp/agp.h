@@ -405,14 +405,20 @@ void get_agp_version(struct agp_bridge_data *bridge);
 
 #define AGPSTAT_RQ_DEPTH	(0xff000000)
 
+#define AGPSTAT_CAL_MASK	(1<<12|1<<11|1<<10)
+#define AGPSTAT_ARQSZ		(1<<15|1<<14|1<<13)
 #define AGPSTAT_ARQSZ_SHIFT	13
 
 #define AGPSTAT_AGP_ENABLE	(1<<8)
 #define AGPSTAT_SBA		(1<<9)
+#define AGPSTAT_MODE_3_0	(1<<3)
 
 #define AGPSTAT2_1X		(1<<0)
 #define AGPSTAT2_2X		(1<<1)
 #define AGPSTAT2_4X		(1<<2)
+#define AGPSTAT3_8X		(1<<1)
+#define AGPSTAT3_4X		(1)
+
 #define AGPSTAT_FW		(1<<4)
 
 #endif				/* _AGP_BACKEND_PRIV_H */
