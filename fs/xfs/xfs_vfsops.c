@@ -1579,7 +1579,7 @@ xfs_syncsub(
 }
 
 /*
- * xfs_vget - called by DMAPI to get vnode from file handle
+ * xfs_vget - called by DMAPI and NFSD to get vnode from file handle
  */
 STATIC int
 xfs_vget(
@@ -1621,7 +1621,7 @@ xfs_vget(
 		return XFS_ERROR(EIO);
 	}
 
-	if (ip->i_d.di_mode == 0 || (igen && (ip->i_d.di_gen != igen))) {
+	if (ip->i_d.di_mode == 0 || ip->i_d.di_gen != igen) {
 		xfs_iput_new(ip, XFS_ILOCK_SHARED);
 		*vpp = NULL;
 		return XFS_ERROR(ENOENT);
