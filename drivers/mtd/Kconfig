@@ -1,4 +1,4 @@
-# $Id: Kconfig,v 1.6 2004/08/09 13:19:42 dwmw2 Exp $
+# $Id: Kconfig,v 1.7 2004/11/22 11:33:56 ijc Exp $
 
 menu "Memory Technology Devices (MTD)"
 
@@ -54,8 +54,8 @@ config MTD_REDBOOT_PARTS
 	depends on MTD_PARTITIONS
 	---help---
 	  RedBoot is a ROM monitor and bootloader which deals with multiple
-	  'images' in flash devices by putting a table in the last erase
-	  block of the device, similar to a partition table, which gives
+	  'images' in flash devices by putting a table one of the erase
+	  blocks on the device, similar to a partition table, which gives
 	  the offsets, lengths and names of all the images stored in the
 	  flash.
 
@@ -68,6 +68,23 @@ config MTD_REDBOOT_PARTS
 	  SA1100 map driver (CONFIG_MTD_SA1100) has an option for this, for 
 	  example.
 
+config MTD_REDBOOT_DIRECTORY_BLOCK
+	int "Location of RedBoot partition table"
+	depends on MTD_REDBOOT_PARTS
+	default "-1"
+	---help---
+	  This option is the Linux counterpart to the
+	  CYGNUM_REDBOOT_FIS_DIRECTORY_BLOCK RedBoot compile time
+	  option.
+
+	  The option specifies which Flash sectors holds the RedBoot
+	  partition table.  A zero or positive value gives an absolete
+	  erase block number. A negative value specifies a number of
+	  sectors before the end of the device.
+	  
+	  For example "2" means block number 2, "-1" means the last
+	  block and "-2" means the penultimate block.
+	  
 config MTD_REDBOOT_PARTS_UNALLOCATED
 	bool "  Include unallocated flash regions"
 	depends on MTD_REDBOOT_PARTS
