@@ -239,12 +239,17 @@ static void change_speed (unsigned int index)
 		__asm__("\tcli\n");
 	rdmsrl (MSR_K7_FID_VID_CTL, fidvidctl.val);
 	fidvidctl.bits.SGTC = latency;	/* Stop grant timeout counter */
+
 	fidvidctl.bits.FID = fid;
-	fidvidctl.bits.VID = vid;
-	/* Note, we could set these lazily. Ie, only do voltage transition
-	   if its changed since last time (Some speeds have the same voltage) */
 	fidvidctl.bits.FIDC = 1;
-	fidvidctl.bits.VIDC = 1;
+
+	/* Set the voltage lazily. Ie, only do voltage transition
+	   if its changed since last time (Some speeds have the same voltage) */
+	if (fidvidctl.bits.VID != vid) {
+		fidvidctl.bits.VID = vid;
+		fidvidctl.bits.VIDC = 1;
+	}
+
 	wrmsrl (MSR_K7_FID_VID_CTL, fidvidctl.val);
 	if (have_a0 == 1)
 		__asm__("\tsti\n");

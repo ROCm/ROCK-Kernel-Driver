@@ -558,25 +558,25 @@ void pnp_init_resource_table(struct pnp_resource_table *table)
 		table->irq_resource[idx].name = NULL;
 		table->irq_resource[idx].start = -1;
 		table->irq_resource[idx].end = -1;
-		table->irq_resource[idx].flags = 0;
+		table->irq_resource[idx].flags = IORESOURCE_AUTO;
 	}
 	for (idx = 0; idx < PNP_MAX_DMA; idx++) {
 		table->dma_resource[idx].name = NULL;
 		table->dma_resource[idx].start = -1;
 		table->dma_resource[idx].end = -1;
-		table->dma_resource[idx].flags = 0;
+		table->dma_resource[idx].flags = IORESOURCE_AUTO;
 	}
 	for (idx = 0; idx < PNP_MAX_PORT; idx++) {
 		table->port_resource[idx].name = NULL;
 		table->port_resource[idx].start = 0;
 		table->port_resource[idx].end = 0;
-		table->port_resource[idx].flags = 0;
+		table->port_resource[idx].flags = IORESOURCE_AUTO;
 	}
 	for (idx = 0; idx < PNP_MAX_MEM; idx++) {
 		table->mem_resource[idx].name = NULL;
 		table->mem_resource[idx].start = 0;
 		table->mem_resource[idx].end = 0;
-		table->mem_resource[idx].flags = 0;
+		table->mem_resource[idx].flags = IORESOURCE_AUTO;
 	}
 }
 

@@ -11,18 +11,6 @@
  * 32 bit structures for IA32 support.
  */
 
-struct ia32_flock64 {
-	short  l_type;
-	short  l_whence;
-	loff_t l_start;  /* unnatural alignment */
-	loff_t l_len;
-	pid_t  l_pid;
-} __attribute__((packed));
-
-#define F_GETLK64	12	/*  using 'struct flock64' */
-#define F_SETLK64	13
-#define F_SETLKW64	14
-
 #include <asm/sigcontext32.h>
 
 /* signal.h */
@@ -155,6 +143,13 @@ struct ustat32 {
 
 #define IA32_PAGE_OFFSET 0xffffe000
 #define IA32_STACK_TOP IA32_PAGE_OFFSET
+
+#ifdef __KERNEL__
+struct user_desc;
+int do_get_thread_area(struct thread_struct *t, struct user_desc *u_info);
+int do_set_thread_area(struct thread_struct *t, struct user_desc *u_info);
+int ia32_child_tls(struct task_struct *p, struct pt_regs *childregs);
+#endif
 
 #endif /* !CONFIG_IA32_SUPPORT */
  

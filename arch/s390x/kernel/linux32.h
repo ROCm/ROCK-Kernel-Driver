@@ -21,10 +21,6 @@ struct ipc_kludge_32 {
         __s32   msgtyp;
 };
 
-#define F_GETLK64       12
-#define F_SETLK64       13
-#define F_SETLKW64      14    
-
 struct old_sigaction32 {
        __u32			sa_handler;	/* Really a pointer, but need to deal with 32 bits */
        compat_old_sigset_t	sa_mask;	/* A 32 bit mask */

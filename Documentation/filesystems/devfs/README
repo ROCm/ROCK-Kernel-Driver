@@ -1466,13 +1466,6 @@ The simplest option (especially when porting drivers to devfs) is to
 keep using the old major and minor numbers. Devfs will take whatever
 values are given for major&minor and pass them onto userspace.
 
-Alternatively, you can have devfs choose unique device numbers for
-you. When you register a character or block device using
-devfs_register you can provide the optional
-DEVFS_FL_AUTO_DEVNUM flag, which will then automatically allocate a
-unique device number (the allocation is separated for the character
-and block devices).
-
 This device number is a 16 bit number, so this leaves plenty of space
 for large numbers of discs and partitions. This scheme can also be
 used for character devices, in particular the tty devices, which are

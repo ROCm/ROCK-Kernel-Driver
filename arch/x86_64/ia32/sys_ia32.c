@@ -1016,102 +1016,6 @@ sys32_getrusage(int who, struct rusage32 *ru)
 	return ret;
 }
 
-extern asmlinkage long sys_fcntl(unsigned int fd, unsigned int cmd, unsigned long arg);
-asmlinkage long sys32_fcntl64(unsigned int fd, unsigned int cmd, unsigned long arg);
-
-
-asmlinkage long sys32_fcntl(unsigned int fd, unsigned int cmd, unsigned long arg)
-{
-	switch (cmd) {
-	case F_GETLK:
-	case F_SETLK:
-	case F_SETLKW:
-		{
-			struct flock f;
-			mm_segment_t old_fs;
-			long ret;
-			
-			if (get_compat_flock(&f, (struct compat_flock *)arg))
-				return -EFAULT;
-			old_fs = get_fs(); set_fs (KERNEL_DS);
-			ret = sys_fcntl(fd, cmd, (unsigned long)&f);
-			set_fs (old_fs);
-			if (ret) return ret;
-			if (put_compat_flock(&f, (struct compat_flock *)arg))
-				return -EFAULT;
-			return 0;
-		}
-	case F_GETLK64: 
-	case F_SETLK64: 
-	case F_SETLKW64: 
-		return sys32_fcntl64(fd,cmd,arg); 
-
-	default:
-		return sys_fcntl(fd, cmd, (unsigned long)arg);
-	}
-}
-
-static inline int get_flock64(struct ia32_flock64 *fl32, struct flock *fl64)
-{
-	if (access_ok(fl32, sizeof(struct ia32_flock64), VERIFY_WRITE)) {
-		int ret = __get_user(fl64->l_type, &fl32->l_type); 
-		ret |= __get_user(fl64->l_whence, &fl32->l_whence);
-		ret |= __get_user(fl64->l_start, &fl32->l_start); 
-		ret |= __get_user(fl64->l_len, &fl32->l_len); 
-		ret |= __get_user(fl64->l_pid, &fl32->l_pid); 
-		return ret; 
-		}
-	return -EFAULT; 
-}
-
-static inline int put_flock64(struct ia32_flock64 *fl32, struct flock *fl64)
-{
-	if (access_ok(fl32, sizeof(struct ia32_flock64), VERIFY_WRITE)) {
-		int ret = __put_user(fl64->l_type, &fl32->l_type); 
-		ret |= __put_user(fl64->l_whence, &fl32->l_whence);
-		ret |= __put_user(fl64->l_start, &fl32->l_start); 
-		ret |= __put_user(fl64->l_len, &fl32->l_len); 
-		ret |= __put_user(fl64->l_pid, &fl32->l_pid); 
-		return ret; 
-	}
-	return -EFAULT; 
-}
-
-asmlinkage long sys32_fcntl64(unsigned int fd, unsigned int cmd, unsigned long arg)
-{
-	struct flock fl64;  
-	mm_segment_t oldfs = get_fs(); 
-	int ret = 0; 
-	int oldcmd = cmd;
-	unsigned long oldarg = arg;
-
-	switch (cmd) {
-	case F_GETLK64: 
-		cmd = F_GETLK; 
-		goto cnv;
-	case F_SETLK64: 
-		cmd = F_SETLK; 
-		goto cnv; 
-	case F_SETLKW64:
-		cmd = F_SETLKW; 
-	cnv:
-		ret = get_flock64((struct ia32_flock64 *)arg, &fl64); 
-		arg = (unsigned long)&fl64; 
-		set_fs(KERNEL_DS); 
-		break; 
-	case F_GETLK:
-	case F_SETLK:
-	case F_SETLKW:
-		return sys32_fcntl(fd,cmd,arg); 
-	}
-	if (!ret)
-		ret = sys_fcntl(fd, cmd, arg);
-	set_fs(oldfs); 
-	if (oldcmd == F_GETLK64 && !ret)
-		ret = put_flock64((struct ia32_flock64 *)oldarg, &fl64); 
-	return ret; 
-}
-
 int sys32_ni_syscall(int call)
 { 
 	printk(KERN_INFO "IA32 syscall %d from %s not implemented\n", call,
@@ -1261,8 +1165,8 @@ siginfo64to32(siginfo_t32 *d, siginfo_t *s)
 	if (s->si_signo >= SIGRTMIN) {
 		d->si_pid = s->si_pid;
 		d->si_uid = s->si_uid;
-		/* XXX: Ouch, how to find this out??? */
-		d->si_int = s->si_int;
+		memcpy(&d->si_int, &s->si_int, 
+                       sizeof(siginfo_t) - offsetof(siginfo_t,si_int));
 	} else switch (s->si_signo) {
 	/* XXX: What about POSIX1.b timers */
 	case SIGCHLD:
@@ -1299,8 +1203,9 @@ siginfo32to64(siginfo_t *d, siginfo_t32 *s)
 	if (s->si_signo >= SIGRTMIN) {
 		d->si_pid = s->si_pid;
 		d->si_uid = s->si_uid;
-		/* XXX: Ouch, how to find this out??? */
-		d->si_int = s->si_int;
+		memcpy(&d->si_int,
+                       &s->si_int,
+                       sizeof(siginfo_t) - offsetof(siginfo_t, si_int)); 
 	} else switch (s->si_signo) {
 	/* XXX: What about POSIX1.b timers */
 	case SIGCHLD:

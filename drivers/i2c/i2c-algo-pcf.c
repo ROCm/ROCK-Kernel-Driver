@@ -49,7 +49,6 @@
 /* module parameters:
  */
 static int i2c_debug=0;
-static int pcf_scan=0;	/* have a look at what's hanging 'round		*/
 
 /* --- setting states on the bus with the right timing: ---------------	*/
 
@@ -423,12 +422,6 @@ static int pcf_xfer(struct i2c_adapter *i2c_adap,
 	return (i);
 }
 
-static int algo_control(struct i2c_adapter *adapter, 
-	unsigned int cmd, unsigned long arg)
-{
-	return 0;
-}
-
 static u32 pcf_func(struct i2c_adapter *adap)
 {
 	return I2C_FUNC_SMBUS_EMUL | I2C_FUNC_10BIT_ADDR | 
@@ -438,14 +431,10 @@ static u32 pcf_func(struct i2c_adapter *adap)
 /* -----exported algorithm data: -------------------------------------	*/
 
 static struct i2c_algorithm pcf_algo = {
-	"PCF8584 algorithm",
-	I2C_ALGO_PCF,
-	pcf_xfer,
-	NULL,
-	NULL,				/* slave_xmit		*/
-	NULL,				/* slave_recv		*/
-	algo_control,			/* ioctl		*/
-	pcf_func,			/* functionality	*/
+	.name		= "PCF8584 algorithm",
+	.id		= I2C_ALGO_PCF,
+	.master_xfer	= pcf_xfer,
+	.functionality	= pcf_func,
 };
 
 /* 
@@ -453,8 +442,8 @@ static struct i2c_algorithm pcf_algo = {
  */
 int i2c_pcf_add_bus(struct i2c_adapter *adap)
 {
-	int i, status;
 	struct i2c_algo_pcf_data *pcf_adap = adap->algo_data;
+	int rval;
 
 	DEB2(printk(KERN_DEBUG "i2c-algo-pcf.o: hw routines for %s registered.\n",
 	            adap->name));
@@ -467,36 +456,10 @@ int i2c_pcf_add_bus(struct i2c_adapter *adap)
 	adap->timeout = 100;		/* default values, should	*/
 	adap->retries = 3;		/* be replaced by defines	*/
 
-	if ((i = pcf_init_8584(pcf_adap))) {
-		return i;
-	}
-
-	i2c_add_adapter(adap);
-
-	/* scan bus */
-	if (pcf_scan) {
-		printk(KERN_INFO " i2c-algo-pcf.o: scanning bus %s.\n",
-		       adap->name);
-		for (i = 0x00; i < 0xff; i+=2) {
-			if (wait_for_bb(pcf_adap)) {
-    			printk(KERN_INFO " i2c-algo-pcf.o: scanning bus %s - TIMEOUTed.\n",
-		           adap->name);
-			    break;
-			}
-			i2c_outb(pcf_adap, i);
-			i2c_start(pcf_adap);
-			if ((wait_for_pin(pcf_adap, &status) >= 0) && 
-			    ((status & I2C_PCF_LRB) == 0)) { 
-				printk("(%02x)",i>>1); 
-			} else {
-				printk("."); 
-			}
-			i2c_stop(pcf_adap);
-			udelay(pcf_adap->udelay);
-		}
-		printk("\n");
-	}
-	return 0;
+	rval = pcf_init_8584(pcf_adap);
+	if (!rval)
+		i2c_add_adapter(adap);
+	return rval;
 }
 
 
@@ -512,9 +475,6 @@ MODULE_AUTHOR("Hans Berglund <hb@spacetec.no>");
 MODULE_DESCRIPTION("I2C-Bus PCF8584 algorithm");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(pcf_scan, "i");
 MODULE_PARM(i2c_debug,"i");
-
-MODULE_PARM_DESC(pcf_scan, "Scan for active chips on the bus");
 MODULE_PARM_DESC(i2c_debug,
         "debug level - 0 off; 1 normal; 2,3 more verbose; 9 pcf-protocol");

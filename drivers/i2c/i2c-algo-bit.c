@@ -41,27 +41,13 @@
 #define DEBPROTO(x) if (i2c_debug>=9) { x; }
  	/* debug the protocol by showing transferred bits */
 
-/* debugging - slow down transfer to have a look at the data .. 	*/
-/* I use this with two leds&resistors, each one connected to sda,scl 	*/
-/* respectively. This makes sure that the algorithm works. Some chips   */
-/* might not like this, as they have an internal timeout of some mils	*/
-/*
-#define SLO_IO      jif=jiffies;while(time_before_eq(jiffies, jif+i2c_table[minor].veryslow))\
-                        cond_resched();
-*/
-
 
 /* ----- global variables ---------------------------------------------	*/
-
-#ifdef SLO_IO
-	int jif;
-#endif
 
 /* module parameters:
  */
 static int i2c_debug;
 static int bit_test;	/* see if the line-setting functions work	*/
-static int bit_scan;	/* have a look at what's hanging 'round		*/
 
 /* --- setting states on the bus with the right timing: ---------------	*/
 
@@ -86,9 +72,6 @@ static inline void scllo(struct i2c_algo_bit_data *adap)
 {
 	setscl(adap,0);
 	udelay(adap->udelay);
-#ifdef SLO_IO
-	SLO_IO
-#endif
 }
 
 /*
@@ -97,32 +80,28 @@ static inline void scllo(struct i2c_algo_bit_data *adap)
  */
 static inline int sclhi(struct i2c_algo_bit_data *adap)
 {
-	int start=jiffies;
+	unsigned long start;
 
 	setscl(adap,1);
-
-	udelay(adap->udelay);
 
 	/* Not all adapters have scl sense line... */
 	if (adap->getscl == NULL )
 		return 0;
 
- 	while (! getscl(adap) ) {	
+	start=jiffies;
+	while (! getscl(adap) ) {	
  		/* the hw knows how to read the clock line,
  		 * so we wait until it actually gets high.
  		 * This is safer as some chips may hold it low
  		 * while they are processing data internally. 
  		 */
-		setscl(adap,1);
 		if (time_after_eq(jiffies, start+adap->timeout)) {
 			return -ETIMEDOUT;
 		}
 		cond_resched();
 	}
 	DEBSTAT(printk(KERN_DEBUG "needed %ld jiffies\n", jiffies-start));
-#ifdef SLO_IO
-	SLO_IO
-#endif
+	udelay(adap->udelay);
 	return 0;
 } 
 
@@ -175,7 +154,6 @@ static int i2c_outb(struct i2c_adapter *i2c_adap, char c)
 	struct i2c_algo_bit_data *adap = i2c_adap->algo_data;
 
 	/* assert: scl is low */
-	DEB2(printk(KERN_DEBUG " i2c_outb:%2.2X\n",c&0xff));
 	for ( i=7 ; i>=0 ; i-- ) {
 		sb = c & ( 1 << i );
 		setsda(adap,sb);
@@ -183,6 +161,7 @@ static int i2c_outb(struct i2c_adapter *i2c_adap, char c)
 		DEBPROTO(printk(KERN_DEBUG "%d",sb!=0));
 		if (sclhi(adap)<0) { /* timed out */
 			sdahi(adap); /* we don't want to block the net */
+			DEB2(printk(KERN_DEBUG " i2c_outb: 0x%02x, timeout at bit #%d\n", c&0xff, i));
 			return -ETIMEDOUT;
 		};
 		/* do arbitration here: 
@@ -193,11 +172,12 @@ static int i2c_outb(struct i2c_adapter *i2c_adap, char c)
 	}
 	sdahi(adap);
 	if (sclhi(adap)<0){ /* timeout */
-		return -ETIMEDOUT;
+	    DEB2(printk(KERN_DEBUG " i2c_outb: 0x%02x, timeout at ack\n", c&0xff));
+	    return -ETIMEDOUT;
 	};
 	/* read ack: SDA should be pulled down by slave */
 	ack=getsda(adap);	/* ack: sda is pulled low ->success.	 */
-	DEB2(printk(KERN_DEBUG " i2c_outb: getsda() =  0x%2.2x\n", ~ack ));
+	DEB2(printk(KERN_DEBUG " i2c_outb: 0x%02x , getsda() = %d\n", c & 0xff, ack));
 
 	DEBPROTO( printk(KERN_DEBUG "[%2.2x]",c&0xff) );
 	DEBPROTO(if (0==ack){ printk(KERN_DEBUG " A ");} else printk(KERN_DEBUG " NA ") );
@@ -216,11 +196,10 @@ static int i2c_inb(struct i2c_adapter *i2c_adap)
 	struct i2c_algo_bit_data *adap = i2c_adap->algo_data;
 
 	/* assert: scl is low */
-	DEB2(printk(KERN_DEBUG "i2c_inb.\n"));
-
 	sdahi(adap);
 	for (i=0;i<8;i++) {
 		if (sclhi(adap)<0) { /* timeout */
+			DEB2(printk(KERN_DEBUG " i2c_inb: timeout at bit #%d\n", 7-i));
 			return -ETIMEDOUT;
 		};
 		indata *= 2;
@@ -229,7 +208,9 @@ static int i2c_inb(struct i2c_adapter *i2c_adap)
 		scllo(adap);
 	}
 	/* assert: scl is low */
-	DEBPROTO(printk(KERN_DEBUG " %2.2x", indata & 0xff));
+	DEB2(printk(KERN_DEBUG "i2c_inb: 0x%02x\n", indata & 0xff));
+
+	DEBPROTO(printk(KERN_DEBUG " 0x%02x", indata & 0xff));
 	return (int) (indata & 0xff);
 }
 
@@ -337,30 +318,35 @@ static inline int try_address(struct i2c_adapter *i2c_adap,
 		i2c_start(adap);
 		udelay(adap->udelay);
 	}
-	DEB2(if (i) printk(KERN_DEBUG "i2c-algo-bit.o: needed %d retries for %d\n",
-	                   i,addr));
+	DEB2(if (i)
+	     printk(KERN_DEBUG "i2c-algo-bit.o: Used %d tries to %s client at 0x%02x : %s\n",
+		    i+1, addr & 1 ? "read" : "write", addr>>1,
+		    ret==1 ? "success" : ret==0 ? "no ack" : "failed, timeout?" )
+	    );
 	return ret;
 }
 
-static int sendbytes(struct i2c_adapter *i2c_adap,const char *buf, int count)
+static int sendbytes(struct i2c_adapter *i2c_adap, struct i2c_msg *msg)
 {
 	struct i2c_algo_bit_data *adap = i2c_adap->algo_data;
 	char c;
-	const char *temp = buf;
+	const char *temp = msg->buf;
+	int count = msg->len;
+	unsigned short nak_ok = msg->flags & I2C_M_IGNORE_NAK; 
 	int retval;
 	int wrcount=0;
 
 	while (count > 0) {
 		c = *temp;
-		DEB2(printk(KERN_DEBUG "i2c-algo-bit.o: %s i2c_write: writing %2.2X\n",
+		DEB2(printk(KERN_DEBUG "i2c-algo-bit.o: %s sendbytes: writing %2.2X\n",
 			    i2c_adap->name, c&0xff));
 		retval = i2c_outb(i2c_adap,c);
-		if (retval>0) {
+		if ((retval>0) || (nak_ok && (retval==0)))  { /* ok or ignored NAK */
 			count--; 
 			temp++;
 			wrcount++;
 		} else { /* arbitration or no acknowledge */
-			printk(KERN_ERR "i2c-algo-bit.o: %s i2c_write: error - bailout.\n",
+			printk(KERN_ERR "i2c-algo-bit.o: %s sendbytes: error - bailout.\n",
 			       i2c_adap->name);
 			i2c_stop(adap);
 			return (retval<0)? retval : -EFAULT;
@@ -374,12 +360,13 @@ static int sendbytes(struct i2c_adapter *i2c_adap,const char *buf, int count)
 	return wrcount;
 }
 
-static inline int readbytes(struct i2c_adapter *i2c_adap,char *buf,int count)
+static inline int readbytes(struct i2c_adapter *i2c_adap, struct i2c_msg *msg)
 {
-	char *temp = buf;
 	int inval;
 	int rdcount=0;   	/* counts bytes read */
 	struct i2c_algo_bit_data *adap = i2c_adap->algo_data;
+	char *temp = msg->buf;
+	int count = msg->len;
 
 	while (count > 0) {
 		inval = i2c_inb(i2c_adap);
@@ -388,7 +375,7 @@ static inline int readbytes(struct i2c_adapter *i2c_adap,char *buf,int count)
 			*temp = inval;
 			rdcount++;
 		} else {   /* read timed out */
-			printk(KERN_ERR "i2c-algo-bit.o: i2c_read: i2c_inb timed out.\n");
+			printk(KERN_ERR "i2c-algo-bit.o: readbytes: i2c_inb timed out.\n");
 			break;
 		}
 
@@ -401,7 +388,7 @@ static inline int readbytes(struct i2c_adapter *i2c_adap,char *buf,int count)
 		}
 		if (sclhi(adap)<0) {	/* timeout */
 			sdahi(adap);
-			printk(KERN_ERR "i2c-algo-bit.o: i2c_read: Timeout at ack\n");
+			printk(KERN_ERR "i2c-algo-bit.o: readbytes: Timeout at ack\n");
 			return -ETIMEDOUT;
 		};
 		scllo(adap);
@@ -416,31 +403,34 @@ static inline int readbytes(struct i2c_adapter *i2c_adap,char *buf,int count)
  * try_address) and transmits the address in the necessary format to handle
  * reads, writes as well as 10bit-addresses.
  * returns:
- *  0 everything went okay, the chip ack'ed
+ *  0 everything went okay, the chip ack'ed, or IGNORE_NAK flag was set
  * -x an error occurred (like: -EREMOTEIO if the device did not answer, or
  *	-ETIMEDOUT, for example if the lines are stuck...) 
  */
-static inline int bit_doAddress(struct i2c_adapter *i2c_adap,
-                                struct i2c_msg *msg, int retries) 
+static inline int bit_doAddress(struct i2c_adapter *i2c_adap, struct i2c_msg *msg) 
 {
 	unsigned short flags = msg->flags;
+	unsigned short nak_ok = msg->flags & I2C_M_IGNORE_NAK;
 	struct i2c_algo_bit_data *adap = i2c_adap->algo_data;
 
 	unsigned char addr;
-	int ret;
+	int ret, retries;
+
+	retries = nak_ok ? 0 : i2c_adap->retries;
+	
 	if ( (flags & I2C_M_TEN)  ) { 
 		/* a ten bit address */
 		addr = 0xf0 | (( msg->addr >> 7) & 0x03);
 		DEB2(printk(KERN_DEBUG "addr0: %d\n",addr));
 		/* try extended address code...*/
 		ret = try_address(i2c_adap, addr, retries);
-		if (ret!=1) {
+		if ((ret != 1) && !nak_ok)  {
 			printk(KERN_ERR "died at extended address code.\n");
 			return -EREMOTEIO;
 		}
 		/* the remaining 8 bit address */
 		ret = i2c_outb(i2c_adap,msg->addr & 0x7f);
-		if (ret != 1) {
+		if ((ret != 1) && !nak_ok) {
 			/* the chip did not ack / xmission error occurred */
 			printk(KERN_ERR "died at 2nd address code.\n");
 			return -EREMOTEIO;
@@ -450,7 +440,7 @@ static inline int bit_doAddress(struct i2c_adapter *i2c_adap,
 			/* okay, now switch into reading mode */
 			addr |= 0x01;
 			ret = try_address(i2c_adap, addr, retries);
-			if (ret!=1) {
+			if ((ret!=1) && !nak_ok) {
 				printk(KERN_ERR "died at extended address code.\n");
 				return -EREMOTEIO;
 			}
@@ -462,10 +452,10 @@ static inline int bit_doAddress(struct i2c_adapter *i2c_adap,
 		if (flags & I2C_M_REV_DIR_ADDR )
 			addr ^= 1;
 		ret = try_address(i2c_adap, addr, retries);
-		if (ret!=1) {
+		if ((ret!=1) && !nak_ok)
 			return -EREMOTEIO;
-		}
 	}
+
 	return 0;
 }
 
@@ -476,31 +466,33 @@ static int bit_xfer(struct i2c_adapter *i2c_adap,
 	struct i2c_algo_bit_data *adap = i2c_adap->algo_data;
 	
 	int i,ret;
+	unsigned short nak_ok;
 
 	i2c_start(adap);
 	for (i=0;i<num;i++) {
 		pmsg = &msgs[i];
+		nak_ok = pmsg->flags & I2C_M_IGNORE_NAK; 
 		if (!(pmsg->flags & I2C_M_NOSTART)) {
 			if (i) {
 				i2c_repstart(adap);
 			}
-			ret = bit_doAddress(i2c_adap,pmsg,i2c_adap->retries);
-			if (ret != 0) {
-				DEB2(printk(KERN_DEBUG "i2c-algo-bit.o: NAK from device adr %#2x msg #%d\n"
-				       ,msgs[i].addr,i));
-				return (ret<0) ? ret : -EREMOTEIO;
+			ret = bit_doAddress(i2c_adap, pmsg);
+			if ((ret != 0) && !nak_ok) {
+			    DEB2(printk(KERN_DEBUG "i2c-algo-bit.o: NAK from device addr %2.2x msg #%d\n"
+					,msgs[i].addr,i));
+			    return (ret<0) ? ret : -EREMOTEIO;
 			}
 		}
 		if (pmsg->flags & I2C_M_RD ) {
 			/* read bytes into buffer*/
-			ret = readbytes(i2c_adap,pmsg->buf,pmsg->len);
+			ret = readbytes(i2c_adap, pmsg);
 			DEB2(printk(KERN_DEBUG "i2c-algo-bit.o: read %d bytes.\n",ret));
 			if (ret < pmsg->len ) {
 				return (ret<0)? ret : -EREMOTEIO;
 			}
 		} else {
 			/* write bytes from buffer */
-			ret = sendbytes(i2c_adap,pmsg->buf,pmsg->len);
+			ret = sendbytes(i2c_adap, pmsg);
 			DEB2(printk(KERN_DEBUG "i2c-algo-bit.o: wrote %d bytes.\n",ret));
 			if (ret < pmsg->len ) {
 				return (ret<0) ? ret : -EREMOTEIO;
@@ -509,12 +501,6 @@ static int bit_xfer(struct i2c_adapter *i2c_adap,
 	}
 	i2c_stop(adap);
 	return num;
-}
-
-static int algo_control(struct i2c_adapter *adapter, 
-	unsigned int cmd, unsigned long arg)
-{
-	return 0;
 }
 
 static u32 bit_func(struct i2c_adapter *adap)
@@ -530,7 +516,6 @@ static struct i2c_algorithm i2c_bit_algo = {
 	.name		= "Bit-shift algorithm",
 	.id		= I2C_ALGO_BIT,
 	.master_xfer	= bit_xfer,
-	.algo_control	= algo_control,
 	.functionality	= bit_func,
 };
 
@@ -539,7 +524,6 @@ static struct i2c_algorithm i2c_bit_algo = {
  */
 int i2c_bit_add_bus(struct i2c_adapter *adap)
 {
-	int i;
 	struct i2c_algo_bit_data *bit_adap = adap->algo_data;
 
 	if (bit_test) {
@@ -559,23 +543,6 @@ int i2c_bit_add_bus(struct i2c_adapter *adap)
 	adap->timeout = 100;	/* default values, should	*/
 	adap->retries = 3;	/* be replaced by defines	*/
 
-	/* scan bus */
-	if (bit_scan) {
-		int ack;
-		printk(KERN_INFO " i2c-algo-bit.o: scanning bus %s.\n",
-		       adap->name);
-		for (i = 0x00; i < 0xff; i+=2) {
-			i2c_start(bit_adap);
-			ack = i2c_outb(adap,i);
-			i2c_stop(bit_adap);
-			if (ack>0) {
-				printk("(%02x)",i>>1); 
-			} else 
-				printk("."); 
-		}
-		printk("\n");
-	}
-
 	i2c_add_adapter(adap);
 	return 0;
 }
@@ -583,14 +550,7 @@ int i2c_bit_add_bus(struct i2c_adapter *adap)
 
 int i2c_bit_del_bus(struct i2c_adapter *adap)
 {
-	int res;
-
-	if ((res = i2c_del_adapter(adap)) < 0)
-		return res;
-
-	DEB2(printk(KERN_DEBUG "i2c-algo-bit.o: adapter unregistered: %s\n",adap->name));
-
-	return 0;
+	return i2c_del_adapter(adap);
 }
 
 EXPORT_SYMBOL(i2c_bit_add_bus);
@@ -601,10 +561,8 @@ MODULE_DESCRIPTION("I2C-Bus bit-banging algorithm");
 MODULE_LICENSE("GPL");
 
 MODULE_PARM(bit_test, "i");
-MODULE_PARM(bit_scan, "i");
 MODULE_PARM(i2c_debug,"i");
 
 MODULE_PARM_DESC(bit_test, "Test the lines of the bus to see if it is stuck");
-MODULE_PARM_DESC(bit_scan, "Scan for active chips on the bus");
 MODULE_PARM_DESC(i2c_debug,
-            "debug level - 0 off; 1 normal; 2,3 more verbose; 9 bit-protocol");
+		 "debug level - 0 off; 1 normal; 2,3 more verbose; 9 bit-protocol");

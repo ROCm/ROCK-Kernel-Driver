@@ -532,6 +532,39 @@ int pnp_auto_config_dev(struct pnp_dev *dev)
 	return error;
 }
 
+static void pnp_process_manual_resources(struct pnp_resource_table * ctab, struct pnp_resource_table * ntab)
+{
+	int idx;
+	for (idx = 0; idx < PNP_MAX_IRQ; idx++) {
+		if (ntab->irq_resource[idx].flags & IORESOURCE_AUTO)
+			continue;
+		ctab->irq_resource[idx].start = ntab->irq_resource[idx].start;
+		ctab->irq_resource[idx].end = ntab->irq_resource[idx].end;
+		ctab->irq_resource[idx].flags = ntab->irq_resource[idx].flags;
+	}
+	for (idx = 0; idx < PNP_MAX_DMA; idx++) {
+		if (ntab->dma_resource[idx].flags & IORESOURCE_AUTO)
+			continue;
+		ctab->dma_resource[idx].start = ntab->dma_resource[idx].start;
+		ctab->dma_resource[idx].end = ntab->dma_resource[idx].end;
+		ctab->dma_resource[idx].flags = ntab->dma_resource[idx].flags;
+	}
+	for (idx = 0; idx < PNP_MAX_PORT; idx++) {
+		if (ntab->port_resource[idx].flags & IORESOURCE_AUTO)
+			continue;
+		ctab->port_resource[idx].start = ntab->port_resource[idx].start;
+		ctab->port_resource[idx].end = ntab->port_resource[idx].end;
+		ctab->port_resource[idx].flags = ntab->port_resource[idx].flags;
+	}
+	for (idx = 0; idx < PNP_MAX_MEM; idx++) {
+		if (ntab->irq_resource[idx].flags & IORESOURCE_AUTO)
+			continue;
+		ctab->irq_resource[idx].start = ntab->mem_resource[idx].start;
+		ctab->irq_resource[idx].end = ntab->mem_resource[idx].end;
+		ctab->irq_resource[idx].flags = ntab->mem_resource[idx].flags;
+	}
+}
+
 /**
  * pnp_manual_config_dev - Disables Auto Config and Manually sets the resource table
  * @dev: pointer to the desired device
@@ -554,7 +587,7 @@ int pnp_manual_config_dev(struct pnp_dev *dev, struct pnp_resource_table * res, 
 	*bak = dev->res;
 
 	spin_lock(&pnp_lock);
-	dev->res = *res;
+	pnp_process_manual_resources(&dev->res, res);
 	if (!(mode & PNP_CONFIG_FORCE)) {
 		for (i = 0; i < PNP_MAX_PORT; i++) {
 			if(pnp_check_port(dev,i))
@@ -681,7 +714,7 @@ int pnp_disable_dev(struct pnp_dev *dev)
 		return -1;
 	}
 	dev->active = 0; /* just in case the protocol doesn't do this */
-	pnp_dbg("the device '%s' has been disabled.", dev->dev.bus_id);
+	pnp_dbg("res: the device '%s' has been disabled.", dev->dev.bus_id);
 	return 0;
 }
 

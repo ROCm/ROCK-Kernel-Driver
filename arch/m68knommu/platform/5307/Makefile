@@ -16,7 +16,7 @@ ifdef CONFIG_FULLDEBUG
 AFLAGS += -DDEBUGGER_COMPATIBLE_CACHE=1
 endif
 
-obj-$(CONFIG_COLDFIRE)	+= entry.o
+obj-$(CONFIG_COLDFIRE)	+= entry.o timers.o vectors.o
 obj-$(CONFIG_M5307)	+= config.o
 
 ifeq ($(CONFIG_M5307),y)

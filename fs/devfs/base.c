@@ -729,7 +729,6 @@
 
 #define OPTION_NONE             0x00
 #define OPTION_MOUNT            0x01
-#define OPTION_ONLY             0x02
 
 #define PRINTK(format, args...) \
    {printk (KERN_ERR "%s" format, __FUNCTION__ , ## args);}
@@ -763,17 +762,10 @@ struct directory_type
     unsigned char no_more_additions:1;
 };
 
-struct file_type
-{
-    struct file_operations *ops;
-    unsigned long size;
-};
-
 struct bdev_type
 {
     struct block_device_operations *ops;
     dev_t dev;
-    unsigned char autogen:1;
     unsigned char removable:1;
 };
 
@@ -811,7 +803,6 @@ struct devfs_entry
     union 
     {
 	struct directory_type dir;
-	struct file_type file;
 	struct bdev_type bdev;
 	struct cdev_type cdev;
 	struct symlink_type symlink;
@@ -938,8 +929,6 @@ void devfs_put (devfs_handle_t de)
     if ( S_ISLNK (de->mode) ) kfree (de->u.symlink.linkname);
     if ( S_ISCHR (de->mode) && de->u.cdev.autogen )
 	devfs_dealloc_devnum (de->mode, de->u.cdev.dev);
-    if ( S_ISBLK (de->mode) && de->u.bdev.autogen )
-	devfs_dealloc_devnum (de->mode, de->u.bdev.dev);
     WRITE_ENTRY_MAGIC (de, 0);
 #ifdef CONFIG_DEVFS_DEBUG
     spin_lock (&stat_lock);
@@ -1495,17 +1484,6 @@ devfs_handle_t devfs_register (devfs_handle_t dir, const char *name,
 	PRINTK ("(%s): creating symlinks is not allowed\n", name);
 	return NULL;
     }
-    if ( ( S_ISCHR (mode) || S_ISBLK (mode) ) &&
-	 (flags & DEVFS_FL_AUTO_DEVNUM) )
-    {
-	devnum = devfs_alloc_devnum (mode);
-	if (!devnum) {
-	    PRINTK ("(%s): exhausted %s device numbers\n",
-		    name, S_ISCHR (mode) ? "char" : "block");
-	    return NULL;
-	}
-	dev = devnum;
-    }
     if ( ( de = _devfs_prepare_leaf (&dir, name, mode) ) == NULL )
     {
 	PRINTK ("(%s): could not prepare leaf\n", name);
@@ -1521,8 +1499,6 @@ devfs_handle_t devfs_register (devfs_handle_t dir, const char *name,
 	de->u.cdev.autogen = devnum != 0;
 	de->u.bdev.ops = ops;
 	if (flags & DEVFS_FL_REMOVABLE) de->u.bdev.removable = TRUE;
-    } else if ( S_ISREG (mode) ) {
-	de->u.file.ops = ops;
     } else {
 	PRINTK ("(%s): illegal mode: %x\n", name, mode);
 	devfs_put (de);
@@ -1825,18 +1801,9 @@ int devfs_generate_path (devfs_handle_t de, char *path, int buflen)
 
 static struct file_operations *devfs_get_ops (devfs_handle_t de)
 {
-    struct module *owner;
-    struct file_operations *ops;
+    struct file_operations *ops = de->u.cdev.ops;
+    struct module *owner = ops->owner;
 
-    if (de == NULL) return NULL;
-    VERIFY_ENTRY (de);
-    if (S_ISCHR (de->mode))
-	ops = de->u.cdev.ops;
-    else
-	ops = de->u.file.ops;
-    if (!ops)
-	return NULL;
-    owner = ops->owner;
     read_lock (&de->parent->u.dir.lock);  /*  Prevent module from unloading  */
     if ( (de->next == de) || !try_module_get (owner) )
     {   /*  Entry is already unhooked or module is unloading  */
@@ -1846,40 +1813,6 @@ static struct file_operations *devfs_get_ops (devfs_handle_t de)
     read_unlock (&de->parent->u.dir.lock);  /*  Module can continue unloading*/
     return ops;
 }   /*  End Function devfs_get_ops  */
-
-/**
- *	devfs_set_file_size - Set the file size for a devfs regular file.
- *	@de: The handle to the device entry.
- *	@size: The new file size.
- *
- *	Returns 0 on success, else a negative error code.
- */
-
-int devfs_set_file_size (devfs_handle_t de, unsigned long size)
-{
-    if (de == NULL) return -EINVAL;
-    VERIFY_ENTRY (de);
-    if ( !S_ISREG (de->mode) ) return -EINVAL;
-    if (de->u.file.size == size) return 0;
-    de->u.file.size = size;
-    if (de->inode.dentry == NULL) return 0;
-    if (de->inode.dentry->d_inode == NULL) return 0;
-    de->inode.dentry->d_inode->i_size = size;
-    return 0;
-}   /*  End Function devfs_set_file_size  */
-
-
-/**
- *	devfs_only - returns true if "devfs=only" is a boot option
- *
- *	If "devfs=only" this function will return 1, otherwise 0 is returned.
- */
-
-int devfs_only (void)
-{
-    return (boot_options & OPTION_ONLY) ? 1 : 0;
-}   /*  End Function devfs_only  */
-
 
 /**
  *	devfs_setup - Process kernel boot options.
@@ -1909,7 +1842,6 @@ static int __init devfs_setup (char *str)
 	{"dilookup",  DEBUG_I_LOOKUP,     &devfs_debug_init},
 	{"diunlink",  DEBUG_I_UNLINK,     &devfs_debug_init},
 #endif  /*  CONFIG_DEVFS_DEBUG  */
-	{"only",      OPTION_ONLY,        &boot_options},
 	{"mount",     OPTION_MOUNT,       &boot_options},
 	{NULL,        0,                  NULL}
     };
@@ -2192,11 +2124,8 @@ static struct inode *_devfs_get_vfs_inode (struct super_block *sb,
 	if (bd_acquire (inode) != 0)
 		PRINTK ("(%d): no block device from bdget()\n",(int)inode->i_ino);
     }
-    else if ( S_ISFIFO (de->mode) ) inode->i_fop = &def_fifo_fops;
-    else if ( S_ISREG (de->mode) )
-    {
-	inode->i_size = de->u.file.size;
-    }
+    else if ( S_ISFIFO (de->mode) )
+    	inode->i_fop = &def_fifo_fops;
     else if ( S_ISDIR (de->mode) )
     {
 	inode->i_op = &devfs_dir_iops;
@@ -2309,15 +2238,6 @@ static int devfs_open (struct inode *inode, struct file *file)
 	}
 	else
 	    err = chrdev_open (inode, file);
-    } else if (S_ISREG(inode->i_mode)) {
-	ops = devfs_get_ops (de);  /*  Now have module refcount  */
-	file->f_op = ops;
-	if (file->f_op)
-	{
-	    lock_kernel ();
-	    err = file->f_op->open ? (*file->f_op->open) (inode, file) : 0;
-	    unlock_kernel ();
-	}
     }
     return err;
 }   /*  End Function devfs_open  */

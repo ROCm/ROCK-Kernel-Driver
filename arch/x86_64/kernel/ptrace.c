@@ -26,6 +26,7 @@
 #include <asm/ldt.h>
 #include <asm/desc.h>
 #include <asm/proto.h>
+#include <asm/ia32.h>
 
 /*
  * does not yet catch signals sent when the child dies.
@@ -322,6 +323,13 @@ asmlinkage long sys_ptrace(long request, long pid, long addr, long data)
 		wake_up_process(child);
 		ret = 0;
 		break;
+	}
+
+#ifdef CONFIG_IA32_EMULATION
+		/* This makes only sense with 32bit programs. Allow a
+		   64bit debugger to fully examine them too. Better
+		   don't use it against 64bit processes, use
+		   PTRACE_ARCH_PRCTL instead. */
 	case PTRACE_SET_THREAD_AREA: {
 		int old; 
 		get_user(old,  &((struct user_desc *)data)->entry_number); 
@@ -338,7 +346,13 @@ asmlinkage long sys_ptrace(long request, long pid, long addr, long data)
 		put_user(old,  &((struct user_desc *)data)->entry_number); 
 		break;
 	} 
-	}
+#endif
+		/* normal 64bit interface to access TLS data. 
+		   Works just like arch_prctl, except that the arguments
+		   are reversed. */
+	case PTRACE_ARCH_PRCTL: 
+		ret = do_arch_prctl(child, data, addr);
+		break;
 
 /*
  * make the child exit.  Best I can do is send it a sigkill. 

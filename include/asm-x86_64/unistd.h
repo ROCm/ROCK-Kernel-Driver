@@ -469,7 +469,7 @@ __SYSCALL(__NR_sched_setaffinity, sys_sched_setaffinity)
 #define __NR_sched_getaffinity     204
 __SYSCALL(__NR_sched_getaffinity, sys_sched_getaffinity)
 #define __NR_set_thread_area	205
-__SYSCALL(__NR_set_thread_area, sys_set_thread_area)
+__SYSCALL(__NR_set_thread_area, sys_ni_syscall)	/* use arch_prctl */
 #define __NR_io_setup	206
 __SYSCALL(__NR_io_setup, sys_io_setup)
 #define __NR_io_destroy	207
@@ -481,7 +481,7 @@ __SYSCALL(__NR_io_submit, sys_io_submit)
 #define __NR_io_cancel	210
 __SYSCALL(__NR_io_cancel, sys_io_cancel)
 #define __NR_get_thread_area	211
-__SYSCALL(__NR_get_thread_area, sys_get_thread_area)
+__SYSCALL(__NR_get_thread_area, sys_ni_syscall)	/* use arch_prctl */
 #define __NR_lookup_dcookie	212
 __SYSCALL(__NR_lookup_dcookie, sys_lookup_dcookie)
 #define __NR_epoll_create	213

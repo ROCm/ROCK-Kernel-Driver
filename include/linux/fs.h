@@ -526,8 +526,10 @@ extern struct list_head file_lock_list;
 extern int fcntl_getlk(struct file *, struct flock *);
 extern int fcntl_setlk(struct file *, unsigned int, struct flock *);
 
+#if BITS_PER_LONG == 32
 extern int fcntl_getlk64(struct file *, struct flock64 *);
 extern int fcntl_setlk64(struct file *, unsigned int, struct flock64 *);
+#endif
 
 /* fs/locks.c */
 extern void locks_init_lock(struct file_lock *);

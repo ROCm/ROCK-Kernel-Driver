@@ -98,7 +98,7 @@ scaling_max_freq.
 -------------
 
 The CPUfreq governor "userspace" allows the user, or any userspace
-program running with UID "root", to set the CPU to a specifc frequency
+program running with UID "root", to set the CPU to a specific frequency
 by making a sysfs file "scaling_setspeed" available in the CPU-device
 directory.
 

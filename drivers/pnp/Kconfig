@@ -30,15 +30,6 @@ config PNP_NAMES
 
 	  If unsure, say Y.
 
-config PNP_CARD
-	bool "Plug and Play card services"
-	depends on PNP
-	help
-	  Select Y if you want the PnP Layer to manage cards.  Cards are groups
-	  of PnP devices.  Some drivers, especially PnP sound card drivers, use
-	  these cards.  If you want to use the protocol ISAPNP you will need to
-	  say Y here.
-
 config PNP_DEBUG
 	bool "PnP Debug Messages"
 	depends on PNP
@@ -51,7 +42,7 @@ comment "Protocols"
 
 config ISAPNP
 	bool "ISA Plug and Play support (EXPERIMENTAL)"
-	depends on PNP && EXPERIMENTAL && PNP_CARD
+	depends on PNP && EXPERIMENTAL
 	help
 	  Say Y here if you would like support for ISA Plug and Play devices.
 	  Some information is in <file:Documentation/isapnp.txt>.

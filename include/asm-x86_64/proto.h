@@ -57,11 +57,11 @@ extern unsigned long max_mapnr;
 extern unsigned long end_pfn; 
 extern unsigned long table_start, table_end;
 
-struct thread_struct;
-struct user_desc;
+extern void syscall_init(void);
 
-int do_set_thread_area(struct thread_struct *t, struct user_desc *u_info);
-int do_get_thread_area(struct thread_struct *t, struct user_desc *u_info);
+struct pt_regs;
+
+long do_arch_prctl(struct task_struct *task, int code, unsigned long addr);
 
 #define round_up(x,y) (((x) + (y) - 1) & ~((y)-1))
 #define round_down(x,y) ((x) & ~((y)-1))

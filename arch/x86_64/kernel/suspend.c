@@ -26,6 +26,7 @@
 #include <asm/acpi.h>
 #include <asm/tlbflush.h>
 #include <asm/io.h>
+#include <asm/proto.h>
 
 static struct saved_context saved_context;
 
@@ -58,10 +59,9 @@ void save_processor_state (void)
 	asm volatile ("movw %%gs, %0" : "=m" (saved_context.gs));
 	asm volatile ("movw %%ss, %0" : "=m" (saved_context.ss));
 
-	asm volatile ("swapgs");
-	rdmsrl(0xc0000100, saved_context.fs_base);
-	rdmsrl(0xc0000101, saved_context.gs_base);
-	asm volatile ("swapgs");
+	rdmsrl(MSR_FS_BASE, saved_context.fs_base);
+	rdmsrl(MSR_GS_BASE, saved_context.gs_base);
+	rdmsrl(MSR_KERNEL_GS_BASE, saved_context.gs_kernel_base);
 
 	/*
 	 * control registers 
@@ -99,10 +99,9 @@ void restore_processor_state(void)
 	load_gs_index(saved_context.gs);
 	asm volatile ("movw %0, %%ss" :: "r" (saved_context.ss));
 
-	asm volatile ("swapgs");
-	wrmsrl(0xc0000100, saved_context.fs_base);
-	wrmsrl(0xc0000101, saved_context.gs_base);
-	asm volatile ("swapgs");
+	wrmsrl(MSR_FS_BASE, saved_context.fs_base);
+	wrmsrl(MSR_GS_BASE, saved_context.gs_base);
+	wrmsrl(MSR_KERNEL_GS_BASE, saved_context.gs_kernel_base);
 
 	/*
 	 * now restore the descriptor tables to their proper values

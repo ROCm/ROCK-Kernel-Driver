@@ -74,8 +74,6 @@ extern int  kgdb_output_string (const char* s, unsigned int count);
 static char *serial_name = "CPM UART driver";
 static char *serial_version = "0.03";
 
-static DECLARE_TASK_QUEUE(tq_serial);
-
 static struct tty_driver serial_driver, callout_driver;
 static int serial_refcount;
 int serial_console_setup(struct console *co, char *options);
@@ -243,7 +241,7 @@ typedef struct serial_info {
 	int			magic;
 	int			flags;
 
-	struct serial_state		*state;
+	struct serial_state	*state;
  	/* struct serial_struct	*state; */
  	/* struct async_struct	*state; */
 	
@@ -261,12 +259,10 @@ typedef struct serial_info {
 	int			blocked_open; /* # of blocked opens */
 	long			session; /* Session of opening process */
 	long			pgrp; /* pgrp of opening process */
-	struct tq_struct	tqueue;
-	struct tq_struct	tqueue_hangup;
+	struct work_struct	tqueue;
+	struct work_struct	tqueue_hangup;
  	wait_queue_head_t	open_wait; 
  	wait_queue_head_t	close_wait; 
-/*	struct wait_queue     *open_wait; */
-/*	struct wait_queue	   *close_wait;i */
 
 	
 /* CPM Buffer Descriptor pointers.
@@ -324,7 +320,7 @@ static int baud_table[] = {
 #elif defined(CONFIG_CONSOLE_115200)
   #define CONSOLE_BAUDRATE 115200
 #else
-  #warn "console baud rate undefined"
+  #warning "console baud rate undefined"
   #define CONSOLE_BAUDRATE 9600
 #endif
 
@@ -404,18 +400,6 @@ static void rs_360_start(struct tty_struct *tty)
  * 				- Ted Ts'o (tytso@mit.edu), 7-Mar-93
  * -----------------------------------------------------------------------
  */
-
-/*
- * This routine is used by the interrupt handler to schedule
- * processing in the software interrupt portion of the driver.
- */
-static _INLINE_ void rs_sched_event(ser_info_t *info,
-				  int event)
-{
-	info->event |= 1 << event;
-	queue_task(&info->tqueue, &tq_serial);
-	mark_bh(SERIAL_BH);
-}
 
 static _INLINE_ void receive_chars(ser_info_t *info)
 {
@@ -556,7 +540,7 @@ static _INLINE_ void receive_chars(ser_info_t *info)
 
 	info->rx_cur = (QUICC_BD *)bdp;
 
-	queue_task(&tty->flip.tqueue, &tq_timer);
+	schedule_work(&tty->flip.work);
 }
 
 static _INLINE_ void receive_break(ser_info_t *info)
@@ -573,7 +557,7 @@ static _INLINE_ void receive_break(ser_info_t *info)
 	*(tty->flip.char_buf_ptr++) = 0;
 	tty->flip.count++;
 
-	queue_task(&tty->flip.tqueue, &tq_timer);
+	schedule_work(&tty->flip.work);
 }
 
 static _INLINE_ void transmit_chars(ser_info_t *info)
@@ -581,7 +565,7 @@ static _INLINE_ void transmit_chars(ser_info_t *info)
 
 	if ((info->flags & TX_WAKEUP) ||
 	    (info->tty->flags & (1 << TTY_DO_WRITE_WAKEUP))) {
-		rs_sched_event(info, RS_EVENT_WRITE_WAKEUP);
+		schedule_work(&info->tqueue);
 	}
 
 #ifdef SERIAL_DEBUG_INTR
@@ -717,19 +701,6 @@ static void rs_360_interrupt(int vec, void *dev_id, struct pt_regs *fp)
  * -------------------------------------------------------------------
  */
 
-/*
- * This routine is used to handle the "bottom half" processing for the
- * serial driver, known also the "software interrupt" processing.
- * This processing is done at the kernel interrupt level, after the
- * rs_interrupt() has returned, BUT WITH INTERRUPTS TURNED ON.  This
- * is where time-consuming activities which can not be done in the
- * interrupt driver proper are done; the interrupt driver schedules
- * them using rs_sched_event(), and they get done here.
- */
-static void do_serial_bh(void)
-{
-	run_task_queue(&tq_serial);
-}
 
 static void do_softint(void *private_)
 {
@@ -747,8 +718,6 @@ static void do_softint(void *private_)
 		wake_up_interruptible(&tty->write_wait);
 	}
 }
-
-
 
 
 /*
@@ -771,11 +740,6 @@ static void do_serial_hangup(void *private_)
 
 	tty_hangup(tty);
 }
-
-/*static void rs_360_timer(void)
-{
-	printk("rs_360_timer\n");
-}*/
 
 
 static int startup(ser_info_t *info)
@@ -1841,7 +1805,7 @@ static void rs_360_wait_until_sent(struct tty_struct *tty, int timeout)
 	 */
 	char_time = 1;
 	if (timeout)
-		char_time = min(char_time, timeout);
+		char_time = min(char_time, (unsigned long)timeout);
 #ifdef SERIAL_DEBUG_RS_WAIT_UNTIL_SENT
 	printk("In rs_wait_until_sent(%d) check=%lu...", timeout, char_time);
 	printk("jiff=%lu...", jiffies);
@@ -2078,7 +2042,7 @@ static int rs_360_open(struct tty_struct *tty, struct file * filp)
 	ser_info_t	*info;
 	int 		retval, line;
 
-	line = MINOR(tty->device) - tty->driver.minor_start;
+	line = minor(tty->device) - tty->driver.minor_start;
 	if ((line < 0) || (line >= NR_PORTS))
 		return -ENODEV;
 	retval = get_async_struct(line, &info);
@@ -2612,8 +2576,6 @@ int rs_360_init(void)
 	volatile	struct uart_pram	*sup;
 	/* volatile	immap_t		*immap; */
 	
-	init_bh(SERIAL_BH, do_serial_bh);
-
 	show_serial_version();
 
 	/* Initialize the tty_driver structure */
@@ -2763,17 +2725,14 @@ int rs_360_init(void)
 		/* info = kmalloc(sizeof(ser_info_t), GFP_KERNEL); */
 		info = &quicc_ser_info[i];
 		if (info) {
-			/* __clear_user(info,sizeof(ser_info_t)); */
 			memset (info, 0, sizeof(ser_info_t));
+			info->magic = SERIAL_MAGIC;
+			info->line = i;
+			info->flags = state->flags;
+			INIT_WORK(&info->tqueue, do_softint, info);
+			INIT_WORK(&info->tqueue_hangup, do_serial_hangup, info);
 			init_waitqueue_head(&info->open_wait);
 			init_waitqueue_head(&info->close_wait);
-			info->magic = SERIAL_MAGIC;
-			info->flags = state->flags;
-			info->tqueue.routine = do_softint;
-			info->tqueue.data = info;
-			info->tqueue_hangup.routine = do_serial_hangup;
-			info->tqueue_hangup.data = info;
-			info->line = i;
 			info->state = state;
 			state->info = (struct async_struct *)info;
 
@@ -2818,15 +2777,6 @@ int rs_360_init(void)
 				*(uint *)_periph_base = sipex_mode_bits;
 				/* printk ("sipex bits = 0x%08x\n", sipex_mode_bits); */
 #endif
-
-				scp = &pquicc->scc_regs[idx];
-				sup = &pquicc->pram[info->state->port].scc.pscc.u;
-				sup->rbase = dp_addr;
-			}
-			else {
-				sp = &cp->smc_regs[idx];
-				up = &pquicc->pram[info->state->port].scc.pothers.idma_smc.psmc.u;
-				up->rbase = dp_addr;
 			}
 
 			dp_addr = m360_cpm_dpalloc(sizeof(QUICC_BD) * TX_NUM_FIFO);
@@ -2856,6 +2806,9 @@ int rs_360_init(void)
 			bdp->status = (BD_SC_WRAP | BD_SC_INTRPT);
 
 			if (info->state->smc_scc_num & NUM_IS_SCC) {
+				scp = &pquicc->scc_regs[idx];
+				sup = &pquicc->pram[info->state->port].scc.pscc.u;
+				sup->rbase = dp_addr;
 				sup->tbase = dp_addr;
 
 				/* Set up the uart parameters in the
@@ -2919,6 +2872,8 @@ int rs_360_init(void)
 				/* Configure SMCs Tx/Rx instead of port B
 				 * parallel I/O.
 				 */
+				up = &pquicc->pram[info->state->port].scc.pothers.idma_smc.psmc.u;
+				up->rbase = dp_addr;
 
 				iobits = 0xc0 << (idx * 4);
 				cp->pip_pbpar |= iobits;
@@ -2964,6 +2919,7 @@ int rs_360_init(void)
 				/* Set UART mode, 8 bit, no parity, one stop.
 				 * Enable receive and transmit.
 				 */
+				sp = &cp->smc_regs[idx];
 				sp->smc_smcmr = smcr_mk_clen(9) | SMCMR_SM_UART;
 
 				/* Disable all interrupts and clear all pending
@@ -3008,8 +2964,7 @@ int rs_360_init(void)
 int serial_console_setup( struct console *co, char *options)
 {
 	struct		serial_state	*ser;
-	uint       mem_addr, dp_addr, bidx, idx, iobits;
-	int i;
+	uint		mem_addr, dp_addr, bidx, idx, iobits;
 	ushort		chan;
 	QUICC_BD	*bdp;
 	volatile	QUICC			*cp;
@@ -3038,18 +2993,11 @@ int serial_console_setup( struct console *co, char *options)
 
 	idx = PORT_NUM(ser->smc_scc_num);
 	if (ser->smc_scc_num & NUM_IS_SCC) {
-		scp = &cp->scc_regs[idx];
-		/* sup = (scc_uart_t *)&cp->cp_dparam[ser->port]; */
-		sup = &pquicc->pram[ser->port].scc.pscc.u;
 
 		/* TODO: need to set up SCC pin assignment etc. here */
 		
 	}
 	else {
-		sp = &cp->smc_regs[idx];
-		/* up = (smc_uart_t *)&cp->cp_dparam[ser->port]; */
-		up = &pquicc->pram[ser->port].scc.pothers.idma_smc.psmc.u;
-
 		iobits = 0xc0 << (idx * 4);
 		cp->pip_pbpar |= iobits;
 		cp->pip_pbdir &= ~iobits;
@@ -3096,6 +3044,9 @@ int serial_console_setup( struct console *co, char *options)
 	/* Set up the uart parameters in the parameter ram.
 	 */
 	if (ser->smc_scc_num & NUM_IS_SCC) {
+		scp = &cp->scc_regs[idx];
+		/* sup = (scc_uart_t *)&cp->cp_dparam[ser->port]; */
+		sup = &pquicc->pram[ser->port].scc.pscc.u;
 
 		sup->rbase = dp_addr;
 		sup->tbase = dp_addr + sizeof(QUICC_BD);
@@ -3153,6 +3104,9 @@ int serial_console_setup( struct console *co, char *options)
 
 	}
 	else {
+		/* up = (smc_uart_t *)&cp->cp_dparam[ser->port]; */
+		up = &pquicc->pram[ser->port].scc.pothers.idma_smc.psmc.u;
+
 		up->rbase = dp_addr;	/* Base of receive buffer desc. */
 		up->tbase = dp_addr+sizeof(QUICC_BD);	/* Base of xmt buffer desc. */
 		up->rfcr = SMC_EB;
@@ -3167,12 +3121,12 @@ int serial_console_setup( struct console *co, char *options)
 		*/
 		chan = smc_chan_map[idx];
 		cp->cp_cr = mk_cr_cmd(chan, CPM_CR_INIT_TRX) | CPM_CR_FLG;
-		printk("");
 		while (cp->cp_cr & CPM_CR_FLG);
 
 		/* Set UART mode, 8 bit, no parity, one stop.
 		 * Enable receive and transmit.
 		 */
+		sp = &cp->smc_regs[idx];
 		sp->smc_smcmr = smcr_mk_clen(9) |  SMCMR_SM_UART;
 
 		/* And finally, enable Rx and Tx.

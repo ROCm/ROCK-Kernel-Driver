@@ -220,11 +220,11 @@ struct i2c_adapter {
 			/* and can be set via the i2c_ioctl call	*/
 
 			/* data fields that are valid for all devices	*/
-	struct semaphore lock;  
+	struct semaphore bus;
+	struct semaphore list;  
 	unsigned int flags;/* flags specifying div. data		*/
 
 	struct i2c_client *clients[I2C_CLIENT_MAX];
-	int client_count;
 
 	int timeout;
 	int retries;

@@ -12,8 +12,9 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/slab.h>
-#include <asm/uaccess.h>
+#include <linux/miscdevice.h>
 #include <linux/devfs_fs_kernel.h>
+#include <asm/uaccess.h>
 #include "miropcm20-rds-core.h"
 
 static char * text_buffer;
@@ -103,28 +104,39 @@ static ssize_t rds_f_read(struct file *file, char *buffer, size_t length, loff_t
 	}
 }
 
-static struct file_operations rds_f_ops = {
+static struct file_operations rds_fops = {
 	.owner		= THIS_MODULE,
 	.read		= rds_f_read,
 	.open		= rds_f_open,
 	.release	= rds_f_release
 };
 
+static struct miscdevice rds_miscdev = {
+	.minor		= MISC_DYNAMIC_MINOR,
+	.name		= "radiotext"
+	.fops		= &rds_fops,
+};
 
 static int __init miropcm20_rds_init(void)
 {
-	if (!devfs_register(NULL, "v4l/rds/radiotext", 
-				   DEVFS_FL_DEFAULT | DEVFS_FL_AUTO_DEVNUM,
-				   0, 0, S_IRUGO | S_IFCHR, &rds_f_ops, NULL))
-		return -EINVAL;
+	int error;
 
-	printk("miropcm20-rds: userinterface driver loaded.\n");
-	return 0;
+	error = misc_register(&rds_miscdev);
+	if (error)
+		return error;
+
+	error = devfs_mk_symlink(NULL, "v4l/rds/radiotext", 0,
+				 "../misc/radiotext", NULL, NULL);
+	if (error)
+		misc_deregister(&rds_miscdev)
+
+	return error;
 }
 
 static void __exit miropcm20_rds_cleanup(void)
 {
 	devfs_remove("v4l/rds/radiotext");
+	misc_deregister(&rds_miscdev)
 }
 
 module_init(miropcm20_rds_init);

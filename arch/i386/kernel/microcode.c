@@ -372,7 +372,6 @@ static ssize_t microcode_write(struct file *file, const char *buf, size_t len, l
 		ret = (ssize_t)len;
 	}
 out_fsize:
-	devfs_set_file_size(devfs_handle, mc_fsize);
 	vfree(microcode);
 out_unlock:
 	up_write(&microcode_rwsem);
@@ -388,7 +387,6 @@ static int microcode_ioctl(struct inode *inode, struct file *file,
 			if (mc_applied) {
 				int bytes = NR_CPUS * sizeof(struct microcode);
 
-				devfs_set_file_size(devfs_handle, 0);
 				kfree(mc_applied);
 				mc_applied = NULL;
 				printk(KERN_INFO "microcode: freed %d bytes\n", bytes);

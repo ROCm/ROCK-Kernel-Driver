@@ -6,8 +6,6 @@
 
 #define __KERNEL32_CS   0x38
 
-#define __USER_LONGBASE	((GDT_ENTRY_LONGBASE * 8)  | 3)
-
 /* 
  * we cannot use the same code segment descriptor for user and kernel
  * -- not even in the long flat mode, because of different DPL /kkeil 
@@ -30,6 +28,13 @@
 #define GDT_ENTRY_KERNELCS16 15
 
 #define GDT_ENTRY_TLS_ENTRIES 3
+
+/* TLS indexes for 64bit - hardcoded in arch_prctl */
+#define FS_TLS 0	
+#define GS_TLS 1	
+
+#define GS_TLS_SEL ((GDT_ENTRY_TLS_MIN+GS_TLS)*8 + 3)
+#define FS_TLS_SEL ((GDT_ENTRY_TLS_MIN+FS_TLS)*8 + 3)
 
 #define IDT_ENTRIES 256
 #define GDT_ENTRIES 16
