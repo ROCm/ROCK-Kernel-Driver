@@ -49,6 +49,10 @@
  *      increase. If there are decrement operations in the operations
  *      array we do the same as before.
  *
+ * With the incarnation of O(1) scheduler, it becomes unnecessary to perform
+ * check/retry algorithm for waking up blocked processes as the new scheduler
+ * is better at handling thread switch than the old one.
+ *
  * /proc/sysvipc/sem support (c) 1999 Dragos Acostachioaie <dragos@iname.com>
  *
  * SMP-threaded, sysctl's added
@@ -258,8 +262,7 @@ static inline void remove_from_queue (struct sem_array * sma,
  */
 
 static int try_atomic_semop (struct sem_array * sma, struct sembuf * sops,
-			     int nsops, struct sem_undo *un, int pid,
-			     int do_undo)
+			     int nsops, struct sem_undo *un, int pid)
 {
 	int result, sem_op;
 	struct sembuf *sop;
@@ -289,10 +292,6 @@ static int try_atomic_semop (struct sem_array * sma, struct sembuf * sops,
 		curr->semval = result;
 	}
 
-	if (do_undo) {
-		result = 0;
-		goto undo;
-	}
 	sop--;
 	while (sop >= sops) {
 		sma->sem_base[sop->sem_num].sempid = pid;
@@ -334,23 +333,14 @@ static void update_queue (struct sem_array * sma)
 
 	for (q = sma->sem_pending; q; q = q->next) {
 			
-		if (q->status == 1)
-			continue;	/* this one was woken up before */
-
 		error = try_atomic_semop(sma, q->sops, q->nsops,
-					 q->undo, q->pid, q->alter);
+					 q->undo, q->pid);
 
 		/* Does q->sleeper still need to sleep? */
 		if (error <= 0) {
-				/* Found one, wake it up */
-			wake_up_process(q->sleeper);
-			if (error == 0 && q->alter) {
-				/* if q-> alter let it self try */
-				q->status = 1;
-				return;
-			}
 			q->status = error;
 			remove_from_queue(sma,q);
+			wake_up_process(q->sleeper);
 		}
 	}
 }
@@ -1062,7 +1052,7 @@ retry_undos:
 	if (error)
 		goto out_unlock_free;
 
-	error = try_atomic_semop (sma, sops, nsops, un, current->pid, 0);
+	error = try_atomic_semop (sma, sops, nsops, un, current->pid);
 	if (error <= 0)
 		goto update;
 
@@ -1075,55 +1065,46 @@ retry_undos:
 	queue.nsops = nsops;
 	queue.undo = un;
 	queue.pid = current->pid;
-	queue.alter = decrease;
 	queue.id = semid;
 	if (alter)
 		append_to_queue(sma ,&queue);
 	else
 		prepend_to_queue(sma ,&queue);
 
-	for (;;) {
-		queue.status = -EINTR;
-		queue.sleeper = current;
-		current->state = TASK_INTERRUPTIBLE;
-		sem_unlock(sma);
+	queue.status = -EINTR;
+	queue.sleeper = current;
+	current->state = TASK_INTERRUPTIBLE;
+	sem_unlock(sma);
 
-		if (timeout)
-			jiffies_left = schedule_timeout(jiffies_left);
-		else
-			schedule();
+	if (timeout)
+		jiffies_left = schedule_timeout(jiffies_left);
+	else
+		schedule();
 
-		sma = sem_lock(semid);
-		if(sma==NULL) {
-			if(queue.prev != NULL)
-				BUG();
-			error = -EIDRM;
-			goto out_free;
-		}
-		/*
-		 * If queue.status == 1 we where woken up and
-		 * have to retry else we simply return.
-		 * If an interrupt occurred we have to clean up the
-		 * queue
-		 *
-		 */
-		if (queue.status == 1)
-		{
-			error = try_atomic_semop (sma, sops, nsops, un,
-						  current->pid,0);
-			if (error <= 0) 
-				break;
-		} else {
-			error = queue.status;
-			if (error == -EINTR && timeout && jiffies_left == 0)
-				error = -EAGAIN;
-			if (queue.prev) /* got Interrupt */
-				break;
-			/* Everything done by update_queue */
-			goto out_unlock_free;
-		}
+	sma = sem_lock(semid);
+	if(sma==NULL) {
+		if(queue.prev != NULL)
+			BUG();
+		error = -EIDRM;
+		goto out_free;
 	}
+
+	/*
+	 * If queue.status != -EINTR we are woken up by another process
+	 */
+	error = queue.status;
+	if (queue.status != -EINTR) {
+		goto out_unlock_free;
+	}
+
+	/*
+	 * If an interrupt occurred we have to clean up the queue
+	 */
+	if (timeout && jiffies_left == 0)
+		error = -EAGAIN;
 	remove_from_queue(sma,&queue);
+	goto out_unlock_free;
+
 update:
 	if (alter)
 		update_queue (sma);

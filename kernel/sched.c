@@ -508,8 +508,8 @@ repeat_lock_task:
 		}
 #ifdef CONFIG_SMP
 	       	else
-			if (unlikely(kick) && task_running(rq, p) && (p->thread_info->cpu != smp_processor_id()))
-				smp_send_reschedule(p->thread_info->cpu);
+			if (unlikely(kick) && task_running(rq, p) && (task_cpu(p) != smp_processor_id()))
+				smp_send_reschedule(task_cpu(p));
 #endif
 		p->state = TASK_RUNNING;
 	}
@@ -1332,7 +1332,7 @@ pick_next_task:
 switch_tasks:
 	prefetch(next);
 	clear_tsk_need_resched(prev);
-	RCU_qsctr(prev->thread_info->cpu)++;
+	RCU_qsctr(task_cpu(prev))++;
 
 	if (likely(prev != next)) {
 		rq->nr_switches++;

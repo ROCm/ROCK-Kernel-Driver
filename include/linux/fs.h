@@ -420,6 +420,8 @@ struct file_ra_state {
 	unsigned long ahead_start;	/* Ahead window */
 	unsigned long ahead_size;
 	unsigned long ra_pages;		/* Maximum readahead window */
+	unsigned long mmap_hit;		/* Cache hit stat for mmap accesses */
+	unsigned long mmap_miss;	/* Cache miss stat for mmap accesses */
 };
 
 struct file {

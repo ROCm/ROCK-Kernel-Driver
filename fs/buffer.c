@@ -319,6 +319,7 @@ asmlinkage long sys_fsync(unsigned int fd)
 
 	/* We need to protect against concurrent writers.. */
 	down(&inode->i_sem);
+	current->flags |= PF_SYNCWRITE;
 	ret = filemap_fdatawrite(inode->i_mapping);
 	err = file->f_op->fsync(file, dentry, 0);
 	if (!ret)
@@ -326,6 +327,7 @@ asmlinkage long sys_fsync(unsigned int fd)
 	err = filemap_fdatawait(inode->i_mapping);
 	if (!ret)
 		ret = err;
+	current->flags &= ~PF_SYNCWRITE;
 	up(&inode->i_sem);
 
 out_putf:
@@ -354,6 +356,7 @@ asmlinkage long sys_fdatasync(unsigned int fd)
 		goto out_putf;
 
 	down(&inode->i_sem);
+	current->flags |= PF_SYNCWRITE;
 	ret = filemap_fdatawrite(inode->i_mapping);
 	err = file->f_op->fsync(file, dentry, 1);
 	if (!ret)
@@ -361,6 +364,7 @@ asmlinkage long sys_fdatasync(unsigned int fd)
 	err = filemap_fdatawait(inode->i_mapping);
 	if (!ret)
 		ret = err;
+	current->flags &= ~PF_SYNCWRITE;
 	up(&inode->i_sem);
 
 out_putf:
@@ -1450,24 +1454,13 @@ EXPORT_SYMBOL(__getblk);
 /*
  * Do async read-ahead on a buffer..
  */
-void
-__breadahead(struct block_device *bdev, sector_t block, int size)
+void __breadahead(struct block_device *bdev, sector_t block, int size)
 {
 	struct buffer_head *bh = __getblk(bdev, block, size);
-	if (!test_set_buffer_locked(bh)) {
-		if (!buffer_uptodate(bh)) {
-			/*
-			 * This eats the bh count from __getblk() and
-			 * unlocks when the read is done.
-			 */
-			bh->b_end_io = end_buffer_io_sync;
-			submit_bh(READ, bh);
-			return;
-		}
-		unlock_buffer(bh);
-	}
+	ll_rw_block(READA, 1, &bh);
 	brelse(bh);
 }
+EXPORT_SYMBOL(__breadahead);
 
 /**
  *  __bread() - reads a specified block and returns the bh

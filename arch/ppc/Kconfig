@@ -450,9 +450,6 @@ config EV64260
 config SPRUCE
 	bool "IBM-Spruce"
 
-config MENF1
-	bool "MEN-F1"
-
 config LOPEC
 	bool "Motorola-LoPEC"
 
@@ -473,6 +470,10 @@ config PRPMC800
 
 config SANDPOINT
 	bool "Motorola-Sandpoint"
+	help
+	  Select SANDPOINT if configuring for a Motorola Sandpoint X3
+	  or X3(b).
+	  X3 (any flavor).
 
 config ADIR
 	bool "SBS-Adirondack"
@@ -490,14 +491,16 @@ config GEMINI
 	  series Single Board Computer.  More information is available at:
 	  <http://www.synergymicro.com/PressRel/97_10_15.html>.
 
-config ZX4500
-	bool "Zynx-ZX4500"
-
 endchoice
 
 config PPC_CHRP
 	bool
 	depends on PPC_MULTIPLATFORM
+	default y
+
+config PPC_GEN550
+	bool
+	depends on SANDPOINT
 	default y
 
 config PPC_PMAC
@@ -515,10 +518,6 @@ config PPC_OF
 	depends on PPC_PMAC || PPC_CHRP
 	default y
 
-config SANDPOINT_X3
-	bool "Sandpoint X3"
-	depends on SANDPOINT
-
 config FORCE
 	bool
 	depends on 6xx && !8260 && (PCORE || POWERPMC250)
@@ -526,7 +525,7 @@ config FORCE
 
 config EPIC_SERIAL_MODE
 	bool
-	depends on 6xx && !8260 && (LOPEC || SANDPOINT_X3)
+	depends on 6xx && !8260 && (LOPEC || SANDPOINT)
 	default y
 
 config WILLOW
@@ -536,7 +535,7 @@ config WILLOW
 
 config MPC10X_STORE_GATHERING
 	bool "Enable MPC10x store gathering"
-	depends on FORCE || MENF1 || SANDPOINT || ZX4500
+	depends on FORCE || SANDPOINT
 
 config GT64260
 	bool
@@ -1528,7 +1527,7 @@ config BOOTX_TEXT
 
 config SERIAL_TEXT_DEBUG
 	bool "Support for early boot texts over serial port"
-	depends on 4xx || GT64260 || LOPEC || MCPN765 || PPLUS || PRPMC800 || SANDPOINT || ZX4500
+	depends on 4xx || GT64260 || LOPEC || MCPN765 || PPLUS || PRPMC800 || SANDPOINT
 
 config OCP
 	bool

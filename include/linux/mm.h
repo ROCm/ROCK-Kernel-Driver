@@ -571,10 +571,6 @@ void page_cache_readahead(struct address_space *mapping,
 			  struct file_ra_state *ra,
 			  struct file *filp,
 			  unsigned long offset);
-void page_cache_readaround(struct address_space *mapping, 
-			   struct file_ra_state *ra,
-			   struct file *filp,
-			   unsigned long offset);
 void handle_ra_miss(struct address_space *mapping, 
 		    struct file_ra_state *ra, pgoff_t offset);
 unsigned long max_sane_readahead(unsigned long nr);

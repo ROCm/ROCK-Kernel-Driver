@@ -925,6 +925,9 @@ static int page_cache_read(struct file * file, unsigned long offset)
 	return error == -EEXIST ? 0 : error;
 }
 
+#define MMAP_READAROUND (16UL)
+#define MMAP_LOTSAMISS  (100)
+
 /*
  * filemap_nopage() is invoked via the vma operations vector for a
  * mapped memory region to read in file data during a page fault.
@@ -942,19 +945,19 @@ struct page * filemap_nopage(struct vm_area_struct * area, unsigned long address
 	struct inode *inode = mapping->host;
 	struct page *page;
 	unsigned long size, pgoff, endoff;
-	int did_readahead;
+	int did_readaround = 0;
 
 	pgoff = ((address - area->vm_start) >> PAGE_CACHE_SHIFT) + area->vm_pgoff;
 	endoff = ((area->vm_end - area->vm_start) >> PAGE_CACHE_SHIFT) + area->vm_pgoff;
 
 retry_all:
-	/*
-	 * An external ptracer can access pages that normally aren't
-	 * accessible..
-	 */
 	size = (inode->i_size + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
-	if ((pgoff >= size) && (area->vm_mm == current->mm))
-		return NULL;
+	if (pgoff >= size)
+		goto outside_data_content;
+
+	/* If we don't want any read-ahead, don't bother */
+	if (VM_RandomReadHint(area))
+		goto no_cached_page;
 
 	/*
 	 * The "size" of the file, as far as mmap is concerned, isn't bigger
@@ -963,25 +966,14 @@ retry_all:
 	if (size > endoff)
 		size = endoff;
 
-	did_readahead = 0;
-
 	/*
 	 * The readahead code wants to be told about each and every page
 	 * so it can build and shrink its windows appropriately
+	 *
+	 * For sequential accesses, we use the generic readahead logic.
 	 */
-	if (VM_SequentialReadHint(area)) {
-		did_readahead = 1;
+	if (VM_SequentialReadHint(area))
 		page_cache_readahead(mapping, ra, file, pgoff);
-	}
-
-	/*
-	 * If the offset is outside the mapping size we're off the end
-	 * of a privately mapped file, so we need to map a zero page.
-	 */
-	if ((pgoff < size) && !VM_RandomReadHint(area)) {
-		did_readahead = 1;
-		page_cache_readaround(mapping, ra, file, pgoff);
-	}
 
 	/*
 	 * Do we have something in the page cache already?
@@ -989,12 +981,26 @@ retry_all:
 retry_find:
 	page = find_get_page(mapping, pgoff);
 	if (!page) {
-		if (did_readahead) {
+		if (VM_SequentialReadHint(area)) {
 			handle_ra_miss(mapping, ra, pgoff);
-			did_readahead = 0;
+			goto no_cached_page;
 		}
-		goto no_cached_page;
+		ra->mmap_miss++;
+
+		/*
+		 * Do we miss much more than hit in this file? If so,
+		 * stop bothering with read-ahead. It will only hurt.
+		 */
+		if (ra->mmap_miss > ra->mmap_hit + MMAP_LOTSAMISS)
+			goto no_cached_page;
+
+		did_readaround = 1;
+		do_page_cache_readahead(mapping, file, pgoff & ~(MMAP_READAROUND-1), MMAP_READAROUND);
+		goto retry_find;
 	}
+
+	if (!did_readaround)
+		ra->mmap_hit++;
 
 	/*
 	 * Ok, found a page in the page cache, now we need to check
@@ -1010,6 +1016,14 @@ success:
 	mark_page_accessed(page);
 	return page;
 
+outside_data_content:
+	/*
+	 * An external ptracer can access pages that normally aren't
+	 * accessible..
+	 */
+	if (area->vm_mm == current->mm)
+		return NULL;
+	/* Fall through to the non-read-ahead case */
 no_cached_page:
 	/*
 	 * We're only likely to ever get here if MADV_RANDOM is in

@@ -177,11 +177,8 @@ EXPORT_SYMBOL(unregister_hdlc_device);
 
 struct packet_type hdlc_packet_type=
 {
-        __constant_htons(ETH_P_HDLC),
-        NULL,
-        hdlc_rcv,
-        NULL,
-        NULL
+	.type = __constant_htons(ETH_P_HDLC),
+	.func = hdlc_rcv,
 };
 
 
