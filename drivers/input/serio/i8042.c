@@ -52,6 +52,13 @@ static unsigned int i8042_dumbkbd;
 module_param_named(dumbkbd, i8042_dumbkbd, bool, 0);
 MODULE_PARM_DESC(dumbkbd, "Pretend that controller can only read data from keyboard");
 
+__obsolete_setup("i8042_noaux");
+__obsolete_setup("i8042_nomux");
+__obsolete_setup("i8042_unlock");
+__obsolete_setup("i8042_reset");
+__obsolete_setup("i8042_direct");
+__obsolete_setup("i8042_dumbkbd");
+
 #undef DEBUG
 #include "i8042.h"
 
@@ -379,6 +386,8 @@ static irqreturn_t i8042_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	unsigned int dfl;
 	int ret;
 
+	mod_timer(&i8042_timer, jiffies + I8042_POLL_PERIOD);
+
 	spin_lock_irqsave(&i8042_lock, flags);
 	str = i8042_read_status();
 	if (str & I8042_STR_OBF)
@@ -433,7 +442,6 @@ static irqreturn_t i8042_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 irq_ret:
 	ret = 1;
 out:
-	mod_timer(&i8042_timer, jiffies + I8042_POLL_PERIOD);
 	return IRQ_RETVAL(ret);
 }
 

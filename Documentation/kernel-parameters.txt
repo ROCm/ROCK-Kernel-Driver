@@ -151,7 +151,15 @@ running once the system is up.
 			Format: <host-scsi-id>,<target-scsi-id>,<max-rate>,<max-offset>
 			See also header of drivers/scsi/AM53C974.c.
 
-	amijoy=		[HW,JOY] Amiga joystick support 
+	amijoy.map=	[HW,JOY] Amiga joystick support
+			Map of devices attached to JOY0DAT and JOY1DAT
+			Format: <a>,<b>
+			See also Documentation/kernel/input/joystick.txt
+
+	analog.map=	[HW,JOY] Analog joystick and gamepad support
+			Specifies type or capabilities of an analog joystick
+			connected to one of 16 gameports
+			Format: <type1>,<type2>,..<type16>
 
 	apc=		[HW,SPARC] Power management functions (SPARCstation-4/5 + deriv.)
 			Format: noidle
@@ -174,11 +182,18 @@ running once the system is up.
 
 	atascsi=	[HW,SCSI] Atari SCSI
 
-	atkbd.set=	[HW] Select keyboard code set
-			Format: <int>
+	atkbd.extra=	[HW] Enable extra LEDs and keys on IBM RapidAccess, EzKey
+			and similar keyboards
+
+	atkbd.reset=	[HW] Reset keyboard during initialization
+
+	atkbd.set=	[HW] Select keyboard code set 
+			Format: <int> (2 = AT (default) 3 = PS/2)
+
+	atkbd.scroll=	[HW] Enable scroll wheel on MS Office and similar keyboards
+	
 	atkbd.softrepeat=
 			[HW] Use software keyboard repeat
-	atkbd.reset=	[HW] Reset keyboard during initialization
 
 	autotest	[IA64]
 
@@ -280,10 +295,11 @@ running once the system is up.
 	dasd=		[HW,NET]    
 			See header of drivers/s390/block/dasd_devmap.c.
 
-	db9=		[HW,JOY]
-	db9_2=
-	db9_3=
- 
+	db9.dev[2|3]=	[HW,JOY] Multisystem joystick support via parallel port
+			(one device per port)
+			Format: <port#>,<type>
+			See also Documentation/input/joystick-parport.txt
+
 	debug		[KNL] Enable kernel debugging (events log level).
 
 	decnet=		[HW,NET]
@@ -377,12 +393,14 @@ running once the system is up.
 	ftape=		[HW] Floppy Tape subsystem debugging options.
 			See Documentation/ftape.txt.
 
+	gamecon.map[2|3]=
+			[HW,JOY] Multisystem joystick and NES/SNES/PSX pad
+			support via parallel port (up to 5 devices per port)
+			Format: <port#>,<pad1>,<pad2>,<pad3>,<pad4>,<pad5>
+			See also Documentation/input/joystick-parport.txt
+
 	gamma=		[HW,DRM]
 
-	gc=		[HW,JOY]
-	gc_2=		See Documentation/input/joystick-parport.txt.
-	gc_3=		
- 
 	gdth=		[HW,SCSI]
 			See header of drivers/scsi/gdth.c.
 
@@ -609,9 +627,9 @@ running once the system is up.
 
 	mga=		[HW,DRM]
 
-	mousedev.xres	[MOUSE] Horizontal screen resolution, used for devices
+	mousedev.xres=	[MOUSE] Horizontal screen resolution, used for devices
 			reporting absolute coordinates, such as tablets
-	mousedev.yres	[MOUSE] Vertical screen resolution, used for devices
+	mousedev.yres=	[MOUSE] Vertical screen resolution, used for devices
 			reporting absolute coordinates, such as tablets
 
 	mpu401=		[HW,OSS]
@@ -1156,10 +1174,6 @@ running once the system is up.
 			See header of drivers/scsi/t128.c.
 
 	tdfx=		[HW,DRM]
- 
-	tgfx=		[HW,JOY] TurboGraFX parallel port interface
-	tgfx_2=		See Documentation/input/joystick-parport.txt.
-	tgfx_3=
 
 	thash_entries=	[KNL,NET]
 			Set number of hash buckets for TCP connection
@@ -1182,8 +1196,13 @@ running once the system is up.
 	trix=		[HW,OSS] MediaTrix AudioTrix Pro
 			Format: <io>,<irq>,<dma>,<dma2>,<sb_io>,<sb_irq>,<sb_dma>,<mpu_io>,<mpu_irq>
  
-	tsdev.xres	[TS] Horizontal screen resolution.
-	tsdev.yres	[TS] Vertical screen resolution.
+	tsdev.xres=	[TS] Horizontal screen resolution.
+	tsdev.yres=	[TS] Vertical screen resolution.
+
+	turbografx.map[2|3]=
+			[HW,JOY] TurboGraFX parallel port interface
+			Format: <port#>,<js1>,<js2>,<js3>,<js4>,<js5>,<js6>,<js7>
+			See also Documentation/input/joystick-parport.txt
 
 	u14-34f=	[HW,SCSI] UltraStor 14F/34F SCSI host adapter
 			See header of drivers/scsi/u14-34f.c.
