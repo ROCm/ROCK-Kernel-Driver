@@ -7,8 +7,9 @@
 #include <errno.h>
 #include <unistd.h>
 #include <linux/stddef.h>
-#include <sys/ptrace.h>
-#include <asm/ptrace.h>
+#include <linux/ptrace.h>
+//#include <sys/ptrace.h>
+//#include <asm/ptrace.h>
 #include <asm/user.h>
 #include "kern_util.h"
 #include "sysdep/thread.h"
