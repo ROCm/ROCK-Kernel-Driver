@@ -303,6 +303,8 @@ struct isdn_netif_ops {
 	void                    (*unbind)(struct isdn_net_local_s *lp);
 	int                     (*init)(struct isdn_net_local_s *lp);
 	void                    (*cleanup)(struct isdn_net_local_s *lp);
+	int                     (*open)(struct isdn_net_local_s *lp);
+	void                    (*close)(struct isdn_net_local_s *lp);
 };
 
 /* Local interface-data */

@@ -232,36 +232,19 @@ isdn_net_unreachable(struct net_device *dev, struct sk_buff *skb, char *reason)
 static int
 isdn_net_open(struct net_device *dev)
 {
-	int i;
-	struct net_device *p;
-	struct in_device *in_dev;
+	isdn_net_local *lp = dev->priv;
+	int retval = 0;
 
-	/* moved here from isdn_net_reset, because only the master has an
-	   interface associated which is supposed to be started. BTW:
-	   we need to call netif_start_queue, not netif_wake_queue here */
+	if (!lp->ops)
+		return -ENODEV;
+
+	if (lp->ops->open)
+		retval = lp->ops->open(lp);
+
+	if (!retval)
+		return retval;
+	
 	netif_start_queue(dev);
-
-	isdn_x25_open(dev);
-	/* Fill in the MAC-level header (not needed, but for compatibility... */
-	for (i = 0; i < ETH_ALEN - sizeof(u32); i++)
-		dev->dev_addr[i] = 0xfc;
-	if ((in_dev = dev->ip_ptr) != NULL) {
-		/*
-		 *      Any address will do - we take the first
-		 */
-		struct in_ifaddr *ifa = in_dev->ifa_list;
-		if (ifa != NULL)
-			memcpy(dev->dev_addr+2, &ifa->ifa_local, 4);
-	}
-
-	/* If this interface has slaves, start them also */
-
-	if ((p = (((isdn_net_local *) dev->priv)->slave))) {
-		while (p) {
-			isdn_x25_open(p);
-			p = (((isdn_net_local *) p->priv)->slave);
-		}
-	}
 	isdn_MOD_INC_USE_COUNT();
 	return 0;
 }
@@ -1132,17 +1115,16 @@ static int
 isdn_net_close(struct net_device *dev)
 {
 	struct net_device *p;
+	isdn_net_local *lp = dev->priv;
 
-	isdn_x25_close(dev);
+	if (lp->ops->close)
+		lp->ops->close(lp);
+
 	netif_stop_queue(dev);
-	if ((p = (((isdn_net_local *) dev->priv)->slave))) {
-		/* If this interface has slaves, stop them also */
-		while (p) {
-			isdn_x25_close(p);
-			isdn_net_hangup(p->priv);
-			p = (((isdn_net_local *) p->priv)->slave);
-		}
-	}
+	
+	for (p = lp->slave; p; p = ((isdn_net_local *) p->priv)->slave)
+		isdn_net_hangup(p->priv);
+
 	isdn_net_hangup(dev->priv);
 	isdn_MOD_DEC_USE_COUNT();
 	return 0;
@@ -2373,6 +2355,26 @@ isdn_ether_receive(isdn_net_dev *p, isdn_net_local *olp,
 }
 
 static int
+isdn_ether_open(isdn_net_local *lp)
+{
+	struct net_device *dev = &lp->netdev->dev;
+	struct in_device *in_dev;
+	int i;
+
+	/* Fill in the MAC-level header ... */
+	for (i = 0; i < ETH_ALEN; i++)
+		dev->dev_addr[i] = 0xfc;
+	in_dev = dev->ip_ptr;
+	if (in_dev) {
+		/* any address will do - we take the first */
+		struct in_ifaddr *ifa = in_dev->ifa_list;
+		if (ifa)
+			memcpy(dev->dev_addr+2, &ifa->ifa_local, 4);
+	}
+	return 0;
+}
+
+static int
 isdn_ether_init(isdn_net_local *lp)
 {
 	struct net_device *dev = &lp->netdev->dev;
@@ -2388,6 +2390,7 @@ static struct isdn_netif_ops ether_ops = {
 	.hard_header         = eth_header,
 	.receive             = isdn_ether_receive,
 	.init                = isdn_ether_init,
+	.open                = isdn_ether_open,
 };
 
 // ======================================================================

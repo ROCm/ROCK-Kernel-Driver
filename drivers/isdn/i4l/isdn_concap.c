@@ -107,12 +107,12 @@ struct concap_proto * isdn_concap_new( int encap )
 	return NULL;
 }
 
-void isdn_x25_open(struct net_device *dev)
+static int
+isdn_x25_open(isdn_net_local *lp)
 {
-	struct concap_proto * cprot =
-		( (isdn_net_local *) dev->priv ) -> netdev -> cprot;
-	struct concap_proto * dops =
-		( (isdn_net_local *) dev->priv ) -> dops;
+	struct net_device * dev = & lp -> netdev -> dev;
+	struct concap_proto * cprot = lp -> netdev -> cprot;
+	struct concap_proto * dops = lp -> dops;
 	unsigned long flags;
 
 	save_flags(flags);
@@ -120,17 +120,19 @@ void isdn_x25_open(struct net_device *dev)
 	if( cprot -> pops && dops )
 		cprot -> pops -> restart ( cprot, dev, dops );
 	restore_flags(flags);
+	return 0;
 }
 
-void isdn_x25_close(struct net_device *dev)
+static void
+isdn_x25_close(isdn_net_local *lp)
 {
-	struct concap_proto * cprot =
-		( (isdn_net_local *) dev->priv ) -> netdev -> cprot;
+	struct concap_proto * cprot = lp -> netdev -> cprot;
 
 	if( cprot && cprot -> pops ) cprot -> pops -> close( cprot );
 }
 
-static void isdn_x25_connected(isdn_net_local *lp)
+static void
+isdn_x25_connected(isdn_net_local *lp)
 {
 	struct concap_proto *cprot = lp -> netdev -> cprot;
 	struct concap_proto_ops *pops = cprot ? cprot -> pops : 0;
@@ -143,7 +145,8 @@ static void isdn_x25_connected(isdn_net_local *lp)
 	isdn_net_device_wake_queue(lp);
 }
 
-static void isdn_x25_disconnected(isdn_net_local *lp)
+static void
+isdn_x25_disconnected(isdn_net_local *lp)
 {
 	struct concap_proto *cprot = lp -> netdev -> cprot;
 	struct concap_proto_ops *pops = cprot ? cprot -> pops : 0;
@@ -155,7 +158,8 @@ static void isdn_x25_disconnected(isdn_net_local *lp)
 		pops -> disconn_ind(cprot);
 }
 
-int isdn_x25_start_xmit(struct sk_buff *skb, struct net_device *dev)
+int
+isdn_x25_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 /* At this point hard_start_xmit() passes control to the encapsulation
    protocol (if present).
@@ -247,6 +251,8 @@ struct isdn_netif_ops isdn_x25_ops = {
 	.disconnected        = isdn_x25_disconnected,
 	.init                = isdn_x25_init,
 	.cleanup             = isdn_x25_cleanup,
+	.open                = isdn_x25_open,
+	.close               = isdn_x25_close,
 };
 
 #endif /* CONFIG_ISDN_X25 */
