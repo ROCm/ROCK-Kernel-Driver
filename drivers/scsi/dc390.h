@@ -14,12 +14,9 @@
 #define DC390_H
 
 #include <linux/version.h>
-#ifndef KERNEL_VERSION
-# define KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))
-#endif
 
 #define DC390_BANNER "Tekram DC390/AM53C974"
-#define DC390_VERSION "2.1b 2004-04-13"
+#define DC390_VERSION "2.1d 2004-05-27"
 
 /* We don't have eh_abort_handler, eh_device_reset_handler, 
  * eh_bus_reset_handler, eh_host_reset_handler yet! 
@@ -32,14 +29,4 @@
 # define NEW_EH use_new_eh_code: 1,
 # define USE_NEW_EH
 #endif
-
-static int DC390_detect(Scsi_Host_Template *psht);
-static int DC390_queue_command(Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *));
-static int DC390_abort(Scsi_Cmnd *cmd);
-static int DC390_reset(Scsi_Cmnd *cmd);
-static int DC390_bios_param(struct scsi_device *sdev, struct block_device *dev,
-		sector_t capacity, int geom[]);
-
-static int DC390_release(struct Scsi_Host *);
-
 #endif /* DC390_H */

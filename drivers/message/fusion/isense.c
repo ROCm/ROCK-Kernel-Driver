@@ -56,14 +56,6 @@
 #include <linux/errno.h>
 #include <linux/init.h>
 #include <asm/io.h>
-#if defined (__sparc__)
-#include <linux/timer.h>
-#endif
-
-/* Hmmm, avoid undefined spinlock_t on lk-2.2.14-5.0 */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
-#include <asm/spinlock.h>
-#endif
 
 #define MODULEAUTHOR "Steven J. Ralston"
 #define COPYRIGHT "Copyright (c) 2001-2004 " MODULEAUTHOR

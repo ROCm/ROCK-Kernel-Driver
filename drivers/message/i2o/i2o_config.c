@@ -97,7 +97,7 @@ static void i2o_cfg_reply(struct i2o_handler *h, struct i2o_controller *c, struc
 	u32 *msg = (u32 *)m;
 
 	if (msg[0] & MSG_FAIL) {
-		u32 *preserved_msg = (u32*)(c->mem_offset + msg[7]);
+		u32 *preserved_msg = (u32*)(c->msg_virt + msg[7]);
 
 		printk(KERN_ERR "i2o_config: IOP failed to process the msg.\n");
 

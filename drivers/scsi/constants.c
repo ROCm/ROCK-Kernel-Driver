@@ -154,7 +154,7 @@ static void print_opcode(int opcode) {
 }
 #endif  
 
-void print_command (unsigned char *command) {
+void __scsi_print_command (unsigned char *command) {
     int i,s;
     print_opcode(command[0]);
     for ( i = 1, s = COMMAND_SIZE(command[0]); i < s; ++i) 
@@ -173,7 +173,7 @@ void print_command (unsigned char *command) {
  *	(e.g. "0x2" for Check Condition).
  **/
 void
-print_status(unsigned char scsi_status) {
+scsi_print_status(unsigned char scsi_status) {
 #if (CONSTANTS & CONST_STATUS)
 	const char * ccp;
 
@@ -1014,12 +1014,12 @@ print_sense_internal(const char *devclass,
 #endif
 }
 
-void print_sense(const char *devclass, struct scsi_cmnd *cmd)
+void scsi_print_sense(const char *devclass, struct scsi_cmnd *cmd)
 {
 	print_sense_internal(devclass, cmd->sense_buffer, cmd->request);
 }
 
-void print_req_sense(const char *devclass, struct scsi_request *sreq)
+void scsi_print_req_sense(const char *devclass, struct scsi_request *sreq)
 {
 	print_sense_internal(devclass, sreq->sr_sense_buffer, sreq->sr_request);
 }
@@ -1051,7 +1051,7 @@ static const char *extended_msgs[] = {
 #define NO_EXTENDED_MSGS (sizeof(two_byte_msgs)  / sizeof (const char *))
 #endif /* (CONSTANTS & CONST_MSG) */
 
-int print_msg (const unsigned char *msg) {
+int scsi_print_msg (const unsigned char *msg) {
     int len = 0, i;
     if (msg[0] == EXTENDED_MESSAGE) {
 	len = 3 + msg[1];
@@ -1124,13 +1124,13 @@ int print_msg (const unsigned char *msg) {
     return len;
 }
 
-void print_Scsi_Cmnd(struct scsi_cmnd *cmd) {
+void scsi_print_command(struct scsi_cmnd *cmd) {
     printk("scsi%d : destination target %d, lun %d\n", 
 	   cmd->device->host->host_no, 
 	   cmd->device->id, 
 	   cmd->device->lun);
     printk("        command = ");
-    print_command(cmd->cmnd);
+    __scsi_print_command(cmd->cmnd);
 }
 
 #if (CONSTANTS & CONST_HOST)
@@ -1139,7 +1139,7 @@ static const char * hostbyte_table[]={
 "DID_ABORT", "DID_PARITY", "DID_ERROR", "DID_RESET", "DID_BAD_INTR",
 "DID_PASSTHROUGH", "DID_SOFT_ERROR", "DID_IMM_RETRY", NULL};
 
-void print_hostbyte(int scsiresult)
+void scsi_print_hostbyte(int scsiresult)
 {   static int maxcode=0;
     int i;
    
@@ -1155,7 +1155,7 @@ void print_hostbyte(int scsiresult)
     printk("(%s) ",hostbyte_table[host_byte(scsiresult)]);
 }
 #else
-void print_hostbyte(int scsiresult)
+void scsi_print_hostbyte(int scsiresult)
 {   printk("Hostbyte=0x%02x ",host_byte(scsiresult));
 }
 #endif
@@ -1170,7 +1170,7 @@ static const char * driversuggest_table[]={"SUGGEST_OK",
 unknown,unknown,unknown, "SUGGEST_SENSE",NULL};
 
 
-void print_driverbyte(int scsiresult)
+void scsi_print_driverbyte(int scsiresult)
 {   static int driver_max=0,suggest_max=0;
     int i,dr=driver_byte(scsiresult)&DRIVER_MASK, 
 	su=(driver_byte(scsiresult)&SUGGEST_MASK)>>4;
@@ -1187,7 +1187,7 @@ void print_driverbyte(int scsiresult)
 	su<suggest_max ? driversuggest_table[su]:"invalid");
 }
 #else
-void print_driverbyte(int scsiresult)
+void scsi_print_driverbyte(int scsiresult)
 {   printk("Driverbyte=0x%02x ",driver_byte(scsiresult));
 }
 #endif

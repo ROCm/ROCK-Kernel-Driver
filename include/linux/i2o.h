@@ -99,6 +99,7 @@ struct i2o_controller
 	int		irq;
 	int		short_req:1;	/* Use small block sizes        */
 	int		dpt:1;		/* Don't quiesce                */
+	int		raptor:1;	/* split bar                    */
 	int		promise:1;	/* Promise controller		*/
 #ifdef CONFIG_MTRR
 	int		mtrr_reg0;
@@ -109,9 +110,9 @@ struct i2o_controller
 	atomic_t users;
 	struct i2o_device *devices;		/* I2O device chain */
 	struct i2o_controller *next;		/* Controller chain */
-	unsigned long post_port;		/* Inbout port address */
-	unsigned long reply_port;		/* Outbound port address */
-	unsigned long irq_mask;			/* Interrupt register address */
+	void *post_port;			/* Inbout port address */
+	void *reply_port;			/* Outbound port address */
+	void *irq_mask;				/* Interrupt register address */
 
 	/* Dynamic LCT related data */
 	struct semaphore lct_sem;
@@ -128,8 +129,11 @@ struct i2o_controller
 	dma_addr_t hrt_phys;
 	u32 hrt_len;
 
-	unsigned long mem_offset;		/* MFA offset */
-	unsigned long mem_phys;			/* MFA physical */
+	void *base_virt;			/* base virtual address */
+	unsigned long base_phys;		/* base physical address */
+
+	void *msg_virt;				/* messages virtual address */
+	unsigned long msg_phys;			/* messages physical address */
 
 	int battery:1;				/* Has a battery backup */
 	int io_alloc:1;				/* An I/O resource was allocated */
