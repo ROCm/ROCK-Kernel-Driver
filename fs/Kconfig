@@ -266,6 +266,18 @@ config REISERFS_FS_POSIX_ACL
 
 	  If you don't know what Access Control Lists are, say N
 
+config REISERFS_FS_SECURITY
+	bool "ReiserFS Security Labels"
+	depends on REISERFS_FS_XATTR
+	help
+	  Security labels support alternative access control models
+	  implemented by security modules like SELinux.  This option
+	  enables an extended attribute handler for file security
+	  labels in the ReiserFS filesystem.
+
+	  If you are not using a security module that requires using
+	  extended attributes for file security labels, say N.
+
 config JFS_FS
 	tristate "JFS filesystem support"
 	select NLS

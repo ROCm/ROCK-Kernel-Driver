@@ -13,6 +13,10 @@ ifeq ($(CONFIG_REISERFS_FS_XATTR),y)
 reiserfs-objs += xattr.o xattr_user.o xattr_trusted.o
 endif
 
+ifeq ($(CONFIG_REISERFS_FS_SECURITY),y)
+reiserfs-objs += xattr_security.o
+endif
+
 ifeq ($(CONFIG_REISERFS_FS_POSIX_ACL),y)
 reiserfs-objs += xattr_acl.o
 endif

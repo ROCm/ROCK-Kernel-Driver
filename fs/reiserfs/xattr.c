@@ -1177,6 +1177,9 @@ reiserfs_xattr_register_handlers (void)
     /* Add the handlers */
     list_add_tail (&user_handler.handlers, &xattr_handlers);
     list_add_tail (&trusted_handler.handlers, &xattr_handlers);
+#ifdef CONFIG_REISERFS_FS_SECURITY
+    list_add_tail (&security_handler.handlers, &xattr_handlers);
+#endif
 #ifdef CONFIG_REISERFS_FS_POSIX_ACL
     list_add_tail (&posix_acl_access_handler.handlers, &xattr_handlers);
     list_add_tail (&posix_acl_default_handler.handlers, &xattr_handlers);

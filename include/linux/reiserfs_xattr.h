@@ -51,6 +51,9 @@ int reiserfs_xattr_set (struct inode *, const char *, const void *,
 
 extern struct reiserfs_xattr_handler user_handler;
 extern struct reiserfs_xattr_handler trusted_handler;
+#ifdef CONFIG_REISERFS_FS_SECURITY
+extern struct reiserfs_xattr_handler security_handler;
+#endif
 
 int reiserfs_xattr_register_handlers (void) __init;
 void reiserfs_xattr_unregister_handlers (void);
