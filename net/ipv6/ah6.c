@@ -353,6 +353,9 @@ static int ah6_init_state(struct xfrm_state *x, void *args)
 	if (x->aalg->alg_key_len > 512)
 		goto error;
 
+	if (x->encap)
+		goto error;
+
 	ahp = kmalloc(sizeof(*ahp), GFP_KERNEL);
 	if (ahp == NULL)
 		return -ENOMEM;

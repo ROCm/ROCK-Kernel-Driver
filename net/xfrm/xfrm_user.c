@@ -78,15 +78,6 @@ static int verify_encap_tmpl(struct rtattr **xfrma)
 	if ((rt->rta_len - sizeof(*rt)) < sizeof(*encap))
 		return -EINVAL;
 
-	encap = RTA_DATA(rt);
-	switch (encap->encap_type) {
-	case UDP_ENCAP_ESPINUDP:
-	case UDP_ENCAP_ESPINUDP_NON_IKE:
-		break;
-	default:
-		return -ENOPROTOOPT;
-	}
-
 	return 0;
 }
 

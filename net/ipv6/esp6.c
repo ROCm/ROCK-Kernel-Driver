@@ -310,6 +310,9 @@ int esp6_init_state(struct xfrm_state *x, void *args)
 	if (x->ealg == NULL)
 		goto error;
 
+	if (x->encap)
+		goto error;
+
 	esp = kmalloc(sizeof(*esp), GFP_KERNEL);
 	if (esp == NULL)
 		return -ENOMEM;

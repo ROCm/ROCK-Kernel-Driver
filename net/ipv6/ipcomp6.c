@@ -284,6 +284,9 @@ static int ipcomp6_init_state(struct xfrm_state *x, void *args)
 	if (!x->calg)
 		goto out;
 
+	if (x->encap)
+		goto out;
+
 	err = -ENOMEM;
 	ipcd = kmalloc(sizeof(*ipcd), GFP_KERNEL);
 	if (!ipcd)

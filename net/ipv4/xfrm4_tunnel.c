@@ -84,6 +84,10 @@ static int ipip_init_state(struct xfrm_state *x, void *args)
 {
 	if (!x->props.mode)
 		return -EINVAL;
+
+	if (x->encap)
+		return -EINVAL;
+
 	x->props.header_len = sizeof(struct iphdr);
 
 	return 0;

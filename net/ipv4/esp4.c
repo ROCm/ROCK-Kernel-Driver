@@ -436,6 +436,7 @@ int esp_init_state(struct xfrm_state *x, void *args)
 
 		switch (encap->encap_type) {
 		default:
+			goto error;
 		case UDP_ENCAP_ESPINUDP:
 			x->props.header_len += sizeof(struct udphdr);
 			break;
@@ -449,15 +450,9 @@ int esp_init_state(struct xfrm_state *x, void *args)
 	return 0;
 
 error:
-	if (esp) {
-		if (esp->auth.tfm)
-			crypto_free_tfm(esp->auth.tfm);
-		if (esp->auth.work_icv)
-			kfree(esp->auth.work_icv);
-		if (esp->conf.tfm)
-			crypto_free_tfm(esp->conf.tfm);
-		kfree(esp);
-	}
+	x->data = esp;
+	esp_destroy(x);
+	x->data = NULL;
 	return -EINVAL;
 }
 
