@@ -1251,7 +1251,7 @@ static int do_swap_page(struct mm_struct * mm,
 	mark_page_accessed(page);
 	pte_chain = pte_chain_alloc(GFP_KERNEL);
 	if (!pte_chain) {
-		ret = -ENOMEM;
+		ret = VM_FAULT_OOM;
 		goto out;
 	}
 	lock_page(page);
