@@ -27,6 +27,8 @@
 #include <linux/watchdog.h>
 #include <linux/init.h>
 
+#include <asm/arch/pxa-regs.h>
+
 #include <asm/hardware.h>
 #include <asm/bitops.h>
 #include <asm/uaccess.h>
