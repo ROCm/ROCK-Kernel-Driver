@@ -1,4 +1,4 @@
-/* $Id: idifunc.c,v 1.14 2004/03/21 18:13:43 armin Exp $
+/* $Id: idifunc.c,v 1.14.4.2 2004/05/09 16:42:20 armin Exp $
  *
  * Driver for Eicon DIVA Server ISDN cards.
  * User Mode IDI Interface 
@@ -137,14 +137,14 @@ static void um_remove_card(DESCRIPTOR * d)
 static void DIVA_EXIT_FUNCTION remove_all_idi_proc(void)
 {
 	udiva_card *card;
-	struct list_head *tmp;
 	diva_os_spin_lock_magic_t old_irql;
 
 rescan:
 	diva_os_enter_spin_lock(&ll_lock, &old_irql, "remove all");
-	list_for_each(tmp, &cards) {
-		card = list_entry(tmp, udiva_card, list);
-	diva_os_leave_spin_lock(&ll_lock, &old_irql, "remove all");
+	if (!list_empty(&cards)) {
+		card = list_entry(cards.next, udiva_card, list);
+		list_del(&card->list);
+		diva_os_leave_spin_lock(&ll_lock, &old_irql, "remove all");
 		diva_user_mode_idi_remove_adapter(card->Id);
 		diva_os_free(0, card);
 		goto rescan;
