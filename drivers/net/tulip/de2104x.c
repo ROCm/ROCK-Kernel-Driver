@@ -1208,8 +1208,7 @@ static void de_adapter_wake (struct de_private *de)
 		pci_write_config_dword(de->pdev, PCIPM, pmctl);
 
 		/* de4x5.c delays, so we do too */
-		current->state = TASK_UNINTERRUPTIBLE;
-		schedule_timeout(msecs_to_jiffies(10));
+		msleep(10);
 	}
 }
 
