@@ -2747,9 +2747,10 @@ CIFSTCon(unsigned int xid, struct cifsSesInfo *ses,
 	struct smb_hdr *smb_buffer_response;
 	TCONX_REQ *pSMB;
 	TCONX_RSP *pSMBr;
-	char *bcc_ptr;
+	unsigned char *bcc_ptr;
 	int rc = 0;
 	int length;
+	__u16 count;
 
 	if (ses == NULL)
 		return -EIO;
@@ -2769,7 +2770,7 @@ CIFSTCon(unsigned int xid, struct cifsSesInfo *ses,
 	pSMB->AndXCommand = 0xFF;
 	pSMB->Flags = cpu_to_le16(TCON_EXTENDED_SECINFO);
 	pSMB->PasswordLength = cpu_to_le16(1);	/* minimum */
-	bcc_ptr = &(pSMB->Password[0]);
+	bcc_ptr = &pSMB->Password[0];
 	bcc_ptr++;		/* skip password */
 
 	if(ses->server->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
@@ -2795,16 +2796,16 @@ CIFSTCon(unsigned int xid, struct cifsSesInfo *ses,
 	strcpy(bcc_ptr, "?????");
 	bcc_ptr += strlen("?????");
 	bcc_ptr += 1;
-	BCC(smb_buffer) = (long) bcc_ptr - (long) pByteArea(smb_buffer);
-	smb_buffer->smb_buf_length += BCC(smb_buffer);
-	BCC(smb_buffer) = cpu_to_le16(BCC(smb_buffer));
+	count = bcc_ptr - &pSMB->Password[0];
+	pSMB->hdr.smb_buf_length += count;
+	pSMB->ByteCount = cpu_to_le16(count);
 
 	rc = SendReceive(xid, ses, smb_buffer, smb_buffer_response, &length, 0);
 
 	/* if (rc) rc = map_smb_to_linux_error(smb_buffer_response); */
 	/* above now done in SendReceive */
 	if ((rc == 0) && (tcon != NULL)) {
-        tcon->tidStatus = CifsGood;
+		tcon->tidStatus = CifsGood;
 		tcon->tid = smb_buffer_response->Tid;
 		bcc_ptr = pByteArea(smb_buffer_response);
 		length = strnlen(bcc_ptr, BCC(smb_buffer_response) - 2);
@@ -2813,8 +2814,8 @@ CIFSTCon(unsigned int xid, struct cifsSesInfo *ses,
 		strncpy(tcon->treeName, tree, MAX_TREE_SIZE);
 		if (smb_buffer->Flags2 & SMBFLG2_UNICODE) {
 			length = UniStrnlen((wchar_t *) bcc_ptr, 512);
-			if (((long) bcc_ptr + (2 * length)) -
-			    (long) pByteArea(smb_buffer_response) <=
+			if ((bcc_ptr + (2 * length)) -
+			     pByteArea(smb_buffer_response) <=
 			    BCC(smb_buffer_response)) {
 				if(tcon->nativeFileSystem)
 					kfree(tcon->nativeFileSystem);
@@ -2831,8 +2832,8 @@ CIFSTCon(unsigned int xid, struct cifsSesInfo *ses,
 			/* else do not bother copying these informational fields */
 		} else {
 			length = strnlen(bcc_ptr, 1024);
-			if (((long) bcc_ptr + length) -
-			    (long) pByteArea(smb_buffer_response) <=
+			if ((bcc_ptr + length) -
+			    pByteArea(smb_buffer_response) <=
 			    BCC(smb_buffer_response)) {
 				if(tcon->nativeFileSystem)
 					kfree(tcon->nativeFileSystem);

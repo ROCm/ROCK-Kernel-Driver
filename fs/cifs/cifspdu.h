@@ -328,7 +328,7 @@ struct smb_hdr {
 #define BCC(smb_var) ( *(__u16 *)((char *)smb_var + sizeof(struct smb_hdr) + (2* smb_var->WordCount) ) )
 
 /* given a pointer to an smb_hdr retrieve the pointer to the byte area */
-#define pByteArea(smb_var) ((char *)smb_var + sizeof(struct smb_hdr) + (2* smb_var->WordCount) + 2 )
+#define pByteArea(smb_var) ((unsigned char *)smb_var + sizeof(struct smb_hdr) + (2* smb_var->WordCount) + 2 )
 
 /*
  * Computer Name Length
@@ -537,10 +537,10 @@ typedef struct smb_com_tconx_req {
 	struct smb_hdr hdr;	/* wct = 4 */
 	__u8 AndXCommand;
 	__u8 AndXReserved;
-	__u16 AndXOffset;
-	__u16 Flags;		/* see below */
-	__u16 PasswordLength;
-	__u16 ByteCount;
+	__le16 AndXOffset;
+	__le16 Flags;		/* see below */
+	__le16 PasswordLength;
+	__le16 ByteCount;
 	unsigned char Password[1];	/* followed by */
 /* STRING Path    *//* \\server\share name */
 	/* STRING Service */
@@ -550,8 +550,8 @@ typedef struct smb_com_tconx_rsp {
 	struct smb_hdr hdr;	/* wct = 3 *//* note that Win2000 has sent wct=7 in some cases on responses. Four unspecified words followed OptionalSupport */
 	__u8 AndXCommand;
 	__u8 AndXReserved;
-	__u16 AndXOffset;
-	__u16 OptionalSupport;	/* see below */
+	__le16 AndXOffset;
+	__le16 OptionalSupport;	/* see below */
 	__u16 ByteCount;
 	unsigned char Service[1];	/* always ASCII, not Unicode */
 	/* STRING NativeFileSystem */
