@@ -473,11 +473,11 @@ struct input_id {
 #define KEY_RESTART		0x198
 #define KEY_SLOW		0x199
 #define KEY_SHUFFLE		0x19a
-#define KEY_BREAK		0x1ab
+#define KEY_BREAK		0x19b
 #define KEY_PREVIOUS		0x19c
 #define KEY_DIGITS		0x19d
 #define KEY_TEEN		0x19e
-#define KEY_TWEN		0x1af
+#define KEY_TWEN		0x19f
 
 #define KEY_MAX			0x1ff
 
