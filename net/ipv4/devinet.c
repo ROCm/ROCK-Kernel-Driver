@@ -88,12 +88,9 @@ static void devinet_sysctl_register(struct in_device *in_dev,
 static void devinet_sysctl_unregister(struct ipv4_devconf *p);
 #endif
 
-int inet_ifa_count;
-int inet_dev_count;
-
 /* Locks all the inet devices. */
 
-rwlock_t inetdev_lock = RW_LOCK_UNLOCKED;
+static spinlock_t inetdev_lock = SPIN_LOCK_UNLOCKED;
 
 static struct in_ifaddr *inet_alloc_ifa(void)
 {
@@ -101,18 +98,24 @@ static struct in_ifaddr *inet_alloc_ifa(void)
 
 	if (ifa) {
 		memset(ifa, 0, sizeof(*ifa));
-		inet_ifa_count++;
+		INIT_RCU_HEAD(&ifa->rcu_head);
 	}
 
 	return ifa;
 }
 
-static __inline__ void inet_free_ifa(struct in_ifaddr *ifa)
+static inline void inet_free_ifa(struct in_ifaddr *ifa)
 {
 	if (ifa->ifa_dev)
-		__in_dev_put(ifa->ifa_dev);
+		in_dev_put(ifa->ifa_dev);
 	kfree(ifa);
-	inet_ifa_count--;
+}
+
+static void inet_rcu_free_ifa(struct rcu_head *head)
+{
+	struct in_ifaddr *ifa = container_of(head, struct in_ifaddr, rcu_head);
+
+	inet_free_ifa(ifa);
 }
 
 void in_dev_finish_destroy(struct in_device *idev)
@@ -129,7 +132,6 @@ void in_dev_finish_destroy(struct in_device *idev)
 	if (!idev->dead)
 		printk("Freeing alive in_device %p\n", idev);
 	else {
-		inet_dev_count--;
 		kfree(idev);
 	}
 }
@@ -144,24 +146,23 @@ struct in_device *inetdev_init(struct net_device *dev)
 	if (!in_dev)
 		goto out;
 	memset(in_dev, 0, sizeof(*in_dev));
-	in_dev->lock = RW_LOCK_UNLOCKED;
+	INIT_RCU_HEAD(&in_dev->rcu_head);
 	memcpy(&in_dev->cnf, &ipv4_devconf_dflt, sizeof(in_dev->cnf));
 	in_dev->cnf.sysctl = NULL;
 	in_dev->dev = dev;
 	if ((in_dev->arp_parms = neigh_parms_alloc(dev, &arp_tbl)) == NULL)
 		goto out_kfree;
-	inet_dev_count++;
 	/* Reference in_dev->dev */
 	dev_hold(dev);
 #ifdef CONFIG_SYSCTL
 	neigh_sysctl_register(dev, in_dev->arp_parms, NET_IPV4,
 			      NET_IPV4_NEIGH, "ipv4", NULL);
 #endif
-	write_lock_bh(&inetdev_lock);
+	spin_lock_bh(&inetdev_lock);
 	dev->ip_ptr = in_dev;
 	/* Account for reference dev->ip_ptr */
 	in_dev_hold(in_dev);
-	write_unlock_bh(&inetdev_lock);
+	spin_unlock_bh(&inetdev_lock);
 #ifdef CONFIG_SYSCTL
 	devinet_sysctl_register(in_dev, &in_dev->cnf);
 #endif
@@ -188,16 +189,16 @@ static void inetdev_destroy(struct in_device *in_dev)
 
 	while ((ifa = in_dev->ifa_list) != NULL) {
 		inet_del_ifa(in_dev, &in_dev->ifa_list, 0);
-		inet_free_ifa(ifa);
+		call_rcu(&ifa->rcu_head, inet_rcu_free_ifa);
 	}
 
 #ifdef CONFIG_SYSCTL
 	devinet_sysctl_unregister(&in_dev->cnf);
 #endif
-	write_lock_bh(&inetdev_lock);
+	spin_lock_bh(&inetdev_lock);
 	in_dev->dev->ip_ptr = NULL;
 	/* in_dev_put following below will kill the in_device */
-	write_unlock_bh(&inetdev_lock);
+	spin_unlock_bh(&inetdev_lock);
 
 #ifdef CONFIG_SYSCTL
 	neigh_sysctl_unregister(in_dev->arp_parms);
@@ -208,16 +209,16 @@ static void inetdev_destroy(struct in_device *in_dev)
 
 int inet_addr_onlink(struct in_device *in_dev, u32 a, u32 b)
 {
-	read_lock(&in_dev->lock);
+	rcu_read_lock();
 	for_primary_ifa(in_dev) {
 		if (inet_ifa_match(a, ifa)) {
 			if (!b || inet_ifa_match(b, ifa)) {
-				read_unlock(&in_dev->lock);
+				rcu_read_unlock();
 				return 1;
 			}
 		}
 	} endfor_ifa(in_dev);
-	read_unlock(&in_dev->lock);
+	rcu_read_unlock();
 	return 0;
 }
 
@@ -241,21 +242,21 @@ static void inet_del_ifa(struct in_device *in_dev, struct in_ifaddr **ifap,
 				ifap1 = &ifa->ifa_next;
 				continue;
 			}
-			write_lock_bh(&in_dev->lock);
+			spin_lock_bh(&inetdev_lock);
 			*ifap1 = ifa->ifa_next;
-			write_unlock_bh(&in_dev->lock);
+			spin_unlock_bh(&inetdev_lock);
 
 			rtmsg_ifa(RTM_DELADDR, ifa);
 			notifier_call_chain(&inetaddr_chain, NETDEV_DOWN, ifa);
-			inet_free_ifa(ifa);
+			call_rcu(&ifa->rcu_head, inet_rcu_free_ifa);
 		}
 	}
 
 	/* 2. Unlink it */
 
-	write_lock_bh(&in_dev->lock);
+	spin_lock_bh(&inetdev_lock);
 	*ifap = ifa1->ifa_next;
-	write_unlock_bh(&in_dev->lock);
+	spin_unlock_bh(&inetdev_lock);
 
 	/* 3. Announce address deletion */
 
@@ -270,7 +271,7 @@ static void inet_del_ifa(struct in_device *in_dev, struct in_ifaddr **ifap,
 	rtmsg_ifa(RTM_DELADDR, ifa1);
 	notifier_call_chain(&inetaddr_chain, NETDEV_DOWN, ifa1);
 	if (destroy) {
-		inet_free_ifa(ifa1);
+		call_rcu(&ifa1->rcu_head, inet_rcu_free_ifa);
 
 		if (!in_dev->ifa_list)
 			inetdev_destroy(in_dev);
@@ -285,7 +286,7 @@ static int inet_insert_ifa(struct in_ifaddr *ifa)
 	ASSERT_RTNL();
 
 	if (!ifa->ifa_local) {
-		inet_free_ifa(ifa);
+		call_rcu(&ifa->rcu_head, inet_rcu_free_ifa);
 		return 0;
 	}
 
@@ -300,11 +301,11 @@ static int inet_insert_ifa(struct in_ifaddr *ifa)
 		if (ifa1->ifa_mask == ifa->ifa_mask &&
 		    inet_ifa_match(ifa1->ifa_address, ifa)) {
 			if (ifa1->ifa_local == ifa->ifa_local) {
-				inet_free_ifa(ifa);
+				call_rcu(&ifa->rcu_head, inet_rcu_free_ifa);
 				return -EEXIST;
 			}
 			if (ifa1->ifa_scope != ifa->ifa_scope) {
-				inet_free_ifa(ifa);
+				call_rcu(&ifa->rcu_head, inet_rcu_free_ifa);
 				return -EINVAL;
 			}
 			ifa->ifa_flags |= IFA_F_SECONDARY;
@@ -317,9 +318,9 @@ static int inet_insert_ifa(struct in_ifaddr *ifa)
 	}
 
 	ifa->ifa_next = *ifap;
-	write_lock_bh(&in_dev->lock);
+	spin_lock_bh(&inetdev_lock);
 	*ifap = ifa;
-	write_unlock_bh(&in_dev->lock);
+	spin_unlock_bh(&inetdev_lock);
 
 	/* Send message first, then call notifier.
 	   Notifier will trigger FIB update, so that
@@ -339,7 +340,7 @@ static int inet_set_ifa(struct net_device *dev, struct in_ifaddr *ifa)
 	if (!in_dev) {
 		in_dev = inetdev_init(dev);
 		if (!in_dev) {
-			inet_free_ifa(ifa);
+			call_rcu(&ifa->rcu_head, inet_rcu_free_ifa);
 			return -ENOBUFS;
 		}
 	}
@@ -771,12 +772,11 @@ u32 inet_select_addr(const struct net_device *dev, u32 dst, int scope)
 	u32 addr = 0;
 	struct in_device *in_dev;
 
-	read_lock(&inetdev_lock);
+	rcu_read_lock();
 	in_dev = __in_dev_get(dev);
 	if (!in_dev)
 		goto out_unlock_inetdev;
 
-	read_lock(&in_dev->lock);
 	for_primary_ifa(in_dev) {
 		if (ifa->ifa_scope > scope)
 			continue;
@@ -787,8 +787,7 @@ u32 inet_select_addr(const struct net_device *dev, u32 dst, int scope)
 		if (!addr)
 			addr = ifa->ifa_local;
 	} endfor_ifa(in_dev);
-	read_unlock(&in_dev->lock);
-	read_unlock(&inetdev_lock);
+	rcu_read_unlock();
 
 	if (addr)
 		goto out;
@@ -798,30 +797,25 @@ u32 inet_select_addr(const struct net_device *dev, u32 dst, int scope)
 	   in dev_base list.
 	 */
 	read_lock(&dev_base_lock);
-	read_lock(&inetdev_lock);
+	rcu_read_lock();
 	for (dev = dev_base; dev; dev = dev->next) {
 		if ((in_dev = __in_dev_get(dev)) == NULL)
 			continue;
 
-		read_lock(&in_dev->lock);
 		for_primary_ifa(in_dev) {
 			if (ifa->ifa_scope != RT_SCOPE_LINK &&
 			    ifa->ifa_scope <= scope) {
-				read_unlock(&in_dev->lock);
 				addr = ifa->ifa_local;
 				goto out_unlock_both;
 			}
 		} endfor_ifa(in_dev);
-		read_unlock(&in_dev->lock);
 	}
 out_unlock_both:
-	read_unlock(&inetdev_lock);
 	read_unlock(&dev_base_lock);
+out_unlock_inetdev:
+	rcu_read_unlock();
 out:
 	return addr;
-out_unlock_inetdev:
-	read_unlock(&inetdev_lock);
-	goto out;
 }
 
 static u32 confirm_addr_indev(struct in_device *in_dev, u32 dst,
@@ -874,29 +868,24 @@ u32 inet_confirm_addr(const struct net_device *dev, u32 dst, u32 local, int scop
 	struct in_device *in_dev;
 
 	if (dev) {
-		read_lock(&inetdev_lock);
-		if ((in_dev = __in_dev_get(dev))) {
-			read_lock(&in_dev->lock);
+		rcu_read_lock();
+		if ((in_dev = __in_dev_get(dev)))
 			addr = confirm_addr_indev(in_dev, dst, local, scope);
-			read_unlock(&in_dev->lock);
-		}
-		read_unlock(&inetdev_lock);
+		rcu_read_unlock();
 
 		return addr;
 	}
 
 	read_lock(&dev_base_lock);
-	read_lock(&inetdev_lock);
+	rcu_read_lock();
 	for (dev = dev_base; dev; dev = dev->next) {
 		if ((in_dev = __in_dev_get(dev))) {
-			read_lock(&in_dev->lock);
 			addr = confirm_addr_indev(in_dev, dst, local, scope);
-			read_unlock(&in_dev->lock);
 			if (addr)
 				break;
 		}
 	}
-	read_unlock(&inetdev_lock);
+	rcu_read_unlock();
 	read_unlock(&dev_base_lock);
 
 	return addr;
@@ -1065,12 +1054,12 @@ static int inet_dump_ifaddr(struct sk_buff *skb, struct netlink_callback *cb)
 			continue;
 		if (idx > s_idx)
 			s_ip_idx = 0;
-		read_lock(&inetdev_lock);
+		rcu_read_lock();
 		if ((in_dev = __in_dev_get(dev)) == NULL) {
-			read_unlock(&inetdev_lock);
+			rcu_read_unlock();
 			continue;
 		}
-		read_lock(&in_dev->lock);
+
 		for (ifa = in_dev->ifa_list, ip_idx = 0; ifa;
 		     ifa = ifa->ifa_next, ip_idx++) {
 			if (ip_idx < s_ip_idx)
@@ -1078,13 +1067,11 @@ static int inet_dump_ifaddr(struct sk_buff *skb, struct netlink_callback *cb)
 			if (inet_fill_ifaddr(skb, ifa, NETLINK_CB(cb->skb).pid,
 					     cb->nlh->nlmsg_seq,
 					     RTM_NEWADDR) <= 0) {
-				read_unlock(&in_dev->lock);
-				read_unlock(&inetdev_lock);
+				rcu_read_unlock();
 				goto done;
 			}
 		}
-		read_unlock(&in_dev->lock);
-		read_unlock(&inetdev_lock);
+		rcu_read_unlock();
 	}
 
 done:
@@ -1138,11 +1125,11 @@ void inet_forward_change(void)
 	read_lock(&dev_base_lock);
 	for (dev = dev_base; dev; dev = dev->next) {
 		struct in_device *in_dev;
-		read_lock(&inetdev_lock);
+		rcu_read_lock();
 		in_dev = __in_dev_get(dev);
 		if (in_dev)
 			in_dev->cnf.forwarding = on;
-		read_unlock(&inetdev_lock);
+		rcu_read_unlock();
 	}
 	read_unlock(&dev_base_lock);
 
@@ -1508,6 +1495,5 @@ EXPORT_SYMBOL(devinet_ioctl);
 EXPORT_SYMBOL(in_dev_finish_destroy);
 EXPORT_SYMBOL(inet_select_addr);
 EXPORT_SYMBOL(inetdev_by_index);
-EXPORT_SYMBOL(inetdev_lock);
 EXPORT_SYMBOL(register_inetaddr_notifier);
 EXPORT_SYMBOL(unregister_inetaddr_notifier);

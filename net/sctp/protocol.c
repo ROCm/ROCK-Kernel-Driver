@@ -148,13 +148,12 @@ static void sctp_v4_copy_addrlist(struct list_head *addrlist,
 	struct in_ifaddr *ifa;
 	struct sctp_sockaddr_entry *addr;
 
-	read_lock(&inetdev_lock);
+	rcu_read_lock();
 	if ((in_dev = __in_dev_get(dev)) == NULL) {
-		read_unlock(&inetdev_lock);
+		rcu_read_unlock();
 		return;
 	}
 
-	read_lock(&in_dev->lock);
 	for (ifa = in_dev->ifa_list; ifa; ifa = ifa->ifa_next) {
 		/* Add the address to the local list.  */
 		addr = t_new(struct sctp_sockaddr_entry, GFP_ATOMIC);
@@ -166,8 +165,7 @@ static void sctp_v4_copy_addrlist(struct list_head *addrlist,
 		}
 	}
 
-	read_unlock(&in_dev->lock);
-	read_unlock(&inetdev_lock);
+	rcu_read_unlock();
 }
 
 /* Extract our IP addresses from the system and stash them in the

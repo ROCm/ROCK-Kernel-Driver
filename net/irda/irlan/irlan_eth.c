@@ -306,7 +306,7 @@ void irlan_eth_send_gratuitous_arp(struct net_device *dev)
 	in_dev = in_dev_get(dev);
 	if (in_dev == NULL)
 		return;
-	read_lock(&in_dev->lock);
+	rcu_read_lock();
 	if (in_dev->ifa_list)
 		
 	arp_send(ARPOP_REQUEST, ETH_P_ARP, 
@@ -314,7 +314,7 @@ void irlan_eth_send_gratuitous_arp(struct net_device *dev)
 		 dev, 
 		 in_dev->ifa_list->ifa_address,
 		 NULL, dev->dev_addr, NULL);
-	read_unlock(&in_dev->lock);
+	rcu_read_unlock();
 	in_dev_put(in_dev);
 #endif /* CONFIG_INET */
 }

@@ -1855,7 +1855,7 @@ int ip_route_input(struct sk_buff *skb, u32 daddr, u32 saddr,
 	if (MULTICAST(daddr)) {
 		struct in_device *in_dev;
 
-		read_lock(&inetdev_lock);
+		rcu_read_lock();
 		if ((in_dev = __in_dev_get(dev)) != NULL) {
 			int our = ip_check_mc(in_dev, daddr, saddr,
 				skb->nh.iph->protocol);
@@ -1864,12 +1864,12 @@ int ip_route_input(struct sk_buff *skb, u32 daddr, u32 saddr,
 			    || (!LOCAL_MCAST(daddr) && IN_DEV_MFORWARD(in_dev))
 #endif
 			    ) {
-				read_unlock(&inetdev_lock);
+				rcu_read_unlock();
 				return ip_route_input_mc(skb, daddr, saddr,
 							 tos, dev, our);
 			}
 		}
-		read_unlock(&inetdev_lock);
+		rcu_read_unlock();
 		return -EINVAL;
 	}
 	return ip_route_input_slow(skb, daddr, saddr, tos, dev);

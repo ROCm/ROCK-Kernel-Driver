@@ -878,7 +878,7 @@ static void icmp_address_reply(struct sk_buff *skb)
 	in_dev = in_dev_get(dev);
 	if (!in_dev)
 		goto out;
-	read_lock(&in_dev->lock);
+	rcu_read_lock();
 	if (in_dev->ifa_list &&
 	    IN_DEV_LOG_MARTIANS(in_dev) &&
 	    IN_DEV_FORWARD(in_dev)) {
@@ -895,7 +895,7 @@ static void icmp_address_reply(struct sk_buff *skb)
 			       NIPQUAD(mask), dev->name, NIPQUAD(rt->rt_src));
 		}
 	}
-	read_unlock(&in_dev->lock);
+	rcu_read_unlock();
 	in_dev_put(in_dev);
 out:;
 }
