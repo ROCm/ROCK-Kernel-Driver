@@ -131,12 +131,6 @@ int scsi_remove_host(struct Scsi_Host *shost)
 	struct scsi_cmnd *scmd;
 
 	/*
-	 * Current policy is all shosts go away on unregister.
-	 */
-	if (shost->hostt->module && GET_USE_COUNT(shost->hostt->module))
-		return 1;
-
-	/*
 	 * FIXME Do ref counting.  We force all of the devices offline to
 	 * help prevent race conditions where other hosts/processors could
 	 * try and get in and queue a command.
@@ -499,8 +493,6 @@ int scsi_register_host(Scsi_Host_Template *shost_tp)
 
 	cur_cnt = scsi_hosts_registered;
 
-	MOD_INC_USE_COUNT;
-
 	/*
 	 * The detect routine must carefully spinunlock/spinlock if it
 	 * enables interrupts, since all interrupt handlers do spinlock as
@@ -583,8 +575,6 @@ int scsi_unregister_host(Scsi_Host_Template *shost_tp)
 	if (pcount != scsi_hosts_registered)
 		printk(KERN_INFO "scsi : %d host%s left.\n", scsi_hosts_registered,
 		       (scsi_hosts_registered == 1) ? "" : "s");
-
-	MOD_DEC_USE_COUNT;
 
 	unlock_kernel();
 	return 0;

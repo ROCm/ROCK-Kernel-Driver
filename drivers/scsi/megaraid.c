@@ -760,9 +760,8 @@ struct mega_hbas mega_hbas[MAX_CONTROLLERS];
 /* For controller re-ordering */ 
 
 static struct file_operations megadev_fops = {
-	ioctl:megadev_ioctl_entry,
-	open:megadev_open,
-	release:megadev_close,
+	.owner			= THIS_MODULE,
+	.ioctl			= megadev_ioctl_entry,
 };
 
 /*
@@ -4333,15 +4332,6 @@ static void enq_scb_freelist (mega_host_config * megacfg, mega_scb * scb, int lo
 	}
 }
 
-/*
- * Routines for the character/ioctl interface to the driver
- */
-static int megadev_open (struct inode *inode, struct file *filep)
-{
-	MOD_INC_USE_COUNT;
-	return 0;		/* success */
-}
-
 static int megadev_ioctl_entry (struct inode *inode, struct file *filep,
 		     unsigned int cmd, unsigned long arg)
 {
@@ -4851,16 +4841,6 @@ megadev_doioctl (mega_host_config * megacfg, Scsi_Cmnd * sc)
 
 	return scb;
 }
-
-static int
-megadev_close (struct inode *inode, struct file *filep)
-{
-#ifdef MODULE
-	MOD_DEC_USE_COUNT;
-#endif
-	return 0;
-}
-
 
 static int
 mega_support_ext_cdb(mega_host_config *this_hba)
