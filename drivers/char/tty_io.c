@@ -833,6 +833,11 @@ static int init_dev(kdev_t device, struct tty_struct **ret_tty)
 	 * and locked termios may be retained.)
 	 */
 
+	if (!try_module_get(driver->owner)) {
+		retval = -ENODEV;
+		goto end_init;
+	}
+
 	o_tty = NULL;
 	tp = o_tp = NULL;
 	ltp = o_ltp = NULL;
@@ -991,6 +996,7 @@ free_mem_out:
 	free_tty_struct(tty);
 
 fail_no_mem:
+	module_put(driver->owner);
 	retval = -ENOMEM;
 	goto end_init;
 
@@ -1033,6 +1039,7 @@ static void release_mem(struct tty_struct *tty, int idx)
 	tty->magic = 0;
 	(*tty->driver.refcount)--;
 	list_del(&tty->tty_files);
+	module_put(tty->driver.owner);
 	free_tty_struct(tty);
 }
 
