@@ -410,7 +410,7 @@ typedef struct isdn_net_dev_s {
   int                    chargeint;    /* Interval between charge-infos    */
 
   int                    pppbind;      /* ippp device for bindings         */
-  int			 ppp_slot;     /* PPPD device slot number          */
+  struct ipppd          *ipppd;        /* /dev/ipppX which controls us     */
 
   struct sk_buff_head    super_tx_queue; /* List of supervisory frames to  */
 	                               /* be transmitted asap              */

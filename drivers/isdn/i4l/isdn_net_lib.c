@@ -369,7 +369,7 @@ isdn_net_addif(char *name, isdn_net_local *mlp)
 	idev->pre_channel = -1;
 	idev->exclusive = -1;
 
-	idev->ppp_slot = -1;
+	idev->ipppd = NULL;
 	idev->pppbind = -1;
 
 	init_timer(&idev->dial_timer);
