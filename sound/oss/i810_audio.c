@@ -1079,25 +1079,15 @@ static void __i810_update_lvi(struct i810_state *state, int rec)
 	else
 		port += dmabuf->write_channel->port;
 
-	/* if we are currently stopped, then our CIV is actually set to our
-	 * *last* sg segment and we are ready to wrap to the next.  However,
-	 * if we set our LVI to the last sg segment, then it won't wrap to
-	 * the next sg segment, it won't even get a start.  So, instead, when
-	 * we are stopped, we set both the LVI value and also we increment
-	 * the CIV value to the next sg segment to be played so that when
-	 * we call start_{dac,adc}, things will operate properly
-	 */
 	if (!dmabuf->enable && dmabuf->ready) {
 		if(rec && dmabuf->count < dmabuf->dmasize &&
 		   (dmabuf->trigger & PCM_ENABLE_INPUT))
 		{
-			CIV_TO_LVI(port, 1);
 			__start_adc(state);
 			while( !(inb(port + OFF_CR) & ((1<<4) | (1<<2))) ) ;
 		} else if (!rec && dmabuf->count &&
 			   (dmabuf->trigger & PCM_ENABLE_OUTPUT))
 		{
-			CIV_TO_LVI(port, 1);
 			__start_dac(state);
 			while( !(inb(port + OFF_CR) & ((1<<4) | (1<<2))) ) ;
 		}
