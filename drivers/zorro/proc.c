@@ -51,7 +51,7 @@ proc_bus_zorro_read(struct file *file, char *buf, size_t nbytes, loff_t *ppos)
 	struct proc_dir_entry *dp = PDE(ino);
 	struct zorro_dev *dev = dp->data;
 	struct ConfigDev cd;
-	int pos = *ppos;
+	loff_t pos = *ppos;
 
 	if (pos >= sizeof(struct ConfigDev))
 		return 0;

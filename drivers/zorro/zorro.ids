@@ -4,7 +4,7 @@
 #	Maintained by Geert Uytterhoeven <zorro@linux-m68k.org>
 #	If you have any new entries, please send them to the maintainer.
 #
-#	$Id: zorro.ids,v 1.17 2001/10/25 08:21:39 geert Exp $
+#	$Id: zorro.ids,v 1.19 2002/10/14 13:08:58 geert Exp $
 #
 
 # Manufacturers and Products. Please keep sorted.
@@ -364,7 +364,13 @@
 	1300  Warp Engine 40xx [Accelerator, SCSI Host Adapter and RAM Expansion]
 089e  ElBox Computer
 	0600  1200/4 [RAM Expansion]
-	1900  PowerFlyer [IDE Interface]
+	0800  FastATA 1200 [IDE Interface]
+	1200  FastATA 1200 [IDE Interface]
+	1300  FastATA 1200 [IDE Interface]
+	1800  FastATA 1200 [IDE Interface]
+	1900  FastATA 4000 [IDE Interface]
+	1d00  FastATA 4000 [IDE Interface]
+	1e00  FastATA ZIV [IDE Interface]
 0a00  Harms Professional
 	1000  030 Plus [Accelerator]
 	d000  3500 Professional [Accelerator and RAM Expansion]

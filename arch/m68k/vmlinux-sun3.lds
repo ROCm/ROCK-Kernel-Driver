@@ -34,13 +34,14 @@ SECTIONS
   /* End of data goes *here* so that freeing init code works properly. */
   _edata = .;
 
+  /* will be freed after init */
   . = ALIGN(8192);	/* Init code and data */
 __init_begin = .;
-  	.text.init : { *(.text.init) }
-  	.data.init : { *(.data.init) }
+  	.init.text : { *(.init.text) }
+  	.init.data : { *(.init.data) }
 	. = ALIGN(16);
 	__setup_start = .;
-	.setup.init : { *(.setup.init) }
+	.init.setup : { *(.init.setup) }
 	__setup_end = .;
 	__initcall_start = .;
 	.initcall.init : {
@@ -61,6 +62,13 @@ __init_begin = .;
   .bss : { *(.bss) }		/* BSS */
 
   _end = . ;
+
+  /* Sections to be discarded */
+  /DISCARD/ : {
+	*(.exit.text)
+	*(.exit.data)
+	*(.exitcall.exit)
+	}
 
   .crap : {
   	/* Stabs debugging sections.  */

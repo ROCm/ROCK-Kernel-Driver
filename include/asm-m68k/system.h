@@ -7,11 +7,6 @@
 #include <asm/segment.h>
 #include <asm/entry.h>
 
-#define prepare_arch_schedule(prev)		do { } while(0)
-#define finish_arch_schedule(prev)		do { } while(0)
-#define prepare_arch_switch(rq)			do { } while(0)
-#define finish_arch_switch(rq)			spin_unlock_irq(&(rq)->lock)
-
 /*
  * switch_to(n) should switch tasks to task ptr, first checking that
  * ptr isn't the current task, in which case it does nothing.  This
@@ -52,23 +47,24 @@ asmlinkage void resume(void);
 #define local_irq_enable() asm volatile ("andiw %0,%%sr": : "i" (ALLOWINT) : "memory")
 #else
 #include <asm/hardirq.h>
-#define local_irq_enable() ({							      \
-	if (MACH_IS_Q40 || !local_irq_count(smp_processor_id()))              \
-		asm volatile ("andiw %0,%%sr": : "i" (ALLOWINT) : "memory");  \
+#define local_irq_enable() ({							\
+	if (MACH_IS_Q40 || !hardirq_count())					\
+		asm volatile ("andiw %0,%%sr": : "i" (ALLOWINT) : "memory");	\
 })
 #endif
 #define local_irq_disable() asm volatile ("oriw  #0x0700,%%sr": : : "memory")
 #define local_save_flags(x) asm volatile ("movew %%sr,%0":"=d" (x) : : "memory")
 #define local_irq_restore(x) asm volatile ("movew %0,%%sr": :"d" (x) : "memory")
 
+static inline int irqs_disabled(void)
+{
+	unsigned long flags;
+	local_save_flags(flags);
+	return flags & ~ALLOWINT;
+}
+
 /* For spinlocks etc */
 #define local_irq_save(x)	({ local_save_flags(x); local_irq_disable(); })
-
-#define cli()			local_irq_disable()
-#define sti()			local_irq_enable()
-#define save_flags(x)		local_save_flags(x)
-#define restore_flags(x)	local_irq_restore(x)
-#define save_and_cli(flags)   do { save_flags(flags); cli(); } while(0)
 
 /*
  * Force strict CPU ordering.
@@ -95,33 +91,29 @@ struct __xchg_dummy { unsigned long a[100]; };
 #ifndef CONFIG_RMW_INSNS
 static inline unsigned long __xchg(unsigned long x, volatile void * ptr, int size)
 {
-  unsigned long tmp, flags;
+	unsigned long flags, tmp;
 
-  save_flags(flags);
-  cli();
+	local_irq_save(flags);
 
-  switch (size) {
-  case 1:
-    __asm__ __volatile__
-    ("moveb %2,%0\n\t"
-     "moveb %1,%2"
-    : "=&d" (tmp) : "d" (x), "m" (*__xg(ptr)) : "memory");
-    break;
-  case 2:
-    __asm__ __volatile__
-    ("movew %2,%0\n\t"
-     "movew %1,%2"
-    : "=&d" (tmp) : "d" (x), "m" (*__xg(ptr)) : "memory");
-    break;
-  case 4:
-    __asm__ __volatile__
-    ("movel %2,%0\n\t"
-     "movel %1,%2"
-    : "=&d" (tmp) : "d" (x), "m" (*__xg(ptr)) : "memory");
-    break;
-  }
-  restore_flags(flags);
-  return tmp;
+	switch (size) {
+	case 1:
+		tmp = *(u8 *)ptr;
+		*(u8 *)ptr = x;
+		break;
+	case 2:
+		tmp = *(u16 *)ptr;
+		*(u16 *)ptr = x;
+		break;
+	case 4:
+		tmp = *(u32 *)ptr;
+		*(u32 *)ptr = x;
+		break;
+	default:
+		BUG();
+	}
+
+	local_irq_restore(flags);
+	return tmp;
 }
 #else
 static inline unsigned long __xchg(unsigned long x, volatile void * ptr, int size)

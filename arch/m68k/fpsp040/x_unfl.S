@@ -29,7 +29,7 @@ X_UNFL:	|idnt    2,1 | Motorola 040 Floating Point Software Package
 
 	|section	8
 
-	.include "fpsp.h"
+#include "fpsp.h"
 
 	|xref	denorm
 	|xref	round

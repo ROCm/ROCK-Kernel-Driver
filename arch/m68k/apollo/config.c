@@ -26,8 +26,6 @@ u_long timer_physaddr;
 u_long apollo_model;
 
 extern void dn_sched_init(void (*handler)(int,void *,struct pt_regs *));
-extern int dn_keyb_init(void);
-extern int dn_dummy_kbdrate(struct kbd_repeat *);
 extern void dn_init_IRQ(void);
 extern int dn_request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *), unsigned long flags, const char *devname, void *dev_id);
 extern void dn_free_irq(unsigned int irq, void *dev_id);
@@ -37,7 +35,6 @@ extern int show_dn_interrupts(struct seq_file *, void *);
 extern unsigned long dn_gettimeoffset(void);
 extern int dn_dummy_hwclk(int, struct rtc_time *);
 extern int dn_dummy_set_clock_mmss(unsigned long);
-extern void dn_mksound(unsigned int count, unsigned int ticks);
 extern void dn_dummy_reset(void);
 extern void dn_dummy_waitbut(void);
 extern struct fb_info *dn_fb_init(long *);
@@ -165,10 +162,6 @@ void config_apollo(void) {
 	dn_setup_model();	
 
 	mach_sched_init=dn_sched_init; /* */
-#ifdef CONFIG_VT
-	mach_keyb_init=dn_keyb_init;
-	mach_kbdrate=dn_dummy_kbdrate;
-#endif
 	mach_init_IRQ=dn_init_IRQ;
 	mach_default_handler=NULL;
 	mach_request_irq     = dn_request_irq;
@@ -188,9 +181,6 @@ void config_apollo(void) {
 	mach_reset	     = dn_dummy_reset;  /* */
 #ifdef CONFIG_DUMMY_CONSOLE
         conswitchp           = &dummy_con;
-#endif
-#ifdef CONFIG_VT
-	kd_mksound	     = dn_mksound;
 #endif
 #ifdef CONFIG_HEARTBEAT
   	mach_heartbeat = dn_heartbeat;

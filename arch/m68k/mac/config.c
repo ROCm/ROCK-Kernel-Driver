@@ -78,6 +78,8 @@ extern void oss_init(void);
 extern void psc_init(void);
 extern void baboon_init(void);
 
+extern void mac_mksound(unsigned int, unsigned int);
+
 extern void nubus_sweep_video(void);
 
 /* Mac specific debug functions (in debug.c) */
@@ -217,7 +219,7 @@ void __init config_mac(void)
 #if 0
 	mach_debug_init	 = mac_debug_init;
 #endif
-#ifdef CONFIG_INPUT_M68K_BEEP
+#if defined(CONFIG_INPUT_M68K_BEEP) || defined(CONFIG_INPUT_M68K_BEEP_MODULE)
         mach_beep            = mac_mksound;
 #endif
 #ifdef CONFIG_HEARTBEAT

@@ -33,6 +33,36 @@ extern void gen_rtc_interrupt(unsigned long);
 #define RTC_24H 0x02		/* 24 hour mode - else hours bit 7 means pm */
 #define RTC_DST_EN 0x01	        /* auto switch DST - works f. USA only */
 
+static inline void get_rtc_time(struct rtc_time *time)
+{
+	/*
+	 * Only the values that we read from the RTC are set. We leave
+	 * tm_wday, tm_yday and tm_isdst untouched. Even though the
+	 * RTC has RTC_DAY_OF_WEEK, we ignore it, as it is only updated
+	 * by the RTC when initially set to a non-zero value.
+	 */
+	mach_hwclk(0, time);
+}
+
+static inline int set_rtc_time(struct rtc_time *time)
+{
+	return mach_hwclk(1, time);
+}
+
+static inline int get_rtc_pll(struct rtc_pll_info *pll)
+{
+	if (mach_get_rtc_pll)
+		return mach_get_rtc_pll(pll);
+	else
+		return -EINVAL;
+}
+static inline int set_rtc_pll(struct rtc_pll_info *pll)
+{
+	if (mach_set_rtc_pll)
+		return mach_set_rtc_pll(pll);
+	else
+		return -EINVAL;
+}
 
 #endif /* __KERNEL__ */
 

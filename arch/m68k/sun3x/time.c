@@ -79,6 +79,7 @@ unsigned long sun3x_gettimeoffset (void)
     return 0L;
 }
 
+#if 0
 static void sun3x_timer_tick(int irq, void *dev_id, struct pt_regs *regs)
 {
     void (*vector)(int, void *, struct pt_regs *) = dev_id;
@@ -89,6 +90,7 @@ static void sun3x_timer_tick(int irq, void *dev_id, struct pt_regs *regs)
     
     vector(irq, NULL, regs);
 }
+#endif
 
 void __init sun3x_sched_init(void (*vector)(int, void *, struct pt_regs *))
 {

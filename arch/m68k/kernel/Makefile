@@ -19,18 +19,19 @@ EXTRA_AFLAGS := -traditional
 
 include $(TOPDIR)/Rules.make
 
-head.o: head.S m68k_defs.h
+$(obj)/head.o: $(obj)/head.S $(obj)/m68k_defs.h
 
-entry.o: entry.S m68k_defs.h
+$(obj)/entry.o: $(obj)/entry.S $(obj)/m68k_defs.h
 
-sun3-head.o: sun3-head.S m68k_defs.h
+$(obj)/sun3-head.o: $(obj)/sun3-head.S $(obj)/m68k_defs.h
 
-m68k_defs.h: m68k_defs.c m68k_defs.head
-	rm -f m68k_defs.d
-	SUNPRO_DEPENDENCIES="m68k_defs.d m68k_defs.h" \
-	$(CC) $(filter-out -MD,$(CFLAGS)) -S m68k_defs.c
-	cp m68k_defs.head m68k_defs.h
-	grep '^#define' m68k_defs.s >> m68k_defs.h
-	rm m68k_defs.s
--include m68k_defs.d
+$(obj)/m68k_defs.h: $(src)/m68k_defs.c $(src)/m68k_defs.head
+	rm -f $(obj)/m68k_defs.d
+	SUNPRO_DEPENDENCIES="$(obj)/m68k_defs.d $(obj)/m68k_defs.h" \
+	$(CC) $(filter-out -MD,$(CFLAGS)) -S $(src)/m68k_defs.c -o \
+	$(obj)/m68k_defs.s
+	cp $(src)/m68k_defs.head $(obj)/m68k_defs.h
+	grep '^#define' $(obj)/m68k_defs.s >> $(obj)/m68k_defs.h
+	rm $(obj)/m68k_defs.s
+-include $(obj)/m68k_defs.d
 

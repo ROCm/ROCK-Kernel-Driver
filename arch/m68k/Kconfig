@@ -25,10 +25,6 @@ config RWSEM_GENERIC_SPINLOCK
 config RWSEM_XCHGADD_ALGORITHM
 	bool
 
-config GENERIC_ISA_DMA
-	bool
-	default y
-
 
 mainmenu "Linux/68k Kernel Configuration"
 
@@ -201,7 +197,8 @@ config SUN3X
 	help
 	  This option enables support for the Sun 3x series of workstations.
 	  Be warned that this support is very experimental. You will also want
-	  to say Y to 68020 support and N to the other processors below.
+	  to say Y to 68030 support and N to the other processors below.
+	  Note that Sun 3x kernels are not compatible with Sun 3 hardware.
 	  General Linux information on the Sun 3x series (now discontinued)
 	  is at <http://www.angelfire.com/ca2/tech68k/sun3.html>.
 
@@ -210,13 +207,14 @@ config SUN3X
 config SUN3
 	bool "Sun3 support"
 	help
-	  This option enables support for the Sun 3 series of workstations.
-	  Currently, only the Sun 3/80 is supported within the Sun 3x family.
-	  You will also want to enable 68030 support.  General Linux
-	  information on the Sun 3x series (now discontinued) is at
-	  <http://www.angelfire.com/ca2/tech68k/sun3.html>.
+	  This option enables support for the Sun 3 series of workstations
+	  (3/50, 3/60, 3/1xx, 3/2xx systems). Enabling this option requires 
+	  that all other hardware types must be disabled, as Sun 3 kernels 
+	  are incompatible with all other m68k targets (including Sun 3x!).  
+	  Also, you will want to say Y to 68020 support and N to the other 
+	  processors below.
 
-	  If you don't want to compile a kernel for a Sun 3, say N.
+	  If you don't want to compile a kernel exclusively for a Sun 3, say N.
 
 config Q40
 	bool "Q40/Q60 support"
@@ -638,6 +636,11 @@ config ISA
 	  (MCA) or VESA.  ISA is an older system, now being displaced by PCI;
 	  newer boards don't support it.  If you have ISA, say Y, otherwise N.
 
+config GENERIC_ISA_DMA
+	bool
+	depends on Q40 || AMIGA_PCMCIA || GG2
+	default y
+
 source "drivers/pci/Kconfig"
 
 source "drivers/zorro/Kconfig"
@@ -654,9 +657,7 @@ source "drivers/block/Kconfig"
 
 source "drivers/md/Kconfig"
 
-if MAC
 source "drivers/input/Kconfig"
-endif
 
 
 menu "ATA/ATAPI/MFM/RLL device support"
@@ -1132,8 +1133,8 @@ config SUN3_SCSI
 	depends on SUN3 && SCSI
 	help
 	  This option will enable support for the OBIO (onboard io) NCR5380
-	  SCSI controller found in the Sun 3/50 and 3/60.  Note that this
-	  driver does not provide support for VME SCSI boards.
+	  SCSI controller found in the Sun 3/50 and 3/60, as well as for
+	  "Sun3" type VME scsi controllers also based on the NCR5380.
 	  General Linux information on the Sun 3 series (now discontinued)
 	  is at <http://www.angelfire.com/ca2/tech68k/sun3.html>.
 
@@ -1774,6 +1775,11 @@ config VT_CONSOLE
 
 	  If unsure, say Y.
 
+config HW_CONSOLE
+	bool
+	depends on VT
+	default y
+
 config NVRAM
 	bool
 	depends on ATARI
@@ -1800,51 +1806,6 @@ config NVRAM
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
 	  The module will be called nvram.o. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
-
-config AMIGAMOUSE
-	tristate "Amiga mouse support"
-	depends on AMIGA
-	help
-	  If you want to be able to use an Amiga mouse in Linux, say Y.
-
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module is called amigamouse.o. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
-
-config BUSMOUSE
-	bool
-	depends on SUN3X_ZS || ATARI && VT && ATARIMOUSE || AMIGA && AMIGAMOUSE
-	default y
-	---help---
-	  Say Y here if your machine has a bus mouse as opposed to a serial
-	  mouse. Most people have a regular serial MouseSystem or
-	  Microsoft mouse (made by Logitech) that plugs into a COM port
-	  (rectangular with 9 or 25 pins). These people say N here. 
-
-	  If you have a laptop, you either have to check the documentation or
-	  experiment a bit to find out whether the trackball is a serial mouse
-	  or not; it's best to say Y here for you.
-
-	  This is the generic bus mouse driver code. If you have a bus mouse,
-	  you will have to say Y here and also to the specific driver for your
-	  mouse below.
-
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called busmouse.o. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
-
-config ATARIMOUSE
-	tristate "Atari mouse support"
-	depends on ATARI && VT
-	help
-	  If you want to be able to use an Atari mouse in Linux, say Y.
-
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module is called atarimouse.o. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config ATARI_MFPSER

@@ -295,7 +295,7 @@ z2_open( struct inode *inode, struct file *filp )
 
 	current_device = device;
 	z2ram_size <<= Z2RAM_CHUNKSHIFT;
-	set_capacity(z2ram_gendisk, z2ram_size >> 9;   
+	set_capacity(z2ram_gendisk, z2ram_size >> 9);
     }
 
     return 0;
