@@ -58,16 +58,12 @@
 #include <linux/errno.h>
 #include <linux/string.h>
 #include <linux/mm.h>
-#include <linux/tty.h>
 #include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/fb.h>
 #include <linux/init.h>
-#include <linux/selection.h>
 #include <linux/ioport.h>
 #include <linux/pci.h>
-
-#include "console/fbcon.h"
 
 #include <asm/grfioctl.h>	/* for HP-UX compatibility */
 
@@ -113,7 +109,6 @@ struct stifb_info {
 	ngle_rom_t ngle_rom;
 	struct sti_struct *sti;
 	int deviceSpecificConfig;
-	struct display disp;
 };
 
 static int stifb_force_bpp[MAX_STI_ROMS] = {0, };
@@ -897,7 +892,11 @@ stifb_setcolreg(u_int regno, u_int red, u_int green,
 
 	if (regno >= 256)  /* no. of hw registers */
 		return 1;
-	
+
+	red   >>= 8;
+	green >>= 8;
+	blue  >>= 8;
+
 	START_IMAGE_COLORMAP_ACCESS(fb);
 	
 	if (fb->info.var.grayscale) {
@@ -1042,7 +1041,6 @@ stifb_init_fb(struct sti_struct *sti, int force_bpp)
 {
 	struct fb_fix_screeninfo *fix;
 	struct fb_var_screeninfo *var;
-	struct display *disp;
 	struct stifb_info *fb;
 	struct fb_info *info;
 	unsigned long sti_rom_address;
@@ -1061,7 +1059,6 @@ stifb_init_fb(struct sti_struct *sti, int force_bpp)
 	memset(fb, 0, sizeof(*fb));
 	fix = &info->fix;
 	var = &info->var;
-	disp = &fb->disp;
 
 	fb->sti = sti;
 	/* store upper 32bits of the graphics id */
