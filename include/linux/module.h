@@ -46,6 +46,11 @@ struct kernel_symbol
 
 #ifdef MODULE
 
+#ifdef KBUILD_MODNAME
+static const char __module_name[MODULE_NAME_LEN] __attribute__((section(".gnu.linkonce.modname"))) = \
+  __stringify(KBUILD_MODNAME);
+#endif
+
 /* For replacement modutils, use an alias not a pointer. */
 #define MODULE_GENERIC_TABLE(gtype,name)			\
 static const unsigned long __module_##gtype##_size		\
@@ -315,12 +320,7 @@ extern int module_dummy_usage;
 /* Old-style "I'll just call it init_module and it'll be run at
    insert".  Use module_init(myroutine) instead. */
 #ifdef MODULE
-/* Used as "int init_module(void) { ... }".  Get funky to insert modname. */
-#define init_module(voidarg)						\
-	__initfn(void);							\
-	char __module_name[] __attribute__((section(".modulename"))) =	\
-	__stringify(KBUILD_MODNAME);					\
-	int __initfn(void)
+#define init_module(voidarg) __initfn(void)
 #define cleanup_module(voidarg) __exitfn(void)
 #endif
 

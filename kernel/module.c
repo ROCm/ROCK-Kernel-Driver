@@ -867,8 +867,8 @@ static struct module *load_module(void *umod,
 			/* Internal symbols */
 			DEBUGP("Symbol table in section %u\n", i);
 			symindex = i;
-		} else if (strcmp(secstrings+sechdrs[i].sh_name, ".modulename")
-			   == 0) {
+		} else if (strcmp(secstrings+sechdrs[i].sh_name,
+				  ".gnu.linkonce.modname") == 0) {
 			/* This module's name */
 			DEBUGP("Module name in section %u\n", i);
 			modnameindex = i;
