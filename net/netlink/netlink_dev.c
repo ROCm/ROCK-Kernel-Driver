@@ -170,11 +170,21 @@ static struct file_operations netlink_fops = {
 	.release =	netlink_release,
 };
 
-static devfs_handle_t devfs_handle;
+static struct { char *name; int minor; } entries[] = {
+	{"route", 0},
+	{"skip", 1},
+	{"usersock", 2},
+	{"fwmonitor", 3},
+	{"tcpdiag", 4},
+	{"arpd", 8},
+	{"route6", 11},
+	{"ip6_fw", 13},
+	{"dnrtmsg", 13},
+}
 
 static void __init make_devfs_entries (const char *name, int minor)
 {
-	devfs_register (devfs_handle, name, DEVFS_FL_DEFAULT,
+	devfs_register (NULL, name, DEVFS_FL_DEFAULT,
 			NETLINK_MAJOR, minor,
 			S_IFCHR | S_IRUSR | S_IWUSR,
 			&netlink_fops, NULL);
@@ -186,21 +196,18 @@ int __init init_netlink(void)
 		printk(KERN_ERR "netlink: unable to get major %d\n", NETLINK_MAJOR);
 		return -EIO;
 	}
-	devfs_handle = devfs_mk_dir (NULL, "netlink", NULL);
+	devfs_mk_dir (NULL, "netlink", NULL);
 	/*  Someone tell me the official names for the uppercase ones  */
-	make_devfs_entries ("route", 0);
-	make_devfs_entries ("skip", 1);
-	make_devfs_entries ("usersock", 2);
-	make_devfs_entries ("fwmonitor", 3);
-	make_devfs_entries ("tcpdiag", 4);
-	make_devfs_entries ("arpd", 8);
-	make_devfs_entries ("route6", 11);
-	make_devfs_entries ("ip6_fw", 13);
-	make_devfs_entries ("dnrtmsg", 13);
-	devfs_register_series (devfs_handle, "tap%u", 16, DEVFS_FL_DEFAULT,
-			       NETLINK_MAJOR, 16,
-			       S_IFCHR | S_IRUSR | S_IWUSR,
-			       &netlink_fops, NULL);
+	for (i = 0; i < sizeof(entries)/sizeof(entries[0]); i++) {
+		char name[20];
+		sprintf(name, "netlink/%s", entries[i].name);
+		make_devfs_entries(name, entries[i].minor);
+	}
+	for (i = 0; i < 16; i++) {
+		char name[20];
+		sprintf(name, "netlink/tap%d", i);
+		make_devfs_entries(name, i + 16);
+	}
 	return 0;
 }
 
@@ -216,7 +223,11 @@ int init_module(void)
 
 void cleanup_module(void)
 {
-	devfs_unregister (devfs_handle);
+	for (i = 0; i < sizeof(entries)/sizeof(entries[0]); i++)
+		devfs_remove("netlink/%s", entries[i].name);
+	for (i = 0; i < 16; i++)
+		devfs_remove("netlink/tap%d", i);
+	devfs_remove("netlink");
 	unregister_chrdev(NETLINK_MAJOR, "netlink");
 }
 
