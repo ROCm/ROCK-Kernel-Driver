@@ -458,14 +458,14 @@ int vlan_dev_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 			kfree_skb(sk_tmp);
 			if (skb == NULL) {
 				stats->tx_dropped++;
-				return -ENOMEM;
+				return 0;
 			}
 			VLAN_DEV_INFO(dev)->cnt_inc_headroom_on_tx++;
 		} else {
 			if (!(skb = skb_unshare(skb, GFP_ATOMIC))) {
 				printk(KERN_ERR "vlan: failed to unshare skbuff\n");
 				stats->tx_dropped++;
-				return -ENOMEM;
+				return 0;
 			}
 		}
 		veth = (struct vlan_ethhdr *)skb_push(skb, VLAN_HLEN);
