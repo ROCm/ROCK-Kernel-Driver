@@ -3342,6 +3342,48 @@ static int nsp32_prom_read(nsp32_hw_data *data, int romaddr)
 	return val;
 }
 
+static inline void nsp32_prom_set(nsp32_hw_data *data, int bit, int val)
+{
+	int base = data->BaseAddress;
+	int tmp;
+
+	tmp = nsp32_index_read1(base, SERIAL_ROM_CTL);
+
+	if (val == 0) {
+		tmp &= ~bit;
+	} else {
+		tmp |=  bit;
+	}
+
+	nsp32_index_write1(base, SERIAL_ROM_CTL, tmp);
+
+	udelay(10);
+}
+
+static inline int nsp32_prom_get(nsp32_hw_data *data, int bit)
+{
+	int base = data->BaseAddress;
+	int tmp, ret;
+
+	if (bit != SDA) {
+		nsp32_msg(KERN_ERR, "return value is not appropriate");
+		return 0;
+	}
+
+
+	tmp = nsp32_index_read1(base, SERIAL_ROM_CTL) & bit;
+
+	if (tmp == 0) {
+		ret = 0;
+	} else {
+		ret = 1;
+	}
+
+	udelay(10);
+
+	return ret;
+}
+
 static void nsp32_prom_start (nsp32_hw_data *data)
 {
 	/* start condition */
@@ -3385,48 +3427,6 @@ static int nsp32_prom_read_bit(nsp32_hw_data *data)
 	nsp32_prom_set(data, ENA, 1);	/* output mode */
 
 	return val;
-}
-
-static inline void nsp32_prom_set(nsp32_hw_data *data, int bit, int val)
-{
-	int base = data->BaseAddress;
-	int tmp;
-
-	tmp = nsp32_index_read1(base, SERIAL_ROM_CTL);
-
-	if (val == 0) {
-		tmp &= ~bit;
-	} else {
-		tmp |=  bit;
-	}
-
-	nsp32_index_write1(base, SERIAL_ROM_CTL, tmp);
-
-	udelay(10);
-}
-
-static inline int nsp32_prom_get(nsp32_hw_data *data, int bit)
-{
-	int base = data->BaseAddress;
-	int tmp, ret;
-
-	if (bit != SDA) {
-		nsp32_msg(KERN_ERR, "return value is not appropriate");
-		return 0;
-	}
-
-
-	tmp = nsp32_index_read1(base, SERIAL_ROM_CTL) & bit;
-
-	if (tmp == 0) {
-		ret = 0;
-	} else {
-		ret = 1;
-	}
-
-	udelay(10);
-
-	return ret;
 }
 
 
