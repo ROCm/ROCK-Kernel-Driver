@@ -541,7 +541,7 @@ static int mixart_hwdep_dsp_load(snd_hwdep_t *hw, snd_hwdep_dsp_image_t *dsp)
 			return err;
 	};
 
-	printk( KERN_DEBUG "miXart firmware downloaded and successfully set up\n");
+	snd_printdd("miXart firmware downloaded and successfully set up\n");
 
 	return 0;
 }

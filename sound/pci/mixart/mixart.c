@@ -198,7 +198,7 @@ static int mixart_set_clock(mixart_mgr_t *mgr, mixart_pipe_t *pipe, unsigned int
 	clock_properties.nb_callers = 1; /* only one entry in uid_caller ! */
 	clock_properties.uid_caller[0] = pipe->group_uid;
 
-	snd_printk(KERN_DEBUG "mixart_set_clock to %d kHz\n", rate);
+	snd_printdd("mixart_set_clock to %d kHz\n", rate);
 
 	request.message_id = MSG_CLOCK_SET_PROPERTIES;
 	request.uid = mgr->uid_console_manager;
@@ -253,7 +253,7 @@ mixart_pipe_t* snd_mixart_add_ref_pipe( mixart_t *chip, int pcm_number, int capt
 		mixart_streaming_group_t streaming_group_resp;
 		mixart_streaming_group_req_t streaming_group_req;
 
-		snd_printk(KERN_DEBUG "add_ref_pipe audio chip(%d) pcm(%d)\n", chip->chip_idx, pcm_number);
+		snd_printdd("add_ref_pipe audio chip(%d) pcm(%d)\n", chip->chip_idx, pcm_number);
 
 		request.uid = (mixart_uid_t){0,0};      /* should be StreamManagerUID, but zero is OK if there is only one ! */
 		request.data = &streaming_group_req;
@@ -403,7 +403,7 @@ static int snd_mixart_trigger(snd_pcm_substream_t *subs, int cmd)
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
 
-		snd_printk(KERN_DEBUG "SNDRV_PCM_TRIGGER_START\n");
+		snd_printdd("SNDRV_PCM_TRIGGER_START\n");
 
 		// snd_printk(KERN_DEBUG "hw_avail = %d\n", snd_pcm_playback_hw_avail(subs->runtime));
 		/* START_STREAM */
@@ -422,19 +422,19 @@ static int snd_mixart_trigger(snd_pcm_substream_t *subs, int cmd)
 		/* TODO : mixart drains data transefered in advance -> mute stream ? */
 		stream->status = MIXART_STREAM_STATUS_OPEN;
 
-		snd_printk(KERN_DEBUG "SNDRV_PCM_TRIGGER_STOP\n");
+		snd_printdd("SNDRV_PCM_TRIGGER_STOP\n");
 
 		break;
 
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
 		/* TODO */
 		stream->status = MIXART_STREAM_STATUS_PAUSE;
-		snd_printk(KERN_DEBUG "SNDRV_PCM_PAUSE_PUSH\n");
+		snd_printdd("SNDRV_PCM_PAUSE_PUSH\n");
 		break;
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
 		/* TODO */
 		stream->status = MIXART_STREAM_STATUS_RUNNING;
-		snd_printk(KERN_DEBUG "SNDRV_PCM_PAUSE_RELEASE\n");
+		snd_printdd("SNDRV_PCM_PAUSE_RELEASE\n");
 		break;
 	default:
 		return -EINVAL;
@@ -452,7 +452,7 @@ static int snd_mixart_prepare(snd_pcm_substream_t *subs)
 
 	/* TODO de façon non bloquante, réappliquer les hw_params (rate, bits, codec) */
 
-	snd_printk(KERN_DEBUG "snd_mixart_prepare\n");
+	snd_printdd("snd_mixart_prepare\n");
 
 	/* only the first stream can choose the sample rate */
 	/* the further opened streams will be limited to its frequency (see open) */
@@ -523,7 +523,7 @@ static int mixart_set_format(mixart_stream_t *stream, snd_pcm_format_t format)
 		stream_param.sample_size = 16;
 	}
 
-	snd_printk(KERN_DEBUG "set SNDRV_PCM_FORMAT sample_type(%d) sample_size(%d) freq(%d) channels(%d)\n",
+	snd_printdd("set SNDRV_PCM_FORMAT sample_type(%d) sample_size(%d) freq(%d) channels(%d)\n",
 		   stream_param.sample_type, stream_param.sample_size, stream_param.sampling_freq, stream->channels);
 
 	/* TODO: what else to configure ? */
@@ -601,7 +601,7 @@ static int snd_mixart_hw_params(snd_pcm_substream_t *subs,
 		mgr->bufferinfo_array[i].available_length = subs->runtime->dma_bytes;
 		/* mgr->bufferinfo_array[i].buffer_id  is already defined */
 
-		snd_printk(KERN_DEBUG "snd_mixart_hw_params(pcm %d) : dma_addr(%x) dma_bytes(%x) subs-number(%d)\n", i, subs->runtime->dma_addr, subs->runtime->dma_bytes, subs->number);
+		snd_printdd("snd_mixart_hw_params(pcm %d) : dma_addr(%x) dma_bytes(%x) subs-number(%d)\n", i, subs->runtime->dma_addr, subs->runtime->dma_bytes, subs->number);
 	}
 	up(&mgr->setup_mutex);
 
@@ -683,7 +683,7 @@ static int snd_mixart_playback_open(snd_pcm_substream_t *subs)
 		pcm_number = MIXART_PCM_DIGITAL;
 		runtime->hw = snd_mixart_digital_caps;
 	}
-	snd_printk(KERN_DEBUG "snd_mixart_playback_open C%d/P%d/Sub%d\n", chip->chip_idx, pcm_number, subs->number);
+	snd_printdd("snd_mixart_playback_open C%d/P%d/Sub%d\n", chip->chip_idx, pcm_number, subs->number);
 
 	/* get stream info */
 	stream = &(chip->playback_stream[pcm_number][subs->number]);
@@ -761,7 +761,7 @@ static int snd_mixart_capture_open(snd_pcm_substream_t *subs)
 
 	runtime->hw.channels_min = 2; /* for instance, no mono */
 
-	snd_printk(KERN_DEBUG "snd_mixart_capture_open C%d/P%d/Sub%d\n", chip->chip_idx, pcm_number, subs->number);
+	snd_printdd("snd_mixart_capture_open C%d/P%d/Sub%d\n", chip->chip_idx, pcm_number, subs->number);
 
 	/* get stream info */
 	stream = &(chip->capture_stream[pcm_number]);
@@ -824,7 +824,7 @@ static int snd_mixart_close(snd_pcm_substream_t *subs)
 
 	down(&mgr->setup_mutex);
 
-	snd_printk(KERN_DEBUG "snd_mixart_close C%d/P%d/Sub%d\n", chip->chip_idx, stream->pcm_number, subs->number);
+	snd_printdd("snd_mixart_close C%d/P%d/Sub%d\n", chip->chip_idx, stream->pcm_number, subs->number);
 
 	/* sample rate released */
 	if(--mgr->ref_count_rate == 0) {
@@ -1045,7 +1045,7 @@ static int snd_mixart_free(mixart_mgr_t *mgr)
 	/* reset board if some firmware was loaded */
 	if(mgr->hwdep->dsp_loaded) {
 		snd_mixart_reset_board(mgr);
-		snd_printk(KERN_DEBUG "reset miXart !\n");
+		snd_printdd("reset miXart !\n");
 	}
 
 	/* release the i/o ports */

@@ -377,19 +377,19 @@ void snd_mixart_msg_tasklet( unsigned long arg)
 			case MSG_STREAM_STOP_INPUT_STAGE_PACKET:
 			case MSG_STREAM_STOP_OUTPUT_STAGE_PACKET:
 				if(mixart_msg_data[0])
-					snd_printk(KERN_DEBUG "tasklet : MSG_STREAM_ST***_***PUT_STAGE_PACKET txx_status(%x)\n", mixart_msg_data[0]);
+					snd_printdd("tasklet : MSG_STREAM_ST***_***PUT_STAGE_PACKET txx_status(%x)\n", mixart_msg_data[0]);
 				break;
 			case MSG_CLOCK_CHECK_PROPERTIES:
 			case MSG_CLOCK_SET_PROPERTIES:
 				if(mixart_msg_data[0])
-					snd_printk(KERN_DEBUG "tasklet : MSG_CLOCK_***_PROPERTIES txx_status(%x) clock_mode(%x)\n", mixart_msg_data[0], mixart_msg_data[1]);
+					snd_printdd("tasklet : MSG_CLOCK_***_PROPERTIES txx_status(%x) clock_mode(%x)\n", mixart_msg_data[0], mixart_msg_data[1]);
 				break;
 			case MSG_SYSTEM_WAIT_SYNCHRO_CMD:
 				if(mixart_msg_data[0])
-					snd_printk(KERN_DEBUG "tasklet : MSG_SYSTEM_WAIT_SYNCHRO_CMD txx_status(%x)\n", mixart_msg_data[0]);
+					snd_printdd("tasklet : MSG_SYSTEM_WAIT_SYNCHRO_CMD txx_status(%x)\n", mixart_msg_data[0]);
 				break;
 			default:
-				snd_printk(KERN_DEBUG "tasklet received mf(%x) : msg_id(%x) uid(%x, %x) size(%d)\n",
+				snd_printdd("tasklet received mf(%x) : msg_id(%x) uid(%x, %x) size(%d)\n",
 					   msg, resp.message_id, resp.uid.object_id, resp.uid.desc, resp.size);
 				break;
 			}
@@ -516,12 +516,12 @@ irqreturn_t snd_mixart_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 					}
 #endif
 					((char*)mixart_msg_data)[resp.size - 1] = 0;
-					printk(KERN_DEBUG "MIXART TRACE : %s\n", (char*)mixart_msg_data);
+					snd_printdd("MIXART TRACE : %s\n", (char*)mixart_msg_data);
 				}
 				break;
 			}
 
-			snd_printk(KERN_DEBUG "command %x not handled\n", resp.message_id);
+			snd_printdd("command %x not handled\n", resp.message_id);
 			break;
 
 		case MSG_TYPE_NOTIFY:
@@ -546,7 +546,7 @@ irqreturn_t snd_mixart_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			break;
 		case MSG_TYPE_REQUEST:
 		default:
-			snd_printk(KERN_DEBUG "interrupt received request %x\n", msg);
+			snd_printdd("interrupt received request %x\n", msg);
 			/* TODO : are there things to do here ? */
 			break;
 		} /* switch on msg type */
