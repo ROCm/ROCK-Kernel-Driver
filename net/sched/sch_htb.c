@@ -19,9 +19,11 @@
  *			code review and helpful comments on shaping
  *		Tomasz Wrona, <tw@eter.tym.pl>
  *			created test case so that I was able to fix nasty bug
+ *		Wilfried Weissmann
+ *			spotted bug in dequeue code and helped with fix
  *		and many others. thanks.
  *
- * $Id: sch_htb.c,v 1.20 2003/06/18 19:55:49 devik Exp devik $
+ * $Id: sch_htb.c,v 1.24 2003/07/28 15:25:23 devik Exp devik $
  */
 #include <linux/config.h>
 #include <linux/module.h>
@@ -73,7 +75,7 @@
 #define HTB_HYSTERESIS 1/* whether to use mode hysteresis for speedup */
 #define HTB_QLOCK(S) spin_lock_bh(&(S)->dev->queue_lock)
 #define HTB_QUNLOCK(S) spin_unlock_bh(&(S)->dev->queue_lock)
-#define HTB_VER 0x3000c	/* major must be matched with number suplied by TC as version */
+#define HTB_VER 0x3000d	/* major must be matched with number suplied by TC as version */
 
 #if HTB_VER >> 16 != TC_HTB_PROTOVER
 #error "Mismatched sch_htb.c and pkt_sch.h"
@@ -98,7 +100,8 @@
  from LSB
  */
 #ifdef HTB_DEBUG
-#define HTB_DBG(S,L,FMT,ARG...) if (((q->debug>>(2*S))&3) >= L) \
+#define HTB_DBG_COND(S,L) (((q->debug>>(2*S))&3) >= L)
+#define HTB_DBG(S,L,FMT,ARG...) if (HTB_DBG_COND(S,L)) \
 	printk(KERN_DEBUG FMT,##ARG)
 #define HTB_CHCL(cl) BUG_TRAP((cl)->magic == HTB_CMAGIC)
 #define HTB_PASSQ q,
@@ -114,6 +117,7 @@
 		rb_erase(N,R); \
 		(N)->rb_color = -1; } while (0)
 #else
+#define HTB_DBG_COND(S,L) (0)
 #define HTB_DBG(S,L,FMT,ARG...)
 #define HTB_PASSQ
 #define HTB_ARGQ
@@ -901,6 +905,7 @@ htb_lookup_leaf(struct rb_root *tree,int prio,struct rb_node **pptr)
 		struct rb_node **pptr;
 	} stk[TC_HTB_MAXDEPTH],*sp = stk;
 	
+	BUG_TRAP(tree->rb_node);
 	sp->root = tree->rb_node;
 	sp->pptr = pptr;
 
@@ -934,15 +939,36 @@ static struct sk_buff *
 htb_dequeue_tree(struct htb_sched *q,int prio,int level)
 {
 	struct sk_buff *skb = NULL;
-	//struct htb_sched *q = (struct htb_sched *)sch->data;
 	struct htb_class *cl,*start;
 	/* look initial class up in the row */
 	start = cl = htb_lookup_leaf (q->row[level]+prio,prio,q->ptr[level]+prio);
 	
 	do {
-		BUG_TRAP(cl && cl->un.leaf.q->q.qlen); if (!cl) return NULL;
+next:
+		BUG_TRAP(cl); 
+		if (!cl) return NULL;
 		HTB_DBG(4,1,"htb_deq_tr prio=%d lev=%d cl=%X defic=%d\n",
 				prio,level,cl->classid,cl->un.leaf.deficit[level]);
+
+		/* class can be empty - it is unlikely but can be true if leaf
+		   qdisc drops packets in enqueue routine or if someone used
+		   graft operation on the leaf since last dequeue; 
+		   simply deactivate and skip such class */
+		if (unlikely(cl->un.leaf.q->q.qlen == 0)) {
+			struct htb_class *next;
+			htb_deactivate(q,cl);
+
+			/* row/level might become empty */
+			if ((q->row_mask[level] & (1 << prio)) == 0)
+				return NULL; 
+			
+			next = htb_lookup_leaf (q->row[level]+prio,
+					prio,q->ptr[level]+prio);
+			if (cl == start) /* fix start if we just deleted it */
+				start = next;
+			cl = next;
+			goto next;
+		}
 	
 		if (likely((skb = cl->un.leaf.q->dequeue(cl->un.leaf.q)) != NULL)) 
 			break;
@@ -1189,7 +1215,8 @@ static int htb_dump(struct Qdisc *sch, struct sk_buff *skb)
 	gopt.direct_pkts = q->direct_pkts;
 
 #ifdef HTB_DEBUG
-	htb_debug_dump(q);
+	if (HTB_DBG_COND(0,2))
+		htb_debug_dump(q);
 #endif
 	gopt.version = HTB_VER;
 	gopt.rate2quantum = q->rate2quantum;
@@ -1270,6 +1297,9 @@ static int htb_graft(struct Qdisc *sch, unsigned long arg, struct Qdisc *new,
 					return -ENOBUFS;
 		sch_tree_lock(sch);
 		if ((*old = xchg(&cl->un.leaf.q, new)) != NULL) {
+			if (cl->prio_activity)
+				htb_deactivate ((struct htb_sched*)sch->data,cl);
+
 			/* TODO: is it correct ? Why CBQ doesn't do it ? */
 			sch->q.qlen -= (*old)->q.qlen;	
 			qdisc_reset(*old);
