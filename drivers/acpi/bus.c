@@ -46,7 +46,6 @@ struct proc_dir_entry		*acpi_root_dir;
 
 #define STRUCT_TO_INT(s)	(*((int*)&s))
 
-
 /* --------------------------------------------------------------------------
                                 Device Management
    -------------------------------------------------------------------------- */
@@ -624,19 +623,6 @@ acpi_bus_init (void)
 		goto error1;
 	}
 
-#ifdef CONFIG_ACPI_EC
-	/*
-	 * ACPI 2.0 requires the EC driver to be loaded and work before
-	 * the EC device is found in the namespace. This is accomplished
-	 * by looking for the ECDT table, and getting the EC parameters out
-	 * of that.
-	 */
-	result = acpi_ec_ecdt_probe();
-	if (result) {
-		goto error1;
-	}
-#endif
-
 	status = acpi_initialize_objects(ACPI_FULL_INITIALIZATION);
 	if (ACPI_FAILURE(status)) {
 		printk(KERN_ERR PREFIX "Unable to initialize ACPI objects\n");
@@ -658,26 +644,17 @@ acpi_bus_init (void)
 	status = acpi_install_notify_handler(ACPI_ROOT_OBJECT, ACPI_SYSTEM_NOTIFY, &acpi_bus_notify, NULL);
 	if (ACPI_FAILURE(status)) {
 		printk(KERN_ERR PREFIX "Unable to register for device notifications\n");
-		result = -ENODEV;
 		goto error1;
 	}
 
 	/*
 	 * Create the top ACPI proc directory
 	 */
-	acpi_device_dir(acpi_root) = proc_mkdir(ACPI_BUS_FILE_ROOT, NULL);
-	if (!acpi_root) {
-		result = -ENODEV;
-		goto error3;
-	}
-	acpi_root_dir = acpi_device_dir(acpi_root);
+	acpi_root_dir = proc_mkdir(ACPI_BUS_FILE_ROOT, NULL);
 
 	return_VALUE(0);
 
 	/* Mimic structured exception handling */
-error3:
-	acpi_remove_notify_handler(ACPI_ROOT_OBJECT,
-		ACPI_SYSTEM_NOTIFY, &acpi_bus_notify);
 error1:
 	acpi_terminate();
 error0:

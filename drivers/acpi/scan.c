@@ -16,6 +16,12 @@ ACPI_MODULE_NAME		("scan")
 
 extern struct acpi_device		*acpi_root;
 
+
+#define ACPI_BUS_CLASS			"system_bus"
+#define ACPI_BUS_HID			"ACPI_BUS"
+#define ACPI_BUS_DRIVER_NAME		"ACPI Bus Driver"
+#define ACPI_BUS_DEVICE_NAME		"System Bus"
+
 static int
 acpi_device_register (
 	struct acpi_device	*device,

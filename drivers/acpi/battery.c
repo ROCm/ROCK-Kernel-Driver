@@ -46,6 +46,19 @@ MODULE_LICENSE("GPL");
 #define ACPI_BATTERY_FORMAT_BIF	"NNNNNNNNNSSSS"
 #define ACPI_BATTERY_FORMAT_BST	"NNNN"
 
+#define ACPI_BATTERY_COMPONENT		0x00040000
+#define ACPI_BATTERY_CLASS		"battery"
+#define ACPI_BATTERY_HID		"PNP0C0A"
+#define ACPI_BATTERY_DRIVER_NAME	"ACPI Battery Driver"
+#define ACPI_BATTERY_DEVICE_NAME	"Battery"
+#define ACPI_BATTERY_FILE_INFO		"info"
+#define ACPI_BATTERY_FILE_STATUS	"state"
+#define ACPI_BATTERY_FILE_ALARM		"alarm"
+#define ACPI_BATTERY_NOTIFY_STATUS	0x80
+#define ACPI_BATTERY_NOTIFY_INFO	0x81
+#define ACPI_BATTERY_UNITS_WATTS	"mW"
+#define ACPI_BATTERY_UNITS_AMPS		"mA"
+
 static int acpi_battery_add (struct acpi_device *device);
 static int acpi_battery_remove (struct acpi_device *device, int type);
 

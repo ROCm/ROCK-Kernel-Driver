@@ -38,6 +38,14 @@
 #define _COMPONENT		ACPI_EC_COMPONENT
 ACPI_MODULE_NAME		("acpi_ec")
 
+#define ACPI_EC_COMPONENT		0x00100000
+#define ACPI_EC_CLASS			"embedded_controller"
+#define ACPI_EC_HID			"PNP0C09"
+#define ACPI_EC_DRIVER_NAME		"ACPI Embedded Controller Driver"
+#define ACPI_EC_DEVICE_NAME		"Embedded Controller"
+#define ACPI_EC_FILE_INFO		"info"
+
+
 #define ACPI_EC_FLAG_OBF	0x01	/* Output buffer full */
 #define ACPI_EC_FLAG_IBF	0x02	/* Input buffer full */
 #define ACPI_EC_FLAG_SCI	0x20	/* EC-SCI occurred */
@@ -723,7 +731,7 @@ acpi_ec_stop (
 }
 
 
-int __init
+static int __init
 acpi_ec_ecdt_probe (void)
 {
 	acpi_status		status;
@@ -790,18 +798,23 @@ static int __init acpi_ec_init (void)
 	if (acpi_disabled)
 		return_VALUE(0);
 
-	result = acpi_bus_register_driver(&acpi_ec_driver);
-	if (result < 0) {
-		remove_proc_entry(ACPI_EC_CLASS, acpi_root_dir);
-		return_VALUE(-ENODEV);
-	}
+	/*
+	 * ACPI 2.0 requires the EC driver to be loaded and work before
+	 * the EC device is found in the namespace. This is accomplished
+	 * by looking for the ECDT table, and getting the EC parameters out
+	 * of that.
+	 */
+	result = acpi_ec_ecdt_probe();
 
-	return_VALUE(0);
+	/* Now register the driver for the EC */
+	if (!result) 
+		result = acpi_bus_register_driver(&acpi_ec_driver);
+	return_VALUE(result);
 }
 
 subsys_initcall(acpi_ec_init);
 
-void __exit
+static void __exit
 acpi_ec_ecdt_exit (void)
 {
 	if (!ec_ecdt)
@@ -815,7 +828,7 @@ acpi_ec_ecdt_exit (void)
 	kfree(ec_ecdt);
 }
 
-void __exit
+static void __exit
 acpi_ec_exit (void)
 {
 	int			result = 0;

@@ -40,6 +40,33 @@ MODULE_AUTHOR("Paul Diefenbaugh");
 MODULE_DESCRIPTION(ACPI_BUTTON_DRIVER_NAME);
 MODULE_LICENSE("GPL");
 
+#define ACPI_BUTTON_COMPONENT		0x00080000
+#define ACPI_BUTTON_DRIVER_NAME		"ACPI Button Driver"
+#define ACPI_BUTTON_CLASS		"button"
+#define ACPI_BUTTON_FILE_INFO		"info"
+#define ACPI_BUTTON_TYPE_UNKNOWN	0x00
+#define ACPI_BUTTON_NOTIFY_STATUS	0x80
+
+#define ACPI_BUTTON_SUBCLASS_POWER	"power"
+#define ACPI_BUTTON_HID_POWER		"PNP0C0C"	
+#define ACPI_BUTTON_DEVICE_NAME_POWER	"Power Button (CM)"
+#define ACPI_BUTTON_DEVICE_NAME_POWERF	"Power Button (FF)"
+#define ACPI_BUTTON_TYPE_POWER		0x01
+#define ACPI_BUTTON_TYPE_POWERF		0x02
+
+#define ACPI_BUTTON_SUBCLASS_SLEEP	"sleep"
+#define ACPI_BUTTON_HID_SLEEP		"PNP0C0E"
+#define ACPI_BUTTON_DEVICE_NAME_SLEEP	"Sleep Button (CM)"
+#define ACPI_BUTTON_DEVICE_NAME_SLEEPF	"Sleep Button (FF)"
+#define ACPI_BUTTON_TYPE_SLEEP		0x03
+#define ACPI_BUTTON_TYPE_SLEEPF		0x04
+
+#define ACPI_BUTTON_SUBCLASS_LID	"lid"
+#define ACPI_BUTTON_HID_LID		"PNP0C0D"
+#define ACPI_BUTTON_DEVICE_NAME_LID	"Lid Switch"
+#define ACPI_BUTTON_TYPE_LID		0x05
+
+
 int acpi_button_add (struct acpi_device *device);
 int acpi_button_remove (struct acpi_device *device, int type);
 

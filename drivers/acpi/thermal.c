@@ -54,6 +54,24 @@ static int tzp = 0;
 MODULE_PARM(tzp, "i");
 MODULE_PARM_DESC(tzp, "Thermal zone polling frequency, in 1/10 seconds.\n");
 
+#define ACPI_THERMAL_COMPONENT		0x04000000
+#define ACPI_THERMAL_CLASS		"thermal_zone"
+#define ACPI_THERMAL_DRIVER_NAME	"ACPI Thermal Zone Driver"
+#define ACPI_THERMAL_DEVICE_NAME	"Thermal Zone"
+#define ACPI_THERMAL_FILE_STATE		"state"
+#define ACPI_THERMAL_FILE_TEMPERATURE	"temperature"
+#define ACPI_THERMAL_FILE_TRIP_POINTS	"trip_points"
+#define ACPI_THERMAL_FILE_COOLING_MODE	"cooling_mode"
+#define ACPI_THERMAL_FILE_POLLING_FREQ	"polling_frequency"
+#define ACPI_THERMAL_NOTIFY_TEMPERATURE	0x80
+#define ACPI_THERMAL_NOTIFY_THRESHOLDS	0x81
+#define ACPI_THERMAL_NOTIFY_DEVICES	0x82
+#define ACPI_THERMAL_NOTIFY_CRITICAL	0xF0
+#define ACPI_THERMAL_NOTIFY_HOT		0xF1
+#define ACPI_THERMAL_MODE_ACTIVE	0x00
+#define ACPI_THERMAL_MODE_PASSIVE	0x01
+#define ACPI_THERMAL_PATH_POWEROFF	"/sbin/poweroff"
+
 #define ACPI_THERMAL_MAX_ACTIVE	10
 
 #define KELVIN_TO_CELSIUS(t)	((t-2732+5)/10)
