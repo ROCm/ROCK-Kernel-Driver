@@ -12,6 +12,16 @@ struct timespec {
 };
 #endif /* _STRUCT_TIMESPEC */
 
+struct timeval {
+	time_t		tv_sec;		/* seconds */
+	suseconds_t	tv_usec;	/* microseconds */
+};
+
+struct timezone {
+	int	tz_minuteswest;	/* minutes west of Greenwich */
+	int	tz_dsttime;	/* type of dst correction */
+};
+
 #ifdef __KERNEL__
 
 /*
@@ -45,6 +55,27 @@ static __inline__ void
 jiffies_to_timespec(unsigned long jiffies, struct timespec *value)
 {
 	value->tv_nsec = (jiffies % HZ) * (1000000000L / HZ);
+	value->tv_sec = jiffies / HZ;
+}
+
+/* Same for "timeval" */
+static __inline__ unsigned long
+timeval_to_jiffies(struct timeval *value)
+{
+	unsigned long sec = value->tv_sec;
+	long usec = value->tv_usec;
+
+	if (sec >= (MAX_JIFFY_OFFSET / HZ))
+		return MAX_JIFFY_OFFSET;
+	usec += 1000000L / HZ - 1;
+	usec /= 1000000L / HZ;
+	return HZ * sec + usec;
+}
+
+static __inline__ void
+jiffies_to_timeval(unsigned long jiffies, struct timeval *value)
+{
+	value->tv_usec = (jiffies % HZ) * (1000000L / HZ);
 	value->tv_sec = jiffies / HZ;
 }
 
@@ -87,17 +118,6 @@ extern struct timeval xtime;
 #define CURRENT_TIME (xtime.tv_sec)
 
 #endif /* __KERNEL__ */
-
-
-struct timeval {
-	time_t		tv_sec;		/* seconds */
-	suseconds_t	tv_usec;	/* microseconds */
-};
-
-struct timezone {
-	int	tz_minuteswest;	/* minutes west of Greenwich */
-	int	tz_dsttime;	/* type of dst correction */
-};
 
 #define NFDBITS			__NFDBITS
 

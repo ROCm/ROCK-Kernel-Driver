@@ -98,7 +98,7 @@ static int uptime_read_proc(char *page, char **start, off_t off,
 	int len;
 
 	uptime = jiffies;
-	idle = init_task.times.tms_utime + init_task.times.tms_stime;
+	idle = init_task.utime + init_task.stime;
 
 	/* The formula for the fraction parts really is ((t * 100) / HZ) % 100, but
 	   that would overflow about every five days at HZ == 100.

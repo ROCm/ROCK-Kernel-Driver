@@ -18,6 +18,7 @@
 #include <linux/fs.h>
 #include <linux/tqueue.h>
 #include <linux/device.h>
+#include <linux/times.h>
 
 #include <asm/uaccess.h>
 #include <asm/io.h>
@@ -833,10 +834,16 @@ asmlinkage long sys_times(struct tms * tbuf)
 	 *	atomically safe type this is just fine. Conceptually its
 	 *	as if the syscall took an instant longer to occur.
 	 */
-	if (tbuf)
-		if (copy_to_user(tbuf, &current->times, sizeof(struct tms)))
+	if (tbuf) {
+		struct tms tmp;
+		tmp.tms_utime = jiffies_to_clock_t(current->utime);
+		tmp.tms_stime = jiffies_to_clock_t(current->stime);
+		tmp.tms_cutime = jiffies_to_clock_t(current->cutime);
+		tmp.tms_cstime = jiffies_to_clock_t(current->cstime);
+		if (copy_to_user(tbuf, &tmp, sizeof(struct tms)))
 			return -EFAULT;
-	return jiffies;
+	}
+	return jiffies_to_clock_t(jiffies);
 }
 
 /*
@@ -1193,28 +1200,22 @@ int getrusage(struct task_struct *p, int who, struct rusage *ru)
 	memset((char *) &r, 0, sizeof(r));
 	switch (who) {
 		case RUSAGE_SELF:
-			r.ru_utime.tv_sec = CT_TO_SECS(p->times.tms_utime);
-			r.ru_utime.tv_usec = CT_TO_USECS(p->times.tms_utime);
-			r.ru_stime.tv_sec = CT_TO_SECS(p->times.tms_stime);
-			r.ru_stime.tv_usec = CT_TO_USECS(p->times.tms_stime);
+			jiffies_to_timeval(p->utime, &r.ru_utime);
+			jiffies_to_timeval(p->stime, &r.ru_stime);
 			r.ru_minflt = p->min_flt;
 			r.ru_majflt = p->maj_flt;
 			r.ru_nswap = p->nswap;
 			break;
 		case RUSAGE_CHILDREN:
-			r.ru_utime.tv_sec = CT_TO_SECS(p->times.tms_cutime);
-			r.ru_utime.tv_usec = CT_TO_USECS(p->times.tms_cutime);
-			r.ru_stime.tv_sec = CT_TO_SECS(p->times.tms_cstime);
-			r.ru_stime.tv_usec = CT_TO_USECS(p->times.tms_cstime);
+			jiffies_to_timeval(p->cutime, &r.ru_utime);
+			jiffies_to_timeval(p->cstime, &r.ru_stime);
 			r.ru_minflt = p->cmin_flt;
 			r.ru_majflt = p->cmaj_flt;
 			r.ru_nswap = p->cnswap;
 			break;
 		default:
-			r.ru_utime.tv_sec = CT_TO_SECS(p->times.tms_utime + p->times.tms_cutime);
-			r.ru_utime.tv_usec = CT_TO_USECS(p->times.tms_utime + p->times.tms_cutime);
-			r.ru_stime.tv_sec = CT_TO_SECS(p->times.tms_stime + p->times.tms_cstime);
-			r.ru_stime.tv_usec = CT_TO_USECS(p->times.tms_stime + p->times.tms_cstime);
+			jiffies_to_timeval(p->utime + p->cutime, &r.ru_utime);
+			jiffies_to_timeval(p->stime + p->cstime, &r.ru_stime);
 			r.ru_minflt = p->min_flt + p->cmin_flt;
 			r.ru_majflt = p->maj_flt + p->cmaj_flt;
 			r.ru_nswap = p->nswap + p->cnswap;

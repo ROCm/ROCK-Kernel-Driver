@@ -71,6 +71,7 @@
 #include <linux/signal.h>
 #include <linux/highmem.h>
 #include <linux/file.h>
+#include <linux/times.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -360,10 +361,10 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 		task->cmin_flt,
 		task->maj_flt,
 		task->cmaj_flt,
-		task->times.tms_utime,
-		task->times.tms_stime,
-		task->times.tms_cutime,
-		task->times.tms_cstime,
+		jiffies_to_clock_t(task->utime),
+		jiffies_to_clock_t(task->stime),
+		jiffies_to_clock_t(task->cutime),
+		jiffies_to_clock_t(task->cstime),
 		priority,
 		nice,
 		0UL /* removed */,
@@ -692,8 +693,8 @@ int proc_pid_cpu(struct task_struct *task, char * buffer)
 
 	len = sprintf(buffer,
 		"cpu  %lu %lu\n",
-		task->times.tms_utime,
-		task->times.tms_stime);
+		task->utime,
+		task->stime);
 		
 	for (i = 0 ; i < NR_CPUS; i++) {
 		if (cpu_online(i))
