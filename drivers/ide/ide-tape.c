@@ -2132,7 +2132,8 @@ static ide_startstop_t idetape_pc_intr(struct ata_device *drive, struct request 
 	if (test_and_clear_bit (PC_DMA_IN_PROGRESS, &pc->flags)) {
 		printk (KERN_ERR "ide-tape: The tape wants to issue more interrupts in DMA mode\n");
 		printk (KERN_ERR "ide-tape: DMA disabled, reverting to PIO\n");
-		drive->channel->udma(ide_dma_off, drive, NULL);
+		udma_enable(drive, 0, 1);
+
 		return ide_stopped;
 	}
 #endif /* CONFIG_BLK_DEV_IDEDMA */
@@ -2309,7 +2310,7 @@ static ide_startstop_t idetape_issue_packet_command(struct ata_device *drive, st
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (test_and_clear_bit (PC_DMA_ERROR, &pc->flags)) {
 		printk (KERN_WARNING "ide-tape: DMA disabled, reverting to PIO\n");
-		(void) drive->channel->udma(ide_dma_off, drive, NULL);
+		udma_enable(drive, 0, 1);
 	}
 	if (test_bit (PC_DMA_RECOMMENDED, &pc->flags) && drive->using_dma) {
 		if (test_bit (PC_WRITING, &pc->flags))

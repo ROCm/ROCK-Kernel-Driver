@@ -123,18 +123,16 @@ static int ns87415_udma_write(struct ata_device *drive, struct request *rq)
 	return 1;
 }
 
-static int ns87415_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request *rq)
+static int ns87415_dmaproc(struct ata_device *drive)
 {
-	switch (func) {
-		case ide_dma_check:
-			if (drive->type != ATA_DISK)
-				return ide_dmaproc(ide_dma_off_quietly, drive, rq);
-			/* Fallthrough... */
-		default:
-			return ide_dmaproc(func, drive, rq);	/* use standard DMA stuff */
+	if (drive->type != ATA_DISK) {
+		udma_enable(drive, 0, 0);
+
+		return 0;
 	}
+	return XXX_ide_dmaproc(drive);
 }
-#endif /* CONFIG_BLK_DEV_IDEDMA */
+#endif
 
 void __init ide_init_ns87415(struct ata_channel *hwif)
 {
@@ -233,7 +231,7 @@ void __init ide_init_ns87415(struct ata_channel *hwif)
 		hwif->udma_stop = ns87415_udma_stop;
 		hwif->udma_read = ns87415_udma_read;
 		hwif->udma_write = ns87415_udma_write;
-		hwif->udma = ns87415_dmaproc;
+		hwif->XXX_udma = ns87415_dmaproc;
 	}
 #endif
 

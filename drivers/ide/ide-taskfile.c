@@ -260,7 +260,7 @@ int drive_is_ready(struct ata_device *drive)
 {
 	byte stat = 0;
 	if (drive->waiting_for_dma)
-		return drive->channel->udma(ide_dma_test_irq, drive, NULL);
+		return udma_irq_status(drive);
 #if 0
 	/* need to guarantee 400ns since last command was issued */
 	udelay(1);

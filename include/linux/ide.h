@@ -373,15 +373,6 @@ struct ata_device {
 	int		max_depth;
 } ide_drive_t;
 
-typedef enum {
-	ide_dma_check,
-	ide_dma_on, ide_dma_off,
-	ide_dma_off_quietly,
-	ide_dma_test_irq,
-	ide_dma_lostirq,
-	ide_dma_timeout
-} ide_dma_action_t;
-
 enum {
 	ATA_PRIMARY	= 0,
 	ATA_SECONDARY	= 1
@@ -431,7 +422,7 @@ struct ata_channel {
 	void (*atapi_read)(struct ata_device *, void *, unsigned int);
 	void (*atapi_write)(struct ata_device *, void *, unsigned int);
 
-	int (*udma)(ide_dma_action_t, struct ata_device *, struct request *);
+	int (*XXX_udma)(struct ata_device *);
 
 	int (*udma_start) (struct ata_device *, struct request *rq);
 	int (*udma_stop) (struct ata_device *);
@@ -442,7 +433,7 @@ struct ata_channel {
 	int (*udma_irq_status) (struct ata_device *);
 
 	void (*udma_timeout) (struct ata_device *);
-	void (*udma_lost_irq) (struct ata_device *);
+	void (*udma_irq_lost) (struct ata_device *);
 
 	unsigned int	*dmatable_cpu;	/* dma physical region descriptor table (cpu view) */
 	dma_addr_t	dmatable_dma;	/* dma physical region descriptor table (dma view) */
@@ -884,7 +875,7 @@ extern void udma_enable(struct ata_device *, int, int);
 extern int udma_black_list(struct ata_device *);
 extern int udma_white_list(struct ata_device *);
 extern void udma_timeout(struct ata_device *);
-extern void udma_lost_irq(struct ata_device *);
+extern void udma_irq_lost(struct ata_device *);
 extern int udma_start(struct ata_device *, struct request *rq);
 extern int udma_stop(struct ata_device *);
 extern int udma_read(struct ata_device *, struct request *rq);
@@ -898,7 +889,7 @@ extern int udma_tcq_enable(struct ata_device *, int);
 
 extern ide_startstop_t ide_dma_intr(struct ata_device *, struct request *);
 extern int check_drive_lists(struct ata_device *, int good_bad);
-extern int ide_dmaproc(ide_dma_action_t func, struct ata_device *, struct request *);
+extern int XXX_ide_dmaproc(struct ata_device *);
 extern void ide_release_dma(struct ata_channel *);
 extern void ide_setup_dma(struct ata_channel *,	unsigned long, unsigned int) __init;
 extern int ata_start_dma(struct ata_device *, struct request *rq);

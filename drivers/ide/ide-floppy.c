@@ -944,10 +944,11 @@ static ide_startstop_t idefloppy_pc_intr(struct ata_device *drive, struct reques
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (test_and_clear_bit (PC_DMA_IN_PROGRESS, &pc->flags)) {
 		printk (KERN_ERR "ide-floppy: The floppy wants to issue more interrupts in DMA mode\n");
-		drive->channel->udma(ide_dma_off, drive, NULL);
+		udma_enable(drive, 0, 1);
+
 		return ide_stopped;
 	}
-#endif /* CONFIG_BLK_DEV_IDEDMA */
+#endif
 	bcount.b.high=IN_BYTE (IDE_BCOUNTH_REG);			/* Get the number of bytes to transfer */
 	bcount.b.low=IN_BYTE (IDE_BCOUNTL_REG);			/* on this interrupt */
 	ireason.all=IN_BYTE (IDE_IREASON_REG);
@@ -1119,9 +1120,9 @@ static ide_startstop_t idefloppy_issue_pc(struct ata_device *drive, struct reque
 	bcount.all = min(pc->request_transfer, 63 * 1024);
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-	if (test_and_clear_bit (PC_DMA_ERROR, &pc->flags)) {
-		(void) drive->channel->udma(ide_dma_off, drive, NULL);
-	}
+	if (test_and_clear_bit (PC_DMA_ERROR, &pc->flags))
+		udma_enable(drive, 0, 1);
+
 	if (test_bit (PC_DMA_RECOMMENDED, &pc->flags) && drive->using_dma) {
 		if (test_bit (PC_WRITING, &pc->flags))
 			dma_ok = !udma_write(drive, rq);

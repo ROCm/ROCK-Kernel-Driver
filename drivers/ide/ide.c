@@ -311,7 +311,7 @@ int __ide_end_request(struct ata_device *drive, struct request *rq, int uptodate
 
 	if (drive->state == DMA_PIO_RETRY && drive->retry_pio <= 3) {
 		drive->state = 0;
-		drive->channel->udma(ide_dma_on, drive, rq);
+		udma_enable(drive, 1, 1);
 	}
 
 	if (!end_that_request_first(rq, uptodate, nr_secs)) {
@@ -364,13 +364,13 @@ static void ata_pre_reset(struct ata_device *drive)
 
 	/* check the DMA crc count */
 	if (drive->crc_count) {
-		drive->channel->udma(ide_dma_off_quietly, drive, NULL);
+		udma_enable(drive, 0, 0);
 		if ((drive->channel->speedproc) != NULL)
 		        drive->channel->speedproc(drive, ide_auto_reduce_xfer(drive));
 		if (drive->current_speed >= XFER_SW_DMA_0)
-			drive->channel->udma(ide_dma_on, drive, NULL);
+			udma_enable(drive, 1, 1);
 	} else
-		drive->channel->udma(ide_dma_off, drive, NULL);
+		udma_enable(drive, 0, 1);
 }
 
 /*
@@ -1402,18 +1402,11 @@ void do_ide_request(request_queue_t *q)
  */
 static void dma_timeout_retry(struct ata_device *drive, struct request *rq)
 {
-	struct ata_channel *ch = drive->channel;
-
 	/*
 	 * end current dma transaction
 	 */
-	ch->udma_stop(drive);
-
-	/*
-	 * complain a little, later we might remove some of this verbosity
-	 */
-	printk("%s: timeout waiting for DMA\n", drive->name);
-	ch->udma(ide_dma_timeout, drive, rq);
+	udma_stop(drive);
+	udma_timeout(drive);
 
 	/*
 	 * Disable dma for now, but remember that we did so because of
@@ -1422,7 +1415,7 @@ static void dma_timeout_retry(struct ata_device *drive, struct request *rq)
 	 */
 	drive->retry_pio++;
 	drive->state = DMA_PIO_RETRY;
-	ch->udma(ide_dma_off_quietly, drive, rq);
+	udma_enable(drive, 0, 0);
 
 	/*
 	 * un-busy drive etc (hwgroup->busy is cleared on return) and
@@ -1510,7 +1503,7 @@ void ide_timer_expiry(unsigned long data)
 				startstop = handler(drive, ch->hwgroup->rq);
 			} else if (drive_is_ready(drive)) {
 				if (drive->waiting_for_dma)
-					ch->udma(ide_dma_lostirq, drive, ch->hwgroup->rq);
+					udma_irq_lost(drive);
 				(void) ide_ack_intr(ch);
 				printk("%s: lost interrupt\n", drive->name);
 				startstop = handler(drive, ch->hwgroup->rq);
@@ -2126,14 +2119,14 @@ void ide_unregister(struct ata_channel *ch)
 	ch->ata_write = old.ata_write;
 	ch->atapi_read = old.atapi_read;
 	ch->atapi_write = old.atapi_write;
-	ch->udma = old.udma;
+	ch->XXX_udma = old.XXX_udma;
 	ch->udma_start = old.udma_start;
 	ch->udma_stop = old.udma_stop;
 	ch->udma_read = old.udma_read;
 	ch->udma_write = old.udma_write;
 	ch->udma_irq_status = old.udma_irq_status;
 	ch->udma_timeout = old.udma_timeout;
-	ch->udma_lost_irq = old.udma_lost_irq;
+	ch->udma_irq_lost = old.udma_irq_lost;
 	ch->busproc = old.busproc;
 	ch->bus_state = old.bus_state;
 	ch->dma_base = old.dma_base;
@@ -2409,10 +2402,11 @@ static int set_using_dma(struct ata_device *drive, int arg)
 {
 	if (!drive->driver)
 		return -EPERM;
-	if (!drive->id || !(drive->id->capability & 1) || !drive->channel->udma)
+
+	if (!drive->id || !(drive->id->capability & 1) || !drive->channel->XXX_udma)
 		return -EPERM;
-	if (drive->channel->udma(arg ? ide_dma_on : ide_dma_off, drive, NULL))
-		return -EIO;
+
+	udma_enable(drive, arg, 1);
 	return 0;
 }
 
@@ -3184,7 +3178,7 @@ int ide_register_subdriver(struct ata_device *drive, struct ata_operations *driv
 	restore_flags(flags);		/* all CPUs */
 	/* FIXME: Check what this magic number is supposed to be about? */
 	if (drive->autotune != 2) {
-		if (drive->channel->udma) {
+		if (drive->channel->XXX_udma) {
 
 			/*
 			 * Force DMAing for the beginning of the check.  Some
@@ -3194,8 +3188,8 @@ int ide_register_subdriver(struct ata_device *drive, struct ata_operations *driv
 			 *   PARANOIA!!!
 			 */
 
-			drive->channel->udma(ide_dma_off_quietly, drive, NULL);
-			drive->channel->udma(ide_dma_check, drive, NULL);
+			udma_enable(drive, 0, 0);
+			drive->channel->XXX_udma(drive);
 #ifdef CONFIG_BLK_DEV_IDE_TCQ_DEFAULT
 			udma_tcq_enable(drive, 1);
 #endif

@@ -235,18 +235,14 @@ static int trm290_udma_write(struct ata_device *drive, struct request *rq)
 	return do_udma(0, drive, rq);
 }
 
-static int trm290_dmaproc (ide_dma_action_t func, struct ata_device *drive, struct request *rq)
+static int trm290_udma_irq_status(struct ata_device *drive)
 {
-	struct ata_channel *ch = drive->channel;
+	return (inw(drive->channel->dma_base + 2) == 0x00ff);
+}
 
-	switch (func) {
-		case ide_dma_test_irq:
-			return (inw(ch->dma_base + 2) == 0x00ff);
-		default:
-			return ide_dmaproc(func, drive, rq);
-	}
-	trm290_prepare_drive(drive, 0);	/* select PIO xfer */
-	return 1;
+static int trm290_dmaproc(struct ata_device *drive)
+{
+	return XXX_ide_dmaproc(drive);
 }
 #endif
 
@@ -304,7 +300,8 @@ void __init ide_init_trm290(struct ata_channel *hwif)
 	hwif->udma_stop = trm290_udma_stop;
 	hwif->udma_read = trm290_udma_read;
 	hwif->udma_write = trm290_udma_write;
-	hwif->udma = trm290_dmaproc;
+	hwif->udma_irq_status = trm290_udma_irq_status;
+	hwif->XXX_udma = trm290_dmaproc;
 #endif
 
 	hwif->selectproc = &trm290_selectproc;

@@ -114,9 +114,9 @@ static int config_for_dma(ide_drive_t *drive)
  * Check to see if the drive and
  * chipset is capable of DMA mode
  */
-static int sl82c105_check_drive(ide_drive_t *drive, struct request *rq)
+static int sl82c105_check_drive(ide_drive_t *drive)
 {
-	ide_dma_action_t dma_func = ide_dma_off_quietly;
+	int on = 0;
 
 	do {
 		struct hd_driveid *id = drive->id;
@@ -130,45 +130,38 @@ static int sl82c105_check_drive(ide_drive_t *drive, struct request *rq)
 
 		/* Consult the list of known "bad" drives */
 		if (udma_black_list(drive)) {
-			dma_func = ide_dma_off;
+			on = 0;
 			break;
 		}
 
 		if (id->field_valid & 2) {
 			if  (id->dma_mword & 7 || id->dma_1word & 7)
-				dma_func = ide_dma_on;
+				on = 1;
 			break;
 		}
 
 		if (udma_white_list(drive)) {
-			dma_func = ide_dma_on;
+			on = 1;
 			break;
 		}
 	} while (0);
+	if (on)
+		config_for_dma(drive);
+	else
+		config_for_pio(drive, 4, 0);
 
-	return drive->channel->udma(dma_func, drive, rq);
+	udma_enable(drive, on, 0);
+
+
+	return 0;
 }
 
 /*
  * Our own dmaproc, only to intercept ide_dma_check
  */
-static int sl82c105_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request *rq)
+static int sl82c105_dmaproc(struct ata_device *drive)
 {
-	switch (func) {
-	case ide_dma_check:
-		return sl82c105_check_drive(drive, rq);
-	case ide_dma_on:
-		if (config_for_dma(drive))
-			func = ide_dma_off;
-		/* fall through */
-	case ide_dma_off_quietly:
-	case ide_dma_off:
-		config_for_pio(drive, 4, 0);
-		break;
-	default:
-		break;
-	}
-	return ide_dmaproc(func, drive, rq);
+	return sl82c105_check_drive(drive);
 }
 
 /*
@@ -252,10 +245,10 @@ void __init dma_init_sl82c105(struct ata_channel *hwif, unsigned long dma_base)
 	}
 	outb(dma_state, dma_base + 2);
 
-	hwif->udma = NULL;
+	hwif->XXX_udma = NULL;
 	ide_setup_dma(hwif, dma_base, 8);
-	if (hwif->udma)
-		hwif->udma = sl82c105_dmaproc;
+	if (hwif->XXX_udma)
+		hwif->XXX_udma = sl82c105_dmaproc;
 }
 
 /*

@@ -736,7 +736,7 @@ static int set_using_tcq(struct ata_device *drive, int arg)
 {
 	if (!drive->driver)
 		return -EPERM;
-	if (!drive->channel->udma)
+	if (!drive->channel->XXX_udma)
 		return -EPERM;
 	if (arg == drive->queue_depth && drive->using_tcq)
 		return 0;

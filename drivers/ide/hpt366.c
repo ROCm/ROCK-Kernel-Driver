@@ -661,7 +661,7 @@ static int config_chipset_for_dma (ide_drive_t *drive)
 	int  rval;
 
 	if ((drive->type != ATA_DISK) && (speed < XFER_SW_DMA_0))
-		return ((int) ide_dma_off_quietly);
+		return 0;
 
 	if ((id->dma_ultra & 0x0020) &&
 	    (!check_in_drive_lists(drive, bad_ata100_5)) &&
@@ -694,15 +694,15 @@ static int config_chipset_for_dma (ide_drive_t *drive)
 	} else if (id->dma_mword & 0x0001) {
 		speed = XFER_MW_DMA_0;
 	} else {
-		return ((int) ide_dma_off_quietly);
+		return 0;
 	}
 
 	(void) hpt3xx_tune_chipset(drive, speed);
 
-	rval = (int)(	((id->dma_ultra >> 11) & 7) ? ide_dma_on :
-			((id->dma_ultra >> 8) & 7) ? ide_dma_on :
-			((id->dma_mword >> 8) & 7) ? ide_dma_on :
-						     ide_dma_off_quietly);
+	rval = (int)(	((id->dma_ultra >> 11) & 7) ? 1 :
+			((id->dma_ultra >> 8) & 7) ? 1 :
+			((id->dma_mword >> 8) & 7) ? 1 :
+						     0);
 	return rval;
 }
 
@@ -744,29 +744,31 @@ void hpt3xx_maskproc (ide_drive_t *drive, int mask)
 static int config_drive_xfer_rate (ide_drive_t *drive)
 {
 	struct hd_driveid *id = drive->id;
-	ide_dma_action_t dma_func = ide_dma_on;
+	int on = 1;
+	int verbose = 1;
 
 	if (id && (id->capability & 1) && drive->channel->autodma) {
 		/* Consult the list of known "bad" drives */
 		if (udma_black_list(drive)) {
-			dma_func = ide_dma_off;
+			on = 0;
 			goto fast_ata_pio;
 		}
-		dma_func = ide_dma_off_quietly;
+		on = 0;
+		verbose = 0;
 		if (id->field_valid & 4) {
 			if (id->dma_ultra & 0x002F) {
 				/* Force if Capable UltraDMA */
-				dma_func = config_chipset_for_dma(drive);
+				on = config_chipset_for_dma(drive);
 				if ((id->field_valid & 2) &&
-				    (dma_func != ide_dma_on))
+				    (!on))
 					goto try_dma_modes;
 			}
 		} else if (id->field_valid & 2) {
 try_dma_modes:
 			if (id->dma_mword & 0x0007) {
 				/* Force if Capable regular DMA modes */
-				dma_func = config_chipset_for_dma(drive);
-				if (dma_func != ide_dma_on)
+				on = config_chipset_for_dma(drive);
+				if (!on)
 					goto no_dma_set;
 			}
 		} else if (udma_white_list(drive)) {
@@ -774,60 +776,45 @@ try_dma_modes:
 				goto no_dma_set;
 			}
 			/* Consult the list of known "good" drives */
-			dma_func = config_chipset_for_dma(drive);
-			if (dma_func != ide_dma_on)
+			on = config_chipset_for_dma(drive);
+			if (!on)
 				goto no_dma_set;
 		} else {
 			goto fast_ata_pio;
 		}
 	} else if ((id->capability & 8) || (id->field_valid & 2)) {
 fast_ata_pio:
-		dma_func = ide_dma_off_quietly;
+		on = 0;
+		verbose = 0;
 no_dma_set:
 
 		config_chipset_for_pio(drive);
 	}
-	return drive->channel->udma(dma_func, drive, NULL);
+	udma_enable(drive, on, verbose);
+
+	return 0;
+}
+
+static void hpt366_udma_irq_lost(struct ata_device *drive)
+{
+	u8 reg50h = 0, reg52h = 0, reg5ah = 0;
+
+	pci_read_config_byte(drive->channel->pci_dev, 0x50, &reg50h);
+	pci_read_config_byte(drive->channel->pci_dev, 0x52, &reg52h);
+	pci_read_config_byte(drive->channel->pci_dev, 0x5a, &reg5ah);
+	printk("%s: (%s)  reg50h=0x%02x, reg52h=0x%02x, reg5ah=0x%02x\n",
+			drive->name, __FUNCTION__, reg50h, reg52h, reg5ah);
+	if (reg5ah & 0x10)
+		pci_write_config_byte(drive->channel->pci_dev, 0x5a, reg5ah & ~0x10);
 }
 
 /*
- * hpt366_dmaproc() initiates/aborts (U)DMA read/write operations on a drive.
- *
  * This is specific to the HPT366 UDMA bios chipset
  * by HighPoint|Triones Technologies, Inc.
  */
-int hpt366_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request *rq)
+static int hpt366_dmaproc(struct ata_device *drive)
 {
-	byte reg50h = 0, reg52h = 0, reg5ah = 0, dma_stat = 0;
-	unsigned long dma_base = drive->channel->dma_base;
-
-	switch (func) {
-		case ide_dma_check:
-			return config_drive_xfer_rate(drive);
-		case ide_dma_test_irq:	/* returns 1 if dma irq issued, 0 otherwise */
-			dma_stat = inb(dma_base+2);
-			return (dma_stat & 4) == 4;	/* return 1 if INTR asserted */
-		case ide_dma_lostirq:
-			pci_read_config_byte(drive->channel->pci_dev, 0x50, &reg50h);
-			pci_read_config_byte(drive->channel->pci_dev, 0x52, &reg52h);
-			pci_read_config_byte(drive->channel->pci_dev, 0x5a, &reg5ah);
-			printk("%s: (ide_dma_lostirq)  reg50h=0x%02x, reg52h=0x%02x, reg5ah=0x%02x\n",
-				drive->name, reg50h, reg52h, reg5ah);
-			if (reg5ah & 0x10)
-				pci_write_config_byte(drive->channel->pci_dev, 0x5a, reg5ah & ~0x10);
-			/* fall through to a reset */
-#if 0
-		case ide_dma_begin:
-		case ide_dma_end:
-			/* reset the chips state over and over.. */
-			pci_write_config_byte(drive->channel->pci_dev, 0x51, 0x13);
-#endif
-			break;
-		case ide_dma_timeout:
-		default:
-			break;
-	}
-	return ide_dmaproc(func, drive, rq);	/* use standard DMA stuff */
+	return config_drive_xfer_rate(drive);
 }
 
 static void do_udma_start(struct ata_device *drive)
@@ -879,7 +866,7 @@ static void hpt370_udma_timeout(struct ata_device *drive)
 	do_udma_start(drive);
 }
 
-static void hpt370_udma_lost_irq(struct ata_device *drive)
+static void hpt370_udma_irq_lost(struct ata_device *drive)
 {
 	do_timeout_irq(drive);
 	do_udma_start(drive);
@@ -910,42 +897,10 @@ static int hpt370_udma_stop(struct ata_device *drive)
 	return (dma_stat & 7) != 4 ? (0x10 | dma_stat) : 0;	/* verify good DMA status */
 }
 
-int hpt370_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request *rq)
+
+static int hpt370_dmaproc(struct ata_device *drive)
 {
-	struct ata_channel *hwif = drive->channel;
-	unsigned long dma_base = hwif->dma_base;
-	byte regstate = hwif->unit ? 0x54 : 0x50;
-	byte reginfo = hwif->unit ? 0x56 : 0x52;
-	byte dma_stat;
-
-	switch (func) {
-		case ide_dma_check:
-			return config_drive_xfer_rate(drive);
-		case ide_dma_test_irq:	/* returns 1 if dma irq issued, 0 otherwise */
-			dma_stat = inb(dma_base+2);
-			return (dma_stat & 4) == 4;	/* return 1 if INTR asserted */
-
-		case ide_dma_timeout:
-		case ide_dma_lostirq:
-			pci_read_config_byte(hwif->pci_dev, reginfo, 
-					     &dma_stat); 
-			printk("%s: %d bytes in FIFO\n", drive->name, 
-			       dma_stat);
-			pci_write_config_byte(hwif->pci_dev, regstate, 0x37);
-			udelay(10);
-			dma_stat = inb(dma_base);
-			outb(dma_stat & ~0x1, dma_base); /* stop dma */
-			dma_stat = inb(dma_base + 2); 
-			outb(dma_stat | 0x6, dma_base+2); /* clear errors */
-			/* fallthrough */
-
-			do_udma_start(drive);
-			break;
-
-		default:
-			break;
-	}
-	return ide_dmaproc(func, drive, rq);	/* use standard DMA stuff */
+	return config_drive_xfer_rate(drive);
 }
 #endif
 
@@ -1249,9 +1204,12 @@ void __init ide_init_hpt366(struct ata_channel *hwif)
 				pci_write_config_byte(hwif->pci_dev, 0x5a, reg5ah & ~0x10);
 			hwif->udma_start = hpt370_udma_start;
 			hwif->udma_stop = hpt370_udma_stop;
-			hwif->udma = hpt370_dmaproc;
+			hwif->udma_timeout = hpt370_udma_timeout;
+			hwif->udma_irq_lost = hpt370_udma_irq_lost;
+			hwif->XXX_udma = hpt370_dmaproc;
 		} else {
-			hwif->udma = hpt366_dmaproc;
+			hwif->udma_irq_lost = hpt366_udma_irq_lost;
+			hwif->XXX_udma = hpt366_dmaproc;
 		}
 		if (!noautodma)
 			hwif->autodma = 1;

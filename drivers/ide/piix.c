@@ -376,38 +376,26 @@ static void piix_tune_drive(ide_drive_t *drive, unsigned char pio)
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
 
-/*
- * piix_dmaproc() is a callback from upper layers that can do
- * a lot, but we use it for DMA/PIO tuning only, delegating everything
- * else to the default ide_dmaproc().
- */
-
-int piix_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request *rq)
+int piix_dmaproc(struct ata_device *drive)
 {
+	short w80 = drive->channel->udma_four;
 
-	if (func == ide_dma_check) {
-
-		short w80 = drive->channel->udma_four;
-
-		short speed = ata_timing_mode(drive,
-			XFER_PIO | XFER_EPIO | 
+	short speed = ata_timing_mode(drive,
+			XFER_PIO | XFER_EPIO |
 			(piix_config->flags & PIIX_NODMA ? 0 : (XFER_SWDMA | XFER_MWDMA |
 			(piix_config->flags & PIIX_UDMA ? XFER_UDMA : 0) |
 			(w80 && (piix_config->flags & PIIX_UDMA) >= PIIX_UDMA_66 ? XFER_UDMA_66 : 0) |
 			(w80 && (piix_config->flags & PIIX_UDMA) >= PIIX_UDMA_100 ? XFER_UDMA_100 : 0) |
 			(w80 && (piix_config->flags & PIIX_UDMA) >= PIIX_UDMA_133 ? XFER_UDMA_133 : 0))));
 
-		piix_set_drive(drive, speed);
+	piix_set_drive(drive, speed);
 
-		func = (drive->channel->autodma && (speed & XFER_MODE) != XFER_PIO)
-			? ide_dma_on : ide_dma_off_quietly;
+	udma_enable(drive, drive->channel->autodma && (speed & XFER_MODE) != XFER_PIO, 0);
 
-	}
-
-	return ide_dmaproc(func, drive, rq);
+	return 0;
 }
 
-#endif /* CONFIG_BLK_DEV_IDEDMA */
+#endif
 
 /*
  * The initialization callback. Here we determine the IDE chip type
@@ -566,13 +554,13 @@ void __init ide_init_piix(struct ata_channel *hwif)
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (hwif->dma_base) {
 		hwif->highmem = 1;
-		hwif->udma = piix_dmaproc;
-#ifdef CONFIG_IDEDMA_AUTO
+		hwif->XXX_udma = piix_dmaproc;
+# ifdef CONFIG_IDEDMA_AUTO
 		if (!noautodma)
 			hwif->autodma = 1;
-#endif
+# endif
 	}
-#endif /* CONFIG_BLK_DEV_IDEDMA */
+#endif
 }
 
 /*

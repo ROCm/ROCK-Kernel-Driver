@@ -326,30 +326,50 @@ static int config_drive_for_dma(struct ata_device *drive)
 
 	if (id && (id->capability & 1) && ch->autodma && config_allows_dma) {
 		/* Consult the list of known "bad" drives */
-		if (udma_black_list(drive))
-			return ch->udma(ide_dma_off, drive, NULL);
+		if (udma_black_list(drive)) {
+			udma_enable(drive, 0, 1);
+
+			return 0;
+		}
 
 		/* Enable DMA on any drive that has UltraDMA (mode 6/7/?) enabled */
 		if ((id->field_valid & 4) && (eighty_ninty_three(drive)))
-			if ((id->dma_ultra & (id->dma_ultra >> 14) & 2))
-				return ch->udma(ide_dma_on, drive, NULL);
+			if ((id->dma_ultra & (id->dma_ultra >> 14) & 2)) {
+				udma_enable(drive, 1, 1);
+
+				return 0;
+			}
 		/* Enable DMA on any drive that has UltraDMA (mode 3/4/5) enabled */
 		if ((id->field_valid & 4) && (eighty_ninty_three(drive)))
-			if ((id->dma_ultra & (id->dma_ultra >> 11) & 7))
-				return ch->udma(ide_dma_on, drive, NULL);
+			if ((id->dma_ultra & (id->dma_ultra >> 11) & 7)) {
+				udma_enable(drive, 1, 1);
+
+				return 0;
+			}
 		/* Enable DMA on any drive that has UltraDMA (mode 0/1/2) enabled */
 		if (id->field_valid & 4)	/* UltraDMA */
-			if ((id->dma_ultra & (id->dma_ultra >> 8) & 7))
-				return ch->udma(ide_dma_on, drive, NULL);
+			if ((id->dma_ultra & (id->dma_ultra >> 8) & 7)) {
+				udma_enable(drive, 1, 1);
+
+				return 0;
+			}
 		/* Enable DMA on any drive that has mode2 DMA (multi or single) enabled */
 		if (id->field_valid & 2)	/* regular DMA */
-			if ((id->dma_mword & 0x404) == 0x404 || (id->dma_1word & 0x404) == 0x404)
-				return ch->udma(ide_dma_on, drive, NULL);
+			if ((id->dma_mword & 0x404) == 0x404 || (id->dma_1word & 0x404) == 0x404) {
+				udma_enable(drive, 1, 1);
+
+				return 0;
+			}
 		/* Consult the list of known "good" drives */
-		if (udma_white_list(drive))
-			return ch->udma(ide_dma_on, drive, NULL);
+		if (udma_white_list(drive)) {
+			udma_enable(drive, 1, 1);
+
+			return 0;
+		}
 	}
-	return ch->udma(ide_dma_off_quietly, drive, NULL);
+	udma_enable(drive, 0, 0);
+
+	return 0;
 }
 
 /*
@@ -375,20 +395,6 @@ static int dma_timer_expiry(struct ata_device *drive, struct request *__rq)
 	if (dma_stat & 1)	/* DMAing */
 		return WAIT_CMD;
 	return 0;
-}
-
-static void ide_toggle_bounce(struct ata_device *drive, int on)
-{
-	u64 addr = BLK_BOUNCE_HIGH;
-
-	if (on && drive->type == ATA_DISK && drive->channel->highmem) {
-		if (!PCI_DMA_BUS_IS_PHYS)
-			addr = BLK_BOUNCE_ANY;
-		else
-			addr = drive->channel->pci_dev->dma_mask;
-	}
-
-	blk_queue_bounce_limit(&drive->queue, addr);
 }
 
 int ata_start_dma(struct ata_device *drive, struct request *rq)
@@ -427,54 +433,9 @@ int ata_start_dma(struct ata_device *drive, struct request *rq)
  * the caller should revert to PIO for the current request.
  * May also be invoked from trm290.c
  */
-int ide_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request *rq)
+int XXX_ide_dmaproc(struct ata_device *drive)
 {
-	struct ata_channel *ch = drive->channel;
-	unsigned long dma_base = ch->dma_base;
-	u8 unit = (drive->select.b.unit & 0x01);
-	unsigned int set_high = 1;
-	u8 dma_stat;
-
-	switch (func) {
-		case ide_dma_off:
-			printk("%s: DMA disabled\n", drive->name);
-		case ide_dma_off_quietly:
-			set_high = 0;
-			outb(inb(dma_base+2) & ~(1<<(5+unit)), dma_base+2);
-#ifdef CONFIG_BLK_DEV_IDE_TCQ
-			udma_tcq_enable(drive, 0);
-#endif
-		case ide_dma_on:
-			ide_toggle_bounce(drive, set_high);
-			drive->using_dma = (func == ide_dma_on);
-			if (drive->using_dma) {
-				outb(inb(dma_base+2)|(1<<(5+unit)), dma_base+2);
-#ifdef CONFIG_BLK_DEV_IDE_TCQ_DEFAULT
-				udma_tcq_enable(drive, 1);
-#endif
-			}
-			return 0;
-		case ide_dma_check:
-			return config_drive_for_dma (drive);
-		case ide_dma_test_irq: /* returns 1 if dma irq issued, 0 otherwise */
-			dma_stat = inb(dma_base+2);
-#if 0  /* do not set unless you know what you are doing */
-			if (dma_stat & 4) {
-				u8 stat = GET_STAT();
-				outb(dma_base+2, dma_stat & 0xE4);
-			}
-#endif
-			return (dma_stat & 4) == 4;	/* return 1 if INTR asserted */
-		case ide_dma_timeout:
-			printk(KERN_ERR "%s: DMA timeout occured!\n", __FUNCTION__);
-			return 1;
-		case ide_dma_lostirq:
-			printk(KERN_ERR "%s: chipset supported func only: %d\n", __FUNCTION__,  func);
-			return 1;
-		default:
-			printk(KERN_ERR "%s: unsupported func: %d\n", __FUNCTION__, func);
-			return 1;
-	}
+	return config_drive_for_dma(drive);
 }
 
 /*
@@ -528,7 +489,7 @@ void ide_setup_dma(struct ata_channel *ch, unsigned long dma_base, unsigned int 
 		goto dma_alloc_failure;
 	}
 
-	ch->udma = ide_dmaproc;
+	ch->XXX_udma = XXX_ide_dmaproc;
 
 	if (ch->chipset != ide_trm290) {
 		u8 dma_stat = inb(dma_base+2);
@@ -874,10 +835,10 @@ void udma_timeout(struct ata_device *drive)
 
 }
 
-void udma_lost_irq(struct ata_device *drive)
+void udma_irq_lost(struct ata_device *drive)
 {
-	if (drive->channel->udma_lost_irq)
-		drive->channel->udma_lost_irq(drive);
+	if (drive->channel->udma_irq_lost)
+		drive->channel->udma_irq_lost(drive);
 }
 
 EXPORT_SYMBOL(udma_enable);

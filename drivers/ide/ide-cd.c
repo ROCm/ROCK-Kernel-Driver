@@ -906,7 +906,7 @@ static ide_startstop_t cdrom_read_intr(struct ata_device *drive, struct request 
 	if (dma) {
 		info->dma = 0;
 		if ((dma_error = udma_stop(drive)))
-			drive->channel->udma(ide_dma_off, drive, NULL);
+			udma_enable(drive, 0, 1);
 	}
 
 	if (cdrom_decode_status(&startstop, drive, rq, 0, &stat))
@@ -1482,7 +1482,7 @@ static ide_startstop_t cdrom_write_intr(struct ata_device *drive, struct request
 		info->dma = 0;
 		if ((dma_error = udma_stop(drive))) {
 			printk("ide-cd: write dma error\n");
-			drive->channel->udma(ide_dma_off, drive, NULL);
+			udma_enable(drive, 0, 1);
 		}
 	}
 

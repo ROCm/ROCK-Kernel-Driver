@@ -556,7 +556,7 @@ static int sis5513_tune_chipset (ide_drive_t *drive, byte speed)
 		case 1:		drive_pci = 0x42; break;
 		case 2:		drive_pci = 0x44; break;
 		case 3:		drive_pci = 0x46; break;
-		default:	return ide_dma_off;
+		default:	return 0;
 	}
 
 #ifdef BROKEN_LEVEL
@@ -663,39 +663,41 @@ static int config_chipset_for_dma (ide_drive_t *drive, byte ultra)
 	else if (id->dma_1word & 0x0001)
 		speed = XFER_SW_DMA_0;
 	else
-		return ((int) ide_dma_off_quietly);
+		return 0;
 
 	outb(inb(hwif->dma_base+2)|(1<<(5+unit)), hwif->dma_base+2);
 
 	sis5513_tune_chipset(drive, speed);
 
-	return ((int)	((id->dma_ultra >> 11) & 7) ? ide_dma_on :
-			((id->dma_ultra >> 8) & 7) ? ide_dma_on :
-			((id->dma_mword >> 8) & 7) ? ide_dma_on :
-			((id->dma_1word >> 8) & 7) ? ide_dma_on :
-						     ide_dma_off_quietly);
+	return ((int)	((id->dma_ultra >> 11) & 7) ? 1 :
+			((id->dma_ultra >> 8) & 7) ? 1 :
+			((id->dma_mword >> 8) & 7) ? 1 :
+			((id->dma_1word >> 8) & 7) ? 1 :
+						     0);
 }
 
 static int config_drive_xfer_rate (ide_drive_t *drive)
 {
-	struct hd_driveid *id		= drive->id;
-	ide_dma_action_t dma_func	= ide_dma_off_quietly;
+	struct hd_driveid *id = drive->id;
+	int on = 0;
+	int verbose = 1;
 
 	config_chipset_for_pio(drive, 5);
 
 	if (id && (id->capability & 1) && drive->channel->autodma) {
 		/* Consult the list of known "bad" drives */
 		if (udma_black_list(drive)) {
-			dma_func = ide_dma_off;
+			on = 0;
 			goto fast_ata_pio;
 		}
-		dma_func = ide_dma_off_quietly;
+		on = 0;
+		verbose = 0;
 		if (id->field_valid & 4) {
 			if (id->dma_ultra & 0x003F) {
 				/* Force if Capable UltraDMA */
-				dma_func = config_chipset_for_dma(drive, 1);
+				on = config_chipset_for_dma(drive, 1);
 				if ((id->field_valid & 2) &&
-				    (dma_func != ide_dma_on))
+				    (!on))
 					goto try_dma_modes;
 			}
 		} else if (id->field_valid & 2) {
@@ -703,43 +705,40 @@ try_dma_modes:
 			if ((id->dma_mword & 0x0007) ||
 			    (id->dma_1word & 0x0007)) {
 				/* Force if Capable regular DMA modes */
-				dma_func = config_chipset_for_dma(drive, 0);
-				if (dma_func != ide_dma_on)
+				on = config_chipset_for_dma(drive, 0);
+				if (!on)
 					goto no_dma_set;
 			}
 		} else if ((udma_white_list(drive)) &&
 			   (id->eide_dma_time > 150)) {
 			/* Consult the list of known "good" drives */
-			dma_func = config_chipset_for_dma(drive, 0);
-			if (dma_func != ide_dma_on)
+			on = config_chipset_for_dma(drive, 0);
+			if (!on)
 				goto no_dma_set;
 		} else {
 			goto fast_ata_pio;
 		}
 	} else if ((id->capability & 8) || (id->field_valid & 2)) {
 fast_ata_pio:
-		dma_func = ide_dma_off_quietly;
+		on = 0;
+		verbose = 0;
 no_dma_set:
 		(void) config_chipset_for_pio(drive, 5);
 	}
 
-	return drive->channel->udma(dma_func, drive, NULL);
+	udma_enable(drive, on, verbose);
+
+	return 0;
 }
 
-/* initiates/aborts (U)DMA read/write operations on a drive. */
-int sis5513_dmaproc (ide_dma_action_t func, struct ata_device *drive, struct request *rq)
+static int sis5513_dmaproc(struct ata_device *drive)
 {
-	switch (func) {
-		case ide_dma_check:
-			config_drive_art_rwp(drive);
-			config_art_rwp_pio(drive, 5);
-			return config_drive_xfer_rate(drive);
-		default:
-			break;
-	}
-	return ide_dmaproc(func, drive, rq);	/* use standard DMA stuff */
+	config_drive_art_rwp(drive);
+	config_art_rwp_pio(drive, 5);
+
+	return config_drive_xfer_rate(drive);
 }
-#endif /* CONFIG_BLK_DEV_IDEDMA */
+#endif
 
 /* Chip detection and general config */
 unsigned int __init pci_init_sis5513(struct pci_dev *dev)
@@ -852,7 +851,7 @@ void __init ide_init_sis5513(struct ata_channel *hwif)
 		if (chipset_family > ATA_16) {
 			hwif->autodma = noautodma ? 0 : 1;
 			hwif->highmem = 1;
-			hwif->udma = sis5513_dmaproc;
+			hwif->XXX_udma = sis5513_dmaproc;
 		} else {
 #endif
 			hwif->autodma = 0;
