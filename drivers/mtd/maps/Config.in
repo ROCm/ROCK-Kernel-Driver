@@ -47,7 +47,7 @@ if [ "$CONFIG_MIPS" = "y" ]; then
 fi
 
 if [ "$CONFIG_SUPERH" = "y" ]; then
-   dep_tristate '  CFI Flash device mapped on Hitachi SolutionEngine' CONFIG_MTD_SOLUTIONENGINE $CONFIG_MTD_CFI $CONFIG_SH $CONFIG_MTD_REDBOOT_PARTS
+   dep_tristate '  CFI Flash device mapped on Hitachi SolutionEngine' CONFIG_MTD_SOLUTIONENGINE $CONFIG_MTD_CFI $CONFIG_SUPERH $CONFIG_MTD_REDBOOT_PARTS
 fi
 
 if [ "$CONFIG_ARM" = "y" ]; then
