@@ -65,7 +65,7 @@ extern struct net_device *skmca_probe(int unit);
 extern struct net_device *elplus_probe(int unit);
 extern int ac3200_probe(struct net_device *);
 extern int es_probe(struct net_device *);
-extern int lne390_probe(struct net_device *);
+extern struct net_device *lne390_probe(int unit);
 extern struct net_device *e2100_probe(int unit);
 extern struct net_device *ni5010_probe(int unit);
 extern struct net_device *ni52_probe(int unit);
@@ -170,6 +170,10 @@ static struct devprobe eisa_probes[] __initdata = {
 #ifdef CONFIG_ES3210
 	{es_probe, 0},
 #endif
+	{NULL, 0},
+};
+
+static struct devprobe2 eisa_probes2[] __initdata = {
 #ifdef CONFIG_LNE390
 	{lne390_probe, 0},
 #endif
@@ -392,6 +396,7 @@ static void __init ethif_probe2(int unit)
 	if (base_addr == 1)
 		return;
 
+	probe_list2(unit, eisa_probes2, base_addr == 0) &&
 	probe_list2(unit, mca_probes, base_addr == 0) &&
 	probe_list2(unit, isa_probes, base_addr == 0) &&
 	probe_list2(unit, parport_probes, base_addr == 0);
