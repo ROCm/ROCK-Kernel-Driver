@@ -1,7 +1,7 @@
 /*
  *  linux/arch/arm/mm/extable.c
  */
-#include <linux/config.h>
+#include <linux/module.h>
 #include <asm/uaccess.h>
 
 const struct exception_table_entry *
@@ -23,4 +23,15 @@ search_extable(const struct exception_table_entry *first,
                         last = mid-1;
         }
         return NULL;
+}
+
+int fixup_exception(struct pt_regs *regs)
+{
+	const struct exception_table_entry *fixup;
+
+	fixup = search_exception_tables(instruction_pointer(regs));
+	if (fixup)
+		regs->ARM_pc = fixup->fixup;
+
+	return fixup != NULL;
 }
