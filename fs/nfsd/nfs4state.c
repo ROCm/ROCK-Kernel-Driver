@@ -1132,20 +1132,6 @@ nfs4_share_conflict(struct svc_fh *current_fh, unsigned int deny_type)
 	return nfs_ok;
 }
 
-static inline int
-nfs4_file_upgrade(struct file *filp, unsigned int share_access)
-{
-int status;
-
-	if (share_access & NFS4_SHARE_ACCESS_WRITE) {
-		status = get_write_access(filp->f_dentry->d_inode);
-		if (status)
-			return nfserrno(status);
-		filp->f_mode = (filp->f_mode | FMODE_WRITE) & ~FMODE_READ;
-	}
-	return nfs_ok;
-}
-
 static inline void
 nfs4_file_downgrade(struct file *filp, unsigned int share_access)
 {
@@ -1275,6 +1261,33 @@ out:
 	return status;
 }
 
+static int
+nfs4_upgrade_open(struct svc_rqst *rqstp, struct svc_fh *cur_fh, struct nfs4_stateid *stp, struct nfsd4_open *open)
+{
+	struct file *filp = stp->st_vfs_file;
+	struct inode *inode = filp->f_dentry->d_inode;
+	unsigned int share_access;
+	int status;
+
+	set_access(&share_access, stp->st_access_bmap);
+	share_access = ~share_access;
+	share_access &= open->op_share_access;
+
+	/* update the struct file */
+	if (share_access & NFS4_SHARE_ACCESS_WRITE) {
+		status = get_write_access(inode);
+		if (status)
+			return nfserrno(status);
+
+		/* remember the open */
+		filp->f_mode = (filp->f_mode | FMODE_WRITE) & ~FMODE_READ;
+		set_bit(open->op_share_access, &stp->st_access_bmap);
+		set_bit(open->op_share_deny, &stp->st_deny_bmap);
+	}
+	return nfs_ok;
+}
+
+
 /* decrement seqid on successful reclaim, it will be bumped in encode_open */
 static void
 nfs4_set_claim_prev(struct nfsd4_open *open, int *status)
@@ -1328,21 +1341,10 @@ nfsd4_process_open2(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nf
 	}
 
 	if (stp) {
-		/* This is an upgrade of an existing OPEN.
-		 * OR the incoming share with the existing
-		 * nfs4_stateid share */
-		unsigned int share_access;
-
-		set_access(&share_access, stp->st_access_bmap);
-		share_access = ~share_access;
-		share_access &= open->op_share_access;
-
-		/* update the struct file */
-		if ((status = nfs4_file_upgrade(stp->st_vfs_file, share_access)))
+		/* Stateid was found, this is an OPEN upgrade */
+		status = nfs4_upgrade_open(rqstp, current_fh, stp, open);
+		if (status)
 			goto out;
-		/* remember the open */
-		set_bit(open->op_share_access, &stp->st_access_bmap);
-		set_bit(open->op_share_deny, &stp->st_deny_bmap);
 	} else {
 		int flags = 0;
 
