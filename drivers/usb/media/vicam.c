@@ -864,8 +864,6 @@ static void vicam_decode_color(const u8 *data, u8 *rgb)
 {
 	/* vicam_decode_color - Convert from Vicam Y-Cr-Cb to RGB
 	 * Copyright (C) 2002 Monroe Williams (monroe@pobox.com)
-	 *
-	 * FIXME: camera should use V4L2 YCrCb return type now
 	 */
 
 	int i, prevY, nextY;
@@ -1011,10 +1009,8 @@ vicam_read( struct file *file, char *buf, size_t count, loff_t *ppos )
 
 	DBG("read %d bytes.\n", (int) count);
 
-	down(&cam->cam_lock);
 	if (*ppos >= VICAM_MAX_FRAME_SIZE) {
 		*ppos = 0;
-		up(&cam->cam_lock);
 		return 0;
 	}
 
@@ -1036,7 +1032,7 @@ vicam_read( struct file *file, char *buf, size_t count, loff_t *ppos )
 	if (count == VICAM_MAX_FRAME_SIZE) {
 		*ppos = 0;
 	}
-	up(&cam->cam_lock);
+
 	return count;
 }
 

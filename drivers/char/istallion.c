@@ -848,7 +848,7 @@ static void __exit istallion_module_exit(void)
 	i = tty_unregister_driver(stli_serial);
 	if (i) {
 		printk("STALLION: failed to un-register tty driver, "
-			"errno=%d\n", -i);
+			"errno=%d,%d\n", -i);
 		restore_flags(flags);
 		return;
 	}
@@ -4697,7 +4697,7 @@ static stlibrd_t *stli_allocbrd()
 	brdp = (stlibrd_t *) stli_memalloc(sizeof(stlibrd_t));
 	if (brdp == (stlibrd_t *) NULL) {
 		printk(KERN_ERR "STALLION: failed to allocate memory "
-				"(size=%d)\n", (int) sizeof(stlibrd_t));
+				"(size=%d)\n", sizeof(stlibrd_t));
 		return((stlibrd_t *) NULL);
 	}
 
@@ -4816,7 +4816,6 @@ static ssize_t stli_memread(struct file *fp, char *buf, size_t count, loff_t *of
 	void		*memptr;
 	stlibrd_t	*brdp;
 	int		brdnr, size, n;
-	loff_t		pos = *offp;
 
 #if DEBUG
 	printk(KERN_DEBUG "stli_memread(fp=%x,buf=%x,count=%x,offp=%x)\n",
@@ -4831,27 +4830,26 @@ static ssize_t stli_memread(struct file *fp, char *buf, size_t count, loff_t *of
 		return(-ENODEV);
 	if (brdp->state == 0)
 		return(-ENODEV);
-	if (pos < 0 || pos >= brdp->memsize)
+	if (fp->f_pos >= brdp->memsize)
 		return(0);
 
-	size = MIN(count, (brdp->memsize - pos));
+	size = MIN(count, (brdp->memsize - fp->f_pos));
 
 	save_flags(flags);
 	cli();
 	EBRDENABLE(brdp);
 	while (size > 0) {
 		memptr = (void *) EBRDGETMEMPTR(brdp, fp->f_pos);
-		n = MIN(size, (brdp->pagesize - (((unsigned long) pos) % brdp->pagesize)));
+		n = MIN(size, (brdp->pagesize - (((unsigned long) fp->f_pos) % brdp->pagesize)));
 		if (copy_to_user(buf, memptr, n)) {
 			count = -EFAULT;
 			goto out;
 		}
-		pos += n;
+		fp->f_pos += n;
 		buf += n;
 		size -= n;
 	}
 out:
-	*offp = pos;
 	EBRDDISABLE(brdp);
 	restore_flags(flags);
 
@@ -4873,8 +4871,7 @@ static ssize_t stli_memwrite(struct file *fp, const char *buf, size_t count, lof
 	stlibrd_t	*brdp;
 	char		*chbuf;
 	int		brdnr, size, n;
-	loff_t		pos = *offp;
-	
+
 #if DEBUG
 	printk(KERN_DEBUG "stli_memwrite(fp=%x,buf=%x,count=%x,offp=%x)\n",
 			(int) fp, (int) buf, count, (int) offp);
@@ -4888,27 +4885,26 @@ static ssize_t stli_memwrite(struct file *fp, const char *buf, size_t count, lof
 		return(-ENODEV);
 	if (brdp->state == 0)
 		return(-ENODEV);
-	if (pos < 0 || pos >= brdp->memsize)
+	if (fp->f_pos >= brdp->memsize)
 		return(0);
 
 	chbuf = (char *) buf;
-	size = MIN(count, (brdp->memsize - pos));
+	size = MIN(count, (brdp->memsize - fp->f_pos));
 
 	save_flags(flags);
 	cli();
 	EBRDENABLE(brdp);
 	while (size > 0) {
-		memptr = (void *) EBRDGETMEMPTR(brdp, pos);
-		n = MIN(size, (brdp->pagesize - (((unsigned long) pos) % brdp->pagesize)));
+		memptr = (void *) EBRDGETMEMPTR(brdp, fp->f_pos);
+		n = MIN(size, (brdp->pagesize - (((unsigned long) fp->f_pos) % brdp->pagesize)));
 		if (copy_from_user(memptr, chbuf, n)) {
 			count = -EFAULT;
 			goto out;
 		}
-		pos += n;
+		fp->f_pos += n;
 		chbuf += n;
 		size -= n;
 	}
-	*offp = pos;
 out:
 	EBRDDISABLE(brdp);
 	restore_flags(flags);

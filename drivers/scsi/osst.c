@@ -3187,7 +3187,7 @@ static ssize_t osst_write(struct file * filp, const char * buf, size_t count, lo
 	
 	if (ppos != &filp->f_pos) {
 	 	/* "A request was outside the capabilities of the device." */
-		retval = (-ESPIPE);
+		retval = (-ENXIO);
 		goto out;
 	}
 
@@ -3514,7 +3514,7 @@ static ssize_t osst_read(struct file * filp, char * buf, size_t count, loff_t *p
 	
 	if (ppos != &filp->f_pos) {
 		/* "A request was outside the capabilities of the device." */
-		retval = (-ESPIPE);
+		retval = (-ENXIO);
 		goto out;
 	}
 
@@ -5386,7 +5386,6 @@ static struct file_operations osst_fops = {
 	.owner =        THIS_MODULE,
 	.read =         osst_read,
 	.write =        osst_write,
-	.llseek = 	no_llseek,
 	.ioctl =        osst_ioctl,
 	.open =         os_scsi_tape_open,
 	.flush =        os_scsi_tape_flush,

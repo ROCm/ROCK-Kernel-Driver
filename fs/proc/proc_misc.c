@@ -569,12 +569,12 @@ static int execdomains_read_proc(char *page, char **start, off_t off,
 static ssize_t
 read_profile(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 {
-	loff_t p = *ppos;
+	unsigned long p = *ppos;
 	ssize_t read;
 	char * pnt;
 	unsigned int sample_step = 1 << prof_shift;
 
-	if (p < 0 || p >= (prof_len+1)*sizeof(unsigned int))
+	if (p >= (prof_len+1)*sizeof(unsigned int))
 		return 0;
 	if (count > (prof_len+1)*sizeof(unsigned int) - p)
 		count = (prof_len+1)*sizeof(unsigned int) - p;
@@ -588,7 +588,7 @@ read_profile(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 	if (copy_to_user(buf,(void *)pnt,count))
 		return -EFAULT;
 	read += count;
-	*ppos = p;
+	*ppos += read;
 	return read;
 }
 

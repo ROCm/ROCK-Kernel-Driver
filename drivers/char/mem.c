@@ -143,7 +143,7 @@ static ssize_t do_write_mem(void *p, unsigned long realp,
 		return -EFAULT;
 	}
 	written += count;
-	*ppos = realp + written;
+	*ppos += written;
 	return written;
 }
 
@@ -180,7 +180,7 @@ static ssize_t read_mem(struct file * file, char * buf,
 	if (copy_to_user(buf, __va(p), count))
 		return -EFAULT;
 	read += count;
-	*ppos = p + read;
+	*ppos += read;
 	return read;
 }
 

@@ -114,32 +114,14 @@ static ssize_t udf_file_write(struct file * file, const char * buf,
 {
 	ssize_t retval;
 	struct inode *inode = file->f_dentry->d_inode;
-	int err;
-	loff_t pos;
+	int err, pos;
 
 	if (UDF_I_ALLOCTYPE(inode) == ICBTAG_FLAG_AD_IN_ICB)
 	{
-		/* FIXME: locking checks needed */
 		if (file->f_flags & O_APPEND)
 			pos = inode->i_size;
 		else
 			pos = *ppos;
-
-		/* Some checks from generic_file_write_checks that are
-		 * special cased: UDF_I_LENALLOC(inode) is 32-bits, but
-		 * sb->s_max_bytes = MAX_LFS_FILESIZE.
-		 * Additionally, udf_expand_file_adinicb() takes
-		 * 'int newsize', but it's not used anywhere.*/
-		if (pos < 0)
-			return -EINVAL;
-		if (pos >= MAX_NON_LFS) {
-			send_sig(SIGXFSZ, current, 0);
-			return -EFBIG;
-		}
-
-		if (count > MAX_NON_LFS - pos) {
-			count = MAX_NON_LFS - pos;
-		}
 
 		if (inode->i_sb->s_blocksize < (udf_file_entry_alloc_offset(inode) +
 			pos + count))
@@ -160,10 +142,10 @@ static ssize_t udf_file_write(struct file * file, const char * buf,
 		}
 	}
 
-	retval = generic_file_write(file, buf, count, &pos);
+	retval = generic_file_write(file, buf, count, ppos);
+
 	if (retval > 0)
 		mark_inode_dirty(inode);
-	*ppos = pos;
 	return retval;
 }
 

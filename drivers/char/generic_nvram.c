@@ -22,15 +22,12 @@
 #include <linux/smp_lock.h>
 #include <asm/uaccess.h>
 #include <asm/nvram.h>
-#include <asm/semaphore.h>
 
 #define NVRAM_SIZE	8192
 
-static DECLARE_MUTEX(nvram_sem);
-
 static loff_t nvram_llseek(struct file *file, loff_t offset, int origin)
 {
-	down(&nvram_sem);
+	lock_kernel();
 	switch (origin) {
 	case 1:
 		offset += file->f_pos;
@@ -40,57 +37,48 @@ static loff_t nvram_llseek(struct file *file, loff_t offset, int origin)
 		break;
 	}
 	if (offset < 0) {
-		up(&nvram_sem);
+		unlock_kernel();
 		return -EINVAL;
 	}
 	file->f_pos = offset;
-	up(&nvram_sem);
+	unlock_kernel();
 	return file->f_pos;
 }
 
 static ssize_t read_nvram(struct file *file, char __user *buf,
 			  size_t count, loff_t *ppos)
 {
-	loff_t i;
+	unsigned int i;
 	char __user *p = buf;
-	
+
 	if (verify_area(VERIFY_WRITE, buf, count))
 		return -EFAULT;
-		
-	down(&nvram_sem);
-	/* If we are already off the end then we report 0 anyway .. */
+	if (*ppos >= NVRAM_SIZE)
+		return 0;
 	for (i = *ppos; count > 0 && i < NVRAM_SIZE; ++i, ++p, --count)
 		if (__put_user(nvram_read_byte(i), p))
-		{
-			up(&nvram_sem);
 			return -EFAULT;
-		}
 	*ppos = i;
-	up(&nvram_sem);
 	return p - buf;
 }
 
 static ssize_t write_nvram(struct file *file, const char __user *buf,
 			   size_t count, loff_t *ppos)
 {
-	loff_t i;
+	unsigned int i;
 	const char __user *p = buf;
 	char c;
 
 	if (verify_area(VERIFY_READ, buf, count))
 		return -EFAULT;
-		
-	down(&nvram_sem);
-	/* if *ppos > end then we return 0 anyway */
+	if (*ppos >= NVRAM_SIZE)
+		return 0;
 	for (i = *ppos; count > 0 && i < NVRAM_SIZE; ++i, ++p, --count) {
-		if (__get_user(c, p)) {
-			up(&nvram_sem);
+		if (__get_user(c, p))
 			return -EFAULT;
-		}
 		nvram_write_byte(c, i);
 	}
 	*ppos = i;
-	up(&nvram_sem);
 	return p - buf;
 }
 

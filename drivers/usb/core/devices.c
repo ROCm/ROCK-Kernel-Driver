@@ -560,39 +560,31 @@ static ssize_t usb_device_read(struct file *file, char __user *buf, size_t nbyte
 {
 	struct list_head *buslist;
 	struct usb_bus *bus;
-	ssize_t ret = 0, total_written = 0;
-	loff_t skip_bytes;
+	ssize_t ret, total_written = 0;
+	loff_t skip_bytes = *ppos;
 
-	down (&usb_bus_list_lock);
-	
-	skip_bytes = *ppos;
-	if (skip_bytes < 0)
-	{
-		ret =  -EINVAL;
-		goto error;
-	}
+	if (*ppos < 0)
+		return -EINVAL;
 	if (nbytes <= 0)
-		goto error;
+		return 0;
 	if (!access_ok(VERIFY_WRITE, buf, nbytes))
-	{
-		ret =  -EFAULT;
-		goto error;
-	}
+		return -EFAULT;
+
 	/* enumerate busses */
+	down (&usb_bus_list_lock);
 	for (buslist = usb_bus_list.next; buslist != &usb_bus_list; buslist = buslist->next) {
 		/* print devices for this bus */
 		bus = list_entry(buslist, struct usb_bus, bus_list);
 		/* recurse through all children of the root hub */
 		ret = usb_device_dump(&buf, &nbytes, &skip_bytes, ppos, bus->root_hub, bus, 0, 0, 0);
 		if (ret < 0) {
-			goto error;
+			up(&usb_bus_list_lock);
+			return ret;
 		}
 		total_written += ret;
 	}
-	ret = total_written;
-error:
 	up (&usb_bus_list_lock);
-	return ret;
+	return total_written;
 }
 
 /* Kernel lock for "lastev" protection */
@@ -654,8 +646,7 @@ static loff_t usb_device_lseek(struct file * file, loff_t offset, int orig)
 {
 	loff_t ret;
 
-	/* This already guards the other users */
-	down(&usb_bus_list_lock);
+	lock_kernel();
 
 	switch (orig) {
 	case 0:
@@ -671,7 +662,7 @@ static loff_t usb_device_lseek(struct file * file, loff_t offset, int orig)
 		ret = -EINVAL;
 	}
 
-	up(&usb_bus_list_lock);
+	unlock_kernel();
 	return ret;
 }
 

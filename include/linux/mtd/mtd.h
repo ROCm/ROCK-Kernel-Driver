@@ -222,9 +222,6 @@ struct mtd_info {
 	/* Power Management functions */
 	int (*suspend) (struct mtd_info *mtd);
 	void (*resume) (struct mtd_info *mtd);
-	
-	/* Semaphore */
-	struct semaphore mutex;
 
 	void *priv;
 

@@ -947,7 +947,7 @@ isdn_info_update(void)
 }
 
 static ssize_t
-isdn_read(struct file *file, char *buf, size_t count, loff_t * poff)
+isdn_read(struct file *file, char *buf, size_t count, loff_t * off)
 {
 	uint minor = MINOR(file->f_dentry->d_inode->i_rdev);
 	int len = 0;
@@ -955,14 +955,11 @@ isdn_read(struct file *file, char *buf, size_t count, loff_t * poff)
 	int chidx;
 	int retval;
 	char *p;
-	loff_t off;
 
-	if (poff != &file->f_pos)
+	if (off != &file->f_pos)
 		return -ESPIPE;
 
 	lock_kernel();
-	off = *poff;
-	
 	if (minor == ISDN_MINOR_STATUS) {
 		if (!file->private_data) {
 			if (file->f_flags & O_NONBLOCK) {
@@ -978,7 +975,7 @@ isdn_read(struct file *file, char *buf, size_t count, loff_t * poff)
 				retval = -EFAULT;
 				goto out;
 			}
-			off += len;
+			*off += len;
 			retval = len;
 			goto out;
 		}
@@ -1007,7 +1004,7 @@ isdn_read(struct file *file, char *buf, size_t count, loff_t * poff)
 		}
 		len = isdn_readbchan(drvidx, chidx, p, 0, count,
 				     &dev->drv[drvidx]->rcv_waitq[chidx]);
-		off += len;
+		*off += len;
 		if (copy_to_user(buf,p,len)) 
 			len = -EFAULT;
 		kfree(p);
@@ -1040,7 +1037,7 @@ isdn_read(struct file *file, char *buf, size_t count, loff_t * poff)
 			dev->drv[drvidx]->stavail -= len;
 		else
 			dev->drv[drvidx]->stavail = 0;
-		off += len;
+		*off += len;
 		retval = len;
 		goto out;
 	}
@@ -1052,7 +1049,6 @@ isdn_read(struct file *file, char *buf, size_t count, loff_t * poff)
 #endif
 	retval = -ENODEV;
  out:
- 	*poff = off;
 	unlock_kernel();
 	return retval;
 }

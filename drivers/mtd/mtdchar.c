@@ -30,8 +30,6 @@ static loff_t mtd_lseek (struct file *file, loff_t offset, int orig)
 {
 	struct mtd_info *mtd=(struct mtd_info *)file->private_data;
 
-
-	down(&mtd->mutex);
 	switch (orig) {
 	case 0:
 		/* SEEK_SET */
@@ -46,16 +44,14 @@ static loff_t mtd_lseek (struct file *file, loff_t offset, int orig)
 		file->f_pos =mtd->size + offset;
 		break;
 	default:
-		up(&mtd->mutex);
 		return -EINVAL;
 	}
 
-	/* XXX Should return -EINVAL surely ?? */
 	if (file->f_pos < 0)
 		file->f_pos = 0;
 	else if (file->f_pos >= mtd->size)
 		file->f_pos = mtd->size - 1;
-	up(&mtd->mutex);
+
 	return file->f_pos;
 }
 
@@ -131,16 +127,11 @@ static ssize_t mtd_read(struct file *file, char *buf, size_t count,loff_t *ppos)
 	
 	DEBUG(MTD_DEBUG_LEVEL0,"MTD_read\n");
 
-	down(&mtd->mutex);
-	
-	if (count > mtd->size - *ppos)
+	if (*ppos + count > mtd->size)
 		count = mtd->size - *ppos;
 
 	if (!count)
-	{
-		up(&mtd->mutex);
 		return 0;
-	}
 	
 	/* FIXME: Use kiovec in 2.5 to lock down the user's buffers
 	   and pass them directly to the MTD functions */
@@ -152,18 +143,13 @@ static ssize_t mtd_read(struct file *file, char *buf, size_t count,loff_t *ppos)
 
 		kbuf=kmalloc(len,GFP_KERNEL);
 		if (!kbuf)
-		{
-			up(&mtd->mutex);
-			/* API error - should return I/O done so far if > 0 */
 			return -ENOMEM;
-		}		
+		
 		ret = MTD_READ(mtd, *ppos, len, &retlen, kbuf);
 		if (!ret) {
 			*ppos += retlen;
 			if (copy_to_user(buf, kbuf, retlen)) {
 			        kfree(kbuf);
-			        up(&mtd->mutex);
-				/* API error - should return I/O done so far if > 0 */
 				return -EFAULT;
 			}
 			else
@@ -174,13 +160,12 @@ static ssize_t mtd_read(struct file *file, char *buf, size_t count,loff_t *ppos)
 		}
 		else {
 			kfree(kbuf);
-			up(&mtd->mutex);
 			return ret;
 		}
 		
 		kfree(kbuf);
 	}
-	up(&mtd->mutex);	
+	
 	return total_retlen;
 } /* mtd_read */
 
@@ -194,22 +179,15 @@ static ssize_t mtd_write(struct file *file, const char *buf, size_t count,loff_t
 	int len;
 
 	DEBUG(MTD_DEBUG_LEVEL0,"MTD_write\n");
-
-	down(&mtd->mutex);	
-	if (*ppos >= mtd->size)
-	{
-		up(&mtd->mutex);
-		return -ENOSPC;
-	}
 	
-	if (count > mtd->size - *ppos)
+	if (*ppos == mtd->size)
+		return -ENOSPC;
+	
+	if (*ppos + count > mtd->size)
 		count = mtd->size - *ppos;
 
 	if (!count)
-	{
-		up(&mtd->mutex);
 		return 0;
-	}
 
 	while (count) {
 		if (count > MAX_KMALLOC_SIZE) 
@@ -219,14 +197,11 @@ static ssize_t mtd_write(struct file *file, const char *buf, size_t count,loff_t
 
 		kbuf=kmalloc(len,GFP_KERNEL);
 		if (!kbuf) {
-//			printk("kmalloc is null\n");
-			/* API bug should report I/O completed */
-			up(&mtd->mutex);
+			printk("kmalloc is null\n");
 			return -ENOMEM;
 		}
 
 		if (copy_from_user(kbuf, buf, len)) {
-			up(&mtd->mutex);
 			kfree(kbuf);
 			return -EFAULT;
 		}
@@ -239,15 +214,13 @@ static ssize_t mtd_write(struct file *file, const char *buf, size_t count,loff_t
 			buf += retlen;
 		}
 		else {
-			up(&mtd->mutex);
 			kfree(kbuf);
-			/* API bug ?? */
 			return ret;
 		}
 		
 		kfree(kbuf);
 	}
-	up(&mtd->mutex);
+
 	return total_retlen;
 } /* mtd_write */
 

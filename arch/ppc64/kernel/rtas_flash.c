@@ -238,7 +238,7 @@ static ssize_t rtas_flash_read(struct file *file, char *buf,
 	if (msglen > count)
 		msglen = count;
 
-	if (*ppos != 0)
+	if (ppos && *ppos != 0)
 		return 0;	/* be cheap */
 
 	error = verify_area(VERIFY_WRITE, buf, msglen);
@@ -248,7 +248,8 @@ static ssize_t rtas_flash_read(struct file *file, char *buf,
 	if (copy_to_user(buf, msg, msglen))
 		return -EFAULT;
 
-	*ppos = msglen;
+	if (ppos)
+		*ppos = msglen;
 	return msglen;
 }
 
@@ -374,7 +375,7 @@ static ssize_t manage_flash_read(struct file *file, char *buf,
 	if (msglen > count)
 		msglen = count;
 
-	if (*ppos != 0)
+	if (ppos && *ppos != 0)
 		return 0;	/* be cheap */
 
 	error = verify_area(VERIFY_WRITE, buf, msglen);
@@ -384,7 +385,8 @@ static ssize_t manage_flash_read(struct file *file, char *buf,
 	if (copy_to_user(buf, msg, msglen))
 		return -EFAULT;
 
-	*ppos = msglen;
+	if (ppos)
+		*ppos = msglen;
 	return msglen;
 }
 
@@ -479,7 +481,7 @@ static ssize_t validate_flash_read(struct file *file, char *buf,
 
 	args_buf = (struct rtas_validate_flash_t *) dp->data;
 
-	if (*ppos != 0)
+	if (ppos && *ppos != 0)
 		return 0;	/* be cheap */
 	
 	msglen = get_validate_flash_msg(args_buf, msg);
@@ -493,7 +495,8 @@ static ssize_t validate_flash_read(struct file *file, char *buf,
 	if (copy_to_user(buf, msg, msglen))
 		return -EFAULT;
 
-	*ppos = msglen;
+	if (ppos)
+		*ppos = msglen;
 	return msglen;
 }
 

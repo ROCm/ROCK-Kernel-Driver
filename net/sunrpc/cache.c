@@ -1170,19 +1170,19 @@ static ssize_t read_flush(struct file *file, char *buf,
 {
 	struct cache_detail *cd = PDE(file->f_dentry->d_inode)->data;
 	char tbuf[20];
-	loff_t p = *ppos;
+	unsigned long p = *ppos;
 	int len;
 
-	len = sprintf(tbuf, "%lu\n", cd->flush_time);
-	if (p < 0 || p >= len)
+	sprintf(tbuf, "%lu\n", cd->flush_time);
+	len = strlen(tbuf);
+	if (p >= len)
 		return 0;
-
 	len -= p;
 	if (len > count) len = count;
 	if (copy_to_user(buf, (void*)(tbuf+p), len))
 		len = -EFAULT;
 	else
-		*ppos = p + len;
+		*ppos += len;
 	return len;
 }
 
@@ -1206,7 +1206,7 @@ static ssize_t write_flush(struct file * file, const char * buf,
 	cd->nextcheck = get_seconds();
 	cache_flush();
 
-	*ppos = count;
+	*ppos += count;
 	return count;
 }
 

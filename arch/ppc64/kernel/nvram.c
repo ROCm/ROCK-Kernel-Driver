@@ -57,7 +57,6 @@ struct err_log_info {
 static loff_t dev_nvram_llseek(struct file *file, loff_t offset, int origin)
 {
 	int size;
-	/* XXX needs locking */
 
 	if (ppc_md.nvram_size == NULL)
 		return -ENODEV;
@@ -84,7 +83,6 @@ static ssize_t dev_nvram_read(struct file *file, char *buf,
 	ssize_t len;
 	char *tmp_buffer;
 	int size;
-	loff_t pos = *ppos;
 
 	if (ppc_md.nvram_size == NULL)
 		return -ENODEV;
@@ -92,7 +90,7 @@ static ssize_t dev_nvram_read(struct file *file, char *buf,
 
 	if (verify_area(VERIFY_WRITE, buf, count))
 		return -EFAULT;
-	if (pos >= size || pos < 0 || size < 0)
+	if (*ppos >= size)
 		return 0;
 	if (count > size) 
 		count = size;
@@ -103,9 +101,7 @@ static ssize_t dev_nvram_read(struct file *file, char *buf,
 		return -ENOMEM;
 	}
 
-	len = ppc_md.nvram_read(tmp_buffer, count, &pos);
-	*ppos = pos;
-	
+	len = ppc_md.nvram_read(tmp_buffer, count, ppos);
 	if ((long)len <= 0) {
 		kfree(tmp_buffer);
 		return len;
@@ -127,7 +123,6 @@ static ssize_t dev_nvram_write(struct file *file, const char *buf,
 	ssize_t len;
 	char * tmp_buffer;
 	int size;
-	loff_t pos = *ppos;
 
 	if (ppc_md.nvram_size == NULL)
 		return -ENODEV;
@@ -135,7 +130,7 @@ static ssize_t dev_nvram_write(struct file *file, const char *buf,
 
 	if (verify_area(VERIFY_READ, buf, count))
 		return -EFAULT;
-	if (pos >= size || pos < 0 || size < 0)
+	if (*ppos >= size)
 		return 0;
 	if (count > size)
 		count = size;
@@ -151,9 +146,7 @@ static ssize_t dev_nvram_write(struct file *file, const char *buf,
 		return -EFAULT;
 	}
 
-	len = ppc_md.nvram_write(tmp_buffer, count, &pos);
-	*ppos = pos;
-	
+	len = ppc_md.nvram_write(tmp_buffer, count, ppos);
 	if ((long)len <= 0) {
 		kfree(tmp_buffer);
 		return len;
