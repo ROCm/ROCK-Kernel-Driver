@@ -447,11 +447,7 @@ static inline void forget_original_parent(struct task_struct * father)
 	struct task_struct *p, *reaper = father;
 	struct list_head *_p;
 
-	if (father->exit_signal != -1)
-		reaper = prev_thread(reaper);
-	else
-		reaper = child_reaper;
-
+	reaper = father->group_leader;
 	if (reaper == father)
 		reaper = child_reaper;
 
