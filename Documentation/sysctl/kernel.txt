@@ -23,7 +23,6 @@ show up in /proc/sys/kernel:
 - dentry-state
 - domainname
 - hostname
-- htab-reclaim                [ PPC only ]
 - hotplug
 - java-appletviewer           [ binfmt_java, obsolete ]
 - java-interpreter            [ binfmt_java, obsolete ]
@@ -143,14 +142,6 @@ Information Service) or YP (Yellow Pages) domainname. These two
 domain names are in general different. For a detailed discussion
 see the hostname(1) man page.
 
-==============================================================
-
-htab-reclaim: (PPC only)
-
-Setting this to a non-zero value, the PowerPC htab
-(see Documentation/powerpc/ppc_htab.txt) is pruned
-each time the system hits the idle loop.
- 
 ==============================================================
 
 hotplug:
