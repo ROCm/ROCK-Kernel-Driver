@@ -1,0 +1,966 @@
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook V3.1//EN"[]>
+<book id="USB-Gadget-API">
+  <bookinfo>
+    <title>USB Gadget API for Linux</title>
+    <date>02 June 2003</date>
+    <edition>02 June 2003</edition>
+  
+    <legalnotice>
+      <para>Permission is granted to copy, distribute, and/or modify
+      this document under the terms of the GNU Free Documentation
+      License, version 1.2, or any later version published by the
+      Free Software Foundation; with the Invariant Sections being
+      the "GNU Free Documentation License",
+      no Front-Cover Texts,
+      and
+      no Back-Cover Texts.
+      </para>
+      
+      <para>This documentation is distributed in the hope that it will be
+      useful, but WITHOUT ANY WARRANTY; without even the implied
+      warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+      See the GNU Free Documentation License for more details.
+      </para>
+
+      <para>Note that certain sections of this document are merged
+      into Linux kernel source code.
+      That content is the bulk of 
+      <xref linkend="core" /> and
+      <xref linkend="utils" />,
+      where the "GNU Free Documentation License" is identified
+      as an alternate licence for its documentation.
+      </para>
+
+    </legalnotice>
+    <copyright>
+      <year>2003</year>
+      <holder>David Brownell</holder>
+    </copyright>
+
+    <author>
+      <firstname>David</firstname> 
+      <surname>Brownell</surname>
+      <affiliation>
+        <address><email>dbrownell@users.sourceforge.net</email></address>
+      </affiliation>
+    </author>
+  </bookinfo>
+
+<toc></toc>
+
+<chapter><title>Introduction</title>
+
+<para>This document presents a Linux-USB "Gadget"
+kernel mode
+API, for use within peripherals and other USB devices
+that embed Linux.
+It provides an overview of the API structure,
+and shows how that fits into a system development project.
+This is the first such API released on Linux to address
+a number of important problems, including: </para>
+
+<itemizedlist>
+    <listitem><para>Supports USB 2.0, for high speed devices which
+	can stream data at several dozen megabytes per second.
+	</para></listitem>
+    <listitem><para>Handles devices with dozens of endpoints just as
+	well as ones with just two fixed-function ones.  Gadget drivers
+	can be written so they're easy to port to new hardware.
+	</para></listitem>
+    <listitem><para>Flexible enough to expose more complex USB device
+	capabilities such as multiple configurations, multiple interfaces,
+	composite devices,
+	and alternate interface settings.
+	</para></listitem>
+    <listitem><para>Sharing data structures and API models with the
+	Linux-USB host side API.  This looks forward to USB "On-The-Go"
+	(OTG) and similar more-symmetric frameworks.
+	</para></listitem>
+    <listitem><para>Minimalist, so it's easier to support new device
+	controller hardware.  I/O processing doesn't imply large
+	demands for memory or CPU resources.
+	</para></listitem>
+</itemizedlist>
+
+
+<para>Most Linux developers will not be able to use this API, since they
+have USB "host" hardware in a PC, workstation, or server.
+Linux users with embedded systems are more likely to
+have USB peripheral hardware.
+To distinguish drivers running inside such hardware from the
+more familiar Linux "USB device drivers",
+which are host side proxies for the real USB devices,
+a different term is used:
+the drivers inside the peripherals are "USB gadget drivers".
+In USB protocol interactions, the device driver is the master
+(or "client driver")
+and the gadget driver is the slave (or "function driver").
+</para>
+
+<para>The gadget API resembles the host side Linux-USB API in that both
+use queues of request objects to package I/O buffers, and those requests
+may be submitted or canceled.
+They share common definitions for the standard USB
+<emphasis>Chapter 9</emphasis> messages, structures, and constants.
+Also, both APIs bind and unbind drivers to devices.
+The APIs differ in detail, since the host side's current
+URB framework exposes a number of implementation details
+and assumptions that are inappropriate for a gadget API.
+While the model for control transfers and configuration
+management is necessarily different (one side is a hardware-neutral master,
+the other is a hardware-aware slave), the endpoint I/0 API used here
+should also be usable for an overhead-reduced host side API.
+</para>
+
+</chapter>
+
+<chapter id="structure"><title>Structure of Gadget Drivers</title>
+
+<para>A system running inside a USB peripheral
+normally has at least three layers inside the kernel to handle
+USB protocol processing, and may have additional layers in
+user space code.
+The "gadget" API is used by the middle layer to interact
+with the lowest level (which directly handles hardware).
+</para>
+
+<para>In Linux, from the bottom up, these layers are:
+</para>
+
+<variablelist>
+
+    <varlistentry>
+        <term><emphasis>USB Controller Driver</emphasis></term>
+
+	<listitem>
+	<para>This is the lowest software level.
+	It is the only layer that talks to hardware,
+	through registers, fifos, dma, irqs, and the like.
+	The <filename>&lt;linux/usb_gadget.h&gt;</filename> API abstracts
+	the peripheral controller endpoint hardware.
+	That hardware is exposed through endpoint objects, which accept
+	streams of IN/OUT buffers, and through callbacks that interact
+	with gadget drivers.
+	Since normal USB devices only have one upstream
+	port, they only have one of these drivers.
+	The controller driver can support any number of different
+	gadget drivers, but only one of them can be used at a time.
+	</para>
+
+	<para>Examples of such controller hardware include
+	the PCI-based NetChip 2280 USB 2.0 high speed controller,
+	the SA-11x0 or PXA-25x UDC (found within many PDAs),
+	and a variety of other products.
+	</para>
+	</listitem></varlistentry>
+
+    <varlistentry>
+	<term><emphasis>Gadget Driver</emphasis></term>
+
+	<listitem>
+	<para>The lower boundary of this driver implements hardware-neutral
+	USB functions, using calls to the controller driver.
+	Because such hardware varies widely in capabilities and restrictions,
+	the gadget driver is normally configured at compile time
+	to work with endpoints supported by one particular controller.
+	Gadget drivers may be portable to several different controllers,
+	using conditional compilation.
+	Gadget driver responsibilities include:
+	</para>
+	<itemizedlist>
+	    <listitem><para>handling setup requests (ep0 protocol responses)
+		possibly including class-specific functionality
+		</para></listitem>
+	    <listitem><para>returning configuration and string descriptors
+		</para></listitem>
+	    <listitem><para>(re)setting configurations and interface
+		altsettings, including enabling and configuring endpoints
+		</para></listitem>
+	    <listitem><para>handling life cycle events, such as managing
+		bindings
+	        to hardware, and disconnection from the USB host.
+		</para></listitem>
+	    <listitem><para>managing IN and OUT transfers on all currently
+		enabled endpoints
+		</para></listitem>
+	</itemizedlist>
+
+	<para>
+	Such drivers may be modules of proprietary code, although
+	that approach is discouraged in the Linux community.
+	</para>
+	</listitem></varlistentry>
+
+    <varlistentry>
+	<term><emphasis>Upper Level</emphasis></term>
+
+	<listitem>
+	<para>Most gadget drivers have an upper boundary that connects
+	to some Linux driver or framework in Linux.
+	Through that boundary flows the data which the gadget driver
+	produces and/or consumes through protocol transfers over USB.
+	Examples include:
+	</para>
+	<itemizedlist>
+	    <listitem><para>user mode code, using generic (gadgetfs)
+	        or application specific files in
+		<filename>/dev</filename>
+		</para></listitem>
+	    <listitem><para>networking subsystem (for network gadgets,
+		like the CDC Ethernet Model gadget driver)
+		</para></listitem>
+	    <listitem><para>data capture drivers, perhaps video4Linux or
+		 a scanner driver; or test and measurement hardware.
+		 </para></listitem>
+	    <listitem><para>input subsystem (for HID gadgets)
+		</para></listitem>
+	    <listitem><para>sound subsystem (for audio gadgets)
+		</para></listitem>
+	    <listitem><para>file system (for PTP gadgets)
+		</para></listitem>
+	    <listitem><para>block i/o subsystem (for usb-storage gadgets)
+		</para></listitem>
+	    <listitem><para>... and more </para></listitem>
+	</itemizedlist>
+	</listitem></varlistentry>
+
+    <varlistentry>
+	<term><emphasis>Additional Layers</emphasis></term>
+
+	<listitem>
+	<para>Other layers may exist.
+	These could include kernel layers, such as network protocol stacks,
+	as well as user mode applications building on standard POSIX
+	system call APIs such as
+	<emphasis>open()</emphasis>, <emphasis>close()</emphasis>,
+	<emphasis>read()</emphasis> and <emphasis>write()</emphasis>.
+	On newer systems, POSIX Async I/O calls may be an option.
+	Such user mode code will not necessarily be subject to
+	the GNU General Public License (GPL).
+	</para>
+	</listitem></varlistentry>
+
+
+</variablelist>
+
+<para>Over time, reusable utilities should evolve to help make some
+gadget driver tasks simpler.  An example of particular interest
+is code implementing standard USB-IF protocols for
+HID, networking, storage, or audio classes.
+Some developers are interested in KDB or KGDB hooks, to let
+target hardware be remotely debugged.
+Most such USB protocol code doesn't need to be hardware-specific,
+any more than network protocols like X11, HTTP, or NFS are.
+Such interface drivers might be combined, to support composite devices.
+</para>
+
+</chapter>
+
+
+<chapter id="api"><title>Kernel Mode Gadget API</title>
+
+<para>Gadget drivers declare themselves through a
+<emphasis>struct usb_gadget_driver</emphasis>, which is responsible for
+most parts of enumeration for a <emphasis>struct usb_gadget</emphasis>.
+The response to a set_configuration usually involves
+enabling one or more of the <emphasis>struct usb_ep</emphasis> objects
+exposed by the gadget, and submitting one or more
+<emphasis>struct usb_request</emphasis> buffers to transfer data.
+Understand those four data types, and their operations, and
+you will understand how this API works.
+</para> 
+
+<note><title>Incomplete Data Type Descriptions</title>
+
+<para>This documentation was prepared using the standard Linux
+kernel <filename>docproc</filename> tool, which turns text
+and in-code comments into SGML DocBook and then into usable
+formats such as HTML or PDF.
+Other than the "Chapter 9" data types, most of the significant
+data types and functions are described here.
+</para>
+
+<para>However, docproc does not understand all the C constructs
+that are used, so some relevant information is likely omitted from
+what you are reading.  
+One example of such information is several per-request flags.
+You'll have to read the header file, and use example source
+code (such as that for "Gadget Zero"), to fully understand the API.
+</para>
+
+<para>The part of the API implementing some basic
+driver capabilities is specific to the version of the
+Linux kernel that's in use.
+The 2.5 kernel includes a <emphasis>driver model</emphasis>
+framework that has no analogue on earlier kernels;
+so those parts of the gadget API are not fully portable.
+(They are implemented on 2.4 kernels, but in a different way.)
+The driver model state is another part of this API that is
+ignored by the kerneldoc tools.
+</para>
+</note>
+
+<para>The core API does not expose
+every possible hardware feature, only the most widely available ones.
+There are significant hardware features, such as device-to-device DMA
+(without temporary storage in a memory buffer)
+that would be added using hardware-specific APIs.
+</para>
+
+<para>This API expects drivers to use conditional compilation to handle
+endpoint capabilities of different hardware.
+Those tend to have arbitrary restrictions, relating to
+transfer types, addressing, packet sizes, buffering, and availability.
+As a rule, such differences only matter for "endpoint zero" logic
+that handles device configuration and management.
+The API only supports limited run-time
+detection of capabilities, through naming conventions for endpoints.
+Although a gadget driver could scan the endpoints available to it and
+choose to map those capabilities onto driver functionality in some way,
+few drivers will want to reconfigure themselves at run-time.
+</para>
+
+<para>Like the Linux-USB host side API, this API exposes
+the "chunky" nature of USB messages:  I/O requests are in terms
+of one or more "packets", and packet boundaries are visible to drivers.
+Compared to RS-232 serial protocols, USB resembles
+synchronous protocols like HDLC
+(N bytes per frame, multipoint addressing from the host)
+more than asynchronous ones
+(tty style, like 8 bytes, no parity, one stop bit).
+So for example the controller drivers won't buffer
+two single byte writes into a single two-byte USB IN packet,
+although gadget drivers may do so when they implement
+protocols where packet boundaries (and "short packets")
+are not significant.
+</para>
+
+<sect1 id="lifecycle"><title>Driver Life Cycle</title>
+
+<para>Gadget drivers make endpoint I/O requests to hardware without
+needing to know many details of the hardware, but driver
+setup/configuration code needs to handle some differences.
+Use the API like this:
+</para>
+
+<orderedlist numeration='arabic'>
+
+<listitem><para>Register a driver for the particular device side
+usb controller hardware,
+such as the net2280 on PCI (USB 2.0),
+sa11x0 or pxa25x as found in Linux PDAs,
+and so on.
+At this point the device is logically in the USB ch9 initial state
+("attached"), drawing no power and not usable
+(since it does not yet support enumeration).
+</para></listitem>
+
+<listitem><para>Register a gadget driver that implements some higher level
+device function.  That will then bind() to a usb_gadget.
+</para></listitem>
+
+<listitem><para>The hardware driver can now start enumerating.
+The steps it handles are to accept USB power and set_address requests.
+Other steps are handled by the gadget driver.
+If the gadget driver module is unloaded before the host starts to
+enumerate, steps before step 7 are skipped.
+</para></listitem>
+
+<listitem><para>The gadget driver's setup() call returns usb descriptors,
+based both on what the bus interface hardware provides and on the
+functionality being implemented.
+That can involve alternate settings or configurations,
+unless the hardware prevents such operation.
+</para></listitem>
+
+<listitem><para>The gadget driver handles the last step of enumeration,
+when the USB host issues a set_configuration call.
+It enables all endpoints used in that configuration,
+with all interfaces in their default settings.
+That involves using a list of the hardware's endpoints, enabling each
+endpoint according to its descriptor.
+</para></listitem>
+
+<listitem><para>Do real work and perform data transfers, possibly involving
+changes to interface settings or switching to new configurations, until the
+device is disconnect()ed from the host.
+Queue any number of transfer requests to each endpoint.
+The drivers then go back to step 3 (above).
+</para></listitem>
+
+<listitem><para>When the gadget driver module is being unloaded,
+the driver unbind() callback is issued.  That lets the controller
+driver be unloaded.
+</para></listitem>
+
+</orderedlist>
+
+<para>Drivers will normally be arranged so that just loading the
+gadget driver module (or statically linking it into a Linux kernel)
+allows the peripheral device to be enumerated.
+Note that at this lowest level there are no policies about how
+ep0 configuration logic is implemented,
+except that it should obey USB specifications.
+Such issues are in the domain of gadget drivers,
+including knowing about implementation constraints
+imposed by some USB controllers
+or understanding that composite devices might happen to
+be built by integrating reusable components.
+</para>
+
+</sect1>
+
+<sect1 id="ch9"><title>USB 2.0 Chapter 9 Types and Constants</title>
+
+<para>Gadget drivers
+rely on common USB structures and constants
+defined in the
+<filename>&lt;linux/usb_ch9.h&gt;</filename>
+header file, which is standard in Linux 2.5 kernels.
+These are the same types and constants used by host
+side drivers.
+</para>
+
+!Iinclude/linux/usb_ch9.h
+</sect1>
+
+<sect1 id="core"><title>Core Objects and Methods</title>
+
+<para>These are declared in
+<filename>&lt;linux/usb_gadget.h&gt;</filename>,
+and are used by gadget drivers to interact with
+USB peripheral controller drivers.
+</para>
+
+	<!-- yeech, this is ugly in nsgmls PDF output.
+
+	     the PDF bookmark and refentry output nesting is wrong,
+	     and the member/argument documentation indents ugly.
+
+	     plus something (docproc?) adds whitespace before the
+	     descriptive paragraph text, so it can't line up right
+	     unless the explanations are trivial.
+	  -->
+
+!Iinclude/linux/usb_gadget.h
+</sect1>
+
+<sect1 id="utils"><title>Optional Utilities</title>
+
+<para>The core API is sufficient for writing a USB Gadget Driver,
+but some optional utilities are provided to simplify common tasks.
+</para>
+
+!Edrivers/usb/gadget/usbstring.c
+</sect1>
+
+</chapter>
+
+<chapter id="controllers"><title>Peripheral Controller Drivers</title>
+
+<para>The first hardware supporting this API is the NetChip 2280
+controller, which supports USB 2.0 high speed and is based on PCI.
+This is the <filename>net2280</filename> driver module.
+The driver supports Linux kernel versions 2.4 and 2.5;
+contact NetChip Technologies for development boards and product
+information.
+</para> 
+
+<!-- !Edrivers/usb/gadget/net2280.c -->
+
+<para>A partial USB simulator,
+the <filename>dummy_hcd</filename> driver, is available.
+It can act like a net2280, a pxa25x, or an sa11x0 in terms
+of available endpoints and device speeds; and it simulates
+control, bulk, and to some extent interrupt transfers.
+That lets you develop some parts of a gadget driver on a normal PC,
+without any special hardware, and perhaps with the assistance
+of tools such as GDB running with User Mode Linux.
+At least one person has expressed interest in adapting that
+approach, hooking it up to a simulator for a microcontroller.
+Such simulators can help debug subsystems where the runtime hardware
+is unfriendly to software development, or is not yet available.
+</para>
+
+<para>Support for other controllers is expected to be developed
+and contributed
+over time, as this driver framework evolves.
+</para>
+
+</chapter>
+
+<chapter id="gadget"><title>Gadget Drivers</title>
+
+<para>In addition to <emphasis>Gadget Zero</emphasis>
+(used primarily for testing and development with drivers
+for usb controller hardware), other gadget drivers exist.
+</para>
+
+<para>There's an <emphasis>ethernet</emphasis> gadget
+driver, which implements one of the most useful
+<emphasis>Communications Device Class</emphasis> models.  
+One of the standards for cable modem interoperability even
+specifies the use of this ethernet model as one of two
+mandatory options.
+Gadgets using this code look to a USB host as if they're
+an Ethernet adapter.
+It provides access to a network where the gadget's CPU is one host,
+which could easily be bridging, routing, or firewalling
+access to other networks.
+</para>
+
+<para>There is also support for user mode gadget drivers,
+using <emphasis>gadgetfs</emphasis>.
+This provides a <emphasis>User Mode API</emphasis> that presents
+each endpoint as a single file descriptor.  I/O is done using
+normal <emphasis>read()</emphasis> and <emphasis>read()</emphasis> calls.
+Familiar tools like GDB and pthreads can be used to
+develop and debug user mode drivers, so that once a robust
+controller driver is available many applications for it
+won't require new kernel mode software.
+</para>
+
+<para>Support for other kinds of gadget is expected to
+be developed and contributed
+over time, as this driver framework evolves.
+</para>
+
+</chapter>
+
+
+<appendix id="gfdl">
+<title>GNU Free Documentation License</title>
+<subtitle>Version 1.2, November 2002</subtitle>
+
+<blockquote id="fsf-copyright">
+ <para>Copyright (C) 2000,2001,2002  Free Software Foundation, Inc.
+59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+Everyone is permitted to copy and distribute verbatim copies
+of this license document, but changing it is not allowed.</para>
+</blockquote>
+
+<sect1 id="gfdl-0"><title>PREAMBLE</title>
+
+<para>The purpose of this License is to make a manual, textbook, or
+other functional and useful document "free" in the sense of freedom: to
+assure everyone the effective freedom to copy and redistribute it, with
+or without modifying it, either commercially or noncommercially.
+Secondarily, this License preserves for the author and publisher a way
+to get credit for their work, while not being considered responsible for
+modifications made by others.</para>
+
+<para>This License is a kind of "copyleft", which means that derivative
+works of the document must themselves be free in the same sense.  It
+complements the GNU General Public License, which is a copyleft license
+designed for free software.</para>
+
+<para>We have designed this License in order to use it for manuals for
+free software, because free software needs free documentation: a free
+program should come with manuals providing the same freedoms that the
+software does.  But this License is not limited to software manuals; it
+can be used for any textual work, regardless of subject matter or
+whether it is published as a printed book.  We recommend this License
+principally for works whose purpose is instruction or reference.</para>
+</sect1>
+
+<sect1 id="gfdl-1"><title>APPLICABILITY AND DEFINITIONS</title>
+
+<para id="gfdl-doc">This License applies to any manual or other work, in
+any medium, that contains a notice placed by the copyright holder saying
+it can be distributed under the terms of this License.  Such a notice
+grants a world-wide, royalty-free license, unlimited in duration, to use
+that work under the conditions stated herein.  The "Document", below,
+refers to any such manual or work.  Any member of the public is a
+licensee, and is addressed as "you".  You accept the license if you
+copy, modify or distribute the work in a way requiring permission under
+copyright law.</para>
+
+<para id="gfdl-mod-ver">A "Modified Version" of the Document means any
+work containing the Document or a portion of it, either copied verbatim,
+or with modifications and/or translated into another language.</para>
+
+<para id="gfdl-secnd-sect">A "Secondary Section" is a named appendix or
+a front-matter section of the Document that deals exclusively with the
+relationship of the publishers or authors of the Document to the
+Document's overall subject (or to related matters) and contains nothing
+that could fall directly within that overall subject.  (Thus, if the
+Document is in part a textbook of mathematics, a Secondary Section may
+not explain any mathematics.)  The relationship could be a matter of
+historical connection with the subject or with related matters, or of
+legal, commercial, philosophical, ethical or political position
+regarding them.</para>
+
+<para id="gfdl-inv-sect">The "Invariant Sections" are certain Secondary
+Sections whose titles are designated, as being those of Invariant
+Sections, in the notice that says that the Document is released under
+this License.  If a section does not fit the above definition of
+Secondary then it is not allowed to be designated as Invariant.  The
+Document may contain zero Invariant Sections.  If the Document does not
+identify any Invariant Sections then there are none.</para>
+
+<para id="gfdl-cov-text">The "Cover Texts" are certain short passages of
+text that are listed, as Front-Cover Texts or Back-Cover Texts, in the
+notice that says that the Document is released under this License.  A
+Front-Cover Text may be at most 5 words, and a Back-Cover Text may be at
+most 25 words.</para>
+
+<para id="gfdl-transparent">A "Transparent" copy of the Document means a
+machine-readable copy, represented in a format whose specification is
+available to the general public, that is suitable for revising the
+document straightforwardly with generic text editors or (for images
+composed of pixels) generic paint programs or (for drawings) some widely
+available drawing editor, and that is suitable for input to text
+formatters or for automatic translation to a variety of formats suitable
+for input to text formatters.  A copy made in an otherwise Transparent
+file format whose markup, or absence of markup, has been arranged to
+thwart or discourage subsequent modification by readers is not
+Transparent.  An image format is not Transparent if used for any
+substantial amount of text.  A copy that is not "Transparent" is called
+"Opaque".</para>
+
+<para>Examples of suitable formats for Transparent copies include plain
+ASCII without markup, Texinfo input format, LaTeX input format, SGML or
+XML using a publicly available DTD, and standard-conforming simple HTML,
+PostScript or PDF designed for human modification.  Examples of
+transparent image formats include PNG, XCF and JPG.  Opaque formats
+include proprietary formats that can be read and edited only by
+proprietary word processors, SGML or XML for which the DTD and/or
+processing tools are not generally available, and the machine-generated
+HTML, PostScript or PDF produced by some word processors for output
+purposes only.</para>
+
+<para id="gfdl-title-page">The "Title Page" means, for a printed book,
+the title page itself, plus such following pages as are needed to hold,
+legibly, the material this License requires to appear in the title page.
+For works in formats which do not have any title page as such, "Title
+Page" means the text near the most prominent appearance of the work's
+title, preceding the beginning of the body of the text.</para>
+
+<para id="gfdl-entitled">A section "Entitled XYZ" means a named subunit
+of the Document whose title either is precisely XYZ or contains XYZ in
+parentheses following text that translates XYZ in another language.
+(Here XYZ stands for a specific section name mentioned below, such as
+"Acknowledgements", "Dedications", "Endorsements", or "History".)  To
+"Preserve the Title" of such a section when you modify the Document
+means that it remains a section "Entitled XYZ" according to this
+definition.</para>
+
+<para>The Document may include Warranty Disclaimers next to the notice
+which states that this License applies to the Document.  These Warranty
+Disclaimers are considered to be included by reference in this License,
+but only as regards disclaiming warranties: any other implication that
+these Warranty Disclaimers may have is void and has no effect on the
+meaning of this License.</para>
+</sect1>
+
+<sect1 id="gfdl-2"><title>VERBATIM COPYING</title>
+
+<para>You may copy and distribute the Document in any medium, either
+commercially or noncommercially, provided that this License, the
+copyright notices, and the license notice saying this License applies to
+the Document are reproduced in all copies, and that you add no other
+conditions whatsoever to those of this License.  You may not use
+technical measures to obstruct or control the reading or further copying
+of the copies you make or distribute.  However, you may accept
+compensation in exchange for copies.  If you distribute a large enough
+number of copies you must also follow the conditions in section 3.
+</para>
+
+<para>You may also lend copies, under the same conditions stated above,
+and you may publicly display copies.</para>
+</sect1>
+
+<sect1 id="gfdl-3"><title>COPYING IN QUANTITY</title>
+
+<para>If you publish printed copies (or copies in media that commonly
+have printed covers) of the Document, numbering more than 100, and the
+Document's license notice requires Cover Texts, you must enclose the
+copies in covers that carry, clearly and legibly, all these Cover Texts:
+Front-Cover Texts on the front cover, and Back-Cover Texts on the back
+cover.  Both covers must also clearly and legibly identify you as the
+publisher of these copies.  The front cover must present the full title
+with all words of the title equally prominent and visible.  You may add
+other material on the covers in addition.  Copying with changes limited
+to the covers, as long as they preserve the title of the Document and
+satisfy these conditions, can be treated as verbatim copying in other
+respects.</para>
+
+<para>If the required texts for either cover are too voluminous to fit
+legibly, you should put the first ones listed (as many as fit
+reasonably) on the actual cover, and continue the rest onto adjacent
+pages.</para>
+
+<para>If you publish or distribute Opaque copies of the Document
+numbering more than 100, you must either include a machine-readable
+Transparent copy along with each Opaque copy, or state in or with each
+Opaque copy a computer-network location from which the general
+network-using public has access to download using public-standard
+network protocols a complete Transparent copy of the Document, free of
+added material.  If you use the latter option, you must take reasonably
+prudent steps, when you begin distribution of Opaque copies in quantity,
+to ensure that this Transparent copy will remain thus accessible at the
+stated location until at least one year after the last time you
+distribute an Opaque copy (directly or through your agents or retailers)
+of that edition to the public.</para>
+
+<para>It is requested, but not required, that you contact the authors of
+the Document well before redistributing any large number of copies, to
+give them a chance to provide you with an updated version of the
+Document.</para>
+</sect1>
+
+<sect1 id="gfdl-4"><title>MODIFICATIONS</title>
+
+<para>You may copy and distribute a Modified Version of the Document
+under the conditions of sections 2 and 3 above, provided that you
+release the Modified Version under precisely this License, with the
+Modified Version filling the role of the Document, thus licensing
+distribution and modification of the Modified Version to whoever
+possesses a copy of it.  In addition, you must do these things in the
+Modified Version:</para>
+
+<orderedlist id="gfdl-modif-cond" numeration="upperalpha">
+<listitem><simpara>Use in the Title Page (and on the covers, if any) a
+  title distinct from that of the Document, and from those of previous
+  versions (which should, if there were any, be listed in the History
+  section of the Document).  You may use the same title as a previous
+  version if the original publisher of that version gives permission.
+</simpara></listitem>
+<listitem><simpara>List on the Title Page, as authors, one or more
+  persons or entities responsible for authorship of the modifications in
+  the Modified Version, together with at least five of the principal
+  authors of the Document (all of its principal authors, if it has fewer
+  than five), unless they release you from this requirement.
+</simpara></listitem>
+<listitem><simpara>State on the Title page the name of the publisher of
+  the Modified Version, as the publisher.</simpara></listitem>
+<listitem><simpara>Preserve all the copyright notices of the Document.
+</simpara></listitem>
+<listitem><simpara>Add an appropriate copyright notice for your
+  modifications adjacent to the other copyright notices.
+</simpara></listitem>
+<listitem><simpara>Include, immediately after the copyright notices, a
+  license notice giving the public permission to use the Modified
+  Version under the terms of this License, in the form shown in the
+  <link linkend="gfdl-addendum">Addendum</link> below.
+</simpara></listitem>
+<listitem><simpara>Preserve in that license notice the full lists of
+  Invariant Sections and required Cover Texts given in the Document's
+  license notice.</simpara></listitem>
+<listitem><simpara>Include an unaltered copy of this License.
+</simpara></listitem>
+<listitem><simpara>Preserve the section Entitled "History", Preserve its
+  Title, and add to it an item stating at least the title, year, new
+  authors, and publisher of the Modified Version as given on the Title
+  Page.  If there is no section Entitled "History" in the Document,
+  create one stating the title, year, authors, and publisher of the
+  Document as given on its Title Page, then add an item describing the
+  Modified Version as stated in the previous sentence.
+</simpara></listitem>
+<listitem><simpara>Preserve the network location, if any, given in the
+  Document for public access to a Transparent copy of the Document, and
+  likewise the network locations given in the Document for previous
+  versions it was based on.  These may be placed in the "History"
+  section.  You may omit a network location for a work that was
+  published at least four years before the Document itself, or if the
+  original publisher of the version it refers to gives permission.
+</simpara></listitem>
+<listitem><simpara>For any section Entitled "Acknowledgements" or
+  "Dedications", Preserve the Title of the section, and preserve in the
+  section all the substance and tone of each of the contributor
+  acknowledgements and/or dedications given therein.
+</simpara></listitem>
+<listitem><simpara>Preserve all the Invariant Sections of the Document,
+  unaltered in their text and in their titles.  Section numbers or the
+  equivalent are not considered part of the section titles.
+</simpara></listitem>
+<listitem><simpara>Delete any section Entitled "Endorsements".
+  Such a section may not be included in the Modified Version.
+</simpara></listitem>
+<listitem><simpara>Do not retitle any existing section to be Entitled
+  "Endorsements" or to conflict in title with any Invariant Section.
+</simpara></listitem>
+<listitem><simpara>Preserve any Warranty Disclaimers.
+</simpara></listitem>
+</orderedlist>
+
+<para>If the Modified Version includes new front-matter sections or
+appendices that qualify as Secondary Sections and contain no material
+copied from the Document, you may at your option designate some or all
+of these sections as invariant.  To do this, add their titles to the
+list of Invariant Sections in the Modified Version's license notice.
+These titles must be distinct from any other section titles.</para>
+
+<para>You may add a section Entitled "Endorsements", provided it
+contains nothing but endorsements of your Modified Version by various
+parties--for example, statements of peer review or that the text has
+been approved by an organization as the authoritative definition of a
+standard.</para>
+
+<para>You may add a passage of up to five words as a Front-Cover Text,
+and a passage of up to 25 words as a Back-Cover Text, to the end of the
+list of Cover Texts in the Modified Version.  Only one passage of
+Front-Cover Text and one of Back-Cover Text may be added by (or through
+arrangements made by) any one entity.  If the Document already includes
+a cover text for the same cover, previously added by you or by
+arrangement made by the same entity you are acting on behalf of, you may
+not add another; but you may replace the old one, on explicit permission
+from the previous publisher that added the old one.</para>
+
+<para>The author(s) and publisher(s) of the Document do not by this
+License give permission to use their names for publicity for or to
+assert or imply endorsement of any Modified Version.</para>
+</sect1>
+
+<sect1 id="gfdl-5"><title>COMBINING DOCUMENTS</title>
+
+<para>You may combine the Document with other documents released under
+this License, under the terms defined in <link linkend="gfdl-4">section
+4</link> above for modified versions, provided that you include in the
+combination all of the Invariant Sections of all of the original
+documents, unmodified, and list them all as Invariant Sections of your
+combined work in its license notice, and that you preserve all their
+Warranty Disclaimers.</para>
+
+<para>The combined work need only contain one copy of this License, and
+multiple identical Invariant Sections may be replaced with a single
+copy.  If there are multiple Invariant Sections with the same name but
+different contents, make the title of each such section unique by adding
+at the end of it, in parentheses, the name of the original author or
+publisher of that section if known, or else a unique number.  Make the
+same adjustment to the section titles in the list of Invariant Sections
+in the license notice of the combined work.</para>
+
+<para>In the combination, you must combine any sections Entitled
+"History" in the various original documents, forming one section
+Entitled "History"; likewise combine any sections Entitled
+"Acknowledgements", and any sections Entitled "Dedications".  You must
+delete all sections Entitled "Endorsements".</para>
+</sect1>
+
+<sect1 id="gfdl-6"><title>COLLECTIONS OF DOCUMENTS</title>
+
+<para>You may make a collection consisting of the Document and other
+documents released under this License, and replace the individual copies
+of this License in the various documents with a single copy that is
+included in the collection, provided that you follow the rules of this
+License for verbatim copying of each of the documents in all other
+respects.</para>
+
+<para>You may extract a single document from such a collection, and
+distribute it individually under this License, provided you insert a
+copy of this License into the extracted document, and follow this
+License in all other respects regarding verbatim copying of that
+document.</para>
+</sect1>
+
+<sect1 id="gfdl-7"><title>AGGREGATION WITH INDEPENDENT WORKS</title>
+
+<para>A compilation of the Document or its derivatives with other
+separate and independent documents or works, in or on a volume of a
+storage or distribution medium, is called an "aggregate" if the
+copyright resulting from the compilation is not used to limit the legal
+rights of the compilation's users beyond what the individual works
+permit.  When the Document is included an aggregate, this License does
+not apply to the other works in the aggregate which are not themselves
+derivative works of the Document.</para>
+
+<para>If the Cover Text requirement of section 3 is applicable to these
+copies of the Document, then if the Document is less than one half of
+the entire aggregate, the Document's Cover Texts may be placed on covers
+that bracket the Document within the aggregate, or the electronic
+equivalent of covers if the Document is in electronic form.  Otherwise
+they must appear on printed covers that bracket the whole
+aggregate.</para>
+</sect1>
+
+<sect1 id="gfdl-8"><title>TRANSLATION</title>
+
+<para>Translation is considered a kind of modification, so you may
+distribute translations of the Document under the terms of section 4.
+Replacing Invariant Sections with translations requires special
+permission from their copyright holders, but you may include
+translations of some or all Invariant Sections in addition to the
+original versions of these Invariant Sections.  You may include a
+translation of this License, and all the license notices in the
+Document, and any Warranty Disclaimers, provided that you also include
+the original English version of this License and the original versions
+of those notices and disclaimers.  In case of a disagreement between the
+translation and the original version of this License or a notice or
+disclaimer, the original version will prevail.</para>
+
+<para>If a section in the Document is Entitled "Acknowledgements",
+"Dedications", or "History", the requirement (section 4) to Preserve its
+Title (section 1) will typically require changing the actual
+title.</para>
+</sect1>
+
+<sect1 id="gfdl-9"><title>TERMINATION</title>
+
+<para>You may not copy, modify, sublicense, or distribute the Document
+except as expressly provided for under this License.  Any other attempt
+to copy, modify, sublicense or distribute the Document is void, and will
+automatically terminate your rights under this License.  However,
+parties who have received copies, or rights, from you under this License
+will not have their licenses terminated so long as such parties remain
+in full compliance.</para>
+</sect1>
+
+<sect1 id="gfdl-10"><title>FUTURE REVISIONS OF THIS LICENSE</title>
+
+<para>The Free Software Foundation may publish new, revised versions of
+the GNU Free Documentation License from time to time.  Such new versions
+will be similar in spirit to the present version, but may differ in
+detail to address new problems or concerns.  See
+http://www.gnu.org/copyleft/.</para>
+
+<para>Each version of the License is given a distinguishing version
+number.  If the Document specifies that a particular numbered version of
+this License "or any later version" applies to it, you have the option
+of following the terms and conditions either of that specified version
+or of any later version that has been published (not as a draft) by the
+Free Software Foundation.  If the Document does not specify a version
+number of this License, you may choose any version ever published (not
+as a draft) by the Free Software Foundation.</para>
+</sect1>
+
+<sect1 id="gfdl-addendum"><title>ADDENDUM: How to use this License for
+  your documents</title>
+
+<para>To use this License in a document you have written, include a copy
+of the License in the document and put the following copyright and
+license notices just after the title page:</para>
+
+<blockquote id="copyright-sample"><para>
+    Copyright (c)  YEAR  YOUR NAME.
+    Permission is granted to copy, distribute and/or modify this document
+    under the terms of the GNU Free Documentation License, Version 1.2
+    or any later version published by the Free Software Foundation;
+    with no Invariant Sections, no Front-Cover Texts, and no Back-Cover Texts.
+    A copy of the license is included in the section entitled "GNU
+    Free Documentation License".
+</para></blockquote>
+
+<para>If you have Invariant Sections, Front-Cover Texts and Back-Cover
+Texts, replace the "with...Texts." line with this:</para>
+
+<blockquote id="inv-cover-sample"><para>
+    with the Invariant Sections being LIST THEIR TITLES, with the
+    Front-Cover Texts being LIST, and with the Back-Cover Texts being LIST.
+</para></blockquote>
+
+<para>If you have Invariant Sections without Cover Texts, or some other
+combination of the three, merge those two alternatives to suit the
+situation.</para>
+
+<para>If your document contains nontrivial examples of program code, we
+recommend releasing these examples in parallel under your choice of free
+software license, such as the GNU General Public License, to permit
+their use in free software.</para>
+</sect1>
+</appendix>
+
+</book>
+<!--
+	vim:syntax=sgml:sw=4
+-->

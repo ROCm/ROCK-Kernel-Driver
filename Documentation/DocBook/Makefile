@@ -11,7 +11,8 @@ DOCBOOKS := wanbook.sgml z8530book.sgml mcabook.sgml videobook.sgml \
 	    kernel-locking.sgml via-audio.sgml mousedrivers.sgml \
 	    deviceiobook.sgml procfs-guide.sgml tulip-user.sgml \
 	    writing_usb_driver.sgml scsidrivers.sgml sis900.sgml \
-	    kernel-api.sgml journal-api.sgml lsm.sgml usb.sgml
+	    kernel-api.sgml journal-api.sgml lsm.sgml usb.sgml \
+	    gadget.sgml
 
 ###
 # The build process is as follows (targets):
