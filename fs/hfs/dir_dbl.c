@@ -20,6 +20,7 @@
 #include <linux/hfs_fs_sb.h>
 #include <linux/hfs_fs_i.h>
 #include <linux/hfs_fs.h>
+#include <linux/smp_lock.h>
 
 /*================ Forward declarations ================*/
 
@@ -114,6 +115,7 @@ static struct dentry *dbl_lookup(struct inode * dir, struct dentry *dentry)
 	struct hfs_cat_key key;
 	struct inode *inode = NULL;
 
+	lock_kernel();
 	dentry->d_op = &hfs_dentry_operations;
 	entry = HFS_I(dir)->entry;
 	
@@ -145,6 +147,7 @@ static struct dentry *dbl_lookup(struct inode * dir, struct dentry *dentry)
 	}
 	
 done:
+	unlock_kernel();
 	d_add(dentry, inode);
 	return NULL;
 }

@@ -15,6 +15,7 @@
 #include <linux/mm.h>
 #include <linux/errno.h>
 #include <linux/config.h>	/* Joliet? */
+#include <linux/smp_lock.h>
 
 #include <asm/uaccess.h>
 
@@ -167,6 +168,7 @@ struct dentry *isofs_lookup(struct inode * dir, struct dentry * dentry)
 	if (!page)
 		return ERR_PTR(-ENOMEM);
 
+	lock_kernel();
 	ino = isofs_find_entry(dir, dentry, page_address(page),
 			       1024 + page_address(page));
 	__free_page(page);
@@ -174,9 +176,12 @@ struct dentry *isofs_lookup(struct inode * dir, struct dentry * dentry)
 	inode = NULL;
 	if (ino) {
 		inode = iget(dir->i_sb, ino);
-		if (!inode)
+		if (!inode) {
+			unlock_kernel();
 			return ERR_PTR(-EACCES);
+		}
 	}
+	unlock_kernel();
 	d_add(dentry, inode);
 	return NULL;
 }

@@ -298,14 +298,17 @@ udf_lookup(struct inode *dir, struct dentry *dentry)
 	if (dentry->d_name.len > UDF_NAME_LEN)
 		return ERR_PTR(-ENAMETOOLONG);
 
+	lock_kernel();
 #ifdef UDF_RECOVERY
 	/* temporary shorthand for specifying files by inode number */
 	if (!strncmp(dentry->d_name.name, ".B=", 3) )
 	{
 		lb_addr lb = { 0, simple_strtoul(dentry->d_name.name+3, NULL, 0) };
 		inode = udf_iget(dir->i_sb, lb);
-		if (!inode)
+		if (!inode) {
+			unlock_kernel();
 			return ERR_PTR(-EACCES);
+		}
 	}
 	else
 #endif /* UDF_RECOVERY */
@@ -317,9 +320,12 @@ udf_lookup(struct inode *dir, struct dentry *dentry)
 		udf_release_data(fibh.sbh);
 
 		inode = udf_iget(dir->i_sb, lelb_to_cpu(cfi.icb.extLocation));
-		if ( !inode )
+		if ( !inode ) {
+			unlock_kernel();
 			return ERR_PTR(-EACCES);
+		}
 	}
+	unlock_kernel();
 	d_add(dentry, inode);
 	return NULL;
 }

@@ -25,6 +25,7 @@
 #include <linux/major.h>
 #include <linux/slab.h>
 #include <linux/ctype.h>
+#include <linux/smp_lock.h>
 #include <asm/bitops.h>
 #include <asm/uaccess.h>
 
@@ -170,10 +171,12 @@ static struct dentry *capifs_root_lookup(struct inode * dir, struct dentry * den
 	if (tmp == p || *tmp)
 		return NULL;
 
+	lock_kernel();
 	for (i = 0, np = sbi->nccis ; i < sbi->max_ncci; i++, np++) {
 		if (np->used && np->num == num && np->type == type)
 			break;
 	}
+	unlock_kernel();
 
 	if ( i >= sbi->max_ncci )
 		return NULL;

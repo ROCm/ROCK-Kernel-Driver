@@ -189,6 +189,7 @@ struct dentry *hpfs_lookup(struct inode *dir, struct dentry *dentry)
 	struct inode *result = NULL;
 	struct hpfs_inode_info *hpfs_result;
 
+	lock_kernel();
 	if ((err = hpfs_chk_name((char *)name, &len))) {
 		if (err == -ENAMETOOLONG) return ERR_PTR(-ENAMETOOLONG);
 		goto end_add;
@@ -273,6 +274,7 @@ struct dentry *hpfs_lookup(struct inode *dir, struct dentry *dentry)
 	hpfs_unlock_inode(dir);
 	end_add:
 	hpfs_set_dentry_operations(dentry);
+	unlock_kernel();
 	d_add(dentry, result);
 	return NULL;
 
@@ -286,5 +288,6 @@ struct dentry *hpfs_lookup(struct inode *dir, struct dentry *dentry)
 	/*bail:*/
 
 	hpfs_unlock_inode(dir);
+	unlock_kernel();
 	return ERR_PTR(-ENOENT);
 }

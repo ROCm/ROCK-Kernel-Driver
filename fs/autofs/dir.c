@@ -17,6 +17,7 @@
  * layer. So all children are negative and dcache-based versions of operations
  * are OK.
  */
+/* SMP-safe */
 static struct dentry *autofs_dir_lookup(struct inode *dir,struct dentry *dentry)
 {
 	d_add(dentry, NULL);

@@ -8,6 +8,7 @@
 #include <linux/string.h>
 #include <linux/bfs_fs.h>
 #include <linux/locks.h>
+#include <linux/smp_lock.h>
 
 #include "bfs_defs.h"
 
@@ -125,14 +126,18 @@ static struct dentry * bfs_lookup(struct inode * dir, struct dentry * dentry)
 	if (dentry->d_name.len > BFS_NAMELEN)
 		return ERR_PTR(-ENAMETOOLONG);
 
+	lock_kernel();
 	bh = bfs_find_entry(dir, dentry->d_name.name, dentry->d_name.len, &de);
 	if (bh) {
 		unsigned long ino = le32_to_cpu(de->ino);
 		brelse(bh);
 		inode = iget(dir->i_sb, ino);
-		if (!inode)
+		if (!inode) {
+			unlock_kernel();
 			return ERR_PTR(-EACCES);
+		}
 	}
+	unlock_kernel();
 	d_add(dentry, inode);
 	return NULL;
 }

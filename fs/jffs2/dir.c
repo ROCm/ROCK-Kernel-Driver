@@ -43,6 +43,7 @@
 #include <linux/jffs2_fs_i.h>
 #include <linux/jffs2_fs_sb.h>
 #include <linux/time.h>
+#include <linux/smp_lock.h>
 #include "nodelist.h"
 
 static int jffs2_readdir (struct file *, void *, filldir_t);
@@ -98,6 +99,7 @@ static struct dentry *jffs2_lookup(struct inode *dir_i, struct dentry *target)
 
 	D1(printk(KERN_DEBUG "jffs2_lookup()\n"));
 
+	lock_kernel();
 	dir_f = JFFS2_INODE_INFO(dir_i);
 	c = JFFS2_SB_INFO(dir_i->i_sb);
 
@@ -118,10 +120,12 @@ static struct dentry *jffs2_lookup(struct inode *dir_i, struct dentry *target)
 	if (ino) {
 		inode = iget(dir_i->i_sb, ino);
 		if (!inode) {
+			unlock_kernel();
 			printk(KERN_WARNING "iget() failed for ino #%u\n", ino);
 			return (ERR_PTR(-EIO));
 		}
 	}
+	unlock_kernel();
 
 	d_add(target, inode);
 

@@ -1,0 +1,86 @@
+Changes since 2.5.0:
+
+--- 
+[recommeneded]
+
+New helpers: sb_bread(), sb_getblk(), sb_get_hash_table(), set_bh(),
+	sb_set_blocksize() and sb_min_blocksize().
+
+Use them.
+
+--- 
+[recommeneded]
+
+New methods: ->alloc_inode() and ->destroy_inode().
+
+Remove inode->u.foo_inode_i
+Declare
+	struct foo_inode_info {
+		/* fs-private stuff */
+		struct inode vfs_inode;
+	};
+	static inline FOO_I(struct inode *inode)
+	{
+		return list_entry(inode, struct foo_inode_info, vfs_inode);
+	}
+
+Use FOO_I(inode) instead of &inode->u.foo_inode_i;
+
+Add foo_alloc_inode() and foo_destory_inode() - the former should allocate
+foo_inode_info and return the address of ->vfs_inode, the latter should free
+FOO_I(inode) (see in-tree filesystems for examples).
+
+Make them ->alloc_inode and ->destroy_inode in your super_operations.
+
+Keep in mind that now you need explicit initialization of private data -
+typically in ->read_inode() and after getting an inode from new_inode().
+
+At some point that will become mandatory.
+
+---
+[mandatory]
+
+Change of file_system_type method (->read_super to ->get_sb)
+
+->read_super() is no more.  Ditto for DECLARE_FSTYPE and DECLARE_FSTYPE_DEV.
+
+Turn your foo_read_super() into a function that would return 0 in case of
+success and negative number in case of error (-EINVAL unless you have more
+informative error value to report).  Call it foo_fill_super().  Now declare
+
+struct super_block foo_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_bdev(fs_type, flags, dev_name, data, ext2_fill_super);
+}
+
+(or similar with s/bdev/nodev/ or s/bdev/single/, depending on the kind of
+filesystem).
+
+Replace DECLARE_FSTYPE... with explicit initializer and have ->get_sb set as
+foo_get_sb.
+
+---
+[mandatory]
+
+Locking change: ->s_vfs_rename_sem is taken only by cross-directory renames.
+Most likely there is no need to change anything, but if you relied on
+global exclusion between renames for some internal purpose - you need to
+change your internal locking.  Otherwise exclusion warranties remain the
+same (i.e. parents are victim are locked, etc.).
+
+---
+[informational]
+
+Now we have the exclusion between ->lookup() and directory removal (by
+->rmdir() and ->rename()).  If you used to need that exclusion and do
+it by internal locking (most of filesystems couldn't care less) - you
+can relax your locking.
+
+---
+[mandatory]
+
+->lookup() is called without BKL now.  Grab it on the entry, drop upon return
+- that will guarantee the same locking you used to have.  If your ->lookup()
+or its parts do not need BKL - better yet, now you can shift lock_kernel()/
+unlock_kernel() so that they would protect exactly what needs to be protected.

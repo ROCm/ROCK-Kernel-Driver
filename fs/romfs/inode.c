@@ -318,6 +318,7 @@ romfs_lookup(struct inode *dir, struct dentry *dentry)
 
 	res = -EACCES;			/* placeholder for "no data here" */
 	offset = dir->i_ino & ROMFH_MASK;
+	lock_kernel();
 	if (romfs_copyfrom(dir, &ri, offset, ROMFH_SIZE) <= 0)
 		goto out;
 
@@ -378,7 +379,8 @@ out0:	inode = NULL;
 outi:	res = 0;
 	d_add (dentry, inode);
 
-out:	return ERR_PTR(res);
+out:	unlock_kernel();
+	return ERR_PTR(res);
 }
 
 /*

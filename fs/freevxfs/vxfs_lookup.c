@@ -38,6 +38,7 @@
 #include <linux/highmem.h>
 #include <linux/kernel.h>
 #include <linux/pagemap.h>
+#include <linux/smp_lock.h>
 
 #include "vxfs.h"
 #include "vxfs_dir.h"
@@ -210,13 +211,16 @@ vxfs_lookup(struct inode *dip, struct dentry *dp)
 	if (dp->d_name.len > VXFS_NAMELEN)
 		return ERR_PTR(-ENAMETOOLONG);
 				 
+	lock_kernel();
 	ino = vxfs_inode_by_name(dip, dp);
-	if (ino == 0)
-		return NULL;
-
-	ip = iget(dip->i_sb, ino);
-	if (!ip)
-		return ERR_PTR(-EACCES);
+	if (ino) {
+		ip = iget(dip->i_sb, ino);
+		if (!ip) {
+			unlock_kernel();
+			return ERR_PTR(-EACCES);
+		}
+	}
+	unlock_kernel();
 	d_add(dp, ip);
 	return NULL;
 }

@@ -6,6 +6,7 @@
 
 #include <linux/fs.h>
 #include <linux/minix_fs.h>
+#include <linux/smp_lock.h>
 #include <linux/pagemap.h>
 
 static inline void inc_count(struct inode *inode)
@@ -66,13 +67,17 @@ static struct dentry *minix_lookup(struct inode * dir, struct dentry *dentry)
 	if (dentry->d_name.len > dir->i_sb->u.minix_sb.s_namelen)
 		return ERR_PTR(-ENAMETOOLONG);
 
+	lock_kernel();
 	ino = minix_inode_by_name(dentry);
 	if (ino) {
 		inode = iget(dir->i_sb, ino);
  
-		if (!inode)
+		if (!inode) {
+			unlock_kernel();
 			return ERR_PTR(-EACCES);
+		}
 	}
+	unlock_kernel();
 	d_add(dentry, inode);
 	return NULL;
 }

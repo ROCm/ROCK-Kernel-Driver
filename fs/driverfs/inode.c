@@ -68,6 +68,7 @@ static int driverfs_statfs(struct super_block *sb, struct statfs *buf)
 	return 0;
 }
 
+/* SMP-safe */
 static struct dentry *driverfs_lookup(struct inode *dir, struct dentry *dentry)
 {
 	d_add(dentry, NULL);

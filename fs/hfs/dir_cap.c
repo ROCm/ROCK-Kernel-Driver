@@ -24,6 +24,7 @@
 #include <linux/hfs_fs_sb.h>
 #include <linux/hfs_fs_i.h>
 #include <linux/hfs_fs.h>
+#include <linux/smp_lock.h>
 
 /*================ Forward declarations ================*/
 
@@ -102,6 +103,8 @@ static struct dentry *cap_lookup(struct inode * dir, struct dentry *dentry)
 	struct hfs_cat_key key;
 	struct inode *inode = NULL;
 
+	lock_kernel();
+
 	dentry->d_op = &hfs_dentry_operations;
 	entry = HFS_I(dir)->entry;
 	dtype = HFS_ITYPE(dir->i_ino);
@@ -112,7 +115,7 @@ static struct dentry *cap_lookup(struct inode * dir, struct dentry *dentry)
 
 	/* no need to check for "."  or ".." */
 
-	/* Check for special directories if in a normal directory.
+	/* Check for epecial directories if in a normal directory.
 	   Note that cap_dupdir() does an iput(dir). */
 	if (dtype==HFS_CAP_NDIR) {
 		/* Check for ".resource", ".finderinfo" and ".rootinfo" */
@@ -149,6 +152,7 @@ static struct dentry *cap_lookup(struct inode * dir, struct dentry *dentry)
 	}
 
 done:
+	unlock_kernel();
 	d_add(dentry, inode);
 	return NULL;
 }

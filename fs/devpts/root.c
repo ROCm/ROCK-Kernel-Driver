@@ -14,6 +14,7 @@
 #include <linux/stat.h>
 #include <linux/param.h>
 #include <linux/string.h>
+#include <linux/smp_lock.h>
 #include "devpts_i.h"
 
 static int devpts_root_readdir(struct file *,void *,filldir_t);
@@ -126,10 +127,12 @@ static struct dentry *devpts_root_lookup(struct inode * dir, struct dentry * den
 	if ( entry >= sbi->max_ptys )
 		return NULL;
 
+	lock_kernel();
 	if ( sbi->inodes[entry] )
 		atomic_inc(&sbi->inodes[entry]->i_count);
 	
 	d_add(dentry, sbi->inodes[entry]);
+	unlock_kernel();
 
 	return NULL;
 }

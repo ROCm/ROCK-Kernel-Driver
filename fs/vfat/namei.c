@@ -21,6 +21,7 @@
 #include <linux/msdos_fs.h>
 #include <linux/ctype.h>
 #include <linux/slab.h>
+#include <linux/smp_lock.h>
 
 #define DEBUG_LEVEL 0
 #if (DEBUG_LEVEL >= 1)
@@ -986,6 +987,7 @@ struct dentry *vfat_lookup(struct inode *dir,struct dentry *dentry)
 	PRINTK2(("vfat_lookup: name=%s, len=%d\n", 
 		 dentry->d_name.name, dentry->d_name.len));
 
+	lock_kernel();
 	table = (MSDOS_SB(dir->i_sb)->options.name_check == 's') ? 2 : 0;
 	dentry->d_op = &vfat_dentry_ops[table];
 
@@ -997,19 +999,23 @@ struct dentry *vfat_lookup(struct inode *dir,struct dentry *dentry)
 	}
 	inode = fat_build_inode(dir->i_sb, de, sinfo.ino, &res);
 	fat_brelse(dir->i_sb, bh);
-	if (res)
+	if (res) {
+		unlock_kernel();
 		return ERR_PTR(res);
+	}
 	alias = d_find_alias(inode);
 	if (alias) {
 		if (d_invalidate(alias)==0)
 			dput(alias);
 		else {
 			iput(inode);
+			unlock_kernel();
 			return alias;
 		}
 		
 	}
 error:
+	unlock_kernel();
 	dentry->d_op = &vfat_dentry_ops[table];
 	dentry->d_time = dentry->d_parent->d_inode->i_version;
 	d_add(dentry,inode);

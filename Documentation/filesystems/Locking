@@ -49,7 +49,7 @@ prototypes:
 locking rules:
 	all may block
 		BKL	i_sem(inode)
-lookup:		yes	yes
+lookup:		no	yes
 create:		yes	yes
 link:		yes	yes
 mknod:		yes	yes

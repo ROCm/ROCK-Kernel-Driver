@@ -349,15 +349,18 @@ static struct dentry * reiserfs_lookup (struct inode * dir, struct dentry * dent
     if (dentry->d_name.len > REISERFS_MAX_NAME_LEN (dir->i_sb->s_blocksize))
 	return ERR_PTR(-ENAMETOOLONG);
 
+    lock_kernel();
     de.de_gen_number_bit_string = 0;
     retval = reiserfs_find_entry (dir, dentry->d_name.name, dentry->d_name.len, &path_to_entry, &de);
     pathrelse (&path_to_entry);
     if (retval == NAME_FOUND) {
 	inode = reiserfs_iget (dir->i_sb, (struct cpu_key *)&(de.de_dir_id));
 	if (!inode || IS_ERR(inode)) {
+	    unlock_kernel();
 	    return ERR_PTR(-EACCES);
         }
     }
+    unlock_kernel();
     if ( retval == IO_ERROR ) {
 	return ERR_PTR(-EIO);
     }

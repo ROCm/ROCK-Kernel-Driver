@@ -529,6 +529,7 @@ static struct dentry *ntfs_lookup(struct inode *dir, struct dentry *d)
 	walk.name = NULL;
 	walk.namelen = 0;
 	/* Convert to wide string. */
+	lock_kernel();
 	err = ntfs_decodeuni(NTFS_INO2VOL(dir), (char*)d->d_name.name,
 			       d->d_name.len, &walk.name, &walk.namelen);
 	if (err)
@@ -548,10 +549,12 @@ static struct dentry *ntfs_lookup(struct inode *dir, struct dentry *d)
 	d_add(d, res);
 	ntfs_free(item);
 	ntfs_free(walk.name);
+	unlock_kernel();
 	/* Always return success, the dcache will handle negative entries. */
 	return NULL;
 err_ret:
 	ntfs_free(walk.name);
+	unlock_kernel();
 	return ERR_PTR(err);
 }
 

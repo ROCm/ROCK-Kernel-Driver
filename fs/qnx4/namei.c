@@ -21,6 +21,7 @@
 #include <linux/stat.h>
 #include <linux/fcntl.h>
 #include <linux/errno.h>
+#include <linux/smp_lock.h>
 
 
 /*
@@ -115,6 +116,7 @@ struct dentry * qnx4_lookup(struct inode *dir, struct dentry *dentry)
 	int len = dentry->d_name.len;
 	struct inode *foundinode = NULL;
 
+	lock_kernel();
 	if (!(bh = qnx4_find_entry(len, dir, name, &de, &ino)))
 		goto out;
 	/* The entry is linked, let's get the real info */
@@ -127,10 +129,12 @@ struct dentry * qnx4_lookup(struct inode *dir, struct dentry *dentry)
 	brelse(bh);
 
 	if ((foundinode = iget(dir->i_sb, ino)) == NULL) {
+		unlock_kernel();
 		QNX4DEBUG(("qnx4: lookup->iget -> NULL\n"));
 		return ERR_PTR(-EACCES);
 	}
 out:
+	unlock_kernel();
 	d_add(dentry, foundinode);
 
 	return NULL;
