@@ -7190,26 +7190,33 @@ static int __devinit tg3_do_test_dma(struct tg3 *tp, u32 *buf, dma_addr_t buf_dm
 	test_desc.addr_lo = buf_dma & 0xffffffff;
 	test_desc.nic_mbuf = 0x00002100;
 	test_desc.len = size;
+
+	/*
+	 * HP ZX1 was seeing test failures for 5701 cards running at 33Mhz
+	 * the *second* time the tg3 driver was getting loaded after an
+	 * initial scan.
+	 *
+	 * Broadcom tells me:
+	 *   ...the DMA engine is connected to the GRC block and a DMA
+	 *   reset may affect the GRC block in some unpredictable way...
+	 *   The behavior of resets to individual blocks has not been tested.
+	 *
+	 * Broadcom noted the GRC reset will also reset all sub-components.
+	 */
 	if (to_device) {
 		test_desc.cqid_sqid = (13 << 8) | 2;
-		tw32(RDMAC_MODE, RDMAC_MODE_RESET);
-		tr32(RDMAC_MODE);
-		udelay(40);
 
 		tw32(RDMAC_MODE, RDMAC_MODE_ENABLE);
 		tr32(RDMAC_MODE);
 		udelay(40);
 	} else {
 		test_desc.cqid_sqid = (16 << 8) | 7;
-		tw32(WDMAC_MODE, WDMAC_MODE_RESET);
-		tr32(WDMAC_MODE);
-		udelay(40);
 
 		tw32(WDMAC_MODE, WDMAC_MODE_ENABLE);
 		tr32(WDMAC_MODE);
 		udelay(40);
 	}
-	test_desc.flags = 0x00000004;
+	test_desc.flags = 0x00000005;
 
 	for (i = 0; i < (sizeof(test_desc) / sizeof(u32)); i++) {
 		u32 val;
@@ -7368,9 +7375,19 @@ static int __devinit tg3_test_dma(struct tg3 *tp)
 	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5701) {
 		/* Remove this if it causes problems for some boards. */
 		tp->dma_rwctrl |= DMA_RWCTRL_USE_MEM_READ_MULT;
-	}
 
-	tp->dma_rwctrl |= DMA_RWCTRL_ASSERT_ALL_BE;
+		/* On 5700/5701 chips, we need to set this bit.
+		 * Otherwise the chip will issue cacheline transactions
+		 * to streamable DMA memory with not all the byte
+		 * enables turned on.  This is an error on several
+		 * RISC PCI controllers, in particular sparc64.
+		 *
+		 * On 5703/5704 chips, this bit has been reassigned
+		 * a different meaning.  In particular, it is used
+		 * on those chips to enable a PCI-X workaround.
+		 */
+		tp->dma_rwctrl |= DMA_RWCTRL_ASSERT_ALL_BE;
+	}
 
 	tw32(TG3PCI_DMA_RW_CTRL, tp->dma_rwctrl);
 
@@ -7385,28 +7402,38 @@ static int __devinit tg3_test_dma(struct tg3 *tp)
 		goto out;
 
 	while (1) {
-		u32 *p, i;
+		u32 *p = buf, i;
 
-		p = buf;
 		for (i = 0; i < TEST_BUFFER_SIZE / sizeof(u32); i++)
 			p[i] = i;
 
 		/* Send the buffer to the chip. */
 		ret = tg3_do_test_dma(tp, buf, buf_dma, TEST_BUFFER_SIZE, 1);
-		if (ret)
+		if (ret) {
+			printk(KERN_ERR "tg3_test_dma() Write the buffer failed %d\n", ret);
 			break;
+		}
 
-		p = buf;
-		for (i = 0; i < TEST_BUFFER_SIZE / sizeof(u32); i++)
+		/* validate data reached card RAM correctly. */
+		for (i = 0; i < TEST_BUFFER_SIZE / sizeof(u32); i++) {
+			u32 val;
+			tg3_read_mem(tp, 0x2100 + (i*4), &val);
+			if (val != p[i]) {
+				printk( KERN_ERR "  tg3_test_dma()  Card buffer currupted on write! (%d != %d)\n", val, i);
+				/* ret = -ENODEV here? */
+			}
 			p[i] = 0;
+		}
 
 		/* Now read it back. */
 		ret = tg3_do_test_dma(tp, buf, buf_dma, TEST_BUFFER_SIZE, 0);
-		if (ret)
+		if (ret) {
+			printk(KERN_ERR "tg3_test_dma() Read the buffer failed %d\n", ret);
+
 			break;
+		}
 
 		/* Verify it. */
-		p = buf;
 		for (i = 0; i < TEST_BUFFER_SIZE / sizeof(u32); i++) {
 			if (p[i] == i)
 				continue;
@@ -7417,6 +7444,7 @@ static int __devinit tg3_test_dma(struct tg3 *tp)
 				tw32(TG3PCI_DMA_RW_CTRL, tp->dma_rwctrl);
 				break;
 			} else {
+				printk(KERN_ERR "tg3_test_dma() buffer corrupted on read back! (%d != %d)\n", p[i], i);
 				ret = -ENODEV;
 				goto out;
 			}
