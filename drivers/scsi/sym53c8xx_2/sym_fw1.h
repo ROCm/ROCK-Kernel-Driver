@@ -1361,7 +1361,7 @@ static struct SYM_FWB_SCR SYM_FWB_SCR = {
 	 *  some target to reset or some disconnected 
 	 *  job to abort. Since error recovery is a serious 
 	 *  busyness, we will really reset the SCSI BUS, if 
-	 *  case of a SCSI interrupt occuring in this path.
+	 *  case of a SCSI interrupt occurring in this path.
 	 */
 
 #ifdef SYM_CONF_TARGET_ROLE_SUPPORT

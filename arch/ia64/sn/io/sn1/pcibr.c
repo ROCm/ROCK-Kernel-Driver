@@ -5113,7 +5113,7 @@ ate_freeze(pcibr_dmamap_t pcibr_dmamap,
 
     /* Bridge Hardware Bug WAR #484930:
      * Bridge can't handle updating External ATEs
-     * while DMA is occuring that uses External ATEs,
+     * while DMA is occurring that uses External ATEs,
      * even if the particular ATEs involved are disjoint.
      */
 
@@ -6844,7 +6844,7 @@ pcibr_xintr_preset(void *which_widget,
  *
  * This is the pcibr interrupt "wrapper" function that is called,
  * in interrupt context, to initiate the interrupt handler(s) registered
- * (via pcibr_intr_alloc/connect) for the occuring interrupt. Non-threaded 
+ * (via pcibr_intr_alloc/connect) for the occurring interrupt. Non-threaded 
  * handlers will be called directly, and threaded handlers will have their 
  * thread woken up.
  */

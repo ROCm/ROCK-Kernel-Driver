@@ -2523,7 +2523,7 @@ int show_reiserfs_locks(void) {
 ** haven't hit disk yet.  called from bitmap.c
 **
 ** if it starts flushing things, it ors SCHEDULE_OCCURRED into repeat.
-** note, this is just if schedule has a chance of occuring.  I need to 
+** note, this is just if schedule has a chance of occurring.  I need to 
 ** change flush_commit_lists to have a repeat parameter too.
 **
 */

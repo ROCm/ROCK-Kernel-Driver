@@ -939,7 +939,7 @@ out:
 	return 0;
 }
 
-/* A restart is occuring, check to make sure no new addresses
+/* A restart is occurring, check to make sure no new addresses
  * are being added as we may be under a takeover attack.
  */
 static int sctp_sf_check_restart_addrs(const sctp_association_t *new_asoc,

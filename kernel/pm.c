@@ -141,7 +141,7 @@ void pm_unregister_all(pm_callback callback)
  *	data field must hold the intended next state. No call is made
  *	if the state matches.
  *
- *	BUGS: what stops two power management requests occuring in parallel
+ *	BUGS: what stops two power management requests occurring in parallel
  *	and conflicting.
  *
  *	WARNING: Calling pm_send directly is not generally recommended, in
@@ -227,7 +227,7 @@ static void pm_undo_all(struct pm_dev *last)
  *	Zero is returned on success. If a suspend fails then the status
  *	from the device that vetoes the suspend is returned.
  *
- *	BUGS: what stops two power management requests occuring in parallel
+ *	BUGS: what stops two power management requests occurring in parallel
  *	and conflicting.
  */
  

@@ -897,7 +897,7 @@ static int pc_write(struct tty_struct * tty, int from_user,
 					Remember copy_from_user WILL generate a page fault if the
 					user memory being accessed has been swapped out.  This can
 					cause this routine to temporarily sleep while this page
-					fault is occuring.
+					fault is occurring.
 				
 				----------------------------------------------------------------- */
 

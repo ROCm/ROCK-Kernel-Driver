@@ -842,7 +842,7 @@ printk("pcibr_xintr_preset: b_wid_int_upper 0x%lx b_wid_int_lower 0x%lx b_int_ho
  *
  * This is the pcibr interrupt "wrapper" function that is called,
  * in interrupt context, to initiate the interrupt handler(s) registered
- * (via pcibr_intr_alloc/connect) for the occuring interrupt. Non-threaded 
+ * (via pcibr_intr_alloc/connect) for the occurring interrupt. Non-threaded 
  * handlers will be called directly, and threaded handlers will have their 
  * thread woken up.
  */

@@ -3653,7 +3653,7 @@ static	struct scripth scripth0 __initdata = {
 	**	some target to reset or some disconnected 
 	**	job to abort. Since error recovery is a serious 
 	**	busyness, we will really reset the SCSI BUS, if 
-	**	case of a SCSI interrupt occuring in this path.
+	**	case of a SCSI interrupt occurring in this path.
 	*/
 
 	/*
