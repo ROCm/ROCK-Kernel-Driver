@@ -22,6 +22,10 @@
 #define PAGE_MASK	(~(PAGE_SIZE-1))
 #define PAGE_OFFSET_MASK (PAGE_SIZE-1)
 
+#define SID_SHIFT       28
+#define SID_MASK        0xfffffffff
+#define GET_ESID(x)     (((x) >> SID_SHIFT) & SID_MASK)
+
 #ifdef CONFIG_HUGETLB_PAGE
 
 #define HPAGE_SHIFT	24
@@ -33,40 +37,42 @@
 #define TASK_HPAGE_BASE 	(0x0000010000000000UL)
 #define TASK_HPAGE_END 	(0x0000018000000000UL)
 
-/* For 32-bit processes the hugepage range is 2-3G */
-#define TASK_HPAGE_BASE_32	(0x80000000UL)
-#define TASK_HPAGE_END_32	(0xc0000000UL)
+#define LOW_ESID_MASK(addr, len)	(((1U << (GET_ESID(addr+len-1)+1)) \
+	   	                	- (1U << GET_ESID(addr))) & 0xffff)
 
 #define ARCH_HAS_HUGEPAGE_ONLY_RANGE
 #define ARCH_HAS_PREPARE_HUGEPAGE_RANGE
 
-#define is_hugepage_low_range(addr, len) \
-	(((addr) > (TASK_HPAGE_BASE_32-(len))) && ((addr) < TASK_HPAGE_END_32))
-#define is_hugepage_high_range(addr, len) \
+#define touches_hugepage_low_range(addr, len) \
+	(LOW_ESID_MASK((addr), (len)) & current->mm->context.htlb_segs)
+#define touches_hugepage_high_range(addr, len) \
 	(((addr) > (TASK_HPAGE_BASE-(len))) && ((addr) < TASK_HPAGE_END))
 
+#define __within_hugepage_low_range(addr, len, segmask) \
+	((LOW_ESID_MASK((addr), (len)) | (segmask)) == (segmask))
+#define within_hugepage_low_range(addr, len) \
+	__within_hugepage_low_range((addr), (len), \
+				    current->mm->context.htlb_segs)
+#define within_hugepage_high_range(addr, len) (((addr) >= TASK_HPAGE_BASE) \
+	  && ((addr)+(len) <= TASK_HPAGE_END) && ((addr)+(len) >= (addr)))
+
 #define is_hugepage_only_range(addr, len) \
-	(is_hugepage_high_range((addr), (len)) || \
-	 (current->mm->context.low_hpages \
-	  && is_hugepage_low_range((addr), (len))))
+	(touches_hugepage_high_range((addr), (len)) || \
+	  touches_hugepage_low_range((addr), (len)))
 #define hugetlb_free_pgtables free_pgtables
 #define HAVE_ARCH_HUGETLB_UNMAPPED_AREA
 
 #define in_hugepage_area(context, addr) \
 	((cur_cpu_spec->cpu_features & CPU_FTR_16M_PAGE) && \
-	 ((((addr) >= TASK_HPAGE_BASE) && ((addr) < TASK_HPAGE_END)) || \
-	  ((context).low_hpages && \
-	   (((addr) >= TASK_HPAGE_BASE_32) && ((addr) < TASK_HPAGE_END_32)))))
+	 ( (((addr) >= TASK_HPAGE_BASE) && ((addr) < TASK_HPAGE_END)) || \
+	   ( ((addr) < 0x100000000L) && \
+	     ((1 << GET_ESID(addr)) & (context).htlb_segs) ) ) )
 
 #else /* !CONFIG_HUGETLB_PAGE */
 
 #define in_hugepage_area(mm, addr)	0
 
 #endif /* !CONFIG_HUGETLB_PAGE */
-
-#define SID_SHIFT       28
-#define SID_MASK        0xfffffffff
-#define GET_ESID(x)     (((x) >> SID_SHIFT) & SID_MASK)
 
 /* align addr on a size boundary - adjust address up/down if needed */
 #define _ALIGN_UP(addr,size)	(((addr)+((size)-1))&(~((size)-1)))
