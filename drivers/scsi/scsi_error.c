@@ -701,25 +701,14 @@ static int scsi_eh_get_sense(struct list_head *work_q,
 		 * upper level.
 		 */
 		if (rtn == SUCCESS)
-			scsi_eh_finish_cmd(scmd, done_q);
-		if (rtn != NEEDS_RETRY)
+			/* we don't want this command reissued, just
+			 * finished with the sense data, so set
+			 * retries to the max allowed to ensure it
+			 * won't get reissued */
+			scmd->retries = scmd->allowed;
+		else if (rtn != NEEDS_RETRY)
 			continue;
 
-		/*
-		 * we only come in here if we want to retry a
-		 * command.  the test to see whether the command
-		 * should be retried should be keeping track of the
-		 * number of tries, so we don't end up looping, of
-		 * course.
-		 */
-		scmd->state = NEEDS_RETRY;
-		rtn = scsi_eh_retry_cmd(scmd);
-		if (rtn != SUCCESS)
-			continue;
-
-		/*
-		 * we eventually hand this one back to the top level.
-		 */
 		scsi_eh_finish_cmd(scmd, done_q);
 	}
 
@@ -1321,9 +1310,11 @@ int scsi_decide_disposition(struct scsi_cmnd *scmd)
 		rtn = scsi_check_sense(scmd);
 		if (rtn == NEEDS_RETRY)
 			goto maybe_retry;
-		/* if rtn == FAILED, we have no sense information */
-		/* was: return rtn; */
-		return SUCCESS;
+		/* if rtn == FAILED, we have no sense information;
+		 * returning FAILED will wake the error handler thread
+		 * to collect the sense and redo the decide
+		 * disposition */
+		return rtn;
 	case CONDITION_GOOD:
 	case INTERMEDIATE_GOOD:
 	case INTERMEDIATE_C_GOOD:
