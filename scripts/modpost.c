@@ -397,7 +397,7 @@ add_versions(struct buffer *b, struct module *mod)
 
 	for (s = mod->unres; s; s = s->next) {
 		exp = find_symbol(s->name);
-		if (!exp) {
+		if (!exp || exp->module == mod) {
 			if (have_vmlinux)
 				fprintf(stderr, "*** Warning: \"%s\" [%s.ko] "
 				"undefined!\n",	s->name, mod->name);
@@ -514,7 +514,6 @@ main(int argc, char **argv)
 {
 	struct module *mod;
 	struct buffer buf = { };
-	struct symbol *s;
 	char fname[SZ];
 
 	for (; argv[1]; argv++) {
