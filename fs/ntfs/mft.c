@@ -678,6 +678,9 @@ err_out:
  * ntfs inode @ni to backing store.  If the mft record @m has a counterpart in
  * the mft mirror, that is also updated.
  *
+ * We only write the mft record if the ntfs inode @ni is dirty and the buffers
+ * belonging to its mft record are dirty, too.
+ *
  * On success, clean the mft record and return 0.  On error, leave the mft
  * record dirty and return -errno.  The caller should call make_bad_inode() on
  * the base inode to ensure no more access happens to this inode.  We do not do
@@ -707,6 +710,7 @@ int write_mft_record_nolock(ntfs_inode *ni, MFT_RECORD *m, int sync)
 	struct buffer_head *bh, *head;
 	unsigned int block_start, block_end, m_start, m_end;
 	int i_bhs, nr_bhs, err = 0;
+	BOOL rec_is_dirty = TRUE;
 
 	ntfs_debug("Entering for inode 0x%lx.", ni->mft_no);
 	BUG_ON(NInoAttr(ni));
@@ -739,29 +743,34 @@ no_buffers_err_out:
 	do {
 		block_end = block_start + blocksize;
 		/* If the buffer is outside the mft record, skip it. */
-		if ((block_end <= m_start) || (block_start >= m_end))
+		if (block_end <= m_start)
 			continue;
-		if (!buffer_mapped(bh)) {
-			ntfs_error(vol->sb, "Writing mft records without "
-					"existing mapped buffers is not "
-					"implemented yet.  %s",
-					ntfs_please_email);
-			err = -EOPNOTSUPP;
+		if (unlikely(block_start >= m_end))
+			break;
+		/*
+		 * If the buffer is clean and it is the first buffer of the mft
+		 * record, it was written out by other means already so we are
+		 * done.  For safety we make sure all the other buffers are
+		 * clean also.  If it is clean but not the first buffer and the
+		 * first buffer was dirty it is a bug.
+		 */
+		if (!buffer_dirty(bh)) {
+			if (block_start == m_start)
+				rec_is_dirty = FALSE;
+			else
+				BUG_ON(rec_is_dirty);
 			continue;
 		}
-		if (!buffer_uptodate(bh)) {
-			ntfs_error(vol->sb, "Writing mft records without "
-					"existing uptodate buffers is not "
-					"implemented yet.  %s",
-					ntfs_please_email);
-			err = -EOPNOTSUPP;
-			continue;
-		}
+		BUG_ON(!rec_is_dirty);
+		BUG_ON(!buffer_mapped(bh));
+		BUG_ON(!buffer_uptodate(bh));
 		BUG_ON(!nr_bhs && (m_start != block_start));
 		BUG_ON(nr_bhs >= max_bhs);
 		bhs[nr_bhs++] = bh;
 		BUG_ON((nr_bhs >= max_bhs) && (m_end != block_end));
 	} while (block_start = block_end, (bh = bh->b_this_page) != head);
+	if (!rec_is_dirty)
+		goto done;
 	if (unlikely(err))
 		goto cleanup_out;
 	/* Apply the mst protection fixups. */
@@ -778,8 +787,7 @@ no_buffers_err_out:
 		if (unlikely(test_set_buffer_locked(tbh)))
 			BUG();
 		BUG_ON(!buffer_uptodate(tbh));
-		if (buffer_dirty(tbh))
-			clear_buffer_dirty(tbh);
+		clear_buffer_dirty(tbh);
 		get_bh(tbh);
 		tbh->b_end_io = end_buffer_write_sync;
 		submit_bh(WRITE, tbh);
@@ -795,8 +803,8 @@ no_buffers_err_out:
 		if (unlikely(!buffer_uptodate(tbh))) {
 			err = -EIO;
 			/*
-			 * Set the buffer uptodate so the page & buffer states
-			 * don't become out of sync.
+			 * Set the buffer uptodate so the page and buffer
+			 * states do not become out of sync.
 			 */
 			if (PageUptodate(page))
 				set_buffer_uptodate(tbh);
