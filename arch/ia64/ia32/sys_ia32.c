@@ -3433,8 +3433,12 @@ struct sysinfo32 {
 	u32 bufferram;
 	u32 totalswap;
 	u32 freeswap;
-	unsigned short procs;
-	char _f[22];
+	u16 procs;
+	u16 pad;
+	u32 totalhigh;
+	u32 freehigh;
+	u32 mem_unit;
+	char _f[8];
 };
 
 asmlinkage long
@@ -3463,6 +3467,9 @@ sys32_sysinfo (struct sysinfo32 *info)
 	err |= __put_user(s.totalswap, &info->totalswap);
 	err |= __put_user(s.freeswap, &info->freeswap);
 	err |= __put_user(s.procs, &info->procs);
+	err |= __put_user (s.totalhigh, &info->totalhigh);
+	err |= __put_user (s.freehigh, &info->freehigh);
+	err |= __put_user (s.mem_unit, &info->mem_unit);
 	if (err)
 		return -EFAULT;
 	return ret;
