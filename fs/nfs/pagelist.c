@@ -196,7 +196,7 @@ nfs_list_add_request(struct nfs_page *req, struct list_head *head)
 		BUG();
 	}
 #endif
-	for (pos = head->prev; pos != head; pos = pos->prev) {
+	list_for_each_prev(pos, head) {
 		struct nfs_page	*p = nfs_list_entry(pos);
 		if (page_index(p->wb_page) < pg_idx)
 			break;

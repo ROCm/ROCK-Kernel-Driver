@@ -835,7 +835,7 @@ int filp_close(struct file *filp, fl_owner_t id)
 		retval = filp->f_op->flush(filp);
 		unlock_kernel();
 	}
-	fcntl_dirnotify(0, filp, 0);
+	dnotify_flush(filp, id);
 	locks_remove_posix(filp, id);
 	fput(filp);
 	return retval;

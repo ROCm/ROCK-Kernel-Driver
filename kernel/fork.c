@@ -387,14 +387,14 @@ static int copy_mm(unsigned long clone_flags, struct task_struct * tsk)
 	if (!mm_init(mm))
 		goto fail_nomem;
 
+	if (init_new_context(tsk,mm))
+		goto free_pt;
+
 	down_write(&oldmm->mmap_sem);
 	retval = dup_mmap(mm);
 	up_write(&oldmm->mmap_sem);
 
 	if (retval)
-		goto free_pt;
-
-	if (init_new_context(tsk,mm))
 		goto free_pt;
 
 good_mm:

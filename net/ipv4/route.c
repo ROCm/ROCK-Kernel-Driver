@@ -286,7 +286,7 @@ static int rt_cache_stat_get_info(char *buffer, char **start, off_t offset, int 
         for (lcpu = 0; lcpu < smp_num_cpus; lcpu++) {
                 i = cpu_logical_map(lcpu);
 
-		len += sprintf(buffer+len, "%08x  %08x %08x %08x %08x %08x %08x %08x  %08x %08x %08x\n",
+		len += sprintf(buffer+len, "%08x  %08x %08x %08x %08x %08x %08x %08x  %08x %08x %08x %08x %08x %08x %08x \n",
 			       dst_entries,		       
 			       rt_cache_stat[i].in_hit,
 			       rt_cache_stat[i].in_slow_tot,
@@ -298,7 +298,13 @@ static int rt_cache_stat_get_info(char *buffer, char **start, off_t offset, int 
 
 			       rt_cache_stat[i].out_hit,
 			       rt_cache_stat[i].out_slow_tot,
-			       rt_cache_stat[i].out_slow_mc
+			       rt_cache_stat[i].out_slow_mc, 
+
+			       rt_cache_stat[i].gc_total,
+			       rt_cache_stat[i].gc_ignored,
+			       rt_cache_stat[i].gc_goal_miss,
+			       rt_cache_stat[i].gc_dst_overflow
+
 			);
 	}
 	len -= offset;
@@ -499,9 +505,14 @@ static int rt_garbage_collect(void)
 	 * Garbage collection is pretty expensive,
 	 * do not make it too frequently.
 	 */
+
+	rt_cache_stat[smp_processor_id()].gc_total++;
+
 	if (now - last_gc < ip_rt_gc_min_interval &&
-	    atomic_read(&ipv4_dst_ops.entries) < ip_rt_max_size)
+	    atomic_read(&ipv4_dst_ops.entries) < ip_rt_max_size) {
+		rt_cache_stat[smp_processor_id()].gc_ignored++;
 		goto out;
+	}
 
 	/* Calculate number of entries, which we want to expire now. */
 	goal = atomic_read(&ipv4_dst_ops.entries) -
@@ -567,6 +578,8 @@ static int rt_garbage_collect(void)
 		     We will not spin here for long time in any case.
 		 */
 
+		rt_cache_stat[smp_processor_id()].gc_goal_miss++;
+
 		if (expire == 0)
 			break;
 
@@ -584,6 +597,7 @@ static int rt_garbage_collect(void)
 		goto out;
 	if (net_ratelimit())
 		printk(KERN_WARNING "dst cache overflow\n");
+	rt_cache_stat[smp_processor_id()].gc_dst_overflow++;
 	return 1;
 
 work_done:

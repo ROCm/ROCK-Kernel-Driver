@@ -317,6 +317,8 @@ drm_agp_head_t *DRM(agp_init)(void)
 			break;
 #endif
 
+		case HP_ZX1:		head->chipset = "HP ZX1";	 break;
+
 		default:		head->chipset = "Unknown";       break;
 		}
 #if LINUX_VERSION_CODE <= 0x020408
