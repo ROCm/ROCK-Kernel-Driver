@@ -2183,34 +2183,11 @@ xfs_alloc_read_agf(
 		INT_GET(agf->agf_flfirst, ARCH_CONVERT) < XFS_AGFL_SIZE(mp) &&
 		INT_GET(agf->agf_fllast,  ARCH_CONVERT) < XFS_AGFL_SIZE(mp) &&
 		INT_GET(agf->agf_flcount, ARCH_CONVERT) <= XFS_AGFL_SIZE(mp);
-	if (XFS_TEST_ERROR(!agf_ok, mp, XFS_ERRTAG_ALLOC_READ_AGF,
-			XFS_RANDOM_ALLOC_READ_AGF)) {
+	if (unlikely(XFS_TEST_ERROR(!agf_ok, mp, XFS_ERRTAG_ALLOC_READ_AGF,
+			XFS_RANDOM_ALLOC_READ_AGF))) {
+		XFS_CORRUPTION_ERROR("xfs_alloc_read_agf",
+				     XFS_ERRLEVEL_LOW, mp, agf);
 		xfs_trans_brelse(tp, bp);
-#ifdef __KERNEL__	/* additional, temporary, debugging code */
-		cmn_err(CE_NOTE,
-			"xfs_alloc_read_agf: error in <%s> AG %d",
-			mp->m_fsname, agno);
-		if (INT_GET(agf->agf_magicnum, ARCH_CONVERT) != XFS_AGF_MAGIC)
-			cmn_err(CE_NOTE, "bad agf_magicnum 0x%x",
-				INT_GET(agf->agf_magicnum, ARCH_CONVERT));
-		if (!XFS_AGF_GOOD_VERSION(INT_GET(agf->agf_versionnum, ARCH_CONVERT)))
-			cmn_err(CE_NOTE, "Bad version number 0x%x",
-				INT_GET(agf->agf_versionnum, ARCH_CONVERT));
-		if (!(INT_GET(agf->agf_freeblks, ARCH_CONVERT) <=
-				INT_GET(agf->agf_length, ARCH_CONVERT)))
-			cmn_err(CE_NOTE, "Bad freeblks %d %d",
-				INT_GET(agf->agf_freeblks, ARCH_CONVERT),
-				INT_GET(agf->agf_length, ARCH_CONVERT));
-		if (!(INT_GET(agf->agf_flfirst, ARCH_CONVERT) < XFS_AGFL_SIZE(mp)))
-			cmn_err(CE_NOTE, "Bad flfirst %d",
-				INT_GET(agf->agf_flfirst, ARCH_CONVERT));
-		if (!(INT_GET(agf->agf_fllast, ARCH_CONVERT) < XFS_AGFL_SIZE(mp)))
-			cmn_err(CE_NOTE, "Bad fllast %d",
-				INT_GET(agf->agf_fllast, ARCH_CONVERT));
-		if (!(INT_GET(agf->agf_flcount, ARCH_CONVERT) <= XFS_AGFL_SIZE(mp)))
-			cmn_err(CE_NOTE, "Bad flcount %d",
-				INT_GET(agf->agf_flcount, ARCH_CONVERT));
-#endif
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 	pag = &mp->m_perag[agno];

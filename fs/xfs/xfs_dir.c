@@ -887,7 +887,7 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 	 * hashval, then we run with it.
 	 */
 	if (bno > 0) {
-		error = xfs_da_read_buf(trans, dp, bno, -1, &bp, XFS_DATA_FORK);
+		error = xfs_da_read_buf(trans, dp, bno, -2, &bp, XFS_DATA_FORK);
 		if ((error != 0) && (error != EFSCORRUPTED))
 			return(error);
 		if (bp)
@@ -962,9 +962,11 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 	 */
 	for (;;) {
 		leaf = bp->data;
-		if (INT_GET(leaf->hdr.info.magic, ARCH_CONVERT) != XFS_DIR_LEAF_MAGIC) {
+		if (unlikely(INT_GET(leaf->hdr.info.magic, ARCH_CONVERT) != XFS_DIR_LEAF_MAGIC)) {
 			xfs_dir_trace_g_dul("node: not a leaf", dp, uio, leaf);
 			xfs_da_brelse(trans, bp);
+			XFS_CORRUPTION_ERROR("xfs_dir_node_getdents(1)",
+					     XFS_ERRLEVEL_LOW, mp, leaf);
 			return XFS_ERROR(EFSCORRUPTED);
 		}
 		xfs_dir_trace_g_dul("node: leaf detail", dp, uio, leaf);
@@ -988,8 +990,11 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 					XFS_DATA_FORK);
 		if (error)
 			return(error);
-		if (bp == NULL)
+		if (unlikely(bp == NULL)) {
+			XFS_ERROR_REPORT("xfs_dir_node_getdents(2)",
+					 XFS_ERRLEVEL_LOW, mp);
 			return(XFS_ERROR(EFSCORRUPTED));
+		}
 	}
 	*eofp = 1;
 	xfs_dir_trace_g_du("node: E-O-F", dp, uio);

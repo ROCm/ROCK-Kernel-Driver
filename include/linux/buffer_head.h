@@ -137,6 +137,7 @@ int try_to_free_buffers(struct page *);
 void create_empty_buffers(struct page *, unsigned long,
 			unsigned long b_state);
 void end_buffer_io_sync(struct buffer_head *bh, int uptodate);
+void end_buffer_async_write(struct buffer_head *bh, int uptodate);
 
 /* Things to do with buffers at mapping->private_list */
 void buffer_insert_list(spinlock_t *lock,

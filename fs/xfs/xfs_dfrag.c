@@ -69,15 +69,12 @@ xfs_swapext(
 	}
 
 	bhp = VN_BHV_HEAD(vp);
-	VN_BHV_READ_LOCK(bhp);
 	bdp = vn_bhv_lookup(bhp, &xfs_vnodeops);
 	if (bdp == NULL) {
-		VN_BHV_READ_UNLOCK(bhp);
 		error = XFS_ERROR(EBADF);
 		goto error0;
 	} else {
 		ip = XFS_BHVTOI(bdp);
-		VN_BHV_READ_UNLOCK(bhp);
 	}
 
 	if (((tfp = fget((int)sx.sx_fdtmp)) == NULL) ||
@@ -87,15 +84,12 @@ xfs_swapext(
 	}
 
 	tbhp = VN_BHV_HEAD(tvp);
-	VN_BHV_READ_LOCK(tbhp);
 	tbdp = vn_bhv_lookup(tbhp, &xfs_vnodeops);
 	if (tbdp == NULL) {
-		VN_BHV_READ_UNLOCK(tbhp);
 		error = XFS_ERROR(EBADF);
 		goto error0;
 	} else {
 		tip = XFS_BHVTOI(tbdp);
-		VN_BHV_READ_UNLOCK(tbhp);
 	}
 
 	if (ip->i_ino == tip->i_ino) {

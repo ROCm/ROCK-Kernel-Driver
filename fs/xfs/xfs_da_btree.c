@@ -1791,8 +1791,11 @@ xfs_da_swap_lastblock(xfs_da_args_t *args, xfs_dablk_t *dead_blknop,
 		error = xfs_bmap_last_offset(tp, ip, &lastoff, w);
 	if (error)
 		return error;
-	if (lastoff == 0)
+	if (unlikely(lastoff == 0)) {
+		XFS_ERROR_REPORT("xfs_da_swap_lastblock(1)", XFS_ERRLEVEL_LOW,
+				 mp);
 		return XFS_ERROR(EFSCORRUPTED);
+	}
 	/*
 	 * Read the last block in the btree space.
 	 */
@@ -1833,8 +1836,11 @@ xfs_da_swap_lastblock(xfs_da_args_t *args, xfs_dablk_t *dead_blknop,
 		if ((error = xfs_da_read_buf(tp, ip, sib_blkno, -1, &sib_buf, w)))
 			goto done;
 		sib_info = sib_buf->data;
-		if (INT_GET(sib_info->forw, ARCH_CONVERT) != last_blkno ||
-		    INT_GET(sib_info->magic, ARCH_CONVERT) != INT_GET(dead_info->magic, ARCH_CONVERT)) {
+		if (unlikely(
+		    INT_GET(sib_info->forw, ARCH_CONVERT) != last_blkno ||
+		    INT_GET(sib_info->magic, ARCH_CONVERT) != INT_GET(dead_info->magic, ARCH_CONVERT))) {
+			XFS_ERROR_REPORT("xfs_da_swap_lastblock(2)",
+					 XFS_ERRLEVEL_LOW, mp);
 			error = XFS_ERROR(EFSCORRUPTED);
 			goto done;
 		}
@@ -1852,9 +1858,12 @@ xfs_da_swap_lastblock(xfs_da_args_t *args, xfs_dablk_t *dead_blknop,
 		if ((error = xfs_da_read_buf(tp, ip, sib_blkno, -1, &sib_buf, w)))
 			goto done;
 		sib_info = sib_buf->data;
-		if (   INT_GET(sib_info->back, ARCH_CONVERT) != last_blkno
+		if (unlikely(
+		       INT_GET(sib_info->back, ARCH_CONVERT) != last_blkno
 		    || INT_GET(sib_info->magic, ARCH_CONVERT)
-				!= INT_GET(dead_info->magic, ARCH_CONVERT)) {
+				!= INT_GET(dead_info->magic, ARCH_CONVERT))) {
+			XFS_ERROR_REPORT("xfs_da_swap_lastblock(3)",
+					 XFS_ERRLEVEL_LOW, mp);
 			error = XFS_ERROR(EFSCORRUPTED);
 			goto done;
 		}
@@ -1874,8 +1883,11 @@ xfs_da_swap_lastblock(xfs_da_args_t *args, xfs_dablk_t *dead_blknop,
 		if ((error = xfs_da_read_buf(tp, ip, par_blkno, -1, &par_buf, w)))
 			goto done;
 		par_node = par_buf->data;
-		if (INT_GET(par_node->hdr.info.magic, ARCH_CONVERT) != XFS_DA_NODE_MAGIC ||
-		    (level >= 0 && level != INT_GET(par_node->hdr.level, ARCH_CONVERT) + 1)) {
+		if (unlikely(
+		    INT_GET(par_node->hdr.info.magic, ARCH_CONVERT) != XFS_DA_NODE_MAGIC ||
+		    (level >= 0 && level != INT_GET(par_node->hdr.level, ARCH_CONVERT) + 1))) {
+			XFS_ERROR_REPORT("xfs_da_swap_lastblock(4)",
+					 XFS_ERRLEVEL_LOW, mp);
 			error = XFS_ERROR(EFSCORRUPTED);
 			goto done;
 		}
@@ -1885,7 +1897,9 @@ xfs_da_swap_lastblock(xfs_da_args_t *args, xfs_dablk_t *dead_blknop,
 		     INT_GET(par_node->btree[entno].hashval, ARCH_CONVERT) < dead_hash;
 		     entno++)
 			continue;
-		if (entno == INT_GET(par_node->hdr.count, ARCH_CONVERT)) {
+		if (unlikely(entno == INT_GET(par_node->hdr.count, ARCH_CONVERT))) {
+			XFS_ERROR_REPORT("xfs_da_swap_lastblock(5)",
+					 XFS_ERRLEVEL_LOW, mp);
 			error = XFS_ERROR(EFSCORRUPTED);
 			goto done;
 		}
@@ -1910,15 +1924,20 @@ xfs_da_swap_lastblock(xfs_da_args_t *args, xfs_dablk_t *dead_blknop,
 		par_blkno = INT_GET(par_node->hdr.info.forw, ARCH_CONVERT);
 		xfs_da_brelse(tp, par_buf);
 		par_buf = NULL;
-		if (par_blkno == 0) {
+		if (unlikely(par_blkno == 0)) {
+			XFS_ERROR_REPORT("xfs_da_swap_lastblock(6)",
+					 XFS_ERRLEVEL_LOW, mp);
 			error = XFS_ERROR(EFSCORRUPTED);
 			goto done;
 		}
 		if ((error = xfs_da_read_buf(tp, ip, par_blkno, -1, &par_buf, w)))
 			goto done;
 		par_node = par_buf->data;
-		if (INT_GET(par_node->hdr.level, ARCH_CONVERT) != level ||
-		    INT_GET(par_node->hdr.info.magic, ARCH_CONVERT) != XFS_DA_NODE_MAGIC) {
+		if (unlikely(
+		    INT_GET(par_node->hdr.level, ARCH_CONVERT) != level ||
+		    INT_GET(par_node->hdr.info.magic, ARCH_CONVERT) != XFS_DA_NODE_MAGIC)) {
+			XFS_ERROR_REPORT("xfs_da_swap_lastblock(7)",
+					 XFS_ERRLEVEL_LOW, mp);
 			error = XFS_ERROR(EFSCORRUPTED);
 			goto done;
 		}
@@ -2111,6 +2130,26 @@ xfs_da_do_buf(
 	}
 	if (!xfs_da_map_covers_blocks(nmap, mapp, bno, nfsb)) {
 		error = mappedbno == -2 ? 0 : XFS_ERROR(EFSCORRUPTED);
+		if (unlikely(error == EFSCORRUPTED)) {
+			if (xfs_error_level >= XFS_ERRLEVEL_LOW) {
+				int	i;
+				cmn_err(CE_ALERT, "xfs_da_do_buf: bno %lld\n",
+					bno);
+				cmn_err(CE_ALERT, "dir: inode %lld\n",
+					dp->i_ino);
+				for (i = 0; i < nmap; i++) {
+					cmn_err(CE_ALERT,
+						"[%02d] br_startoff %lld br_startblock %lld br_blockcount %lld br_state %d\n",
+						i,
+						mapp[i].br_startoff,
+						mapp[i].br_startblock,
+						mapp[i].br_blockcount,
+						mapp[i].br_state);
+				}
+			}
+			XFS_ERROR_REPORT("xfs_da_do_buf(1)",
+					 XFS_ERRLEVEL_LOW, mp);
+		}
 		goto exit0;
 	}
 	if (caller != 3 && nmap > 1) {
@@ -2193,7 +2232,8 @@ xfs_da_do_buf(
 		free = rbp->data;
 		magic = INT_GET(info->magic, ARCH_CONVERT);
 		magic1 = INT_GET(data->hdr.magic, ARCH_CONVERT);
-		if (XFS_TEST_ERROR((magic != XFS_DA_NODE_MAGIC) &&
+		if (unlikely(
+		    XFS_TEST_ERROR((magic != XFS_DA_NODE_MAGIC) &&
 				   (magic != XFS_DIR_LEAF_MAGIC) &&
 				   (magic != XFS_ATTR_LEAF_MAGIC) &&
 				   (magic != XFS_DIR2_LEAF1_MAGIC) &&
@@ -2202,8 +2242,10 @@ xfs_da_do_buf(
 				   (magic1 != XFS_DIR2_DATA_MAGIC) &&
 				   (INT_GET(free->hdr.magic, ARCH_CONVERT) != XFS_DIR2_FREE_MAGIC),
 				mp, XFS_ERRTAG_DA_READ_BUF,
-				XFS_RANDOM_DA_READ_BUF)) {
+				XFS_RANDOM_DA_READ_BUF))) {
 			xfs_buftrace("DA READ ERROR", rbp->bps[0]);
+			XFS_CORRUPTION_ERROR("xfs_da_do_buf(2)",
+					     XFS_ERRLEVEL_LOW, mp, info);
 			error = XFS_ERROR(EFSCORRUPTED);
 			xfs_da_brelse(trans, rbp);
 			nbplist = 0;

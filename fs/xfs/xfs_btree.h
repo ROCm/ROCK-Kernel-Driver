@@ -570,7 +570,9 @@ int xfs_fsb_sanity_check(struct xfs_mount *mp, xfs_fsblock_t fsb);
 	{ \
 		int fs_is_ok = (x); \
 		ASSERT(fs_is_ok); \
-		if (!fs_is_ok) { \
+		if (unlikely(!fs_is_ok)) { \
+			XFS_ERROR_REPORT("XFS_WANT_CORRUPTED_GOTO", \
+					 XFS_ERRLEVEL_LOW, NULL); \
 			error = XFS_ERROR(EFSCORRUPTED); \
 			goto l; \
 		} \
@@ -580,8 +582,11 @@ int xfs_fsb_sanity_check(struct xfs_mount *mp, xfs_fsblock_t fsb);
 	{ \
 		int fs_is_ok = (x); \
 		ASSERT(fs_is_ok); \
-		if (!fs_is_ok) \
+		if (unlikely(!fs_is_ok)) { \
+			XFS_ERROR_REPORT("XFS_WANT_CORRUPTED_RETURN", \
+					 XFS_ERRLEVEL_LOW, NULL); \
 			return XFS_ERROR(EFSCORRUPTED); \
+		} \
 	}
 
 #endif	/* __XFS_BTREE_H__ */

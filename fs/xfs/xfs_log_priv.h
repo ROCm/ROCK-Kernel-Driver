@@ -536,8 +536,7 @@ typedef struct log {
 
 
 /* common routines */
-extern xfs_lsn_t xlog_assign_tail_lsn(struct xfs_mount *mp,
-				      xlog_in_core_t *iclog);
+extern xfs_lsn_t xlog_assign_tail_lsn(struct xfs_mount *mp);
 extern int	 xlog_find_head(xlog_t *log, xfs_daddr_t *head_blk);
 extern int	 xlog_find_tail(xlog_t	*log,
 				xfs_daddr_t *head_blk,

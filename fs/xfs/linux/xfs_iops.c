@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -45,7 +45,7 @@ validate_fields(
 	vattr_t		va;
 	int		error;
 
-	va.va_mask = XFS_AT_NLINK|XFS_AT_SIZE;
+	va.va_mask = XFS_AT_NLINK|XFS_AT_SIZE|XFS_AT_NBLOCKS;
 	VOP_GETATTR(vp, &va, ATTR_LAZY, NULL, error);
 	ip->i_nlink = va.va_nlink;
 	ip->i_size = va.va_size;
@@ -154,20 +154,18 @@ linvfs_mkdir(
 	return linvfs_mknod(dir, dentry, mode|S_IFDIR, 0);
 }
 
-
 STATIC struct dentry *
 linvfs_lookup(
 	struct inode	*dir,
 	struct dentry	*dentry)
 {
-	int		error;
-	vnode_t		*vp, *cvp;
 	struct inode	*ip = NULL;
+	vnode_t		*vp, *cvp = NULL;
+	int		error;
 
 	if (dentry->d_name.len >= MAXNAMELEN)
 		return ERR_PTR(-ENAMETOOLONG);
 
-	cvp = NULL;
 	vp = LINVFS_GET_VP(dir);
 	VOP_LOOKUP(vp, dentry, &cvp, 0, NULL, NULL, error);
 	if (!error) {
@@ -189,10 +187,10 @@ linvfs_link(
 	struct inode	*dir,
 	struct dentry	*dentry)
 {
-	int		error;
-	vnode_t		*tdvp;	/* Target directory for new name/link */
-	vnode_t		*vp;	/* vp of name being linked */
 	struct inode	*ip;	/* inode of guy being linked to */
+	vnode_t		*tdvp;	/* target directory for new name/link */
+	vnode_t		*vp;	/* vp of name being linked */
+	int		error;
 
 	ip = old_dentry->d_inode;	/* inode being linked to */
 	if (S_ISDIR(ip->i_mode))
@@ -201,7 +199,6 @@ linvfs_link(
 	tdvp = LINVFS_GET_VP(dir);
 	vp = LINVFS_GET_VP(ip);
 
-	error = 0;
 	VOP_LINK(tdvp, vp, dentry, NULL, error);
 	if (!error) {
 		VMODIFY(tdvp);
@@ -218,16 +215,14 @@ linvfs_unlink(
 	struct inode	*dir,
 	struct dentry	*dentry)
 {
-	int		error = 0;
 	struct inode	*inode;
 	vnode_t		*dvp;	/* directory containing name to remove */
+	int		error;
 
 	inode = dentry->d_inode;
-
 	dvp = LINVFS_GET_VP(dir);
 
 	VOP_REMOVE(dvp, dentry, NULL, error);
-
 	if (!error) {
 		validate_fields(dir);	/* For size only */
 		validate_fields(inode);
@@ -244,13 +239,14 @@ linvfs_symlink(
 	struct dentry	*dentry,
 	const char	*symname)
 {
-	int		error;
+	struct inode	*ip;
+	vattr_t		va;
 	vnode_t		*dvp;	/* directory containing name to remove */
 	vnode_t		*cvp;	/* used to lookup symlink to put in dentry */
-	vattr_t		va;
-	struct inode	*ip = NULL;
+	int		error;
 
 	dvp = LINVFS_GET_VP(dir);
+	cvp = NULL;
 
 	memset(&va, 0, sizeof(va));
 	va.va_type = VLNK;
@@ -259,20 +255,14 @@ linvfs_symlink(
 
 	error = 0;
 	VOP_SYMLINK(dvp, dentry, &va, (char *)symname, &cvp, NULL, error);
-	if (!error) {
-		ASSERT(cvp);
+	if (!error && cvp) {
 		ASSERT(cvp->v_type == VLNK);
 		ip = LINVFS_GET_IP(cvp);
-		if (!ip) {
-			error = ENOMEM;
-			VN_RELE(cvp);
-		} else {
-			d_instantiate(dentry, ip);
-			validate_fields(dir);
-			validate_fields(ip); /* size needs update */
-			mark_inode_dirty_sync(ip);
-			mark_inode_dirty_sync(dir);
-		}
+		d_instantiate(dentry, ip);
+		validate_fields(dir);
+		validate_fields(ip); /* size needs update */
+		mark_inode_dirty_sync(ip);
+		mark_inode_dirty_sync(dir);
 	}
 	return -error;
 }
@@ -303,23 +293,20 @@ linvfs_rename(
 	struct inode	*ndir,
 	struct dentry	*ndentry)
 {
-	int		error;
+	struct inode	*new_inode = ndentry->d_inode;
 	vnode_t		*fvp;	/* from directory */
 	vnode_t		*tvp;	/* target directory */
-	struct inode	*new_inode = NULL;
+	int		error;
 
 	fvp = LINVFS_GET_VP(odir);
 	tvp = LINVFS_GET_VP(ndir);
-
-	new_inode = ndentry->d_inode;
 
 	VOP_RENAME(fvp, odentry, tvp, ndentry, NULL, error);
 	if (error)
 		return -error;
 
-	if (new_inode) {
+	if (new_inode)
 		validate_fields(new_inode);
-	}
 
 	validate_fields(odir);
 	if (ndir != odir)
@@ -334,12 +321,10 @@ linvfs_readlink(
 	char		*buf,
 	int		size)
 {
-	vnode_t		*vp;
+	vnode_t		*vp = LINVFS_GET_VP(dentry->d_inode);
 	uio_t		uio;
 	iovec_t		iov;
 	int		error;
-
-	vp = LINVFS_GET_VP(dentry->d_inode);
 
 	iov.iov_base = buf;
 	iov.iov_len = size;
@@ -348,6 +333,7 @@ linvfs_readlink(
 	uio.uio_offset = 0;
 	uio.uio_segflg = UIO_USERSPACE;
 	uio.uio_resid = size;
+	uio.uio_iovcnt = 1;
 
 	VOP_READLINK(vp, &uio, NULL, error);
 	if (error)
@@ -395,6 +381,7 @@ linvfs_follow_link(
 	uio->uio_segflg = UIO_SYSSPACE;
 	uio->uio_resid = MAXNAMELEN;
 	uio->uio_fmode = 0;
+	uio->uio_iovcnt = 1;
 
 	VOP_READLINK(vp, uio, NULL, error);
 	if (error) {
@@ -425,11 +412,6 @@ linvfs_permission(
 	return -error;
 }
 
-/* Brute force approach for now - copy data into linux inode
- * from the results of a getattr. This gets called out of things
- * like stat.
- */
-
 STATIC int
 linvfs_getattr(
 	struct vfsmount	*mnt,
@@ -440,9 +422,8 @@ linvfs_getattr(
 	vnode_t		*vp = LINVFS_GET_VP(inode);
 	int		error = 0;
 
-	if (unlikely(vp->v_flag & VMODIFIED)) {
+	if (unlikely(vp->v_flag & VMODIFIED))
 		error = vn_revalidate(vp);
-	}
 	if (!error)
 		generic_fillattr(inode, stat);
 	return 0;
@@ -454,11 +435,11 @@ linvfs_setattr(
 	struct iattr	*attr)
 {
 	struct inode	*inode = dentry->d_inode;
+	unsigned int	ia_valid = attr->ia_valid;
 	vnode_t		*vp = LINVFS_GET_VP(inode);
 	vattr_t		vattr;
-	unsigned int	ia_valid = attr->ia_valid;
-	int		error;
 	int		flags = 0;
+	int		error;
 
 	memset(&vattr, 0, sizeof(vattr_t));
 	if (ia_valid & ATTR_UID) {
@@ -511,7 +492,7 @@ linvfs_setattr(
 
 STATIC void
 linvfs_truncate(
-	struct inode		*inode)
+	struct inode	*inode)
 {
 	block_truncate_page(inode->i_mapping, inode->i_size, linvfs_get_block);
 }
@@ -579,11 +560,11 @@ linvfs_setxattr(
 	size_t		size,
 	int		flags)
 {
-	int		error;
-	int		xflags = 0;
-	char		*p = (char *)name;
 	struct inode	*inode = dentry->d_inode;
 	vnode_t		*vp = LINVFS_GET_VP(inode);
+	char		*p = (char *)name;
+	int		xflags = 0;
+	int		error;
 
 	if (strncmp(name, xfs_namespaces[SYSTEM_NAMES].name,
 			xfs_namespaces[SYSTEM_NAMES].namelen) == 0) {
@@ -592,20 +573,16 @@ linvfs_setxattr(
 			 return error;
 		error = -EOPNOTSUPP;
 		p += xfs_namespaces[SYSTEM_NAMES].namelen;
-		if (strcmp(p, POSIXACL_ACCESS) == 0) {
+		if (strcmp(p, POSIXACL_ACCESS) == 0)
 			error = xfs_acl_vset(vp, (void *) data, size,
 						_ACL_TYPE_ACCESS);
-		}
-		else if (strcmp(p, POSIXACL_DEFAULT) == 0) {
+		else if (strcmp(p, POSIXACL_DEFAULT) == 0)
 			error = xfs_acl_vset(vp, (void *) data, size,
 						_ACL_TYPE_DEFAULT);
-		}
-		else if (strcmp(p, POSIXCAP) == 0) {
+		else if (strcmp(p, POSIXCAP) == 0)
 			error = xfs_cap_vset(vp, (void *) data, size);
-		}
-		if (!error) {
+		if (!error)
 			error = vn_revalidate(vp);
-		}
 		return error;
 	}
 
@@ -642,25 +619,22 @@ linvfs_getxattr(
 	void		*data,
 	size_t		size)
 {
-	ssize_t		error;
-	int		xflags = 0;
-	char		*p = (char *)name;
 	struct inode	*inode = dentry->d_inode;
 	vnode_t		*vp = LINVFS_GET_VP(inode);
+	char		*p = (char *)name;
+	int		xflags = 0;
+	ssize_t		error;
 
 	if (strncmp(name, xfs_namespaces[SYSTEM_NAMES].name,
 			xfs_namespaces[SYSTEM_NAMES].namelen) == 0) {
 		error = -EOPNOTSUPP;
 		p += xfs_namespaces[SYSTEM_NAMES].namelen;
-		if (strcmp(p, POSIXACL_ACCESS) == 0) {
+		if (strcmp(p, POSIXACL_ACCESS) == 0)
 			error = xfs_acl_vget(vp, data, size, _ACL_TYPE_ACCESS);
-		}
-		else if (strcmp(p, POSIXACL_DEFAULT) == 0) {
+		else if (strcmp(p, POSIXACL_DEFAULT) == 0)
 			error = xfs_acl_vget(vp, data, size, _ACL_TYPE_DEFAULT);
-		}
-		else if (strcmp(p, POSIXCAP) == 0) {
+		else if (strcmp(p, POSIXCAP) == 0)
 			error = xfs_cap_vget(vp, data, size);
-		}
 		return error;
 	}
 
@@ -699,15 +673,13 @@ linvfs_listxattr(
 	char			*data,
 	size_t			size)
 {
-	ssize_t			error;
-	int			result = 0;
-	int			xflags = ATTR_KERNAMELS;
-	char			*k = data;
 	attrlist_cursor_kern_t	cursor;
 	xattr_namespace_t	*sys;
-	vnode_t			*vp;
-
-	vp = LINVFS_GET_VP(dentry->d_inode);
+	vnode_t			*vp = LINVFS_GET_VP(dentry->d_inode);
+	char			*k = data;
+	int			xflags = ATTR_KERNAMELS;
+	int			result = 0;
+	ssize_t			error;
 
 	if (!size)
 		xflags |= ATTR_KERNOVAL;
@@ -743,11 +715,11 @@ linvfs_removexattr(
 	struct dentry	*dentry,
 	const char	*name)
 {
-	int		error;
-	int		xflags = 0;
-	char		*p = (char *)name;
 	struct inode	*inode = dentry->d_inode;
 	vnode_t		*vp = LINVFS_GET_VP(inode);
+	char		*p = (char *)name;
+	int		xflags = 0;
+	int		error;
 
 	if (strncmp(name, xfs_namespaces[SYSTEM_NAMES].name,
 			xfs_namespaces[SYSTEM_NAMES].namelen) == 0) {
@@ -786,8 +758,8 @@ linvfs_removexattr(
 struct inode_operations linvfs_file_inode_operations =
 {
 	.permission		= linvfs_permission,
-	.getattr		= linvfs_getattr,
 	.truncate		= linvfs_truncate,
+	.getattr		= linvfs_getattr,
 	.setattr		= linvfs_setattr,
 	.setxattr		= linvfs_setxattr,
 	.getxattr		= linvfs_getxattr,

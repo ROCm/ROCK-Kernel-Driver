@@ -444,16 +444,22 @@ xfs_qm_unmount_quotas(
 			xfs_iflock(uqp);
 			error = xfs_iflush(uqp, XFS_IFLUSH_SYNC);
 			xfs_iunlock(uqp, XFS_ILOCK_EXCL);
-			if (error == EFSCORRUPTED)
+			if (unlikely(error == EFSCORRUPTED)) {
+				XFS_ERROR_REPORT("xfs_qm_unmount_quotas(1)",
+						 XFS_ERRLEVEL_LOW, mp);
 				goto out;
+			}
 		}
 		if ((gqp = mp->m_quotainfo->qi_gquotaip) != NULL) {
 			xfs_ilock(gqp, XFS_ILOCK_EXCL);
 			xfs_iflock(gqp);
 			error = xfs_iflush(gqp, XFS_IFLUSH_SYNC);
 			xfs_iunlock(gqp, XFS_ILOCK_EXCL);
-			if (error == EFSCORRUPTED)
+			if (unlikely(error == EFSCORRUPTED)) {
+				XFS_ERROR_REPORT("xfs_qm_unmount_quotas(2)",
+						 XFS_ERRLEVEL_LOW, mp);
 				goto out;
+			}
 		}
 	}
 	if (uqp) {

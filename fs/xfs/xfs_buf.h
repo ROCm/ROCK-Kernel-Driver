@@ -163,15 +163,17 @@ extern inline xfs_caddr_t xfs_buf_offset(page_buf_t *bp, size_t offset)
 #define XFS_BUF_SET_PTR(bp, val, count)		\
 				pagebuf_associate_memory(bp, val, count)
 #define XFS_BUF_ADDR(bp)	((bp)->pb_bn)
-#define XFS_BUF_OFFSET(bp)	((bp)->pb_file_offset >> 9)
 #define XFS_BUF_SET_ADDR(bp, blk)		\
 			((bp)->pb_bn = (page_buf_daddr_t)(blk))
+#define XFS_BUF_OFFSET(bp)	((bp)->pb_file_offset)
+#define XFS_BUF_SET_OFFSET(bp, off)		\
+			((bp)->pb_file_offset = (off))
 #define XFS_BUF_COUNT(bp)	((bp)->pb_count_desired)
 #define XFS_BUF_SET_COUNT(bp, cnt)		\
-			((bp)->pb_count_desired = cnt)
+			((bp)->pb_count_desired = (cnt))
 #define XFS_BUF_SIZE(bp)	((bp)->pb_buffer_length)
 #define XFS_BUF_SET_SIZE(bp, cnt)		\
-			((bp)->pb_buffer_length = cnt)
+			((bp)->pb_buffer_length = (cnt))
 #define XFS_BUF_SET_VTYPE_REF(bp, type, ref)
 #define XFS_BUF_SET_VTYPE(bp, type)
 #define XFS_BUF_SET_REF(bp, ref)
@@ -242,7 +244,7 @@ static inline void	xfs_buf_relse(page_buf_t *bp)
 
 
 #define xfs_biodone(pb)		    \
-	    pagebuf_iodone(pb, 0)
+	    pagebuf_iodone(pb, 0, 0)
 
 #define xfs_incore(buftarg,blkno,len,lockit) \
 	    pagebuf_find(buftarg, blkno ,len, lockit)

@@ -205,13 +205,17 @@ xfs_mount_validate_sb(
 		return XFS_ERROR(EWRONGFS);
 	}
 
-	if (sbp->sb_logstart == 0 && mp->m_logdev_targp == mp->m_ddev_targp) {
+	if (unlikely(sbp->sb_logstart == 0 && mp->m_logdev_targp == mp->m_ddev_targp)) {
 		cmn_err(CE_WARN, "XFS: filesystem is marked as having an external log; specify logdev on the\nmount command line.");
+		XFS_CORRUPTION_ERROR("xfs_mount_validate_sb(1)",
+				     XFS_ERRLEVEL_HIGH, mp, sbp);
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 
-	if (sbp->sb_logstart != 0 && mp->m_logdev_targp != mp->m_ddev_targp) {
+	if (unlikely(sbp->sb_logstart != 0 && mp->m_logdev_targp != mp->m_ddev_targp)) {
 		cmn_err(CE_WARN, "XFS: filesystem is marked as having an internal log; don't specify logdev on\nthe mount command line.");
+		XFS_CORRUPTION_ERROR("xfs_mount_validate_sb(2)",
+				     XFS_ERRLEVEL_HIGH, mp, sbp);
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 
@@ -219,7 +223,8 @@ xfs_mount_validate_sb(
 	 * More sanity checking. These were stolen directly from
 	 * xfs_repair.
 	 */
-	if (sbp->sb_agcount <= 0					||
+	if (unlikely(
+	    sbp->sb_agcount <= 0					||
 	    sbp->sb_sectsize < XFS_MIN_SECTORSIZE			||
 	    sbp->sb_sectsize > XFS_MAX_SECTORSIZE			||
 	    sbp->sb_sectlog < XFS_MIN_SECTORSIZE_LOG			||
@@ -232,20 +237,25 @@ xfs_mount_validate_sb(
 	    sbp->sb_inodesize > XFS_DINODE_MAX_SIZE			||
 	    (sbp->sb_rextsize * sbp->sb_blocksize > XFS_MAX_RTEXTSIZE)	||
 	    (sbp->sb_rextsize * sbp->sb_blocksize < XFS_MIN_RTEXTSIZE)	||
-	    sbp->sb_imax_pct > 100) {
+	    sbp->sb_imax_pct > 100)) {
 		cmn_err(CE_WARN, "XFS: SB sanity check 1 failed");
+		XFS_CORRUPTION_ERROR("xfs_mount_validate_sb(3)",
+				     XFS_ERRLEVEL_LOW, mp, sbp);
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 
 	/*
 	 * Sanity check AG count, size fields against data size field
 	 */
-	if (sbp->sb_dblocks == 0 ||
+	if (unlikely(
+	    sbp->sb_dblocks == 0 ||
 	    sbp->sb_dblocks >
 	     (xfs_drfsbno_t)sbp->sb_agcount * sbp->sb_agblocks ||
 	    sbp->sb_dblocks < (xfs_drfsbno_t)(sbp->sb_agcount - 1) *
-			      sbp->sb_agblocks + XFS_MIN_AG_BLOCKS) {
+			      sbp->sb_agblocks + XFS_MIN_AG_BLOCKS)) {
 		cmn_err(CE_WARN, "XFS: SB sanity check 2 failed");
+		XFS_ERROR_REPORT("xfs_mount_validate_sb(4)",
+				 XFS_ERRLEVEL_LOW, mp);
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 
@@ -257,8 +267,10 @@ xfs_mount_validate_sb(
 	}
 #endif
 
-	if (sbp->sb_inprogress) {
+	if (unlikely(sbp->sb_inprogress)) {
 		cmn_err(CE_WARN, "XFS: file system busy");
+		XFS_ERROR_REPORT("xfs_mount_validate_sb(5)",
+				 XFS_ERRLEVEL_LOW, mp);
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 
@@ -636,7 +648,6 @@ xfs_mountfs(
 				error = XFS_ERROR(EINVAL);
 				goto error1;
 			}
-			mp->m_dalign = mp->m_swidth = 0;
 		} else {
 			/*
 			 * Convert the stripe unit and width to FSBs.
@@ -915,7 +926,7 @@ xfs_mountfs(
 	/*
 	 * log's mount-time initialization. Perform 1st part recovery if needed
 	 */
-	if (sbp->sb_logblocks > 0) {		/* check for volume case */
+	if (likely(sbp->sb_logblocks > 0)) {	/* check for volume case */
 		error = xfs_log_mount(mp, mp->m_logdev_targp->pbr_dev,
 				      XFS_FSB_TO_DADDR(mp, sbp->sb_logstart),
 				      XFS_FSB_TO_BB(mp, sbp->sb_logblocks));
@@ -925,6 +936,7 @@ xfs_mountfs(
 		}
 	} else {	/* No log has been defined */
 		cmn_err(CE_WARN, "XFS: no log defined");
+		XFS_ERROR_REPORT("xfs_mountfs_int(1)", XFS_ERRLEVEL_LOW, mp);
 		error = XFS_ERROR(EFSCORRUPTED);
 		goto error2;
 	}
@@ -941,7 +953,7 @@ xfs_mountfs(
 
 	ASSERT(rip != NULL);
 	rvp = XFS_ITOV(rip);
-	if ((rip->i_d.di_mode & IFMT) != IFDIR) {
+	if (unlikely((rip->i_d.di_mode & IFMT) != IFDIR)) {
 		cmn_err(CE_WARN, "XFS: corrupted root inode");
 		VMAP(rvp, vmap);
 		prdev("Root inode %llu is not a directory",
@@ -949,6 +961,8 @@ xfs_mountfs(
 		xfs_iunlock(rip, XFS_ILOCK_EXCL);
 		VN_RELE(rvp);
 		vn_purge(rvp, &vmap);
+		XFS_ERROR_REPORT("xfs_mountfs_int(2)", XFS_ERRLEVEL_LOW,
+				 mp);
 		error = XFS_ERROR(EFSCORRUPTED);
 		goto error3;
 	}

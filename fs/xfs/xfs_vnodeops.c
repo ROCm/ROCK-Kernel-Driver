@@ -72,7 +72,8 @@ xfs_open(
 	 */
 	if (vp->v_type == VDIR && ip->i_d.di_nextents > 0) {
 		mode = xfs_ilock_map_shared(ip);
-		(void)xfs_da_reada_buf(NULL, ip, 0, XFS_DATA_FORK);
+		if (ip->i_d.di_nextents > 0)
+			(void)xfs_da_reada_buf(NULL, ip, 0, XFS_DATA_FORK);
 		xfs_iunlock(ip, mode);
 	}
 	return 0;
@@ -125,7 +126,8 @@ xfs_getattr(
 	 * Quick exit for non-stat callers
 	 */
 	if ((vap->va_mask &
-	    ~(XFS_AT_SIZE|XFS_AT_FSID|XFS_AT_NODEID|XFS_AT_NLINK)) == 0) {
+	    ~(XFS_AT_SIZE|XFS_AT_FSID|XFS_AT_NODEID|
+	      XFS_AT_NLINK|XFS_AT_BLKSIZE)) == 0) {
 		if (!(flags & ATTR_LAZY))
 			xfs_iunlock(ip, XFS_ILOCK_SHARED);
 		return 0;
@@ -1919,6 +1921,7 @@ xfs_create(
 	xfs_bmap_free_t		free_list;
 	xfs_fsblock_t		first_block;
 	boolean_t		dp_joined_to_trans;
+	int			dm_event_sent = 0;
 	uint			cancel_flags;
 	int			committed;
 	xfs_prid_t		prid;
@@ -1943,14 +1946,15 @@ xfs_create(
 				dm_di_mode, 0, 0);
 		if (error)
 			return error;
+		dm_event_sent = 1;
 	}
-
-	/* Return through std_return after this point. */
 
 	mp = dp->i_mount;
 
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
+
+	/* Return through std_return after this point. */
 
 	udqp = gdqp = NULL;
 	if (vap->va_mask & XFS_AT_PROJID)
@@ -2111,12 +2115,12 @@ xfs_create(
 	/* Fallthrough to std_return with error = 0  */
 
 std_return:
-	if ((error != 0) &&
+	if ( (*vpp || (error != 0 && dm_event_sent != 0)) &&
 			DM_EVENT_ENABLED(dir_vp->v_vfsp, XFS_BHVTOI(dir_bdp),
 							DM_EVENT_POSTCREATE)) {
 		(void) dm_send_namesp_event(DM_EVENT_POSTCREATE,
 			dir_bdp, DM_RIGHT_NULL,
-			vn_bhv_lookup_unlocked(VN_BHV_HEAD(vp), &xfs_vnodeops),
+			*vpp ? vn_bhv_lookup_unlocked(VN_BHV_HEAD(vp), &xfs_vnodeops):NULL,
 			DM_RIGHT_NULL, name, NULL,
 			dm_di_mode, error, 0);
 	}
@@ -2838,6 +2842,7 @@ xfs_mkdir(
 	vnode_t			*dir_vp;
 	boolean_t		dp_joined_to_trans;
 	boolean_t		created = B_FALSE;
+	int			dm_event_sent = 0;
 	xfs_prid_t		prid;
 	xfs_dquot_t		*udqp, *gdqp;
 	uint			resblks;
@@ -2864,6 +2869,7 @@ xfs_mkdir(
 					dm_di_mode, 0, 0);
 		if (error)
 			return error;
+		dm_event_sent = 1;
 	}
 
 	/* Return through std_return after this point. */
@@ -3026,7 +3032,7 @@ xfs_mkdir(
 	 * xfs_trans_commit. */
 
 std_return:
-	if ( (created || (error != 0)) &&
+	if ( (created || (error != 0 && dm_event_sent != 0)) &&
 			DM_EVENT_ENABLED(dir_vp->v_vfsp, XFS_BHVTOI(dir_bdp),
 						DM_EVENT_POSTCREATE)) {
 		(void) dm_send_namesp_event(DM_EVENT_POSTCREATE,

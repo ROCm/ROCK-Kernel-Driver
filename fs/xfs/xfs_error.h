@@ -52,6 +52,39 @@ extern int	xfs_error_trap(int);
 #define XFS_ERROR(e)	(e)
 #endif
 
+struct xfs_mount;
+
+extern void
+xfs_error_report(
+	char		*tag,
+	int		level,
+	struct xfs_mount *mp,
+	char		*fname,
+	int		linenum,
+	inst_t		*ra);
+
+extern void
+xfs_corruption_error(
+	char		*tag,
+	int		level,
+	struct xfs_mount *mp,
+	void		*p,
+	char		*fname,
+	int		linenum,
+	inst_t		*ra);
+
+extern void
+xfs_hex_dump(void *p, int length);
+
+#define	XFS_ERROR_REPORT(e, lvl, mp)	\
+	xfs_error_report(e, lvl, mp, __FILE__, __LINE__, __return_address)
+#define	XFS_CORRUPTION_ERROR(e, lvl, mp, mem)	\
+	xfs_corruption_error(e, lvl, mp, mem, \
+			     __FILE__, __LINE__, __return_address)
+
+#define XFS_ERRLEVEL_OFF	0
+#define XFS_ERRLEVEL_LOW	1
+#define XFS_ERRLEVEL_HIGH	5
 
 /*
  * error injection tags - the labels can be anything you want
@@ -79,7 +112,8 @@ extern int	xfs_error_trap(int);
 #define XFS_ERRTAG_STRATREAD_IOERR			18
 #define XFS_ERRTAG_STRATCMPL_IOERR			19
 #define XFS_ERRTAG_DIOWRITE_IOERR			20
-#define XFS_ERRTAG_MAX					21
+#define XFS_ERRTAG_BMAPIFORMAT				21
+#define XFS_ERRTAG_MAX					22
 
 /*
  * Random factors for above tags, 1 means always, 2 means 1/2 time, etc.
@@ -105,6 +139,7 @@ extern int	xfs_error_trap(int);
 #define XFS_RANDOM_STRATREAD_IOERR			(XFS_RANDOM_DEFAULT/10)
 #define XFS_RANDOM_STRATCMPL_IOERR			(XFS_RANDOM_DEFAULT/10)
 #define XFS_RANDOM_DIOWRITE_IOERR			(XFS_RANDOM_DEFAULT/10)
+#define	XFS_RANDOM_BMAPIFORMAT				XFS_RANDOM_DEFAULT
 
 #if (defined(DEBUG) || defined(INDUCE_IO_ERROR))
 extern int	xfs_error_test(int, int *, char *, int, char *, unsigned long);
@@ -146,7 +181,7 @@ int		xfs_errortag_clearall_umount(int64_t fsid, char *fsname,
 #define		XFS_PTAG_IFLUSH			0x0000000000000001LL
 #define		XFS_PTAG_LOGRES			0x0000000000000002LL
 #define		XFS_PTAG_AILDELETE		0x0000000000000004LL
-#define		XFS_PTAG_AVAILABLE		0x0000000000000008LL
+#define		XFS_PTAG_ERROR_REPORT		0x0000000000000008LL
 #define		XFS_PTAG_SHUTDOWN_CORRUPT	0x0000000000000010LL
 #define		XFS_PTAG_SHUTDOWN_IOERROR	0x0000000000000020LL
 #define		XFS_PTAG_SHUTDOWN_LOGERROR	0x0000000000000040LL
