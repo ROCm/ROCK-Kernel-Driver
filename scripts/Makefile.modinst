@@ -11,28 +11,7 @@ include .config
 
 include $(obj)/Makefile
 
-# Figure out what we need to build from the various variables
-# ==========================================================================
-
-# When an object is listed to be built compiled-in and modular,
-# only build the compiled-in version
-
-obj-m := $(filter-out $(obj-y),$(obj-m))
-
-__subdir-y	:= $(patsubst %/,%,$(filter %/, $(obj-y)))
-subdir-y	+= $(__subdir-y)
-__subdir-m	:= $(patsubst %/,%,$(filter %/, $(obj-m)))
-subdir-m	+= $(__subdir-m)
-obj-m		:= $(filter-out %/, $(obj-m))
-
-# Subdirectories we need to descend into
-
-subdir-ym	:= $(sort $(subdir-y) $(subdir-m))
-
-# Add subdir path
-
-obj-m		:= $(addprefix $(obj)/,$(obj-m))
-subdir-ym	:= $(addprefix $(obj)/,$(subdir-ym))
+include scripts/Makefile.lib
 
 # ==========================================================================
 
@@ -47,17 +26,9 @@ else
 	@:
 endif
 
-# ===========================================================================
-# Generic stuff
-# ===========================================================================
-
 # Descending
 # ---------------------------------------------------------------------------
 
 .PHONY: $(subdir-ym)
 $(subdir-ym):
 	$(Q)$(MAKE) -rR -f scripts/Makefile.modinst obj=$@
-
-# If quiet is set, only print short version of command
-
-cmd = @$(if $($(quiet)cmd_$(1)),echo '  $($(quiet)cmd_$(1))' &&) $(cmd_$(1))

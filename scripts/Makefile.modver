@@ -11,56 +11,7 @@ include .config
 
 include $(obj)/Makefile
 
-# Standard vars
-
-comma   := ,
-
-# Figure out what we need to build from the various variables
-# ===========================================================================
-
-# When an object is listed to be built compiled-in and modular,
-# only build the compiled-in version
-
-obj-m := $(filter-out $(obj-y),$(obj-m))
-
-# Handle objects in subdirs
-# ---------------------------------------------------------------------------
-# o if we encounter foo/ in $(obj-y), replace it by foo/built-in.o
-#   and add the directory to the list of dirs to descend into: $(subdir-y)
-# o if we encounter foo/ in $(obj-m), remove it from $(obj-m) 
-#   and add the directory to the list of dirs to descend into: $(subdir-m)
-
-__subdir-y	:= $(patsubst %/,%,$(filter %/, $(obj-y)))
-subdir-y	+= $(__subdir-y)
-__subdir-m	:= $(patsubst %/,%,$(filter %/, $(obj-m)))
-subdir-m	+= $(__subdir-m)
-obj-y		:= $(patsubst %/, %/built-in.o, $(obj-y))
-obj-m		:= $(filter-out %/, $(obj-m))
-
-# Subdirectories we need to descend into
-subdir-ym	:= $(sort $(subdir-y) $(subdir-m))
-
-# $(subdir-obj-y) is the list of objects in $(obj-y) which do not live
-# in the local directory
-subdir-obj-y := $(foreach o,$(obj-y),$(if $(filter-out $(o),$(notdir $(o))),$(o)))
-
-# Replace multi-part objects by their individual parts, look at local dir only
-real-objs-y := $(foreach m, $(filter-out $(subdir-obj-y), $(obj-y)), $(if $($(m:.o=-objs)),$($(m:.o=-objs)),$(m))) $(EXTRA_TARGETS)
-real-objs-m := $(foreach m, $(obj-m), $(if $($(m:.o=-objs)),$($(m:.o=-objs)),$(m)))
-
-# Only build module versions for files which are selected to be built
-export-objs := $(filter $(export-objs),$(real-objs-y) $(real-objs-m))
-
-# Add subdir path
-
-export-objs	:= $(addprefix $(obj)/,$(export-objs))
-real-objs-y	:= $(addprefix $(obj)/,$(real-objs-y))
-real-objs-m	:= $(addprefix $(obj)/,$(real-objs-m))
-subdir-ym	:= $(addprefix $(obj)/,$(subdir-ym))
-
-# The temporary file to save gcc -MD generated dependencies must not
-# contain a comma
-depfile = $(subst $(comma),_,$(@D)/.$(@F).d)
+include scripts/Makefile.lib
 
 # ===========================================================================
 
@@ -145,19 +96,6 @@ modver: $(targets) $(subdir-ym)
 
 endif # export-objs 
 
-# Shipped files
-# ===========================================================================
-
-quiet_cmd_shipped = SHIPPED $@
-cmd_shipped = cat $< > $@
-
-%:: %_shipped
-	$(call cmd,shipped)
-
-# ===========================================================================
-# Generic stuff
-# ===========================================================================
-
 # Descending
 # ---------------------------------------------------------------------------
 
@@ -183,14 +121,3 @@ cmd_files := $(wildcard $(foreach f,$(targets),$(dir $(f)).$(notdir $(f)).cmd))
 ifneq ($(cmd_files),)
   include $(cmd_files)
 endif
-
-# Usage: $(call if_changed_rule,foo)
-# will check if $(cmd_foo) changed, or any of the prequisites changed,
-# and if so will execute $(rule_foo)
-
-if_changed_rule = $(if $(strip $? \
-		               $(filter-out $(cmd_$(1)),$(cmd_$@))\
-			       $(filter-out $(cmd_$@),$(cmd_$(1)))),\
-			@set -e; \
-			mkdir -p $(dir $@); \
-			$(rule_$(1)))

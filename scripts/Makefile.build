@@ -11,12 +11,7 @@ include .config
 
 include $(obj)/Makefile
 
-# Standard vars
-
-comma   := ,
-
-# bug traps
-# ===========================================================================
+include scripts/Makefile.lib
 
 ifdef O_TARGET
 $(error kbuild: $(obj)/Makefile - Usage of O_TARGET := $(O_TARGET) is obsolete in 2.5. Please fix!)
@@ -35,84 +30,6 @@ endif
 ifndef obj
 $(warning kbuild: Makefile.build is included improperly)
 endif
-
-# Figure out what we need to build from the various variables
-# ===========================================================================
-
-# When an object is listed to be built compiled-in and modular,
-# only build the compiled-in version
-
-obj-m := $(filter-out $(obj-y),$(obj-m))
-
-# Handle objects in subdirs
-# ---------------------------------------------------------------------------
-# o if we encounter foo/ in $(obj-y), replace it by foo/built-in.o
-#   and add the directory to the list of dirs to descend into: $(subdir-y)
-# o if we encounter foo/ in $(obj-m), remove it from $(obj-m) 
-#   and add the directory to the list of dirs to descend into: $(subdir-m)
-
-__subdir-y	:= $(patsubst %/,%,$(filter %/, $(obj-y)))
-subdir-y	+= $(__subdir-y)
-__subdir-m	:= $(patsubst %/,%,$(filter %/, $(obj-m)))
-subdir-m	+= $(__subdir-m)
-obj-y		:= $(patsubst %/, %/built-in.o, $(obj-y))
-obj-m		:= $(filter-out %/, $(obj-m))
-
-# Subdirectories we need to descend into
-
-subdir-ym	:= $(sort $(subdir-y) $(subdir-m))
-
-# export.o is never a composite object, since $(export-objs) has a
-# fixed meaning (== objects which EXPORT_SYMBOL())
-__obj-y = $(filter-out export.o,$(obj-y))
-__obj-m = $(filter-out export.o,$(obj-m))
-
-# if $(foo-objs) exists, foo.o is a composite object 
-multi-used-y := $(sort $(foreach m,$(__obj-y), $(if $(strip $($(m:.o=-objs)) $($(m:.o=-y))), $(m))))
-multi-used-m := $(sort $(foreach m,$(__obj-m), $(if $(strip $($(m:.o=-objs)) $($(m:.o=-y))), $(m))))
-
-# Build list of the parts of our composite objects, our composite
-# objects depend on those (obviously)
-multi-objs-y := $(foreach m, $(multi-used-y), $($(m:.o=-objs)) $($(m:.o=-y)))
-multi-objs-m := $(foreach m, $(multi-used-m), $($(m:.o=-objs)) $($(m:.o=-y)))
-
-# $(subdir-obj-y) is the list of objects in $(obj-y) which do not live
-# in the local directory
-subdir-obj-y := $(foreach o,$(obj-y),$(if $(filter-out $(o),$(notdir $(o))),$(o)))
-
-# Replace multi-part objects by their individual parts, look at local dir only
-real-objs-y := $(foreach m, $(filter-out $(subdir-obj-y), $(obj-y)), $(if $(strip $($(m:.o=-objs)) $($(m:.o=-y))),$($(m:.o=-objs)) $($(m:.o=-y)),$(m))) $(EXTRA_TARGETS)
-real-objs-m := $(foreach m, $(obj-m), $(if $(strip $($(m:.o=-objs)) $($(m:.o=-y))),$($(m:.o=-objs)) $($(m:.o=-y)),$(m)))
-
-# Only build module versions for files which are selected to be built
-export-objs := $(filter $(export-objs),$(real-objs-y) $(real-objs-m))
-
-host-progs-single     := $(foreach m,$(host-progs),$(if $($(m)-objs),,$(m)))
-host-progs-multi      := $(foreach m,$(host-progs),$(if $($(m)-objs),$(m)))
-host-progs-multi-objs := $(foreach m,$(host-progs-multi),$($(m)-objs))
-
-# Add subdir path
-
-EXTRA_TARGETS	:= $(addprefix $(obj)/,$(EXTRA_TARGETS))
-obj-y		:= $(addprefix $(obj)/,$(obj-y))
-obj-m		:= $(addprefix $(obj)/,$(obj-m))
-export-objs	:= $(addprefix $(obj)/,$(export-objs))
-subdir-obj-y	:= $(addprefix $(obj)/,$(subdir-obj-y))
-real-objs-y	:= $(addprefix $(obj)/,$(real-objs-y))
-real-objs-m	:= $(addprefix $(obj)/,$(real-objs-m))
-multi-used-y	:= $(addprefix $(obj)/,$(multi-used-y))
-multi-used-m	:= $(addprefix $(obj)/,$(multi-used-m))
-multi-objs-y	:= $(addprefix $(obj)/,$(multi-objs-y))
-multi-objs-m	:= $(addprefix $(obj)/,$(multi-objs-m))
-subdir-ym	:= $(addprefix $(obj)/,$(subdir-ym))
-host-progs	:= $(addprefix $(obj)/,$(host-progs))
-host-progs-single     := $(addprefix $(obj)/,$(host-progs-single))
-host-progs-multi      := $(addprefix $(obj)/,$(host-progs-multi))
-host-progs-multi-objs := $(addprefix $(obj)/,$(host-progs-multi-objs))
-
-# The temporary file to save gcc -MD generated dependencies must not
-# contain a comma
-depfile = $(subst $(comma),_,$(@D)/.$(@F).d)
 
 # ===========================================================================
 
@@ -279,49 +196,6 @@ $(host-progs-multi): %: $(host-progs-multi-objs) FORCE
 
 targets += $(host-progs-single) $(host-progs-multi-objs) $(host-progs-multi) 
 
-# Shipped files
-# ===========================================================================
-
-quiet_cmd_shipped = SHIPPED $@
-cmd_shipped = cat $< > $@
-
-%:: %_shipped
-	$(call cmd,shipped)
-
-# Commands useful for building a boot image
-# ===========================================================================
-# 
-#	Use as following:
-#
-#	target: source(s) FORCE
-#		$(if_changed,ld/objcopy/gzip)
-#
-#	and add target to EXTRA_TARGETS so that we know we have to
-#	read in the saved command line
-
-# Linking
-# ---------------------------------------------------------------------------
-
-quiet_cmd_ld = LD      $@
-cmd_ld = $(LD) $(LDFLAGS) $(EXTRA_LDFLAGS) $(LDFLAGS_$(@F)) \
-	       $(filter-out FORCE,$^) -o $@ 
-
-# Objcopy
-# ---------------------------------------------------------------------------
-
-quiet_cmd_objcopy = OBJCOPY $@
-cmd_objcopy = $(OBJCOPY) $(OBJCOPYFLAGS) $< $@
-
-# Gzip
-# ---------------------------------------------------------------------------
-
-quiet_cmd_gzip = GZIP    $@
-cmd_gzip = gzip -f -9 < $< > $@
-
-# ===========================================================================
-# Generic stuff
-# ===========================================================================
-
 # Descending
 # ---------------------------------------------------------------------------
 
@@ -347,65 +221,3 @@ cmd_files := $(wildcard $(foreach f,$(targets),$(dir $(f)).$(notdir $(f)).cmd))
 ifneq ($(cmd_files),)
   include $(cmd_files)
 endif
-
-# function to only execute the passed command if necessary
-
-if_changed = $(if $(strip $? \
-		          $(filter-out $(cmd_$(1)),$(cmd_$@))\
-			  $(filter-out $(cmd_$@),$(cmd_$(1)))),\
-	@set -e; \
-	$(if $($(quiet)cmd_$(1)),echo '  $($(quiet)cmd_$(1))';) \
-	$(cmd_$(1)); \
-	echo 'cmd_$@ := $(cmd_$(1))' > $(@D)/.$(@F).cmd)
-
-
-# execute the command and also postprocess generated .d dependencies
-# file
-
-if_changed_dep = $(if $(strip $? $(filter-out FORCE $(wildcard $^),$^)\
-		          $(filter-out $(cmd_$(1)),$(cmd_$@))\
-			  $(filter-out $(cmd_$@),$(cmd_$(1)))),\
-	@set -e; \
-	$(if $($(quiet)cmd_$(1)),echo '  $($(quiet)cmd_$(1))';) \
-	$(cmd_$(1)); \
-	scripts/fixdep $(depfile) $@ '$(cmd_$(1))' > $(@D)/.$(@F).tmp; \
-	rm -f $(depfile); \
-	mv -f $(@D)/.$(@F).tmp $(@D)/.$(@F).cmd)
-
-# Usage: $(call if_changed_rule,foo)
-# will check if $(cmd_foo) changed, or any of the prequisites changed,
-# and if so will execute $(rule_foo)
-
-if_changed_rule = $(if $(strip $? \
-		               $(filter-out $(cmd_$(1)),$(cmd_$@))\
-			       $(filter-out $(cmd_$@),$(cmd_$(1)))),\
-			@set -e; \
-			mkdir -p $(dir $@); \
-			$(rule_$(1)))
-
-# If quiet is set, only print short version of command
-
-cmd = @$(if $($(quiet)cmd_$(1)),echo '  $($(quiet)cmd_$(1))' &&) $(cmd_$(1))
-
-# do_cmd is a shorthand used to support both compressed, verbose
-# and silent output in a single line.
-# Compared to cmd described avobe, do_cmd does no rely on any variables 
-# previously assigned a value.
-#
-# Usage $(call do_cmd,CMD   $@,cmd_to_execute bla bla)
-# Example:
-# $(call do_cmd,CP $@,cp -b $< $@)
-# make -s => nothing will be printed
-# make KBUILD_VERBOSE=1 => cp -b path/to/src.file path/to/dest.file
-# make KBUILD_VERBOSE=0 =>   CP path/to/dest.file
-define do_cmd
-        @$(if $(filter quiet_,$(quiet)), echo '  $(1)' &&,
-           $(if $(filter silent_,$(quiet)),,
-             echo "$(2)" &&)) \
-        $(2)
-endef
-
-#	$(call descend,<dir>,<target>)
-#	Recursively call a sub-make in <dir> with target <target> 
-
-descend = $(Q)$(MAKE) -f scripts/Makefile.build obj=$(1) $(2)
