@@ -808,10 +808,9 @@ EXPORT_SYMBOL(fc_release_transport);
  * @dev:	scsi device
  * @data:	unused
  **/
-static int fc_device_block(struct device *dev, void *data)
+static void fc_device_block(struct scsi_device *sdev, void *data)
 {
-	scsi_internal_device_block(to_scsi_device(dev));
-	return 0;
+	scsi_internal_device_block(sdev);
 }
 
 /**
@@ -819,10 +818,9 @@ static int fc_device_block(struct device *dev, void *data)
  * @dev:	scsi device
  * @data:	unused
  **/
-static int fc_device_unblock(struct device *dev, void *data)
+static void fc_device_unblock(struct scsi_device *sdev, void *data)
 {
-	scsi_internal_device_unblock(to_scsi_device(dev));
-	return 0;
+	scsi_internal_device_unblock(sdev);
 }
 
 /**
@@ -842,7 +840,7 @@ static void fc_timeout_blocked_tgt(void  *data)
 	 * unblock this device, then IO errors will probably
 	 * result if the host still isn't ready.
 	 */
-	device_for_each_child(&starget->dev, NULL, fc_device_unblock);
+	starget_for_each_device(starget, NULL, fc_device_unblock);
 }
 
 /**
@@ -870,7 +868,7 @@ fc_target_block(struct scsi_target *starget)
 	if (timeout < 0 || timeout > SCSI_DEVICE_BLOCK_MAX_TIMEOUT)
 		return -EINVAL;
 
-	device_for_each_child(&starget->dev, NULL, fc_device_block);
+	starget_for_each_device(starget, NULL, fc_device_block);
 
 	/* The scsi lld blocks this target for the timeout period only. */
 	schedule_delayed_work(work, timeout * HZ);
@@ -901,7 +899,7 @@ fc_target_unblock(struct scsi_target *starget)
 	if (cancel_delayed_work(&fc_starget_dev_loss_work(starget)))
 		flush_scheduled_work();
 
-	device_for_each_child(&starget->dev, NULL, fc_device_unblock);
+	starget_for_each_device(starget, NULL, fc_device_unblock);
 }
 EXPORT_SYMBOL(fc_target_unblock);
 
