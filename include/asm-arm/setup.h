@@ -131,7 +131,14 @@ struct tag_ramdisk {
 };
 
 /* describes where the compressed ramdisk image lives */
+/*
+ * this one accidentally used virtual addresses - as such,
+ * its depreciated.
+ */
 #define ATAG_INITRD	0x54410005
+
+/* describes where the compressed ramdisk image lives */
+#define ATAG_INITRD2	0x54420005
 
 struct tag_initrd {
 	u32 start;	/* physical start address */

@@ -517,6 +517,20 @@ static int __init parse_tag_initrd(const struct tag *tag)
 
 __tagtable(ATAG_INITRD, parse_tag_initrd);
 
+static int __init parse_tag_initrd2(const struct tag *tag)
+{
+	unsigned long start = 0;
+
+	if (tag->u.initrd.size) {
+		start = (unsigned long)phys_to_virt(tag->u.initrd.start);
+
+		setup_initrd(start, tag->u.initrd.size);
+	}
+	return 0;
+}
+
+__tagtable(ATAG_INITRD2, parse_tag_initrd2);
+
 static int __init parse_tag_serialnr(const struct tag *tag)
 {
 	system_serial_low = tag->u.serialnr.low;
