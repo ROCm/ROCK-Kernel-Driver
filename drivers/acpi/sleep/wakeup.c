@@ -68,14 +68,30 @@ acpi_enable_wakeup_device(
 		struct acpi_device * dev = container_of(node, 
 			struct acpi_device, wakeup_list);
 
+		/* If users want to disable run-wake GPE,
+		 * we only disable it for wake and leave it for runtime
+		 */
+		if (dev->wakeup.flags.run_wake && !dev->wakeup.state.enabled) {
+			spin_unlock(&acpi_device_lock);
+			acpi_set_gpe_type(dev->wakeup.gpe_device, 
+				dev->wakeup.gpe_number, ACPI_GPE_TYPE_RUNTIME);
+			/* Re-enable it, since set_gpe_type will disable it */
+			acpi_enable_gpe(dev->wakeup.gpe_device, 
+				dev->wakeup.gpe_number, ACPI_ISR);
+			spin_lock(&acpi_device_lock);
+			continue;
+		}
+
 		if (!dev->wakeup.flags.valid ||
 			!dev->wakeup.state.enabled ||
 			(sleep_state > (u32) dev->wakeup.sleep_state))
 			continue;
 
 		spin_unlock(&acpi_device_lock);
-		acpi_enable_gpe(dev->wakeup.gpe_device, 
-			dev->wakeup.gpe_number, ACPI_ISR);
+		/* run-wake GPE has been enabled */
+		if (!dev->wakeup.flags.run_wake)
+			acpi_enable_gpe(dev->wakeup.gpe_device, 
+				dev->wakeup.gpe_number, ACPI_ISR);
 		dev->wakeup.state.active = 1;
 		spin_lock(&acpi_device_lock);
 	}
@@ -100,6 +116,17 @@ acpi_disable_wakeup_device (
 		struct acpi_device * dev = container_of(node, 
 			struct acpi_device, wakeup_list);
 
+		if (dev->wakeup.flags.run_wake && !dev->wakeup.state.enabled) {
+			spin_unlock(&acpi_device_lock);
+			acpi_set_gpe_type(dev->wakeup.gpe_device, 
+				dev->wakeup.gpe_number, ACPI_GPE_TYPE_WAKE_RUN);
+			/* Re-enable it, since set_gpe_type will disable it */
+			acpi_enable_gpe(dev->wakeup.gpe_device, 
+				dev->wakeup.gpe_number, ACPI_NOT_ISR);
+			spin_lock(&acpi_device_lock);
+			continue;
+		}
+
 		if (!dev->wakeup.flags.valid || 
 			!dev->wakeup.state.active ||
 			(sleep_state > (u32) dev->wakeup.sleep_state))
@@ -107,10 +134,13 @@ acpi_disable_wakeup_device (
 
 		spin_unlock(&acpi_device_lock);
 		acpi_disable_wakeup_device_power(dev);
-		acpi_disable_gpe(dev->wakeup.gpe_device, 
-			dev->wakeup.gpe_number, ACPI_NOT_ISR);
-		acpi_clear_gpe(dev->wakeup.gpe_device, 
-			dev->wakeup.gpe_number, ACPI_NOT_ISR);
+		/* Never disable run-wake GPE */
+		if (!dev->wakeup.flags.run_wake) {
+			acpi_disable_gpe(dev->wakeup.gpe_device, 
+				dev->wakeup.gpe_number, ACPI_NOT_ISR);
+			acpi_clear_gpe(dev->wakeup.gpe_device, 
+				dev->wakeup.gpe_number, ACPI_NOT_ISR);
+		}
 		dev->wakeup.state.active = 0;
 		spin_lock(&acpi_device_lock);
 	}
@@ -127,12 +157,14 @@ static int __init acpi_wakeup_device_init(void)
 	list_for_each_safe(node, next, &acpi_wakeup_device_list) {
 		struct acpi_device * dev = container_of(node, 
 			struct acpi_device, wakeup_list);
-
-		/* Enable wakeup GPE for Lid/sleep button by default */
-		if (dev->wakeup.flags.run_wake) {
+		
+		/* In case user doesn't load button driver */
+		if (dev->wakeup.flags.run_wake && !dev->wakeup.state.enabled) {
 			spin_unlock(&acpi_device_lock);
 			acpi_set_gpe_type(dev->wakeup.gpe_device, 
 				dev->wakeup.gpe_number, ACPI_GPE_TYPE_WAKE_RUN);
+			acpi_enable_gpe(dev->wakeup.gpe_device, 
+				dev->wakeup.gpe_number, ACPI_NOT_ISR);
 			dev->wakeup.state.enabled = 1;
 			spin_lock(&acpi_device_lock);
 		}
