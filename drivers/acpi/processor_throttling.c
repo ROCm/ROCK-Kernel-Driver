@@ -69,11 +69,11 @@ acpi_processor_get_throttling (
 
 	pr->throttling.state = 0;
 
-	local_irq_disable();
-
 	duty_mask = pr->throttling.state_count - 1;
 
 	duty_mask <<= pr->throttling.duty_offset;
+
+	local_irq_disable();
 
 	value = inl(pr->throttling.address);
 
@@ -123,8 +123,6 @@ int acpi_processor_set_throttling (
 	if (state == pr->throttling.state)
 		return_VALUE(0);
 
-	local_irq_disable();
-
 	/*
 	 * Calculate the duty_value and duty_mask.
 	 */
@@ -139,6 +137,8 @@ int acpi_processor_set_throttling (
 		duty_mask <<= acpi_fadt.duty_offset;
 		duty_mask = ~duty_mask;
 	}
+
+	local_irq_disable();
 
 	/*
 	 * Disable throttling by writing a 0 to bit 4.  Note that we must
