@@ -971,7 +971,13 @@ void show_free_areas(void)
 			printk("\n");
 
 		for (cpu = 0; cpu < NR_CPUS; ++cpu) {
-			struct per_cpu_pageset *pageset = zone->pageset + cpu;
+			struct per_cpu_pageset *pageset;
+
+			if (!cpu_possible(cpu))
+				continue;
+
+			pageset = zone->pageset + cpu;
+
 			for (temperature = 0; temperature < 2; temperature++)
 				printk("cpu %d %s: low %d, high %d, batch %d\n",
 					cpu,
