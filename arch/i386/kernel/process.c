@@ -324,7 +324,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 		int idx;
 
 		err = -EFAULT;
-		if (copy_from_user(&info, (void *)childregs->esi, sizeof(info)))
+		if (copy_from_user(&info, (void __user *)childregs->esi, sizeof(info)))
 			goto out;
 		err = -EINVAL;
 		if (LDT_empty(&info))
@@ -567,11 +567,14 @@ asmlinkage int sys_execve(struct pt_regs regs)
 	int error;
 	char * filename;
 
-	filename = getname((char *) regs.ebx);
+	filename = getname((char __user *) regs.ebx);
 	error = PTR_ERR(filename);
 	if (IS_ERR(filename))
 		goto out;
-	error = do_execve(filename, (char **) regs.ecx, (char **) regs.edx, &regs);
+	error = do_execve(filename,
+			(char __user * __user *) regs.ecx,
+			(char __user * __user *) regs.edx,
+			&regs);
 	if (error == 0) {
 		current->ptrace &= ~PT_DTRACE;
 		/* Make sure we don't return using sysenter.. */
@@ -633,7 +636,7 @@ static int get_free_idx(void)
 /*
  * Set a given TLS descriptor:
  */
-asmlinkage int sys_set_thread_area(struct user_desc *u_info)
+asmlinkage int sys_set_thread_area(struct user_desc __user *u_info)
 {
 	struct thread_struct *t = &current->thread;
 	struct user_desc info;
@@ -700,7 +703,7 @@ asmlinkage int sys_set_thread_area(struct user_desc *u_info)
 #define GET_PRESENT(desc)	(((desc)->b >> 15) & 1)
 #define GET_USEABLE(desc)	(((desc)->b >> 20) & 1)
 
-asmlinkage int sys_get_thread_area(struct user_desc *u_info)
+asmlinkage int sys_get_thread_area(struct user_desc __user *u_info)
 {
 	struct user_desc info;
 	struct desc_struct *desc;

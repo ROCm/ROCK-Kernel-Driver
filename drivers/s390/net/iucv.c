@@ -1,5 +1,5 @@
 /* 
- * $Id: iucv.c,v 1.9 2002/11/06 13:37:25 cohuck Exp $
+ * $Id: iucv.c,v 1.10 2003/03/28 08:54:40 mschwide Exp $
  *
  * IUCV network driver
  *
@@ -29,14 +29,13 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: IUCV lowlevel driver $Revision: 1.9 $
+ * RELEASE-TAG: IUCV lowlevel driver $Revision: 1.10 $
  *
  */
 
 #include <linux/module.h>
 #include <linux/config.h>
 
-#include <linux/version.h>
 #include <linux/spinlock.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
@@ -333,7 +332,7 @@ do { \
 static void
 iucv_banner(void)
 {
-	char vbuf[] = "$Revision: 1.9 $";
+	char vbuf[] = "$Revision: 1.10 $";
 	char *version = vbuf;
 
 	if ((version = strchr(version, ':'))) {

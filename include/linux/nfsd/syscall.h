@@ -116,7 +116,7 @@ union nfsctl_res {
 /*
  * Kernel syscall implementation.
  */
-extern asmlinkage long	sys_nfsservctl(int, struct nfsctl_arg *, void *);
+extern asmlinkage long	sys_nfsservctl(int, struct nfsctl_arg __user *, void __user *);
 extern int		exp_addclient(struct nfsctl_client *ncp);
 extern int		exp_delclient(struct nfsctl_client *ncp);
 extern int		exp_export(struct nfsctl_export *nxp);

@@ -1,5 +1,5 @@
 /*
- * $Id: netiucv.c,v 1.16 2003/02/18 09:15:14 mschwide Exp $
+ * $Id: netiucv.c,v 1.19 2003/04/08 16:00:17 mschwide Exp $
  *
  * IUCV network driver
  *
@@ -30,7 +30,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: IUCV network driver $Revision: 1.16 $
+ * RELEASE-TAG: IUCV network driver $Revision: 1.19 $
  *
  */
 
@@ -1140,7 +1140,6 @@ netiucv_transmit_skb(struct iucv_connection *conn, struct sk_buff *skb) {
  */
 static int
 netiucv_open(struct net_device *dev) {
-	MOD_INC_USE_COUNT;
 	SET_DEVICE_START(dev, 1);
 	fsm_event(((struct netiucv_priv *)dev->priv)->fsm, DEV_EVENT_START, dev);
 	return 0;
@@ -1158,7 +1157,6 @@ static int
 netiucv_close(struct net_device *dev) {
 	SET_DEVICE_START(dev, 0);
 	fsm_event(((struct netiucv_priv *)dev->priv)->fsm, DEV_EVENT_STOP, dev);
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -1517,12 +1515,14 @@ netiucv_new_connection(struct net_device *dev, char *username)
 		conn->max_buffsize = NETIUCV_BUFSIZE_DEFAULT;
 		conn->netdev = dev;
 
-		conn->rx_buff = alloc_skb(NETIUCV_BUFSIZE_DEFAULT, GFP_DMA);
+		conn->rx_buff = alloc_skb(NETIUCV_BUFSIZE_DEFAULT,
+					  GFP_KERNEL | GFP_DMA);
 		if (!conn->rx_buff) {
 			kfree(conn);
 			return NULL;
 		}
-		conn->tx_buff = alloc_skb(NETIUCV_BUFSIZE_DEFAULT, GFP_DMA);
+		conn->tx_buff = alloc_skb(NETIUCV_BUFSIZE_DEFAULT,
+					  GFP_KERNEL | GFP_DMA);
 		if (!conn->tx_buff) {
 			kfree_skb(conn->rx_buff);
 			kfree(conn);
@@ -1630,6 +1630,7 @@ netiucv_init_netdevice(int ifno, char *username)
 	dev->addr_len            = 0;
 	dev->type                = ARPHRD_SLIP;
 	dev->tx_queue_len        = NETIUCV_QUEUELEN_DEFAULT;
+	dev->owner               = THIS_MODULE;
 	dev->flags	         = IFF_POINTOPOINT | IFF_NOARP;
 	return dev;
 }
@@ -1716,7 +1717,7 @@ static struct device_driver netiucv_driver = {
 static void
 netiucv_banner(void)
 {
-	char vbuf[] = "$Revision: 1.16 $";
+	char vbuf[] = "$Revision: 1.19 $";
 	char *version = vbuf;
 
 	if ((version = strchr(version, ':'))) {

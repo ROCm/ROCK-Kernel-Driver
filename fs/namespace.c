@@ -367,7 +367,7 @@ static int do_umount(struct vfsmount *mnt, int flags)
  * unixes. Our API is identical to OSF/1 to avoid making a mess of AMD
  */
 
-asmlinkage long sys_umount(char * name, int flags)
+asmlinkage long sys_umount(char __user * name, int flags)
 {
 	struct nameidata nd;
 	int retval;
@@ -396,7 +396,7 @@ out:
  *	The 2.0 compatible umount. No flags. 
  */
  
-asmlinkage long sys_oldumount(char * name)
+asmlinkage long sys_oldumount(char __user * name)
 {
 	return sys_umount(name,0);
 }
@@ -664,7 +664,7 @@ out:
 	return err;
 }
 
-static int copy_mount_options (const void *data, unsigned long *where)
+static int copy_mount_options (const void __user *data, unsigned long *where)
 {
 	int i;
 	unsigned long page;
@@ -842,8 +842,9 @@ out:
 	return -ENOMEM;
 }
 
-asmlinkage long sys_mount(char * dev_name, char * dir_name, char * type,
-			  unsigned long flags, void * data)
+asmlinkage long sys_mount(char __user * dev_name, char __user * dir_name,
+			  char __user * type, unsigned long flags,
+			  void __user * data)
 {
 	int retval;
 	unsigned long data_page;
@@ -963,7 +964,7 @@ static void chroot_fs_refs(struct nameidata *old_nd, struct nameidata *new_nd)
  *    first.
  */
 
-asmlinkage long sys_pivot_root(const char *new_root, const char *put_old)
+asmlinkage long sys_pivot_root(const char __user *new_root, const char __user *put_old)
 {
 	struct vfsmount *tmp;
 	struct nameidata new_nd, old_nd, parent_nd, root_parent, user_nd;
