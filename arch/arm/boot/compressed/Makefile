@@ -66,8 +66,8 @@ endif
 
 SEDFLAGS	= s/TEXT_START/$(ZTEXTADDR)/;s/BSS_START/$(ZBSSADDR)/
 
-targets       := vmlinux vmlinux.lds piggy piggy.gz piggy.o \
-                 font.o head.o $(OBJS)
+targets       := vmlinux vmlinux.lds piggy.gz piggy.o font.o \
+		 head.o misc.o $(OBJS)
 EXTRA_CFLAGS  := -fpic
 EXTRA_AFLAGS  :=
 
@@ -89,16 +89,10 @@ $(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/$(HEAD) $(obj)/piggy.o \
 	$(call if_changed,ld)
 	@:
 
-
-$(obj)/piggy: vmlinux FORCE
-	$(call if_changed,objcopy)
-
-$(obj)/piggy.gz: $(obj)/piggy FORCE
+$(obj)/piggy.gz: $(obj)/../Image FORCE
 	$(call if_changed,gzip)
 
-LDFLAGS_piggy.o := -r -b binary
 $(obj)/piggy.o:  $(obj)/piggy.gz FORCE
-	$(call if_changed,ld)
 
 CFLAGS_font.o := -Dstatic=
 $(obj)/font.o: $(FONTC)

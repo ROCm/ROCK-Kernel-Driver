@@ -75,6 +75,9 @@ $(obj)/Image: vmlinux FORCE
 	$(call if_changed,objcopy)
 	@echo '  Kernel: $@ is ready'
 
+$(obj)/compressed/vmlinux: $(obj)/Image FORCE
+	$(Q)$(MAKE) $(build)=$(obj)/compressed $@
+
 $(obj)/zImage:	$(obj)/compressed/vmlinux FORCE
 	$(call if_changed,objcopy)
 	@echo '  Kernel: $@ is ready'
@@ -88,17 +91,15 @@ $(obj)/uImage:	$(obj)/zImage FORCE
 	$(call if_changed,uimage)
 	@echo '  Image $@ is ready'
 
+$(obj)/bootp/bootp: $(obj)/zImage initrd FORCE
+	$(Q)$(MAKE) $(build)=$(obj)/bootp $@
+	@:
+
 $(obj)/bootpImage: $(obj)/bootp/bootp FORCE
 	$(call if_changed,objcopy)
 	@echo '  Kernel: $@ is ready'
 
-$(obj)/compressed/vmlinux: vmlinux FORCE
-	$(Q)$(MAKE) $(build)=$(obj)/compressed $@
-
-$(obj)/bootp/bootp: $(obj)/zImage initrd FORCE
-	$(Q)$(MAKE) $(build)=$(obj)/bootp $@
-
-.PHONY: initrd
+.PHONY: initrd FORCE
 initrd:
 	@test "$(INITRD_PHYS)" != "" || \
 	(echo This machine does not support INITRD; exit -1)
