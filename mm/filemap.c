@@ -463,7 +463,7 @@ EXPORT_SYMBOL(fail_writepage);
  */
 int filemap_fdatawrite(struct address_space *mapping)
 {
-	return writeback_mapping(mapping, NULL);
+	return do_writepages(mapping, NULL);
 }
 
 /**

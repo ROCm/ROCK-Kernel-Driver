@@ -748,7 +748,7 @@ struct address_space_operations def_blk_aops = {
 	sync_page: block_sync_page,
 	prepare_write: blkdev_prepare_write,
 	commit_write: blkdev_commit_write,
-	writeback_mapping: generic_writeback_mapping,
+	writepages: generic_writepages,
 	vm_writeback: generic_vm_writeback,
 	direct_IO: blkdev_direct_IO,
 };

@@ -47,6 +47,6 @@ static inline void wait_on_inode(struct inode *inode)
 void balance_dirty_pages(struct address_space *mapping);
 void balance_dirty_pages_ratelimited(struct address_space *mapping);
 int pdflush_operation(void (*fn)(unsigned long), unsigned long arg0);
-int writeback_mapping(struct address_space *mapping, int *nr_to_write);
+int do_writepages(struct address_space *mapping, int *nr_to_write);
 
 #endif		/* WRITEBACK_H */

@@ -282,7 +282,7 @@ struct address_space_operations {
 	int (*sync_page)(struct page *);
 
 	/* Write back some dirty pages from this mapping. */
-	int (*writeback_mapping)(struct address_space *, int *nr_to_write);
+	int (*writepages)(struct address_space *, int *nr_to_write);
 
 	/* Perform a writeback as a memory-freeing operation. */
 	int (*vm_writeback)(struct page *, int *nr_to_write);

@@ -44,7 +44,7 @@ static int swap_vm_writeback(struct page *page, int *nr_to_write)
 	struct address_space *mapping = page->mapping;
 
 	unlock_page(page);
-	return generic_writeback_mapping(mapping, nr_to_write);
+	return generic_writepages(mapping, nr_to_write);
 }
 
 static struct address_space_operations swap_aops = {

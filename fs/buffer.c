@@ -780,11 +780,11 @@ EXPORT_SYMBOL(sync_mapping_buffers);
  *
  * The private_list buffers generally contain filesystem indirect blocks.
  * The idea is that the filesystem can start I/O against the indirects at
- * the same time as running generic_writeback_mapping(), so the indirect's
+ * the same time as running generic_writepages(), so the indirect's
  * I/O will be merged with the data.
  *
  * We sneakliy write the buffers in probable tail-to-head order.  This is
- * because generic_writeback_mapping writes in probable head-to-tail
+ * because generic_writepages() writes in probable head-to-tail
  * order.  If the file is so huge that the data or the indirects overflow
  * the request queue we will at least get some merging this way.
  *

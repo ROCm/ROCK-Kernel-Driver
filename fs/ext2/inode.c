@@ -616,13 +616,13 @@ ext2_direct_IO(int rw, struct inode *inode, struct kiobuf *iobuf,
 }
 
 static int
-ext2_writeback_mapping(struct address_space *mapping, int *nr_to_write)
+ext2_writepages(struct address_space *mapping, int *nr_to_write)
 {
 	int ret;
 	int err;
 
 	ret = write_mapping_buffers(mapping);
-	err = mpage_writeback_mapping(mapping, nr_to_write, ext2_get_block);
+	err = mpage_writepages(mapping, nr_to_write, ext2_get_block);
 	if (!ret)
 		ret = err;
 	return ret;
@@ -637,7 +637,7 @@ struct address_space_operations ext2_aops = {
 	commit_write:		generic_commit_write,
 	bmap:			ext2_bmap,
 	direct_IO:		ext2_direct_IO,
-	writeback_mapping:	ext2_writeback_mapping,
+	writepages:		ext2_writepages,
 	vm_writeback:		generic_vm_writeback,
 };
 

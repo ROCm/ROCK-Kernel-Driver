@@ -267,7 +267,7 @@ int generic_vm_writeback(struct page *page, int *nr_to_write)
 	unlock_page(page);
 
 	if (inode) {
-		writeback_mapping(inode->i_mapping, nr_to_write);
+		do_writepages(inode->i_mapping, nr_to_write);
 
 		/*
 		 * This iput() will internally call ext2_discard_prealloc(),
@@ -292,13 +292,13 @@ int generic_vm_writeback(struct page *page, int *nr_to_write)
 EXPORT_SYMBOL(generic_vm_writeback);
 
 /**
- * generic_writeback_mapping - walk the list of dirty pages of the given
+ * generic_writepages - walk the list of dirty pages of the given
  * address space and writepage() all of them.
  * 
  * @mapping: address space structure to write
  * @nr_to_write: subtract the number of written pages from *@nr_to_write
  *
- * This is a library function, which implements the writeback_mapping()
+ * This is a library function, which implements the writepages()
  * address_space_operation.
  *
  * (The next two paragraphs refer to code which isn't here yet, but they
@@ -307,7 +307,7 @@ EXPORT_SYMBOL(generic_vm_writeback);
  * Pages can be moved from clean_pages or locked_pages onto dirty_pages
  * at any time - it's not possible to lock against that.  So pages which
  * have already been added to a BIO may magically reappear on the dirty_pages
- * list.  And generic_writeback_mapping() will again try to lock those pages.
+ * list.  And generic_writepages() will again try to lock those pages.
  * But I/O has not yet been started against the page.  Thus deadlock.
  *
  * To avoid this, the entire contents of the dirty_pages list are moved
@@ -317,7 +317,7 @@ EXPORT_SYMBOL(generic_vm_writeback);
  * This has the added benefit of preventing a livelock which would otherwise
  * occur if pages are being dirtied faster than we can write them out.
  *
- * If a page is already under I/O, generic_writeback_mapping() skips it, even
+ * If a page is already under I/O, generic_writepages() skips it, even
  * if it's dirty.  This is desirable behaviour for memory-cleaning writeback,
  * but it is INCORRECT for data-integrity system calls such as fsync().  fsync()
  * and msync() need to guarentee that all the data which was dirty at the time
@@ -327,7 +327,7 @@ EXPORT_SYMBOL(generic_vm_writeback);
  * It's fairly rare for PageWriteback pages to be on ->dirty_pages.  It
  * means that someone redirtied the page while it was under I/O.
  */
-int generic_writeback_mapping(struct address_space *mapping, int *nr_to_write)
+int generic_writepages(struct address_space *mapping, int *nr_to_write)
 {
 	int (*writepage)(struct page *) = mapping->a_ops->writepage;
 	int ret = 0;
@@ -394,13 +394,13 @@ int generic_writeback_mapping(struct address_space *mapping, int *nr_to_write)
 	write_unlock(&mapping->page_lock);
 	return ret;
 }
-EXPORT_SYMBOL(generic_writeback_mapping);
+EXPORT_SYMBOL(generic_writepages);
 
-int writeback_mapping(struct address_space *mapping, int *nr_to_write)
+int do_writepages(struct address_space *mapping, int *nr_to_write)
 {
-	if (mapping->a_ops->writeback_mapping)
-		return mapping->a_ops->writeback_mapping(mapping, nr_to_write);
-	return generic_writeback_mapping(mapping, nr_to_write);
+	if (mapping->a_ops->writepages)
+		return mapping->a_ops->writepages(mapping, nr_to_write);
+	return generic_writepages(mapping, nr_to_write);
 }
 
 /**

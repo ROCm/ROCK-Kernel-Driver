@@ -114,13 +114,13 @@ static void write_inode(struct inode *inode, int sync)
  * from *nr_to_write.
  *
  * Normally it is not legal for a single process to lock more than one
- * page at a time, due to ab/ba deadlock problems.  But writeback_mapping()
+ * page at a time, due to ab/ba deadlock problems.  But writepages()
  * does want to lock a large number of pages, without immediately submitting
  * I/O against them (starting I/O is a "deferred unlock_page").
  *
  * However it *is* legal to lock multiple pages, if this is only ever performed
  * by a single process.  We provide that exclusion via locking in the
- * filesystem's ->writeback_mapping a_op. This ensures that only a single
+ * filesystem's ->writepages a_op. This ensures that only a single
  * process is locking multiple pages against this inode.  And as I/O is
  * submitted against all those locked pages, there is no deadlock.
  *
@@ -146,7 +146,7 @@ static void __sync_single_inode(struct inode *inode, int wait, int *nr_to_write)
 	mapping->dirtied_when = 0;	/* assume it's whole-file writeback */
 	spin_unlock(&inode_lock);
 
-	writeback_mapping(mapping, nr_to_write);
+	do_writepages(mapping, nr_to_write);
 
 	/* Don't write the inode if only I_DIRTY_PAGES was set */
 	if (dirty & (I_DIRTY_SYNC | I_DIRTY_DATASYNC))

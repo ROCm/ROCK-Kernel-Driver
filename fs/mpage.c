@@ -470,11 +470,11 @@ out:
 }
 
 /*
- * This is a cut-n-paste of generic_writeback_mapping().  We _could_
+ * This is a cut-n-paste of generic_writepages().  We _could_
  * generalise that function.  It'd get a bit messy.  We'll see.
  */
 int
-mpage_writeback_mapping(struct address_space *mapping,
+mpage_writepages(struct address_space *mapping,
 			int *nr_to_write, get_block_t get_block)
 {
 	struct bio *bio = NULL;
@@ -544,4 +544,4 @@ mpage_writeback_mapping(struct address_space *mapping,
 		mpage_bio_submit(WRITE, bio);
 	return ret;
 }
-EXPORT_SYMBOL(mpage_writeback_mapping);
+EXPORT_SYMBOL(mpage_writepages);
