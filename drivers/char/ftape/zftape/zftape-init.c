@@ -88,9 +88,9 @@ static int zft_close(struct inode *ino, struct file *filep);
 static int  zft_ioctl(struct inode *ino, struct file *filep,
 		      unsigned int command, unsigned long arg);
 static int  zft_mmap(struct file *filep, struct vm_area_struct *vma);
-static ssize_t zft_read (struct file *fp, char *buff,
+static ssize_t zft_read (struct file *fp, char __user *buff,
 			 size_t req_len, loff_t *ppos);
-static ssize_t zft_write(struct file *fp, const char *buff,
+static ssize_t zft_write(struct file *fp, const char __user *buff,
 			 size_t req_len, loff_t *ppos);
 
 static struct file_operations zft_cdev =
@@ -177,7 +177,7 @@ static int zft_ioctl(struct inode *ino, struct file *filep,
 	old_sigmask = current->blocked; /* save mask */
 	sigfillset(&current->blocked);
 	/* This will work as long as sizeof(void *) == sizeof(long) */
-	result = _zft_ioctl(command, (void *) arg);
+	result = _zft_ioctl(command, (void __user *) arg);
 	current->blocked = old_sigmask; /* restore mask */
 	TRACE_EXIT result;
 }
@@ -211,7 +211,7 @@ static int  zft_mmap(struct file *filep, struct vm_area_struct *vma)
 
 /*      Read from floppy tape device
  */
-static ssize_t zft_read(struct file *fp, char *buff,
+static ssize_t zft_read(struct file *fp, char __user *buff,
 			size_t req_len, loff_t *ppos)
 {
 	int result = -EIO;
@@ -234,7 +234,7 @@ static ssize_t zft_read(struct file *fp, char *buff,
 
 /*      Write to tape device
  */
-static ssize_t zft_write(struct file *fp, const char *buff,
+static ssize_t zft_write(struct file *fp, const char __user *buff,
 			 size_t req_len, loff_t *ppos)
 {
 	int result = -EIO;

@@ -90,7 +90,7 @@ KERN_INFO "Compiled for Linux version %s\n", UTS_RELEASE);
 	TRACE(ft_t_info, "ftape_init @ 0x%p", ftape_init);
 	/*  Allocate the DMA buffers. They are deallocated at cleanup() time.
 	 */
-#if TESTING
+#ifdef TESTING
 #ifdef MODULE
 	while (ftape_set_nr_buffers(CONFIG_FT_NR_BUFFERS) < 0) {
 		ftape_sleep(FT_SECOND/20);

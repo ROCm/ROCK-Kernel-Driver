@@ -57,7 +57,7 @@ mv STB_PC_S.bin build-2.4/dvb-ttusb-dec-3000s.fw
 Hotplug Firmware Loading for 2.6 kernels
 ----------------------------------------
 For 2.6 kernels the firmware is loaded at the point that the driver module is
-loaded.  See linux/Documentation/dvb/firmware.txt for more information.
+loaded.  See Documentation/dvb/firmware.txt for more information.
 
 mv STB_PC_T.bin /usr/lib/hotplug/firmware/dvb-ttusb-dec-2000t.fw
 mv STB_PC_X.bin /usr/lib/hotplug/firmware/dvb-ttusb-dec-2540t.fw

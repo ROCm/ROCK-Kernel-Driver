@@ -554,44 +554,6 @@ menu "DOS/FAT/NT Filesystems"
 config FAT_FS
 	tristate
 	select NLS
-	help
-	  If you want to use one of the FAT-based file systems (the MS-DOS,
-	  VFAT (Windows 95) and UMSDOS (used to run Linux on top of an
-	  ordinary DOS partition) file systems), then you must say Y or M here
-	  to include FAT support. You will then be able to mount partitions or
-	  diskettes with FAT-based file systems and transparently access the
-	  files on them, i.e. MSDOS files will look and behave just like all
-	  other Unix files.
-
-	  This FAT support is not a file system in itself, it only provides
-	  the foundation for the other file systems. You will have to say Y or
-	  M to at least one of "MSDOS fs support" or "VFAT fs support" in
-	  order to make use of it.
-
-	  Another way to read and write MSDOS floppies and hard drive
-	  partitions from within Linux (but not transparently) is with the
-	  mtools ("man mtools") program suite. You don't need to say Y here in
-	  order to do that.
-
-	  If you need to move large files on floppies between a DOS and a
-	  Linux box, say Y here, mount the floppy under Linux with an MSDOS
-	  file system and use GNU tar's M option. GNU tar is a program
-	  available for Unix and DOS ("man tar" or "info tar").
-
-	  It is now also becoming possible to read and write compressed FAT
-	  file systems; read <file:Documentation/filesystems/fat_cvf.txt> for
-	  details.
-
-	  The FAT support will enlarge your kernel by about 37 KB. If unsure,
-	  say Y.
-
-	  To compile this as a module, choose M here: the module will be called
-	  fat.  Note that if you compile the FAT support as a module, you
-	  cannot compile any of the FAT-based file systems into the kernel
-	  -- they will have to be modules as well.
-	  The file system of your root partition (the one containing the
-	  directory /) cannot be a module, so don't say M here if you intend
-	  to use UMSDOS as your root file system.
 
 config MSDOS_FS
 	tristate "MSDOS fs support"
@@ -643,25 +605,6 @@ config VFAT_FS
 
 	  To compile this as a module, choose M here: the module will be called
 	  vfat.
-
-config FAT_DEFAULT_CODEPAGE
-	int "Default codepage for FAT"
-	depends on MSDOS_FS || VFAT_FS
-	default 437
-	help
-	  This option should be set to the codepage of your FAT filesystems.
-	  It can be overridden with the 'codepage' mount option.
-
-config FAT_DEFAULT_IOCHARSET
-	string "Default iocharset for FAT"
-	depends on VFAT_FS
-	default "iso8859-1"
-	help
-	  Set this to the default I/O character set you'd like FAT to use.
-	  It should probably match the character set that most of your
-	  FAT filesystems use, and can be overridded with the 'iocharset'
-	  mount option for FAT filesystems.  Note that UTF8 is *not* a
-	  supported charset for FAT filesystems.
 
 config UMSDOS_FS
 #dep_tristate '    UMSDOS: Unix-like file system on top of standard MSDOS fs' CONFIG_UMSDOS_FS $CONFIG_MSDOS_FS
@@ -1133,24 +1076,20 @@ config JFFS2_FS_DEBUG
 	  messages at debug level 1 while the misbehaviour was occurring.
 
 config JFFS2_FS_NAND
-	bool "JFFS2 support for NAND flash (EXPERIMENTAL)"
-	depends on JFFS2_FS && EXPERIMENTAL
+	bool "JFFS2 support for NAND flash"
+	depends on JFFS2_FS
 	default n
 	help
-	  This enables the experimental support for NAND flash in JFFS2. NAND
-	  is a newer type of flash chip design than the traditional NOR flash,
-	  with higher density but a handful of characteristics which make it
-	  more interesting for the file system to use. Support for NAND flash
-	  is not yet complete and may corrupt data. For further information,
-	  including a link to the mailing list where details of the remaining
-	  work to be completed for NAND flash support can be found, see the 
-	  JFFS2 web site at <http://sources.redhat.com/jffs2>.
+	  This enables the support for NAND flash in JFFS2. NAND is a newer
+	  type of flash chip design than the traditional NOR flash, with
+	  higher density but a handful of characteristics which make it more
+	  interesting for the file system to use.
 
-	  Say 'N' unless you have NAND flash and you are willing to test and
-	  develop JFFS2 support for it.
+	  Say 'N' unless you have NAND flash.
 
 config JFFS2_COMPRESSION_OPTIONS
 	bool "Advanced compression options for JFFS2"
+	depends on JFFS2_FS
 	default n
 	help
 	  Enabling this option allows you to explicitly choose which

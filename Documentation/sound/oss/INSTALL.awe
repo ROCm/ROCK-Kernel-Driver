@@ -114,7 +114,7 @@ See INSTALL.RH for more details.
 		# insmod awe_wave
 		(Be sure to load awe_wave after sb!)
 
-		See /usr/src/linux/Documentation/sound/oss/AWE32 for
+		See Documentation/sound/oss/AWE32 for
 		more details.
 
   9. (only for obsolete systems) If you don't have /dev/sequencer

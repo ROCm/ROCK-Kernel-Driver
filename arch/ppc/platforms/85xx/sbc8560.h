@@ -16,8 +16,9 @@
 #define __MACH_SBC8560_H__
  
 #include <linux/config.h>
-#include <linux/serial.h>
 #include <platforms/85xx/sbc85xx.h>
+
+#define CPM_MAP_ADDR    (CCSRBAR + MPC85xx_CPM_OFFSET)
  
 #ifdef CONFIG_SERIAL_MANY_PORTS
 #define RS_TABLE_SIZE  64

@@ -212,7 +212,7 @@ MODULE_PARM_DESC(bbuf, "ThunderLAN use big buffer (0-1)");
 /* Define this to enable Link beat monitoring */
 #undef MONITOR
 
-/* Turn on debugging. See linux/Documentation/networking/tlan.txt for details */
+/* Turn on debugging. See Documentation/networking/tlan.txt for details */
 static  int		debug;
 
 static	int		bbuf;

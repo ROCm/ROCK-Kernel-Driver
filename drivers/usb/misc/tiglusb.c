@@ -10,7 +10,7 @@
  *
  * Based on dabusb.c, printer.c & scanner.c
  *
- * Please see the file: linux/Documentation/usb/SilverLink.txt
+ * Please see the file: Documentation/usb/silverlink.txt
  * and the website at:  http://lpg.ticalc.org/prj_usb/
  * for more info.
  *

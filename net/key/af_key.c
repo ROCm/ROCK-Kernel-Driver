@@ -1182,10 +1182,10 @@ static int pfkey_getspi(struct sock *sk, struct sk_buff *skb, struct sadb_msg *h
 			min_spi = range->sadb_spirange_min;
 			max_spi = range->sadb_spirange_max;
 		} else {
-			min_spi = htonl(0x100);
-			max_spi = htonl(0x0fffffff);
+			min_spi = 0x100;
+			max_spi = 0x0fffffff;
 		}
-		xfrm_alloc_spi(x, min_spi, max_spi);
+		xfrm_alloc_spi(x, htonl(min_spi), htonl(max_spi));
 		if (x->id.spi)
 			resp_skb = pfkey_xfrm_state2msg(x, 0, 3);
 	}

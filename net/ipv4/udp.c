@@ -930,7 +930,7 @@ static int udp_encap_rcv(struct sock * sk, struct sk_buff *skb)
 		} else
 			/* Must be an IKE packet.. pass it through */
 			return 1;
-
+		break;
 	case UDP_ENCAP_ESPINUDP_NON_IKE:
 		/* Check if this is a keepalive packet.  If so, eat it. */
 		if (len == 1 && udpdata[0] == 0xff) {
@@ -943,6 +943,7 @@ static int udp_encap_rcv(struct sock * sk, struct sk_buff *skb)
 		} else
 			/* Must be an IKE packet.. pass it through */
 			return 1;
+		break;
 	}
 
 	/* At this point we are sure that this is an ESPinUDP packet,

@@ -9,6 +9,7 @@
 #define PSMOUSE_CMD_GETID	0x02f2
 #define PSMOUSE_CMD_SETRATE	0x10f3
 #define PSMOUSE_CMD_ENABLE	0x00f4
+#define PSMOUSE_CMD_DISABLE	0x00f5
 #define PSMOUSE_CMD_RESET_DIS	0x00f6
 #define PSMOUSE_CMD_RESET_BAT	0x02ff
 
@@ -17,15 +18,17 @@
 #define PSMOUSE_RET_ACK		0xfa
 #define PSMOUSE_RET_NAK		0xfe
 
-/* psmouse states */
-#define PSMOUSE_CMD_MODE	0
-#define PSMOUSE_ACTIVATED	1
-#define PSMOUSE_IGNORE		2
-
 #define PSMOUSE_FLAG_ACK	0	/* Waiting for ACK/NAK */
 #define PSMOUSE_FLAG_CMD	1	/* Waiting for command to finish */
-#define PSMOUSE_FLAG_CMD1	2	/* First byte of command response */
-#define PSMOUSE_FLAG_ID		3	/* First byte is not keyboard ID */
+#define PSMOUSE_FLAG_CMD1	2	/* Waiting for the first byte of command response */
+#define PSMOUSE_FLAG_WAITID	3	/* Command execiting is GET ID */
+
+enum psmouse_state {
+	PSMOUSE_IGNORE,
+	PSMOUSE_INITIALIZING,
+	PSMOUSE_CMD_MODE,
+	PSMOUSE_ACTIVATED,
+};
 
 /* psmouse protocol handler return codes */
 typedef enum {
@@ -48,12 +51,15 @@ struct psmouse {
 	unsigned char model;
 	unsigned long last;
 	unsigned long out_of_sync;
-	unsigned char state;
+	enum psmouse_state state;
 	unsigned char nak;
 	char error;
 	char devname[64];
 	char phys[32];
 	unsigned long flags;
+
+	/* Used to signal completion from interrupt handler */
+	wait_queue_head_t wait;
 
 	psmouse_ret_t (*protocol_handler)(struct psmouse *psmouse, struct pt_regs *regs);
 	int (*reconnect)(struct psmouse *psmouse);

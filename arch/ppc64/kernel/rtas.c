@@ -500,7 +500,7 @@ void rtas_stop_self(void)
 
 	BUG_ON(rtas_args->token == RTAS_UNKNOWN_SERVICE);
 
-	printk("%u %u Ready to die...\n",
+	printk("cpu %u (hwid %u) Ready to die...\n",
 	       smp_processor_id(), hard_smp_processor_id());
 	enter_rtas(__pa(rtas_args));
 

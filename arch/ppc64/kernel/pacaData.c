@@ -57,7 +57,6 @@ char emergency_stack[PAGE_SIZE * NR_CPUS] __attribute__((aligned(128)));
 	.stab_addr = (asrv),		/* Virt pointer to segment table */ \
 	.emergency_sp = &emergency_stack[((number)+1) * PAGE_SIZE],	    \
 	.cpu_start = (start),		/* Processor start */		    \
-	.stab_next_rr = 1,						    \
 	.lppaca = {							    \
 		.xDesc = 0xd397d781,	/* "LpPa" */			    \
 		.xSize = sizeof(struct ItLpPaca),			    \

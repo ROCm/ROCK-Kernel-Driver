@@ -31,9 +31,10 @@ KERNELPATH := kernel-$(subst -,,$(KERNELRELEASE))
 MKSPEC     := $(srctree)/scripts/package/mkspec
 PREV       := set -e; cd ..;
 
+# rpm-pkg
 .PHONY: rpm-pkg rpm
 
-$(objtree)/kernel.spec: $(MKSPEC)
+$(objtree)/kernel.spec: $(MKSPEC) $(srctree)/Makefile
 	$(CONFIG_SHELL) $(MKSPEC) > $@
 
 rpm-pkg rpm: $(objtree)/kernel.spec
@@ -52,6 +53,22 @@ rpm-pkg rpm: $(objtree)/kernel.spec
 
 clean-rule +=  rm -f $(objtree)/kernel.spec
 
+# binrpm-pkg
+.PHONY: binrpm-pkg
+$(objtree)/binkernel.spec: $(MKSPEC) $(srctree)/Makefile
+	$(CONFIG_SHELL) $(MKSPEC) prebuilt > $@
+	
+binrpm-pkg: $(objtree)/binkernel.spec
+	$(MAKE)
+	set -e; \
+	$(CONFIG_SHELL) $(srctree)/scripts/mkversion > $(objtree)/.tmp_version
+	set -e; \
+	mv -f $(objtree)/.tmp_version $(objtree)/.version
+
+	$(RPM) --define "_builddir $(srctree)" --target $(UTS_MACHINE) -bb $<
+
+clean-rule += rm -f $(objtree)/binkernel.spec
+
 # Deb target
 # ---------------------------------------------------------------------------
 #
@@ -67,5 +84,6 @@ clean-rule += && rm -rf $(objtree)/debian/
 # ---------------------------------------------------------------------------
 help:
 	@echo  '  rpm-pkg         - Build the kernel as an RPM package'
+	@echo  '  binrpm-pkg      - Build an rpm package containing the compiled kernel & modules'
 	@echo  '  deb-pkg         - Build the kernel as an deb package'
 

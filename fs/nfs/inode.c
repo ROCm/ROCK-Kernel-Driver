@@ -456,7 +456,7 @@ nfs_fill_super(struct super_block *sb, struct nfs_mount_data *data, int silent)
 
 	/* Create RPC client handles */
 	server->client = nfs_create_client(server, data);
-	if (server->client == NULL)
+	if (IS_ERR(server->client))
 		goto out_fail;
 	/* RFC 2623, sec 2.3.2 */
 	if (authflavor != RPC_AUTH_UNIX) {
@@ -1550,15 +1550,16 @@ static int nfs4_fill_super(struct super_block *sb, struct nfs4_mount_data *data,
 		err = PTR_ERR(clnt);
 		goto out_remove_list;
 	}
+
+	clnt->cl_intr     = (server->flags & NFS4_MOUNT_INTR) ? 1 : 0;
+	clnt->cl_softrtry = (server->flags & NFS4_MOUNT_SOFT) ? 1 : 0;
+	server->client    = clnt;
+
 	err = -ENOMEM;
 	if (server->nfs4_state->cl_idmap == NULL) {
 		printk(KERN_WARNING "NFS: failed to create idmapper.\n");
 		goto out_shutdown;
 	}
-
-	clnt->cl_intr     = (server->flags & NFS4_MOUNT_INTR) ? 1 : 0;
-	clnt->cl_softrtry = (server->flags & NFS4_MOUNT_SOFT) ? 1 : 0;
-	server->client    = clnt;
 
 	if (clnt->cl_auth->au_flavor != authflavour) {
 		if (rpcauth_create(authflavour, clnt) == NULL) {

@@ -756,7 +756,7 @@ xircom_up(struct net_device *dev)
 	xircom_init_ring(dev);
 	/* Clear the tx ring */
 	for (i = 0; i < TX_RING_SIZE; i++) {
-		tp->tx_skbuff[i] = 0;
+		tp->tx_skbuff[i] = NULL;
 		tp->tx_ring[i].status = 0;
 	}
 
@@ -904,7 +904,7 @@ static void xircom_init_ring(struct net_device *dev)
 	/* The Tx buffer descriptor is filled in as needed, but we
 	   do need to clear the ownership bit. */
 	for (i = 0; i < TX_RING_SIZE; i++) {
-		tp->tx_skbuff[i] = 0;
+		tp->tx_skbuff[i] = NULL;
 		tp->tx_ring[i].status = 0;
 		tp->tx_ring[i].buffer2 = virt_to_bus(&tp->tx_ring[i+1]);
 #ifdef CARDBUS
@@ -1128,7 +1128,7 @@ static irqreturn_t xircom_interrupt(int irq, void *dev_instance, struct pt_regs 
 
 				/* Free the original skb. */
 				dev_kfree_skb_irq(tp->tx_skbuff[entry]);
-				tp->tx_skbuff[entry] = 0;
+				tp->tx_skbuff[entry] = NULL;
 			}
 
 #ifndef final_version
@@ -1338,7 +1338,7 @@ xircom_close(struct net_device *dev)
 	/* Free all the skbuffs in the Rx queue. */
 	for (i = 0; i < RX_RING_SIZE; i++) {
 		struct sk_buff *skb = tp->rx_skbuff[i];
-		tp->rx_skbuff[i] = 0;
+		tp->rx_skbuff[i] = NULL;
 		tp->rx_ring[i].status = 0;		/* Not owned by Xircom chip. */
 		tp->rx_ring[i].length = 0;
 		tp->rx_ring[i].buffer1 = 0xBADF00D0; /* An invalid address. */
@@ -1349,7 +1349,7 @@ xircom_close(struct net_device *dev)
 	for (i = 0; i < TX_RING_SIZE; i++) {
 		if (tp->tx_skbuff[i])
 			dev_kfree_skb(tp->tx_skbuff[i]);
-		tp->tx_skbuff[i] = 0;
+		tp->tx_skbuff[i] = NULL;
 	}
 
 	tp->open = 0;
@@ -1629,7 +1629,7 @@ static void set_rx_mode(struct net_device *dev)
 
 		if (entry != 0) {
 			/* Avoid a chip errata by prefixing a dummy entry. */
-			tp->tx_skbuff[entry] = 0;
+			tp->tx_skbuff[entry] = NULL;
 			tp->tx_ring[entry].length =
 				(entry == TX_RING_SIZE - 1) ? Tx1RingWrap : 0;
 			tp->tx_ring[entry].buffer1 = 0;
@@ -1638,7 +1638,7 @@ static void set_rx_mode(struct net_device *dev)
 			entry = tp->cur_tx++ % TX_RING_SIZE;
 		}
 
-		tp->tx_skbuff[entry] = 0;
+		tp->tx_skbuff[entry] = NULL;
 		/* Put the setup frame on the Tx list. */
 		if (entry == TX_RING_SIZE - 1)
 			tx_flags |= Tx1RingWrap;		/* Wrap ring. */

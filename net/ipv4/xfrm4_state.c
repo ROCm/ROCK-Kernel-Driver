@@ -74,11 +74,8 @@ __xfrm4_find_acq(u8 mode, u32 reqid, u8 proto,
 		    proto == x->id.proto &&
 		    saddr->a4 == x->props.saddr.a4 &&
 		    reqid == x->props.reqid &&
-		    x->km.state == XFRM_STATE_ACQ) {
-			    if (!x0)
-				    x0 = x;
-			    if (x->id.spi)
-				    continue;
+		    x->km.state == XFRM_STATE_ACQ &&
+		    !x->id.spi) {
 			    x0 = x;
 			    break;
 		    }

@@ -867,7 +867,7 @@ menu "Ftape, the floppy tape device driver"
 
 config FTAPE
 	tristate "Ftape (QIC-80/Travan) support"
-	depends on BROKEN_ON_SMP
+	depends on BROKEN_ON_SMP && (ALPHA || X86)
 	---help---
 	  If you have a tape drive that is connected to your floppy
 	  controller, say Y here.
@@ -976,14 +976,18 @@ config HPET_RTC_IRQ
 	  is assumed the platform called hpet_alloc with the RTC IRQ values for
 	  the HPET timers.
 
-config HPET_NOMMAP
-	bool "HPET - Control mmap capability."
-	default n
+config HPET_MMAP
+	bool "Allow mmap of HPET"
+	default y
 	depends on HPET
 	help
-	  If you say Y here, then the mmap interface for the HPET driver returns ENOSYS.
-	  Some hardware implementations might not want all the memory in the page the
-	  HPET control registers reside to be exposed.
+	  If you say Y here, user applications will be able to mmap
+	  the HPET registers.
+
+	  In some hardware implementations, the page containing HPET
+	  registers may also contain other things that shouldn't be
+	  exposed to the user.  If this applies to your hardware,
+	  say N here.
 
 config MAX_RAW_DEVS
 	int "Maximum number of RAW devices to support (1-8192)"

@@ -4214,13 +4214,6 @@ out:
 	return 0;
 }
 
-#ifdef CONFIG_NET_FASTROUTE
-static int bond_accept_fastpath(struct net_device *bond_dev, struct dst_entry *dst)
-{
-	return -1;
-}
-#endif
-
 /*------------------------- Device initialization ---------------------------*/
 
 /*
@@ -4294,9 +4287,6 @@ static int __init bond_init(struct net_device *bond_dev, struct bond_params *par
 	bond_set_mode_ops(bond_dev, bond->params.mode);
 
 	bond_dev->destructor = free_netdev;
-#ifdef CONFIG_NET_FASTROUTE
-	bond_dev->accept_fastpath = bond_accept_fastpath;
-#endif
 
 	/* Initialize the device options */
 	bond_dev->tx_queue_len = 0;

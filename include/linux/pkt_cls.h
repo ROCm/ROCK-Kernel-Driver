@@ -117,8 +117,6 @@ enum
 struct tc_police
 {
 	__u32			index;
-	int 			refcnt;
-	int 			bindcnt;
 	int			action;
 #define TC_POLICE_UNSPEC	TC_ACT_UNSPEC
 #define TC_POLICE_OK		TC_ACT_OK
@@ -131,6 +129,9 @@ struct tc_police
 	__u32			mtu;
 	struct tc_ratespec	rate;
 	struct tc_ratespec	peakrate;
+	int 			refcnt;
+	int 			bindcnt;
+	__u32			capab;
 };
 
 struct tcf_t
@@ -188,6 +189,7 @@ enum
 	TCA_U32_POLICE,
 	TCA_U32_ACT,   
 	TCA_U32_INDEV,
+	TCA_U32_PCNT,
 	__TCA_U32_MAX
 };
 
@@ -199,7 +201,6 @@ struct tc_u32_key
 	__u32		val;
 	int		off;
 	int		offmask;
-	__u32		kcnt;
 };
 
 struct tc_u32_sel
@@ -215,10 +216,16 @@ struct tc_u32_sel
 	short			hoff;
 	__u32			hmask;
 	struct tc_u32_key	keys[0];
-	unsigned long		rcnt;
-	unsigned long		rhit;
 };
 
+#ifdef CONFIG_CLS_U32_PERF
+struct tc_u32_pcnt
+{
+	__u64 rcnt;
+	__u64 rhit;
+	__u64 kcnts[0];
+};
+#endif
 /* Flags */
 
 #define TC_U32_TERMINAL		1
@@ -283,8 +290,8 @@ enum
 	TCA_FW_UNSPEC,
 	TCA_FW_CLASSID,
 	TCA_FW_POLICE,
-	TCA_FW_INDEV,
-	TCA_FW_ACT,
+	TCA_FW_INDEV, /*  used by CONFIG_NET_CLS_IND */
+	TCA_FW_ACT, /* used by CONFIG_NET_CLS_ACT */
 	__TCA_FW_MAX
 };
 
