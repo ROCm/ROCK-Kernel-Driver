@@ -4367,11 +4367,10 @@ static void sched_domain_debug(void)
 			printk("domain %d: ", level);
 
 			if (!(sd->flags & SD_LOAD_BALANCE)) {
-				printk("does not balance");
+				printk("does not load-balance");
 				if (sd->parent)
 					printk(" ERROR !SD_LOAD_BALANCE domain has parent");
 				printk("\n");
-				break;
 			}
 
 			printk("span %s\n", str);
