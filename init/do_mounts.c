@@ -28,6 +28,7 @@ extern asmlinkage long sys_mount(char *dev_name, char *dir_name, char *type,
 	 unsigned long flags, void *data);
 extern asmlinkage long sys_mkdir(const char *name, int mode);
 extern asmlinkage long sys_chdir(const char *name);
+extern asmlinkage long sys_fchdir(int fd);
 extern asmlinkage long sys_chroot(const char *name);
 extern asmlinkage long sys_unlink(const char *name);
 extern asmlinkage long sys_symlink(const char *old, const char *new);
@@ -730,17 +731,13 @@ static void __init mount_root(void)
 }
 
 #ifdef CONFIG_BLK_DEV_INITRD
+static int old_fd, root_fd;
 static int do_linuxrc(void * shell)
 {
 	static char *argv[] = { "linuxrc", NULL, };
 	extern char * envp_init[];
 
-	sys_chdir("/root");
-	sys_mount(".", "/", NULL, MS_MOVE, NULL);
-	sys_chroot(".");
-
-	mount_devfs_fs ();
-
+	close(old_fd);close(root_fd);
 	close(0);close(1);close(2);
 	setsid();
 	(void) open("/dev/console",O_RDWR,0);
@@ -758,9 +755,16 @@ static void __init handle_initrd(void)
 	int i, pid;
 
 	create_dev("/dev/root.old", Root_RAM0, NULL);
+	/* mount initrd on rootfs' /root */
 	mount_block_root("/dev/root.old", root_mountflags & ~MS_RDONLY);
 	sys_mkdir("/old", 0700);
-	sys_chdir("/old");
+	root_fd = open("/", 0, 0);
+	old_fd = open("/old", 0, 0);
+	/* move initrd over / and chdir/chroot in initrd root */
+	sys_chdir("/root");
+	sys_mount(".", "/", NULL, MS_MOVE, NULL);
+	sys_chroot(".");
+	mount_devfs_fs ();
 
 	pid = kernel_thread(do_linuxrc, "/linuxrc", SIGCHLD);
 	if (pid > 0) {
@@ -768,7 +772,14 @@ static void __init handle_initrd(void)
 			yield();
 	}
 
-	sys_mount("..", ".", NULL, MS_MOVE, NULL);
+	/* move initrd to rootfs' /old */
+	sys_fchdir(old_fd);
+	sys_mount("/", ".", NULL, MS_MOVE, NULL);
+	/* switch root and cwd back to / of rootfs */
+	sys_fchdir(root_fd);
+	sys_chroot(".");
+	close(old_fd);
+	close(root_fd);
 	sys_umount("/old/dev", 0);
 
 	if (real_root_dev == Root_RAM0) {
