@@ -40,6 +40,7 @@
 #include <net/llc_pdu.h>
 #include <net/llc_conn.h>
 #include <net/llc_mac.h>
+#include <net/llc_main.h>
 #include <linux/llc.h>
 #include <linux/if_arp.h>
 #include <linux/rtnetlink.h>
@@ -145,52 +146,6 @@ static int llc_ui_send_data(struct sock* sk, struct sk_buff *skb, int noblock)
 }
 
 /**
- *	llc_ui_find_sap - returns sap struct that matches sap number specified
- *	@sap: Sap number to search for.
- *
- *	Search the local socket list and return the first instance of the sap
- *	structure which matches the sap number the user specified.
- *	Returns llc_sap upon match, %NULL otherwise.
- */
-static __inline__ struct llc_sap *llc_ui_find_sap(u8 sap)
-{
-	struct sock *sk;
-	struct llc_sap *s = NULL;
-
-	read_lock_bh(&llc_ui_sockets_lock);
-	for (sk = llc_ui_sockets; sk; sk = sk->next) {
-		struct llc_opt *llc = llc_sk(sk);
-
-		if (!llc->sap)
-			continue;
-		if (llc->sap->laddr.lsap == sap) {
-			s = llc->sap;
-			break;
-		}
-	}
-	read_unlock_bh(&llc_ui_sockets_lock);
-	return s;
-}
-
-static struct sock *__llc_ui_find_sk_by_exact(struct llc_addr *laddr,
-					      struct llc_addr *daddr)
-{
-	struct sock *sk;
-
-	for (sk = llc_ui_sockets; sk; sk = sk->next) {
-		struct llc_opt *llc = llc_sk(sk);
-
-		if (llc->addr.sllc_ssap == laddr->lsap &&
-		    llc->addr.sllc_dsap == daddr->lsap &&
-		    llc_mac_null(llc->addr.sllc_mmac) &&
-		    llc_mac_match(llc->addr.sllc_smac, laddr->mac) &&
-		    llc_mac_match(llc->addr.sllc_dmac, daddr->mac))
-			break;
-	}
-	return sk;
-}
-
-/**
  *	__llc_ui_find_sk_by_addr - return socket matching local mac + sap.
  *	@addr: Local address to match.
  *
@@ -204,7 +159,7 @@ static struct sock *__llc_ui_find_sk_by_addr(struct llc_addr *laddr,
 					     struct llc_addr *daddr,
 					     struct net_device *dev)
 {
-	struct sock *sk, *tmp_sk;
+	struct sock *sk;
 
 	for (sk = llc_ui_sockets; sk; sk = sk->next) {
 		struct llc_opt *llc = llc_sk(sk);
@@ -226,11 +181,6 @@ static struct sock *__llc_ui_find_sk_by_addr(struct llc_addr *laddr,
 			break;
 		if (!llc_mac_match(llc->addr.sllc_smac, laddr->mac))
 			continue;
-		tmp_sk = __llc_ui_find_sk_by_exact(laddr, daddr);
-		if (tmp_sk) {
-			sk = tmp_sk;
-			break;
-		}
 		if (llc_mac_null(llc->addr.sllc_dmac))
 			break;
 	}
@@ -248,20 +198,6 @@ static struct sock *llc_ui_find_sk_by_addr(struct llc_addr *addr,
 	if (sk)
 		sock_hold(sk);
 	read_unlock(&llc_ui_sockets_lock);
-	return sk;
-}
-
-static struct sock *llc_ui_bh_find_sk_by_addr(struct llc_addr *addr,
-					      struct llc_addr *daddr,
-					      struct net_device *dev)
-{
-	struct sock *sk;
-
-	read_lock_bh(&llc_ui_sockets_lock);
-	sk = __llc_ui_find_sk_by_addr(addr, daddr, dev);
-	if (sk)
-		sock_hold(sk);
-	read_unlock_bh(&llc_ui_sockets_lock);
 	return sk;
 }
 
@@ -388,7 +324,7 @@ static int llc_ui_autoport(void)
 	while (tries < LLC_SAP_DYN_TRIES) {
 		for (i = llc_ui_sap_last_autoport;
 		     i < LLC_SAP_DYN_STOP; i += 2) {
-			sap = llc_ui_find_sap(i);
+			sap = llc_sap_find(i);
 			if (!sap) {
 				llc_ui_sap_last_autoport = i + 2;
 				goto out;
@@ -446,7 +382,7 @@ static int llc_ui_autobind(struct socket *sock, struct sockaddr_llc *addr)
 		if (!addr->sllc_ssap)
 			goto out;
 	}
-	sap = llc_ui_find_sap(addr->sllc_ssap);
+	sap = llc_sap_find(addr->sllc_ssap);
 	if (!sap) {
 		sap = llc_sap_open(llc_ui_indicate, llc_ui_confirm,
 				   addr->sllc_ssap);
@@ -472,7 +408,7 @@ static int llc_ui_autobind(struct socket *sock, struct sockaddr_llc *addr)
 			memcpy(laddr.mac, addr->sllc_smac, IFHWADDRLEN);
 		laddr.lsap = addr->sllc_ssap;
 		rc = -EADDRINUSE; /* mac + sap clash. */
-		ask = llc_ui_bh_find_sk_by_addr(&laddr, &daddr, dev);
+		ask = llc_lookup_established(sap, &daddr, &laddr);
 		if (ask) {
 			sock_put(ask);
 			goto out;
