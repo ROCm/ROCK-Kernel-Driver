@@ -408,7 +408,7 @@ au1100fb_mmap(struct fb_info *_fb,
 	/* This is an IO map - tell maydump to skip this VMA */
 	vma->vm_flags |= VM_IO;
 
-	if (io_remap_page_range(vma->vm_start, off,
+	if (io_remap_page_range(vma, vma->vm_start, off,
 				vma->vm_end - vma->vm_start,
 				vma->vm_page_prot)) {
 		return -EAGAIN;
