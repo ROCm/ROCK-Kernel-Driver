@@ -367,6 +367,7 @@
  * 0.4.14  2003-07-15
  *    - Fixed race between open and probe (Oliver Neukum).
  *    - Added vendor/product ids for Avision, Canon, HP, Microtek and Relisys scanners.
+ *    - Clean up irq urb when not enough memory is available.
  *
  * TODO
  *    - Performance
@@ -1072,6 +1073,9 @@ probe_scanner(struct usb_interface *intf,
 /* Ok, now initialize all the relevant values */
 	if (!(scn->obuf = (char *)kmalloc(OBUF_SIZE, GFP_KERNEL))) {
 		err("probe_scanner(%d): Not enough memory for the output buffer.", intf->minor);
+		if (have_intr)
+			usb_unlink_urb(scn->scn_irq);
+		usb_free_urb(scn->scn_irq);
 		kfree(scn);
 		up(&scn_mutex);
 		return -ENOMEM;
@@ -1080,6 +1084,9 @@ probe_scanner(struct usb_interface *intf,
 
 	if (!(scn->ibuf = (char *)kmalloc(IBUF_SIZE, GFP_KERNEL))) {
 		err("probe_scanner(%d): Not enough memory for the input buffer.", intf->minor);
+		if (have_intr)
+			usb_unlink_urb(scn->scn_irq);
+		usb_free_urb(scn->scn_irq);
 		kfree(scn->obuf);
 		kfree(scn);
 		up(&scn_mutex);
