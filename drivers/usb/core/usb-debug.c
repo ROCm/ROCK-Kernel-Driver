@@ -5,7 +5,6 @@
  * face, but so that you can still use them..
  */
 #include <linux/config.h>
-#include <linux/version.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
 #include <linux/slab.h>
