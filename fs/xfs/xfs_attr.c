@@ -106,10 +106,9 @@ STATIC int xfs_attr_rmtval_remove(xfs_da_args_t *args);
 #define ATTR_RMTVALUE_MAPSIZE	1	/* # of map entries at once */
 #define ATTR_RMTVALUE_TRANSBLKS	8	/* max # of blks in a transaction */
 
-#if defined(DEBUG)
+#if defined(XFS_ATTR_TRACE)
 ktrace_t *xfs_attr_trace_buf;
 #endif
-
 
 
 /*========================================================================

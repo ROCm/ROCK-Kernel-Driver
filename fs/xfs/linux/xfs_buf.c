@@ -2091,6 +2091,10 @@ pagebuf_terminate(void)
 {
 	pagebuf_daemon_stop();
 
+#ifdef PAGEBUF_TRACE
+	ktrace_free(pagebuf_trace_buf);
+#endif
+
 	kmem_cache_destroy(pagebuf_cache);
 
 	unregister_sysctl_table(pagebuf_table_header);
