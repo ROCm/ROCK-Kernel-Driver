@@ -166,8 +166,9 @@ void
 default_idle (void)
 {
 #ifdef CONFIG_IA64_PAL_IDLE
-	if (!need_resched())
-		safe_halt();
+	if (!ia64_platform_is("sn2"))
+		if (!need_resched())
+			safe_halt();
 #endif
 }
 
