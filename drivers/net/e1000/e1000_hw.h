@@ -317,9 +317,9 @@ void e1000_pci_clear_mwi(struct e1000_hw *hw);
 void e1000_read_pci_cfg(struct e1000_hw *hw, uint32_t reg, uint16_t * value);
 void e1000_write_pci_cfg(struct e1000_hw *hw, uint32_t reg, uint16_t * value);
 /* Port I/O is only supported on 82544 and newer */
-uint32_t e1000_io_read(struct e1000_hw *hw, uint32_t port);
+uint32_t e1000_io_read(struct e1000_hw *hw, unsigned long port);
 uint32_t e1000_read_reg_io(struct e1000_hw *hw, uint32_t offset);
-void e1000_io_write(struct e1000_hw *hw, uint32_t port, uint32_t value);
+void e1000_io_write(struct e1000_hw *hw, unsigned long port, uint32_t value);
 void e1000_write_reg_io(struct e1000_hw *hw, uint32_t offset, uint32_t value);
 int32_t e1000_config_dsp_after_link_change(struct e1000_hw *hw, boolean_t link_up);
 int32_t e1000_set_d3_lplu_state(struct e1000_hw *hw, boolean_t active);
@@ -978,7 +978,7 @@ struct e1000_hw {
     e1000_ms_type master_slave;
     e1000_ms_type original_master_slave;
     e1000_ffe_config ffe_config_state;
-    uint32_t io_base;
+    unsigned long io_base;
     uint32_t phy_id;
     uint32_t phy_revision;
     uint32_t phy_addr;

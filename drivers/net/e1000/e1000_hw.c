@@ -4523,8 +4523,8 @@ uint32_t
 e1000_read_reg_io(struct e1000_hw *hw,
                   uint32_t offset)
 {
-    uint32_t io_addr = hw->io_base;
-    uint32_t io_data = hw->io_base + 4;
+    unsigned long io_addr = hw->io_base;
+    unsigned long io_data = hw->io_base + 4;
 
     e1000_io_write(hw, io_addr, offset);
     return e1000_io_read(hw, io_data);
@@ -4543,8 +4543,8 @@ e1000_write_reg_io(struct e1000_hw *hw,
                    uint32_t offset,
                    uint32_t value)
 {
-    uint32_t io_addr = hw->io_base;
-    uint32_t io_data = hw->io_base + 4;
+    unsigned long io_addr = hw->io_base;
+    unsigned long io_data = hw->io_base + 4;
 
     e1000_io_write(hw, io_addr, offset);
     e1000_io_write(hw, io_data, value);

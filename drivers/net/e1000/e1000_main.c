@@ -2641,13 +2641,13 @@ e1000_write_pci_cfg(struct e1000_hw *hw, uint32_t reg, uint16_t *value)
 }
 
 uint32_t
-e1000_io_read(struct e1000_hw *hw, uint32_t port)
+e1000_io_read(struct e1000_hw *hw, unsigned long port)
 {
 	return inl(port);
 }
 
 void
-e1000_io_write(struct e1000_hw *hw, uint32_t port, uint32_t value)
+e1000_io_write(struct e1000_hw *hw, unsigned long port, uint32_t value)
 {
 	outl(value, port);
 }
