@@ -271,6 +271,13 @@ source "drivers/md/Kconfig"
 
 source "drivers/mtd/Kconfig"
 
+source "drivers/input/Kconfig"
+source "drivers/char/Kconfig"
+source "drivers/video/Kconfig"
+
+config X11_FB
+	bool "X11 Framebuffer driver"
+	depends on FB
 
 menu "Kernel hacking"
 

@@ -33,28 +33,6 @@
 #define MAX_TTYS (16)
 
 /* ----------------------------------------------------------------------------- */
-/* trivial console driver -- simply dump everything to stderr                    */
-
-static void stderr_console_write(struct console *console, const char *string, 
-				 unsigned len)
-{
-	generic_write(2 /* stderr */, string, len, NULL);
-}
-
-static struct console stderr_console = {
-	.name		"stderr",
-	.write		stderr_console_write,
-	.flags		CON_PRINTBUFFER,
-};
-
-static int __init stderr_console_init(void)
-{
-	register_console(&stderr_console);
-	return 0;
-}
-console_initcall(stderr_console_init);
-
-/* ----------------------------------------------------------------------------- */
 
 /* Referenced only by tty_driver below - presumably it's locked correctly
  * by the tty driver.
@@ -181,10 +159,12 @@ int stdio_init(void)
 {
 	char *new_title;
 
-	printk(KERN_INFO "Initializing stdio console driver\n");
 	console_driver = line_register_devfs(&console_lines, &driver,
 					     &console_ops, vts,
 					     sizeof(vts)/sizeof(vts[0]));
+	if (NULL == console_driver)
+		return -1;
+	printk(KERN_INFO "Initialized stdio console driver\n");
 
 	lines_init(vts, sizeof(vts)/sizeof(vts[0]));
 

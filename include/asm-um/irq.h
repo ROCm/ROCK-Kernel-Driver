@@ -16,8 +16,9 @@
 #define TELNETD_IRQ 		12
 #define XTERM_IRQ 		13
 #define HUMFS_IRQ		14
+#define X11_IRQ			15
  
-#define LAST_IRQ HUMFS_IRQ
+#define LAST_IRQ X11_IRQ
 #define NR_IRQS (LAST_IRQ + 1)
 
 #endif

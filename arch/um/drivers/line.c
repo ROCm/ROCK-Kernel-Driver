@@ -517,8 +517,12 @@ struct tty_driver *line_register_devfs(struct lines *set,
 	driver->init_termios = tty_std_termios;
 	tty_set_operations(driver, ops);
 
-	if (tty_register_driver(driver))
-		panic("line_register_devfs : Couldn't register driver\n");
+	if (tty_register_driver(driver)) {
+		printk("%s: can't register %s driver\n",
+		       __FUNCTION__,line_driver->name);
+		put_tty_driver(driver);
+		return NULL;
+	}
 
 	from = line_driver->symlink_from;
 	to = line_driver->symlink_to;

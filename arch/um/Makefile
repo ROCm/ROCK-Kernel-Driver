@@ -42,11 +42,11 @@ MAKEFILE-$(CONFIG_MODE_TT) += Makefile-tt
 MAKEFILE-$(CONFIG_MODE_SKAS) += Makefile-skas
 
 ifneq ($(MAKEFILE-y),)
-  include $(addprefix $(ARCH_DIR)/,$(MAKEFILE-y))
+  include $(addprefix $(srctree)/$(ARCH_DIR)/,$(MAKEFILE-y))
 endif
 
-include $(ARCH_DIR)/Makefile-$(SUBARCH)
-include $(ARCH_DIR)/Makefile-os-$(OS)
+include $(srctree)/$(ARCH_DIR)/Makefile-$(SUBARCH)
+include $(srctree)/$(ARCH_DIR)/Makefile-os-$(OS)
 
 #EXTRAVERSION := $(EXTRAVERSION)-2um
 
@@ -131,9 +131,14 @@ LD_SCRIPT-y := $(ARCH_DIR)/$(LD_SCRIPT-y)
 #$(LD_SCRIPT-y) : $(LD_SCRIPT-y:.s=.S) scripts FORCE
 #	$(call if_changed_dep,as_s_S)
 
+UML_LIBS := -L/usr/lib -lutil
+ifeq ($(CONFIG_X11_FB),y)
+UML_LIBS += -L /usr/X11R6/lib -lX11 -lXext
+endif
+
 linux: vmlinux $(LD_SCRIPT-y)
 	$(CC) -Wl,-T,$(LD_SCRIPT-y) $(LINK-y) $(LINK_WRAPS) \
-		-o linux $(ARCH_DIR)/main.o vmlinux -L/usr/lib -lutil
+		-o linux $(ARCH_DIR)/main.o vmlinux $(UML_LIBS)
 
 USER_CFLAGS := $(patsubst -I%,,$(CFLAGS))
 USER_CFLAGS := $(patsubst -Derrno=kernel_errno,,$(USER_CFLAGS))
