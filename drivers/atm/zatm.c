@@ -22,6 +22,7 @@
 #include <linux/atm_zatm.h>
 #include <linux/capability.h>
 #include <linux/bitops.h>
+#include <linux/wait.h>
 #include <asm/byteorder.h>
 #include <asm/system.h>
 #include <asm/string.h>
@@ -867,31 +868,21 @@ static void close_tx(struct atm_vcc *vcc)
 	struct zatm_vcc *zatm_vcc;
 	unsigned long flags;
 	int chan;
-struct sk_buff *skb;
-int once = 1;
 
 	zatm_vcc = ZATM_VCC(vcc);
 	zatm_dev = ZATM_DEV(vcc->dev);
 	chan = zatm_vcc->tx_chan;
 	if (!chan) return;
 	DPRINTK("close_tx\n");
-	while (skb_peek(&zatm_vcc->backlog)) {
-if (once) {
-printk("waiting for backlog to drain ...\n");
-event_dump();
-once = 0;
-}
-		sleep_on(&zatm_vcc->tx_wait);
+	if (skb_peek(&zatm_vcc->backlog)) {
+		printk("waiting for backlog to drain ...\n");
+		event_dump();
+		wait_event(zatm_vcc->tx_wait, !skb_peek(&zatm_vcc->backlog));
 	}
-once = 1;
-	while ((skb = skb_peek(&zatm_vcc->tx_queue))) {
-if (once) {
-printk("waiting for TX queue to drain ... %p\n",skb);
-event_dump();
-once = 0;
-}
-		DPRINTK("waiting for TX queue to drain ... %p\n",skb);
-		sleep_on(&zatm_vcc->tx_wait);
+	if (skb_peek(&zatm_vcc->tx_queue)) {
+		printk("waiting for TX queue to drain ...\n");
+		event_dump();
+		wait_event(zatm_vcc->tx_wait, !skb_peek(&zatm_vcc->tx_queue));
 	}
 	spin_lock_irqsave(&zatm_dev->lock, flags);
 #if 0
