@@ -437,8 +437,10 @@ int ip_setsockopt(struct sock *sk, int level, int optname, char *optval, int opt
 				    (!((1<<sk->state)&(TCPF_LISTEN|TCPF_CLOSE))
 				     && inet->daddr != LOOPBACK4_IPV6)) {
 #endif
+					if (inet->opt)
+						tp->ext_header_len -= inet->opt->optlen;
 					if (opt)
-						tp->ext_header_len = opt->optlen;
+						tp->ext_header_len += opt->optlen;
 					tcp_sync_mss(sk, tp->pmtu_cookie);
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 				}

@@ -137,7 +137,23 @@ struct inet_opt {
 	int			mc_index;	/* Multicast device index */
 	__u32			mc_addr;
 	struct ip_mc_socklist	*mc_list;	/* Group array */
+	struct page		*sndmsg_page;	/* Cached page for sendmsg */
+	u32			sndmsg_off;	/* Cached offset for sendmsg */
+	/*
+	 * Following members are used to retain the infomation to build
+	 * an ip header on each ip fragmentation while the socket is corked.
+	 */
+	struct {
+		unsigned int		flags;
+		unsigned int		fragsize;
+		struct ip_options	*opt;
+		struct rtable		*rt;
+		int			length; /* Total length of all frames */
+		u32			addr;
+	} cork;
 };
+
+#define IPCORK_OPT	1	/* ip-options has been held in ipcork.opt */
 
 struct ipv6_pinfo;
 

@@ -1851,7 +1851,7 @@ static inline void tcp_v4_setup_caps(struct sock *sk, struct dst_entry *dst)
 {
 	sk->route_caps = dst->dev->features;
 	if (sk->route_caps & NETIF_F_TSO) {
-		if (sk->no_largesend)
+		if (sk->no_largesend || dst->header_len)
 			sk->route_caps &= ~NETIF_F_TSO;
 	}
 }

@@ -357,11 +357,13 @@ static void icmp_out_count(int type)
  *	checksum.
  */
 static int icmp_glue_bits(const void *p, char *to, unsigned int offset,
-			  unsigned int fraglen)
+			  unsigned int fraglen, struct sk_buff *skb)
 {
 	struct icmp_bxm *icmp_param = (struct icmp_bxm *)p;
 	struct icmphdr *icmph;
 	unsigned int csum;
+
+	skb->ip_summed = CHECKSUM_NONE;
 
 	if (offset) {
 		icmp_param->csum =

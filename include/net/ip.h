@@ -102,12 +102,26 @@ extern int		ip_build_xmit(struct sock *sk,
 				      int getfrag (const void *,
 						   char *,
 						   unsigned int,
-						   unsigned int),
+						   unsigned int,
+						   struct sk_buff *),
 				      const void *frag,
 				      unsigned length,
 				      struct ipcm_cookie *ipc,
 				      struct rtable *rt,
 				      int flags);
+extern int		ip_append_data(struct sock *sk,
+				       int getfrag(void *from, char *to, int offset, int len,
+						   int odd, struct sk_buff *skb),
+				void *from, int len, int protolen,
+				struct ipcm_cookie *ipc,
+				struct rtable *rt,
+				unsigned int flags);
+extern int		generic_getfrag(void *from, char *to, int offset, int len, int odd, struct sk_buff *skb);
+extern ssize_t		ip_append_page(struct sock *sk, struct page *page,
+				int offset, size_t size, int flags);
+extern int		ip_push_pending_frames(struct sock *sk);
+extern void		ip_flush_pending_frames(struct sock *sk);
+
 
 /*
  *	Map a multicast IP onto multicast MAC for type Token Ring.
