@@ -36,18 +36,19 @@ static int pas202bcb_init(struct sn9c102_device* cam)
 	err += sn9c102_write_reg(cam, 0x00, 0x11);
 	err += sn9c102_write_reg(cam, 0x00, 0x14);
 	err += sn9c102_write_reg(cam, 0x20, 0x17);
-	err += sn9c102_write_reg(cam, 0x20, 0x19);
+	err += sn9c102_write_reg(cam, 0x30, 0x19);
 	err += sn9c102_write_reg(cam, 0x09, 0x18);
 
-	err += sn9c102_i2c_write(cam, 0x02, 0x0c);
+	err += sn9c102_i2c_write(cam, 0x02, 0x14);
 	err += sn9c102_i2c_write(cam, 0x03, 0x40);
 	err += sn9c102_i2c_write(cam, 0x04, 0x07);
 	err += sn9c102_i2c_write(cam, 0x05, 0x25);
 	err += sn9c102_i2c_write(cam, 0x0d, 0x2c);
 	err += sn9c102_i2c_write(cam, 0x0e, 0x01);
 	err += sn9c102_i2c_write(cam, 0x0f, 0xa9);
-	err += sn9c102_i2c_write(cam, 0x08, 0x01);
+	err += sn9c102_i2c_write(cam, 0x10, 0x08);
 	err += sn9c102_i2c_write(cam, 0x0b, 0x01);
+	err += sn9c102_i2c_write(cam, 0x0c, 0x04);
 	err += sn9c102_i2c_write(cam, 0x13, 0x63);
 	err += sn9c102_i2c_write(cam, 0x15, 0x70);
 	err += sn9c102_i2c_write(cam, 0x11, 0x01);
@@ -217,7 +218,7 @@ int sn9c102_probe_pas202bcb(struct sn9c102_device* cam)
 	 *  NOTE: do NOT change the values!
 	 */
 	err += sn9c102_write_reg(cam, 0x01, 0x01); /* sensor power down */
-	err += sn9c102_write_reg(cam, 0x00, 0x01); /* sensor power on */
+	err += sn9c102_write_reg(cam, 0x40, 0x01); /* sensor power on */
 	err += sn9c102_write_reg(cam, 0x28, 0x17); /* sensor clock at 24 MHz */
 	if (err)
 		return -EIO;

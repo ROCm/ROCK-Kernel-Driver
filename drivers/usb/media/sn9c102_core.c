@@ -400,7 +400,7 @@ sn9c102_i2c_try_raw_write(struct sn9c102_device* cam,
 	if (err)
 		DBG(3, "I2C write failed for %s image sensor", sensor->name)
 
-	PDBGG("I2C write: %u bytes, data0 = 0x%02X, data1 = 0x%02X, "
+	PDBGG("I2C raw write: %u bytes, data0 = 0x%02X, data1 = 0x%02X, "
 	      "data2 = 0x%02X, data3 = 0x%02X, data4 = 0x%02X, data5 = 0x%02X",
 	      n, data0, data1, data2, data3, data4, data5)
 
@@ -634,7 +634,7 @@ static int sn9c102_start_transfer(struct sn9c102_device* cam)
 	struct usb_device *udev = cam->usbdev;
 	struct urb* urb;
 	const unsigned int wMaxPacketSize[] = {0, 128, 256, 384, 512,
-                                               680, 800, 900, 1023};
+	                                       680, 800, 900, 1023};
 	const unsigned int psz = wMaxPacketSize[SN9C102_ALTERNATE_SETTING];
 	s8 i, j;
 	int err = 0;
@@ -965,6 +965,11 @@ static ssize_t sn9c102_show_i2c_val(struct class_device* cd, char* buf)
 		return -ENODEV;
 	}
 
+	if (cam->sensor->slave_read_id == SN9C102_I2C_SLAVEID_UNAVAILABLE) {
+		up(&sn9c102_sysfs_lock);
+		return -ENOSYS;
+	}
+
 	if ((val = sn9c102_i2c_read(cam, cam->sysfs.i2c_reg)) < 0) {
 		up(&sn9c102_sysfs_lock);
 		return -EIO;
@@ -1126,7 +1131,8 @@ static void sn9c102_create_sysfs(struct sn9c102_device* cam)
 		video_device_create_file(v4ldev, &class_device_attr_blue);
 		video_device_create_file(v4ldev, &class_device_attr_red);
 	}
-	if (cam->sensor->slave_write_id && cam->sensor->slave_read_id) {
+	if (cam->sensor->slave_write_id != SN9C102_I2C_SLAVEID_UNAVAILABLE ||
+	    cam->sensor->slave_read_id != SN9C102_I2C_SLAVEID_UNAVAILABLE) {
 		video_device_create_file(v4ldev, &class_device_attr_i2c_reg);
 		video_device_create_file(v4ldev, &class_device_attr_i2c_val);
 	}
@@ -2362,10 +2368,20 @@ sn9c102_usb_probe(struct usb_interface* intf, const struct usb_device_id* id)
 	}
 
 	cam->bridge = (sn9c102_id_table[i].idProduct & 0xffc0) == 0x6080 ?
-	              BRIDGE_SN9C102 : BRIDGE_SN9C103;
-
-	DBG(2, "SN9C10x PC Camera Controller detected (vid/pid 0x%04X/0x%04X)",
-	    sn9c102_id_table[i].idVendor, sn9c102_id_table[i].idProduct)
+	              BRIDGE_SN9C103 : BRIDGE_SN9C102;
+	switch (cam->bridge) {
+	case BRIDGE_SN9C101:
+	case BRIDGE_SN9C102:
+		DBG(2, "SN9C10[12] PC Camera Controller detected "
+		       "(vid/pid 0x%04X/0x%04X)", sn9c102_id_table[i].idVendor,
+		    sn9c102_id_table[i].idProduct)
+		break;
+	case BRIDGE_SN9C103:
+		DBG(2, "SN9C103 PC Camera Controller detected "
+		       "(vid/pid 0x%04X/0x%04X)", sn9c102_id_table[i].idVendor,
+		    sn9c102_id_table[i].idProduct)
+		break;
+	}
 
 	for  (i = 0; sn9c102_sensor_table[i]; i++) {
 		err = sn9c102_sensor_table[i](cam);

@@ -186,6 +186,9 @@ enum sn9c102_i2c_interface {
 	SN9C102_I2C_3WIRES,
 };
 
+#define SN9C102_I2C_SLAVEID_FICTITIOUS 0xff
+#define SN9C102_I2C_SLAVEID_UNAVAILABLE 0x00
+
 struct sn9c102_sensor {
 	char name[32], /* sensor name */
 	     maintainer[64]; /* name of the mantainer <email> */

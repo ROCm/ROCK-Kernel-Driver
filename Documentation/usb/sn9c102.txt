@@ -123,12 +123,12 @@ analyze kernel messages and verify that the loading process has gone well:
 Module parameters are listed below:
 -------------------------------------------------------------------------------
 Name:           video_nr
-Type:           int array (min = 0, max = 32)
+Type:           int array (min = 0, max = 64)
 Syntax:         <-1|n[,...]> 
 Description:    Specify V4L2 minor mode number:
                 -1 = use next available
                  n = use minor number n
-                You can specify up to 32 cameras this way.
+                You can specify up to 64 cameras this way.
                 For example:
                 video_nr=-1,2,-1 would assign minor number 2 to the second
                 recognized camera and use auto for the first one and for every
@@ -180,7 +180,9 @@ identifier - of the camera registered as "/dev/video0":
 	[root@localhost #] echo 1 > i2c_reg
 	[root@localhost #] cat i2c_val
 
-Now let's set the green gain's register of the SN9C10x chip to 2:
+Note that "cat" will fail if sensor registers cannot be read.
+
+Now let's set the green gain's register of the SN9C101 or SN9C102 chips to 2:
 
 	[root@localhost #] echo 0x11 > reg
 	[root@localhost #] echo 2 > val
@@ -249,6 +251,9 @@ PAS106B     PixArt Imaging Inc.
 PAS202BCB   PixArt Imaging Inc.
 TAS5110C1B  Taiwan Advanced Sensor Corporation
 TAS5130D1B  Taiwan Advanced Sensor Corporation
+
+All the available control settings of each image sensor are supported through
+the V4L2 interface.
 
 If you think your camera is based on the above hardware and is not actually
 listed in the above table, you may try to add the specific USB VendorID and

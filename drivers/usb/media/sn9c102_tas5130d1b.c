@@ -109,8 +109,8 @@ static struct sn9c102_sensor tas5130d1b = {
 	.maintainer = "Luca Risolia <luca.risolia@studio.unibo.it>",
 	.frequency = SN9C102_I2C_100KHZ,
 	.interface = SN9C102_I2C_3WIRES,
-	.slave_read_id = 0xff, /* fictitious */
-	.slave_write_id = 0xff, /* fictitious */
+	.slave_read_id = SN9C102_I2C_SLAVEID_UNAVAILABLE,
+	.slave_write_id = SN9C102_I2C_SLAVEID_FICTITIOUS,
 	.init = &tas5130d1b_init,
 	.qctrl = {
 		{
