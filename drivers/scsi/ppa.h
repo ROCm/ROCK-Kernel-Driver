@@ -161,14 +161,14 @@ static int ppa_out(int, char *, int);
 #define ppa_release 0
 #endif
 
-int ppa_detect(Scsi_Host_Template *);
+static int ppa_detect(Scsi_Host_Template *);
 const char *ppa_info(struct Scsi_Host *);
 int ppa_command(Scsi_Cmnd *);
-int ppa_queuecommand(Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
-int ppa_abort(Scsi_Cmnd *);
-int ppa_reset(Scsi_Cmnd *);
-int ppa_proc_info(struct Scsi_Host *host, char *, char **, off_t, int, int);
-int ppa_biosparam(struct scsi_device *, struct block_device *,
+static int ppa_queuecommand(Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
+static int ppa_abort(Scsi_Cmnd *);
+static int ppa_reset(Scsi_Cmnd *);
+static int ppa_proc_info(struct Scsi_Host *host, char *, char **, off_t, int, int);
+static int ppa_biosparam(struct scsi_device *, struct block_device *,
 		sector_t, int *);
 
 #endif				/* _PPA_H */
