@@ -651,7 +651,6 @@ struct thread_struct {
 	unsigned long	ksp;		/* Kernel stack pointer */
 	struct pt_regs	*regs;		/* Pointer to saved register state */
 	mm_segment_t	fs;		/* for get_fs() validation */
-	signed long     last_syscall;
 	double		fpr[32];	/* Complete floating point set */
 	unsigned long	fpscr;		/* Floating point status */
 };
@@ -662,7 +661,6 @@ struct thread_struct {
 	INIT_SP, /* ksp */ \
 	(struct pt_regs *)INIT_SP - 1, /* regs */ \
 	KERNEL_DS, /*fs*/ \
-	0, /* last_syscall */ \
 	{0}, /* fpr */ \
 	0 /* fpscr */ \
 }
