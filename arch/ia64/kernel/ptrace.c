@@ -1381,10 +1381,9 @@ ptrace_disable (struct task_struct *child)
 }
 
 asmlinkage long
-sys_ptrace (long request, pid_t pid, unsigned long addr, unsigned long data,
-	    long arg4, long arg5, long arg6, long arg7, long stack)
+sys_ptrace (long request, pid_t pid, unsigned long addr, unsigned long data)
 {
-	struct pt_regs *pt, *regs = (struct pt_regs *) &stack;
+	struct pt_regs *pt;
 	unsigned long urbs_end, peek_or_poke;
 	struct task_struct *child;
 	struct switch_stack *sw;
@@ -1446,7 +1445,7 @@ sys_ptrace (long request, pid_t pid, unsigned long addr, unsigned long data,
 		if (ret == 0) {
 			ret = data;
 			/* ensure "ret" is not mistaken as an error code: */
-			regs->r8 = 0;
+			force_successful_syscall_return();
 		}
 		goto out_tsk;
 
@@ -1465,7 +1464,7 @@ sys_ptrace (long request, pid_t pid, unsigned long addr, unsigned long data,
 		}
 		ret = data;
 		/* ensure "ret" is not mistaken as an error code */
-		regs->r8 = 0;
+		force_successful_syscall_return();
 		goto out_tsk;
 
 	      case PTRACE_POKEUSR:
@@ -1609,16 +1608,16 @@ syscall_trace (void)
 
 asmlinkage void
 syscall_trace_enter (long arg0, long arg1, long arg2, long arg3,
-		     long arg4, long arg5, long arg6, long arg7, long stack)
+		     long arg4, long arg5, long arg6, long arg7,
+		     struct pt_regs regs)
 {
-	struct pt_regs *regs = (struct pt_regs *) &stack;
 	long syscall;
 
 	if (unlikely(current->audit_context)) {
-		if (IS_IA32_PROCESS(regs))
-			syscall = regs->r1;
+		if (IS_IA32_PROCESS(&regs))
+			syscall = regs.r1;
 		else
-			syscall = regs->r15;
+			syscall = regs.r15;
 
 		audit_syscall_entry(current, syscall, arg0, arg1, arg2, arg3);
 	}
@@ -1632,10 +1631,11 @@ syscall_trace_enter (long arg0, long arg1, long arg2, long arg3,
 
 asmlinkage void
 syscall_trace_leave (long arg0, long arg1, long arg2, long arg3,
-		     long arg4, long arg5, long arg6, long arg7, long stack)
+		     long arg4, long arg5, long arg6, long arg7,
+		     struct pt_regs regs)
 {
 	if (unlikely(current->audit_context))
-		audit_syscall_exit(current, ((struct pt_regs *) &stack)->r8);
+		audit_syscall_exit(current, regs.r8);
 
 	if (test_thread_flag(TIF_SYSCALL_TRACE)
 	    && (current->ptrace & PT_PTRACED))
