@@ -429,6 +429,8 @@ static int hc_reset (struct ohci_hcd *ohci)
 	ohci->hc_control = readl (&ohci->regs->control);
 	ohci->hc_control &= OHCI_CTRL_RWC;	/* hcfs 0 = RESET */
 	writel (ohci->hc_control, &ohci->regs->control);
+	// flush those pci writes
+	(void) readl (&ohci->regs->control);
 	wait_ms (50);
 
 	/* HC Reset requires max 10 us delay */
@@ -450,6 +452,8 @@ static int hc_reset (struct ohci_hcd *ohci)
 	 * this if we write fmInterval after we're OPERATIONAL.
 	 */
 	writel (ohci->hc_control, &ohci->regs->control);
+	// flush those pci writes
+	(void) readl (&ohci->regs->control);
 
 	return 0;
 }
@@ -524,6 +528,8 @@ static int hc_start (struct ohci_hcd *ohci)
 	writel (tmp, &ohci->regs->roothub.a);
 	writel (RH_HS_LPSC, &ohci->regs->roothub.status);
 	writel (0, &ohci->regs->roothub.b);
+	// flush those pci writes
+	(void) readl (&ohci->regs->control);
 
 	// POTPGT delay is bits 24-31, in 2 ms units.
 	mdelay ((roothub_a (ohci) >> 23) & 0x1fe);
@@ -610,6 +616,8 @@ static void ohci_irq (struct usb_hcd *hcd, struct pt_regs *ptregs)
 
 	writel (ints, &regs->intrstatus);
 	writel (OHCI_INTR_MIE, &regs->intrenable);	
+	// flush those pci writes
+	(void) readl (&ohci->regs->control);
 }
 
 /*-------------------------------------------------------------------------*/
