@@ -69,6 +69,8 @@ struct ehci_hcd {			/* one per controller */
 	struct pci_pool		*qtd_pool;	/* one or more per qh */
 	struct pci_pool		*itd_pool;	/* itd per iso urb */
 	struct pci_pool		*sitd_pool;	/* sitd per split iso urb */
+
+	struct timer_list	watchdog;
 };
 
 /* unwrap an HCD pointer to get an EHCI_HCD pointer */ 

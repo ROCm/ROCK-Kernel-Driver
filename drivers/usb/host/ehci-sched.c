@@ -222,16 +222,14 @@ static int disable_periodic (struct ehci_hcd *ehci)
 
 // FIXME microframe periods not yet handled
 
-static void intr_deschedule (
+static unsigned long intr_deschedule (
 	struct ehci_hcd	*ehci,
 	struct ehci_qh	*qh,
-	int		wait
+	int		wait,
+	unsigned long	flags
 ) {
-	unsigned long	flags;
 	int		status;
 	unsigned	frame = qh->start;
-
-	spin_lock_irqsave (&ehci->lock, flags);
 
 	do {
 		periodic_unlink (ehci, frame, qh);
@@ -251,8 +249,6 @@ static void intr_deschedule (
 		vdbg ("periodic schedule still enabled");
 	}
 
-	spin_unlock_irqrestore (&ehci->lock, flags);
-
 	/*
 	 * If the hc may be looking at this qh, then delay a uframe
 	 * (yeech!) to be sure it's done.
@@ -260,8 +256,10 @@ static void intr_deschedule (
 	 */
 	if (((ehci_get_frame (&ehci->hcd) - frame) % qh->period) == 0) {
 		if (wait) {
+			spin_unlock_irqrestore (&ehci->lock, flags);
 			udelay (125);
 			qh->hw_next = EHCI_LIST_END;
+			spin_lock_irqsave (&ehci->lock, flags);
 		} else {
 			/* we may not be IDLE yet, but if the qh is empty
 			 * the race is very short.  then if qh also isn't
@@ -281,6 +279,7 @@ static void intr_deschedule (
 	vdbg ("descheduled qh %p, per = %d frame = %d count = %d, urbs = %d",
 		qh, qh->period, frame,
 		atomic_read (&qh->refcount), ehci->periodic_sched);
+	return flags;
 }
 
 static int check_period (
@@ -513,12 +512,10 @@ intr_complete (
 	}
 	
 	/* handle any completions */
-	spin_unlock_irqrestore (&ehci->lock, flags);
-	qh_completions (ehci, qh);
-	spin_lock_irqsave (&ehci->lock, flags);
+	flags = qh_completions (ehci, qh, flags);
 
 	if (unlikely (list_empty (&qh->qtd_list)))
-		intr_deschedule (ehci, qh, 0);
+		flags = intr_deschedule (ehci, qh, 0, flags);
 
 	return flags;
 }
@@ -1091,13 +1088,12 @@ static int sitd_submit (struct ehci_hcd *ehci, struct urb *urb, int mem_flags)
 
 /*-------------------------------------------------------------------------*/
 
-static void scan_periodic (struct ehci_hcd *ehci)
+static unsigned long
+scan_periodic (struct ehci_hcd *ehci, unsigned long flags)
 {
 	unsigned	frame, clock, now_uframe, mod;
-	unsigned long	flags;
 
 	mod = ehci->periodic_size << 3;
-	spin_lock_irqsave (&ehci->lock, flags);
 
 	/*
 	 * When running, scan from last scan point up to "now"
@@ -1237,5 +1233,5 @@ restart:
 		} else
 			frame = (frame + 1) % ehci->periodic_size;
 	} 
-	spin_unlock_irqrestore (&ehci->lock, flags);
+	return flags;
 }

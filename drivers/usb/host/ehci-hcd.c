@@ -87,7 +87,7 @@
  * 2001-June	Works with usb-storage and NEC EHCI on 2.4
  */
 
-#define DRIVER_VERSION "2002-Aug-06"
+#define DRIVER_VERSION "2002-Aug-28"
 #define DRIVER_AUTHOR "David Brownell"
 #define DRIVER_DESC "USB 2.0 'Enhanced' Host Controller (EHCI) Driver"
 
@@ -103,6 +103,8 @@
 #define	EHCI_TUNE_RL_TT		0
 #define	EHCI_TUNE_MULT_HS	1	/* 1-3 transactions/uframe; 4.10.3 */
 #define	EHCI_TUNE_MULT_TT	1
+
+#define EHCI_WATCHDOG_JIFFIES	(HZ/10)		/* arbitrary; ~100 msec */
 
 /* Initial IRQ latency:  lower than default */
 static int log2_irq_thresh = 0;		// 0 to 6
@@ -231,6 +233,23 @@ static void ehci_ready (struct ehci_hcd *ehci)
 /*-------------------------------------------------------------------------*/
 
 static void ehci_tasklet (unsigned long param);
+
+static void ehci_watchdog (unsigned long param)
+{
+	struct ehci_hcd		*ehci = (struct ehci_hcd *) param;
+	unsigned long		flags;
+
+	/* guard against lost IAA, which wedges everything */
+	spin_lock_irqsave (&ehci->lock, flags);
+	if (ehci->reclaim) {
+		err ("%s watchdog, reclaim qh %p%s", ehci->hcd.self.bus_name,
+			ehci->reclaim, ehci->reclaim_ready ? " ready" : "");
+//		ehci->reclaim_ready = 1;
+		tasklet_schedule (&ehci->tasklet);
+	}
+	spin_unlock_irqrestore (&ehci->lock, flags);
+
+}
 
 /* EHCI 0.96 (and later) section 5.1 says how to kick BIOS/SMM/...
  * off the controller (maybe it can boot from highspeed USB disks).
@@ -372,6 +391,10 @@ static int ehci_start (struct usb_hcd *hcd)
 	ehci->tasklet.func = ehci_tasklet;
 	ehci->tasklet.data = (unsigned long) ehci;
 
+	init_timer (&ehci->watchdog);
+	ehci->watchdog.function = ehci_watchdog;
+	ehci->watchdog.data = (unsigned long) ehci;
+
 	/* wire up the root hub */
 	hcd->self.root_hub = udev = usb_alloc_dev (NULL, &hcd->self);
 	if (!udev) {
@@ -394,7 +417,7 @@ done2:
         /* PCI Serial Bus Release Number is at 0x60 offset */
 	pci_read_config_byte (hcd->pdev, 0x60, &tempbyte);
 	temp = readw (&ehci->caps->hci_version);
-	info ("USB %x.%x support enabled, EHCI rev %x.%2x",
+	info ("USB %x.%x support enabled, EHCI rev %x.%02x",
 	      ((tempbyte & 0xf0)>>4),
 	      (tempbyte & 0x0f),
 	       temp >> 8,
@@ -433,7 +456,14 @@ static void ehci_stop (struct usb_hcd *hcd)
 	/* no more interrupts ... */
 	if (hcd->state == USB_STATE_RUNNING)
 		ehci_ready (ehci);
+	if (in_interrupt ())		/* should not happen!! */
+		err ("stopped %s!", RUN_CONTEXT);
+	else
+		del_timer_sync (&ehci->watchdog);
 	ehci_reset (ehci);
+
+	/* let companion controllers work when we aren't */
+	writel (0, &ehci->regs->configured_flag);
 
 	remove_debug_files (ehci);
 
@@ -546,12 +576,17 @@ dbg ("%s: resume port %d", hcd->self.bus_name, i);
 static void ehci_tasklet (unsigned long param)
 {
 	struct ehci_hcd		*ehci = (struct ehci_hcd *) param;
+	unsigned long		flags;
+
+	spin_lock_irqsave (&ehci->lock, flags);
 
 	if (ehci->reclaim_ready)
-		end_unlink_async (ehci);
-	scan_async (ehci);
+		flags = end_unlink_async (ehci, flags);
+	flags = scan_async (ehci, flags);
 	if (ehci->next_uframe != -1)
-		scan_periodic (ehci);
+		flags = scan_periodic (ehci, flags);
+
+	spin_unlock_irqrestore (&ehci->lock, flags);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -681,7 +716,13 @@ static int ehci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
 	default:
 		spin_lock_irqsave (&ehci->lock, flags);
 		if (ehci->reclaim) {
-			dbg ("dq: reclaim busy, %s", RUN_CONTEXT);
+			dbg ("dq %p: reclaim = %p, %s",
+				qh, ehci->reclaim, RUN_CONTEXT);
+			if (qh == ehci->reclaim) {
+				/* unlinking qh for another queued urb? */
+				spin_unlock_irqrestore (&ehci->lock, flags);
+				return 0;
+			}
 			if (in_interrupt ()) {
 				spin_unlock_irqrestore (&ehci->lock, flags);
 				return -EAGAIN;
@@ -702,19 +743,19 @@ static int ehci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
 		break;
 
 	case PIPE_INTERRUPT:
+		spin_lock_irqsave (&ehci->lock, flags);
 		if (qh->qh_state == QH_STATE_LINKED) {
 			/* messy, can spin or block a microframe ... */
-			intr_deschedule (ehci, qh, 1);
+			flags = intr_deschedule (ehci, qh, 1, flags);
 			/* qh_state == IDLE */
 		}
-		qh_completions (ehci, qh);
+		flags = qh_completions (ehci, qh, flags);
 
 		/* reschedule QH iff another request is queued */
 		if (!list_empty (&qh->qtd_list)
 				&& HCD_IS_RUNNING (ehci->hcd.state)) {
 			int status;
 
-			spin_lock_irqsave (&ehci->lock, flags);
 			status = qh_schedule (ehci, qh);
 			spin_unlock_irqrestore (&ehci->lock, flags);
 
@@ -726,7 +767,7 @@ static int ehci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
 			}
 			return status;
 		}
-
+		spin_unlock_irqrestore (&ehci->lock, flags);
 		break;
 
 	case PIPE_ISOCHRONOUS:
@@ -805,8 +846,7 @@ static void ehci_free_config (struct usb_hcd *hcd, struct usb_device *udev)
 				start_unlink_async (ehci, qh);
 			while (qh->qh_state != QH_STATE_IDLE
 					&& ehci->hcd.state != USB_STATE_HALT) {
-				spin_unlock_irqrestore (&ehci->lock,
-					flags);
+				spin_unlock_irqrestore (&ehci->lock, flags);
 				wait_ms (1);
 				spin_lock_irqsave (&ehci->lock, flags);
 			}
