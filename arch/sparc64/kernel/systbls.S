@@ -76,7 +76,7 @@ sys_call_table32:
 	.word sys_timer_delete, sys32_timer_create, sys_ni_syscall, compat_sys_io_setup, sys_io_destroy
 /*270*/	.word sys32_io_submit, sys_io_cancel, compat_sys_io_getevents, sys32_mq_open, sys_mq_unlink
 	.word sys_mq_timedsend, sys_mq_timedreceive, compat_sys_mq_notify, compat_sys_mq_getsetattr, compat_sys_waitid
-/*280*/	.word sys_ni_syscall, sys_ni_syscall, sys_ni_syscall
+/*280*/	.word sys_setaltroot, sys_add_key, sys_request_key, sys_keyctl
 
 #endif /* CONFIG_COMPAT */
 
@@ -142,7 +142,7 @@ sys_call_table:
 	.word sys_timer_delete, sys_timer_create, sys_ni_syscall, sys_io_setup, sys_io_destroy
 /*270*/	.word sys_io_submit, sys_io_cancel, sys_io_getevents, sys_mq_open, sys_mq_unlink
 	.word sys_mq_timedsend, sys_mq_timedreceive, sys_mq_notify, sys_mq_getsetattr, sys_waitid
-/*280*/	.word sys_ni_syscall, sys_ni_syscall, sys_ni_syscall
+/*280*/	.word sys_setaltroot, sys_add_key, sys_request_key, sys_keyctl
 
 #if defined(CONFIG_SUNOS_EMUL) || defined(CONFIG_SOLARIS_EMUL) || \
     defined(CONFIG_SOLARIS_EMUL_MODULE)
@@ -247,5 +247,5 @@ sunos_sys_table:
 	.word sunos_nosys, sunos_nosys, sunos_nosys
 	.word sunos_nosys, sunos_nosys, sunos_nosys
 	.word sunos_nosys, sunos_nosys, sunos_nosys
-
+	.word sunos_nosys
 #endif
