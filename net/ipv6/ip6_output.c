@@ -984,7 +984,7 @@ static int ip6_fragment(struct sk_buff *skb, int (*output)(struct sk_buff*))
 		ipv6_select_ident(skb, fh);
 		fh->nexthdr = nexthdr;
 		fh->reserved = 0;
-		fh->frag_off = htons(0x0001);
+		fh->frag_off = htons(IP6_MF);
 		frag_id = fh->identification;
 
 		first_len = skb_pagelen(skb);
@@ -1004,7 +1004,9 @@ static int ip6_fragment(struct sk_buff *skb, int (*output)(struct sk_buff*))
 				offset += skb->len - hlen - sizeof(struct frag_hdr);
 				fh->nexthdr = nexthdr;
 				fh->reserved = 0;
-				fh->frag_off = htons(offset | (frag->next != NULL ? 0x0001 : 0));
+				fh->frag_off = htons(offset);
+				if (frag->next != NULL)
+					fh->frag_off |= htons(IP6_MF);
 				fh->identification = frag_id;
 				frag->nh.ipv6h->payload_len = htons(frag->len - sizeof(struct ipv6hdr));
 				ip6_copy_metadata(frag, skb);
@@ -1111,7 +1113,9 @@ slow_path:
 			BUG();
 		left -= len;
 
-		fh->frag_off = htons( left > 0 ?  (offset | 0x0001) : offset);
+		fh->frag_off = htons(offset);
+		if (left > 0)
+			fh->frag_off |= htons(IP6_MF);
 		frag->nh.ipv6h->payload_len = htons(frag->len - sizeof(struct ipv6hdr));
 
 		ptr += len;
