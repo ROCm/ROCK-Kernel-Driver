@@ -80,5 +80,5 @@
 
 #define LOCK_TEXT							\
 		VMLINUX_SYMBOL(__lock_text_start) = .;			\
-		*(.lock.text)						\
+		*(.spinlock.text)					\
 		VMLINUX_SYMBOL(__lock_text_end) = .;
