@@ -226,8 +226,8 @@ xfs_vget_fsop_handlereq(
 	xfs_inode_t		*ip;
 	struct inode		*inodep;
 	vnode_t			*vpp;
+	xfs_ino_t		ino;
 	__u32			igen;
-	ino_t			ino;
 	int			error;
 
 	if (!capable(cap))
