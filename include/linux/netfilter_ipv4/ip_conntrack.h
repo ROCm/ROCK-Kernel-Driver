@@ -172,9 +172,6 @@ struct ip_conntrack
            plus 1 for any connection(s) we are `master' for */
 	struct nf_conntrack ct_general;
 
-	/* These are my tuples; original and reply */
-	struct ip_conntrack_tuple_hash tuplehash[IP_CT_DIR_MAX];
-
 	/* Have we seen traffic both ways yet? (bitset) */
 	unsigned long status;
 
@@ -220,6 +217,9 @@ struct ip_conntrack
 	} nat;
 #endif /* CONFIG_IP_NF_NAT_NEEDED */
 
+	/* Traversed often, so hopefully in different cacheline to top */
+	/* These are my tuples; original and reply */
+	struct ip_conntrack_tuple_hash tuplehash[IP_CT_DIR_MAX];
 };
 
 /* get master conntrack via master expectation */
