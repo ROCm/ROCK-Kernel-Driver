@@ -30,8 +30,8 @@ extern void __delay(unsigned int loops);
  * (which corresponds to ~3800 bogomips at HZ = 100).
  *  -- paulus
  */
-#define __MAX_UDELAY	(226050910/HZ)	/* maximum udelay argument */
-#define __MAX_NDELAY	(2147483647/HZ)	/* maximum ndelay argument */
+#define __MAX_UDELAY	(226050910UL/HZ)	/* maximum udelay argument */
+#define __MAX_NDELAY	(4294967295UL/HZ)	/* maximum ndelay argument */
 
 extern __inline__ void __udelay(unsigned int x)
 {
