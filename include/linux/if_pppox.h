@@ -159,8 +159,6 @@ enum {
     PPPOX_DEAD		= 16  /* dead, useless, please clean me up!*/
 };
 
-extern struct ppp_channel_ops pppoe_chan_ops;
-
 #endif /* __KERNEL__ */
 
 #endif /* !(__LINUX_IF_PPPOX_H) */

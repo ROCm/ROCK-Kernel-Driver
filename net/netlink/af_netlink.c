@@ -176,7 +176,7 @@ found:
 	return sk;
 }
 
-extern struct proto_ops netlink_ops;
+static struct proto_ops netlink_ops;
 
 static int netlink_insert(struct sock *sk, u32 pid)
 {

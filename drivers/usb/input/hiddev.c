@@ -66,9 +66,6 @@ struct hiddev_list {
 
 static struct hiddev *hiddev_table[HIDDEV_MINORS];
 
-/* forward reference to make our lives easier */
-extern struct usb_driver hiddev_driver;
-
 /*
  * Find a report, given the report's type and ID.  The ID can be specified
  * indirectly by REPORT_ID_FIRST (which returns the first report of the given
