@@ -145,7 +145,7 @@ void local_bh_enable(void)
 	preempt_count() -= SOFTIRQ_OFFSET - 1;
 
 	if (unlikely(!in_interrupt() && local_softirq_pending()))
-		invoke_softirq();
+		do_softirq();
 
 	dec_preempt_count();
 	preempt_check_resched();
