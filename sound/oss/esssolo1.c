@@ -2451,11 +2451,7 @@ static struct pci_driver solo1_driver = {
 static int __init init_solo1(void)
 {
 	printk(KERN_INFO "solo1: version v0.20 time " __TIME__ " " __DATE__ "\n");
-	if (!pci_register_driver(&solo1_driver)) {
-		pci_unregister_driver(&solo1_driver);
-                return -ENODEV;
-	}
-	return 0;
+	return pci_register_driver(&solo1_driver);
 }
 
 /* --------------------------------------------------------------------- */

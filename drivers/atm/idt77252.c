@@ -3841,11 +3841,7 @@ static int __init idt77252_init(void)
 		return -EIO;
 	}
 
-	if (pci_register_driver(&idt77252_driver) > 0)
-		return 0;
-
-	pci_unregister_driver(&idt77252_driver);
-	return -ENODEV;
+	return pci_register_driver(&idt77252_driver);
 }
 
 static void __exit idt77252_exit(void)

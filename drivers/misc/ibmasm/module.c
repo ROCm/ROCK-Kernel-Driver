@@ -209,10 +209,9 @@ static int __init ibmasm_init(void)
 		return result;
 	}
 	result = pci_register_driver(&ibmasm_driver);
-	if (result <= 0) {
-		pci_unregister_driver(&ibmasm_driver);
+	if (result) {
 		ibmasmfs_unregister();
-		return -ENODEV;
+		return result;
 	}
 	ibmasm_register_panic_notifier();
 	info(DRIVER_DESC " version " DRIVER_VERSION " loaded");
@@ -225,3 +224,4 @@ module_exit(ibmasm_exit);
 MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
+

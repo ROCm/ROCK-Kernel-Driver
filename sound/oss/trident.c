@@ -4594,11 +4594,7 @@ trident_init_module(void)
 	       "5050 PCI Audio, version " DRIVER_VERSION ", " __TIME__ " " 
 	       __DATE__ "\n");
 
-	if (!pci_register_driver(&trident_pci_driver)) {
-		pci_unregister_driver(&trident_pci_driver);
-		return -ENODEV;
-	}
-	return 0;
+	return pci_register_driver(&trident_pci_driver);
 }
 
 static void __exit

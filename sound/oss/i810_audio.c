@@ -3483,13 +3483,15 @@ static struct pci_driver i810_pci_driver = {
 
 static int __init i810_init_module (void)
 {
+	int retval;
+
 	printk(KERN_INFO "Intel 810 + AC97 Audio, version "
 	       DRIVER_VERSION ", " __TIME__ " " __DATE__ "\n");
 
-	if (!pci_register_driver(&i810_pci_driver)) {
-		pci_unregister_driver(&i810_pci_driver);
-                return -ENODEV;
-	}
+	retval = pci_register_driver(&i810_pci_driver);
+	if (retval)
+		return retval;
+
 	if(ftsodell != 0) {
 		printk("i810_audio: ftsodell is now a deprecated option.\n");
 	}

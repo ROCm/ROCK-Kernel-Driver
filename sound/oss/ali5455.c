@@ -3713,11 +3713,7 @@ static int __init ali_init_module(void)
 			controller_pcmout_share_spdif_locked = 0;
 		}
 	}
-	if (!pci_register_driver(&ali_pci_driver)) {
-		pci_unregister_driver(&ali_pci_driver);
-		return -ENODEV;
-	}
-	return 0;
+	return pci_register_driver(&ali_pci_driver);
 }
 
 static void __exit ali_cleanup_module(void)

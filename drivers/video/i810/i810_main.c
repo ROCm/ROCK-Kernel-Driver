@@ -1995,10 +1995,7 @@ int __init i810fb_init(void)
 		return -ENODEV;
 	i810fb_setup(option);
 
-	if (pci_register_driver(&i810fb_driver) > 0)
-		return 0;
-	pci_unregister_driver(&i810fb_driver);
-	return -ENODEV;
+	return pci_register_driver(&i810fb_driver);
 }
 #endif 
 
@@ -2013,10 +2010,7 @@ int __init i810fb_init(void)
 	hsync1 *= 1000;
 	hsync2 *= 1000;
 
-	if (pci_register_driver(&i810fb_driver) > 0)
-		return 0;
-	pci_unregister_driver(&i810fb_driver);
-	return -ENODEV;
+	return pci_register_driver(&i810fb_driver);
 }
 
 MODULE_PARM(vram, "i");
