@@ -161,7 +161,7 @@ nfsd_lookup(struct svc_rqst *rqstp, struct svc_fh *fhp, const char *name,
 			struct dentry *dp;
 			struct vfsmount *mnt = mntget(exp->ex_mnt);
 			dentry = dget(dparent);
-			while(follow_up(&mnt, &dentry))
+			while(dentry == mnt->mnt_root && follow_up(&mnt, &dentry))
 				;
 			dp = dget_parent(dentry);
 			dput(dentry);
