@@ -73,7 +73,7 @@ pci_unmap_single(struct pci_dev *hwdev, dma_addr_t handle, size_t size, int dir)
 		return;
 	}
 
-	return dma_unmap_single(hwdev ? &hwdev->dev : NULL, handle, size, dir);
+	dma_unmap_single(hwdev ? &hwdev->dev : NULL, handle, size, dir);
 }
 
 static inline int
