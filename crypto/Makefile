@@ -4,8 +4,9 @@
 
 export-objs := api.o hmac.o
 
-obj-$(CONFIG_CRYPTO) += api.o cipher.o digest.o compress.o
-obj-$(CONFIG_KMOD) += autoload.o
+autoload-crypto-$(CONFIG_KMOD) = autoload.o
+
+obj-$(CONFIG_CRYPTO) += api.o cipher.o digest.o compress.o $(autoload-crypto-y)
 
 obj-$(CONFIG_CRYPTO_HMAC) += hmac.o
 obj-$(CONFIG_CRYPTO_MD4) += md4.o
