@@ -1145,7 +1145,7 @@ static unsigned long longest_sleep(struct ata_channel *channel)
 }
 
 /*
- * Select the next device which will be serviced.  This selects onlt between
+ * Select the next device which will be serviced.  This selects only between
  * devices on the same channel, since everything else will be scheduled on the
  * queue level.
  */

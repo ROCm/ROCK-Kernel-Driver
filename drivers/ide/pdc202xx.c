@@ -53,219 +53,9 @@
 #define PDC202XX_DEBUG_DRIVE_INFO		0
 #define PDC202XX_DECODE_REGISTER_INFO		0
 
-#undef DISPLAY_PDC202XX_TIMINGS
-
 #ifndef SPLIT_BYTE
 #define SPLIT_BYTE(B,H,L)	((H)=(B>>4), (L)=(B-((B>>4)<<4)))
 #endif
-
-#if defined(DISPLAY_PDC202XX_TIMINGS) && defined(CONFIG_PROC_FS)
-#include <linux/stat.h>
-#include <linux/proc_fs.h>
-
-static int pdc202xx_get_info(char *, char **, off_t, int);
-extern int (*pdc202xx_display_info)(char *, char **, off_t, int); /* ide-proc.c */
-static struct pci_dev *bmide_dev;
-
-char *pdc202xx_pio_verbose (u32 drive_pci)
-{
-	if ((drive_pci & 0x000ff000) == 0x000ff000) return("NOTSET");
-	if ((drive_pci & 0x00000401) == 0x00000401) return("PIO 4");
-	if ((drive_pci & 0x00000602) == 0x00000602) return("PIO 3");
-	if ((drive_pci & 0x00000803) == 0x00000803) return("PIO 2");
-	if ((drive_pci & 0x00000C05) == 0x00000C05) return("PIO 1");
-	if ((drive_pci & 0x00001309) == 0x00001309) return("PIO 0");
-	return("PIO ?");
-}
-
-char *pdc202xx_dma_verbose (u32 drive_pci)
-{
-	if ((drive_pci & 0x00036000) == 0x00036000) return("MWDMA 2");
-	if ((drive_pci & 0x00046000) == 0x00046000) return("MWDMA 1");
-	if ((drive_pci & 0x00056000) == 0x00056000) return("MWDMA 0");
-	if ((drive_pci & 0x00056000) == 0x00056000) return("SWDMA 2");
-	if ((drive_pci & 0x00068000) == 0x00068000) return("SWDMA 1");
-	if ((drive_pci & 0x000BC000) == 0x000BC000) return("SWDMA 0");
-	return("PIO---");
-}
-
-char *pdc202xx_ultra_verbose (u32 drive_pci, u16 slow_cable)
-{
-	if ((drive_pci & 0x000ff000) == 0x000ff000)
-		return("NOTSET");
-	if ((drive_pci & 0x00012000) == 0x00012000)
-		return((slow_cable) ? "UDMA 2" : "UDMA 4");
-	if ((drive_pci & 0x00024000) == 0x00024000)
-		return((slow_cable) ? "UDMA 1" : "UDMA 3");
-	if ((drive_pci & 0x00036000) == 0x00036000)
-		return("UDMA 0");
-	return(pdc202xx_dma_verbose(drive_pci));
-}
-
-static char * pdc202xx_info (char *buf, struct pci_dev *dev)
-{
-	char *p = buf;
-
-	u32 bibma  = pci_resource_start(dev, 4);
-	u32 reg60h = 0, reg64h = 0, reg68h = 0, reg6ch = 0;
-	u16 reg50h = 0, pmask = (1<<10), smask = (1<<11);
-	u8 hi = 0, lo = 0;
-
-        /*
-         * at that point bibma+0x2 et bibma+0xa are byte registers
-         * to investigate:
-         */
-	u8 c0	= inb_p((unsigned short)bibma + 0x02);
-	u8 c1	= inb_p((unsigned short)bibma + 0x0a);
-
-	u8 sc11	= inb_p((unsigned short)bibma + 0x11);
-	u8 sc1a	= inb_p((unsigned short)bibma + 0x1a);
-	u8 sc1b	= inb_p((unsigned short)bibma + 0x1b);
-	u8 sc1c	= inb_p((unsigned short)bibma + 0x1c); 
-	u8 sc1d	= inb_p((unsigned short)bibma + 0x1d);
-	u8 sc1e	= inb_p((unsigned short)bibma + 0x1e);
-	u8 sc1f	= inb_p((unsigned short)bibma + 0x1f);
-
-	pci_read_config_word(dev, 0x50, &reg50h);
-	pci_read_config_dword(dev, 0x60, &reg60h);
-	pci_read_config_dword(dev, 0x64, &reg64h);
-	pci_read_config_dword(dev, 0x68, &reg68h);
-	pci_read_config_dword(dev, 0x6c, &reg6ch);
-
-	switch(dev->device) {
-		case PCI_DEVICE_ID_PROMISE_20267:
-			p += sprintf(p, "\n                                PDC20267 Chipset.\n");
-			break;
-		case PCI_DEVICE_ID_PROMISE_20265:
-			p += sprintf(p, "\n                                PDC20265 Chipset.\n");
-			break;
-		case PCI_DEVICE_ID_PROMISE_20262:
-			p += sprintf(p, "\n                                PDC20262 Chipset.\n");
-			break;
-		case PCI_DEVICE_ID_PROMISE_20246:
-			p += sprintf(p, "\n                                PDC20246 Chipset.\n");
-			reg50h |= 0x0c00;
-			break;
-		default:
-			p += sprintf(p, "\n                                PDC202XX Chipset.\n");
-			break;
-	}
-
-	p += sprintf(p, "------------------------------- General Status ---------------------------------\n");
-	p += sprintf(p, "Burst Mode                           : %sabled\n", (sc1f & 0x01) ? "en" : "dis");
-	p += sprintf(p, "Host Mode                            : %s\n", (sc1f & 0x08) ? "Tri-Stated" : "Normal");
-	p += sprintf(p, "Bus Clocking                         : %s\n",
-		((sc1f & 0xC0) == 0xC0) ? "100 External" :
-		((sc1f & 0x80) == 0x80) ? "66 External" :
-		((sc1f & 0x40) == 0x40) ? "33 External" : "33 PCI Internal");
-	p += sprintf(p, "IO pad select                        : %s mA\n",
-		((sc1c & 0x03) == 0x03) ? "10" :
-		((sc1c & 0x02) == 0x02) ? "8" :
-		((sc1c & 0x01) == 0x01) ? "6" :
-		((sc1c & 0x00) == 0x00) ? "4" : "??");
-	SPLIT_BYTE(sc1e, hi, lo);
-	p += sprintf(p, "Status Polling Period                : %d\n", hi);
-	p += sprintf(p, "Interrupt Check Status Polling Delay : %d\n", lo);
-	p += sprintf(p, "--------------- Primary Channel ---------------- Secondary Channel -------------\n");
-	p += sprintf(p, "                %s                         %s\n",
-		(c0&0x80)?"disabled":"enabled ",
-		(c1&0x80)?"disabled":"enabled ");
-	p += sprintf(p, "66 Clocking     %s                         %s\n",
-		(sc11&0x02)?"enabled ":"disabled",
-		(sc11&0x08)?"enabled ":"disabled");
-	p += sprintf(p, "           Mode %s                      Mode %s\n",
-		(sc1a & 0x01) ? "MASTER" : "PCI   ",
-		(sc1b & 0x01) ? "MASTER" : "PCI   ");
-	p += sprintf(p, "                %s                     %s\n",
-		(sc1d & 0x08) ? "Error       " :
-		((sc1d & 0x05) == 0x05) ? "Not My INTR " :
-		(sc1d & 0x04) ? "Interrupting" :
-		(sc1d & 0x02) ? "FIFO Full   " :
-		(sc1d & 0x01) ? "FIFO Empty  " : "????????????",
-		(sc1d & 0x80) ? "Error       " :
-		((sc1d & 0x50) == 0x50) ? "Not My INTR " :
-		(sc1d & 0x40) ? "Interrupting" :
-		(sc1d & 0x20) ? "FIFO Full   " :
-		(sc1d & 0x10) ? "FIFO Empty  " : "????????????");
-	p += sprintf(p, "--------------- drive0 --------- drive1 -------- drive0 ---------- drive1 ------\n");
-	p += sprintf(p, "DMA enabled:    %s              %s             %s               %s\n",
-		(c0&0x20)?"yes":"no ",(c0&0x40)?"yes":"no ",(c1&0x20)?"yes":"no ",(c1&0x40)?"yes":"no ");
-	p += sprintf(p, "DMA Mode:       %s           %s          %s            %s\n",
-		pdc202xx_ultra_verbose(reg60h, (reg50h & pmask)),
-		pdc202xx_ultra_verbose(reg64h, (reg50h & pmask)),
-		pdc202xx_ultra_verbose(reg68h, (reg50h & smask)),
-		pdc202xx_ultra_verbose(reg6ch, (reg50h & smask)));
-	p += sprintf(p, "PIO Mode:       %s            %s           %s            %s\n",
-		pdc202xx_pio_verbose(reg60h),
-		pdc202xx_pio_verbose(reg64h),
-		pdc202xx_pio_verbose(reg68h),
-		pdc202xx_pio_verbose(reg6ch));
-#if 0
-	p += sprintf(p, "--------------- Can ATAPI DMA ---------------\n");
-#endif
-	return (char *)p;
-}
-
-static char * pdc202xx_info_new (char *buf, struct pci_dev *dev)
-{
-	char *p = buf;
-//	u32 bibma = pci_resource_start(dev, 4);
-
-//	u32 reg60h = 0, reg64h = 0, reg68h = 0, reg6ch = 0;
-//	u16 reg50h = 0, word88 = 0;
-//	int udmasel[4]={0,0,0,0}, piosel[4]={0,0,0,0}, i=0, hd=0;
-
-	switch(dev->device) {
-		case PCI_DEVICE_ID_PROMISE_20275:
-			p += sprintf(p, "\n                                PDC20275 Chipset.\n");
-			break;
-		case PCI_DEVICE_ID_PROMISE_20276:
-			p += sprintf(p, "\n                                PDC20276 Chipset.\n");
-			break;
-		case PCI_DEVICE_ID_PROMISE_20269:
-			p += sprintf(p, "\n                                PDC20269 TX2 Chipset.\n");
-			break;
-		case PCI_DEVICE_ID_PROMISE_20268:
-		case PCI_DEVICE_ID_PROMISE_20268R:
-			p += sprintf(p, "\n                                PDC20268 TX2 Chipset.\n");
-			break;
-default:
-			p += sprintf(p, "\n                                PDC202XX Chipset.\n");
-			break;
-	}
-	return (char *)p;
-}
-
-static int pdc202xx_get_info (char *buffer, char **addr, off_t offset, int count)
-{
-	char *p = buffer;
-	switch(bmide_dev->device) {
-		case PCI_DEVICE_ID_PROMISE_20275:
-		case PCI_DEVICE_ID_PROMISE_20276:
-		case PCI_DEVICE_ID_PROMISE_20269:
-		case PCI_DEVICE_ID_PROMISE_20268:
-		case PCI_DEVICE_ID_PROMISE_20268R:
-			p = pdc202xx_info_new(buffer, bmide_dev);
-			break;
-		default:
-			p = pdc202xx_info(buffer, bmide_dev);
-			break;
-	}
-	return p-buffer;	/* => must be less than 4k! */
-}
-#endif  /* defined(DISPLAY_PDC202XX_TIMINGS) && defined(CONFIG_PROC_FS) */
-
-byte pdc202xx_proc = 0;
-
-const char *pdc_quirk_drives[] = {
-	"QUANTUM FIREBALLlct08 08",
-	"QUANTUM FIREBALLP KA6.4",
-	"QUANTUM FIREBALLP LM20.4",
-	"QUANTUM FIREBALLP KX20.5",
-	"QUANTUM FIREBALLP KX27.3",
-	"QUANTUM FIREBALLP LM20.5",
-	NULL
-};
 
 extern char *ide_xfer_verbose (byte xfer_rate);
 
@@ -322,7 +112,6 @@ static void decode_registers (byte registers, byte value)
 
 	switch(registers) {
 		case REG_A:
-			bit2 = 0;
 			printk("A Register ");
 			if (value & 0x80) printk("SYNC_IN ");
 			if (value & 0x40) printk("ERRDY_EN ");
@@ -335,7 +124,6 @@ static void decode_registers (byte registers, byte value)
 			printk("PIO(A) = %d ", bit2);
 			break;
 		case REG_B:
-			bit1 = 0;bit2 = 0;
 			printk("B Register ");
 			if (value & 0x80) { printk("MB2 ");bit1 |= 0x80; }
 			if (value & 0x40) { printk("MB1 ");bit1 |= 0x40; }
@@ -349,7 +137,6 @@ static void decode_registers (byte registers, byte value)
 			printk("PIO(B) = %d ", bit2);
 			break;
 		case REG_C:
-			bit2 = 0;
 			printk("C Register ");
 			if (value & 0x80) printk("DMARQp ");
 			if (value & 0x40) printk("IORDYp ");
@@ -379,23 +166,22 @@ static void decode_registers (byte registers, byte value)
 
 #endif /* PDC202XX_DECODE_REGISTER_INFO */
 
-static int check_in_drive_lists(struct ata_device *drive, const char **list)
-{
+int check_in_drive_lists(struct ata_device *drive) {
+	const char *pdc_quirk_drives[] = {
+		"QUANTUM FIREBALLlct08 08",
+		"QUANTUM FIREBALLP KA6.4",
+		"QUANTUM FIREBALLP LM20.4",
+		"QUANTUM FIREBALLP KX20.5",
+		"QUANTUM FIREBALLP KX27.3",
+		"QUANTUM FIREBALLP LM20.5",
+		NULL
+	};
+     const char**list = pdc_quirk_drives;
 	struct hd_driveid *id = drive->id;
 
-	if (pdc_quirk_drives == list) {
-		while (*list) {
-			if (strstr(id->model, *list++)) {
-				return 2;
-			}
-		}
-	} else {
-		while (*list) {
-			if (!strcmp(*list++,id->model)) {
-				return 1;
-			}
-		}
-	}
+	while (*list)
+		if (strstr(id->model, *list++))
+			return 2;
 	return 0;
 }
 
@@ -523,6 +309,15 @@ static int pdc202xx_tune_chipset(struct ata_device *drive, byte speed)
 	return err;
 }
 
+#define set_2regs(a, b) \
+        OUT_BYTE((a + adj), indexreg); \
+	OUT_BYTE(b, datareg);
+
+#define set_reg_and_wait(value, reg, delay) \
+	OUT_BYTE(value, reg); \
+        mdelay(delay);
+
+
 static int pdc202xx_new_tune_chipset(struct ata_device *drive, byte speed)
 {
 	struct ata_channel *hwif = drive->channel;
@@ -549,121 +344,79 @@ static int pdc202xx_new_tune_chipset(struct ata_device *drive, byte speed)
 		case XFER_UDMA_7:
 			speed = XFER_UDMA_6;
 		case XFER_UDMA_6:
-			OUT_BYTE((0x10 + adj), indexreg);
-			OUT_BYTE(0x1a, datareg);
-			OUT_BYTE((0x11 + adj), indexreg);
-			OUT_BYTE(0x01, datareg);
-			OUT_BYTE((0x12 + adj), indexreg);
-			OUT_BYTE(0xcb, datareg);
+			set_2regs(0x10, 0x1a);
+			set_2regs(0x11, 0x01);
+			set_2regs(0x12, 0xcb);
 			break;
 		case XFER_UDMA_5:
-			OUT_BYTE((0x10 + adj), indexreg);
-			OUT_BYTE(0x1a, datareg);
-			OUT_BYTE((0x11 + adj), indexreg);
-			OUT_BYTE(0x02, datareg);
-			OUT_BYTE((0x12 + adj), indexreg);
-			OUT_BYTE(0xcb, datareg);
+			set_2regs(0x10, 0x1a);
+			set_2regs(0x11, 0x02);
+			set_2regs(0x12, 0xcb);
 			break;
 		case XFER_UDMA_4:
-			OUT_BYTE((0x10 + adj), indexreg);
-			OUT_BYTE(0x1a, datareg);
-			OUT_BYTE((0x11 + adj), indexreg);
-			OUT_BYTE(0x03, datareg);
-			OUT_BYTE((0x12 + adj), indexreg);
-			OUT_BYTE(0xcd, datareg);
+			set_2regs(0x10, 0x1a);
+			set_2regs(0x11, 0x03);
+			set_2regs(0x12, 0xcd);
 			break;
 		case XFER_UDMA_3:
-			OUT_BYTE((0x10 + adj), indexreg);
-			OUT_BYTE(0x1a, datareg);
-			OUT_BYTE((0x11 + adj), indexreg);
-			OUT_BYTE(0x05, datareg);
-			OUT_BYTE((0x12 + adj), indexreg);
-			OUT_BYTE(0xcd, datareg);
+			set_2regs(0x10, 0x1a);
+			set_2regs(0x11, 0x05);
+			set_2regs(0x12, 0xcd);
 			break;
 		case XFER_UDMA_2:
-			OUT_BYTE((0x10 + adj), indexreg);
-			OUT_BYTE(0x2a, datareg);
-			OUT_BYTE((0x11 + adj), indexreg);
-			OUT_BYTE(0x07, datareg);
-			OUT_BYTE((0x12 + adj), indexreg);
-			OUT_BYTE(0xcd, datareg);
+			set_2regs(0x10, 0x2a);
+			set_2regs(0x11, 0x07);
+			set_2regs(0x12, 0xcd);
 			break;
 		case XFER_UDMA_1:
-			OUT_BYTE((0x10 + adj), indexreg);
-			OUT_BYTE(0x3a, datareg);
-			OUT_BYTE((0x11 + adj), indexreg);
-			OUT_BYTE(0x0a, datareg);
-			OUT_BYTE((0x12 + adj), indexreg);
-			OUT_BYTE(0xd0, datareg);
+			set_2regs(0x10, 0x3a);
+			set_2regs(0x11, 0x0a);
+			set_2regs(0x12, 0xd0);
 			break;
 		case XFER_UDMA_0:
-			OUT_BYTE((0x10 + adj), indexreg);
-			OUT_BYTE(0x4a, datareg);
-			OUT_BYTE((0x11 + adj), indexreg);
-			OUT_BYTE(0x0f, datareg);
-			OUT_BYTE((0x12 + adj), indexreg);
-			OUT_BYTE(0xd5, datareg);
+			set_2regs(0x10, 0x4a);
+			set_2regs(0x11, 0x0f);
+			set_2regs(0x12, 0xd5);
 			break;
 		case XFER_MW_DMA_2:
-			OUT_BYTE((0x0e + adj), indexreg);
-			OUT_BYTE(0x69, datareg);
-			OUT_BYTE((0x0f + adj), indexreg);
-			OUT_BYTE(0x25, datareg);
+			set_2regs(0x0e, 0x69);
+			set_2regs(0x0f, 0x25);
 			break;
 		case XFER_MW_DMA_1:
-			OUT_BYTE((0x0e + adj), indexreg);
-			OUT_BYTE(0x6b, datareg);
-			OUT_BYTE((0x0f+ adj), indexreg);
-			OUT_BYTE(0x27, datareg);
+			set_2regs(0x0e, 0x6b);
+			set_2regs(0x0f, 0x27);
 			break;
 		case XFER_MW_DMA_0:
-			OUT_BYTE((0x0e + adj), indexreg);
-			OUT_BYTE(0xdf, datareg);
-			OUT_BYTE((0x0f + adj), indexreg);
-			OUT_BYTE(0x5f, datareg);
+			set_2regs(0x0e, 0xdf);
+			set_2regs(0x0f, 0x5f);
 			break;
 #else
 	switch (speed) {
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 		case XFER_PIO_4:
-			OUT_BYTE((0x0c + adj), indexreg);
-			OUT_BYTE(0x23, datareg);
-			OUT_BYTE((0x0d + adj), indexreg);
-			OUT_BYTE(0x09, datareg);
-			OUT_BYTE((0x13 + adj), indexreg);
-			OUT_BYTE(0x25, datareg);
+			set_2regs(0x0c, 0x23);
+			set_2regs(0x0d, 0x09);
+			set_2regs(0x13, 0x25);
 			break;
 		case XFER_PIO_3:
-			OUT_BYTE((0x0c + adj), indexreg);
-			OUT_BYTE(0x27, datareg);
-			OUT_BYTE((0x0d + adj), indexreg);
-			OUT_BYTE(0x0d, datareg);
-			OUT_BYTE((0x13 + adj), indexreg);
-			OUT_BYTE(0x35, datareg);
+			set_2regs(0x0c, 0x27);
+			set_2regs(0x0d, 0x0d);
+			set_2regs(0x13, 0x35);
 			break;
 		case XFER_PIO_2:
-			OUT_BYTE((0x0c + adj), indexreg);
-			OUT_BYTE(0x23, datareg);
-			OUT_BYTE((0x0d + adj), indexreg);
-			OUT_BYTE(0x26, datareg);
-			OUT_BYTE((0x13 + adj), indexreg);
-			OUT_BYTE(0x64, datareg);
+			set_2regs(0x0c, 0x23);
+			set_2regs(0x0d, 0x26);
+			set_2regs(0x13, 0x64);
 			break;
 		case XFER_PIO_1:
-			OUT_BYTE((0x0c + adj), indexreg);
-			OUT_BYTE(0x46, datareg);
-			OUT_BYTE((0x0d + adj), indexreg);
-			OUT_BYTE(0x29, datareg);
-			OUT_BYTE((0x13 + adj), indexreg);
-			OUT_BYTE(0xa4, datareg);
+			set_2regs(0x0c, 0x46);
+			set_2regs(0x0d, 0x29);
+			set_2regs(0x13, 0xa4);
 			break;
 		case XFER_PIO_0:
-			OUT_BYTE((0x0c + adj), indexreg);
-			OUT_BYTE(0xfb, datareg);
-			OUT_BYTE((0x0d + adj), indexreg);
-			OUT_BYTE(0x2b, datareg);
-			OUT_BYTE((0x13 + adj), indexreg);
-			OUT_BYTE(0xac, datareg);
+			set_2regs(0x0c, 0xfb);
+			set_2regs(0x0d, 0x2b);
+			set_2regs(0x13, 0xac);
 			break;
 		default:
 			;
@@ -684,21 +437,15 @@ static int pdc202xx_new_tune_chipset(struct ata_device *drive, byte speed)
  * 180, 120,  90,  90,  90,  60,  30
  *  11,   5,   4,   3,   2,   1,   0
  */
-static int config_chipset_for_pio(struct ata_device *drive, byte pio)
+static void config_chipset_for_pio(struct ata_device *drive, byte pio)
 {
-	byte speed = 0x00;
+	byte speed;
 
 	if (pio == 255)
 		speed = ata_timing_mode(drive, XFER_PIO | XFER_EPIO);
-	else
-		speed = XFER_PIO_0 + min_t(byte, pio, 4);
+	else	speed = XFER_PIO_0 + min_t(byte, pio, 4);
 
-	return ((int) pdc202xx_tune_chipset(drive, speed));
-}
-
-static void pdc202xx_tune_drive(struct ata_device *drive, byte pio)
-{
-	(void) config_chipset_for_pio(drive, pio);
+	pdc202xx_tune_chipset(drive, speed);
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
@@ -833,8 +580,7 @@ static int config_chipset_for_dma(struct ata_device *drive, byte ultra)
 		if (drive->type != ATA_DISK)
 			return 0;
 		if (id->capability & 4) {	/* IORDY_EN & PREFETCH_EN */
-			OUT_BYTE((iordy + adj), indexreg);
-			OUT_BYTE((IN_BYTE(datareg)|0x03), datareg);
+			set_2regs(iordy, (IN_BYTE(datareg)|0x03));
 		}
 		goto jumpbit_is_set;
 	}
@@ -971,17 +717,12 @@ fast_ata_pio:
 		on = 0;
 		verbose = 0;
 no_dma_set:
-		(void) config_chipset_for_pio(drive, 5);
+		config_chipset_for_pio(drive, 5);
 	}
 
 	udma_enable(drive, on, verbose);
 
 	return 0;
-}
-
-int pdc202xx_quirkproc(struct ata_device *drive)
-{
-	return ((int) check_in_drive_lists(drive, pdc_quirk_drives));
 }
 
 static int pdc202xx_udma_start(struct ata_device *drive, struct request *rq)
@@ -1119,15 +860,7 @@ somebody_else:
 	return (dma_stat & 4) == 4;	/* return 1 if INTR asserted */
 }
 
-static void pdc202xx_udma_timeout(struct ata_device *drive)
-{
-	if (!drive->channel->resetproc)
-		return;
-	/* Assume naively that resetting the drive may help. */
-	drive->channel->resetproc(drive);
-}
-
-static void pdc202xx_udma_irq_lost(struct ata_device *drive)
+static void pdc202xx_bug (struct ata_device *drive)
 {
 	if (!drive->channel->resetproc)
 		return;
@@ -1143,10 +876,8 @@ static int pdc202xx_dmaproc(struct ata_device *drive)
 
 void pdc202xx_new_reset(struct ata_device *drive)
 {
-	OUT_BYTE(0x04,IDE_CONTROL_REG);
-	mdelay(1000);
-	OUT_BYTE(0x00,IDE_CONTROL_REG);
-	mdelay(1000);
+	set_reg_and_wait(0x04,IDE_CONTROL_REG, 1000);
+	set_reg_and_wait(0x00,IDE_CONTROL_REG, 1000);
 	printk("PDC202XX: %s channel reset.\n",
 		drive->channel->unit ? "Secondary" : "Primary");
 }
@@ -1156,38 +887,10 @@ void pdc202xx_reset(struct ata_device *drive)
 	unsigned long high_16	= pci_resource_start(drive->channel->pci_dev, 4);
 	byte udma_speed_flag	= IN_BYTE(high_16 + 0x001f);
 
-	OUT_BYTE(udma_speed_flag | 0x10, high_16 + 0x001f);
-	mdelay(100);
-	OUT_BYTE(udma_speed_flag & ~0x10, high_16 + 0x001f);
-	mdelay(2000);		/* 2 seconds ?! */
+	set_reg_and_wait(udma_speed_flag | 0x10, high_16 + 0x001f, 100);
+	set_reg_and_wait(udma_speed_flag & ~0x10, high_16 + 0x001f, 2000);		/* 2 seconds ?! */
 	printk("PDC202XX: %s channel reset.\n",
 		drive->channel->unit ? "Secondary" : "Primary");
-}
-
-/*
- * Since SUN Cobalt is attempting to do this operation, I should disclose
- * this has been a long time ago Thu Jul 27 16:40:57 2000 was the patch date
- * HOTSWAP ATA Infrastructure.
- */
-static int pdc202xx_tristate(struct ata_device * drive, int state)
-{
-#if 0
-	struct ata_channel *hwif = drive->channel;
-	unsigned long high_16	= pci_resource_start(hwif->pci_dev, 4);
-	byte sc1f		= inb(high_16 + 0x001f);
-
-	if (!hwif)
-		return -EINVAL;
-
-//	hwif->bus_state = state;
-
-	if (state) {
-		outb(sc1f | 0x08, high_16 + 0x001f);
-	} else {
-		outb(sc1f & ~0x08, high_16 + 0x001f);
-	}
-#endif
-	return 0;
 }
 
 static unsigned int __init pdc202xx_init_chipset(struct pci_dev *dev)
@@ -1213,10 +916,8 @@ static unsigned int __init pdc202xx_init_chipset(struct pci_dev *dev)
 			break;
 		case PCI_DEVICE_ID_PROMISE_20267:
 		case PCI_DEVICE_ID_PROMISE_20265:
-			OUT_BYTE(udma_speed_flag | 0x10, high_16 + 0x001f);
-			mdelay(100);
-			OUT_BYTE(udma_speed_flag & ~0x10, high_16 + 0x001f);
-			mdelay(2000);   /* 2 seconds ?! */
+			set_reg_and_wait(udma_speed_flag | 0x10, high_16 + 0x001f, 100);
+			set_reg_and_wait(udma_speed_flag & ~0x10, high_16 + 0x001f, 2000);   /* 2 seconds ?! */
 			break;
 		case PCI_DEVICE_ID_PROMISE_20262:
 			/*
@@ -1229,10 +930,8 @@ static unsigned int __init pdc202xx_init_chipset(struct pci_dev *dev)
 			 * reset leaves the timing registers intact,
 			 * but resets the drives.
 			 */
-			OUT_BYTE(udma_speed_flag | 0x10, high_16 + 0x001f);
-			mdelay(100);
-			OUT_BYTE(udma_speed_flag & ~0x10, high_16 + 0x001f);
-			mdelay(2000);	/* 2 seconds ?! */
+			set_reg_and_wait(udma_speed_flag | 0x10, high_16 + 0x001f, 100);
+			set_reg_and_wait(udma_speed_flag & ~0x10, high_16 + 0x001f, 2000);	/* 2 seconds ?! */
 		default:
 			if ((dev->class >> 8) != PCI_CLASS_STORAGE_IDE) {
 				byte irq = 0, irq2 = 0;
@@ -1265,31 +964,7 @@ static unsigned int __init pdc202xx_init_chipset(struct pci_dev *dev)
 	}
 #endif /* CONFIG_PDC202XX_BURST */
 
-#ifdef CONFIG_PDC202XX_MASTER
-	if (!(primary_mode & 1)) {
-		printk("%s: FORCING PRIMARY MODE BIT 0x%02x -> 0x%02x ",
-			dev->name, primary_mode, (primary_mode|1));
-		OUT_BYTE(primary_mode|1, high_16 + 0x001a);
-		printk("%s\n", (IN_BYTE(high_16 + 0x001a) & 1) ? "MASTER" : "PCI");
-	}
-
-	if (!(secondary_mode & 1)) {
-		printk("%s: FORCING SECONDARY MODE BIT 0x%02x -> 0x%02x ",
-			dev->name, secondary_mode, (secondary_mode|1));
-		OUT_BYTE(secondary_mode|1, high_16 + 0x001b);
-		printk("%s\n", (IN_BYTE(high_16 + 0x001b) & 1) ? "MASTER" : "PCI");
-	}
-#endif
-
 fttk_tx_series:
-
-#if defined(DISPLAY_PDC202XX_TIMINGS) && defined(CONFIG_PROC_FS)
-	if (!pdc202xx_proc) {
-		pdc202xx_proc = 1;
-		bmide_dev = dev;
-		pdc202xx_display_info = &pdc202xx_get_info;
-	}
-#endif
 	return dev->irq;
 }
 
@@ -1314,8 +989,8 @@ static unsigned int __init ata66_pdc202xx(struct ata_channel *hwif)
 
 static void __init ide_init_pdc202xx(struct ata_channel *hwif)
 {
-	hwif->tuneproc  = &pdc202xx_tune_drive;
-	hwif->quirkproc = &pdc202xx_quirkproc;
+	hwif->tuneproc  = &config_chipset_for_pio;
+	hwif->quirkproc = &check_in_drive_lists;
 
         switch(hwif->pci_dev->device) {
 		case PCI_DEVICE_ID_PROMISE_20275:
@@ -1329,7 +1004,6 @@ static void __init ide_init_pdc202xx(struct ata_channel *hwif)
 		case PCI_DEVICE_ID_PROMISE_20267:
 		case PCI_DEVICE_ID_PROMISE_20265:
 		case PCI_DEVICE_ID_PROMISE_20262:
-			hwif->busproc   = &pdc202xx_tristate;
 			hwif->resetproc	= &pdc202xx_reset;
 		case PCI_DEVICE_ID_PROMISE_20246:
 			hwif->speedproc = &pdc202xx_tune_chipset;
@@ -1337,19 +1011,13 @@ static void __init ide_init_pdc202xx(struct ata_channel *hwif)
 			break;
 	}
 
-#undef CONFIG_PDC202XX_32_UNMASK
-#ifdef CONFIG_PDC202XX_32_UNMASK
-	hwif->io_32bit = 1;
-	hwif->unmask = 1;
-#endif
-
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (hwif->dma_base) {
 		hwif->udma_start = pdc202xx_udma_start;
 		hwif->udma_stop = pdc202xx_udma_stop;
 		hwif->udma_irq_status = pdc202xx_udma_irq_status;
-		hwif->udma_irq_lost = pdc202xx_udma_irq_lost;
-		hwif->udma_timeout = pdc202xx_udma_timeout;
+		hwif->udma_irq_lost = pdc202xx_bug;
+		hwif->udma_timeout = pdc202xx_bug;
 		hwif->XXX_udma = pdc202xx_dmaproc;
 		hwif->highmem = 1;
 		if (!noautodma)
@@ -1509,7 +1177,7 @@ static struct ata_pci_device chipsets[] __initdata = {
 
 int __init init_pdc202xx(void)
 {
-	int i;
+	unsigned int i;
 
 	for (i = 0; i < ARRAY_SIZE(chipsets); ++i) {
 		ata_register_chipset(&chipsets[i]);

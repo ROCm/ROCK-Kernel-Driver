@@ -562,7 +562,7 @@ static ide_startstop_t task_out_intr(struct ata_device *drive, struct request *r
 		if (!ide_end_request(drive, rq, 1))
 			return ide_stopped;
 
-	if ((rq->current_nr_sectors==1) ^ (stat & DRQ_STAT)) {
+	if ((rq->nr_sectors == 1) != (stat & DRQ_STAT)) {
 		pBuf = ide_map_rq(rq, &flags);
 		DTF("write: %p, rq->current_nr_sectors: %d\n", pBuf, (int) rq->current_nr_sectors);
 

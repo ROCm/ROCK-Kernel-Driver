@@ -820,22 +820,55 @@ extern int ide_unregister_subdriver(struct ata_device *drive);
 
 void __init ide_scan_pcibus(int scan_direction);
 #endif
+
+static inline void udma_enable(struct ata_device *drive, int on, int verbose)
+{
+	drive->channel->udma_enable(drive, on, verbose);
+}
+
+static inline int udma_start(struct ata_device *drive, struct request *rq)
+{
+	return drive->channel->udma_start(drive, rq);
+}
+
+static inline int udma_stop(struct ata_device *drive)
+{
+	return drive->channel->udma_stop(drive);
+}
+
+static inline int udma_read(struct ata_device *drive, struct request *rq)
+{
+	return drive->channel->udma_read(drive, rq);
+}
+
+static inline int udma_write(struct ata_device *drive, struct request *rq)
+{
+	return drive->channel->udma_write(drive, rq);
+}
+
+static inline int udma_irq_status(struct ata_device *drive)
+{
+	return drive->channel->udma_irq_status(drive);
+}
+
+static inline void udma_timeout(struct ata_device *drive)
+{
+	return drive->channel->udma_timeout(drive);
+}
+
+static inline void udma_irq_lost(struct ata_device *drive)
+{
+	return drive->channel->udma_irq_lost(drive);
+}
+
 #ifdef CONFIG_BLK_DEV_IDEDMA
 
 extern int udma_new_table(struct ata_channel *, struct request *);
 extern void udma_destroy_table(struct ata_channel *);
 extern void udma_print(struct ata_device *);
 
-extern void udma_enable(struct ata_device *, int, int);
 extern int udma_black_list(struct ata_device *);
 extern int udma_white_list(struct ata_device *);
-extern void udma_timeout(struct ata_device *);
-extern void udma_irq_lost(struct ata_device *);
-extern int udma_start(struct ata_device *, struct request *rq);
-extern int udma_stop(struct ata_device *);
-extern int udma_read(struct ata_device *, struct request *rq);
-extern int udma_write(struct ata_device *, struct request *rq);
-extern int udma_irq_status(struct ata_device *);
 
 extern int ata_do_udma(unsigned int reading, struct ata_device *drive, struct request *rq);
 
