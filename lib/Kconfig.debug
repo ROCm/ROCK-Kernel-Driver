@@ -107,6 +107,16 @@ config DEBUG_INFO
         If you're truly short on disk space or don't expect to report any
         bugs back to the UML developers, say N, otherwise say Y.
 
+config DEBUG_FS
+	bool "Debug Filesystem"
+	depends on DEBUG_KERNEL
+	help
+	  debugfs is a virtual file system that kernel developers use to put
+	  debugging files into.  Enable this option to be able to read and
+	  write to these files.
+
+	  If unsure, say N.
+
 if !X86_64
 config FRAME_POINTER
 	bool "Compile the kernel with frame pointers"

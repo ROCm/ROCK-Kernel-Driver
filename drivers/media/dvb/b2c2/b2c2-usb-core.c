@@ -370,7 +370,7 @@ static void b2c2_exit_usb(struct usb_b2c2_usb *b2c2)
 
 static int b2c2_init_usb(struct usb_b2c2_usb *b2c2)
 {
-	u16 frame_size = b2c2->uintf->cur_altsetting->endpoint[0].desc.wMaxPacketSize;
+	u16 frame_size = le16_to_cpu(b2c2->uintf->cur_altsetting->endpoint[0].desc.wMaxPacketSize);
 	int bufsize = B2C2_USB_NUM_ISO_URB * B2C2_USB_FRAMES_PER_ISO * frame_size,i,j,ret;
 	int buffer_offset = 0;
 

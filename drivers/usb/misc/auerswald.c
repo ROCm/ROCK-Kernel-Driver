@@ -1123,16 +1123,16 @@ static void auerswald_int_free (pauerswald_t cp)
 static int auerswald_int_open (pauerswald_t cp)
 {
         int ret;
-	struct usb_endpoint_descriptor *ep;
+	struct usb_host_endpoint *ep;
 	int irqsize;
 	dbg ("auerswald_int_open");
 
-	ep = usb_epnum_to_ep_desc (cp->usbdev, USB_DIR_IN | AU_IRQENDP);
+	ep = cp->usbdev->ep_in[AU_IRQENDP];
 	if (!ep) {
 		ret = -EFAULT;
   		goto intoend;
     	}
-	irqsize = ep->wMaxPacketSize;
+	irqsize = le16_to_cpu(ep->desc.wMaxPacketSize);
 	cp->irqsize = irqsize;
 
 	/* allocate the urb and data buffer */
@@ -1151,7 +1151,9 @@ static int auerswald_int_open (pauerswald_t cp)
                 }
         }
         /* setup urb */
-        usb_fill_int_urb (cp->inturbp, cp->usbdev, usb_rcvintpipe (cp->usbdev,AU_IRQENDP), cp->intbufp, irqsize, auerswald_int_complete, cp, ep->bInterval);
+        usb_fill_int_urb (cp->inturbp, cp->usbdev,
+			usb_rcvintpipe (cp->usbdev,AU_IRQENDP), cp->intbufp,
+			irqsize, auerswald_int_complete, cp, ep->desc.bInterval);
         /* start the urb */
 	cp->inturbp->status = 0;	/* needed! */
 	ret = usb_submit_urb (cp->inturbp, GFP_KERNEL);
@@ -1929,11 +1931,8 @@ static int auerswald_probe (struct usb_interface *intf,
 	int ret;
 
 	dbg ("probe: vendor id 0x%x, device id 0x%x",
-	     usbdev->descriptor.idVendor, usbdev->descriptor.idProduct);
-
-	/* See if the device offered us matches that we can accept */
-	if (usbdev->descriptor.idVendor != ID_AUERSWALD)
-		return -ENODEV;
+	     le16_to_cpu(usbdev->descriptor.idVendor),
+	     le16_to_cpu(usbdev->descriptor.idProduct));
 
         /* we use only the first -and only- interface */
         if (intf->altsetting->desc.bInterfaceNumber != 0)
@@ -1967,7 +1966,7 @@ static int auerswald_probe (struct usb_interface *intf,
 	cp->dtindex = intf->minor;
 
 	/* Get the usb version of the device */
-	cp->version = cp->usbdev->descriptor.bcdDevice;
+	cp->version = le16_to_cpu(cp->usbdev->descriptor.bcdDevice);
 	dbg ("Version is %X", cp->version);
 
 	/* allow some time to settle the device */
