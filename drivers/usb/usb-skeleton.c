@@ -294,7 +294,7 @@ static int skel_release (struct inode *inode, struct file *file)
 
 	--dev->open;
 
-	if (!dev->present) {
+	if (!dev->present && !dev->open) {
 		/* the device was unplugged before the file was released */
 		up (&dev->sem);
 		skel_delete (dev);
