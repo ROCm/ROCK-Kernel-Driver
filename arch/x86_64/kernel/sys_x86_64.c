@@ -112,8 +112,8 @@ asmlinkage long sys_uname(struct new_utsname * name)
 	down_read(&uts_sem);
 	err = copy_to_user(name, &system_utsname, sizeof (*name));
 	up_read(&uts_sem);
-	if (current->personality == PER_LINUX32) 
-		err |= copy_to_user(&name->machine, "i386", 5); 		
+	if (personality(current->personality) == PER_LINUX32) 
+		err |= copy_to_user(&name->machine, "i686", 5); 		
 	return err ? -EFAULT : 0;
 }
 

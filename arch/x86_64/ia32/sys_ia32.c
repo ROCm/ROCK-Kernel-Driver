@@ -1422,8 +1422,9 @@ asmlinkage long sys32_olduname(struct oldold_utsname * name)
 	 __copy_to_user(&name->version,&system_utsname.version,__OLD_UTS_LEN);
 	 __put_user(0,name->version+__OLD_UTS_LEN);
 	 { 
-		 char *arch = current->personality == PER_LINUX32
-			 ? "i386" : "x86_64"; 
+		 char *arch = "x86_64";
+		 if (personality(current->personality) == PER_LINUX32)
+			 arch = "i686";
 		 
 		 __copy_to_user(&name->machine,arch,strlen(arch)+1);
 	 }
@@ -1443,7 +1444,7 @@ long sys32_uname(struct old_utsname * name)
 	down_read(&uts_sem);
 	err=copy_to_user(name, &system_utsname, sizeof (*name));
 	up_read(&uts_sem);
-	if (current->personality == PER_LINUX32) 
+	if (personality(current->personality) == PER_LINUX32) 
 		err |= copy_to_user(&name->machine, "i686", 5);
 	return err?-EFAULT:0;
 }
