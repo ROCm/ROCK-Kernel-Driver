@@ -856,7 +856,14 @@ SiS190_tx_clear(struct sis190_private *tp)
 	tp->cur_tx = 0;
 	for (i = 0; i < NUM_TX_DESC; i++) {
 		if (tp->Tx_skbuff[i] != NULL) {
-			dev_kfree_skb(tp->Tx_skbuff[i]);
+			struct sk_buff *skb;
+
+			skb = tp->Tx_skbuff[i];
+			pci_unmap_single(tp->pci_dev,
+				le32_to_cpu(tp->TxDescArray[i].buf_addr),
+				skb->len < ETH_ZLEN ? ETH_ZLEN : skb->len,
+				PCI_DMA_TODEVICE);
+			dev_kfree_skb(skb);
 			tp->Tx_skbuff[i] = NULL;
 			tp->stats.tx_dropped++;
 		}
@@ -895,46 +902,58 @@ SiS190_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	struct sis190_private *tp = dev->priv;
 	void *ioaddr = tp->mmio_addr;
 	int entry = tp->cur_tx % NUM_TX_DESC;
+	u32 len;
 
-	if (skb->len < ETH_ZLEN) {
+	if (unlikely(skb->len < ETH_ZLEN)) {
 		skb = skb_padto(skb, ETH_ZLEN);
 		if (skb == NULL)
-			return 0;
+			goto drop_tx;
+		len = ETH_ZLEN;
+	} else {
+		len = skb->len;
 	}
 
 	spin_lock_irq(&tp->lock);
 
-	if ((tp->TxDescArray[entry].status & OWNbit) == 0) {
-#warning Replace virt_to_bus with DMA mapping
-		tp->Tx_skbuff[entry] = skb;
-		tp->TxDescArray[entry].buf_addr = virt_to_bus(skb->data);
-		tp->TxDescArray[entry].PSize =
-		    ((skb->len > ETH_ZLEN) ? skb->len : ETH_ZLEN);
+	if ((le32_to_cpu(tp->TxDescArray[entry].status) & OWNbit) == 0) {
+		dma_addr_t mapping;
 
-		if (entry != (NUM_TX_DESC - 1)) {
+		mapping = pci_map_single(tp->pci_dev, skb->data, len,
+					 PCI_DMA_TODEVICE);
+
+		tp->Tx_skbuff[entry] = skb;
+		tp->TxDescArray[entry].buf_addr = cpu_to_le32(mapping);
+		tp->TxDescArray[entry].PSize = cpu_to_le32(len);
+
+		if (entry != (NUM_TX_DESC - 1))
+			tp->TxDescArray[entry].buf_Len = cpu_to_le32(len);
+		else
 			tp->TxDescArray[entry].buf_Len =
-			    tp->TxDescArray[entry].PSize;
-		} else {
-			tp->TxDescArray[entry].buf_Len =
-			    tp->TxDescArray[entry].PSize | ENDbit;
-		}
+				cpu_to_le32(len | ENDbit);
 
 		tp->TxDescArray[entry].status |=
-		    (OWNbit | INTbit | DEFbit | CRCbit | PADbit);
+		    cpu_to_le32(OWNbit | INTbit | DEFbit | CRCbit | PADbit);
 
 		SiS_W32(TxControl, 0x1a11);	//Start Send
 
 		dev->trans_start = jiffies;
 
 		tp->cur_tx++;
+	} else {
+		spin_unlock_irq(&tp->lock);
+		goto drop_tx;
 	}
+
+	if ((tp->cur_tx - NUM_TX_DESC) == tp->dirty_tx)
+		netif_stop_queue(dev);
 
 	spin_unlock_irq(&tp->lock);
 
-	if ((tp->cur_tx - NUM_TX_DESC) == tp->dirty_tx) {
-		netif_stop_queue(dev);
-	}
+	return 0;
 
+drop_tx:
+	tp->stats.tx_dropped++;
+	dev_kfree_skb(skb);
 	return 0;
 }
 
@@ -953,10 +972,18 @@ SiS190_tx_interrupt(struct net_device *dev, struct sis190_private *tp,
 	tx_left = tp->cur_tx - dirty_tx;
 
 	while (tx_left > 0) {
-		if ((tp->TxDescArray[entry].status & OWNbit) == 0) {
-			dev_kfree_skb_irq(tp->
-					  Tx_skbuff[dirty_tx % NUM_TX_DESC]);
-			tp->Tx_skbuff[dirty_tx % NUM_TX_DESC] = NULL;
+		if ((le32_to_cpu(tp->TxDescArray[entry].status) & OWNbit) == 0) {
+			struct sk_buff *skb;
+
+			skb = tp->Tx_skbuff[entry];
+
+			pci_unmap_single(tp->pci_dev,
+				le32_to_cpu(tp->TxDescArray[entry].buf_addr),
+				skb->len < ETH_ZLEN ? ETH_ZLEN : skb->len,
+				PCI_DMA_TODEVICE);
+
+			dev_kfree_skb_irq(skb);
+			tp->Tx_skbuff[entry] = NULL;
 			tp->stats.tx_packets++;
 			dirty_tx++;
 			tx_left--;
@@ -966,8 +993,7 @@ SiS190_tx_interrupt(struct net_device *dev, struct sis190_private *tp,
 
 	if (tp->dirty_tx != dirty_tx) {
 		tp->dirty_tx = dirty_tx;
-		if (netif_queue_stopped(dev))
-			netif_wake_queue(dev);
+		netif_wake_queue(dev);
 	}
 }
 
