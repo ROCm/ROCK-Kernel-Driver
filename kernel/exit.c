@@ -76,6 +76,7 @@ void release_task(struct task_struct * p)
 	if (unlikely(p->ptrace))
 		__ptrace_unlink(p);
 	BUG_ON(!list_empty(&p->ptrace_list) || !list_empty(&p->ptrace_children));
+	__exit_signal(p);
 	__exit_sighand(p);
 	proc_dentry = __unhash_process(p);
 
@@ -546,7 +547,7 @@ static void exit_notify(struct task_struct *tsk)
 {
 	struct task_struct *t;
 
-	if (signal_pending(tsk) && !tsk->sig->group_exit
+	if (signal_pending(tsk) && !tsk->signal->group_exit
 	    && !thread_group_empty(tsk)) {
 		/*
 		 * This occurs when there was a race between our exit
@@ -558,14 +559,14 @@ static void exit_notify(struct task_struct *tsk)
 		 * sure someone gets all the pending signals.
 		 */
 		read_lock(&tasklist_lock);
-		spin_lock_irq(&tsk->sig->siglock);
+		spin_lock_irq(&tsk->sighand->siglock);
 		for (t = next_thread(tsk); t != tsk; t = next_thread(t))
 			if (!signal_pending(t) && !(t->flags & PF_EXITING)) {
 				recalc_sigpending_tsk(t);
 				if (signal_pending(t))
 					signal_wake_up(t, 0);
 			}
-		spin_unlock_irq(&tsk->sig->siglock);
+		spin_unlock_irq(&tsk->sighand->siglock);
 		read_unlock(&tasklist_lock);
 	}
 
@@ -708,9 +709,9 @@ task_t *next_thread(task_t *p)
 	struct list_head *tmp, *head = &link->pidptr->task_list;
 
 #if CONFIG_SMP
-	if (!p->sig)
+	if (!p->sighand)
 		BUG();
-	if (!spin_is_locked(&p->sig->siglock) &&
+	if (!spin_is_locked(&p->sighand->siglock) &&
 				!rwlock_is_locked(&tasklist_lock))
 		BUG();
 #endif
@@ -730,21 +731,22 @@ do_group_exit(int exit_code)
 {
 	BUG_ON(exit_code & 0x80); /* core dumps don't get here */
 
-	if (current->sig->group_exit)
-		exit_code = current->sig->group_exit_code;
+	if (current->signal->group_exit)
+		exit_code = current->signal->group_exit_code;
 	else if (!thread_group_empty(current)) {
-		struct signal_struct *const sig = current->sig;
+		struct signal_struct *const sig = current->signal;
+		struct sighand_struct *const sighand = current->sighand;
 		read_lock(&tasklist_lock);
-		spin_lock_irq(&sig->siglock);
+		spin_lock_irq(&sighand->siglock);
 		if (sig->group_exit)
 			/* Another thread got here before we took the lock.  */
 			exit_code = sig->group_exit_code;
 		else {
-		sig->group_exit = 1;
-		sig->group_exit_code = exit_code;
+			sig->group_exit = 1;
+			sig->group_exit_code = exit_code;
 			zap_other_threads(current);
 		}
-		spin_unlock_irq(&sig->siglock);
+		spin_unlock_irq(&sighand->siglock);
 		read_unlock(&tasklist_lock);
 	}
 
@@ -838,8 +840,8 @@ static int wait_task_zombie(task_t *p, unsigned int *stat_addr, struct rusage *r
 
 	retval = ru ? getrusage(p, RUSAGE_BOTH, ru) : 0;
 	if (!retval && stat_addr) {
-		if (p->sig->group_exit)
-			retval = put_user(p->sig->group_exit_code, stat_addr);
+		if (p->signal->group_exit)
+			retval = put_user(p->signal->group_exit_code, stat_addr);
 		else
 			retval = put_user(p->exit_code, stat_addr);
 	}
@@ -879,7 +881,7 @@ static int wait_task_stopped(task_t *p, int delayed_group_leader,
 	if (!p->exit_code)
 		return 0;
 	if (delayed_group_leader && !(p->ptrace & PT_PTRACED) &&
-	    p->sig && p->sig->group_stop_count > 0)
+	    p->signal && p->signal->group_stop_count > 0)
 		/*
 		 * A group stop is in progress and this is the group leader.
 		 * We won't report until all threads have stopped.
@@ -1004,7 +1006,7 @@ repeat:
 		if (options & __WNOTHREAD)
 			break;
 		tsk = next_thread(tsk);
-		if (tsk->sig != current->sig)
+		if (tsk->signal != current->signal)
 			BUG();
 	} while (tsk != current);
 	read_unlock(&tasklist_lock);

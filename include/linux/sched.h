@@ -220,10 +220,21 @@ struct mm_struct {
 
 extern int mmlist_nr;
 
-struct signal_struct {
+struct sighand_struct {
 	atomic_t		count;
 	struct k_sigaction	action[_NSIG];
 	spinlock_t		siglock;
+};
+
+/*
+ * NOTE! "signal_struct" does not have it's own
+ * locking, because a shared signal_struct always
+ * implies a shared sighand_struct, so locking
+ * sighand_struct is always a proper superset of
+ * the locking of signal_struct.
+ */
+struct signal_struct {
+	atomic_t		count;
 
 	/* current thread group signal load-balancing target: */
 	task_t			*curr_target;
@@ -378,7 +389,8 @@ struct task_struct {
 /* namespace */
 	struct namespace *namespace;
 /* signal handlers */
-	struct signal_struct *sig;
+	struct signal_struct *signal;
+	struct sighand_struct *sighand;
 
 	sigset_t blocked, real_blocked;
 	struct sigpending pending;
@@ -589,6 +601,8 @@ extern void exit_thread(void);
 
 extern void exit_mm(struct task_struct *);
 extern void exit_files(struct task_struct *);
+extern void exit_signal(struct task_struct *);
+extern void __exit_signal(struct task_struct *);
 extern void exit_sighand(struct task_struct *);
 extern void __exit_sighand(struct task_struct *);
 

@@ -133,7 +133,7 @@ void cap_bprm_compute_creds (struct linux_binprm *bprm)
 		if (must_not_trace_exec (current)
 		    || atomic_read (&current->fs->count) > 1
 		    || atomic_read (&current->files->count) > 1
-		    || atomic_read (&current->sig->count) > 1) {
+		    || atomic_read (&current->sighand->count) > 1) {
 			if (!capable (CAP_SETPCAP)) {
 				new_permitted = cap_intersect (new_permitted,
 							       current->
