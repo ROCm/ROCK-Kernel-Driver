@@ -1534,6 +1534,7 @@ construct_dentry(struct qstr *qstring, struct file *file,
 			if(*ptmp_inode == NULL)
 				return;
 			d_instantiate(tmp_dentry, *ptmp_inode);
+			insert_inode_hash(*ptmp_inode);
 		}
 	} else {
 		tmp_dentry = d_alloc(file->f_dentry, qstring);
@@ -1549,6 +1550,7 @@ construct_dentry(struct qstr *qstring, struct file *file,
 			return;
 		d_instantiate(tmp_dentry, *ptmp_inode);
 		d_rehash(tmp_dentry);
+		insert_inode_hash(*ptmp_inode);
 	}
 
 	tmp_dentry->d_time = jiffies;

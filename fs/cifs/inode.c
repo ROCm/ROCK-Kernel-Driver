@@ -80,9 +80,9 @@ cifs_get_inode_info_unix(struct inode **pinode,
 		/* get new inode */
 		if (*pinode == NULL) {
 			*pinode = new_inode(sb);
-		}
-		if(*pinode == NULL) {
-			return -ENOMEM;
+			if(*pinode == NULL) 
+				return -ENOMEM;
+			insert_inode_hash(*pinode);
 		}
 			
 		inode = *pinode;
@@ -235,9 +235,10 @@ cifs_get_inode_info(struct inode **pinode, const unsigned char *search_path,
 		/* get new inode */
 		if (*pinode == NULL) {
 			*pinode = new_inode(sb);
+			if(*pinode == NULL)
+				return -ENOMEM;
+			insert_inode_hash(*pinode);
 		}
-		if(*pinode == NULL)
-			return -ENOMEM;
 		inode = *pinode;
 		cifsInfo = CIFS_I(inode);
 		pfindData->Attributes = le32_to_cpu(pfindData->Attributes);
