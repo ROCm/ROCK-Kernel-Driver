@@ -58,6 +58,9 @@
 #include <linux/serio.h>
 #include <linux/init.h>
 
+MODULE_DESCRIPTION("Handykey Twiddler keyboard as a joystick driver");
+MODULE_LICENSE("GPL");
+
 /*
  * Constants.
  */
@@ -142,7 +145,7 @@ static void twidjoy_process_packet(struct twidjoy *twidjoy, struct pt_regs *regs
  * packet processing routine.
  */
 
-static void twidjoy_interrupt(struct serio *serio, unsigned char data, unsigned int flags, struc pt_regs *regs)
+static irqreturn_t twidjoy_interrupt(struct serio *serio, unsigned char data, unsigned int flags, struct pt_regs *regs)
 {
 	struct twidjoy *twidjoy = serio->private;
 
@@ -153,7 +156,7 @@ static void twidjoy_interrupt(struct serio *serio, unsigned char data, unsigned 
 	if ((data & 0x80) == 0)
 		twidjoy->idx = 0;	/* this byte starts a new packet */
 	else if (twidjoy->idx == 0)
-		return;			/* wrong MSB -- ignore this byte */
+		return IRQ_HANDLED;	/* wrong MSB -- ignore this byte */
 
 	if (twidjoy->idx < TWIDJOY_MAX_LENGTH)
 		twidjoy->data[twidjoy->idx++] = data;
@@ -163,7 +166,7 @@ static void twidjoy_interrupt(struct serio *serio, unsigned char data, unsigned 
 		twidjoy->idx = 0;
 	}
 
-	return;
+	return IRQ_HANDLED;
 }
 
 /*
