@@ -3,35 +3,47 @@
  * This is included late in kernel/setup.c so that it can make use of all of
  * the static functions. */
 
+#define MB (1024 * 1024)
+
+unsigned long sgivwfb_mem_phys;
+unsigned long sgivwfb_mem_size;
+
+long long mem_size __initdata = 0;
+
 static inline char * __init machine_specific_memory_setup(void)
 {
-	char *who;
+	long long gfx_mem_size = 8 * MB;
 
+	mem_size = ALT_MEM_K;
 
-	who = "BIOS-e820";
+	if (!mem_size) {
+		printk(KERN_WARNING "Bootloader didn't set memory size, upgrade it !\n");
+		mem_size = 128 * MB;
+	}
 
 	/*
-	 * Try to copy the BIOS-supplied E820-map.
-	 *
-	 * Otherwise fake a memory map; one section from 0k->640k,
-	 * the next section from 1mb->appropriate_mem_k
+	 * this hardcodes the graphics memory to 8 MB
+	 * it really should be sized dynamically (or at least
+	 * set as a boot param)
 	 */
-	sanitize_e820_map(E820_MAP, &E820_MAP_NR);
-	if (copy_e820_map(E820_MAP, E820_MAP_NR) < 0) {
-		unsigned long mem_size;
+	if (!sgivwfb_mem_size) {
+		printk(KERN_WARNING "Defaulting to 8 MB framebuffer size\n");
+		sgivwfb_mem_size = 8 * MB;
+	}
 
-		/* compare results from other methods and take the greater */
-		if (ALT_MEM_K < EXT_MEM_K) {
-			mem_size = EXT_MEM_K;
-			who = "BIOS-88";
-		} else {
-			mem_size = ALT_MEM_K;
-			who = "BIOS-e801";
-		}
+	/*
+	 * Trim to nearest MB
+	 */
+	sgivwfb_mem_size &= ~((1 << 20) - 1);
+	sgivwfb_mem_phys = mem_size - gfx_mem_size;
 
-		e820.nr_map = 0;
-		add_memory_region(0, LOWMEMSIZE(), E820_RAM);
-		add_memory_region(HIGH_MEMORY, mem_size << 10, E820_RAM);
-  	}
-	return who;
+	add_memory_region(0, LOWMEMSIZE(), E820_RAM);
+	add_memory_region(HIGH_MEMORY, mem_size - sgivwfb_mem_size - HIGH_MEMORY, E820_RAM);
+	add_memory_region(sgivwfb_mem_phys, sgivwfb_mem_size, E820_RESERVED);
+
+	return "PROM";
+
+	/* Remove gcc warnings */
+	(void) sanitize_e820_map(NULL, NULL);
+	(void) copy_e820_map(NULL, 0);
 }
