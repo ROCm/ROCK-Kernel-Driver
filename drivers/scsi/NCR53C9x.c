@@ -2048,7 +2048,7 @@ static int esp_do_data_finale(struct NCR_ESP *esp,
 	 * and not only for the entire host adapter as it is now, the workaround
 	 * is way to expensive performance wise.
 	 * Instead, it turns out that when this happens the target has disconnected
-	 * allready but it doesn't show in the interrupt register. Compensate for
+	 * already but it doesn't show in the interrupt register. Compensate for
 	 * that here to try and avoid a SCSI bus reset.
 	 */
 	if(!esp->fas_premature_intr_workaround && (fifocnt == 1) &&

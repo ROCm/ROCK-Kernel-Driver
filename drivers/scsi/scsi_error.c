@@ -32,7 +32,6 @@
 
 #include "scsi.h"
 #include "hosts.h"
-#include "constants.h"
 
 /*
  * We must always allow SHUTDOWN_SIGS.  Even if we are not a module,
@@ -1095,6 +1094,8 @@ int scsi_decide_disposition(Scsi_Cmnd * SCpnt)
  */
 STATIC int scsi_eh_completed_normally(Scsi_Cmnd * SCpnt)
 {
+	int rtn;
+
 	/*
 	 * First check the host byte, to see if there is anything in there
 	 * that would indicate what we need to do.
@@ -1102,20 +1103,25 @@ STATIC int scsi_eh_completed_normally(Scsi_Cmnd * SCpnt)
 	if (host_byte(SCpnt->result) == DID_RESET) {
 		if (SCpnt->flags & IS_RESETTING) {
 			/*
-			 * OK, this is normal.  We don't know whether in fact the
-			 * command in question really needs to be rerun or not - 
-			 * if this was the original data command then the answer is yes,
-			 * otherwise we just flag it as success.
+			 * OK, this is normal.  We don't know whether in fact
+			 * the command in question really needs to be rerun
+			 * or not - if this was the original data command then
+			 * the answer is yes, otherwise we just flag it as
+			 * success.
 			 */
 			SCpnt->flags &= ~IS_RESETTING;
-			return NEEDS_RETRY;
+			goto maybe_retry;
 		}
 		/*
-		 * Rats.  We are already in the error handler, so we now get to try
-		 * and figure out what to do next.  If the sense is valid, we have
-		 * a pretty good idea of what to do.  If not, we mark it as failed.
+		 * Rats.  We are already in the error handler, so we now
+		 * get to try and figure out what to do next.  If the sense
+		 * is valid, we have a pretty good idea of what to do.
+		 * If not, we mark it as failed.
 		 */
-		return scsi_check_sense(SCpnt);
+		rtn = scsi_check_sense(SCpnt);
+		if (rtn == NEEDS_RETRY)
+			goto maybe_retry;
+		return rtn;
 	}
 	if (host_byte(SCpnt->result) != DID_OK) {
 		return FAILED;
@@ -1127,14 +1133,18 @@ STATIC int scsi_eh_completed_normally(Scsi_Cmnd * SCpnt)
 		return FAILED;
 	}
 	/*
-	 * Now, check the status byte to see if this indicates anything special.
+	 * Now, check the status byte to see if this indicates
+	 * anything special.
 	 */
 	switch (status_byte(SCpnt->result)) {
 	case GOOD:
 	case COMMAND_TERMINATED:
 		return SUCCESS;
 	case CHECK_CONDITION:
-		return scsi_check_sense(SCpnt);
+		rtn = scsi_check_sense(SCpnt);
+		if (rtn == NEEDS_RETRY)
+			goto maybe_retry;
+		return rtn;
 	case CONDITION_GOOD:
 	case INTERMEDIATE_GOOD:
 	case INTERMEDIATE_C_GOOD:
@@ -1149,6 +1159,14 @@ STATIC int scsi_eh_completed_normally(Scsi_Cmnd * SCpnt)
 		return FAILED;
 	}
 	return FAILED;
+
+ maybe_retry:
+	if ((++SCpnt->retries) < SCpnt->allowed) {
+		return NEEDS_RETRY;
+	} else {
+		/* No more retries - report this one back to upper level */
+		return SUCCESS;
+	}
 }
 
 /*
@@ -1995,23 +2013,3 @@ scsi_new_reset(Scsi_Cmnd *SCpnt, int flag)
 
 	return rtn;
 }
-
-
-/*
- * Overrides for Emacs so that we follow Linus's tabbing style.
- * Emacs will notice this stuff at the end of the file and automatically
- * adjust the settings for this buffer only.  This must remain at the end
- * of the file.
- * ---------------------------------------------------------------------------
- * Local variables:
- * c-indent-level: 4
- * c-brace-imaginary-offset: 0
- * c-brace-offset: -4
- * c-argdecl-indent: 4
- * c-label-offset: -4
- * c-continued-statement-offset: 4
- * c-continued-brace-offset: 0
- * indent-tabs-mode: nil
- * tab-width: 8
- * End:
- */

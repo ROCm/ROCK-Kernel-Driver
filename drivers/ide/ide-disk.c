@@ -91,143 +91,126 @@ static int lba_capacity_is_ok(struct hd_driveid *id)
 }
 
 /*
- * Handler for command with PIO data-in phase
+ * Handler for command with PIO data-in phase.
  */
-static ide_startstop_t task_in_intr(struct ata_device *drive, struct request *rq)
+static ide_startstop_t pio_in_intr(struct ata_device *drive, struct request *rq)
 {
-	char *buf = NULL;
 	unsigned long flags;
+	struct ata_channel *ch = drive->channel;
+	unsigned int msect;
 
+	spin_lock_irqsave(ch->lock, flags);
 	if (!ata_status(drive, DATA_READY, BAD_R_STAT)) {
-		if (drive->status & (ERR_STAT|DRQ_STAT))
+		if (drive->status & (ERR_STAT|DRQ_STAT)) {
+			spin_unlock_irqrestore(ch->lock, flags);
+
 			return ata_error(drive, rq, __FUNCTION__);
-
-		if (!(drive->status & BUSY_STAT)) {
-#if 0
-			printk("task_in_intr to Soon wait for next interrupt\n");
-#endif
-			ide_set_handler(drive, task_in_intr, WAIT_CMD, NULL);
-
-			return ide_started;
 		}
-	}
-	buf = ide_map_rq(rq, &flags);
-#if 0
-	printk("Read: %p, rq->current_nr_sectors: %d\n", buf, (int) rq->current_nr_sectors);
-#endif
 
-	ata_read(drive, buf, SECTOR_WORDS);
-	ide_unmap_rq(rq, buf, &flags);
-
-	/* First segment of the request is complete. note that this does not
-	 * necessarily mean that the entire request is done!! this is only true
-	 * if ide_end_request() returns 0.
-	 */
-
-	if (--rq->current_nr_sectors <= 0) {
-#if 0
-		printk("Request Ended stat: %02x\n", drive->status);
-#endif
-		if (!ide_end_request(drive, rq, 1))
-			return ide_stopped;
+		if (!(drive->status & BUSY_STAT))
+			goto cont;
 	}
 
+	msect = drive->mult_count;
+	do {
+		unsigned int nsect;
+
+		if (drive->mult_count) {
+			nsect = rq->current_nr_sectors;
+			/* Don't try to transfer more sectors at once then one
+			 * multi sector command can swallow.
+			 */
+			if (nsect > msect)
+				nsect = msect;
+		} else {
+			nsect = rq->current_nr_sectors;
+			nsect = 1;
+		}
+
+//		printk("Read: rq->current_nr_sectors: %d %d %d\n", msect, nsect,  (int) rq->current_nr_sectors);
+		{
+			unsigned long flags;
+			char *buf;
+
+			buf = ide_map_rq(rq, &flags);
+			ata_read(drive, buf, nsect * SECTOR_WORDS);
+			ide_unmap_rq(rq, buf, &flags);
+		}
+
+		/* Segment of the request is complete. note that this does not
+		 * necessarily mean that the entire request is done!! this is
+		 * only true if ata_end_request() returns 0.
+		 */
+
+		rq->errors = 0;
+		rq->current_nr_sectors -= nsect;
+
+		if (rq->current_nr_sectors <= 0) {
+			if (!__ata_end_request(drive, rq, 1, 0)) {
+				spin_unlock_irqrestore(ch->lock, flags);
+
+				return ide_stopped;
+			}
+		}
+		msect -= nsect;
+	} while (msect > 0);
+
+cont:
 	/* still data left to transfer */
-	ide_set_handler(drive, task_in_intr,  WAIT_CMD, NULL);
+	ata_set_handler(drive, pio_in_intr,  WAIT_CMD, NULL);
+	spin_unlock_irqrestore(ch->lock, flags);
 
 	return ide_started;
 }
 
 /*
- * Handler for command with PIO data-out phase
+ * Handler for command with PIO data-out phase.
  */
 static ide_startstop_t task_out_intr(struct ata_device *drive, struct request *rq)
 {
-	char *buf = NULL;
 	unsigned long flags;
+	struct ata_channel *ch = drive->channel;
+	int ret;
 
-	if (!ata_status(drive, DRIVE_READY, drive->bad_wstat))
+	spin_lock_irqsave(ch->lock, flags);
+	if (!ata_status(drive, DRIVE_READY, drive->bad_wstat)) {
+		spin_unlock_irqrestore(ch->lock, flags);
+
 		return ata_error(drive, rq, __FUNCTION__);
-
-	if (!rq->current_nr_sectors)
-		if (!ide_end_request(drive, rq, 1))
-			return ide_stopped;
-
-	if ((rq->nr_sectors == 1) != (drive->status & DRQ_STAT)) {
-		buf = ide_map_rq(rq, &flags);
-#if 0
-		printk("write: %p, rq->current_nr_sectors: %d\n", buf, (int) rq->current_nr_sectors);
-#endif
-
-		ata_write(drive, buf, SECTOR_WORDS);
-		ide_unmap_rq(rq, buf, &flags);
-		rq->errors = 0;
-		rq->current_nr_sectors--;
 	}
 
-	ide_set_handler(drive, task_out_intr, WAIT_CMD, NULL);
+	if (!rq->current_nr_sectors && !__ata_end_request(drive, rq, 1, 0)) {
+		ret = ide_stopped;
+	} else {
+		if ((rq->nr_sectors == 1) != (drive->status & DRQ_STAT)) {
+			unsigned long flags;
+			char *buf;
 
-	return ide_started;
-}
+//			printk("write: %p, rq->current_nr_sectors: %d\n", buf, (int) rq->current_nr_sectors);
+			buf = ide_map_rq(rq, &flags);
+			ata_write(drive, buf, SECTOR_WORDS);
+			ide_unmap_rq(rq, buf, &flags);
 
-/*
- * Handler for command with Read Multiple
- */
-static ide_startstop_t task_mulin_intr(struct ata_device *drive, struct request *rq)
-{
-	char *buf = NULL;
-	unsigned int msect, nsect;
-	unsigned long flags;
-
-	if (!ata_status(drive, DATA_READY, BAD_R_STAT)) {
-		if (drive->status & (ERR_STAT|DRQ_STAT))
-			return ata_error(drive, rq, __FUNCTION__);
-
-		/* no data yet, so wait for another interrupt */
-		ide_set_handler(drive, task_mulin_intr, WAIT_CMD, NULL);
-		return ide_started;
-	}
-
-	/* (ks/hs): Fixed Multi-Sector transfer */
-	msect = drive->mult_count;
-
-	do {
-		nsect = rq->current_nr_sectors;
-		if (nsect > msect)
-			nsect = msect;
-
-		buf = ide_map_rq(rq, &flags);
-
-#if 0
-		printk("Multiread: %p, nsect: %d , rq->current_nr_sectors: %d\n",
-			buf, nsect, rq->current_nr_sectors);
-#endif
-		ata_read(drive, buf, nsect * SECTOR_WORDS);
-		ide_unmap_rq(rq, buf, &flags);
-		rq->errors = 0;
-		rq->current_nr_sectors -= nsect;
-		msect -= nsect;
-		if (!rq->current_nr_sectors) {
-			if (!ide_end_request(drive, rq, 1))
-				return ide_stopped;
+			rq->errors = 0;
+			--rq->current_nr_sectors;
 		}
-	} while (msect);
+		ata_set_handler(drive, task_out_intr, WAIT_CMD, NULL);
 
+		ret = ide_started;
+	}
+	spin_unlock_irqrestore(ch->lock, flags);
 
-	/*
-	 * more data left
-	 */
-	ide_set_handler(drive, task_mulin_intr, WAIT_CMD, NULL);
-
-	return ide_started;
+	return ret;
 }
 
 static ide_startstop_t task_mulout_intr(struct ata_device *drive, struct request *rq)
 {
+	unsigned long flags;
+	struct ata_channel *ch = drive->channel;
 	int ok;
-	int mcount = drive->mult_count;
-	ide_startstop_t startstop;
+	int ret;
 
+	spin_lock_irqsave(ch->lock, flags);
 
 	/*
 	 * FIXME: the drive->status checks here seem to be messy.
@@ -240,298 +223,228 @@ static ide_startstop_t task_mulout_intr(struct ata_device *drive, struct request
 
 	if (!ok || !rq->nr_sectors) {
 		if (drive->status & (ERR_STAT | DRQ_STAT)) {
-			startstop = ata_error(drive, rq, __FUNCTION__);
+			spin_unlock_irqrestore(ch->lock, flags);
 
-			return startstop;
+			return ata_error(drive, rq, __FUNCTION__);
 		}
 	}
-
 	if (!rq->nr_sectors) {
-		__ide_end_request(drive, rq, 1, rq->hard_nr_sectors);
+		__ata_end_request(drive, rq, 1, rq->hard_nr_sectors);
 		rq->bio = NULL;
-
-		return ide_stopped;
-	}
-
-	if (!ok) {
+		ret = ide_stopped;
+	} else if (!ok) {
 		/* no data yet, so wait for another interrupt */
-		if (!drive->channel->handler)
-			ide_set_handler(drive, task_mulout_intr, WAIT_CMD, NULL);
+		if (!ch->handler)
+			ata_set_handler(drive, task_mulout_intr, WAIT_CMD, NULL);
+		ret = ide_started;
+	} else {
+		int mcount = drive->mult_count;
 
-		return ide_started;
-	}
+		do {
+			char *buf;
+			int nsect = rq->current_nr_sectors;
+			unsigned long flags;
 
-	do {
-		char *buffer;
-		int nsect = rq->current_nr_sectors;
-		unsigned long flags;
+			if (nsect > mcount)
+				nsect = mcount;
+			mcount -= nsect;
 
-		if (nsect > mcount)
-			nsect = mcount;
-		mcount -= nsect;
+			buf = bio_kmap_irq(rq->bio, &flags) + ide_rq_offset(rq);
+			rq->sector += nsect;
+			rq->nr_sectors -= nsect;
+			rq->current_nr_sectors -= nsect;
 
-		buffer = bio_kmap_irq(rq->bio, &flags) + ide_rq_offset(rq);
-		rq->sector += nsect;
-		rq->nr_sectors -= nsect;
-		rq->current_nr_sectors -= nsect;
+			/* Do we move to the next bio after this? */
+			if (!rq->current_nr_sectors) {
+				/* remember to fix this up /jens */
+				struct bio *bio = rq->bio->bi_next;
 
-		/* Do we move to the next bio after this? */
-		if (!rq->current_nr_sectors) {
-			/* remember to fix this up /jens */
-			struct bio *bio = rq->bio->bi_next;
-
-			/* end early if we ran out of requests */
-			if (!bio) {
-				mcount = 0;
-			} else {
-				rq->bio = bio;
-				rq->current_nr_sectors = bio_iovec(bio)->bv_len >> 9;
+				/* end early if we ran out of requests */
+				if (!bio) {
+					mcount = 0;
+				} else {
+					rq->bio = bio;
+					rq->current_nr_sectors = bio_iovec(bio)->bv_len >> 9;
+				}
 			}
-		}
 
-		/*
-		 * Ok, we're all setup for the interrupt re-entering us on the
-		 * last transfer.
-		 */
-		ata_write(drive, buffer, nsect * SECTOR_WORDS);
-		bio_kunmap_irq(buffer, &flags);
-	} while (mcount);
+			/*
+			 * Ok, we're all setup for the interrupt re-entering us on the
+			 * last transfer.
+			 */
+			ata_write(drive, buf, nsect * SECTOR_WORDS);
+			bio_kunmap_irq(buf, &flags);
+		} while (mcount);
 
-	rq->errors = 0;
-	if (!drive->channel->handler)
-		ide_set_handler(drive, task_mulout_intr, WAIT_CMD, NULL);
+		rq->errors = 0;
+
+		if (!ch->handler)
+			ata_set_handler(drive, task_mulout_intr, WAIT_CMD, NULL);
+
+		ret = ide_started;
+	}
+	spin_unlock_irqrestore(ch->lock, flags);
 
 	return ide_started;
 }
 
 /*
- * Decode with physical ATA command to use and setup associated data.
+ * Channel lock should be held on entry.
  */
-static u8 get_command(struct ata_device *drive, struct ata_taskfile *ar, int cmd)
+static ide_startstop_t __do_request(struct ata_device *drive,
+		struct ata_taskfile *ar, struct request *rq)
 {
-	int lba48bit = (drive->id->cfs_enable_2 & 0x0400) ? 1 : 0;
+	struct hd_driveid *id = drive->id;
 
-#if 1
-	lba48bit = drive->addressing;
-#endif
+	/* (ks/hs): Moved to start, do not use for multiple out commands.
+	 * FIXME: why not?! */
+	if (!(ar->cmd == CFA_WRITE_MULTI_WO_ERASE ||
+	      ar->cmd == WIN_MULTWRITE ||
+	      ar->cmd == WIN_MULTWRITE_EXT)) {
+		ata_irq_enable(drive, 1);
+		ata_mask(drive);
+	}
 
-	if (lba48bit) {
-		if (cmd == READ) {
-			ar->command_type = IDE_DRIVE_TASK_IN;
-			if (drive->using_tcq) {
-				return WIN_READDMA_QUEUED_EXT;
-			} else if (drive->using_dma) {
-				return WIN_READDMA_EXT;
-			} else if (drive->mult_count) {
-				ar->handler = task_mulin_intr;
-				return WIN_MULTREAD_EXT;
-			} else {
-				ar->handler = task_in_intr;
-				return WIN_READ_EXT;
+	if ((id->command_set_2 & 0x0400) && (id->cfs_enable_2 & 0x0400) &&
+	    (drive->addressing == 1))
+		ata_out_regfile(drive, &ar->hobfile);
+
+	ata_out_regfile(drive, &ar->taskfile);
+
+	OUT_BYTE((ar->taskfile.device_head & (drive->addressing ? 0xE0 : 0xEF)) | drive->select.all,
+			IDE_SELECT_REG);
+
+	if (ar->XXX_handler) {
+		struct ata_channel *ch = drive->channel;
+
+		ata_set_handler(drive, ar->XXX_handler, WAIT_CMD, NULL);
+		OUT_BYTE(ar->cmd, IDE_COMMAND_REG);
+
+		/* FIXME: Warning check for race between handler and prehandler
+		 * for writing first block of data.  however since we are well
+		 * inside the boundaries of the seek, we should be okay.
+		 *
+		 * FIXME: Replace the switch by using a proper command_type.
+		 */
+
+		if (ar->cmd == CFA_WRITE_SECT_WO_ERASE ||
+		    ar->cmd == WIN_WRITE ||
+		    ar->cmd == WIN_WRITE_EXT ||
+		    ar->cmd == WIN_WRITE_VERIFY ||
+		    ar->cmd == WIN_WRITE_BUFFER ||
+		    ar->cmd == WIN_DOWNLOAD_MICROCODE ||
+		    ar->cmd == CFA_WRITE_MULTI_WO_ERASE ||
+		    ar->cmd == WIN_MULTWRITE ||
+		    ar->cmd == WIN_MULTWRITE_EXT) {
+			ide_startstop_t startstop;
+
+			if (ata_status_poll(drive, DATA_READY, drive->bad_wstat,
+						WAIT_DRQ, rq, &startstop)) {
+				printk(KERN_ERR "%s: no DRQ after issuing %s\n",
+						drive->name, drive->mult_count ? "MULTWRITE" : "WRITE");
+
+				return startstop;
 			}
-		} else if (cmd == WRITE) {
-			ar->command_type = IDE_DRIVE_TASK_RAW_WRITE;
-			if (drive->using_tcq) {
-				return WIN_WRITEDMA_QUEUED_EXT;
-			} else if (drive->using_dma) {
-				return WIN_WRITEDMA_EXT;
-			} else if (drive->mult_count) {
-				ar->handler = task_mulout_intr;
-				return WIN_MULTWRITE_EXT;
+
+			/* FIXME: This doesn't make the slightest sense.
+			 * (ks/hs): Fixed Multi Write
+			 */
+			if (!(ar->cmd == CFA_WRITE_MULTI_WO_ERASE ||
+			      ar->cmd == WIN_MULTWRITE ||
+			      ar->cmd == WIN_MULTWRITE_EXT)) {
+				unsigned long flags;
+				char *buf = ide_map_rq(rq, &flags);
+
+				/* For Write_sectors we need to stuff the first sector */
+				ata_write(drive, buf, SECTOR_WORDS);
+
+				rq->current_nr_sectors--;
+				ide_unmap_rq(rq, buf, &flags);
+
+				return ide_started;
 			} else {
-				ar->handler = task_out_intr;
-				return WIN_WRITE_EXT;
+				int i;
+				int ret;
+
+				/* Polling wait until the drive is ready.
+				 *
+				 * Stuff the first sector(s) by calling the
+				 * handler driectly therafter.
+				 *
+				 * FIXME: Replace hard-coded 100, what about
+				 * error handling?
+				 */
+
+				for (i = 0; i < 100; ++i) {
+					if (drive_is_ready(drive))
+						break;
+				}
+				if (!drive_is_ready(drive)) {
+					printk(KERN_ERR "DISASTER WAITING TO HAPPEN!\n");
+				}
+				/* FIXME: make this unlocking go away*/
+				spin_unlock_irq(ch->lock);
+				ret =  ar->XXX_handler(drive, rq);
+				spin_lock_irq(ch->lock);
+
+				return ret;
 			}
 		}
 	} else {
-		if (cmd == READ) {
-			ar->command_type = IDE_DRIVE_TASK_IN;
-			if (drive->using_tcq) {
-				return WIN_READDMA_QUEUED;
-			} else if (drive->using_dma) {
-				return WIN_READDMA;
-			} else if (drive->mult_count) {
-				ar->handler = task_in_intr;
-				return WIN_MULTREAD;
-			} else {
-				ar->handler = task_in_intr;
-				return WIN_READ;
-			}
-		} else if (cmd == WRITE) {
-			ar->command_type = IDE_DRIVE_TASK_RAW_WRITE;
-			if (drive->using_tcq) {
-				return WIN_WRITEDMA_QUEUED;
-			} else if (drive->using_dma) {
-				return WIN_WRITEDMA;
-			} else if (drive->mult_count) {
-				ar->handler = task_mulout_intr;
-				return WIN_MULTWRITE;
-			} else {
-				ar->handler = task_out_intr;
-				return WIN_WRITE;
-			}
+		/*
+		 * FIXME: This is a gross hack, need to unify tcq dma proc and
+		 * regular dma proc. It should now be easier.
+		 *
+		 * FIXME: Handle the alternateives by a command type.
+		 */
+
+		if (!drive->using_dma)
+			return ide_started;
+
+		/* for dma commands we don't set the handler */
+		if (ar->cmd == WIN_WRITEDMA ||
+		    ar->cmd == WIN_WRITEDMA_EXT ||
+		    ar->cmd == WIN_READDMA ||
+		    ar->cmd == WIN_READDMA_EXT)
+			return udma_init(drive, rq);
+#ifdef CONFIG_BLK_DEV_IDE_TCQ
+		else if (ar->cmd == WIN_WRITEDMA_QUEUED ||
+			 ar->cmd == WIN_WRITEDMA_QUEUED_EXT ||
+			 ar->cmd == WIN_READDMA_QUEUED ||
+			 ar->cmd == WIN_READDMA_QUEUED_EXT)
+			return udma_tcq_init(drive, rq);
+#endif
+		else {
+			printk(KERN_ERR "%s: unknown command %x\n", __FUNCTION__, ar->cmd);
+			return ide_stopped;
 		}
 	}
 
-	/* not reached! */
-	return WIN_NOP;
-}
-
-static ide_startstop_t chs_do_request(struct ata_device *drive, struct request *rq, sector_t block)
-{
-	struct ata_taskfile args;
-	int sectors;
-
-	unsigned int track	= (block / drive->sect);
-	unsigned int sect	= (block % drive->sect) + 1;
-	unsigned int head	= (track % drive->head);
-	unsigned int cyl	= (track / drive->head);
-
-	sectors = rq->nr_sectors;
-	if (sectors == 256)
-		sectors = 0;
-
-	memset(&args, 0, sizeof(args));
-
-	if (blk_rq_tagged(rq)) {
-		args.taskfile.feature = sectors;
-		args.taskfile.sector_count = rq->tag << 3;
-	} else
-		args.taskfile.sector_count = sectors;
-
-	args.taskfile.sector_number = sect;
-	args.taskfile.low_cylinder = cyl;
-	args.taskfile.high_cylinder = (cyl>>8);
-
-	args.taskfile.device_head = head;
-	args.taskfile.device_head |= drive->select.all;
-	args.cmd = get_command(drive, &args, rq_data_dir(rq));
-
-#ifdef DEBUG
-	printk("%s: %sing: ", drive->name,
-		(rq_data_dir(rq)==READ) ? "read" : "writ");
-	if (lba)	printk("LBAsect=%lld, ", block);
-	else		printk("CHS=%d/%d/%d, ", cyl, head, sect);
-	printk("sectors=%ld, ", rq->nr_sectors);
-	printk("buffer=%p\n", rq->buffer);
-#endif
-
-	rq->special = &args;
-
-	return ata_taskfile(drive, &args, rq);
-}
-
-static ide_startstop_t lba28_do_request(struct ata_device *drive, struct request *rq, sector_t block)
-{
-	struct ata_taskfile args;
-	int sectors;
-
-	sectors = rq->nr_sectors;
-	if (sectors == 256)
-		sectors = 0;
-
-	memset(&args, 0, sizeof(args));
-
-	if (blk_rq_tagged(rq)) {
-		args.taskfile.feature = sectors;
-		args.taskfile.sector_count = rq->tag << 3;
-	} else
-		args.taskfile.sector_count = sectors;
-
-	args.taskfile.sector_number = block;
-	args.taskfile.low_cylinder = (block >>= 8);
-
-	args.taskfile.high_cylinder = (block >>= 8);
-
-	args.taskfile.device_head = ((block >> 8) & 0x0f);
-	args.taskfile.device_head |= drive->select.all;
-	args.cmd = get_command(drive, &args, rq_data_dir(rq));
-
-#ifdef DEBUG
-	printk("%s: %sing: ", drive->name,
-		(rq_data_dir(rq)==READ) ? "read" : "writ");
-	if (lba)	printk("LBAsect=%lld, ", block);
-	else		printk("CHS=%d/%d/%d, ", cyl, head, sect);
-	printk("sectors=%ld, ", rq->nr_sectors);
-	printk("buffer=%p\n", rq->buffer);
-#endif
-
-	rq->special = &args;
-
-	return ata_taskfile(drive, &args, rq);
-}
-
-/*
- * 268435455  == 137439 MB or 28bit limit
- * 320173056  == 163929 MB or 48bit addressing
- * 1073741822 == 549756 MB or 48bit addressing fake drive
- */
-
-static ide_startstop_t lba48_do_request(struct ata_device *drive, struct request *rq, sector_t block)
-{
-	struct ata_taskfile args;
-	int sectors;
-
-	sectors = rq->nr_sectors;
-	if (sectors == 65536)
-		sectors = 0;
-
-	memset(&args, 0, sizeof(args));
-
-	if (blk_rq_tagged(rq)) {
-		args.taskfile.feature = sectors;
-		args.hobfile.feature = sectors >> 8;
-		args.taskfile.sector_count = rq->tag << 3;
-	} else {
-		args.taskfile.sector_count = sectors;
-		args.hobfile.sector_count = sectors >> 8;
-	}
-
-	args.taskfile.sector_number = block;		/* low lba */
-	args.taskfile.low_cylinder = (block >>= 8);	/* mid lba */
-	args.taskfile.high_cylinder = (block >>= 8);	/* hi  lba */
-	args.taskfile.device_head = drive->select.all;
-
-	args.hobfile.sector_number = (block >>= 8);	/* low lba */
-	args.hobfile.low_cylinder = (block >>= 8);	/* mid lba */
-	args.hobfile.high_cylinder = (block >>= 8);	/* hi  lba */
-	args.hobfile.device_head = drive->select.all;
-
-	args.cmd = get_command(drive, &args, rq_data_dir(rq));
-
-#ifdef DEBUG
-	printk("%s: %sing: ", drive->name,
-		(rq_data_dir(rq)==READ) ? "read" : "writ");
-	if (lba)	printk("LBAsect=%lld, ", block);
-	else		printk("CHS=%d/%d/%d, ", cyl, head, sect);
-	printk("sectors=%ld, ", rq->nr_sectors);
-	printk("buffer=%p\n",rq->buffer);
-#endif
-
-	rq->special = &args;
-
-	return ata_taskfile(drive, &args, rq);
+	return ide_started;
 }
 
 /*
  * Issue a READ or WRITE command to a disk, using LBA if supported, or CHS
  * otherwise, to address sectors.  It also takes care of issuing special
  * DRIVE_CMDs.
+ *
+ * Channel lock should be held.
  */
 static ide_startstop_t idedisk_do_request(struct ata_device *drive, struct request *rq, sector_t block)
 {
-	/*
-	 * Wait until all request have bin finished.
+	struct ata_taskfile args;
+	unsigned int sectors;
+
+	/* This issues a special drive command.
 	 */
+	if (rq->flags & REQ_SPECIAL)
+		return __do_request(drive, rq->special, rq);
 
-	while (drive->blocked) {
-		yield();
-		printk(KERN_ERR "ide: Request while drive blocked?");
-	}
-
+	/* FIXME: this check doesn't make sense */
 	if (!(rq->flags & REQ_CMD)) {
 		blk_dump_rq_flags(rq, "idedisk_do_request - bad command");
-		ide_end_request(drive, rq, 0);
+		__ata_end_request(drive, rq, 0, 0);
+
 		return ide_stopped;
 	}
 
@@ -545,39 +458,176 @@ static ide_startstop_t idedisk_do_request(struct ata_device *drive, struct reque
 	 * start a tagged operation
 	 */
 	if (drive->using_tcq) {
-		unsigned long flags;
-		int ret;
-
-		spin_lock_irqsave(drive->channel->lock, flags);
-
-		ret = blk_queue_start_tag(&drive->queue, rq);
+		int st = blk_queue_start_tag(&drive->queue, rq);
 
 		if (ata_pending_commands(drive) > drive->max_depth)
 			drive->max_depth = ata_pending_commands(drive);
 		if (ata_pending_commands(drive) > drive->max_last_depth)
 			drive->max_last_depth = ata_pending_commands(drive);
 
-		spin_unlock_irqrestore(drive->channel->lock, flags);
-
-		if (ret) {
+		if (st) {
 			BUG_ON(!ata_pending_commands(drive));
+
 			return ide_started;
 		}
 	}
 
-	/* 48-bit LBA */
-	if ((drive->id->cfs_enable_2 & 0x0400) && (drive->addressing))
-		return lba48_do_request(drive, rq, block);
+	memset(&args, 0, sizeof(args));
+	sectors = rq->nr_sectors;
+	/* Dispatch depending up on the drive access method. */
+	if ((drive->id->cfs_enable_2 & 0x0400) && (drive->addressing)) {
+		/* LBA 48 bit */
+		/*
+		 * 268435455  == 137439 MB or 28bit limit
+		 * 320173056  == 163929 MB or 48bit addressing
+		 * 1073741822 == 549756 MB or 48bit addressing fake drive
+		 */
+		if (sectors == 65536)
+			sectors = 0;
 
-	/* 28-bit LBA */
-	if (drive->select.b.lba)
-		return lba28_do_request(drive, rq, block);
+		if (blk_rq_tagged(rq)) {
+			args.taskfile.feature = sectors;
+			args.hobfile.feature = sectors >> 8;
+			args.taskfile.sector_count = rq->tag << 3;
+		} else {
+			args.taskfile.sector_count = sectors;
+			args.hobfile.sector_count = sectors >> 8;
+		}
 
-	/* 28-bit CHS */
-	return chs_do_request(drive, rq, block);
+		args.taskfile.sector_number = block;		/* low lba */
+		args.taskfile.low_cylinder = (block >>= 8);	/* mid lba */
+		args.taskfile.high_cylinder = (block >>= 8);	/* hi  lba */
+		args.taskfile.device_head = drive->select.all;
+
+		args.hobfile.sector_number = (block >>= 8);	/* low lba */
+		args.hobfile.low_cylinder = (block >>= 8);	/* mid lba */
+		args.hobfile.high_cylinder = (block >>= 8);	/* hi  lba */
+	} else if (drive->select.b.lba) {
+		/* LBA 28 bit  */
+		if (sectors == 256)
+			sectors = 0;
+
+		if (blk_rq_tagged(rq)) {
+			args.taskfile.feature = sectors;
+			args.taskfile.sector_count = rq->tag << 3;
+		} else
+			args.taskfile.sector_count = sectors;
+
+		args.taskfile.sector_number = block;
+		args.taskfile.low_cylinder = (block >>= 8);
+		args.taskfile.high_cylinder = (block >>= 8);
+		args.taskfile.device_head = ((block >> 8) & 0x0f);
+	} else {
+		/* CHS */
+		unsigned int track	= (block / drive->sect);
+		unsigned int sect	= (block % drive->sect) + 1;
+		unsigned int head	= (track % drive->head);
+		unsigned int cyl	= (track / drive->head);
+
+		if (sectors == 256)
+			sectors = 0;
+
+		if (blk_rq_tagged(rq)) {
+			args.taskfile.feature = sectors;
+			args.taskfile.sector_count = rq->tag << 3;
+		} else
+			args.taskfile.sector_count = sectors;
+
+		args.taskfile.sector_number = sect;
+		args.taskfile.low_cylinder = cyl;
+		args.taskfile.high_cylinder = (cyl>>8);
+		args.taskfile.device_head = head;
+	}
+	args.taskfile.device_head |= drive->select.all;
+
+	/*
+	 * Decode with physical ATA command to use and setup associated data.
+	 */
+
+	if (rq_data_dir(rq) == READ) {
+		args.command_type = IDE_DRIVE_TASK_IN;
+		if (drive->addressing) {
+			if (drive->using_tcq) {
+				args.cmd = WIN_READDMA_QUEUED_EXT;
+			} else if (drive->using_dma) {
+				args.cmd = WIN_READDMA_EXT;
+			} else if (drive->mult_count) {
+				args.XXX_handler = pio_in_intr;
+				args.cmd = WIN_MULTREAD_EXT;
+			} else {
+				args.XXX_handler = pio_in_intr;
+				args.cmd = WIN_READ_EXT;
+			}
+		} else {
+			if (drive->using_tcq) {
+				args.cmd = WIN_READDMA_QUEUED;
+			} else if (drive->using_dma) {
+				args.cmd = WIN_READDMA;
+			} else if (drive->mult_count) {
+				args.XXX_handler = pio_in_intr;
+				args.cmd = WIN_MULTREAD;
+			} else {
+				args.XXX_handler = pio_in_intr;
+				args.cmd = WIN_READ;
+			}
+		}
+	} else {
+		args.command_type = IDE_DRIVE_TASK_RAW_WRITE;
+		if (drive->addressing) {
+			if (drive->using_tcq) {
+				args.cmd = WIN_WRITEDMA_QUEUED_EXT;
+			} else if (drive->using_dma) {
+				args.cmd = WIN_WRITEDMA_EXT;
+			} else if (drive->mult_count) {
+				args.XXX_handler = task_mulout_intr;
+				args.cmd = WIN_MULTWRITE_EXT;
+			} else {
+				args.XXX_handler = task_out_intr;
+				args.cmd = WIN_WRITE_EXT;
+			}
+		} else {
+			if (drive->using_tcq) {
+				args.cmd = WIN_WRITEDMA_QUEUED;
+			} else if (drive->using_dma) {
+				args.cmd = WIN_WRITEDMA;
+			} else if (drive->mult_count) {
+				args.XXX_handler = task_mulout_intr;
+				args.cmd = WIN_MULTWRITE;
+			} else {
+				args.XXX_handler = task_out_intr;
+				args.cmd = WIN_WRITE;
+			}
+		}
+	}
+
+
+#ifdef DEBUG
+	printk("%s: %sing: ", drive->name,
+			(rq_data_dir(rq)==READ) ? "read" : "writ");
+	if (lba)	printk("LBAsect=%lld, ", block);
+	else		printk("CHS=%d/%d/%d, ", cyl, head, sect);
+	printk("sectors=%ld, ", rq->nr_sectors);
+	printk("buffer=%p\n", rq->buffer);
+#endif
+	rq->special = &args;
+
+	return __do_request(drive, &args, rq);
 }
 
-static int idedisk_open (struct inode *inode, struct file *filp, struct ata_device *drive)
+/*
+ * Small helper function used to execute simple commands.
+ */
+static int simple_taskfile(struct ata_device *drive, u8 cmd)
+{
+	struct ata_taskfile args;
+
+	memset(&args, 0, sizeof(args));
+	args.cmd = cmd;
+
+	return ide_raw_taskfile(drive, &args, NULL);
+}
+
+static int idedisk_open(struct inode *inode, struct file *__fp, struct ata_device *drive)
 {
 	MOD_INC_USE_COUNT;
 	if (drive->removable && drive->usage == 1) {
@@ -585,51 +635,40 @@ static int idedisk_open (struct inode *inode, struct file *filp, struct ata_devi
 
 		/*
 		 * Ignore the return code from door_lock, since the open() has
-		 * already succeeded once, and the door_lock is irrelevant at this
-		 * time.
+		 * already succeeded once, and the door_lock is irrelevant at
+		 * this time.
 		 */
 		if (drive->doorlocking) {
-			struct ata_taskfile args;
-
-			memset(&args, 0, sizeof(args));
-			args.cmd = WIN_DOORLOCK;
-			if (ide_raw_taskfile(drive, &args))
+			if (simple_taskfile(drive, WIN_DOORLOCK))
 				drive->doorlocking = 0;
 		}
 	}
+
 	return 0;
 }
 
-static int idedisk_flushcache(struct ata_device *drive)
+static int flush_cache(struct ata_device *drive)
 {
-	struct ata_taskfile args;
-
-	memset(&args, 0, sizeof(args));
+	u8 cmd;
 
 	if (drive->id->cfs_enable_2 & 0x2400)
-		args.cmd = WIN_FLUSH_CACHE_EXT;
+		cmd = WIN_FLUSH_CACHE_EXT;
 	else
-		args.cmd = WIN_FLUSH_CACHE;
-	return ide_raw_taskfile(drive, &args);
+		cmd = WIN_FLUSH_CACHE;
+
+	return simple_taskfile(drive, cmd);
 }
 
 static void idedisk_release(struct inode *inode, struct file *filp, struct ata_device *drive)
 {
 	if (drive->removable && !drive->usage) {
-		/* XXX I don't think this is up to the lowlevel drivers..  --hch */
-		invalidate_bdev(inode->i_bdev, 0);
-
 		if (drive->doorlocking) {
-			struct ata_taskfile args;
-
-			memset(&args, 0, sizeof(args));
-			args.cmd = WIN_DOORUNLOCK;
-			if (ide_raw_taskfile(drive, &args))
+			if (simple_taskfile(drive, WIN_DOORUNLOCK))
 				drive->doorlocking = 0;
 		}
 	}
 	if ((drive->id->cfs_enable_2 & 0x3000) && drive->wcache)
-		if (idedisk_flushcache(drive))
+		if (flush_cache(drive))
 			printk (KERN_INFO "%s: Write Cache FAILED Flushing!\n",
 				drive->name);
 	MOD_DEC_USE_COUNT;
@@ -671,7 +710,7 @@ static int set_multcount(struct ata_device *drive, int arg)
 	memset(&args, 0, sizeof(args));
 	args.taskfile.sector_count = arg;
 	args.cmd = WIN_SETMULT;
-	if (!ide_raw_taskfile(drive, &args)) {
+	if (!ide_raw_taskfile(drive, &args, NULL)) {
 		/* all went well track this setting as valid */
 		drive->mult_count = arg;
 
@@ -700,7 +739,7 @@ static int write_cache(struct ata_device *drive, int arg)
 	memset(&args, 0, sizeof(args));
 	args.taskfile.feature	= (arg) ? SETFEATURES_EN_WCACHE : SETFEATURES_DIS_WCACHE;
 	args.cmd = WIN_SETFEATURES;
-	ide_raw_taskfile(drive, &args);
+	ide_raw_taskfile(drive, &args, NULL);
 
 	drive->wcache = arg;
 
@@ -709,11 +748,7 @@ static int write_cache(struct ata_device *drive, int arg)
 
 static int idedisk_standby(struct ata_device *drive)
 {
-	struct ata_taskfile args;
-
-	memset(&args, 0, sizeof(args));
-	args.cmd = WIN_STANDBYNOW1;
-	return ide_raw_taskfile(drive, &args);
+	return simple_taskfile(drive, WIN_STANDBYNOW1);
 }
 
 static int set_acoustic(struct ata_device *drive, int arg)
@@ -724,7 +759,7 @@ static int set_acoustic(struct ata_device *drive, int arg)
 	args.taskfile.feature = (arg)?SETFEATURES_EN_AAM:SETFEATURES_DIS_AAM;
 	args.taskfile.sector_count = arg;
 	args.cmd = WIN_SETFEATURES;
-	ide_raw_taskfile(drive, &args);
+	ide_raw_taskfile(drive, &args, NULL);
 
 	drive->acoustic = arg;
 
@@ -821,9 +856,10 @@ static int idedisk_resume(struct device *dev, u32 level)
 /* This is just a hook for the overall driver tree.
  */
 
-static struct device_driver idedisk_devdrv = {
-	suspend: idedisk_suspend,
-	resume: idedisk_resume,
+static struct device_driver disk_devdrv = {
+	.lock = RW_LOCK_UNLOCKED,
+	.suspend = idedisk_suspend,
+	.resume = idedisk_resume,
 };
 
 /*
@@ -843,7 +879,7 @@ static unsigned long native_max_address(struct ata_device *drive)
 	memset(&args, 0, sizeof(args));
 	args.taskfile.device_head = 0x40;
 	args.cmd = WIN_READ_NATIVE_MAX;
-	ide_raw_taskfile(drive, &args);
+	ide_raw_taskfile(drive, &args, NULL);
 
 	/* if OK, compute maximum address value */
 	if (!(drive->status & ERR_STAT)) {
@@ -865,10 +901,9 @@ static u64 native_max_address_ext(struct ata_device *drive)
 
 	/* Create IDE/ATA command request structure */
 	memset(&args, 0, sizeof(args));
-
 	args.taskfile.device_head = 0x40;
 	args.cmd = WIN_READ_NATIVE_MAX_EXT;
-        ide_raw_taskfile(drive, &args);
+        ide_raw_taskfile(drive, &args, NULL);
 
 	/* if OK, compute maximum address value */
 	if (!(drive->status & ERR_STAT)) {
@@ -906,7 +941,7 @@ static sector_t set_max_address(struct ata_device *drive, sector_t addr_req)
 
 	args.taskfile.device_head = ((addr_req >> 24) & 0x0f) | 0x40;
 	args.cmd = WIN_SET_MAX;
-	ide_raw_taskfile(drive, &args);
+	ide_raw_taskfile(drive, &args, NULL);
 
 	/* if OK, read new maximum address value */
 	if (!(drive->status & ERR_STAT)) {
@@ -939,7 +974,7 @@ static u64 set_max_address_ext(struct ata_device *drive, u64 addr_req)
 	args.hobfile.high_cylinder = (addr_req >>= 8);
 	args.hobfile.device_head = 0x40;
 
-	ide_raw_taskfile(drive, &args);
+	ide_raw_taskfile(drive, &args, NULL);
 
 	/* if OK, compute maximum address value */
 	if (!(drive->status & ERR_STAT)) {
@@ -964,6 +999,7 @@ static void idedisk_setup(struct ata_device *drive)
 	sector_t capacity;
 	sector_t set_max;
 	int drvid = -1;
+	struct ata_channel *ch = drive->channel;
 
 	if (id == NULL)
 		return;
@@ -973,35 +1009,31 @@ static void idedisk_setup(struct ata_device *drive)
 	 * to us, but they are removable and don't have a doorlock mechanism.
 	 */
 	if (drive->removable && !drive_is_flashcard(drive)) {
-		/*
-		 * Removable disks (eg. SYQUEST); ignore 'WD' drives.
+		/* Removable disks (eg. SYQUEST); ignore 'WD' drives.
 		 */
-		if (id->model[0] != 'W' || id->model[1] != 'D') {
+		if (!strncmp(id->model, "WD", 2))
 			drive->doorlocking = 1;
-		}
 	}
-	for (i = 0; i < MAX_DRIVES; ++i) {
-		struct ata_channel *hwif = drive->channel;
 
-		if (drive != &hwif->drives[i])
+	for (i = 0; i < MAX_DRIVES; ++i) {
+		if (drive != &ch->drives[i])
 		    continue;
 		drvid = i;
-		hwif->gd->de_arr[i] = drive->de;
+		ch->gd->de_arr[i] = drive->de;
 		if (drive->removable)
-			hwif->gd->flags[i] |= GENHD_FL_REMOVABLE;
+			ch->gd->flags[i] |= GENHD_FL_REMOVABLE;
 		break;
 	}
 
 	/* Register us within the device tree.
 	 */
-
 	if (drvid != -1) {
-		sprintf(drive->device.bus_id, "%d", drvid);
-		sprintf(drive->device.name, "ide-disk");
-		drive->device.driver = &idedisk_devdrv;
-		drive->device.parent = &drive->channel->dev;
-		drive->device.driver_data = drive;
-		device_register(&drive->device);
+		sprintf(drive->dev.bus_id, "sd@%x,%x", ch->unit, drvid);
+		strcpy(drive->dev.name, "ATA-Disk");
+		drive->dev.driver = &disk_devdrv;
+		drive->dev.parent = &ch->dev;
+		drive->dev.driver_data = drive;
+		device_register(&drive->dev);
 	}
 
 	/* Extract geometry if we did not already have one for the drive */
@@ -1126,7 +1158,6 @@ static void idedisk_setup(struct ata_device *drive)
 	printk(KERN_INFO " %s: %ld sectors", drive->name, capacity);
 
 #if 0
-
 	/* Right now we avoid this calculation, since it can result in the
 	 * usage of not supported compiler internal functions on 32 bit hosts.
 	 * However since the calculation appears to be an interesting piece of
@@ -1193,15 +1224,27 @@ static void idedisk_setup(struct ata_device *drive)
 
 static int idedisk_cleanup(struct ata_device *drive)
 {
+	int ret;
+
 	if (!drive)
 	    return 0;
 
-	put_device(&drive->device);
-	if ((drive->id->cfs_enable_2 & 0x3000) && drive->wcache)
-		if (idedisk_flushcache(drive))
+	if ((drive->id->cfs_enable_2 & 0x3000) && drive->wcache) {
+		if (flush_cache(drive))
 			printk (KERN_INFO "%s: Write Cache FAILED Flushing!\n",
 				drive->name);
-	return ide_unregister_subdriver(drive);
+	}
+	ret = ide_unregister_subdriver(drive);
+
+	/* FIXME: This is killing the kernel with BUG 185 at asm/spinlocks.h
+	 * horribly.  Check whatever we did REGISTER the device properly
+	 * in front?
+	 */
+#if 0
+	put_device(&drive->device);
+#endif
+
+	return ret;
 }
 
 static int idedisk_ioctl(struct ata_device *drive, struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)

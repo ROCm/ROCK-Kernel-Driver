@@ -26,6 +26,7 @@
 #define write_lock_bh(lock)			do { local_bh_disable();         write_lock(lock); } while (0)
 
 #define spin_unlock_irqrestore(lock, flags)	do { spin_unlock(lock);  local_irq_restore(flags); } while (0)
+#define _raw_spin_unlock_irqrestore(lock, flags) do { _raw_spin_unlock(lock);  local_irq_restore(flags); } while (0)
 #define spin_unlock_irq(lock)			do { spin_unlock(lock);  local_irq_enable();       } while (0)
 #define spin_unlock_bh(lock)			do { spin_unlock(lock);  local_bh_enable();        } while (0)
 
@@ -64,13 +65,9 @@
 #elif !defined(spin_lock_init) /* !SMP and spin_lock_init not previously
                                   defined (e.g. by including asm/spinlock.h */
 
-#define DEBUG_SPINLOCKS	0	/* 0 == no debugging, 1 == maintain lock state, 2 == full debug */
-
-#if (DEBUG_SPINLOCKS < 1)
-
 #ifndef CONFIG_PREEMPT
-#define atomic_dec_and_lock(atomic,lock) atomic_dec_and_test(atomic)
-#define ATOMIC_DEC_AND_LOCK
+# define atomic_dec_and_lock(atomic,lock) atomic_dec_and_test(atomic)
+# define ATOMIC_DEC_AND_LOCK
 #endif
 
 /*
@@ -80,10 +77,10 @@
  */
 #if (__GNUC__ > 2)
   typedef struct { } spinlock_t;
-  #define SPIN_LOCK_UNLOCKED (spinlock_t) { }
+# define SPIN_LOCK_UNLOCKED (spinlock_t) { }
 #else
   typedef struct { int gcc_is_buggy; } spinlock_t;
-  #define SPIN_LOCK_UNLOCKED (spinlock_t) { 0 }
+# define SPIN_LOCK_UNLOCKED (spinlock_t) { 0 }
 #endif
 
 #define spin_lock_init(lock)	do { (void)(lock); } while(0)
@@ -92,42 +89,6 @@
 #define _raw_spin_trylock(lock)	((void)(lock), 1)
 #define spin_unlock_wait(lock)	do { (void)(lock); } while(0)
 #define _raw_spin_unlock(lock)	do { (void)(lock); } while(0)
-
-#elif (DEBUG_SPINLOCKS < 2)
-
-typedef struct {
-	volatile unsigned long lock;
-} spinlock_t;
-#define SPIN_LOCK_UNLOCKED (spinlock_t) { 0 }
-
-#define spin_lock_init(x)	do { (x)->lock = 0; } while (0)
-#define spin_is_locked(lock)	(test_bit(0,(lock)))
-#define spin_trylock(lock)	(!test_and_set_bit(0,(lock)))
-
-#define spin_lock(x)		do { (x)->lock = 1; } while (0)
-#define spin_unlock_wait(x)	do { } while (0)
-#define spin_unlock(x)		do { (x)->lock = 0; } while (0)
-
-#else /* (DEBUG_SPINLOCKS >= 2) */
-
-typedef struct {
-	volatile unsigned long lock;
-	volatile unsigned int babble;
-	const char *module;
-} spinlock_t;
-#define SPIN_LOCK_UNLOCKED (spinlock_t) { 0, 25, __BASE_FILE__ }
-
-#include <linux/kernel.h>
-
-#define spin_lock_init(x)	do { (x)->lock = 0; } while (0)
-#define spin_is_locked(lock)	(test_bit(0,(lock)))
-#define spin_trylock(lock)	(!test_and_set_bit(0,(lock)))
-
-#define spin_lock(x)		do {unsigned long __spinflags; save_flags(__spinflags); cli(); if ((x)->lock&&(x)->babble) {printk("%s:%d: spin_lock(%s:%p) already locked\n", __BASE_FILE__,__LINE__, (x)->module, (x));(x)->babble--;} (x)->lock = 1; restore_flags(__spinflags);} while (0)
-#define spin_unlock_wait(x)	do {unsigned long __spinflags; save_flags(__spinflags); cli(); if ((x)->lock&&(x)->babble) {printk("%s:%d: spin_unlock_wait(%s:%p) deadlock\n", __BASE_FILE__,__LINE__, (x)->module, (x));(x)->babble--;} restore_flags(__spinflags);} while (0)
-#define spin_unlock(x)		do {unsigned long __spinflags; save_flags(__spinflags); cli(); if (!(x)->lock&&(x)->babble) {printk("%s:%d: spin_unlock(%s:%p) not locked\n", __BASE_FILE__,__LINE__, (x)->module, (x));(x)->babble--;} (x)->lock = 0; restore_flags(__spinflags);} while (0)
-
-#endif	/* DEBUG_SPINLOCKS */
 
 /*
  * Read-write spinlocks, allowing multiple readers
@@ -183,6 +144,12 @@ do { \
 		preempt_schedule(); \
 } while (0)
 
+#define preempt_check_resched() \
+do { \
+	if (unlikely(test_thread_flag(TIF_NEED_RESCHED))) \
+		preempt_schedule(); \
+} while (0)
+
 #define spin_lock(lock)	\
 do { \
 	preempt_disable(); \
@@ -197,6 +164,12 @@ do { \
 	preempt_enable(); \
 } while (0)
 
+#define spin_unlock_no_resched(lock) \
+do { \
+	_raw_spin_unlock(lock); \
+	preempt_enable_no_resched(); \
+} while (0)
+
 #define read_lock(lock)		({preempt_disable(); _raw_read_lock(lock);})
 #define read_unlock(lock)	({_raw_read_unlock(lock); preempt_enable();})
 #define write_lock(lock)	({preempt_disable(); _raw_write_lock(lock);})
@@ -206,20 +179,22 @@ do { \
 
 #else
 
-#define preempt_get_count()	(0)
-#define preempt_disable()	do { } while (0)
+#define preempt_get_count()		(0)
+#define preempt_disable()		do { } while (0)
 #define preempt_enable_no_resched()	do {} while(0)
-#define preempt_enable()	do { } while (0)
+#define preempt_enable()		do { } while (0)
+#define preempt_check_resched()		do { } while (0)
 
-#define spin_lock(lock)		_raw_spin_lock(lock)
-#define spin_trylock(lock)	_raw_spin_trylock(lock)
-#define spin_unlock(lock)	_raw_spin_unlock(lock)
+#define spin_lock(lock)			_raw_spin_lock(lock)
+#define spin_trylock(lock)		_raw_spin_trylock(lock)
+#define spin_unlock(lock)		_raw_spin_unlock(lock)
+#define spin_unlock_no_resched(lock)	_raw_spin_unlock(lock)
 
-#define read_lock(lock)		_raw_read_lock(lock)
-#define read_unlock(lock)	_raw_read_unlock(lock)
-#define write_lock(lock)	_raw_write_lock(lock)
-#define write_unlock(lock)	_raw_write_unlock(lock)
-#define write_trylock(lock)	_raw_write_trylock(lock)
+#define read_lock(lock)			_raw_read_lock(lock)
+#define read_unlock(lock)		_raw_read_unlock(lock)
+#define write_lock(lock)		_raw_write_lock(lock)
+#define write_unlock(lock)		_raw_write_unlock(lock)
+#define write_trylock(lock)		_raw_write_trylock(lock)
 #endif
 
 /* "lock on reference count zero" */

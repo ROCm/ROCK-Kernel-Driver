@@ -317,34 +317,10 @@ static struct super_operations sockfs_ops = {
 	statfs:		simple_statfs,
 };
 
-static int sockfs_fill_super(struct super_block *sb, void *data, int silent)
-{
-	struct inode *root;
-	sb->s_blocksize = 1024;
-	sb->s_blocksize_bits = 10;
-	sb->s_magic = SOCKFS_MAGIC;
-	sb->s_op = &sockfs_ops;
-	root = new_inode(sb);
-	if (!root)
-		return -ENOMEM;
-	root->i_mode = S_IFDIR | S_IRUSR | S_IWUSR;
-	root->i_uid = root->i_gid = 0;
-	root->i_atime = root->i_mtime = root->i_ctime = CURRENT_TIME;
-	sb->s_root = d_alloc(NULL, &(const struct qstr) { "socket:", 7, 0 });
-	if (!sb->s_root) {
-		iput(root);
-		return -ENOMEM;
-	}
-	sb->s_root->d_sb = sb;
-	sb->s_root->d_parent = sb->s_root;
-	d_instantiate(sb->s_root, root);
-	return 0;
-}
-
 static struct super_block *sockfs_get_sb(struct file_system_type *fs_type,
 	int flags, char *dev_name, void *data)
 {
-	return get_sb_nodev(fs_type, flags, data, sockfs_fill_super);
+	return get_sb_pseudo(fs_type, "socket:", &sockfs_ops, SOCKFS_MAGIC);
 }
 
 static struct vfsmount *sock_mnt;
@@ -353,7 +329,6 @@ static struct file_system_type sock_fs_type = {
 	name:		"sockfs",
 	get_sb:		sockfs_get_sb,
 	kill_sb:	kill_anon_super,
-	fs_flags:	FS_NOMOUNT,
 };
 static int sockfs_delete_dentry(struct dentry *dentry)
 {
@@ -783,11 +758,13 @@ static int sock_fasync(int fd, struct file *filp, int on)
 			return -ENOMEM;
 	}
 
-
 	sock = SOCKET_I(filp->f_dentry->d_inode);
-	
-	if ((sk=sock->sk) == NULL)
+
+	if ((sk=sock->sk) == NULL) {
+		if (fna)
+			kfree(fna);
 		return -EINVAL;
+	}
 
 	lock_sock(sk);
 

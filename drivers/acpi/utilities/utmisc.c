@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: utmisc - common utility procedures
- *              $Revision: 75 $
+ *              $Revision: 78 $
  *
  ******************************************************************************/
 
@@ -27,6 +27,7 @@
 #include "acpi.h"
 #include "acnamesp.h"
 #include "amlcode.h"
+#include "acinterp.h"
 
 
 #define _COMPONENT          ACPI_UTILITIES
@@ -1100,119 +1101,6 @@ acpi_ut_delete_generic_state_cache (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_resolve_reference
- *
- * PARAMETERS:  ACPI_PKG_CALLBACK
- *
- * RETURN:      Status          - the status of the call
- *
- * DESCRIPTION: Resolve a reference object to an actual value
- *
- ******************************************************************************/
-
-acpi_status
-acpi_ut_resolve_reference (
-	u8                      object_type,
-	acpi_operand_object     *source_object,
-	acpi_generic_state      *state,
-	void                    *context)
-{
-	acpi_pkg_info           *info = (acpi_pkg_info *) context;
-
-
-	switch (object_type) {
-	case ACPI_COPY_TYPE_SIMPLE:
-
-		/*
-		 * Simple object - check for a reference
-		 */
-		if (source_object->common.type == INTERNAL_TYPE_REFERENCE) {
-			switch (source_object->reference.opcode) {
-			case AML_ZERO_OP:
-
-				source_object->common.type = ACPI_TYPE_INTEGER;
-				source_object->integer.value = 0;
-				break;
-
-			case AML_ONE_OP:
-
-				source_object->common.type = ACPI_TYPE_INTEGER;
-				source_object->integer.value = 1;
-				break;
-
-			case AML_ONES_OP:
-
-				source_object->common.type = ACPI_TYPE_INTEGER;
-				source_object->integer.value = ACPI_INTEGER_MAX;
-				break;
-
-			default:
-				/* Other types not supported */
-				return (AE_SUPPORT);
-			}
-		}
-		break;
-
-
-	case ACPI_COPY_TYPE_PACKAGE:
-
-		/* Package object - nothing much to do here, let the walk handle it */
-
-		info->num_packages++;
-		state->pkg.this_target_obj = NULL;
-		break;
-
-	default:
-		return (AE_BAD_PARAMETER);
-	}
-
-	return (AE_OK);
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    Acpi_ut_resolve_package_references
- *
- * PARAMETERS:  Obj_desc        - The Package object on which to resolve refs
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Walk through a package and turn internal references into values
- *
- ******************************************************************************/
-
-acpi_status
-acpi_ut_resolve_package_references (
-	acpi_operand_object     *obj_desc)
-{
-	acpi_pkg_info           info;
-	acpi_status             status;
-
-
-	ACPI_FUNCTION_TRACE ("Ut_resolve_package_references");
-
-
-	if (obj_desc->common.type != ACPI_TYPE_PACKAGE) {
-		/* The object must be a package */
-
-		ACPI_REPORT_ERROR (("Expecting a Package object\n"));
-		return_ACPI_STATUS (AE_TYPE);
-	}
-
-	info.length      = 0;
-	info.object_space = 0;
-	info.num_packages = 1;
-
-	status = acpi_ut_walk_package_tree (obj_desc, NULL,
-			 acpi_ut_resolve_reference, &info);
-
-	return_ACPI_STATUS (status);
-}
-
-
-/*******************************************************************************
- *
  * FUNCTION:    Acpi_ut_walk_package_tree
  *
  * PARAMETERS:  Obj_desc        - The Package object on which to resolve refs
@@ -1260,7 +1148,7 @@ acpi_ut_walk_package_tree (
 		 */
 		if ((!this_source_obj) ||
 			(ACPI_GET_DESCRIPTOR_TYPE (this_source_obj) != ACPI_DESC_TYPE_OPERAND) ||
-			(this_source_obj->common.type != ACPI_TYPE_PACKAGE)) {
+			(ACPI_GET_OBJECT_TYPE (this_source_obj) != ACPI_TYPE_PACKAGE)) {
 			status = walk_callback (ACPI_COPY_TYPE_SIMPLE, this_source_obj,
 					 state, context);
 			if (ACPI_FAILURE (status)) {

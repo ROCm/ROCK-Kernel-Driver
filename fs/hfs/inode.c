@@ -20,6 +20,7 @@
 #include <linux/hfs_fs_sb.h>
 #include <linux/hfs_fs_i.h>
 #include <linux/hfs_fs.h>
+#include <linux/pagemap.h>
 #include <linux/smp_lock.h>
 
 /*================ Variable-like macros ================*/

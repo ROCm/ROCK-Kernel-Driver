@@ -73,6 +73,7 @@ static const char *mcdx_c_version
 
 #include <linux/major.h>
 #define MAJOR_NR MITSUMI_X_CDROM_MAJOR
+#define DEVICE_NR(device) (minor(device))
 #include <linux/blk.h>
 #include <linux/devfs_fs_kernel.h>
 
@@ -562,10 +563,8 @@ void do_mcdx_request(request_queue_t * q)
 
       again:
 
-	if (blk_queue_empty(QUEUE)) {
-		CLEAR_INTR;
+	if (blk_queue_empty(QUEUE))
 		return;
-	}
 
 	dev = minor(CURRENT->rq_dev);
 	stuffp = mcdx_stuffp[dev];
@@ -576,14 +575,14 @@ void do_mcdx_request(request_queue_t * q)
 		xwarn("do_request(): bad device: %s\n",
 		      kdevname(CURRENT->rq_dev));
 		xtrace(REQUEST, "end_request(0): bad device\n");
-		end_request(0);
+		end_request(CURRENT, 0);
 		return;
 	}
 
 	if (stuffp->audio) {
 		xwarn("do_request() attempt to read from audio cd\n");
 		xtrace(REQUEST, "end_request(0): read from audio\n");
-		end_request(0);
+		end_request(CURRENT, 0);
 		return;
 	}
 
@@ -593,7 +592,7 @@ void do_mcdx_request(request_queue_t * q)
 	if (CURRENT->cmd != READ) {
 		xwarn("do_request(): non-read command to cd!!\n");
 		xtrace(REQUEST, "end_request(0): write\n");
-		end_request(0);
+		end_request(CURRENT, 0);
 		return;
 	}
 	else {
@@ -607,18 +606,18 @@ void do_mcdx_request(request_queue_t * q)
 					  CURRENT->nr_sectors);
 
 			if (i == -1) {
-				end_request(0);
+				end_request(CURRENT, 0);
 				goto again;
 			}
 			CURRENT->sector += i;
 			CURRENT->nr_sectors -= i;
 			CURRENT->buffer += (i * 512);
 		}
-		end_request(1);
+		end_request(CURRENT, 1);
 		goto again;
 
 		xtrace(REQUEST, "end_request(1)\n");
-		end_request(1);
+		end_request(CURRENT, 1);
 	}
 
 	goto again;
@@ -1106,7 +1105,8 @@ int __init mcdx_init_drive(int drive)
 	init_waitqueue_head(&stuffp->sleepq);
 
 	/* check if i/o addresses are available */
-	if (check_region((unsigned int) stuffp->wreg_data, MCDX_IO_SIZE)) {
+	if (!request_region((unsigned int) stuffp->wreg_data, MCDX_IO_SIZE,
+			    "mcdx")) {
 		xwarn("0x%3p,%d: Init failed. "
 		      "I/O ports (0x%3p..0x%3p) already in use.\n",
 		      stuffp->wreg_data, stuffp->irq,
@@ -1126,6 +1126,8 @@ int __init mcdx_init_drive(int drive)
 	xtrace(INIT, "init() get version\n");
 	if (-1 == mcdx_requestversion(stuffp, &version, 4)) {
 		/* failed, next drive */
+		release_region((unsigned long) stuffp->wreg_data,
+			       MCDX_IO_SIZE);
 		xwarn("%s=0x%3p,%d: Init failed. Can't get version.\n",
 		      MCDX, stuffp->wreg_data, stuffp->irq);
 		xtrace(MALLOC, "init() free stuffp @ %p\n", stuffp);
@@ -1155,6 +1157,8 @@ int __init mcdx_init_drive(int drive)
 	stuffp->playcmd = READ1X;
 
 	if (!stuffp->present) {
+		release_region((unsigned long) stuffp->wreg_data,
+			       MCDX_IO_SIZE);
 		xwarn("%s=0x%3p,%d: Init failed. No Mitsumi CD-ROM?.\n",
 		      MCDX, stuffp->wreg_data, stuffp->irq);
 		kfree(stuffp);
@@ -1163,6 +1167,8 @@ int __init mcdx_init_drive(int drive)
 
 	xtrace(INIT, "init() register blkdev\n");
 	if (devfs_register_blkdev(MAJOR_NR, "mcdx", &mcdx_bdops) != 0) {
+		release_region((unsigned long) stuffp->wreg_data,
+			       MCDX_IO_SIZE);
 		xwarn("%s=0x%3p,%d: Init failed. Can't get major %d.\n",
 		      MCDX, stuffp->wreg_data, stuffp->irq, MAJOR_NR);
 		kfree(stuffp);
@@ -1175,6 +1181,8 @@ int __init mcdx_init_drive(int drive)
 	xtrace(INIT, "init() subscribe irq and i/o\n");
 	mcdx_irq_map[stuffp->irq] = stuffp;
 	if (request_irq(stuffp->irq, mcdx_intr, SA_INTERRUPT, "mcdx", NULL)) {
+		release_region((unsigned long) stuffp->wreg_data,
+			       MCDX_IO_SIZE);
 		xwarn("%s=0x%3p,%d: Init failed. Can't get irq (%d).\n",
 		      MCDX, stuffp->wreg_data, stuffp->irq, stuffp->irq);
 		stuffp->irq = 0;
@@ -1182,8 +1190,6 @@ int __init mcdx_init_drive(int drive)
 		kfree(stuffp);
 		return 0;
 	}
-	request_region((unsigned int) stuffp->wreg_data,
-		       MCDX_IO_SIZE, "mcdx");
 
 	xtrace(INIT, "init() get garbage\n");
 	{

@@ -84,17 +84,6 @@ extern struct cpuinfo_x86 cpu_data[];
 #define current_cpu_data boot_cpu_data
 #endif
 
-#define cpu_has_pge 1
-#define cpu_has_pse 1
-#define cpu_has_pae 1
-#define cpu_has_tsc 1
-#define cpu_has_de 1
-#define cpu_has_vme 1
-#define cpu_has_fxsr 1
-#define cpu_has_mmx 1
-#define cpu_has_xmm 1
-#define cpu_has_apic 1
-
 extern char ignore_irq13;
 
 extern void identify_cpu(struct cpuinfo_x86 *);
@@ -371,8 +360,6 @@ extern void release_thread(struct task_struct *);
  */
 extern long kernel_thread(int (*fn)(void *), void * arg, unsigned long flags);
 
-/* Copy and release all segment info associated with a VM */
-extern void copy_segments(struct task_struct *p, struct mm_struct * mm);
 extern void release_segments(struct mm_struct * mm);
 
 /*

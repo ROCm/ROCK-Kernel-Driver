@@ -32,6 +32,7 @@
 #include <linux/bootmem.h>
 #include <linux/seq_file.h>
 #include <linux/console.h>
+#include <linux/root_dev.h>
 #include <linux/highmem.h>
 #include <asm/e820.h>
 #include <asm/mpspec.h>
@@ -581,7 +582,7 @@ void __init setup_arch(char **cmdline_p)
 	early_cpu_init();
 
 
- 	ROOT_DEV = to_kdev_t(ORIG_ROOT_DEV);
+ 	ROOT_DEV = ORIG_ROOT_DEV;
  	drive_info = DRIVE_INFO;
  	screen_info = SCREEN_INFO;
 #ifdef CONFIG_APM

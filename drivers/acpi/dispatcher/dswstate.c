@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dswstate - Dispatcher parse tree walk management routines
- *              $Revision: 64 $
+ *              $Revision: 65 $
  *
  *****************************************************************************/
 
@@ -84,7 +84,7 @@ acpi_ds_result_insert (
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
 		"Obj=%p [%s] State=%p Num=%X Cur=%X\n",
-		object, object ? acpi_ut_get_type_name (((acpi_operand_object *) object)->common.type) : "NULL",
+		object, object ? acpi_ut_get_object_type_name ((acpi_operand_object *) object) : "NULL",
 		walk_state, state->results.num_results, walk_state->current_result));
 
 	return (AE_OK);
@@ -148,7 +148,7 @@ acpi_ds_result_remove (
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
 		"Obj=%p [%s] Index=%X State=%p Num=%X\n",
-		*object, (*object) ? acpi_ut_get_type_name ((*object)->common.type) : "NULL",
+		*object, (*object) ? acpi_ut_get_object_type_name (*object) : "NULL",
 		index, walk_state, state->results.num_results));
 
 	return (AE_OK);
@@ -204,7 +204,7 @@ acpi_ds_result_pop (
 			state->results.obj_desc [index -1] = NULL;
 
 			ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Obj=%p [%s] Index=%X State=%p Num=%X\n",
-				*object, (*object) ? acpi_ut_get_type_name ((*object)->common.type) : "NULL",
+				*object, (*object) ? acpi_ut_get_object_type_name (*object) : "NULL",
 				index -1, walk_state, state->results.num_results));
 
 			return (AE_OK);
@@ -274,7 +274,7 @@ acpi_ds_result_pop_from_bottom (
 	}
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Obj=%p [%s], Results=%p State=%p\n",
-		*object, (*object) ? acpi_ut_get_type_name ((*object)->common.type) : "NULL",
+		*object, (*object) ? acpi_ut_get_object_type_name (*object) : "NULL",
 		state, walk_state));
 
 
@@ -329,7 +329,7 @@ acpi_ds_result_push (
 	state->results.num_results++;
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Obj=%p [%s] State=%p Num=%X Cur=%X\n",
-		object, object ? acpi_ut_get_type_name (((acpi_operand_object *) object)->common.type) : "NULL",
+		object, object ? acpi_ut_get_object_type_name ((acpi_operand_object *) object) : "NULL",
 		walk_state, state->results.num_results, walk_state->current_result));
 
 	return (AE_OK);
@@ -487,7 +487,7 @@ acpi_ds_obj_stack_push (
 	walk_state->num_operands++;
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Obj=%p [%s] State=%p #Ops=%X\n",
-			  object, acpi_ut_get_type_name (((acpi_operand_object *) object)->common.type),
+			  object, acpi_ut_get_object_type_name ((acpi_operand_object *) object),
 			  walk_state, walk_state->num_operands));
 
 	return (AE_OK);
@@ -547,7 +547,7 @@ acpi_ds_obj_stack_pop_object (
 	walk_state->operands [walk_state->num_operands] = NULL;
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Obj=%p [%s] State=%p #Ops=%X\n",
-			  *object, acpi_ut_get_type_name ((*object)->common.type),
+			  *object, acpi_ut_get_object_type_name (*object),
 			  walk_state, walk_state->num_operands));
 
 	return (AE_OK);

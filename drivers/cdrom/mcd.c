@@ -102,6 +102,7 @@
 #include <asm/uaccess.h>
 
 #define MAJOR_NR MITSUMI_CDROM_MAJOR
+#define DEVICE_NR(device) (minor(device))
 #include <linux/blk.h>
 
 #define mcd_port mcd		/* for compatible parameter passing with "insmod" */
@@ -621,14 +622,14 @@ static void do_mcd_request(request_queue_t * q)
 	while (current_valid()) {
 		mcd_transfer();
 		if (CURRENT->nr_sectors == 0) {
-			end_request(1);
+			end_request(CURRENT, 1);
 		} else {
 			mcd_buf_out = -1;	/* Want to read a block not in buffer */
 			if (mcd_state == MCD_S_IDLE) {
 				if (!tocUpToDate) {
 					if (updateToc() < 0) {
 						while (current_valid())
-							end_request(0);
+							end_request(CURRENT, 0);
 						break;
 					}
 				}
@@ -693,7 +694,7 @@ static void mcd_poll(unsigned long dummy)
 					goto ret;
 				}
 				if (current_valid())
-					end_request(0);
+					end_request(CURRENT, 0);
 				McdTries = MCD_RETRY_ATTEMPTS;
 			}
 		}
@@ -750,7 +751,7 @@ set_mode_immediately:
 				       "mcd: disk removed\n");
 				mcd_state = MCD_S_IDLE;
 				while (current_valid())
-					end_request(0);
+					end_request(CURRENT, 0);
 				goto out;
 			}
 			outb(MCMD_SET_MODE, MCDPORT(0));
@@ -784,7 +785,7 @@ read_immediately:
 				       "mcd: disk removed\n");
 				mcd_state = MCD_S_IDLE;
 				while (current_valid())
-					end_request(0);
+					end_request(CURRENT, 0);
 				goto out;
 			}
 
@@ -825,7 +826,7 @@ data_immediately:
 					break;
 				}
 				if (current_valid())
-					end_request(0);
+					end_request(CURRENT, 0);
 				McdTries = 5;
 			}
 			mcd_state = MCD_S_START;
@@ -852,7 +853,7 @@ data_immediately:
 				while (current_valid()) {
 					mcd_transfer();
 					if (CURRENT->nr_sectors == 0)
-						end_request(1);
+						end_request(CURRENT, 1);
 					else
 						break;
 				}
@@ -1068,7 +1069,7 @@ int __init mcd_init(void)
 		printk(KERN_ERR "mcd: Unable to get major %d for Mitsumi CD-ROM\n", MAJOR_NR);
 		return -EIO;
 	}
-	if (check_region(mcd_port, 4)) {
+	if (!request_region(mcd_port, 4, "mcd")) {
 		cleanup(1);
 		printk(KERN_ERR "mcd: Initialization failed, I/O port (%X) already in use\n", mcd_port);
 		return -EIO;
@@ -1091,7 +1092,7 @@ int __init mcd_init(void)
 	if (count >= 2000000) {
 		printk(KERN_INFO "mcd: initialisation failed - No mcd device at 0x%x irq %d\n",
 		       mcd_port, mcd_irq);
-		cleanup(1);
+		cleanup(2);
 		return -EIO;
 	}
 	count = inb(MCDPORT(0));	/* pick up the status */
@@ -1101,12 +1102,12 @@ int __init mcd_init(void)
 		if (getValue(result + count)) {
 			printk(KERN_ERR "mcd: mitsumi get version failed at 0x%x\n",
 			       mcd_port);
-			cleanup(1);
+			cleanup(2);
 			return -EIO;
 		}
 
 	if (result[0] == result[1] && result[1] == result[2]) {
-		cleanup(1);
+		cleanup(2);
 		return -EIO;
 	}
 
@@ -1119,7 +1120,7 @@ int __init mcd_init(void)
 
 	if (request_irq(mcd_irq, mcd_interrupt, SA_INTERRUPT, "Mitsumi CD", NULL)) {
 		printk(KERN_ERR "mcd: Unable to get IRQ%d for Mitsumi CD-ROM\n", mcd_irq);
-		cleanup(1);
+		cleanup(2);
 		return -EIO;
 	}
 
@@ -1132,8 +1133,6 @@ int __init mcd_init(void)
 	sprintf(msg, " mcd: Mitsumi %s Speed CD-ROM at port=0x%x,"
 		" irq=%d\n", mcd_info.speed == 1 ? "Single" : "Double",
 		mcd_port, mcd_irq);
-
-	request_region(mcd_port, 4, "mcd");
 
 	outb(MCMD_CONFIG_DRIVE, MCDPORT(0));
 	outb(0x02, MCDPORT(0));

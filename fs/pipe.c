@@ -119,7 +119,7 @@ do_more_read:
 		 * writers synchronously that there is more
 		 * room.
 		 */
-		wake_up_interruptible(PIPE_WAIT(*inode));
+		wake_up_interruptible_sync(PIPE_WAIT(*inode));
  		kill_fasync(PIPE_FASYNC_WRITERS(*inode), SIGIO, POLL_OUT);
 		if (!PIPE_EMPTY(*inode))
 			BUG();
@@ -219,7 +219,7 @@ pipe_write(struct file *filp, const char *buf, size_t count, loff_t *ppos)
 			 * is going to give up this CPU, so it doesnt have
 			 * to do idle reschedules.
 			 */
-			wake_up_interruptible(PIPE_WAIT(*inode));
+			wake_up_interruptible_sync(PIPE_WAIT(*inode));
  			kill_fasync(PIPE_FASYNC_READERS(*inode), SIGIO, POLL_IN);
 			PIPE_WAITING_WRITERS(*inode)++;
 			pipe_wait(inode);
@@ -665,46 +665,16 @@ no_files:
  * d_name - pipe: will go nicely and kill the special-casing in procfs.
  */
 
-static struct super_operations pipefs_ops = {
-	statfs:		simple_statfs,
-};
-
-static int pipefs_fill_super(struct super_block *sb, void *data, int silent)
-{
-	struct inode *root;
-
-	sb->s_blocksize = 1024;
-	sb->s_blocksize_bits = 10;
-	sb->s_magic = PIPEFS_MAGIC;
-	sb->s_op	= &pipefs_ops;
-	root = new_inode(sb);
-	if (!root)
-		return -ENOMEM;
-	root->i_mode = S_IFDIR | S_IRUSR | S_IWUSR;
-	root->i_uid = root->i_gid = 0;
-	root->i_atime = root->i_mtime = root->i_ctime = CURRENT_TIME;
-	sb->s_root = d_alloc(NULL, &(const struct qstr) { "pipe:", 5, 0 });
-	if (!sb->s_root) {
-		iput(root);
-		return -ENOMEM;
-	}
-	sb->s_root->d_sb = sb;
-	sb->s_root->d_parent = sb->s_root;
-	d_instantiate(sb->s_root, root);
-	return 0;
-}
-
 static struct super_block *pipefs_get_sb(struct file_system_type *fs_type,
 	int flags, char *dev_name, void *data)
 {
-	return get_sb_nodev(fs_type, flags, data, pipefs_fill_super);
+	return get_sb_pseudo(fs_type, "pipe:", NULL, PIPEFS_MAGIC);
 }
 
 static struct file_system_type pipe_fs_type = {
 	name:		"pipefs",
 	get_sb:		pipefs_get_sb,
 	kill_sb:	kill_anon_super,
-	fs_flags:	FS_NOMOUNT,
 };
 
 static int __init init_pipe_fs(void)

@@ -1,13 +1,14 @@
 /*
- * arch/x86_64/lib/checksum.c
+ * arch/x86_64/lib/csum-partial.c
  *
  * This file contains network checksum routines that are better done
- * in an architecture-specific manner due to speed..
+ * in an architecture-specific manner due to speed.
  */
  
-#include <linux/string.h>
-#include <asm/byteorder.h>
+#include <linux/compiler.h>
+#include <linux/module.h>
 
+/* Better way for this sought */
 static inline unsigned short from64to16(unsigned long x)
 {
 	/* add up 32-bit words for 33 bits */
@@ -22,13 +23,13 @@ static inline unsigned short from64to16(unsigned long x)
 }
 
 /*
- * Do a 64-bit checksum on an arbitrary memory area..
+ * Do a 64-bit checksum on an arbitrary memory area.
+ * Returns a 32bit checksum.
  *
- * This isn't a great routine, but it's not _horrible_ either. The
- * inner loop could be unrolled a bit further, and there are better
- * ways to do the carry, but this is reasonable.
+ * This isn't a great routine, but it's not _horrible_ either. 
+ * We rely on the compiler to unroll.
  */
-static inline unsigned long do_csum(const unsigned char * buff, int len)
+static inline unsigned do_csum(const unsigned char * buff, int len)
 {
 	int odd, count;
 	unsigned long result = 0;
@@ -36,7 +37,7 @@ static inline unsigned long do_csum(const unsigned char * buff, int len)
 	if (len <= 0)
 		goto out;
 	odd = 1 & (unsigned long) buff;
-	if (odd) {
+	if (unlikely(odd)) {
 		result = *buff << 8;
 		len--;
 		buff++;
@@ -59,16 +60,15 @@ static inline unsigned long do_csum(const unsigned char * buff, int len)
 			}
 			count >>= 1;	/* nr of 64-bit words.. */
 			if (count) {
-				unsigned long carry = 0;
+				unsigned long zero = 0; 
 				do {
-					unsigned long w = *(unsigned long *) buff;
+					asm("  addq %1,%0\n"
+					    "  adcq %2,%0\n" 
+					    : "=r" (result)
+					    : "m"  (*buff), "r" (zero),  "0" (result));
 					count--;
 					buff += 8;
-					result += carry;
-					result += w;
-					carry = (w > result);
 				} while (count);
-				result += carry;
 				result = (result & 0xffffffff) + (result >> 32);
 			}
 			if (len & 4) {
@@ -84,8 +84,8 @@ static inline unsigned long do_csum(const unsigned char * buff, int len)
 	if (len & 1)
 		result += *buff;
 	result = from64to16(result);
-	if (odd)
-		result = ((result >> 8) & 0xff) | ((result & 0xff) << 8);
+	if (unlikely(odd))
+		return ((result >> 8) & 0xff) | ((result & 0xff) << 8);
 out:
 	return result;
 }
@@ -100,18 +100,19 @@ out:
  * this function must be called with even lengths, except
  * for the last fragment, which may be odd
  *
- * it's best to have buff aligned on a 32-bit boundary
+ * it's best to have buff aligned on a 64-bit boundary
  */
 unsigned int csum_partial(const unsigned char * buff, int len, unsigned int sum)
 {
-	unsigned long result = do_csum(buff, len);
+	unsigned result = do_csum(buff, len);
 
 	/* add in old sum, and carry.. */
-	result += sum;
-	/* 32+c bits -> 32 bits */
-	result = (result & 0xffffffff) + (result >> 32);
+	asm("addl %1,%0\n\t"
+	    "adcl $0,%0" : "=r" (result) : "r" (sum), "0" (result)); 
 	return result;
 }
+
+//EXPORT_SYMBOL(csum_partial);
 
 /*
  * this routine is used for miscellaneous IP-like checksums, mainly
@@ -119,6 +120,7 @@ unsigned int csum_partial(const unsigned char * buff, int len, unsigned int sum)
  */
 unsigned short ip_compute_csum(unsigned char * buff, int len)
 {
-	return ~from64to16(do_csum(buff,len));
+	return ~csum_partial(buff,len,0); 
 }
 
+EXPORT_SYMBOL(ip_compute_csum);

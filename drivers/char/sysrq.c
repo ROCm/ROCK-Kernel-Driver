@@ -105,11 +105,9 @@ static struct sysrq_key_op sysrq_reboot_op = {
 
 /* do_emergency_sync helper function */
 /* Guesses if the device is a local hard drive */
-static int is_local_disk(kdev_t dev) {
-	unsigned int major;
-	major = major(dev);
-
-	switch (major) {
+static int is_local_disk(struct block_device *bdev)
+{
+	switch (MAJOR(bdev->bd_dev)) {
 	case IDE0_MAJOR:
 	case IDE1_MAJOR:
 	case IDE2_MAJOR:
@@ -143,7 +141,7 @@ static void go_sync(struct super_block *sb, int remount_flag)
 	console_loglevel = 7;
 	printk(KERN_INFO "%sing device %s ... ",
 	       remount_flag ? "Remount" : "Sync",
-	       kdevname(sb->s_dev));
+	       sb->s_id);
 
 	if (remount_flag) { /* Remount R/O */
 		int ret, flags;
@@ -202,13 +200,13 @@ void do_emergency_sync(void) {
 	for (sb = sb_entry(super_blocks.next);
 	     sb != sb_entry(&super_blocks); 
 	     sb = sb_entry(sb->s_list.next))
-		if (is_local_disk(sb->s_dev))
+		if (sb->s_bdev && is_local_disk(sb->s_bdev))
 			go_sync(sb, remount_flag);
 
 	for (sb = sb_entry(super_blocks.next);
 	     sb != sb_entry(&super_blocks); 
 	     sb = sb_entry(sb->s_list.next))
-		if (!is_local_disk(sb->s_dev) && major(sb->s_dev))
+		if (sb->s_bdev && !is_local_disk(sb->s_bdev))
 			go_sync(sb, remount_flag);
 
 	unlock_kernel();
@@ -319,22 +317,6 @@ static struct sysrq_key_op sysrq_kill_op = {
 	action_msg:	"Kill All Tasks",
 };
 
-#ifdef CONFIG_SOFTWARE_SUSPEND
-static void sysrq_handle_swsusp(int key, struct pt_regs *pt_regs,
-		struct kbd_struct *kbd, struct tty_struct *tty) {
-        if(!software_suspend_enabled) {
-		printk("Software Suspend is not possible now\n");
-		return;
-	}
-	software_suspend();
-}
-static struct sysrq_key_op sysrq_swsusp_op = {
-	handler:	sysrq_handle_swsusp,
-	help_msg:	"suspenD",
-	action_msg:	"Software suspend\n",
-};
-#endif
-
 /* END SIGNAL SYSRQ HANDLERS BLOCK */
 
 
@@ -357,11 +339,7 @@ static struct sysrq_key_op *sysrq_key_table[SYSRQ_KEY_TABLE_LENGTH] = {
 		 and will never arive */
 /* b */	&sysrq_reboot_op,
 /* c */	NULL,
-#ifdef CONFIG_SOFTWARE_SUSPEND
-/* d */	&sysrq_swsusp_op,
-#else
 /* d */	NULL,
-#endif
 /* e */	&sysrq_term_op,
 /* f */	NULL,
 /* g */	NULL,
@@ -387,7 +365,7 @@ static struct sysrq_key_op *sysrq_key_table[SYSRQ_KEY_TABLE_LENGTH] = {
 /* v */	NULL,
 /* w */	NULL,
 /* x */	NULL,
-/* w */	NULL,
+/* y */	NULL,
 /* z */	NULL
 };
 

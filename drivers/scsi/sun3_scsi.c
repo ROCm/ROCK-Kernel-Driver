@@ -78,7 +78,6 @@
 #include "hosts.h"
 #include "sun3_scsi.h"
 #include "NCR5380.h"
-#include "constants.h"
 
 #define USE_WRAPPER
 #define RESET_BOOT

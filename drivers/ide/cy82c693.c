@@ -21,12 +21,9 @@
  *   hdparm -t reports 8.17 MB/sec at about 6% CPU usage for the DTTA
  * - this is my first linux driver, so there's probably a lot  of room
  *   for optimizations and bug fixing, so feel free to do it.
- * - use idebus=xx parameter to set PCI bus speed - needed to calc
- *   timings for PIO modes (default will be 40)
- * - if using PIO mode it's a good idea to set the PIO mode and
- *   32-bit I/O support (if possible), e.g. hdparm -p2 -c1 /dev/hda
  * - I had some problems with my IBM DHEA with PIO modes < 2
  *   (lost interrupts) ?????
+ *   FIXME: probably because we set wrong timings for 8bit  --bkz
  * - first tests with DMA look okay, they seem to work, but there is a
  *   problem with sound - the BusMaster IDE TimeOut should fixed this
  *
@@ -83,6 +80,9 @@
 /* here are the offset definitions for the registers */
 #define CY82_IDE_CMDREG		0x04
 #define CY82_IDE_ADDRSETUP	0x48
+
+#define CYPRESS_TIMINGS		0x4C
+
 #define CY82_IDE_MASTER_IOR	0x4C
 #define CY82_IDE_MASTER_IOW	0x4D
 #define CY82_IDE_SLAVE_IOR	0x4E
@@ -105,19 +105,20 @@
 #define CY82C963_MIN_BUS_SPEED	25
 #define CY82C963_MAX_BUS_SPEED	33
 
-/* the struct for the PIO mode timings */
+/* the struct for the PIO mode timings (in clocks) */
 typedef struct pio_clocks_s {
-        byte	address_time;		/* Address setup (clocks) */
-	byte	time_16r;		/* clocks for 16bit IOR (0xF0=Active/data, 0x0F=Recovery) */
-	byte	time_16w;		/* clocks for 16bit IOW (0xF0=Active/data, 0x0F=Recovery) */
-	byte	time_8;			/* clocks for 8bit (0xF0=Active/data, 0x0F=Recovery) */
+	u8 address_time;	/* Address setup */
+	/* 0xF0=Active/data, 0x0F=Recovery */
+	u8 time_16r;		/* 16bit IOR */
+	u8 time_16w;		/* 16bit IOW */
+	u8 time_8;		/* 8bit */
 } pio_clocks_t;
 
 /*
  * calc clocks using bus_speed
  * returns (rounded up) time in bus clocks for time in ns
  */
-static int calc_clk (int time, int bus_speed)
+static u8 calc_clk(int time, int bus_speed)
 {
 	int clocks;
 
@@ -129,7 +130,7 @@ static int calc_clk (int time, int bus_speed)
 	if (clocks > 0x0F)
 		clocks = 0x0F;
 
-	return clocks;
+	return (u8)clocks;
 }
 
 /*
@@ -140,7 +141,8 @@ static int calc_clk (int time, int bus_speed)
  *       for mode 3 and 4 drives 8 and 16-bit timings are the same
  *
  */
-static void compute_clocks (byte pio, pio_clocks_t *p_pclk)
+/* FIXME: use generic ata-timings library  --bkz */
+static void compute_clocks(u8 pio, pio_clocks_t *p_pclk)
 {
 	struct ata_timing *t;
 	int clk1, clk2;
@@ -149,34 +151,33 @@ static void compute_clocks (byte pio, pio_clocks_t *p_pclk)
 
 	/* we don't check against CY82C693's min and max speed,
 	 * so you can play with the idebus=xx parameter
+	 * FIXME: warn about going out of specification  --bkz
 	 */
 
 	if (pio > CY82C693_MAX_PIO)
 		pio = CY82C693_MAX_PIO;
 
-	/* let's calc the address setup time clocks */
-	p_pclk->address_time = (byte)calc_clk(t->setup, system_bus_speed);
+	/* address setup */
+	p_pclk->address_time = calc_clk(t->setup, system_bus_speed);
 
-	/* let's calc the active and recovery time clocks */
+	/* active */
 	clk1 = calc_clk(t->active, system_bus_speed);
 
-	/* calc recovery timing */
-	clk2 =	t->cycle - t->active - t->setup;
+	/* FIXME: check why not t->cycle - t->active ?  --bkz */
+	/* recovery */
+	clk2 = calc_clk(t->cycle - t->active - t->setup, system_bus_speed);
 
-	clk2 = calc_clk(clk2, system_bus_speed);
-
-	clk1 = (clk1<<4)|clk2;	/* combine active and recovery clocks */
+	clk1 = (clk1 << 4) | clk2; /* combine active and recovery clocks */
 
 	/* note: we use the same values for 16bit IOR and IOW
          *	those are all the same, since I don't have other
 	 *	timings than those from ata-timing.h
 	 */
+	p_pclk->time_16w = p_pclk->time_16r = clk1;
 
-	p_pclk->time_16r = (byte)clk1;
-	p_pclk->time_16w = (byte)clk1;
-
+	/* FIXME: ugh...  --bkz */
 	/* what are good values for 8bit ?? */
-	p_pclk->time_8 = (byte)clk1;
+	p_pclk->time_8 = clk1;
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
@@ -203,7 +204,7 @@ static void cy82c693_dma_enable(struct ata_device *drive, int mode, int single)
 	data = IN_BYTE(CY82_DATA_PORT);
 
 	printk (KERN_INFO "%s (ch=%d, dev=%d): DMA mode is %d (single=%d)\n", drive->name, drive->channel->unit, drive->select.b.unit, (data&0x3), ((data>>2)&1));
-#endif /* CY82C693_DEBUG_LOGS */
+#endif
 
 	data = (byte)mode|(byte)(single<<2);
 
@@ -212,7 +213,7 @@ static void cy82c693_dma_enable(struct ata_device *drive, int mode, int single)
 
 #if CY82C693_DEBUG_INFO
 	printk (KERN_INFO "%s (ch=%d, dev=%d): set DMA mode to %d (single=%d)\n", drive->name, drive->channel->unit, drive->select.b.unit, mode, single);
-#endif /* CY82C693_DEBUG_INFO */
+#endif
 
 	/*
 	 * note: below we set the value for Bus Master IDE TimeOut Register
@@ -230,7 +231,7 @@ static void cy82c693_dma_enable(struct ata_device *drive, int mode, int single)
 
 #if CY82C693_DEBUG_INFO
 	printk (KERN_INFO "%s: Set IDE Bus Master TimeOut Register to 0x%X\n", drive->name, data);
-#endif /* CY82C693_DEBUG_INFO */
+#endif
 }
 
 /*
@@ -276,7 +277,9 @@ static void cy82c693_tune_drive(struct ata_device *drive, byte pio)
 	struct pci_dev *dev = hwif->pci_dev;
 	pio_clocks_t pclk;
 	unsigned int addrCtrl;
+	u8 ior, iow, bit8;
 
+	/* FIXME: probaly broken  --bkz */
 	/* select primary or secondary channel */
 	if (hwif->index > 0) {  /* drive is on the secondary channel */
 		dev = pci_find_slot(dev->bus->number, dev->devfn+1);
@@ -286,40 +289,41 @@ static void cy82c693_tune_drive(struct ata_device *drive, byte pio)
 		}
 	}
 
+	if (drive->select.b.unit == 0) {
+		ior = CY82_IDE_MASTER_IOR;
+		iow = CY82_IDE_MASTER_IOW;
+		bit8 = CY82_IDE_MASTER_8BIT;
+	} else {
+		ior = CY82_IDE_SLAVE_IOR;
+		iow = CY82_IDE_SLAVE_IOW;
+		bit8 = CY82_IDE_SLAVE_8BIT;
+	}
+
 #if CY82C693_DEBUG_LOGS
 	/* for debug let's show the register values */
 
-	if (drive->select.b.unit == 0) {
-		/*
-		 * get master drive registers
-		 * address setup control register
-		 * is 32 bit !!!
-		 */
-		pci_read_config_dword(dev, CY82_IDE_ADDRSETUP, &addrCtrl);
+	/*
+	 * get address setup control register
+	 * mine master or slave data
+	 */
+	pci_read_config_dword(dev, CY82_IDE_ADDRSETUP, &addrCtrl);
+
+	if (drive->select.b.unit == 0)
 		addrCtrl &= 0x0F;
-
-		/* now let's get the remaining registers */
-		pci_read_config_byte(dev, CY82_IDE_MASTER_IOR, &pclk.time_16r);
-		pci_read_config_byte(dev, CY82_IDE_MASTER_IOW, &pclk.time_16w);
-		pci_read_config_byte(dev, CY82_IDE_MASTER_8BIT, &pclk.time_8);
-	} else {
-		/*
-		 * set slave drive registers
-		 * address setup control register
-		 * is 32 bit !!!
-		 */
-		pci_read_config_dword(dev, CY82_IDE_ADDRSETUP, &addrCtrl);
-
+	else {
 		addrCtrl &= 0xF0;
 		addrCtrl >>= 4;
-
-		/* now let's get the remaining registers */
-		pci_read_config_byte(dev, CY82_IDE_SLAVE_IOR, &pclk.time_16r);
-		pci_read_config_byte(dev, CY82_IDE_SLAVE_IOW, &pclk.time_16w);
-		pci_read_config_byte(dev, CY82_IDE_SLAVE_8BIT, &pclk.time_8);
 	}
 
-	printk (KERN_INFO "%s (ch=%d, dev=%d): PIO timing is (addr=0x%X, ior=0x%X, iow=0x%X, 8bit=0x%X)\n", drive->name, hwif->unit, drive->select.b.unit, addrCtrl, pclk.time_16r, pclk.time_16w, pclk.time_8);
+	/* now let's get the remaining registers */
+	pci_read_config_byte(dev, ior, &pclk.time_16r);
+	pci_read_config_byte(dev, iow, &pclk.time_16w);
+	pci_read_config_byte(dev, bit8, &pclk.time_8);
+
+	printk(KERN_INFO "%s (ch=%d, dev=%d): PIO timing is (addr=0x%X,"
+			 " ior=0x%X, iow=0x%X, 8bit=0x%X)\n",
+			 drive->name, hwif->unit, drive->select.b.unit,
+			 addrCtrl, pclk.time_16r, pclk.time_16w, pclk.time_8);
 #endif /* CY82C693_DEBUG_LOGS */
 
         /* first let's calc the pio modes */
@@ -327,69 +331,41 @@ static void cy82c693_tune_drive(struct ata_device *drive, byte pio)
 
 #if CY82C693_DEBUG_INFO
 	printk (KERN_INFO "%s: Selected PIO mode %d\n", drive->name, pio);
-#endif /* CY82C693_DEBUG_INFO */
+#endif
 
         compute_clocks(pio, &pclk);  /* let's calc the values for this PIO mode */
 
-	/* now let's write  the clocks registers */
+	/*
+	 * set address setup control register
+	 */
+	pci_read_config_dword(dev, CY82_IDE_ADDRSETUP, &addrCtrl);
 	if (drive->select.b.unit == 0) {
-		/*
-		 * set master drive
-		 * address setup control register
-		 * is 32 bit !!!
-		 */
-		pci_read_config_dword(dev, CY82_IDE_ADDRSETUP, &addrCtrl);
-
-		addrCtrl &= (~0xF);
+		addrCtrl &= (~0x0F);
 		addrCtrl |= (unsigned int)pclk.address_time;
-		pci_write_config_dword(dev, CY82_IDE_ADDRSETUP, addrCtrl);
-
-		/* now let's set the remaining registers */
-		pci_write_config_byte(dev, CY82_IDE_MASTER_IOR, pclk.time_16r);
-		pci_write_config_byte(dev, CY82_IDE_MASTER_IOW, pclk.time_16w);
-		pci_write_config_byte(dev, CY82_IDE_MASTER_8BIT, pclk.time_8);
-
-		addrCtrl &= 0xF;
 	} else {
-		/*
-		 * set slave drive
-		 * address setup control register
-		 * is 32 bit !!!
-		 */
-		pci_read_config_dword(dev, CY82_IDE_ADDRSETUP, &addrCtrl);
-
 		addrCtrl &= (~0xF0);
 		addrCtrl |= ((unsigned int)pclk.address_time<<4);
-		pci_write_config_dword(dev, CY82_IDE_ADDRSETUP, addrCtrl);
-
-		/* now let's set the remaining registers */
-		pci_write_config_byte(dev, CY82_IDE_SLAVE_IOR, pclk.time_16r);
-		pci_write_config_byte(dev, CY82_IDE_SLAVE_IOW, pclk.time_16w);
-		pci_write_config_byte(dev, CY82_IDE_SLAVE_8BIT, pclk.time_8);
-
-		addrCtrl >>= 4;
-		addrCtrl &= 0xF;
 	}
+	pci_write_config_dword(dev, CY82_IDE_ADDRSETUP, addrCtrl);
+
+	/* now let's set the remaining registers */
+	pci_write_config_byte(dev, ior, pclk.time_16r);
+	pci_write_config_byte(dev, iow, pclk.time_16w);
+	pci_write_config_byte(dev, bit8, pclk.time_8);
 
 #if CY82C693_DEBUG_INFO
-	printk (KERN_INFO "%s (ch=%d, dev=%d): set PIO timing to (addr=0x%X, ior=0x%X, iow=0x%X, 8bit=0x%X)\n", drive->name, hwif->unit, drive->select.b.unit, addrCtrl, pclk.time_16r, pclk.time_16w, pclk.time_8);
-#endif /* CY82C693_DEBUG_INFO */
+	printk(KERN_INFO "%s (ch=%d, dev=%d): set PIO timing to (addr=0x%X,"
+			 " ior=0x%X, iow=0x%X, 8bit=0x%X)\n", drive->name,
+			 hwif->unit, drive->select.b.unit, addrCtrl,
+			 pclk.time_16r, pclk.time_16w, pclk.time_8);
+#endif
 }
-
-/*
- * this function is called during init and is used to setup the cy82c693 chip
- */
-/*
- * FIXME! "pci_init_cy82c693" really should replace
- * the "init_cy82c693_chip", it is the correct location to tinker/setup
- * the device prior to INIT.
- */
 
 static unsigned int __init pci_init_cy82c693(struct pci_dev *dev)
 {
 #ifdef CY82C693_SETDMA_CLOCK
-        byte data;
-#endif /* CY82C693_SETDMA_CLOCK */
+	u8 data;
+#endif
 
 	/* write info about this verion of the driver */
 	printk (KERN_INFO CY82_VERSION "\n");
@@ -402,7 +378,7 @@ static unsigned int __init pci_init_cy82c693(struct pci_dev *dev)
 
 #if CY82C693_DEBUG_INFO
 	printk (KERN_INFO "%s: Peripheral Configuration Register: 0x%X\n", dev->name, data);
-#endif /* CY82C693_DEBUG_INFO */
+#endif
 
         /*
 	 * for some reason sometimes the DMA controller

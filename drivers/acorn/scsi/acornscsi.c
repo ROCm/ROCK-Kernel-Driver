@@ -154,7 +154,6 @@
 
 #include "../../scsi/scsi.h"
 #include "../../scsi/hosts.h"
-#include "../../scsi/constants.h"
 #include "acornscsi.h"
 #include "msgqueue.h"
 #include "scsi.h"

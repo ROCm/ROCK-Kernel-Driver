@@ -439,15 +439,16 @@ static int __init pci_v3_setup_resources(struct resource **resource)
 #define SC_LBFADDR (IO_ADDRESS(INTEGRATOR_SC_BASE) + 0x20)
 #define SC_LBFCODE (IO_ADDRESS(INTEGRATOR_SC_BASE) + 0x24)
 
-static int v3_fault(unsigned long addr, struct pt_regs *regs)
+static int
+v3_pci_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 {
 	unsigned long pc = instruction_pointer(regs);
 	unsigned long instr = *(unsigned long *)pc;
 #if 0
 	char buf[128];
 
-	sprintf(buf, "V3 fault: address=0x%08lx, pc=0x%08lx [%08lx] LBFADDR=%08x LBFCODE=%02x ISTAT=%02x\n",
-		addr, pc, instr, __raw_readl(SC_LBFADDR), __raw_readl(SC_LBFCODE) & 255,
+	sprintf(buf, "V3 fault: addr 0x%08lx, FSR 0x%03x, PC 0x%08lx [%08lx] LBFADDR=%08x LBFCODE=%02x ISTAT=%02x\n",
+		addr, fsr, pc, instr, __raw_readl(SC_LBFADDR), __raw_readl(SC_LBFCODE) & 255,
 		v3_readb(V3_LB_ISTAT));
 	printk(KERN_DEBUG "%s", buf);
 	printascii(buf);
@@ -515,8 +516,6 @@ static void v3_irq(int irq, void *devid, struct pt_regs *regs)
 #endif
 }
 
-extern int (*external_fault)(unsigned long addr, struct pt_regs *regs);
-
 int __init pci_v3_setup(int nr, struct pci_sys_data *sys)
 {
 	int ret = 0;
@@ -547,7 +546,10 @@ void __init pci_v3_preinit(void)
 	/*
 	 * Hook in our fault handler for PCI errors
 	 */
-	external_fault = v3_fault;
+	hook_fault_code(4, v3_pci_fault, SIGBUS, "external abort on linefetch");
+	hook_fault_code(6, v3_pci_fault, SIGBUS, "external abort on linefetch");
+	hook_fault_code(8, v3_pci_fault, SIGBUS, "external abort on non-linefetch");
+	hook_fault_code(10, v3_pci_fault, SIGBUS, "external abort on non-linefetch");
 
 	spin_lock_irqsave(&v3_lock, flags);
 

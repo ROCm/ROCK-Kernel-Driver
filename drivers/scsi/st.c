@@ -55,6 +55,7 @@ static char *verstr = "20020205";
 #endif
 
 #define MAJOR_NR SCSI_TAPE_MAJOR
+#define DEVICE_NR(device) (minor(device) & 0x7f)
 #include <linux/blk.h>
 
 #include "scsi.h"
@@ -65,8 +66,6 @@ static char *verstr = "20020205";
 
 #include "st_options.h"
 #include "st.h"
-
-#include "constants.h"
 
 static int buffer_kbs;
 static int write_threshold_kbs;

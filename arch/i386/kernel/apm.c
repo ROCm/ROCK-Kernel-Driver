@@ -848,6 +848,7 @@ recalc:
 			case 1: apm_idle_done = 1;
 				break;
 			default: /* BIOS refused */
+				;
 			}
 		}
 		if (original_pm_idle)

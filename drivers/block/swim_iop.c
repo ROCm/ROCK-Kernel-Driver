@@ -27,6 +27,8 @@
 /* This has to be defined before some of the #includes below */
 
 #define MAJOR_NR  FLOPPY_MAJOR
+#define DEVICE_NAME "floppy"
+#define DEVICE_NR(device) ( (minor(device) & 3) | ((minor(device) & 0x80 ) >> 5 ))
 
 #include <linux/stddef.h>
 #include <linux/kernel.h>
@@ -98,7 +100,7 @@ static char *drive_names[7] = {
 
 int swimiop_init(void);
 static void swimiop_init_request(struct swim_iop_req *);
-static int swimiop_send_request(struct swim_iop_req *);
+static int swimiop_send_request(CURRENT, struct swim_iop_req *);
 static void swimiop_receive(struct iop_msg *, struct pt_regs *);
 static void swimiop_status_update(int, struct swim_drvstatus *);
 static int swimiop_eject(struct floppy_state *fs);
@@ -169,7 +171,7 @@ int swimiop_init(void)
 		swimiop_init_request(&req);
 		cmd->code = CMD_STATUS;
 		cmd->drive_num = i + 1;
-		if (swimiop_send_request(&req) != 0) continue;
+		if (swimiop_send_request(CURRENT, &req) != 0) continue;
 		while (!req.complete);
 		if (cmd->error != 0) {
 			printk(KERN_ERR "SWIM-IOP: probe on drive %d returned error %d\n", i, (uint) cmd->error);
@@ -202,7 +204,7 @@ static void swimiop_init_request(struct swim_iop_req *req)
 	req->done = NULL;
 }
 
-static int swimiop_send_request(struct swim_iop_req *req)
+static int swimiop_send_request(CURRENT, struct swim_iop_req *req)
 {
 	unsigned long cpu_flags;
 	int err;
@@ -317,7 +319,7 @@ static int swimiop_eject(struct floppy_state *fs)
 	swimiop_init_request(&req);
 	cmd->code = CMD_EJECT;
 	cmd->drive_num = fs->drive_num;
-	err = swimiop_send_request(&req);
+	err = swimiop_send_request(CURRENT, &req);
 	if (err) {
 		release_drive(fs);
 		return err;
@@ -521,12 +523,12 @@ static void fd_request_complete(struct swim_iop_req *req)
 	fs->state = idle;
 	if (cmd->error) {
 		printk(KERN_ERR "SWIM-IOP: error %d on read/write request.\n", cmd->error);
-		end_request(0);
+		end_request(CURRENT, 0);
 	} else {
 		CURRENT->sector += cmd->num_blocks;
 		CURRENT->current_nr_sectors -= cmd->num_blocks;
 		if (CURRENT->current_nr_sectors <= 0) {
-			end_request(1);
+			end_request(CURRENT, 1);
 			return;
 		}
 	}
@@ -538,7 +540,7 @@ static void fd_request_timeout(unsigned long data)
 	struct floppy_state *fs = (struct floppy_state *) data;
 
 	fs->timeout_pending = 0;
-	end_request(0);
+	end_request(CURRENT, 0);
 	fs->state = idle;
 }
 
@@ -566,15 +568,15 @@ static void start_request(struct floppy_state *fs)
 #endif
 
 		if (CURRENT->sector < 0 || CURRENT->sector >= fs->total_secs) {
-			end_request(0);
+			end_request(CURRENT, 0);
 			continue;
 		}
 		if (CURRENT->current_nr_sectors == 0) {
-			end_request(1);
+			end_request(CURRENT, 1);
 			continue;
 		}
 		if (fs->ejected) {
-			end_request(0);
+			end_request(CURRENT, 0);
 			continue;
 		}
 
@@ -584,7 +586,7 @@ static void start_request(struct floppy_state *fs)
 
 		if (CURRENT->cmd == WRITE) {
 			if (fs->write_prot) {
-				end_request(0);
+				end_request(CURRENT, 0);
 				continue;
 			}
 			cmd->code = CMD_WRITE;
@@ -597,8 +599,8 @@ static void start_request(struct floppy_state *fs)
 		cmd->first_block = CURRENT->sector;
 		cmd->num_blocks = CURRENT->current_nr_sectors;
 
-		if (swimiop_send_request(&req)) {
-			end_request(0);
+		if (swimiop_send_request(CURRENT, &req)) {
+			end_request(CURRENT, 0);
 			continue;
 		}
 

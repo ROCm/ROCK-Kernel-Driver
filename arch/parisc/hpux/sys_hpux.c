@@ -107,9 +107,7 @@ static int hpux_ustat(dev_t dev, struct hpux_ustat *ubuf)
 	struct statfs sbuf;
 	int err = -EINVAL;
 
-	lock_kernel();
-	s = get_super(to_kdev_t(dev));
-	unlock_kernel();
+	s = user_get_super(dev);
 	if (s == NULL)
 		goto out;
 	err = vfs_statfs(s, &sbuf);

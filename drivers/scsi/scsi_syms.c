@@ -21,7 +21,6 @@
 #include "scsi.h"
 #include <scsi/scsi_ioctl.h>
 #include "hosts.h"
-#include "constants.h"
 
 #include "sd.h"
 #include <scsi/scsicam.h>
@@ -48,6 +47,8 @@ EXPORT_SYMBOL(print_sense);
 EXPORT_SYMBOL(print_req_sense);
 EXPORT_SYMBOL(print_msg);
 EXPORT_SYMBOL(print_status);
+EXPORT_SYMBOL(scsi_sense_key_string);
+EXPORT_SYMBOL(scsi_extd_sense_format);
 EXPORT_SYMBOL(kernel_scsi_ioctl);
 EXPORT_SYMBOL(scsi_release_command);
 EXPORT_SYMBOL(print_Scsi_Cmnd);

@@ -5,13 +5,6 @@
 # Rewritten to use lists instead of if-statements.
 #
 
-
-mod-subdirs :=	dio mtd sbus video macintosh usb input telephony sgi ide \
-		message scsi md ieee1394 pnp isdn atm \
-		fc4 i2c acpi bluetooth input/serio \
-		input/gameport parport hotplug \
-		base char block misc net media cdrom
-
 obj-$(CONFIG_PCI)		+= pci/
 obj-$(CONFIG_ACPI)		+= acpi/
 obj-$(CONFIG_PARPORT)		+= parport/

@@ -2,9 +2,6 @@
 # Makefile for the Linux network (ethercard) device drivers.
 #
 
-mod-subdirs     := appletalk arcnet fc irda tokenring tulip pcmcia wireless \
-		   wan ../acorn/net
-
 # All of the (potential) objects that export symbols.
 # This list comes from 'grep -l EXPORT_SYMBOL *.[hc]'.
 

@@ -72,11 +72,6 @@
 #define PIIX_CHECK_REV		0x40	/* May be a buggy revision of PIIX */
 #define PIIX_NODMA		0x80	/* Don't do DMA with this chip */
 
-#ifdef CONFIG_BLK_DEV_PIIX_TRY133	/* I think even the older ICHs should be able to do UDMA133 */
-#undef PIIX_UDMA_100
-#define PIIX_UDMA_100 PIIX_UDMA_133
-#endif
-
 /*
  * Intel IDE chips
  */
@@ -104,7 +99,6 @@ static struct piix_ide_chip {
 
 static struct piix_ide_chip *piix_config;
 static unsigned char piix_enabled;
-static unsigned int piix_80w;
 
 static char *piix_dma[] = { "MWDMA16", "UDMA33", "UDMA66", "UDMA100", "UDMA133" };
 
@@ -227,8 +221,6 @@ static int piix_set_drive(struct ata_device *drive, unsigned char speed)
 	}
 
 	piix_set_speed(drive->channel->pci_dev, drive->dn, &t, umul);
-
-	drive->current_speed = speed;
 
 	return 0;
 }

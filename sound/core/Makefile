@@ -5,8 +5,6 @@
 
 export-objs  := sound.o pcm.o pcm_lib.o rawmidi.o timer.o rtctimer.o hwdep.o
 
-mod-subdirs  := oss seq
-
 snd-objs     := sound.o init.o isadma.o memory.o info.o control.o misc.o \
                 device.o wrappers.o
 ifeq ($(CONFIG_SND_OSSEMUL),y)

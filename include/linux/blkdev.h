@@ -113,7 +113,7 @@ typedef void (request_fn_proc) (request_queue_t *q);
 typedef request_queue_t * (queue_proc) (kdev_t dev);
 typedef int (make_request_fn) (request_queue_t *q, struct bio *bio);
 typedef int (prep_rq_fn) (request_queue_t *, struct request *);
-typedef void (unplug_device_fn) (void *q);
+typedef void (unplug_fn) (void *q);
 
 enum blk_queue_state {
 	Queue_down,
@@ -157,6 +157,7 @@ struct request_queue
 	merge_requests_fn	*merge_requests_fn;
 	make_request_fn		*make_request_fn;
 	prep_rq_fn		*prep_rq_fn;
+	unplug_fn		*unplug_fn;
 
 	struct backing_dev_info	backing_dev_info;
 
@@ -206,13 +207,11 @@ struct request_queue
 #define RQ_SCSI_DONE		0xfffe
 #define RQ_SCSI_DISCONNECTING	0xffe0
 
-#define QUEUE_FLAG_PLUGGED	0	/* queue is plugged */
-#define QUEUE_FLAG_CLUSTER	1	/* cluster several segments into 1 */
-#define QUEUE_FLAG_QUEUED	2	/* uses generic tag queueing */
-#define QUEUE_FLAG_STOPPED	3	/* queue is stopped */
+#define QUEUE_FLAG_CLUSTER	0	/* cluster several segments into 1 */
+#define QUEUE_FLAG_QUEUED	1	/* uses generic tag queueing */
+#define QUEUE_FLAG_STOPPED	2	/* queue is stopped */
 
-#define blk_queue_plugged(q)	test_bit(QUEUE_FLAG_PLUGGED, &(q)->queue_flags)
-#define blk_mark_plugged(q)	set_bit(QUEUE_FLAG_PLUGGED, &(q)->queue_flags)
+#define blk_queue_plugged(q)	!list_empty(&(q)->plug_list)
 #define blk_queue_tagged(q)	test_bit(QUEUE_FLAG_QUEUED, &(q)->queue_flags)
 #define blk_queue_empty(q)	elv_queue_empty(q)
 #define list_entry_rq(ptr)	list_entry((ptr), struct request, queuelist)
@@ -292,6 +291,7 @@ extern void blk_attempt_remerge(request_queue_t *, struct request *);
 extern struct request *blk_get_request(request_queue_t *, int, int);
 extern void blk_put_request(struct request *);
 extern void blk_plug_device(request_queue_t *);
+extern int blk_remove_plug(request_queue_t *);
 extern void blk_recount_segments(request_queue_t *, struct bio *);
 extern inline int blk_phys_contig_segment(request_queue_t *q, struct bio *, struct bio *);
 extern inline int blk_hw_contig_segment(request_queue_t *q, struct bio *, struct bio *);

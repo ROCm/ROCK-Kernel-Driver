@@ -7,9 +7,6 @@
 #ifndef __ASM_X8664_CPUFEATURE_H
 #define __ASM_X8664_CPUFEATURE_H
 
-/* Sample usage: CPU_FEATURE_P(cpu.x86_capability, FPU) */
-#define CPU_FEATURE_P(CAP, FEATURE) test_bit(CAP, X86_FEATURE_##FEATURE ##_BIT)
-
 #define NCAPINTS	4	/* Currently we have 4 32-bit words worth of info */
 
 /* Intel-defined CPU features, CPUID level 0x00000001, word 0 */
@@ -63,11 +60,26 @@
 #define X86_FEATURE_CYRIX_ARR	(3*32+ 2) /* Cyrix ARRs (= MTRRs) */
 #define X86_FEATURE_CENTAUR_MCR	(3*32+ 3) /* Centaur MCRs (= MTRRs) */
 
-#endif /* __ASM_X8664_CPUFEATURE_H */
+#define cpu_has(c, bit)                test_bit(bit, (c)->x86_capability)
+#define boot_cpu_has(bit)      test_bit(bit, boot_cpu_data.x86_capability)
 
-/* 
- * Local Variables:
- * mode:c
- * comment-column:42
- * End:
- */
+#define cpu_has_fpu            1
+#define cpu_has_vme            0
+#define cpu_has_de             1
+#define cpu_has_pse            1
+#define cpu_has_tsc            1
+#define cpu_has_pae            ___BUG___
+#define cpu_has_pge            1
+#define cpu_has_apic           1
+#define cpu_has_mtrr           1
+#define cpu_has_mmx            1
+#define cpu_has_fxsr           1
+#define cpu_has_xmm            1
+#define cpu_has_ht             0 /* you need to report the support from i386. sorry */
+#define cpu_has_mp             1 /* XXX */
+#define cpu_has_k6_mtrr        0
+#define cpu_has_cyrix_arr      0
+#define cpu_has_centaur_mcr    0
+
+
+#endif /* __ASM_X8664_CPUFEATURE_H */

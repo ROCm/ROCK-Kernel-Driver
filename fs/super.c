@@ -151,47 +151,17 @@ static int grab_super(struct super_block *s)
 	yield();
 	return 0;
 }
- 
-/**
- *	insert_super	-	put superblock on the lists
- *	@s:	superblock in question
- *	@type:	filesystem type it will belong to
- *
- *	Associates superblock with fs type and puts it on per-type and global
- *	superblocks' lists.  Should be called with sb_lock held; drops it.
- *
- *	NOTE: the super_blocks ordering here is important: writeback wants
- *	the blockdev superblock to be at super_blocks.next.
- */
-static void insert_super(struct super_block *s, struct file_system_type *type)
-{
-	s->s_type = type;
-	list_add(&s->s_list, super_blocks.prev);
-	list_add(&s->s_instances, &type->fs_supers);
-	spin_unlock(&sb_lock);
-	get_filesystem(type);
-}
 
 /**
- *	remove_super	-	makes superblock unreachable
- *	@s:	superblock in question
+ *	generic_shutdown_super	-	common helper for ->kill_sb()
+ *	@sb: superblock to kill
  *
- *	Removes superblock from the lists, and unlocks it.  @s should have
- *	no active references by that time and after remove_super() it's
- *	essentially in rundown mode - all remaining references are temporary,
- *	no new references of any sort are going to appear and all holders
- *	of temporary ones will eventually drop them.  At that point superblock
- *	itself will be destroyed; all its contents is already gone.
+ *	generic_shutdown_super() does all fs-independent work on superblock
+ *	shutdown.  Typical ->kill_sb() should pick all fs-specific objects
+ *	that need destruction out of superblock, call generic_shutdown_super()
+ *	and release aforementioned objects.  Note: dentries and inodes _are_
+ *	taken care of and do not need specific handling.
  */
-static void remove_super(struct super_block *s)
-{
-	spin_lock(&sb_lock);
-	list_del(&s->s_list);
-	list_del(&s->s_instances);
-	spin_unlock(&sb_lock);
-	up_write(&s->s_umount);
-}
-
 void generic_shutdown_super(struct super_block *sb)
 {
 	struct dentry *root = sb->s_root;
@@ -224,9 +194,20 @@ void generic_shutdown_super(struct super_block *sb)
 		unlock_kernel();
 		unlock_super(sb);
 	}
-	remove_super(sb);
+	spin_lock(&sb_lock);
+	list_del(&sb->s_list);
+	list_del(&sb->s_instances);
+	spin_unlock(&sb_lock);
+	up_write(&sb->s_umount);
 }
 
+/**
+ *	sget	-	find or create a superblock
+ *	@type:	filesystem type superblock should belong to
+ *	@test:	comparison callback
+ *	@set:	setup callback
+ *	@data:	argument to each of them
+ */
 struct super_block *sget(struct file_system_type *type,
 			int (*test)(struct super_block *,void *),
 			int (*set)(struct super_block *,void *),
@@ -253,29 +234,20 @@ retry:
 	}
 	err = set(s, data);
 	if (err) {
+		spin_unlock(&sb_lock);
 		destroy_super(s);
 		return ERR_PTR(err);
 	}
-	insert_super(s, type);
+	s->s_type = type;
+	list_add(&s->s_list, super_blocks.prev);
+	list_add(&s->s_instances, &type->fs_supers);
+	spin_unlock(&sb_lock);
+	get_filesystem(type);
 	return s;
 }
 
 struct vfsmount *alloc_vfsmnt(char *name);
 void free_vfsmnt(struct vfsmount *mnt);
-
-static inline struct super_block * find_super(kdev_t dev)
-{
-	struct list_head *p;
-
-	list_for_each(p, &super_blocks) {
-		struct super_block * s = sb_entry(p);
-		if (kdev_same(s->s_dev, dev)) {
-			s->s_count++;
-			return s;
-		}
-	}
-	return NULL;
-}
 
 void drop_super(struct super_block *sb)
 {
@@ -323,26 +295,50 @@ restart:
  *	Scans the superblock list and finds the superblock of the file system
  *	mounted on the device given. %NULL is returned if no match is found.
  */
- 
-struct super_block * get_super(kdev_t dev)
+
+struct super_block * get_super(struct block_device *bdev)
 {
-	struct super_block * s;
-
-	if (kdev_none(dev))
+	struct list_head *p;
+	if (!bdev)
 		return NULL;
-
-	while (1) {
-		spin_lock(&sb_lock);
-		s = find_super(dev);
-		spin_unlock(&sb_lock);
-		if (!s)
-			break;
-		down_read(&s->s_umount);
-		if (s->s_root)
-			break;
-		drop_super(s);
+rescan:
+	spin_lock(&sb_lock);
+	list_for_each(p, &super_blocks) {
+		struct super_block *s = sb_entry(p);
+		if (s->s_bdev == bdev) {
+			s->s_count++;
+			spin_unlock(&sb_lock);
+			down_read(&s->s_umount);
+			if (s->s_root)
+				return s;
+			drop_super(s);
+			goto rescan;
+		}
 	}
-	return s;
+	spin_unlock(&sb_lock);
+	return NULL;
+}
+ 
+struct super_block * user_get_super(dev_t dev)
+{
+	struct list_head *p;
+
+rescan:
+	spin_lock(&sb_lock);
+	list_for_each(p, &super_blocks) {
+		struct super_block *s = sb_entry(p);
+		if (s->s_dev ==  dev) {
+			s->s_count++;
+			spin_unlock(&sb_lock);
+			down_read(&s->s_umount);
+			if (s->s_root)
+				return s;
+			drop_super(s);
+			goto rescan;
+		}
+	}
+	spin_unlock(&sb_lock);
+	return NULL;
 }
 
 asmlinkage long sys_ustat(dev_t dev, struct ustat * ubuf)
@@ -352,7 +348,7 @@ asmlinkage long sys_ustat(dev_t dev, struct ustat * ubuf)
         struct statfs sbuf;
 	int err = -EINVAL;
 
-        s = get_super(to_kdev_t(dev));
+        s = user_get_super(dev);
         if (s == NULL)
                 goto out;
 	err = vfs_statfs(s, &sbuf);
@@ -381,7 +377,7 @@ int do_remount_sb(struct super_block *sb, int flags, void *data)
 {
 	int retval;
 	
-	if (!(flags & MS_RDONLY) && !kdev_none(sb->s_dev) && is_read_only(sb->s_dev))
+	if (!(flags & MS_RDONLY) && bdev_read_only(sb->s_bdev))
 		return -EACCES;
 		/*flags |= MS_RDONLY;*/
 	if (flags & MS_RDONLY)
@@ -423,19 +419,13 @@ int set_anon_super(struct super_block *s, void *data)
 	}
 	set_bit(dev, unnamed_dev_in_use);
 	spin_unlock(&unnamed_dev_lock);
-	s->s_dev = mk_kdev(0, dev);
+	s->s_dev = MKDEV(0, dev);
 	return 0;
 }
 
-struct super_block *get_anon_super(struct file_system_type *type,
-	int (*compare)(struct super_block *,void *), void *data)
-{
-	return sget(type, compare, set_anon_super, data);
-}
- 
 void kill_anon_super(struct super_block *sb)
 {
-	int slot = minor(sb->s_dev);
+	int slot = MINOR(sb->s_dev);
 	generic_shutdown_super(sb);
 	spin_lock(&unnamed_dev_lock);
 	clear_bit(slot, unnamed_dev_in_use);
@@ -452,7 +442,7 @@ void kill_litter_super(struct super_block *sb)
 static int set_bdev_super(struct super_block *s, void *data)
 {
 	s->s_bdev = data;
-	s->s_dev = to_kdev_t(s->s_bdev->bd_dev);
+	s->s_dev = s->s_bdev->bd_dev;
 	return 0;
 }
 
@@ -505,14 +495,17 @@ struct super_block *get_sb_bdev(struct file_system_type *fs_type,
 		goto out;
 	check_disk_change(dev);
 	error = -EACCES;
-	if (!(flags & MS_RDONLY) && is_read_only(dev))
+	if (!(flags & MS_RDONLY) && bdev_read_only(bdev))
 		goto out1;
 	error = bd_claim(bdev, fs_type);
 	if (error)
 		goto out1;
 
 	s = sget(fs_type, test_bdev_super, set_bdev_super, bdev);
-	if (s->s_root) {
+	if (IS_ERR(s)) {
+		bd_release(bdev);
+		blkdev_put(bdev, BDEV_FS);
+	} else if (s->s_root) {
 		if ((flags ^ s->s_flags) & MS_RDONLY) {
 			up_write(&s->s_umount);
 			deactivate_super(s);
@@ -557,7 +550,7 @@ struct super_block *get_sb_nodev(struct file_system_type *fs_type,
 	int (*fill_super)(struct super_block *, void *, int))
 {
 	int error;
-	struct super_block *s = get_anon_super(fs_type, NULL, NULL);
+	struct super_block *s = sget(fs_type, NULL, set_anon_super, NULL);
 
 	if (IS_ERR(s))
 		return s;
@@ -583,9 +576,10 @@ struct super_block *get_sb_single(struct file_system_type *fs_type,
 	int flags, void *data,
 	int (*fill_super)(struct super_block *, void *, int))
 {
+	struct super_block *s;
 	int error;
-	struct super_block *s = get_anon_super(fs_type, compare_single, NULL);
 
+	s = sget(fs_type, compare_single, set_anon_super, NULL);
 	if (IS_ERR(s))
 		return s;
 	if (!s->s_root) {
@@ -618,8 +612,6 @@ do_kern_mount(const char *fstype, int flags, char *name, void *data)
 	sb = type->get_sb(type, flags, name, data);
 	if (IS_ERR(sb))
 		goto out_mnt;
-	if (type->fs_flags & FS_NOMOUNT)
-		sb->s_flags |= MS_NOUSER;
 	mnt->mnt_sb = sb;
 	mnt->mnt_root = dget(sb->s_root);
 	mnt->mnt_mountpoint = sb->s_root;

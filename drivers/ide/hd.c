@@ -52,6 +52,7 @@
 #include <asm/uaccess.h>
 
 #define MAJOR_NR HD_MAJOR
+#define DEVICE_NR(device) (minor(device)>>6)
 #include <linux/blk.h>
 
 #ifdef __arm__
@@ -111,13 +112,16 @@ static int hd_sizes[MAX_HD<<6];
 
 static struct timer_list device_timer;
 
+#define TIMEOUT_VALUE (6*HZ)
+
 #define SET_TIMER							\
 	do {								\
 		mod_timer(&device_timer, jiffies + TIMEOUT_VALUE);	\
 	} while (0)
 
+static void (*do_hd)(void) = NULL;
 #define SET_HANDLER(x) \
-if ((DEVICE_INTR = (x)) != NULL) \
+if ((do_hd = (x)) != NULL) \
 	SET_TIMER; \
 else \
 	del_timer(&device_timer);
@@ -374,7 +378,7 @@ static void bad_rw_intr(void)
 		return;
 	dev = DEVICE_NR(CURRENT->rq_dev);
 	if (++CURRENT->errors >= MAX_ERRORS || (hd_error & BBD_ERR)) {
-		end_request(0);
+		end_request(CURRENT, 0);
 		special_op[dev] = recalibrate[dev] = 1;
 	} else if (CURRENT->errors % RESET_FREQ == 0)
 		reset = 1;
@@ -424,7 +428,7 @@ ok_to_read:
 		(unsigned long) CURRENT->buffer+512));
 #endif
 	if (CURRENT->current_nr_sectors <= 0)
-		end_request(1);
+		end_request(CURRENT, 1);
 	if (i > 0) {
 		SET_HANDLER(&read_intr);
 		return;
@@ -462,7 +466,7 @@ ok_to_write:
 	--CURRENT->current_nr_sectors;
 	CURRENT->buffer += 512;
 	if (!i || (CURRENT->bio && !SUBSECTOR(i)))
-		end_request(1);
+		end_request(CURRENT, 1);
 	if (i > 0) {
 		SET_HANDLER(&write_intr);
 		outsw(HD_DATA,CURRENT->buffer,256);
@@ -493,7 +497,7 @@ static void hd_times_out(unsigned long dummy)
 {
 	unsigned int dev;
 
-	DEVICE_INTR = NULL;
+	do_hd = NULL;
 
 	if (blk_queue_empty(QUEUE))
 		return;
@@ -507,7 +511,7 @@ static void hd_times_out(unsigned long dummy)
 #ifdef DEBUG
 		printk("hd%c: too many errors\n", dev+'a');
 #endif
-		end_request(0);
+		end_request(CURRENT, 0);
 	}
 	cli();
 	hd_request();
@@ -523,7 +527,7 @@ int do_special_op (unsigned int dev)
 	}
 	if (hd_info[dev].head > 16) {
 		printk ("hd%c: cannot handle device with more than 16 heads - giving up\n", dev+'a');
-		end_request(0);
+		end_request(CURRENT, 0);
 	}
 	special_op[dev] = 0;
 	return 1;
@@ -543,14 +547,14 @@ static void hd_request(void)
 {
 	unsigned int dev, block, nsect, sec, track, head, cyl;
 
-	if (DEVICE_INTR)
+	if (do_hd)
 		return;
 repeat:
 	del_timer(&device_timer);
 	sti();
 
 	if (blk_queue_empty(QUEUE)) {
-		CLEAR_INTR;
+		do_hd = NULL;
 		return;
 	}
 
@@ -570,7 +574,7 @@ repeat:
 		else
 			printk("hd%c: bad access: block=%d, count=%d\n",
 				(minor(CURRENT->rq_dev)>>6)+'a', block, nsect);
-		end_request(0);
+		end_request(CURRENT, 0);
 		goto repeat;
 	}
 
@@ -608,7 +612,7 @@ repeat:
 			break;
 		default:
 			printk("unknown hd-command\n");
-			end_request(0);
+			end_request(CURRENT, 0);
 			break;
 		}
 	}
@@ -699,9 +703,9 @@ static struct gendisk hd_gendisk = {
 	
 static void hd_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	void (*handler)(void) = DEVICE_INTR;
+	void (*handler)(void) = do_hd;
 
-	DEVICE_INTR = NULL;
+	do_hd = NULL;
 	del_timer(&device_timer);
 	if (!handler)
 		handler = unexpected_hd_interrupt;

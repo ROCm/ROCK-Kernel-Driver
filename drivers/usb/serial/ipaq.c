@@ -78,7 +78,7 @@ static int ipaq_chars_in_buffer(struct usb_serial_port *port);
 static void ipaq_destroy_lists(struct usb_serial_port *port);
 
 
-static __devinitdata struct usb_device_id ipaq_id_table [] = {
+static struct usb_device_id ipaq_id_table [] = {
 	{ USB_DEVICE(COMPAQ_VENDOR_ID, COMPAQ_IPAQ_ID) },
 	{ USB_DEVICE(HP_VENDOR_ID, HP_JORNADA_548_ID) },
 	{ USB_DEVICE(HP_VENDOR_ID, HP_JORNADA_568_ID) },
@@ -99,7 +99,7 @@ struct usb_serial_device_type ipaq_device = {
 	num_ports:		1,
 	open:			ipaq_open,
 	close:			ipaq_close,
-	startup:		ipaq_startup,
+	attach:			ipaq_startup,
 	shutdown:		ipaq_shutdown,
 	write:			ipaq_write,
 	write_room:		ipaq_write_room,
@@ -401,8 +401,7 @@ static void ipaq_write_gather(struct usb_serial_port *port)
 		pkt->written += count;
 		priv->queue_len -= count;
 		if (pkt->written == pkt->len) {
-			list_del(&pkt->list);
-			list_add(&pkt->list, &priv->freelist);
+			list_move(&pkt->list, &priv->freelist);
 			priv->free_len += PACKET_SIZE;
 		}
 		if (room == 0) {

@@ -115,7 +115,6 @@
 
 #include "scsi.h"
 #include "hosts.h"
-#include "constants.h"
 
 #include "53c700.h"
 #include "NCR_D700.h"

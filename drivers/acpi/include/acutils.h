@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acutils.h -- prototypes for the common (subsystem-wide) procedures
- *       $Revision: 137 $
+ *       $Revision: 140 $
  *
  *****************************************************************************/
 
@@ -100,12 +100,15 @@ NATIVE_CHAR *
 acpi_ut_get_mutex_name (
 	u32                     mutex_id);
 
+#endif
+
 NATIVE_CHAR *
 acpi_ut_get_type_name (
 	acpi_object_type        type);
 
-#endif
-
+NATIVE_CHAR *
+acpi_ut_get_object_type_name (
+	acpi_operand_object     *obj_desc);
 
 NATIVE_CHAR *
 acpi_ut_get_region_name (
@@ -662,17 +665,6 @@ acpi_ut_strtoul64 (
 NATIVE_CHAR *
 acpi_ut_strupr (
 	NATIVE_CHAR             *src_string);
-
-acpi_status
-acpi_ut_resolve_package_references (
-	acpi_operand_object     *obj_desc);
-
-acpi_status
-acpi_ut_resolve_reference (
-	u8                      object_type,
-	acpi_operand_object     *source_object,
-	acpi_generic_state      *state,
-	void                    *context);
 
 u8 *
 acpi_ut_get_resource_end_tag (

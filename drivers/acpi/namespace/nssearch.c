@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: nssearch - Namespace search
- *              $Revision: 85 $
+ *              $Revision: 86 $
  *
  ******************************************************************************/
 
@@ -204,7 +204,8 @@ acpi_ns_search_parent_tree (
 		}
 
 		if (acpi_ns_local (type)) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "[%4.4s] type [%s] must be local to this scope (no parent search)\n",
+			ACPI_DEBUG_PRINT ((ACPI_DB_NAMES,
+				"[%4.4s] type [%s] must be local to this scope (no parent search)\n",
 				(char *) &target_name, acpi_ut_get_type_name (type)));
 		}
 

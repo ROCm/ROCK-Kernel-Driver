@@ -3,8 +3,6 @@
 # Copyright (c) 2001 by Jaroslav Kysela <perex@suse.cz>
 #
 
-mod-subdirs  := emux
-
 export-objs  := util_mem.o
 
 snd-util-mem-objs := util_mem.o

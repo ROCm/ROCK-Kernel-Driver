@@ -1400,7 +1400,7 @@ static int ext3_load_journal(struct super_block * sb,
 	int err = 0;
 	int really_read_only;
 
-	really_read_only = is_read_only(sb->s_dev);
+	really_read_only = bdev_read_only(sb->s_bdev);
 
 	/*
 	 * Are we loading a blank journal or performing recovery after a

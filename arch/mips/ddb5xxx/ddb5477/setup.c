@@ -23,9 +23,10 @@
 #include <linux/sched.h>
 #include <linux/pci.h>
 #include <linux/ide.h>
-#include <linux/fs.h>		/* for ROOT_DEV */
+#include <linux/fs.h>
 #include <linux/ioport.h>
 #include <linux/param.h>	/* for HZ */
+#include <linux/root_dev.h>
 
 #include <asm/addrspace.h>
 #include <asm/time.h>
@@ -152,7 +153,7 @@ void __init ddb_setup(void)
 	ddb5477_board_init();
 
 #if defined(CONFIG_BLK_DEV_INITRD)
-	ROOT_DEV = MKDEV(RAMDISK_MAJOR, 0);
+	ROOT_DEV = Root_RAM0;
 	initrd_start = (unsigned long)&__rd_start;
 	initrd_end = (unsigned long)&__rd_end;
 #endif

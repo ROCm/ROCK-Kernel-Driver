@@ -684,10 +684,7 @@ static int try_to_unuse(unsigned int type)
 		 * private" pages, but they are handled by tmpfs files.
 		 * Note shmem_unuse already deleted its from swap cache.
 		 */
-		swcount = *swap_map;
-		if ((swcount > 0) != PageSwapCache(page))
-			BUG();
-		if ((swcount > 1) && PageDirty(page)) {
+		if ((*swap_map > 1) && PageDirty(page) && PageSwapCache(page)) {
 			rw_swap_page(WRITE, page);
 			lock_page(page);
 		}

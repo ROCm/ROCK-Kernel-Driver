@@ -26,11 +26,11 @@ obj-$(CONFIG_ALIGNMENT_TRAP) += alignment.o
 obj-$(CONFIG_DISCONTIGMEM) += discontig.o
 
 # Select the processor-specific files
-p-$(CONFIG_CPU_26)	+= proc-arm2,3.o
+p-$(CONFIG_CPU_26)	+= proc-arm2_3.o
 
 # ARMv3
-p-$(CONFIG_CPU_ARM610)	+= proc-arm6,7.o  tlb-v3.o   copypage-v3.o
-p-$(CONFIG_CPU_ARM710)	+= proc-arm6,7.o  tlb-v3.o   copypage-v3.o
+p-$(CONFIG_CPU_ARM610)	+= proc-arm6_7.o  tlb-v3.o   copypage-v3.o
+p-$(CONFIG_CPU_ARM710)	+= proc-arm6_7.o  tlb-v3.o   copypage-v3.o
 
 # ARMv4
 p-$(CONFIG_CPU_ARM720T)	+= proc-arm720.o  tlb-v4.o   copypage-v4wt.o abort-lv4t.o

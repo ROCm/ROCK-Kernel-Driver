@@ -1,16 +1,34 @@
 /*
- * linux/arch/i386/mm/extable.c
+ * linux/arch/x86_64/mm/extable.c
  */
 
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/spinlock.h>
 #include <asm/uaccess.h>
+#include <linux/init.h>
 
 extern const struct exception_table_entry __start___ex_table[];
 extern const struct exception_table_entry __stop___ex_table[];
 
-static inline unsigned long
+
+void __init exception_table_check(void)
+{ 
+	const struct exception_table_entry *e;
+	unsigned long prev;
+
+	prev = 0;
+	for (e = __start___ex_table; e < __stop___ex_table; e++) { 		
+		if (e->insn < prev) {
+			panic("unordered exception table at %016lx:%016lx and %016lx:%016lx\n",
+				   prev, e[-1].fixup, 
+			       e->insn, e->fixup);
+		}		   	
+		prev = e->insn;
+	} 
+} 
+
+static unsigned long
 search_one_table(const struct exception_table_entry *first,
 		 const struct exception_table_entry *last,
 		 unsigned long value)
@@ -41,8 +59,7 @@ search_exception_table(unsigned long addr)
 
 #ifndef CONFIG_MODULES
 	/* There is only the kernel to search.  */
-	ret = search_one_table(__start___ex_table, __stop___ex_table-1, addr);
-	return ret;
+	return search_one_table(__start___ex_table, __stop___ex_table-1, addr);
 #else
 	/* The kernel is the last "module" -- no need to treat it special.  */
 	struct module *mp;

@@ -69,7 +69,7 @@ extern struct ata_timing ata_timing[];
 #define XFER_EPIO	0x01
 #define XFER_PIO	0x00
 
-/* External interface to host chips chanell timing setup.
+/* External interface to host chips channel timing setup.
  *
  * It's a bit elaborate due to the legacy we have to bear.
  */
@@ -79,8 +79,10 @@ extern void ata_timing_quantize(struct ata_timing *t, struct ata_timing *q,
 		int T, int UT);
 extern void ata_timing_merge(struct ata_timing *a, struct ata_timing *b,
 		struct ata_timing *m, unsigned int what);
+void ata_timing_merge_8bit(struct ata_timing *t);
 extern struct ata_timing* ata_timing_data(short speed);
 extern int ata_timing_compute(struct ata_device *drive,
 		short speed, struct ata_timing *t, int T, int UT);
+extern u8 ata_best_pio_mode(struct ata_device *drive);
 
 #endif

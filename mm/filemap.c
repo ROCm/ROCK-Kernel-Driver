@@ -70,7 +70,7 @@ void __remove_inode_page(struct page *page)
 {
 	struct address_space *mapping = page->mapping;
 
-	if (unlikely(PageDirty(page)))
+	if (unlikely(PageDirty(page)) && !PageSwapCache(page))
 		BUG();
 
 	radix_tree_delete(&page->mapping->page_tree, page->index);
@@ -2178,7 +2178,7 @@ generic_file_write(struct file *file, const char *buf,
 		if (unlikely(pos + count > inode->i_sb->s_maxbytes))
 			count = inode->i_sb->s_maxbytes - pos;
 	} else {
-		if (is_read_only(inode->i_rdev)) {
+		if (bdev_read_only(inode->i_bdev)) {
 			err = -EPERM;
 			goto out;
 		}

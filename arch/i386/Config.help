@@ -944,10 +944,12 @@ CONFIG_DEBUG_OBSOLETE
 Software Suspend
 CONFIG_SOFTWARE_SUSPEND
   Enable the possibilty of suspendig machine. It doesn't need APM.
-  You may suspend your machine by either pressing Sysrq-d or with
-  'swsusp' or 'shutdown -z <time>' (patch for sysvinit needed). It
-  creates an image which is saved in your active swaps. By the next
-  booting the kernel detects the saved image, restores the memory from
+  You may suspend your machine by 'swsusp' or 'shutdown -z <time>' 
+  (patch for sysvinit needed). 
+
+  It creates an image which is saved in your active swaps. By the next
+  booting the, pass 'resume=/path/to/your/swap/file' and kernel will 
+  detect the saved image, restore the memory from
   it and then it continues to run as before you've suspended.
   If you don't want the previous state to continue use the 'noresume'
   kernel option. However note that your partitions will be fsck'd and

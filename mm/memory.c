@@ -310,17 +310,6 @@ nomem:
 	return -ENOMEM;
 }
 
-/*
- * Return indicates whether a page was freed so caller can adjust rss
- */
-static inline void forget_pte(pte_t page)
-{
-	if (!pte_none(page)) {
-		printk("forget_pte: old mapping existed!\n");
-		BUG();
-	}
-}
-
 static void zap_pte_range(mmu_gather_t *tlb, pmd_t * pmd, unsigned long address, unsigned long size)
 {
 	unsigned long offset;
@@ -427,7 +416,7 @@ void zap_page_range(struct vm_area_struct *vma, unsigned long address, unsigned 
 	spin_lock(&mm->page_table_lock);
 	flush_cache_range(vma, address, end);
 
-	tlb = tlb_gather_mmu(mm);
+	tlb = tlb_gather_mmu(mm, 0);
 	unmap_page_range(tlb, vma, address, end);
 	tlb_finish_mmu(tlb, start, end);
 	spin_unlock(&mm->page_table_lock);
@@ -777,9 +766,8 @@ static inline void zeromap_pte_range(pte_t * pte, unsigned long address,
 		end = PMD_SIZE;
 	do {
 		pte_t zero_pte = pte_wrprotect(mk_pte(ZERO_PAGE(address), prot));
-		pte_t oldpage = ptep_get_and_clear(pte);
+		BUG_ON(!pte_none(*pte));
 		set_pte(pte, zero_pte);
-		forget_pte(oldpage);
 		address += PAGE_SIZE;
 		pte++;
 	} while (address && (address < end));
@@ -853,11 +841,9 @@ static inline void remap_pte_range(pte_t * pte, unsigned long address, unsigned 
 		end = PMD_SIZE;
 	pfn = phys_addr >> PAGE_SHIFT;
 	do {
-		pte_t oldpage = ptep_get_and_clear(pte);
-
+		BUG_ON(!pte_none(*pte));
 		if (!pfn_valid(pfn) || PageReserved(pfn_to_page(pfn)))
  			set_pte(pte, pfn_pte(pfn, prot));
-		forget_pte(oldpage);
 		address += PAGE_SIZE;
 		pfn++;
 		pte++;

@@ -76,6 +76,7 @@
 #include <asm/io.h>
 
 #define MAJOR_NR OPTICS_CDROM_MAJOR
+#define DEVICE_NR(device) (minor(device))
 #include <linux/blk.h>
 
 #include <linux/cdrom.h>
@@ -1095,7 +1096,7 @@ static void poll(unsigned long data)
 			if (transfer_is_active)
 				loop_again = 0;
 			if (current_valid())
-				end_request(0);
+				end_request(CURRENT, 0);
 			tries = 5;
 		}
 		error = 0;
@@ -1129,7 +1130,7 @@ static void poll(unsigned long data)
 			if (send_cmd(COMDRVST)) {
 				state = S_IDLE;
 				while (current_valid())
-					end_request(0);
+					end_request(CURRENT, 0);
 				return;
 			}
 			state = S_READ;
@@ -1156,7 +1157,7 @@ static void poll(unsigned long data)
 					: "disk removed");
 				state = S_IDLE;
 				while (current_valid())
-					end_request(0);
+					end_request(CURRENT, 0);
 				return;
 			}
 			if (!current_valid()) {
@@ -1211,7 +1212,7 @@ static void poll(unsigned long data)
 						break;
 					}
 					if (current_valid())
-						end_request(0);
+						end_request(CURRENT, 0);
 					tries = 5;
 				}
 				state = S_START;
@@ -1247,7 +1248,7 @@ static void poll(unsigned long data)
 						read_count = 0;
 						state = S_STOP;
 						loop_again = 1;
-						end_request(0);
+						end_request(CURRENT, 0);
 						break;
 					}
 					fetch_data(buf+
@@ -1277,7 +1278,7 @@ static void poll(unsigned long data)
 					while (current_valid()) {
 						transfer();
 						if (CURRENT -> nr_sectors == 0)
-							end_request(1);
+							end_request(CURRENT, 1);
 						else
 							break;
 					}
@@ -1308,7 +1309,7 @@ static void poll(unsigned long data)
 			if (send_cmd(COMDRVST)) {
 				state = S_IDLE;
 				while (current_valid())
-					end_request(0);
+					end_request(CURRENT, 0);
 				return;
 			}
 			state = S_STOPPING;
@@ -1349,7 +1350,7 @@ static void poll(unsigned long data)
 		if (exec_cmd(COMSTOP) < 0) {
 			state = S_IDLE;
 			while (current_valid())
-				end_request(0);
+				end_request(CURRENT, 0);
 			return;
 		}
 	}
@@ -1365,7 +1366,7 @@ static void do_optcd_request(request_queue_t * q)
 
 	if (disk_info.audio) {
 		printk(KERN_WARNING "optcd: tried to mount an Audio CD\n");
-		end_request(0);
+		end_request(CURRENT, 0);
 		return;
 	}
 
@@ -1373,14 +1374,14 @@ static void do_optcd_request(request_queue_t * q)
 	while (current_valid()) {
 		transfer();	/* First try to transfer block from buffers */
 		if (CURRENT -> nr_sectors == 0) {
-			end_request(1);
+			end_request(CURRENT, 1);
 		} else {	/* Want to read a block not in buffer */
 			buf_out = NOBUF;
 			if (state == S_IDLE) {
 				/* %% Should this block the request queue?? */
 				if (update_toc() < 0) {
 					while (current_valid())
-						end_request(0);
+						end_request(CURRENT, 0);
 					break;
 				}
 				/* Start state machine */
@@ -1507,7 +1508,6 @@ static int cdromplaytrkind(unsigned long arg)
 
 static int cdromreadtochdr(unsigned long arg)
 {
-	int status;
 	struct cdrom_tochdr tochdr;
 
 	tochdr.cdth_trk0 = disk_info.first;
@@ -1519,7 +1519,6 @@ static int cdromreadtochdr(unsigned long arg)
 
 static int cdromreadtocentry(unsigned long arg)
 {
-	int status;
 	struct cdrom_tocentry entry;
 	struct cdrom_subchnl *tocptr;
 
@@ -1646,7 +1645,6 @@ static int cdromseek(unsigned long arg)
 #ifdef MULTISESSION
 static int cdrommultisession(unsigned long arg)
 {
-	int status;
 	struct cdrom_multisession ms;
 
 	if (copy_from_user(&ms, (void*) arg, sizeof ms))
@@ -2010,7 +2008,7 @@ int __init optcd_init(void)
 			"optcd: no Optics Storage CDROM Initialization\n");
 		return -EIO;
 	}
-	if (check_region(optcd_port, 4)) {
+	if (!request_region(optcd_port, 4, "optcd")) {
 		printk(KERN_ERR "optcd: conflict, I/O port 0x%x already used\n",
 			optcd_port);
 		return -EIO;
@@ -2018,21 +2016,25 @@ int __init optcd_init(void)
 
 	if (!reset_drive()) {
 		printk(KERN_ERR "optcd: drive at 0x%x not ready\n", optcd_port);
+		release_region(optcd_port, 4);
 		return -EIO;
 	}
 	if (!version_ok()) {
 		printk(KERN_ERR "optcd: unknown drive detected; aborting\n");
+		release_region(optcd_port, 4);
 		return -EIO;
 	}
 	status = exec_cmd(COMINITDOUBLE);
 	if (status < 0) {
 		printk(KERN_ERR "optcd: cannot init double speed mode\n");
+		release_region(optcd_port, 4);
 		DEBUG((DEBUG_VFS, "exec_cmd COMINITDOUBLE: %02x", -status));
 		return -EIO;
 	}
 	if (devfs_register_blkdev(MAJOR_NR, "optcd", &opt_fops) != 0)
 	{
 		printk(KERN_ERR "optcd: unable to get major %d\n", MAJOR_NR);
+		release_region(optcd_port, 4);
 		return -EIO;
 	}
 	devfs_register (NULL, "optcd", DEVFS_FL_DEFAULT, MAJOR_NR, 0,
@@ -2040,7 +2042,6 @@ int __init optcd_init(void)
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_optcd_request,
 		       &optcd_lock);
 	blk_queue_hardsect_size(BLK_DEFAULT_QUEUE(MAJOR_NR), 2048);
-	request_region(optcd_port, 4, "optcd");
 	register_disk(NULL, mk_kdev(MAJOR_NR,0), 1, &opt_fops, 0);
 
 	printk(KERN_INFO "optcd: DOLPHIN 8000 AT CDROM at 0x%x\n", optcd_port);

@@ -113,6 +113,7 @@ static int w_long(unsigned int fd, unsigned int cmd, unsigned long arg)
 	return err;
 }
  
+#if 0 
 static int rw_long(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
 	mm_segment_t old_fs = get_fs();
@@ -128,6 +129,7 @@ static int rw_long(unsigned int fd, unsigned int cmd, unsigned long arg)
 		return -EFAULT;
 	return err;
 }
+#endif
 
 static int do_ext2_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
@@ -2971,11 +2973,6 @@ static int blkpg_ioctl_trans(unsigned int fd, unsigned int cmd, struct blkpg_ioc
 	return err;
 }
 
-static int ioc_settimeout(unsigned int fd, unsigned int cmd, unsigned long arg)
-{
-	return rw_long(fd, AUTOFS_IOC_SETTIMEOUT, arg);
-}
-
 /* SuSE extension */ 
 #ifndef TIOCGDEV
 #define TIOCGDEV       _IOR('T',0x32, unsigned int)
@@ -3087,19 +3084,13 @@ static int serial_struct_ioctl(unsigned fd, unsigned cmd,  void *ptr)
 	return err;	
 }
 
-struct ioctl_trans {
-	unsigned long cmd;
-	int (*handler)(unsigned int, unsigned int, unsigned long, struct file * filp);
-	struct ioctl_trans *next;
-};
-
-/* generic function to change a single long put_user to arg to 32bit */
-static int arg2long(unsigned int fd, unsigned int cmd, unsigned long arg)
+static int generic_long_put(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
 	int ret; 
 	unsigned long val = 0; 
 	mm_segment_t oldseg = get_fs();
 	set_fs(KERNEL_DS);
+	cmd = (cmd & 0xc000ffff)  | (sizeof(unsigned long) << _IOC_SIZESHIFT); 
 	ret = sys_ioctl(fd, cmd, (unsigned long)&val);  
 	set_fs(oldseg); 
 	if (!ret || val) {
@@ -3108,6 +3099,29 @@ static int arg2long(unsigned int fd, unsigned int cmd, unsigned long arg)
 	}
 	return ret; 
 } 
+
+static int generic_long_get(unsigned int fd, unsigned int cmd, unsigned long arg)
+{
+	int ret; 
+	unsigned int ival; 
+	unsigned long val = 0; 
+	mm_segment_t oldseg = get_fs();
+	if (get_user(ival, (unsigned int *)arg))
+		return -EFAULT;
+	val = ival;
+	set_fs(KERNEL_DS);
+	cmd = (cmd & 0xc000ffff)  | (sizeof(unsigned long) << _IOC_SIZESHIFT); 
+	ret = sys_ioctl(fd, cmd, (unsigned long)&val);  
+	set_fs(oldseg); 
+	return ret; 
+} 
+
+
+struct ioctl_trans {
+	unsigned long cmd;
+	int (*handler)(unsigned int, unsigned int, unsigned long, struct file * filp);
+	struct ioctl_trans *next;
+};
 
 #define REF_SYMBOL(handler) if (0) (void)handler;
 #define HANDLE_IOCTL2(cmd,handler) REF_SYMBOL(handler);  asm volatile(".quad %c0, " #handler ",0"::"i" (cmd)); 
@@ -3316,10 +3330,6 @@ COMPATIBLE_IOCTL(_IOR('v' , BASE_VIDIOCPRIVATE+5, int))
 COMPATIBLE_IOCTL(_IOR('v' , BASE_VIDIOCPRIVATE+6, int))
 COMPATIBLE_IOCTL(_IOR('v' , BASE_VIDIOCPRIVATE+7, int))
 /* Little p (/dev/rtc, /dev/envctrl, etc.) */
-#if 0
-COMPATIBLE_IOCTL(_IOR('p', 20, int[7])) /* RTCGET */
-COMPATIBLE_IOCTL(_IOW('p', 21, int[7])) /* RTCSET */
-#endif
 COMPATIBLE_IOCTL(RTC_AIE_ON)
 COMPATIBLE_IOCTL(RTC_AIE_OFF)
 COMPATIBLE_IOCTL(RTC_UIE_ON)
@@ -3334,10 +3344,14 @@ COMPATIBLE_IOCTL(RTC_RD_TIME)
 COMPATIBLE_IOCTL(RTC_SET_TIME)
 COMPATIBLE_IOCTL(RTC_WKALM_SET)
 COMPATIBLE_IOCTL(RTC_WKALM_RD)
-HANDLE_IOCTL(RTC_IRQP_READ,arg2long)
-COMPATIBLE_IOCTL(RTC_IRQP_SET)
-COMPATIBLE_IOCTL(RTC_EPOCH_READ)
-COMPATIBLE_IOCTL(RTC_EPOCH_SET)
+#define RTC_IRQP_READ32	_IOR('p', 0x0b, unsigned int)	 /* Read IRQ rate   */
+HANDLE_IOCTL(RTC_IRQP_READ32,generic_long_put)
+#define RTC_IRQP_SET32	_IOW('p', 0x0c, unsigned int)	 /* Set IRQ rate    */
+HANDLE_IOCTL(RTC_IRQP_SET32,generic_long_get)
+#define RTC_EPOCH_READ32	_IOR('p', 0x0d, unsigned long)	 /* Read epoch      */
+#define RTC_EPOCH_SET32		_IOW('p', 0x0e, unsigned long)	 /* Set epoch       */
+HANDLE_IOCTL(RTC_EPOCH_READ32, generic_long_put)
+HANDLE_IOCTL(RTC_EPOCH_SET32, generic_long_get)
 /* Little m */
 COMPATIBLE_IOCTL(MTIOCTOP)
 /* Socket level stuff */
@@ -3605,6 +3619,8 @@ COMPATIBLE_IOCTL(AUTOFS_IOC_FAIL)
 COMPATIBLE_IOCTL(AUTOFS_IOC_CATATONIC)
 COMPATIBLE_IOCTL(AUTOFS_IOC_PROTOVER)
 COMPATIBLE_IOCTL(AUTOFS_IOC_EXPIRE)
+#define AUTOFS_IOC_SETTIMEOUT32 _IOWR(0x93,0x64,unsigned int)
+HANDLE_IOCTL(AUTOFS_IOC_SETTIMEOUT32, generic_long_get); 
 /* DEVFS */
 COMPATIBLE_IOCTL(DEVFSDIOC_GET_PROTO_REV)
 COMPATIBLE_IOCTL(DEVFSDIOC_SET_EVENT_MASK)
@@ -3671,14 +3687,6 @@ COMPATIBLE_IOCTL(DRM_IOCTL_LOCK)
 COMPATIBLE_IOCTL(DRM_IOCTL_UNLOCK)
 COMPATIBLE_IOCTL(DRM_IOCTL_FINISH)
 #endif /* DRM */
-#ifdef CONFIG_AUTOFS_FS
-COMPATIBLE_IOCTL(AUTOFS_IOC_READY);
-COMPATIBLE_IOCTL(AUTOFS_IOC_FAIL);
-COMPATIBLE_IOCTL(AUTOFS_IOC_CATATONIC);
-COMPATIBLE_IOCTL(AUTOFS_IOC_PROTOVER);
-COMPATIBLE_IOCTL(AUTOFS_IOC_SETTIMEOUT);
-COMPATIBLE_IOCTL(AUTOFS_IOC_EXPIRE);
-#endif
 COMPATIBLE_IOCTL(REISERFS_IOC_UNPACK);
 /* serial driver */ 
 HANDLE_IOCTL(TIOCGSERIAL, serial_struct_ioctl);
@@ -3771,8 +3779,6 @@ HANDLE_IOCTL(CDROMREADALL, cdrom_ioctl_trans)
 HANDLE_IOCTL(CDROM_SEND_PACKET, cdrom_ioctl_trans)
 HANDLE_IOCTL(LOOP_SET_STATUS, loop_status)
 HANDLE_IOCTL(LOOP_GET_STATUS, loop_status)
-#define AUTOFS_IOC_SETTIMEOUT32 _IOWR(0x93,0x64,unsigned int)
-HANDLE_IOCTL(AUTOFS_IOC_SETTIMEOUT32, ioc_settimeout)
 HANDLE_IOCTL(PIO_FONTX, do_fontx_ioctl)
 HANDLE_IOCTL(GIO_FONTX, do_fontx_ioctl)
 HANDLE_IOCTL(PIO_UNIMAP, do_unimap_ioctl)

@@ -33,6 +33,7 @@
 #include <linux/blk.h>
 #endif
 #include <linux/bootmem.h>
+#include <linux/root_dev.h>
 #include <linux/console.h>
 #include <linux/seq_file.h>
 #include <asm/uaccess.h>
@@ -321,7 +322,7 @@ void __init setup_arch(char **cmdline_p)
 	       "This machine has an IEEE fpu\n" :
 	       "This machine has no IEEE fpu\n");
 
-        ROOT_DEV = to_kdev_t(0x0100);
+        ROOT_DEV = Root_RAM0;
         memory_start = (unsigned long) &_end;    /* fixit if use $CODELO etc*/
 	memory_end = memory_size & ~0x400000UL;  /* align memory end to 4MB */
         /*

@@ -469,7 +469,7 @@ static client_t *get_event_dest_client(snd_seq_event_t *event, int filter)
 	if (! dest->accept_input)
 		goto __not_avail;
 	if ((dest->filter & SNDRV_SEQ_FILTER_USE_EVENT) &&
-	    ! test_bit(event->type, &dest->event_filter))
+	    ! test_bit(event->type, dest->event_filter))
 		goto __not_avail;
 	if (filter && !(dest->filter & filter))
 		goto __not_avail;

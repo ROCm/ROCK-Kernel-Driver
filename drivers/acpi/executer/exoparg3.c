@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exoparg3 - AML execution - opcodes with 3 arguments
- *              $Revision: 13 $
+ *              $Revision: 14 $
  *
  *****************************************************************************/
 
@@ -159,7 +159,7 @@ acpi_ex_opcode_3A_1T_1R (
 		 * Create the return object.  The Source operand is guaranteed to be
 		 * either a String or a Buffer, so just use its type.
 		 */
-		return_desc = acpi_ut_create_internal_object (operand[0]->common.type);
+		return_desc = acpi_ut_create_internal_object (ACPI_GET_OBJECT_TYPE (operand[0]));
 		if (!return_desc) {
 			status = AE_NO_MEMORY;
 			goto cleanup;

@@ -513,9 +513,9 @@ static int do_sys32_msgsnd (int first, int second, int third, void *uptr)
 
 	if (!p)
 		return -ENOMEM;
-	err = get_user (p->mtype, &up->mtype);
-	err |= __copy_from_user (p->mtext, &up->mtext, second);
-	if (err)
+	err = -EFAULT;
+	if (get_user (p->mtype, &up->mtype) ||
+	    __copy_from_user (p->mtext, &up->mtext, second))
 		goto out;
 	old_fs = get_fs ();
 	set_fs (KERNEL_DS);
@@ -1001,7 +1001,7 @@ typedef ssize_t (*iov_fn_t)(struct file *, const struct iovec *, unsigned long, 
 static long do_readv_writev32(int type, struct file *file,
 			      const struct iovec32 *vector, u32 count)
 {
-	unsigned long tot_len;
+	__kernel_ssize_t32 tot_len;
 	struct iovec iovstack[UIO_FASTIOV];
 	struct iovec *iov=iovstack, *ivp;
 	struct inode *inode;
@@ -1031,13 +1031,19 @@ static long do_readv_writev32(int type, struct file *file,
 	tot_len = 0;
 	i = count;
 	ivp = iov;
+	retval = -EINVAL;
 	while(i > 0) {
-		u32 len;
+		__kernel_ssize_t32 tmp = tot_len;
+		__kernel_ssize_t32 len;
 		u32 buf;
 
 		__get_user(len, &vector->iov_len);
 		__get_user(buf, &vector->iov_base);
+		if (len < 0)	/* size_t not fittina an ssize_t32 .. */
+			goto out;
 		tot_len += len;
+		if (tot_len < tmp) /* maths overflow on the ssize_t32 */
+			goto out;
 		ivp->iov_base = (void *)A(buf);
 		ivp->iov_len = (__kernel_size_t) len;
 		vector++;
@@ -2759,6 +2765,8 @@ sys32_rt_sigaction(int sig, struct sigaction32 *act, struct sigaction32 *oact,
 		ret |= __copy_to_user(&oact->sa_mask, &set32, sizeof(sigset_t32));
 		ret |= __put_user(old_ka.sa.sa_flags, &oact->sa_flags);
 		ret |= __put_user((long)old_ka.sa.sa_restorer, &oact->sa_restorer);
+		if (ret)
+			ret = -EFAULT;
         }
 
         return ret;
@@ -3494,7 +3502,7 @@ static int nfs_clnt32_trans(struct nfsctl_arg *karg, struct nfsctl_arg32 *arg32)
 	err |= copy_from_user(&karg->ca_client.cl_fhkey[0],
 			  &arg32->ca32_client.cl32_fhkey[0],
 			  NFSCLNT_KEYMAX);
-	return err;
+	return (err ? -EFAULT : 0);
 }
 
 static int nfs_exp32_trans(struct nfsctl_arg *karg, struct nfsctl_arg32 *arg32)
@@ -3520,7 +3528,7 @@ static int nfs_exp32_trans(struct nfsctl_arg *karg, struct nfsctl_arg32 *arg32)
 		      &arg32->ca32_export.ex32_anon_gid);
 	karg->ca_export.ex_anon_uid = high2lowuid(karg->ca_export.ex_anon_uid);
 	karg->ca_export.ex_anon_gid = high2lowgid(karg->ca_export.ex_anon_gid);
-	return err;
+	return (err ? -EFAULT : 0);
 }
 
 static int nfs_uud32_trans(struct nfsctl_arg *karg, struct nfsctl_arg32 *arg32)
@@ -3568,7 +3576,7 @@ static int nfs_uud32_trans(struct nfsctl_arg *karg, struct nfsctl_arg32 *arg32)
 		err |= __get_user(karg->ca_umap.ug_gdimap[i],
 			      &(((__kernel_gid_t32 *)A(uaddr))[i]));
 
-	return err;
+	return (err ? -EFAULT : 0);
 }
 
 static int nfs_getfh32_trans(struct nfsctl_arg *karg, struct nfsctl_arg32 *arg32)
@@ -3585,7 +3593,7 @@ static int nfs_getfh32_trans(struct nfsctl_arg *karg, struct nfsctl_arg32 *arg32
 		      &arg32->ca32_getfh.gf32_ino);
 	err |= __get_user(karg->ca_getfh.gf_version,
 		      &arg32->ca32_getfh.gf32_version);
-	return err;
+	return (err ? -EFAULT : 0);
 }
 
 static int nfs_getfd32_trans(struct nfsctl_arg *karg, struct nfsctl_arg32 *arg32)
@@ -3601,7 +3609,7 @@ static int nfs_getfd32_trans(struct nfsctl_arg *karg, struct nfsctl_arg32 *arg32
 			  (NFS_MAXPATHLEN+1));
 	err |= __get_user(karg->ca_getfd.gd_version,
 		      &arg32->ca32_getfd.gd32_version);
-	return err;
+	return (err ? -EFAULT : 0);
 }
 
 static int nfs_getfs32_trans(struct nfsctl_arg *karg, struct nfsctl_arg32 *arg32)
@@ -3617,7 +3625,7 @@ static int nfs_getfs32_trans(struct nfsctl_arg *karg, struct nfsctl_arg32 *arg32
 			  (NFS_MAXPATHLEN+1));
 	err |= __get_user(karg->ca_getfs.gd_maxlen,
 		      &arg32->ca32_getfs.gd32_maxlen);
-	return err;
+	return (err ? -EFAULT : 0);
 }
 
 /* This really doesn't need translations, we are only passing
@@ -3625,7 +3633,7 @@ static int nfs_getfs32_trans(struct nfsctl_arg *karg, struct nfsctl_arg32 *arg32
  */
 static int nfs_getfh32_res_trans(union nfsctl_res *kres, union nfsctl_res32 *res32)
 {
-	return copy_to_user(res32, kres, sizeof(*res32));
+	return (copy_to_user(res32, kres, sizeof(*res32)) ? -EFAULT : 0);
 }
 
 int asmlinkage sys32_nfsservctl(int cmd, struct nfsctl_arg32 *arg32, union nfsctl_res32 *res32)

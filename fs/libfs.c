@@ -155,3 +155,50 @@ struct file_operations simple_dir_operations = {
 struct inode_operations simple_dir_inode_operations = {
 	lookup:		simple_lookup,
 };
+
+/*
+ * Common helper for pseudo-filesystems (sockfs, pipefs, bdev - stuff that
+ * will never be mountable)
+ */
+struct super_block *
+get_sb_pseudo(struct file_system_type *fs_type, char *name,
+	struct super_operations *ops, unsigned long magic)
+{
+	struct super_block *s = sget(fs_type, NULL, set_anon_super, NULL);
+	static struct super_operations default_ops = {statfs: simple_statfs};
+	struct dentry *dentry;
+	struct inode *root;
+	struct qstr d_name = {name:name, len:strlen(name)};
+
+	if (IS_ERR(s))
+		return s;
+
+	s->s_flags = MS_NOUSER;
+	s->s_maxbytes = ~0ULL;
+	s->s_blocksize = 1024;
+	s->s_blocksize_bits = 10;
+	s->s_magic = magic;
+	s->s_op = ops ? ops : &default_ops;
+	root = new_inode(s);
+	if (!root)
+		goto Enomem;
+	root->i_mode = S_IFDIR | S_IRUSR | S_IWUSR;
+	root->i_uid = root->i_gid = 0;
+	root->i_atime = root->i_mtime = root->i_ctime = CURRENT_TIME;
+	dentry = d_alloc(NULL, &d_name);
+	if (!dentry) {
+		iput(root);
+		goto Enomem;
+	}
+	dentry->d_sb = s;
+	dentry->d_parent = dentry;
+	d_instantiate(dentry, root);
+	s->s_root = dentry;
+	s->s_flags |= MS_ACTIVE;
+	return s;
+
+Enomem:
+	up_write(&s->s_umount);
+	deactivate_super(s);
+	return ERR_PTR(-ENOMEM);
+}

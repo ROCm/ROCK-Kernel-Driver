@@ -233,7 +233,7 @@ static int i2c_detect_tries = 5;
 #define ov51x_mmx_available (0)
 #endif
 
-static __devinitdata struct usb_device_id device_table [] = {
+static struct usb_device_id device_table [] = {
 	{ USB_DEVICE(VEND_OMNIVISION, PROD_OV511) },
 	{ USB_DEVICE(VEND_OMNIVISION, PROD_OV511PLUS) },
 	{ USB_DEVICE(VEND_OMNIVISION, PROD_OV518) },

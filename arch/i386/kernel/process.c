@@ -223,7 +223,13 @@ int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
  */
 void exit_thread(void)
 {
-	/* nothing to do ... */
+	struct task_struct *tsk = current;
+
+	/* The process may have allocated an io port bitmap... nuke it. */
+	if (unlikely(NULL != tsk->thread.ts_io_bitmap)) {
+		kfree(tsk->thread.ts_io_bitmap);
+		tsk->thread.ts_io_bitmap = NULL;
+	}
 }
 
 void flush_thread(void)
@@ -263,6 +269,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 	struct task_struct * p, struct pt_regs * regs)
 {
 	struct pt_regs * childregs;
+	struct task_struct *tsk;
 
 	childregs = ((struct pt_regs *) (THREAD_SIZE + (unsigned long) p->thread_info)) - 1;
 	struct_cpy(childregs, regs);
@@ -277,8 +284,17 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 	savesegment(fs,p->thread.fs);
 	savesegment(gs,p->thread.gs);
 
-	unlazy_fpu(current);
-	struct_cpy(&p->thread.i387, &current->thread.i387);
+	tsk = current;
+	unlazy_fpu(tsk);
+	struct_cpy(&p->thread.i387, &tsk->thread.i387);
+
+	if (unlikely(NULL != tsk->thread.ts_io_bitmap)) {
+		p->thread.ts_io_bitmap = kmalloc(IO_BITMAP_BYTES, GFP_KERNEL);
+		if (!p->thread.ts_io_bitmap)
+			return -ENOMEM;
+		memcpy(p->thread.ts_io_bitmap, tsk->thread.ts_io_bitmap,
+			IO_BITMAP_BYTES);
+	}
 
 	return 0;
 }
@@ -399,8 +415,8 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 		loaddebug(next, 7);
 	}
 
-	if (unlikely(prev->ioperm || next->ioperm)) {
-		if (next->ioperm) {
+	if (unlikely(prev->ts_io_bitmap || next->ts_io_bitmap)) {
+		if (next->ts_io_bitmap) {
 			/*
 			 * 4 cachelines copy ... not good, but not that
 			 * bad either. Anyone got something better?
@@ -409,8 +425,8 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 			 * and playing VM tricks to switch the IO bitmap
 			 * is not really acceptable.]
 			 */
-			memcpy(tss->io_bitmap, next->io_bitmap,
-				 IO_BITMAP_SIZE*sizeof(unsigned long));
+			memcpy(tss->io_bitmap, next->ts_io_bitmap,
+				IO_BITMAP_BYTES);
 			tss->bitmap = IO_BITMAP_OFFSET;
 		} else
 			/*

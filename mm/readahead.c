@@ -32,7 +32,7 @@ static inline unsigned long get_min_readahead(struct file *file)
 }
 
 static int
-read_pages(struct address_space *mapping,
+read_pages(struct file *file, struct address_space *mapping,
 		struct list_head *pages, unsigned nr_pages)
 {
 	unsigned page_idx;
@@ -44,7 +44,7 @@ read_pages(struct address_space *mapping,
 		struct page *page = list_entry(pages->prev, struct page, list);
 		list_del(&page->list);
 		if (!add_to_page_cache_unique(page, mapping, page->index))
-			mapping->a_ops->readpage(NULL, page);
+			mapping->a_ops->readpage(file, page);
 		page_cache_release(page);
 	}
 	return 0;
@@ -167,7 +167,7 @@ void do_page_cache_readahead(struct file *file,
 	 * uptodate then the caller will launch readpage again, and
 	 * will then handle the error.
 	 */
-	read_pages(mapping, &page_pool, nr_to_really_read);
+	read_pages(file, mapping, &page_pool, nr_to_really_read);
 	blk_run_queues();
 	BUG_ON(!list_empty(&page_pool));
 	return;

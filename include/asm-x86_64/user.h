@@ -84,6 +84,7 @@ struct user{
 /* ptrace does not yet supply these.  Someday.... */
   int u_fpvalid;		/* True if math co-processor being used. */
                                 /* for this mess. Not yet used. */
+  int pad0;
   struct user_i387_struct i387;	/* Math Co-processor registers. */
 /* The rest of this junk is to help gdb figure out what goes where */
   unsigned long int u_tsize;	/* Text segment size (pages). */
@@ -96,12 +97,15 @@ struct user{
 				   esp register.  */
   long int signal;     		/* Signal that caused the core dump. */
   int reserved;			/* No longer used */
+  int pad1;
   struct user_pt_regs * u_ar0;	/* Used by gdb to help find the values for */
 				/* the registers. */
   struct user_i387_struct* u_fpstate;	/* Math Co-processor pointer. */
   unsigned long magic;		/* To uniquely identify a core file */
   char u_comm[32];		/* User command that was responsible */
   unsigned long u_debugreg[8];
+  unsigned long error_code; /* CPU error code or 0 */
+  unsigned long fault_address; /* CR3 or 0 */
 };
 #define NBPG PAGE_SIZE
 #define UPAGES 1

@@ -319,6 +319,12 @@ static inline unsigned long __ffs(unsigned long word)
 }
 
 /*
+ * fls: find last bit set.
+ */
+
+#define fls(x) generic_fls(x)
+
+/*
  * ffs: find first bit set. This is defined the same way as
  * the libc and compiler builtin ffs routines, therefore
  * differs in spirit from the above ffz (man ffs).
@@ -332,15 +338,14 @@ static inline unsigned long __ffs(unsigned long word)
  */
 static inline int sched_find_first_bit(unsigned long *b)
 {
-	if (unlikely(b[0]))
-		return __ffs(b[0]);
-	if (unlikely(b[1]))
-		return __ffs(b[1]) + 32;
-	if (unlikely(b[2]))
-		return __ffs(b[2]) + 64;
-	if (b[3])
-		return __ffs(b[3]) + 96;
-	return __ffs(b[4]) + 128;
+	unsigned long v;
+	unsigned int off;
+
+	for (off = 0; v = b[off], off < 4; off++) {
+		if (unlikely(v))
+			break;
+	}
+	return __ffs(v) + off * 32;
 }
 
 /*

@@ -43,6 +43,7 @@
 #include <linux/init.h>
 #include <linux/list.h>
 #include <linux/fs.h>
+#include <linux/namei.h>
 #include <linux/jffs2.h>
 #include <linux/pagemap.h>
 #include <linux/mtd/mtd.h>
@@ -118,7 +119,7 @@ static int jffs2_sb_set(struct super_block *sb, void *data)
 	   device */
 	sb->u.generic_sbp = p;
 	p->os_priv = sb;
-	sb->s_dev = mk_kdev(MTD_BLOCK_MAJOR, p->mtd->index);
+	sb->s_dev = MKDEV(MTD_BLOCK_MAJOR, p->mtd->index);
 
 	return 0;
 }

@@ -38,6 +38,7 @@
 #include <linux/irq.h>
 #include <linux/console.h>
 #include <linux/seq_file.h>
+#include <linux/root_dev.h>
 
 #include <asm/processor.h>
 #include <asm/io.h>
@@ -232,10 +233,10 @@ chrp_setup_arch(void)
 	initrd_below_start_ok = 1;
 	
 	if (initrd_start)
-		ROOT_DEV = mk_kdev(RAMDISK_MAJOR, 0);
+		ROOT_DEV = Root_RAM0;
 	else
 #endif
-		ROOT_DEV = to_kdev_t(0x0802); /* sda2 (sda1 is for the kernel) */
+		ROOT_DEV = Root_SDA2; /* sda2 (sda1 is for the kernel) */
 
 	/* Lookup PCI host bridges */
 	chrp_find_bridges();

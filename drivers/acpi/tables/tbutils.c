@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbutils - Table manipulation utilities
- *              $Revision: 53 $
+ *              $Revision: 54 $
  *
  *****************************************************************************/
 
@@ -91,7 +91,7 @@ acpi_tb_handle_to_object (
  *             name
  *          3) Table must be readable for length specified in the header
  *          4) Table checksum must be valid (with the exception of the FACS
- *              which has no checksum for some odd reason)
+ *              which has no checksum because it contains variable fields)
  *
  ******************************************************************************/
 
@@ -187,21 +187,26 @@ acpi_tb_map_acpi_table (
 
 		table_size = (ACPI_SIZE) table->length;
 
+#if 0
+/* We don't want to validate the header here.  */
 		/*
 		 * Validate the header and delete the mapping.
 		 * We will create a mapping for the full table below.
 		 */
 		status = acpi_tb_validate_table_header (table);
+#endif
 
 		/* Always unmap the memory for the header */
 
 		acpi_os_unmap_memory (table, sizeof (acpi_table_header));
 
+#if 0
 		/* Exit if header invalid */
 
 		if (ACPI_FAILURE (status)) {
 			return (status);
 		}
+#endif
 	}
 
 	/* Map the physical memory for the correct length */

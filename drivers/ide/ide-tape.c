@@ -892,7 +892,7 @@ typedef struct {
 	struct bio *bio;
 	char *b_data;
 	int b_count;
-	
+
 	/*
 	 *	Pipeline parameters.
 	 *
@@ -1864,6 +1864,7 @@ static int idetape_end_request(struct ata_device *drive, struct request *rq, int
 				idetape_increase_max_pipeline_stages (drive);
 		}
 	}
+
 	blkdev_dequeue_request(rq);
 	drive->rq = NULL;
 	end_that_request_last(rq);
@@ -1977,6 +1978,8 @@ static void idetape_postpone_request(struct ata_device *drive, struct request *r
  */
 static ide_startstop_t idetape_pc_intr(struct ata_device *drive, struct request *rq)
 {
+	unsigned long flags;
+	struct ata_channel *ch = drive->channel;
 	idetape_tape_t *tape = drive->driver_data;
 	idetape_status_reg_t status;
 	idetape_bcount_reg_t bcount;
@@ -2064,6 +2067,7 @@ static ide_startstop_t idetape_pc_intr(struct ata_device *drive, struct request 
 			tape->dsc_polling_frequency = IDETAPE_DSC_MA_FAST;
 			tape->dsc_timeout = jiffies + IDETAPE_DSC_MA_TIMEOUT;
 			idetape_postpone_request(drive, rq);		/* Allow ide.c to handle other requests */
+
 			return ide_stopped;
 		}
 		if (tape->failed_pc == pc)
@@ -2071,24 +2075,35 @@ static ide_startstop_t idetape_pc_intr(struct ata_device *drive, struct request 
 		pc->callback(drive, rq);	/* Command finished - Call the callback function */
 		return ide_stopped;
 	}
+	/* FIXME: this locking should encompass the above register
+	 * file access too.
+	 */
+
+	spin_lock_irqsave(ch->lock, flags);
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (test_and_clear_bit (PC_DMA_IN_PROGRESS, &pc->flags)) {
 		printk (KERN_ERR "ide-tape: The tape wants to issue more interrupts in DMA mode\n");
 		printk (KERN_ERR "ide-tape: DMA disabled, reverting to PIO\n");
 		udma_enable(drive, 0, 1);
+		spin_unlock_irqrestore(ch->lock, flags);
 
 		return ide_stopped;
 	}
 #endif
+
 	bcount.b.high = IN_BYTE (IDE_BCOUNTH_REG);			/* Get the number of bytes to transfer */
 	bcount.b.low  = IN_BYTE (IDE_BCOUNTL_REG);			/* on this interrupt */
 	ireason.all   = IN_BYTE (IDE_IREASON_REG);
 
 	if (ireason.b.cod) {
+		spin_unlock_irqrestore(ch->lock, flags);
+
 		printk (KERN_ERR "ide-tape: CoD != 0 in idetape_pc_intr\n");
 		return ide_stopped;
 	}
 	if (ireason.b.io == test_bit (PC_WRITING, &pc->flags)) {	/* Hopefully, we will never get here */
+		spin_unlock_irqrestore(ch->lock, flags);
+
 		printk (KERN_ERR "ide-tape: We wanted to %s, ", ireason.b.io ? "Write":"Read");
 		printk (KERN_ERR "ide-tape: but the tape wants us to %s !\n",ireason.b.io ? "Read":"Write");
 		return ide_stopped;
@@ -2099,7 +2114,9 @@ static ide_startstop_t idetape_pc_intr(struct ata_device *drive, struct request 
 			if (temp > pc->buffer_size) {
 				printk (KERN_ERR "ide-tape: The tape wants to send us more data than expected - discarding data\n");
 				atapi_discard_data (drive, bcount.all);
-				ide_set_handler(drive, idetape_pc_intr, IDETAPE_WAIT_CMD, NULL);
+				ata_set_handler(drive, idetape_pc_intr, IDETAPE_WAIT_CMD, NULL);
+				spin_unlock_irqrestore(ch->lock, flags);
+
 				return ide_started;
 			}
 #if IDETAPE_DEBUG_LOG
@@ -2125,7 +2142,9 @@ static ide_startstop_t idetape_pc_intr(struct ata_device *drive, struct request 
 	if (tape->debug_level >= 2)
 		printk(KERN_INFO "ide-tape: [cmd %x] transferred %d bytes on that interrupt\n", pc->c[0], bcount.all);
 #endif
-	ide_set_handler(drive, idetape_pc_intr, IDETAPE_WAIT_CMD, NULL);	/* And set the interrupt handler again */
+	ata_set_handler(drive, idetape_pc_intr, IDETAPE_WAIT_CMD, NULL);	/* And set the interrupt handler again */
+	spin_unlock_irqrestore(ch->lock, flags);
+
 	return ide_started;
 }
 
@@ -2173,36 +2192,48 @@ static ide_startstop_t idetape_pc_intr(struct ata_device *drive, struct request 
  */
 static ide_startstop_t idetape_transfer_pc(struct ata_device *drive, struct request *rq)
 {
+	unsigned long flags;
+	struct ata_channel *ch = drive->channel;
 	idetape_tape_t *tape = drive->driver_data;
 	struct atapi_packet_command *pc = tape->pc;
 	idetape_ireason_reg_t ireason;
 	int retries = 100;
 	ide_startstop_t startstop;
+	int ret;
 
-	if (ide_wait_stat(&startstop, drive, rq, DRQ_STAT, BUSY_STAT, WAIT_READY)) {
+	/* FIXME: Move this lock upwards.
+	 */
+	spin_lock_irqsave(ch->lock, flags);
+	if (ata_status_poll(drive, DRQ_STAT, BUSY_STAT,
+				WAIT_READY, rq, &startstop)) {
 		printk (KERN_ERR "ide-tape: Strange, packet command initiated yet DRQ isn't asserted\n");
-		return startstop;
-	}
-	ireason.all = IN_BYTE (IDE_IREASON_REG);
-	while (retries-- && (!ireason.b.cod || ireason.b.io)) {
-		printk(KERN_ERR "ide-tape: (IO,CoD != (0,1) while issuing a packet command, retrying\n");
-		udelay(100);
-		ireason.all = IN_BYTE(IDE_IREASON_REG);
-		if (retries == 0) {
-			printk(KERN_ERR "ide-tape: (IO,CoD != (0,1) while issuing a packet command, ignoring\n");
-			ireason.b.cod = 1;
-			ireason.b.io = 0;
+
+		ret = startstop;
+	} else {
+		ireason.all = IN_BYTE (IDE_IREASON_REG);
+		while (retries-- && (!ireason.b.cod || ireason.b.io)) {
+			printk(KERN_ERR "ide-tape: (IO,CoD != (0,1) while issuing a packet command, retrying\n");
+			udelay(100);
+			ireason.all = IN_BYTE(IDE_IREASON_REG);
+			if (retries == 0) {
+				printk(KERN_ERR "ide-tape: (IO,CoD != (0,1) while issuing a packet command, ignoring\n");
+				ireason.b.cod = 1;
+				ireason.b.io = 0;
+			}
+		}
+		if (!ireason.b.cod || ireason.b.io) {
+			printk (KERN_ERR "ide-tape: (IO,CoD) != (0,1) while issuing a packet command\n");
+			ret = ide_stopped;
+		} else {
+			tape->cmd_start_time = jiffies;
+			ata_set_handler(drive, idetape_pc_intr, IDETAPE_WAIT_CMD, NULL);	/* Set the interrupt routine */
+			atapi_write(drive,pc->c,12);	/* Send the actual packet */
+			ret = ide_started;
 		}
 	}
-	if (!ireason.b.cod || ireason.b.io) {
-		printk (KERN_ERR "ide-tape: (IO,CoD) != (0,1) while issuing a packet command\n");
-		return ide_stopped;
-	}
-	tape->cmd_start_time = jiffies;
-	ide_set_handler(drive, idetape_pc_intr, IDETAPE_WAIT_CMD, NULL);	/* Set the interrupt routine */
-	atapi_write(drive,pc->c,12);	/* Send the actual packet */
+	spin_unlock_irqrestore(ch->lock, flags);
 
-	return ide_started;
+	return ret;
 }
 
 static ide_startstop_t idetape_issue_packet_command(struct ata_device *drive,
@@ -2259,7 +2290,7 @@ static ide_startstop_t idetape_issue_packet_command(struct ata_device *drive,
 		udma_enable(drive, 0, 1);
 	}
 	if (test_bit (PC_DMA_RECOMMENDED, &pc->flags) && drive->using_dma)
-		dma_ok = !udma_init(drive, rq);
+		dma_ok = udma_init(drive, rq);
 #endif
 
 	ata_irq_enable(drive, 1);
@@ -2274,8 +2305,18 @@ static ide_startstop_t idetape_issue_packet_command(struct ata_device *drive,
 	}
 #endif
 	if (test_bit(IDETAPE_DRQ_INTERRUPT, &tape->flags)) {
-		ide_set_handler(drive, idetape_transfer_pc, IDETAPE_WAIT_CMD, NULL);
+		unsigned long flags;
+		struct ata_channel *ch = drive->channel;
+
+		/* FIXME: this locking should encompass the above register
+		 * file access too.
+		 */
+
+		spin_lock_irqsave(ch->lock, flags);
+		ata_set_handler(drive, idetape_transfer_pc, IDETAPE_WAIT_CMD, NULL);
 		OUT_BYTE(WIN_PACKETCMD, IDE_COMMAND_REG);
+		spin_unlock_irqrestore(ch->lock, flags);
+
 		return ide_started;
 	} else {
 		OUT_BYTE(WIN_PACKETCMD, IDE_COMMAND_REG);
@@ -2564,10 +2605,12 @@ static void idetape_create_write_cmd(idetape_tape_t *tape,
  */
 static ide_startstop_t idetape_do_request(struct ata_device *drive, struct request *rq, sector_t block)
 {
+	struct ata_channel *ch = drive->channel;
 	idetape_tape_t *tape = drive->driver_data;
 	struct atapi_packet_command *pc;
 	struct request *postponed_rq = tape->postponed_rq;
 	idetape_status_reg_t status;
+	int ret;
 
 #if IDETAPE_DEBUG_LOG
 /*	if (tape->debug_level >= 5)
@@ -2581,7 +2624,7 @@ static ide_startstop_t idetape_do_request(struct ata_device *drive, struct reque
 		 *	We do not support buffer cache originated requests.
 		 */
 		printk (KERN_NOTICE "ide-tape: %s: Unsupported command in request queue (%ld)\n", drive->name, rq->flags);
-		ide_end_request(drive, rq, 0);			/* Let the common code handle it */
+		__ata_end_request(drive, rq, 0, 0);			/* Let the common code handle it */
 		return ide_stopped;
 	}
 
@@ -2589,13 +2632,24 @@ static ide_startstop_t idetape_do_request(struct ata_device *drive, struct reque
 	 *	Retry a failed packet command
 	 */
 	if (tape->failed_pc != NULL && tape->pc->c[0] == IDETAPE_REQUEST_SENSE_CMD) {
-		return idetape_issue_packet_command(drive, rq, tape->failed_pc);
+		int ret;
+
+		/* FIXME: make this unlocking go away*/
+		spin_unlock_irq(ch->lock);
+		ret = idetape_issue_packet_command(drive, rq, tape->failed_pc);
+		spin_lock_irq(ch->lock);
+
+		return ret;
 	}
 #if IDETAPE_DEBUG_BUGS
 	if (postponed_rq != NULL)
 		if (rq != postponed_rq) {
 			printk (KERN_ERR "ide-tape: ide-tape.c bug - Two DSC requests were queued\n");
+			/* FIXME: make this unlocking go away*/
+			spin_unlock_irq(ch->lock);
 			idetape_end_request(drive, rq, 0);
+			spin_lock_irq(ch->lock);
+
 			return ide_stopped;
 		}
 #endif
@@ -2616,7 +2670,7 @@ static ide_startstop_t idetape_do_request(struct ata_device *drive, struct reque
 	if (tape->onstream)
 		status.b.dsc = 1;
 	if (!drive->dsc_overlap && rq->flags != IDETAPE_PC_RQ2)
-		set_bit (IDETAPE_IGNORE_DSC, &tape->flags);
+		set_bit(IDETAPE_IGNORE_DSC, &tape->flags);
 
 	/*
 	 * For the OnStream tape, check the current status of the tape
@@ -2661,7 +2715,7 @@ static ide_startstop_t idetape_do_request(struct ata_device *drive, struct reque
 			tape->req_buffer_fill = 1;
 		}
 #if ONSTREAM_DEBUG
-		else if (tape->debug_level >= 4) 
+		else if (tape->debug_level >= 4)
 			printk(KERN_INFO "ide-tape: %s: postpone_cnt %d\n", tape->name, tape->postpone_cnt);
 #endif
 	}
@@ -2673,7 +2727,10 @@ static ide_startstop_t idetape_do_request(struct ata_device *drive, struct reque
 		} else if ((signed long) (jiffies - tape->dsc_timeout) > 0) {
 			printk (KERN_ERR "ide-tape: %s: DSC timeout\n", tape->name);
 			if (rq->flags == IDETAPE_PC_RQ2) {
+				/* FIXME: make this unlocking go away*/
+				spin_unlock_irq(ch->lock);
 				idetape_media_access_finished(drive, rq);
+				spin_lock_irq(ch->lock);
 				return ide_stopped;
 			} else {
 				return ide_stopped;
@@ -2681,6 +2738,7 @@ static ide_startstop_t idetape_do_request(struct ata_device *drive, struct reque
 		} else if (jiffies - tape->dsc_polling_start > IDETAPE_DSC_MA_THRESHOLD)
 			tape->dsc_polling_frequency = IDETAPE_DSC_MA_SLOW;
 		idetape_postpone_request(drive, rq);
+
 		return ide_stopped;
 	}
 	switch (rq->flags) {
@@ -2697,8 +2755,8 @@ static ide_startstop_t idetape_do_request(struct ata_device *drive, struct reque
 				if (jiffies > tape->last_buffer_fill + 5 * HZ / 100)
 					tape->req_buffer_fill = 1;
 			}
-			pc = idetape_next_pc_storage (drive);
-			idetape_create_read_cmd (tape, pc, rq->current_nr_sectors, rq->bio);
+			pc = idetape_next_pc_storage(drive);
+			idetape_create_read_cmd(tape, pc, rq->current_nr_sectors, rq->bio);
 			break;
 		case IDETAPE_WRITE_RQ:
 			tape->buffer_head++;
@@ -2715,12 +2773,12 @@ static ide_startstop_t idetape_do_request(struct ata_device *drive, struct reque
 				calculate_speeds(drive);
 			}
 			pc = idetape_next_pc_storage (drive);
-			idetape_create_write_cmd (tape, pc, rq->current_nr_sectors, rq->bio);
+			idetape_create_write_cmd(tape, pc, rq->current_nr_sectors, rq->bio);
 			break;
 		case IDETAPE_READ_BUFFER_RQ:
 			tape->postpone_cnt = 0;
 			pc = idetape_next_pc_storage (drive);
-			idetape_create_read_buffer_cmd (tape, pc, rq->current_nr_sectors, rq->bio);
+			idetape_create_read_buffer_cmd(tape, pc, rq->current_nr_sectors, rq->bio);
 			break;
 		case IDETAPE_ABORTED_WRITE_RQ:
 			rq->flags = IDETAPE_WRITE_RQ;
@@ -2740,14 +2798,25 @@ static ide_startstop_t idetape_do_request(struct ata_device *drive, struct reque
 			rq->flags = IDETAPE_PC_RQ2;
 			break;
 		case IDETAPE_PC_RQ2:
+			/* FIXME: make this unlocking go away*/
+			spin_unlock_irq(ch->lock);
 			idetape_media_access_finished(drive, rq);
+			spin_lock_irq(ch->lock);
 			return ide_stopped;
 		default:
 			printk (KERN_ERR "ide-tape: bug in IDETAPE_RQ_CMD macro\n");
+			/* FIXME: make this unlocking go away*/
+			spin_unlock_irq(ch->lock);
 			idetape_end_request(drive, rq, 0);
+			spin_lock_irq(ch->lock);
 			return ide_stopped;
 	}
-	return idetape_issue_packet_command(drive, rq, pc);
+	/* FIXME: make this unlocking go away*/
+	spin_unlock_irq(ch->lock);
+	ret = idetape_issue_packet_command(drive, rq, pc);
+	spin_lock_irq(ch->lock);
+
+	return ret;
 }
 
 /*
@@ -3326,7 +3395,7 @@ static int __idetape_discard_read_pipeline(struct ata_device *drive)
 		tape->merge_stage = NULL;
 	}
 	tape->chrdev_direction = idetape_direction_none;
-	
+
 	if (tape->first_stage == NULL)
 		return 0;
 
@@ -3723,10 +3792,10 @@ static int idetape_add_chrdev_write_request(struct ata_device *drive, int blocks
 #if IDETAPE_DEBUG_LOG
 	if (tape->debug_level >= 3)
 		printk (KERN_INFO "ide-tape: Reached idetape_add_chrdev_write_request\n");
-#endif /* IDETAPE_DEBUG_LOG */
+#endif
 
-     	/*
-     	 *	Attempt to allocate a new stage.
+	/*
+	 *	Attempt to allocate a new stage.
 	 *	Pay special attention to possible race conditions.
 	 */
 	while ((new_stage = idetape_kmalloc_stage (tape)) == NULL) {

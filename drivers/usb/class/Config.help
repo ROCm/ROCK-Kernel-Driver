@@ -34,6 +34,26 @@ CONFIG_USB_BLUETOOTH_TTY
   The module will be called bluetty.o. If you want to compile it as
   a module, say M here and read <file:Documentation/modules.txt>.
 
+CONFIG_USB_MIDI
+  Say Y here if you want to connect a USB MIDI device to your
+  computer's USB port. This driver is for devices that comply with
+  'Universal Serial Bus Device Class Definition for MIDI Device'.
+
+  The following devices are known to work:
+    * Steinberg USB2MIDI
+    * Roland MPU64
+    * Roland PC-300
+    * Roland SC8850
+    * Roland UM-1
+    * Roland UM-2
+    * Roland UA-100
+    * Yamaha MU1000
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called usb-midi.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
 CONFIG_USB_PRINTER
   Say Y here if you want to connect a USB printer to your computer's
   USB port.

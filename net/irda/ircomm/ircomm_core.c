@@ -514,7 +514,7 @@ int ircomm_proc_read(char *buf, char **start, off_t offset, int len)
 
 	self = (struct ircomm_cb *) hashbin_get_first(ircomm);
 	while (self != NULL) {
-		ASSERT(self->magic == IRCOMM_MAGIC, return len;);
+		ASSERT(self->magic == IRCOMM_MAGIC, break;);
 
 		if(self->line < 0x10)
 			len += sprintf(buf+len, "ircomm%d", self->line);

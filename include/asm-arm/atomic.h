@@ -32,7 +32,7 @@ typedef struct { volatile int counter; } atomic_t;
 #define atomic_read(v)	((v)->counter)
 #define atomic_set(v,i)	(((v)->counter) = (i))
 
-static __inline__ void atomic_add(int i, volatile atomic_t *v)
+static inline void atomic_add(int i, volatile atomic_t *v)
 {
 	unsigned long flags;
 
@@ -41,7 +41,7 @@ static __inline__ void atomic_add(int i, volatile atomic_t *v)
 	__restore_flags(flags);
 }
 
-static __inline__ void atomic_sub(int i, volatile atomic_t *v)
+static inline void atomic_sub(int i, volatile atomic_t *v)
 {
 	unsigned long flags;
 
@@ -50,7 +50,7 @@ static __inline__ void atomic_sub(int i, volatile atomic_t *v)
 	__restore_flags(flags);
 }
 
-static __inline__ void atomic_inc(volatile atomic_t *v)
+static inline void atomic_inc(volatile atomic_t *v)
 {
 	unsigned long flags;
 
@@ -59,7 +59,7 @@ static __inline__ void atomic_inc(volatile atomic_t *v)
 	__restore_flags(flags);
 }
 
-static __inline__ void atomic_dec(volatile atomic_t *v)
+static inline void atomic_dec(volatile atomic_t *v)
 {
 	unsigned long flags;
 
@@ -68,7 +68,7 @@ static __inline__ void atomic_dec(volatile atomic_t *v)
 	__restore_flags(flags);
 }
 
-static __inline__ int atomic_dec_and_test(volatile atomic_t *v)
+static inline int atomic_dec_and_test(volatile atomic_t *v)
 {
 	unsigned long flags;
 	int val;
@@ -94,7 +94,7 @@ static inline int atomic_add_negative(int i, volatile atomic_t *v)
 	return val < 0;
 }
 
-static __inline__ void atomic_clear_mask(unsigned long mask, unsigned long *addr)
+static inline void atomic_clear_mask(unsigned long mask, unsigned long *addr)
 {
 	unsigned long flags;
 

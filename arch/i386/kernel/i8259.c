@@ -239,9 +239,21 @@ spurious_8259A_irq:
 	}
 }
 
+static int i8259A_resume(struct device *dev, u32 level)
+{
+	if (level == RESUME_POWER_ON)
+		init_8259A(0);
+	return 0;
+}
+
+static struct device_driver driver_i8259A = {
+	resume:		i8259A_resume,
+};
+
 static struct device device_i8259A = {
 	name:	       	"i8259A",
 	bus_id:		"0020",
+	driver:		&driver_i8259A,
 };
 
 static int __init init_8259A_devicefs(void)

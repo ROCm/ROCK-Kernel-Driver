@@ -247,7 +247,7 @@ int nfs_fill_super(struct super_block *sb, struct nfs_mount_data *data, int sile
 	int			tcp, version, maxlen;
 
 	/* We probably want something more informative here */
-	snprintf(sb->s_id, sizeof(sb->s_id), "%x:%x", major(sb->s_dev), minor(sb->s_dev));
+	snprintf(sb->s_id, sizeof(sb->s_id), "%x:%x", MAJOR(sb->s_dev), MINOR(sb->s_dev));
 
 	sb->s_magic      = NFS_SUPER_MAGIC;
 	sb->s_op         = &nfs_sops;

@@ -41,6 +41,7 @@
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/smp.h>
+#include <linux/device.h>
 
 #include <asm/io.h>
 #include <asm/smp.h>
@@ -57,11 +58,7 @@
 
 #include <asm/fixmap.h>
 
-/*
- * for x86_do_profile()
- */
 #include <linux/irq.h>
-
 
 unsigned int cpu_khz;	/* Detected as we calibrate the TSC */
 
@@ -79,9 +76,9 @@ unsigned int __fast_gettimeoffset_quotient __section_fast_gettimeoffset_quotient
 
 extern rwlock_t xtime_lock;
 struct timeval __xtime __section_xtime;
-volatile unsigned long __jiffies __section_jiffies;
 unsigned long __wall_jiffies __section_wall_jiffies;
 struct timezone __sys_tz __section_sys_tz;
+volatile unsigned long __jiffies __section_jiffies;
  
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 
@@ -527,3 +524,15 @@ void __init time_init(void)
 
 	setup_irq(0, &irq0);
 }
+
+static struct device device_i8253 = {
+       name:           "i8253",
+       bus_id:         "0040",
+};
+
+static int time_init_driverfs(void)
+{
+       return register_sys_device(&device_i8253);
+}
+
+__initcall(time_init_driverfs);

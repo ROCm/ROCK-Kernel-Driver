@@ -191,10 +191,10 @@ void __init smp_store_cpu_info(int id)
 		/* If we get here, it's not a certified SMP capable AMD system. */
 		printk (KERN_INFO "WARNING: This combination of AMD processors is not suitable for SMP.\n");
 		tainted |= TAINT_UNSAFE_SMP;
-		
 	}
-valid_k7:
 
+valid_k7:
+	;
 }
 
 /*

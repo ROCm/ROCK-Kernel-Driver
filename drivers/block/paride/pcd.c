@@ -180,7 +180,6 @@ MODULE_PARM(drive3,"1-6i");
 /* set up defines for blk.h,  why don't all drivers do it this way ? */
 
 #define MAJOR_NR	major
-#define DEVICE_NAME "PCD"
 #define DEVICE_NR(device) (minor(device))
 #define DEVICE_OFF(device)
 
@@ -329,8 +328,8 @@ static void pcd_init_units( void )
 }
 
 int pcd_init (void)	/* preliminary initialisation */
-
-{       int 	i, unit;
+{
+	int unit;
 
 	if (disable) return -1;
 
@@ -760,10 +759,8 @@ static void do_pcd_request (request_queue_t * q)
 
 	if (pcd_busy) return;
         while (1) {
-	    if (blk_queue_empty(QUEUE)) {
-		    CLEAR_INTR;
+	    if (blk_queue_empty(QUEUE))
 		    return;
-	    }
 
 	    if (rq_data_dir(CURRENT) == READ) {
 		unit = minor(CURRENT->rq_dev);
@@ -778,7 +775,7 @@ static void do_pcd_request (request_queue_t * q)
 	        ps_set_intr(do_pcd_read,0,0,nice); 
 		return;
 	    } 
-	    else end_request(0);
+	    else end_request(CURRENT, 0);
 	}
 }
 
@@ -820,7 +817,7 @@ static void pcd_start( void )
 		pcd_bufblk = -1; 
 		spin_lock_irqsave(&pcd_lock,saved_flags);
 		pcd_busy = 0;
-		end_request(0);
+		end_request(CURRENT, 0);
 		do_pcd_request(NULL);
 		spin_unlock_irqrestore(&pcd_lock,saved_flags);
 		return;
@@ -843,7 +840,7 @@ static void do_pcd_read( void )
 	pcd_transfer();
 	if (!pcd_count) {
 		spin_lock_irqsave(&pcd_lock,saved_flags);
-		end_request(1);
+		end_request(CURRENT, 1);
 		pcd_busy = 0;
 		do_pcd_request(NULL);
 		spin_unlock_irqrestore(&pcd_lock,saved_flags);
@@ -868,7 +865,7 @@ static void do_pcd_read_drq( void )
 		spin_lock_irqsave(&pcd_lock,saved_flags);
 		pcd_busy = 0;
 		pcd_bufblk = -1;
-		end_request(0);
+		end_request(CURRENT, 0);
 		do_pcd_request(NULL);
 		spin_unlock_irqrestore(&pcd_lock,saved_flags);
 		return;

@@ -96,6 +96,12 @@ mpage_alloc(struct block_device *bdev,
 	struct bio *bio;
 
 	bio = bio_alloc(gfp_flags, nr_vecs);
+
+	if (bio == NULL && (current->flags & PF_MEMALLOC)) {
+		while (!bio && (nr_vecs /= 2))
+			bio = bio_alloc(gfp_flags, nr_vecs);
+	}
+
 	if (bio) {
 		bio->bi_bdev = bdev;
 		bio->bi_vcnt = nr_vecs;
@@ -301,13 +307,13 @@ EXPORT_SYMBOL(mpage_readpage);
  * If the page has no buffers (preferred) then the page is mapped here.
  *
  * If all blocks are found to be contiguous then the page can go into the
- * BIO.  Otherwise fall back to block_write_full_page().
+ * BIO.  Otherwise fall back to the mapping's writepage().
  * 
  * FIXME: This code wants an estimate of how many pages are still to be
  * written, so it can intelligently allocate a suitably-sized BIO.  For now,
  * just allocate full-size (16-page) BIOs.
  */
-static /* inline */ struct bio *
+static inline struct bio *
 mpage_writepage(struct bio *bio, struct page *page, get_block_t get_block,
 			sector_t *last_block_in_bio, int *ret)
 {
@@ -464,7 +470,7 @@ page_is_mapped:
 confused:
 	if (bio)
 		bio = mpage_bio_submit(WRITE, bio);
-	*ret = block_write_full_page(page, get_block);
+	*ret = page->mapping->a_ops->writepage(page);
 out:
 	return bio;
 }

@@ -10,6 +10,7 @@
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <linux/spinlock.h>
+#include <linux/mm.h>
 #include <linux/highmem.h>
 #include <linux/smp_lock.h>
 

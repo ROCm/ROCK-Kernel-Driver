@@ -127,7 +127,7 @@ static int ioctl_internal_command(Scsi_Device * dev, char *cmd,
 				/* gag this error, VFS will log it anyway /axboe */
 				/* printk(KERN_INFO "Disc change detected.\n"); */
 				break;
-			};
+			}
 		default:	/* Fall through for non-removable media */
 			printk("SCSI error: host %d id %d lun %d return code = %x\n",
 			       dev->host->host_no,
@@ -139,7 +139,7 @@ static int ioctl_internal_command(Scsi_Device * dev, char *cmd,
 			       sense_error(SRpnt->sr_sense_buffer[0]),
 			       SRpnt->sr_sense_buffer[2] & 0xf);
 
-		};
+		}
 
 	result = SRpnt->sr_result;
 
@@ -152,7 +152,7 @@ static int ioctl_internal_command(Scsi_Device * dev, char *cmd,
 }
 
 /*
- * This interface is depreciated - users should use the scsi generic (sg)
+ * This interface is deprecated - users should use the scsi generic (sg)
  * interface instead, as this is a more flexible approach to performing
  * generic SCSI commands on a device.
  *
@@ -516,22 +516,3 @@ int kernel_scsi_ioctl(Scsi_Device * dev, int cmd, void *arg)
 	set_fs(oldfs);
 	return tmp;
 }
-
-/*
- * Overrides for Emacs so that we almost follow Linus's tabbing style.
- * Emacs will notice this stuff at the end of the file and automatically
- * adjust the settings for this buffer only.  This must remain at the end
- * of the file.
- * ---------------------------------------------------------------------------
- * Local variables:
- * c-indent-level: 4
- * c-brace-imaginary-offset: 0
- * c-brace-offset: -4
- * c-argdecl-indent: 4
- * c-label-offset: -4
- * c-continued-statement-offset: 4
- * c-continued-brace-offset: 0
- * indent-tabs-mode: nil
- * tab-width: 8
- * End:
- */

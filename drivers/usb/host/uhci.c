@@ -2008,10 +2008,8 @@ static void rh_int_timer_do(unsigned long ptr)
 			uhci_fsbr_timeout(uhci, u);
 
 		/* Check if the URB timed out */
-		if (u->timeout && time_after_eq(jiffies, up->inserttime + u->timeout)) {
-			list_del(&u->urb_list);
-			list_add_tail(&u->urb_list, &list);
-		}
+		if (u->timeout && time_after_eq(jiffies, up->inserttime + u->timeout))
+			list_move_tail(&u->urb_list, &list);
 
 		spin_unlock(&u->lock);
 	}

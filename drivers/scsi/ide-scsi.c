@@ -243,8 +243,8 @@ static int idescsi_end_request(struct ata_device *drive, struct request *rq, int
 	u8 *scsi_buf;
 	unsigned long flags;
 
-	if (!(rq->flags & REQ_SPECIAL)) {
-		ide_end_request(drive, rq, uptodate);
+	if (!(rq->flags & REQ_PC)) {
+		ata_end_request(drive, rq, uptodate);
 		return 0;
 	}
 
@@ -293,6 +293,8 @@ static inline unsigned long get_timeout(struct atapi_packet_command *pc)
  */
 static ide_startstop_t idescsi_pc_intr(struct ata_device *drive, struct request *rq)
 {
+	unsigned long flags;
+	struct ata_channel *ch = drive->channel;
 	struct Scsi_Host *host = drive->driver_data;
 	idescsi_scsi_t *scsi = idescsi_private(host);
 	u8 ireason;
@@ -333,6 +335,8 @@ static ide_startstop_t idescsi_pc_intr(struct ata_device *drive, struct request 
 		temp = pc->actually_transferred + bcount;
 		if ( temp > pc->request_transfer) {
 			if (temp > pc->buffer_size) {
+				unsigned long flags;
+				struct ata_channel *ch = drive->channel;
 				printk (KERN_ERR "ide-scsi: The scsi wants to send us more data than expected - discarding data\n");
 				temp = pc->buffer_size - pc->actually_transferred;
 				if (temp) {
@@ -346,7 +350,14 @@ static ide_startstop_t idescsi_pc_intr(struct ata_device *drive, struct request 
 				pc->actually_transferred += temp;
 				pc->current_position += temp;
 				atapi_discard_data(drive,bcount - temp);
-				ide_set_handler(drive, idescsi_pc_intr, get_timeout(pc), NULL);
+				/* FIXME: this locking should encompass the above register
+				 * file access too.
+				 */
+
+				spin_lock_irqsave(ch->lock, flags);
+				ata_set_handler(drive, idescsi_pc_intr, get_timeout(pc), NULL);
+				spin_unlock_irqrestore(ch->lock, flags);
+
 				return ide_started;
 			}
 #ifdef DEBUG
@@ -370,30 +381,50 @@ static ide_startstop_t idescsi_pc_intr(struct ata_device *drive, struct request 
 	pc->actually_transferred+=bcount;				/* Update the current position */
 	pc->current_position+=bcount;
 
-	ide_set_handler(drive, idescsi_pc_intr, get_timeout(pc), NULL);	/* And set the interrupt handler again */
+	/* FIXME: this locking should encompass the above register
+	 * file access too.
+	 */
+
+	spin_lock_irqsave(ch->lock, flags);
+	ata_set_handler(drive, idescsi_pc_intr, get_timeout(pc), NULL);	/* And set the interrupt handler again */
+	spin_unlock_irqrestore(ch->lock, flags);
+
 	return ide_started;
 }
 
 static ide_startstop_t idescsi_transfer_pc(struct ata_device *drive, struct request *rq)
 {
+	unsigned long flags;
+	struct ata_channel *ch = drive->channel;
 	struct Scsi_Host *host = drive->driver_data;
 	idescsi_scsi_t *scsi = idescsi_private(host);
 	struct atapi_packet_command *pc = scsi->pc;
-	byte ireason;
+	u8 ireason;
 	ide_startstop_t startstop;
+	int ret;
 
-	if (ide_wait_stat(&startstop, drive, rq, DRQ_STAT, BUSY_STAT, WAIT_READY)) {
+	/* FIXME: Move this lock upwards.
+	 */
+	spin_lock_irqsave(ch->lock, flags);
+	if (ata_status_poll(drive, DRQ_STAT, BUSY_STAT,
+				WAIT_READY, rq, &startstop)) {
 		printk (KERN_ERR "ide-scsi: Strange, packet command initiated yet DRQ isn't asserted\n");
-		return startstop;
+		ret = startstop;
+	} else {
+		ireason = IN_BYTE(IDE_IREASON_REG);
+
+		if ((ireason & (IDESCSI_IREASON_IO | IDESCSI_IREASON_COD)) != IDESCSI_IREASON_COD) {
+			printk (KERN_ERR "ide-scsi: (IO,CoD) != (0,1) while issuing a packet command\n");
+			ret = ide_stopped;
+		} else {
+			ata_set_handler(drive, idescsi_pc_intr, get_timeout(pc), NULL);
+			atapi_write(drive, scsi->pc->c, 12);
+			ret = ide_started;
+		}
 	}
-	ireason = IN_BYTE (IDE_IREASON_REG);
-	if ((ireason & (IDESCSI_IREASON_IO | IDESCSI_IREASON_COD)) != IDESCSI_IREASON_COD) {
-		printk (KERN_ERR "ide-scsi: (IO,CoD) != (0,1) while issuing a packet command\n");
-		return ide_stopped;
-	}
-	ide_set_handler(drive, idescsi_pc_intr, get_timeout(pc), NULL);	/* Set the interrupt routine */
-	atapi_write(drive, scsi->pc->c, 12);			/* Send the actual packet */
-	return ide_started;
+	spin_unlock_irqrestore(ch->lock, flags);
+
+	return ret;
 }
 
 /*
@@ -413,7 +444,7 @@ static ide_startstop_t idescsi_issue_pc(struct ata_device *drive, struct request
 	bcount = min(pc->request_transfer, 63 * 1024);		/* Request to transfer the entire buffer at once */
 
 	if (drive->using_dma && rq->bio)
-		dma_ok = !udma_init(drive, rq);
+		dma_ok = udma_init(drive, rq);
 
 	ata_select(drive, 10);
 	ata_irq_enable(drive, 1);
@@ -425,8 +456,18 @@ static ide_startstop_t idescsi_issue_pc(struct ata_device *drive, struct request
 		set_bit(PC_DMA_IN_PROGRESS, &pc->flags);
 		udma_start(drive, rq);
 	}
-	if (test_bit (IDESCSI_DRQ_INTERRUPT, &scsi->flags)) {
-		ide_set_handler(drive, idescsi_transfer_pc, get_timeout(pc), NULL);
+	if (test_bit(IDESCSI_DRQ_INTERRUPT, &scsi->flags)) {
+		unsigned long flags;
+		struct ata_channel *ch = drive->channel;
+
+		/* FIXME: this locking should encompass the above register
+		 * file access too.
+		 */
+
+		spin_lock_irqsave(ch->lock, flags);
+		ata_set_handler(drive, idescsi_transfer_pc, get_timeout(pc), NULL);
+		spin_unlock_irqrestore(ch->lock, flags);
+
 		OUT_BYTE (WIN_PACKETCMD, IDE_COMMAND_REG);		/* Issue the packet command */
 		return ide_started;
 	} else {
@@ -440,6 +481,9 @@ static ide_startstop_t idescsi_issue_pc(struct ata_device *drive, struct request
  */
 static ide_startstop_t idescsi_do_request(struct ata_device *drive, struct request *rq, sector_t block)
 {
+	struct ata_channel *ch = drive->channel;
+	int ret;
+
 #ifdef DEBUG
 	printk(KERN_INFO "rq_status: %d, cmd: %d, errors: %d\n",
 			rq->rq_status,
@@ -452,12 +496,18 @@ static ide_startstop_t idescsi_do_request(struct ata_device *drive, struct reque
 			rq->current_nr_sectors);
 #endif
 
-	if (rq->flags & REQ_SPECIAL) {
-		return idescsi_issue_pc(drive, rq, (struct atapi_packet_command *) rq->special);
+	/* FIXME: make this unlocking go away*/
+	spin_unlock_irq(ch->lock);
+	if (rq->flags & REQ_PC) {
+		ret = idescsi_issue_pc(drive, rq, (struct atapi_packet_command *) rq->special);
+	} else {
+	    blk_dump_rq_flags(rq, "ide-scsi: unsup command");
+	    idescsi_end_request(drive, rq, 0);
+	    ret = ide_stopped;
 	}
-	blk_dump_rq_flags(rq, "ide-scsi: unsup command");
-	idescsi_end_request(drive, rq, 0);
-	return ide_stopped;
+	spin_lock_irq(ch->lock);
+
+	return ret;
 }
 
 static int idescsi_open(struct inode *inode, struct file *filp, struct ata_device *drive)
@@ -667,7 +717,7 @@ static int idescsi_queue(Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *))
 	}
 
 	memset(rq, 0, sizeof(*rq));
-	rq->flags = REQ_SPECIAL;
+	rq->flags = REQ_PC;
 	rq->special = (char *) pc;
 	rq->bio = idescsi_dma_bio (drive, pc);
 	spin_unlock_irq(cmd->host->host_lock);

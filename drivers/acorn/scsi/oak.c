@@ -59,7 +59,6 @@
 
 #include "../../scsi/scsi.h"
 #include "../../scsi/hosts.h"
-#include "../../scsi/constants.h"
 
 #define OAKSCSI_PUBLIC_RELEASE 1
 

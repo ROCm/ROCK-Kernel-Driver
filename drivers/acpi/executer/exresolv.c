@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exresolv - AML Interpreter object resolution
- *              $Revision: 111 $
+ *              $Revision: 114 $
  *
  *****************************************************************************/
 
@@ -130,7 +130,7 @@ acpi_ex_resolve_object_to_value (
 
 	/* This is an acpi_operand_object  */
 
-	switch (stack_desc->common.type) {
+	switch (ACPI_GET_OBJECT_TYPE (stack_desc)) {
 	case INTERNAL_TYPE_REFERENCE:
 
 		opcode = stack_desc->reference.opcode;
@@ -178,56 +178,6 @@ acpi_ex_resolve_object_to_value (
 				stack_desc->reference.offset, obj_desc));
 			break;
 
-		/*
-		 * For constants, we must change the reference/constant object
-		 * to a real integer object
-		 */
-		case AML_ZERO_OP:
-		case AML_ONE_OP:
-		case AML_ONES_OP:
-		case AML_REVISION_OP:
-
-			/* Create a new integer object */
-
-			obj_desc = acpi_ut_create_internal_object (ACPI_TYPE_INTEGER);
-			if (!obj_desc) {
-				return_ACPI_STATUS (AE_NO_MEMORY);
-			}
-
-			switch (opcode) {
-			case AML_ZERO_OP:
-				obj_desc->integer.value = 0;
-				break;
-
-			case AML_ONE_OP:
-				obj_desc->integer.value = 1;
-				break;
-
-			case AML_ONES_OP:
-				obj_desc->integer.value = ACPI_INTEGER_MAX;
-
-				/* Truncate value if we are executing from a 32-bit ACPI table */
-
-				acpi_ex_truncate_for32bit_table (obj_desc, walk_state);
-				break;
-
-			case AML_REVISION_OP:
-				obj_desc->integer.value = ACPI_CA_SUPPORT_LEVEL;
-				break;
-
-			default:
-				/* No other opcodes can get here */
-				break;
-			}
-
-			/*
-			 * Remove a reference from the original reference object
-			 * and put the new object in its place
-			 */
-			acpi_ut_remove_reference (stack_desc);
-			*stack_ptr = obj_desc;
-			break;
-
 
 		case AML_INDEX_OP:
 
@@ -239,6 +189,7 @@ acpi_ex_resolve_object_to_value (
 
 
 			case ACPI_TYPE_PACKAGE:
+
 				obj_desc = *stack_desc->reference.where;
 				if (obj_desc) {
 					/*
@@ -262,7 +213,9 @@ acpi_ex_resolve_object_to_value (
 				}
 				break;
 
+
 			default:
+
 				/* Invalid reference object */
 
 				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
@@ -282,14 +235,12 @@ acpi_ex_resolve_object_to_value (
 
 		default:
 
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown Reference object subtype %02X in %p\n",
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown Reference opcode %X in %p\n",
 				opcode, stack_desc));
 			status = AE_AML_INTERNAL;
 			break;
-
-		}   /* switch (Opcode) */
-
-		break; /* case INTERNAL_TYPE_REFERENCE */
+		}
+		break;
 
 
 	case ACPI_TYPE_BUFFER:
@@ -313,7 +264,7 @@ acpi_ex_resolve_object_to_value (
 	case INTERNAL_TYPE_INDEX_FIELD:
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Field_read Source_desc=%p Type=%X\n",
-			stack_desc, stack_desc->common.type));
+			stack_desc, ACPI_GET_OBJECT_TYPE (stack_desc)));
 
 		status = acpi_ex_read_data_from_field (walk_state, stack_desc, &obj_desc);
 		*stack_ptr = (void *) obj_desc;

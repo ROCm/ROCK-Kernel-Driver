@@ -53,6 +53,7 @@ static void ali15x3_tune_drive(struct ata_device *drive, byte pio)
 
 	t = ata_timing_data(pio);
 
+	/* FIXME: use generic ata-timing library  --bkz */
 	s_time = t->setup;
 	a_time = t->active;
 	if ((s_clc = (s_time * system_bus_speed + 999999) / 1000000) >= 8)
@@ -171,14 +172,7 @@ static int ali15x3_tune_chipset(struct ata_device *drive, byte speed)
 	}
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 
-	drive->current_speed = speed;
-
 	return ide_config_drive_speed(drive, speed);
-}
-
-static void config_chipset_for_pio(struct ata_device *drive)
-{
-	ali15x3_tune_drive(drive, 5);
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
@@ -253,7 +247,7 @@ fast_ata_pio:
 		on = 0;
 		verbose = 0;
 no_dma_set:
-		config_chipset_for_pio(drive);
+		ali15x3_tune_drive(drive, 255);
 	}
 
 	udma_enable(drive, on, verbose);
@@ -264,7 +258,7 @@ no_dma_set:
 static int ali15x3_udma_init(struct ata_device *drive, struct request *rq)
 {
 	if ((m5229_revision < 0xC2) && (drive->type != ATA_DISK))
-		return 1;	/* try PIO instead of DMA */
+		return ide_stopped;	/* try PIO instead of DMA */
 
 	return udma_pci_init(drive, rq);
 }

@@ -436,10 +436,26 @@ static int eexp_open(struct net_device *dev)
 	ret = request_irq(dev->irq,&eexp_irq,0,dev->name,dev);
 	if (ret) return ret;
 
-	request_region(ioaddr, EEXP_IO_EXTENT, "EtherExpress");
-	request_region(ioaddr+0x4000, 16, "EtherExpress shadow");
-	request_region(ioaddr+0x8000, 16, "EtherExpress shadow");
-	request_region(ioaddr+0xc000, 16, "EtherExpress shadow");
+	if (!request_region(ioaddr, EEXP_IO_EXTENT, "EtherExpress")) {
+		printk(KERN_WARNING "EtherExpress io port %x, is busy.\n"
+			, ioaddr);
+		goto err_out1;
+	}
+	if (!request_region(ioaddr+0x4000, EEXP_IO_EXTENT, "EtherExpress shadow")) {
+		printk(KERN_WARNING "EtherExpress io port %x, is busy.\n"
+			, ioaddr+0x4000);
+		goto err_out2;
+	}
+	if (!request_region(ioaddr+0x8000, EEXP_IO_EXTENT, "EtherExpress shadow")) {
+		printk(KERN_WARNING "EtherExpress io port %x, is busy.\n"
+			, ioaddr+0x8000);
+		goto err_out3;
+	}
+	if (!request_region(ioaddr+0xc000, EEXP_IO_EXTENT, "EtherExpress shadow")) {
+		printk(KERN_WARNING "EtherExpress io port %x, is busy.\n"
+			, ioaddr+0xc000);
+		goto err_out4;
+	}
 	
 	if (lp->width) {
 		printk("%s: forcing ASIC to 8-bit mode\n", dev->name);
@@ -452,6 +468,16 @@ static int eexp_open(struct net_device *dev)
 	printk(KERN_DEBUG "%s: leaving eexp_open()\n", dev->name);
 #endif
 	return 0;
+
+	err_out4:
+		release_region(ioaddr+0x8000, EEXP_IO_EXTENT);
+	err_out3:
+		release_region(ioaddr+0x4000, EEXP_IO_EXTENT);
+	err_out2:
+		release_region(ioaddr, EEXP_IO_EXTENT);
+	err_out1:
+		free_irq(dev->irq, dev);
+		return -EBUSY;
 }
 
 /*

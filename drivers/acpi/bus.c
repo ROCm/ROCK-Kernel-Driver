@@ -92,7 +92,7 @@ static struct acpi_blacklist_item acpi_blacklist[] __initdata =
 #ifdef CONFIG_LDM
 
 static int acpi_device_probe(struct device *dev);
-static int acpi_device_remove(struct device *dev, u32 flags);
+static int acpi_device_remove(struct device *dev);
 static int acpi_device_suspend(struct device *dev, u32 state, u32 stage);
 static int acpi_device_resume(struct device *dev, u32 stage);
 
@@ -121,8 +121,7 @@ acpi_device_probe (
 
 static int
 acpi_device_remove (
-	struct device		*dev,
-	u32			flags)
+	struct device		*dev)
 {
 	ACPI_FUNCTION_TRACE("acpi_device_remove");
 

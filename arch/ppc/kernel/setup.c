@@ -17,6 +17,7 @@
 #include <linux/tty.h>
 #include <linux/bootmem.h>
 #include <linux/seq_file.h>
+#include <linux/root_dev.h>
 
 #include <asm/residual.h>
 #include <asm/io.h>
@@ -431,7 +432,7 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 				r3 += KERNELBASE;
 			initrd_start = r3;
 			initrd_end = r3 + r4;
-			ROOT_DEV = mk_kdev(RAMDISK_MAJOR, 0);
+			ROOT_DEV = Root_RAM0;
 			initrd_below_start_ok = 1;
 		}
 #endif

@@ -48,7 +48,7 @@ static int __init sbf_struct_valid(unsigned long tptr)
 	unsigned int i;
 	struct sbf_boot sb;
 	
-	memcpy_fromio(&sb, tptr, sizeof(sb));
+	memcpy_fromio(&sb, (void *)tptr, sizeof(sb));
 
 	if(sb.sbf_len != 40 && sb.sbf_len != 39)
 		// 39 on IBM ThinkPad A21m, BIOS version 1.02b (KXET24WW; 2000-12-19).
@@ -238,6 +238,7 @@ static int __init sbf_init(void)
 		rp = (unsigned long)ioremap(rp, 4096);
 		if(rp == 0)
 			continue;
+		
 		if(sbf_struct_valid(rp))
 		{
 			/* Found the BOOT table and processed it */

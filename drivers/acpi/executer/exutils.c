@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exutils - interpreter/scanner utilities
- *              $Revision: 98 $
+ *              $Revision: 100 $
  *
  *****************************************************************************/
 
@@ -148,8 +148,6 @@ acpi_ex_validate_object_type (
  * FUNCTION:    Acpi_ex_truncate_for32bit_table
  *
  * PARAMETERS:  Obj_desc        - Object to be truncated
- *              Walk_state      - Current walk state
- *                                (A method must be executing)
  *
  * RETURN:      none
  *
@@ -160,8 +158,7 @@ acpi_ex_validate_object_type (
 
 void
 acpi_ex_truncate_for32bit_table (
-	acpi_operand_object     *obj_desc,
-	acpi_walk_state         *walk_state)
+	acpi_operand_object     *obj_desc)
 {
 
 	ACPI_FUNCTION_ENTRY ();
@@ -172,8 +169,7 @@ acpi_ex_truncate_for32bit_table (
 	 * a control method
 	 */
 	if ((!obj_desc) ||
-		(obj_desc->common.type != ACPI_TYPE_INTEGER) ||
-		(!walk_state->method_node)) {
+		(ACPI_GET_OBJECT_TYPE (obj_desc) != ACPI_TYPE_INTEGER)) {
 		return;
 	}
 

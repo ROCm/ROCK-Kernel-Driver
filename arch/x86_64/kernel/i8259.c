@@ -12,6 +12,7 @@
 #include <linux/smp_lock.h>
 #include <linux/init.h>
 #include <linux/kernel_stat.h>
+#include <linux/device.h>
 
 #include <asm/atomic.h>
 #include <asm/system.h>
@@ -318,6 +319,18 @@ spurious_8259A_irq:
 		goto handle_real_irq;
 	}
 }
+
+static struct device device_i8259A = {
+       name:           "i8259A",
+       bus_id:         "0020",
+};
+
+static int __init init_8259A_devicefs(void)
+{
+       return register_sys_device(&device_i8259A);
+}
+
+__initcall(init_8259A_devicefs);
 
 void __init init_8259A(int auto_eoi)
 {

@@ -1,6 +1,4 @@
 /*
- * linux/drivers/ide/ide-pmac.c		Version ?.??	Mar. 18, 2000
- *
  * Support for IDE interfaces on PowerMacs.
  * These IDE interfaces are memory-mapped and have a DBDMA channel
  * for doing DMA.
@@ -342,21 +340,6 @@ pmac_ide_init_hwif_ports(hw_regs_t *hw,
 		ide_hwifs[ix].unmask = 1;
 	}
 }
-
-#if 0
-/* This one could be later extended to handle CMD IDE and be used by some kind
- * of /proc interface. I want to be able to get the devicetree path of a block
- * device for yaboot configuration
- */
-struct device_node*
-pmac_ide_get_devnode(struct ata_device *drive)
-{
-	int i = pmac_ide_find(drive);
-	if (i < 0)
-		return NULL;
-	return pmac_ide[i].node;
-}
-#endif
 
 /* Setup timings for the selected drive (master/slave). I still need to verify if this
  * is enough, I beleive selectproc will be called whenever an IDE command is started,
@@ -1367,7 +1350,8 @@ static int pmac_udma_start(struct ata_device *drive, struct request *rq)
 	 */
 	ix = pmac_ide_find(drive);
 	if (ix < 0)
-		return 0;
+		return ide_stopped;
+
 	dma = pmac_ide[ix].dma_regs;
 	ata4 = (pmac_ide[ix].kind == controller_kl_ata4 ||
 		pmac_ide[ix].kind == controller_kl_ata4_80);
@@ -1375,7 +1359,8 @@ static int pmac_udma_start(struct ata_device *drive, struct request *rq)
 	out_le32(&dma->control, (RUN << 16) | RUN);
 	/* Make sure it gets to the controller right now */
 	(void)in_le32(&dma->control);
-	return 0;
+
+	return ide_started;
 }
 
 static int pmac_udma_stop(struct ata_device *drive)
@@ -1413,7 +1398,7 @@ static int pmac_udma_init(struct ata_device *drive, struct request *rq)
 	 */
 	ix = pmac_ide_find(drive);
 	if (ix < 0)
-		return 0;
+		return ide_stopped;
 
 	if (rq_data_dir(rq) == READ)
 		reading = 1;
@@ -1425,7 +1410,7 @@ static int pmac_udma_init(struct ata_device *drive, struct request *rq)
 		pmac_ide[ix].kind == controller_kl_ata4_80);
 
 	if (!pmac_ide_build_dmatable(drive, rq, ix, !reading))
-		return 1;
+		return ide_stopped;
 	/* Apple adds 60ns to wrDataSetup on reads */
 	if (ata4 && (pmac_ide[ix].timings[unit] & TR_66_UDMA_EN)) {
 		out_le32((unsigned *)(IDE_DATA_REG + IDE_TIMING_CONFIG + _IO_BASE),
@@ -1435,8 +1420,9 @@ static int pmac_udma_init(struct ata_device *drive, struct request *rq)
 	}
 	drive->waiting_for_dma = 1;
 	if (drive->type != ATA_DISK)
-		return 0;
-	ide_set_handler(drive, ide_dma_intr, WAIT_CMD, NULL);
+		return ide_started;
+
+	ata_set_handler(drive, ide_dma_intr, WAIT_CMD, NULL);
 	if ((rq->flags & REQ_SPECIAL) &&
 		(drive->addressing == 1)) {
 		struct ata_taskfile *args = rq->special;
@@ -1448,7 +1434,9 @@ static int pmac_udma_init(struct ata_device *drive, struct request *rq)
 		OUT_BYTE(reading ? WIN_READDMA : WIN_WRITEDMA, IDE_COMMAND_REG);
 	}
 
-	return udma_start(drive, rq);
+	udma_start(drive, rq);
+
+	return ide_started;
 }
 
 /*

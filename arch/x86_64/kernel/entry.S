@@ -40,6 +40,7 @@
 #include <asm/unistd.h>
 #include <asm/thread_info.h>
 #include <asm/hw_irq.h>
+#include <asm/errno.h>
 
 	.code64
 
@@ -270,8 +271,8 @@ int_very_careful:
 	/* Check for syscall exit trace */	
 	bt $TIF_SYSCALL_TRACE,%edx
 	jnc int_signal
-	movq %rsp,%rdi		# &ptregs -> arg1
 	pushq %rdi
+	leaq 8(%rsp),%rdi	# &ptregs -> arg1	
 	call syscall_trace
 	popq %rdi
 	btr  $TIF_SYSCALL_TRACE,%edi
@@ -563,16 +564,17 @@ ENTRY(kernel_thread)
 
 	# rdi: flags, rsi: usp, rdx: will be &pt_regs
 	movq %rdx,%rdi
-	orq  $CLONE_VM, %rdi
-
+	orq  kernel_thread_flags(%rip), %rdi
 	movq $-1, %rsi
-
 	movq %rsp, %rdx
 
 	# clone now
-	call do_fork_FIXME_NOW_RETURNS_TASK_STRUCT
-	# save retval on the stack so it's popped before `ret`
-	movq %rax, RAX(%rsp)
+	call do_fork
+
+	xorl %edi,%edi
+	cmpq $-1000,%rax
+	cmovb %rdi,%rax
+	movq %rax,RAX(%rsp)
 
 	/*
 	 * It isn't worth to check for reschedule here,

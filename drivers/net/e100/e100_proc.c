@@ -257,7 +257,8 @@ write_blink_led_timer(struct file *file, const char *buffer,
 	if (count > WRITE_BUF_MAX_LEN) {
 		count = WRITE_BUF_MAX_LEN;
 	}
-	copy_from_user(s_blink_op, buffer, count);
+	if (copy_from_user(s_blink_op, buffer, count))
+		return -EFAULT;
 	s_blink_op[count] = '\0';
 	i_blink_op = simple_strtoul(s_blink_op, &res, 0);
 	if (res == s_blink_op) {

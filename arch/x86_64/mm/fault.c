@@ -85,7 +85,7 @@ void dump_pagetable(unsigned long address)
 }
 
 int page_fault_trace; 
-int exception_trace;
+int exception_trace = 1;
 
 /*
  * This routine handles page faults.  It determines the address,
@@ -311,11 +311,7 @@ vmalloc_fault:
 		if (!pte_present(*pte))
 			goto bad_area_nosemaphore;
 
-		/* Strictly a flush_tlb_all because vmalloc is global,
-		   but this only applies to new global pages so it should
-		   not be needed. vmalloc will likely touch multiple ptes,
-		   so do a full flush instead of a partial one. */ 
-		__flush_tlb();		
+		__flush_tlb_all();		
 		return;
 	}
 }

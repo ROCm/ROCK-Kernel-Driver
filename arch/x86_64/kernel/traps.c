@@ -77,7 +77,7 @@ asmlinkage void machine_check(void);
 asmlinkage void spurious_interrupt_bug(void);
 asmlinkage void call_debug(void);
 
-extern char iret_address[];
+extern int exception_trace;
 
 struct notifier_block *die_chain;
 
@@ -172,6 +172,8 @@ void show_trace(unsigned long *stack)
 	i = 1;
 	if (stack >= irqstack && stack < irqstack_end) {
 		unsigned long *tstack;
+
+		printk("<IRQ> ");  
 		while (stack < irqstack_end) {
 			addr = *stack++;
 			/*
@@ -197,12 +199,10 @@ void show_trace(unsigned long *stack)
 		tstack = (unsigned long *)(current_thread_info()+1);
 		if (stack < tstack || (char*)stack > (char*)tstack+THREAD_SIZE) 
 			printk("\n" KERN_DEBUG 
-		       "no stack at the end of irqstack; stack:%lx, curstack %lx\n",
+		       "no stack at the end of irqstack; stack:%p, curstack %p\n",
 			       stack, tstack); 
 #endif			       
 	} 
-
-	
 
 	while (((long) stack & (THREAD_SIZE-1)) != 0) {
 		addr = *stack++;
@@ -263,7 +263,7 @@ void show_stack(unsigned long * rsp)
 void show_registers(struct pt_regs *regs)
 {
 	int i;
-	int in_kernel = 1;
+	int in_kernel = (regs->cs & 3) == 0;
 	unsigned long rsp;
 #ifdef CONFIG_SMP
 	/* For SMP should get the APIC id here, just to protect against corrupted GS */ 
@@ -273,11 +273,8 @@ void show_registers(struct pt_regs *regs)
 #endif	
 	struct task_struct *cur = cpu_pda[cpu].pcurrent; 
 
-	rsp = (unsigned long) (&regs->rsp);
-	if (regs->rsp < TASK_SIZE) {
-		in_kernel = 0;
 		rsp = regs->rsp;
-	}
+
 	printk("CPU %d ", cpu);
 	show_regs(regs);
 	printk("Process %s (pid: %d, stackpage=%08lx)\n",
@@ -383,7 +380,7 @@ static void do_trap(int trapnr, int signr, char *str,
 	if ((regs->cs & 3)  != 0) { 
 		struct task_struct *tsk = current;
 
-		if (trapnr != 3)
+		if (exception_trace && trapnr != 3)
 			printk("%s[%d] trap %s at rip:%lx rsp:%lx err:%lx\n",
 		       tsk->comm, tsk->pid, str, regs->rip, regs->rsp, error_code);
 
@@ -456,9 +453,14 @@ extern void dump_pagetable(unsigned long);
 asmlinkage void do_general_protection(struct pt_regs * regs, long error_code)
 {
 	if ((regs->cs & 3)!=0) { 
-	current->thread.error_code = error_code;
-	current->thread.trap_no = 13;
-	force_sig(SIGSEGV, current);
+		struct task_struct *tsk = current;
+		if (exception_trace)
+			printk("%s[%d] #gp at rip:%lx rsp:%lx err:%lx\n",
+			       tsk->comm, tsk->pid, regs->rip, regs->rsp, error_code);
+
+		tsk->thread.error_code = error_code;
+		tsk->thread.trap_no = 13;
+		force_sig(SIGSEGV, tsk);
 	return;
 	} 
 
@@ -509,8 +511,7 @@ asmlinkage void do_nmi(struct pt_regs * regs)
 {
 	unsigned char reason = inb(0x61);
 
-
-	++nmi_count(smp_processor_id());
+	add_pda(__nmi_count,1);
 	if (!(reason & 0xc0)) {
 #if CONFIG_X86_LOCAL_APIC
 		/*

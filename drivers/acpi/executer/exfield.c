@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exfield - ACPI AML (p-code) execution - field manipulation
- *              $Revision: 110 $
+ *              $Revision: 112 $
  *
  *****************************************************************************/
 
@@ -70,7 +70,7 @@ acpi_ex_read_data_from_field (
 		return_ACPI_STATUS (AE_AML_NO_OPERAND);
 	}
 
-	if (obj_desc->common.type == ACPI_TYPE_BUFFER_FIELD) {
+	if (ACPI_GET_OBJECT_TYPE (obj_desc) == ACPI_TYPE_BUFFER_FIELD) {
 		/*
 		 * If the Buffer_field arguments have not been previously evaluated,
 		 * evaluate them now and save the results.
@@ -110,6 +110,8 @@ acpi_ex_read_data_from_field (
 			return_ACPI_STATUS (AE_NO_MEMORY);
 		}
 
+		/* Complete the buffer object initialization */
+
 		buffer_desc->common.flags = AOPOBJ_DATA_VALID;
 		buffer_desc->buffer.length = length;
 		buffer = buffer_desc->buffer.pointer;
@@ -129,7 +131,7 @@ acpi_ex_read_data_from_field (
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
 		"Obj=%p Type=%X Buf=%p Len=%X\n",
-		obj_desc, obj_desc->common.type, buffer, length));
+		obj_desc, ACPI_GET_OBJECT_TYPE (obj_desc), buffer, length));
 	ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
 		"Field_write: Bit_len=%X Bit_off=%X Byte_off=%X\n",
 		obj_desc->common_field.bit_length,
@@ -193,7 +195,7 @@ acpi_ex_write_data_to_field (
 		return_ACPI_STATUS (AE_AML_NO_OPERAND);
 	}
 
-	if (obj_desc->common.type == ACPI_TYPE_BUFFER_FIELD) {
+	if (ACPI_GET_OBJECT_TYPE (obj_desc) == ACPI_TYPE_BUFFER_FIELD) {
 		/*
 		 * If the Buffer_field arguments have not been previously evaluated,
 		 * evaluate them now and save the results.
@@ -209,7 +211,7 @@ acpi_ex_write_data_to_field (
 	/*
 	 * Get a pointer to the data to be written
 	 */
-	switch (source_desc->common.type) {
+	switch (ACPI_GET_OBJECT_TYPE (source_desc)) {
 	case ACPI_TYPE_INTEGER:
 		buffer = &source_desc->integer.value;
 		length = sizeof (source_desc->integer.value);
@@ -258,7 +260,7 @@ acpi_ex_write_data_to_field (
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
 		"Obj=%p Type=%X Buf=%p Len=%X\n",
-		obj_desc, obj_desc->common.type, buffer, length));
+		obj_desc, ACPI_GET_OBJECT_TYPE (obj_desc), buffer, length));
 	ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
 		"Field_read: Bit_len=%X Bit_off=%X Byte_off=%X\n",
 		obj_desc->common_field.bit_length,

@@ -86,7 +86,7 @@ static unsigned int debug = 0;
 #define PDEBUG(level, fmt, args...) \
 	do { \
 	if (debug >= level)	\
-		info("[" __PRETTY_FUNCTION__ ":%d] " fmt, __LINE__ , ## args);	\
+		info("[%s:%d] " fmt, __FUNCTION__, __LINE__ , ## args);	\
 	} while (0)
 
 
@@ -1449,7 +1449,7 @@ static struct video_device stv680_template = {
 	fops:           &stv680_fops,
 };
 
-static void *__devinit stv680_probe (struct usb_device *dev, unsigned int ifnum, const struct usb_device_id *id)
+static void *stv680_probe (struct usb_device *dev, unsigned int ifnum, const struct usb_device_id *id)
 {
 	struct usb_interface_descriptor *interface;
 	struct usb_stv *stv680;

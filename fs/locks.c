@@ -443,15 +443,6 @@ static void locks_insert_block(struct file_lock *blocker,
 	list_add(&waiter->fl_link, &blocked_list);
 }
 
-static inline
-void locks_notify_blocked(struct file_lock *waiter)
-{
-	if (waiter->fl_notify)
-		waiter->fl_notify(waiter);
-	else
-		wake_up(&waiter->fl_wait);
-}
-
 /* Wake up processes blocked waiting for blocker.
  * If told to wait then schedule the processes until the block list
  * is empty, otherwise empty the block list ourselves.
@@ -459,12 +450,13 @@ void locks_notify_blocked(struct file_lock *waiter)
 static void locks_wake_up_blocks(struct file_lock *blocker)
 {
 	while (!list_empty(&blocker->fl_block)) {
-		struct file_lock *waiter = list_entry(blocker->fl_block.next, struct file_lock, fl_block);
-		/* Remove waiter from the block list, because by the
-		 * time it wakes up blocker won't exist any more.
-		 */
+		struct file_lock *waiter = list_entry(blocker->fl_block.next,
+				struct file_lock, fl_block);
 		locks_delete_block(waiter);
-		locks_notify_blocked(waiter);
+		if (waiter->fl_notify)
+			waiter->fl_notify(waiter);
+		else
+			wake_up(&waiter->fl_wait);
 	}
 }
 
@@ -1405,8 +1397,6 @@ int fcntl_setlk(struct file *filp, unsigned int cmd, struct flock *l)
 	if (copy_from_user(&flock, l, sizeof(flock)))
 		goto out;
 
-	/* Get arguments and validate them ...
-	 */
 	inode = filp->f_dentry->d_inode;
 
 	/* Don't allow mandatory locks on files that may be memory mapped
@@ -1438,23 +1428,6 @@ int fcntl_setlk(struct file *filp, unsigned int cmd, struct flock *l)
 		break;
 	case F_UNLCK:
 		break;
-	case F_SHLCK:
-	case F_EXLCK:
-#ifdef __sparc__
-/* warn a bit for now, but don't overdo it */
-{
-	static int count = 0;
-	if (!count) {
-		count=1;
-		printk(KERN_WARNING
-		       "fcntl_setlk() called by process %d (%s) with broken flock() emulation\n",
-		       current->pid, current->comm);
-	}
-}
-		if (!(filp->f_mode & 3))
-			goto out;
-		break;
-#endif
 	default:
 		error = -EINVAL;
 		goto out;
@@ -1543,8 +1516,6 @@ int fcntl_setlk64(struct file *filp, unsigned int cmd, struct flock64 *l)
 	if (copy_from_user(&flock, l, sizeof(flock)))
 		goto out;
 
-	/* Get arguments and validate them ...
-	 */
 	inode = filp->f_dentry->d_inode;
 
 	/* Don't allow mandatory locks on files that may be memory mapped
@@ -1576,8 +1547,6 @@ int fcntl_setlk64(struct file *filp, unsigned int cmd, struct flock64 *l)
 		break;
 	case F_UNLCK:
 		break;
-	case F_SHLCK:
-	case F_EXLCK:
 	default:
 		error = -EINVAL;
 		goto out;

@@ -33,7 +33,7 @@ void generic_fillattr(struct inode *inode, struct kstat *stat)
 	stat->blksize = inode->i_blksize;
 }
 
-static int do_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat)
+int vfs_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat)
 {
 	struct inode *inode = dentry->d_inode;
 
@@ -58,7 +58,7 @@ int vfs_stat(char *name, struct kstat *stat)
 
 	error = user_path_walk(name, &nd);
 	if (!error) {
-		error = do_getattr(nd.mnt, nd.dentry, stat);
+		error = vfs_getattr(nd.mnt, nd.dentry, stat);
 		path_release(&nd);
 	}
 	return error;
@@ -71,7 +71,7 @@ int vfs_lstat(char *name, struct kstat *stat)
 
 	error = user_path_walk_link(name, &nd);
 	if (!error) {
-		error = do_getattr(nd.mnt, nd.dentry, stat);
+		error = vfs_getattr(nd.mnt, nd.dentry, stat);
 		path_release(&nd);
 	}
 	return error;
@@ -83,7 +83,7 @@ int vfs_fstat(unsigned int fd, struct kstat *stat)
 	int error = -EBADF;
 
 	if (f) {
-		error = do_getattr(f->f_vfsmnt, f->f_dentry, stat);
+		error = vfs_getattr(f->f_vfsmnt, f->f_dentry, stat);
 		fput(f);
 	}
 	return error;

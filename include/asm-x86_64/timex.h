@@ -48,4 +48,6 @@ static inline cycles_t get_cycles (void)
 
 extern unsigned int cpu_khz;
 
+#define ARCH_HAS_JIFFIES_64
+
 #endif

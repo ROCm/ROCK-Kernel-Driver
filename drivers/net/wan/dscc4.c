@@ -645,6 +645,24 @@ refill:
 	rx_fd->end = 0xbabeface;
 }
 
+static void dscc4_free1(struct pci_dev *pdev)
+{
+	struct dscc4_pci_priv *ppriv;
+	struct dscc4_dev_priv *root;
+	int i;
+
+	ppriv = pci_get_drvdata(pdev);
+	root = ppriv->root;
+
+	for (i = 0; i < dev_per_card; i++)
+		unregister_hdlc_device(&root[i].hdlc);
+
+	pci_set_drvdata(pdev, NULL);
+
+	kfree(root);
+	kfree(ppriv);
+}
+
 static int __init dscc4_init_one(struct pci_dev *pdev,
 				  const struct pci_device_id *ent)
 {
@@ -693,7 +711,7 @@ static int __init dscc4_init_one(struct pci_dev *pdev,
 
 	if (request_irq(pdev->irq, &dscc4_irq, SA_SHIRQ, DRV_NAME, priv->root)){
 		printk(KERN_WARNING "%s: IRQ %d busy\n", DRV_NAME, pdev->irq);
-		goto err_out_iounmap;
+		goto err_out_free1;
 	}
 
 	/* power up/little endian/dma core controlled via lrda/ltda */
@@ -768,6 +786,8 @@ err_out_free_iqtx:
 			    priv->iqcfg_dma);
 err_out_free_irq:
 	free_irq(pdev->irq, priv->root);
+err_out_free1:
+	dscc4_free1(pdev);
 err_out_iounmap:
 	iounmap ((void *)ioaddr);
 err_out_free_mmio_region:
@@ -1779,9 +1799,6 @@ static void __exit dscc4_remove_one(struct pci_dev *pdev)
 			    ppriv->iqcfg_dma);
 	for (i = 0; i < dev_per_card; i++) {
 		struct dscc4_dev_priv *dpriv = root + i;
-		hdlc_device *hdlc = &dpriv->hdlc;
-
-		unregister_hdlc_device(hdlc);
 
 		pci_free_consistent(pdev, IRQ_RING_SIZE*sizeof(u32),
 				    dpriv->iqrx, dpriv->iqrx_dma);
@@ -1789,11 +1806,9 @@ static void __exit dscc4_remove_one(struct pci_dev *pdev)
 				    dpriv->iqtx, dpriv->iqtx_dma);
 	}
 
-	iounmap((void *)ioaddr);
-	kfree(root);
+	dscc4_free1(pdev);
 
-	pci_set_drvdata(pdev, NULL);
-	kfree(ppriv);
+	iounmap((void *)ioaddr);
 
 	release_mem_region(pci_resource_start(pdev, 1),
 			   pci_resource_len(pdev, 1));

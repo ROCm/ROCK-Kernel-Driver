@@ -11,6 +11,7 @@
 #include <linux/tty.h>
 #include <linux/init.h>
 #include <linux/suspend.h>
+#include <linux/root_dev.h>
 
 #include <linux/nfs_fs.h>
 #include <linux/nfs_fs_sb.h>
@@ -55,7 +56,7 @@ int root_mountflags = MS_RDONLY | MS_VERBOSE;
 static char root_device_name[64];
 
 /* this is initialized in init/main.c */
-kdev_t ROOT_DEV;
+dev_t ROOT_DEV;
 
 static int do_devfs = 0;
 
@@ -239,7 +240,7 @@ static int __init root_dev_setup(char *line)
 	int i;
 	char ch;
 
-	ROOT_DEV = name_to_kdev_t(line);
+	ROOT_DEV = kdev_t_to_nr(name_to_kdev_t(line));
 	memset (root_device_name, 0, sizeof root_device_name);
 	if (strncmp (line, "/dev/", 5) == 0) line += 5;
 	for (i = 0; i < sizeof root_device_name - 1; ++i)
@@ -319,12 +320,12 @@ retry:
 		 * and bad superblock on root device.
 		 */
 		printk ("VFS: Cannot open root device \"%s\" or %s\n",
-			root_device_name, kdevname (ROOT_DEV));
+			root_device_name, kdevname (to_kdev_t(ROOT_DEV)));
 		printk ("Please append a correct \"root=\" boot option\n");
 		panic("VFS: Unable to mount root fs on %s",
-			kdevname(ROOT_DEV));
+			kdevname(to_kdev_t(ROOT_DEV)));
 	}
-	panic("VFS: Unable to mount root fs on %s", kdevname(ROOT_DEV));
+	panic("VFS: Unable to mount root fs on %s", kdevname(to_kdev_t(ROOT_DEV)));
 out:
 	putname(fs_names);
 	sys_chdir("/root");
@@ -345,7 +346,7 @@ static int __init mount_nfs_root(void)
 }
 #endif
 
-static int __init create_dev(char *name, kdev_t dev, char *devfs_name)
+static int __init create_dev(char *name, dev_t dev, char *devfs_name)
 {
 	void *handle;
 	char path[64];
@@ -353,10 +354,10 @@ static int __init create_dev(char *name, kdev_t dev, char *devfs_name)
 
 	sys_unlink(name);
 	if (!do_devfs)
-		return sys_mknod(name, S_IFBLK|0600, kdev_t_to_nr(dev));
+		return sys_mknod(name, S_IFBLK|0600, dev);
 
-	handle = devfs_find_handle(NULL, kdev_none(dev) ? devfs_name : NULL,
-				major(dev), minor(dev), DEVFS_SPECIAL_BLK, 1);
+	handle = devfs_find_handle(NULL, !dev ? devfs_name : NULL,
+				MAJOR(dev), MINOR(dev), DEVFS_SPECIAL_BLK, 1);
 	if (!handle)
 		return -1;
 	n = devfs_generate_path(handle, path + 5, sizeof (path) - 5);
@@ -634,7 +635,7 @@ static int __init rd_load_disk(int n)
 #ifdef CONFIG_BLK_DEV_RAM
 	if (rd_prompt)
 		change_floppy("root floppy disk to be loaded into RAM disk");
-	create_dev("/dev/ram", mk_kdev(RAMDISK_MAJOR, n), NULL);
+	create_dev("/dev/ram", MKDEV(RAMDISK_MAJOR, n), NULL);
 #endif
 	return rd_load_image("/dev/root");
 }
@@ -699,7 +700,7 @@ static void __init devfs_make_root(char *name)
 static void __init mount_root(void)
 {
 #ifdef CONFIG_ROOT_NFS
-	if (major(ROOT_DEV) == UNNAMED_MAJOR) {
+	if (MAJOR(ROOT_DEV) == UNNAMED_MAJOR) {
 		if (mount_nfs_root()) {
 			sys_chdir("/root");
 			ROOT_DEV = current->fs->pwdmnt->mnt_sb->s_dev;
@@ -707,17 +708,17 @@ static void __init mount_root(void)
 			return;
 		}
 		printk(KERN_ERR "VFS: Unable to mount root fs via NFS, trying floppy.\n");
-		ROOT_DEV = mk_kdev(FLOPPY_MAJOR, 0);
+		ROOT_DEV = Root_FD0;
 	}
 #endif
 	devfs_make_root(root_device_name);
 	create_dev("/dev/root", ROOT_DEV, root_device_name);
 #ifdef CONFIG_BLK_DEV_FD
-	if (major(ROOT_DEV) == FLOPPY_MAJOR) {
+	if (MAJOR(ROOT_DEV) == FLOPPY_MAJOR) {
 		/* rd_doload is 2 for a dual initrd/ramload setup */
 		if (rd_doload==2) {
 			if (rd_load_disk(1)) {
-				ROOT_DEV = mk_kdev(RAMDISK_MAJOR, 1);
+				ROOT_DEV = Root_RAM1;
 				create_dev("/dev/root", ROOT_DEV, NULL);
 			}
 		} else
@@ -752,11 +753,10 @@ static int do_linuxrc(void * shell)
 static void __init handle_initrd(void)
 {
 #ifdef CONFIG_BLK_DEV_INITRD
-	kdev_t ram0 = mk_kdev(RAMDISK_MAJOR,0);
 	int error;
 	int i, pid;
 
-	create_dev("/dev/root.old", ram0, NULL);
+	create_dev("/dev/root.old", Root_RAM0, NULL);
 	mount_block_root("/dev/root.old", root_mountflags & ~MS_RDONLY);
 	sys_mkdir("/old", 0700);
 	sys_chdir("/old");
@@ -770,12 +770,12 @@ static void __init handle_initrd(void)
 	sys_mount("..", ".", NULL, MS_MOVE, NULL);
 	sys_umount("/old/dev", 0);
 
-	if (real_root_dev == kdev_t_to_nr(ram0)) {
+	if (real_root_dev == Root_RAM0) {
 		sys_chdir("/old");
 		return;
 	}
 
-	ROOT_DEV = to_kdev_t(real_root_dev);
+	ROOT_DEV = real_root_dev;
 	mount_root();
 
 	printk(KERN_NOTICE "Trying to move old root to /initrd ... ");
@@ -802,8 +802,8 @@ static void __init handle_initrd(void)
 static int __init initrd_load(void)
 {
 #ifdef CONFIG_BLK_DEV_INITRD
-	create_dev("/dev/ram", mk_kdev(RAMDISK_MAJOR, 0), NULL);
-	create_dev("/dev/initrd", mk_kdev(RAMDISK_MAJOR, INITRD_MINOR), NULL);
+	create_dev("/dev/ram", MKDEV(RAMDISK_MAJOR, 0), NULL);
+	create_dev("/dev/initrd", MKDEV(RAMDISK_MAJOR, INITRD_MINOR), NULL);
 #endif
 	return rd_load_image("/dev/initrd");
 }
@@ -813,11 +813,11 @@ static int __init initrd_load(void)
  */
 void prepare_namespace(void)
 {
-	int is_floppy = major(ROOT_DEV) == FLOPPY_MAJOR;
+	int is_floppy = MAJOR(ROOT_DEV) == FLOPPY_MAJOR;
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (!initrd_start)
 		mount_initrd = 0;
-	real_root_dev = kdev_t_to_nr(ROOT_DEV);
+	real_root_dev = ROOT_DEV;
 #endif
 	sys_mkdir("/dev", 0700);
 	sys_mkdir("/root", 0700);
@@ -834,12 +834,12 @@ void prepare_namespace(void)
 	software_resume();
 
 	if (mount_initrd) {
-		if (initrd_load() && !kdev_same(ROOT_DEV, mk_kdev(RAMDISK_MAJOR, 0))) {
+		if (initrd_load() && ROOT_DEV != Root_RAM0) {
 			handle_initrd();
 			goto out;
 		}
 	} else if (is_floppy && rd_doload && rd_load_disk(0))
-		ROOT_DEV = mk_kdev(RAMDISK_MAJOR, 0);
+		ROOT_DEV = Root_RAM0;
 	mount_root();
 out:
 	sys_umount("/dev", 0);

@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rsutils - Utilities for the resource manager
- *              $Revision: 30 $
+ *              $Revision: 33 $
  *
  ******************************************************************************/
 
@@ -56,7 +56,7 @@ acpi_rs_get_prt_method_data (
 	acpi_handle             handle,
 	acpi_buffer             *ret_buffer)
 {
-	acpi_operand_object     *ret_obj;
+	acpi_operand_object     *obj_desc;
 	acpi_status             status;
 
 
@@ -68,12 +68,12 @@ acpi_rs_get_prt_method_data (
 	/*
 	 *  Execute the method, no parameters
 	 */
-	status = acpi_ns_evaluate_relative (handle, "_PRT", NULL, &ret_obj);
+	status = acpi_ns_evaluate_relative (handle, "_PRT", NULL, &obj_desc);
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
 
-	if (!ret_obj) {
+	if (!obj_desc) {
 		/* Return object is required */
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "No object was returned from _PRT\n"));
@@ -81,13 +81,13 @@ acpi_rs_get_prt_method_data (
 	}
 
 	/*
-	 * The return object will be a package, so check the parameters.  If the
+	 * The return object must be a package, so check the parameters.  If the
 	 * return object is not a package, then the underlying AML code is corrupt
 	 * or improperly written.
 	 */
-	if (ACPI_TYPE_PACKAGE != ret_obj->common.type) {
+	if (ACPI_GET_OBJECT_TYPE (obj_desc) != ACPI_TYPE_PACKAGE) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "_PRT did not return a Package, returned %s\n",
-				acpi_ut_get_type_name (ret_obj->common.type)));
+				acpi_ut_get_object_type_name (obj_desc)));
 		status = AE_AML_OPERAND_TYPE;
 		goto cleanup;
 	}
@@ -96,13 +96,13 @@ acpi_rs_get_prt_method_data (
 	 * Create a resource linked list from the byte stream buffer that comes
 	 * back from the _CRS method execution.
 	 */
-	status = acpi_rs_create_pci_routing_table (ret_obj, ret_buffer);
+	status = acpi_rs_create_pci_routing_table (obj_desc, ret_buffer);
 
 	/* On exit, we must delete the object returned by Evaluate_object */
 
 cleanup:
 
-	acpi_ut_remove_reference (ret_obj);
+	acpi_ut_remove_reference (obj_desc);
 	return_ACPI_STATUS (status);
 }
 
@@ -130,7 +130,7 @@ acpi_rs_get_crs_method_data (
 	acpi_handle             handle,
 	acpi_buffer             *ret_buffer)
 {
-	acpi_operand_object     *ret_obj;
+	acpi_operand_object     *obj_desc;
 	acpi_status             status;
 
 
@@ -142,12 +142,12 @@ acpi_rs_get_crs_method_data (
 	/*
 	 * Execute the method, no parameters
 	 */
-	status = acpi_ns_evaluate_relative (handle, "_CRS", NULL, &ret_obj);
+	status = acpi_ns_evaluate_relative (handle, "_CRS", NULL, &obj_desc);
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
 
-	if (!ret_obj) {
+	if (!obj_desc) {
 		/* Return object is required */
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "No object was returned from _CRS\n"));
@@ -160,9 +160,9 @@ acpi_rs_get_crs_method_data (
 	 * then the underlying AML code is corrupt or improperly
 	 * written.
 	 */
-	if (ACPI_TYPE_BUFFER != ret_obj->common.type) {
+	if (ACPI_GET_OBJECT_TYPE (obj_desc) != ACPI_TYPE_BUFFER) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "_CRS did not return a Buffer, returned %s\n",
-				acpi_ut_get_type_name (ret_obj->common.type)));
+				acpi_ut_get_object_type_name (obj_desc)));
 		status = AE_AML_OPERAND_TYPE;
 		goto cleanup;
 	}
@@ -172,13 +172,13 @@ acpi_rs_get_crs_method_data (
 	 * byte stream buffer that comes back from the _CRS method
 	 * execution.
 	 */
-	status = acpi_rs_create_resource_list (ret_obj, ret_buffer);
+	status = acpi_rs_create_resource_list (obj_desc, ret_buffer);
 
 	/* On exit, we must delete the object returned by evaluate_object */
 
 cleanup:
 
-	acpi_ut_remove_reference (ret_obj);
+	acpi_ut_remove_reference (obj_desc);
 	return_ACPI_STATUS (status);
 }
 
@@ -206,7 +206,7 @@ acpi_rs_get_prs_method_data (
 	acpi_handle             handle,
 	acpi_buffer             *ret_buffer)
 {
-	acpi_operand_object     *ret_obj;
+	acpi_operand_object     *obj_desc;
 	acpi_status             status;
 
 
@@ -218,12 +218,12 @@ acpi_rs_get_prs_method_data (
 	/*
 	 * Execute the method, no parameters
 	 */
-	status = acpi_ns_evaluate_relative (handle, "_PRS", NULL, &ret_obj);
+	status = acpi_ns_evaluate_relative (handle, "_PRS", NULL, &obj_desc);
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
 
-	if (!ret_obj) {
+	if (!obj_desc) {
 		/* Return object is required */
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "No object was returned from _PRS\n"));
@@ -236,9 +236,9 @@ acpi_rs_get_prs_method_data (
 	 * then the underlying AML code is corrupt or improperly
 	 * written..
 	 */
-	if (ACPI_TYPE_BUFFER != ret_obj->common.type) {
+	if (ACPI_GET_OBJECT_TYPE (obj_desc) != ACPI_TYPE_BUFFER) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "_PRS did not return a Buffer, returned %s\n",
-				acpi_ut_get_type_name (ret_obj->common.type)));
+				acpi_ut_get_object_type_name (obj_desc)));
 		status = AE_AML_OPERAND_TYPE;
 		goto cleanup;
 	}
@@ -248,13 +248,13 @@ acpi_rs_get_prs_method_data (
 	 * byte stream buffer that comes back from the _CRS method
 	 * execution.
 	 */
-	status = acpi_rs_create_resource_list (ret_obj, ret_buffer);
+	status = acpi_rs_create_resource_list (obj_desc, ret_buffer);
 
 	/* On exit, we must delete the object returned by evaluate_object */
 
 cleanup:
 
-	acpi_ut_remove_reference (ret_obj);
+	acpi_ut_remove_reference (obj_desc);
 	return_ACPI_STATUS (status);
 }
 
@@ -319,6 +319,7 @@ acpi_rs_set_srs_method_data (
 	 */
 	params[0]->buffer.length  = (u32) buffer.length;
 	params[0]->buffer.pointer = buffer.pointer;
+	params[0]->common.flags   = AOPOBJ_DATA_VALID;
 	params[1] = NULL;
 
 	/*

@@ -135,7 +135,6 @@ struct prio_array {
  */
 struct runqueue {
 	spinlock_t lock;
-	spinlock_t frozen;
 	unsigned long nr_running, nr_switches, expired_timestamp;
 	signed long nr_uninterruptible;
 	task_t *curr, *idle;
@@ -153,17 +152,21 @@ static struct runqueue runqueues[NR_CPUS] __cacheline_aligned;
 #define cpu_curr(cpu)		(cpu_rq(cpu)->curr)
 #define rt_task(p)		((p)->prio < MAX_RT_PRIO)
 
+/*
+ * task_rq_lock - lock the runqueue a given task resides on and disable
+ * interrupts.  Note the ordering: we can safely lookup the task_rq without
+ * explicitly disabling preemption.
+ */
 static inline runqueue_t *task_rq_lock(task_t *p, unsigned long *flags)
 {
 	struct runqueue *rq;
 
 repeat_lock_task:
-	preempt_disable();
+	local_irq_save(*flags);
 	rq = task_rq(p);
-	spin_lock_irqsave(&rq->lock, *flags);
+	spin_lock(&rq->lock);
 	if (unlikely(rq != task_rq(p))) {
 		spin_unlock_irqrestore(&rq->lock, *flags);
-		preempt_enable();
 		goto repeat_lock_task;
 	}
 	return rq;
@@ -172,7 +175,23 @@ repeat_lock_task:
 static inline void task_rq_unlock(runqueue_t *rq, unsigned long *flags)
 {
 	spin_unlock_irqrestore(&rq->lock, *flags);
-	preempt_enable();
+}
+
+/*
+ * rq_lock - lock a given runqueue and disable interrupts.
+ */
+static inline runqueue_t *rq_lock(runqueue_t *rq)
+{
+	local_irq_disable();
+	rq = this_rq();
+	spin_lock(&rq->lock);
+	return rq;
+}
+
+static inline void rq_unlock(runqueue_t *rq)
+{
+	spin_unlock(&rq->lock);
+	local_irq_enable();
 }
 
 /*
@@ -284,9 +303,15 @@ void wait_task_inactive(task_t * p)
 repeat:
 	preempt_disable();
 	rq = task_rq(p);
-	while (unlikely(rq->curr == p)) {
+	if (unlikely(rq->curr == p)) {
 		cpu_relax();
-		barrier();
+		/*
+		 * enable/disable preemption just to make this
+		 * a preemption point - we are busy-waiting
+		 * anyway.
+		 */
+		preempt_enable();
+		goto repeat;
 	}
 	rq = task_rq_lock(p, &flags);
 	if (unlikely(rq->curr == p)) {
@@ -322,40 +347,50 @@ void kick_if_running(task_t * p)
  * "current->state = TASK_RUNNING" to mark yourself runnable
  * without the overhead of this.
  */
-static int try_to_wake_up(task_t * p)
+static int try_to_wake_up(task_t * p, int sync)
 {
 	unsigned long flags;
 	int success = 0;
 	long old_state;
 	runqueue_t *rq;
 
+repeat_lock_task:
 	rq = task_rq_lock(p, &flags);
 	old_state = p->state;
-	p->state = TASK_RUNNING;
 	if (!p->array) {
+		if (unlikely(sync && (rq->curr != p))) {
+			if (p->thread_info->cpu != smp_processor_id()) {
+				p->thread_info->cpu = smp_processor_id();
+				task_rq_unlock(rq, &flags);
+				goto repeat_lock_task;
+			}
+		}
 		if (old_state == TASK_UNINTERRUPTIBLE)
 			rq->nr_uninterruptible--;
 		activate_task(p, rq);
+		/*
+		 * If sync is set, a resched_task() is a NOOP
+		 */
 		if (p->prio < rq->curr->prio)
 			resched_task(rq->curr);
 		success = 1;
 	}
+	p->state = TASK_RUNNING;
 	task_rq_unlock(rq, &flags);
+
 	return success;
 }
 
 int wake_up_process(task_t * p)
 {
-	return try_to_wake_up(p);
+	return try_to_wake_up(p, 0);
 }
 
 void wake_up_forked_process(task_t * p)
 {
 	runqueue_t *rq;
 
-	preempt_disable();
-	rq = this_rq();
-	spin_lock_irq(&rq->lock);
+	rq = rq_lock(rq);
 
 	p->state = TASK_RUNNING;
 	if (!rt_task(p)) {
@@ -371,8 +406,7 @@ void wake_up_forked_process(task_t * p)
 	p->thread_info->cpu = smp_processor_id();
 	activate_task(p, rq);
 
-	spin_unlock_irq(&rq->lock);
-	preempt_enable();
+	rq_unlock(rq);
 }
 
 /*
@@ -401,18 +435,17 @@ void sched_exit(task_t * p)
 }
 
 #if CONFIG_SMP || CONFIG_PREEMPT
-asmlinkage void schedule_tail(void)
+asmlinkage void schedule_tail(task_t *prev)
 {
-	spin_unlock_irq(&this_rq()->frozen);
+	finish_arch_switch(this_rq());
+	finish_arch_schedule(prev);
 }
 #endif
 
-static inline void context_switch(task_t *prev, task_t *next)
+static inline task_t * context_switch(task_t *prev, task_t *next)
 {
 	struct mm_struct *mm = next->mm;
 	struct mm_struct *oldmm = prev->active_mm;
-
-	prepare_to_switch();
 
 	if (unlikely(!mm)) {
 		next->active_mm = oldmm;
@@ -427,7 +460,9 @@ static inline void context_switch(task_t *prev, task_t *next)
 	}
 
 	/* Here we just switch the register state and the stack. */
-	switch_to(prev, next);
+	switch_to(prev, next, prev);
+
+	return prev;
 }
 
 unsigned long nr_running(void)
@@ -762,8 +797,8 @@ asmlinkage void schedule(void)
 	list_t *queue;
 	int idx;
 
-	if (unlikely(in_interrupt()))
-		BUG();
+	BUG_ON(in_interrupt());
+
 #if CONFIG_DEBUG_HIGHMEM
 	check_highmem_ptes();
 #endif
@@ -773,6 +808,7 @@ need_resched:
 	rq = this_rq();
 
 	release_kernel_lock(prev, smp_processor_id());
+	prepare_arch_schedule(prev);
 	prev->sleep_timestamp = jiffies;
 	spin_lock_irq(&rq->lock);
 
@@ -828,28 +864,20 @@ switch_tasks:
 	if (likely(prev != next)) {
 		rq->nr_switches++;
 		rq->curr = next;
-		spin_lock(&rq->frozen);
-		spin_unlock(&rq->lock);
-
-		context_switch(prev, next);
-
-		/*
-		 * The runqueue pointer might be from another CPU
-		 * if the new task was last running on a different
-		 * CPU - thus re-load it.
-		 */
-		mb();
+	
+		prepare_arch_switch(rq);
+		prev = context_switch(prev, next);
+		barrier();
 		rq = this_rq();
-		spin_unlock_irq(&rq->frozen);
-	} else {
+		finish_arch_switch(rq);
+	} else
 		spin_unlock_irq(&rq->lock);
-	}
+	finish_arch_schedule(prev);
 
 	reacquire_kernel_lock(current);
 	preempt_enable_no_resched();
 	if (test_thread_flag(TIF_NEED_RESCHED))
 		goto need_resched;
-	return;
 }
 
 #ifdef CONFIG_PREEMPT
@@ -865,9 +893,15 @@ asmlinkage void preempt_schedule(void)
 	if (unlikely(ti->preempt_count))
 		return;
 
+need_resched:
 	ti->preempt_count = PREEMPT_ACTIVE;
 	schedule();
 	ti->preempt_count = 0;
+
+	/* we can miss a preemption opportunity between schedule and now */
+	barrier();
+	if (unlikely(test_thread_flag(TIF_NEED_RESCHED)))
+		goto need_resched;
 }
 #endif /* CONFIG_PREEMPT */
 
@@ -880,7 +914,7 @@ asmlinkage void preempt_schedule(void)
  * started to run but is not in state TASK_RUNNING.  try_to_wake_up() returns
  * zero in this (rare) case, and we handle it by continuing to scan the queue.
  */
-static inline void __wake_up_common(wait_queue_head_t *q, unsigned int mode, int nr_exclusive)
+static inline void __wake_up_common(wait_queue_head_t *q, unsigned int mode, int nr_exclusive, int sync)
 {
 	struct list_head *tmp;
 	unsigned int state;
@@ -891,7 +925,7 @@ static inline void __wake_up_common(wait_queue_head_t *q, unsigned int mode, int
 		curr = list_entry(tmp, wait_queue_t, task_list);
 		p = curr->task;
 		state = p->state;
-		if ((state & mode) && try_to_wake_up(p) &&
+		if ((state & mode) && try_to_wake_up(p, sync) &&
 			((curr->flags & WQ_FLAG_EXCLUSIVE) && !--nr_exclusive))
 				break;
 	}
@@ -905,17 +939,36 @@ void __wake_up(wait_queue_head_t *q, unsigned int mode, int nr_exclusive)
 		return;
 
 	spin_lock_irqsave(&q->lock, flags);
-	__wake_up_common(q, mode, nr_exclusive);
+	__wake_up_common(q, mode, nr_exclusive, 0);
 	spin_unlock_irqrestore(&q->lock, flags);
 }
 
+#if CONFIG_SMP
+
+void __wake_up_sync(wait_queue_head_t *q, unsigned int mode, int nr_exclusive)
+{
+	unsigned long flags;
+
+	if (unlikely(!q))
+		return;
+
+	spin_lock_irqsave(&q->lock, flags);
+	if (likely(nr_exclusive))
+		__wake_up_common(q, mode, nr_exclusive, 1);
+	else
+		__wake_up_common(q, mode, nr_exclusive, 0);
+	spin_unlock_irqrestore(&q->lock, flags);
+}
+
+#endif
+ 
 void complete(struct completion *x)
 {
 	unsigned long flags;
 
 	spin_lock_irqsave(&x->wait.lock, flags);
 	x->done++;
-	__wake_up_common(&x->wait, TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE, 1);
+	__wake_up_common(&x->wait, TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE, 1, 0);
 	spin_unlock_irqrestore(&x->wait.lock, flags);
 }
 
@@ -1147,7 +1200,7 @@ static int setscheduler(pid_t pid, int policy, struct sched_param *param)
 
 	/*
 	 * Valid priorities for SCHED_FIFO and SCHED_RR are
-	 * 1..MAX_USER_RT_PRIO, valid priority for SCHED_OTHER is 0.
+	 * 1..MAX_USER_RT_PRIO-1, valid priority for SCHED_OTHER is 0.
 	 */
 	retval = -EINVAL;
 	if (lp.sched_priority < 0 || lp.sched_priority > MAX_USER_RT_PRIO-1)
@@ -1342,8 +1395,7 @@ asmlinkage long sys_sched_yield(void)
 	runqueue_t *rq;
 	prio_array_t *array;
 
-	preempt_disable();
-	rq = this_rq();
+	rq = rq_lock(rq);
 
 	/*
 	 * Decrease the yielding task's priority by one, to avoid
@@ -1353,7 +1405,6 @@ asmlinkage long sys_sched_yield(void)
 	 * If priority is already MAX_PRIO-1 then we still
 	 * roundrobin the task within the runlist.
 	 */
-	spin_lock_irq(&rq->lock);
 	array = current->array;
 	/*
 	 * If the task has reached maximum priority (or is a RT task)
@@ -1370,8 +1421,7 @@ asmlinkage long sys_sched_yield(void)
 		list_add_tail(&current->run_list, array->queue + current->prio);
 		__set_bit(current->prio, array->bitmap);
 	}
-	spin_unlock(&rq->lock);
-	preempt_enable_no_resched();
+	spin_unlock_no_resched(&rq->lock);
 
 	schedule();
 
@@ -1599,7 +1649,6 @@ void __init sched_init(void)
 		rq->active = rq->arrays;
 		rq->expired = rq->arrays + 1;
 		spin_lock_init(&rq->lock);
-		spin_lock_init(&rq->frozen);
 		INIT_LIST_HEAD(&rq->migration_queue);
 
 		for (j = 0; j < 2; j++) {
@@ -1687,7 +1736,15 @@ void set_cpus_allowed(task_t *p, unsigned long new_mask)
 		task_rq_unlock(rq, &flags);
 		goto out;
 	}
-
+	/*
+	 * If the task is not on a runqueue (and not running), then
+	 * it is sufficient to simply update the task's cpu field.
+	 */
+	if (!p->array && (p != rq->curr)) {
+		p->thread_info->cpu = __ffs(p->cpus_allowed);
+		task_rq_unlock(rq, &flags);
+		goto out;
+	}
 	init_MUTEX_LOCKED(&req.sem);
 	req.task = p;
 	list_add(&req.list, &rq->migration_queue);
@@ -1710,15 +1767,15 @@ static int migration_thread(void * bind_cpu)
 	sigfillset(&current->blocked);
 	set_fs(KERNEL_DS);
 	/*
-	 * The first migration thread is started on CPU #0. This one can migrate
-	 * the other migration threads to their destination CPUs.
+	 * The first migration thread is started on CPU #0. This one can
+	 * migrate the other migration threads to their destination CPUs.
 	 */
 	if (cpu != 0) {
 		while (!cpu_rq(cpu_logical_map(0))->migration_thread)
 			yield();
 		set_cpus_allowed(current, 1UL << cpu);
 	}
-	printk("migration_task %d on cpu=%d\n",cpu,smp_processor_id());
+	printk("migration_task %d on cpu=%d\n", cpu, smp_processor_id());
 	ret = setscheduler(0, SCHED_FIFO, &param);
 
 	rq = this_rq();
@@ -1790,4 +1847,4 @@ void __init migration_init(void)
 		while (!cpu_rq(cpu_logical_map(cpu))->migration_thread)
 			schedule_timeout(2);
 }
-#endif
+#endif /* CONFIG_SMP */

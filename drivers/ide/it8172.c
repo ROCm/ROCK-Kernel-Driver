@@ -45,21 +45,11 @@
 #include "ata-timing.h"
 #include "pcihost.h"
 
-/*
- * Prototypes
- */
-static void it8172_tune_drive (struct ata_device *drive, byte pio);
-#if defined(CONFIG_BLK_DEV_IDEDMA) && defined(CONFIG_IT8172_TUNING)
-static byte it8172_dma_2_pio (byte xfer_rate);
-static int it8172_tune_chipset (struct ata_device *drive, byte speed);
-static int it8172_config_chipset_for_dma (struct ata_device *drive);
-static int it8172_dmaproc(ide_dma_action_t func, struct ata_device *drive);
-#endif
-void __init ide_init_it8172(struct ata_channel *channel);
 
-
-static void it8172_tune_drive (struct ata_device *drive, byte pio)
+/* FIXME: fix locking  --bkz */
+static void it8172_tune_drive (struct ata_device *drive, u8 pio)
 {
+	struct pci_dev *dev = drive->channel->pci_dev;
     unsigned long flags;
     u16 drive_enables;
     u32 drive_timing;
@@ -70,8 +60,8 @@ static void it8172_tune_drive (struct ata_device *drive, byte pio)
 	else
 		pio = min_t(byte, pio, 4);
 
-    pci_read_config_word(drive->channel->pci_dev, master_port, &master_data);
-    pci_read_config_dword(drive->channel->pci_dev, slave_port, &slave_data);
+	pci_read_config_word(dev, master_port, &master_data);
+	pci_read_config_dword(dev, slave_port, &slave_data);
 
     /*
      * FIX! The DIOR/DIOW pulse width and recovery times in port 0x44
@@ -102,7 +92,7 @@ static void it8172_tune_drive (struct ata_device *drive, byte pio)
 
     save_flags(flags);
     cli();
-    pci_write_config_word(drive->channel->pci_dev, master_port, master_data);
+	pci_write_config_word(dev, master_port, master_data);
     restore_flags(flags);
 }
 
@@ -110,7 +100,7 @@ static void it8172_tune_drive (struct ata_device *drive, byte pio)
 /*
  *
  */
-static byte it8172_dma_2_pio (byte xfer_rate)
+static u8 it8172_dma_2_pio(u8 xfer_rate)
 {
     switch(xfer_rate) {
     case XFER_UDMA_5:
@@ -139,7 +129,7 @@ static byte it8172_dma_2_pio (byte xfer_rate)
     }
 }
 
-static int it8172_tune_chipset (struct ata_device *drive, byte speed)
+static int it8172_tune_chipset(struct ata_device *drive, u8 speed)
 {
     struct ata_channel *hwif = drive->channel;
     struct pci_dev *dev	= hwif->pci_dev;
@@ -147,7 +137,7 @@ static int it8172_tune_chipset (struct ata_device *drive, byte speed)
     int u_flag		= 1 << drive->dn;
     int u_speed		= 0;
     int err		= 0;
-    byte reg48, reg4a;
+	u8 reg48, reg4a;
 
     pci_read_config_byte(dev, 0x48, &reg48);
     pci_read_config_byte(dev, 0x4a, &reg4a);
@@ -187,52 +177,28 @@ static int it8172_tune_chipset (struct ata_device *drive, byte speed)
 
     it8172_tune_drive(drive, it8172_dma_2_pio(speed));
 
-    err = ide_config_drive_speed(drive, speed);
-    drive->current_speed = speed;
-    return err;
+	return ide_config_drive_speed(drive, speed);
 }
 
-static int it8172_config_chipset_for_dma(struct ata_device *drive)
+static int it8172_udma_setup(struct ata_device *drive)
 {
-    struct hd_driveid *id = drive->id;
-    byte speed;
+	u8 speed = ata_timing_mode(drive, XFER_PIO | XFER_EPIO |
+				   XFER_SWDMA | XFER_MWDMA | XFER_UDMA);
 
-    speed = ata_timing_mode(drive, XFER_PIO | XFER_EPIO | XFER_SWDMA | XFER_MWDMA | XFER_UDMA);
-
-    (void) it8172_tune_chipset(drive, speed);
-
-    return ((int)((id->dma_ultra >> 11) & 7) ? ide_dma_on :
-	    ((id->dma_ultra >> 8) & 7) ? ide_dma_on :
-	    ((id->dma_mword >> 8) & 7) ? ide_dma_on :
-	    ((id->dma_1word >> 8) & 7) ? ide_dma_on :
-	    ide_dma_off_quietly);
+	return !it8172_tune_chipset(drive, speed);
 }
-
-static int it8172_dmaproc(ide_dma_action_t func, struct ata_device *drive)
-{
-    switch (func) {
-    case ide_dma_check:
-	return ide_dmaproc((ide_dma_action_t)it8172_config_chipset_for_dma(drive),
-			   drive);
-    default :
-	break;
-    }
-    /* Other cases are done by generic IDE-DMA code. */
-    return ide_dmaproc(func, drive);
-}
-
 #endif /* defined(CONFIG_BLK_DEV_IDEDMA) && (CONFIG_IT8172_TUNING) */
 
 
-static unsigned int __init pci_init_it8172 (struct pci_dev *dev)
+static unsigned int __init pci_init_it8172(struct pci_dev *dev)
 {
-    unsigned char progif;
+	u8 progif;
 
     /*
      * Place both IDE interfaces into PCI "native" mode
      */
-    (void)pci_read_config_byte(dev, PCI_CLASS_PROG, &progif);
-    (void)pci_write_config_byte(dev, PCI_CLASS_PROG, progif | 0x05);
+	pci_read_config_byte(dev, PCI_CLASS_PROG, &progif);
+	pci_write_config_byte(dev, PCI_CLASS_PROG, progif | 0x05);
 
     return IT8172_IDE_IRQ;
 }

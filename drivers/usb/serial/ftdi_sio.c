@@ -120,7 +120,7 @@
 #define DRIVER_AUTHOR "Greg Kroah-Hartman <greg@kroah.com>, Bill Ryder <bryder@sgi.com>"
 #define DRIVER_DESC "USB FTDI RS232 Converters Driver"
 
-static __devinitdata struct usb_device_id id_table_sio [] = {
+static struct usb_device_id id_table_sio [] = {
 	{ USB_DEVICE(FTDI_VID, FTDI_SIO_PID) },
 	{ }						/* Terminating entry */
 };
@@ -133,7 +133,7 @@ static __devinitdata struct usb_device_id id_table_sio [] = {
   */
 
    
-static __devinitdata struct usb_device_id id_table_8U232AM [] = {
+static struct usb_device_id id_table_8U232AM [] = {
 	{ USB_DEVICE(FTDI_VID, FTDI_8U232AM_PID) },
 	{ USB_DEVICE(FTDI_NF_RIC_VID, FTDI_NF_RIC_PID) },
 	{ }						/* Terminating entry */
@@ -189,7 +189,7 @@ static struct usb_serial_device_type ftdi_sio_device = {
 	ioctl:			ftdi_sio_ioctl,
 	set_termios:		ftdi_sio_set_termios,
 	break_ctl:		ftdi_sio_break_ctl,
-	startup:		ftdi_sio_startup,
+	attach:			ftdi_sio_startup,
         shutdown:               ftdi_sio_shutdown,
 };
 
@@ -210,7 +210,7 @@ static struct usb_serial_device_type ftdi_8U232AM_device = {
 	ioctl:			ftdi_sio_ioctl,
 	set_termios:		ftdi_sio_set_termios,
 	break_ctl:		ftdi_sio_break_ctl,
-	startup:		ftdi_8U232AM_startup,
+	attach:			ftdi_8U232AM_startup,
         shutdown:               ftdi_sio_shutdown,
 };
 

@@ -521,7 +521,7 @@ static int	stl_readproc(char *page, char **start, off_t off, int count, int *eof
 static int	stl_brdinit(stlbrd_t *brdp);
 static int	stl_initports(stlbrd_t *brdp, stlpanel_t *panelp);
 static int	stl_mapirq(int irq, char *name);
-static void	stl_getserial(stlport_t *portp, struct serial_struct *sp);
+static int	stl_getserial(stlport_t *portp, struct serial_struct *sp);
 static int	stl_setserial(stlport_t *portp, struct serial_struct *sp);
 static int	stl_getbrdstats(combrd_t *bp);
 static int	stl_getportstats(stlport_t *portp, comstats_t *cp);
@@ -1332,7 +1332,8 @@ static int stl_write(struct tty_struct *tty, int from_user, const unsigned char 
 		count = MIN(len, count);
 		
 		down(&stl_tmpwritesem);
-		copy_from_user(stl_tmpwritebuf, chbuf, count);
+		if (copy_from_user(stl_tmpwritebuf, chbuf, count)) 
+			return -EFAULT;
 		chbuf = &stl_tmpwritebuf[0];
 	}
 
@@ -1504,7 +1505,7 @@ static int stl_charsinbuffer(struct tty_struct *tty)
  *	Generate the serial struct info.
  */
 
-static void stl_getserial(stlport_t *portp, struct serial_struct *sp)
+static int stl_getserial(stlport_t *portp, struct serial_struct *sp)
 {
 	struct serial_struct	sio;
 	stlbrd_t		*brdp;
@@ -1534,7 +1535,7 @@ static void stl_getserial(stlport_t *portp, struct serial_struct *sp)
 	if (brdp != (stlbrd_t *) NULL)
 		sio.irq = brdp->irq;
 
-	copy_to_user(sp, &sio, sizeof(struct serial_struct));
+	return copy_to_user(sp, &sio, sizeof(struct serial_struct)) ? -EFAULT : 0;
 }
 
 /*****************************************************************************/
@@ -1648,7 +1649,7 @@ static int stl_ioctl(struct tty_struct *tty, struct file *file, unsigned int cmd
 	case TIOCGSERIAL:
 		if ((rc = verify_area(VERIFY_WRITE, (void *) arg,
 		    sizeof(struct serial_struct))) == 0)
-			stl_getserial(portp, (struct serial_struct *) arg);
+			rc = stl_getserial(portp, (struct serial_struct *) arg);
 		break;
 	case TIOCSSERIAL:
 		if ((rc = verify_area(VERIFY_READ, (void *) arg,

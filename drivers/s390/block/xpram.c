@@ -84,8 +84,6 @@ int xpram_major;   /* must be declared before including blk.h */
 devfs_handle_t xpram_devfs_handle;
 
 #define DEVICE_NR(device) MINOR(device)   /* xpram has no partition bits */
-#define DEVICE_NAME "xpram"               /* name for messaging */
-#define DEVICE_INTR xpram_intrptr         /* pointer to the bottom half */
 #define DEVICE_NO_RANDOM                  /* no entropy to contribute */
 #define DEVICE_OFF(d)                     /* do-nothing */
 
@@ -158,7 +156,6 @@ MODULE_PARM_DESC(sizes, "list of device (partition) sizes " \
 /* The following items are obtained through kmalloc() in init_module() */
 
 Xpram_Dev *xpram_devices = NULL;
-int *xpram_hardsects = NULL;
 int *xpram_offsets = NULL;   /* partition offsets */
 
 #define MIN(x,y) ((x) < (y) ? (x) : (y))
@@ -684,10 +681,8 @@ void xpram_request(request_queue_t * queue)
         struct request * current_req;      /* working request */
 
 	while(1) {
-		if (blk_queue_empty(QUEUE)) {
-			CLEAR_INTR;
+		if (blk_queue_empty(QUEUE))
 			return;
-		}
 
 		fault=0;
 		current_req = CURRENT;
@@ -697,7 +692,7 @@ void xpram_request(request_queue_t * queue)
 			static int count = 0;
 			if (count++ < 5) /* print the message at most five times */
 				PRINT_WARN(" request for unknown device\n");
-			end_request(0);
+			end_request(CURRENT, 0);
 			continue;
 		}
 
@@ -707,7 +702,7 @@ void xpram_request(request_queue_t * queue)
                 /* does request exceed size of device ? */
 		if ( XPRAM_SEC2KB(sects_to_copy) > xpram_sizes[dev_no] ) {
 			PRINT_WARN(" request past end of device\n");
-			end_request(0);
+			end_request(CURRENT, 0);
 			continue;
 		}
 
@@ -721,20 +716,20 @@ void xpram_request(request_queue_t * queue)
                 if ( current_req->sector &  (XPRAM_SEC_IN_PG - 1) ) {
 			PRINT_WARN(" request does not start at an expanded storage page boundery\n");
 			PRINT_WARN(" referenced sector: %ld\n",current_req->sector);
-			end_request(0);
+			end_request(CURRENT, 0);
 			continue;
 		}
 		/* Does request refere to partial expanded storage pages? */
                 if ( sects_to_copy & (XPRAM_SEC_IN_PG - 1) ) {
 			PRINT_WARN(" request referes to a partial expanded storage page\n");
-			end_request(0);
+			end_request(CURRENT, 0);
 			continue;
 		}
 #endif /*  XPRAM_SEC_IN_PG != 1 */
 		/* Is request buffer aligned with kernel pages? */
 		if ( ((unsigned long)buffer) & (XPRAM_PGSIZE-1) ) {
 			PRINT_WARN(" request buffer is not aligned with kernel pages\n");
-			end_request(0);
+			end_request(CURRENT, 0);
 			continue;
 		}
 
@@ -772,11 +767,11 @@ void xpram_request(request_queue_t * queue)
 			break;
 		default:
 			/* can't happen */
-			end_request(0);
+			end_request(CURRENT, 0);
 			continue;
 		}
-		if ( fault ) end_request(0);
-		else end_request(1); /* success */
+		if ( fault ) end_request(CURRENT, 0);
+		else end_request(CURRENT, 1); /* success */
 	}
 }
 
@@ -939,6 +934,7 @@ int xpram_init(void)
 
 	q = BLK_DEFAULT_QUEUE(major);
 	blk_init_queue (q, xpram_request);
+	blk_queue_hardsect_size(q, xpram_hardsect);
 
 	/* we want to have XPRAM_UNUSED blocks security buffer between devices */
 	mem_usable=xpram_mem_avail-(XPRAM_UNUSED*(xpram_devs-1));
@@ -978,16 +974,6 @@ int xpram_init(void)
 		PRINT_DEBUG(" device(%d) offset = %d kB, size = %d kB\n",i, xpram_offsets[i], xpram_sizes[i]);
 #endif
 
-	xpram_hardsects = kmalloc(xpram_devs * sizeof(int), GFP_KERNEL);
-	if (!xpram_hardsects) {
-		PRINT_ERR("Not enough memory for xpram_hardsects\n");
-                PRINT_ERR("Giving up xpram\n");
-		goto fail_malloc_hardsects;
-	}
-	for (i=0; i < xpram_devs; i++) /* all the same hardsect */
-		xpram_hardsects[i] = xpram_hardsect;
-	hardsect_size[major]=xpram_hardsects;
-   
 	/* 
 	 * allocate the devices -- we can't have them static, as the number
 	 * can be specified at load time
@@ -1040,7 +1026,6 @@ int xpram_init(void)
 		  goto fail_devfs_register;
 		}
 #endif  /* WHY? */
-				 
 	}
 
 	return 0; /* succeed */
@@ -1053,10 +1038,7 @@ int xpram_init(void)
 	}
 	kfree(xpram_devices);
 	kfree (xpram_offsets);
- fail_malloc_hardsects:
  fail_malloc_devices:
-	kfree(xpram_hardsects);
-	hardsect_size[major] = NULL;
  fail_malloc:
 	/* ???	unregister_chrdev(major, "xpram"); */
 	unregister_blkdev(major, "xpram");
@@ -1086,7 +1068,6 @@ void cleanup_module(void)
 	int i;
 
 	/* first of all, reset all the data structures */
-	kfree(hardsect_size[major]);
 	kfree(xpram_offsets);
 	blk_clear(major);
 

@@ -213,6 +213,7 @@ void ide_setup_ports(hw_regs_t *hw,
 
 /* Currently only m68k, apus and m8xx need it */
 #ifdef ATA_ARCH_ACK_INTR
+extern int ide_irq_lock;
 # define ide_ack_intr(hwif) (hwif->hw.ack_intr ? hwif->hw.ack_intr(hwif) : 1)
 #else
 # define ide_ack_intr(hwif) (1)
@@ -356,7 +357,7 @@ struct ata_device {
 	byte		queue_depth;	/* max queue depth */
 	unsigned int	failures;	/* current failure count */
 	unsigned int	max_failures;	/* maximum allowed failure count */
-	struct device	device;		/* global device tree handle */
+	struct device	dev;		/* global device tree handle */
 
 	/*
 	 * tcq statistics
@@ -458,9 +459,9 @@ struct ata_channel {
 	int (*udma_setup)(struct ata_device *);
 
 	void (*udma_enable)(struct ata_device *, int, int);
-	int (*udma_start) (struct ata_device *, struct request *rq);
+	void (*udma_start) (struct ata_device *, struct request *);
 	int (*udma_stop) (struct ata_device *);
-	int (*udma_init) (struct ata_device *, struct request *rq);
+	int (*udma_init) (struct ata_device *, struct request *);
 	int (*udma_irq_status) (struct ata_device *);
 	void (*udma_timeout) (struct ata_device *);
 	void (*udma_irq_lost) (struct ata_device *);
@@ -598,28 +599,20 @@ extern int noautodma;
  */
 #define IDE_DRIVER		/* Toggle some magic bits in blk.h */
 #define LOCAL_END_REQUEST	/* Don't generate end_request in blk.h */
+#define DEVICE_NR(device)	(minor(device) >> PARTN_BITS)
 #include <linux/blk.h>
 
-extern int __ide_end_request(struct ata_device *, struct request *, int, unsigned int);
-extern int ide_end_request(struct ata_device *drive, struct request *, int);
+/* Not locking and locking variant: */
+extern int __ata_end_request(struct ata_device *, struct request *, int, unsigned int);
+extern int ata_end_request(struct ata_device *drive, struct request *, int);
 
-/*
- * This is used on exit from the driver, to designate the next irq handler
- * and also to start the safety timer.
- */
-extern void ide_set_handler(struct ata_device *drive, ata_handler_t handler,
+extern void ata_set_handler(struct ata_device *drive, ata_handler_t handler,
 		unsigned long timeout, ata_expiry_t expiry);
 
 extern u8 ata_dump(struct ata_device *, struct request *, const char *);
 extern ide_startstop_t ata_error(struct ata_device *, struct request *rq, const char *);
 
 extern void ide_fixstring(char *s, const int bytecount, const int byteswap);
-
-extern int ide_wait_stat(ide_startstop_t *,
-		struct ata_device *, struct request *rq,
-		byte, byte, unsigned long);
-
-extern int ide_wait_noerr(struct ata_device *, byte, byte, unsigned long);
 
 /*
  * This routine is called from the partition-table code in genhd.c
@@ -659,14 +652,11 @@ struct ata_taskfile {
 	struct hd_drive_task_hdr  hobfile;
 	u8 cmd;					/* actual ATA command */
 	int command_type;
-	ide_startstop_t (*handler)(struct ata_device *, struct request *);
+	ide_startstop_t (*XXX_handler)(struct ata_device *, struct request *);
 };
 
 extern void ata_read(struct ata_device *, void *, unsigned int);
 extern void ata_write(struct ata_device *, void *, unsigned int);
-
-extern ide_startstop_t ata_taskfile(struct ata_device *,
-	struct ata_taskfile *, struct request *);
 
 /*
  * Special Flagged Register Validation Caller
@@ -690,8 +680,7 @@ static inline void ide_unmap_rq(struct request *rq, char *to,
 		bio_kunmap_irq(to, flags);
 }
 
-extern ide_startstop_t ata_special_intr(struct ata_device *, struct request *);
-extern int ide_raw_taskfile(struct ata_device *, struct ata_taskfile *);
+extern int ide_raw_taskfile(struct ata_device *, struct ata_taskfile *, char *);
 
 extern void ide_fix_driveid(struct hd_driveid *id);
 extern int ide_config_drive_speed(struct ata_device *, byte);
@@ -759,9 +748,9 @@ static inline void udma_enable(struct ata_device *drive, int on, int verbose)
 	drive->channel->udma_enable(drive, on, verbose);
 }
 
-static inline int udma_start(struct ata_device *drive, struct request *rq)
+static inline void udma_start(struct ata_device *drive, struct request *rq)
 {
-	return drive->channel->udma_start(drive, rq);
+	drive->channel->udma_start(drive, rq);
 }
 
 static inline int udma_stop(struct ata_device *drive)
@@ -772,7 +761,7 @@ static inline int udma_stop(struct ata_device *drive)
 /*
  * Initiate actual DMA data transfer. The direction is encoded in the request.
  */
-static inline int udma_init(struct ata_device *drive, struct request *rq)
+static inline ide_startstop_t udma_init(struct ata_device *drive, struct request *rq)
 {
 	return drive->channel->udma_init(drive, rq);
 }
@@ -795,7 +784,7 @@ static inline void udma_irq_lost(struct ata_device *drive)
 #ifdef CONFIG_BLK_DEV_IDEDMA
 
 extern void udma_pci_enable(struct ata_device *drive, int on, int verbose);
-extern int udma_pci_start(struct ata_device *drive, struct request *rq);
+extern void udma_pci_start(struct ata_device *drive, struct request *rq);
 extern int udma_pci_stop(struct ata_device *drive);
 extern int udma_pci_init(struct ata_device *drive, struct request *rq);
 extern int udma_pci_irq_status(struct ata_device *drive);
@@ -810,7 +799,7 @@ extern void udma_print(struct ata_device *);
 extern int udma_black_list(struct ata_device *);
 extern int udma_white_list(struct ata_device *);
 
-extern ide_startstop_t udma_tcq_taskfile(struct ata_device *, struct request *);
+extern ide_startstop_t udma_tcq_init(struct ata_device *, struct request *);
 extern int udma_tcq_enable(struct ata_device *, int);
 
 extern ide_startstop_t ide_dma_intr(struct ata_device *, struct request *);
@@ -834,7 +823,11 @@ extern int drive_is_ready(struct ata_device *drive);
 
 extern void ata_select(struct ata_device *, unsigned long);
 extern void ata_mask(struct ata_device *);
+extern int ata_busy_poll(struct ata_device *, unsigned long);
 extern int ata_status(struct ata_device *, u8, u8);
+extern int ata_status_poll( struct ata_device *, u8, u8,
+		unsigned long, struct request *rq, ide_startstop_t *);
+
 extern int ata_irq_enable(struct ata_device *, int);
 extern void ata_reset(struct ata_channel *);
 extern void ata_out_regfile(struct ata_device *, struct hd_drive_task_hdr *);

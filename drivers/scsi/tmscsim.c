@@ -228,7 +228,6 @@
 
 #include "scsi.h"
 #include "hosts.h"
-#include "constants.h"
 #include "sd.h"
 #include <linux/stat.h>
 #include <scsi/scsicam.h>
@@ -253,8 +252,6 @@
  * level 1: rely on the locking of the mid level code (io_request_lock)
  * undef  : traditional save_flags; cli; restore_flags;
  */
-
-//#define DEBUG_SPINLOCKS 2	/* Set to 0, 1 or 2 in include/linux/spinlock.h */
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,30)
 # include <linux/init.h>
@@ -293,7 +290,7 @@ MODULE_DEVICE_TABLE(pci, tmscsim_pci_tbl);
 
 # if USE_SPINLOCKS == 3 /* both */
 
-#  if defined (CONFIG_SMP) || DEBUG_SPINLOCKS > 0
+#  if defined (CONFIG_SMP)
 #   define DC390_LOCKA_INIT { spinlock_t __unlocked = SPIN_LOCK_UNLOCKED; pACB->lock = __unlocked; };
 #  else
 #   define DC390_LOCKA_INIT
@@ -322,7 +319,7 @@ MODULE_DEVICE_TABLE(pci, tmscsim_pci_tbl);
 
 #  if USE_SPINLOCKS == 2 /* adapter specific locks */
 
-#   if defined (CONFIG_SMP) || DEBUG_SPINLOCKS > 0
+#   if defined (CONFIG_SMP)
 #    define DC390_LOCKA_INIT { spinlock_t __unlocked = SPIN_LOCK_UNLOCKED; pACB->lock = __unlocked; };
 #   else
 #    define DC390_LOCKA_INIT

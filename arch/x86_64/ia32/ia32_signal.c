@@ -241,7 +241,7 @@ asmlinkage int sys32_sigreturn(struct pt_regs regs)
 	return eax;
 
 badframe:
-	force_sig(SIGSEGV, current);
+	signal_fault(&regs, frame, "32bit sigreturn"); 
 	return 0;
 }	
 
@@ -280,7 +280,7 @@ asmlinkage int sys32_rt_sigreturn(struct pt_regs regs)
 	return eax;
 
 badframe:
-	force_sig(SIGSEGV, current);
+	signal_fault(&regs, frame, "32bit rt sigreturn"); 
 	return 0;
 }	
 
@@ -420,7 +420,7 @@ void ia32_setup_frame(int sig, struct k_sigaction *ka,
 give_sigsegv:
 	if (sig == SIGSEGV)
 		ka->sa.sa_handler = SIG_DFL;
-	force_sig(SIGSEGV, current);
+	signal_fault(regs,frame,"32bit signal setup"); 
 }
 
 void ia32_setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
@@ -493,6 +493,6 @@ void ia32_setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 give_sigsegv:
 	if (sig == SIGSEGV)
 		ka->sa.sa_handler = SIG_DFL;
-	force_sig(SIGSEGV, current);
+	signal_fault(regs, frame, "32bit rt signal setup"); 
 }
 

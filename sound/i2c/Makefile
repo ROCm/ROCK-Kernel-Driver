@@ -3,8 +3,6 @@
 # Copyright (c) 2001 by Jaroslav Kysela <perex@suse.cz>
 #
 
-mod-subdirs := l3
-
 export-objs  := i2c.o cs8427.o tea6330t.o
 
 snd-i2c-objs := i2c.o

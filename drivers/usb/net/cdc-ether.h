@@ -43,7 +43,7 @@
 #define	CDC_ETHER_REQ_GET_REGS	0xf0
 #define	CDC_ETHER_REQ_SET_REGS	0xf1
 #define	CDC_ETHER_REQ_SET_REG	PIPERIDER_REQ_SET_REGS
-#define	ALIGN(x)		x __attribute__((aligned(L1_CACHE_BYTES)))
+#define	L1_ALIGN(x)		x __attribute__((aligned(L1_CACHE_BYTES)))
 
 #define MODE_FLAG_PROMISCUOUS   (1<<0)
 #define MODE_FLAG_ALL_MULTICAST (1<<1)
@@ -84,9 +84,9 @@ typedef struct _ether_dev_t {
 	__u8			bNumberPowerFilters;
 	int			intr_interval;
 	struct urb		*rx_urb, *tx_urb, *intr_urb;
-	unsigned char		ALIGN(rx_buff[CDC_ETHER_MAX_MTU]);
-	unsigned char		ALIGN(tx_buff[CDC_ETHER_MAX_MTU]);
-	unsigned char		ALIGN(intr_buff[8]);
+	unsigned char		L1_ALIGN(rx_buff[CDC_ETHER_MAX_MTU]);
+	unsigned char		L1_ALIGN(tx_buff[CDC_ETHER_MAX_MTU]);
+	unsigned char		L1_ALIGN(intr_buff[8]);
 } ether_dev_t;
 
 #define REQ_HDR_FUNC_DESCR	0x0001

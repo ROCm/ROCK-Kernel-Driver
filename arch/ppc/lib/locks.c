@@ -16,7 +16,7 @@
 #include <asm/system.h>
 #include <asm/io.h>
 
-#ifdef SPINLOCK_DEBUG
+#ifdef CONFIG_DEBUG_SPINLOCK
 
 #undef INIT_STUCK
 #define INIT_STUCK 200000000 /*0xffffffff*/

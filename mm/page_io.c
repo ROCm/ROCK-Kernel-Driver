@@ -116,8 +116,10 @@ void rw_swap_page_nolock(int rw, swp_entry_t entry, char *buf)
 		PAGE_BUG(page);
 	/* needs sync_page to wait I/O completation */
 	page->mapping = &swapper_space;
-	if (!rw_swap_page_base(rw, entry, page))
-		unlock_page(page);
-	wait_on_page_locked(page);
+	if (rw_swap_page_base(rw, entry, page))
+		lock_page(page);
+	if (page_has_buffers(page) && !try_to_free_buffers(page))
+		PAGE_BUG(page);
 	page->mapping = NULL;
+	unlock_page(page);
 }

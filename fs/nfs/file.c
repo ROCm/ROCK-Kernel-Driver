@@ -272,7 +272,7 @@ nfs_lock(struct file *filp, int cmd, struct file_lock *fl)
 	 * Not sure whether that would be unique, though, or whether
 	 * that would break in other places.
 	 */
-	if (!fl->fl_owner || (fl->fl_flags & (FL_POSIX|FL_BROKEN)) != FL_POSIX)
+	if (!fl->fl_owner || (fl->fl_flags & FL_POSIX) != FL_POSIX)
 		return -ENOLCK;
 
 	/*
