@@ -16,6 +16,8 @@
 
 struct path;
 
+struct block_device *dm_path_to_bdev(struct path *path);
+
 /*
  * We provide an abstraction for the code that chooses which path
  * to send some io down.
@@ -31,6 +33,22 @@ struct path_selector {
  */
 typedef int (*ps_ctr_fn) (struct path_selector *ps);
 typedef void (*ps_dtr_fn) (struct path_selector *ps);
+
+/*
+ * Allows the ps to initialize itself. It should return one
+ * of the following return values. iif DM_PS_INITIALIZING is
+ * returned the path-selector must call dm_ps_init_complete
+ * when the initializtion has completed.
+ */
+enum {
+	DM_PS_SUCCESS,
+	DM_PS_FAILED,
+	DM_PS_INITIALIZING,
+};
+
+void dm_ps_init_complete(struct path_selector *ps);
+
+typedef int (*ps_init_fn) (struct path_selector *ps);
 
 /*
  * Add an opaque path object, along with some selector specific
@@ -49,13 +67,11 @@ typedef	int (*ps_add_path_fn) (struct path_selector *ps,
  * reused or reallocated because an endio call (which needs to free it)
  * might happen after a couple of select calls.
  */
-typedef	struct path *(*ps_select_path_fn) (struct path_selector *ps);
-
-/*
- * Notify the selector that a path has failed.
- */
-typedef	void (*ps_fail_path_fn) (struct path_selector *ps,
-				 struct path *p);
+typedef	struct path *(*ps_select_path_fn) (struct path_selector *ps,
+					   struct bio *bio,
+					   union map_info *info);
+typedef void (*ps_end_io) (struct path_selector *ps, struct bio *bio,
+			   int error, union map_info *info);
 
 /*
  * Table content based on parameters added in ps_add_path_fn
@@ -69,14 +85,17 @@ typedef	int (*ps_status_fn) (struct path_selector *ps,
 /* Information about a path selector type */
 struct path_selector_type {
 	char *name;
+	struct module *module;
+
 	unsigned int table_args;
 	unsigned int info_args;
 	ps_ctr_fn ctr;
 	ps_dtr_fn dtr;
+	ps_init_fn init;
 
 	ps_add_path_fn add_path;
-	ps_fail_path_fn fail_path;
 	ps_select_path_fn select_path;
+	ps_end_io end_io;
 	ps_status_fn status;
 };
 

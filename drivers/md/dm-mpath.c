@@ -17,24 +17,8 @@
 #include <linux/slab.h>
 #include <linux/time.h>
 #include <linux/workqueue.h>
+#include <linux/completion.h>
 #include <asm/atomic.h>
-
-/* FIXME: get rid of this */
-#define MPATH_FAIL_COUNT	1
-
-/*
- * We don't want to call the path selector for every single io
- * that comes through, so instead we only consider changing paths
- * every MPATH_MIN_IO ios.  This number should be selected to be
- * big enough that we can reduce the overhead of the path
- * selector, but also small enough that we don't take the policy
- * decision away from the path selector.
- *
- * So people should _not_ be tuning this number to try and get
- * the most performance from some particular type of hardware.
- * All the smarts should be going into the path selector.
- */
-#define MPATH_MIN_IO		1000
 
 /* Path properties */
 struct path {
@@ -42,35 +26,37 @@ struct path {
 
 	struct dm_dev *dev;
 	struct priority_group *pg;
-
-	spinlock_t failed_lock;
-	int has_failed;
-	unsigned fail_count;
 };
+
+inline struct block_device *dm_path_to_bdev(struct path *path)
+{
+	return path->dev->bdev;
+}
 
 struct priority_group {
 	struct list_head list;
 
 	struct multipath *m;
-	struct path_selector *ps;
+	struct path_selector ps;
 
 	unsigned nr_paths;
 	struct list_head paths;
 };
+
+#define ps_to_pg(__ps) container_of((__ps), struct priority_group, ps)
 
 /* Multipath context */
 struct multipath {
 	struct list_head list;
 	struct dm_target *ti;
 
+	spinlock_t lock;
+
 	unsigned nr_priority_groups;
 	struct list_head priority_groups;
-
-	spinlock_t lock;
-	unsigned nr_valid_paths;
-
-	struct path *current_path;
-	unsigned current_count;
+	int initializing_pg;
+	struct completion init_pg_wait;
+	struct priority_group *current_pg;
 
 	struct work_struct dispatch_failed;
 	struct bio_list failed_ios;
@@ -78,19 +64,20 @@ struct multipath {
 	struct work_struct trigger_event;
 
 	/*
-	 * We must use a mempool of mpath_io structs so that we
+	 * We must use a mempool of mp_io structs so that we
 	 * can resubmit bios on error.
 	 */
-	mempool_t *details_pool;
+	mempool_t *mpio_pool;
 };
 
 struct mpath_io {
 	struct path *path;
+	union map_info info;
 	struct dm_bio_details details;
 };
 
 #define MIN_IOS 256
-static kmem_cache_t *_details_cache;
+static kmem_cache_t *_mpio_cache;
 
 static void dispatch_failed_ios(void *data);
 static void trigger_event(void *data);
@@ -99,12 +86,8 @@ static struct path *alloc_path(void)
 {
 	struct path *path = kmalloc(sizeof(*path), GFP_KERNEL);
 
-	if (path) {
+	if (path)
 		memset(path, 0, sizeof(*path));
-		path->failed_lock = SPIN_LOCK_UNLOCKED;
-		path->fail_count = MPATH_FAIL_COUNT;
-	}
-
 	return path;
 }
 
@@ -121,13 +104,7 @@ static struct priority_group *alloc_priority_group(void)
 	if (!pg)
 		return NULL;
 
-	pg->ps = kmalloc(sizeof(*pg->ps), GFP_KERNEL);
-	if (!pg->ps) {
-		kfree(pg);
-		return NULL;
-	}
-	memset(pg->ps, 0, sizeof(*pg->ps));
-
+	memset(pg, 0, sizeof(*pg));
 	INIT_LIST_HEAD(&pg->paths);
 
 	return pg;
@@ -147,14 +124,11 @@ static void free_paths(struct list_head *paths, struct dm_target *ti)
 static void free_priority_group(struct priority_group *pg,
 				struct dm_target *ti)
 {
-	struct path_selector *ps = pg->ps;
+	struct path_selector *ps = &pg->ps;
 
-	if (ps) {
-		if (ps->type) {
-			ps->type->dtr(ps);
-			dm_put_path_selector(ps->type);
-		}
-		kfree(ps);
+	if (ps->type) {
+		ps->type->dtr(ps);
+		dm_put_path_selector(ps->type);
 	}
 
 	free_paths(&pg->paths, ti);
@@ -169,12 +143,14 @@ static struct multipath *alloc_multipath(void)
 	if (m) {
 		memset(m, 0, sizeof(*m));
 		INIT_LIST_HEAD(&m->priority_groups);
+		init_completion(&m->init_pg_wait);
+		m->initializing_pg = 0;
 		m->lock = SPIN_LOCK_UNLOCKED;
 		INIT_WORK(&m->dispatch_failed, dispatch_failed_ios, m);
 		INIT_WORK(&m->trigger_event, trigger_event, m);
-		m->details_pool = mempool_create(MIN_IOS, mempool_alloc_slab,
-						 mempool_free_slab, _details_cache);
-		if (!m->details_pool) {
+		m->mpio_pool = mempool_create(MIN_IOS, mempool_alloc_slab,
+					      mempool_free_slab, _mpio_cache);
+		if (!m->mpio_pool) {
 			kfree(m);
 			return NULL;
 		}
@@ -192,58 +168,121 @@ static void free_multipath(struct multipath *m)
 		free_priority_group(pg, m->ti);
 	}
 
-	mempool_destroy(m->details_pool);
+	mempool_destroy(m->mpio_pool);
 	kfree(m);
 }
 
-/*-----------------------------------------------------------------
- * The multipath daemon is responsible for resubmitting failed ios.
- *---------------------------------------------------------------*/
-static int __choose_path(struct multipath *m)
+static void __ps_init_complete(struct multipath *m,
+			       struct priority_group *pg)
 {
-	struct priority_group *pg;
-	struct path *path = NULL;
-
-	if (m->nr_valid_paths) {
-		/* loop through the priority groups until we find a valid path. */
-		list_for_each_entry (pg, &m->priority_groups, list) {
-			path = pg->ps->type->select_path(pg->ps);
-			if (path)
-				break;
-		}
-	}
-
-	m->current_path = path;
-	m->current_count = MPATH_MIN_IO;
-
-	return 0;
+	m->initializing_pg = 0;
+	m->current_pg = pg;
+	complete_all(&m->init_pg_wait);
+	schedule_work(&m->dispatch_failed);
 }
 
-static struct path *get_current_path(struct multipath *m)
+void dm_ps_init_complete(struct path_selector *ps)
 {
-	struct path *path;
 	unsigned long flags;
+	struct priority_group *pg = ps_to_pg(ps);
+	struct multipath *m = pg->m;
 
 	spin_lock_irqsave(&m->lock, flags);
-
-	/* Do we need to select a new path? */
-	if (!m->current_path || --m->current_count == 0)
-		__choose_path(m);
-
-	path = m->current_path;
-
+	__ps_init_complete(m, pg);
 	spin_unlock_irqrestore(&m->lock, flags);
-
-	return path;
 }
 
-static int map_io(struct multipath *m, struct bio *bio, struct path **chosen)
-{
-	*chosen = get_current_path(m);
-	if (!*chosen)
-		return -EIO;
+EXPORT_SYMBOL(dm_ps_init_complete);
 
-	bio->bi_bdev = (*chosen)->dev->bdev;
+static int select_group(struct multipath *m, struct mpath_io *mpio,
+			struct bio *bio)
+{
+	struct priority_group *pg = NULL;
+	int err;
+
+	m->current_pg = NULL;
+	m->initializing_pg = 1;
+	init_completion(&m->init_pg_wait);
+
+	list_for_each_entry (pg, &m->priority_groups, list) {
+
+		if (pg->ps.type->init) {
+			spin_unlock_irq(&m->lock);
+			err = pg->ps.type->init(&pg->ps);
+			spin_lock_irq(&m->lock);
+
+			if (err == DM_PS_INITIALIZING)
+				return DM_PS_INITIALIZING;
+			else if (err == DM_PS_FAILED)
+				continue;
+		}
+
+		mpio->path = pg->ps.type->select_path(&pg->ps, bio,
+						      &mpio->info);
+		if (mpio->path)
+			break;
+	}
+
+	__ps_init_complete(m, mpio->path ? pg : NULL);
+	return mpio->path ? DM_PS_SUCCESS : DM_PS_FAILED;
+}
+  
+static int select_path1(struct multipath *m, struct mpath_io *mpio,
+		       struct bio *bio, int wait)
+{
+	mpio->path = NULL;
+
+ retest:
+	/*
+	 * completion event, current_pg, initializing_pg and
+	 * in the case of wait=0 adding to the failed_ios list for
+	 * resubmission are protected under the m->lock to avoid races.
+	 */
+	if (unlikely(m->initializing_pg)) {
+		if (!wait)
+			return -EWOULDBLOCK;
+
+		spin_unlock_irq(&m->lock);
+		wait_for_completion(&m->init_pg_wait);
+		spin_lock_irq(&m->lock);
+		goto retest;
+	}
+
+	if (m->current_pg) {
+		struct path_selector *ps = &m->current_pg->ps;
+
+		mpio->path = ps->type->select_path(ps, bio, &mpio->info);
+		if (!mpio->path &&
+		    (select_group(m, mpio, bio) == DM_PS_INITIALIZING))
+			/*
+			 * while the lock was dropped the
+			 * initialization might have completed.
+			 */
+			goto retest;
+	}
+
+	return mpio->path ? 0 : -EIO;
+}
+
+static int map_io(struct multipath *m, struct mpath_io *mpio,
+		  struct bio *bio, int wait)
+{
+	int err;
+
+	spin_lock_irq(&m->lock);
+	err = select_path1(m, mpio, bio, wait);
+	if (err == -EWOULDBLOCK)
+		/*
+		 * when the ps init is completed it will
+		 * remap and submit this bio
+		 */
+		bio_list_add(&m->failed_ios, bio);
+	spin_unlock_irq(&m->lock);
+
+	if (err)
+		return err;
+
+	bio->bi_bdev = mpio->path->dev->bdev;
 	return 0;
 }
 
@@ -259,9 +298,29 @@ static void dispatch_failed_ios(void *data)
 	spin_unlock_irqrestore(&m->lock, flags);
 
 	while (bio) {
+		int err;
+		struct mpath_io *mpio;
+		union map_info *info;
+
 		next = bio->bi_next;
 		bio->bi_next = NULL;
-		generic_make_request(bio);
+
+		info = dm_get_mapinfo(bio);
+		mpio = info->ptr;
+
+		/*
+		 * For -EWOULDBLOCK the bio could not be mapped
+		 * due to a ps initialization. The bio has been
+		 * requeued, and the work will be processed when
+		 * the initialization is completed.
+		 */
+		err = map_io(m, mpio, bio, 0);
+		if (!err)
+			generic_make_request(bio);
+		else if (err != -EWOULDBLOCK)
+			/* no paths left */
+			bio_endio(bio, bio->bi_size, -EIO);
+
 		bio = next;
 	}
 }
@@ -393,13 +452,12 @@ static struct priority_group *parse_priority_group(struct arg_set *as,
 		goto bad;
 	}
 
-	r = pst->ctr(pg->ps);
+	r = pst->ctr(&pg->ps);
 	if (r) {
-		/* FIXME: need to put the pst ? fix after
-		 * factoring out the register */
+		dm_put_path_selector(pst);
 		goto bad;
 	}
-	pg->ps->type = pst;
+	pg->ps.type = pst;
 
 	/*
 	 * read the paths
@@ -423,7 +481,7 @@ static struct priority_group *parse_priority_group(struct arg_set *as,
 		path_args.argc = nr_params;
 		path_args.argv = as->argv;
 
-		path = parse_path(&path_args, pg->ps, ti);
+		path = parse_path(&path_args, &pg->ps, ti);
 		if (!path)
 			goto bad;
 
@@ -471,10 +529,10 @@ static int multipath_ctr(struct dm_target *ti, unsigned int argc,
 		if (!pg)
 			goto bad;
 
-		m->nr_valid_paths += pg->nr_paths;
 		list_add_tail(&pg->list, &m->priority_groups);
 	}
-
+	m->current_pg = list_entry(m->priority_groups.next,
+				   struct priority_group, list);
 	ti->private = m;
 	m->ti = ti;
 
@@ -492,81 +550,48 @@ static void multipath_dtr(struct dm_target *ti)
 }
 
 static int multipath_map(struct dm_target *ti, struct bio *bio,
-			 union map_info *map_context)
+			 union map_info *info)
 {
 	int r;
-	struct mpath_io *io;
+	struct mpath_io *mpio;
 	struct multipath *m = (struct multipath *) ti->private;
 
-	io = mempool_alloc(m->details_pool, GFP_NOIO);
-	dm_bio_record(&io->details, bio);
+	mpio = mempool_alloc(m->mpio_pool, GFP_NOIO);
+	dm_bio_record(&mpio->details, bio);
 
 	bio->bi_rw |= (1 << BIO_RW_FAILFAST);
-	r = map_io(m, bio, &io->path);
-	if (r) {
-		mempool_free(io, m->details_pool);
+	r = map_io(m, mpio, bio, 1);
+	if (unlikely(r)) {
+		mempool_free(mpio, m->mpio_pool);
 		return r;
 	}
 
-	map_context->ptr = io;
+	info->ptr = mpio;
 	return 1;
 }
 
-static void fail_path(struct path *path)
-{
-	unsigned long flags;
-	struct multipath *m;
-
-	spin_lock_irqsave(&path->failed_lock, flags);
-
-	/* FIXME: path->fail_count is brain dead */
-	if (!path->has_failed && !--path->fail_count) {
-		m = path->pg->m;
-
-		path->has_failed = 1;
-		path->pg->ps->type->fail_path(path->pg->ps, path);
-		schedule_work(&m->trigger_event);
-
-		spin_lock(&m->lock);
-		m->nr_valid_paths--;
-
-		if (path == m->current_path)
-			m->current_path = NULL;
-
-		spin_unlock(&m->lock);
-	}
-
-	spin_unlock_irqrestore(&path->failed_lock, flags);
-}
-
 static int do_end_io(struct multipath *m, struct bio *bio,
-		     int error, struct mpath_io *io)
+		     int error, struct mpath_io *mpio)
 {
-	int r;
+	struct path_selector *ps = &mpio->path->pg->ps;
 
+	ps->type->end_io(ps, bio, error, &mpio->info);
 	if (error) {
-		spin_lock(&m->lock);
-		if (!m->nr_valid_paths) {
-			spin_unlock(&m->lock);
-			return -EIO;
-		}
-		spin_unlock(&m->lock);
 
-		fail_path(io->path);
+		dm_bio_restore(&mpio->details, bio);
 
-		/* remap */
-		dm_bio_restore(&io->details, bio);
-		r = map_io(m, bio, &io->path);
-		if (r)
-			/* no paths left */
-			return -EIO;
-
-		/* queue for the daemon to resubmit */
+		/* queue for the daemon to resubmit or fail */
 		spin_lock(&m->lock);
 		bio_list_add(&m->failed_ios, bio);
+		/*
+		 * If a ps is initializing we do not queue the work
+		 * becuase when the ps initialization has completed
+		 * it will queue the dispatch function to be run.
+		 */
+		if (!m->initializing_pg)
+			schedule_work(&m->dispatch_failed);
 		spin_unlock(&m->lock);
 
-		schedule_work(&m->dispatch_failed);
 		return 1;	/* io not complete */
 	}
 
@@ -574,15 +599,26 @@ static int do_end_io(struct multipath *m, struct bio *bio,
 }
 
 static int multipath_end_io(struct dm_target *ti, struct bio *bio,
-			    int error, union map_info *map_context)
+			    int error, union map_info *info)
 {
 	struct multipath *m = (struct multipath *) ti->private;
-	struct mpath_io *io = (struct mpath_io *) map_context->ptr;
+	struct mpath_io *io = (struct mpath_io *) info->ptr;
 	int r;
 
-	r  = do_end_io(m, bio, error, io);
+	/*
+	 * If we report to dm that we are going to retry the
+	 * bio, but that fails due to a pst->init failure
+	 * calling bio_endio from dm-mpath.c will end up
+	 * calling dm-mpath's endio fn, so this test catches
+	 * that case.
+	 */
+	if (io->path)
+		r = do_end_io(m, bio, error, io);
+	else
+		r = -EIO;
+
 	if (r <= 0)
-		mempool_free(io, m->details_pool);
+		mempool_free(io, m->mpio_pool);
 
 	return r;
 }
@@ -598,7 +634,6 @@ static int multipath_status(struct dm_target *ti, status_type_t type,
 			    char *result, unsigned int maxlen)
 {
 	int sz = 0;
-	unsigned long flags;
 	struct multipath *m = (struct multipath *) ti->private;
 	struct priority_group *pg;
 	struct path *p;
@@ -612,16 +647,13 @@ static int multipath_status(struct dm_target *ti, status_type_t type,
 		EMIT("%u ", m->nr_priority_groups);
 
 		list_for_each_entry(pg, &m->priority_groups, list) {
-			EMIT("%u %u ", pg->nr_paths, pg->ps->type->info_args);
+			EMIT("%u %u ", pg->nr_paths, pg->ps.type->info_args);
 
 			list_for_each_entry(p, &pg->paths, list) {
 				format_dev_t(buffer, p->dev->bdev->bd_dev);
-				spin_lock_irqsave(&p->failed_lock, flags);
-				EMIT("%s %s %u ", buffer,
-				     p->has_failed ? "F" : "A", p->fail_count);
-				pg->ps->type->status(pg->ps, p, type,
+				EMIT("%s ", buffer);
+				sz += pg->ps.type->status(&pg->ps, p, type,
 						     result + sz, maxlen - sz);
-				spin_unlock_irqrestore(&p->failed_lock, flags);
 			}
 		}
 		break;
@@ -630,13 +662,13 @@ static int multipath_status(struct dm_target *ti, status_type_t type,
 		EMIT("%u ", m->nr_priority_groups);
 
 		list_for_each_entry(pg, &m->priority_groups, list) {
-			EMIT("%s %u %u ", pg->ps->type->name,
-			     pg->nr_paths, pg->ps->type->table_args);
+			EMIT("%s %u %u ", pg->ps.type->name,
+			     pg->nr_paths, pg->ps.type->table_args);
 
 			list_for_each_entry(p, &pg->paths, list) {
 				format_dev_t(buffer, p->dev->bdev->bd_dev);
 				EMIT("%s ", buffer);
-				pg->ps->type->status(pg->ps, p, type,
+				sz += pg->ps.type->status(&pg->ps, p, type,
 						     result + sz, maxlen - sz);
 
 			}
@@ -661,27 +693,27 @@ static struct target_type multipath_target = {
 	.status = multipath_status,
 };
 
-int __init dm_multipath_init(void)
+static int __init dm_multipath_init(void)
 {
 	int r;
 
 	/* allocate a slab for the dm_ios */
-	_details_cache = kmem_cache_create("dm_mpath", sizeof(struct mpath_io),
-					   0, 0, NULL, NULL);
-	if (!_details_cache)
+	_mpio_cache = kmem_cache_create("dm_mpath", sizeof(struct mpath_io),
+					0, 0, NULL, NULL);
+	if (!_mpio_cache)
 		return -ENOMEM;
 
 	r = dm_register_target(&multipath_target);
 	if (r < 0) {
 		DMERR("%s: register failed %d", multipath_target.name, r);
-		kmem_cache_destroy(_details_cache);
+		kmem_cache_destroy(_mpio_cache);
 		return -EINVAL;
 	}
 
 	r = dm_register_path_selectors();
 	if (r && r != -EEXIST) {
 		dm_unregister_target(&multipath_target);
-		kmem_cache_destroy(_details_cache);
+		kmem_cache_destroy(_mpio_cache);
 		return r;
 	}
 
@@ -689,7 +721,7 @@ int __init dm_multipath_init(void)
 	return r;
 }
 
-void __exit dm_multipath_exit(void)
+static void __exit dm_multipath_exit(void)
 {
 	int r;
 
@@ -698,7 +730,7 @@ void __exit dm_multipath_exit(void)
 	if (r < 0)
 		DMERR("%s: target unregister failed %d",
 		      multipath_target.name, r);
-	kmem_cache_destroy(_details_cache);
+	kmem_cache_destroy(_mpio_cache);
 }
 
 module_init(dm_multipath_init);

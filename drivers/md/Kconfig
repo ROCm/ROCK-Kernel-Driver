@@ -201,10 +201,10 @@ config DM_ZERO
 	  reads.  Useful in some recovery situations.
 
 config DM_MULTIPATH
-       tristate "Multipath target (EXPERIMENTAL)"
-       depends on BLK_DEV_DM && EXPERIMENTAL
-       ---help---
-         Allow volume managers to support multipath hardware.
+	tristate "Multipath target (EXPERIMENTAL)"
+	depends on BLK_DEV_DM && EXPERIMENTAL
+	---help---
+	  Allow volume managers to support multipath hardware.
 
 config DM_FLAKEY
        tristate "Flakey target (EXPERIMENTAL)"
@@ -224,3 +224,4 @@ config BLK_DEV_DM_BBR
 	  If unsure, say N.
 
 endmenu
+

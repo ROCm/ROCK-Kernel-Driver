@@ -141,7 +141,7 @@ int __init dm_flakey_init(void)
 	return r;
 }
 
-void dm_flakey_exit(void)
+void __exit dm_flakey_exit(void)
 {
 	int r = dm_unregister_target(&flakey_target);
 

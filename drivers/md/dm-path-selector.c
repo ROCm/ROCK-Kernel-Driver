@@ -14,11 +14,13 @@
 #include <linux/slab.h>
 
 struct ps_internal {
-	struct path_selector_type pt;
+	struct path_selector_type pst;
 
 	struct list_head list;
 	long use;
 };
+
+#define pst_to_psi(__pst) container_of((__pst), struct ps_internal, pst)
 
 static LIST_HEAD(_path_selectors);
 static DECLARE_MUTEX(_lock);
@@ -28,8 +30,8 @@ struct path_selector_type *__find_path_selector_type(const char *name)
 	struct ps_internal *li;
 
 	list_for_each_entry (li, &_path_selectors, list) {
-		if (!strcmp(name, li->pt.name))
-			return &li->pt;
+		if (!strcmp(name, li->pst.name))
+			return &li->pst;
 	}
 
 	return NULL;
@@ -37,32 +39,42 @@ struct path_selector_type *__find_path_selector_type(const char *name)
 
 struct path_selector_type *dm_get_path_selector(const char *name)
 {
-	struct path_selector_type *lb;
+	struct path_selector_type *pst;
 
 	if (!name)
 		return NULL;
 
 	down(&_lock);
-	lb = __find_path_selector_type(name);
-	if (lb) {
-		struct ps_internal *li = (struct ps_internal *) lb;
-		li->use++;
+	pst = __find_path_selector_type(name);
+	if (pst) {
+		struct ps_internal *psi = pst_to_psi(pst);
+
+		if (psi->use == 0 && !try_module_get(pst->module))
+			psi = NULL;
+		else
+			psi->use++;
 	}
 	up(&_lock);
 
-	return lb;
+	return pst;
 }
 
-void dm_put_path_selector(struct path_selector_type *l)
+void dm_put_path_selector(struct path_selector_type *pst)
 {
-	struct ps_internal *li = (struct ps_internal *) l;
+	struct ps_internal *psi;
 
 	down(&_lock);
-	if (--li->use < 0)
+	pst = __find_path_selector_type(pst->name);
+	if (!pst)
+		return;
+
+	psi = pst_to_psi(pst);
+	if (--psi->use == 0)
+		module_put(psi->pst.module);
+
+	if (psi->use < 0)
 		BUG();
 	up(&_lock);
-
-	return;
 }
 
 static struct ps_internal *_alloc_path_selector(struct path_selector_type *pt)
@@ -71,7 +83,7 @@ static struct ps_internal *_alloc_path_selector(struct path_selector_type *pt)
 
 	if (psi) {
 		memset(psi, 0, sizeof(*psi));
-		memcpy(psi, pt, sizeof(*pt));
+		memcpy(&psi->pst, pt, sizeof(*pt));
 	}
 
 	return psi;
@@ -97,17 +109,20 @@ int dm_register_path_selector(struct path_selector_type *pst)
 	return r;
 }
 
+EXPORT_SYMBOL(dm_register_path_selector);
+
 int dm_unregister_path_selector(struct path_selector_type *pst)
 {
 	struct ps_internal *psi;
 
 	down(&_lock);
-	psi = (struct ps_internal *) __find_path_selector_type(pst->name);
-	if (!psi) {
+	pst = __find_path_selector_type(pst->name);
+	if (!pst) {
 		up(&_lock);
 		return -EINVAL;
 	}
 
+	psi = pst_to_psi(pst);
 	if (psi->use) {
 		up(&_lock);
 		return -ETXTBSY;
@@ -121,12 +136,19 @@ int dm_unregister_path_selector(struct path_selector_type *pst)
 	return 0;
 }
 
+EXPORT_SYMBOL(dm_unregister_path_selector);
+
 /*-----------------------------------------------------------------
  * Path handling code, paths are held in lists
  *---------------------------------------------------------------*/
+
+/* FIXME: get rid of this */
+#define RR_FAIL_COUNT	1
+
 struct path_info {
 	struct list_head list;
 	struct path *path;
+	unsigned fail_count;
 };
 
 static struct path_info *path_lookup(struct list_head *head, struct path *p)
@@ -143,8 +165,14 @@ static struct path_info *path_lookup(struct list_head *head, struct path *p)
 /*-----------------------------------------------------------------
  * Round robin selector
  *---------------------------------------------------------------*/
+
+#define RR_MIN_IO		1000
+
 struct selector {
 	spinlock_t lock;
+
+	struct path_info *current_path;
+	unsigned current_count;
 
 	struct list_head valid_paths;
 	struct list_head invalid_paths;
@@ -155,6 +183,7 @@ static struct selector *alloc_selector(void)
 	struct selector *s = kmalloc(sizeof(*s), GFP_KERNEL);
 
 	if (s) {
+		memset(s, 0, sizeof(*s));
 		INIT_LIST_HEAD(&s->valid_paths);
 		INIT_LIST_HEAD(&s->invalid_paths);
 		s->lock = SPIN_LOCK_UNLOCKED;
@@ -215,6 +244,7 @@ static int rr_add_path(struct path_selector *ps, struct path *path,
 		return -ENOMEM;
 	}
 
+	pi->fail_count = 0;
 	pi->path = path;
 
 	spin_lock(&s->lock);
@@ -224,44 +254,56 @@ static int rr_add_path(struct path_selector *ps, struct path *path,
 	return 0;
 }
 
-static void rr_fail_path(struct path_selector *ps, struct path *p)
+static void rr_end_io(struct path_selector *ps, struct bio *bio, int error,
+		      union map_info *info)
 {
 	unsigned long flags;
 	struct selector *s = (struct selector *) ps->context;
-	struct path_info *pi;
+	struct path_info *pi = (struct path_info *)info->ptr;
 
-	/*
-	 * This function will be called infrequently so we don't
-	 * mind the expense of these searches.
-	 */
+	if (likely(!error))
+		return;
+
 	spin_lock_irqsave(&s->lock, flags);
-	pi = path_lookup(&s->valid_paths, p);
-	if (!pi)
-		pi = path_lookup(&s->invalid_paths, p);
 
-	if (!pi)
-		DMWARN("asked to change the state of an unknown path");
-
-	else
+	if (++pi->fail_count == RR_FAIL_COUNT) {
 		list_move(&pi->list, &s->invalid_paths);
+
+		if (pi == s->current_path)
+			s->current_path = NULL;
+	}
 
 	spin_unlock_irqrestore(&s->lock, flags);
 }
 
 /* Path selector */
-static struct path *rr_select_path(struct path_selector *ps)
+static struct path *rr_select_path(struct path_selector *ps, struct bio *bio,
+				   union map_info *info)
 {
 	unsigned long flags;
 	struct selector *s = (struct selector *) ps->context;
 	struct path_info *pi = NULL;
 
 	spin_lock_irqsave(&s->lock, flags);
+
+	/* Do we need to select a new path? */
+	if (s->current_path && s->current_count-- > 0) {
+		pi = s->current_path;
+		goto done;
+	}
+
 	if (!list_empty(&s->valid_paths)) {
 		pi = list_entry(s->valid_paths.next, struct path_info, list);
 		list_move_tail(&pi->list, &s->valid_paths);
+
+		s->current_path = pi;
+		s->current_count = RR_MIN_IO;
 	}
+
+ done:
 	spin_unlock_irqrestore(&s->lock, flags);
 
+	info->ptr = pi;
 	return pi ? pi->path : NULL;
 }
 
@@ -269,17 +311,45 @@ static struct path *rr_select_path(struct path_selector *ps)
 static int rr_status(struct path_selector *ps, struct path *path,
 		     status_type_t type, char *result, unsigned int maxlen)
 {
-	return 0;
+	unsigned long flags;
+	struct path_info *pi;
+	int failed = 0;
+	struct selector *s = (struct selector *) ps->context;
+	int sz = 0;
+
+	if (type == STATUSTYPE_TABLE)
+		return 0;
+
+	spin_lock_irqsave(&s->lock, flags);
+
+	/*
+	 * Is status called often for testing or something?
+	 * If so maybe a ps's info should be allocated w/ path
+	 * so a simple container_of can be used.
+	 */
+	pi = path_lookup(&s->valid_paths, path);
+	if (!pi) {
+		failed = 1;
+		pi = path_lookup(&s->invalid_paths, path);
+	}
+
+	sz = scnprintf(result, maxlen, "%s %u ", failed ? "F" : "A",
+		       pi->fail_count);
+
+	spin_unlock_irqrestore(&s->lock, flags);
+
+	return sz;
 }
 
 static struct path_selector_type rr_ps = {
 	.name = "round-robin",
+	.module = THIS_MODULE,
 	.table_args = 0,
 	.info_args = 0,
 	.ctr = rr_ctr,
 	.dtr = rr_dtr,
 	.add_path = rr_add_path,
-	.fail_path = rr_fail_path,
+	.end_io = rr_end_io,
 	.select_path = rr_select_path,
 	.status = rr_status,
 };

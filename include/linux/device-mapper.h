@@ -18,6 +18,8 @@ union map_info {
 	unsigned long long ll;
 };
 
+inline union map_info *dm_get_mapinfo(struct bio *bio);
+
 /*
  * In the constructor the target parameter will already have the
  * table, type, begin and len fields filled in.
