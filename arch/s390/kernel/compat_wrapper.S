@@ -5,6 +5,7 @@
 *  S390 version
 *    Copyright (C) 2000 IBM Deutschland Entwicklung GmbH, IBM Corporation
 *    Author(s): Gerhard Tonn (ton@de.ibm.com),
+*               Thomas Spatzier (tspat@de.ibm.com)
 */ 
 
 	.globl  sys32_exit_wrapper 
@@ -1230,3 +1231,37 @@ sys_epoll_wait_wrapper:
 	lgfr	%r4,%r4			# int
 	lgfr	%r5,%r5			# int
 	jg	sys_epoll_wait		# branch to system call
+
+	.globl	sys32_io_setup_wrapper
+sys32_io_setup_wrapper:
+	llgfr	%r2,%r2			# unsigned int
+	llgtr	%r3,%r3			# u32 *
+	jg	compat_sys_io_setup
+
+	.globl	sys32_io_destroy_wrapper
+sys32_io_destroy_wrapper:
+	llgfr	%r2,%r2			# (aio_context_t) u32
+	jg	sys_io_destroy
+
+	.globl	sys32_io_getevents_wrapper
+sys32_io_getevents_wrapper:
+	llgfr	%r2,%r2			# (aio_context_t) u32
+	lgfr	%r3,%r3			# long
+	lgfr	%r4,%r4			# long
+	llgtr	%r5,%r5			# struct io_event *
+	llgtr	%r6,%r6			# struct compat_timespec *
+	jg	compat_sys_io_getevents
+
+	.globl	sys32_io_submit_wrapper
+sys32_io_submit_wrapper:
+	llgfr	%r2,%r2			# (aio_context_t) u32
+	lgfr	%r3,%r3			# long
+	llgtr	%r4,%r4			# struct iocb **
+	jg	compat_sys_io_submit
+
+	.globl	sys32_io_cancel_wrapper
+sys32_io_cancel_wrapper:
+	llgfr	%r2,%r2			# (aio_context_t) u32
+	llgtr	%r3,%r3			# struct iocb *
+	llgtr	%r4,%r4			# struct io_event *
+	jg	sys_io_cancel
