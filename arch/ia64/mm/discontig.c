@@ -247,8 +247,7 @@ void __init find_memory(void)
  *	- replicate the nodedir structure to other nodes
  */
 
-void __init
-discontig_paging_init(void)
+void __init paging_init(void)
 {
 	int		node, mynode;
 	unsigned long	max_dma, zones_size[MAX_NR_ZONES];
@@ -305,6 +304,9 @@ discontig_paging_init(void)
 			memcpy(node_data[node], node_data[mynode], sizeof(struct ia64_node_data));
 			node_data[node]->node = node;
 		}
+
+	efi_memmap_walk(count_pages, &num_physpages);
+	zero_page_memmap_ptr = virt_to_page(ia64_imva(empty_zero_page));
 }
 
 void show_mem(void)
