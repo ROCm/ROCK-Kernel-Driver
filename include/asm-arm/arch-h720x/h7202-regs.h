@@ -17,8 +17,12 @@
  * which is included by this file.
  */
 
-#define SERIAL2_VIRT 		(IO_VIRT + 0x2d000)
-#define SERIAL3_VIRT 		(IO_VIRT + 0x2e000)
+#define SERIAL2_OFS		0x2d000
+#define SERIAL2_BASE		(IO_PHYS + SERIAL2_OFS)
+#define SERIAL2_VIRT 		(IO_VIRT + SERIAL2_OFS)
+#define SERIAL3_OFS		0x2e000
+#define SERIAL3_BASE		(IO_PHYS + SERIAL3_OFS)
+#define SERIAL3_VIRT 		(IO_VIRT + SERIAL3_OFS)
 
 /* Matrix Keyboard Controller */
 #define KBD_VIRT		(IO_VIRT + 0x22000)
