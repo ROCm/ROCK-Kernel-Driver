@@ -478,14 +478,15 @@ static void *r_start(struct seq_file *m, loff_t *pos)
 static void *r_next(struct seq_file *m, void *v, loff_t *pos)
 {
 	++*pos;
+	if (v)
+		deactivate_super(v);
 	return NULL;
 }
 
 static void r_stop(struct seq_file *m, void *v)
 {
-	struct proc_dir_entry *de = m->private;
-	struct super_block *s = de->data;
-	deactivate_super(s);
+	if (v)
+		deactivate_super(v);
 }
 
 static int r_show(struct seq_file *m, void *v)

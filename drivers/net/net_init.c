@@ -148,11 +148,14 @@ static struct net_device *init_netdev(struct net_device *dev, int sizeof_priv,
 	 
 	if (dev->name[0] == '\0' || dev->name[0] == ' ') {
 		strcpy(dev->name, mask);
+		rtnl_lock();
 		if (dev_alloc_name(dev, mask)<0) {
+			rtnl_unlock();
 			if (new_device)
 				kfree(dev);
 			return NULL;
 		}
+		rtnl_unlock();
 	}
 
 	netdev_boot_setup_check(dev);

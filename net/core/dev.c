@@ -646,11 +646,12 @@ int dev_alloc_name(struct net_device *dev, const char *name)
  *	failed. The cause of an error is returned as a negative errno code
  *	in the variable @err points to.
  *
- *	The caller must hold the @dev_base or RTNL locks when doing this in
+ *	This call is deprecated in favor of alloc_netdev because
+ *	the caller must hold the @dev_base or RTNL locks when doing this in
  *	order to avoid duplicate name allocations.
  */
 
-struct net_device *dev_alloc(const char *name, int *err)
+struct net_device *__dev_alloc(const char *name, int *err)
 {
 	struct net_device *dev = kmalloc(sizeof(*dev), GFP_KERNEL);
 
@@ -2997,7 +2998,7 @@ EXPORT_SYMBOL(__dev_remove_pack);
 EXPORT_SYMBOL(__skb_linearize);
 EXPORT_SYMBOL(call_netdevice_notifiers);
 EXPORT_SYMBOL(dev_add_pack);
-EXPORT_SYMBOL(dev_alloc);
+EXPORT_SYMBOL(__dev_alloc);
 EXPORT_SYMBOL(dev_alloc_name);
 EXPORT_SYMBOL(dev_close);
 EXPORT_SYMBOL(dev_get_by_flags);

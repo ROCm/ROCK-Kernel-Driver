@@ -769,7 +769,6 @@ ext3_get_block_handle(handle_t *handle, struct inode *inode, sector_t iblock,
 	int boundary = 0;
 	int depth = ext3_block_to_path(inode, iblock, offsets, &boundary);
 	struct ext3_inode_info *ei = EXT3_I(inode);
-	loff_t new_size;
 
 	J_ASSERT(handle != NULL || create == 0);
 
@@ -834,23 +833,17 @@ out:
 	if (!err)
 		err = ext3_splice_branch(handle, inode, iblock, chain,
 					 partial, left);
+	/* i_disksize growing is protected by truncate_sem
+	 * don't forget to protect it if you're about to implement
+	 * concurrent ext3_get_block() -bzzz */
+	if (!err && extend_disksize && inode->i_size > ei->i_disksize)
+		ei->i_disksize = inode->i_size;
 	up(&ei->truncate_sem);
 	if (err == -EAGAIN)
 		goto changed;
 	if (err)
 		goto cleanup;
 
-	if (extend_disksize) {
-		/*
-		 * This is not racy against ext3_truncate's modification of
-		 * i_disksize because VM/VFS ensures that the file cannot be
-		 * extended while truncate is in progress.  It is racy between
-		 * multiple parallel instances of get_block, but we have BKL.
-		 */
-		new_size = inode->i_size;
-		if (new_size > ei->i_disksize)
-			ei->i_disksize = new_size;
-	}
 	set_buffer_new(bh_result);
 	goto got_it;
 
