@@ -191,6 +191,13 @@ typedef struct	SHT
      int (*eh_host_reset_handler)(Scsi_Cmnd *);
 
     /*
+     * Old EH handlers, no longer used. Make them warn the user of old
+     * drivers by using a wrogn type
+     */
+    int (*abort)(int);
+    int (*reset)(int,int);
+
+    /*
      * Once the device has responded to an INQUIRY and we know the device
      * is online, call into the low level driver with the Scsi_Device *
      * (so that the low level driver may save it off in a safe location
