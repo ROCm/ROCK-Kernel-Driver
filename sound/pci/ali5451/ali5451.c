@@ -1934,6 +1934,7 @@ static int ali_suspend(snd_card_t *card, unsigned int state)
 	outl(0xffffffff, ALI_REG(chip, ALI_STOP));
 
 	spin_unlock_irq(&chip->reg_lock);
+	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
 
