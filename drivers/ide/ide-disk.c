@@ -1774,6 +1774,9 @@ static int idedisk_open(struct inode *inode, struct file *filp)
 
 static int ide_cacheflush_p(ide_drive_t *drive)
 {
+	if (!(drive->id->cfs_enable_2 & 0x3000))
+		return 0;
+
 	if(drive->wcache)
 	{
 		if (do_idedisk_flushcache(drive))
