@@ -390,7 +390,7 @@ CIFSSMBMkDir(const int xid, const struct cifsTconInfo *tcon,
 int
 CIFSSMBOpen(const int xid, const struct cifsTconInfo *tcon,
 	    const char *fileName, const int openDisposition,
-	    const int access_flags, const int omode, __u16 * netfid,
+	    const int access_flags, const int create_options, __u16 * netfid,
 	    int *pOplock, const struct nls_table *nls_codepage)
 {
 	int rc = -EACCES;
@@ -436,7 +436,7 @@ CIFSSMBOpen(const int xid, const struct cifsTconInfo *tcon,
 	pSMB->FileAttributes = cpu_to_le32(pSMB->FileAttributes);
 	pSMB->ShareAccess = cpu_to_le32(FILE_SHARE_ALL);
 	pSMB->CreateDisposition = cpu_to_le32(openDisposition);
-	pSMB->CreateOptions = cpu_to_le32(CREATE_NOT_DIR);	/* BB what are these? BB */
+	pSMB->CreateOptions = cpu_to_le32(create_options);
 	pSMB->ImpersonationLevel = cpu_to_le32(SECURITY_IMPERSONATION);	/* BB ?? BB */
 	pSMB->SecurityFlags =
 	    cpu_to_le32(SECURITY_CONTEXT_TRACKING | SECURITY_EFFECTIVE_ONLY);
@@ -962,7 +962,7 @@ CIFSSMBUnixQuerySymLink(const int xid, const struct cifsTconInfo *tcon,
 	int bytes_returned;
 	int name_len;
 
-	cFYI(1, ("\nIn QPathSymLinkInfo (Unix) the path %s", searchName));
+	cFYI(1, ("\nIn QPathSymLinkInfo (Unix) for path %s", searchName));
 	rc = smb_init(SMB_COM_TRANSACTION2, 15, tcon, (void **) &pSMB,
 		      (void **) &pSMBr);
 	if (rc)
@@ -1014,7 +1014,8 @@ CIFSSMBUnixQuerySymLink(const int xid, const struct cifsTconInfo *tcon,
 	} else {		/* decode response */
 		pSMBr->DataOffset = le16_to_cpu(pSMBr->DataOffset);
 		pSMBr->DataCount = le16_to_cpu(pSMBr->DataCount);
-		if ((pSMBr->ByteCount < 2) || (pSMBr->DataOffset > 512))	/* BB also check enough total bytes returned */
+		if ((pSMBr->ByteCount < 2) || (pSMBr->DataOffset > 512))
+		/* BB also check enough total bytes returned */
 			rc = -EIO;	/* bad smb */
 		else {
 			if (pSMBr->hdr.Flags2 & SMBFLG2_UNICODE) {
@@ -1041,7 +1042,89 @@ CIFSSMBUnixQuerySymLink(const int xid, const struct cifsTconInfo *tcon,
 							       pSMBr->
 							       DataCount));
 			}
-			symlinkinfo[buflen] = 0;	/* just in case so the calling code does not go off the end of the buffer */
+			symlinkinfo[buflen] = 0;
+	/* just in case so calling code does not go off the end of buffer */
+		}
+	}
+	if (pSMB)
+		buf_release(pSMB);
+	return rc;
+}
+
+
+
+int
+CIFSSMBQueryReparseLinkInfo(const int xid, const struct cifsTconInfo *tcon,
+			const unsigned char *searchName,
+			char *symlinkinfo, const int buflen,__u16 fid,
+			const struct nls_table *nls_codepage)
+{
+	int rc = 0;
+	int bytes_returned;
+	int name_len;
+	struct smb_com_transaction_ioctl_req * pSMB;
+	struct smb_com_transaction_ioctl_rsp * pSMBr;
+
+	cFYI(1, ("\nIn Windows reparse style QueryLink info for path %s", searchName));
+	rc = smb_init(SMB_COM_NT_TRANSACT, 23, tcon, (void **) &pSMB,
+		      (void **) &pSMBr);
+	if (rc)
+		return rc;
+
+	pSMB->TotalParameterCount = 0 ;
+	pSMB->TotalDataCount = 0;
+	pSMB->MaxParameterCount = cpu_to_le16(2);
+	pSMB->MaxDataCount = cpu_to_le16(4000);	/* BB find exact max SMB PDU from sess structure BB */
+	pSMB->MaxSetupCount = 4;
+	pSMB->Reserved = 0;
+	pSMB->ParameterOffset = 0;
+	pSMB->DataCount = 0;
+	pSMB->DataOffset = 0;
+	pSMB->SetupCount = 4;
+	pSMB->SubCommand = cpu_to_le16(NT_TRANSACT_IOCTL);
+	pSMB->ParameterCount = pSMB->TotalParameterCount;
+	pSMB->FunctionCode = cpu_to_le32(FSCTL_GET_REPARSE_POINT);
+	pSMB->IsFsctl = 1; /* FSCTL */
+	pSMB->IsRootFlag = 0;
+	pSMB->Fid = fid; /* file handle always le */
+	pSMB->ByteCount = 0;
+
+	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
+			 (struct smb_hdr *) pSMBr, &bytes_returned, 0);
+	if (rc) {
+		cFYI(1, ("\nSend error in QueryReparseLinkInfo = %d\n", rc));
+	} else {		/* decode response */
+		pSMBr->DataOffset = le16_to_cpu(pSMBr->DataOffset);
+		pSMBr->DataCount = le16_to_cpu(pSMBr->DataCount);
+		if ((pSMBr->ByteCount < 2) || (pSMBr->DataOffset > 512))
+		/* BB also check enough total bytes returned */
+			rc = -EIO;	/* bad smb */
+		else {
+			if(pSMBr->DataCount && (pSMBr->DataCount < 2048)) {
+		/* could also validata reparse tag && better check name length */
+				struct reparse_data * reparse_buf = (struct reparse_data *)
+					((char *)&pSMBr->hdr.Protocol + pSMBr->DataOffset);
+				if (pSMBr->hdr.Flags2 & SMBFLG2_UNICODE) {
+					name_len = UniStrnlen((wchar_t *)
+							(reparse_buf->LinkNamesBuf + 
+							reparse_buf->TargetNameOffset),
+							min(buflen/2, reparse_buf->TargetNameLen / 2)); 
+					cifs_strfromUCS_le(symlinkinfo,
+						(wchar_t *) (reparse_buf->LinkNamesBuf + 
+						reparse_buf->TargetNameOffset),
+						name_len, nls_codepage);
+				} else { /* ASCII names */
+					strncpy(symlinkinfo,reparse_buf->LinkNamesBuf + 
+						reparse_buf->TargetNameOffset, 
+						min(buflen, (int)reparse_buf->TargetNameLen));
+				}
+			} else {
+				rc = -EIO;
+				cFYI(1,("\nInvalid return data count on get reparse info ioctl"));
+			}
+			symlinkinfo[buflen] = 0; /* just in case so the caller
+					does not go off the end of the buffer */
+			cFYI(1,("\nreadlink result - %s ",symlinkinfo));
 		}
 	}
 	if (pSMB)

@@ -35,8 +35,6 @@
 #include "cifs_debug.h"
 #include "cifs_fs_sb.h"
 
-
-
 int
 cifs_open(struct inode *inode, struct file *file)
 {
@@ -94,9 +92,8 @@ cifs_open(struct inode *inode, struct file *file)
 		oplock = FALSE;
 
 	/* BB pass O_SYNC flag through on file attributes .. BB */
-	rc = CIFSSMBOpen(xid, pTcon, full_path, disposition, desiredAccess,			 
-			 -1 /* i.e. dummy value, ignored for time being */,
-			 &netfid, &oplock, cifs_sb->local_nls);
+	rc = CIFSSMBOpen(xid, pTcon, full_path, disposition, desiredAccess,
+			CREATE_NOT_DIR, &netfid, &oplock, cifs_sb->local_nls);
 	if (rc) {
 		cFYI(1, ("\ncifs_open returned 0x%x ", rc));
 		cFYI(1, (" oplock: %d ", oplock));
@@ -112,7 +109,8 @@ cifs_open(struct inode *inode, struct file *file)
 			pCifsFile->pfile = file; /* needed for writepage */
 			list_add(&pCifsFile->tlist,&pTcon->openFileList);
 			pCifsInode = CIFS_I(file->f_dentry->d_inode);
-			list_add(&pCifsFile->flist,&pCifsInode->openFileList);
+			if(pCifsInode->openFileList.next)
+				list_add(&pCifsFile->flist,&pCifsInode->openFileList);
 			if(file->f_flags & O_CREAT) {           
 				/* time to set mode which we can not set earlier due
 				 to problems creating new read-only files */
@@ -153,7 +151,8 @@ cifs_close(struct inode *inode, struct file *file)
 	cifs_sb = CIFS_SB(inode->i_sb);
 	pTcon = cifs_sb->tcon;
 	if (pSMBFile) {
-		list_del(&pSMBFile->flist);
+		if(pSMBFile->flist.next)
+			list_del(&pSMBFile->flist);
 		list_del(&pSMBFile->tlist);
 		rc = CIFSSMBClose(xid, pTcon, pSMBFile->netfid);
 		kfree(file->private_data);
@@ -649,6 +648,7 @@ fill_in_inode(struct inode *tmp_inode,
 		cFYI(1, (" File inode "));
 		tmp_inode->i_op = &cifs_file_inode_ops;
 		tmp_inode->i_fop = &cifs_file_ops;
+		tmp_inode->i_data.a_ops = &cifs_addr_ops;
 	} else if (S_ISDIR(tmp_inode->i_mode)) {
 		cFYI(1, (" Directory inode"));
 		tmp_inode->i_op = &cifs_dir_inode_ops;
@@ -716,6 +716,7 @@ unix_fill_in_inode(struct inode *tmp_inode,
 		cFYI(1, (" File inode "));
 		tmp_inode->i_op = &cifs_file_inode_ops;
 		tmp_inode->i_fop = &cifs_file_ops;
+		tmp_inode->i_data.a_ops = &cifs_addr_ops;
 	} else if (S_ISDIR(tmp_inode->i_mode)) {
 		cFYI(1, (" Directory inode"));
 		tmp_inode->i_op = &cifs_dir_inode_ops;

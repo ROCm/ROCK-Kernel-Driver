@@ -176,10 +176,12 @@ cifs_readlink(struct dentry *direntry, char *pBuffer, int buflen)
 	struct inode *inode = direntry->d_inode;
 	int rc = -EACCES;
 	int xid;
+	int oplock = FALSE;
 	struct cifs_sb_info *cifs_sb;
 	struct cifsTconInfo *pTcon;
 	char *full_path = NULL;
 	char tmpbuffer[256];
+	__u16 fid;
 
 	xid = GetXid();
 	cifs_sb = CIFS_SB(inode->i_sb);
@@ -192,12 +194,23 @@ cifs_readlink(struct dentry *direntry, char *pBuffer, int buflen)
 /* BB add read reparse point symlink code and Unix extensions symlink code here BB */
 	if (cifs_sb->tcon->ses->capabilities & CAP_UNIX)
 		rc = CIFSSMBUnixQuerySymLink(xid, pTcon, full_path,
-					     tmpbuffer,
-					     sizeof (tmpbuffer) - 1,
-					     cifs_sb->local_nls);
+					tmpbuffer,
+					sizeof (tmpbuffer) - 1,
+					cifs_sb->local_nls);
 	else {
-		/* rc = CIFSSMBQueryReparseLinkInfo */
-		/* BB Add code to Query ReparsePoint info */
+		rc = CIFSSMBOpen(xid, pTcon, full_path, FILE_OPEN, GENERIC_READ,
+				OPEN_REPARSE_POINT,&fid, &oplock, cifs_sb->local_nls);
+		if(!rc) {
+			rc = CIFSSMBQueryReparseLinkInfo(xid, pTcon, full_path,
+				tmpbuffer,
+				sizeof(tmpbuffer) - 1, 
+				fid,
+				cifs_sb->local_nls);
+			if(CIFSSMBClose(xid, pTcon, fid)) {
+				cFYI(1,("Error closing junction point (open for ioctl)"));
+			}
+		}
+
 	}
 	/* BB Anything else to do to handle recursive links? */
 	/* BB Should we be using page ops here? */

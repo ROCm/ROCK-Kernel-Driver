@@ -252,7 +252,7 @@ const static struct {
 	ERRHRD, ERRgeneral, NT_STATUS_DISK_CORRUPT_ERROR}, {
 	ERRDOS, ERRbadfile, NT_STATUS_OBJECT_NAME_INVALID}, {	/* mapping changed since shell does lookup on * and expects file not found */
 	ERRDOS, ERRbadfile, NT_STATUS_OBJECT_NAME_NOT_FOUND}, {
-	ERRDOS, 183, NT_STATUS_OBJECT_NAME_COLLISION}, {
+	ERRDOS, ERRalreadyexists, NT_STATUS_OBJECT_NAME_COLLISION}, {
 	ERRHRD, ERRgeneral, NT_STATUS_HANDLE_NOT_WAITABLE}, {
 	ERRDOS, ERRbadfid, NT_STATUS_PORT_DISCONNECTED}, {
 	ERRHRD, ERRgeneral, NT_STATUS_DEVICE_ALREADY_ATTACHED}, {
@@ -285,7 +285,7 @@ const static struct {
 	ERRHRD, ERRgeneral, NT_STATUS_EA_CORRUPT_ERROR}, {
 	ERRDOS, ERRlock, NT_STATUS_FILE_LOCK_CONFLICT}, {
 	ERRDOS, ERRlock, NT_STATUS_LOCK_NOT_GRANTED}, {
-	ERRDOS, ERRnoaccess, NT_STATUS_DELETE_PENDING}, {
+	ERRDOS, ERRbadfile, NT_STATUS_DELETE_PENDING}, {
 	ERRDOS, ERRunsup, NT_STATUS_CTL_FILE_NOT_SUPPORTED}, {
 	ERRHRD, ERRgeneral, NT_STATUS_UNKNOWN_REVISION}, {
 	ERRHRD, ERRgeneral, NT_STATUS_REVISION_MISMATCH}, {
@@ -753,7 +753,7 @@ cifs_print_status(__u32 status_code)
 {
 	int idx = 0;
 
-	printk("\nStatus code returned: 0x%08x", status_code);
+	printk("\nStatus code returned: 0x%08x ", status_code);
 
 	while (nt_errs[idx].nt_errstr != NULL) {
 		if (((nt_errs[idx].nt_errcode) & 0xFFFFFF) ==
