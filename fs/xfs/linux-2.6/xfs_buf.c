@@ -1522,9 +1522,12 @@ xfs_mapping_buftarg(
 	xfs_buftarg_t		*btp,
 	struct block_device	*bdev)
 {
+	struct backing_dev_info	*bdi;
 	struct inode		*inode;
 	struct address_space	*mapping;
-	struct backing_dev_info	*bdi;
+	static struct address_space_operations mapping_aops = {
+		.sync_page = block_sync_page,
+	};
 
 	inode = new_inode(bdev->bd_inode->i_sb);
 	if (!inode) {
@@ -1536,10 +1539,11 @@ xfs_mapping_buftarg(
 	inode->i_mode = S_IFBLK;
 	inode->i_bdev = bdev;
 	inode->i_rdev = bdev->bd_dev;
-	mapping = &inode->i_data;
 	bdi = blk_get_backing_dev_info(bdev);
 	if (!bdi)
 		bdi = &default_backing_dev_info;
+	mapping = &inode->i_data;
+	mapping->a_ops = &mapping_aops;
 	mapping->backing_dev_info = bdi;
 	mapping_set_gfp_mask(mapping, GFP_KERNEL);
 	btp->pbr_mapping = mapping;
