@@ -1437,7 +1437,10 @@ static struct file_system_type nfs_fs_type = {
 
 #ifdef CONFIG_NFS_V4
 
+#include "delegation.h"
+
 static void nfs4_clear_inode(struct inode *);
+
 
 static struct super_operations nfs4_sops = { 
 	.alloc_inode	= nfs_alloc_inode,
@@ -1459,6 +1462,9 @@ static void nfs4_clear_inode(struct inode *inode)
 {
 	struct nfs_inode *nfsi = NFS_I(inode);
 
+	/* If we are holding a delegation, return it! */
+	if (nfsi->delegation != NULL)
+		nfs_inode_return_delegation(inode);
 	/* First call standard NFS clear_inode() code */
 	nfs_clear_inode(inode);
 	/* Now clear out any remaining state */
@@ -1743,22 +1749,30 @@ out_free:
 	return s;
 }
 
+static void nfs4_kill_super(struct super_block *sb)
+{
+	nfs_return_all_delegations(sb);
+	nfs_kill_super(sb);
+}
+
 static struct file_system_type nfs4_fs_type = {
 	.owner		= THIS_MODULE,
 	.name		= "nfs4",
 	.get_sb		= nfs4_get_sb,
-	.kill_sb	= nfs_kill_super,
+	.kill_sb	= nfs4_kill_super,
 	.fs_flags	= FS_ODD_RENAME|FS_REVAL_DOT|FS_BINARY_MOUNTDATA,
 };
 
-#define nfs4_zero_state(nfsi) \
+#define nfs4_init_once(nfsi) \
 	do { \
 		INIT_LIST_HEAD(&(nfsi)->open_states); \
+		nfsi->delegation = NULL; \
+		init_rwsem(&nfsi->rwsem); \
 	} while(0)
 #define register_nfs4fs() register_filesystem(&nfs4_fs_type)
 #define unregister_nfs4fs() unregister_filesystem(&nfs4_fs_type)
 #else
-#define nfs4_zero_state(nfsi) \
+#define nfs4_init_once(nfsi) \
 	do { } while (0)
 #define register_nfs4fs() (0)
 #define unregister_nfs4fs()
@@ -1780,7 +1794,6 @@ static struct inode *nfs_alloc_inode(struct super_block *sb)
 	if (!nfsi)
 		return NULL;
 	nfsi->flags = 0;
-	nfs4_zero_state(nfsi);
 	return &nfsi->vfs_inode;
 }
 
@@ -1806,6 +1819,7 @@ static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
 		nfsi->ncommit = 0;
 		nfsi->npages = 0;
 		init_waitqueue_head(&nfsi->nfs_i_wait);
+		nfs4_init_once(nfsi);
 	}
 }
  

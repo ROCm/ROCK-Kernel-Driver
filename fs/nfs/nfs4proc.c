@@ -47,6 +47,8 @@
 #include <linux/smp_lock.h>
 #include <linux/namei.h>
 
+#include "delegation.h"
+
 #define NFSDBG_FACILITY		NFSDBG_PROC
 
 #define NFS4_POLL_RETRY_MIN	(1*HZ)
@@ -298,7 +300,7 @@ static int _nfs4_do_open(struct inode *dir, struct qstr *name, int flags, struct
 	down(&sp->so_sema);
 	o_arg.seqid = sp->so_seqid;
 	o_arg.id = sp->so_id;
-	o_arg.clientid = NFS_SERVER(dir)->nfs4_state->cl_clientid,
+	o_arg.clientid = clp->cl_clientid,
 
 	status = rpc_call_sync(server->client, &msg, 0);
 	nfs4_increment_seqid(status, sp);
@@ -347,7 +349,8 @@ static int _nfs4_do_open(struct inode *dir, struct qstr *name, int flags, struct
 		state->nwriters++;
 	state->state |= flags & (FMODE_READ|FMODE_WRITE);
 	spin_unlock(&inode->i_lock);
-
+	if (o_res.delegation_type != 0)
+		nfs_inode_set_delegation(inode, cred, &o_res);
 	up(&sp->so_sema);
 	nfs4_put_state_owner(sp);
 	up_read(&clp->cl_sem);
@@ -1991,6 +1994,40 @@ nfs4_proc_setclientid_confirm(struct nfs4_client *clp)
 		spin_unlock(&clp->cl_lock);
 	}
 	return status;
+}
+
+static int _nfs4_proc_delegreturn(struct inode *inode, struct rpc_cred *cred, const nfs4_stateid *stateid)
+{
+	struct nfs4_delegreturnargs args = {
+		.fhandle = NFS_FH(inode),
+		.stateid = stateid,
+	};
+	struct rpc_message msg = {
+		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_DELEGRETURN],
+		.rpc_argp = &args,
+		.rpc_cred = cred,
+	};
+
+	return rpc_call_sync(NFS_CLIENT(inode), &msg, 0);
+}
+
+int nfs4_proc_delegreturn(struct inode *inode, struct rpc_cred *cred, const nfs4_stateid *stateid)
+{
+	struct nfs_server *server = NFS_SERVER(inode);
+	struct nfs4_exception exception = { };
+	int err;
+	do {
+		err = _nfs4_proc_delegreturn(inode, cred, stateid);
+		switch (err) {
+			case -NFS4ERR_STALE_STATEID:
+			case -NFS4ERR_EXPIRED:
+				nfs4_schedule_state_recovery(server->nfs4_state);
+			case 0:
+				return 0;
+		}
+		err = nfs4_handle_exception(server, err, &exception);
+	} while (exception.retry);
+	return err;
 }
 
 #define NFS4_LOCK_MINTIMEOUT (1 * HZ)

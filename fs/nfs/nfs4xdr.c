@@ -128,6 +128,8 @@ static int nfs_stat_to_errno(int);
 				2 + nfs4_name_maxsz + \
 				nfs4_fattr_bitmap_maxsz)
 #define decode_create_maxsz	(op_decode_hdr_maxsz + 8)
+#define encode_delegreturn_maxsz (op_encode_hdr_maxsz + 4)
+#define decode_delegreturn_maxsz (op_decode_hdr_maxsz)
 #define NFS4_enc_compound_sz	(1024)  /* XXX: large enough? */
 #define NFS4_dec_compound_sz	(1024)  /* XXX: large enough? */
 #define NFS4_enc_read_sz	(compound_encode_hdr_maxsz + \
@@ -355,6 +357,11 @@ static int nfs_stat_to_errno(int);
 				encode_getattr_maxsz)
 #define NFS4_dec_server_caps_sz (compound_decode_hdr_maxsz + \
 				decode_getattr_maxsz)
+#define NFS4_enc_delegreturn_sz	(compound_encode_hdr_maxsz + \
+				encode_putfh_maxsz + \
+				encode_delegreturn_maxsz)
+#define NFS4_dec_delegreturn_sz (compound_decode_hdr_maxsz + \
+				decode_delegreturn_maxsz)
 
 static struct {
 	unsigned int	mode;
@@ -1103,6 +1110,18 @@ static int encode_write(struct xdr_stream *xdr, const struct nfs_writeargs *args
 
 	return 0;
 }
+
+static int encode_delegreturn(struct xdr_stream *xdr, const nfs4_stateid *stateid)
+{
+	uint32_t *p;
+
+	RESERVE_SPACE(20);
+
+	WRITE32(OP_DELEGRETURN);
+	WRITEMEM(stateid->data, sizeof(stateid->data));
+	return 0;
+
+}
 /*
  * END OF "GENERIC" ENCODE ROUTINES.
  */
@@ -1741,6 +1760,24 @@ static int nfs4_xdr_enc_setclientid_confirm(struct rpc_rqst *req, uint32_t *p, s
 }
 
 /*
+ * DELEGRETURN request
+ */
+static int nfs4_xdr_enc_delegreturn(struct rpc_rqst *req, uint32_t *p, const struct nfs4_delegreturnargs *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 2,
+	};
+	int status;
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr);
+	if ((status = encode_putfh(&xdr, args->fhandle)) == 0)
+		status = encode_delegreturn(&xdr, args->stateid);
+	return status;
+}
+
+/*
  * START OF "GENERIC" DECODE ROUTINES.
  *   These may look a little ugly since they are imported from a "generic"
  * set of XDR encode/decode routines which are intended to be shared by
@@ -1773,6 +1810,17 @@ static int nfs4_xdr_enc_setclientid_confirm(struct rpc_rqst *req, uint32_t *p, s
 		return -EIO; \
 	} \
 } while (0)
+
+static int decode_opaque_inline(struct xdr_stream *xdr, uint32_t *len, char **string)
+{
+	uint32_t *p;
+
+	READ_BUF(4);
+	READ32(*len);
+	READ_BUF(*len);
+	*string = (char *)p;
+	return 0;
+}
 
 static int decode_compound_hdr(struct xdr_stream *xdr, struct compound_hdr *hdr)
 {
@@ -1808,6 +1856,17 @@ static int decode_op_hdr(struct xdr_stream *xdr, enum nfs_opnum4 expected)
 	if (nfserr != NFS_OK)
 		return -nfs_stat_to_errno(nfserr);
 	return 0;
+}
+
+/* Dummy routine */
+static int decode_ace(struct xdr_stream *xdr, void *ace, struct nfs4_client *clp)
+{
+	uint32_t *p;
+	uint32_t strlen;
+	char *str;
+
+	READ_BUF(12);
+	return decode_opaque_inline(xdr, &strlen, &str);
 }
 
 static int decode_attr_bitmap(struct xdr_stream *xdr, uint32_t *bitmap)
@@ -2742,10 +2801,56 @@ static int decode_lookup(struct xdr_stream *xdr)
 	return decode_op_hdr(xdr, OP_LOOKUP);
 }
 
+/* This is too sick! */
+static int decode_space_limit(struct xdr_stream *xdr, u64 *maxsize)
+{
+        uint32_t *p;
+	uint32_t limit_type, nblocks, blocksize;
+
+	READ_BUF(12);
+	READ32(limit_type);
+	switch (limit_type) {
+		case 1:
+			READ64(*maxsize);
+			break;
+		case 2:
+			READ32(nblocks);
+			READ32(blocksize);
+			*maxsize = (uint64_t)nblocks * (uint64_t)blocksize;
+	}
+	return 0;
+}
+
+static int decode_delegation(struct xdr_stream *xdr, struct nfs_openres *res)
+{
+        uint32_t *p;
+        uint32_t delegation_type;
+
+	READ_BUF(4);
+	READ32(delegation_type);
+	if (delegation_type == NFS4_OPEN_DELEGATE_NONE) {
+		res->delegation_type = 0;
+		return 0;
+	}
+	READ_BUF(20);
+	COPYMEM(res->delegation.data, sizeof(res->delegation.data));
+	READ32(res->do_recall);
+	switch (delegation_type) {
+		case NFS4_OPEN_DELEGATE_READ:
+			res->delegation_type = FMODE_READ;
+			break;
+		case NFS4_OPEN_DELEGATE_WRITE:
+			res->delegation_type = FMODE_WRITE|FMODE_READ;
+			if (decode_space_limit(xdr, &res->maxsize) < 0)
+				return -EIO;
+	}
+	return decode_ace(xdr, NULL, res->server->nfs4_state);
+}
+
 static int decode_open(struct xdr_stream *xdr, struct nfs_openres *res)
 {
         uint32_t *p;
-        uint32_t bmlen, delegation_type;
+        uint32_t bmlen;
         int status;
 
         status = decode_op_hdr(xdr, OP_OPEN);
@@ -2762,11 +2867,9 @@ static int decode_open(struct xdr_stream *xdr, struct nfs_openres *res)
         if (bmlen > 10)
                 goto xdr_error;
 
-        READ_BUF((bmlen << 2) + 4);
+        READ_BUF(bmlen << 2);
         p += bmlen;
-        READ32(delegation_type);
-        if (delegation_type == NFS4_OPEN_DELEGATE_NONE)
-		return 0;
+	return decode_delegation(xdr, res);
 xdr_error:
 	printk(KERN_NOTICE "%s: xdr error!\n", __FUNCTION__);
 	return -EIO;
@@ -3053,6 +3156,11 @@ static int decode_write(struct xdr_stream *xdr, struct nfs_writeres *res)
 	READ32(res->verf->committed);
 	COPYMEM(res->verf->verifier, 8);
 	return 0;
+}
+
+static int decode_delegreturn(struct xdr_stream *xdr)
+{
+	return decode_op_hdr(xdr, OP_DELEGRETURN);
 }
 
 /*
@@ -3688,6 +3796,25 @@ static int nfs4_xdr_dec_setclientid_confirm(struct rpc_rqst *req, uint32_t *p, s
 	return status;
 }
 
+/*
+ * DELEGRETURN request
+ */
+static int nfs4_xdr_dec_delegreturn(struct rpc_rqst *rqstp, uint32_t *p, void *dummy)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status == 0) {
+		status = decode_putfh(&xdr);
+		if (status == 0)
+			status = decode_delegreturn(&xdr);
+	}
+	return status;
+}
+
 uint32_t *nfs4_decode_dirent(uint32_t *p, struct nfs_entry *entry, int plus)
 {
 	uint32_t bitmap[1] = {0};
@@ -3841,6 +3968,7 @@ struct rpc_procinfo	nfs4_procedures[] = {
   PROC(READLINK,	enc_readlink,	dec_readlink),
   PROC(READDIR,		enc_readdir,	dec_readdir),
   PROC(SERVER_CAPS,	enc_server_caps, dec_server_caps),
+  PROC(DELEGRETURN,	enc_delegreturn, dec_delegreturn),
 };
 
 struct rpc_version		nfs_version4 = {

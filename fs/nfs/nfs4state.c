@@ -98,6 +98,7 @@ nfs4_alloc_client(struct in_addr *addr)
 		memset(clp, 0, sizeof(*clp));
 		memcpy(&clp->cl_addr, addr, sizeof(clp->cl_addr));
 		init_rwsem(&clp->cl_sem);
+		INIT_LIST_HEAD(&clp->cl_delegations);
 		INIT_LIST_HEAD(&clp->cl_state_owners);
 		INIT_LIST_HEAD(&clp->cl_unused);
 		spin_lock_init(&clp->cl_lock);
@@ -234,6 +235,7 @@ nfs4_alloc_state_owner(void)
 	init_MUTEX(&sp->so_sema);
 	sp->so_seqid = 0;                 /* arbitrary */
 	INIT_LIST_HEAD(&sp->so_states);
+	INIT_LIST_HEAD(&sp->so_delegations);
 	atomic_set(&sp->so_count, 1);
 	return sp;
 }

@@ -28,6 +28,7 @@
 #include <linux/nfs3.h>
 #include <linux/nfs4.h>
 #include <linux/nfs_xdr.h>
+#include <linux/rwsem.h>
 #include <linux/workqueue.h>
 
 /*
@@ -96,6 +97,11 @@ struct nfs_open_context {
 	struct list_head list;
 	wait_queue_head_t waitq;
 };
+
+/*
+ * NFSv4 delegation
+ */
+struct nfs_delegation;
 
 /*
  * nfs fs inode data in memory
@@ -178,6 +184,8 @@ struct nfs_inode {
 #ifdef CONFIG_NFS_V4
         /* NFSv4 state */
 	struct list_head	open_states;
+	struct nfs_delegation	*delegation;
+	struct rw_semaphore	rwsem;
 #endif /* CONFIG_NFS_V4*/
 
 	struct inode		vfs_inode;
@@ -545,6 +553,7 @@ struct nfs4_client {
 	 */
 	struct rw_semaphore	cl_sem;
 
+	struct list_head	cl_delegations;
 	struct list_head	cl_state_owners;
 	struct list_head	cl_unused;
 	int			cl_nunused;
@@ -592,6 +601,7 @@ struct nfs4_state_owner {
 
 	struct rpc_cred	     *so_cred;	 /* Associated cred */
 	struct list_head     so_states;
+	struct list_head     so_delegations;
 };
 
 /*

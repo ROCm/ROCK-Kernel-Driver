@@ -122,6 +122,10 @@ struct nfs_openres {
 	__u32                   rflags;
 	struct nfs_fattr *      f_attr;
 	const struct nfs_server *server;
+	int			delegation_type;
+	nfs4_stateid		delegation;
+	__u32			do_recall;
+	__u64			maxsize;
 };
 
 /*
@@ -222,6 +226,11 @@ struct nfs_lockres {
 		struct nfs_lock_denied  denied; /* LOCK failed, LOCKT success */
 	} u;
 	const struct nfs_server *	server;
+};
+
+struct nfs4_delegreturnargs {
+	const struct nfs_fh *fhandle;
+	const nfs4_stateid *stateid;
 };
 
 /*
