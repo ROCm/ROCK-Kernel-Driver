@@ -5,14 +5,19 @@
  *  Licensed under the terms of the GNU GPL License version 2.
  *  Based upon datasheets & sample CPUs kindly provided by VIA.
  *
- *  VIA have currently 2 different versions of Longhaul.
+ *  VIA have currently 3 different versions of Longhaul.
  *  Version 1 (Longhaul) uses the BCR2 MSR at 0x1147.
- *   It is present only in Samuel 1, Samuel 2 and Ezra.
- *  Version 2 (Powersaver) uses the POWERSAVER MSR at 0x110a.
- *   It is present in Ezra-T, Nehemiah and above.
- *   In addition to scaling multiplier, it can also scale voltage.
- *   There is provision for scaling FSB too, but this doesn't work
- *   too well in practice.
+ *   It is present only in Samuel 1 (C5A), Samuel 2 (C5B) stepping 0.
+ *  Version 2 of longhaul is the same as v1, but adds voltage scaling.
+ *   Present in Samuel 2 (steppings 1-7 only) (C5B), and Ezra (C5C)
+ *   voltage scaling support has currently been disabled in this driver
+ *   until we have code that gets it right.
+ *  Version 3 of longhaul got renamed to Powersaver and redesigned
+ *   to use the POWERSAVER MSR at 0x110a.
+ *   It is present in Ezra-T (C5M), Nehemiah (C5X) and above.
+ *   It's pretty much the same feature wise to longhaul v2, though
+ *   there is provision for scaling FSB too, but this doesn't work
+ *   too well in practice so we don't even try to use this.
  *
  *  BIG FAT DISCLAIMER: Work in progress code. Possibly *dangerous*
  */
@@ -95,6 +100,27 @@ static int longhaul_get_cpu_mult(void)
 }
 
 
+static void do_powersaver(union msr_longhaul *longhaul,
+			unsigned int clock_ratio_index, int version)
+{
+	rdmsrl(MSR_VIA_LONGHAUL, longhaul->val);
+	longhaul->bits.SoftBusRatio = clock_ratio_index & 0xf;
+	longhaul->bits.SoftBusRatio4 = (clock_ratio_index & 0x10) >> 4;
+	longhaul->bits.EnableSoftBusRatio = 1;
+	longhaul->bits.RevisionKey = 0;
+	local_irq_disable();
+	wrmsrl(MSR_VIA_LONGHAUL, longhaul->val);
+	local_irq_enable();
+	__hlt();
+
+	rdmsrl(MSR_VIA_LONGHAUL, longhaul->val);
+	longhaul->bits.EnableSoftBusRatio = 0;
+	longhaul->bits.RevisionKey = version;
+	local_irq_disable();
+	wrmsrl(MSR_VIA_LONGHAUL, longhaul->val);
+	local_irq_enable();
+}
+
 /**
  * longhaul_set_cpu_frequency()
  * @clock_ratio_index : bitpattern of the new multiplier.
@@ -126,61 +152,54 @@ static void longhaul_setstate(unsigned int clock_ratio_index)
 	dprintk (KERN_INFO PFX "FSB:%d Mult:%d.%dx\n", fsb, mult/10, mult%10);
 
 	switch (longhaul_version) {
+
+	/*
+	 * Longhaul v1. (Samuel[C5A] and Samuel2 stepping 0[C5B])
+	 * Software controlled multipliers only.
+	 *
+	 * *NB* Until we get voltage scaling working v1 & v2 are the same code.
+	 * Longhaul v2 appears in Samuel2 Steppings 1->7 [C5b] and Ezra [C5C]
+	 */
 	case 1:
 		rdmsrl (MSR_VIA_BCR2, bcr2.val);
 		/* Enable software clock multiplier */
 		bcr2.bits.ESOFTBF = 1;
 		bcr2.bits.CLOCKMUL = clock_ratio_index;
+		local_irq_disable();
 		wrmsrl (MSR_VIA_BCR2, bcr2.val);
+		local_irq_enable();
 
 		__hlt();
 
 		/* Disable software clock multiplier */
 		rdmsrl (MSR_VIA_BCR2, bcr2.val);
 		bcr2.bits.ESOFTBF = 0;
+		local_irq_disable();
 		wrmsrl (MSR_VIA_BCR2, bcr2.val);
+		local_irq_enable();
 		break;
 
 	/*
-	 * Powersaver. (Ezra-T [C5M], Nehemiah [C5N])
+	 * Longhaul v3 (aka Powersaver). (Ezra-T [C5M])
 	 * We can scale voltage with this too, but that's currently
 	 * disabled until we come up with a decent 'match freq to voltage'
 	 * algorithm.
-	 * We also need to do the voltage/freq setting in order depending
-	 * on the direction of scaling (like we do in powernow-k7.c)
-	 * Ezra-T was alleged to do FSB scaling too, but it never worked in practice.
+	 * When we add voltage scaling, we will also need to do the
+	 * voltage/freq setting in order depending on the direction
+	 * of scaling (like we do in powernow-k7.c)
 	 */
 	case 2:
-		rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
-		longhaul.bits.SoftBusRatio = clock_ratio_index & 0xf;
-		longhaul.bits.SoftBusRatio4 = (clock_ratio_index & 0x10) >> 4;
-		longhaul.bits.EnableSoftBusRatio = 1;
-		/* We must program the revision key only with values we
-		 * know about, not blindly copy it from 0:3 */
-		longhaul.bits.RevisionKey = 3;	/* SoftVID & SoftBSEL */
-		wrmsrl(MSR_VIA_LONGHAUL, longhaul.val);
-		__hlt();
-
-		rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
-		longhaul.bits.EnableSoftBusRatio = 0;
-		longhaul.bits.RevisionKey = 3;
-		wrmsrl (MSR_VIA_LONGHAUL, longhaul.val);
+		do_powersaver(&longhaul, clock_ratio_index, 3);
 		break;
+
+	/*
+	 * Powersaver. (Nehemiah [C5N])
+	 * As for Ezra-T, we don't do voltage yet.
+	 * This can do FSB scaling too, but it has never been proven
+	 * to work in practice.
+	 */
 	case 3:
-		rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
-		longhaul.bits.SoftBusRatio = clock_ratio_index & 0xf;
-		longhaul.bits.SoftBusRatio4 = (clock_ratio_index & 0x10) >> 4;
-		longhaul.bits.EnableSoftBusRatio = 1;
-
-		longhaul.bits.RevisionKey = 0x0;
-
-		wrmsrl(MSR_VIA_LONGHAUL, longhaul.val);
-		__hlt();
-
-		rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
-		longhaul.bits.EnableSoftBusRatio = 0;
-		longhaul.bits.RevisionKey = 0xf;
-		wrmsrl (MSR_VIA_LONGHAUL, longhaul.val);
+		do_powersaver(&longhaul, clock_ratio_index, 0xf);
 		break;
 	}
 
@@ -289,7 +308,11 @@ static int __init longhaul_get_ranges(void)
 		minmult=50;
 		maxmult=longhaul_get_cpu_mult();
 
-		fsb = eblcr_fsb_table_v2[longhaul.bits.MaxMHzFSB];
+		/* Starting with the 1.2GHz parts, theres a 200MHz bus. */
+		if ((cpu_khz/1000) > 1200)
+			fsb = 200;
+		else
+			fsb = eblcr_fsb_table_v2[longhaul.bits.MaxMHzFSB];
 		break;
 	}
 

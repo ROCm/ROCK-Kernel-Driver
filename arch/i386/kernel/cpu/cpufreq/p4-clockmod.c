@@ -184,7 +184,7 @@ static unsigned int cpufreq_p4_get_frequency(struct cpuinfo_x86 *c)
 		       "The speedstep_centrino module offers voltage scaling"
 		       " in addition of frequency scaling. You should use "
 		       "that instead of p4-clockmod, if possible.\n");
-		/* on P-4s, the TSC runs with constant frequency independent wether
+		/* on P-4s, the TSC runs with constant frequency independent whether
 		 * throttling is active or not. */
 		p4clockmod_driver.flags |= CPUFREQ_CONST_LOOPS;
 		return speedstep_get_processor_frequency(SPEEDSTEP_PROCESSOR_PM);
@@ -195,7 +195,7 @@ static unsigned int cpufreq_p4_get_frequency(struct cpuinfo_x86 *c)
 		return 0;
 	}
 
-	/* on P-4s, the TSC runs with constant frequency independent wether
+	/* on P-4s, the TSC runs with constant frequency independent whether
 	 * throttling is active or not. */
 	p4clockmod_driver.flags |= CPUFREQ_CONST_LOOPS;
 

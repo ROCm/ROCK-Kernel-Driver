@@ -115,6 +115,11 @@ static int speedstep_smi_get_freqs (unsigned int *low, unsigned int *high)
 		: "=a" (result), "=b" (high_mhz), "=c" (low_mhz), "=d" (state), "=D" (edi)
 		: "a" (command), "b" (function), "c" (state), "d" (smi_port), "S" (0)
 	);
+
+	/* abort if results are obviously incorrect... */
+	if ((high_mhz + low_mhz) < 600)
+		return -EINVAL;
+
 	*high = high_mhz * 1000;
 	*low  = low_mhz  * 1000;
 
@@ -180,7 +185,7 @@ static void speedstep_set_state (unsigned int state)
 	local_irq_restore(flags);
 
 	if (new_state == state) {
-		dprintk(KERN_INFO "cpufreq: change to %u MHz succeeded after %u tries with result %u\n", (freqs.new / 1000), retry, result);
+		dprintk(KERN_INFO "cpufreq: change to %u MHz succeeded after %u tries with result %u\n", (speedstep_freqs[new_state].frequency / 1000), retry, result);
 	} else {
 		printk(KERN_ERR "cpufreq: change failed with new_state %u and result %u\n", new_state, result);
 	}
