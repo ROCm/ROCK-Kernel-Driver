@@ -544,6 +544,7 @@ pcnet32_probe1(unsigned long ioaddr, unsigned int irq_line, int shared,
 	} else {
 		printk(KERN_INFO "pcnet32: probe at %lx failed\n", ioaddr);
 		goto err_release_region;
+	}
     }
 
     chip_version = a->read_csr(ioaddr, 88) | (a->read_csr(ioaddr,89) << 16);
