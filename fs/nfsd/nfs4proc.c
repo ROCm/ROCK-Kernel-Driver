@@ -450,7 +450,31 @@ nfsd4_rename(struct svc_rqst *rqstp, struct svc_fh *current_fh,
 static inline int
 nfsd4_setattr(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_setattr *setattr)
 {
-	return nfsd_setattr(rqstp, current_fh, &setattr->sa_iattr, 0, (time_t)0);
+	struct nfs4_stateid *stp;
+	int status = nfs_ok;
+
+	if (setattr->sa_iattr.ia_valid & ATTR_SIZE) {
+		status = nfserr_bad_stateid;
+		if (ZERO_STATEID(&setattr->sa_stateid) || ONE_STATEID(&setattr->sa_stateid)) {
+		dprintk("NFSD: nfsd4_setattr: magic stateid!\n");
+		goto out;
+		}
+
+		if ((status = nfs4_preprocess_stateid_op(current_fh, 
+						&setattr->sa_stateid, 
+						CHECK_FH, &stp))) {
+			dprintk("NFSD: nfsd4_setattr: couldn't process stateid!\n");
+			goto out;
+		}
+		status = nfserr_openmode;
+		if (!(stp->st_share_access & NFS4_SHARE_ACCESS_WRITE)) {
+			dprintk("NFSD: nfsd4_setattr: not opened for write!\n");
+			goto out;
+		}
+	}
+	status = nfsd_setattr(rqstp, current_fh, &setattr->sa_iattr, 0, (time_t)0);
+out:
+	return status;
 }
 
 static inline int
