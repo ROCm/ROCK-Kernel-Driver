@@ -57,17 +57,17 @@
 
 /* Section 3.1.  SCTP Common Header Format */
 typedef struct sctphdr {
-        uint16_t source;
-        uint16_t dest;
-        uint32_t vtag;
-        uint32_t checksum;
+	__u16 source;
+	__u16 dest;
+	__u32 vtag;
+	__u32 checksum;
 } sctp_sctphdr_t __attribute__((packed));
 
 /* Section 3.2.  Chunk Field Descriptions. */
 typedef struct sctp_chunkhdr {
-        uint8_t  type;
-        uint8_t  flags;
-        uint16_t length;
+	__u8 type;
+	__u8 flags;
+	__u16 length;
 } sctp_chunkhdr_t __attribute__((packed));
 
 
@@ -150,8 +150,8 @@ enum { SCTP_CHUNK_FLAG_T = 0x01 };
  */
 
 typedef struct sctp_paramhdr {
-	uint16_t type;
-	uint16_t length;
+	__u16 type;
+	__u16 length;
 } sctp_paramhdr_t __attribute((packed));
 
 typedef enum {
@@ -196,11 +196,11 @@ typedef enum {
 /* RFC 2960 Section 3.3.1 Payload Data (DATA) (0) */
 
 typedef struct sctp_datahdr {
-        uint32_t tsn;
-        uint16_t stream;
-        uint16_t ssn;
-        uint32_t ppid;
-        uint8_t  payload[0];
+	__u32 tsn;
+	__u16 stream;
+	__u16 ssn;
+	__u32 ppid;
+	__u8  payload[0];
 } sctp_datahdr_t __attribute__((packed));
 
 typedef struct sctp_data_chunk {
@@ -225,12 +225,12 @@ enum { SCTP_DATA_FRAG_MASK = 0x03, };
  *  endpoints.
  */  
 typedef struct sctp_inithdr {
-	uint32_t init_tag;
-	uint32_t a_rwnd;
-	uint16_t num_outbound_streams;
-	uint16_t num_inbound_streams;
-	uint32_t initial_tsn;
-	uint8_t  params[0];
+	__u32 init_tag;
+	__u32 a_rwnd;
+	__u16 num_outbound_streams;
+	__u16 num_inbound_streams;
+	__u32 initial_tsn;
+	__u8  params[0];
 } sctp_inithdr_t __attribute__((packed));
 
 typedef struct sctp_init_chunk {
@@ -285,7 +285,7 @@ typedef sctp_init_chunk_t sctp_initack_chunk_t;
 /* Section 3.3.3.1 State Cookie (7) */
 typedef struct sctp_cookie_param {
 	sctp_paramhdr_t p;
-	uint8_t body[0];
+	__u8 body[0];
 } sctp_cookie_param_t __attribute__((packed));
 
 /* Section 3.3.3.1 Unrecognized Parameters (8) */
@@ -305,8 +305,8 @@ typedef struct sctp_unrecognized_param {
  */
 
 typedef struct sctp_gap_ack_block {
-	uint16_t start;
-	uint16_t end;
+	__u16 start;
+	__u16 end;
 } sctp_gap_ack_block_t __attribute__((packed));
 
 typedef uint32_t sctp_dup_tsn_t;
@@ -317,10 +317,10 @@ typedef union {
 } sctp_sack_variable_t;
 
 typedef struct sctp_sackhdr {
-        uint32_t cum_tsn_ack;
-        uint32_t a_rwnd;
-        uint16_t num_gap_ack_blocks;
-        uint16_t num_dup_tsns;
+	__u32 cum_tsn_ack;
+	__u32 a_rwnd;
+	__u16 num_gap_ack_blocks;
+	__u16 num_dup_tsns;
 	sctp_sack_variable_t variable[0];
 } sctp_sackhdr_t __attribute__((packed));
 
@@ -360,7 +360,7 @@ typedef struct sctp_abort_chunk {
  * and the highest consecutive acking value.
  */
 typedef struct sctp_shutdownhdr {
-        uint32_t cum_tsn_ack;
+	__u32 cum_tsn_ack;
 } sctp_shutdownhdr_t __attribute__((packed));
 
 struct sctp_shutdown_chunk_t {
@@ -373,9 +373,9 @@ struct sctp_shutdown_chunk_t {
 /* RFC 2960.  Section 3.3.10 Operation Error (ERROR) (9) */
 
 typedef struct sctp_errhdr {
-        uint16_t cause;
-        uint16_t length;
-	uint8_t  variable[0];
+	__u16 cause;
+	__u16 length;
+	__u8  variable[0];
 } sctp_errhdr_t __attribute__((packed));
 
 typedef struct sctp_operr_chunk {
@@ -450,7 +450,7 @@ typedef enum {
  *   Explicit Congestion Notification Echo (ECNE) (12)
  */
 typedef struct sctp_ecnehdr {
-	uint32_t lowest_tsn;
+	__u32 lowest_tsn;
 } sctp_ecnehdr_t;
 
 typedef struct sctp_ecne_chunk {
@@ -462,7 +462,7 @@ typedef struct sctp_ecne_chunk {
  *   Congestion Window Reduced (CWR) (13)
  */
 typedef struct sctp_cwrhdr {
-	uint32_t lowest_tsn;
+	__u32 lowest_tsn;
 } sctp_cwrhdr_t;
 
 typedef struct sctp_cwr_chunk {
@@ -496,9 +496,9 @@ typedef struct sctp_cwr_chunk {
  * an ASCONF Chunk.
  */
 typedef struct {
-	uint32_t	correlation;
+	__u32	correlation;
 	sctp_paramhdr_t p;
-	uint8_t		payload[0];
+	__u8		payload[0];
 } sctpAsconfReq_t;
 
 /* ADDIP
@@ -512,10 +512,10 @@ typedef struct {
  * variable parameters.
  */
 typedef struct {
-	uint32_t	serial;
-	uint8_t		reserved[3];
-	uint8_t		addr_type;
-	uint32_t	addr[4];
+	__u32	serial;
+	__u8	reserved[3];
+	__u8	addr_type;
+	__u32	addr[4];
 	sctpAsconfReq_t requests[0];
 } sctpAsconf_t;
   
@@ -539,11 +539,11 @@ typedef struct {
  */
 typedef union {
 	struct {
-		uint32_t	correlation;
+		__u32		correlation;
 		sctp_paramhdr_t header;	/* success report */
 	} success;
 	struct {
-		uint32_t	correlation;
+		__u32		correlation;
 		sctp_paramhdr_t header;	/* error cause indication */
 		sctp_paramhdr_t errcause;
 		uint8_t request[0];	/* original request from ASCONF */
@@ -562,7 +562,7 @@ typedef union {
  * ASCONF Parameters that were processed by the receiver.
  */
 typedef struct {
-	uint32_t	serial;
+	__u32	serial;
 	sctpAsconfAckRsp_t responses[0];
 } sctpAsconfAck_t;
 
