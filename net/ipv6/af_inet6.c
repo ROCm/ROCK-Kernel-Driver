@@ -77,8 +77,11 @@ MODULE_LICENSE("GPL");
 extern int raw6_proc_init(void);
 extern int raw6_proc_exit(void);
 
-extern int tcp6_get_info(char *, char **, off_t, int);
-extern int udp6_get_info(char *, char **, off_t, int);
+extern int tcp6_proc_init(void);
+extern void tcp6_proc_exit(void);
+
+extern int udp6_proc_init(void);
+extern void udp6_proc_exit(void);
 
 extern int ipv6_misc_proc_init(void);
 extern int ipv6_misc_proc_exit(void);
@@ -787,9 +790,9 @@ static int __init inet6_init(void)
 	err = -ENOMEM;
 	if (raw6_proc_init())
 		goto proc_raw6_fail;
-	if (!proc_net_create("tcp6", 0, tcp6_get_info))
+	if (tcp6_proc_init())
 		goto proc_tcp6_fail;
-	if (!proc_net_create("udp6", 0, udp6_get_info))
+	if (udp6_proc_init())
 		goto proc_udp6_fail;
 	if (ipv6_misc_proc_init())
 		goto proc_misc6_fail;
@@ -820,9 +823,9 @@ static int __init inet6_init(void)
 proc_anycast6_fail:
 	ipv6_misc_proc_exit();
 proc_misc6_fail:
-	proc_net_remove("udp6");
+	udp6_proc_exit();
 proc_udp6_fail:
-	proc_net_remove("tcp6");
+	tcp6_proc_exit();
 proc_tcp6_fail:
 	raw6_proc_exit();
 proc_raw6_fail:

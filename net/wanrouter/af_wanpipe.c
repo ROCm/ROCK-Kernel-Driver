@@ -1408,8 +1408,7 @@ static int wanpipe_bind(struct socket *sock, struct sockaddr *uaddr, int addr_le
 		/* Bind a socket to a interface name 
                  * This is used by PVC mostly
                  */
-		strncpy(name,sll->sll_device,14);
-		name[14]=0;
+		strlcpy(name,sll->sll_device,sizeof(name));
 		dev = dev_get_by_name(name);
 		if (dev == NULL){
 			printk(KERN_INFO "wansock: Failed to get Dev from name: %s,\n",

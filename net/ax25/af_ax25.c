@@ -743,9 +743,8 @@ static int ax25_getsockopt(struct socket *sock, int level, int optname,
 		ax25_dev = ax25->ax25_dev;
 
 		if (ax25_dev != NULL && ax25_dev->dev != NULL) {
-			strncpy(devname, ax25_dev->dev->name, IFNAMSIZ);
-			length = min_t(unsigned int, strlen(ax25_dev->dev->name)+1, maxlen);
-			devname[length-1] = '\0';
+			strlcpy(devname, ax25_dev->dev->name, sizeof(devname));
+			length = strlen(devname) + 1;
 		} else {
 			*devname = '\0';
 			length = 1;

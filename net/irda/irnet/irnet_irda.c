@@ -114,7 +114,7 @@ irnet_open_tsap(irnet_socket *	self)
   notify.flow_indication	= irnet_flow_indication;
   notify.status_indication	= irnet_status_indication;
   notify.instance		= self;
-  strncpy(notify.name, IRNET_NOTIFY_NAME, NOTIFY_MAX_NAME);
+  strlcpy(notify.name, IRNET_NOTIFY_NAME, sizeof(notify.name));
 
   /* Open an IrTTP instance */
   self->tsap = irttp_open_tsap(LSAP_ANY, DEFAULT_INITIAL_CREDIT,
@@ -692,7 +692,7 @@ irnet_daddr_to_dname(irnet_socket *	self)
       if(discoveries[i].daddr == self->daddr)
 	{
 	  /* Yes !!! Get it.. */
-	  strncpy(self->rname, discoveries[i].info, NICKNAME_MAX_LEN);
+	  strlcpy(self->rname, discoveries[i].info, sizeof(self->rname));
 	  self->rname[NICKNAME_MAX_LEN + 1] = '\0';
 	  DEBUG(IRDA_SERV_INFO, "Device 0x%08x is in fact ``%s''.\n",
 		self->daddr, self->rname);
