@@ -94,7 +94,6 @@ static void sd_init_onedisk(struct scsi_disk * sdkp, struct gendisk *disk);
 static void sd_rw_intr(struct scsi_cmnd * SCpnt);
 
 static int sd_attach(struct scsi_device *);
-static int sd_detect(struct scsi_device *);
 static void sd_detach(struct scsi_device *);
 static int sd_init_command(struct scsi_cmnd *);
 static int sd_synchronize_cache(struct scsi_disk *, int);
@@ -107,7 +106,6 @@ static struct Scsi_Device_Template sd_template = {
 	.name		= "disk",
 	.tag		= "sd",
 	.scsi_type	= TYPE_DISK,
-	.detect		= sd_detect,
 	.attach		= sd_attach,
 	.detach		= sd_detach,
 	.init_command	= sd_init_command,
@@ -758,7 +756,6 @@ static void
 sd_spinup_disk(struct scsi_disk *sdkp, char *diskname,
 	       struct scsi_request *SRpnt, unsigned char *buffer) {
 	unsigned char cmd[10];
-	struct scsi_device *sdp = sdkp->device;
 	unsigned long spintime_value = 0;
 	int the_result, retries, spintime;
 
@@ -1163,23 +1160,6 @@ sd_init_onedisk(struct scsi_disk * sdkp, struct gendisk *disk)
 	scsi_release_request(SRpnt);
 
 	kfree(buffer);
-}
-
-/**
- *	sd_detect - called at the start of driver initialization, once 
- *	for each scsi device (not just disks) present.
- *
- *	Returns 0 if not interested in this scsi device (e.g. scanner);
- *	1 if this device is of interest (e.g. a disk).
- *
- *	Note: this function is invoked from the scsi mid-level.
- **/
-static int sd_detect(struct scsi_device * sdp)
-{
-	SCSI_LOG_HLQUEUE(3, printk("sd_detect: type=%d\n", sdp->type));
-	if (sdp->type != TYPE_DISK && sdp->type != TYPE_MOD)
-		return 0;
-	return 1;
 }
 
 /**

@@ -757,7 +757,7 @@ config SCSI
 	  inserted in and removed from the running kernel whenever you want).
 	  The module will be called scsi_mod.o.  If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt> and
-	  <file:Documentation/scsi.txt>.  However, do not compile this as a
+	  <file:Documentation/scsi/scsi.txt>.  However, do not compile this as a
 	  module if your root file system (the one containing the directory /)
 	  is located on a SCSI device.
 
@@ -778,7 +778,7 @@ config BLK_DEV_SD
 	  inserted in and removed from the running kernel whenever you want).
 	  The module will be called sd_mod.o.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> and
-	  <file:Documentation/scsi.txt>.  Do not compile this driver as a
+	  <file:Documentation/scsi/scsi.txt>.  Do not compile this driver as a
 	  module if your root file system (the one containing the directory /)
 	  is located on a SCSI disk. In this case, do not compile the driver
 	  for your SCSI host adapter (below) as a module either.
@@ -807,14 +807,14 @@ config CHR_DEV_ST
 	  If you want to use a SCSI tape drive under Linux, say Y and read the
 	  SCSI-HOWTO, available from
 	  <http://www.linuxdoc.org/docs.html#howto>, and
-	  <file:drivers/scsi/README.st> in the kernel source.  This is NOT for
-	  SCSI CD-ROMs.
+	  <file:Documentation/scsi/st.txt> in the kernel source.  This is NOT
+	  for SCSI CD-ROMs.
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
 	  The module will be called st.o. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> and
-	  <file:Documentation/scsi.txt>.
+	  <file:Documentation/scsi/scsi.txt>.
 
 config CHR_DEV_OSST
 	tristate "SCSI OnStream SC-x0 tape support"
@@ -829,7 +829,7 @@ config CHR_DEV_OSST
 	  tapes (QIC-157) and can be driven by the standard driver st.
 	  For more information, you may have a look at the SCSI-HOWTO
 	  <http://www.linuxdoc.org/docs.html#howto>  and
-	  <file:drivers/scsi/README.osst>  in the kernel source.
+	  <file:Documentation/scsi/osst.txt>  in the kernel source.
 	  More info on the OnStream driver may be found on
 	  <http://linux1.onstream.nl/test/>
 	  Please also have a look at the standard st docu, as most of it
@@ -839,7 +839,7 @@ config CHR_DEV_OSST
 	  inserted in and removed from the running kernel whenever you want).
 	  The module will be called osst.o. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> and
-	  <file:Documentation/scsi.txt>.
+	  <file:Documentation/scsi/scsi.txt>.
 
 config BLK_DEV_SR
 	tristate "SCSI CDROM support"
@@ -854,7 +854,7 @@ config BLK_DEV_SR
 	  inserted in and removed from the running kernel whenever you want).
 	  The module will be called sr_mod.o. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> and
-	  <file:Documentation/scsi.txt>.
+	  <file:Documentation/scsi/scsi.txt>.
 
 config BLK_DEV_SR_VENDOR
 	bool "Enable vendor-specific extensions (for SCSI CDROM)"
@@ -900,13 +900,13 @@ config CHR_DEV_SG
 	  quality digital reader of audio CDs (<http://www.xiph.org/paranoia/>).
 	  For other devices, it's possible that you'll have to write the
 	  driver software yourself. Please read the file
-	  <file:Documentation/scsi-generic.txt> for more information.
+	  <file:Documentation/scsi/scsi-generic.txt> for more information.
 
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt> and
-	  <file:Documentation/scsi.txt>. The module will be called sg.o. If unsure,
-	  say N.
+	  <file:Documentation/scsi/scsi.txt>. The module will be called sg.o.
+	  If unsure, say N.
 
 comment "Some SCSI devices (e.g. CD jukebox) support multiple LUNs"
 	depends on SCSI
@@ -1025,7 +1025,7 @@ config SCSI_AIC7XXX_OLD
 	  Information on the configuration options for this controller can be
 	  found by checking the help file for each of the available
 	  configuration options. You should read
-	  <file:drivers/scsi/aic7xxx_old/README.aic7xxx> at a minimum before
+	  <file:Documentation/scsi/aic7xxx_old.txt> at a minimum before
 	  contacting the maintainer with any questions.  The SCSI-HOWTO,
 	  available from <http://www.linuxdoc.org/docs.html#howto>, can also
 	  be of great help.
@@ -1051,7 +1051,7 @@ config AIC7XXX_OLD_TCQ_ON_BY_DEFAULT
 
 	  If you say Y here, you can still turn off TCQ on troublesome devices
 	  with the use of the tag_info boot parameter.  See the file
-	  <file:drivers/scsi/README.aic7xxx> for more information on that and
+	  <file:Documentation/scsi/aic7xxx.txt> for more information on that and
 	  other aic7xxx setup commands.  If this option is turned off, you may
 	  still enable TCQ on known good devices by use of the tag_info boot
 	  parameter.
@@ -1061,7 +1061,7 @@ config AIC7XXX_OLD_TCQ_ON_BY_DEFAULT
 
 	  However, TCQ can increase performance on some hard drives by as much
 	  as 50% or more, so it is recommended that if you say N here, you
-	  should at least read the <file:drivers/scsi/README.aic7xxx> file so
+	  should at least read the <file:Documentation/scsi/aic7xxx.txt> file so
 	  you will know how to enable this option manually should your drives
 	  prove to be safe in regards to TCQ.
 
@@ -1200,7 +1200,7 @@ config SCSI_NCR53C8XX
 	  only one may be active at a time.  If you have a 53c8xx board, you
 	  probably do not want to use the "NCR53c7,8xx SCSI support".
 
-	  Please read <file:drivers/scsi/README.ncr53c8xx> for more
+	  Please read <file:Documentation/scsi/ncr53c8xx.txt> for more
 	  information.
 
 config SCSI_SYM53C8XX
@@ -1227,7 +1227,7 @@ config SCSI_SYM53C8XX
 	  SYM53C8XX driver, thus allowing the NCR53C8XX driver to attach them.
 	  The 'excl' option is also supported by the NCR53C8XX driver.
 
-	  Please read <file:drivers/scsi/README.ncr53c8xx> for more
+	  Please read <file:Documentation/scsi/ncr53c8xx.txt> for more
 	  information.
 
 config SCSI_NCR53C8XX_DEFAULT_TAGS
@@ -1371,7 +1371,7 @@ config SCSI_QLOGIC_ISP
 	  If you say Y here, make sure to choose "BIOS" at the question "PCI
 	  access mode".
 
-	  Please read the file <file:drivers/scsi/README.qlogicisp>.  You
+	  Please read the file <file:Documentation/scsi/qlogicisp.txt>.  You
 	  should also read the SCSI-HOWTO, available from
 	  <http://www.linuxdoc.org/docs.html#howto>.
 
