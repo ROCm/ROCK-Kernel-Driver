@@ -923,7 +923,7 @@ asmlinkage long sys_keyctl(int option, unsigned long arg2, unsigned long arg3,
 					     (int) arg3);
 
 	case KEYCTL_JOIN_SESSION_KEYRING:
-		return keyctl_join_session_keyring((const char __user *) arg3);
+		return keyctl_join_session_keyring((const char __user *) arg2);
 
 	case KEYCTL_UPDATE:
 		return keyctl_update_key((key_serial_t) arg2,
