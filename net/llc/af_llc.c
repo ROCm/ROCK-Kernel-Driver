@@ -495,18 +495,18 @@ static int llc_ui_wait_for_disc(struct sock *sk, int timeout)
 	add_wait_queue_exclusive(sk->sk_sleep, &wait);
 	for (;;) {
 		__set_current_state(TASK_INTERRUPTIBLE);
-		rc = -ERESTARTSYS;
-		if (signal_pending(current))
-			break;
-		rc = -EAGAIN;
-		if (!timeout)
-			break;
 		rc = 0;
 		if (sk->sk_state != TCP_CLOSE) {
 			release_sock(sk);
 			timeout = schedule_timeout(timeout);
 			lock_sock(sk);
 		} else
+			break;
+		rc = -ERESTARTSYS;
+		if (signal_pending(current))
+			break;
+		rc = -EAGAIN;
+		if (!timeout)
 			break;
 	}
 	__set_current_state(TASK_RUNNING);
@@ -525,18 +525,18 @@ static int llc_ui_wait_for_conn(struct sock *sk, int timeout)
 		rc = -EAGAIN;
 		if (sk->sk_state == TCP_CLOSE)
 			break;
-		rc = -ERESTARTSYS;
-		if (signal_pending(current))
-			break;
-		rc = -EAGAIN;
-		if (!timeout)
-			break;
 		rc = 0;
 		if (sk->sk_state != TCP_ESTABLISHED) {
 			release_sock(sk);
 			timeout = schedule_timeout(timeout);
 			lock_sock(sk);
 		} else
+			break;
+		rc = -ERESTARTSYS;
+		if (signal_pending(current))
+			break;
+		rc = -EAGAIN;
+		if (!timeout)
 			break;
 	}
 	__set_current_state(TASK_RUNNING);
@@ -554,12 +554,6 @@ static int llc_ui_wait_for_data(struct sock *sk, int timeout)
 		__set_current_state(TASK_INTERRUPTIBLE);
 		if (sk->sk_shutdown & RCV_SHUTDOWN)
 			break;
-		rc = -ERESTARTSYS;
-		if (signal_pending(current))
-			break;
-		rc = -EAGAIN;
-		if (!timeout)
-			break;
 		/*
 		 * Well, if we have backlog, try to process it now.
 		 */
@@ -573,6 +567,12 @@ static int llc_ui_wait_for_data(struct sock *sk, int timeout)
 			timeout = schedule_timeout(timeout);
 			lock_sock(sk);
 		} else
+			break;
+		rc = -ERESTARTSYS;
+		if (signal_pending(current))
+			break;
+		rc = -EAGAIN;
+		if (!timeout)
 			break;
 	}
 	__set_current_state(TASK_RUNNING);
@@ -593,18 +593,18 @@ static int llc_ui_wait_for_busy_core(struct sock *sk, int timeout)
 		rc = -ENOTCONN;
 		if (sk->sk_shutdown & RCV_SHUTDOWN)
 			break;
-		rc = -ERESTARTSYS;
-		if (signal_pending(current))
-			break;
-		rc = -EAGAIN;
-		if (!timeout)
-			break;
 		rc = 0;
 		if (llc_data_accept_state(llc->state) || llc->p_flag) {
 			release_sock(sk);
 			timeout = schedule_timeout(timeout);
 			lock_sock(sk);
 		} else
+			break;
+		rc = -ERESTARTSYS;
+		if (signal_pending(current))
+			break;
+		rc = -EAGAIN;
+		if (!timeout)
 			break;
 	}
 	__set_current_state(TASK_RUNNING);
