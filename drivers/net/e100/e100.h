@@ -706,8 +706,6 @@ typedef enum _non_tx_cmd_state_t {
 #define IPCB_INSERTVLAN_ENABLE 		BIT_1
 #define IPCB_IP_ACTIVATION_DEFAULT      IPCB_HARDWAREPARSING_ENABLE
 
-#define FOLD_CSUM(_XSUM)  ((((_XSUM << 16) | (_XSUM >> 16)) + _XSUM) >> 16)
-
 /* Transmit Buffer Descriptor (TBD)*/
 typedef struct _tbd_t {
 	u32 tbd_buf_addr;	/* Physical Transmit Buffer Address */
