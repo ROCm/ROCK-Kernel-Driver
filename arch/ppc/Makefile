@@ -24,7 +24,7 @@ LDFLAGS_vmlinux	:= -Ttext $(KERNELLOAD) -Bstatic
 CPPFLAGS	+= -Iarch/$(ARCH)
 AFLAGS		+= -Iarch/$(ARCH)
 CFLAGS		+= -Iarch/$(ARCH) -msoft-float -pipe \
-		-ffixed-r2 -Wno-uninitialized -mmultiple
+		-ffixed-r2 -mmultiple
 CPP		= $(CC) -E $(CFLAGS)
 
 CHECKFLAGS	+= -D__powerpc__=1
