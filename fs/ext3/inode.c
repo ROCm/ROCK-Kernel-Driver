@@ -455,14 +455,22 @@ no_block:
  *	  + if pointer will live in indirect block - allocate near that block.
  *	  + if pointer will live in inode - allocate in the same
  *	    cylinder group. 
+ *
+ * In the latter case we colour the starting block by the callers PID to
+ * prevent it from clashing with concurrent allocations for a different inode
+ * in the same block group.   The PID is used here so that functionally related
+ * files will be close-by on-disk.
+ *
  *	Caller must make sure that @ind is valid and will stay that way.
  */
 
-static inline unsigned long ext3_find_near(struct inode *inode, Indirect *ind)
+static unsigned long ext3_find_near(struct inode *inode, Indirect *ind)
 {
 	struct ext3_inode_info *ei = EXT3_I(inode);
 	u32 *start = ind->bh ? (u32*) ind->bh->b_data : ei->i_data;
 	u32 *p;
+	unsigned long bg_start;
+	unsigned long colour;
 
 	/* Try to find previous block */
 	for (p = ind->p - 1; p >= start; p--)
@@ -477,8 +485,11 @@ static inline unsigned long ext3_find_near(struct inode *inode, Indirect *ind)
 	 * It is going to be refered from inode itself? OK, just put it into
 	 * the same cylinder group then.
 	 */
-	return (ei->i_block_group * EXT3_BLOCKS_PER_GROUP(inode->i_sb)) +
-	       le32_to_cpu(EXT3_SB(inode->i_sb)->s_es->s_first_data_block);
+	bg_start = (ei->i_block_group * EXT3_BLOCKS_PER_GROUP(inode->i_sb)) +
+		le32_to_cpu(EXT3_SB(inode->i_sb)->s_es->s_first_data_block);
+	colour = (current->pid % 16) *
+			(EXT3_BLOCKS_PER_GROUP(inode->i_sb) / 16);
+	return bg_start + colour;
 }
 
 /**
