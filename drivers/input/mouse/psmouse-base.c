@@ -223,7 +223,7 @@ int psmouse_command(struct psmouse *psmouse, unsigned char *param, int command)
 	psmouse->cmdcnt = receive;
 
 	if (command == PSMOUSE_CMD_RESET_BAT)
-                timeout = 2000000; /* 2 sec */
+                timeout = 4000000; /* 4 sec */
 
 	if (command & 0xff)
 		if (psmouse_sendbyte(psmouse, command & 0xff))
