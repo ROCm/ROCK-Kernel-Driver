@@ -168,7 +168,7 @@ void nbd_send_req(struct socket *sock, struct request *req)
 		struct bio *bio = req->bio;
 		DEBUG("data, ");
 		do {
-			result = nbd_xmit(1, sock, bio_data(bio), bio_size(bio), bio->bi_next == NULL ? 0 : MSG_MORE);
+			result = nbd_xmit(1, sock, bio_data(bio), bio->bi_size, bio->bi_next == NULL ? 0 : MSG_MORE);
 			if (result <= 0)
 				FAIL("Send data failed.");
 			bio = bio->bi_next;
@@ -208,7 +208,7 @@ struct request *nbd_read_stat(struct nbd_device *lo)
 		struct bio *bio = req->bio;
 		DEBUG("data, ");
 		do {
-			result = nbd_xmit(0, lo->sock, bio_data(bio), bio_size(bio), MSG_WAITALL);
+			result = nbd_xmit(0, lo->sock, bio_data(bio), bio->bi_size, MSG_WAITALL);
 			if (result <= 0)
 				HARDFAIL("Recv data failed.");
 			bio = bio->bi_next;

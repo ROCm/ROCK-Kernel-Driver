@@ -287,8 +287,8 @@ static int i2ob_send(u32 m, struct i2ob_device *dev, struct i2ob_request *ireq, 
 		while(bio)
 		{
 			if (bio_to_phys(bio) == last) {
-				size += bio_size(bio);
-				last += bio_size(bio);
+				size += bio->bi_size;
+				last += bio->bi_size;
 				if(bio->bi_next)
 					__raw_writel(0x14000000|(size), mptr-8);
 				else
@@ -297,16 +297,16 @@ static int i2ob_send(u32 m, struct i2ob_device *dev, struct i2ob_request *ireq, 
 			else
 			{
 				if(bio->bi_next)
-					__raw_writel(0x10000000|bio_size(bio), mptr);
+					__raw_writel(0x10000000|bio->bi_size, mptr);
 				else
-					__raw_writel(0xD0000000|bio_size(bio), mptr);
+					__raw_writel(0xD0000000|bio->bi_size, mptr);
 				__raw_writel(bio_to_phys(bio), mptr+4);
 				mptr += 8;	
-				size = bio_size(bio);
-				last = bio_to_phys(bio) + bio_size(bio);
+				size = bio->bi_size;
+				last = bio_to_phys(bio) + bio->bi_size;
 			}
 
-			count -= bio_size(bio);
+			count -= bio->bi_size;
 			bio = bio->bi_next;
 		}
 		/*
@@ -326,8 +326,8 @@ static int i2ob_send(u32 m, struct i2ob_device *dev, struct i2ob_request *ireq, 
 		while(bio)
 		{
 			if (bio_to_phys(bio) == last) {
-				size += bio_size(bio);
-				last += bio_size(bio);
+				size += bio->bi_size;
+				last += bio->bi_size;
 				if(bio->bi_next)
 					__raw_writel(0x14000000|(size), mptr-8);
 				else
@@ -336,16 +336,16 @@ static int i2ob_send(u32 m, struct i2ob_device *dev, struct i2ob_request *ireq, 
 			else
 			{
 				if(bio->bi_next)
-					__raw_writel(0x14000000|bio_size(bio), mptr);
+					__raw_writel(0x14000000|bio->bi_size, mptr);
 				else
-					__raw_writel(0xD4000000|bio_size(bio), mptr);
+					__raw_writel(0xD4000000|bio->bi_size, mptr);
 				__raw_writel(bio_to_phys(bio), mptr+4);
 				mptr += 8;	
-				size = bio_size(bio);
-				last = bio_to_phys(bio) + bio_size(bio);
+				size = bio->bi_size;
+				last = bio_to_phys(bio) + bio->bi_size;
 			}
 
-			count -= bio_size(bio);
+			count -= bio->bi_size;
 			bio = bio->bi_next;
 		}
 

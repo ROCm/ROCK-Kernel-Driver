@@ -116,9 +116,6 @@ MODULE_DEVICE_TABLE (usb, id_table);
 static struct usb_serial_device_type empeg_device = {
 	name:			"Empeg",
 	id_table:		id_table,
-	needs_interrupt_in:	MUST_HAVE_NOT,	/* must not have an interrupt in endpoint */
-	needs_bulk_in:		MUST_HAVE,	/* must have a bulk in endpoint */
-	needs_bulk_out:		MUST_HAVE,	/* must have a bulk out endpoint */
 	num_interrupt_in:	0,
 	num_bulk_in:		1,
 	num_bulk_out:		1,

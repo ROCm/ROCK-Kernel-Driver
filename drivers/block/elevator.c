@@ -98,7 +98,7 @@ inline int elv_rq_merge_ok(request_queue_t *q, struct request *rq,
 {
 	if (bio_data_dir(bio) == rq->cmd) {
 		if (rq->rq_dev == bio->bi_dev && !rq->waiting
-		    && !rq->special && rq->inactive && rq->q == q)
+		    && !rq->special && rq->inactive)
 			return 1;
 	}
 

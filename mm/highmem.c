@@ -207,35 +207,31 @@ static LIST_HEAD(emergency_bhs);
  * queue gfp mask set, *to may or may not be a highmem page. kmap it
  * always, it will do the Right Thing
  */
-static inline void copy_from_high_bio(struct bio *to, struct bio *from)
-{
-	unsigned char *vto, *vfrom;
-
-	if (unlikely(in_interrupt()))
-		BUG();
-
-	vto = bio_kmap(to);
-	vfrom = bio_kmap(from);
-
-	memcpy(vto, vfrom + bio_offset(from), bio_size(to));
-
-	bio_kunmap(from);
-	bio_kunmap(to);
-}
-
 static inline void copy_to_high_bio_irq(struct bio *to, struct bio *from)
 {
 	unsigned char *vto, *vfrom;
 	unsigned long flags;
+	struct bio_vec *tovec, *fromvec;
+	int i;
 
-	__save_flags(flags);
-	__cli();
-	vto = kmap_atomic(bio_page(to), KM_BOUNCE_READ);
-	vfrom = kmap_atomic(bio_page(from), KM_BOUNCE_READ);
-	memcpy(vto + bio_offset(to), vfrom, bio_size(to));
-	kunmap_atomic(vfrom, KM_BOUNCE_READ);
-	kunmap_atomic(vto, KM_BOUNCE_READ);
-	__restore_flags(flags);
+	bio_for_each_segment(tovec, to, i) {
+		fromvec = &from->bi_io_vec[i];
+
+		/*
+		 * not bounced
+		 */
+		if (tovec->bv_page == fromvec->bv_page)
+			continue;
+
+		vfrom = page_address(fromvec->bv_page) + fromvec->bv_offset;
+
+		__save_flags(flags);
+		__cli();
+		vto = kmap_atomic(tovec->bv_page, KM_BOUNCE_READ);
+		memcpy(vto + tovec->bv_offset, vfrom, to->bi_size);
+		kunmap_atomic(vto, KM_BOUNCE_READ);
+		__restore_flags(flags);
+	}
 }
 
 static __init int init_emergency_pool(void)
@@ -347,15 +343,64 @@ repeat_alloc:
 	goto repeat_alloc;
 }
 
-void create_bounce(struct bio **bio_orig, int gfp_mask)
+void create_bounce(unsigned long pfn, struct bio **bio_orig, int gfp_mask)
 {
 	struct page *page;
-	struct bio *bio;
+	struct bio *bio = NULL;
 	int i, rw = bio_data_dir(*bio_orig);
+	struct bio_vec *to, *from;
 
 	BUG_ON((*bio_orig)->bi_idx);
 
-	bio = bio_alloc(GFP_NOHIGHIO, (*bio_orig)->bi_vcnt);
+	bio_for_each_segment(from, *bio_orig, i) {
+		page = from->bv_page;
+
+		/*
+		 * is destination page below bounce pfn?
+		 */
+		if ((page - page->zone->zone_mem_map) + (page->zone->zone_start_paddr >> PAGE_SHIFT) < pfn)
+			continue;
+
+		/*
+		 * irk, bounce it
+		 */
+		if (!bio)
+			bio = bio_alloc(GFP_NOHIGHIO, (*bio_orig)->bi_vcnt);
+
+		to = &bio->bi_io_vec[i];
+
+		to->bv_page = alloc_bounce_page(gfp_mask);
+		to->bv_len = from->bv_len;
+		to->bv_offset = from->bv_offset;
+
+		if (rw & WRITE) {
+			char *vto, *vfrom;
+
+			vto = page_address(to->bv_page) + to->bv_offset;
+			vfrom = kmap(from->bv_page);
+			memcpy(vto, vfrom + from->bv_offset, to->bv_len);
+			kunmap(to->bv_page);
+		}
+	}
+
+	/*
+	 * no pages bounced
+	 */
+	if (!bio)
+		return;
+
+	/*
+	 * at least one page was bounced, fill in possible non-highmem
+	 * pages
+	 */
+	bio_for_each_segment(from, *bio_orig, i) {
+		to = &bio->bi_io_vec[i];
+		if (!to->bv_page) {
+			to->bv_page = from->bv_page;
+			to->bv_len = from->bv_len;
+			to->bv_offset = to->bv_offset;
+		}
+	}
 
 	bio->bi_dev = (*bio_orig)->bi_dev;
 	bio->bi_sector = (*bio_orig)->bi_sector;
@@ -369,23 +414,6 @@ void create_bounce(struct bio **bio_orig, int gfp_mask)
 		bio->bi_end_io = bounce_end_io_write;
 	else
 		bio->bi_end_io = bounce_end_io_read;
-
-	for (i = 0; i < bio->bi_vcnt; i++) {
-		char *vto, *vfrom;
-
-		page = alloc_bounce_page(gfp_mask);
-
-		bio->bi_io_vec[i].bv_page = page;
-		bio->bi_io_vec[i].bv_len = (*bio_orig)->bi_io_vec[i].bv_len;
-		bio->bi_io_vec[i].bv_offset = 0;
-
-		if (rw & WRITE) {
-			vto = page_address(page);
-			vfrom = __bio_kmap(*bio_orig, i);
-			memcpy(vto, vfrom + __bio_offset(*bio_orig, i), bio->bi_io_vec[i].bv_len);
-			__bio_kunmap(bio, i);
-		}
-	}
 
 	bio->bi_private = *bio_orig;
 	*bio_orig = bio;

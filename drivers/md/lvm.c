@@ -1246,8 +1246,6 @@ static int lvm_map(struct bio *bh)
  	}
 
  out:
-	if (test_bit(BIO_HASHED, &bh->bi_flags))
-		BUG();
 	bh->bi_dev = rdev_map;
 	bh->bi_sector = rsector_map;
 	up_read(&lv->lv_lock);

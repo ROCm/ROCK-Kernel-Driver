@@ -108,13 +108,6 @@ struct usb_serial {
 };
 
 
-#define MUST_HAVE_NOT	0x01
-#define MUST_HAVE	0x02
-#define DONT_CARE	0x03
-
-#define	HAS		0x02
-#define HAS_NOT		0x01
-
 #define NUM_DONT_CARE	(-1)
 
 
@@ -122,9 +115,6 @@ struct usb_serial {
 struct usb_serial_device_type {
 	char	*name;
 	const struct usb_device_id *id_table;
-	char	needs_interrupt_in;
-	char	needs_bulk_in;
-	char	needs_bulk_out;
 	char	num_interrupt_in;
 	char	num_bulk_in;
 	char	num_bulk_out;

@@ -118,9 +118,6 @@ static void pl2303_shutdown (struct usb_serial *serial);
 static struct usb_serial_device_type pl2303_device = {
 	name:			"PL-2303",
 	id_table:		id_table,
-	needs_interrupt_in:	DONT_CARE,		/* this device must have an interrupt in endpoint */
-	needs_bulk_in:		MUST_HAVE,		/* this device must have a bulk in endpoint */
-	needs_bulk_out:		MUST_HAVE,		/* this device must have a bulk out endpoint */
 	num_interrupt_in:	NUM_DONT_CARE,
 	num_bulk_in:		1,
 	num_bulk_out:		1,

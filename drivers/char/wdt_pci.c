@@ -71,7 +71,7 @@
 #define PCI_DEVICE_ID_WDG_CSM 0x22c0
 #endif
 
-static int wdt_is_open;
+static unsigned long wdt_is_open;
 
 /*
  *	You must set these - there is no sane way to probe for this board.

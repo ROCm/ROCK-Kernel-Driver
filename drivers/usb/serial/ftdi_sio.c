@@ -176,9 +176,6 @@ static void ftdi_sio_break_ctl		(struct usb_serial_port *port, int break_state )
 static struct usb_serial_device_type ftdi_sio_device = {
 	name:			"FTDI SIO",
 	id_table:		id_table_sio,
-	needs_interrupt_in:	MUST_HAVE_NOT,
-	needs_bulk_in:		MUST_HAVE,
-	needs_bulk_out:		MUST_HAVE,
 	num_interrupt_in:	0,
 	num_bulk_in:		1,
 	num_bulk_out:		1,
@@ -199,9 +196,6 @@ static struct usb_serial_device_type ftdi_sio_device = {
 static struct usb_serial_device_type ftdi_8U232AM_device = {
 	name:			"FTDI 8U232AM",
 	id_table:		id_table_8U232AM,
-	needs_interrupt_in:	DONT_CARE,
-	needs_bulk_in:		MUST_HAVE,
-	needs_bulk_out:		MUST_HAVE,
 	num_interrupt_in:	0,
 	num_bulk_in:		1,
 	num_bulk_out:		1,

@@ -409,13 +409,13 @@ static int initrd_release(struct inode *inode,struct file *file)
 {
 	extern void free_initrd_mem(unsigned long, unsigned long);
 
-	spin_lock( &initrd_users_lock );
+	spin_lock(&initrd_users_lock);
 	if (!--initrd_users) {
-		spin_unlock( &initrd_users_lock );
+		spin_unlock(&initrd_users_lock);
 		free_initrd_mem(initrd_start, initrd_end);
 		initrd_start = 0;
 	} else {
-		spin_unlock( &initrd_users_lock );
+		spin_unlock(&initrd_users_lock);
 	}
 		
 	blkdev_put(inode->i_bdev, BDEV_FILE);
@@ -437,9 +437,9 @@ static int rd_open(struct inode * inode, struct file * filp)
 
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (unit == INITRD_MINOR) {
+		if (!initrd_start) return -ENODEV;
 		spin_lock( &initrd_users_lock );
 		initrd_users++;
-		if (!initrd_start) return -ENODEV;
 		spin_unlock( &initrd_users_lock );
 		filp->f_op = &initrd_fops;
 		return 0;

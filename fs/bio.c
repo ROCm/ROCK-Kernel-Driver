@@ -215,6 +215,9 @@ inline void bio_init(struct bio *bio)
 	atomic_set(&bio->bi_cnt, 1);
 	bio->bi_flags = 0;
 	bio->bi_rw = 0;
+	bio->bi_vcnt = 0;
+	bio->bi_idx = 0;
+	bio->bi_size = 0;
 	bio->bi_end_io = NULL;
 }
 

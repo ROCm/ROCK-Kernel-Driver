@@ -500,9 +500,6 @@ MODULE_DEVICE_TABLE (usb, id_table_combined);
 static struct usb_serial_device_type digi_acceleport_2_device = {
 	name:				"Digi USB",
 	id_table:			id_table_2,
-	needs_interrupt_in:		DONT_CARE,
-	needs_bulk_in:			MUST_HAVE,
-	needs_bulk_out:			MUST_HAVE,
 	num_interrupt_in:		0,
 	num_bulk_in:			4,
 	num_bulk_out:			4,
@@ -526,9 +523,6 @@ static struct usb_serial_device_type digi_acceleport_2_device = {
 static struct usb_serial_device_type digi_acceleport_4_device = {
 	name:				"Digi USB",
 	id_table:			id_table_4,
-	needs_interrupt_in:		DONT_CARE,
-	needs_bulk_in:			MUST_HAVE,
-	needs_bulk_out:			MUST_HAVE,
 	num_interrupt_in:		0,
 	num_bulk_in:			5,
 	num_bulk_out:			5,

@@ -34,7 +34,7 @@ extern int esp_reset(Scsi_Cmnd *, unsigned int);
 			    this_id:		7, \
 			    sg_tablesize:	SG_ALL, \
 			    cmd_per_lun:	1, \
-			    use_clustering:	DISABLE_CLUSTERING, \
+			    use_clustering:	DISABLE_CLUSTERING }
 
 #endif /* MAC_ESP_H */
 

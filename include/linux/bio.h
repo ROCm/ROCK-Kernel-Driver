@@ -93,10 +93,9 @@ struct bio {
 #define bio_iovec_idx(bio, idx)	(&((bio)->bi_io_vec[(bio)->bi_idx]))
 #define bio_iovec(bio)		bio_iovec_idx((bio), (bio)->bi_idx)
 #define bio_page(bio)		bio_iovec((bio))->bv_page
-#define bio_size(bio)		((bio)->bi_size)
 #define __bio_offset(bio, idx)	bio_iovec_idx((bio), (idx))->bv_offset
 #define bio_offset(bio)		bio_iovec((bio))->bv_offset
-#define bio_sectors(bio)	(bio_size((bio)) >> 9)
+#define bio_sectors(bio)	((bio)->bi_size >> 9)
 #define bio_data(bio)		(page_address(bio_page((bio))) + bio_offset((bio)))
 #define bio_barrier(bio)	((bio)->bi_rw & (1 << BIO_BARRIER))
 
@@ -105,13 +104,6 @@ struct bio {
  */
 #define bio_to_phys(bio)	(page_to_phys(bio_page((bio))) + bio_offset((bio)))
 #define bvec_to_phys(bv)	(page_to_phys((bv)->bv_page) + (bv)->bv_offset)
-
-/*
- * hack to avoid doing 64-bit calculations on 32-bit archs, instead use a
- * pseudo-pfn check to do segment coalescing
- */
-#define bio_sec_pfn(bio) \
-	((((bio_page(bio) - bio_page(bio)->zone->zone_mem_map) << PAGE_SHIFT) / bio_size(bio)) + (bio_offset(bio) >> 9))
 
 /*
  * queues that have highmem support enabled may still need to revert to
@@ -124,12 +116,16 @@ struct bio {
 #define __bio_kunmap(bio, idx)	kunmap(bio_iovec_idx((bio), (idx))->bv_page)
 #define bio_kunmap(bio)		__bio_kunmap((bio), (bio)->bi_idx)
 
+/*
+ * merge helpers etc
+ */
+#define __BVEC_END(bio) bio_iovec_idx((bio), (bio)->bi_idx - 1)
 #define BIO_CONTIG(bio, nxt) \
-	(bio_to_phys((bio)) + bio_size((bio)) == bio_to_phys((nxt)))
+	(bvec_to_phys(__BVEC_END((bio)) + (bio)->bi_size) ==bio_to_phys((nxt)))
 #define __BIO_SEG_BOUNDARY(addr1, addr2, mask) \
 	(((addr1) | (mask)) == (((addr2) - 1) | (mask)))
 #define BIO_SEG_BOUNDARY(q, b1, b2) \
-	__BIO_SEG_BOUNDARY(bvec_to_phys(bio_iovec_idx((b1), (b1)->bi_cnt - 1)), bio_to_phys((b2)) + bio_size((b2)), (q)->seg_boundary_mask)
+	__BIO_SEG_BOUNDARY(bvec_to_phys(__BVEC_END((b1))), bio_to_phys((b2)) + (b2)->bi_size, (q)->seg_boundary_mask)
 
 typedef int (bio_end_io_t) (struct bio *, int);
 typedef void (bio_destructor_t) (struct bio *);

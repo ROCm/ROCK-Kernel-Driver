@@ -88,7 +88,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v1.1"
+#define DRIVER_VERSION "v1.2"
 #define DRIVER_AUTHOR "Greg Kroah-Hartman <greg@kroah.com>"
 #define DRIVER_DESC "USB ConnectTech WhiteHEAT driver"
 
@@ -128,28 +128,23 @@ static int  whiteheat_ioctl		(struct usb_serial_port *port, struct file * file, 
 static void whiteheat_set_termios	(struct usb_serial_port *port, struct termios * old);
 static void whiteheat_throttle		(struct usb_serial_port *port);
 static void whiteheat_unthrottle	(struct usb_serial_port *port);
-static int  whiteheat_startup		(struct usb_serial *serial);
-static void whiteheat_shutdown		(struct usb_serial *serial);
+static int  whiteheat_fake_startup	(struct usb_serial *serial);
+static int  whiteheat_real_startup	(struct usb_serial *serial);
+static void whiteheat_real_shutdown	(struct usb_serial *serial);
 
 static struct usb_serial_device_type whiteheat_fake_device = {
 	name:			"Connect Tech - WhiteHEAT - (prerenumeration)",
 	id_table:		id_table_prerenumeration,
-	needs_interrupt_in:	DONT_CARE,				/* don't have to have an interrupt in endpoint */
-	needs_bulk_in:		DONT_CARE,				/* don't have to have a bulk in endpoint */
-	needs_bulk_out:		DONT_CARE,				/* don't have to have a bulk out endpoint */
 	num_interrupt_in:	NUM_DONT_CARE,
 	num_bulk_in:		NUM_DONT_CARE,
 	num_bulk_out:		NUM_DONT_CARE,
 	num_ports:		1,
-	startup:		whiteheat_startup	
+	startup:		whiteheat_fake_startup,
 };
 
 static struct usb_serial_device_type whiteheat_device = {
 	name:			"Connect Tech - WhiteHEAT",
 	id_table:		id_table_std,
-	needs_interrupt_in:	DONT_CARE,				/* don't have to have an interrupt in endpoint */
-	needs_bulk_in:		DONT_CARE,				/* don't have to have a bulk in endpoint */
-	needs_bulk_out:		DONT_CARE,				/* don't have to have a bulk out endpoint */
 	num_interrupt_in:	NUM_DONT_CARE,
 	num_bulk_in:		NUM_DONT_CARE,
 	num_bulk_out:		NUM_DONT_CARE,
@@ -160,7 +155,8 @@ static struct usb_serial_device_type whiteheat_device = {
 	unthrottle:		whiteheat_unthrottle,
 	ioctl:			whiteheat_ioctl,
 	set_termios:		whiteheat_set_termios,
-	shutdown:		whiteheat_shutdown,
+	startup:		whiteheat_real_startup,
+	shutdown:		whiteheat_real_shutdown,
 };
 
 struct whiteheat_private {
@@ -539,7 +535,7 @@ static void whiteheat_unthrottle (struct usb_serial_port *port)
  - device renumerated itself and comes up as new device id with all
    firmware download completed.
 */
-static int  whiteheat_startup (struct usb_serial *serial)
+static int  whiteheat_fake_startup (struct usb_serial *serial)
 {
 	int response;
 	const struct whiteheat_hex_record *record;
@@ -598,7 +594,66 @@ static int  whiteheat_startup (struct usb_serial *serial)
 }
 
 
-static void whiteheat_shutdown (struct usb_serial *serial)
+static int  whiteheat_real_startup (struct usb_serial *serial)
+{
+	struct whiteheat_hw_info *hw_info;
+	int pipe;
+	int ret;
+	int alen;
+	__u8 command[2] = { WHITEHEAT_GET_HW_INFO, 0 };
+	__u8 result[sizeof(*hw_info) + 1];
+
+	pipe = usb_rcvbulkpipe (serial->dev, 7);
+	usb_bulk_msg (serial->dev, pipe, result, sizeof(result), &alen, 2 * HZ);
+	/*
+	 * We ignore the return code. In the case where rmmod/insmod is
+	 * performed with a WhiteHEAT connected, the above times out
+	 * because the endpoint is already prepped, meaning the below succeeds
+	 * regardless. All other cases the above succeeds.
+	 */
+
+	pipe = usb_sndbulkpipe (serial->dev, 7);
+	ret = usb_bulk_msg (serial->dev, pipe, command, sizeof(command), &alen, 2 * HZ);
+	if (ret) {
+		err("%s: Couldn't send command [%d]", serial->type->name, ret);
+		goto error_out;
+	} else if (alen != sizeof(command)) {
+		err("%s: Send command incomplete [%d]", serial->type->name, alen);
+		goto error_out;
+	}
+
+	pipe = usb_rcvbulkpipe (serial->dev, 7);
+	ret = usb_bulk_msg (serial->dev, pipe, result, sizeof(result), &alen, 2 * HZ);
+	if (ret) {
+		err("%s: Couldn't get results [%d]", serial->type->name, ret);
+		goto error_out;
+	} else if (alen != sizeof(result)) {
+		err("%s: Get results incomplete [%d]", serial->type->name, alen);
+		goto error_out;
+	} else if (result[0] != command[0]) {
+		err("%s: Command failed [%d]", serial->type->name, result[0]);
+		goto error_out;
+	}
+
+	hw_info = (struct whiteheat_hw_info *)&result[1];
+
+	info("%s: Driver %s: Firmware v%d.%02d", serial->type->name,
+	     DRIVER_VERSION, hw_info->sw_major_rev, hw_info->sw_minor_rev);
+
+	return 0;
+
+error_out:
+	err("%s: Unable to retrieve firmware version, try replugging\n", serial->type->name);
+	/*
+	 * Return that we've claimed the interface. A failure here may be
+	 * due to interception by the command_callback routine or other
+	 * causes that don't mean that the firmware isn't running. This may
+	 * change in the future. Probably should actually.
+	 */
+	return 0;
+}
+
+static void whiteheat_real_shutdown (struct usb_serial *serial)
 {
 	struct usb_serial_port 		*command_port;
 	int i;
@@ -660,7 +715,7 @@ static int __init whiteheat_init (void)
 {
 	usb_serial_register (&whiteheat_fake_device);
 	usb_serial_register (&whiteheat_device);
-	info(DRIVER_VERSION ":" DRIVER_DESC);
+	info(DRIVER_DESC " " DRIVER_VERSION);
 	return 0;
 }
 

@@ -37,7 +37,7 @@ int sim710_release(struct Scsi_Host *);
 		      this_id:			7, 			\
 		      sg_tablesize:		128,		 	\
 		      cmd_per_lun:		1,		 	\
-		      use_clustering:		DISABLE_CLUSTERING,	\
+		      use_clustering:		DISABLE_CLUSTERING }
 
 #ifndef HOSTS_C
 

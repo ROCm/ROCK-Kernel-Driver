@@ -177,14 +177,11 @@ extern inline struct request *elv_next_request(request_queue_t *q)
 
 #ifdef CONFIG_HIGHMEM
 
-extern void create_bounce(struct bio **bio_orig, int gfp_mask);
+extern void create_bounce(unsigned long pfn, struct bio **bio_orig, int gfp_mask);
 
 extern inline void blk_queue_bounce(request_queue_t *q, struct bio **bio)
 {
-	struct page *page = bio_page(*bio);
-
-	if ((page - page->zone->zone_mem_map) + (page->zone->zone_start_paddr >> PAGE_SHIFT) < q->bounce_pfn)
-		create_bounce(bio, q->bounce_gfp);
+	create_bounce(q->bounce_pfn, bio, q->bounce_gfp);
 }
 
 #else /* CONFIG_HIGHMEM */
@@ -234,7 +231,7 @@ extern void blk_attempt_remerge(request_queue_t *, struct request *);
 extern int blk_init_queue(request_queue_t *, request_fn_proc *);
 extern void blk_cleanup_queue(request_queue_t *);
 extern void blk_queue_make_request(request_queue_t *, make_request_fn *);
-extern void blk_queue_bounce_limit(request_queue_t *, unsigned long long);
+extern void blk_queue_bounce_limit(request_queue_t *, u64);
 extern void blk_queue_max_sectors(request_queue_t *q, unsigned short);
 extern void blk_queue_max_segments(request_queue_t *q, unsigned short);
 extern void blk_queue_max_segment_size(request_queue_t *q, unsigned int);

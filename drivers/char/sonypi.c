@@ -617,8 +617,11 @@ static int __devinit sonypi_probe(struct pci_dev *pcidev) {
 		goto out3;
 	}
 
+#if !defined(CONFIG_ACPI)
+	/* Enable ACPI mode to get Fn key events */
 	if (fnkeyinit)
 		outb(0xf0, 0xb2);
+#endif
 
 	if (sonypi_device.model == SONYPI_DEVICE_MODEL_TYPE2)
 		sonypi_type2_srs();
@@ -666,6 +669,11 @@ static void __devexit sonypi_remove(void) {
 		sonypi_type2_dis();
 	else
 		sonypi_type1_dis();
+#if !defined(CONFIG_ACPI)
+	/* disable ACPI mode */
+	if (fnkeyinit)
+		outb(0xf1, 0xb2);
+#endif
 	free_irq(sonypi_device.irq, sonypi_irq);
 	release_region(sonypi_device.ioport1, sonypi_device.region_size);
 	misc_deregister(&sonypi_misc_device);

@@ -58,6 +58,10 @@ where:
 			get enabled unless you set this parameter to 1.
 			Do not use this option unless it's actually necessary,
 			some Vaio models don't deal well with this option.
+			This option is available only if the kernel is 
+			compiled without ACPI support (since it conflicts
+			with it and it shouldn't be required anyway if 
+			ACPI is already enabled).
 
 	verbose:	print unknown events from the sonypi device
 
@@ -93,7 +97,10 @@ Bugs:
 	- some users reported that the laptop speed is lower (dhrystone
 	  tested) when using the driver with the fnkeyinit parameter. I cannot
 	  reproduce it on my laptop and not all users have this problem.
-	  Still under investigation.
+	  This happens because the fnkeyinit parameter enables the ACPI 
+	  mode (but without additionnal ACPI control, like processor 
+	  speed handling etc). Use ACPI instead of APM if it works on your
+	  laptop.
 	
 	- since all development was done by reverse engineering, there is
 	  _absolutely no guarantee_ that this driver will not crash your

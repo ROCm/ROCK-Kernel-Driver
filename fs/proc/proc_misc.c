@@ -318,7 +318,7 @@ static int partitions_read_proc(char *page, char **start, off_t off,
 
 static void *single_start(struct seq_file *p, loff_t *pos)
 {
-	return (void *)(*pos == 0);
+	return NULL + (*pos == 0);
 }
 static void *single_next(struct seq_file *p, void *v, loff_t *pos)
 {
@@ -561,9 +561,7 @@ void __init proc_misc_init(void)
 		entry->proc_fops = &proc_kmsg_operations;
 	create_seq_entry("mounts", 0, &proc_mounts_operations);
 	create_seq_entry("cpuinfo", 0, &proc_cpuinfo_operations);
-#if defined(CONFIG_ARCH_S390) || defined(CONFIG_X86) || defined(CONFIG_ARCH_MIPS)
 	create_seq_entry("interrupts", 0, &proc_interrupts_operations);
-#endif
 #ifdef CONFIG_MODULES
 	create_seq_entry("ksyms", 0, &proc_ksyms_operations);
 #endif

@@ -93,9 +93,6 @@ MODULE_DEVICE_TABLE (usb, id_table);
 struct usb_serial_device_type ir_device = {
 	name:			"IR Dongle",
 	id_table:		id_table,
-	needs_interrupt_in:	MUST_HAVE,
-	needs_bulk_in:		MUST_HAVE,
-	needs_bulk_out:		MUST_HAVE,
 	num_interrupt_in:	1,
 	num_bulk_in:		1,
 	num_bulk_out:		1,

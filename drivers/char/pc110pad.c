@@ -68,8 +68,8 @@ static struct pc110pad_params current_params;
 /* driver/filesystem interface management */
 static wait_queue_head_t queue;
 static struct fasync_struct *asyncptr;
-static active_count = 0; 	/* number of concurrent open()s */
-static spinlock_t active_lock = SPIN_LOCK_UNLOCKED;
+static int active_count = 0; 	/* number of concurrent open()s */
+static spinlock_t pc110_lock = SPIN_LOCK_UNLOCKED;
 /* this lock should be held when referencing active_count */
 static struct semaphore reader_lock;
 
@@ -482,15 +482,14 @@ static void sample_debug(int d[3])
 	int thisd, thisdd, thisx, thisy;
 	int b;
 	unsigned long flags;
-	
-	save_flags(flags);
-	cli();
+
+	spin_lock_irqsave(&pc110_lock, flags);	
 	read_raw_pad(&thisd, &thisdd, &thisx, &thisy);
 	d[0]=(thisd?0x80:0) | (thisdd?0x40:0) | bounce;
 	d[1]=(recent_transition?0x80:0)+transition_count;
 	read_button(&b);
 	d[2]=(synthesize_tap<<4) | (b?0x01:0);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&pc110_lock, flags);
 }
 
 /**
@@ -586,11 +585,12 @@ static int fasync_pad(int fd, struct file *filp, int on)
  
 static int close_pad(struct inode * inode, struct file * file)
 {
+	unsigned long flags;
 	fasync_pad(-1, file, 0);
-	spin_lock( &active_lock );
+	spin_lock_irqsave(&pc110_lock, flags);
 	if (!--active_count)
 		outb(0x30, current_params.io+2);  /* switch off digitiser */
-	spin_unlock( &active_lock );	
+	spin_unlock_irqrestore(&active_lock, flags);	
 	return 0;
 }
 
@@ -610,16 +610,13 @@ static int open_pad(struct inode * inode, struct file * file)
 {
 	unsigned long flags;
 	
-	spin_lock( &active_lock );
+       	spin_lock_irqsave(&pc110_lock, flags);
 	if (active_count++)
         {
-		spin_unlock( &active_lock );
+        	spin_unlock_irqrestore(&pc110_lock, flags);
 		return 0;
 	}
-	spin_unlock( &active_lock );
 
-	save_flags(flags);
-	cli();
 	outb(0x30, current_params.io+2);	/* switch off digitiser */
 	pad_irq(0,0,0);		/* read to flush any pending bytes */
 	pad_irq(0,0,0);		/* read to flush any pending bytes */
@@ -634,7 +631,7 @@ static int open_pad(struct inode * inode, struct file * file)
 	synthesize_tap=0;
 	del_timer(&bounce_timer);
 	del_timer(&tap_timer);
-	restore_flags(flags);
+       spin_unlock_irqrestore(&pc110_lock, flags);
 
 	return 0;
 }

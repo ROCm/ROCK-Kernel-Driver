@@ -307,14 +307,14 @@ struct usb_device;
 /*
  * Device table entry for "new style" table-driven USB drivers.
  * User mode code can read these tables to choose which modules to load.
- * Declare the table as __devinitdata, and as a MODULE_DEVICE_TABLE.
+ * Declare the table as a MODULE_DEVICE_TABLE.
  *
- * With a device table provide bind() instead of probe().  Then the
- * third bind() parameter will point to a matching entry from this
- * table.  (Null value reserved.)
+ * The third probe() parameter will point to a matching entry from this
+ * table.  (Null value reserved.)  Use the driver_data field for each
+ * match to hold information tied to that match:  device quirks, etc.
  * 
  * Terminate the driver's table with an all-zeroes entry.
- * Init the fields you care about; zeroes are not used in comparisons.
+ * Use the flag values to control which fields are compared.
  */
 #define USB_DEVICE_ID_MATCH_VENDOR		0x0001
 #define USB_DEVICE_ID_MATCH_PRODUCT		0x0002
@@ -345,43 +345,115 @@ struct usb_device;
 #define USB_INTERFACE_INFO(cl,sc,pr) \
 	match_flags: USB_DEVICE_ID_MATCH_INT_INFO, bInterfaceClass: (cl), bInterfaceSubClass: (sc), bInterfaceProtocol: (pr)
 
+/**
+ * struct usb_device_id - identifies USB devices for probing and hotplugging
+ * @match_flags: Bit mask controlling of the other fields are used to match
+ *	against new devices.  Any field except for driver_info may be used,
+ *	although some only make sense in conjunction with other fields.
+ *	This is usually set by a USB_DEVICE_*() macro, which sets all
+ *	other fields in this structure except for driver_info.
+ * @idVendor: USB vendor ID for a device; numbers are assigned
+ *	by the USB forum to its members.
+ * @idProduct: Vendor-assigned product ID.
+ * @bcdDevice_lo: Low end of range of vendor-assigned product version numbers.
+ *	This is also used to identify individual product versions, for
+ *	a range consisting of a single device.
+ * @bcdDevice_hi: High end of version number range.  The range of product
+ *	versions is inclusive.
+ * @bDeviceClass: Class of device; numbers are assigned
+ *	by the USB forum.  Products may choose to implement classes,
+ *	or be vendor-specific.  Device classes specify behavior of all
+ *	the interfaces on a devices.
+ * @bDeviceSubClass: Subclass of device; associated with bDeviceClass.
+ * @bDeviceProtocol: Protocol of device; associated with bDeviceClass.
+ * @bInterfaceClass: Class of interface; numbers are assigned
+ *	by the USB forum.  Products may choose to implement classes,
+ *	or be vendor-specific.  Interface classes specify behavior only
+ *	of a given interface; other interfaces may support other classes.
+ * @bInterfaceSubClass: Subclass of interface; associated with bInterfaceClass.
+ * @bInterfaceProtocol: Protocol of interface; associated with bInterfaceClass.
+ * @driver_info: Holds information used by the driver.  Usually it holds
+ *	a pointer to a descriptor understood by the driver, or perhaps
+ *	device flags.
+ *
+ * In most cases, drivers will create a table of device IDs by using
+ * the USB_DEVICE() macros designed for that purpose.
+ * They will then export it to userspace using MODULE_DEVICE_TABLE(),
+ * and provide it to the USB core through their usb_driver structure.
+ *
+ * See the usb_match_id() function for information about how matches are
+ * performed.  Briefly, you will normally use one of several macros to help
+ * construct these entries.  Each entry you provide will either identify
+ * one or more specific products, or will identify a class of products
+ * which have agreed to behave the same.  You should put the more specific
+ * matches towards the beginning of your table, so that driver_info can
+ * record quirks of specific products.
+ */
 struct usb_device_id {
-	/* This bitmask is used to determine which of the following fields
-	 * are to be used for matching.
-	 */
+	/* which fields to match against? */
 	__u16		match_flags;
 
-	/*
-	 * vendor/product codes are checked, if vendor is nonzero
-	 * Range is for device revision (bcdDevice), inclusive;
-	 * zero values here mean range isn't considered
-	 */
+	/* Used for product specific matches; range is inclusive */
 	__u16		idVendor;
 	__u16		idProduct;
-	__u16		bcdDevice_lo, bcdDevice_hi;
+	__u16		bcdDevice_lo;
+	__u16		bcdDevice_hi;
 
-	/*
-	 * if device class != 0, these can be match criteria;
-	 * but only if this bDeviceClass value is nonzero
-	 */
+	/* Used for device class matches */
 	__u8		bDeviceClass;
 	__u8		bDeviceSubClass;
 	__u8		bDeviceProtocol;
 
-	/*
-	 * if interface class != 0, these can be match criteria;
-	 * but only if this bInterfaceClass value is nonzero
-	 */
+	/* Used for interface class matches */
 	__u8		bInterfaceClass;
 	__u8		bInterfaceSubClass;
 	__u8		bInterfaceProtocol;
 
-	/*
-	 * for driver's use; not involved in driver matching.
-	 */
+	/* not matched against */
 	unsigned long	driver_info;
 };
 
+/**
+ * struct usb_driver - identifies USB driver to usbcore
+ * @name: The driver name should be unique among USB drivers
+ * @probe: Called to see if the driver is willing to manage a particular
+ *	interface on a device.  The probe routine returns a handle that 
+ *	will later be provided to disconnect(), or a null pointer to
+ *	indicate that the driver will not handle the interface.
+ *	The handle is normally a pointer to driver-specific data.
+ *	If the probe() routine needs to access the interface
+ *	structure itself, use usb_ifnum_to_if() to make sure it's using
+ *	the right one.
+ * @disconnect: Called when the interface is no longer accessible, usually
+ *	because its device has been (or is being) disconnected.  The
+ *	handle passed is what was returned by probe(), or was provided
+ *	to usb_driver_claim_interface().
+ * @fops: USB drivers can reuse some character device framework in
+ *	the USB subsystem by providing a file operations vector and
+ *	a minor number.
+ * @minor: Used with fops to simplify creating USB character devices.
+ *	Such drivers have sixteen character devices, using the USB
+ *	major number and starting with this minor number.
+ * @ioctl: Used for drivers that want to talk to userspace through
+ *	the "usbfs" filesystem.  This lets devices provide ways to
+ *	expose information to user space regardless of where they
+ *	do (or don't) show up otherwise in the filesystem.
+ * @id_table: USB drivers use ID table to support hotplugging.
+ *
+ * USB drivers should provide a name, probe() and disconnect() methods,
+ * and an id_table.  Other driver fields are optional.
+ *
+ * The id_table is used in hotplugging.  It holds a set of descriptors,
+ * and specialized data may be associated with each entry.  That table
+ * is used by both user and kernel mode hotplugging support.
+ *
+ * The probe() and disconnect() methods are called in a context where
+ * they can sleep, but they should avoid abusing the privilage.  Most
+ * work to connect to a device should be done when the device is opened,
+ * and undone at the last close.  The disconnect code needs to address
+ * concurrency issues with respect to open() and close() methods, as
+ * well as cancel any I/O requests that are still pending.
+ */
 struct usb_driver {
 	const char *name;
 
@@ -390,7 +462,10 @@ struct usb_driver {
 	    unsigned intf,			/* what interface */
 	    const struct usb_device_id *id	/* from id_table */
 	    );
-	void (*disconnect)(struct usb_device *, void *);
+	void (*disconnect)(
+	    struct usb_device *dev,		/* the device */
+	    void *handle			/* as returned by probe() */
+	    );
 
 	struct list_head driver_list;
 
@@ -402,9 +477,7 @@ struct usb_driver {
 	/* ioctl -- userspace apps can talk to drivers through usbdevfs */
 	int (*ioctl)(struct usb_device *dev, unsigned int code, void *buf);
 
-	/* support for "new-style" USB hotplugging
-	 * binding policy can be driven from user mode too
-	 */
+	/* support for "new-style" USB hotplugging */
 	const struct usb_device_id *id_table;
 
 	/* suspend before the bus suspends;
@@ -419,6 +492,8 @@ struct usb_driver {
 
 /*
  * urb->transfer_flags:
+ *
+ * FIXME should be URB_* flags
  */
 #define USB_DISABLE_SPD         0x0001
 #define USB_ISO_ASAP            0x0002
@@ -439,68 +514,237 @@ typedef struct
 struct urb;
 typedef void (*usb_complete_t)(struct urb *);
 
-typedef struct urb
+/**
+ * struct urb - USB Request Block
+ * @urb_list: For use by current owner of the URB.
+ * @next: Used primarily to link ISO requests into rings.
+ * @pipe: Holds endpoint number, direction, type, and max packet size.
+ *	Create these values with the eight macros available;
+ *	usb_{snd,rcv}TYPEpipe(dev,endpoint), where the type is "ctrl"
+ *	(control), "bulk", "int" (interrupt), or "iso" (isochronous).
+ *	For example usb_sndbulkpipe() or usb_rcvintpipe().  Endpoint
+ *	numbers range from zero to fifteen.  Note that "in" endpoint two
+ *	is a different endpoint (and pipe) from "out" endpoint two.
+ *	The current configuration controls the existence, type, and
+ *	maximum packet size of any given endpoint.
+ * @dev: Identifies the USB device to perform the request.
+ * @status: This is read in non-iso completion functions to get the
+ *	status of the particular request.  ISO requests only use it
+ *	to tell whether the URB was unlinked; detailed status for
+ *	each frame is in the fields of the iso_frame-desc.
+ * @transfer_flags: A variety of flags may be used to affect how URB
+ *	submission, unlinking, or operation are handled.  Different
+ *	kinds of URB can use different flags.
+ * @transfer_buffer: For non-iso transfers, this identifies the buffer
+ *	to (or from) which the I/O request will be performed.  This
+ *	buffer must be suitable for DMA; allocate it with kmalloc()
+ *	or equivalent.  For transfers to "in" endpoints, contents of
+ *	this buffer will be modified.
+ * @transfer_buffer_length: How big is transfer_buffer.  The transfer may
+ *	be broken up into chunks according to the current maximum packet
+ *	size for the endpoint, which is a function of the configuration
+ *	and is encoded in the pipe.
+ * @actual_length: This is read in non-iso completion functions, and
+ *	it tells how many bytes (out of transfer_buffer_length) were
+ *	transferred.  It will normally be the same as requested, unless
+ *	either an error was reported or a short read was performed and
+ *	the USB_DISABLE_SPD transfer flag was used to say that such
+ *	short reads are not errors. 
+ * @setup_packet: Only used for control transfers, this points to eight bytes
+ *	of setup data.  Control transfers always start by sending this data
+ *	to the device.  Then transfer_buffer is read or written, if needed.
+ * @start_frame: Returns the initial frame for interrupt or isochronous
+ *	transfers.
+ * @number_of_packets: Lists the number of ISO transfer buffers.
+ * @interval: Specifies the polling interval for interrupt transfers, in
+ *	milliseconds.
+ * @error_count: Returns the number of ISO transfers that reported errors.
+ * @context: For use in completion functions.  This normally points to
+ *	request-specific driver context.
+ * @complete: Completion handler. This URB is passed as the parameter to the
+ *	completion function.  Except for interrupt or isochronous transfers
+ *	that aren't being unlinked, the completion function may then do what
+ *	it likes with the URB, including resubmitting or freeing it.
+ * @iso_frame_desc: Used to provide arrays of ISO transfer buffers and to 
+ *	collect the transfer status for each buffer.
+ *
+ * This structure identifies USB transfer requests.  URBs may be allocated
+ * in any way, although usb_alloc_urb() is often convenient.  Initialization
+ * may be done using various FILL_*_URB() macros.  URBs are submitted
+ * using usb_submit_urb(), and pending requests may be canceled using
+ * usb_unlink_urb().
+ *
+ * Initialization:
+ *
+ * All URBs submitted must initialize dev, pipe, next (may be null),
+ * transfer_flags (may be zero), complete, timeout (may be zero).
+ * The USB_ASYNC_UNLINK transfer flag affects later invocations of
+ * the usb_unlink_urb() routine.
+ *
+ * All non-isochronous URBs must also initialize 
+ * transfer_buffer and transfer_buffer_length.  They may provide the
+ * USB_DISABLE_SPD transfer flag, indicating that short reads are
+ * not to be treated as errors.
+ *
+ * Bulk URBs may pass the USB_QUEUE_BULK transfer flag, telling the host
+ * controller driver never to report an error if several bulk requests get
+ * queued to the same endpoint.  Such queueing supports more efficient use
+ * of bus bandwidth, minimizing delays due to interrupts and scheduling,
+ * if the host controller hardware is smart enough.  Bulk URBs can also
+ * use the USB_ZERO_PACKET transfer flag, indicating that bulk OUT transfers
+ * should always terminate with a short packet, even if it means adding an
+ * extra zero length packet.
+ *
+ * Control URBs must provide a setup_packet.
+ *
+ * Interupt UBS must provide an interval, saying how often (in milliseconds)
+ * to poll for transfers.  After the URB has been submitted, the interval
+ * and start_frame fields reflect how the transfer was actually scheduled.
+ * The polling interval may be more frequent than requested.
+ *
+ * Isochronous URBs normally use the USB_ISO_ASAP transfer flag, telling
+ * the host controller to schedule the transfer as soon as bandwidth
+ * utilization allows, and then set start_frame to reflect the actual frame
+ * selected during submission.  Otherwise drivers must specify the start_frame
+ * and handle the case where the transfer can't begin then.  However, drivers
+ * won't know how bandwidth is currently allocated, and while they can
+ * find the current frame using usb_get_current_frame_number () they can't
+ * know the range for that frame number.  (Common ranges for the frame
+ * counter include 256, 512, and 1024 frames.)
+ *
+ * Isochronous URBs have a different data transfer model, in part because
+ * the quality of service is only "best effort".  Callers provide specially
+ * allocated URBs, with number_of_packets worth of iso_frame_desc structures
+ * at the end.  Each such packet is an individual ISO transfer.  Isochronous
+ * URBs are normally submitted with urb->next fields set up as a ring, so
+ * that data (such as audio or video) streams at as constant a rate as the
+ * host controller scheduler can support.
+ *
+ * Completion Callbacks:
+ *
+ * The completion callback is made in_interrupt(), and one of the first
+ * things that a completion handler should do is check the status field.
+ * The status field is provided for all URBs.  It is used to report
+ * unlinked URBs, and status for all non-ISO transfers.  It should not
+ * be examined outside of the completion handler.
+ *
+ * The context field is normally used to link URBs back to the relevant
+ * driver or request state.
+ *
+ * When completion callback is invoked for non-isochronous URBs, the
+ * actual_length field tells how many bytes were transferred.
+ *
+ * For interrupt and isochronous URBs, the URB provided to the calllback
+ * function is still "owned" by the USB core subsystem unless the status
+ * indicates that the URB has been unlinked.  Completion handlers should
+ * not modify such URBs until they have been unlinked.
+ *
+ * ISO transfer status is reported in the status and actual_length fields
+ * of the iso_frame_desc array, and the number of errors is reported in
+ * error_count.
+ */
+struct urb
 {
-	spinlock_t lock;		// lock for the URB
-	void *hcpriv;			// private data for host controller
-	struct list_head urb_list;	// list pointer to all active urbs 
-	struct urb *next;		// pointer to next URB	
-	struct usb_device *dev;		// pointer to associated USB device
-	unsigned int pipe;		// pipe information
-	int status;			// returned status
-	unsigned int transfer_flags;	// USB_DISABLE_SPD | USB_ISO_ASAP | etc.
-	void *transfer_buffer;		// associated data buffer
-	int transfer_buffer_length;	// data buffer length
-	int actual_length;              // actual data buffer length	
-	int bandwidth;			// bandwidth for this transfer request (INT or ISO)
-	unsigned char *setup_packet;	// setup packet (control only)
-	//
-	int start_frame;		// start frame (iso/irq only)
-	int number_of_packets;		// number of packets in this request (iso)
-	int interval;                   // polling interval (irq only)
-	int error_count;		// number of errors in this transfer (iso only)
-	int timeout;			// timeout (in jiffies)
-	//
-	void *context;			// context for completion routine
-	usb_complete_t complete;	// pointer to completion routine
-	//
-	iso_packet_descriptor_t iso_frame_desc[0];
-} urb_t, *purb_t;
+	spinlock_t lock;		/* lock for the URB */
+	void *hcpriv;			/* private data for host controller */
+	struct list_head urb_list;	/* list pointer to all active urbs */
+	struct urb *next; 		/* (in) pointer to next URB */
+	struct usb_device *dev; 	/* (in) pointer to associated device */
+	unsigned int pipe;		/* (in) pipe information */
+	int status;			/* (return) non-ISO status */
+	unsigned int transfer_flags;	/* (in) USB_DISABLE_SPD | ...*/
+	void *transfer_buffer;		/* (in) associated data buffer */
+	int transfer_buffer_length;	/* (in) data buffer length */
+	int actual_length;              /* (return) actual transfer length */
+	int bandwidth;			/* bandwidth for INT/ISO request */
+	unsigned char *setup_packet;	/* (in) setup packet (control only) */
+	int start_frame;		/* (modify) start frame (INT/ISO) */
+	int number_of_packets;		/* (in) number of ISO packets */
+	int interval;                   /* (in) polling interval (INT only) */
+	int error_count;		/* (return) number of ISO errors */
+	int timeout;			/* (in) timeout, in jiffies */
+	void *context;			/* (in) context for completion */
+	usb_complete_t complete;	/* (in) completion routine */
+	iso_packet_descriptor_t iso_frame_desc[0];	/* (in) ISO ONLY */
+};
 
-#define FILL_CONTROL_URB(a,aa,b,c,d,e,f,g) \
+typedef struct urb urb_t, *purb_t;
+
+/**
+ * FILL_CONTROL_URB - macro to help initialize a control urb
+ * @URB: pointer to the urb to initialize.
+ * @DEV: pointer to the struct usb_device for this urb.
+ * @PIPE: the endpoint pipe
+ * @SETUP_PACKET: pointer to the setup_packet buffer
+ * @TRANSFER_BUFFER: pointer to the transfer buffer
+ * @BUFFER_LENGTH: length of the transfer buffer
+ * @COMPLETE: pointer to the usb_complete_t function
+ * @CONTEXT: what to set the urb context to.
+ *
+ * Initializes a control urb with the proper information needed to submit it to
+ * a device.
+ */
+#define FILL_CONTROL_URB(URB,DEV,PIPE,SETUP_PACKET,TRANSFER_BUFFER,BUFFER_LENGTH,COMPLETE,CONTEXT) \
     do {\
-	spin_lock_init(&(a)->lock);\
-	(a)->dev=aa;\
-	(a)->pipe=b;\
-	(a)->setup_packet=c;\
-	(a)->transfer_buffer=d;\
-	(a)->transfer_buffer_length=e;\
-	(a)->complete=f;\
-	(a)->context=g;\
+	spin_lock_init(&(URB)->lock);\
+	(URB)->dev=DEV;\
+	(URB)->pipe=PIPE;\
+	(URB)->setup_packet=SETUP_PACKET;\
+	(URB)->transfer_buffer=TRANSFER_BUFFER;\
+	(URB)->transfer_buffer_length=BUFFER_LENGTH;\
+	(URB)->complete=COMPLETE;\
+	(URB)->context=CONTEXT;\
     } while (0)
 
-#define FILL_BULK_URB(a,aa,b,c,d,e,f) \
+/**
+ * FILL_BULK_URB - macro to help initialize a bulk urb
+ * @URB: pointer to the urb to initialize.
+ * @DEV: pointer to the struct usb_device for this urb.
+ * @PIPE: the endpoint pipe
+ * @TRANSFER_BUFFER: pointer to the transfer buffer
+ * @BUFFER_LENGTH: length of the transfer buffer
+ * @COMPLETE: pointer to the usb_complete_t function
+ * @CONTEXT: what to set the urb context to.
+ *
+ * Initializes a bulk urb with the proper information needed to submit it to
+ * a device.
+ */
+#define FILL_BULK_URB(URB,DEV,PIPE,TRANSFER_BUFFER,BUFFER_LENGTH,COMPLETE,CONTEXT) \
     do {\
-	spin_lock_init(&(a)->lock);\
-	(a)->dev=aa;\
-	(a)->pipe=b;\
-	(a)->transfer_buffer=c;\
-	(a)->transfer_buffer_length=d;\
-	(a)->complete=e;\
-	(a)->context=f;\
+	spin_lock_init(&(URB)->lock);\
+	(URB)->dev=DEV;\
+	(URB)->pipe=PIPE;\
+	(URB)->transfer_buffer=TRANSFER_BUFFER;\
+	(URB)->transfer_buffer_length=BUFFER_LENGTH;\
+	(URB)->complete=COMPLETE;\
+	(URB)->context=CONTEXT;\
     } while (0)
     
-#define FILL_INT_URB(a,aa,b,c,d,e,f,g) \
+/**
+ * FILL_INT_URB - macro to help initialize a interrupt urb
+ * @URB: pointer to the urb to initialize.
+ * @DEV: pointer to the struct usb_device for this urb.
+ * @PIPE: the endpoint pipe
+ * @TRANSFER_BUFFER: pointer to the transfer buffer
+ * @BUFFER_LENGTH: length of the transfer buffer
+ * @COMPLETE: pointer to the usb_complete_t function
+ * @CONTEXT: what to set the urb context to.
+ * @INTERVAL: what to set the urb interval to.
+ *
+ * Initializes a interrupt urb with the proper information needed to submit it to
+ * a device.
+ */
+#define FILL_INT_URB(URB,DEV,PIPE,TRANSFER_BUFFER,BUFFER_LENGTH,COMPLETE,CONTEXT,INTERVAL) \
     do {\
-	spin_lock_init(&(a)->lock);\
-	(a)->dev=aa;\
-	(a)->pipe=b;\
-	(a)->transfer_buffer=c;\
-	(a)->transfer_buffer_length=d;\
-	(a)->complete=e;\
-	(a)->context=f;\
-	(a)->interval=g;\
-	(a)->start_frame=-1;\
+	spin_lock_init(&(URB)->lock);\
+	(URB)->dev=DEV;\
+	(URB)->pipe=PIPE;\
+	(URB)->transfer_buffer=TRANSFER_BUFFER;\
+	(URB)->transfer_buffer_length=BUFFER_LENGTH;\
+	(URB)->complete=COMPLETE;\
+	(URB)->context=CONTEXT;\
+	(URB)->interval=INTERVAL;\
+	(URB)->start_frame=-1;\
     } while (0)
 
 #define FILL_CONTROL_URB_TO(a,aa,b,c,d,e,f,g,h) \

@@ -47,6 +47,7 @@
 #include <linux/route.h>
 #include <linux/udp.h>
 #include <linux/proc_fs.h>
+#include <linux/major.h>
 #include <net/arp.h>
 #include <net/ip.h>
 #include <net/ipconfig.h>

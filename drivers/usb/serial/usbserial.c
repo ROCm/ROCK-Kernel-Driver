@@ -339,9 +339,6 @@ static struct usb_device_id generic_device_ids[2]; /* Initially all zeroes. */
 static struct usb_serial_device_type generic_device = {
 	name:			"Generic",
 	id_table:		generic_device_ids,
-	needs_interrupt_in:	DONT_CARE,		/* don't have to have an interrupt in endpoint */
-	needs_bulk_in:		DONT_CARE,		/* don't have to have a bulk in endpoint */
-	needs_bulk_out:		DONT_CARE,		/* don't have to have a bulk out endpoint */
 	num_interrupt_in:	NUM_DONT_CARE,
 	num_bulk_in:		NUM_DONT_CARE,
 	num_bulk_out:		NUM_DONT_CARE,
@@ -1068,9 +1065,6 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 	int minor;
 	int buffer_size;
 	int i;
-	char interrupt_pipe;
-	char bulk_in_pipe;
-	char bulk_out_pipe;
 	int num_interrupt_in = 0;
 	int num_bulk_in = 0;
 	int num_bulk_out = 0;
@@ -1097,10 +1091,8 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 		dbg("none matched");
 		return(NULL);
 	}
-	
+
 	/* descriptor matches, let's find the endpoints needed */
-	interrupt_pipe = bulk_in_pipe = bulk_out_pipe = HAS_NOT;
-			
 	/* check out the endpoints */
 	iface_desc = &interface->altsetting[0];
 	for (i = 0; i < iface_desc->bNumEndpoints; ++i) {
@@ -1110,7 +1102,6 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 		    ((endpoint->bmAttributes & 3) == 0x02)) {
 			/* we found a bulk in endpoint */
 			dbg("found bulk in");
-			bulk_in_pipe = HAS;
 			bulk_in_endpoint[num_bulk_in] = endpoint;
 			++num_bulk_in;
 		}
@@ -1119,7 +1110,6 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 		    ((endpoint->bmAttributes & 3) == 0x02)) {
 			/* we found a bulk out endpoint */
 			dbg("found bulk out");
-			bulk_out_pipe = HAS;
 			bulk_out_endpoint[num_bulk_out] = endpoint;
 			++num_bulk_out;
 		}
@@ -1128,7 +1118,6 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 		    ((endpoint->bmAttributes & 3) == 0x03)) {
 			/* we found a interrupt in endpoint */
 			dbg("found interrupt in");
-			interrupt_pipe = HAS;
 			interrupt_in_endpoint[num_interrupt_in] = endpoint;
 			++num_interrupt_in;
 		}
@@ -1151,7 +1140,6 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 				    ((endpoint->bmAttributes & 3) == 0x03)) {
 					/* we found a interrupt in endpoint */
 					dbg("found interrupt in for Prolific device on separate interface");
-					interrupt_pipe = HAS;
 					interrupt_in_endpoint[num_interrupt_in] = endpoint;
 					++num_interrupt_in;
 				}
@@ -1161,15 +1149,6 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 	/* END HORRIBLE HACK FOR PL2303 */
 #endif
 	
-	/* verify that we found all of the endpoints that we need */
-	if (!((interrupt_pipe & type->needs_interrupt_in) &&
-	      (bulk_in_pipe & type->needs_bulk_in) &&
-	      (bulk_out_pipe & type->needs_bulk_out))) {
-		/* nope, they don't match what we expected */
-		info("descriptors matched, but endpoints did not");
-		return NULL;
-	}
-
 	/* found all that we need */
 	info("%s converter detected", type->name);
 

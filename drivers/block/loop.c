@@ -182,7 +182,7 @@ static int lo_send(struct loop_device *lo, struct bio *bio, int bsize, loff_t po
 	down(&mapping->host->i_sem);
 	index = pos >> PAGE_CACHE_SHIFT;
 	offset = pos & (PAGE_CACHE_SIZE - 1);
-	len = bio_size(bio);
+	len = bio->bi_size;
 	data = bio_data(bio);
 	while (len > 0) {
 		int IV = index * (PAGE_CACHE_SIZE/bsize) + offset/bsize;
@@ -272,7 +272,7 @@ static int lo_receive(struct loop_device *lo, struct bio *bio, int bsize, loff_t
 	cookie.data = bio_data(bio);
 	cookie.bsize = bsize;
 	desc.written = 0;
-	desc.count = bio_size(bio);
+	desc.count = bio->bi_size;
 	desc.buf = (char*)&cookie;
 	desc.error = 0;
 	spin_lock_irq(&lo->lo_lock);
@@ -470,7 +470,7 @@ static int loop_make_request(request_queue_t *q, struct bio *rbh)
 	IV = loop_get_iv(lo, rbh->bi_sector);
 	if (rw == WRITE) {
 		if (lo_do_transfer(lo, WRITE, bio_data(bh), bio_data(rbh),
-				   bio_size(bh), IV))
+				   bh->bi_size, IV))
 			goto err;
 	}
 
@@ -504,7 +504,7 @@ static inline void loop_handle_bio(struct loop_device *lo, struct bio *bio)
 		unsigned long IV = loop_get_iv(lo, rbh->bi_sector);
 
 		ret = lo_do_transfer(lo, READ, bio_data(bio), bio_data(rbh),
-				     bio_size(bio), IV);
+				     bio->bi_size, IV);
 
 		bio_endio(rbh, !ret, bio_sectors(bio));
 		loop_put_buffer(bio);

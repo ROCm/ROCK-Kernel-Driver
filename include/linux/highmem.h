@@ -13,7 +13,7 @@ extern struct page *highmem_start_page;
 /* declarations for linux/mm/highmem.c */
 unsigned int nr_free_highpages(void);
 
-extern void create_bounce(struct bio **bio_orig, int gfp_mask);
+extern void create_bounce(unsigned long pfn, struct bio **bio_orig, int gfp_mask);
 
 static inline char *bh_kmap(struct buffer_head *bh)
 {

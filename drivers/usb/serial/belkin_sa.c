@@ -1,8 +1,8 @@
 /*
  * Belkin USB Serial Adapter Driver
  *
- *  Copyright (C) 2000
- *      William Greathouse (wgreathouse@smva.com)
+ *  Copyright (C) 2000		William Greathouse (wgreathouse@smva.com)
+ *  Copyright (C) 2000-2001 	Greg Kroah-Hartman (greg@kroah.com)
  *
  *  This program is largely derived from work by the linux-usb group
  *  and associated source files.  Please see the usb/serial files for
@@ -23,6 +23,9 @@
  *    framework in, but haven't analyzed the "tty_flip" interface yet.
  * -- Add support for flush commands
  * -- Add everything that is missing :)
+ *
+ * 27-Nov-2001 gkh
+ * 	compressed all the differnent device entries into 1.
  *
  * 30-May-2001 gkh
  *	switched from using spinlock to a semaphore, which fixes lots of problems.
@@ -88,7 +91,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v1.1"
+#define DRIVER_VERSION "v1.2"
 #define DRIVER_AUTHOR "William Greathouse <wgreathouse@smva.com>"
 #define DRIVER_DESC "USB Belkin Serial converter driver"
 
@@ -112,125 +115,12 @@ static __devinitdata struct usb_device_id id_table_combined [] = {
 	{ }							/* Terminating entry */
 };
 
-static __devinitdata struct usb_device_id belkin_dockstation_table [] = {
-	{ USB_DEVICE(BELKIN_DOCKSTATION_VID, BELKIN_DOCKSTATION_PID) },
-	{ }							/* Terminating entry */
-};
-
-static __devinitdata struct usb_device_id belkin_sa_table [] = {
-	{ USB_DEVICE(BELKIN_SA_VID, BELKIN_SA_PID) },
-	{ }							/* Terminating entry */
-};
-
-static __devinitdata struct usb_device_id belkin_old_table [] = {
-	{ USB_DEVICE(BELKIN_OLD_VID, BELKIN_OLD_PID) },
-	{ }							/* Terminating entry */
-};
-
-static __devinitdata struct usb_device_id peracom_table [] = {
-	{ USB_DEVICE(PERACOM_VID, PERACOM_PID) },
-	{ }							/* Terminating entry */
-};
-
-static __devinitdata struct usb_device_id gocom232_table [] = {
-	{ USB_DEVICE(GOHUBS_VID, GOHUBS_PID) },
-	{ }							/* Terminating entry */
-};
-
 MODULE_DEVICE_TABLE (usb, id_table_combined);
 
-/* All of the device info needed for the Belkin dockstation serial converter */
-static struct usb_serial_device_type belkin_dockstation_device = {
-	name:			"Belkin F5U120-PC USB Serial Adapter",
-	id_table:		belkin_dockstation_table,		/* the Belkin F5U103 device */
-	needs_interrupt_in:	MUST_HAVE,			/* this device must have an interrupt in endpoint */
-	needs_bulk_in:		MUST_HAVE,			/* this device must have a bulk in endpoint */
-	needs_bulk_out:		MUST_HAVE,			/* this device must have a bulk out endpoint */
-	num_interrupt_in:	1,
-	num_bulk_in:		1,
-	num_bulk_out:		1,
-	num_ports:		1,
-	open:			belkin_sa_open,
-	close:			belkin_sa_close,
-	read_int_callback:	belkin_sa_read_int_callback,	/* How we get the status info */
-	ioctl:			belkin_sa_ioctl,
-	set_termios:		belkin_sa_set_termios,
-	break_ctl:		belkin_sa_break_ctl,
-	startup:		belkin_sa_startup,
-	shutdown:		belkin_sa_shutdown,
-};
-
-/* All of the device info needed for the Belkin serial converter */
-static struct usb_serial_device_type belkin_sa_device = {
-	name:			"Belkin F5U103 USB Serial Adapter",
-	id_table:		belkin_sa_table,		/* the Belkin F5U103 device */
-	needs_interrupt_in:	MUST_HAVE,			/* this device must have an interrupt in endpoint */
-	needs_bulk_in:		MUST_HAVE,			/* this device must have a bulk in endpoint */
-	needs_bulk_out:		MUST_HAVE,			/* this device must have a bulk out endpoint */
-	num_interrupt_in:	1,
-	num_bulk_in:		1,
-	num_bulk_out:		1,
-	num_ports:		1,
-	open:			belkin_sa_open,
-	close:			belkin_sa_close,
-	read_int_callback:	belkin_sa_read_int_callback,	/* How we get the status info */
-	ioctl:			belkin_sa_ioctl,
-	set_termios:		belkin_sa_set_termios,
-	break_ctl:		belkin_sa_break_ctl,
-	startup:		belkin_sa_startup,
-	shutdown:		belkin_sa_shutdown,
-};
-
-
-/* This driver also supports the "old" school Belkin single port adaptor */
-static struct usb_serial_device_type belkin_old_device = {
-	name:			"Belkin USB Serial Adapter",
-	id_table:		belkin_old_table,		/* the old Belkin device */
-	needs_interrupt_in:	MUST_HAVE,			/* this device must have an interrupt in endpoint */
-	needs_bulk_in:		MUST_HAVE,			/* this device must have a bulk in endpoint */
-	needs_bulk_out:		MUST_HAVE,			/* this device must have a bulk out endpoint */
-	num_interrupt_in:	1,
-	num_bulk_in:		1,
-	num_bulk_out:		1,
-	num_ports:		1,
-	open:			belkin_sa_open,
-	close:			belkin_sa_close,
-	read_int_callback:	belkin_sa_read_int_callback,	/* How we get the status info */
-	ioctl:			belkin_sa_ioctl,
-	set_termios:		belkin_sa_set_termios,
-	break_ctl:		belkin_sa_break_ctl,
-	startup:		belkin_sa_startup,
-	shutdown:		belkin_sa_shutdown,
-};
-
-/* this driver also works for the Peracom single port adapter */
-static struct usb_serial_device_type peracom_device = {
-	name:			"Peracom single port USB Serial Adapter",
-	id_table:		peracom_table,			/* the Peracom device */
-	needs_interrupt_in:	MUST_HAVE,			/* this device must have an interrupt in endpoint */
-	needs_bulk_in:		MUST_HAVE,			/* this device must have a bulk in endpoint */
-	needs_bulk_out:		MUST_HAVE,			/* this device must have a bulk out endpoint */
-	num_interrupt_in:	1,
-	num_bulk_in:		1,
-	num_bulk_out:		1,
-	num_ports:		1,
-	open:			belkin_sa_open,
-	close:			belkin_sa_close,
-	read_int_callback:	belkin_sa_read_int_callback,	/* How we get the status info */
-	ioctl:			belkin_sa_ioctl,
-	set_termios:		belkin_sa_set_termios,
-	break_ctl:		belkin_sa_break_ctl,
-	startup:		belkin_sa_startup,
-	shutdown:		belkin_sa_shutdown,
-};
-
-/* the GoHubs Go-COM232 device is the same as the Peracom single port adapter */
-static struct usb_serial_device_type gocom232_device = {
-	name:			"GO-COM232 USB Serial Converter",
-	id_table:		gocom232_table,			/* the GO-COM232 device */
-	needs_interrupt_in:	MUST_HAVE,			/* this device must have an interrupt in endpoint */
-	needs_bulk_in:		MUST_HAVE,			/* this device must have a bulk in endpoint */
-	needs_bulk_out:		MUST_HAVE,			/* this device must have a bulk out endpoint */
+/* All of the device info needed for the serial converters */
+static struct usb_serial_device_type belkin_device = {
+	name:			"Belkin / Peracom / GoHubs USB Serial Adapter",
+	id_table:		id_table_combined,
 	num_interrupt_in:	1,
 	num_bulk_in:		1,
 	num_bulk_out:		1,
@@ -642,11 +532,7 @@ static int belkin_sa_ioctl (struct usb_serial_port *port, struct file * file, un
 
 static int __init belkin_sa_init (void)
 {
-	usb_serial_register (&belkin_dockstation_device);
-	usb_serial_register (&belkin_sa_device);
-	usb_serial_register (&belkin_old_device);
-	usb_serial_register (&peracom_device);
-	usb_serial_register (&gocom232_device);
+	usb_serial_register (&belkin_device);
 	info(DRIVER_DESC " " DRIVER_VERSION);
 	return 0;
 }
@@ -654,11 +540,7 @@ static int __init belkin_sa_init (void)
 
 static void __exit belkin_sa_exit (void)
 {
-	usb_serial_deregister (&belkin_dockstation_device);
-	usb_serial_deregister (&belkin_sa_device);
-	usb_serial_deregister (&belkin_old_device);
-	usb_serial_deregister (&peracom_device);
-	usb_serial_deregister (&gocom232_device);
+	usb_serial_deregister (&belkin_device);
 }
 
 

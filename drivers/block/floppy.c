@@ -2437,16 +2437,15 @@ static int buffer_chain_size(void)
 	char *base;
 
 	base = CURRENT->buffer;
-	size = CURRENT->current_nr_sectors << 9;
-	bio = CURRENT->bio;
+	size = 0;
 
-	if (bio){
-		bio = bio->bi_next;
-		while (bio && bio_data(bio) == base + size){
-			size += bio_size(bio);
-			bio = bio->bi_next;
-		}
+	rq_for_each_bio(bio, CURRENT) {
+		if (bio_data(bio) != base + size)
+			break;
+
+		size += bio->bi_size;
 	}
+
 	return size >> 9;
 }
 
@@ -2543,7 +2542,7 @@ static void copy_buffer(int ssize, int max_sector, int max_sector_2)
 			break;
 		}
 #endif
-		size = bio_size(bio);
+		size = bio->bi_size;;
 		buffer = bio_data(bio);
 	}
 #ifdef FLOPPY_SANITY_CHECK

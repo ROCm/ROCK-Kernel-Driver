@@ -224,7 +224,7 @@ static int dabusb_alloc_buffers (pdabusb_t s)
 			err("kmalloc(sizeof(buff_t))==NULL");
 			goto err;
 		}
-		memset (b, sizeof (buff_t), 0);
+		memset (b, 0, sizeof (buff_t));
 		b->s = s;
 		b->purb = usb_alloc_urb(packets);
 		if (!b->purb) {

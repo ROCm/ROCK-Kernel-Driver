@@ -204,8 +204,83 @@
   </chapter>
 
   <chapter id="usb">
-     <title>USB Devices</title>
+    <title>USB Devices</title>
+
+    <para>Drivers for USB devices talk to the "usbcore" APIs, and are
+    exposed through driver frameworks such as block, character,
+    or network devices.
+    There are two types of public "usbcore" APIs:  those intended for
+    general driver use, and those which are only public to drivers that
+    are part of the core.
+    The drivers that are part of the core are involved in managing a USB bus.
+    They include the "hub" driver, which manages trees of USB devices, and
+    several different kinds of "host controller" driver (HCD), which control
+    individual busses.
+    </para>
+
+    <para>The device model seen by USB drivers is relatively complex.
+    </para>
+     
+    <itemizedlist>
+
+	<listitem><para>USB supports four kinds of data transfer
+	(control, bulk, interrupt, and isochronous).  Two transfer
+	types use bandwidth as it's available (control and bulk),
+	while the other two types of transfer (interrupt and isochronous)
+	are scheduled to provide guaranteed bandwidth.
+	</para></listitem>
+
+	<listitem><para>The device description model includes one or more
+	"configurations" per device, only one of which is active at a time.
+	</para></listitem>
+
+	<listitem><para>Configurations have one or more "interface", each
+	of which may have "alternate settings".  Interfaces may be
+	standardized by USB "Class" specifications, or may be specific to
+	a vendor or device.</para>
+
+	<para>USB device drivers actually bind to interfaces, not devices.
+	Think of them as "interface drivers", though you
+	may not see many devices where the distinction is important.
+	Most USB devices are simple, with only one configuration,
+	one interface, and one alternate setting.
+	</para></listitem>
+
+	<listitem><para>Interfaces have one or more "endpoints", each of
+	which supports one type and direction of data transfer such as
+	"bulk out" or "interrupt in".  The entire configuration may have
+	up to sixteen endpoints in each direction, allocated as needed
+	among all the interfaces.
+	</para></listitem>
+
+	<listitem><para>Data transfer on USB is packetized; each endpoint
+	has a maximum packet size.
+	Drivers must often be aware of conventions such as flagging the end
+	of bulk transfers using "short" (including zero length) packets.
+	</para></listitem>
+
+	<listitem><para>The Linux USB API supports synchronous calls for
+	control and bulk messaging.
+	It also supports asynchnous calls for all kinds of data transfer,
+	using request structures called "URBs" (USB Request Blocks).
+	</para></listitem>
+
+    </itemizedlist>
+
+    <para>Accordingly, the USB Core API exposed to device drivers
+    covers quite a lot of territory.  You'll probably need to consult
+    the USB 2.0 specification, available online from www.usb.org at
+    no cost, as well as class or device specifications.
+    </para>
+
+    <sect1><title>Data Types and Macros</title>
+!Iinclude/linux/usb.h
+    </sect1>
+
+    <sect1><title>USB Core APIs</title>
 !Edrivers/usb/usb.c
+    </sect1>
+
   </chapter>
 
   <chapter id="uart16x50">

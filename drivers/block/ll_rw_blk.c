@@ -303,10 +303,7 @@ int blk_rq_map_sg(request_queue_t *q, struct request *rq, struct scatterlist *sg
 
 			BIO_BUG_ON(i > bio->bi_vcnt);
 
-			if (!cluster)
-				goto new_segment;
-
-			if (bvec_to_phys(bvec) == lastend) {
+			if (cluster && bvec_to_phys(bvec) == lastend) {
 				if (sg[nsegs - 1].length + nbytes > q->max_segment_size)
 					goto new_segment;
 
@@ -1135,7 +1132,7 @@ int submit_bio(int rw, struct bio *bio)
 	BUG_ON(!bio->bi_end_io);
 
 	BIO_BUG_ON(bio_offset(bio) > PAGE_SIZE);
-	BIO_BUG_ON(!bio_size(bio));
+	BIO_BUG_ON(!bio->bi_size);
 	BIO_BUG_ON(!bio->bi_io_vec);
 
 	bio->bi_rw = rw;
@@ -1172,11 +1169,7 @@ int submit_bh(int rw, struct buffer_head * bh)
 	bio = bio_alloc(GFP_NOIO, 1);
 
 	bio->bi_sector = bh->b_blocknr * (bh->b_size >> 9);
-	bio->bi_next = NULL;
 	bio->bi_dev = bh->b_dev;
-	bio->bi_private = bh;
-	bio->bi_end_io = end_bio_bh_io_sync;
-
 	bio->bi_io_vec[0].bv_page = bh->b_page;
 	bio->bi_io_vec[0].bv_len = bh->b_size;
 	bio->bi_io_vec[0].bv_offset = bh_offset(bh);
@@ -1184,6 +1177,9 @@ int submit_bh(int rw, struct buffer_head * bh)
 	bio->bi_vcnt = 1;
 	bio->bi_idx = 0;
 	bio->bi_size = bh->b_size;
+
+	bio->bi_end_io = end_bio_bh_io_sync;
+	bio->bi_private = bh;
 
 	return submit_bio(rw, bio);
 }

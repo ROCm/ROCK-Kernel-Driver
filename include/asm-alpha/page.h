@@ -64,7 +64,14 @@ do {										\
 	printk("kernel BUG at %s:%d!\n", __FILE__, __LINE__);			\
 	__asm__ __volatile__("call_pal %0  # bugchk" : : "i" (PAL_bugchk));	\
 } while (0)
+
 #define PAGE_BUG(page)	BUG()
+
+#define BUG_ON(condition)			\
+	do {					\
+		if (unlikely((long)(condition)))\
+			BUG();			\
+	} while (0)
 
 /* Pure 2^n version of get_order */
 extern __inline__ int get_order(unsigned long size)

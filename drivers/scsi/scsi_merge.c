@@ -148,7 +148,7 @@ __inline static int __count_segments(struct request *req,
 	 */
 	bio = req->bio;
 #ifdef DMA_SEGMENT_SIZE_LIMITED
-	if (reqsize + bio_size(bio) > PAGE_SIZE)
+	if (reqsize + bio->bi_size > PAGE_SIZE)
 		ret++;
 #endif
 
@@ -156,7 +156,7 @@ __inline static int __count_segments(struct request *req,
 		bio_for_each_segment(bvec, bio, i)
 			ret++;
 
-		reqsize += bio_size(bio);
+		reqsize += bio->bi_size;
 	}
 
 	if (remainder)
@@ -201,7 +201,7 @@ recount_segments(Scsi_Cmnd * SCpnt)
 }
 
 #define MERGEABLE_BUFFERS(X,Y) \
-(((((long)bio_to_phys((X))+bio_size((X)))|((long)bio_to_phys((Y)))) & \
+(((((long)bio_to_phys((X))+(X)->bi_size)|((long)bio_to_phys((Y)))) & \
   (DMA_CHUNK_SIZE - 1)) == 0)
 
 #ifdef DMA_CHUNK_SIZE
@@ -767,7 +767,7 @@ __inline static int __init_io(Scsi_Cmnd * SCpnt,
 		 * back and allocate a really small one - enough to satisfy
 		 * the first buffer.
 		 */
-		if (bio_to_phys(bio) + bio_size(bio) - 1 > ISA_DMA_THRESHOLD) {
+		if (bio_to_phys(bio) + bio->bi_size - 1 > ISA_DMA_THRESHOLD) {
 			buff = (char *) scsi_malloc(this_count << 9);
 			if (!buff) {
 				printk("Warning - running low on DMA memory\n");
