@@ -279,7 +279,7 @@ static int __devinit aperture_valid(u64 aper, u32 size)
 
 	   Maybe better to use pci_assign_resource/pci_enable_device instead trusting
 	   the bridges? */
-	if (!not_first_call && request_mem_region(aper, size, "aperture") < 0) { 
+	if (!not_first_call && !request_mem_region(aper, size, "aperture")) { 
 		printk(KERN_ERR PFX "Aperture conflicts with PCI mapping.\n"); 
 		return 0;
 	}
@@ -357,11 +357,18 @@ static __devinit int cache_nbs (struct pci_dev *pdev, u32 cap_ptr)
 		}
 		hammers[i++] = loop_dev;
 		nr_garts = i;
+#ifdef CONFIG_SMP
 		if (i == MAX_HAMMER_GARTS) { 
 			printk(KERN_INFO PFX "Too many northbridges for AGP\n");
 			return -1;
 		}
+#else
+		/* Uniprocessor case, return after finding first bridge.
+		   (There may be more, but in UP, we don't care). */
+		return 0;
+#endif
 	}
+
 	return i == 0 ? -1 : 0;
 }
 
