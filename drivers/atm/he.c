@@ -1963,7 +1963,7 @@ he_service_tbrq(struct he_dev *he_dev, int group)
 	struct he_tpd *tpd;
 	int slot, updated = 0;
 #ifdef USE_TPD_POOL
-	struct list_head *p;
+	struct he_tpd *__tpd;
 #endif
 
 	/* 2.1.6 transmit buffer return queue */
@@ -1978,8 +1978,7 @@ he_service_tbrq(struct he_dev *he_dev, int group)
 			TBRQ_MULTIPLE(he_dev->tbrq_head) ? " MULTIPLE" : "");
 #ifdef USE_TPD_POOL
 		tpd = NULL;
-		list_for_each(p, &he_dev->outstanding_tpds) {
-			struct he_tpd *__tpd = list_entry(p, struct he_tpd, entry);
+		list_for_each_entry(__tpd, &he_dev->outstanding_tpds, entry) {
 			if (TPD_ADDR(__tpd->status) == TBRQ_TPD(he_dev->tbrq_head)) {
 				tpd = __tpd;
 				list_del(&__tpd->entry);
