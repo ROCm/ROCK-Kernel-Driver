@@ -63,8 +63,8 @@ static inline void set_bit_cs(unsigned long nr, volatile void *ptr)
 
 	addr = (unsigned long) ptr;
 #if ALIGN_CS == 1
-	addr ^= addr & 7;		/* align address to 8 */
 	nr += (addr & 7) << 3;		/* add alignment to bit number */
+	addr ^= addr & 7;		/* align address to 8 */
 #endif
 	addr += (nr ^ (nr & 63)) >> 3;	/* calculate address for CS */
 	mask = 1UL << (nr & 63);	/* make OR mask */
@@ -88,8 +88,8 @@ static inline void clear_bit_cs(unsigned long nr, volatile void *ptr)
 
 	addr = (unsigned long) ptr;
 #if ALIGN_CS == 1
-	addr ^= addr & 7;		/* align address to 8 */
 	nr += (addr & 7) << 3;		/* add alignment to bit number */
+	addr ^= addr & 7;		/* align address to 8 */
 #endif
 	addr += (nr ^ (nr & 63)) >> 3;	/* calculate address for CS */
 	mask = ~(1UL << (nr & 63));	/* make AND mask */
@@ -113,8 +113,8 @@ static inline void change_bit_cs(unsigned long nr, volatile void *ptr)
 
 	addr = (unsigned long) ptr;
 #if ALIGN_CS == 1
-	addr ^= addr & 7;		/* align address to 8 */
 	nr += (addr & 7) << 3;		/* add alignment to bit number */
+	addr ^= addr & 7;		/* align address to 8 */
 #endif
 	addr += (nr ^ (nr & 63)) >> 3;	/* calculate address for CS */
 	mask = 1UL << (nr & 63);	/* make XOR mask */
@@ -139,8 +139,8 @@ test_and_set_bit_cs(unsigned long nr, volatile void *ptr)
 
 	addr = (unsigned long) ptr;
 #if ALIGN_CS == 1
-	addr ^= addr & 7;		/* align address to 8 */
 	nr += (addr & 7) << 3;		/* add alignment to bit number */
+	addr ^= addr & 7;		/* align address to 8 */
 #endif
 	addr += (nr ^ (nr & 63)) >> 3;	/* calculate address for CS */
 	mask = 1UL << (nr & 63);	/* make OR/test mask */
@@ -166,8 +166,8 @@ test_and_clear_bit_cs(unsigned long nr, volatile void *ptr)
 
 	addr = (unsigned long) ptr;
 #if ALIGN_CS == 1
-	addr ^= addr & 7;		/* align address to 8 */
 	nr += (addr & 7) << 3;		/* add alignment to bit number */
+	addr ^= addr & 7;		/* align address to 8 */
 #endif
 	addr += (nr ^ (nr & 63)) >> 3;	/* calculate address for CS */
 	mask = ~(1UL << (nr & 63));	/* make AND mask */
@@ -193,8 +193,8 @@ test_and_change_bit_cs(unsigned long nr, volatile void *ptr)
 
 	addr = (unsigned long) ptr;
 #if ALIGN_CS == 1
-	addr ^= addr & 7;		/* align address to 8 */
 	nr += (addr & 7) << 3;		/* add alignment to bit number */
+	addr ^= addr & 7;		/* align address to 8 */
 #endif
 	addr += (nr ^ (nr & 63)) >> 3;	/* calculate address for CS */
 	mask = 1UL << (nr & 63);	/* make XOR mask */
