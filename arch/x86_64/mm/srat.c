@@ -20,17 +20,20 @@
 
 static struct acpi_table_slit *acpi_slit;
 
-static DECLARE_BITMAP(nodes_parsed, MAX_NUMNODES) __initdata;
+static nodemask_t nodes_parsed __initdata;
+static nodemask_t nodes_found __initdata;
 static struct node nodes[MAX_NUMNODES] __initdata;
 static __u8  pxm2node[256] __initdata = { [0 ... 255] = 0xff };
 
 static __init int setup_node(int pxm)
 {
-	if (pxm2node[pxm] == 0xff) {
-		if (num_online_nodes() >= MAX_NUMNODES)
+	unsigned node = pxm2node[pxm];
+	if (node == 0xff) {
+		if (nodes_weight(nodes_found) >= MAX_NUMNODES)
 			return -1;
-		pxm2node[pxm] = num_online_nodes();
-		node_set_online(num_online_nodes());
+		node = first_unset_node(nodes_found); 
+		node_set(node, nodes_found);
+		pxm2node[pxm] = node;
 	}
 	return pxm2node[pxm];
 }
@@ -140,7 +143,7 @@ acpi_numa_memory_affinity_init(struct acpi_table_memory_affinity *ma)
 		return;
 	}
 	nd = &nodes[node];
-	if (!test_and_set_bit(node, &nodes_parsed)) {
+	if (!node_test_and_set(node, nodes_parsed)) {
 		nd->start = start;
 		nd->end = end;
 	} else {
@@ -171,7 +174,7 @@ int __init acpi_scan_nodes(unsigned long start, unsigned long end)
 		return -1;
 	}
 	for (i = 0; i < MAX_NUMNODES; i++) {
-		if (!test_bit(i, &nodes_parsed))
+		if (!node_isset(i, nodes_parsed))
 			continue;
 		cutoff_node(i, start, end);
 		if (nodes[i].start == nodes[i].end)
