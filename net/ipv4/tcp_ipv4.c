@@ -334,11 +334,11 @@ void tcp_listen_wlock(void)
 	write_lock(&tcp_lhash_lock);
 
 	if (atomic_read(&tcp_lhash_users)) {
-		DECLARE_WAITQUEUE(wait, current);
+		DEFINE_WAIT(wait);
 
-		add_wait_queue_exclusive(&tcp_lhash_wait, &wait);
 		for (;;) {
-			set_current_state(TASK_UNINTERRUPTIBLE);
+			prepare_to_wait_exclusive(&tcp_lhash_wait,
+						&wait, TASK_UNINTERRUPTIBLE);
 			if (!atomic_read(&tcp_lhash_users))
 				break;
 			write_unlock_bh(&tcp_lhash_lock);
@@ -346,8 +346,7 @@ void tcp_listen_wlock(void)
 			write_lock_bh(&tcp_lhash_lock);
 		}
 
-		__set_current_state(TASK_RUNNING);
-		remove_wait_queue(&tcp_lhash_wait, &wait);
+		finish_wait(&tcp_lhash_wait, &wait);
 	}
 }
 

@@ -659,7 +659,7 @@ static int wait_for_tcp_connect(struct sock *sk, int flags, long *timeo_p)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
 	struct task_struct *tsk = current;
-	DECLARE_WAITQUEUE(wait, tsk);
+	DEFINE_WAIT(wait);
 
 	while ((1 << sk->state) & ~(TCPF_ESTABLISHED | TCPF_CLOSE_WAIT)) {
 		if (sk->err)
@@ -671,16 +671,14 @@ static int wait_for_tcp_connect(struct sock *sk, int flags, long *timeo_p)
 		if (signal_pending(tsk))
 			return sock_intr_errno(*timeo_p);
 
-		__set_task_state(tsk, TASK_INTERRUPTIBLE);
-		add_wait_queue(sk->sleep, &wait);
+		prepare_to_wait(sk->sleep, &wait, TASK_INTERRUPTIBLE);
 		tp->write_pending++;
 
 		release_sock(sk);
 		*timeo_p = schedule_timeout(*timeo_p);
 		lock_sock(sk);
 
-		__set_task_state(tsk, TASK_RUNNING);
-		remove_wait_queue(sk->sleep, &wait);
+		finish_wait(sk->sleep, &wait);
 		tp->write_pending--;
 	}
 	return 0;
@@ -700,16 +698,15 @@ static int wait_for_tcp_memory(struct sock *sk, long *timeo)
 	int err = 0;
 	long vm_wait = 0;
 	long current_timeo = *timeo;
-	DECLARE_WAITQUEUE(wait, current);
+	DEFINE_WAIT(wait);
 
 	if (tcp_memory_free(sk))
 		current_timeo = vm_wait = (net_random() % (HZ / 5)) + 2;
 
-	add_wait_queue(sk->sleep, &wait);
 	for (;;) {
 		set_bit(SOCK_ASYNC_NOSPACE, &sk->socket->flags);
 
-		set_current_state(TASK_INTERRUPTIBLE);
+		prepare_to_wait(sk->sleep, &wait, TASK_INTERRUPTIBLE);
 
 		if (sk->err || (sk->shutdown & SEND_SHUTDOWN))
 			goto do_error;
@@ -740,8 +737,7 @@ static int wait_for_tcp_memory(struct sock *sk, long *timeo)
 		*timeo = current_timeo;
 	}
 out:
-	current->state = TASK_RUNNING;
-	remove_wait_queue(sk->sleep, &wait);
+	finish_wait(sk->sleep, &wait);
 	return err;
 
 do_error:
@@ -1374,11 +1370,9 @@ static void cleanup_rbuf(struct sock *sk, int copied)
 
 static long tcp_data_wait(struct sock *sk, long timeo)
 {
-	DECLARE_WAITQUEUE(wait, current);
+	DEFINE_WAIT(wait);
 
-	add_wait_queue(sk->sleep, &wait);
-
-	__set_current_state(TASK_INTERRUPTIBLE);
+	prepare_to_wait(sk->sleep, &wait, TASK_INTERRUPTIBLE);
 
 	set_bit(SOCK_ASYNC_WAITDATA, &sk->socket->flags);
 	release_sock(sk);
@@ -1389,8 +1383,7 @@ static long tcp_data_wait(struct sock *sk, long timeo)
 	lock_sock(sk);
 	clear_bit(SOCK_ASYNC_WAITDATA, &sk->socket->flags);
 
-	remove_wait_queue(sk->sleep, &wait);
-	__set_current_state(TASK_RUNNING);
+	finish_wait(sk->sleep, &wait);
 	return timeo;
 }
 
@@ -2017,12 +2010,10 @@ void tcp_close(struct sock *sk, long timeout)
 
 	if (timeout) {
 		struct task_struct *tsk = current;
-		DECLARE_WAITQUEUE(wait, current);
-
-		add_wait_queue(sk->sleep, &wait);
+		DEFINE_WAIT(wait);
 
 		do {
-			set_current_state(TASK_INTERRUPTIBLE);
+			prepare_to_wait(sk->sleep, &wait, TASK_INTERRUPTIBLE);
 			if (!closing(sk))
 				break;
 			release_sock(sk);
@@ -2030,8 +2021,7 @@ void tcp_close(struct sock *sk, long timeout)
 			lock_sock(sk);
 		} while (!signal_pending(tsk) && timeout);
 
-		tsk->state = TASK_RUNNING;
-		remove_wait_queue(sk->sleep, &wait);
+		finish_wait(sk->sleep, &wait);
 	}
 
 adjudge_to_death:
@@ -2191,7 +2181,7 @@ int tcp_disconnect(struct sock *sk, int flags)
 static int wait_for_connect(struct sock *sk, long timeo)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
-	DECLARE_WAITQUEUE(wait, current);
+	DEFINE_WAIT(wait);
 	int err;
 
 	/*
@@ -2208,9 +2198,8 @@ static int wait_for_connect(struct sock *sk, long timeo)
 	 * our exclusiveness temporarily when we get woken up without
 	 * having to remove and re-insert us on the wait queue.
 	 */
-	add_wait_queue_exclusive(sk->sleep, &wait);
 	for (;;) {
-		current->state = TASK_INTERRUPTIBLE;
+		prepare_to_wait_exclusive(sk->sleep, &wait, TASK_INTERRUPTIBLE);
 		release_sock(sk);
 		if (!tp->accept_queue)
 			timeo = schedule_timeout(timeo);
@@ -2228,8 +2217,7 @@ static int wait_for_connect(struct sock *sk, long timeo)
 		if (!timeo)
 			break;
 	}
-	current->state = TASK_RUNNING;
-	remove_wait_queue(sk->sleep, &wait);
+	finish_wait(sk->sleep, &wait);
 	return err;
 }
 

@@ -859,10 +859,9 @@ static long unix_wait_for_peer(unix_socket *other, long timeo)
 {
 	struct unix_sock *u = unix_sk(other);
 	int sched;
-	DECLARE_WAITQUEUE(wait, current);
+	DEFINE_WAIT(wait);
 
-	__set_current_state(TASK_INTERRUPTIBLE);
-	add_wait_queue_exclusive(&u->peer_wait, &wait);
+	prepare_to_wait_exclusive(&u->peer_wait, &wait, TASK_INTERRUPTIBLE);
 
 	sched = (!test_bit(SOCK_DEAD, &other->flags) &&
 		 !(other->shutdown&RCV_SHUTDOWN) &&
@@ -873,8 +872,7 @@ static long unix_wait_for_peer(unix_socket *other, long timeo)
 	if (sched)
 		timeo = schedule_timeout(timeo);
 
-	__set_current_state(TASK_RUNNING);
-	remove_wait_queue(&u->peer_wait, &wait);
+	finish_wait(&u->peer_wait, &wait);
 	return timeo;
 }
 
@@ -1542,14 +1540,12 @@ out:
  
 static long unix_stream_data_wait(unix_socket * sk, long timeo)
 {
-	DECLARE_WAITQUEUE(wait, current);
+	DEFINE_WAIT(wait);
 
 	unix_state_rlock(sk);
 
-	add_wait_queue(sk->sleep, &wait);
-
 	for (;;) {
-		set_current_state(TASK_INTERRUPTIBLE);
+		prepare_to_wait(sk->sleep, &wait, TASK_INTERRUPTIBLE);
 
 		if (skb_queue_len(&sk->receive_queue) ||
 		    sk->err ||
@@ -1565,8 +1561,7 @@ static long unix_stream_data_wait(unix_socket * sk, long timeo)
 		clear_bit(SOCK_ASYNC_WAITDATA, &sk->socket->flags);
 	}
 
-	__set_current_state(TASK_RUNNING);
-	remove_wait_queue(sk->sleep, &wait);
+	finish_wait(sk->sleep, &wait);
 	unix_state_runlock(sk);
 	return timeo;
 }

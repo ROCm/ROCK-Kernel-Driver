@@ -746,17 +746,16 @@ void sock_kfree_s(struct sock *sk, void *mem, int size)
  */
 static long sock_wait_for_wmem(struct sock * sk, long timeo)
 {
-	DECLARE_WAITQUEUE(wait, current);
+	DEFINE_WAIT(wait);
 
 	clear_bit(SOCK_ASYNC_NOSPACE, &sk->socket->flags);
-	add_wait_queue(sk->sleep, &wait);
 	for (;;) {
 		if (!timeo)
 			break;
 		if (signal_pending(current))
 			break;
 		set_bit(SOCK_NOSPACE, &sk->socket->flags);
-		set_current_state(TASK_INTERRUPTIBLE);
+		prepare_to_wait(sk->sleep, &wait, TASK_INTERRUPTIBLE);
 		if (atomic_read(&sk->wmem_alloc) < sk->sndbuf)
 			break;
 		if (sk->shutdown & SEND_SHUTDOWN)
@@ -765,8 +764,7 @@ static long sock_wait_for_wmem(struct sock * sk, long timeo)
 			break;
 		timeo = schedule_timeout(timeo);
 	}
-	__set_current_state(TASK_RUNNING);
-	remove_wait_queue(sk->sleep, &wait);
+	finish_wait(sk->sleep, &wait);
 	return timeo;
 }
 
@@ -860,19 +858,18 @@ struct sk_buff *sock_alloc_send_skb(struct sock *sk, unsigned long size,
 
 void __lock_sock(struct sock *sk)
 {
-	DECLARE_WAITQUEUE(wait, current);
+	DEFINE_WAIT(wait);
 
-	add_wait_queue_exclusive(&sk->lock.wq, &wait);
 	for(;;) {
-		current->state = TASK_UNINTERRUPTIBLE;
+		prepare_to_wait_exclusive(&sk->lock.wq, &wait,
+					TASK_UNINTERRUPTIBLE);
 		spin_unlock_bh(&sk->lock.slock);
 		schedule();
 		spin_lock_bh(&sk->lock.slock);
 		if(!sock_owned_by_user(sk))
 			break;
 	}
-	current->state = TASK_RUNNING;
-	remove_wait_queue(&sk->lock.wq, &wait);
+	finish_wait(&sk->lock.wq, &wait);
 }
 
 void __release_sock(struct sock *sk)

@@ -562,10 +562,9 @@ int inet_dgram_connect(struct socket *sock, struct sockaddr * uaddr,
 
 static long inet_wait_for_connect(struct sock *sk, long timeo)
 {
-	DECLARE_WAITQUEUE(wait, current);
+	DEFINE_WAIT(wait);
 
-	__set_current_state(TASK_INTERRUPTIBLE);
-	add_wait_queue(sk->sleep, &wait);
+	prepare_to_wait(sk->sleep, &wait, TASK_INTERRUPTIBLE);
 
 	/* Basic assumption: if someone sets sk->err, he _must_
 	 * change state of the socket from TCP_SYN_*.
@@ -578,10 +577,9 @@ static long inet_wait_for_connect(struct sock *sk, long timeo)
 		lock_sock(sk);
 		if (signal_pending(current) || !timeo)
 			break;
-		set_current_state(TASK_INTERRUPTIBLE);
+		prepare_to_wait(sk->sleep, &wait, TASK_INTERRUPTIBLE);
 	}
-	__set_current_state(TASK_RUNNING);
-	remove_wait_queue(sk->sleep, &wait);
+	finish_wait(sk->sleep, &wait);
 	return timeo;
 }
 
