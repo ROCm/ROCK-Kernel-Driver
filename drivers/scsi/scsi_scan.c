@@ -1201,7 +1201,12 @@ static void scsi_scan_target(struct Scsi_Host *shost, unsigned int channel,
 	 */
 	res = scsi_probe_and_add_lun(shost, channel, id, 0, &bflags, &sdev,
 				     rescan, NULL);
-	if (res == SCSI_SCAN_LUN_PRESENT) {
+	/* 
+	 * Note: Previously, we did not try report_lun_scan if LUN 0 was
+	 * not present. However, the assumption we can't use REPORT_LUNS
+	 * b/c of non-existing LUN 0 has no foundation in the standard.
+	 */
+	if (res == SCSI_SCAN_LUN_PRESENT || SCSI_SCAN_TARGET_PRESENT) {
 		if (scsi_report_lun_scan(sdev, bflags, rescan) != 0)
 			/*
 			 * The REPORT LUN did not scan the target,
@@ -1209,15 +1214,6 @@ static void scsi_scan_target(struct Scsi_Host *shost, unsigned int channel,
 			 */
 			scsi_sequential_lun_scan(shost, channel, id, bflags,
 				       	res, sdev->scsi_level, rescan);
-	} else if (res == SCSI_SCAN_TARGET_PRESENT) {
-		/*
-		 * There's a target here, but lun 0 is offline so we
-		 * can't use the report_lun scan.  Fall back to a
-		 * sequential lun scan with a bflags of SPARSELUN and
-		 * a default scsi level of SCSI_2
-		 */
-		scsi_sequential_lun_scan(shost, channel, id, BLIST_SPARSELUN,
-				SCSI_SCAN_TARGET_PRESENT, SCSI_2, rescan);
 	}
 }
 
