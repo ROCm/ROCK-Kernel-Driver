@@ -470,7 +470,7 @@ static int snd_dummy_volume_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
 	ucontrol->value.integer.value[1] = dummy->mixer_volume[addr][1];
 	spin_unlock_irqrestore(&dummy->mixer_lock, flags);
 	return 0;
-}                                                                                                                                                                                                                                                                                                            
+}
 
 static int snd_dummy_volume_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
@@ -496,7 +496,7 @@ static int snd_dummy_volume_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
 	dummy->mixer_volume[addr][1] = right;
 	spin_unlock_irqrestore(&dummy->mixer_lock, flags);
 	return change;
-}                                                                                                                                                                                                                                                                                                            
+}
 
 #define DUMMY_CAPSRC(xname, xindex, addr) \
 { .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex, \
@@ -542,7 +542,7 @@ static int snd_dummy_capsrc_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
 	dummy->capture_source[addr][1] = right;
 	spin_unlock_irqrestore(&dummy->mixer_lock, flags);
 	return change;
-}                                                                                                                                                                                                                                                                                                            
+}
 
 #define DUMMY_CONTROLS (sizeof(snd_dummy_controls)/sizeof(snd_kcontrol_new_t))
 
