@@ -38,13 +38,13 @@
 	  : : "r" (x));					\
 	} while (0)
 
-#define modify_domain(dom,type)				\
-	do {						\
-	unsigned int domain = current->thread.domain;	\
-	domain &= ~domain_val(dom, DOMAIN_MANAGER);	\
-	domain |= domain_val(dom, type);		\
-	current->thread.domain = domain;		\
-	set_domain(current->thread.domain);		\
+#define modify_domain(dom,type)					\
+	do {							\
+	struct thread_info *thread = current_thread_info();	\
+	unsigned int domain = thread->cpu_domain;		\
+	domain &= ~domain_val(dom, DOMAIN_MANAGER);		\
+	thread->cpu_domain = domain | domain_val(dom, type);	\
+	set_domain(thread->cpu_domain);				\
 	} while (0)
 
 #endif

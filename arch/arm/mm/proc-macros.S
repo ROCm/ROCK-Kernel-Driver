@@ -1,3 +1,10 @@
+/*
+ * We need constants.h for:
+ *  VMA_VM_MM
+ *  VMA_VM_FLAGS
+ *  VM_EXEC
+ */
+#include <asm/constants.h>
 #include <asm/thread_info.h>
 
 /*

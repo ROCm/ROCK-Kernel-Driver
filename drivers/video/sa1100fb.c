@@ -23,11 +23,11 @@
  * Thank you.
  *
  * Known problems:
- *  - With the Neponset plugged into an Assabet, LCD powerdown
- *    doesn't work (LCD stays powered up).  Therefore we shouldn't
- *    blank the screen.
- *  - We don't limit the CPU clock rate nor the mode selection
- *    according to the available SDRAM bandwidth.
+ *	- With the Neponset plugged into an Assabet, LCD powerdown
+ *	  doesn't work (LCD stays powered up).  Therefore we shouldn't
+ *	  blank the screen.
+ *	- We don't limit the CPU clock rate nor the mode selection
+ *	  according to the available SDRAM bandwidth.
  *
  * Other notes:
  *	- Linear grayscale palettes and the kernel.
@@ -40,6 +40,17 @@
  *	  to set the colourmap correctly from user space has been sent to
  *	  David Neuer.  It's around 8 lines of C code, plus another 4 to
  *	  detect if we are using grayscale.
+ *
+ *	- The following must never be specified in a panel definition:
+ *	     LCCR0_LtlEnd, LCCR3_PixClkDiv, LCCR3_VrtSnchL, LCCR3_HorSnchL
+ *
+ *	- The following should be specified:
+ *	     either LCCR0_Color or LCCR0_Mono
+ *	     either LCCR0_Sngl or LCCR0_Dual
+ *	     either LCCR0_Act or LCCR0_Pas
+ *	     either LCCR3_OutEnH or LCCD3_OutEnL
+ *	     either LCCR3_PixRsEdg or LCCR3_PixFlEdg
+ *	     either LCCR3_ACBsDiv or LCCR3_ACBsCntOff
  *
  * Code Status:
  * 1999/04/01:
@@ -161,6 +172,7 @@
 #include <linux/delay.h>
 #include <linux/pm.h>
 #include <linux/init.h>
+#include <linux/ioport.h>
 #include <linux/cpufreq.h>
 
 #include <asm/hardware.h>
@@ -169,17 +181,13 @@
 #include <asm/mach-types.h>
 #include <asm/uaccess.h>
 #include <asm/arch/assabet.h>
+#include <asm/arch/shannon.h>
 
 #include <video/fbcon.h>
 #include <video/fbcon-mfb.h>
 #include <video/fbcon-cfb4.h>
 #include <video/fbcon-cfb8.h>
 #include <video/fbcon-cfb16.h>
-
-/*
- * enable this if your panel appears to have broken
- */
-#undef CHECK_COMPAT
 
 /*
  * debugging?
@@ -194,245 +202,11 @@
 
 #include "sa1100fb.h"
 
+extern void (*sa1100fb_backlight_power)(int on);
+extern void (*sa1100fb_lcd_power)(int on);
+
 void (*sa1100fb_blank_helper)(int blank);
 EXPORT_SYMBOL(sa1100fb_blank_helper);
-
-
-#ifdef CHECK_COMPAT
-static void
-sa1100fb_check_shadow(struct sa1100fb_lcd_reg *new_regs,
-			   struct fb_var_screeninfo *var, u_int pcd)
-{
-	struct sa1100fb_lcd_reg shadow;
-	int different = 0;
-
-	/*
-	 * These machines are good machines!
-	 */
-	if (machine_is_assabet() || machine_is_h3600())
-		return;
-
-	/*
-	 * The following ones are bad, bad, bad.
-	 * Please make yours good!
-	 */
-	if (machine_is_pangolin()) {
-		DPRINTK("Configuring Pangolin LCD\n");
-		shadow.lccr0 =
-		    LCCR0_LEN + LCCR0_Color + LCCR0_LDM +
-		    LCCR0_BAM + LCCR0_ERM + LCCR0_Act +
-		    LCCR0_LtlEnd + LCCR0_DMADel(0);
-		shadow.lccr1 =
-		    LCCR1_DisWdth(var->xres) + LCCR1_HorSnchWdth(64) +
-		    LCCR1_BegLnDel(160) + LCCR1_EndLnDel(24);
-		shadow.lccr2 =
-		    LCCR2_DisHght(var->yres) + LCCR2_VrtSnchWdth(7) +
-		    LCCR2_BegFrmDel(7) + LCCR2_EndFrmDel(1);
-		shadow.lccr3 =
-		    LCCR3_PixClkDiv(pcd) + LCCR3_HorSnchH +
-		    LCCR3_VrtSnchH + LCCR3_PixFlEdg + LCCR3_OutEnH;
-
-		DPRINTK("pcd = %x, PixCldDiv(pcd)=%x\n",
-			pcd, LCCR3_PixClkDiv(pcd));
-	}
-	if (machine_is_freebird()) {
-		DPRINTK("Configuring  Freebird LCD\n");
-#if 1
-		shadow.lccr0 = 0x00000038;
-		shadow.lccr1 = 0x010108e0;
-		shadow.lccr2 = 0x0000053f;
-		shadow.lccr3 = 0x00000c20;
-#else
-		shadow.lccr0 =
-		    LCCR0_LEN + LCCR0_Color + LCCR0_Sngl +
-		    LCCR0_LDM + LCCR0_BAM + LCCR0_ERM + LCCR0_Pas +
-		    LCCR0_LtlEnd + LCCR0_DMADel(0);
-		/* Check ,Chester */
-		shadow.lccr1 =
-		    LCCR1_DisWdth(var->xres) + LCCR1_HorSnchWdth(5) +
-		    LCCR1_BegLnDel(61) + LCCR1_EndLnDel(9);
-		/* Check ,Chester */
-		shadow.lccr2 =
-		    LCCR2_DisHght(var->yres) + LCCR2_VrtSnchWdth(1) +
-		    LCCR2_BegFrmDel(3) + LCCR2_EndFrmDel(0);
-		/* Check ,Chester */
-		shadow.lccr3 =
-		    LCCR3_OutEnH + LCCR3_PixFlEdg + LCCR3_VrtSnchH +
-		    LCCR3_HorSnchH + LCCR3_ACBsCntOff +
-		    LCCR3_ACBsDiv(2) + LCCR3_PixClkDiv(pcd);
-#endif
-	}
-	if (machine_is_brutus()) {
-		DPRINTK("Configuring  Brutus LCD\n");
-		shadow.lccr0 =
-		    LCCR0_LEN + LCCR0_Color + LCCR0_Sngl + LCCR0_Pas +
-		    LCCR0_LtlEnd + LCCR0_LDM + LCCR0_BAM + LCCR0_ERM +
-		    LCCR0_DMADel(0);
-		shadow.lccr1 =
-		    LCCR1_DisWdth(var->xres) + LCCR1_HorSnchWdth(3) +
-		    LCCR1_BegLnDel(41) + LCCR1_EndLnDel(101);
-		shadow.lccr2 =
-		    LCCR2_DisHght(var->yres) + LCCR2_VrtSnchWdth(1) +
-		    LCCR2_BegFrmDel(0) + LCCR2_EndFrmDel(0);
-		shadow.lccr3 =
-		    LCCR3_OutEnH + LCCR3_PixRsEdg + LCCR3_VrtSnchH +
-		    LCCR3_HorSnchH + LCCR3_ACBsCntOff +
-		    LCCR3_ACBsDiv(2) + LCCR3_PixClkDiv(44);
-	}
-	if (machine_is_huw_webpanel()) {
-		DPRINTK("Configuring  HuW LCD\n");
-		shadow.lccr0 = LCCR0_LEN + LCCR0_Dual + LCCR0_LDM;
-		shadow.lccr1 = LCCR1_DisWdth(var->xres) +
-		    LCCR1_HorSnchWdth(3) +
-		    LCCR1_BegLnDel(41) + LCCR1_EndLnDel(101);
-		shadow.lccr2 = 239 + LCCR2_VrtSnchWdth(1);
-		shadow.lccr3 = 8 + LCCR3_OutEnH +
-		    LCCR3_PixRsEdg + LCCR3_VrtSnchH +
-		    LCCR3_HorSnchH + LCCR3_ACBsCntOff + LCCR3_ACBsDiv(2);
-	}
-	if (machine_is_lart()) {
-		DPRINTK("Configuring LART LCD\n");
-#if defined LART_GREY_LCD
-		shadow.lccr0 =
-		    LCCR0_LEN + LCCR0_Mono + LCCR0_Sngl + LCCR0_Pas +
-		    LCCR0_LtlEnd + LCCR0_LDM + LCCR0_BAM + LCCR0_ERM +
-		    LCCR0_DMADel(0);
-		shadow.lccr1 =
-		    LCCR1_DisWdth(var->xres) + LCCR1_HorSnchWdth(1) +
-		    LCCR1_BegLnDel(4) + LCCR1_EndLnDel(2);
-		shadow.lccr2 =
-		    LCCR2_DisHght(var->yres) + LCCR2_VrtSnchWdth(1) +
-		    LCCR2_BegFrmDel(0) + LCCR2_EndFrmDel(0);
-		shadow.lccr3 =
-		    LCCR3_PixClkDiv(34) + LCCR3_ACBsDiv(512) +
-		    LCCR3_ACBsCntOff + LCCR3_HorSnchH + LCCR3_VrtSnchH;
-#endif
-#if defined LART_COLOR_LCD
-		shadow.lccr0 =
-		    LCCR0_LEN + LCCR0_Color + LCCR0_Sngl + LCCR0_Act +
-		    LCCR0_LtlEnd + LCCR0_LDM + LCCR0_BAM + LCCR0_ERM +
-		    LCCR0_DMADel(0);
-		shadow.lccr1 =
-		    LCCR1_DisWdth(var->xres) + LCCR1_HorSnchWdth(2) +
-		    LCCR1_BegLnDel(69) + LCCR1_EndLnDel(8);
-		shadow.lccr2 =
-		    LCCR2_DisHght(var->yres) + LCCR2_VrtSnchWdth(3) +
-		    LCCR2_BegFrmDel(14) + LCCR2_EndFrmDel(4);
-		shadow.lccr3 =
-		    LCCR3_PixClkDiv(34) + LCCR3_ACBsDiv(512) +
-		    LCCR3_ACBsCntOff + LCCR3_HorSnchL + LCCR3_VrtSnchL +
-		    LCCR3_PixFlEdg;
-#endif
-#if defined LART_VIDEO_OUT
-		shadow.lccr0 =
-		    LCCR0_LEN + LCCR0_Color + LCCR0_Sngl + LCCR0_Act +
-		    LCCR0_LtlEnd + LCCR0_LDM + LCCR0_BAM + LCCR0_ERM +
-		    LCCR0_DMADel(0);
-		shadow.lccr1 =
-		    LCCR1_DisWdth(640) + LCCR1_HorSnchWdth(95) +
-		    LCCR1_BegLnDel(40) + LCCR1_EndLnDel(24);
-		shadow.lccr2 =
-		    LCCR2_DisHght(480) + LCCR2_VrtSnchWdth(2) +
-		    LCCR2_BegFrmDel(32) + LCCR2_EndFrmDel(11);
-		shadow.lccr3 =
-		    LCCR3_PixClkDiv(8) + LCCR3_ACBsDiv(512) +
-		    LCCR3_ACBsCntOff + LCCR3_HorSnchH + LCCR3_VrtSnchH +
-		    LCCR3_PixFlEdg + LCCR3_OutEnL;
-#endif
-	}
-	if (machine_is_graphicsclient()) {
-		DPRINTK("Configuring GraphicsClient LCD\n");
-		shadow.lccr0 =
-		    LCCR0_LEN + LCCR0_Color + LCCR0_Sngl + LCCR0_Act;
-		shadow.lccr1 =
-		    LCCR1_DisWdth(var->xres) + LCCR1_HorSnchWdth(9) +
-		    LCCR1_EndLnDel(54) + LCCR1_BegLnDel(54);
-		shadow.lccr2 =
-		    LCCR2_DisHght(var->yres) + LCCR2_VrtSnchWdth(9) +
-		    LCCR2_EndFrmDel(32) + LCCR2_BegFrmDel(24);
-		shadow.lccr3 =
-		    LCCR3_PixClkDiv(10) + LCCR3_ACBsDiv(2) +
-		    LCCR3_ACBsCntOff + LCCR3_HorSnchL + LCCR3_VrtSnchL;
-	}
-	if (machine_is_omnimeter()) {
-		DPRINTK("Configuring  OMNI LCD\n");
-		shadow.lccr0 = LCCR0_LEN | LCCR0_CMS | LCCR0_DPD;
-		shadow.lccr1 =
-		    LCCR1_BegLnDel(10) + LCCR1_EndLnDel(10) +
-		    LCCR1_HorSnchWdth(1) + LCCR1_DisWdth(var->xres);
-		shadow.lccr2 = LCCR2_DisHght(var->yres);
-		shadow.lccr3 =
-		    LCCR3_ACBsDiv(0xFF) + LCCR3_PixClkDiv(44);
-//jca (GetPCD(25) << LCD3_V_PCD);
-	}
-	if (machine_is_xp860()) {
-		DPRINTK("Configuring XP860 LCD\n");
-		shadow.lccr0 =
-		    LCCR0_LEN + LCCR0_Color + LCCR0_Sngl + LCCR0_Act +
-		    LCCR0_LtlEnd + LCCR0_LDM + LCCR0_ERM + LCCR0_DMADel(0);
-		shadow.lccr1 =
-		    LCCR1_DisWdth(var->xres) +
-		    LCCR1_HorSnchWdth(var->hsync_len) +
-		    LCCR1_BegLnDel(var->left_margin) +
-		    LCCR1_EndLnDel(var->right_margin);
-		shadow.lccr2 =
-		    LCCR2_DisHght(var->yres) +
-		    LCCR2_VrtSnchWdth(var->vsync_len) +
-		    LCCR2_BegFrmDel(var->upper_margin) +
-		    LCCR2_EndFrmDel(var->lower_margin);
-		shadow.lccr3 =
-		    LCCR3_PixClkDiv(6) + LCCR3_HorSnchL + LCCR3_VrtSnchL;
-	}
-
-	/*
-	 * Ok, since we're calculating these values, we want to know
-	 * if the calculation is correct.  If you see any of these
-	 * messages _PLEASE_ report the incident to me for diagnosis,
-	 * including details about what was happening when the
-	 * messages appeared. --rmk, 30 March 2001
-	 */
-	if (shadow.lccr0 != new_regs->lccr0) {
-		printk(KERN_ERR "LCCR1 mismatch: 0x%08x != 0x%08x\n",
-			shadow.lccr1, new_regs->lccr1);
-		different = 1;
-	}
-	if (shadow.lccr1 != new_regs->lccr1) {
-		printk(KERN_ERR "LCCR1 mismatch: 0x%08x != 0x%08x\n",
-			shadow.lccr1, new_regs->lccr1);
-		different = 1;
-	}
-	if (shadow.lccr2 != new_regs->lccr2) {
-		printk(KERN_ERR "LCCR2 mismatch: 0x%08x != 0x%08x\n",
-			shadow.lccr2, new_regs->lccr2);
-		different = 1;
-	}
-	if (shadow.lccr3 != new_regs->lccr3) {
-		printk(KERN_ERR "LCCR3 mismatch: 0x%08x != 0x%08x\n",
-			shadow.lccr3, new_regs->lccr3);
-		different = 1;
-	}
-	if (different) {
-		printk(KERN_ERR "var: xres=%d hslen=%d lm=%d rm=%d\n",
-			var->xres, var->hsync_len,
-			var->left_margin, var->right_margin);
-		printk(KERN_ERR "var: yres=%d vslen=%d um=%d bm=%d\n",
-			var->yres, var->vsync_len,
-			var->upper_margin, var->lower_margin);
-
-		printk(KERN_ERR "Please report this to Russell King "
-			"<rmk@arm.linux.org.uk>\n");
-	}
-
-	DPRINTK("olccr0 = 0x%08x\n", shadow.lccr0);
-	DPRINTK("olccr1 = 0x%08x\n", shadow.lccr1);
-	DPRINTK("olccr2 = 0x%08x\n", shadow.lccr2);
-	DPRINTK("olccr3 = 0x%08x\n", shadow.lccr3);
-}
-#else
-#define sa1100fb_check_shadow(regs,var,pcd)
-#endif
-
-
 
 /*
  * IMHO this looks wrong.  In 8BPP, length should be 8.
@@ -488,10 +262,44 @@ static struct sa1100fb_mach_info pal_info __initdata = {
 #endif
 #endif
 
-#ifdef CONFIG_SA1100_H3600
+#ifdef CONFIG_SA1100_H3XXX
+static struct sa1100fb_mach_info h3800_info __initdata = {
+	pixclock:	174757, 	bpp:		16,
+	xres:		320,		yres:		240,
+
+	hsync_len:	3,		vsync_len:	3,
+	left_margin:	12,		upper_margin:	10,
+	right_margin:	17,		lower_margin:	1,
+
+	sync:		0,		cmap_static:	1,
+
+	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
+	lccr3:		LCCR3_ACBsCntOff | LCCR3_PixFlEdg | LCCR3_OutEnH,
+};
+
 static struct sa1100fb_mach_info h3600_info __initdata = {
-#ifdef CONFIG_IPAQ_H3100
-	pixclock:	407766,		bpp:		4,
+	pixclock:	174757, 	bpp:		16,
+	xres:		320,		yres:		240,
+
+	hsync_len:	3,		vsync_len:	3,
+	left_margin:	12,		upper_margin:	10,
+	right_margin:	17,		lower_margin:	1,
+
+	sync:		0,		cmap_static:	1,
+
+	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
+	lccr3:		LCCR3_ACBsCntOff | LCCR3_OutEnH | LCCR3_PixFlEdg,
+};
+
+static struct sa1100fb_rgb h3600_rgb_16 = {
+	red:	{ offset: 12, length: 4, },
+	green:	{ offset: 7,  length: 4, },
+	blue:	{ offset: 1,  length: 4, },
+	transp: { offset: 0,  length: 0, },
+};
+
+static struct sa1100fb_mach_info h3100_info __initdata = {
+	pixclock:	406977, 	bpp:		4,
 	xres:		320,		yres:		240,
 
 	hsync_len:	26,		vsync_len:	41,
@@ -499,31 +307,11 @@ static struct sa1100fb_mach_info h3600_info __initdata = {
 	right_margin:	4,		lower_margin:	0,
 
 	sync:		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
-	cmap_greyscale:	1,		cmap_static:	1,
+	cmap_greyscale: 1,
 	cmap_inverse:	1,
 
 	lccr0:		LCCR0_Mono | LCCR0_4PixMono | LCCR0_Sngl | LCCR0_Pas,
 	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2),
-#else
-	pixclock:	174757,		bpp:		16,
-	xres:		320,		yres:		240,
-
-	hsync_len:	3,		vsync_len:	3,
-	left_margin:	12,		upper_margin:	10,
-	right_margin:	17,		lower_margin:	1,
-
-	sync:		0,
-
-	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2),
-#endif
-};
-
-static struct sa1100fb_rgb h3600_rgb_16 = {
-	red:	{ offset: 12, length: 4, },
-	green:	{ offset: 7,  length: 4, },
-	blue:	{ offset: 1,  length: 4, },
-	transp:	{ offset: 0,  length: 0, },
 };
 #endif
 
@@ -717,6 +505,22 @@ static struct sa1100fb_mach_info lart_kit01_info __initdata =
 };
 #endif
 
+#ifdef CONFIG_SA1100_SHANNON
+static struct sa1100fb_mach_info shannon_info __initdata = {
+	pixclock:	152500,		bpp:		8,
+	xres:		640,		yres:		480,
+
+	hsync_len:	4,		vsync_len:	3,
+	left_margin:	2,		upper_margin:	0,
+	right_margin:	1,		lower_margin:	0,
+
+	sync:		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT, 
+
+	lccr0:		LCCR0_Color | LCCR0_Dual | LCCR0_Pas,
+	lccr3:		LCCR3_ACBsDiv(512),
+};
+#endif
+
 #ifdef CONFIG_SA1100_OMNIMETER
 static struct sa1100fb_mach_info omnimeter_info __initdata = {
 	pixclock:	0,		bpp:		4,
@@ -752,7 +556,7 @@ static struct sa1100fb_mach_info pangolin_info __initdata = {
 	sync:		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
 
 	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixFlEdg,
+	lccr3:		LCCR3_OutEnH | LCCR3_PixFlEdg | LCCR3_ACBsCntOff,
 };
 #endif
 
@@ -811,6 +615,33 @@ static struct sa1100fb_rgb stork_dstn_rgb_16 = {
 #endif
 #endif
 
+#ifdef CONFIG_SA1100_PT_SYSTEM3
+/*
+ * 648 x 480 x 8bpp x 75Hz Dual Panel Color STN Display
+ *
+ * pixclock = 1/( 640*3/8*240 ), [pixclock]=1e-12s=ps
+ *	3 due to r,g,b lines
+ *	8 due to 8 bit data bus
+ *	640 due to 640 pixels per line
+ *	240 = 480/2 due to dual panel display
+ *	=>4.32Mhz => 231481E-12s
+ */
+static struct sa1100fb_mach_info system3_info __initdata = {
+	pixclock:	231481,		bpp:		8,
+	xres:		640,		yres:		480,
+
+	hsync_len:	2,		vsync_len:	2,
+	left_margin:	2,		upper_margin:	0,
+	right_margin:	2,		lower_margin:	0,
+
+	sync:		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+
+	lccr0:		LCCR0_Color | LCCR0_Dual | LCCR0_Pas,
+	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg |	LCCR3_ACBsDiv(512) |
+			LCCR3_ACBsCntOff,
+};
+#endif
+
 #ifdef CONFIG_SA1100_XP860
 static struct sa1100fb_mach_info xp860_info __initdata = {
 	pixclock:	0,		bpp:		8,
@@ -849,10 +680,16 @@ sa1100fb_get_machine_info(struct sa1100fb_info *fbi)
 #endif
 	}
 #endif
-#ifdef CONFIG_SA1100_H3600
+#ifdef CONFIG_SA1100_H3XXX
 	if (machine_is_h3600()) {
 		inf = &h3600_info;
 		fbi->rgb[RGB_16] = &h3600_rgb_16;
+	}
+	if (machine_is_h3100()) {
+		inf = &h3100_info;
+	}
+	if (machine_is_h3800()) {
+		inf = &h3800_info;
 	}
 #endif
 #ifdef CONFIG_SA1100_BRUTUS
@@ -907,9 +744,14 @@ sa1100fb_get_machine_info(struct sa1100fb_info *fbi)
 		inf = &pangolin_info;
 	}
 #endif
-#ifdef CONFIG_SA1100_XP860
-	if (machine_is_xp860()) {
-		inf = &xp860_info;
+#ifdef CONFIG_SA1100_PT_SYSTEM3
+	if (machine_is_pt_system3()) {
+		inf = &system3_info;
+	}
+#endif
+#ifdef CONFIG_SA1100_SHANNON
+	if (machine_is_shannon()) {
+		inf = &shannon_info;
 	}
 #endif
 #ifdef CONFIG_SA1100_STORK
@@ -921,6 +763,11 @@ sa1100fb_get_machine_info(struct sa1100fb_info *fbi)
 		inf = &stork_dstn_info;
 		fbi->rgb[RGB_16] = &stork_dstn_rgb_16;
 #endif
+	}
+#endif
+#ifdef CONFIG_SA1100_XP860
+	if (machine_is_xp860()) {
+		inf = &xp860_info;
 	}
 #endif
 	return inf;
@@ -1556,7 +1403,8 @@ static inline int get_pcd(unsigned int pixclock)
 	unsigned int pcd;
 
 	if (pixclock) {
-		pcd = get_cclk_frequency() * pixclock;
+		pcd = cpufreq_get(0) / 100;
+		pcd *= pixclock;
 		pcd /= 10000000;
 		pcd += 1;	/* make up for integer math truncations */
 	} else {
@@ -1659,8 +1507,6 @@ static int sa1100fb_activate_var(struct fb_var_screeninfo *var, struct sa1100fb_
 	if (pcd)
 		new_regs.lccr3 |= LCCR3_PixClkDiv(pcd);
 
-	sa1100fb_check_shadow(&new_regs, var, pcd);
-
 	DPRINTK("nlccr0 = 0x%08x\n", new_regs.lccr0);
 	DPRINTK("nlccr1 = 0x%08x\n", new_regs.lccr1);
 	DPRINTK("nlccr2 = 0x%08x\n", new_regs.lccr2);
@@ -1704,35 +1550,12 @@ static int sa1100fb_activate_var(struct fb_var_screeninfo *var, struct sa1100fb_
  * Also, I'm expecting that the backlight stuff should
  * be handled differently.
  */
-static void sa1100fb_backlight_on(struct sa1100fb_info *fbi)
+static inline void sa1100fb_backlight_on(struct sa1100fb_info *fbi)
 {
 	DPRINTK("backlight on\n");
 
-#ifdef CONFIG_SA1100_FREEBIRD
-#error FIXME
-	if (machine_is_freebird()) {
-		BCR_set(BCR_FREEBIRD_LCD_PWR | BCR_FREEBIRD_LCD_DISP);
-	}
-#endif
-#ifdef CONFIG_SA1100_FREEBIRD
-	if (machine_is_freebird()) {
-		/* Turn on backlight ,Chester */
-		BCR_set(BCR_FREEBIRD_LCD_BACKLIGHT);
-	}
-#endif
-#ifdef CONFIG_SA1100_HUW_WEBPANEL
-#error FIXME
-	if (machine_is_huw_webpanel()) {
-		BCR_set(BCR_CCFL_POW + BCR_PWM_BACKLIGHT);
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_task(200 * HZ / 1000);
-		BCR_set(BCR_TFT_ENA);
-	}
-#endif
-#ifdef CONFIG_SA1100_OMNIMETER
-	if (machine_is_omnimeter())
-		LEDBacklightOn();
-#endif
+	if (sa1100fb_backlight_power)
+		sa1100fb_backlight_power(1);
 }
 
 /*
@@ -1740,47 +1563,21 @@ static void sa1100fb_backlight_on(struct sa1100fb_info *fbi)
  * Also, I'm expecting that the backlight stuff should
  * be handled differently.
  */
-static void sa1100fb_backlight_off(struct sa1100fb_info *fbi)
+static inline void sa1100fb_backlight_off(struct sa1100fb_info *fbi)
 {
 	DPRINTK("backlight off\n");
 
-#ifdef CONFIG_SA1100_FREEBIRD
-#error FIXME
-	if (machine_is_freebird()) {
-		BCR_clear(BCR_FREEBIRD_LCD_PWR | BCR_FREEBIRD_LCD_DISP
-			  /*| BCR_FREEBIRD_LCD_BACKLIGHT */ );
-	}
-#endif
-#ifdef CONFIG_SA1100_OMNIMETER
-	if (machine_is_omnimeter())
-		LEDBacklightOff();
-#endif
+	if (sa1100fb_backlight_power)
+		sa1100fb_backlight_power(0);
 }
 
-static void sa1100fb_power_up_lcd(struct sa1100fb_info *fbi)
+static inline void sa1100fb_power_up_lcd(struct sa1100fb_info *fbi)
 {
 	DPRINTK("LCD power on\n");
 
-#ifndef ASSABET_PAL_VIDEO
-	if (machine_is_assabet())
-		ASSABET_BCR_set(ASSABET_BCR_LCD_ON);
-#endif
-#ifdef CONFIG_SA1100_HUW_WEBPANEL
-	if (machine_is_huw_webpanel())
-		BCR_clear(BCR_TFT_NPWR);
-#endif
-#ifdef CONFIG_SA1100_OMNIMETER
-	if (machine_is_omnimeter())
-		LCDPowerOn();
-#endif
-#ifdef CONFIG_SA1100_H3600
-	if (machine_is_h3600()) {
-		set_h3600_egpio(EGPIO_H3600_LCD_ON |
-				EGPIO_H3600_LCD_PCI |
-				EGPIO_H3600_LCD_5V_ON |
-				EGPIO_H3600_LVDD_ON);
-	}
-#endif
+	if (sa1100fb_lcd_power)
+		sa1100fb_lcd_power(1);
+
 #ifdef CONFIG_SA1100_STORK
 	if (machine_is_stork()) {
 		storkSetLCDCPLD(0, 1);
@@ -1789,27 +1586,13 @@ static void sa1100fb_power_up_lcd(struct sa1100fb_info *fbi)
 #endif
 }
 
-static void sa1100fb_power_down_lcd(struct sa1100fb_info *fbi)
+static inline void sa1100fb_power_down_lcd(struct sa1100fb_info *fbi)
 {
 	DPRINTK("LCD power off\n");
 
-#ifndef ASSABET_PAL_VIDEO
-	if (machine_is_assabet())
-		ASSABET_BCR_clear(ASSABET_BCR_LCD_ON);
-#endif
-#ifdef CONFIG_SA1100_HUW_WEBPANEL
-	// dont forget to set the control lines to zero (?)
-	if (machine_is_huw_webpanel())
-		BCR_set(BCR_TFT_NPWR);
-#endif
-#ifdef CONFIG_SA1100_H3600
-	if (machine_is_h3600()) {
-		clr_h3600_egpio(EGPIO_H3600_LCD_ON |
-				EGPIO_H3600_LCD_PCI |
-				EGPIO_H3600_LCD_5V_ON |
-				EGPIO_H3600_LVDD_ON);
-	}
-#endif
+	if (sa1100fb_lcd_power)
+		sa1100fb_lcd_power(0);
+
 #ifdef CONFIG_SA1100_STORK
 	if (machine_is_stork()) {
 		storkSetLCDCPLD(0, 0);
@@ -1844,14 +1627,6 @@ static void sa1100fb_setup_gpio(struct sa1100fb_info *fbi)
 
 	}
 
-#ifdef CONFIG_SA1100_FREEBIRD
-#error Please contact <rmk@arm.linux.org.uk> about this
-	if (machine_is_freebird()) {
-		/* Color single passive */
-		mask |= GPIO_LDD15 | GPIO_LDD14 | GPIO_LDD13 | GPIO_LDD12 |
-			GPIO_LDD11 | GPIO_LDD10 | GPIO_LDD9  | GPIO_LDD8;
-	}
-#endif
 	if (machine_is_cerf()) {
 		/* GPIO15 is used as a bypass for 3.8" displays */
 		mask |= GPIO_GPIO15;
@@ -1920,6 +1695,11 @@ static void sa1100fb_enable_controller(struct sa1100fb_info *fbi)
 	}
 #endif
 
+	if (machine_is_shannon()) {
+		GPDR |= SHANNON_GPIO_DISP_EN;
+		GPSR |= SHANNON_GPIO_DISP_EN;
+	}	
+
 	DPRINTK("DBAR1 = %p\n", DBAR1);
 	DPRINTK("DBAR2 = %p\n", DBAR2);
 	DPRINTK("LCCR0 = 0x%08x\n", LCCR0);
@@ -1957,6 +1737,10 @@ static void sa1100fb_disable_controller(struct sa1100fb_info *fbi)
 		BCR_clear(BCR_TFT_ENA + BCR_CCFL_POW + BCR_PWM_BACKLIGHT);
 	}
 #endif
+
+	if (machine_is_shannon()) {
+		GPCR |= SHANNON_GPIO_DISP_EN;
+	}	
 
 	add_wait_queue(&fbi->ctrlr_wait, &wait);
 	set_current_state(TASK_UNINTERRUPTIBLE);
@@ -2006,12 +1790,13 @@ static void set_ctrlr_state(struct sa1100fb_info *fbi, u_int state)
 		 * Disable controller for clock change.  If the
 		 * controller is already disabled, then do nothing.
 		 */
-		if (old_state != C_DISABLE) {
+		if (old_state != C_DISABLE && old_state != C_DISABLE_PM) {
 			fbi->state = state;
 			sa1100fb_disable_controller(fbi);
 		}
 		break;
 
+	case C_DISABLE_PM:
 	case C_DISABLE:
 		/*
 		 * Disable controller
@@ -2049,6 +1834,16 @@ static void set_ctrlr_state(struct sa1100fb_info *fbi, u_int state)
 			sa1100fb_enable_controller(fbi);
 		}
 		break;
+
+	case C_ENABLE_PM:
+		/*
+		 * Re-enable the controller after PM.  This is not
+		 * perfect - think about the case where we were doing
+		 * a clock change, and we suspended half-way through.
+		 */
+		if (old_state != C_DISABLE_PM)
+			break;
+		/* fall through */
 
 	case C_ENABLE:
 		/*
@@ -2162,10 +1957,10 @@ sa1100fb_pm_callback(struct pm_dev *pm_dev, pm_request_t req, void *data)
 
 		if (state == 0) {
 			/* Enter D0. */
-			set_ctrlr_state(fbi, C_ENABLE);
+			set_ctrlr_state(fbi, C_ENABLE_PM);
 		} else {
 			/* Enter D1-D3.  Disable the LCD controller.  */
-			set_ctrlr_state(fbi, C_DISABLE);
+			set_ctrlr_state(fbi, C_DISABLE_PM);
 		}
 	}
 	DPRINTK("done\n");
@@ -2245,7 +2040,7 @@ static struct sa1100fb_info * __init sa1100fb_init_fbinfo(void)
 	fbi->fb.updatevar	= sa1100fb_updatevar;
 	fbi->fb.blank		= sa1100fb_blank;
 	fbi->fb.flags		= FBINFO_FLAG_DEFAULT;
-	fbi->fb.node		= -1;
+	fbi->fb.node		= NODEV;
 	fbi->fb.monspecs	= monspecs;
 	fbi->fb.disp		= (struct display *)(fbi + 1);
 	fbi->fb.pseudo_palette	= (void *)(fbi->fb.disp + 1);
@@ -2293,6 +2088,9 @@ int __init sa1100fb_init(void)
 	struct sa1100fb_info *fbi;
 	int ret;
 
+	if (!request_mem_region(0xb0100000, 0x10000, "LCD"))
+		return -EBUSY;
+
 	fbi = sa1100fb_init_fbinfo();
 	ret = -ENOMEM;
 	if (!fbi)
@@ -2304,7 +2102,7 @@ int __init sa1100fb_init(void)
 		goto failed;
 
 	ret = request_irq(IRQ_LCD, sa1100fb_handle_irq, SA_INTERRUPT,
-			  fbi->fb.fix.id, fbi);
+			  "LCD", fbi);
 	if (ret) {
 		printk(KERN_ERR "sa1100fb: request_irq failed: %d\n", ret);
 		goto failed;
@@ -2358,6 +2156,7 @@ int __init sa1100fb_init(void)
 failed:
 	if (fbi)
 		kfree(fbi);
+	release_mem_region(0xb0100000, 0x10000);
 	return ret;
 }
 
