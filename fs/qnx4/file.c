@@ -33,6 +33,7 @@ struct file_operations qnx4_file_operations =
 #ifdef CONFIG_QNX4FS_RW
 	fsync:			qnx4_sync_file,
 #endif
+	sendfile:		generic_file_sendfile,
 };
 
 struct inode_operations qnx4_file_inode_operations =

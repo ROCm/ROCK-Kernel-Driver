@@ -365,6 +365,7 @@ struct file_operations udf_file_operations = {
 	write:			udf_file_write,
 	release:		udf_release_file,
 	fsync:			udf_fsync_file,
+	sendfile:		generic_file_sendfile,
 };
 
 struct inode_operations udf_file_inode_operations = {

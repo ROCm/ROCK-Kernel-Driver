@@ -21,6 +21,7 @@ static struct file_operations hpfs_file_ops =
 	open:		hpfs_open,
 	release:	hpfs_file_release,
 	fsync:		hpfs_file_fsync,
+	sendfile:	generic_file_sendfile,
 };
 
 static struct inode_operations hpfs_file_iops =

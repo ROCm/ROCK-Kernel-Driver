@@ -18,10 +18,11 @@
 #endif
 
 struct file_operations bfs_file_operations = {
-	llseek: generic_file_llseek,
-	read:	generic_file_read,
-	write:	generic_file_write,
-	mmap:	generic_file_mmap,
+	llseek: 	generic_file_llseek,
+	read:		generic_file_read,
+	write:		generic_file_write,
+	mmap:		generic_file_mmap,
+	sendfile:	generic_file_sendfile,
 };
 
 static int bfs_move_block(unsigned long from, unsigned long to, struct super_block *sb)
