@@ -470,15 +470,15 @@ xfs_setattr(
 		if (mask & XFS_AT_MODE) {
 			mode_t m = 0;
 
-			if ((vap->va_mode & ISUID) && !file_owner)
-				m |= ISUID;
-			if ((vap->va_mode & ISGID) &&
+			if ((vap->va_mode & S_ISUID) && !file_owner)
+				m |= S_ISUID;
+			if ((vap->va_mode & S_ISGID) &&
 			    !in_group_p((gid_t)ip->i_d.di_gid))
-				m |= ISGID;
+				m |= S_ISGID;
 #if 0
 			/* Linux allows this, Irix doesn't. */
-			if ((vap->va_mode & ISVTX) && vp->v_type != VDIR)
-				m |= ISVTX;
+			if ((vap->va_mode & S_ISVTX) && vp->v_type != VDIR)
+				m |= S_ISVTX;
 #endif
 			if (m && !capable(CAP_FSETID))
 				vap->va_mode &= ~m;
@@ -755,8 +755,8 @@ xfs_setattr(
 	 * Change file access modes.
 	 */
 	if (mask & XFS_AT_MODE) {
-		ip->i_d.di_mode &= IFMT;
-		ip->i_d.di_mode |= vap->va_mode & ~IFMT;
+		ip->i_d.di_mode &= S_IFMT;
+		ip->i_d.di_mode |= vap->va_mode & ~S_IFMT;
 
 		xfs_trans_log_inode (tp, ip, XFS_ILOG_CORE);
 		timeflags |= XFS_ICHGTIME_CHG;
@@ -776,9 +776,9 @@ xfs_setattr(
 		 * The set-user-ID and set-group-ID bits of a file will be
 		 * cleared upon successful return from chown()
 		 */
-		if ((ip->i_d.di_mode & (ISUID|ISGID)) &&
+		if ((ip->i_d.di_mode & (S_ISUID|S_ISGID)) &&
 		    !capable(CAP_FSETID)) {
-			ip->i_d.di_mode &= ~(ISUID|ISGID);
+			ip->i_d.di_mode &= ~(S_ISUID|S_ISGID);
 		}
 
 		/*
@@ -1019,7 +1019,7 @@ xfs_readlink(
 
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
 
-	ASSERT((ip->i_d.di_mode & IFMT) == IFLNK);
+	ASSERT((ip->i_d.di_mode & S_IFMT) == S_IFLNK);
 
 	offset = uiop->uio_offset;
 	count = uiop->uio_resid;
@@ -1662,7 +1662,7 @@ xfs_release(
 	mp = ip->i_mount;
 
 	if (ip->i_d.di_nlink != 0) {
-		if ((((ip->i_d.di_mode & IFMT) == IFREG) &&
+		if ((((ip->i_d.di_mode & S_IFMT) == S_IFREG) &&
 		     ((ip->i_d.di_size > 0) || (VN_CACHED(vp) > 0)) &&
 		     (ip->i_df.if_flags & XFS_IFEXTENTS))  &&
 		    (!(ip->i_d.di_flags & (XFS_DIFLAG_PREALLOC|XFS_DIFLAG_APPEND)))) {
@@ -1723,7 +1723,7 @@ xfs_inactive(
 	 */
 	truncate = ((ip->i_d.di_nlink == 0) &&
 	    ((ip->i_d.di_size != 0) || (ip->i_d.di_nextents > 0)) &&
-	    ((ip->i_d.di_mode & IFMT) == IFREG));
+	    ((ip->i_d.di_mode & S_IFMT) == S_IFREG));
 
 	mp = ip->i_mount;
 
@@ -1739,7 +1739,7 @@ xfs_inactive(
 		goto out;
 
 	if (ip->i_d.di_nlink != 0) {
-		if ((((ip->i_d.di_mode & IFMT) == IFREG) &&
+		if ((((ip->i_d.di_mode & S_IFMT) == S_IFREG) &&
 		     ((ip->i_d.di_size > 0) || (VN_CACHED(vp) > 0)) &&
 		     (ip->i_df.if_flags & XFS_IFEXTENTS))  &&
 		    (!(ip->i_d.di_flags & (XFS_DIFLAG_PREALLOC|XFS_DIFLAG_APPEND)) ||
@@ -1802,7 +1802,7 @@ xfs_inactive(
 			xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
 			return (VN_INACTIVE_CACHE);
 		}
-	} else if ((ip->i_d.di_mode & IFMT) == IFLNK) {
+	} else if ((ip->i_d.di_mode & S_IFMT) == S_IFLNK) {
 
 		/*
 		 * If we get an error while cleaning up a
@@ -3508,7 +3508,7 @@ xfs_symlink(
 	/*
 	 * Allocate an inode for the symlink.
 	 */
-	error = xfs_dir_ialloc(&tp, dp, IFLNK | (vap->va_mode&~IFMT),
+	error = xfs_dir_ialloc(&tp, dp, S_IFLNK | (vap->va_mode&~S_IFMT),
 			       1, 0, credp, prid, resblks > 0, &ip, NULL);
 	if (error) {
 		if (error == ENOSPC)
@@ -3891,7 +3891,7 @@ xfs_reclaim(
 	ASSERT(!VN_MAPPED(vp));
 	ip = XFS_BHVTOI(bdp);
 
-	if ((ip->i_d.di_mode & IFMT) == IFREG) {
+	if ((ip->i_d.di_mode & S_IFMT) == S_IFREG) {
 		if (ip->i_d.di_size > 0) {
 			/*
 			 * Flush and invalidate any data left around that is
@@ -4597,7 +4597,7 @@ xfs_change_file_space(
 
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
 
-	if ((error = xfs_iaccess(ip, IWRITE, credp))) {
+	if ((error = xfs_iaccess(ip, S_IWUSR, credp))) {
 		xfs_iunlock(ip, XFS_ILOCK_SHARED);
 		return error;
 	}
@@ -4704,17 +4704,17 @@ xfs_change_file_space(
 	xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
 	xfs_trans_ihold(tp, ip);
 
-	ip->i_d.di_mode &= ~ISUID;
+	ip->i_d.di_mode &= ~S_ISUID;
 
 	/*
 	 * Note that we don't have to worry about mandatory
 	 * file locking being disabled here because we only
-	 * clear the ISGID bit if the Group execute bit is
+	 * clear the S_ISGID bit if the Group execute bit is
 	 * on, but if it was on then mandatory locking wouldn't
 	 * have been enabled.
 	 */
-	if (ip->i_d.di_mode & (IEXEC >> 3))
-		ip->i_d.di_mode &= ~ISGID;
+	if (ip->i_d.di_mode & S_IXGRP)
+		ip->i_d.di_mode &= ~S_ISGID;
 
 	xfs_ichgtime(ip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 

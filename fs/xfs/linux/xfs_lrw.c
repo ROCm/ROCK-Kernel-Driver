@@ -671,9 +671,9 @@ start:
 	 * setgid binaries.
 	 */
 
-	if (((xip->i_d.di_mode & ISUID) ||
-	    ((xip->i_d.di_mode & (ISGID | (IEXEC >> 3))) ==
-		(ISGID | (IEXEC >> 3)))) &&
+	if (((xip->i_d.di_mode & S_ISUID) ||
+	    ((xip->i_d.di_mode & (S_ISGID | S_IXGRP)) ==
+		(S_ISGID | S_IXGRP))) &&
 	     !capable(CAP_FSETID)) {
 		error = xfs_write_clear_setuid(xip);
 		if (error) {
@@ -851,7 +851,7 @@ xfs_bmap(bhv_desc_t	*bdp,
 	xfs_inode_t	*ip = XFS_BHVTOI(bdp);
 	xfs_iocore_t	*io = &ip->i_iocore;
 
-	ASSERT((ip->i_d.di_mode & IFMT) == IFREG);
+	ASSERT((ip->i_d.di_mode & S_IFMT) == S_IFREG);
 	ASSERT(((ip->i_d.di_flags & XFS_DIFLAG_REALTIME) != 0) ==
 	       ((ip->i_iocore.io_flags & XFS_IOCORE_RT) != 0));
 

@@ -2383,7 +2383,7 @@ xlog_recover_do_inode_trans(
 	/* Take the opportunity to reset the flush iteration count */
 	dicp->di_flushiter = 0;
 
-	if (unlikely((dicp->di_mode & IFMT) == IFREG)) {
+	if (unlikely((dicp->di_mode & S_IFMT) == S_IFREG)) {
 		if ((dicp->di_format != XFS_DINODE_FMT_EXTENTS) &&
 		    (dicp->di_format != XFS_DINODE_FMT_BTREE)) {
 			XFS_CORRUPTION_ERROR("xlog_recover_do_inode_trans(3)",
@@ -2394,7 +2394,7 @@ xlog_recover_do_inode_trans(
 				item, dip, bp, ino);
 			return XFS_ERROR(EFSCORRUPTED);
 		}
-	} else if (unlikely((dicp->di_mode & IFMT) == IFDIR)) {
+	} else if (unlikely((dicp->di_mode & S_IFMT) == S_IFDIR)) {
 		if ((dicp->di_format != XFS_DINODE_FMT_EXTENTS) &&
 		    (dicp->di_format != XFS_DINODE_FMT_BTREE) &&
 		    (dicp->di_format != XFS_DINODE_FMT_LOCAL)) {

@@ -155,7 +155,7 @@ xfs_dir2_isempty(
 {
 	xfs_dir2_sf_t	*sfp;		/* shortform directory structure */
 
-	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
+	ASSERT((dp->i_d.di_mode & S_IFMT) == S_IFDIR);
 	/*
 	 * Might happen during shutdown.
 	 */
@@ -183,7 +183,7 @@ xfs_dir2_init(
 	memset((char *)&args, 0, sizeof(args));
 	args.dp = dp;
 	args.trans = tp;
-	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
+	ASSERT((dp->i_d.di_mode & S_IFMT) == S_IFDIR);
 	if ((error = xfs_dir_ino_validate(tp->t_mountp, pdp->i_ino))) {
 		return error;
 	}
@@ -208,7 +208,7 @@ xfs_dir2_createname(
 	int			rval;		/* return value */
 	int			v;		/* type-checking value */
 
-	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
+	ASSERT((dp->i_d.di_mode & S_IFMT) == S_IFDIR);
 	if ((rval = xfs_dir_ino_validate(tp->t_mountp, inum))) {
 		return rval;
 	}
@@ -261,7 +261,7 @@ xfs_dir2_lookup(
 	int		rval;		/* return value */
 	int		v;		/* type-checking value */
 
-	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
+	ASSERT((dp->i_d.di_mode & S_IFMT) == S_IFDIR);
 	XFS_STATS_INC(xs_dir_lookup);
 
 	/*
@@ -319,7 +319,7 @@ xfs_dir2_removename(
 	int		rval;		/* return value */
 	int		v;		/* type-checking value */
 
-	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
+	ASSERT((dp->i_d.di_mode & S_IFMT) == S_IFDIR);
 	XFS_STATS_INC(xs_dir_remove);
 	/*
 	 * Fill in the arg structure for this request.
@@ -369,7 +369,7 @@ xfs_dir2_getdents(
 	int		rval;		/* return value */
 	int		v;		/* type-checking value */
 
-	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
+	ASSERT((dp->i_d.di_mode & S_IFMT) == S_IFDIR);
 	XFS_STATS_INC(xs_dir_getdents);
 	/*
 	 * If our caller has given us a single contiguous aligned memory buffer,
@@ -422,7 +422,7 @@ xfs_dir2_replace(
 	int		rval;		/* return value */
 	int		v;		/* type-checking value */
 
-	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
+	ASSERT((dp->i_d.di_mode & S_IFMT) == S_IFDIR);
 
 	if ((rval = xfs_dir_ino_validate(tp->t_mountp, inum))) {
 		return rval;
@@ -473,7 +473,7 @@ xfs_dir2_canenter(
 	int		rval;		/* return value */
 	int		v;		/* type-checking value */
 
-	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
+	ASSERT((dp->i_d.di_mode & S_IFMT) == S_IFDIR);
 	/*
 	 * Fill in the arg structure for this request.
 	 */

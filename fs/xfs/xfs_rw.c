@@ -86,17 +86,17 @@ xfs_write_clear_setuid(
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
 	xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
 	xfs_trans_ihold(tp, ip);
-	ip->i_d.di_mode &= ~ISUID;
+	ip->i_d.di_mode &= ~S_ISUID;
 
 	/*
 	 * Note that we don't have to worry about mandatory
 	 * file locking being disabled here because we only
-	 * clear the ISGID bit if the Group execute bit is
+	 * clear the S_ISGID bit if the Group execute bit is
 	 * on, but if it was on then mandatory locking wouldn't
 	 * have been enabled.
 	 */
-	if (ip->i_d.di_mode & (IEXEC >> 3)) {
-		ip->i_d.di_mode &= ~ISGID;
+	if (ip->i_d.di_mode & S_IXGRP) {
+		ip->i_d.di_mode &= ~S_ISGID;
 	}
 	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 	xfs_trans_set_sync(tp);
