@@ -209,6 +209,7 @@ static void __pci_addr_cache_insert_device(struct pci_dev *dev)
 {
 	struct device_node *dn;
 	int i;
+	int inserted = 0;
 
 	dn = pci_device_to_OF_node(dev);
 	if (!dn) {
@@ -242,7 +243,12 @@ static void __pci_addr_cache_insert_device(struct pci_dev *dev)
 		if (start == 0 || ~start == 0 || end == 0 || ~end == 0)
 			 continue;
 		pci_addr_cache_insert(dev, start, end, flags);
+		inserted = 1;
 	}
+
+	/* If there was nothing to add, the cache has no reference... */
+	if (!inserted)
+		pci_dev_put(dev);
 }
 
 /**
@@ -265,6 +271,7 @@ void pci_addr_cache_insert_device(struct pci_dev *dev)
 static inline void __pci_addr_cache_remove_device(struct pci_dev *dev)
 {
 	struct rb_node *n;
+	int removed = 0;
 
 restart:
 	n = rb_first(&pci_io_addr_cache_root.rb_root);
@@ -274,6 +281,7 @@ restart:
 
 		if (piar->pcidev == dev) {
 			rb_erase(n, &pci_io_addr_cache_root.rb_root);
+			removed = 1;
 			kfree(piar);
 			goto restart;
 		}
@@ -281,7 +289,8 @@ restart:
 	}
 
 	/* The cache no longer holds its reference to this device... */
-	pci_dev_put(dev);
+	if (removed)
+		pci_dev_put(dev);
 }
 
 /**
