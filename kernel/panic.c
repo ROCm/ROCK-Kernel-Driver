@@ -59,13 +59,7 @@ NORET_TYPE void panic(const char * fmt, ...)
 	va_start(args, fmt);
 	vsnprintf(buf, sizeof(buf), fmt, args);
 	va_end(args);
-	printk(KERN_EMERG "Kernel panic: %s\n",buf);
-	if (in_interrupt())
-		printk(KERN_EMERG "In interrupt handler - not syncing\n");
-	else if (!current->pid)
-		printk(KERN_EMERG "In idle task - not syncing\n");
-	else
-		sys_sync();
+	printk(KERN_EMERG "Kernel panic - not syncing: %s\n",buf);
 	bust_spinlocks(0);
 
 #ifdef CONFIG_SMP
