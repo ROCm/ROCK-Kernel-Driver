@@ -33,8 +33,9 @@ ENTRY(do_magic)
 	movl %ecx,%cr3
 
 	call do_magic_resume_1
-	movl $0,loop
-	cmpl $0,nr_copy_pages
+	movl nr_copy_pages,%eax
+	movl %eax,loop
+	cmpl $0,%eax
 	je .L1453
 	.p2align 4,,7
 .L1455:
@@ -45,8 +46,8 @@ ENTRY(do_magic)
 	movl loop,%eax
 	movl loop2,%edx
 	sall $4,%eax
-	movl 4(%ecx,%eax),%ebx
-	movl (%ecx,%eax),%eax
+	movl -12(%ecx,%eax),%ebx
+	movl -16(%ecx,%eax),%eax
 	movb (%edx,%eax),%al
 	movb %al,(%edx,%ebx)
 	movl %cr3, %eax;              
@@ -59,11 +60,11 @@ ENTRY(do_magic)
 	cmpl $4095,%eax
 	jbe .L1459
 	movl loop,%eax
-	leal 1(%eax),%edx
+	leal -1(%eax),%edx
 	movl %edx,loop
 	movl %edx,%eax
-	cmpl nr_copy_pages,%eax
-	jb .L1455
+	cmpl $0,%eax
+	jne .L1455
 	.p2align 4,,7
 .L1453:
 	movl $__USER_DS,%eax
