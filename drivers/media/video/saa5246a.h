@@ -1,5 +1,7 @@
 /*
-   Driver for the SAA5246A videotext decoder chip from Philips.
+   Driver for the SAA5246A or SAA5281 Teletext (=Videotext) decoder chips from
+   Philips.
+
    Copyright (C) 2004 Michael Geng (linux@MichaelGeng.de)
 
    This program is free software; you can redistribute it and/or modify
@@ -21,7 +23,7 @@
 #define __SAA5246A_H__
 
 #define MAJOR_VERSION 1		/* driver major version number */
-#define MINOR_VERSION 6		/* driver minor version number */
+#define MINOR_VERSION 7		/* driver minor version number */
 
 #define IF_NAME "SAA5246A"
 

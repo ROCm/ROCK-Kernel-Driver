@@ -17,6 +17,7 @@
 
 #include <linux/config.h>
 #include <linux/compiler.h>
+#include <linux/cpu.h>
 #include <linux/errno.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
@@ -34,6 +35,8 @@
 #include <linux/delay.h>
 #include <linux/reboot.h>
 #include <linux/init.h>
+#include <linux/module.h>
+#include <linux/notifier.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -41,9 +44,7 @@
 #include <asm/io.h>
 #include <asm/processor.h>
 #include <asm/irq.h>
-#if defined(CONFIG_VIRT_TIMER) || defined (CONFIG_NO_IDLE_HZ)
 #include <asm/timer.h>
-#endif
 
 asmlinkage void ret_from_fork(void) __asm__("ret_from_fork");
 
@@ -68,13 +69,39 @@ unsigned long thread_saved_pc(struct task_struct *tsk)
 }
 
 /*
+ * Need to know about CPUs going idle?
+ */
+static struct notifier_block *idle_chain;
+
+int register_idle_notifier(struct notifier_block *nb)
+{
+	return notifier_chain_register(&idle_chain, nb);
+}
+EXPORT_SYMBOL(register_idle_notifier);
+
+int unregister_idle_notifier(struct notifier_block *nb)
+{
+	return notifier_chain_unregister(&idle_chain, nb);
+}
+EXPORT_SYMBOL(unregister_idle_notifier);
+
+void do_monitor_call(struct pt_regs *regs, long interruption_code)
+{
+	/* disable monitor call class 0 */
+	__ctl_clear_bit(8, 15);
+
+	notifier_call_chain(&idle_chain, CPU_NOT_IDLE,
+			    (void *)(long) smp_processor_id());
+}
+
+/*
  * The idle loop on a S390...
  */
-
 void default_idle(void)
 {
 	psw_t wait_psw;
 	unsigned long reg;
+	int cpu, rc;
 
 	local_irq_disable();
         if (need_resched()) {
@@ -83,14 +110,22 @@ void default_idle(void)
                 return;
         }
 
-#if defined(CONFIG_VIRT_TIMER) || defined (CONFIG_NO_IDLE_HZ)
-	/*
-	 * hook to stop timers that should not tick while CPU is idle
-	 */
-	if (stop_timers()) {
+	/* CPU is going idle. */
+	cpu = smp_processor_id();
+	rc = notifier_call_chain(&idle_chain, CPU_IDLE, (void *)(long) cpu);
+	if (rc != NOTIFY_OK && rc != NOTIFY_DONE)
+		BUG();
+	if (rc != NOTIFY_OK) {
 		local_irq_enable();
 		return;
 	}
+
+	/* enable monitor call class 0 */
+	__ctl_set_bit(8, 15);
+
+#ifdef CONFIG_HOTPLUG_CPU
+	if (cpu_is_offline(smp_processor_id()))
+		cpu_die();
 #endif
 
 	/* 

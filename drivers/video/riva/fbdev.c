@@ -1681,7 +1681,8 @@ static int __devinit riva_set_fbinfo(struct fb_info *info)
 		    | FBINFO_HWACCEL_YPAN
 		    | FBINFO_HWACCEL_COPYAREA
 		    | FBINFO_HWACCEL_FILLRECT
-		    | FBINFO_HWACCEL_IMAGEBLIT;
+		    | FBINFO_HWACCEL_IMAGEBLIT
+	            | FBINFO_MISC_MODESWITCHLATE;
 	info->var = rivafb_default_var;
 	info->fix.visual = (info->var.bits_per_pixel == 8) ?
 				FB_VISUAL_PSEUDOCOLOR : FB_VISUAL_DIRECTCOLOR;
