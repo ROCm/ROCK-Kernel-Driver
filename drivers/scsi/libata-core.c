@@ -1619,7 +1619,7 @@ static void ata_dev_set_pio(struct ata_port *ap, unsigned int device)
 static void ata_sg_clean(struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
-	Scsi_Cmnd *cmd = qc->scsicmd;
+	struct scsi_cmnd *cmd = qc->scsicmd;
 	struct scatterlist *sg = qc->sg;
 	int dir = scsi_to_pci_dma_dir(cmd->sc_data_direction);
 
@@ -1681,7 +1681,7 @@ void ata_fill_sg(struct ata_queued_cmd *qc)
 static int ata_sg_setup_one(struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
-	Scsi_Cmnd *cmd = qc->scsicmd;
+	struct scsi_cmnd *cmd = qc->scsicmd;
 	int dir = scsi_to_pci_dma_dir(cmd->sc_data_direction);
 	struct scatterlist *sg = qc->sg;
 	unsigned int have_sg = (qc->flags & ATA_QCFLAG_SG);
@@ -1720,7 +1720,7 @@ static int ata_sg_setup_one(struct ata_queued_cmd *qc)
 static int ata_sg_setup(struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
-	Scsi_Cmnd *cmd = qc->scsicmd;
+	struct scsi_cmnd *cmd = qc->scsicmd;
 	struct scatterlist *sg;
 	int n_elem;
 	unsigned int have_sg = (qc->flags & ATA_QCFLAG_SG);
@@ -1872,7 +1872,7 @@ static void ata_pio_sector(struct ata_port *ap)
 {
 	struct ata_queued_cmd *qc;
 	struct scatterlist *sg;
-	Scsi_Cmnd *cmd;
+	struct scsi_cmnd *cmd;
 	unsigned char *buf;
 	u8 status;
 
@@ -2092,7 +2092,7 @@ struct ata_queued_cmd *ata_qc_new_init(struct ata_port *ap,
 void ata_qc_complete(struct ata_queued_cmd *qc, u8 drv_stat, unsigned int done_late)
 {
 	struct ata_port *ap = qc->ap;
-	Scsi_Cmnd *cmd = qc->scsicmd;
+	struct scsi_cmnd *cmd = qc->scsicmd;
 	unsigned int tag, do_clear = 0;
 
 	assert(qc != NULL);	/* ata_qc_from_tag _might_ return NULL */
@@ -2163,7 +2163,7 @@ static void ata_qc_push (struct ata_queued_cmd *qc, unsigned int append)
 int ata_qc_issue(struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
-	Scsi_Cmnd *cmd = qc->scsicmd;
+	struct scsi_cmnd *cmd = qc->scsicmd;
 	unsigned int dma = qc->flags & ATA_QCFLAG_DMA;
 
 	ata_dev_select(ap, qc->dev->devno, 1, 0);
@@ -2719,7 +2719,7 @@ static void ata_host_remove(struct ata_port *ap, unsigned int do_unregister)
 	DPRINTK("ENTER\n");
 
 	if (do_unregister)
-		scsi_remove_host(sh); /* FIXME: check return val */
+		scsi_remove_host(sh);
 
 	ata_thread_kill(ap);	/* FIXME: check return val */
 
@@ -3204,7 +3204,6 @@ void ata_pci_remove_one (struct pci_dev *pdev)
 	for (i = 0; i < host_set->n_ports; i++) {
 		ap = host_set->ports[i];
 
-		/* FIXME: check return val */
 		scsi_remove_host(ap->host);
 	}
 
@@ -3215,13 +3214,10 @@ void ata_pci_remove_one (struct pci_dev *pdev)
 		host_set->ports[0]->ops->host_stop(host_set);
 
 	for (i = 0; i < host_set->n_ports; i++) {
-		Scsi_Host_Template *sht;
-
 		ap = host_set->ports[i];
-		sht = ap->host->hostt;
 
 		ata_scsi_release(ap->host);
-		scsi_host_put(ap->host); /* FIXME: check return val */
+		scsi_host_put(ap->host);
 	}
 
 	pci_release_regions(pdev);

@@ -57,8 +57,8 @@ int ata_std_bios_param(struct scsi_device *sdev, struct block_device *bdev,
 
 struct ata_queued_cmd *ata_scsi_qc_new(struct ata_port *ap,
 				       struct ata_device *dev,
-				       Scsi_Cmnd *cmd,
-				       void (*done)(Scsi_Cmnd *))
+				       struct scsi_cmnd *cmd,
+				       void (*done)(struct scsi_cmnd *))
 {
 	struct ata_queued_cmd *qc;
 
@@ -92,7 +92,7 @@ struct ata_queued_cmd *ata_scsi_qc_new(struct ata_port *ap,
 
 void ata_to_sense_error(struct ata_queued_cmd *qc)
 {
-	Scsi_Cmnd *cmd = qc->scsicmd;
+	struct scsi_cmnd *cmd = qc->scsicmd;
 
 	cmd->result = SAM_STAT_CHECK_CONDITION;
 
@@ -305,7 +305,7 @@ static unsigned int ata_scsi_rw_xlat(struct ata_queued_cmd *qc, u8 *scsicmd,
  */
 
 void ata_scsi_rw_queue(struct ata_port *ap, struct ata_device *dev,
-		      Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *),
+		      struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *),
 		      unsigned int cmd_size)
 {
 	struct ata_queued_cmd *qc;
@@ -355,7 +355,7 @@ err_out:
  *	Length of response buffer.
  */
 
-static unsigned int ata_scsi_rbuf_get(Scsi_Cmnd *cmd, u8 **buf_out)
+static unsigned int ata_scsi_rbuf_get(struct scsi_cmnd *cmd, u8 **buf_out)
 {
 	u8 *buf;
 	unsigned int buflen;
@@ -386,7 +386,7 @@ static unsigned int ata_scsi_rbuf_get(Scsi_Cmnd *cmd, u8 **buf_out)
  *	spin_lock_irqsave(host_set lock)
  */
 
-static inline void ata_scsi_rbuf_put(Scsi_Cmnd *cmd)
+static inline void ata_scsi_rbuf_put(struct scsi_cmnd *cmd)
 {
 	if (cmd->use_sg) {
 		struct scatterlist *sg;
@@ -417,7 +417,7 @@ void ata_scsi_rbuf_fill(struct ata_scsi_args *args,
 {
 	u8 *rbuf;
 	unsigned int buflen, rc;
-	Scsi_Cmnd *cmd = args->cmd;
+	struct scsi_cmnd *cmd = args->cmd;
 
 	buflen = ata_scsi_rbuf_get(cmd, &rbuf);
 	rc = actor(args, rbuf, buflen);
@@ -840,7 +840,7 @@ unsigned int ata_scsiop_report_luns(struct ata_scsi_args *args, u8 *rbuf,
  *	spin_lock_irqsave(host_set lock)
  */
 
-void ata_scsi_badcmd(Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *), u8 asc, u8 ascq)
+void ata_scsi_badcmd(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *), u8 asc, u8 ascq)
 {
 	DPRINTK("ENTER\n");
 	cmd->result = SAM_STAT_CHECK_CONDITION;
@@ -870,7 +870,7 @@ void ata_scsi_badcmd(Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *), u8 asc, u8 ascq)
  */
 
 static void atapi_scsi_queuecmd(struct ata_port *ap, struct ata_device *dev,
-			       Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *))
+			       struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *))
 {
 	struct ata_queued_cmd *qc;
 	u8 *scsicmd = cmd->cmnd, status;
@@ -981,7 +981,7 @@ err_out:
  *	Zero.
  */
 
-int ata_scsi_queuecmd(Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *))
+int ata_scsi_queuecmd(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *))
 {
 	u8 *scsicmd = cmd->cmnd;
 	struct ata_port *ap;
