@@ -1005,7 +1005,11 @@ fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var)
 
 			fb_set_cmap(&info->cmap, 1, info);
 
-			notifier_call_chain(&fb_notifier_list, FB_EVENT_MODE_CHANGE, info);
+			if (info->flags & FBINFO_MISC_MODECHANGEUSER) {
+				notifier_call_chain(&fb_notifier_list,
+						    FB_EVENT_MODE_CHANGE, info);
+				info->flags &= ~FBINFO_MISC_MODECHANGEUSER;
+			}
 		}
 	}
 	return 0;
@@ -1056,7 +1060,9 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		if (copy_from_user(&var, (void *) arg, sizeof(var)))
 			return -EFAULT;
 		acquire_console_sem();
+		info->flags |= FBINFO_MISC_MODECHANGEUSER;
 		i = fb_set_var(info, &var);
+		info->flags &= ~FBINFO_MISC_MODECHANGEUSER;
 		release_console_sem();
 		if (i) return i;
 		if (copy_to_user((void *) arg, &var, sizeof(var)))

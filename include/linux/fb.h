@@ -530,6 +530,8 @@ struct fb_ops {
 #define FBINFO_HWACCEL_YPAN		0x2000 /* optional */
 #define FBINFO_HWACCEL_YWRAP		0x4000 /* optional */
 
+#define FBINFO_MISC_MODECHANGEUSER     0x10000 /* mode change request
+						  from userspace */
 
 struct fb_info {
 	int node;

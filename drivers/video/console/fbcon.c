@@ -2358,6 +2358,56 @@ static void fbcon_resumed(struct fb_info *info)
 	update_screen(vc->vc_num);
 }
 
+static void fbcon_modechanged(struct fb_info *info)
+{
+	struct vc_data *vc = vc_cons[info->currcon].d;
+	struct display *p;
+	int rows, cols;
+
+	if (info->currcon < 0 || vt_cons[info->currcon]->vc_mode !=
+	    KD_TEXT)
+		return;
+	p = &fb_display[vc->vc_num];
+
+	info->var.xoffset = info->var.yoffset = p->yscroll = 0;
+	vc->vc_can_do_color = info->var.bits_per_pixel != 1;
+	vc->vc_complement_mask = vc->vc_can_do_color ? 0x7700 : 0x0800;
+
+	if (CON_IS_VISIBLE(vc)) {
+		cols = info->var.xres / vc->vc_font.width;
+		rows = info->var.yres / vc->vc_font.height;
+		vc_resize(vc->vc_num, cols, rows);
+		switch (p->scrollmode) {
+		case SCROLL_WRAP:
+			scrollback_phys_max = p->vrows - vc->vc_rows;
+			break;
+		case SCROLL_PAN:
+			scrollback_phys_max = p->vrows - 2 * vc->vc_rows;
+			if (scrollback_phys_max < 0)
+				scrollback_phys_max = 0;
+			break;
+		default:
+			scrollback_phys_max = 0;
+			break;
+		}
+		scrollback_max = 0;
+		scrollback_current = 0;
+		update_var(vc->vc_num, info);
+		fbcon_set_palette(vc, color_table);
+		update_screen(vc->vc_num);
+		if (softback_buf) {
+			int l = fbcon_softback_size / vc->vc_size_row;
+			if (l > 5)
+				softback_end = softback_buf + l * vc->vc_size_row;
+			else {
+				/* Smaller scrollback makes no sense, and 0
+				   would screw the operation totally */
+				softback_top = 0;
+			}
+		}
+	}
+}
+
 static int fbcon_event_notify(struct notifier_block *self, 
 			      unsigned long action, void *data)
 {
@@ -2369,6 +2419,9 @@ static int fbcon_event_notify(struct notifier_block *self,
 		break;
 	case FB_EVENT_RESUME:
 		fbcon_resumed(info);
+		break;
+	case FB_EVENT_MODE_CHANGE:
+		fbcon_modechanged(info);
 		break;
 	}
 
