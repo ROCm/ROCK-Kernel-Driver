@@ -92,7 +92,8 @@ drop_pte:
 		mm->rss--;
 		UnlockPage(page);
 		{
-			int freeable = page_count(page) - !!page->buffers <= 2;
+			int freeable = page_count(page) -
+				!!PagePrivate(page) <= 2;
 			page_cache_release(page);
 			return freeable;
 		}
@@ -121,7 +122,7 @@ drop_pte:
 	 * Anonymous buffercache pages can be left behind by
 	 * concurrent truncate and pagefault.
 	 */
-	if (page->buffers)
+	if (PagePrivate(page))
 		goto preserve;
 
 	/*
@@ -138,10 +139,16 @@ drop_pte:
 		 * (adding to the page cache will clear the dirty
 		 * and uptodate bits, so we need to do it again)
 		 */
-		if (add_to_swap_cache(page, entry) == 0) {
+		switch (add_to_swap_cache(page, entry)) {
+		case 0:				/* Success */
 			SetPageUptodate(page);
 			set_page_dirty(page);
 			goto set_swap_pte;
+		case -ENOMEM:			/* radix-tree allocation */
+			swap_free(entry);
+			goto preserve;
+		default:			/* ENOENT: raced */
+			break;
 		}
 		/* Raced with "speculative" read_swap_cache_async */
 		swap_free(entry);
@@ -341,6 +348,7 @@ static int FASTCALL(shrink_cache(int nr_pages, zone_t * classzone, unsigned int 
 static int shrink_cache(int nr_pages, zone_t * classzone, unsigned int gfp_mask, int priority)
 {
 	struct list_head * entry;
+	struct address_space *mapping;
 	int max_scan = nr_inactive_pages / priority;
 	int max_mapped = nr_pages << (9 - priority);
 
@@ -377,7 +385,7 @@ static int shrink_cache(int nr_pages, zone_t * classzone, unsigned int gfp_mask,
 			continue;
 
 		/* Racy check to avoid trylocking when not worthwhile */
-		if (!page->buffers && (page_count(page) != 1 || !page->mapping))
+		if (!PagePrivate(page) && (page_count(page) != 1 || !page->mapping))
 			goto page_mapped;
 
 		/*
@@ -395,7 +403,9 @@ static int shrink_cache(int nr_pages, zone_t * classzone, unsigned int gfp_mask,
 			continue;
 		}
 
-		if (PageDirty(page) && is_page_cache_freeable(page) && page->mapping) {
+		mapping = page->mapping;
+
+		if (PageDirty(page) && is_page_cache_freeable(page) && mapping) {
 			/*
 			 * It is not critical here to write it only if
 			 * the page is unmapped beause any direct writer
@@ -406,7 +416,7 @@ static int shrink_cache(int nr_pages, zone_t * classzone, unsigned int gfp_mask,
 			 */
 			int (*writepage)(struct page *);
 
-			writepage = page->mapping->a_ops->writepage;
+			writepage = mapping->a_ops->writepage;
 			if ((gfp_mask & __GFP_FS) && writepage) {
 				ClearPageDirty(page);
 				SetPageLaunder(page);
@@ -426,14 +436,14 @@ static int shrink_cache(int nr_pages, zone_t * classzone, unsigned int gfp_mask,
 		 * associated with this page. If we succeed we try to free
 		 * the page as well.
 		 */
-		if (page->buffers) {
+		if (PagePrivate(page)) {
 			spin_unlock(&pagemap_lru_lock);
 
 			/* avoid to free a locked page */
 			page_cache_get(page);
 
 			if (try_to_release_page(page, gfp_mask)) {
-				if (!page->mapping) {
+				if (!mapping) {
 					/*
 					 * We must not allow an anon page
 					 * with no buffers to be visible on
@@ -470,33 +480,35 @@ static int shrink_cache(int nr_pages, zone_t * classzone, unsigned int gfp_mask,
 			}
 		}
 
-		spin_lock(&pagecache_lock);
+		/*
+		 * This is the non-racy check for busy page.
+		 */
+		if (mapping) {
+			write_lock(&mapping->page_lock);
+			if (is_page_cache_freeable(page))
+				goto page_freeable;
+			write_unlock(&mapping->page_lock);
+		}
+		UnlockPage(page);
+page_mapped:
+		if (--max_mapped >= 0)
+			continue;
 
 		/*
-		 * this is the non-racy check for busy page.
+		 * Alert! We've found too many mapped pages on the
+		 * inactive list, so we start swapping out now!
 		 */
-		if (!page->mapping || !is_page_cache_freeable(page)) {
-			spin_unlock(&pagecache_lock);
-			UnlockPage(page);
-page_mapped:
-			if (--max_mapped >= 0)
-				continue;
+		spin_unlock(&pagemap_lru_lock);
+		swap_out(priority, gfp_mask, classzone);
+		return nr_pages;
 
-			/*
-			 * Alert! We've found too many mapped pages on the
-			 * inactive list, so we start swapping out now!
-			 */
-			spin_unlock(&pagemap_lru_lock);
-			swap_out(priority, gfp_mask, classzone);
-			return nr_pages;
-		}
-
+page_freeable:
 		/*
 		 * It is critical to check PageDirty _after_ we made sure
 		 * the page is freeable* so not in use by anybody.
 		 */
 		if (PageDirty(page)) {
-			spin_unlock(&pagecache_lock);
+			write_unlock(&mapping->page_lock);
 			UnlockPage(page);
 			continue;
 		}
@@ -504,12 +516,12 @@ page_mapped:
 		/* point of no return */
 		if (likely(!PageSwapCache(page))) {
 			__remove_inode_page(page);
-			spin_unlock(&pagecache_lock);
+			write_unlock(&mapping->page_lock);
 		} else {
 			swp_entry_t swap;
 			swap.val = page->index;
 			__delete_from_swap_cache(page);
-			spin_unlock(&pagecache_lock);
+			write_unlock(&mapping->page_lock);
 			swap_free(swap);
 		}
 

@@ -200,16 +200,16 @@ static inline void *hfs_buffer_data(const hfs_buffer buffer) {
 #endif
 
 static inline int hfs_clear_bit(int bitnr, hfs_u32 *lword) {
-	return test_and_clear_bit(BITNR(bitnr), lword);
+	return test_and_clear_bit(BITNR(bitnr), (unsigned long *)lword);
 }
 
 static inline int hfs_set_bit(int bitnr, hfs_u32 *lword) {
-	return test_and_set_bit(BITNR(bitnr), lword);
+	return test_and_set_bit(BITNR(bitnr), (unsigned long *)lword);
 }
 
 static inline int hfs_test_bit(int bitnr, const hfs_u32 *lword) {
 	/* the kernel should declare the second arg of test_bit as const */
-	return test_bit(BITNR(bitnr), (void *)lword);
+	return test_bit(BITNR(bitnr), (unsigned long *)lword);
 }
 
 #undef BITNR

@@ -108,6 +108,47 @@ inline request_queue_t *blk_get_queue(kdev_t dev)
 		return &blk_dev[major(dev)].request_queue;
 }
 
+/**
+ * blk_set_readahead - set a queue's readahead tunable
+ * @dev:	device
+ * @sectors:	readahead, in 512 byte sectors
+ *
+ * Returns zero on success, else negative errno
+ */
+int blk_set_readahead(kdev_t dev, unsigned sectors)
+{
+	int ret = -EINVAL;
+	request_queue_t *q = blk_get_queue(dev);
+
+	if (q) {
+		q->ra_sectors = sectors;
+		ret = 0;
+	}
+	return ret;
+}
+
+/**
+ * blk_get_readahead - query a queue's readahead tunable
+ * @dev:	device
+ *
+ * Locates the passed device's request queue and returns its
+ * readahead setting.
+ *
+ * The returned value is in units of 512 byte sectors.
+ *
+ * Will return zero if the queue has never had its readahead
+ * setting altered.
+ */
+unsigned blk_get_readahead(kdev_t dev)
+{
+	unsigned ret = 0;
+	request_queue_t *q = blk_get_queue(dev);
+
+	if (q)
+		ret = q->ra_sectors;
+	return ret;
+}
+
 void blk_queue_prep_rq(request_queue_t *q, prep_rq_fn *pfn)
 {
 	q->prep_rq_fn = pfn;
@@ -810,7 +851,8 @@ int blk_init_queue(request_queue_t *q, request_fn_proc *rfn, spinlock_t *lock)
 	q->plug_tq.data		= q;
 	q->queue_flags		= (1 << QUEUE_FLAG_CLUSTER);
 	q->queue_lock		= lock;
-	
+	q->ra_sectors		= 0;		/* Use VM default */
+
 	blk_queue_segment_boundary(q, 0xffffffff);
 
 	blk_queue_make_request(q, __make_request);

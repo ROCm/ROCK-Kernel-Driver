@@ -361,7 +361,6 @@ loff_t hdr_llseek(struct file *file, loff_t offset, int origin)
 	if (offset>=0 && offset<file->f_dentry->d_inode->i_size) {
 		if (offset != file->f_pos) {
 			file->f_pos = offset;
-			file->f_reada = 0;
 		}
 		retval = offset;
 	}
@@ -594,7 +593,6 @@ hfs_did_done:
 		} else if (fork) {
 			left = hfs_do_read(inode, fork, offset, buf, left);
 			if (left > 0) {
-				filp->f_reada = 1;
 			} else if (!read) {
 				return left;
 			} else {

@@ -105,7 +105,6 @@ static loff_t cap_info_llseek(struct file *file, loff_t offset, int origin)
 	if (offset>=0 && offset<=HFS_FORK_MAX) {
 		if (offset != file->f_pos) {
 			file->f_pos = offset;
-			file->f_reada = 0;
 		}
 		retval = offset;
 	}

@@ -19,6 +19,7 @@
 #include <linux/highmem.h>
 #include <linux/blkdev.h>
 #include <linux/module.h>
+#include <linux/blkpg.h>
 
 #include <asm/uaccess.h>
 
@@ -172,7 +173,6 @@ static loff_t block_llseek(struct file *file, loff_t offset, int origin)
 	if (offset >= 0 && offset <= size) {
 		if (offset != file->f_pos) {
 			file->f_pos = offset;
-			file->f_reada = 0;
 			file->f_version = ++event;
 		}
 		retval = offset;
@@ -692,9 +692,20 @@ int blkdev_close(struct inode * inode, struct file * filp)
 static int blkdev_ioctl(struct inode *inode, struct file *file, unsigned cmd,
 			unsigned long arg)
 {
-	if (inode->i_bdev->bd_op->ioctl)
-		return inode->i_bdev->bd_op->ioctl(inode, file, cmd, arg);
-	return -EINVAL;
+	int ret = -EINVAL;
+	switch (cmd) {
+	case BLKRAGET:
+	case BLKFRAGET:
+	case BLKRASET:
+	case BLKFRASET:
+		ret = blk_ioctl(inode->i_bdev, cmd, arg);
+		break;
+	default:
+		if (inode->i_bdev->bd_op->ioctl)
+			ret =inode->i_bdev->bd_op->ioctl(inode, file, cmd, arg);
+		break;
+	}
+	return ret;
 }
 
 struct address_space_operations def_blk_aops = {

@@ -237,6 +237,18 @@ int blk_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long arg)
 			intval = (is_read_only(dev) != 0);
 			return put_user(intval, (int *)(arg));
 
+		case BLKRASET:
+		case BLKFRASET:
+			if(!capable(CAP_SYS_ADMIN))
+				return -EACCES;
+			return blk_set_readahead(dev, arg);
+
+		case BLKRAGET:
+		case BLKFRAGET:
+			if (!arg)
+				return -EINVAL;
+			return put_user(blk_get_readahead(dev), (long *)arg);
+
 		case BLKSECTGET:
 			if ((q = blk_get_queue(dev)) == NULL)
 				return -EINVAL;
@@ -259,11 +271,11 @@ int blk_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long arg)
 
 		case BLKGETSIZE:
 			/* size in sectors, works up to 2 TB */
-			ullval = blkdev_size_in_bytes(dev);
+			ullval = bdev->bd_inode->i_size;
 			return put_user((unsigned long)(ullval >> 9), (unsigned long *) arg);
 		case BLKGETSIZE64:
 			/* size in bytes */
-			ullval = blkdev_size_in_bytes(dev);
+			ullval = bdev->bd_inode->i_size;
 			return put_user(ullval, (u64 *) arg);
 #if 0
 		case BLKRRPART: /* Re-read partition tables */

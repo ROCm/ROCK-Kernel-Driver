@@ -94,12 +94,12 @@ static struct super_operations jffs2_super_operations =
 
 static int jffs2_sb_compare(struct super_block *sb, void *data)
 {
-	struct mtd_info *mtd = data;
+	struct jffs2_sb_info *p = data;
 	struct jffs2_sb_info *c = JFFS2_SB_INFO(sb);
 
 	/* The superblocks are considered to be equivalent if the underlying MTD
 	   device is the same one */
-	if (c->mtd == mtd) {
+	if (c->mtd == p->mtd) {
 		D1(printk(KERN_DEBUG "jffs2_sb_compare: match on device %d (\"%s\")\n", mtd->index, mtd->name));
 		return 1;
 	} else {
@@ -111,12 +111,14 @@ static int jffs2_sb_compare(struct super_block *sb, void *data)
 
 static int jffs2_sb_set(struct super_block *sb, void *data)
 {
-	struct mtd_info *mtd = data;
+	struct jffs2_sb_info *p = data;
 
 	/* For persistence of NFS exports etc. we use the same s_dev
 	   each time we mount the device, don't just use an anonymous
 	   device */
-	sb->s_dev = mk_kdev(MTD_BLOCK_MAJOR, mtd->index);
+	sb->u.generic_sbp = p;
+	p->os_priv = sb;
+	sb->s_dev = mk_kdev(MTD_BLOCK_MAJOR, p->mtd->index);
 
 	return 0;
 }
@@ -129,7 +131,13 @@ static struct super_block *jffs2_get_sb_mtd(struct file_system_type *fs_type,
 	struct jffs2_sb_info *c;
 	int ret;
 
-	sb = sget(fs_type, jffs2_sb_compare, jffs2_sb_set, mtd);
+	c = kmalloc(sizeof(*c), GFP_KERNEL);
+	if (!c)
+		return ERR_PTR(-ENOMEM);
+	memset(c, 0, sizeof(*c));
+	c->mtd = mtd;
+
+	sb = sget(fs_type, jffs2_sb_compare, jffs2_sb_set, c);
 
 	if (IS_ERR(sb))
 		goto out_put;
@@ -144,18 +152,7 @@ static struct super_block *jffs2_get_sb_mtd(struct file_system_type *fs_type,
 	D1(printk(KERN_DEBUG "jffs2_get_sb_mtd(): New superblock for device %d (\"%s\")\n",
 		  mtd->index, mtd->name));
 
-	c = kmalloc(sizeof(*c), GFP_KERNEL);
-	if (!c) {
-		sb = ERR_PTR(-ENOMEM);
-		goto out_put;
-	}
-
-	sb->u.generic_sbp = c;
 	sb->s_op = &jffs2_super_operations;
-
-	memset(c, 0, sizeof(*c));
-	c->os_priv = sb;
-	c->mtd = mtd;
 
 	ret = jffs2_do_fill_super(sb, data, (flags&MS_VERBOSE)?1:0);
 
@@ -164,13 +161,15 @@ static struct super_block *jffs2_get_sb_mtd(struct file_system_type *fs_type,
 		up_write(&sb->s_umount);
 		deactivate_super(sb);
 		sb = ERR_PTR(ret);
-		goto out_put;
+		goto out_put1;
 	}
 
 	sb->s_flags |= MS_ACTIVE;
 	return sb;
 
  out_put:
+	kfree(c);
+ out_put1:
 	put_mtd_device(mtd);
 
 	return sb;
@@ -288,18 +287,23 @@ void jffs2_put_super (struct super_block *sb)
 	kfree(c->blocks);
 	if (c->mtd->sync)
 		c->mtd->sync(c->mtd);
-	put_mtd_device(c->mtd);
-
-	kfree(c);
 
 	D1(printk(KERN_DEBUG "jffs2_put_super returning\n"));
+}
+
+static void jffs2_kill_sb(struct super_block *sb)
+{
+	struct jffs2_sb_info *c = JFFS2_SB_INFO(sb);
+	generic_shutdown_super(sb);
+	put_mtd_device(c->mtd);
+	kfree(c);
 }
  
 static struct file_system_type jffs2_fs_type = {
 	owner:		THIS_MODULE,
 	name:		"jffs2",
 	get_sb:		jffs2_get_sb,
-	kill_sb:	generic_shutdown_super
+	kill_sb:	jffs2_kill_sb,
 };
 
 

@@ -166,7 +166,6 @@ static hfs_rwret_t hfs_file_read(struct file * filp, char * buf,
 	}
 	if ((read = hfs_do_read(inode, HFS_I(inode)->fork, pos, buf, left)) > 0) {
 	        *ppos += read;
-		filp->f_reada = 1;
 	}
 
 	return read;
