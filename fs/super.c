@@ -802,11 +802,6 @@ static struct super_block *__get_sb_nodev(struct file_system_type *fs_type,
 {
 	return get_sb_nodev(fs_type, flags, data, fill_super);
 }
-static struct super_block *__get_sb_single(struct file_system_type *fs_type,
-	int flags, char *dev_name, void * data)
-{
-	return get_sb_single(fs_type, flags, data, fill_super);
-}
 
 struct vfsmount *
 do_kern_mount(const char *fstype, int flags, char *name, void *data)
@@ -825,8 +820,6 @@ do_kern_mount(const char *fstype, int flags, char *name, void *data)
 		sb = type->get_sb(type, flags, name, data);
 	else if (type->fs_flags & FS_REQUIRES_DEV)
 		sb = __get_sb_bdev(type, flags, name, data);
-	else if (type->fs_flags & FS_SINGLE)
-		sb = __get_sb_single(type, flags, name, data);
 	else
 		sb = __get_sb_nodev(type, flags, name, data);
 	if (IS_ERR(sb))
