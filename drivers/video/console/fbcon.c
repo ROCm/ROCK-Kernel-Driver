@@ -101,7 +101,7 @@
 #endif
 
 struct display fb_display[MAX_NR_CONSOLES];
-char con2fb_map[MAX_NR_CONSOLES];
+signed char con2fb_map[MAX_NR_CONSOLES];
 static int logo_height;
 static int logo_lines;
 static int logo_shown = -1;
