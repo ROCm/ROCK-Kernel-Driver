@@ -82,12 +82,12 @@ extern void xmon_init(void);
 #endif
 
 #else
-#define debugger(regs)			0
-#define debugger_bpt(regs)		0
-#define debugger_sstep(regs)		0
-#define debugger_iabr_match(regs)	0
-#define debugger_dabr_match(regs)	0
-#define debugger_fault_handler(regs)	0
+static inline int debugger(struct *pt_regs regs) { return 0; }
+static inline int debugger_bpt(struct *pt_regs regs) { return 0; }
+static inline int debugger_sstep(struct *pt_regs regs) { return 0; }
+static inline int debugger_iabr_match(struct *pt_regs regs) { return 0; }
+static inline int debugger_dabr_match(struct *pt_regs regs) { return 0; }
+static inline int debugger_fault_handler(struct *pt_regs regs) { return 0; }
 #endif
 
 extern void show_regs(struct pt_regs * regs);
