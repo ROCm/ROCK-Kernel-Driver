@@ -711,7 +711,7 @@ u16 capi20_get_profile(u32 contr, struct capi_profile *profp)
 EXPORT_SYMBOL(capi20_get_profile);
 
 #ifdef CONFIG_AVMB1_COMPAT
-static int old_capi_manufacturer(unsigned int cmd, void *data)
+static int old_capi_manufacturer(unsigned int cmd, void __user *data)
 {
 	avmb1_loadandconfigdef ldef;
 	avmb1_extcarddef cdef;
@@ -728,12 +728,12 @@ static int old_capi_manufacturer(unsigned int cmd, void *data)
 	case AVMB1_ADDCARD:
 	case AVMB1_ADDCARD_WITH_TYPE:
 		if (cmd == AVMB1_ADDCARD) {
-		   if ((retval = copy_from_user((void *) &cdef, data,
+		   if ((retval = copy_from_user(&cdef, data,
 					    sizeof(avmb1_carddef))))
 			   return retval;
 		   cdef.cardtype = AVM_CARDTYPE_B1;
 		} else {
-		   if ((retval = copy_from_user((void *) &cdef, data,
+		   if ((retval = copy_from_user(&cdef, data,
 					    sizeof(avmb1_extcarddef))))
 			   return retval;
 		}
@@ -780,13 +780,13 @@ static int old_capi_manufacturer(unsigned int cmd, void *data)
 	case AVMB1_LOAD_AND_CONFIG:
 
 		if (cmd == AVMB1_LOAD) {
-			if (copy_from_user((void *)&ldef, data,
+			if (copy_from_user(&ldef, data,
 					   sizeof(avmb1_loaddef)))
 				return -EFAULT;
 			ldef.t4config.len = 0;
 			ldef.t4config.data = NULL;
 		} else {
-			if (copy_from_user((void *)&ldef, data,
+			if (copy_from_user(&ldef, data,
 					   sizeof(avmb1_loadandconfigdef)))
 				return -EFAULT;
 		}
@@ -843,7 +843,7 @@ static int old_capi_manufacturer(unsigned int cmd, void *data)
 		return 0;
 
 	case AVMB1_RESETCARD:
-		if (copy_from_user((void *)&rdef, data, sizeof(avmb1_resetdef)))
+		if (copy_from_user(&rdef, data, sizeof(avmb1_resetdef)))
 			return -EFAULT;
 		card = get_capi_ctr_by_nr(rdef.contr);
 		if (!card)
@@ -869,7 +869,7 @@ static int old_capi_manufacturer(unsigned int cmd, void *data)
 }
 #endif
 
-int capi20_manufacturer(unsigned int cmd, void *data)
+int capi20_manufacturer(unsigned int cmd, void __user *data)
 {
         struct capi_ctr *card;
 
@@ -886,7 +886,7 @@ int capi20_manufacturer(unsigned int cmd, void *data)
 	{
 		kcapi_flagdef fdef;
 
-		if (copy_from_user((void *)&fdef, data, sizeof(kcapi_flagdef)))
+		if (copy_from_user(&fdef, data, sizeof(kcapi_flagdef)))
 			return -EFAULT;
 
 		card = get_capi_ctr_by_nr(fdef.contr);
@@ -906,8 +906,7 @@ int capi20_manufacturer(unsigned int cmd, void *data)
 		kcapi_carddef cdef;
 		int retval;
 
-		if ((retval = copy_from_user((void *) &cdef, data,
-							sizeof(cdef))))
+		if ((retval = copy_from_user(&cdef, data, sizeof(cdef))))
 			return retval;
 
 		cparams.port = cdef.port;

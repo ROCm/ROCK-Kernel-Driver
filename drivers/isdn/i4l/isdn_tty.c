@@ -1483,7 +1483,7 @@ isdn_tty_ioctl(struct tty_struct *tty, struct file *file,
 #ifdef ISDN_DEBUG_MODEM_IOCTL
 			printk(KERN_DEBUG "ttyI%d ioctl TIOCSERGETLSR\n", info->line);
 #endif
-			return isdn_tty_get_lsr_info(info, (uint *) arg);
+			return isdn_tty_get_lsr_info(info, (uint __user *) arg);
 		default:
 #ifdef ISDN_DEBUG_MODEM_IOCTL
 			printk(KERN_DEBUG "UNKNOWN ioctl 0x%08x on ttyi%d\n", cmd, info->line);

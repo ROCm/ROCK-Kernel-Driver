@@ -565,7 +565,7 @@ void diva_os_remove_soft_isr(diva_os_soft_isr_t * psoft_isr)
  * kernel/user space copy functions
  */
 static int
-xdi_copy_to_user(void *os_handle, void *dst, const void *src, int length)
+xdi_copy_to_user(void *os_handle, void __user *dst, const void *src, int length)
 {
 	if (copy_to_user(dst, src, length)) {
 		return (-EFAULT);
@@ -574,7 +574,7 @@ xdi_copy_to_user(void *os_handle, void *dst, const void *src, int length)
 }
 
 static int
-xdi_copy_from_user(void *os_handle, void *dst, const void *src, int length)
+xdi_copy_from_user(void *os_handle, void *dst, const void __user *src, int length)
 {
 	if (copy_from_user(dst, src, length)) {
 		return (-EFAULT);
@@ -598,7 +598,7 @@ static int divas_release(struct inode *inode, struct file *file)
 	return (0);
 }
 
-static ssize_t divas_write(struct file *file, const char *buf,
+static ssize_t divas_write(struct file *file, const char __user *buf,
 			   size_t count, loff_t * ppos)
 {
 	int ret = -EINVAL;
@@ -629,7 +629,7 @@ static ssize_t divas_write(struct file *file, const char *buf,
 	return (ret);
 }
 
-static ssize_t divas_read(struct file *file, char *buf,
+static ssize_t divas_read(struct file *file, char __user *buf,
 			  size_t count, loff_t * ppos)
 {
 	int ret = -EINVAL;

@@ -117,7 +117,7 @@ int command(isdn_ctrl *cmd)
 		scs_ioctl	ioc;
 
 		memcpy(&cmdptr, cmd->parm.num, sizeof(unsigned long));
-		if (copy_from_user(&ioc, (scs_ioctl *)cmdptr,
+		if (copy_from_user(&ioc, (scs_ioctl __user *)cmdptr,
 				   sizeof(scs_ioctl))) {
 			pr_debug("%s: Failed to verify user space 0x%x\n",
 				sc_adapter[card]->devicename, cmdptr);

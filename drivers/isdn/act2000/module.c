@@ -243,16 +243,18 @@ act2000_command(act2000_card * card, isdn_ctrl * c)
 	char tmp[17];
 	int ret;
 	unsigned long flags;
+	void __user *arg;
  
         switch (c->command) {
 		case ISDN_CMD_IOCTL:
 			memcpy(&a, c->parm.num, sizeof(ulong));
+			arg = (void __user *)a;
 			switch (c->arg) {
 				case ACT2000_IOCTL_LOADBOOT:
 					switch (card->bus) {
 						case ACT2000_BUS_ISA:
 							ret = act2000_isa_download(card,
-									   (act2000_ddef *)a);
+									   arg);
 							if (!ret) {
 								card->flags |= ACT2000_FLAGS_LOADED;
 								if (!(card->flags & ACT2000_FLAGS_IVALID)) {
@@ -278,7 +280,7 @@ act2000_command(act2000_card * card, isdn_ctrl * c)
 					actcapi_manufacturer_req_net(card);
 					return 0;
 				case ACT2000_IOCTL_SETMSN:
-					if (copy_from_user(tmp, (char *)a,
+					if (copy_from_user(tmp, arg,
 							   sizeof(tmp)))
 						return -EFAULT;
 					if ((ret = act2000_set_msn(card, tmp)))
@@ -287,7 +289,7 @@ act2000_command(act2000_card * card, isdn_ctrl * c)
 						return(actcapi_manufacturer_req_msn(card));
 					return 0;
 				case ACT2000_IOCTL_ADDCARD:
-					if (copy_from_user(&cdef, (char *)a,
+					if (copy_from_user(&cdef, arg,
 							   sizeof(cdef)))
 						return -EFAULT;
 					if (act2000_addcard(cdef.bus, cdef.port, cdef.irq, cdef.id))

@@ -388,7 +388,7 @@ void divasa_xdi_driver_unload(void)
 /*
 **  Receive and process command from user mode utility
 */
-void *diva_xdi_open_adapter(void *os_handle, const void *src,
+void *diva_xdi_open_adapter(void *os_handle, const void __user *src,
 			    int length,
 			    divas_xdi_copy_from_user_fn_t cp_fn)
 {
@@ -437,7 +437,7 @@ void diva_xdi_close_adapter(void *adapter, void *os_handle)
 }
 
 int
-diva_xdi_write(void *adapter, void *os_handle, const void *src,
+diva_xdi_write(void *adapter, void *os_handle, const void __user *src,
 	       int length, divas_xdi_copy_from_user_fn_t cp_fn)
 {
 	diva_os_xdi_adapter_t *a = (diva_os_xdi_adapter_t *) adapter;
@@ -480,7 +480,7 @@ diva_xdi_write(void *adapter, void *os_handle, const void *src,
 **  Write answers to user mode utility, if any
 */
 int
-diva_xdi_read(void *adapter, void *os_handle, void *dst,
+diva_xdi_read(void *adapter, void *os_handle, void __user *dst,
 	      int max_length, divas_xdi_copy_to_user_fn_t cp_fn)
 {
 	diva_os_xdi_adapter_t *a = (diva_os_xdi_adapter_t *) adapter;

@@ -77,7 +77,7 @@ typedef struct capi_profile {
 
 typedef struct capi_manufacturer_cmd {
 	unsigned long cmd;
-	void *data;
+	void __user *data;
 } capi_manufacturer_cmd;
 
 /*

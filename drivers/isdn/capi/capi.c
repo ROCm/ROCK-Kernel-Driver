@@ -878,8 +878,7 @@ capi_ioctl(struct inode *inode, struct file *file,
 			struct capi_manufacturer_cmd mcmd;
 			if (!capable(CAP_SYS_ADMIN))
 				return -EPERM;
-			if (copy_from_user(&mcmd, argp,
-					   sizeof(mcmd)))
+			if (copy_from_user(&mcmd, argp, sizeof(mcmd)))
 				return -EFAULT;
 			return capi20_manufacturer(mcmd.cmd, mcmd.data);
 		}

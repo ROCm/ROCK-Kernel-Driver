@@ -72,7 +72,7 @@ int sc_ioctl(int card, scs_ioctl *data)
 		/*
 		 * Get the SRec from user space
 		 */
-		if (copy_from_user(srec, (char *) data->dataptr, sizeof(srec))) {
+		if (copy_from_user(srec, data->dataptr, sizeof(srec))) {
 			kfree(rcvmsg);
 			kfree(srec);
 			return -EFAULT;
@@ -118,8 +118,7 @@ int sc_ioctl(int card, scs_ioctl *data)
 		/*
 		 * Get the switch type from user space
 		 */
-		if (copy_from_user(&switchtype, (char *)data->dataptr,
-				   sizeof(char))) {
+		if (copy_from_user(&switchtype, data->dataptr, sizeof(char))) {
 			kfree(rcvmsg);
 			return -EFAULT;
 		}
@@ -169,7 +168,7 @@ int sc_ioctl(int card, scs_ioctl *data)
 		/*
 		 * Package the switch type and send to user space
 		 */
-		if (copy_to_user((char *)data->dataptr, &switchtype,
+		if (copy_to_user(data->dataptr, &switchtype,
 				 sizeof(char))) {
 			kfree(rcvmsg);
 			return -EFAULT;
@@ -209,7 +208,7 @@ int sc_ioctl(int card, scs_ioctl *data)
 		/*
 		 * Package the switch type and send to user space
 		 */
-		if (copy_to_user((char *)data->dataptr, spid, SCIOC_SPIDSIZE)) {
+		if (copy_to_user(data->dataptr, spid, SCIOC_SPIDSIZE)) {
 			kfree(spid);
 			kfree(rcvmsg);
 			return -EFAULT;
@@ -234,7 +233,7 @@ int sc_ioctl(int card, scs_ioctl *data)
 		/*
 		 * Get the spid from user space
 		 */
-		if (copy_from_user(spid, (char *) data->dataptr, SCIOC_SPIDSIZE)) {
+		if (copy_from_user(spid, data->dataptr, SCIOC_SPIDSIZE)) {
 			kfree(rcvmsg);
 			return -EFAULT;
 		}
@@ -292,7 +291,7 @@ int sc_ioctl(int card, scs_ioctl *data)
 		/*
 		 * Package the dn and send to user space
 		 */
-		if (copy_to_user((char *)data->dataptr, dn, SCIOC_DNSIZE)) {
+		if (copy_to_user(data->dataptr, dn, SCIOC_DNSIZE)) {
 			kfree(dn);
 			return -EFAULT;
 		}
@@ -313,7 +312,7 @@ int sc_ioctl(int card, scs_ioctl *data)
 		/*
 		 * Get the spid from user space
 		 */
-		if (copy_from_user(dn, (char *)data->dataptr, SCIOC_DNSIZE)) {
+		if (copy_from_user(dn, data->dataptr, SCIOC_DNSIZE)) {
 			kfree(rcvmsg);
 			kfree(dn);
 			return -EFAULT;
@@ -366,8 +365,7 @@ int sc_ioctl(int card, scs_ioctl *data)
 		kfree(rcvmsg);
 		GetStatus(card, bi);
 
-		if (copy_to_user((boardInfo *)data->dataptr, bi,
-				 sizeof(boardInfo))) {
+		if (copy_to_user(data->dataptr, bi, sizeof(boardInfo))) {
 			kfree(bi);
 			return -EFAULT;
 		}
@@ -405,7 +403,7 @@ int sc_ioctl(int card, scs_ioctl *data)
 		 * Package the switch type and send to user space
 		 */
 
-		if (copy_to_user((char *) data->dataptr, &speed, sizeof(char)))
+		if (copy_to_user(data->dataptr, &speed, sizeof(char)))
 			return -EFAULT;
 
 		return 0;

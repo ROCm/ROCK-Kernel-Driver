@@ -34,10 +34,10 @@ static DESCRIPTOR MaintDescriptor =
 extern void *diva_os_malloc_tbuffer(unsigned long flags,
 				    unsigned long size);
 extern void diva_os_free_tbuffer(unsigned long flags, void *ptr);
-extern int diva_os_copy_to_user(void *os_handle, void *dst,
+extern int diva_os_copy_to_user(void *os_handle, void __user *dst,
 				const void *src, int length);
 extern int diva_os_copy_from_user(void *os_handle, void *dst,
-				  const void *src, int length);
+				  const void __user *src, int length);
 
 static void no_printf(unsigned char *x, ...)
 {
@@ -148,7 +148,7 @@ static void DIVA_EXIT_FUNCTION disconnect_didd(void)
 /*
  * read/write maint
  */
-int maint_read_write(void *buf, int count)
+int maint_read_write(void __user *buf, int count)
 {
 	byte data[128];
 	dword cmd, id, mask;
