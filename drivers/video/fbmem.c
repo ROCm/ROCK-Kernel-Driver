@@ -1167,7 +1167,7 @@ fbmem_init(void)
 	}
 	return 0;
 }
-module_init(fbmem_init);
+subsys_initcall(fbmem_init);
 
 static char *video_options[FB_MAX];
 static int ofonly;
