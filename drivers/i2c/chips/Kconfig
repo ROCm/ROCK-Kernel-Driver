@@ -2,7 +2,7 @@
 # I2C Sensor device configuration
 #
 
-menu "I2C Hardware Sensors Chip support"
+menu "Hardware Sensors Chip support"
 	depends on I2C
 
 config I2C_SENSOR
@@ -32,18 +32,6 @@ config SENSORS_ASB100
 
 	  This driver can also be built as a module.  If so, the module
 	  will be called asb100.
-
-config SENSORS_EEPROM
-	tristate "EEPROM (DIMM) reader"
-	depends on I2C && EXPERIMENTAL
-	select I2C_SENSOR
-	help
-	  If you say yes here you get read-only access to the EEPROM data
-	  available on modern memory DIMMs, and which could theoretically
-	  also be available on other devices.
-
-	  This driver can also be built as a module.  If so, the module
-	  will be called eeprom.
 
 config SENSORS_FSCHER
 	tristate "FSC Hermes"
@@ -192,5 +180,22 @@ config SENSORS_W83627HF
 
 	  This driver can also be built as a module.  If so, the module
 	  will be called w83627hf.
+
+endmenu
+
+menu "Other I2C Chip support"
+	depends on I2C
+
+config SENSORS_EEPROM
+	tristate "EEPROM reader"
+	depends on I2C && EXPERIMENTAL
+	select I2C_SENSOR
+	help
+	  If you say yes here you get read-only access to the EEPROM data
+	  available on modern memory DIMMs and Sony Vaio laptops.  Such
+	  EEPROMs could theoretically be available on other devices as well.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called eeprom.
 
 endmenu
