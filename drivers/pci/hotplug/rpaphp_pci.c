@@ -32,12 +32,12 @@ struct pci_dev *rpaphp_find_pci_dev(struct device_node *dn)
 	struct pci_dev		*retval_dev = NULL, *dev = NULL;
 
 	while ((dev = pci_get_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
-		if(!dev->bus) 
+		if(!dev->bus)
 			continue;
-	
-		if (dev->devfn != dn->devfn) 
+
+		if (dev->devfn != dn->devfn)
 			continue;
-		
+
 		if (dn->phb->global_number == pci_domain_nr(dev->bus) &&
 		    dn->busno == dev->bus->number) {
 			retval_dev = dev;
@@ -46,9 +46,9 @@ struct pci_dev *rpaphp_find_pci_dev(struct device_node *dn)
 	}
 
 	return retval_dev;
-	
+
 }
- 
+
 int rpaphp_claim_resource(struct pci_dev *dev, int resource)
 {
 	struct resource *res = &dev->resource[resource];
@@ -63,9 +63,9 @@ int rpaphp_claim_resource(struct pci_dev *dev, int resource)
 
 	if (err) {
 		err("PCI: %s region %d of %s %s [%lx:%lx]\n",
-		       root ? "Address space collision on" :
-			      "No parent found for",
-		       resource, dtype, pci_name(dev), res->start, res->end);
+			root ? "Address space collision on" :
+			"No parent found for",
+			resource, dtype, pci_name(dev), res->start, res->end);
 	}
 
 	return err;

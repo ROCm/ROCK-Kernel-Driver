@@ -2,7 +2,7 @@
  *  linux/drivers/cpufreq/cpufreq_userspace.c
  *
  *  Copyright (C)  2001 Russell King
- *            (C)  2002 - 2003 Dominik Brodowski <linux@brodo.de>
+ *            (C)  2002 - 2004 Dominik Brodowski <linux@brodo.de>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -112,7 +112,14 @@ int cpufreq_set(unsigned int freq, unsigned int cpu)
 	if (freq > cpu_max_freq[cpu])
 		freq = cpu_max_freq[cpu];
 
-	ret = cpufreq_driver_target(&current_policy[cpu], freq, 
+	/*
+	 * We're safe from concurrent calls to ->target() here
+	 * as we hold the userspace_sem lock. If we were calling
+	 * cpufreq_driver_target, a deadlock situation might occur:
+	 * A: cpufreq_set (lock userspace_sem) -> cpufreq_driver_target(lock policy->lock)
+	 * B: cpufreq_set_policy(lock policy->lock) -> __cpufreq_governor -> cpufreq_governor_userspace (lock userspace_sem)
+	 */
+	ret = __cpufreq_driver_target(&current_policy[cpu], freq, 
 	      CPUFREQ_RELATION_L);
 
  err:

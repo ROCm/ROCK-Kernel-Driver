@@ -3,7 +3,7 @@
  *
  * John Rose <johnrose@austin.ibm.com>
  * Linda Xie <lxie@us.ibm.com>
- * 
+ *
  * October 2003
  *
  * Copyright (C) 2003 IBM.
@@ -16,12 +16,15 @@
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <asm/pci-bridge.h>
+#include <asm/semaphore.h>
 #include "../pci.h"
 #include "rpaphp.h"
 #include "rpadlpar.h"
 
 #define MODULE_VERSION "1.0"
 #define MODULE_NAME "rpadlpar_io"
+
+static DECLARE_MUTEX(rpadlpar_sem);
 
 static inline int is_hotplug_capable(struct device_node *dn)
 {
@@ -175,7 +178,7 @@ static int dlpar_pci_remove_bus(struct pci_dev *bridge_dev)
 	struct pci_bus *secondary_bus;
 
 	if (!bridge_dev) {
-		printk(KERN_ERR "%s: %s() unexpected null device\n", 
+		printk(KERN_ERR "%s: %s() unexpected null device\n",
 				MODULE_NAME, __FUNCTION__);
 		return 1;
 	}
@@ -183,7 +186,7 @@ static int dlpar_pci_remove_bus(struct pci_dev *bridge_dev)
 	secondary_bus = bridge_dev->subordinate;
 
 	if (unmap_bus_range(secondary_bus)) {
-		printk(KERN_ERR "%s: failed to unmap bus range\n", 
+		printk(KERN_ERR "%s: failed to unmap bus range\n",
 				__FUNCTION__);
 		return 1;
 	}
@@ -203,36 +206,47 @@ static int dlpar_pci_remove_bus(struct pci_dev *bridge_dev)
  * 0			Success
  * -ENODEV		Not a valid drc_name
  * -EINVAL		Slot already added
+ * -ERESTARTSYS		Signalled before obtaining lock
  * -EIO			Internal PCI Error
  */
 int dlpar_add_slot(char *drc_name)
 {
 	struct device_node *dn = find_php_slot_node(drc_name);
 	struct pci_dev *dev;
+	int rc = 0;
 
-	if (!dn)
-		return -ENODEV;
+	if (down_interruptible(&rpadlpar_sem))
+		return -ERESTARTSYS;
+
+	if (!dn) {
+		rc = -ENODEV;
+		goto exit;
+	}
 
 	/* Check for existing hotplug slot */
-	if (find_slot(drc_name))
-		return -EINVAL;
+	if (find_slot(drc_name)) {
+		rc = -EINVAL;
+		goto exit;
+	}
 
 	/* Add pci bus */
 	dev = dlpar_pci_add_bus(dn);
 	if (!dev) {
 		printk(KERN_ERR "%s: unable to add bus %s\n", __FUNCTION__,
 				drc_name);
-		return -EIO;
+		rc = -EIO;
+		goto exit;
 	}
 
 	/* Add hotplug slot for new bus */
 	if (rpaphp_add_slot(drc_name)) {
 		printk(KERN_ERR "%s: unable to add hotplug slot %s\n",
 				__FUNCTION__, drc_name);
-		return -EIO;
+		rc = -EIO;
 	}
-
-	return 0;
+exit:
+	up(&rpadlpar_sem);
+	return rc;
 }
 
 /**
@@ -245,6 +259,7 @@ int dlpar_add_slot(char *drc_name)
  * 0			Success
  * -ENODEV		Not a valid drc_name
  * -EINVAL		Slot already removed
+ * -ERESTARTSYS		Signalled before obtaining lock
  * -EIO			Internal PCI Error
  */
 int dlpar_remove_slot(char *drc_name)
@@ -252,35 +267,46 @@ int dlpar_remove_slot(char *drc_name)
 	struct device_node *dn = find_php_slot_node(drc_name);
 	struct slot *slot;
 	struct pci_dev *bridge_dev;
+	int rc = 0;
 
-	if (!dn)
-		return -ENODEV;
+	if (down_interruptible(&rpadlpar_sem))
+		return -ERESTARTSYS;
 
-	if (!(slot = find_slot(drc_name)))
-		return -EINVAL;
+	if (!dn) {
+		rc = -ENODEV;
+		goto exit;
+	}
+
+	if (!(slot = find_slot(drc_name))) {
+		rc = -EINVAL;
+		goto exit;
+	}
 
 	bridge_dev = slot->bridge;
 	if (!bridge_dev) {
 		printk(KERN_ERR "%s: %s(): unexpected null bridge device\n",
 				MODULE_NAME, __FUNCTION__);
-		return -EIO;
+		rc = -EIO;
+		goto exit;
 	}
 
 	/* Remove hotplug slot */
 	if (rpaphp_remove_slot(slot)) {
 		printk(KERN_ERR "%s: %s(): unable to remove hotplug slot %s\n",
 				MODULE_NAME, __FUNCTION__, drc_name);
-		return -EIO;
+		rc = -EIO;
+		goto exit;
 	}
 
 	/* Remove pci bus */
 	if (dlpar_pci_remove_bus(bridge_dev)) {
 		printk(KERN_ERR "%s: %s() unable to remove pci bus %s\n",
 				MODULE_NAME, __FUNCTION__, drc_name);
-		return -EIO;
+		rc = -EIO;
 	}
-
-	return 0;
+exit:
+	up(&rpadlpar_sem);
+	return rc;
 }
 
 static inline int is_dlpar_capable(void)

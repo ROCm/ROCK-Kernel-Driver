@@ -236,15 +236,31 @@ int bt_sock_recvmsg(struct kiocb *iocb, struct socket *sock,
 	return err ? : copied;
 }
 
+static inline unsigned int bt_accept_poll(struct sock *parent)
+{
+	struct list_head *p, *n;
+	struct sock *sk;
+
+	list_for_each_safe(p, n, &bt_sk(parent)->accept_q) {
+		sk = (struct sock *) list_entry(p, struct bt_sock, accept_q);
+		if (sk->sk_state == BT_CONNECTED)
+			return POLLIN | POLLRDNORM;
+	}
+
+	return 0;
+}
+
 unsigned int bt_sock_poll(struct file * file, struct socket *sock, poll_table *wait)
 {
 	struct sock *sk = sock->sk;
-	unsigned int mask;
+	unsigned int mask = 0;
 
 	BT_DBG("sock %p, sk %p", sock, sk);
 
 	poll_wait(file, sk->sk_sleep, wait);
-	mask = 0;
+
+	if (sk->sk_state == BT_LISTEN)
+		return bt_accept_poll(sk);
 
 	if (sk->sk_err || !skb_queue_empty(&sk->sk_error_queue))
 		mask |= POLLERR;
@@ -253,16 +269,17 @@ unsigned int bt_sock_poll(struct file * file, struct socket *sock, poll_table *w
 		mask |= POLLHUP;
 
 	if (!skb_queue_empty(&sk->sk_receive_queue) || 
-			!list_empty(&bt_sk(sk)->accept_q) ||
 			(sk->sk_shutdown & RCV_SHUTDOWN))
 		mask |= POLLIN | POLLRDNORM;
 
 	if (sk->sk_state == BT_CLOSED)
 		mask |= POLLHUP;
 
-	if (sk->sk_state == BT_CONNECT || sk->sk_state == BT_CONNECT2)
+	if (sk->sk_state == BT_CONNECT ||
+			sk->sk_state == BT_CONNECT2 ||
+			sk->sk_state == BT_CONFIG)
 		return mask;
-	
+
 	if (sock_writeable(sk))
 		mask |= POLLOUT | POLLWRNORM | POLLWRBAND;
 	else

@@ -46,21 +46,14 @@ register double f30 asm ("f30"); register double f31 asm ("f31");
 
 extern spinlock_t timerlist_lock;
 
-static fpswa_interface_t *fpswa_interface;
+fpswa_interface_t *fpswa_interface;
 
 void __init
 trap_init (void)
 {
-	int major = 0, minor = 0;
-
-	if (ia64_boot_param->fpswa) {
+	if (ia64_boot_param->fpswa)
 		/* FPSWA fixup: make the interface pointer a kernel virtual address: */
 		fpswa_interface = __va(ia64_boot_param->fpswa);
-		major = fpswa_interface->revision >> 16;
-		minor = fpswa_interface->revision & 0xffff;
-	}
-	printk(KERN_INFO "fpswa interface at %lx (rev %d.%d)\n",
-	       ia64_boot_param->fpswa, major, minor);
 }
 
 /*

@@ -1,5 +1,5 @@
 /*
- *	i810-tco:	TCO timer driver for i8xx chipsets
+ *	i8xx_tco:	TCO timer driver for i8xx chipsets
  *
  *	(c) Copyright 2000 kernel concepts <nils@kernelconcepts.de>, All Rights Reserved.
  *				http://www.kernelconcepts.de
@@ -21,12 +21,12 @@
  *	based on softdog.c by Alan Cox <alan@redhat.com>
  *
  *	For history and the complete list of supported I/O Controller Hub's
- *	see i810-tco.c
+ *	see i8xx_tco.c
  */
 
 
 /*
- * Some address definitions for the i810 TCO
+ * Some address definitions for the TCO
  */
 
 #define	TCOBASE		ACPIBASE + 0x60	/* TCO base address		*/

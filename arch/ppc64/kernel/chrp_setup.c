@@ -143,10 +143,6 @@ chrp_setup_arch(void)
 #ifdef CONFIG_BLK_DEV_INITRD
 	/* this is fine for chrp */
 	initrd_below_start_ok = 1;
-	
-	if (initrd_start)
-		ROOT_DEV = Root_RAM0;
-	else
 #endif
 	ROOT_DEV = Root_SDA2;
 	ROOT_DEV = Root_SDA3;

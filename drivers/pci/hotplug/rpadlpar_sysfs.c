@@ -116,7 +116,7 @@ static struct attribute *default_attrs[] = {
 static void dlpar_io_release(struct kobject *kobj)
 {
 	/* noop */
-	return;	
+	return;
 }
 
 struct kobj_type ktype_dlpar_io = {

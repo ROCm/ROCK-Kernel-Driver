@@ -639,20 +639,7 @@ source "sound/Kconfig"
 
 source "drivers/usb/Kconfig"
 
-
-menu "Watchdog"
-
-config SOFT_WATCHDOG
-	tristate "Software watchdog"
-	help
-	  A software monitoring watchdog. This will fail to reboot your system
-	  from some situations that the hardware watchdog will recover
-	  from. Equally it's a lot cheaper to install.
-
-	  To compile this driver as a module, choose M here: the
-	  module will be called softdog.
-
-endmenu
+source "drivers/char/watchdog/Kconfig"
 
 source "arch/sparc64/oprofile/Kconfig"
 

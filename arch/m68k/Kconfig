@@ -1012,50 +1012,7 @@ config SERIAL_CONSOLE
 config USERIAL
 	bool "Support for user serial device modules"
 
-config WATCHDOG
-	bool "Watchdog Timer Support"
-	---help---
-	  If you say Y here (and to one of the following options) and create a
-	  character special file /dev/watchdog with major number 10 and minor
-	  number 130 using mknod ("man mknod"), you will get a watchdog, i.e.:
-	  subsequently opening the file and then failing to write to it for
-	  longer than 1 minute will result in rebooting the machine. This
-	  could be useful for a networked machine that needs to come back
-	  online as fast as possible after a lock-up. There's both a watchdog
-	  implementation entirely in software (which can sometimes fail to
-	  reboot the machine) and a driver for hardware watchdog boards, which
-	  are more robust and can also keep track of the temperature inside
-	  your computer. For details, read <file:Documentation/watchdog/watchdog.txt>
-	  in the kernel source.
-
-	  The watchdog is usually used together with the watchdog daemon
-	  which is available from
-	  <ftp://ibiblio.org/pub/Linux/system/daemons/watchdog/>. This daemon can
-	  also monitor NFS connections and can reboot the machine when the process
-	  table is full.
-
-	  If unsure, say N.
-
-config WATCHDOG_NOWAYOUT
-	bool "Disable watchdog shutdown on close"
-	depends on WATCHDOG
-	help
-	  The default watchdog behaviour (which you get if you say N here) is
-	  to stop the timer if the process managing it closes the file
-	  /dev/watchdog. It's always remotely possible that this process might
-	  get killed. If you say Y here, the watchdog cannot be stopped once
-	  it has been started.
-
-config SOFT_WATCHDOG
-	bool "Software watchdog"
-	depends on WATCHDOG
-	help
-	  A software monitoring watchdog. This will fail to reboot your system
-	  from some situations that the hardware watchdog will recover
-	  from. Equally it's a lot cheaper to install.
-
-	  To compile this driver as a module, choose M here: the
-	  module will be called softdog.
+source "drivers/char/watchdog/Kconfig"
 
 config GEN_RTC
 	tristate "Generic /dev/rtc emulation" if !SUN3

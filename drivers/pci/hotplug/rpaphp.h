@@ -47,8 +47,8 @@
 #define ERR_SENSE_USE -9002     /* No DR operation will succeed, slot is unusable  */
 
 /* Sensor values from rtas_get-sensor */
-#define EMPTY           0       /* No card in slot */
-#define PRESENT         1       /* Card in slot */
+#define EMPTY	0       /* No card in slot */
+#define PRESENT	1       /* Card in slot */
 
 #if !defined(CONFIG_HOTPLUG_PCI_MODULE)
 	#define MY_NAME "rpaphp"
@@ -81,11 +81,11 @@
  */
 struct slot {
 	u32	magic;
-        int     state;
-        u32     index;
-        u32     type;
-        u32     power_domain;
-        char    *name;
+	int     state;
+	u32     index;
+	u32     type;
+	u32     power_domain;
+	char    *name;
 	struct	device_node *dn;/* slot's device_node in OFDT		*/
 				/* dn has phb info			*/
 	struct	pci_dev	*bridge;/* slot's pci_dev in pci_devices	*/

@@ -97,7 +97,7 @@ static inline struct vio_driver *to_vio_driver(struct device_driver *drv)
 struct vio_dev {
 	struct device_node *archdata;   /* Open Firmware node */
 	void *driver_data;              /* data private to the driver */
-	unsigned long unit_address;	
+	unsigned int unit_address;	
 	struct TceTable *tce_table;     /* vio_map_* uses this */
 	unsigned int irq;
 

@@ -29,7 +29,7 @@
 #define DBGENTER() pr_debug("%s entered\n", __FUNCTION__)
 
 /* just so vio_find_node() will always match vio_register_device() */
-#define KOBJNAME_FMT "%s@%lx"
+#define KOBJNAME_FMT "%s@%x"
 
 extern struct subsystem devices_subsys; /* needed for vio_find_name() */
 
@@ -302,11 +302,11 @@ static struct vio_dev *vio_find_name(const char *kobj_name)
  */
 struct vio_dev *vio_find_node(struct device_node *vnode)
 {
-	unsigned long *unit_address;
+	unsigned int *unit_address;
 	char kobj_name[BUS_ID_SIZE];
 
 	/* construct the kobject name from the device node */
-	unit_address = (unsigned long *)get_property(vnode, "reg", NULL);
+	unit_address = (unsigned int *)get_property(vnode, "reg", NULL);
 	if (!unit_address)
 		return NULL;
 	snprintf(kobj_name, BUS_ID_SIZE, KOBJNAME_FMT, vnode->name, *unit_address);

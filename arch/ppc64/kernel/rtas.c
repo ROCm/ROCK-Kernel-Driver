@@ -145,7 +145,7 @@ log_rtas_error(struct rtas_args	*rtas_args)
 	get_paca()->xRtas = err_args;
 
 	PPCDBG(PPCDBG_RTAS, "\tentering rtas with 0x%lx\n",
-	       (void *)__pa((unsigned long)err_args));
+	       (void *)__pa((unsigned long)&err_args));
 	enter_rtas((void *)__pa((unsigned long)&get_paca()->xRtas));
 	PPCDBG(PPCDBG_RTAS, "\treturned from rtas ...\n");
 

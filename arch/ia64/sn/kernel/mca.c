@@ -68,20 +68,6 @@ print_hook(const char *fmt, ...)
 }
 
 
-
-/*
- * ia64_sn2_platform_plat_specific_err_print
- *
- * Called by the MCA handler to log platform-specific errors.
- */
-void
-ia64_sn2_platform_plat_specific_err_print(int header_len, int sect_len, u8 *p_data, prfunc_t prfunc)
-{
-	ia64_sn_plat_specific_err_print(print_hook, p_data - sect_len);
-}
-
-
-
 static void
 sn_cpei_handler(int irq, void *devid, struct pt_regs *regs)
 {

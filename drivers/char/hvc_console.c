@@ -291,10 +291,7 @@ int __init hvc_init(void)
 
 	return 0;
 }
-
-static void __exit hvc_exit(void)
-{
-}
+device_initcall(hvc_init);
 
 void hvc_console_print(struct console *co, const char *b, unsigned count)
 {
@@ -356,6 +353,3 @@ static int __init hvc_console_init(void)
 	return 0;
 }
 console_initcall(hvc_console_init);
-
-module_init(hvc_init);
-module_exit(hvc_exit);

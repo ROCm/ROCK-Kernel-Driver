@@ -1934,9 +1934,11 @@ static int fbcon_do_set_font(struct vc_data *vc, struct console_font_op *op,
 	vc->vc_font.height = h;
 	if (vc->vc_hi_font_mask && cnt == 256) {
 		vc->vc_hi_font_mask = 0;
-		if (vc->vc_can_do_color)
+		if (vc->vc_can_do_color) {
 			vc->vc_complement_mask >>= 1;
-
+			vc->vc_s_complement_mask >>= 1;
+		}
+			
 		/* ++Edmund: reorder the attribute bits */
 		if (vc->vc_can_do_color) {
 			unsigned short *cp =
@@ -1955,9 +1957,11 @@ static int fbcon_do_set_font(struct vc_data *vc, struct console_font_op *op,
 		}
 	} else if (!vc->vc_hi_font_mask && cnt == 512) {
 		vc->vc_hi_font_mask = 0x100;
-		if (vc->vc_can_do_color)
+		if (vc->vc_can_do_color) {
 			vc->vc_complement_mask <<= 1;
-
+			vc->vc_s_complement_mask <<= 1;
+		}
+			
 		/* ++Edmund: reorder the attribute bits */
 		{
 			unsigned short *cp =

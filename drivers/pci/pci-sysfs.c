@@ -202,4 +202,7 @@ void pci_create_sysfs_dev_files (struct pci_dev *pdev)
 	device_create_file (dev, &dev_attr_devspec);
 #endif
 	sysfs_create_bin_file(&dev->kobj, &pci_config_attr);
+
+	/* add platform-specific attributes */
+	pcibios_add_platform_entries(pdev);
 }

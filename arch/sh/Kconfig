@@ -940,61 +940,7 @@ config PSMOUSE
 	  <ftp://gnu.systemy.it/pub/gpm/>) solves this problem, or you can get
 	  the "mconv2" utility from <ftp://ibiblio.org/pub/Linux/system/mouse/>.
 
-
-menu "Watchdog Cards"
-
-config WATCHDOG
-	bool "Watchdog Timer Support"
-	---help---
-	  If you say Y here (and to one of the following options) and create a
-	  character special file /dev/watchdog with major number 10 and minor
-	  number 130 using mknod ("man mknod"), you will get a watchdog, i.e.:
-	  subsequently opening the file and then failing to write to it for
-	  longer than 1 minute will result in rebooting the machine. This
-	  could be useful for a networked machine that needs to come back
-	  online as fast as possible after a lock-up. There's both a watchdog
-	  implementation entirely in software (which can sometimes fail to
-	  reboot the machine) and a driver for hardware watchdog boards, which
-	  are more robust and can also keep track of the temperature inside
-	  your computer. For details, read <file:Documentation/watchdog/watchdog.txt>
-	  in the kernel source.
-
-	  The watchdog is usually used together with the watchdog daemon
-	  which is available from
-	  <ftp://ibiblio.org/pub/Linux/system/daemons/watchdog/>. This daemon can
-	  also monitor NFS connections and can reboot the machine when the process
-	  table is full.
-
-	  If unsure, say N.
-
-config WATCHDOG_NOWAYOUT
-	bool "Disable watchdog shutdown on close"
-	depends on WATCHDOG
-	help
-	  The default watchdog behaviour (which you get if you say N here) is
-	  to stop the timer if the process managing it closes the file
-	  /dev/watchdog. It's always remotely possible that this process might
-	  get killed. If you say Y here, the watchdog cannot be stopped once
-	  it has been started.
-
-config SH_WDT
-	tristate "SuperH Watchdog"
-	depends on WATCHDOG
-	help
-	  This driver adds watchdog support for the integrated watchdog in the
-	  SuperH processors. If you have one of these processors and wish
-	  to have watchdog support enabled, say Y, otherwise say N.
-
-	  As a side note, saying Y here will automatically boost HZ to 1000
-	  so that the timer has a chance to clear the overflow counter. On
-	  slower systems (such as the SH-2 and SH-3) this will likely yield
-	  some performance issues. As such, the WDT should be avoided here
-	  unless it is absolutely necessary.
-
-	  To compile this driver as a module, choose M here: the
-	  module will be called shwdt.
-
-endmenu
+source "drivers/char/watchdog/Kconfig"
 
 config RTC
 	tristate "Enhanced Real Time Clock Support"
