@@ -356,7 +356,7 @@ static int open_dev(struct dm_dev *d, dev_t dev)
 		return -ENOMEM;
 
 	r = blkdev_get(d->bdev, d->mode, 0, BDEV_RAW);
-	if (!r)
+	if (r)
 		return r;
 
 	r = bd_claim(d->bdev, _claim_ptr);
