@@ -389,7 +389,7 @@ static int longhaul_cpu_init (struct cpufreq_policy *policy)
 		case 1 ... 15:
 			cpuname = "C3 'Ezra' [C5C]";
 			longhaul_version=2;
-			memcpy (clock_ratio, longhaul2_clock_ratio, sizeof(longhaul2_clock_ratio));
+			memcpy (clock_ratio, ezra_clock_ratio, sizeof(ezra_clock_ratio));
 			memcpy (eblcr_table, ezra_eblcr, sizeof(ezra_eblcr));
 			break;
 		}

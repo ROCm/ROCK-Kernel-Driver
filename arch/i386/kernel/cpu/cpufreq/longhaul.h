@@ -97,7 +97,7 @@ static int __initdata samuel1_eblcr[16] = {
 /*
  * VIA C3 Samuel2 Stepping 1->15 & VIA C3 Ezra
  */
-static int __initdata longhaul2_clock_ratio[16] = {
+static int __initdata ezra_clock_ratio[16] = {
 	100, /* 0000 -> 10.0x */
 	30,  /* 0001 ->  3.0x */
 	40,  /* 0010 ->  4.0x */
