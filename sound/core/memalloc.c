@@ -152,6 +152,10 @@ static void *snd_dma_hack_alloc_coherent(struct device *dev, size_t size,
 
 #endif /* arch */
 
+#if ! defined(__arm__)
+#define NEED_RESERVE_PAGES
+#endif
+
 /*
  *
  *  Generic memory allocators
@@ -168,6 +172,20 @@ static inline void inc_snd_pages(int order)
 static inline void dec_snd_pages(int order)
 {
 	snd_allocated_pages -= 1 << order;
+}
+
+static void mark_pages(struct page *page, int order)
+{
+	struct page *last_page = page + (1 << order);
+	while (page < last_page)
+		SetPageReserved(page++);
+}
+
+static void unmark_pages(struct page *page, int order)
+{
+	struct page *last_page = page + (1 << order);
+	while (page < last_page)
+		ClearPageReserved(page++);
 }
 
 /**
@@ -188,11 +206,7 @@ void *snd_malloc_pages(size_t size, unsigned int gfp_flags)
 	snd_assert(gfp_flags != 0, return NULL);
 	pg = get_order(size);
 	if ((res = (void *) __get_free_pages(gfp_flags, pg)) != NULL) {
-		/* mark pages */
-		struct page *page = virt_to_page(res);
-		struct page *last_page = page + (1 << pg);
-		while (page < last_page)
-			SetPageReserved(page++);
+		mark_pages(virt_to_page(res), pg);
 		inc_snd_pages(pg);
 	}
 	return res;
@@ -237,17 +251,12 @@ void *snd_malloc_pages_fallback(size_t size, unsigned int gfp_flags, size_t *res
 void snd_free_pages(void *ptr, size_t size)
 {
 	int pg;
-	struct page *page, *last_page;
 
 	if (ptr == NULL)
 		return;
 	pg = get_order(size);
 	dec_snd_pages(pg);
-	/* reset pages */
-	page = virt_to_page(ptr);
-	last_page = page + (1 << pg);
-	while (page < last_page)
-		ClearPageReserved(page++);
+	unmark_pages(virt_to_page(ptr), pg);
 	free_pages((unsigned long) ptr, pg);
 }
 
@@ -271,8 +280,12 @@ static void *snd_malloc_dev_pages(struct device *dev, size_t size, dma_addr_t *d
 	if (pg > 0)
 		gfp_flags |= __GFP_NOWARN;
 	res = dma_alloc_coherent(dev, PAGE_SIZE << pg, dma, gfp_flags);
-	if (res != NULL)
+	if (res != NULL) {
+#ifdef NEED_RESERVE_PAGES
+		mark_pages(virt_to_page(res), pg); /* should be dma_to_page() */
+#endif
 		inc_snd_pages(pg);
+	}
 
 	return res;
 }
@@ -303,6 +316,9 @@ static void snd_free_dev_pages(struct device *dev, size_t size, void *ptr,
 		return;
 	pg = get_order(size);
 	dec_snd_pages(pg);
+#ifdef NEED_RESERVE_PAGES
+	unmark_pages(virt_to_page(ptr), pg); /* should be dma_to_page() */
+#endif
 	dma_free_coherent(dev, PAGE_SIZE << pg, ptr, dma);
 }
 
