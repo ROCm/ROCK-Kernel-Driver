@@ -967,8 +967,12 @@ call_header(struct rpc_task *task)
 static u32 *
 call_verify(struct rpc_task *task)
 {
-	u32	*p = task->tk_rqstp->rq_rcv_buf.head[0].iov_base, n;
+	struct kvec *iov = &task->tk_rqstp->rq_rcv_buf.head[0];
+	int len = task->tk_rqstp->rq_rcv_buf.len >> 2;
+	u32	*p = iov->iov_base, n;
 
+	if ((len -= 3) < 0)
+		goto garbage;
 	p += 1;	/* skip XID */
 
 	if ((n = ntohl(*p++)) != RPC_REPLY) {
@@ -978,9 +982,11 @@ call_verify(struct rpc_task *task)
 	if ((n = ntohl(*p++)) != RPC_MSG_ACCEPTED) {
 		int	error = -EACCES;
 
+		if (--len < 0)
+			goto garbage;
 		if ((n = ntohl(*p++)) != RPC_AUTH_ERROR) {
 			printk(KERN_WARNING "call_verify: RPC call rejected: %x\n", n);
-		} else
+		} else if (--len < 0)
 		switch ((n = ntohl(*p++))) {
 		case RPC_AUTH_REJECTEDCRED:
 		case RPC_AUTH_REJECTEDVERF:
@@ -1011,7 +1017,8 @@ call_verify(struct rpc_task *task)
 		default:
 			printk(KERN_WARNING "call_verify: unknown auth error: %x\n", n);
 			error = -EIO;
-		}
+		} else
+			goto garbage;
 		dprintk("RPC: %4d call_verify: call rejected %d\n",
 						task->tk_pid, n);
 		rpc_exit(task, error);
@@ -1021,6 +1028,9 @@ call_verify(struct rpc_task *task)
 		printk(KERN_WARNING "call_verify: auth check failed\n");
 		goto garbage;		/* bad verifier, retry */
 	}
+	len = p - (u32 *)iov->iov_base - 1;
+	if (len < 0)
+		goto garbage;
 	switch ((n = ntohl(*p++))) {
 	case RPC_SUCCESS:
 		return p;
