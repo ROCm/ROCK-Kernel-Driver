@@ -55,6 +55,7 @@
 #include <linux/sockios.h>
 #include <linux/socket.h>
 #include <linux/in.h>
+#include <linux/mroute.h>
 #include <linux/netdevice.h>
 #include <linux/in_route.h>
 #include <linux/route.h>
