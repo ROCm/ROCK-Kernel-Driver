@@ -641,7 +641,6 @@ err_setup_rx:
 	return err;
 }
 
-
 #define REG_PATTERN_TEST(R, M, W)                                              \
 {                                                                              \
 	uint32_t pat, value;                                                   \
