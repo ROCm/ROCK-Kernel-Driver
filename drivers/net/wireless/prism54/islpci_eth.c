@@ -319,17 +319,9 @@ islpci_eth_receive(islpci_private *priv)
 		/* The card reports full 802.11 packets but with a 20 bytes
 		 * header and without the FCS. But there a is a bit that
 		 * indicates if the packet is corrupted :-) */
-		/* int i; */
-		if (skb->data[8] & 0x01){
+		if (skb->data[8] & 0x01)
 			/* This one is bad. Drop it !*/
 			discard = 1;
-			/* printk("BAD\n");*/
-		}
-		/*
-		for(i=0;i<50;i++)
-			printk("%2.2X:",skb->data[i]);
-		printk("\n");
-		*/		
 		skb_pull(skb, 20);
 		skb->protocol = htons(ETH_P_802_2);
 		skb->mac.raw = skb->data;
@@ -414,6 +406,15 @@ islpci_eth_receive(islpci_private *priv)
 }
 
 void
+islpci_do_reset_and_wake(void *data)
+{
+       islpci_private *priv = (islpci_private *) data;
+       islpci_reset(priv, 1);
+       netif_wake_queue(priv->ndev);
+       priv->reset_task_pending = 0;
+}
+
+void
 islpci_eth_tx_timeout(struct net_device *ndev)
 {
 	islpci_private *priv = netdev_priv(ndev);
@@ -422,13 +423,11 @@ islpci_eth_tx_timeout(struct net_device *ndev)
 	/* increment the transmit error counter */
 	statistics->tx_errors++;
 
-#if 0
-	/* don't do this here! we are not allowed to sleep since we are in interrupt context */
-	if (islpci_reset(priv))
-		printk(KERN_ERR "%s: error on TX timeout card reset!\n",
-		       ndev->name);
-#endif
+	if(!priv->reset_task_pending) {
+		priv->reset_task_pending = 1;
+		netif_stop_queue(ndev);
+		schedule_work(&priv->reset_task);
+	}
 
-	/* netif_wake_queue(ndev); */
 	return;
 }

@@ -188,6 +188,9 @@ typedef struct {
 	struct list_head bss_wpa_list;
 	int num_bss_wpa;
 	struct semaphore wpa_sem;
+
+	struct work_struct reset_task;
+	int reset_task_pending;
 } islpci_private;
 
 static inline islpci_state_t
