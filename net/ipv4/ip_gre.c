@@ -1250,7 +1250,7 @@ static struct inet_protocol ipgre_protocol = {
  *	And now the modules code and kernel interface.
  */
 
-int __init ipgre_init(void)
+static int __init ipgre_init(void)
 {
 	int err = -EINVAL;
 
@@ -1288,8 +1288,6 @@ void ipgre_fini(void)
 	unregister_netdev(ipgre_fb_tunnel_dev);
 }
 
-#ifdef MODULE
 module_init(ipgre_init);
-#endif
 module_exit(ipgre_fini);
 MODULE_LICENSE("GPL");

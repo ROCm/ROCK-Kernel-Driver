@@ -129,6 +129,9 @@ void __init inet_initpeers(void)
 			0, SLAB_HWCACHE_ALIGN,
 			NULL, NULL);
 
+	if (!peer_cachep)
+		panic("cannot create inet_peer_cache");
+
 	/* All the timers, started at system startup tend
 	   to synchronize. Perturb it a bit.
 	 */
