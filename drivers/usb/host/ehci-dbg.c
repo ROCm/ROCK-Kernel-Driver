@@ -117,10 +117,10 @@ static inline void dbg_hcc_params (struct ehci_hcd *ehci, char *label) {}
 static void __attribute__((__unused__))
 dbg_qh (char *label, struct ehci_hcd *ehci, struct ehci_qh *qh)
 {
-	dbg ("%s %p info1 %x info2 %x hw_curr %x qtd_next %x", label,
-		qh, qh->hw_info1, qh->hw_info2,
+	dbg ("%s %p n%08x info1 %x info2 %x hw_curr %x qtd_next %x", label,
+		qh, qh->hw_next, qh->hw_info1, qh->hw_info2,
 		qh->hw_current, qh->hw_qtd_next);
-	dbg ("  alt+errs= %x, token= %x, page0= %x, page1= %x",
+	dbg ("  alt+nak+t= %x, token= %x, page0= %x, page1= %x",
 		qh->hw_alt_next, qh->hw_token,
 		qh->hw_buf [0], qh->hw_buf [1]);
 	if (qh->hw_buf [2]) {

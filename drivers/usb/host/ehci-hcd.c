@@ -576,7 +576,7 @@ static int ehci_suspend (struct usb_hcd *hcd, u32 state)
 	int			ports;
 	int			i;
 
-	dbg ("%s: suspend to %d", hcd_to_bus (hcd)->bus_name, state);
+	ehci_dbg (ehci, "suspend to %d\n", state);
 
 	ports = HCS_N_PORTS (ehci->hcs_params);
 
@@ -593,7 +593,7 @@ static int ehci_suspend (struct usb_hcd *hcd, u32 state)
 		if ((temp & PORT_PE) == 0
 				|| (temp & PORT_OWNER) != 0)
 			continue;
-dbg ("%s: suspend port %d", hcd_to_bus (hcd)->bus_name, i);
+		ehci_dbg (ehci, "suspend port %d", i);
 		temp |= PORT_SUSPEND;
 		writel (temp, &ehci->regs->port_status [i]);
 	}
@@ -615,7 +615,7 @@ static int ehci_resume (struct usb_hcd *hcd)
 	int			ports;
 	int			i;
 
-	dbg ("%s: resume", hcd_to_bus (hcd)->bus_name);
+	ehci_dbg (ehci, "resume\n");
 
 	ports = HCS_N_PORTS (ehci->hcs_params);
 
@@ -635,7 +635,7 @@ static int ehci_resume (struct usb_hcd *hcd)
 		if ((temp & PORT_PE) == 0
 				|| (temp & PORT_SUSPEND) != 0)
 			continue;
-dbg ("%s: resume port %d", hcd_to_bus (hcd)->bus_name, i);
+		ehci_dbg (ehci, "resume port %d", i);
 		temp |= PORT_RESUME;
 		writel (temp, &ehci->regs->port_status [i]);
 		readl (&ehci->regs->command);	/* unblock posted writes */
@@ -880,8 +880,8 @@ static void ehci_free_config (struct usb_hcd *hcd, struct usb_device *udev)
 	/* ASSERT:  no requests/urbs are still linked (so no TDs) */
 	/* ASSERT:  nobody can be submitting urbs for this any more */
 
-	dbg ("%s: free_config devnum %d",
-		hcd_to_bus (hcd)->bus_name, udev->devnum);
+	ehci_dbg (ehci, "free_config %s devnum %d\n",
+			udev->devpath, udev->devnum);
 
 	spin_lock_irqsave (&ehci->lock, flags);
 	for (i = 0; i < 32; i++) {
@@ -912,7 +912,8 @@ static void ehci_free_config (struct usb_hcd *hcd, struct usb_device *udev)
 			dev->ep [i] = 0;
 			if (qh->qh_state == QH_STATE_IDLE)
 				goto idle;
-			dbg ("free_config, async ep 0x%02x qh %p", i, qh);
+			ehci_dbg (ehci, "free_config, async ep 0x%02x qh %p",
+					i, qh);
 
 			/* scan_async() empties the ring as it does its work,
 			 * using IAA, but doesn't (yet?) turn it off.  if it

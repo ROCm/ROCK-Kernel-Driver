@@ -783,7 +783,7 @@ static int whiteheat_ioctl (struct usb_serial_port *port, struct file * file, un
 			if (info->mcr & UART_MCR_RTS)
 				modem_signals |= TIOCM_RTS;
 			
-			if (copy_to_user((unsigned int *)arg, &modem_signals, sizeof(unsigned int)));
+			if (copy_to_user((unsigned int *)arg, &modem_signals, sizeof(unsigned int)))
 				return -EFAULT;
 
 			break;
