@@ -68,8 +68,8 @@ setattr:	yes
 permission:	no
 getattr:	no
 setxattr:	yes
-getxattr:	yes
-listxattr:	yes
+getxattr:	no
+listxattr:	no
 removexattr:	yes
 	Additionally, ->rmdir(), ->unlink() and ->rename() have ->i_sem on
 victim.

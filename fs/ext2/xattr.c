@@ -204,11 +204,16 @@ ext2_getxattr(struct dentry *dentry, const char *name,
 {
 	struct ext2_xattr_handler *handler;
 	struct inode *inode = dentry->d_inode;
+	ssize_t error;
 
 	handler = ext2_xattr_resolve_name(&name);
 	if (!handler)
 		return -EOPNOTSUPP;
-	return handler->get(inode, name, buffer, size);
+	down(&inode->i_sem);
+	error = handler->get(inode, name, buffer, size);
+	up(&inode->i_sem);
+
+	return error;
 }
 
 /*
@@ -219,7 +224,13 @@ ext2_getxattr(struct dentry *dentry, const char *name,
 ssize_t
 ext2_listxattr(struct dentry *dentry, char *buffer, size_t size)
 {
-	return ext2_xattr_list(dentry->d_inode, buffer, size);
+	ssize_t error;
+
+	down(&dentry->d_inode->i_sem);
+	error = ext2_xattr_list(dentry->d_inode, buffer, size);
+	up(&dentry->d_inode->i_sem);
+
+	return error;
 }
 
 /*
