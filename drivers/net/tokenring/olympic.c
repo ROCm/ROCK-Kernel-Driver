@@ -1806,7 +1806,7 @@ static int __init olympic_pci_init(void)
 
 static void __exit olympic_pci_cleanup(void)
 {
-	return pci_unregister_driver(&olympic_driver) ; 
+	pci_unregister_driver(&olympic_driver) ; 
 }	
 
 
