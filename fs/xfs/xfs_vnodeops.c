@@ -826,29 +826,34 @@ xfs_setattr(
 				mp->m_sb.sb_blocklog;
 		}
 		if (mask & XFS_AT_XFLAGS) {
+			uint	di_flags;
+
 			/* can't set PREALLOC this way, just preserve it */
-			ip->i_d.di_flags =
-				(ip->i_d.di_flags & XFS_DIFLAG_PREALLOC);
-			if (vap->va_xflags & XFS_XFLAG_REALTIME &&
-			    (ip->i_d.di_mode & S_IFMT) == S_IFREG) {
-				ip->i_d.di_flags |= XFS_DIFLAG_REALTIME;
-				ip->i_iocore.io_flags |= XFS_IOCORE_RT;
-			} else {
-				ip->i_iocore.io_flags &= ~XFS_IOCORE_RT;
-			}
+			di_flags = (ip->i_d.di_flags & XFS_DIFLAG_PREALLOC);
 			if (vap->va_xflags & XFS_XFLAG_IMMUTABLE)
-				ip->i_d.di_flags |= XFS_DIFLAG_IMMUTABLE;
+				di_flags |= XFS_DIFLAG_IMMUTABLE;
 			if (vap->va_xflags & XFS_XFLAG_APPEND)
-				ip->i_d.di_flags |= XFS_DIFLAG_APPEND;
+				di_flags |= XFS_DIFLAG_APPEND;
 			if (vap->va_xflags & XFS_XFLAG_SYNC)
-				ip->i_d.di_flags |= XFS_DIFLAG_SYNC;
+				di_flags |= XFS_DIFLAG_SYNC;
 			if (vap->va_xflags & XFS_XFLAG_NOATIME)
-				ip->i_d.di_flags |= XFS_DIFLAG_NOATIME;
+				di_flags |= XFS_DIFLAG_NOATIME;
 			if (vap->va_xflags & XFS_XFLAG_NODUMP)
-				ip->i_d.di_flags |= XFS_DIFLAG_NODUMP;
-			if ((vap->va_xflags & XFS_XFLAG_RTINHERIT) &&
-			    (ip->i_d.di_mode & S_IFMT) == S_IFDIR)
-				ip->i_d.di_flags |= XFS_DIFLAG_RTINHERIT;
+				di_flags |= XFS_DIFLAG_NODUMP;
+			if ((ip->i_d.di_mode & S_IFMT) == S_IFDIR) {
+				if (vap->va_xflags & XFS_XFLAG_REALTIME) {
+					ip->i_iocore.io_flags |= XFS_IOCORE_RT;
+					di_flags |= XFS_DIFLAG_REALTIME;
+				}
+				if (vap->va_xflags & XFS_XFLAG_RTINHERIT)
+					di_flags |= XFS_DIFLAG_RTINHERIT;
+				if (vap->va_xflags & XFS_XFLAG_NOSYMLINKS)
+					di_flags |= XFS_DIFLAG_NOSYMLINKS;
+			} else {
+				if (!(vap->va_xflags & XFS_XFLAG_REALTIME))
+					ip->i_iocore.io_flags &= ~XFS_IOCORE_RT;
+			}
+			ip->i_d.di_flags = di_flags;
 		}
 		xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 		timeflags |= XFS_ICHGTIME_CHG;
@@ -1606,7 +1611,7 @@ xfs_inactive(
 	 * If the inode is already free, then there can be nothing
 	 * to clean up here.
 	 */
-	if (ip->i_d.di_mode == 0) {
+	if (ip->i_d.di_mode == 0 || VN_BAD(vp)) {
 		ASSERT(ip->i_df.if_real_bytes == 0);
 		ASSERT(ip->i_df.if_broot_bytes == 0);
 		return VN_INACTIVE_CACHE;
@@ -3390,6 +3395,14 @@ xfs_symlink(
 	xfs_ilock(dp, XFS_ILOCK_EXCL);
 
 	/*
+	 * Check whether the directory allows new symlinks or not.
+	 */
+	if (dp->i_d.di_flags & XFS_DIFLAG_NOSYMLINKS) {
+		error = XFS_ERROR(EPERM);
+		goto error_return;
+	}
+
+	/*
 	 * Reserve disk quota : blocks and inode.
 	 */
 	error = XFS_TRANS_RESERVE_QUOTA(mp, tp, udqp, gdqp, resblks, 1, 0);
@@ -3795,11 +3808,17 @@ xfs_reclaim(
 	vnode_t		*vp;
 
 	vp = BHV_TO_VNODE(bdp);
+	ip = XFS_BHVTOI(bdp);
 
 	vn_trace_entry(vp, __FUNCTION__, (inst_t *)__return_address);
 
 	ASSERT(!VN_MAPPED(vp));
-	ip = XFS_BHVTOI(bdp);
+
+	/* bad inode, get out here ASAP */
+	if (VN_BAD(vp)) {
+		xfs_ireclaim(ip);
+		return 0;
+	}
 
 	if ((ip->i_d.di_mode & S_IFMT) == S_IFREG) {
 		if (ip->i_d.di_size > 0) {
@@ -3877,7 +3896,11 @@ xfs_finish_reclaim(
 	int		sync_mode)
 {
 	xfs_ihash_t	*ih = ip->i_hash;
+	vnode_t		*vp = XFS_ITOV_NULL(ip);
 	int		error;
+
+	if (vp && VN_BAD(vp))
+		return 0;
 
 	/* The hash lock here protects a thread in xfs_iget_core from
 	 * racing with us on linking the inode back with a vnode.
@@ -3886,8 +3909,7 @@ xfs_finish_reclaim(
 	 */
 	write_lock(&ih->ih_lock);
 	if ((ip->i_flags & XFS_IRECLAIM) ||
-	    (!(ip->i_flags & XFS_IRECLAIMABLE) &&
-	      (XFS_ITOV_NULL(ip) == NULL))) {
+	    (!(ip->i_flags & XFS_IRECLAIMABLE) && vp == NULL)) {
 		write_unlock(&ih->ih_lock);
 		if (locked) {
 			xfs_ifunlock(ip);
@@ -3954,15 +3976,13 @@ int
 xfs_finish_reclaim_all(xfs_mount_t *mp, int noblock)
 {
 	int		purged;
-	struct list_head	*curr, *next;
-	xfs_inode_t	*ip;
+	xfs_inode_t	*ip, *n;
 	int		done = 0;
 
 	while (!done) {
 		purged = 0;
 		XFS_MOUNT_ILOCK(mp);
-		list_for_each_safe(curr, next, &mp->m_del_inodes) {
-			ip = list_entry(curr, xfs_inode_t, i_reclaim);
+		list_for_each_entry_safe(ip, n, &mp->m_del_inodes, i_reclaim) {
 			if (noblock) {
 				if (xfs_ilock_nowait(ip, XFS_ILOCK_EXCL) == 0)
 					continue;

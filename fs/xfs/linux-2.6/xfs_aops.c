@@ -550,6 +550,7 @@ enough:
 STATIC void
 xfs_submit_page(
 	struct page		*page,
+	struct writeback_control *wbc,
 	struct buffer_head	*bh_arr[],
 	int			cnt)
 {
@@ -573,8 +574,10 @@ xfs_submit_page(
 
 		for (i = 0; i < cnt; i++)
 			submit_bh(WRITE, bh_arr[i]);
-	} else
+	} else {
 		end_page_writeback(page);
+		wbc->pages_skipped++;	/* We didn't write this page */
+	}
 }
 
 /*
@@ -652,7 +655,7 @@ xfs_convert_page(
 
 	if (startio) {
 		wbc->nr_to_write--;
-		xfs_submit_page(page, bh_arr, index);
+		xfs_submit_page(page, wbc, bh_arr, index);
 	} else {
 		unlock_page(page);
 	}
@@ -864,7 +867,7 @@ xfs_page_state_convert(
 		SetPageUptodate(page);
 
 	if (startio)
-		xfs_submit_page(page, bh_arr, cnt);
+		xfs_submit_page(page, wbc, bh_arr, cnt);
 
 	if (iomp) {
 		tlast = (iomp->iomap_offset + iomp->iomap_bsize - 1) >>

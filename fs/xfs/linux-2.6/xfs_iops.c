@@ -174,8 +174,9 @@ linvfs_mknod(
 				 */
 				teardown.d_inode = ip = LINVFS_GET_IP(vp);
 				teardown.d_name = dentry->d_name;
-				remove_inode_hash(ip);
-				make_bad_inode(ip);
+
+				vn_mark_bad(vp);
+				
 				if (S_ISDIR(mode))
 					VOP_RMDIR(dvp, &teardown, NULL, err2);
 				else
@@ -225,26 +226,21 @@ linvfs_lookup(
 	struct dentry	*dentry,
 	struct nameidata *nd)
 {
-	struct inode	*ip = NULL;
-	vnode_t		*vp, *cvp = NULL;
+	struct vnode	*vp = LINVFS_GET_VP(dir), *cvp;
 	int		error;
 
 	if (dentry->d_name.len >= MAXNAMELEN)
 		return ERR_PTR(-ENAMETOOLONG);
 
-	vp = LINVFS_GET_VP(dir);
 	VOP_LOOKUP(vp, dentry, &cvp, 0, NULL, NULL, error);
-	if (!error) {
-		ASSERT(cvp);
-		ip = LINVFS_GET_IP(cvp);
-		if (!ip) {
-			VN_RELE(cvp);
-			return ERR_PTR(-EACCES);
-		}
+	if (error) {
+		if (unlikely(error != ENOENT))
+			return ERR_PTR(-error);
+		d_add(dentry, NULL);
+		return NULL;
 	}
-	if (error && (error != ENOENT))
-		return ERR_PTR(-error);
-	return d_splice_alias(ip, dentry);
+
+	return d_splice_alias(LINVFS_GET_IP(cvp), dentry);
 }
 
 STATIC int
@@ -304,7 +300,7 @@ linvfs_symlink(
 {
 	struct inode	*ip;
 	vattr_t		va;
-	vnode_t		*dvp;	/* directory containing name to remove */
+	vnode_t		*dvp;	/* directory containing name of symlink */
 	vnode_t		*cvp;	/* used to lookup symlink to put in dentry */
 	int		error;
 
