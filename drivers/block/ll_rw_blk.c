@@ -42,6 +42,16 @@ static void blk_unplug_timeout(unsigned long data);
  */
 static kmem_cache_t *request_cachep;
 
+/*
+ * For queue allocation
+ */
+static kmem_cache_t *requestq_cachep;
+
+/*
+ * For io context allocations
+ */
+static kmem_cache_t *iocontext_cachep;
+
 static wait_queue_head_t congestion_wqh[2] = {
 		__WAIT_QUEUE_HEAD_INITIALIZER(congestion_wqh[0]),
 		__WAIT_QUEUE_HEAD_INITIALIZER(congestion_wqh[1])
@@ -1272,7 +1282,7 @@ void blk_cleanup_queue(request_queue_t * q)
 	if (blk_queue_tagged(q))
 		blk_queue_free_tags(q);
 
-	kfree(q);
+	kmem_cache_free(requestq_cachep, q);
 }
 
 EXPORT_SYMBOL(blk_cleanup_queue);
@@ -1336,7 +1346,7 @@ __setup("elevator=", elevator_setup);
 
 request_queue_t *blk_alloc_queue(int gfp_mask)
 {
-	request_queue_t *q = kmalloc(sizeof(*q), gfp_mask);
+	request_queue_t *q = kmem_cache_alloc(requestq_cachep, gfp_mask);
 
 	if (!q)
 		return NULL;
@@ -1425,7 +1435,7 @@ request_queue_t *blk_init_queue(request_fn_proc *rfn, spinlock_t *lock)
 out_elv:
 	blk_cleanup_queue(q);
 out_init:
-	kfree(q);
+	kmem_cache_free(requestq_cachep, q);
 	return NULL;
 }
 
@@ -2817,6 +2827,16 @@ int __init blk_dev_init(void)
 	if (!request_cachep)
 		panic("Can't create request pool slab cache\n");
 
+	requestq_cachep = kmem_cache_create("blkdev_queue",
+			sizeof(request_queue_t), 0, 0, NULL, NULL);
+	if (!requestq_cachep)
+		panic("Can't create request queue slab cache\n");
+
+	iocontext_cachep = kmem_cache_create("blkdev_ioc",
+			sizeof(struct io_context), 0, 0, NULL, NULL);
+	if (!iocontext_cachep)
+		panic("Can't create io context slab cache\n");
+
 	blk_max_low_pfn = max_low_pfn;
 	blk_max_pfn = max_pfn;
 	return 0;
@@ -2835,7 +2855,7 @@ void put_io_context(struct io_context *ioc)
 	if (atomic_dec_and_test(&ioc->refcount)) {
 		if (ioc->aic && ioc->aic->dtor)
 			ioc->aic->dtor(ioc->aic);
-		kfree(ioc);
+		kmem_cache_free(iocontext_cachep, ioc);
 	}
 }
 
@@ -2874,7 +2894,7 @@ struct io_context *get_io_context(int gfp_flags)
 	local_irq_save(flags);
 	ret = tsk->io_context;
 	if (ret == NULL) {
-		ret = kmalloc(sizeof(*ret), GFP_ATOMIC);
+		ret = kmem_cache_alloc(iocontext_cachep, GFP_ATOMIC);
 		if (ret) {
 			atomic_set(&ret->refcount, 1);
 			ret->pid = tsk->pid;
