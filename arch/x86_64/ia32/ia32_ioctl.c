@@ -19,22 +19,29 @@
 #include "compat_ioctl.c"
   
 #ifndef TIOCGDEV
-#define TIOCGDEV       _IOR('T',0x32, unsigned int)
+#define TIOCGDEV       _IOR('T',0x32, unsigned long)
 #endif
-static int tiocgdev(unsigned fd, unsigned cmd,  unsigned int *ptr) 
+static int tiocgdev(unsigned fd, unsigned cmd, unsigned long arg) 
 { 
 
 	struct file *file = fget(fd);
 	struct tty_struct *real_tty;
+	int ret;
 
-	if (!fd)
-		return -EBADF;
+	ret = -EBADF;
+	if (!file)
+		goto out2;
+	ret = -EINVAL;
 	if (file->f_op->ioctl != tty_ioctl)
-		return -EINVAL; 
+		goto out;
 	real_tty = (struct tty_struct *)file->private_data;
 	if (!real_tty) 	
-		return -EINVAL; 
-	return put_user(new_encode_dev(tty_devnum(real_tty)), ptr); 
+		goto out;
+	ret = put_user(new_encode_dev(tty_devnum(real_tty)), (unsigned long*)arg); 
+out:
+	fput(file);
+out2:
+	return ret;
 } 
 
 #define RTC_IRQP_READ32	_IOR('p', 0x0b, unsigned int)	 /* Read IRQ rate   */

@@ -1892,7 +1892,7 @@ int tty_ioctl(struct inode * inode, struct file * file,
 		 */
 		case TIOCGDEV:
 		{
-			unsigned long ret = old_encode_dev(tty_devnum(real_tty));
+			unsigned long ret = new_encode_dev(tty_devnum(real_tty));
 			return put_user(ret, (unsigned long*) arg);
 		}
 
