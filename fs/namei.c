@@ -945,8 +945,7 @@ int fastcall path_lookup(const char *name, unsigned int flags, struct nameidata 
 		}
 		nd->mnt = mntget(current->fs->rootmnt);
 		nd->dentry = dget(current->fs->root);
-	}
-	else{
+	} else {
 		nd->mnt = mntget(current->fs->pwdmnt);
 		nd->dentry = dget(current->fs->pwd);
 	}
@@ -2305,12 +2304,8 @@ int page_readlink(struct dentry *dentry, char __user *buffer, int buflen)
 int page_follow_link_light(struct dentry *dentry, struct nameidata *nd)
 {
 	struct page *page;
-	char *s = page_getlink(dentry, &page);
-	if (!IS_ERR(s)) {
-		nd_set_link(nd, s);
-		s = NULL;
-	}
-	return PTR_ERR(s);
+	nd_set_link(nd, page_getlink(dentry, &page));
+	return 0;
 }
 
 void page_put_link(struct dentry *dentry, struct nameidata *nd)
