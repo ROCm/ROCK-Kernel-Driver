@@ -146,6 +146,11 @@ struct rfcomm_rpn {
 	u16 param_mask;
 } __attribute__ ((packed));
 
+struct rfcomm_rls {
+	u8  dlci;
+	u8  status;
+} __attribute__ ((packed));
+
 struct rfcomm_msc {
 	u8  dlci;
 	u8  v24_sig;
