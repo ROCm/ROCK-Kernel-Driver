@@ -104,8 +104,6 @@
 
 #include <asm/io.h>
 
-#include "opti621.h"
-
 #define OPTI621_MAX_PIO 3
 /* In fact, I do not have any PIO 4 drive
  * (address: 25 ns, data: 70 ns, recovery: 35 ns),
@@ -347,6 +345,24 @@ static void __init init_hwif_opti621 (ide_hwif_t *hwif)
 	hwif->drives[0].autodma = hwif->autodma;
 	hwif->drives[1].autodma = hwif->autodma;
 }
+
+static ide_pci_device_t opti621_chipsets[] __devinitdata = {
+	{	/* 0 */
+		.name		= "OPTI621",
+		.init_hwif	= init_hwif_opti621,
+		.channels	= 2,
+		.autodma	= AUTODMA,
+		.enablebits	= {{0x45,0x80,0x00}, {0x40,0x08,0x00}},
+		.bootable	= ON_BOARD,
+	},{	/* 1 */
+		.name		= "OPTI621X",
+		.init_hwif	= init_hwif_opti621,
+		.channels	= 2,
+		.autodma	= AUTODMA,
+		.enablebits	= {{0x45,0x80,0x00}, {0x40,0x08,0x00}},
+		.bootable	= ON_BOARD,
+	}
+};
 
 static int __devinit opti621_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
