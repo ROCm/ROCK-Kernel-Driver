@@ -81,6 +81,12 @@ show_stack (struct task_struct *task)
 }
 
 void
+dump_stack (void)
+{
+	show_stack(NULL);
+}
+
+void
 show_regs (struct pt_regs *regs)
 {
 	unsigned long ip = regs->cr_iip + ia64_psr(regs)->ri;
@@ -248,18 +254,15 @@ ia64_load_extra (struct task_struct *task)
  *	|                     | <-- sp (lowest addr)
  *	+---------------------+
  *
- * Note: if we get called through kernel_thread() then the memory
- * above "(highest addr)" is valid kernel stack memory that needs to
- * be copied as well.
+ * Note: if we get called through kernel_thread() then the memory above "(highest addr)"
+ * is valid kernel stack memory that needs to be copied as well.
  *
- * Observe that we copy the unat values that are in pt_regs and
- * switch_stack.  Spilling an integer to address X causes bit N in
- * ar.unat to be set to the NaT bit of the register, with N=(X &
- * 0x1ff)/8.  Thus, copying the unat value preserves the NaT bits ONLY
- * if the pt_regs structure in the parent is congruent to that of the
- * child, modulo 512.  Since the stack is page aligned and the page
- * size is at least 4KB, this is always the case, so there is nothing
- * to worry about.
+ * Observe that we copy the unat values that are in pt_regs and switch_stack.  Spilling an
+ * integer to address X causes bit N in ar.unat to be set to the NaT bit of the register,
+ * with N=(X & 0x1ff)/8.  Thus, copying the unat value preserves the NaT bits ONLY if the
+ * pt_regs structure in the parent is congruent to that of the child, modulo 512.  Since
+ * the stack is page aligned and the page size is at least 4KB, this is always the case,
+ * so there is nothing to worry about.
  */
 int
 copy_thread (int nr, unsigned long clone_flags,
@@ -300,6 +303,8 @@ copy_thread (int nr, unsigned long clone_flags,
 	memcpy((void *) child_rbs, (void *) rbs, rbs_size);
 
 	if (user_mode(child_ptregs)) {
+		if (clone_flags & CLONE_SETTLS)
+			child_ptregs->r13 = regs->r16;	/* see sys_clone2() in entry.S */
 		if (user_stack_base) {
 			child_ptregs->r12 = user_stack_base + user_stack_size - 16;
 			child_ptregs->ar_bspstore = user_stack_base;

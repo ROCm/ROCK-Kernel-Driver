@@ -474,7 +474,7 @@ threads_sync_user_rbs (struct task_struct *child, unsigned long child_urbs_end, 
 {
 	struct switch_stack *sw;
 	unsigned long urbs_end;
-	struct task_struct *p;
+	struct task_struct *g, *p;
 	struct mm_struct *mm;
 	struct pt_regs *pt;
 	long multi_threaded;
@@ -495,7 +495,7 @@ threads_sync_user_rbs (struct task_struct *child, unsigned long child_urbs_end, 
 	} else {
 		read_lock(&tasklist_lock);
 		{
-			for_each_task(p) {
+			do_each_thread(g, p) {
 				if (p->mm == mm && p->state != TASK_RUNNING) {
 					sw = (struct switch_stack *) (p->thread.ksp + 16);
 					pt = ia64_task_regs(p);
@@ -504,7 +504,7 @@ threads_sync_user_rbs (struct task_struct *child, unsigned long child_urbs_end, 
 					if (make_writable)
 						user_flushrs(p, pt);
 				}
-			}
+			} while_each_thread(g, p);
 		}
 		read_unlock(&tasklist_lock);
 	}

@@ -174,6 +174,13 @@ do {										\
 #define local_irq_enable()	__asm__ __volatile__ (";; ssm psr.i;; srlz.d" ::: "memory")
 #define local_save_flags(flags)	__asm__ __volatile__ ("mov %0=psr" : "=r" (flags) :: "memory")
 
+#define irqs_disabled()				\
+({						\
+	unsigned long flags;			\
+	local_save_flags(flags);		\
+	(flags & IA64_PSR_I) == 0;		\
+})
+
 /*
  * Force an unresolved reference if someone tries to use
  * ia64_fetch_and_add() with a bad value.

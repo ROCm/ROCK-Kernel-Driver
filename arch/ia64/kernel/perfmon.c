@@ -1742,14 +1742,14 @@ pfm_restart(struct task_struct *task, pfm_context_t *ctx, void *arg, int count,
 static void
 pfm_tasklist_toggle_pp(unsigned int val)
 {
-	struct task_struct *p;
+	struct task_struct *g, *p;
 	struct pt_regs *regs;
 
 	DBprintk(("invoked by [%d] pp=%u\n", current->pid, val));
 
 	read_lock(&tasklist_lock);
 
-	for_each_task(p) {
+	do_each_thread(g, p) {
        		regs = (struct pt_regs *)((unsigned long) p + IA64_STK_OFFSET);
 
 		/*
@@ -1761,7 +1761,8 @@ pfm_tasklist_toggle_pp(unsigned int val)
 		 * update psr.pp
 		 */
 		ia64_psr(regs)->pp = val;
-	}
+	} while_each_thread(g, p);
+
 	read_unlock(&tasklist_lock);
 }
 #endif
@@ -4039,14 +4040,14 @@ pfm_cleanup_smpl_buf(struct task_struct *task)
 void
 pfm_cleanup_owners(struct task_struct *task)
 {
-	struct task_struct *p;
+	struct task_struct *g, *p;
 	pfm_context_t *ctx;
 
 	DBprintk(("called by [%d] for [%d]\n", current->pid, task->pid));
 
 	read_lock(&tasklist_lock);
 
-	for_each_task(p) {
+	do_each_thread(g, p) {
 		/*
 		 * It is safe to do the 2-step test here, because thread.ctx
 		 * is cleaned up only in release_thread() and at that point
@@ -4084,7 +4085,8 @@ pfm_cleanup_owners(struct task_struct *task)
 
 			DBprintk(("done for notifier [%d] in [%d]\n", task->pid, p->pid));
 		}
-	}
+	} while_each_thread(g, p);
+
 	read_unlock(&tasklist_lock);
 
 	atomic_set(&task->thread.pfm_owners_check, 0);
@@ -4098,23 +4100,21 @@ pfm_cleanup_owners(struct task_struct *task)
 void
 pfm_cleanup_notifiers(struct task_struct *task)
 {
-	struct task_struct *p;
+	struct task_struct *g, *p;
 	pfm_context_t *ctx;
 
 	DBprintk(("called by [%d] for [%d]\n", current->pid, task->pid));
 
 	read_lock(&tasklist_lock);
 
-	for_each_task(p) {
+	do_each_thread(g, p) {
 		/*
-		 * It is safe to do the 2-step test here, because thread.ctx
-		 * is cleaned up only in release_thread() and at that point
-		 * the task has been detached from the tasklist which is an
-		 * operation which uses the write_lock() on the tasklist_lock
-		 * so it cannot run concurrently to this loop. So we have the
-		 * guarantee that if we find p and it has a perfmon ctx then
-		 * it is going to stay like this for the entire execution of this
-		 * loop.
+		 * It is safe to do the 2-step test here, because thread.ctx is cleaned up
+		 * only in release_thread() and at that point the task has been detached
+		 * from the tasklist which is an operation which uses the write_lock() on
+		 * the tasklist_lock so it cannot run concurrently to this loop. So we
+		 * have the guarantee that if we find p and it has a perfmon ctx then it
+		 * is going to stay like this for the entire execution of this loop.
 		 */
 		ctx = p->thread.pfm_context;
 
@@ -4123,16 +4123,16 @@ pfm_cleanup_notifiers(struct task_struct *task)
 		if (ctx && ctx->ctx_notify_task == task) {
 			DBprintk(("trying for notifier [%d] in [%d]\n", task->pid, p->pid));
 			/*
-			 * the spinlock is required to take care of a race condition
-			 * with the send_sig_info() call. We must make sure that 
-			 * either the send_sig_info() completes using a valid task,
-			 * or the notify_task is cleared before the send_sig_info()
-			 * can pick up a stale value. Note that by the time this
-			 * function is executed the 'task' is already detached from the
-			 * tasklist. The problem is that the notifiers have a direct
-			 * pointer to it. It is okay to send a signal to a task in this
-			 * stage, it simply will have no effect. But it is better than sending
-			 * to a completely destroyed task or worse to a new task using the same
+			 * the spinlock is required to take care of a race condition with
+			 * the send_sig_info() call. We must make sure that either the
+			 * send_sig_info() completes using a valid task, or the
+			 * notify_task is cleared before the send_sig_info() can pick up a
+			 * stale value. Note that by the time this function is executed
+			 * the 'task' is already detached from the tasklist. The problem
+			 * is that the notifiers have a direct pointer to it. It is okay
+			 * to send a signal to a task in this stage, it simply will have
+			 * no effect. But it is better than sending to a completely
+			 * destroyed task or worse to a new task using the same
 			 * task_struct address.
 			 */
 			LOCK_CTX(ctx);
@@ -4143,7 +4143,8 @@ pfm_cleanup_notifiers(struct task_struct *task)
 
 			DBprintk(("done for notifier [%d] in [%d]\n", task->pid, p->pid));
 		}
-	}
+	} while_each_thread(g, p);
+
 	read_unlock(&tasklist_lock);
 
 	atomic_set(&task->thread.pfm_notifiers_check, 0);

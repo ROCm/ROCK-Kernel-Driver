@@ -202,6 +202,7 @@ main (int argc, char **argv)
     }
 
   printf ("\n#define CLONE_IDLETASK_BIT	%ld\n", ia64_fls (CLONE_IDLETASK));
+  printf ("\n#define CLONE_SETTLS_BIT	%ld\n", ia64_fls (CLONE_SETTLS));
 
   printf ("\n#endif /* _ASM_IA64_OFFSETS_H */\n");
   return 0;

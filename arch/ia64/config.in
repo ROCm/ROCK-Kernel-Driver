@@ -86,6 +86,31 @@ fi
 
 define_bool CONFIG_KCORE_ELF y	# On IA-64, we always want an ELF /proc/kcore.
 
+define_int CONFIG_FORCE_MAX_ZONEORDER 18
+
+bool 'IA-64 Huge TLB Page Support' CONFIG_HUGETLB_PAGE
+
+if [ "$CONFIG_HUGETLB_PAGE" = "y" ]; then
+	if [ "$CONFIG_MCKINLEY" = "y" ]; then
+		choice '    IA-64 Huge TLB Page Size'				\
+		 	"4GB           CONFIG_HUGETLB_PAGE_SIZE_4GB		\
+		 	256MB          CONFIG_HUGETLB_PAGE_SIZE_256MB		\
+			64MB           CONFIG_HUGETLB_PAGE_SIZE_64MB		\
+			16MB           CONFIG_HUGETLB_PAGE_SIZE_16MB		\
+			4MB            CONFIG_HUGETLB_PAGE_SIZE_4MB		\
+			1MB            CONFIG_HUGETLB_PAGE_SIZE_1MB		\
+			256KB          CONFIG_HUGETLB_PAGE_SIZE_256KB" 16MB
+	else
+		choice '    IA-64 Huge TLB Page Size'				\
+		 	"256MB         CONFIG_HUGETLB_PAGE_SIZE_256MB		\
+			64MB           CONFIG_HUGETLB_PAGE_SIZE_64MB		\
+			16MB           CONFIG_HUGETLB_PAGE_SIZE_16MB		\
+			4MB            CONFIG_HUGETLB_PAGE_SIZE_4MB		\
+			1MB            CONFIG_HUGETLB_PAGE_SIZE_1MB		\
+			256KB          CONFIG_HUGETLB_PAGE_SIZE_256KB" 16MB
+	fi
+fi
+
 bool 'SMP support' CONFIG_SMP
 bool 'Support running of Linux/x86 binaries' CONFIG_IA32_SUPPORT
 bool 'Performance monitor support' CONFIG_PERFMON

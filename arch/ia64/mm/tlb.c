@@ -63,7 +63,7 @@ wrap_mmu_context (struct mm_struct *mm)
 
 	read_lock(&tasklist_lock);
   repeat:
-	for_each_task(tsk) {
+	for_each_process(tsk) {
 		if (!tsk->mm)
 			continue;
 		tsk_context = tsk->mm->context;

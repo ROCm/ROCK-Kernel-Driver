@@ -33,6 +33,15 @@
 
 #define EFI_DEBUG	0
 
+#ifdef CONFIG_HUGETLB_PAGE
+
+/* By default at total of 512MB is reserved huge pages. */
+#define HTLBZONE_SIZE_DEFAULT  0x20000000
+
+unsigned long htlbzone_pages = (HTLBZONE_SIZE_DEFAULT >> HPAGE_SHIFT);
+
+#endif
+
 extern efi_status_t efi_call_phys (void *, ...);
 
 struct efi efi;
@@ -399,6 +408,25 @@ efi_init (void)
 				++cp;
 		}
 	}
+#ifdef CONFIG_HUGETLB_PAGE
+	/* Just duplicating the above algo for lpzone start */
+	for (cp = saved_command_line; *cp; ) {
+		if (memcmp(cp, "lpmem=", 8) == 0) {
+			cp += 8;
+			htlbzone_pages = memparse(cp, &end);
+			htlbzone_pages = (htlbzone_pages >> HPAGE_SHIFT);
+			if (end != cp)
+				break;
+			cp = end;
+		} else {
+			while (*cp != ' ' && *cp)
+				++cp;
+			while (*cp == ' ')
+				++cp;
+		}
+	}
+	printk("Total HugeTLB_Page memory pages requested  0x%lx \n", htlbzone_pages);
+#endif
 	if (mem_limit != ~0UL)
 		printk("Ignoring memory above %luMB\n", mem_limit >> 20);
 

@@ -30,6 +30,32 @@
 #define PAGE_MASK		(~(PAGE_SIZE - 1))
 #define PAGE_ALIGN(addr)	(((addr) + PAGE_SIZE - 1) & PAGE_MASK)
 
+#ifdef CONFIG_HUGETLB_PAGE
+
+# if defined(CONFIG_HUGETLB_PAGE_SIZE_4GB)
+#  define HPAGE_SHIFT	32
+# elif defined(CONFIG_HUGETLB_PAGE_SIZE_256MB)
+#  define HPAGE_SHIFT	28
+# elif defined(CONFIG_HUGETLB_PAGE_SIZE_64MB)
+#  define HPAGE_SHIFT	26
+# elif defined(CONFIG_HUGETLB_PAGE_SIZE_16MB)
+#  define HPAGE_SHIFT	24
+# elif defined(CONFIG_HUGETLB_PAGE_SIZE_4MB)
+#  define HPAGE_SHIFT	22
+# elif defined(CONFIG_HUGETLB_PAGE_SIZE_1MB)
+#  define HPAGE_SHIFT	20
+# elif defined(CONFIG_HUGETLB_PAGE_SIZE_256KB)
+#  define HPAGE_SHIFT	18
+# else
+#  error Unsupported IA-64 HugeTLB Page Size!
+# endif
+
+# define REGION_HPAGE	(4UL)	/* note: this is hardcoded in mmu_context.h:reload_context()!*/
+# define REGION_SHIFT	61
+# define HPAGE_SIZE	(__IA64_UL_CONST(1) << HPAGE_SHIFT)
+# define HPAGE_MASK	(~(HPAGE_SIZE - 1))
+#endif /* CONFIG_HUGETLB_PAGE */
+
 #ifdef __ASSEMBLY__
 # define __pa(x)		((x) - PAGE_OFFSET)
 # define __va(x)		((x) + PAGE_OFFSET)
@@ -86,6 +112,12 @@ typedef union ia64_va {
 
 #define REGION_SIZE		REGION_NUMBER(1)
 #define REGION_KERNEL		7
+
+#ifdef CONFIG_HUGETLB_PAGE
+# define htlbpage_to_page(x)	((REGION_NUMBER(x) << 61)				\
+				 | (REGION_OFFSET(x) >> (HPAGE_SHIFT-PAGE_SHIFT)))
+# define HUGETLB_PAGE_ORDER	(HPAGE_SHIFT - PAGE_SHIFT)
+#endif
 
 #if (__GNUC__ > 3) || (__GNUC__ == 3 && __GNUC_MINOR__ >= 1)
 # define ia64_abort()	__builtin_trap()

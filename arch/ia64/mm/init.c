@@ -339,6 +339,14 @@ ia64_mmu_init (void *my_cpu_data)
 /*
  * Set up the page tables.
  */
+
+#ifdef CONFIG_HUGETLB_PAGE
+long htlbpagemem;
+int htlbpage_max;
+extern long htlbzone_pages;
+extern struct list_head htlbpage_freelist;
+#endif
+
 void
 paging_init (void)
 {
@@ -438,5 +446,30 @@ mem_init (void)
 
 #ifdef CONFIG_IA32_SUPPORT
 	ia32_gdt_init();
+#endif
+#ifdef CONFIG_HUGETLB_PAGE
+	{
+		long i;
+		int j;
+		struct page *page, *map;
+
+		if ((htlbzone_pages << (HPAGE_SHIFT - PAGE_SHIFT)) >= max_low_pfn)
+			htlbzone_pages = (max_low_pfn >> ((HPAGE_SHIFT - PAGE_SHIFT) + 1));
+		INIT_LIST_HEAD(&htlbpage_freelist);
+		for (i = 0; i < htlbzone_pages; i++) {
+			page = alloc_pages(GFP_ATOMIC, HUGETLB_PAGE_ORDER);
+			if (!page)
+				break;
+			map = page;
+			for (j = 0; j < (HPAGE_SIZE/PAGE_SIZE); j++) {
+				SetPageReserved(map);
+				map++;
+			}
+			list_add(&page->list, &htlbpage_freelist);
+		}
+		printk("Total Huge_TLB_Page memory pages allocated %ld \n", i);
+		htlbzone_pages = htlbpagemem = i;
+		htlbpage_max = (int)i;
+	}
 #endif
 }
