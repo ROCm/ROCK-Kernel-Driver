@@ -169,7 +169,7 @@ free_initrd_mem (unsigned long start, unsigned long end)
 {
 	struct page *page;
 	/*
-	 * EFI uses 4KB pages while the kernel can use 4KB  or bigger.
+	 * EFI uses 4KB pages while the kernel can use 4KB or bigger.
 	 * Thus EFI and the kernel may have different page sizes. It is
 	 * therefore possible to have the initrd share the same page as
 	 * the end of the kernel (given current setup).
@@ -580,7 +580,7 @@ mem_init (void)
 		if (!fsyscall_table[i] || nolwsys)
 			fsyscall_table[i] = sys_call_table[i] | 1;
 	}
-	setup_gate();	/* setup gate pages before we free up boot memory... */
+	setup_gate();
 
 #ifdef CONFIG_IA32_SUPPORT
 	ia32_boot_gdt_init();
