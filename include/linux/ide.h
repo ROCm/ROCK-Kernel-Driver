@@ -1510,6 +1510,8 @@ extern int ide_dma_enable(ide_drive_t *drive);
 extern char *ide_xfer_verbose(u8 xfer_rate);
 extern void ide_toggle_bounce(ide_drive_t *drive, int on);
 extern int ide_set_xfer_rate(ide_drive_t *drive, u8 rate);
+
+void ide_dump_opcode(ide_drive_t *);
 extern byte ide_dump_atapi_status(ide_drive_t *drive, const char *msg, byte stat);
 
 typedef struct ide_pio_timings_s {

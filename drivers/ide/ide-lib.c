@@ -445,6 +445,43 @@ int ide_set_xfer_rate(ide_drive_t *drive, u8 rate)
 
 EXPORT_SYMBOL_GPL(ide_set_xfer_rate);
 
+void ide_dump_opcode(ide_drive_t *drive)
+{
+	struct request *rq;
+	u8 opcode = 0;
+	int found = 0;
+
+	spin_lock(&ide_lock);
+	rq = NULL;
+	if (HWGROUP(drive))
+		rq = HWGROUP(drive)->rq;
+	spin_unlock(&ide_lock);
+	if (!rq)
+		return;
+	if (rq->flags & (REQ_DRIVE_CMD | REQ_DRIVE_TASK)) {
+		char *args = rq->buffer;
+		if (args) {
+			opcode = args[0];
+			found = 1;
+		}
+	} else if (rq->flags & REQ_DRIVE_TASKFILE) {
+		ide_task_t *args = rq->special;
+		if (args) {
+			task_struct_t *tf = (task_struct_t *) args->tfRegister;
+			opcode = tf->command;
+			found = 1;
+		}
+	}
+
+	printk("ide: failed opcode was: ");
+	if (!found)
+		printk("unknown\n");
+	else
+		printk("0x%02x\n", opcode);
+}
+
+EXPORT_SYMBOL_GPL(ide_dump_opcode);
+
 /**
  *	ide_dump_atapi_status       -       print human readable atapi status
  *	@drive: drive that status applies to
@@ -488,6 +525,7 @@ byte ide_dump_atapi_status (ide_drive_t *drive, const char *msg, byte stat)
 						error.b.sense_key);
 		printk("\n");
 	}
+	ide_dump_opcode(drive);
 	local_irq_restore(flags);
 	return error.all;
 }
