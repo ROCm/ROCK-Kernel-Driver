@@ -58,7 +58,7 @@ void device_resume(void)
 	up(&dpm_sem);
 }
 
-EXPORT_SYMBOL(device_resume);
+EXPORT_SYMBOL_GPL(device_resume);
 
 
 /**
@@ -97,6 +97,6 @@ void device_power_up(void)
 	dpm_power_up();
 }
 
-EXPORT_SYMBOL(device_power_up);
+EXPORT_SYMBOL_GPL(device_power_up);
 
 
