@@ -2187,7 +2187,7 @@ int tw_scsi_eh_abort(Scsi_Cmnd *SCpnt)
 		return (FAILED);
 	}
 
-	tw_dev = (TW_Device_Extension *)SCpnt->host->hostdata;
+	tw_dev = (TW_Device_Extension *)SCpnt->device->host->hostdata;
 	if (tw_dev == NULL) {
 		printk(KERN_WARNING "3w-xxxx: tw_scsi_eh_abort(): Invalid device extension.\n");
 		return (FAILED);
@@ -2254,7 +2254,7 @@ int tw_scsi_eh_reset(Scsi_Cmnd *SCpnt)
 		return (FAILED);
 	}
 
-	tw_dev = (TW_Device_Extension *)SCpnt->host->hostdata;
+	tw_dev = (TW_Device_Extension *)SCpnt->device->host->hostdata;
 	if (tw_dev == NULL) {
 		printk(KERN_WARNING "3w-xxxx: tw_scsi_eh_reset(): Invalid device extension.\n");
 		return (FAILED);
@@ -2356,7 +2356,7 @@ int tw_scsi_queue(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 	int request_id = 0;
 	int error = 0;
 	unsigned long flags = 0;
-	TW_Device_Extension *tw_dev = (TW_Device_Extension *)SCpnt->host->hostdata;
+	TW_Device_Extension *tw_dev = (TW_Device_Extension *)SCpnt->device->host->hostdata;
 
 	if (tw_dev == NULL) {
 		printk(KERN_WARNING "3w-xxxx: tw_scsi_queue(): Invalid device extension.\n");

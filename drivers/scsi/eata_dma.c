@@ -270,7 +270,7 @@ void eata_int_handler(int irq, void *dev_id, struct pt_regs * regs)
 	    }
 
 	    cmd = ccb->cmd;
-	    base = (uint) cmd->host->base;
+	    base = (uint) cmd->device->host->base;
        	    hba_stat = sp->hba_stat;
 	    
 	    scsi_stat = (sp->scsi_stat >> 1) & 0x1f; 
@@ -478,7 +478,7 @@ int eata_queue(Scsi_Cmnd * cmd, void (* done) (Scsi_Cmnd *))
     queue_counter++;
 
     hd = HD(cmd);
-    sh = cmd->host;
+    sh = cmd->device->host;
     
     if (cmd->cmnd[0] == REQUEST_SENSE && cmd->sense_buffer[0] != 0) {
         DBG(DBG_REQSENSE, printk(KERN_DEBUG "Tried to REQUEST SENSE\n"));
@@ -642,7 +642,7 @@ int eata_abort(Scsi_Cmnd * cmd)
 	}
     }
 
-    while (inb((u32)(cmd->host->base) + HA_RAUXSTAT) & HA_ABUSY) {
+    while (inb((u32)(cmd->device->host->base) + HA_RAUXSTAT) & HA_ABUSY) {
 	if (--loop == 0) {
 	    printk("eata_dma: abort, timeout error.\n");
 	    DBG(DBG_ABNORM && DBG_DELAY, DELAY(1));
@@ -708,7 +708,7 @@ int eata_reset(Scsi_Cmnd * cmd, unsigned int resetflags)
 	return (SCSI_RESET_ERROR);
     }
     
-    while (inb((u32)(cmd->host->base) + HA_RAUXSTAT) & HA_ABUSY)
+    while (inb((u32)(cmd->device->host->base) + HA_RAUXSTAT) & HA_ABUSY)
 	if (--loop == 0) {
 	    printk("eata_reset: exit, timeout error.\n");
 	    restore_flags(flags);
@@ -716,7 +716,7 @@ int eata_reset(Scsi_Cmnd * cmd, unsigned int resetflags)
 	    return (SCSI_RESET_ERROR);
 	}
  
-    for (x = 0; x < cmd->host->can_queue; x++) {
+    for (x = 0; x < cmd->device->host->can_queue; x++) {
 	if (HD(cmd)->ccb[x].status == FREE)
 	    continue;
 
@@ -743,8 +743,8 @@ int eata_reset(Scsi_Cmnd * cmd, unsigned int resetflags)
     }
     
     /* hard reset the HBA  */
-    inb((u32) (cmd->host->base) + HA_RSTATUS);	/* This might cause trouble */
-    eata_send_command(0, (u32) cmd->host->base, EATA_CMD_RESET);
+    inb((u32) (cmd->device->host->base) + HA_RSTATUS);	/* This might cause trouble */
+    eata_send_command(0, (u32) cmd->device->host->base, EATA_CMD_RESET);
     
     HD(cmd)->state = RESET;
 
@@ -757,7 +757,7 @@ int eata_reset(Scsi_Cmnd * cmd, unsigned int resetflags)
     DBG(DBG_ABNORM, printk("eata_reset: interrupts disabled again.\n"));
     DBG(DBG_ABNORM && DBG_DELAY, DELAY(1));
     
-    for (x = 0; x < cmd->host->can_queue; x++) {
+    for (x = 0; x < cmd->device->host->can_queue; x++) {
 	
 	/* Skip slots already set free by interrupt and those that 
          * are still LOCKED from the last reset */

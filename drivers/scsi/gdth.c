@@ -2297,7 +2297,7 @@ static void gdth_putq(int hanum,Scsi_Cmnd *scp,unchar priority)
     GDTH_LOCK_HA(ha, flags);
 
     scp->SCp.this_residual = (int)priority;
-    b = virt_ctr ? NUMDATA(scp->host)->busnum : scp->device->channel;
+    b = virt_ctr ? NUMDATA(scp->device->host)->busnum : scp->device->channel;
     t = scp->device->id;
 #if LINUX_VERSION_CODE >= 0x010300
     if (priority >= DEFAULT_PRI) {
@@ -2358,7 +2358,7 @@ static void gdth_next(int hanum)
     for (nscp = pscp = ha->req_first; nscp; nscp = (Scsi_Cmnd *)nscp->SCp.ptr) {
         if (nscp != pscp && nscp != (Scsi_Cmnd *)pscp->SCp.ptr)
             pscp = (Scsi_Cmnd *)pscp->SCp.ptr;
-        b = virt_ctr ? NUMDATA(nscp->host)->busnum : nscp->device->channel;
+        b = virt_ctr ? NUMDATA(nscp->device->host)->busnum : nscp->device->channel;
         t = nscp->device->id;
         if (nscp->SCp.this_residual >= DEFAULT_PRI) {
             if ((b != ha->virt_bus && ha->raw[BUS_L2P(ha,b)].lock) ||
@@ -3340,7 +3340,7 @@ static void gdth_interrupt(int irq,struct pt_regs *regs)
     if (rval == 2) {
         gdth_putq(hanum,scp,scp->SCp.this_residual);
     } else if (rval == 1) {
-        GDTH_LOCK_SCSI_DONE(scp->host, flags);
+        GDTH_LOCK_SCSI_DONE(scp->device->host, flags);
         scp->scsi_done(scp);
         GDTH_UNLOCK_SCSI_DONE(scp->host,flags);
     }
@@ -3429,7 +3429,7 @@ static int gdth_sync_event(int hanum,int service,unchar index,Scsi_Cmnd *scp)
         printk("\n");
 
     } else {
-        b = virt_ctr ? NUMDATA(scp->host)->busnum : scp->device->channel;
+        b = virt_ctr ? NUMDATA(scp->device->host)->busnum : scp->device->channel;
         if (scp->SCp.sent_command == -1 && b != ha->virt_bus) {
             ha->raw[BUS_L2P(ha,b)].io_cnt[scp->device->id]--;
         }
@@ -4469,8 +4469,8 @@ int gdth_eh_bus_reset(Scsi_Cmnd *scp)
     unchar b;
 
     TRACE2(("gdth_eh_bus_reset()\n"));
-    hanum = NUMDATA(scp->host)->hanum;
-    b = virt_ctr ? NUMDATA(scp->host)->busnum : scp->device->channel;
+    hanum = NUMDATA(scp->device->host)->hanum;
+    b = virt_ctr ? NUMDATA(scp->device->host)->busnum : scp->device->channel;
     ha    = HADATA(gdth_ctr_tab[hanum]);
 
     /* clear command tab */
@@ -4561,7 +4561,7 @@ int gdth_queuecommand(Scsi_Cmnd *scp,void (*done)(Scsi_Cmnd *))
     scp->SCp.have_data_in = 1;
     scp->SCp.phase = -1;
     scp->SCp.sent_command = -1;
-    hanum = NUMDATA(scp->host)->hanum;
+    hanum = NUMDATA(scp->device->host)->hanum;
 #ifdef GDTH_STATISTICS
     ++act_ios;
 #endif

@@ -498,7 +498,7 @@ static int atp870u_queuecommand(Scsi_Cmnd * req_p, void (*done) (Scsi_Cmnd *))
 		return 0;
 	};
 
-	host = req_p->host;
+	host = req_p->device->host;
 	dev = (struct atp_unit *)&host->hostdata;
 	
 	m = 1;
@@ -2606,7 +2606,7 @@ int atp870u_abort(Scsi_Cmnd * SCpnt)
 	unsigned char j, k;
 	Scsi_Cmnd *workrequ;
 	unsigned int tmport;
-	struct atp_unit *dev = (struct atp_unit *)&SCpnt->host->hostdata;
+	struct atp_unit *dev = (struct atp_unit *)&SCpnt->device->host->hostdata;
 
 	printk(KERN_DEBUG "working=%x last_cmd=%x ", dev->working, dev->last_cmd);
 	printk(" quhdu=%x quendu=%x ", dev->quhdu, dev->quendu);

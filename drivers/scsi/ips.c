@@ -1417,7 +1417,7 @@ ips_eh_abort(Scsi_Cmnd *SC) {
    if (!SC)
       return (FAILED);
 
-   ha = (ips_ha_t *) SC->host->hostdata;
+   ha = (ips_ha_t *) SC->device->host->hostdata;
 
    if (!ha)
       return (FAILED);
@@ -1484,7 +1484,7 @@ ips_eh_reset(Scsi_Cmnd *SC) {
       return (FAILED);
    }
 
-   ha = (ips_ha_t *) SC->host->hostdata;
+   ha = (ips_ha_t *) SC->device->host->hostdata;
 
    if (!ha) {
       DEBUG(1, "Reset called with NULL ha struct");
@@ -1672,7 +1672,7 @@ ips_queue(Scsi_Cmnd *SC, void (*done) (Scsi_Cmnd *)) {
 
    METHOD_TRACE("ips_queue", 1);
 
-   ha = (ips_ha_t *) SC->host->hostdata;
+   ha = (ips_ha_t *) SC->device->host->hostdata;
 
    if (!ha)
       return (1);

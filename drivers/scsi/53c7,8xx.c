@@ -1996,7 +1996,7 @@ NCR53c8xx_run_tests (struct Scsi_Host *host) {
 static void 
 NCR53c8xx_dsa_fixup (struct NCR53c7x0_cmd *cmd) {
     Scsi_Cmnd *c = cmd->cmd;
-    struct Scsi_Host *host = c->host;
+    struct Scsi_Host *host = c->device->host;
     struct NCR53c7x0_hostdata *hostdata = (struct NCR53c7x0_hostdata *)
     	host->hostdata;
     int i;
@@ -2113,7 +2113,7 @@ run_process_issue_queue(void) {
 static void 
 abnormal_finished (struct NCR53c7x0_cmd *cmd, int result) {
     Scsi_Cmnd *c = cmd->cmd;
-    struct Scsi_Host *host = c->host;
+    struct Scsi_Host *host = c->device->host;
     struct NCR53c7x0_hostdata *hostdata = (struct NCR53c7x0_hostdata *)
     	host->hostdata;
     unsigned long flags;
@@ -3430,7 +3430,7 @@ NCR53c8x0_soft_reset (struct Scsi_Host *host) {
 
 static struct NCR53c7x0_cmd *
 allocate_cmd (Scsi_Cmnd *cmd) {
-    struct Scsi_Host *host = cmd->host;
+    struct Scsi_Host *host = cmd->device->host;
     struct NCR53c7x0_hostdata *hostdata = 
 	(struct NCR53c7x0_hostdata *) host->hostdata;
     void *real;			/* Real address */
@@ -3512,7 +3512,7 @@ allocate_cmd (Scsi_Cmnd *cmd) {
 static struct NCR53c7x0_cmd *
 create_cmd (Scsi_Cmnd *cmd) {
     NCR53c7x0_local_declare();
-    struct Scsi_Host *host = cmd->host;
+    struct Scsi_Host *host = cmd->device->host;
     struct NCR53c7x0_hostdata *hostdata = (struct NCR53c7x0_hostdata *)
         host->hostdata;	
     struct NCR53c7x0_cmd *tmp; 	/* NCR53c7x0_cmd structure for this command */
@@ -3527,7 +3527,7 @@ create_cmd (Scsi_Cmnd *cmd) {
     int msglen;			/* Length of whole select message */
 #endif
     unsigned long flags;
-    NCR53c7x0_local_setup(cmd->host);
+    NCR53c7x0_local_setup(cmd->device->host);
 
     if (!(tmp = allocate_cmd (cmd)))
 	return NULL;
@@ -3879,7 +3879,7 @@ create_cmd (Scsi_Cmnd *cmd) {
 
 int
 NCR53c7xx_queue_command (Scsi_Cmnd *cmd, void (* done)(Scsi_Cmnd *)) {
-    struct Scsi_Host *host = cmd->host;
+    struct Scsi_Host *host = cmd->device->host;
     struct NCR53c7x0_hostdata *hostdata = 
 	(struct NCR53c7x0_hostdata *) host->hostdata;
     unsigned long flags;
@@ -5465,7 +5465,7 @@ ncr_state (int state) {
 int 
 NCR53c7xx_abort (Scsi_Cmnd *cmd) {
     NCR53c7x0_local_declare();
-    struct Scsi_Host *host = cmd->host;
+    struct Scsi_Host *host = cmd->device->host;
     struct NCR53c7x0_hostdata *hostdata = host ? (struct NCR53c7x0_hostdata *) 
 	host->hostdata : NULL;
     unsigned long flags;
@@ -5575,7 +5575,7 @@ NCR53c7xx_abort (Scsi_Cmnd *cmd) {
 	    return SCSI_ABORT_NOT_RUNNING;
 	} else {
 	    printk ("scsi%d : DANGER : command running, can not abort.\n",
-		cmd->host->host_no);
+		cmd->device->host->host_no);
 	    restore_flags(flags);
 	    return SCSI_ABORT_BUSY;
 	}
@@ -5651,7 +5651,7 @@ NCR53c7xx_reset (Scsi_Cmnd *cmd, unsigned int reset_flags) {
      * each command.  
      */
     Scsi_Cmnd *nuke_list = NULL;
-    struct Scsi_Host *host = cmd->host;
+    struct Scsi_Host *host = cmd->device->host;
     struct NCR53c7x0_hostdata *hostdata = 
     	(struct NCR53c7x0_hostdata *) host->hostdata;
 
@@ -5722,7 +5722,7 @@ NCR53c7xx_reset (Scsi_Cmnd *cmd, unsigned int reset_flags) {
 static int 
 insn_to_offset (Scsi_Cmnd *cmd, u32 *insn) {
     struct NCR53c7x0_hostdata *hostdata = 
-	(struct NCR53c7x0_hostdata *) cmd->host->hostdata;
+	(struct NCR53c7x0_hostdata *) cmd->device->host->hostdata;
     struct NCR53c7x0_cmd *ncmd = 
 	(struct NCR53c7x0_cmd *) cmd->host_scribble;
     int offset = 0, buffers;
@@ -5790,7 +5790,7 @@ print_progress (Scsi_Cmnd *cmd) {
     int offset, i;
     char *where;
     u32 *ptr;
-    NCR53c7x0_local_setup (cmd->host);
+    NCR53c7x0_local_setup (cmd->device->host);
     for (i = 0; i < 2; ++i) {
 	if (check_address ((unsigned long) ncmd, 
 	    sizeof (struct NCR53c7x0_cmd)) == -1) 
@@ -5808,15 +5808,15 @@ print_progress (Scsi_Cmnd *cmd) {
 
 	if (offset != -1) 
 	    printk ("scsi%d : %s data pointer at offset %d\n",
-		cmd->host->host_no, where, offset);
+		cmd->device->host->host_no, where, offset);
 	else {
 	    int size;
 	    printk ("scsi%d : can't determine %s data pointer offset\n",
-		cmd->host->host_no, where);
+		cmd->device->host->host_no, where);
 	    if (ncmd) {
-		size = print_insn (cmd->host, 
+		size = print_insn (cmd->device->host, 
 		    bus_to_virt(le32_to_cpu(ncmd->saved_data_pointer)), "", 1);
-		print_insn (cmd->host, 
+		print_insn (cmd->device->host, 
 		    bus_to_virt(le32_to_cpu(ncmd->saved_data_pointer)) + size * sizeof(u32),
 		    "", 1);
 	    }

@@ -897,7 +897,7 @@ static __inline__ void run_main(void)
 static int AM53C974_queue_command(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *))
 {
 	unsigned long flags;
-	struct Scsi_Host *instance = cmd->host;
+	struct Scsi_Host *instance = cmd->device->host;
 	struct AM53C974_hostdata *hostdata = (struct AM53C974_hostdata *) instance->hostdata;
 	Scsi_Cmnd *tmp;
 
@@ -2279,7 +2279,7 @@ static int AM53C974_abort(Scsi_Cmnd * cmd)
 {
 	AM53C974_local_declare();
 	unsigned long flags;
-	struct Scsi_Host *instance = cmd->host;
+	struct Scsi_Host *instance = cmd->device->host;
 	struct AM53C974_hostdata *hostdata = (struct AM53C974_hostdata *) instance->hostdata;
 	Scsi_Cmnd *tmp, **prev;
 
@@ -2388,7 +2388,7 @@ static int AM53C974_reset(Scsi_Cmnd * cmd, unsigned int reset_flags)
 	AM53C974_local_declare();
 	unsigned long flags;
 	int i;
-	struct Scsi_Host *instance = cmd->host;
+	struct Scsi_Host *instance = cmd->device->host;
 	struct AM53C974_hostdata *hostdata = (struct AM53C974_hostdata *) instance->hostdata;
 	AM53C974_setio(instance);
 

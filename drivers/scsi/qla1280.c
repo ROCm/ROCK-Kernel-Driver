@@ -1157,7 +1157,7 @@ qla1280_queuecommand(Scsi_Cmnd * cmd, void (*fn) (Scsi_Cmnd *))
 	/*ENTER("qla1280_queuecommand");
 	 */
 
-	host = cmd->host;
+	host = cmd->device->host;
 	ha = (struct scsi_qla_host *)host->hostdata;
 
 	/* send command to adapter */
@@ -1232,8 +1232,8 @@ qla1280_abort(Scsi_Cmnd * cmd)
 	u16 data;
 
 	ENTER("qla1280_abort");
-	ha = (struct scsi_qla_host *)cmd->host->hostdata;
-	host = cmd->host;
+	ha = (struct scsi_qla_host *)cmd->device->host->hostdata;
+	host = cmd->device->host;
 
 	/* Get the SCSI request ptr */
 	sp = (srb_t *)CMD_SP(cmd);
@@ -1365,7 +1365,7 @@ qla1280_new_abort(Scsi_Cmnd * cmd)
 	u16 data;
 
 	ENTER("qla1280_abort");
-	host = cmd->host;
+	host = cmd->device->host;
 	ha = (struct scsi_qla_host *)host->hostdata;
 
 	/* Get the SCSI request ptr */
@@ -1523,7 +1523,7 @@ qla1280_reset(Scsi_Cmnd * cmd, unsigned int flags)
 		       "pointer, failing.\n");
 		return SCSI_RESET_SNOOZE;
 	}
-	ha = (struct scsi_qla_host *)cmd->host->hostdata;
+	ha = (struct scsi_qla_host *)cmd->device->host->hostdata;
 	sp = (srb_t *)CMD_SP(cmd);
 
 #if STOP_ON_RESET

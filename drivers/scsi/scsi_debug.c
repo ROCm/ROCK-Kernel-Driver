@@ -871,7 +871,7 @@ static struct sdebug_dev_info * devInfoReg(struct scsi_cmnd *scmd)
 		if ((devip->channel == scmd->device->channel) &&
 		    (devip->target == scmd->device->id) &&
 		    (devip->lun == scmd->device->lun) &&
-		    (devip->host == scmd->host))
+		    (devip->host == scmd->device->host))
 			return devip;
 	}
 	for (k = 0; k < scsi_debug_num_devs; ++k) {
@@ -880,7 +880,7 @@ static struct sdebug_dev_info * devInfoReg(struct scsi_cmnd *scmd)
 			devip->channel = scmd->device->channel;
 			devip->target = scmd->device->id;
 			devip->lun = scmd->device->lun;
-			devip->host = scmd->host;
+			devip->host = scmd->device->host;
 			devip->reset = 1;
 			devip->used = 1;
 			memset(devip->sense_buff, 0, SDEBUG_SENSE_LEN);
@@ -962,7 +962,7 @@ static int scsi_debug_bus_reset(struct scsi_cmnd * SCpnt)
 	if (SCSI_DEBUG_OPT_NOISE & scsi_debug_opts)
 		printk(KERN_INFO "scsi_debug: bus_reset\n");
 	++num_bus_resets;
-	if (SCpnt && ((sdp = SCpnt->device)) && ((hp = SCpnt->host))) {
+	if (SCpnt && ((sdp = SCpnt->device)) && ((hp = SCpnt->device->host))) {
 		for (k = 0; k < scsi_debug_num_devs; ++k) {
 			if (hp == devInfop[k].host)
 				devInfop[k].reset = 1;

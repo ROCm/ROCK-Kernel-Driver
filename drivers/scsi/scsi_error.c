@@ -149,18 +149,18 @@ void scsi_times_out(Scsi_Cmnd *scmd)
 
 	scsi_eh_eflags_set(scmd, SCSI_EH_CMD_TIMEOUT | SCSI_EH_CMD_ERR);
 
-	if( scmd->host->eh_wait == NULL ) {
+	if( scmd->device->host->eh_wait == NULL ) {
 		panic("Error handler thread not present at %p %p %s %d",
-		      scmd, scmd->host, __FILE__, __LINE__);
+		      scmd, scmd->device->host, __FILE__, __LINE__);
 	}
 
-	scsi_host_failed_inc_and_test(scmd->host);
+	scsi_host_failed_inc_and_test(scmd->device->host);
 
 	SCSI_LOG_TIMEOUT(3, printk("Command timed out active=%d busy=%d "
 				   " failed=%d\n",
-				   atomic_read(&scmd->host->host_active),
-				   scmd->host->host_busy,
-				   scmd->host->host_failed));
+				   atomic_read(&scmd->device->host->host_active),
+				   scmd->device->host->host_busy,
+				   scmd->device->host->host_failed));
 }
 
 /**
@@ -439,8 +439,8 @@ static void scsi_eh_times_out(Scsi_Cmnd *scmd)
 	SCSI_LOG_ERROR_RECOVERY(3, printk("%s: scmd:%p\n", __FUNCTION__,
 					  scmd));
 
-	if (scmd->host->eh_action != NULL)
-		up(scmd->host->eh_action);
+	if (scmd->device->host->eh_action != NULL)
+		up(scmd->device->host->eh_action);
 	else
 		printk("%s: eh_action NULL\n", __FUNCTION__);
 }
@@ -471,8 +471,8 @@ static void scsi_eh_done(Scsi_Cmnd *scmd)
 	SCSI_LOG_ERROR_RECOVERY(3, printk("%s scmd: %p result: %x\n",
 					  __FUNCTION__, scmd, scmd->result));
 
-	if (scmd->host->eh_action != NULL)
-		up(scmd->host->eh_action);
+	if (scmd->device->host->eh_action != NULL)
+		up(scmd->device->host->eh_action);
 }
 
 /**
@@ -490,7 +490,7 @@ static void scsi_eh_done(Scsi_Cmnd *scmd)
 static int scsi_send_eh_cmnd(Scsi_Cmnd *scmd, int timeout)
 {
 	unsigned long flags;
-	struct Scsi_Host *host = scmd->host;
+	struct Scsi_Host *host = scmd->device->host;
 	int rtn = SUCCESS;
 
 	ASSERT_LOCK(host->host_lock, 0);
@@ -513,16 +513,16 @@ static int scsi_send_eh_cmnd(Scsi_Cmnd *scmd, int timeout)
 		/*
 		 * set up the semaphore so we wait for the command to complete.
 		 */
-		scmd->host->eh_action = &sem;
+		scmd->device->host->eh_action = &sem;
 		scmd->request->rq_status = RQ_SCSI_BUSY;
 
-		spin_lock_irqsave(scmd->host->host_lock, flags);
+		spin_lock_irqsave(scmd->device->host->host_lock, flags);
 		host->hostt->queuecommand(scmd, scsi_eh_done);
-		spin_unlock_irqrestore(scmd->host->host_lock, flags);
+		spin_unlock_irqrestore(scmd->device->host->host_lock, flags);
 
 		down(&sem);
 
-		scmd->host->eh_action = NULL;
+		scmd->device->host->eh_action = NULL;
 
 		/*
 		 * see if timeout.  if so, tell the host to forget about it.
@@ -542,10 +542,10 @@ static int scsi_send_eh_cmnd(Scsi_Cmnd *scmd, int timeout)
 			 * abort a timed out command or not.  not sure how
 			 * we should treat them differently anyways.
 			 */
-			spin_lock_irqsave(scmd->host->host_lock, flags);
-			if (scmd->host->hostt->eh_abort_handler)
-				scmd->host->hostt->eh_abort_handler(scmd);
-			spin_unlock_irqrestore(scmd->host->host_lock, flags);
+			spin_lock_irqsave(scmd->device->host->host_lock, flags);
+			if (scmd->device->host->hostt->eh_abort_handler)
+				scmd->device->host->hostt->eh_abort_handler(scmd);
+			spin_unlock_irqrestore(scmd->device->host->host_lock, flags);
 			
 			scmd->request->rq_status = RQ_SCSI_DONE;
 			scmd->owner = SCSI_OWNER_ERROR_HANDLER;
@@ -613,7 +613,7 @@ static int scsi_request_sense(Scsi_Cmnd *scmd)
 	memcpy((void *) scmd->cmnd, (void *) generic_sense,
 	       sizeof(generic_sense));
 
-	scsi_result = (!scmd->host->hostt->unchecked_isa_dma)
+	scsi_result = (!scmd->device->host->hostt->unchecked_isa_dma)
 	    ? &scsi_result0[0] : kmalloc(512, GFP_ATOMIC | GFP_DMA);
 
 	if (scsi_result == NULL) {
@@ -803,7 +803,7 @@ static int scsi_try_to_abort_cmd(Scsi_Cmnd *scmd)
 	int rtn = FAILED;
 	unsigned long flags;
 
-	if (scmd->host->hostt->eh_abort_handler == NULL) {
+	if (scmd->device->host->hostt->eh_abort_handler == NULL) {
 		return rtn;
 	}
 	/*
@@ -815,9 +815,9 @@ static int scsi_try_to_abort_cmd(Scsi_Cmnd *scmd)
 
 	scmd->owner = SCSI_OWNER_LOWLEVEL;
 
-	spin_lock_irqsave(scmd->host->host_lock, flags);
-	rtn = scmd->host->hostt->eh_abort_handler(scmd);
-	spin_unlock_irqrestore(scmd->host->host_lock, flags);
+	spin_lock_irqsave(scmd->device->host->host_lock, flags);
+	rtn = scmd->device->host->hostt->eh_abort_handler(scmd);
+	spin_unlock_irqrestore(scmd->device->host->host_lock, flags);
 	return rtn;
 }
 
@@ -925,14 +925,14 @@ static int scsi_try_bus_device_reset(Scsi_Cmnd *scmd)
 	unsigned long flags;
 	int rtn = FAILED;
 
-	if (scmd->host->hostt->eh_device_reset_handler == NULL) {
+	if (scmd->device->host->hostt->eh_device_reset_handler == NULL) {
 		return rtn;
 	}
 	scmd->owner = SCSI_OWNER_LOWLEVEL;
 
-	spin_lock_irqsave(scmd->host->host_lock, flags);
-	rtn = scmd->host->hostt->eh_device_reset_handler(scmd);
-	spin_unlock_irqrestore(scmd->host->host_lock, flags);
+	spin_lock_irqsave(scmd->device->host->host_lock, flags);
+	rtn = scmd->device->host->hostt->eh_device_reset_handler(scmd);
+	spin_unlock_irqrestore(scmd->device->host->host_lock, flags);
 
 	if (rtn == SUCCESS) {
 		scmd->device->was_reset = 1;
@@ -1003,19 +1003,19 @@ static int scsi_try_bus_reset(Scsi_Cmnd *scmd)
 	scmd->owner = SCSI_OWNER_LOWLEVEL;
 	scmd->serial_number_at_timeout = scmd->serial_number;
 
-	if (scmd->host->hostt->eh_bus_reset_handler == NULL)
+	if (scmd->device->host->hostt->eh_bus_reset_handler == NULL)
 		return FAILED;
 
-	spin_lock_irqsave(scmd->host->host_lock, flags);
-	rtn = scmd->host->hostt->eh_bus_reset_handler(scmd);
-	spin_unlock_irqrestore(scmd->host->host_lock, flags);
+	spin_lock_irqsave(scmd->device->host->host_lock, flags);
+	rtn = scmd->device->host->hostt->eh_bus_reset_handler(scmd);
+	spin_unlock_irqrestore(scmd->device->host->host_lock, flags);
 
 	if (rtn == SUCCESS) {
 		scsi_sleep(BUS_RESET_SETTLE_TIME);
 		/*
 		 * Mark all affected devices to expect a unit attention.
 		 */
-		list_for_each_entry(sdev, &scmd->host->my_devices, siblings)
+		list_for_each_entry(sdev, &scmd->device->host->my_devices, siblings)
 			if (scmd->device->channel == sdev->channel) {
 				sdev->was_reset = 1;
 				sdev->expecting_cc_ua = 1;
@@ -1039,19 +1039,19 @@ static int scsi_try_host_reset(Scsi_Cmnd *scmd)
 	scmd->owner = SCSI_OWNER_LOWLEVEL;
 	scmd->serial_number_at_timeout = scmd->serial_number;
 
-	if (scmd->host->hostt->eh_host_reset_handler == NULL)
+	if (scmd->device->host->hostt->eh_host_reset_handler == NULL)
 		return FAILED;
 
-	spin_lock_irqsave(scmd->host->host_lock, flags);
-	rtn = scmd->host->hostt->eh_host_reset_handler(scmd);
-	spin_unlock_irqrestore(scmd->host->host_lock, flags);
+	spin_lock_irqsave(scmd->device->host->host_lock, flags);
+	rtn = scmd->device->host->hostt->eh_host_reset_handler(scmd);
+	spin_unlock_irqrestore(scmd->device->host->host_lock, flags);
 
 	if (rtn == SUCCESS) {
 		scsi_sleep(HOST_RESET_SETTLE_TIME);
 		/*
 		 * Mark all affected devices to expect a unit attention.
 		 */
-		list_for_each_entry(sdev, &scmd->host->my_devices, siblings)
+		list_for_each_entry(sdev, &scmd->device->host->my_devices, siblings)
 			if (scmd->device->channel == sdev->channel) {
 				sdev->was_reset = 1;
 				sdev->expecting_cc_ua = 1;
@@ -1348,7 +1348,7 @@ int scsi_decide_disposition(Scsi_Cmnd *scmd)
 
 	case RESERVATION_CONFLICT:
 		printk("scsi%d (%d,%d,%d) : reservation conflict\n",
-		       scmd->host->host_no, scmd->device->channel,
+		       scmd->device->host->host_no, scmd->device->channel,
 		       scmd->device->id, scmd->device->lun);
 		return SUCCESS; /* causes immediate i/o error */
 	default:
@@ -1764,7 +1764,6 @@ scsi_reset_provider(Scsi_Device *dev, int flag)
 
 	SCpnt->request = &req;
 	memset(&SCpnt->eh_timeout, 0, sizeof(SCpnt->eh_timeout));
-	SCpnt->host                    	= dev->host;
 	SCpnt->device                  	= dev;
 	SCpnt->request->rq_status      	= RQ_SCSI_BUSY;
 	SCpnt->request->waiting        	= NULL;

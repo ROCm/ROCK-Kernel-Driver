@@ -1118,7 +1118,7 @@ int print_msg (const unsigned char *msg) {
 
 void print_Scsi_Cmnd (Scsi_Cmnd *cmd) {
     printk("scsi%d : destination target %d, lun %d\n", 
-	   cmd->host->host_no, 
+	   cmd->device->host->host_no, 
 	   cmd->device->id, 
 	   cmd->device->lun);
     printk("        command = ");

@@ -157,7 +157,7 @@ static void eata_pio_int_handler(int irq, void *dev_id, struct pt_regs *regs)
 
 		cp = &hd->ccb[0];
 		cmd = cp->cmd;
-		base = (uint) cmd->host->base;
+		base = (uint) cmd->device->host->base;
 
 		do {
 			stat = inb(base + HA_RSTATUS);
@@ -286,7 +286,7 @@ static int eata_pio_queue(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *))
 	queue_counter++;
 
 	hd = HD(cmd);
-	sh = cmd->host;
+	sh = cmd->device->host;
 	base = (uint) sh->base;
 
 	/* use only slot 0, as 2001 can handle only one cmd at a time */
@@ -378,7 +378,7 @@ static int eata_pio_abort(Scsi_Cmnd * cmd)
 	DBG(DBG_ABNORM, printk(KERN_WARNING "eata_pio_abort called pid: %ld " "target: %x lun: %x reason %x\n", cmd->pid, cmd->device->id, cmd->device->lun, cmd->abort_reason));
 
 
-	while (inb(cmd->host->base + HA_RAUXSTAT) & HA_ABUSY)
+	while (inb(cmd->device->host->base + HA_RAUXSTAT) & HA_ABUSY)
 		if (--loop == 0) {
 			printk(KERN_WARNING "eata_pio: abort, timeout error.\n");
 			return FAILED;
@@ -408,7 +408,7 @@ static int eata_pio_host_reset(Scsi_Cmnd * cmd)
 	uint x, limit = 0;
 	unsigned char success = FALSE;
 	Scsi_Cmnd *sp;
-	struct Scsi_Host *host = cmd->host;
+	struct Scsi_Host *host = cmd->device->host;
 
 	DBG(DBG_ABNORM, printk(KERN_WARNING "eata_pio_reset called pid:%ld target:" " %x lun: %x reason %x\n", cmd->pid, cmd->device->id, cmd->device->lun, cmd->abort_reason));
 
@@ -419,7 +419,7 @@ static int eata_pio_host_reset(Scsi_Cmnd * cmd)
 
 	/* force all slots to be free */
 
-	for (x = 0; x < cmd->host->can_queue; x++) {
+	for (x = 0; x < cmd->device->host->can_queue; x++) {
 
 		if (HD(cmd)->ccb[x].status == FREE)
 			continue;
@@ -433,7 +433,7 @@ static int eata_pio_host_reset(Scsi_Cmnd * cmd)
 	}
 
 	/* hard reset the HBA  */
-	outb(EATA_CMD_RESET, (uint) cmd->host->base + HA_WCOMMAND);
+	outb(EATA_CMD_RESET, (uint) cmd->device->host->base + HA_WCOMMAND);
 
 	DBG(DBG_ABNORM, printk(KERN_WARNING "eata_pio_reset: board reset done.\n"));
 	HD(cmd)->state = RESET;
@@ -445,7 +445,7 @@ static int eata_pio_host_reset(Scsi_Cmnd * cmd)
 
 	DBG(DBG_ABNORM, printk(KERN_WARNING "eata_pio_reset: interrupts disabled, " "loops %d.\n", limit));
 
-	for (x = 0; x < cmd->host->can_queue; x++) {
+	for (x = 0; x < cmd->device->host->can_queue; x++) {
 
 		/* Skip slots already set free by interrupt */
 		if (HD(cmd)->ccb[x].status != RESET)

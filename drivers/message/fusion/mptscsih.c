@@ -1594,8 +1594,8 @@ mptscsih_report_queue_full(Scsi_Cmnd *sc, SCSIIOReply_t *pScsiReply, SCSIIOReque
 	if (time - last_queue_full > 10 * HZ) {
 		char *ioc_str = "ioc?";
 
-		if (sc->host != NULL && sc->host->hostdata != NULL)
-			ioc_str = ((MPT_SCSI_HOST *)sc->host->hostdata)->ioc->name;
+		if (sc->device && sc->device->host != NULL && sc->device->host->hostdata != NULL)
+			ioc_str = ((MPT_SCSI_HOST *)sc->device->host->hostdata)->ioc->name;
 		printk(MYIOC_s_WARN_FMT "Device (%d:%d:%d) reported QUEUE_FULL!\n",
 				ioc_str, 0, sc->device->id, sc->device->lun);
 		last_queue_full = time;
@@ -2576,7 +2576,7 @@ mptscsih_qcmd(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 	int	 issueCmd;
 
 	did_errcode = 0;
-	hd = (MPT_SCSI_HOST *) SCpnt->host->hostdata;
+	hd = (MPT_SCSI_HOST *) SCpnt->device->host->hostdata;
 	target = SCpnt->device->id;
 	lun = SCpnt->device->lun;
 	SCpnt->scsi_done = done;
@@ -3159,7 +3159,7 @@ mptscsih_abort(Scsi_Cmnd * SCpnt)
 
 	/* If we can't locate our host adapter structure, return FAILED status.
 	 */
-	if ((hd = (MPT_SCSI_HOST *) SCpnt->host->hostdata) == NULL) {
+	if ((hd = (MPT_SCSI_HOST *) SCpnt->device->host->hostdata) == NULL) {
 		SCpnt->result = DID_RESET << 16;
 		SCpnt->scsi_done(SCpnt);
 		nehprintk((KERN_WARNING MYNAM ": mptscsih_abort: "
@@ -3263,7 +3263,7 @@ mptscsih_dev_reset(Scsi_Cmnd * SCpnt)
 
 	/* If we can't locate our host adapter structure, return FAILED status.
 	 */
-	if ((hd = (MPT_SCSI_HOST *) SCpnt->host->hostdata) == NULL){
+	if ((hd = (MPT_SCSI_HOST *) SCpnt->device->host->hostdata) == NULL){
 		nehprintk((KERN_WARNING MYNAM ": mptscsih_dev_reset: "
 			   "Can't locate host! (sc=%p)\n",
 			   SCpnt));
@@ -3323,7 +3323,7 @@ mptscsih_bus_reset(Scsi_Cmnd * SCpnt)
 
 	/* If we can't locate our host adapter structure, return FAILED status.
 	 */
-	if ((hd = (MPT_SCSI_HOST *) SCpnt->host->hostdata) == NULL){
+	if ((hd = (MPT_SCSI_HOST *) SCpnt->device->host->hostdata) == NULL){
 		nehprintk((KERN_WARNING MYNAM ": mptscsih_bus_reset: "
 			   "Can't locate host! (sc=%p)\n",
 			   SCpnt ) );
@@ -3385,7 +3385,7 @@ mptscsih_host_reset(Scsi_Cmnd *SCpnt)
 	int              status = SUCCESS;
 
 	/*  If we can't locate the host to reset, then we failed. */
-	if ((hd = (MPT_SCSI_HOST *) SCpnt->host->hostdata) == NULL){
+	if ((hd = (MPT_SCSI_HOST *) SCpnt->device->host->hostdata) == NULL){
 		nehprintk( ( KERN_WARNING MYNAM ": mptscsih_host_reset: "
 			     "Can't locate host! (sc=%p)\n",
 			     SCpnt ) );
@@ -4261,7 +4261,7 @@ SCPNT_TO_LOOKUP_IDX(Scsi_Cmnd *sc)
 	MPT_SCSI_HOST *hd;
 	int i;
 
-	hd = (MPT_SCSI_HOST *) sc->host->hostdata;
+	hd = (MPT_SCSI_HOST *) sc->device->host->hostdata;
 
 	for (i = 0; i < hd->ioc->req_depth; i++) {
 		if (hd->ScsiLookup[i] == sc) {

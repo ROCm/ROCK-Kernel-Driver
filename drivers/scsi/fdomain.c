@@ -1252,9 +1252,9 @@ static void do_fdomain_16x0_intr( int irq, void *dev_id, struct pt_regs * regs )
 #if EVERY_ACCESS
 	 printk( " AFAIL " );
 #endif
-         spin_lock_irqsave(current_SC->host->host_lock, flags);
+         spin_lock_irqsave(current_SC->device->host->host_lock, flags);
 	 my_done( DID_BUS_BUSY << 16 );
-         spin_unlock_irqrestore(current_SC->host->host_lock, flags);
+         spin_unlock_irqrestore(current_SC->device->host->host_lock, flags);
 	 return;
       }
       current_SC->SCp.phase = in_selection;
@@ -1278,9 +1278,9 @@ static void do_fdomain_16x0_intr( int irq, void *dev_id, struct pt_regs * regs )
 #if EVERY_ACCESS
 	    printk( " SFAIL " );
 #endif
-            spin_lock_irqsave(current_SC->host->host_lock, flags);
+            spin_lock_irqsave(current_SC->device->host->host_lock, flags);
 	    my_done( DID_NO_CONNECT << 16 );
-            spin_unlock_irqrestore(current_SC->host->host_lock, flags);
+            spin_unlock_irqrestore(current_SC->device->host->host_lock, flags);
 	    return;
 	 } else {
 #if EVERY_ACCESS
@@ -1476,10 +1476,10 @@ static void do_fdomain_16x0_intr( int irq, void *dev_id, struct pt_regs * regs )
 #if EVERY_ACCESS
       printk( "BEFORE MY_DONE. . ." );
 #endif
-      spin_lock_irqsave(current_SC->host->host_lock, flags);
+      spin_lock_irqsave(current_SC->device->host->host_lock, flags);
       my_done( (current_SC->SCp.Status & 0xff)
 	       | ((current_SC->SCp.Message & 0xff) << 8) | (DID_OK << 16) );
-      spin_unlock_irqrestore(current_SC->host->host_lock, flags);
+      spin_unlock_irqrestore(current_SC->device->host->host_lock, flags);
 #if EVERY_ACCESS
       printk( "RETURNING.\n" );
 #endif
@@ -1580,13 +1580,13 @@ static void print_info(Scsi_Cmnd *SCpnt)
    unsigned int irr;
    unsigned int isr;
 
-   if (!SCpnt || !SCpnt->host) {
+   if (!SCpnt || !SCpnt->device || !SCpnt->device->host) {
       printk(KERN_WARNING "scsi: <fdomain> Cannot provide detailed information\n");
       return;
    }
    
-   printk(KERN_INFO "%s\n", fdomain_16x0_info( SCpnt->host ) );
-   print_banner(SCpnt->host);
+   printk(KERN_INFO "%s\n", fdomain_16x0_info( SCpnt->device->host ) );
+   print_banner(SCpnt->device->host);
    switch (SCpnt->SCp.phase) {
    case in_arbitration: printk("arbitration"); break;
    case in_selection:   printk("selection");   break;

@@ -532,8 +532,8 @@ static void nsp32_start_timer(Scsi_Cmnd *SCpnt, int time)
  */
 static int nsp32hw_start_selection(Scsi_Cmnd *SCpnt, nsp32_hw_data *data)
 {
-	unsigned int   host_id = SCpnt->host->this_id;
-	unsigned int   base    = SCpnt->host->io_port;
+	unsigned int   host_id = SCpnt->device->host->this_id;
+	unsigned int   base    = SCpnt->device->host->io_port;
 	unsigned char  target  = SCpnt->device->id;
 	unsigned char  *param  = data->autoparam;
 	unsigned char  phase, arbit;
@@ -1021,7 +1021,7 @@ static int nsp32hw_setup_sg_table(Scsi_Cmnd *SCpnt, nsp32_hw_data *data)
 
 static int nsp32_queuecommand(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 {
-	nsp32_hw_data *data = (nsp32_hw_data *)SCpnt->host->hostdata;
+	nsp32_hw_data *data = (nsp32_hw_data *)SCpnt->device->host->hostdata;
 	struct nsp32_target *target;
 	struct nsp32_lunt *curlunt;
 	int ret;
@@ -1920,7 +1920,7 @@ static int nsp32_reset(Scsi_Cmnd *SCpnt, unsigned int reset_flags)
 
 static int nsp32_eh_abort(Scsi_Cmnd *SCpnt)
 {
-	nsp32_hw_data *data = (nsp32_hw_data *)SCpnt->host->hostdata;
+	nsp32_hw_data *data = (nsp32_hw_data *)SCpnt->device->host->hostdata;
 	unsigned int base = data->BaseAddress;
 
 	nsp32_msg(KERN_WARNING, "abort");
@@ -1942,7 +1942,7 @@ static int nsp32_eh_abort(Scsi_Cmnd *SCpnt)
 
 static int nsp32_eh_bus_reset(Scsi_Cmnd *SCpnt)
 {
-	nsp32_hw_data *data = (nsp32_hw_data *)SCpnt->host->hostdata;
+	nsp32_hw_data *data = (nsp32_hw_data *)SCpnt->device->host->hostdata;
 	unsigned int base = data->BaseAddress;
 
 	nsp32_msg(KERN_INFO, "Bus Reset");	
@@ -1997,7 +1997,7 @@ static void nsp32_do_bus_reset(nsp32_hw_data *data)
 
 static int nsp32_eh_host_reset(Scsi_Cmnd *SCpnt)
 {
-	struct Scsi_Host *host = SCpnt->host;
+	struct Scsi_Host *host = SCpnt->device->host;
 	nsp32_hw_data *data = (nsp32_hw_data *)host->hostdata;
 	unsigned int base = data->BaseAddress;
 

@@ -342,7 +342,7 @@ static int usb_stor_control_thread(void * __us)
 			US_DEBUGP("-- exit command received\n");
 			break;
 		}
-		host = us->srb->host;
+		host = us->srb->device->host;
 
 		/* lock access to the state */
 		scsi_lock(host);

@@ -10298,7 +10298,7 @@ aic7xxx_queue(Scsi_Cmnd *cmd, void (*fn)(Scsi_Cmnd *))
   struct aic7xxx_scb *scb;
   struct aic_dev_data *aic_dev;
 
-  p = (struct aic7xxx_host *) cmd->host->hostdata;
+  p = (struct aic7xxx_host *) cmd->device->host->hostdata;
 
   aic_dev = cmd->device->hostdata;  
 #ifdef AIC7XXX_VERBOSE_DEBUGGING
@@ -10379,7 +10379,7 @@ aic7xxx_bus_device_reset(Scsi_Cmnd *cmd)
     printk(KERN_ERR "aic7xxx_bus_device_reset: called with NULL cmd!\n");
     return FAILED;
   }
-  p = (struct aic7xxx_host *)cmd->host->hostdata;
+  p = (struct aic7xxx_host *)cmd->device->host->hostdata;
   aic_dev = AIC_DEV(cmd);
   if(aic7xxx_position(cmd) < p->scb_data->numscbs)
     scb = (p->scb_data->scb_array[aic7xxx_position(cmd)]);
@@ -10604,7 +10604,7 @@ aic7xxx_abort(Scsi_Cmnd *cmd)
     printk(KERN_ERR "aic7xxx_abort: called with NULL cmd!\n");
     return FAILED;
   }
-  p = (struct aic7xxx_host *)cmd->host->hostdata;
+  p = (struct aic7xxx_host *)cmd->device->host->hostdata;
   aic_dev = AIC_DEV(cmd);
   if(aic7xxx_position(cmd) < p->scb_data->numscbs)
     scb = (p->scb_data->scb_array[aic7xxx_position(cmd)]);
@@ -10825,7 +10825,7 @@ aic7xxx_reset(Scsi_Cmnd *cmd)
   struct aic7xxx_host *p;
   struct aic_dev_data *aic_dev;
 
-  p = (struct aic7xxx_host *) cmd->host->hostdata;
+  p = (struct aic7xxx_host *) cmd->device->host->hostdata;
   aic_dev = AIC_DEV(cmd);
   if(aic7xxx_position(cmd) < p->scb_data->numscbs)
   {

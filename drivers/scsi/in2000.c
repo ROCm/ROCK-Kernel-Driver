@@ -343,7 +343,7 @@ static int in2000_queuecommand(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *))
 	struct IN2000_hostdata *hostdata;
 	Scsi_Cmnd *tmp;
 
-	instance = cmd->host;
+	instance = cmd->device->host;
 	hostdata = (struct IN2000_hostdata *) instance->hostdata;
 
 	DB(DB_QUEUE_COMMAND, printk("Q-%d-%02x-%ld(", cmd->device->id, cmd->cmnd[0], cmd->pid))
@@ -428,7 +428,7 @@ static int in2000_queuecommand(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *))
  * Go see if any of them are runnable!
  */
 
-	in2000_execute(cmd->host);
+	in2000_execute(cmd->device->host);
 
 	DB(DB_QUEUE_COMMAND, printk(")Q-%ld ", cmd->pid))
 	    return 0;
@@ -753,7 +753,7 @@ static void transfer_bytes(Scsi_Cmnd * cmd, int data_in_dir)
 	unsigned short f;
 	int i;
 
-	hostdata = (struct IN2000_hostdata *) cmd->host->hostdata;
+	hostdata = (struct IN2000_hostdata *) cmd->device->host->hostdata;
 
 /* Normally, you'd expect 'this_residual' to be non-zero here.
  * In a series of scatter-gather transfers, however, this
@@ -1648,7 +1648,7 @@ static int in2000_bus_reset(Scsi_Cmnd * cmd)
 	struct IN2000_hostdata *hostdata;
 	int x;
 
-	instance = cmd->host;
+	instance = cmd->device->host;
 	hostdata = (struct IN2000_hostdata *) instance->hostdata;
 
 	printk(KERN_WARNING "scsi%d: Reset. ", instance->host_no);
@@ -1693,7 +1693,7 @@ static int in2000_abort(Scsi_Cmnd * cmd)
 	uchar sr, asr;
 	unsigned long timeout;
 
-	instance = cmd->host;
+	instance = cmd->device->host;
 	hostdata = (struct IN2000_hostdata *) instance->hostdata;
 
 	printk(KERN_DEBUG "scsi%d: Abort-", instance->host_no);

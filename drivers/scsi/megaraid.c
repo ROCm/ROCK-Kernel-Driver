@@ -3535,7 +3535,7 @@ int megaraid_queue (Scsi_Cmnd * SCpnt, void (*pktComp) (Scsi_Cmnd *))
 	mega_scb *pScb;
 	char *user_area = NULL;
 
-	megaCfg = (mega_host_config *) SCpnt->host->hostdata;
+	megaCfg = (mega_host_config *) SCpnt->device->host->hostdata;
 	DRIVER_LOCK (megaCfg);
 
 	if (!(megaCfg->flag & (1L << SCpnt->device->channel))) {
@@ -3698,7 +3698,7 @@ int megaraid_abort (Scsi_Cmnd * SCpnt)
 
 	rc = SCSI_ABORT_NOT_RUNNING;
 
-	megaCfg = (mega_host_config *) SCpnt->host->hostdata;
+	megaCfg = (mega_host_config *) SCpnt->device->host->hostdata;
 
 	megaCfg->flag |= IN_ABORT;
 
@@ -3796,7 +3796,7 @@ int megaraid_reset (Scsi_Cmnd * SCpnt, unsigned int rstflags)
 	mega_scb *pScb;
 
 	rc = SCSI_RESET_NOT_RUNNING;
-	megaCfg = (mega_host_config *) SCpnt->host->hostdata;
+	megaCfg = (mega_host_config *) SCpnt->device->host->hostdata;
 
 	megaCfg->flag |= IN_RESET;
 

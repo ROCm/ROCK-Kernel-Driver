@@ -1640,7 +1640,7 @@ static int eata2x_queuecommand(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *)) {
    struct mscp *cpp;
 
    /* j is the board number */
-   j = ((struct hostdata *) SCpnt->host->hostdata)->board_number;
+   j = ((struct hostdata *) SCpnt->device->host->hostdata)->board_number;
 
    if (SCpnt->host_scribble)
       panic("%s: qcomm, pid %ld, SCpnt %p already active.\n",
@@ -1722,7 +1722,7 @@ static int eata2x_queuecommand(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *)) {
 static int eata2x_eh_abort(Scsi_Cmnd *SCarg) {
    unsigned int i, j;
 
-   j = ((struct hostdata *) SCarg->host->hostdata)->board_number;
+   j = ((struct hostdata *) SCarg->device->host->hostdata)->board_number;
 
    if (SCarg->host_scribble == NULL) {
       printk("%s: abort, target %d.%d:%d, pid %ld inactive.\n",
@@ -1798,7 +1798,7 @@ static int eata2x_eh_host_reset(Scsi_Cmnd *SCarg) {
    int arg_done = FALSE;
    Scsi_Cmnd *SCpnt;
 
-   j = ((struct hostdata *) SCarg->host->hostdata)->board_number;
+   j = ((struct hostdata *) SCarg->device->host->hostdata)->board_number;
    printk("%s: reset, enter, target %d.%d:%d, pid %ld.\n",
           BN(j), SCarg->device->channel, SCarg->device->id, SCarg->device->lun, SCarg->pid);
 

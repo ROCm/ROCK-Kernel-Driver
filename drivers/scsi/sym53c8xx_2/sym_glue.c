@@ -330,7 +330,7 @@ typedef struct sym_ucmd *ucmd_p;
 
 #define SYM_UCMD_PTR(cmd)  ((ucmd_p)(&(cmd)->SCp))
 #define SYM_SCMD_PTR(ucmd) sym_que_entry(ucmd, Scsi_Cmnd, SCp)
-#define SYM_SOFTC_PTR(cmd) (((struct host_data *)cmd->host->hostdata)->ncb)
+#define SYM_SOFTC_PTR(cmd) (((struct host_data *)cmd->device->host->hostdata)->ncb)
 
 /*
  *  Deal with DMA mapping/unmapping.

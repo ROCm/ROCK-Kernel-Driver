@@ -1148,7 +1148,7 @@ int isp2x00_queuecommand(Scsi_Cmnd * Cmnd, void (*done) (Scsi_Cmnd *))
 
 	ENTER("isp2x00_queuecommand");
 
-	host = Cmnd->host;
+	host = Cmnd->device->host;
 	hostdata = (struct isp2x00_hostdata *) host->hostdata;
 	Cmnd->scsi_done = done;
 
@@ -1709,7 +1709,7 @@ int isp2x00_abort(Scsi_Cmnd * Cmnd)
 
 	ENTER("isp2x00_abort");
 
-	host = Cmnd->host;
+	host = Cmnd->device->host;
 	hostdata = (struct isp2x00_hostdata *) host->hostdata;
 
 	for (i = 0; i < QLOGICFC_REQ_QUEUE_LEN; i++)
@@ -1766,7 +1766,7 @@ int isp2x00_reset(Scsi_Cmnd * Cmnd, unsigned int reset_flags)
 
 	ENTER("isp2x00_reset");
 
-	host = Cmnd->host;
+	host = Cmnd->device->host;
 	hostdata = (struct isp2x00_hostdata *) host->hostdata;
 	param[0] = MBOX_BUS_RESET;
 	param[1] = 3;

@@ -829,7 +829,7 @@ static void sbp2util_free_command_dma(struct sbp2_command_info *command)
 {
 	struct sbp2scsi_host_info *hi;
 	
-	hi = (struct sbp2scsi_host_info *) command->Current_SCpnt->host->hostdata[0];
+	hi = (struct sbp2scsi_host_info *) command->Current_SCpnt->device->host->hostdata[0];
 
 	if (hi == NULL) {
 		printk(KERN_ERR "%s: hi == NULL\n", __FUNCTION__);
@@ -2659,7 +2659,7 @@ static int sbp2scsi_queuecommand (Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 	/*
 	 * Pull our host info and scsi id instance data from the scsi command
 	 */
-	hi = (struct sbp2scsi_host_info *) SCpnt->host->hostdata[0];
+	hi = (struct sbp2scsi_host_info *) SCpnt->device->host->hostdata[0];
 
 	if (!hi) {
 		SBP2_ERR("sbp2scsi_host_info is NULL - this is bad!");
@@ -2882,7 +2882,7 @@ static void sbp2scsi_complete_command(struct sbp2scsi_host_info *hi, struct scsi
  */
 static int sbp2scsi_abort (Scsi_Cmnd *SCpnt) 
 {
-	struct sbp2scsi_host_info *hi = (struct sbp2scsi_host_info *) SCpnt->host->hostdata[0];
+	struct sbp2scsi_host_info *hi = (struct sbp2scsi_host_info *) SCpnt->device->host->hostdata[0];
 	struct scsi_id_instance_data *scsi_id = hi->scsi_id[SCpnt->device->id];
 	struct sbp2_command_info *command;
 	unsigned long flags;
@@ -2932,7 +2932,7 @@ static int sbp2scsi_abort (Scsi_Cmnd *SCpnt)
  */
 static int sbp2scsi_reset (Scsi_Cmnd *SCpnt) 
 {
-	struct sbp2scsi_host_info *hi = (struct sbp2scsi_host_info *) SCpnt->host->hostdata[0];
+	struct sbp2scsi_host_info *hi = (struct sbp2scsi_host_info *) SCpnt->device->host->hostdata[0];
 	struct scsi_id_instance_data *scsi_id = hi->scsi_id[SCpnt->device->id];
 
 	SBP2_ERR("reset requested");

@@ -998,7 +998,7 @@ void usb_stor_abort_transport(struct us_data *us)
 
 	/* set state to abort and release the lock */
 	atomic_set(&us->sm_state, US_STATE_ABORTING);
-	host = us->srb->host;
+	host = us->srb->device->host;
 	scsi_unlock(host);
 
 	/* If the state machine is blocked waiting for an URB,

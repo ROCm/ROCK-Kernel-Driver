@@ -365,7 +365,7 @@ static void scsi_dump_status(int level)
 				printk(KERN_INFO "(%3d) %2d:%1d:%2d:%2d (%6s %4llu %4ld %4ld %4x %1d) (%1d %1d 0x%2x) (%4d %4d %4d) 0x%2.2x 0x%2.2x 0x%8.8x\n",
 				       i++,
 
-				       SCpnt->host->host_no,
+				       SCpnt->device->host->host_no,
 				       SCpnt->device->channel,
                                        SCpnt->device->id,
                                        SCpnt->device->lun,

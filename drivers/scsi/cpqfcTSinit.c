@@ -1299,7 +1299,7 @@ static void QueBadTargetCmnd( CPQFCHBA *cpqfcHBAdata, Scsi_Cmnd *Cmnd)
 
 int cpqfcTS_queuecommand(Scsi_Cmnd *Cmnd, void (* done)(Scsi_Cmnd *))
 {
-  struct Scsi_Host *HostAdapter = Cmnd->host;
+  struct Scsi_Host *HostAdapter = Cmnd->device->host;
   CPQFCHBA *cpqfcHBAdata = (CPQFCHBA *)HostAdapter->hostdata;
   PTACHYON fcChip = &cpqfcHBAdata->fcChip;
   TachFCHDR_GCMND fchs;  // only use for FC destination id field  
@@ -1477,7 +1477,7 @@ int cpqfcTS_abort(Scsi_Cmnd *Cmnd)
 int cpqfcTS_eh_abort(Scsi_Cmnd *Cmnd)
 {
 
-  struct Scsi_Host *HostAdapter = Cmnd->host;
+  struct Scsi_Host *HostAdapter = Cmnd->device->host;
   // get the pointer to our Scsi layer HBA buffer  
   CPQFCHBA *cpqfcHBAdata = (CPQFCHBA *)HostAdapter->hostdata;
   PTACHYON fcChip = &cpqfcHBAdata->fcChip;
@@ -1670,9 +1670,9 @@ int cpqfcTS_eh_device_reset(Scsi_Cmnd *Cmnd)
   int retval;
   Scsi_Device *SDpnt = Cmnd->device;
   // printk("   ENTERING cpqfcTS_eh_device_reset() \n");
-  spin_unlock_irq(Cmnd->host->host_lock);
+  spin_unlock_irq(Cmnd->device->host->host_lock);
   retval = cpqfcTS_TargetDeviceReset( SDpnt, 0);
-  spin_lock_irq(Cmnd->host->host_lock);
+  spin_lock_irq(Cmnd->device->host->host_lock);
   return retval;
 }
 

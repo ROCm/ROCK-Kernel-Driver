@@ -728,7 +728,6 @@ struct scsi_request {
 struct scsi_cmnd {
 	int     sc_magic;
 
-	struct Scsi_Host   *host;
 	struct scsi_device *device;
 	unsigned short state;
 	unsigned short owner;
@@ -776,6 +775,8 @@ struct scsi_cmnd {
 /* 	unsigned int target; */
 /* 	unsigned int lun; */
 /* 	unsigned int channel; */
+/* OBSOLETE, use cmd->device->host instead */	
+/* 	struct Scsi_Host   *host; */
 
 	unsigned char cmd_len;
 	unsigned char old_cmd_len;

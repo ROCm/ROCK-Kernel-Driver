@@ -141,7 +141,7 @@ static int command( Scsi_Cmnd *srb )
 /* This is always called with scsi_lock(srb->host) held */
 static int queuecommand( Scsi_Cmnd *srb , void (*done)(Scsi_Cmnd *))
 {
-	struct us_data *us = (struct us_data *)srb->host->hostdata[0];
+	struct us_data *us = (struct us_data *)srb->device->host->hostdata[0];
 
 	US_DEBUGP("queuecommand() called\n");
 	srb->host_scribble = (unsigned char *)us;
@@ -166,7 +166,7 @@ static int queuecommand( Scsi_Cmnd *srb , void (*done)(Scsi_Cmnd *))
 /* This is always called with scsi_lock(srb->host) held */
 static int command_abort( Scsi_Cmnd *srb )
 {
-	struct us_data *us = (struct us_data *)srb->host->hostdata[0];
+	struct us_data *us = (struct us_data *)srb->device->host->hostdata[0];
 
 	US_DEBUGP("command_abort() called\n");
 
@@ -185,7 +185,7 @@ static int command_abort( Scsi_Cmnd *srb )
 /* This is always called with scsi_lock(srb->host) held */
 static int device_reset( Scsi_Cmnd *srb )
 {
-	struct us_data *us = (struct us_data *)srb->host->hostdata[0];
+	struct us_data *us = (struct us_data *)srb->device->host->hostdata[0];
 	int result;
 
 	US_DEBUGP("device_reset() called\n" );
@@ -193,7 +193,7 @@ static int device_reset( Scsi_Cmnd *srb )
 
 	/* set the state and release the lock */
 	atomic_set(&us->sm_state, US_STATE_RESETTING);
-	scsi_unlock(srb->host);
+	scsi_unlock(srb->device->host);
 
 	/* lock the device pointers */
 	down(&(us->dev_semaphore));
@@ -206,7 +206,7 @@ static int device_reset( Scsi_Cmnd *srb )
 	up(&(us->dev_semaphore));
 
 	/* lock access to the state and clear it */
-	scsi_lock(srb->host);
+	scsi_lock(srb->device->host);
 	atomic_set(&us->sm_state, US_STATE_IDLE);
 	return result;
 }
@@ -217,7 +217,7 @@ static int device_reset( Scsi_Cmnd *srb )
 /* This is always called with scsi_lock(srb->host) held */
 static int bus_reset( Scsi_Cmnd *srb )
 {
-	struct us_data *us = (struct us_data *)srb->host->hostdata[0];
+	struct us_data *us = (struct us_data *)srb->device->host->hostdata[0];
 	int i;
 	int result;
 	struct usb_device *pusb_dev_save;
@@ -225,14 +225,14 @@ static int bus_reset( Scsi_Cmnd *srb )
 	/* we use the usb_reset_device() function to handle this for us */
 	US_DEBUGP("bus_reset() called\n");
 
-	scsi_unlock(srb->host);
+	scsi_unlock(srb->device->host);
 
 	/* if the device has been removed, this worked */
 	down(&us->dev_semaphore);
 	if (!(us->flags & US_FL_DEV_ATTACHED)) {
 		US_DEBUGP("-- device removed already\n");
 		up(&us->dev_semaphore);
-		scsi_lock(srb->host);
+		scsi_lock(srb->device->host);
 		return SUCCESS;
 	}
 	pusb_dev_save = us->pusb_dev;
@@ -242,7 +242,7 @@ static int bus_reset( Scsi_Cmnd *srb )
 	result = usb_reset_device(pusb_dev_save);
 	US_DEBUGP("usb_reset_device returns %d\n", result);
 	if (result < 0) {
-		scsi_lock(srb->host);
+		scsi_lock(srb->device->host);
 		return FAILED;
 	}
 
@@ -266,7 +266,7 @@ static int bus_reset( Scsi_Cmnd *srb )
 		usb_device_probe (&intf->dev);
 	}
 	US_DEBUGP("bus_reset() complete\n");
-	scsi_lock(srb->host);
+	scsi_lock(srb->device->host);
 	return SUCCESS;
 }
 

@@ -5845,7 +5845,7 @@ advansys_queuecommand(Scsi_Cmnd *scp, void (*done)(Scsi_Cmnd *))
     ulong               flags;
     Scsi_Cmnd           *done_scp;
 
-    shp = scp->host;
+    shp = scp->device->host;
     boardp = ASC_BOARDP(shp);
     ASC_STATS(shp, queuecommand);
 
@@ -5941,12 +5941,12 @@ advansys_reset(Scsi_Cmnd *scp)
     ASC_DBG1(1, "advansys_reset: 0x%lx\n", (ulong) scp);
 
 #ifdef ADVANSYS_STATS
-    if (scp->host != NULL) {
-        ASC_STATS(scp->host, reset);
+    if (scp->device->host != NULL) {
+        ASC_STATS(scp->device->host, reset);
     }
 #endif /* ADVANSYS_STATS */
 
-    if ((shp = scp->host) == NULL) {
+    if ((shp = scp->device->host) == NULL) {
         scp->result = HOST_BYTE(DID_ERROR);
         return FAILED;
     }
@@ -6390,13 +6390,13 @@ asc_scsi_done_list(Scsi_Cmnd *scp, int from_isr)
         ASC_DBG1(3, "asc_scsi_done_list: scp 0x%lx\n", (ulong) scp);
         tscp = REQPNEXT(scp);
         REQPNEXT(scp) = NULL;
-        ASC_STATS(scp->host, done);
+        ASC_STATS(scp->device->host, done);
         ASC_ASSERT(scp->scsi_done != NULL);
 	if (from_isr)
-	    spin_lock_irqsave(scp->host->host_lock, flags);
+	    spin_lock_irqsave(scp->device->host->host_lock, flags);
         scp->scsi_done(scp);
 	if (from_isr)
-	    spin_unlock_irqrestore(scp->host->host_lock, flags);
+	    spin_unlock_irqrestore(scp->device->host->host_lock, flags);
         scp = tscp;
     }
     ASC_DBG(2, "asc_scsi_done_list: done\n");
@@ -6462,7 +6462,7 @@ asc_execute_scsi_cmnd(Scsi_Cmnd *scp)
     ASC_DBG2(1, "asc_execute_scsi_cmnd: scp 0x%lx, done 0x%lx\n",
         (ulong) scp, (ulong) scp->scsi_done);
 
-    boardp = ASC_BOARDP(scp->host);
+    boardp = ASC_BOARDP(scp->device->host);
     device = boardp->device[scp->device->id];
 
     if (ASC_NARROW_BOARD(boardp)) {
@@ -6483,7 +6483,7 @@ asc_execute_scsi_cmnd(Scsi_Cmnd *scp)
          * asc_build_req() can not return ASC_BUSY.
          */
         if (asc_build_req(boardp, scp) == ASC_ERROR) {
-            ASC_STATS(scp->host, build_error);
+            ASC_STATS(scp->device->host, build_error);
             return ASC_ERROR;
         }
 
@@ -6493,7 +6493,7 @@ asc_execute_scsi_cmnd(Scsi_Cmnd *scp)
          */
         switch (ret = AscExeScsiQueue(asc_dvc_varp, &asc_scsi_q)) {
         case ASC_NOERROR:
-            ASC_STATS(scp->host, exe_noerror);
+            ASC_STATS(scp->device->host, exe_noerror);
             /*
              * Increment monotonically increasing per device successful
              * request counter. Wrapping doesn't matter.
@@ -6508,13 +6508,13 @@ asc_execute_scsi_cmnd(Scsi_Cmnd *scp)
              * Caller will enqueue request on the target's waiting queue
              * and retry later.
              */
-            ASC_STATS(scp->host, exe_busy);
+            ASC_STATS(scp->device->host, exe_busy);
             break;
         case ASC_ERROR:
             ASC_PRINT2(
 "asc_execute_scsi_cmnd: board %d: AscExeScsiQueue() ASC_ERROR, err_code 0x%x\n",
                 boardp->id, asc_dvc_varp->err_code);
-            ASC_STATS(scp->host, exe_error);
+            ASC_STATS(scp->device->host, exe_error);
             scp->result = HOST_BYTE(DID_ERROR);
             asc_enqueue(&boardp->done, scp, ASC_BACK);
             break;
@@ -6522,7 +6522,7 @@ asc_execute_scsi_cmnd(Scsi_Cmnd *scp)
             ASC_PRINT2(
 "asc_execute_scsi_cmnd: board %d: AscExeScsiQueue() unknown, err_code 0x%x\n",
                 boardp->id, asc_dvc_varp->err_code);
-            ASC_STATS(scp->host, exe_unknown);
+            ASC_STATS(scp->device->host, exe_unknown);
             scp->result = HOST_BYTE(DID_ERROR);
             asc_enqueue(&boardp->done, scp, ASC_BACK);
             break;
@@ -6563,7 +6563,7 @@ asc_execute_scsi_cmnd(Scsi_Cmnd *scp)
               */
         default:
             ASC_DBG(1, "asc_execute_scsi_cmnd: adv_build_req ASC_ERROR\n");
-            ASC_STATS(scp->host, build_error);
+            ASC_STATS(scp->device->host, build_error);
             return ASC_ERROR;
         }
 
@@ -6573,7 +6573,7 @@ asc_execute_scsi_cmnd(Scsi_Cmnd *scp)
          */
         switch (ret = AdvExeScsiQueue(adv_dvc_varp, adv_scsiqp)) {
         case ASC_NOERROR:
-            ASC_STATS(scp->host, exe_noerror);
+            ASC_STATS(scp->device->host, exe_noerror);
             /*
              * Increment monotonically increasing per device successful
              * request counter. Wrapping doesn't matter.
@@ -6588,13 +6588,13 @@ asc_execute_scsi_cmnd(Scsi_Cmnd *scp)
              * Caller will enqueue request on the target's waiting queue
              * and retry later.
              */
-            ASC_STATS(scp->host, exe_busy);
+            ASC_STATS(scp->device->host, exe_busy);
             break;
         case ASC_ERROR:
             ASC_PRINT2(
 "asc_execute_scsi_cmnd: board %d: AdvExeScsiQueue() ASC_ERROR, err_code 0x%x\n",
                 boardp->id, adv_dvc_varp->err_code);
-            ASC_STATS(scp->host, exe_error);
+            ASC_STATS(scp->device->host, exe_error);
             scp->result = HOST_BYTE(DID_ERROR);
             asc_enqueue(&boardp->done, scp, ASC_BACK);
             break;
@@ -6602,7 +6602,7 @@ asc_execute_scsi_cmnd(Scsi_Cmnd *scp)
             ASC_PRINT2(
 "asc_execute_scsi_cmnd: board %d: AdvExeScsiQueue() unknown, err_code 0x%x\n",
                 boardp->id, adv_dvc_varp->err_code);
-            ASC_STATS(scp->host, exe_unknown);
+            ASC_STATS(scp->device->host, exe_unknown);
             scp->result = HOST_BYTE(DID_ERROR);
             asc_enqueue(&boardp->done, scp, ASC_BACK);
             break;
@@ -6684,11 +6684,11 @@ asc_build_req(asc_board_t *boardp, Scsi_Cmnd *scp)
         /*
          * CDB request of single contiguous buffer.
          */
-        ASC_STATS(scp->host, cont_cnt);
+        ASC_STATS(scp->device->host, cont_cnt);
         asc_scsi_q.q1.data_addr =
             cpu_to_le32(virt_to_bus(scp->request_buffer));
         asc_scsi_q.q1.data_cnt = cpu_to_le32(scp->request_bufflen);
-        ASC_STATS_ADD(scp->host, cont_xfer,
+        ASC_STATS_ADD(scp->device->host, cont_xfer,
                       ASC_CEILING(scp->request_bufflen, 512));
         asc_scsi_q.q1.sg_queue_cnt = 0;
         asc_scsi_q.sg_head = NULL;
@@ -6699,16 +6699,16 @@ asc_build_req(asc_board_t *boardp, Scsi_Cmnd *scp)
         int                     sgcnt;
         struct scatterlist      *slp;
 
-        if (scp->use_sg > scp->host->sg_tablesize) {
+        if (scp->use_sg > scp->device->host->sg_tablesize) {
             ASC_PRINT3(
 "asc_build_req: board %d: use_sg %d > sg_tablesize %d\n",
-                boardp->id, scp->use_sg, scp->host->sg_tablesize);
+                boardp->id, scp->use_sg, scp->device->host->sg_tablesize);
             scp->result = HOST_BYTE(DID_ERROR);
             asc_enqueue(&boardp->done, scp, ASC_BACK);
             return ASC_ERROR;
         }
 
-        ASC_STATS(scp->host, sg_cnt);
+        ASC_STATS(scp->device->host, sg_cnt);
 
         /*
          * Use global ASC_SG_HEAD structure and set the ASC_SCSI_Q
@@ -6722,7 +6722,7 @@ asc_build_req(asc_board_t *boardp, Scsi_Cmnd *scp)
         asc_scsi_q.q1.data_addr = 0;
         /* This is a byte value, otherwise it would need to be swapped. */
         asc_sg_head.entry_cnt = asc_scsi_q.q1.sg_queue_cnt = scp->use_sg;
-        ASC_STATS_ADD(scp->host, sg_elem, asc_sg_head.entry_cnt);
+        ASC_STATS_ADD(scp->device->host, sg_elem, asc_sg_head.entry_cnt);
 
         /*
          * Convert scatter-gather list into ASC_SG_HEAD list.
@@ -6733,7 +6733,7 @@ asc_build_req(asc_board_t *boardp, Scsi_Cmnd *scp)
                 cpu_to_le32(virt_to_bus(
 		(unsigned char *)page_address(slp->page) + slp->offset));
             asc_sg_head.sg_list[sgcnt].bytes = cpu_to_le32(slp->length);
-            ASC_STATS_ADD(scp->host, sg_xfer, ASC_CEILING(slp->length, 512));
+            ASC_STATS_ADD(scp->device->host, sg_xfer, ASC_CEILING(slp->length, 512));
         }
     }
 
@@ -6768,7 +6768,7 @@ adv_build_req(asc_board_t *boardp, Scsi_Cmnd *scp,
      */
     if (boardp->adv_reqp == NULL) {
         ASC_DBG(1, "adv_build_req: no free adv_req_t\n");
-        ASC_STATS(scp->host, adv_build_noreq);
+        ASC_STATS(scp->device->host, adv_build_noreq);
         return ASC_BUSY;
     } else {
         reqp = boardp->adv_reqp;
@@ -6844,8 +6844,8 @@ adv_build_req(asc_board_t *boardp, Scsi_Cmnd *scp,
         reqp->sgblkp = NULL;
         scsiqp->sg_list_ptr = NULL;
         scsiqp->sg_real_addr = 0;
-        ASC_STATS(scp->host, cont_cnt);
-        ASC_STATS_ADD(scp->host, cont_xfer,
+        ASC_STATS(scp->device->host, cont_cnt);
+        ASC_STATS_ADD(scp->device->host, cont_xfer,
                       ASC_CEILING(scp->request_bufflen, 512));
     } else {
         /*
@@ -6854,7 +6854,7 @@ adv_build_req(asc_board_t *boardp, Scsi_Cmnd *scp,
         if (scp->use_sg > ADV_MAX_SG_LIST) {
             ASC_PRINT3(
 "adv_build_req: board %d: use_sg %d > ADV_MAX_SG_LIST %d\n",
-                boardp->id, scp->use_sg, scp->host->sg_tablesize);
+                boardp->id, scp->use_sg, scp->device->host->sg_tablesize);
             scp->result = HOST_BYTE(DID_ERROR);
             asc_enqueue(&boardp->done, scp, ASC_BACK);
 
@@ -6879,8 +6879,8 @@ adv_build_req(asc_board_t *boardp, Scsi_Cmnd *scp,
             return ret;
         }
 
-        ASC_STATS(scp->host, sg_cnt);
-        ASC_STATS_ADD(scp->host, sg_elem, scp->use_sg);
+        ASC_STATS(scp->device->host, sg_cnt);
+        ASC_STATS_ADD(scp->device->host, sg_elem, scp->use_sg);
     }
 
     ASC_DBG_PRT_ADV_SCSI_REQ_Q(2, scsiqp);
@@ -6929,7 +6929,7 @@ adv_get_sglist(asc_board_t *boardp, adv_req_t *reqp, Scsi_Cmnd *scp)
          */
         if ((sgblkp = boardp->adv_sgblkp) == NULL) {
             ASC_DBG(1, "adv_get_sglist: no free adv_sgblk_t\n");
-            ASC_STATS(scp->host, adv_build_nosg);
+            ASC_STATS(scp->device->host, adv_build_nosg);
 
             /*
              * Allocation failed. Free 'adv_sgblk_t' structures already
@@ -6992,7 +6992,7 @@ adv_get_sglist(asc_board_t *boardp, adv_req_t *reqp, Scsi_Cmnd *scp)
                 cpu_to_le32(virt_to_bus(
                    (unsigned char *)page_address(slp->page) + slp->offset));
             sg_block->sg_list[i].sg_count = cpu_to_le32(slp->length);
-            ASC_STATS_ADD(scp->host, sg_xfer, ASC_CEILING(slp->length, 512));
+            ASC_STATS_ADD(scp->device->host, sg_xfer, ASC_CEILING(slp->length, 512));
 
             if (--sg_elem_cnt == 0)
             {   /* Last ADV_SG_BLOCK and scatter-gather entry. */
@@ -7043,7 +7043,7 @@ asc_isr_callback(ASC_DVC_VAR *asc_dvc_varp, ASC_QDONE_INFO *qdonep)
      * If the request's host pointer is not valid, display a
      * message and return.
      */
-    shp = scp->host;
+    shp = scp->device->host;
     for (i = 0; i < asc_board_count; i++) {
         if (asc_host[i] == shp) {
             break;
@@ -7232,7 +7232,7 @@ adv_isr_callback(ADV_DVC_VAR *adv_dvc_varp, ADV_SCSI_REQ_Q *scsiqp)
      * If the request's host pointer is not valid, display a message
      * and return.
      */
-    shp = scp->host;
+    shp = scp->device->host;
     for (i = 0; i < asc_board_count; i++) {
         if (asc_host[i] == shp) {
             break;

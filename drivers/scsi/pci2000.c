@@ -407,7 +407,7 @@ out:;
 int Pci2000_QueueCommand (Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 	{
 	UCHAR		   *cdb = (UCHAR *)SCpnt->cmnd;					// Pointer to SCSI CDB
-	PADAPTER2000	padapter = HOSTDATA(SCpnt->host);			// Pointer to adapter control structure
+	PADAPTER2000	padapter = HOSTDATA(SCpnt->device->host);			// Pointer to adapter control structure
 	int				rc		 = -1;								// command return code
 	UCHAR			bus		 = SCpnt->device->channel;
 	UCHAR			pun		 = SCpnt->device->id;

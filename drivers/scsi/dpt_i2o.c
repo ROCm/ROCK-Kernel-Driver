@@ -391,7 +391,7 @@ static int adpt_queue(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *))
 		return 0;
 	}
 
-	pHba = (adpt_hba*)cmd->host->hostdata[0];
+	pHba = (adpt_hba*)cmd->device->host->hostdata[0];
 	if (!pHba) {
 		return FAILED;
 	}
@@ -647,7 +647,7 @@ static int adpt_abort(Scsi_Cmnd * cmd)
 	if(cmd->serial_number == 0){
 		return FAILED;
 	}
-	pHba = (adpt_hba*) cmd->host->hostdata[0];
+	pHba = (adpt_hba*) cmd->device->host->hostdata[0];
 	printk(KERN_INFO"%s: Trying to Abort cmd=%ld\n",pHba->name, cmd->serial_number);
 	if ((dptdevice = (void*) (cmd->device->hostdata)) == NULL) {
 		printk(KERN_ERR "%s: Unable to abort: No device in cmnd\n",pHba->name);
@@ -685,7 +685,7 @@ static int adpt_device_reset(Scsi_Cmnd* cmd)
 	int old_state;
 	struct adpt_device* d = (void*) cmd->device->hostdata;
 
-	pHba = (void*) cmd->host->hostdata[0];
+	pHba = (void*) cmd->device->host->hostdata[0];
 	printk(KERN_INFO"%s: Trying to reset device\n",pHba->name);
 	if (!d) {
 		printk(KERN_INFO"%s: Reset Device: Device Not found\n",pHba->name);
@@ -722,7 +722,7 @@ static int adpt_bus_reset(Scsi_Cmnd* cmd)
 	adpt_hba* pHba;
 	u32 msg[4];
 
-	pHba = (adpt_hba*)cmd->host->hostdata[0];
+	pHba = (adpt_hba*)cmd->device->host->hostdata[0];
 	memset(msg, 0, sizeof(msg));
 	printk(KERN_WARNING"%s: Bus reset: SCSI Bus %d: tid: %d\n",pHba->name, cmd->device->channel,pHba->channel[cmd->device->channel].tid );
 	msg[0] = FOUR_WORD_MSG_SIZE|SGL_OFFSET_0;
@@ -743,7 +743,7 @@ static int adpt_reset(Scsi_Cmnd* cmd)
 {
 	adpt_hba* pHba;
 	int rcode;
-	pHba = (adpt_hba*)cmd->host->hostdata[0];
+	pHba = (adpt_hba*)cmd->device->host->hostdata[0];
 	printk(KERN_WARNING"%s: Hba Reset: scsi id %d: tid: %d\n",pHba->name,cmd->device->channel,pHba->channel[cmd->device->channel].tid );
 	rcode =  adpt_hba_reset(pHba);
 	if(rcode == 0){
@@ -2216,7 +2216,7 @@ static s32 adpt_i2o_to_scsi(ulong reply, Scsi_Cmnd* cmd)
 	// calculate resid for sg 
 	cmd->resid = cmd->request_bufflen - readl(reply+5);
 
-	pHba = (adpt_hba*) cmd->host->hostdata[0];
+	pHba = (adpt_hba*) cmd->device->host->hostdata[0];
 
 	cmd->sense_buffer[0] = '\0';  // initialize sense valid flag to false
 

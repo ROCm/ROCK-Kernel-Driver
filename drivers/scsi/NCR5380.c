@@ -929,7 +929,7 @@ int NCR5380_proc_info(char *buffer, char **start, off_t offset, int length, int 
 
 static char *lprint_Scsi_Cmnd(Scsi_Cmnd * cmd, char *pos, char *buffer, int length)
 {
-	SPRINTF("scsi%d : destination target %d, lun %d\n", cmd->host->host_no, cmd->device->id, cmd->device->lun);
+	SPRINTF("scsi%d : destination target %d, lun %d\n", cmd->device->host->host_no, cmd->device->id, cmd->device->lun);
 	SPRINTF("        command = ");
 	pos = lprint_command(cmd->cmnd, pos, buffer, length);
 	return (pos);
@@ -1106,7 +1106,7 @@ static int __init NCR5380_init(struct Scsi_Host *instance, int flags)
 
 static int NCR5380_queue_command(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *)) 
 {
-	struct Scsi_Host *instance = cmd->host;
+	struct Scsi_Host *instance = cmd->device->host;
 	struct NCR5380_hostdata *hostdata = (struct NCR5380_hostdata *) instance->hostdata;
 	Scsi_Cmnd *tmp;
 
@@ -2872,7 +2872,7 @@ static void NCR5380_dma_complete(NCR5380_instance * instance) {
 
 static int NCR5380_abort(Scsi_Cmnd * cmd) {
 	NCR5380_local_declare();
-	struct Scsi_Host *instance = cmd->host;
+	struct Scsi_Host *instance = cmd->device->host;
 	struct NCR5380_hostdata *hostdata = (struct NCR5380_hostdata *) instance->hostdata;
 	Scsi_Cmnd *tmp, **prev;
 	
@@ -3031,10 +3031,10 @@ static int NCR5380_abort(Scsi_Cmnd * cmd) {
 
 static int NCR5380_bus_reset(Scsi_Cmnd * cmd) {
 	NCR5380_local_declare();
-	NCR5380_setup(cmd->host);
+	NCR5380_setup(cmd->device->host);
 
-	NCR5380_print_status(cmd->host);
-	do_reset(cmd->host);
+	NCR5380_print_status(cmd->device->host);
+	do_reset(cmd->device->host);
 	return SUCCESS;
 }
 

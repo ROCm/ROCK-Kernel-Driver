@@ -4735,7 +4735,7 @@ static void PRINT_LUN(ncb_p np, int target, int lun)
 
 static void PRINT_ADDR(Scsi_Cmnd *cmd)
 {
-	struct host_data *host_data = (struct host_data *) cmd->host->hostdata;
+	struct host_data *host_data = (struct host_data *) cmd->device->host->hostdata;
 	PRINT_LUN(host_data->ncb, cmd->device->id, cmd->device->lun);
 }
 
@@ -13592,7 +13592,7 @@ const char *sym53c8xx_info (struct Scsi_Host *host)
 
 int sym53c8xx_queue_command (Scsi_Cmnd *cmd, void (* done)(Scsi_Cmnd *))
 {
-     ncb_p np = ((struct host_data *) cmd->host->hostdata)->ncb;
+     ncb_p np = ((struct host_data *) cmd->device->host->hostdata)->ncb;
      unsigned long flags;
      int sts;
 
@@ -13661,9 +13661,9 @@ static void sym53c8xx_intr(int irq, void *dev_id, struct pt_regs * regs)
      if (DEBUG_FLAGS & DEBUG_TINY) printk ("]\n");
 
      if (done_list) {
-          NCR_LOCK_SCSI_DONE(done_list->host, flags);
+          NCR_LOCK_SCSI_DONE(done_list->device->host, flags);
           ncr_flush_done_cmds(done_list);
-          NCR_UNLOCK_SCSI_DONE(done_list->host, flags);
+          NCR_UNLOCK_SCSI_DONE(done_list->device->host, flags);
      }
 }
 
@@ -13684,9 +13684,9 @@ static void sym53c8xx_timeout(unsigned long npref)
      NCR_UNLOCK_NCB(np, flags);
 
      if (done_list) {
-          NCR_LOCK_SCSI_DONE(done_list->host, flags);
+          NCR_LOCK_SCSI_DONE(done_list->device->host, flags);
           ncr_flush_done_cmds(done_list);
-          NCR_UNLOCK_SCSI_DONE(done_list->host, flags);
+          NCR_UNLOCK_SCSI_DONE(done_list->device->host, flags);
      }
 }
 
@@ -13700,7 +13700,7 @@ int sym53c8xx_reset(Scsi_Cmnd *cmd, unsigned int reset_flags)
 int sym53c8xx_reset(Scsi_Cmnd *cmd)
 #endif
 {
-	ncb_p np = ((struct host_data *) cmd->host->hostdata)->ncb;
+	ncb_p np = ((struct host_data *) cmd->device->host->hostdata)->ncb;
 	int sts;
 	unsigned long flags;
 	Scsi_Cmnd *done_list;
@@ -13762,7 +13762,7 @@ out:
 
 int sym53c8xx_abort(Scsi_Cmnd *cmd)
 {
-	ncb_p np = ((struct host_data *) cmd->host->hostdata)->ncb;
+	ncb_p np = ((struct host_data *) cmd->device->host->hostdata)->ncb;
 	int sts;
 	unsigned long flags;
 	Scsi_Cmnd *done_list;

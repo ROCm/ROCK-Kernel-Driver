@@ -802,7 +802,7 @@ int isp1020_queuecommand(Scsi_Cmnd *Cmnd, void (*done)(Scsi_Cmnd *))
 
 	ENTER("isp1020_queuecommand");
 
-	host = Cmnd->host;
+	host = Cmnd->device->host;
 	hostdata = (struct isp1020_hostdata *) host->hostdata;
 	Cmnd->scsi_done = done;
 
@@ -1175,7 +1175,7 @@ int isp1020_abort(Scsi_Cmnd *Cmnd)
 
 	ENTER("isp1020_abort");
 
-	host = Cmnd->host;
+	host = Cmnd->device->host;
 	hostdata = (struct isp1020_hostdata *) host->hostdata;
 
 	for (i = 0; i < QLOGICISP_REQ_QUEUE_LEN + 1; i++)
@@ -1214,7 +1214,7 @@ int isp1020_reset(Scsi_Cmnd *Cmnd, unsigned int reset_flags)
 
 	ENTER("isp1020_reset");
 
-	host = Cmnd->host;
+	host = Cmnd->device->host;
 	hostdata = (struct isp1020_hostdata *) host->hostdata;
 
 	param[0] = MBOX_BUS_RESET;

@@ -523,7 +523,7 @@ static int inia100_queue(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 	register ORC_SCB *pSCB;
 	ORC_HCS *pHCB;		/* Point to Host adapter control block */
 
-	pHCB = (ORC_HCS *) SCpnt->host->hostdata;
+	pHCB = (ORC_HCS *) SCpnt->device->host->hostdata;
 	SCpnt->scsi_done = done;
 	/* Get free SCSI control block  */
 	if ((pSCB = orc_alloc_scb(pHCB)) == NULL) {
@@ -549,7 +549,7 @@ static int inia100_abort(Scsi_Cmnd * SCpnt)
 {
 	ORC_HCS *hcsp;
 
-	hcsp = (ORC_HCS *) SCpnt->host->hostdata;
+	hcsp = (ORC_HCS *) SCpnt->device->host->hostdata;
 	return orc_abort_srb(hcsp, SCpnt);
 }
 
@@ -564,7 +564,7 @@ static int inia100_abort(Scsi_Cmnd * SCpnt)
 static int inia100_bus_reset(Scsi_Cmnd * SCpnt)
 {				/* I need Host Control Block Information */
 	ORC_HCS *pHCB;
-	pHCB = (ORC_HCS *) SCpnt->host->hostdata;
+	pHCB = (ORC_HCS *) SCpnt->device->host->hostdata;
 	return orc_reset_scsi_bus(pHCB);
 }
 
@@ -578,7 +578,7 @@ static int inia100_bus_reset(Scsi_Cmnd * SCpnt)
 static int inia100_device_reset(Scsi_Cmnd * SCpnt)
 {				/* I need Host Control Block Information */
 	ORC_HCS *pHCB;
-	pHCB = (ORC_HCS *) SCpnt->host->hostdata;
+	pHCB = (ORC_HCS *) SCpnt->device->host->hostdata;
 	return orc_device_reset(pHCB, SCpnt, SCpnt->device->id);
 
 }

@@ -1223,7 +1223,7 @@ int DC390_queue_command (Scsi_Cmnd *cmd, void (* done)(Scsi_Cmnd *))
     PDCB   pDCB;
     PSRB   pSRB;
     DC390_AFLAGS
-    PACB   pACB = (PACB) cmd->host->hostdata;
+    PACB   pACB = (PACB) cmd->device->host->hostdata;
 
 
     DEBUG0(/*  if(pACB->scan_devices) */	\
@@ -1547,7 +1547,7 @@ int DC390_abort (Scsi_Cmnd *cmd)
     int   status;
     //ULONG sbac;
     DC390_AFLAGS
-    PACB  pACB = (PACB) cmd->host->hostdata;
+    PACB  pACB = (PACB) cmd->device->host->hostdata;
 
     DC390_LOCK_ACB;
 
@@ -1785,7 +1785,7 @@ int DC390_reset (Scsi_Cmnd *cmd, unsigned int resetFlags)
 {
     UCHAR   bval;
     DC390_AFLAGS
-    PACB    pACB = (PACB) cmd->host->hostdata;
+    PACB    pACB = (PACB) cmd->device->host->hostdata;
 
     printk(KERN_INFO "DC390: RESET ... ");
 
@@ -2361,7 +2361,7 @@ static void dc390_inquiry_done (Scsi_Cmnd* cmd)
 	   cmd->device->id, cmd->device->lun, cmd->result);
    if (cmd->result)
    {
-	PACB pACB = (PACB)cmd->host->hostdata;
+	PACB pACB = (PACB)cmd->device->host->hostdata;
 	PDCB pDCB = dc390_findDCB (pACB, cmd->device->id, cmd->device->lun);
 	printk ("DC390: Unsetting DsCn, Sync and TagQ!\n");
 	if (pDCB)
@@ -2387,7 +2387,8 @@ void dc390_inquiry (PACB pACB, PDCB pDCB)
    cmd->cmnd[4] = 0xff;
    
    cmd->cmd_len = 6; cmd->old_cmd_len = 6;
-   cmd->host = pACB->pScsiHost;
+/* TODO FIXME */
+/*    cmd->host = pACB->pScsiHost; */
    cmd->device->id = pDCB->TargetID;
    cmd->device->lun = pDCB->TargetLUN; 
    cmd->serial_number = 1;
@@ -2437,7 +2438,8 @@ void dc390_sendstart (PACB pACB, PDCB pDCB)
    cmd->cmnd[4] = 0x01; /* START */
    
    cmd->cmd_len = 6; cmd->old_cmd_len = 6;
-   cmd->host = pACB->pScsiHost;
+/* TODO FIXME */
+/*    cmd->host = pACB->pScsiHost; */
    cmd->device->id = pDCB->TargetID;
    cmd->device->lun = pDCB->TargetLUN; 
    cmd->serial_number = 1;
@@ -2734,7 +2736,9 @@ int dc390_set_info (char *buffer, int length, PACB pACB)
    
  reset:
      {
-	Scsi_Cmnd cmd; cmd.host = pACB->pScsiHost;
+	Scsi_Cmnd cmd;
+	/* TODO FIXME */
+	/* cmd.host = pACB->pScsiHost; */
 	printk (KERN_WARNING "DC390: Driver reset requested!\n");
 	DC390_UNLOCK_ACB;
 	DC390_reset (&cmd, 0);

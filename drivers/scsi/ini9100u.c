@@ -528,7 +528,7 @@ int i91u_queue(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 		done(SCpnt);	/* Notify system DONE           */
 		return (0);
 	}
-	pHCB = (HCS *) SCpnt->host->base;
+	pHCB = (HCS *) SCpnt->device->host->base;
 
 	SCpnt->scsi_done = done;
 	/* Get free SCSI control block  */
@@ -558,7 +558,7 @@ int i91u_abort(Scsi_Cmnd * SCpnt)
 {
 	HCS *pHCB;
 
-	pHCB = (HCS *) SCpnt->host->base;
+	pHCB = (HCS *) SCpnt->device->host->base;
 	return tul_abort_srb(pHCB, SCpnt);
 }
 
@@ -570,7 +570,7 @@ int i91u_reset(Scsi_Cmnd * SCpnt, unsigned int reset_flags)
 {				/* I need Host Control Block Information */
 	HCS *pHCB;
 
-	pHCB = (HCS *) SCpnt->host->base;
+	pHCB = (HCS *) SCpnt->device->host->base;
 
 	if (reset_flags & (SCSI_RESET_SUGGEST_BUS_RESET | SCSI_RESET_SUGGEST_HOST_RESET))
 		return tul_reset_scsi_bus(pHCB);

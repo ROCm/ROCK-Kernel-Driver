@@ -3471,7 +3471,7 @@ int BusLogic_QueueCommand(SCSI_Command_T *Command,
 			  void (*CompletionRoutine)(SCSI_Command_T *))
 {
   BusLogic_HostAdapter_T *HostAdapter =
-    (BusLogic_HostAdapter_T *) Command->host->hostdata;
+    (BusLogic_HostAdapter_T *) Command->device->host->hostdata;
   BusLogic_TargetFlags_T *TargetFlags =
     &HostAdapter->TargetFlags[Command->device->id];
   BusLogic_TargetStatistics_T *TargetStatistics =
@@ -3708,7 +3708,7 @@ int BusLogic_QueueCommand(SCSI_Command_T *Command,
 int BusLogic_AbortCommand(SCSI_Command_T *Command)
 {
   BusLogic_HostAdapter_T *HostAdapter =
-    (BusLogic_HostAdapter_T *) Command->host->hostdata;
+    (BusLogic_HostAdapter_T *) Command->device->host->hostdata;
 
   int TargetID = Command->device->id;
   BusLogic_CCB_T *CCB;
@@ -4153,7 +4153,7 @@ Done:
 int BusLogic_ResetCommand(SCSI_Command_T *Command, unsigned int ResetFlags)
 {
   BusLogic_HostAdapter_T *HostAdapter =
-    (BusLogic_HostAdapter_T *) Command->host->hostdata;
+    (BusLogic_HostAdapter_T *) Command->device->host->hostdata;
   int TargetID = Command->device->id;
   BusLogic_ErrorRecoveryStrategy_T
     ErrorRecoveryStrategy = HostAdapter->ErrorRecoveryStrategy[TargetID];
