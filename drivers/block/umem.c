@@ -371,11 +371,12 @@ static void mm_unplug_device(void *data)
 {
 	request_queue_t *q = data;
 	struct cardinfo *card = q->queuedata;
+	unsigned long flags;
 
-	spin_lock_bh(&card->lock);
+	spin_lock_irqsave(&card->lock, flags);
 	if (blk_remove_plug(q))
 		activate(card);
-	spin_unlock_bh(&card->lock);
+	spin_unlock_irqrestore(&card->lock, flags);
 }
 
 /* 
@@ -557,12 +558,12 @@ static int mm_make_request(request_queue_t *q, struct bio *bio)
 	PRINTK("mm_make_request %ld %d\n", bh->b_rsector, bh->b_size);
 
 	bio->bi_phys_segments = bio->bi_idx; /* count of completed segments*/
-	spin_lock_bh(&card->lock);
+	spin_lock_irq(&card->lock);
 	*card->biotail = bio;
 	bio->bi_next = NULL;
 	card->biotail = &bio->bi_next;
 	blk_plug_device(q);
-	spin_unlock_bh(&card->lock);
+	spin_unlock_irq(&card->lock);
 
 	return 0;
 }
