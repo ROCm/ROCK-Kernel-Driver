@@ -1225,7 +1225,7 @@ static struct sk_buff *compose_sadb_supported(struct sadb_msg *orig, int allocat
 		esp_len += sizeof(struct sadb_supported);
 	len = esp_len + ah_len + sizeof(struct sadb_msg);
 
-	skb = alloc_skb(allocation, len + 16);
+	skb = alloc_skb(len + 16, allocation);
 	if (!skb)
 		goto out_put_algs;
 
