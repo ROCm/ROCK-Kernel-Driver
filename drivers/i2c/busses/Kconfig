@@ -113,6 +113,16 @@ config I2C_PIIX4
 	  This driver can also be built as a module.  If so, the module
 	  will be called i2c-piix4.
 
+config I2C_SAVAGE4
+	tristate "S3 Savage 4"
+	depends on I2C && PCI && EXPERIMENTAL
+	help
+	  If you say yes to this option, support will be included for the 
+	  S3 Savage 4 I2C interface.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called i2c-savage4.
+
 config I2C_SIS5595
 	tristate "SiS 5595"
 	depends on I2C && PCI && EXPERIMENTAL
