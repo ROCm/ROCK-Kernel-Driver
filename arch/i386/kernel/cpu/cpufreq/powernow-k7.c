@@ -14,6 +14,7 @@
  * - We disable half multipliers if ACPI is used on A0 stepping CPUs.
  */
 
+#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/module.h> 
 #include <linux/init.h>
@@ -191,8 +192,8 @@ static void change_FID(int fid)
 {
 	union msr_fidvidctl fidvidctl;
 
+	rdmsrl (MSR_K7_FID_VID_CTL, fidvidctl.val);
 	if (fidvidctl.bits.FID != fid) {
-		rdmsrl (MSR_K7_FID_VID_CTL, fidvidctl.val);
 		fidvidctl.bits.SGTC = latency;
 		fidvidctl.bits.FID = fid;
 		fidvidctl.bits.FIDC = 1;
@@ -205,8 +206,8 @@ static void change_VID(int vid)
 {
 	union msr_fidvidctl fidvidctl;
 
+	rdmsrl (MSR_K7_FID_VID_CTL, fidvidctl.val);
 	if (fidvidctl.bits.VID != vid) {
-		rdmsrl (MSR_K7_FID_VID_CTL, fidvidctl.val);
 		fidvidctl.bits.VID = vid;
 		fidvidctl.bits.VIDC = 1;
 		wrmsrl (MSR_K7_FID_VID_CTL, fidvidctl.val);
