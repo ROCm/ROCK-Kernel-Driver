@@ -49,6 +49,7 @@
 #define DEBUG	1
 // #define	VERBOSE		/* extra debug messages (success too) */
 
+#include <linux/version.h>
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/pci.h>
