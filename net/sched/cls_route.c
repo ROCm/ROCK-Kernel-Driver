@@ -384,9 +384,9 @@ static int route4_set_parms(struct tcf_proto *tp, unsigned long base,
 		id = *(u32*)RTA_DATA(tb[TCA_ROUTE4_IIF-1]);
 		if (id > 0x7FFF)
 			goto errout;
-		nhandle = (id | 0x8000) << 16;
+		nhandle |= (id | 0x8000) << 16;
 	} else
-		nhandle = 0xFFFF << 16;
+		nhandle |= 0xFFFF << 16;
 
 	if (handle && new) {
 		nhandle |= handle & 0x7F00;
