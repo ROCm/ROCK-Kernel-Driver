@@ -1047,6 +1047,7 @@ int usb_serial_probe(struct usb_interface *interface,
 			goto probe_error;
 		}
 		buffer_size = endpoint->wMaxPacketSize;
+		port->bulk_in_size = buffer_size;
 		port->bulk_in_endpointAddress = endpoint->bEndpointAddress;
 		port->bulk_in_buffer = kmalloc (buffer_size, GFP_KERNEL);
 		if (!port->bulk_in_buffer) {
