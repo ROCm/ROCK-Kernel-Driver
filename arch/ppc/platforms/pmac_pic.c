@@ -373,7 +373,7 @@ pmac_pic_init(void)
 			ppc_md.get_irq = openpic_get_irq;
 			OpenPIC_Addr = ioremap(irqctrler->addrs[0].address,
 					       irqctrler->addrs[0].size);
-			openpic_init(1, 0, 0, nmi_irq);
+			openpic_init(1, 0, nmi_irq);
 #ifdef CONFIG_XMON
 			if (nmi_irq >= 0)
 				request_irq(nmi_irq, xmon_irq, 0,

@@ -34,6 +34,11 @@
 
 void* OpenPIC_Addr;
 static volatile struct OpenPIC *OpenPIC = NULL;
+/*
+ * We define OpenPIC_InitSenses table thusly:
+ * bit 0x1: sense, 0 for edge and 1 for level.
+ * bit 0x2: polarity, 0 for negative, 1 for positive.
+ */
 u_int OpenPIC_NumInitSenses __initdata = 0;
 u_char *OpenPIC_InitSenses __initdata = NULL;
 extern int use_of_interrupt_tree;
@@ -41,16 +46,12 @@ extern int use_of_interrupt_tree;
 static u_int NumProcessors;
 static u_int NumSources;
 static int open_pic_irq_offset;
-static volatile unsigned char* chrp_int_ack_special;
 static volatile OpenPIC_Source *ISR[NR_IRQS];
 
 /* Global Operations */
 static void openpic_disable_8259_pass_through(void);
 static void openpic_set_priority(u_int pri);
 static void openpic_set_spurious(u_int vector);
-static void openpic_enable_sie(void);
-static void openpic_eicr_set_clk(u_int clkval);
-static void openpic_eicr_set_clk(u_int clkval);
 
 #ifdef CONFIG_SMP
 /* Interprocessor Interrupts */
@@ -73,7 +74,6 @@ static void openpic_mapirq(u_int irq, u_int cpumask, u_int keepmask);
  * These functions are not used but the code is kept here
  * for completeness and future reference.
  */
-static void openpic_reset(void);
 #ifdef notused
 static void openpic_enable_8259_pass_through(void);
 static u_int openpic_get_priority(void);
@@ -263,6 +263,31 @@ static void openpic_safe_writefield_IPI(volatile u_int *addr, u_int mask, u_int 
 }
 #endif /* CONFIG_SMP */
 
+#if defined(CONFIG_EPIC_SERIAL_MODE) || defined(CONFIG_PMAC_PBOOK)
+static void openpic_reset(void)
+{
+	openpic_setfield(&OpenPIC->Global.Global_Configuration0,
+			 OPENPIC_CONFIG_RESET);
+	while (openpic_readfield(&OpenPIC->Global.Global_Configuration0,
+				 OPENPIC_CONFIG_RESET))
+		mb();
+}
+#endif
+
+#ifdef CONFIG_EPIC_SERIAL_MODE
+static void openpic_enable_sie(void)
+{
+	openpic_setfield(&OpenPIC->Global.Global_Configuration1,
+			 OPENPIC_EICR_SIE);
+}
+
+static void openpic_eicr_set_clk(u_int clkval)
+{
+	openpic_writefield(&OpenPIC->Global.Global_Configuration1,
+			 OPENPIC_EICR_S_CLK_MASK, (clkval << 28));
+}
+#endif
+
 void openpic_set_sources(int first_irq, int num_irqs, void *first_ISR)
 {
 	volatile OpenPIC_Source *src = first_ISR;
@@ -277,8 +302,7 @@ void openpic_set_sources(int first_irq, int num_irqs, void *first_ISR)
 		ISR[i] = src;
 }
 
-void __init openpic_init(int main_pic, int offset, unsigned char* chrp_ack,
-			 int programmer_switch_irq)
+void __init openpic_init(int main_pic, int offset, int programmer_switch_irq)
 {
 	u_int t, i;
 	u_int timerfreq;
@@ -331,7 +355,6 @@ void __init openpic_init(int main_pic, int offset, unsigned char* chrp_ack,
 		return;
 
 	open_pic_irq_offset = offset;
-	chrp_int_ack_special = (volatile unsigned char*)chrp_ack;
 
 	/* Initialize timer interrupts */
 	if ( ppc_md.progress ) ppc_md.progress("openpic timer",0x3ba);
@@ -359,14 +382,8 @@ void __init openpic_init(int main_pic, int offset, unsigned char* chrp_ack,
 
 	openpic_set_priority(0xf);
 
-	/* SIOint (8259 cascade) is special */
-	if (offset) {
-		openpic_initirq(0, 8, offset, 1, 1);
-		openpic_mapirq(0, 1<<0, 0);
-	}
-
-	/* Init all external sources */
-	for (i = 1; i < NumSources; i++) {
+	/* Init all external sources, including possibly the cascade. */
+	for (i = 0; i < NumSources; i++) {
 		int pri, sense;
 
 		if (ISR[i] == 0)
@@ -376,12 +393,18 @@ void __init openpic_init(int main_pic, int offset, unsigned char* chrp_ack,
 		openpic_disable_irq(i+offset);
 
 		pri = (i == programmer_switch_irq)? 9: 8;
+		/*
+		 * We find the vale from either the InitSenses table
+		 * or assume a negative polarity level interrupt.
+		 */
 		sense = (i < OpenPIC_NumInitSenses)? OpenPIC_InitSenses[i]: 1;
-		if (sense)
+
+		if ((sense & IRQ_SENSE_MASK) == 1)
 			irq_desc[i+offset].status = IRQ_LEVEL;
 
 		/* Enabled, Priority 8 or 9 */
-		openpic_initirq(i, pri, i+offset, !sense, sense);
+		openpic_initirq(i, pri, i+offset, (sense & IRQ_POLARITY_MASK),
+				(sense & IRQ_SENSE_MASK));
 		/* Processor 0 */
 		openpic_mapirq(i, 1<<0, 0);
 	}
@@ -400,38 +423,14 @@ void __init openpic_init(int main_pic, int offset, unsigned char* chrp_ack,
 				"82c59 cascade", NULL))
 			printk("Unable to get OpenPIC IRQ 0 for cascade\n");
 	}
-#ifdef CONFIG_EPIC_SERIAL_MODE
  	openpic_disable_8259_pass_through();
+#ifdef CONFIG_EPIC_SERIAL_MODE
 	openpic_eicr_set_clk(7);	/* Slowest value until we know better */
 	openpic_enable_sie();
-	openpic_set_priority(0);
-#else
- 	openpic_disable_8259_pass_through();
- 	openpic_set_priority(0);
 #endif
+	openpic_set_priority(0);
 
 	if (ppc_md.progress) ppc_md.progress("openpic exit",0x222);
-}
-
-static void openpic_reset(void)
-{
-	openpic_setfield(&OpenPIC->Global.Global_Configuration0,
-			 OPENPIC_CONFIG_RESET);
-	while (openpic_readfield(&OpenPIC->Global.Global_Configuration0,
-				 OPENPIC_CONFIG_RESET))
-		mb();
-}
-
-static void openpic_enable_sie(void)
-{
-	openpic_setfield(&OpenPIC->Global.Global_Configuration1,
-			 OPENPIC_EICR_SIE);
-}
-
-static void openpic_eicr_set_clk(u_int clkval)
-{
-	openpic_writefield(&OpenPIC->Global.Global_Configuration1,
-			 OPENPIC_EICR_S_CLK_MASK, (clkval << 28));
 }
 
 #ifdef notused
@@ -533,7 +532,9 @@ void openpic_reset_processor_phys(u_int mask)
 	openpic_write(&OpenPIC->Global.Processor_Initialization, mask);
 }
 
+#if defined(CONFIG_SMP) || defined(CONFIG_PMAC_PBOOK)
 static spinlock_t openpic_setup_lock = SPIN_LOCK_UNLOCKED;
+#endif
 
 #ifdef CONFIG_SMP
 /*
@@ -810,19 +811,13 @@ openpic_get_irq(struct pt_regs *regs)
 	/* Management of the cascade should be moved out of here */
 
 	/* Yep - because openpic !=> i8259, for one thing. -VAL */
-        if (open_pic_irq_offset && irq == open_pic_irq_offset)
-        {
-                /*
-                 * This magic address generates a PCI IACK cycle.
-                 */
-		if ( chrp_int_ack_special )
-			irq = *chrp_int_ack_special;
+	if (open_pic_irq_offset && irq == open_pic_irq_offset)
+	{
 #ifndef CONFIG_GEMINI
-		else
-			irq = i8259_poll();
+		irq = i8259_irq(regs); /* get IRQ from cascade */
 #endif
 		openpic_eoi();
-        }
+	}
 	if (irq == OPENPIC_VEC_SPURIOUS + open_pic_irq_offset)
 		irq = -1;
 	return irq;
