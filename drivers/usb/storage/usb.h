@@ -180,7 +180,7 @@ struct us_data {
 
 	/* mutual exclusion structures */
 	struct completion	notify;		 /* thread begin/end	    */
-	struct semaphore	queue_exclusion; /* to protect data structs */
+	spinlock_t		queue_exclusion; /* to protect data structs */
 	struct us_unusual_dev   *unusual_dev;	 /* If unusual device       */
 	void			*extra;		 /* Any extra data          */
 	extra_data_destructor	extra_destructor;/* extra data destructor   */
@@ -196,5 +196,17 @@ extern struct usb_driver usb_storage_driver;
 /* Function to fill an inquiry response. See usb.c for details */
 extern void fill_inquiry_response(struct us_data *us,
 	unsigned char *data, unsigned int data_len);
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,3)
+#define scsi_unlock(host)	spin_unlock_irq(host->host_lock)
+#define scsi_lock(host)		spin_lock_irq(host->host_lock)
+
+#define sg_address(psg)		(page_address((psg)->page) + (psg)->offset)
+#else
+#define scsi_unlock(host)	spin_unlock_irq(&io_request_lock)
+#define scsi_lock(host)		spin_lock_irq(&io_request_lock)
+
+#define sg_address(psg)		((psg)->address)
+#endif
 
 #endif

@@ -337,9 +337,9 @@ static int usb_stor_control_thread(void * __us)
 
 	/* signal that we've started the thread */
 	complete(&(us->notify));
-	set_current_state(TASK_INTERRUPTIBLE);
 
 	for(;;) {
+		struct Scsi_Host *host;
 		US_DEBUGP("*** thread sleeping.\n");
 		if(down_interruptible(&us->sema))
 			break;
@@ -347,15 +347,16 @@ static int usb_stor_control_thread(void * __us)
 		US_DEBUGP("*** thread awakened.\n");
 
 		/* lock access to the queue element */
-		down(&(us->queue_exclusion));
+		spin_lock_irq(&us->queue_exclusion);
 
 		/* take the command off the queue */
 		action = us->action;
 		us->action = 0;
 		us->srb = us->queue_srb;
+		host = us->srb->host;
 
 		/* release the queue lock as fast as possible */
-		up(&(us->queue_exclusion));
+		spin_unlock_irq(&us->queue_exclusion);
 
 		switch (action) {
 		case US_ACT_COMMAND:
@@ -365,9 +366,10 @@ static int usb_stor_control_thread(void * __us)
 			if (us->srb->sc_data_direction == SCSI_DATA_UNKNOWN) {
 				US_DEBUGP("UNKNOWN data direction\n");
 				us->srb->result = DID_ERROR << 16;
-				set_current_state(TASK_INTERRUPTIBLE);
+				scsi_lock(host);
 				us->srb->scsi_done(us->srb);
 				us->srb = NULL;
+				scsi_unlock(host);
 				break;
 			}
 
@@ -380,9 +382,10 @@ static int usb_stor_control_thread(void * __us)
 					  us->srb->target, us->srb->lun);
 				us->srb->result = DID_BAD_TARGET << 16;
 
-				set_current_state(TASK_INTERRUPTIBLE);
+				scsi_lock(host);
 				us->srb->scsi_done(us->srb);
 				us->srb = NULL;
+				scsi_unlock(host);
 				break;
 			}
 
@@ -391,9 +394,10 @@ static int usb_stor_control_thread(void * __us)
 					  us->srb->target, us->srb->lun);
 				us->srb->result = DID_BAD_TARGET << 16;
 
-				set_current_state(TASK_INTERRUPTIBLE);
+				scsi_lock(host);
 				us->srb->scsi_done(us->srb);
 				us->srb = NULL;
+				scsi_unlock(host);
 				break;
 			}
 
@@ -403,9 +407,10 @@ static int usb_stor_control_thread(void * __us)
 				US_DEBUGP("Skipping START_STOP command\n");
 				us->srb->result = GOOD << 1;
 
-				set_current_state(TASK_INTERRUPTIBLE);
+				scsi_lock(host);
 				us->srb->scsi_done(us->srb);
 				us->srb = NULL;
+				scsi_unlock(host);
 				break;
 			}
 
@@ -466,14 +471,15 @@ static int usb_stor_control_thread(void * __us)
 			if (us->srb->result != DID_ABORT << 16) {
 				US_DEBUGP("scsi cmd done, result=0x%x\n", 
 					   us->srb->result);
-				set_current_state(TASK_INTERRUPTIBLE);
+				scsi_lock(host);
 				us->srb->scsi_done(us->srb);
+				us->srb = NULL;
+				scsi_unlock(host);
 			} else {
 				US_DEBUGP("scsi command aborted\n");
-				set_current_state(TASK_INTERRUPTIBLE);
+				us->srb = NULL;
 				complete(&(us->notify));
 			}
-			us->srb = NULL;
 			break;
 
 		case US_ACT_DEVICE_RESET:
@@ -493,9 +499,6 @@ static int usb_stor_control_thread(void * __us)
 			break;
 		}
 	} /* for (;;) */
-
-	/* clean up after ourselves */
-	set_current_state(TASK_INTERRUPTIBLE);
 
 	/* notify the exit routine that we're actually exiting now */
 	complete(&(us->notify));
@@ -773,7 +776,7 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 		/* Initialize the mutexes only when the struct is new */
 		init_completion(&(ss->notify));
 		init_MUTEX_LOCKED(&(ss->ip_waitq));
-		init_MUTEX(&(ss->queue_exclusion));
+		spin_lock_init(&ss->queue_exclusion);
 		init_MUTEX(&(ss->irq_urb_sem));
 		init_MUTEX(&(ss->current_urb_sem));
 		init_MUTEX(&(ss->dev_semaphore));

@@ -70,7 +70,11 @@ static const char* host_info(struct Scsi_Host *host)
 	return "SCSI emulation for USB Mass Storage devices";
 }
 
-/* detect a virtual adapter (always works) */
+/* detect a virtual adapter (always works)
+ * Synchronization: 2.4: with the io_request_lock
+ * 			2.5: no locks.
+ * fortunately we don't care.
+ * */
 static int detect(struct SHT *sht)
 {
 	struct us_data *us;
@@ -82,7 +86,7 @@ static int detect(struct SHT *sht)
 
 	/* set up the name of our subdirectory under /proc/scsi/ */
 	sprintf(local_name, "usb-storage-%d", us->host_number);
-	sht->proc_name = kmalloc (strlen(local_name) + 1, GFP_KERNEL);
+	sht->proc_name = kmalloc (strlen(local_name) + 1, GFP_ATOMIC);
 	if (!sht->proc_name)
 		return 0;
 	strcpy(sht->proc_name, local_name);
@@ -108,6 +112,7 @@ static int detect(struct SHT *sht)
  *
  * NOTE: There is no contention here, because we're already deregistered
  * the driver and we're doing each virtual host in turn, not in parallel
+ * Synchronization: BLK, no spinlock.
  */
 static int release(struct Scsi_Host *psh)
 {
@@ -145,12 +150,13 @@ static int command( Scsi_Cmnd *srb )
 static int queuecommand( Scsi_Cmnd *srb , void (*done)(Scsi_Cmnd *))
 {
 	struct us_data *us = (struct us_data *)srb->host->hostdata[0];
+	unsigned long flags;
 
 	US_DEBUGP("queuecommand() called\n");
 	srb->host_scribble = (unsigned char *)us;
 
 	/* get exclusive access to the structures we want */
-	down(&(us->queue_exclusion));
+	spin_lock_irqsave(&us->queue_exclusion, flags);
 
 	/* enqueue the command */
 	us->queue_srb = srb;
@@ -158,7 +164,7 @@ static int queuecommand( Scsi_Cmnd *srb , void (*done)(Scsi_Cmnd *))
 	us->action = US_ACT_COMMAND;
 
 	/* release the lock on the structure */
-	up(&(us->queue_exclusion));
+	spin_unlock_irqrestore(&us->queue_exclusion, flags);
 
 	/* wake up the process task */
 	up(&(us->sema));
@@ -178,10 +184,12 @@ static int command_abort( Scsi_Cmnd *srb )
 	US_DEBUGP("command_abort() called\n");
 
 	if (atomic_read(&us->sm_state) == US_STATE_RUNNING) {
+ 		scsi_unlock(srb->host);
 		usb_stor_abort_transport(us);
 
 		/* wait for us to be done */
 		wait_for_completion(&(us->notify));
+ 		scsi_lock(srb->host);
 		return SUCCESS;
 	}
 
@@ -202,6 +210,7 @@ static int device_reset( Scsi_Cmnd *srb )
 	if (atomic_read(&us->sm_state) == US_STATE_DETACHED)
 		return SUCCESS;
 
+	scsi_unlock(srb->host);
 	/* lock the device pointers */
 	down(&(us->dev_semaphore));
 	us->srb = srb;
@@ -211,6 +220,7 @@ static int device_reset( Scsi_Cmnd *srb )
 
 	/* unlock the device pointers */
 	up(&(us->dev_semaphore));
+	scsi_lock(srb->host);
 	return result;
 }
 
@@ -234,10 +244,13 @@ static int bus_reset( Scsi_Cmnd *srb )
 	}
 
 	/* attempt to reset the port */
+	scsi_unlock(srb->host);
 	result = usb_reset_device(pusb_dev_save);
 	US_DEBUGP("usb_reset_device returns %d\n", result);
-	if (result < 0)
+	if (result < 0) {
+		scsi_lock(srb->host);
 		return FAILED;
+	}
 
 	/* FIXME: This needs to lock out driver probing while it's working
 	 * or we can have race conditions */
@@ -262,8 +275,8 @@ static int bus_reset( Scsi_Cmnd *srb )
 		intf->driver->probe(pusb_dev_save, i, id);
 		up(&intf->driver->serialize);
 	}
-
 	US_DEBUGP("bus_reset() complete\n");
+	scsi_lock(srb->host);
 	return SUCCESS;
 }
 
@@ -271,6 +284,7 @@ static int bus_reset( Scsi_Cmnd *srb )
 static int host_reset( Scsi_Cmnd *srb )
 {
 	printk(KERN_CRIT "usb-storage: host_reset() requested but not implemented\n" );
+	bus_reset(srb);
 	return FAILED;
 }
 

@@ -864,7 +864,7 @@ void isd200_invoke_transport( struct us_data *us,
 	 * condition, show that in the result code
 	 */
 	if (transferStatus == ISD200_TRANSPORT_FAILED)
-		srb->result = CHECK_CONDITION;
+		srb->result = CHECK_CONDITION << 1;
 }
 
 #ifdef CONFIG_USB_STORAGE_DEBUG
