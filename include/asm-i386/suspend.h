@@ -15,8 +15,6 @@ arch_prepare_suspend(void)
 
 /* image of the saved processor state */
 struct saved_context {
-	unsigned long eax, ebx, ecx, edx;
-	unsigned long esp, ebp, esi, edi;
   	u16 es, fs, gs, ss;
 	unsigned long cr0, cr2, cr3, cr4;
 	u16 gdt_pad;
@@ -30,8 +28,13 @@ struct saved_context {
 	unsigned long tr;
 	unsigned long safety;
 	unsigned long return_address;
-	unsigned long eflags;
 } __attribute__((packed));
+
+/* We'll access these from assembly, so we'd better have them outside struct */
+extern unsigned long saved_context_eax, saved_context_ebx, saved_context_ecx, saved_context_edx;
+extern unsigned long saved_context_esp, saved_context_ebp, saved_context_esi, saved_context_edi;
+extern unsigned long saved_context_eflags;
+
 
 #define loaddebug(thread,register) \
                __asm__("movl %0,%%db" #register  \
