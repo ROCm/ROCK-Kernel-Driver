@@ -69,8 +69,6 @@ extern const struct gtype##_id __mod_##gtype##_table		\
   __attribute__ ((unused, alias(__stringify(name))))
 
 #define THIS_MODULE (&__this_module)
-#define MOD_INC_USE_COUNT _MOD_INC_USE_COUNT(THIS_MODULE)
-#define MOD_DEC_USE_COUNT __MOD_DEC_USE_COUNT(THIS_MODULE)
 
 /*
  * The following license idents are currently accepted as indicating free
@@ -107,8 +105,6 @@ extern const struct gtype##_id __mod_##gtype##_table		\
 #define MODULE_ALIAS(alias)
 #define MODULE_GENERIC_TABLE(gtype,name)
 #define THIS_MODULE ((struct module *)0)
-#define MOD_INC_USE_COUNT	do { } while (0)
-#define MOD_DEC_USE_COUNT	do { } while (0)
 #define MODULE_LICENSE(license)
 #endif
 
@@ -418,20 +414,6 @@ __attribute__((section(".gnu.linkonce.this_module"))) = {
 #define symbol_request(x) try_then_request_module(symbol_get(x), "symbol:" #x)
 
 /* BELOW HERE ALL THESE ARE OBSOLETE AND WILL VANISH */
-static inline void __deprecated __MOD_INC_USE_COUNT(struct module *module)
-{
-	__unsafe(module);
-	/*
-	 * Yes, we ignore the retval here, that's why it's deprecated.
-	 */
-	try_module_get(module);
-}
-
-static inline void __deprecated __MOD_DEC_USE_COUNT(struct module *module)
-{
-	module_put(module);
-}
-
 #define SET_MODULE_OWNER(dev) ((dev)->owner = THIS_MODULE)
 
 struct obsolete_modparm {
@@ -445,14 +427,7 @@ struct obsolete_modparm {
 struct obsolete_modparm __parm_##var __attribute__((section("__obsparm"))) = \
 { __stringify(var), type };
 
-#else
-#define MODULE_PARM(var,type)
-#endif
-
-/* People do this inside their init routines, when the module isn't
-   "live" yet.  They should no longer be doing that, but
-   meanwhile... */
-static inline void __deprecated _MOD_INC_USE_COUNT(struct module *module)
+static inline void __deprecated MOD_INC_USE_COUNT(struct module *module)
 {
 	__unsafe(module);
 
@@ -460,9 +435,23 @@ static inline void __deprecated _MOD_INC_USE_COUNT(struct module *module)
 	local_inc(&module->ref[get_cpu()].count);
 	put_cpu();
 #else
-	try_module_get(module);
+	(void)try_module_get(module);
 #endif
 }
+
+static inline void __deprecated MOD_DEC_USE_COUNT(struct module *module)
+{
+	module_put(module);
+}
+
+#define MOD_INC_USE_COUNT	MOD_INC_USE_COUNT(THIS_MODULE)
+#define MOD_DEC_USE_COUNT	MOD_DEC_USE_COUNT(THIS_MODULE)
+#else
+#define MODULE_PARM(var,type)
+#define MOD_INC_USE_COUNT	do { } while (0)
+#define MOD_DEC_USE_COUNT	do { } while (0)
+#endif
+
 #define __MODULE_STRING(x) __stringify(x)
 
 /*
