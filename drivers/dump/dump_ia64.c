@@ -45,13 +45,12 @@ static int alloc_dha_stack(void)
 	{
 		return 0;
 	}
-
-       	ptr = kmalloc(THREAD_SIZE * num_online_cpus(),GFP_KERNEL);
-	bzero(ptr,THREAD_SIZE );
+       	ptr = vmalloc(THREAD_SIZE * num_online_cpus());
        	if (!ptr) {
 		printk("vmalloc for dha_stacks failed\n");
 		return -ENOMEM;
 	}
+	bzero(ptr,THREAD_SIZE );
 
 	for (i = 0; i < num_online_cpus(); i++) {
 		dump_header_asm.dha_stack[i] = (uint64_t)((unsigned long)ptr + (i * THREAD_SIZE));
