@@ -684,6 +684,10 @@ MODULE_LICENSE ("GPL");
 #include "ohci-sa1111.c"
 #endif
 
-#if !(defined(CONFIG_PCI) || defined(CONFIG_SA1111))
+#ifdef CONFIG_ARCH_OMAP
+#include "ohci-omap.c"
+#endif
+
+#if !(defined(CONFIG_PCI) || defined(CONFIG_SA1111) || defined(CONFIG_ARCH_OMAP))
 #error "missing bus glue for ohci-hcd"
 #endif

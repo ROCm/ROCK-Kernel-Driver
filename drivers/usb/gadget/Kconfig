@@ -3,12 +3,10 @@
 #    (a) a peripheral controller, and
 #    (b) the gadget driver using it.
 #
-# for 2.5 kbuild, drivers/usb/gadget/Kconfig
-# source this at the end of drivers/usb/Kconfig
-#
-menuconfig USB_GADGET
+menu "USB Gadget Support"
+
+config USB_GADGET
 	tristate "Support for USB Gadgets"
-	depends on EXPERIMENTAL
 	help
 	   USB is a master/slave protocol, organized with one master
 	   host (such as a PC) controlling up to 127 peripheral devices.
@@ -36,12 +34,15 @@ menuconfig USB_GADGET
 # USB Peripheral Controller Support
 #
 choice
-	prompt "USB Peripheral Controller Support"
+	prompt "USB Peripheral Controller"
 	depends on USB_GADGET
+	help
+	   A USB device uses a controller to talk to its host.
+	   Systems should have only one such upstream link.
 
-config USB_NET2280
-	tristate "NetChip 2280 USB Peripheral Controller"
-	depends on PCI && USB_GADGET
+config USB_GADGET_NET2280
+	boolean "NetChip 2280"
+	depends on PCI
 	help
 	   NetChip 2280 is a PCI based USB peripheral controller which
 	   supports both full and high speed USB 2.0 data transfers.  
@@ -54,21 +55,118 @@ config USB_NET2280
 	   dynamically linked module called "net2280" and force all
 	   gadget drivers to also be dynamically linked.
 
+config USB_NET2280
+	tristate
+	depends on USB_GADGET_NET2280
+	default USB_GADGET
+
+config USB_GADGET_PXA2XX
+	boolean "PXA 2xx or IXP 42x"
+	depends on ARCH_PXA || ARCH_IXP425
+	help
+	   Intel's PXA 2xx series XScale ARM-5TE processors include
+	   an integrated full speed USB 1.1 device controller.  The
+	   controller in the IXP 4xx series is register-compatible.
+
+	   It has fifteen fixed-function endpoints, as well as endpoint
+	   zero (for control transfers).
+
+	   Say "y" to link the driver statically, or "m" to build a
+	   dynamically linked module called "pxa2xx_udc" and force all
+	   gadget drivers to also be dynamically linked.
+
+config USB_PXA2XX
+	tristate
+	depends on USB_GADGET_PXA2XX
+	default USB_GADGET
+
+# if there's only one gadget driver, using only two bulk endpoints,
+# don't waste memory for the other endpoints
+config USB_PXA2XX_SMALL
+	depends on USB_GADGET_PXA2XX
+	bool
+	default y if USB_ZERO
+	default y if USB_ETH
+	default y if USB_G_SERIAL
+
+config USB_GADGET_GOKU
+	boolean "Toshiba TC86C001 'Goku-S'"
+	depends on PCI
+	help
+	   The Toshiba TC86C001 is a PCI device which includes controllers
+	   for full speed USB devices, IDE, I2C, SIO, plus a USB host (OHCI).
+	   
+	   The device controller has three configurable (bulk or interrupt)
+	   endpoints, plus endpoint zero (for control transfers).
+
+	   Say "y" to link the driver statically, or "m" to build a
+	   dynamically linked module called "goku_udc" and to force all
+	   gadget drivers to also be dynamically linked.
+
+config USB_GOKU
+	tristate
+	depends on USB_GADGET_GOKU
+	default USB_GADGET
+
+# this could be built elsewhere (doesn't yet exist)
+config USB_GADGET_SA1100
+	boolean "SA 1100"
+	depends on ARCH_SA1100
+	help
+	   Intel's SA-1100 is an ARM-4 processor with an integrated
+	   full speed USB 1.1 device controller.
+
+	   It has two fixed-function endpoints, as well as endpoint
+	   zero (for control transfers).
+
+config USB_SA1100
+	tristate
+	depends on USB_GADGET_SA1100
+	default USB_GADGET
+
+config USB_GADGET_DUMMY_HCD
+	boolean "Dummy HCD (DEVELOPMENT)"
+	depends on USB
+	help
+	  This host controller driver emulates USB, looping all data transfer
+	  requests back to a USB "gadget driver" in the same host.  The host
+	  side is the master; the gadget side is the slave.  Gadget drivers
+	  can be high, full, or low speed; and they have access to endpoints
+	  like those from NET2280, PXA2xx, or SA1100 hardware.
+	  
+	  This may help in some stages of creating a driver to embed in a
+	  Linux device, since it lets you debug several parts of the gadget
+	  driver without its hardware or drivers being involved.
+	  
+	  Since such a gadget side driver needs to interoperate with a host
+	  side Linux-USB device driver, this may help to debug both sides
+	  of a USB protocol stack.
+
+	  Say "y" to link the driver statically, or "m" to build a
+	  dynamically linked module called "dummy_hcd" and force all
+	  gadget drivers to also be dynamically linked.
+
+config USB_DUMMY_HCD
+	tristate
+	depends on USB_GADGET_DUMMY_HCD
+	default USB_GADGET
+
 endchoice
+
 
 #
 # USB Gadget Drivers
 #
 choice
-	prompt "USB Gadget Drivers"
+	tristate "USB Gadget Drivers"
 	depends on USB_GADGET
 	default USB_ETH
 
-# FIXME want a cleaner dependency/config approach for drivers.
+# this first set of drivers all depend on bulk-capable hardware.
 
 config USB_ZERO
 	tristate "Gadget Zero (DEVELOPMENT)"
-	depends on USB_GADGET && (USB_DUMMY_HCD || USB_NET2280 || USB_PXA2XX || USB_SA1100)
+	depends on EXPERIMENTAL
 	help
 	  Gadget Zero is a two-configuration device.  It either sinks and
 	  sources bulk data; or it loops back a configurable number of
@@ -91,26 +189,9 @@ config USB_ZERO
 	  Say "y" to link the driver statically, or "m" to build a
 	  dynamically linked module called "g_zero".
 
-config USB_ZERO_NET2280
-	bool
-	# for now, treat the "dummy" hcd as if it were a net2280
-	depends on USB_ZERO && (USB_NET2280 || USB_DUMMY_HCD)
-	default y
-
-config USB_ZERO_PXA2XX
-	bool
-	depends on USB_ZERO && USB_PXA2XX
-	default y
-
-config USB_ZERO_SA1100
-	bool
-	depends on USB_ZERO && USB_SA1100
-	default y
-
-
 config USB_ETH
 	tristate "Ethernet Gadget"
-	depends on USB_GADGET && NET && (USB_DUMMY_HCD || USB_NET2280 || USB_PXA2XX || USB_SA1100)
+	depends on NET
 	help
 	  This driver implements Ethernet style communication, in either
 	  of two ways:
@@ -136,26 +217,9 @@ config USB_ETH
 	  Say "y" to link the driver statically, or "m" to build a
 	  dynamically linked module called "g_ether".
 
-
-config USB_ETH_NET2280
-	bool
-	# for now, treat the "dummy" hcd as if it were a net2280
-	depends on USB_ETH && (USB_NET2280 || USB_DUMMY_HCD)
-	default y
-
-config USB_ETH_PXA2XX
-	bool
-	depends on USB_ETH && USB_PXA2XX
-	default y
-
-config USB_ETH_SA1100
-	bool
-	depends on USB_ETH && USB_SA1100
-	default y
-
 config USB_GADGETFS
 	tristate "Gadget Filesystem (EXPERIMENTAL)"
-	depends on USB_GADGET && (USB_DUMMY_HCD || USB_NET2280 || USB_PXA2XX) && EXPERIMENTAL
+	depends on EXPERIMENTAL
 	help
 	  This driver provides a filesystem based API that lets user mode
 	  programs implement a single-configuration USB device, including
@@ -166,16 +230,43 @@ config USB_GADGETFS
 	  Say "y" to link the driver statically, or "m" to build a
 	  dynamically linked module called "gadgetfs".
 
-config USB_GADGETFS_NET2280
-	bool
-	# for now, treat the "dummy" hcd as if it were a net2280
-	depends on USB_GADGETFS && (USB_NET2280 || USB_DUMMY_HCD)
-	default y
+config USB_FILE_STORAGE
+	tristate "File-backed Storage Gadget (DEVELOPMENT)"
+	# we don't support the SA1100 because of its limitations
+	depends on USB_GADGET_SA1100 = n
+	help
+	  The File-backed Storage Gadget acts as a USB Mass Storage
+	  disk drive.  As its storage repository it can use a regular
+	  file or a block device (in much the same way as the "loop"
+	  device driver), specified as a module parameter.
 
-config USB_GADGETFS_PXA2XX
-	bool
-	depends on USB_GADGETFS && USB_PXA2XX
-	default y
+	  Say "y" to link the driver statically, or "m" to build a
+	  dynamically linked module called "g_file_storage".
+
+config USB_FILE_STORAGE_TEST
+	bool "File-backed Storage Gadget test version"
+	depends on USB_FILE_STORAGE
+	default n
+	help
+	  Say "y" to generate the larger testing version of the
+	  File-backed Storage Gadget, useful for probing the
+	  behavior of USB Mass Storage hosts.  Not needed for
+	  normal operation.
+
+config USB_G_SERIAL
+	tristate "Serial Gadget"
+	help
+	  The Serial Gadget talks to the Linux-USB generic serial driver.
+
+	  Say "y" to link the driver statically, or "m" to build a
+	  dynamically linked module called "g_serial".
+
+
+
+# put drivers that need isochronous transfer support (for audio
+# or video class gadget drivers), or specific hardware, here.
+
+# - none yet
 
 config USB_G_SERIAL
 	tristate "serial Gadget"
@@ -200,4 +291,4 @@ config USB_G_SERIAL_SA1100
 
 endchoice
 
-# endmenuconfig
+endmenu

@@ -31,6 +31,7 @@
 #include <asm/uaccess.h>
 #include <asm/byteorder.h>
 
+#include "usb.h"
 #include "hcd.h"
 #include "hub.h"
 
@@ -1316,8 +1317,8 @@ int usb_physical_reset_device(struct usb_device *dev)
 		kfree(descriptor);
 		usb_destroy_configuration(dev);
 
-		ret = usb_get_device_descriptor(dev);
-		if (ret < sizeof(dev->descriptor)) {
+		ret = usb_get_device_descriptor(dev, sizeof(dev->descriptor));
+		if (ret != sizeof(dev->descriptor)) {
 			if (ret < 0)
 				err("unable to get device %s descriptor "
 					"(error=%d)", dev->devpath, ret);

@@ -651,7 +651,7 @@ static int  kobil_ioctl(struct usb_serial_port *port, struct file *file,
 		return 0;
 
 	case TCSETS:   // 0x5402
-		if (! &port->tty->termios) {
+		if (!(port->tty->termios)) {
 			dbg("%s - port %d Error: port->tty->termios is NULL", __FUNCTION__, port->number);
 			return -ENOTTY;
 		}
