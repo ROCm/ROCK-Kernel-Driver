@@ -115,6 +115,11 @@ int usb_register(struct usb_driver *new_driver)
 {
 	int retval = 0;
 	
+	if ((new_driver->fops) && (new_driver->num_minors == 0)) {
+		err ("%s driver must specify num_minors", new_driver->name);
+		return -EINVAL;
+	}
+
 #ifndef CONFIG_USB_DYNAMIC_MINORS
 	if (new_driver->fops != NULL) {
 		retval = usb_register_minors (new_driver, new_driver->num_minors, new_driver->minor);
