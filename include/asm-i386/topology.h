@@ -66,9 +66,6 @@ static inline cpumask_t pcibus_to_cpumask(int bus)
 	return node_to_cpumask(mp_bus_id_to_node[bus]);
 }
 
-/* Node-to-Node distance */
-#define node_distance(from, to) ((from) != (to))
-
 /* sched_domains SD_NODE_INIT for NUMAQ machines */
 #define SD_NODE_INIT (struct sched_domain) {		\
 	.span			= CPU_MASK_NONE,	\

@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/lib/memset.S
+ *  linux/arch/arm26/lib/memset.S
  *
  *  Copyright (C) 1995-2000 Russell King
  *

@@ -26,6 +26,9 @@ EXPORT_SYMBOL(printf);
 
 EXPORT_SYMBOL(strstr);
 
+EXPORT_SYMBOL(vsyscall_ehdr);
+EXPORT_SYMBOL(vsyscall_end);
+
 /* Here, instead, I can provide a fake prototype. Yes, someone cares: genksyms.
  * However, the modules will use the CRC defined *here*, no matter if it is
  * good; so the versions of these symbols will always match

@@ -44,42 +44,22 @@ void *kb_data;
 void *sycamore_rtc_base;
 
 /*
- * Define all of the IRQ senses and polarities.
+ * Define external IRQ senses and polarities.
  */
-
-static u_char Sycamore_IRQ_initsenses[] __initdata = {
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 0: Uart 0*/
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 1: Uart 1*/
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 2: IIC */
-	(IRQ_SENSE_EDGE  | IRQ_POLARITY_POSITIVE),	/* 3: External Master */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 4: PCI ext cmd write*/
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 5: DMA Chan 0 */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 6: DMA Chan 1 */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 7: DMA Chan 2 */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 8: DMA Chan 3 */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 9: Ethernet wakeup (WOL)*/
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 10: Mal (SEER) */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 11: Mal TXEOB */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 12: Mal RXEOB */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 13: Mal TXDE*/
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 14: Mal RXDE*/
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 15: Ethernet */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 16: Ext PCI SERR */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 17: ECC */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 18: PCI PM*/
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* 19: Ext Int 7 */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* 20: Ext Int 8 */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* 21: Ext Int 9 */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* 22: Ext Int 10 */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* 23: Ext Int 11 */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* 24: Ext Int 12 */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* 25: Ext Int 0 */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* 26: Ext Int 1 */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* 27: Ext Int 2 */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* 28: Ext Int 3 */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* 29: Ext Int 4 */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* 30: Ext Int 5 */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* 31: Ext Int 6 */
+unsigned char ppc4xx_uic_ext_irq_cfg[] __initdata = {
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* Ext Int 7 */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* Ext Int 8 */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* Ext Int 9 */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* Ext Int 10 */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* Ext Int 11 */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* Ext Int 12 */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* Ext Int 0 */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* Ext Int 1 */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* Ext Int 2 */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* Ext Int 3 */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* Ext Int 4 */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* Ext Int 5 */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* Ext Int 6 */
 };
 
 
@@ -158,8 +138,6 @@ sycamore_setup_arch(void)
 	sycamore_rtc_base = (void *) SYCAMORE_RTC_VADDR;
 	TODC_INIT(TODC_TYPE_DS1743, sycamore_rtc_base, sycamore_rtc_base,
 		  sycamore_rtc_base, 8);
-	ibm4xxPIC_InitSenses = Sycamore_IRQ_initsenses;
-	ibm4xxPIC_NumInitSenses = sizeof(Sycamore_IRQ_initsenses);
 
 	/* Identify the system */
 	printk(KERN_INFO "IBM Sycamore (IBM405GPr) Platform\n");

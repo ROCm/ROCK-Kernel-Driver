@@ -1,6 +1,12 @@
 
 menu "Character Devices"
 
+config STDERR_CONSOLE
+	bool "stderr console"
+	default y
+	help
+	console driver which dumps all printk messages to stderr.
+
 config STDIO_CONSOLE
 	bool
 	default y

@@ -14,12 +14,12 @@
  * Domain numbers
  *
  *  DOMAIN_IO     - domain 2 includes all IO only
- *  DOMAIN_KERNEL - domain 1 includes all kernel memory only
- *  DOMAIN_USER   - domain 0 includes all user memory only
+ *  DOMAIN_USER   - domain 1 includes all user memory only
+ *  DOMAIN_KERNEL - domain 0 includes all kernel memory only
  */
-#define DOMAIN_USER	0
-#define DOMAIN_KERNEL	1
-#define DOMAIN_TABLE	1
+#define DOMAIN_KERNEL	0
+#define DOMAIN_TABLE	0
+#define DOMAIN_USER	1
 #define DOMAIN_IO	2
 
 /*

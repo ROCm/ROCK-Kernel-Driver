@@ -124,8 +124,8 @@ void settlbcam(int index, unsigned long virt, phys_addr_t phys,
 		flags |= _PAGE_COHERENT;
 #endif
 
-	TLBCAM[index].MAS0 = MAS0_TLBSEL | (index << 16);
-	TLBCAM[index].MAS1 = MAS1_VALID | MAS1_IPROT | MAS1_TSIZE(tsize) | ((pid << 16) & MAS1_TID);
+	TLBCAM[index].MAS0 = MAS0_TLBSEL(1) | MAS0_ESEL(index);
+	TLBCAM[index].MAS1 = MAS1_VALID | MAS1_IPROT | MAS1_TSIZE(tsize) | MAS1_TID(pid);
 	TLBCAM[index].MAS2 = virt & PAGE_MASK;
 
 	TLBCAM[index].MAS2 |= (flags & _PAGE_WRITETHRU) ? MAS2_W : 0;
@@ -156,7 +156,7 @@ void settlbcam(int index, unsigned long virt, phys_addr_t phys,
 
 void invalidate_tlbcam_entry(int index)
 {
-	TLBCAM[index].MAS0 = MAS0_TLBSEL | (index << 16);
+	TLBCAM[index].MAS0 = MAS0_TLBSEL(1) | MAS0_ESEL(index);
 	TLBCAM[index].MAS1 = ~MAS1_VALID;
 
 	loadcam_entry(index);

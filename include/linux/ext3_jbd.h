@@ -188,6 +188,8 @@ __ext3_journal_dirty_metadata(const char *where,
 #define ext3_journal_dirty_metadata(handle, bh) \
 	__ext3_journal_dirty_metadata(__FUNCTION__, (handle), (bh))
 
+int ext3_journal_dirty_data(handle_t *handle, struct buffer_head *bh);
+
 handle_t *ext3_journal_start_sb(struct super_block *sb, int nblocks);
 int __ext3_journal_stop(const char *where, handle_t *handle);
 

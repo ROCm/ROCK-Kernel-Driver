@@ -134,6 +134,39 @@ extern int __put_user_4(void *, unsigned int);
 extern int __put_user_8(void *, unsigned long long);
 extern int __put_user_bad(void);
 
+#define __put_user_x(__r1,__p,__e,__s)                                  \
+           __asm__ __volatile__ (                                       \
+                __asmeq("%0", "r0") __asmeq("%2", "r1")                 \
+                "bl     __put_user_" #__s                               \
+                : "=&r" (__e)                                           \
+                : "0" (__p), "r" (__r1)                                 \
+                : "ip", "lr", "cc")
+
+#define put_user(x,p)                                                   \
+        ({                                                              \
+                const register typeof(*(p)) __r1 asm("r1") = (x);       \
+                const register typeof(*(p)) *__p asm("r0") = (p);       \
+                register int __e asm("r0");                             \
+                switch (sizeof(*(__p))) {                               \
+                case 1:                                                 \
+                        __put_user_x(__r1, __p, __e, 1);                \
+                        break;                                          \
+                case 2:                                                 \
+                        __put_user_x(__r1, __p, __e, 2);                \
+                        break;                                          \
+                case 4:                                                 \
+                        __put_user_x(__r1, __p, __e, 4);                \
+                        break;                                          \
+                case 8:                                                 \
+                        __put_user_x(__r1, __p, __e, 8);                \
+                        break;                                          \
+                default: __e = __put_user_bad(); break;                 \
+                }                                                       \
+                __e;                                                    \
+        })
+
+#if 0
+/*********************   OLD METHOD *******************/
 #define __put_user_x(__r1,__p,__e,__s,__i...)				\
 	   __asm__ __volatile__ ("bl	__put_user_" #__s		\
 		: "=&r" (__e)						\
@@ -156,12 +189,14 @@ extern int __put_user_bad(void);
 			__put_user_x(__r1, __p, __e, 4, "r2", "lr");	\
 			break;						\
 		case 8:							\
-			__put_user_x(__r1, __p, __e, 8, "ip", "lr");	\
+			__put_user_x(__r1, __p, __e, 8, "r2", "ip", "lr");	\
 			break;						\
 		default: __e = __put_user_bad(); break;			\
 		}							\
 		__e;							\
 	})
+/*************************************************/
+#endif
 
 #define __put_user(x,ptr)                                               \
 ({                                                                      \

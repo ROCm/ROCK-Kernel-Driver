@@ -5,6 +5,9 @@ please mail me.
 
 00-INDEX
 	- this file
+cpu_features.txt
+	- info on how we support a variety of CPUs with minimal compile-time
+	options.
 ppc_htab.txt
 	- info about the Linux/PPC /proc/ppc_htab entry
 smp.txt

@@ -17,7 +17,11 @@ ifeq ($(CONFIG_4xx),y)
 ifeq ($(CONFIG_VIRTEX_II_PRO),y)
 obj-$(CONFIG_40x)		+= xilinx_pic.o
 else
+ifeq ($(CONFIG_403),y)
+obj-$(CONFIG_40x)		+= ppc403_pic.o
+else
 obj-$(CONFIG_40x)		+= ppc4xx_pic.o
+endif
 endif
 obj-$(CONFIG_44x)		+= ppc4xx_pic.o
 obj-$(CONFIG_40x)		+= ppc4xx_setup.o
@@ -39,17 +43,22 @@ obj-$(CONFIG_PPC_CHRP)		+= open_pic.o indirect_pci.o i8259.o
 obj-$(CONFIG_PPC_PREP)		+= open_pic.o indirect_pci.o i8259.o todc_time.o
 obj-$(CONFIG_ADIR)		+= i8259.o indirect_pci.o pci_auto.o \
 					todc_time.o
+obj-$(CONFIG_CPCI690)		+= todc_time.o pci_auto.o
 obj-$(CONFIG_EBONY)		+= indirect_pci.o pci_auto.o todc_time.o
-obj-$(CONFIG_EV64260)		+= gt64260_common.o gt64260_pic.o \
-					indirect_pci.o todc_time.o pci_auto.o
+obj-$(CONFIG_EV64260)		+= todc_time.o pci_auto.o
+obj-$(CONFIG_CHESTNUT)		+= mv64360_pic.o pci_auto.o
 obj-$(CONFIG_GEMINI)		+= open_pic.o indirect_pci.o
+obj-$(CONFIG_GT64260)		+= gt64260_pic.o
 obj-$(CONFIG_K2)		+= i8259.o indirect_pci.o todc_time.o \
 					pci_auto.o
 obj-$(CONFIG_LOPEC)		+= i8259.o pci_auto.o todc_time.o
+obj-$(CONFIG_KATANA)		+= pci_auto.o
 obj-$(CONFIG_MCPN765)		+= todc_time.o indirect_pci.o pci_auto.o \
 					open_pic.o i8259.o hawk_common.o
 obj-$(CONFIG_MENF1)		+= todc_time.o i8259.o mpc10x_common.o \
 					pci_auto.o indirect_pci.o
+obj-$(CONFIG_MV64360)		+= mv64360_pic.o
+obj-$(CONFIG_MV64X60)		+= mv64x60.o mv64x60_win.o indirect_pci.o
 obj-$(CONFIG_MVME5100)		+= open_pic.o todc_time.o indirect_pci.o \
 					pci_auto.o hawk_common.o
 obj-$(CONFIG_MVME5100_IPMC761_PRESENT)	+= i8259.o
@@ -74,6 +83,9 @@ obj-$(CONFIG_CPM2)		+= cpm2_common.o cpm2_pic.o
 ifeq ($(CONFIG_PPC_GEN550),y)
 obj-$(CONFIG_KGDB)		+= gen550_kgdb.o gen550_dbg.o
 obj-$(CONFIG_SERIAL_TEXT_DEBUG)	+= gen550_dbg.o
+endif
+ifeq ($(CONFIG_SERIAL_MPSC_CONSOLE),y)
+obj-$(CONFIG_SERIAL_TEXT_DEBUG)	+= mv64x60_dbg.o
 endif
 obj-$(CONFIG_BOOTX_TEXT)	+= btext.o
 obj-$(CONFIG_MPC10X_BRIDGE)     += mpc10x_common.o indirect_pci.o

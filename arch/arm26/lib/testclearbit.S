@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/lib/testclearbit.S
+ *  linux/arch/arm26/lib/testclearbit.S
  *
  *  Copyright (C) 1995-1996 Russell King
  *

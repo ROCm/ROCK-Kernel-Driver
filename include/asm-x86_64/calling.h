@@ -143,22 +143,6 @@
 	RESTORE_ARGS 0,\addskip
 	.endm
 
-	/* push in order ss, rsp, eflags, cs, rip */
-	.macro FAKE_STACK_FRAME child_rip
-	xorl %eax,%eax
-	subq $6*8,%rsp
-	movq %rax,5*8(%rsp)  /* ss */
-	movq %rax,4*8(%rsp)  /* rsp */
-	movq $(1<<9),3*8(%rsp)  /* eflags */
-	movq $__KERNEL_CS,2*8(%rsp) /* cs */
-	movq \child_rip,1*8(%rsp)  /* rip */ 
-	movq %rax,(%rsp)   /* orig_rax */ 
-	.endm
-
-	.macro UNFAKE_STACK_FRAME
-	addq $8*6, %rsp
-	.endm
-
 	.macro icebp
 	.byte 0xf1
 	.endm

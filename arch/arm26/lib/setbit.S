@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/lib/setbit.S
+ *  linux/arch/arm26/lib/setbit.S
  *
  *  Copyright (C) 1995-1996 Russell King
  *

@@ -111,10 +111,7 @@ __change_page_attr(struct page *page, pgprot_t prot)
 	unsigned long address;
 	struct page *kpte_page;
 
-#ifdef CONFIG_HIGHMEM
-	if (page >= highmem_start_page) 
-		BUG(); 
-#endif
+	BUG_ON(PageHighMem(page));
 	address = (unsigned long)page_address(page);
 
 	kpte = lookup_address(address);

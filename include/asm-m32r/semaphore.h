@@ -15,18 +15,9 @@
 #include <linux/config.h>
 #include <linux/wait.h>
 #include <linux/rwsem.h>
+#include <asm/assembler.h>
 #include <asm/system.h>
 #include <asm/atomic.h>
-
-#undef LOAD
-#undef STORE
-#ifdef CONFIG_SMP
-#define LOAD	"lock"
-#define STORE	"unlock"
-#else
-#define LOAD	"ld"
-#define STORE	"st"
-#endif
 
 struct semaphore {
 	atomic_t count;
@@ -97,9 +88,9 @@ static inline void down(struct semaphore * sem)
 	__asm__ __volatile__ (
 		"# down				\n\t"
 		DCACHE_CLEAR("%0", "r4", "%1")
-		LOAD"	%0, @%1;		\n\t"
+		M32R_LOCK" %0, @%1;		\n\t"
 		"addi	%0, #-1;		\n\t"
-		STORE"	%0, @%1;		\n\t"
+		M32R_UNLOCK" %0, @%1;		\n\t"
 		: "=&r" (count)
 		: "r" (&sem->count)
 		: "memory"
@@ -128,9 +119,9 @@ static inline int down_interruptible(struct semaphore * sem)
 	__asm__ __volatile__ (
 		"# down_interruptible		\n\t"
 		DCACHE_CLEAR("%0", "r4", "%1")
-		LOAD"	%0, @%1;		\n\t"
+		M32R_LOCK" %0, @%1;		\n\t"
 		"addi	%0, #-1;		\n\t"
-		STORE"	%0, @%1;		\n\t"
+		M32R_UNLOCK" %0, @%1;		\n\t"
 		: "=&r" (count)
 		: "r" (&sem->count)
 		: "memory"
@@ -160,9 +151,9 @@ static inline int down_trylock(struct semaphore * sem)
 	__asm__ __volatile__ (
 		"# down_trylock			\n\t"
 		DCACHE_CLEAR("%0", "r4", "%1")
-		LOAD"	%0, @%1;		\n\t"
+		M32R_LOCK" %0, @%1;		\n\t"
 		"addi	%0, #-1;		\n\t"
-		STORE"	%0, @%1;		\n\t"
+		M32R_UNLOCK" %0, @%1;		\n\t"
 		: "=&r" (count)
 		: "r" (&sem->count)
 		: "memory"
@@ -193,9 +184,9 @@ static inline void up(struct semaphore * sem)
 	__asm__ __volatile__ (
 		"# up				\n\t"
 		DCACHE_CLEAR("%0", "r4", "%1")
-		LOAD"	%0, @%1;		\n\t"
+		M32R_LOCK" %0, @%1;		\n\t"
 		"addi	%0, #1;			\n\t"
-		STORE"	%0, @%1;		\n\t"
+		M32R_UNLOCK" %0, @%1;		\n\t"
 		: "=&r" (count)
 		: "r" (&sem->count)
 		: "memory"

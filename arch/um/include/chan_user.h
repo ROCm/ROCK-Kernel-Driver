@@ -42,8 +42,9 @@ extern int generic_window_size(int fd, void *unused, unsigned short *rows_out,
 			       unsigned short *cols_out);
 extern void generic_free(void *data);
 
-extern void register_winch(int fd, void *device_data);
-extern void register_winch_irq(int fd, int tty_fd, int pid, void *line);
+struct tty_struct;
+extern void register_winch(int fd,  struct tty_struct *tty);
+extern void register_winch_irq(int fd, int tty_fd, int pid, struct tty_struct *tty);
 
 #define __channel_help(fn, prefix) \
 __uml_help(fn, prefix "[0-9]*=<channel description>\n" \

@@ -20,27 +20,17 @@
 
 extern int reiserfs_default_io_size; /* default io size devuned in super.c */
 
-/* args for the create parameter of reiserfs_get_block */
-#define GET_BLOCK_NO_CREATE 0 /* don't create new blocks or convert tails */
-#define GET_BLOCK_CREATE 1    /* add anything you need to find block */
-#define GET_BLOCK_NO_HOLE 2   /* return -ENOENT for file holes */
-#define GET_BLOCK_READ_DIRECT 4  /* read the tail if indirect item not found */
-#define GET_BLOCK_NO_ISEM     8 /* i_sem is not held, don't preallocate */
-#define GET_BLOCK_NO_DANGLE   16 /* don't leave any transactions running */
-
-static int reiserfs_get_block (struct inode * inode, sector_t block,
-			       struct buffer_head * bh_result, int create);
 static int reiserfs_commit_write(struct file *f, struct page *page,
                                  unsigned from, unsigned to);
 
 void reiserfs_delete_inode (struct inode * inode)
 {
-    int jbegin_count = JOURNAL_PER_BALANCE_CNT * 2; 
+    /* We need blocks for transaction + (user+group) quota update (possibly delete) */
+    int jbegin_count = JOURNAL_PER_BALANCE_CNT * 2 + 2 * REISERFS_QUOTA_INIT_BLOCKS;
     struct reiserfs_transaction_handle th ;
   
     reiserfs_write_lock(inode->i_sb);
 
-    DQUOT_FREE_INODE(inode);
     /* The = 0 happens when we abort creating a new inode for some reason like lack of space.. */
     if (!(inode->i_state & I_NEW) && INODE_PKEY(inode)->k_objectid != 0) { /* also handles bad_inode case */
 	down (&inode->i_sem); 
@@ -57,6 +47,11 @@ void reiserfs_delete_inode (struct inode * inode)
 	    up (&inode->i_sem);
 	    goto out;
 	}
+
+	/* Do quota update inside a transaction for journaled quotas. We must do that
+	 * after delete_object so that quota updates go into the same transaction as
+	 * stat data deletion */
+	DQUOT_FREE_INODE(inode);
 
 	if (journal_end(&th, inode->i_sb, jbegin_count)) {
 	    up (&inode->i_sem);
@@ -592,8 +587,9 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
         . 3 balancings in direct->indirect conversion
         . 1 block involved into reiserfs_update_sd()
        XXX in practically impossible worst case direct2indirect()
-       can incur (much) more that 3 balancings. */
-    int jbegin_count = JOURNAL_PER_BALANCE_CNT * 3 + 1;
+       can incur (much) more than 3 balancings.
+       quota update for user, group */
+    int jbegin_count = JOURNAL_PER_BALANCE_CNT * 3 + 1 + 2 * REISERFS_QUOTA_TRANS_BLOCKS;
     int version;
     int dangle = 1;
     loff_t new_offset = (((loff_t)block) << inode->i_sb->s_blocksize_bits) + 1 ;
@@ -1699,6 +1695,10 @@ int reiserfs_new_inode (struct reiserfs_transaction_handle *th,
 
     BUG_ON (!th->t_trans_id);
   
+    if (DQUOT_ALLOC_INODE(inode)) {
+	err = -EDQUOT;
+	goto out_end_trans;
+    }
     if (!dir || !dir->i_nlink) {
 	err = -EPERM;
 	goto out_bad_inode;
@@ -1866,9 +1866,12 @@ out_bad_inode:
     /* Invalidate the object, nothing was inserted yet */
     INODE_PKEY(inode)->k_objectid = 0;
 
-    /* dquot_drop must be done outside a transaction */
-    journal_end(th, th->t_super, th->t_blocks_allocated) ;
+    /* Quota change must be inside a transaction for journaling */
     DQUOT_FREE_INODE(inode);
+
+out_end_trans:
+    journal_end(th, th->t_super, th->t_blocks_allocated) ;
+    /* Drop can be outside and it needs more credits so it's better to have it outside */
     DQUOT_DROP(inode);
     inode->i_flags |= S_NOQUOTA;
     make_bad_inode(inode);
@@ -2796,8 +2799,25 @@ int reiserfs_setattr(struct dentry *dentry, struct iattr *attr) {
 	    (ia_valid & ATTR_GID && attr->ia_gid != inode->i_gid)) {
                 error = reiserfs_chown_xattrs (inode, attr);
 
-                if (!error)
+                if (!error) {
+		    struct reiserfs_transaction_handle th;
+
+		    /* (user+group)*(old+new) structure - we count quota info and , inode write (sb, inode) */
+		    journal_begin(&th, inode->i_sb, 4*REISERFS_QUOTA_INIT_BLOCKS+2);
                     error = DQUOT_TRANSFER(inode, attr) ? -EDQUOT : 0;
+		    if (error) {
+			journal_end(&th, inode->i_sb, 4*REISERFS_QUOTA_INIT_BLOCKS+2);
+			goto out;
+		    }
+		    /* Update corresponding info in inode so that everything is in
+		     * one transaction */
+		    if (attr->ia_valid & ATTR_UID)
+			inode->i_uid = attr->ia_uid;
+		    if (attr->ia_valid & ATTR_GID)
+			inode->i_gid = attr->ia_gid;
+		    mark_inode_dirty(inode);
+		    journal_end(&th, inode->i_sb, 4*REISERFS_QUOTA_INIT_BLOCKS+2);
+		}
         }
         if (!error)
             error = inode_setattr(inode, attr) ;

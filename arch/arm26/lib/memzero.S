@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/lib/memzero.S
+ *  linux/arch/arm26/lib/memzero.S
  *
  *  Copyright (C) 1995-2000 Russell King
  *

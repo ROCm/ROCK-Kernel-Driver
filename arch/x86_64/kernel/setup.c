@@ -57,6 +57,7 @@
 #include <asm/proto.h>
 #include <asm/setup.h>
 #include <asm/mach_apic.h>
+#include <asm/numa.h>
 
 /*
  * Machine setup..
@@ -75,8 +76,13 @@ extern acpi_interrupt_flags	acpi_sci_flags;
 int __initdata acpi_force = 0;
 #endif
 
+int acpi_numa __initdata;
+
 /* For PCI or other memory-mapped resources */
 unsigned long pci_mem_start = 0x10000000;
+
+/* Boot loader ID as an integer, for the benefit of proc_dointvec */
+int bootloader_type;
 
 unsigned long saved_video_mode;
 
@@ -312,6 +318,9 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 		if (!memcmp(from,"oops=panic", 10))
 			panic_on_oops = 1;
 
+		if (!memcmp(from, "noexec=", 7))
+			nonx_setup(from + 7);
+
 	next_char:
 		c = *(from++);
 		if (!c)
@@ -452,6 +461,7 @@ void __init setup_arch(char **cmdline_p)
 	edid_info = EDID_INFO;
 	aux_device_present = AUX_DEVICE_INFO;
 	saved_video_mode = SAVED_VIDEO_MODE;
+	bootloader_type = LOADER_TYPE;
 
 #ifdef CONFIG_BLK_DEV_RAM
 	rd_image_start = RAMDISK_FLAGS & RAMDISK_IMAGE_START_MASK;
@@ -484,6 +494,21 @@ void __init setup_arch(char **cmdline_p)
 	check_efer();
 
 	init_memory_mapping(); 
+
+#ifdef CONFIG_ACPI_BOOT
+	/*
+	 * Initialize the ACPI boot-time table parser (gets the RSDP and SDT).
+	 * Call this early for SRAT node setup.
+	 */
+	acpi_boot_table_init();
+#endif
+
+#ifdef CONFIG_ACPI_NUMA
+	/*
+	 * Parse SRAT to discover nodes.
+	 */
+	acpi_numa_init();
+#endif
 
 #ifdef CONFIG_DISCONTIGMEM
 	numa_initmem_init(0, end_pfn); 
@@ -551,16 +576,15 @@ void __init setup_arch(char **cmdline_p)
 #endif
 	paging_init();
 
-		check_ioapic();
+	check_ioapic();
+
 #ifdef CONFIG_ACPI_BOOT
-       /*
-        * Initialize the ACPI boot-time table parser (gets the RSDP and SDT).
-        * Must do this after paging_init (due to reliance on fixmap, and thus
-        * the bootmem allocator) but before get_smp_config (to allow parsing
-        * of MADT).
-        */
+	/*
+	 * Read APIC and some other early information from ACPI tables.
+	 */
 	acpi_boot_init();
 #endif
+
 #ifdef CONFIG_X86_LOCAL_APIC
 	/*
 	 * get boot-time SMP configuration:
@@ -662,6 +686,9 @@ static int __init init_amd(struct cpuinfo_x86 *c)
 {
 	int r;
 	int level;
+#ifdef CONFIG_NUMA
+	int cpu;
+#endif
 
 	/* Bit 31 in normal CPUID used for nonstandard 3DNow ID;
 	   3DNow is IDd by bit 31 in extended CPUID (1*32+31) anyway */
@@ -684,7 +711,7 @@ static int __init init_amd(struct cpuinfo_x86 *c)
 	} 
 	display_cacheinfo(c);
 
-	if (c->cpuid_level >= 0x80000008) {
+	if (cpuid_eax(0x80000000) >= 0x80000008) {
 		c->x86_num_cores = (cpuid_ecx(0x80000008) & 0xff) + 1;
 		if (c->x86_num_cores & (c->x86_num_cores - 1))
 			c->x86_num_cores = 1;
@@ -693,13 +720,14 @@ static int __init init_amd(struct cpuinfo_x86 *c)
 		/* On a dual core setup the lower bits of apic id
 		   distingush the cores. Fix up the CPU<->node mappings
 		   here based on that.
-		   Assumes number of cores is a power of two. */
-		if (c->x86_num_cores > 1) {
-			int cpu = c->x86_apicid;
+		   Assumes number of cores is a power of two.
+		   When using SRAT use mapping from SRAT. */
+		cpu = c->x86_apicid;
+		if (acpi_numa <= 0 && c->x86_num_cores > 1) {
 			cpu_to_node[cpu] = cpu >> hweight32(c->x86_num_cores - 1);
-			printk(KERN_INFO "CPU %d -> Node %d\n",
-			       cpu, cpu_to_node[cpu]);
 		}
+		printk(KERN_INFO "CPU %d(%d) -> Node %d\n",
+				cpu, c->x86_num_cores, cpu_to_node[cpu]);
 #endif
 	}
 
@@ -750,6 +778,19 @@ static void __init detect_ht(struct cpuinfo_x86 *c)
 		printk(KERN_INFO  "CPU: Physical Processor ID: %d\n",
 		       phys_proc_id[cpu]);
 	}
+#endif
+}
+
+static void __init sched_cmp_hack(struct cpuinfo_x86 *c)
+{
+#ifdef CONFIG_SMP
+	/* AMD dual core looks like HT but isn't really. Hide it from the
+	   scheduler. This works around problems with the domain scheduler.
+	   Also probably gives slightly better scheduling and disables
+	   SMT nice which is harmful on dual core.
+	   TBD tune the domain scheduler for dual core. */
+	if (c->x86_vendor == X86_VENDOR_AMD && cpu_has(c, X86_FEATURE_CMP_LEGACY))
+		smp_num_siblings = 1;
 #endif
 }
 	
@@ -895,7 +936,8 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 
 	select_idle_routine(c);
 	detect_ht(c); 
-		
+	sched_cmp_hack(c);
+
 	/*
 	 * On SMP, boot_cpu_data holds the common feature set between
 	 * all CPUs; so make sure that we indicate which features are
@@ -910,6 +952,10 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 
 #ifdef CONFIG_X86_MCE
 	mcheck_init(c);
+#endif
+#ifdef CONFIG_NUMA
+	if (c != &boot_cpu_data)
+		numa_add_cpu(c - cpu_data);
 #endif
 }
  
@@ -973,7 +1019,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 
 		/* AMD-defined (#2) */
-		"lahf_lm", "htvalid", NULL, NULL, NULL, NULL, NULL, NULL,
+		"lahf_lm", "cmp_legacy", NULL, NULL, NULL, NULL, NULL, NULL,
 		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
@@ -1016,11 +1062,9 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	if (c->x86_cache_size >= 0) 
 		seq_printf(m, "cache size\t: %d KB\n", c->x86_cache_size);
 	
-#ifdef CONFIG_X86_HT
-	if (smp_num_siblings > 1) {
-		seq_printf(m, "physical id\t: %d\n", phys_proc_id[c - cpu_data]);
-		seq_printf(m, "siblings\t: %d\n", smp_num_siblings);
-	}
+#ifdef CONFIG_SMP
+	seq_printf(m, "physical id\t: %d\n", phys_proc_id[c - cpu_data]);
+	seq_printf(m, "siblings\t: %d\n", c->x86_num_cores * smp_num_siblings);
 #endif	
 
 	seq_printf(m,
@@ -1062,6 +1106,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 					seq_printf(m, " [%d]", i);
 			}
 	}
+	seq_printf(m, "\n");
 
 	if (c->x86_num_cores > 1)
 		seq_printf(m, "cpu cores\t: %d\n", c->x86_num_cores);

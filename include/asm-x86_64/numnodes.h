@@ -3,7 +3,6 @@
 
 #include <linux/config.h>
 
-/* Max 8 Nodes - APIC limit currently */
-#define NODES_SHIFT	3
+#define NODES_SHIFT	6
 
 #endif

@@ -196,18 +196,20 @@ cpi_module_init(void)
 	rc = sclp_register(&sclp_cpi_event);
 	if (rc) {
 		/* could not register sclp event. Die. */
-		printk("cpi: could not register to hardware console.\n");
+		printk(KERN_WARNING "cpi: could not register to hardware "
+		       "console.\n");
 		return -EINVAL;
 	}
 	if (!(sclp_cpi_event.sclp_send_mask & EvTyp_CtlProgIdent_Mask)) {
-		printk("cpi: no control program identification support\n");
+		printk(KERN_WARNING "cpi: no control program identification "
+		       "support\n");
 		sclp_unregister(&sclp_cpi_event);
 		return -ENOTSUPP;
 	}
 
 	req = cpi_prepare_req();
 	if (IS_ERR(req)) {
-		printk("cpi: couldn't allocate request\n");
+		printk(KERN_WARNING "cpi: couldn't allocate request\n");
 		sclp_unregister(&sclp_cpi_event);
 		return PTR_ERR(req);
 	}
@@ -216,13 +218,20 @@ cpi_module_init(void)
 	sema_init(&sem, 0);
 	req->callback_data = &sem;
 	/* Add request to sclp queue */
-	sclp_add_request(req);
+	rc = sclp_add_request(req);
+	if (rc) {
+		printk(KERN_WARNING "cpi: could not start request\n");
+		cpi_free_req(req);
+		sclp_unregister(&sclp_cpi_event);
+		return rc;
+	}
 	/* make "insmod" sleep until callback arrives */
 	down(&sem);
 
 	rc = ((struct cpi_sccb *) req->sccb)->header.response_code;
 	if (rc != 0x0020) {
-		printk("cpi: failed with response code 0x%x\n", rc);
+		printk(KERN_WARNING "cpi: failed with response code 0x%x\n",
+		       rc);
 		rc = -ECOMM;
 	} else
 		rc = 0;

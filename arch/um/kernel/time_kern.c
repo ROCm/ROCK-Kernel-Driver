@@ -170,7 +170,7 @@ void __const_udelay(um_udelay_t usecs)
 void timer_handler(int sig, union uml_pt_regs *regs)
 {
 	local_irq_disable();
-	update_process_times(user_context(UPT_SP(regs)));
+	update_process_times(CHOOSE_MODE(user_context(UPT_SP(regs)), (regs)->skas.is_user));
 	local_irq_enable();
 	if(current_thread->cpu == 0)
 		timer_irq(regs);

@@ -9,8 +9,6 @@
 
 #ifdef CONFIG_HIGHMEM
 
-extern struct page *highmem_start_page;
-
 #include <asm/highmem.h>
 
 /* declarations for linux/mm/highmem.c */

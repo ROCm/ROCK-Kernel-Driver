@@ -21,6 +21,7 @@
 
 #include <asm/ibm4xx.h>
 #include <asm/ocp.h>
+#include <asm/ppc4xx_pic.h>
 
 #include <platforms/4xx/ibm405ep.h>
 
@@ -130,5 +131,13 @@ struct ocp_def core_ocp[] = {
 	  .show		= &ocp_show_emac_data
 	},
 	{ .vendor	= OCP_VENDOR_INVALID
+	}
+};
+
+/* Polarity and triggering settings for internal interrupt sources */
+struct ppc4xx_uic_settings ppc4xx_core_uic_cfg[] __initdata = {
+	{ .polarity 	= 0xffff7f80,
+	  .triggering	= 0x00000000,
+	  .ext_irq_mask	= 0x0000007f,	/* IRQ0 - IRQ6 */
 	}
 };

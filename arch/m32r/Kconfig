@@ -20,9 +20,13 @@ config GENERIC_ISA_DMA
 	bool
 	default y
 
-#config GENERIC_HARDIRQS
-#	bool
-#	default y
+config GENERIC_HARDIRQS
+	bool
+	default y
+
+config GENERIC_IRQ_PROBE
+	bool
+	default y
 
 source "init/Kconfig"
 

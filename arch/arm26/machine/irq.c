@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/mach-arc/irq.c
+ *  linux/arch/arm26/mach-arc/irq.c
  *
  *  Copyright (C) 1996 Russell King
  *

@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/lib/floppydma.S
+ *  linux/arch/arm26/lib/floppydma.S
  *
  *  Copyright (C) 1995, 1996 Russell King
  *
