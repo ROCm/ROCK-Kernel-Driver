@@ -1433,7 +1433,7 @@ void emmh32_setseed(emmh32_context *context, u8 *pkey, int keylen, struct crypto
   
 	int i,j;
 	u32 counter;
-	u8 *cipher;
+	u8 *cipher, plain[16];
 	struct scatterlist sg[1];
 
 	crypto_cipher_setkey(tfm, pkey, 16);
@@ -1444,8 +1444,9 @@ void emmh32_setseed(emmh32_context *context, u8 *pkey, int keylen, struct crypto
 		aes_counter[13] = (u8)(counter >> 16);
 		aes_counter[12] = (u8)(counter >> 24);
 		counter++;
-		sg[0].page = virt_to_page(aes_counter);
-		sg[0].offset = ((long) aes_counter & ~PAGE_MASK);
+		memcpy (plain, aes_counter, 16);
+		sg[0].page = virt_to_page(plain);
+		sg[0].offset = ((long) plain & ~PAGE_MASK);
 		sg[0].length = 16;
 		crypto_cipher_encrypt(tfm, sg, sg, 16);
 		cipher = kmap(sg[0].page) + sg[0].offset;
