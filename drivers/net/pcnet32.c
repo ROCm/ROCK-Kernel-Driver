@@ -22,8 +22,8 @@
  *************************************************************************/
 
 #define DRV_NAME	"pcnet32"
-#define DRV_VERSION	"1.30b"
-#define DRV_RELDATE	"05.24.2004"
+#define DRV_VERSION	"1.30c"
+#define DRV_RELDATE	"05.25.2004"
 #define PFX		DRV_NAME ": "
 
 static const char *version =
@@ -1604,12 +1604,16 @@ pcnet32_tx_timeout (struct net_device *dev)
 	   lp->cur_rx);
 	for (i = 0 ; i < RX_RING_SIZE; i++)
 	printk("%s %08x %04x %08x %04x", i & 1 ? "" : "\n ",
-	       lp->rx_ring[i].base, -lp->rx_ring[i].buf_length,
-	       lp->rx_ring[i].msg_length, (unsigned)lp->rx_ring[i].status);
+	       le32_to_cpu(lp->rx_ring[i].base),
+	       le16_to_cpu(-lp->rx_ring[i].buf_length),
+	       le32_to_cpu(lp->rx_ring[i].msg_length),
+	       le16_to_cpu((unsigned)lp->rx_ring[i].status));
 	for (i = 0 ; i < TX_RING_SIZE; i++)
 	printk("%s %08x %04x %08x %04x", i & 1 ? "" : "\n ",
-	       lp->tx_ring[i].base, -lp->tx_ring[i].length,
-	       lp->tx_ring[i].misc, (unsigned)lp->tx_ring[i].status);
+	       le32_to_cpu(lp->tx_ring[i].base),
+	       le16_to_cpu(-lp->tx_ring[i].length),
+	       le32_to_cpu(lp->tx_ring[i].misc),
+	       le16_to_cpu((unsigned)lp->tx_ring[i].status));
 	printk("\n");
     }
     pcnet32_restart(dev, 0x0042);
@@ -1826,6 +1830,7 @@ pcnet32_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	    /* stop the chip to clear the error condition, then restart */
 	    lp->a.write_csr (ioaddr, 0, 0x0004);
 	    pcnet32_restart(dev, 0x0002);
+	    netif_wake_queue(dev);
 	}
     }
 
@@ -2097,8 +2102,9 @@ static void pcnet32_set_multicast_list(struct net_device *dev)
     }
 
     lp->a.write_csr (ioaddr, 0, 0x0004); /* Temporarily stop the lance. */
-
     pcnet32_restart(dev, 0x0042); /*  Resume normal operation */
+    netif_wake_queue(dev);
+
     spin_unlock_irqrestore(&lp->lock, flags);
 }
 
