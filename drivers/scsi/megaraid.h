@@ -989,8 +989,6 @@ typedef enum { LOCK_INT, LOCK_EXT } lockscope_t;
 
 const char *megaraid_info (struct Scsi_Host *);
 
-static int megaraid_detect(Scsi_Host_Template *);
-static void mega_find_card(Scsi_Host_Template *, u16, u16);
 static int mega_query_adapter(adapter_t *);
 static inline int issue_scb(adapter_t *, scb_t *);
 static int mega_setup_mailbox(adapter_t *);
@@ -1007,7 +1005,6 @@ static irqreturn_t megaraid_isr_iomapped(int, void *, struct pt_regs *);
 
 static void mega_free_scb(adapter_t *, scb_t *);
 
-static int megaraid_release (struct Scsi_Host *);
 static int megaraid_abort(Scsi_Cmnd *);
 static int megaraid_reset(Scsi_Cmnd *);
 static int megaraid_abort_and_reset(adapter_t *, Scsi_Cmnd *, int);
@@ -1025,8 +1022,6 @@ static inline void mega_free_sgl (adapter_t *adapter);
 static void mega_8_to_40ld (mraid_inquiry *inquiry,
 		mega_inquiry3 *enquiry3, mega_product_info *);
 
-static int megaraid_reboot_notify (struct notifier_block *,
-				   unsigned long, void *);
 static int megadev_open (struct inode *, struct file *);
 static int megadev_ioctl (struct inode *, struct file *, unsigned int,
 		unsigned long);
