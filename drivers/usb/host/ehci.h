@@ -47,13 +47,6 @@ struct ehci_stats {
 #define	EHCI_MAX_ROOT_PORTS	15		/* see HCS_N_PORTS */
 
 struct ehci_hcd {			/* one per controller */
-
-	/* glue to PCI and HCD framework */
-	struct usb_hcd		hcd;		/* must come first! */
-	struct ehci_caps __iomem *caps;
-	struct ehci_regs __iomem *regs;
-	__u32			hcs_params;	/* cached register copy */
-
 	spinlock_t		lock;
 
 	/* async schedule support */
@@ -91,6 +84,11 @@ struct ehci_hcd {			/* one per controller */
 
 	unsigned		is_arc_rh_tt:1;	/* ARC roothub with TT */
 
+	/* glue to PCI and HCD framework */
+	struct ehci_caps __iomem *caps;
+	struct ehci_regs __iomem *regs;
+	__u32			hcs_params;	/* cached register copy */
+
 	/* irq statistics */
 #ifdef EHCI_STATS
 	struct ehci_stats	stats;
@@ -100,8 +98,15 @@ struct ehci_hcd {			/* one per controller */
 #endif
 };
 
-/* unwrap an HCD pointer to get an EHCI_HCD pointer */ 
-#define hcd_to_ehci(hcd_ptr) container_of(hcd_ptr, struct ehci_hcd, hcd)
+/* convert between an HCD pointer and the corresponding EHCI_HCD */ 
+static inline struct ehci_hcd *hcd_to_ehci (struct usb_hcd *hcd)
+{
+	return (struct ehci_hcd *) (hcd->hcd_priv);
+}
+static inline struct usb_hcd *ehci_to_hcd (struct ehci_hcd *ehci)
+{
+	return container_of ((void *) ehci, struct usb_hcd, hcd_priv);
+}
 
 
 enum ehci_timer_action {

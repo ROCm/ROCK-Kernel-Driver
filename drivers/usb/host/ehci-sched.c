@@ -249,14 +249,14 @@ static int enable_periodic (struct ehci_hcd *ehci)
 	 */
 	status = handshake (&ehci->regs->status, STS_PSS, 0, 9 * 125);
 	if (status != 0) {
-		ehci->hcd.state = USB_STATE_HALT;
+		ehci_to_hcd(ehci)->state = USB_STATE_HALT;
 		return status;
 	}
 
 	cmd = readl (&ehci->regs->command) | CMD_PSE;
 	writel (cmd, &ehci->regs->command);
 	/* posted write ... PSS happens later */
-	ehci->hcd.state = USB_STATE_RUNNING;
+	ehci_to_hcd(ehci)->state = USB_STATE_RUNNING;
 
 	/* make sure ehci_work scans these */
 	ehci->next_uframe = readl (&ehci->regs->frame_index)
@@ -274,7 +274,7 @@ static int disable_periodic (struct ehci_hcd *ehci)
 	 */
 	status = handshake (&ehci->regs->status, STS_PSS, STS_PSS, 9 * 125);
 	if (status != 0) {
-		ehci->hcd.state = USB_STATE_HALT;
+		ehci_to_hcd(ehci)->state = USB_STATE_HALT;
 		return status;
 	}
 
@@ -348,7 +348,7 @@ static int qh_link_periodic (struct ehci_hcd *ehci, struct ehci_qh *qh)
 	qh_get (qh);
 
 	/* update per-qh bandwidth for usbfs */
-	hcd_to_bus (&ehci->hcd)->bandwidth_allocated += qh->period
+	ehci_to_hcd(ehci)->self.bandwidth_allocated += qh->period
 		? ((qh->usecs + qh->c_usecs) / qh->period)
 		: (qh->usecs * 8);
 
@@ -379,7 +379,7 @@ static void qh_unlink_periodic (struct ehci_hcd *ehci, struct ehci_qh *qh)
 		periodic_unlink (ehci, i, qh);
 
 	/* update per-qh bandwidth for usbfs */
-	hcd_to_bus (&ehci->hcd)->bandwidth_allocated -= qh->period
+	ehci_to_hcd(ehci)->self.bandwidth_allocated -= qh->period
 		? ((qh->usecs + qh->c_usecs) / qh->period)
 		: (qh->usecs * 8);
 
@@ -618,7 +618,7 @@ static int intr_submit (
 	BUG_ON (qh == 0);
 
 	/* ... update usbfs periodic stats */
-	hcd_to_bus (&ehci->hcd)->bandwidth_int_reqs++;
+	ehci_to_hcd(ehci)->self.bandwidth_int_reqs++;
 
 done:
 	spin_unlock_irqrestore (&ehci->lock, flags);
@@ -1258,7 +1258,7 @@ itd_link_urb (
 	next_uframe = stream->next_uframe % mod;
 
 	if (unlikely (list_empty(&stream->td_list))) {
-		hcd_to_bus (&ehci->hcd)->bandwidth_allocated
+		ehci_to_hcd(ehci)->self.bandwidth_allocated
 				+= stream->bandwidth;
 		ehci_vdbg (ehci,
 			"schedule devp %s ep%d%s-iso period %d start %d.%d\n",
@@ -1268,7 +1268,7 @@ itd_link_urb (
 			next_uframe >> 3, next_uframe & 0x7);
 		stream->start = jiffies;
 	}
-	hcd_to_bus (&ehci->hcd)->bandwidth_isoc_reqs++;
+	ehci_to_hcd(ehci)->self.bandwidth_isoc_reqs++;
 
 	/* fill iTDs uframe by uframe */
 	for (packet = 0, itd = NULL; packet < urb->number_of_packets; ) {
@@ -1390,10 +1390,10 @@ itd_complete (
 	ehci->periodic_sched--;
 	if (unlikely (!ehci->periodic_sched))
 		(void) disable_periodic (ehci);
-	hcd_to_bus (&ehci->hcd)->bandwidth_isoc_reqs--;
+	ehci_to_hcd(ehci)->self.bandwidth_isoc_reqs--;
 
 	if (unlikely (list_empty (&stream->td_list))) {
-		hcd_to_bus (&ehci->hcd)->bandwidth_allocated
+		ehci_to_hcd(ehci)->self.bandwidth_allocated
 				-= stream->bandwidth;
 		ehci_vdbg (ehci,
 			"deschedule devp %s ep%d%s-iso\n",
@@ -1643,7 +1643,7 @@ sitd_link_urb (
 
 	if (list_empty(&stream->td_list)) {
 		/* usbfs ignores TT bandwidth */
-		hcd_to_bus (&ehci->hcd)->bandwidth_allocated
+		ehci_to_hcd(ehci)->self.bandwidth_allocated
 				+= stream->bandwidth;
 		ehci_vdbg (ehci,
 			"sched dev%s ep%d%s-iso [%d] %dms/%04x\n",
@@ -1653,7 +1653,7 @@ sitd_link_urb (
 			stream->interval, le32_to_cpu (stream->splits));
 		stream->start = jiffies;
 	}
-	hcd_to_bus (&ehci->hcd)->bandwidth_isoc_reqs++;
+	ehci_to_hcd(ehci)->self.bandwidth_isoc_reqs++;
 
 	/* fill sITDs frame by frame */
 	for (packet = 0, sitd = NULL;
@@ -1753,10 +1753,10 @@ sitd_complete (
 	ehci->periodic_sched--;
 	if (!ehci->periodic_sched)
 		(void) disable_periodic (ehci);
-	hcd_to_bus (&ehci->hcd)->bandwidth_isoc_reqs--;
+	ehci_to_hcd(ehci)->self.bandwidth_isoc_reqs--;
 
 	if (list_empty (&stream->td_list)) {
-		hcd_to_bus (&ehci->hcd)->bandwidth_allocated
+		ehci_to_hcd(ehci)->self.bandwidth_allocated
 				-= stream->bandwidth;
 		ehci_vdbg (ehci,
 			"deschedule devp %s ep%d%s-iso\n",
@@ -1860,7 +1860,7 @@ scan_periodic (struct ehci_hcd *ehci, struct pt_regs *regs)
 	 * Touches as few pages as possible:  cache-friendly.
 	 */
 	now_uframe = ehci->next_uframe;
-	if (HCD_IS_RUNNING (ehci->hcd.state))
+	if (HCD_IS_RUNNING (ehci_to_hcd(ehci)->state))
 		clock = readl (&ehci->regs->frame_index);
 	else
 		clock = now_uframe + mod - 1;
@@ -1894,7 +1894,7 @@ restart:
 			union ehci_shadow	temp;
 			int			live;
 
-			live = HCD_IS_RUNNING (ehci->hcd.state);
+			live = HCD_IS_RUNNING (ehci_to_hcd(ehci)->state);
 			switch (type) {
 			case Q_TYPE_QH:
 				/* handle any completions */
@@ -1983,7 +1983,7 @@ restart:
 		if (now_uframe == clock) {
 			unsigned	now;
 
-			if (!HCD_IS_RUNNING (ehci->hcd.state))
+			if (!HCD_IS_RUNNING (ehci_to_hcd(ehci)->state))
 				break;
 			ehci->next_uframe = now_uframe;
 			now = readl (&ehci->regs->frame_index) % mod;
