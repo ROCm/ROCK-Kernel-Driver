@@ -126,6 +126,7 @@ xfs-$(CONFIG_XFS_TRACE)		+= xfs_dir2_trace.o
 
 # Objects in linux-2.6/
 xfs-y				+= $(addprefix linux-2.6/, \
+				   kmem.o \
 				   xfs_aops.o \
 				   xfs_buf.o \
 				   xfs_file.o \
