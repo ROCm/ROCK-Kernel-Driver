@@ -936,11 +936,13 @@ void show_free_areas(void)
 		K(nr_free_pages()),
 		K(nr_free_highpages()));
 
-	printk("Active:%lu inactive:%lu dirty:%lu writeback:%lu free:%u\n",
+	printk("Active:%lu inactive:%lu dirty:%lu writeback:%lu "
+		"unstable:%lu free:%u\n",
 		active,
 		inactive,
 		ps.nr_dirty,
 		ps.nr_writeback,
+		ps.nr_unstable,
 		nr_free_pages());
 
 	for_each_zone(zone) {
@@ -1439,6 +1441,7 @@ struct seq_operations fragmentation_op = {
 static char *vmstat_text[] = {
 	"nr_dirty",
 	"nr_writeback",
+	"nr_unstable",
 	"nr_page_table_pages",
 	"nr_mapped",
 	"nr_slab",
