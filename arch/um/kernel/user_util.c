@@ -29,6 +29,7 @@
 #include "mem_user.h"
 #include "init.h"
 #include "helper.h"
+#include "uml-config.h"
 
 #define COMMAND_LINE_SIZE _POSIX_ARG_MAX
 
@@ -88,12 +89,15 @@ void task_protections(unsigned long address)
 {
 	unsigned long guard = address + page_size();
 	unsigned long stack = guard + page_size();
-	int prot = 0;
+	int prot = 0, pages;
 
+#ifdef notdef
 	if(mprotect((void *) stack, page_size(), prot) < 0)
 		panic("protecting guard page failed, errno = %d", errno);
+#endif
+	pages = (1 << CONFIG_KERNEL_STACK_ORDER) - 2;
 	prot = PROT_READ | PROT_WRITE | PROT_EXEC;
-	if(mprotect((void *) stack, 2 * page_size(), prot) < 0)
+	if(mprotect((void *) stack, pages * page_size(), prot) < 0)
 		panic("protecting stack failed, errno = %d", errno);
 }
 

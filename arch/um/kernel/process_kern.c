@@ -306,7 +306,11 @@ EXPORT_SYMBOL(not_implemented);
 
 int user_context(unsigned long sp)
 {
-	return((sp & (PAGE_MASK << 1)) != current->thread.kernel_stack);
+	unsigned long stack;
+
+	stack = sp & (PAGE_MASK << CONFIG_KERNEL_STACK_ORDER);
+	stack += 2 * PAGE_SIZE;
+	return(stack != current->thread.kernel_stack);
 }
 
 extern void remove_umid_dir(void);

@@ -85,10 +85,10 @@ static void c_stop(struct seq_file *m, void *v)
 }
 
 struct seq_operations cpuinfo_op = {
-	start:	c_start,
-	next:	c_next,
-	stop:	c_stop,
-	show:	show_cpuinfo,
+	.start	= c_start,
+	.next	= c_next,
+	.stop	= c_stop,
+	.show	= show_cpuinfo,
 };
 
 pte_t * __bad_pagetable(void)
@@ -361,9 +361,9 @@ static int panic_exit(struct notifier_block *self, unsigned long unused1,
 }
 
 static struct notifier_block panic_exit_notifier = {
-	notifier_call :		panic_exit,
-	next :			NULL,
-	priority :		0
+	.notifier_call 		= panic_exit,
+	.next 			= NULL,
+	.priority 		= 0
 };
 
 void __init setup_arch(char **cmdline_p)

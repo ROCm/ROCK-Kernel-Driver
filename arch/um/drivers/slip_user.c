@@ -257,14 +257,14 @@ static void slip_del_addr(unsigned char *addr, unsigned char *netmask,
 }
 
 struct net_user_info slip_user_info = {
-	init:		slip_user_init,
-	open:		slip_open,
-	close:	 	slip_close,
-	remove:	 	NULL,
-	set_mtu:	slip_set_mtu,
-	add_address:	slip_add_addr,
-	delete_address: slip_del_addr,
-	max_packet:	BUF_SIZE
+	.init		= slip_user_init,
+	.open		= slip_open,
+	.close	 	= slip_close,
+	.remove	 	= NULL,
+	.set_mtu	= slip_set_mtu,
+	.add_address	= slip_add_addr,
+	.delete_address = slip_del_addr,
+	.max_packet	= BUF_SIZE
 };
 
 /*

@@ -32,8 +32,8 @@ struct port_list {
 struct port_dev {
 	struct port_list *port;
 	int fd;
-	int helper_pid;
-	int telnetd_pid;
+ 	int helper_pid;
+ 	int telnetd_pid;
 };
 
 struct connection {
@@ -50,7 +50,7 @@ static void pipe_interrupt(int irq, void *data, struct pt_regs *regs)
 	struct connection *conn = data;
 	int fd;
 
-	fd = os_rcv_fd(conn->socket[0], &conn->helper_pid);
+ 	fd = os_rcv_fd(conn->socket[0], &conn->helper_pid);
 	if(fd < 0){
 		if(fd == -EAGAIN)
 			return;
@@ -85,11 +85,11 @@ static int port_accept(struct port_list *port)
 		goto out_close;
 	}
 	*conn = ((struct connection) 
-		{ list :	LIST_HEAD_INIT(conn->list),
-		  fd :		fd,
-		  socket : 	{ socket[0], socket[1] },
-		  telnetd_pid :	pid,
-		  port :	port });
+		{ .list		= LIST_HEAD_INIT(conn->list),
+		  .fd		= fd,
+		  .socket	= { socket[0], socket[1] },
+		  .telnetd_pid	= pid,
+		  .port		= port });
 
 	if(um_request_irq(TELNETD_IRQ, socket[0], IRQ_READ, pipe_interrupt, 
 			  SA_INTERRUPT | SA_SHIRQ | SA_SAMPLE_RANDOM, 
@@ -99,7 +99,8 @@ static int port_accept(struct port_list *port)
 	}
 
 	list_add(&conn->list, &port->pending);
-	return(1);
+	ret = 1;
+	goto out;
 
  out_free:
 	kfree(conn);
@@ -173,14 +174,15 @@ void *port_data(int port_num)
 	}
 
 	*port = ((struct port_list) 
-		{ list :	 	LIST_HEAD_INIT(port->list),
-		  has_connection :	0,
-		  sem :			__SEMAPHORE_INITIALIZER(port->sem, 0),
-		  lock :		SPIN_LOCK_UNLOCKED,
-		  port :	 	port_num,
-		  fd : 			fd,
-		  pending :		LIST_HEAD_INIT(port->pending),
-		  connections :		LIST_HEAD_INIT(port->connections) });
+		{ .list 	 	= LIST_HEAD_INIT(port->list),
+		  .has_connection 	= 0,
+		  .sem 			= __SEMAPHORE_INITIALIZER(port->sem, 
+								  0),
+		  .lock 		= SPIN_LOCK_UNLOCKED,
+		  .port 	 	= port_num,
+		  .fd  			= fd,
+		  .pending 		= LIST_HEAD_INIT(port->pending),
+		  .connections 		= LIST_HEAD_INIT(port->connections) });
 	list_add(&port->list, &ports);
 
  found:
@@ -190,9 +192,9 @@ void *port_data(int port_num)
 		goto out;
 	}
 
-	*dev = ((struct port_dev) { port : 		port,
-				    fd :		-1,
-				    helper_pid : 	-1 });
+	*dev = ((struct port_dev) { .port  		= port,
+				    .helper_pid  	= -1,
+				    .telnetd_pid  	= -1 });
 	goto out;
 
  out_free:
@@ -274,8 +276,6 @@ void port_kern_free(void *d)
 {
 	struct port_dev *dev = d;
 
- 	if(dev->helper_pid != -1) os_kill_process(dev->helper_pid, 0);
- 	if(dev->telnetd_pid != -1) os_kill_process(dev->telnetd_pid, 0);
 	kfree(dev);
 }
 

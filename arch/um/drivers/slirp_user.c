@@ -180,14 +180,14 @@ static int slirp_set_mtu(int mtu, void *data)
 }
 
 struct net_user_info slirp_user_info = {
-	init:		slirp_user_init,
-	open:		slirp_open,
-	close:	 	slirp_close,
-	remove:	 	NULL,
-	set_mtu:	slirp_set_mtu,
-	add_address:	NULL,
-	delete_address: NULL,
-	max_packet:	BUF_SIZE
+	.init		= slirp_user_init,
+	.open		= slirp_open,
+	.close	 	= slirp_close,
+	.remove	 	= NULL,
+	.set_mtu	= slirp_set_mtu,
+	.add_address	= NULL,
+	.delete_address = NULL,
+	.max_packet	= BUF_SIZE
 };
 
 /*
