@@ -1320,6 +1320,7 @@ out_nounlock:
 static void show_task(task_t * p)
 {
 	unsigned long free = 0;
+	task_t *relative;
 	int state;
 	static const char * stat_nam[] = { "R", "S", "D", "Z", "T", "W" };
 
@@ -1346,17 +1347,17 @@ static void show_task(task_t * p)
 			n++;
 		free = (unsigned long) n - (unsigned long)(p+1);
 	}
-	printk("%5lu %5d %6d ", free, p->pid, p->p_pptr->pid);
-	if (p->p_cptr)
-		printk("%5d ", p->p_cptr->pid);
+	printk("%5lu %5d %6d ", free, p->pid, p->parent->pid);
+	if ((relative = eldest_child(p)))
+		printk("%5d ", relative->pid);
 	else
 		printk("      ");
-	if (p->p_ysptr)
-		printk("%7d", p->p_ysptr->pid);
+	if ((relative = younger_sibling(p)))
+		printk("%7d", relative->pid);
 	else
 		printk("       ");
-	if (p->p_osptr)
-		printk(" %5d", p->p_osptr->pid);
+	if ((relative = older_sibling(p)))
+		printk(" %5d", relative->pid);
 	else
 		printk("      ");
 	if (!p->mm)

@@ -274,9 +274,12 @@ struct task_struct {
 	/* 
 	 * pointers to (original) parent process, youngest child, younger sibling,
 	 * older sibling, respectively.  (p->father can be replaced with 
-	 * p->p_pptr->pid)
+	 * p->parent->pid)
 	 */
-	struct task_struct *p_opptr, *p_pptr, *p_cptr, *p_ysptr, *p_osptr;
+	struct task_struct *real_parent; /* real parent process (when being debugged) */
+	struct task_struct *parent;	/* parent process */
+	struct list_head children;	/* list of my children */
+	struct list_head sibling;	/* linkage in my parent's children list */
 	struct list_head thread_group;
 
 	/* PID hash table linkage. */
@@ -715,27 +718,43 @@ do {									\
 	__ret;								\
 })
 
-#define REMOVE_LINKS(p) do { \
-	(p)->next_task->prev_task = (p)->prev_task; \
-	(p)->prev_task->next_task = (p)->next_task; \
-	if ((p)->p_osptr) \
-		(p)->p_osptr->p_ysptr = (p)->p_ysptr; \
-	if ((p)->p_ysptr) \
-		(p)->p_ysptr->p_osptr = (p)->p_osptr; \
-	else \
-		(p)->p_pptr->p_cptr = (p)->p_osptr; \
+#define REMOVE_LINKS(p) do {				\
+	(p)->next_task->prev_task = (p)->prev_task;	\
+	(p)->prev_task->next_task = (p)->next_task;	\
+	list_del_init(&(p)->sibling);			\
 	} while (0)
 
-#define SET_LINKS(p) do { \
-	(p)->next_task = &init_task; \
-	(p)->prev_task = init_task.prev_task; \
-	init_task.prev_task->next_task = (p); \
-	init_task.prev_task = (p); \
-	(p)->p_ysptr = NULL; \
-	if (((p)->p_osptr = (p)->p_pptr->p_cptr) != NULL) \
-		(p)->p_osptr->p_ysptr = p; \
-	(p)->p_pptr->p_cptr = p; \
+#define SET_LINKS(p) do {					\
+	(p)->next_task = &init_task;				\
+	(p)->prev_task = init_task.prev_task;			\
+	init_task.prev_task->next_task = (p);			\
+	init_task.prev_task = (p);				\
+	list_add_tail(&(p)->sibling,&(p)->parent->children);	\
 	} while (0)
+
+static inline struct task_struct *eldest_child(struct task_struct *p)
+{
+	if (list_empty(&p->children)) return NULL;
+	return list_entry(p->children.next,struct task_struct,sibling);
+}
+
+static inline struct task_struct *youngest_child(struct task_struct *p)
+{
+	if (list_empty(&p->children)) return NULL;
+	return list_entry(p->children.prev,struct task_struct,sibling);
+}
+
+static inline struct task_struct *older_sibling(struct task_struct *p)
+{
+	if (p->sibling.prev==&p->parent->children) return NULL;
+	return list_entry(p->sibling.prev,struct task_struct,sibling);
+}
+
+static inline struct task_struct *younger_sibling(struct task_struct *p)
+{
+	if (p->sibling.next==&p->parent->children) return NULL;
+	return list_entry(p->sibling.next,struct task_struct,sibling);
+}
 
 #define for_each_task(p) \
 	for (p = &init_task ; (p = p->next_task) != &init_task ; )
