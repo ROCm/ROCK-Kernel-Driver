@@ -621,7 +621,7 @@ int ip6_build_xmit(struct sock *sk, inet_getfrag_t getfrag, const void *data,
 		if (opt)
 			pktlength += opt->opt_flen + opt->opt_nflen;
 
-		if (pktlength > 0xFFFF + sizeof(struct ipv6hdr)) {
+		if (pktlength > sizeof(struct ipv6hdr) + IPV6_MAXPLEN) {
 			/* Jumbo datagram.
 			   It is assumed, that in the case of hdrincl
 			   jumbo option is supplied by user.
@@ -1264,8 +1264,8 @@ int ip6_append_data(struct sock *sk, int getfrag(void *from, char *to, int offse
 	fragheaderlen = sizeof(struct ipv6hdr) + (opt ? opt->opt_nflen : 0);
 	maxfraglen = ((mtu - fragheaderlen) & ~7) + fragheaderlen - sizeof(struct frag_hdr);
 
-	if (mtu < 65576) {
-		if (inet->cork.length + length > 0xFFFF - fragheaderlen) {
+	if (mtu <= sizeof(struct ipv6hdr) + IPV6_MAXPLEN) {
+		if (inet->cork.length + length > IPV6_MAXPLEN - fragheaderlen) {
 			ipv6_local_error(sk, EMSGSIZE, fl, mtu-exthdrlen);
 			return -EMSGSIZE;
 		}
@@ -1461,7 +1461,7 @@ int ip6_push_pending_frames(struct sock *sk)
 	
 	*(u32*)hdr = fl->fl6_flowlabel | htonl(0x60000000);
 
-	if (skb->len < 65536)
+	if (skb->len <= IPV6_MAXPLEN)
 		hdr->payload_len = htons(skb->len - sizeof(struct ipv6hdr));
 	else
 		hdr->payload_len = 0;
