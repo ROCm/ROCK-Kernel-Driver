@@ -469,8 +469,14 @@ static void autoconfig_16550a(struct uart_8250_port *up)
 	 */
 	serial_outp(up, UART_LCR, UART_LCR_DLAB);
 	if (serial_in(up, UART_EFR) == 0) {
-		DEBUG_AUTOCONF("EFRv1 ");
-		up->port.type = PORT_16650;
+		serial_outp(up, UART_EFR, 0xA8);
+		if (serial_in(up, UART_EFR) != 0) {
+			DEBUG_AUTOCONF("EFRv1 ");
+			up->port.type = PORT_16650;
+		} else {
+			DEBUG_AUTOCONF("Motorola 8xxx DUART ");
+		}
+		serial_outp(up, UART_EFR, 0);
 		return;
 	}
 
