@@ -162,6 +162,11 @@
 #define PROTEGO_SPECIAL_3	0xFC72	/* special/unknown device */
 #define PROTEGO_SPECIAL_4	0xFC73	/* special/unknown device */ 
 
+/* 
+ * Gude Analog- und Digitalsysteme GmbH
+ */
+#define FTDI_GUDEADS_889_PID    0xe889  /* USB RS323 OptoBridge */ 
+
 /* Commands */
 #define FTDI_SIO_RESET 		0 /* Reset the port */
 #define FTDI_SIO_MODEM_CTRL 	1 /* Set the modem control register */
