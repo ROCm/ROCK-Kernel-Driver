@@ -40,11 +40,15 @@ static struct llc_sap_state_trans *llc_find_sap_trans(struct llc_sap *sap,
  */
 void llc_sap_assign_sock(struct llc_sap *sap, struct sock *sk)
 {
-	spin_lock_bh(&sap->sk_list.lock);
+	write_lock_bh(&sap->sk_list.lock);
 	llc_sk(sk)->sap = sap;
-	list_add_tail(&llc_sk(sk)->node, &sap->sk_list.list);
+	sk->next = sap->sk_list.list;
+	if (sk->next)
+		sap->sk_list.list->pprev = &sk->next;
+	sap->sk_list.list = sk;
+	sk->pprev = &sap->sk_list.list;
 	sock_hold(sk);
-	spin_unlock_bh(&sap->sk_list.lock);
+	write_unlock_bh(&sap->sk_list.lock);
 }
 
 /**
@@ -56,10 +60,19 @@ void llc_sap_assign_sock(struct llc_sap *sap, struct sock *sk)
  */
 void llc_sap_unassign_sock(struct llc_sap *sap, struct sock *sk)
 {
-	spin_lock_bh(&sap->sk_list.lock);
-	list_del(&llc_sk(sk)->node);
-	sock_put(sk);
-	spin_unlock_bh(&sap->sk_list.lock);
+	write_lock_bh(&sap->sk_list.lock);
+	if (sk->pprev) {
+		if (sk->next)
+			sk->next->pprev = sk->pprev;
+		*sk->pprev = sk->next;
+		sk->pprev  = NULL;
+		/*
+		 * This only makes sense if the socket was inserted on the
+		 * list, if sk->pprev is NULL it wasn't
+		 */
+		sock_put(sk);
+	}
+	write_unlock_bh(&sap->sk_list.lock);
 }
 
 /**
@@ -77,32 +90,30 @@ void llc_sap_state_process(struct llc_sap *sap, struct sk_buff *skb,
 {
 	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
 
+	/*
+	 * We have to hold the skb, because llc_sap_next_state
+	 * will kfree it in the sending path and we need to
+	 * look at the skb->cb, where we encode llc_sap_state_ev.
+	 */
+	skb_get(skb);
+	ev->ind_cfm_flag = 0;
 	llc_sap_next_state(sap, skb);
 	if (ev->ind_cfm_flag == LLC_IND) {
-		if (sap->rcv_func) {
-			/* FIXME:
-			 * Ugly hack, still trying to figure it
-			 * out if this is a bug in IPX or here
-			 * in LLC Land... But hey, it even works,
-			 * no leaks 8)
-			 */
-			if (skb->list)
-				skb_get(skb);
+		if (sap->rcv_func)
 			sap->rcv_func(skb, skb->dev, pt);
-		} else {
+		else {
 			if (skb->sk->state == TCP_LISTEN)
-				goto drop;
-
-			llc_save_primitive(skb, ev->prim);
-
-			/* queue skb to the user. */
-			if (sock_queue_rcv_skb(skb->sk, skb))
 				kfree_skb(skb);
+			else {
+				llc_save_primitive(skb, ev->prim);
+
+				/* queue skb to the user. */
+				if (sock_queue_rcv_skb(skb->sk, skb))
+					kfree_skb(skb);
+			}
 		}
-	} else if (ev->type == LLC_SAP_EV_TYPE_PDU) {
-drop:
-		kfree_skb(skb);
-	}
+	} 
+	kfree_skb(skb);
 }
 
 /**

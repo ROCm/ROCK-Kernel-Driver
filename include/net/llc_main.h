@@ -43,7 +43,7 @@ struct llc_station {
 	u8			    maximum_retry;
 	u8			    mac_sa[6];
 	struct {
-		spinlock_t	    lock;
+		rwlock_t	    lock;
 		struct list_head    list;
 	} sap_list;
 	struct {
@@ -52,7 +52,6 @@ struct llc_station {
 	} ev_q;
 	struct sk_buff_head	    mac_pdu_q;
 };
-struct llc_station_state_ev;
 
 extern struct llc_sap *llc_sap_alloc(void);
 extern void llc_sap_save(struct llc_sap *sap);

@@ -70,8 +70,6 @@ struct llc_opt {
 
 #define llc_sk(__sk) ((struct llc_opt *)(__sk)->protinfo)
 
-struct llc_conn_state_ev;
-
 extern struct sock *llc_sk_alloc(int family, int priority);
 extern void llc_sk_free(struct sock *sk);
 

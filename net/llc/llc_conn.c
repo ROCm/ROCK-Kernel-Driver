@@ -493,27 +493,21 @@ static int llc_exec_conn_trans_actions(struct sock *sk,
 struct sock *llc_lookup_established(struct llc_sap *sap, struct llc_addr *daddr,
 				    struct llc_addr *laddr)
 {
-	struct sock *rc = NULL;
-	struct list_head *entry;
+	struct sock *rc;
 
-	spin_lock_bh(&sap->sk_list.lock);
-	if (list_empty(&sap->sk_list.list))
-		goto out;
-	list_for_each(entry, &sap->sk_list.list) {
-		struct llc_opt *llc = list_entry(entry, struct llc_opt, node);
+	read_lock_bh(&sap->sk_list.lock);
+	for (rc = sap->sk_list.list; rc; rc = rc->next) {
+		struct llc_opt *llc = llc_sk(rc);
 
 		if (llc->laddr.lsap == laddr->lsap &&
 		    llc->daddr.lsap == daddr->lsap &&
 		    llc_mac_match(llc->laddr.mac, laddr->mac) &&
-		    llc_mac_match(llc->daddr.mac, daddr->mac)) {
-			rc = llc->sk;
+		    llc_mac_match(llc->daddr.mac, daddr->mac))
 			break;
-		}
 	}
 	if (rc)
 		sock_hold(rc);
-out:
-	spin_unlock_bh(&sap->sk_list.lock);
+	read_unlock_bh(&sap->sk_list.lock);
 	return rc;
 }
 
@@ -528,25 +522,20 @@ out:
  */
 struct sock *llc_lookup_listener(struct llc_sap *sap, struct llc_addr *laddr)
 {
-	struct sock *rc = NULL;
-	struct list_head *entry;
+	struct sock *rc;
 
-	spin_lock_bh(&sap->sk_list.lock);
-	if (list_empty(&sap->sk_list.list))
-		goto out;
-	list_for_each(entry, &sap->sk_list.list) {
-		struct llc_opt *llc = list_entry(entry, struct llc_opt, node);
+	read_lock_bh(&sap->sk_list.lock);
+	for (rc = sap->sk_list.list; rc; rc = rc->next) {
+		struct llc_opt *llc = llc_sk(rc);
 
-		if (llc->sk->type != SOCK_STREAM || llc->sk->state != TCP_LISTEN ||
-		    llc->laddr.lsap != laddr->lsap ||
-		    !llc_mac_match(llc->laddr.mac, laddr->mac))
-			continue;
-		rc = llc->sk;
+		if (rc->type == SOCK_STREAM && rc->state == TCP_LISTEN &&
+		    llc->laddr.lsap == laddr->lsap &&
+		    llc_mac_match(llc->laddr.mac, laddr->mac))
+			break;
 	}
 	if (rc)
 		sock_hold(rc);
-out:
-	spin_unlock_bh(&sap->sk_list.lock);
+	read_unlock_bh(&sap->sk_list.lock);
 	return rc;
 }
 
@@ -560,26 +549,20 @@ out:
  */
 struct sock *llc_lookup_dgram(struct llc_sap *sap, struct llc_addr *laddr)
 {
-	struct sock *rc = NULL;
-	struct list_head *entry;
+	struct sock *rc;
 
-	spin_lock_bh(&sap->sk_list.lock);
-	if (list_empty(&sap->sk_list.list))
-		goto out;
-	list_for_each(entry, &sap->sk_list.list) {
-		struct llc_opt *llc = list_entry(entry, struct llc_opt, node);
+	read_lock_bh(&sap->sk_list.lock);
+	for (rc = sap->sk_list.list; rc; rc = rc->next) {
+		struct llc_opt *llc = llc_sk(rc);
 
-		if (llc->sk->type == SOCK_DGRAM &&
+		if (rc->type == SOCK_DGRAM &&
 		    llc->laddr.lsap == laddr->lsap &&
-		    llc_mac_match(llc->laddr.mac, laddr->mac)) {
-			rc = llc->sk;
+		    llc_mac_match(llc->laddr.mac, laddr->mac))
 			break;
-		}
 	}
 	if (rc)
 		sock_hold(rc);
-out:
-	spin_unlock_bh(&sap->sk_list.lock);
+	read_unlock_bh(&sap->sk_list.lock);
 	return rc;
 }
 /**
