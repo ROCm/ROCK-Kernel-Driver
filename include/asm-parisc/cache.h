@@ -7,7 +7,6 @@
 
 #include <linux/config.h>
 
-#ifndef __ASSEMBLY__
 /*
  * PA 2.0 processors have 64-byte cachelines; PA 1.1 processors have
  * 32-byte cachelines.  The default configuration is not for SMP anyway,
@@ -24,12 +23,12 @@
 #define L1_CACHE_SHIFT 5
 #endif
 
+#ifndef __ASSEMBLY__
+
 #define L1_CACHE_ALIGN(x)       (((x)+(L1_CACHE_BYTES-1))&~(L1_CACHE_BYTES-1))
 
 #define SMP_CACHE_BYTES L1_CACHE_BYTES
 #define L1_CACHE_SHIFT_MAX 5	/* largest L1 which this arch supports */
-
-#define __cacheline_aligned __attribute__((__aligned__(L1_CACHE_BYTES)))
 
 extern void flush_data_cache_local(void);  /* flushes local data-cache only */
 extern void flush_instruction_cache_local(void); /* flushes local code-cache only */

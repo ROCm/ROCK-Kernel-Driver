@@ -143,7 +143,7 @@ static int __init snd_audiodrive_probe(int dev)
 		}
 	}
 
-	if (xmpu_irq >= 0) {
+	if (xmpu_irq >= 0 && xmpu_irq != SNDRV_AUTO_IRQ && chip->mpu_port > 0) {
 		if ((err = snd_mpu401_uart_new(card, 0, MPU401_HW_ES1688,
 					       chip->mpu_port, 0,
 					       xmpu_irq,

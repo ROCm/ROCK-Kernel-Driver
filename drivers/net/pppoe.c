@@ -517,7 +517,7 @@ static int pppoe_create(struct socket *sock)
 	sk->sk_protocol	   = PX_PROTO_OE;
 	sk->sk_destruct	   = pppoe_sk_free;
 
-	po = pppox_sk(sk) = kmalloc(sizeof(*po), GFP_KERNEL);
+	po = sk->sk_protinfo = kmalloc(sizeof(*po), GFP_KERNEL);
 	if (!po)
 		goto frees;
 	memset(po, 0, sizeof(*po));

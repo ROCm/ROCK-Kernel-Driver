@@ -748,7 +748,7 @@ ext2_xattr_set2(struct inode *inode, struct buffer_head *old_bh,
 				/* The old block is released after updating
 				   the inode.  */
 				ea_bdebug(new_bh, "reusing block");
-				
+
 				error = -EDQUOT;
 				if (DQUOT_ALLOC_BLOCK(inode, 1)) {
 					unlock_buffer(new_bh);

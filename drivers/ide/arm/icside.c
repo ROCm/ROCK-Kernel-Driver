@@ -330,72 +330,6 @@ static int icside_set_speed(ide_drive_t *drive, u8 xfer_mode)
 	return on;
 }
 
-/*
- * The following is a sick duplication from ide-dma.c ;(
- *
- * This should be defined in one place only.
- */
-struct drive_list_entry {
-	const char * id_model;
-	const char * id_firmware;
-};
-
-static const struct drive_list_entry drive_whitelist [] = {
-	{ "Micropolis 2112A",			"ALL"		},
-	{ "CONNER CTMA 4000",			"ALL"		},
-	{ "CONNER CTT8000-A",			"ALL"		},
-	{ "ST34342A",				"ALL"		},
-	{ NULL,					NULL		}
-};
-
-static struct drive_list_entry drive_blacklist [] = {
-	{ "WDC AC11000H",			"ALL"		},
-	{ "WDC AC22100H",			"ALL"		},
-	{ "WDC AC32500H",			"ALL"		},
-	{ "WDC AC33100H",			"ALL"		},
-	{ "WDC AC31600H",			"ALL"		},
-	{ "WDC AC32100H",			"24.09P07"	},
-	{ "WDC AC23200L",			"21.10N21"	},
-	{ "Compaq CRD-8241B",			"ALL"		},
-	{ "CRD-8400B",				"ALL"		},
-	{ "CRD-8480B",				"ALL"		},
-	{ "CRD-8480C",				"ALL"		},
-	{ "CRD-8482B",				"ALL"		},
- 	{ "CRD-84",				"ALL"		},
-	{ "SanDisk SDP3B",			"ALL"		},
-	{ "SanDisk SDP3B-64",			"ALL"		},
-	{ "SANYO CD-ROM CRD",			"ALL"		},
-	{ "HITACHI CDR-8",			"ALL"		},
-	{ "HITACHI CDR-8335",			"ALL"		},
-	{ "HITACHI CDR-8435",			"ALL"		},
-	{ "Toshiba CD-ROM XM-6202B",		"ALL"		},
-	{ "CD-532E-A",				"ALL"		},
-	{ "E-IDE CD-ROM CR-840",		"ALL"		},
-	{ "CD-ROM Drive/F5A",			"ALL"		},
-	{ "RICOH CD-R/RW MP7083A",		"ALL"		},
-	{ "WPI CDD-820",			"ALL"		},
-	{ "SAMSUNG CD-ROM SC-148C",		"ALL"		},
-	{ "SAMSUNG CD-ROM SC-148F",		"ALL"		},
-	{ "SAMSUNG CD-ROM SC",			"ALL"		},
-	{ "SanDisk SDP3B-64",			"ALL"		},
-	{ "SAMSUNG CD-ROM SN-124",		"ALL"		},
-	{ "PLEXTOR CD-R PX-W8432T",		"ALL"		},
-	{ "ATAPI CD-ROM DRIVE 40X MAXIMUM",	"ALL"		},
-	{ "_NEC DV5800A",			"ALL"		},
-	{ NULL,					NULL		}
-};
-
-static int
-in_drive_list(struct hd_driveid *id, const struct drive_list_entry *drive_table)
-{
-	for ( ; drive_table->id_model ; drive_table++)
-		if ((!strcmp(drive_table->id_model, id->model)) &&
-		    ((!strstr(drive_table->id_firmware, id->fw_rev)) ||
-		     (!strcmp(drive_table->id_firmware, "ALL"))))
-			return 1;
-	return 0;
-}
-
 static int icside_dma_host_off(ide_drive_t *drive)
 {
 	return 0;
@@ -437,11 +371,8 @@ static int icside_dma_check(ide_drive_t *drive)
 	/*
 	 * Consult the list of known "bad" drives
 	 */
-	if (in_drive_list(id, drive_blacklist)) {
-		printk("%s: Disabling DMA for %s (blacklisted)\n",
-			drive->name, id->model);
+	if (__ide_dma_bad_drive(drive))
 		goto out;
-	}
 
 	/*
 	 * Enable DMA on any drive that has multiword DMA
@@ -454,7 +385,7 @@ static int icside_dma_check(ide_drive_t *drive)
 	/*
 	 * Consult the list of known "good" drives
 	 */
-	if (in_drive_list(id, drive_whitelist)) {
+	if (__ide_dma_good_drive(drive)) {
 		if (id->eide_dma_time > 150)
 			goto out;
 		xfer_mode = XFER_MW_DMA_1;
@@ -954,18 +885,10 @@ icside_probe(struct expansion_card *ec, const struct ecard_id *id)
 		break;
 	}
 
-	if (ret == 0) {
+	if (ret == 0)
 		ecard_set_drvdata(ec, state);
-
-		/*
-		 * this locks the driver in-core - remove this
-		 * comment and the line below when we can
-		 * safely remove interfaces.
-		 */
-		MOD_INC_USE_COUNT;
-	} else {
+	else
 		kfree(state);
-	}
  out:
 	return ret;
 }
@@ -1048,14 +971,8 @@ static int __init icside_init(void)
 	return ecard_register_driver(&icside_driver);
 }
 
-static void __exit icside_exit(void)
-{
-	ecard_remove_driver(&icside_driver);
-}
-
 MODULE_AUTHOR("Russell King <rmk@arm.linux.org.uk>");
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("ICS IDE driver");
 
 module_init(icside_init);
-module_exit(icside_exit);

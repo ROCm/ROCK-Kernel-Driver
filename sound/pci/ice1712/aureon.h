@@ -33,8 +33,8 @@
 extern struct snd_ice1712_card_info  snd_vt1724_aureon_cards[];
 
 /* GPIO bits */
-#define AUREON_CS8415_CS	(1 << 23)
-#define AUREON_CS8415_CDTO	(1 << 22)
+#define AUREON_CS8415_CS	(1 << 22)
+#define AUREON_CS8415_CDTO	(1 << 21)
 #define AUREON_WM_RESET		(1 << 20)
 #define AUREON_WM_CLK		(1 << 19)
 #define AUREON_WM_DATA		(1 << 18)

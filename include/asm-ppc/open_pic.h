@@ -21,10 +21,6 @@
  *  Non-offset'ed vector numbers
  */
 
-//#define OPENPIC_VEC_TIMER	64	/* and up */
-//#define OPENPIC_VEC_IPI      	72	/* and up */
-//#define OPENPIC_VEC_SPURIOUS	127
-
 #define OPENPIC_VEC_TIMER	110	/* and up */
 #define OPENPIC_VEC_IPI		118	/* and up */
 #define OPENPIC_VEC_SPURIOUS	127

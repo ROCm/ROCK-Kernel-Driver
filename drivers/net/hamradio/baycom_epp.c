@@ -991,9 +991,7 @@ static int epp_open(struct net_device *dev)
 	
 	baycom_paranoia_check(dev, "epp_open", -ENXIO);
 	bc = (struct baycom_state *)dev->priv;
-        pp = parport_enumerate();
-        while (pp && pp->base != dev->base_addr) 
-                pp = pp->next;
+        pp = parport_find_base(dev->base_addr);
         if (!pp) {
                 printk(KERN_ERR "%s: parport at 0x%lx unknown\n", bc_drvname, dev->base_addr);
                 return -ENXIO;
@@ -1001,17 +999,21 @@ static int epp_open(struct net_device *dev)
 #if 0
         if (pp->irq < 0) {
                 printk(KERN_ERR "%s: parport at 0x%lx has no irq\n", bc_drvname, pp->base);
+		parport_put_port(pp);
                 return -ENXIO;
         }
 #endif
 	if ((~pp->modes) & (PARPORT_MODE_TRISTATE | PARPORT_MODE_PCSPP | PARPORT_MODE_SAFEININT)) {
                 printk(KERN_ERR "%s: parport at 0x%lx cannot be used\n",
 		       bc_drvname, pp->base);
+		parport_put_port(pp);
                 return -EIO;
 	}
 	memset(&bc->modem, 0, sizeof(bc->modem));
-        if (!(bc->pdev = parport_register_device(pp, dev->name, NULL, epp_wakeup, 
-                                                 epp_interrupt, PARPORT_DEV_EXCL, dev))) {
+        bc->pdev = parport_register_device(pp, dev->name, NULL, epp_wakeup, 
+					epp_interrupt, PARPORT_DEV_EXCL, dev);
+	parport_put_port(pp);
+        if (!bc->pdev) {
                 printk(KERN_ERR "%s: cannot register parport at 0x%lx\n", bc_drvname, pp->base);
                 return -ENXIO;
         }
@@ -1275,7 +1277,7 @@ static int baycom_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
  * If dev->base_addr == 2, allocate space for the device and return success
  * (detachable devices only).
  */
-static int baycom_probe(struct net_device *dev)
+static void baycom_probe(struct net_device *dev)
 {
 	static char ax25_bcast[AX25_ADDR_LEN] = {
 		'Q' << 1, 'S' << 1, 'T' << 1, ' ' << 1, ' ' << 1, ' ' << 1, '0' << 1
@@ -1288,9 +1290,6 @@ static int baycom_probe(struct net_device *dev)
 	};
 	struct baycom_state *bc;
 
-	if (!dev)
-		return -ENXIO;
-	baycom_paranoia_check(dev, "baycom_probe", -ENXIO);
 	/*
 	 * not a real probe! only initialize data structures
 	 */
@@ -1332,8 +1331,6 @@ static int baycom_probe(struct net_device *dev)
 
 	/* New style flags */
 	dev->flags = 0;
-
-	return 0;
 }
 
 /* --------------------------------------------------------------------- */
@@ -1368,7 +1365,7 @@ static void __init baycom_epp_dev_setup(struct net_device *dev)
 	/*
 	 * initialize part of the device struct
 	 */
-	dev->init = baycom_probe;
+	baycom_probe(dev);
 }
 
 static int __init init_baycomepp(void)
@@ -1401,7 +1398,7 @@ static int __init init_baycomepp(void)
 
 		if (register_netdev(dev)) {
 			printk(KERN_WARNING "%s: cannot register net device %s\n", bc_drvname, dev->name);
-			kfree(dev);
+			free_netdev(dev);
 			break;
 		}
 		if (set_hw && baycom_setmode(dev->priv, mode[i]))

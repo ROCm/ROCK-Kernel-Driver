@@ -28,6 +28,7 @@
                         transfers. Add i2c_xfer routine.
     2003/09/21 BenH	Rework state machine with Paulus help
     2004/01/21 BenH	Merge in Greg KH changes, polled mode is back
+    2004/02/05 BenH	Merge 64 bits fixes from the g5 ppc64 tree
 
     My understanding of the various modes supported by keywest are:
 

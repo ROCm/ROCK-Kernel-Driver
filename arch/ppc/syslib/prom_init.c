@@ -501,11 +501,10 @@ setup_disp_fake_bi(ihandle dp)
 	if (strcmp(name, "valkyrie") == 0)
 		address += 0x1000;
 
-	prom_print("address:");
-	prom_print_hex(address);
-	prom_print("\n");
-
 #ifdef CONFIG_POWER4
+#if CONFIG_TASK_SIZE > 0x80000000
+#error CONFIG_TASK_SIZE cannot be above 0x80000000 with BOOTX_TEXT on G5
+#endif
 	{
 		extern boot_infos_t disp_bi;
 		unsigned long va, pa, i, offset;
@@ -515,7 +514,8 @@ setup_disp_fake_bi(ihandle dp)
 
 		for (i=0; i<0x4000; i++) {  
 			make_pte((unsigned long)Hash - KERNELBASE, Hash_size, va, pa, 
-				 _PAGE_ACCESSED | _PAGE_NO_CACHE | _PAGE_GUARDED | PP_RWXX);
+				 _PAGE_ACCESSED | _PAGE_NO_CACHE |
+				 _PAGE_GUARDED | PP_RWXX);
 			va += 0x1000;
 			pa += 0x1000;
 		}
@@ -855,8 +855,6 @@ prom_init(int r3, int r4, prom_entry pp)
 	 * loaded by an OF bootloader which did set a BAT for us.
 	 * This breaks OF translate so we force phys to be 0.
 	 */
-	prom_print("&stext=0x");
-	prom_print_hex(phys);
 	if (offset == 0) {
 		prom_print("(already at 0xc0000000) phys=0\n");
 		phys = 0;
@@ -869,13 +867,6 @@ prom_init(int r3, int r4, prom_entry pp)
 	} else {
 		/* We assume the phys. address size is 3 cells */
 		phys = (unsigned long)result[2];
-		prom_print(" phys=0x");
-		prom_print_hex(phys);
-		prom_print("(result[0]=0x");
-		prom_print_hex((unsigned long)result[0]);
-		prom_print(" result[1]=0x");
-		prom_print_hex((unsigned long)result[1]);
-		prom_print(")\n");
 	}
 
 	if (prom_disp_node != 0)

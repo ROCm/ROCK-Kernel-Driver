@@ -908,7 +908,7 @@ ether3_probe(struct expansion_card *ec, const struct ecard_id *id)
 failed:
 	release_region(dev->base_addr, 128);
 free:
-	kfree(dev);
+	free_netdev(dev);
 out:
 	return ret;
 }

@@ -506,7 +506,6 @@ static int __devinit sl82c105_init_one(struct pci_dev *dev, const struct pci_dev
 	if (dev->device != d->device)
 		BUG();
 	ide_setup_pci_device(dev, d);
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -526,13 +525,7 @@ static int sl82c105_ide_init(void)
 	return ide_pci_register_driver(&driver);
 }
 
-static void sl82c105_ide_exit(void)
-{
-	ide_pci_unregister_driver(&driver);
-}
-
 module_init(sl82c105_ide_init);
-module_exit(sl82c105_ide_exit);
 
 MODULE_DESCRIPTION("PCI driver module for W82C105 IDE");
 MODULE_LICENSE("GPL");

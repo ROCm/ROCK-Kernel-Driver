@@ -333,7 +333,7 @@ static ssize_t ppc_rtas_progress_read(struct file * file, char * buf,
 {
 	int sn, n = 0;
 	char *tmpbuf;
-	
+
 	if (progress_led == NULL) return 0;
 
 	tmpbuf = kmalloc (MAX_LINELENGTH, GFP_KERNEL);

@@ -286,7 +286,7 @@ void get_pci_node_path(struct pci_dev *dev, struct hardware_path *path)
 		path->bc[i--] = PCI_SLOT(devfn) | (PCI_FUNC(devfn) << 5);
 	}
 
-	padev = HBA_DATA(bus->dev->platform_data)->dev;
+	padev = HBA_DATA(bus->bridge->platform_data)->dev;
 	while (padev != &root) {
 		path->bc[i--] = padev->hw_path;
 		padev = padev->parent;

@@ -20,8 +20,7 @@ config	IP_VS
 	  be used to choose which server the connection is directed to,
 	  thus load balancing can be achieved among the servers.  For more
 	  information and its administration program, please visit the
-	  following URL:
-		http://www.linuxvirtualserver.org/
+	  following URL: <http://www.linuxvirtualserver.org/>.
 
 	  If you want to compile it in kernel, say Y. To compile it as a
 	  module, choose M here. If unsure, say N.

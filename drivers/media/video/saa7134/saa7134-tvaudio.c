@@ -45,6 +45,9 @@ static unsigned int audio_ddep = 0;
 MODULE_PARM(audio_ddep,"i");
 MODULE_PARM_DESC(audio_ddep,"audio ddep overwrite");
 
+static int audio_clock_override = UNSET;
+MODULE_PARM(audio_clock_override, "i");
+
 static int audio_clock_tweak = 0;
 MODULE_PARM(audio_clock_tweak, "i");
 MODULE_PARM_DESC(audio_clock_tweak, "Audio clock tick fine tuning for cards with audio crystal that's slightly off (range [-1024 .. 1024])");
@@ -139,6 +142,9 @@ static struct saa7134_tvaudio tvaudio[] = {
 static void tvaudio_init(struct saa7134_dev *dev)
 {
 	int clock = saa7134_boards[dev->board].audio_clock;
+
+	if (UNSET != audio_clock_override)
+	        clock = audio_clock_override;
 
 	/* init all audio registers */
 	saa_writeb(SAA7134_AUDIO_PLL_CTRL,   0x00);
@@ -296,8 +302,13 @@ static int tvaudio_sleep(struct saa7134_dev *dev, int timeout)
 	DECLARE_WAITQUEUE(wait, current);
 	
 	add_wait_queue(&dev->thread.wq, &wait);
-	set_current_state(TASK_INTERRUPTIBLE);
-	schedule_timeout(timeout);
+	if (dev->thread.scan1 == dev->thread.scan2 && !dev->thread.shutdown) {
+		set_current_state(TASK_INTERRUPTIBLE);
+		if (timeout < 0)
+			schedule();
+		else
+			schedule_timeout(timeout);
+	}
 	remove_wait_queue(&dev->thread.wq, &wait);
 	return dev->thread.scan1 != dev->thread.scan2;
 }
@@ -457,18 +468,11 @@ static int tvaudio_thread(void *data)
 	unsigned int i, audio;
 	int max1,max2,carrier,rx,mode,lastmode;
 
-	lock_kernel();
 	daemonize("%s", dev->name);
-	dev->thread.task = current;
-	unlock_kernel();
-	if (dev->thread.notify != NULL)
-		up(dev->thread.notify);
-
+	allow_signal(SIGTERM);
 	for (;;) {
-		if (dev->thread.exit || signal_pending(current))
-			goto done;
-		interruptible_sleep_on(&dev->thread.wq);
-		if (dev->thread.exit || signal_pending(current))
+		tvaudio_sleep(dev,-1);
+		if (dev->thread.shutdown || signal_pending(current))
 			goto done;
 
 	restart:
@@ -571,7 +575,7 @@ static int tvaudio_thread(void *data)
 		for (;;) {
 			if (tvaudio_sleep(dev,5*HZ))
 				goto restart;
-			if (dev->thread.exit || signal_pending(current))
+			if (dev->thread.shutdown || signal_pending(current))
 				break;
 			if (UNSET == dev->thread.mode) {
 				rx = tvaudio_getstereo(dev,&tvaudio[i]);
@@ -587,9 +591,7 @@ static int tvaudio_thread(void *data)
 	}
 
  done:
-	dev->thread.task = NULL;
-	if(dev->thread.notify != NULL)
-		up(dev->thread.notify);
+	complete_and_exit(&dev->thread.exit, 0);
 	return 0;
 }
 
@@ -721,22 +723,16 @@ static int tvaudio_thread_ddep(void *data)
 	struct saa7134_dev *dev = data;
 	u32 value, norms;
 
-	lock_kernel();
 	daemonize("%s", dev->name);
-	dev->thread.task = current;
-	unlock_kernel();
-	if (dev->thread.notify != NULL)
-		up(dev->thread.notify);
+	allow_signal(SIGTERM);
 
 	/* unmute */
 	saa_dsp_writel(dev, 0x474 >> 2, 0x00);
 	saa_dsp_writel(dev, 0x450 >> 2, 0x00);
 
 	for (;;) {
-		if (dev->thread.exit || signal_pending(current))
-			goto done;
-		interruptible_sleep_on(&dev->thread.wq);
-		if (dev->thread.exit || signal_pending(current))
+		tvaudio_sleep(dev,-1);
+		if (dev->thread.shutdown || signal_pending(current))
 			goto done;
 
 	restart:
@@ -808,9 +804,7 @@ static int tvaudio_thread_ddep(void *data)
 	}
 
  done:
-	dev->thread.task = NULL;
-	if(dev->thread.notify != NULL)
-		up(dev->thread.notify);
+	complete_and_exit(&dev->thread.exit, 0);
 	return 0;
 }
 
@@ -893,7 +887,6 @@ int saa7134_tvaudio_init2(struct saa7134_dev *dev)
 {
 	DECLARE_MUTEX_LOCKED(sem);
 	int (*my_thread)(void *data) = NULL;
-	int rc;
 
 	/* enable I2S audio output */
 	if (saa7134_boards[dev->board].i2s_rate) {
@@ -915,17 +908,16 @@ int saa7134_tvaudio_init2(struct saa7134_dev *dev)
 		my_thread = tvaudio_thread_ddep;
 		break;
 	}
+
+	dev->thread.pid = -1;
 	if (my_thread) {
 		/* start tvaudio thread */
 		init_waitqueue_head(&dev->thread.wq);
-		dev->thread.notify = &sem;
-		rc = kernel_thread(my_thread,dev,0);
-		if (rc < 0)
+		init_completion(&dev->thread.exit);
+		dev->thread.pid = kernel_thread(my_thread,dev,0);
+		if (dev->thread.pid < 0)
 			printk(KERN_WARNING "%s: kernel_thread() failed\n",
 			       dev->name);
-		else
-			down(&sem);
-		dev->thread.notify = NULL;
 		wake_up_interruptible(&dev->thread.wq);
 	}
 
@@ -934,15 +926,11 @@ int saa7134_tvaudio_init2(struct saa7134_dev *dev)
 
 int saa7134_tvaudio_fini(struct saa7134_dev *dev)
 {
-	DECLARE_MUTEX_LOCKED(sem);
-
 	/* shutdown tvaudio thread */
-	if (dev->thread.task) {
-		dev->thread.notify = &sem;
-		dev->thread.exit = 1;
+	if (dev->thread.pid >= 0) {
+		dev->thread.shutdown = 1;
 		wake_up_interruptible(&dev->thread.wq);
-		down(&sem);
-		dev->thread.notify = NULL;
+		wait_for_completion(&dev->thread.exit);
 	}
 	saa_andorb(SAA7134_ANALOG_IO_SELECT, 0x07, 0x00); /* LINE1 */
 	return 0;
@@ -950,7 +938,7 @@ int saa7134_tvaudio_fini(struct saa7134_dev *dev)
 
 int saa7134_tvaudio_do_scan(struct saa7134_dev *dev)
 {
-	if (dev->thread.task) {
+	if (dev->thread.pid >= 0) {
 		dev->thread.mode = UNSET;
 		dev->thread.scan2++;
 		wake_up_interruptible(&dev->thread.wq);

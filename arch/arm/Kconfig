@@ -616,6 +616,8 @@ source "drivers/ide/Kconfig"
 
 source "drivers/scsi/Kconfig"
 
+source "drivers/message/fusion/Kconfig"
+
 source "drivers/ieee1394/Kconfig"
 
 source "drivers/message/i2o/Kconfig"
@@ -628,6 +630,10 @@ source "drivers/isdn/Kconfig"
 source "drivers/input/Kconfig"
 
 source "drivers/char/Kconfig"
+
+source "drivers/i2c/Kconfig"
+
+source "drivers/l3/Kconfig"
 
 source "drivers/media/Kconfig"
 

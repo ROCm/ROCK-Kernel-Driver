@@ -44,6 +44,11 @@
 
 #define MODULE_NAME "SBA"
 
+#ifdef CONFIG_PROC_FS
+/* depends on proc fs support. But costs CPU performance */
+#undef SBA_COLLECT_STATS
+#endif
+
 /*
 ** The number of debug flags is a clue - this code is fragile.
 ** Don't even think about messing with it unless you have
@@ -217,7 +222,7 @@ struct ioc {
 	} saved[DELAYED_RESOURCE_CNT];
 #endif
 
-#ifdef CONFIG_PROC_FS
+#ifdef SBA_COLLECT_STATS
 #define SBA_SEARCH_SAMPLE	0x100
 	unsigned long avg_search[SBA_SEARCH_SAMPLE];
 	unsigned long avg_idx;	/* current index into avg_search */
@@ -560,7 +565,7 @@ static int
 sba_alloc_range(struct ioc *ioc, size_t size)
 {
 	unsigned int pages_needed = size >> IOVP_SHIFT;
-#ifdef CONFIG_PROC_FS
+#ifdef SBA_COLLECT_STATS
 	unsigned long cr_start = mfctl(16);
 #endif
 	unsigned long pide;
@@ -579,7 +584,8 @@ sba_alloc_range(struct ioc *ioc, size_t size)
 	if (pide >= (ioc->res_size << 3)) {
 		pide = sba_search_bitmap(ioc, pages_needed);
 		if (pide >= (ioc->res_size << 3))
-			panic(__FILE__ ": I/O MMU @ %lx is out of mapping resources\n", ioc->ioc_hpa);
+			panic("%s: I/O MMU @ %lx is out of mapping resources\n",
+			      __FILE__, ioc->ioc_hpa);
 	}
 
 #ifdef ASSERT_PDIR_SANITY
@@ -594,7 +600,7 @@ sba_alloc_range(struct ioc *ioc, size_t size)
 		(uint) ((unsigned long) ioc->res_hint - (unsigned long) ioc->res_map),
 		ioc->res_bitshift );
 
-#ifdef CONFIG_PROC_FS
+#ifdef SBA_COLLECT_STATS
 	{
 		unsigned long cr_end = mfctl(16);
 		unsigned long tmp = cr_end - cr_start;
@@ -636,7 +642,7 @@ sba_free_range(struct ioc *ioc, dma_addr_t iova, size_t size)
 		__FUNCTION__, (uint) iova, size,
 		bits_not_wanted, m, pide, res_ptr, *res_ptr);
 
-#ifdef CONFIG_PROC_FS
+#ifdef SBA_COLLECT_STATS
 	ioc->used_pages -= bits_not_wanted;
 #endif
 
@@ -854,7 +860,7 @@ sba_map_single(struct device *dev, void *addr, size_t size,
 	sba_check_pdir(ioc,"Check before sba_map_single()");
 #endif
 
-#ifdef CONFIG_PROC_FS
+#ifdef SBA_COLLECT_STATS
 	ioc->msingle_calls++;
 	ioc->msingle_pages += size >> IOVP_SHIFT;
 #endif
@@ -929,7 +935,7 @@ sba_unmap_single(struct device *dev, dma_addr_t iova, size_t size,
 
 	spin_lock_irqsave(&ioc->res_lock, flags);
 
-#ifdef CONFIG_PROC_FS
+#ifdef SBA_COLLECT_STATS
 	ioc->usingle_calls++;
 	ioc->usingle_pages += size >> IOVP_SHIFT;
 #endif
@@ -1057,7 +1063,7 @@ sba_fill_pdir(
 			printk(KERN_DEBUG " %2d : %08lx/%05x %p/%05x\n",
 				nents,
 				(unsigned long) sg_dma_address(startsg), cnt,
-				sg_virt_address(startsg), startsg->length
+				sg_virt_addr(startsg), startsg->length
 		);
 #else
 		DBG_RUN_SG(" %d : %08lx/%05x %p/%05x\n",
@@ -1093,7 +1099,7 @@ sba_fill_pdir(
 			cnt += dma_offset;
 			dma_offset=0;	/* only want offset on first chunk */
 			cnt = ROUNDUP(cnt, IOVP_SIZE);
-#ifdef CONFIG_PROC_FS
+#ifdef SBA_COLLECT_STATS
 			ioc->msg_pages += cnt >> IOVP_SHIFT;
 #endif
 			do {
@@ -1300,7 +1306,7 @@ sba_map_sg(struct device *dev, struct scatterlist *sglist, int nents,
 	}
 #endif
 
-#ifdef CONFIG_PROC_FS
+#ifdef SBA_COLLECT_STATS
 	ioc->msg_calls++;
 #endif
 
@@ -1365,7 +1371,7 @@ sba_unmap_sg(struct device *dev, struct scatterlist *sglist, int nents,
 	ioc = GET_IOC(dev);
 	ASSERT(ioc);
 
-#ifdef CONFIG_PROC_FS
+#ifdef SBA_COLLECT_STATS
 	ioc->usg_calls++;
 #endif
 
@@ -1378,7 +1384,7 @@ sba_unmap_sg(struct device *dev, struct scatterlist *sglist, int nents,
 	while (sg_dma_len(sglist) && nents--) {
 
 		sba_unmap_single(dev, sg_dma_address(sglist), sg_dma_len(sglist), direction);
-#ifdef CONFIG_PROC_FS
+#ifdef SBA_COLLECT_STATS
 		ioc->usg_pages += ((sg_dma_address(sglist) & ~IOVP_MASK) + sg_dma_len(sglist) + IOVP_SIZE - 1) >> PAGE_SHIFT;
 		ioc->usingle_calls--;	/* kluge since call is unmap_sg() */
 #endif
@@ -1680,6 +1686,21 @@ sba_hw_init(struct sba_device *sba_dev)
 	int num_ioc;
 	u64 ioc_ctl;
 
+	if (!is_pdc_pat()) {
+		/* Shutdown the USB controller on Astro-based workstations.
+		** Once we reprogram the IOMMU, the next DMA performed by
+		** USB will HPMC the box.
+		*/
+		pdc_io_reset_devices();
+
+		/*
+		** XXX May need something more sophisticated to deal
+		**     with DMA from LAN. Maybe use page zero boot device
+		**     as a handle to talk to PDC about which device to
+		**     shutdown. This also needs to work for is_pdc_pat(). 
+		*/
+	}
+
 	ioc_ctl = READ_REG(sba_dev->sba_hpa+IOC_CTRL);
 	DBG_INIT("%s() hpa 0x%lx ioc_ctl 0x%Lx ->",
 		__FUNCTION__, sba_dev->sba_hpa, ioc_ctl);
@@ -1766,7 +1787,8 @@ sba_common_init(struct sba_device *sba_dev)
 
 		if (NULL == sba_dev->ioc[i].res_map)
 		{
-			panic(__FILE__ ":%s() could not allocate resource map\n", __FUNCTION__ );
+			panic("%s:%s() could not allocate resource map\n",
+			      __FILE__, __FUNCTION__ );
 		}
 
 		memset(sba_dev->ioc[i].res_map, 0, res_size);
@@ -1829,7 +1851,9 @@ static int sba_proc_info(char *buf, char **start, off_t offset, int len)
 	struct sba_device *sba_dev = sba_list;
 	struct ioc *ioc = &sba_dev->ioc[0];	/* FIXME: Multi-IOC support! */
 	int total_pages = (int) (ioc->res_size << 3); /* 8 bits per byte */
+#ifdef SBA_COLLECT_STATS
 	unsigned long i = 0, avg = 0, min, max;
+#endif
 
 	sprintf(buf, "%s rev %d.%d\n",
 		sba_dev->name,
@@ -1841,12 +1865,13 @@ static int sba_proc_info(char *buf, char **start, off_t offset, int len)
 		(int) ((ioc->res_size << 3) * sizeof(u64)), /* 8 bits/byte */
 		total_pages);
 
+	sprintf(buf, "%sResource bitmap : %d bytes (%d pages)\n", 
+		buf, ioc->res_size, ioc->res_size << 3);   /* 8 bits per byte */
+
+#ifdef SBA_COLLECT_STATS
 	sprintf(buf, "%sIO PDIR entries : %ld free  %ld used (%d%%)\n", buf,
 		total_pages - ioc->used_pages, ioc->used_pages,
 		(int) (ioc->used_pages * 100 / total_pages));
-	
-	sprintf(buf, "%sResource bitmap : %d bytes (%d pages)\n", 
-		buf, ioc->res_size, ioc->res_size << 3);   /* 8 bits per byte */
 
 	min = max = ioc->avg_search[0];
 	for (i = 0; i < SBA_SEARCH_SAMPLE; i++) {
@@ -1876,6 +1901,7 @@ static int sba_proc_info(char *buf, char **start, off_t offset, int len)
 	sprintf(buf, "%spci_unmap_sg()  : %12ld calls  %12ld pages (avg %d/1000)\n",
 		buf, ioc->usg_calls, ioc->usg_pages,
 		(int) ((ioc->usg_pages * 1000)/ioc->usg_calls));
+#endif
 
 	return strlen(buf);
 }

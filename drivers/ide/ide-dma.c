@@ -90,11 +90,11 @@
 #include <asm/irq.h>
 
 struct drive_list_entry {
-	char * id_model;
-	char * id_firmware;
+	const char *id_model;
+	const char *id_firmware;
 };
 
-struct drive_list_entry drive_whitelist [] = {
+static const struct drive_list_entry drive_whitelist [] = {
 
 	{ "Micropolis 2112A"	,       "ALL"		},
 	{ "CONNER CTMA 4000"	,       "ALL"		},
@@ -103,7 +103,7 @@ struct drive_list_entry drive_whitelist [] = {
 	{ 0			,	0		}
 };
 
-struct drive_list_entry drive_blacklist [] = {
+static const struct drive_list_entry drive_blacklist [] = {
 
 	{ "WDC AC11000H"	,	"ALL"		},
 	{ "WDC AC22100H"	,	"ALL"		},
@@ -151,7 +151,7 @@ struct drive_list_entry drive_blacklist [] = {
  *	Returns 1 if the drive is found in the table.
  */
 
-static int in_drive_list(struct hd_driveid *id, struct drive_list_entry * drive_table)
+static int in_drive_list(struct hd_driveid *id, const struct drive_list_entry *drive_table)
 {
 	for ( ; drive_table->id_model ; drive_table++)
 		if ((!strcmp(drive_table->id_model, id->model)) &&
@@ -161,6 +161,7 @@ static int in_drive_list(struct hd_driveid *id, struct drive_list_entry * drive_
 	return 0;
 }
 
+#ifdef CONFIG_BLK_DEV_IDEDMA_PCI
 /**
  *	ide_dma_intr	-	IDE DMA interrupt handler
  *	@drive: the drive the interrupt is for
@@ -512,9 +513,9 @@ int __ide_dma_off_quietly (ide_drive_t *drive)
 
 	if (HWIF(drive)->ide_dma_host_off(drive))
 		return 1;
-
-	HWIF(drive)->ide_dma_queued_off(drive);
-
+#ifdef CONFIG_BLK_DEV_IDE_TCQ
+	__ide_dma_queued_off(drive);
+#endif
 	return 0;
 }
 
@@ -764,6 +765,7 @@ int __ide_dma_test_irq (ide_drive_t *drive)
 }
 
 EXPORT_SYMBOL(__ide_dma_test_irq);
+#endif /* CONFIG_BLK_DEV_IDEDMA_PCI */
 
 int __ide_dma_bad_drive (ide_drive_t *drive)
 {
@@ -771,8 +773,9 @@ int __ide_dma_bad_drive (ide_drive_t *drive)
 
 	int blacklist = in_drive_list(id, drive_blacklist);
 	if (blacklist) {
-		printk(KERN_WARNING "%s: Disabling (U)DMA for %s\n", drive->name, id->model);
-		return(blacklist);
+		printk(KERN_WARNING "%s: Disabling (U)DMA for %s (blacklisted)\n",
+				    drive->name, id->model);
+		return blacklist;
 	}
 	return 0;
 }
@@ -787,6 +790,7 @@ int __ide_dma_good_drive (ide_drive_t *drive)
 
 EXPORT_SYMBOL(__ide_dma_good_drive);
 
+#ifdef CONFIG_BLK_DEV_IDEDMA_PCI
 /*
  * Used for HOST FIFO counters for VDMA
  * PIO over DMA, effective ATA-Bridge operator.
@@ -849,22 +853,6 @@ int __ide_dma_verbose (ide_drive_t *drive)
 }
 
 EXPORT_SYMBOL(__ide_dma_verbose);
-
-/**
- *	__ide_dma_retune	-	default retune handler
- *	@drive: drive to retune
- *
- *	Default behaviour when we decide to return the IDE DMA setup.
- *	The default behaviour is "we don't"
- */
- 
-int __ide_dma_retune (ide_drive_t *drive)
-{
-	printk(KERN_WARNING "%s: chipset supported call only\n", __FUNCTION__);
-	return 1;
-}
-
-EXPORT_SYMBOL(__ide_dma_retune);
 
 int __ide_dma_lostirq (ide_drive_t *drive)
 {
@@ -1104,27 +1092,8 @@ void ide_setup_dma (ide_hwif_t *hwif, unsigned long dma_base, unsigned int num_p
 		hwif->ide_dma_verbose = &__ide_dma_verbose;
 	if (!hwif->ide_dma_timeout)
 		hwif->ide_dma_timeout = &__ide_dma_timeout;
-	if (!hwif->ide_dma_retune)
-		hwif->ide_dma_retune = &__ide_dma_retune;
 	if (!hwif->ide_dma_lostirq)
 		hwif->ide_dma_lostirq = &__ide_dma_lostirq;
-
-	/*
-	 * dma queued ops. if tcq isn't set, queued on and off are just
-	 * dummy functions. cuts down on ifdef hell
-	 */
-	if (!hwif->ide_dma_queued_on)
-		hwif->ide_dma_queued_on = __ide_dma_queued_on;
-	if (!hwif->ide_dma_queued_off)
-		hwif->ide_dma_queued_off = __ide_dma_queued_off;
-#ifdef CONFIG_BLK_DEV_IDE_TCQ
-	if (!hwif->ide_dma_queued_read)
-		hwif->ide_dma_queued_read = __ide_dma_queued_read;
-	if (!hwif->ide_dma_queued_write)
-		hwif->ide_dma_queued_write = __ide_dma_queued_write;
-	if (!hwif->ide_dma_queued_start)
-		hwif->ide_dma_queued_start = __ide_dma_queued_start;
-#endif
 
 	if (hwif->chipset != ide_trm290) {
 		u8 dma_stat = hwif->INB(hwif->dma_status);
@@ -1139,3 +1108,4 @@ void ide_setup_dma (ide_hwif_t *hwif, unsigned long dma_base, unsigned int num_p
 }
 
 EXPORT_SYMBOL_GPL(ide_setup_dma);
+#endif /* CONFIG_BLK_DEV_IDEDMA_PCI */

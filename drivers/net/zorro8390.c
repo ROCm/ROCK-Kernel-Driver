@@ -103,18 +103,18 @@ static int __init zorro8390_probe(void)
 	    continue;
 	board = z->resource.start;
 	ioaddr = board+cards[i].offset;
-	dev = init_etherdev(0, 0);
-	SET_MODULE_OWNER(dev);
+	dev = alloc_ei_netdev();
 	if (!dev)
 	    return -ENOMEM;
+	SET_MODULE_OWNER(dev);
 	if (!request_mem_region(ioaddr, NE_IO_EXTENT*2, dev->name)) {
-	    kfree(dev);
+	    free_netdev(dev);
 	    continue;
 	}
 	if ((err = zorro8390_init(dev, board, cards[i].name,
 				  ZTWO_VADDR(ioaddr)))) {
 	    release_mem_region(ioaddr, NE_IO_EXTENT*2);
-	    kfree(dev);
+	    free_netdev(dev);
 	    return err;
 	}
 	err = 0;
@@ -129,6 +129,7 @@ static int __init zorro8390_init(struct net_device *dev, unsigned long board,
 				 const char *name, unsigned long ioaddr)
 {
     int i;
+    int err;
     unsigned char SA_prom[32];
     int start_page, stop_page;
     static u32 zorro8390_offsets[16] = {
@@ -195,12 +196,6 @@ static int __init zorro8390_init(struct net_device *dev, unsigned long board,
     i = request_irq(IRQ_AMIGA_PORTS, ei_interrupt, SA_SHIRQ, dev->name, dev);
     if (i) return i;
 
-    /* Allocate dev->priv and fill in 8390 specific dev fields. */
-    if (ethdev_init(dev)) {
-	printk("Unable to get memory for dev->priv.\n");
-	return -ENOMEM;
-    }
-
     for(i = 0; i < ETHER_ADDR_LEN; i++) {
 #ifdef DEBUG
 	printk(" %2.2x", SA_prom[i]);
@@ -232,7 +227,10 @@ static int __init zorro8390_init(struct net_device *dev, unsigned long board,
     root_zorro8390_dev = dev;
 #endif
     NS8390_init(dev, 0);
-    return 0;
+    err = register_netdev(dev);
+    if (err)
+	free_irq(IRQ_AMIGA_PORTS, dev);
+    return err;
 }
 
 static int zorro8390_open(struct net_device *dev)

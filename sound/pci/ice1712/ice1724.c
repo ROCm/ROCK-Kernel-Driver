@@ -295,8 +295,8 @@ static snd_pcm_hw_constraint_list_t hw_constraints_channels = {
 static int snd_vt1724_pcm_trigger(snd_pcm_substream_t *substream, int cmd)
 {
 	ice1712_t *ice = snd_pcm_substream_chip(substream);
-	unsigned int what;
-	unsigned int old;
+	unsigned char what;
+	unsigned char old;
 	struct list_head *pos;
 	snd_pcm_substream_t *s;
 
@@ -316,12 +316,12 @@ static int snd_vt1724_pcm_trigger(snd_pcm_substream_t *substream, int cmd)
 				what |= VT1724_RDMA1_PAUSE;
 		}
 		spin_lock(&ice->reg_lock);
-		old = inl(ICEMT1724(ice, DMA_PAUSE));
+		old = inb(ICEMT1724(ice, DMA_PAUSE));
 		if (cmd == SNDRV_PCM_TRIGGER_PAUSE_PUSH)
 			old |= what;
 		else
 			old &= ~what;
-		outl(old, ICEMT1724(ice, DMA_PAUSE));
+		outb(old, ICEMT1724(ice, DMA_PAUSE));
 		spin_unlock(&ice->reg_lock);
 		break;
 
@@ -346,12 +346,12 @@ static int snd_vt1724_pcm_trigger(snd_pcm_substream_t *substream, int cmd)
 			}
 		}
 		spin_lock(&ice->reg_lock);
-		old = inl(ICEMT1724(ice, DMA_CONTROL));
+		old = inb(ICEMT1724(ice, DMA_CONTROL));
 		if (cmd == SNDRV_PCM_TRIGGER_START)
 			old |= what;
 		else
 			old &= ~what;
-		outl(old, ICEMT1724(ice, DMA_CONTROL));
+		outb(old, ICEMT1724(ice, DMA_CONTROL));
 		spin_unlock(&ice->reg_lock);
 		break;
 

@@ -9,8 +9,6 @@
 #define ACPI_PROCESSOR_MAX_C2_LATENCY	100
 #define ACPI_PROCESSOR_MAX_C3_LATENCY	1000
 
-#define ACPI_PROCESSOR_MAX_PERFORMANCE	8
-
 #define ACPI_PROCESSOR_MAX_THROTTLING	16
 #define ACPI_PROCESSOR_MAX_THROTTLE	250	/* 25% */
 #define ACPI_PROCESSOR_MAX_DUTY_WIDTH	4
@@ -67,18 +65,20 @@ struct acpi_processor_px {
 	acpi_integer		status;			/* success indicator */
 };
 
+#define ACPI_PDC_REVISION_ID                   0x1
+
 struct acpi_processor_performance {
-	int			state;
-	int			platform_limit;
-	u16			control_register;
-	u16			status_register;
-	u8			control_register_bit_width;
-	u8			status_register_bit_width;
-	int			state_count;
-	struct acpi_processor_px states[ACPI_PROCESSOR_MAX_PERFORMANCE];
-	struct cpufreq_frequency_table freq_table[ACPI_PROCESSOR_MAX_PERFORMANCE];
-	struct acpi_processor   *pr;
+	unsigned int		 state;
+	unsigned int		 platform_limit;
+	struct acpi_pct_register control_register;
+	struct acpi_pct_register status_register;
+	unsigned int		 state_count;
+	struct acpi_processor_px *states;
+
+	/* the _PDC objects passed by the driver, if any */
+	struct acpi_object_list *pdc;
 };
+
 
 
 /* Throttling Control */
@@ -133,11 +133,11 @@ struct acpi_processor {
 	struct acpi_processor_limit limit;
 };
 
-extern int acpi_processor_get_platform_limit (
-	struct acpi_processor*	pr);
 extern int acpi_processor_register_performance (
 	struct acpi_processor_performance * performance,
-	struct acpi_processor ** pr,
+	unsigned int cpu);
+extern void acpi_processor_unregister_performance (
+	struct acpi_processor_performance * performance,
 	unsigned int cpu);
 
 #endif

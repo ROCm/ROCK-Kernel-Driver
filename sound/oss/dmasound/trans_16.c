@@ -61,7 +61,6 @@ static ssize_t pmac_ct_u16_read(const u_char *userPtr, size_t userCount,
 
 /*** Translations ************************************************************/
 
-extern int expand_bal;	/* Balance factor for expanding (not volume!) */
 static int expand_data;	/* Data for expanding */
 
 static ssize_t pmac_ct_law(const u_char *userPtr, size_t userCount,
@@ -814,12 +813,12 @@ TRANS transAwacsNormalRead = {
 };
 
 TRANS transAwacsExpandRead = {
-	ct_s8:		pmac_ctx_s8_read,
-	ct_u8:		pmac_ctx_u8_read,
-	ct_s16be:	pmac_ctx_s16_read,
-	ct_u16be:	pmac_ctx_u16_read,
-	ct_s16le:	pmac_ctx_s16_read,
-	ct_u16le:	pmac_ctx_u16_read,
+	.ct_s8=		pmac_ctx_s8_read,
+	.ct_u8=		pmac_ctx_u8_read,
+	.ct_s16be=	pmac_ctx_s16_read,
+	.ct_u16be=	pmac_ctx_u16_read,
+	.ct_s16le=	pmac_ctx_s16_read,
+	.ct_u16le=	pmac_ctx_u16_read,
 };
 
 /* translation tables */

@@ -479,6 +479,8 @@ void snd_ac97_resume(ac97_t *ac97);
 
 /* quirk types */
 enum {
+	AC97_TUNE_DEFAULT = -1,	/* use default from quirk list (not valid in list) */
+	AC97_TUNE_NONE = 0,	/* nothing extra to do */
 	AC97_TUNE_HP_ONLY,	/* headphone (true line-out) control as master only */
 	AC97_TUNE_SWAP_HP,	/* swap headphone and master controls */
 	AC97_TUNE_SWAP_SURROUND, /* swap master and surround controls */
@@ -493,7 +495,7 @@ struct ac97_quirk {
 	int type;		/* quirk type above */
 };
 
-int snd_ac97_tune_hardware(ac97_t *ac97, struct ac97_quirk *quirk);
+int snd_ac97_tune_hardware(ac97_t *ac97, struct ac97_quirk *quirk, int override);
 int snd_ac97_set_rate(ac97_t *ac97, int reg, unsigned short rate);
 
 int snd_ac97_pcm_assign(ac97_bus_t *ac97,

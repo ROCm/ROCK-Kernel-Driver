@@ -39,6 +39,7 @@
 #include "hosts.h"
 #include <linux/libata.h>
 #include <asm/io.h>
+#include <linux/ide.h>
 #include <asm/semaphore.h>
 
 #include "libata.h"
@@ -969,7 +970,7 @@ retry:
 		printk(KERN_INFO "ata%u: dev %u ATA, max %s, %Lu sectors%s\n",
 		       ap->id, device,
 		       ata_udma_string(udma_modes),
-		       dev->n_sectors,
+		       (unsigned long long)dev->n_sectors,
 		       dev->flags & ATA_DFLAG_LBA48 ? " (lba48)" : "");
 	}
 

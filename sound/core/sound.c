@@ -70,6 +70,8 @@ static struct list_head snd_minors_hash[SNDRV_CARDS];
 static DECLARE_MUTEX(sound_mutex);
 
 extern struct class_simple *sound_class;
+
+
 #ifdef CONFIG_KMOD
 
 /**

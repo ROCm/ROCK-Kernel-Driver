@@ -318,12 +318,12 @@ static int econet_sendmsg(struct kiocb *iocb, struct socket *sock,
 #ifdef CONFIG_ECONET_NATIVE
 		dev_hold(dev);
 		
-		skb = sock_alloc_send_skb(sk, len+dev->hard_header_len+15, 
+		skb = sock_alloc_send_skb(sk, len+LL_RESERVED_SPACE(dev), 
 					  msg->msg_flags & MSG_DONTWAIT, &err);
 		if (skb==NULL)
 			goto out_unlock;
 		
-		skb_reserve(skb, (dev->hard_header_len+15)&~15);
+		skb_reserve(skb, LL_RESERVED_SPACE(dev));
 		skb->nh.raw = skb->data;
 		
 		eb = (struct ec_cb *)&skb->cb;
@@ -568,7 +568,7 @@ static int econet_create(struct socket *sock, int protocol)
 	sock_init_data(sock,sk);
 	sk_set_owner(sk, THIS_MODULE);
 
-	eo = ec_sk(sk) = kmalloc(sizeof(*eo), GFP_KERNEL);
+	eo = sk->sk_protinfo = kmalloc(sizeof(*eo), GFP_KERNEL);
 	if (!eo)
 		goto out_free;
 	memset(eo, 0, sizeof(*eo));

@@ -148,7 +148,7 @@ static int pfkey_create(struct socket *sock, int protocol)
 	sk_set_owner(sk, THIS_MODULE);
 
 	err = -ENOMEM;
-	pfk = pfkey_sk(sk) = kmalloc(sizeof(*pfk), GFP_KERNEL);
+	pfk = sk->sk_protinfo = kmalloc(sizeof(*pfk), GFP_KERNEL);
 	if (!pfk) {
 		sk_free(sk);
 		goto out;

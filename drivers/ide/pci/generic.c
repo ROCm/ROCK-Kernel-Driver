@@ -121,7 +121,6 @@ static int __devinit generic_init_one(struct pci_dev *dev, const struct pci_devi
 		return 1; 
 	}
 	ide_setup_pci_device(dev, d);
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -150,13 +149,7 @@ static int generic_ide_init(void)
 	return ide_pci_register_driver(&driver);
 }
 
-static void generic_ide_exit(void)
-{
-	ide_pci_unregister_driver(&driver);
-}
-
 module_init(generic_ide_init);
-module_exit(generic_ide_exit);
 
 MODULE_AUTHOR("Andre Hedrick");
 MODULE_DESCRIPTION("PCI driver module for generic PCI IDE");

@@ -277,18 +277,10 @@ inline static unsigned char read_status (struct net_device *dev)
    then calls us here.
 
    */
-static int
+static void
 plip_init_netdev(struct net_device *dev)
 {
 	struct net_local *nl = dev->priv;
-
-	printk(KERN_INFO "%s", version);
-	if (dev->irq != -1)
-		printk(KERN_INFO "%s: Parallel port at %#3lx, using IRQ %d.\n",
-		       dev->name, dev->base_addr, dev->irq);
-	else
-		printk(KERN_INFO "%s: Parallel port at %#3lx, not using IRQ.\n",
-		       dev->name, dev->base_addr);
 
 	/* Then, override parts of it */
 	dev->hard_start_xmit	 = plip_tx_packet;
@@ -323,8 +315,6 @@ plip_init_netdev(struct net_device *dev)
 		INIT_WORK(&nl->timer, (void (*)(void *))plip_timer_bh, dev);
 
 	spin_lock_init(&nl->lock);
-
-	return 0;
 }
 
 /* Bottom half handler for the delayed request.
@@ -1282,14 +1272,13 @@ static void plip_attach (struct parport *port)
 		}
 
 		sprintf(name, "plip%d", unit);
-		dev = alloc_netdev(sizeof(struct net_local), name, 
-				   ether_setup);
+		dev = alloc_etherdev(sizeof(struct net_local));
 		if (!dev) {
 			printk(KERN_ERR "plip: memory squeeze\n");
 			return;
 		}
 		
-		dev->init = plip_init_netdev;
+		strcpy(dev->name, name);
 
 		SET_MODULE_OWNER(dev);
 		dev->irq = port->irq;
@@ -1306,17 +1295,35 @@ static void plip_attach (struct parport *port)
 
 		if (!nl->pardev) {
 			printk(KERN_ERR "%s: parport_register failed\n", name);
-			kfree(dev);
+			goto err_free_dev;
 			return;
 		}
 
+		plip_init_netdev(dev);
+
 		if (register_netdev(dev)) {
 			printk(KERN_ERR "%s: network register failed\n", name);
-			kfree(dev);
-		} else {
-			dev_plip[unit++] = dev;
+			goto err_parport_unregister;
 		}
+
+		printk(KERN_INFO "%s", version);
+		if (dev->irq != -1)
+			printk(KERN_INFO "%s: Parallel port at %#3lx, "
+					 "using IRQ %d.\n",
+				         dev->name, dev->base_addr, dev->irq);
+		else
+			printk(KERN_INFO "%s: Parallel port at %#3lx, "
+					 "not using IRQ.\n",
+					 dev->name, dev->base_addr);
+		dev_plip[unit++] = dev;
 	}
+	return;
+
+err_parport_unregister:
+	parport_unregister_device(nl->pardev);
+err_free_dev:
+	free_netdev(dev);
+	return;
 }
 
 /* plip_detach() is called (by the parport code) when a port is

@@ -801,7 +801,12 @@ pci_busdev_to_OF_node(struct pci_bus *bus, int devfn)
 
 	/* Fixup bus number according to what OF think it is. */
 #ifdef CONFIG_PPC_PMAC
-	/* Sorry about that, I need to find a best way to fix it.... */
+	/* The G5 need a special case here. Basically, we don't remap all
+	 * busses on it so we don't create the pci-OF-map. However, we do
+	 * remap the AGP bus and so have to deal with it. A future better
+	 * fix has to be done by making the remapping per-host and always
+	 * filling the pci_to_OF map. --BenH
+	 */
 	if (_machine == _MACH_Pmac && busnr >= 0xf0)
 		busnr -= 0xf0;
 	else
@@ -896,7 +901,7 @@ void __init
 pci_process_bridge_OF_ranges(struct pci_controller *hose,
 			   struct device_node *dev, int primary)
 {
-	static unsigned int static_lc_ranges[1024] __initdata;
+	static unsigned int static_lc_ranges[256] __initdata;
 	unsigned int *dt_ranges, *lc_ranges, *ranges, *prev;
 	unsigned int size;
 	int rlen = 0, orig_rlen;
@@ -913,9 +918,9 @@ pci_process_bridge_OF_ranges(struct pci_controller *hose,
 	if (!dt_ranges)
 		return;
 	/* Sanity check, though hopefully that never happens */
-	if (rlen > 1024) {
+	if (rlen > sizeof(static_lc_ranges)) {
 		printk(KERN_WARNING "OF ranges property too large !\n");
-		rlen = 1024;
+		rlen = sizeof(static_lc_ranges);
 	}
 	lc_ranges = static_lc_ranges;
 	memcpy(lc_ranges, dt_ranges, rlen);

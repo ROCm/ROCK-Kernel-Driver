@@ -28,6 +28,11 @@
 
 #define DBGENTER() pr_debug("%s entered\n", __FUNCTION__)
 
+/* just so vio_find_node() will always match vio_register_device() */
+#define KOBJNAME_FMT "%s@%lx"
+
+extern struct subsystem devices_subsys; /* needed for vio_find_name() */
+
 extern struct TceTable *build_tce_table(struct TceTable *tbl);
 
 extern dma_addr_t get_tces(struct TceTable *, unsigned order,
@@ -250,7 +255,7 @@ struct vio_dev * __devinit vio_register_device(struct device_node *of_node)
 	/* init generic 'struct device' fields: */
 	viodev->dev.parent = &vio_bus_device->dev;
 	viodev->dev.bus = &vio_bus_type;
-	snprintf(viodev->dev.bus_id, BUS_ID_SIZE, "%s@%lx",
+	snprintf(viodev->dev.bus_id, BUS_ID_SIZE, KOBJNAME_FMT,
 		of_node->name, viodev->unit_address);
 	viodev->dev.release = vio_dev_release;
 
@@ -273,6 +278,42 @@ void __devinit vio_unregister_device(struct vio_dev *viodev)
 	device_unregister(&viodev->dev);
 }
 EXPORT_SYMBOL(vio_unregister_device);
+
+/* vio_find_name() - internal because only vio.c knows how we formatted the
+ * kobject name
+ * XXX once vio_bus_type.devices is actually used as a kset in
+ * drivers/base/bus.c, this function should be removed in favor of
+ * "device_find(kobj_name, &vio_bus_type)"
+ */
+static struct vio_dev *vio_find_name(const char *kobj_name)
+{
+	struct kobject *found;
+
+	found = kset_find_obj(&devices_subsys.kset, kobj_name);
+	if (!found)
+		return NULL;
+
+	return to_vio_dev(container_of(found, struct device, kobj));
+}
+
+/**
+ * vio_find_node - find an already-registered vio_dev
+ * @vnode: device_node of the virtual device we're looking for
+ */
+struct vio_dev *vio_find_node(struct device_node *vnode)
+{
+	unsigned long *unit_address;
+	char kobj_name[BUS_ID_SIZE];
+
+	/* construct the kobject name from the device node */
+	unit_address = (unsigned long *)get_property(vnode, "reg", NULL);
+	if (!unit_address)
+		return NULL;
+	snprintf(kobj_name, BUS_ID_SIZE, KOBJNAME_FMT, vnode->name, *unit_address);
+
+	return vio_find_name(kobj_name);
+}
+EXPORT_SYMBOL(vio_find_node);
 
 /**
  * vio_get_attribute: - get attribute for virtual device

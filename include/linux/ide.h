@@ -799,15 +799,8 @@ typedef struct ide_dma_ops_s {
 	int (*ide_dma_good_drive)(ide_drive_t *drive);
 	int (*ide_dma_count)(ide_drive_t *drive);
 	int (*ide_dma_verbose)(ide_drive_t *drive);
-	int (*ide_dma_retune)(ide_drive_t *drive);
 	int (*ide_dma_lostirq)(ide_drive_t *drive);
 	int (*ide_dma_timeout)(ide_drive_t *drive);
-	/* dma queued operations */
-	int (*ide_dma_queued_on)(ide_drive_t *drive);
-	int (*ide_dma_queued_off)(ide_drive_t *drive);
-	ide_startstop_t (*ide_dma_queued_read)(ide_drive_t *drive);
-	ide_startstop_t (*ide_dma_queued_write)(ide_drive_t *drive);
-	ide_startstop_t (*ide_dma_queued_start)(ide_drive_t *drive);
 } ide_dma_ops_t;
 
 /*
@@ -945,16 +938,8 @@ typedef struct hwif_s {
 	int (*ide_dma_good_drive)(ide_drive_t *drive);
 	int (*ide_dma_count)(ide_drive_t *drive);
 	int (*ide_dma_verbose)(ide_drive_t *drive);
-	int (*ide_dma_retune)(ide_drive_t *drive);
 	int (*ide_dma_lostirq)(ide_drive_t *drive);
 	int (*ide_dma_timeout)(ide_drive_t *drive);
-
-	/* dma queued operations */
-	int (*ide_dma_queued_on)(ide_drive_t *drive);
-	int (*ide_dma_queued_off)(ide_drive_t *drive);
-	ide_startstop_t (*ide_dma_queued_read)(ide_drive_t *drive);
-	ide_startstop_t (*ide_dma_queued_write)(ide_drive_t *drive);
-	ide_startstop_t (*ide_dma_queued_start)(ide_drive_t *drive);
 
 	void (*OUTB)(u8 addr, unsigned long port);
 	void (*OUTBSYNC)(ide_drive_t *drive, u8 addr, unsigned long port);
@@ -1214,13 +1199,6 @@ typedef struct ide_driver_s {
 
 extern int generic_ide_ioctl(struct block_device *, unsigned, unsigned long);
 
-typedef struct ide_devices_s {
-	char			name[4];		/* hdX */
-	unsigned		attached	: 1;	/* native */
-	unsigned		alttached	: 1;	/* alternate */
-	struct ide_devices_s	*next;
-} ide_devices_t;
-
 /*
  * ide_hwifs[] is the master data structure used to keep track
  * of just about everything in ide.c.  Whenever possible, routines
@@ -1231,13 +1209,6 @@ typedef struct ide_devices_s {
  */
 #ifndef _IDE_C
 extern	ide_hwif_t	ide_hwifs[];		/* master data repository */
-
-extern ide_devices_t   *idedisk;
-extern ide_devices_t   *idecd;
-extern ide_devices_t   *idefloppy;
-extern ide_devices_t   *idetape;
-extern ide_devices_t   *idescsi;
-
 #endif
 extern int noautodma;
 
@@ -1626,6 +1597,10 @@ extern void ide_setup_pci_devices(struct pci_dev *, struct pci_dev *, ide_pci_de
 #define BAD_DMA_DRIVE		0
 #define GOOD_DMA_DRIVE		1
 
+#ifdef CONFIG_BLK_DEV_IDEDMA
+int __ide_dma_bad_drive(ide_drive_t *);
+int __ide_dma_good_drive(ide_drive_t *);
+
 #ifdef CONFIG_BLK_DEV_IDEDMA_PCI
 extern int ide_build_sglist(ide_drive_t *, struct request *);
 extern int ide_raw_build_sglist(ide_drive_t *, struct request *);
@@ -1647,11 +1622,8 @@ extern int __ide_dma_write(ide_drive_t *);
 extern int __ide_dma_begin(ide_drive_t *);
 extern int __ide_dma_end(ide_drive_t *);
 extern int __ide_dma_test_irq(ide_drive_t *);
-extern int __ide_dma_bad_drive(ide_drive_t *);
-extern int __ide_dma_good_drive(ide_drive_t *);
 extern int __ide_dma_count(ide_drive_t *);
 extern int __ide_dma_verbose(ide_drive_t *);
-extern int __ide_dma_retune(ide_drive_t *);
 extern int __ide_dma_lostirq(ide_drive_t *);
 extern int __ide_dma_timeout(ide_drive_t *);
 
@@ -1661,21 +1633,13 @@ extern int __ide_dma_queued_off(ide_drive_t *drive);
 extern ide_startstop_t __ide_dma_queued_read(ide_drive_t *drive);
 extern ide_startstop_t __ide_dma_queued_write(ide_drive_t *drive);
 extern ide_startstop_t __ide_dma_queued_start(ide_drive_t *drive);
-#else
-static inline int __ide_dma_queued_on(ide_drive_t *drive)
-{
-	return 1;
-}
-
-static inline int __ide_dma_queued_off(ide_drive_t *drive)
-{
-	return 1;
-}
 #endif
 
 #else
 static inline void ide_release_dma(ide_hwif_t *drive) {;}
 #endif
+
+#endif /* CONFIG_BLK_DEV_IDEDMA */
 
 extern int ide_hwif_request_regions(ide_hwif_t *hwif);
 extern void ide_hwif_release_regions(ide_hwif_t* hwif);

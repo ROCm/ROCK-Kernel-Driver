@@ -304,13 +304,6 @@ pciio_dmaaddr_drain(vertex_hdl_t dev, paddr_t addr, size_t size)
 	(dev, addr, size);
 }
 
-void
-pciio_dmalist_drain(vertex_hdl_t dev, alenlist_t list)
-{
-    DEV_FUNC(dev, dmalist_drain)
-	(dev, list);
-}
-
 /* =====================================================================
  *          INTERRUPT MANAGEMENT
  *

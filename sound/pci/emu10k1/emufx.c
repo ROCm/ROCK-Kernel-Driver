@@ -1330,7 +1330,7 @@ static int __devinit _snd_emu10k1_audigy_init_efx(emu10k1_t *emu)
 #define A_ADD_VOLUME_IN(var,vol,input) \
 A_OP(icode, &ptr, iMAC0, A_GPR(var), A_GPR(var), A_GPR(vol), A_EXTIN(input))
 
-	/* AC'97 Playback Volume - used only for mic */
+	/* AC'97 Playback Volume - used only for mic (renamed later) */
 	A_ADD_VOLUME_IN(stereo_mix, gpr, A_EXTIN_AC97_L);
 	A_ADD_VOLUME_IN(stereo_mix+1, gpr+1, A_EXTIN_AC97_R);
 	snd_emu10k1_init_stereo_control(&controls[nctl++], "AMic Playback Volume", gpr, 0);
@@ -1347,12 +1347,16 @@ A_OP(icode, &ptr, iMAC0, A_GPR(var), A_GPR(var), A_GPR(vol), A_EXTIN(input))
 	/* Audigy CD Playback Volume */
 	A_ADD_VOLUME_IN(stereo_mix, gpr, A_EXTIN_SPDIF_CD_L);
 	A_ADD_VOLUME_IN(stereo_mix+1, gpr+1, A_EXTIN_SPDIF_CD_R);
-	snd_emu10k1_init_stereo_control(&controls[nctl++], "Audigy CD Playback Volume", gpr, 0);
+	snd_emu10k1_init_stereo_control(&controls[nctl++],
+					emu->no_ac97 ? "CD Playback Volume" : "Audigy CD Playback Volume",
+					gpr, 0);
 	gpr += 2;
 	/* Audigy CD Capture Volume */
 	A_ADD_VOLUME_IN(capture, gpr, A_EXTIN_SPDIF_CD_L);
 	A_ADD_VOLUME_IN(capture+1, gpr+1, A_EXTIN_SPDIF_CD_R);
-	snd_emu10k1_init_stereo_control(&controls[nctl++], "Audigy CD Capture Volume", gpr, 0);
+	snd_emu10k1_init_stereo_control(&controls[nctl++],
+					emu->no_ac97 ? "CD Capture Volume" : "Audigy CD Capture Volume",
+					gpr, 0);
 	gpr += 2;
 
  	/* Optical SPDIF Playback Volume */
@@ -1369,12 +1373,16 @@ A_OP(icode, &ptr, iMAC0, A_GPR(var), A_GPR(var), A_GPR(vol), A_EXTIN(input))
 	/* Line2 Playback Volume */
 	A_ADD_VOLUME_IN(stereo_mix, gpr, A_EXTIN_LINE2_L);
 	A_ADD_VOLUME_IN(stereo_mix+1, gpr+1, A_EXTIN_LINE2_R);
-	snd_emu10k1_init_stereo_control(&controls[nctl++], "Line2 Playback Volume", gpr, 0);
+	snd_emu10k1_init_stereo_control(&controls[nctl++],
+					emu->no_ac97 ? "Line Playback Volume" : "Line2 Playback Volume",
+					gpr, 0);
 	gpr += 2;
 	/* Line2 Capture Volume */
 	A_ADD_VOLUME_IN(capture, gpr, A_EXTIN_LINE2_L);
 	A_ADD_VOLUME_IN(capture+1, gpr+1, A_EXTIN_LINE2_R);
-	snd_emu10k1_init_stereo_control(&controls[nctl++], "Line2 Capture Volume", gpr, 0);
+	snd_emu10k1_init_stereo_control(&controls[nctl++],
+					emu->no_ac97 ? "Line Capture Volume" : "Line2 Capture Volume",
+					gpr, 0);
 	gpr += 2;
         
 	/* Philips ADC Playback Volume */
@@ -1391,12 +1399,16 @@ A_OP(icode, &ptr, iMAC0, A_GPR(var), A_GPR(var), A_GPR(vol), A_EXTIN(input))
 	/* Aux2 Playback Volume */
 	A_ADD_VOLUME_IN(stereo_mix, gpr, A_EXTIN_AUX2_L);
 	A_ADD_VOLUME_IN(stereo_mix+1, gpr+1, A_EXTIN_AUX2_R);
-	snd_emu10k1_init_stereo_control(&controls[nctl++], "Aux2 Playback Volume", gpr, 0);
+	snd_emu10k1_init_stereo_control(&controls[nctl++],
+					emu->no_ac97 ? "Aux Playback Volume" : "Aux2 Playback Volume",
+					gpr, 0);
 	gpr += 2;
 	/* Aux2 Capture Volume */
 	A_ADD_VOLUME_IN(capture, gpr, A_EXTIN_AUX2_L);
 	A_ADD_VOLUME_IN(capture+1, gpr+1, A_EXTIN_AUX2_R);
-	snd_emu10k1_init_stereo_control(&controls[nctl++], "Aux2 Capture Volume", gpr, 0);
+	snd_emu10k1_init_stereo_control(&controls[nctl++],
+					emu->no_ac97 ? "Aux Capture Volume" : "Aux2 Capture Volume",
+					gpr, 0);
 	gpr += 2;
 	
 	/* Stereo Mix Front Playback Volume */

@@ -24,6 +24,7 @@ typedef u16	compat_nlink_t;
 typedef u16	compat_ipc_pid_t;
 typedef s32	compat_daddr_t;
 typedef u32	compat_caddr_t;
+typedef u32	compat_timer_t;
 
 typedef s32	compat_int_t;
 typedef s32	compat_long_t;
@@ -101,6 +102,15 @@ struct compat_statfs {
 	s32		f_spare[5];
 };
 
+struct compat_sigcontext {
+	compat_int_t sc_flags;
+	compat_int_t sc_gr[32]; /* PSW in sc_gr[0] */
+	u64 sc_fr[32];
+	compat_int_t sc_iasq[2];
+	compat_int_t sc_iaoq[2];
+	compat_int_t sc_sar; /* cr11 */
+};
+
 #define COMPAT_RLIM_INFINITY 0xffffffff
 
 typedef u32		compat_old_sigset_t;	/* at least 32 bits */
@@ -129,9 +139,7 @@ static inline void *compat_ptr(compat_uptr_t uptr)
 static __inline__ void *compat_alloc_user_space(long len)
 {
 	struct pt_regs *regs = &current->thread.regs;
-	unsigned long usp = regs->gr[30];
-
-	return (void *)(usp + len);
+	return (void *)regs->gr[30];
 }
 
 #endif /* _ASM_PARISC_COMPAT_H */

@@ -2372,6 +2372,7 @@ static int sbmac_init(struct net_device *dev, int idx)
 	unsigned char *eaddr;
 	uint64_t ea_reg;
 	int i;
+	int err;
 	
 	sc = (struct sbmac_softc *)dev->priv;
 	
@@ -2430,7 +2431,6 @@ static int sbmac_init(struct net_device *dev, int idx)
 	
 	spin_lock_init(&(sc->sbm_lock));
 	
-	ether_setup(dev);
 	dev->open               = sbmac_open;
 	dev->hard_start_xmit    = sbmac_start_tx;
 	dev->stop               = sbmac_close;
@@ -2444,8 +2444,11 @@ static int sbmac_init(struct net_device *dev, int idx)
 
 	/* This is needed for PASS2 for Rx H/W checksum feature */
 	sbmac_set_iphdr_offset(sc);
-	
-	return 0;
+
+	err = register_netdev(dev);
+	if (err)
+		sbmac_uninitctx(sc);
+	return err;
 }
 
 
@@ -2811,13 +2814,12 @@ sbmac_setup_hwaddr(int chan,char *addr)
 }
 #endif
 
-static struct net_device *dev_sbmac[MAX_UNITS] = {0,0,0};
+static struct net_device *dev_sbmac[MAX_UNITS];
 
 static int __init
 sbmac_init_module(void)
 {
 	int idx;
-	int macidx = 0;
 	struct net_device *dev;
 	sbmac_port_t port;
 	int chip_max_units;
@@ -2884,26 +2886,24 @@ sbmac_init_module(void)
 		 * Okay, cool.  Initialize this MAC.
 		 */
 
-		dev = init_etherdev(NULL,sizeof(struct sbmac_softc));
+		dev = alloc_etherdev(sizeof(struct sbmac_softc));
 		if (!dev) 
-		  return -ENOMEM;	/* return ENOMEM */
+			return -ENOMEM;	/* return ENOMEM */
 
 		printk(KERN_DEBUG "sbmac: configuring MAC at %lx\n", port);
 
 		dev->irq = K_INT_MAC_0 + idx;
 		dev->base_addr = port;
 		dev->mem_end = 0;
-		/*dev->init = sbmac_init;*/
-		sbmac_init(dev, macidx);
-
-		dev_sbmac[macidx] = dev;
-		macidx++;
+		if (sbmac_init(dev, idx)) {
+			port = A_MAC_CHANNEL_BASE(idx);
+			SBMAC_WRITECSR(KSEG1ADDR(port+R_MAC_ETHERNET_ADDR),
+					sbmac_orig_hwaddr[idx] );
+			free_netdev(dev);
+			continue;
+		}
+		dev_sbmac[idx++] = dev;
 	}
-
-	/*
-	 * Should we care, 'macidx' is the total number of enabled MACs.
-	 */
-	
 	return 0;
 }
 
@@ -2916,21 +2916,12 @@ sbmac_cleanup_module(void)
 	sbmac_port_t port;
 	for (idx = 0; idx < MAX_UNITS; idx++) {
 		dev = dev_sbmac[idx];
-		if (dev == NULL)
-			continue;
-		if (dev->priv != NULL) {
-			struct sbmac_softc *sc = (struct sbmac_softc *) dev->priv;
-			
+		if (!dev) {
+			struct sbmac_softc *sc = dev->priv;
 			unregister_netdev(dev);
-			
 			sbmac_uninitctx(sc);
-			
+			free_netdev(dev);
 		}
-
-	        port = A_MAC_CHANNEL_BASE(idx);
-		SBMAC_WRITECSR(KSEG1ADDR(port+R_MAC_ETHERNET_ADDR), sbmac_orig_hwaddr[idx] );
-		free_netdev(dev);
-		dev_sbmac[idx] = NULL;
 	}
 }
 

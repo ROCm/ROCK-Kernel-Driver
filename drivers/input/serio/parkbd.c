@@ -151,7 +151,7 @@ static int parkbd_getport(void)
 		return -ENODEV;
 	}
 
-	for (pp = parport_enumerate(); pp != NULL && (parkbd > 0); pp = pp->next) parkbd--;
+	pp = parport_find_number(parkbd);
 
 	if (pp == NULL) {
 		printk(KERN_ERR "parkbd: no such parport\n");
@@ -159,6 +159,7 @@ static int parkbd_getport(void)
 	}
 
 	parkbd_dev = parport_register_device(pp, "parkbd", NULL, NULL, parkbd_interrupt, PARPORT_DEV_EXCL, NULL);
+	parport_put_port(pp);
 
 	if (!parkbd_dev)
 		return -ENODEV;

@@ -2551,7 +2551,6 @@ powerbook_sleep_grackle(void)
 	return 0;
 }
 
-
 static int __pmac
 powerbook_sleep_Core99(void)
 {

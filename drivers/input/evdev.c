@@ -209,7 +209,7 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	struct evdev *evdev = list->evdev;
 	struct input_dev *dev = evdev->handle.dev;
 	struct input_absinfo abs;
-	int i, t, u, v;
+	int t, u, v;
 
 	if (!evdev->exist) return -ENODEV;
 
@@ -231,10 +231,8 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			if (get_user(t, ((int *) arg) + 0)) return -EFAULT;
 			if (t < 0 || t > dev->keycodemax || !dev->keycodesize) return -EINVAL;
 			if (get_user(v, ((int *) arg) + 1)) return -EFAULT;
-			u = INPUT_KEYCODE(dev, t);
-			SET_INPUT_KEYCODE(dev, t, v);
-			for (i = 0; i < dev->keycodemax; i++) if (v == u) break;
-			if (i == dev->keycodemax) clear_bit(u, dev->keybit);
+			u = SET_INPUT_KEYCODE(dev, t, v);
+			clear_bit(u, dev->keybit);
 			set_bit(v, dev->keybit);
 			return 0;
 

@@ -61,28 +61,6 @@ static int hfsplus_get_last_session(struct super_block *sb,
 	/* default values */
 	*start = 0;
 	*size = sb->s_bdev->bd_inode->i_size >> 9;
-	{
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-		struct gendisk *gd = get_gendisk(sb->s_bdev->bd_inode->i_rdev);
-		if (gd && gd->part) {
-			printk("size: %ld,%ld\n", *size,
-				gd->part[MINOR(sb->s_bdev->bd_inode->i_rdev)].nr_sects);
-			*size = gd->part[MINOR(sb->s_bdev->bd_inode->i_rdev)].nr_sects;
-		}
-#else
-		int part;
-		struct gendisk *gd = get_gendisk(sb->s_bdev->bd_inode->i_rdev, &part);
-		if (gd && part && gd->part) {
-			printk("size: %d,%ld,%ld\n", part, *size,
-				gd->part[part-1]->nr_sects);
-			//*size = gd->part[part-1]->nr_sects;
-		} else if (gd && !part) {
-			printk("size: %d,%ld,%ld\n", part, *size,
-				gd->capacity);
-		}
-		put_disk(gd);
-#endif
-	}
 
 	if (HFSPLUS_SB(sb).session >= 0) {
 		te.cdte_track = HFSPLUS_SB(sb).session;

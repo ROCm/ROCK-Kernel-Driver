@@ -445,6 +445,7 @@ static int __initdata parport_count;
 
 static int __devinit parport_init_chip(struct parisc_device *dev)
 {
+	struct parport *p;
 	unsigned long port;
 
 	if (!dev->irq) {
@@ -467,11 +468,34 @@ static int __devinit parport_init_chip(struct parisc_device *dev)
 		printk("%s: enhanced parport-modes not supported.\n", __FUNCTION__);
 	}
 	
-	if (parport_gsc_probe_port(port, 0, dev->irq,
-			/* PARPORT_IRQ_NONE */ PARPORT_DMA_NONE, NULL))
+	p = parport_gsc_probe_port(port, 0, dev->irq,
+			/* PARPORT_IRQ_NONE */ PARPORT_DMA_NONE, NULL);
+	if (p)
 		parport_count++;
+	dev->dev.driver_data = p;
 
 	return 0;
+}
+
+static void __devexit parport_remove_chip(struct parisc_device *dev)
+{
+	struct parport *p = dev->dev.driver_data;
+	if (p) {
+		struct parport_gsc_private *priv = p->private_data;
+		struct parport_operations *ops = p->ops;
+		if (p->dma != PARPORT_DMA_NONE)
+			free_dma(p->dma);
+		if (p->irq != PARPORT_IRQ_NONE)
+			free_irq(p->irq, p);
+		parport_proc_unregister(p);
+		if (priv->dma_buf)
+			pci_free_consistent(priv->dev, PAGE_SIZE,
+					    priv->dma_buf,
+					    priv->dma_handle);
+		kfree (p->private_data);
+		parport_unregister_port(p);
+		kfree (ops); /* hope no-one cached it */
+	}
 }
 
 static struct parisc_device_id parport_tbl[] = {
@@ -485,6 +509,7 @@ static struct parisc_driver parport_driver = {
 	.name		= "Parallel",
 	.id_table	= parport_tbl,
 	.probe		= parport_init_chip,
+	.remove		= parport_remove_chip,
 };
 
 int __devinit parport_gsc_init(void)
@@ -494,27 +519,6 @@ int __devinit parport_gsc_init(void)
 
 static void __devexit parport_gsc_exit(void)
 {
-	struct parport *p = parport_enumerate(), *tmp;
-	while (p) {
-		tmp = p->next;
-		if (p->modes & PARPORT_MODE_PCSPP) { 
-			struct parport_gsc_private *priv = p->private_data;
-			struct parport_operations *ops = p->ops;
-			if (p->dma != PARPORT_DMA_NONE)
-				free_dma(p->dma);
-			if (p->irq != PARPORT_IRQ_NONE)
-				free_irq(p->irq, p);
-			parport_proc_unregister(p);
-			if (priv->dma_buf)
-				pci_free_consistent(priv->dev, PAGE_SIZE,
-						    priv->dma_buf,
-						    priv->dma_handle);
-			kfree (p->private_data);
-			parport_unregister_port(p);
-			kfree (ops); /* hope no-one cached it */
-		}
-		p = tmp;
-	}
 	unregister_parisc_driver(&parport_driver);
 }
 

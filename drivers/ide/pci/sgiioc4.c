@@ -653,7 +653,6 @@ ide_init_sgiioc4(ide_hwif_t * hwif)
 	hwif->ide_dma_good_drive = &__ide_dma_good_drive;
 	hwif->ide_dma_count = &__ide_dma_count;
 	hwif->ide_dma_verbose = &sgiioc4_ide_dma_verbose;
-	hwif->ide_dma_retune = &__ide_dma_retune;
 	hwif->ide_dma_lostirq = &sgiioc4_ide_dma_lostirq;
 	hwif->ide_dma_timeout = &__ide_dma_timeout;
 	hwif->INB = &sgiioc4_INB;
@@ -795,8 +794,6 @@ sgiioc4_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 	if (pci_init_sgiioc4(dev, d))
 		return 0;
 
-	MOD_INC_USE_COUNT;
-
 	return 0;
 }
 
@@ -818,14 +815,7 @@ sgiioc4_ide_init(void)
 	return ide_pci_register_driver(&driver);
 }
 
-static void
-sgiioc4_ide_exit(void)
-{
-	ide_pci_unregister_driver(&driver);
-}
-
 module_init(sgiioc4_ide_init);
-module_exit(sgiioc4_ide_exit);
 
 MODULE_AUTHOR("Aniket Malatpure - Silicon Graphics Inc. (SGI)");
 MODULE_DESCRIPTION("PCI driver module for SGI IOC4 Base-IO Card");

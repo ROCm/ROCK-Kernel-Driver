@@ -1798,9 +1798,7 @@ eth_bind (struct usb_gadget *gadget)
 	/* network device setup */
 	dev->net = net;
 	SET_MODULE_OWNER (net);
-	net->priv = dev;
 	strcpy (net->name, "usb%d");
-	ether_setup (net);
 
 	/* one random address for the gadget device ... both of these could
 	 * reasonably come from an id prom or a module parameter.

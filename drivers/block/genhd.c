@@ -223,7 +223,6 @@ struct gendisk *get_gendisk(dev_t dev, int *part)
 	struct kobject *kobj = kobj_lookup(bdev_map, dev, part);
 	return  kobj ? to_disk(kobj) : NULL;
 }
-EXPORT_SYMBOL(get_gendisk);
 
 #ifdef CONFIG_PROC_FS
 /* iterator */

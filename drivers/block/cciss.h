@@ -32,6 +32,7 @@ typedef struct _drive_info_struct
 	int 	heads;
 	int	sectors;
 	int 	cylinders;
+	int	raid_level;
 } drive_info_struct;
 
 struct ctlr_info 
@@ -42,13 +43,13 @@ struct ctlr_info
 	char	firm_ver[4]; // Firmware version 
 	struct pci_dev *pdev;
 	__u32	board_id;
-	ulong   vaddr;
-	__u32	paddr;	
+	unsigned long vaddr;
+	unsigned long paddr;
 	unsigned long io_mem_addr;
 	unsigned long io_mem_length;
 	CfgTable_struct *cfgtable;
 	int	intr;
-
+	int	interrupts_enabled;
 	int 	max_commands;
 	int	commands_outstanding;
 	int 	max_outstanding; /* Debug */ 
@@ -78,6 +79,7 @@ struct ctlr_info
         unsigned long  		*cmd_pool_bits;
 	int			nr_allocs;
 	int			nr_frees; 
+	int			busy_configuring;
 
 	// Disk structures we need to pass back
 	struct gendisk   *gendisk[NWD];
@@ -134,9 +136,11 @@ static void SA5_intr_mask(ctlr_info_t *h, unsigned long val)
 {
 	if (val) 
 	{ /* Turn interrupts on */
+		h->interrupts_enabled = 1;
 		writel(0, h->vaddr + SA5_REPLY_INTR_MASK_OFFSET);
 	} else /* Turn them off */
 	{
+		h->interrupts_enabled = 0;
         	writel( SA5_INTR_OFF, 
 			h->vaddr + SA5_REPLY_INTR_MASK_OFFSET);
 	}
@@ -150,9 +154,11 @@ static void SA5B_intr_mask(ctlr_info_t *h, unsigned long val)
 {
         if (val)
         { /* Turn interrupts on */
+		h->interrupts_enabled = 1;
                 writel(0, h->vaddr + SA5_REPLY_INTR_MASK_OFFSET);
         } else /* Turn them off */
         {
+		h->interrupts_enabled = 0;
                 writel( SA5B_INTR_OFF,
                         h->vaddr + SA5_REPLY_INTR_MASK_OFFSET);
         }

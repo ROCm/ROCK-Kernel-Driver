@@ -82,6 +82,7 @@ static long mpu_port[SNDRV_CARDS];
 static int joystick[SNDRV_CARDS];
 #endif
 static int ac97_clock[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 48000};
+static int ac97_quirk[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = AC97_TUNE_DEFAULT};
 static int dxs_support[SNDRV_CARDS];
 
 MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
@@ -104,6 +105,9 @@ MODULE_PARM_SYNTAX(joystick, SNDRV_ENABLE_DESC "," SNDRV_BOOLEAN_FALSE_DESC);
 MODULE_PARM(ac97_clock, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(ac97_clock, "AC'97 codec clock (default 48000Hz).");
 MODULE_PARM_SYNTAX(ac97_clock, SNDRV_ENABLED ",default:48000");
+MODULE_PARM(ac97_quirk, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(ac97_quirk, "AC'97 workaround for strange hardware.");
+MODULE_PARM_SYNTAX(ac97_quirk, SNDRV_ENABLED ",allows:{{-1,3}},dialog:list,default:-1");
 MODULE_PARM(dxs_support, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(dxs_support, "Support for DXS channels (0 = auto, 1 = enable, 2 = disable, 3 = 48k only, 4 = no VRA)");
 MODULE_PARM_SYNTAX(dxs_support, SNDRV_ENABLED ",allows:{{0,4}},dialog:list");
@@ -523,14 +527,16 @@ static int snd_via82xx_codec_ready(via82xx_t *chip, int secondary)
 static int snd_via82xx_codec_valid(via82xx_t *chip, int secondary)
 {
 	unsigned int timeout = 1000;	/* 1ms */
-	unsigned int val;
+	unsigned int val, val1;
 	unsigned int stat = !secondary ? VIA_REG_AC97_PRIMARY_VALID :
 					 VIA_REG_AC97_SECONDARY_VALID;
 	
 	while (timeout-- > 0) {
-		udelay(1);
-		if ((val = snd_via82xx_codec_xread(chip)) & stat)
+		val = snd_via82xx_codec_xread(chip);
+		val1 = val & (VIA_REG_AC97_BUSY | stat);
+		if (val1 == stat)
 			return val & 0xffff;
+		udelay(1);
 	}
 	return -EIO;
 }
@@ -580,8 +586,7 @@ static unsigned short snd_via82xx_codec_read(ac97_t *ac97, unsigned short reg)
 		      	return 0xffff;
 		}
 		snd_via82xx_codec_xwrite(chip, xval);
-		if (snd_via82xx_codec_ready(chip, ac97->num) < 0)
-			continue;
+		udelay (20);
 		if (snd_via82xx_codec_valid(chip, ac97->num) >= 0) {
 			udelay(25);
 			val = snd_via82xx_codec_xread(chip);
@@ -1558,7 +1563,7 @@ static struct ac97_quirk ac97_quirks[] = {
 	{ } /* terminator */
 };
 
-static int __devinit snd_via82xx_mixer_new(via82xx_t *chip)
+static int __devinit snd_via82xx_mixer_new(via82xx_t *chip, int ac97_quirk)
 {
 	ac97_bus_t bus;
 	ac97_t ac97;
@@ -1581,7 +1586,7 @@ static int __devinit snd_via82xx_mixer_new(via82xx_t *chip)
 	if ((err = snd_ac97_mixer(chip->ac97_bus, &ac97, &chip->ac97)) < 0)
 		return err;
 
-	snd_ac97_tune_hardware(chip->ac97, ac97_quirks);
+	snd_ac97_tune_hardware(chip->ac97, ac97_quirks, ac97_quirk);
 
 	if (chip->chip_type != TYPE_VIA686) {
 		/* use slot 10/11 */
@@ -1640,14 +1645,6 @@ static int snd_via686_init_misc(via82xx_t *chip, int dev)
 			pci_write_config_dword(chip->pci, 0x18, mpu_port[dev] | 0x01);
 		} else {
 			mpu_port[dev] = pci_resource_start(chip->pci, 2);
-		}
-		if (mpu_port[dev] >= 0x200 &&
-		    (chip->mpu_res = request_region(pci_resource_start(chip->pci, 2), 2,
-						    "VIA82xx MPU401")) != NULL) {
-			legacy |= VIA_FUNC_ENABLE_MIDI;
-		} else {
-			mpu_port[dev] = 0;
-			legacy &= ~VIA_FUNC_ENABLE_MIDI;
 		}
 	} else {
 		switch (mpu_port[dev]) {	/* force MIDI */
@@ -1987,7 +1984,7 @@ static int __devinit check_dxs_list(struct pci_dev *pci)
 		{ .vendor = 0x1019, .device = 0x0996, .action = VIA_DXS_48K },
 		{ .vendor = 0x1043, .device = 0x8095, .action = VIA_DXS_ENABLE }, /* ASUS A7V8X */
 		{ .vendor = 0x1043, .device = 0x80a1, .action = VIA_DXS_NO_VRA }, /* ASUS A7V8-X */
-		{ .vendor = 0x1043, .device = 0x80b0, .action = VIA_DXS_ENABLE }, /* ASUS A7V600 */
+		{ .vendor = 0x1043, .device = 0x80b0, .action = VIA_DXS_NO_VRA }, /* ASUS A7V600 & K8V*/ 
 		{ .vendor = 0x10cf, .device = 0x118e, .action = VIA_DXS_ENABLE }, /* FSC laptop */
 		{ .vendor = 0x1106, .device = 0x4161, .action = VIA_DXS_NO_VRA }, /* ASRock K7VT2 */
 		{ .vendor = 0x1297, .device = 0xa232, .action = VIA_DXS_ENABLE }, /* Shuttle ?? */
@@ -1995,6 +1992,7 @@ static int __devinit check_dxs_list(struct pci_dev *pci)
 		{ .vendor = 0x1458, .device = 0xa002, .action = VIA_DXS_ENABLE }, /* Gigabyte GA-7VAXP */
 		{ .vendor = 0x147b, .device = 0x1401, .action = VIA_DXS_ENABLE }, /* ABIT KD7(-RAID) */
 		{ .vendor = 0x14ff, .device = 0x0403, .action = VIA_DXS_ENABLE }, /* Twinhead mobo */
+		{ .vendor = 0x1462, .device = 0x3800, .action = VIA_DXS_ENABLE }, /* MSI KT266 */
 		{ .vendor = 0x1462, .device = 0x7120, .action = VIA_DXS_ENABLE }, /* MSI KT4V */
 		{ .vendor = 0x1631, .device = 0xe004, .action = VIA_DXS_ENABLE }, /* Easy Note 3174, Packard Bell */
 		{ .vendor = 0x1695, .device = 0x3005, .action = VIA_DXS_ENABLE }, /* EPoX EP-8K9A */
@@ -2093,7 +2091,7 @@ static int __devinit snd_via82xx_probe(struct pci_dev *pci,
 		
 	if ((err = snd_via82xx_create(card, pci, chip_type, revision, ac97_clock[dev], &chip)) < 0)
 		goto __error;
-	if ((err = snd_via82xx_mixer_new(chip)) < 0)
+	if ((err = snd_via82xx_mixer_new(chip, ac97_quirk[dev])) < 0)
 		goto __error;
 
 	if (chip_type == TYPE_VIA686) {
@@ -2175,7 +2173,8 @@ module_exit(alsa_card_via82xx_exit)
 #ifndef MODULE
 
 /* format is: snd-via82xx=enable,index,id,
-			  mpu_port,joystick,ac97_clock,dxs_support */
+			  mpu_port,joystick,
+			  ac97_quirk,ac97_clock,dxs_support */
 
 static int __init alsa_card_via82xx_setup(char *str)
 {
@@ -2190,6 +2189,7 @@ static int __init alsa_card_via82xx_setup(char *str)
 #ifdef SUPPORT_JOYSTICK
 	       get_option(&str,&joystick[nr_dev]) == 2 &&
 #endif
+	       get_option(&str,&ac97_quirk[nr_dev]) == 2 &&
 	       get_option(&str,&ac97_clock[nr_dev]) == 2 &&
 	       get_option(&str,&dxs_support[nr_dev]) == 2);
 	nr_dev++;

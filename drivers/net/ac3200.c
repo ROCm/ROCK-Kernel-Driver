@@ -75,7 +75,6 @@ static const char *port_name[4] = { "10baseT", "invalid", "AUI", "10base2"};
 #define AC_START_PG		0x00	/* First page of 8390 TX buffer */
 #define AC_STOP_PG		0x80	/* Last page +1 of the 8390 RX ring */
 
-int ac3200_probe(struct net_device *dev);
 static int ac_probe1(int ioaddr, struct net_device *dev);
 
 static int ac_open(struct net_device *dev);
@@ -96,9 +95,11 @@ static int ac_close_card(struct net_device *dev);
 	or the unique value in the station address PROM.
 	*/
 
-int __init ac3200_probe(struct net_device *dev)
+static int __init do_ac3200_probe(struct net_device *dev)
 {
 	unsigned short ioaddr = dev->base_addr;
+	int irq = dev->irq;
+	int mem_start = dev->mem_start;
 
 	SET_MODULE_OWNER(dev);
 
@@ -110,11 +111,48 @@ int __init ac3200_probe(struct net_device *dev)
 	if ( ! EISA_bus)
 		return -ENXIO;
 
-	for (ioaddr = 0x1000; ioaddr < 0x9000; ioaddr += 0x1000)
+	for (ioaddr = 0x1000; ioaddr < 0x9000; ioaddr += 0x1000) {
 		if (ac_probe1(ioaddr, dev) == 0)
 			return 0;
+		dev->irq = irq;
+		dev->mem_start = mem_start;
+	}
 
 	return -ENODEV;
+}
+
+static void cleanup_card(struct net_device *dev)
+{
+	/* Someday free_irq may be in ac_close_card() */
+	free_irq(dev->irq, dev);
+	release_region(dev->base_addr, AC_IO_EXTENT);
+	if (ei_status.reg0)
+		iounmap((void *)dev->mem_start);
+}
+
+struct net_device * __init ac3200_probe(int unit)
+{
+	struct net_device *dev = alloc_ei_netdev();
+	int err;
+
+	if (!dev)
+		return ERR_PTR(-ENOMEM);
+
+	sprintf(dev->name, "eth%d", unit);
+	netdev_boot_setup_check(dev);
+
+	err = do_ac3200_probe(dev);
+	if (err)
+		goto out;
+	err = register_netdev(dev);
+	if (err)
+		goto out1;
+	return dev;
+out1:
+	cleanup_card(dev);
+out:
+	free_netdev(dev);
+	return ERR_PTR(err);
 }
 
 static int __init ac_probe1(int ioaddr, struct net_device *dev)
@@ -155,13 +193,6 @@ static int __init ac_probe1(int ioaddr, struct net_device *dev)
 		goto out;
 	}
 #endif
-
-	/* Allocate dev->priv and fill in 8390 specific dev fields. */
-	if (ethdev_init(dev)) {
-		printk (", unable to allocate memory for dev->priv.\n");
-		retval = -ENOMEM;
-		goto out;
-	}
 
 	/* Assign and allocate the interrupt now. */
 	if (dev->irq == 0) {
@@ -210,7 +241,7 @@ static int __init ac_probe1(int ioaddr, struct net_device *dev)
 			printk(KERN_CRIT "ac3200.c: or to an address above 0x%lx.\n", virt_to_phys(high_memory));
 			printk(KERN_CRIT "ac3200.c: Driver NOT installed.\n");
 			retval = -EINVAL;
-			goto out2;
+			goto out1;
 		}
 		dev->mem_start = (unsigned long)ioremap(dev->mem_start, AC_STOP_PG*0x100);
 		if (dev->mem_start == 0) {
@@ -218,7 +249,7 @@ static int __init ac_probe1(int ioaddr, struct net_device *dev)
 			printk(KERN_ERR "ac3200.c: Try using EISA SCU to set memory below 1MB.\n");
 			printk(KERN_ERR "ac3200.c: Driver NOT installed.\n");
 			retval = -EINVAL;
-			goto out2;
+			goto out1;
 		}
 		ei_status.reg0 = 1;	/* Use as remap flag */
 		printk("ac3200.c: remapped %dkB card memory to virtual address %#lx\n",
@@ -247,11 +278,8 @@ static int __init ac_probe1(int ioaddr, struct net_device *dev)
 	dev->stop = &ac_close_card;
 	NS8390_init(dev, 0);
 	return 0;
-out2:
-	free_irq(dev->irq, dev);
 out1:
-	kfree(dev->priv);
-	dev->priv = NULL;
+	free_irq(dev->irq, dev);
 out:
 	release_region(ioaddr, AC_IO_EXTENT);
 	return retval;
@@ -338,7 +366,7 @@ static int ac_close_card(struct net_device *dev)
 
 #ifdef MODULE
 #define MAX_AC32_CARDS	4	/* Max number of AC32 cards per module */
-static struct net_device dev_ac32[MAX_AC32_CARDS];
+static struct net_device *dev_ac32[MAX_AC32_CARDS];
 static int io[MAX_AC32_CARDS];
 static int irq[MAX_AC32_CARDS];
 static int mem[MAX_AC32_CARDS];
@@ -354,26 +382,32 @@ MODULE_LICENSE("GPL");
 int
 init_module(void)
 {
+	struct net_device *dev;
 	int this_dev, found = 0;
 
 	for (this_dev = 0; this_dev < MAX_AC32_CARDS; this_dev++) {
-		struct net_device *dev = &dev_ac32[this_dev];
+		if (io[this_dev] == 0 && this_dev != 0)
+			break;
+		dev = alloc_ei_netdev();
+		if (!dev)
+			break;
 		dev->irq = irq[this_dev];
 		dev->base_addr = io[this_dev];
 		dev->mem_start = mem[this_dev];		/* Currently ignored by driver */
-		dev->init = ac3200_probe;
-		/* Default is to only install one card. */
-		if (io[this_dev] == 0 && this_dev != 0) break;
-		if (register_netdev(dev) != 0) {
-			printk(KERN_WARNING "ac3200.c: No ac3200 card found (i/o = 0x%x).\n", io[this_dev]);
-			if (found != 0) {	/* Got at least one. */
-				return 0;
+		if (do_ac3200_probe(dev) == 0) {
+			if (register_netdev(dev) == 0) {
+				dev_ac32[found++] = dev;
+				continue;
 			}
-			return -ENXIO;
+			cleanup_card(dev);
 		}
-		found++;
+		free_netdev(dev);
+		printk(KERN_WARNING "ac3200.c: No ac3200 card found (i/o = 0x%x).\n", io[this_dev]);
+		break;
 	}
-	return 0;
+	if (found)
+		return 0;
+	return -ENXIO;
 }
 
 void
@@ -382,16 +416,11 @@ cleanup_module(void)
 	int this_dev;
 
 	for (this_dev = 0; this_dev < MAX_AC32_CARDS; this_dev++) {
-		struct net_device *dev = &dev_ac32[this_dev];
-		if (dev->priv != NULL) {
-			/* Someday free_irq may be in ac_close_card() */
-			free_irq(dev->irq, dev);
-			release_region(dev->base_addr, AC_IO_EXTENT);
-			if (ei_status.reg0)
-				iounmap((void *)dev->mem_start);
+		struct net_device *dev = dev_ac32[this_dev];
+		if (dev) {
 			unregister_netdev(dev);
-			kfree(dev->priv);
-			dev->priv = NULL;
+			cleanup_card(dev);
+			free_netdev(dev);
 		}
 	}
 }

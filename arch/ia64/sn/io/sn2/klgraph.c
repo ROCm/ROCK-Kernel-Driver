@@ -43,7 +43,7 @@ klhwg_add_hub(vertex_hdl_t node_vertex, klhub_t *hub, cnodeid_t cnode)
 
 	hwgraph_path_add(node_vertex, EDGE_LBL_HUB, &myhubv);
 
-	HWGRAPH_DEBUG((__FILE__, __FUNCTION__,__LINE__, myhubv, NULL, "Created path for hub vertex for Shub node.\n"));
+	HWGRAPH_DEBUG(__FILE__, __FUNCTION__,__LINE__, myhubv, NULL, "Created path for hub vertex for Shub node.\n");
 
 	rc = device_master_set(myhubv, node_vertex);
 	if (rc) {
@@ -71,7 +71,7 @@ klhwg_add_disabled_cpu(vertex_hdl_t node_vertex, cnodeid_t cnode, klcpu_t *cpu, 
 		snprintf(name, 120, "%s/%s/%c", EDGE_LBL_DISABLED, EDGE_LBL_CPU, 'a' + cpu->cpu_info.physid);
 		(void) hwgraph_path_add(node_vertex, name, &my_cpu);
 
-		HWGRAPH_DEBUG((__FILE__, __FUNCTION__,__LINE__, my_cpu, NULL, "Created path for disabled cpu slice.\n"));
+		HWGRAPH_DEBUG(__FILE__, __FUNCTION__,__LINE__, my_cpu, NULL, "Created path for disabled cpu slice.\n");
 
 		mark_cpuvertex_as_cpu(my_cpu, cpu_id);
 		device_master_set(my_cpu, node_vertex);
@@ -98,7 +98,7 @@ klhwg_add_cpu(vertex_hdl_t node_vertex, cnodeid_t cnode, klcpu_t *cpu)
 
         (void) hwgraph_path_add(node_vertex, name, &my_cpu);
 
-	HWGRAPH_DEBUG((__FILE__, __FUNCTION__,__LINE__, my_cpu, NULL, "Created path for active cpu slice.\n"));
+	HWGRAPH_DEBUG(__FILE__, __FUNCTION__,__LINE__, my_cpu, NULL, "Created path for active cpu slice.\n");
 
 	mark_cpuvertex_as_cpu(my_cpu, cpu_id);
         device_master_set(my_cpu, node_vertex);
@@ -107,7 +107,7 @@ klhwg_add_cpu(vertex_hdl_t node_vertex, cnodeid_t cnode, klcpu_t *cpu)
         if (hwgraph_edge_get(node_vertex, EDGE_LBL_CPU, &cpu_dir) == GRAPH_SUCCESS) {
                 snprintf(name, 120, "%c", 'a' + cpu->cpu_info.physid);
                 (void) hwgraph_edge_add(cpu_dir, my_cpu, name);
-		HWGRAPH_DEBUG((__FILE__, __FUNCTION__,__LINE__, cpu_dir, my_cpu, "Created % from vhdl1 to vhdl2.\n", name));
+		HWGRAPH_DEBUG(__FILE__, __FUNCTION__,__LINE__, cpu_dir, my_cpu, "Created % from vhdl1 to vhdl2.\n", name);
         }
 }
 
@@ -166,7 +166,7 @@ klhwg_add_xbow(cnodeid_t cnode, nasid_t nasid)
 			return;
                 }
 
-		HWGRAPH_DEBUG((__FILE__, __FUNCTION__, __LINE__, xbow_v, NULL, "Created path for xtalk.\n"));
+		HWGRAPH_DEBUG(__FILE__, __FUNCTION__, __LINE__, xbow_v, NULL, "Created path for xtalk.\n");
 
 		xswitch_vertex_init(xbow_v); 
 
@@ -212,7 +212,7 @@ klhwg_add_node(vertex_hdl_t hwgraph_root, cnodeid_t cnode)
 		return;
 	}
 
-	HWGRAPH_DEBUG((__FILE__, __FUNCTION__, __LINE__, node_vertex, NULL, "Created path for SHUB node.\n"));
+	HWGRAPH_DEBUG(__FILE__, __FUNCTION__, __LINE__, node_vertex, NULL, "Created path for SHUB node.\n");
 	hub = (klhub_t *)find_first_component(brd, KLSTRUCT_HUB);
 	ASSERT(hub);
 	if(hub->hub_info.flags & KLINFO_ENABLE)
@@ -250,7 +250,7 @@ klhwg_add_node(vertex_hdl_t hwgraph_root, cnodeid_t cnode)
 			printk("klhwg_add_node: Cannot create CPU directory\n");
 			return;
 		}
-		HWGRAPH_DEBUG((__FILE__, __FUNCTION__, __LINE__, cpu_dir, NULL, "Created cpu directiry on SHUB node.\n"));
+		HWGRAPH_DEBUG(__FILE__, __FUNCTION__, __LINE__, cpu_dir, NULL, "Created cpu directiry on SHUB node.\n");
 
 	}
 
@@ -305,7 +305,7 @@ klhwg_add_all_routers(vertex_hdl_t hwgraph_root)
 						  "failed.  Path == %s", path_buffer);
 				return;
 			}
-			HWGRAPH_DEBUG((__FILE__, __FUNCTION__, __LINE__, node_vertex, NULL, "Created router path.\n"));
+			HWGRAPH_DEBUG(__FILE__, __FUNCTION__, __LINE__, node_vertex, NULL, "Created router path.\n");
 
 		/* Find the rest of the routers stored on this node. */
 		} while ( (brd = find_lboard_class_any(KLCF_NEXT_ANY(brd),
@@ -400,7 +400,7 @@ klhwg_connect_one_router(vertex_hdl_t hwgraph_root, lboard_t *brd,
 				path_buffer, dest_path, (void *)dest_hndl, rc);
 			return;
 		}
-		HWGRAPH_DEBUG((__FILE__, __FUNCTION__, __LINE__, router_hndl, dest_hndl, "Created edge %s from vhdl1 to vhdl2.\n", dest_path));
+		HWGRAPH_DEBUG(__FILE__, __FUNCTION__, __LINE__, router_hndl, dest_hndl, "Created edge %s from vhdl1 to vhdl2.\n", dest_path);
 		
 	}
 }
@@ -492,14 +492,14 @@ klhwg_connect_hubs(vertex_hdl_t hwgraph_root)
 
 				rc = hwgraph_path_add(hub_hndl, EDGE_LBL_INTERCONNECT, &hub_hndl);
 
-				HWGRAPH_DEBUG((__FILE__, __FUNCTION__, __LINE__, hub_hndl, NULL, "Created link path.\n"));
+				HWGRAPH_DEBUG(__FILE__, __FUNCTION__, __LINE__, hub_hndl, NULL, "Created link path.\n");
 
 				sprintf(buf,"%s/%s",path_buffer,EDGE_LBL_INTERCONNECT);
 				rc = hwgraph_traverse(hwgraph_root, buf, &hub_hndl);
 				sprintf(buf,"%d",port);
 				rc = hwgraph_edge_add(hub_hndl, dest_hndl, buf);
 
-				HWGRAPH_DEBUG((__FILE__, __FUNCTION__, __LINE__, hub_hndl, dest_hndl, "Created edge %s from vhdl1 to vhdl2.\n", buf));
+				HWGRAPH_DEBUG(__FILE__, __FUNCTION__, __LINE__, hub_hndl, dest_hndl, "Created edge %s from vhdl1 to vhdl2.\n", buf);
 
 				if (rc != GRAPH_SUCCESS) {
 					printk("Can't create edge: %s/%s to vertex 0x%p, error 0x%x\n",
@@ -533,7 +533,7 @@ klhwg_add_all_modules(vertex_hdl_t hwgraph_root)
 		rc = hwgraph_path_add(hwgraph_root, name, &module_vhdl);
 		ASSERT(rc == GRAPH_SUCCESS);
 		rc = rc;
-		HWGRAPH_DEBUG((__FILE__, __FUNCTION__, __LINE__, module_vhdl, NULL, "Created module path.\n"));
+		HWGRAPH_DEBUG(__FILE__, __FUNCTION__, __LINE__, module_vhdl, NULL, "Created module path.\n");
 
 		hwgraph_fastinfo_set(module_vhdl, (arbitrary_info_t) modules[cm]);
 
@@ -545,7 +545,7 @@ klhwg_add_all_modules(vertex_hdl_t hwgraph_root)
 		rc = hwgraph_path_add(hwgraph_root, name, &vhdl);
 		ASSERT_ALWAYS(rc == GRAPH_SUCCESS); 
 		rc = rc;
-		HWGRAPH_DEBUG((__FILE__, __FUNCTION__, __LINE__, vhdl, NULL, "Created L1 path.\n"));
+		HWGRAPH_DEBUG(__FILE__, __FUNCTION__, __LINE__, vhdl, NULL, "Created L1 path.\n");
 
 		hwgraph_info_add_LBL(vhdl, INFO_LBL_ELSC,
 				     (arbitrary_info_t)1);

@@ -2084,7 +2084,7 @@ err_out_res:
 err_out_disable:
 	pci_disable_device(pdev);
 err_out_free:
-	kfree(dev);
+	free_netdev(dev);
 	return rc;
 }
 

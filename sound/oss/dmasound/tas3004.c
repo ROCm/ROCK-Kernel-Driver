@@ -449,7 +449,7 @@ tas3004_set_mixer_level(struct tas3004_data_t *self, int mixer, uint level)
 		break;
 	case SOUND_MIXER_MIC:
 		if ((level&0xff)>0) {
-			software_input_volume = SW_INPUT_VOLUME_SCALE * (level&0xff); 
+			software_input_volume = SW_INPUT_VOLUME_SCALE * (level&0xff);
 			if (self->super.mixer[mixer] == 0) {
 				self->super.mixer[SOUND_MIXER_LINE] = 0;
 				shadow[TAS3004_REG_ANALOG_CTRL][0]=0xc2;
@@ -458,14 +458,14 @@ tas3004_set_mixer_level(struct tas3004_data_t *self, int mixer, uint level)
 		} else {
 			self->super.mixer[SOUND_MIXER_LINE] = SW_INPUT_VOLUME_DEFAULT;
 			software_input_volume = SW_INPUT_VOLUME_SCALE *
-				(self->super.mixer[SOUND_MIXER_LINE]&0xff); 
+				(self->super.mixer[SOUND_MIXER_LINE]&0xff);
 			shadow[TAS3004_REG_ANALOG_CTRL][0]=0x00;
 			rc = tas3004_sync_register(self,TAS3004_REG_ANALOG_CTRL);
-		} 
+		}
 		break;
 	case SOUND_MIXER_LINE:
-		if (self->super.mixer[SOUND_MIXER_MIC] == 0) { 
-			software_input_volume = SW_INPUT_VOLUME_SCALE * (level&0xff); 
+		if (self->super.mixer[SOUND_MIXER_MIC] == 0) {
+			software_input_volume = SW_INPUT_VOLUME_SCALE * (level&0xff);
 			rc=0;
 		}
 		break;

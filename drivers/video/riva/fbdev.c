@@ -52,7 +52,7 @@
 #error This driver requires PCI support.
 #endif
 
-#ifdef CONFIG_PPC
+#ifdef CONFIG_PPC_PMAC
 #include <linux/adb.h>
 #include <linux/pmu.h>
 #include <asm/prom.h>

@@ -312,6 +312,7 @@ enum
 	NET_TCP_FRTO=92,
 	NET_TCP_LOW_LATENCY=93,
 	NET_IPV4_IPFRAG_SECRET_INTERVAL=94,
+	NET_TCP_WESTWOOD=95,
 };
 
 enum {
@@ -361,6 +362,7 @@ enum
 	NET_IPV4_CONF_MEDIUM_ID=14,
 	NET_IPV4_CONF_NOXFRM=15,
 	NET_IPV4_CONF_NOPOLICY=16,
+	NET_IPV4_CONF_FORCE_IGMP_VERSION=17,
 };
 
 /* /proc/sys/net/ipv4/netfilter */
@@ -582,6 +584,8 @@ enum {
 	NET_SCTP_PRESERVE_ENABLE         = 11,
 	NET_SCTP_MAX_BURST               = 12,
 	NET_SCTP_ADDIP_ENABLE		 = 13,
+	NET_SCTP_RMEM			 = 14,
+	NET_SCTP_WMEM			 = 15,
 };
 
 /* /proc/sys/net/bridge */

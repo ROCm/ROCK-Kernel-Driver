@@ -470,9 +470,10 @@ ide_startstop_t __ide_do_rw_disk (ide_drive_t *drive, struct request *rq, sector
 	}
 
 	if (rq_data_dir(rq) == READ) {
+#ifdef CONFIG_BLK_DEV_IDE_TCQ
 		if (blk_rq_tagged(rq))
-			return hwif->ide_dma_queued_read(drive);
-
+			return __ide_dma_queued_read(drive);
+#endif
 		if (drive->using_dma && !hwif->ide_dma_read(drive))
 			return ide_started;
 
@@ -483,10 +484,10 @@ ide_startstop_t __ide_do_rw_disk (ide_drive_t *drive, struct request *rq, sector
 		return ide_started;
 	} else if (rq_data_dir(rq) == WRITE) {
 		ide_startstop_t startstop;
-
+#ifdef CONFIG_BLK_DEV_IDE_TCQ
 		if (blk_rq_tagged(rq))
-			return hwif->ide_dma_queued_write(drive);
-
+			return __ide_dma_queued_write(drive);
+#endif
 		if (drive->using_dma && !(HWIF(drive)->ide_dma_write(drive)))
 			return ide_started;
 
@@ -1400,13 +1401,10 @@ static int set_acoustic (ide_drive_t *drive, int arg)
 #ifdef CONFIG_BLK_DEV_IDE_TCQ
 static int set_using_tcq(ide_drive_t *drive, int arg)
 {
-	ide_hwif_t *hwif = HWIF(drive);
 	int ret;
 
 	if (!drive->driver)
 		return -EPERM;
-	if (!hwif->ide_dma_queued_on || !hwif->ide_dma_queued_off)
-		return -ENXIO;
 	if (arg == drive->queue_depth && drive->using_tcq)
 		return 0;
 
@@ -1420,9 +1418,9 @@ static int set_using_tcq(ide_drive_t *drive, int arg)
 	}
 
 	if (arg)
-		ret = HWIF(drive)->ide_dma_queued_on(drive);
+		ret = __ide_dma_queued_on(drive);
 	else
-		ret = HWIF(drive)->ide_dma_queued_off(drive);
+		ret = __ide_dma_queued_off(drive);
 
 	return ret ? -EIO : 0;
 }
@@ -1673,7 +1671,7 @@ static void idedisk_setup (ide_drive_t *drive)
 
 #ifdef CONFIG_BLK_DEV_IDE_TCQ_DEFAULT
 	if (drive->using_dma)
-		HWIF(drive)->ide_dma_queued_on(drive);
+		__ide_dma_queued_on(drive);
 #endif
 }
 

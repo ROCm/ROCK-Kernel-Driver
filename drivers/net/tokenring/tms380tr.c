@@ -147,7 +147,6 @@ static void 	tms380tr_hardware_send_packet(struct net_device *dev,
 			struct net_local* tp);
 /* "I" */
 static int 	tms380tr_init_adapter(struct net_device *dev);
-static int 	tms380tr_init_card(struct net_device *dev);
 static void 	tms380tr_init_ipb(struct net_local *tp);
 static void 	tms380tr_init_net_local(struct net_device *dev);
 static void 	tms380tr_init_opb(struct net_device *dev);
@@ -231,15 +230,6 @@ static int madgemc_sifprobe(struct net_device *dev)
         return (0);
 }
 #endif
-
-/* Dummy function */
-static int tms380tr_init_card(struct net_device *dev)
-{
-	if(tms380tr_debug > 3)
-		printk(KERN_DEBUG "%s: tms380tr_init_card\n", dev->name);
-
-	return (0);
-}
 
 /*
  * Open/initialize the board. This is called sometime after
@@ -2386,7 +2376,6 @@ int tmsdev_init(struct net_device *dev, unsigned long dmalimit,
 	}
 	
 	/* These can be overridden by the card driver if needed */
-	dev->init		= tms380tr_init_card;
 	dev->open		= tms380tr_open;
 	dev->stop		= tms380tr_close;
 	dev->do_ioctl		= NULL; 

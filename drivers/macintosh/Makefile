@@ -4,7 +4,6 @@
 
 # Each configuration option enables a list of files.
 
-# Turn that into a separate config option
 obj-$(CONFIG_PPC_PMAC)		+= macio_asic.o
 
 obj-$(CONFIG_PMAC_PBOOK)	+= mediabay.o
@@ -26,4 +25,4 @@ obj-$(CONFIG_ADB_MACIO)		+= macio-adb.o
 
 obj-$(CONFIG_THERM_PM72)	+= therm_pm72.o
 obj-$(CONFIG_THERM_WINDTUNNEL)	+= therm_windtunnel.o
-obj-$(CONFIG_THERM_IBOOKG4)	+= therm_adt7467.o
+obj-$(CONFIG_THERM_ADT7467)	+= therm_adt7467.o

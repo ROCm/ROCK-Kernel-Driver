@@ -2532,12 +2532,17 @@ static char *
 sg_page_malloc(int rqSz, int lowDma, int *retSzp)
 {
 	char *resp = NULL;
-	int page_mask = lowDma ? (GFP_ATOMIC | GFP_DMA) : GFP_ATOMIC;
+	int page_mask;
 	int order, a_size;
 	int resSz = rqSz;
 
 	if (rqSz <= 0)
 		return resp;
+
+	if (lowDma)
+		page_mask = GFP_ATOMIC | GFP_DMA | __GFP_NOWARN;
+	else
+		page_mask = GFP_ATOMIC | __GFP_NOWARN;
 
 	for (order = 0, a_size = PAGE_SIZE; a_size < rqSz;
 	     order++, a_size <<= 1) ;

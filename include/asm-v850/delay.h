@@ -2,8 +2,8 @@
  * include/asm-v850/delay.h -- Delay routines, using a pre-computed
  * 	"loops_per_second" value
  *
- *  Copyright (C) 2001  NEC Corporation
- *  Copyright (C) 2001  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2001,03  NEC Corporation
+ *  Copyright (C) 2001,03  Miles Bader <miles@gnu.org>
  *  Copyright (C) 1994 Hamish Macdonald
  *
  * This file is subject to the terms and conditions of the GNU General
@@ -18,8 +18,9 @@
 
 extern __inline__ void __delay(unsigned long loops)
 {
-	__asm__ __volatile__ ("1: add -1, %0; bnz 1b"
-			      : "=r" (loops) : "0" (loops));
+	if (loops)
+		__asm__ __volatile__ ("1: add -1, %0; bnz 1b"
+				      : "=r" (loops) : "0" (loops));
 }
 
 /*

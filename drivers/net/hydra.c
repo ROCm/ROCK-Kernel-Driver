@@ -89,13 +89,14 @@ static int __init hydra_init(unsigned long board)
     const char name[] = "NE2000";
     int start_page, stop_page;
     int j;
+    int err;
 
     static u32 hydra_offsets[16] = {
 	0x00, 0x02, 0x04, 0x06, 0x08, 0x0a, 0x0c, 0x0e,
 	0x10, 0x12, 0x14, 0x16, 0x18, 0x1a, 0x1c, 0x1e,
     };
 
-    dev = init_etherdev(NULL, 0);
+    dev = alloc_ei_netdev();
     if (!dev)
 	return -ENOMEM;
     SET_MODULE_OWNER(dev);
@@ -113,13 +114,9 @@ static int __init hydra_init(unsigned long board)
 
     /* Install the Interrupt handler */
     if (request_irq(IRQ_AMIGA_PORTS, ei_interrupt, SA_SHIRQ, "Hydra Ethernet",
-		    dev))
+		    dev)) {
+	free_netdev(dev);
 	return -EAGAIN;
-
-    /* Allocate dev->priv and fill in 8390 specific dev fields. */
-    if (ethdev_init(dev)) {
-	printk("Unable to get memory for dev->priv.\n");
-	return -ENOMEM;
     }
 
     printk("%s: hydra at 0x%08lx, address %02x:%02x:%02x:%02x:%02x:%02x (hydra.c " HYDRA_VERSION ")\n", dev->name, ZTWO_PADDR(board),
@@ -146,7 +143,13 @@ static int __init hydra_init(unsigned long board)
     root_hydra_dev = dev;
 #endif
     NS8390_init(dev, 0);
-    return 0;
+    err = register_netdev(dev);
+    if (!err)
+	return 0;
+
+    free_irq(IRQ_AMIGA_PORTS, dev);
+    free_netdev(dev);
+    return err;
 }
 
 static int hydra_open(struct net_device *dev)

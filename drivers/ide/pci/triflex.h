@@ -14,7 +14,15 @@
 
 static unsigned int __devinit init_chipset_triflex(struct pci_dev *, const char *);
 static void init_hwif_triflex(ide_hwif_t *);
+#ifdef CONFIG_PROC_FS
 static int triflex_get_info(char *, char **, off_t, int);
+
+static ide_pci_host_proc_t triflex_proc __initdata = {
+	.name		= "triflex",
+	.set		= 1,
+	.get_info 	= triflex_get_info,
+};
+#endif
 
 static ide_pci_device_t triflex_devices[] __devinitdata = {
 	{
@@ -32,14 +40,6 @@ static ide_pci_device_t triflex_devices[] __devinitdata = {
 		.bootable	= EOL,
 	}
 };
-
-#ifdef CONFIG_PROC_FS
-static ide_pci_host_proc_t triflex_proc __initdata = {
-	.name		= "triflex",
-	.set		= 1,
-	.get_info 	= triflex_get_info,
-};
-#endif
 
 static struct pci_device_id triflex_pci_tbl[] = {
 	{ PCI_VENDOR_ID_COMPAQ, PCI_DEVICE_ID_COMPAQ_TRIFLEX_IDE, PCI_ANY_ID, 

@@ -180,7 +180,7 @@ static void mace_dma_off(struct net_device *dev)
  * model of Macintrash has a MACE (AV macintoshes)
  */
  
-int mace_probe(struct net_device *unused)
+struct net_device *mace_probe(int unit)
 {
 	int j;
 	struct mace_data *mp;
@@ -188,13 +188,19 @@ int mace_probe(struct net_device *unused)
 	struct net_device *dev;
 	unsigned char checksum = 0;
 	static int found = 0;
+	int err;
 	
-	if (found || macintosh_config->ether_type != MAC_ETHER_MACE) return -ENODEV;
+	if (found || macintosh_config->ether_type != MAC_ETHER_MACE)
+		return ERR_PTR(-ENODEV);
 
 	found = 1;	/* prevent 'finding' one on every device probe */
 
-	dev = init_etherdev(0, PRIV_BYTES);
-	if (!dev) return -ENOMEM;
+	dev = alloc_etherdev(PRIV_BYTES);
+	if (!dev)
+		return ERR_PTR(-ENOMEM);
+
+	if (unit >= 0)
+		sprintf(dev->name, "eth%d", unit);
 
 	mp = (struct mace_data *) dev->priv;
 	dev->base_addr = (u32)MACE_BASE;
@@ -221,7 +227,10 @@ int mace_probe(struct net_device *unused)
 		checksum ^= bitrev(addr[j<<4]);
 	}
 	
-	if (checksum != 0xFF) return -ENODEV;
+	if (checksum != 0xFF) {
+		free_netdev(dev);
+		return ERR_PTR(-ENODEV);
+	}
 
 	memset(&mp->stats, 0, sizeof(mp->stats));
 
@@ -234,13 +243,16 @@ int mace_probe(struct net_device *unused)
 	dev->set_multicast_list	= mace_set_multicast;
 	dev->set_mac_address	= mace_set_address;
 
-	ether_setup(dev);
-
 	printk(KERN_INFO "%s: 68K MACE, hardware address %.2X", dev->name, dev->dev_addr[0]);
 	for (j = 1 ; j < 6 ; j++) printk(":%.2X", dev->dev_addr[j]);
 	printk("\n");
 
-	return 0;
+	err = register_netdev(dev);
+	if (!err)
+		return dev;
+
+	free_netdev(dev);
+	return ERR_PTR(err);
 }
 
 /*

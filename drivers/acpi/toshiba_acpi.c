@@ -55,8 +55,8 @@ MODULE_LICENSE("GPL");
 
 /* Toshiba ACPI method paths */
 #define METHOD_LCD_BRIGHTNESS	"\\_SB_.PCI0.VGA_.LCD_._BCM"
-#define METHOD_HCI_1          "\\_SB_.VALD.GHCI"
-#define METHOD_HCI_2          "\\_SB_.VALZ.GHCI"
+#define METHOD_HCI_1		"\\_SB_.VALD.GHCI"
+#define METHOD_HCI_2		"\\_SB_.VALZ.GHCI"
 #define METHOD_VIDEO_OUT	"\\_SB_.VALX.DSSX"
 
 /* Toshiba HCI interface definitions
@@ -170,7 +170,7 @@ read_acpi_int(const char* methodName, int* pVal)
 }
 #endif
 
-static const char*            method_hci /*= 0*/;
+static const char*		method_hci /*= 0*/;
 
 /* Perform a raw HCI call.  Here we don't care about input or output buffer
  * format.
@@ -233,7 +233,7 @@ hci_read1(u32 reg, u32* out1, u32* result)
 	return status;
 }
 
-static struct proc_dir_entry* toshiba_proc_dir /*= 0*/;
+static struct proc_dir_entry*	toshiba_proc_dir /*= 0*/;
 static int			force_fan;
 static int			last_key_event;
 static int			key_event_valid;
@@ -350,7 +350,7 @@ write_video(const char* buffer, unsigned long count)
 	 *  NOTE: to keep scanning simple, invalid fields are ignored
 	 */
 	while (remain) {
- 		if (snscanf(buffer, remain, " lcd_out : %i", &value) == 1)
+		if (snscanf(buffer, remain, " lcd_out : %i", &value) == 1)
 			lcd_out = value & 1;
 		else if (snscanf(buffer, remain, " crt_out : %i", &value) == 1)
 			crt_out = value & 1;

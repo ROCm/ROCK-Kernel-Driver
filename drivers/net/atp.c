@@ -195,7 +195,7 @@ static void atp_timed_checker(unsigned long ignored);
 
 /* Index to functions, as function prototypes. */
 
-static int atp_probe1(struct net_device *dev, long ioaddr);
+static int atp_probe1(long ioaddr);
 static void get_node_ID(struct net_device *dev);
 static unsigned short eeprom_op(long ioaddr, unsigned int cmd);
 static int net_open(struct net_device *dev);
@@ -224,13 +224,13 @@ static struct net_device *root_atp_dev;
    
    FIXME: we should use the parport layer for this
    */
-static int __init atp_init(struct net_device *dev)
+static int __init atp_init(void)
 {
 	int *port, ports[] = {0x378, 0x278, 0x3bc, 0};
-	int base_addr = dev ? dev->base_addr : io[0];
+	int base_addr = io[0];
 
 	if (base_addr > 0x1ff)		/* Check a single specified location. */
-		return atp_probe1(dev, base_addr);
+		return atp_probe1(base_addr);
 	else if (base_addr == 1)	/* Don't probe at all. */
 		return -ENXIO;
 
@@ -239,17 +239,19 @@ static int __init atp_init(struct net_device *dev)
 		outb(0x57, ioaddr + PAR_DATA);
 		if (inb(ioaddr + PAR_DATA) != 0x57)
 			continue;
-		if (atp_probe1(dev, ioaddr) == 0)
+		if (atp_probe1(ioaddr) == 0)
 			return 0;
 	}
 
 	return -ENODEV;
 }
 
-static int __init atp_probe1(struct net_device *dev, long ioaddr)
+static int __init atp_probe1(long ioaddr)
 {
+	struct net_device *dev = NULL;
 	struct net_local *lp;
 	int saved_ctrl_reg, status, i;
+	int res;
 
 	outb(0xff, ioaddr + PAR_DATA);
 	/* Save the original value of the Control register, in case we guessed
@@ -296,7 +298,7 @@ static int __init atp_probe1(struct net_device *dev, long ioaddr)
 		return -ENODEV;
 	}
 
-	dev = init_etherdev(dev, sizeof(struct net_local));
+	dev = alloc_etherdev(sizeof(struct net_local));
 	if (!dev)
 		return -ENOMEM;
 	SET_MODULE_OWNER(dev);
@@ -331,23 +333,12 @@ static int __init atp_probe1(struct net_device *dev, long ioaddr)
 		   dev->dev_addr[3], dev->dev_addr[4], dev->dev_addr[5]);
 
 	/* Reset the ethernet hardware and activate the printer pass-through. */
-    write_reg_high(ioaddr, CMR1, CMR1h_RESET | CMR1h_MUX);
-
-	/* Initialize the device structure. */
-	ether_setup(dev);
-	if (dev->priv == NULL)
-		dev->priv = kmalloc(sizeof(struct net_local), GFP_KERNEL);
-	if (dev->priv == NULL)
-		return -ENOMEM;
-	memset(dev->priv, 0, sizeof(struct net_local));
+	write_reg_high(ioaddr, CMR1, CMR1h_RESET | CMR1h_MUX);
 
 	lp = (struct net_local *)dev->priv;
 	lp->chip_type = RTL8002;
 	lp->addr_mode = CMR2h_Normal;
 	spin_lock_init(&lp->lock);
-
-	lp->next_module = root_atp_dev;
-	root_atp_dev = dev;
 
 	/* For the ATP adapter the "if_port" is really the data transfer mode. */
 	if (xcvr[0])
@@ -365,6 +356,15 @@ static int __init atp_probe1(struct net_device *dev, long ioaddr)
 	  lp->chip_type == RTL8002 ? &set_rx_mode_8002 : &set_rx_mode_8012;
 	dev->tx_timeout		= tx_timeout;
 	dev->watchdog_timeo	= TX_TIMEOUT;
+
+	res = register_netdev(dev);
+	if (res) {
+		free_netdev(dev);
+		return res;
+	}
+
+	lp->next_module = root_atp_dev;
+	root_atp_dev = dev;
 
 	return 0;
 }
@@ -933,7 +933,7 @@ static void set_rx_mode_8012(struct net_device *dev)
 static int __init atp_init_module(void) {
 	if (debug)					/* Emit version even if no cards detected. */
 		printk(KERN_INFO "%s" KERN_INFO "%s", versionA, versionB);
-	return atp_init(NULL);
+	return atp_init();
 }
 
 static void __exit atp_cleanup_module(void) {

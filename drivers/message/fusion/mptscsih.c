@@ -198,7 +198,7 @@ static int	mptscsih_setup(char *str);
 
 /* module entry point */
 static int  __init    mptscsih_init  (void);
-static void __exit    mptscsih_exit  (void);
+static void    mptscsih_exit  (void);
 
 static int  __devinit mptscsih_probe (struct pci_dev *, const struct pci_device_id *);
 static void __devexit mptscsih_remove(struct pci_dev *);
@@ -1985,7 +1985,7 @@ __init mptscsih_init(void)
  *
  */
 static void
-__exit mptscsih_exit(void)
+mptscsih_exit(void)
 {
 	MPT_ADAPTER	*ioc;
 

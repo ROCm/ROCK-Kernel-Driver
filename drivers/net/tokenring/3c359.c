@@ -314,7 +314,6 @@ int __devinit xl_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	dev->irq=pdev->irq;
 	dev->base_addr=pci_resource_start(pdev,0) ; 
-	dev->init=NULL ; /* Must be null with new api, otherwise get called twice */
 	xl_priv->xl_card_name = pci_name(pdev);
 	xl_priv->xl_mmio=ioremap(pci_resource_start(pdev,1), XL_IO_SPACE);
 	xl_priv->pdev = pdev ; 
@@ -332,7 +331,7 @@ int __devinit xl_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		
 	if((i = xl_init(dev))) {
 		iounmap(xl_priv->xl_mmio) ; 
-		kfree(dev) ; 
+		free_netdev(dev) ; 
 		pci_release_regions(pdev) ; 
 		return i ; 
 	}				
@@ -352,7 +351,7 @@ int __devinit xl_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		printk(KERN_ERR "3C359, register netdev failed\n") ;  
 		pci_set_drvdata(pdev,NULL) ; 
 		iounmap(xl_priv->xl_mmio) ; 
-		kfree(dev) ; 
+		free_netdev(dev) ; 
 		pci_release_regions(pdev) ; 
 		return i ; 
 	}

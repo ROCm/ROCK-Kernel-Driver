@@ -261,11 +261,13 @@ pcxl_alloc_range(size_t size)
 	} else if(pages_needed <= 32) {
 		PCXL_FIND_FREE_MAPPING(res_idx, mask, 32);
 	} else {
-		panic(__FILE__ ": pcxl_alloc_range() Too many pages to map.\n");
+		panic("%s: pcxl_alloc_range() Too many pages to map.\n",
+		      __FILE__);
 	}
 
 	dump_resmap();
-	panic(__FILE__ ": pcxl_alloc_range() out of dma mapping resources\n");
+	panic("%s: pcxl_alloc_range() out of dma mapping resources\n",
+	      __FILE__);
 	
 resource_found:
 	
@@ -319,7 +321,8 @@ pcxl_free_range(unsigned long vaddr, size_t size)
 	} else if(pages_mapped <= 32) {
 		PCXL_FREE_MAPPINGS(res_idx, mask, 32);
 	} else {
-		panic(__FILE__ ": pcxl_free_range() Too many pages to unmap.\n");
+		panic("%s: pcxl_free_range() Too many pages to unmap.\n",
+		      __FILE__);
 	}
 	
 	pcxl_used_pages -= (pages_mapped ? pages_mapped : 1);
