@@ -117,6 +117,9 @@ static struct ata_port_operations piix_pata_ops = {
 	.eng_timeout		= ata_eng_timeout,
 
 	.irq_handler		= ata_interrupt,
+
+	.port_start		= ata_port_start,
+	.port_stop		= ata_port_stop,
 };
 
 static struct ata_port_operations piix_sata_ops = {
@@ -137,6 +140,9 @@ static struct ata_port_operations piix_sata_ops = {
 	.eng_timeout		= ata_eng_timeout,
 
 	.irq_handler		= ata_interrupt,
+
+	.port_start		= ata_port_start,
+	.port_stop		= ata_port_stop,
 };
 
 static struct ata_port_info piix_port_info[] = {
