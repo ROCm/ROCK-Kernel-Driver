@@ -173,8 +173,9 @@ static inline snd_info_entry_t *snd_info_create_device(const char *name,
 						       unsigned int mode) { return NULL; }
 static inline void snd_info_free_device(snd_info_entry_t * entry) { ; }
 
+static inline int snd_info_card_create(snd_card_t * card) { return 0; }
 static inline int snd_info_card_register(snd_card_t * card) { return 0; }
-static inline int snd_info_card_unregister(snd_card_t * card) { return 0; }
+static inline int snd_info_card_free(snd_card_t * card) { return 0; }
 static inline int snd_info_register(snd_info_entry_t * entry) { return 0; }
 static inline int snd_info_unregister(snd_info_entry_t * entry) { return 0; }
 

@@ -182,7 +182,7 @@ static int __devinit snd_card_emu10k1_probe(struct pci_dev *pci,
 		strcpy(card->driver, "EMU10K1");
 		strcpy(card->shortname, "Sound Blaster Live!");
 	}
-	sprintf(card->longname, "%s at 0x%lx, irq %i", card->shortname, emu->port, emu->irq);
+	sprintf(card->longname, "%s (rev.%d) at 0x%lx, irq %i", card->shortname, emu->revision, emu->port, emu->irq);
 
 	if ((err = snd_card_register(card)) < 0) {
 		snd_card_free(card);

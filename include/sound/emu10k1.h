@@ -231,7 +231,7 @@
 #define A_IOCFG			0x18		/* GPIO on Audigy card (16bits)			*/
 #define A_GPINPUT_MASK		0xff00
 #define A_GPOUTPUT_MASK		0x00ff
-#define A_IOCFG_GPOUT0		0x0040		/* analog/digital? */
+#define A_IOCFG_GPOUT0		0x0044		/* analog/digital? */
 
 #define TIMER			0x1a		/* Timer terminal count register		*/
 						/* NOTE: After the rate is changed, a maximum	*/

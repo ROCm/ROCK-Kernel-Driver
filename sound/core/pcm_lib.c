@@ -2578,6 +2578,7 @@ EXPORT_SYMBOL(snd_pcm_hw_param_mask);
 EXPORT_SYMBOL(snd_pcm_hw_param_first);
 EXPORT_SYMBOL(snd_pcm_hw_param_last);
 EXPORT_SYMBOL(snd_pcm_hw_param_near);
+EXPORT_SYMBOL(snd_pcm_hw_param_set);
 EXPORT_SYMBOL(snd_pcm_hw_refine);
 EXPORT_SYMBOL(snd_pcm_hw_constraints_init);
 EXPORT_SYMBOL(snd_pcm_hw_constraints_complete);

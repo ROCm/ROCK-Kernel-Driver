@@ -1098,6 +1098,8 @@ static int snd_pcm_playback_drain(snd_pcm_substream_t * substream)
 		/* Fall through */
 	case SNDRV_PCM_STATE_SETUP:
 		goto _end;
+	default: 
+		break; 
 	}
 
 	if (runtime->status->state == SNDRV_PCM_STATE_RUNNING) {
@@ -1200,6 +1202,8 @@ static int snd_pcm_playback_drop(snd_pcm_substream_t *substream)
 			spin_lock_irq(&runtime->lock);
 		}
 		goto _xrun_recovery;
+	default:
+		break; 
 	}
 	runtime->control->appl_ptr = runtime->status->hw_ptr;
        _end:
@@ -1253,6 +1257,8 @@ static int snd_pcm_capture_drain(snd_pcm_substream_t * substream)
 			spin_lock_irq(&runtime->lock);
 		}
 		goto _xrun_recovery;
+	default: 
+		break; 
 	}
        _end:
 	spin_unlock_irq(&runtime->lock);
@@ -1295,6 +1301,8 @@ static int snd_pcm_capture_drop(snd_pcm_substream_t * substream)
 	case SNDRV_PCM_STATE_XRUN:
 		snd_pcm_change_state(substream, SNDRV_PCM_STATE_SETUP);
 		break;
+	default: 
+		break; 
 	}
 	runtime->control->appl_ptr = runtime->status->hw_ptr;
        _end: 

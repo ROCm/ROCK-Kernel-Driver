@@ -163,6 +163,11 @@ quake, send a command via echo like the following:
 
 	% echo "quake 0 0 direct" > /proc/asound/card0/pcm0p/oss
 
+While quake wants only playback, you may append the second command
+to notify driver that only this direction is about to be allocated:
+
+	% echo "quake 0 0 disable" > /proc/asound/card0/pcm0c/oss
+
 The permission of proc files depend on the module options of snd.
 As default it's set as root, so you'll likely need to be superuser for
 sending the command above.

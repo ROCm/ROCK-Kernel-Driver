@@ -65,13 +65,22 @@ static void snd_mpu401_uart_clear_rx(mpu401_t *mpu)
 
 static void _snd_mpu401_uart_interrupt(mpu401_t *mpu)
 {
-	if (test_bit(MPU401_MODE_BIT_INPUT, &mpu->mode))
-		snd_mpu401_uart_input_read(mpu);
-	else
+	if (test_bit(MPU401_MODE_BIT_INPUT, &mpu->mode)) {
+		if (! test_and_set_bit(MPU401_MODE_BIT_RX_LOOP, &mpu->mode)) {
+			spin_lock(&mpu->input_lock);
+			snd_mpu401_uart_input_read(mpu);
+			spin_unlock(&mpu->input_lock);
+			clear_bit(MPU401_MODE_BIT_RX_LOOP, &mpu->mode);
+		}
+	} else
 		snd_mpu401_uart_clear_rx(mpu);
-	/* ok. for better Tx performance try do some output when input is done */
-	if (test_bit(MPU401_MODE_BIT_OUTPUT, &mpu->mode))
+ 	/* ok. for better Tx performance try do some output when input is done */
+	if (test_bit(MPU401_MODE_BIT_OUTPUT, &mpu->mode) &&
+	    test_bit(MPU401_MODE_BIT_OUTPUT_TRIGGER, &mpu->mode)) {
+		spin_lock(&mpu->output_lock);
 		snd_mpu401_uart_output_write(mpu);
+		spin_unlock(&mpu->output_lock);
+	}
 }
 
 /**
@@ -91,20 +100,26 @@ void snd_mpu401_uart_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	_snd_mpu401_uart_interrupt(mpu);
 }
 
+/*
+ * timer callback
+ * reprogram the timer and call the interrupt job
+ */
 static void snd_mpu401_uart_timer(unsigned long data)
 {
-	unsigned long flags;
 	mpu401_t *mpu = snd_magic_cast(mpu401_t, (void *)data, return);
 
-	spin_lock_irqsave(&mpu->timer_lock, flags);
+	spin_lock(&mpu->timer_lock);
 	/*mpu->mode |= MPU401_MODE_TIMER;*/
 	mpu->timer.expires = 1 + jiffies;
 	add_timer(&mpu->timer);
-	spin_unlock_irqrestore(&mpu->timer_lock, flags);
+	spin_unlock(&mpu->timer_lock);
 	if (mpu->rmidi)
 		_snd_mpu401_uart_interrupt(mpu);
 }
 
+/*
+ * initialize the timer callback if not programmed yet
+ */
 static void snd_mpu401_uart_add_timer (mpu401_t *mpu, int input)
 {
 	unsigned long flags;
@@ -121,6 +136,9 @@ static void snd_mpu401_uart_add_timer (mpu401_t *mpu, int input)
 	spin_unlock_irqrestore (&mpu->timer_lock, flags);
 }
 
+/*
+ * remove the timer callback if still active
+ */
 static void snd_mpu401_uart_remove_timer (mpu401_t *mpu, int input)
 {
 	unsigned long flags;
@@ -244,7 +262,7 @@ static int snd_mpu401_uart_output_close(snd_rawmidi_substream_t * substream)
 }
 
 /*
- * trigger input
+ * trigger input callback
  */
 static void snd_mpu401_uart_input_trigger(snd_rawmidi_substream_t * substream, int up)
 {
@@ -253,48 +271,48 @@ static void snd_mpu401_uart_input_trigger(snd_rawmidi_substream_t * substream, i
 	int max = 64;
 
 	mpu = snd_magic_cast(mpu401_t, substream->rmidi->private_data, return);
-	spin_lock_irqsave(&mpu->input_lock, flags);
 	if (up) {
 		if (! test_and_set_bit(MPU401_MODE_BIT_INPUT_TRIGGER, &mpu->mode)) {
-			/* flush FIFO */
+			/* first time - flush FIFO */
 			while (max-- > 0)
 				inb(MPU401D(mpu));
+			if (mpu->irq < 0)
+				snd_mpu401_uart_add_timer(mpu, 1);
 		}
-		if (mpu->irq < 0)
-			snd_mpu401_uart_add_timer(mpu, 1);
+		
+		/* read data in advance */
+		/* prevent double enter via rawmidi->event callback */
+		if (! test_and_set_bit(MPU401_MODE_BIT_RX_LOOP, &mpu->mode)) {
+			spin_lock_irqsave(&mpu->input_lock, flags);
+			snd_mpu401_uart_input_read(mpu);
+			spin_unlock_irqrestore(&mpu->input_lock, flags);
+			clear_bit(MPU401_MODE_BIT_RX_LOOP, &mpu->mode);
+		}
 	} else {
 		if (mpu->irq < 0)
 			snd_mpu401_uart_remove_timer(mpu, 1);
 		clear_bit(MPU401_MODE_BIT_INPUT_TRIGGER, &mpu->mode);
 	}
-	spin_unlock_irqrestore(&mpu->input_lock, flags);
-	if (up)
-		snd_mpu401_uart_input_read(mpu);
 }
 
+/*
+ * transfer input pending data
+ * call with input_lock spinlock held
+ */
 static void snd_mpu401_uart_input_read(mpu401_t * mpu)
 {
 	int max = 128;
 	unsigned char byte;
 
-	/* prevent double enter via event callback */
-	if (test_and_set_bit(MPU401_MODE_BIT_RX_LOOP, &mpu->mode))
-		return;
-	spin_lock(&mpu->input_lock);
 	while (max-- > 0) {
 		if (snd_mpu401_input_avail(mpu)) {
 			byte = inb(MPU401D(mpu));
-			if (test_bit(MPU401_MODE_BIT_INPUT_TRIGGER, &mpu->mode)) {
-				spin_unlock(&mpu->input_lock);
+			if (test_bit(MPU401_MODE_BIT_INPUT_TRIGGER, &mpu->mode))
 				snd_rawmidi_receive(mpu->substream_input, &byte, 1);
-				spin_lock(&mpu->input_lock);
-			}
 		} else {
 			break; /* input not available */
 		}
 	}
-	spin_unlock(&mpu->input_lock);
-	clear_bit(MPU401_MODE_BIT_RX_LOOP, &mpu->mode);
 }
 
 /*
@@ -305,18 +323,16 @@ static void snd_mpu401_uart_input_read(mpu401_t * mpu)
  *    SoundBlaster AWE 64       -  2 bytes (ugly hardware)
  */
 
+/*
+ * write output pending bytes
+ * call with output_lock spinlock held
+ */
 static void snd_mpu401_uart_output_write(mpu401_t * mpu)
 {
 	unsigned char byte;
 	int max = 256, timeout;
 
-	if (!test_bit(MPU401_MODE_BIT_OUTPUT_TRIGGER, &mpu->mode))
-		return;
-	/* prevent double enter */
-	if (test_and_set_bit(MPU401_MODE_BIT_TX_LOOP, &mpu->mode))
-		return;
 	do {
-		spin_lock(&mpu->output_lock);
 		if (snd_rawmidi_transmit_peek(mpu->substream_output, &byte, 1) == 1) {
 			for (timeout = 100; timeout > 0; timeout--) {
 				if (snd_mpu401_output_ready(mpu)) {
@@ -329,28 +345,38 @@ static void snd_mpu401_uart_output_write(mpu401_t * mpu)
 			snd_mpu401_uart_remove_timer (mpu, 0);
 			max = 1; /* no other data - leave the tx loop */
 		}
-		spin_unlock(&mpu->output_lock);
 	} while (--max > 0);
-	clear_bit(MPU401_MODE_BIT_TX_LOOP, &mpu->mode);
 }
 
+/*
+ * output trigger callback
+ */
 static void snd_mpu401_uart_output_trigger(snd_rawmidi_substream_t * substream, int up)
 {
 	unsigned long flags;
 	mpu401_t *mpu;
 
 	mpu = snd_magic_cast(mpu401_t, substream->rmidi->private_data, return);
-	spin_lock_irqsave(&mpu->output_lock, flags);
 	if (up) {
 		set_bit(MPU401_MODE_BIT_OUTPUT_TRIGGER, &mpu->mode);
+		/* try to add the timer at each output trigger,
+		 * since the output timer might have been removed in
+		 * snd_mpu401_uart_output_write().
+		 */
 		snd_mpu401_uart_add_timer(mpu, 0);
+
+		/* output pending data */
+		/* prevent double enter via rawmidi->event callback */
+		if (! test_and_set_bit(MPU401_MODE_BIT_TX_LOOP, &mpu->mode)) {
+			spin_lock_irqsave(&mpu->output_lock, flags);
+			snd_mpu401_uart_output_write(mpu);
+			spin_unlock_irqrestore(&mpu->output_lock, flags);
+			clear_bit(MPU401_MODE_BIT_TX_LOOP, &mpu->mode);
+		}
 	} else {
 		snd_mpu401_uart_remove_timer(mpu, 0);
 		clear_bit(MPU401_MODE_BIT_OUTPUT_TRIGGER, &mpu->mode);
 	}
-	spin_unlock_irqrestore(&mpu->output_lock, flags);
-	if (up)
-		snd_mpu401_uart_output_write(mpu);
 }
 
 /*

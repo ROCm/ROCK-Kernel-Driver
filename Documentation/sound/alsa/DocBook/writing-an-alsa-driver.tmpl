@@ -3659,13 +3659,8 @@
       </para>
 
       <para>
-        Note that these callbacks are atomic unlike the callbacks of
-      control API since the ac97 middle-layer routine takes a
-      spinlock before calling these callbacks.  Therefore you cannot
-      use mutex or schedule in them. However, these are never called
-      from interrupts unless you do by yourself.
-      Thus it's not necessarily protected with
-      <function>spin_lock_irqsave()</function> usually. 
+      These callbacks are non-atomic like the callbacks of control API
+      unless they are called during suspend/resume phase.
       </para>
 
       <para>
@@ -3679,22 +3674,22 @@
         The <structfield>reset</structfield> callback is used to reset
       the codec. If the chip requires a special way of reset, you can
       define this callback. 
-      This callback is atomic, since it can be called in the suspend
-      phase, too.
+      This callback must be atomic when it's called in the suspend
+      mode.
       </para>
 
       <para>
         The <structfield>wait</structfield> callback is used for a
       certain wait at the standard initialization of the codec. If the
       chip requires the extra wait-time, define this callback. 
-      This callback is non-atomic.
+      This callback is always non-atomic, because it's never called
+      in the resume mode.
       </para>
 
       <para>
         The <structfield>init</structfield> callback is used for
       additional initialization of the codec.  This callback is called
-      after the reset phase, and should be atomic, since it's called
-      from the resume handler, too.
+      after the reset, and should be atomic in the resume mode.
       </para>
     </section>
 
@@ -4462,13 +4457,12 @@
 
       <para>
         For creating the SG-buffer handler, call
-        <function>snd_pcm_sgbuf_init()</function> in the
-        <structfield>open</structfield> callback 
-        of a pcm substream (or in the constructor of the pcm).
+        <function>snd_pcm_lib_preallocate_sg_pages()</function> or
+        <function>snd_pcm_lib_preallocate_sg_pages_for_all()</function>
+	in the PCM constructor like other PCI pre-allocator.
         You need to pass the
-        <structname>pci_dev</structname> struct pointer of the chip
-        and the default table size (which can be changed
-        dynamically). The <type>snd_sg_buf_t</type> instance is created as
+        <structname>pci_dev</structname> struct pointer of the chip.
+        The <type>snd_sg_buf_t</type> instance is created as
         substream-&gt;dma_private. You can cast
         the pointer like: 
 
@@ -4483,41 +4477,29 @@
       </para>
 
       <para>
-        Then call <function>snd_pcm_sgbuf_alloc()</function> instead
-      of normal <function>snd_pcm_lib_malloc_pages()</function> in
-      <structfield>hw_params</structfield> callback. The SG-handler
-      will allocate single pages 
-      and build the table on sgbuf-&gt;table. The pointer and the
-      physical address of each page is stored in this table. You can
-      get the physical address at a certain offset via
+        Then call <function>snd_pcm_lib_malloc_pages()</function>
+      in <structfield>hw_params</structfield> callback
+      as well as in the case of normal PCI buffer.
+      The SG-buffer handler will allocate the non-contiguous kernel
+      pages of the given size and map them onto the virtually contiguous
+      memory.  The virtual pointer is addressed in runtime-&gt;dma_area.
+      The physical address (runtime-&gt;dma_addr) is set to zero,
+      because the buffer is physically non-contigous.
+      The physical address table is set up in sgbuf-&gt;table.
+      You can get the physical address at a certain offset via
       <function>snd_pcm_sgbuf_get_addr()</function>. 
       </para>
 
       <para>
         When a SG-handler is used, you need to set
-      <function>snd_pcm_sgbuf_ops_copy_playback</function> and
-      <function>snd_pcm_ops_silence</function> as the
-      <structfield>copy</structfield> and the
-      <structfield>silence</structfield> callbacks, respectively.
-      All the jobs described in the previous section will be done
-      by these helper functions.
-      Also, the <structfield>page</structfield> callback must be set as
-      <function>snd_pcm_sgbuf_ops_page</function>. 
+      <function>snd_pcm_sgbuf_ops_page</function> as
+      the <structfield>page</structfield> callback.
       </para>
 
       <para>
         For releasing the data, call
-      <function>snd_pcm_sgbuf_free()</function> in the
-      <structfield>hw_free</structfield> callback, and call
-      <function>snd_pcm_sgbuf_delete()</function> in the
-      <structfield>close</structfield> callback (or in the destructor,
-      if <function>snd_pcm_sgbuf_init()</function> was called in the
-      constructor).
-      </para>
-
-      <para>
-      Note that you must not do pre-allocation if a SG-handler is used.
-      They conflict with each other.
+      <function>snd_pcm_lib_free_pages()</function> in the
+      <structfield>hw_free</structfield> callback as usual.
       </para>
     </section>
 
@@ -4550,13 +4532,6 @@
 ]]>
           </programlisting>
         </informalexample>
-      </para>
-
-      <para>
-        You don't need <structfield>copy</structfield> and
-      <structfield>silence</structfield> callbacks in this case,
-      because the copy/set operations are available on the virtual
-      address. 
       </para>
     </section>
 

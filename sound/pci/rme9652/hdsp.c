@@ -23,6 +23,7 @@
 #include <sound/driver.h>
 #include <linux/delay.h>
 #include <linux/interrupt.h>
+#include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/pci.h>
 
@@ -817,10 +818,18 @@ static inline int snd_hdsp_midi_input_available (hdsp_t *hdsp, int id)
 
 static inline int snd_hdsp_midi_output_possible (hdsp_t *hdsp, int id)
 {
+	int fifo_bytes_used;
+
 	if (id) {
-		return (hdsp_read(hdsp, HDSP_midiStatusOut1) & 0xff) < 128;
+		fifo_bytes_used = hdsp_read(hdsp, HDSP_midiStatusOut1) & 0xff;
 	} else {
-		return (hdsp_read(hdsp, HDSP_midiStatusOut0) & 0xff)< 128;
+		fifo_bytes_used = hdsp_read(hdsp, HDSP_midiStatusOut0) & 0xff;
+	}
+
+	if (fifo_bytes_used < 128) {
+		return  128 - fifo_bytes_used;
+	} else {
+		return 0;
 	}
 }
 

@@ -357,13 +357,17 @@ void snd_verbose_printk(const char *file, int line, const char *format, ...);
 #if defined(CONFIG_SND_DEBUG) && defined(CONFIG_SND_VERBOSE_PRINTK)
 void snd_verbose_printd(const char *file, int line, const char *format, ...);
 #endif
-#if defined(CONFIG_SND_DEBUG) && !defined(CONFIG_SND_VERBOSE_PRINTK)
-void snd_printd(const char *format, ...);
-#endif
 
 /* --- */
 
 #ifdef CONFIG_SND_VERBOSE_PRINTK
+/**
+ * snd_printk - printk wrapper
+ * @fmt: format string
+ *
+ * Works like print() but prints the file and the line of the caller
+ * when configured with CONFIG_SND_VERBOSE_PRINTK.
+ */
 #define snd_printk(fmt, args...) \
 	snd_verbose_printk(__FILE__, __LINE__, fmt ,##args)
 #else
@@ -376,15 +380,45 @@ void snd_printd(const char *format, ...);
 #define __ASTRING__(x) #x
 
 #ifdef CONFIG_SND_VERBOSE_PRINTK
+/**
+ * snd_printd - debug printk
+ * @format: format string
+ *
+ * Compiled only when Works like snd_printk() for debugging purpose.
+ * Ignored when CONFIG_SND_DEBUG is not set.
+ */
 #define snd_printd(fmt, args...) \
 	snd_verbose_printd(__FILE__, __LINE__, fmt ,##args)
+#else
+#define snd_printd(fmt, args...) \
+	printk(fmt ,##args)
 #endif
+/**
+ * snd_assert - run-time assersion macro
+ * @expr: expression
+ * @args...: the action
+ *
+ * This macro checks the expression in run-time and invokes the commands
+ * given in the rest arguments if the assertion is failed.
+ * When CONFIG_SND_DEBUG is not set, the expression is executed but
+ * not checked.
+ */
 #define snd_assert(expr, args...) do {\
 	if (!(expr)) {\
 		snd_printk("BUG? (%s) (called from %p)\n", __ASTRING__(expr), __builtin_return_address(0));\
 		args;\
 	}\
 } while (0)
+/**
+ * snd_runtime_check - run-time assersion macro
+ * @expr: expression
+ * @args...: the action
+ *
+ * This macro checks the expression in run-time and invokes the commands
+ * given in the rest arguments if the assertion is failed.
+ * Unlike snd_assert(), the action commands are executed even if
+ * CONFIG_SND_DEBUG is not set but without any error messages.
+ */
 #define snd_runtime_check(expr, args...) do {\
 	if (!(expr)) {\
 		snd_printk("ERROR (%s) (called from %p)\n", __ASTRING__(expr), __builtin_return_address(0));\
@@ -401,6 +435,13 @@ void snd_printd(const char *format, ...);
 #endif /* CONFIG_SND_DEBUG */
 
 #ifdef CONFIG_SND_DEBUG_DETECT
+/**
+ * snd_printdd - debug printk
+ * @format: format string
+ *
+ * Compiled only when Works like snd_printk() for debugging purpose.
+ * Ignored when CONFIG_SND_DEBUG_DETECT is not set.
+ */
 #define snd_printdd(format, args...) snd_printk(format, ##args)
 #else
 #define snd_printdd(format, args...) /* nothing */

@@ -86,11 +86,19 @@ snd_card_t *snd_card_new(int idx, const char *xid,
 				idx = idx2;
 				break;
 			}
+		if (idx < 0 && snd_ecards_limit < SNDRV_CARDS)
+			/* for dynamically additional devices like hotplug:
+			 * increment the limit if still free slot exists.
+			 */
+			idx = snd_ecards_limit++;
 	} else if (idx < snd_ecards_limit) {
 		if (snd_cards_lock & (1 << idx))
 			idx = -1;	/* invalid */
-	}
-	if (idx < 0 || idx >= snd_ecards_limit) {
+	} else if (idx < SNDRV_CARDS)
+		snd_ecards_limit = idx + 1; /* increase the limit */
+	else
+		idx = -1;
+	if (idx < 0) {
 		write_unlock(&snd_card_rwlock);
 		if (idx >= snd_ecards_limit)
 			snd_printk(KERN_ERR "card %i is out of range (0-%i)\n", idx, snd_ecards_limit-1);

@@ -211,7 +211,8 @@ snd_kcontrol_t *snd_ctl_new1(snd_kcontrol_new_t * ncontrol, void *private_data)
 	kctl.id.iface = ncontrol->iface;
 	kctl.id.device = ncontrol->device;
 	kctl.id.subdevice = ncontrol->subdevice;
-	strncpy(kctl.id.name, ncontrol->name, sizeof(kctl.id.name)-1);
+	if (ncontrol->name)
+		strncpy(kctl.id.name, ncontrol->name, sizeof(kctl.id.name)-1);
 	kctl.id.index = ncontrol->index;
 	kctl.access = ncontrol->access == 0 ? SNDRV_CTL_ELEM_ACCESS_READWRITE :
 		      (ncontrol->access & (SNDRV_CTL_ELEM_ACCESS_READWRITE|SNDRV_CTL_ELEM_ACCESS_INACTIVE|SNDRV_CTL_ELEM_ACCESS_INDIRECT));

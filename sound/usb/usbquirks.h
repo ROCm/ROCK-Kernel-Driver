@@ -162,6 +162,15 @@
 	}
 },
 {
+	USB_DEVICE(0x0499, 0x1011),
+	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
+		.vendor_name = "Yamaha",
+		.product_name = "P-250",
+		.ifnum = QUIRK_ANY_INTERFACE,
+		.type = QUIRK_MIDI_YAMAHA
+	}
+},
+{
 	USB_DEVICE(0x0499, 0x1012),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "Yamaha",
@@ -233,8 +242,55 @@
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "Roland",
 		.product_name = "UA-100",
-		.ifnum = 0,
-		.type = QUIRK_ROLAND_UA100
+		.ifnum = QUIRK_ANY_INTERFACE,
+		.type = QUIRK_COMPOSITE,
+		.data = & (const snd_usb_audio_quirk_t[]) {
+			{
+				.ifnum = 0,
+				.type = QUIRK_AUDIO_FIXED_ENDPOINT,
+				.data = & (const struct audioformat) {
+					.format = SNDRV_PCM_FORMAT_S16_LE,
+					.channels = 4,
+					.iface = 0,
+					.altsetting = 1,
+					.altset_idx = 1,
+					.attributes = 0,
+					.endpoint = 0x01,
+					.ep_attr = 0x09,
+					.rates = SNDRV_PCM_RATE_CONTINUOUS,
+					.rate_min = 44100,
+					.rate_max = 44100,
+				}
+			},
+			{
+				.ifnum = 1,
+				.type = QUIRK_AUDIO_FIXED_ENDPOINT,
+				.data = & (const struct audioformat) {
+					.format = SNDRV_PCM_FORMAT_S16_LE,
+					.channels = 2,
+					.iface = 1,
+					.altsetting = 1,
+					.altset_idx = 1,
+					.attributes = EP_CS_ATTR_FILL_MAX,
+					.endpoint = 0x81,
+					.ep_attr = 0x05,
+					.rates = SNDRV_PCM_RATE_CONTINUOUS,
+					.rate_min = 44100,
+					.rate_max = 44100,
+				}
+			},
+			{
+				.ifnum = 2,
+				.type = QUIRK_MIDI_FIXED_ENDPOINT,
+				.data = & (const snd_usb_midi_endpoint_info_t) {
+					.out_cables = 0x0007,
+					.in_cables  = 0x0007
+				}
+			},
+			{
+				.ifnum = -1
+			}
+		}
 	}
 },
 {
@@ -342,15 +398,59 @@
 	}
 },
 {
+	/* thanks to Emiliano Grilli <emillo@libero.it> for helping researching this data */
 	USB_DEVICE(0x0582, 0x000c),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "Roland",
 		.product_name = "SC-D70",
-		.ifnum = 2,
-		.type = QUIRK_MIDI_FIXED_ENDPOINT,
-		.data = & (const snd_usb_midi_endpoint_info_t) {
-			.out_cables = 0x0007,
-			.in_cables  = 0x0007
+		.ifnum = QUIRK_ANY_INTERFACE,
+		.type = QUIRK_COMPOSITE,
+		.data = & (const snd_usb_audio_quirk_t[]) {
+			{
+				.ifnum = 0,
+				.type = QUIRK_AUDIO_FIXED_ENDPOINT,
+				.data = & (const struct audioformat) {
+					.format = SNDRV_PCM_FORMAT_S24_3LE,
+					.channels = 2,
+					.iface = 0,
+					.altsetting = 1,
+					.altset_idx = 1,
+					.attributes = 0,
+					.endpoint = 0x01,
+					.ep_attr = 0x01,
+					.rates = SNDRV_PCM_RATE_CONTINUOUS,
+					.rate_min = 44100,
+					.rate_max = 44100,
+				}
+			},
+			{
+				.ifnum = 1,
+				.type = QUIRK_AUDIO_FIXED_ENDPOINT,
+				.data = & (const struct audioformat) {
+					.format = SNDRV_PCM_FORMAT_S24_3LE,
+					.channels = 2,
+					.iface = 1,
+					.altsetting = 1,
+					.altset_idx = 1,
+					.attributes = 0,
+					.endpoint = 0x81,
+					.ep_attr = 0x01,
+					.rates = SNDRV_PCM_RATE_CONTINUOUS,
+					.rate_min = 44100,
+					.rate_max = 44100,
+				}
+			},
+			{
+				.ifnum = 2,
+				.type = QUIRK_MIDI_FIXED_ENDPOINT,
+				.data = & (const snd_usb_midi_endpoint_info_t) {
+					.out_cables = 0x0007,
+					.in_cables  = 0x0007
+				}
+			},
+			{
+				.ifnum = -1
+			}
 		}
 	}
 },

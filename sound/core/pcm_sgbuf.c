@@ -21,6 +21,7 @@
 
 #include <sound/driver.h>
 #include <linux/slab.h>
+#include <linux/vmalloc.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/pcm_sgbuf.h>
@@ -30,174 +31,126 @@
 #define SGBUF_TBL_ALIGN		32
 #define sgbuf_align_table(tbl)	((((tbl) + SGBUF_TBL_ALIGN - 1) / SGBUF_TBL_ALIGN) * SGBUF_TBL_ALIGN)
 
-/*
- * shrink to the given pages.
- * free the unused pages
- */
-static void sgbuf_shrink(struct snd_sg_buf *sgbuf, int pages)
-{
-	snd_assert(sgbuf, return);
-	if (! sgbuf->table)
-		return;
-	while (sgbuf->pages > pages) {
-		sgbuf->pages--;
-		snd_free_pci_page(sgbuf->pci, sgbuf->table[sgbuf->pages].buf,
-				   sgbuf->table[sgbuf->pages].addr);
-	}
-}
 
-/**
- * snd_pcm_sgbuf_init - initialize the sg buffer
- * @substream: the pcm substream instance
+/*
+ * snd_pcm_sgbuf_new - constructor of the sgbuf instance
  * @pci: pci device pointer
- * @tblsize: the default table size
  *
- * Initializes the SG-buffer instance and assigns it to
- * substream->dma_private.  The SG-table is initialized with the
- * given size.
+ * Initializes the SG-buffer instance to be assigned to
+ * substream->dma_private.
  * 
- * Call this function in the open callback.
- *
- * Returns zero if successful, or a negative error code on failure.
+ * Returns the pointer of the instance, or NULL at error.
  */
-int snd_pcm_sgbuf_init(snd_pcm_substream_t *substream, struct pci_dev *pci, int tblsize)
+struct snd_sg_buf *snd_pcm_sgbuf_new(struct pci_dev *pci)
 {
 	struct snd_sg_buf *sgbuf;
 
-	tblsize = sgbuf_align_table(tblsize);
 	sgbuf = snd_magic_kcalloc(snd_pcm_sgbuf_t, 0, GFP_KERNEL);
 	if (! sgbuf)
-		return -ENOMEM;
-	substream->dma_private = sgbuf;
+		return NULL;
 	sgbuf->pci = pci;
 	sgbuf->pages = 0;
-	sgbuf->tblsize = tblsize;
-	sgbuf->table = kmalloc(sizeof(struct snd_sg_page) * tblsize, GFP_KERNEL);
-	if (! sgbuf->table) {
-		snd_pcm_sgbuf_delete(substream);
-		return -ENOMEM;
-	}
-	memset(sgbuf->table, 0, sizeof(struct snd_sg_page) * tblsize);
-	return 0;
+	sgbuf->tblsize = 0;
+
+	return sgbuf;
 }
 
-/**
- * snd_pcm_sgbuf_delete - release all pages and free the sgbuf instance
- * @substream: the pcm substream instance
+/*
+ * snd_pcm_sgbuf_delete - destructor of sgbuf instance
+ * @sgbuf: the SG-buffer instance
  *
- * Releaes all pages and free the sgbuf instance.
- *
- * Call this function in the close callback.
- *
- * Returns zero if successful, or a negative error code on failure.
+ * Destructor Releaes all pages and free the sgbuf instance.
  */
-int snd_pcm_sgbuf_delete(snd_pcm_substream_t *substream)
+void snd_pcm_sgbuf_delete(struct snd_sg_buf *sgbuf)
 {
-	struct snd_sg_buf *sgbuf;
-
-	/* return in case, when sgbuf is not initialized */
-	if (substream->dma_private == NULL)
-		return -EINVAL;
-	sgbuf = snd_magic_cast(snd_pcm_sgbuf_t, substream->dma_private, return -EINVAL);
-	sgbuf_shrink(sgbuf, 0);
-	if (sgbuf->table)
-		kfree(sgbuf->table);
+	snd_pcm_sgbuf_free_pages(sgbuf, NULL);
 	snd_magic_kfree(sgbuf);
-	substream->dma_private = NULL;
-	return 0;
 }
 
 /**
- * snd_pcm_sgbuf_alloc - allocate the pages for the SG buffer
- * @substream: the pcm substream instance
+ * snd_pcm_sgbuf_alloc_pages - allocate the pages for the SG buffer
+ * @sgbuf: the sgbuf instance
  * @size: the requested buffer size in bytes
  *
  * Allocates the buffer pages for the given size and updates the
- * sg buffer table.  If the buffer table already exists, try to resize
- * it.
+ * sg buffer table.  The pages are mapped to the virtually continuous
+ * memory.
  *
- * Call this function from hw_params callback.
+ * This function is usually called from snd_pcm_lib_malloc_pages().
  *
- * Returns 1 if the buffer is changed, 0 if not changed, or a negative
- * code on failure.
+ * Returns the mapped virtual address of the buffer if allocation was
+ * successful, or NULL at error.
  */
-int snd_pcm_sgbuf_alloc(snd_pcm_substream_t *substream, size_t size)
+void *snd_pcm_sgbuf_alloc_pages(struct snd_sg_buf *sgbuf, size_t size)
 {
-	struct snd_sg_buf *sgbuf;
-	unsigned int pages;
-	unsigned int tblsize;
-	int changed = 0;
+	unsigned int i, pages;
+	void *vmaddr;
 
-	sgbuf = snd_magic_cast(snd_pcm_sgbuf_t, substream->dma_private, return -EINVAL);
 	pages = snd_pcm_sgbuf_pages(size);
-	tblsize = sgbuf_align_table(pages);
-	if (pages < sgbuf->pages) {
-		/* release unsed pages */
-		sgbuf_shrink(sgbuf, pages);
-		if (substream->runtime)
-			substream->runtime->dma_bytes = size;
-		return 1; /* changed */
-	} else if (pages > sgbuf->tblsize) {
-		/* bigger than existing one.  reallocate the table. */
-		struct snd_sg_page *table;
-		table = kmalloc(sizeof(*table) * tblsize, GFP_KERNEL);
-		if (! table)
-			return -ENOMEM;
-		memcpy(table, sgbuf->table, sizeof(*table) * sgbuf->tblsize);
-		kfree(sgbuf->table);
-		sgbuf->table = table;
-		sgbuf->tblsize = tblsize;
-	}
+	sgbuf->tblsize = sgbuf_align_table(pages);
+	sgbuf->table = snd_kcalloc(sizeof(*sgbuf->table) * sgbuf->tblsize, GFP_KERNEL);
+	if (! sgbuf->table)
+		goto _failed;
+	sgbuf->page_table = snd_kcalloc(sizeof(*sgbuf->page_table) * sgbuf->tblsize, GFP_KERNEL);
+	if (! sgbuf->page_table)
+		goto _failed;
+
 	/* allocate each page */
-	while (sgbuf->pages < pages) {
+	for (i = 0; i < pages; i++) {
 		void *ptr;
 		dma_addr_t addr;
 		ptr = snd_malloc_pci_page(sgbuf->pci, &addr);
 		if (! ptr)
-			return -ENOMEM;
-		sgbuf->table[sgbuf->pages].buf = ptr;
-		sgbuf->table[sgbuf->pages].addr = addr;
+			goto _failed;
+		sgbuf->table[i].buf = ptr;
+		sgbuf->table[i].addr = addr;
+		sgbuf->page_table[i] = virt_to_page(ptr);
 		sgbuf->pages++;
-		changed = 1;
 	}
+
 	sgbuf->size = size;
-	if (substream->runtime)
-		substream->runtime->dma_bytes = size;
-	return changed;
+	vmaddr = vmap(sgbuf->page_table, sgbuf->pages);
+	if (! vmaddr)
+		goto _failed;
+	return vmaddr;
+
+ _failed:
+	snd_pcm_sgbuf_free_pages(sgbuf, NULL); /* free the table */
+	return NULL;
 }
 
 /**
- * snd_pcm_sgbuf_free - free the sg buffer
- * @substream: the pcm substream instance
+ * snd_pcm_sgbuf_free_pages - free the sg buffer
+ * @sgbuf: the sgbuf instance
+ * @vmaddr: the mapped virtual address
  *
- * Releases the pages.  The SG-table itself is still kept.
+ * Releases the pages and the mapped tables.
  *
- * Call this function from hw_free callback.
+ * This function is called usually from snd_pcm_lib_free_pages().
  *
  * Returns zero if successful, or a negative error code on failure.
  */
-int snd_pcm_sgbuf_free(snd_pcm_substream_t *substream)
+int snd_pcm_sgbuf_free_pages(struct snd_sg_buf *sgbuf, void *vmaddr)
 {
-	struct snd_sg_buf *sgbuf;
+	if (vmaddr)
+		vunmap(vmaddr);
 
-	sgbuf = snd_magic_cast(snd_pcm_sgbuf_t, substream->dma_private, return -EINVAL);
-	sgbuf_shrink(sgbuf, 0);
+	while (sgbuf->pages > 0) {
+		sgbuf->pages--;
+		snd_free_pci_page(sgbuf->pci, sgbuf->table[sgbuf->pages].buf,
+				   sgbuf->table[sgbuf->pages].addr);
+	}
+	if (sgbuf->table)
+		kfree(sgbuf->table);
+	sgbuf->table = NULL;
+	if (sgbuf->page_table)
+		kfree(sgbuf->page_table);
+	sgbuf->page_table = NULL;
+	sgbuf->tblsize = 0;
+	sgbuf->pages = 0;
+	sgbuf->size = 0;
+	
 	return 0;
-}
-
-/*
- * get the page pointer on the given offset
- */
-static void *sgbuf_get_addr(snd_pcm_substream_t *substream, unsigned long offset)
-{
-	struct snd_sg_buf *sgbuf;
-	unsigned int idx;
-
-	sgbuf = snd_magic_cast(snd_pcm_sgbuf_t, substream->dma_private, return NULL);
-	idx = offset >> PAGE_SHIFT;
-	if (idx >= sgbuf->pages)
-		return 0;
-	return sgbuf->table[idx].buf;
 }
 
 /**
@@ -210,167 +163,68 @@ static void *sgbuf_get_addr(snd_pcm_substream_t *substream, unsigned long offset
  */
 struct page *snd_pcm_sgbuf_ops_page(snd_pcm_substream_t *substream, unsigned long offset)
 {
-	void *addr = sgbuf_get_addr(substream, offset);
-	if (addr)
-		return virt_to_page(addr);
-	else
-		return 0;
+	struct snd_sg_buf *sgbuf = snd_magic_cast(snd_pcm_sgbuf_t, substream->dma_private, return NULL);
+
+	unsigned int idx = offset >> PAGE_SHIFT;
+	if (idx >= sgbuf->pages)
+		return NULL;
+	return sgbuf->page_table[idx];
 }
 
-/*
- * do copy_from_user to the sg buffer
- */
-static int copy_from_user_sg_buf(snd_pcm_substream_t *substream,
-				 char *buf, size_t hwoff, ssize_t bytes)
-{
-	int len;
-	char *addr;
-	size_t p = (hwoff >> PAGE_SHIFT) << PAGE_SHIFT;
-	hwoff -= p;
-	len = PAGE_SIZE - hwoff;
-	for (;;) {
-		addr = sgbuf_get_addr(substream, p);
-		if (! addr)
-			return -EFAULT;
-		if (len > bytes)
-			len = bytes;
-		if (copy_from_user(addr + hwoff, buf, len))
-			return -EFAULT;
-		bytes -= len;
-		if (bytes <= 0)
-			break;
-		buf += len;
-		p += PAGE_SIZE;
-		len = PAGE_SIZE;
-		hwoff = 0;
-	}
-	return 0;
-}
-
-/*
- * do copy_to_user from the sg buffer
- */
-static int copy_to_user_sg_buf(snd_pcm_substream_t *substream,
-			       char *buf, size_t hwoff, ssize_t bytes)
-{
-	int len;
-	char *addr;
-	size_t p = (hwoff >> PAGE_SHIFT) << PAGE_SHIFT;
-	hwoff -= p;
-	len = PAGE_SIZE - hwoff;
-	for (;;) {
-		addr = sgbuf_get_addr(substream, p);
-		if (! addr)
-			return -EFAULT;
-		if (len > bytes)
-			len = bytes;
-		if (copy_to_user(buf, addr + hwoff, len))
-			return -EFAULT;
-		bytes -= len;
-		if (bytes <= 0)
-			break;
-		buf += len;
-		p += PAGE_SIZE;
-		len = PAGE_SIZE;
-		hwoff = 0;
-	}
-	return 0;
-}
-
-/*
- * set silence on the sg buffer
- */
-static int set_silence_sg_buf(snd_pcm_substream_t *substream,
-			      size_t hwoff, ssize_t samples)
-{
-	snd_pcm_runtime_t *runtime = substream->runtime;
-	int len, page_len;
-	char *addr;
-	size_t p = (hwoff >> PAGE_SHIFT) << PAGE_SHIFT;
-	hwoff -= p;
-	len = bytes_to_samples(substream->runtime, PAGE_SIZE - hwoff);
-	page_len = bytes_to_samples(substream->runtime, PAGE_SIZE);
-	for (;;) {
-		addr = sgbuf_get_addr(substream, p);
-		if (! addr)
-			return -EFAULT;
-		if (len > samples)
-			len = samples;
-		snd_pcm_format_set_silence(runtime->format, addr + hwoff, len);
-		samples -= len;
-		if (samples <= 0)
-			break;
-		p += PAGE_SIZE;
-		len = page_len;
-		hwoff = 0;
-	}
-	return 0;
-}
 
 /**
- * snd_pcm_sgbuf_ops_copy_playback - copy callback for playback pcm ops
+ * snd_pcm_lib_preallocate_sg_pages - initialize SG-buffer for the PCI bus
  *
- * copy callback for playback pcm ops
- */
-int snd_pcm_sgbuf_ops_copy_playback(snd_pcm_substream_t *substream, int channel,
-				    snd_pcm_uframes_t hwoff, void *buf, snd_pcm_uframes_t count)
-{
-	snd_pcm_runtime_t *runtime = substream->runtime;
-	if (channel < 0) {
-		return copy_from_user_sg_buf(substream, buf, frames_to_bytes(runtime, hwoff), frames_to_bytes(runtime, count));
-	} else {
-		size_t dma_csize = runtime->dma_bytes / runtime->channels;
-		size_t c_ofs = (channel * dma_csize) + samples_to_bytes(runtime, hwoff);
-		return copy_from_user_sg_buf(substream, buf, c_ofs, samples_to_bytes(runtime, count));
-	}
-}
-
-/**
- * snd_pcm_sgbuf_ops_copy_capture - copy callback for capture pcm ops
+ * @pci: pci device
+ * @substream: substream to assign the buffer
  *
- * copy callback for capture pcm ops
+ * Initializes SG-buffer for the PCI bus.
+ *
+ * Returns zero if successful, or a negative error code on failure.
  */
-int snd_pcm_sgbuf_ops_copy_capture(snd_pcm_substream_t *substream, int channel,
-				   snd_pcm_uframes_t hwoff, void *buf, snd_pcm_uframes_t count)
+int snd_pcm_lib_preallocate_sg_pages(struct pci_dev *pci,
+				     snd_pcm_substream_t *substream)
 {
-	snd_pcm_runtime_t *runtime = substream->runtime;
-	if (channel < 0) {
-		return copy_to_user_sg_buf(substream, buf, frames_to_bytes(runtime, hwoff), frames_to_bytes(runtime, count));
-	} else {
-		size_t dma_csize = runtime->dma_bytes / runtime->channels;
-		size_t c_ofs = (channel * dma_csize) + samples_to_bytes(runtime, hwoff);
-		return copy_to_user_sg_buf(substream, buf, c_ofs, samples_to_bytes(runtime, count));
-	}
+	if ((substream->dma_private = snd_pcm_sgbuf_new(pci)) == NULL)
+		return -ENOMEM;
+	substream->dma_type = SNDRV_PCM_DMA_TYPE_PCI_SG;
+	substream->dma_area = 0;
+	substream->dma_addr = 0;
+	substream->dma_bytes = 0;
+	substream->buffer_bytes_max = UINT_MAX;
+	substream->dma_max = 0;
+	return 0;
 }
 
-/**
- * snd_pcm_sgbuf_ops_silence - silence callback for pcm ops
- * 
- * silence callback for pcm ops
+/*
+ * FIXME: the function name is too long for docbook!
+ *
+ * snd_pcm_lib_preallocate_sg_pages_for_all - initialize SG-buffer for the PCI bus (all substreams)
+ * @pci: pci device
+ * @pcm: pcm to assign the buffer
+ *
+ * Initialize the SG-buffer to all substreams of the given pcm for the
+ * PCI bus.
+ *
+ * Returns zero if successful, or a negative error code on failure.
  */
-int snd_pcm_sgbuf_ops_silence(snd_pcm_substream_t *substream, int channel,
-			      snd_pcm_uframes_t hwoff, snd_pcm_uframes_t count)
+int snd_pcm_lib_preallocate_sg_pages_for_all(struct pci_dev *pci,
+					     snd_pcm_t *pcm)
 {
-	snd_pcm_runtime_t *runtime = substream->runtime;
-	if (channel < 0) {
-		return set_silence_sg_buf(substream, frames_to_bytes(runtime, hwoff),
-					  frames_to_bytes(runtime, count));
-	} else {
-		size_t dma_csize = runtime->dma_bytes / runtime->channels;
-		size_t c_ofs = (channel * dma_csize) + samples_to_bytes(runtime, hwoff);
-		return set_silence_sg_buf(substream, c_ofs, samples_to_bytes(runtime, count));
-	}
+	snd_pcm_substream_t *substream;
+	int stream, err;
+
+	for (stream = 0; stream < 2; stream++)
+		for (substream = pcm->streams[stream].substream; substream; substream = substream->next)
+			if ((err = snd_pcm_lib_preallocate_sg_pages(pci, substream)) < 0)
+				return err;
+	return 0;
 }
 
 
 /*
  *  Exported symbols
  */
-EXPORT_SYMBOL(snd_pcm_sgbuf_init);
-EXPORT_SYMBOL(snd_pcm_sgbuf_delete);
-EXPORT_SYMBOL(snd_pcm_sgbuf_alloc);
-EXPORT_SYMBOL(snd_pcm_sgbuf_free);
-EXPORT_SYMBOL(snd_pcm_sgbuf_ops_copy_playback);
-EXPORT_SYMBOL(snd_pcm_sgbuf_ops_copy_capture);
-EXPORT_SYMBOL(snd_pcm_sgbuf_ops_silence);
+EXPORT_SYMBOL(snd_pcm_lib_preallocate_sg_pages);
+EXPORT_SYMBOL(snd_pcm_lib_preallocate_sg_pages_for_all);
 EXPORT_SYMBOL(snd_pcm_sgbuf_ops_page);

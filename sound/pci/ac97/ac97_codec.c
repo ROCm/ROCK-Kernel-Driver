@@ -141,7 +141,7 @@ static const ac97_codec_id_t snd_ac97_codec_ids[] = {
 { 0x57454301, 0xffffffff, "W83971D",		NULL },
 { 0x574d4c00, 0xffffffff, "WM9701A",		patch_wolfson00 },
 { 0x574d4c03, 0xffffffff, "WM9703/9707",	patch_wolfson03 },
-{ 0x574d4c04, 0xffffffff, "WM9704 (quad)",	patch_wolfson04 },
+{ 0x574d4c04, 0xffffffff, "WM9704/quad",	patch_wolfson04 },
 { 0x574d4c05, 0xffffffff, "WM9705",		NULL },	// patch?
 { 0x594d4800, 0xffffffff, "YMF743",		NULL },
 { 0x594d4802, 0xffffffff, "YMF752",		NULL },
@@ -291,8 +291,9 @@ void snd_ac97_write_cache(ac97_t *ac97, unsigned short reg, unsigned short value
 	if (!snd_ac97_valid_reg(ac97, reg))
 		return;
 	spin_lock(&ac97->reg_lock);
-	ac97->write(ac97, reg, ac97->regs[reg] = value);
+	ac97->regs[reg] = value;
 	spin_unlock(&ac97->reg_lock);
+	ac97->write(ac97, reg, value);
 	set_bit(reg, ac97->reg_accessed);
 }
 
@@ -301,12 +302,12 @@ static void snd_ac97_write_cache_test(ac97_t *ac97, unsigned short reg, unsigned
 #if 0
 	if (!snd_ac97_valid_reg(ac97, reg))
 		return;
-	spin_lock(&ac97->reg_lock);
+	//spin_lock(&ac97->reg_lock);
 	ac97->write(ac97, reg, value);
 	ac97->regs[reg] = ac97->read(ac97, reg);
 	if (value != ac97->regs[reg])
 		snd_printk("AC97 reg=%02x val=%04x real=%04x\n", reg, value, ac97->regs[reg]);
-	spin_unlock(&ac97->reg_lock);
+	//spin_unlock(&ac97->reg_lock);
 #endif
 	snd_ac97_write_cache(ac97, reg, value);
 }
@@ -332,27 +333,11 @@ int snd_ac97_update(ac97_t *ac97, unsigned short reg, unsigned short value)
 	spin_lock(&ac97->reg_lock);
 	change = ac97->regs[reg] != value;
 	if (change) {
-		ac97->write(ac97, reg, value);
 		ac97->regs[reg] = value;
-	}
-	spin_unlock(&ac97->reg_lock);
-	return change;
-}
-
-static int snd_ac97_update_bits_nolock(ac97_t *ac97, unsigned short reg, unsigned short mask, unsigned short value)
-{
-	int change;
-	unsigned short old, new;
-
-	if (!snd_ac97_valid_reg(ac97, reg))
-		return -EINVAL;
-	old = ac97->regs[reg];
-	new = (old & ~mask) | value;
-	change = old != new;
-	if (change) {
-		ac97->write(ac97, reg, new);
-		ac97->regs[reg] = new;
-	}
+		spin_unlock(&ac97->reg_lock);
+		ac97->write(ac97, reg, value);
+	} else
+		spin_unlock(&ac97->reg_lock);
 	return change;
 }
 
@@ -372,9 +357,20 @@ static int snd_ac97_update_bits_nolock(ac97_t *ac97, unsigned short reg, unsigne
 int snd_ac97_update_bits(ac97_t *ac97, unsigned short reg, unsigned short mask, unsigned short value)
 {
 	int change;
+	unsigned short old, new;
+
+	if (!snd_ac97_valid_reg(ac97, reg))
+		return -EINVAL;
 	spin_lock(&ac97->reg_lock);
-	change = snd_ac97_update_bits_nolock(ac97, reg, mask, value);
-	spin_unlock(&ac97->reg_lock);
+	old = ac97->regs[reg];
+	new = (old & ~mask) | value;
+	change = old != new;
+	if (change) {
+		ac97->regs[reg] = new;
+		spin_unlock(&ac97->reg_lock);
+		ac97->write(ac97, reg, new);
+	} else
+		spin_unlock(&ac97->reg_lock);
 	return change;
 }
 
@@ -389,15 +385,16 @@ static int snd_ac97_ad18xx_update_pcm_bits(ac97_t *ac97, int codec, unsigned sho
 	new = (old & ~mask) | value;
 	change = old != new;
 	if (change) {
+		ac97->spec.ad18xx.pcmreg[codec] = new;
+		spin_unlock(&ac97->reg_lock);
 		/* select single codec */
 		ac97->write(ac97, AC97_AD_SERIAL_CFG, ac97->spec.ad18xx.unchained[codec] | ac97->spec.ad18xx.chained[codec]);
 		/* update PCM bits */
 		ac97->write(ac97, AC97_PCM, new);
 		/* select all codecs */
 		ac97->write(ac97, AC97_AD_SERIAL_CFG, 0x7000);
-		ac97->spec.ad18xx.pcmreg[codec] = new;
-	}
-	spin_unlock(&ac97->reg_lock);
+	} else
+		spin_unlock(&ac97->reg_lock);
 	up(&ac97->spec.ad18xx.mutex);
 	return change;
 }
@@ -795,7 +792,7 @@ static int snd_ac97_spdif_default_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_val
 	ac97_t *ac97 = snd_kcontrol_chip(kcontrol);
 	unsigned int new = 0;
 	unsigned short val = 0;
-	int change = 0;
+	int change;
 
 	spin_lock(&ac97->reg_lock);
 	new = val = ucontrol->value.iec958.status[0] & (IEC958_AES0_PROFESSIONAL|IEC958_AES0_NONAUDIO);
@@ -826,7 +823,9 @@ static int snd_ac97_spdif_default_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_val
 		}
 	}
 
-	
+	change = ac97->spdif_status != new;
+	ac97->spdif_status = new;
+	spin_unlock(&ac97->reg_lock);
 
 	if (ac97->flags & AC97_CS_SPDIF) {
 		int x = (val >> 12) & 0x03;
@@ -835,21 +834,18 @@ static int snd_ac97_spdif_default_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_val
 		case 2: x = 0; break;  // 48.0
 		default: x = 0; break; // illegal.
 		}
-		change = snd_ac97_update_bits_nolock(ac97, AC97_CSR_SPDIF, 0x3fff, ((val & 0xcfff) | (x << 12)));
+		change |= snd_ac97_update_bits(ac97, AC97_CSR_SPDIF, 0x3fff, ((val & 0xcfff) | (x << 12)));
 	} else if (ac97->flags & AC97_CX_SPDIF) {
 		int v;
-		v = ucontrol->value.iec958.status[0] & (IEC958_AES0_CON_EMPHASIS_5015|IEC958_AES0_CON_NOT_COPYRIGHT) ? 0 : AC97_CXR_COPYRGT;
-		v |= ucontrol->value.iec958.status[0] & IEC958_AES0_NONAUDIO ? AC97_CXR_SPDIF_AC3 : AC97_CXR_SPDIF_PCM;
-		change = snd_ac97_update_bits_nolock(ac97, AC97_CXR_AUDIO_MISC, 
-						     AC97_CXR_SPDIF_MASK | AC97_CXR_COPYRGT,
-						     v);
+		v = new & (IEC958_AES0_CON_EMPHASIS_5015|IEC958_AES0_CON_NOT_COPYRIGHT) ? 0 : AC97_CXR_COPYRGT;
+		v |= new & IEC958_AES0_NONAUDIO ? AC97_CXR_SPDIF_AC3 : AC97_CXR_SPDIF_PCM;
+		change |= snd_ac97_update_bits(ac97, AC97_CXR_AUDIO_MISC, 
+					       AC97_CXR_SPDIF_MASK | AC97_CXR_COPYRGT,
+					       v);
 	} else {
-		change = snd_ac97_update_bits_nolock(ac97, AC97_SPDIF, 0x3fff, val);
+		change |= snd_ac97_update_bits(ac97, AC97_SPDIF, 0x3fff, val);
 	}
 
-	change |= ac97->spdif_status != new;
-	ac97->spdif_status = new;
-	spin_unlock(&ac97->reg_lock);
 	return change;
 }
 
@@ -1005,11 +1001,11 @@ static const snd_kcontrol_new_t snd_ac97_controls_alc650[] = {
 #if 0 /* always set in patch_alc650 */
 	AC97_SINGLE("IEC958 Input Clock Enable", AC97_ALC650_CLOCK, 0, 1, 0),
 	AC97_SINGLE("IEC958 Input Pin Enable", AC97_ALC650_CLOCK, 1, 1, 0),
-#endif
 	AC97_SINGLE("Surround DAC Switch", AC97_ALC650_SURR_DAC_VOL, 15, 1, 1),
 	AC97_DOUBLE("Surround DAC Volume", AC97_ALC650_SURR_DAC_VOL, 8, 0, 31, 1),
 	AC97_SINGLE("Center/LFE DAC Switch", AC97_ALC650_LFE_DAC_VOL, 15, 1, 1),
 	AC97_DOUBLE("Center/LFE DAC Volume", AC97_ALC650_LFE_DAC_VOL, 8, 0, 31, 1),
+#endif
 };
 
 /* The following snd_ac97_ymf753_... items added by David Shust (dshust@shustring.com) */
@@ -1748,7 +1744,7 @@ static void snd_ac97_get_name(ac97_t *ac97, unsigned int id, char *name)
 				pid->patch(ac97);
 			return;
 		}
-	sprintf(name + strlen(name), " (%x)", id & 0xff);
+	sprintf(name + strlen(name), " id %x", id & 0xff);
 }
 
 
@@ -2224,12 +2220,12 @@ static int set_spdif_rate(ac97_t *ac97, unsigned short rate)
 
 	spin_lock(&ac97->reg_lock);
 	old = ac97->regs[reg] & ~AC97_SC_SPSR_MASK;
-	if (old != bits) {
-		snd_ac97_update_bits_nolock(ac97, AC97_EXTENDED_STATUS, AC97_EA_SPDIF, 0);
-		snd_ac97_update_bits_nolock(ac97, reg, AC97_SC_SPSR_MASK, bits);
-	}
-	snd_ac97_update_bits_nolock(ac97, AC97_EXTENDED_STATUS, AC97_EA_SPDIF, AC97_EA_SPDIF);
 	spin_unlock(&ac97->reg_lock);
+	if (old != bits) {
+		snd_ac97_update_bits(ac97, AC97_EXTENDED_STATUS, AC97_EA_SPDIF, 0);
+		snd_ac97_update_bits(ac97, reg, AC97_SC_SPSR_MASK, bits);
+	}
+	snd_ac97_update_bits(ac97, AC97_EXTENDED_STATUS, AC97_EA_SPDIF, AC97_EA_SPDIF);
 	return 0;
 }
 

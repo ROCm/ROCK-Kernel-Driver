@@ -273,9 +273,6 @@ static void snd_cs46xx_ac97_write(ac97_t *ac97,
 				   unsigned short val)
 {
 	cs46xx_t *chip = snd_magic_cast(cs46xx_t, ac97->private_data, return);
-#ifndef CONFIG_SND_CS46XX_NEW_DSP
-	int val2 = 0;
-#endif
 	int codec_index = -1;
 
 	/* UGGLY: nr_ac97_codecs == 0 primery codec detection is in progress */
@@ -287,59 +284,9 @@ static void snd_cs46xx_ac97_write(ac97_t *ac97,
 	else
 		snd_assert(0,return);
 
-#ifndef CONFIG_SND_CS46XX_NEW_DSP
-	if (reg == AC97_CD)
-		val2 = snd_cs46xx_codec_read(chip, AC97_CD, codec_index);
-#endif
-
+	chip->active_ctrl(chip, 1);
 	snd_cs46xx_codec_write(chip, reg, val, codec_index);
-
-#ifndef CONFIG_SND_CS46XX_NEW_DSP
-    /* Benny: I've not found *one* soundcard where
-       this code below could do any sense, and
-       with the HW mixering it's anyway broken, with
-       more then 1 PCM stream the amplifier will not
-       be turned off by unmuting CD channel. So just
-       lets skip it.
-    */
-	
-	/*
-	 *	Adjust power if the mixer is selected/deselected according
-	 *	to the CD.
-	 *
-	 *	IF the CD is a valid input source (mixer or direct) AND
-	 *		the CD is not muted THEN power is needed
-	 *
-	 *	We do two things. When record select changes the input to
-	 *	add/remove the CD we adjust the power count if the CD is
-	 *	unmuted.
-	 *
-	 *	When the CD mute changes we adjust the power level if the
-	 *	CD was a valid input.
-	 *
-	 *      We also check for CD volume != 0, as the CD mute isn't
-	 *      normally tweaked from userspace.
-	 */
-	 
-	/* CD mute change ? */
-
-	/* Benny: this hack dont seems to make any sense to me, at least on the Game Theater XP,
-	   Turning of the amplifier just make the PCM sound very distorcionated.
-	   is this really needed ????????????????
-	*/
-	if (reg == AC97_CD) {
-		/* Mute bit change ? */
-		if ((val2^val)&0x8000 || ((val2 == 0x1f1f || val == 0x1f1f) && val2 != val)) {
-			/* Mute on */
-			if(val&0x8000 || val == 0x1f1f)
-				chip->amplifier_ctrl(chip, -1);
-			else /* Mute off power on */
-				chip->amplifier_ctrl(chip, 1);
-		}
-	}
-
 	chip->active_ctrl(chip, -1);
-#endif
 }
 
 
@@ -1506,7 +1453,6 @@ static int _cs46xx_playback_open_channel (snd_pcm_substream_t * substream,int pc
 	if (chip->accept_valid)
 		substream->runtime->hw.info |= SNDRV_PCM_INFO_MMAP_VALID;
 	chip->active_ctrl(chip, 1);
-	chip->amplifier_ctrl(chip, 1);
 
 	return 0;
 }
@@ -1570,7 +1516,6 @@ static int snd_cs46xx_capture_open(snd_pcm_substream_t * substream)
 		substream->runtime->hw.info |= SNDRV_PCM_INFO_MMAP_VALID;
 
 	chip->active_ctrl(chip, 1);
-	chip->amplifier_ctrl(chip, 1);
 
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
 	snd_pcm_hw_constraint_list(substream->runtime, 0,
@@ -1605,7 +1550,6 @@ static int snd_cs46xx_playback_close(snd_pcm_substream_t * substream)
 	cpcm->substream = NULL;
 	snd_free_pci_pages(chip->pci, cpcm->hw_size, cpcm->hw_area, cpcm->hw_addr);
 	chip->active_ctrl(chip, -1);
-	chip->amplifier_ctrl(chip, -1);
 
 	return 0;
 }
@@ -1617,7 +1561,6 @@ static int snd_cs46xx_capture_close(snd_pcm_substream_t * substream)
 	chip->capt.substream = NULL;
 	snd_free_pci_pages(chip->pci, chip->capt.hw_size, chip->capt.hw_area, chip->capt.hw_addr);
 	chip->active_ctrl(chip, -1);
-	chip->amplifier_ctrl(chip, -1);
 
 	return 0;
 }
@@ -3545,9 +3488,6 @@ static void voyetra_mixer_init (cs46xx_t *chip)
 {
 	snd_printdd ("initializing Voyetra mixer\n");
 
-	/* turnon Amplifier and leave it on */
-	chip->amplifier_ctrl(chip, 1);
-  
 	/* Enable SPDIF out */
 	snd_cs46xx_pokeBA0(chip, BA0_EGPIODR, EGPIODR_GPOE0);
 	snd_cs46xx_pokeBA0(chip, BA0_EGPIOPTR, EGPIODR_GPOE0);
@@ -3566,9 +3506,6 @@ static void hercules_mixer_init (cs46xx_t *chip)
 	snd_printdd ("initializing Hercules mixer\n");
 
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
-	/* turnon Amplifier and leave it on */
-	chip->amplifier_ctrl(chip, 1);
-
 	for (idx = 0 ; idx < sizeof(snd_hercules_controls) / 
 		     sizeof(snd_hercules_controls[0]) ; idx++) {
 		snd_kcontrol_t *kctl;
@@ -3708,6 +3645,8 @@ static struct cs_card_type __devinitdata cards[] = {
 #ifdef CONFIG_PM
 void snd_cs46xx_suspend(cs46xx_t *chip)
 {
+	int amp_saved;
+
 	snd_card_t *card = chip->card;
 
 	if (card->power_state == SNDRV_CTL_POWER_D3hot)
@@ -3715,7 +3654,13 @@ void snd_cs46xx_suspend(cs46xx_t *chip)
 	snd_pcm_suspend_all(chip->pcm);
 	// chip->ac97_powerdown = snd_cs46xx_codec_read(chip, AC97_POWER_CONTROL);
 	// chip->ac97_general_purpose = snd_cs46xx_codec_read(chip, BA0_AC97_GENERAL_PURPOSE);
+	amp_saved = chip->amplifier;
+	/* turn off amp */
+	chip->amplifier_ctrl(chip, -chip->amplifier);
 	snd_cs46xx_hw_stop(chip);
+	/* disable CLKRUN */
+	chip->active_ctrl(chip, -chip->amplifier);
+	chip->amplifier = amp_saved; /* restore the status */
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 }
 
@@ -3748,11 +3693,10 @@ void snd_cs46xx_resume(cs46xx_t *chip)
 	snd_ac97_resume(chip->ac97[CS46XX_PRIMARY_CODEC_INDEX]);
 
 	if (amp_saved)
-		chip->amplifier_ctrl(chip, 1); /* try to turn on */
-	if (! amp_saved) {
-		chip->amplifier = 1;
-		chip->active_ctrl(chip, -1);
-	}
+		chip->amplifier_ctrl(chip, 1); /* turn amp on */
+	else
+		chip->active_ctrl(chip, -1); /* disable CLKRUN */
+	chip->amplifier = amp_saved;
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 }
 
@@ -3853,11 +3797,11 @@ int __devinit snd_cs46xx_create(snd_card_t * card,
 	for (cp = &cards[0]; cp->name; cp++) {
 		if (cp->vendor == ss_vendor && cp->id == ss_card) {
 			snd_printd ("hack for %s enabled\n", cp->name);
-			if (cp->init)
-				cp->init(chip);
 			chip->amplifier_ctrl = cp->amp;
 			chip->active_ctrl = cp->active;
 			chip->mixer_init = cp->mixer_init;
+			if (cp->init)
+				cp->init(chip);
 			break;
 		}
 	}
@@ -3878,7 +3822,7 @@ int __devinit snd_cs46xx_create(snd_card_t * card,
 	if (chip->active_ctrl == NULL)
 		chip->active_ctrl = amp_none;
 
-	chip->active_ctrl(chip, 1);
+	chip->active_ctrl(chip, 1); /* enable CLKRUN */
 
 	pci_set_master(pci);
 
@@ -3929,7 +3873,10 @@ int __devinit snd_cs46xx_create(snd_card_t * card,
 		return err;
 	}
 	
-	chip->active_ctrl(chip, -1);
+	/* turn on amplifier */
+	chip->amplifier_ctrl(chip, 1);
+
+	chip->active_ctrl(chip, -1); /* disable CLKRUN */
 
 	*rchip = chip;
 	return 0;

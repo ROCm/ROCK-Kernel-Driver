@@ -26,6 +26,9 @@
 #include <sound/pcm.h>
 #include <sound/info.h>
 #include <sound/initval.h>
+#ifdef CONFIG_PCI
+#include <sound/pcm_sgbuf.h>
+#endif
 
 static int preallocate_dma = 1;
 MODULE_PARM(preallocate_dma, "i");
@@ -59,6 +62,10 @@ static int alloc_pcm_pages(snd_pcm_substream_t *substream, size_t size,
 #ifdef CONFIG_PCI
 	case SNDRV_PCM_DMA_TYPE_PCI:
 		*dma_area = snd_malloc_pci_pages((struct pci_dev *)substream->dma_private, size, dma_addr);
+		break;
+	case SNDRV_PCM_DMA_TYPE_PCI_SG:
+		*dma_area = snd_pcm_sgbuf_alloc_pages((struct snd_sg_buf *)substream->dma_private, size);
+		*dma_addr = 0;
 		break;
 #endif
 #ifdef CONFIG_SBUS
@@ -121,6 +128,9 @@ static void free_pcm_pages(snd_pcm_substream_t *substream, size_t size,
 		snd_free_pci_pages((struct pci_dev *)substream->dma_private,
 				   size, dma_area, dma_addr);
 		break;
+	case SNDRV_PCM_DMA_TYPE_PCI_SG:
+		snd_pcm_sgbuf_free_pages((struct snd_sg_buf *)substream->dma_private, dma_area);
+		break;
 #endif
 #ifdef CONFIG_SBUS
 	case SNDRV_PCM_DMA_TYPE_SBUS:
@@ -158,6 +168,11 @@ int snd_pcm_lib_preallocate_free(snd_pcm_substream_t *substream)
 		snd_info_unregister(substream->proc_prealloc_entry);
 		substream->proc_prealloc_entry = NULL;
 	}
+#ifdef CONFIG_PCI
+	if (substream->dma_type == SNDRV_PCM_DMA_TYPE_PCI_SG)
+		snd_pcm_sgbuf_delete((struct snd_sg_buf *)substream->dma_private);
+#endif
+	substream->dma_type = SNDRV_PCM_DMA_TYPE_UNKNOWN;
 	return 0;
 }
 

@@ -926,7 +926,7 @@ static int snd_ymfpci_playback_spdif_open(snd_pcm_substream_t * substream)
 			  snd_ymfpci_readw(chip, YDSXGR_SPDIFOUTCTRL) | 2);
 	ymfpci_open_extension(chip);
 	chip->spdif_pcm_bits = chip->spdif_bits;
-	snd_ymfpci_writel(chip, YDSXGR_SPDIFOUTSTATUS, chip->spdif_pcm_bits);
+	snd_ymfpci_writew(chip, YDSXGR_SPDIFOUTSTATUS, chip->spdif_pcm_bits);
 	chip->spdif_opened++;
 	spin_unlock_irqrestore(&chip->reg_lock, flags);
 
@@ -1314,8 +1314,8 @@ static int snd_ymfpci_spdif_mask_get(snd_kcontrol_t * kcontrol,
 static snd_kcontrol_new_t snd_ymfpci_spdif_mask __devinitdata =
 {
 	.access =	SNDRV_CTL_ELEM_ACCESS_READ,
-	.iface =		SNDRV_CTL_ELEM_IFACE_PCM,
-	.name =           SNDRV_CTL_NAME_IEC958("",PLAYBACK,CON_MASK),
+	.iface =	SNDRV_CTL_ELEM_IFACE_PCM,
+	.name =         SNDRV_CTL_NAME_IEC958("",PLAYBACK,CON_MASK),
 	.info =		snd_ymfpci_spdif_mask_info,
 	.get =		snd_ymfpci_spdif_mask_get,
 };
@@ -1362,8 +1362,8 @@ static int snd_ymfpci_spdif_stream_put(snd_kcontrol_t * kcontrol,
 static snd_kcontrol_new_t snd_ymfpci_spdif_stream __devinitdata =
 {
 	.access =	SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_INACTIVE,
-	.iface =		SNDRV_CTL_ELEM_IFACE_PCM,
-	.name =           SNDRV_CTL_NAME_IEC958("",PLAYBACK,PCM_STREAM),
+	.iface =	SNDRV_CTL_ELEM_IFACE_PCM,
+	.name =         SNDRV_CTL_NAME_IEC958("",PLAYBACK,PCM_STREAM),
 	.info =		snd_ymfpci_spdif_stream_info,
 	.get =		snd_ymfpci_spdif_stream_get,
 	.put =		snd_ymfpci_spdif_stream_put

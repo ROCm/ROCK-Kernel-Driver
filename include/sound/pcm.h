@@ -125,6 +125,7 @@ typedef struct _snd_pcm_ops {
 #define SNDRV_PCM_DMA_TYPE_ISA		2	/* ISA continuous */
 #define SNDRV_PCM_DMA_TYPE_PCI		3	/* PCI continuous */
 #define SNDRV_PCM_DMA_TYPE_SBUS		4	/* SBUS continuous */
+#define SNDRV_PCM_DMA_TYPE_PCI_SG	5	/* PCI SG-buffer */
 
 /* If you change this don't forget to change rates[] table in pcm_native.c */
 #define SNDRV_PCM_RATE_5512		(1<<0)		/* 5512Hz */
@@ -743,6 +744,10 @@ int snd_pcm_hw_param_near(snd_pcm_substream_t *substream,
 			  snd_pcm_hw_params_t *params,
 			  snd_pcm_hw_param_t var, 
 			  unsigned int val, int *dir);
+int snd_pcm_hw_param_set(snd_pcm_substream_t *pcm,
+			 snd_pcm_hw_params_t *params,
+			 snd_pcm_hw_param_t var,
+			 unsigned int val, int dir);
 int snd_pcm_hw_params_choose(snd_pcm_substream_t *substream, snd_pcm_hw_params_t *params);
 
 int snd_pcm_hw_refine(snd_pcm_substream_t *substream, snd_pcm_hw_params_t *params);

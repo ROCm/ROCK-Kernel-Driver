@@ -77,6 +77,7 @@ struct snd_usb_midi {
 	struct usb_interface *iface;
 	const snd_usb_audio_quirk_t *quirk;
 	snd_rawmidi_t* rmidi;
+	struct list_head list;
 
 	struct snd_usb_midi_endpoint {
 		snd_usb_midi_out_endpoint_t *out;
@@ -394,7 +395,7 @@ static void snd_usbmidi_do_output(snd_usb_midi_out_endpoint_t* ep)
 	unsigned long flags;
 	
 	spin_lock_irqsave(&ep->buffer_lock, flags);
-	if (urb->status == -EINPROGRESS) {
+	if (urb->status == -EINPROGRESS || ep->umidi->chip->shutdown) {
 		spin_unlock_irqrestore(&ep->buffer_lock, flags);
 		return;
 	}
@@ -451,10 +452,8 @@ static void snd_usbmidi_output_trigger(snd_rawmidi_substream_t* substream, int u
 	usbmidi_out_port_t* port = (usbmidi_out_port_t*)substream->runtime->private_data;
 
 	port->active = up;
-	if (up) {
-		if (! port->ep->umidi->chip->shutdown) /* to be sure... */
-			tasklet_hi_schedule(&port->ep->tasklet);
-	}
+	if (up)
+		tasklet_hi_schedule(&port->ep->tasklet);
 }
 
 static int snd_usbmidi_input_open(snd_rawmidi_substream_t* substream)
@@ -490,11 +489,8 @@ static snd_rawmidi_ops_t snd_usbmidi_input_ops = {
 static void snd_usbmidi_in_endpoint_delete(snd_usb_midi_in_endpoint_t* ep)
 {
 	if (ep->urb) {
-		if (ep->urb->transfer_buffer) {
-			if (! ep->umidi->chip->shutdown) /* to be sure */
-				usb_unlink_urb(ep->urb);
+		if (ep->urb->transfer_buffer)
 			kfree(ep->urb->transfer_buffer);
-		}
 		usb_free_urb(ep->urb);
 	}
 	snd_magic_kfree(ep);
@@ -619,11 +615,8 @@ static void snd_usbmidi_out_endpoint_delete(snd_usb_midi_out_endpoint_t* ep)
 	if (ep->tasklet.func)
 		tasklet_kill(&ep->tasklet);
 	if (ep->urb) {
-		if (ep->urb->transfer_buffer) {
-			if (! ep->umidi->chip->shutdown) /* to be sure */
-				usb_unlink_urb(ep->urb);
+		if (ep->urb->transfer_buffer)
 			kfree(ep->urb->transfer_buffer);
-		}
 		usb_free_urb(ep->urb);
 	}
 	snd_magic_kfree(ep);
@@ -691,6 +684,24 @@ static void snd_usbmidi_free(snd_usb_midi_t* umidi)
 			snd_usbmidi_in_endpoint_delete(ep->in);
 	}
 	snd_magic_kfree(umidi);
+}
+
+/*
+ * Unlinks all URBs (must be done before the usb_device is deleted).
+ */
+void snd_usbmidi_disconnect(struct list_head* p)
+{
+	snd_usb_midi_t* umidi;
+	int i;
+
+	umidi = list_entry(p, snd_usb_midi_t, list);
+	for (i = 0; i < MIDI_MAX_ENDPOINTS; ++i) {
+		snd_usb_midi_endpoint_t* ep = &umidi->endpoints[i];
+		if (ep->out && ep->out->urb)
+			usb_unlink_urb(ep->out->urb);
+		if (ep->in && ep->in->urb)
+			usb_unlink_urb(ep->in->urb);
+	}
 }
 
 static void snd_usbmidi_rawmidi_free(snd_rawmidi_t* rmidi)
@@ -994,7 +1005,7 @@ static int snd_usbmidi_create_rawmidi(snd_usb_midi_t* umidi,
 			      out_ports, in_ports, &rmidi);
 	if (err < 0)
 		return err;
-	strcpy(rmidi->name, umidi->chip->card->longname);
+	strcpy(rmidi->name, umidi->chip->card->shortname);
 	rmidi->info_flags = SNDRV_RAWMIDI_INFO_OUTPUT |
 			    SNDRV_RAWMIDI_INFO_INPUT |
 			    SNDRV_RAWMIDI_INFO_DUPLEX;
@@ -1078,6 +1089,8 @@ int snd_usb_create_midi_interface(snd_usb_audio_t* chip,
 		snd_usbmidi_free(umidi);
 		return err;
 	}
+
+	list_add(&umidi->list, &umidi->chip->midi_list);
 
 	for (i = 0; i < MIDI_MAX_ENDPOINTS; ++i)
 		if (umidi->endpoints[i].in)

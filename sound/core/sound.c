@@ -90,7 +90,7 @@ void snd_request_card(int card)
 	read_unlock(&snd_card_rwlock);
 	if (locked)
 		return;
-	if (card < 0 || card >= snd_ecards_limit)
+	if (card < 0 || card >= cards_limit)
 		return;
 	sprintf(str, "snd-card-%i", card);
 	request_module(str);
