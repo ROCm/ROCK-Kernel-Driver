@@ -1,3 +1,6 @@
+#define VMLINUX_SYMBOL(_sym_) _##_sym_
+#include <asm-generic/vmlinux.lds.h>
+#include <asm/thread_info.h>
 #include <linux/config.h>
 
 #ifdef CONFIG_H8300H_GENERIC
