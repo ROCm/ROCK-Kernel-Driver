@@ -46,6 +46,7 @@
  */
 #define MAX_IRQ_CNT	100000
 
+static int noirqdebug;
 static volatile unsigned long irq_err_count;
 static spinlock_t irq_controller_lock = SPIN_LOCK_UNLOCKED;
 static LIST_HEAD(irq_pending);
@@ -235,7 +236,7 @@ report_bad_irq(unsigned int irq, struct pt_regs *regs, struct irqdesc *desc, int
 	static int count = 100;
 	struct irqaction *action;
 
-	if (!count)
+	if (!count || noirqdebug)
 		return;
 
 	count--;
@@ -863,3 +864,11 @@ void __init init_IRQ(void)
 	init_arch_irq();
 	init_dma();
 }
+
+static int __init noirqdebug_setup(char *str)
+{
+	noirqdebug = 1;
+	return 1;
+}
+
+__setup("noirqdebug", noirqdebug_setup);

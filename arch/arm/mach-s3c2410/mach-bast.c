@@ -10,6 +10,7 @@
  * published by the Free Software Foundation.
  *
  * Modifications:
+ *     14-Sep-2004 BJD  USB power control
  *     20-Aug-2004 BJD  Added s3c2410_board struct
  *     18-Aug-2004 BJD  Added platform devices from default set
  *     16-May-2003 BJD  Created initial version
@@ -44,6 +45,7 @@
 #include "s3c2410.h"
 #include "devs.h"
 #include "cpu.h"
+#include "usb-simtec.h"
 
 /* macros for virtual address mods for the io space entries */
 #define VA_C5(item) ((item) + BAST_VAM_CS5)
@@ -215,6 +217,7 @@ void __init bast_map_io(void)
 	s3c24xx_init_io(bast_iodesc, ARRAY_SIZE(bast_iodesc));
 	s3c2410_init_uarts(bast_uartcfgs, ARRAY_SIZE(bast_uartcfgs));
 	s3c2410_set_board(&bast_board);
+	usb_simtec_init();
 }
 
 void __init bast_init_irq(void)

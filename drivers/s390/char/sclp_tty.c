@@ -277,7 +277,7 @@ sclp_ttybuf_callback(struct sclp_buffer *buffer, int rc)
 	wake_up(&sclp_tty_waitq);
 	/* check if the tty needs a wake up call */
 	if (sclp_tty != NULL) {
-		tty_wakeup(tty);
+		tty_wakeup(sclp_tty);
 	}
 }
 
