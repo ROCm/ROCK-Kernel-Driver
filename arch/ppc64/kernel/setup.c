@@ -41,7 +41,6 @@
 #include <asm/elf.h>
 #include <asm/machdep.h>
 #include <asm/iSeries/LparData.h>
-#include <asm/naca.h>
 #include <asm/paca.h>
 #include <asm/ppcdebug.h>
 #include <asm/time.h>
@@ -113,6 +112,7 @@ int boot_cpuid = 0;
 int boot_cpuid_phys = 0;
 dev_t boot_dev;
 u64 ppc64_pft_size;
+u64 ppc64_debug_switch;
 
 struct ppc64_caches ppc64_caches;
 
@@ -161,7 +161,7 @@ struct screen_info screen_info = {
  */
 void __init ppcdbg_initialize(void)
 {
-	naca->debug_switch = PPC_DEBUG_DEFAULT; /* | PPCDBG_BUSWALK | */
+	ppc64_debug_switch = PPC_DEBUG_DEFAULT; /* | PPCDBG_BUSWALK | */
 	/* PPCDBG_PHBINIT | PPCDBG_MM | PPCDBG_MMINIT | PPCDBG_TCEINIT | PPCDBG_TCE */;
 }
 
@@ -399,7 +399,7 @@ void __init early_setup(unsigned long dt_ptr)
 	DBG(" -> early_setup()\n");
 
 	/*
-	 * Fill the default DBG level in naca (do we want to keep
+	 * Fill the default DBG level (do we want to keep
 	 * that old mecanism around forever ?)
 	 */
 	ppcdbg_initialize();
@@ -453,17 +453,17 @@ void __init early_setup(unsigned long dt_ptr)
 
 
 /*
- * Initialize some remaining members of the naca and systemcfg structures
+ * Initialize some remaining members of the ppc64_caches and systemcfg structures
  * (at least until we get rid of them completely). This is mostly some
  * cache informations about the CPU that will be used by cache flush
  * routines and/or provided to userland
  */
-static void __init initialize_naca(void)
+static void __init initialize_cache_info(void)
 {
 	struct device_node *np;
 	unsigned long num_cpus = 0;
 
-	DBG(" -> initialize_naca()\n");
+	DBG(" -> initialize_cache_info()\n");
 
 	for (np = NULL; (np = of_find_node_by_type(np, "cpu"));) {
 		num_cpus += 1;
@@ -530,7 +530,7 @@ static void __init initialize_naca(void)
 	systemcfg->version.minor = SYSTEMCFG_MINOR;
 	systemcfg->processor = mfspr(SPRN_PVR);
 
-	DBG(" <- initialize_naca()\n");
+	DBG(" <- initialize_cache_info()\n");
 }
 
 static void __init check_for_initrd(void)
@@ -591,7 +591,7 @@ void __init setup_system(void)
 	unflatten_device_tree();
 
 	/*
-	 * Fill the naca & systemcfg structures with informations
+	 * Fill the ppc64_caches & systemcfg structures with informations
 	 * retreived from the device-tree. Need to be called before
 	 * finish_device_tree() since the later requires some of the
 	 * informations filled up here to properly parse the interrupt
@@ -600,7 +600,7 @@ void __init setup_system(void)
 	 * routines like flush_icache_range (used by the hash init
 	 * later on).
 	 */
-	initialize_naca();
+	initialize_cache_info();
 
 #ifdef CONFIG_PPC_PSERIES
 	/*
@@ -661,9 +661,8 @@ void __init setup_system(void)
 	printk("Starting Linux PPC64 %s\n", UTS_RELEASE);
 
 	printk("-----------------------------------------------------\n");
-	printk("naca                          = 0x%p\n", naca);
 	printk("ppc64_pft_size                = 0x%lx\n", ppc64_pft_size);
-	printk("naca->debug_switch            = 0x%lx\n", naca->debug_switch);
+	printk("ppc64_debug_switch            = 0x%lx\n", ppc64_debug_switch);
 	printk("ppc64_interrupt_controller    = 0x%ld\n", ppc64_interrupt_controller);
 	printk("systemcfg                     = 0x%p\n", systemcfg);
 	printk("systemcfg->platform           = 0x%x\n", systemcfg->platform);

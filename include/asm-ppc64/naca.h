@@ -19,9 +19,6 @@ struct naca_struct {
 	void *xItVpdAreas;              /* VPD Data                  0x00 */
 	void *xRamDisk;                 /* iSeries ramdisk           0x08 */
 	u64   xRamDiskSize;		/* In pages                  0x10 */
-	u64 debug_switch;		/* Debug print control       0x20 */
-	u64 banner;                     /* Ptr to banner string      0x28 */
-	u64 log;                        /* Ptr to log buffer         0x30 */
 };
 
 extern struct naca_struct *naca;

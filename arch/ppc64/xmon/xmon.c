@@ -26,7 +26,6 @@
 #include <asm/pgtable.h>
 #include <asm/mmu.h>
 #include <asm/mmu_context.h>
-#include <asm/naca.h>
 #include <asm/paca.h>
 #include <asm/ppcdebug.h>
 #include <asm/cputable.h>
@@ -2372,9 +2371,9 @@ static void debug_trace(void)
 	if (cmd == '\n') {
 		/* show current state */
 		unsigned long i;
-		printf("naca->debug_switch = 0x%lx\n", naca->debug_switch);
+		printf("ppc64_debug_switch = 0x%lx\n", ppc64_debug_switch);
 		for (i = 0; i < PPCDBG_NUM_FLAGS ;i++) {
-			on = PPCDBG_BITVAL(i) & naca->debug_switch;
+			on = PPCDBG_BITVAL(i) & ppc64_debug_switch;
 			printf("%02x %s %12s   ", i, on ? "on " : "off",  trace_names[i] ? trace_names[i] : "");
 			if (((i+1) % 3) == 0)
 				printf("\n");
@@ -2388,7 +2387,7 @@ static void debug_trace(void)
 			on = (cmd == '+');
 			cmd = inchar();
 			if (cmd == ' ' || cmd == '\n') {  /* Turn on or off based on + or - */
-				naca->debug_switch = on ? PPCDBG_ALL:PPCDBG_NONE;
+				ppc64_debug_switch = on ? PPCDBG_ALL:PPCDBG_NONE;
 				printf("Setting all values to %s...\n", on ? "on" : "off");
 				if (cmd == '\n') return;
 				else cmd = skipbl(); 
@@ -2403,10 +2402,10 @@ static void debug_trace(void)
 			return;
 		}
 		if (on) {
-			naca->debug_switch |= PPCDBG_BITVAL(val);
+			ppc64_debug_switch |= PPCDBG_BITVAL(val);
 			printf("enable debug %x %s\n", val, trace_names[val] ? trace_names[val] : "");
 		} else {
-			naca->debug_switch &= ~PPCDBG_BITVAL(val);
+			ppc64_debug_switch &= ~PPCDBG_BITVAL(val);
 			printf("disable debug %x %s\n", val, trace_names[val] ? trace_names[val] : "");
 		}
 		cmd = skipbl();

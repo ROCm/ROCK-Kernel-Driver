@@ -56,7 +56,6 @@
 #include <asm/dma.h>
 #include <asm/machdep.h>
 #include <asm/irq.h>
-#include <asm/naca.h>
 #include <asm/time.h>
 #include <asm/nvram.h>
 #include <asm/plpar_wrappers.h>
@@ -318,7 +317,7 @@ static  void __init pSeries_discover_pic(void)
 		else if (strstr(typep, "ppc-xicp"))
 			ppc64_interrupt_controller = IC_PPC_XIC;
 		else
-			printk("initialize_naca: failed to recognize"
+			printk("pSeries_discover_pic: failed to recognize"
 			       " interrupt-controller\n");
 		break;
 	}
