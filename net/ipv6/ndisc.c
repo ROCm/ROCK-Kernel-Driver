@@ -884,7 +884,6 @@ static void ndisc_recv_ns(struct sk_buff *skb)
 		in6_dev_put(idev);
 	} else {
 		struct inet6_dev *in6_dev = in6_dev_get(dev);
-		int addr_type = ipv6_addr_type(saddr);
 
 		if (in6_dev && in6_dev->cnf.forwarding &&
 		    (addr_type & IPV6_ADDR_UNICAST) &&
