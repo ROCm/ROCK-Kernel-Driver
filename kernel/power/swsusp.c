@@ -81,9 +81,6 @@ extern char __nosave_begin, __nosave_end;
 
 extern int is_head_of_free_region(struct page *);
 
-/* Locks */
-spinlock_t suspend_pagedir_lock __nosavedata = SPIN_LOCK_UNLOCKED;
-
 /* Variables to be preserved over suspend */
 int pagedir_order_check;
 int nr_copy_pages_check;
@@ -908,10 +905,7 @@ static void suspend_power_down(void)
 
 static void suspend_finish(void)
 {
-	spin_lock_irq(&suspend_pagedir_lock);	/* Done to disable interrupts */ 
-
 	free_pages((unsigned long) pagedir_nosave, pagedir_order);
-	spin_unlock_irq(&suspend_pagedir_lock);
 
 #ifdef CONFIG_HIGHMEM
 	printk( "Restoring highmem\n" );
