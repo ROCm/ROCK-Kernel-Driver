@@ -1141,7 +1141,8 @@ static inline void wl3501_md_confirm_interrupt(struct net_device *dev,
 
 	wl3501_get_from_wla(this, addr, &sig, sizeof(sig));
 	wl3501_free_tx_buffer(this, sig.data);
-	netif_wake_queue(dev);
+	if (netif_queue_stopped(dev))
+		netif_wake_queue(dev);
 }
 
 static inline void wl3501_md_ind_interrupt(struct net_device *dev,
@@ -1544,6 +1545,9 @@ static int wl3501_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		++this->stats.tx_packets;
 		this->stats.tx_bytes += skb->len;
 		kfree_skb(skb);
+
+		if (this->tx_buffer_cnt < 2)
+			netif_stop_queue(dev);
 	}
 	spin_unlock_irqrestore(&this->lock, flags);
 	return rc;
