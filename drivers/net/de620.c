@@ -844,12 +844,6 @@ int __init de620_probe(struct net_device *dev)
 		return -ENODEV;
 	}
 
-#if 0 /* Not yet */
-	if (check_region(dev->base_addr, 3)) {
-		printk(", port 0x%x busy\n", dev->base_addr);
-		return -EBUSY;
-	}
-#endif
 	if (!request_region(dev->base_addr, 3, "de620")) {
 		printk(KERN_ERR "io 0x%3lX, which is busy.\n", dev->base_addr);
 		return -EBUSY;

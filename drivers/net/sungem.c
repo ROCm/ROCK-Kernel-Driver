@@ -99,11 +99,6 @@ static u16 link_modes[] __devinitdata = {
 #define GEM_MODULE_NAME	"gem"
 #define PFX GEM_MODULE_NAME ": "
 
-/* Until this gets merged from 2.4.x... */
-#ifndef PCI_DEVICE_ID_APPLE_UNI_N_GMACP
-#define PCI_DEVICE_ID_APPLE_UNI_N_GMACP 0x0024
-#endif
-
 static struct pci_device_id gem_pci_tbl[] __devinitdata = {
 	{ PCI_VENDOR_ID_SUN, PCI_DEVICE_ID_SUN_GEM,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },

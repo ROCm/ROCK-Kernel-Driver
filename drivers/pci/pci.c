@@ -88,6 +88,8 @@ pci_max_busnr(void)
  *  %PCI_CAP_ID_MSI          Message Signalled Interrupts
  *
  *  %PCI_CAP_ID_CHSWP        CompactPCI HotSwap 
+ *
+ *  %PCI_CAP_ID_PCIX         PCI-X
  */
 int
 pci_find_capability(struct pci_dev *dev, int cap)

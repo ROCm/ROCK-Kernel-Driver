@@ -686,21 +686,21 @@ static int qcam_read(struct file *file, char *buf,
 
 /* video device template */
 static struct file_operations qcam_fops = {
-	owner:		THIS_MODULE,
-	open:           video_exclusive_open,
-	release:        video_exclusive_release,
-	ioctl:          qcam_ioctl,
-	read:		qcam_read,
-	llseek:         no_llseek,
+	.owner		= THIS_MODULE,
+	.open           = video_exclusive_open,
+	.release        = video_exclusive_release,
+	.ioctl          = qcam_ioctl,
+	.read		= qcam_read,
+	.llseek         = no_llseek,
 };
 
 static struct video_device qcam_template=
 {
-	owner:		THIS_MODULE,
-	name:		"Colour QuickCam",
-	type:		VID_TYPE_CAPTURE,
-	hardware:	VID_HARDWARE_QCAM_C,
-	fops:           &qcam_fops,
+	.owner		= THIS_MODULE,
+	.name		= "Colour QuickCam",
+	.type		= VID_TYPE_CAPTURE,
+	.hardware	= VID_HARDWARE_QCAM_C,
+	.fops           = &qcam_fops,
 };
 
 /* Initialize the QuickCam driver control structure. */

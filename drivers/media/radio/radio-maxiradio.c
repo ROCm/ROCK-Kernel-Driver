@@ -76,19 +76,19 @@ static int radio_ioctl(struct inode *inode, struct file *file,
 		       unsigned int cmd, unsigned long arg);
 
 static struct file_operations maxiradio_fops = {
-	owner:		THIS_MODULE,
-	open:           video_exclusive_open,
-	release:        video_exclusive_release,
-	ioctl:	        radio_ioctl,
-	llseek:         no_llseek,
+	.owner		= THIS_MODULE,
+	.open           = video_exclusive_open,
+	.release        = video_exclusive_release,
+	.ioctl	        = radio_ioctl,
+	.llseek         = no_llseek,
 };
 static struct video_device maxiradio_radio =
 {
-	owner:		THIS_MODULE,
-	name:		"Maxi Radio FM2000 radio",
-	type:		VID_TYPE_TUNER,
-	hardware:	VID_HARDWARE_SF16MI,
-	fops:           &maxiradio_fops,
+	.owner		= THIS_MODULE,
+	.name		= "Maxi Radio FM2000 radio",
+	.type		= VID_TYPE_TUNER,
+	.hardware	= VID_HARDWARE_SF16MI,
+	.fops           = &maxiradio_fops,
 };
 
 static struct radio_device
@@ -336,10 +336,10 @@ static struct pci_device_id maxiradio_pci_tbl[] __devinitdata = {
 MODULE_DEVICE_TABLE(pci, maxiradio_pci_tbl);
 
 static struct pci_driver maxiradio_driver = {
-	name:		"radio-maxiradio",
-	id_table:	maxiradio_pci_tbl,
-	probe:		maxiradio_init_one,
-	remove:		__devexit_p(maxiradio_remove_one),
+	.name		= "radio-maxiradio",
+	.id_table	= maxiradio_pci_tbl,
+	.probe		= maxiradio_init_one,
+	.remove		= __devexit_p(maxiradio_remove_one),
 };
 
 int __init maxiradio_radio_init(void)

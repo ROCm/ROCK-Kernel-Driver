@@ -92,7 +92,8 @@ static int fdomain_event(event_t event, int priority,
 static dev_link_t *fdomain_attach(void);
 static void fdomain_detach(dev_link_t *);
 
-static Scsi_Host_Template driver_template = FDOMAIN_16X0;
+#define driver_template fdomain_driver_template
+extern Scsi_Host_Template fdomain_driver_template;
 
 static dev_link_t *dev_list = NULL;
 

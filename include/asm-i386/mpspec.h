@@ -105,6 +105,7 @@ struct mpc_config_bus
 #define BUSTYPE_TC	"TC"
 #define BUSTYPE_VME	"VME"
 #define BUSTYPE_XPRESS	"XPRESS"
+#define BUSTYPE_NEC98	"NEC98"
 
 struct mpc_config_ioapic
 {
@@ -195,7 +196,8 @@ enum mp_bustype {
 	MP_BUS_ISA = 1,
 	MP_BUS_EISA,
 	MP_BUS_PCI,
-	MP_BUS_MCA
+	MP_BUS_MCA,
+	MP_BUS_NEC98
 };
 extern int mp_bus_id_to_type [MAX_MP_BUSSES];
 extern int mp_bus_id_to_node [MAX_MP_BUSSES];

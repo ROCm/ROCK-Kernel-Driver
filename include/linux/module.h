@@ -15,6 +15,7 @@
 #include <linux/cache.h>
 #include <linux/kmod.h>
 #include <linux/elf.h>
+#include <linux/stringify.h>
 
 #include <asm/module.h>
 #include <asm/uaccess.h> /* For struct exception_table_entry */
@@ -31,6 +32,11 @@
 #define MODULE_PARM_DESC(var,desc)
 #define print_modules()
 
+/* v850 toolchain uses a `_' prefix for all user symbols */
+#ifndef MODULE_SYMBOL_PREFIX
+#define MODULE_SYMBOL_PREFIX ""
+#endif
+
 #define MODULE_NAME_LEN (64 - sizeof(unsigned long))
 struct kernel_symbol
 {
@@ -40,11 +46,19 @@ struct kernel_symbol
 
 #ifdef MODULE
 
-#define MODULE_GENERIC_TABLE(gtype,name)	\
-static const unsigned long __module_##gtype##_size \
-  __attribute__ ((unused)) = sizeof(struct gtype##_id); \
-static const struct gtype##_id * __module_##gtype##_table \
-  __attribute__ ((unused)) = name
+#ifdef KBUILD_MODNAME
+static const char __module_name[MODULE_NAME_LEN] __attribute__((section(".gnu.linkonce.modname"))) = \
+  __stringify(KBUILD_MODNAME);
+#endif
+
+/* For replacement modutils, use an alias not a pointer. */
+#define MODULE_GENERIC_TABLE(gtype,name)			\
+static const unsigned long __module_##gtype##_size		\
+  __attribute__ ((unused)) = sizeof(struct gtype##_id);		\
+static const struct gtype##_id * __module_##gtype##_table	\
+  __attribute__ ((unused)) = name;				\
+extern const struct gtype##_id __mod_##gtype##_table		\
+  __attribute__ ((unused, alias(__stringify(name))))
 
 /* This is magically filled in by the linker, but THIS_MODULE must be
    a constant so it works in initializers. */
@@ -86,13 +100,13 @@ struct exception_table
 /* Get/put a kernel symbol (calls must be symmetric) */
 void *__symbol_get(const char *symbol);
 void *__symbol_get_gpl(const char *symbol);
-#define symbol_get(x) ((typeof(&x))(__symbol_get(#x)))
+#define symbol_get(x) ((typeof(&x))(__symbol_get(MODULE_SYMBOL_PREFIX #x)))
 
 /* For every exported symbol, place a struct in the __ksymtab section */
 #define EXPORT_SYMBOL(sym)				\
 	const struct kernel_symbol __ksymtab_##sym	\
 	__attribute__((section("__ksymtab")))		\
-	= { (unsigned long)&sym, #sym }
+	= { (unsigned long)&sym, MODULE_SYMBOL_PREFIX #sym }
 
 #define EXPORT_SYMBOL_NOVERS(sym) EXPORT_SYMBOL(sym)
 #define EXPORT_SYMBOL_GPL(sym) EXPORT_SYMBOL(sym)
@@ -166,7 +180,7 @@ struct module
 #ifdef CONFIG_MODULE_UNLOAD
 
 void __symbol_put(const char *symbol);
-#define symbol_put(x) __symbol_put(#x)
+#define symbol_put(x) __symbol_put(MODULE_SYMBOL_PREFIX #x)
 void symbol_put_addr(void *addr);
 
 /* We only need protection against local interrupts. */
@@ -306,12 +320,7 @@ extern int module_dummy_usage;
 /* Old-style "I'll just call it init_module and it'll be run at
    insert".  Use module_init(myroutine) instead. */
 #ifdef MODULE
-/* Used as "int init_module(void) { ... }".  Get funky to insert modname. */
-#define init_module(voidarg)						\
-	__initfn(void);							\
-	char __module_name[] __attribute__((section(".modulename"))) =	\
-	__stringify(KBUILD_MODNAME);					\
-	int __initfn(void)
+#define init_module(voidarg) __initfn(void)
 #define cleanup_module(voidarg) __exitfn(void)
 #endif
 

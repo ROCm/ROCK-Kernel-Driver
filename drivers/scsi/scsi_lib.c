@@ -7,18 +7,15 @@
  *                        of people at Linux Expo.
  */
 
-#include <linux/string.h>
-#include <linux/slab.h>
 #include <linux/bio.h>
-#include <linux/kernel.h>
 #include <linux/blk.h>
-#include <asm/hardirq.h>
-#include <linux/smp_lock.h>
 #include <linux/completion.h>
+#include <linux/kernel.h>
+#include <linux/slab.h>
 
 #include "scsi.h"
 #include "hosts.h"
-#include <scsi/scsi_ioctl.h>
+
 
 /*
  * Function:    scsi_insert_special_cmd()
@@ -665,7 +662,7 @@ static int scsi_init_io(Scsi_Cmnd *SCpnt)
 {
 	struct request     *req = SCpnt->request;
 	struct scatterlist *sgpnt;
-	int count, gfp_mask, ret = 0;
+	int count, ret = 0;
 
 	/*
 	 * if this is a rq->data based REQ_BLOCK_PC, setup for a non-sg xfer
@@ -685,16 +682,10 @@ static int scsi_init_io(Scsi_Cmnd *SCpnt)
 	 */
 	SCpnt->use_sg = req->nr_phys_segments;
 
-	gfp_mask = GFP_NOIO;
-	if (likely(in_atomic())) {
-		gfp_mask &= ~__GFP_WAIT;
-		gfp_mask |= __GFP_HIGH;
-	}
-
 	/*
 	 * if sg table allocation fails, requeue request later.
 	 */
-	sgpnt = scsi_alloc_sgtable(SCpnt, gfp_mask);
+	sgpnt = scsi_alloc_sgtable(SCpnt, GFP_ATOMIC);
 	if (unlikely(!sgpnt)) {
 		req->flags |= REQ_SPECIAL;
 		ret = BLKPREP_DEFER;

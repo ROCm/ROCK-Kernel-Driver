@@ -1970,16 +1970,16 @@ static void saa_close(struct video_device *dev)
 /* template for video_device-structure */
 static struct video_device saa_template =
 {
-	owner:		THIS_MODULE,
-	name:		"SAA7146A",
-	type:		VID_TYPE_CAPTURE | VID_TYPE_OVERLAY,
-	hardware:	VID_HARDWARE_SAA7146,
-	open:		saa_open,
-	close:		saa_close,
-	read:		saa_read,
-	write:		saa_write,
-	ioctl:		saa_ioctl,
-	mmap:		saa_mmap,
+	.owner		= THIS_MODULE,
+	.name		= "SAA7146A",
+	.type		= VID_TYPE_CAPTURE | VID_TYPE_OVERLAY,
+	.hardware	= VID_HARDWARE_SAA7146,
+	.open		= saa_open,
+	.close		= saa_close,
+	.read		= saa_read,
+	.write		= saa_write,
+	.ioctl		= saa_ioctl,
+	.mmap		= saa_mmap,
 };
 
 static int configure_saa7146(struct pci_dev *dev, int num)

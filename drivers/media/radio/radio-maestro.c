@@ -68,20 +68,20 @@ static int radio_ioctl(struct inode *inode, struct file *file,
 		       unsigned int cmd, unsigned long arg);
 
 static struct file_operations maestro_fops = {
-	owner:		THIS_MODULE,
-	open:           video_exclusive_open,
-	release:        video_exclusive_release,
-	ioctl:		radio_ioctl,
-	llseek:         no_llseek,
+	.owner		= THIS_MODULE,
+	.open           = video_exclusive_open,
+	.release        = video_exclusive_release,
+	.ioctl		= radio_ioctl,
+	.llseek         = no_llseek,
 };
 
 static struct video_device maestro_radio=
 {
-	owner:		THIS_MODULE,
-	name:		"Maestro radio",
-	type:		VID_TYPE_TUNER,
-	hardware:	VID_HARDWARE_SF16MI,
-	fops:           &maestro_fops,
+	.owner		= THIS_MODULE,
+	.name		= "Maestro radio",
+	.type		= VID_TYPE_TUNER,
+	.hardware	= VID_HARDWARE_SF16MI,
+	.fops           = &maestro_fops,
 };
 
 static struct radio_device

@@ -352,9 +352,9 @@ void tulip_select_media(struct net_device *dev, int startup)
 		if (tulip_media_cap[dev->if_port] & MediaIsMII) {
 			new_csr6 = 0x020E0000;
 		} else if (tulip_media_cap[dev->if_port] & MediaIsFx) {
-			new_csr6 = 0x028600000;
+			new_csr6 = 0x02860000;
 		} else
-			new_csr6 = 0x038600000;
+			new_csr6 = 0x03860000;
 		if (tulip_debug > 1)
 			printk(KERN_DEBUG "%s: No media description table, assuming "
 				   "%s transceiver, CSR12 %2.2x.\n",

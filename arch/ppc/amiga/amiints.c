@@ -310,14 +310,14 @@ static void ami_int7(int irq, void *dev_id, struct pt_regs *fp)
    and executes them in a loop. Having ami_badint at the end of the chain
    is a bad idea. */
 struct irqaction amiga_sys_irqaction[AUTO_IRQS] = {
-	{ handler: ami_badint, name: "spurious int" },
-	{ handler: ami_int1, name: "int1 handler" },
+	{ .handler = ami_badint, .name = "spurious int" },
+	{ .handler = ami_int1, .name = "int1 handler" },
 	{ 0, /* CIAA */ },
-	{ handler: ami_int3, name: "int3 handler" },
-	{ handler: ami_int4, name: "int4 handler" },
-	{ handler: ami_int5, name: "int5 handler" },
+	{ .handler = ami_int3, .name = "int3 handler" },
+	{ .handler = ami_int4, .name = "int4 handler" },
+	{ .handler = ami_int5, .name = "int5 handler" },
 	{ 0, /* CIAB */ },
-	{ handler: ami_int7, name: "int7 handler" },
+	{ .handler = ami_int7, .name = "int7 handler" },
 };
 #else
 void (*amiga_default_handler[SYS_IRQS])(int, void *, struct pt_regs *) = {

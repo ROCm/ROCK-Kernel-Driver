@@ -3783,21 +3783,21 @@ static int cpia_mmap(struct file *file, struct vm_area_struct *vma)
 }
 
 static struct file_operations cpia_fops = {
-	owner:		THIS_MODULE,
-	open:		cpia_open,
-	release:       	cpia_close,
-	read:		cpia_read,
-	mmap:		cpia_mmap,
-	ioctl:          cpia_ioctl,
-	llseek:         no_llseek,
+	.owner		= THIS_MODULE,
+	.open		= cpia_open,
+	.release       	= cpia_close,
+	.read		= cpia_read,
+	.mmap		= cpia_mmap,
+	.ioctl          = cpia_ioctl,
+	.llseek         = no_llseek,
 };
 
 static struct video_device cpia_template = {
-	owner:		THIS_MODULE,
-	name:		"CPiA Camera",
-	type:		VID_TYPE_CAPTURE,
-	hardware:	VID_HARDWARE_CPIA,
-	fops:           &cpia_fops,
+	.owner		= THIS_MODULE,
+	.name		= "CPiA Camera",
+	.type		= VID_TYPE_CAPTURE,
+	.hardware	= VID_HARDWARE_CPIA,
+	.fops           = &cpia_fops,
 };
 
 /* initialise cam_data structure  */

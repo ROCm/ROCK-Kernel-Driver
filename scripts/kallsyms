@@ -31,7 +31,7 @@ encode_symbols()
 }
 
 # FIXME: Use System.map as input, and regenerate each time in Makefile.
-$NM $1 | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > kallsyms.map
+$NM -n $1 | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > kallsyms.map
 
 encode_symbols kallsyms.map > kallsyms.c
 $CC $CFLAGS -c -o $2 kallsyms.c

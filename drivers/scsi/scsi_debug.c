@@ -155,6 +155,7 @@ static rwlock_t atomic_rw = RW_LOCK_UNLOCKED;
 static char sdebug_proc_name[] = "scsi_debug";
 static struct device_driver sdebug_driverfs_driver = {
 	.name = sdebug_proc_name,
+	.devclass = &shost_devclass,
 };
 
 /* function declarations */
@@ -1501,7 +1502,7 @@ static void sdebug_add_shost(int num)
 		printk(KERN_ERR "sdebug_add_shost: scsi_register failed\n");
 		return;
 	}
-	err = scsi_add_host(hpnt);
+	err = scsi_add_host(hpnt, scsi_debug_hosts[num].dev);
 	if (err) {
 		printk(KERN_ERR "sdebug_add_shost: scsi_add_host failed\n");
 		scsi_unregister(hpnt);

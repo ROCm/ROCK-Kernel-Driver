@@ -105,7 +105,6 @@ extern int mac89x0_probe(struct net_device *dev);
 extern int mc32_probe(struct net_device *dev);
   
 /* Detachable devices ("pocket adaptors") */
-extern int de600_probe(struct net_device *);
 extern int de620_probe(struct net_device *);
 
 /* FDDI adapters */
@@ -315,9 +314,6 @@ static struct devprobe isa_probes[] __initdata = {
 };
 
 static struct devprobe parport_probes[] __initdata = {
-#ifdef CONFIG_DE600		/* D-Link DE-600 adapter */
-	{de600_probe, 0},
-#endif
 #ifdef CONFIG_DE620		/* D-Link DE-620 adapter */
 	{de620_probe, 0},
 #endif
