@@ -458,6 +458,8 @@ islpci_mgt_transaction(struct net_device *ndev,
 	int err;
 	DEFINE_WAIT(wait);
 
+	*recvframe = NULL;
+
 	if (down_interruptible(&priv->mgmt_sem))
 		return -ERESTARTSYS;
 
