@@ -16,6 +16,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/version.h>
 #include <linux/compiler.h>
 #include <linux/cpu.h>
 #include <linux/errno.h>
