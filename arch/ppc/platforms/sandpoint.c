@@ -383,15 +383,6 @@ sandpoint_request_io(void)
 
 arch_initcall(sandpoint_request_io);
 
-static int __init
-sandpoint_request_cascade(void)
-{
-	openpic_hookup_cascade(NUM_8259_INTERRUPTS, "82c59 cascade",
-			i8259_irq);
-	return 0;
-}
-arch_initcall(sandpoint_request_cascade);
-
 /*
  * Interrupt setup and service.  Interrrupts on the Sandpoint come
  * from the four PCI slots plus the 8259 in the Winbond Super I/O (SIO).
@@ -407,6 +398,8 @@ sandpoint_init_IRQ(void)
 	OpenPIC_NumInitSenses = sizeof(sandpoint_openpic_initsenses);
 
 	mpc10x_set_openpic();
+	openpic_hookup_cascade(NUM_8259_INTERRUPTS, "82c59 cascade",
+			i8259_irq);
 
 	/*
 	 * openpic_init() has set up irq_desc[16-31] to be openpic

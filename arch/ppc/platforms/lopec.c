@@ -258,17 +258,6 @@ lopec_ide_init_hwif_ports(hw_regs_t *hw, unsigned long data,
 }
 #endif /* BLK_DEV_IDE */
 
-static int __init
-lopec_request_cascade(void)
-{
-	/* We have a cascade on OpenPIC IRQ 0, Linux IRQ 16 */
-	openpic_hookup_cascade(NUM_8259_INTERRUPTS, "82c59 cascade",
-			&i8259_irq);
-
-	return 0;
-}
-arch_initcall(lopec_request_cascade);
-
 static void __init
 lopec_init_IRQ(void)
 {
@@ -281,6 +270,10 @@ lopec_init_IRQ(void)
 	OpenPIC_NumInitSenses = sizeof(lopec_openpic_initsenses);
 
 	mpc10x_set_openpic();
+
+	/* We have a cascade on OpenPIC IRQ 0, Linux IRQ 16 */
+	openpic_hookup_cascade(NUM_8259_INTERRUPTS, "82c59 cascade",
+			&i8259_irq);
 
 	/* Map i8259 interrupts */
 	for(i = 0; i < NUM_8259_INTERRUPTS; i++)

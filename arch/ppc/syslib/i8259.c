@@ -13,7 +13,6 @@ unsigned char cached_8259[2] = { 0xff, 0xff };
 static spinlock_t i8259_lock = SPIN_LOCK_UNLOCKED;
 
 int i8259_pic_irq_offset;
-static int i8259_present;
 
 /*
  * Acknowledge the IRQ using either the PCI host bridge's interrupt
@@ -152,19 +151,12 @@ static struct resource pic_edgectrl_iores = {
 	"8259 edge control", 0x4d0, 0x4d1, IORESOURCE_BUSY
 };
 
-static int __init
-i8259_hook_cascade(void)
-{
-	if (!i8259_present)
-		return 0;
-
-	/* reserve our resources */
-	request_irq( i8259_pic_irq_offset + 2, no_action, SA_INTERRUPT,
-				"82c59 secondary cascade", NULL );
-	return 0;
-}
-
-arch_initcall(i8259_hook_cascade);
+static struct irqaction i8259_irqaction = {
+	.handler = no_action,
+	.flags = SA_INTERRUPT,
+	.mask = CPU_MASK_NONE,
+	.name = "82c59 secondary cascade",
+};
 
 /*
  * i8259_init()
@@ -199,12 +191,12 @@ i8259_init(long intack_addr)
 
 	spin_unlock_irqrestore(&i8259_lock, flags);
 
+	/* reserve our resources */
+	setup_irq( i8259_pic_irq_offset + 2, &i8259_irqaction);
 	request_resource(&ioport_resource, &pic1_iores);
 	request_resource(&ioport_resource, &pic2_iores);
 	request_resource(&ioport_resource, &pic_edgectrl_iores);
 
 	if (intack_addr != 0)
 		pci_intack = ioremap(intack_addr, 1);
-
-	i8259_present = 1;
 }
