@@ -40,12 +40,16 @@
 	
 	LK1.1.5 (val@nmt.edu):
 	* Fix forced full-duplex bug I introduced
+
+	LK1.1.6 (val@nmt.edu):
+	* Only print warning on truly "oversized" packets
+	* Fix theoretical bug on gigabit cards - return to 1.1.3 behavior
 	
 */
 
 #define DRV_NAME	"yellowfin"
-#define DRV_VERSION	"1.05+LK1.1.5"
-#define DRV_RELDATE	"May 10, 2001"
+#define DRV_VERSION	"1.05+LK1.1.6"
+#define DRV_RELDATE	"Feb 11, 2002"
 
 #define PFX DRV_NAME ": "
 
@@ -177,8 +181,8 @@ MODULE_PARM_DESC(gx_fix, "G-NIC: enable GX server chipset bug workaround (0-1)")
 I. Board Compatibility
 
 This device driver is designed for the Packet Engines "Yellowfin" Gigabit
-Ethernet adapter.  The only PCA currently supported is the G-NIC 64-bit
-PCI card.
+Ethernet adapter.  The G-NIC 64-bit PCI card is supported, as well as the 
+Symbios 53C885E dual function chip.
 
 II. Board-specific settings
 
@@ -260,7 +264,8 @@ enum pci_id_flags_bits {
 };
 enum capability_flags {
 	HasMII=1, FullTxStatus=2, IsGigabit=4, HasMulticastBug=8, FullRxStatus=16,
-	HasMACAddrBug=32, DontUseEeprom=64, /* Only on early revs.  */
+	HasMACAddrBug=32, /* Only on early revs.  */
+	DontUseEeprom=64, /* Don't read the MAC from the EEPROm. */
 };
 /* The PCI I/O space extent. */
 #define YELLOWFIN_SIZE 0x100
@@ -284,7 +289,7 @@ struct pci_id_info {
 static struct pci_id_info pci_id_tbl[] = {
 	{"Yellowfin G-NIC Gigabit Ethernet", { 0x07021000, 0xffffffff},
 	 PCI_IOTYPE, YELLOWFIN_SIZE,
-	 FullTxStatus | IsGigabit | HasMulticastBug | HasMACAddrBug},
+	 FullTxStatus | IsGigabit | HasMulticastBug | HasMACAddrBug | DontUseEeprom},
 	{"Symbios SYM83C885", { 0x07011000, 0xffffffff},
 	 PCI_IOTYPE, YELLOWFIN_SIZE, HasMII | DontUseEeprom },
 	{0,},
@@ -1126,8 +1131,9 @@ static int yellowfin_rx(struct net_device *dev)
 		if (--boguscnt < 0)
 			break;
 		if ( ! (desc_status & RX_EOP)) {
-			printk(KERN_WARNING "%s: Oversized Ethernet frame spanned multiple buffers,"
-				   " status %4.4x!\n", dev->name, desc_status);
+			if (data_size != 0)
+				printk(KERN_WARNING "%s: Oversized Ethernet frame spanned multiple buffers,"
+					   " status %4.4x, data_size %d!\n", dev->name, desc_status, data_size);
 			yp->stats.rx_length_errors++;
 		} else if ((yp->drv_flags & IsGigabit)  &&  (frame_status & 0x0038)) {
 			/* There was a error. */
