@@ -155,7 +155,7 @@
  * for zero-mapped memory areas etc..
  */
 extern unsigned long empty_zero_page[PAGE_SIZE/sizeof(unsigned long)];
-#define ZERO_PAGE(vaddr) (mem_map + MAP_NR(empty_zero_page))
+#define ZERO_PAGE(vaddr) (virt_to_page(empty_zero_page))
 #endif /* __ASSEMBLY__ */
 
 /* shift to put page number into pte */

@@ -392,38 +392,32 @@ __flush_tlb_range(struct mm_struct *mm, unsigned long start, unsigned long end)
 		flush_hash_range(context, i, local);
 }
 
-
-void __init free_initmem(void)
+void free_initmem(void)
 {
-	unsigned long a;
-	unsigned long num_freed_pages = 0;
-#define FREESEC(START,END,CNT) do { \
-	a = (unsigned long)(&START); \
-	for (; a < (unsigned long)(&END); a += PAGE_SIZE) { \
-	  	clear_bit(PG_reserved, &mem_map[MAP_NR(a)].flags); \
-		set_page_count(mem_map+MAP_NR(a), 1); \
-		free_page(a); \
-		CNT++; \
-	} \
-} while (0)
+	unsigned long addr;
 
-	FREESEC(__init_begin,__init_end,num_freed_pages);
-
-	printk ("Freeing unused kernel memory: %ldk init\n",
-		PGTOKB(num_freed_pages));
+	addr = (unsigned long)(&__init_begin);
+	for (; addr < (unsigned long)(&__init_end); addr += PAGE_SIZE) {
+		ClearPageReserved(virt_to_page(addr));
+		set_page_count(virt_to_page(addr), 1);
+		free_page(addr);
+		totalram_pages++;
+	}
+	printk ("Freeing unused kernel memory: %dk freed\n",
+		(&__init_end - &__init_begin) >> 10);
 }
 
 #ifdef CONFIG_BLK_DEV_INITRD
 void free_initrd_mem(unsigned long start, unsigned long end)
 {
-	unsigned long xstart = start;
+	if (start < end)
+		printk ("Freeing initrd memory: %ldk freed\n", (end - start) >> 10);
 	for (; start < end; start += PAGE_SIZE) {
-		ClearPageReserved(mem_map + MAP_NR(start));
-		set_page_count(mem_map+MAP_NR(start), 1);
+		ClearPageReserved(virt_to_page(start));
+		set_page_count(virt_to_page(start), 1);
 		free_page(start);
 		totalram_pages++;
 	}
-	printk ("Freeing initrd memory: %ldk freed\n", (end - xstart) >> 10);
 }
 #endif
 
@@ -572,11 +566,11 @@ void __init mem_init(void)
 		for (addr = (unsigned long)sysmap;
 		     addr < PAGE_ALIGN((unsigned long)sysmap+sysmap_size) ;
 		     addr += PAGE_SIZE)
-			SetPageReserved(mem_map + MAP_NR(addr));
+			SetPageReserved(virt_to_page(addr));
 	
 	for (addr = KERNELBASE; addr <= (unsigned long)__va(lmb_end_of_DRAM());
 	     addr += PAGE_SIZE) {
-		if (!PageReserved(mem_map + MAP_NR(addr)))
+		if (!PageReserved(virt_to_page(addr)))
 			continue;
 		if (addr < (ulong) etext)
 			codepages++;
