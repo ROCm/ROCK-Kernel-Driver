@@ -880,7 +880,7 @@ EXPORT_SYMBOL(agp_generic_free_by_type);
 void *agp_generic_alloc_page(void)
 {
 	struct page * page;
-	
+
 	page = alloc_page(GFP_KERNEL);
 	if (page == NULL)
 		return 0;
@@ -1003,11 +1003,11 @@ int agp3_generic_configure(void)
 	pci_read_config_dword(agp_bridge->dev, AGP_APBASE, &temp);
 	agp_bridge->gart_bus_addr = (temp & PCI_BASE_ADDRESS_MEM_MASK);
 
-	// set aperture size
+	/* set aperture size */
 	pci_write_config_word(agp_bridge->dev, agp_bridge->capndx+AGPAPSIZE, current_size->size_value);
-    // set gart pointer
+	/* set gart pointer */
 	pci_write_config_dword(agp_bridge->dev, agp_bridge->capndx+AGPGARTLO, agp_bridge->gatt_bus_addr);
-	// enable aperture and GTLB
+	/* enable aperture and GTLB */
 	pci_read_config_dword(agp_bridge->dev, agp_bridge->capndx+AGPCTRL, &temp);
 	pci_write_config_dword(agp_bridge->dev, agp_bridge->capndx+AGPCTRL, temp | AGPCTRL_APERENB | AGPCTRL_GTLBEN);
 	return 0;
