@@ -1303,23 +1303,26 @@ int ip6_pkt_discard_out(struct sk_buff **pskb)
 }
 
 /*
- *	Add address
+ *	Allocate a dst for local (unicast / anycast) address.
  */
 
-int ip6_rt_addr_add(struct in6_addr *addr, struct net_device *dev, int anycast)
+struct rt6_info *addrconf_dst_alloc(struct inet6_dev *idev,
+				    const struct in6_addr *addr,
+				    int anycast)
 {
 	struct rt6_info *rt = ip6_dst_alloc();
 
 	if (rt == NULL)
-		return -ENOMEM;
+		return ERR_PTR(-ENOMEM);
 
 	dev_hold(&loopback_dev);
+	in6_dev_hold(idev);
 
 	rt->u.dst.flags = DST_HOST;
 	rt->u.dst.input = ip6_input;
 	rt->u.dst.output = ip6_output;
 	rt->rt6i_dev = &loopback_dev;
-	rt->rt6i_idev = in6_dev_get(&loopback_dev);
+	rt->rt6i_idev = idev;
 	rt->u.dst.metrics[RTAX_MTU-1] = ipv6_get_mtu(rt->rt6i_dev);
 	rt->u.dst.metrics[RTAX_ADVMSS-1] = ipv6_advmss(dst_pmtu(&rt->u.dst));
 	rt->u.dst.metrics[RTAX_HOPLIMIT-1] = ipv6_get_hoplimit(rt->rt6i_dev);
@@ -1331,14 +1334,39 @@ int ip6_rt_addr_add(struct in6_addr *addr, struct net_device *dev, int anycast)
 	rt->rt6i_nexthop = ndisc_get_neigh(rt->rt6i_dev, &rt->rt6i_gateway);
 	if (rt->rt6i_nexthop == NULL) {
 		dst_free((struct dst_entry *) rt);
-		return -ENOMEM;
+		return ERR_PTR(-ENOMEM);
 	}
 
 	ipv6_addr_copy(&rt->rt6i_dst.addr, addr);
 	rt->rt6i_dst.plen = 128;
+
+	return rt;
+}
+
+/*
+ *	Add address
+ */
+
+int ip6_rt_addr_add(struct in6_addr *addr, struct net_device *dev, int anycast)
+{
+	struct inet6_dev *idev;
+	struct rt6_info *rt;
+	int err = 0;
+
+	idev = in6_dev_get(&loopback_dev);
+
+	rt = addrconf_dst_alloc(idev, addr, anycast);
+	if (IS_ERR(rt)) {
+		err = PTR_ERR(rt);
+		goto out;
+	}
+
 	ip6_ins_rt(rt, NULL, NULL);
 
-	return 0;
+out:
+	if (idev)
+		in6_dev_put(idev);
+	return err;
 }
 
 /* Delete address. Warning: you should check that this address

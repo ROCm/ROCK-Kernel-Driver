@@ -72,6 +72,10 @@ extern struct dst_entry *ndisc_dst_alloc(struct net_device *dev,
 extern int ndisc_dst_gc(int *more);
 extern void fib6_force_start_gc(void);
 
+extern struct rt6_info *addrconf_dst_alloc(struct inet6_dev *idev,
+					   const struct in6_addr *addr,
+					   int anycast);
+
 /*
  *	support functions for ND
  *
