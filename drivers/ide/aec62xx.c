@@ -1,6 +1,6 @@
 /*
  *
- * $Id: aec62xx.c,v 1.0 2002/05/24 14:37:19 vojtech Exp $
+ * aec62xx.c, v1.2 2002/05/24
  *
  *  Copyright (c) 2002 Vojtech Pavlik
  *
@@ -60,7 +60,9 @@
 #define AEC_PLLCLK_ATA133	0x10
 #define AEC_CABLEPINS_INPUT	0x10
 
-static unsigned char aec_cyc2udma[17] = { 0, 0, 7, 6, 5, 4, 4, 3, 3, 2, 2, 2, 2, 1, 1, 1, 1 };
+static unsigned char aec_cyc2udma[9] = { 5, 5, 5, 4, 3, 2, 2, 1, 1 };
+static unsigned char aec_cyc2act[16] = { 1, 1, 2, 3, 4, 5, 6, 0, 0, 7,  7,  7, 7,  7,  7,  7 };
+static unsigned char aec_cyc2rec[16] = { 1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 12, 13, 14 };
 
 /*
  * aec_set_speed_old() writes timing values to
@@ -71,8 +73,10 @@ static void aec_set_speed_old(struct pci_dev *dev, unsigned char dn, struct ata_
 {
 	unsigned char t;
 
-	pci_write_config_byte(dev, AEC_DRIVE_TIMING + (dn << 1),     FIT(timing->active, 0, 15));
-	pci_write_config_byte(dev, AEC_DRIVE_TIMING + (dn << 1) + 1, FIT(timing->recover, 0, 15));
+	pci_write_config_byte(dev, AEC_DRIVE_TIMING + (dn << 1),
+		aec_cyc2act[FIT(timing->active, 0, 15)]);
+	pci_write_config_byte(dev, AEC_DRIVE_TIMING + (dn << 1) + 1,
+		aec_cyc2rec[FIT(timing->recover, 0, 15)]);
 
 	pci_read_config_byte(dev, AEC_UDMA_OLD, &t);
 	t &= ~(3 << (dn << 1));
@@ -91,12 +95,19 @@ static void aec_set_speed_new(struct pci_dev *dev, unsigned char dn, struct ata_
 	unsigned char t;
 
 	pci_write_config_byte(dev, AEC_DRIVE_TIMING + dn,
-		(FIT(timing->active, 0, 15) << 4) | FIT(timing->recover, 0, 15));
+		(aec_cyc2act[FIT(timing->active, 0, 15)] << 4)
+		| aec_cyc2rec[FIT(timing->recover, 0, 15)]);
 
 	pci_read_config_byte(dev, AEC_UDMA_NEW + (dn >> 1), &t);
 	t &= ~(0xf << ((dn & 1) << 2));
-	if (timing->udma)
-		t |= aec_cyc2udma[FIT(timing->udma, 2, 16)] << ((dn & 1) << 2);
+	if (timing->udma) {
+		if (timing->udma >= 2)
+			t |= aec_cyc2udma[FIT(timing->udma, 2, 8)] << ((dn & 1) << 2);
+		if (timing->mode == XFER_UDMA_5)
+			t |= 6;
+		if (timing->mode == XFER_UDMA_6)
+			t |= 7;
+	}
 	pci_write_config_byte(dev, AEC_UDMA_NEW + (dn >> 1), t);
 }
 
@@ -120,9 +131,10 @@ static int aec_set_drive(struct ata_device *drive, unsigned char speed)
 				drive->dn >> 1, drive->dn & 1);
 
 	T = 1000000000 / system_bus_speed;
-	UT = T / (aec_old ? 1 : 4);
+	UT = T / (aec_old ? 1 : 2);
 
 	ata_timing_compute(drive, speed, &t, T, UT);
+	ata_timing_merge_8bit(&t);
 
 	if (aec_old)
 		aec_set_speed_old(drive->channel->pci_dev, drive->dn, &t);
