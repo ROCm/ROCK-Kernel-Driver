@@ -423,7 +423,12 @@ void __rfcomm_dlc_unthrottle(struct rfcomm_dlc *d)
 	rfcomm_schedule(RFCOMM_SCHED_TX);
 }
 
-int rfcomm_dlc_modem_status(struct rfcomm_dlc *d, int v24_sig)
+/* 
+   Set/get modem status functions use _local_ status i.e. what we report
+   to the other side.
+   Remote status is provided by dlc->modem_status() callback.
+ */
+int rfcomm_dlc_set_modem_status(struct rfcomm_dlc *d, u8 v24_sig)
 {
 	BT_DBG("dlc %p state %ld v24_sig 0x%x", 
 			d, d->state, v24_sig);
@@ -438,6 +443,15 @@ int rfcomm_dlc_modem_status(struct rfcomm_dlc *d, int v24_sig)
 	if (!test_and_set_bit(RFCOMM_MSC_PENDING, &d->flags))
 		rfcomm_schedule(RFCOMM_SCHED_TX);
 
+	return 0;
+}
+
+int rfcomm_dlc_get_modem_status(struct rfcomm_dlc *d, u8 *v24_sig)
+{
+	BT_DBG("dlc %p state %ld v24_sig 0x%x", 
+			d, d->state, d->v24_sig);
+
+	*v24_sig = d->v24_sig;
 	return 0;
 }
 

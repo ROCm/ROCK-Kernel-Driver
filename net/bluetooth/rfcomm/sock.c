@@ -109,12 +109,6 @@ static void rfcomm_sk_state_change(struct rfcomm_dlc *d, int err)
 	bh_unlock_sock(sk);
 }
 
-static void rfcomm_sk_modem_status(struct rfcomm_dlc *d, int v24_sig)
-{
-	BT_DBG("dlc %p v24_sig 0x%02x", d, v24_sig);
-	return;
-}
-
 /* ---- Socket functions ---- */
 static struct sock *__rfcomm_get_sock_by_addr(int channel, bdaddr_t *src)
 {
@@ -276,7 +270,6 @@ static struct sock *rfcomm_sock_alloc(struct socket *sock, int proto, int prio)
 	}
 	d->data_ready   = rfcomm_sk_data_ready;
 	d->state_change = rfcomm_sk_state_change;
-	d->modem_status = rfcomm_sk_modem_status;
 
 	rfcomm_pi(sk)->dlc = d;
 	d->owner = sk;

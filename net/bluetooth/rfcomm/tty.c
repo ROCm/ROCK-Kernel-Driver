@@ -64,6 +64,8 @@ struct rfcomm_dev {
 	bdaddr_t		dst;
 	u8 			channel;
 
+	uint 			modem_status;
+
 	struct rfcomm_dlc	*dlc;
 	struct tty_struct	*tty;
 	wait_queue_head_t       wait;
@@ -78,7 +80,7 @@ static rwlock_t rfcomm_dev_lock = RW_LOCK_UNLOCKED;
 
 static void rfcomm_dev_data_ready(struct rfcomm_dlc *dlc, struct sk_buff *skb);
 static void rfcomm_dev_state_change(struct rfcomm_dlc *dlc, int err);
-static void rfcomm_dev_modem_status(struct rfcomm_dlc *dlc, int v24_sig);
+static void rfcomm_dev_modem_status(struct rfcomm_dlc *dlc, u8 v24_sig);
 
 static void rfcomm_tty_wakeup(unsigned long arg);
 
@@ -489,11 +491,20 @@ static void rfcomm_dev_state_change(struct rfcomm_dlc *dlc, int err)
 	}
 }
 
-static void rfcomm_dev_modem_status(struct rfcomm_dlc *dlc, int v24_sig)
+static void rfcomm_dev_modem_status(struct rfcomm_dlc *dlc, u8 v24_sig)
 {
-	BT_DBG("dlc %p v24_sig 0x%02x", dlc, v24_sig);
-}
+	struct rfcomm_dev *dev = dlc->owner;
+	if (!dev)
+		return;
+	
+	BT_DBG("dlc %p dev %p v24_sig 0x%02x", dlc, dev, v24_sig);
 
+	dev->modem_status = 
+		(v24_sig & RFCOMM_V24_RTC) ? (TIOCM_DSR | TIOCM_DTR) : 0 |
+		(v24_sig & RFCOMM_V24_RTR) ? (TIOCM_RTS | TIOCM_CTS) : 0 |
+		(v24_sig & RFCOMM_V24_IC)  ? TIOCM_RI : 0 |
+		(v24_sig & RFCOMM_V24_DV)  ? TIOCM_CD : 0;
+}
 
 /* ---- TTY functions ---- */
 static void rfcomm_tty_wakeup(unsigned long arg)
@@ -642,11 +653,38 @@ static int rfcomm_tty_write_room(struct tty_struct *tty)
 	return dlc->mtu * (dlc->tx_credits ? : 10);
 }
 
+static int rfcomm_tty_set_modem_status(uint cmd, struct rfcomm_dlc *dlc, uint status)
+{
+	u8 v24_sig, mask;
+
+	BT_DBG("dlc %p cmd 0x%02x", dlc, cmd);
+
+	if (cmd == TIOCMSET)
+		v24_sig = 0;
+	else
+		rfcomm_dlc_get_modem_status(dlc, &v24_sig);
+
+	mask =  (status & TIOCM_DSR) ? RFCOMM_V24_RTC : 0 |
+		(status & TIOCM_DTR) ? RFCOMM_V24_RTC : 0 |
+		(status & TIOCM_RTS) ? RFCOMM_V24_RTR : 0 |
+		(status & TIOCM_CTS) ? RFCOMM_V24_RTR : 0 |
+		(status & TIOCM_RI)  ? RFCOMM_V24_IC  : 0 |
+		(status & TIOCM_CD)  ? RFCOMM_V24_DV  : 0;
+
+	if (cmd == TIOCMBIC)
+		v24_sig &= ~mask;
+	else
+		v24_sig |= mask;
+
+	rfcomm_dlc_set_modem_status(dlc, v24_sig);
+	return 0;
+}
+
 static int rfcomm_tty_ioctl(struct tty_struct *tty, struct file *filp, unsigned int cmd, unsigned long arg)
 {
 	struct rfcomm_dev *dev = (struct rfcomm_dev *) tty->driver_data;
 	struct rfcomm_dlc *dlc = dev->dlc;
-	unsigned int modeminfo;
+	uint status;
 	int err;
 
 	BT_DBG("tty %p cmd 0x%02x", tty, cmd);
@@ -663,34 +701,14 @@ static int rfcomm_tty_ioctl(struct tty_struct *tty, struct file *filp, unsigned 
 	case TIOCMGET:
 		BT_DBG("TIOCMGET");
 
-		modeminfo = ((dlc->v24_sig & RFCOMM_V24_RTC) ? TIOCM_DSR | TIOCM_DTR : 0)
-			  | ((dlc->v24_sig & RFCOMM_V24_RTR) ? TIOCM_RTS | TIOCM_CTS : 0)
-			  | ((dlc->v24_sig & RFCOMM_V24_IC) ? TIOCM_RI : 0)
-			  | ((dlc->v24_sig & RFCOMM_V24_DV) ? TIOCM_CD : 0);
+		return put_user(dev->modem_status, (unsigned int *)arg);
 
-		return put_user(modeminfo, (unsigned int *)arg);
-
-	case TIOCMBIS:
-		BT_DBG("TIOCMBIS");
-
-		if ((err = get_user(modeminfo, (unsigned int *)arg)))
+	case TIOCMSET: /* Turns on and off the lines as specified by the mask */
+	case TIOCMBIS: /* Turns on the lines as specified by the mask */
+	case TIOCMBIC: /* Turns off the lines as specified by the mask */
+		if ((err = get_user(status, (unsigned int *)arg)))
 			return err;
-
-		dlc->v24_sig |= (modeminfo & TIOCM_DSR) ? RFCOMM_V24_RTC : 0;
-		dlc->v24_sig |= (modeminfo & TIOCM_DTR) ? RFCOMM_V24_RTC : 0;
-		dlc->v24_sig |= (modeminfo & TIOCM_RTS) ? RFCOMM_V24_RTR : 0;
-		dlc->v24_sig |= (modeminfo & TIOCM_CTS) ? RFCOMM_V24_RTR : 0;
-		dlc->v24_sig |= (modeminfo & TIOCM_RI) ? RFCOMM_V24_IC : 0;
-		dlc->v24_sig |= (modeminfo & TIOCM_CD) ? RFCOMM_V24_DV : 0;
-
-		// rfcomm_send_msc(dlc->session, dlc->dlci, 1, dlc->v24_sig);
-
-		return 0;
-
-	case TIOCMBIC:
-	case TIOCMSET:
-		BT_DBG("set modem info");
-		break;
+		return rfcomm_tty_set_modem_status(cmd, dlc, status);
 
 	case TIOCMIWAIT:
 		BT_DBG("TIOCMIWAIT");

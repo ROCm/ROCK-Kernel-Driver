@@ -192,7 +192,7 @@ struct rfcomm_dlc {
 
 	void (*data_ready)(struct rfcomm_dlc *d, struct sk_buff *skb);
 	void (*state_change)(struct rfcomm_dlc *d, int err);
-	void (*modem_status)(struct rfcomm_dlc *d, int v24_sig);
+	void (*modem_status)(struct rfcomm_dlc *d, u8 v24_sig);
 };
 
 /* DLC and session flags */
@@ -231,7 +231,8 @@ void rfcomm_dlc_free(struct rfcomm_dlc *d);
 int  rfcomm_dlc_open(struct rfcomm_dlc *d, bdaddr_t *src, bdaddr_t *dst, u8 channel);
 int  rfcomm_dlc_close(struct rfcomm_dlc *d, int reason);
 int  rfcomm_dlc_send(struct rfcomm_dlc *d, struct sk_buff *skb);
-int  rfcomm_dlc_modem_status(struct rfcomm_dlc *d, int v24_sig);
+int  rfcomm_dlc_set_modem_status(struct rfcomm_dlc *d, u8 v24_sig);
+int  rfcomm_dlc_get_modem_status(struct rfcomm_dlc *d, u8 *v24_sig);
 
 #define rfcomm_dlc_lock(d)     spin_lock(&d->lock)
 #define rfcomm_dlc_unlock(d)   spin_unlock(&d->lock)
