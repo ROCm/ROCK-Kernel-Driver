@@ -814,15 +814,18 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 			}
 			if (pages) {
 				pages[i] = get_page_map(map);
-				if (!pages[i] || PageReserved(pages[i])) {
-					spin_unlock(&mm->page_table_lock);
-					while (i--)
-						page_cache_release(pages[i]);
-					i = -EFAULT;
-					goto out;
+				if (unlikely(!pages[i] || PageReserved(pages[i]))) {
+					if (pages[i] != ZERO_PAGE(start)) {
+						spin_unlock(&mm->page_table_lock);
+						while (i--)
+							page_cache_release(pages[i]);
+						i = -EFAULT;
+						goto out;
+					}
+				} else {
+					flush_dcache_page(pages[i]);
+					page_cache_get(pages[i]);
 				}
-				flush_dcache_page(pages[i]);
-				page_cache_get(pages[i]);
 			}
 			if (vmas)
 				vmas[i] = vma;
