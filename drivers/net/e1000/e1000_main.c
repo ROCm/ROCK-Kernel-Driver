@@ -937,12 +937,9 @@ e1000_configure_rx(struct e1000_adapter *adapter)
 
 	if(adapter->hw.mac_type >= e1000_82540) {
 		E1000_WRITE_REG(&adapter->hw, RADV, adapter->rx_abs_int_delay);
-
-		/* Set the interrupt throttling rate.  Value is calculated
-		 * as DEFAULT_ITR = 1/(MAX_INTS_PER_SEC * 256ns) */
-#define MAX_INTS_PER_SEC        8000
-#define DEFAULT_ITR             1000000000/(MAX_INTS_PER_SEC * 256)
-		E1000_WRITE_REG(&adapter->hw, ITR, DEFAULT_ITR);
+		if(adapter->itr > 1)
+			E1000_WRITE_REG(&adapter->hw, ITR,
+				1000000000 / (adapter->itr * 256));
 	}
 
 	/* Setup the Base and Length of the Rx Descriptor Ring */
@@ -1391,6 +1388,18 @@ e1000_watchdog(unsigned long data)
 		}
 	}
 
+	/* Dynamic mode for Interrupt Throttle Rate (ITR) */
+	if(adapter->hw.mac_type >= e1000_82540 && adapter->itr == 1) {
+		/* Symmetric Tx/Rx gets a reduced ITR=2000; Total
+		 * asymmetrical Tx or Rx gets ITR=8000; everyone
+		 * else is between 2000-8000. */
+		uint32_t goc = (adapter->gotcl + adapter->gorcl) / 10000;
+		uint32_t dif = (adapter->gotcl > adapter->gorcl ? 
+			adapter->gotcl - adapter->gorcl :
+			adapter->gorcl - adapter->gotcl) / 10000;
+		uint32_t itr = goc > 0 ? (dif * 6000 / goc + 2000) : 8000;
+		E1000_WRITE_REG(&adapter->hw, ITR, 1000000000 / (itr * 256));
+	}
 
 	/* Cause software interrupt to ensure rx ring is cleaned */
 	E1000_WRITE_REG(&adapter->hw, ICS, E1000_ICS_RXDMT0);
@@ -1811,7 +1820,8 @@ e1000_update_stats(struct e1000_adapter *adapter)
 
 	adapter->stats.crcerrs += E1000_READ_REG(hw, CRCERRS);
 	adapter->stats.gprc += E1000_READ_REG(hw, GPRC);
-	adapter->stats.gorcl += E1000_READ_REG(hw, GORCL);
+	adapter->gorcl = E1000_READ_REG(hw, GORCL);
+	adapter->stats.gorcl += adapter->gorcl;
 	adapter->stats.gorch += E1000_READ_REG(hw, GORCH);
 	adapter->stats.bprc += E1000_READ_REG(hw, BPRC);
 	adapter->stats.mprc += E1000_READ_REG(hw, MPRC);
@@ -1842,7 +1852,8 @@ e1000_update_stats(struct e1000_adapter *adapter)
 	adapter->stats.xofftxc += E1000_READ_REG(hw, XOFFTXC);
 	adapter->stats.fcruc += E1000_READ_REG(hw, FCRUC);
 	adapter->stats.gptc += E1000_READ_REG(hw, GPTC);
-	adapter->stats.gotcl += E1000_READ_REG(hw, GOTCL);
+	adapter->gotcl = E1000_READ_REG(hw, GOTCL);
+	adapter->stats.gotcl += adapter->gotcl;
 	adapter->stats.gotch += E1000_READ_REG(hw, GOTCH);
 	adapter->stats.rnbc += E1000_READ_REG(hw, RNBC);
 	adapter->stats.ruc += E1000_READ_REG(hw, RUC);

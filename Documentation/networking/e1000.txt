@@ -123,6 +123,20 @@ Default: Read flow control settings from the EEPROM
     This parameter controls the automatic generation(Tx) and response(Rx) to 
     Ethernet PAUSE frames.
 
+InterruptThrottleRate
+Valid Range: 100-100000 (0=off, 1=dynamic)
+Default Value: 1
+    This value represents the maximum number of interrupts per second the 
+    controller generates. InterruptThrottleRate is another setting used in 
+    interrupt moderation. Dynamic mode uses a heuristic algorithm to adjust 
+    InterruptThrottleRate based on the current traffic load.
+
+    NOTE: InterruptThrottleRate takes precedence over the TxAbsIntDelay and 
+          RxAbsIntDelay parameters. In other words, minimizing the receive 
+          and/or transmit absolute delays does not force the controller to 
+          generate more interrupts than what the Interrupt Throttle Rate 
+          allows.
+
 RxDescriptors
 Valid Range: 80-256 for 82542 and 82543-based adapters
              80-4096 for 82540, 82544, 82545, and 82546-based adapters

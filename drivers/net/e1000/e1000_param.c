@@ -183,6 +183,15 @@ E1000_PARAM(RxIntDelay, "Receive Interrupt Delay");
 
 E1000_PARAM(RxAbsIntDelay, "Receive Absolute Interrupt Delay");
 
+/* Interrupt Throttle Rate (interrupts/sec)
+ *
+ * Valid Range: 100-100000 (0=off, 1=dynamic)
+ *
+ * Default Value: 1
+ */
+
+E1000_PARAM(InterruptThrottleRate, "Interrupt Throttling Rate");
+
 #define AUTONEG_ADV_DEFAULT  0x2F
 #define AUTONEG_ADV_MASK     0x2F
 #define FLOW_CONTROL_DEFAULT FLOW_CONTROL_FULL
@@ -212,6 +221,10 @@ E1000_PARAM(RxAbsIntDelay, "Receive Absolute Interrupt Delay");
 #define DEFAULT_TADV                  64
 #define MAX_TXABSDELAY            0xFFFF
 #define MIN_TXABSDELAY                 0
+
+#define DEFAULT_ITR                    1
+#define MAX_ITR                   100000
+#define MIN_ITR                      100
 
 struct e1000_option {
 	enum { enable_option, range_option, list_option } type;
@@ -422,6 +435,27 @@ e1000_check_options(struct e1000_adapter *adapter)
 		adapter->rx_abs_int_delay = RxAbsIntDelay[bd];
 		e1000_validate_option(&adapter->rx_abs_int_delay, &opt);
 	}
+	{ /* Interrupt Throttling Rate */
+		struct e1000_option opt = {
+			.type = range_option,
+			.name = "Interrupt Throttling Rate (ints/sec)",
+			.err  = "using default of " __MODULE_STRING(DEFAULT_ITR),
+			.def  = DEFAULT_ITR,
+			.arg  = { .r = { .min = MIN_ITR,
+					 .max = MAX_ITR }}
+		};
+
+		adapter->itr = InterruptThrottleRate[bd];
+		if(adapter->itr == 0) {
+			printk(KERN_INFO "%s turned off\n", opt.name);
+		} else if(adapter->itr == 1 || adapter->itr == -1) {
+			/* Dynamic mode */
+			adapter->itr = 1;
+		} else {
+			e1000_validate_option(&adapter->itr, &opt);
+		}
+	}
+
 	switch(adapter->hw.media_type) {
 	case e1000_media_type_fiber:
 		e1000_check_fiber_options(adapter);

@@ -187,6 +187,7 @@ struct e1000_adapter {
 	uint32_t txd_cmd;
 	uint32_t tx_int_delay;
 	uint32_t tx_abs_int_delay;
+	uint32_t gotcl;
 	uint32_t tx_fifo_head;
 	uint32_t tx_head_addr;
 	uint32_t tx_fifo_size;
@@ -199,6 +200,10 @@ struct e1000_adapter {
 	uint32_t rx_int_delay;
 	uint32_t rx_abs_int_delay;
 	boolean_t rx_csum;
+	uint32_t gorcl;
+
+	/* Interrupt Throttle Rate */
+	uint32_t itr;
 
 	/* OS defined structs */
 	struct net_device *netdev;
