@@ -89,6 +89,7 @@ ia64_acpi_release_global_lock (unsigned int *lock)
 	((Acq) = ia64_acpi_release_global_lock((unsigned int *) GLptr))
 
 #define acpi_disabled 0	/* ACPI always enabled on IA64 */
+#define acpi_pci_disabled 0 /* ACPI PCI always enabled on IA64 */
 #define acpi_strict 1	/* no ACPI spec workarounds on IA64 */
 static inline void disable_acpi(void) { }
 

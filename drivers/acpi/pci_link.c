@@ -793,7 +793,7 @@ static int __init acpi_pci_link_init (void)
 {
 	ACPI_FUNCTION_TRACE("acpi_pci_link_init");
 
-	if (acpi_disabled)
+	if (acpi_pci_disabled)
 		return_VALUE(0);
 
 	acpi_link.count = 0;

@@ -531,12 +531,18 @@ static __init __attribute__((unused)) int force_acpi_ht(struct dmi_blacklist *d)
 #endif
 
 #ifdef	CONFIG_ACPI_PCI
+static __init int disable_acpi_irq(struct dmi_blacklist *d) 
+{ 
+	printk(KERN_NOTICE "%s detected: force use of acpi=noirq\n", d->ident); 	
+	acpi_noirq_set();
+	return 0;
+}
 static __init int disable_acpi_pci(struct dmi_blacklist *d) 
 { 
 	printk(KERN_NOTICE "%s detected: force use of pci=noacpi\n", d->ident); 	
-	acpi_noirq_set();
+	acpi_disable_pci();
 	return 0;
-} 
+}  
 #endif
 
 /*
@@ -951,13 +957,21 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 	 *	Boxes that need ACPI PCI IRQ routing disabled
 	 */
 
-	{ disable_acpi_pci, "ASUS A7V", {
+	{ disable_acpi_irq, "ASUS A7V", {
 			MATCH(DMI_BOARD_VENDOR, "ASUSTeK Computer INC"),
 			MATCH(DMI_BOARD_NAME, "<A7V>"),
 			/* newer BIOS, Revision 1011, does work */
 			MATCH(DMI_BIOS_VERSION, "ASUS A7V ACPI BIOS Revision 1007"),
 			NO_MATCH }},
 
+	/*
+	 *	Boxes that need ACPI PCI IRQ routing and PCI scan disabled
+	 */
+	{ disable_acpi_pci, "ASUS PR-DLS", {	/* _BBN 0 bug */
+			MATCH(DMI_BOARD_VENDOR, "ASUSTeK Computer INC."),
+			MATCH(DMI_BOARD_NAME, "PR-DLS"),
+			MATCH(DMI_BIOS_VERSION, "ASUS PR-DLS ACPI BIOS Revision 1010"),
+			MATCH(DMI_BIOS_DATE, "03/21/2003") }},
 #endif
 
 	{ NULL, }

@@ -596,9 +596,13 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 				disable_acpi();
 			acpi_ht = 1;
 		}
-
-		/* "pci=noacpi" disables ACPI interrupt routing */
+		
+		/* "pci=noacpi" disable ACPI IRQ routing and PCI scan */
 		else if (!memcmp(from, "pci=noacpi", 10)) {
+			acpi_disable_pci();
+		}
+		/* "acpi=noirq" disables ACPI interrupt routing */
+		else if (!memcmp(from, "acpi=noirq", 10)) {
 			acpi_noirq_set();
 		}
 

@@ -64,8 +64,8 @@ struct cpuinfo_x86 boot_cpu_data;
 unsigned long mmu_cr4_features;
 EXPORT_SYMBOL_GPL(mmu_cr4_features);
 
-int acpi_disabled = 0;
-
+int acpi_disabled;
+EXPORT_SYMBOL(acpi_disabled);
 #ifdef	CONFIG_ACPI_BOOT
 extern int __initdata acpi_ht;
 extern acpi_interrupt_flags	acpi_sci_flags;
@@ -217,7 +217,7 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 #ifdef CONFIG_ACPI_BOOT
 		/* "acpi=off" disables both ACPI table parsing and interpreter init */
 		if (!memcmp(from, "acpi=off", 8))
-			acpi_disabled = 1;
+			disable_acpi();
 
 		if (!memcmp(from, "acpi=force", 10)) { 
 			/* add later when we do DMI horrors: */
@@ -231,7 +231,9 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 			acpi_ht = 1; 
 		}
                 else if (!memcmp(from, "pci=noacpi", 10)) 
-                        acpi_noirq_set();
+			acpi_disable_pci();
+		else if (!memcmp(from, "acpi=noirq", 10))
+			acpi_noirq_set();
 
 		else if (!memcmp(from, "acpi_sci=edge", 13))
 			acpi_sci_flags.trigger =  1;

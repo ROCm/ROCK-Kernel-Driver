@@ -53,7 +53,13 @@ static inline int ioapic_setup_disabled(void) { return 0; }
 
 #define PREFIX			"ACPI: "
 
+#ifdef CONFIG_ACPI_PCI
 int acpi_noirq __initdata;	/* skip ACPI IRQ initialization */
+int acpi_pci_disabled __initdata; /* skip ACPI PCI scan and IRQ initialization */
+#else
+int acpi_noirq __initdata = 1;
+int acpi_pci_disabled __initdata = 1;
+#endif
 int acpi_ht __initdata = 1;	/* enable HT */
 
 int acpi_lapic;
