@@ -18,5 +18,3 @@ i810fb-objs                     += i810_gtf.o
 else
 i810fb-objs                     += i810_dvt.o
 endif
-
-include $(TOPDIR)/Rules.make
