@@ -639,7 +639,7 @@ setstack_hdlc(struct PStack *st, struct BCState *bcs)
 }
 
 void __init
-clear_pending_hdlc_ints(struct IsdnCardState *cs)
+inithdlc(struct IsdnCardState *cs)
 {
 	u_int val;
 
@@ -666,11 +666,7 @@ clear_pending_hdlc_ints(struct IsdnCardState *cs)
 		val = ReadHDLCPnP(cs, 1, HDLC_STATUS + 3);
 		debugl1(cs, "HDLC 2 VIN %x", val);
 	}
-}
 
-void __init
-inithdlc(struct IsdnCardState *cs)
-{
 	cs->bcs[0].BC_SetStack = setstack_hdlc;
 	cs->bcs[1].BC_SetStack = setstack_hdlc;
 	cs->bcs[0].BC_Close = close_hdlcstate;
@@ -731,9 +727,7 @@ AVM_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 			release_region(cs->hw.avm.cfg_reg, 32);
 			return(0);
 		case CARD_INIT:
-			clear_pending_isac_ints(cs);
 			initisac(cs);
-			clear_pending_hdlc_ints(cs);
 			inithdlc(cs);
 			outb(AVM_STATUS0_DIS_TIMER | AVM_STATUS0_RES_TIMER,
 				cs->hw.avm.cfg_reg + 2);

@@ -155,7 +155,6 @@ ISurf_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 			release_io_isurf(cs);
 			return(0);
 		case CARD_INIT:
-			clear_pending_isac_ints(cs);
 			writeb(0, cs->hw.isurf.isar+ISAR_IRQBIT);mb();
 			initisac(cs);
 			initisar(cs);

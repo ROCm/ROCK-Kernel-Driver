@@ -220,9 +220,20 @@ setstack_hscx(struct PStack *st, struct BCState *bcs)
 }
 
 void __init
-clear_pending_hscx_ints(struct IsdnCardState *cs)
+inithscx(struct IsdnCardState *cs)
 {
 	int val, eval;
+
+	cs->bcs[0].BC_SetStack = setstack_hscx;
+	cs->bcs[1].BC_SetStack = setstack_hscx;
+	cs->bcs[0].BC_Close = close_hscxstate;
+	cs->bcs[1].BC_Close = close_hscxstate;
+	cs->bcs[0].hw.hscx.hscx = 0;
+	cs->bcs[1].hw.hscx.hscx = 1;
+	cs->bcs[0].hw.hscx.tsaxr0 = 0x2f;
+	cs->bcs[0].hw.hscx.tsaxr1 = 3;
+	cs->bcs[1].hw.hscx.tsaxr0 = 0x2f;
+	cs->bcs[1].hw.hscx.tsaxr1 = 3;
 
 	val = cs->BC_Read_Reg(cs, 1, HSCX_ISTA);
 	debugl1(cs, "HSCX B ISTA %x", val);
@@ -243,21 +254,7 @@ clear_pending_hscx_ints(struct IsdnCardState *cs)
 	/* disable all IRQ */
 	cs->BC_Write_Reg(cs, 0, HSCX_MASK, 0xFF);
 	cs->BC_Write_Reg(cs, 1, HSCX_MASK, 0xFF);
-}
 
-void __init
-inithscx(struct IsdnCardState *cs)
-{
-	cs->bcs[0].BC_SetStack = setstack_hscx;
-	cs->bcs[1].BC_SetStack = setstack_hscx;
-	cs->bcs[0].BC_Close = close_hscxstate;
-	cs->bcs[1].BC_Close = close_hscxstate;
-	cs->bcs[0].hw.hscx.hscx = 0;
-	cs->bcs[1].hw.hscx.hscx = 1;
-	cs->bcs[0].hw.hscx.tsaxr0 = 0x2f;
-	cs->bcs[0].hw.hscx.tsaxr1 = 3;
-	cs->bcs[1].hw.hscx.tsaxr0 = 0x2f;
-	cs->bcs[1].hw.hscx.tsaxr1 = 3;
 	modehscx(cs->bcs, 0, 0);
 	modehscx(cs->bcs + 1, 0, 0);
 }
@@ -266,8 +263,6 @@ void __init
 inithscxisac(struct IsdnCardState *cs, int part)
 {
 	if (part & 1) {
-		clear_pending_isac_ints(cs);
-		clear_pending_hscx_ints(cs);
 		initisac(cs);
 		inithscx(cs);
 	}

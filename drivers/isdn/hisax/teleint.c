@@ -242,7 +242,6 @@ TeleInt_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 			return(0);
 		case CARD_INIT:
 			inithfc(cs);
-			clear_pending_isac_ints(cs);
 			initisac(cs);
 			/* Reenable all IRQ */
 			cs->writeisac(cs, ISAC_MASK, 0);

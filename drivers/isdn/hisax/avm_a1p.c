@@ -224,8 +224,6 @@ AVM_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 
 		case CARD_INIT:
 			byteout(cs->hw.avm.cfg_reg+ASL0_OFFSET,ASL0_W_TDISABLE|ASL0_W_TRESET|ASL0_W_IRQENABLE);
-			clear_pending_isac_ints(cs);
-			clear_pending_hscx_ints(cs);
 			inithscxisac(cs, 1);
 			inithscxisac(cs, 2);
 			return 0;
