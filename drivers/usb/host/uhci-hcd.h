@@ -338,9 +338,6 @@ struct urb_priv {
 	struct urb *urb;
 	struct usb_device *dev;
 
-	dma_addr_t setup_packet_dma_handle;
-	dma_addr_t transfer_buffer_dma_handle;
-
 	struct uhci_qh *qh;		/* QH for this URB */
 	struct list_head td_list;	/* P: urb->lock */
 
