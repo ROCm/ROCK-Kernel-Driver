@@ -53,7 +53,6 @@
 #include <asm/mpspec.h>
 #include <asm/mmu_context.h>
 #include <asm/bootsetup.h>
-#include <asm/smp.h>
 #include <asm/proto.h>
 #include <asm/setup.h>
 #include <asm/mach_apic.h>

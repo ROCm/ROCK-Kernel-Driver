@@ -125,7 +125,7 @@ static int op_ppc64_create_files(struct super_block *sb, struct dentry *root)
 	return 0;
 }
 
-void __init oprofile_arch_init(struct oprofile_operations *ops)
+int __init oprofile_arch_init(struct oprofile_operations *ops)
 {
 	unsigned int pvr;
 
@@ -170,7 +170,7 @@ void __init oprofile_arch_init(struct oprofile_operations *ops)
 			break;
 
 		default:
-			return;
+			return -ENODEV;
 	}
 
 	ops->create_files = op_ppc64_create_files;
@@ -181,6 +181,8 @@ void __init oprofile_arch_init(struct oprofile_operations *ops)
 
 	printk(KERN_INFO "oprofile: using %s performance monitoring.\n",
 	       ops->cpu_type);
+
+	return 0;
 }
 
 void oprofile_arch_exit(void)

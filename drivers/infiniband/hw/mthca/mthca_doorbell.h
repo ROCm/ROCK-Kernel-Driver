@@ -32,9 +32,7 @@
  * $Id: mthca_doorbell.h 1349 2004-12-16 21:09:43Z roland $
  */
 
-#include <linux/config.h>
 #include <linux/types.h>
-#include <linux/preempt.h>
 
 #define MTHCA_RD_DOORBELL      0x00
 #define MTHCA_SEND_DOORBELL    0x10
@@ -59,51 +57,13 @@ static inline void mthca_write64(u32 val[2], void __iomem *dest,
 	__raw_writeq(*(u64 *) val, dest);
 }
 
-#elif defined(CONFIG_INFINIBAND_MTHCA_SSE_DOORBELL)
-/* Use SSE to write 64 bits atomically without a lock. */
-
-#define MTHCA_DECLARE_DOORBELL_LOCK(name)
-#define MTHCA_INIT_DOORBELL_LOCK(ptr)    do { } while (0)
-#define MTHCA_GET_DOORBELL_LOCK(ptr)      (NULL)
-
-static inline unsigned long mthca_get_fpu(void)
-{
-	unsigned long cr0;
-
-	preempt_disable();
-	asm volatile("mov %%cr0,%0; clts" : "=r" (cr0));
-	return cr0;
-}
-
-static inline void mthca_put_fpu(unsigned long cr0)
-{
-	asm volatile("mov %0,%%cr0" : : "r" (cr0));
-	preempt_enable();
-}
-
-static inline void mthca_write64(u32 val[2], void __iomem *dest,
-				 spinlock_t *doorbell_lock)
-{
-	/* i386 stack is aligned to 8 bytes, so this should be OK: */
-	u8 xmmsave[8] __attribute__((aligned(8)));
-	unsigned long cr0;
-
-	cr0 = mthca_get_fpu();
-
-	asm volatile (
-		"movlps %%xmm0,(%0); \n\t"
-		"movlps (%1),%%xmm0; \n\t"
-		"movlps %%xmm0,(%2); \n\t"
-		"movlps (%0),%%xmm0; \n\t"
-		:
-		: "r" (xmmsave), "r" (val), "r" (dest)
-		: "memory" );
-
-	mthca_put_fpu(cr0);
-}
-
 #else
-/* Just fall back to a spinlock to protect the doorbell */
+
+/*
+ * Just fall back to a spinlock to protect the doorbell if
+ * BITS_PER_LONG is 32 -- there's no portable way to do atomic 64-bit
+ * MMIO writes.
+ */
 
 #define MTHCA_DECLARE_DOORBELL_LOCK(name) spinlock_t name;
 #define MTHCA_INIT_DOORBELL_LOCK(ptr)     spin_lock_init(ptr)

@@ -6,7 +6,7 @@
  * Laboratoire MASI - Institut Blaise Pascal
  * Universite Pierre et Marie Curie (Paris VI)
  *
- *  Enhanced block allocation by Stephen Tweedie (sct@dcs.ed.ac.uk), 1993
+ *  Enhanced block allocation by Stephen Tweedie (sct@redhat.com), 1993
  *  Big-endian to little-endian byte-swapping/bitmaps by
  *        David S. Miller (davem@caip.rutgers.edu), 1995
  */
@@ -52,9 +52,9 @@ struct ext2_group_desc * ext2_get_group_desc(struct super_block * sb,
 
 		return NULL;
 	}
-	
-	group_desc = block_group / EXT2_DESC_PER_BLOCK(sb);
-	offset = block_group % EXT2_DESC_PER_BLOCK(sb);
+
+	group_desc = block_group >> EXT2_DESC_PER_BLOCK_BITS(sb);
+	offset = block_group & (EXT2_DESC_PER_BLOCK(sb) - 1);
 	if (!sbi->s_group_desc[group_desc]) {
 		ext2_error (sb, "ext2_get_group_desc",
 			    "Group descriptor not loaded - "
@@ -62,7 +62,7 @@ struct ext2_group_desc * ext2_get_group_desc(struct super_block * sb,
 			     block_group, group_desc, offset);
 		return NULL;
 	}
-	
+
 	desc = (struct ext2_group_desc *) sbi->s_group_desc[group_desc]->b_data;
 	if (bh)
 		*bh = sbi->s_group_desc[group_desc];
@@ -236,12 +236,12 @@ do_more:
 
 	for (i = 0, group_freed = 0; i < count; i++) {
 		if (!ext2_clear_bit_atomic(sb_bgl_lock(sbi, block_group),
-					bit + i, (void *) bitmap_bh->b_data))
-			ext2_error (sb, "ext2_free_blocks",
-				      "bit already cleared for block %lu",
-				      block + i);
-		else
+						bit + i, bitmap_bh->b_data)) {
+			ext2_error(sb, __FUNCTION__,
+				"bit already cleared for block %lu", block + i);
+		} else {
 			group_freed++;
+		}
 	}
 
 	mark_buffer_dirty(bitmap_bh);
@@ -569,25 +569,24 @@ unsigned long ext2_count_free_blocks (struct super_block * sb)
 static inline int
 block_in_use(unsigned long block, struct super_block *sb, unsigned char *map)
 {
-	return ext2_test_bit ((block - le32_to_cpu(EXT2_SB(sb)->s_es->s_first_data_block)) %
+	return ext2_test_bit ((block -
+		le32_to_cpu(EXT2_SB(sb)->s_es->s_first_data_block)) %
 			 EXT2_BLOCKS_PER_GROUP(sb), map);
 }
 
 static inline int test_root(int a, int b)
 {
-	if (a == 0)
-		return 1;
-	while (1) {
-		if (a == 1)
-			return 1;
-		if (a % b)
-			return 0;
-		a = a / b;
-	}
+	int num = b;
+
+	while (a > num)
+		num *= b;
+	return num == a;
 }
 
 static int ext2_group_sparse(int group)
 {
+	if (group <= 1)
+		return 1;
 	return (test_root(group, 3) || test_root(group, 5) ||
 		test_root(group, 7));
 }

@@ -9,7 +9,7 @@
 #ifdef CONFIG_FB_MATROX_MYSTIQUE
 extern struct matrox_switch matrox_mystique;
 #endif
-#ifdef CONFIG_FB_MATROX_G100
+#ifdef CONFIG_FB_MATROX_G
 extern struct matrox_switch matrox_G100;
 #endif
 #ifdef NEED_DAC1064

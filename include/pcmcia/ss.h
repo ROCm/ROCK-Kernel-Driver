@@ -81,7 +81,7 @@ typedef struct pccard_io_map {
     u_char	map;
     u_char	flags;
     u_short	speed;
-    ioaddr_t	start, stop;
+    kio_addr_t	start, stop;
 } pccard_io_map;
 
 typedef struct pccard_mem_map {
@@ -144,8 +144,8 @@ struct pcmcia_socket;
 
 typedef struct io_window_t {
 	u_int			Attributes;
-	ioaddr_t		BasePort, NumPorts;
-	ioaddr_t		InUse, Config;
+	kio_addr_t		BasePort, NumPorts;
+	kio_addr_t		InUse, Config;
 	struct resource		*res;
 } io_window_t;
 
@@ -165,7 +165,6 @@ typedef struct window_t {
 #define MAX_WIN 4
 
 struct config_t;
-struct region_t;
 struct pcmcia_callback;
 
 
@@ -185,7 +184,6 @@ struct pcmcia_socket {
 	} irq;
 	io_window_t			io[MAX_IO_WIN];
 	window_t			win[MAX_WIN];
-	struct region_t			*c_region, *a_region;
 	struct list_head		cis_cache;
 	u_int				fake_cis_len;
 	char				*fake_cis;
@@ -201,7 +199,7 @@ struct pcmcia_socket {
 	u_int				features;
 	u_int				irq_mask;
 	u_int				map_size;
-	ioaddr_t			io_offset;
+	kio_addr_t			io_offset;
 	u_char				pci_irq;
 	struct pci_dev *		cb_dev;
 

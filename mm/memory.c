@@ -1558,7 +1558,7 @@ void unmap_mapping_range(struct address_space *mapping,
 	spin_lock(&mapping->i_mmap_lock);
 
 	/* serialize i_size write against truncate_count write */
-	smp_wmb(); 
+	smp_wmb();
 	/* Protect against page faults, and endless unmapping loops */
 	mapping->truncate_count++;
 	/*

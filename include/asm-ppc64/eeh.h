@@ -20,28 +20,28 @@
 #ifndef _PPC64_EEH_H
 #define _PPC64_EEH_H
 
+#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/list.h>
 #include <linux/string.h>
-#include <linux/notifier.h>
 
 struct pci_dev;
 struct device_node;
+struct device_node;
+struct notifier_block;
+
+#ifdef CONFIG_EEH
 
 /* Values for eeh_mode bits in device_node */
 #define EEH_MODE_SUPPORTED	(1<<0)
 #define EEH_MODE_NOCHECK	(1<<1)
 #define EEH_MODE_ISOLATED	(1<<2)
 
-#ifdef CONFIG_PPC_PSERIES
-extern void __init eeh_init(void);
-unsigned long eeh_check_failure(const volatile void __iomem *token, unsigned long val);
-int eeh_dn_check_failure (struct device_node *dn, struct pci_dev *dev);
-void __iomem *eeh_ioremap(unsigned long addr, void __iomem *vaddr);
+void __init eeh_init(void);
+unsigned long eeh_check_failure(const volatile void __iomem *token,
+				unsigned long val);
+int eeh_dn_check_failure(struct device_node *dn, struct pci_dev *dev);
 void __init pci_addr_cache_build(void);
-#else
-#define eeh_check_failure(token, val) (val)
-#endif
 
 /**
  * eeh_add_device_early
@@ -52,7 +52,6 @@ void __init pci_addr_cache_build(void);
  * device (including config space i/o).  Call eeh_add_device_late
  * to finish the eeh setup for this device.
  */
-struct device_node;
 void eeh_add_device_early(struct device_node *);
 void eeh_add_device_late(struct pci_dev *);
 
@@ -69,8 +68,6 @@ void eeh_remove_device(struct pci_dev *);
 #define EEH_ENABLE		1
 #define EEH_RELEASE_LOADSTORE	2
 #define EEH_RELEASE_DMA		3
-int eeh_set_option(struct pci_dev *dev, int options);
-
 
 /**
  * Notifier event flags.
@@ -106,6 +103,18 @@ int eeh_unregister_notifier(struct notifier_block *nb);
  * bytes: 1, 2, or 4) for comparing with the result of a read.
  */
 #define EEH_IO_ERROR_VALUE(size)	(~0U >> ((4 - (size)) * 8))
+
+#else
+#define eeh_init()
+#define eeh_check_failure(token, val) (val)
+#define eeh_dn_check_failure(dn, dev) (0)
+#define pci_addr_cache_build()
+#define eeh_add_device_early(dn)
+#define eeh_add_device_late(dev)
+#define eeh_remove_device(dev)
+#define EEH_POSSIBLE_ERROR(val, type) (0)
+#define EEH_IO_ERROR_VALUE(size) (-1UL)
+#endif
 
 /* 
  * MMIO read/write operations with EEH support.
@@ -194,7 +203,8 @@ static inline void eeh_raw_writeq(u64 val, volatile void __iomem *addr)
 #define EEH_CHECK_ALIGN(v,a) \
 	((((unsigned long)(v)) & ((a) - 1)) == 0)
 
-static inline void eeh_memset_io(volatile void __iomem *addr, int c, unsigned long n)
+static inline void eeh_memset_io(volatile void __iomem *addr, int c,
+				 unsigned long n)
 {
 	u32 lc = c;
 	lc |= lc << 8;

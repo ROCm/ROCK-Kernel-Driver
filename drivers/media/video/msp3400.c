@@ -380,7 +380,7 @@ static void msp3400c_setvolume(struct i2c_client *client,
 	int val = 0, bal = 0;
 
 	if (!muted) {
-		val = (volume * 0x73 / 65535) << 8;
+		val = (volume * 0x7F / 65535) << 8;
 	}
 	if (val) {
 		bal = (balance / 256) - 128;

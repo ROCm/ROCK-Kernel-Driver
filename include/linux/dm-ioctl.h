@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2001 - 2003 Sistina Software (UK) Limited.
- * Copyright (C) 2004 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2004 - 2005 Red Hat, Inc. All rights reserved.
  *
  * This file is released under the LGPL.
  */
@@ -272,9 +272,9 @@ typedef char ioctl_struct[308];
 #define DM_TARGET_MSG	 _IOWR(DM_IOCTL, DM_TARGET_MSG_CMD, struct dm_ioctl)
 
 #define DM_VERSION_MAJOR	4
-#define DM_VERSION_MINOR	3
+#define DM_VERSION_MINOR	4
 #define DM_VERSION_PATCHLEVEL	0
-#define DM_VERSION_EXTRA	"-ioctl (2004-09-30)"
+#define DM_VERSION_EXTRA	"-ioctl (2005-01-12)"
 
 /* Status bits */
 #define DM_READONLY_FLAG	(1 << 0) /* In/Out */
@@ -299,5 +299,10 @@ typedef char ioctl_struct[308];
  * results.
  */
 #define DM_BUFFER_FULL_FLAG	(1 << 8) /* Out */
+
+/*
+ * Set this to improve performance when you aren't going to use open_count
+ */
+#define DM_SKIP_BDGET_FLAG	(1 << 9) /* In */
 
 #endif				/* _LINUX_DM_IOCTL_H */

@@ -27,17 +27,22 @@
 #include <linux/moduleparam.h>
 
 /* debug */
-#ifdef CONFIG_DVB_DIBCOM_DEBUG
-int debug;
-module_param(debug, int, 0644);
-MODULE_PARM_DESC(debug, "set debugging level (1=info,2=xfer,4=alotmore,8=ts,16=err,32=rc (|-able)).");
-#endif
+int dvb_dibusb_debug;
+module_param_named(debug, dvb_dibusb_debug,  int, 0644);
 
-int pid_parse;
+#ifdef CONFIG_DVB_DIBCOM_DEBUG
+#define DBSTATUS ""
+#else
+#define DBSTATUS " (debugging is not enabled)"
+#endif
+MODULE_PARM_DESC(debug, "set debugging level (1=info,2=xfer,4=alotmore,8=ts,16=err,32=rc (|-able))." DBSTATUS);
+#undef DBSTATUS
+
+static int pid_parse;
 module_param(pid_parse, int, 0644);
 MODULE_PARM_DESC(pid_parse, "enable pid parsing (filtering) when running at USB2.0");
 
-int rc_query_interval;
+static int rc_query_interval;
 module_param(rc_query_interval, int, 0644);
 MODULE_PARM_DESC(rc_query_interval, "interval in msecs for remote control query (default: 100; min: 40)");
 
@@ -409,6 +414,10 @@ static int dibusb_probe(struct usb_interface *intf,
 		
 		dib->udev = udev;
 		dib->dibdev = dibdev;
+
+		/* store parameters to structures */
+		dib->rc_query_interval = rc_query_interval;
+		dib->pid_parse = pid_parse;
 
 		usb_set_intfdata(intf, dib);
 		

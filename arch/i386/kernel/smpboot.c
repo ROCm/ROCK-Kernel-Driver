@@ -386,8 +386,6 @@ void __init smp_callin(void)
 	setup_local_APIC();
 	map_cpu_to_logical_apicid();
 
-	local_irq_enable();
-
 	/*
 	 * Get our bogomips.
 	 */
@@ -400,7 +398,7 @@ void __init smp_callin(void)
  	smp_store_cpu_info(cpuid);
 
 	disable_APIC_timer();
-	local_irq_disable();
+
 	/*
 	 * Allow the master to continue.
 	 */
@@ -447,6 +445,10 @@ static void __init start_secondary(void *unused)
 	 */
 	local_flush_tlb();
 	cpu_set(smp_processor_id(), cpu_online_map);
+
+	/* We can take interrupts now: we're officially "up". */
+	local_irq_enable();
+
 	wmb();
 	cpu_idle();
 }

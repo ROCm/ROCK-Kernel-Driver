@@ -1,4 +1,7 @@
 /*
+ * Modified in order to keep it compatible both with new and old videotext IOCTLs by
+ * Michael Geng <linux@MichaelGeng.de>
+ *
  *	Cleaned up to use existing videodev interface and allow the idea
  *	of multiple teletext decoders on the video4linux iface. Changed i2c
  *	to cover addressing clashes on device busses. It's also rebuilt so
@@ -58,7 +61,7 @@
 #include <asm/uaccess.h>
 
 #define VTX_VER_MAJ 1
-#define VTX_VER_MIN 7
+#define VTX_VER_MIN 8
 
 
 
@@ -578,6 +581,54 @@ static int do_saa5249_ioctl(struct inode *inode, struct file *file,
 }
 
 /*
+ * Translates old vtx IOCTLs to new ones
+ *
+ * This keeps new kernel versions compatible with old userspace programs.
+ */
+static inline unsigned int vtx_fix_command(unsigned int cmd)
+{
+	switch (cmd) {
+	case VTXIOCGETINFO_OLD:
+		cmd = VTXIOCGETINFO;
+		break;
+	case VTXIOCCLRPAGE_OLD:
+		cmd = VTXIOCCLRPAGE;
+		break;
+	case VTXIOCCLRFOUND_OLD:
+		cmd = VTXIOCCLRFOUND;
+		break;
+	case VTXIOCPAGEREQ_OLD:
+		cmd = VTXIOCPAGEREQ;
+		break;
+	case VTXIOCGETSTAT_OLD:
+		cmd = VTXIOCGETSTAT;
+		break;
+	case VTXIOCGETPAGE_OLD:
+		cmd = VTXIOCGETPAGE;
+		break;
+	case VTXIOCSTOPDAU_OLD:
+		cmd = VTXIOCSTOPDAU;
+		break;
+	case VTXIOCPUTPAGE_OLD:
+		cmd = VTXIOCPUTPAGE;
+		break;
+	case VTXIOCSETDISP_OLD:
+		cmd = VTXIOCSETDISP;
+		break;
+	case VTXIOCPUTSTAT_OLD:
+		cmd = VTXIOCPUTSTAT;
+		break;
+	case VTXIOCCLRCACHE_OLD:
+		cmd = VTXIOCCLRCACHE;
+		break;
+	case VTXIOCSETVIRT_OLD:
+		cmd = VTXIOCSETVIRT;
+		break;
+	}
+	return cmd;
+}
+
+/*
  *	Handle the locking
  */
  
@@ -588,6 +639,7 @@ static int saa5249_ioctl(struct inode *inode, struct file *file,
 	struct saa5249_device *t=vd->priv;
 	int err;
 	
+	cmd = vtx_fix_command(cmd);
 	down(&t->lock);
 	err = video_usercopy(inode,file,cmd,arg,do_saa5249_ioctl);
 	up(&t->lock);

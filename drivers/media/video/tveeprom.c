@@ -1,4 +1,4 @@
-/* 
+/*
  * tveeprom - eeprom decoder for tvcard configuration eeproms
  *
  * Data and decoding routines shamelessly borrowed from bttv-cards.c
@@ -10,7 +10,7 @@
     (c) 1999-2001 Gerd Knorr <kraxel@goldbach.in-berlin.de>
 
  * Adjustments to fit a more general model and all bugs:
- 
+
  	Copyright (C) 2003 John Klar <linpvr at projectplasma.com>
 
  * This program is free software; you can redistribute it and/or modify
@@ -73,7 +73,7 @@ hauppauge_tuner_fmt[] =
 	{ 0x00000007, "PAL(B/G)" },
 	{ 0x00001000, "NTSC(M)" },
 	{ 0x00000010, "PAL(I)" },
-	{ 0x00400000, "SECAM(L/L´)" },
+	{ 0x00400000, "SECAM(L/Lï¿½)" },
 	{ 0x00000e00, "PAL(D/K)" },
 	{ 0x03000000, "ATSC Digital" },
 };
@@ -82,12 +82,12 @@ hauppauge_tuner_fmt[] =
    supplying this information. Note that many tuners where only used for
    testing and never made it to the outside world. So you will only see
    a subset in actual produced cards. */
-static struct HAUPPAUGE_TUNER 
+static struct HAUPPAUGE_TUNER
 {
 	int  id;
 	char *name;
-} 
-hauppauge_tuner[] = 
+}
+hauppauge_tuner[] =
 {
 	/* 0-9 */
 	{ TUNER_ABSENT,        "None" },
@@ -142,7 +142,7 @@ hauppauge_tuner[] =
 	{ TUNER_ABSENT,        "Philips TD1536D FH 44"},
 	{ TUNER_LG_NTSC_FM,    "LG TP18NSR01F"},
 	{ TUNER_LG_PAL_FM,     "LG TP18PSB01D"},
-	{ TUNER_LG_PAL,        "LG TP18PSB11D"},	
+	{ TUNER_LG_PAL,        "LG TP18PSB11D"},
 	{ TUNER_LG_PAL_I_FM,   "LG TAPC-I001D"},
 	/* 50-59 */
 	{ TUNER_LG_PAL_I,      "LG TAPC-I701D"},
@@ -270,7 +270,7 @@ void tveeprom_hauppauge_analog(struct tveeprom *tvee, unsigned char *eeprom_data
 
 	int i, j, len, done, tag, tuner = 0, t_format = 0;
 	char *t_name = NULL, *t_fmt_name = NULL;
-	
+
 	dprintk(1, "%s\n",__FUNCTION__);
 	tvee->revision = done = len = 0;
 	for (i = 0; !done && i < 256; i += len) {
@@ -307,34 +307,34 @@ void tveeprom_hauppauge_analog(struct tveeprom *tvee, unsigned char *eeprom_data
 			tuner = eeprom_data[i+6];
 			t_format = eeprom_data[i+5];
 			tvee->has_radio = eeprom_data[i+len-1];
-			tvee->model = 
-				eeprom_data[i+8] + 
+			tvee->model =
+				eeprom_data[i+8] +
 				(eeprom_data[i+9] << 8);
 			tvee->revision = eeprom_data[i+10] +
 				(eeprom_data[i+11] << 8) +
 				(eeprom_data[i+12] << 16);
 			break;
 		case 0x01:
-			tvee->serial_number = 
-				eeprom_data[i+6] + 
-				(eeprom_data[i+7] << 8) + 
+			tvee->serial_number =
+				eeprom_data[i+6] +
+				(eeprom_data[i+7] << 8) +
 				(eeprom_data[i+8] << 16);
 			break;
 		case 0x02:
 			tvee->audio_processor = eeprom_data[i+2] & 0x0f;
 			break;
 		case 0x04:
-			tvee->serial_number = 
-				eeprom_data[i+5] + 
-				(eeprom_data[i+6] << 8) + 
+			tvee->serial_number =
+				eeprom_data[i+5] +
+				(eeprom_data[i+6] << 8) +
 				(eeprom_data[i+7] << 16);
 			break;
 		case 0x05:
 			tvee->audio_processor = eeprom_data[i+1] & 0x0f;
 			break;
 		case 0x06:
-			tvee->model = 
-				eeprom_data[i+1] + 
+			tvee->model =
+				eeprom_data[i+1] +
 				(eeprom_data[i+2] << 8);
 			tvee->revision = eeprom_data[i+5] +
 				(eeprom_data[i+6] << 8) +
@@ -511,8 +511,10 @@ tveeprom_detect_client(struct i2c_adapter *adapter,
 {
 	struct i2c_client *client;
 
+	dprintk(1,"%s: id 0x%x @ 0x%x\n",__FUNCTION__,
+	       adapter->id, address << 1);
 	client = kmalloc(sizeof(struct i2c_client), GFP_KERNEL);
-	if (client == 0)
+	if (NULL == client)
 		return -ENOMEM;
 	memset(client, 0, sizeof(struct i2c_client));
 	client->addr = address;
@@ -520,12 +522,14 @@ tveeprom_detect_client(struct i2c_adapter *adapter,
 	client->driver = &i2c_driver_tveeprom;
 	client->flags = I2C_CLIENT_ALLOW_USE;
 	snprintf(client->name, sizeof(client->name), "tveeprom");
+        i2c_attach_client(client);
 	return 0;
 }
 
 static int
 tveeprom_attach_adapter (struct i2c_adapter *adapter)
 {
+	dprintk(1,"%s: id 0x%x\n",__FUNCTION__,adapter->id);
 	if (adapter->id != (I2C_ALGO_BIT | I2C_HW_B_BT848))
 		return 0;
 	return i2c_probe(adapter, &addr_data, tveeprom_detect_client);
@@ -537,9 +541,8 @@ tveeprom_detach_client (struct i2c_client *client)
 	int err;
 
 	err = i2c_detach_client(client);
-	if (err)
+	if (err < 0)
 		return err;
-
 	kfree(client);
 	return 0;
 }

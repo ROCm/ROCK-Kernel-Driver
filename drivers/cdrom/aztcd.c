@@ -165,7 +165,6 @@
 			 Torben Mathiasen <tmm@image.dk>
 */
 
-#include <linux/version.h>
 #include <linux/blkdev.h>
 #include "aztcd.h"
 
@@ -1708,8 +1707,8 @@ static int __init aztcd_init(void)
 	printk(KERN_INFO "aztcd: (C) 1994-98 W.Zimmermann\n");
 	if (azt_port == -1) {
 		printk
-		    ("aztcd: KernelVersion=%s DriverVersion=%s For IDE/ATAPI-drives use ide-cd.c\n",
-		     UTS_RELEASE, AZT_VERSION);
+		    ("aztcd: DriverVersion=%s For IDE/ATAPI-drives use ide-cd.c\n",
+		     AZT_VERSION);
 	} else
 		printk
 		    ("aztcd: DriverVersion=%s BaseAddress=0x%x  For IDE/ATAPI-drives use ide-cd.c\n",

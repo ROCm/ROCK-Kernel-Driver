@@ -59,8 +59,8 @@ static int mthca_query_device(struct ib_device *ibdev,
 	in_mad->method         	   = IB_MGMT_METHOD_GET;
 	in_mad->attr_id   	   = IB_SMP_ATTR_NODE_INFO;
 
-	err = mthca_MAD_IFC(to_mdev(ibdev), 1,
-			    1, in_mad, out_mad,
+	err = mthca_MAD_IFC(to_mdev(ibdev), 1, 1,
+			    1, NULL, NULL, in_mad, out_mad,
 			    &status);
 	if (err)
 		goto out;
@@ -104,8 +104,8 @@ static int mthca_query_port(struct ib_device *ibdev,
 	in_mad->attr_id   	   = IB_SMP_ATTR_PORT_INFO;
 	in_mad->attr_mod           = cpu_to_be32(port);
 
-	err = mthca_MAD_IFC(to_mdev(ibdev), 1,
-			    port, in_mad, out_mad,
+	err = mthca_MAD_IFC(to_mdev(ibdev), 1, 1,
+			    port, NULL, NULL, in_mad, out_mad,
 			    &status);
 	if (err)
 		goto out;
@@ -137,7 +137,35 @@ static int mthca_modify_port(struct ib_device *ibdev,
 			     u8 port, int port_modify_mask,
 			     struct ib_port_modify *props)
 {
-	return 0;
+	struct mthca_set_ib_param set_ib;
+	struct ib_port_attr attr;
+	int err;
+	u8 status;
+
+	if (down_interruptible(&to_mdev(ibdev)->cap_mask_mutex))
+		return -ERESTARTSYS;
+
+	err = mthca_query_port(ibdev, port, &attr);
+	if (err)
+		goto out;
+
+	set_ib.set_si_guid     = 0;
+	set_ib.reset_qkey_viol = !!(port_modify_mask & IB_PORT_RESET_QKEY_CNTR);
+
+	set_ib.cap_mask = (attr.port_cap_flags | props->set_port_cap_mask) &
+		~props->clr_port_cap_mask;
+
+	err = mthca_SET_IB(to_mdev(ibdev), &set_ib, port, &status);
+	if (err)
+		goto out;
+	if (status) {
+		err = -EINVAL;
+		goto out;
+	}
+
+out:
+	up(&to_mdev(ibdev)->cap_mask_mutex);
+	return err;
 }
 
 static int mthca_query_pkey(struct ib_device *ibdev,
@@ -161,8 +189,8 @@ static int mthca_query_pkey(struct ib_device *ibdev,
 	in_mad->attr_id   	   = IB_SMP_ATTR_PKEY_TABLE;
 	in_mad->attr_mod           = cpu_to_be32(index / 32);
 
-	err = mthca_MAD_IFC(to_mdev(ibdev), 1,
-			    port, in_mad, out_mad,
+	err = mthca_MAD_IFC(to_mdev(ibdev), 1, 1,
+			    port, NULL, NULL, in_mad, out_mad,
 			    &status);
 	if (err)
 		goto out;
@@ -200,8 +228,8 @@ static int mthca_query_gid(struct ib_device *ibdev, u8 port,
 	in_mad->attr_id   	   = IB_SMP_ATTR_PORT_INFO;
 	in_mad->attr_mod           = cpu_to_be32(port);
 
-	err = mthca_MAD_IFC(to_mdev(ibdev), 1,
-			    port, in_mad, out_mad,
+	err = mthca_MAD_IFC(to_mdev(ibdev), 1, 1,
+			    port, NULL, NULL, in_mad, out_mad,
 			    &status);
 	if (err)
 		goto out;
@@ -220,8 +248,8 @@ static int mthca_query_gid(struct ib_device *ibdev, u8 port,
 	in_mad->attr_id   	   = IB_SMP_ATTR_GUID_INFO;
 	in_mad->attr_mod           = cpu_to_be32(index / 8);
 
-	err = mthca_MAD_IFC(to_mdev(ibdev), 1,
-			    port, in_mad, out_mad,
+	err = mthca_MAD_IFC(to_mdev(ibdev), 1, 1,
+			    port, NULL, NULL, in_mad, out_mad,
 			    &status);
 	if (err)
 		goto out;
@@ -605,6 +633,8 @@ int mthca_register_device(struct mthca_dev *dev)
 	dev->ib_dev.attach_mcast         = mthca_multicast_attach;
 	dev->ib_dev.detach_mcast         = mthca_multicast_detach;
 	dev->ib_dev.process_mad          = mthca_process_mad;
+
+	init_MUTEX(&dev->cap_mask_mutex);
 
 	ret = ib_register_device(&dev->ib_dev);
 	if (ret)

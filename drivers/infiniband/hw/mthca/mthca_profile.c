@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004 Topspin Communications.  All rights reserved.
+ * Copyright (c) 2004, 2005 Topspin Communications.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
  * licenses.  You may choose to be licensed under the terms of the GNU
@@ -60,7 +60,7 @@ enum {
 	MTHCA_NUM_PDS = 1 << 15
 };
 
-int mthca_make_profile(struct mthca_dev *dev,
+u64 mthca_make_profile(struct mthca_dev *dev,
 		       struct mthca_profile *request,
 		       struct mthca_dev_lim *dev_lim,
 		       struct mthca_init_hca_param *init_hca)
@@ -116,6 +116,8 @@ int mthca_make_profile(struct mthca_dev *dev,
 		profile[i].type     = i;
 		profile[i].log_num  = max(ffs(profile[i].num) - 1, 0);
 		profile[i].size    *= profile[i].num;
+		if (dev->hca_type == ARBEL_NATIVE)
+			profile[i].size = max(profile[i].size, (u64) PAGE_SIZE);
 	}
 
 	if (dev->hca_type == ARBEL_NATIVE) {
@@ -239,6 +241,10 @@ int mthca_make_profile(struct mthca_dev *dev,
 		case MTHCA_RES_UDAV:
 			dev->av_table.ddr_av_base = profile[i].start;
 			dev->av_table.num_ddr_avs = profile[i].num;
+		case MTHCA_RES_UARC:
+			init_hca->uarc_base   = profile[i].start;
+			init_hca->log_uarc_sz = ffs(request->uarc_size) - 13;
+			init_hca->log_uar_sz  = ffs(request->num_uar) - 1;
 		default:
 			break;
 		}
@@ -251,5 +257,5 @@ int mthca_make_profile(struct mthca_dev *dev,
 	dev->limits.num_pds = MTHCA_NUM_PDS;
 
 	kfree(profile);
-	return 0;
+	return total_size;
 }

@@ -2806,7 +2806,7 @@ static void pktgen_thread_worker(struct pktgen_thread *t)
 			tx_since_softirq += pkt_dev->last_ok;
 
 			if (tx_since_softirq > max_before_softirq) {
-				if(softirq_pending(smp_processor_id()))  
+				if (local_softirq_pending())
 					do_softirq();
 				tx_since_softirq = 0;
 			}

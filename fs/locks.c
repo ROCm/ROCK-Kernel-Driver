@@ -1011,7 +1011,7 @@ int locks_mandatory_locked(struct inode *inode)
  * @count:      length of area to check
  *
  * Searches the inode's list of locks to find any POSIX locks which conflict.
- * This function is called from locks_verify_area() and
+ * This function is called from rw_verify_area() and
  * locks_verify_truncate().
  */
 int locks_mandatory_area(int read_write, struct inode *inode,

@@ -41,6 +41,8 @@ long __init chrp_time_init(void)
 	int base;
 
 	rtcs = find_compatible_devices("rtc", "pnpPNP,b00");
+	if (rtcs == NULL)
+		rtcs = find_compatible_devices("rtc", "ds1385-rtc");
 	if (rtcs == NULL || rtcs->addrs == NULL)
 		return 0;
 	base = rtcs->addrs[0].address;

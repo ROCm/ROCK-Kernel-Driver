@@ -1,5 +1,5 @@
 /*
-    $Id: bttv-vbi.c,v 1.8 2004/12/10 12:33:39 kraxel Exp $
+    $Id: bttv-vbi.c,v 1.9 2005/01/13 17:22:33 kraxel Exp $
 
     bttv - Bt848 frame grabber driver
     vbi interface
@@ -183,7 +183,7 @@ void bttv_vbi_try_fmt(struct bttv_fh *fh, struct v4l2_format *f)
 	case 2: /* SECAM */
 	default:
 		start0 = 7;
-		start1 = 319;
+		start1 = 320;
 	}
 
 	count0 = (f->fmt.vbi.start[0] + f->fmt.vbi.count[0]) - start0;

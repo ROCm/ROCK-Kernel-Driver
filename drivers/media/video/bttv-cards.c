@@ -1,5 +1,5 @@
 /*
-    $Id: bttv-cards.c,v 1.41 2005/01/07 13:58:49 kraxel Exp $
+    $Id: bttv-cards.c,v 1.42 2005/01/13 17:22:33 kraxel Exp $
 
     bttv-cards.c
 
@@ -288,12 +288,12 @@ static struct CARD {
 
 	// DVB cards (using pci function .1 for mpeg data xfer)
 	{ 0x01010071, BTTV_NEBULA_DIGITV, "Nebula Electronics DigiTV" },
-	{ 0x07611461, BTTV_AVDVBT_761,    "AverMedia AverTV DVB-T" },
+	{ 0x07611461, BTTV_AVDVBT_761,    "AverMedia AverTV DVB-T 761" },
 	{ 0x001c11bd, BTTV_PINNACLESAT,   "Pinnacle PCTV Sat" },
 	{ 0x002611bd, BTTV_TWINHAN_DST,   "Pinnacle PCTV SAT CI" },
 	{ 0x00011822, BTTV_TWINHAN_DST,   "Twinhan VisionPlus DVB-T" },
 	{ 0xfc00270f, BTTV_TWINHAN_DST,   "ChainTech digitop DST-1000 DVB-S" },
-	{ 0x07711461, BTTV_AVDVBT_771,    "AVermedia DVB-T 771" },
+	{ 0x07711461, BTTV_AVDVBT_771,    "AVermedia AverTV DVB-T 771" },
 	{ 0xdb1018ac, BTTV_DVICO_DVBT_LITE,    "DVICO FusionHDTV DVB-T Lite" },
 
 	{ 0, -1, NULL }
@@ -2784,7 +2784,10 @@ void __devinit bttv_init_card2(struct bttv *btv)
 	if (0 == tda9887 && 0 == bttv_tvcards[btv->c.type].has_dvb &&
 	    bttv_I2CRead(btv, I2C_TDA9887, "TDA9887") >=0)
 		tda9887 = 1;
-	if (tda9887)
+	if((btv->tuner_type == TUNER_PHILIPS_FM1216ME_MK3) ||
+	   (btv->tuner_type == TUNER_PHILIPS_FM1236_MK3) ||
+	   (btv->tuner_type == TUNER_PHILIPS_FM1256_IH3) ||
+	    tda9887)
 		request_module("tda9887");
 	if (btv->tuner_type != UNSET)
 		request_module("tuner");
@@ -2792,67 +2795,6 @@ void __devinit bttv_init_card2(struct bttv *btv)
 
 
 /* ----------------------------------------------------------------------- */
-/* some hauppauge specific stuff                                           */
-
-static struct HAUPPAUGE_TUNER
-{
-        int  id;
-        char *name;
-}
-hauppauge_tuner[] __devinitdata =
-{
-        { TUNER_ABSENT,        "" },
-        { TUNER_ABSENT,        "External" },
-        { TUNER_ABSENT,        "Unspecified" },
-        { TUNER_PHILIPS_PAL,   "Philips FI1216" },
-        { TUNER_PHILIPS_SECAM, "Philips FI1216MF" },
-        { TUNER_PHILIPS_NTSC,  "Philips FI1236" },
-        { TUNER_PHILIPS_PAL_I, "Philips FI1246" },
-        { TUNER_PHILIPS_PAL_DK,"Philips FI1256" },
-        { TUNER_PHILIPS_PAL,   "Philips FI1216 MK2" },
-        { TUNER_PHILIPS_SECAM, "Philips FI1216MF MK2" },
-        { TUNER_PHILIPS_NTSC,  "Philips FI1236 MK2" },
-        { TUNER_PHILIPS_PAL_I, "Philips FI1246 MK2" },
-        { TUNER_PHILIPS_PAL_DK,"Philips FI1256 MK2" },
-        { TUNER_TEMIC_NTSC,    "Temic 4032FY5" },
-        { TUNER_TEMIC_PAL,     "Temic 4002FH5" },
-        { TUNER_TEMIC_PAL_I,   "Temic 4062FY5" },
-        { TUNER_PHILIPS_PAL,   "Philips FR1216 MK2" },
-        { TUNER_PHILIPS_SECAM, "Philips FR1216MF MK2" },
-        { TUNER_PHILIPS_NTSC,  "Philips FR1236 MK2" },
-        { TUNER_PHILIPS_PAL_I, "Philips FR1246 MK2" },
-        { TUNER_PHILIPS_PAL_DK,"Philips FR1256 MK2" },
-        { TUNER_PHILIPS_PAL,   "Philips FM1216" },
-        { TUNER_PHILIPS_SECAM, "Philips FM1216MF" },
-        { TUNER_PHILIPS_NTSC,  "Philips FM1236" },
-        { TUNER_PHILIPS_PAL_I, "Philips FM1246" },
-        { TUNER_PHILIPS_PAL_DK,"Philips FM1256" },
-        { TUNER_TEMIC_4036FY5_NTSC, "Temic 4036FY5" },
-        { TUNER_ABSENT,        "Samsung TCPN9082D" },
-        { TUNER_ABSENT,        "Samsung TCPM9092P" },
-        { TUNER_TEMIC_4006FH5_PAL, "Temic 4006FH5" },
-        { TUNER_ABSENT,        "Samsung TCPN9085D" },
-        { TUNER_ABSENT,        "Samsung TCPB9085P" },
-        { TUNER_ABSENT,        "Samsung TCPL9091P" },
-        { TUNER_TEMIC_4039FR5_NTSC, "Temic 4039FR5" },
-        { TUNER_PHILIPS_FQ1216ME,   "Philips FQ1216 ME" },
-        { TUNER_TEMIC_4066FY5_PAL_I, "Temic 4066FY5" },
-        { TUNER_PHILIPS_NTSC,        "Philips TD1536" },
-        { TUNER_PHILIPS_NTSC,        "Philips TD1536D" },
-	{ TUNER_PHILIPS_NTSC,  "Philips FMR1236" }, /* mono radio */
-        { TUNER_ABSENT,        "Philips FI1256MP" },
-        { TUNER_ABSENT,        "Samsung TCPQ9091P" },
-        { TUNER_TEMIC_4006FN5_MULTI_PAL, "Temic 4006FN5" },
-        { TUNER_TEMIC_4009FR5_PAL, "Temic 4009FR5" },
-        { TUNER_TEMIC_4046FM5,     "Temic 4046FM5" },
-	{ TUNER_TEMIC_4009FN5_MULTI_PAL_FM, "Temic 4009FN5" },
-	{ TUNER_ABSENT,        "Philips TD1536D_FH_44"},
-	{ TUNER_LG_NTSC_FM,    "LG TPI8NSR01F"},
-	{ TUNER_LG_PAL_FM,     "LG TPI8PSB01D"},
-	{ TUNER_LG_PAL,        "LG TPI8PSB11D"},
-	{ TUNER_LG_PAL_I_FM,   "LG TAPC-I001D"},
-	{ TUNER_LG_PAL_I,      "LG TAPC-I701D"}
-};
 
 static void modtec_eeprom(struct bttv *btv)
 {
@@ -2876,39 +2818,11 @@ static void modtec_eeprom(struct bttv *btv)
 
 static void __devinit hauppauge_eeprom(struct bttv *btv)
 {
-#if 0
-	unsigned int blk2,tuner,radio,model;
-
-	if (eeprom_data[0] != 0x84 || eeprom_data[2] != 0)
-		printk(KERN_WARNING "bttv%d: Hauppauge eeprom: invalid\n",
-		       btv->c.nr);
-
-	/* Block 2 starts after len+3 bytes header */
-	blk2 = eeprom_data[1] + 3;
-
-	/* decode + use some config infos */
-	model = eeprom_data[12] << 8 | eeprom_data[11];
-	tuner = eeprom_data[9];
-	radio = eeprom_data[blk2-1] & 0x01;
-
-        if (tuner < ARRAY_SIZE(hauppauge_tuner))
-                btv->tuner_type = hauppauge_tuner[tuner].id;
-	if (radio)
-		btv->has_radio = 1;
-
-	if (bttv_verbose)
-		printk(KERN_INFO "bttv%d: Hauppauge eeprom: model=%d, "
-		       "tuner=%s (%d), radio=%s\n",
-		       btv->c.nr, model, (tuner < ARRAY_SIZE(hauppauge_tuner)
-					  ? hauppauge_tuner[tuner].name : "?"),
-		       btv->tuner_type, radio ? "yes" : "no");
-#else
 	struct tveeprom tv;
 
 	tveeprom_hauppauge_analog(&tv, eeprom_data);
 	btv->tuner_type = tv.tuner_type;
 	btv->has_radio  = tv.has_radio;
-#endif
 }
 
 static int terratec_active_radio_upgrade(struct bttv *btv)
@@ -3124,7 +3038,8 @@ static int tuner_0_table[] = {
         TUNER_PHILIPS_PAL,   TUNER_PHILIPS_PAL /* PAL-I*/,
         TUNER_PHILIPS_PAL,   TUNER_PHILIPS_PAL,
         TUNER_PHILIPS_SECAM, TUNER_PHILIPS_SECAM,
-        TUNER_PHILIPS_SECAM, TUNER_PHILIPS_PAL};
+        TUNER_PHILIPS_SECAM, TUNER_PHILIPS_PAL,
+	TUNER_PHILIPS_FM1216ME_MK3 };
 #if 0
 int tuner_0_fm_table[] = {
         PHILIPS_FR1236_NTSC,  PHILIPS_FR1216_PAL,
@@ -3151,11 +3066,15 @@ static void __devinit avermedia_eeprom(struct bttv *btv)
 	btv->has_remote = (eeprom_data[0x42] & 0x01);
 
 	if (tuner_make == 0 || tuner_make == 2)
-		if(tuner_format <=9)
+		if(tuner_format <=0x0a)
 			tuner = tuner_0_table[tuner_format];
 	if (tuner_make == 1)
 		if(tuner_format <=9)
 			tuner = tuner_1_table[tuner_format];
+
+	if (tuner_make == 4)
+		if(tuner_format == 0x09)
+			tuner = TUNER_LG_NTSC_NEW_TAPC; // TAPC-G702P
 
 	printk(KERN_INFO "bttv%d: Avermedia eeprom[0x%02x%02x]: tuner=",
 		btv->c.nr,eeprom_data[0x41],eeprom_data[0x42]);

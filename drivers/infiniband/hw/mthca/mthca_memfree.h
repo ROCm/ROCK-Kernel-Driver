@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004 Topspin Communications.  All rights reserved.
+ * Copyright (c) 2004, 2005 Topspin Communications.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
  * licenses.  You may choose to be licensed under the terms of the GNU
@@ -38,8 +38,10 @@
 #include <linux/list.h>
 #include <linux/pci.h>
 
+#include <asm/semaphore.h>
+
 #define MTHCA_ICM_CHUNK_LEN \
-	((512 - sizeof (struct list_head) - 2 * sizeof (int)) /		\
+	((256 - sizeof (struct list_head) - 2 * sizeof (int)) /		\
 	 (sizeof (struct scatterlist)))
 
 struct mthca_icm_chunk {
@@ -53,6 +55,13 @@ struct mthca_icm {
 	struct list_head chunk_list;
 };
 
+struct mthca_icm_table {
+	u64               virt;
+	int               num_icm;
+	struct semaphore  sem;
+	struct mthca_icm *icm[0];
+};
+
 struct mthca_icm_iter {
 	struct mthca_icm       *icm;
 	struct mthca_icm_chunk *chunk;
@@ -64,6 +73,12 @@ struct mthca_dev;
 struct mthca_icm *mthca_alloc_icm(struct mthca_dev *dev, int npages,
 				  unsigned int gfp_mask);
 void mthca_free_icm(struct mthca_dev *dev, struct mthca_icm *icm);
+
+struct mthca_icm_table *mthca_alloc_icm_table(struct mthca_dev *dev,
+					      u64 virt, unsigned size,
+					      unsigned reserved,
+					      int use_lowmem);
+void mthca_free_icm_table(struct mthca_dev *dev, struct mthca_icm_table *table);
 
 static inline void mthca_icm_first(struct mthca_icm *icm,
 				   struct mthca_icm_iter *iter)

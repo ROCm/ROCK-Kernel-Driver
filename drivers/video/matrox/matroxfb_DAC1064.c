@@ -155,7 +155,7 @@ static void DAC1064_setmclk(WPMINFO int oscinfo, unsigned long fmem) {
 	hw->MXoptionReg = mx;
 }
 
-#ifdef CONFIG_FB_MATROX_G450
+#ifdef CONFIG_FB_MATROX_G
 static void g450_set_plls(WPMINFO2) {
 	u_int32_t c2_ctl;
 	unsigned int pxc;
@@ -253,7 +253,7 @@ void DAC1064_global_init(WPMINFO2) {
 	hw->DACreg[POS1064_XMISCCTRL] &= M1064_XMISCCTRL_DAC_WIDTHMASK;
 	hw->DACreg[POS1064_XMISCCTRL] |= M1064_XMISCCTRL_LUT_EN;
 	hw->DACreg[POS1064_XPIXCLKCTRL] = M1064_XPIXCLKCTRL_PLL_UP | M1064_XPIXCLKCTRL_EN | M1064_XPIXCLKCTRL_SRC_PLL;
-#ifdef CONFIG_FB_MATROX_G450
+#ifdef CONFIG_FB_MATROX_G
 	if (ACCESS_FBINFO(devflags.g450dac)) {
 		hw->DACreg[POS1064_XPWRCTRL] = 0x1F;	/* powerup everything */
 		hw->DACreg[POS1064_XOUTPUTCONN] = 0x00;	/* disable outputs */
@@ -498,7 +498,7 @@ static struct matrox_altout m1064 = {
 	.compute = m1064_compute,
 };
 
-#ifdef CONFIG_FB_MATROX_G450
+#ifdef CONFIG_FB_MATROX_G
 static int g450_compute(void* out, struct my_timming* m) {
 #define minfo ((struct matrox_fb_info*)out)
 	if (m->mnp < 0) {
@@ -541,7 +541,7 @@ static int MGA1064_init(WPMINFO struct my_timming* m) {
 }
 #endif
 
-#ifdef CONFIG_FB_MATROX_G100
+#ifdef CONFIG_FB_MATROX_G
 static int MGAG100_init(WPMINFO struct my_timming* m) {
 	struct matrox_hw_state* hw = &ACCESS_FBINFO(hw);
 
@@ -562,7 +562,7 @@ static int MGAG100_init(WPMINFO struct my_timming* m) {
 	if (DAC1064_init_2(PMINFO m)) return 1;
 	return 0;
 }
-#endif	/* G100 */
+#endif	/* G */
 
 #ifdef CONFIG_FB_MATROX_MYSTIQUE
 static void MGA1064_ramdac_init(WPMINFO2) {
@@ -583,7 +583,7 @@ static void MGA1064_ramdac_init(WPMINFO2) {
 }
 #endif
 
-#ifdef CONFIG_FB_MATROX_G100
+#ifdef CONFIG_FB_MATROX_G
 /* BIOS environ */
 static int x7AF4 = 0x10;	/* flags, maybe 0x10 = SDRAM, 0x00 = SGRAM??? */
 				/* G100 wants 0x10, G200 SGRAM does not care... */
@@ -692,8 +692,7 @@ static void MGA1064_reset(WPMINFO2) {
 }
 #endif
 
-#ifdef CONFIG_FB_MATROX_G100
-#ifdef CONFIG_FB_MATROX_G450
+#ifdef CONFIG_FB_MATROX_G
 static void g450_mclk_init(WPMINFO2) {
 	/* switch all clocks to PCI source */
 	pci_write_config_dword(ACCESS_FBINFO(pcidev), PCI_OPTION_REG, ACCESS_FBINFO(hw).MXoptionReg | 4);
@@ -811,10 +810,6 @@ static void g450_preinit(WPMINFO2) {
 	
 	return;
 }
-#else
-static inline void g450_preinit(WPMINFO2) {
-}
-#endif
 
 static int MGAG100_preinit(WPMINFO2) {
 	static const int vxres_g100[] = {  512,        640, 768,  800,  832,  960,
@@ -851,7 +846,7 @@ static int MGAG100_preinit(WPMINFO2) {
 	ACCESS_FBINFO(capable.plnwt) = ACCESS_FBINFO(devflags.accelerator) == FB_ACCEL_MATROX_MGAG100
 			? ACCESS_FBINFO(devflags.sgram) : 1;
 
-#ifdef CONFIG_FB_MATROX_G450
+#ifdef CONFIG_FB_MATROX_G
 	if (ACCESS_FBINFO(devflags.g450dac)) {
 		ACCESS_FBINFO(outputs[0]).output = &g450out;
 	} else
@@ -1043,7 +1038,7 @@ static void MGA1064_restore(WPMINFO2) {
 }
 #endif
 
-#ifdef CONFIG_FB_MATROX_G100
+#ifdef CONFIG_FB_MATROX_G
 static void MGAG100_restore(WPMINFO2) {
 	int i;
 	struct matrox_hw_state* hw = &ACCESS_FBINFO(hw);
@@ -1077,7 +1072,7 @@ struct matrox_switch matrox_mystique = {
 EXPORT_SYMBOL(matrox_mystique);
 #endif
 
-#ifdef CONFIG_FB_MATROX_G100
+#ifdef CONFIG_FB_MATROX_G
 struct matrox_switch matrox_G100 = {
 	MGAG100_preinit, MGAG100_reset, MGAG100_init, MGAG100_restore,
 };

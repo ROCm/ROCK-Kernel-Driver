@@ -134,28 +134,29 @@ static void get_writeback_state(struct writeback_state *wbs)
  */
 static void
 get_dirty_limits(struct writeback_state *wbs, long *pbackground, long *pdirty,
-		 struct address_space *mapping)
+		struct address_space *mapping)
 {
 	int background_ratio;		/* Percentages */
 	int dirty_ratio;
 	int unmapped_ratio;
 	long background;
 	long dirty;
-	struct task_struct *tsk;
 	unsigned long available_memory = total_pages;
+	struct task_struct *tsk;
 
 	get_writeback_state(wbs);
 
 #ifdef CONFIG_HIGHMEM
 	/*
-	 * In some cases we can only allocate from low memory,
-	 * so we exclude high memory from our count.
+	 * If this mapping can only allocate from low memory,
+	 * we exclude high memory from our count.
 	 */
 	if (mapping && !(mapping_gfp_mask(mapping) & __GFP_HIGHMEM))
 		available_memory -= totalhigh_pages;
 #endif
 
-	unmapped_ratio = 100 - (wbs->nr_mapped * 100) / available_memory;
+
+	unmapped_ratio = 100 - (wbs->nr_mapped * 100) / total_pages;
 
 	dirty_ratio = vm_dirty_ratio;
 	if (dirty_ratio > unmapped_ratio / 2)
@@ -168,8 +169,8 @@ get_dirty_limits(struct writeback_state *wbs, long *pbackground, long *pdirty,
 	if (background_ratio >= dirty_ratio)
 		background_ratio = dirty_ratio / 2;
 
-	background = (background_ratio * total_pages) / 100;
-	dirty = (dirty_ratio * total_pages) / 100;
+	background = (background_ratio * available_memory) / 100;
+	dirty = (dirty_ratio * available_memory) / 100;
 	tsk = current;
 	if (tsk->flags & PF_LESS_THROTTLE || rt_task(tsk)) {
 		background += background / 4;
@@ -205,7 +206,8 @@ static void balance_dirty_pages(struct address_space *mapping)
 			.nr_to_write	= write_chunk,
 		};
 
-		get_dirty_limits(&wbs, &background_thresh, &dirty_thresh, mapping);
+		get_dirty_limits(&wbs, &background_thresh,
+					&dirty_thresh, mapping);
 		nr_reclaimable = wbs.nr_dirty + wbs.nr_unstable;
 		if (nr_reclaimable + wbs.nr_writeback <= dirty_thresh)
 			break;

@@ -439,6 +439,11 @@ asmlinkage long compat_sys_ioctl(unsigned int fd, unsigned int cmd,
 	if (!filp)
 		goto out;
 
+	/* RED-PEN how should LSM module know it's handling 32bit? */
+	error = security_file_ioctl(filp, cmd, arg);
+	if (error)
+		goto out_fput;
+
 	/*
 	 * To allow the compat_ioctl handlers to be self contained
 	 * we need to check the common ioctls here first.
@@ -496,11 +501,6 @@ asmlinkage long compat_sys_ioctl(unsigned int fd, unsigned int cmd,
 
  found_handler:
 	if (t->handler) {
-		/* RED-PEN how should LSM module know it's handling 32bit? */
-		error = security_file_ioctl(filp, cmd, arg);
-		if (error)
-			goto out_fput;
-
 		lock_kernel();
 		error = t->handler(fd, cmd, arg, filp);
 		unlock_kernel();
@@ -510,7 +510,7 @@ asmlinkage long compat_sys_ioctl(unsigned int fd, unsigned int cmd,
 
 	up_read(&ioctl32_sem);
  do_ioctl:
-	error = sys_ioctl(fd, cmd, arg);
+	error = vfs_ioctl(filp, fd, cmd, arg);
  out_fput:
 	fput_light(filp, fput_needed);
  out:
@@ -1126,7 +1126,6 @@ static ssize_t compat_do_readv_writev(int type, struct file *file,
 	int seg;
 	io_fn_t fn;
 	iov_fn_t fnv;
-	struct inode *inode;
 
 	/*
 	 * SuS says "The readv() function *may* fail if the iovcnt argument
@@ -1191,11 +1190,7 @@ static ssize_t compat_do_readv_writev(int type, struct file *file,
 		goto out;
 	}
 
-	inode = file->f_dentry->d_inode;
-	/* VERIFY_WRITE actually means a read, as we write to user space */
-	ret = locks_verify_area((type == READ
-				 ? FLOCK_VERIFY_READ : FLOCK_VERIFY_WRITE),
-				inode, file, *pos, tot_len);
+	ret = rw_verify_area(type, file, pos, tot_len);
 	if (ret)
 		goto out;
 

@@ -330,7 +330,7 @@ static int w9966_init(struct w9966_dev* cam, struct parport* port)
 
 // Fill in the video_device struct and register us to v4l
 	memcpy(&cam->vdev, &w9966_template, sizeof(struct video_device));
-	cam->vdev.priv = (void*)cam;
+	cam->vdev.priv = cam;
 
 	if (video_register_device(&cam->vdev, VFL_TYPE_GRABBER, video_nr) == -1)		 
 		return -1;
@@ -712,7 +712,7 @@ static int w9966_v4l_do_ioctl(struct inode *inode, struct file *file,
 			      unsigned int cmd, void *arg)
 {
 	struct video_device *vdev = video_devdata(file);
-	struct w9966_dev *cam = (struct w9966_dev*)vdev->priv;
+	struct w9966_dev *cam = vdev->priv;
 	
 	switch(cmd)
 	{
@@ -871,7 +871,7 @@ static ssize_t w9966_v4l_read(struct file *file, char  __user *buf,
 			      size_t count, loff_t *ppos)
 {
 	struct video_device *vdev = video_devdata(file);
-	struct w9966_dev *cam = (struct w9966_dev *)vdev->priv;
+	struct w9966_dev *cam = vdev->priv;
 	unsigned char addr = 0xa0;	// ECP, read, CCD-transfer, 00000
 	unsigned char __user *dest = (unsigned char __user *)buf;
 	unsigned long dleft = count;

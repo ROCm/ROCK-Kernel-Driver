@@ -341,24 +341,12 @@ EXPORT_SYMBOL(pcmcia_get_socket_by_nr);
 
 /*======================================================================
 
-    Shutdown_Socket() and setup_socket() are scheduled using add_timer
-    calls by the main event handler when card insertion and removal
-    events are received.  Shutdown_Socket() unconfigures a socket and
-    turns off socket power.  Setup_socket() turns on socket power
-    and resets the socket, in two stages.
+    socket_setup() and shutdown_socket() are called by the main event
+    handler when card insertion and removal events are received.
+    socket_setup() turns on socket power and resets the socket, in two stages.
+    shutdown_socket() unconfigures a socket and turns off socket power.
 
 ======================================================================*/
-
-static void free_regions(memory_handle_t *list)
-{
-    memory_handle_t tmp;
-    while (*list != NULL) {
-	tmp = *list;
-	*list = tmp->info.next;
-	tmp->region_magic = 0;
-	kfree(tmp);
-    }
-}
 
 static void shutdown_socket(struct pcmcia_socket *s)
 {
@@ -379,8 +367,6 @@ static void shutdown_socket(struct pcmcia_socket *s)
 	kfree(s->config);
 	s->config = NULL;
     }
-    free_regions(&s->a_region);
-    free_regions(&s->c_region);
 
     {
 	int status;
@@ -755,19 +741,19 @@ static int alloc_io_space(struct pcmcia_socket *s, u_int attr, ioaddr_t *base,
 			  ioaddr_t num, u_int lines)
 {
     int i;
-    ioaddr_t try, align;
+    kio_addr_t try, align;
 
     align = (*base) ? (lines ? 1<<lines : 0) : 1;
     if (align && (align < num)) {
 	if (*base) {
-	    cs_dbg(s, 0, "odd IO request: num %04x align %04x\n",
+	    cs_dbg(s, 0, "odd IO request: num %#x align %#lx\n",
 		   num, align);
 	    align = 0;
 	} else
 	    while (align && (align < num)) align <<= 1;
     }
     if (*base & ~(align-1)) {
-	cs_dbg(s, 0, "odd IO request: base %04x align %04x\n",
+	cs_dbg(s, 0, "odd IO request: base %#x align %#lx\n",
 	       *base, align);
 	align = 0;
     }

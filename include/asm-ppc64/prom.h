@@ -149,18 +149,15 @@ struct device_node {
 	struct  proc_dir_entry *pde;       /* this node's proc directory */
 	struct  proc_dir_entry *name_link; /* name symlink */
 	struct  proc_dir_entry *addr_link; /* addr symlink */
-	atomic_t _users;                 /* reference count */
+	struct  kref kref;
 	unsigned long _flags;
 };
 
 extern struct device_node *of_chosen;
 
 /* flag descriptions */
-#define OF_STALE   0 /* node is slated for deletion */
 #define OF_DYNAMIC 1 /* node and properties were allocated via kmalloc */
 
-#define OF_IS_STALE(x) test_bit(OF_STALE, &x->_flags)
-#define OF_MARK_STALE(x) set_bit(OF_STALE, &x->_flags)
 #define OF_IS_DYNAMIC(x) test_bit(OF_DYNAMIC, &x->_flags)
 #define OF_MARK_DYNAMIC(x) set_bit(OF_DYNAMIC, &x->_flags)
 

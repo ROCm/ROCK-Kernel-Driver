@@ -25,6 +25,13 @@ ToDo/Notes:
 	- Enable the code for setting the NT4 compatibility flag when we start
 	  making NTFS 1.2 specific modifications.
 
+2.1.23-WIP
+
+	- Add printk rate limiting for ntfs_warning() and ntfs_error() when
+	  compiled without debug.  This avoids a possible denial of service
+	  attack.  Thanks to Carl-Daniel Hailfinger from SuSE for pointing this
+	  out.
+
 2.1.22 - Many bug and race fixes and error handling improvements.
 
 	- Improve error handling in fs/ntfs/inode.c::ntfs_truncate().

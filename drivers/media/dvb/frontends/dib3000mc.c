@@ -562,9 +562,11 @@ static int dib3000mc_set_frontend(struct dvb_frontend* fe,
 
 static int dib3000mc_fe_init(struct dvb_frontend* fe, int mobile_mode)
 {
-	deb_info("init start\n");
-	struct dib3000_state* state = (struct dib3000_state*) fe->demodulator_priv;
+	struct dib3000_state *state;
 
+	deb_info("init start\n");
+
+	state = fe->demodulator_priv;
 	state->timing_offset = 0;
 	state->timing_offset_comp_done = 0;
 	

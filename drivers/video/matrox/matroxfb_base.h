@@ -127,7 +127,7 @@
 
 /* G-series and Mystique have (almost) same DAC */
 #undef NEED_DAC1064
-#if defined(CONFIG_FB_MATROX_MYSTIQUE) || defined(CONFIG_FB_MATROX_G100)
+#if defined(CONFIG_FB_MATROX_MYSTIQUE) || defined(CONFIG_FB_MATROX_G)
 #define NEED_DAC1064 1
 #endif
 

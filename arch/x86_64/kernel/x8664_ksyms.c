@@ -30,7 +30,6 @@
 #include <asm/nmi.h>
 #include <asm/kdebug.h>
 #include <asm/unistd.h>
-#include <asm/delay.h>
 #include <asm/tlbflush.h>
 #include <asm/kdebug.h>
 

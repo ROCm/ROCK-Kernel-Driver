@@ -5,7 +5,7 @@
  */
 
 #include "linux/kernel.h"
-#include "linux/version.h"
+#include "linux/utsname.h"
 #include "linux/module.h"
 #include "asm/current.h"
 #include "asm/ptrace.h"
@@ -16,7 +16,7 @@ void __show_regs(struct pt_regs * regs)
 	printk("\n");
 	print_modules();
 	printk("Pid: %d, comm: %.20s %s %s\n",
-	       current->pid, current->comm, print_tainted(), UTS_RELEASE);
+	       current->pid, current->comm, print_tainted(), system_utsname.release);
 	printk("RIP: %04lx:[<%016lx>] ", PT_REGS_CS(regs) & 0xffff,
 	       PT_REGS_RIP(regs));
 	printk("\nRSP: %016lx  EFLAGS: %08lx\n", PT_REGS_RSP(regs),

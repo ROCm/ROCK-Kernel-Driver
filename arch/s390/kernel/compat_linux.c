@@ -906,6 +906,7 @@ asmlinkage long sys32_adjtimex(struct timex32 *utp)
 	return ret;
 }
 
+#ifdef CONFIG_SYSCTL
 struct __sysctl_args32 {
 	u32 name;
 	int nlen;
@@ -953,6 +954,7 @@ asmlinkage long sys32_sysctl(struct __sysctl_args32 *args)
 	}
 	return error;
 }
+#endif
 
 struct stat64_emu31 {
 	unsigned long long  st_dev;

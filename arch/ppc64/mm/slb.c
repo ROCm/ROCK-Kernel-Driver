@@ -78,7 +78,7 @@ static void slb_flush_and_rebolt(void)
 void switch_slb(struct task_struct *tsk, struct mm_struct *mm)
 {
 	unsigned long offset = get_paca()->slb_cache_ptr;
-	unsigned long esid_data;
+	unsigned long esid_data = 0;
 	unsigned long pc = KSTK_EIP(tsk);
 	unsigned long stack = KSTK_ESP(tsk);
 	unsigned long unmapped_base;
@@ -97,11 +97,8 @@ void switch_slb(struct task_struct *tsk, struct mm_struct *mm)
 	}
 
 	/* Workaround POWER5 < DD2.1 issue */
-	if (offset == 1 || offset > SLB_CACHE_ENTRIES) {
-		/* flush segment in EEH region, we shouldn't ever
-		 * access addresses in this region. */
-		asm volatile("slbie %0" : : "r"(EEHREGIONBASE));
-	}
+	if (offset == 1 || offset > SLB_CACHE_ENTRIES)
+		asm volatile("slbie %0" : : "r" (esid_data));
 
 	get_paca()->slb_cache_ptr = 0;
 	get_paca()->context = mm->context;

@@ -73,7 +73,7 @@ void *stdin;
 void *stdout;
 void *stderr;
 
-#define DEBUG
+#undef DEBUG
 
 static unsigned long claim_base = PROG_START;
 

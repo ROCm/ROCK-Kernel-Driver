@@ -1,7 +1,13 @@
 #ifndef _VTX_H
 #define _VTX_H
 
-/* $Id: videotext.h,v 1.1 1998/03/30 22:26:39 alan Exp $
+/*
+ * Teletext (=Videotext) hardware decoders using interface /dev/vtx
+ * Do not confuse with drivers using /dev/vbi which decode videotext by software
+ *
+ * Videotext IOCTLs changed in order to use _IO() macros defined in <linux/ioctl.h>,
+ * unused tuner IOCTLs cleaned up by
+ * Michael Geng <linux@MichaelGeng.de>
  *
  * Copyright (c) 1994-97 Martin Buck  <martin-2.buck@student.uni-ulm.de>
  * Read COPYING for more information
@@ -12,19 +18,32 @@
 /*
  *	Videotext ioctls
  */
-#define VTXIOCGETINFO  0x7101  /* get version of driver & capabilities of vtx-chipset */
-#define VTXIOCCLRPAGE  0x7102  /* clear page-buffer */
-#define VTXIOCCLRFOUND 0x7103  /* clear bits indicating that page was found */
-#define VTXIOCPAGEREQ  0x7104  /* search for page */
-#define VTXIOCGETSTAT  0x7105  /* get status of page-buffer */
-#define VTXIOCGETPAGE  0x7106  /* get contents of page-buffer */
-#define VTXIOCSTOPDAU  0x7107  /* stop data acquisition unit */
-#define VTXIOCPUTPAGE  0x7108  /* display page on TV-screen */
-#define VTXIOCSETDISP  0x7109  /* set TV-mode */
-#define VTXIOCPUTSTAT  0x710a  /* set status of TV-output-buffer */
-#define VTXIOCCLRCACHE 0x710b  /* clear cache on VTX-interface (if avail.) */
-#define VTXIOCSETVIRT  0x710c  /* turn on virtual mode (this disables TV-display) */
+#define VTXIOCGETINFO	_IOR  (0x81,  1, vtx_info_t)
+#define VTXIOCCLRPAGE	_IOW  (0x81,  2, vtx_pagereq_t)
+#define VTXIOCCLRFOUND	_IOW  (0x81,  3, vtx_pagereq_t)
+#define VTXIOCPAGEREQ	_IOW  (0x81,  4, vtx_pagereq_t)
+#define VTXIOCGETSTAT	_IOW  (0x81,  5, vtx_pagereq_t)
+#define VTXIOCGETPAGE	_IOW  (0x81,  6, vtx_pagereq_t)
+#define VTXIOCSTOPDAU	_IOW  (0x81,  7, vtx_pagereq_t)
+#define VTXIOCPUTPAGE	_IO   (0x81,  8)
+#define VTXIOCSETDISP	_IO   (0x81,  9)
+#define VTXIOCPUTSTAT	_IO   (0x81, 10)
+#define VTXIOCCLRCACHE	_IO   (0x81, 11)
+#define VTXIOCSETVIRT	_IOW  (0x81, 12, long)
 
+/* for compatibility, will go away some day */
+#define VTXIOCGETINFO_OLD  0x7101  /* get version of driver & capabilities of vtx-chipset */
+#define VTXIOCCLRPAGE_OLD  0x7102  /* clear page-buffer */
+#define VTXIOCCLRFOUND_OLD 0x7103  /* clear bits indicating that page was found */
+#define VTXIOCPAGEREQ_OLD  0x7104  /* search for page */
+#define VTXIOCGETSTAT_OLD  0x7105  /* get status of page-buffer */
+#define VTXIOCGETPAGE_OLD  0x7106  /* get contents of page-buffer */
+#define VTXIOCSTOPDAU_OLD  0x7107  /* stop data acquisition unit */
+#define VTXIOCPUTPAGE_OLD  0x7108  /* display page on TV-screen */
+#define VTXIOCSETDISP_OLD  0x7109  /* set TV-mode */
+#define VTXIOCPUTSTAT_OLD  0x710a  /* set status of TV-output-buffer */
+#define VTXIOCCLRCACHE_OLD 0x710b  /* clear cache on VTX-interface (if avail.) */
+#define VTXIOCSETVIRT_OLD  0x710c  /* turn on virtual mode (this disables TV-display) */
 
 /* 
  *	Definitions for VTXIOCGETINFO
@@ -102,43 +121,5 @@ typedef struct
 	unsigned hamming : 1;		/* hamming-error occurred */
 }
 vtx_pageinfo_t;
-
-
-/*
- *	Definitions for VTXIOCSETDISP
- */
  
-typedef enum { 
-	DISPOFF, DISPNORM, DISPTRANS, DISPINS, INTERLACE_OFFSET 
-} vtxdisp_t;
-
-
-
-/*
- *	Tuner ioctls
- */
- 
-#define TUNIOCGETINFO  0x7201  /* get version of driver & capabilities of tuner */
-#define TUNIOCRESET    0x7202  /* reset tuner */
-#define TUNIOCSETFREQ  0x7203  /* set tuning frequency (unit: kHz) */
-#define TUNIOCGETFREQ  0x7204  /* get tuning frequency (unit: kHz) */
-#define TUNIOCSETCHAN  0x7205  /* set tuning channel */
-#define TUNIOCGETCHAN  0x7206  /* get tuning channel */
-
-
-typedef struct 
-{
-	int version_major, version_minor;	/* version of driver; if version_major changes, driver */
-						/* is not backward compatible!!! CHECK THIS!!! */  
-	unsigned freq : 1;			/* tuner can be set to given frequency */
-	unsigned chan : 1;			/* tuner stores several channels */
-	unsigned scan : 1;			/* tuner supports scanning */
-	unsigned autoscan : 1;		/* tuner supports scanning with automatic stop */
-	unsigned afc : 1;			/* tuner supports AFC */
-	unsigned dummy1, dummy2, dummy3, dummy4, dummy5, dummy6, dummy7, dummy8, dummy9, dummy10,
- 		dummy11 : 1;
-	int dummy12, dummy13, dummy14, dummy15, dummy16, dummy17, dummy18, dummy19;
-} tuner_info_t;
-
-
 #endif /* _VTX_H */

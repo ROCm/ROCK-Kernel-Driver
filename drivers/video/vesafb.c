@@ -229,7 +229,7 @@ static int __init vesafb_probe(struct device *device)
 	unsigned int size_total;
 
 	if (screen_info.orig_video_isVGA != VIDEO_TYPE_VLFB)
-		return -ENXIO;
+		return -ENODEV;
 
 	vesafb_fix.smem_start = screen_info.lfb_base;
 	vesafb_defined.bits_per_pixel = screen_info.lfb_depth;
@@ -407,7 +407,7 @@ static int __init vesafb_probe(struct device *device)
 		(ypan) ? FBINFO_HWACCEL_YPAN : 0;
 
 	if (fb_alloc_cmap(&info->cmap, 256, 0) < 0) {
-		err = -ENXIO;
+		err = -ENOMEM;
 		goto err;
 	}
 	if (register_framebuffer(info)<0) {

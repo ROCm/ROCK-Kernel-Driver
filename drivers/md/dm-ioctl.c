@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2001, 2002 Sistina Software (UK) Limited.
- * Copyright (C) 2004 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2004 - 2005 Red Hat, Inc. All rights reserved.
  *
  * This file is released under the GPL.
  */
@@ -520,19 +520,22 @@ static int __dev_status(struct mapped_device *md, struct dm_ioctl *param)
 	if (dm_suspended(md))
 		param->flags |= DM_SUSPEND_FLAG;
 
-	bdev = bdget_disk(disk, 0);
-	if (!bdev)
-		return -ENXIO;
-
 	param->dev = huge_encode_dev(MKDEV(disk->major, disk->first_minor));
 
-	/*
-	 * Yes, this will be out of date by the time it gets back
-	 * to userland, but it is still very useful ofr
-	 * debugging.
-	 */
-	param->open_count = bdev->bd_openers;
-	bdput(bdev);
+	if (!(param->flags & DM_SKIP_BDGET_FLAG)) {
+		bdev = bdget_disk(disk, 0);
+		if (!bdev)
+			return -ENXIO;
+
+		/*
+		 * Yes, this will be out of date by the time it gets back
+		 * to userland, but it is still very useful for
+		 * debugging.
+		 */
+		param->open_count = bdev->bd_openers;
+		bdput(bdev);
+	} else
+		param->open_count = -1;
 
 	if (disk->policy)
 		param->flags |= DM_READONLY_FLAG;

@@ -96,7 +96,7 @@ static inline int _check_irq(int irq, int flags)
 /* Parameters that can be set with 'insmod' */
 
 /* Default base address for i82365sl and other ISA chips */
-static int i365_base = 0x3e0;
+static unsigned long i365_base = 0x3e0;
 /* Should we probe at 0x3e2 for an extra ISA controller? */
 static int extra_sockets = 0;
 /* Specify a socket number to ignore */
@@ -130,7 +130,7 @@ static int async_clock = -1;
 static int cable_mode = -1;
 static int wakeup = 0;
 
-module_param(i365_base, int, 0444);
+module_param(i365_base, ulong, 0444);
 module_param(ignore, int, 0444);
 module_param(extra_sockets, int, 0444);
 module_param(irq_mask, int, 0444);
@@ -167,7 +167,7 @@ struct i82365_socket {
     u_short		type, flags;
     struct pcmcia_socket	socket;
     unsigned int	number;
-    ioaddr_t		ioaddr;
+    kio_addr_t		ioaddr;
     u_short		psock;
     u_char		cs_irq, intr;
     union {
@@ -240,7 +240,7 @@ static u_char i365_get(u_short sock, u_short reg)
     unsigned long flags;
     spin_lock_irqsave(&bus_lock,flags);
     {
-	ioaddr_t port = socket[sock].ioaddr;
+	kio_addr_t port = socket[sock].ioaddr;
 	u_char val;
 	reg = I365_REG(socket[sock].psock, reg);
 	outb(reg, port); val = inb(port+1);
@@ -254,7 +254,7 @@ static void i365_set(u_short sock, u_short reg, u_char data)
     unsigned long flags;
     spin_lock_irqsave(&bus_lock,flags);
     {
-	ioaddr_t port = socket[sock].ioaddr;
+	kio_addr_t port = socket[sock].ioaddr;
 	u_char val = I365_REG(socket[sock].psock, reg);
 	outb(val, port); outb(data, port+1);
 	spin_unlock_irqrestore(&bus_lock,flags);
@@ -589,7 +589,7 @@ static int to_cycles(int ns)
 
 /*====================================================================*/
 
-static int __init identify(u_short port, u_short sock)
+static int __init identify(kio_addr_t port, u_short sock)
 {
     u_char val;
     int type = -1;
@@ -660,7 +660,7 @@ static int __init identify(u_short port, u_short sock)
 static int __init is_alive(u_short sock)
 {
     u_char stat;
-    u_short start, stop;
+    kio_addr_t start, stop;
     
     stat = i365_get(sock, I365_STATUS);
     start = i365_get_pair(sock, I365_IO(0)+I365_W_START);
@@ -677,7 +677,7 @@ static int __init is_alive(u_short sock)
 
 /*====================================================================*/
 
-static void __init add_socket(u_short port, int psock, int type)
+static void __init add_socket(kio_addr_t port, int psock, int type)
 {
     socket[sockets].ioaddr = port;
     socket[sockets].psock = psock;
@@ -699,7 +699,7 @@ static void __init add_pcic(int ns, int type)
     
     if (base == 0) printk("\n");
     printk(KERN_INFO "  %s", pcic[type].name);
-    printk(" ISA-to-PCMCIA at port %#x ofs 0x%02x",
+    printk(" ISA-to-PCMCIA at port %#lx ofs 0x%02x",
 	       t->ioaddr, t->psock*0x40);
     printk(", %d socket%s\n", ns, ((ns > 1) ? "s" : ""));
 
@@ -773,7 +773,7 @@ static struct pnp_dev *i82365_pnpdev;
 static void __init isa_probe(void)
 {
     int i, j, sock, k, ns, id;
-    ioaddr_t port;
+    kio_addr_t port;
 #ifdef CONFIG_PNP
     struct isapnp_device_id *devid;
     struct pnp_dev *dev;
@@ -804,7 +804,7 @@ static void __init isa_probe(void)
 
     if (check_region(i365_base, 2) != 0) {
 	if (sockets == 0)
-	    printk("port conflict at %#x\n", i365_base);
+	    printk("port conflict at %#lx\n", i365_base);
 	return;
     }
 
@@ -1127,7 +1127,7 @@ static int i365_set_io_map(u_short sock, struct pccard_io_map *io)
     u_char map, ioctl;
     
     debug(1, "SetIOMap(%d, %d, %#2.2x, %d ns, "
-	  "%#4.4x-%#4.4x)\n", sock, io->map, io->flags,
+	  "%#lx-%#lx)\n", sock, io->map, io->flags,
 	  io->speed, io->start, io->stop);
     map = io->map;
     if ((map > 1) || (io->start > 0xffff) || (io->stop > 0xffff) ||
@@ -1156,8 +1156,8 @@ static int i365_set_mem_map(u_short sock, struct pccard_mem_map *mem)
     u_short base, i;
     u_char map;
     
-    debug(1, "SetMemMap(%d, %d, %#2.2x, %d ns, %#5.5lx-%#5.5"
-	  "lx, %#5.5x)\n", sock, mem->map, mem->flags, mem->speed,
+    debug(1, "SetMemMap(%d, %d, %#2.2x, %d ns, %#lx-%#lx, "
+	  "%#x)\n", sock, mem->map, mem->flags, mem->speed,
 	  mem->res->start, mem->res->end, mem->card_start);
 
     map = mem->map;
@@ -1447,7 +1447,7 @@ static void __exit exit_i82365(void)
 	i365_set(i, I365_CSCINT, 0);
 	release_region(socket[i].ioaddr, 2);
     }
-#ifdef __ISAPNP__
+#ifdef CONFIG_PNP
     if (i82365_pnpdev)
     		pnp_disable_dev(i82365_pnpdev);
 #endif

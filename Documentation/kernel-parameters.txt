@@ -1102,6 +1102,9 @@ running once the system is up.
 
 	root=		[KNL] Root filesystem
 
+	rootdelay=	[KNL] Delay (in seconds) to pause before attempting to
+			mount the root filesystem
+
 	rootflags=	[KNL] Set root filesystem mount option string
 
 	rootfstype=	[KNL] Set root filesystem type
