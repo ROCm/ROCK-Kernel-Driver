@@ -170,43 +170,10 @@ page_add_rmap(struct page *page, pte_t *ptep, struct pte_chain *pte_chain)
 	pte_addr_t pte_paddr = ptep_to_paddr(ptep);
 	struct pte_chain *cur_pte_chain;
 
-#ifdef DEBUG_RMAP
-	if (!page || !ptep)
-		BUG();
-	if (!pte_present(*ptep))
-		BUG();
-	if (!ptep_to_mm(ptep))
-		BUG();
-#endif
-
-	if (!pfn_valid(page_to_pfn(page)) || PageReserved(page))
-		return pte_chain;
-
 	pte_chain_lock(page);
 
-#ifdef DEBUG_RMAP
-	/*
-	 * This stuff needs help to get up to highmem speed.
-	 */
-	{
-		struct pte_chain *pc;
-		int i;
-
-		if (PageDirect(page)) {
-			if (page->pte.direct == pte_paddr)
-				BUG();
-		} else {
-			for (pc = page->pte.chain; pc; pc=pte_chain_next(pc)) {
-				for (i = 0; i < NRPTE; i++) {
-					pte_addr_t p = pc->ptes[i];
-
-					if (p && p == pte_paddr)
-						BUG();
-				}
-			}
-		}
-	}
-#endif
+	if (!pfn_valid(page_to_pfn(page)) || PageReserved(page))
+		goto out;
 
 	if (page->pte.direct == 0) {
 		page->pte.direct = pte_paddr;
@@ -253,19 +220,18 @@ out:
  * the page.
  * Caller needs to hold the mm->page_table_lock.
  */
-void page_remove_rmap(struct page * page, pte_t * ptep)
+void page_remove_rmap(struct page *page, pte_t *ptep)
 {
 	pte_addr_t pte_paddr = ptep_to_paddr(ptep);
 	struct pte_chain *pc;
 
-	if (!page || !ptep)
-		BUG();
-	if (!pfn_valid(page_to_pfn(page)) || PageReserved(page))
-		return;
-	if (!page_mapped(page))
-		return;		/* remap_page_range() from a driver? */
-
 	pte_chain_lock(page);
+
+	if (!pfn_valid(page_to_pfn(page)) || PageReserved(page))
+		goto out_unlock;
+
+	if (!page_mapped(page))
+		goto out_unlock;	/* remap_page_range() from a driver? */
 
 	if (PageDirect(page)) {
 		if (page->pte.direct == pte_paddr) {
@@ -304,27 +270,11 @@ void page_remove_rmap(struct page * page, pte_t * ptep)
 			}
 		}
 	}
-#ifdef DEBUG_RMAP
-	/* Not found. This should NEVER happen! */
-	printk(KERN_ERR "page_remove_rmap: pte_chain %p not present.\n", ptep);
-	printk(KERN_ERR "page_remove_rmap: only found: ");
-	if (PageDirect(page)) {
-		printk("%llx", (u64)page->pte.direct);
-	} else {
-		for (pc = page->pte.chain; pc; pc = pte_chain_next(pc)) {
-			int i;
-			for (i = 0; i < NRPTE; i++)
-				printk(" %d:%llx", i, (u64)pc->ptes[i]);
-		}
-	}
-	printk("\n");
-	printk(KERN_ERR "page_remove_rmap: driver cleared PG_reserved ?\n");
-#endif
-
 out:
-	pte_chain_unlock(page);
 	if (!page_mapped(page))
 		dec_page_state(nr_mapped);
+out_unlock:
+	pte_chain_unlock(page);
 	return;
 }
 
