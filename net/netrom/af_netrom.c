@@ -433,6 +433,7 @@ static int nr_create(struct socket *sock, int protocol)
 	nr = nr_sk(sk);
 
 	sock_init_data(sock, sk);
+	sk_set_owner(sk, THIS_MODULE);
 
 	sock->ops    = &nr_proto_ops;
 	sk->sk_protocol = protocol;
@@ -473,6 +474,7 @@ static struct sock *nr_make_new(struct sock *osk)
 	nr = nr_sk(sk);
 
 	sock_init_data(NULL, sk);
+	sk_set_owner(sk, THIS_MODULE);
 
 	sk->sk_type     = osk->sk_type;
 	sk->sk_socket   = osk->sk_socket;
