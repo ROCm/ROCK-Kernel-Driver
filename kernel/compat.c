@@ -156,3 +156,23 @@ asmlinkage long compat_sys_setitimer(int which, struct compat_itimerval *in,
 		return -EFAULT;
 	return 0;
 }
+
+asmlinkage long compat_sys_times(struct compat_tms *tbuf)
+{
+	/*
+	 *	In the SMP world we might just be unlucky and have one of
+	 *	the times increment as we use it. Since the value is an
+	 *	atomically safe type this is just fine. Conceptually its
+	 *	as if the syscall took an instant longer to occur.
+	 */
+	if (tbuf) {
+		struct compat_tms tmp;
+		tmp.tms_utime = compat_jiffies_to_clock_t(current->utime);
+		tmp.tms_stime = compat_jiffies_to_clock_t(current->stime);
+		tmp.tms_cutime = compat_jiffies_to_clock_t(current->cutime);
+		tmp.tms_cstime = compat_jiffies_to_clock_t(current->cstime);
+		if (copy_to_user(tbuf, &tmp, sizeof(tmp)))
+			return -EFAULT;
+	}
+	return compat_jiffies_to_clock_t(jiffies);
+}
