@@ -139,7 +139,7 @@ struct address_space_operations swap_aops = {
 
 /*
  * A scruffy utility function to read or write an arbitrary swap page
- * and wait on the I/O.
+ * and wait on the I/O.  The caller must have a ref on the page.
  */
 int rw_swap_page_sync(int rw, swp_entry_t entry, struct page *page)
 {
@@ -151,8 +151,7 @@ int rw_swap_page_sync(int rw, swp_entry_t entry, struct page *page)
 	lock_page(page);
 
 	BUG_ON(page_mapping(page));
-	SetPageSwapCache(page);
-	page->private = entry.val;
+	add_to_page_cache(page, &swapper_space, entry.val, GFP_NOIO);
 
 	if (rw == READ) {
 		ret = swap_readpage(NULL, page);
@@ -161,7 +160,12 @@ int rw_swap_page_sync(int rw, swp_entry_t entry, struct page *page)
 		ret = swap_writepage(page, &swap_wbc);
 		wait_on_page_writeback(page);
 	}
-	ClearPageSwapCache(page);
+
+	lock_page(page);
+	remove_from_page_cache(page);
+	unlock_page(page);
+	page_cache_release(page);	/* For add_to_page_cache() */
+
 	if (ret == 0 && (!PageUptodate(page) || PageError(page)))
 		ret = -EIO;
 	return ret;

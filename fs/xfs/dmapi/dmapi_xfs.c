@@ -246,6 +246,12 @@ prohibited_mr_events(
 
 		vma = __vma_prio_tree_next(vma, &mapping->i_mmap_shared, &iter, 0, ULONG_MAX);
 	}
+	list_for_each_entry(vma, &mapping->i_mmap_nonlinear, shared.vm_set.list) {
+		if (!(vma->vm_flags & VM_DENYWRITE)) {
+			prohibited |= (1 << DM_EVENT_WRITE);
+			break;
+		}
+	}
 	up(&mapping->i_shared_sem);
 #else
 	spin_lock(&mapping->i_shared_lock);

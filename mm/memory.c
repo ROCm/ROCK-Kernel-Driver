@@ -1477,6 +1477,7 @@ retry:
 		lru_cache_add_active(page);
 		new_page = page;
 		anon = 1;
+		pageable = 1;
 	}
 
 	spin_lock(&mm->page_table_lock);
