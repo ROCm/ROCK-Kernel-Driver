@@ -739,7 +739,7 @@ do_append_data:
 	goto out;
 }
 
-ssize_t udp_sendpage(struct sock *sk, struct page *page, int offset, size_t size, int flags)
+int udp_sendpage(struct sock *sk, struct page *page, int offset, size_t size, int flags)
 {
 	struct udp_opt *up = udp_sk(sk);
 	int ret;
