@@ -107,45 +107,83 @@ asmlinkage long sys_setfsgid16(old_gid_t gid)
 	return sys_setfsgid((gid_t)gid);
 }
 
+static int groups16_to_user(old_gid_t __user *grouplist,
+    struct group_info *group_info)
+{
+	int i;
+	old_gid_t group;
+
+	for (i = 0; i < group_info->ngroups; i++) {
+		group = (old_gid_t)GROUP_AT(group_info, i);
+		if (put_user(group, grouplist+i))
+			return -EFAULT;
+	}
+
+	return 0;
+}
+
+static int groups16_from_user(struct group_info *group_info,
+    old_gid_t __user *grouplist)
+{
+	int i;
+	old_gid_t group;
+
+	for (i = 0; i < group_info->ngroups; i++) {
+		if (get_user(group, grouplist+i))
+			return  -EFAULT;
+		GROUP_AT(group_info, i) = (gid_t)group;
+	}
+
+	return 0;
+}
+
 asmlinkage long sys_getgroups16(int gidsetsize, old_gid_t __user *grouplist)
 {
-	old_gid_t groups[NGROUPS];
-	int i,j;
+	int i = 0;
 
 	if (gidsetsize < 0)
 		return -EINVAL;
-	i = current->ngroups;
+
+	get_group_info(current->group_info);
+	i = current->group_info->ngroups;
 	if (gidsetsize) {
-		if (i > gidsetsize)
-			return -EINVAL;
-		for(j=0;j<i;j++)
-			groups[j] = current->groups[j];
-		if (copy_to_user(grouplist, groups, sizeof(old_gid_t)*i))
-			return -EFAULT;
+		if (i > gidsetsize) {
+			i = -EINVAL;
+			goto out;
+		}
+		if (groups16_to_user(grouplist, current->group_info)) {
+			i = -EFAULT;
+			goto out;
+		}
 	}
+out:
+	put_group_info(current->group_info);
 	return i;
 }
 
 asmlinkage long sys_setgroups16(int gidsetsize, old_gid_t __user *grouplist)
 {
-	old_gid_t groups[NGROUPS];
-	gid_t new_groups[NGROUPS];
-	int i;
+	struct group_info *group_info;
+	int retval;
 
 	if (!capable(CAP_SETGID))
 		return -EPERM;
-	if ((unsigned) gidsetsize > NGROUPS)
+	if ((unsigned)gidsetsize > NGROUPS_MAX)
 		return -EINVAL;
-	if (copy_from_user(groups, grouplist, gidsetsize * sizeof(old_gid_t)))
-		return -EFAULT;
-	for (i = 0 ; i < gidsetsize ; i++)
-		new_groups[i] = (gid_t)groups[i];
-	i = security_task_setgroups(gidsetsize, new_groups);
-	if (i)
-		return i;
-	memcpy(current->groups, new_groups, gidsetsize * sizeof(gid_t));
-	current->ngroups = gidsetsize;
-	return 0;
+
+	group_info = groups_alloc(gidsetsize);
+	if (!group_info)
+		return -ENOMEM;
+	retval = groups16_from_user(group_info, grouplist);
+	if (retval) {
+		put_group_info(group_info);
+		return retval;
+	}
+
+	retval = set_current_groups(group_info);
+	put_group_info(group_info);
+
+	return retval;
 }
 
 asmlinkage long sys_getuid16(void)

@@ -544,7 +544,7 @@ static int dummy_task_getsid (struct task_struct *p)
 	return 0;
 }
 
-static int dummy_task_setgroups (int gidsetsize, gid_t * grouplist)
+static int dummy_task_setgroups (struct group_info *group_info)
 {
 	return 0;
 }
