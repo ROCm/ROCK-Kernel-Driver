@@ -748,9 +748,8 @@ static void do_pd_request1(request_queue_t * q)
 	if (!pd_req)
 		return;
 
-	pd_current = pd_req->rq_disk->private_data;
-
-	pi_do_claimed(pd_current->pi, do_pd_io);
+	ps_continuation = do_pd_io;
+	ps_set_intr();
 }
 
 static void do_pd_request(request_queue_t * q)
@@ -792,8 +791,8 @@ static inline void next_request(int success)
 
 static void do_pd_io(void)
 {
-	ps_continuation = do_pd_io_start;
-	ps_set_intr();
+	pd_current = pd_req->rq_disk->private_data;
+	pi_do_claimed(pd_current->pi, do_pd_io_start);
 }
 
 static void do_pd_io_start(void)
