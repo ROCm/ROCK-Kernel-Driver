@@ -543,8 +543,7 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 	int do_retry;
 	struct reclaim_state reclaim_state;
 
-	if (wait)
-		might_sleep();
+	might_sleep_if(wait);
 
 	cold = 0;
 	if (gfp_mask & __GFP_COLD)

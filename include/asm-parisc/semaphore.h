@@ -84,7 +84,7 @@ extern __inline__ void down(struct semaphore * sem)
 #if WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
 #endif
-
+	might_sleep();
 	spin_lock_irq(&sem->sentry);
 	if (sem->count > 0) {
 		sem->count--;
@@ -100,7 +100,7 @@ extern __inline__ int down_interruptible(struct semaphore * sem)
 #if WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
 #endif
-
+	might_sleep();
 	spin_lock_irq(&sem->sentry);
 	if (sem->count > 0) {
 		sem->count--;

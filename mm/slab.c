@@ -1814,8 +1814,7 @@ alloc_done:
 static inline void
 cache_alloc_debugcheck_before(kmem_cache_t *cachep, int flags)
 {
-	if (flags & __GFP_WAIT)
-		might_sleep();
+	might_sleep_if(flags & __GFP_WAIT);
 #if DEBUG
 	kmem_flagcheck(cachep, flags);
 #endif

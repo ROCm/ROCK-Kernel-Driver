@@ -88,6 +88,7 @@ static inline void down(struct semaphore * sem)
 #if WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
 #endif
+	might_sleep();
 	if (atomic_dec_return(&sem->count) < 0)
 		__down(sem);
 }
@@ -103,6 +104,7 @@ static inline int down_interruptible(struct semaphore * sem)
 #if WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
 #endif
+	might_sleep();
 	if (atomic_dec_return(&sem->count) < 0)
 		ret = __down_interruptible(sem);
 	return ret;
