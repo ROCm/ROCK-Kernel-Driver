@@ -1534,9 +1534,6 @@ typedef struct sctp_cmsgs {
 	struct sctp_sndrcvinfo *info;
 } sctp_cmsgs_t;
 
-int sctp_msghdr_parse(const struct msghdr *msg, sctp_cmsgs_t *cmsgs);
-
-
 /* Structure for tracking memory objects */
 typedef struct {
 	char *label;

@@ -136,6 +136,8 @@ int sctp_bind(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	return retval;
 }
 
+static long sctp_get_port_local(struct sock *, unsigned short);
+
 /* Bind a local address either to an endpoint or to an association.  */
 static int sctp_do_bind(struct sock *sk, sockaddr_storage_t *newaddr, int addr_len)
 {
@@ -223,10 +225,10 @@ static int sctp_do_bind(struct sock *sk, sockaddr_storage_t *newaddr, int addr_l
 	sctp_sk_addr_set(sk, &tmpaddr, &saveaddr);
 
 	/* Make sure we are allowed to bind here.
-	 * The function sctp_get_port() does duplicate address
+	 * The function sctp_get_port_local() does duplicate address
 	 * detection.
 	 */
-	if ((ret = sctp_get_port(sk, *snum))) {
+	if ((ret = sctp_get_port_local(sk, *snum))) {
 		sctp_sk_addr_restore(sk, &saveaddr);
 		if (ret == (long) sk) {
 			/* This endpoint has a conflicting address. */
@@ -665,7 +667,7 @@ static int sctp_setsockopt_bindx(struct sock* sk, struct sockaddr_storage *addrs
  * If sd in the close() call is a branched-off socket representing only
  * one association, the shutdown is performed on that association only.
  */
-void sctp_close(struct sock *sk, long timeout)
+static void sctp_close(struct sock *sk, long timeout)
 {
 	sctp_endpoint_t *ep;
 	sctp_association_t *asoc;
@@ -733,7 +735,9 @@ void sctp_close(struct sock *sk, long timeout)
 /* BUG:  We do not implement timeouts.  */
 /* BUG:  We do not implement the equivalent of wait_for_tcp_memory(). */
 
-int sctp_sendmsg(struct sock *sk, struct msghdr *msg, int size)
+static int sctp_msghdr_parse(const struct msghdr *, sctp_cmsgs_t *);
+
+static int sctp_sendmsg(struct sock *sk, struct msghdr *msg, int size)
 {
 	sctp_opt_t *sp;
 	sctp_endpoint_t *ep;
@@ -1097,8 +1101,8 @@ do_interrupted:
  *  flags   - flags sent or received with the user message, see Section
  *            5 for complete description of the flags.
  */
-int sctp_recvmsg(struct sock *sk, struct msghdr *msg, int len, int noblock,
-		 int flags, int *addr_len)
+static int sctp_recvmsg(struct sock *sk, struct msghdr *msg, int len,
+			int noblock, int flags, int *addr_len)
 {
 	sctp_ulpevent_t *event = NULL;
 	struct sk_buff *skb;
@@ -1231,8 +1235,8 @@ static inline int sctp_setsockopt_autoclose(struct sock *sk, char *optval, int o
  *   optval  - the buffer to store the value of the option.
  *   optlen  - the size of the buffer.
  */
-int sctp_setsockopt(struct sock *sk, int level, int optname, char *optval,
-		    int optlen)
+static int sctp_setsockopt(struct sock *sk, int level, int optname,
+			   char *optval, int optlen)
 {
 	int retval = 0;
 	char * tmp;
@@ -1315,19 +1319,19 @@ out_nounlock:
 }
 
 /* FIXME: Write comments. */
-int sctp_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
+static int sctp_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 {
 	return -EOPNOTSUPP; /* STUB */
 }
 
 /* FIXME: Write comments. */
-int sctp_disconnect(struct sock *sk, int flags)
+static int sctp_disconnect(struct sock *sk, int flags)
 {
 	return -EOPNOTSUPP; /* STUB */
 }
 
 /* FIXME: Write comments. */
-struct sock *sctp_accept(struct sock *sk, int flags, int *err)
+static struct sock *sctp_accept(struct sock *sk, int flags, int *err)
 {
 	int error = -EOPNOTSUPP;
 
@@ -1336,7 +1340,7 @@ struct sock *sctp_accept(struct sock *sk, int flags, int *err)
 }
 
 /* FIXME: Write Comments. */
-int sctp_ioctl(struct sock *sk, int cmd, unsigned long arg)
+static int sctp_ioctl(struct sock *sk, int cmd, unsigned long arg)
 {
 	return -EOPNOTSUPP; /* STUB */
 }
@@ -1345,7 +1349,7 @@ int sctp_ioctl(struct sock *sk, int cmd, unsigned long arg)
  * initialized the SCTP-specific portion of the sock.
  * The sock structure should already be zero-filled memory.
  */
-int sctp_init_sock(struct sock *sk)
+static int sctp_init_sock(struct sock *sk)
 {
 	sctp_endpoint_t *ep;
 	sctp_protocol_t *proto;
@@ -1430,7 +1434,7 @@ int sctp_init_sock(struct sock *sk)
 }
 
 /* Cleanup any SCTP per socket resources.  */
-int sctp_destroy_sock(struct sock *sk)
+static int sctp_destroy_sock(struct sock *sk)
 {
 	sctp_endpoint_t *ep;
 
@@ -1444,7 +1448,7 @@ int sctp_destroy_sock(struct sock *sk)
 }
 
 /* FIXME: Comments needed.  */
-void sctp_shutdown(struct sock *sk, int how)
+static void sctp_shutdown(struct sock *sk, int how)
 {
 	/* UDP-style sockets do not support shutdown. */
 	/* STUB */
@@ -1565,7 +1569,7 @@ static inline int sctp_getsockopt_autoclose(struct sock *sk, int len, char *optv
 }
 
 /* Helper routine to branch off an association to a new socket.  */
-int sctp_do_peeloff(sctp_association_t *assoc, struct socket **newsock)
+static int sctp_do_peeloff(sctp_association_t *assoc, struct socket **newsock)
 {
 	struct sock *oldsk = assoc->base.sk;
 	struct sock *newsk;
@@ -1654,8 +1658,8 @@ static inline int sctp_getsockopt_peeloff(struct sock *sk, int len, char *optval
 	return 0;
 }
 
-int sctp_getsockopt(struct sock *sk, int level, int optname, char *optval,
-		    int *optlen)
+static int sctp_getsockopt(struct sock *sk, int level, int optname,
+			   char *optval, int *optlen)
 {
 	int retval = 0;
 	sctp_protocol_t *proto = sctp_get_protocol();
@@ -1714,12 +1718,12 @@ int sctp_getsockopt(struct sock *sk, int level, int optname, char *optval,
 	return retval;
 }
 
-void sctp_hash(struct sock *sk)
+static void sctp_hash(struct sock *sk)
 {
 	/* STUB */
 }
 
-void sctp_unhash(struct sock *sk)
+static void sctp_unhash(struct sock *sk)
 {
 	/* STUB */
 }
@@ -1736,7 +1740,7 @@ void sctp_unhash(struct sock *sk)
  * link to the socket (struct sock) that uses it, the port number and
  * a fastreuse flag (FIXME: NPI ipg).
  */
-long sctp_get_port(struct sock *sk, unsigned short snum)
+static long sctp_get_port_local(struct sock *sk, unsigned short snum)
 {
 	sctp_bind_hashbucket_t *head; /* hash list */
 	sctp_bind_bucket_t *pp; /* hash list port iterator */
@@ -1916,6 +1920,13 @@ fail:
 	return ret;
 }
 
+static int sctp_get_port(struct sock *sk, unsigned short snum)
+{
+	long ret = sctp_get_port_local(sk, snum);
+
+	return (ret ? 1 : 0);
+}
+
 /*
  * 3.1.3 listen() - UDP Style Syntax
  *
@@ -1923,7 +1934,7 @@ fail:
  *   An application uses listen() to mark a socket as being able to
  *   accept new associations.
  */
-int sctp_seqpacket_listen(struct sock *sk, int backlog)
+static int sctp_seqpacket_listen(struct sock *sk, int backlog)
 {
 	sctp_opt_t *sp = sctp_sk(sk);
 	sctp_endpoint_t *ep = sp->ep;
@@ -2073,7 +2084,7 @@ static sctp_bind_bucket_t *sctp_bucket_create(sctp_bind_hashbucket_t *head, unsi
 }
 
 /* FIXME: Commments! */
-__inline__ void __sctp_put_port(struct sock *sk)
+static __inline__ void __sctp_put_port(struct sock *sk)
 {
 	sctp_protocol_t *sctp_proto = sctp_get_protocol();
 	sctp_bind_hashbucket_t *head =
@@ -2109,7 +2120,7 @@ void sctp_put_port(struct sock *sk)
  * One of those addresses will be the primary address for the association.
  * This automatically enables the multihoming capability of SCTP.
  */
-int sctp_autobind(struct sock *sk)
+static int sctp_autobind(struct sock *sk)
 {
 	sockaddr_storage_t autoaddr;
 	int addr_len = 0;
@@ -2180,7 +2191,7 @@ int sctp_autobind(struct sock *sk)
  * msg_control
  * points here
  */
-int sctp_msghdr_parse(const struct msghdr *msg, sctp_cmsgs_t *cmsgs)
+static int sctp_msghdr_parse(const struct msghdr *msg, sctp_cmsgs_t *cmsgs)
 {
 	struct cmsghdr *cmsg;
 
@@ -2371,7 +2382,7 @@ out:
  * Note: This is pretty much the same routine as in core/datagram.c
  * with a few changes to make lksctp work.
  */
-struct sk_buff *sctp_skb_recv_datagram(struct sock *sk, int flags, int noblock, int *err)
+static struct sk_buff *sctp_skb_recv_datagram(struct sock *sk, int flags, int noblock, int *err)
 {
 	int error;
 	struct sk_buff *skb;
