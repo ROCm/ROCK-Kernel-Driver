@@ -165,20 +165,6 @@ EXPORT_SYMBOL(pcmcia_register_driver);
  */
 void pcmcia_unregister_driver(struct pcmcia_driver *driver)
 {
-	socket_bind_t *b;
-	struct pcmcia_bus_socket *bus_sock;
-
-	if (driver->use_count > 0) {
-		/* Blank out any left-over device instances */
-		driver->attach = NULL; driver->detach = NULL;
-		down_read(&bus_socket_list_rwsem);
-		list_for_each_entry(bus_sock, &bus_socket_list, socket_list) {
-			for (b = bus_sock->bind; b; b = b->next)
-				if (b->driver == driver) 
-					b->instance = NULL;
-		}
-		up_read(&bus_socket_list_rwsem);
-	}
 	driver_unregister(&driver->drv);
 }
 EXPORT_SYMBOL(pcmcia_unregister_driver);
@@ -367,6 +353,9 @@ static int bind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
 	return -EBUSY;
     }
 
+    if (!try_module_get(driver->owner))
+	    return -EINVAL;
+
     bind_req.Socket = s->socket_no;
     bind_req.Function = bind_info->function;
     bind_req.dev_info = (dev_info_t *) driver->drv.name;
@@ -375,6 +364,7 @@ static int bind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
 	cs_error(NULL, BindDevice, ret);
 	printk(KERN_NOTICE "ds: unable to bind '%s' to socket %d\n",
 	       (char *)dev_info, s->socket_no);
+	module_put(driver->owner);
 	return -ENODEV;
     }
 
@@ -384,6 +374,7 @@ static int bind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
     if (!b) 
     {
     	driver->use_count--;
+	module_put(driver->owner);
 	return -ENOMEM;    
     }
     b->driver = driver;
@@ -397,6 +388,7 @@ static int bind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
 	if (b->instance == NULL) {
 	    printk(KERN_NOTICE "ds: unable to create instance "
 		   "of '%s'!\n", (char *)bind_info->dev_info);
+	    module_put(driver->owner);
 	    return -ENODEV;
 	}
     }
@@ -493,9 +485,9 @@ static int unbind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
 	if (c->instance)
 	    c->driver->detach(c->instance);
     }
+    module_put(c->driver->owner);
     *b = c->next;
     kfree(c);
-    
     return 0;
 } /* unbind_request */
 
