@@ -495,6 +495,7 @@ void __bad_xchg(volatile void *ptr, int size)
 		__builtin_return_address(0), ptr, size);
 	BUG();
 }
+EXPORT_SYMBOL(__bad_xchg);
 
 /*
  * A data abort trap was taken, but we did not handle the instruction.
@@ -532,12 +533,14 @@ volatile void __bug(const char *file, int line, void *data)
 	printk("\n");
 	*(int *)0 = 0;
 }
+EXPORT_SYMBOL(__bug);
 
 void __readwrite_bug(const char *fn)
 {
 	printk("%s called, but not implemented", fn);
 	BUG();
 }
+EXPORT_SYMBOL(__readwrite_bug);
 
 void __pte_error(const char *file, int line, unsigned long val)
 {
@@ -559,6 +562,7 @@ asmlinkage void __div0(void)
 	printk("Division by zero in kernel.\n");
 	dump_stack();
 }
+EXPORT_SYMBOL_NOVERS(__div0);
 
 void abort(void)
 {
@@ -567,6 +571,7 @@ void abort(void)
 	/* if that doesn't kill us, halt */
 	panic("Oops failed to kill thread");
 }
+EXPORT_SYMBOL(abort);
 
 void __init trap_init(void)
 {

@@ -103,6 +103,7 @@ void disable_irq(unsigned int irq)
 	list_del_init(&desc->pend);
 	spin_unlock_irqrestore(&irq_controller_lock, flags);
 }
+EXPORT_SYMBOL(disable_irq);
 
 /**
  *	enable_irq - enable interrupt handling on an irq
@@ -142,6 +143,7 @@ void enable_irq(unsigned int irq)
 	}
 	spin_unlock_irqrestore(&irq_controller_lock, flags);
 }
+EXPORT_SYMBOL(enable_irq);
 
 /*
  * Enable wake on selected irq
@@ -156,6 +158,7 @@ void enable_irq_wake(unsigned int irq)
 		desc->chip->wake(irq, 1);
 	spin_unlock_irqrestore(&irq_controller_lock, flags);
 }
+EXPORT_SYMBOL(enable_irq_wake);
 
 void disable_irq_wake(unsigned int irq)
 {
@@ -167,6 +170,7 @@ void disable_irq_wake(unsigned int irq)
 		desc->chip->wake(irq, 0);
 	spin_unlock_irqrestore(&irq_controller_lock, flags);
 }
+EXPORT_SYMBOL(disable_irq_wake);
 
 int show_interrupts(struct seq_file *p, void *v)
 {
@@ -541,6 +545,7 @@ int set_irq_type(unsigned int irq, unsigned int type)
 
 	return ret;
 }
+EXPORT_SYMBOL(set_irq_type);
 
 void set_irq_flags(unsigned int irq, unsigned int iflags)
 {
@@ -798,6 +803,7 @@ unsigned int probe_irq_mask(unsigned long irqs)
 
 	return mask;
 }
+EXPORT_SYMBOL(probe_irq_mask);
 
 /*
  * Possible return values:

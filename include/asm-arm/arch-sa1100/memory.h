@@ -36,8 +36,6 @@
  * same.  The NUMA code is handling the large holes that might exist between
  * all memory banks.
  */
-#define __virt_to_phys__is_a_macro
-#define __phys_to_virt__is_a_macro
 #define __virt_to_phys(x)	(x)
 #define __phys_to_virt(x)	(x)
 
@@ -50,8 +48,6 @@
  *
  * On the SA1100, bus addresses are equivalent to physical addresses.
  */
-#define __virt_to_bus__is_a_macro
-#define __bus_to_virt__is_a_macro
 #define __virt_to_bus(x)	 __virt_to_phys(x)
 #define __bus_to_virt(x)	 __phys_to_virt(x)
 

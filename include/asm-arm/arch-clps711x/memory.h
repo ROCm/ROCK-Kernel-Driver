@@ -43,9 +43,7 @@
 /*
  * On integrator, the dram is contiguous
  */
-#define __virt_to_phys__is_a_macro
 #define __virt_to_phys(vpage) ((vpage) - PAGE_OFFSET + PHYS_OFFSET)
-#define __phys_to_virt__is_a_macro
 #define __phys_to_virt(ppage) ((ppage) + PAGE_OFFSET - PHYS_OFFSET)
 
 /*
@@ -58,23 +56,17 @@
 
 #if defined(CONFIG_ARCH_CDB89712)
 
-#define __virt_to_bus__is_a_macro
 #define __virt_to_bus(x)	(x)
-#define __bus_to_virt__is_a_macro
 #define __bus_to_virt(x)	(x)
 
 #elif defined (CONFIG_ARCH_AUTCPU12)
 
-#define __virt_to_bus__is_a_macro
 #define __virt_to_bus(x)	(x)
-#define __bus_to_virt__is_a_macro
 #define __bus_to_virt(x)	(x)
 
 #else
 
-#define __virt_to_bus__is_a_macro
 #define __virt_to_bus(x)	((x) - PAGE_OFFSET)
-#define __bus_to_virt__is_a_macro
 #define __bus_to_virt(x)	((x) + PAGE_OFFSET)
 
 #endif

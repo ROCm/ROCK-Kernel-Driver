@@ -162,8 +162,10 @@ __ioremap(unsigned long phys_addr, size_t size, unsigned long flags,
 	}
 	return (void *) (offset + (char *)addr);
 }
+EXPORT_SYMBOL(__ioremap);
 
 void __iounmap(void *addr)
 {
 	vfree((void *) (PAGE_MASK & (unsigned long) addr));
 }
+EXPORT_SYMBOL(__iounmap);
