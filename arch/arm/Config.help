@@ -116,6 +116,16 @@ CONFIG_PCI_INTEGRATOR
   information about which PCI hardware does work under Linux and which
   doesn't.
 
+CONFIG_PREEMPT
+  This option reduces the latency of the kernel when reacting to
+  real-time or interactive events by allowing a low priority process to
+  be preempted even if it is in kernel mode executing a system call.
+  This allows applications to run more reliably even when the system is
+  under load.
+
+  Say Y here if you are building a kernel for a desktop, embedded
+  or real-time system.  Say N if you are unsure.
+
 CONFIG_MCA
   MicroChannel Architecture is found in some IBM PS/2 machines and
   laptops.  It is a bus system similar to PCI or ISA. See
@@ -521,6 +531,10 @@ CONFIG_ARCH_EBSA285_HOST
 
   Saying N will reduce the size of the Footbridge kernel.
 
+CONFIG_ARCH_IQ80310
+  Say Y here if you want to run your kernel on the Intel IQ80310
+  evaluation kit for the IOP310 chipset.
+
 CONFIG_ARCH_L7200
   Say Y here if you intend to run this kernel on a LinkUp Systems
   L7200 Software Development Board which uses an ARM720T processor.
@@ -558,6 +572,13 @@ CONFIG_ARCH_PERSONAL_SERVER
   If you have any questions or comments about the  Compaq Personal
   Server, send e-mail to skiff@crl.dec.com.
 
+CONFIG_PLD_HOTSWAP
+  This enables support for the dynamic loading and configuration of
+  compatible drivers when the contents of the PLD are changed. This
+  is still experimental and requires configuration tools which are
+  not yet generally available. Say N here. You must enable the kernel
+  module loader for this feature to work.
+
 CONFIG_SA1100_ASSABET
   Say Y here if you are using the Intel(R) StrongARM(R) SA-1110
   Microprocessor Development Board (also known as the Assabet).
@@ -567,27 +588,13 @@ CONFIG_ASSABET_NEPONSET
   Microprocessor Development Board (Assabet)  with the SA-1111
   Development Board (Nepon).
 
-CONFIG_SA1100_H3600
-  Say Y here if you intend to run this kernel on the Compaq iPAQ
-  H3600 handheld computer.  Information about this machine and the
-  Linux port to this machine can be found at:
-
-  <http://www.handhelds.org/Compaq/index.html#iPAQ_H3600>
-  <http://www.compaq.com/products/handhelds/pocketpc/>
+CONFIG_SA1100_BADGE4
+  Say Y here if you want to build a kernel for the HP Laboratories
+  BadgePAD 4.
 
 CONFIG_SA1100_BRUTUS
   Say Y here if you are using the Intel(R) StrongARM(R) SA-1100
   Microprocessor Development Board (also known as the Brutus).
-
-CONFIG_SA1100_LART
-  Say Y here if you are using the Linux Advanced Radio Terminal
-  (also known as the LART).  See <http://www.lart.tudelft.nl/> for
-  information on the LART.
-
-CONFIG_SA1100_GRAPHICSCLIENT
-  Say Y here if you are using an Applied Data Systems Intel(R)
-  StrongARM(R) SA-1100 based Graphics Client SBC.  See
-  <http://www.flatpanels.com/> for information on this system.
 
 CONFIG_SA1100_CERF
   The Intrinsyc CerfBoard is based on the StrongARM 1110.
@@ -601,6 +608,24 @@ CONFIG_SA1100_FLEXANET
   Say Y here if you intend to run this kernel on the FlexaNet
   handheld instruments. Information about this machine can be
   found at: <http://www.flexanet.com/>.
+
+CONFIG_SA1100_GRAPHICSCLIENT
+  Say Y here if you are using an Applied Data Systems Intel(R)
+  StrongARM(R) SA-1100 based Graphics Client SBC.  See
+  <http://www.flatpanels.com/> for information on this system.
+
+CONFIG_SA1100_H3600
+  Say Y here if you intend to run this kernel on the Compaq iPAQ
+  H3600 handheld computer.  Information about this machine and the
+  Linux port to this machine can be found at:
+
+  <http://www.handhelds.org/Compaq/index.html#iPAQ_H3600>
+  <http://www.compaq.com/products/handhelds/pocketpc/>
+
+CONFIG_SA1100_LART
+  Say Y here if you are using the Linux Advanced Radio Terminal
+  (also known as the LART).  See <http://www.lart.tudelft.nl/> for
+  information on the LART.
 
 CONFIG_SA1100_NANOENGINE
   The nanoEngine is a StrongARM 1110-based single board computer
@@ -618,6 +643,19 @@ CONFIG_SA1100_PANGOLIN
 
   Say Y if configuring for a Pangolin.
   Say N otherwise.
+
+CONFIG_SA1100_PFS168
+  The Radisys Corp. PFS-168 (aka Tulsa) is an Intel® StrongArm® SA-1110 based
+  computer which includes the SA-1111 Microprocessor Companion Chip and other
+  custom I/O designed to add connectivity and multimedia features for vending
+  and business machine applications. Say Y here if you require support for
+  this target.
+
+CONFIG_SA1100_SHANNON
+  The Shannon (also known as a Tuxscreen, and also as a IS2630) was a
+  limited edition webphone produced by Philips. The Shannon is a SA1100
+  platform with a 640x480 LCD, touchscreen, CIR keyboard, PCMCIA slots,
+  and a telco interface.
 
 CONFIG_SA1100_VICTOR
   Say Y here if you are using a Visu Aide Intel(R) StrongARM(R)
@@ -656,6 +694,31 @@ CONFIG_CPU_ARM920T
   Say Y if you want support for the ARM920T processor.
   Otherwise, say N.
 
+CONFIG_CPU_ARM922T
+  The ARM922T is a version of the ARM920T, but with smaller
+  instruction and data caches. It is used in Altera's
+  Excalibur XA device family.
+
+  Say Y if you want support for the ARM922T processor.
+  Otherwise, say N.
+
+CONFIG_CPU_ARM922_CPU_IDLE
+  Saying Y here will allow the processor to enter a low power
+  mode whilst waiting for an interrupt in idle. If you're unsure
+  say Y.
+
+CONFIG_CPU_ARM922_I_CACHE_ON
+  Say Y here to enable the processor instruction cache. Unless
+  you have a reason not to, say Y.
+
+CONFIG_CPU_ARM922_D_CACHE_ON
+  Say Y here to enable the processor data cache. Unless
+  you have a reason not to, say Y.
+
+CONFIG_CPU_ARM922_WRITETHROUGH
+  Say Y here to use the data cache in writethough mode. Unless you
+  specifically require this, say N.
+
 CONFIG_CPU_ARM1020
   The ARM1020 is the cached version of the ARM10 processor,
   with an addition of a floating-point unit.
@@ -688,16 +751,14 @@ CONFIG_FPE_NWFPE
 
 CONFIG_FPE_FASTFPE
   Say Y here to include the FAST floating point emulator in the kernel.
-  This is an experimental much faster emulator which has only 32 bit
+  This is an experimental much faster emulator which now also has full
   precision for the mantissa.  It does not support any exceptions.
-  This makes it very simple, it is approximately 4-8 times faster than
-  NWFPE.
+  It is very simple, and approximately 3-6 times faster than NWFPE.
 
-  It should be sufficient for most programs.  It is definitely not
-  suitable if you do scientific calculations that need double
-  precision for iteration formulas that sum up lots of very small
-  numbers.  If you do not feel you need a faster FP emulation you
-  should better choose NWFPE.
+  It should be sufficient for most programs.  It may be not suitable
+  for scientific calculations, but you have to check this for yourself.
+  If you do not feel you need a faster FP emulation you should better
+  choose NWFPE.
 
   It is also possible to say M to build the emulator as a module
   (fastfpe.o).  But keep in mind that you should only load the FP
