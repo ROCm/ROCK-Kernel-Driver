@@ -880,11 +880,13 @@ static void ipr_process_ccn(struct ipr_cmnd *ipr_cmd)
  **/
 static void ipr_log_vpd(struct ipr_std_inq_vpids *vpids, u8 *serial_num)
 {
-	char buffer[max_t(int, sizeof(struct ipr_std_inq_vpids),
-			  IPR_SERIAL_NUM_LEN) + 1];
+	char buffer[IPR_VENDOR_ID_LEN + IPR_PROD_ID_LEN
+		    + IPR_SERIAL_NUM_LEN];
 
-	memcpy(buffer, vpids, sizeof(struct ipr_std_inq_vpids));
-	buffer[sizeof(struct ipr_std_inq_vpids)] = '\0';
+	memcpy(buffer, vpids->vendor_id, IPR_VENDOR_ID_LEN);
+	memcpy(buffer + IPR_VENDOR_ID_LEN, vpids->product_id,
+	       IPR_PROD_ID_LEN);
+	buffer[IPR_VENDOR_ID_LEN + IPR_PROD_ID_LEN] = '\0';
 	ipr_err("Vendor/Product ID: %s\n", buffer);
 
 	memcpy(buffer, serial_num, IPR_SERIAL_NUM_LEN);
