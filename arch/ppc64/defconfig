@@ -131,6 +131,7 @@ CONFIG_CHR_DEV_SG=y
 # CONFIG_BLK_DEV_3W_XXXX_RAID is not set
 # CONFIG_SCSI_7000FASST is not set
 # CONFIG_SCSI_ACARD is not set
+# CONFIG_SCSI_AACRAID is not set
 # CONFIG_SCSI_AIC7XXX is not set
 # CONFIG_SCSI_AIC7XXX_OLD is not set
 # CONFIG_SCSI_DPT_I2O is not set
@@ -227,6 +228,12 @@ CONFIG_NET_IPIP=y
 # CONFIG_INET_ECN is not set
 CONFIG_SYN_COOKIES=y
 CONFIG_IPV6=m
+
+#
+#    SCTP Configuration (EXPERIMENTAL)
+#
+CONFIG_IPV6_SCTP__=m
+# CONFIG_IP_SCTP is not set
 # CONFIG_ATM is not set
 # CONFIG_VLAN_8021Q is not set
 # CONFIG_LLC is not set
@@ -286,6 +293,11 @@ CONFIG_VORTEX=y
 # CONFIG_LANCE is not set
 # CONFIG_NET_VENDOR_SMC is not set
 # CONFIG_NET_VENDOR_RACAL is not set
+
+#
+# Tulip family network device support
+#
+# CONFIG_NET_TULIP is not set
 # CONFIG_HP100 is not set
 # CONFIG_NET_ISA is not set
 CONFIG_NET_PCI=y
@@ -311,6 +323,7 @@ CONFIG_E100=y
 # CONFIG_SIS900 is not set
 # CONFIG_EPIC100 is not set
 # CONFIG_SUNDANCE is not set
+# CONFIG_SUNDANCE_MMIO is not set
 # CONFIG_TLAN is not set
 # CONFIG_VIA_RHINE is not set
 # CONFIG_VIA_RHINE_MMIO is not set
@@ -353,11 +366,6 @@ CONFIG_E1000=y
 # Wan interfaces
 #
 # CONFIG_WAN is not set
-
-#
-# Tulip family network device support
-#
-# CONFIG_NET_TULIP is not set
 
 #
 # Amateur Radio support
@@ -411,9 +419,6 @@ CONFIG_SOUND_GAMEPORT=y
 # CONFIG_GAMEPORT_CS461x is not set
 CONFIG_SERIO=y
 CONFIG_SERIO_I8042=y
-CONFIG_I8042_REG_BASE=60
-CONFIG_I8042_KBD_IRQ=1
-CONFIG_I8042_AUX_IRQ=12
 # CONFIG_SERIO_SERPORT is not set
 # CONFIG_SERIO_CT82C710 is not set
 # CONFIG_SERIO_PARKBD is not set
@@ -519,6 +524,7 @@ CONFIG_HVC_CONSOLE=y
 # CONFIG_FTAPE is not set
 # CONFIG_AGP is not set
 # CONFIG_DRM is not set
+# CONFIG_SCx200_GPIO is not set
 CONFIG_RAW_DRIVER=y
 
 #
@@ -581,6 +587,9 @@ CONFIG_EXT2_FS=y
 # CONFIG_UDF_RW is not set
 # CONFIG_UFS_FS is not set
 # CONFIG_UFS_FS_WRITE is not set
+# CONFIG_XFS_FS is not set
+# CONFIG_XFS_RT is not set
+# CONFIG_XFS_QUOTA is not set
 
 #
 # Network File Systems
