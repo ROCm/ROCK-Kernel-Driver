@@ -10,11 +10,6 @@
  */
 #define USE_TX_COAL_NOW	 0
 
-#ifndef MAX_SKB_FRAGS
-#define MAX_SKB_FRAGS 0
-#endif
-
-
 /*
  * Addressing:
  *
@@ -712,13 +707,7 @@ static inline int tx_space (struct ace_private *ap, u32 csm, u32 prd)
 }
 
 #define tx_free(ap) 		tx_space((ap)->tx_ret_csm, (ap)->tx_prd, ap)
-
-#if MAX_SKB_FRAGS
 #define tx_ring_full(ap, csm, prd)	(tx_space(ap, csm, prd) <= TX_RESERVED)
-#else
-#define tx_ring_full			0
-#endif
-
 
 static inline void set_aceaddr(aceaddr *aa, dma_addr_t addr)
 {

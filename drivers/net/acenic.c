@@ -2523,10 +2523,7 @@ restart:
 	if (tx_ring_full(ap, ap->tx_ret_csm, idx))
 		goto overflow;
 
-#if MAX_SKB_FRAGS
-	if (!skb_shinfo(skb)->nr_frags)
-#endif
-	{
+	if (!skb_shinfo(skb)->nr_frags)	{
 		dma_addr_t mapping;
 		u32 vlan_tag = 0;
 
@@ -2548,9 +2545,7 @@ restart:
 			flagsize |= BD_FLG_COAL_NOW;
 
 		ace_load_tx_bd(ap, desc, mapping, flagsize, vlan_tag);
-	}
-#if MAX_SKB_FRAGS
-	else {
+	} else {
 		dma_addr_t mapping;
 		u32 vlan_tag = 0;
 		int i, len = 0;
@@ -2605,7 +2600,6 @@ restart:
 			ace_load_tx_bd(ap, desc, mapping, flagsize, vlan_tag);
 		}
 	}
-#endif
 
  	wmb();
  	ap->tx_prd = idx;
