@@ -194,7 +194,7 @@ MODULE_PARM(drive3, "1-8i");
 
 static void ps_tq_int( void *data);
 
-enum action {Fail = 0, Ok = 1, Claim, Hold};
+enum action {Fail = 0, Ok = 1, Claim, Hold, Wait};
 
 static enum action (*phase)(void);
 static unsigned long ps_timeout;
@@ -210,6 +210,7 @@ static void ps_set_intr(void)
 }
 
 static struct pd_unit *pd_current; /* current request's drive */
+static PIA *pi_current; /* current request's PIA */
 static struct request *pd_req;	/* current request */
 
 static void run_fsm(void)
@@ -218,10 +219,14 @@ static void run_fsm(void)
 
 	switch(res = phase()) {
 		case Ok: case Fail:
+			pi_unclaim(pi_current);
 			next_request(res);
 			break;
+		case Wait:
+			pi_unclaim(pi_current);
+			/* fallthrough */
 		case Claim:
-			pi_do_claimed(pd_current->pi, run_fsm);
+			pi_do_claimed(pi_current, run_fsm);
 			break;
 		case Hold:
 			ps_set_intr();
@@ -813,6 +818,7 @@ static inline void next_request(int success)
 static enum action do_pd_io(void)
 {
 	pd_current = pd_req->rq_disk->private_data;
+	pi_current = pd_current->pi;
 	phase = do_pd_io_start;
 	return Claim;
 }
@@ -822,10 +828,8 @@ static enum action do_pd_io_start(void)
 	pd_block = pd_req->sector;
 	pd_run = pd_req->nr_sectors;
 	pd_count = pd_req->current_nr_sectors;
-	if (pd_block + pd_count > get_capacity(pd_req->rq_disk)) {
-		pi_unclaim(pd_current->pi);
+	if (pd_block + pd_count > get_capacity(pd_req->rq_disk))
 		return Fail;
-	}
 
 	pd_cmd = rq_data_dir(pd_req);
 	pd_buf = pd_req->buffer;
@@ -835,20 +839,18 @@ static enum action do_pd_io_start(void)
 		return do_pd_read_start();
 	} else if (pd_cmd == WRITE) {
 		return do_pd_write_start();
-	} else {
-		pi_unclaim(pd_current->pi);
+	} else
 		return Fail;
-	}
 }
 
 static enum action do_pd_read_start(void)
 {
-	pi_connect(pd_current->pi);
+	pi_current->proto->connect(pi_current);
 	if (pd_wait_for(pd_current, STAT_READY, "do_pd_read") & STAT_ERR) {
-		pi_disconnect(pd_current->pi);
+		pi_current->proto->disconnect(pi_current);
 		if (pd_retries < PD_MAX_RETRIES) {
 			pd_retries++;
-			return Claim;
+			return Wait;
 		}
 		return Fail;
 	}
@@ -865,11 +867,11 @@ static enum action do_pd_read_drq(void)
 
 	while (1) {
 		if (pd_wait_for(pd_current, STAT_DRQ, "do_pd_read_drq") & STAT_ERR) {
-			pi_disconnect(pd_current->pi);
+			pi_current->proto->disconnect(pi_current);
 			if (pd_retries < PD_MAX_RETRIES) {
 				pd_retries++;
 				phase = do_pd_read_start;
-				return Claim;
+				return Wait;
 			}
 			return Fail;
 		}
@@ -877,28 +879,28 @@ static enum action do_pd_read_drq(void)
 		if (pd_next_buf())
 			break;
 	}
-	pi_disconnect(pd_current->pi);
+	pi_current->proto->disconnect(pi_current);
 	return Ok;
 }
 
 static enum action do_pd_write_start(void)
 {
-	pi_connect(pd_current->pi);
+	pi_current->proto->connect(pi_current);
 	if (pd_wait_for(pd_current, STAT_READY, "do_pd_write") & STAT_ERR) {
-		pi_disconnect(pd_current->pi);
+		pi_current->proto->disconnect(pi_current);
 		if (pd_retries < PD_MAX_RETRIES) {
 			pd_retries++;
-			return Claim;
+			return Wait;
 		}
 		return Fail;
 	}
 	pd_ide_command(pd_current, IDE_WRITE, pd_block, pd_run);
 	while (1) {
 		if (pd_wait_for(pd_current, STAT_DRQ, "do_pd_write_drq") & STAT_ERR) {
-			pi_disconnect(pd_current->pi);
+			pi_current->proto->disconnect(pi_current);
 			if (pd_retries < PD_MAX_RETRIES) {
 				pd_retries++;
-				return Claim;
+				return Wait;
 			}
 			return Fail;
 		}
@@ -917,15 +919,15 @@ static enum action do_pd_write_done(void)
 		return Hold;
 
 	if (pd_wait_for(pd_current, STAT_READY, "do_pd_write_done") & STAT_ERR) {
-		pi_disconnect(pd_current->pi);
+		pi_current->proto->disconnect(pi_current);
 		if (pd_retries < PD_MAX_RETRIES) {
 			pd_retries++;
 			phase = do_pd_write_start;
-			return Claim;
+			return Wait;
 		}
 		return Fail;
 	}
-	pi_disconnect(pd_current->pi);
+	pi_current->proto->disconnect(pi_current);
 	return Ok;
 }
 
