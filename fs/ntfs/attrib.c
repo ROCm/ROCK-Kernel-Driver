@@ -731,17 +731,18 @@ run_list_element *decompress_mapping_pairs(const ntfs_volume *vol,
 
 #ifdef DEBUG
 	/* Make sure attr exists and is non-resident. */
-	if (!attr || !attr->non_resident ||
-			sle64_to_cpu(attr->_ANR(lowest_vcn)) < (VCN)0) {
+	if (!attr || !attr->non_resident || sle64_to_cpu(
+			attr->data.non_resident.lowest_vcn) < (VCN)0) {
 		ntfs_error(vol->sb, "Invalid arguments.");
 		return ERR_PTR(-EINVAL);
 	}
 #endif
 	/* Start at vcn = lowest_vcn and lcn 0. */
-	vcn = sle64_to_cpu(attr->_ANR(lowest_vcn));
+	vcn = sle64_to_cpu(attr->data.non_resident.lowest_vcn);
 	lcn = 0;
 	/* Get start of the mapping pairs array. */
-	buf = (u8*)attr + le16_to_cpu(attr->_ANR(mapping_pairs_offset));
+	buf = (u8*)attr + le16_to_cpu(
+			attr->data.non_resident.mapping_pairs_offset);
 	attr_end = (u8*)attr + le32_to_cpu(attr->length);
 	if (unlikely(buf < (u8*)attr || buf > attr_end)) {
 		ntfs_error(vol->sb, "Corrupt attribute.");
@@ -867,7 +868,7 @@ run_list_element *decompress_mapping_pairs(const ntfs_volume *vol,
 	 * If there is a highest_vcn specified, it must be equal to the final
 	 * vcn in the run list - 1, or something has gone badly wrong.
 	 */
-	deltaxcn = sle64_to_cpu(attr->_ANR(highest_vcn));
+	deltaxcn = sle64_to_cpu(attr->data.non_resident.highest_vcn);
 	if (unlikely(deltaxcn && vcn - 1 != deltaxcn)) {
 mpa_err:
 		ntfs_error(vol->sb, "Corrupt mapping pairs array in "
@@ -875,10 +876,11 @@ mpa_err:
 		goto err_out;
 	}
 	/* Setup not mapped run list element if this is the base extent. */
-	if (!attr->_ANR(lowest_vcn)) {
+	if (!attr->data.non_resident.lowest_vcn) {
 		VCN max_cluster;
 
-		max_cluster = (sle64_to_cpu(attr->_ANR(allocated_size)) +
+		max_cluster = (sle64_to_cpu(
+				attr->data.non_resident.allocated_size) +
 				vol->cluster_size - 1) >>
 				vol->cluster_size_bits;
 		/*
@@ -951,7 +953,7 @@ int map_run_list(ntfs_inode *ni, VCN vcn)
 	if (!NInoAttr(ni))
 		base_ni = ni;
 	else
-		base_ni = ni->_INE(base_ntfs_ino);
+		base_ni = ni->ext.base_ntfs_ino;
 
 	mrec = map_mft_record(base_ni);
 	if (IS_ERR(mrec))
@@ -1183,19 +1185,20 @@ BOOL find_attr(const ATTR_TYPES type, const uchar_t *name, const u32 name_len,
 			u32 vl;
 			register int rc;
 
-			vl = le32_to_cpu(a->_ARA(value_length));
+			vl = le32_to_cpu(a->data.resident.value_length);
 			if (vl > val_len)
 				vl = val_len;
 
 			rc = memcmp(val, (u8*)a + le16_to_cpu(
-					a->_ARA(value_offset)), vl);
+					a->data.resident.value_offset), vl);
 			/*
 			 * If @val collates before the current attribute's
 			 * value, there is no matching attribute.
 			 */
 			if (!rc) {
 				register u32 avl;
-				avl = le32_to_cpu(a->_ARA(value_length));
+				avl = le32_to_cpu(
+						a->data.resident.value_length);
 				if (val_len == avl)
 					return TRUE;
 				if (val_len < avl)
@@ -1547,9 +1550,11 @@ do_next_attr_loop:
 		 * If no @val specified or @val specified and it matches, we
 		 * have found it!
 		 */
-		if (!val || (!a->non_resident && le32_to_cpu(a->_ARA(value_length))
-				== val_len && !memcmp((u8*)a +
-				le16_to_cpu(a->_ARA(value_offset)), val, val_len))) {
+		if (!val || (!a->non_resident && le32_to_cpu(
+				a->data.resident.value_length) == val_len &&
+				!memcmp((u8*)a +
+				le16_to_cpu(a->data.resident.value_offset),
+				val, val_len))) {
 			ntfs_debug("Done, found.");
 			return TRUE;
 		}

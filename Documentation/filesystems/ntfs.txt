@@ -247,6 +247,9 @@ ChangeLog
 
 Note, a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
 
+2.1.4:
+	- Minor update allowing compilation with all gcc versions (well, the
+	  ones the kernel can be compiled with anyway).
 2.1.3:
 	- Major bug fixes for reading files and volumes in corner cases which
 	  were being hit by Windows 2k/XP users.

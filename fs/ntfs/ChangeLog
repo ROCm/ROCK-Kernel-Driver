@@ -20,6 +20,12 @@ ToDo:
 	  sufficient for synchronisation here. We then just need to make sure
 	  ntfs_readpage/writepage/truncate interoperate properly with us.
 
+2.1.4 - Reduce compiler requirements.
+
+	- Remove all uses of unnamed structs and unions in the driver to make
+	  old and newer gcc versions happy. Makes it a bit uglier IMO but at
+	  least people will stop hassling me about it.
+
 2.1.3 - Important bug fixes in corner cases.
 
 	- super.c::parse_ntfs_boot_sector(): Correct the check for 64-bit

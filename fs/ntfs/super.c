@@ -883,10 +883,10 @@ get_ctx_vol_failed:
 		goto iput_volume_failed;
 	}
 	vi = (VOLUME_INFORMATION*)((char*)ctx->attr +
-			le16_to_cpu(ctx->attr->_ARA(value_offset)));
+			le16_to_cpu(ctx->attr->data.resident.value_offset));
 	/* Some bounds checks. */
 	if ((u8*)vi < (u8*)ctx->attr || (u8*)vi +
-			le32_to_cpu(ctx->attr->_ARA(value_length)) >
+			le32_to_cpu(ctx->attr->data.resident.value_length) >
 			(u8*)ctx->attr + le32_to_cpu(ctx->attr->length))
 		goto err_put_vol;
 	/* Setup volume flags and version. */

@@ -1,8 +1,8 @@
 /**
  * dir.c - NTFS kernel directory operations. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2001,2002 Anton Altaparmakov.
- * Copyright (c) 2002 Richard Russon.
+ * Copyright (c) 2001-2003 Anton Altaparmakov
+ * Copyright (c) 2002 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -105,7 +105,7 @@ MFT_REF ntfs_lookup_inode_by_name(ntfs_inode *dir_ni, const uchar_t *uname,
 	}
 	/* Get to the index root value (it's been verified in read_inode). */
 	ir = (INDEX_ROOT*)((u8*)ctx->attr +
-			le16_to_cpu(ctx->attr->_ARA(value_offset)));
+			le16_to_cpu(ctx->attr->data.resident.value_offset));
 	index_end = (u8*)&ir->index + le32_to_cpu(ir->index.index_length);
 	/* The first index entry. */
 	ie = (INDEX_ENTRY*)((u8*)&ir->index +
@@ -114,18 +114,18 @@ MFT_REF ntfs_lookup_inode_by_name(ntfs_inode *dir_ni, const uchar_t *uname,
 	 * Loop until we exceed valid memory (corruption case) or until we
 	 * reach the last entry.
 	 */
-	for (;; ie = (INDEX_ENTRY*)((u8*)ie + le16_to_cpu(ie->_IEH(length)))) {
+	for (;; ie = (INDEX_ENTRY*)((u8*)ie + le16_to_cpu(ie->length))) {
 		/* Bounds checks. */
 		if ((u8*)ie < (u8*)ctx->mrec || (u8*)ie +
 				sizeof(INDEX_ENTRY_HEADER) > index_end ||
-				(u8*)ie + le16_to_cpu(ie->_IEH(key_length)) >
+				(u8*)ie + le16_to_cpu(ie->key_length) >
 				index_end)
 			goto dir_err_out;
 		/*
 		 * The last entry cannot contain a name. It can however contain
 		 * a pointer to a child node in the B+tree so we just break out.
 		 */
-		if (ie->_IEH(flags) & INDEX_ENTRY_END)
+		if (ie->flags & INDEX_ENTRY_END)
 			break;
 		/*
 		 * We perform a case sensitive comparison and if that matches
@@ -159,7 +159,7 @@ found_it:
 					}
 				}
 				name->mref = le64_to_cpu(
-						ie->_IIF(indexed_file));
+						ie->data.dir.indexed_file);
 				name->type = FILE_NAME_DOS;
 				name->len = 0;
 				*res = name;
@@ -168,7 +168,7 @@ found_it:
 					kfree(name);
 				*res = NULL;
 			}
-			mref = le64_to_cpu(ie->_IIF(indexed_file));
+			mref = le64_to_cpu(ie->data.dir.indexed_file);
 			put_attr_search_ctx(ctx);
 			unmap_mft_record(dir_ni);
 			return mref;
@@ -211,7 +211,7 @@ found_it:
 				err = -ENOMEM;
 				goto err_out;
 			}
-			name->mref = le64_to_cpu(ie->_IIF(indexed_file));
+			name->mref = le64_to_cpu(ie->data.dir.indexed_file);
 			name->type = type;
 			if (type != FILE_NAME_DOS) {
 				name->len = len;
@@ -265,7 +265,7 @@ found_it:
 	 * we have got a matching name cached in name in which case return the
 	 * mft reference associated with it.
 	 */
-	if (!(ie->_IEH(flags) & INDEX_ENTRY_NODE)) {
+	if (!(ie->flags & INDEX_ENTRY_NODE)) {
 		if (name) {
 			put_attr_search_ctx(ctx);
 			unmap_mft_record(dir_ni);
@@ -284,7 +284,7 @@ found_it:
 		goto err_out;
 	}
 	/* Get the starting vcn of the index_block holding the child node. */
-	vcn = sle64_to_cpup((u8*)ie + le16_to_cpu(ie->_IEH(length)) - 8);
+	vcn = sle64_to_cpup((u8*)ie + le16_to_cpu(ie->length) - 8);
 	ia_mapping = VFS_I(dir_ni)->i_mapping;
 	/*
 	 * We are done with the index root and the mft record. Release them,
@@ -301,7 +301,7 @@ descend_into_child_node:
 	 * disk if necessary.
 	 */
 	page = ntfs_map_page(ia_mapping, vcn <<
-			dir_ni->_IDM(index_vcn_size_bits) >> PAGE_CACHE_SHIFT);
+			dir_ni->itype.index.vcn_size_bits >> PAGE_CACHE_SHIFT);
 	if (IS_ERR(page)) {
 		ntfs_error(sb, "Failed to map directory index page, error %ld.",
 				-PTR_ERR(page));
@@ -312,7 +312,7 @@ descend_into_child_node:
 fast_descend_into_child_node:
 	/* Get to the index allocation block. */
 	ia = (INDEX_ALLOCATION*)(kaddr + ((vcn <<
-			dir_ni->_IDM(index_vcn_size_bits)) & ~PAGE_CACHE_MASK));
+			dir_ni->itype.index.vcn_size_bits) & ~PAGE_CACHE_MASK));
 	/* Bounds checks. */
 	if ((u8*)ia < kaddr || (u8*)ia > kaddr + PAGE_CACHE_SIZE) {
 		ntfs_error(sb, "Out of bounds check failed. Corrupt directory "
@@ -331,18 +331,18 @@ fast_descend_into_child_node:
 		goto unm_err_out;
 	}
 	if (le32_to_cpu(ia->index.allocated_size) + 0x18 !=
-			dir_ni->_IDM(index_block_size)) {
+			dir_ni->itype.index.block_size) {
 		ntfs_error(sb, "Index buffer (VCN 0x%Lx) of directory inode "
 				"0x%lx has a size (%u) differing from the "
 				"directory specified size (%u). Directory "
 				"inode is corrupt or driver bug.",
 				(long long)vcn, dir_ni->mft_no,
 				le32_to_cpu(ia->index.allocated_size) + 0x18,
-				dir_ni->_IDM(index_block_size));
+				dir_ni->itype.index.block_size);
 		err = -EIO;
 		goto unm_err_out;
 	}
-	index_end = (u8*)ia + dir_ni->_IDM(index_block_size);
+	index_end = (u8*)ia + dir_ni->itype.index.block_size;
 	if (index_end > kaddr + PAGE_CACHE_SIZE) {
 		ntfs_error(sb, "Index buffer (VCN 0x%Lx) of directory inode "
 				"0x%lx crosses page boundary. Impossible! "
@@ -352,7 +352,7 @@ fast_descend_into_child_node:
 		goto unm_err_out;
 	}
 	index_end = (u8*)&ia->index + le32_to_cpu(ia->index.index_length);
-	if (index_end > (u8*)ia + dir_ni->_IDM(index_block_size)) {
+	if (index_end > (u8*)ia + dir_ni->itype.index.block_size) {
 		ntfs_error(sb, "Size of index buffer (VCN 0x%Lx) of directory "
 				"inode 0x%lx exceeds maximum size.",
 				(long long)vcn, dir_ni->mft_no);
@@ -367,11 +367,11 @@ fast_descend_into_child_node:
 	 * loop until we exceed valid memory (corruption case) or until we
 	 * reach the last entry.
 	 */
-	for (;; ie = (INDEX_ENTRY*)((u8*)ie + le16_to_cpu(ie->_IEH(length)))) {
+	for (;; ie = (INDEX_ENTRY*)((u8*)ie + le16_to_cpu(ie->length))) {
 		/* Bounds check. */
 		if ((u8*)ie < (u8*)ia || (u8*)ie +
 				sizeof(INDEX_ENTRY_HEADER) > index_end ||
-				(u8*)ie + le16_to_cpu(ie->_IEH(key_length)) >
+				(u8*)ie + le16_to_cpu(ie->key_length) >
 				index_end) {
 			ntfs_error(sb, "Index entry out of bounds in "
 					"directory inode 0x%lx.",
@@ -383,7 +383,7 @@ fast_descend_into_child_node:
 		 * The last entry cannot contain a name. It can however contain
 		 * a pointer to a child node in the B+tree so we just break out.
 		 */
-		if (ie->_IEH(flags) & INDEX_ENTRY_END)
+		if (ie->flags & INDEX_ENTRY_END)
 			break;
 		/*
 		 * We perform a case sensitive comparison and if that matches
@@ -417,7 +417,7 @@ found_it2:
 					}
 				}
 				name->mref = le64_to_cpu(
-						ie->_IIF(indexed_file));
+						ie->data.dir.indexed_file);
 				name->type = FILE_NAME_DOS;
 				name->len = 0;
 				*res = name;
@@ -426,7 +426,7 @@ found_it2:
 					kfree(name);
 				*res = NULL;
 			}
-			mref = le64_to_cpu(ie->_IIF(indexed_file));
+			mref = le64_to_cpu(ie->data.dir.indexed_file);
 			ntfs_unmap_page(page);
 			return mref;
 		}
@@ -469,7 +469,7 @@ found_it2:
 				err = -ENOMEM;
 				goto unm_err_out;
 			}
-			name->mref = le64_to_cpu(ie->_IIF(indexed_file));
+			name->mref = le64_to_cpu(ie->data.dir.indexed_file);
 			name->type = type;
 			if (type != FILE_NAME_DOS) {
 				name->len = len;
@@ -521,7 +521,7 @@ found_it2:
 	 * We have finished with this index buffer without success. Check for
 	 * the presence of a child node.
 	 */
-	if (ie->_IEH(flags) & INDEX_ENTRY_NODE) {
+	if (ie->flags & INDEX_ENTRY_NODE) {
 		if ((ia->index.flags & NODE_MASK) == LEAF_NODE) {
 			ntfs_error(sb, "Index entry with child node found in "
 					"a leaf node in directory inode 0x%lx.",
@@ -531,8 +531,7 @@ found_it2:
 		}
 		/* Child node present, descend into it. */
 		old_vcn = vcn;
-		vcn = sle64_to_cpup((u8*)ie +
-				le16_to_cpu(ie->_IEH(length)) - 8);
+		vcn = sle64_to_cpup((u8*)ie + le16_to_cpu(ie->length) - 8);
 		if (vcn >= 0) {
 			/* If vcn is in the same page cache page as old_vcn we
 			 * recycle the mapped page. */
@@ -646,7 +645,7 @@ u64 ntfs_lookup_inode_by_name(ntfs_inode *dir_ni, const uchar_t *uname,
 	}
 	/* Get to the index root value (it's been verified in read_inode). */
 	ir = (INDEX_ROOT*)((u8*)ctx->attr +
-			le16_to_cpu(ctx->attr->_ARA(value_offset)));
+			le16_to_cpu(ctx->attr->data.resident.value_offset));
 	index_end = (u8*)&ir->index + le32_to_cpu(ir->index.index_length);
 	/* The first index entry. */
 	ie = (INDEX_ENTRY*)((u8*)&ir->index +
@@ -655,18 +654,18 @@ u64 ntfs_lookup_inode_by_name(ntfs_inode *dir_ni, const uchar_t *uname,
 	 * Loop until we exceed valid memory (corruption case) or until we
 	 * reach the last entry.
 	 */
-	for (;; ie = (INDEX_ENTRY*)((u8*)ie + le16_to_cpu(ie->_IEH(length)))) {
+	for (;; ie = (INDEX_ENTRY*)((u8*)ie + le16_to_cpu(ie->length))) {
 		/* Bounds checks. */
 		if ((u8*)ie < (u8*)ctx->mrec || (u8*)ie +
 				sizeof(INDEX_ENTRY_HEADER) > index_end ||
-				(u8*)ie + le16_to_cpu(ie->_IEH(key_length)) >
+				(u8*)ie + le16_to_cpu(ie->key_length) >
 				index_end)
 			goto dir_err_out;
 		/*
 		 * The last entry cannot contain a name. It can however contain
 		 * a pointer to a child node in the B+tree so we just break out.
 		 */
-		if (ie->_IEH(flags) & INDEX_ENTRY_END)
+		if (ie->flags & INDEX_ENTRY_END)
 			break;
 		/*
 		 * If the current entry has a name type of POSIX, the name is
@@ -691,7 +690,7 @@ u64 ntfs_lookup_inode_by_name(ntfs_inode *dir_ni, const uchar_t *uname,
 				ie->key.file_name.file_name_length, ic,
 				vol->upcase, vol->upcase_len)) {
 found_it:
-			mref = le64_to_cpu(ie->_IIF(indexed_file));
+			mref = le64_to_cpu(ie->data.dir.indexed_file);
 			put_attr_search_ctx(ctx);
 			unmap_mft_record(dir_ni);
 			return mref;
@@ -738,7 +737,7 @@ found_it:
 	 * We have finished with this index without success. Check for the
 	 * presence of a child node.
 	 */
-	if (!(ie->_IEH(flags) & INDEX_ENTRY_NODE)) {
+	if (!(ie->flags & INDEX_ENTRY_NODE)) {
 		/* No child node, return -ENOENT. */
 		err = -ENOENT;
 		goto err_out;
@@ -752,7 +751,7 @@ found_it:
 		goto err_out;
 	}
 	/* Get the starting vcn of the index_block holding the child node. */
-	vcn = sle64_to_cpup((u8*)ie + le16_to_cpu(ie->_IEH(length)) - 8);
+	vcn = sle64_to_cpup((u8*)ie + le16_to_cpu(ie->length) - 8);
 	ia_mapping = VFS_I(dir_ni)->i_mapping;
 	/*
 	 * We are done with the index root and the mft record. Release them,
@@ -769,7 +768,7 @@ descend_into_child_node:
 	 * disk if necessary.
 	 */
 	page = ntfs_map_page(ia_mapping, vcn <<
-			dir_ni->_IDM(index_vcn_size_bits) >> PAGE_CACHE_SHIFT);
+			dir_ni->itype.index.vcn_size_bits >> PAGE_CACHE_SHIFT);
 	if (IS_ERR(page)) {
 		ntfs_error(sb, "Failed to map directory index page, error %ld.",
 				-PTR_ERR(page));
@@ -780,7 +779,7 @@ descend_into_child_node:
 fast_descend_into_child_node:
 	/* Get to the index allocation block. */
 	ia = (INDEX_ALLOCATION*)(kaddr + ((vcn <<
-			dir_ni->_IDM(index_vcn_size_bits)) & ~PAGE_CACHE_MASK));
+			dir_ni->itype.index.vcn_size_bits) & ~PAGE_CACHE_MASK));
 	/* Bounds checks. */
 	if ((u8*)ia < kaddr || (u8*)ia > kaddr + PAGE_CACHE_SIZE) {
 		ntfs_error(sb, "Out of bounds check failed. Corrupt directory "
@@ -799,18 +798,18 @@ fast_descend_into_child_node:
 		goto unm_err_out;
 	}
 	if (le32_to_cpu(ia->index.allocated_size) + 0x18 !=
-			dir_ni->_IDM(index_block_size)) {
+			dir_ni->itype.index.block_size) {
 		ntfs_error(sb, "Index buffer (VCN 0x%Lx) of directory inode "
 				"0x%lx has a size (%u) differing from the "
 				"directory specified size (%u). Directory "
 				"inode is corrupt or driver bug.",
 				(long long)vcn, dir_ni->mft_no,
 				le32_to_cpu(ia->index.allocated_size) + 0x18,
-				dir_ni->_IDM(index_block_size));
+				dir_ni->itype.index.block_size);
 		err = -EIO;
 		goto unm_err_out;
 	}
-	index_end = (u8*)ia + dir_ni->_IDM(index_block_size);
+	index_end = (u8*)ia + dir_ni->itype.index.block_size;
 	if (index_end > kaddr + PAGE_CACHE_SIZE) {
 		ntfs_error(sb, "Index buffer (VCN 0x%Lx) of directory inode "
 				"0x%lx crosses page boundary. Impossible! "
@@ -820,7 +819,7 @@ fast_descend_into_child_node:
 		goto unm_err_out;
 	}
 	index_end = (u8*)&ia->index + le32_to_cpu(ia->index.index_length);
-	if (index_end > (u8*)ia + dir_ni->_IDM(index_block_size)) {
+	if (index_end > (u8*)ia + dir_ni->itype.index.block_size) {
 		ntfs_error(sb, "Size of index buffer (VCN 0x%Lx) of directory "
 				"inode 0x%lx exceeds maximum size.",
 				(long long)vcn, dir_ni->mft_no);
@@ -835,11 +834,11 @@ fast_descend_into_child_node:
 	 * loop until we exceed valid memory (corruption case) or until we
 	 * reach the last entry.
 	 */
-	for (;; ie = (INDEX_ENTRY*)((u8*)ie + le16_to_cpu(ie->_IEH(length)))) {
+	for (;; ie = (INDEX_ENTRY*)((u8*)ie + le16_to_cpu(ie->length))) {
 		/* Bounds check. */
 		if ((u8*)ie < (u8*)ia || (u8*)ie +
 				sizeof(INDEX_ENTRY_HEADER) > index_end ||
-				(u8*)ie + le16_to_cpu(ie->_IEH(key_length)) >
+				(u8*)ie + le16_to_cpu(ie->key_length) >
 				index_end) {
 			ntfs_error(sb, "Index entry out of bounds in "
 					"directory inode 0x%lx.",
@@ -851,7 +850,7 @@ fast_descend_into_child_node:
 		 * The last entry cannot contain a name. It can however contain
 		 * a pointer to a child node in the B+tree so we just break out.
 		 */
-		if (ie->_IEH(flags) & INDEX_ENTRY_END)
+		if (ie->flags & INDEX_ENTRY_END)
 			break;
 		/*
 		 * If the current entry has a name type of POSIX, the name is
@@ -876,7 +875,7 @@ fast_descend_into_child_node:
 				ie->key.file_name.file_name_length, ic,
 				vol->upcase, vol->upcase_len)) {
 found_it2:
-			mref = le64_to_cpu(ie->_IIF(indexed_file));
+			mref = le64_to_cpu(ie->data.dir.indexed_file);
 			ntfs_unmap_page(page);
 			return mref;
 		}
@@ -922,7 +921,7 @@ found_it2:
 	 * We have finished with this index buffer without success. Check for
 	 * the presence of a child node.
 	 */
-	if (ie->_IEH(flags) & INDEX_ENTRY_NODE) {
+	if (ie->flags & INDEX_ENTRY_NODE) {
 		if ((ia->index.flags & NODE_MASK) == LEAF_NODE) {
 			ntfs_error(sb, "Index entry with child node found in "
 					"a leaf node in directory inode 0x%lx.",
@@ -932,8 +931,7 @@ found_it2:
 		}
 		/* Child node present, descend into it. */
 		old_vcn = vcn;
-		vcn = sle64_to_cpup((u8*)ie +
-				le16_to_cpu(ie->_IEH(length)) - 8);
+		vcn = sle64_to_cpup((u8*)ie + le16_to_cpu(ie->length) - 8);
 		if (vcn >= 0) {
 			/* If vcn is in the same page cache page as old_vcn we
 			 * recycle the mapped page. */
@@ -1007,7 +1005,7 @@ static inline int ntfs_filldir(ntfs_volume *vol, loff_t *fpos,
 	if (index_type == INDEX_TYPE_ALLOCATION)
 		*fpos = (u8*)ie - (u8*)iu.ia +
 				(sle64_to_cpu(iu.ia->index_block_vcn) <<
-				ndir->_IDM(index_vcn_size_bits)) +
+				ndir->itype.index.vcn_size_bits) +
 				vol->mft_record_size;
 	else /* if (index_type == INDEX_TYPE_ROOT) */
 		*fpos = (u8*)ie - (u8*)iu.ir;
@@ -1016,11 +1014,11 @@ static inline int ntfs_filldir(ntfs_volume *vol, loff_t *fpos,
 		ntfs_debug("Skipping DOS name space entry.");
 		return 0;
 	}
-	if (MREF_LE(ie->_IIF(indexed_file)) == FILE_root) {
+	if (MREF_LE(ie->data.dir.indexed_file) == FILE_root) {
 		ntfs_debug("Skipping root directory self reference entry.");
 		return 0;
 	}
-	if (MREF_LE(ie->_IIF(indexed_file)) < FILE_first_user &&
+	if (MREF_LE(ie->data.dir.indexed_file) < FILE_first_user &&
 			!NVolShowSystemFiles(vol)) {
 		ntfs_debug("Skipping system file.");
 		return 0;
@@ -1039,10 +1037,10 @@ static inline int ntfs_filldir(ntfs_volume *vol, loff_t *fpos,
 		dt_type = DT_REG;
 	ntfs_debug("Calling filldir for %s with len %i, fpos 0x%Lx, inode "
 			"0x%lx, DT_%s.", name, name_len, *fpos,
-			MREF_LE(ie->_IIF(indexed_file)),
+			MREF_LE(ie->data.dir.indexed_file),
 			dt_type == DT_DIR ? "DIR" : "REG");
 	return filldir(dirent, name, name_len, *fpos,
-			MREF_LE(ie->_IIF(indexed_file)), dt_type);
+			MREF_LE(ie->data.dir.indexed_file), dt_type);
 }
 
 /*
@@ -1139,7 +1137,7 @@ static int ntfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	}
 	/* Get to the index root value (it's been verified in read_inode). */
 	ir = (INDEX_ROOT*)((u8*)ctx->attr +
-			le16_to_cpu(ctx->attr->_ARA(value_offset)));
+			le16_to_cpu(ctx->attr->data.resident.value_offset));
 	index_end = (u8*)&ir->index + le32_to_cpu(ir->index.index_length);
 	/* The first index entry. */
 	ie = (INDEX_ENTRY*)((u8*)&ir->index +
@@ -1149,16 +1147,16 @@ static int ntfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	 * reach the last entry or until filldir tells us it has had enough
 	 * or signals an error (both covered by the rc test).
 	 */
-	for (;; ie = (INDEX_ENTRY*)((u8*)ie + le16_to_cpu(ie->_IEH(length)))) {
+	for (;; ie = (INDEX_ENTRY*)((u8*)ie + le16_to_cpu(ie->length))) {
 		ntfs_debug("In index root, offset 0x%x.", (u8*)ie - (u8*)ir);
 		/* Bounds checks. */
 		if (unlikely((u8*)ie < (u8*)ctx->mrec || (u8*)ie +
 				sizeof(INDEX_ENTRY_HEADER) > index_end ||
-				(u8*)ie + le16_to_cpu(ie->_IEH(key_length)) >
+				(u8*)ie + le16_to_cpu(ie->key_length) >
 				index_end))
 			goto err_out;
 		/* The last entry cannot contain a name. */
-		if (ie->_IEH(flags) & INDEX_ENTRY_END)
+		if (ie->flags & INDEX_ENTRY_END)
 			break;
 		/* Skip index root entry if continuing previous readdir. */
 		if (ir_pos > (u8*)ie - (u8*)ir)
@@ -1192,7 +1190,7 @@ skip_index_root:
 	/* Get the offset into the index allocation attribute. */
 	ia_pos = (s64)fpos - vol->mft_record_size;
 	ia_mapping = vdir->i_mapping;
-	bmp_vi = ndir->_IDM(bmp_ino);
+	bmp_vi = ndir->itype.index.bmp_ino;
 	if (unlikely(!bmp_vi)) {
 		ntfs_debug("Inode %lu, regetting index bitmap.", vdir->i_ino);
 		bmp_vi = ntfs_attr_iget(vdir, AT_BITMAP, I30, 4);
@@ -1201,11 +1199,11 @@ skip_index_root:
 			err = PTR_ERR(bmp_vi);
 			goto err_out;
 		}
-		ndir->_IDM(bmp_ino) = bmp_vi;
+		ndir->itype.index.bmp_ino = bmp_vi;
 	}
 	bmp_mapping = bmp_vi->i_mapping;
 	/* Get the starting bitmap bit position and sanity check it. */
-	bmp_pos = ia_pos >> ndir->_IDM(index_block_size_bits);
+	bmp_pos = ia_pos >> ndir->itype.index.block_size_bits;
 	if (unlikely(bmp_pos >> 3 >= bmp_vi->i_size)) {
 		ntfs_error(sb, "Current index allocation position exceeds "
 				"index bitmap size.");
@@ -1245,7 +1243,7 @@ find_next_index_buffer:
 		if (unlikely(((bmp_pos + cur_bmp_pos) >> 3) >= vdir->i_size))
 			goto unm_EOD;
 		ia_pos = (bmp_pos + cur_bmp_pos) <<
-				ndir->_IDM(index_block_size_bits);
+				ndir->itype.index.block_size_bits;
 	}
 	ntfs_debug("Handling index buffer 0x%Lx.",
 			(long long)bmp_pos + cur_bmp_pos);
@@ -1269,7 +1267,7 @@ find_next_index_buffer:
 	}
 	/* Get the current index buffer. */
 	ia = (INDEX_ALLOCATION*)(kaddr + (ia_pos & ~PAGE_CACHE_MASK &
-			~(s64)(ndir->_IDM(index_block_size) - 1)));
+			~(s64)(ndir->itype.index.block_size - 1)));
 	/* Bounds checks. */
 	if (unlikely((u8*)ia < kaddr || (u8*)ia > kaddr + PAGE_CACHE_SIZE)) {
 		ntfs_error(sb, "Out of bounds check failed. Corrupt directory "
@@ -1277,45 +1275,45 @@ find_next_index_buffer:
 		goto err_out;
 	}
 	if (unlikely(sle64_to_cpu(ia->index_block_vcn) != (ia_pos &
-			~(s64)(ndir->_IDM(index_block_size) - 1)) >>
-			ndir->_IDM(index_vcn_size_bits))) {
+			~(s64)(ndir->itype.index.block_size - 1)) >>
+			ndir->itype.index.vcn_size_bits)) {
 		ntfs_error(sb, "Actual VCN (0x%Lx) of index buffer is "
 				"different from expected VCN (0x%Lx). "
 				"Directory inode 0x%lx is corrupt or driver "
 				"bug. ",
 				(long long)sle64_to_cpu(ia->index_block_vcn),
 				(long long)ia_pos >>
-				ndir->_IDM(index_vcn_size_bits), vdir->i_ino);
+				ndir->itype.index.vcn_size_bits, vdir->i_ino);
 		goto err_out;
 	}
 	if (unlikely(le32_to_cpu(ia->index.allocated_size) + 0x18 !=
-			ndir->_IDM(index_block_size))) {
+			ndir->itype.index.block_size)) {
 		ntfs_error(sb, "Index buffer (VCN 0x%Lx) of directory inode "
 				"0x%lx has a size (%u) differing from the "
 				"directory specified size (%u). Directory "
 				"inode is corrupt or driver bug.",
 				(long long)ia_pos >>
-				ndir->_IDM(index_vcn_size_bits), vdir->i_ino,
+				ndir->itype.index.vcn_size_bits, vdir->i_ino,
 				le32_to_cpu(ia->index.allocated_size) + 0x18,
-				ndir->_IDM(index_block_size));
+				ndir->itype.index.block_size);
 		goto err_out;
 	}
-	index_end = (u8*)ia + ndir->_IDM(index_block_size);
+	index_end = (u8*)ia + ndir->itype.index.block_size;
 	if (unlikely(index_end > kaddr + PAGE_CACHE_SIZE)) {
 		ntfs_error(sb, "Index buffer (VCN 0x%Lx) of directory inode "
 				"0x%lx crosses page boundary. Impossible! "
 				"Cannot access! This is probably a bug in the "
 				"driver.", (long long)ia_pos >>
-				ndir->_IDM(index_vcn_size_bits), vdir->i_ino);
+				ndir->itype.index.vcn_size_bits, vdir->i_ino);
 		goto err_out;
 	}
-	ia_start = ia_pos & ~(s64)(ndir->_IDM(index_block_size) - 1);
+	ia_start = ia_pos & ~(s64)(ndir->itype.index.block_size - 1);
 	index_end = (u8*)&ia->index + le32_to_cpu(ia->index.index_length);
-	if (unlikely(index_end > (u8*)ia + ndir->_IDM(index_block_size))) {
+	if (unlikely(index_end > (u8*)ia + ndir->itype.index.block_size)) {
 		ntfs_error(sb, "Size of index buffer (VCN 0x%Lx) of directory "
 				"inode 0x%lx exceeds maximum size.",
 				(long long)ia_pos >>
-				ndir->_IDM(index_vcn_size_bits), vdir->i_ino);
+				ndir->itype.index.vcn_size_bits, vdir->i_ino);
 		goto err_out;
 	}
 	/* The first index entry in this index buffer. */
@@ -1326,17 +1324,17 @@ find_next_index_buffer:
 	 * reach the last entry or until filldir tells us it has had enough
 	 * or signals an error (both covered by the rc test).
 	 */
-	for (;; ie = (INDEX_ENTRY*)((u8*)ie + le16_to_cpu(ie->_IEH(length)))) {
+	for (;; ie = (INDEX_ENTRY*)((u8*)ie + le16_to_cpu(ie->length))) {
 		ntfs_debug("In index allocation, offset 0x%Lx.",
 				(long long)ia_start + ((u8*)ie - (u8*)ia));
 		/* Bounds checks. */
 		if (unlikely((u8*)ie < (u8*)ia || (u8*)ie +
 				sizeof(INDEX_ENTRY_HEADER) > index_end ||
-				(u8*)ie + le16_to_cpu(ie->_IEH(key_length)) >
+				(u8*)ie + le16_to_cpu(ie->key_length) >
 				index_end))
 			goto err_out;
 		/* The last entry cannot contain a name. */
-		if (ie->_IEH(flags) & INDEX_ENTRY_END)
+		if (ie->flags & INDEX_ENTRY_END)
 			break;
 		/* Skip index block entry if continuing previous readdir. */
 		if (ia_pos - ia_start > (u8*)ie - (u8*)ia)

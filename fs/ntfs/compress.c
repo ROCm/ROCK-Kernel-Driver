@@ -477,7 +477,7 @@ int ntfs_read_compressed_block(struct page *page)
 	u8 *cb, *cb_pos, *cb_end;
 	struct buffer_head **bhs;
 	unsigned long offset, index = page->index;
-	u32 cb_size = ni->_ICF(compression_block_size);
+	u32 cb_size = ni->itype.compressed.block_size;
 	u64 cb_size_mask = cb_size - 1UL;
 	VCN vcn;
 	LCN lcn;
@@ -492,7 +492,7 @@ int ntfs_read_compressed_block(struct page *page)
 			& ~cb_size_mask) >> vol->cluster_size_bits;
 	/* Number of compression blocks (cbs) in the wanted vcn range. */
 	unsigned int nr_cbs = (end_vcn - start_vcn) << vol->cluster_size_bits
-			>> ni->_ICF(compression_block_size_bits);
+			>> ni->itype.compressed.block_size_bits;
 	/*
 	 * Number of pages required to store the uncompressed data from all
 	 * compression blocks (cbs) overlapping @page. Due to alignment
@@ -573,7 +573,7 @@ int ntfs_read_compressed_block(struct page *page)
 	 */
 	cur_page = 0;
 	cur_ofs = 0;
-	cb_clusters = ni->_ICF(compression_block_clusters);
+	cb_clusters = ni->itype.compressed.block_clusters;
 do_next_cb:
 	nr_cbs--;
 	nr_bhs = 0;
