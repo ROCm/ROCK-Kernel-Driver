@@ -1104,7 +1104,7 @@ void sched_balance_exec(void)
  *      load_{t} = load_{t-1}/2 + nr_node_running_{t}
  * This way sudden load peaks are flattened out a bit.
  * Node load is divided by nr_cpus_node() in order to compare nodes
- * of different cpu count but also [first] multiplied by 10 to
+ * of different cpu count but also [first] multiplied by NR_CPUS to
  * provide better resolution.
  */
 static int find_busiest_node(int this_node)
@@ -1114,14 +1114,14 @@ static int find_busiest_node(int this_node)
 	if (!nr_cpus_node(this_node))
 		return node;
 	this_load = maxload = (this_rq()->prev_node_load[this_node] >> 1)
-		+ (10 * atomic_read(&node_nr_running[this_node])
+  + (NR_CPUS * atomic_read(&node_nr_running[this_node])
 		/ nr_cpus_node(this_node));
 	this_rq()->prev_node_load[this_node] = this_load;
 	for_each_node_with_cpus(i) {
 		if (i == this_node)
 			continue;
 		load = (this_rq()->prev_node_load[i] >> 1)
-			+ (10 * atomic_read(&node_nr_running[i])
+   + (NR_CPUS * atomic_read(&node_nr_running[i])
 			/ nr_cpus_node(i));
 		this_rq()->prev_node_load[i] = load;
 		if (load > maxload && (100*load > NODE_THRESHOLD*this_load)) {
