@@ -31,7 +31,7 @@ extern unsigned long machine_flags;
 #define MACHINE_HAS_CSP  (machine_flags & 8)
 #define MACHINE_HAS_MVPG (machine_flags & 16)
 
-#define MACHINE_HAS_HWC  (!MACHINE_IS_P390)
+#define MACHINE_HAS_SCLP (!MACHINE_IS_P390)
 
 /*
  * Console mode. Override with conmode=
@@ -40,10 +40,10 @@ extern unsigned int console_mode;
 extern unsigned int console_device;
 
 #define CONSOLE_IS_UNDEFINED	(console_mode == 0)
-#define CONSOLE_IS_HWC		(console_mode == 1)
+#define CONSOLE_IS_SCLP		(console_mode == 1)
 #define CONSOLE_IS_3215		(console_mode == 2)
 #define CONSOLE_IS_3270		(console_mode == 3)
-#define SET_CONSOLE_HWC		do { console_mode = 1; } while (0)
+#define SET_CONSOLE_SCLP	do { console_mode = 1; } while (0)
 #define SET_CONSOLE_3215	do { console_mode = 2; } while (0)
 #define SET_CONSOLE_3270	do { console_mode = 3; } while (0)
 

@@ -9,6 +9,8 @@
 #ifndef DEBUG_H
 #define DEBUG_H
 
+#include <linux/string.h>
+
 /* Note:
  * struct __debug_entry must be defined outside of #ifdef __KERNEL__ 
  * in order to allow a user program to analyze the 'raw'-view.

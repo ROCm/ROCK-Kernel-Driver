@@ -325,7 +325,6 @@ static int xpram_ioctl (struct inode *inode, struct file *filp,
 {
 	struct hd_geometry *geo;
 	unsigned long size;
-	int idx = minor(inode->i_rdev);
  	if (cmd != HDIO_GETGEO)
 		return -EINVAL;
 	/*
@@ -474,6 +473,7 @@ static int __init xpram_setup_blkdev(void)
 out:
 	while (i--)
 		put_disk(xpram_disks[i]);
+	return rc;
 }
 
 /*
