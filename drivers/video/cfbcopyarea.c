@@ -65,15 +65,14 @@ static void bitcpy(unsigned long *dst, int dst_idx, const unsigned long *src,
 			// Single word
 			if (last)
 				first &= last;
-			FB_WRITEL((*src & first) | (FB_READL(dst) & ~first),
-				  dst);
+			FB_WRITEL((FB_READL(src) & first) | (FB_READL(dst) & ~first), dst);
 		} else {
 			// Multiple destination words
 			// Leading bits
 			if (first) {
 				
-				FB_WRITEL((*src & first) | (FB_READL(dst) & 
-							    ~first), dst);
+				FB_WRITEL((FB_READL(src) & first) | 
+					  (FB_READL(dst) & ~first), dst);
 				dst++;
 				src++;
 				n -= BITS_PER_LONG-dst_idx;
@@ -82,22 +81,21 @@ static void bitcpy(unsigned long *dst, int dst_idx, const unsigned long *src,
 			// Main chunk
 			n /= BITS_PER_LONG;
 			while (n >= 8) {
-				FB_WRITEL(*src++, dst++);
-				FB_WRITEL(*src++, dst++);
-				FB_WRITEL(*src++, dst++);
-				FB_WRITEL(*src++, dst++);
-				FB_WRITEL(*src++, dst++);
-				FB_WRITEL(*src++, dst++);
-				FB_WRITEL(*src++, dst++);
-				FB_WRITEL(*src++, dst++);
+				FB_WRITEL(FB_READL(src++), dst++);
+				FB_WRITEL(FB_READL(src++), dst++);
+				FB_WRITEL(FB_READL(src++), dst++);
+				FB_WRITEL(FB_READL(src++), dst++);
+				FB_WRITEL(FB_READL(src++), dst++);
+				FB_WRITEL(FB_READL(src++), dst++);
+				FB_WRITEL(FB_READL(src++), dst++);
+				FB_WRITEL(FB_READL(src++), dst++);
 				n -= 8;
 			}
 			while (n--)
-				FB_WRITEL(*src++, dst++);
+				FB_WRITEL(FB_READL(src++), dst++);
 			// Trailing bits
 			if (last)
-				FB_WRITEL((*src & last) | (FB_READL(dst) & 
-							   ~last), dst);
+				FB_WRITEL((FB_READL(src) & last) | (FB_READL(dst) & ~last), dst);
 		}
 	} else {
 		// Different alignment for source and dest
@@ -111,22 +109,22 @@ static void bitcpy(unsigned long *dst, int dst_idx, const unsigned long *src,
 				first &= last;
 			if (shift > 0) {
 				// Single source word
-				FB_WRITEL(((*src >> right) & first) | 
+				FB_WRITEL(((FB_READL(src) >> right) & first) | 
 					  (FB_READL(dst) & ~first), dst);
 			} else if (src_idx+n <= BITS_PER_LONG) {
 				// Single source word
-				FB_WRITEL(((*src << left) & first) | 
+				FB_WRITEL(((FB_READL(src) << left) & first) | 
 					  (FB_READL(dst) & ~first), dst);
 			} else {
 				// 2 source words
-				d0 = *src++;
-				d1 = *src;
+				d0 = FB_READL(src++);
+				d1 = FB_READL(src);
 				FB_WRITEL(((d0<<left | d1>>right) & first) | 
 					  (FB_READL(dst) & ~first), dst);
 			}
 		} else {
 			// Multiple destination words
-			d0 = *src++;
+			d0 = FB_READL(src++);
 			// Leading bits
 			if (shift > 0) {
 				// Single source word
@@ -136,7 +134,7 @@ static void bitcpy(unsigned long *dst, int dst_idx, const unsigned long *src,
 				n -= BITS_PER_LONG-dst_idx;
 			} else {
 				// 2 source words
-				d1 = *src++;
+				d1 = FB_READL(src++);
 				FB_WRITEL(((d0<<left | d1>>right) & first) | 
 					  (FB_READL(dst) & ~first), dst);
 				d0 = d1;
@@ -148,22 +146,22 @@ static void bitcpy(unsigned long *dst, int dst_idx, const unsigned long *src,
 			m = n % BITS_PER_LONG;
 			n /= BITS_PER_LONG;
 			while (n >= 4) {
-				d1 = *src++;
+				d1 = FB_READL(src++);
 				FB_WRITEL(d0 << left | d1 >> right, dst++);
 				d0 = d1;
-				d1 = *src++;
+				d1 = FB_READL(src++);
 				FB_WRITEL(d0 << left | d1 >> right, dst++);
 				d0 = d1;
-				d1 = *src++;
+				d1 = FB_READL(src++);
 				FB_WRITEL(d0 << left | d1 >> right, dst++);
 				d0 = d1;
-				d1 = *src++;
+				d1 = FB_READL(src++);
 				FB_WRITEL(d0 << left | d1 >> right, dst++);
 				d0 = d1;
 				n -= 4;
 			}
 			while (n--) {
-				d1 = *src++;
+				d1 = FB_READL(src++);
 				FB_WRITEL(d0 << left | d1 >> right, dst++);
 				d0 = d1;
 			}
@@ -177,7 +175,7 @@ static void bitcpy(unsigned long *dst, int dst_idx, const unsigned long *src,
 						  dst);
 				} else {
 					// 2 source words
-					d1 = *src;
+					d1 = FB_READL(src);
 					FB_WRITEL(((d0<<left | d1>>right) & 
 						   last) | (FB_READL(dst) & 
 							    ~last), dst);
@@ -220,14 +218,12 @@ static void bitcpy_rev(unsigned long *dst, int dst_idx,
 			// Single word
 			if (last)
 				first &= last;
-			FB_WRITEL((*src & first) | (FB_READL(dst) & ~first), 
-				  dst);
+			FB_WRITEL((FB_READL(src) & first) | (FB_READL(dst) & ~first), dst); 
 		} else {
 			// Multiple destination words
 			// Leading bits
 			if (first) {
-				FB_WRITEL((*src & first) | (FB_READL(dst) & 
-							    ~first), dst);
+				FB_WRITEL((FB_READL(src) & first) | (FB_READL(dst) & ~first), dst); 
 				dst--;
 				src--;
 				n -= dst_idx+1;
@@ -236,23 +232,22 @@ static void bitcpy_rev(unsigned long *dst, int dst_idx,
 			// Main chunk
 			n /= BITS_PER_LONG;
 			while (n >= 8) {
-				FB_WRITEL(*src--, dst--);
-				FB_WRITEL(*src--, dst--);
-				FB_WRITEL(*src--, dst--);
-				FB_WRITEL(*src--, dst--);
-				FB_WRITEL(*src--, dst--);
-				FB_WRITEL(*src--, dst--);
-				FB_WRITEL(*src--, dst--);
-				FB_WRITEL(*src--, dst--);
+				FB_WRITEL(FB_READL(src--), dst--);
+				FB_WRITEL(FB_READL(src--), dst--);
+				FB_WRITEL(FB_READL(src--), dst--);
+				FB_WRITEL(FB_READL(src--), dst--);
+				FB_WRITEL(FB_READL(src--), dst--);
+				FB_WRITEL(FB_READL(src--), dst--);
+				FB_WRITEL(FB_READL(src--), dst--);
+				FB_WRITEL(FB_READL(src--), dst--);
 				n -= 8;
 			}
 			while (n--)
-				FB_WRITEL(*src--, dst--);
+				FB_WRITEL(FB_READL(src--), dst--);
 			
 			// Trailing bits
 			if (last)
-				FB_WRITEL((*src & last) | (FB_READL(dst) & 
-							   ~last), dst);
+				FB_WRITEL((FB_READL(src) & last) | (FB_READL(dst) & ~last), dst);
 		}
 	} else {
 		// Different alignment for source and dest
@@ -266,22 +261,22 @@ static void bitcpy_rev(unsigned long *dst, int dst_idx,
 				first &= last;
 			if (shift < 0) {
 				// Single source word
-				FB_WRITEL((*src << left & first) | 
+				FB_WRITEL((FB_READL(src) << left & first) | 
 					  (FB_READL(dst) & ~first), dst);
 			} else if (1+(unsigned long)src_idx >= n) {
 				// Single source word
-				FB_WRITEL(((*src >> right) & first) | 
+				FB_WRITEL(((FB_READL(src) >> right) & first) | 
 					  (FB_READL(dst) & ~first), dst);
 			} else {
 				// 2 source words
-				d0 = *src--;
-				d1 = *src;
+				d0 = FB_READL(src--);
+				d1 = FB_READL(src);
 				FB_WRITEL(((d0>>right | d1<<left) & first) | 
 					  (FB_READL(dst) & ~first), dst);
 			}
 		} else {
 			// Multiple destination words
-			d0 = *src--;
+			d0 = FB_READL(src--);
 			// Leading bits
 			if (shift < 0) {
 				// Single source word
@@ -291,7 +286,7 @@ static void bitcpy_rev(unsigned long *dst, int dst_idx,
 				n -= dst_idx+1;
 			} else {
 				// 2 source words
-				d1 = *src--;
+				d1 = FB_READL(src--);
 				FB_WRITEL(((d0>>right | d1<<left) & first) | 
 					  (FB_READL(dst) & ~first), dst);
 				d0 = d1;
@@ -303,22 +298,22 @@ static void bitcpy_rev(unsigned long *dst, int dst_idx,
 			m = n % BITS_PER_LONG;
 			n /= BITS_PER_LONG;
 			while (n >= 4) {
-				d1 = *src--;
+				d1 = FB_READL(src--);
 				FB_WRITEL(d0 >> right | d1 << left, dst--);
 				d0 = d1;
-				d1 = *src--;
+				d1 = FB_READL(src--);
 				FB_WRITEL(d0 >> right | d1 << left, dst--);
 				d0 = d1;
-				d1 = *src--;
+				d1 = FB_READL(src--);
 				FB_WRITEL(d0 >> right | d1 << left, dst--);
 				d0 = d1;
-				d1 = *src--;
+				d1 = FB_READL(src--);
 				FB_WRITEL(d0 >> right | d1 << left, dst--);
 				d0 = d1;
 				n -= 4;
 			}
 			while (n--) {
-				d1 = *src--;
+				d1 = FB_READL(src--);
 				FB_WRITEL(d0 >> right | d1 << left, dst--);
 				d0 = d1;
 			}
@@ -332,7 +327,7 @@ static void bitcpy_rev(unsigned long *dst, int dst_idx,
 						  dst);
 				} else {
 					// 2 source words
-					d1 = *src;
+					d1 = FB_READL(src);
 					FB_WRITEL(((d0>>right | d1<<left) & 
 						   last) | (FB_READL(dst) & 
 							    ~last), dst);
@@ -412,8 +407,7 @@ void cfb_copyarea(struct fb_info *p, const struct fb_copyarea *area)
 			dst_idx &= (BYTES_PER_LONG-1);
 			src += src_idx >> SHIFT_PER_LONG;
 			src_idx &= (BYTES_PER_LONG-1);
-			bitcpy_rev((unsigned long*)dst, dst_idx, 
-				   (unsigned long *)src, src_idx, 
+			bitcpy_rev(dst, dst_idx, src, src_idx, 
 				   width*p->var.bits_per_pixel);
 		}	
 	} else {
@@ -422,8 +416,7 @@ void cfb_copyarea(struct fb_info *p, const struct fb_copyarea *area)
 			dst_idx &= (BYTES_PER_LONG-1);
 			src += src_idx >> SHIFT_PER_LONG;
 			src_idx &= (BYTES_PER_LONG-1);
-			bitcpy((unsigned long*)dst, dst_idx, 
-			       (unsigned long *)src, src_idx, 
+			bitcpy(dst, dst_idx, src, src_idx, 
 			       width*p->var.bits_per_pixel);
 			dst_idx += next_line*8;
 			src_idx += next_line*8;

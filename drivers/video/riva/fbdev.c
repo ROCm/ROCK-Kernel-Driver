@@ -1383,18 +1383,16 @@ static void rivafb_imageblit(struct fb_info *info,
 			     const struct fb_image *image)
 {
 	struct riva_par *par = (struct riva_par *) info->par;
-	u32 fgx = 0, bgx = 0, width, mod, tmp;
+	u32 fgx = 0, bgx = 0, width, tmp;
 	u8 *cdat = (u8 *) image->data;
 	volatile u32 *d;
-	int i, j, k, size;
+	int i, size;
 
 	if (image->depth != 0) {
-		wait_for_idle(par);
 		cfb_imageblit(info, image);
 		return;
 	}
 
-	width = (image->width + 7)/8;
 	switch (info->var.bits_per_pixel) {
 	case 8:
 		fgx = image->fg_color;
@@ -1429,49 +1427,23 @@ static void rivafb_imageblit(struct fb_info *info,
 
 	d = &par->riva.Bitmap->MonochromeData01E;
 
-	mod = width % 4;
-
-	if (width >= 4) {
-		k = image->height;
-		while (k--) {
-			size = width / 4;
-			while (size >= 16) {
-				RIVA_FIFO_FREE(par->riva, Bitmap, 16);
-				for (i = 0; i < 16; i++) {
-					tmp = *((u32 *)cdat)++;
-					reverse_order(&tmp);
-					d[i] = tmp;
-				}
-				size -= 16;
-			}
-
-			if (size) {
-				RIVA_FIFO_FREE(par->riva, Bitmap, size);
-				for (i = 0; i < size; i++) {
-					tmp = *((u32 *) cdat)++;
-					reverse_order(&tmp);
-					d[i] = tmp;
-				}
-			}
-
-			if (mod) {
-				RIVA_FIFO_FREE(par->riva, Bitmap, 1);
-				for (i = 0; i < mod; i++)
-					((u8 *)&tmp)[i] = *cdat++;
-				reverse_order(&tmp);
-				d[i] = tmp;
-			}
+	width = (image->width + 31)/32;
+	size = width * image->height;
+	while (size >= 16) {
+		RIVA_FIFO_FREE(par->riva, Bitmap, 16);
+		for (i = 0; i < 16; i++) {
+			tmp = *((u32 *)cdat)++;
+			reverse_order(&tmp);
+			d[i] = tmp;
 		}
-	} else {
-		for (i = image->height; i > 0; i-=16) {
-			size = (i >= 16) ? 16 : i;
-			RIVA_FIFO_FREE(par->riva, Bitmap, size);
-			for (j = 0; j < size; j++) {
-				for (k = 0; k < width; k++) 
-					((u8 *) &tmp)[k] = *cdat++;
-				reverse_order(&tmp);
-				d[j] = tmp;
-			}
+		size -= 16;
+	}
+	if (size) {
+		RIVA_FIFO_FREE(par->riva, Bitmap, size);
+		for (i = 0; i < size; i++) {
+			tmp = *((u32 *) cdat)++;
+			reverse_order(&tmp);
+			d[i] = tmp;
 		}
 	}
 }
@@ -1632,6 +1604,12 @@ static int __init riva_set_fbinfo(struct fb_info *info)
 
 	cmap_len = riva_get_cmap_len(&info->var);
 	fb_alloc_cmap(&info->cmap, cmap_len, 0);	
+
+	info->pixmap.size = 64 * 1024;
+	info->pixmap.buf_align = 4;
+	info->pixmap.scan_align = 4;
+	info->pixmap.flags = FB_PIXMAP_SYSTEM;
+
 	return 0;
 }
 
@@ -1776,6 +1754,11 @@ static int __init rivafb_probe(struct pci_dev *pd,
 	memset(info, 0, sizeof(struct fb_info));
 	memset(default_par, 0, sizeof(struct riva_par));
 
+	info->pixmap.addr = kmalloc(64 * 1024, GFP_KERNEL);
+	if (info->pixmap.addr == NULL)
+		goto err_out_kfree1;
+	memset(info->pixmap.addr, 0, 64 * 1024);
+
 	strcat(rivafb_fix.id, rci->name);
 	default_par->riva.Architecture = rci->arch_rev;
 
@@ -1805,7 +1788,7 @@ static int __init rivafb_probe(struct pci_dev *pd,
 	if (!request_mem_region(rivafb_fix.mmio_start,
 				rivafb_fix.mmio_len, "rivafb")) {
 		printk(KERN_ERR PFX "cannot reserve MMIO region\n");
-		goto err_out_kfree;
+		goto err_out_kfree2;
 	}
 
 	default_par->ctrl_base = ioremap(rivafb_fix.mmio_start,
@@ -1921,6 +1904,10 @@ err_out_iounmap_ctrl:
 	iounmap(default_par->ctrl_base);
 err_out_free_base0:
 	release_mem_region(rivafb_fix.mmio_start, rivafb_fix.mmio_len);
+err_out_kfree2:
+	kfree(info->pixmap.addr);
+err_out_kfree1:
+	kfree(default_par);
 err_out_kfree:
 	kfree(info);
 err_out:
@@ -1954,6 +1941,7 @@ static void __exit rivafb_remove(struct pci_dev *pd)
 		iounmap((caddr_t)par->riva.PRAMIN);
 		release_mem_region(info->fix.smem_start + 0x00C00000, 0x00008000);
 	}
+	kfree(info->pixmap.addr);
 	kfree(par);
 	kfree(info);
 	pci_set_drvdata(pd, NULL);
