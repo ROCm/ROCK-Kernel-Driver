@@ -219,6 +219,7 @@ $(sort $(vmlinux-objs)): $(SUBDIRS) ;
 
 # 	Handle descending into subdirectories listed in $(SUBDIRS)
 
+.PHONY: $(SUBDIRS)
 $(SUBDIRS): FORCE include/linux/version.h include/config/MARKER
 	@$(MAKE) -C $@
 
@@ -273,6 +274,25 @@ dep-files: scripts/mkdep archdep include/linux/version.h
 ifdef CONFIG_MODVERSIONS
 	$(MAKE) update-modverfile
 endif
+
+# update modversions.h, but only if it would change
+update-modverfile:
+	@(echo "#ifndef _LINUX_MODVERSIONS_H";\
+	  echo "#define _LINUX_MODVERSIONS_H"; \
+	  echo "#include <linux/modsetver.h>"; \
+	  cd $(TOPDIR)/include/linux/modules; \
+	  for f in *.ver; do \
+	    if [ -f $$f ]; then echo "#include <linux/modules/$${f}>"; fi; \
+	  done; \
+	  echo "#endif"; \
+	) > $(TOPDIR)/include/linux/modversions.h.tmp
+	@if [ -r $(TOPDIR)/include/linux/modversions.h ] && cmp -s $(TOPDIR)/include/linux/modversions.h $(TOPDIR)/include/linux/modversions.h.tmp; then \
+		echo $(TOPDIR)/include/linux/modversions.h was not updated; \
+		rm -f $(TOPDIR)/include/linux/modversions.h.tmp; \
+	else \
+		echo $(TOPDIR)/include/linux/modversions.h was updated; \
+		mv -f $(TOPDIR)/include/linux/modversions.h.tmp $(TOPDIR)/include/linux/modversions.h; \
+	fi
 
 # ---------------------------------------------------------------------------
 # Modules
