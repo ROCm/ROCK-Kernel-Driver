@@ -387,7 +387,7 @@ static int datafab_id_device(struct us_data *us,
 
 	// we'll go ahead and extract the media capacity while we're here...
 	//
-	rc = datafab_bulk_read(us, reply, sizeof(reply));
+	rc = datafab_bulk_read(us, reply, 512);
 	if (rc == USB_STOR_XFER_GOOD) {
 		// capacity is at word offset 57-58
 		//
