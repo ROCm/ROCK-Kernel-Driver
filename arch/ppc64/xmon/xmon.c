@@ -128,7 +128,6 @@ static void mem_check_pagetable_vsids (void);
 
 static void mem_map_check_slab(void);
 static void mem_map_lock_pages(void);
-static void mem_map_check_hash(void);
 static void mem_check_dup_rpn (void);
 static void debug_trace(void);
 
@@ -650,9 +649,6 @@ cmds(struct pt_regs *excp)
 				break;
 			case 'j':
 				mem_map_check_slab();
-				break;
-			case 'h':
-				mem_map_check_hash();
 				break;
 			case 'f':
 				mem_find_real();
@@ -2499,34 +2495,6 @@ void mem_map_lock_pages()
 	}
 
 	printf(" count of locked pages = %d \n", lock_count); 
-}
-
-
-
-void mem_map_check_hash()
-{
-	int i = max_mapnr;
-	
-	while (i-- > 0)  {
-		/* skip the reserved */
-		if (!PageReserved(mem_map+i)) {
-			if (((mem_map+i)->next_hash) != NULL) {
-				if ( REGION_ID((mem_map+i)->next_hash) != KERNEL_REGION_ID ) {
-					printf(" mem_map check hash - non c0 entry - "
-					       "address/value = %p %lx\n", mem_map+i,(mem_map+i)->next_hash);
-				} 
-				if ((unsigned long)((mem_map+i)->next_hash) ==  KERNELBASE){
-					printf(" mem_map check hash - 0x%lx  entry = %p \n",
-					       KERNELBASE, mem_map+i);
-				} 
-			}
-		} else {
-			if (page_count(mem_map+i) < 0) {
-				printf(" reserved page with negative count- entry = %lx \n", mem_map+i);
-			}
-		}
-	}
-	printf(" mem_map check hash completed \n");
 }
 
 void mem_check_dup_rpn ()
