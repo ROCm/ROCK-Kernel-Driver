@@ -582,6 +582,40 @@ ENTRY(anakin_active_irqs)
 
   		.macro	irq_prio_table
  		.endm
+
+#elif defined(CONFIG_ARCH_PXA)
+
+		.macro	disable_fiq
+		.endm
+
+		.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
+		mov	\base, #0xfc000000		@ IIR Ctl = 0xfcd00000
+		add	\base, \base, #0x00d00000
+		ldr	\irqstat, [\base, #0]		@ ICIP
+		ldr	\irqnr, [\base, #4]		@ ICMR
+		ands	\irqstat, \irqstat, \irqnr
+		mov	\irqnr, #0
+		beq	1001f
+		tst	\irqstat, #0xff00
+		moveq	\irqstat, \irqstat, lsr #8
+		addeq	\irqnr, \irqnr, #8
+		tsteq	\irqstat, #0xff00
+		moveq	\irqstat, \irqstat, lsr #8
+		addeq	\irqnr, \irqnr, #8
+		tst	\irqstat, #0x0f00
+		moveq	\irqstat, \irqstat, lsr #4
+		addeq	\irqnr, \irqnr, #4
+		tst	\irqstat, #0x0300
+		moveq	\irqstat, \irqstat, lsr #2
+		addeq	\irqnr, \irqnr, #2
+		tst	\irqstat, #0x0100
+		addeqs	\irqnr, \irqnr, #1
+1001:
+		.endm
+
+		.macro	irq_prio_table
+		.endm
+
 #else
 #error Unknown architecture
 #endif
