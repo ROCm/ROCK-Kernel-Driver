@@ -552,6 +552,8 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 		return;
 	}
 
+	srb->result = SAM_STAT_GOOD;
+
 	/* Determine if we need to auto-sense
 	 *
 	 * I normally don't use a flag like this, but it's almost impossible
@@ -582,8 +584,8 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 	}
 
 	/*
-	 * Also, if we have a short transfer on a command that can't have
-	 * a short transfer, we're going to do this.
+	 * A short transfer on a command where we don't expect it
+	 * is unusual, but it doesn't mean we need to auto-sense.
 	 */
 	if ((srb->resid > 0) &&
 	    !((srb->cmnd[0] == REQUEST_SENSE) ||
@@ -592,7 +594,6 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 	      (srb->cmnd[0] == LOG_SENSE) ||
 	      (srb->cmnd[0] == MODE_SENSE_10))) {
 		US_DEBUGP("-- unexpectedly short transfer\n");
-		need_auto_sense = 1;
 	}
 
 	/* Now, if we need to do the auto-sense, let's do it */
@@ -693,26 +694,15 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 		/* set the result so the higher layers expect this data */
 		srb->result = SAM_STAT_CHECK_CONDITION;
 
-		/* If things are really okay, then let's show that */
-		if ((srb->sense_buffer[2] & 0xf) == 0x0)
+		/* If things are really okay, then let's show that.  Zero
+		 * out the sense buffer so the higher layers won't realize
+		 * we did an unsolicited auto-sense. */
+		if (result == USB_STOR_TRANSPORT_GOOD &&
+				(srb->sense_buffer[2] & 0xf) == 0x0) {
 			srb->result = SAM_STAT_GOOD;
-	} else /* if (need_auto_sense) */
-		srb->result = SAM_STAT_GOOD;
-
-	/* Regardless of auto-sense, if we _know_ we have an error
-	 * condition, show that in the result code
-	 */
-	if (result == USB_STOR_TRANSPORT_FAILED)
-		srb->result = SAM_STAT_CHECK_CONDITION;
-
-	/* If we think we're good, then make sure the sense data shows it.
-	 * This is necessary because the auto-sense for some devices always
-	 * sets byte 0 == 0x70, even if there is no error
-	 */
-	if ((us->protocol == US_PR_CB || us->protocol == US_PR_DPCM_USB) && 
-	    (result == USB_STOR_TRANSPORT_GOOD) &&
-	    ((srb->sense_buffer[2] & 0xf) == 0x0))
-		srb->sense_buffer[0] = 0x0;
+			srb->sense_buffer[0] = 0x0;
+		}
+	}
 	return;
 
 	/* abort processing: the bulk-only transport requires a reset
