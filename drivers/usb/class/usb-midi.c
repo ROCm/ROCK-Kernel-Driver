@@ -398,7 +398,7 @@ static void usb_bulk_read(struct urb *urb, struct pt_regs *regs)
 			}
 		}
 
-		spin_unlock &ep->lock );
+		spin_unlock ( &ep->lock );
 		if ( wake ) {
 			wake_up( &ep->wait );
 		}
