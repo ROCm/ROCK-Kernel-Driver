@@ -432,17 +432,32 @@ int udsl_atm_processqueue_thread (void *data)
 	strcpy (current->comm, "kSpeedSARd");
 
 	add_wait_queue (&udsl_wqh, &wait);
+	set_current_state(TASK_INTERRUPTIBLE);
 
 	for (;;) {
-		interruptible_sleep_on (&udsl_wqh);
+		schedule();
 		if (signal_pending (current))
 			break;
 		PDEBUG ("SpeedSARd awoke\n");
+retry:
 		for (i = 0; i < MAX_UDSL; i++)
 			if (minor_data[i])
 				udsl_atm_processqueue (minor_data[i]);
+		set_current_state(TASK_INTERRUPTIBLE);
+		/* we must check for data recieved and restart processing if there's any */
+		for (i = 0; i < MAX_UDSL; i++) {
+			spin_lock_irq(&minor_data[i]->recvqlock);
+			if (!skb_queue_empty(&minor_data[i]->recvqueue)) {
+				spin_unlock_irq(&minor_data[i]->recvqlock);
+				set_current_state(TASK_RUNNING);
+				goto retry;
+			} else {
+				spin_unlock_irq(&minor_data[i]->recvqlock);
+			}
+		}
 	};
 
+	set_current_state(TASK_RUNNING);
 	remove_wait_queue (&udsl_wqh, &wait);
 	PDEBUG ("SpeedSARd is exiting\n");
 	complete_and_exit(&thread_grave, 0);
