@@ -6,7 +6,7 @@
  * Copyright (C) 2002-2003 Greg Ungerer <gerg@snapgear.com>
  * Copyright (C) 2002-2003 SnapGear Inc
  *
- * $Id: doc2000.h,v 1.23 2004/09/16 23:26:08 gleixner Exp $ 
+ * $Id: doc2000.h,v 1.24 2005/01/05 12:40:38 dwmw2 Exp $ 
  *
  * Released under GPL
  */
