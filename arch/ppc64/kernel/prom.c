@@ -930,10 +930,12 @@ prom_hold_cpus(unsigned long mem)
         unsigned long *spinloop     = __v2a(&__secondary_hold_spinloop);
         unsigned long *acknowledge  = __v2a(&__secondary_hold_acknowledge);
         unsigned long secondary_hold = (unsigned long)__v2a(*PTRRELOC((unsigned long *)__secondary_hold));
-        struct naca_struct *_naca = RELOC(naca);
         struct systemcfg *_systemcfg = RELOC(systemcfg);
 	struct paca_struct *_xPaca = PTRRELOC(&paca[0]);
 	struct prom_t *_prom = PTRRELOC(&prom);
+#ifdef CONFIG_SMP
+	struct naca_struct *_naca = RELOC(naca);
+#endif
 
 	/* On pmac, we just fill out the various global bitmasks and
 	 * arrays indicating our CPUs are here, they are actually started
@@ -1103,8 +1105,9 @@ prom_hold_cpus(unsigned long mem)
 			cpu_set(cpuid, RELOC(cpu_online_map));
 			cpu_set(cpuid, RELOC(cpu_present_at_boot));
 		}
-
-	next:
+#endif
+next:
+#ifdef CONFIG_SMP
 		/* Init paca for secondary threads.   They start later. */
 		for (i=1; i < cpu_threads; i++) {
 			cpuid++;

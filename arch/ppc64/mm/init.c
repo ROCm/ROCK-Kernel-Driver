@@ -98,10 +98,12 @@ DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
 DEFINE_PER_CPU(struct pte_freelist_batch *, pte_freelist_cur);
 unsigned long pte_freelist_forced_free;
 
+#ifdef CONFIG_SMP
 static void pte_free_smp_sync(void *arg)
 {
 	/* Do nothing, just ensure we sync with all CPUs */
 }
+#endif
 
 /* This is only called when we are critically out of memory
  * (and fail to get a page in pte_free_tlb).
