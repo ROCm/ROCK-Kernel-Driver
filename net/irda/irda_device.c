@@ -378,8 +378,6 @@ void irda_device_setup(struct net_device *dev)
         dev->hard_header_len = 0;
         dev->addr_len        = 0;
 
-	dev->destructor      = free_netdev;
-
         dev->type            = ARPHRD_IRDA;
         dev->tx_queue_len    = 8; /* Window size + 1 s-frame */
 
