@@ -210,38 +210,6 @@ static int RANGE_TO_REG( int range )
  *       MSB (bit 3, value 8).  If the enable bit is 0, the encoded value
  *       is ignored, or set to 0.
  */
-static int lm85_smooth_map[] = {  /* .1 sec */
-		350, 176, 118,  70,  44,   30,   16,    8
-/*    35.4 *    1/1, 1/2, 1/3, 1/5, 1/8, 1/12, 1/24, 1/48  */
-	};
-static int SMOOTH_TO_REG( int smooth )
-{
-	int i;
-
-	if( smooth <= 0 ) { return 0 ; }  /* Disabled */
-	for( i = 0 ; i < 7 ; ++i )
-		if( smooth >= lm85_smooth_map[i] )
-			break ;
-	return( (i & 0x07) | 0x08 );
-}
-#define SMOOTH_FROM_REG(val) ((val)&0x08?lm85_smooth_map[(val)&0x07]:0)
-
-/* These are the fan spinup delay time encodings */
-static int lm85_spinup_map[] = {  /* .1 sec */
-		0, 1, 2, 4, 7, 10, 20, 40
-	};
-static int SPINUP_TO_REG( int spinup )
-{
-	int i;
-
-	if( spinup >= lm85_spinup_map[7] ) { return 7 ; }
-	for( i = 0 ; i < 7 ; ++i )
-		if( spinup <= lm85_spinup_map[i] )
-			break ;
-	return( i & 0x07 );
-}
-#define SPINUP_FROM_REG(val) (lm85_spinup_map[(val)&0x07])
-
 /* These are the PWM frequency encodings */
 static int lm85_freq_map[] = { /* .1 Hz */
 		100, 150, 230, 300, 380, 470, 620, 940
