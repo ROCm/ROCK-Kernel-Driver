@@ -220,17 +220,17 @@ static int __init snd_gusextreme_probe(int dev)
 	xgf1_irq = gf1_irq[dev];
 	if (xgf1_irq == SNDRV_AUTO_IRQ) {
 		if ((xgf1_irq = snd_legacy_find_free_irq(possible_gf1_irqs)) < 0) {
-			snd_card_free(card);
 			snd_printk("unable to find a free IRQ for GF1\n");
-			return -EBUSY;
+			err = -EBUSY;
+			goto out;
 		}
 	}
 	xess_irq = irq[dev];
 	if (xess_irq == SNDRV_AUTO_IRQ) {
 		if ((xess_irq = snd_legacy_find_free_irq(possible_ess_irqs)) < 0) {
-			snd_card_free(card);
 			snd_printk("unable to find a free IRQ for ES1688\n");
-			return -EBUSY;
+			err = -EBUSY;
+			goto out;
 		}
 	}
 	if (mpu_port[dev] == SNDRV_AUTO_PORT)
@@ -241,26 +241,24 @@ static int __init snd_gusextreme_probe(int dev)
 	xgf1_dma = dma1[dev];
 	if (xgf1_dma == SNDRV_AUTO_DMA) {
 		if ((xgf1_dma = snd_legacy_find_free_dma(possible_gf1_dmas)) < 0) {
-			snd_card_free(card);
 			snd_printk("unable to find a free DMA for GF1\n");
-			return -EBUSY;
+			err = -EBUSY;
+			goto out;
 		}
 	}
 	xess_dma = dma8[dev];
 	if (xess_dma == SNDRV_AUTO_DMA) {
 		if ((xess_dma = snd_legacy_find_free_dma(possible_ess_dmas)) < 0) {
-			snd_card_free(card);
 			snd_printk("unable to find a free DMA for ES1688\n");
-			return -EBUSY;
+			err = -EBUSY;
+			goto out;
 		}
 	}
 
 	if ((err = snd_es1688_create(card, port[dev], mpu_port[dev],
 				     xess_irq, xmpu_irq, xess_dma,
-				     ES1688_HW_1688, &es1688)) < 0) {
-		snd_card_free(card);
-		return err;
-	}
+				     ES1688_HW_1688, &es1688)) < 0)
+		goto out;
 	if (gf1_port[dev] < 0)
 		gf1_port[dev] = port[dev] + 0x20;
 	if ((err = snd_gus_create(card,
@@ -270,77 +268,65 @@ static int __init snd_gusextreme_probe(int dev)
 				  -1,
 				  0, channels[dev],
 				  pcm_channels[dev], 0,
-				  &gus)) < 0) {
-		snd_card_free(card);
-		return err;
-	}
-	if ((err = snd_gusextreme_detect(dev, card, gus, es1688)) < 0) {
-		snd_card_free(card);
-		return err;
-	}
+				  &gus)) < 0)
+		goto out;
+
+	if ((err = snd_gusextreme_detect(dev, card, gus, es1688)) < 0)
+		goto out;
+
 	snd_gusextreme_init(dev, gus);
-	if ((err = snd_gus_initialize(gus)) < 0) {
-		snd_card_free(card);
-		return err;
-	}
+	if ((err = snd_gus_initialize(gus)) < 0)
+		goto out;
+
 	if (!gus->ess_flag) {
 		snd_printdd("GUS Extreme soundcard was not detected at 0x%lx\n", gus->gf1.port);
-		snd_card_free(card);
-		return -ENODEV;
+		err = -ENODEV;
+		goto out;
 	}
-	if ((err = snd_es1688_pcm(es1688, 0, NULL)) < 0) {
-		snd_card_free(card);
-		return err;
-	}
-	if ((err = snd_es1688_mixer(es1688)) < 0) {
-		snd_card_free(card);
-		return err;
-	}
+	if ((err = snd_es1688_pcm(es1688, 0, NULL)) < 0)
+		goto out;
+
+	if ((err = snd_es1688_mixer(es1688)) < 0)
+		goto out;
+
 	snd_component_add(card, "ES1688");
 	if (pcm_channels[dev] > 0) {
-		if ((err = snd_gf1_pcm_new(gus, 1, 1, NULL)) < 0) {
-			snd_card_free(card);
-			return err;
-		}
+		if ((err = snd_gf1_pcm_new(gus, 1, 1, NULL)) < 0)
+			goto out;
 	}
-	if ((err = snd_gf1_new_mixer(gus)) < 0) {
-		snd_card_free(card);
-		return err;
-	}
-	if ((err = snd_gusextreme_mixer(es1688)) < 0) {
-		snd_card_free(card);
-		return err;
-	}
+	if ((err = snd_gf1_new_mixer(gus)) < 0)
+		goto out;
+
+	if ((err = snd_gusextreme_mixer(es1688)) < 0)
+		goto out;
 
 	if (snd_opl3_create(card, es1688->port, es1688->port + 2,
 			    OPL3_HW_OPL3, 0, &opl3) < 0) {
 		printk(KERN_ERR "gusextreme: opl3 not detected at 0x%lx\n", es1688->port);
 	} else {
-		if ((err = snd_opl3_hwdep_new(opl3, 0, 2, NULL)) < 0) {
-			snd_card_free(card);
-			return err;
-		}
+		if ((err = snd_opl3_hwdep_new(opl3, 0, 2, NULL)) < 0)
+			goto out;
 	}
 
-	if (es1688->mpu_port >= 0x300) {
-		if ((err = snd_mpu401_uart_new(card, 0, MPU401_HW_ES1688,
+	if (es1688->mpu_port >= 0x300 &&
+	    ((err = snd_mpu401_uart_new(card, 0, MPU401_HW_ES1688,
 					       es1688->mpu_port, 0,
 					       xmpu_irq,
 					       SA_INTERRUPT,
-					       NULL)) < 0) {
-			snd_card_free(card);
-			return err;
-		}
-	}
+					       NULL)) < 0)
+		goto out;
 
 	sprintf(card->longname, "Gravis UltraSound Extreme at 0x%lx, irq %i&%i, dma %i&%i",
 		es1688->port, xgf1_irq, xess_irq, xgf1_dma, xess_dma);
-	if ((err = snd_card_register(card)) < 0) {
-		snd_card_free(card);
-		return err;
-	}
+	if ((err = snd_card_register(card)) < 0)
+		goto out;
+
 	snd_gusextreme_cards[dev] = card;
 	return 0;
+
+      out:
+	snd_card_free(card);
+	return err;
 }
 
 static int __init snd_gusextreme_legacy_auto_probe(unsigned long xport)
