@@ -1369,6 +1369,7 @@ rtl8169_tx_interrupt(struct net_device *dev, struct rtl8169_private *tp,
 	while (tx_left > 0) {
 		int entry = dirty_tx % NUM_TX_DESC;
 
+		rmb();
 		if (!(le32_to_cpu(tp->TxDescArray[entry].status) & OWNbit)) {
 			struct sk_buff *skb = tp->Tx_skbuff[entry];
 
@@ -1430,7 +1431,10 @@ rtl8169_rx_interrupt(struct net_device *dev, struct rtl8169_private *tp,
 
 	while (rx_left > 0) {
 		int entry = cur_rx % NUM_RX_DESC;
-		u32 status = le32_to_cpu(tp->RxDescArray[entry].status);
+		u32 status;
+
+		rmb();
+		status = le32_to_cpu(tp->RxDescArray[entry].status);
 
 		if (status & OWNbit)
 			break;
