@@ -27,30 +27,25 @@
 /* debug */
 #ifdef CONFIG_DVB_DIBCOM_DEBUG
 #define dprintk(level,args...) \
-	    do { if ((debug & level)) { printk(args); } } while (0)
+	    do { if ((dvb_dibusb_debug & level)) { printk(args); } } while (0)
 
-#define debug_dump(b,l) if (debug) {\
-	int i; deb_xfer("%s: %d > ",__FUNCTION__,l); \
+#define debug_dump(b,l) {\
+	int i; \
 	for (i = 0; i < l; i++) deb_xfer("%02x ", b[i]); \
 	deb_xfer("\n");\
 }
-
-/* module parameters - declared in -core.c */
-extern int debug;
 
 #else
 #define dprintk(args...)
 #define debug_dump(b,l)
 #endif
 
+extern int dvb_dibusb_debug;
+
 /* Version information */
 #define DRIVER_VERSION "0.3"
 #define DRIVER_DESC "Driver for DiBcom based USB Budget DVB-T device"
 #define DRIVER_AUTHOR "Patrick Boettcher, patrick.boettcher@desy.de"
-
-/* module parameters - declared in -core.c */
-extern int pid_parse;
-extern int rc_query_interval;
 
 #define deb_info(args...) dprintk(0x01,args)
 #define deb_xfer(args...) dprintk(0x02,args)
@@ -162,7 +157,6 @@ struct usb_dibusb {
 	int init_state;
 
 	int feedcount;
-	int pid_parse;
 	struct dib_fe_xfer_ops xfer_ops;
 
 	struct dibusb_tuner *tuner;
@@ -196,6 +190,10 @@ struct usb_dibusb {
 	struct input_dev rc_input_dev;
 	struct work_struct rc_query_work;
 	int rc_input_event;
+
+	/* module parameters */
+	int pid_parse;
+	int rc_query_interval;
 };
 
 /* commonly used functions in the separated files */

@@ -158,7 +158,7 @@ int dibusb_streaming(struct usb_dibusb *dib,int onoff)
 
 int dibusb_urb_init(struct usb_dibusb *dib)
 {
-	int ret,i,bufsize;
+	int ret,i,bufsize,def_pid_parse = 1;
 	
 	/*
 	 * when reloading the driver w/o replugging the device 
@@ -210,12 +210,14 @@ int dibusb_urb_init(struct usb_dibusb *dib)
 		dib->init_state |= DIBUSB_STATE_URB_SUBMIT;
 	}
 
-
-	dib->pid_parse = 1;
+	/* dib->pid_parse here contains the value of the module parameter */
+	/* decide if pid parsing can be deactivated:
+	 * is possible (by speed) and wanted (by user)
+	 */
 	switch (dib->dibdev->dev_cl->id) {
 		case DIBUSB2_0:
-			if (dib->udev->speed == USB_SPEED_HIGH && !pid_parse) {
-				dib->pid_parse = 0;
+			if (dib->udev->speed == USB_SPEED_HIGH && !dib->pid_parse) {
+				def_pid_parse = 0;
 				info("running at HIGH speed, will deliver the complete TS.");
 			} else
 				info("will use pid_parsing.");
@@ -223,6 +225,8 @@ int dibusb_urb_init(struct usb_dibusb *dib)
 		default: 
 			break;
 	}
+	/* from here on it contains the device and user decision */
+	dib->pid_parse = def_pid_parse;
 	
 	return 0;
 }
