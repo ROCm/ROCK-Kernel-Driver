@@ -555,14 +555,15 @@ void openpic_request_IPIs(void)
 	if (OpenPIC == NULL)
 		return;
 
-	request_irq(openpic_vec_ipi,
-		    openpic_ipi_action, 0, "IPI0 (call function)", 0);
-	request_irq(openpic_vec_ipi+1,
-		    openpic_ipi_action, 0, "IPI1 (reschedule)", 0);
-	request_irq(openpic_vec_ipi+2,
-		    openpic_ipi_action, 0, "IPI2 (invalidate tlb)", 0);
-	request_irq(openpic_vec_ipi+3,
-		    openpic_ipi_action, 0, "IPI3 (xmon break)", 0);
+	/* IPIs are marked SA_INTERRUPT as they must run with irqs disabled */
+	request_irq(openpic_vec_ipi, openpic_ipi_action, SA_INTERRUPT,
+		    "IPI0 (call function)", 0);
+	request_irq(openpic_vec_ipi+1, openpic_ipi_action, SA_INTERRUPT,
+		   "IPI1 (reschedule)", 0);
+	request_irq(openpic_vec_ipi+2, openpic_ipi_action, SA_INTERRUPT,
+		   "IPI2 (invalidate tlb)", 0);
+	request_irq(openpic_vec_ipi+3, openpic_ipi_action, SA_INTERRUPT,
+		   "IPI3 (xmon break)", 0);
 
 	for ( i = 0; i < OPENPIC_NUM_IPI ; i++ )
 		openpic_enable_ipi(openpic_vec_ipi+i);
@@ -754,17 +755,12 @@ static void openpic_set_affinity(unsigned int irq_nr, unsigned long cpumask)
 #ifdef CONFIG_SMP
 static void openpic_end_ipi(unsigned int irq_nr)
 {
-	/* IPIs are marked IRQ_PER_CPU. This has the side effect of
+	/*
+	 * IPIs are marked IRQ_PER_CPU. This has the side effect of
 	 * preventing the IRQ_PENDING/IRQ_INPROGRESS logic from
 	 * applying to them. We EOI them late to avoid re-entering.
-	 * however, I'm wondering if we could simply let them have the
-	 * SA_INTERRUPT flag and let them execute with all interrupts OFF.
-	 * This would have the side effect of either running cross-CPU
-	 * functions with interrupts off, or we can re-enable them explicitely
-	 * with a local_irq_enable() in smp_call_function_interrupt(), since
-	 * smp_call_function() is protected by a spinlock.
-	 * Or maybe we shouldn't set the IRQ_PER_CPU flag on cross-CPU
-	 * function calls IPI at all but that would make a special case.
+	 * We mark IPI's with SA_INTERRUPT as they must run with
+	 * irqs disabled.
 	 */
 	openpic_eoi();
 }

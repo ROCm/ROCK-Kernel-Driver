@@ -121,7 +121,6 @@ int atm_create(struct socket *sock,int protocol,int family)
 	vcc->push_oam = NULL;
 	vcc->vpi = vcc->vci = 0; /* no VCI/VPI yet */
 	vcc->atm_options = vcc->aal_options = 0;
-	vcc->timestamp.tv_sec = vcc->timestamp.tv_usec = 0;
 	init_waitqueue_head(&vcc->sleep);
 	skb_queue_head_init(&vcc->recvq);
 	skb_queue_head_init(&vcc->listenq);
@@ -379,7 +378,7 @@ int atm_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
 	set_current_state(TASK_RUNNING);
 	remove_wait_queue(&vcc->sleep,&wait);
 	if (error <= 0) return error;
-	vcc->timestamp = skb->stamp;
+	sock_recv_timestamp(m, vcc->sk, skb);
 	eff_len = skb->len > size ? size : skb->len;
 	if (skb->len > size) /* Not fit ?  Report it... */
 		m->msg_flags |= MSG_TRUNC;
@@ -611,13 +610,11 @@ int atm_ioctl(struct socket *sock,unsigned int cmd,unsigned long arg)
 			kfree(tmp_buf);
 			goto done;
 		case SIOCGSTAMP: /* borrowed from IP */
-			if (!vcc->timestamp.tv_sec) {
+			if (!vcc->sk->stamp.tv_sec) {
 				ret_val = -ENOENT;
 				goto done;
 			}
-			vcc->timestamp.tv_sec += vcc->timestamp.tv_usec/1000000;
-			vcc->timestamp.tv_usec %= 1000000;
-			ret_val = copy_to_user((void *) arg,&vcc->timestamp,
+			ret_val = copy_to_user((void *) arg, &vcc->sk->stamp,
 			    sizeof(struct timeval)) ? -EFAULT : 0;
 			goto done;
 		case ATM_SETSC:

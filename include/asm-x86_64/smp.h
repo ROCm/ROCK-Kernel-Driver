@@ -8,6 +8,7 @@
 #include <linux/config.h>
 #include <linux/threads.h>
 #include <linux/bitops.h>
+extern int disable_apic;
 #endif
 
 #ifdef CONFIG_X86_LOCAL_APIC
@@ -92,7 +93,6 @@ extern __inline int hard_smp_processor_id(void)
 	return GET_APIC_ID(*(unsigned int *)(APIC_BASE+APIC_ID));
 }
 
-extern int disable_apic;
 extern int slow_smp_processor_id(void);
 
 extern inline int safe_smp_processor_id(void)

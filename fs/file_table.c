@@ -188,6 +188,13 @@ void file_move(struct file *file, struct list_head *list)
 	file_list_unlock();
 }
 
+void file_kill(struct file *file)
+{
+	file_list_lock();
+	list_del_init(&file->f_list);
+	file_list_unlock();
+}
+
 int fs_may_remount_ro(struct super_block *sb)
 {
 	struct list_head *p;

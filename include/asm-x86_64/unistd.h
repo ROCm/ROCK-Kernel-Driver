@@ -502,8 +502,26 @@ __SYSCALL(__NR_restart_syscall, sys_restart_syscall)
 __SYSCALL(__NR_semtimedop, sys_semtimedop)
 #define __NR_fadvise64		221
 __SYSCALL(__NR_fadvise64, sys_fadvise64)
+#define __NR_timer_create		222
+__SYSCALL(__NR_timer_create, sys_timer_create)
+#define __NR_timer_settime		223
+__SYSCALL(__NR_timer_settime, sys_timer_settime)
+#define __NR_timer_gettime		224
+__SYSCALL(__NR_timer_gettime, sys_timer_gettime)
+#define __NR_timer_getoverrun		225
+__SYSCALL(__NR_timer_getoverrun, sys_timer_getoverrun)
+#define __NR_timer_delete	226
+__SYSCALL(__NR_timer_delete, sys_timer_delete)
+#define __NR_clock_settime	227
+__SYSCALL(__NR_clock_settime, sys_clock_settime)
+#define __NR_clock_gettime	228
+__SYSCALL(__NR_clock_gettime, sys_clock_gettime)
+#define __NR_clock_getres	229
+__SYSCALL(__NR_clock_getres, sys_clock_getres)
+#define __NR_clock_nanosleep	230
+__SYSCALL(__NR_clock_nanosleep, sys_clock_nanosleep)
 
-#define __NR_syscall_max __NR_fadvise64
+#define __NR_syscall_max __NR_clock_nanosleep
 #ifndef __NO_STUBS
 
 /* user-visible error numbers are in the range -1 - -4095 */

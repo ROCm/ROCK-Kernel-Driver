@@ -432,11 +432,12 @@ pnp_set_current_resources(struct device * dmdev, const char * ubuf, size_t count
 		goto done;
 	}
 	if (!strnicmp(buf,"set",3)) {
+		struct pnp_resource_table res;
+		int nport = 0, nmem = 0, nirq = 0, ndma = 0;
+
 		if (dev->active)
 			goto done;
 		buf += 3;
-		struct pnp_resource_table res;
-		int nport = 0, nmem = 0, nirq = 0, ndma = 0;
 		pnp_init_resource_table(&res);
 		while (1) {
 			while (isspace(*buf))

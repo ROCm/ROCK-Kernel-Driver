@@ -209,6 +209,174 @@ void cpu_panic(void)
 	panic("SMP bolixed\n");
 }
 
+static unsigned long current_tick_offset;
+
+/* This stick register synchronization scheme is taken entirely from
+ * the ia64 port, see arch/ia64/kernel/smpboot.c for details and credit.
+ *
+ * The only change I've made is to rework it so that the master
+ * initiates the synchonization instead of the slave. -DaveM
+ */
+
+#define MASTER	0
+#define SLAVE	(SMP_CACHE_BYTES/sizeof(unsigned long))
+
+#define NUM_ROUNDS	64	/* magic value */
+#define NUM_ITERS	5	/* likewise */
+
+static spinlock_t itc_sync_lock = SPIN_LOCK_UNLOCKED;
+static unsigned long go[SLAVE + 1];
+
+#define DEBUG_STICK_SYNC	0
+
+static inline unsigned long get_stick(void)
+{
+	unsigned long val;
+
+	__asm__ __volatile__("rd	%%asr24, %0"
+			     : "=r" (val));
+	return val;
+}
+
+static inline long get_delta (long *rt, long *master)
+{
+	unsigned long best_t0 = 0, best_t1 = ~0UL, best_tm = 0;
+	unsigned long tcenter, t0, t1, tm;
+	unsigned long i;
+
+	for (i = 0; i < NUM_ITERS; i++) {
+		t0 = get_stick();
+		go[MASTER] = 1;
+		membar("#StoreLoad");
+		while (!(tm = go[SLAVE]))
+			membar("#LoadLoad");
+		go[SLAVE] = 0;
+		membar("#StoreStore");
+		t1 = get_stick();
+
+		if (t1 - t0 < best_t1 - best_t0)
+			best_t0 = t0, best_t1 = t1, best_tm = tm;
+	}
+
+	*rt = best_t1 - best_t0;
+	*master = best_tm - best_t0;
+
+	/* average best_t0 and best_t1 without overflow: */
+	tcenter = (best_t0/2 + best_t1/2);
+	if (best_t0 % 2 + best_t1 % 2 == 2)
+		tcenter++;
+	return tcenter - best_tm;
+}
+
+static void adjust_stick(long adj)
+{
+	unsigned long tmp, pstate;
+
+	__asm__ __volatile__(
+		"rdpr	%%pstate, %0\n\t"
+		"ba,pt	%%xcc, 1f\n\t"
+		" wrpr	%0, %4, %%pstate\n\t"
+		".align	16\n\t"
+		"1:nop\n\t"
+		"rd	%%asr24, %1\n\t"
+		"add	%1, %2, %1\n\t"
+		"wr	%1, 0x0, %%asr24\n\t"
+		"add	%1, %3, %1\n\t"
+		"wr	%1, 0x0, %%asr25\n\t"
+		"wrpr	%0, 0x0, %%pstate"
+		: "=&r" (pstate), "=&r" (tmp)
+		: "r" (adj), "r" (current_tick_offset),
+		  "i" (PSTATE_IE));
+}
+
+void smp_synchronize_stick_client(void)
+{
+	long i, delta, adj, adjust_latency = 0, done = 0;
+	unsigned long flags, rt, master_time_stamp, bound;
+#if DEBUG_STICK_SYNC
+	struct {
+		long rt;	/* roundtrip time */
+		long master;	/* master's timestamp */
+		long diff;	/* difference between midpoint and master's timestamp */
+		long lat;	/* estimate of itc adjustment latency */
+	} t[NUM_ROUNDS];
+#endif
+
+	go[MASTER] = 1;
+
+	while (go[MASTER])
+		membar("#LoadLoad");
+
+	local_irq_save(flags);
+	{
+		for (i = 0; i < NUM_ROUNDS; i++) {
+			delta = get_delta(&rt, &master_time_stamp);
+			if (delta == 0) {
+				done = 1;	/* let's lock on to this... */
+				bound = rt;
+			}
+
+			if (!done) {
+				if (i > 0) {
+					adjust_latency += -delta;
+					adj = -delta + adjust_latency/4;
+				} else
+					adj = -delta;
+
+				adjust_stick(adj);
+			}
+#if DEBUG_STICK_SYNC
+			t[i].rt = rt;
+			t[i].master = master_time_stamp;
+			t[i].diff = delta;
+			t[i].lat = adjust_latency/4;
+#endif
+		}
+	}
+	local_irq_restore(flags);
+
+#if DEBUG_STICK_SYNC
+	for (i = 0; i < NUM_ROUNDS; i++)
+		printk("rt=%5ld master=%5ld diff=%5ld adjlat=%5ld\n",
+		       t[i].rt, t[i].master, t[i].diff, t[i].lat);
+#endif
+
+	printk(KERN_INFO "CPU %d: synchronized STICK with master CPU (last diff %ld cycles,"
+	       "maxerr %lu cycles)\n", smp_processor_id(), delta, rt);
+}
+
+static void smp_start_sync_stick_client(int cpu);
+
+static void smp_synchronize_one_stick(int cpu)
+{
+	unsigned long flags, i;
+
+	go[MASTER] = 0;
+
+	smp_start_sync_stick_client(cpu);
+
+	/* wait for client to be ready */
+	while (!go[MASTER])
+		membar("#LoadLoad");
+
+	/* now let the client proceed into his loop */
+	go[MASTER] = 0;
+	membar("#StoreLoad");
+
+	spin_lock_irqsave(&itc_sync_lock, flags);
+	{
+		for (i = 0; i < NUM_ROUNDS*NUM_ITERS; i++) {
+			while (!go[MASTER])
+				membar("#LoadLoad");
+			go[MASTER] = 0;
+			membar("#StoreStore");
+			go[SLAVE] = get_stick();
+			membar("#StoreLoad");
+		}
+	}
+	spin_unlock_irqrestore(&itc_sync_lock, flags);
+}
+
 extern struct prom_cpuinfo linux_cpus[NR_CPUS];
 
 extern unsigned long sparc64_cpu_startup;
@@ -468,6 +636,15 @@ static void smp_cross_call_masked(unsigned long *func, u32 ctx, u64 data1, u64 d
 	else
 		cheetah_xcall_deliver(data0, data1, data2, mask);
 	/* NOTE: Caller runs local copy on master. */
+}
+
+extern unsigned long xcall_sync_stick;
+
+static void smp_start_sync_stick_client(int cpu)
+{
+	smp_cross_call_masked(&xcall_sync_stick,
+			      0, 0, 0,
+			      (1UL << cpu));
 }
 
 /* Send cross call to all processors except self. */
@@ -928,8 +1105,6 @@ void smp_promstop_others(void)
 
 extern void sparc64_do_profile(struct pt_regs *regs);
 
-static unsigned long current_tick_offset;
-
 #define prof_multiplier(__cpu)		cpu_data[(__cpu)].multiplier
 #define prof_counter(__cpu)		cpu_data[(__cpu)].counter
 
@@ -1260,8 +1435,12 @@ int __devinit __cpu_up(unsigned int cpu)
 		set_bit(cpu, &smp_commenced_mask);
 		while (!test_bit(cpu, &cpu_online_map))
 			mb();
-		if (!test_bit(cpu, &cpu_online_map))
+		if (!test_bit(cpu, &cpu_online_map)) {
 			ret = -ENODEV;
+		} else {
+			if (SPARC64_USE_STICK)
+				smp_synchronize_one_stick(cpu);
+		}
 	}
 	return ret;
 }

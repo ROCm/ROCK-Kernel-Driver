@@ -455,6 +455,7 @@ extern int scsi_slave_attach(struct scsi_device *);
 extern void scsi_slave_detach(struct scsi_device *);
 extern int scsi_device_get(struct scsi_device *);
 extern void scsi_device_put(struct scsi_device *);
+extern void scsi_set_device_offline(struct scsi_device *);
 extern void scsi_done(Scsi_Cmnd * SCpnt);
 extern void scsi_finish_command(Scsi_Cmnd *);
 extern int scsi_retry_command(Scsi_Cmnd *);
@@ -726,6 +727,7 @@ struct scsi_cmnd {
 
 	struct list_head list;  /* scsi_cmnd participates in queue lists */
 
+	struct list_head eh_entry; /* entry for the host eh_cmd_q */
 	int eh_state;		/* Used for state tracking in error handlr */
 	int eh_eflags;		/* Used by error handlr */
 	void (*done) (struct scsi_cmnd *);	/* Mid-level done function */
@@ -850,6 +852,7 @@ struct scsi_cmnd {
  */
 #define SCSI_MLQUEUE_HOST_BUSY   0x1055
 #define SCSI_MLQUEUE_DEVICE_BUSY 0x1056
+#define SCSI_MLQUEUE_EH_RETRY    0x1057
 
 /*
  * old style reset request from external source
@@ -960,12 +963,12 @@ static inline Scsi_Cmnd *scsi_find_tag(Scsi_Device *SDpnt, int tag) {
 /*
  * Scsi Error Handler Flags
  */
-#define SCSI_EH_CMD_ERR	0x0001	/* Orig cmd error'd */
-#define SCSI_EH_CMD_FAILED	0x0002	/* Orig cmd error type failed */
-#define SCSI_EH_CMD_TIMEOUT	0x0004	/* Orig cmd error type timeout */
-#define SCSI_EH_REC_TIMEOUT	0x0008	/* Recovery cmd timeout */
+#define SCSI_EH_CANCEL_CMD	0x0001	/* Cancel this cmd */
+#define SCSI_EH_REC_TIMEOUT	0x0002	/* EH retry timed out */
 
 #define SCSI_SENSE_VALID(scmd) ((scmd->sense_buffer[0] & 0x70) == 0x70)
+
+extern int scsi_eh_scmd_add(struct scsi_cmnd *, int);
 
 int scsi_set_medium_removal(Scsi_Device *dev, char state);
 

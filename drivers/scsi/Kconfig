@@ -129,6 +129,7 @@ config SCSI_MULTI_LUN
 config SCSI_REPORT_LUNS
 	bool "Build with SCSI REPORT LUNS support"
 	depends on SCSI
+	default y
 	help
 	  If you want to build with SCSI REPORT LUNS support in the kernel, say Y here.
 	  The REPORT LUNS command is useful for devices (such as disk arrays) with

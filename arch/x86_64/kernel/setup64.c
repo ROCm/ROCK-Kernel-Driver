@@ -99,7 +99,7 @@ void pda_init(int cpu)
 	pda->irqcount = -1;
 	pda->cpudata_offset = 0;
 	pda->kernelstack = 
-		(unsigned long)current_thread_info() - PDA_STACKOFFSET + THREAD_SIZE; 
+		(unsigned long)stack_thread_info() - PDA_STACKOFFSET + THREAD_SIZE; 
 
 	if (cpu == 0) {
 		/* others are initialized in smpboot.c */

@@ -2658,6 +2658,12 @@ int __init ip_rt_init(void)
 					GFP_KERNEL);
 	if (!rt_cache_stat) 
 		goto out_enomem1;
+	for (i = 0; i < NR_CPUS; i++) {
+		if (cpu_possible(i)) {
+			memset(per_cpu_ptr(rt_cache_stat, i), 0,
+			       sizeof (struct rt_cache_stat));
+		}
+	}
 
 	devinet_init();
 	ip_fib_init();

@@ -180,7 +180,7 @@ static struct aligninfo aligninfo[128] = {
 
 #define SWAP(a, b)	(t = (a), (a) = (b), (b) = t)
 
-unsigned static inline make_dsisr( unsigned instr )
+static inline unsigned make_dsisr(unsigned instr)
 {
 	unsigned dsisr;
 	

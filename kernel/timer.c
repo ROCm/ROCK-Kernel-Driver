@@ -31,6 +31,7 @@
 
 #include <asm/uaccess.h>
 #include <asm/div64.h>
+#include <asm/timex.h>
 
 /*
  * per-CPU timer vector definitions:
@@ -762,7 +763,9 @@ unsigned long wall_jiffies;
  * This read-write spinlock protects us from races in SMP while
  * playing with xtime and avenrun.
  */
+#ifndef ARCH_HAVE_XTIME_LOCK
 seqlock_t xtime_lock __cacheline_aligned_in_smp = SEQLOCK_UNLOCKED;
+#endif
 unsigned long last_time_offset;
 
 /*

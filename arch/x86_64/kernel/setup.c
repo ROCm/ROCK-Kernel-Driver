@@ -88,8 +88,6 @@ unsigned char aux_device_present;
 extern int root_mountflags;
 extern char _text, _etext, _edata, _end;
 
-static int disable_x86_fxsr __initdata = 0;
-
 char command_line[COMMAND_LINE_SIZE];
 char saved_command_line[COMMAND_LINE_SIZE];
 
@@ -387,18 +385,6 @@ void __init setup_arch(char **cmdline_p)
 #endif
 }
 
-#ifndef CONFIG_X86_TSC
-static int tsc_disable __initdata = 0;
-
-static int __init tsc_setup(char *str)
-{
-	tsc_disable = 1;
-	return 1;
-}
-
-__setup("notsc", tsc_setup);
-#endif
-
 static int __init get_model_name(struct cpuinfo_x86 *c)
 {
 	unsigned int *v;
@@ -417,25 +403,36 @@ static int __init get_model_name(struct cpuinfo_x86 *c)
 
 static void __init display_cacheinfo(struct cpuinfo_x86 *c)
 {
-	unsigned int n, dummy, ecx, edx;
+	unsigned int n, dummy, eax, ebx, ecx, edx;
 
 	n = cpuid_eax(0x80000000);
 
 	if (n >= 0x80000005) {
-		cpuid(0x80000005, &dummy, &dummy, &ecx, &edx);
+		cpuid(0x80000005, &dummy, &ebx, &ecx, &edx);
 		printk(KERN_INFO "CPU: L1 I Cache: %dK (%d bytes/line), D cache %dK (%d bytes/line)\n",
 			edx>>24, edx&0xFF, ecx>>24, ecx&0xFF);
-		c->x86_cache_size=(ecx>>24)+(edx>>24);	
+		c->x86_cache_size = (ecx>>24)+(edx>>24);
+		/* DTLB and ITLB together, but only 4K */
+		c->x86_tlbsize = ((ebx >> 16) & 0xff) + (ebx & 0xff);
 	}
 
-	if (n < 0x80000006)
-		return;
-
+	if (n >= 0x80000006) {
+		cpuid(0x80000006, &dummy, &ebx, &ecx, &edx);
 	ecx = cpuid_ecx(0x80000006);
 	c->x86_cache_size = ecx >> 16;
+		c->x86_tlbsize += ((ebx >> 16) & 0xff) + (ebx & 0xff);
 
 	printk(KERN_INFO "CPU: L2 Cache: %dK (%d bytes/line)\n",
 		c->x86_cache_size, ecx & 0xFF);
+	}
+
+	if (n >= 0x80000007)
+		cpuid(0x80000007, &dummy, &dummy, &dummy, &c->x86_power); 
+	if (n >= 0x80000008) {
+		cpuid(0x80000008, &eax, &dummy, &dummy, &dummy); 
+		c->x86_virt_bits = (eax >> 8) & 0xff;
+		c->x86_phys_bits = eax & 0xff;
+	}
 }
 
 
@@ -478,15 +475,6 @@ struct cpu_model_info {
 	char *model_names[16];
 };
 
-int __init x86_fxsr_setup(char * s)
-{
-	disable_x86_fxsr = 1;
-	return 1;
-}
-__setup("nofxsr", x86_fxsr_setup);
-
-
-
 /*
  * This does the hard work of actually picking apart the CPU stuff...
  */
@@ -514,13 +502,17 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 	/* Note that the vendor-specific code below might override */
 
 	/* Intel-defined flags: level 0x00000001 */
-	if ( c->cpuid_level >= 0x00000001 ) {
+	if (c->cpuid_level >= 0x00000001) {
 		__u32 misc;
 		cpuid(0x00000001, &tfms, &misc, &junk,
 		      &c->x86_capability[0]);
-		c->x86 = (tfms >> 8) & 15;
-		c->x86_model = (tfms >> 4) & 15;
-		c->x86_mask = tfms & 15;
+		c->x86 = (tfms >> 8) & 0xf;
+		c->x86_model = (tfms >> 4) & 0xf;
+		c->x86_mask = tfms & 0xf;
+		if (c->x86 == 0xf) {
+			c->x86 += (tfms >> 20) & 0xff;
+			c->x86_model += ((tfms >> 16) & 0xF) << 4;
+		} 
 		if (c->x86_capability[0] & (1<<19)) 
        		c->x86_clflush_size = ((misc >> 8) & 0xff) * 8;
 	} else {
@@ -567,37 +559,6 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 			break;
 	}
 	
-	printk(KERN_DEBUG "CPU: After vendor init, caps: %08x %08x %08x %08x\n",
-	       c->x86_capability[0],
-	       c->x86_capability[1],
-	       c->x86_capability[2],
-	       c->x86_capability[3]);
-
-	/*
-	 * The vendor-specific functions might have changed features.  Now
-	 * we do "generic changes."
-	 */
-
-	/* TSC disabled? */
-#ifndef CONFIG_X86_TSC
-	if ( tsc_disable )
-		clear_bit(X86_FEATURE_TSC, &c->x86_capability);
-#endif
-
-	/* FXSR disabled? */
-	if (disable_x86_fxsr) {
-		clear_bit(X86_FEATURE_FXSR, &c->x86_capability);
-		clear_bit(X86_FEATURE_XMM, &c->x86_capability);
-	}
-
-	/* Now the feature flags better reflect actual CPU features! */
-
-	printk(KERN_DEBUG "CPU:     After generic, caps: %08x %08x %08x %08x\n",
-	       c->x86_capability[0],
-	       c->x86_capability[1],
-	       c->x86_capability[2],
-	       c->x86_capability[3]);
-
 	/*
 	 * On SMP, boot_cpu_data holds the common feature set between
 	 * all CPUs; so make sure that we indicate which features are
@@ -665,6 +626,13 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 	};
+	static char *x86_power_flags[] = { 
+		"ts",	/* temperature sensor */
+		"fid",  /* frequency id control */
+		"vid",  /* voltage id control */
+		"ttp",  /* thermal trip */
+	};
+
 
 #ifdef CONFIG_SMP
 	if (!(cpu_online_map & (1<<(c-cpu_data))))
@@ -712,9 +680,30 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 				seq_printf(m, " %s", x86_cap_flags[i]);
 	}
 		
-	seq_printf(m, "\nbogomips\t: %lu.%02lu\n\n",
+	seq_printf(m, "\nbogomips\t: %lu.%02lu\n",
 		   c->loops_per_jiffy/(500000/HZ),
 		   (c->loops_per_jiffy/(5000/HZ)) % 100);
+
+	if (c->x86_tlbsize > 0) 
+		seq_printf(m, "TLB size\t: %d 4K pages\n", c->x86_tlbsize);
+	seq_printf(m, "clflush size\t: %d\n", c->x86_clflush_size);
+
+	seq_printf(m, "address sizes\t: %u bits physical, %u bits virtual\n", 
+		   c->x86_phys_bits, c->x86_virt_bits);
+
+	seq_printf(m, "power management:");
+	{
+		int i;
+		for (i = 0; i < 32; i++) 
+			if (c->x86_power & (1 << i)) {
+				if (i < ARRAY_SIZE(x86_power_flags))
+					seq_printf(m, " %s", x86_power_flags[i]);
+				else
+					seq_printf(m, " [%d]", i);
+			}
+	}
+
+	seq_printf(m, "\n\n"); 
 
 	return 0;
 }

@@ -84,6 +84,7 @@ struct dev_info scsi_static_device_list[] __initdata = {
 	{"NEC", "CD-ROM DRIVE:841", "1.0", BLIST_NOLUN},/* locks up */
 	{"PHILIPS", "PCA80SC", "V4-2", BLIST_NOLUN},	/* responds to all lun */
 	{"RODIME", "RO3000S", "2.33", BLIST_NOLUN},	/* locks up */
+	{"SUN", "SENA", NULL, BLIST_NOLUN},		/* responds to all luns */
 	/*
 	 * The following causes a failed REQUEST SENSE on lun 1 for
 	 * aha152x controller, which causes SCSI code to reset bus.
@@ -128,6 +129,7 @@ struct dev_info scsi_static_device_list[] __initdata = {
 	{"MITSUMI", "CD-R CR-2201CS", "6119", BLIST_NOLUN},	/* locks up */
 	{"RELISYS", "Scorpio", NULL, BLIST_NOLUN},	/* responds to all lun */
 	{"MICROTEK", "ScanMaker II", "5.61", BLIST_NOLUN},	/* responds to all lun */
+	{"NEC", "D3856", "0009", BLIST_NOLUN},
 
 	/*
 	 * Other types of devices that have special flags.

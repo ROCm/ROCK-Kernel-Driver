@@ -64,38 +64,38 @@ int main(int argc, char **argv)
 	long padPages = 0;
 	if ( argc < 2 )
 	{
-		printf("Name of System Map file missing.\n");
+		fprintf(stderr, "Name of System Map file missing.\n");
 		exit(1);
 	}
 
 	if ( argc < 3 )
 	{
-		printf("Name of vmlinux file missing.\n");
+		fprintf(stderr, "Name of vmlinux file missing.\n");
 		exit(1);
 	}
 
 	if ( argc < 4 )
 	{
-		printf("Name of vmlinux output file missing.\n");
+		fprintf(stderr, "Name of vmlinux output file missing.\n");
 		exit(1);
 	}
 
 	sysmap = fopen(argv[1], "r");
 	if ( ! sysmap )
 	{
-		printf("System Map file \"%s\" failed to open.\n", argv[1]);
+		fprintf(stderr, "System Map file \"%s\" failed to open.\n", argv[1]);
 		exit(1);
 	}
 	inputVmlinux = fopen(argv[2], "r");
 	if ( ! inputVmlinux )
 	{
-		printf("vmlinux file \"%s\" failed to open.\n", argv[2]);
+		fprintf(stderr, "vmlinux file \"%s\" failed to open.\n", argv[2]);
 		exit(1);
 	}
 	outputVmlinux = fopen(argv[3], "w");
 	if ( ! outputVmlinux )
 	{
-		printf("output vmlinux file \"%s\" failed to open.\n", argv[3]);
+		fprintf(stderr, "output vmlinux file \"%s\" failed to open.\n", argv[3]);
 		exit(1);
 	}
 
@@ -107,7 +107,7 @@ int main(int argc, char **argv)
 	printf("kernel file size = %ld\n", kernelLen);
 	if ( kernelLen == 0 )
 	{
-		printf("You must have a linux kernel specified as argv[2]\n");
+		fprintf(stderr, "You must have a linux kernel specified as argv[2]\n");
 		exit(1);
 	}
 
@@ -146,17 +146,15 @@ int main(int argc, char **argv)
   /* Process the Sysmap file to determine the true end of the kernel */
 	sysmapPages = sysmapLen / 4096;
 	printf("System map pages to copy = %ld\n", sysmapPages);
-	for (i=0; i<sysmapPages; ++i)
-	{
-		get4k(sysmap, inbuf);
-	}
+	/* read the whole file line by line, expect that it doesnt fail */
+	while ( fgets(inbuf, 4096, sysmap) )  ;
 	/* search for _end in the last page of the system map */
 	ptr_end = strstr(inbuf, " _end");
 	if (!ptr_end)
 	{
-		printf("Unable to find _end in the sysmap file \n");
-		printf("inbuf: \n");
-		printf("%s \n", inbuf);
+		fprintf(stderr, "Unable to find _end in the sysmap file \n");
+		fprintf(stderr, "inbuf: \n");
+		fprintf(stderr, "%s \n", inbuf);
 		exit(1);
 	}
 	printf("Found _end in the last page of the sysmap - backing up 10 characters it looks like %s", ptr_end-10);

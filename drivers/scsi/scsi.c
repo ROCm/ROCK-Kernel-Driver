@@ -36,9 +36,6 @@
  *  out_of_space hacks, D. Gilbert (dpg) 990608
  */
 
-#define REVISION	"Revision: 1.00"
-#define VERSION		"Id: scsi.c 1.00 2000/09/26"
-
 #include <linux/config.h>
 #include <linux/module.h>
 
@@ -790,13 +787,9 @@ static void scsi_softirq(struct softirq_action *h)
 				if ((status_byte(SCpnt->result) & CHECK_CONDITION) != 0) {
 					SCSI_LOG_MLCOMPLETE(3, print_sense("bh", SCpnt));
 				}
-				if (SCpnt->device->host->eh_wait != NULL) {
-					scsi_eh_eflags_set(SCpnt, SCSI_EH_CMD_FAILED | SCSI_EH_CMD_ERR);
-					SCpnt->owner = SCSI_OWNER_ERROR_HANDLER;
-					SCpnt->state = SCSI_STATE_FAILED;
 
-					scsi_host_failed_inc_and_test(SCpnt->device->host);
-				} else {
+				if (!scsi_eh_scmd_add(SCpnt, 0))
+				{
 					/*
 					 * We only get here if the error
 					 * recovery thread has died.
@@ -1148,29 +1141,6 @@ int scsi_dev_info_list_add_str (char *dev_list)
 }
 
 /**
- * scsi_dev_list_init: set up the dynamic device list.
- * @dev_list:	string of device flags to add
- *
- * Description:
- * 	Add command line @dev_list entries, then add
- * 	scsi_static_device_list entries to the scsi device info list.
- **/
-static void scsi_dev_info_list_init (char *dev_list)
-{
-	int i;
-
-	if (scsi_dev_info_list_add_str(dev_list) == -ENOMEM)
-		return;
-	for (i = 0; scsi_static_device_list[i].vendor != NULL; i++)
-		if (scsi_dev_info_list_add(1 /* compatibile */,
-			   scsi_static_device_list[i].vendor,
-			   scsi_static_device_list[i].model,
-			   NULL,
-			   scsi_static_device_list[i].flags) == -ENOMEM)
-			return;
-}
-
-/**
  * scsi_dev_info_list_delete: called from scsi.c:exit_scsi to remove
  * 	the scsi_dev_info_list.
  **/
@@ -1184,6 +1154,37 @@ static void scsi_dev_info_list_delete (void)
 				     dev_info_list);
 		kfree(devinfo);
 	}
+}
+
+/**
+ * scsi_dev_list_init: set up the dynamic device list.
+ * @dev_list:	string of device flags to add
+ *
+ * Description:
+ * 	Add command line @dev_list entries, then add
+ * 	scsi_static_device_list entries to the scsi device info list.
+ **/
+static int scsi_dev_info_list_init (char *dev_list)
+{
+	int error, i;
+
+	error = scsi_dev_info_list_add_str(dev_list);
+	if (error)
+		return error;
+
+	for (i = 0; scsi_static_device_list[i].vendor != NULL; i++) {
+		error = scsi_dev_info_list_add(1 /* compatibile */,
+				scsi_static_device_list[i].vendor,
+				scsi_static_device_list[i].model,
+				NULL,
+				scsi_static_device_list[i].flags);
+		if (error)
+			break;
+	}
+
+	if (error)
+		scsi_dev_info_list_delete();
+	return error;
 }
 
 /**
@@ -1296,6 +1297,44 @@ void scsi_device_put(struct scsi_device *sdev)
 {
 	sdev->access_count--;
 	module_put(sdev->host->hostt->module);
+}
+
+/**
+ * scsi_set_device_offline - set scsi_device offline
+ * @sdev:	pointer to struct scsi_device to offline. 
+ *
+ * Locks:	host_lock held on entry.
+ **/
+void scsi_set_device_offline(struct scsi_device *sdev)
+{
+	struct scsi_cmnd *scmd;
+	int	cmds_active = 0;
+	unsigned long flags;
+
+	sdev->online = FALSE;
+
+	spin_lock_irqsave(&sdev->list_lock, flags);
+	list_for_each_entry(scmd, &sdev->cmd_list, list) {
+		if (scmd->request && scmd->request->rq_status != RQ_INACTIVE) {
+			/*
+			 * If we are unable to remove the timer, it means
+			 * that the command has already timed out or
+			 * finished.
+			 */
+			if (!scsi_delete_timer(scmd)) {
+				continue;
+			}
+
+			++cmds_active;
+
+			scsi_eh_scmd_add(scmd, SCSI_EH_CANCEL_CMD);
+		}
+	}
+	spin_unlock_irqrestore(&sdev->list_lock, flags);
+
+	if (!cmds_active) {
+		/* FIXME: Send online state change hotplug event */
+	}
 }
 
 /*
@@ -1437,17 +1476,38 @@ __setup("scsi_default_dev_flags=", setup_scsi_default_dev_flags);
 
 #endif
 
-/* FIXME(hch): add proper error handling */
 static int __init init_scsi(void)
 {
-	scsi_init_queue();
-	scsi_init_procfs();
-	devfs_mk_dir(NULL, "scsi", NULL);
+	int error;
+
+	error = scsi_init_queue();
+	if (error)
+		return error;
+	error = scsi_init_procfs();
+	if (error)
+		goto cleanup_queue;
+	error = scsi_dev_info_list_init(scsi_dev_flags);
+	if (error)
+		goto cleanup_procfs;
+	error = scsi_sysfs_register();
+	if (error)
+		goto cleanup_devlist;
+
 	scsi_host_init();
-	scsi_dev_info_list_init(scsi_dev_flags);
-	scsi_sysfs_register();
+	devfs_mk_dir(NULL, "scsi", NULL);
 	open_softirq(SCSI_SOFTIRQ, scsi_softirq, NULL);
+	printk(KERN_NOTICE "SCSI subsystem initialized\n");
 	return 0;
+
+cleanup_devlist:
+	scsi_dev_info_list_delete();
+cleanup_procfs:
+	scsi_exit_procfs();
+cleanup_queue:
+	scsi_exit_queue();
+	printk(KERN_ERR "SCSI subsystem failed to initialize, error = %d\n",
+	       -error);
+	return error;
 }
 
 static void __exit exit_scsi(void)

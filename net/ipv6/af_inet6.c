@@ -67,11 +67,9 @@ static int unloadable = 0; /* XX: Turn to one when all is ok within the
 			      module for allowing unload */
 #endif
 
-#if defined(MODULE) && LINUX_VERSION_CODE > 0x20115
 MODULE_AUTHOR("Cast of dozens");
 MODULE_DESCRIPTION("IPv6 protocol stack for Linux");
 MODULE_PARM(unloadable, "i");
-#endif
 
 /* IPv6 procfs goodies... */
 
@@ -571,6 +569,7 @@ inet6_register_protosw(struct inet_protosw *p)
 	struct list_head *lh;
 	struct inet_protosw *answer;
 	int protocol = p->protocol;
+	struct list_head *last_perm;
 
 	br_write_lock_bh(BR_NETPROTO_LOCK);
 
@@ -579,24 +578,29 @@ inet6_register_protosw(struct inet_protosw *p)
 
 	/* If we are trying to override a permanent protocol, bail. */
 	answer = NULL;
+	last_perm = &inetsw6[p->type];
 	list_for_each(lh, &inetsw6[p->type]) {
 		answer = list_entry(lh, struct inet_protosw, list);
 
 		/* Check only the non-wild match. */
-		if (protocol == answer->protocol &&
-		    (INET_PROTOSW_PERMANENT & answer->flags))
-			break;
+		if (INET_PROTOSW_PERMANENT & answer->flags) {
+			if (protocol == answer->protocol)
+				break;
+			last_perm = lh;
+		}
 
 		answer = NULL;
 	}
 	if (answer)
 		goto out_permanent;
 
-	/* Add to the BEGINNING so that we override any existing
-	 * entry.  This means that when we remove this entry, the
+	/* Add the new entry after the last permanent entry if any, so that
+	 * the new entry does not override a permanent entry when matched with
+	 * a wild-card protocol. But it is allowed to override any existing
+	 * non-permanent entry.  This means that when we remove this entry, the 
 	 * system automatically returns to the old behavior.
 	 */
-	list_add(&p->list, &inetsw6[p->type]);
+	list_add(&p->list, last_perm);
 out:
 	br_write_unlock_bh(BR_NETPROTO_LOCK);
 	return;

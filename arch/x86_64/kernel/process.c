@@ -328,7 +328,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long rsp,
  * - fold all the options into a flag word and test it with a single test.
  * - could test fs/gs bitsliced
  */
-void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
+struct task_struct *__switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 {
 	struct thread_struct *prev = &prev_p->thread,
 				 *next = &next_p->thread;
@@ -439,6 +439,8 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 			tss->io_map_base = INVALID_IO_BITMAP_OFFSET;
 		}
 	}
+
+	return prev_p;
 }
 
 /*

@@ -154,8 +154,8 @@ static int do_posix_gettime(struct k_clock *clock, struct timespec *tp);
 int do_posix_clock_monotonic_gettime(struct timespec *tp);
 
 int do_posix_clock_monotonic_settime(struct timespec *tp);
-static struct k_itimer *lock_timer(timer_t timer_id, long *flags);
-static inline void unlock_timer(struct k_itimer *timr, long flags);
+static struct k_itimer *lock_timer(timer_t timer_id, unsigned long *flags);
+static inline void unlock_timer(struct k_itimer *timr, unsigned long flags);
 
 /* 
  * Initialize everything, well, just everything in Posix clocks/timers ;)
@@ -266,7 +266,7 @@ do_schedule_next_timer(struct siginfo *info)
 {
 
 	struct k_itimer *timr;
-	long flags;
+	unsigned long flags;
 
 	timr = lock_timer(info->si_tid, &flags);
 
@@ -347,7 +347,7 @@ static void
 posix_timer_fn(unsigned long __data)
 {
 	struct k_itimer *timr = (struct k_itimer *) __data;
-	long flags;
+	unsigned long flags;
 
 	spin_lock_irqsave(&timr->it_lock, flags);
 	timer_notify_task(timr);
@@ -561,7 +561,7 @@ good_timespec(const struct timespec *ts)
 }
 
 static inline void
-unlock_timer(struct k_itimer *timr, long flags)
+unlock_timer(struct k_itimer *timr, unsigned long flags)
 {
 	spin_unlock_irqrestore(&timr->it_lock, flags);
 }
@@ -576,7 +576,7 @@ unlock_timer(struct k_itimer *timr, long flags)
 
  */
 static struct k_itimer *
-lock_timer(timer_t timer_id, long *flags)
+lock_timer(timer_t timer_id, unsigned long *flags)
 {
 	struct k_itimer *timr;
 	/*
@@ -668,7 +668,7 @@ sys_timer_gettime(timer_t timer_id, struct itimerspec *setting)
 {
 	struct k_itimer *timr;
 	struct itimerspec cur_setting;
-	long flags;
+	unsigned long flags;
 
 	timr = lock_timer(timer_id, &flags);
 	if (!timr)

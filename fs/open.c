@@ -638,7 +638,6 @@ struct file *dentry_open(struct dentry *dentry, struct vfsmount *mnt, int flags)
 {
 	struct file * f;
 	struct inode *inode;
-	static LIST_HEAD(kill_list);
 	int error;
 
 	error = -ENFILE;
@@ -683,7 +682,7 @@ cleanup_all:
 	fops_put(f->f_op);
 	if (f->f_mode & FMODE_WRITE)
 		put_write_access(inode);
-	file_move(f, &kill_list); /* out of the way.. */
+	file_kill(f);
 	f->f_dentry = NULL;
 	f->f_vfsmnt = NULL;
 cleanup_file:
