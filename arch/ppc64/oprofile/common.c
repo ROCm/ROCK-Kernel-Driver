@@ -125,16 +125,7 @@ static int op_ppc64_create_files(struct super_block *sb, struct dentry *root)
 	return 0;
 }
 
-static struct oprofile_operations oprof_ppc64_ops = {
-	.create_files	= op_ppc64_create_files,
-	.setup		= op_ppc64_setup,
-	.shutdown	= op_ppc64_shutdown,
-	.start		= op_ppc64_start,
-	.stop		= op_ppc64_stop,
-	.cpu_type	= NULL		/* To be filled in below. */
-};
-
-int __init oprofile_arch_init(struct oprofile_operations **ops)
+void __init oprofile_arch_init(struct oprofile_operations *ops)
 {
 	unsigned int pvr;
 
@@ -145,7 +136,7 @@ int __init oprofile_arch_init(struct oprofile_operations **ops)
 		case PV_630p:
 			model = &op_model_rs64;
 			model->num_counters = 8;
-			oprof_ppc64_ops.cpu_type = "ppc64/power3";
+			ops->cpu_type = "ppc64/power3";
 			break;
 
 		case PV_NORTHSTAR:
@@ -154,40 +145,42 @@ int __init oprofile_arch_init(struct oprofile_operations **ops)
 		case PV_SSTAR:
 			model = &op_model_rs64;
 			model->num_counters = 8;
-			oprof_ppc64_ops.cpu_type = "ppc64/rs64";
+			ops->cpu_type = "ppc64/rs64";
 			break;
 
 		case PV_POWER4:
 		case PV_POWER4p:
 			model = &op_model_power4;
 			model->num_counters = 8;
-			oprof_ppc64_ops.cpu_type = "ppc64/power4";
+			ops->cpu_type = "ppc64/power4";
 			break;
 
 		case PV_970:
 		case PV_970FX:
 			model = &op_model_power4;
 			model->num_counters = 8;
-			oprof_ppc64_ops.cpu_type = "ppc64/970";
+			ops->cpu_type = "ppc64/970";
 			break;
 
 		case PV_POWER5:
 		case PV_POWER5p:
 			model = &op_model_power4;
 			model->num_counters = 6;
-			oprof_ppc64_ops.cpu_type = "ppc64/power5";
+			ops->cpu_type = "ppc64/power5";
 			break;
 
 		default:
-			return -ENODEV;
+			return;
 	}
 
-	*ops = &oprof_ppc64_ops;
+	ops->create_files = op_ppc64_create_files;
+	ops->setup = op_ppc64_setup;
+	ops->shutdown = op_ppc64_shutdown;
+	ops->start = op_ppc64_start;
+	ops->stop = op_ppc64_stop;
 
 	printk(KERN_INFO "oprofile: using %s performance monitoring.\n",
-	       oprof_ppc64_ops.cpu_type);
-
-	return 0;
+	       ops->cpu_type);
 }
 
 void oprofile_arch_exit(void)

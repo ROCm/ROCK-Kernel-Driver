@@ -180,7 +180,6 @@ static void rs64_handle_interrupt(struct pt_regs *regs,
 	int i;
 	unsigned long pc = mfspr(SPRN_SIAR);
 	int is_kernel = (pc >= KERNELBASE);
-	unsigned int cpu = smp_processor_id();
 
 	/* set the PMM bit (see comment below) */
 	mtmsrd(mfmsr() | MSR_PMM);
@@ -189,7 +188,7 @@ static void rs64_handle_interrupt(struct pt_regs *regs,
 		val = ctr_read(i);
 		if (val < 0) {
 			if (ctr[i].enabled) {
-				oprofile_add_sample(pc, is_kernel, i, cpu);
+				oprofile_add_pc(pc, is_kernel, i);
 				ctr_write(i, reset_value[i]);
 			} else {
 				ctr_write(i, 0);
