@@ -7558,7 +7558,7 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 			goto err_out_free_res;
 		}
 	} else {
-		err = pci_set_dma_mask(pdev, (u64) 0xffffffff);
+		err = pci_set_dma_mask(pdev, 0xffffffffULL);
 		if (err) {
 			printk(KERN_ERR PFX "No usable DMA configuration, "
 			       "aborting.\n");
