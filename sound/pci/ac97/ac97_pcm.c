@@ -166,7 +166,7 @@ static unsigned char get_slot_reg(struct ac97_pcm *pcm, unsigned short cidx,
 	if (slot > 11)
 		return 0xff;
 	if (pcm->stream == SNDRV_PCM_STREAM_PLAYBACK)
-		return rate_preg_tables[dbl][pcm->r[dbl].rate_table[cidx]][slot - 3];
+		return rate_reg_tables[dbl][pcm->r[dbl].rate_table[cidx]][slot - 3];
 	else
 		return rate_cregs[slot - 3];
 }
