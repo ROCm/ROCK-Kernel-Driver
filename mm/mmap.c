@@ -1346,7 +1346,6 @@ static int acct_stack_growth(struct vm_area_struct * vma, unsigned long size, un
 	struct rlimit *rlim = current->signal->rlim;
 
 	/* address space limit tests */
-	rlim = current->signal->rlim;
 	if (mm->total_vm + grow > rlim[RLIMIT_AS].rlim_cur >> PAGE_SHIFT)
 		return -ENOMEM;
 
