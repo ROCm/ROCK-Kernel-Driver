@@ -36,7 +36,7 @@
 #define LARGE_TAG_ANSISTR		0x02
 #define LARGE_TAG_UNICODESTR		0x03
 #define LARGE_TAG_VENDOR		0x04
-#define LARGE_TAG_MEM32		0x05
+#define LARGE_TAG_MEM32			0x05
 #define LARGE_TAG_FIXEDMEM32		0x06
 
 
@@ -143,6 +143,11 @@ unsigned char * pnp_parse_current_resources(unsigned char * p, unsigned char * e
 				/* ignore this for now */
 				break;
 			}
+			case LARGE_TAG_VENDOR:
+			{
+				/* do nothing */
+				break;
+			}
 			case LARGE_TAG_MEM32:
 			{
 				int io = *(int *) &p[4];
@@ -204,6 +209,11 @@ unsigned char * pnp_parse_current_resources(unsigned char * p, unsigned char * e
 			if (len != 7)
 				goto sm_err;
 			current_ioresource(res, io, size);
+			break;
+		}
+		case SMALL_TAG_VENDOR:
+		{
+			/* do nothing */
 			break;
 		}
 		case SMALL_TAG_FIXEDPORT:

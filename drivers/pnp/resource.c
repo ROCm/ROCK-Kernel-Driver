@@ -2,7 +2,7 @@
  * resource.c - Contains functions for registering and analyzing resource information
  *
  * based on isapnp.c resource management (c) Jaroslav Kysela <perex@suse.cz>
- * Copyright 2002 Adam Belay <ambx1@neo.rr.com>
+ * Copyright 2003 Adam Belay <ambx1@neo.rr.com>
  *
  */
 
@@ -598,7 +598,7 @@ int pnp_generate_rule(struct pnp_dev * dev, int depnum, struct pnp_rule_table * 
 	struct pnp_irq * irq;
 	struct pnp_dma * dma;
 
-	if (depnum <= 0 || !rule)
+	if (depnum < 0 || !rule)
 		return -EINVAL;
 
 	/* independent */
@@ -631,6 +631,8 @@ int pnp_generate_rule(struct pnp_dev * dev, int depnum, struct pnp_rule_table * 
 	}
 
 	/* dependent */
+	if (depnum == 0)
+		return 1;
 	res = pnp_find_resources(dev, depnum);
 	if (!res)
 		return -ENODEV;
@@ -680,7 +682,6 @@ EXPORT_SYMBOL(pnp_add_irq_resource);
 EXPORT_SYMBOL(pnp_add_dma_resource);
 EXPORT_SYMBOL(pnp_add_port_resource);
 EXPORT_SYMBOL(pnp_add_mem_resource);
-EXPORT_SYMBOL(pnp_add_mem32_resource);
 EXPORT_SYMBOL(pnp_init_resource_table);
 EXPORT_SYMBOL(pnp_generate_rule);
 

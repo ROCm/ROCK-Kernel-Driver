@@ -146,9 +146,9 @@ static struct desc_struct bad_bios_desc = { 0, 0x00409200 };
 
 /*
  * At some point we want to use this stack frame pointer to unwind
- * after PnP BIOS oopses. 
+ * after PnP BIOS oopses.
  */
- 
+
 u32 pnp_bios_fault_esp;
 u32 pnp_bios_fault_eip;
 u32 pnp_bios_is_utter_crap = 0;

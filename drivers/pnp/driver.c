@@ -107,9 +107,6 @@ static int pnp_device_probe(struct device *dev)
 			if (error < 0)
 				return error;
 		}
-	} else {
-		if ((pnp_drv->flags & PNP_DRIVER_DO_NOT_ACTIVATE))
-			pnp_disable_dev(pnp_dev);
 	}
 	error = 0;
 	if (pnp_drv->probe && pnp_dev->active) {

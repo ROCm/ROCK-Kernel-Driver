@@ -765,7 +765,7 @@ static int __init isapnp_create_device(struct pnp_card *card,
 /*
  *  Parse resource map for ISA PnP card.
  */
- 
+
 static void __init isapnp_parse_resource_map(struct pnp_card *card)
 {
 	unsigned char type, tmp[17];
@@ -822,7 +822,7 @@ static unsigned char __init isapnp_checksum(unsigned char *data)
 {
 	int i, j;
 	unsigned char checksum = 0x6a, bit, b;
-	
+
 	for (i = 0; i < 8; i++) {
 		b = data[i];
 		for (j = 0; j < 8; j++) {
@@ -900,7 +900,6 @@ static int isapnp_parse_current_resources(struct pnp_dev *dev, struct pnp_resour
 		}
 		for (tmp = 0; tmp < PNP_MAX_DMA; tmp++) {
 			ret = isapnp_read_byte(ISAPNP_CFG_DMA + tmp);
-			pnp_info("dma %d", tmp);
 			if (ret == 4)
 				continue;
 			if (rule.dma[tmp]) { /* some isapnp systems forget to set this to 4 so we have to check */
@@ -1174,7 +1173,7 @@ int __init isapnp_init(void)
 	return 0;
 }
 
-subsys_initcall(isapnp_init);
+device_initcall(isapnp_init);
 
 /* format is: noisapnp */
 

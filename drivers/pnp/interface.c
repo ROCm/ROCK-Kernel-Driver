@@ -229,6 +229,13 @@ static ssize_t pnp_show_possible_resources(struct device *dmdev, char *buf)
 
 static DEVICE_ATTR(possible,S_IRUGO,pnp_show_possible_resources,NULL);
 
+static void pnp_print_conflict_node(pnp_info_buffer_t *buffer, struct pnp_dev * dev)
+{
+	if (!dev)
+		return;
+	pnp_printf(buffer, "'%s'.\n", dev->dev.bus_id);
+}
+
 static void pnp_print_conflict_desc(pnp_info_buffer_t *buffer, int conflict)
 {
 	if (!conflict)
@@ -236,31 +243,31 @@ static void pnp_print_conflict_desc(pnp_info_buffer_t *buffer, int conflict)
 	pnp_printf(buffer, "  Conflict Detected: %2x - ", conflict);
 	switch (conflict) {
 	case CONFLICT_TYPE_RESERVED:
-		pnp_printf(buffer, "This resource was manually reserved.\n");
+		pnp_printf(buffer, "manually reserved.\n");
 		break;
 
 	case CONFLICT_TYPE_IN_USE:
-		pnp_printf(buffer, "This resource resource is currently in use.\n");
+		pnp_printf(buffer, "currently in use.\n");
 		break;
 
 	case CONFLICT_TYPE_PCI:
-		pnp_printf(buffer, "This resource conflicts with a PCI device.\n");
+		pnp_printf(buffer, "PCI device.\n");
 		break;
 
 	case CONFLICT_TYPE_INVALID:
-		pnp_printf(buffer, "This resource is invalid.\n");
+		pnp_printf(buffer, "invalid.\n");
 		break;
 
 	case CONFLICT_TYPE_INTERNAL:
-		pnp_printf(buffer, "This resource conflicts with another resource on this device.\n");
+		pnp_printf(buffer, "another resource on this device.\n");
 		break;
 
 	case CONFLICT_TYPE_PNP_WARM:
-		pnp_printf(buffer, "This resource conflicts with the active PnP device ");
+		pnp_printf(buffer, "active PnP device ");
 		break;
 
 	case CONFLICT_TYPE_PNP_COLD:
-		pnp_printf(buffer, "This resource conflicts with the resources that PnP plans to assign to the device ");
+		pnp_printf(buffer, "disabled PnP device ");
 		break;
 	default:
 		pnp_printf(buffer, "Unknown conflict.\n");
@@ -268,16 +275,9 @@ static void pnp_print_conflict_desc(pnp_info_buffer_t *buffer, int conflict)
 	}
 }
 
-static void pnp_print_conflict_node(pnp_info_buffer_t *buffer, struct pnp_dev * dev)
-{
-	if (!dev)
-		return;
-	pnp_printf(buffer, "%s.\n", dev->dev.bus_id);
-}
-
 static void pnp_print_conflict(pnp_info_buffer_t *buffer, struct pnp_dev * dev, int idx, int type)
 {
-	struct pnp_dev * cdev, * wdev;
+	struct pnp_dev * cdev, * wdev = NULL;
 	int conflict;
 	switch (type) {
 	case IORESOURCE_IO:
@@ -310,6 +310,8 @@ static void pnp_print_conflict(pnp_info_buffer_t *buffer, struct pnp_dev * dev, 
 
 	pnp_print_conflict_desc(buffer, conflict);
 
+	if (wdev)
+		pnp_print_conflict_node(buffer, wdev);
 
 	if (cdev) {
 		pnp_print_conflict_desc(buffer, CONFLICT_TYPE_PNP_COLD);
@@ -392,14 +394,41 @@ pnp_set_current_resources(struct device * dmdev, const char * ubuf, size_t count
 		retval = pnp_activate_dev(dev);
 		goto done;
 	}
+	if (!strnicmp(buf,"reset",5)) {
+		if (!dev->active)
+			goto done;
+		retval = pnp_disable_dev(dev);
+		if (retval)
+			goto done;
+		retval = pnp_activate_dev(dev);
+		goto done;
+	}
 	if (!strnicmp(buf,"auto-config",11)) {
 		if (dev->active)
 			goto done;
 		retval = pnp_auto_config_dev(dev);
 		goto done;
 	}
+	if (!strnicmp(buf,"clear-config",12)) {
+		if (dev->active)
+			goto done;
+		spin_lock(&pnp_lock);
+		dev->config_mode = PNP_CONFIG_MANUAL;
+		pnp_init_resource_table(&dev->res);
+		if (dev->rule)
+			dev->rule->depnum = 0;
+		spin_unlock(&pnp_lock);
+		goto done;
+	}
 	if (!strnicmp(buf,"resolve",7)) {
 		retval = pnp_resolve_conflicts(dev);
+		goto done;
+	}
+	if (!strnicmp(buf,"get",3)) {
+		spin_lock(&pnp_lock);
+		if (pnp_can_read(dev))
+			dev->protocol->get(dev, &dev->res);
+		spin_unlock(&pnp_lock);
 		goto done;
 	}
 	if (!strnicmp(buf,"set",3)) {

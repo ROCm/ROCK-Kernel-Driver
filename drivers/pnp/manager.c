@@ -1,7 +1,7 @@
 /*
  * manager.c - Resource Management, Conflict Resolution, Activation and Disabling of Devices
  *
- * Copyright 2002 Adam Belay <ambx1@neo.rr.com>
+ * Copyright 2003 Adam Belay <ambx1@neo.rr.com>
  *
  */
 
@@ -27,31 +27,31 @@ int pnp_max_moves = 4;
 static int pnp_next_port(struct pnp_dev * dev, int idx)
 {
 	struct pnp_port *port;
-	unsigned long *value1, *value2, *value3;
+	unsigned long *start, *end, *flags;
 	if (!dev || idx < 0 || idx >= PNP_MAX_PORT)
 		return 0;
 	port = dev->rule->port[idx];
 	if (!port)
 		return 1;
 
-	value1 = &dev->res.port_resource[idx].start;
-	value2 = &dev->res.port_resource[idx].end;
-	value3 = &dev->res.port_resource[idx].flags;
+	start = &dev->res.port_resource[idx].start;
+	end = &dev->res.port_resource[idx].end;
+	flags = &dev->res.port_resource[idx].flags;
 
 	/* set the initial values if this is the first time */
-	if (*value1 == 0) {
-		*value1 = port->min;
-		*value2 = *value1 + port->size -1;
-		*value3 = port->flags | IORESOURCE_IO;
+	if (*start == 0) {
+		*start = port->min;
+		*end = *start + port->size - 1;
+		*flags = port->flags | IORESOURCE_IO;
 		if (!pnp_check_port(dev, idx))
 			return 1;
 	}
 
 	/* run through until pnp_check_port is happy */
 	do {
-		*value1 += port->align;
-		*value2 = *value1 + port->size - 1;
-		if (*value1 > port->max || !port->align)
+		*start += port->align;
+		*end = *start + port->size - 1;
+		if (*start > port->max || !port->align)
 			return 0;
 	} while (pnp_check_port(dev, idx));
 	return 1;
@@ -60,39 +60,39 @@ static int pnp_next_port(struct pnp_dev * dev, int idx)
 static int pnp_next_mem(struct pnp_dev * dev, int idx)
 {
 	struct pnp_mem *mem;
-	unsigned long *value1, *value2, *value3;
+	unsigned long *start, *end, *flags;
 	if (!dev || idx < 0 || idx >= PNP_MAX_MEM)
 		return 0;
 	mem = dev->rule->mem[idx];
 	if (!mem)
 		return 1;
 
-	value1 = &dev->res.mem_resource[idx].start;
-	value2 = &dev->res.mem_resource[idx].end;
-	value3 = &dev->res.mem_resource[idx].flags;
+	start = &dev->res.mem_resource[idx].start;
+	end = &dev->res.mem_resource[idx].end;
+	flags = &dev->res.mem_resource[idx].flags;
 
 	/* set the initial values if this is the first time */
-	if (*value1 == 0) {
-		*value1 = mem->min;
-		*value2 = *value1 + mem->size -1;
-		*value3 = mem->flags | IORESOURCE_MEM;
+	if (*start == 0) {
+		*start = mem->min;
+		*end = *start + mem->size -1;
+		*flags = mem->flags | IORESOURCE_MEM;
 		if (!(mem->flags & IORESOURCE_MEM_WRITEABLE))
-			*value3 |= IORESOURCE_READONLY;
+			*flags |= IORESOURCE_READONLY;
 		if (mem->flags & IORESOURCE_MEM_CACHEABLE)
-			*value3 |= IORESOURCE_CACHEABLE;
+			*flags |= IORESOURCE_CACHEABLE;
 		if (mem->flags & IORESOURCE_MEM_RANGELENGTH)
-			*value3 |= IORESOURCE_RANGELENGTH;
+			*flags |= IORESOURCE_RANGELENGTH;
 		if (mem->flags & IORESOURCE_MEM_SHADOWABLE)
-			*value3 |= IORESOURCE_SHADOWABLE;
+			*flags |= IORESOURCE_SHADOWABLE;
 		if (!pnp_check_mem(dev, idx))
 			return 1;
 	}
 
 	/* run through until pnp_check_mem is happy */
 	do {
-		*value1 += mem->align;
-		*value2 = *value1 + mem->size - 1;
-		if (*value1 > mem->max || !mem->align)
+		*start += mem->align;
+		*end = *start + mem->size - 1;
+		if (*start > mem->max || !mem->align)
 			return 0;
 	} while (pnp_check_mem(dev, idx));
 	return 1;
@@ -101,7 +101,7 @@ static int pnp_next_mem(struct pnp_dev * dev, int idx)
 static int pnp_next_irq(struct pnp_dev * dev, int idx)
 {
 	struct pnp_irq *irq;
-	unsigned long *value1, *value2, *value3;
+	unsigned long *start, *end, *flags;
 	int i, mask;
 	if (!dev || idx < 0 || idx >= PNP_MAX_IRQ)
 		return 0;
@@ -109,23 +109,23 @@ static int pnp_next_irq(struct pnp_dev * dev, int idx)
 	if (!irq)
 		return 1;
 
-	value1 = &dev->res.irq_resource[idx].start;
-	value2 = &dev->res.irq_resource[idx].end;
-	value3 = &dev->res.irq_resource[idx].flags;
+	start = &dev->res.irq_resource[idx].start;
+	end = &dev->res.irq_resource[idx].end;
+	flags = &dev->res.irq_resource[idx].flags;
 
 	/* set the initial values if this is the first time */
-	if (*value1 == -1) {
-		*value1 = *value2 = 0;
-		*value3 = irq->flags | IORESOURCE_IRQ;
+	if (*start == -1) {
+		*start = *end = 0;
+		*flags = irq->flags | IORESOURCE_IRQ;
 		if (!pnp_check_irq(dev, idx))
 			return 1;
 	}
 
 	mask = irq->map;
-	for (i = *value1 + 1; i < 16; i++)
+	for (i = *start + 1; i < 16; i++)
 	{
 		if(mask>>i & 0x01) {
-			*value1 = *value2 = i;
+			*start = *end = i;
 			if(!pnp_check_irq(dev, idx))
 				return 1;
 		}
@@ -136,8 +136,7 @@ static int pnp_next_irq(struct pnp_dev * dev, int idx)
 static int pnp_next_dma(struct pnp_dev * dev, int idx)
 {
 	struct pnp_dma *dma;
-	struct resource backup;
-	unsigned long *value1, *value2, *value3;
+	unsigned long *start, *end, *flags;
 	int i, mask;
 	if (!dev || idx < 0 || idx >= PNP_MAX_DMA)
 		return -EINVAL;
@@ -145,33 +144,29 @@ static int pnp_next_dma(struct pnp_dev * dev, int idx)
 	if (!dma)
 		return 1;
 
-	value1 = &dev->res.dma_resource[idx].start;
-	value2 = &dev->res.dma_resource[idx].end;
-	value3 = &dev->res.dma_resource[idx].flags;
-	*value3 = dma->flags | IORESOURCE_DMA;
-	backup = dev->res.dma_resource[idx];
+	start = &dev->res.dma_resource[idx].start;
+	end = &dev->res.dma_resource[idx].end;
+	flags = &dev->res.dma_resource[idx].flags;
 
 	/* set the initial values if this is the first time */
-	if (*value1 == -1) {
-		*value1 = *value2 = 0;
-		*value3 = dma->flags | IORESOURCE_DMA;
+	if (*start == -1) {
+		*start = *end = 0;
+		*flags = dma->flags | IORESOURCE_DMA;
 		if (!pnp_check_dma(dev, idx))
 			return 1;
 	}
 
 	mask = dma->map;
-	for (i = *value1 + 1; i < 8; i++)
+	for (i = *start + 1; i < 8; i++)
 	{
 		if(mask>>i & 0x01) {
-			*value1 = *value2 = i;
+			*start = *end = i;
 			if(!pnp_check_dma(dev, idx))
 				return 1;
 		}
 	}
-	dev->res.dma_resource[idx] = backup;
 	return 0;
 }
-
 
 static int pnp_next_rule(struct pnp_dev *dev)
 {
@@ -179,12 +174,22 @@ static int pnp_next_rule(struct pnp_dev *dev)
         int max = pnp_get_max_depnum(dev);
 	int priority = PNP_RES_PRIORITY_PREFERRED;
 
+	if (depnum < 0)
+		return 0;
+
+	if (max == 0) {
+		if (pnp_generate_rule(dev, 0, dev->rule)) {
+			dev->rule->depnum = -1;
+			return 1;
+		}
+	}
+
 	if(depnum > 0) {
 		struct pnp_resources * res = pnp_find_resources(dev, depnum);
 		priority = res->priority;
 	}
 
-	for (; priority <= PNP_RES_PRIORITY_FUNCTIONAL; priority++, depnum=0) {
+	for (; priority <= PNP_RES_PRIORITY_FUNCTIONAL; priority++, depnum = 0) {
 		depnum += 1;
 		for (; depnum <= max; depnum++) {
 			struct pnp_resources * res = pnp_find_resources(dev, depnum);
@@ -251,6 +256,7 @@ static void pnp_commit_changes(struct pnp_change * parent, struct pnp_change * c
 	if (!list_empty(&change->changes))
 		list_splice_init(&change->changes, &parent->changes);
 }
+
 static int pnp_next_config(struct pnp_dev * dev, int move, struct pnp_change * parent);
 
 static int pnp_next_request(struct pnp_dev * dev, int move, struct pnp_change * parent, struct pnp_change * change)
@@ -259,7 +265,8 @@ static int pnp_next_request(struct pnp_dev * dev, int move, struct pnp_change * 
 	struct pnp_dev * cdev;
 
 	for (i = 0; i < PNP_MAX_PORT; i++) {
-		if (dev->res.port_resource[i].start == 0 || pnp_check_port_conflicts(dev,i,SEARCH_WARM)) {
+		if (dev->res.port_resource[i].start == 0
+		 || pnp_check_port_conflicts(dev,i,SEARCH_WARM)) {
 			if (!pnp_next_port(dev,i))
 				return 0;
 		}
@@ -274,7 +281,8 @@ static int pnp_next_request(struct pnp_dev * dev, int move, struct pnp_change * 
 		pnp_commit_changes(parent, change);
 	}
 	for (i = 0; i < PNP_MAX_MEM; i++) {
-		if (dev->res.mem_resource[i].start == 0 || pnp_check_mem_conflicts(dev,i,SEARCH_WARM)) {
+		if (dev->res.mem_resource[i].start == 0
+		 || pnp_check_mem_conflicts(dev,i,SEARCH_WARM)) {
 			if (!pnp_next_mem(dev,i))
 				return 0;
 		}
@@ -289,7 +297,8 @@ static int pnp_next_request(struct pnp_dev * dev, int move, struct pnp_change * 
 		pnp_commit_changes(parent, change);
 	}
 	for (i = 0; i < PNP_MAX_IRQ; i++) {
-		if (dev->res.irq_resource[i].start == -1 || pnp_check_irq_conflicts(dev,i,SEARCH_WARM)) {
+		if (dev->res.irq_resource[i].start == -1
+		 || pnp_check_irq_conflicts(dev,i,SEARCH_WARM)) {
 			if (!pnp_next_irq(dev,i))
 				return 0;
 		}
@@ -304,7 +313,8 @@ static int pnp_next_request(struct pnp_dev * dev, int move, struct pnp_change * 
 		pnp_commit_changes(parent, change);
 	}
 	for (i = 0; i < PNP_MAX_DMA; i++) {
-		if (dev->res.dma_resource[i].start == -1 || pnp_check_dma_conflicts(dev,i,SEARCH_WARM)) {
+		if (dev->res.dma_resource[i].start == -1
+		 || pnp_check_dma_conflicts(dev,i,SEARCH_WARM)) {
 			if (!pnp_next_dma(dev,i))
 				return 0;
 		}
@@ -323,12 +333,13 @@ static int pnp_next_request(struct pnp_dev * dev, int move, struct pnp_change * 
 
 static int pnp_next_config(struct pnp_dev * dev, int move, struct pnp_change * parent)
 {
-	struct pnp_change * change = pnp_add_change(parent,dev);
+	struct pnp_change * change;
 	move--;
+	if (!dev->rule)
+		return 0;
+	change = pnp_add_change(parent,dev);
 	if (!change)
 		return 0;
-	if (!dev->rule)
-		goto fail;
 	if (!pnp_can_configure(dev))
 		goto fail;
 	if (!dev->rule->depnum) {
@@ -431,8 +442,6 @@ static int pnp_simple_config(struct pnp_dev * dev)
 		spin_unlock(&pnp_lock);
 		return 1;
 	}
-	dev->rule->depnum = 0;
-	pnp_init_resource_table(&dev->res);
 	if (!dev->rule) {
 		dev->rule = pnp_alloc(sizeof(struct pnp_rule_table));
 		if (!dev->rule) {
@@ -440,6 +449,8 @@ static int pnp_simple_config(struct pnp_dev * dev)
 			return -ENOMEM;
 		}
 	}
+	dev->rule->depnum = 0;
+	pnp_init_resource_table(&dev->res);
 	while (pnp_next_rule(dev)) {
 		for (i = 0; i < PNP_MAX_PORT; i++) {
 			if (!pnp_next_port(dev,i))
