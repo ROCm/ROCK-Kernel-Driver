@@ -191,13 +191,8 @@ sctp_disposition_t sctp_sf_do_5_1B_init(const sctp_endpoint_t *ep,
 	sctp_chunk_t *err_chunk;
 	struct sctp_packet *packet;
 	sctp_unrecognized_param_t *unk_param;
+	struct sock *sk;
 	int len;
-
-	/* If the packet is an OOTB packet which is temporarily on the
-	 * control endpoint, respond with an ABORT.
-	 */
-	if (ep == sctp_sk((sctp_get_ctl_sock()))->ep)
-		return sctp_sf_ootb(ep, asoc, type, arg, commands);
 
 	/* 6.10 Bundling
 	 * An endpoint MUST NOT bundle INIT, INIT ACK or
@@ -205,6 +200,22 @@ sctp_disposition_t sctp_sf_do_5_1B_init(const sctp_endpoint_t *ep,
 	 */
 	if (!chunk->singleton)
 		return SCTP_DISPOSITION_VIOLATION;
+
+	/* If the packet is an OOTB packet which is temporarily on the
+	 * control endpoint, respond with an ABORT.
+	 */
+	if (ep == sctp_sk((sctp_get_ctl_sock()))->ep)
+		return sctp_sf_tabort_8_4_8(ep, asoc, type, arg, commands);
+
+	sk = ep->base.sk;
+	/* If the endpoint is not listening or if the number of associations
+	 * on the TCP-style socket exceed the max backlog, respond with an
+	 * ABORT.
+	 */
+	if ((SCTP_SS_LISTENING != sk->state) ||
+	    ((SCTP_SOCKET_TCP == sctp_sk(sk)->type) &&
+	     (sk->ack_backlog >= sk->max_ack_backlog)))
+		return sctp_sf_tabort_8_4_8(ep, asoc, type, arg, commands);
 
 	/* Verify the INIT chunk before processing it. */
 	err_chunk = NULL;
