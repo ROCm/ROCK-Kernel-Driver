@@ -388,7 +388,7 @@ struct shmid64_ds32 {
  *
  * This is really horribly ugly.
  */
-#define IPCOP_MASK(__x)	(1UL << (__x))
+#define IPCOP_MASK(__x)	(1UL << ((__x)&~IPC_64))
 static int do_sys32_semctl(int first, int second, int third, void *uptr)
 {
 	union semun fourth;
@@ -400,7 +400,7 @@ static int do_sys32_semctl(int first, int second, int third, void *uptr)
 	err = -EFAULT;
 	if (get_user (pad, (u32 *)uptr))
 		goto out;
-	if(third == SETVAL)
+	if ((third & ~IPC_64) == SETVAL)
 		fourth.val = (int)pad;
 	else
 		fourth.__pad = (void *)A(pad);
