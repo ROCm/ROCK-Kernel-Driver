@@ -2139,7 +2139,7 @@ static int dv1394_procfs_write( struct file *file,
 			const char *buffer, unsigned long count, void *data)
 {
 	int len = 0;
-	char new_value[64];
+	char new_value[65];
 	char *pos;
 	struct video_card *video = (struct video_card*) data;
 	
@@ -2151,11 +2151,12 @@ static int dv1394_procfs_write( struct file *file,
 	if (copy_from_user( new_value, buffer, len))
 		return -EFAULT;
 	
+	new_value[len] = 0;
 	pos = strchr(new_value, '=');
 	if (pos != NULL) {
 		int val_len = len - (pos-new_value) - 1;
-		char buf[64];
-		memset(buf, 0, 64);
+		char buf[65];
+		memset(buf, 0, 65);
 		strncpy(buf, pos+1, val_len);
 		if (buf[val_len-1] == '\n') buf[val_len-1] = 0;
 		
