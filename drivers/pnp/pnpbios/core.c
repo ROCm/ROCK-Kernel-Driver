@@ -1256,6 +1256,12 @@ static int pnpbios_get_resources(struct pnp_dev *dev)
 	struct pnp_dev_node_info node_info;
 	u8 nodenum = dev->number;
 	struct pnp_bios_node * node;
+		
+	/* just in case */
+	if(dev->driver)
+		return -EBUSY;
+	if(!pnp_is_dynamic(dev))
+		return -EPERM;
 	if (pnp_bios_dev_node_info(&node_info) != 0)
 		return -ENODEV;
 	node = pnpbios_kmalloc(node_info.max_node_size, GFP_KERNEL);
@@ -1273,10 +1279,15 @@ static int pnpbios_set_resources(struct pnp_dev *dev, struct pnp_cfg *config, ch
 	struct pnp_dev_node_info node_info;
 	u8 nodenum = dev->number;
 	struct pnp_bios_node * node;
-	node = pnpbios_kmalloc(node_info.max_node_size, GFP_KERNEL);
 
+	/* just in case */
+	if(dev->driver)
+		return -EBUSY;
+	if (flags == PNP_DYNAMIC && !pnp_is_dynamic(dev))
+		return -EPERM;
 	if (pnp_bios_dev_node_info(&node_info) != 0)
 		return -ENODEV;
+	node = pnpbios_kmalloc(node_info.max_node_size, GFP_KERNEL);
 	if (!node)
 		return -1;
 	if (pnp_bios_get_dev_node(&nodenum, (char )1, node))
@@ -1323,16 +1334,21 @@ static int pnpbios_disable_resources(struct pnp_dev *dev)
 	struct pnp_bios_node * node;
 	if (!config)
 		return -1;
+	/* just in case */
+	if(dev->driver)
+		return -EBUSY;
+	if(dev->flags & PNP_NO_DISABLE || !pnp_is_dynamic(dev))
+		return -EPERM;
 	memset(config, 0, sizeof(struct pnp_cfg));
 	if (!dev || !dev->active)
 		return -EINVAL;
-	for (i=0; i <= 8; i++)
+	for (i=0; i < 8; i++)
 		config->port[i] = &port;
-	for (i=0; i <= 4; i++)
+	for (i=0; i < 4; i++)
 		config->mem[i] = &mem;
-	for (i=0; i <= 2; i++)
+	for (i=0; i < 2; i++)
 		config->irq[i] = &irq;
-	for (i=0; i <= 2; i++)
+	for (i=0; i < 2; i++)
 		config->dma[i] = &dma;
 	dev->active = 0;
 
@@ -1369,7 +1385,7 @@ static int inline insert_device(struct pnp_dev *dev)
 	struct list_head * pos;
 	struct pnp_dev * pnp_dev;
 	list_for_each (pos, &pnpbios_protocol.devices){
-		pnp_dev = list_entry(pos, struct pnp_dev, dev_list);
+		pnp_dev = list_entry(pos, struct pnp_dev, protocol_list);
 		if (dev->number == pnp_dev->number)
 			return -1;
 	}
@@ -1402,10 +1418,13 @@ static void __init build_devlist(void)
 	for(nodenum=0; nodenum<0xff; ) {
 		u8 thisnodenum = nodenum;
 		/* We build the list from the "boot" config because
-		 * asking for the "current" config causes some
-		 * BIOSes to crash.
+		 * we know that the resources couldn't have changed
+		 * at this stage.  Furthermore some buggy PnP BIOSes
+		 * will crash if we request the "current" config
+		 * from devices that are can only be static such as
+		 * those controlled by the "system" driver.
 		 */
-		if (pnp_bios_get_dev_node(&nodenum, (char )0 , node))
+		if (pnp_bios_get_dev_node(&nodenum, (char )1, node))
 			break;
 		nodes_got++;
 		dev =  pnpbios_kmalloc(sizeof (struct pnp_dev), GFP_KERNEL);
@@ -1416,7 +1435,6 @@ static void __init build_devlist(void)
 		if (!dev_id)
 			break;
 		memset(dev_id,0,sizeof(struct pnp_id));
-		pnp_init_device(dev);
 		dev->number = thisnodenum;
 		memcpy(dev->name,"Unknown Device",13);
 		dev->name[14] = '\0';
@@ -1426,6 +1444,7 @@ static void __init build_devlist(void)
 		pos = node_current_resource_data_to_dev(node,dev);
 		pos = node_possible_resource_data_to_dev(pos,node,dev);
 		node_id_data_to_dev(pos,node,dev);
+		dev->flags = node->flags;
 
 		dev->protocol = &pnpbios_protocol;
 
@@ -1450,10 +1469,7 @@ static void __init build_devlist(void)
  *
  */
 
-extern int is_sony_vaio_laptop;
-
 static int pnpbios_disabled; /* = 0 */
-static int dont_reserve_resources; /* = 0 */
 int pnpbios_dont_use_current_config; /* = 0 */
 
 #ifndef MODULE
@@ -1471,8 +1487,6 @@ static int __init pnpbios_setup(char *str)
 			str += 3;
 		if (strncmp(str, "curr", 4) == 0)
 			pnpbios_dont_use_current_config = invert;
-		if (strncmp(str, "res", 3) == 0)
-			dont_reserve_resources = invert;
 		str = strchr(str, ',');
 		if (str != NULL)
 			str += strspn(str, ", \t");
@@ -1498,9 +1512,6 @@ int __init pnpbios_init(void)
 		printk(KERN_INFO "PnPBIOS: Disabled\n");
 		return -ENODEV;
 	}
-
-	if ( is_sony_vaio_laptop )
-		pnpbios_dont_use_current_config = 1;
 
 	/*
  	 * Search the defined area (0xf0000-0xffff0) for a valid PnP BIOS
@@ -1544,7 +1555,7 @@ int __init pnpbios_init(void)
 	}
 	if (!pnp_bios_present())
 		return -ENODEV;
-	pnp_protocol_register(&pnpbios_protocol);
+	pnp_register_protocol(&pnpbios_protocol);
 	build_devlist();
 	/*if ( ! dont_reserve_resources )*/
 		/*reserve_resources();*/

@@ -841,10 +841,9 @@ struct pnp_id pnp_opl3sa2_list[] = {
 	{.id = ""}
 };
 
-/*MODULE_DEVICE_TABLE(isapnp, isapnp_opl3sa2_list);*/
+MODULE_DEVICE_TABLE(pnp, pnp_opl3sa2_list);
 
-static int opl3sa2_pnp_probe(struct pnp_dev *dev, const struct pnp_id *card_id,
-			     const struct pnp_id *dev_id)
+static int opl3sa2_pnp_probe(struct pnp_dev *dev, const struct pnp_id *dev_id)
 {
 	int card = opl3sa2_cards_num;
 	if (opl3sa2_cards_num == OPL3SA2_CARDS_MAX)
@@ -883,7 +882,6 @@ static int opl3sa2_pnp_probe(struct pnp_dev *dev, const struct pnp_id *card_id,
 
 static struct pnp_driver opl3sa2_driver = {
 	.name		= "opl3sa2",
-	.card_id_table	= NULL,
 	.id_table	= pnp_opl3sa2_list,
 	.probe		= opl3sa2_pnp_probe,
 };
