@@ -144,10 +144,10 @@ int imm_sg = SG_ALL;		/* enable/disable scatter-gather. */
 #endif
 
 static int imm_engine(imm_struct *, Scsi_Cmnd *);
-static int imm_in(int, char *, int);
-static int imm_init(int);
+static int imm_in(imm_struct *, char *, int);
+static int imm_init(imm_struct *);
 static void imm_interrupt(void *);
-static int imm_out(int, char *, int);
+static int imm_out(imm_struct *, char *, int);
 
 static int imm_detect(Scsi_Host_Template *);
 static int imm_queuecommand(Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
