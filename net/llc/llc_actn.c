@@ -19,9 +19,10 @@
  */
 #include <linux/netdevice.h>
 #include <net/llc_if.h>
-#include <net/llc_main.h>
 #include <net/llc_evnt.h>
 #include <net/llc_pdu.h>
+#include <net/llc_sap.h>
+#include <net/llc_station.h>
 #include "llc_output.h"
 
 int llc_station_ac_start_ack_timer(struct llc_station *station,

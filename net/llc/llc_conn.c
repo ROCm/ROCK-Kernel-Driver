@@ -11,20 +11,17 @@
  *
  * See the GNU General Public License for more details.
  */
-#include <linux/netdevice.h>
-#include <linux/interrupt.h>
+
 #include <linux/init.h>
-#include <net/llc_if.h>
 #include <net/llc_sap.h>
+#include <net/llc_station.h>
 #include <net/llc_conn.h>
 #include <net/sock.h>
 #include <linux/tcp.h>
-#include <net/llc_main.h>
 #include <net/llc_c_ev.h>
 #include <net/llc_c_ac.h>
 #include <net/llc_c_st.h>
 #include <net/llc_pdu.h>
-#include <net/llc_s_ev.h>
 
 #if 0
 #define dprintk(args...) printk(KERN_DEBUG args)

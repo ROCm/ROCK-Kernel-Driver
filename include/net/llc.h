@@ -76,6 +76,8 @@ extern struct llc_sap *llc_sap_open(unsigned char lsap,
 					       struct packet_type *pt));
 extern void llc_sap_close(struct llc_sap *sap);
 
+extern struct llc_sap *llc_sap_find(unsigned char sap_value);
+
 extern int llc_build_and_send_ui_pkt(struct llc_sap *sap, struct sk_buff *skb,
 				     unsigned char *dmac, unsigned char dsap);
 #endif /* LLC_H */

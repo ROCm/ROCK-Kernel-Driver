@@ -17,12 +17,13 @@
  *
  * See the GNU General Public License for more details.
  */
+
 #include <linux/netdevice.h>
-#include <net/llc_if.h>
-#include <net/llc_sap.h>
-#include <net/llc_main.h>
-#include <net/llc_s_ev.h>
+#include <net/llc.h>
 #include <net/llc_pdu.h>
+#include <net/llc_s_ac.h>
+#include <net/llc_s_ev.h>
+#include <net/llc_sap.h>
 #include "llc_output.h"
 
 /**

@@ -15,7 +15,6 @@
 #include <net/llc.h>
 #include <net/llc_pdu.h>
 #include <net/llc_sap.h>
-#include <net/llc_main.h>
 
 #if 0
 #define dprintk(args...) printk(KERN_DEBUG args)

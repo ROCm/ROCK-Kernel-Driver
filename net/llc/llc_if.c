@@ -25,7 +25,6 @@
 #include <net/llc_c_ev.h>
 #include <net/llc_c_ac.h>
 #include <net/llc_c_st.h>
-#include <net/llc_main.h>
 
 u8 llc_mac_null_var[IFHWADDRLEN];
 

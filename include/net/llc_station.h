@@ -1,8 +1,8 @@
-#ifndef LLC_MAIN_H
-#define LLC_MAIN_H
+#ifndef LLC_STATION_H
+#define LLC_STATION_H
 /*
  * Copyright (c) 1997 by Procom Technology, Inc.
- * 		 2001 by Arnaldo Carvalho de Melo <acme@conectiva.com.br>
+ * 		 2001-2003 by Arnaldo Carvalho de Melo <acme@conectiva.com.br>
  *
  * This program can be redistributed or modified under the terms of the
  * GNU General Public License as published by the Free Software Foundation.
@@ -55,4 +55,4 @@ extern void llc_station_send_pdu(struct llc_station *station,
 				 struct sk_buff *skb);
 extern int __init llc_station_init(void);
 extern void __exit llc_station_exit(void);
-#endif /* LLC_MAIN_H */
+#endif /* LLC_STATION_H */

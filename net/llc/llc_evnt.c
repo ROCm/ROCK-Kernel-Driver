@@ -16,12 +16,12 @@
  *
  * See the GNU General Public License for more details.
  */
-#include <linux/socket.h>
+
 #include <net/sock.h>
 #include <net/llc_if.h>
-#include <net/llc_main.h>
 #include <net/llc_evnt.h>
 #include <net/llc_pdu.h>
+#include <net/llc_station.h>
 
 int llc_stat_ev_enable_with_dup_addr_check(struct llc_station *station,
 					   struct sk_buff *skb)

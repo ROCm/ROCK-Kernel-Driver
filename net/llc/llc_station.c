@@ -1,6 +1,5 @@
 /*
- * llc_main.c - This module contains main functions to manage station, saps
- * 	and connections of the LLC.
+ * llc_station.c - station component of LLC
  *
  * Copyright (c) 1997 by Procom Technology, Inc.
  * 		 2001-2003 by Arnaldo Carvalho de Melo <acme@conectiva.com.br>
@@ -18,7 +17,7 @@
 #include <net/llc.h>
 #include <net/llc_sap.h>
 #include <net/llc_conn.h>
-#include <net/llc_main.h>
+#include <net/llc_station.h>
 #include <net/llc_evnt.h>
 #include <net/llc_actn.h>
 #include <net/llc_stat.h>
