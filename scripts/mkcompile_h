@@ -27,7 +27,12 @@ fi
 
 UTS_VERSION="#$VERSION"
 if [ -n "$SMP" ] ; then UTS_VERSION="$UTS_VERSION SMP"; fi
-UTS_VERSION="$UTS_VERSION `LC_ALL=C LANG=C date`"
+if [ -n "$BUILD_TIMESTAMP" ]; then
+  TIMESTAMP="`LC_ALL=C LANG=C date -d "$BUILD_TIMESTAMP"`"
+else
+   TIMESTAMP="`LC_ALL=C LANG=C date`"
+fi
+UTS_VERSION="$UTS_VERSION $TIMESTAMP"
 
 # Truncate to maximum length
 
@@ -43,16 +48,9 @@ UTS_TRUNCATE="sed -e s/\(.\{1,$UTS_LEN\}\).*/\1/"
   echo \#define UTS_VERSION \"`echo $UTS_VERSION | $UTS_TRUNCATE`\"
 
   echo \#define LINUX_COMPILE_TIME \"`LC_ALL=C LANG=C date +%T`\"
-  echo \#define LINUX_COMPILE_BY \"`whoami`\"
-  echo \#define LINUX_COMPILE_HOST \"`hostname | $UTS_TRUNCATE`\"
-
-  if [ -x /bin/dnsdomainname ]; then
-    echo \#define LINUX_COMPILE_DOMAIN \"`dnsdomainname | $UTS_TRUNCATE`\"
-  elif [ -x /bin/domainname ]; then
-    echo \#define LINUX_COMPILE_DOMAIN \"`domainname | $UTS_TRUNCATE`\"
-  else
-    echo \#define LINUX_COMPILE_DOMAIN
-  fi
+  echo \#define LINUX_COMPILE_BY \"geeko\"
+  echo \#define LINUX_COMPILE_HOST \"buildhost\"
+  echo \#define LINUX_COMPILE_DOMAIN \"suse.de\"
 
   echo \#define LINUX_COMPILER \"`$CC -v 2>&1 | tail -n 1`\"
 ) > .tmpcompile

@@ -269,3 +269,5 @@ config GCOV
 
 endmenu
 
+source "rpmify/Kconfig"
+

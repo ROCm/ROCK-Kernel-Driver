@@ -45,11 +45,10 @@ warn(const char *fmt, ...)
 	va_end(arglist);
 }
 
-void *do_nofail(void *ptr, const char *file, int line, const char *expr)
+void *do_nofail(void *ptr, const char *expr)
 {
 	if (!ptr) {
-		fatal("Memory allocation failure %s line %d: %s.\n",
-		      file, line, expr);
+		fatal("Memory allocation failure: %s.\n", expr);
 	}
 	return ptr;
 }

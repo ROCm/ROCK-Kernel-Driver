@@ -25,7 +25,6 @@
 #define MODUTILS_GENKSYMS_H 1
 
 #include <stdio.h>
-#include <assert.h>
 
 
 enum symbol_type
@@ -89,8 +88,17 @@ void error_with_pos(const char *, ...);
 
 #define MODUTILS_VERSION "<in-kernel>"
 
-#define xmalloc(size) ({ void *__ptr = malloc(size); assert(__ptr || size == 0); __ptr; })
-#define xstrdup(str)  ({ char *__str = strdup(str); assert(__str); __str; })
-
+#define xmalloc(size) ({ void *__ptr = malloc(size);		\
+	if(!__ptr && size != 0) {				\
+		fprintf(stderr, "out of memory\n");		\
+		exit(1);					\
+	}							\
+	__ptr; })
+#define xstrdup(str)  ({ char *__str = strdup(str);		\
+	if (!__str) {						\
+		fprintf(stderr, "out of memory\n");		\
+		exit(1);					\
+	}							\
+	__str; })
 
 #endif /* genksyms.h */

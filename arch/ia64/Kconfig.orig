@@ -1,0 +1,529 @@
+#
+# For a description of the syntax of this configuration file,
+# see Documentation/kbuild/kconfig-language.txt.
+#
+
+mainmenu "IA-64 Linux Kernel Configuration"
+
+source "init/Kconfig"
+
+menu "Processor type and features"
+
+config IA64
+	bool
+	default y
+	help
+	  The Itanium Processor Family is Intel's 64-bit successor to
+	  the 32-bit X86 line.  The IA-64 Linux project has a home
+	  page at <http://www.linuxia64.org/> and a mailing list at
+	  <linux-ia64@vger.kernel.org>.
+
+config 64BIT
+	bool
+	default y
+
+config MMU
+	bool
+	default y
+
+config RWSEM_XCHGADD_ALGORITHM
+	bool
+	default y
+
+config TIME_INTERPOLATION
+	bool
+	default y
+
+config EFI
+	bool
+	default y
+
+choice
+	prompt "System type"
+	default IA64_GENERIC
+
+config IA64_GENERIC
+	bool "generic"
+	select NUMA
+	select ACPI_NUMA
+	select VIRTUAL_MEM_MAP
+	select DISCONTIGMEM
+	help
+	  This selects the system type of your hardware.  A "generic" kernel
+	  will run on any supported IA-64 system.  However, if you configure
+	  a kernel for your specific system, it will be faster and smaller.
+
+	  generic	 For any supported IA-64 system
+	  DIG-compliant	 For DIG ("Developer's Interface Guide") compliant systems
+	  HP-zx1/sx1000	 For HP systems
+	  SGI-SN2	 For SGI Altix systems
+	  Ski-simulator  For the HP simulator <http://www.hpl.hp.com/research/linux/ski/>
+
+	  If you don't know what to do, choose "generic".
+
+config IA64_DIG
+	bool "DIG-compliant"
+
+config IA64_HP_ZX1
+	bool "HP-zx1/sx1000"
+	help
+	  Build a kernel that runs on HP zx1 and sx1000 systems.  This adds
+	  support for the HP I/O MMU.
+
+config IA64_SGI_SN2
+	bool "SGI-SN2"
+
+config IA64_HP_SIM
+	bool "Ski-simulator"
+
+endchoice
+
+choice
+	prompt "Processor type"
+	default ITANIUM
+
+config ITANIUM
+	bool "Itanium"
+	help
+	  Select your IA-64 processor type.  The default is Itanium.
+	  This choice is safe for all IA-64 systems, but may not perform
+	  optimally on systems with, say, Itanium 2 or newer processors.
+
+config MCKINLEY
+	bool "Itanium 2"
+	help
+	  Select this to configure for an Itanium 2 (McKinley) processor.
+
+endchoice
+
+choice
+	prompt "Kernel page size"
+	default IA64_PAGE_SIZE_16KB
+
+config IA64_PAGE_SIZE_4KB
+	bool "4KB"
+	help
+	  This lets you select the page size of the kernel.  For best IA-64
+	  performance, a page size of 8KB or 16KB is recommended.  For best
+	  IA-32 compatibility, a page size of 4KB should be selected (the vast
+	  majority of IA-32 binaries work perfectly fine with a larger page
+	  size).  For Itanium 2 or newer systems, a page size of 64KB can also
+	  be selected.
+
+	  4KB                For best IA-32 compatibility
+	  8KB                For best IA-64 performance
+	  16KB               For best IA-64 performance
+	  64KB               Requires Itanium 2 or newer processor.
+
+	  If you don't know what to do, choose 16KB.
+
+config IA64_PAGE_SIZE_8KB
+	bool "8KB"
+
+config IA64_PAGE_SIZE_16KB
+	bool "16KB"
+
+config IA64_PAGE_SIZE_64KB
+	depends on !ITANIUM
+	bool "64KB"
+
+endchoice
+
+config IA64_BRL_EMU
+	bool
+	depends on ITANIUM
+	default y
+
+config ITANIUM_BSTEP_SPECIFIC
+	bool "Itanium B-step specific code"
+	depends on ITANIUM
+	help
+	  Select this option to build a kernel for an Itanium prototype system
+	  with a B-step CPU.  You have a B-step CPU if the "revision" field in
+	  /proc/cpuinfo has a value in the range from 1 to 4.
+
+# align cache-sensitive data to 128 bytes
+config IA64_L1_CACHE_SHIFT
+	int
+	default "7" if MCKINLEY
+	default "6" if ITANIUM
+
+# align cache-sensitive data to 64 bytes
+config NUMA
+	bool "NUMA support"
+	depends on !IA64_HP_SIM
+	default y if IA64_SGI_SN2
+	help
+	  Say Y to compile the kernel to support NUMA (Non-Uniform Memory
+	  Access).  This option is for configuring high-end multiprocessor
+	  server systems.  If in doubt, say N.
+
+config VIRTUAL_MEM_MAP
+	bool "Virtual mem map"
+	default y if !IA64_HP_SIM
+	help
+	  Say Y to compile the kernel with support for a virtual mem map.
+	  This code also only takes effect if a memory hole of greater than
+	  1 Gb is found during boot.  You must turn this option on if you
+	  require the DISCONTIGMEM option for your machine. If you are
+	  unsure, say Y.
+
+config DISCONTIGMEM
+	bool "Discontiguous memory support"
+	depends on (IA64_DIG || IA64_SGI_SN2 || IA64_GENERIC) && NUMA && VIRTUAL_MEM_MAP
+	default y if (IA64_SGI_SN2 || IA64_GENERIC) && NUMA
+	help
+	  Say Y to support efficient handling of discontiguous physical memory,
+	  for architectures which are either NUMA (Non-Uniform Memory Access)
+	  or have huge holes in the physical address space for other reasons.
+	  See <file:Documentation/vm/numa> for more.
+
+config IA64_CYCLONE
+	bool "Support Cyclone(EXA) Time Source"
+	help
+		Say Y here to enable support for IBM EXA Cyclone time source.
+		If you're unsure, answer N.
+
+config IOSAPIC
+	bool
+	depends on !IA64_HP_SIM
+	default y
+
+config IA64_SGI_SN_XPC
+	tristate "Support DMA Messaging between SGI machines"
+	depends on (IA64_SGI_SN2 || IA64_GENERIC)
+	default m if (IA64_SGI_SN2 || IA64_GENERIC)
+	help
+	  An SGI machine can be divided into multiple Single System
+	  Images which act independently of each other and have
+	  hardware based memory protection from the others.  Enabling
+	  this feature will allow limited communication between
+	  those System Images without allowing write access.
+
+config IA64_SGI_SN_SIM
+	bool "SGI Medusa Simulator Support"
+	depends on IA64_SGI_SN2
+	help
+	  If you are compiling a kernel that will run under SGI's IA-64
+	  simulator (Medusa) then say Y, otherwise say N.
+
+config FORCE_MAX_ZONEORDER
+	int
+	default "18"
+
+config SMP
+	bool "Symmetric multi-processing support"
+	help
+	  This enables support for systems with more than one CPU. If you have
+	  a system with only one CPU, say N.  If you have a system with more
+	  than one CPU, say Y.
+
+	  If you say N here, the kernel will run on single and multiprocessor
+	  systems, but will use only one CPU of a multiprocessor system.  If
+	  you say Y here, the kernel will run on many, but not all,
+	  single processor systems.  On a single processor system, the kernel
+	  will run faster if you say N here.
+
+	  See also the <file:Documentation/smp.txt> and the SMP-HOWTO
+	  available at <http://www.tldp.org/docs.html#howto>.
+
+	  If you don't know what to do here, say N.
+
+config NR_CPUS
+	int "Maximum number of CPUs (2-512)"
+	range 2 512
+	depends on SMP
+	default "64"
+	help
+	  You should set this to the number of CPUs in your system, but
+	  keep in mind that a kernel compiled for, e.g., 2 CPUs will boot but
+	  only use 2 CPUs on a >2 CPU system.  Setting this to a value larger
+	  than 64 will cause the use of a CPU mask array, causing a small
+	  performance hit.
+
+config HOTPLUG_CPU
+    bool "Support for hot-pluggable CPUs (EXPERIMENTAL)"
+    depends on SMP && HOTPLUG && EXPERIMENTAL
+	default n
+    ---help---
+      Say Y here to experiment with turning CPUs off and on.  CPUs
+      can be controlled through /sys/devices/system/cpu/cpu#.
+      Say N if you want to disable CPU hotplug.
+
+config PREEMPT
+	bool "Preemptible Kernel"
+        help
+          This option reduces the latency of the kernel when reacting to
+          real-time or interactive events by allowing a low priority process to
+          be preempted even if it is in kernel mode executing a system call.
+          This allows applications to run more reliably even when the system is
+          under load.
+
+          Say Y here if you are building a kernel for a desktop, embedded
+          or real-time system.  Say N if you are unsure.
+
+config HAVE_DEC_LOCK
+	bool
+	depends on (SMP || PREEMPT)
+	default y
+
+config IA32_SUPPORT
+	bool "Support for Linux/x86 binaries"
+	help
+	  IA-64 processors can execute IA-32 (X86) instructions.  By
+	  saying Y here, the kernel will include IA-32 system call
+	  emulation support which makes it possible to transparently
+	  run IA-32 Linux binaries on an IA-64 Linux system.
+	  If in doubt, say Y.
+
+config COMPAT
+	bool
+	depends on IA32_SUPPORT
+	default y
+
+config PERFMON
+	bool "Performance monitor support"
+	help
+	  Selects whether support for the IA-64 performance monitor hardware
+	  is included in the kernel.  This makes some kernel data-structures a
+	  little bigger and slows down execution a bit, but it is generally
+	  a good idea to turn this on.  If you're unsure, say Y.
+
+config IA64_PALINFO
+	tristate "/proc/pal support"
+	help
+	  If you say Y here, you are able to get PAL (Processor Abstraction
+	  Layer) information in /proc/pal.  This contains useful information
+	  about the processors in your systems, such as cache and TLB sizes
+	  and the PAL firmware version in use.
+
+	  To use this option, you have to ensure that the "/proc file system
+	  support" (CONFIG_PROC_FS) is enabled, too.
+
+source "drivers/firmware/Kconfig"
+
+source "fs/Kconfig.binfmt"
+
+endmenu
+
+menu "Power management and ACPI"
+
+config PM
+	bool "Power Management support"
+	depends on IA64_GENERIC || IA64_DIG || IA64_HP_ZX1
+	default y
+	help
+	  "Power Management" means that parts of your computer are shut
+	  off or put into a power conserving "sleep" mode if they are not
+	  being used.  There are two competing standards for doing this: APM
+	  and ACPI.  If you want to use either one, say Y here and then also
+	  to the requisite support below.
+
+	  Power Management is most important for battery powered laptop
+	  computers; if you have a laptop, check out the Linux Laptop home
+	  page on the WWW at <http://www.linux-on-laptops.com/> and the
+	  Battery Powered Linux mini-HOWTO, available from
+	  <http://www.tldp.org/docs.html#howto>.
+
+	  Note that, even if you say N here, Linux on the x86 architecture
+	  will issue the hlt instruction if nothing is to be done, thereby
+	  sending the processor to sleep and saving power.
+
+config ACPI
+	bool
+	depends on !IA64_HP_SIM
+	default y
+
+if !IA64_HP_SIM
+
+source "drivers/acpi/Kconfig"
+
+endif
+
+endmenu
+
+if !IA64_HP_SIM
+
+menu "Bus options (PCI, PCMCIA)"
+
+config PCI
+	bool "PCI support"
+	help
+	  Find out whether you have a PCI motherboard. PCI is the name of a
+	  bus system, i.e. the way the CPU talks to the other stuff inside
+	  your box. Other bus systems are ISA, EISA, MicroChannel (MCA) or
+	  VESA. If you have PCI, say Y, otherwise N.
+
+	  The PCI-HOWTO, available from
+	  <http://www.tldp.org/docs.html#howto>, contains valuable
+	  information about which PCI hardware does work under Linux and which
+	  doesn't.
+
+config PCI_DOMAINS
+	bool
+	default PCI
+
+source "drivers/pci/Kconfig"
+
+source "drivers/pci/hotplug/Kconfig"
+
+source "drivers/pcmcia/Kconfig"
+
+endmenu
+
+endif
+
+source "drivers/Kconfig"
+
+source "fs/Kconfig"
+
+source "lib/Kconfig"
+
+source "arch/ia64/hp/sim/Kconfig"
+
+source "arch/ia64/oprofile/Kconfig"
+
+menu "Kernel hacking"
+
+choice
+	prompt "Physical memory granularity"
+	default IA64_GRANULE_64MB
+
+config IA64_GRANULE_16MB
+	bool "16MB"
+	help
+	  IA-64 identity-mapped regions use a large page size called "granules".
+
+	  Select "16MB" for a small granule size.
+	  Select "64MB" for a large granule size.  This is the current default.
+
+config IA64_GRANULE_64MB
+	bool "64MB"
+	depends on !(IA64_GENERIC || IA64_HP_ZX1 || IA64_SGI_SN2)
+
+endchoice
+
+config DEBUG_KERNEL
+	bool "Kernel debugging"
+	help
+	  Say Y here if you are developing drivers or trying to debug and
+	  identify kernel problems.
+
+config IA64_PRINT_HAZARDS
+	bool "Print possible IA-64 dependency violations to console"
+	depends on DEBUG_KERNEL
+	help
+	  Selecting this option prints more information for Illegal Dependency
+	  Faults, that is, for Read-after-Write (RAW), Write-after-Write (WAW),
+	  or Write-after-Read (WAR) violations.  This option is ignored if you
+	  are compiling for an Itanium A step processor
+	  (CONFIG_ITANIUM_ASTEP_SPECIFIC).  If you're unsure, select Y.
+
+config DISABLE_VHPT
+	bool "Disable VHPT"
+	depends on DEBUG_KERNEL
+	help
+	  The Virtual Hash Page Table (VHPT) enhances virtual address
+	  translation performance.  Normally you want the VHPT active but you
+	  can select this option to disable the VHPT for debugging.  If you're
+	  unsure, answer N.
+
+config MAGIC_SYSRQ
+	bool "Magic SysRq key"
+	depends on DEBUG_KERNEL
+	help
+	  If you say Y here, you will have some control over the system even
+	  if the system crashes for example during kernel debugging (e.g., you
+	  will be able to flush the buffer cache to disk, reboot the system
+	  immediately or dump some status information). This is accomplished
+	  by pressing various keys while holding SysRq (Alt+PrintScreen). It
+	  also works on a serial console (on PC hardware at least), if you
+	  send a BREAK and then within 5 seconds a command keypress. The
+	  keys are documented in <file:Documentation/sysrq.txt>. Don't say Y
+	  unless you really know what this hack does.
+
+config IA64_EARLY_PRINTK
+	bool "Early printk support"
+	depends on DEBUG_KERNEL && !IA64_GENERIC
+	help
+	  Selecting this option uses the VGA screen or serial console for
+	  printk() output before the consoles are initialised.  It is useful
+	  for debugging problems early in the boot process, but only if you
+	  have a suitable VGA/serial console attached.  If you're unsure,
+	  select N.
+
+config IA64_EARLY_PRINTK_UART
+	bool "Early printk on MMIO serial port"
+	depends on IA64_EARLY_PRINTK
+
+config IA64_EARLY_PRINTK_UART_BASE
+	hex "UART MMIO base address"
+	depends on IA64_EARLY_PRINTK_UART
+	default "ff5e0000"
+
+config IA64_EARLY_PRINTK_VGA
+	bool "Early printk on VGA"
+	depends on IA64_EARLY_PRINTK
+
+config IA64_EARLY_PRINTK_SGI_SN
+	bool "Early printk on SGI SN serial console"
+	depends on IA64_EARLY_PRINTK && (IA64_GENERIC || IA64_SGI_SN2)
+
+config DEBUG_SLAB
+	bool "Debug memory allocations"
+	depends on DEBUG_KERNEL
+	help
+	  Say Y here to have the kernel do limited verification on memory
+	  allocation as well as poisoning memory on free to catch use of freed
+	  memory.
+
+config DEBUG_SPINLOCK
+	bool "Spinlock debugging"
+	depends on DEBUG_KERNEL
+	help
+	  Say Y here and build SMP to catch missing spinlock initialization
+	  and certain other kinds of spinlock errors commonly made.  This is
+	  best used in conjunction with the NMI watchdog so that spinlock
+	  deadlocks are also debuggable.
+
+config DEBUG_SPINLOCK_SLEEP
+	  bool "Sleep-inside-spinlock checking"
+	  help
+	    If you say Y here, various routines which may sleep will become very
+	    noisy if they are called with a spinlock held.
+
+config IA64_DEBUG_CMPXCHG
+	bool "Turn on compare-and-exchange bug checking (slow!)"
+	depends on DEBUG_KERNEL
+	help
+	  Selecting this option turns on bug checking for the IA-64
+	  compare-and-exchange instructions.  This is slow!  Itaniums
+	  from step B3 or later don't have this problem. If you're unsure,
+	  select N.
+
+config IA64_DEBUG_IRQ
+	bool "Turn on irq debug checks (slow!)"
+	depends on DEBUG_KERNEL
+	help
+	  Selecting this option turns on bug checking for the IA-64 irq_save
+	  and restore instructions.  It's useful for tracking down spinlock
+	  problems, but slow!  If you're unsure, select N.
+
+config DEBUG_INFO
+	bool "Compile the kernel with debug info"
+	depends on DEBUG_KERNEL
+	help
+          If you say Y here the resulting kernel image will include
+	  debugging info resulting in a larger kernel image.
+	  Say Y here only if you plan to use gdb to debug the kernel.
+	  If you don't debug the kernel, you can say N.
+
+config SYSVIPC_COMPAT
+	bool
+	depends on COMPAT && SYSVIPC
+	default y
+endmenu
+
+source "security/Kconfig"
+
+source "crypto/Kconfig"

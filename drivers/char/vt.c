@@ -3267,6 +3267,31 @@ static int pm_con_request(struct pm_dev *dev, pm_request_t rqst, void *data)
 	return 0;
 }
 
+#ifdef CONFIG_BOOTSPLASH
+void con_remap_def_color(int currcons, int new_color)
+{
+       unsigned short *sbuf = screenbuf;
+       unsigned c, len = screenbuf_size >> 1;
+       int old_color;
+
+       if (sbuf) {
+	       old_color = def_color << 8;
+	       new_color <<= 8;
+	       while(len--) {
+		       c = *sbuf;
+		       if (((c ^ old_color) & 0xf000) == 0)
+			       *sbuf ^= (old_color ^ new_color) & 0xf000;
+		       if (((c ^ old_color) & 0x0f00) == 0)
+			       *sbuf ^= (old_color ^ new_color) & 0x0f00;
+		       sbuf++;
+	       }
+	       new_color >>= 8;
+       }
+       def_color = color = new_color;
+       update_attr(currcons);
+}
+#endif
+
 /*
  *	Visible symbols for modules
  */

@@ -80,4 +80,4 @@ define archhelp
   echo  '		   (arch/$(ARCH)/boot/zImage.initrd)'
 endef
 
-CLEAN_FILES += include/asm-ppc64/offsets.h
+MRPROPER_FILES += include/asm-ppc64/offsets.h

@@ -93,6 +93,9 @@
 #endif
 
 #include "fbcon.h"
+#ifdef CONFIG_BOOTSPLASH
+#include "../bootsplash/bootsplash.h"
+#endif
 
 #ifdef FBCONDEBUG
 #  define DPRINTK(fmt, args...) printk(KERN_DEBUG "%s: " fmt, __FUNCTION__ , ## args)
@@ -210,8 +213,14 @@ static void fb_flashcursor(void *private)
 	    info->cursor.rop == ROP_COPY || !vc || !CON_IS_VISIBLE(vc)
 	    || registered_fb[(int) con2fb_map[vc->vc_num]] != info)
 		return;
-	acquire_console_sem();
 	info->cursor.enable ^= 1;
+#ifdef CONFIG_BOOTSPLASH
+	if (info->splash_data) {
+		splash_cursor(info->splash_data, info, &info->cursor);
+		return;
+	}
+#endif
+	acquire_console_sem();
 	info->fbops->fb_cursor(info, &info->cursor);
 	release_console_sem();
 }
@@ -410,6 +419,14 @@ void accel_bmove(struct vc_data *vc, struct fb_info *info, int sy,
 {
 	struct fb_copyarea area;
 
+#ifdef CONFIG_BOOTSPLASH
+	if (info->splash_data) {
+		splash_bmove(info->splash_data, vc, info, 
+				sy, sx, dy, dx, height, width);
+		return;
+	}
+#endif
+
 	area.sx = sx * vc->vc_font.width;
 	area.sy = sy * vc->vc_font.height;
 	area.dx = dx * vc->vc_font.width;
@@ -426,6 +443,13 @@ void accel_clear(struct vc_data *vc, struct fb_info *info, int sy,
 	int bgshift = (vc->vc_hi_font_mask) ? 13 : 12;
 	struct fb_fillrect region;
 
+#ifdef CONFIG_BOOTSPLASH
+	if (info->splash_data) {
+		splash_clear(info->splash_data, vc, info,
+					 sy, sx, height, width);
+		return;
+	}
+#endif
 	region.color = attr_bgcol_ec(bgshift, vc);
 	region.dx = sx * vc->vc_font.width;
 	region.dy = sy * vc->vc_font.height;
@@ -457,6 +481,13 @@ void accel_putcs(struct vc_data *vc, struct fb_info *info,
 	unsigned int idx = vc->vc_font.width >> 3;
 	struct fb_image image;
 	u8 *src, *dst;
+
+#ifdef CONFIG_BOOTSPLASH
+	if (info->splash_data) {
+		splash_putcs(info->splash_data, vc, info, s, count, yy, xx);
+		return;
+	}
+#endif
 
 	image.fg_color = attr_fgcol((vc->vc_hi_font_mask) ? 9 : 8,
 				    scr_readw(s));
@@ -525,6 +556,13 @@ void accel_clear_margins(struct vc_data *vc, struct fb_info *info,
 	unsigned int rs = info->var.xres - rw;
 	unsigned int bs = info->var.yres - bh;
 	struct fb_fillrect region;
+
+#ifdef CONFIG_BOOTSPLASH
+	if (info->splash_data) {
+		splash_clear_margins(info->splash_data, vc, info, bottom_only);
+		return;
+	}
+#endif
 
 	region.color = attr_bgcol_ec(bgshift, vc);
 	region.rop = ROP_COPY;
@@ -746,6 +784,12 @@ static void fbcon_init(struct vc_data *vc, int init)
 		if (vc->vc_can_do_color)
 			vc->vc_complement_mask <<= 1;
 	}
+#ifdef CONFIG_BOOTSPLASH
+	if(vc->vc_splash_data && vc->vc_splash_data->splash_state) {
+		con_remap_def_color(vc->vc_num, vc->vc_splash_data->splash_color << 4 | vc->vc_splash_data->splash_fg_color);
+	}
+#endif 
+
 	cols = vc->vc_cols;
 	rows = vc->vc_rows;
 	new_cols = info->var.xres / vc->vc_font.width;
@@ -777,6 +821,14 @@ static void fbcon_init(struct vc_data *vc, int init)
 		vc->vc_cols = new_cols;
 		vc->vc_rows = new_rows;
 	}
+
+#ifdef CONFIG_BOOTSPLASH
+	if (vc->vc_splash_data && vc->vc_splash_data->splash_state) {
+		nr_cols = vc->vc_splash_data->splash_text_wi / vc->vc_font.width;
+		nr_rows = vc->vc_splash_data->splash_text_he / vc->vc_font.height;
+		logo = 0;
+	}
+#endif
 
 	if (logo) {
 		/* Need to make room for the logo */
@@ -948,6 +1000,13 @@ static void fbcon_putc(struct vc_data *vc, int c, int ypos, int xpos)
 	if (vt_cons[vc->vc_num]->vc_mode != KD_TEXT)
 		return;
 
+#ifdef CONFIG_BOOTSPLASH
+	if (info->splash_data) {
+		splash_putc(info->splash_data, vc, info, c, ypos, xpos);
+		return;
+	}
+#endif
+	
 	image.dx = xpos * vc->vc_font.width;
 	image.dy = real_y(p, ypos) * vc->vc_font.height;
 	image.width = vc->vc_font.width;
@@ -1025,6 +1084,12 @@ static void fbcon_cursor(struct vc_data *vc, int mode)
 		if (info->cursor.rop == ROP_XOR) {
 			info->cursor.enable = 0;
 			info->cursor.rop = ROP_COPY;
+#ifdef CONFIG_BOOTSPLASH
+			if (info->splash_data) {
+				splash_cursor(info->splash_data, info, &cursor);
+				break;
+			}
+#endif
 			info->fbops->fb_cursor(info, &cursor);
 		}	
 		break;
@@ -1101,6 +1166,13 @@ static void fbcon_cursor(struct vc_data *vc, int mode)
 				mask[i++] = 0xff;
 		}
         	info->cursor.rop = ROP_XOR;
+#ifdef CONFIG_BOOTSPLASH
+		if (info->splash_data) {
+			splash_cursor(info->splash_data, info, &cursor);
+			vbl_cursor_cnt = CURSOR_DRAW_DELAY;
+			break;
+		}
+#endif
 		info->fbops->fb_cursor(info, &cursor);
 		vbl_cursor_cnt = CURSOR_DRAW_DELAY;
 		break;
@@ -1540,6 +1612,10 @@ static int fbcon_scroll(struct vc_data *vc, int t, int b, int dir,
 			fbcon_softback_note(vc, t, count);
 		if (logo_shown >= 0)
 			goto redraw_up;
+#ifdef CONFIG_BOOTSPLASH
+		if (info->splash_data)
+			goto redraw_up;
+#endif
 		switch (p->scrollmode) {
 		case SCROLL_MOVE:
 			accel_bmove(vc, info, t + count, 0, t, 0,
@@ -1625,6 +1701,10 @@ static int fbcon_scroll(struct vc_data *vc, int t, int b, int dir,
 	case SM_DOWN:
 		if (count > vc->vc_rows)	/* Maximum realistic size */
 			count = vc->vc_rows;
+#ifdef CONFIG_BOOTSPLASH
+		if (info->splash_data)
+			goto redraw_down;
+#endif
 		switch (p->scrollmode) {
 		case SCROLL_MOVE:
 			accel_bmove(vc, info, t, 0, t + count, 0,
@@ -1767,6 +1847,13 @@ static void fbcon_bmove_rec(struct vc_data *vc, struct display *p, int sy, int s
 		}
 		return;
 	}
+#ifdef CONFIG_BOOTSPLASH
+	if (info->splash_data && sy == dy && height == 1) {
+		/* must use slower redraw bmove to keep background pic intact */
+		splash_bmove_redraw(info->splash_data, vc, info, sy, sx, dx, width);
+		return;
+	}
+#endif
 	accel_bmove(vc, info, real_y(p, sy), sx, real_y(p, dy), dx,
 			height, width);
 }
@@ -1848,6 +1935,10 @@ static int fbcon_switch(struct vc_data *vc)
 	struct fb_info *info = registered_fb[(int) con2fb_map[vc->vc_num]];
 	struct display *p = &fb_display[vc->vc_num];
 	int i;
+
+#ifdef CONFIG_BOOTSPLASH
+	splash_prepare(vc, info);
+#endif
 
 	if (softback_top) {
 		int l = fbcon_softback_size / vc->vc_size_row;
@@ -1966,6 +2057,12 @@ static int fbcon_blank(struct vc_data *vc, int blank, int mode_switch)
 	fbcon_cursor(vc, blank ? CM_ERASE : CM_DRAW);
 
 	if (!info->fbops->fb_blank) {
+#ifdef CONFIG_BOOTSPLASH
+		if (info->splash_data) {
+			splash_blank(info->splash_data, vc, info, blank);
+			return 0;
+		}
+#endif
 		if (blank) {
 			unsigned short oldc;
 			u_int height;
@@ -2134,9 +2231,16 @@ static int fbcon_do_set_font(struct vc_data *vc, int w, int h,
 	}
 
 	if (resize) {
+		u32 xres = info->var.xres, yres = info->var.yres;
 		/* reset wrap/pan */
 		info->var.xoffset = info->var.yoffset = p->yscroll = 0;
-		vc_resize(vc->vc_num, info->var.xres / w, info->var.yres / h);
+#ifdef CONFIG_BOOTSPLASH
+		if (info->splash_data) {
+			xres = info->splash_data->splash_text_wi;
+			yres = info->splash_data->splash_text_he;
+		}
+#endif
+		vc_resize(vc->vc_num, xres / w, yres / h);
 		if (CON_IS_VISIBLE(vc) && softback_buf) {
 			int l = fbcon_softback_size / vc->vc_size_row;
 			if (l > 5)
@@ -2607,7 +2711,6 @@ int fb_console_init(void)
 
 	if (!num_registered_fb)
 		return -ENODEV;
-
 	if (info_idx == -1) {
 		for (i = 0; i < FB_MAX; i++) {
 			if (registered_fb[i] != NULL) {
@@ -2618,6 +2721,10 @@ int fb_console_init(void)
 	}
 	for (i = first_fb_vc; i <= last_fb_vc; i++)
 		con2fb_map[i] = info_idx;
+#ifdef CONFIG_BOOTSPLASH
+	splash_init();
+#endif
+
 	err = take_over_console(&fb_con, first_fb_vc, last_fb_vc,
 				fbcon_is_default);
 	if (err) {

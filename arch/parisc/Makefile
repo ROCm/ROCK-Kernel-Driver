@@ -94,8 +94,8 @@ arch/parisc/kernel/asm-offsets.s: include/asm include/linux/version.h \
 include/asm-parisc/offsets.h: arch/parisc/kernel/asm-offsets.s
 	$(call filechk,gen-asm-offsets)
 
-CLEAN_FILES	+= lifimage include/asm-parisc/offsets.h
-MRPROPER_FILES	+= palo.conf
+CLEAN_FILES	+= lifimage
+MRPROPER_FILES	+= palo.conf include/asm-parisc/offsets.h
 
 define archhelp
 	@echo  '* vmlinux	- Uncompressed kernel image (./vmlinux)'

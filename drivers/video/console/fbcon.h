@@ -23,6 +23,34 @@
     *    low-level frame buffer device
     */
 
+#ifdef CONFIG_BOOTSPLASH
+struct splash_data {
+    int splash_state;			/* show splash? */
+    int splash_color;			/* transparent color */
+    int splash_fg_color;		/* foreground color */
+    int splash_width;			/* width of image */
+    int splash_height;			/* height of image */
+    int splash_text_xo;			/* text area origin */
+    int splash_text_yo;
+    int splash_text_wi;			/* text area size */ 
+    int splash_text_he;
+    int splash_showtext;		/* silent/verbose mode */
+    int splash_boxcount;
+    int splash_percent;
+    int splash_overpaintok;		/* is it ok to overpaint boxes */
+    int splash_palcnt;
+    char *oldscreen_base;		/* pointer to top of virtual screen */
+    unsigned char *splash_boxes;
+    unsigned char *splash_jpeg;		/* jpeg */
+    unsigned char *splash_palette;	/* palette for 8-bit */
+
+    int splash_dosilent;		/* show silent jpeg */
+    unsigned char *splash_silentjpeg;
+    unsigned char *splash_sboxes;
+    int splash_sboxcount;
+};
+#endif
+    
 struct display {
     /* Filled in by the frame buffer device */
     u_short inverse;                /* != 0 text black on white as default */

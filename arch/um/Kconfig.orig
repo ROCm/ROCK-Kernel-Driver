@@ -1,0 +1,271 @@
+config USERMODE
+	bool
+	default y
+
+# XXX: does UM have a mmu/swap?
+config MMU
+	bool
+	default y
+
+mainmenu "Linux/Usermode Kernel Configuration"
+
+config ISA
+	bool
+
+config SBUS
+	bool
+
+config PCI
+	bool
+
+config UID16
+	bool
+	default y
+
+config RWSEM_GENERIC_SPINLOCK
+	bool
+	default y
+
+menu "UML-specific options"
+
+config MODE_TT
+	bool "Tracing thread support"
+	default y
+	help
+	This option controls whether tracing thread support is compiled
+	into UML.  Normally, this should be set to Y.  If you intend to
+	use only skas mode (and the host has the skas patch applied to it), 
+	then it is OK to say N here.
+
+config STATIC_LINK
+	bool "Force a static link"
+	default n
+	depends on !MODE_TT
+	help
+	If CONFIG_MODE_TT is disabled, then this option gives you the ability
+	to force a static link of UML.  Normally, if only skas mode is built
+	in to UML, it will be linked as a shared binary.  This is inconvenient
+	for use in a chroot jail.  So, if you intend to run UML inside a 
+	chroot, and you disable CONFIG_MODE_TT, you probably want to say Y
+	here.
+
+config MODE_SKAS
+	bool "Separate Kernel Address Space support"
+	default y
+	help
+	This option controls whether skas (separate kernel address space)
+	support is compiled in.  If you have applied the skas patch to the
+	host, then you certainly want to say Y here (and consider saying N
+	to CONFIG_MODE_TT).  Otherwise, it is safe to say Y.  Disabling this
+	option will shrink the UML binary slightly.
+
+config NET
+	bool "Networking support"
+
+source "fs/Kconfig.binfmt"
+
+config HOSTFS
+	tristate "Host filesystem"
+	help
+        While the User-Mode Linux port uses its own root file system for
+        booting and normal file access, this module lets the UML user
+        access files stored on the host.  It does not require any
+        network connection between the Host and UML.  An example use of
+        this might be:
+
+        mount none /tmp/fromhost -t hostfs -o /tmp/umlshare
+
+        where /tmp/fromhost is an empty directory inside UML and
+        /tmp/umlshare is a directory on the host with files the UML user
+        wishes to access.
+
+        For more information, see
+        <http://user-mode-linux.sourceforge.net/hostfs.html>.
+
+        If you'd like to be able to work with files stored on the host, 
+        say Y or M here; otherwise say N.
+
+
+config MCONSOLE
+	bool "Management console"
+	help
+        The user mode linux management console is a low-level interface to
+        the kernel, somewhat like the i386 SysRq interface.  Since there is
+        a full-blown operating system running under every user mode linux
+        instance, there is much greater flexibility possible than with the
+        SysRq mechanism.
+
+        If you answer 'Y' to this option, to use this feature, you need the
+        mconsole client (called uml_mconsole) which is present in CVS in
+        2.4.5-9um and later (path /tools/mconsole), and is also in the
+        distribution RPM package in 2.4.6 and later.
+
+        It is safe to say 'Y' here.
+
+config MAGIC_SYSRQ
+	bool "Magic SysRq key"
+	depends on MCONSOLE
+
+config HOST_2G_2G
+	bool "2G/2G host address space split"
+
+config UML_SMP
+	bool "Symmetric multi-processing support"
+	help
+        This option enables UML SMP support.  UML implements virtual SMP by
+        allowing as many processes to run simultaneously on the host as
+        there are virtual processors configured.  Obviously, if the host is
+        a uniprocessor, those processes will timeshare, but, inside UML,
+        will appear to be running simultaneously.  If the host is a
+        multiprocessor, then UML processes may run simultaneously, depending
+        on the host scheduler.
+        CONFIG_SMP will be set to whatever this option is set to.
+        It is safe to leave this unchanged.
+
+config SMP
+	bool
+	default UML_SMP
+
+config NR_CPUS
+	int "Maximum number of CPUs (2-32)"
+	range 2 32
+	depends on SMP
+	default "32"
+
+config NEST_LEVEL
+	int "Nesting level"
+	default "0"
+	help
+        This is set to the number of layers of UMLs that this UML will be run
+        in.  Normally, this is zero, meaning that it will run directly on the
+        host.  Setting it to one will build a UML that can run inside a UML
+        that is running on the host.  Generally, if you intend this UML to run
+        inside another UML, set CONFIG_NEST_LEVEL to one more than the host 
+        UML.
+
+        Note that if the hosting UML has its CONFIG_KERNEL_HALF_GIGS set to 
+        greater than one, then the guest UML should have its CONFIG_NEST_LEVEL 
+        set to the host's CONFIG_NEST_LEVEL + CONFIG_KERNEL_HALF_GIGS.
+        Only change this if you are running nested UMLs.
+
+config KERNEL_HALF_GIGS
+	int "Kernel address space size (in .5G units)"
+	default "1"
+	help
+        This determines the amount of address space that UML will allocate for
+        its own, measured in half Gigabyte units.  The default is 1.
+        Change this only if you need to boot UML with an unusually large amount
+        of physical memory.
+
+config HIGHMEM
+	bool "Highmem support"
+
+config KERNEL_STACK_ORDER
+	int "Kernel stack size order"
+	default 2
+	help
+	This option determines the size of UML kernel stacks.  They will
+	be 1 << order pages.  The default is OK unless you're running Valgrind
+	on UML, in which case, set this to 3.
+
+endmenu
+
+source "init/Kconfig"
+
+source "drivers/base/Kconfig"
+
+source "arch/um/Kconfig_char"
+
+source "arch/um/Kconfig_block"
+
+config NETDEVICES
+	bool
+	default NET
+
+source "arch/um/Kconfig_net"
+
+source "net/Kconfig"
+
+source "fs/Kconfig"
+
+source "security/Kconfig"
+
+source "crypto/Kconfig"
+
+source "lib/Kconfig"
+
+menu "SCSI support"
+
+config SCSI
+	tristate "SCSI support"
+
+# This gives us free_dma, which scsi.c wants.
+config GENERIC_ISA_DMA
+	bool
+	depends on SCSI
+	default y
+
+source "arch/um/Kconfig_scsi"
+
+endmenu
+
+source "drivers/md/Kconfig"
+
+source "drivers/mtd/Kconfig"
+
+
+menu "Kernel hacking"
+
+config DEBUG_SLAB
+	bool "Debug memory allocations"
+
+config DEBUG_SPINLOCK
+	bool "Debug spinlocks usage"
+
+config DEBUG_INFO
+	bool "Enable kernel debugging symbols"
+	help
+        When this is enabled, the User-Mode Linux binary will include
+        debugging symbols.  This enlarges the binary by a few megabytes,
+        but aids in tracking down kernel problems in UML.  It is required
+        if you intend to do any kernel development.
+
+        If you're truly short on disk space or don't expect to report any
+        bugs back to the UML developers, say N, otherwise say Y.
+
+config FRAME_POINTER
+	bool
+	default y if DEBUG_INFO
+
+config PT_PROXY
+	bool "Enable ptrace proxy"
+	depends on XTERM_CHAN && DEBUG_INFO
+
+config GPROF
+	bool "Enable gprof support"
+	depends on DEBUG_INFO
+	help
+        This allows profiling of a User-Mode Linux kernel with the gprof
+        utility.
+
+        See <http://user-mode-linux.sourceforge.net/gprof.html> for more
+        details.
+
+        If you're involved in UML kernel development and want to use gprof,
+        say Y.  If you're unsure, say N.
+
+config GCOV
+	bool "Enable gcov support"
+	depends on DEBUG_INFO
+	help
+        This option allows developers to retrieve coverage data from a UML
+        session.
+
+        See <http://user-mode-linux.sourceforge.net/gprof.html> for more
+        details.
+
+        If you're involved in UML kernel development and want to use gcov,
+        say Y.  If you're unsure, say N.
+
+endmenu
+

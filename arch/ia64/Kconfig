@@ -527,3 +527,6 @@ endmenu
 source "security/Kconfig"
 
 source "crypto/Kconfig"
+
+source "rpmify/Kconfig"
+

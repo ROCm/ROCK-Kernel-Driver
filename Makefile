@@ -1,7 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 6
 SUBLEVEL = 8
-EXTRAVERSION =-rc3
+EXTRAVERSION = -rc3-$(shell echo $(CONFIG_RELEASE)-$(CONFIG_CFGNAME))
 NAME=Zonked Quokka
 
 # *DOCUMENTATION*
@@ -981,14 +981,25 @@ KBUILD_MODULES := 1
 crmodverdir:
 	$(Q)mkdir -p $(MODVERDIR)
 
+.PHONY: $(objtree)/Module.symvers
+$(objtree)/Module.symvers:
+	@test -e $(objtree)/Module.symvers || ( \
+	echo; \
+	echo "WARNING: Symbol version dump $(objtree)/Module.symvers is " \
+	     "missing, modules will have CONFIG_MODVERSIONS disabled."; \
+	echo )
+
 module-dirs := $(addprefix _module_,$(KBUILD_EXTMOD))
 .PHONY: $(module-dirs) modules
-$(module-dirs): crmodverdir
+$(module-dirs): crmodverdir $(objtree)/Module.symvers
 	$(Q)$(MAKE) $(build)=$(patsubst _module_%,%,$@)
 
 modules: $(module-dirs)
 	@echo '  Building modules, stage 2.';
 	$(Q)$(MAKE) -rR -f $(srctree)/scripts/Makefile.modpost
+
+.PHONY: modules_add
+modules_add: modules_install
 
 .PHONY: modules_install
 modules_install:

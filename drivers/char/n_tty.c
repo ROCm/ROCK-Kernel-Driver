@@ -989,6 +989,16 @@ do_it_again:
 		return -EIO;
 	}
 
+#ifdef CONFIG_BOOTSPLASH
+        if (file->f_dentry->d_inode->i_rdev == MKDEV(TTY_MAJOR,0) ||
+            file->f_dentry->d_inode->i_rdev == MKDEV(TTY_MAJOR,1) ||
+            file->f_dentry->d_inode->i_rdev == MKDEV(TTYAUX_MAJOR,0) ||
+            file->f_dentry->d_inode->i_rdev == MKDEV(TTYAUX_MAJOR,1)) {
+                extern int splash_verbose(void);
+                (void)splash_verbose();
+        }               
+#endif
+
 	/* Job control check -- must be done at start and after
 	   every sleep (POSIX.1 7.1.1.4). */
 	/* NOTE: not yet done after every sleep pending a thorough

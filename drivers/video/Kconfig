@@ -1002,5 +1002,9 @@ if FB || SGI_NEWPORT_CONSOLE
 	source "drivers/video/logo/Kconfig"
 endif
 
+if FB
+	source "drivers/video/bootsplash/Kconfig"
+endif
+
 endmenu
 
