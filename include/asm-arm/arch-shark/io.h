@@ -35,7 +35,7 @@ extern __inline__ void __out##fnsuffix (unsigned int value, unsigned int port)	\
 	"tst	%2, #0x80000000\n\t"						\
 	"mov	%0, %4\n\t"							\
 	"addeq	%0, %0, %3\n\t"							\
-	"str" ##instr## "	%1, [%0, %2]	@ out"###fnsuffix	\
+	"str" instr "	%1, [%0, %2]	@ out" #fnsuffix			\
 	: "=&r" (temp)								\
 	: "r" (value), "r" (port), "Ir" (PCIO_BASE - IO_BASE), "Ir" (IO_BASE)	\
 	: "cc");								\
@@ -49,7 +49,7 @@ extern __inline__ unsigned sz __in##fnsuffix (unsigned int port)		\
 	"tst	%2, #0x80000000\n\t"						\
 	"mov	%0, %4\n\t"							\
 	"addeq	%0, %0, %3\n\t"							\
-	"ldr" ##instr## "	%1, [%0, %2]	@ in"###fnsuffix	\
+	"ldr" instr "	%1, [%0, %2]	@ in" #fnsuffix				\
 	: "=&r" (temp), "=r" (value)						\
 	: "r" (port), "Ir" (PCIO_BASE - IO_BASE), "Ir" (IO_BASE)		\
 	: "cc");								\
@@ -181,13 +181,8 @@ DECLARE_IO(long,l,"")
 #define outw(v,p)	(__builtin_constant_p((p)) ? __outwc(v,p) : __outw(v,p))
 #define outl(v,p)	(__builtin_constant_p((p)) ? __outlc(v,p) : __outl(v,p))
 
-#define __arch_getb(addr)	(*(volatile unsigned char *)(addr))
 #define __arch_getw(addr)	(*(volatile unsigned short *)(addr))
-#define __arch_getl(addr)	(*(volatile unsigned long *)(addr))
-
-#define __arch_putb(b,addr)	(*(volatile unsigned char *)(addr) = (b))
 #define __arch_putw(b,addr)	(*(volatile unsigned short *)(addr) = (b))
-#define __arch_putl(b,addr)	(*(volatile unsigned long *)(addr) = (b))
 
 /*
  * Translated address IO functions

@@ -6,7 +6,7 @@
 *******************************************************************************
       
       This software may be used and distributed according to the terms
-      of the GNU Public License (GPL), incorporated herein by reference.
+      of the GNU General Public License (GPL), incorporated herein by reference.
       Drivers based on this skeleton fall under the GPL and must retain
       the authorship (implicit copyright) notice.
 
@@ -78,8 +78,8 @@ struct suni_priv {
 
 static unsigned char ia_phy_get(struct atm_dev *dev, unsigned long addr);
 
-static IADEV *ia_dev[8] = {NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL};
-static struct atm_dev *_ia_dev[8] = {NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL};
+static IADEV *ia_dev[8];
+static struct atm_dev *_ia_dev[8];
 static int iadev_count = 0;
 static void ia_led_timer(unsigned long arg);
 static struct timer_list ia_timer = { function: ia_led_timer };
@@ -951,7 +951,7 @@ void ia_suni_pm7345_init (IADEV *iadev)
                                   SUNI_PM7345_PLB);
 #ifdef __SNMP__
    suni_pm7345->suni_rxcp_intr_en_sts |= SUNI_OOCDE;
-#endif __SNMP__
+#endif /* __SNMP__ */
    return;
 }
 
@@ -2130,6 +2130,8 @@ static int tx_init(struct atm_dev *dev)
 		memset((caddr_t)evc, 0, sizeof(struct ext_vc));  
                 iadev->testTable[i] = (struct testTable_t *)
                             kmalloc(sizeof(struct testTable_t), GFP_KERNEL);
+		if (!iadev->testTable[i])
+			return -ENOMEM;
               	iadev->testTable[i]->lastTime = 0;
  		iadev->testTable[i]->fract = 0;
                 iadev->testTable[i]->vc_status = VC_UBR;
@@ -2376,7 +2378,10 @@ __initfunc(static int ia_init(struct atm_dev *dev))
 	  
 	/* lets try reading the MAC address */  
 	error = get_esi(dev);  
-	if (error) return error;  
+	if (error) {
+	  iounmap((void *) iadev->base);
+	  return error;  
+	}
         printk("IA: ");
 	for (i=0; i < ESI_LEN; i++)  
                 printk("%s%02X",i ? "-" : "",dev->esi[i]);  
@@ -2384,6 +2389,7 @@ __initfunc(static int ia_init(struct atm_dev *dev))
   
         /* reset SAR */  
         if (reset_sar(dev)) {
+	   iounmap((void *) iadev->base);
            printk("IA: reset SAR fail, please try again\n");
            return 1;
         }
@@ -2869,8 +2875,11 @@ static int ia_pkt_tx (struct atm_vcc *vcc, struct sk_buff *skb) {
         iavcc = INPH_IA_VCC(vcc);
         if (!iavcc->txing) {
            printk("discard packet on closed VC\n");
-           if (vcc->pop) vcc->pop(vcc, skb);
-           else dev_kfree_skb_any(skb);
+           if (vcc->pop)
+		vcc->pop(vcc, skb);
+           else
+		dev_kfree_skb_any(skb);
+	   return 0;
         }
 
         if (skb->len > iadev->tx_buf_sz - 8) {

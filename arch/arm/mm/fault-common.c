@@ -9,8 +9,41 @@
  * published by the Free Software Foundation.
  */
 #include <linux/config.h>
+#include <linux/signal.h>
+#include <linux/sched.h>
+#include <linux/kernel.h>
+#include <linux/errno.h>
+#include <linux/string.h>
+#include <linux/types.h>
+#include <linux/ptrace.h>
+#include <linux/mman.h>
+#include <linux/mm.h>
+#include <linux/interrupt.h>
+#include <linux/proc_fs.h>
+#include <linux/init.h>
 
-extern void die(const char *msg, struct pt_regs *regs, int err);
+#include <asm/system.h>
+#include <asm/uaccess.h>
+#include <asm/pgtable.h>
+#include <asm/unaligned.h>
+
+#ifdef CONFIG_CPU_26
+#define FAULT_CODE_WRITE	0x02
+#define FAULT_CODE_FORCECOW	0x01
+#define DO_COW(m)		((m) & (FAULT_CODE_WRITE|FAULT_CODE_FORCECOW))
+#define READ_FAULT(m)		(!((m) & FAULT_CODE_WRITE))
+#else
+/*
+ * On 32-bit processors, we define "mode" to be zero when reading,
+ * non-zero when writing.  This now ties up nicely with the polarity
+ * of the 26-bit machines, and also means that we avoid the horrible
+ * gcc code for "int val = !other_val;".
+ */
+#define DO_COW(m)		(m)
+#define READ_FAULT(m)		(!(m))
+#endif
+
+NORET_TYPE void die(const char *msg, struct pt_regs *regs, int err) ATTRIB_NORET;
 
 /*
  * This is useful to dump out the page tables associated with
@@ -60,7 +93,9 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
 	printk("\n");
 }
 
-static int __do_page_fault(struct mm_struct *mm, unsigned long addr, int mode, struct task_struct *tsk)
+static int
+__do_page_fault(struct mm_struct *mm, unsigned long addr, int mode,
+		struct task_struct *tsk)
 {
 	struct vm_area_struct *vma;
 	int fault, mask;
@@ -159,7 +194,7 @@ bad_area:
 	return -2;
 }
 
-static int do_page_fault(unsigned long addr, int mode, struct pt_regs *regs)
+int do_page_fault(unsigned long addr, int mode, struct pt_regs *regs)
 {
 	struct task_struct *tsk;
 	struct mm_struct *mm;
@@ -278,8 +313,10 @@ no_context:
 	 * Oops. The kernel tried to access some bad page. We'll have to
 	 * terminate things with extreme prejudice.
 	 */
-	printk(KERN_ALERT "Unable to handle kernel %s at virtual address %08lx\n",
-		(addr < PAGE_SIZE) ? "NULL pointer dereference" : "paging request", addr);
+	printk(KERN_ALERT
+		"Unable to handle kernel %s at virtual address %08lx\n",
+		(addr < PAGE_SIZE) ? "NULL pointer dereference" :
+		"paging request", addr);
 
 	show_pte(mm, addr);
 	die("Oops", regs, mode);

@@ -31,10 +31,12 @@ static void puts( const char *s )
 			serial_port = (unsigned long *)_Ser3UTCR0;
 		else
 			serial_port = (unsigned long *)_Ser1UTCR0;
-	} else if (machine_is_brutus()||machine_is_nanoengine())
+	} else if (machine_is_brutus()||machine_is_nanoengine() ||
+		machine_is_pangolin())
 		serial_port = (unsigned long *)_Ser1UTCR0;
 	else if (machine_is_empeg() || machine_is_bitsy() ||
-		 machine_is_victor() || machine_is_lart())
+		 machine_is_victor() || machine_is_lart() ||
+		 machine_is_sherman() )
 		serial_port = (unsigned long *)_Ser3UTCR0;
 	else
 		return;

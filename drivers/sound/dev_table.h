@@ -150,6 +150,7 @@ struct dma_buffparms
 typedef struct coproc_operations 
 {
 	char name[64];
+	struct module *owner;
 	int (*open) (void *devc, int sub_device);
 	void (*close) (void *devc, int sub_device);
 	int (*ioctl) (void *devc, unsigned int cmd, caddr_t arg, int local);

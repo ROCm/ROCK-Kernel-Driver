@@ -20,15 +20,4 @@ export-objs		:= hw.o leds.o
 
 obj-$(CONFIG_LEDS)	+= leds.o
 
-# Files that are both resident and modular; remove from modular.
-
-obj-m		:= $(filter-out $(obj-y), $(obj-m))
-
-# Translate to Rules.make lists.
-
-O_OBJS		:= $(filter-out $(export-objs), $(obj-y))
-OX_OBJS 	:= $(filter	$(export-objs), $(obj-y))
-M_OBJS		:= $(sort $(filter-out $(export-objs), $(obj-m)))
-MX_OBJS 	:= $(sort $(filter     $(export-objs), $(obj-m)))
-
 include $(TOPDIR)/Rules.make

@@ -998,7 +998,7 @@ void irlap_init_qos_capabilities(struct irlap_cb *self,
 }
 
 /*
- * Function irlap_apply_default_connection_parameters (void)
+ * Function irlap_apply_default_connection_parameters (void, now)
  *
  *    Use the default connection and transmission parameters
  * 
@@ -1010,13 +1010,15 @@ void irlap_apply_default_connection_parameters(struct irlap_cb *self)
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == LAP_MAGIC, return;);
 
+	/* xbofs : Default value in NDM */
+	self->next_bofs   = 12;
+	self->bofs_count  = 12;
+
+	/* NDM Speed is 9600 */
 	irlap_change_speed(self, 9600, TRUE);
 
 	/* Set mbusy when going to NDM state */
 	irda_device_set_media_busy(self->netdev, TRUE);
-
-	/* Default value in NDM */
-	self->bofs_count = 12;
 
 	/* 
 	 * Generate random connection address for this session, which must
@@ -1056,23 +1058,31 @@ void irlap_apply_default_connection_parameters(struct irlap_cb *self)
 }
 
 /*
- * Function irlap_apply_connection_parameters (qos)
+ * Function irlap_apply_connection_parameters (qos, now)
  *
  *    Initialize IrLAP with the negotiated QoS values
  *
+ * If 'now' is false, the speed and xbofs will be changed after the next
+ * frame is sent.
+ * If 'now' is true, the speed and xbofs is changed immediately
  */
-void irlap_apply_connection_parameters(struct irlap_cb *self) 
+void irlap_apply_connection_parameters(struct irlap_cb *self, int now) 
 {
 	IRDA_DEBUG(4, __FUNCTION__ "()\n");
 	
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == LAP_MAGIC, return;);
 
-	irlap_change_speed(self, self->qos_tx.baud_rate.value, FALSE);
+	/* Set the negociated xbofs value */
+	self->next_bofs   = self->qos_tx.additional_bofs.value;
+	if(now)
+		self->bofs_count = self->next_bofs;
+
+	/* Set the negociated link speed (may need the new xbofs value) */
+	irlap_change_speed(self, self->qos_tx.baud_rate.value, now);
 
 	self->window_size = self->qos_tx.window_size.value;
 	self->window      = self->qos_tx.window_size.value;
-	self->bofs_count  = self->qos_tx.additional_bofs.value;
 
 	/*
 	 *  Calculate how many bytes it is possible to transmit before the

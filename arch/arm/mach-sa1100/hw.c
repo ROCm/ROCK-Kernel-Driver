@@ -90,12 +90,12 @@ static int bitsy_egpio = EGPIO_BITSY_RS232_ON;
 void clr_bitsy_egpio(unsigned long x) 
 {
   bitsy_egpio &= ~x;
-  *(volatile int *)0xdc000000 = bitsy_egpio;
+  BITSY_EGPIO = bitsy_egpio;
 }
 void set_bitsy_egpio(unsigned long x) 
 {
   bitsy_egpio |= x;
-  *(volatile int *)0xdc000000 = bitsy_egpio;
+  BITSY_EGPIO = bitsy_egpio;
 }
 EXPORT_SYMBOL(clr_bitsy_egpio);
 EXPORT_SYMBOL(set_bitsy_egpio);
@@ -119,8 +119,8 @@ static void __init sa1111_init(void){
   /* First, set up the 3.6864MHz clock on GPIO 27 for the SA-1111:
    * (SA-1110 Developer's Manual, section 9.1.2.1)
    */
-  GAFR |= GPIO_GPIO27;
-  GPDR |= GPIO_GPIO27;
+  GAFR |= GPIO_32_768kHz;
+  GPDR |= GPIO_32_768kHz;
   TUCR = TUCR_3_6864MHz;
 
   /* Now, set up the PLL and RCLK in the SA-1111: */
@@ -133,32 +133,32 @@ static void __init sa1111_init(void){
    * using the SKPCR.
    */
 
-  {
-  /*
-   * SA1111 DMA bus master setup 
+  /* If the system is going to use the SA-1111 DMA engines, set up
+   * the memory bus request/grant pins. Also configure the shared
+   * memory controller on the SA-1111 (SA-1111 Developer's Manual,
+   * section 3.2.3) and power up the DMA bus clock:
    */
-	int cas;
+  if(machine_is_assabet()){
 
-	/* SA1111 side */
-	switch ( (MDCNFG>>12) & 0x03 ) {
-	case 0x02:
-		cas = 0; break;
-	case 0x03:
-		cas = 1; break;
-	default:
-		cas = 1; break;
-	}
-	SMCR = 1		/* 1: memory is SDRAM */
-		| ( 1 << 1 )	/* 1:MBGNT is enable */
-		| ( ((MDCNFG >> 4) & 0x07) << 2 )	/* row address lines */
-		| ( cas << 5 );	/* CAS latency */
+    GAFR |= (GPIO_MBGNT | GPIO_MBREQ);
+    GPDR |= GPIO_MBGNT;
+    GPDR &= ~GPIO_MBREQ;
+    TUCR |= TUCR_MR;
 
-	/* SA1110 side */
-	GPDR |= 1<<21;
-	GPDR &= ~(1<<22);
-	GAFR |= ( (1<<21) | (1<<22) );
+    /* Assabet is populated by default with two Samsung KM416S8030T-G8
+     * 128Mb SDRAMs, which are organized as 12-bit (row addr) x 9-bit
+     * (column addr), according to the data sheet. Apparently, the 
+     * bank selects factor into the row address, as Angel sets up the
+     * SA-1110 to use 14x9 addresses. The SDRAM datasheet specifies
+     * that when running at 100-125MHz, the CAS latency for -8 parts
+     * is 3 cycles, which is consistent with Angel.
+     */
 
-	TUCR |= (1<<10);
+    SMCR = (SMCR_DTIM | SMCR_MBGE | 
+	    FInsrt(FExtr(MDCNFG, MDCNFG_SA1110_DRAC0), SMCR_DRAC) |
+	    ((FExtr(MDCNFG, MDCNFG_SA1110_TDL0)==3) ? SMCR_CLAT : 0));
+
+    SKPCR |= SKPCR_DCLKEN;
   }
 }
 

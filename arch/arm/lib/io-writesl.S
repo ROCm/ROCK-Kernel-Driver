@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/lib/io-readsb.S
+ *  linux/arch/arm/lib/io-writesl.S
  *
  *  Copyright (C) 1995-2000 Russell King
  *

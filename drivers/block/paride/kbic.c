@@ -1,6 +1,6 @@
 /*
         kbic.c    (c) 1997-8  Grant R. Guenther <grant@torque.net>
-                              Under the terms of the GNU public license.
+                              Under the terms of the GNU General Public License.
 
         This is a low-level driver for the KBIC-951A and KBIC-971A
         parallel to IDE adapter chips from KingByte Information Systems.

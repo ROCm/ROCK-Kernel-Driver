@@ -12,24 +12,17 @@
 #
 # Copyright (C) 1995-2000 by Russell King
 
-OBJCOPY		:= $(CROSS_COMPILE)objcopy -O binary -R .note -R .comment -S
-CPP		:= $(CC) -E
-LINKFLAGS	:= -p -X -T arch/arm/vmlinux.lds
-ARCHCC		:= $(word 1,$(CC))
-
-AFLAGS		+= -mno-fpu
-CFLAGS_PIPE	:= -pipe
-CFLAGS		:= $(CFLAGS) $(CFLAGS_PIPE) -msoft-float
+LINKFLAGS	:=-p -X -T arch/arm/vmlinux.lds
+GZFLAGS		:=-9
+CFLAGS		+=-fno-common -pipe
 
 ifdef CONFIG_FRAME_POINTER
-CFLAGS		:= $(CFLAGS:-fomit-frame-pointer=)
+CFLAGS		:=$(CFLAGS:-fomit-frame-pointer=)
 endif
 
 ifdef CONFIG_DEBUG_INFO
-CFLAGS		+= -g
+CFLAGS		+=-g
 endif
-
-GZFLAGS		= -9
 
 # Ensure this is ld "2.9.4" or later
 NEW_LINKER	:= $(shell $(LD) --gc-sections --version >/dev/null 2>&1; echo $$?)
@@ -40,60 +33,41 @@ dummy:;		@echo '*** ${VERSION}.${PATCHLEVEL} kernels no longer build correctly w
 		@false
 endif
 
-# GCC 2.7 uses different options to later compilers; sort out which we have
-NEW_GCC		:= $(shell $(CC) --version 2>&1 | grep '^2\.7' > /dev/null; echo $$?)
-
+# Select CPU dependent flags.  Note that order of declaration is important;
+# the options further down the list override previous items.
 #
-# select flags depending on the compiler
-#
-ifneq ($(NEW_GCC),0)
-CFLAGS			+= -mshort-load-bytes
-CFLAGS_PROC_CPU_26	:= -mcpu=arm3 -mapcs-26 -Os
-CFLAGS_PROC_CPU_32v3	:= -march=armv3
-CFLAGS_PROC_CPU_32v4	:= -march=armv4
-else
-CFLAGS			+= -DNO_TEXT_SECTIONS
-CFLAGS_PROC_CPU_26	:= -m3
-CFLAGS_PROC_CPU_32v3	:= -m6
-CFLAGS_PROC_CPU_32v4	:= -m6
-endif
+apcs-$(CONFIG_CPU_26)		:=-mapcs-26 -mcpu=arm3 -Os
+apcs-$(CONFIG_CPU_32)		:=-mapcs-32
 
-#
-# Select CPU dependent flags
-#
-ifeq ($(CONFIG_CPU_26),y)
- PROCESSOR	 = armo
- TEXTADDR	 = 0x02080000
- CFLAGS		+= $(CFLAGS_PROC_CPU_26)
- AFLAGS		+= -mapcs-26
-endif
+arch-$(CONFIG_CPU_32v3)		:=-march=armv3
+arch-$(CONFIG_CPU_32v4)		:=-march=armv4
+arch-$(CONFIG_CPU_32v5)		:=-march=armv5
 
-ifeq ($(CONFIG_CPU_32),y)
- PROCESSOR	 = armv
- TEXTADDR	 = 0xC0008000
- ifeq ($(CONFIG_CPU_32v4),y)
-  CFLAGS	+= $(CFLAGS_PROC_CPU_32v4)
-  AFLAGS	+= -mapcs-32 -marmv4
- else
-  CFLAGS	+= $(CFLAGS_PROC_CPU_32v3)
-  AFLAGS	+= -mapcs-32 -marmv3m
- endif
+proc-$(CONFIG_CPU_32v3)		:=-marmv3m
+proc-$(CONFIG_CPU_32v4)		:=-marmv4
+proc-$(CONFIG_CPU_32v5)		:=-marmv5
 
- opt-$(CONFIG_CPU_ARM6)		:= -mtune=arm6
- opt-$(CONFIG_CPU_ARM7)		:= -mtune=arm7
- opt-$(CONFIG_CPU_ARM720)	:= -mtune=arm7tdmi
- opt-$(CONFIG_CPU_ARM920)	:= -mtune=arm9tdmi
- opt-$(CONFIG_CPU_SA110)	:= -mtune=strongarm110
- opt-$(CONFIG_CPU_SA1100)	:= -mtune=strongarm110
+tune-$(CONFIG_CPU_ARM610)	:=-mtune=arm610
+tune-$(CONFIG_CPU_ARM710)	:=-mtune=arm710
+tune-$(CONFIG_CPU_ARM720T)	:=-mtune=arm7tdmi
+tune-$(CONFIG_CPU_ARM920T)	:=-mtune=arm9tdmi
+tune-$(CONFIG_CPU_SA110)	:=-mtune=strongarm110
+tune-$(CONFIG_CPU_SA1100)	:=-mtune=strongarm1100
 
- ifneq ($(NEW_GCC),0)
- CFLAGS	+= $(opt-y)
- endif
-endif
+CFLAGS		+= $(apcs-y) $(arch-y) $(tune-y) -mshort-load-bytes -msoft-float
+AFLAGS		+= $(apcs-y) $(proc-y) -mno-fpu
 
 LIBGCC		:= $(shell $(CC) $(CFLAGS) --print-libgcc-file-name)
 
-export	LIBGCC MACHINE PROCESSOR TEXTADDR GZFLAGS
+ifeq ($(CONFIG_CPU_26),y)
+PROCESSOR	 = armo
+TEXTADDR	 = 0x02080000
+endif
+
+ifeq ($(CONFIG_CPU_32),y)
+PROCESSOR	 = armv
+TEXTADDR	 = 0xC0008000
+endif
 
 ifeq ($(CONFIG_ARCH_ARCA5K),y)
 MACHINE		 = arc
@@ -132,6 +106,10 @@ MACHINE		 = shark
 endif
 
 ifeq ($(CONFIG_ARCH_SA1100),y)
+ifeq ($(CONFIG_SA1111),y)
+# SA1111 DMA bug: we don't want the kernel to live in precious DMA-able memory
+TEXTADDR	 = 0xc0208000
+endif
 MACHINE		 = sa1100
 endif
 
@@ -142,6 +120,13 @@ endif
 ifeq ($(CONFIG_ARCH_INTEGRATOR),y)
 MACHINE		 = integrator
 endif
+
+ifeq ($(CONFIG_ARCH_CLPS711X),y)
+TEXTADDR	 = 0xc0018000
+MACHINE		 = clps711x
+endif
+
+export	LIBGCC MACHINE PROCESSOR TEXTADDR GZFLAGS
 
 # Only set INCDIR if its not already defined above
 # Grr, ?= doesn't work as all the other assignment operators do.  Make bug?
@@ -158,21 +143,12 @@ endif
 
 HEAD		:= arch/arm/kernel/head-$(PROCESSOR).o \
 		   arch/arm/kernel/init_task.o
-SUBDIRS		+= arch/arm/kernel arch/arm/mm arch/arm/lib \
-		   arch/arm/nwfpe
+SUBDIRS		+= arch/arm/kernel arch/arm/mm arch/arm/lib arch/arm/nwfpe
 CORE_FILES	:= arch/arm/kernel/kernel.o arch/arm/mm/mm.o $(CORE_FILES)
 LIBS		:= arch/arm/lib/lib.o arch/arm/lib/lib.a $(LIBS) $(LIBGCC)
 
 ifeq ($(CONFIG_NWFPE),y)
 LIBS		:= arch/arm/nwfpe/math-emu.o $(LIBS)
-endif
-
-ifeq ($(CONFIG_ARCH_ACORN),y)
-SUBDIRS		+= drivers/acorn
-DRIVERS		+= drivers/acorn/block/acorn-block.a
-DRIVERS		+= drivers/acorn/char/acorn-char.o
-DRIVERS		+= drivers/acorn/net/acorn-net.o
-DRIVERS		+= drivers/acorn/scsi/acorn-scsi.a
 endif
 
 ifeq ($(CONFIG_ARCH_CLPS7500),y)
@@ -230,6 +206,7 @@ zImg:;	@$(MAKEBOOT) zImage
 Img:;	@$(MAKEBOOT) Image
 i:;	@$(MAKEBOOT) install
 zi:;	@$(MAKEBOOT) zinstall
+bp:;	@$(MAKEBOOT) bootpImage
 
 #
 # Configuration targets.  Use these to select a
@@ -237,9 +214,10 @@ zi:;	@$(MAKEBOOT) zinstall
 CFGS=	a5k_config		ebsa110_config		\
 	footbridge_config	rpc_config		\
 	brutus_config		victor_config		\
-	empeg_config		thinclient_config	\
+	empeg_config		graphicsclient_config	\
 	assabet_config		lart_config		\
-	cerf_config		lusl7200_config 
+	cerf_config		lusl7200_config 	\
+	sherman_config		pangolin_config
 
 $(CFGS):
 	@( \

@@ -8,7 +8,7 @@
  *	Director, National Security Agency.
  * 
  *	This software may be used and distributed according to the terms
- *	of the GNU Public License, incorporated herein by reference.
+ *	of the GNU General Public License, incorporated herein by reference.
  *
  *	This driver is for PCnet32 and PCnetPCI based ethercards
  */
@@ -811,7 +811,7 @@ pcnet32_open(struct net_device *dev)
 	val |= 0x10;
     lp->a.write_csr (ioaddr, 124, val);
     
-    if (lp->mii & !(lp->options & PORT_ASEL)) {
+    if (lp->mii && !(lp->options & PORT_ASEL)) {
 	val = lp->a.read_bcr (ioaddr, 32) & ~0x38; /* disable Auto Negotiation, set 10Mpbs, HD */
 	if (lp->options & PORT_FD)
 	    val |= 0x10;

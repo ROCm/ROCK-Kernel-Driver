@@ -149,7 +149,7 @@ extern __inline__ unsigned long pmd_page(pmd_t pmd)
 #define pte_young(pte)			(pte_val(pte) & L_PTE_YOUNG)
 
 #define PTE_BIT_FUNC(fn,op)			\
-extern inline pte_t pte_##fn##(pte_t pte) { pte_val(pte) op##; return pte; }
+extern inline pte_t pte_##fn(pte_t pte) { pte_val(pte) op; return pte; }
 
 /*PTE_BIT_FUNC(rdprotect, &= ~L_PTE_USER);*/
 /*PTE_BIT_FUNC(mkread,    |= L_PTE_USER);*/
@@ -162,5 +162,10 @@ PTE_BIT_FUNC(mkdirty,   |= L_PTE_DIRTY);
 PTE_BIT_FUNC(mkold,     &= ~L_PTE_YOUNG);
 PTE_BIT_FUNC(mkyoung,   |= L_PTE_YOUNG);
 PTE_BIT_FUNC(nocache,   &= ~L_PTE_CACHEABLE);
+
+/*
+ * Mark the prot value as uncacheable and unbufferable.
+ */
+#define pgprot_noncached(prot)	__pgprot(pgprot_val(prot) & ~(L_PTE_CACHEABLE | L_PTE_BUFFERABLE))
 
 #endif /* __ASM_PROC_PGTABLE_H */

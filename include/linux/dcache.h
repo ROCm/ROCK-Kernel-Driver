@@ -27,6 +27,15 @@ struct qstr {
 	unsigned int hash;
 };
 
+struct dentry_stat_t {
+	int nr_dentry;
+	int nr_unused;
+	int age_limit;          /* age in seconds */
+	int want_pages;         /* pages requested by system */
+	int dummy[2];
+};
+extern struct dentry_stat_t dentry_stat;
+
 /* Name hashing routines. Initial hash value */
 #define init_name_hash()		0
 

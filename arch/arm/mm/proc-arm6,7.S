@@ -7,10 +7,8 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  *
- *  MMU functions for ARM6
- *
  *  These are the low level assembler for performing cache and TLB
- *  functions on the ARM6 & ARM7.
+ *  functions on the ARM610 & ARM710.
  */
 #include <linux/linkage.h>
 #include <asm/assembler.h>
@@ -105,9 +103,9 @@ ENTRY(cpu_arm7_tlb_invalidate_page)
 
 ENTRY(cpu_arm6_data_abort)
 		ldr	r4, [r0]			@ read instruction causing problem
-		mov	r1, r4, lsr #19			@ r1 b1 = L
+		tst	r4, r4, lsr #21			@ C = bit 20
+		sbc	r1, r1, r1			@ r1 = C - 1
 		and	r2, r4, #14 << 24
-		and	r1, r1, #2			@ check read/write bit
 		teq	r2, #8 << 24			@ was it ldm/stm
 		bne	Ldata_simple
 
@@ -138,9 +136,9 @@ Ldata_simple:	mrc	p15, 0, r0, c6, c0, 0		@ get FAR
 
 ENTRY(cpu_arm7_data_abort)
 		ldr	r4, [r0]			@ read instruction causing problem
-		mov	r1, r4, lsr #19			@ r1 b1 = L
+		tst	r4, r4, lsr #21			@ C = bit 20
+		sbc	r1, r1, r1			@ r1 = C - 1
 		and	r2, r4, #15 << 24
-		and	r1, r1, #2			@ check read/write bit
 		add	pc, pc, r2, lsr #22		@ Now branch to the relevent processing routine
 		movs	pc, lr
 

@@ -32,7 +32,6 @@
 #include <linux/skbuff.h>
 #include <linux/rtnetlink.h>
 #include <linux/if_arp.h>
-#include <linux/if_slip.h>
 #include <linux/init.h>
 #include <linux/ip.h>
 #include <linux/tcp.h>
@@ -75,7 +74,7 @@
 #define SIXP_RESYNC_TIMEOUT		500	/* in 10 ms */
 
 /* 6pack configuration. */
-#define SIXP_NRUNIT			256	/* MAX number of 6pack channels */
+#define SIXP_NRUNIT			31      /* MAX number of 6pack channels */
 #define SIXP_MTU			256	/* Default MTU */
 
 enum sixpack_flags {
@@ -128,20 +127,18 @@ struct sixpack {
 	struct timer_list	resync_t;
 };
 
-/* should later be moved to include/net/ax25.h */
 #define AX25_6PACK_HEADER_LEN 0
 #define SIXPACK_MAGIC 0x5304
 
-static const char banner[] __initdata = KERN_INFO "AX.25: 6pack driver, " SIXPACK_VERSION " (dynamic channels, max=%d)\n";
-
 typedef struct sixpack_ctrl {
-	struct sixpack	ctrl;		/* 6pack things			*/
+	struct sixpack	ctrl;			/* 6pack things			*/
 	struct net_device	dev;		/* the device			*/
 } sixpack_ctrl_t;
 static sixpack_ctrl_t **sixpack_ctrls;
-int sixpack_maxdev = SIXP_NRUNIT;	/* Can be overridden with insmod! */
 
-static struct tty_ldisc	sp_ldisc;
+int sixpack_maxdev = SIXP_NRUNIT;	/* Can be overridden with insmod! */
+MODULE_PARM(sixpack_maxdev, "i");
+MODULE_PARM_DESC(sixpack_maxdev, "number of 6PACK devices");
 
 static void sp_start_tx_timer(struct sixpack *);
 static void sp_xmit_on_air(unsigned long);
@@ -687,51 +684,66 @@ static int sp_open_dev(struct net_device *dev)
 	return 0;
 }
 
+/* Fill in our line protocol discipline */
+static struct tty_ldisc sp_ldisc = {
+	magic:		TTY_LDISC_MAGIC,
+	name:		"6pack",
+	open:		sixpack_open,
+	close:		sixpack_close,
+	ioctl:		(int (*)(struct tty_struct *, struct file *,
+			unsigned int, unsigned long)) sixpack_ioctl,
+	receive_buf:	sixpack_receive_buf,
+	receive_room:	sixpack_receive_room,
+	write_wakeup:	sixpack_write_wakeup,
+};
+
 /* Initialize 6pack control device -- register 6pack line discipline */
+
+static const char msg_banner[]  __initdata = KERN_INFO "AX.25: 6pack driver, " SIXPACK_VERSION " (dynamic channels, max=%d)\n";
+static const char msg_invparm[] __initdata = KERN_ERR  "6pack: sixpack_maxdev parameter too large.\n";
+static const char msg_nomem[]   __initdata = KERN_ERR  "6pack: can't allocate sixpack_ctrls[] array! No 6pack available.\n";
+static const char msg_regfail[] __initdata = KERN_ERR  "6pack: can't register line discipline (err = %d)\n";
 
 static int __init sixpack_init_driver(void)
 {
 	int status;
 
+	/* Do sanity checks on maximum device parameter. */
 	if (sixpack_maxdev < 4)
-		sixpack_maxdev = 4; /* Sanity */
+		sixpack_maxdev = 4;
+	if (sixpack_maxdev * sizeof(void*) >= KMALLOC_MAXSIZE) {
+	        printk(msg_invparm);
+		return -ENFILE;
+	}
 
-	printk(banner, sixpack_maxdev);
+	printk(msg_banner, sixpack_maxdev);
 
 	sixpack_ctrls = (sixpack_ctrl_t **) kmalloc(sizeof(void*)*sixpack_maxdev, GFP_KERNEL);
 	if (sixpack_ctrls == NULL) {
-		printk(KERN_WARNING "6pack: Can't allocate sixpack_ctrls[] array!  Uaargh! (-> No 6pack available)\n");
+		printk(msg_nomem);
 		return -ENOMEM;
 	}
 
 	/* Clear the pointer array, we allocate devices when we need them */
 	memset(sixpack_ctrls, 0, sizeof(void*)*sixpack_maxdev); /* Pointers */
 
-	/* Fill in our line protocol discipline, and register it */
-	sp_ldisc.magic  = TTY_LDISC_MAGIC;
-	sp_ldisc.name   = "6pack";
-	sp_ldisc.flags  = 0;
-	sp_ldisc.open   = sixpack_open;
-	sp_ldisc.close  = sixpack_close;
-	sp_ldisc.read   = NULL;
-	sp_ldisc.write  = NULL;
-	sp_ldisc.ioctl  = (int (*)(struct tty_struct *, struct file *,
-				   unsigned int, unsigned long)) sixpack_ioctl;
-	sp_ldisc.poll = NULL;
-	sp_ldisc.receive_buf = sixpack_receive_buf;
-	sp_ldisc.receive_room = sixpack_receive_room;
-	sp_ldisc.write_wakeup = sixpack_write_wakeup;
-	if ((status = tty_register_ldisc(N_6PACK, &sp_ldisc)) != 0)  {
-		printk(KERN_WARNING "6pack: can't register line discipline (err = %d)\n", status);
+	/* Register the provided line protocol discipline */
+	if ((status = tty_register_ldisc(N_6PACK, &sp_ldisc)) != 0) {
+		printk(msg_regfail, status);
 		kfree(sixpack_ctrls);
 	}
 
 	return status;
 }
 
-static void __exit sixpack_cleanup_driver(void)
+static const char msg_unregfail[] __exitdata = KERN_ERR "6pack: can't unregister line discipline (err = %d)\n";
+
+static void __exit sixpack_exit_driver(void)
 {
 	int i;
+
+	if ((i = tty_register_ldisc(N_6PACK, NULL)))
+		printk(msg_unregfail, i);
 
 	for (i = 0; i < sixpack_maxdev; i++) {
 		if (sixpack_ctrls[i]) {
@@ -746,8 +758,6 @@ static void __exit sixpack_cleanup_driver(void)
 		}
 	}
 	kfree(sixpack_ctrls);
-	if ((i = tty_register_ldisc(N_6PACK, NULL)))
-		printk(KERN_WARNING "6pack: can't unregister line discipline (err = %d)\n", i);
 }
 
 
@@ -1059,8 +1069,6 @@ static void decode_data(unsigned char inbyte, struct sixpack *sp)
 
 MODULE_AUTHOR("Andreas Könsgen <ajk@ccac.rwth-aachen.de>");
 MODULE_DESCRIPTION("6pack driver for AX.25");
-MODULE_PARM(sixpack_maxdev, "i");
-MODULE_PARM_DESC(sixpack_maxdev, "number of 6PACK devices");
 
 module_init(sixpack_init_driver);
-module_exit(sixpack_cleanup_driver);
+module_exit(sixpack_exit_driver);

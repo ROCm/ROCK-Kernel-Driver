@@ -2129,7 +2129,6 @@ static void r4k_show_regs(struct pt_regs *regs)
 	       regs->cp0_epc, regs->cp0_badvaddr);
 	printk("Status  : %08x\nCause   : %08x\n",
 	       (unsigned int) regs->cp0_status, (unsigned int) regs->cp0_cause);
-//{static int x = 3; x--; if(!x) while(1);}
 }
 
 /* Detect and size the various r4k caches. */

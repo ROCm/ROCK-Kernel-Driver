@@ -843,30 +843,40 @@ static void __init pci_fixup_i450gx(struct pci_dev *d)
 	pcibios_last_bus = -1;
 }
 
+/*
+ * ServerWorks host bridges -- Find and scan all secondary buses.
+ * Register 0x44 contains first, 0x45 last bus number routed there.
+ */
 static void __init pci_fixup_serverworks(struct pci_dev *d)
 {
-	/*
-	 * ServerWorks host bridges -- Find and scan all secondary buses.
-	 * Register 0x44 contains first, 0x45 last bus number routed there.
-	 */
-	u8 busno;
-	pci_read_config_byte(d, 0x44, &busno);
-	printk("PCI: ServerWorks host bridge: secondary bus %02x\n", busno);
-	pci_scan_bus(busno, pci_root_ops, NULL);
-	pcibios_last_bus = -1;
+	u8 busno1, busno2;
+
+	pci_read_config_byte(d, 0x44, &busno1);
+	pci_read_config_byte(d, 0x45, &busno2);
+	if (busno2 < busno1)
+		busno2 = busno1;
+	if (busno2 > pcibios_last_bus) {
+		pcibios_last_bus = busno2;
+		printk("PCI: ServerWorks host bridge: last bus %02x\n", pcibios_last_bus);
+	}
 }
 
+/*	
+ * Compaq host bridges -- Find and scan all secondary buses.
+ * This time registers 0xc8 and 0xc9.
+ */
 static void __init pci_fixup_compaq(struct pci_dev *d)
 {
-	/*	
-	 * Compaq host bridges -- Find and scan all secondary buses.
-	 * This time registers 0xc8 and 0xc9.
-	 */
-	u8 busno;
-	pci_read_config_byte(d, 0xc8, &busno);
-	printk("PCI: Compaq host bridge: secondary bus %02x\n", busno);
-	pci_scan_bus(busno, pci_root_ops, NULL);
-	pcibios_last_bus = -1;
+	u8 busno1, busno2;
+
+	pci_read_config_byte(d, 0xc8, &busno1);
+	pci_read_config_byte(d, 0xc9, &busno2);
+	if (busno2 < busno1)
+		busno2 = busno1;
+	if (busno2 > pcibios_last_bus) {
+		pcibios_last_bus = busno2;
+		printk("PCI: Compaq host bridge: last bus %02x\n", busno2);
+	}
 }
 
 static void __init pci_fixup_umc_ide(struct pci_dev *d)
@@ -924,6 +934,22 @@ static void __init pci_fixup_latency(struct pci_dev *d)
 	pcibios_max_latency = 32;
 }
 
+static void __init pci_fixup_vt8363(struct pci_dev *d)
+{
+	/*
+	 *  VIA VT8363 host bridge has broken feature 'PCI Master Read
+	 *  Caching'. It caches more than is good for it, sometimes
+	 *  serving the bus master with stale data. Some BIOSes enable
+	 *  it by default, so we disable it.
+	 */
+	u8 tmp;
+	pci_read_config_byte(d, 0x70, &tmp);
+	if(tmp & 4) {
+		printk("PCI: Bus master read caching disabled\n");
+		pci_write_config_byte(d, 0x70, tmp & ~4);
+	}
+}
+
 struct pci_fixup pcibios_fixups[] = {
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82451NX,	pci_fixup_i450nx },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82454GX,	pci_fixup_i450gx },
@@ -936,6 +962,7 @@ struct pci_fixup pcibios_fixups[] = {
 	{ PCI_FIXUP_HEADER,	PCI_ANY_ID,		PCI_ANY_ID,			pci_fixup_ide_bases },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_SI,	PCI_DEVICE_ID_SI_5597,		pci_fixup_latency },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_SI,	PCI_DEVICE_ID_SI_5598,		pci_fixup_latency },
+	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_8363_0,	pci_fixup_vt8363 },
 	{ 0 }
 };
 

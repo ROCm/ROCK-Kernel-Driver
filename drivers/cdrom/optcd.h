@@ -49,4 +49,4 @@
 #define N_BUFS		6
 
 
-#endif _LINUX_OPTCD_H
+#endif /* _LINUX_OPTCD_H */

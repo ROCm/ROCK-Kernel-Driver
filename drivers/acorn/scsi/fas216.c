@@ -47,6 +47,7 @@
 #include <linux/unistd.h>
 #include <linux/stat.h>
 #include <linux/delay.h>
+#include <linux/init.h>
 
 #include <asm/dma.h>
 #include <asm/io.h>
@@ -2767,12 +2768,12 @@ EXPORT_SYMBOL(fas216_print_stats);
 EXPORT_SYMBOL(fas216_print_device);
 
 #ifdef MODULE
-int init_module(void)
+int __init init_module(void)
 {
 	return 0;
 }
 
-void cleanup_module(void)
+void __exit cleanup_module(void)
 {
 }
 #endif

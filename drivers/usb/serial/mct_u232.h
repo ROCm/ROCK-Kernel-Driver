@@ -24,7 +24,14 @@
 #define __LINUX_USB_SERIAL_MCT_U232_H
 
 #define MCT_U232_VID	                0x0711	/* Vendor Id */
-#define MCT_U232_PID	                0x0210	/* Product Id */
+#define MCT_U232_PID	                0x0210	/* Original MCT Product Id */
+
+/* U232-P25, Sitecom */
+#define MCT_U232_SITECOM_PID		0x0230	/* Sitecom Product Id */
+
+/* DU-H3SP USB BAY hub */
+
+#define MCT_U232_DU_H3SP_PID		0x0200	/* D-Link DU-H3SP USB BAY */
 
 /*
  * Vendor Request Interface

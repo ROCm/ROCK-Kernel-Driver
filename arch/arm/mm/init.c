@@ -49,7 +49,7 @@
 #define TABLE_SIZE	((TABLE_OFFSET + PTRS_PER_PTE) * sizeof(void *))
 
 static unsigned long totalram_pages;
-pgd_t swapper_pg_dir[PTRS_PER_PGD];
+extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
 extern char _stext, _text, _etext, _end, __init_begin, __init_end;
 
 /*
@@ -418,7 +418,7 @@ static __init void reserve_node_zero(unsigned int bootmap_pfn, unsigned int boot
 	if (machine_is_archimedes() || machine_is_a5k())
 		reserve_bootmem_node(pgdat, 0x02000000, 0x00080000);
 	if (machine_is_p720t())
-		reserve_bootmem_node(pgdat, 0xc0000000, 0x00014000);
+		reserve_bootmem_node(pgdat, PAGE_OFFSET, 0x00014000);
 }
 
 /*
@@ -450,8 +450,28 @@ void __init bootmem_init(struct meminfo *mi)
 	initrd_node   = check_initrd(mi);
 
 	map_pg = bootmap_pfn;
-	
-	for (node = 0; node < numnodes; node++, np++) {
+
+	/*
+	 * Initialise the bootmem nodes.
+	 *
+	 * What we really want to do is:
+	 *
+	 *   unmap_all_regions_except_kernel();
+	 *   for_each_node_in_reverse_order(node) {
+	 *     map_node(node);
+	 *     allocate_bootmem_map(node);
+	 *     init_bootmem_node(node);
+	 *     free_bootmem_node(node);
+	 *   }
+	 *
+	 * but this is a 2.5-type change.  For now, we just set
+	 * the nodes up in reverse order.
+	 *
+	 * (we could also do with rolling bootmem_init and paging_init
+	 * into one generic "memory_init" type function).
+	 */
+	np += numnodes - 1;
+	for (node = numnodes - 1; node >= 0; node--, np--) {
 		/*
 		 * If there are no pages in this node, ignore it.
 		 * Note that node 0 must always have some pages.

@@ -73,6 +73,11 @@ Current status:
   the port to use for the HotSync transfer. The "Generic" port can be used
   for other device communication, such as a PPP link.
 
+  If after pressing the sync button, nothing shows up in the system log,
+  try resetting the Visor, first a hot reset, and then a cold reset if
+  necessary.  Some Visors need this before they can talk to the USB port
+  properly.
+  
   There is a webpage and mailing lists for this portion of the driver at: 
   http://usbvisor.sourceforge.net/
 
@@ -103,22 +108,22 @@ Current status:
 
 Keyspan USA-series Serial Adapters
 
-  Single and Dual port adapters - driver uses Keyspan supplied 
+  Single, Dual and Quad port adapters - driver uses Keyspan supplied 
   firmware and is being developed with their support.
   
-  Driver isn't as far advanced as Keyspan PDA driver mentioned above.
-  
 Current status:
- Things that work:
-   Firmware upload for USA-18X, USA-28, USA-28X, USA-19 and USA-19W 
-   Simple character I/O fixed at 9600 baud on USA-19 only
-   
- Things that don't:
-   Everything else. (for now...)
-   
- Big Things on the todo list:
-   Driver is in infancy, much functionality remains to be added
+  The USA-18X, USA-28X, USA-19, USA-19W and USA-49W are supported and
+  have been pretty throughly tested at various baud rates with 8-N-1
+  character settings.  Other character lengths and parity setups are
+  presently untested.
 
+  The USA-28 isn't yet supported though doing so should be pretty
+  straightforward.  Contact the maintainer if you require this
+  functionality.
+  
+  More information is available at:
+        http://www.linuxcare.com.au/hugh/keyspan.html
+   
 
 FTDI Single Port Serial Driver
 
@@ -157,6 +162,7 @@ Digi AccelePort Driver
 Belkin USB Serial Adapter F5U103
 
   Single port DB-9/PS-2 serial adapter from Belkin with firmware by eTEK Labs.
+  The Peracom single port serial adapter also works with this driver.
 
 Current status:
   The following have been tested and work:
@@ -210,6 +216,11 @@ MCT USB Single Port Serial Adapter U232
  The driver is generally working, though it still needs some more
  testing. It is derived from the Belkin USB Serial Adapter F5U103
  driver and its TODO list is valid for this driver as well.
+
+ This driver has also been found to work for other products, which have 
+ the same Vendor ID but different Product IDs. Sitecom's U232-P25 
+ serial converter uses Product ID 0x230 and Vendor ID 0x711 and works with 
+ this driver. Also, D-Link's DU-H3SP USB BAY also works with this driver.
 
 
 Generic Serial driver

@@ -66,7 +66,7 @@ $(HEAD): 	$(HEAD:.o=.S)
 		$(CC) $(AFLAGS) -traditional -c $(HEAD:.o=.S)
 
 piggy.o:	$(SYSTEM)
-		$(OBJCOPY) $(SYSTEM) piggy
+		$(OBJCOPY) -O binary -R .note -R .comment -S $(SYSTEM) piggy
 		gzip $(GZFLAGS) < piggy > piggy.gz
 		$(LD) -r -o $@ -b binary piggy.gz
 		rm -f piggy piggy.gz

@@ -52,6 +52,8 @@
  *	    Adapted to module_init/module_exit
  * 11-10-2000: Bartlomiej Zolnierkiewicz <bkz@linux-ide.org>
  *	    Added __init to probe_pss(), attach_pss() and probe_pss_mpu()
+ * 02-Jan-2001: Chris Rankin
+ *          Specify that this module owns the coprocessor
  */
 
 
@@ -979,6 +981,7 @@ static int pss_coproc_ioctl(void *dev_info, unsigned int cmd, caddr_t arg, int l
 static coproc_operations pss_coproc_operations =
 {
 	"ADSP-2115",
+	THIS_MODULE,
 	pss_coproc_open,
 	pss_coproc_close,
 	pss_coproc_ioctl,

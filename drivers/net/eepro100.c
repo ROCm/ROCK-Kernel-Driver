@@ -10,7 +10,7 @@
 	Please use this email address and linux-kernel mailing list for bug reports.
 
 	This software may be used and distributed according to the terms
-	of the GNU Public License, incorporated herein by reference.
+	of the GNU General Public License, incorporated herein by reference.
 
 	This driver is for the Intel EtherExpress Pro100 (Speedo3) design.
 	It should work with all i82557/558/559 boards.
@@ -475,7 +475,7 @@ struct speedo_private {
 	struct speedo_mc_block *mc_setup_tail;/* Multicast setup frame list tail. */
 	int in_interrupt;					/* Word-aligned dev->interrupt */
 	unsigned char acpi_pwr;
-	char rx_mode;						/* Current PROMISC/ALLMULTI setting. */
+	signed char rx_mode;					/* Current PROMISC/ALLMULTI setting. */
 	unsigned int tx_full:1;				/* The Tx queue is full. */
 	unsigned int full_duplex:1;			/* Full-duplex operation requested. */
 	unsigned int flow_ctrl:1;			/* Use 802.3x flow control. */
@@ -725,7 +725,7 @@ static int speedo_found1(struct pci_dev *pdev,
 		/* The self-test results must be paragraph aligned. */
 		volatile s32 *self_test_results;
 		int boguscnt = 16000;	/* Timeout for set-test. */
-		if (eeprom[3] & 0x03)
+		if ((eeprom[3] & 0x03) != 0x03)
 			printk(KERN_INFO "  Receiver lock-up bug exists -- enabling"
 				   " work-around.\n");
 		printk(KERN_INFO "  Board assembly %4.4x%2.2x-%3.3d, Physical"

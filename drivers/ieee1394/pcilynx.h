@@ -80,6 +80,8 @@ struct ti_lynx {
         struct hpsb_host *host;
 
         int phyid, isroot;
+        int selfid_size;
+        int phy_reg0;
 
         spinlock_t phy_reg_lock;
 
@@ -248,9 +250,9 @@ inline static void reg_clear_bits(const struct ti_lynx *lynx, int offset,
 #define FIFO_SIZES                        0xa00
 
 #define FIFO_CONTROL                      0xa10
-#define GRF_FLUSH                         (1<<4)
-#define ITF_FLUSH                         (1<<3)
-#define ATF_FLUSH                         (1<<2)
+#define FIFO_CONTROL_GRF_FLUSH            (1<<4)
+#define FIFO_CONTROL_ITF_FLUSH            (1<<3)
+#define FIFO_CONTROL_ATF_FLUSH            (1<<2)
 
 #define FIFO_XMIT_THRESHOLD               0xa14
 
@@ -285,8 +287,8 @@ inline static void reg_clear_bits(const struct ti_lynx *lynx, int offset,
 #define DMA_WORD1_CMP_MATCH_OTHERBUS      (1<<15)
 #define DMA_WORD1_CMP_MATCH_BROADCAST     (1<<14)
 #define DMA_WORD1_CMP_MATCH_BUS_BCAST     (1<<13)
-#define DMA_WORD1_CMP_MATCH_NODE_BCAST    (1<<12)
-#define DMA_WORD1_CMP_MATCH_LOCAL         (1<<11)
+#define DMA_WORD1_CMP_MATCH_LOCAL_NODE    (1<<12)
+#define DMA_WORD1_CMP_MATCH_EXACT         (1<<11)
 #define DMA_WORD1_CMP_ENABLE_SELF_ID      (1<<10)
 #define DMA_WORD1_CMP_ENABLE_MASTER       (1<<8)
 

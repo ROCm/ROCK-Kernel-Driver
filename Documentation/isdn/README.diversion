@@ -6,7 +6,7 @@ document. The diversion services may be used with all cards supported by
 the HiSax driver.
 The diversion kernel interface and controlling tool divertctrl were written
 by Werner Cornelius (werner@isdn4linux.de or werner@titro.de) under the
-GNU Public License.
+GNU General Public License.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

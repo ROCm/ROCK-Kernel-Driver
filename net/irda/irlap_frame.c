@@ -60,7 +60,7 @@ static inline void irlap_insert_info(struct irlap_cb *self,
 	 */
 	cb->magic = LAP_MAGIC;
 	cb->mtt = self->mtt_required;
-	cb->speed = self->speed;
+	cb->next_speed = self->speed;
 
 	/* Reset */
 	self->mtt_required = 0;
@@ -70,10 +70,13 @@ static inline void irlap_insert_info(struct irlap_cb *self,
 	 * force the negotiated minimum turnaround time 
 	 */
 	cb->xbofs = self->bofs_count;
+	cb->next_xbofs = self->next_bofs;
 	cb->xbofs_delay = self->xbofs_delay;
 	
 	/* Reset XBOF's delay (used only for getting min turn time) */
 	self->xbofs_delay = 0;
+	/* Put the correct xbofs value for the next packet */
+	self->bofs_count = self->next_bofs;
 }
 
 /*

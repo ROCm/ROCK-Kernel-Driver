@@ -1866,14 +1866,16 @@ int __init find_zoran(void)
 			SA_SHIRQ|SA_INTERRUPT,"zoran",(void *)ztv);
 		if (result==-EINVAL)
 		{
+			iounmap(ztv->zoran_mem);
 			printk(KERN_ERR "zoran: Bad irq number or handler\n");
 			return -EINVAL;
 		}
 		if (result==-EBUSY)
 			printk(KERN_ERR "zoran: IRQ %d busy, change your PnP config in BIOS\n",dev->irq);
-		if (result < 0)
+		if (result < 0) {
+			iounmap(ztv->zoran_mem);
 			return result;
-
+		}
 		/* Enable bus-mastering */
 		pci_set_master(dev);
 

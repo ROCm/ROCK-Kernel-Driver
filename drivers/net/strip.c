@@ -82,12 +82,9 @@ static const char StripVersion[] = "1.3-STUART.CHESHIRE";
 /* Header files								*/
 
 #include <linux/config.h>
-
-#ifdef MODULE
 #include <linux/module.h>
 #include <linux/version.h>
-#endif
-
+#include <linux/init.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
 #include <asm/segment.h>
@@ -459,7 +456,7 @@ static const long            LongTime               = 0x7FFFFFFF;
 /************************************************************************/
 /* Global variables							*/
 
-static struct strip *struct_strip_list = NULL;
+static struct strip *struct_strip_list;
 
 
 /************************************************************************/
@@ -492,7 +489,7 @@ static struct strip *struct_strip_list = NULL;
 
 typedef unsigned long InterruptStatus;
 
-extern __inline__ InterruptStatus DisableInterrupts(void)
+static inline InterruptStatus DisableInterrupts(void)
 {
     InterruptStatus x;
     save_flags(x);
@@ -500,7 +497,7 @@ extern __inline__ InterruptStatus DisableInterrupts(void)
     return(x);
 }
 
-extern __inline__ void RestoreInterrupts(InterruptStatus x)
+static inline void RestoreInterrupts(InterruptStatus x)
 {
     restore_flags(x);
 }
@@ -2589,11 +2586,7 @@ static int strip_dev_init(struct net_device *dev)
     dev->hard_start_xmit    = strip_xmit;
     dev->hard_header        = strip_header;
     dev->rebuild_header     = strip_rebuild_header;
-    /*  dev->type_trans            unused */
-    /*  dev->set_multicast_list   unused */
     dev->set_mac_address    = dev_set_mac_address;
-    /*  dev->do_ioctl             unused */
-    /*  dev->set_config           unused */
     dev->get_stats          = strip_get_stats;
     return 0;
 }
@@ -2730,9 +2723,7 @@ static int strip_open(struct tty_struct *tty)
     tty->termios->c_cflag |= CLOCAL;    /* Ignore modem control signals. */
     tty->termios->c_cflag &= ~HUPCL;    /* Don't close on hup */
 
-#ifdef MODULE
     MOD_INC_USE_COUNT;
-#endif
 
     printk(KERN_INFO "STRIP: device \"%s\" activated\n", strip_info->dev.name);
 
@@ -2760,7 +2751,6 @@ static void strip_close(struct tty_struct *tty)
     if (!strip_info || strip_info->magic != STRIP_MAGIC)
         return;
 
-    dev_close(&strip_info->dev);
     unregister_netdev(&strip_info->dev);
 
     tty->disc_data = 0;
@@ -2768,9 +2758,7 @@ static void strip_close(struct tty_struct *tty)
     printk(KERN_INFO "STRIP: device \"%s\" closed down\n", strip_info->dev.name);
     strip_free(strip_info);
     tty->disc_data = NULL;
-#ifdef MODULE
     MOD_DEC_USE_COUNT;
-#endif
 }
 
 
@@ -2823,80 +2811,65 @@ static int strip_ioctl(struct tty_struct *tty, struct file *file,
 /************************************************************************/
 /* Initialization							*/
 
+static struct tty_ldisc strip_ldisc = {
+	magic:		TTY_LDISC_MAGIC,
+	name:		"strip",
+	open:		strip_open,
+	close:		strip_close,
+	ioctl:		strip_ioctl,
+	receive_buf:	strip_receive_buf,
+	receive_room:	strip_receive_room,
+	write_wakeup:	strip_write_some_more,
+};
+
 /*
  * Initialize the STRIP driver.
  * This routine is called at boot time, to bootstrap the multi-channel
  * STRIP driver
  */
 
-int strip_init_ctrl_dev(struct net_device *dummy)
+static const char signon[] __initdata = KERN_INFO "STRIP: Version %s (unlimited channels)\n";
+
+static int __init strip_init_driver(void)
 {
-    static struct tty_ldisc strip_ldisc;
     int status;
 
-    printk(KERN_INFO "STRIP: Version %s (unlimited channels)\n", StripVersion);
+    printk(signon, StripVersion);
 
     /*
      * Fill in our line protocol discipline, and register it
      */
-
-    memset(&strip_ldisc, 0, sizeof(strip_ldisc));
-    strip_ldisc.magic        = TTY_LDISC_MAGIC;
-    strip_ldisc.flags        = 0;
-    strip_ldisc.open         = strip_open;
-    strip_ldisc.close        = strip_close;
-    strip_ldisc.read         = NULL;
-    strip_ldisc.write        = NULL;
-    strip_ldisc.ioctl        = strip_ioctl;
-    strip_ldisc.poll         = NULL;
-    strip_ldisc.receive_buf  = strip_receive_buf;
-    strip_ldisc.receive_room = strip_receive_room;
-    strip_ldisc.write_wakeup = strip_write_some_more;
-    status = tty_register_ldisc(N_STRIP, &strip_ldisc);
-    if (status != 0)
-    {
+    if ((status = tty_register_ldisc(N_STRIP, &strip_ldisc)))
         printk(KERN_ERR "STRIP: can't register line discipline (err = %d)\n", status);
-    }
 
     /*
      * Register the status file with /proc
      */
-    proc_net_create ("strip", S_IFREG | S_IRUGO, get_status_info);
+    proc_net_create("strip", S_IFREG | S_IRUGO, get_status_info);
 
-#ifdef MODULE
-     return status;
-#else
-
-    /* Return "not found", so that dev_init() will unlink
-     * the placeholder device entry for us.
-     */
-    return -ENODEV;
-#endif
+    return status;
 }
+module_init(strip_init_driver);
 
+static const char signoff[] __exitdata = KERN_INFO "STRIP: Module Unloaded\n";
 
-/************************************************************************/
-/* From here down is only used when compiled as an external module	*/
-
-#ifdef MODULE
-
-int init_module(void)
-{
-    return strip_init_ctrl_dev(0);
-}
-
-void cleanup_module(void)
+static void __exit strip_exit_driver(void)
 {
     int i;
     while (struct_strip_list)
         strip_free(struct_strip_list);
 
     /* Unregister with the /proc/net file here. */
-    proc_net_remove ("strip");
+    proc_net_remove("strip");
 
     if ((i = tty_register_ldisc(N_STRIP, NULL)))
         printk(KERN_ERR "STRIP: can't unregister line discipline (err = %d)\n", i);
 
-    printk(KERN_INFO "STRIP: Module Unloaded\n");
+    printk(signoff);
 }
-#endif /* MODULE */
+module_exit(strip_exit_driver);
+
+MODULE_AUTHOR("Stuart Cheshire <cheshire@cs.stanford.edu>");
+MODULE_DESCRIPTION("Starmode Radio IP (STRIP) Device Driver");
+MODULE_SUPPORTED_DEVICE("Starmode Radio IP (STRIP) modem");
+

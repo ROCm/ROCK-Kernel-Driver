@@ -1,6 +1,6 @@
 /* 
         fit3.c        (c) 1998  Grant R. Guenther <grant@torque.net>
-                          Under the terms of the GNU public license.
+                          Under the terms of the GNU General Public License.
 
 	fit3.c is a low-level protocol driver for newer models 
         of the Fidelity International Technology parallel port adapter.  

@@ -4772,15 +4772,24 @@ awe_detect_base(int addr)
 	
 #if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
 static struct {
+	unsigned short card_vendor, card_device;
 	unsigned short vendor;
 	unsigned short function;
 	char *name;
 } isapnp_awe_list[] __initdata = {
-	{ISAPNP_VENDOR('C','T','L'), ISAPNP_FUNCTION(0x0021), "AWE32 WaveTable"},
-	{ISAPNP_VENDOR('C','T','L'), ISAPNP_FUNCTION(0x0022), "AWE64 WaveTable"},
-	{ISAPNP_VENDOR('C','T','L'), ISAPNP_FUNCTION(0x0023), "AWE64 Gold WaveTable"},
-	{0,}
+	{	ISAPNP_ANY_ID, ISAPNP_ANY_ID,
+		ISAPNP_VENDOR('C','T','L'), ISAPNP_FUNCTION(0x0021),
+		"AWE32 WaveTable" },
+	{	ISAPNP_ANY_ID, ISAPNP_ANY_ID,
+		ISAPNP_VENDOR('C','T','L'), ISAPNP_FUNCTION(0x0022),
+		"AWE64 WaveTable" },
+	{	ISAPNP_ANY_ID, ISAPNP_ANY_ID,
+		ISAPNP_VENDOR('C','T','L'), ISAPNP_FUNCTION(0x0023),
+		"AWE64 Gold WaveTable" },
+	{0}
 };
+
+MODULE_DEVICE_TABLE(isapnp, isapnp_awe_list);
 
 static struct pci_dev *idev = NULL;
 

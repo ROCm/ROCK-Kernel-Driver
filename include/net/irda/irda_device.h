@@ -218,29 +218,54 @@ extern inline __u16 irda_get_mtt(struct sk_buff *skb)
 #endif
 
 /*
- * Function irda_get_speed (skb)
+ * Function irda_get_next_speed (skb)
  *
- *    Extact the speed this frame should be sent out with from the skb
+ *    Extract the speed that should be set *after* this frame from the skb
  *
+ * Note : return -1 for user space frames
  */
-#define irda_get_speed(skb) (	                                        \
+#define irda_get_next_speed(skb) (	                                        \
 	(((struct irda_skb_cb*) skb->cb)->magic == LAP_MAGIC) ? 	\
-                  ((struct irda_skb_cb *)(skb->cb))->speed : 9600 	\
+                  ((struct irda_skb_cb *)(skb->cb))->next_speed : -1 	\
 )
 
 #if 0
-extern inline __u32 irda_get_speed(struct sk_buff *skb)
+extern inline __u32 irda_get_next_speed(struct sk_buff *skb)
 {
 	__u32 speed;
 
 	if (((struct irda_skb_cb *)(skb->cb))->magic != LAP_MAGIC)
-		speed = 9600;
+		speed = -1;
 	else
-		speed = ((struct irda_skb_cb *)(skb->cb))->speed;
+		speed = ((struct irda_skb_cb *)(skb->cb))->next_speed;
 
 	return speed;
 }
 #endif
+
+/*
+ * Function irda_get_next_xbofs (skb)
+ *
+ *    Extract the xbofs that should be set for this frame from the skb
+ *
+ * Note : default to 10 for user space frames
+ */
+#define irda_get_xbofs(skb) (	                                        \
+	(((struct irda_skb_cb*) skb->cb)->magic == LAP_MAGIC) ? 	\
+                  ((struct irda_skb_cb *)(skb->cb))->xbofs : 10 	\
+)
+
+/*
+ * Function irda_get_next_xbofs (skb)
+ *
+ *    Extract the xbofs that should be set *after* this frame from the skb
+ *
+ * Note : return -1 for user space frames
+ */
+#define irda_get_next_xbofs(skb) (	                                        \
+	(((struct irda_skb_cb*) skb->cb)->magic == LAP_MAGIC) ? 	\
+                  ((struct irda_skb_cb *)(skb->cb))->next_xbofs : -1 	\
+)
 
 #endif /* IRDA_DEVICE_H */
 

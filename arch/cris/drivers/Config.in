@@ -1,0 +1,49 @@
+mainmenu_option next_comment
+comment 'Drivers for Etrax built-in interfaces'
+
+bool 'Ethernet support' CONFIG_ETRAX_ETHERNET y
+if [ "$CONFIG_ETRAX_ETHERNET" = "y" ]; then
+# this is just so that the user does not have to go into the
+# normal ethernet driver section just to enable ethernetworking
+  define_bool CONFIG_NET_ETHERNET y
+fi
+
+bool 'Serial-port support' CONFIG_ETRAX_SERIAL y
+
+bool 'ATA/IDE support' CONFIG_ETRAX_IDE n
+
+if [ "$CONFIG_ETRAX_IDE" = "y" ]; then
+# here we should add the CONFIG_'s necessary to enable the basic
+# general ide drivers so the common case does not need to go
+# into that config submenu. enable disk and CD support. others
+# need to go fiddle in the submenu..
+	define_bool CONFIG_IDE y
+
+	define_bool CONFIG_BLK_DEV_IDE y
+	define_bool CONFIG_BLK_DEV_IDEDISK y
+	define_bool CONFIG_BLK_DEV_IDECD y
+
+	define_bool CONFIG_BLK_DEV_IDEDMA y
+	define_bool CONFIG_DMA_NONPCI y
+ 
+	choice 'IDE reset pin' \
+  	"Port_PB_Bit_7  CONFIG_ETRAX_IDE_PB7_RESET\
+   	 Port_G_Bit_27  CONFIG_ETRAX_IDE_G27_RESET\
+   	 Port_CSE1_Bit_16  CONFIG_ETRAX_IDE_CSE1_16_RESET" Port_PB_Bit_7 
+fi
+
+bool 'Axis flash-map support' CONFIG_ETRAX_AXISFLASHMAP n
+
+if [ "$CONFIG_ETRAX_AXISFLASHMAP" = "y" ]; then
+# here we define the CONFIG_'s necessary to enable MTD support
+# for the flash
+	define_bool CONFIG_MTD y
+
+	define_bool CONFIG_MTD_CFI y
+	define_bool CONFIG_MTD_CFI_INTELEXT n
+	define_bool CONFIG_MTD_CFI_AMDSTD y
+
+	define_bool CONFIG_MTD_CHAR y
+fi
+
+endmenu

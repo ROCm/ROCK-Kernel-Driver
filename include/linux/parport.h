@@ -229,7 +229,7 @@ struct pardevice {
 	unsigned long int time;
 	unsigned long int timeslice;
 	volatile long int timeout;
-	unsigned int waiting;
+	unsigned long waiting;		 /* long req'd for set_bit --RR */
 	struct pardevice *waitprev;
 	struct pardevice *waitnext;
 	void * sysctl_table;

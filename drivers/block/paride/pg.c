@@ -1,6 +1,6 @@
 /* 
 	pg.c    (c) 1998  Grant R. Guenther <grant@torque.net>
-			  Under the terms of the GNU public license.
+			  Under the terms of the GNU General Public License.
 
 	The pg driver provides a simple character device interface for
 	sending ATAPI commands to a device.  With the exception of the

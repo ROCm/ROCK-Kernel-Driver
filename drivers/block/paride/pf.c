@@ -1,6 +1,6 @@
 /* 
         pf.c    (c) 1997-8  Grant R. Guenther <grant@torque.net>
-                            Under the terms of the GNU public license.
+                            Under the terms of the GNU General Public License.
 
         This is the high-level driver for parallel port ATAPI disk
         drives based on chips supported by the paride module.

@@ -82,9 +82,6 @@ static int __init hydra_probe(void)
     unsigned long board;
     int err = -ENODEV;
 
-    if (load_8390_module("hydra.c"))
-	return -ENOSYS;
-
     while ((z = zorro_find_device(ZORRO_PROD_HYDRA_SYSTEMS_AMIGANET, z))) {
 	board = z->resource.start;
 	if (!request_mem_region(board, 0x10000, "Hydra"))
@@ -96,10 +93,9 @@ static int __init hydra_probe(void)
 	err = 0;
     }
 
-    if (err == -ENODEV) {
+    if (err == -ENODEV)
 	printk("No Hydra ethernet card found.\n");
-	unload_8390_module();
-    }
+
     return err;
 }
 
@@ -116,9 +112,10 @@ int __init hydra_init(unsigned long board)
 	0x10, 0x12, 0x14, 0x16, 0x18, 0x1a, 0x1c, 0x1e,
     };
 
-    dev = init_etherdev(0, 0);
+    dev = init_etherdev(NULL, 0);
     if (!dev)
 	return -ENOMEM;
+    SET_MODULE_OWNER(dev);
 
     for(j = 0; j < ETHER_ADDR_LEN; j++)
 	dev->dev_addr[j] = *((u8 *)(board + HYDRA_ADDRPROM + 2*j));
@@ -174,7 +171,6 @@ int __init hydra_init(unsigned long board)
 static int hydra_open(struct net_device *dev)
 {
     ei_open(dev);
-    MOD_INC_USE_COUNT;
     return 0;
 }
 
@@ -183,7 +179,6 @@ static int hydra_close(struct net_device *dev)
     if (ei_debug > 1)
 	printk("%s: Shutting down ethercard.\n", dev->name);
     ei_close(dev);
-    MOD_DEC_USE_COUNT;
     return 0;
 }
 
@@ -254,7 +249,6 @@ static void __exit hydra_cleanup(void)
 	kfree(dev);
 	root_hydra_dev = next;
     }
-    unload_8390_module();
 #endif
 }
 

@@ -2,9 +2,9 @@
  *
  * Hardware accelerated Matrox Millennium I, II, Mystique, G100, G200 and G400
  *
- * (c) 1998,1999,2000 Petr Vandrovec <vandrove@vc.cvut.cz>
+ * (c) 1998-2001 Petr Vandrovec <vandrove@vc.cvut.cz>
  *
- * Version: 1.50 2000/08/10
+ * Version: 1.52 2001/02/02
  *
  * MTRR stuff: 1998 Tom Rini <trini@kernel.crashing.org>
  *
@@ -1409,12 +1409,12 @@ static struct video_board vbG400		= {0x2000000, 0x1000000, FB_ACCEL_MATROX_MGAG4
 
 #define DEVF_VIDEO64BIT		0x0001
 #define	DEVF_SWAPS		0x0002
-#define DEVF_MILLENNIUM		0x0004
-#define	DEVF_MILLENNIUM2	0x0008
+/* #define DEVF_recycled	0x0004 */
+/* #define DEVF_recycled	0x0008 */
 #define DEVF_CROSS4MB		0x0010
 #define DEVF_TEXT4B		0x0020
 #define DEVF_DDC_8_2		0x0040
-#define DEVF_DMA		0x0080
+/* #define DEVF_recycled	0x0080 */
 #define DEVF_SUPPORT32MB	0x0100
 #define DEVF_ANY_VXRES		0x0200
 #define DEVF_TEXT16B		0x0400
@@ -1441,19 +1441,19 @@ static struct board {
 #ifdef CONFIG_FB_MATROX_MILLENIUM
 	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_MIL,	0xFF,
 		0,			0,
-		DEVF_MILLENNIUM | DEVF_TEXT4B,
+		DEVF_TEXT4B,
 		230000,
 		&vbMillennium,
 		"Millennium (PCI)"},
 	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_MIL_2,	0xFF,
 		0,			0,
-		DEVF_MILLENNIUM | DEVF_MILLENNIUM2 | DEVF_SWAPS,
+		DEVF_SWAPS,
 		220000,
 		&vbMillennium2,
 		"Millennium II (PCI)"},
 	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_MIL_2_AGP,	0xFF,
 		0,			0,
-		DEVF_MILLENNIUM | DEVF_MILLENNIUM2 | DEVF_SWAPS,
+		DEVF_SWAPS,
 		250000,
 		&vbMillennium2A,
 		"Millennium II (AGP)"},
@@ -1461,13 +1461,13 @@ static struct board {
 #ifdef CONFIG_FB_MATROX_MYSTIQUE
 	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_MYS,	0x02,
 		0,			0,
-		DEVF_VIDEO64BIT,
+		DEVF_VIDEO64BIT | DEVF_CROSS4MB,
 		180000,
 		&vbMystique,
 		"Mystique (PCI)"},
 	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_MYS,	0xFF,
 		0,			0,
-		DEVF_VIDEO64BIT | DEVF_SWAPS,
+		DEVF_VIDEO64BIT | DEVF_SWAPS | DEVF_CROSS4MB,
 		220000,
 		&vbMystique,
 		"Mystique 220 (PCI)"},
@@ -1842,33 +1842,33 @@ static int initMatrox2(WPMINFO struct display* d, struct board* b){
 	}
 
 	/* FIXME: Where to move this?! */
-#if defined(CONFIG_PPC)
+#if defined(CONFIG_ALL_PPC)
 #if defined(CONFIG_FB_COMPAT_XPMAC)
 	strcpy(ACCESS_FBINFO(matrox_name), "MTRX,");	/* OpenFirmware naming convension */
 	strncat(ACCESS_FBINFO(matrox_name), b->name, 26);
 	if (!console_fb_info)
 		console_fb_info = &ACCESS_FBINFO(fbcon);
 #endif
-	if ((xres <= 640) && (yres <= 480)) {
+#ifndef MODULE
+	if (_machine == _MACH_Pmac) {
 		struct fb_var_screeninfo var;
-		if (default_vmode == VMODE_NVRAM) {
-			default_vmode = nvram_read_byte(NV_VMODE);
-			if (default_vmode <= 0 || default_vmode > VMODE_MAX)
-				default_vmode = VMODE_CHOOSE;
-		}
 		if (default_vmode <= 0 || default_vmode > VMODE_MAX)
 			default_vmode = VMODE_640_480_60;
+#ifdef CONFIG_NVRAM
 		if (default_cmode == CMODE_NVRAM)
 			default_cmode = nvram_read_byte(NV_CMODE);
+#endif
 		if (default_cmode < CMODE_8 || default_cmode > CMODE_32)
 			default_cmode = CMODE_8;
 		if (!mac_vmode_to_var(default_vmode, default_cmode, &var)) {
 			var.accel_flags = vesafb_defined.accel_flags;
 			var.xoffset = var.yoffset = 0;
-			vesafb_defined = var; /* Note: mac_vmode_to_var() doesnot set all parameters */
+			/* Note: mac_vmode_to_var() does not set all parameters */
+			vesafb_defined = var;
 		}
 	}
-#endif /* CONFIG_PPC */
+#endif /* !MODULE */
+#endif /* CONFIG_ALL_PPC */
 	vesafb_defined.xres_virtual = vesafb_defined.xres;
 	if (nopan) {
 		vesafb_defined.yres_virtual = vesafb_defined.yres;
@@ -2005,6 +2005,7 @@ static int matroxfb_probe(struct pci_dev* pdev, const struct pci_device_id* dumm
 	u_int32_t cmd;
 #ifndef CONFIG_FB_MATROX_MULTIHEAD
 	static int registered = 0;
+	static struct display global_disp;
 #endif
 	DBG("matroxfb_probe")
 
@@ -2502,8 +2503,8 @@ int __init matroxfb_init(void)
 
 /* *************************** init module code **************************** */
 
-MODULE_AUTHOR("(c) 1998,1999 Petr Vandrovec <vandrove@vc.cvut.cz>");
-MODULE_DESCRIPTION("Accelerated FBDev driver for Matrox Millennium/Mystique/G100/G200/G400");
+MODULE_AUTHOR("(c) 1998-2001 Petr Vandrovec <vandrove@vc.cvut.cz>");
+MODULE_DESCRIPTION("Accelerated FBDev driver for Matrox Millennium/Mystique/G100/G200/G400/G450");
 MODULE_PARM(mem, "i");
 MODULE_PARM_DESC(mem, "Size of available memory in MB, KB or B (2,4,8,12,16MB, default=autodetect)");
 MODULE_PARM(disabled, "i");

@@ -1,6 +1,6 @@
 /* 
 	on20.c	(c) 1996-8  Grant R. Guenther <grant@torque.net>
-		            Under the terms of the GNU public license.
+		            Under the terms of the GNU General Public License.
 
         on20.c is a low-level protocol driver for the
         Onspec 90c20 parallel to IDE adapter. 

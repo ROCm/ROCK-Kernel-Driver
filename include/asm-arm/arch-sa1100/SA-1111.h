@@ -11,6 +11,8 @@
 #ifndef _ASM_ARCH_SA1111
 #define _ASM_ARCH_SA1111
 
+#include <asm/arch/bitfield.h>
+
 /*
  * Macro that calculates real address for registers in the SA-1111
  */
@@ -18,7 +20,21 @@
 #define _SA1111( x )    ((x) + SA1111_BASE)
 
 /*
- * System Bus Interface (SBI)
+ * 26 bits of the SA-1110 address bus are available to the SA-1111.
+ * Use these when feeding target addresses to the DMA engines.
+ */
+
+#define SA1111_ADDR_WIDTH	(26)
+#define SA1111_ADDR_MASK	((1<<SA1111_ADDR_WIDTH)-1)
+#define SA1111_DMA_ADDR(x)	((x)&SA1111_ADDR_MASK)
+
+/*
+ * Don't ask the (SAC) DMA engines to move less than this amount.
+ */
+
+#define SA1111_SAC_DMA_MIN_XFER	(0x800)
+
+/* System Bus Interface (SBI)
  *
  * Registers
  *    SKCR	Control Register
@@ -57,6 +73,7 @@
 #define SMCR_DRAC_0	(1<<2)
 #define SMCR_DRAC_1	(1<<3)
 #define SMCR_DRAC_2	(1<<4)
+#define SMCR_DRAC	Fld(3, 2)
 #define SMCR_CLAT	(1<<5)
 
 #define SKID_SIREV_MASK	(0x000000f0)
@@ -102,6 +119,186 @@
 #define SKPWM1		(*((volatile Word *) SA1111_p2v (_SKPWM1)))
 
 #endif  /* LANGUAGE == C */
+
+#define SKPCR_UCLKEN	(1<<0)
+#define SKPCR_ACCLKEN	(1<<1)
+#define SKPCR_I2SCLKEN	(1<<2)
+#define SKPCR_L3CLKEN	(1<<3)
+#define SKPCR_SCLKEN	(1<<4)
+#define SKPCR_PMCLKEN	(1<<5)
+#define SKPCR_PTCLKEN	(1<<6)
+#define SKPCR_DCLKEN	(1<<7)
+#define SKPCR_PWMCLKEN	(1<<8)
+
+/*
+ * Serial Audio Controller
+ *
+ * Registers
+ *    SACR0             Serial Audio Common Control Register
+ *    SACR1             Serial Audio Alternate Mode (I2C/MSB) Control Register
+ *    SACR2             Serial Audio AC-link Control Register
+ *    SASR0             Serial Audio I2S/MSB Interface & FIFO Status Register
+ *    SASR1             Serial Audio AC-link Interface & FIFO Status Register
+ *    SASCR             Serial Audio Status Clear Register
+ *    L3_CAR            L3 Control Bus Address Register
+ *    L3_CDR            L3 Control Bus Data Register
+ *    ACCAR             AC-link Command Address Register
+ *    ACCDR             AC-link Command Data Register
+ *    ACSAR             AC-link Status Address Register
+ *    ACSDR             AC-link Status Data Register
+ *    SADTCS            Serial Audio DMA Transmit Control/Status Register
+ *    SADTSA            Serial Audio DMA Transmit Buffer Start Address A
+ *    SADTCA            Serial Audio DMA Transmit Buffer Count Register A
+ *    SADTSB            Serial Audio DMA Transmit Buffer Start Address B
+ *    SADTCB            Serial Audio DMA Transmit Buffer Count Register B
+ *    SADRCS            Serial Audio DMA Receive Control/Status Register
+ *    SADRSA            Serial Audio DMA Receive Buffer Start Address A
+ *    SADRCA            Serial Audio DMA Receive Buffer Count Register A
+ *    SADRSB            Serial Audio DMA Receive Buffer Start Address B
+ *    SADRCB            Serial Audio DMA Receive Buffer Count Register B
+ *    SAITR             Serial Audio Interrupt Test Register
+ *    SADR              Serial Audio Data Register (16 x 32-bit)
+ */
+
+#define _SACR0          _SA1111( 0x0600 )
+#define _SACR1          _SA1111( 0x0604 )
+#define _SACR2          _SA1111( 0x0608 )
+#define _SASR0          _SA1111( 0x060c )
+#define _SASR1          _SA1111( 0x0610 )
+#define _SASCR          _SA1111( 0x0618 )
+#define _L3_CAR         _SA1111( 0x061c )
+#define _L3_CDR         _SA1111( 0x0620 )
+#define _ACCAR          _SA1111( 0x0624 )
+#define _ACCDR          _SA1111( 0x0628 )
+#define _ACSAR          _SA1111( 0x062c )
+#define _ACSDR          _SA1111( 0x0630 )
+#define _SADTCS         _SA1111( 0x0634 )
+#define _SADTSA         _SA1111( 0x0638 )
+#define _SADTCA         _SA1111( 0x063c )
+#define _SADTSB         _SA1111( 0x0640 )
+#define _SADTCB         _SA1111( 0x0644 )
+#define _SADRCS         _SA1111( 0x0648 )
+#define _SADRSA         _SA1111( 0x064c )
+#define _SADRCA         _SA1111( 0x0650 )
+#define _SADRSB         _SA1111( 0x0654 )
+#define _SADRCB         _SA1111( 0x0658 )
+#define _SAITR          _SA1111( 0x065c )
+#define _SADR           _SA1111( 0x0680 )
+
+#if LANGUAGE == C
+
+#define SACR0		(*((volatile Word *) SA1111_p2v (_SACR0)))
+#define SACR1		(*((volatile Word *) SA1111_p2v (_SACR1)))
+#define SACR2		(*((volatile Word *) SA1111_p2v (_SACR2)))
+#define SASR0		(*((volatile Word *) SA1111_p2v (_SASR0)))
+#define SASR1		(*((volatile Word *) SA1111_p2v (_SASR1)))
+#define SASCR		(*((volatile Word *) SA1111_p2v (_SASCR)))
+#define L3_CAR		(*((volatile Word *) SA1111_p2v (_L3_CAR)))
+#define L3_CDR		(*((volatile Word *) SA1111_p2v (_L3_CDR)))
+#define ACCAR		(*((volatile Word *) SA1111_p2v (_ACCAR)))
+#define ACCDR		(*((volatile Word *) SA1111_p2v (_ACCDR)))
+#define ACSAR		(*((volatile Word *) SA1111_p2v (_ACSAR)))
+#define ACSDR		(*((volatile Word *) SA1111_p2v (_ACSDR)))
+#define SADTCS		(*((volatile Word *) SA1111_p2v (_SADTCS)))
+#define SADTSA		(*((volatile Word *) SA1111_p2v (_SADTSA)))
+#define SADTCA		(*((volatile Word *) SA1111_p2v (_SADTCA)))
+#define SADTSB		(*((volatile Word *) SA1111_p2v (_SADTSB)))
+#define SADTCB		(*((volatile Word *) SA1111_p2v (_SADTCB)))
+#define SADRCS		(*((volatile Word *) SA1111_p2v (_SADRCS)))
+#define SADRSA		(*((volatile Word *) SA1111_p2v (_SADRSA)))
+#define SADRCA		(*((volatile Word *) SA1111_p2v (_SADRCA)))
+#define SADRSB		(*((volatile Word *) SA1111_p2v (_SADRSB)))
+#define SADRCB		(*((volatile Word *) SA1111_p2v (_SADRCB)))
+#define SAITR		(*((volatile Word *) SA1111_p2v (_SAITR)))
+#define SADR		(*((volatile Word *) SA1111_p2v (_SADR)))
+
+#endif  /* LANGUAGE == C */
+
+#define SACR0_ENB	(1<<0)
+#define SACR0_BCKD	(1<<2)
+#define SACR0_RST	(1<<3)
+
+#define SACR1_AMSL	(1<<0)
+#define SACR1_L3EN	(1<<1)
+#define SACR1_L3MB	(1<<2)
+#define SACR1_DREC	(1<<3)
+#define SACR1_DRPL	(1<<4)
+#define SACR1_ENLBF	(1<<5)
+
+#define SACR2_TS3V	(1<<0)
+#define SACR2_TS4V	(1<<1)
+#define SACR2_WKUP	(1<<2)
+#define SACR2_DREC	(1<<3)
+#define SACR2_DRPL	(1<<4)
+#define SACR2_ENLBF	(1<<5)
+#define SACR2_RESET	(1<<5)
+
+#define SASR0_TNF	(1<<0)
+#define SASR0_RNE	(1<<1)
+#define SASR0_BSY	(1<<2)
+#define SASR0_TFS	(1<<3)
+#define SASR0_RFS	(1<<4)
+#define SASR0_TUR	(1<<5)
+#define SASR0_ROR	(1<<6)
+#define SASR0_L3WD	(1<<16)
+#define SASR0_L3RD	(1<<17)
+
+#define SASR1_TNF	(1<<0)
+#define SASR1_RNE	(1<<1)
+#define SASR1_BSY	(1<<2)
+#define SASR1_TFS	(1<<3)
+#define SASR1_RFS	(1<<4)
+#define SASR1_TUR	(1<<5)
+#define SASR1_ROR	(1<<6)
+#define SASR1_CADT	(1<<16)
+#define SASR1_SADR	(1<<17)
+#define SASR1_RSTO	(1<<18)
+#define SASR1_CLPM	(1<<19)
+#define SASR1_CRDY	(1<<20)
+#define SASR1_RS3V	(1<<21)
+#define SASR1_RS4V	(1<<22)
+
+#define SASCR_TUR	(1<<5)
+#define SASCR_ROR	(1<<6)
+#define SASCR_DTS	(1<<16)
+#define SASCR_RDD	(1<<17)
+#define SASCR_STO	(1<<18)
+
+#define SADTCS_TDEN	(1<<0)
+#define SADTCS_TDIE	(1<<1)
+#define SADTCS_TDBDA	(1<<3)
+#define SADTCS_TDSTA	(1<<4)
+#define SADTCS_TDBDB	(1<<5)
+#define SADTCS_TDSTB	(1<<6)
+#define SADTCS_TBIU	(1<<7)
+
+#define SADRCS_RDEN	(1<<0)
+#define SADRCS_RDIE	(1<<1)
+#define SADRCS_RDBDA	(1<<3)
+#define SADRCS_RDSTA	(1<<4)
+#define SADRCS_RDBDB	(1<<5)
+#define SADRCS_RDSTB	(1<<6)
+#define SADRCS_RBIU	(1<<7)
+
+#define SAD_CS_DEN	(1<<0)
+#define SAD_CS_DIE	(1<<1)	/* Not functional on metal 1 */
+#define SAD_CS_DBDA	(1<<3)	/* Not functional on metal 1 */
+#define SAD_CS_DSTA	(1<<4)
+#define SAD_CS_DBDB	(1<<5)	/* Not functional on metal 1 */
+#define SAD_CS_DSTB	(1<<6)
+#define SAD_CS_BIU	(1<<7)	/* Not functional on metal 1 */
+
+#define SAITR_TFS	(1<<0)
+#define SAITR_RFS	(1<<1)
+#define SAITR_TUR	(1<<2)
+#define SAITR_ROR	(1<<3)
+#define SAITR_CADT	(1<<4)
+#define SAITR_SADR	(1<<5)
+#define SAITR_RSTO	(1<<6)
+#define SAITR_TDBDA	(1<<8)
+#define SAITR_TDBDB	(1<<9)
+#define SAITR_RDBDA	(1<<10)
+#define SAITR_RDBDB	(1<<11)
 
 /*
  * General-Purpose I/O Interface
@@ -211,6 +408,154 @@
 #define WAKE_EN1	(*((volatile Word *) SA1111_p2v (_WAKE_EN1)))
 #define WAKE_POL0	(*((volatile Word *) SA1111_p2v (_WAKE_POL0)))
 #define WAKE_POL1	(*((volatile Word *) SA1111_p2v (_WAKE_POL1)))
+
+#endif  /* LANGUAGE == C */
+
+/*
+ * PS/2 Trackpad and Mouse Interfaces
+ *
+ * Registers   (prefix kbd applies to trackpad interface, mse to mouse)
+ *    KBDCR     Control Register
+ *    KBDSTAT       Status Register
+ *    KBDDATA       Transmit/Receive Data register
+ *    KBDCLKDIV     Clock Division Register
+ *    KBDPRECNT     Clock Precount Register
+ *    KBDTEST1      Test register 1
+ *    KBDTEST2      Test register 2
+ *    KBDTEST3      Test register 3
+ *    KBDTEST4      Test register 4
+ *    MSECR
+ *    MSESTAT
+ *    MSEDATA
+ *    MSECLKDIV
+ *    MSEPRECNT
+ *    MSETEST1
+ *    MSETEST2
+ *    MSETEST3
+ *    MSETEST4
+ *
+ */
+
+#define _KBD( x )   _SA1111( 0x0A00 )
+#define _MSE( x )   _SA1111( 0x0C00 )
+
+#define _KBDCR      _SA1111( 0x0A00 )
+#define _KBDSTAT    _SA1111( 0x0A04 )
+#define _KBDDATA    _SA1111( 0x0A08 )
+#define _KBDCLKDIV  _SA1111( 0x0A0C )
+#define _KBDPRECNT  _SA1111( 0x0A10 )
+#define _MSECR      _SA1111( 0x0C00 )
+#define _MSESTAT    _SA1111( 0x0C04 )
+#define _MSEDATA    _SA1111( 0x0C08 )
+#define _MSECLKDIV  _SA1111( 0x0C10 )
+#define _MSEPRECNT  _SA1111( 0x0C14 )
+
+#if ( LANGUAGE == C )
+
+#define KBDCR       (*((volatile Word *) SA1111_p2v (_KBDCR)))
+#define KBDSTAT     (*((volatile Word *) SA1111_p2v (_KBDSTAT)))
+#define KBDDATA     (*((volatile Word *) SA1111_p2v (_KBDDATA)))
+#define KBDCLKDIV   (*((volatile Word *) SA1111_p2v (_KBDCLKDIV)))
+#define KBDPRECNT   (*((volatile Word *) SA1111_p2v (_KBDPRECNT)))
+#define KBDTEST1    (*((volatile Word *) SA1111_p2v (_KBDTEST1)))
+#define KBDTEST2    (*((volatile Word *) SA1111_p2v (_KBDTEST2)))
+#define KBDTEST3    (*((volatile Word *) SA1111_p2v (_KBDTEST3)))
+#define KBDTEST4    (*((volatile Word *) SA1111_p2v (_KBDTEST4)))
+#define MSECR       (*((volatile Word *) SA1111_p2v (_MSECR)))
+#define MSESTAT     (*((volatile Word *) SA1111_p2v (_MSESTAT)))
+#define MSEDATA     (*((volatile Word *) SA1111_p2v (_MSEDATA)))
+#define MSECLKDIV   (*((volatile Word *) SA1111_p2v (_MSECLKDIV)))
+#define MSEPRECNT   (*((volatile Word *) SA1111_p2v (_MSEPRECNT)))
+#define MSETEST1    (*((volatile Word *) SA1111_p2v (_MSETEST1)))
+#define MSETEST2    (*((volatile Word *) SA1111_p2v (_MSETEST2)))
+#define MSETEST3    (*((volatile Word *) SA1111_p2v (_MSETEST3)))
+#define MSETEST4    (*((volatile Word *) SA1111_p2v (_MSETEST4)))
+
+#define KBDCR_ENA        0x08
+#define KBDCR_FKD        0x02
+#define KBDCR_FKC        0x01
+
+#define KBDSTAT_TXE      0x80
+#define KBDSTAT_TXB      0x40
+#define KBDSTAT_RXF      0x20
+#define KBDSTAT_RXB      0x10
+#define KBDSTAT_ENA      0x08
+#define KBDSTAT_RXP      0x04
+#define KBDSTAT_KBD      0x02
+#define KBDSTAT_KBC      0x01
+
+#define KBDCLKDIV_DivVal     Fld(4,0)
+
+#define MSECR_ENA        0x08
+#define MSECR_FKD        0x02
+#define MSECR_FKC        0x01
+
+#define MSESTAT_TXE      0x80
+#define MSESTAT_TXB      0x40
+#define MSESTAT_RXF      0x20
+#define MSESTAT_RXB      0x10
+#define MSESTAT_ENA      0x08
+#define MSESTAT_RXP      0x04
+#define MSESTAT_MSD      0x02
+#define MSESTAT_MSC      0x01
+
+#define MSECLKDIV_DivVal     Fld(4,0)
+
+#define KBDTEST1_CD      0x80
+#define KBDTEST1_RC1         0x40
+#define KBDTEST1_MC      0x20
+#define KBDTEST1_C       Fld(2,3)
+#define KBDTEST1_T2      0x40
+#define KBDTEST1_T1      0x20
+#define KBDTEST1_T0      0x10
+#define KBDTEST2_TICBnRES    0x08
+#define KBDTEST2_RKC         0x04
+#define KBDTEST2_RKD         0x02
+#define KBDTEST2_SEL         0x01
+#define KBDTEST3_ms_16       0x80
+#define KBDTEST3_us_64       0x40
+#define KBDTEST3_us_16       0x20
+#define KBDTEST3_DIV8        0x10
+#define KBDTEST3_DIn         0x08
+#define KBDTEST3_CIn         0x04
+#define KBDTEST3_KD      0x02
+#define KBDTEST3_KC      0x01
+#define KBDTEST4_BC12        0x80
+#define KBDTEST4_BC11        0x40
+#define KBDTEST4_TRES        0x20
+#define KBDTEST4_CLKOE       0x10
+#define KBDTEST4_CRES        0x08
+#define KBDTEST4_RXB         0x04
+#define KBDTEST4_TXB         0x02
+#define KBDTEST4_SRX         0x01
+
+#define MSETEST1_CD      0x80
+#define MSETEST1_RC1         0x40
+#define MSETEST1_MC      0x20
+#define MSETEST1_C       Fld(2,3)
+#define MSETEST1_T2      0x40
+#define MSETEST1_T1      0x20
+#define MSETEST1_T0      0x10
+#define MSETEST2_TICBnRES    0x08
+#define MSETEST2_RKC         0x04
+#define MSETEST2_RKD         0x02
+#define MSETEST2_SEL         0x01
+#define MSETEST3_ms_16       0x80
+#define MSETEST3_us_64       0x40
+#define MSETEST3_us_16       0x20
+#define MSETEST3_DIV8        0x10
+#define MSETEST3_DIn         0x08
+#define MSETEST3_CIn         0x04
+#define MSETEST3_KD      0x02
+#define MSETEST3_KC      0x01
+#define MSETEST4_BC12        0x80
+#define MSETEST4_BC11        0x40
+#define MSETEST4_TRES        0x20
+#define MSETEST4_CLKOE       0x10
+#define MSETEST4_CRES        0x08
+#define MSETEST4_RXB         0x04
+#define MSETEST4_TXB         0x02
+#define MSETEST4_SRX         0x01
 
 #endif  /* LANGUAGE == C */
 

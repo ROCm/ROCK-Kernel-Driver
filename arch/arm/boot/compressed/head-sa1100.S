@@ -11,10 +11,6 @@
 #include <linux/linkage.h>
 #include <asm/mach-types.h>
 
-#ifndef CONFIG_ARCH_SA1100
-#error What am I doing here...
-#endif
-
 		.section        ".start", #alloc, #execinstr
 
 __SA1100_start:
@@ -54,6 +50,8 @@ __SA1100_start:
 		bic	r0, r0, #0x0d		@ clear WB, DC, MMU
 		bic	r0, r0, #0x1000		@ clear Icache
 		mcr	p15, 0, r0, c1, c0, 0
+
+#ifdef CONFIG_ANGELBOOT
 /*
  * Pause for a short time so that we give enough time
  * for the host to start a terminal up.
@@ -61,3 +59,5 @@ __SA1100_start:
 		mov	r0, #0x00200000
 1:		subs	r0, r0, #1
 		bne	1b
+#endif
+

@@ -1,4 +1,4 @@
-/* $Id: netjet.c,v 1.24.6.1 2000/12/06 16:59:20 kai Exp $
+/* $Id: netjet.c,v 1.24.6.2 2000/12/17 22:45:11 kai Exp $
  *
  * netjet.c     low level stuff for Traverse Technologie NETJet ISDN cards
  *
@@ -19,17 +19,10 @@
 #include <linux/pci.h>
 #include <linux/interrupt.h>
 #include <linux/ppp_defs.h>
+#include <asm/io.h>
 #include "netjet.h"
 
-#ifndef bus_to_virt
-#define bus_to_virt (u_int *)
-#endif
-
-#ifndef virt_to_bus
-#define virt_to_bus (u_int)
-#endif
-
-const char *NETjet_revision = "$Revision: 1.24.6.1 $";
+const char *NETjet_revision = "$Revision: 1.24.6.2 $";
 
 /* Interface functions */
 

@@ -52,4 +52,9 @@
 
 #define IRQ_TIMER		IRQ_TIMER0
 
+/*
+ * This is the offset of the FIQ "IRQ" numbers
+ */
+#define FIQ_START		64
+
 #define irq_cannonicalize(i)	(i)

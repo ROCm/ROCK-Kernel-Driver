@@ -96,4 +96,9 @@ extern inline pte_t pte_mkyoung(pte_t pte)      { pte_val(pte) &= ~_PAGE_OLD;   
 
 #define pte_alloc_kernel        pte_alloc
 
+/*
+ * We don't store cache state bits in the page table here.
+ */
+#define pgprot_noncached(prot)	(prot)
+
 #endif /* __ASM_PROC_PGTABLE_H */

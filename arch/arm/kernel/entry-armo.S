@@ -197,8 +197,7 @@ irq_prio_h:	.byte	 0, 8, 9, 8,10,10,10,10,11,11,11,11,10,10,10,10
 #endif
 #define FAULT_CODE_PREFETCH	0x04
 #define FAULT_CODE_WRITE	0x02
-#define FAULT_CODE_USER		0x01
-
+#define FAULT_CODE_FORCECOW	0x01
 
 #define SVC_SAVE_ALL				\
 		str	sp, [sp, #-16]!		;\
@@ -487,7 +486,6 @@ vector_data:	sub	lr, lr, #8		@ Correct lr
 		save_user_regs
 		teqp	pc, #0x00000003		@ NOT a problem - doesnt change mode
 		mask_pc	r0, lr
-		mov	r2, #FAULT_CODE_USER
 		bl	Ldata_do
 		b	ret_from_exception
 
@@ -499,7 +497,6 @@ Ldata_not_user:
 		tst	lr, #0x08000000
 		teqeqp	pc, #0x00000003		@ NOT a problem - doesnt change mode
 		mask_pc	r0, lr
-		mov	r2, #0
 		bl	Ldata_do
 		SVC_RESTORE_ALL
 
@@ -510,6 +507,7 @@ Ldata_illegal_mode:
 
 Ldata_do:	mov	r3, sp
 		ldr	r4, [r0]		@ Get instruction
+		mov	r2, #0
 		tst	r4, #1 << 20		@ Check to see if it is a write instruction
 		orreq	r2, r2, #FAULT_CODE_WRITE @ Indicate write instruction
 		mov	r1, r4, lsr #22		@ Now branch to the relevent processing routine

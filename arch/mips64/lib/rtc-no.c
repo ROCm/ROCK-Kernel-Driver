@@ -1,5 +1,4 @@
-/* $Id: rtc-no.c,v 1.1 1999/08/21 21:43:01 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -7,9 +6,10 @@
  * Stub RTC routines to keep Linux from crashing on machine which don't
  * have a RTC chip.
  *
- * Copyright (C) 1998 by Ralf Baechle
+ * Copyright (C) 1998, 2001 by Ralf Baechle
  */
 #include <linux/kernel.h>
+#include <linux/spinlock.h>
 #include <linux/mc146818rtc.h>
 
 static unsigned char no_rtc_read_data(unsigned long addr)

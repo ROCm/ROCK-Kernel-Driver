@@ -163,7 +163,7 @@ static void host_reset(struct hpsb_host *host)
                         return;
                 }
 
-                INIT_LIST_HEAD(&greq->tq.list);
+                INIT_TQ_LINK(greq->tq);
                 greq->tq.sync = 0;
                 greq->tq.routine = (void (*)(void*))pkt_complete;
                 greq->tq.data = greq;

@@ -67,7 +67,7 @@ static const card_ids __init etherh_cids[] = {
 MODULE_AUTHOR("Russell King");
 MODULE_DESCRIPTION("i3 EtherH driver");
 
-static char version[] __initdata =
+static const char version[] __initdata =
 	"etherh [500/600/600A] ethernet driver (c) 2000 R.M.King v1.07\n";
 
 #define ETHERH500_DATAPORT	0x200	/* MEMC */
@@ -363,12 +363,8 @@ etherh_get_header (struct net_device *dev, struct e8390_pkt_hdr *hdr, int ring_p
 static int
 etherh_open(struct net_device *dev)
 {
-	MOD_INC_USE_COUNT;
-
-	if (request_irq(dev->irq, ei_interrupt, 0, "etherh", dev)) {
-		MOD_DEC_USE_COUNT;
+	if (request_irq(dev->irq, ei_interrupt, 0, "etherh", dev))
 		return -EAGAIN;
-	}
 
 	/*
 	 * Make sure that we aren't going to change the
@@ -406,8 +402,6 @@ etherh_close(struct net_device *dev)
 {
 	ei_close (dev);
 	free_irq (dev->irq, dev);
-
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -424,12 +418,8 @@ static void etherh_irq_disable(ecard_t *ec, int irqnr)
 }
 
 static expansioncard_ops_t etherh_ops = {
-	etherh_irq_enable,
-	etherh_irq_disable,
-	NULL,
-	NULL,
-	NULL,
-	NULL
+	irqenable:	etherh_irq_enable,
+	irqdisable:	etherh_irq_disable,
 };
 
 /*
@@ -508,6 +498,8 @@ static struct net_device * __init etherh_init_one(struct expansion_card *ec)
 	dev = init_etherdev(NULL, 0);
 	if (!dev)
 		goto out;
+
+	SET_MODULE_OWNER(dev);
 
 	etherh_addr(dev->dev_addr, ec);
 

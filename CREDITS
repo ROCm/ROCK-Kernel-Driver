@@ -957,6 +957,8 @@ S: USA
 N: Hans Grobler
 E: grobh@sun.ac.za
 D: Various AX.25/ROSE/NETROM + hamradio driver patches
+D: Various X.25/LABP + driver patches
+D: Misc kernel fixes and updates
 S: Department of Electronic Engineering
 S: University of Stellenbosch
 S: Stellenbosch, Western Cape
@@ -1051,11 +1053,12 @@ S: USA
 N: Jochen Hein
 E: jochen@jochen.org
 P: 1024/4A27F015 25 72 FB E3 85 9F DE 3B  CB 0A DA DA 40 77 05 6C
+P: 1024D/77D4FC9B F5C5 1C20 1DFC DEC3 3107  54A4 2332 ADFC 77D4 FC9B
 D: National Language Support
 D: Linux Internationalization Project
 D: German Localization for Linux and GNU software
-S: Frankenstraße 33
-S: 34131 Kassel
+S: Helenenstrasse 18
+S: 65183 Wiesbaden
 S: Germany
 
 N: Christoph Hellwig
@@ -1250,11 +1253,7 @@ S: Czech Republic
 N: Niels Kristian Bech Jensen
 E: nkbj@image.dk
 W: http://www.image.dk/~nkbj
-D: 4.4BSD and NeXTstep filesystem support in the old ufs.
-D: Openstep filesystem and NeXTstep CDROM support in the new ufs.
-D: Replace CPU==[3-6]86 and __i386__ submodel flags by configuration options.
-D: Replace __SMP__ by CONFIG_SMP.
-D: Danish HOWTO, Linux+FreeBSD mini-HOWTO.
+D: Miscellaneous kernel updates and fixes.
 S: Dr. Holsts Vej 34, lejl. 164
 S: DK-8230 Åbyhøj
 S: Denmark
@@ -2938,9 +2937,10 @@ D: ARCnet stuff, Applicom board driver, SO_BINDTODEVICE,
 D: some Alpha platform porting from 2.0, Memory Technology Devices,
 D: Acquire watchdog timer, PC speaker driver maintenance,
 D: various other stuff that annoyed me by not working.
-S: c/o Red Hat UK Limited
-S: 35-36 Cambridge Place
-S: Cambridge. CB2 1NS
+S: c/o Red Hat Engineering
+S: Rustat House
+S: 60 Clifton Road
+S: Cambridge. CB1 7EG
 S: England
 
 N: Frank Xia

@@ -21,6 +21,9 @@
  * Daniel Rodriksson: reworked the use of the device specific copy_user
  *                    still generic
  * Horst von Brand:  Add missing #include <linux/string.h>
+ * Chris Rankin    : Update the module-usage counter for the coprocessor,
+ *                   and decrement the counters again if we cannot open
+ *                   the audio device.
  */
 
 #include <linux/stddef.h>
@@ -71,6 +74,8 @@ int audio_open(int dev, struct file *file)
 	int bits;
 	int dev_type = dev & 0x0f;
 	int mode = translate_mode(file);
+	const struct audio_driver *driver;
+	const struct coproc_operations *coprocessor;
 
 	dev = dev >> 4;
 
@@ -82,18 +87,20 @@ int audio_open(int dev, struct file *file)
 	if (dev < 0 || dev >= num_audiodevs)
 		return -ENXIO;
 
-	if (audio_devs[dev]->d->owner)
-		__MOD_INC_USE_COUNT (audio_devs[dev]->d->owner);
+	driver = audio_devs[dev]->d;
+	if (driver->owner)
+		__MOD_INC_USE_COUNT(driver->owner);
 
 	if ((ret = DMAbuf_open(dev, mode)) < 0)
-		return ret;
+		goto error_1;
 
-	if (audio_devs[dev]->coproc) {
-		if ((ret = audio_devs[dev]->coproc->
-			open(audio_devs[dev]->coproc->devc, COPR_PCM)) < 0) {
-			audio_release(dev, file);
+	if ( (coprocessor = audio_devs[dev]->coproc) != NULL ) {
+		if (coprocessor->owner)
+			__MOD_INC_USE_COUNT(coprocessor->owner);
+
+		if ((ret = coprocessor->open(coprocessor->devc, COPR_PCM)) < 0) {
 			printk(KERN_WARNING "Sound: Can't access coprocessor device\n");
-			return ret;
+			goto error_2;
 		}
 	}
 	
@@ -106,6 +113,20 @@ int audio_open(int dev, struct file *file)
 
 	audio_devs[dev]->audio_mode = AM_NONE;
 
+	return 0;
+
+	/*
+	 * Clean-up stack: this is what needs (un)doing if
+	 * we can't open the audio device ...
+	 */
+	error_2:
+	if (coprocessor->owner)
+		__MOD_DEC_USE_COUNT(coprocessor->owner);
+	DMAbuf_release(dev, mode);
+
+	error_1:
+	if (driver->owner)
+		__MOD_DEC_USE_COUNT(driver->owner);
 
 	return ret;
 }
@@ -156,7 +177,8 @@ static void sync_output(int dev)
 
 void audio_release(int dev, struct file *file)
 {
-	int             mode = translate_mode(file);
+	const struct coproc_operations *coprocessor;
+	int mode = translate_mode(file);
 
 	dev = dev >> 4;
 
@@ -176,8 +198,12 @@ void audio_release(int dev, struct file *file)
 	if (mode & OPEN_WRITE)
 		sync_output(dev);
 
-	if (audio_devs[dev]->coproc)
-		audio_devs[dev]->coproc->close(audio_devs[dev]->coproc->devc, COPR_PCM);
+	if ( (coprocessor = audio_devs[dev]->coproc) != NULL ) {
+		coprocessor->close(coprocessor->devc, COPR_PCM);
+
+		if (coprocessor->owner)
+			__MOD_DEC_USE_COUNT(coprocessor->owner);
+	}
 	DMAbuf_release(dev, mode);
 
 	if (audio_devs[dev]->d->owner)

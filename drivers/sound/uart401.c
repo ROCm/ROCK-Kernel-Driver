@@ -202,7 +202,7 @@ static inline int uart401_buffer_status(int dev)
 #define MIDI_SYNTH_CAPS	SYNTH_CAP_INPUT
 #include "midi_synth.h"
 
-static struct midi_operations uart401_operations =
+static const struct midi_operations uart401_operations =
 {
 	owner:		THIS_MODULE,
 	info:		{"MPU-401 (UART) MIDI", 0, 0, SNDCARD_MPU401},
@@ -351,7 +351,6 @@ int probe_uart401(struct address_info *hw_config, struct module *owner)
 		goto cleanup_irq;
 	}
 	conf_printf(name, hw_config);
-	std_midi_synth.midi_dev = devc->my_dev;
 	midi_devs[devc->my_dev] = kmalloc(sizeof(struct midi_operations), GFP_KERNEL);
 	if (!midi_devs[devc->my_dev]) {
 		printk(KERN_ERR "uart401: Failed to allocate memory\n");
@@ -371,6 +370,11 @@ int probe_uart401(struct address_info *hw_config, struct module *owner)
 	memcpy(midi_devs[devc->my_dev]->converter, &std_midi_synth, sizeof(struct synth_operations));
 	strcpy(midi_devs[devc->my_dev]->info.name, name);
 	midi_devs[devc->my_dev]->converter->id = "UART401";
+	midi_devs[devc->my_dev]->converter->midi_dev = devc->my_dev;
+
+	if (owner)
+		midi_devs[devc->my_dev]->converter->owner = owner;
+
 	hw_config->slots[4] = devc->my_dev;
 	sequencer_init();
 	devc->opened = 0;

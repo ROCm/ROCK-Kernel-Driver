@@ -139,6 +139,15 @@ struct tsap_cb *irttp_open_tsap(__u8 stsap_sel, int credit, notify_t *notify)
 	ASSERT(irttp != NULL, return NULL;);
 	ASSERT(irttp->magic == TTP_MAGIC, return NULL;);
 
+	/* The IrLMP spec (IrLMP 1.1 p10) says that we have the right to
+	 * use only 0x01-0x6F. Of course, we can use LSAP_ANY as well.
+	 * JeanII */
+	if((stsap_sel != LSAP_ANY) &&
+	   ((stsap_sel < 0x01) || (stsap_sel >= 0x70))) {
+		IRDA_DEBUG(0, __FUNCTION__ "(), invalid tsap!\n");
+		return NULL;
+	}
+
 	self = kmalloc(sizeof(struct tsap_cb), GFP_ATOMIC);
 	if (self == NULL) {
 		IRDA_DEBUG(0, __FUNCTION__ "(), unable to kmalloc!\n");
@@ -1564,9 +1573,9 @@ int irttp_proc_read(char *buf, char **start, off_t offset, int len)
 			       self->remote_credit);
 		len += sprintf(buf+len, "send credit: %d\n",
 			       self->send_credit);
-		len += sprintf(buf+len, "  tx packets: %d, ",
+		len += sprintf(buf+len, "  tx packets: %ld, ",
 			       self->stats.tx_packets);
-		len += sprintf(buf+len, "rx packets: %d, ",
+		len += sprintf(buf+len, "rx packets: %ld, ",
 			       self->stats.rx_packets);
 		len += sprintf(buf+len, "tx_queue len: %d ", 
 			       skb_queue_len(&self->tx_queue));

@@ -41,8 +41,8 @@
 #define PROD_MORLEY_SCSI_UNCACHED	0x0067
 
 #define MANU_CUMANA		0x003a
-#define PROD_CUMANA_SCSI_1		0x00a0
 #define PROD_CUMANA_SCSI_2		0x003a
+#define PROD_CUMANA_SCSI_1		0x00a0
 
 #define MANU_ICS		0x003c
 #define PROD_ICS_IDE			0x00ae
@@ -59,6 +59,7 @@
 #define PROD_I3_ETHERLAN600A		0x011e
 
 #define MANU_ANT		0x0053
+#define PROD_ANT_ETHERM			0x00d8
 #define PROD_ANT_ETHERB			0x00e4
 
 #define MANU_ALSYSTEMS		0x005b

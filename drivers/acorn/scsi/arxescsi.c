@@ -16,6 +16,7 @@
  *  01-01-2000	SH	0.1.0   Added *real* pseudo dma writing
  *				(arxescsi_pseudo_dma_write)
  *  02-04-2000	RMK	0.1.1	Updated for new error handling code.
+ *  22-10-2000  SH		Updated for new registering scheme.
  */
 #include <linux/module.h>
 #include <linux/blk.h>
@@ -27,6 +28,7 @@
 #include <linux/unistd.h>
 #include <linux/stat.h>
 #include <linux/delay.h>
+#include <linux/init.h>
 
 #include <asm/dma.h>
 #include <asm/io.h>
@@ -416,8 +418,24 @@ int arxescsi_proc_info(char *buffer, char **start, off_t offset,
 	return pos;
 }
 
-#ifdef MODULE
-Scsi_Host_Template driver_template = ARXEScsi;
+static Scsi_Host_Template arxescsi_template = ARXEScsi;
 
-#include "../../scsi/scsi_module.c"
-#endif
+static int __init init_arxe_scsi_driver(void)
+{
+        arxescsi_template.module = THIS_MODULE;
+	scsi_register_module(MODULE_SCSI_HA, &arxescsi_template);
+	if (arxescsi_template.present)
+		return 0;
+
+	scsi_unregister_module(MODULE_SCSI_HA, &arxescsi_template);
+	return -ENODEV;
+}
+
+static void __exit exit_arxe_scsi_driver(void)
+{
+	scsi_unregister_module(MODULE_SCSI_HA, &arxescsi_template);
+}
+
+module_init(init_arxe_scsi_driver);
+module_exit(exit_arxe_scsi_driver);
+

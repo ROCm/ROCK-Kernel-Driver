@@ -74,6 +74,8 @@ typedef __u64	Elf64_Word;
 
 #define EM_X8664	62	/* AMD x86-64 */
 
+#define EM_CRIS         76      /* Axis Communications 32-bit embedded processor */
+
 /*
  * This is an interim value that we will use until the committee comes
  * up with a final number.

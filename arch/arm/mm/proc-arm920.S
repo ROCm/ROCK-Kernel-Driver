@@ -68,9 +68,9 @@
 ENTRY(cpu_arm920_data_abort)
 	ldr	r1, [r0]			@ read aborted instruction
 	mrc	p15, 0, r0, c6, c0, 0		@ get FAR
-	mov	r1, r1, lsr #19			@ b1 = L
+	tst	r1, r1, lsr #21			@ C = bit 20
 	mrc	p15, 0, r3, c5, c0, 0		@ get FSR
-	and	r1, r1, #2
+	sbc	r1, r1, r1			@ r1 = C - 1
 	and	r3, r3, #255
 	mov	pc, lr
 
@@ -330,7 +330,7 @@ ENTRY(cpu_arm920_icache_invalidate_range)
 	mov	r0, #0
 	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
 ENTRY(cpu_arm920_icache_invalidate_page)
-	/* why no invalidate I cache --rmk */
+	mcr	p15, 0, r0, c7, c5, 0		@ invalidate I cache
 	mov	pc, lr
 
 

@@ -41,11 +41,11 @@ extern pg_data_t sa1100_node_data[];
  * Given a kernel address, find the home node of the underlying memory.
  */
 #define KVADDR_TO_NID(addr) \
-		(((unsigned long)(addr) & 0x18000000) >> 27)
+		(((unsigned long)(addr) - 0xc0000000) >> 27)
 
 /*
  * Given a kaddr, ADDR_TO_MAPBASE finds the owning node of the memory
- * and returns the the mem_map of that node.
+ * and returns the mem_map of that node.
  */
 #define ADDR_TO_MAPBASE(kaddr) \
 			NODE_MEM_MAP(KVADDR_TO_NID((unsigned long)(kaddr)))
@@ -66,7 +66,12 @@ extern pg_data_t sa1100_node_data[];
 	(ADDR_TO_MAPBASE(kaddr) + LOCAL_MAP_NR(kaddr))
 
 /*
- * Didn't find the best way to validate a page pointer yet...
+ * VALID_PAGE returns a non-zero value if given page pointer is valid.
+ * This assumes all node's mem_maps are stored within the node they refer to.
  */
+#define VALID_PAGE(page) \
+({ unsigned int node = KVADDR_TO_NID(page); \
+   ( (node < 4) && \
+     ((unsigned)((page) - NODE_MEM_MAP(node)) < NODE_DATA(node)->node_size) ); \
+})
 
-#define VALID_PAGE(page)	(1)

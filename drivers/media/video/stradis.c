@@ -2067,11 +2067,15 @@ static int configure_saa7146(struct pci_dev *dev, int num)
 	if (result == -EBUSY)
 		printk(KERN_ERR "stradis%d: IRQ %ld busy, change your PnP"
 		       " config in BIOS\n", num, saa->irq);
-	if (result < 0)
+	if (result < 0) {
+		iounmap(saa->saa7146_mem);
 		return result;
+	}
 	pci_set_master(dev);
-	if (video_register_device(&saa->video_dev, VFL_TYPE_GRABBER) < 0)
+	if (video_register_device(&saa->video_dev, VFL_TYPE_GRABBER) < 0) {
+		iounmap(saa->saa7146_mem);
 		return -1;
+	}
 #if 0
 	/* i2c generic interface is currently BROKEN */
 	i2c_register_bus(&saa->i2c);

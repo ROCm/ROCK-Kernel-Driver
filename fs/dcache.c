@@ -52,13 +52,8 @@ static unsigned int d_hash_shift;
 static struct list_head *dentry_hashtable;
 static LIST_HEAD(dentry_unused);
 
-struct {
-	int nr_dentry;
-	int nr_unused;
-	int age_limit;		/* age in seconds */
-	int want_pages;		/* pages requested by system */
-	int dummy[2];
-} dentry_stat = {0, 0, 45, 0,};
+/* Statistics gathering. */
+struct dentry_stat_t dentry_stat = {0, 0, 45, 0,};
 
 /* no dcache_lock, please */
 static inline void d_free(struct dentry *dentry)

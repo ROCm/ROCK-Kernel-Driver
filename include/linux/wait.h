@@ -19,29 +19,9 @@
 #include <asm/processor.h>
 
 /*
- * Temporary debugging help until all code is converted to the new
- * waitqueue usage.
+ * Debug control.  Slow but useful.
  */
 #define WAITQUEUE_DEBUG 0
-
-#if WAITQUEUE_DEBUG
-extern int printk(const char *fmt, ...);
-#define WQ_BUG() do { \
-	printk("wq bug, forcing oops.\n"); \
-	BUG(); \
-} while (0)
-
-#define CHECK_MAGIC(x) if (x != (long)&(x)) \
-	{ printk("bad magic %lx (should be %lx), ", (long)x, (long)&(x)); WQ_BUG(); }
-
-#define CHECK_MAGIC_WQHEAD(x) do { \
-	if (x->__magic != (long)&(x->__magic)) { \
-		printk("bad magic %lx (should be %lx, creator %lx), ", \
-			x->__magic, (long)&(x->__magic), x->__creator); \
-		WQ_BUG(); \
-	} \
-} while (0)
-#endif
 
 struct __wait_queue {
 	unsigned int flags;
@@ -99,24 +79,70 @@ struct __wait_queue_head {
 };
 typedef struct __wait_queue_head wait_queue_head_t;
 
+
+/*
+ * Debugging macros.  We eschew `do { } while (0)' because gcc can generate
+ * spurious .aligns.
+ */
 #if WAITQUEUE_DEBUG
-# define __WAITQUEUE_DEBUG_INIT(name) \
-		, (long)&(name).__magic, 0
-# define __WAITQUEUE_HEAD_DEBUG_INIT(name) \
-		, (long)&(name).__magic, (long)&(name).__magic
+#define WQ_BUG()	BUG()
+#define CHECK_MAGIC(x)							\
+	do {									\
+		if ((x) != (long)&(x)) {					\
+			printk("bad magic %lx (should be %lx), ",		\
+				(long)x, (long)&(x));				\
+			WQ_BUG();						\
+		}								\
+	} while (0)
+#define CHECK_MAGIC_WQHEAD(x)							\
+	do {									\
+		if ((x)->__magic != (long)&((x)->__magic)) {			\
+			printk("bad magic %lx (should be %lx, creator %lx), ",	\
+			(x)->__magic, (long)&((x)->__magic), (x)->__creator);	\
+			WQ_BUG();						\
+		}								\
+	} while (0)
+#define WQ_CHECK_LIST_HEAD(list) 						\
+	do {									\
+		if (!list->next || !list->prev)					\
+			WQ_BUG();						\
+	} while(0)
+#define WQ_NOTE_WAKER(tsk)							\
+	do {									\
+		tsk->__waker = (long)__builtin_return_address(0);		\
+	} while (0)
+#else
+#define WQ_BUG()
+#define CHECK_MAGIC(x)
+#define CHECK_MAGIC_WQHEAD(x)
+#define WQ_CHECK_LIST_HEAD(list)
+#define WQ_NOTE_WAKER(tsk)
+#endif
+
+/*
+ * Macros for declaration and initialisaton of the datatypes
+ */
+
+#if WAITQUEUE_DEBUG
+# define __WAITQUEUE_DEBUG_INIT(name) (long)&(name).__magic, 0
+# define __WAITQUEUE_HEAD_DEBUG_INIT(name) (long)&(name).__magic, (long)&(name).__magic
 #else
 # define __WAITQUEUE_DEBUG_INIT(name)
 # define __WAITQUEUE_HEAD_DEBUG_INIT(name)
 #endif
 
-#define __WAITQUEUE_INITIALIZER(name,task) \
-	{ 0x0, task, { NULL, NULL } __WAITQUEUE_DEBUG_INIT(name)}
-#define DECLARE_WAITQUEUE(name,task) \
-	wait_queue_t name = __WAITQUEUE_INITIALIZER(name,task)
+#define __WAITQUEUE_INITIALIZER(name, tsk) {				\
+	task:		tsk,						\
+	task_list:	{ NULL, NULL },					\
+			 __WAITQUEUE_DEBUG_INIT(name)}
 
-#define __WAIT_QUEUE_HEAD_INITIALIZER(name) \
-{ WAITQUEUE_RW_LOCK_UNLOCKED, { &(name).task_list, &(name).task_list } \
-		__WAITQUEUE_HEAD_DEBUG_INIT(name)}
+#define DECLARE_WAITQUEUE(name, tsk)					\
+	wait_queue_t name = __WAITQUEUE_INITIALIZER(name, tsk)
+
+#define __WAIT_QUEUE_HEAD_INITIALIZER(name) {				\
+	lock:		WAITQUEUE_RW_LOCK_UNLOCKED,			\
+	task_list:	{ &(name).task_list, &(name).task_list },	\
+			__WAITQUEUE_HEAD_DEBUG_INIT(name)}
 
 #define DECLARE_WAIT_QUEUE_HEAD(name) \
 	wait_queue_head_t name = __WAIT_QUEUE_HEAD_INITIALIZER(name)
@@ -135,8 +161,7 @@ static inline void init_waitqueue_head(wait_queue_head_t *q)
 #endif
 }
 
-static inline void init_waitqueue_entry(wait_queue_t *q,
-				 struct task_struct *p)
+static inline void init_waitqueue_entry(wait_queue_t *q, struct task_struct *p)
 {
 #if WAITQUEUE_DEBUG
 	if (!q || !p)

@@ -275,7 +275,7 @@ static void __init create_mapping(struct map_desc *md)
 	off    = md->physical - virt;
 	length = md->length;
 
-	while ((virt & 1048575 || (virt + off) & 1048575) && length >= PAGE_SIZE) {
+	while ((virt & 0xfffff || (virt + off) & 0xfffff) && length >= PAGE_SIZE) {
 		alloc_init_page(virt, virt + off, md->domain, prot_pte);
 
 		virt   += PAGE_SIZE;

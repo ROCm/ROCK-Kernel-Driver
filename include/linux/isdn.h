@@ -1,4 +1,4 @@
-/* $Id: isdn.h,v 1.111 2000/11/25 17:01:02 kai Exp $
+/* $Id: isdn.h,v 1.111.6.1 2001/02/07 11:31:31 kai Exp $
 
  * Main header for the Linux ISDN subsystem (linklevel).
  *
@@ -592,23 +592,6 @@ typedef struct {
 	char *private;
 } infostruct;
 
-typedef struct isdn_module {
-	struct isdn_module *prev;
-	struct isdn_module *next;
-	char *name;
-	int (*get_free_channel)(int, int, int, int, int);
-	int (*free_channel)(int, int, int);
-	int (*status_callback)(isdn_ctrl *);
-	int (*command)(isdn_ctrl *);
-	int (*receive_callback)(int, int, struct sk_buff *);
-	int (*writebuf_skb)(int, int, int, struct sk_buff *);
-	int (*net_start_xmit)(struct sk_buff *, struct net_device *);
-	int (*net_receive)(struct net_device *, struct sk_buff *);
-	int (*net_open)(struct net_device *);
-	int (*net_close)(struct net_device *);
-	int priority;
-} isdn_module;
-
 #define DRV_FLAG_RUNNING 1
 #define DRV_FLAG_REJBUS  2
 #define DRV_FLAG_LOADED  4
@@ -668,7 +651,6 @@ typedef struct isdn_devt {
 	atomic_t          v110use[ISDN_MAX_CHANNELS];/* Usage-Semaphore for stream */
 	isdn_v110_stream  *v110[ISDN_MAX_CHANNELS];  /* V.110 private data         */
 	struct semaphore  sem;                       /* serialize list access*/
-	isdn_module       *modules;
 	unsigned long     global_features;
 #ifdef CONFIG_DEVFS_FS
 	devfs_handle_t devfs_handle_isdninfo;

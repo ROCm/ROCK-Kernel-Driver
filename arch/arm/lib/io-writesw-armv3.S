@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/lib/io-readsb.S
+ *  linux/arch/arm/lib/io-writesw-armv3.S
  *
  *  Copyright (C) 1995-2000 Russell King
  *
@@ -39,6 +39,7 @@ ENTRY(__arch_writesw)
 
 		subs	r2, r2, #8
 		bmi	.no_outsw_8
+
 .outsw_8_lp:	ldmia	r1!, {r3, r4, r5, r6}
 
 		mov	ip, r3, lsl #16
@@ -75,6 +76,7 @@ ENTRY(__arch_writesw)
 
 		subs	r2, r2, #8
 		bpl	.outsw_8_lp
+
 		tst	r2, #7
 		LOADREGS(eqfd, sp!, {r4, r5, r6, pc})
 
@@ -121,5 +123,3 @@ ENTRY(__arch_writesw)
 		strne	ip, [r0]
 
 		LOADREGS(fd, sp!, {r4, r5, r6, pc})
-
-

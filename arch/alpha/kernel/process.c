@@ -416,22 +416,20 @@ dump_fpu(struct pt_regs * regs, elf_fpregset_t *r)
  * Don't do this at home.
  */
 asmlinkage int
-sys_execve(unsigned long a0, unsigned long a1, unsigned long a2,
-	unsigned long a3, unsigned long a4, unsigned long a5,
-	struct pt_regs regs)
+sys_execve(char *ufilename, char **argv, char **envp,
+	   unsigned long a3, unsigned long a4, unsigned long a5,
+	   struct pt_regs regs)
 {
 	int error;
-	char * filename;
+	char *filename;
 
-	lock_kernel();
-	filename = getname((char *) a0);
+	filename = getname(ufilename);
 	error = PTR_ERR(filename);
 	if (IS_ERR(filename))
 		goto out;
-	error = do_execve(filename, (char **) a1, (char **) a2, &regs);
+	error = do_execve(filename, argv, envp, &regs);
 	putname(filename);
 out:
-	unlock_kernel();
 	return error;
 }
 

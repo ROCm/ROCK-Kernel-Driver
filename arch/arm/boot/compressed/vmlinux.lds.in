@@ -19,12 +19,13 @@ SECTIONS
 
   .text : {
     _start = .;
-    head.o(.start)
     *(.start)
-    head.o(.text)
     *(.text)
     *(.fixup)
     *(.gnu.warning)
+    *(.rodata)
+    *(.glue_7)
+    *(.glue_7t)
     input_data = .;
     piggy.o
     input_data_end = .;

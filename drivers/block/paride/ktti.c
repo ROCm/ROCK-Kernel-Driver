@@ -1,6 +1,6 @@
 /* 
         ktti.c        (c) 1998  Grant R. Guenther <grant@torque.net>
-                          Under the terms of the GNU public license.
+                          Under the terms of the GNU General Public License.
 
 	ktti.c is a low-level protocol driver for the KT Technology
 	parallel port adapter.  This adapter is used in the "PHd" 

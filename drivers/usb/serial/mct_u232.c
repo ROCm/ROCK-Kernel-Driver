@@ -24,6 +24,10 @@
  *   Basic tests have been performed with minicom/zmodem transfers and
  *   modem dialing under Linux 2.4.0-test10 (for me it works fine).
  *
+ * 06-Jan-2001 Cornel Ciocirlan 
+ *   - Added support for Sitecom U232-P25 model (Product Id 0x0230)
+ *   - Added support for D-Link DU-H3SP USB BAY (Product Id 0x0200)
+ *
  * 29-Nov-2000 Greg Kroah-Hartman
  *   - Added device id table to fit with 2.4.0-test11 structure.
  *   - took out DEAL_WITH_TWO_INT_IN_ENDPOINTS #define as it's not needed
@@ -101,17 +105,34 @@ static void mct_u232_break_ctl	         (struct usb_serial_port *port,
 /*
  * All of the device info needed for the MCT USB-RS232 converter.
  */
-static __devinitdata struct usb_device_id id_table [] = {
-	{ idVendor: MCT_U232_VID, idProduct: MCT_U232_PID },
-	{ }					/* Terminating entry */
+static __devinitdata struct usb_device_id id_table_combined [] = {
+	{ USB_DEVICE(MCT_U232_VID, MCT_U232_PID) },
+	{ USB_DEVICE(MCT_U232_VID, MCT_U232_SITECOM_PID) },
+	{ USB_DEVICE(MCT_U232_VID, MCT_U232_DU_H3SP_PID) },
+	{ }		/* Terminating entry */
 };
 
-MODULE_DEVICE_TABLE (usb, id_table);
+static __devinitdata struct usb_device_id mct_u232_table [] = {
+        { USB_DEVICE(MCT_U232_VID, MCT_U232_PID) },
+        { }                        /* Terminating entry */
+};
+
+static __devinitdata struct usb_device_id mct_u232_sitecom_table [] = {
+        { USB_DEVICE(MCT_U232_VID, MCT_U232_SITECOM_PID) },
+        { }                        /* Terminating entry */
+};
+
+static __devinitdata struct usb_device_id mct_u232_du_h3sp_table [] = {
+        { USB_DEVICE(MCT_U232_VID, MCT_U232_DU_H3SP_PID) },
+        { }                        /* Terminating entry */
+};
+
+MODULE_DEVICE_TABLE (usb, id_table_combined);
 
 
 struct usb_serial_device_type mct_u232_device = {
 	name:		     "Magic Control Technology USB-RS232",
-	id_table:	     id_table,
+	id_table:	     mct_u232_table,
 	needs_interrupt_in:  MUST_HAVE,	 /* 2 interrupt-in endpoints */
 	needs_bulk_in:	     MUST_HAVE_NOT,   /* no bulk-in endpoint */
 	needs_bulk_out:	     MUST_HAVE,	      /* 1 bulk-out endpoint */
@@ -132,6 +153,57 @@ struct usb_serial_device_type mct_u232_device = {
 	startup:	     mct_u232_startup,
 	shutdown:	     mct_u232_shutdown,
 };
+
+struct usb_serial_device_type mct_u232_sitecom_device = {
+	name:		     "MCT/Sitecom USB-RS232",
+	id_table:	     mct_u232_sitecom_table,
+	needs_interrupt_in:  MUST_HAVE,	 /* 2 interrupt-in endpoints */
+	needs_bulk_in:	     MUST_HAVE_NOT,   /* no bulk-in endpoint */
+	needs_bulk_out:	     MUST_HAVE,	      /* 1 bulk-out endpoint */
+	num_interrupt_in:    2,
+	num_bulk_in:	     0,
+	num_bulk_out:	     1,
+	num_ports:	     1,
+	open:		     mct_u232_open,
+	close:		     mct_u232_close,
+#ifdef FIX_WRITE_RETURN_CODE_PROBLEM
+	write:		     mct_u232_write,
+	write_bulk_callback: mct_u232_write_bulk_callback,
+#endif
+	read_int_callback:   mct_u232_read_int_callback,
+	ioctl:		     mct_u232_ioctl,
+	set_termios:	     mct_u232_set_termios,
+	break_ctl:	     mct_u232_break_ctl,
+	startup:	     mct_u232_startup,
+	shutdown:	     mct_u232_shutdown,
+};
+
+struct usb_serial_device_type mct_u232_du_h3sp_device = {
+        name:                "MCT/D-Link DU-H3SP USB BAY",
+        id_table:            mct_u232_du_h3sp_table,
+        needs_interrupt_in:  MUST_HAVE,  /* 2 interrupt-in endpoints */
+        needs_bulk_in:       MUST_HAVE_NOT,   /* no bulk-in endpoint */
+        needs_bulk_out:      MUST_HAVE,       /* 1 bulk-out endpoint */
+        num_interrupt_in:    2,
+        num_bulk_in:         0,
+        num_bulk_out:        1,
+        num_ports:           1,
+        open:                mct_u232_open,
+        close:               mct_u232_close,
+#ifdef FIX_WRITE_RETURN_CODE_PROBLEM
+        write:               mct_u232_write,
+        write_bulk_callback: mct_u232_write_bulk_callback,
+#endif
+        read_int_callback:   mct_u232_read_int_callback,
+        ioctl:               mct_u232_ioctl,
+        set_termios:         mct_u232_set_termios,
+        break_ctl:           mct_u232_break_ctl,
+        startup:             mct_u232_startup,
+        shutdown:            mct_u232_shutdown,
+};
+
+
+
 
 struct mct_u232_private {
 	unsigned long	     control_state; /* Modem Line Setting (TIOCM) */
@@ -750,6 +822,8 @@ static int mct_u232_ioctl (struct usb_serial_port *port, struct file * file,
 static int __init mct_u232_init (void)
 {
 	usb_serial_register (&mct_u232_device);
+	usb_serial_register (&mct_u232_sitecom_device);
+	usb_serial_register (&mct_u232_du_h3sp_device);
 	
 	return 0;
 }
@@ -758,6 +832,8 @@ static int __init mct_u232_init (void)
 static void __exit mct_u232_exit (void)
 {
 	usb_serial_deregister (&mct_u232_device);
+	usb_serial_deregister (&mct_u232_sitecom_device);
+	usb_serial_deregister (&mct_u232_du_h3sp_device);
 }
 
 

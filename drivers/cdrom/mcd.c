@@ -1158,7 +1158,7 @@ static void cleanup(int level)
       return;
     }
     blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
-  default:
+  default:;
   }
 }
 

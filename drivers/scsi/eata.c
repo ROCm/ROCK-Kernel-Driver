@@ -1,6 +1,9 @@
 /*
  *      eata.c - Low-level driver for EATA/DMA SCSI host adapters.
  *
+ *      25 Jan 2001 Rev. 6.03 for linux 2.4.0
+ *        + "check_region" call replaced by "request_region".
+ *
  *      22 Nov 2000 Rev. 6.02 for linux 2.4.0-test11
  *        + Return code checked when calling pci_enable_device.
  *        + Removed old scsi error handling support.
@@ -210,7 +213,7 @@
  *          This driver is based on the CAM (Common Access Method Committee)
  *          EATA (Enhanced AT Bus Attachment) rev. 2.0A, using DMA protocol.
  *
- *  Copyright (C) 1994-2000 Dario Ballabio (ballabio_dario@emc.com)
+ *  Copyright (C) 1994-2001 Dario Ballabio (ballabio_dario@emc.com)
  *
  *  Alternate email: dario.ballabio@inwind.it, dario.ballabio@tiscalinet.it
  *
@@ -901,25 +904,34 @@ static inline int port_detect \
 
    sprintf(name, "%s%d", driver_name, j);
 
-   if(check_region(port_base, REGION_SIZE)) {
+   if(!request_region(port_base, REGION_SIZE, driver_name)) {
 #if defined(DEBUG_DETECT)
       printk("%s: address 0x%03lx in use, skipping probe.\n", name, port_base);
 #endif
       return FALSE;
       }
 
-   if (do_dma(port_base, 0, READ_CONFIG_PIO)) return FALSE;
+   if (do_dma(port_base, 0, READ_CONFIG_PIO)) {
+      release_region(port_base, REGION_SIZE);
+      return FALSE;
+      }
 
    /* Read the info structure */
-   if (read_pio(port_base, (ushort *)&info, (ushort *)&info.ipad[0]))
+   if (read_pio(port_base, (ushort *)&info, (ushort *)&info.ipad[0])) {
+      release_region(port_base, REGION_SIZE);
       return FALSE;
+      }
 
    /* Check the controller "EATA" signature */
-   if (info.sign != EATA_SIGNATURE) return FALSE;
+   if (info.sign != EATA_SIGNATURE) {
+      release_region(port_base, REGION_SIZE);
+      return FALSE;
+      }
 
    if (DEV2H(info.data_len) < EATA_2_0A_SIZE) {
       printk("%s: config structure size (%d bytes) too short, detaching.\n",
              name, DEV2H(info.data_len));
+      release_region(port_base, REGION_SIZE);
       return FALSE;
       }
    else if (DEV2H(info.data_len) == EATA_2_0A_SIZE)
@@ -957,6 +969,7 @@ static inline int port_detect \
    if (!info.haaval || info.ata) {
       printk("%s: address 0x%03lx, unusable %s board (%d%d), detaching.\n",
              name, port_base, bus_type, info.haaval, info.ata);
+      release_region(port_base, REGION_SIZE);
       return FALSE;
       }
 
@@ -996,6 +1009,7 @@ static inline int port_detect \
              SA_INTERRUPT | ((subversion == ESA) ? SA_SHIRQ : 0),
              driver_name, (void *) &sha[j])) {
       printk("%s: unable to allocate IRQ %u, detaching.\n", name, irq);
+      release_region(port_base, REGION_SIZE);
       return FALSE;
       }
 
@@ -1003,6 +1017,7 @@ static inline int port_detect \
       printk("%s: unable to allocate DMA channel %u, detaching.\n",
              name, dma_channel);
       free_irq(irq, &sha[j]);
+      release_region(port_base, REGION_SIZE);
       return FALSE;
       }
 
@@ -1017,6 +1032,7 @@ static inline int port_detect \
 
    if (do_dma(port_base, (unsigned long)&config, SET_CONFIG_DMA)) {
       printk("%s: busy timeout sending configuration, detaching.\n", name);
+      release_region(port_base, REGION_SIZE);
       return FALSE;
       }
    }
@@ -1031,6 +1047,7 @@ static inline int port_detect \
 
       if (subversion == ISA) free_dma(dma_channel);
 
+      release_region(port_base, REGION_SIZE);
       return FALSE;
       }
 
@@ -1129,7 +1146,7 @@ static inline int port_detect \
    else                                 tag_type = 'n';
 
    if (j == 0) {
-      printk("EATA/DMA 2.0x: Copyright (C) 1994-2000 Dario Ballabio.\n");
+      printk("EATA/DMA 2.0x: Copyright (C) 1994-2001 Dario Ballabio.\n");
       printk("%s config options -> tc:%c, lc:%c, mq:%d, rs:%c, et:%c.\n",
              driver_name, tag_type, YESNO(linked_comm), max_queue_depth,
              YESNO(rev_scan), YESNO(ext_tran));
@@ -1149,7 +1166,7 @@ static inline int port_detect \
 
 #if defined(DEBUG_DETECT)
    printk("%s: Vers. 0x%x, ocs %u, tar %u, trnxfr %u, more %u, SYNC 0x%x, "\
-          "sec. %u, infol %ld, cpl %ld spl %ld.\n", name, info.version,
+          "sec. %u, infol %d, cpl %d spl %d.\n", name, info.version,
           info.ocsena, info.tarsup, info.trnxfr, info.morsup, info.sync,
           info.second, DEV2H(info.data_len), DEV2H(info.cp_len),
           DEV2H(info.sp_len));

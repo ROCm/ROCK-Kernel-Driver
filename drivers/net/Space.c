@@ -640,47 +640,6 @@ static struct net_device tr0_dev = {
 #define	NEXT_DEV	(&sbni0_dev)
 #endif 
 	
-/* S/390 channels */
-#ifdef CONFIG_CTC
-    extern int ctc_probe(struct net_device *dev);
-    static struct net_device ctc7_dev =
-       {"ctc7", 0, 0, 0, 0, 0, 0, 0, 0, 0, NEXT_DEV,  ctc_probe};
-    static struct net_device ctc6_dev =
-       {"ctc6", 0, 0, 0, 0, 0, 0, 0, 0, 0, &ctc7_dev, ctc_probe};
-    static struct net_device ctc5_dev =
-       {"ctc5", 0, 0, 0, 0, 0, 0, 0, 0, 0, &ctc6_dev, ctc_probe};
-    static struct net_device ctc4_dev =
-       {"ctc4", 0, 0, 0, 0, 0, 0, 0, 0, 0, &ctc5_dev, ctc_probe};
-    static struct net_device ctc3_dev =
-       {"ctc3", 0, 0, 0, 0, 0, 0, 0, 0, 0, &ctc4_dev, ctc_probe};
-    static struct net_device ctc2_dev =
-       {"ctc2", 0, 0, 0, 0, 0, 0, 0, 0, 0, &ctc3_dev, ctc_probe};
-    static struct net_device ctc1_dev =
-       {"ctc1", 0, 0, 0, 0, 0, 0, 0, 0, 0, &ctc2_dev, ctc_probe};
-    static struct net_device ctc0_dev =
-       {"ctc0", 0, 0, 0, 0, 0, 0, 0, 0, 0, &ctc1_dev, ctc_probe}; 
-
-    static struct net_device escon7_dev =
-       {"escon7", 0, 0, 0, 0, 0, 0, 0, 0, 0, &ctc0_dev,   ctc_probe};
-    static struct net_device escon6_dev =
-       {"escon6", 0, 0, 0, 0, 0, 0, 0, 0, 0, &escon7_dev, ctc_probe};
-    static struct net_device escon5_dev =
-       {"escon5", 0, 0, 0, 0, 0, 0, 0, 0, 0, &escon6_dev, ctc_probe};
-    static struct net_device escon4_dev =
-       {"escon4", 0, 0, 0, 0, 0, 0, 0, 0, 0, &escon5_dev, ctc_probe};
-    static struct net_device escon3_dev =
-       {"escon3", 0, 0, 0, 0, 0, 0, 0, 0, 0, &escon4_dev, ctc_probe};
-    static struct net_device escon2_dev =
-       {"escon2", 0, 0, 0, 0, 0, 0, 0, 0, 0, &escon3_dev, ctc_probe};
-    static struct net_device escon1_dev =
-       {"escon1", 0, 0, 0, 0, 0, 0, 0, 0, 0, &escon2_dev, ctc_probe};
-    static struct net_device escon0_dev =
-       {"escon0", 0, 0, 0, 0, 0, 0, 0, 0, 0, &escon1_dev, ctc_probe}; 
-
-#undef  NEXT_DEV
-#define NEXT_DEV        (&escon0_dev)                                  
-#endif  
-
 /*
  *	The loopback device is global so it can be directly referenced
  *	by the network code. Also, it must be first on device list.

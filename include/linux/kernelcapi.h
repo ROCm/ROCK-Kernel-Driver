@@ -1,5 +1,5 @@
 /*
- * $Id: kernelcapi.h,v 1.8.6.1 2000/11/28 09:36:56 kai Exp $
+ * $Id: kernelcapi.h,v 1.8.6.2 2001/02/07 11:31:31 kai Exp $
  * 
  * Kernel CAPI 2.0 Interface for Linux
  * 
@@ -10,8 +10,8 @@
 #ifndef __KERNELCAPI_H__
 #define __KERNELCAPI_H__
 
-#define CAPI_MAXAPPL	20	/* maximum number of applications  */
-#define CAPI_MAXCONTR	10	/* maximum number of controller    */
+#define CAPI_MAXAPPL	128	/* maximum number of applications  */
+#define CAPI_MAXCONTR	16	/* maximum number of controller    */
 #define CAPI_MAXDATAWINDOW	8
 
 

@@ -924,7 +924,7 @@ static int get_multi_disk_info(void)
 		return -EIO;
 	return 0;
 }
-#endif MULTISESSION
+#endif /* MULTISESSION */
 
 
 static int update_toc(void)
@@ -962,7 +962,7 @@ static int update_toc(void)
 #ifdef MULTISESSION
  	if (disk_info.xa)
 		get_multi_disk_info();	/* Here disk_info.multi is set */
-#endif MULTISESSION
+#endif /* MULTISESSION */
 	if (disk_info.multi)
 		printk(KERN_WARNING "optcd: Multisession support experimental, "
 			"see linux/Documentation/cdrom/optcd\n");
@@ -1709,11 +1709,11 @@ static int cdrommultisession(unsigned long arg)
 			disk_info.last_session.minute,
 			disk_info.last_session.second,
 			disk_info.last_session.frame);
-#endif DEBUG_MULTIS
+#endif /* DEBUG_MULTIS */
 
 	return 0;
 }
-#endif MULTISESSION
+#endif /* MULTISESSION */
 
 
 static int cdromreset(void)
@@ -2026,7 +2026,7 @@ static int optcd_setup(char *str)
 
 __setup("optcd=", optcd_setup);
 
-#endif MODULE
+#endif /* MODULE */
 
 /* Test for presence of drive and initialize it. Called at boot time
    or during module initialisation. */

@@ -12,64 +12,10 @@
 
 #define STRICT_MM_TYPECHECKS
 
-/*
- * A _lot_ of the kernel time is spent clearing pages, so
- * do this as fast as we possibly can. Also, doing this
- * as a separate inline function (rather than memset())
- * results in clearer kernel profiles as we see _who_ is
- * doing page clearing or copying.
- */
-static inline void clear_page(void * page)
-{
-	unsigned long count = PAGE_SIZE/64;
-	unsigned long *ptr = (unsigned long *)page;
-
-	do {
-		ptr[0] = 0;
-		ptr[1] = 0;
-		ptr[2] = 0;
-		ptr[3] = 0;
-		count--;
-		ptr[4] = 0;
-		ptr[5] = 0;
-		ptr[6] = 0;
-		ptr[7] = 0;
-		ptr += 8;
-	} while (count);
-}
-
+extern void clear_page(void *page);
 #define clear_user_page(page, vaddr)	clear_page(page)
 
-static inline void copy_page(void * _to, void * _from)
-{
-	unsigned long count = PAGE_SIZE/64;
-	unsigned long *to = (unsigned long *)_to;
-	unsigned long *from = (unsigned long *)_from;
-
-	do {
-		unsigned long a,b,c,d,e,f,g,h;
-		a = from[0];
-		b = from[1];
-		c = from[2];
-		d = from[3];
-		e = from[4];
-		f = from[5];
-		g = from[6];
-		h = from[7];
-		count--;
-		from += 8;
-		to[0] = a;
-		to[1] = b;
-		to[2] = c;
-		to[3] = d;
-		to[4] = e;
-		to[5] = f;
-		to[6] = g;
-		to[7] = h;
-		to += 8;
-	} while (count);
-}
-
+extern void copy_page(void * _to, void * _from);
 #define copy_user_page(to, from, vaddr)	copy_page(to, from)
 
 #ifdef STRICT_MM_TYPECHECKS

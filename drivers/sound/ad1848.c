@@ -28,6 +28,7 @@
  *		          of irqs. Use dev_id.
  * Christoph Hellwig	: adapted to module_init/module_exit
  * Aki Laukkanen	: added power management support
+ * Arnaldo C. de Melo	: added missing restore_flags in ad1848_resume
  *
  * Status:
  *		Tested. Believed fully functional.
@@ -1900,9 +1901,6 @@ int ad1848_init (char *name, int io_base, int irq, int dma_playback,
 	if(portc==NULL)
 		return -1;
 
-	if (owner)
-		ad1848_audio_driver.owner = owner;
-	
 	if ((my_dev = sound_install_audiodrv(AUDIO_DRIVER_VERSION,
 					     dev_name,
 					     &ad1848_audio_driver,
@@ -1920,6 +1918,8 @@ int ad1848_init (char *name, int io_base, int irq, int dma_playback,
 	
 	audio_devs[my_dev]->portc = portc;
 	audio_devs[my_dev]->mixer_dev = -1;
+	if (owner)
+		audio_devs[my_dev]->d->owner = owner;
 	memset((char *) portc, 0, sizeof(*portc));
 
 	nr_ad1848_devs++;
@@ -1986,6 +1986,7 @@ int ad1848_init (char *name, int io_base, int irq, int dma_playback,
 			if (sound_alloc_dma(dma_capture, devc->name))
 				printk(KERN_WARNING "ad1848.c: Can't allocate DMA%d\n", dma_capture);
 	}
+
 	if ((e = sound_install_mixer(MIXER_DRIVER_VERSION,
 				     dev_name,
 				     &ad1848_mixer_operations,
@@ -1993,6 +1994,8 @@ int ad1848_init (char *name, int io_base, int irq, int dma_playback,
 				     devc)) >= 0)
 	{
 		audio_devs[my_dev]->mixer_dev = e;
+		if (owner)
+			mixer_devs[e]->owner = owner;
 	}
 	return my_dev;
 }
@@ -2751,6 +2754,7 @@ static int ad1848_resume(ad1848_info *devc)
 		bits = interrupt_bits[devc->irq];
 		if (bits == -1) {
 			printk(KERN_ERR "MSS: Bad IRQ %d\n", devc->irq);
+			restore_flags(flags);
 			return -1;
 		}
 

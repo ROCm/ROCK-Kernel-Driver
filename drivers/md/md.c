@@ -2590,7 +2590,7 @@ static int md_ioctl (struct inode *inode, struct file *file,
 			err = md_put_user (read_ahead[
 				MAJOR(dev)], (long *) arg);
 			goto done;
-		default:
+		default:;
 	}
 
 	/*
@@ -2609,7 +2609,7 @@ static int md_ioctl (struct inode *inode, struct file *file,
 				err = -EEXIST;
 				goto abort;
 			}
-		default:
+		default:;
 	}
 	switch (cmd)
 	{
@@ -2662,7 +2662,7 @@ static int md_ioctl (struct inode *inode, struct file *file,
 			}
 			goto done;
 
-		default:
+		default:;
 	}
 
 	/*
@@ -3665,6 +3665,7 @@ static struct {
  *             elements in device-list are read by name_to_kdev_t so can be
  *             a hex number or something like /dev/hda1 /dev/sdb
  */
+#ifndef MODULE
 extern kdev_t name_to_kdev_t(char *line) md__init;
 static int md__init md_setup(char *str)
 {
@@ -3740,6 +3741,7 @@ static int md__init md_setup(char *str)
 	md_setup_args.device_set[minor] = 1;
 	return 1;
 }
+#endif /* !MODULE */
 
 void md__init md_setup_drive(void)
 {

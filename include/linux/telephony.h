@@ -43,6 +43,11 @@
  *  the telephony products they support under Linux)
  *
  *****************************************************************************/
+#define QTI_PHONEJACK		100
+#define QTI_LINEJACK		300
+#define QTI_PHONEJACK_LITE	400
+#define QTI_PHONEJACK_PCI	500
+#define QTI_PHONECARD		600
 
 /******************************************************************************
 *
@@ -91,7 +96,7 @@ typedef struct {
         int namelen;
         char name[80];
 } PHONE_CID;
-
+ 
 #define PHONE_RING			_IO  ('q', 0x83)
 #define PHONE_HOOKSTATE			_IO  ('q', 0x84)
 #define PHONE_MAXRINGS			_IOW ('q', 0x85, char)

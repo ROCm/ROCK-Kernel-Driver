@@ -1534,7 +1534,7 @@ static int amifb_ioctl(struct inode *inode, struct file *file,
 			}
 			return i;
 		}
-#endif */ DEBUG */
+#endif	/* DEBUG */
 	}
 	return -EINVAL;
 }

@@ -40,7 +40,7 @@ static void arc_floppy_data_enable_dma(dmach_t channel, dma_t *dma)
 		memcpy ((void *)0x1c, (void *)&fdc1772_dma_read,
 			&fdc1772_dma_read_end - &fdc1772_dma_read);
 		fdc1772_setupdma(dma->buf.length, dma->buf.address); /* Sets data pointer up */
-		enable_irq (64);
+		enable_fiq(FIQ_FLOPPYDATA);
 		restore_flags(flags);
 	   }
 	   break;
@@ -55,7 +55,7 @@ static void arc_floppy_data_enable_dma(dmach_t channel, dma_t *dma)
 		memcpy ((void *)0x1c, (void *)&fdc1772_dma_write,
 			&fdc1772_dma_write_end - &fdc1772_dma_write);
 		fdc1772_setupdma(dma->buf.length, dma->buf.address); /* Sets data pointer up */
-		enable_irq (64);
+		enable_fiq(FIQ_FLOPPYDATA;
 
 		restore_flags(flags);
 	    }
@@ -102,7 +102,7 @@ static int arc_floppy_cmdend_get_dma_residue(dmach_t channel, dma_t *dma)
 
 static void arc_disable_dma(dmach_t channel, dma_t *dma)
 {
-	disable_irq(dma->dma_irq);
+	disable_fiq(dma->dma_irq);
 }
 
 static struct dma_ops arc_floppy_data_dma_ops = {
@@ -158,12 +158,12 @@ static void a5k_floppy_enable_dma(dmach_t channel, dma_t *dma)
 	regs.ARM_r10 = dma->buf.address;
 	regs.ARM_fp = FLOPPYDMA_BASE;
 	set_fiq_regs(&regs);
-	enable_irq(dma->dma_irq);
+	enable_fiq(dma->dma_irq);
 }
 
 static void a5k_floppy_disable_dma(dmach_t channel, dma_t *dma)
 {
-	disable_irq(dma->dma_irq);
+	disable_fiq(dma->dma_irq);
 	release_fiq(&fh);
 }
 
@@ -192,15 +192,15 @@ void __init arch_dma_init(dma_t *dma)
 {
 #if defined(CONFIG_BLK_DEV_FD1772) || defined(CONFIG_BLK_DEV_FD1772_MODULE)
 	if (machine_is_archimedes()) {
-		dma[DMA_VIRTUAL_FLOPPY0].dma_irq = 64;
+		dma[DMA_VIRTUAL_FLOPPY0].dma_irq = FIQ_FLOPPYDATA;
 		dma[DMA_VIRTUAL_FLOPPY0].d_ops   = &arc_floppy_data_dma_ops;
-		dma[DMA_VIRTUAL_FLOPPY1].dma_irq = 65;
+		dma[DMA_VIRTUAL_FLOPPY1].dma_irq = 1;
 		dma[DMA_VIRTUAL_FLOPPY1].d_ops   = &arc_floppy_cmdend_dma_ops;
 	}
 #endif
 #ifdef CONFIG_ARCH_A5K
 	if (machine_is_a5k()) {
-		dma[DMA_VIRTUAL_FLOPPY0].dma_irq = 64;
+		dma[DMA_VIRTUAL_FLOPPY0].dma_irq = FIQ_FLOPPYDATA;
 		dma[DMA_VIRTUAL_FLOPPY0].d_ops   = &a5k_floppy_dma_ops;
 	}
 #endif

@@ -112,8 +112,7 @@ start:
 		 */
 
 		.text
-1:		mrc	p15, 0, r6, c0, c0	@ get processor ID
-		adr	r2, LC0
+1:		adr	r2, LC0
 		ldmia	r2, {r2, r3, r4, r5, sp}
 
 		mov	r0, #0
@@ -124,14 +123,15 @@ start:
 		cmp	r2, r3
 		blt	1b
 
+		mrc	p15, 0, r6, c0, c0	@ get processor ID
 		bl	cache_on
 
 		mov	r1, sp			@ malloc space above stack
 		add	r2, sp, #0x10000	@ 64k max
 
 		teq	r4, r5			@ will we overwrite ourselves?
-		moveq	r5, r2
-		movne	r5, r4
+		moveq	r5, r2			@ decompress after image
+		movne	r5, r4			@ decompress to final location
 
 		mov	r0, r5
 		mov	r3, r7

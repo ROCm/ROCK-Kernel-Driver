@@ -263,7 +263,7 @@ static int
 toshoboe_hard_xmit (struct sk_buff *skb, struct net_device *dev)
 {
   struct toshoboe_cb *self;
-  __u32 speed;
+  __s32 speed;
   int mtt, len;
 
   self = (struct toshoboe_cb *) dev->priv;
@@ -272,10 +272,12 @@ toshoboe_hard_xmit (struct sk_buff *skb, struct net_device *dev)
     );
 
   /* Check if we need to change the speed */
-  if ((speed = irda_get_speed(skb)) != self->io.speed) {
+  speed = irda_get_next_speed(skb);
+  if ((speed != self->io.speed) && (speed != -1)) {
 	/* Check for empty frame */
 	if (!skb->len) {
 	    toshoboe_setbaud(self, speed); 
+	    dev_kfree_skb(skb);
 	    return 0;
 	} else
 	    self->new_speed = speed;

@@ -1,5 +1,5 @@
 /* 
- * $Id: isdn_divert.c,v 1.6 2000/11/13 22:51:47 kai Exp $
+ * $Id: isdn_divert.c,v 1.6.6.1 2001/02/07 11:31:31 kai Exp $
  *
  * DSS1 main diversion supplementary handling for i4l.
  *
@@ -187,7 +187,7 @@ int cf_command(int drvid, int mode,
   restore_flags(flags);
   *procid = cs->ics.parm.dss1_io.ll_id;  
 
-  sprintf(cs->info,"%d 0x%lx %s%s 0 %s %0x %d%s%s\n",
+  sprintf(cs->info,"%d 0x%lx %s%s 0 %s %02x %d%s%s\n",
 	  (!mode ) ? DIVERT_DEACTIVATE : (mode == 1) ? DIVERT_ACTIVATE : DIVERT_REPORT,
           cs->ics.parm.dss1_io.ll_id,
           (mode != 2) ? "" : "0 ",

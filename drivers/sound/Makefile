@@ -62,14 +62,19 @@ obj-$(CONFIG_SOUND_ES1370)	+= es1370.o
 obj-$(CONFIG_SOUND_ES1371)	+= es1371.o ac97_codec.o
 obj-$(CONFIG_SOUND_ESSSOLO1)	+= esssolo1.o
 obj-$(CONFIG_SOUND_FUSION)	+= cs46xx.o ac97_codec.o
-obj-$(CONFIG_SOUND_CS4281)	+= cs4281.o
 obj-$(CONFIG_SOUND_MAESTRO)	+= maestro.o
+obj-$(CONFIG_SOUND_MAESTRO3)	+= maestro3.o ac97_codec.o
 obj-$(CONFIG_SOUND_TRIDENT)	+= trident.o ac97_codec.o
 
 subdir-$(CONFIG_SOUND_EMU10K1) += emu10k1
+subdir-$(CONFIG_SOUND_CS4281) += cs4281
 
 ifeq ($(CONFIG_SOUND_EMU10K1),y)
   obj-y += emu10k1/emu10k1.o
+endif
+
+ifeq ($(CONFIG_SOUND_CS4281),y)
+  obj-y += cs4281/cs4281.o
 endif
 
 subdir-$(CONFIG_DMASOUND) += dmasound

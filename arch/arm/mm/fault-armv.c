@@ -27,27 +27,9 @@
 #include <asm/pgtable.h>
 #include <asm/unaligned.h>
 
-#define FAULT_CODE_READ		0x02
-
-#define DO_COW(m)		(!((m) & FAULT_CODE_READ))
-#define READ_FAULT(m)		((m) & FAULT_CODE_READ)
-
 extern void die_if_kernel(const char *str, struct pt_regs *regs, int err);
-
-#include "fault-common.c"
-
-#ifdef DEBUG
-static int sp_valid(unsigned long *sp)
-{
-	unsigned long addr = (unsigned long) sp;
-
-	if (addr >= 0xb0000000 && addr < 0xd0000000)
-		return 1;
-	if (addr >= 0x03ff0000 && addr < 0x04000000)
-		return 1;
-	return 0;
-}
-#endif
+extern void show_pte(struct mm_struct *mm, unsigned long addr);
+extern int do_page_fault(unsigned long addr, int mode, struct pt_regs *regs);
 
 #ifdef CONFIG_ALIGNMENT_TRAP
 /*
@@ -178,6 +160,15 @@ do_alignment(unsigned long addr, int error_code, struct pt_regs *regs)
 					eaddr -= offset.un;
 			}
 
+			/*
+			 * This is a "hint" - we already have eaddr worked out by the
+			 * processor for us.
+			 */
+			if (addr != eaddr)
+				printk(KERN_ERR "LDRHSTRH: PC = %08lx, instr = %08x, "
+					"addr = %08lx, eaddr = %08lx\n",
+					 instruction_pointer(regs), instr, addr, eaddr);
+
 			if (LDST_L_BIT(instr))
 				regs->uregs[rd] = get_unaligned((unsigned short *)eaddr);
 			else
@@ -253,8 +244,15 @@ do_alignment(unsigned long addr, int error_code, struct pt_regs *regs)
 			}
 		}
 
-if (addr != eaddr)
-printk("PC = %08lx, instr = %08x, addr = %08lx, eaddr = %08lx\n", instruction_pointer(regs), instr, addr, eaddr);
+		/*
+		 * This is a "hint" - we already have eaddr worked out by the
+		 * processor for us.
+		 */
+		if (addr != eaddr)
+			printk(KERN_ERR "LDRSTR: PC = %08lx, instr = %08x, "
+				"addr = %08lx, eaddr = %08lx\n",
+				 instruction_pointer(regs), instr, addr, eaddr);
+
 		if (LDST_L_BIT(instr)) {
 			regs->uregs[rd] = get_unaligned((unsigned long *)eaddr);
 			if (rd == 15)
@@ -283,6 +281,15 @@ printk("PC = %08lx, instr = %08x, addr = %08lx, eaddr = %08lx\n", instruction_po
 
 		if  (!LDST_U_BIT(instr))
 			eaddr -= nr_regs;
+
+		/*
+		 * This is a "hint" - we already have eaddr worked out by the
+		 * processor for us.
+		 */
+		if (addr != eaddr)
+			printk(KERN_ERR "LDMSTM: PC = %08lx, instr = %08x, "
+				"addr = %08lx, eaddr = %08lx\n",
+				 instruction_pointer(regs), instr, addr, eaddr);
 
 		if ((LDST_U_BIT(instr) == 0 && LDST_P_BIT(instr) == 0) ||
 		    (LDST_U_BIT(instr)      && LDST_P_BIT(instr)))
@@ -322,39 +329,39 @@ printk("PC = %08lx, instr = %08x, addr = %08lx, eaddr = %08lx\n", instruction_po
 
 #endif
 
-#ifdef CONFIG_DEBUG_USER
-
+/*
+ * Some section permission faults need to be handled gracefully, for
+ * instance, when they happen due to a __{get,put}_user during an oops).
+ * In this case, we should return an error to the __{get,put}_user caller
+ * instead of causing another oops.  We should also fixup this fault as
+ * the user could pass a pointer to a section to the kernel.
+ */
 static int
 do_sect_fault(unsigned long addr, int error_code, struct pt_regs *regs)
 {
+	unsigned long fixup;
+
 	if (user_mode(regs)) {
+#ifdef CONFIG_DEBUG_USER
 		printk("%s: permission fault on section, "
 		       "address=0x%08lx, code %d\n",
 		       current->comm, addr, error_code);
-#ifdef DEBUG
-		{
-			unsigned int i, j;
-			unsigned long *sp;
-
-			sp = (unsigned long *) (regs->ARM_sp - 128);
-			for (j = 0; j < 20 && sp_valid(sp); j++) {
-				printk("%p: ", sp);
-				for (i = 0; i < 8 && sp_valid(sp); i += 1, sp++)
-					printk("%08lx ", *sp);
-				printk("\n");
-			}
-			show_regs(regs);
-			c_backtrace(regs->ARM_fp, regs->ARM_cpsr);
-		}
 #endif
+		goto fail;
 	}
+
+	fixup = search_exception_table(instruction_pointer(regs));
+	if (fixup != 0) {
+#ifdef DEBUG
+		printk(KERN_DEBUG "%s: Exception at [<%lx>] addr=%lx (fixup: %lx)\n",
+			tsk->comm, regs->ARM_pc, addr, fixup);
+#endif
+		regs->ARM_pc = fixup;
+		return 0;
+	}
+fail:
 	return 1;	/* not fixed up */
 }
-#else
-
-#define do_sect_fault NULL
-
-#endif
 
 static const struct fsr_info {
 	int	(*fn)(unsigned long addr, int error_code, struct pt_regs *regs);
@@ -382,18 +389,19 @@ static const struct fsr_info {
 /*
  * Currently dropped down to debug level
  */
-#define BUG_PROC_MSG \
-  KERN_DEBUG "Weird data abort (%08X).\n" \
-  KERN_DEBUG "Please see http://www.arm.linux.org.uk/state.html for " \
-	"more information\n"
-
 asmlinkage void
 do_DataAbort(unsigned long addr, int error_code, struct pt_regs *regs, int fsr)
 {
 	const struct fsr_info *inf = fsr_info + (fsr & 15);
 
+#if defined(CONFIG_CPU_SA110) || defined(CONFIG_CPU_SA1100)
 	if (addr == regs->ARM_pc)
-		goto weirdness;
+		goto sa1_weirdness;
+#endif
+#if defined(CONFIG_CPU_ARM720T) && defined(CONFIG_ALIGNMENT_TRAP)
+	if (addr & 3 && (fsr & 13) != 1)
+		goto arm720_weirdness;
+#endif
 
 	if (!inf->fn)
 		goto bad;
@@ -409,26 +417,51 @@ bad:
 	die_if_kernel("Oops", regs, 0);
 	return;
 
-weirdness:
+#if defined(CONFIG_CPU_SA110) || defined(CONFIG_CPU_SA1100)
+sa1_weirdness:
 	if (user_mode(regs)) {
 		static int first = 1;
 		if (first)
-			/*
-			 * I want statistical information on this problem,
-			 * but we don't want to hastle the users too much.
-			 */
-			printk(BUG_PROC_MSG, fsr);
+			printk(KERN_DEBUG "Weird data abort detected\n");
 		first = 0;
 		return;
 	}
 
 	if (!inf->fn || inf->fn(addr, error_code, regs))
 		goto bad;
+	return;
+#endif
+#if defined(CONFIG_CPU_ARM720T) && defined(CONFIG_ALIGNMENT_TRAP)
+arm720_weirdness:
+	if (!user_mode(regs)) {
+		unsigned long instr;
+
+		instr = *(unsigned long *)instruction_pointer(regs);
+
+		if ((instr & 0x04400000) != 0x04400000) {
+			static int first = 1;
+			if (first)
+				printk("Mis-reported alignment fault at "
+					"0x%08lx, fsr 0x%02x, code 0x%02x, "
+					"PC = 0x%08lx, instr = 0x%08lx\n",
+					addr, fsr, error_code, regs->ARM_pc,
+					instr);
+			first = 0;
+			cpu_tlb_invalidate_all();
+			cpu_cache_clean_invalidate_all();
+			return;
+		}
+	}
+
+	if (!inf->fn || inf->fn(addr, error_code, regs))
+		goto bad;
+	return;
+#endif
 }
 
 asmlinkage int
 do_PrefetchAbort(unsigned long addr, struct pt_regs *regs)
 {
-	do_page_fault(addr, FAULT_CODE_READ, regs);
+	do_page_fault(addr, 0, regs);
 	return 1;
 }

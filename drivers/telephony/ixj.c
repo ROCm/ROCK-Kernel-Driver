@@ -20,6 +20,7 @@
  *    
  * Fixes:
  *                  Marc Boucher, <marc@mbsi.ca>
+ *		    David Huggins-Daines <dhd@cepstral.com>
  * 
  * More information about the hardware related to this driver can be found  
  * at our website:    http://www.quicknet.net
@@ -90,7 +91,7 @@ static int samplerate = 100;
 
 MODULE_PARM(ixjdebug, "i");
 
-static IXJ ixj[IXJMAX];
+static IXJ* ixj[IXJMAX];
 
 static struct timer_list ixj_timer;
 
@@ -103,7 +104,7 @@ int ixj_convert_loaded = 0;
 *
 ************************************************************************/
 
-static int Stub(IXJ * J, unsigned long arg)
+static int Stub(IXJ * j, unsigned long arg)
 {
 	return 0;
 }
@@ -117,60 +118,62 @@ static IXJ_REGFUNC ixj_PostWrite = &Stub;
 static IXJ_REGFUNC ixj_PreIoctl = &Stub;
 static IXJ_REGFUNC ixj_PostIoctl = &Stub;
 
-static void ixj_read_frame(int board);
-static void ixj_write_frame(int board);
+static void ixj_read_frame(IXJ *j);
+static void ixj_write_frame(IXJ *j);
 static void ixj_init_timer(void);
 static void ixj_add_timer(void);
 static void ixj_timeout(unsigned long ptr);
-static int read_filters(int board);
-static int LineMonitor(int board);
+static int read_filters(IXJ *j);
+static int LineMonitor(IXJ *j);
 static int ixj_fasync(int fd, struct file *, int mode);
-static int ixj_set_port(int board, int arg);
-static int ixj_set_pots(int board, int arg);
-static int ixj_hookstate(int board);
-static int ixj_record_start(int board);
-static void ixj_record_stop(int board);
-static void set_rec_volume(int board, int volume);
-static void ixj_vad(int board, int arg);
-static int ixj_play_start(int board);
-static void ixj_play_stop(int board);
-static int ixj_set_tone_on(unsigned short arg, int board);
-static int ixj_set_tone_off(unsigned short, int board);
-static int ixj_play_tone(int board, char tone);
-static int idle(int board);
-static void ixj_ring_on(int board);
-static void ixj_ring_off(int board);
-static void aec_stop(int board);
-static void ixj_ringback(int board);
-static void ixj_busytone(int board);
-static void ixj_dialtone(int board);
-static void ixj_cpt_stop(int board);
-static char daa_int_read(int board);
-static int daa_set_mode(int board, int mode);
-static int ixj_linetest(int board);
-static int ixj_daa_write(int board);
-static int ixj_daa_cid_read(int board);
-static void DAA_Coeff_US(int board);
-static void DAA_Coeff_UK(int board);
-static void DAA_Coeff_France(int board);
-static void DAA_Coeff_Germany(int board);
-static void DAA_Coeff_Australia(int board);
-static void DAA_Coeff_Japan(int board);
-static int ixj_init_filter(int board, IXJ_FILTER * jf);
-static int ixj_init_tone(int board, IXJ_TONE * ti);
-static int ixj_build_cadence(int board, IXJ_CADENCE * cp);
-static int ixj_build_filter_cadence(int board, IXJ_FILTER_CADENCE * cp);
+static int ixj_set_port(IXJ *j, int arg);
+static int ixj_set_pots(IXJ *j, int arg);
+static int ixj_hookstate(IXJ *j);
+static int ixj_record_start(IXJ *j);
+static void ixj_record_stop(IXJ *j);
+static void set_rec_volume(IXJ *j, int volume);
+static void ixj_vad(IXJ *j, int arg);
+static int ixj_play_start(IXJ *j);
+static void ixj_play_stop(IXJ *j);
+static int ixj_set_tone_on(unsigned short arg, IXJ *j);
+static int ixj_set_tone_off(unsigned short, IXJ *j);
+static int ixj_play_tone(IXJ *j, char tone);
+static int idle(IXJ *j);
+static void ixj_ring_on(IXJ *j);
+static void ixj_ring_off(IXJ *j);
+static void aec_stop(IXJ *j);
+static void ixj_ringback(IXJ *j);
+static void ixj_busytone(IXJ *j);
+static void ixj_dialtone(IXJ *j);
+static void ixj_cpt_stop(IXJ *j);
+static char daa_int_read(IXJ *j);
+static int daa_set_mode(IXJ *j, int mode);
+static int ixj_linetest(IXJ *j);
+static int ixj_daa_write(IXJ *j);
+static int ixj_daa_cid_read(IXJ *j);
+static void DAA_Coeff_US(IXJ *j);
+static void DAA_Coeff_UK(IXJ *j);
+static void DAA_Coeff_France(IXJ *j);
+static void DAA_Coeff_Germany(IXJ *j);
+static void DAA_Coeff_Australia(IXJ *j);
+static void DAA_Coeff_Japan(IXJ *j);
+static int ixj_init_filter(IXJ *j, IXJ_FILTER * jf);
+static int ixj_init_tone(IXJ *j, IXJ_TONE * ti);
+static int ixj_build_cadence(IXJ *j, IXJ_CADENCE * cp);
+static int ixj_build_filter_cadence(IXJ *j, IXJ_FILTER_CADENCE * cp);
 // Serial Control Interface funtions
-static int SCI_Control(int board, int control);
-static int SCI_Prepare(int board);
-static int SCI_WaitHighSCI(int board);
-static int SCI_WaitLowSCI(int board);
+static int SCI_Control(IXJ *j, int control);
+static int SCI_Prepare(IXJ *j);
+static int SCI_WaitHighSCI(IXJ *j);
+static int SCI_WaitLowSCI(IXJ *j);
 static DWORD PCIEE_GetSerialNumber(WORD wAddress);
-static int ixj_PCcontrol_wait(int board);
-static void ixj_write_cid(int board);
-static void ixj_write_cid_bit(int board, int bit);
-static int set_base_frame(int board, int size);
-static int set_play_codec(int board, int rate);
+static int ixj_PCcontrol_wait(IXJ *j);
+static void ixj_write_cid(IXJ *j);
+static void ixj_write_cid_bit(IXJ *j, int bit);
+static int set_base_frame(IXJ *j, int size);
+static int set_play_codec(IXJ *j, int rate);
+static void set_rec_depth(IXJ *j, int depth);
+static void set_play_depth(IXJ *j, int depth);
 
 /************************************************************************
 CT8020/CT8021 Host Programmers Model
@@ -186,72 +189,79 @@ C-D Host Transmit (Write) Data Buffer Access Port (buffer input)Write Only
 E-F Host Recieve (Read) Data Buffer Access Port (buffer input)	Read Only
 ************************************************************************/
 
-extern __inline__ void ixj_read_HSR(int board)
+extern __inline__ void ixj_read_HSR(IXJ *j)
 {
-	ixj[board].hsr.bytes.low = inb_p(ixj[board].DSPbase + 8);
-	ixj[board].hsr.bytes.high = inb_p(ixj[board].DSPbase + 9);
+	j->hsr.bytes.low = inb_p(j->DSPbase + 8);
+	j->hsr.bytes.high = inb_p(j->DSPbase + 9);
 }
 
-extern __inline__ int IsControlReady(int board)
+extern __inline__ int IsControlReady(IXJ *j)
 {
-	ixj_read_HSR(board);
-	return ixj[board].hsr.bits.controlrdy ? 1 : 0;
+	ixj_read_HSR(j);
+	return j->hsr.bits.controlrdy ? 1 : 0;
 }
 
-extern __inline__ int IsPCControlReady(int board)
+extern __inline__ int IsPCControlReady(IXJ *j)
 {
-	ixj[board].pccr1.byte = inb_p(ixj[board].XILINXbase + 3);
-	return ixj[board].pccr1.bits.crr ? 1 : 0;
+	j->pccr1.byte = inb_p(j->XILINXbase + 3);
+	return j->pccr1.bits.crr ? 1 : 0;
 }
 
-extern __inline__ int IsStatusReady(int board)
+extern __inline__ int IsStatusReady(IXJ *j)
 {
-	ixj_read_HSR(board);
-	return ixj[board].hsr.bits.statusrdy ? 1 : 0;
+	ixj_read_HSR(j);
+	return j->hsr.bits.statusrdy ? 1 : 0;
 }
 
-extern __inline__ int IsRxReady(int board)
+extern __inline__ int IsRxReady(IXJ *j)
 {
-	ixj_read_HSR(board);
+	ixj_read_HSR(j);
 #ifdef PERFMON_STATS
-	++ixj[board].rxreadycheck;
+	++j->rxreadycheck;
 #endif
-	return ixj[board].hsr.bits.rxrdy ? 1 : 0;
+	return j->hsr.bits.rxrdy ? 1 : 0;
 }
 
-extern __inline__ int IsTxReady(int board)
+extern __inline__ int IsTxReady(IXJ *j)
 {
-	ixj_read_HSR(board);
+	ixj_read_HSR(j);
 #ifdef PERFMON_STATS
-	++ixj[board].txreadycheck;
+	++j->txreadycheck;
 #endif
-	return ixj[board].hsr.bits.txrdy ? 1 : 0;
+	return j->hsr.bits.txrdy ? 1 : 0;
 }
 
-extern __inline__ void set_play_volume(int board, int volume)
+extern __inline__ void set_play_volume(IXJ *j, int volume)
 {
-	ixj_WriteDSPCommand(0xCF02, board);
-	ixj_WriteDSPCommand(volume, board);
+	ixj_WriteDSPCommand(0xCF02, j);
+	ixj_WriteDSPCommand(volume, j);
 }
 
-extern __inline__ int get_play_volume(int board)
+extern __inline__ void set_play_depth(IXJ *j, int depth)
 {
-	ixj_WriteDSPCommand(0xCF00, board);
-	return ixj[board].ssr.high << 8 | ixj[board].ssr.low;
+	if (depth > 60)
+		depth = 60;
+	if (depth < 0)
+		depth = 0;
+	ixj_WriteDSPCommand(0x5280 + depth, j);
 }
 
-extern __inline__ BYTE SLIC_GetState(int board)
+extern __inline__ int get_play_volume(IXJ *j)
 {
-	IXJ *j = &ixj[board];
+	ixj_WriteDSPCommand(0xCF00, j);
+	return j->ssr.high << 8 | j->ssr.low;
+}
 
-	if (j->cardtype == 600) {
+extern __inline__ BYTE SLIC_GetState(IXJ *j)
+{
+	if (j->cardtype == QTI_PHONECARD) {
 		j->pccr1.byte = 0;
 		j->psccr.bits.dev = 3;
 		j->psccr.bits.rw = 1;
 		outw_p(j->psccr.byte << 8, j->XILINXbase + 0x00);
-		ixj_PCcontrol_wait(board);
+		ixj_PCcontrol_wait(j);
 		j->pslic.byte = inw_p(j->XILINXbase + 0x00) & 0xFF;
-		ixj_PCcontrol_wait(board);
+		ixj_PCcontrol_wait(j);
 		if (j->pslic.bits.powerdown)
 			return PLD_SLIC_STATE_OC;
 		else if (!j->pslic.bits.ring0 && !j->pslic.bits.ring1)
@@ -264,12 +274,11 @@ extern __inline__ BYTE SLIC_GetState(int board)
 	return j->pld_slicr.bits.state;
 }
 
-static BOOL SLIC_SetState(BYTE byState, int board)
+static BOOL SLIC_SetState(BYTE byState, IXJ *j)
 {
 	BOOL fRetVal = FALSE;
-	IXJ *j = &ixj[board];
 
-	if (j->cardtype == 600) {
+	if (j->cardtype == QTI_PHONECARD) {
 		if (j->flags.pcmciasct) {
 			switch (byState) {
 			case PLD_SLIC_STATE_TIPOPEN:
@@ -309,7 +318,7 @@ static BOOL SLIC_SetState(BYTE byState, int board)
 			j->psccr.bits.dev = 3;
 			j->psccr.bits.rw = 0;
 			outw_p(j->psccr.byte << 8 | j->pslic.byte, j->XILINXbase + 0x00);
-			ixj_PCcontrol_wait(board);
+			ixj_PCcontrol_wait(j);
 		}
 	} else {
 		// Set the C1, C2, C3 & B2EN signals.
@@ -398,12 +407,14 @@ int ixj_register(int index, IXJ_REGFUNC regfunc)
 	case G729LOADER:
 		ixj_DownloadG729 = regfunc;
 		for (cnt = 0; cnt < IXJMAX; cnt++)
-			ixj_DownloadG729(&ixj[cnt], 0L);
+			if (ixj[cnt] != NULL)
+				ixj_DownloadG729(ixj[cnt], 0L);
 		break;
 	case TS85LOADER:
 		ixj_DownloadTS85 = regfunc;
 		for (cnt = 0; cnt < IXJMAX; cnt++)
-			ixj_DownloadTS85(&ixj[cnt], 0L);
+			if (ixj[cnt] != NULL)
+				ixj_DownloadTS85(ixj[cnt], 0L);
 		break;
 	case PRE_READ:
 		ixj_PreRead = regfunc;
@@ -476,9 +487,8 @@ static void ixj_add_timer(void)
 	add_timer(&ixj_timer);
 }
 
-static void ixj_tone_timeout(int board)
+static void ixj_tone_timeout(IXJ *j)
 {
-	IXJ *j = &ixj[board];
 	IXJ_TONE ti;
 
 	j->tone_state++;
@@ -489,11 +499,11 @@ static void ixj_tone_timeout(int board)
 			if (j->tone_cadence_state >= j->cadence_t->elements_used) {
 				switch (j->cadence_t->termination) {
 				case PLAY_ONCE:
-					ixj_cpt_stop(board);
+					ixj_cpt_stop(j);
 					break;
 				case REPEAT_LAST_ELEMENT:
 					j->tone_cadence_state--;
-					ixj_play_tone(board, j->cadence_t->ce[j->tone_cadence_state].index);
+					ixj_play_tone(j, j->cadence_t->ce[j->tone_cadence_state].index);
 					break;
 				case REPEAT_ALL:
 					j->tone_cadence_state = 0;
@@ -503,11 +513,11 @@ static void ixj_tone_timeout(int board)
 						ti.gain0 = j->cadence_t->ce[j->tone_cadence_state].gain0;
 						ti.freq1 = j->cadence_t->ce[j->tone_cadence_state].freq1;
 						ti.gain1 = j->cadence_t->ce[j->tone_cadence_state].gain1;
-						ixj_init_tone(board, &ti);
+						ixj_init_tone(j, &ti);
 					}
-					ixj_set_tone_on(j->cadence_t->ce[0].tone_on_time, board);
-					ixj_set_tone_off(j->cadence_t->ce[0].tone_off_time, board);
-					ixj_play_tone(board, j->cadence_t->ce[0].index);
+					ixj_set_tone_on(j->cadence_t->ce[0].tone_on_time, j);
+					ixj_set_tone_off(j->cadence_t->ce[0].tone_off_time, j);
+					ixj_play_tone(j, j->cadence_t->ce[0].index);
 					break;
 				}
 			} else {
@@ -517,41 +527,43 @@ static void ixj_tone_timeout(int board)
 					ti.gain0 = j->cadence_t->ce[j->tone_cadence_state].gain0;
 					ti.freq1 = j->cadence_t->ce[j->tone_cadence_state].freq1;
 					ti.gain1 = j->cadence_t->ce[j->tone_cadence_state].gain1;
-					ixj_init_tone(board, &ti);
+					ixj_init_tone(j, &ti);
 				}
-				ixj_set_tone_on(j->cadence_t->ce[j->tone_cadence_state].tone_on_time, board);
-				ixj_set_tone_off(j->cadence_t->ce[j->tone_cadence_state].tone_off_time, board);
-				ixj_play_tone(board, j->cadence_t->ce[j->tone_cadence_state].index);
+				ixj_set_tone_on(j->cadence_t->ce[j->tone_cadence_state].tone_on_time, j);
+				ixj_set_tone_off(j->cadence_t->ce[j->tone_cadence_state].tone_off_time, j);
+				ixj_play_tone(j, j->cadence_t->ce[j->tone_cadence_state].index);
 			}
 		}
 	}
 }
 
-extern __inline__ void ixj_kill_fasync(int board, int dir)
+extern __inline__ void ixj_kill_fasync(IXJ *j, int band)
 {
-	kill_fasync(&ixj[board].async_queue, SIGIO, dir);	// Send apps notice of change
-
+	kill_fasync(&j->async_queue, SIGIO, band);
 }
+
 static void ixj_timeout(unsigned long ptr)
 {
 	int board;
 	unsigned long jifon;
-	IXJ *j;
 
 	for (board = 0; board < IXJMAX; board++) {
-		j = &ixj[board];
+		IXJ *j = ixj[board];
+
+		if (j == NULL)
+			continue;
 
 		if (j->DSPbase) {
 #ifdef PERFMON_STATS
 			j->timerchecks++;
 #endif
 			if (j->tone_state) {
-				if (!ixj_hookstate(board)) {
-					ixj_cpt_stop(board);
+				if (!ixj_hookstate(j)) {
+					ixj_cpt_stop(j);
 					if (j->m_hook) {
 						j->m_hook = 0;
 						j->ex.bits.hookstate = 1;
-						ixj_kill_fasync(board, POLL_IN);
+						ixj_kill_fasync(j, POLL_PRI);
 					}
 					continue;
 				}
@@ -562,60 +574,60 @@ static void ixj_timeout(unsigned long ptr)
 					    (hertz * j->tone_off_time * 25 / 100000);
 				if (time_before(jiffies, j->tone_start_jif + jifon)) {
 					if (j->tone_state == 1) {
-						ixj_play_tone(board, j->tone_index);
+						ixj_play_tone(j, j->tone_index);
 						if (j->dsp.low == 0x20) {
 							continue;
 						}
 					} else {
-						ixj_play_tone(board, 0);
+						ixj_play_tone(j, 0);
 						if (j->dsp.low == 0x20) {
 							continue;
 						}
 					}
 				} else {
-					ixj_tone_timeout(board);
+					ixj_tone_timeout(j);
 					if (j->flags.dialtone) {
-						ixj_dialtone(board);
+						ixj_dialtone(j);
 					}
 					if (j->flags.busytone) {
-						ixj_busytone(board);
+						ixj_busytone(j);
 						if (j->dsp.low == 0x20) {
 							continue;
 						}
 					}
 					if (j->flags.ringback) {
-						ixj_ringback(board);
+						ixj_ringback(j);
 						if (j->dsp.low == 0x20) {
 							continue;
 						}
 					}
 					if (!j->tone_state) {
 						if (j->dsp.low == 0x20 || (j->play_mode == -1 && j->rec_mode == -1))
-							idle(board);
+							idle(j);
 						if (j->dsp.low == 0x20 && j->play_mode != -1)
-							ixj_play_start(board);
+							ixj_play_start(j);
 						if (j->dsp.low == 0x20 && j->rec_mode != -1)
-							ixj_record_start(board);
+							ixj_record_start(j);
 					}
 				}
 			}
-			if (!j->tone_state || j->dsp.low != 0x20) {
-				if (IsRxReady(board)) {
-					ixj_read_frame(board);
+			if (!(j->tone_state && j->dsp.low == 0x20)) {
+				if (IsRxReady(j)) {
+					ixj_read_frame(j);
 				}
-				if (IsTxReady(board) && !j->flags.cidplay) {
-					ixj_write_frame(board);
+				if (IsTxReady(j) && !j->flags.cidplay) {
+					ixj_write_frame(j);
 				}
 			}
 			if (j->flags.cringing) {
-				if (ixj_hookstate(board) & 1) {
+				if (ixj_hookstate(j) & 1) {
 					j->flags.cringing = 0;
-					ixj_ring_off(board);
+					ixj_ring_off(j);
 				} else {
 					if (jiffies - j->ring_cadence_jif >= (hertz/2)) {
 						if (j->flags.cidring && !j->flags.cidsent) {
 							j->flags.cidsent = 1;
-							ixj_write_cid(board);
+							ixj_write_cid(j);
 							j->flags.cidring = 0;
 						}
 						j->ring_cadence_t--;
@@ -624,34 +636,34 @@ static void ixj_timeout(unsigned long ptr)
 						j->ring_cadence_jif = jiffies;
 					}
 					if (j->ring_cadence & 1 << j->ring_cadence_t) {
-						ixj_ring_on(board);
+						ixj_ring_on(j);
 					} else {
-						ixj_ring_off(board);
+						ixj_ring_off(j);
 						j->flags.cidring = 1;
 					}
 					continue;
 				}
 			}
 			if (!j->flags.ringing) {
-				if (ixj_hookstate(board)) {
+				if (ixj_hookstate(j)) {
 					if (j->dsp.low != 0x20 &&
-					    SLIC_GetState(board) != PLD_SLIC_STATE_ACTIVE) {
-						SLIC_SetState(PLD_SLIC_STATE_ACTIVE, board);
+					    SLIC_GetState(j) != PLD_SLIC_STATE_ACTIVE) {
+						SLIC_SetState(PLD_SLIC_STATE_ACTIVE, j);
 					}
-					LineMonitor(board);
-					read_filters(board);
-					ixj_WriteDSPCommand(0x511B, board);
+					LineMonitor(j);
+					read_filters(j);
+					ixj_WriteDSPCommand(0x511B, j);
 					j->proc_load = j->ssr.high << 8 | j->ssr.low;
 					if (!j->m_hook) {
 						j->m_hook = j->ex.bits.hookstate = 1;
-						ixj_kill_fasync(board, POLL_IN);
+						ixj_kill_fasync(j, POLL_PRI);
 					}
 				} else {
 					if (j->dsp.low != 0x20 &&
-					    SLIC_GetState(board) == PLD_SLIC_STATE_ACTIVE)
+					    SLIC_GetState(j) == PLD_SLIC_STATE_ACTIVE)
 						// Internet LineJACK
 					{
-						SLIC_SetState(PLD_SLIC_STATE_STANDBY, board);
+						SLIC_SetState(PLD_SLIC_STATE_STANDBY, j);
 					}
 					if (j->ex.bits.dtmf_ready) {
 						j->dtmf_wp = j->dtmf_rp = j->ex.bits.dtmf_ready = 0;
@@ -659,7 +671,7 @@ static void ixj_timeout(unsigned long ptr)
 					if (j->m_hook) {
 						j->m_hook = 0;
 						j->ex.bits.hookstate = 1;
-						ixj_kill_fasync(board, POLL_IN);
+						ixj_kill_fasync(j, POLL_PRI);
 					}
 				}
 			}
@@ -667,34 +679,34 @@ static void ixj_timeout(unsigned long ptr)
 				if (j->flags.pstn_present) {
 					j->pld_scrr.byte = inb_p(j->XILINXbase);
 					if (j->pld_scrr.bits.daaflag) {
-						daa_int_read(board);
+						daa_int_read(j);
 						if (j->m_DAAShadowRegs.XOP_REGS.XOP.xr0.bitreg.RING) {
 							if (!j->flags.pstn_ringing) {
 								j->flags.pstn_ringing = 1;
 								if (j->daa_mode != SOP_PU_RINGING)
-									daa_set_mode(board, SOP_PU_RINGING);
+									daa_set_mode(j, SOP_PU_RINGING);
 							}
 						}
 						if (time_after(jiffies, j->pstn_sleeptil) && j->m_DAAShadowRegs.XOP_REGS.XOP.xr0.bitreg.VDD_OK) {
 							j->pstn_winkstart = 0;
 							j->pstn_ring_stop = 0;
-							ixj[board].pld_scrw.bits.led1 = 1;
+							j->pld_scrw.bits.led1 = 1;
 							if (j->flags.pstn_ringing && !j->pstn_envelope) {
 								if (j->daa_mode != SOP_PU_RINGING) {
 									j->flags.pstn_ringing = 0;
 								} else {
-									ixj[board].pld_scrw.bits.led2 = 0;
+									j->pld_scrw.bits.led2 = 0;
 									j->pstn_envelope = 1;
 									j->pstn_ring_start = jiffies;
 									j->pstn_ring_stop = 0;
 								}
 								j->ex.bits.pstn_ring = 0;
 							}
-							outb_p(ixj[board].pld_scrw.byte, ixj[board].XILINXbase);
+							outb_p(j->pld_scrw.byte, j->XILINXbase);
 						} else {
-							ixj[board].pld_scrw.bits.led1 = 0;
-							ixj[board].pld_scrw.bits.led2 = 1;
-							outb_p(ixj[board].pld_scrw.byte, ixj[board].XILINXbase);
+							j->pld_scrw.bits.led1 = 0;
+							j->pld_scrw.bits.led2 = 1;
+							outb_p(j->pld_scrw.byte, j->XILINXbase);
 							if (j->flags.pstn_ringing && j->pstn_envelope) {
 								if(!j->pstn_ring_stop) {
 									j->pstn_ring_stop = jiffies;
@@ -707,7 +719,7 @@ static void ixj_timeout(unsigned long ptr)
 								if (!j->pstn_winkstart) {
 									j->pstn_winkstart = jiffies;
 								} else if (time_after(jiffies, j->pstn_winkstart + (hertz * j->winktime / 1000))) {
-									daa_set_mode(board, SOP_PU_SLEEP);
+									daa_set_mode(j, SOP_PU_SLEEP);
 									j->pstn_winkstart = 0;
 									j->ex.bits.pstn_wink = 1;
 								}
@@ -717,7 +729,7 @@ static void ixj_timeout(unsigned long ptr)
 						}
 						if (j->m_DAAShadowRegs.XOP_REGS.XOP.xr0.bitreg.Cadence) {
 							if (j->daa_mode == SOP_PU_RINGING) {
-								daa_set_mode(board, SOP_PU_SLEEP);
+								daa_set_mode(j, SOP_PU_SLEEP);
 								j->flags.pstn_ringing = 0;
 								j->ex.bits.pstn_ring = 0;
 							}
@@ -730,12 +742,12 @@ static void ixj_timeout(unsigned long ptr)
 						}
 					} else {
 						if (j->pld_scrr.bits.daaflag) {
-							daa_int_read(board);
+							daa_int_read(j);
 						}
 						j->ex.bits.pstn_ring = 0;
 						if (j->pstn_cid_intr && jiffies > j->pstn_cid_received + (hertz * 3)) {
 							if (j->daa_mode == SOP_PU_RINGING) {
-								ixj_daa_cid_read(board);
+								ixj_daa_cid_read(j);
 								j->ex.bits.caller_id = 1;
 							}
 							j->pstn_cid_intr = 0;
@@ -743,9 +755,9 @@ static void ixj_timeout(unsigned long ptr)
 							j->ex.bits.caller_id = 0;
 						}
 						if (!j->m_DAAShadowRegs.XOP_REGS.XOP.xr0.bitreg.VDD_OK) {
-							ixj[board].pld_scrw.bits.led1 = 0;
-							ixj[board].pld_scrw.bits.led2 = 1;
-							outb_p(ixj[board].pld_scrw.byte, ixj[board].XILINXbase);
+							j->pld_scrw.bits.led1 = 0;
+							j->pld_scrw.bits.led2 = 1;
+							outb_p(j->pld_scrw.byte, j->XILINXbase);
 							if (j->flags.pstn_ringing && j->pstn_envelope) {
 								if(!j->pstn_ring_stop) {
 									j->pstn_ring_stop = jiffies;
@@ -754,13 +766,13 @@ static void ixj_timeout(unsigned long ptr)
 									j->ex.bits.pstn_ring = 1;
 									j->pstn_envelope = 0;
 								}
-								ixj[board].pld_scrw.bits.led1 = 0;
-								outb_p(ixj[board].pld_scrw.byte, ixj[board].XILINXbase);
+								j->pld_scrw.bits.led1 = 0;
+								outb_p(j->pld_scrw.byte, j->XILINXbase);
 							} else if (j->daa_mode == SOP_PU_CONVERSATION) {
 								if (!j->pstn_winkstart) {
 									j->pstn_winkstart = jiffies;
 								} else if (time_after(jiffies, j->pstn_winkstart + (hertz * j->winktime / 1000))) {
-									daa_set_mode(board, SOP_PU_SLEEP);
+									daa_set_mode(j, SOP_PU_SLEEP);
 									j->pstn_winkstart = 0;
 									j->ex.bits.pstn_wink = 1;
 								}
@@ -771,8 +783,7 @@ static void ixj_timeout(unsigned long ptr)
 			}
 			if (j->ex.bytes) {
 				wake_up_interruptible(&j->poll_q);	// Wake any blocked selects
-
-				ixj_kill_fasync(board, POLL_IN);
+				ixj_kill_fasync(j, POLL_PRI);
 			}
 		} else {
 			break;
@@ -781,12 +792,12 @@ static void ixj_timeout(unsigned long ptr)
 	ixj_add_timer();
 }
 
-static int ixj_status_wait(int board)
+static int ixj_status_wait(IXJ *j)
 {
 	unsigned long jif;
 
 	jif = jiffies;
-	while (!IsStatusReady(board)) {
+	while (!IsStatusReady(j)) {
 		if (jiffies - jif > (60 * (hertz / 100))) {
 			return -1;
 		}
@@ -794,12 +805,12 @@ static int ixj_status_wait(int board)
 	return 0;
 }
 
-static int ixj_PCcontrol_wait(int board)
+static int ixj_PCcontrol_wait(IXJ *j)
 {
 	unsigned long jif;
 
 	jif = jiffies;
-	while (!IsPCControlReady(board)) {
+	while (!IsPCControlReady(j)) {
 		if (jiffies - jif > (60 * (hertz / 100))) {
 			return -1;
 		}
@@ -807,7 +818,7 @@ static int ixj_PCcontrol_wait(int board)
 	return 0;
 }
 
-int ixj_WriteDSPCommand(unsigned short cmd, int board)
+int ixj_WriteDSPCommand(unsigned short cmd, IXJ *j)
 {
 	BYTES bytes;
 	unsigned long jif;
@@ -815,22 +826,22 @@ int ixj_WriteDSPCommand(unsigned short cmd, int board)
 	bytes.high = (cmd & 0xFF00) >> 8;
 	bytes.low = cmd & 0x00FF;
 	jif = jiffies;
-	while (!IsControlReady(board)) {
+	while (!IsControlReady(j)) {
 		if (jiffies - jif > (60 * (hertz / 100))) {
 			return -1;
 		}
 	}
-	outb_p(bytes.low, ixj[board].DSPbase + 6);
-	outb_p(bytes.high, ixj[board].DSPbase + 7);
+	outb_p(bytes.low, j->DSPbase + 6);
+	outb_p(bytes.high, j->DSPbase + 7);
 
-	if (ixj_status_wait(board)) {
-		ixj[board].ssr.low = 0xFF;
-		ixj[board].ssr.high = 0xFF;
+	if (ixj_status_wait(j)) {
+		j->ssr.low = 0xFF;
+		j->ssr.high = 0xFF;
 		return -1;
 	}
 /* Read Software Status Register */
-	ixj[board].ssr.low = inb_p(ixj[board].DSPbase + 2);
-	ixj[board].ssr.high = inb_p(ixj[board].DSPbase + 3);
+	j->ssr.low = inb_p(j->DSPbase + 2);
+	j->ssr.high = inb_p(j->DSPbase + 3);
 	return 0;
 }
 
@@ -839,26 +850,26 @@ int ixj_WriteDSPCommand(unsigned short cmd, int board)
 *  General Purpose IO Register read routine
 *
 ***************************************************************************/
-extern __inline__ int ixj_gpio_read(int board)
+extern __inline__ int ixj_gpio_read(IXJ *j)
 {
-	if (ixj_WriteDSPCommand(0x5143, board))
+	if (ixj_WriteDSPCommand(0x5143, j))
 		return -1;
 
-	ixj[board].gpio.bytes.low = ixj[board].ssr.low;
-	ixj[board].gpio.bytes.high = ixj[board].ssr.high;
+	j->gpio.bytes.low = j->ssr.low;
+	j->gpio.bytes.high = j->ssr.high;
 
 	return 0;
 }
 
-extern __inline__ void LED_SetState(int state, int board)
+extern __inline__ void LED_SetState(int state, IXJ *j)
 {
-	if (ixj[board].cardtype == 300) {
-		ixj[board].pld_scrw.bits.led1 = state & 0x1 ? 1 : 0;
-		ixj[board].pld_scrw.bits.led2 = state & 0x2 ? 1 : 0;
-		ixj[board].pld_scrw.bits.led3 = state & 0x4 ? 1 : 0;
-		ixj[board].pld_scrw.bits.led4 = state & 0x8 ? 1 : 0;
+	if (j->cardtype == QTI_LINEJACK) {
+		j->pld_scrw.bits.led1 = state & 0x1 ? 1 : 0;
+		j->pld_scrw.bits.led2 = state & 0x2 ? 1 : 0;
+		j->pld_scrw.bits.led3 = state & 0x4 ? 1 : 0;
+		j->pld_scrw.bits.led4 = state & 0x8 ? 1 : 0;
 
-		outb_p(ixj[board].pld_scrw.byte, ixj[board].XILINXbase);
+		outb_p(j->pld_scrw.byte, j->XILINXbase);
 	}
 }
 
@@ -876,11 +887,9 @@ extern __inline__ void LED_SetState(int state, int board)
 *
 * Hook Switch changes reported on GPIO_3
 *********************************************************************/
-static int ixj_set_port(int board, int arg)
+static int ixj_set_port(IXJ *j, int arg)
 {
-	IXJ *j = &ixj[board];
-
-	if (j->cardtype == 400) {
+	if (j->cardtype == QTI_PHONEJACK_LITE) {
 		if (arg != PORT_POTS)
 			return 10;
 		else
@@ -890,20 +899,20 @@ static int ixj_set_port(int board, int arg)
 	case PORT_POTS:
 		j->port = PORT_POTS;
 		switch (j->cardtype) {
-		case 600:
+		case QTI_PHONECARD:
 			if (j->flags.pcmciasct == 1)
-				SLIC_SetState(PLD_SLIC_STATE_ACTIVE, board);
+				SLIC_SetState(PLD_SLIC_STATE_ACTIVE, j);
 			else
 				return 11;
 			break;
-		case 500:
+		case QTI_PHONEJACK_PCI:
 			j->pld_slicw.pcib.mic = 0;
 			j->pld_slicw.pcib.spk = 0;
 			outb_p(j->pld_slicw.byte, j->XILINXbase + 0x01);
 			break;
-		case 300:
-			ixj_set_pots(board, 0);
-			if (ixj_WriteDSPCommand(0xC528, board))		/* Write CODEC config to
+		case QTI_LINEJACK:
+			ixj_set_pots(j, 0);
+			if (ixj_WriteDSPCommand(0xC528, j))		/* Write CODEC config to
 									   Software Control Register */
 				return 2;
 			j->pld_scrw.bits.daafsyncen = 0;	// Turn off DAA Frame Sync
@@ -914,19 +923,19 @@ static int ixj_set_port(int board, int arg)
 			j->pld_slicw.bits.rly1 = 1;
 			j->pld_slicw.bits.spken = 0;
 			outb_p(j->pld_slicw.byte, j->XILINXbase + 0x01);
-			SLIC_SetState(PLD_SLIC_STATE_STANDBY, board);
+			SLIC_SetState(PLD_SLIC_STATE_STANDBY, j);
 			break;
-		case 100:
+		case QTI_PHONEJACK:
 			j->gpio.bytes.high = 0x0B;
 			j->gpio.bits.gpio6 = 0;
 			j->gpio.bits.gpio7 = 0;
-			ixj_WriteDSPCommand(j->gpio.word, board);
+			ixj_WriteDSPCommand(j->gpio.word, j);
 			break;
 		}
 		break;
 	case PORT_PSTN:
-		if (j->cardtype == 300) {
-			ixj_WriteDSPCommand(0xC534, board);	/* Write CODEC config to Software Control Register */
+		if (j->cardtype == QTI_LINEJACK) {
+			ixj_WriteDSPCommand(0xC534, j);	/* Write CODEC config to Software Control Register */
 
 			j->pld_slicw.bits.rly3 = 0;
 			j->pld_slicw.bits.rly1 = 1;
@@ -940,38 +949,35 @@ static int ixj_set_port(int board, int arg)
 	case PORT_SPEAKER:
 		j->port = PORT_SPEAKER;
 		switch (j->cardtype) {
-		case 600:
+		case QTI_PHONECARD:
 			if (j->flags.pcmciasct) {
-				SLIC_SetState(PLD_SLIC_STATE_OC, board);
-//                              while(SLIC_GetState(board) != PLD_SLIC_STATE_OC) {
-				//                                      SLIC_SetState(PLD_SLIC_STATE_OC,board);
-				//                              }
+				SLIC_SetState(PLD_SLIC_STATE_OC, j);
 			}
 			break;
-		case 500:
+		case QTI_PHONEJACK_PCI:
 			j->pld_slicw.pcib.mic = 1;
 			j->pld_slicw.pcib.spk = 1;
 			outb_p(j->pld_slicw.byte, j->XILINXbase + 0x01);
 			break;
-		case 300:
-			ixj_set_pots(board, 0);
+		case QTI_LINEJACK:
+			ixj_set_pots(j, 0);
 			break;
-		case 100:
+		case QTI_PHONEJACK:
 			j->gpio.bytes.high = 0x0B;
 			j->gpio.bits.gpio6 = 0;
 			j->gpio.bits.gpio7 = 1;
-			ixj_WriteDSPCommand(j->gpio.word, board);
+			ixj_WriteDSPCommand(j->gpio.word, j);
 			break;
 		}
 		break;
 	case PORT_HANDSET:
-		if (j->cardtype == 300 || j->cardtype == 500) {
+		if (j->cardtype == QTI_LINEJACK || j->cardtype == QTI_PHONEJACK_PCI) {
 			return 5;
 		} else {
 			j->gpio.bytes.high = 0x0B;
 			j->gpio.bits.gpio6 = 1;
 			j->gpio.bits.gpio7 = 0;
-			ixj_WriteDSPCommand(j->gpio.word, board);
+			ixj_WriteDSPCommand(j->gpio.word, j);
 			j->port = PORT_HANDSET;
 		}
 		break;
@@ -982,11 +988,9 @@ static int ixj_set_port(int board, int arg)
 	return 0;
 }
 
-static int ixj_set_pots(int board, int arg)
+static int ixj_set_pots(IXJ *j, int arg)
 {
-	IXJ *j = &ixj[board];
-
-	if (j->cardtype == 300) {
+	if (j->cardtype == QTI_LINEJACK) {
 		if (arg) {
 			if (j->port == PORT_PSTN) {
 				j->pld_slicw.bits.rly1 = 0;
@@ -1005,33 +1009,22 @@ static int ixj_set_pots(int board, int arg)
 	}
 }
 
-static void ixj_ring_on(int board)
+static void ixj_ring_on(IXJ *j)
 {
-	IXJ *j = &ixj[board];
-	if (j->dsp.low == 0x20)	// Internet PhoneJACK
-	 {
-		if (ixjdebug > 0)
-			printk(KERN_INFO "IXJ Ring On /dev/phone%d\n", board);
-
+	if (j->dsp.low == 0x20) { // Internet PhoneJACK
 		j->gpio.bytes.high = 0x0B;
 		j->gpio.bytes.low = 0x00;
 		j->gpio.bits.gpio1 = 1;
 		j->gpio.bits.gpio2 = 1;
 		j->gpio.bits.gpio5 = 0;
-		ixj_WriteDSPCommand(j->gpio.word, board);	/* send the ring signal */
-	} else			// Internet LineJACK, Internet PhoneJACK Lite or Internet PhoneJACK PCI
-	 {
-		if (ixjdebug > 0)
-			printk(KERN_INFO "IXJ Ring On /dev/phone%d\n", board);
-
-		SLIC_SetState(PLD_SLIC_STATE_RINGING, board);
+		ixj_WriteDSPCommand(j->gpio.word, j);	/* send the ring signal */
+	} else {			// Internet LineJACK, Internet PhoneJACK Lite or Internet PhoneJACK PCI
+		SLIC_SetState(PLD_SLIC_STATE_RINGING, j);
 	}
 }
 
-static int ixj_pcmcia_cable_check(int board)
+static int ixj_pcmcia_cable_check(IXJ *j)
 {
-	IXJ *j = &ixj[board];
-
 	j->pccr1.byte = inb_p(j->XILINXbase + 0x03);
 	if (!j->flags.pcmciastate) {
 		j->pccr2.byte = inb_p(j->XILINXbase + 0x02);
@@ -1044,13 +1037,13 @@ static int ixj_pcmcia_cable_check(int board)
 			j->psccr.bits.dev = 3;
 			j->psccr.bits.rw = 1;
 			outw_p(j->psccr.byte << 8, j->XILINXbase + 0x00);
-			ixj_PCcontrol_wait(board);
+			ixj_PCcontrol_wait(j);
 			j->pslic.byte = inw_p(j->XILINXbase + 0x00) & 0xFF;
 			j->pslic.bits.led2 = j->pslic.bits.det ? 1 : 0;
 			j->psccr.bits.dev = 3;
 			j->psccr.bits.rw = 0;
 			outw_p(j->psccr.byte << 8 | j->pslic.byte, j->XILINXbase + 0x00);
-			ixj_PCcontrol_wait(board);
+			ixj_PCcontrol_wait(j);
 			return j->pslic.bits.led2 ? 1 : 0;
 		} else if (j->flags.pcmciasct) {
 			return j->r_hook;
@@ -1089,7 +1082,7 @@ static int ixj_pcmcia_cable_check(int board)
 			j->psccr.bits.dev = 3;
 			j->psccr.bits.rw = 1;
 			outb_p(j->psccr.byte, j->XILINXbase + 0x01);
-			ixj_PCcontrol_wait(board);
+			ixj_PCcontrol_wait(j);
 			j->flags.pcmciascp = 1;		// Set Cable Present Flag
 
 			j->flags.pcmciasct = (inw_p(j->XILINXbase + 0x00) >> 8) & 0x03;		// Get Cable Type
@@ -1122,7 +1115,7 @@ static int ixj_pcmcia_cable_check(int board)
 			j->psccr.bits.dev = 0;
 			outb(j->sic1.byte, j->XILINXbase + 0x00);
 			outb(j->psccr.byte, j->XILINXbase + 0x01);
-			ixj_PCcontrol_wait(board);
+			ixj_PCcontrol_wait(j);
 			j->sic2.bits.al = 0;	// Analog Loopback DAC analog -> ADC analog
 
 			j->sic2.bits.dl2 = 0;	// Digital Loopback DAC -> ADC one bit
@@ -1140,7 +1133,7 @@ static int ixj_pcmcia_cable_check(int board)
 			j->psccr.bits.dev = 0;
 			outb(j->sic2.byte, j->XILINXbase + 0x00);
 			outb(j->psccr.byte, j->XILINXbase + 0x01);
-			ixj_PCcontrol_wait(board);
+			ixj_PCcontrol_wait(j);
 			j->psccr.bits.addr = 3;		// R/W Smart Cable Register Address
 
 			j->psccr.bits.rw = 0;	// Read / Write flag
@@ -1149,7 +1142,7 @@ static int ixj_pcmcia_cable_check(int board)
 			outb(0x00, j->XILINXbase + 0x00);	// PLL Divide N1
 
 			outb(j->psccr.byte, j->XILINXbase + 0x01);
-			ixj_PCcontrol_wait(board);
+			ixj_PCcontrol_wait(j);
 			j->psccr.bits.addr = 4;		// R/W Smart Cable Register Address
 
 			j->psccr.bits.rw = 0;	// Read / Write flag
@@ -1158,7 +1151,7 @@ static int ixj_pcmcia_cable_check(int board)
 			outb(0x09, j->XILINXbase + 0x00);	// PLL Multiply M1
 
 			outb(j->psccr.byte, j->XILINXbase + 0x01);
-			ixj_PCcontrol_wait(board);
+			ixj_PCcontrol_wait(j);
 			j->sirxg.bits.lig = 1;	// Line In Gain
 
 			j->sirxg.bits.lim = 1;	// Line In Mute
@@ -1178,7 +1171,7 @@ static int ixj_pcmcia_cable_check(int board)
 			j->psccr.bits.dev = 0;
 			outb(j->sirxg.byte, j->XILINXbase + 0x00);
 			outb(j->psccr.byte, j->XILINXbase + 0x01);
-			ixj_PCcontrol_wait(board);
+			ixj_PCcontrol_wait(j);
 			j->siadc.bits.hom = 0;	// Handset Out Mute
 
 			j->siadc.bits.lom = 0;	// Line Out Mute
@@ -1192,7 +1185,7 @@ static int ixj_pcmcia_cable_check(int board)
 			j->psccr.bits.dev = 0;
 			outb(j->siadc.byte, j->XILINXbase + 0x00);
 			outb(j->psccr.byte, j->XILINXbase + 0x01);
-			ixj_PCcontrol_wait(board);
+			ixj_PCcontrol_wait(j);
 			j->sidac.bits.srm = 1;	// Speaker Right Mute
 
 			j->sidac.bits.slm = 1;	// Speaker Left Mute
@@ -1206,7 +1199,7 @@ static int ixj_pcmcia_cable_check(int board)
 			j->psccr.bits.dev = 0;
 			outb(j->sidac.byte, j->XILINXbase + 0x00);
 			outb(j->psccr.byte, j->XILINXbase + 0x01);
-			ixj_PCcontrol_wait(board);
+			ixj_PCcontrol_wait(j);
 			j->siaatt.bits.sot = 0;
 			j->psccr.bits.addr = 9;		// R/W Smart Cable Register Address
 
@@ -1215,7 +1208,7 @@ static int ixj_pcmcia_cable_check(int board)
 			j->psccr.bits.dev = 0;
 			outb(j->siaatt.byte, j->XILINXbase + 0x00);
 			outb(j->psccr.byte, j->XILINXbase + 0x01);
-			ixj_PCcontrol_wait(board);
+			ixj_PCcontrol_wait(j);
 
 			if (j->flags.pcmciasct == 1 && !j->readers && !j->writers) {
 				j->psccr.byte = j->pslic.byte = 0;
@@ -1223,7 +1216,7 @@ static int ixj_pcmcia_cable_check(int board)
 				j->psccr.bits.dev = 3;
 				j->psccr.bits.rw = 0;
 				outw_p(j->psccr.byte << 8 | j->pslic.byte, j->XILINXbase + 0x00);
-				ixj_PCcontrol_wait(board);
+				ixj_PCcontrol_wait(j);
 			}
 		}
 		return 0;
@@ -1234,21 +1227,20 @@ static int ixj_pcmcia_cable_check(int board)
 	return 0;
 }
 
-static int ixj_hookstate(int board)
+static int ixj_hookstate(IXJ *j)
 {
 	unsigned long det;
-	IXJ *j = &ixj[board];
 	int fOffHook = 0;
 
 	switch (j->cardtype) {
-	case 100:
-		ixj_gpio_read(board);
+	case QTI_PHONEJACK:
+		ixj_gpio_read(j);
 		fOffHook = j->gpio.bits.gpio3read ? 1 : 0;
 		break;
-	case 300:
-	case 400:
-	case 500:
-		SLIC_GetState(board);
+	case QTI_LINEJACK:
+	case QTI_PHONEJACK_LITE:
+	case QTI_PHONEJACK_PCI:
+		SLIC_GetState(j);
 		if (j->pld_slicr.bits.state == PLD_SLIC_STATE_ACTIVE ||
 		    j->pld_slicr.bits.state == PLD_SLIC_STATE_STANDBY) {
 			if (j->flags.ringing) {
@@ -1259,27 +1251,27 @@ static int ixj_hookstate(int board)
 						schedule_timeout(1);
 					}
 				}
-				SLIC_GetState(board);
+				SLIC_GetState(j);
 				if (j->pld_slicr.bits.state == PLD_SLIC_STATE_RINGING) {
-					ixj_ring_on(board);
+					ixj_ring_on(j);
 				}
 			}
-			if (j->cardtype == 500) {
+			if (j->cardtype == QTI_PHONEJACK_PCI) {
 				j->pld_scrr.byte = inb_p(j->XILINXbase);
 				fOffHook = j->pld_scrr.pcib.det ? 1 : 0;
 			} else
 				fOffHook = j->pld_slicr.bits.det ? 1 : 0;
 		}
 		break;
-	case 600:
-		fOffHook = ixj_pcmcia_cable_check(board);
+	case QTI_PHONECARD:
+		fOffHook = ixj_pcmcia_cable_check(j);
 		break;
 	}
 	if (j->r_hook != fOffHook) {
 		j->r_hook = fOffHook;
 		if (j->port != PORT_POTS) {
 			j->ex.bits.hookstate = 1;
-			ixj_kill_fasync(board, POLL_IN);
+			ixj_kill_fasync(j, POLL_PRI);
 		} else if (!fOffHook) {
 			j->flash_end = jiffies + (hertz / 10 * 6);
 		}
@@ -1299,9 +1291,8 @@ static int ixj_hookstate(int board)
 		return fOffHook;
 }
 
-static void ixj_ring_off(board)
+static void ixj_ring_off(IXJ *j)
 {
-	IXJ *j = &ixj[board];
 
 	if (j->dsp.low == 0x20)	// Internet PhoneJACK
 	 {
@@ -1312,57 +1303,54 @@ static void ixj_ring_off(board)
 		j->gpio.bits.gpio1 = 0;
 		j->gpio.bits.gpio2 = 1;
 		j->gpio.bits.gpio5 = 0;
-		ixj_WriteDSPCommand(j->gpio.word, board);
+		ixj_WriteDSPCommand(j->gpio.word, j);
 	} else			// Internet LineJACK
 	 {
 		if (ixjdebug > 0)
 			printk(KERN_INFO "IXJ Ring Off\n");
 
-		SLIC_SetState(PLD_SLIC_STATE_STANDBY, board);
+		SLIC_SetState(PLD_SLIC_STATE_STANDBY, j);
 
-		SLIC_GetState(board);
+		SLIC_GetState(j);
 	}
 }
 
-static void ixj_ring_start(int board)
+static void ixj_ring_start(IXJ *j)
 {
-	IXJ *j = &ixj[board];
-
 	j->flags.cringing = 1;
-	if (ixj_hookstate(board) & 1) {
+	if (ixj_hookstate(j) & 1) {
 		if (j->port == PORT_POTS)
-			ixj_ring_off(board);
+			ixj_ring_off(j);
 		j->flags.cringing = 0;
 	} else {
 		j->ring_cadence_jif = jiffies;
 		j->ring_cadence_t = 15;
 		if (j->ring_cadence & 1 << j->ring_cadence_t) {
-			ixj_ring_on(board);
+			ixj_ring_on(j);
 		} else {
-			ixj_ring_off(board);
+			ixj_ring_off(j);
 		}
 	}
 }
 
-static int ixj_ring(int board)
+static int ixj_ring(IXJ *j)
 {
 	char cntr;
 	unsigned long jif, det;
-	IXJ *j = &ixj[board];
 
 	j->flags.ringing = 1;
-	if (ixj_hookstate(board) & 1) {
-		ixj_ring_off(board);
+	if (ixj_hookstate(j) & 1) {
+		ixj_ring_off(j);
 		j->flags.ringing = 0;
 		return 1;
 	}
 	det = 0;
 	for (cntr = 0; cntr < j->maxrings; cntr++) {
 		jif = jiffies + (1 * hertz);
-		ixj_ring_on(board);
+		ixj_ring_on(j);
 		while (time_before(jiffies, jif)) {
-			if (ixj_hookstate(board) & 1) {
-				ixj_ring_off(board);
+			if (ixj_hookstate(j) & 1) {
+				ixj_ring_off(j);
 				j->flags.ringing = 0;
 				return 1;
 			}
@@ -1372,9 +1360,9 @@ static int ixj_ring(int board)
 				break;
 		}
 		jif = jiffies + (3 * hertz);
-		ixj_ring_off(board);
+		ixj_ring_off(j);
 		while (time_before(jiffies, jif)) {
-			if (ixj_hookstate(board) & 1) {
+			if (ixj_hookstate(j) & 1) {
 				det = jiffies + (hertz / 100);
 				while (time_before(jiffies, det)) {
 					set_current_state(TASK_INTERRUPTIBLE);
@@ -1382,7 +1370,7 @@ static int ixj_ring(int board)
 					if (signal_pending(current))
 						break;
 				}
-				if (ixj_hookstate(board) & 1) {
+				if (ixj_hookstate(j) & 1) {
 					j->flags.ringing = 0;
 					return 1;
 				}
@@ -1393,14 +1381,17 @@ static int ixj_ring(int board)
 				break;
 		}
 	}
-	ixj_ring_off(board);
+	ixj_ring_off(j);
 	j->flags.ringing = 0;
 	return 0;
 }
 
 int ixj_open(struct phone_device *p, struct file *file_p)
 {
-	IXJ *j = file_p->private_data = &ixj[p->board];
+	IXJ *j = file_p->private_data = ixj[p->board];
+
+	if (j == NULL)
+		return -ENODEV;
 
 	if (!j->DSPbase)
 		return -ENODEV;
@@ -1424,14 +1415,13 @@ int ixj_open(struct phone_device *p, struct file *file_p)
 		}
 	}
 
-	if (j->cardtype == 600) {
+	if (j->cardtype == QTI_PHONECARD) {
 		j->pslic.bits.powerdown = 0;
 		j->psccr.bits.dev = 3;
 		j->psccr.bits.rw = 0;
 		outw_p(j->psccr.byte << 8 | j->pslic.byte, j->XILINXbase + 0x00);
-		ixj_PCcontrol_wait(p->board);
+		ixj_PCcontrol_wait(j);
 	}
-	MOD_INC_USE_COUNT;
 
 	if (ixjdebug > 0)
 		printk(KERN_INFO "Opening board %d\n", p->board);
@@ -1443,25 +1433,22 @@ int ixj_open(struct phone_device *p, struct file *file_p)
 int ixj_release(struct inode *inode, struct file *file_p)
 {
 	IXJ_TONE ti;
-//	int board = NUM(inode->i_rdev);
+	int cnt;
 	IXJ *j = file_p->private_data;
-	int board = j->p.board;
-//	IXJ *j = &ixj[board];
 
 	if (ixjdebug > 0)
 		printk(KERN_INFO "Closing board %d\n", NUM(inode->i_rdev));
 
-	daa_set_mode(board, SOP_PU_SLEEP);
-	if (j->cardtype == 600)
-		ixj_set_port(board, PORT_SPEAKER);
+	if (j->cardtype == QTI_PHONECARD)
+		ixj_set_port(j, PORT_SPEAKER);
 	else
-		ixj_set_port(board, PORT_POTS);
-	aec_stop(board);
-	ixj_play_stop(board);
-	ixj_record_stop(board);
-	set_play_volume(board, 0x100);
-	set_rec_volume(board, 0x100);
-	ixj_ring_off(board);
+		ixj_set_port(j, PORT_POTS);
+	aec_stop(j);
+	ixj_play_stop(j);
+	ixj_record_stop(j);
+	set_play_volume(j, 0x100);
+	set_rec_volume(j, 0x100);
+	ixj_ring_off(j);
 
 	// Restore the tone table to default settings.
 	ti.tone_index = 10;
@@ -1484,97 +1471,114 @@ int ixj_release(struct inode *inode, struct file *file_p)
 	ti.freq0 = hz800;
 	ti.gain1 = 0;
 	ti.freq1 = 0;
-	ixj_init_tone(board, &ti);
+	ixj_init_tone(j, &ti);
 	ti.tone_index = 14;
 	ti.gain0 = 1;
 	ti.freq0 = hz1000;
 	ti.gain1 = 0;
 	ti.freq1 = 0;
-	ixj_init_tone(board, &ti);
+	ixj_init_tone(j, &ti);
 	ti.tone_index = 15;
 	ti.gain0 = 1;
 	ti.freq0 = hz1250;
 	ti.gain1 = 0;
 	ti.freq1 = 0;
-	ixj_init_tone(board, &ti);
+	ixj_init_tone(j, &ti);
 	ti.tone_index = 16;
 	ti.gain0 = 1;
 	ti.freq0 = hz950;
 	ti.gain1 = 0;
 	ti.freq1 = 0;
-	ixj_init_tone(board, &ti);
+	ixj_init_tone(j, &ti);
 	ti.tone_index = 17;
 	ti.gain0 = 1;
 	ti.freq0 = hz1100;
 	ti.gain1 = 0;
 	ti.freq1 = 0;
-	ixj_init_tone(board, &ti);
+	ixj_init_tone(j, &ti);
 	ti.tone_index = 18;
 	ti.gain0 = 1;
 	ti.freq0 = hz1400;
 	ti.gain1 = 0;
 	ti.freq1 = 0;
-	ixj_init_tone(board, &ti);
+	ixj_init_tone(j, &ti);
 	ti.tone_index = 19;
 	ti.gain0 = 1;
 	ti.freq0 = hz1500;
 	ti.gain1 = 0;
 	ti.freq1 = 0;
-	ixj_init_tone(board, &ti);
+	ixj_init_tone(j, &ti);
 	ti.tone_index = 20;
 	ti.gain0 = 1;
 	ti.freq0 = hz1600;
 	ti.gain1 = 0;
 	ti.freq1 = 0;
-	ixj_init_tone(board, &ti);
+	ixj_init_tone(j, &ti);
 	ti.tone_index = 21;
 	ti.gain0 = 1;
 	ti.freq0 = hz1800;
 	ti.gain1 = 0;
 	ti.freq1 = 0;
-	ixj_init_tone(board, &ti);
+	ixj_init_tone(j, &ti);
 	ti.tone_index = 22;
 	ti.gain0 = 1;
 	ti.freq0 = hz2100;
 	ti.gain1 = 0;
 	ti.freq1 = 0;
-	ixj_init_tone(board, &ti);
+	ixj_init_tone(j, &ti);
 	ti.tone_index = 23;
 	ti.gain0 = 1;
 	ti.freq0 = hz1300;
 	ti.gain1 = 0;
 	ti.freq1 = 0;
-	ixj_init_tone(board, &ti);
+	ixj_init_tone(j, &ti);
 	ti.tone_index = 24;
 	ti.gain0 = 1;
 	ti.freq0 = hz2450;
 	ti.gain1 = 0;
 	ti.freq1 = 0;
-	ixj_init_tone(board, &ti);
+	ixj_init_tone(j, &ti);
 	ti.tone_index = 25;
 	ti.gain0 = 1;
 	ti.freq0 = hz350;
 	ti.gain1 = 0;
 	ti.freq1 = hz440;
-	ixj_init_tone(board, &ti);
+	ixj_init_tone(j, &ti);
 	ti.tone_index = 26;
 	ti.gain0 = 1;
 	ti.freq0 = hz440;
 	ti.gain1 = 0;
 	ti.freq1 = hz480;
-	ixj_init_tone(board, &ti);
+	ixj_init_tone(j, &ti);
 	ti.tone_index = 27;
 	ti.gain0 = 1;
 	ti.freq0 = hz480;
 	ti.gain1 = 0;
 	ti.freq1 = hz620;
-	ixj_init_tone(board, &ti);
+	ixj_init_tone(j, &ti);
 
-	idle(board);
+	set_rec_depth(j, 2);	// Set Record Channel Limit to 2 frames
 
-//        if(j->cardtype == 600) { // && j->flags.pcmciasct == 1 && j->readers == 1 && j->writers == 1) {
-	SLIC_SetState(PLD_SLIC_STATE_OC, board);
-//      }
+	set_play_depth(j, 2);	// Set Playback Channel Limit to 2 frames
+
+	j->ex.bits.dtmf_ready = 0;
+	j->dtmf_state = 0;
+	j->dtmf_wp = j->dtmf_rp = 0;
+	j->rec_mode = j->play_mode = -1;
+	j->flags.ringing = 0;
+	j->maxrings = MAXRINGS;
+	j->ring_cadence = USA_RING_CADENCE;
+	j->drybuffer = 0;
+	j->winktime = 320;
+	j->flags.dtmf_oob = 0;
+	for (cnt = 0; cnt < 4; cnt++)
+		j->cadence_f[cnt].enable = 0;
+
+	idle(j);
+
+	if(j->cardtype == QTI_PHONECARD) {
+		SLIC_SetState(PLD_SLIC_STATE_OC, j);
+	}
 
 	if (file_p->f_mode & FMODE_READ)
 		j->readers--;
@@ -1596,24 +1600,23 @@ int ixj_release(struct inode *inode, struct file *file_p)
 	j->flags.cidsent = j->flags.cidring = 0;
 	ixj_fasync(-1, file_p, 0);	// remove from list of async notification
 
-	if(j->cardtype == 300 && !j->readers && !j->writers) {
-		ixj_set_port(board, PORT_PSTN);
-		ixj_set_pots(board, 1);
+	if(j->cardtype == QTI_LINEJACK && !j->readers && !j->writers) {
+		ixj_set_port(j, PORT_PSTN);
+		daa_set_mode(j, SOP_PU_SLEEP);
+		ixj_set_pots(j, 1);
 	}
-	ixj_WriteDSPCommand(0x0FE3, board);	// Put the DSP in 1/5 power mode.
+	ixj_WriteDSPCommand(0x0FE3, j);	// Put the DSP in 1/5 power mode.
 
 	file_p->private_data = NULL;
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
-static int read_filters(int board)
+static int read_filters(IXJ *j)
 {
 	unsigned short fc, cnt;
 	int var;
-	IXJ *j = &ixj[board];
 
-	if (ixj_WriteDSPCommand(0x5144, board))
+	if (ixj_WriteDSPCommand(0x5144, j))
 		return -1;
 
 	fc = j->ssr.high << 8 | j->ssr.low;
@@ -1628,10 +1631,10 @@ static int read_filters(int board)
 	var = 10;
 
 	for (cnt = 0; cnt < 4; cnt++) {
-		if (ixj_WriteDSPCommand(0x5154 + cnt, board))
+		if (ixj_WriteDSPCommand(0x5154 + cnt, j))
 			return -1;
 
-		if (ixj_WriteDSPCommand(0x515C, board))
+		if (ixj_WriteDSPCommand(0x515C, j))
 			return -1;
 
 		j->filter_hist[cnt] = j->ssr.high << 8 | j->ssr.low;
@@ -1756,17 +1759,14 @@ static int read_filters(int board)
 	return 0;
 }
 
-static int LineMonitor(int board)
+static int LineMonitor(IXJ *j)
 {
-	IXJ *j = &ixj[board];
-
 	if (j->dtmf_proc) {
 		return -1;
 	}
 	j->dtmf_proc = 1;
 
-	if (ixj_WriteDSPCommand(0x7000, board))		// Line Monitor
-
+	if (ixj_WriteDSPCommand(0x7000, j))		// Line Monitor
 		return -1;
 
 	j->dtmf.bytes.high = j->ssr.high;
@@ -1797,8 +1797,11 @@ static int LineMonitor(int board)
 ssize_t ixj_read(struct file * file_p, char *buf, size_t length, loff_t * ppos)
 {
 	unsigned long i = *ppos;
-	IXJ *j = &ixj[NUM(file_p->f_dentry->d_inode->i_rdev)];
+	IXJ *j = ixj[NUM(file_p->f_dentry->d_inode->i_rdev)];
 	DECLARE_WAITQUEUE(wait, current);
+
+	if (j == NULL) /* shouldn't happen! */
+		return -ENODEV;
 
 	if (j->flags.inread)
 		return -EALREADY;
@@ -1823,7 +1826,7 @@ ssize_t ixj_read(struct file * file_p, char *buf, size_t length, loff_t * ppos)
 			j->flags.inread = 0;
 			return -EAGAIN;
 		}
-		if (!ixj_hookstate(NUM(file_p->f_dentry->d_inode->i_rdev))) {
+		if (!ixj_hookstate(j)) {
 			set_current_state(TASK_RUNNING);
 			remove_wait_queue(&j->read_q, &wait);
 			j->flags.inread = 0;
@@ -1857,7 +1860,10 @@ ssize_t ixj_enhanced_read(struct file * file_p, char *buf, size_t length,
 {
 	int pre_retval;
 	ssize_t read_retval = 0;
-	IXJ *j = &ixj[NUM(file_p->f_dentry->d_inode->i_rdev)];
+	IXJ *j = ixj[NUM(file_p->f_dentry->d_inode->i_rdev)];
+
+	if (j == NULL) /* shouldn't happen! */
+		return -ENODEV;
 
 	pre_retval = ixj_PreRead(j, 0L);
 	switch (pre_retval) {
@@ -1883,6 +1889,9 @@ ssize_t ixj_write(struct file *file_p, const char *buf, size_t count, loff_t * p
 	IXJ *j = file_p->private_data;
 	DECLARE_WAITQUEUE(wait, current);
 
+	if (j == NULL) /* shouldn't happen! */
+		return -ENODEV;
+
 	if (j->flags.inwrite)
 		return -EALREADY;
 
@@ -1907,7 +1916,7 @@ ssize_t ixj_write(struct file *file_p, const char *buf, size_t count, loff_t * p
 			j->flags.inwrite = 0;
 			return -EAGAIN;
 		}
-		if (!ixj_hookstate(NUM(file_p->f_dentry->d_inode->i_rdev))) {
+		if (!ixj_hookstate(j)) {
 			set_current_state(TASK_RUNNING);
 			remove_wait_queue(&j->write_q, &wait);
 			j->flags.inwrite = 0;
@@ -1938,7 +1947,10 @@ ssize_t ixj_enhanced_write(struct file * file_p, const char *buf, size_t count, 
 {
 	int pre_retval;
 	ssize_t write_retval = 0;
-	IXJ *j = &ixj[NUM(file_p->f_dentry->d_inode->i_rdev)];
+	IXJ *j = ixj[NUM(file_p->f_dentry->d_inode->i_rdev)];
+
+	if (j == NULL) /* shouldn't happen! */
+		return -ENODEV;
 
 	pre_retval = ixj_PreWrite(j, 0L);
 	switch (pre_retval) {
@@ -1946,14 +1958,14 @@ ssize_t ixj_enhanced_write(struct file * file_p, const char *buf, size_t count, 
 		write_retval = ixj_write(file_p, buf, count, ppos);
 		if (write_retval != -EFAULT) {
 			ixj_PostWrite(j, 0L);
-			j->write_buffer_wp += count;
+			j->write_buffer_wp += write_retval;
 			j->write_buffers_empty--;
 		}
 		break;
 	case NOPOST:
 		write_retval = ixj_write(file_p, buf, count, ppos);
 		if (write_retval != -EFAULT) {
-			j->write_buffer_wp += count;
+			j->write_buffer_wp += write_retval;
 			j->write_buffers_empty--;
 		}
 		break;
@@ -1966,16 +1978,15 @@ ssize_t ixj_enhanced_write(struct file * file_p, const char *buf, size_t count, 
 	return write_retval;
 }
 
-static void ixj_read_frame(int board)
+static void ixj_read_frame(IXJ *j)
 {
 	int cnt, dly;
-	IXJ *j = &ixj[board];
 
 	if (j->read_buffer) {
 		for (cnt = 0; cnt < j->rec_frame_size * 2; cnt += 2) {
-			if (!(cnt % 16) && !IsRxReady(board)) {
+			if (!(cnt % 16) && !IsRxReady(j)) {
 				dly = 0;
-				while (!IsRxReady(board)) {
+				while (!IsRxReady(j)) {
 					if (dly++ > 5) {
 						dly = 0;
 						break;
@@ -1993,11 +2004,19 @@ static void ixj_read_frame(int board)
 		}
 		++j->framesread;
 		if (j->intercom != -1) {
-			if (IsTxReady(j->intercom)) {
+			IXJ *icom = ixj[j->intercom];
+
+			if (icom == NULL) { /* shouldn't happen! */
+				printk(KERN_ERR "ixj_read_frame(): j->intercom = %d = NULL!",
+				       j->intercom);
+				return;
+			}
+
+			if (IsTxReady(icom)) {
 				for (cnt = 0; cnt < j->rec_frame_size * 2; cnt += 2) {
-					if (!(cnt % 16) && !IsTxReady(board)) {
+					if (!(cnt % 16) && !IsTxReady(j)) {
 						dly = 0;
-						while (!IsTxReady(board)) {
+						while (!IsTxReady(j)) {
 							if (dly++ > 5) {
 								dly = 0;
 								break;
@@ -2005,10 +2024,10 @@ static void ixj_read_frame(int board)
 							udelay(10);
 						}
 					}
-					outb_p(*(j->read_buffer + cnt), ixj[j->intercom].DSPbase + 0x0C);
-					outb_p(*(j->read_buffer + cnt + 1), ixj[j->intercom].DSPbase + 0x0D);
+					outb_p(*(j->read_buffer + cnt), icom->DSPbase + 0x0C);
+					outb_p(*(j->read_buffer + cnt + 1), icom->DSPbase + 0x0D);
 				}
-				++ixj[j->intercom].frameswritten;
+				++icom->frameswritten;
 			}
 		} else {
 			j->read_buffer_ready = 1;
@@ -2016,7 +2035,7 @@ static void ixj_read_frame(int board)
 
 			wake_up_interruptible(&j->poll_q);	// Wake any blocked selects
 
-			ixj_kill_fasync(board, POLL_OUT);
+			ixj_kill_fasync(j, POLL_IN);
 		}
 	}
 }
@@ -2078,16 +2097,15 @@ static short fsk[][6][20] =
 };
 
 
-static void ixj_write_cid_bit(int board, int bit)
+static void ixj_write_cid_bit(IXJ *j, int bit)
 {
 	int dly;
 	IXJ_WORD dat;
-	IXJ *j = &ixj[board];
 
 	while (j->fskcnt < 20) {
-		if (!IsTxReady(board)) {
+		if (!IsTxReady(j)) {
 			dly = 0;
-			while (!IsTxReady(board)) {
+			while (!IsTxReady(j)) {
 				if (dly++ > 5) {
 					dly = 0;
 					//      break;
@@ -2111,7 +2129,7 @@ static void ixj_write_cid_bit(int board, int bit)
 
 }
 
-static void ixj_write_cid_byte(int board, char byte)
+static void ixj_write_cid_byte(IXJ *board, char byte)
 {
 	IXJ_CBYTE cb;
 
@@ -2129,7 +2147,7 @@ static void ixj_write_cid_byte(int board, char byte)
 	ixj_write_cid_bit(board, 1);
 }
 
-static void ixj_write_cid_seize(int board)
+static void ixj_write_cid_seize(IXJ *board)
 {
 	int cnt;
 
@@ -2142,7 +2160,7 @@ static void ixj_write_cid_seize(int board)
 	}
 }
 
-static void ixj_write_cidcw_seize(int board)
+static void ixj_write_cidcw_seize(IXJ *board)
 {
 	int cnt;
 
@@ -2151,7 +2169,7 @@ static void ixj_write_cidcw_seize(int board)
 	}
 }
 
-static int ixj_write_cid_string(int board, char *s, int checksum)
+static int ixj_write_cid_string(IXJ *board, char *s, int checksum)
 {
 	int cnt;
 
@@ -2162,15 +2180,14 @@ static int ixj_write_cid_string(int board, char *s, int checksum)
 	return checksum;
 }
 
-static void ixj_pad_fsk(int board, int pad)
+static void ixj_pad_fsk(IXJ *j, int pad)
 {
 	int cnt, dly;
-	IXJ *j = &ixj[board];
 
 	for (cnt = 0; cnt < pad; cnt++) {
-		if (!IsTxReady(board)) {
+		if (!IsTxReady(j)) {
 			dly = 0;
-			while (!IsTxReady(board)) {
+			while (!IsTxReady(j)) {
 				if (dly++ > 5) {
 					dly = 0;
 				}
@@ -2181,9 +2198,9 @@ static void ixj_pad_fsk(int board, int pad)
 		outb_p(0x00, j->DSPbase + 0x0D);
 	}
 	for (cnt = 0; cnt < 720; cnt++) {
-		if (!IsTxReady(board)) {
+		if (!IsTxReady(j)) {
 			dly = 0;
-			while (!IsTxReady(board)) {
+			while (!IsTxReady(j)) {
 				if (dly++ > 5) {
 					dly = 0;
 				}
@@ -2195,10 +2212,8 @@ static void ixj_pad_fsk(int board, int pad)
 	}
 }
 
-static void ixj_write_cid(int board)
+static void ixj_write_cid(IXJ *j)
 {
-	IXJ *j = &ixj[board];
-
 	char sdmf1[50];
 	char sdmf2[50];
 	char sdmf3[80];
@@ -2207,13 +2222,13 @@ static void ixj_write_cid(int board)
 
 	int checksum = 0;
 
-	if (ixj[board].dsp.low == 0x20)
+	if (j->dsp.low == 0x20)
 		return;
 
-	ixj[board].fskz = ixj[board].fskphase = ixj[board].fskcnt =
-	    ixj[board].fskdcnt = 0;
+	j->fskz = j->fskphase = j->fskcnt =
+	    j->fskdcnt = 0;
 
-	ixj[board].flags.cidplay = 1;
+	j->flags.cidplay = 1;
 
 	strcpy(sdmf1, j->cid_send.month);
 	strcat(sdmf1, j->cid_send.day);
@@ -2227,64 +2242,59 @@ static void ixj_write_cid(int board)
 	len3 = strlen(sdmf3);
 	mdmflen = len1 + len2 + len3 + 6;
 
-	printk("CID Lengths = %d %d %d %d\n", len1, len2, len3, mdmflen);
+	set_base_frame(j, 30);
+	set_play_codec(j, LINEAR16);
 
-	set_base_frame(board, 30);
-	set_play_codec(board, LINEAR16);
-
-	if (ixj[board].port == PORT_POTS)
+	if (j->port == PORT_POTS)
 		if(!j->r_hook)
-			SLIC_SetState(PLD_SLIC_STATE_OHT, board);
+			SLIC_SetState(PLD_SLIC_STATE_OHT, j);
 
-	set_play_volume(board, 0x1B);
-	ixj_play_start(board);
-	ixj_write_cid_seize(board);
+	set_play_volume(j, 0x1B);
+	ixj_play_start(j);
+	ixj_write_cid_seize(j);
 
-	ixj_write_cid_byte(board, 0x80);
+	ixj_write_cid_byte(j, 0x80);
 	checksum = 0x80;
-	ixj_write_cid_byte(board, mdmflen);
+	ixj_write_cid_byte(j, mdmflen);
 	checksum = checksum + mdmflen;
 
-	ixj_write_cid_byte(board, 0x01);
+	ixj_write_cid_byte(j, 0x01);
 	checksum = checksum + 0x01;
-	ixj_write_cid_byte(board, len1);
+	ixj_write_cid_byte(j, len1);
 	checksum = checksum + len1;
-	checksum = ixj_write_cid_string(board, sdmf1, checksum);
+	checksum = ixj_write_cid_string(j, sdmf1, checksum);
 
-	ixj_write_cid_byte(board, 0x02);
+	ixj_write_cid_byte(j, 0x02);
 	checksum = checksum + 0x02;
-	ixj_write_cid_byte(board, len2);
+	ixj_write_cid_byte(j, len2);
 	checksum = checksum + len2;
-	checksum = ixj_write_cid_string(board, sdmf2, checksum);
+	checksum = ixj_write_cid_string(j, sdmf2, checksum);
 
-	ixj_write_cid_byte(board, 0x07);
+	ixj_write_cid_byte(j, 0x07);
 	checksum = checksum + 0x07;
-	ixj_write_cid_byte(board, len3);
+	ixj_write_cid_byte(j, len3);
 	checksum = checksum + len3;
-	checksum = ixj_write_cid_string(board, sdmf3, checksum);
+	checksum = ixj_write_cid_string(j, sdmf3, checksum);
 
 	checksum %= 256;
 	checksum ^= 0xFF;
 	checksum += 1;
-	printk("14Checksum = %d\n", checksum);
 
-	ixj_write_cid_byte(board, (char) checksum);
+	ixj_write_cid_byte(j, (char) checksum);
 
 	pad = j->fskdcnt % 240;
 	if (pad) {
 		pad = 240 - pad;
 	}
-	ixj_pad_fsk(board, pad);
-	SLIC_SetState(PLD_SLIC_STATE_STANDBY, board);
-	ixj[board].flags.cidplay = 0;
-	ixj_play_stop(board);
+	ixj_pad_fsk(j, pad);
+	SLIC_SetState(PLD_SLIC_STATE_STANDBY, j);
+	j->flags.cidplay = 0;
+	ixj_play_stop(j);
 }
 
-static void ixj_write_cidcw(int board)
+static void ixj_write_cidcw(IXJ *j)
 {
 	IXJ_TONE ti;
-
-	IXJ *j = &ixj[board];
 
 	char sdmf1[50];
 	char sdmf2[50];
@@ -2294,37 +2304,37 @@ static void ixj_write_cidcw(int board)
 
 	int checksum = 0;
 
-	if (ixj[board].dsp.low == 0x20)
+	if (j->dsp.low == 0x20)
 		return;
 
-	ixj[board].fskz = ixj[board].fskphase = ixj[board].fskcnt = ixj[board].fskdcnt = 0;
+	j->fskz = j->fskphase = j->fskcnt = j->fskdcnt = 0;
 
-	ixj[board].flags.cidplay = 1;
+	j->flags.cidplay = 1;
 
 	ti.tone_index = 23;
 	ti.gain0 = 1;
 	ti.freq0 = hz440;
 	ti.gain1 = 0;
 	ti.freq1 = 0;
-	ixj_init_tone(board, &ti);
+	ixj_init_tone(j, &ti);
 
 	ti.tone_index = 24;
 	ti.gain0 = 1;
 	ti.freq0 = hz2130;
 	ti.gain1 = 0;
 	ti.freq1 = hz2750;
-	ixj_init_tone(board, &ti);
+	ixj_init_tone(j, &ti);
 
-	ixj_set_tone_on(1200, board);
-	ixj_play_tone(board, 23);
+	ixj_set_tone_on(1200, j);
+	ixj_play_tone(j, 23);
 
 	while(j->tone_state) {
 		set_current_state(TASK_INTERRUPTIBLE);
 		schedule_timeout(1);
 	}
 
-	ixj_set_tone_on(320, board);
-	ixj_play_tone(board, 24);
+	ixj_set_tone_on(320, j);
+	ixj_play_tone(j, 24);
 
 	while(j->tone_state) {
 		set_current_state(TASK_INTERRUPTIBLE);
@@ -2354,10 +2364,8 @@ static void ixj_write_cidcw(int board)
 	len3 = strlen(sdmf3);
 	mdmflen = len1 + len2 + len3 + 6;
 
-	printk("CID Lengths = %d %d %d %d\n", len1, len2, len3, mdmflen);
-
 	j->cid_play_codec = j->play_codec;
-	ixj_play_stop(board);
+	ixj_play_stop(j);
 
 	switch(j->baseframe.low) {
 		case 0xA0:
@@ -2370,99 +2378,96 @@ static void ixj_write_cidcw(int board)
 			j->cid_base_frame_size = 30;
 			break;
 	}
-	set_base_frame(board, 30);
-	set_play_codec(board, LINEAR16);
+	set_base_frame(j, 30);
+	set_play_codec(j, LINEAR16);
 
-	set_play_volume(board, 0x1B);
-	ixj_play_start(board);
-	ixj_write_cidcw_seize(board);
+	set_play_volume(j, 0x1B);
+	ixj_play_start(j);
+	ixj_write_cidcw_seize(j);
 
-	ixj_write_cid_byte(board, 0x80);
+	ixj_write_cid_byte(j, 0x80);
 	checksum = 0x80;
-	ixj_write_cid_byte(board, mdmflen);
+	ixj_write_cid_byte(j, mdmflen);
 	checksum = checksum + mdmflen;
 
-	ixj_write_cid_byte(board, 0x01);
+	ixj_write_cid_byte(j, 0x01);
 	checksum = checksum + 0x01;
-	ixj_write_cid_byte(board, len1);
+	ixj_write_cid_byte(j, len1);
 	checksum = checksum + len1;
-	checksum = ixj_write_cid_string(board, sdmf1, checksum);
+	checksum = ixj_write_cid_string(j, sdmf1, checksum);
 
-	ixj_write_cid_byte(board, 0x02);
+	ixj_write_cid_byte(j, 0x02);
 	checksum = checksum + 0x02;
-	ixj_write_cid_byte(board, len2);
+	ixj_write_cid_byte(j, len2);
 	checksum = checksum + len2;
-	checksum = ixj_write_cid_string(board, sdmf2, checksum);
+	checksum = ixj_write_cid_string(j, sdmf2, checksum);
 
-	ixj_write_cid_byte(board, 0x07);
+	ixj_write_cid_byte(j, 0x07);
 	checksum = checksum + 0x07;
-	ixj_write_cid_byte(board, len3);
+	ixj_write_cid_byte(j, len3);
 	checksum = checksum + len3;
-	checksum = ixj_write_cid_string(board, sdmf3, checksum);
+	checksum = ixj_write_cid_string(j, sdmf3, checksum);
 
 	checksum %= 256;
 	checksum ^= 0xFF;
 	checksum += 1;
-	printk("14Checksum = %d\n", checksum);
 
-	ixj_write_cid_byte(board, (char) checksum);
+	ixj_write_cid_byte(j, (char) checksum);
 
 	pad = j->fskdcnt % 240;
 	if (pad) {
 		pad = 240 - pad;
 	}
-	ixj_pad_fsk(board, pad);
-	ixj[board].flags.cidplay = 0;
-	ixj_play_stop(board);
+	ixj_pad_fsk(j, pad);
+	j->flags.cidplay = 0;
+	ixj_play_stop(j);
 
-	set_base_frame(board, j->cid_base_frame_size);
-	set_play_codec(board, j->cid_play_codec);
+	set_base_frame(j, j->cid_base_frame_size);
+	set_play_codec(j, j->cid_play_codec);
 }
 
-static void ixj_write_vmwi(int board, int msg)
+static void ixj_write_vmwi(IXJ *j, int msg)
 {
-	IXJ *j = &ixj[board];
-
 	char mdmflen;
 	int pad;
 
 	int checksum = 0;
 
-	if (ixj[board].dsp.low == 0x20)
+	if (j->dsp.low == 0x20)
 		return;
 
-	ixj[board].fskz = ixj[board].fskphase = ixj[board].fskcnt = ixj[board].fskdcnt = 0;
+	j->fskz = j->fskphase = j->fskcnt = j->fskdcnt = 0;
 
-	ixj[board].flags.cidplay = 1;
+	j->flags.cidplay = 1;
 
 	mdmflen = 3;
 
-	set_base_frame(board, 30);
-	set_play_codec(board, LINEAR16);
+	set_base_frame(j, 30);
+	set_play_codec(j, LINEAR16);
 
-	if (ixj[board].port == PORT_POTS)
-		SLIC_SetState(PLD_SLIC_STATE_OHT, board);
+	if (j->port == PORT_POTS)
+		SLIC_SetState(PLD_SLIC_STATE_OHT, j);
 
-	set_play_volume(board, 0x1B);
-	ixj_play_start(board);
-	ixj_write_cid_seize(board);
+	set_play_volume(j, 0x1B);
+	ixj_play_start(j);
+	ixj_write_cid_seize(j);
 
-	ixj_write_cid_byte(board, 0x82);
+	ixj_write_cid_byte(j, 0x82);
 	checksum = 0x82;
-	ixj_write_cid_byte(board, mdmflen);
+	ixj_write_cid_byte(j, mdmflen);
 	checksum = checksum + mdmflen;
 
-	ixj_write_cid_byte(board, 0x0B);
+	ixj_write_cid_byte(j, 0x0B);
 	checksum = checksum + 0x0B;
-	ixj_write_cid_byte(board, 1);
+	ixj_write_cid_byte(j, 1);
 	checksum = checksum + 1;
 
 	if(msg) {
-		ixj_write_cid_byte(board, 0xFF);
+		ixj_write_cid_byte(j, 0xFF);
 		checksum = checksum + 0xFF;
 	}
 	else {
-		ixj_write_cid_byte(board, 0x00);
+		ixj_write_cid_byte(j, 0x00);
 		checksum = checksum + 0x00;
 	}
 
@@ -2470,23 +2475,22 @@ static void ixj_write_vmwi(int board, int msg)
 	checksum ^= 0xFF;
 	checksum += 1;
 
-	ixj_write_cid_byte(board, (char) checksum);
+	ixj_write_cid_byte(j, (char) checksum);
 
 	pad = j->fskdcnt % 240;
 	if (pad) {
 		pad = 240 - pad;
 	}
-	ixj_pad_fsk(board, pad);
-	SLIC_SetState(PLD_SLIC_STATE_STANDBY, board);
-	ixj[board].flags.cidplay = 0;
-	ixj_play_stop(board);
+	ixj_pad_fsk(j, pad);
+	SLIC_SetState(PLD_SLIC_STATE_STANDBY, j);
+	j->flags.cidplay = 0;
+	ixj_play_stop(j);
 }
 
-static void ixj_write_frame(int board)
+static void ixj_write_frame(IXJ *j)
 {
 	int cnt, frame_count, dly;
 	BYTES blankword;
-	IXJ *j = &ixj[board];
 
 	frame_count = 0;
 	if (j->write_buffer && j->write_buffers_empty < 2) {
@@ -2515,9 +2519,9 @@ static void ixj_write_frame(int board)
 					break;
 				}
 				for (cnt = 0; cnt < 16; cnt++) {
-					if (!(cnt % 16) && !IsTxReady(board)) {
+					if (!(cnt % 16) && !IsTxReady(j)) {
 						dly = 0;
-						while (!IsTxReady(board)) {
+						while (!IsTxReady(j)) {
 							if (dly++ > 5) {
 								dly = 0;
 								break;
@@ -2531,9 +2535,9 @@ static void ixj_write_frame(int board)
 				j->flags.play_first_frame = 0;
 			}
 			for (cnt = 0; cnt < j->play_frame_size * 2; cnt += 2) {
-				if (!(cnt % 16) && !IsTxReady(board)) {
+				if (!(cnt % 16) && !IsTxReady(j)) {
 					dly = 0;
-					while (!IsTxReady(board)) {
+					while (!IsTxReady(j)) {
 						if (dly++ > 5) {
 							dly = 0;
 							break;
@@ -2561,7 +2565,7 @@ static void ixj_write_frame(int board)
 
 			wake_up_interruptible(&j->poll_q);	// Wake any blocked selects
 
-			ixj_kill_fasync(board, POLL_OUT);
+			ixj_kill_fasync(j, POLL_OUT);
 			++j->frameswritten;
 		}
 	} else {
@@ -2569,11 +2573,9 @@ static void ixj_write_frame(int board)
 	}
 }
 
-static int idle(int board)
+static int idle(IXJ *j)
 {
-	IXJ *j = &ixj[board];
-
-	if (ixj_WriteDSPCommand(0x0000, board))		// DSP Idle
+	if (ixj_WriteDSPCommand(0x0000, j))		// DSP Idle
 
 		return 0;
 	if (j->ssr.high || j->ssr.low)
@@ -2582,15 +2584,14 @@ static int idle(int board)
 		return 1;
 }
 
-static int set_base_frame(int board, int size)
+static int set_base_frame(IXJ *j, int size)
 {
 	unsigned short cmd;
 	int cnt;
-	IXJ *j = &ixj[board];
 
-	aec_stop(board);
+	aec_stop(j);
 	for (cnt = 0; cnt < 10; cnt++) {
-		if (idle(board))
+		if (idle(j))
 			break;
 	}
 	if (j->ssr.high || j->ssr.low)
@@ -2618,7 +2619,7 @@ static int set_base_frame(int board, int size)
 		else
 			return -1;
 	}
-	if (ixj_WriteDSPCommand(cmd, board)) {
+	if (ixj_WriteDSPCommand(cmd, j)) {
 		j->baseframe.high = j->baseframe.low = 0xFF;
 		return -1;
 	} else {
@@ -2628,10 +2629,9 @@ static int set_base_frame(int board, int size)
 	return size;
 }
 
-static int set_rec_codec(int board, int rate)
+static int set_rec_codec(IXJ *j, int rate)
 {
 	int retval = 0;
-	IXJ *j = &ixj[board];
 
 	j->rec_codec = rate;
 
@@ -2790,16 +2790,15 @@ static int set_rec_codec(int board, int rate)
 	return retval;
 }
 
-static int ixj_record_start(int board)
+static int ixj_record_start(IXJ *j)
 {
 	unsigned short cmd = 0x0000;
-	IXJ *j = &ixj[board];
 
 	if (j->read_buffer) {
-		ixj_record_stop(board);
+		ixj_record_stop(j);
 	}
 	j->flags.recording = 1;
-	ixj_WriteDSPCommand(0x0FE0, board);	// Put the DSP in full power mode.
+	ixj_WriteDSPCommand(0x0FE0, j);	// Put the DSP in full power mode.
 
 	if (!j->rec_mode) {
 		switch (j->rec_codec) {
@@ -2830,20 +2829,21 @@ static int ixj_record_start(int board)
 		default:
 			return 1;
 		}
-		if (ixj_WriteDSPCommand(cmd, board))
+		if (ixj_WriteDSPCommand(cmd, j))
 			return -1;
 	}
 	if (!j->read_buffer) {
 		if (!j->read_buffer)
 			j->read_buffer = kmalloc(j->rec_frame_size * 2, GFP_ATOMIC);
 		if (!j->read_buffer) {
-			printk("Read buffer allocation for ixj board %d failed!\n", board);
+			printk("Read buffer allocation for ixj board %d failed!\n",
+			       j->p.board);
 			return -ENOMEM;
 		}
 	}
 	j->read_buffer_size = j->rec_frame_size * 2;
 
-	if (ixj_WriteDSPCommand(0x5102, board))		// Set Poll sync mode
+	if (ixj_WriteDSPCommand(0x5102, j))		// Set Poll sync mode
 
 		return -1;
 
@@ -2889,149 +2889,140 @@ static int ixj_record_start(int board)
 		}
 		break;
 	}
-	if (ixj_WriteDSPCommand(cmd, board))
+	if (ixj_WriteDSPCommand(cmd, j))
 		return -1;
 
 	return 0;
 }
 
-static void ixj_record_stop(int board)
+static void ixj_record_stop(IXJ *j)
 {
-	IXJ *j = &ixj[board];
-
 	if (j->read_buffer) {
 		kfree(j->read_buffer);
 		j->read_buffer = NULL;
 		j->read_buffer_size = 0;
 	}
 	if (j->rec_mode > -1) {
-		ixj_WriteDSPCommand(0x5120, board);
+		ixj_WriteDSPCommand(0x5120, j);
 		j->rec_mode = -1;
 	}
 	j->flags.recording = 0;
 	if (!j->flags.playing)
-		ixj_WriteDSPCommand(0x0FE3, board);	// Put the DSP in 1/5 power mode.
+		ixj_WriteDSPCommand(0x0FE3, j);	// Put the DSP in 1/5 power mode.
 
 }
-static void ixj_vad(int board, int arg)
+static void ixj_vad(IXJ *j, int arg)
 {
 	if (arg)
-		ixj_WriteDSPCommand(0x513F, board);
+		ixj_WriteDSPCommand(0x513F, j);
 	else
-		ixj_WriteDSPCommand(0x513E, board);
+		ixj_WriteDSPCommand(0x513E, j);
 }
 
-static void set_rec_depth(int board, int depth)
+static void set_rec_depth(IXJ *j, int depth)
 {
 	if (depth > 60)
 		depth = 60;
 	if (depth < 0)
 		depth = 0;
-	ixj_WriteDSPCommand(0x5180 + depth, board);
+	ixj_WriteDSPCommand(0x5180 + depth, j);
 }
 
-static void set_rec_volume(int board, int volume)
+static void set_rec_volume(IXJ *j, int volume)
 {
-	ixj_WriteDSPCommand(0xCF03, board);
-	ixj_WriteDSPCommand(volume, board);
+	ixj_WriteDSPCommand(0xCF03, j);
+	ixj_WriteDSPCommand(volume, j);
 }
 
-static int get_rec_volume(int board)
+static int get_rec_volume(IXJ *j)
 {
-	ixj_WriteDSPCommand(0xCF03, board);
-	return ixj[board].ssr.high << 8 | ixj[board].ssr.low;
+	ixj_WriteDSPCommand(0xCF01, j);
+	return j->ssr.high << 8 | j->ssr.low;
 }
 
-static int get_rec_level(int board)
+static int get_rec_level(IXJ *j)
 {
 	int retval;
 
-	IXJ *j = &ixj[board];
-
-	ixj_WriteDSPCommand(0xCF88, board);
+	ixj_WriteDSPCommand(0xCF88, j);
 
 	retval = j->ssr.high << 8 | j->ssr.low;
 	retval = (retval * 256) / 240;
 	return retval;
 }
 
-static void ixj_aec_start(int board, int level)
+static void ixj_aec_start(IXJ *j, int level)
 {
-	IXJ *j = &ixj[board];
-
 	j->aec_level = level;
 	if (!level) {
-		aec_stop(board);
+		aec_stop(j);
 	} else {
 		if (j->rec_codec == G729 || j->play_codec == G729) {
-			ixj_WriteDSPCommand(0xE022, board);	// Move AEC filter buffer
+			ixj_WriteDSPCommand(0xE022, j);	// Move AEC filter buffer
 
-			ixj_WriteDSPCommand(0x0300, board);
+			ixj_WriteDSPCommand(0x0300, j);
 		}
-		ixj_WriteDSPCommand(0xB001, board);	// AEC On
+		ixj_WriteDSPCommand(0xB001, j);	// AEC On
 
-		ixj_WriteDSPCommand(0xE013, board);	// Advanced AEC C1
+		ixj_WriteDSPCommand(0xE013, j);	// Advanced AEC C1
 
 		switch (level) {
 		case AEC_LOW:
-			ixj_WriteDSPCommand(0x0000, board);	// Advanced AEC C2 = off
+			ixj_WriteDSPCommand(0x0000, j);	// Advanced AEC C2 = off
 
-			ixj_WriteDSPCommand(0xE011, board);
-			ixj_WriteDSPCommand(0xFFFF, board);
+			ixj_WriteDSPCommand(0xE011, j);
+			ixj_WriteDSPCommand(0xFFFF, j);
 			break;
 
 		case AEC_MED:
-			ixj_WriteDSPCommand(0x0600, board);	// Advanced AEC C2 = on medium
+			ixj_WriteDSPCommand(0x0600, j);	// Advanced AEC C2 = on medium
 
-			ixj_WriteDSPCommand(0xE011, board);
-			ixj_WriteDSPCommand(0x0080, board);
+			ixj_WriteDSPCommand(0xE011, j);
+			ixj_WriteDSPCommand(0x0080, j);
 			break;
 
 		case AEC_HIGH:
-			ixj_WriteDSPCommand(0x0C00, board);	// Advanced AEC C2 = on high
+			ixj_WriteDSPCommand(0x0C00, j);	// Advanced AEC C2 = on high
 
-			ixj_WriteDSPCommand(0xE011, board);
-			ixj_WriteDSPCommand(0x0080, board);
+			ixj_WriteDSPCommand(0xE011, j);
+			ixj_WriteDSPCommand(0x0080, j);
 			break;
 
 		case AEC_AUTO:
-			ixj_WriteDSPCommand(0x0002, board);	// Attenuation scaling factor of 2
+			ixj_WriteDSPCommand(0x0002, j);	// Attenuation scaling factor of 2
 
-			ixj_WriteDSPCommand(0xE011, board);
-			ixj_WriteDSPCommand(0x0100, board);	// Higher Threshold Floor
+			ixj_WriteDSPCommand(0xE011, j);
+			ixj_WriteDSPCommand(0x0100, j);	// Higher Threshold Floor
 
-			ixj_WriteDSPCommand(0xE012, board);	// Set Train and Lock
+			ixj_WriteDSPCommand(0xE012, j);	// Set Train and Lock
 
-			ixj_WriteDSPCommand(0x0023, board);
+			ixj_WriteDSPCommand(0x0023, j);
 
-			ixj_WriteDSPCommand(0xE014, board);
-			ixj_WriteDSPCommand(0x0003, board);	// Lock threashold at 3dB
+			ixj_WriteDSPCommand(0xE014, j);
+			ixj_WriteDSPCommand(0x0003, j);	// Lock threashold at 3dB
 
 			break;
 		}
 	}
 }
 
-static void aec_stop(int board)
+static void aec_stop(IXJ *j)
 {
-	IXJ *j = &ixj[board];
-
 	if (j->rec_codec == G729 || j->play_codec == G729) {
-		ixj_WriteDSPCommand(0xE022, board);	// Move AEC filter buffer back
+		ixj_WriteDSPCommand(0xE022, j);	// Move AEC filter buffer back
 
-		ixj_WriteDSPCommand(0x0700, board);
+		ixj_WriteDSPCommand(0x0700, j);
 	}
-	if (ixj[board].play_mode != -1 && ixj[board].rec_mode != -1)
+	if (j->play_mode != -1 && j->rec_mode != -1)
 	{
-		ixj_WriteDSPCommand(0xB002, board);	// AEC Stop
+		ixj_WriteDSPCommand(0xB002, j);	// AEC Stop
 
 	}
 }
 
-static int set_play_codec(int board, int rate)
+static int set_play_codec(IXJ *j, int rate)
 {
 	int retval = 0;
-	IXJ *j = &ixj[board];
 
 	j->play_codec = rate;
 
@@ -3190,16 +3181,15 @@ static int set_play_codec(int board, int rate)
 	return retval;
 }
 
-static int ixj_play_start(int board)
+static int ixj_play_start(IXJ *j)
 {
 	unsigned short cmd = 0x0000;
-	IXJ *j = &ixj[board];
 
 	if (j->write_buffer) {
-		ixj_play_stop(board);
+		ixj_play_stop(j);
 	}
 	j->flags.playing = 1;
-	ixj_WriteDSPCommand(0x0FE0, board);	// Put the DSP in full power mode.
+	ixj_WriteDSPCommand(0x0FE0, j);	// Put the DSP in full power mode.
 
 	j->flags.play_first_frame = 1;
 	j->drybuffer = 0;
@@ -3233,12 +3223,13 @@ static int ixj_play_start(int board)
 		default:
 			return 1;
 		}
-		if (ixj_WriteDSPCommand(cmd, board))
+		if (ixj_WriteDSPCommand(cmd, j))
 			return -1;
 	}
 	j->write_buffer = kmalloc(j->play_frame_size * 2, GFP_ATOMIC);
 	if (!j->write_buffer) {
-		printk("Write buffer allocation for ixj board %d failed!\n", board);
+		printk("Write buffer allocation for ixj board %d failed!\n",
+		       j->p.board);
 		return -ENOMEM;
 	}
 	j->write_buffers_empty = 2;
@@ -3246,7 +3237,7 @@ static int ixj_play_start(int board)
 	j->write_buffer_end = j->write_buffer + j->play_frame_size * 2;
 	j->write_buffer_rp = j->write_buffer_wp = j->write_buffer;
 
-	if (ixj_WriteDSPCommand(0x5202, board))		// Set Poll sync mode
+	if (ixj_WriteDSPCommand(0x5202, j))		// Set Poll sync mode
 
 		return -1;
 
@@ -3283,56 +3274,47 @@ static int ixj_play_start(int board)
 		}
 		break;
 	}
-	if (ixj_WriteDSPCommand(cmd, board))
+	if (ixj_WriteDSPCommand(cmd, j))
 		return -1;
 
-	if (ixj_WriteDSPCommand(0x2000, board))		// Playback C2
-
-		return -1;
-
-	if (ixj_WriteDSPCommand(0x2000 + ixj[board].play_frame_size, board))	// Playback C3
+	if (ixj_WriteDSPCommand(0x2000, j))		// Playback C2
 
 		return -1;
 
+	if (ixj_WriteDSPCommand(0x2000 + j->play_frame_size, j))	// Playback C3
+
+		return -1;
+
+
+	ixj_kill_fasync(j, POLL_OUT);
 	return 0;
 }
 
-static void ixj_play_stop(int board)
+static void ixj_play_stop(IXJ *j)
 {
-	IXJ *j = &ixj[board];
-
 	if (j->write_buffer) {
 		kfree(j->write_buffer);
 		j->write_buffer = NULL;
 		j->write_buffer_size = 0;
 	}
 	if (j->play_mode > -1) {
-		ixj_WriteDSPCommand(0x5221, board);	// Stop playback and flush buffers.  8022 reference page 9-40
+		ixj_WriteDSPCommand(0x5221, j);	// Stop playback and flush buffers.  8022 reference page 9-40
 
 		j->play_mode = -1;
 	}
 	j->flags.playing = 0;
 	if (!j->flags.recording)
-		ixj_WriteDSPCommand(0x0FE3, board);	// Put the DSP in 1/5 power mode.
+		ixj_WriteDSPCommand(0x0FE3, j);	// Put the DSP in 1/5 power mode.
 
 }
 
-extern __inline__ void set_play_depth(int board, int depth)
-{
-	if (depth > 60)
-		depth = 60;
-	if (depth < 0)
-		depth = 0;
-	ixj_WriteDSPCommand(0x5280 + depth, board);
-}
-
-extern __inline__ int get_play_level(int board)
+extern __inline__ int get_play_level(IXJ *j)
 {
 	int retval;
 
-	ixj_WriteDSPCommand(0xCF8F, board); // 8022 Reference page 9-38
-	return ixj[board].ssr.high << 8 | ixj[board].ssr.low;
-	retval = ixj[board].ssr.high << 8 | ixj[board].ssr.low;
+	ixj_WriteDSPCommand(0xCF8F, j); // 8022 Reference page 9-38
+	return j->ssr.high << 8 | j->ssr.low;
+	retval = j->ssr.high << 8 | j->ssr.low;
 	retval = (retval * 256) / 240;
 	return retval;
 }
@@ -3340,7 +3322,10 @@ extern __inline__ int get_play_level(int board)
 static unsigned int ixj_poll(struct file *file_p, poll_table * wait)
 {
 	unsigned int mask = 0;
-	IXJ *j = &ixj[NUM(file_p->f_dentry->d_inode->i_rdev)];
+	IXJ *j = ixj[NUM(file_p->f_dentry->d_inode->i_rdev)];
+
+	if (j == NULL) /* shouldn't happen! */
+		return -ENODEV;
 
 	poll_wait(file_p, &(j->poll_q), wait);
 	if (j->read_buffer_ready > 0)
@@ -3352,15 +3337,13 @@ static unsigned int ixj_poll(struct file *file_p, poll_table * wait)
 	return mask;
 }
 
-static int ixj_play_tone(int board, char tone)
+static int ixj_play_tone(IXJ *j, char tone)
 {
-	IXJ *j = &ixj[board];
-
-	if (!j->tone_state)
-		idle(board);
+	if (!j->tone_state && j->dsp.low == 0x20)
+		idle(j);
 
 	j->tone_index = tone;
-	if (ixj_WriteDSPCommand(0x6000 + j->tone_index, board))
+	if (ixj_WriteDSPCommand(0x6000 + j->tone_index, j))
 		return -1;
 
 	if (!j->tone_state) {
@@ -3371,26 +3354,23 @@ static int ixj_play_tone(int board, char tone)
 	return 0;
 }
 
-static int ixj_set_tone_on(unsigned short arg, int board)
+static int ixj_set_tone_on(unsigned short arg, IXJ *j)
 {
-	IXJ *j = &ixj[board];
-
 	j->tone_on_time = arg;
 
-	if (ixj_WriteDSPCommand(0x6E04, board))		// Set Tone On Period
+	if (ixj_WriteDSPCommand(0x6E04, j))		// Set Tone On Period
 
 		return -1;
 
-	if (ixj_WriteDSPCommand(arg, board))
+	if (ixj_WriteDSPCommand(arg, j))
 		return -1;
 
 	return 0;
 }
 
-static int SCI_WaitHighSCI(int board)
+static int SCI_WaitHighSCI(IXJ *j)
 {
 	int cnt;
-	IXJ *j = &ixj[board];
 
 	j->pld_scrr.byte = inb_p(j->XILINXbase);
 	if (!j->pld_scrr.bits.sci) {
@@ -3408,10 +3388,9 @@ static int SCI_WaitHighSCI(int board)
 		return 1;
 }
 
-static int SCI_WaitLowSCI(int board)
+static int SCI_WaitLowSCI(IXJ *j)
 {
 	int cnt;
-	IXJ *j = &ixj[board];
 
 	j->pld_scrr.byte = inb_p(j->XILINXbase);
 	if (j->pld_scrr.bits.sci) {
@@ -3429,10 +3408,8 @@ static int SCI_WaitLowSCI(int board)
 		return 1;
 }
 
-static int SCI_Control(int board, int control)
+static int SCI_Control(IXJ *j, int control)
 {
-	IXJ *j = &ixj[board];
-
 	switch (control) {
 	case SCI_End:
 		j->pld_scrw.bits.c0 = 0;	// Set PLD Serial control interface
@@ -3471,7 +3448,7 @@ static int SCI_Control(int board, int control)
 	case SCI_Enable_DAA:
 	case SCI_Enable_Mixer:
 	case SCI_Enable_EEPROM:
-		if (!SCI_WaitHighSCI(board))
+		if (!SCI_WaitHighSCI(j))
 			return 0;
 		break;
 	default:
@@ -3481,21 +3458,20 @@ static int SCI_Control(int board, int control)
 	return 1;
 }
 
-static int SCI_Prepare(int board)
+static int SCI_Prepare(IXJ *j)
 {
-	if (!SCI_Control(board, SCI_End))
+	if (!SCI_Control(j, SCI_End))
 		return 0;
 
-	if (!SCI_WaitLowSCI(board))
+	if (!SCI_WaitLowSCI(j))
 		return 0;
 
 	return 1;
 }
 
-static int ixj_mixer(long val, int board)
+static int ixj_mixer(long val, IXJ *j)
 {
 	BYTES bytes;
-	IXJ *j = &ixj[board];
 
 	bytes.high = (val & 0xFF00) >> 8;
 	bytes.low = val & 0x00FF;
@@ -3504,28 +3480,25 @@ static int ixj_mixer(long val, int board)
 
 	outb_p(bytes.low, j->XILINXbase + 0x02);	// Load Mixer Data
 
-	SCI_Control(board, SCI_Enable_Mixer);
+	SCI_Control(j, SCI_Enable_Mixer);
 
-	SCI_Control(board, SCI_End);
+	SCI_Control(j, SCI_End);
 
 	return 0;
 }
 
-static int daa_load(BYTES * p_bytes, int board)
+static int daa_load(BYTES * p_bytes, IXJ *j)
 {
-	IXJ *j = &ixj[board];
-
 	outb_p(p_bytes->high, j->XILINXbase + 0x03);
 	outb_p(p_bytes->low, j->XILINXbase + 0x02);
-	if (!SCI_Control(board, SCI_Enable_DAA))
+	if (!SCI_Control(j, SCI_Enable_DAA))
 		return 0;
 	else
 		return 1;
 }
 
-static int ixj_daa_cr4(int board, char reg)
+static int ixj_daa_cr4(IXJ *j, char reg)
 {
-	IXJ *j = &ixj[board];
 	BYTES bytes;
 
 	switch (j->daa_mode) {
@@ -3562,21 +3535,20 @@ static int ixj_daa_cr4(int board, char reg)
 
 	bytes.low = j->m_DAAShadowRegs.SOP_REGS.SOP.cr4.reg;
 
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
-	if (!SCI_Prepare(board))
+	if (!SCI_Prepare(j))
 		return 0;
 
 	return 1;
 }
 
-static char daa_int_read(int board)
+static char daa_int_read(IXJ *j)
 {
 	BYTES bytes;
-	IXJ *j = &ixj[board];
 
-	if (!SCI_Prepare(board))
+	if (!SCI_Prepare(j))
 		return 0;
 
 	bytes.high = 0x38;
@@ -3584,7 +3556,7 @@ static char daa_int_read(int board)
 	outb_p(bytes.high, j->XILINXbase + 0x03);
 	outb_p(bytes.low, j->XILINXbase + 0x02);
 
-	if (!SCI_Control(board, SCI_Enable_DAA))
+	if (!SCI_Control(j, SCI_Enable_DAA))
 		return 0;
 
 	bytes.high = inb_p(j->XILINXbase + 0x03);
@@ -3594,9 +3566,9 @@ static char daa_int_read(int board)
 			printk("Cannot read DAA ID Byte high = %d low = %d\n", bytes.high, bytes.low);
 		return 0;
 	}
-	if (!SCI_Control(board, SCI_Enable_DAA))
+	if (!SCI_Control(j, SCI_Enable_DAA))
 		return 0;
-	if (!SCI_Control(board, SCI_End))
+	if (!SCI_Control(j, SCI_End))
 		return 0;
 
 	bytes.high = inb_p(j->XILINXbase + 0x03);
@@ -3606,13 +3578,12 @@ static char daa_int_read(int board)
 	return 1;
 }
 
-static int ixj_daa_cid_reset(int board)
+static int ixj_daa_cid_reset(IXJ *j)
 {
 	int i;
 	BYTES bytes;
-	IXJ *j = &ixj[board];
 
-	if (!SCI_Prepare(board))
+	if (!SCI_Prepare(j))
 		return 0;
 
 	bytes.high = 0x58;
@@ -3620,10 +3591,10 @@ static int ixj_daa_cid_reset(int board)
 	outb_p(bytes.high, j->XILINXbase + 0x03);
 	outb_p(bytes.low, j->XILINXbase + 0x02);
 
-	if (!SCI_Control(board, SCI_Enable_DAA))
+	if (!SCI_Control(j, SCI_Enable_DAA))
 		return 0;
 
-	if (!SCI_WaitHighSCI(board))
+	if (!SCI_WaitHighSCI(j))
 		return 0;
 
 	for (i = 0; i < ALISDAA_CALLERID_SIZE - 1; i += 2) {
@@ -3633,29 +3604,28 @@ static int ixj_daa_cid_reset(int board)
 		if (i < ALISDAA_CALLERID_SIZE - 1)
 			outb_p(bytes.low, j->XILINXbase + 0x02);
 
-		if (!SCI_Control(board, SCI_Enable_DAA))
+		if (!SCI_Control(j, SCI_Enable_DAA))
 			return 0;
 
-		if (!SCI_WaitHighSCI(board))
+		if (!SCI_WaitHighSCI(j))
 			return 0;
 
 	}
 
-	if (!SCI_Control(board, SCI_End))
+	if (!SCI_Control(j, SCI_End))
 		return 0;
 
 	return 1;
 }
 
-static int ixj_daa_cid_read(int board)
+static int ixj_daa_cid_read(IXJ *j)
 {
 	int i;
 	BYTES bytes;
 	char CID[ALISDAA_CALLERID_SIZE], mContinue;
 	char *pIn, *pOut;
-	IXJ *j = &ixj[board];
 
-	if (!SCI_Prepare(board))
+	if (!SCI_Prepare(j))
 		return 0;
 
 	bytes.high = 0x78;
@@ -3663,10 +3633,10 @@ static int ixj_daa_cid_read(int board)
 	outb_p(bytes.high, j->XILINXbase + 0x03);
 	outb_p(bytes.low, j->XILINXbase + 0x02);
 
-	if (!SCI_Control(board, SCI_Enable_DAA))
+	if (!SCI_Control(j, SCI_Enable_DAA))
 		return 0;
 
-	if (!SCI_WaitHighSCI(board))
+	if (!SCI_WaitHighSCI(j))
 		return 0;
 
 	bytes.high = inb_p(j->XILINXbase + 0x03);
@@ -3681,17 +3651,17 @@ static int ixj_daa_cid_read(int board)
 		outb_p(bytes.high, j->XILINXbase + 0x03);
 		outb_p(bytes.low, j->XILINXbase + 0x02);
 
-		if (!SCI_Control(board, SCI_Enable_DAA))
+		if (!SCI_Control(j, SCI_Enable_DAA))
 			return 0;
 
-		if (!SCI_WaitHighSCI(board))
+		if (!SCI_WaitHighSCI(j))
 			return 0;
 
 		CID[i + 0] = inb_p(j->XILINXbase + 0x03);
 		CID[i + 1] = inb_p(j->XILINXbase + 0x02);
 	}
 
-	if (!SCI_Control(board, SCI_End))
+	if (!SCI_Control(j, SCI_End))
 		return 0;
 
 	pIn = CID;
@@ -3733,16 +3703,15 @@ static int ixj_daa_cid_read(int board)
 	pOut += 1;
 	strncpy(j->cid.name, pOut, j->cid.namelen);
 
-	ixj_daa_cid_reset(board);
+	ixj_daa_cid_reset(j);
 	return 1;
 }
 
-static char daa_get_version(int board)
+static char daa_get_version(IXJ *j)
 {
 	BYTES bytes;
-	IXJ *j = &ixj[board];
 
-	if (!SCI_Prepare(board))
+	if (!SCI_Prepare(j))
 		return 0;
 
 	bytes.high = 0x35;
@@ -3750,7 +3719,7 @@ static char daa_get_version(int board)
 	outb_p(bytes.high, j->XILINXbase + 0x03);
 	outb_p(bytes.low, j->XILINXbase + 0x02);
 
-	if (!SCI_Control(board, SCI_Enable_DAA))
+	if (!SCI_Control(j, SCI_Enable_DAA))
 		return 0;
 
 	bytes.high = inb_p(j->XILINXbase + 0x03);
@@ -3760,10 +3729,10 @@ static char daa_get_version(int board)
 			printk("DAA Get Version Cannot read DAA ID Byte high = %d low = %d\n", bytes.high, bytes.low);
 		return 0;
 	}
-	if (!SCI_Control(board, SCI_Enable_DAA))
+	if (!SCI_Control(j, SCI_Enable_DAA))
 		return 0;
 
-	if (!SCI_Control(board, SCI_End))
+	if (!SCI_Control(j, SCI_End))
 		return 0;
 
 	bytes.high = inb_p(j->XILINXbase + 0x03);
@@ -3774,7 +3743,7 @@ static char daa_get_version(int board)
 	return bytes.high;
 }
 
-static int daa_set_mode(int board, int mode)
+static int daa_set_mode(IXJ *j, int mode)
 {
 	// NOTE:
 	//      The DAA *MUST* be in the conversation mode if the
@@ -3791,9 +3760,8 @@ static int daa_set_mode(int board, int mode)
 	//
 
 	BYTES bytes;
-	IXJ *j = &ixj[board];
 
-	if (!SCI_Prepare(board))
+	if (!SCI_Prepare(j))
 		return 0;
 
 	switch (mode) {
@@ -3807,8 +3775,8 @@ static int daa_set_mode(int board, int mode)
 			outb_p(j->pld_slicw.byte, j->XILINXbase + 0x01);
 			bytes.high = 0x10;
 			bytes.low = j->m_DAAShadowRegs.SOP_REGS.SOP.cr0.reg;
-			daa_load(&bytes, board);
-			if (!SCI_Prepare(board))
+			daa_load(&bytes, j);
+			if (!SCI_Prepare(j))
 				return 0;
 		}
 		j->pld_scrw.bits.daafsyncen = 0;	// Turn off DAA Frame Sync
@@ -3818,8 +3786,8 @@ static int daa_set_mode(int board, int mode)
 		outb_p(j->pld_slicw.byte, j->XILINXbase + 0x01);
 		bytes.high = 0x10;
 		bytes.low = j->m_DAAShadowRegs.SOP_REGS.SOP.cr0.reg;
-		daa_load(&bytes, board);
-		if (!SCI_Prepare(board))
+		daa_load(&bytes, j);
+		if (!SCI_Prepare(j))
 			return 0;
 
 		j->daa_mode = SOP_PU_SLEEP;
@@ -3838,19 +3806,21 @@ static int daa_set_mode(int board, int mode)
 		outb_p(j->pld_slicw.byte, j->XILINXbase + 0x01);
 		bytes.high = 0x50;
 		bytes.low = j->m_DAAShadowRegs.SOP_REGS.SOP.cr0.reg;
-		daa_load(&bytes, board);
-		if (!SCI_Prepare(board))
+		daa_load(&bytes, j);
+		if (!SCI_Prepare(j))
 			return 0;
 		j->daa_mode = SOP_PU_RINGING;
 		break;
 	case SOP_PU_CONVERSATION:
 		bytes.high = 0x90;
 		bytes.low = j->m_DAAShadowRegs.SOP_REGS.SOP.cr0.reg;
-		daa_load(&bytes, board);
-		if (!SCI_Prepare(board))
+		daa_load(&bytes, j);
+		if (!SCI_Prepare(j))
 			return 0;
 		j->pld_slicw.bits.rly2 = 1;
 		outb_p(j->pld_slicw.byte, j->XILINXbase + 0x01);
+		j->pld_scrw.bits.led1 = 0;
+		j->pld_scrw.bits.led2 = 1;
 		j->pld_scrw.bits.daafsyncen = 1;	// Turn on DAA Frame Sync
 
 		outb_p(j->pld_scrw.byte, j->XILINXbase);
@@ -3866,8 +3836,8 @@ static int daa_set_mode(int board, int mode)
 		outb_p(j->pld_slicw.byte, j->XILINXbase + 0x01);
 		bytes.high = 0xD0;
 		bytes.low = j->m_DAAShadowRegs.SOP_REGS.SOP.cr0.reg;
-		daa_load(&bytes, board);
-		if (!SCI_Prepare(board))
+		daa_load(&bytes, j);
+		if (!SCI_Prepare(j))
 			return 0;
 		j->daa_mode = SOP_PU_PULSEDIALING;
 		break;
@@ -3877,555 +3847,552 @@ static int daa_set_mode(int board, int mode)
 	return 1;
 }
 
-static int ixj_daa_write(int board)
+static int ixj_daa_write(IXJ *j)
 {
 	BYTES bytes;
-	IXJ *j = &ixj[board];
 
-	if (!SCI_Prepare(board))
+	if (!SCI_Prepare(j))
 		return 0;
 
 	bytes.high = 0x14;
 	bytes.low = j->m_DAAShadowRegs.SOP_REGS.SOP.cr4.reg;
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.SOP_REGS.SOP.cr3.reg;
 	bytes.low = j->m_DAAShadowRegs.SOP_REGS.SOP.cr2.reg;
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.SOP_REGS.SOP.cr1.reg;
 	bytes.low = j->m_DAAShadowRegs.SOP_REGS.SOP.cr0.reg;
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
-	if (!SCI_Prepare(board))
+	if (!SCI_Prepare(j))
 		return 0;
 
 	bytes.high = 0x1F;
 	bytes.low = j->m_DAAShadowRegs.XOP_REGS.XOP.xr7.reg;
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.XOP_xr6_W.reg;
 	bytes.low = j->m_DAAShadowRegs.XOP_REGS.XOP.xr5.reg;
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.XOP_REGS.XOP.xr4.reg;
 	bytes.low = j->m_DAAShadowRegs.XOP_REGS.XOP.xr3.reg;
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.XOP_REGS.XOP.xr2.reg;
 	bytes.low = j->m_DAAShadowRegs.XOP_REGS.XOP.xr1.reg;
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.XOP_xr0_W.reg;
 	bytes.low = 0x00;
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
-	if (!SCI_Prepare(board))
+	if (!SCI_Prepare(j))
 		return 0;
 
 	bytes.high = 0x00;
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.THFilterCoeff_1[7];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.THFilterCoeff_1[6];
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.THFilterCoeff_1[5];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.THFilterCoeff_1[4];
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.THFilterCoeff_1[3];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.THFilterCoeff_1[2];
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.THFilterCoeff_1[1];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.THFilterCoeff_1[0];
 	bytes.low = 0x00;
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
-	if (!SCI_Control(board, SCI_End))
+	if (!SCI_Control(j, SCI_End))
 		return 0;
-	if (!SCI_WaitLowSCI(board))
+	if (!SCI_WaitLowSCI(j))
 		return 0;
 
 	bytes.high = 0x01;
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.THFilterCoeff_2[7];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.THFilterCoeff_2[6];
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.THFilterCoeff_2[5];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.THFilterCoeff_2[4];
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.THFilterCoeff_2[3];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.THFilterCoeff_2[2];
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.THFilterCoeff_2[1];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.THFilterCoeff_2[0];
 	bytes.low = 0x00;
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
-	if (!SCI_Control(board, SCI_End))
+	if (!SCI_Control(j, SCI_End))
 		return 0;
-	if (!SCI_WaitLowSCI(board))
+	if (!SCI_WaitLowSCI(j))
 		return 0;
 
 	bytes.high = 0x02;
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.THFilterCoeff_3[7];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.THFilterCoeff_3[6];
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.THFilterCoeff_3[5];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.THFilterCoeff_3[4];
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.THFilterCoeff_3[3];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.THFilterCoeff_3[2];
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.THFilterCoeff_3[1];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.THFilterCoeff_3[0];
 	bytes.low = 0x00;
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
-	if (!SCI_Control(board, SCI_End))
+	if (!SCI_Control(j, SCI_End))
 		return 0;
-	if (!SCI_WaitLowSCI(board))
+	if (!SCI_WaitLowSCI(j))
 		return 0;
 
 	bytes.high = 0x03;
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.RingerImpendance_1[7];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.RingerImpendance_1[6];
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.RingerImpendance_1[5];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.RingerImpendance_1[4];
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.RingerImpendance_1[3];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.RingerImpendance_1[2];
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.RingerImpendance_1[1];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.RingerImpendance_1[0];
 	bytes.low = 0x00;
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
-	if (!SCI_Control(board, SCI_End))
+	if (!SCI_Control(j, SCI_End))
 		return 0;
-	if (!SCI_WaitLowSCI(board))
+	if (!SCI_WaitLowSCI(j))
 		return 0;
 
 	bytes.high = 0x04;
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.IMFilterCoeff_1[7];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.IMFilterCoeff_1[6];
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.IMFilterCoeff_1[5];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.IMFilterCoeff_1[4];
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.IMFilterCoeff_1[3];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.IMFilterCoeff_1[2];
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.IMFilterCoeff_1[1];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.IMFilterCoeff_1[0];
 	bytes.low = 0x00;
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
-	if (!SCI_Control(board, SCI_End))
+	if (!SCI_Control(j, SCI_End))
 		return 0;
-	if (!SCI_WaitLowSCI(board))
+	if (!SCI_WaitLowSCI(j))
 		return 0;
 
 	bytes.high = 0x05;
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.IMFilterCoeff_2[7];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.IMFilterCoeff_2[6];
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.IMFilterCoeff_2[5];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.IMFilterCoeff_2[4];
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.IMFilterCoeff_2[3];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.IMFilterCoeff_2[2];
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.IMFilterCoeff_2[1];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.IMFilterCoeff_2[0];
 	bytes.low = 0x00;
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
-	if (!SCI_Control(board, SCI_End))
+	if (!SCI_Control(j, SCI_End))
 		return 0;
-	if (!SCI_WaitLowSCI(board))
+	if (!SCI_WaitLowSCI(j))
 		return 0;
 
 	bytes.high = 0x06;
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.RingerImpendance_2[7];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.RingerImpendance_2[6];
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.RingerImpendance_2[5];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.RingerImpendance_2[4];
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.RingerImpendance_2[3];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.RingerImpendance_2[2];
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.RingerImpendance_2[1];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.RingerImpendance_2[0];
 	bytes.low = 0x00;
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
-	if (!SCI_Control(board, SCI_End))
+	if (!SCI_Control(j, SCI_End))
 		return 0;
-	if (!SCI_WaitLowSCI(board))
+	if (!SCI_WaitLowSCI(j))
 		return 0;
 
 	bytes.high = 0x07;
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.FRRFilterCoeff[7];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.FRRFilterCoeff[6];
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.FRRFilterCoeff[5];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.FRRFilterCoeff[4];
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.FRRFilterCoeff[3];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.FRRFilterCoeff[2];
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.FRRFilterCoeff[1];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.FRRFilterCoeff[0];
 	bytes.low = 0x00;
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
-	if (!SCI_Control(board, SCI_End))
+	if (!SCI_Control(j, SCI_End))
 		return 0;
-	if (!SCI_WaitLowSCI(board))
+	if (!SCI_WaitLowSCI(j))
 		return 0;
 
 	bytes.high = 0x08;
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.FRXFilterCoeff[7];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.FRXFilterCoeff[6];
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.FRXFilterCoeff[5];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.FRXFilterCoeff[4];
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.FRXFilterCoeff[3];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.FRXFilterCoeff[2];
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.FRXFilterCoeff[1];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.FRXFilterCoeff[0];
 	bytes.low = 0x00;
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
-	if (!SCI_Control(board, SCI_End))
+	if (!SCI_Control(j, SCI_End))
 		return 0;
-	if (!SCI_WaitLowSCI(board))
+	if (!SCI_WaitLowSCI(j))
 		return 0;
 
 	bytes.high = 0x09;
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.ARFilterCoeff[3];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.ARFilterCoeff[2];
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.ARFilterCoeff[1];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.ARFilterCoeff[0];
 	bytes.low = 0x00;
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
-	if (!SCI_Control(board, SCI_End))
+	if (!SCI_Control(j, SCI_End))
 		return 0;
-	if (!SCI_WaitLowSCI(board))
+	if (!SCI_WaitLowSCI(j))
 		return 0;
 
 	bytes.high = 0x0A;
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.AXFilterCoeff[3];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.AXFilterCoeff[2];
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.AXFilterCoeff[1];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.AXFilterCoeff[0];
 	bytes.low = 0x00;
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
-	if (!SCI_Control(board, SCI_End))
+	if (!SCI_Control(j, SCI_End))
 		return 0;
-	if (!SCI_WaitLowSCI(board))
+	if (!SCI_WaitLowSCI(j))
 		return 0;
 
 	bytes.high = 0x0B;
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.Tone1Coeff[3];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.Tone1Coeff[2];
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.Tone1Coeff[1];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.Tone1Coeff[0];
 	bytes.low = 0x00;
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
-	if (!SCI_Control(board, SCI_End))
+	if (!SCI_Control(j, SCI_End))
 		return 0;
-	if (!SCI_WaitLowSCI(board))
+	if (!SCI_WaitLowSCI(j))
 		return 0;
 
 	bytes.high = 0x0C;
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.Tone2Coeff[3];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.Tone2Coeff[2];
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.Tone2Coeff[1];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.Tone2Coeff[0];
 	bytes.low = 0x00;
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
-	if (!SCI_Control(board, SCI_End))
+	if (!SCI_Control(j, SCI_End))
 		return 0;
-	if (!SCI_WaitLowSCI(board))
+	if (!SCI_WaitLowSCI(j))
 		return 0;
 
 	bytes.high = 0x0D;
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.LevelmeteringRinging[3];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.LevelmeteringRinging[2];
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.LevelmeteringRinging[1];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.LevelmeteringRinging[0];
 	bytes.low = 0x00;
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
-	if (!SCI_Control(board, SCI_End))
+	if (!SCI_Control(j, SCI_End))
 		return 0;
-	if (!SCI_WaitLowSCI(board))
+	if (!SCI_WaitLowSCI(j))
 		return 0;
 
 	bytes.high = 0x0E;
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.CallerID1stTone[7];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.CallerID1stTone[6];
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.CallerID1stTone[5];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.CallerID1stTone[4];
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.CallerID1stTone[3];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.CallerID1stTone[2];
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.CallerID1stTone[1];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.CallerID1stTone[0];
 	bytes.low = 0x00;
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
-	if (!SCI_Control(board, SCI_End))
+	if (!SCI_Control(j, SCI_End))
 		return 0;
-	if (!SCI_WaitLowSCI(board))
+	if (!SCI_WaitLowSCI(j))
 		return 0;
 
 	bytes.high = 0x0F;
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.CallerID2ndTone[7];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.CallerID2ndTone[6];
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.CallerID2ndTone[5];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.CallerID2ndTone[4];
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.CallerID2ndTone[3];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.CallerID2ndTone[2];
 	bytes.low = j->m_DAAShadowRegs.COP_REGS.COP.CallerID2ndTone[1];
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	bytes.high = j->m_DAAShadowRegs.COP_REGS.COP.CallerID2ndTone[0];
 	bytes.low = 0x00;
-	if (!daa_load(&bytes, board))
+	if (!daa_load(&bytes, j))
 		return 0;
 
 	udelay(32);
 	j->pld_scrr.byte = inb_p(j->XILINXbase);
-	if (!SCI_Control(board, SCI_End))
+	if (!SCI_Control(j, SCI_End))
 		return 0;
 
 	return 1;
 }
 
-int ixj_set_tone_off(unsigned short arg, int board)
+int ixj_set_tone_off(unsigned short arg, IXJ *j)
 {
-	ixj[board].tone_off_time = arg;
-	if (ixj_WriteDSPCommand(0x6E05, board))		// Set Tone Off Period
+	j->tone_off_time = arg;
+	if (ixj_WriteDSPCommand(0x6E05, j))		// Set Tone Off Period
 
 		return -1;
-	if (ixj_WriteDSPCommand(arg, board))
-		return -1;
-	return 0;
-}
-
-static int ixj_get_tone_on(int board)
-{
-	if (ixj_WriteDSPCommand(0x6E06, board))		// Get Tone On Period
-
+	if (ixj_WriteDSPCommand(arg, j))
 		return -1;
 	return 0;
 }
 
-static int ixj_get_tone_off(int board)
+static int ixj_get_tone_on(IXJ *j)
 {
-	if (ixj_WriteDSPCommand(0x6E07, board))		// Get Tone Off Period
+	if (ixj_WriteDSPCommand(0x6E06, j))		// Get Tone On Period
 
 		return -1;
 	return 0;
 }
 
-static void ixj_busytone(int board)
+static int ixj_get_tone_off(IXJ *j)
 {
-	ixj[board].flags.ringback = 0;
-	ixj[board].flags.dialtone = 0;
-	ixj[board].flags.busytone = 1;
-	ixj_set_tone_on(0x07D0, board);
-	ixj_set_tone_off(0x07D0, board);
-	ixj_play_tone(board, 27);
+	if (ixj_WriteDSPCommand(0x6E07, j))		// Get Tone Off Period
+		return -1;
+	return 0;
 }
 
-static void ixj_dialtone(int board)
+static void ixj_busytone(IXJ *j)
 {
-	ixj[board].flags.ringback = 0;
-	ixj[board].flags.dialtone = 1;
-	ixj[board].flags.busytone = 0;
-	if (ixj[board].dsp.low == 0x20) {
+	j->flags.ringback = 0;
+	j->flags.dialtone = 0;
+	j->flags.busytone = 1;
+	ixj_set_tone_on(0x07D0, j);
+	ixj_set_tone_off(0x07D0, j);
+	ixj_play_tone(j, 27);
+}
+
+static void ixj_dialtone(IXJ *j)
+{
+	j->flags.ringback = 0;
+	j->flags.dialtone = 1;
+	j->flags.busytone = 0;
+	if (j->dsp.low == 0x20) {
 		return;
 	} else {
-		ixj_set_tone_on(0xFFFF, board);
-		ixj_set_tone_off(0x0000, board);
-		ixj_play_tone(board, 25);
+		ixj_set_tone_on(0xFFFF, j);
+		ixj_set_tone_off(0x0000, j);
+		ixj_play_tone(j, 25);
 	}
 }
 
-static void ixj_cpt_stop(board)
+static void ixj_cpt_stop(IXJ *j)
 {
-	IXJ *j = &ixj[board];
 	if(j->tone_state)
 	{
 		j->flags.dialtone = 0;
 		j->flags.busytone = 0;
 		j->flags.ringback = 0;
-		ixj_set_tone_on(0x0001, board);
-		ixj_set_tone_off(0x0000, board);
-		ixj_play_tone(board, 0);
+		ixj_set_tone_on(0x0001, j);
+		ixj_set_tone_off(0x0000, j);
+		ixj_play_tone(j, 0);
 		j->tone_state = 0;
 		if (j->cadence_t) {
 			if (j->cadence_t->ce) {
@@ -4436,34 +4403,34 @@ static void ixj_cpt_stop(board)
 		}
 	}
 	if (j->play_mode == -1 && j->rec_mode == -1)
-		idle(board);
-	if (j->play_mode != -1)
-		ixj_play_start(board);
-	if (j->rec_mode != -1)
-		ixj_record_start(board);
+		idle(j);
+	if (j->play_mode != -1 && j->dsp.low == 0x20)
+		ixj_play_start(j);
+	if (j->rec_mode != -1 && j->dsp.low == 0x20)
+		ixj_record_start(j);
 }
 
-static void ixj_ringback(int board)
+static void ixj_ringback(IXJ *j)
 {
-	ixj[board].flags.busytone = 0;
-	ixj[board].flags.dialtone = 0;
-	ixj[board].flags.ringback = 1;
-	ixj_set_tone_on(0x0FA0, board);
-	ixj_set_tone_off(0x2EE0, board);
-	ixj_play_tone(board, 26);
+	j->flags.busytone = 0;
+	j->flags.dialtone = 0;
+	j->flags.ringback = 1;
+	ixj_set_tone_on(0x0FA0, j);
+	ixj_set_tone_off(0x2EE0, j);
+	ixj_play_tone(j, 26);
 }
 
-static void ixj_testram(int board)
+static void ixj_testram(IXJ *j)
 {
-	ixj_WriteDSPCommand(0x3001, board);	/* Test External SRAM */
+	ixj_WriteDSPCommand(0x3001, j);	/* Test External SRAM */
 }
 
-static int ixj_build_cadence(int board, IXJ_CADENCE * cp)
+static int ixj_build_cadence(IXJ *j, IXJ_CADENCE * cp)
 {
 	IXJ_CADENCE *lcp;
 	IXJ_CADENCE_ELEMENT *lcep;
 	IXJ_TONE ti;
-	IXJ *j = &ixj[board];
+
 	lcp = kmalloc(sizeof(IXJ_CADENCE), GFP_KERNEL);
 	if (lcp == NULL)
 		return -ENOMEM;
@@ -4490,30 +4457,30 @@ static int ixj_build_cadence(int board, IXJ_CADENCE * cp)
 	lcp->ce = (void *) lcep;
 	j->cadence_t = lcp;
 	j->tone_cadence_state = 0;
-	ixj_set_tone_on(lcp->ce[0].tone_on_time, board);
-	ixj_set_tone_off(lcp->ce[0].tone_off_time, board);
+	ixj_set_tone_on(lcp->ce[0].tone_on_time, j);
+	ixj_set_tone_off(lcp->ce[0].tone_off_time, j);
 	if (j->cadence_t->ce[j->tone_cadence_state].freq0) {
 		ti.tone_index = j->cadence_t->ce[j->tone_cadence_state].index;
 		ti.freq0 = j->cadence_t->ce[j->tone_cadence_state].freq0;
 		ti.gain0 = j->cadence_t->ce[j->tone_cadence_state].gain0;
 		ti.freq1 = j->cadence_t->ce[j->tone_cadence_state].freq1;
 		ti.gain1 = j->cadence_t->ce[j->tone_cadence_state].gain1;
-		ixj_init_tone(board, &ti);
+		ixj_init_tone(j, &ti);
 	}
-	ixj_play_tone(board, lcp->ce[0].index);
+	ixj_play_tone(j, lcp->ce[0].index);
 	return 1;
 }
 
-static int ixj_build_filter_cadence(int board, IXJ_FILTER_CADENCE * cp)
+static int ixj_build_filter_cadence(IXJ *j, IXJ_FILTER_CADENCE * cp)
 {
 	IXJ_FILTER_CADENCE *lcp;
-	IXJ *j = &ixj[board];
+
 	lcp = kmalloc(sizeof(IXJ_CADENCE), GFP_KERNEL);
 	if (lcp == NULL)
 		return -ENOMEM;
 	if (copy_from_user(lcp, (char *) cp, sizeof(IXJ_FILTER_CADENCE)))
 		return -EFAULT;
-	if (lcp->filter > 4)
+	if (lcp->filter >= 4)
 		return -1;
 	j->cadence_f[lcp->filter].state = 0;
 	j->cadence_f[lcp->filter].enable = lcp->enable;
@@ -4540,9 +4507,8 @@ static int ixj_build_filter_cadence(int board, IXJ_FILTER_CADENCE * cp)
 	return 0;
 }
 
-static void add_caps(int board)
+static void add_caps(IXJ *j)
 {
-	IXJ *j = &ixj[board];
 	j->caps = 0;
 	j->caplist[j->caps].cap = PHONE_VENDOR_QUICKNET;
 	strcpy(j->caplist[j->caps].desc, "Quicknet Technologies, Inc. (www.quicknet.net)");
@@ -4550,95 +4516,139 @@ static void add_caps(int board)
 	j->caplist[j->caps].handle = j->caps++;
 	j->caplist[j->caps].captype = device;
 	switch (j->cardtype) {
-	case 100:
+	case QTI_PHONEJACK:
 		strcpy(j->caplist[j->caps].desc, "Quicknet Internet PhoneJACK");
-		j->caplist[j->caps].cap = 100;
 		break;
-	case 300:
+	case QTI_LINEJACK:
 		strcpy(j->caplist[j->caps].desc, "Quicknet Internet LineJACK");
-		j->caplist[j->caps].cap = 300;
 		break;
-	case 400:
+	case QTI_PHONEJACK_LITE:
 		strcpy(j->caplist[j->caps].desc, "Quicknet Internet PhoneJACK Lite");
-		j->caplist[j->caps].cap = 400;
 		break;
-	case 500:
+	case QTI_PHONEJACK_PCI:
 		strcpy(j->caplist[j->caps].desc, "Quicknet Internet PhoneJACK PCI");
-		j->caplist[j->caps].cap = 500;
+		break;
+	case QTI_PHONECARD:
+		strcpy(j->caplist[j->caps].desc, "Quicknet Internet PhoneCARD");
 		break;
 	}
+	j->caplist[j->caps].cap = j->cardtype;
 	j->caplist[j->caps].handle = j->caps++;
 	strcpy(j->caplist[j->caps].desc, "POTS");
 	j->caplist[j->caps].captype = port;
 	j->caplist[j->caps].cap = pots;
 	j->caplist[j->caps].handle = j->caps++;
-	switch (ixj[board].cardtype) {
-	case 100:
+
+ 	// add devices that can do speaker/mic
+	switch (j->cardtype) {
+	case QTI_PHONEJACK:
+	case QTI_LINEJACK:
+	case QTI_PHONEJACK_PCI:
+	case QTI_PHONECARD:
 		strcpy(j->caplist[j->caps].desc, "SPEAKER");
 		j->caplist[j->caps].captype = port;
 		j->caplist[j->caps].cap = speaker;
 		j->caplist[j->caps].handle = j->caps++;
+        default:
+     		break;
+	}
+
+ 	// add devices that can do handset
+	switch (j->cardtype) {
+	case QTI_PHONEJACK:
 		strcpy(j->caplist[j->caps].desc, "HANDSET");
 		j->caplist[j->caps].captype = port;
 		j->caplist[j->caps].cap = handset;
 		j->caplist[j->caps].handle = j->caps++;
 		break;
-	case 300:
-		strcpy(j->caplist[j->caps].desc, "SPEAKER");
-		j->caplist[j->caps].captype = port;
-		j->caplist[j->caps].cap = speaker;
-		j->caplist[j->caps].handle = j->caps++;
+        default:
+     		break;
+	}
+
+ 	// add devices that can do PSTN
+	switch (j->cardtype) {
+	case QTI_LINEJACK:
 		strcpy(j->caplist[j->caps].desc, "PSTN");
 		j->caplist[j->caps].captype = port;
 		j->caplist[j->caps].cap = pstn;
 		j->caplist[j->caps].handle = j->caps++;
 		break;
+        default:
+     		break;
 	}
+
+	// add codecs - all cards can do uLaw, linear 8/16, and Windows sound system
 	strcpy(j->caplist[j->caps].desc, "ULAW");
 	j->caplist[j->caps].captype = codec;
 	j->caplist[j->caps].cap = ULAW;
 	j->caplist[j->caps].handle = j->caps++;
+
 	strcpy(j->caplist[j->caps].desc, "LINEAR 16 bit");
 	j->caplist[j->caps].captype = codec;
 	j->caplist[j->caps].cap = LINEAR16;
 	j->caplist[j->caps].handle = j->caps++;
+
 	strcpy(j->caplist[j->caps].desc, "LINEAR 8 bit");
 	j->caplist[j->caps].captype = codec;
 	j->caplist[j->caps].cap = LINEAR8;
 	j->caplist[j->caps].handle = j->caps++;
+
 	strcpy(j->caplist[j->caps].desc, "Windows Sound System");
 	j->caplist[j->caps].captype = codec;
 	j->caplist[j->caps].cap = WSS;
 	j->caplist[j->caps].handle = j->caps++;
-	if (j->ver.low != 0x12) {
+
+	// version 12 of the 8020 does the following codecs in a broken way
+	if (j->dsp.low != 0x20 || j->ver.low != 0x12) {
 		strcpy(j->caplist[j->caps].desc, "G.723.1 6.3Kbps");
 		j->caplist[j->caps].captype = codec;
 		j->caplist[j->caps].cap = G723_63;
 		j->caplist[j->caps].handle = j->caps++;
+
 		strcpy(j->caplist[j->caps].desc, "G.723.1 5.3Kbps");
 		j->caplist[j->caps].captype = codec;
 		j->caplist[j->caps].cap = G723_53;
 		j->caplist[j->caps].handle = j->caps++;
+
 		strcpy(j->caplist[j->caps].desc, "TrueSpeech 4.8Kbps");
 		j->caplist[j->caps].captype = codec;
 		j->caplist[j->caps].cap = TS48;
 		j->caplist[j->caps].handle = j->caps++;
+
 		strcpy(j->caplist[j->caps].desc, "TrueSpeech 4.1Kbps");
 		j->caplist[j->caps].captype = codec;
 		j->caplist[j->caps].cap = TS41;
 		j->caplist[j->caps].handle = j->caps++;
 	}
-	if (j->cardtype == 100) {
+
+	// 8020 chips can do TS8.5 native, and 8021/8022 can load it
+	if (j->dsp.low == 0x20 || j->flags.ts85_loaded) {
 		strcpy(j->caplist[j->caps].desc, "TrueSpeech 8.5Kbps");
 		j->caplist[j->caps].captype = codec;
 		j->caplist[j->caps].cap = TS85;
 		j->caplist[j->caps].handle = j->caps++;
 	}
+
+	// 8021 chips can do G728
+	if (j->dsp.low == 0x21) {
+		strcpy(j->caplist[j->caps].desc, "G.728 16Kbps");
+		j->caplist[j->caps].captype = codec;
+		j->caplist[j->caps].cap = G728;
+		j->caplist[j->caps].handle = j->caps++;
+	}
+
+	// 8021/8022 chips can do G729 if loaded
+	if (j->dsp.low != 0x20 && j->flags.g729_loaded) {
+		strcpy(j->caplist[j->caps].desc, "G.729A/B");
+		j->caplist[j->caps].captype = codec;
+		j->caplist[j->caps].cap = G728;
+		j->caplist[j->caps].handle = j->caps++;
+	}
 }
-static int capabilities_check(int board, struct phone_capability *pcreq)
+
+static int capabilities_check(IXJ *j, struct phone_capability *pcreq)
 {
 	int cnt;
-	IXJ *j = &ixj[board];
 	int retval = 0;
 	for (cnt = 0; cnt < j->caps; cnt++) {
 		if (pcreq->captype == j->caplist[cnt].captype
@@ -4655,13 +4665,18 @@ int ixj_ioctl(struct inode *inode, struct file *file_p, unsigned int cmd, unsign
 	IXJ_TONE ti;
 	IXJ_FILTER jf;
 	unsigned int minor = MINOR(inode->i_rdev);
-	int board = NUM(inode->i_rdev);
-	IXJ *j = &ixj[NUM(inode->i_rdev)];
+	unsigned int board = NUM(inode->i_rdev);
+	IXJ *j = ixj[board];
 	int retval = 0;
+
 	if (ixjdebug > 1)
 		printk(KERN_DEBUG "phone%d ioctl, cmd: 0x%x, arg: 0x%lx\n", minor, cmd, arg);
 	if (minor >= IXJMAX)
 		return -ENODEV;
+
+	if (j == NULL) /* shouldn't happen! */
+		return -ENODEV;
+
 	/*
 	 *    Check ioctls only root can use.
 	 */
@@ -4674,7 +4689,7 @@ int ixj_ioctl(struct inode *inode, struct file *file_p, unsigned int cmd, unsign
 	}
 	switch (cmd) {
 	case IXJCTL_TESTRAM:
-		ixj_testram(board);
+		ixj_testram(j);
 		retval = (j->ssr.high << 8) + j->ssr.low;
 		break;
 	case IXJCTL_CARDTYPE:
@@ -4697,7 +4712,7 @@ int ixj_ioctl(struct inode *inode, struct file *file_p, unsigned int cmd, unsign
 		else {
 			memset(&j->cid_send, 0, sizeof(PHONE_CID));
 		}
-		ixj_write_cidcw(board);
+		ixj_write_cidcw(j);
 		break;
 	/* Binary compatbility */
 	case OLD_PHONE_RING_START:
@@ -4710,14 +4725,14 @@ int ixj_ioctl(struct inode *inode, struct file *file_p, unsigned int cmd, unsign
 		else {
 			memset(&j->cid_send, 0, sizeof(PHONE_CID));
 		}
-		ixj_ring_start(board);
+		ixj_ring_start(j);
 		break;
 	case PHONE_RING_STOP:
 		j->flags.cringing = 0;
-		ixj_ring_off(board);
+		ixj_ring_off(j);
 		break;
 	case PHONE_RING:
-		retval = ixj_ring(board);
+		retval = ixj_ring(j);
 		break;
 	case PHONE_EXCEPTION:
 		retval = j->ex.bytes;
@@ -4740,70 +4755,70 @@ int ixj_ioctl(struct inode *inode, struct file *file_p, unsigned int cmd, unsign
 		retval = j->r_hook;
 		break;
 	case IXJCTL_SET_LED:
-		LED_SetState(arg, board);
+		LED_SetState(arg, j);
 		break;
 	case PHONE_FRAME:
-		retval = set_base_frame(board, arg);
+		retval = set_base_frame(j, arg);
 		break;
 	case PHONE_REC_CODEC:
-		retval = set_rec_codec(board, arg);
+		retval = set_rec_codec(j, arg);
 		break;
 	case PHONE_VAD:
-		ixj_vad(board, arg);
+		ixj_vad(j, arg);
 		break;
 	case PHONE_REC_START:
-		ixj_record_start(board);
+		ixj_record_start(j);
 		break;
 	case PHONE_REC_STOP:
-		ixj_record_stop(board);
+		ixj_record_stop(j);
 		break;
 	case PHONE_REC_DEPTH:
-		set_rec_depth(board, arg);
+		set_rec_depth(j, arg);
 		break;
 	case PHONE_REC_VOLUME:
 		if(arg == -1) {
-			retval = get_rec_volume(board);
+			retval = get_rec_volume(j);
 		}
 		else {
-			set_rec_volume(board, arg);
+			set_rec_volume(j, arg);
 			retval = arg;
 		}
 		break;
 	case PHONE_REC_LEVEL:
-		retval = get_rec_level(board);
+		retval = get_rec_level(j);
 		break;
 	case IXJCTL_AEC_START:
-		ixj_aec_start(board, arg);
+		ixj_aec_start(j, arg);
 		break;
 	case IXJCTL_AEC_STOP:
-		aec_stop(board);
+		aec_stop(j);
 		break;
 	case IXJCTL_AEC_GET_LEVEL:
 		retval = j->aec_level;
 		break;
 	case PHONE_PLAY_CODEC:
-		retval = set_play_codec(board, arg);
+		retval = set_play_codec(j, arg);
 		break;
 	case PHONE_PLAY_START:
-		retval = ixj_play_start(board);
+		retval = ixj_play_start(j);
 		break;
 	case PHONE_PLAY_STOP:
-		ixj_play_stop(board);
+		ixj_play_stop(j);
 		break;
 	case PHONE_PLAY_DEPTH:
-		set_play_depth(board, arg);
+		set_play_depth(j, arg);
 		break;
 	case PHONE_PLAY_VOLUME:
 		if(arg == -1) {
-			retval = get_play_volume(board);
+			retval = get_play_volume(j);
 		}
 		else {
-			set_play_volume(board, arg);
+			set_play_volume(j, arg);
 			retval = arg;
 		}
 		break;
 	case PHONE_PLAY_LEVEL:
-		retval = get_play_level(board);
+		retval = get_play_level(j);
 		break;
 	case IXJCTL_DSP_TYPE:
 		retval = (j->dsp.high << 8) + j->dsp.low;
@@ -4842,20 +4857,20 @@ int ixj_ioctl(struct inode *inode, struct file *file_p, unsigned int cmd, unsign
 		j->maxrings = arg;
 		break;
 	case PHONE_SET_TONE_ON_TIME:
-		ixj_set_tone_on(arg, board);
+		ixj_set_tone_on(arg, j);
 		break;
 	case PHONE_SET_TONE_OFF_TIME:
-		ixj_set_tone_off(arg, board);
+		ixj_set_tone_off(arg, j);
 		break;
 	case PHONE_GET_TONE_ON_TIME:
-		if (ixj_get_tone_on(board)) {
+		if (ixj_get_tone_on(j)) {
 			retval = -1;
 		} else {
 			retval = (j->ssr.high << 8) + j->ssr.low;
 		}
 		break;
 	case PHONE_GET_TONE_OFF_TIME:
-		if (ixj_get_tone_off(board)) {
+		if (ixj_get_tone_off(j)) {
 			retval = -1;
 		} else {
 			retval = (j->ssr.high << 8) + j->ssr.low;
@@ -4863,7 +4878,9 @@ int ixj_ioctl(struct inode *inode, struct file *file_p, unsigned int cmd, unsign
 		break;
 	case PHONE_PLAY_TONE:
 		if (!j->tone_state)
-			ixj_play_tone(board, arg);
+			retval = ixj_play_tone(j, arg);
+		else
+			retval = -1;
 		break;
 	case PHONE_GET_TONE_STATE:
 		retval = j->tone_state;
@@ -4872,7 +4889,7 @@ int ixj_ioctl(struct inode *inode, struct file *file_p, unsigned int cmd, unsign
 		retval = j->ex.bits.dtmf_ready;
 		break;
 	case PHONE_GET_DTMF:
-		if (ixj_hookstate(board)) {
+		if (ixj_hookstate(j)) {
 			if (j->dtmf_rp != j->dtmf_wp) {
 				retval = j->dtmfbuffer[j->dtmf_rp];
 				j->dtmf_rp++;
@@ -4885,7 +4902,7 @@ int ixj_ioctl(struct inode *inode, struct file *file_p, unsigned int cmd, unsign
 		}
 		break;
 	case PHONE_GET_DTMF_ASCII:
-		if (ixj_hookstate(board)) {
+		if (ixj_hookstate(j)) {
 			if (j->dtmf_rp != j->dtmf_wp) {
 				switch (j->dtmfbuffer[j->dtmf_rp]) {
 				case 10:
@@ -4934,16 +4951,16 @@ int ixj_ioctl(struct inode *inode, struct file *file_p, unsigned int cmd, unsign
 		j->flags.dtmf_oob = arg;
 		break;
 	case PHONE_DIALTONE:
-		ixj_dialtone(board);
+		ixj_dialtone(j);
 		break;
 	case PHONE_BUSY:
-		ixj_busytone(board);
+		ixj_busytone(j);
 		break;
 	case PHONE_RINGBACK:
-		ixj_ringback(board);
+		ixj_ringback(j);
 		break;
 	case PHONE_CPT_STOP:
-		ixj_cpt_stop(board);
+		ixj_cpt_stop(j);
 		break;
 	case PHONE_QUERY_CODEC:
 	{
@@ -4972,36 +4989,36 @@ int ixj_ioctl(struct inode *inode, struct file *file_p, unsigned int cmd, unsign
 		return 0;
 	}
 	case IXJCTL_DSP_IDLE:
-		idle(board);
+		idle(j);
 		break;
 	case IXJCTL_MIXER:
-		ixj_mixer(arg, board);
+		ixj_mixer(arg, j);
 		break;
 	case IXJCTL_DAA_COEFF_SET:
 		switch (arg) {
 		case DAA_US:
-			DAA_Coeff_US(board);
-			retval = ixj_daa_write(board);
+			DAA_Coeff_US(j);
+			retval = ixj_daa_write(j);
 			break;
 		case DAA_UK:
-			DAA_Coeff_UK(board);
-			retval = ixj_daa_write(board);
+			DAA_Coeff_UK(j);
+			retval = ixj_daa_write(j);
 			break;
 		case DAA_FRANCE:
-			DAA_Coeff_France(board);
-			retval = ixj_daa_write(board);
+			DAA_Coeff_France(j);
+			retval = ixj_daa_write(j);
 			break;
 		case DAA_GERMANY:
-			DAA_Coeff_Germany(board);
-			retval = ixj_daa_write(board);
+			DAA_Coeff_Germany(j);
+			retval = ixj_daa_write(j);
 			break;
 		case DAA_AUSTRALIA:
-			DAA_Coeff_Australia(board);
-			retval = ixj_daa_write(board);
+			DAA_Coeff_Australia(j);
+			retval = ixj_daa_write(j);
 			break;
 		case DAA_JAPAN:
-			DAA_Coeff_Japan(board);
-			retval = ixj_daa_write(board);
+			DAA_Coeff_Japan(j);
+			retval = ixj_daa_write(j);
 			break;
 		default:
 			retval = 1;
@@ -5010,13 +5027,13 @@ int ixj_ioctl(struct inode *inode, struct file *file_p, unsigned int cmd, unsign
 		j->country = arg;
 		break;
 	case IXJCTL_DAA_AGAIN:
-		ixj_daa_cr4(board, arg | 0x02);
+		ixj_daa_cr4(j, arg | 0x02);
 		break;
 	case IXJCTL_PSTN_LINETEST:
-		retval = ixj_linetest(board);
+		retval = ixj_linetest(j);
 		break;
 	case IXJCTL_VMWI:
-		ixj_write_vmwi(board, arg);
+		ixj_write_vmwi(j, arg);
 		break;
 	case IXJCTL_CID:
 		if (copy_to_user((char *) arg, &j->cid, sizeof(PHONE_CID)))
@@ -5028,12 +5045,12 @@ int ixj_ioctl(struct inode *inode, struct file *file_p, unsigned int cmd, unsign
 		break;
 	case IXJCTL_PORT:
 		if (arg)
-			retval = ixj_set_port(board, arg);
+			retval = ixj_set_port(j, arg);
 		else
 			retval = j->port;
 		break;
 	case IXJCTL_POTS_PSTN:
-		retval = ixj_set_pots(board, arg);
+		retval = ixj_set_pots(j, arg);
 		break;
 	case PHONE_CAPABILITIES:
 		retval = j->caps;
@@ -5043,10 +5060,10 @@ int ixj_ioctl(struct inode *inode, struct file *file_p, unsigned int cmd, unsign
 			 return -EFAULT;
 		break;
 	case PHONE_CAPABILITIES_CHECK:
-		retval = capabilities_check(board, (struct phone_capability *) arg);
+		retval = capabilities_check(j, (struct phone_capability *) arg);
 		break;
 	case PHONE_PSTN_SET_STATE:
-		daa_set_mode(board, arg);
+		daa_set_mode(j, arg);
 		break;
 	case PHONE_PSTN_GET_STATE:
 		retval = j->daa_mode;
@@ -5055,40 +5072,47 @@ int ixj_ioctl(struct inode *inode, struct file *file_p, unsigned int cmd, unsign
 	case IXJCTL_SET_FILTER:
 		if (copy_from_user(&jf, (char *) arg, sizeof(jf)))
 			return -EFAULT;
-		retval = ixj_init_filter(board, &jf);
+		retval = ixj_init_filter(j, &jf);
 		break;
 	case IXJCTL_GET_FILTER_HIST:
 		retval = j->filter_hist[arg];
 		break;
 	case IXJCTL_INIT_TONE:
 		copy_from_user(&ti, (char *) arg, sizeof(ti));
-		retval = ixj_init_tone(board, &ti);
+		retval = ixj_init_tone(j, &ti);
 		break;
 	case IXJCTL_TONE_CADENCE:
-		retval = ixj_build_cadence(board, (IXJ_CADENCE *) arg);
+		retval = ixj_build_cadence(j, (IXJ_CADENCE *) arg);
 		break;
 	case IXJCTL_FILTER_CADENCE:
-		retval = ixj_build_filter_cadence(board, (IXJ_FILTER_CADENCE *) arg);
+		retval = ixj_build_filter_cadence(j, (IXJ_FILTER_CADENCE *) arg);
 		break;
 	case IXJCTL_INTERCOM_STOP:
-		ixj[board].intercom = -1;
-		ixj[arg].intercom = -1;
-		ixj_record_stop(board);
-		ixj_record_stop(arg);
-		ixj_play_stop(board);
-		ixj_play_stop(arg);
-		idle(board);
-		idle(arg);
+		if (arg != j->intercom
+		    || ixj[arg]->intercom != board)
+			return -EINVAL;
+
+		j->intercom = -1;
+		ixj[arg]->intercom = -1;
+		ixj_record_stop(j);
+		ixj_record_stop(ixj[arg]);
+		ixj_play_stop(j);
+		ixj_play_stop(ixj[arg]);
+		idle(j);
+		idle(ixj[arg]);
 		break;
 	case IXJCTL_INTERCOM_START:
-		ixj[board].intercom = arg;
-		ixj[arg].intercom = board;
-		ixj_play_start(arg);
-		ixj_record_start(board);
-		ixj_play_start(board);
-		ixj_record_start(arg);
-		idle(board);
-		idle(arg);
+		if (ixj[arg] == NULL)
+			return -ENODEV;
+
+		j->intercom = arg;
+		ixj[arg]->intercom = board;
+		ixj_play_start(ixj[arg]);
+		ixj_record_start(j);
+		ixj_play_start(j);
+		ixj_record_start(ixj[arg]);
+		idle(j);
+		idle(ixj[arg]);
 		break;
 	}
 	return retval;
@@ -5096,7 +5120,11 @@ int ixj_ioctl(struct inode *inode, struct file *file_p, unsigned int cmd, unsign
 
 static int ixj_fasync(int fd, struct file *file_p, int mode)
 {
-	IXJ *j = &ixj[NUM(file_p->f_dentry->d_inode->i_rdev)];
+	IXJ *j = ixj[NUM(file_p->f_dentry->d_inode->i_rdev)];
+
+	if (j == NULL) /* shouldn't happen! */
+		return -ENODEV;
+
 	return fasync_helper(fd, file_p, mode, &j->async_queue);
 }
 
@@ -5111,16 +5139,15 @@ struct file_operations ixj_fops =
 	fasync:		ixj_fasync
 };
 
-static int ixj_linetest(int board)
+static int ixj_linetest(IXJ *j)
 {
 	unsigned long jifwait;
-	IXJ *j = &ixj[board];
 
 	j->flags.incheck = 1;	// Testing
 	if (!j->flags.pots_correct) {
 		j->flags.pots_correct = 1;
 
-		daa_int_read(board);	//Clear DAA Interrupt flags
+		daa_int_read(j);	//Clear DAA Interrupt flags
 		//
 		// Hold all relays in the normally de-energized position.
 		//
@@ -5136,7 +5163,7 @@ static int ixj_linetest(int board)
 		if (j->pld_slicr.bits.potspstn) {
 			j->flags.pots_pstn = 1;
 			j->flags.pots_correct = 0;
-			LED_SetState(0x4, board);
+			LED_SetState(0x4, j);
 		} else {
 			j->flags.pots_pstn = 0;
 			j->pld_slicw.bits.rly1 = 0;
@@ -5146,23 +5173,23 @@ static int ixj_linetest(int board)
 			j->pld_scrw.bits.daafsyncen = 0;	// Turn off DAA Frame Sync
 
 			outb_p(j->pld_scrw.byte, j->XILINXbase);
-			daa_set_mode(board, SOP_PU_CONVERSATION);
+			daa_set_mode(j, SOP_PU_CONVERSATION);
 			jifwait = jiffies + hertz;
 			while (time_before(jiffies, jifwait)) {
 				set_current_state(TASK_INTERRUPTIBLE);
 				schedule_timeout(1);
 			}
-			daa_int_read(board);
-			daa_set_mode(board, SOP_PU_SLEEP);
+			daa_int_read(j);
+			daa_set_mode(j, SOP_PU_SLEEP);
 			if (j->m_DAAShadowRegs.XOP_REGS.XOP.xr0.bitreg.VDD_OK) {
 				j->flags.pots_correct = 0;	// Should not be line voltage on POTS port.
 
-				LED_SetState(0x4, board);
+				LED_SetState(0x4, j);
 				j->pld_slicw.bits.rly3 = 0;
 				outb_p(j->pld_slicw.byte, j->XILINXbase + 0x01);
 			} else {
 				j->flags.pots_correct = 1;
-				LED_SetState(0x8, board);
+				LED_SetState(0x8, j);
 				j->pld_slicw.bits.rly1 = 1;
 				j->pld_slicw.bits.rly2 = 0;
 				j->pld_slicw.bits.rly3 = 0;
@@ -5173,14 +5200,14 @@ static int ixj_linetest(int board)
 //      if (!j->flags.pstn_present) {
 	j->pld_slicw.bits.rly3 = 0;
 	outb_p(j->pld_slicw.byte, j->XILINXbase + 0x01);
-	daa_set_mode(board, SOP_PU_CONVERSATION);
+	daa_set_mode(j, SOP_PU_CONVERSATION);
 	jifwait = jiffies + hertz;
 	while (time_before(jiffies, jifwait)) {
 		set_current_state(TASK_INTERRUPTIBLE);
 		schedule_timeout(1);
 	}
-	daa_int_read(board);
-	daa_set_mode(board, SOP_PU_SLEEP);
+	daa_int_read(j);
+	daa_set_mode(j, SOP_PU_SLEEP);
 	if (j->m_DAAShadowRegs.XOP_REGS.XOP.xr0.bitreg.VDD_OK) {
 		j->flags.pstn_present = 1;
 	} else {
@@ -5189,50 +5216,49 @@ static int ixj_linetest(int board)
 //      }
 	if (j->flags.pstn_present) {
 		if (j->flags.pots_correct) {
-			LED_SetState(0xA, board);
+			LED_SetState(0xA, j);
 		} else {
-			LED_SetState(0x6, board);
+			LED_SetState(0x6, j);
 		}
 	} else {
 		if (j->flags.pots_correct) {
-			LED_SetState(0x9, board);
+			LED_SetState(0x9, j);
 		} else {
-			LED_SetState(0x5, board);
+			LED_SetState(0x5, j);
 		}
 	}
 	j->flags.incheck = 0;	// Testing
 	return j->flags.pstn_present;
 }
 
-static int ixj_selfprobe(int board)
+static int ixj_selfprobe(IXJ *j, int cnt)
 {
 	unsigned short cmd;
 	unsigned long jif;
-	int cnt;
+	int i;
 	BYTES bytes;
-	IXJ *j = &ixj[board];
 	
 	init_waitqueue_head(&j->poll_q);
 	init_waitqueue_head(&j->read_q);
 	init_waitqueue_head(&j->write_q);
 	if (ixjdebug > 0)
 		printk(KERN_INFO "Write IDLE to Software Control Register\n");
-	ixj_WriteDSPCommand(0x0FE0, board);	// Put the DSP in full power mode.
+	ixj_WriteDSPCommand(0x0FE0, j);	// Put the DSP in full power mode.
 
-	if (ixj_WriteDSPCommand(0x0000, board))		/* Write IDLE to Software Control Register */
+	if (ixj_WriteDSPCommand(0x0000, j))		/* Write IDLE to Software Control Register */
 		return -1;
 // The read values of the SSR should be 0x00 for the IDLE command
 	if (j->ssr.low || j->ssr.high)
 		return -1;
 	if (ixjdebug > 0)
 		printk(KERN_INFO "Get Device ID Code\n");
-	if (ixj_WriteDSPCommand(0x3400, board))		/* Get Device ID Code */
+	if (ixj_WriteDSPCommand(0x3400, j))		/* Get Device ID Code */
 		return -1;
 	j->dsp.low = j->ssr.low;
 	j->dsp.high = j->ssr.high;
 	if (ixjdebug > 0)
 		printk(KERN_INFO "Get Device Version Code\n");
-	if (ixj_WriteDSPCommand(0x3800, board))		/* Get Device Version Code */
+	if (ixj_WriteDSPCommand(0x3800, j))		/* Get Device Version Code */
 		return -1;
 	j->ver.low = j->ssr.low;
 	j->ver.high = j->ssr.high;
@@ -5246,8 +5272,7 @@ static int ixj_selfprobe(int board)
 			if (bytes.low == bytes.high)	//  Register is read only on
 				//  Internet PhoneJack Lite
 			 {
-				j->cardtype = 400;	// Internet PhoneJACK Lite
-
+				j->cardtype = QTI_PHONEJACK_LITE;
 				if (check_region(j->XILINXbase, 4)) {
 					printk(KERN_INFO "ixj: can't get I/O address 0x%x\n", j->XILINXbase);
 					return -1;
@@ -5256,7 +5281,7 @@ static int ixj_selfprobe(int board)
 				j->pld_slicw.pcib.e1 = 1;
 				outb_p(j->pld_slicw.byte, j->XILINXbase);
 			} else {
-				j->cardtype = 300;	// Internet LineJACK
+				j->cardtype = QTI_LINEJACK;
 
 				if (check_region(j->XILINXbase, 8)) {
 					printk(KERN_INFO "ixj: can't get I/O address 0x%x\n", j->XILINXbase);
@@ -5265,38 +5290,32 @@ static int ixj_selfprobe(int board)
 				request_region(j->XILINXbase, 8, "ixj control");
 			}
 		} else if (j->dsp.low == 0x22) {
-			j->cardtype = 500;	// Internet PhoneJACK PCI
-
+			j->cardtype = QTI_PHONEJACK_PCI;
 			request_region(j->XILINXbase, 4, "ixj control");
 			j->pld_slicw.pcib.e1 = 1;
 			outb_p(j->pld_slicw.byte, j->XILINXbase);
 		} else
-			j->cardtype = 100;	// Internet PhoneJACK
-
+			j->cardtype = QTI_PHONEJACK;
 	} else {
 		switch (j->cardtype) {
-		case 100:	// Internet PhoneJACK
-
+		case QTI_PHONEJACK:
 			if (!j->dsp.low != 0x20) {
 				j->dsp.high = 0x80;
 				j->dsp.low = 0x20;
-				ixj_WriteDSPCommand(0x3800, board);
+				ixj_WriteDSPCommand(0x3800, j);
 				j->ver.low = j->ssr.low;
 				j->ver.high = j->ssr.high;
 			}
 			break;
-		case 300:	// Internet LineJACK
-
+		case QTI_LINEJACK:
 			if (check_region(j->XILINXbase, 8)) {
 				printk(KERN_INFO "ixj: can't get I/O address 0x%x\n", j->XILINXbase);
 				return -1;
 			}
 			request_region(j->XILINXbase, 8, "ixj control");
 			break;
-		case 400:	//Internet PhoneJACK Lite
-
-		case 500:	//Internet PhoneJACK PCI
-
+		case QTI_PHONEJACK_LITE:
+		case QTI_PHONEJACK_PCI:
 			if (check_region(j->XILINXbase, 4)) {
 				printk(KERN_INFO "ixj: can't get I/O address 0x%x\n", j->XILINXbase);
 				return -1;
@@ -5305,36 +5324,37 @@ static int ixj_selfprobe(int board)
 			j->pld_slicw.pcib.e1 = 1;
 			outb_p(j->pld_slicw.byte, j->XILINXbase);
 			break;
-		case 600:	//Internet PhoneCARD
-
+		case QTI_PHONECARD:
 			break;
 		}
 	}
-	if (j->dsp.low == 0x20 || j->cardtype == 400 || j->cardtype == 500) {
+	if (j->dsp.low == 0x20
+	    || j->cardtype == QTI_PHONEJACK_LITE
+	    || j->cardtype == QTI_PHONEJACK_PCI) {
 		if (ixjdebug > 0)
 			printk(KERN_INFO "Write CODEC config to Software Control Register\n");
-		if (ixj_WriteDSPCommand(0xC462, board))		/* Write CODEC config to Software Control Register */
+		if (ixj_WriteDSPCommand(0xC462, j))		/* Write CODEC config to Software Control Register */
 			return -1;
 		if (ixjdebug > 0)
 			printk(KERN_INFO "Write CODEC timing to Software Control Register\n");
-		if (j->cardtype == 100) {
+		if (j->cardtype == QTI_PHONEJACK) {
 			cmd = 0x9FF2;
 		} else {
 			cmd = 0x9FF5;
 		}
-		if (ixj_WriteDSPCommand(cmd, board))	/* Write CODEC timing to Software Control Register */
+		if (ixj_WriteDSPCommand(cmd, j))	/* Write CODEC timing to Software Control Register */
 			return -1;
 	} else {
-		if (set_base_frame(board, 30) != 30)
+		if (set_base_frame(j, 30) != 30)
 			return -1;
 		if (ixjdebug > 0)
 			printk(KERN_INFO "Write CODEC config to Software Control Register\n");
-		if (j->cardtype == 600) {
-			if (ixj_WriteDSPCommand(0xC528, board))		/* Write CODEC config to Software Control Register */
+		if (j->cardtype == QTI_PHONECARD) {
+			if (ixj_WriteDSPCommand(0xC528, j))		/* Write CODEC config to Software Control Register */
 				return -1;
 		}
-		if (j->cardtype == 300) {
-			if (ixj_WriteDSPCommand(0xC528, board))		/* Write CODEC config to Software Control Register */
+		if (j->cardtype == QTI_LINEJACK) {
+			if (ixj_WriteDSPCommand(0xC528, j))		/* Write CODEC config to Software Control Register */
 				return -1;
 			if (ixjdebug > 0)
 				printk(KERN_INFO "Turn on the PLD Clock at 8Khz\n");
@@ -5355,7 +5375,7 @@ static int ixj_selfprobe(int board)
 		j->gpio.bits.gpio5 = 1;
 		j->gpio.bits.gpio6 = 1;
 		j->gpio.bits.gpio7 = 1;
-		ixj_WriteDSPCommand(ixj[board].gpio.word, board);	/* Set GPIO pin directions */
+		ixj_WriteDSPCommand(j->gpio.word, j);	/* Set GPIO pin directions */
 		if (ixjdebug > 0)
 			printk(KERN_INFO "Enable SLIC\n");
 		j->gpio.bytes.high = 0x0B;
@@ -5363,45 +5383,46 @@ static int ixj_selfprobe(int board)
 		j->gpio.bits.gpio1 = 0;
 		j->gpio.bits.gpio2 = 1;
 		j->gpio.bits.gpio5 = 0;
-		ixj_WriteDSPCommand(ixj[board].gpio.word, board);	/* send the ring stop signal */
+		ixj_WriteDSPCommand(j->gpio.word, j);	/* send the ring stop signal */
 		j->port = PORT_POTS;
 	} else {
-		if (j->cardtype == 300) {
-			LED_SetState(0x1, board);
+		if (j->cardtype == QTI_LINEJACK) {
+			LED_SetState(0x1, j);
 			jif = jiffies + (hertz / 10);
 			while (time_before(jiffies, jif)) {
 				set_current_state(TASK_INTERRUPTIBLE);
 				schedule_timeout(1);
 			}
-			LED_SetState(0x2, board);
+			LED_SetState(0x2, j);
 			jif = jiffies + (hertz / 10);
 			while (time_before(jiffies, jif)) {
 				set_current_state(TASK_INTERRUPTIBLE);
 				schedule_timeout(1);
 			}
-			LED_SetState(0x4, board);
+			LED_SetState(0x4, j);
 			jif = jiffies + (hertz / 10);
 			while (time_before(jiffies, jif)) {
 				set_current_state(TASK_INTERRUPTIBLE);
 				schedule_timeout(1);
 			}
-			LED_SetState(0x8, board);
+			LED_SetState(0x8, j);
 			jif = jiffies + (hertz / 10);
 			while (time_before(jiffies, jif)) {
 				set_current_state(TASK_INTERRUPTIBLE);
 				schedule_timeout(1);
 			}
-			LED_SetState(0x0, board);
-			daa_get_version(board);
+			LED_SetState(0x0, j);
+			daa_get_version(j);
 			if (ixjdebug > 0)
 				printk("Loading DAA Coefficients\n");
-			DAA_Coeff_US(board);
-			if (!ixj_daa_write(board))
-				printk("DAA write failed on board %d\n", board);
-			ixj_daa_cid_reset(board);
+			DAA_Coeff_US(j);
+			if (!ixj_daa_write(j))
+				printk("DAA write failed on board %d\n",
+				       j->p.board);
+			ixj_daa_cid_reset(j);
 			j->flags.pots_correct = 0;
 			j->flags.pstn_present = 0;
-			ixj_linetest(board);
+			ixj_linetest(j);
 			if (j->flags.pots_correct) {
 				j->pld_scrw.bits.daafsyncen = 0;	// Turn off DAA Frame Sync
 
@@ -5409,43 +5430,43 @@ static int ixj_selfprobe(int board)
 				j->pld_slicw.bits.rly1 = 1;
 				j->pld_slicw.bits.spken = 1;
 				outb_p(j->pld_slicw.byte, j->XILINXbase + 0x01);
-				SLIC_SetState(PLD_SLIC_STATE_STANDBY, board);
+				SLIC_SetState(PLD_SLIC_STATE_STANDBY, j);
 				j->port = PORT_POTS;
 			}
-			ixj_set_port(board, PORT_PSTN);
-			ixj_set_pots(board, 1);
+			ixj_set_port(j, PORT_PSTN);
+			ixj_set_pots(j, 1);
 			if (ixjdebug > 0)
 				printk(KERN_INFO "Enable Mixer\n");
-			ixj_mixer(0x0000, board);	//Master Volume Left unmute 0db
+			ixj_mixer(0x0000, j);	//Master Volume Left unmute 0db
 
-			ixj_mixer(0x0100, board);	//Master Volume Right unmute 0db
+			ixj_mixer(0x0100, j);	//Master Volume Right unmute 0db
 
-			ixj_mixer(0x0F00, board);	//Mono Out Volume unmute 0db
+			ixj_mixer(0x0F00, j);	//Mono Out Volume unmute 0db
 
-			ixj_mixer(0x0C00, board);	//Mono1 Volume unmute 0db
+			ixj_mixer(0x0C00, j);	//Mono1 Volume unmute 0db
 
-			ixj_mixer(0x0200, board);	//Voice Left Volume unmute 0db
+			ixj_mixer(0x0200, j);	//Voice Left Volume unmute 0db
 
-			ixj_mixer(0x0300, board);	//Voice Right Volume unmute 0db
+			ixj_mixer(0x0300, j);	//Voice Right Volume unmute 0db
 
-			ixj_mixer(0x110C, board);	//Voice Left and Right out
+			ixj_mixer(0x110C, j);	//Voice Left and Right out
 
-			ixj_mixer(0x1401, board);	//Mono1 switch on mixer left
+			ixj_mixer(0x1401, j);	//Mono1 switch on mixer left
 
-			ixj_mixer(0x1501, board);	//Mono1 switch on mixer right
+			ixj_mixer(0x1501, j);	//Mono1 switch on mixer right
 
-			ixj_mixer(0x1700, board);	//Clock select
+			ixj_mixer(0x1700, j);	//Clock select
 
-			ixj_mixer(0x1800, board);	//ADC Source select
+			ixj_mixer(0x1800, j);	//ADC Source select
 
 		} else {
-			if (j->cardtype == 600) {
-				ixj_WriteDSPCommand(0xCF07, board);
-				ixj_WriteDSPCommand(0x00B0, board);
-				ixj_set_port(board, PORT_SPEAKER);
+			if (j->cardtype == QTI_PHONECARD) {
+				ixj_WriteDSPCommand(0xCF07, j);
+				ixj_WriteDSPCommand(0x00B0, j);
+				ixj_set_port(j, PORT_SPEAKER);
 			} else {
-				ixj_set_port(board, PORT_POTS);
-				SLIC_SetState(PLD_SLIC_STATE_STANDBY, board);
+				ixj_set_port(j, PORT_POTS);
+				SLIC_SetState(PLD_SLIC_STATE_STANDBY, j);
 			}
 		}
 	}
@@ -5454,9 +5475,9 @@ static int ixj_selfprobe(int board)
 	j->framesread = j->frameswritten = 0;
 	j->read_wait = j->write_wait = 0;
 	j->rxreadycheck = j->txreadycheck = 0;
-	set_play_volume(board, 0x100);
-	set_rec_volume(board, 0x100);
-	if (ixj_WriteDSPCommand(0x0000, board))		/* Write IDLE to Software Control Register */
+	set_play_volume(j, 0x100);
+	set_rec_volume(j, 0x100);
+	if (ixj_WriteDSPCommand(0x0000, j))		/* Write IDLE to Software Control Register */
 		return -1;
 // The read values of the SSR should be 0x00 for the IDLE command
 	if (j->ssr.low || j->ssr.high)
@@ -5465,41 +5486,41 @@ static int ixj_selfprobe(int board)
 		printk(KERN_INFO "Enable Line Monitor\n");
 	if (ixjdebug > 0)
 		printk(KERN_INFO "Set Line Monitor to Asyncronous Mode\n");
-	if (ixj_WriteDSPCommand(0x7E01, board))		// Asynchronous Line Monitor
+	if (ixj_WriteDSPCommand(0x7E01, j))		// Asynchronous Line Monitor
 
 		return -1;
 	if (ixjdebug > 0)
 		printk(KERN_INFO "Enable DTMF Detectors\n");
-	if (ixj_WriteDSPCommand(0x5151, board))		// Enable DTMF detection
+	if (ixj_WriteDSPCommand(0x5151, j))		// Enable DTMF detection
 
 		return -1;
-	if (ixj_WriteDSPCommand(0x6E01, board))		// Set Asyncronous Tone Generation
+	if (ixj_WriteDSPCommand(0x6E01, j))		// Set Asyncronous Tone Generation
 
 		return -1;
-	set_rec_depth(board, 2);	// Set Record Channel Limit to 2 frames
+	set_rec_depth(j, 2);	// Set Record Channel Limit to 2 frames
 
-	set_play_depth(board, 2);	// Set Playback Channel Limit to 2 frames
+	set_play_depth(j, 2);	// Set Playback Channel Limit to 2 frames
 
 	j->ex.bits.dtmf_ready = 0;
 	j->dtmf_state = 0;
-	j->dtmf_wp = ixj[board].dtmf_rp = 0;
-	j->rec_mode = ixj[board].play_mode = -1;
+	j->dtmf_wp = j->dtmf_rp = 0;
+	j->rec_mode = j->play_mode = -1;
 	j->flags.ringing = 0;
 	j->maxrings = MAXRINGS;
 	j->ring_cadence = USA_RING_CADENCE;
 	j->drybuffer = 0;
 	j->winktime = 320;
 	j->flags.dtmf_oob = 0;
-	for (cnt = 0; cnt < 4; cnt++)
-		j->cadence_f[cnt].enable = 0;
+	for (i = 0; i < 4; i++)
+		j->cadence_f[i].enable = 0;
 	/* must be a device on the specified address */
-	ixj_WriteDSPCommand(0x0FE3, board);	// Put the DSP in 1/5 power mode.
+	ixj_WriteDSPCommand(0x0FE3, j);	// Put the DSP in 1/5 power mode.
 	/* Register with the Telephony for Linux subsystem */
 	j->p.f_op = &ixj_fops;
 	j->p.open = ixj_open;
-	j->p.board = board;
+	j->p.board = cnt;
 	phone_register_device(&j->p, PHONE_UNIT_ANY);
-	add_caps(board);
+	add_caps(j);
 	return 0;
 }
 
@@ -5513,36 +5534,40 @@ int ixj_get_status_proc(char *buf)
 	len += sprintf(buf + len, "\n%s", ixj_h_rcsid);
 	len += sprintf(buf + len, "\n%s", ixjuser_h_rcsid);
 	for (cnt = 0; cnt < IXJMAX; cnt++) {
-		j = &ixj[cnt];
+		j = ixj[cnt];
+
+		if (j == NULL)
+			continue;
+
 		if (j->DSPbase) {
 			len += sprintf(buf + len, "\nCard Num %d", cnt);
 			len += sprintf(buf + len, "\nDSP Base Address 0x%4.4x", j->DSPbase);
-			if (j->cardtype != 100)
+			if (j->cardtype != QTI_PHONEJACK)
 				len += sprintf(buf + len, "\nXILINX Base Address 0x%4.4x", j->XILINXbase);
 			len += sprintf(buf + len, "\nDSP Type %2.2x%2.2x", j->dsp.high, j->dsp.low);
 			len += sprintf(buf + len, "\nDSP Version %2.2x.%2.2x", j->ver.high, j->ver.low);
 			len += sprintf(buf + len, "\nSerial Number %8.8x", j->serial);
 			switch (j->cardtype) {
-			case (100):
+			case (QTI_PHONEJACK):
 				len += sprintf(buf + len, "\nCard Type = Internet PhoneJACK");
 				break;
-			case (300):
+			case (QTI_LINEJACK):
 				len += sprintf(buf + len, "\nCard Type = Internet LineJACK");
 				if (j->flags.g729_loaded)
 					len += sprintf(buf + len, " w/G.729 A/B");
 				len += sprintf(buf + len, " Country = %d", j->country);
 				break;
-			case (400):
+			case (QTI_PHONEJACK_LITE):
 				len += sprintf(buf + len, "\nCard Type = Internet PhoneJACK Lite");
 				if (j->flags.g729_loaded)
 					len += sprintf(buf + len, " w/G.729 A/B");
 				break;
-			case (500):
+			case (QTI_PHONEJACK_PCI):
 				len += sprintf(buf + len, "\nCard Type = Internet PhoneJACK PCI");
 				if (j->flags.g729_loaded)
 					len += sprintf(buf + len, " w/G.729 A/B");
 				break;
-			case (600):
+			case (QTI_PHONECARD):
 				len += sprintf(buf + len, "\nCard Type = Internet PhoneCARD");
 				if (j->flags.g729_loaded)
 					len += sprintf(buf + len, " w/G.729 A/B");
@@ -5557,7 +5582,8 @@ int ixj_get_status_proc(char *buf)
 			}
 			len += sprintf(buf + len, "\nReaders %d", j->readers);
 			len += sprintf(buf + len, "\nWriters %d", j->writers);
-			len += sprintf(buf + len, "\nFSK words %d", ixj[2].fskdcnt);
+			/* FIXME: This makes no sense! */
+			len += sprintf(buf + len, "\nFSK words %d", ixj[2] ? ixj[2]->fskdcnt : 0);
 			len += sprintf(buf + len, "\nCapabilities %d", j->caps);
 			if (j->dsp.low != 0x20)
 				len += sprintf(buf + len, "\nDSP Processor load %d", j->proc_load);
@@ -5671,7 +5697,7 @@ int ixj_get_status_proc(char *buf)
 			}
 			len += sprintf(buf + len, "\nHook state %d", j->r_hook);	// ixj_hookstate(cnt));
 
-			if (j->cardtype == 300) {
+			if (j->cardtype == QTI_LINEJACK) {
 				len += sprintf(buf + len, "\nPOTS Correct %d", j->flags.pots_correct);
 				len += sprintf(buf + len, "\nPSTN Present %d", j->flags.pstn_present);
 				len += sprintf(buf + len, "\nPOTS to PSTN %d", j->flags.pots_pstn);
@@ -5707,7 +5733,7 @@ int ixj_get_status_proc(char *buf)
 			}
 			if (j->dsp.low == 0x21 || j->dsp.low == 0x22) {
 				len += sprintf(buf + len, "\nSLIC state ");
-				switch (SLIC_GetState(cnt)) {
+				switch (SLIC_GetState(j)) {
 				case PLD_SLIC_STATE_OC:
 					len += sprintf(buf + len, "OC");
 					break;
@@ -5736,7 +5762,7 @@ int ixj_get_status_proc(char *buf)
 					len += sprintf(buf + len, "OHTPR");
 					break;
 				default:
-					len += sprintf(buf + len, "%d", SLIC_GetState(cnt));
+					len += sprintf(buf + len, "%d", SLIC_GetState(j));
 					break;
 				}
 			}
@@ -5756,13 +5782,16 @@ int ixj_get_status_proc(char *buf)
 	}
 	return len;
 }
+
 int ixj_get_status_proc_fsk(char *buf)
 {
 	int len;
 	len = 0;
-	if (ixj[2].fskdcnt) {
-		memcpy(buf, &ixj[2].fskdata, (ixj[2].fskdcnt) * 2);
-		len += ixj[2].fskdcnt * 2;
+
+	/* This makes no sense - why is ixj[2] special? */
+	if (ixj[2] != NULL && ixj[2]->fskdcnt) {
+		memcpy(buf, &ixj[2]->fskdata, (ixj[2]->fskdcnt) * 2);
+		len += ixj[2]->fskdcnt * 2;
 	}
 	return len;
 }
@@ -5793,14 +5822,17 @@ static int ixj_read_proc_fsk(char *page, char **start, off_t off,
 
 MODULE_DESCRIPTION("Internet Phone/Internet LineJack module - www.quicknet.net");
 MODULE_AUTHOR("Ed Okerson <eokerson@quicknet.net>");
+
 #ifdef CONFIG_PCMCIA
+
 #ifdef PCMCIA_DEBUG
 static int pc_debug = PCMCIA_DEBUG;
 MODULE_PARM(pc_debug, "i");
 #define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args)
 #else
 #define DEBUG(n, args...)
-#endif
+#endif /* PCMCIA_DEBUG */
+
 typedef struct ixj_info_t {
 	int ndev;
 	dev_node_t node;
@@ -5830,6 +5862,8 @@ static dev_link_t *ixj_attach(void)
 	DEBUG(0, "ixj_attach()\n");
 	/* Create new ixj device */
 	link = kmalloc(sizeof(struct dev_link_t), GFP_KERNEL);
+	if (!link)
+		return NULL;
 	memset(link, 0, sizeof(struct dev_link_t));
 	link->release.function = &ixj_cs_release;
 	link->release.data = (u_long) link;
@@ -5839,6 +5873,8 @@ static dev_link_t *ixj_attach(void)
 	link->conf.Vcc = 50;
 	link->conf.IntType = INT_MEMORY_AND_IO;
 	link->priv = kmalloc(sizeof(struct ixj_info_t), GFP_KERNEL);
+	if (!link->priv)
+		return NULL;
 	memset(link->priv, 0, sizeof(struct ixj_info_t));
 	/* Register with Card Services */
 	link->next = dev_list;
@@ -6016,16 +6052,25 @@ void ixj_config(dev_link_t * link)
 	}
 
 	CS_CHECK(RequestConfiguration, handle, &link->conf);
-	ixj[0].DSPbase = link->io.BasePort1;
-	ixj[0].XILINXbase = link->io.BasePort1 + 0x10;
-	ixj[0].cardtype = 600;
-	ixj_selfprobe(0);
+
+	
+	if ((j = kmalloc(sizeof(*j), GFP_KERNEL)) == NULL)
+		goto cs_failed;
+
+	ixj[0] = j;
+
+	j->DSPbase = link->io.BasePort1;
+	j->XILINXbase = link->io.BasePort1 + 0x10;
+	j->cardtype = QTI_PHONECARD;
+	ixj_selfprobe(j, 0);
+
 	info->ndev = 1;
 	info->node.major = PHONE_MAJOR;
 	link->dev = &info->node;
-	ixj_get_serial(link, &ixj[0]);
+	ixj_get_serial(link, j);
 	link->state &= ~DEV_CONFIG_PENDING;
 	return;
+
       cs_failed:
 	cs_error(link->handle, last_fn, last_ret);
 	ixj_cs_release((u_long) link);
@@ -6041,6 +6086,9 @@ void ixj_cs_release(u_long arg)
 	CardServices(ReleaseConfiguration, link->handle);
 	CardServices(ReleaseIO, link->handle, &link->io);
 	link->state &= ~DEV_CONFIG;
+
+	kfree(ixj[0]);
+	ixj[0] = NULL;
 }
 
 int ixj_event(event_t event, int priority, event_callback_args_t * args)
@@ -6078,38 +6126,44 @@ int ixj_event(event_t event, int priority, event_callback_args_t * args)
 	return 0;
 }
 
-#endif				// PCMCIA
+#endif /* CONFIG_PCMCIA */
 
 static void cleanup(void)
 {
 	int cnt;
 	del_timer(&ixj_timer);
 	for (cnt = 0; cnt < IXJMAX; cnt++) {
-		if (ixj[cnt].cardtype == 300) {
-			ixj[cnt].pld_scrw.bits.daafsyncen = 0;	// Turn off DAA Frame Sync
+		IXJ *j = ixj[cnt];
 
-			outb_p(ixj[cnt].pld_scrw.byte, ixj[cnt].XILINXbase);
-			ixj[cnt].pld_slicw.bits.rly1 = 0;
-			ixj[cnt].pld_slicw.bits.rly2 = 0;
-			ixj[cnt].pld_slicw.bits.rly3 = 0;
-			outb_p(ixj[cnt].pld_slicw.byte, ixj[cnt].XILINXbase + 0x01);
-			LED_SetState(0x0, cnt);
-			release_region(ixj[cnt].XILINXbase, 8);
+		if (j == NULL)
+			continue;
+
+		if (j->cardtype == QTI_LINEJACK) {
+			j->pld_scrw.bits.daafsyncen = 0;	// Turn off DAA Frame Sync
+
+			outb_p(j->pld_scrw.byte, j->XILINXbase);
+			j->pld_slicw.bits.rly1 = 0;
+			j->pld_slicw.bits.rly2 = 0;
+			j->pld_slicw.bits.rly3 = 0;
+			outb_p(j->pld_slicw.byte, j->XILINXbase + 0x01);
+			LED_SetState(0x0, j);
+			release_region(j->XILINXbase, 8);
 		}
-		if (ixj[cnt].cardtype == 400 || ixj[cnt].cardtype == 500) {
-			release_region(ixj[cnt].XILINXbase, 4);
+		if (j->cardtype == QTI_PHONEJACK_LITE
+		    || j->cardtype == QTI_PHONEJACK_PCI) {
+			release_region(j->XILINXbase, 4);
 		}
-		if (ixj[cnt].DSPbase) {
-			release_region(ixj[cnt].DSPbase, 16);
-			phone_unregister_device(&ixj[cnt].p);
+		if (j->DSPbase) {
+			release_region(j->DSPbase, 16);
+			phone_unregister_device(&j->p);
 		}
-		if (ixj[cnt].read_buffer)
-			kfree(ixj[cnt].read_buffer);
-		if (ixj[cnt].write_buffer)
-			kfree(ixj[cnt].write_buffer);
+		if (j->read_buffer)
+			kfree(j->read_buffer);
+		if (j->write_buffer)
+			kfree(j->write_buffer);
 #ifdef CONFIG_ISAPNP
-		if (ixj[cnt].dev)
-			ixj[cnt].dev->deactivate(ixj[cnt].dev);
+		if (j->dev)
+			j->dev->deactivate(j->dev);
 #endif
 #ifdef CONFIG_PCMCIA
 		DEBUG(0, "ixj_cs: unloading\n");
@@ -6117,6 +6171,9 @@ static void cleanup(void)
 		while (dev_list != NULL)
 			ixj_detach(dev_list);
 #endif
+
+		kfree(j);
+		ixj[cnt] = NULL;
 	}
 	remove_proc_entry ("ixj", NULL);
 	remove_proc_entry ("ixjfsk", NULL);
@@ -6223,36 +6280,46 @@ void ixj_exit(void)
 	cleanup();
 }
 
-int __init ixj_init(void)
+#if defined(CONFIG_PCMCIA)
+int __init ixj_register_pcmcia(void)
 {
-	int result;
-	int i = 0;
-	int cnt = 0;
-	int probe = 0;
-#ifdef CONFIG_ISAPNP
-	int func = 0x110;
-	struct pci_dev *dev = NULL, *old_dev = NULL;
-#endif
-#ifdef CONFIG_PCI
-	struct pci_dev *pci = NULL;
-#endif
-#ifdef CONFIG_PCMCIA
 	servinfo_t serv;
+
 	DEBUG(0, "%s\n", version);
 	CardServices(GetCardServicesInfo, &serv);
 	if (serv.Revision != CS_RELEASE_CODE) {
 		printk(KERN_NOTICE "ixj_cs: Card Services release does not match!\n");
-		return -1;
+		return -EINVAL;
 	}
 	register_pcmcia_driver(&dev_info, &ixj_attach, &ixj_detach);
-	probe = 0;
+	return 0;
+}
 #else
-#ifdef CONFIG_ISAPNP
+extern __inline__ int ixj_register_pcmcia(void)
+{
+	return 0;
+}
+
+#if defined(CONFIG_ISAPNP)
+extern __inline__ int ixj_probe_isa(int *cnt)
+{
+	return 0;
+}
+
+int __init ixj_probe_isapnp(int *cnt)
+{
+	int probe = 0;
+	int func = 0x110;
+	struct pci_dev *dev = NULL, *old_dev = NULL;
+
 	while (1) {
 		do {
+			IXJ *j;
+			int result;
+
 			old_dev = dev;
 			dev = isapnp_find_dev(NULL, ISAPNP_VENDOR('Q', 'T', 'I'),
-					 ISAPNP_FUNCTION(func), old_dev);
+					      ISAPNP_FUNCTION(func), old_dev);
 			if (!dev)
 				break;
 			result = dev->prepare(dev);
@@ -6260,8 +6327,10 @@ int __init ixj_init(void)
 				printk("preparing failed %d \n", result);
 				break;
 			}
+
 			if (!(dev->resource[0].flags & IORESOURCE_IO))
 				return -ENODEV;
+
 			dev->resource[0].flags |= IORESOURCE_AUTO;
 			if (func != 0x110)
 				dev->resource[1].flags |= IORESOURCE_AUTO;
@@ -6269,42 +6338,60 @@ int __init ixj_init(void)
 				printk("isapnp configure failed (out of resources?)\n");
 				return -ENOMEM;
 			}
-			ixj[cnt].DSPbase = dev->resource[0].start;	/* get real port */
-			if (func != 0x110)
-				ixj[cnt].XILINXbase = dev->resource[1].start;	/* get real port */
-			result = check_region(ixj[cnt].DSPbase, 16);
-			if (result) {
-				printk(KERN_INFO "ixj: can't get I/O address 0x%x\n", ixj[cnt].DSPbase);
+
+			/* DSP base */
+			if ((result = check_region(dev->resource[0].start, 16)) < 0) {
+				printk(KERN_INFO "ixj: can't get I/O address 0x%lx\n",
+				       dev->resource[0].start);
 				cleanup();
 				return result;
 			}
-			request_region(ixj[cnt].DSPbase, 16, "ixj DSP");
+
+			if ((j = kmalloc(sizeof(*j), GFP_KERNEL)) == NULL) {
+				cleanup();
+				return -ENOMEM;
+			}
+
+			ixj[*cnt] = j;
+
+			j->DSPbase = dev->resource[0].start;
+
+			/* XXX is this racy? */
+			request_region(j->DSPbase, 16, "ixj DSP");
+
+			if (func != 0x110)
+				j->XILINXbase = dev->resource[1].start;
+
 			switch (func) {
 			case (0x110):
-				ixj[cnt].cardtype = 100;
+				j->cardtype = QTI_PHONEJACK;
 				break;
 			case (0x310):
-				ixj[cnt].cardtype = 300;
+				j->cardtype = QTI_LINEJACK;
 				break;
 			case (0x410):
-				ixj[cnt].cardtype = 400;
+				j->cardtype = QTI_PHONEJACK_LITE;
 				break;
 			}
-			probe = ixj_selfprobe(cnt);
-			ixj[cnt].serial = dev->bus->serial;
-			ixj[cnt].dev = dev;
+			probe = ixj_selfprobe(j, *cnt);
+			
+			j->serial = dev->bus->serial;
+			j->dev = dev;
 			switch (func) {
 			case 0x110:
-				printk(KERN_INFO "ixj: found Internet PhoneJACK at 0x%x\n", ixj[cnt].DSPbase);
+				printk(KERN_INFO "ixj: found Internet PhoneJACK at 0x%x\n",
+				       j->DSPbase);
 				break;
 			case 0x310:
-				printk(KERN_INFO "ixj: found Internet LineJACK at 0x%x\n", ixj[cnt].DSPbase);
+				printk(KERN_INFO "ixj: found Internet LineJACK at 0x%x\n",
+				       j->DSPbase);
 				break;
 			case 0x410:
-				printk(KERN_INFO "ixj: found Internet PhoneJACK Lite at 0x%x\n", ixj[cnt].DSPbase);
+				printk(KERN_INFO "ixj: found Internet PhoneJACK Lite at 0x%x\n",
+				       j->DSPbase);
 				break;
 			}
-			cnt++;
+			++*cnt;
 		} while (dev);
 		if (func == 0x410)
 			break;
@@ -6314,69 +6401,143 @@ int __init ixj_init(void)
 			func = 0x310;
 		dev = NULL;
 	}
-#else				//CONFIG_ISAPNP
+
+	return probe;
+}
+#else
+extern __inline__ int ixj_probe_isapnp(int *cnt)
+{
+	return 0;
+}
+
+int __init ixj_probe_isa(int *cnt)
+{
+	int i, result, probe;
+
 	/* Use passed parameters for older kernels without PnP */
 	for (i = 0; i < IXJMAX; i++) {
 		if (dspio[i]) {
-			ixj[cnt].DSPbase = dspio[i];
-			ixj[cnt].XILINXbase = xio[i];
-			ixj[cnt].cardtype = 0;
-			result = check_region(ixj[cnt].DSPbase, 16);
-			if (result) {
-				printk(KERN_INFO "ixj: can't get I/O address 0x%x\n", ixj[cnt].DSPbase);
+			IXJ *j;
+
+			if ((result = check_region(dspio[i], 16)) < 0) {
+				printk(KERN_INFO "ixj: can't get I/O address 0x%x\n", dspio[i]);
 				cleanup();
 				return result;
 			}
-			request_region(ixj[cnt].DSPbase, 16, "ixj DSP");
-			probe = ixj_selfprobe(cnt);
-			ixj[cnt].dev = NULL;
-			cnt++;
-		}
-	}
-#endif				// !CONFIG_ISAPNP
-#endif				// CONFIG_PCMCIA
-#ifdef CONFIG_PCI
-	if (pci_present()) {
-		for (i = 0; i < IXJMAX - cnt; i++) {
-			pci = pci_find_device(0x15E2, 0x0500, pci);
-			if (!pci)
-				break;
-			if (pci_enable_device(pci))
-				break;
-			{
-				ixj[cnt].DSPbase = pci_resource_start(pci, 0);
-				ixj[cnt].XILINXbase = ixj[cnt].DSPbase + 0x10;
-				ixj[cnt].serial = (PCIEE_GetSerialNumber)pci_resource_start(pci, 2);
-				result = check_region(ixj[cnt].DSPbase, 16);
-				if (result) {
-					printk(KERN_INFO "ixj: can't get I/O address 0x%x\n", ixj[cnt].DSPbase);
-					cleanup();
-					return result;
-				}
-				request_region(ixj[cnt].DSPbase, 16, "ixj DSP");
-				ixj[cnt].cardtype = 500;
-				probe = ixj_selfprobe(cnt);
-				if (probe)
-					printk(KERN_INFO "ixj: found Internet PhoneJACK PCI at 0x%x\n", ixj[cnt].DSPbase);
-				cnt++;
+
+			if ((j = kmalloc(sizeof(*j), GFP_KERNEL)) == NULL) {
+				cleanup();
+				return -ENOMEM;
 			}
+			ixj[*cnt] = j;
+
+			j->DSPbase = dspio[i];
+			request_region(j->DSPbase, 16, "ixj DSP");
+
+			j->XILINXbase = xio[i];
+			j->cardtype = 0;
+
+			probe = ixj_selfprobe(j, *cnt);
+			j->dev = NULL;
+
+			++*cnt;
 		}
 	}
-#endif
+
+	return 0;
+}
+#endif /* CONFIG_ISAPNP */
+#endif /* CONFIG_PCMCIA */
+
+#if defined(CONFIG_PCI)
+int __init ixj_probe_pci(int *cnt)
+{
+	struct pci_dev *pci = NULL;
+	int i, probe = 0;
+
+	for (i = 0; i < IXJMAX - *cnt; i++) {
+		pci = pci_find_device(0x15E2, 0x0500, pci);
+		if (!pci)
+			break;
+		if (pci_enable_device(pci))
+			break;
+		{
+			IXJ *j;
+			int result;
+
+			if ((result = check_region(pci_resource_start(pci, 0), 16)) < 0) {
+				printk(KERN_INFO "ixj: can't get I/O address 0x%lx\n",
+				       pci_resource_start(pci, 0));
+				cleanup();
+				return result;
+			}
+
+			if ((j = kmalloc(sizeof(*j), GFP_KERNEL)) == NULL) {
+				cleanup();
+				return -ENOMEM;
+			}
+			ixj[*cnt] = j;
+
+			j->DSPbase = pci_resource_start(pci, 0);
+			request_region(j->DSPbase, 16, "ixj DSP");
+
+			j->XILINXbase = j->DSPbase + 0x10;
+			j->serial = (PCIEE_GetSerialNumber)pci_resource_start(pci, 2);
+			j->cardtype = QTI_PHONEJACK_PCI;
+
+			probe = ixj_selfprobe(j, *cnt);
+			if (probe)
+				printk(KERN_INFO "ixj: found Internet PhoneJACK PCI at 0x%x\n", j->DSPbase);
+			++*cnt;
+		}
+	}
+
+	return probe;
+}
+#else
+extern __inline__ int ixj_probe_pci(int *cnt)
+{
+	return 0;
+}
+#endif /* CONFIG_PCI */
+
+int __init ixj_init(void)
+{
+	int cnt = 0;
+	int probe = 0;
+
+	/* These might be no-ops, see above. */
+	if ((probe = ixj_register_pcmcia()) < 0) {
+		return probe;
+	}
+	if ((probe = ixj_probe_isapnp(&cnt)) < 0) {
+		return probe;
+	}
+	if ((probe = ixj_probe_isa(&cnt)) < 0) {
+		return probe;
+	}
+	if (pci_present()) {
+		if ((probe = ixj_probe_pci(&cnt)) < 0) {
+			return probe;
+		}
+      	}
+
 	printk("%s\n", ixj_c_rcsid);
+
 	create_proc_read_entry ("ixj", 0, NULL, ixj_read_proc, NULL);
 	create_proc_read_entry ("ixjfsk", 0, NULL, ixj_read_proc_fsk, NULL);
+
 	ixj_init_timer();
 	ixj_add_timer();
+
 	return probe;
 }
 
 module_init(ixj_init);
 module_exit(ixj_exit);
 
-static void DAA_Coeff_US(int board)
+static void DAA_Coeff_US(IXJ *j)
 {
-	IXJ *j = &ixj[board];
 	int i;
 
 	j->daa_country = DAA_US;
@@ -6559,9 +6720,8 @@ static void DAA_Coeff_US(int board)
 	j->m_DAAShadowRegs.COP_REGS.COP.Tone2Coeff[0] = 0xB3;
 }
 
-static void DAA_Coeff_UK(int board)
+static void DAA_Coeff_UK(IXJ *j)
 {
-	IXJ *j = &ixj[board];
 	int i;
 
 	j->daa_country = DAA_UK;
@@ -6740,9 +6900,8 @@ static void DAA_Coeff_UK(int board)
 }
 
 
-static void DAA_Coeff_France(int board)
+static void DAA_Coeff_France(IXJ *j)
 {
-	IXJ *j = &ixj[board];
 	int i;
 
 	j->daa_country = DAA_FRANCE;
@@ -6921,9 +7080,8 @@ static void DAA_Coeff_France(int board)
 }
 
 
-static void DAA_Coeff_Germany(int board)
+static void DAA_Coeff_Germany(IXJ *j)
 {
-	IXJ *j = &ixj[board];
 	int i;
 
 	j->daa_country = DAA_GERMANY;
@@ -7102,9 +7260,8 @@ static void DAA_Coeff_Germany(int board)
 }
 
 
-static void DAA_Coeff_Australia(int board)
+static void DAA_Coeff_Australia(IXJ *j)
 {
-	IXJ *j = &ixj[board];
 	int i;
 
 	j->daa_country = DAA_AUSTRALIA;
@@ -7282,9 +7439,8 @@ static void DAA_Coeff_Australia(int board)
 	j->m_DAAShadowRegs.COP_REGS.COP.Tone2Coeff[0] = 0xB3;
 }
 
-static void DAA_Coeff_Japan(int board)
+static void DAA_Coeff_Japan(IXJ *j)
 {
-	IXJ *j = &ixj[board];
 	int i;
 
 	j->daa_country = DAA_JAPAN;
@@ -8998,34 +9154,34 @@ static s16 tone_table[][19] =
 		 0x0FF5		// shift-mask 0x0FF (look at 16 half-frames) bit count = 5
 	},
 };
-static int ixj_init_filter(int board, IXJ_FILTER * jf)
+static int ixj_init_filter(IXJ *j, IXJ_FILTER * jf)
 {
 	unsigned short cmd;
 	int cnt, max;
-	IXJ *j = &ixj[board];
+
 	if (jf->filter > 3) {
 		return -1;
 	}
-	if (ixj_WriteDSPCommand(0x5154 + jf->filter, board))	// Select Filter
+	if (ixj_WriteDSPCommand(0x5154 + jf->filter, j))	// Select Filter
 
 		return -1;
 	if (!jf->enable) {
-		if (ixj_WriteDSPCommand(0x5152, board))		// Disable Filter
+		if (ixj_WriteDSPCommand(0x5152, j))		// Disable Filter
 
 			return -1;
 		else
 			return 0;
 	} else {
-		if (ixj_WriteDSPCommand(0x5153, board))		// Enable Filter
+		if (ixj_WriteDSPCommand(0x5153, j))		// Enable Filter
 
 			return -1;
 		// Select the filter (f0 - f3) to use.
-		if (ixj_WriteDSPCommand(0x5154 + jf->filter, board))
+		if (ixj_WriteDSPCommand(0x5154 + jf->filter, j))
 			return -1;
 	}
 	if (jf->freq < 12 && jf->freq > 3) {
 		// Select the frequency for the selected filter.
-		if (ixj_WriteDSPCommand(0x5170 + jf->freq, board))
+		if (ixj_WriteDSPCommand(0x5170 + jf->freq, j))
 			return -1;
 	} else if (jf->freq > 11) {
 		// We need to load a programmable filter set for undefined
@@ -9033,7 +9189,7 @@ static int ixj_init_filter(int board, IXJ_FILTER * jf)
 		// Since there are only 4 filters and 4 programmable sets, we will
 		// just point the filter to the same number set and program it for the
 		// frequency we want.
-		if (ixj_WriteDSPCommand(0x5170 + jf->filter, board))
+		if (ixj_WriteDSPCommand(0x5170 + jf->filter, j))
 			return -1;
 		if (j->ver.low != 0x12) {
 			cmd = 0x515B;
@@ -9042,10 +9198,10 @@ static int ixj_init_filter(int board, IXJ_FILTER * jf)
 			cmd = 0x515E;
 			max = 15;
 		}
-		if (ixj_WriteDSPCommand(cmd, board))
+		if (ixj_WriteDSPCommand(cmd, j))
 			return -1;
 		for (cnt = 0; cnt < max; cnt++) {
-			if (ixj_WriteDSPCommand(tone_table[jf->freq - 12][cnt], board))
+			if (ixj_WriteDSPCommand(tone_table[jf->freq - 12][cnt], j))
 				return -1;
 		}
 	}
@@ -9053,7 +9209,7 @@ static int ixj_init_filter(int board, IXJ_FILTER * jf)
 	return 0;
 }
 
-static int ixj_init_tone(int board, IXJ_TONE * ti)
+static int ixj_init_tone(IXJ *j, IXJ_TONE * ti)
 {
 	int freq0, freq1;
 	unsigned short data;
@@ -9071,15 +9227,15 @@ static int ixj_init_tone(int board, IXJ_TONE * ti)
 
 	if(ti->tone_index > 12 && ti->tone_index < 28)
 	{
-		if (ixj_WriteDSPCommand(0x6800 + ti->tone_index, board))
+		if (ixj_WriteDSPCommand(0x6800 + ti->tone_index, j))
 			return -1;
-		if (ixj_WriteDSPCommand(0x6000 + (ti->gain0 << 4) + ti->gain1, board))
+		if (ixj_WriteDSPCommand(0x6000 + (ti->gain0 << 4) + ti->gain1, j))
 			return -1;
 		data = freq0;
-		if (ixj_WriteDSPCommand(data, board))
+		if (ixj_WriteDSPCommand(data, j))
 			return -1;
 		data = freq1;
-		if (ixj_WriteDSPCommand(data, board))
+		if (ixj_WriteDSPCommand(data, j))
 			return -1;
 	}
 	return freq0;

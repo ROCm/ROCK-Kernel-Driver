@@ -684,25 +684,26 @@ static int irlap_state_conn(struct irlap_cb *self, IRLAP_EVENT event,
 
 		irlap_initiate_connection_state(self);
 
+		/* 
+		 * Applying the parameters now will make sure we change speed
+		 * *after* we have sent the next frame
+		 */
+		irlap_apply_connection_parameters(self, FALSE);
+
+		/* 
+		 * Sending this frame will force a speed change after it has
+		 * been sent (i.e. the frame will be sent at 9600).
+		 */
+		irlap_send_ua_response_frame(self, &self->qos_rx);
+
 #if 0
 		/* 
 		 * We are allowed to send two frames, but this may increase
 		 * the connect latency, so lets not do it for now.
 		 */
+		/* What the hell is this ? - Jean II */
 		irlap_send_ua_response_frame(self, &self->qos_rx);
 #endif
-
-		/* 
-		 * Applying the parameters now will make sure we change speed
-		 * after we have sent the next frame
-		 */
-		irlap_apply_connection_parameters(self);
-
-		/* 
-		 * Sending this frame will force a speed change after it has
-		 * been sent
-		 */
-		irlap_send_ua_response_frame(self, &self->qos_rx);
 
 		/*
 		 *  The WD-timer could be set to the duration of the P-timer 
@@ -794,8 +795,9 @@ static int irlap_state_setup(struct irlap_cb *self, IRLAP_EVENT event,
 
 			irlap_qos_negotiate(self, skb);
 			
+			/* Send UA frame and then change link settings */
+			irlap_apply_connection_parameters(self, FALSE);
 			irlap_send_ua_response_frame(self, &self->qos_rx);
-			irlap_apply_connection_parameters(self);
 
 			irlap_next_state(self, LAP_NRM_S);
 			irlap_connect_confirm(self, skb);
@@ -827,10 +829,19 @@ static int irlap_state_setup(struct irlap_cb *self, IRLAP_EVENT event,
 
 		irlap_qos_negotiate(self, skb);
 
-		irlap_apply_connection_parameters(self);
+		/* Set the new link setting *now* (before the rr frame) */
+		irlap_apply_connection_parameters(self, TRUE);
 		self->retry_count = 0;
 		
-		/* This frame will actually force the speed change */
+		/* Wait for turnaround time to give a chance to the other
+		 * device to be ready to receive us.
+		 * Note : the time to switch speed is typically larger
+		 * than the turnaround time, but as we don't have the other
+		 * side speed switch time, that's our best guess...
+		 * Jean II */
+		irlap_wait_min_turn_around(self, &self->qos_tx);
+
+		/* This frame will actually be sent at the new speed */
 		irlap_send_rr_frame(self, CMD_FRAME);
 
 		irlap_start_final_timer(self, self->final_timeout/2);
@@ -991,7 +1002,8 @@ static int irlap_state_pclose(struct irlap_cb *self, IRLAP_EVENT event,
 	case RECV_UA_RSP: /* FALLTHROUGH */
 	case RECV_DM_RSP:
 		del_timer(&self->final_timer);
-		
+
+		/* Set new link parameters */
 		irlap_apply_default_connection_parameters(self);
 
 		/* Always switch state before calling upper layers */
@@ -1944,10 +1956,13 @@ static int irlap_state_nrm_s(struct irlap_cb *self, IRLAP_EVENT event,
 		/* Always switch state before calling upper layers */
 		irlap_next_state(self, LAP_NDM);
 
+		/* Send disconnect response */
 		irlap_wait_min_turn_around(self, &self->qos_tx);
 		irlap_send_ua_response_frame(self, NULL);
+
 		del_timer(&self->wd_timer);
 		irlap_flush_all_queues(self);
+		/* Set default link parameters */
 		irlap_apply_default_connection_parameters(self);
 
 		irlap_disconnect_indication(self, LAP_DISC_INDICATION);
@@ -2000,10 +2015,13 @@ static int irlap_state_sclose(struct irlap_cb *self, IRLAP_EVENT event,
 	case RECV_DISC_CMD:
 		/* Always switch state before calling upper layers */
 		irlap_next_state(self, LAP_NDM);
-		
+
+		/* Send disconnect response */
 		irlap_wait_min_turn_around(self, &self->qos_tx);
 		irlap_send_ua_response_frame(self, NULL);
+
 		del_timer(&self->wd_timer);
+		/* Set default link parameters */
 		irlap_apply_default_connection_parameters(self);
 
 		irlap_disconnect_indication(self, LAP_DISC_INDICATION);

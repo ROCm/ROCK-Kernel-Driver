@@ -497,7 +497,7 @@ void w83977af_change_speed(struct w83977af_ir *self, __u32 speed)
 int w83977af_hard_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct w83977af_ir *self;
-	__u32 speed;
+	__s32 speed;
 	int iobase;
 	__u8 set;
 	int mtt;
@@ -513,10 +513,12 @@ int w83977af_hard_xmit(struct sk_buff *skb, struct net_device *dev)
 	netif_stop_queue(dev);
 	
 	/* Check if we need to change the speed */
-	if ((speed = irda_get_speed(skb)) != self->io.speed) {
+	speed = irda_get_next_speed(skb);
+	if ((speed != self->io.speed) && (speed != -1)) {
 		/* Check for empty frame */
 		if (!skb->len) {
 			w83977af_change_speed(self, speed); 
+			dev_kfree_skb(skb);
 			return 0;
 		} else
 			self->new_speed = speed;
@@ -1337,13 +1339,17 @@ static int w83977af_net_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	
 	switch (cmd) {
 	case SIOCSBANDWIDTH: /* Set bandwidth */
-		if (!capable(CAP_NET_ADMIN))
-			return -EPERM;
+		if (!capable(CAP_NET_ADMIN)) {
+			ret = -EPERM;
+			goto out;
+		}
 		w83977af_change_speed(self, irq->ifr_baudrate);
 		break;
 	case SIOCSMEDIABUSY: /* Set media busy */
-		if (!capable(CAP_NET_ADMIN))
-			return -EPERM;
+		if (!capable(CAP_NET_ADMIN)) {
+			ret = -EPERM;
+			goto out;
+		}
 		irda_device_set_media_busy(self->netdev, TRUE);
 		break;
 	case SIOCGRECEIVING: /* Check if we are receiving right now */
@@ -1352,9 +1358,8 @@ static int w83977af_net_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	default:
 		ret = -EOPNOTSUPP;
 	}
-	
+out:
 	restore_flags(flags);
-	
 	return ret;
 }
 

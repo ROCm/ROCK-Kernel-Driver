@@ -1,10 +1,9 @@
-/* $Id: watch.h,v 1.1 1999/09/27 16:01:41 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1996, 1997, 1998, 1999 by Ralf Baechle
+ * Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001 by Ralf Baechle
  */
 #ifndef _ASM_WATCH_H
 #define _ASM_WATCH_H
@@ -35,4 +34,4 @@ extern asmlinkage void __watch_reenable(void);
 	if (watch_available)					\
 		__watch_reenable()
 
-#endif _ASM_WATCH_H
+#endif /* _ASM_WATCH_H  */

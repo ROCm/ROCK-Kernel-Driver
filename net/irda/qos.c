@@ -70,10 +70,6 @@ static int irlap_param_additional_bofs(void *instance, irda_param_t *parm,
 				       int get);
 static int irlap_param_min_turn_time(void *instance, irda_param_t *param, 
 				     int get);
-static int value_index(__u32 value, __u32 *array, int size);
-static __u32 byte_value(__u8 byte, __u32 *array);
-static __u32 index_value(int index, __u32 *array);
-static int value_lower_bits(__u32 value, __u32 *array, int size, __u16 *field);
 
 __u32 min_turn_times[]  = { 10000, 5000, 1000, 500, 100, 50, 10, 0 }; /* us */
 __u32 baud_rates[]      = { 2400, 9600, 19200, 38400, 57600, 115200, 576000, 
@@ -129,6 +125,98 @@ static pi_major_info_t pi_major_call_table[] = {
 };
 
 static pi_param_info_t irlap_param_info = { pi_major_call_table, 2, 0x7f, 7 };
+
+/* ---------------------- LOCAL SUBROUTINES ---------------------- */
+/* Note : we start with a bunch of local subroutines.
+ * As the compiler is "one pass", this is the only way to get them to
+ * inline properly...
+ * Jean II
+ */
+/*
+ * Function value_index (value, array, size)
+ *
+ *    Returns the index to the value in the specified array
+ */
+static inline int value_index(__u32 value, __u32 *array, int size)
+{
+	int i;
+	
+	for (i=0; i < size; i++)
+		if (array[i] == value)
+			break;
+	return i;
+}
+
+/*
+ * Function index_value (index, array)
+ *
+ *    Returns value to index in array, easy!
+ *
+ */
+static inline __u32 index_value(int index, __u32 *array) 
+{
+	return array[index];
+}
+
+/*
+ * Function msb_index (word)
+ *
+ *    Returns index to most significant bit (MSB) in word
+ *
+ */
+int msb_index (__u16 word) 
+{
+	__u16 msb = 0x8000;
+	int index = 15;   /* Current MSB */
+	
+	while (msb) {
+		if (word & msb)
+			break;   /* Found it! */
+		msb >>=1;
+		index--;
+	}
+	return index;
+}
+
+static inline __u32 byte_value(__u8 byte, __u32 *array) 
+{
+	int index;
+
+	ASSERT(array != NULL, return -1;);
+
+	index = msb_index(byte);
+
+	return index_value(index, array);
+}
+
+/*
+ * Function value_lower_bits (value, array)
+ *
+ *    Returns a bit field marking all possibility lower than value.
+ *    We may need a "value_higher_bits" in the future...
+ */
+static inline int value_lower_bits(__u32 value, __u32 *array, int size, __u16 *field)
+{
+	int	i;
+	__u16	mask = 0x1;
+	__u16	result = 0x0;
+
+	for (i=0; i < size; i++) {
+		/* Add the current value to the bit field, shift mask */
+		result |= mask;
+		mask <<= 1;
+		/* Finished ? */
+		if (array[i] >= value)
+			break;
+	}
+	/* Send back a valid index */
+	if(i >= size)
+	  i = size - 1;	/* Last item */
+	*field = result;
+	return i;
+}
+
+/* -------------------------- MAIN CALLS -------------------------- */
 
 /*
  * Function irda_qos_compute_intersection (qos, new)
@@ -594,99 +682,6 @@ __u32 irlap_requested_line_capacity(struct qos_info *qos)
 		   line_capacity);
 	
 	return line_capacity;			       		  
-}
-
-__u32 irlap_min_turn_time_in_bytes(__u32 speed, __u32 min_turn_time)
-{
-	__u32 bytes;
-	
-	bytes = speed * min_turn_time / 10000000;
-	
-	return bytes;
-}
-
-static __u32 byte_value(__u8 byte, __u32 *array) 
-{
-	int index;
-
-	ASSERT(array != NULL, return -1;);
-
-	index = msb_index(byte);
-
-	return index_value(index, array);
-}
-
-/*
- * Function msb_index (word)
- *
- *    Returns index to most significant bit (MSB) in word
- *
- */
-int msb_index (__u16 word) 
-{
-	__u16 msb = 0x8000;
-	int index = 15;   /* Current MSB */
-	
-	while (msb) {
-		if (word & msb)
-			break;   /* Found it! */
-		msb >>=1;
-		index--;
-	}
-	return index;
-}
-
-/*
- * Function value_index (value, array, size)
- *
- *    Returns the index to the value in the specified array
- */
-static int value_index(__u32 value, __u32 *array, int size)
-{
-	int i;
-	
-	for (i=0; i < size; i++)
-		if (array[i] == value)
-			break;
-	return i;
-}
-
-/*
- * Function index_value (index, array)
- *
- *    Returns value to index in array, easy!
- *
- */
-static __u32 index_value(int index, __u32 *array) 
-{
-	return array[index];
-}
-
-/*
- * Function value_lower_bits (value, array)
- *
- *    Returns a bit field marking all possibility lower than value.
- *    We may need a "value_higher_bits" in the future...
- */
-static int value_lower_bits(__u32 value, __u32 *array, int size, __u16 *field)
-{
-	int	i;
-	__u16	mask = 0x1;
-	__u16	result = 0x0;
-
-	for (i=0; i < size; i++) {
-		/* Add the current value to the bit field, shift mask */
-		result |= mask;
-		mask <<= 1;
-		/* Finished ? */
-		if (array[i] >= value)
-			break;
-	}
-	/* Send back a valid index */
-	if(i >= size)
-	  i = size - 1;	/* Last item */
-	*field = result;
-	return i;
 }
 
 void irda_qos_bits_to_value(struct qos_info *qos)

@@ -56,4 +56,9 @@
 #define FIQ_INT8		6
 #define FIQ_FORCE		7
 
+/*
+ * This is the offset of the FIQ "IRQ" numbers
+ */
+#define FIQ_START		64
+
 #define IRQ_TIMER		IRQ_TIMER0

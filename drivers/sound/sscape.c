@@ -15,6 +15,8 @@
  * Sergey Smitienko	: ensoniq p'n'p support
  * Christoph Hellwig	: adapted to module_init/module_exit
  * Bartlomiej Zolnierkiewicz : added __init to attach_sscape()
+ * Chris Rankin		: Specify that this module owns the coprocessor
+ * Arnaldo C. de Melo	: added missing restore_flags in sscape_pnp_upload_file
  */
 
 #include <linux/init.h>
@@ -600,6 +602,7 @@ static int sscape_coproc_ioctl(void *dev_info, unsigned int cmd, caddr_t arg, in
 static coproc_operations sscape_coproc_operations =
 {
 	"SoundScape M68K",
+	THIS_MODULE,
 	sscape_coproc_open,
 	sscape_coproc_close,
 	sscape_coproc_ioctl,
@@ -671,7 +674,7 @@ void __init attach_sscape(struct address_info *hw_config)
 		return;
 	}
 	
-	if (sscape_is_pnp == 0) {
+	if (!sscape_is_pnp) {
 	
 	    save_flags(flags);
 	    cli();
@@ -967,7 +970,10 @@ static	int	sscape_pnp_upload_file(sscape_info* devc, char* fn)
 		memcpy(devc->raw_buf, dt, l); dt += l;
 		sscape_start_dma(devc->dma, devc->raw_buf_phys, l, 0x48);
 		sscape_pnp_start_dma ( devc, 0 );
-		if (sscape_pnp_wait_dma ( devc, 0 ) == 0) return 0;
+		if (sscape_pnp_wait_dma ( devc, 0 ) == 0) {
+			restore_flags(flags);	    
+			return 0;
+		}
 	}
 	
 	restore_flags(flags);	    
@@ -1087,8 +1093,8 @@ static void __init sscape_pnp_init_hw(sscape_info* devc)
 		sscape_pnp_write_codec( devc, 10, (sscape_pnp_read_codec(devc, 10) & 0x7f) |
 		 ( sscape_mic_enable == 0 ? 0x00 : 0x80) );
 	}
-	sscape_write_host_ctrl2( devc, 0x84, 0x32 );
-	sscape_write_host_ctrl2( devc, 0x86, 0x32 );
+	sscape_write_host_ctrl2( devc, 0x84, 0x64 );  /* MIDI volume */
+	sscape_write_host_ctrl2( devc, 0x86, 0x64 );  /* MIDI volume?? */
 	sscape_write_host_ctrl2( devc, 0x8A, sscape_ext_midi);
 
 	sscape_pnp_write_codec ( devc, 6, 0x3f ); //WAV_VOL
@@ -1239,10 +1245,7 @@ static int __init detect_sscape_pnp(sscape_info* devc)
 
 	sscape_pnp_write_codec( devc, 0, sscape_pnp_read_codec( devc, 0) | 0x20);
 	sscape_pnp_write_codec( devc, 0, sscape_pnp_read_codec( devc, 1) | 0x20);
-	
-	release_region(devc->codec, 2);
-	release_region(devc->base, 8);		
-		
+
 	return 1;	
 }
 

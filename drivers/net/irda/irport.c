@@ -616,7 +616,7 @@ int irport_hard_xmit(struct sk_buff *skb, struct net_device *dev)
 	struct irport_cb *self;
 	unsigned long flags;
 	int iobase;
-	__u32 speed;
+	__s32 speed;
 
 	ASSERT(dev != NULL, return 0;);
 	
@@ -628,12 +628,14 @@ int irport_hard_xmit(struct sk_buff *skb, struct net_device *dev)
 	netif_stop_queue(dev);
 	
 	/* Check if we need to change the speed */
-	if ((speed = irda_get_speed(skb)) != self->io.speed) {
+	speed = irda_get_next_speed(skb);
+	if ((speed != self->io.speed) && (speed != -1)) {
 		/* Check for empty frame */
 		if (!skb->len) {
 			irda_task_execute(self, __irport_change_speed, 
 					  irport_change_speed_complete, 
 					  NULL, (void *) speed);
+			dev_kfree_skb(skb);
 			return 0;
 		} else
 			self->new_speed = speed;

@@ -1,6 +1,6 @@
 
 /* Overhauled routines for dealing with different mmap regions of flash */
-/* $Id: map.h,v 1.10 2000/12/04 13:18:33 dwmw2 Exp $ */
+/* $Id: map.h,v 1.10.2.2 2001/01/09 00:44:51 dwmw2 Exp $ */
 
 #ifndef __LINUX_MTD_MAP_H__
 #define __LINUX_MTD_MAP_H__
@@ -44,7 +44,7 @@ struct map_info {
 	void (*write32)(struct map_info *, __u32, unsigned long);
 	void (*copy_to)(struct map_info *, unsigned long, const void *, ssize_t);
 
-	void (*set_vpp)(int);
+	void (*set_vpp)(struct map_info *, int);
 	/* We put these two here rather than a single void *map_priv, 
 	   because we want mappers to be able to have quickly-accessible
 	   cache for the 'currently-mapped page' without the _extra_
@@ -108,7 +108,7 @@ static inline void map_destroy(struct mtd_info *mtd)
 	kfree(mtd);
 }
 
-#define ENABLE_VPP(map) do { if(map->set_vpp) map->set_vpp(1); } while(0)
-#define DISABLE_VPP(map) do { if(map->set_vpp) map->set_vpp(0); } while(0)
+#define ENABLE_VPP(map) do { if(map->set_vpp) map->set_vpp(map, 1); } while(0)
+#define DISABLE_VPP(map) do { if(map->set_vpp) map->set_vpp(map, 0); } while(0)
 
 #endif /* __LINUX_MTD_MAP_H__ */

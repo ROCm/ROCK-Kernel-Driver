@@ -1,4 +1,4 @@
-/* $Id: isdn_net.c,v 1.140.6.1 2000/12/10 22:01:04 kai Exp $
+/* $Id: isdn_net.c,v 1.140.6.3 2001/02/07 11:31:30 kai Exp $
 
  * Linux ISDN subsystem, network interfaces and related functions (linklevel).
  *
@@ -154,6 +154,7 @@ static __inline__ void isdn_net_dec_frame_cnt(isdn_net_local *lp)
 	if (!(isdn_net_device_busy(lp))) {
 		if (!skb_queue_empty(&lp->super_tx_queue)) {
 			queue_task(&lp->tqueue, &tq_immediate);
+			mark_bh(IMMEDIATE_BH);
 		} else {
 			isdn_net_device_wake_queue(lp);
 		}
@@ -181,7 +182,7 @@ static __inline__ void isdn_net_zero_frame_cnt(isdn_net_local *lp)
 int isdn_net_force_dial_lp(isdn_net_local *);
 static int isdn_net_start_xmit(struct sk_buff *, struct net_device *);
 
-char *isdn_net_revision = "$Revision: 1.140.6.1 $";
+char *isdn_net_revision = "$Revision: 1.140.6.3 $";
 
  /*
   * Code for raw-networking over ISDN
@@ -981,11 +982,12 @@ isdn_net_log_skb(struct sk_buff * skb, isdn_net_local * lp)
  */
 void isdn_net_write_super(isdn_net_local *lp, struct sk_buff *skb)
 {
-	if (in_interrupt()) {
+	if (in_irq()) {
 		// we can't grab the lock from irq context, 
 		// so we just queue the packet
 		skb_queue_tail(&lp->super_tx_queue, skb); 
 		queue_task(&lp->tqueue, &tq_immediate);
+		mark_bh(IMMEDIATE_BH);
 		return;
 	}
 

@@ -53,6 +53,14 @@ struct files_stat_struct {
 	int max_files;		/* tunable */
 };
 extern struct files_stat_struct files_stat;
+
+struct inodes_stat_t {
+	int nr_inodes;
+	int nr_unused;
+	int dummy[5];
+};
+extern struct inodes_stat_t inodes_stat;
+
 extern int max_super_blocks, nr_super_blocks;
 extern int leases_enable, dir_notify_enable, lease_break_time;
 

@@ -12,33 +12,59 @@
  */
 		.section .start,#alloc,#execinstr
 		.type	_entry, #function
-_entry:
-kernel_addr:	adr	r10, initdata
-		ldmia	r10, {r11, r12}
+_entry:		adr	r10, initdata
+		ldr	r11, initdata
 		sub	r11, r10, r11		@ work out exec offset
-		add	r12, r12, r11		@ correct "splitify"
-		mov	pc, r12			@ jump to splitify
+		b	splitify
 		.size	_entry,. - _entry
 
 		.type	initdata, #object
 initdata:	.word	initdata		@ compiled address of this
-		.word	splitify
 		.size	initdata,. - initdata
 
 		.text
 splitify:	adr	r13, data
-		ldmia	r13!, {r4-r6}		@ move the kernel
+		ldmia	r13!, {r4-r6}		@ move the initrd
 		add	r4, r4, r11		@ correction
+		bl	move
+
+		ldmia	r13!, {r4-r6}		@ then the kernel
 		mov	r12, r5
-		bl	move
-
-		ldmia	r13!, {r4-r6}		@ then the initrd
 		add	r4, r4, r11		@ correction
 		bl	move
 
-		ldmib	r13, {r5,r6,r7}		@ get size and addr of initrd
-		add	r7, r7, #16*4		@ offset of initrd_start in param_struct
-		stmia	r7, {r5,r6}		@ save in param_struct
+/*
+ * Setup the initrd parameters to pass to the kernel.  This can either be
+ * passed in via a param_struct or a tag list.  We spot the param_struct
+ * method by looking at the first word; this should either indicate a page
+ * size of 4K, 16K or 32K.
+ */
+		ldmia	r13, {r5-r8}		@ get size and addr of initrd
+						@ r5 = ATAG_INITRD
+						@ r6 = initrd start
+						@ r7 = initrd end
+						@ r8 = param_struct address
+		ldr	r9, [r8, #0]		@ no param struct?
+		teq	r9, #0x1000		@ 4K?
+		teqne	r9, #0x4000		@ 16K?
+		teqne	r9, #0x8000		@ 32K?
+		beq	no_taglist
+
+/*
+ * find the end of the tag list, and then add an INITRD tag on the end.
+ */
+taglist:	ldr	r9, [r8, #0]		@ tag length
+		teq	r9, #0			@ last tag?
+		addne	r8, r8, r9
+		bne	taglist
+
+		mov	r4, #16			@ length of initrd tag
+		mov	r9, #0			@ end of tag list terminator
+		stmia	r8, {r4, r5, r6, r7, r9}
+		mov	pc, r12			@ call kernel
+
+no_taglist:	add	r8, r8, #16*4
+		stmia	r8, {r6,r7}		@ save in param_struct
 		mov	pc, r12			@ call kernel
 
 move:		ldmia	r4!, {r7 - r10}		@ move 32-bytes at a time
@@ -49,17 +75,18 @@ move:		ldmia	r4!, {r7 - r10}		@ move 32-bytes at a time
 		bcs	move
 		mov	pc, lr
 
-data:		.word	kernel_start
-		.word	kernel_addr
-		.word	kernel_len
-
-		.word	initrd_start
+data:		.word	initrd_start
 		.word	initrd_addr
 		.word	initrd_len
 
-		.word	initrd_virt
-		.word	initrd_len
-		.word	params
+		.word	kernel_start
+		.word	kernel_addr
+		.word	kernel_len
+
+		.word	0x54410005		@ r5 = ATAG_INITRD
+		.word	initrd_virt		@ r6
+		.word	initrd_len		@ r7
+		.word	params			@ r8
 
 		.type	kernel_start,#object
 		.type	initrd_start,#object

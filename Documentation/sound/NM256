@@ -53,7 +53,7 @@ or CS4232-compatible codec/mixer; you will want to use the appropriate
 compatible OSS driver with these chipsets.  I cannot provide any
 assistance with machines using the SB16, AD1848 or CS4232 compatible
 versions.  (The driver now attempts to detect the mixer version, and
-will refuse to load if it believes the hardware is not not
+will refuse to load if it believes the hardware is not
 AC97-compatible.)
 
 The sound support is very basic, but it does include simultaneous

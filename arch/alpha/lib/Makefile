@@ -42,6 +42,8 @@ OBJS =	__divqu.o __remqu.o __divlu.o __remlu.o \
 	$(ev6)strncpy_from_user.o \
 	$(ev67)strlen_user.o \
 	$(ev6)csum_ipv6_magic.o \
+	$(ev6)clear_page.o \
+	$(ev6)copy_page.o \
 	strcasecmp.o \
 	fpreg.o \
 	callback_srm.o srm_puts.o srm_printk.o

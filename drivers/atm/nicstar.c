@@ -121,7 +121,7 @@
 #define ALIGN_ADDRESS(addr, alignment) \
         bus_to_virt(ALIGN_BUS_ADDR(virt_to_bus(addr), alignment))
 
-#undef CEIL(d)
+#undef CEIL
 
 #ifndef ATM_SKB
 #define ATM_SKB(s) (&(s)->atm)

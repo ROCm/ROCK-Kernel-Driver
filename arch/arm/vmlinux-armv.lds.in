@@ -42,6 +42,8 @@ SECTIONS
 			*(.gnu.warning)
 			*(.text.lock)	/* out-of-line lock text */
 			*(.rodata)
+			*(.glue_7)
+			*(.glue_7t)
 			*(.kstrtab)
 		. = ALIGN(16);
 		__start___ex_table = .;	/* Exception table		*/

@@ -15,10 +15,6 @@
 #include <asm/mach-types.h>
 
 
-#define PCMCIA_IO_0_BASE 0xe0000000
-#define PCMCIA_IO_1_BASE 0xe4000000
-
-
 /*
  * Set up a hw structure for a specified data port, control port and IRQ.
  * This should follow whatever the default interface uses.

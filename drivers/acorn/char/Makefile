@@ -11,11 +11,6 @@
 
 O_TARGET 	:= acorn-char.o
 
-O_OBJS		:=
-OX_OBJS		:=
-M_OBJS		:=
-MX_OBJS		:=
-
 # Object file lists.
 
 obj-y   	:=
@@ -37,10 +32,5 @@ obj-$(CONFIG_ARCH_ACORN)	+= defkeymap-acorn.o i2c.o pcf8583.o
 
 # Do the i2c and rtc last
 obj-y		+= $(obj-$(MACHINE)) 
-
-O_OBJS		:= $(filter-out $(export-objs), $(obj-y))
-OX_OBJS		:= $(filter     $(export-objs), $(obj-y))
-M_OBJS		:= $(sort $(filter-out $(export-objs), $(obj-m)))
-MX_OBJS		:= $(sort $(filter     $(export-objs), $(obj-m)))
 
 include $(TOPDIR)/Rules.make

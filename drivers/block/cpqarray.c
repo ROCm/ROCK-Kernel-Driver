@@ -1327,7 +1327,7 @@ static int ida_ctlr_ioctl(int ctlr, int dsk, ida_ioctl_t *io)
 	case IDA_WRITE_MEDIA:
 		kfree(p);
 		break;
-	default:
+	default:;
 		/* Nothing to do */
 	}
 

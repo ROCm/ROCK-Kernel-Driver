@@ -223,67 +223,53 @@ static ide_startstop_t write_intr (ide_drive_t *drive)
  * ide_multwrite() transfers a block of up to mcount sectors of data
  * to a drive as part of a disk multiple-sector write operation.
  *
- * Returns 0 if successful;  returns 1 if request had to be aborted due to corrupted buffer list.
+ * Returns 0 on success.
+ *
+ * Note that we may be called from two contexts - the do_rw_disk context
+ * and IRQ context. The IRQ can happen any time after we've output the
+ * full "mcount" number of sectors, so we must make sure we update the
+ * state _before_ we output the final part of the data!
  */
 int ide_multwrite (ide_drive_t *drive, unsigned int mcount)
 {
  	ide_hwgroup_t	*hwgroup= HWGROUP(drive);
-
-	/*
-	 *	This may look a bit odd, but remember wrq is a copy of the
-	 *	request not the original. The pointers are real however so the
-	 *	bh's are not copies. Remember that or bad stuff will happen
-	 *
-	 *	At the point we are called the drive has asked us for the
-	 *	data, and its our job to feed it, walking across bh boundaries
-	 *	if need be.
-	 */
-
  	struct request	*rq = &hwgroup->wrq;
-
+ 
   	do {
- 		unsigned long flags;
-  		unsigned int nsect = rq->current_nr_sectors;
+  		char *buffer;
+  		int nsect = rq->current_nr_sectors;
+ 
 		if (nsect > mcount)
 			nsect = mcount;
 		mcount -= nsect;
+		buffer = rq->buffer;
 
-		idedisk_output_data(drive, rq->buffer, nsect<<7);
-#ifdef DEBUG
-		printk("%s: multwrite: sector %ld, buffer=0x%08lx, count=%d, remaining=%ld\n",
-			drive->name, rq->sector, (unsigned long) rq->buffer,
-			nsect, rq->nr_sectors - nsect);
-#endif
-		spin_lock_irqsave(&io_request_lock, flags);	/* Is this really necessary? */
-#ifdef CONFIG_BLK_DEV_PDC4030
 		rq->sector += nsect;
-#endif
-		if (((long)(rq->nr_sectors -= nsect)) <= 0) {
-#ifdef DEBUG
-			printk("%s: multwrite: count=%d, current=%ld\n",
-				drive->name, nsect, rq->nr_sectors);
-#endif
-			spin_unlock_irqrestore(&io_request_lock, flags);
-			break;
-		}
-		if ((rq->current_nr_sectors -= nsect) == 0) {
-			if ((rq->bh = rq->bh->b_reqnext) != NULL) {
-				rq->current_nr_sectors = rq->bh->b_size>>9;
-				rq->buffer             = rq->bh->b_data;
+		rq->buffer += nsect << 9;
+		rq->nr_sectors -= nsect;
+		rq->current_nr_sectors -= nsect;
+
+		/* Do we move to the next bh after this? */
+		if (!rq->current_nr_sectors) {
+			struct buffer_head *bh = rq->bh->b_reqnext;
+
+			/* end early early we ran out of requests */
+			if (!bh) {
+				mcount = 0;
 			} else {
-				spin_unlock_irqrestore(&io_request_lock, flags);
-				printk("%s: buffer list corrupted (%ld, %ld, %d)\n",
-					drive->name, rq->current_nr_sectors,
-					rq->nr_sectors, nsect);
-				ide_end_request(0, hwgroup);
-				return 1;
+				rq->bh = bh;
+				rq->current_nr_sectors = bh->b_size >> 9;
+				rq->buffer             = bh->b_data;
 			}
-		} else {
-			/* Fix the pointer.. we ate data */
-			rq->buffer += nsect << 9;
 		}
-                spin_unlock_irqrestore(&io_request_lock, flags);
+
+		/*
+		 * Ok, we're all setup for the interrupt
+		 * re-entering us on the last transfer.
+		 */
+		idedisk_output_data(drive, buffer, nsect<<7);
 	} while (mcount);
+
         return 0;
 }
 

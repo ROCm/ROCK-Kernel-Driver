@@ -15,6 +15,14 @@
  *
  * See Documentation/usb/usb-serial.txt for more information on using this driver
  *
+ * 2001_02_05 gkh
+ *	Fixed buffer overflows bug with the generic serial driver.  Thanks to
+ *	Todd Squires <squirest@ct0.com> for fixing this.
+ *
+ * (01/10/2001) gkh
+ *	Fixed bug where the generic serial adaptor grabbed _any_ device that was
+ *	offered to it.
+ *
  * (12/12/2000) gkh
  *	Removed MOD_INC and MOD_DEC from poll and disconnect functions, and
  *	moved them to the serial_open and serial_close functions.
@@ -742,6 +750,11 @@ static int generic_open (struct usb_serial_port *port, struct file *filp)
 	if (!port->active) {
 		port->active = 1;
 
+		/* force low_latency on so that our tty_push actually forces the data through, 
+		   otherwise it is scheduled, and with high data rates (like with OHCI) data
+		   can get lost. */
+		port->tty->low_latency = 1;
+		
 		/* if we have a bulk interrupt, start reading from it */
 		if (serial->num_bulk_in) {
 			/* Start reading from the device */
@@ -907,8 +920,13 @@ static void generic_read_bulk_callback (struct urb *urb)
 	tty = port->tty;
 	if (urb->actual_length) {
 		for (i = 0; i < urb->actual_length ; ++i) {
-			 tty_insert_flip_char(tty, data[i], 0);
-	  	}
+			/* if we insert more than TTY_FLIPBUF_SIZE characters, we drop them. */
+			if(tty->flip.count >= TTY_FLIPBUF_SIZE) {
+				tty_flip_buffer_push(tty);
+			}
+			/* this doesn't actually push the data through unless tty->low_latency is set */
+			tty_insert_flip_char(tty, data[i], 0);
+		}
 	  	tty_flip_buffer_push(tty);
 	}
 
@@ -1361,6 +1379,7 @@ int usb_serial_init(void)
 #ifdef CONFIG_USB_SERIAL_GENERIC
 	generic_device_ids[0].idVendor = vendor;
 	generic_device_ids[0].idProduct = product;
+	generic_device_ids[0].match_flags = USB_DEVICE_ID_MATCH_VENDOR | USB_DEVICE_ID_MATCH_PRODUCT;
 	/* register our generic driver with ourselves */
 	usb_serial_register (&generic_device);
 #endif

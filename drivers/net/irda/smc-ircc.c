@@ -606,7 +606,7 @@ static int ircc_hard_xmit(struct sk_buff *skb, struct net_device *dev)
 	struct irport_cb *irport;
 	struct ircc_cb *self;
 	unsigned long flags;
-	__u32 speed;
+	__s32 speed;
 	int iobase;
 	int mtt;
 
@@ -619,10 +619,12 @@ static int ircc_hard_xmit(struct sk_buff *skb, struct net_device *dev)
 	netif_stop_queue(dev);
 
 	/* Check if we need to change the speed after this frame */
-	if ((speed = irda_get_speed(skb)) != self->io.speed) {
+	speed = irda_get_next_speed(skb);
+	if ((speed != self->io.speed) && (speed != -1)) {
 		/* Check for empty frame */
 		if (!skb->len) {
 			ircc_change_speed(self, speed); 
+			dev_kfree_skb(skb);
 			return 0;
 		} else
 			self->new_speed = speed;

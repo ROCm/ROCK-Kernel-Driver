@@ -177,9 +177,10 @@ typedef union {
  */
 struct irda_skb_cb {
 	magic_t magic;       /* Be sure that we can trust the information */
-	__u32   speed;       /* The Speed this frame should be sent with */
+	__u32   next_speed;  /* The Speed to be set *after* this frame */
 	__u16   mtt;         /* Minimum turn around time */
 	__u16   xbofs;       /* Number of xbofs required, used by SIR mode */
+	__u16   next_xbofs;  /* Number of xbofs required *after* this frame */
 	void    *context;    /* May be used by drivers */
 	void    (*destructor)(struct sk_buff *skb); /* Used for flow control */
 	__u16   xbofs_delay; /* Number of xbofs used for generating the mtt */

@@ -1,81 +1,12 @@
 /*
  *
- * Hardware accelerated Matrox Millennium I, II, Mystique, G100, G200 and G400
+ * Hardware accelerated Matrox Millennium I, II, Mystique, G100, G200, G400 and G450.
  *
- * (c) 1998,1999,2000 Petr Vandrovec <vandrove@vc.cvut.cz>
+ * (c) 1998-2001 Petr Vandrovec <vandrove@vc.cvut.cz>
  *
- * Version: 1.50 2000/08/10
+ * Version: 1.52 2001/02/02
  *
- * MTRR stuff: 1998 Tom Rini <trini@kernel.crashing.org>
- *
- * Contributors: "menion?" <menion@mindless.com>
- *                     Betatesting, fixes, ideas
- *
- *               "Kurt Garloff" <garloff@suse.de>
- *                     Betatesting, fixes, ideas, videomodes, videomodes timmings
- *
- *               "Tom Rini" <trini@kernel.crashing.org>
- *                     MTRR stuff, PPC cleanups, betatesting, fixes, ideas
- *
- *               "Bibek Sahu" <scorpio@dodds.net>
- *                     Access device through readb|w|l and write b|w|l
- *                     Extensive debugging stuff
- *
- *               "Daniel Haun" <haund@usa.net>
- *                     Testing, hardware cursor fixes
- *
- *               "Scott Wood" <sawst46+@pitt.edu>
- *                     Fixes
- *
- *               "Gerd Knorr" <kraxel@goldbach.isdn.cs.tu-berlin.de>
- *                     Betatesting
- *
- *               "Kelly French" <targon@hazmat.com>
- *               "Fernando Herrera" <fherrera@eurielec.etsit.upm.es>
- *                     Betatesting, bug reporting
- *
- *               "Pablo Bianucci" <pbian@pccp.com.ar>
- *                     Fixes, ideas, betatesting
- *
- *               "Inaky Perez Gonzalez" <inaky@peloncho.fis.ucm.es>
- *                     Fixes, enhandcements, ideas, betatesting
- *
- *               "Ryuichi Oikawa" <roikawa@rr.iiij4u.or.jp>
- *                     PPC betatesting, PPC support, backward compatibility
- *
- *               "Paul Womar" <Paul@pwomar.demon.co.uk>
- *               "Owen Waller" <O.Waller@ee.qub.ac.uk>
- *                     PPC betatesting
- *
- *               "Thomas Pornin" <pornin@bolet.ens.fr>
- *                     Alpha betatesting
- *
- *               "Pieter van Leuven" <pvl@iae.nl>
- *               "Ulf Jaenicke-Roessler" <ujr@physik.phy.tu-dresden.de>
- *                     G100 testing
- *
- *               "H. Peter Arvin" <hpa@transmeta.com>
- *                     Ideas
- *
- *               "Cort Dougan" <cort@cs.nmt.edu>
- *                     CHRP fixes and PReP cleanup
- *
- *               "Mark Vojkovich" <mvojkovi@ucsd.edu>
- *                     G400 support
- *
- *               "Ken Aaker" <kdaaker@rchland.vnet.ibm.com>
- *                     memtype extension (needed for GXT130P RS/6000 adapter)
- *
- * (following author is not in any relation with this code, but his code
- *  is included in this driver)
- *
- * Based on framebuffer driver for VBE 2.0 compliant graphic boards
- *     (c) 1998 Gerd Knorr <kraxel@cs.tu-berlin.de>
- *
- * (following author is not in any relation with this code, but his ideas
- *  were used when writting this driver)
- *
- *		 FreeVBE/AF (Matrox), "Shawn Hargreaves" <shawn@talula.demon.co.uk>
+ * See matroxfb_base.c for contributors.
  *
  */
 
@@ -787,6 +718,11 @@ static int MGAG100_preinit(WPMINFO struct matrox_hw_state* hw){
 
 	ACCESS_FBINFO(primout) = &m1064;
 
+	if (ACCESS_FBINFO(devflags.g450dac)) {
+		/* we must do this always, BIOS does not do it for us
+		   and accelerator dies without it */
+		mga_outl(0x1C0C, 0);
+	}
 	if (ACCESS_FBINFO(devflags.noinit))
 		return 0;
 	hw->MXoptionReg &= 0xC0000100;

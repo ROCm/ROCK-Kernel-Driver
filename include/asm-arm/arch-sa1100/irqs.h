@@ -72,7 +72,7 @@
 #define	NR_IRQS		(IRQ_GPIO27 + 1)
 
 
-#if defined(CONFIG_SA1100_GRAPHICSCLIENT) || defined(CONFIG_SA1100_THINCLIENT)
+#if defined(CONFIG_SA1100_GRAPHICSCLIENT)
 #define ADS_EXT_IRQ(x)	(IRQ_GPIO27 + 1 + (x))
 #undef NR_IRQS
 #define NR_IRQS		(ADS_EXT_IRQ(15) + 1)

@@ -804,6 +804,7 @@ int __init init_pmc551(void)
 
                 if (add_mtd_device(mtd)) {
                         printk(KERN_NOTICE "pmc551: Failed to register new device\n");
+			iounmap(priv->start);
                         kfree(mtd->priv);
                         kfree(mtd);
                         break;

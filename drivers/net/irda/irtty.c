@@ -279,6 +279,11 @@ static void irtty_close(struct tty_struct *tty)
 	tty->flags &= ~(1 << TTY_DO_WRITE_WAKEUP);
 	tty->disc_data = 0;
 	
+	/* We are not using any dongle anymore! */
+	if (self->dongle)
+		irda_device_dongle_cleanup(self->dongle);
+	self->dongle = NULL;
+
 	/* Remove netdevice */
 	if (self->netdev) {
 		rtnl_lock();
@@ -286,11 +291,6 @@ static void irtty_close(struct tty_struct *tty)
 		rtnl_unlock();
 	}
 	
-	/* We are not using any dongle anymore! */
-	if (self->dongle)
-		irda_device_dongle_cleanup(self->dongle);
-	self->dongle = NULL;
-
 	/* Remove speed changing task if any */
 	if (self->task)
 		irda_task_delete(self->task);
@@ -629,7 +629,7 @@ static int irtty_hard_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct irtty_cb *self;
 	int actual = 0;
-	__u32 speed;
+	__s32 speed;
 
 	self = (struct irtty_cb *) dev->priv;
 	ASSERT(self != NULL, return 0;);
@@ -638,12 +638,14 @@ static int irtty_hard_xmit(struct sk_buff *skb, struct net_device *dev)
 	netif_stop_queue(dev);
 	
 	/* Check if we need to change the speed */
-	if ((speed = irda_get_speed(skb)) != self->io.speed) {
+	speed = irda_get_next_speed(skb);
+	if ((speed != self->io.speed) && (speed != -1)) {
 		/* Check for empty frame */
 		if (!skb->len) {
 			irda_task_execute(self, irtty_change_speed, 
 					  irtty_change_speed_complete, 
 					  NULL, (void *) speed);
+			dev_kfree_skb(skb);
 			return 0;
 		} else
 			self->new_speed = speed;

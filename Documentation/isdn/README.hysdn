@@ -2,7 +2,7 @@ $Id: README.hysdn,v 1.3 2000/08/06 09:22:51 armin Exp $
 The hysdn driver has been written by
 by Werner Cornelius (werner@isdn4linux.de or werner@titro.de) 
 for Hypercope GmbH Aachen Germany. Hypercope agreed to publish this driver
-under the GNU Public License.
+under the GNU General Public License.
 
 The CAPI 2.0-support was added by Ulrich Albrecht (ualbrecht@hypercope.de)
 for Hypercope GmbH Aachen, Germany.

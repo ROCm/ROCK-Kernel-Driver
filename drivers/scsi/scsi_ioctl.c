@@ -101,7 +101,10 @@ static int ioctl_internal_command(Scsi_Device * dev, char *cmd,
 
 
 	SCSI_LOG_IOCTL(1, printk("Trying ioctl with scsi command %d\n", cmd[0]));
-	SRpnt = scsi_allocate_request(dev);
+	if (NULL == (SRpnt = scsi_allocate_request(dev))) {
+		printk("SCSI internal ioctl failed, no memory\n");
+		return -ENOMEM;
+	}
 
 	SRpnt->sr_data_direction = SCSI_DATA_NONE;
         scsi_wait_req(SRpnt, cmd, NULL, 0, timeout, retries);

@@ -120,8 +120,9 @@ void irlan_client_wakeup(struct irlan_cb *self, __u32 saddr, __u32 daddr)
 			return;
 	}
 
-	/* Address may have changed! */
+	/* Addresses may have changed! */
 	self->saddr = saddr;
+	self->daddr = daddr;
 
 	if (self->disconnect_reason == LM_USER_REQUEST) {
 			IRDA_DEBUG(0, __FUNCTION__ "(), still stopped by user\n");

@@ -35,7 +35,7 @@ If the io parameter is used the io addresses of all used cards should be
 supplied else the parameter is assumed 0 and a auto search for a free card is
 invoked which may not give the wanted result. 
 
-Comments and reports to werner@isdn4linux.de or werner@titro.de .
+Comments and reports to werner@isdn4linux.de or werner@isdn-development.de
 
 
 

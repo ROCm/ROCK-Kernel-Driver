@@ -107,7 +107,7 @@ static void dump_instr(struct pt_regs *regs)
 			bad = __get_user(val, &((u32 *)addr)[i]);
 
 		if (!bad)
-			printk(i == 0 ? "(%0*x) " : "%0*x", width, val);
+			printk(i == 0 ? "(%0*x) " : "%0*x ", width, val);
 		else {
 			printk("bad PC value.");
 			break;
@@ -133,7 +133,7 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
 		printk("no frame pointer");
 		ok = 0;
 	} else if (verify_stack(fp)) {
-		printk("invalid frame pointer %08lx", fp);
+		printk("invalid frame pointer 0x%08x", fp);
 		ok = 0;
 	} else if (fp < 4096+(unsigned long)tsk)
 		printk("frame pointer underflow");

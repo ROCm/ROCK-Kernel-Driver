@@ -36,12 +36,14 @@
  *  6. Goto 3
  */
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/mm.h>
 #include <linux/mman.h>
 #include <linux/init.h>
 
 #include <asm/fiq.h>
 #include <asm/io.h>
+#include <asm/irq.h>
 #include <asm/pgalloc.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -71,7 +73,7 @@ static inline void protect_page_0(void)
  * - we always relinquish FIQ control
  * - we always reacquire FIQ control
  */
-int fiq_def_op(void *ref, int relinquish)
+static int fiq_def_op(void *ref, int relinquish)
 {
 	if (!relinquish) {
 		unprotect_page_0();
@@ -213,6 +215,24 @@ void release_fiq(struct fiq_handler *f)
 		current_fiq = current_fiq->next;
 	while (current_fiq->fiq_op(current_fiq->dev_id, 0));
 }
+
+void enable_fiq(int fiq)
+{
+	enable_irq(fiq + FIQ_START);
+}
+
+void disable_fiq(int fiq)
+{
+	disable_irq(fiq + FIQ_START);
+}
+
+EXPORT_SYMBOL(set_fiq_handler);
+EXPORT_SYMBOL(set_fiq_regs);
+EXPORT_SYMBOL(get_fiq_regs);
+EXPORT_SYMBOL(claim_fiq);
+EXPORT_SYMBOL(release_fiq);
+EXPORT_SYMBOL(enable_fiq);
+EXPORT_SYMBOL(disable_fiq);
 
 void __init init_FIQ(void)
 {

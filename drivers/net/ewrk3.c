@@ -5,7 +5,7 @@
    Copyright 1994 Digital Equipment Corporation.
 
    This software may be used and distributed according to the terms of
-   the GNU Public License, incorporated herein by reference.
+   the GNU General Public License, incorporated herein by reference.
 
    This driver is written for the Digital Equipment Corporation series
    of EtherWORKS ethernet cards:
@@ -819,24 +819,24 @@ static int ewrk3_queue_pkt(struct sk_buff *skb, struct net_device *dev)
 					}
 					outb(page, EWRK3_TQ);	/* Start sending pkt */
 				} else {
-					writeb((char) (TCR_QMODE | TCR_PAD | TCR_IFC), (char *) buf);	/* ctrl byte */
+					isa_writeb((char) (TCR_QMODE | TCR_PAD | TCR_IFC), buf);	/* ctrl byte */
 					buf += 1;
-					writeb((char) (skb->len & 0xff), (char *) buf);		/* length (16 bit xfer) */
+					isa_writeb((char) (skb->len & 0xff), buf);		/* length (16 bit xfer) */
 					buf += 1;
 					if (lp->txc) {
-						writeb((char) (((skb->len >> 8) & 0xff) | XCT), (char *) buf);
+						isa_writeb((char) (((skb->len >> 8) & 0xff) | XCT), buf);
 						buf += 1;
-						writeb(0x04, (char *) buf);	/* index byte */
+						isa_writeb(0x04, buf);	/* index byte */
 						buf += 1;
-						writeb(0x00, (char *) (buf + skb->len));	/* Write the XCT flag */
+						isa_writeb(0x00, (buf + skb->len));	/* Write the XCT flag */
 						isa_memcpy_toio(buf, skb->data, PRELOAD);	/* Write PRELOAD bytes */
 						outb(page, EWRK3_TQ);	/* Start sending pkt */
 						isa_memcpy_toio(buf + PRELOAD, skb->data + PRELOAD, skb->len - PRELOAD);
-						writeb(0xff, (char *) (buf + skb->len));	/* Write the XCT flag */
+						isa_writeb(0xff, (buf + skb->len));	/* Write the XCT flag */
 					} else {
-						writeb((char) ((skb->len >> 8) & 0xff), (char *) buf);
+						isa_writeb((char) ((skb->len >> 8) & 0xff), buf);
 						buf += 1;
-						writeb(0x04, (char *) buf);	/* index byte */
+						isa_writeb(0x04, buf);	/* index byte */
 						buf += 1;
 						isa_memcpy_toio(buf, skb->data, skb->len);		/* Write data bytes */
 						outb(page, EWRK3_TQ);	/* Start sending pkt */
@@ -968,9 +968,9 @@ static int ewrk3_rx(struct net_device *dev)
 					pkt_len = inb(EWRK3_DATA);
 					pkt_len |= ((u_short) inb(EWRK3_DATA) << 8);
 				} else {
-					rx_status = readb(buf);
+					rx_status = isa_readb(buf);
 					buf += 1;
-					pkt_len = readw(buf);
+					pkt_len = isa_readw(buf);
 					buf += 3;
 				}
 
@@ -1010,6 +1010,7 @@ static int ewrk3_rx(struct net_device *dev)
 						/*
 						   ** Update stats
 						 */
+						dev->last_rx = jiffies;
 						lp->stats.rx_packets++;
 						lp->stats.rx_bytes += pkt_len;
 						for (i = 1; i < EWRK3_PKT_STAT_SZ - 1; i++) {
@@ -1204,7 +1205,7 @@ static void SetMulticastFilter(struct net_device *dev)
 			if (lp->shmem_length == IO_ONLY) {
 				outb(0xff, EWRK3_DATA);
 			} else {	/* memset didn't work here */
-				writew(0xffff, p);
+				isa_writew(0xffff, (int) p);
 				p++;
 				i++;
 			}
@@ -1221,8 +1222,8 @@ static void SetMulticastFilter(struct net_device *dev)
 				outb(0x00, EWRK3_DATA);
 			}
 		} else {
-			memset_io(lp->mctbl, 0, (HASH_TABLE_LEN >> 3));
-			writeb(0x80, (char *) (lp->mctbl + (HASH_TABLE_LEN >> 4) - 1));
+			isa_memset_io((int) lp->mctbl, 0, (HASH_TABLE_LEN >> 3));
+			isa_writeb(0x80, (int) (lp->mctbl + (HASH_TABLE_LEN >> 4) - 1));
 		}
 
 		/* Update table */
@@ -1251,7 +1252,7 @@ static void SetMulticastFilter(struct net_device *dev)
 					outw((short) ((long) lp->mctbl) + byte, EWRK3_PIR1);
 					outb(tmp, EWRK3_DATA);
 				} else {
-					writeb(readb(lp->mctbl + byte) | bit, lp->mctbl + byte);
+					isa_writeb(isa_readb((int)(lp->mctbl + byte)) | bit, (int)(lp->mctbl + byte));
 				}
 			}
 		}

@@ -132,7 +132,7 @@ fw_in(unsigned int hooknum,
 		if (ret == FW_ACCEPT || ret == FW_SKIP) {
 			if (fwops->fw_acct_out)
 				fwops->fw_acct_out(fwops, PF_INET,
-						   (struct net_device *)in,
+						   (struct net_device *)out,
 						   (*pskb)->nh.raw, &redirpt,
 						   pskb);
 			confirm_connection(*pskb);

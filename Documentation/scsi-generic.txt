@@ -314,7 +314,7 @@ driver relaxes that condition and thereby allows command queuing
 (limit is SG_MAX_QUEUE (16) outstanding packets per file descriptor).
 However, for backward compatibility, command queuing is turned off
 by default (#define SG_DEF_COMMAND_Q 0 in sg.h). This can be changed
-via the the SG_SET_COMMAND_Q ioctl() [or by recompiling after changing
+via the SG_SET_COMMAND_Q ioctl() [or by recompiling after changing
 the above define to 1].
 
 In this sg driver a write() should return more or less immediately.

@@ -166,12 +166,6 @@ extern void low_sleep_handler(void);
 extern void sleep_save_intrs(int);
 extern void sleep_restore_intrs(void);
 
-extern int grackle_pcibios_read_config_word(unsigned char bus,
-	unsigned char dev_fn, unsigned char offset, unsigned short *val);
-
-extern int grackle_pcibios_write_config_word(unsigned char bus,
-	unsigned char dev_fn, unsigned char offset, unsigned short val);
-
 /*
  * This table indicates for each PMU opcode:
  * - the number of data bytes to be sent with the command, or -1
@@ -1336,6 +1330,11 @@ int __openfirmware powerbook_sleep_G3(void)
 	unsigned short pmcr1;
 	struct adb_request req;
 	int ret, timeout;
+	struct pci_dev *grackle;
+
+	grackle = pci_find_slot(0, 0);
+	if (!grackle)
+		return -ENODEV;
 
 	/* Notify device drivers */
 	ret = broadcast_sleep(PBOOK_SLEEP_REQUEST, PBOOK_SLEEP_REJECT);
@@ -1409,21 +1408,21 @@ int __openfirmware powerbook_sleep_G3(void)
 	/* We shut down some HW */
 	feature_prepare_for_sleep();
 
-	grackle_pcibios_read_config_word(0,0,0x70,&pmcr1);
+	pci_read_config_word(grackle, 0x70, &pmcr1);
 	/* Apparently, MacOS uses NAP mode for Grackle ??? */
 	pmcr1 &= ~(GRACKLE_DOZE|GRACKLE_SLEEP); 
 	pmcr1 |= GRACKLE_PM|GRACKLE_NAP;
-	grackle_pcibios_write_config_word(0, 0, 0x70, pmcr1);
+	pci_write_config_word(grackle, 0x70, pmcr1);
 
 	/* Call low-level ASM sleep handler */
 	low_sleep_handler();
 
 	/* We're awake again, stop grackle PM */
-	grackle_pcibios_read_config_word(0, 0, 0x70, &pmcr1);
+	pci_read_config_word(grackle, 0x70, &pmcr1);
 	pmcr1 &= ~(GRACKLE_PM|GRACKLE_DOZE|GRACKLE_SLEEP|GRACKLE_NAP); 
-	grackle_pcibios_write_config_word(0, 0, 0x70, pmcr1);
-	
-	/* Restore things */
+	pci_write_config_word(grackle, 0x70, pmcr1);
+
+	/* Make sure the PMU is idle */
 	feature_wake_up();
 	restore_via_state();
 	

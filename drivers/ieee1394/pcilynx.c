@@ -289,7 +289,8 @@ static quadlet_t generate_own_selfid(struct ti_lynx *lynx,
         char phyreg[7];
         int i;
 
-        for (i = 0; i < 7; i++) {
+        phyreg[0] = lynx->phy_reg0;
+        for (i = 1; i < 7; i++) {
                 phyreg[i] = get_phy_reg(lynx, i);
         }
 
@@ -317,12 +318,17 @@ static quadlet_t generate_own_selfid(struct ti_lynx *lynx,
         return lsid;
 }
 
-static void handle_selfid(struct ti_lynx *lynx, struct hpsb_host *host, size_t size)
+static void handle_selfid(struct ti_lynx *lynx, struct hpsb_host *host)
 {
         quadlet_t *q = lynx->rcv_page;
-        int phyid, isroot;
+        int phyid, isroot, size;
         quadlet_t lsid = 0;
         int i;
+
+        if (lynx->phy_reg0 == -1 || lynx->selfid_size == -1) return;
+
+        size = lynx->selfid_size;
+        phyid = lynx->phy_reg0;
 
         i = (size > 16 ? 16 : size) / 4 - 1;
         while (i >= 0) {
@@ -334,7 +340,6 @@ static void handle_selfid(struct ti_lynx *lynx, struct hpsb_host *host, size_t s
                 lsid = generate_own_selfid(lynx, host);
         }
 
-        phyid = get_phy_reg(lynx, 0);
         isroot = (phyid & 2) != 0;
         phyid >>= 2;
         PRINT(KERN_INFO, lynx->id, "SelfID process finished (phyid %d, %s)",
@@ -369,9 +374,14 @@ static void handle_selfid(struct ti_lynx *lynx, struct hpsb_host *host, size_t s
                 hpsb_selfid_received(host, lsid);
         }
 
-        if (isroot) reg_set_bits(lynx, LINK_CONTROL, LINK_CONTROL_CYCMASTER);
-
         hpsb_selfid_complete(host, phyid, isroot);
+
+        if (host->in_bus_reset) return;
+
+        if (isroot) reg_set_bits(lynx, LINK_CONTROL, LINK_CONTROL_CYCMASTER);
+        reg_set_bits(lynx, LINK_CONTROL,
+                     LINK_CONTROL_RCV_CMP_VALID | LINK_CONTROL_TX_ASYNC_EN
+                     | LINK_CONTROL_RX_ASYNC_EN | LINK_CONTROL_CYCTIMEREN);
 }
 
 
@@ -456,6 +466,9 @@ static int lynx_initialize(struct hpsb_host *host)
         int i;
         u32 *pcli;
 
+        lynx->selfid_size = -1;
+        lynx->phy_reg0 = -1;
+
         lynx->async.queue = NULL;
         spin_lock_init(&lynx->async.queue_lock);
         spin_lock_init(&lynx->phy_reg_lock);
@@ -531,8 +544,8 @@ static int lynx_initialize(struct hpsb_host *host)
         reg_write(lynx, DMA_WORD0_CMP_ENABLE(CHANNEL_ASYNC_RCV), 0xa<<4);
         reg_write(lynx, DMA_WORD1_CMP_VALUE(CHANNEL_ASYNC_RCV), 0);
         reg_write(lynx, DMA_WORD1_CMP_ENABLE(CHANNEL_ASYNC_RCV),
-                  DMA_WORD1_CMP_MATCH_NODE_BCAST | DMA_WORD1_CMP_MATCH_BROADCAST
-                  | DMA_WORD1_CMP_MATCH_LOCAL    | DMA_WORD1_CMP_MATCH_BUS_BCAST
+                  DMA_WORD1_CMP_MATCH_LOCAL_NODE | DMA_WORD1_CMP_MATCH_BROADCAST
+                  | DMA_WORD1_CMP_MATCH_EXACT    | DMA_WORD1_CMP_MATCH_BUS_BCAST
                   | DMA_WORD1_CMP_ENABLE_SELF_ID | DMA_WORD1_CMP_ENABLE_MASTER);
 
         run_pcl(lynx, lynx->rcv_pcl_start, CHANNEL_ASYNC_RCV);
@@ -547,12 +560,21 @@ static int lynx_initialize(struct hpsb_host *host)
         reg_write(lynx, LINK_CONTROL, LINK_CONTROL_RCV_CMP_VALID
                   | LINK_CONTROL_TX_ISO_EN   | LINK_CONTROL_RX_ISO_EN
                   | LINK_CONTROL_TX_ASYNC_EN | LINK_CONTROL_RX_ASYNC_EN
-                  | LINK_CONTROL_RESET_TX    | LINK_CONTROL_RESET_RX
-                  | LINK_CONTROL_CYCTIMEREN);
-        
-        /* attempt to enable contender bit -FIXME- would this work elsewhere? */
-        reg_set_bits(lynx, GPIO_CTRL_A, 0x1);
-        reg_write(lynx, GPIO_DATA_BASE + 0x3c, 0x1); 
+                  | LINK_CONTROL_RESET_TX    | LINK_CONTROL_RESET_RX);
+
+        if (!lynx->phyic.reg_1394a) {
+                /* attempt to enable contender bit -FIXME- would this work
+                 * elsewhere? */
+                reg_set_bits(lynx, GPIO_CTRL_A, 0x1);
+                reg_write(lynx, GPIO_DATA_BASE + 0x3c, 0x1); 
+        } else {
+                /* set the contender bit in the extended PHY register
+                 * set. (Should check that bis 0,1,2 (=0xE0) is set
+                 * in register 2?)
+                 */
+                i = get_phy_reg(lynx, 4);
+                if (i != -1) set_phy_reg(lynx, 4, i | 0x40);
+        }
 
         return 1;
 }
@@ -628,6 +650,11 @@ static int lynx_devctl(struct hpsb_host *host, enum devctl_cmd cmd, int arg)
 
         switch (cmd) {
         case RESET_BUS:
+                if (reg_read(lynx, LINK_INT_STATUS) & LINK_INT_PHY_BUSRESET) {
+                        retval = 0;
+                        break;
+                }
+
                 if (arg) {
                         arg = 3 << 6;
                 } else {
@@ -642,6 +669,8 @@ static int lynx_devctl(struct hpsb_host *host, enum devctl_cmd cmd, int arg)
                       (host->attempt_root ? " and attempting to become root"
                        : ""));
 
+                lynx->selfid_size = -1;
+                lynx->phy_reg0 = -1;
                 set_phy_reg(lynx, 1, arg);
                 break;
 
@@ -1102,14 +1131,28 @@ static void lynx_irq_handler(int irq, void *dev_id,
                 }
                 if (linkint & LINK_INT_PHY_BUSRESET) {
                         PRINT(KERN_INFO, lynx->id, "bus reset interrupt");
-                        if (!host->in_bus_reset) {
+                        lynx->selfid_size = -1;
+                        lynx->phy_reg0 = -1;
+                        if (!host->in_bus_reset)
                                 hpsb_bus_reset(host);
-                        }
                 }
                 if (linkint & LINK_INT_PHY_REG_RCVD) {
+                        u32 reg;
+
+                        spin_lock(&lynx->phy_reg_lock);
+                        reg = reg_read(lynx, LINK_PHY);
+                        spin_unlock(&lynx->phy_reg_lock);
+
                         if (!host->in_bus_reset) {
                                 PRINT(KERN_INFO, lynx->id,
                                       "phy reg received without reset");
+                        } else if (reg & 0xf00) {
+                                PRINT(KERN_INFO, lynx->id,
+                                      "unsolicited phy reg %d received",
+                                      (reg >> 8) & 0xf);
+                        } else {
+                                lynx->phy_reg0 = reg & 0xff;
+                                handle_selfid(lynx, host);
                         }
                 }
                 if (linkint & LINK_INT_ISO_STUCK) {
@@ -1125,6 +1168,10 @@ static void lynx_irq_handler(int irq, void *dev_id,
                         PRINT(KERN_INFO, lynx->id, "invalid transaction code");
                 }
                 if (linkint & LINK_INT_GRF_OVERFLOW) {
+                        /* flush FIFO if overflow happens during reset */
+                        if (host->in_bus_reset)
+                                reg_write(lynx, FIFO_CONTROL,
+                                          FIFO_CONTROL_GRF_FLUSH);
                         PRINT(KERN_INFO, lynx->id, "GRF overflow");
                 }
                 if (linkint & LINK_INT_ITF_UNDERFLOW) {
@@ -1227,11 +1274,8 @@ static void lynx_irq_handler(int irq, void *dev_id,
                        stat & 0x1fff); 
 
                 if (stat & DMA_CHAN_STAT_SELFID) {
-                        handle_selfid(lynx, host, stat & 0x1fff);
-                        reg_set_bits(lynx, LINK_CONTROL,
-                                     LINK_CONTROL_RCV_CMP_VALID
-                                     | LINK_CONTROL_TX_ASYNC_EN
-                                     | LINK_CONTROL_RX_ASYNC_EN);
+                        lynx->selfid_size = stat & 0x1fff;
+                        handle_selfid(lynx, host);
                 } else {
                         quadlet_t *q_data = lynx->rcv_page;
                         if ((*q_data >> 4 & 0xf) == TCODE_READQ_RESPONSE
@@ -1415,13 +1459,15 @@ static int add_card(struct pci_dev *dev)
 
         lynx->lock = SPIN_LOCK_UNLOCKED;
 
-        reg_write(lynx, PCI_INT_ENABLE, PCI_INT_AUX_INT | PCI_INT_DMA_ALL);
+        reg_write(lynx, PCI_INT_ENABLE, PCI_INT_DMA_ALL);
 
 #ifdef CONFIG_IEEE1394_PCILYNX_PORTS
+        reg_set_bits(lynx, PCI_INT_ENABLE, PCI_INT_AUX_INT);
         init_waitqueue_head(&lynx->mem_dma_intr_wait);
         init_waitqueue_head(&lynx->aux_intr_wait);
 #endif
 
+        INIT_TQ_LINK(lynx->iso_rcv.tq);
         lynx->iso_rcv.tq.routine = (void (*)(void*))iso_rcv_bh;
         lynx->iso_rcv.tq.data = lynx;
         lynx->iso_rcv.lock = SPIN_LOCK_UNLOCKED;

@@ -110,6 +110,7 @@ struct snrm_frame {
 	__u8  ncaddr;
 } PACK;
 
+void irlap_queue_xmit(struct irlap_cb *self, struct sk_buff *skb);
 void irlap_send_discovery_xid_frame(struct irlap_cb *, int S, __u8 s, 
 				    __u8 command, discovery_t *discovery);
 void irlap_send_snrm_frame(struct irlap_cb *, struct qos_info *);

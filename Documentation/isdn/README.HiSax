@@ -442,6 +442,7 @@ Special thanks to:
 	Enrik Berkhan (enrik@starfleet.inka.de) for S0BOX specific stuff
 	Ton van Rosmalen for Teles PCI
 	Petr Novak <petr.novak@i.cz> for Winbond W6692 support
+	Werner Cornelius <werner@isdn4linux.de> for HFC-PCI, HFC-S(+/P) and supplementary services support
         and more people who are hunting bugs. (If I forgot somebody, please
 	send me a mail).
 

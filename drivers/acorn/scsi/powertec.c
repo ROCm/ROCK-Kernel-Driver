@@ -30,6 +30,7 @@
 #include <linux/stat.h>
 #include <linux/delay.h>
 #include <linux/pci.h>
+#include <linux/init.h>
 
 #include <asm/dma.h>
 #include <asm/ecard.h>
@@ -39,7 +40,9 @@
 
 #include "../../scsi/sd.h"
 #include "../../scsi/hosts.h"
-#include "powertec.h"
+#include "fas216.h"
+
+#include <scsi/scsicam.h>
 
 /* Configuration */
 #define POWERTEC_XTALFREQ	40
@@ -85,6 +88,20 @@ static struct expansion_card *ecs[MAX_ECARDS];
  * Use term=0,1,0,0,0 to turn terminators on/off
  */
 int term[MAX_ECARDS] = { 1, 1, 1, 1, 1, 1, 1, 1 };
+
+#define NR_SG	256
+
+typedef struct {
+	FAS216_Info info;
+
+	struct {
+		unsigned int term_port;
+		unsigned int terms;
+	} control;
+
+	/* other info... */
+	struct scatterlist sg[NR_SG];	/* Scatter DMA list	*/
+} PowerTecScsi_Info;
 
 /* Prototype: void powertecscsi_irqenable(ec, irqnr)
  * Purpose  : Enable interrupts on Powertec SCSI card
@@ -445,8 +462,42 @@ int powertecscsi_proc_info(char *buffer, char **start, off_t offset,
 	return pos;
 }
 
-#ifdef MODULE
-Scsi_Host_Template driver_template = POWERTECSCSI;
+static Scsi_Host_Template powertecscsi_template = {
+	module:				THIS_MODULE,
+	proc_info:			powertecscsi_proc_info,
+	name:				"PowerTec SCSI",
+	detect:				powertecscsi_detect,
+	release:			powertecscsi_release,
+	info:				powertecscsi_info,
+	bios_param:			scsicam_bios_param,
+	can_queue:			1,
+	this_id:			7,
+	sg_tablesize:			SG_ALL,
+	cmd_per_lun:			1,
+	use_clustering:			ENABLE_CLUSTERING,
+	command:			fas216_command,
+	queuecommand:			fas216_queue_command,
+	eh_host_reset_handler:		fas216_eh_host_reset,
+	eh_bus_reset_handler:		fas216_eh_bus_reset,
+	eh_device_reset_handler:	fas216_eh_device_reset,
+	eh_abort_handler:		fas216_eh_abort,
+	use_new_eh_code:		1
+};
 
-#include "../../scsi/scsi_module.c"
-#endif
+static int __init powertecscsi_init(void)
+{
+	scsi_register_module(MODULE_SCSI_HA, &powertecscsi_template);
+	if (powertecscsi_template.present)
+		return 0;
+
+	scsi_unregister_module(MODULE_SCSI_HA, &powertecscsi_template);
+	return -ENODEV;
+}
+
+static void __exit powertecscsi_exit(void)
+{
+	scsi_unregister_module(MODULE_SCSI_HA, &powertecscsi_template);
+}
+
+module_init(powertecscsi_init);
+module_exit(powertecscsi_exit);

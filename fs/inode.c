@@ -67,11 +67,7 @@ spinlock_t inode_lock = SPIN_LOCK_UNLOCKED;
 /*
  * Statistics gathering..
  */
-struct {
-	int nr_inodes;
-	int nr_unused;
-	int dummy[5];
-} inodes_stat;
+struct inodes_stat_t inodes_stat;
 
 static kmem_cache_t * inode_cachep;
 

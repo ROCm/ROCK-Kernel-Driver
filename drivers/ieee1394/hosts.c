@@ -106,6 +106,7 @@ struct hpsb_host *hpsb_get_host(struct hpsb_host_template *tmpl,
         sema_init(&h->tlabel_count, 64);
         spin_lock_init(&h->tlabel_lock);
 
+        INIT_TQ_LINK(h->timeout_tq);
         h->timeout_tq.routine = (void (*)(void*))abort_timedouts;
         h->timeout_tq.data = h;
 

@@ -21,6 +21,7 @@
 #include <linux/malloc.h>
 #include <linux/spinlock.h>
 #include <linux/list.h>
+#include <linux/init.h>
 
 #include "../../scsi/scsi.h"
 
@@ -295,12 +296,12 @@ EXPORT_SYMBOL(queue_remove_cmd);
 EXPORT_SYMBOL(queue_probetgtlun);
 
 #ifdef MODULE
-int init_module (void)
+int __init init_module (void)
 {
 	return 0;
 }
 
-void cleanup_module (void)
+void __exit cleanup_module (void)
 {
 }
 #endif

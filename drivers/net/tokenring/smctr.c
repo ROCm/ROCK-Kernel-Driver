@@ -4,11 +4,11 @@
  *  Written by Jay Schulist <jschlst@turbolinux.com>
  *
  *  This software may be used and distributed according to the terms
- *  of the GNU Public License, incorporated herein by reference.
+ *  of the GNU General Public License, incorporated herein by reference.
  *
  *  This device driver works with the following SMC adapters:
- *      - SMC TokenCard Elite   (8115T)
- *      - SMC TokenCard Elite/A MCA (8115T/A)
+ *      - SMC TokenCard Elite   (8115T, chips 825/584)
+ *      - SMC TokenCard Elite/A MCA (8115T/A, chips 825/594)
  *
  *  Source(s):
  *  	- SMC TokenCard SDK.
@@ -16,12 +16,15 @@
  *  Maintainer(s):
  *    JS        Jay Schulist <jschlst@turbolinux.com>
  *
+ * Changes:
+ *    07102000          JS      Fixed a timing problem in smctr_wait_cmd();
+ *                              Also added a bit more discriptive error msgs.
+ *    07122000          JS      Fixed problem with detecting a card with
+ *				module io/irq/mem specified.
+ *
  *  To do:
  *    1. Multicast support.
  */
-
-static const char *version = "smctr.c: v1.1 1/1/00 by jschlst@turbolinux.com\n";
-static const char *cardname = "smctr";
 
 #ifdef MODULE
 #include <linux/module.h>
@@ -59,6 +62,10 @@ static const char *cardname = "smctr";
 #include "smctr.h"               /* Our Stuff */
 #include "smctr_firmware.h"      /* SMC adapter firmware */
 
+static char version[] __initdata = KERN_INFO "smctr.c: v1.4 7/12/00 by jschlst@turbolinux.com\n";
+static const char *cardname = "smctr";
+
+
 #define SMCTR_IO_EXTENT   20
 
 /* A zero-terminated list of I/O addresses to be probed. */
@@ -72,7 +79,7 @@ static unsigned int smctr_portlist[] __initdata = {
 static unsigned int smctr_posid = 0x6ec6;
 #endif
 
-static int ringspeed = 0;
+static int ringspeed;
 
 /* SMC Name of the Adapter. */
 static char *smctr_name = "SMC TokenCard";
@@ -107,7 +114,6 @@ static int smctr_close(struct net_device *dev);
 static int smctr_decode_firmware(struct net_device *dev);
 static int smctr_disable_16bit(struct net_device *dev);
 static int smctr_disable_adapter_ctrl_store(struct net_device *dev);
-static int smctr_disable_adapter_ram(struct net_device *dev);
 static int smctr_disable_bic_int(struct net_device *dev);
 
 /* E */
@@ -219,9 +225,7 @@ static int smctr_process_rx_packet(MAC_HEADER *rmf, __u16 size,
         struct net_device *dev, __u16 rx_status);
 
 /* R */
-static int smctr_ram_conflict_test(struct net_device *dev);
 static int smctr_ram_memory_test(struct net_device *dev);
-static unsigned int __init smctr_read_584_chksum(int ioaddr);
 static int smctr_rcv_chg_param(struct net_device *dev, MAC_HEADER *rmf,
         __u16 *correlator);
 static int smctr_rcv_init(struct net_device *dev, MAC_HEADER *rmf,
@@ -234,7 +238,6 @@ static int smctr_rcv_unknown(struct net_device *dev, MAC_HEADER *rmf,
 static int smctr_reset_adapter(struct net_device *dev);
 static int smctr_restart_tx_chain(struct net_device *dev, short queue);
 static int smctr_ring_status_chg(struct net_device *dev);
-static int smctr_rom_conflict_test(struct net_device *dev);
 static int smctr_rx_frame(struct net_device *dev);
 
 /* S */
@@ -626,7 +629,10 @@ static int smctr_chk_mca(struct net_device *dev)
                         break;
 
                 case WD8115T:
-                        smctr_model = "8115T";
+			if(tp->extra_info & CHIP_REV_MASK)
+                                smctr_model = "8115T rev XE";
+                        else
+                                smctr_model = "8115T rev XD";
                         break;
 
                 default:
@@ -827,16 +833,6 @@ static int smctr_decode_firmware(struct net_device *dev)
 
 static int smctr_disable_16bit(struct net_device *dev)
 {
-        struct net_local *tp = (struct net_local *)dev->priv;
-        __u8 r;
-
-        if(tp->adapter_bus == BUS_ISA16_TYPE
-                && ((tp->adapter_flags & FORCED_16BIT_MODE) == 0))
-        {
-                r = inb(dev->base_addr + LAAR);
-                outb((r & ~LAAR_MEM16ENB), dev->base_addr + LAAR);
-        }
-
         return (0);
 }
 
@@ -856,22 +852,6 @@ static int smctr_disable_adapter_ctrl_store(struct net_device *dev)
 
         tp->trc_mask |= CSR_WCSS;
         outb(tp->trc_mask, ioaddr + CSR);
-
-        return (0);
-}
-
-static int smctr_disable_adapter_ram(struct net_device *dev)
-{
-        int ioaddr = dev->base_addr;
-        __u8 r;
-
-        /* First disable memory enable bit. */
-        r = inb(ioaddr + MSR);
-        outb(~MSR_MEMB & r, ioaddr + MSR);
-
-        /* Now disable 16 bit memory enable bit. */
-        r = inb(ioaddr + LAAR);
-        outb(~LAAR_MEM16ENB & r, ioaddr + LAAR);
 
         return (0);
 }
@@ -993,6 +973,11 @@ static int __init smctr_chk_isa(struct net_device *dev)
         request_region(ioaddr, SMCTR_IO_EXTENT, smctr_name);
 
         b = inb(ioaddr + BDID);
+	if(b != BRD_ID_8115T)
+        {
+                printk("%s: The adapter found is not supported\n", dev->name);
+                return (-1);
+        }
 
         /* Check for 8115T Board ID */
         r2 = 0;
@@ -1015,7 +1000,10 @@ static int __init smctr_chk_isa(struct net_device *dev)
                         break;
 
                 case WD8115T:
-                        smctr_model = "8115T";
+			if(tp->extra_info & CHIP_REV_MASK)
+                                smctr_model = "8115T rev XE";
+                        else
+                                smctr_model = "8115T rev XD";
                         break;
 
                 default:
@@ -1164,12 +1152,13 @@ static int __init smctr_chk_isa(struct net_device *dev)
                 if(!(r1 & 0x2) )           /* GP2_ETRD */
                         tp->mode_bits |= EARLY_TOKEN_REL;
 
-                /* see if the chip is corrupted */
+                /* see if the chip is corrupted
                 if(smctr_read_584_chksum(ioaddr))
                 {
                         printk("%s: EEPROM Checksum Failure\n", dev->name);
                         return(-1);
                 }
+		*/
         }
 
         return (0);
@@ -1607,53 +1596,48 @@ static int smctr_init_adapter(struct net_device *dev)
         smctr_disable_bic_int(dev);
         smctr_set_trc_reset(dev->base_addr);
 
-        /* By default the adapter will operate in 16-bit mode only. If
-         * there are two or more adapters in a box, switching between
-         * 16-bit and 8-bit mode may cause problems. In short the adapters
-         * will interfere with each other. XXX - smc.
-         */
-        smctr_disable_adapter_ram(dev);
-        if((err = smctr_rom_conflict_test(dev)))
-                return (err);
-
-        if((err = smctr_ram_conflict_test(dev)))
-                return (err);
-
-        smctr_enable_adapter_ram(dev);
         smctr_enable_16bit(dev);
         smctr_set_page(dev, (__u8 *)tp->ram_access);
 
         if(smctr_checksum_firmware(dev))
-                return (UCODE_NOT_PRESENT);
+	{
+                printk("%s: Previously loaded firmware is missing\n",dev->name);                return (-ENOENT);
+        }
 
         if((err = smctr_ram_memory_test(dev)))
-                return (err);
+	{
+                printk("%s: RAM memory test failed.\n", dev->name);
+                return (-EIO);
+        }
 
-        smctr_enable_16bit(dev);
-        if(smctr_checksum_firmware(dev))
-                return (-1);
-
-        if((err = smctr_ram_memory_test(dev)))
-                return (-1);
-
-        smctr_set_rx_look_ahead(dev);
+	smctr_set_rx_look_ahead(dev);
         smctr_load_node_addr(dev);
 
         /* Initialize adapter for Internal Self Test. */
         smctr_reset_adapter(dev);
-
         if((err = smctr_init_card_real(dev)))
-                return (err);
+	{
+                printk("%s: Initialization of card failed (%d)\n",
+                        dev->name, err);
+                return (-EINVAL);
+        }
 
         /* This routine clobbers the TRC's internal registers. */
         if((err = smctr_internal_self_test(dev)))
-                return (err);
+	{
+                printk("%s: Card failed internal self test (%d)\n",
+                        dev->name, err);
+                return (-EINVAL);
+        }
 
         /* Re-Initialize adapter's internal registers */
         smctr_reset_adapter(dev);
-
         if((err = smctr_init_card_real(dev)))
-                return (err);
+	{
+                printk("%s: Initialization of card failed (%d)\n",
+                        dev->name, err);
+                return (-EINVAL);
+        }
 
         smctr_enable_bic_int(dev);
 
@@ -1742,7 +1726,10 @@ static int smctr_init_card_real(struct net_device *dev)
                 return (err);
 
         if((err = smctr_issue_init_txrx_cmd(dev)))
+	{
+                printk("%s: Hardware failure\n", dev->name);
                 return (err);
+        }
 
         return (0);
 }
@@ -2737,7 +2724,10 @@ static int smctr_issue_init_txrx_cmd(struct net_device *dev)
                 return (err);
 
         if((err = smctr_wait_cmd(dev)))
+	{
+                printk("%s: Hardware failure\n", dev->name);
                 return (err);
+        }
 
         /* Initialize Transmit Queue Pointers that are used, to point to
          * a single FCB.
@@ -3551,17 +3541,10 @@ static int smctr_make_wrap_data(struct net_device *dev, MAC_SUB_VECTOR *tsv)
  */
 static int smctr_open(struct net_device *dev)
 {
-        struct net_local *tp = (struct net_local *)dev->priv;
         int err;
 
         if(smctr_debug > 10)
                 printk("%s: smctr_open\n", dev->name);
-
-        tp->status = NOT_INITIALIZED;
-
-        err = smctr_load_firmware(dev);
-        if(err < 0)
-                return (err);
 
         err = smctr_init_adapter(dev);
         if(err < 0)
@@ -3596,16 +3579,16 @@ static int smctr_open_tr(struct net_device *dev)
         smctr_set_page(dev, (__u8 *)tp->ram_access);
 
         if((err = smctr_issue_resume_rx_fcb_cmd(dev, (short)MAC_QUEUE)))
-                return (err);
+                goto out;
 
         if((err = smctr_issue_resume_rx_bdb_cmd(dev, (short)MAC_QUEUE)))
-                return (err);
+                goto out;
 
         if((err = smctr_issue_resume_rx_fcb_cmd(dev, (short)NON_MAC_QUEUE)))
-                return (err);
+                goto out;
 
         if((err = smctr_issue_resume_rx_bdb_cmd(dev, (short)NON_MAC_QUEUE)))
-                return (err);
+                goto out;
 
         tp->status = CLOSED;
 
@@ -3652,10 +3635,16 @@ static int smctr_open_tr(struct net_device *dev)
                         {
                                 if(!(err = smctr_lobe_media_test(dev)))
                                         err = smctr_issue_insert_cmd(dev);
+				else
+                                {
+                                        if(err == LOBE_MEDIA_TEST_FAILED)
+                                                printk("%s: Lobe Media Test Failure - Check cable?\n", dev->name);
+                                }
                         }
                 }
         }
 
+out:
         restore_flags(flags);
 
         return (err);
@@ -3689,13 +3678,13 @@ int __init smctr_probe (struct net_device *dev)
 
 static int __init smctr_probe1(struct net_device *dev, int ioaddr)
 {
-        static unsigned version_printed = 0;
+        static unsigned version_printed;
         struct net_local *tp;
         int err;
         __u32 *ram;
 
         if(smctr_debug && version_printed++ == 0)
-                printk("%s", version);
+                printk(version);
 
 #ifndef MODULE
         dev = init_trdev(dev, 0);
@@ -3706,8 +3695,10 @@ static int __init smctr_probe1(struct net_device *dev, int ioaddr)
         /* Setup this devices private information structure */
         tp = (struct net_local *)kmalloc(sizeof(struct net_local),
                 GFP_KERNEL);
-        if(tp == NULL)
-                return (-ENOMEM);
+        if(tp == NULL) {
+		err = -ENOMEM;
+		goto out;
+	}
         memset(tp, 0, sizeof(struct net_local));
         dev->priv = tp;
         dev->base_addr = ioaddr;
@@ -3716,11 +3707,9 @@ static int __init smctr_probe1(struct net_device *dev, int ioaddr)
         err = smctr_chk_isa(dev);
         if(err < 0)
         {
-		err = smctr_chk_mca(dev);
-		if(err < 0)
-		{
-                	kfree(tp);
-                	return (-ENODEV);
+		if ((err = smctr_chk_mca(dev)) < 0) {
+			err = -ENODEV;
+			goto out_tp;
 		}
         }
 
@@ -3729,6 +3718,15 @@ static int __init smctr_probe1(struct net_device *dev, int ioaddr)
         dev->rmem_end = dev->mem_end = dev->mem_start + 0x10000;
         ram = (__u32 *)phys_to_virt(dev->mem_start);
         tp->ram_access = *(__u32 *)&ram;
+	tp->status = NOT_INITIALIZED;
+
+        err = smctr_load_firmware(dev);
+        if(err != UCODE_PRESENT && err != SUCCESS)
+        {
+                printk("%s: Firmware load failed (%d)\n", dev->name, err);
+		err = -EIO;
+		goto out_tp;
+        }
 
 	/* Allow user to specify ring speed on module insert. */
 	if(ringspeed == 4)
@@ -3741,6 +3739,7 @@ static int __init smctr_probe1(struct net_device *dev, int ioaddr)
                 (unsigned int)dev->base_addr,
                 dev->irq, tp->rom_base, tp->ram_base);
 
+	/* AKPM: there's no point in this */
         dev->init               = smctr_init_card;
         dev->open               = smctr_open;
         dev->stop               = smctr_close;
@@ -3749,8 +3748,12 @@ static int __init smctr_probe1(struct net_device *dev, int ioaddr)
         dev->watchdog_timeo	= HZ;
         dev->get_stats          = smctr_get_stats;
         dev->set_multicast_list = &smctr_set_multicast_list;
-
         return (0);
+
+out_tp:
+	kfree(tp);
+out:
+	return err;
 }
 
 static int smctr_process_rx_packet(MAC_HEADER *rmf, __u16 size,
@@ -3952,7 +3955,8 @@ static int smctr_process_rx_packet(MAC_HEADER *rmf, __u16 size,
         {
                 rmf->vl = SWAP_BYTES(rmf->vl);
 
-                skb = dev_alloc_skb(size);
+                if (!(skb = dev_alloc_skb(size)))
+			return -ENOMEM;
                 skb->len = size;
 
                 /* Slide data into a sleek skb. */
@@ -3967,31 +3971,11 @@ static int smctr_process_rx_packet(MAC_HEADER *rmf, __u16 size,
                 skb->dev = dev;
                 skb->protocol = tr_type_trans(skb, dev);
                 netif_rx(skb);
+		dev->last_rx = jiffies;
                 err = 0;
         }
 
         return (err);
-}
-
-/* Test for RAM in adapter RAM space. */
-static int smctr_ram_conflict_test(struct net_device *dev)
-{
-        struct net_local *tp = (struct net_local *)dev->priv;
-        unsigned int i;
-        __u16 sword;
-
-        for(i = 0; i < (unsigned int)(tp->ram_usable * 1024); i += 1024)
-        {
-                sword = *(__u16 *)(tp->ram_access + i);
-                *(__u16 *)(tp->ram_access + i) = 0x1234;
-                if(*(__u16 *)(tp->ram_access + i) == 0x1234)
-                {
-                        *(__u16 *)(tp->ram_access + i) = sword;
-                        return (-1);
-                }
-        }
-
-        return (0);
 }
 
 /* Adapter RAM test. Incremental word ODD boundry data test. */
@@ -4034,7 +4018,7 @@ static int smctr_ram_memory_test(struct net_device *dev)
                                 err_offset      = j;
                                 err_word        = word_read;
                                 err_pattern     = word_pattern;
-                                return (-1);
+                                return (RAM_TEST_FAILED);
                         }
                 }
         }
@@ -4059,7 +4043,7 @@ static int smctr_ram_memory_test(struct net_device *dev)
                                 err_offset      = j;
                                 err_word        = word_read;
                                 err_pattern     = word_pattern;
-                                return (-1);
+                                return (RAM_TEST_FAILED);
                         }
                 }
         }
@@ -4067,57 +4051,6 @@ static int smctr_ram_memory_test(struct net_device *dev)
         smctr_set_page(dev, (__u8 *)tp->ram_access);
 
         return (0);
-}
-
-static unsigned int __init smctr_read_584_chksum(int ioaddr)
-{
-        __u8 pg_no, r1, r2;
-        __u16 byte_no, csum_val = 0;
-
-        for(pg_no = 0; pg_no < 16; pg_no++)
-        {
-                r1 = inb(ioaddr + 0x01);
-                r1 &= 0x04;
-                r1 |= 0x02;
-
-                outb(r1, ioaddr + 0x01);
-
-                r1 = inb(ioaddr + 0x03);
-                r1 &= 0x0f;
-                r1 |= (pg_no << 4);
-
-                outb(r1, ioaddr + 0x03);
-
-                r1 = inb(ioaddr + 0x01);
-                r1 &= 0x04;
-                r1 |= 0x12;
-
-                outb(r1, ioaddr + 0x01);
-
-                do {
-                        r1 = inb(ioaddr + 0x01);
-                } while(r1 & 0x10);
-
-                r2 = 0;
-                for(byte_no = 0x08; byte_no < 0x10; byte_no++)
-                {
-                        r1 = inb(ioaddr + byte_no);
-                        r2 += r1;
-                }
-
-                csum_val += r2;
-        }
-
-        r1 = inb(ioaddr + 0x01);
-        r1 &= 0x04;
-        r1 |= 0x10;
-        outb(r1, ioaddr + 0x01);
-
-        csum_val &= 0xff;
-        if(csum_val == 0xff)
-                return (0);
-        else
-                return (-1);
 }
 
 static int smctr_rcv_chg_param(struct net_device *dev, MAC_HEADER *rmf,
@@ -4445,10 +4378,10 @@ static int smctr_reset_adapter(struct net_device *dev)
         int ioaddr = dev->base_addr;
 
         /* Reseting the NIC will put it in a halted and un-initialized state. */        smctr_set_trc_reset(ioaddr);
-        udelay(200000); /* ~2 ms */
+        mdelay(200); /* ~2 ms */
 
         smctr_clear_trc_reset(ioaddr);
-        udelay(200000); /* ~2 ms */
+        mdelay(200); /* ~2 ms */
 
         /* Remove any latched interrupts that occured prior to reseting the
          * adapter or possibily caused by line glitches due to the reset.
@@ -4578,21 +4511,6 @@ static int smctr_ring_status_chg(struct net_device *dev)
         return (0);
 }
 
-/* Test for ROM signature within adapter RAM space. */
-static int smctr_rom_conflict_test(struct net_device *dev)
-{
-        struct net_local *tp = (struct net_local *)dev->priv;
-        unsigned int i;
-
-        for(i = 0; i < (unsigned int)tp->ram_usable * 1024; i += 4096)
-        {
-                if(*(__u16 *)(tp->ram_access + i) == 0xaa55)
-                        return (-1);
-        }
-
-        return (0);
-}
-
 static int smctr_rx_frame(struct net_device *dev)
 {
         struct net_local *tp = (struct net_local *)dev->priv;
@@ -4641,6 +4559,7 @@ static int smctr_rx_frame(struct net_device *dev)
                                 skb->dev = dev;
                                 skb->protocol = tr_type_trans(skb, dev);
                                 netif_rx(skb);
+				dev->last_rx = jiffies;
                         }
                         else
                                 smctr_process_rx_packet((MAC_HEADER *)pbuff,
@@ -4700,7 +4619,7 @@ static int smctr_send_dat(struct net_device *dev)
         {
                 if(fcb->frame_status & FCB_COMMAND_DONE)
                         break;
-                udelay(1000);
+                mdelay(1);
         }
 
         /* Check if GOOD frame Tx'ed. */
@@ -4814,7 +4733,7 @@ static int smctr_send_lobe_media_test(struct net_device *dev)
         {
                 if(fcb->frame_status & FCB_COMMAND_DONE)
                         break;
-                udelay(1000);
+                mdelay(1);
         }
 
         /* Check if GOOD frame Tx'ed */
@@ -5118,7 +5037,7 @@ static int smctr_send_rq_init(struct net_device *dev)
 		{
           		if(fcb->frame_status & FCB_COMMAND_DONE)
               			break;
-          		udelay(1000);
+          		mdelay(1);
       		}
 
                 /* Check if GOOD frame Tx'ed */
@@ -5181,7 +5100,7 @@ static int smctr_send_tx_forward(struct net_device *dev, MAC_HEADER *rmf,
 	{
        		if(fcb->frame_status & FCB_COMMAND_DONE)
            		break;
-        	udelay(1000);
+        	mdelay(1);
    	}
 
         /* Check if GOOD frame Tx'ed */
@@ -5194,7 +5113,7 @@ static int smctr_send_tx_forward(struct net_device *dev, MAC_HEADER *rmf,
 		{
           		if(fcb->frame_status & FCB_COMMAND_DONE)
               			break;
-        		udelay(1000);
+        		mdelay(1);
       		}
 
                 if(!(fcb->frame_status & FCB_COMMAND_DONE))
@@ -5451,7 +5370,7 @@ static int smctr_setup_single_cmd_w_data(struct net_device *dev,
 {
         struct net_local *tp = (struct net_local *)dev->priv;
 
-        tp->acb_head->cmd_done_status   = 0;
+        tp->acb_head->cmd_done_status   = ACB_COMMAND_NOT_DONE;
         tp->acb_head->cmd               = command;
         tp->acb_head->subcmd            = subcommand;
         tp->acb_head->data_offset_lo
@@ -5752,14 +5671,15 @@ static int smctr_wait_cmd(struct net_device *dev)
         {
                 if(tp->acb_head->cmd_done_status & ACB_COMMAND_DONE)
                         break;
+		udelay(1);
                 loop_count--;
         }
 
         if(loop_count == 0)
-                return(-1);
+                return(HARDWARE_FAILED);
 
         if(tp->acb_head->cmd_done_status & 0xff)
-                return(-1);
+                return(HARDWARE_FAILED);
 
         return (0);
 }
@@ -5795,7 +5715,7 @@ static int smctr_wait_while_cbusy(struct net_device *dev)
         if(timeout)
                 return (0);
         else
-                return (-1);
+                return (HARDWARE_FAILED);
 }
 
 #ifdef MODULE

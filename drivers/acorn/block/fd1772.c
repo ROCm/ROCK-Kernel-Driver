@@ -276,8 +276,8 @@ static int MotorOn = 0, MotorOffTrys;
 static volatile int fdc_busy = 0;
 static DECLARE_WAIT_QUEUE_HEAD(fdc_wait);
 
-
-static unsigned int changed_floppies = 0xff, fake_change = 0;
+/* long req'd for set_bit --RR */
+static unsigned long changed_floppies = 0xff, fake_change = 0;
 #define	CHECK_CHANGE_DELAY	HZ/2
 
 /* DAG - increased to 30*HZ - not sure if this is the correct thing to do */

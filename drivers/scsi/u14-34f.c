@@ -1,7 +1,10 @@
 /*
  *      u14-34f.c - Low-level driver for UltraStor 14F/34F SCSI host adapters.
  *
- *      01 Nov 2000 Rev. 6.02 for linux 2.4.0-test11
+ *      25 Jan 2001 Rev. 6.03 for linux 2.4.0
+ *        + "check_region" call replaced by "request_region".
+ *
+ *      22 Nov 2000 Rev. 6.02 for linux 2.4.0-test11
  *        + Removed old scsi error handling support.
  *        + The obsolete boot option flag eh:n is silently ignored.
  *        + Removed error messages while a disk drive is powered up at
@@ -177,7 +180,7 @@
  *
  *          Multiple U14F and/or U34F host adapters are supported.
  *
- *  Copyright (C) 1994-2000 Dario Ballabio (ballabio_dario@emc.com)
+ *  Copyright (C) 1994-2001 Dario Ballabio (ballabio_dario@emc.com)
  *
  *  Alternate email: dario.ballabio@inwind.it, dario.ballabio@tiscalinet.it
  *
@@ -729,18 +732,24 @@ static inline int port_detect \
 
    sprintf(name, "%s%d", driver_name, j);
 
-   if(check_region(port_base, REGION_SIZE)) {
+   if(!request_region(port_base, REGION_SIZE, driver_name)) {
 #if defined(DEBUG_DETECT)
       printk("%s: address 0x%03lx in use, skipping probe.\n", name, port_base);
 #endif
       return FALSE;
       }
 
-   if (inb(port_base + REG_PRODUCT_ID1) != PRODUCT_ID1) return FALSE;
+   if (inb(port_base + REG_PRODUCT_ID1) != PRODUCT_ID1) {
+      release_region(port_base, REGION_SIZE);
+      return FALSE;
+      }
 
    in_byte = inb(port_base + REG_PRODUCT_ID2);
 
-   if ((in_byte & 0xf0) != PRODUCT_ID2) return FALSE;
+   if ((in_byte & 0xf0) != PRODUCT_ID2) {
+      release_region(port_base, REGION_SIZE);
+      return FALSE;
+      }
 
    *(char *)&config_1 = inb(port_base + REG_CONFIG1);
    *(char *)&config_2 = inb(port_base + REG_CONFIG2);
@@ -754,6 +763,7 @@ static inline int port_detect \
              SA_INTERRUPT | ((subversion == ESA) ? SA_SHIRQ : 0),
              driver_name, (void *) &sha[j])) {
       printk("%s: unable to allocate IRQ %u, detaching.\n", name, irq);
+      release_region(port_base, REGION_SIZE);
       return FALSE;
       }
 
@@ -761,6 +771,7 @@ static inline int port_detect \
       printk("%s: unable to allocate DMA channel %u, detaching.\n",
              name, dma_channel);
       free_irq(irq, &sha[j]);
+      release_region(port_base, REGION_SIZE);
       return FALSE;
       }
 
@@ -775,6 +786,7 @@ static inline int port_detect \
 
       if (subversion == ISA) free_dma(dma_channel);
 
+      release_region(port_base, REGION_SIZE);
       return FALSE;
       }
 
@@ -804,9 +816,6 @@ static inline int port_detect \
 
    /* If BIOS is disabled, force enable interrupts */
    if (sh[j]->base == 0) outb(CMD_ENA_INTR, sh[j]->io_port + REG_SYS_MASK);
-
-   /* Register the I/O space that we use */
-   request_region(sh[j]->io_port, sh[j]->n_io_port, driver_name);
 
    memset(HD(j), 0, sizeof(struct hostdata));
    HD(j)->heads = mapping_table[config_2.mapping_mode].heads;
@@ -873,7 +882,7 @@ static inline int port_detect \
    if (max_queue_depth < MAX_CMD_PER_LUN) max_queue_depth = MAX_CMD_PER_LUN;
 
    if (j == 0) {
-      printk("UltraStor 14F/34F: Copyright (C) 1994-2000 Dario Ballabio.\n");
+      printk("UltraStor 14F/34F: Copyright (C) 1994-2001 Dario Ballabio.\n");
       printk("%s config options -> of:%c, lc:%c, mq:%d, et:%c.\n",
              driver_name, YESNO(have_old_firmware), YESNO(linked_comm),
              max_queue_depth, YESNO(ext_tran));

@@ -1,6 +1,6 @@
 /* 
         aten.c  (c) 1997-8  Grant R. Guenther <grant@torque.net>
-                            Under the terms of the GNU public license.
+                            Under the terms of the GNU General Public License.
 
 	aten.c is a low-level protocol driver for the ATEN EH-100
 	parallel port adapter.  The EH-100 supports 4-bit and 8-bit

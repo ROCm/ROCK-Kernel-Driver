@@ -1,5 +1,14 @@
 /*
  * Copyright 2000 by Hans Reiser, licensing governed by reiserfs/README
+ *
+ * Trivial changes by Alan Cox to remove EHASHCOLLISION for compatibility
+ *
+ * Trivial Changes:
+ * Rights granted to Hans Reiser to redistribute under other terms providing
+ * he accepts all liability including but not limited to patent, fitness
+ * for purpose, and direct or indirect claims arising from failure to perform.
+ *
+ * NO WARRANTY
  */
 
 #ifdef __KERNEL__
@@ -472,7 +481,7 @@ static int reiserfs_add_entry (struct reiserfs_transaction_handle *th, struct in
 	    if (buffer != small_buf)
 		reiserfs_kfree (buffer, buflen, dir->i_sb);
 	    pathrelse (&path);
-	    return -EHASHCOLLISION;//EBADSLT
+	    return -EBUSY; //HASHCOLLISION;//EBADSLT
 	}
 	/* adjust offset of directory enrty */
 	deh->deh_offset = cpu_to_le32 (SET_GENERATION_NUMBER (deh_offset (deh), gen_number));
@@ -485,7 +494,7 @@ static int reiserfs_add_entry (struct reiserfs_transaction_handle *th, struct in
 	    if (buffer != small_buf)
 		reiserfs_kfree (buffer, buflen, dir->i_sb);
 	    pathrelse (&path);
-	    return -EHASHCOLLISION;
+	    return -EBUSY;
 	}
     } else {
 	deh->deh_offset = cpu_to_le32 (SET_GENERATION_NUMBER (le32_to_cpu (deh->deh_offset), 0));

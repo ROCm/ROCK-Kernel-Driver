@@ -1314,16 +1314,30 @@ static struct pci_dev *ad1816_init_generic(struct pci_bus *bus, struct pci_dev *
 	return(ad1816_dev);
 }
 
-static struct {
-	unsigned short vendor;
-	unsigned short function;
+static struct ad1816_data {
 	struct pci_dev * (*initfunc)(struct pci_bus*, struct pci_dev *, struct address_info *);
 	char *name;
+} ad1816_pnp_data[] __initdata = {
+	{ &ad1816_init_generic, "Analog Devices 1815" },
+	{ &ad1816_init_generic, "Analog Devices 1816A" }
+};
+
+static struct {
+	unsigned short card_vendor, card_device;
+	unsigned short vendor;
+	unsigned short function;
+	struct ad1816_data *data;
 } isapnp_ad1816_list[] __initdata = {
-	{ISAPNP_VENDOR('A','D','S'), ISAPNP_FUNCTION(0x7150), &ad1816_init_generic, "Analog Devices 1815" },
-	{ISAPNP_VENDOR('A','D','S'), ISAPNP_FUNCTION(0x7180), &ad1816_init_generic, "Analog Devices 1816A" },
+	{	ISAPNP_ANY_ID, ISAPNP_ANY_ID,
+		ISAPNP_VENDOR('A','D','S'), ISAPNP_FUNCTION(0x7150), 
+		&ad1816_pnp_data[0] },
+	{	ISAPNP_ANY_ID, ISAPNP_ANY_ID,
+		ISAPNP_VENDOR('A','D','S'), ISAPNP_FUNCTION(0x7180),
+		&ad1816_pnp_data[1] },
 	{0}
 };
+
+MODULE_DEVICE_TABLE(isapnp, isapnp_ad1816_list);
 
 static int __init ad1816_init_isapnp(struct address_info *hw_config,
 	struct pci_bus *bus, struct pci_dev *card, int slot)
@@ -1331,13 +1345,13 @@ static int __init ad1816_init_isapnp(struct address_info *hw_config,
 	struct pci_dev *idev = NULL;
 	
 	/* You missed the init func? That's bad. */
-	if(isapnp_ad1816_list[slot].initfunc) {
-		char *busname = bus->name[0] ? bus->name : isapnp_ad1816_list[slot].name;
+	if(isapnp_ad1816_list[slot].data->initfunc) {
+		char *busname = bus->name[0] ? bus->name : isapnp_ad1816_list[slot].data->name;
 		
 		printk(KERN_INFO "ad1816: %s detected\n", busname);
 		
 		/* Initialize this baby. */
-		if((idev = isapnp_ad1816_list[slot].initfunc(bus, card, hw_config))) {
+		if((idev = isapnp_ad1816_list[slot].data->initfunc(bus, card, hw_config))) {
 			/* We got it. */
 
 			printk(KERN_NOTICE "ad1816: ISAPnP reports '%s' at i/o %#x, irq %d, dma %d, %d\n",

@@ -878,7 +878,6 @@ static int yam_open(struct net_device *dev)
 
 	printk(KERN_INFO "%s at iobase 0x%lx irq %u uart %s\n", dev->name, dev->base_addr, dev->irq,
 		   uart_str[u]);
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -905,7 +904,6 @@ static int yam_close(struct net_device *dev)
 
 	printk(KERN_INFO "%s: close yam at iobase 0x%lx irq %u\n",
 		   yam_drvname, dev->base_addr, dev->irq);
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -938,14 +936,17 @@ static int yam_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	case SIOCYAMSMCS:
 		if (netif_running(dev))
 			return -EINVAL;		/* Cannot change this parameter when up */
-		ym = kmalloc(sizeof(struct yamdrv_ioctl_mcs), GFP_KERNEL);
-		if(ym==NULL)
+		if ((ym = kmalloc(sizeof(struct yamdrv_ioctl_mcs), GFP_KERNEL)) == NULL)
 			return -ENOBUFS;
 		ym->bitrate = 9600;
-		if (copy_from_user(ym, ifr->ifr_data, sizeof(struct yamdrv_ioctl_mcs)))
-			 return -EFAULT;
-		if (ym->bitrate > YAM_MAXBITRATE)
+		if (copy_from_user(ym, ifr->ifr_data, sizeof(struct yamdrv_ioctl_mcs))) {
+			kfree(ym);
+			return -EFAULT;
+		}
+		if (ym->bitrate > YAM_MAXBITRATE) {
+			kfree(ym);
 			return -EINVAL;
+		}
 		add_mcs(ym->bits, ym->bitrate);
 		kfree(ym);
 		break;
@@ -1129,8 +1130,11 @@ static int __init yam_init_driver(void)
 
 		if (register_netdev(dev)) {
 			printk(KERN_WARNING "yam: cannot register net device %s\n", dev->name);
+			dev->priv = NULL;
 			return -ENXIO;
 		}
+
+		SET_MODULE_OWNER(dev);
 	}
 
 	yam_timer.function = yam_dotimer;

@@ -166,6 +166,6 @@ y {x(interrupt), x(data_ready), x(fifo_overflow), x(data_error),
 #undef y
 #undef x
 
-#endif STATISTICS
+#endif /* STATISTICS */
 
-#endif LINUX_CM206_H
+#endif /* LINUX_CM206_H */

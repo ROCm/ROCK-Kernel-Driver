@@ -12,6 +12,7 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/stddef.h>
+#include <linux/init.h>
 
 #include "msgqueue.h"
 
@@ -128,7 +129,7 @@ int msgqueue_addmsg(MsgQueue_t *msgq, int length, ...)
 
 		va_start(ap, length);
 		for (i = 0; i < length; i++)
-			mq->msg.msg[i] = va_arg(ap, unsigned char);
+			mq->msg.msg[i] = va_arg(ap, unsigned int);
 		va_end(ap);
 
 		mq->msg.length = length;
@@ -169,12 +170,12 @@ EXPORT_SYMBOL(msgqueue_addmsg);
 EXPORT_SYMBOL(msgqueue_flush);
 
 #ifdef MODULE
-int init_module(void)
+int __init init_module(void)
 {
 	return 0;
 }
 
-void cleanup_module(void)
+void __exit cleanup_module(void)
 {
 }
 #endif

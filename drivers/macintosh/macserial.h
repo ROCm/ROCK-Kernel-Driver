@@ -110,6 +110,7 @@ struct mac_serial {
 	char break_abort;   /* Is serial console in, so process brk/abrt */
 	char kgdb_channel;  /* Kgdb is running on this channel */
 	char is_cons;       /* Is this our console. */
+	char is_internal_modem; /* is connected to an internal modem */
 	char is_cobalt_modem;	/* is a gatwick-based cobalt modem */
 	char is_irda;		/* is connected to an IrDA codec */
 	unsigned char tx_active; /* character is being xmitted */

@@ -1,4 +1,4 @@
-/* $Id: isdn_common.c,v 1.114 2000/11/25 17:00:59 kai Exp $
+/* $Id: isdn_common.c,v 1.114.6.6 2001/02/07 11:31:30 kai Exp $
 
  * Linux ISDN subsystem, common used functions (linklevel).
  *
@@ -24,6 +24,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/init.h>
 #include <linux/version.h>
 #include <linux/poll.h>
 #include <linux/vmalloc.h>
@@ -51,7 +52,7 @@
 
 isdn_dev *dev;
 
-static char *isdn_revision = "$Revision: 1.114 $";
+static char *isdn_revision = "$Revision: 1.114.6.6 $";
 
 extern char *isdn_net_revision;
 extern char *isdn_tty_revision;
@@ -2004,16 +2005,6 @@ isdn_writebuf_skb_stub(int drvidx, int chan, int ack, struct sk_buff *skb)
 }
 
 int
-register_isdn_module(isdn_module *m) {
-	return 0;
-}
-
-int
-unregister_isdn_module(isdn_module *m) {
-	return 0;
-}
-
-int
 isdn_add_channels(driver *d, int drvidx, int n, int adding)
 {
 	int j, k, m;
@@ -2173,8 +2164,6 @@ EXPORT_SYMBOL(DIVERT_REG_NAME);
 
 
 EXPORT_SYMBOL(register_isdn);
-EXPORT_SYMBOL(register_isdn_module);
-EXPORT_SYMBOL(unregister_isdn_module);
 #ifdef CONFIG_ISDN_PPP
 EXPORT_SYMBOL(isdn_ppp_register_compressor);
 EXPORT_SYMBOL(isdn_ppp_unregister_compressor);
@@ -2241,12 +2230,6 @@ register_isdn(isdn_if * i)
  * And now the modules code.
  *****************************************************************************
  */
-
-extern int printk(const char *fmt,...);
-
-#ifdef MODULE
-#define isdn_init init_module
-#endif
 
 static char *
 isdn_getrev(const char *revision)
@@ -2356,8 +2339,7 @@ static void isdn_cleanup_devfs(void)
 /*
  * Allocate and initialize all data, register modem-devices
  */
-int
-isdn_init(void)
+static int __init isdn_init(void)
 {
 	int i;
 	char tmprev[50];
@@ -2433,12 +2415,10 @@ isdn_init(void)
 	return 0;
 }
 
-#ifdef MODULE
 /*
  * Unload module
  */
-void
-cleanup_module(void)
+static void __exit isdn_exit(void)
 {
 	int flags;
 	int i;
@@ -2482,4 +2462,6 @@ cleanup_module(void)
 		printk(KERN_NOTICE "ISDN-subsystem unloaded\n");
 	}
 }
-#endif
+
+module_init(isdn_init);
+module_exit(isdn_exit);

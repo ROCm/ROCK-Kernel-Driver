@@ -12,6 +12,7 @@
 #include <linux/smp_lock.h>
 #include <linux/init.h>
 #include <linux/file.h>
+#include <linux/fs.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
@@ -63,6 +64,15 @@ int vm_enough_memory(long pages)
 	free += atomic_read(&page_cache_size);
 	free += nr_free_pages();
 	free += nr_swap_pages;
+	/*
+	 * The code below doesn't account for free space in the inode
+	 * and dentry slab cache, slab cache fragmentation, inodes and
+	 * dentries which will become freeable under VM load, etc.
+	 * Lets just hope all these (complex) factors balance out...
+	 */
+	free += (dentry_stat.nr_unused * sizeof(struct dentry)) >> PAGE_SHIFT;
+	free += (inodes_stat.nr_unused * sizeof(struct inode)) >> PAGE_SHIFT;
+
 	return free > pages;
 }
 

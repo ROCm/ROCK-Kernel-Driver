@@ -130,9 +130,6 @@ static void register_proc_table(ctl_table *, struct proc_dir_entry *);
 static void unregister_proc_table(ctl_table *, struct proc_dir_entry *);
 #endif
 
-extern int inodes_stat[];
-extern int dentry_stat[];
-
 /* The default sysctl tables: */
 
 static ctl_table root_table[] = {

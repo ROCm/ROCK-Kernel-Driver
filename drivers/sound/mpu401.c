@@ -14,6 +14,7 @@
  * Thomas Sailer	ioctl code reworked (vmalloc/vfree removed)
  * Alan Cox		modularisation, use normal request_irq, use dev_id
  * Bartlomiej Zolnierkiewicz	removed some __init to allow using many drivers
+ * Chris Rankin		Update the module-usage counter for the coprocessor
  */
 
 #include <linux/module.h>
@@ -72,6 +73,9 @@ struct mpu_config
 #define	DATAPORT(base)   (base)
 #define	COMDPORT(base)   (base+1)
 #define	STATPORT(base)   (base+1)
+
+
+static void mpu401_close(int dev);
 
 static int mpu401_status(struct mpu_config *devc)
 {
@@ -465,6 +469,7 @@ static int mpu401_open(int dev, int mode,
 {
 	int err;
 	struct mpu_config *devc;
+	struct coproc_operations *coprocessor;
 
 	if (dev < 0 || dev >= num_midis || midi_devs[dev] == NULL)
 		return -ENXIO;
@@ -490,12 +495,15 @@ static int mpu401_open(int dev, int mode,
 		reset_mpu401(devc);
 	}
 
-	if (midi_devs[dev]->coproc)
+	if ( (coprocessor = midi_devs[dev]->coproc) != NULL )
 	{
-		if ((err = midi_devs[dev]->coproc->
-		     open(midi_devs[dev]->coproc->devc, COPR_MIDI)) < 0)
+		if (coprocessor->owner)
+			__MOD_INC_USE_COUNT(coprocessor->owner);
+
+		if ((err = coprocessor->open(coprocessor->devc, COPR_MIDI)) < 0)
 		{
-			printk("MPU-401: Can't access coprocessor device\n");
+			printk(KERN_WARNING "MPU-401: Can't access coprocessor device\n");
+			mpu401_close(dev);
 			return err;
 		}
 	}
@@ -515,6 +523,7 @@ static int mpu401_open(int dev, int mode,
 static void mpu401_close(int dev)
 {
 	struct mpu_config *devc;
+	struct coproc_operations *coprocessor;
 
 	devc = &dev_conf[dev];
 	if (devc->uart_mode)
@@ -524,8 +533,13 @@ static void mpu401_close(int dev)
 	devc->mode = 0;
 	devc->inputintr = NULL;
 
-	if (midi_devs[dev]->coproc)
-		midi_devs[dev]->coproc->close(midi_devs[dev]->coproc->devc, COPR_MIDI);
+	coprocessor = midi_devs[dev]->coproc;
+	if (coprocessor) {
+		coprocessor->close(coprocessor->devc, COPR_MIDI);
+
+		if (coprocessor->owner)
+			__MOD_DEC_USE_COUNT(coprocessor->owner);
+	}
 	devc->opened = 0;
 }
 
@@ -791,6 +805,7 @@ static int mpu_synth_open(int dev, int mode)
 {
 	int midi_dev, err;
 	struct mpu_config *devc;
+	struct coproc_operations *coprocessor;
 
 	midi_dev = synth_devs[dev]->midi_dev;
 
@@ -822,13 +837,17 @@ static int mpu_synth_open(int dev, int mode)
 
 	devc->inputintr = NULL;
 
-	if (midi_devs[midi_dev]->coproc)
-		if ((err = midi_devs[midi_dev]->coproc->
-		 open(midi_devs[midi_dev]->coproc->devc, COPR_MIDI)) < 0)
+	coprocessor = midi_devs[midi_dev]->coproc;
+	if (coprocessor) {
+		if (coprocessor->owner)
+			__MOD_INC_USE_COUNT(coprocessor->owner);
+
+		if ((err = coprocessor->open(coprocessor->devc, COPR_MIDI)) < 0)
 		{
 			printk(KERN_WARNING "mpu401: Can't access coprocessor device\n");
 			return err;
 		}
+	}
 	devc->opened = mode;
 	reset_mpu401(devc);
 
@@ -845,6 +864,7 @@ static void mpu_synth_close(int dev)
 { 
 	int midi_dev;
 	struct mpu_config *devc;
+	struct coproc_operations *coprocessor;
 
 	midi_dev = synth_devs[dev]->midi_dev;
 
@@ -854,8 +874,13 @@ static void mpu_synth_close(int dev)
 
 	devc->inputintr = NULL;
 
-	if (midi_devs[midi_dev]->coproc)
-		midi_devs[midi_dev]->coproc->close(midi_devs[midi_dev]->coproc->devc, COPR_MIDI);
+	coprocessor = midi_devs[midi_dev]->coproc;
+	if (coprocessor) {
+		coprocessor->close(coprocessor->devc, COPR_MIDI);
+
+		if (coprocessor->owner)
+			__MOD_DEC_USE_COUNT(coprocessor->owner);
+	}
 	devc->opened = 0;
 	devc->mode = 0;
 }
@@ -1030,6 +1055,8 @@ void attach_mpu401(struct address_info *hw_config, struct module *owner)
 			(char *) &mpu401_synth_proto,
 			 sizeof(struct synth_operations));
 	}
+	if (owner)
+		mpu401_synth_operations[m]->owner = owner;
 
 	memcpy((char *) &mpu401_midi_operations[m],
 	       (char *) &mpu401_midi_proto,

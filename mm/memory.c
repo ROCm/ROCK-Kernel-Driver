@@ -858,6 +858,8 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 		UnlockPage(old_page);
 		/* FallThrough */
 	case 1:
+		if (PageReserved(old_page))
+			break;
 		flush_cache_page(vma, address);
 		establish_pte(vma, address, page_table, pte_mkyoung(pte_mkdirty(pte_mkwrite(pte))));
 		spin_unlock(&mm->page_table_lock);

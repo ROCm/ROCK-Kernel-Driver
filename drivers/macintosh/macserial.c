@@ -952,6 +952,67 @@ static void dma_init(struct mac_serial * info)
 	info->dma_initted = 1;
 }
 
+/*
+ * FixZeroBug....Works around a bug in the SCC receving channel.
+ * Taken from Darwin code, 15 Sept. 2000  -DanM
+ *
+ * The following sequence prevents a problem that is seen with O'Hare ASICs
+ * (most versions -- also with some Heathrow and Hydra ASICs) where a zero
+ * at the input to the receiver becomes 'stuck' and locks up the receiver.
+ * This problem can occur as a result of a zero bit at the receiver input
+ * coincident with any of the following events:
+ *
+ *	The SCC is initialized (hardware or software).
+ *	A framing error is detected.
+ *	The clocking option changes from synchronous or X1 asynchronous
+ *		clocking to X16, X32, or X64 asynchronous clocking.
+ *	The decoding mode is changed among NRZ, NRZI, FM0, or FM1.
+ *
+ * This workaround attempts to recover from the lockup condition by placing
+ * the SCC in synchronous loopback mode with a fast clock before programming
+ * any of the asynchronous modes.
+ */
+static void fix_zero_bug_scc(struct mac_serial * info)
+{
+	write_zsreg(info->zs_channel, 9,
+		    (info->zs_channel == info->zs_chan_a? CHRA: CHRB));
+	udelay(10);
+	write_zsreg(info->zs_channel, 9,
+		    ((info->zs_channel == info->zs_chan_a? CHRA: CHRB) | NV));
+
+	write_zsreg(info->zs_channel, 4, (X1CLK | EXTSYNC));
+
+	/* I think this is wrong....but, I just copying code....
+	*/
+	write_zsreg(info->zs_channel, 3, (8 & ~RxENABLE));
+
+	write_zsreg(info->zs_channel, 5, (8 & ~TxENAB));
+	write_zsreg(info->zs_channel, 9, NV);	/* Didn't we already do this? */
+	write_zsreg(info->zs_channel, 11, (RCBR | TCBR));
+	write_zsreg(info->zs_channel, 12, 0);
+	write_zsreg(info->zs_channel, 13, 0);
+	write_zsreg(info->zs_channel, 14, (LOOPBAK | SSBR));
+	write_zsreg(info->zs_channel, 14, (LOOPBAK | SSBR | BRENABL));
+	write_zsreg(info->zs_channel, 3, (8 | RxENABLE));
+	write_zsreg(info->zs_channel, 0, RES_EXT_INT);
+	write_zsreg(info->zs_channel, 0, RES_EXT_INT);	/* to kill some time */
+
+	/* The channel should be OK now, but it is probably receiving
+	 * loopback garbage.
+	 * Switch to asynchronous mode, disable the receiver,
+	 * and discard everything in the receive buffer.
+	 */
+	write_zsreg(info->zs_channel, 9, NV);
+	write_zsreg(info->zs_channel, 4, PAR_ENA);
+	write_zsreg(info->zs_channel, 3, (8 & ~RxENABLE));
+
+	while (read_zsreg(info->zs_channel, 0) & Rx_CH_AV) {
+		(void)read_zsreg(info->zs_channel, 8);
+		write_zsreg(info->zs_channel, 0, RES_EXT_INT);
+		write_zsreg(info->zs_channel, 0, ERR_RES);
+	}
+}
+
 static int setup_scc(struct mac_serial * info)
 {
 	unsigned long flags;
@@ -959,6 +1020,9 @@ static int setup_scc(struct mac_serial * info)
 	OPNDBG("setting up ttys%d SCC...\n", info->line);
 
 	save_flags(flags); cli(); /* Disable interrupts */
+
+	/* Nice buggy HW ... */
+	fix_zero_bug_scc(info);
 
 	/*
 	 * Reset the chip.
@@ -1080,7 +1144,7 @@ static void shutdown(struct mac_serial * info)
 
 	info->curregs[5] &= ~TxENAB;
 	if (!info->tty || C_HUPCL(info->tty))
-		info->curregs[5] &= ~(DTR | RTS);
+		info->curregs[5] &= ~DTR;
 	info->pendregs[5] = info->curregs[5];
 	write_zsreg(info->zs_channel, 5, info->curregs[5]);
 
@@ -1252,7 +1316,7 @@ static void irda_setup(struct mac_serial *info)
 
 	/* assert DTR, wait 30ms, talk to the chip */
 	write_zsreg(info->zs_channel, 5, Tx8 | TxENAB | RTS | DTR);
-	udelay(30000);
+	mdelay(30);
 	while (read_zsreg(info->zs_channel, 0) & Rx_CH_AV)
 		read_zsdata(info->zs_channel);
 
@@ -1589,17 +1653,35 @@ static void rs_throttle(struct tty_struct * tty)
 	if (C_CRTSCTS(tty)) {
 		/*
 		 * Here we want to turn off the RTS line.  On Macintoshes,
-		 * we only get the DTR line, which goes to both DTR and
-		 * RTS on the modem.  RTS doesn't go out to the serial
-		 * port socket.  So you should make sure your modem is
-		 * set to ignore DTR if you're using CRTSCTS.
+		 * the external serial ports using a DIN-8 or DIN-9
+		 * connector only have the DTR line (which is usually
+		 * wired to both RTS and DTR on an external modem in
+		 * the cable).  RTS doesn't go out to the serial port
+		 * socket, it acts as an output enable for the transmit
+		 * data line.  So in this case we don't drop RTS.
+		 *
+		 * Macs with internal modems generally do have both RTS
+		 * and DTR wired to the modem, so in that case we do
+		 * drop RTS.
 		 */
+		if (info->is_internal_modem) {
+			save_flags(flags); cli();
+			info->curregs[5] &= ~RTS;
+			info->pendregs[5] &= ~RTS;
+			write_zsreg(info->zs_channel, 5, info->curregs[5]);
+			restore_flags(flags);
+		}
+	}
+	
+#ifdef CDTRCTS
+	if (tty->termios->c_cflag & CDTRCTS) {
 		save_flags(flags); cli();
-		info->curregs[5] &= ~(DTR | RTS);
-		info->pendregs[5] &= ~(DTR | RTS);
+		info->curregs[5] &= ~DTR;
+		info->pendregs[5] &= ~DTR;
 		write_zsreg(info->zs_channel, 5, info->curregs[5]);
 		restore_flags(flags);
 	}
+#endif /* CDTRCTS */
 }
 
 static void rs_unthrottle(struct tty_struct * tty)
@@ -1625,14 +1707,25 @@ static void rs_unthrottle(struct tty_struct * tty)
 		restore_flags(flags);
 	}
 
-	if (C_CRTSCTS(tty)) {
-		/* Assert RTS and DTR lines */
+	if (C_CRTSCTS(tty) && info->is_internal_modem) {
+		/* Assert RTS line */
 		save_flags(flags); cli();
-		info->curregs[5] |= DTR | RTS;
-		info->pendregs[5] |= DTR | RTS;
+		info->curregs[5] |= RTS;
+		info->pendregs[5] |= RTS;
 		write_zsreg(info->zs_channel, 5, info->curregs[5]);
 		restore_flags(flags);
 	}
+
+#ifdef CDTRCTS
+	if (tty->termios->c_cflag & CDTRCTS) {
+		/* Assert DTR line */
+		save_flags(flags); cli();
+		info->curregs[5] |= DTR;
+		info->pendregs[5] |= DTR;
+		write_zsreg(info->zs_channel, 5, info->curregs[5]);
+		restore_flags(flags);
+	}
+#endif
 }
 
 /*
@@ -2196,8 +2289,8 @@ static int rs_open(struct tty_struct *tty, struct file * filp)
 #endif
 	if (serial_paranoia_check(info, tty->device, "rs_open"))
 		return -ENODEV;
-	OPNDBG("rs_open %s%d, count = %d\n", tty->driver.name, info->line,
-	       info->count);
+	OPNDBG("rs_open %s%d, count = %d, tty=%p\n", tty->driver.name,
+	       info->line, info->count, tty);
 
 	info->count++;
 	tty->driver_data = info;
@@ -2314,8 +2407,12 @@ chan_init(struct mac_serial *zss, struct mac_zschannel *zs_chan,
 	zss->is_irda = conn && (strcmp(conn, "infrared") == 0);
 	/* 1999 Powerbook G3 has slot-names property instead */
 	slots = (struct slot_names_prop *)get_property(ch, "slot-names", &len);
-	if (slots && slots->count > 0 && strcmp(slots->name, "IrDA") == 0)
-		zss->is_irda = 1;
+	if (slots && slots->count > 0) {
+		if (strcmp(slots->name, "IrDA") == 0)
+			zss->is_irda = 1;
+		else if (strcmp(slots->name, "Modem") == 0)
+			zss->is_internal_modem = 1;
+	}
 
 	if (zss->has_dma) {
 		zss->dma_priv = NULL;
@@ -2564,6 +2661,8 @@ int macserial_init(void)
 			printk(", port = %s", connector);
 		if (info->is_cobalt_modem)
 			printk(" (cobalt modem)");
+		else if (info->is_internal_modem)
+			printk(" (internal modem)");
 		if (info->is_irda)
 			printk(" (IrDA)");
 		printk("\n");

@@ -134,32 +134,17 @@ void (*leds_event)(led_event_t) = dummy_leds_event;
 #ifdef CONFIG_MODULES
 EXPORT_SYMBOL(leds_event);
 #endif
+#endif
 
+#ifdef CONFIG_LEDS_TIMER
 static void do_leds(void)
 {
-#ifdef CONFIG_LEDS_CPU
-	{
-		static int last_pid;
+	static unsigned int count = 50;
 
-		if (current->pid != last_pid) {
-			last_pid = current->pid;
-			if (last_pid)
-				leds_event(led_idle_end);
-			else
-				leds_event(led_idle_start);
-		}
+	if (--count == 0) {
+		count = 50;
+		leds_event(led_timer);
 	}
-#endif
-#ifdef CONFIG_LEDS_TIMER
-	{
-		static unsigned int count = 50;
-
-		if (--count == 0) {
-			count = 50;
-			leds_event(led_timer);
-		}
-	}
-#endif
 }
 #else
 #define do_leds()

@@ -61,6 +61,7 @@ int irlan_eth_init(struct net_device *dev)
 	dev->hard_start_xmit    = irlan_eth_xmit; 
 	dev->get_stats	        = irlan_eth_get_stats;
 	dev->set_multicast_list = irlan_eth_set_multicast_list;
+	dev->features          |= NETIF_F_DYNALLOC;
 
 	ether_setup(dev);
 	

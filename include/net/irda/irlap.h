@@ -168,7 +168,7 @@ struct irlap_cb {
 	hashbin_t   *discovery_log;
  	discovery_t *discovery_cmd;
 
-	__u32 speed; 
+	__u32 speed;		/* Link speed */
 
 	struct qos_info  qos_tx;   /* QoS requested by peer */
 	struct qos_info  qos_rx;   /* QoS requested by self */
@@ -179,6 +179,7 @@ struct irlap_cb {
 	int    mtt_required;  /* Minumum turnaround time required */
 	int    xbofs_delay;   /* Nr of XBOF's used to MTT */
 	int    bofs_count;    /* Negotiated extra BOFs */
+	int    next_bofs;     /* Negotiated extra BOFs after next frame */
 
 #ifdef CONFIG_IRDA_COMPRESSION
 	struct irda_compressor compressor;
@@ -237,7 +238,7 @@ void irlap_wait_min_turn_around(struct irlap_cb *, struct qos_info *);
 
 void irlap_init_qos_capabilities(struct irlap_cb *, struct qos_info *);
 void irlap_apply_default_connection_parameters(struct irlap_cb *self);
-void irlap_apply_connection_parameters(struct irlap_cb *self);
+void irlap_apply_connection_parameters(struct irlap_cb *self, int now);
 void irlap_set_local_busy(struct irlap_cb *self, int status);
 
 #define IRLAP_GET_HEADER_SIZE(self) 2 /* Will be different when we get VFIR */

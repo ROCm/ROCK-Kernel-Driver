@@ -1,6 +1,6 @@
 /* 
         paride.c  (c) 1997-8  Grant R. Guenther <grant@torque.net>
-                              Under the terms of the GNU public license.
+                              Under the terms of the GNU General Public License.
 
 	This is the base module for the family of device drivers
         that support parallel port IDE devices.  

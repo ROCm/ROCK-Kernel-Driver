@@ -139,19 +139,18 @@
 
 #if CSDEBUG
 static unsigned long cs_debuglevel=1;			/* levels range from 1-9 */
+MODULE_PARM(cs_debuglevel, "i");
 static unsigned long cs_debugmask=CS_INIT | CS_ERROR;	/* use CS_DBGOUT with various mask values */
+MODULE_PARM(cs_debugmask, "i");
 #endif
 #define DMABUF_DEFAULTORDER 3
 static unsigned long defaultorder=DMABUF_DEFAULTORDER;
-#if MODULE
 MODULE_PARM(defaultorder, "i");
-MODULE_PARM(cs_debuglevel, "i");
-MODULE_PARM(cs_debugmask, "i");
-#endif
 
-static int external_amp = 0;
-static int thinkpad = 0;
-
+static int external_amp;
+MODULE_PARM(external_amp, "i");
+static int thinkpad;
+MODULE_PARM(thinkpad, "i");
 
 /* An instance of the 4610 channel */
 
@@ -312,7 +311,7 @@ struct cs_card {
 	} midi;
 };
 
-static struct cs_card *devs = NULL;
+static struct cs_card *devs;
 
 static int cs_open_mixdev(struct inode *inode, struct file *file);
 static int cs_release_mixdev(struct inode *inode, struct file *file);
@@ -320,7 +319,7 @@ static int cs_ioctl_mixdev(struct inode *inode, struct file *file, unsigned int 
 				unsigned long arg);
 static loff_t cs_llseek(struct file *file, loff_t offset, int origin);
 
-extern __inline__ unsigned ld2(unsigned int x)
+static inline unsigned ld2(unsigned int x)
 {
 	unsigned r = 0;
 	
@@ -905,7 +904,7 @@ static void cs_rec_setup(struct cs_state *state)
 /* get current playback/recording dma buffer pointer (byte offset from LBA),
    called with spinlock held! */
    
-extern __inline__ unsigned cs_get_dma_addr(struct cs_state *state)
+static inline unsigned cs_get_dma_addr(struct cs_state *state)
 {
 	struct dmabuf *dmabuf = &state->dmabuf;
 	u32 offset;
@@ -950,7 +949,7 @@ static void resync_dma_ptrs(struct cs_state *state)
 }
 	
 /* Stop recording (lock held) */
-extern __inline__ void __stop_adc(struct cs_state *state)
+static inline void __stop_adc(struct cs_state *state)
 {
 	struct dmabuf *dmabuf = &state->dmabuf;
 	struct cs_card *card = state->card;
@@ -999,7 +998,7 @@ static void start_adc(struct cs_state *state)
 }
 
 /* stop playback (lock held) */
-extern __inline__ void __stop_dac(struct cs_state *state)
+static inline void __stop_dac(struct cs_state *state)
 {
 	struct dmabuf *dmabuf = &state->dmabuf;
 	struct cs_card *card = state->card;
@@ -1766,6 +1765,7 @@ static int cs_midi_release(struct inode *inode, struct file *file)
  *   Midi file operations struct.
  */
 static /*const*/ struct file_operations cs_midi_fops = {
+	owner:		THIS_MODULE,
         llseek:		cs_llseek,
         read:		cs_midi_read,
         write:		cs_midi_write,
@@ -3144,6 +3144,7 @@ static int cs_release(struct inode *inode, struct file *file)
 }
 
 static /*const*/ struct file_operations cs461x_fops = {
+	owner:		THIS_MODULE,
 	llseek:		cs_llseek,
 	read:		cs_read,
 	write:		cs_write,
@@ -3352,7 +3353,7 @@ static void cs_ac97_set(struct ac97_codec *dev, u8 reg, u16 val)
 
 static int cs_open_mixdev(struct inode *inode, struct file *file)
 {
-	int i;
+	int i=0;
 	int minor = MINOR(inode->i_rdev);
 	struct cs_card *card = devs;
 
@@ -3437,6 +3438,7 @@ static int cs_ioctl_mixdev(struct inode *inode, struct file *file, unsigned int 
 }
 
 static /*const*/ struct file_operations cs_mixer_fops = {
+	owner:		THIS_MODULE,
 	llseek:		cs_llseek,
 	ioctl:		cs_ioctl_mixdev,
 	open:		cs_open_mixdev,
@@ -4233,16 +4235,18 @@ static void cs_remove(struct cs_card *card)
 MODULE_AUTHOR("Alan Cox <alan@redhat.com>, Jaroslav Kysela, <audio@crystal.cirrus.com>");
 MODULE_DESCRIPTION("Crystal SoundFusion Audio Support");
 
-int __init cs_probe(void)
+static char banner[] __initdata = KERN_INFO "Crystal 4280/461x + AC97 Audio, version " DRIVER_VERSION ", " __TIME__ " " __DATE__ "\n";
+static char fndmsg[] __initdata = KERN_INFO "cs461x: Found %d audio device(s).\n";
+
+static int __init cs_init_driver(void)
 {
 	struct pci_dev *pcidev = NULL;
 	int foundone=0;
-	
+
 	if (!pci_present())   /* No PCI bus in this machine! */
 		return -ENODEV;
-		
-	printk(KERN_INFO "Crystal 4280/461x + AC97 Audio, version "
-	       DRIVER_VERSION ", " __TIME__ " " __DATE__ "\n");
+
+	printk(banner);
 
 	while( (pcidev = pci_find_device(PCI_VENDOR_ID_CIRRUS, 0x6001 , pcidev))!=NULL ) {
 		if (cs_install(pcidev)==0)
@@ -4257,19 +4261,11 @@ int __init cs_probe(void)
 			foundone++;
 	}
 
-	printk(KERN_INFO "cs461x: Found %d audio device(s).\n",
-		foundone);
-	return foundone;
+	printk(fndmsg, foundone);
+	return foundone ? 0 : -ENODEV;
 }
 
-int __init init_module(void)
-{
-	if(cs_probe()==0)
-		printk(KERN_ERR "cs461x: No devices found.\n");
-	return 0;
-}
-
-void __exit cleanup_module (void)
+static void __exit cs_exit_driver(void)
 {
 	struct cs_card *next;
 #ifdef CS46XX_PM
@@ -4283,5 +4279,5 @@ void __exit cleanup_module (void)
 	}
 }
 
-MODULE_PARM(external_amp, "i");
-MODULE_PARM(thinkpad, "i");
+module_init(cs_init_driver);
+module_exit(cs_exit_driver);

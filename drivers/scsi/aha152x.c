@@ -1,6 +1,6 @@
 /* aha152x.c -- Adaptec AHA-152x driver
  * Author: Jürgen E. Fischer, fischer@norbit.de
- * Copyright 1993-1999 Jürgen E. Fischer
+ * Copyright 1993-2000 Jürgen E. Fischer
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -13,9 +13,13 @@
  * General Public License for more details.
  *
  *
- * $Id: aha152x.c,v 2.3 2000/11/04 16:40:26 fischer Exp $
+ * $Id: aha152x.c,v 2.4 2000/12/16 12:53:56 fischer Exp $
  *
  * $Log: aha152x.c,v $
+ * Revision 2.4  2000/12/16 12:53:56  fischer
+ * - allow REQUEST SENSE to be queued
+ * - handle shared PCI interrupts
+ *
  * Revision 2.3  2000/11/04 16:40:26  fischer
  * - handle data overruns
  * - extend timeout for data phases
@@ -299,7 +303,7 @@
                         (cmd) ? ((cmd)->target & 0x0f) : -1, \
 			(cmd) ? ((cmd)->lun & 0x07) : -1
 
-#define DELAY_DEFAULT 100
+#define DELAY_DEFAULT 1000
 
 /* possible irq range */
 #if defined(PCMCIA)
@@ -932,6 +936,8 @@ static void swintr(int irqno, void *dev_id, struct pt_regs *regs)
         	printk(KERN_ERR "aha152x%d: catched software interrupt for unknown controller.\n", HOSTNO);
 
 	HOSTDATA(shpnt)->swint++;
+
+	SETPORT(DMACNTRL0, INTEN);
 }
 
 
@@ -1231,18 +1237,12 @@ int aha152x_detect(Scsi_Host_Template * tpnt)
 		if (setup[i].reconnect)
 			shpnt->can_queue = AHA152X_MAXQUEUE;
 
-#if 0
-		if(!shpnt->hostt->use_new_eh_code) {
-#endif
-			/* RESET OUT */
-			printk("aha152x: resetting bus...\n");
-			SETPORT(SCSISEQ, SCSIRSTO);
-			mdelay(256);
-			SETPORT(SCSISEQ, 0);
-			mdelay(DELAY);
-#if 0
-		}
-#endif
+		/* RESET OUT */
+		printk("aha152x: resetting bus...\n");
+		SETPORT(SCSISEQ, SCSIRSTO);
+		mdelay(256);
+		SETPORT(SCSISEQ, 0);
+		mdelay(DELAY);
 
 		reset_ports(shpnt);
 
@@ -1274,7 +1274,7 @@ int aha152x_detect(Scsi_Host_Template * tpnt)
 		SETPORT(SIMODE0, 0);
 		SETPORT(SIMODE1, 0);
 
-		ok = request_irq(shpnt->irq, swintr, SA_INTERRUPT, "aha152x", shpnt);
+		ok = request_irq(shpnt->irq, swintr, SA_INTERRUPT|SA_SHIRQ, "aha152x", shpnt);
 		if (ok < 0) {
 			if (ok==-EINVAL)
 				printk(KERN_ERR "aha152x%d: bad IRQ %d.\n", HOSTNO, shpnt->irq);
@@ -1308,6 +1308,8 @@ int aha152x_detect(Scsi_Host_Template * tpnt)
 				printk("failed.\n");
 			}
 
+			SETPORT(DMACNTRL0, INTEN);
+
 			printk(KERN_ERR "aha152x%d: IRQ %d possibly wrong.  Please verify.\n", HOSTNO, shpnt->irq);
 
 			registered_count--;
@@ -1319,13 +1321,12 @@ int aha152x_detect(Scsi_Host_Template * tpnt)
 		}
 		printk("ok.\n");
 
-		SETPORT(DMACNTRL0, INTEN);
 
 		/* clear interrupts */
 		SETPORT(SSTAT0, 0x7f);
 		SETPORT(SSTAT1, 0xef);
 
-		if (request_irq(shpnt->irq, intr, SA_INTERRUPT, "aha152x", shpnt) < 0) {
+		if (request_irq(shpnt->irq, intr, SA_INTERRUPT|SA_SHIRQ, "aha152x", shpnt) < 0) {
 			printk(KERN_ERR "aha152x%d: failed to reassign interrupt.\n", HOSTNO);
 
 			scsi_unregister(shpnt);
@@ -1469,12 +1470,14 @@ int aha152x_internal_queue(Scsi_Cmnd *SCpnt, struct semaphore *sem, int phase, S
 
 int aha152x_queue(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 {
+#if 0
 	if(*SCpnt->cmnd == REQUEST_SENSE) {
 		SCpnt->result = 0;
 		done(SCpnt);
 
-		return SUCCESS;
+		return 0;
 	}
+#endif
 
 	return aha152x_internal_queue(SCpnt, 0, 0, 0, done);
 }
@@ -1604,7 +1607,7 @@ int aha152x_device_reset(Scsi_Cmnd * SCpnt)
 
 	init_timer(&timer);
 	timer.data     = (unsigned long) &sem;
-	timer.expires  = jiffies + 10 * HZ;   /* 10s */
+	timer.expires  = jiffies + 100*HZ;   /* 10s */
 	timer.function = (void (*)(unsigned long)) timer_expired;
 	add_timer(&timer);
 
@@ -2579,7 +2582,7 @@ static void datai_run(struct Scsi_Host *shpnt)
 		if(TESTHI(DMASTAT, DFIFOFULL)) {
 			fifodata = 128;
 		} else {
-			the_time=jiffies + HZ;
+			the_time=jiffies + 10*HZ;
 			while(TESTLO(SSTAT2, SEMPTY) && time_before(jiffies,the_time))
 				barrier();
 
@@ -2735,7 +2738,7 @@ static void datao_run(struct Scsi_Host *shpnt)
 			CURRENT_SC->SCp.this_residual = CURRENT_SC->SCp.buffer->length;
 		}
 
-		the_time=jiffies+10*HZ;
+		the_time=jiffies + 10*HZ;
 		while(TESTLO(DMASTAT, DFIFOEMP|INTSTAT) && time_before(jiffies,the_time))
 			barrier();
 

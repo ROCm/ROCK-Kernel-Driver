@@ -11,6 +11,13 @@
  *
  * See Documentation/usb/usb-serial.txt for more information on using this driver
  *
+ * (01/21/2000) gkh
+ *	Added write_room and chars_in_buffer, as they were previously using the
+ *	generic driver versions which is all wrong now that we are using an urb
+ *	pool.  Thanks to Wolfgang Grandegger for pointing this out to me.
+ *	Removed count assignment in the write function, which was not needed anymore
+ *	either.  Thanks to Al Borchers for pointing this out.
+ *
  * (12/12/2000) gkh
  *	Moved MOD_DEC to end of visor_close to be nicer, as the final write 
  *	message can sleep.
@@ -103,6 +110,8 @@
 static int  visor_open		(struct usb_serial_port *port, struct file *filp);
 static void visor_close		(struct usb_serial_port *port, struct file *filp);
 static int  visor_write		(struct usb_serial_port *port, int from_user, const unsigned char *buf, int count);
+static int  visor_write_room		(struct usb_serial_port *port);
+static int  visor_chars_in_buffer	(struct usb_serial_port *port);
 static void visor_throttle	(struct usb_serial_port *port);
 static void visor_unthrottle	(struct usb_serial_port *port);
 static int  visor_startup	(struct usb_serial *serial);
@@ -142,6 +151,8 @@ struct usb_serial_device_type handspring_device = {
 	ioctl:			visor_ioctl,
 	set_termios:		visor_set_termios,
 	write:			visor_write,
+	write_room:		visor_write_room,
+	chars_in_buffer:	visor_chars_in_buffer,
 	write_bulk_callback:	visor_write_bulk_callback,
 	read_bulk_callback:	visor_read_bulk_callback,
 };
@@ -289,8 +300,6 @@ static int visor_write (struct usb_serial_port *port, int from_user, const unsig
 		else
 			memcpy (urb->transfer_buffer, current_position, transfer_size);
 		
-		count = (count > port->bulk_out_size) ? port->bulk_out_size : count;
-
 		/* build up our urb */
 		FILL_BULK_URB (urb, serial->dev, usb_sndbulkpipe(serial->dev, port->bulk_out_endpointAddress), 
 				urb->transfer_buffer, transfer_size, visor_write_bulk_callback, port);
@@ -310,6 +319,52 @@ static int visor_write (struct usb_serial_port *port, int from_user, const unsig
 exit:
 	return bytes_sent;
 } 
+
+
+static int visor_write_room (struct usb_serial_port *port)
+{
+	unsigned long flags;
+	int i;
+	int room = 0;
+
+	dbg(__FUNCTION__ " - port %d", port->number);
+	
+	spin_lock_irqsave (&port->port_lock, flags);
+
+	for (i = 0; i < NUM_URBS; ++i) {
+		if (write_urb_pool[i]->status != -EINPROGRESS) {
+			room += URB_TRANSFER_BUFFER_SIZE;
+		}
+	}
+	
+	spin_unlock_irqrestore (&port->port_lock, flags);
+	
+	dbg(__FUNCTION__ " - returns %d", room);
+	return (room);
+}
+
+
+static int visor_chars_in_buffer (struct usb_serial_port *port)
+{
+	unsigned long flags;
+	int i;
+	int chars = 0;
+
+	dbg(__FUNCTION__ " - port %d", port->number);
+	
+	spin_lock_irqsave (&port->port_lock, flags);
+
+	for (i = 0; i < NUM_URBS; ++i) {
+		if (write_urb_pool[i]->status == -EINPROGRESS) {
+			chars += URB_TRANSFER_BUFFER_SIZE;
+		}
+	}
+	
+	spin_unlock_irqrestore (&port->port_lock, flags);
+
+	dbg (__FUNCTION__ " - returns %d", chars);
+	return (chars);
+}
 
 
 static void visor_write_bulk_callback (struct urb *urb)

@@ -33,13 +33,11 @@ UART3_BASE:	.long	0x80050000
 #define UTSR0           0x1c
 #define UTSR1           0x20
 
-#define BAUD_DIV_230400	0x000
-#define BAUD_DIV_115200	0x001
-#define BAUD_DIV_57600	0x003
-#define BAUD_DIV_38400	0x005
-#define BAUD_DIV_19200	0x00b
-#define BAUD_DIV_9600	0x017
-#define BAUD_DIV	BAUD_DIV_9600
+#ifndef CONFIG_SA1100_DEFAULT_BAUDRATE
+#define CONFIG_SA1100_DEFAULT_BAUDRATE	9600
+#endif
+
+#define BAUD_DIV	((230400/CONFIG_SA1100_DEFAULT_BAUDRATE)-1)
 
 SCR_loc:	.long	SYMBOL_NAME(SCR_value)
 #define GPIO_2_9	0x3fc
@@ -92,7 +90,7 @@ skip_SCR:
 		bne	skip_uart
 
 		@ UART3 if Assabet is used with Neponset
-		teq	r3, #25			@ if Assabet 
+		teq	r3, #MACH_TYPE_ASSABET	@ if Assabet 
 		tsteq	r2, #(1 << 9)		@ ... and Neponset present
 		ldreq	r0, UART3_BASE
 		beq	uart_init

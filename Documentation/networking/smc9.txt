@@ -3,7 +3,7 @@ SMC 9xxxx Driver
 Revision 0.12 
 3/5/96
 Copyright 1996  Erik Stahlman 
-Released under terms of the GNU public license. 
+Released under terms of the GNU General Public License. 
 
 This file contains the instructions and caveats for my SMC9xxx driver.  You
 should not be using the driver without reading this file.  

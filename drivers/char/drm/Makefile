@@ -10,7 +10,7 @@ O_TARGET	:= drm.o
 module-list     := gamma.o tdfx.o r128.o ffb.o mga.o i810.o
 export-objs     := $(patsubst %.o,%_drv.o,$(module-list))
 
-# libs-objs are included in every module so that radical changes to the
+# lib-objs are included in every module so that radical changes to the
 # architecture of the DRM support library can be made at a later time.
 #
 # The downside is that each module is larger, and a system that uses

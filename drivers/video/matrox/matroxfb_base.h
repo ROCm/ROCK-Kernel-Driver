@@ -589,7 +589,6 @@ static inline struct matrox_fb_info* mxinfo(const struct display* p) {
 #else
 
 extern struct matrox_fb_info matroxfb_global_mxinfo;
-struct display global_disp;
 
 #define ACCESS_FBINFO(x) (matroxfb_global_mxinfo.x)
 #define ACCESS_FBINFO2(info, x) (matroxfb_global_mxinfo.x)
@@ -787,11 +786,7 @@ void matroxfb_unregister_driver(struct matroxfb_driver* drv);
 #define mga_setr(addr,port,val) do { mga_outb(addr, port); mga_outb((addr)+1, val); } while (0)
 #endif
 
-#ifdef __LITTLE_ENDIAN
-#define mga_fifo(n)	do {} while (mga_inb(M_FIFOSTATUS) < (n))
-#else
 #define mga_fifo(n)	do {} while ((mga_inl(M_FIFOSTATUS) & 0xFF) < (n))
-#endif
 
 #define WaitTillIdle()	do {} while (mga_inl(M_STATUS) & 0x10000)
 

@@ -42,6 +42,7 @@
 #include <linux/ioport.h>
 #include <linux/interrupt.h>
 #include <linux/smp_lock.h>
+#include <linux/init.h>
 
 #include <asm/signal.h>
 #include <asm/io.h>
@@ -54,13 +55,12 @@
 
 
 static struct pc110pad_params default_params = {
-	PC110PAD_PS2,	/* read mode */
-	50 MS,		/* bounce interval */
-	200 MS,		/* tap interval */
-	10,		/* IRQ */
-	0x15E0,		/* I/O port */
+	mode:			PC110PAD_PS2,
+	bounce_interval:	50 MS,
+	tap_interval:		200 MS,
+	irq:			10,
+	io:			0x15E0,
 };
-
 
 static struct pc110pad_params current_params;
 
@@ -134,7 +134,7 @@ static void tap_timeout(unsigned long data)
 {
 	if(!recent_transition)
 	{
-		printk("pc110pad: tap_timeout but no recent transition!\n");
+		printk(KERN_ERR "pc110pad: tap_timeout but no recent transition!\n");
 	}
 	if( transition_count==2 || transition_count==4 || transition_count==6 )
 	{
@@ -783,73 +783,60 @@ static struct file_operations pad_fops = {
 
 
 static struct miscdevice pc110_pad = {
-	PC110PAD_MINOR, "pc110 pad", &pad_fops
+	minor:		PC110PAD_MINOR,
+	name:		"pc110 pad",
+	fops:		&pad_fops,
 };
 
 
 /**
- *	pc110pad_init:
+ *	pc110pad_init_driver:
  *
  *	We configure the pad with the default parameters (that is PS/2 
  *	emulation mode. We then claim the needed I/O and interrupt resources.
  *	Finally as a matter of paranoia we turn the pad off until we are
  *	asked to open it by an application.
  */
- 
-int pc110pad_init(void)
+
+static const char banner[] __initdata = KERN_INFO "PC110 digitizer pad at 0x%X, irq %d.\n";
+
+static int __init pc110pad_init_driver(void)
 {
+	init_MUTEX(&reader_lock);
 	current_params = default_params;
 
-	if(request_irq(current_params.irq, pad_irq, 0, "pc110pad", 0))
-	{
-		printk("pc110pad: Unable to get IRQ.\n");
+	if (request_irq(current_params.irq, pad_irq, 0, "pc110pad", 0)) {
+		printk(KERN_ERR "pc110pad: Unable to get IRQ.\n");
 		return -EBUSY;
 	}
-	if(check_region(current_params.io, 4))
-	{
-		printk("pc110pad: I/O area in use.\n");
+	if (!request_region(current_params.io, 4, "pc110pad"))	{
+		printk(KERN_ERR "pc110pad: I/O area in use.\n");
 		free_irq(current_params.irq,0);
 		return -EBUSY;
 	}
-	request_region(current_params.io, 4, "pc110pad");
 	init_waitqueue_head(&queue);
-	printk("PC110 digitizer pad at 0x%X, irq %d.\n",
-		current_params.io,current_params.irq);
+	printk(banner, current_params.io, current_params.irq);
 	misc_register(&pc110_pad);
 	outb(0x30, current_params.io+2);	/* switch off digitiser */
-	
 	return 0;
 }
 
-#ifdef MODULE
-
-/**
- *	pc110pad_unload:
+/*
+ *	pc110pad_exit_driver:
  *
  *	Free the resources we acquired when the module was loaded. We also
  *	turn the pad off to be sure we don't leave it using power.
  */
- 
-static void pc110pad_unload(void)
+
+static void __exit pc110pad_exit_driver(void)
 {
 	outb(0x30, current_params.io+2);	/* switch off digitiser */
-	if(current_params.irq)
+	if (current_params.irq)
 		free_irq(current_params.irq, 0);
-	current_params.irq=0;
+	current_params.irq = 0;
 	release_region(current_params.io, 4);
 	misc_deregister(&pc110_pad);
 }
 
-
-
-int init_module(void)
-{
-	init_MUTEX(&reader_lock);
-	return pc110pad_init();
-}
-
-void cleanup_module(void)
-{
-	pc110pad_unload();
-}
-#endif
+module_init(pc110pad_init_driver);
+module_exit(pc110pad_exit_driver);

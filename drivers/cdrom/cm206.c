@@ -1283,7 +1283,7 @@ static void cleanup(int level)
   case 1: 
     kfree(cd);
     release_region(cm206_base, 16);
-  default:
+  default:;
   }
 }
 

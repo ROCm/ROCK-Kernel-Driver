@@ -285,7 +285,7 @@ static void wacom_intuos_irq(struct urb *urb)
 
 struct wacom_features wacom_features[] = {
 	{ "Wacom Graphire",      8, 10206,  7422,  511, 32, wacom_graphire_irq,
-		BIT(EV_REL), 0, REL_WHEEL, 0 },
+		BIT(EV_REL), 0, BIT(REL_WHEEL), 0 },
 	{ "Wacom Intuos 4x5",   10, 12700, 10360, 1023, 15, wacom_intuos_irq,
 		0, WACOM_INTUOS_ABS, 0, WACOM_INTUOS_BUTTONS, WACOM_INTUOS_TOOLS },
 	{ "Wacom Intuos 6x8",   10, 20320, 15040, 1023, 15, wacom_intuos_irq,

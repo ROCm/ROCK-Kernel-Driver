@@ -15,12 +15,6 @@
 ** 
 ** None known at this time.
 **
-**  TODO:
-**      -Get rid of the wait loops in the API and replace them
-**       with system independent delays ...something like
-**       "delayms(2)".  However, under normal circumstances, the 
-**       delays are very short so they're not a problem.
-**
 **  This program is free software; you can redistribute it and/or modify
 **  it under the terms of the GNU General Public License as published by
 **  the Free Software Foundation; either version 2 of the License, or
@@ -36,7 +30,8 @@
 **  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 **
 **   
-**  Rasmus Andersen, December 2000: Converted to new PCI API.
+**  Rasmus Andersen, December 2000: Converted to new PCI API and general
+**  cleanup.
 **
 **  Pete Popov, January 11,99: Fixed a couple of 2.1.x problems 
 **  (virt_to_bus() not called), tested it under 2.2pre5 (as a module), and 
@@ -64,13 +59,8 @@
 #include <linux/timer.h>
 #include <asm/irq.h>            /* For NR_IRQS only. */
 #include <asm/bitops.h>
-#include <asm/io.h>
 #include <asm/uaccess.h>
 
-#include <linux/if_ether.h>
-#include <linux/netdevice.h>
-#include <linux/etherdevice.h>
-#include <linux/skbuff.h>
 
 
 static char version[] __initdata =
@@ -83,7 +73,6 @@ static char version[] __initdata =
 #define RUN_AT(x) (jiffies + (x))
 
 #define NEW_MULTICAST
-#include <linux/delay.h>
 
 /* PCI/45 Configuration space values */
 #define RC_PCI45_VENDOR_ID  0x4916
@@ -106,38 +95,7 @@ static U32 DriverControlWord =  0;
 
 static void rc_timer(unsigned long);
 
-/*
- * Driver Private Area, DPA.
- */
-typedef struct
-{
-
-    /* 
-     *    pointer to the device structure which is part
-     * of the interface to the Linux kernel.
-     */
-    struct net_device *dev;            
-     
-    U8     id;                        /* the AdapterID */
-    U32    pci_addr;               /* the pci address of the adapter */
-    U32    bus;
-    U32    function;
-    struct timer_list timer;        /*  timer */
-    struct net_device_stats  stats; /* the statistics structure */
-    unsigned long numOutRcvBuffers;/* number of outstanding receive buffers*/
-    unsigned char shutdown;
-    unsigned char reboot;
-    unsigned char nexus;
-    PU8    PLanApiPA;             /* Pointer to Lan Api Private Area */
-
-}
-DPA, *PDPA;
-
-#define MAX_ADAPTERS 32
-
-static PDPA  PCIAdapters[MAX_ADAPTERS];
-
-static int RCinit(struct net_device *dev);
+static int RCinit(struct net_device *);
 
 static int RCopen(struct net_device *);
 static int RC_xmit_packet(struct sk_buff *, struct net_device *);
@@ -146,35 +104,39 @@ static int RCclose(struct net_device *dev);
 static struct net_device_stats *RCget_stats(struct net_device *);
 static int RCioctl(struct net_device *, struct ifreq *, int);
 static int RCconfig(struct net_device *, struct ifmap *);
-static void RCxmit_callback(U32, U16, PU32, U16);
-static void RCrecv_callback(U32, U8, U32, PU32, U16);
-static void RCreset_callback(U32, U32, U32, U16);
-static void RCreboot_callback(U32, U32, U32, U16);
+static void RCxmit_callback(U32, U16, PU32, struct net_device *);
+static void RCrecv_callback(U32, U8, U32, PU32, struct net_device *);
+static void RCreset_callback(U32, U32, U32, struct net_device *);
+static void RCreboot_callback(U32, U32, U32, struct net_device *);
 static int RC_allocate_and_post_buffers(struct net_device *, int);
 
 
 static struct pci_device_id rcpci45_pci_table[] __devinitdata = {
-	{ RC_PCI45_VENDOR_ID, RC_PCI45_DEVICE_ID, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
-	{0, }
+	{ RC_PCI45_VENDOR_ID, RC_PCI45_DEVICE_ID, PCI_ANY_ID, PCI_ANY_ID, },
+	{ }
 };
 MODULE_DEVICE_TABLE(pci, rcpci45_pci_table);
 
-static void rcpci45_remove_one(struct pci_dev *pdev)
+static void __exit rcpci45_remove_one(struct pci_dev *pdev)
 {
 	struct net_device *dev = pdev->driver_data;
 	PDPA pDpa = dev->priv;
 
         if (!dev) {
-                printk (KERN_ERR "remove non-existent device\n");
+                printk (KERN_ERR "(rcpci45 driver:) remove non-existent device\n");
                 return;
         }
 
-	printk("IOP reset: 0x%x\n", RCResetIOP(pDpa->id));
+	dprintk("remove_one: IOP reset: 0x%x\n", RCResetIOP(dev));
 
-	unregister_netdev(dev);
+	/* RAA Inspired by starfire.c and yellowfin.c we keep these
+	 * here. */
+  	unregister_netdev(dev);
+	free_irq(dev->irq, dev); 
 	iounmap((void *)dev->base_addr);
-        free_irq(dev->irq, dev);
-
+	kfree(pDpa->PLanApiPA);
+	kfree(pDpa->pPab);
+	kfree(pDpa);
 	kfree(dev);
 }
 
@@ -192,18 +154,16 @@ static int RCinit(struct net_device *dev)
 static int rcpci45_init_one(struct pci_dev *pdev, 
 			    const struct pci_device_id *ent)
 {
-    int dev_size = 32768;        
-    unsigned long *vaddr=0;
+    unsigned long *vaddr;
     PDPA pDpa;
-    int init_status;
-
-    long memaddr = pci_resource_start(pdev, 0);
-    int card_idx;    
+    int error = -ENOMEM;
+    static int card_idx = -1;
     struct net_device *dev;
+    unsigned long pci_start = pci_resource_start(pdev,0);
+    unsigned long pci_len = pci_resource_len(pdev,0);
+    
 
-    static int card_counter = 0;
-
-    card_idx = card_counter++; /* Yeah, icky hack. */
+    card_idx++;
 
     /* 
      * Allocate and fill new device structure. 
@@ -214,111 +174,80 @@ static int rcpci45_init_one(struct pci_dev *pdev,
      * the LAN API layer.
      */
 
-    dev = (struct net_device *) kmalloc(dev_size, GFP_DMA | GFP_KERNEL |GFP_ATOMIC);
-    if (!dev)
-    {
-        printk("rcpci45 driver: unable to kmalloc dev struct\n");
-        return 1;   
+    dev = init_etherdev(NULL, sizeof(*pDpa));
+    if (!dev) {
+	printk(KERN_ERR "(rcpci45 driver:) unable to allocate in init_etherdev\n");
+	goto err_out;
     }
-    memset(dev, 0, dev_size);
 
     pdev->driver_data = dev;
-
-    /*
-     * dev->priv will point to the start of DPA.
-     */
-    dev->priv = (void *)(((long)dev + sizeof(struct net_device) + 15) & ~15);
-
-#ifdef RCDEBUG
-    printk("rc: dev = 0x%x, dev->priv = 0x%x\n", (uint)dev, (uint)dev->priv);
-#endif
     
     pDpa = dev->priv;
+    pDpa->id = card_idx;
+    pDpa->pci_addr = pci_start;
 
-    pDpa->dev = dev;            /* this is just for easy reference */
-    pDpa->function = pdev->devfn;
-    pDpa->bus = (unsigned char)pdev->bus->number;
-    pDpa->id = card_idx;        /* the device number */
-    pDpa->pci_addr = memaddr;
-    PCIAdapters[card_idx] = pDpa;
-
-#ifdef RCDEBUG
-    printk("rc: pDpa = 0x%x, id = %d \n", (uint)pDpa, (uint)pDpa->id);
-#endif
+    if (!pci_start || !(pci_resource_flags(pdev, 0) & IORESOURCE_MEM)) {
+	printk(KERN_ERR "(rcpci45 driver:) No PCI memory resources! Aborting.\n");
+	goto err_out_free_dev;
+    }    
 
     /*
      * Save the starting address of the LAN API private area.  We'll
      * pass that to RCInitI2OMsgLayer().
      */
-    pDpa->PLanApiPA = (void *)(((long)pDpa + sizeof(DPA) + 0xff) & ~0xff);
-#ifdef RCDEBUG
-    printk("rc: pDpa->PLanApiPA = 0x%x\n", (uint)pDpa->PLanApiPA);
-#endif
+    /* RAA FIXME: This size should be a #define somewhere after I
+     * clear up some questions: What flags are neeeded in the alloc below
+     * and what needs to be done before the memarea is long word aligned?
+     * (Look in old code for an approach.) (Also note that the 16K below
+     * is substantially less than the 32K allocated before (even though
+     * some of the spacce was used for data structures.) */
+    pDpa->msgbuf = kmalloc(16384, GFP_KERNEL);
+    if (!pDpa->msgbuf) {
+        printk(KERN_ERR "(rcpci45 driver:) Could not allocate %d byte memory for the private msgbuf!\n", 16384); /* RAA FIXME not hardcoded! */
+	goto err_out_free_dev;
+    }
+    pDpa->PLanApiPA = (void *)(((long)pDpa->msgbuf + 0xff) & ~0xff);
+
+    dprintk("pDpa->PLanApiPA = 0x%x\n", (uint)pDpa->PLanApiPA);
     
-    /* The adapter is accessable through memory-access read/write, not
+    /* The adapter is accessible through memory-access read/write, not
      * I/O read/write.  Thus, we need to map it to some virtual address
-     * area in order to access the registers are normal memory.
+     * area in order to access the registers as normal memory.
      */
-    vaddr = (ulong *) ioremap (memaddr, 2*32768);
-#ifdef RCDEBUG
-    printk("rc: RCfound_device: 0x%x, priv = 0x%x, vaddr = 0x%x\n", 
+    if (request_mem_region(pci_start, pci_len, dev->name) == NULL) {
+        printk(KERN_ERR "(rcpci45 driver:) %d: resource 0x%lx @ 0x%lx busy, aborting\n",card_idx, pci_start, pci_len);
+	goto err_out_free_msgbuf;
+    }
+
+    if (pci_enable_device(pdev)) {
+        printk(KERN_ERR "(rcpci45 driver:) %d: unable to enable pci device, aborting\n",card_idx);
+	goto err_out_free_msgbuf;
+    }
+
+    vaddr = (ulong *) ioremap (pci_start, pci_len); 
+    if (!vaddr) {
+        printk(KERN_ERR "(rcpci45 driver:) Unable to remap address range from %lu to %lu\n", pci_start, pci_start+pci_len);
+	goto err_out_free_msgbuf;
+    }
+
+    dprintk("rcpci45_init_one: 0x%x, priv = 0x%x, vaddr = 0x%x\n", 
            (uint)dev, (uint)dev->priv, (uint)vaddr);
-#endif
     dev->base_addr = (unsigned long)vaddr;
     dev->irq = pdev->irq;
 
-    /*
-     * Request a shared interrupt line.
-     */
-    if ( request_irq(dev->irq, (void *)RCinterrupt,
-                     SA_INTERRUPT|SA_SHIRQ, "RedCreek VPN Adapter", dev) )
-    {
-        printk( "RC PCI 45: %s: unable to get IRQ %d\n", (PU8)dev->name, (uint)dev->irq );
-        iounmap(vaddr);
-        kfree(dev);
-        return 1;
-    }
-
-    init_status = RCInitI2OMsgLayer(pDpa->id, dev->base_addr, 
-                  pDpa->PLanApiPA, (PU8)virt_to_bus((void *)pDpa->PLanApiPA),
-                  (PFNTXCALLBACK)RCxmit_callback,
-                  (PFNRXCALLBACK)RCrecv_callback,
-                  (PFNCALLBACK)RCreboot_callback);
-    if (init_status)
-    {
-        printk("rc: Unable to initialize msg layer\n");
-        free_irq(dev->irq, dev);
-        iounmap(vaddr);
-        kfree(dev);
-        return 1;
-    }
-    if (RCGetMAC(pDpa->id, dev->dev_addr, NULL))
-    {
-        printk("rc: Unable to get adapter MAC\n");
-        free_irq(dev->irq, dev);
-        iounmap(vaddr);
-        kfree(dev);
-        return 1;
-    }
-
-    DriverControlWord |= WARM_REBOOT_CAPABLE;
-    RCReportDriverCapability(pDpa->id, DriverControlWord);
-
     dev->init = &RCinit;
-    ether_setup(dev);            /* linux kernel interface */
-
-    if (register_netdev(dev) != 0) /* linux kernel interface */
-    {
-        printk("rc: unable to register device \n");
-        free_irq(dev->irq, dev);
-        iounmap(vaddr);
-        kfree(dev);
-        return 1;
-    }
-    printk("%s: RedCreek Communications IPSEC VPN adapter\n",
-        dev->name);
 
     return 0; /* success */
+
+
+ err_out_free_msgbuf:
+    kfree(pDpa->msgbuf);
+ err_out_free_dev:
+    kfree(dev);
+ err_out:
+    unregister_netdev(dev);
+    card_idx--;
+    return error;
 }
 
 static struct pci_driver rcpci45_driver = {
@@ -328,12 +257,12 @@ static struct pci_driver rcpci45_driver = {
 	remove: rcpci45_remove_one,
 };
 
-static int __init rcpci_init_module (void)
+static int __init rcpci_init_module(void)
 {
 	int rc = pci_module_init(&rcpci45_driver);
 
 	if (!rc)
-		printk(version);
+		printk(KERN_INFO "%s",version);
 	return rc;
 }
 
@@ -344,14 +273,42 @@ RCopen(struct net_device *dev)
     PDPA pDpa = (PDPA) dev->priv;
     int count = 0;
     int requested = 0;
+    int error;
 
-#ifdef RCDEBUG
-    printk("rc: RCopen\n");
-#endif
-    RCEnableI2OInterrupts(pDpa->id);
+    dprintk("(rcpci45 driver:) RCopen\n");
 
-    if (pDpa->nexus)
-    {
+    /* Request a shared interrupt line. */
+    if ( (error=request_irq(dev->irq, (void *)RCinterrupt,
+                     SA_INTERRUPT|SA_SHIRQ, "RedCreek VPN Adapter", dev)) ) {
+        printk(KERN_ERR "(rcpci45 driver:) %s: unable to get IRQ %d\n", dev->name, dev->irq );
+	goto err_out;
+    }
+
+    error = RCInitI2OMsgLayer(dev, (PFNTXCALLBACK)RCxmit_callback,
+			      (PFNRXCALLBACK)RCrecv_callback,
+			      (PFNCALLBACK)RCreboot_callback);
+    if (error) {
+        printk(KERN_ERR "(rcpci45 driver:) Unable to initialize msg layer\n");
+	goto err_out_free_irq;
+    }
+    if ( (error=RCGetMAC(dev, NULL)) ) {
+        printk(KERN_ERR "(rcpci45 driver:) Unable to get adapter MAC\n");
+	goto err_out_free_irq;
+    }
+
+    DriverControlWord |= WARM_REBOOT_CAPABLE;
+    RCReportDriverCapability(dev, DriverControlWord);
+
+    printk(KERN_INFO "%s: RedCreek Communications IPSEC VPN adapter\n",
+        dev->name);
+
+
+    /* RAA: Old RCopen starts here */
+    RCEnableI2OInterrupts(dev);
+
+    /* RAA Hmm, how does the comment below jibe with the newly imported
+     * code above? A FIXME!!*/
+    if (pDpa->nexus) {
         /* This is not the first time RCopen is called.  Thus,
          * the interface was previously opened and later closed
          * by RCclose().  RCclose() does a Shutdown; to wake up
@@ -361,16 +318,12 @@ RCopen(struct net_device *dev)
          * were turned off -- we need will need to reinitialize
          * the adapter, rather than simply waking it up.  
          */
-        printk("rc: Waking up adapter...\n");
-        RCResetLANCard(pDpa->id,0,0,0);
-    }
-    else
-    {
+	dprintk(KERN_INFO "Waking up adapter...\n");
+        RCResetLANCard(dev,0,0,0);
+    } else
         pDpa->nexus = 1;
-    }
 
-    while(post_buffers)
-    {
+    while(post_buffers) {
         if (post_buffers > MAX_NMBR_POST_BUFFERS_PER_MSG)
             requested = MAX_NMBR_POST_BUFFERS_PER_MSG;
         else
@@ -382,25 +335,26 @@ RCopen(struct net_device *dev)
             /*
              * Check to see if we were able to post any buffers at all.
              */
-            if (post_buffers == MAX_NMBR_RCV_BUFFERS)
-            {
-                printk("rc: Error RCopen: not able to allocate any buffers\r\n");
+            if (post_buffers == MAX_NMBR_RCV_BUFFERS) {
+                printk(KERN_ERR "(rcpci45 driver:) Error RCopen: not able to allocate any buffers\r\n");
                 return(-ENOMEM);                    
             }
-            printk("rc: Warning RCopen: not able to allocate all requested buffers\r\n");
+            printk(KERN_WARNING "(rcpci45 driver:) Warning RCopen: not able to allocate all requested buffers\r\n");
             break;            /* we'll try to post more buffers later */
-        }
-        else
+        } else
             post_buffers -= count;
     }
     pDpa->numOutRcvBuffers = MAX_NMBR_RCV_BUFFERS - post_buffers;
     pDpa->shutdown = 0;        /* just in case */
-#ifdef RCDEBUG
-    printk("rc: RCopen: posted %d buffers\n", (uint)pDpa->numOutRcvBuffers);
-#endif
+    dprintk("RCopen: posted %d buffers\n", (uint)pDpa->numOutRcvBuffers);
     MOD_INC_USE_COUNT;
     netif_start_queue(dev);
     return 0;
+
+ err_out_free_irq:
+    free_irq(dev->irq, dev);
+ err_out:
+    return error;
 }
 
 static int
@@ -414,11 +368,8 @@ RC_xmit_packet(struct sk_buff *skb, struct net_device *dev)
    
     netif_stop_queue(dev);
      
-    if (pDpa->shutdown || pDpa->reboot)
-    {
-#ifdef RCDEBUG
-            printk("rc: RC_xmit_packet: tbusy!\n");
-#endif
+    if (pDpa->shutdown || pDpa->reboot) {
+            dprintk("RC_xmit_packet: tbusy!\n");
             return 1;
     }
       
@@ -440,20 +391,13 @@ RC_xmit_packet(struct sk_buff *skb, struct net_device *dev)
     ptcb->b.size = skb->len;
     ptcb->b.addr = virt_to_bus((void *)skb->data);
 
-#ifdef RCDEBUG
-    printk("rc: RC xmit: skb = 0x%x, pDpa = 0x%x, id = %d, ptcb = 0x%x\n", 
+    dprintk("RC xmit: skb = 0x%x, pDpa = 0x%x, id = %d, ptcb = 0x%x\n", 
            (uint)skb, (uint)pDpa, (uint)pDpa->id, (uint)ptcb);
-#endif
-    if ( (status = RCI2OSendPacket(pDpa->id, (U32)NULL, (PRCTCB)ptcb))
-         != RC_RTN_NO_ERROR)
-    {
-#ifdef RCDEBUG
-        printk("rc: RC send error 0x%x\n", (uint)status);
-#endif
+    if ( (status = RCI2OSendPacket(dev, (U32)NULL, (PRCTCB)ptcb))
+         != RC_RTN_NO_ERROR) {
+        dprintk("RC send error 0x%x\n", (uint)status);
         return 1;
-    }
-    else
-    {
+    } else {
         dev->trans_start = jiffies;
         netif_wake_queue(dev);
     }
@@ -477,103 +421,77 @@ static void
 RCxmit_callback(U32 Status, 
                 U16 PcktCount, 
                 PU32 BufferContext, 
-                U16 AdapterID)
+                struct net_device *dev)
 {
     struct sk_buff *skb;
-    PDPA pDpa;
-    struct net_device *dev;
+    PDPA pDpa = dev->priv;
 
-        pDpa = PCIAdapters[AdapterID];
-        if (!pDpa)
-        {
-            printk("rc: Fatal error: xmit callback, !pDpa\n");
+    if (!pDpa) {
+            printk(KERN_ERR "(rcpci45 driver:) Fatal error: xmit callback, !pDpa\n");
             return;
-        }
-        dev = pDpa->dev;
+    }
 
-        // printk("xmit_callback: Status = 0x%x\n", (uint)Status);
-        if (Status != I2O_REPLY_STATUS_SUCCESS)
-        {
-            printk("rc: xmit_callback: Status = 0x%x\n", (uint)Status);
-        }
-#ifdef RCDEBUG
-        if (pDpa->shutdown || pDpa->reboot)
-            printk("rc: xmit callback: shutdown||reboot\n");
-#endif
+/*      dprintk("xmit_callback: Status = 0x%x\n", (uint)Status); */
+    if (Status != I2O_REPLY_STATUS_SUCCESS)
+            dprintk("xmit_callback: Status = 0x%x\n", (uint)Status);
+    if (pDpa->shutdown || pDpa->reboot)
+            dprintk("xmit callback: shutdown||reboot\n");
 
-#ifdef RCDEBUG     
-        printk("rc: xmit_callback: PcktCount = %d, BC = 0x%x\n", 
-               (uint)PcktCount, (uint)BufferContext);
-#endif
-        while (PcktCount--)
-        {
+    dprintk("xmit_callback: PcktCount = %d, BC = 0x%x\n", 
+	   (uint)PcktCount, (uint)BufferContext);
+
+    while (PcktCount--) {
             skb = (struct sk_buff *)(BufferContext[0]);
-#ifdef RCDEBUG
-            printk("rc: skb = 0x%x\n", (uint)skb);
-#endif
+            dprintk("skb = 0x%x\n", (uint)skb);
             BufferContext++;
             dev_kfree_skb_irq(skb);
-        }
-	netif_wake_queue(dev);
+    }
+    netif_wake_queue(dev);
 }
 
 static void
-RCreset_callback(U32 Status, U32 p1, U32 p2, U16 AdapterID)
+RCreset_callback(U32 Status, U32 p1, U32 p2, struct net_device *dev)
 {
-    PDPA pDpa;
-    struct net_device *dev;
+    PDPA pDpa = dev->priv;
      
-    pDpa = PCIAdapters[AdapterID];
-    dev = pDpa->dev;
-#ifdef RCDEBUG
-    printk("rc: RCreset_callback Status 0x%x\n", (uint)Status);
-#endif
+    dprintk("RCreset_callback Status 0x%x\n", (uint)Status);
     /*
      * Check to see why we were called.
      */
-    if (pDpa->shutdown)
-    {
-        printk("rc: Shutting down interface\n");
+    if (pDpa->shutdown) {
+        printk(KERN_INFO "(rcpci45 driver:) Shutting down interface\n");
         pDpa->shutdown = 0;
         pDpa->reboot = 0;
         MOD_DEC_USE_COUNT; 
-    }
-    else if (pDpa->reboot)
-    {
-        printk("rc: reboot, shutdown adapter\n");
+    } else if (pDpa->reboot) {
+        printk(KERN_INFO "(rcpci45 driver:) reboot, shutdown adapter\n");
         /*
          * We don't set any of the flags in RCShutdownLANCard()
          * and we don't pass a callback routine to it.
          * The adapter will have already initiated the reboot by
          * the time the function returns.
          */
-        RCDisableI2OInterrupts(pDpa->id);
-        RCShutdownLANCard(pDpa->id,0,0,0);
-        printk("rc: scheduling timer...\n");
+        RCDisableI2OInterrupts(dev);
+        RCShutdownLANCard(dev,0,0,0);
+        printk(KERN_INFO "(rcpci45 driver:) scheduling timer...\n");
         init_timer(&pDpa->timer);
         pDpa->timer.expires = RUN_AT((40*HZ)/10); /* 4 sec. */
         pDpa->timer.data = (unsigned long)dev;
         pDpa->timer.function = &rc_timer;    /* timer handler */
         add_timer(&pDpa->timer);
     }
-
-
-
 }
 
 static void
-RCreboot_callback(U32 Status, U32 p1, U32 p2, U16 AdapterID)
+RCreboot_callback(U32 Status, U32 p1, U32 p2, struct net_device *dev)
 {
-    PDPA pDpa;
+    PDPA pDpa = dev->priv;
     
-    pDpa = PCIAdapters[AdapterID];
-#ifdef RCDEBUG
-    printk("rc: RCreboot: rcv buffers outstanding = %d\n", 
+    dprintk("RCreboot: rcv buffers outstanding = %d\n", 
            (uint)pDpa->numOutRcvBuffers);
-#endif
-    if (pDpa->shutdown)
-    {
-        printk("rc: skipping reboot sequence -- shutdown already initiated\n");
+
+    if (pDpa->shutdown) {
+        printk(KERN_INFO "(rcpci45 driver:) skipping reboot sequence -- shutdown already initiated\n");
         return;
     }
     pDpa->reboot = 1;
@@ -587,8 +505,7 @@ RCreboot_callback(U32 Status, U32 p1, U32 p2, U16 AdapterID)
      * schedule a timer callback routine to execute 3 seconds 
      * later; this routine will reinitialize the adapter at that time.
      */
-    RCResetLANCard(pDpa->id, 
-                   RC_RESOURCE_RETURN_POSTED_RX_BUCKETS | 
+    RCResetLANCard(dev, RC_RESOURCE_RETURN_POSTED_RX_BUCKETS | 
                    RC_RESOURCE_RETURN_PEND_TX_BUFFERS,0,
                    (PFNCALLBACK)RCreset_callback);
 }
@@ -615,66 +532,51 @@ RCrecv_callback(U32  Status,
                 U8   PktCount, 
                 U32  BucketsRemain, 
                 PU32 PacketDescBlock, 
-                U16  AdapterID)
+                struct net_device *dev)
 {
 
     U32 len, count;
-    PDPA pDpa;
+    PDPA pDpa = dev->priv;
     struct sk_buff *skb;
-    struct net_device *dev;
     singleTCB tcb;
     psingleTCB ptcb = &tcb;
 
 
-        pDpa = PCIAdapters[AdapterID];
-        dev = pDpa->dev;
+    ptcb->bcount = 1;
+    
+    dprintk("RCrecv_callback: 0x%x, 0x%x, 0x%x\n",
+	   (uint)PktCount, (uint)BucketsRemain, (uint)PacketDescBlock);
 
-        ptcb->bcount = 1;
-
-#ifdef RCDEBUG
-        printk("rc: RCrecv_callback: 0x%x, 0x%x, 0x%x\n",
-               (uint)PktCount, (uint)BucketsRemain, (uint)PacketDescBlock);
-#endif
-        
-#ifdef RCDEBUG
-        if ((pDpa->shutdown || pDpa->reboot) && !Status)
-            printk("shutdown||reboot && !Status: PktCount = %d\n",PktCount);
-#endif
-
-        if ( (Status != I2O_REPLY_STATUS_SUCCESS) || pDpa->shutdown)
-        {
+    if ((pDpa->shutdown || pDpa->reboot) && !Status)
+            dprintk("shutdown||reboot && !Status: PktCount = %d\n",PktCount);
+    
+    if ( (Status != I2O_REPLY_STATUS_SUCCESS) || pDpa->shutdown)
+    {
             /*
              * Free whatever buffers the adapter returned, but don't
              * pass them to the kernel.
              */
-        
-                if (!pDpa->shutdown && !pDpa->reboot)
-                    printk("rc: RCrecv error: status = 0x%x\n", (uint)Status);
-#ifdef RCDEBUG
+	    
+	    if (!pDpa->shutdown && !pDpa->reboot)
+                    printk(KERN_INFO "(rcpci45 driver:) RCrecv error: status = 0x%x\n", (uint)Status);
                 else
-                    printk("rc: Returning %d buffers, status = 0x%x\n", 
+			dprintk("Returning %d buffers, status = 0x%x\n", 
                            PktCount, (uint)Status);
-#endif
             /*
              * TO DO: check the nature of the failure and put the adapter in
              * failed mode if it's a hard failure.  Send a reset to the adapter
              * and free all outstanding memory.
              */
             if (Status == I2O_REPLY_STATUS_ABORT_NO_DATA_TRANSFER)
-            {
-#ifdef RCDEBUG
-                printk("RCrecv status ABORT NO DATA TRANSFER\n");
-#endif
-            }
+                dprintk("RCrecv status ABORT NO DATA TRANSFER\n");
+
             /* check for reset status: I2O_REPLY_STATUS_ABORT_NO_DATA_TRANSFER */ 
             if (PacketDescBlock)
             {
                 while(PktCount--)
                 {
                     skb = (struct sk_buff *)PacketDescBlock[0];
-#ifdef RCDEBUG
-                    printk("free skb 0x%p\n", skb);
-#endif
+                    dprintk("free skb 0x%p\n", skb);
                     dev_kfree_skb (skb);
                     pDpa->numOutRcvBuffers--;
                     PacketDescBlock += BD_SIZE; /* point to next context field */
@@ -687,14 +589,12 @@ RCrecv_callback(U32  Status,
             while(PktCount--)
             {
                 skb = (struct sk_buff *)PacketDescBlock[0];
-#ifdef RCDEBUG
                 if (pDpa->shutdown)
-                    printk("shutdown: skb=0x%x\n", (uint)skb);
+			dprintk("shutdown: skb=0x%x\n", (uint)skb);
 
-                printk("skb = 0x%x: 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x\n", (uint)skb,
+                dprintk("skb = 0x%x: 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x\n", (uint)skb,
                        (uint)skb->data[0], (uint)skb->data[1], (uint)skb->data[2],
                        (uint)skb->data[3], (uint)skb->data[4], (uint)skb->data[5]);
-#endif
 
 #ifdef PROMISCUOUS_BY_DEFAULT   /* early 2.x firmware */
                 if ( (memcmp(dev->dev_addr, skb->data, 6)) &&
@@ -711,15 +611,13 @@ RCrecv_callback(U32  Status,
                     ptcb->b.size = MAX_ETHER_SIZE;
                     ptcb->b.addr = virt_to_bus((void *)skb->data);
 
-                    if ( RCPostRecvBuffers(pDpa->id, (PRCTCB)ptcb ) != RC_RTN_NO_ERROR)
+                    if ( RCPostRecvBuffers(dev, (PRCTCB)ptcb ) != RC_RTN_NO_ERROR)
                     {
-                        printk("rc: RCrecv_callback: post buffer failed!\n");
+                        printk(KERN_WARNING "(rcpci45 driver:) RCrecv_callback: post buffer failed!\n");
                         dev_kfree_skb (skb);
                     }
                     else
-                    {
                         pDpa->numOutRcvBuffers++;
-                    }
                 }
                 else
 #endif /* PROMISCUOUS_BY_DEFAULT */
@@ -768,16 +666,14 @@ RCinterrupt(int irq, void *dev_id, struct pt_regs *regs)
 
     pDpa = (PDPA) (dev->priv);
      
-#ifdef RCDEBUG
     if (pDpa->shutdown)
-        printk("rc: shutdown: service irq\n");
+        dprintk("shutdown: service irq\n");
 
-    printk("RC irq: pDpa = 0x%x, dev = 0x%x, id = %d\n", 
+    dprintk("RC irq: pDpa = 0x%x, dev = 0x%x, id = %d\n", 
            (uint)pDpa, (uint)dev, (uint)pDpa->id);
-    printk("dev = 0x%x\n", (uint)dev);
-#endif
+    dprintk("dev = 0x%x\n", (uint)dev);
 
-    RCProcI2OMsgQ(pDpa->id);
+    RCProcI2OMsgQ(dev);
 }
 
 
@@ -794,12 +690,9 @@ static void rc_timer(unsigned long data)
 
     if (pDpa->reboot)
     {
-        init_status = RCInitI2OMsgLayer(pDpa->id, dev->base_addr, 
-                                    pDpa->PLanApiPA, 
-                                    (PU8)virt_to_bus((void *)pDpa->PLanApiPA),
-                                    (PFNTXCALLBACK)RCxmit_callback,
-                                    (PFNRXCALLBACK)RCrecv_callback,
-                                    (PFNCALLBACK)RCreboot_callback);
+        init_status = RCInitI2OMsgLayer(dev, (PFNTXCALLBACK)RCxmit_callback,
+					(PFNRXCALLBACK)RCrecv_callback,
+					(PFNCALLBACK)RCreboot_callback);
 
         switch(init_status)
         {
@@ -807,8 +700,8 @@ static void rc_timer(unsigned long data)
  
             pDpa->reboot = 0;
             pDpa->shutdown = 0;        /* just in case */
-            RCReportDriverCapability(pDpa->id, DriverControlWord);
-            RCEnableI2OInterrupts(pDpa->id);
+            RCReportDriverCapability(dev, DriverControlWord);
+            RCEnableI2OInterrupts(dev);
 
             if (dev->flags & IFF_UP)
             {
@@ -825,34 +718,34 @@ static void rc_timer(unsigned long data)
                 }
                 pDpa->numOutRcvBuffers = 
                     MAX_NMBR_RCV_BUFFERS - post_buffers;
-                printk("rc: posted %d buffers \r\n", 
+                dprintk("rc: posted %d buffers \r\n", 
                        (uint)pDpa->numOutRcvBuffers);
             }
-            printk("rc: Initialization done.\n");
+            dprintk("Initialization done.\n");
             netif_wake_queue(dev);
             retry=0;
             return;
         case RC_RTN_FREE_Q_EMPTY:
             retry++;
-            printk("rc: inbound free q empty\n");
+            printk(KERN_WARNING "(rcpci45 driver:) inbound free q empty\n");
             break;
         default:
             retry++;
-            printk("rc: bad status after reboot: %d\n", init_status);    
+            printk(KERN_WARNING "(rcpci45 driver:) bad status after reboot: %d\n", init_status);    
             break;
         }
 
         if (retry > REBOOT_REINIT_RETRY_LIMIT)
         {
-            printk("rc: unable to reinitialize adapter after reboot\n");
-            printk("rc: decrementing driver and closing interface\n");
-            RCDisableI2OInterrupts(pDpa->id);
+            printk(KERN_WARNING "(rcpci45 driver:) unable to reinitialize adapter after reboot\n");
+            printk(KERN_WARNING "(rcpci45 driver:) decrementing driver and closing interface\n");
+            RCDisableI2OInterrupts(dev);
             dev->flags &= ~IFF_UP;
             MOD_DEC_USE_COUNT; 
         }
         else
         {
-            printk("rc: rescheduling timer...\n");
+            printk(KERN_INFO "(rcpci45 driver:) rescheduling timer...\n");
             init_timer(&pDpa->timer);
             pDpa->timer.expires = RUN_AT((40*HZ)/10); /* 3 sec. */
             pDpa->timer.data = (unsigned long)dev;
@@ -861,33 +754,26 @@ static void rc_timer(unsigned long data)
         }
     }
     else
-    {
-        printk("rc: timer??\n");
-    }
+        printk(KERN_WARNING "(rcpci45 driver:) timer??\n");
 }
 
 static int
 RCclose(struct net_device *dev)
 {
-
     PDPA pDpa = (PDPA) dev->priv;
 
     netif_stop_queue(dev);
     
-#ifdef RCDEBUG
-    printk("rc: RCclose\r\n");
-#endif
+    dprintk("RCclose\r\n");
+
     if (pDpa->reboot)
     {
-        printk("rc: skipping reset -- adapter already in reboot mode\n");
+        printk(KERN_INFO "(rcpci45 driver:) skipping reset -- adapter already in reboot mode\n");
         dev->flags &= ~IFF_UP;
         pDpa->shutdown = 1;
         return 0;
     }
-#ifdef RCDEBUG
-    printk("rc: receive buffers outstanding: %d\n", 
-           (uint)pDpa->numOutRcvBuffers);
-#endif
+    dprintk("receive buffers outstanding: %d\n", (uint)pDpa->numOutRcvBuffers);
 
     pDpa->shutdown = 1;
 
@@ -898,12 +784,11 @@ RCclose(struct net_device *dev)
      * even if there are none.
      */
 
-    RCShutdownLANCard(pDpa->id, 
-                      RC_RESOURCE_RETURN_POSTED_RX_BUCKETS | 
+    RCShutdownLANCard(dev, RC_RESOURCE_RETURN_POSTED_RX_BUCKETS | 
                       RC_RESOURCE_RETURN_PEND_TX_BUFFERS,0,
                       (PFNCALLBACK)RCreset_callback);
 
-        dev->flags &= ~IFF_UP;
+    dev->flags &= ~IFF_UP;
     return 0;
 }
 
@@ -916,39 +801,35 @@ RCget_stats(struct net_device *dev)
 
     if (!pDpa)
     {
-        printk("rc: RCget_stats: !pDpa\n");
+	dprintk("RCget_stats: !pDpa\n");
         return 0;
     }
     else if (!(dev->flags & IFF_UP))    
     {
-#ifdef RCDEBUG
-        printk("rc: RCget_stats: device down\n");
-#endif
+	dprintk("RCget_stats: device down\n");
         return 0;
     }
 
     memset(&RCstats, 0, sizeof(RCLINKSTATS));
-    if ( (RCGetLinkStatistics(pDpa->id, &RCstats, (void *)0)) == RC_RTN_NO_ERROR )
+    if ( (RCGetLinkStatistics(dev, &RCstats, (void *)0)) == RC_RTN_NO_ERROR )
     {
-#ifdef RCDEBUG
-        printk("rc: TX_good 0x%x\n", (uint)RCstats.TX_good);
-        printk("rc: TX_maxcol 0x%x\n", (uint)RCstats.TX_maxcol);
-        printk("rc: TX_latecol 0x%x\n", (uint)RCstats.TX_latecol);
-        printk("rc: TX_urun 0x%x\n", (uint)RCstats.TX_urun);
-        printk("rc: TX_crs 0x%x\n", (uint)RCstats.TX_crs);
-        printk("rc: TX_def 0x%x\n", (uint)RCstats.TX_def);
-        printk("rc: TX_singlecol 0x%x\n", (uint)RCstats.TX_singlecol);
-        printk("rc: TX_multcol 0x%x\n", (uint)RCstats.TX_multcol);
-        printk("rc: TX_totcol 0x%x\n", (uint)RCstats.TX_totcol);
-
-        printk("rc: Rcv_good 0x%x\n", (uint)RCstats.Rcv_good);
-        printk("rc: Rcv_CRCerr 0x%x\n", (uint)RCstats.Rcv_CRCerr);
-        printk("rc: Rcv_alignerr 0x%x\n", (uint)RCstats.Rcv_alignerr);
-        printk("rc: Rcv_reserr 0x%x\n", (uint)RCstats.Rcv_reserr);
-        printk("rc: Rcv_orun 0x%x\n", (uint)RCstats.Rcv_orun);
-        printk("rc: Rcv_cdt 0x%x\n", (uint)RCstats.Rcv_cdt);
-        printk("rc: Rcv_runt 0x%x\n", (uint)RCstats.Rcv_runt);
-#endif
+	dprintk("TX_good 0x%x\n", (uint)RCstats.TX_good);
+        dprintk("TX_maxcol 0x%x\n", (uint)RCstats.TX_maxcol);
+        dprintk("TX_latecol 0x%x\n", (uint)RCstats.TX_latecol);
+        dprintk("TX_urun 0x%x\n", (uint)RCstats.TX_urun);
+        dprintk("TX_crs 0x%x\n", (uint)RCstats.TX_crs);
+        dprintk("TX_def 0x%x\n", (uint)RCstats.TX_def);
+        dprintk("TX_singlecol 0x%x\n", (uint)RCstats.TX_singlecol);
+        dprintk("TX_multcol 0x%x\n", (uint)RCstats.TX_multcol);
+        dprintk("TX_totcol 0x%x\n", (uint)RCstats.TX_totcol);
+		 
+        dprintk("Rcv_good 0x%x\n", (uint)RCstats.Rcv_good);
+        dprintk("Rcv_CRCerr 0x%x\n", (uint)RCstats.Rcv_CRCerr);
+        dprintk("Rcv_alignerr 0x%x\n", (uint)RCstats.Rcv_alignerr);
+        dprintk("Rcv_reserr 0x%x\n", (uint)RCstats.Rcv_reserr);
+        dprintk("Rcv_orun 0x%x\n", (uint)RCstats.Rcv_orun);
+        dprintk("Rcv_cdt 0x%x\n", (uint)RCstats.Rcv_cdt);
+        dprintk("Rcv_runt 0x%x\n", (uint)RCstats.Rcv_runt);
 
         pDpa->stats.rx_packets = RCstats.Rcv_good; /* total packets received    */
         pDpa->stats.tx_packets = RCstats.TX_good; /* total packets transmitted    */
@@ -1000,9 +881,7 @@ static int RCioctl(struct net_device *dev, struct ifreq *rq, int cmd)
     RCuser_struct RCuser;
     PDPA pDpa = dev->priv;
 
-#if RCDEBUG
-    printk("RCioctl: cmd = 0x%x\n", cmd);
-#endif
+    dprintk("RCioctl: cmd = 0x%x\n", cmd);
  
     if(!capable(CAP_NET_ADMIN))
     	return -EPERM;
@@ -1023,109 +902,107 @@ static int RCioctl(struct net_device *dev, struct ifreq *rq, int cmd)
         if(copy_from_user(&RCuser, rq->ifr_data, sizeof(RCuser)))
              return -EFAULT;
         
-#ifdef RCDEBUG
-        printk("RCioctl: RCuser_cmd = 0x%x\n", RCuser.cmd);
-#endif
+        dprintk("RCioctl: RCuser_cmd = 0x%x\n", RCuser.cmd);
   
         switch(RCuser.cmd)
         {
         case RCUC_GETFWVER:
-            printk("RC GETFWVER\n");
+            printk(KERN_INFO "(rcpci45 driver:) RC GETFWVER\n");
             RCUD_GETFWVER = &RCuser.RCUS_GETFWVER;
-            RCGetFirmwareVer(pDpa->id, (PU8) &RCUD_GETFWVER->FirmString, NULL);
+            RCGetFirmwareVer(dev, (PU8) &RCUD_GETFWVER->FirmString, NULL);
             break;
         case RCUC_GETINFO:
-            printk("RC GETINFO\n");
+            printk(KERN_INFO "(rcpci45 driver:) RC GETINFO\n");
             RCUD_GETINFO = &RCuser.RCUS_GETINFO;
             RCUD_GETINFO -> mem_start = dev->base_addr;
-            RCUD_GETINFO -> mem_end = dev->base_addr + 2*32768;
-            RCUD_GETINFO -> base_addr = pDpa->pci_addr;
+	    RCUD_GETINFO -> mem_end = dev->base_addr + pDpa->pci_addr_len;
+	    RCUD_GETINFO -> base_addr = pDpa->pci_addr;  
             RCUD_GETINFO -> irq = dev->irq;
             break;
         case RCUC_GETIPANDMASK:
-            printk("RC GETIPANDMASK\n");
+            printk(KERN_INFO "(rcpci45 driver:) RC GETIPANDMASK\n");
             RCUD_GETIPANDMASK = &RCuser.RCUS_GETIPANDMASK;
-            RCGetRavlinIPandMask(pDpa->id, (PU32) &RCUD_GETIPANDMASK->IpAddr,
+            RCGetRavlinIPandMask(dev, (PU32) &RCUD_GETIPANDMASK->IpAddr,
                                  (PU32) &RCUD_GETIPANDMASK->NetMask, NULL);
             break;
         case RCUC_GETLINKSTATISTICS:
-            printk("RC GETLINKSTATISTICS\n");
+            printk(KERN_INFO "(rcpci45 driver:) RC GETLINKSTATISTICS\n");
             RCUD_GETLINKSTATISTICS = &RCuser.RCUS_GETLINKSTATISTICS;
-            RCGetLinkStatistics(pDpa->id, (P_RCLINKSTATS) &RCUD_GETLINKSTATISTICS->StatsReturn, NULL);
+            RCGetLinkStatistics(dev, (P_RCLINKSTATS) &RCUD_GETLINKSTATISTICS->StatsReturn, NULL);
             break;
         case RCUC_GETLINKSTATUS:
-            printk("RC GETLINKSTATUS\n");
+            printk(KERN_INFO "(rcpci45 driver:) RC GETLINKSTATUS\n");
             RCUD_GETLINKSTATUS = &RCuser.RCUS_GETLINKSTATUS;
-            RCGetLinkStatus(pDpa->id, (PU32) &RCUD_GETLINKSTATUS->ReturnStatus, NULL);
+            RCGetLinkStatus(dev, (PU32) &RCUD_GETLINKSTATUS->ReturnStatus, NULL);
             break;
         case RCUC_GETMAC:
-            printk("RC GETMAC\n");
+            printk(KERN_INFO "(rcpci45 driver:) RC GETMAC\n");
             RCUD_GETMAC = &RCuser.RCUS_GETMAC;
-            RCGetMAC(pDpa->id, (PU8) &RCUD_GETMAC->mac, NULL);
+            RCGetMAC(dev, NULL);
             break;
         case RCUC_GETPROM:
-            printk("RC GETPROM\n");
+            printk(KERN_INFO "(rcpci45 driver:) RC GETPROM\n");
             RCUD_GETPROM = &RCuser.RCUS_GETPROM;
-            RCGetPromiscuousMode(pDpa->id, (PU32) &RCUD_GETPROM->PromMode, NULL);
+            RCGetPromiscuousMode(dev, (PU32) &RCUD_GETPROM->PromMode, NULL);
             break;
         case RCUC_GETBROADCAST:
-            printk("RC GETBROADCAST\n");
+            printk(KERN_INFO "(rcpci45 driver:) RC GETBROADCAST\n");
             RCUD_GETBROADCAST = &RCuser.RCUS_GETBROADCAST;
-            RCGetBroadcastMode(pDpa->id, (PU32) &RCUD_GETBROADCAST->BroadcastMode, NULL);
+            RCGetBroadcastMode(dev, (PU32) &RCUD_GETBROADCAST->BroadcastMode, NULL);
             break;
         case RCUC_GETSPEED:
-            printk("RC GETSPEED\n");
+            printk(KERN_INFO "(rcpci45 driver:) RC GETSPEED\n");
             if (!(dev->flags & IFF_UP))    
             {
-                printk("RCioctl, GETSPEED error: interface down\n");
+                printk(KERN_ERR "(rcpci45 driver:) RCioctl, GETSPEED error: interface down\n");
                 return -ENODATA;
             }
             RCUD_GETSPEED = &RCuser.RCUS_GETSPEED;
-            RCGetLinkSpeed(pDpa->id, (PU32) &RCUD_GETSPEED->LinkSpeedCode, NULL);
-            printk("RC speed = 0x%u\n", RCUD_GETSPEED->LinkSpeedCode);
+            RCGetLinkSpeed(dev, (PU32) &RCUD_GETSPEED->LinkSpeedCode, NULL);
+            printk(KERN_INFO "(rcpci45 driver:) RC speed = 0x%u\n", RCUD_GETSPEED->LinkSpeedCode);
             break;
         case RCUC_SETIPANDMASK:
-            printk("RC SETIPANDMASK\n");
+            printk(KERN_INFO "(rcpci45 driver:) RC SETIPANDMASK\n");
             RCUD_SETIPANDMASK = &RCuser.RCUS_SETIPANDMASK;
-            printk ("RC New IP Addr = %d.%d.%d.%d, ", (U8) ((RCUD_SETIPANDMASK->IpAddr) & 0xff),
+            printk (KERN_INFO "(rcpci45 driver:) RC New IP Addr = %d.%d.%d.%d, ", (U8) ((RCUD_SETIPANDMASK->IpAddr) & 0xff),
                     (U8) ((RCUD_SETIPANDMASK->IpAddr >>  8) & 0xff),
                     (U8) ((RCUD_SETIPANDMASK->IpAddr >> 16) & 0xff),
                     (U8) ((RCUD_SETIPANDMASK->IpAddr >> 24) & 0xff));
-            printk ("RC New Mask = %d.%d.%d.%d\n", (U8) ((RCUD_SETIPANDMASK->NetMask) & 0xff),
+            printk (KERN_INFO "(rcpci45 driver:) RC New Mask = %d.%d.%d.%d\n", (U8) ((RCUD_SETIPANDMASK->NetMask) & 0xff),
                     (U8) ((RCUD_SETIPANDMASK->NetMask >>  8) & 0xff),
                     (U8) ((RCUD_SETIPANDMASK->NetMask >> 16) & 0xff),
                     (U8) ((RCUD_SETIPANDMASK->NetMask >> 24) & 0xff));
-            RCSetRavlinIPandMask(pDpa->id, (U32) RCUD_SETIPANDMASK->IpAddr,
+            RCSetRavlinIPandMask(dev, (U32) RCUD_SETIPANDMASK->IpAddr,
                                  (U32) RCUD_SETIPANDMASK->NetMask);
             break;
         case RCUC_SETMAC:
-            printk("RC SETMAC\n");
+            printk(KERN_INFO "(rcpci45 driver:) RC SETMAC\n");
             RCUD_SETMAC = &RCuser.RCUS_SETMAC;
-            printk ("RC New MAC addr = %02X:%02X:%02X:%02X:%02X:%02X\n",
+            printk (KERN_INFO "(rcpci45 driver:) RC New MAC addr = %02X:%02X:%02X:%02X:%02X:%02X\n",
                     (U8) (RCUD_SETMAC->mac[0]), (U8) (RCUD_SETMAC->mac[1]), (U8) (RCUD_SETMAC->mac[2]),
                     (U8) (RCUD_SETMAC->mac[3]), (U8) (RCUD_SETMAC->mac[4]), (U8) (RCUD_SETMAC->mac[5]));
-            RCSetMAC(pDpa->id, (PU8) &RCUD_SETMAC->mac);
+            RCSetMAC(dev, (PU8) &RCUD_SETMAC->mac);
             break;
         case RCUC_SETSPEED:
-            printk("RC SETSPEED\n");
+            printk(KERN_INFO "(rcpci45 driver:) RC SETSPEED\n");
             RCUD_SETSPEED = &RCuser.RCUS_SETSPEED;
-            RCSetLinkSpeed(pDpa->id, (U16) RCUD_SETSPEED->LinkSpeedCode);
-            printk("RC New speed = 0x%x\n", RCUD_SETSPEED->LinkSpeedCode);
+            RCSetLinkSpeed(dev, (U16) RCUD_SETSPEED->LinkSpeedCode);
+            printk(KERN_INFO "(rcpci45 driver:) RC New speed = 0x%x\n", RCUD_SETSPEED->LinkSpeedCode);
             break;
         case RCUC_SETPROM:
-            printk("RC SETPROM\n");
+            printk(KERN_INFO "(rcpci45 driver:) RC SETPROM\n");
             RCUD_SETPROM = &RCuser.RCUS_SETPROM;
-            RCSetPromiscuousMode(pDpa->id,(U16)RCUD_SETPROM->PromMode);
-            printk("RC New prom mode = 0x%x\n", RCUD_SETPROM->PromMode);
+            RCSetPromiscuousMode(dev,(U16)RCUD_SETPROM->PromMode);
+            printk(KERN_INFO "(rcpci45 driver:) RC New prom mode = 0x%x\n", RCUD_SETPROM->PromMode);
             break;
         case RCUC_SETBROADCAST:
-            printk("RC SETBROADCAST\n");
+            printk(KERN_INFO "(rcpci45 driver:) RC SETBROADCAST\n");
             RCUD_SETBROADCAST = &RCuser.RCUS_SETBROADCAST;
-            RCSetBroadcastMode(pDpa->id,(U16)RCUD_SETBROADCAST->BroadcastMode);
-            printk("RC New broadcast mode = 0x%x\n", RCUD_SETBROADCAST->BroadcastMode);
+            RCSetBroadcastMode(dev,(U16)RCUD_SETBROADCAST->BroadcastMode);
+            printk(KERN_INFO "(rcpci45 driver:) RC New broadcast mode = 0x%x\n", RCUD_SETBROADCAST->BroadcastMode);
             break;
         default:
-            printk("RC command default\n");
+            printk(KERN_INFO "(rcpci45 driver:) RC command default\n");
             RCUD_DEFAULT = &RCuser.RCUS_DEFAULT;
             RCUD_DEFAULT -> rc = 0x11223344;
             break;
@@ -1147,14 +1024,14 @@ static int RCconfig(struct net_device *dev, struct ifmap *map)
     /*
      * To be completed ...
       */
-    printk("rc: RCconfig\n");
+    dprintk("RCconfig\n");
     return 0;
     if (dev->flags & IFF_UP)    /* can't act on a running interface */
         return -EBUSY;
 
      /* Don't allow changing the I/O address */
     if (map->base_addr != dev->base_addr) {
-        printk(KERN_WARNING "RC pci45: Change I/O address not implemented\n");
+        printk(KERN_WARNING "(rcpci45 driver:)  Change I/O address not implemented\n");
         return -EOPNOTSUPP;
     }
     return 0;
@@ -1175,54 +1052,46 @@ RC_allocate_and_post_buffers(struct net_device *dev, int numBuffers)
 {
 
     int i;
-    PDPA pDpa = (PDPA)dev->priv;
     PU32 p;
     psingleB pB;
     struct sk_buff *skb;
     RC_RETURN status;
+    U32 res;
 
     if (!numBuffers)
         return 0;
     else if (numBuffers > MAX_NMBR_POST_BUFFERS_PER_MSG)
     {
-#ifdef RCDEBUG
-        printk("rc: Too many buffers requested!\n");
-        printk("rc: attempting to allocate only 32 buffers\n");
-#endif
+        dprintk("Too many buffers requested!\n");
+        dprintk("attempting to allocate only 32 buffers\n");
         numBuffers = 32;
     }
     
-    p = (PU32) kmalloc(sizeof(U32) + numBuffers*sizeof(singleB), GFP_ATOMIC);
+    p = (PU32) kmalloc(sizeof(U32) + numBuffers*sizeof(singleB), GFP_KERNEL);
 
-#ifdef RCDEBUG
-    printk("rc: TCB = 0x%x\n", (uint)p);
-#endif
+    dprintk("TCB = 0x%x\n", (uint)p);
 
     if (!p)
     {
-        printk("rc: RCopen: unable to allocate TCB\n");
+        printk(KERN_WARNING "(rcpci45 driver:) RCopen: unable to allocate TCB\n");
         return 0;
     }
 
     p[0] = 0;                              /* Buffer Count */
     pB = (psingleB)((U32)p + sizeof(U32)); /* point to the first buffer */
 
-#ifdef RCDEBUG
-    printk("rc: p[0] = 0x%x, p = 0x%x, pB = 0x%x\n", (uint)p[0], (uint)p, (uint)pB);
-    printk("rc: pB = 0x%x\n", (uint)pB);
-#endif
+    dprintk("p[0] = 0x%x, p = 0x%x, pB = 0x%x\n", (uint)p[0], (uint)p, (uint)pB);
+    dprintk("pB = 0x%x\n", (uint)pB);
 
     for (i=0; i<numBuffers; i++)
     {
         skb = dev_alloc_skb(MAX_ETHER_SIZE+2);
         if (!skb)
         {
-            printk("rc: Doh! RCopen: unable to allocate enough skbs!\n");
+            dprintk("Doh! RCopen: unable to allocate enough skbs!\n");
             if (*p != 0)        /* did we allocate any buffers at all? */
             {
-#ifdef RCDEBUG
-                printk("rc: will post only %d buffers \n", (uint)(*p));
-#endif
+                dprintk("will post only %d buffers \n", (uint)(*p));
                 break;
             }
             else 
@@ -1231,9 +1100,7 @@ RC_allocate_and_post_buffers(struct net_device *dev, int numBuffers)
                 return 0;
             }
         }
-#ifdef RCDEBUG
-        printk("post 0x%x\n", (uint)skb);
-#endif
+        dprintk("post 0x%x\n", (uint)skb);
         skb_reserve(skb, 2);    /* Align IP on 16 byte boundaries */
         pB->context = (U32)skb;
         pB->scount = 1;        /* segment count */
@@ -1243,24 +1110,21 @@ RC_allocate_and_post_buffers(struct net_device *dev, int numBuffers)
         pB++;
     }
 
-    if ( (status = RCPostRecvBuffers(pDpa->id, (PRCTCB)p )) != RC_RTN_NO_ERROR)
+    if ( (status = RCPostRecvBuffers(dev, (PRCTCB)p )) != RC_RTN_NO_ERROR)
     {
-        printk("rc: Post buffer failed with error code 0x%x!\n", status);
+        printk(KERN_WARNING "(rcpci45 driver:) Post buffer failed with error code 0x%x!\n", status);
         pB = (psingleB)((U32)p + sizeof(U32)); /* point to the first buffer */
         while(p[0])
         {
             skb = (struct sk_buff *)pB->context;
-#ifdef RCDEBUG
-            printk("rc: freeing 0x%x\n", (uint)skb);
-#endif
+            dprintk("freeing 0x%x\n", (uint)skb);
             dev_kfree_skb (skb);
             p[0]--;
             pB++;
         }
-#ifdef RCDEBUG
-        printk("rc: freed all buffers, p[0] = %ld\n", p[0]);
-#endif
+        dprintk("freed all buffers, p[0] = %d\n", (uint)p[0]);
     }
+    res = p[0];
     kfree(p);
-    return(p[0]);                /* return the number of posted buffers */
+    return(res);                /* return the number of posted buffers */
 }

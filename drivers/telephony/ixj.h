@@ -93,8 +93,6 @@ typedef union{
 	  char  cbyte;
 } IXJ_CBYTE;
 
-int ixj_WriteDSPCommand(unsigned short, int board);
-
 /******************************************************************************
 *
 *  This structure represents the Hardware Control Register of the CT8020/8021
@@ -1280,6 +1278,8 @@ typedef struct {
 	short fskdata[8000];
 	int fskdcnt;
 } IXJ;
+
+int ixj_WriteDSPCommand(unsigned short, IXJ *);
 
 typedef int (*IXJ_REGFUNC) (IXJ * j, unsigned long arg);
 

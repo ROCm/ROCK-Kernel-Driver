@@ -1,4 +1,4 @@
-// $Id: nj_s.c,v 2.7.6.1 2000/11/29 16:00:14 kai Exp $
+// $Id: nj_s.c,v 2.7.6.2 2001/02/07 11:31:31 kai Exp $
 //
 // This file is (c) under GNU PUBLIC LICENSE
 //
@@ -14,7 +14,7 @@
 #include <linux/ppp_defs.h>
 #include "netjet.h"
 
-const char *NETjet_S_revision = "$Revision: 2.7.6.1 $";
+const char *NETjet_S_revision = "$Revision: 2.7.6.2 $";
 
 static u_char dummyrr(struct IsdnCardState *cs, int chan, u_char off)
 {
@@ -171,6 +171,7 @@ setup_netjet_s(struct IsdnCard *card)
 			PCI_DEVICE_ID_TIGERJET_300,  dev_netjet))) {
 			if (pci_enable_device(dev_netjet))
 				return(0);
+			pci_set_master(dev_netjet);
 			cs->irq = dev_netjet->irq;
 			if (!cs->irq) {
 				printk(KERN_WARNING "NETjet-S: No IRQ for PCI card found\n");

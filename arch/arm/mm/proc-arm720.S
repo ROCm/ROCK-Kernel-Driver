@@ -144,9 +144,9 @@ Ldata_simple:	mrc	p15, 0, r0, c6, c0, 0		@ get FAR
 
 ENTRY(cpu_arm720_data_abort)
 		ldr	r4, [r0]			@ read instruction causing problem
-		mov	r1, r4, lsr #19			@ r1 b1 = L
+		tst	r4, r4, lsr #21			@ C = bit 20
+		sbc	r1, r1, r1			@ r1 = C - 1
 		and	r2, r4, #15 << 24
-		and	r1, r1, #2			@ check read/write bit
 		add	pc, pc, r2, lsr #22		@ Now branch to the relevent processing routine
 		movs	pc, lr
 
@@ -283,23 +283,11 @@ ENTRY(cpu_arm720_proc_fin)
 		ldmfd	sp!, {pc}
 
 /*
- * Function: arm720_proc_do_idle (void)
- *
- * Params  : r0 = call type:
- *           0 = slow idle
- *           1 = fast idle
- *           2 = switch to slow processor clock
- *           3 = switch to fast processor clock
- *
+ * Function: arm720_proc_do_idle(void)
+ * Params  : r0 = unused
  * Purpose : put the processer in proper idle mode
  */
 ENTRY(cpu_arm720_do_idle)
-#if 0 /* FIXME: is this part of the processor? */
-		ldr	r2, =IO_BASE			@ Virt addr of IO
-		add	r2, r2, #0x00050000		@ Start of PMU regs
-		mov	r1, #0x01			@ Idle mode
-		str	r1, [r2, #4]
-#endif
 		mov	pc, lr
 
 /*

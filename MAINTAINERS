@@ -857,6 +857,12 @@ P:	Pavel Machek
 M:	pavel@atrey.karlin.mff.cuni.cz
 S:	Maintained
 
+NETWORK DEVICE DRIVERS
+P:	Jeff Garzik
+M:	jgarzik@mandrakesoft.com
+L:	linux-net@vger.kernel.org
+S:	Maintained
+
 NETWORKING [GENERAL]
 P:	Networking Team
 M:	netdev@oss.sgi.com

@@ -11,11 +11,14 @@
  *   17-02-1999	NP	empeg henry ugly hacks now in a separate file ;)
  *   11-08-1999	PD	SA1101 support added
  *   25-09-1999	RMK	Merged into main ARM tree, cleaned up
- *   12-05-2000 NP	IRQ dispatcher handler for GPIO 11 to 27.
+ *   12-05-2000 NP	IRQ dispatcher handler for GPIOs 11 to 27.
  *   26-05-2000 JD	SA-1111 support added
+ *   01-06-2000 NP	GraphicsClient external IRQ dispatcher
+ *   09-10-2000 NP	Fixed lost interrupts on GPIOs 11 to 27.
  */
 #include <linux/config.h>
 #include <asm/irq.h>
+#include <asm/hardware.h>
 #include <asm/mach-types.h>
 
 #define fixup_irq(x)	(x)
@@ -85,7 +88,7 @@ static void sa1100_GPIO11_27_demux(int irq, void *dev_id,
 		 * unmasked.  However, such situation should happen only
 		 * during the loop below.  Thus all IRQs which aren't 
 		 * enabled at this point are considered spurious.  Those 
-		 * are cleared but only de-activated if they happened twice.
+		 * are cleared but only de-activated if they happen twice.
 		 */
 		spurious = irq & ~GPIO_11_27_enabled;
 		if (spurious) {
@@ -114,20 +117,35 @@ static struct irqaction GPIO11_27_irq = {
 static void sa1100_mask_and_ack_GPIO11_27_irq(unsigned int irq)
 {
 	int mask = (1 << GPIO_11_27_IRQ(irq));
+	GPIO_11_27_spurious &= ~mask;
 	GPIO_11_27_enabled &= ~mask;
 	GEDR = mask;
 }
 
 static void sa1100_mask_GPIO11_27_irq(unsigned int irq)
 {
-	GPIO_11_27_enabled &= ~(1 << GPIO_11_27_IRQ(irq));
+	int mask = (1 << GPIO_11_27_IRQ(irq));
+	GPIO_11_27_spurious &= ~mask;
+	GPIO_11_27_enabled &= ~mask;
 }
 
 static void sa1100_unmask_GPIO11_27_irq(unsigned int irq)
 {
 	int mask = (1 << GPIO_11_27_IRQ(irq));
+	if (GPIO_11_27_spurious & mask) {
+		/* 
+		 * We don't want to miss an interrupt that would have occured
+		 * while it was masked.  Simulate it if it is the case.
+		 */
+		int state = GPLR;
+		if (((state & GPIO_IRQ_rising_edge) | 
+		     (~state & GPIO_IRQ_falling_edge)) & mask) {
+			do_IRQ(irq, NULL);
+			/* we are being called again from do_IRQ() so ... */
+			return;
+		}
+	}
 	GPIO_11_27_enabled |= mask;
-	GPIO_11_27_spurious &= ~mask;
 	GRER = (GRER & ~mask) | (GPIO_IRQ_rising_edge & mask);
 	GFER = (GFER & ~mask) | (GPIO_IRQ_falling_edge & mask);
 }
@@ -245,7 +263,7 @@ static struct irqaction neponset_irq = {
 #endif
 
 
-#if defined(CONFIG_SA1100_GRAPHICSCLIENT) || defined(CONFIG_SA1100_THINCLIENT)
+#if defined(CONFIG_SA1100_GRAPHICSCLIENT)
 
 /*
  * IRQ handler for the ThinClient/GraphicsClient external IRQ controller
@@ -399,8 +417,8 @@ static __inline__ void irq_init_irq(void)
 	}
 #endif
 
-#if defined(CONFIG_SA1100_GRAPHICSCLIENT) || defined(CONFIG_SA1100_THINCLIENT)
-	if( machine_is_graphicsclient()  || machine_is_thinclient() ){
+#if defined(CONFIG_SA1100_GRAPHICSCLIENT)
+	if( machine_is_graphicsclient() ){
 		/* disable all IRQs */
 		ADS_INT_EN1 = 0;
 		ADS_INT_EN2 = 0;

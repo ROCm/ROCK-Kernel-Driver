@@ -85,7 +85,7 @@ static int midiin_add_buffer(struct emu10k1_mididevice *midi_dev, struct midi_hd
 static int emu10k1_midi_open(struct inode *inode, struct file *file)
 {
 	int minor = MINOR(inode->i_rdev);
-	struct emu10k1_card *card;
+	struct emu10k1_card *card=NULL;
 	struct emu10k1_mididevice *midi_dev;
 	struct list_head *entry;
 
@@ -423,6 +423,7 @@ int emu10k1_midi_callback(unsigned long msg, unsigned long refdata, unsigned lon
 		break;
 
 	default:		/* Unknown message */
+		spin_unlock_irqrestore(&midi_spinlock, flags);
 		return -1;
 	}
 

@@ -21,6 +21,6 @@ obj-$(CONFIG_MADGEMC) 	+= madgemc.o
 obj-$(CONFIG_TMSPCI) 	+= tmspci.o
 obj-$(CONFIG_SMCTR) 	+= smctr.o
 
-L_TARGET := tr.a
+O_TARGET := tr.o
 
 include $(TOPDIR)/Rules.make

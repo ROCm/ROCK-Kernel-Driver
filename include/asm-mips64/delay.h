@@ -12,6 +12,8 @@
 
 #include <linux/config.h>
 
+extern unsigned long loops_per_sec;
+
 extern __inline__ void
 __delay(unsigned long loops)
 {

@@ -326,9 +326,10 @@ static inline void move_first_runqueue(struct task_struct * p)
  * "current->state = TASK_RUNNING" to mark yourself runnable
  * without the overhead of this.
  */
-inline void wake_up_process(struct task_struct * p)
+static inline int try_to_wake_up(struct task_struct * p, int synchronous)
 {
 	unsigned long flags;
+	int success = 0;
 
 	/*
 	 * We want the common case fall through straight, thus the goto.
@@ -338,25 +339,17 @@ inline void wake_up_process(struct task_struct * p)
 	if (task_on_runqueue(p))
 		goto out;
 	add_to_runqueue(p);
-	reschedule_idle(p);
+	if (!synchronous)
+		reschedule_idle(p);
+	success = 1;
 out:
 	spin_unlock_irqrestore(&runqueue_lock, flags);
+	return success;
 }
 
-static inline void wake_up_process_synchronous(struct task_struct * p)
+inline int wake_up_process(struct task_struct * p)
 {
-	unsigned long flags;
-
-	/*
-	 * We want the common case fall through straight, thus the goto.
-	 */
-	spin_lock_irqsave(&runqueue_lock, flags);
-	p->state = TASK_RUNNING;
-	if (task_on_runqueue(p))
-		goto out;
-	add_to_runqueue(p);
-out:
-	spin_unlock_irqrestore(&runqueue_lock, flags);
+	return try_to_wake_up(p, 0);
 }
 
 static void process_timeout(unsigned long __data)
@@ -689,64 +682,59 @@ scheduling_in_interrupt:
 	return;
 }
 
+/*
+ * The core wakeup function.  Non-exclusive wakeups (nr_exclusive == 0) just wake everything
+ * up.  If it's an exclusive wakeup (nr_exclusive == small +ve number) then we wake all the
+ * non-exclusive tasks and one exclusive task.
+ *
+ * There are circumstances in which we can try to wake a task which has already
+ * started to run but is not in state TASK_RUNNING.  try_to_wake_up() returns zero
+ * in this (rare) case, and we handle it by contonuing to scan the queue.
+ */
 static inline void __wake_up_common (wait_queue_head_t *q, unsigned int mode,
 			 	     int nr_exclusive, const int sync)
 {
 	struct list_head *tmp, *head;
 	struct task_struct *p;
-	unsigned long flags;
 
-	if (!q)
-		goto out;
-
-	wq_write_lock_irqsave(&q->lock, flags);
-
-#if WAITQUEUE_DEBUG
 	CHECK_MAGIC_WQHEAD(q);
-#endif
-
 	head = &q->task_list;
-#if WAITQUEUE_DEBUG
-        if (!head->next || !head->prev)
-                WQ_BUG();
-#endif
+	WQ_CHECK_LIST_HEAD(head);
 	tmp = head->next;
 	while (tmp != head) {
 		unsigned int state;
                 wait_queue_t *curr = list_entry(tmp, wait_queue_t, task_list);
 
 		tmp = tmp->next;
-
-#if WAITQUEUE_DEBUG
 		CHECK_MAGIC(curr->__magic);
-#endif
 		p = curr->task;
 		state = p->state;
 		if (state & mode) {
-#if WAITQUEUE_DEBUG
-			curr->__waker = (long)__builtin_return_address(0);
-#endif
-			if (sync)
-				wake_up_process_synchronous(p);
-			else
-				wake_up_process(p);
-			if ((curr->flags & WQ_FLAG_EXCLUSIVE) && !--nr_exclusive)
+			WQ_NOTE_WAKER(curr);
+			if (try_to_wake_up(p, sync) && curr->flags && !--nr_exclusive)
 				break;
 		}
 	}
-	wq_write_unlock_irqrestore(&q->lock, flags);
-out:
-	return;
 }
 
 void __wake_up(wait_queue_head_t *q, unsigned int mode, int nr)
 {
-	__wake_up_common(q, mode, nr, 0);
+	if (q) {
+		unsigned long flags;
+		wq_read_lock_irqsave(&q->lock, flags);
+		__wake_up_common(q, mode, nr, 0);
+		wq_read_unlock_irqrestore(&q->lock, flags);
+	}
 }
 
 void __wake_up_sync(wait_queue_head_t *q, unsigned int mode, int nr)
 {
-	__wake_up_common(q, mode, nr, 1);
+	if (q) {
+		unsigned long flags;
+		wq_read_lock_irqsave(&q->lock, flags);
+		__wake_up_common(q, mode, nr, 1);
+		wq_read_unlock_irqrestore(&q->lock, flags);
+	}
 }
 
 #define	SLEEP_ON_VAR				\

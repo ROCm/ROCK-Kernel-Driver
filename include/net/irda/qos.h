@@ -100,10 +100,19 @@ void irda_qos_compute_intersection(struct qos_info *, struct qos_info *);
 
 __u32 irlap_max_line_capacity(__u32 speed, __u32 max_turn_time);
 __u32 irlap_requested_line_capacity(struct qos_info *qos);
-__u32 irlap_min_turn_time_in_bytes(__u32 speed, __u32 min_turn_time);
 
 int msb_index(__u16 byte);
 void irda_qos_bits_to_value(struct qos_info *qos);
+
+/* So simple, how could we not inline those two ?
+ * Note : one byte is 10 bits if you include start and stop bits
+ * Jean II */
+#define irlap_min_turn_time_in_bytes(speed, min_turn_time) (	\
+	speed * min_turn_time / 10000000			\
+)
+#define irlap_xbofs_in_usec(speed, xbofs) (			\
+	xbofs * 10000000 / speed				\
+)
 
 #endif
 

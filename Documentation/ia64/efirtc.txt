@@ -13,7 +13,7 @@ to get access to the Time Service offered by EFI version 0.92.
 
 EFI provides 4 calls one can make once the OS is booted: GetTime(),
 SetTime(), GetWakeupTime(), SetWakeupTime() which are all supported by this driver.
-We describes those calls as well the the design of the driver in the following
+We describe those calls as well the design of the driver in the following
 sections.
 
 II/ Design Decisions

@@ -26,10 +26,7 @@ obj-	:=
 
 # Each configuration option enables a list of files.
 
-ifeq ($(CONFIG_PMAC_PBOOK),y)
-	obj-y			+= mediabay.o
-endif
-
+obj-$(CONFIG_PMAC_PBOOK)	+= mediabay.o
 obj-$(CONFIG_MAC_SERIAL)	+= macserial.o
 obj-$(CONFIG_NVRAM)		+= nvram.o
 obj-$(CONFIG_MAC_HID)		+= mac_hid.o

@@ -118,7 +118,7 @@ static int find_boot_record(struct NFTLrecord *nftl)
 				break;
 			}
 		}
-	ReplUnitTable:
+	ReplUnitTable:;
 	}
 
 	if (boot_record_count == 0) {
@@ -652,7 +652,7 @@ int NFTL_mount(struct NFTLrecord *s)
 				}
 			}
 		}
-	examine_ReplUnitTable:
+	examine_ReplUnitTable:;
 	}
 
 	/* second pass to format unreferenced blocks  and init free block count */

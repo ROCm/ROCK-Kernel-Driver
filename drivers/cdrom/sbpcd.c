@@ -322,6 +322,9 @@
  *		CD_AUDIO_COMPLETED state so workman (and other playes) can repeat play.
  *		Andrew J. Kroll <ag784@freenet.buffalo.edu> Wed Jul 26 04:24:10 EDT 2000
  *
+ *  4.64 Fix module parameters - were being completely ignored.
+ *	 Can also specify max_drives as 3rd setup int to get rid of
+ *	 "ghost" drives on crap hardware (aren't they all?)   Paul Gortmaker
  *
  *  TODO
  *     implement "read all subchannel data" (96 bytes per frame)
@@ -473,7 +476,7 @@ static int sbpcd[] =
 #else
 static int sbpcd[] = {CDROM_PORT, SBPRO}; /* probe with user's setup only */
 #endif
-MODULE_PARM(sbpcd, "2i");
+MODULE_PARM(sbpcd, "3i");
 
 #define NUM_PROBE  (sizeof(sbpcd) / sizeof(int))
 
@@ -561,7 +564,6 @@ static int sbpcd_debug = 0 & ((1<<DBG_INF) |
 
 static int sbpcd_ioaddr = CDROM_PORT;	/* default I/O base address */
 static int sbpro_type = SBPRO;
-static unsigned char setup_done;
 static unsigned char f_16bit;
 static unsigned char do_16bit;
 static int CDo_command, CDo_reset;
@@ -578,15 +580,19 @@ static struct cdrom_read_audio read_audio;
 static unsigned char msgnum;
 static char msgbuf[80];
 
-static const char *str_sb = "SoundBlaster";
+static int max_drives = MAX_DRIVES;
+#ifndef MODULE
+static unsigned char setup_done;
 static const char *str_sb_l = "soundblaster";
+static const char *str_sp_l = "spea";
+static const char *str_ss_l = "soundscape";
+static const char *str_t16_l = "teac16bit";
+static const char *str_ss = "SoundScape";
+#endif
+static const char *str_sb = "SoundBlaster";
 static const char *str_lm = "LaserMate";
 static const char *str_sp = "SPEA";
-static const char *str_sp_l = "spea";
-static const char *str_ss = "SoundScape";
-static const char *str_ss_l = "soundscape";
 static const char *str_t16 = "Teac16bit";
-static const char *str_t16_l = "teac16bit";
 static const char *type;
 
 #if !(SBPCD_ISSUE-1)
@@ -3739,7 +3745,7 @@ static int __init check_drives(void)
 	
 	msg(DBG_INI,"check_drives entered.\n");
 	ndrives=0;
-	for (j=0;j<MAX_DRIVES;j++)
+	for (j=0;j<max_drives;j++)
 	{
 		D_S[ndrives].drv_id=j;
 		if (sbpro_type==1) D_S[ndrives].drv_sel=(j&0x01)<<1|(j&0x02)>>1;
@@ -5540,6 +5546,7 @@ static int sbpcd_setup(char *s)
 int sbpcd_setup(char *s)
 #endif
 {
+#ifndef MODULE
 	int p[4];
 	(void)get_options(s, ARRAY_SIZE(p), p);
 	setup_done++;
@@ -5555,6 +5562,12 @@ int sbpcd_setup(char *s)
 	else if (!strcmp(s,str_t16)) sbpro_type=3;
 	else if (!strcmp(s,str_t16_l)) sbpro_type=3;
 	if (p[0]>0) sbpcd_ioaddr=p[1];
+	if (p[0]>2) max_drives=p[3];
+#else
+	sbpcd_ioaddr = sbpcd[0];
+	sbpro_type = sbpcd[1];
+	max_drives = sbpcd[2];
+#endif
 	
 	CDo_command=sbpcd_ioaddr;
 	CDi_info=sbpcd_ioaddr;

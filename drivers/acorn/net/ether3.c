@@ -46,8 +46,6 @@
  * 1.17	RMK	13/05/2000	Updated for 2.3.99-pre8
  */
 
-static char *version = "ether3 ethernet driver (c) 1995-2000 R.M.King v1.17\n";
-
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -72,13 +70,15 @@ static char *version = "ether3 ethernet driver (c) 1995-2000 R.M.King v1.17\n";
 #include <asm/io.h>
 #include <asm/irq.h>
 
+static const char version[] __initdata = "ether3 ethernet driver (c) 1995-2000 R.M.King v1.17\n";
+
 #include "ether3.h"
 
 static unsigned int net_debug = NET_DEBUG;
 static const card_ids __init ether3_cids[] = {
 	{ MANU_ANT2, PROD_ANT_ETHER3 },
 	{ MANU_ANT,  PROD_ANT_ETHER3 },
-	{ MANU_ANT,  PROD_ANT_ETHERB }, /* trial - will etherb work? */
+	{ MANU_ANT,  PROD_ANT_ETHERB },
 	{ 0xffff, 0xffff }
 };
 
@@ -96,12 +96,6 @@ static void	ether3_timeout(struct net_device *dev);
 #define BUS_16		2
 #define BUS_8		1
 #define BUS_UNKNOWN	0
-
-/*
- * I'm not sure what address we should default to if the internal one
- * is corrupted...
- */
-unsigned char def_eth_addr[6] = {0x00, 'L', 'i', 'n', 'u', 'x'};
 
 /* --------------------------------------------------------------------------- */
 
@@ -214,7 +208,7 @@ ether3_ledon(struct net_device *dev, struct dev_priv *priv)
  * Read the ethernet address string from the on board rom.
  * This is an ascii string!!!
  */
-static void __init
+static int __init
 ether3_addr(char *addr, struct expansion_card *ec)
 {
 	struct in_chunk_dir cd;
@@ -228,13 +222,13 @@ ether3_addr(char *addr, struct expansion_card *ec)
 				break;
 		}
 		if (i == 6)
-			return;
+			return 0;
 	}
 	/* I wonder if we should even let the user continue in this case
 	 *   - no, it would be better to disable the device
 	 */
 	printk(KERN_ERR "ether3: Couldn't read a valid MAC address from card.\n");
-	memcpy(addr, def_eth_addr, 6);
+	return -ENODEV;
 }
 
 /* --------------------------------------------------------------------------- */
@@ -423,12 +417,8 @@ ether3_probe_bus_16(struct net_device *dev, int val)
 static int
 ether3_open(struct net_device *dev)
 {
-	MOD_INC_USE_COUNT;
-
-	if (request_irq(dev->irq, ether3_interrupt, 0, "ether3", dev)) {
-	    	MOD_DEC_USE_COUNT;
+	if (request_irq(dev->irq, ether3_interrupt, 0, "ether3", dev))
 		return -EAGAIN;
-	}
 
 	ether3_init_for_open(dev);
 
@@ -457,7 +447,6 @@ ether3_close(struct net_device *dev)
 
 	free_irq(dev->irq, dev);
 
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -807,7 +796,8 @@ ether3_get_dev(struct net_device *dev, struct expansion_card *ec)
 	ec->irqaddr = (volatile unsigned char *)ioaddr(dev->base_addr);
 	ec->irqmask = 0xf0;
 
-	ether3_addr(dev->dev_addr, ec);
+	if (ether3_addr(dev->dev_addr, ec))
+		name = NULL;
 
 	return name;
 }
@@ -827,12 +817,17 @@ static struct net_device * __init ether3_init_one(struct expansion_card *ec)
 	if (!dev)
 		goto out;
 
+	SET_MODULE_OWNER(dev);
+
 	name = ether3_get_dev(dev, ec);
+	if (!name)
+		goto free;
 
 	/*
 	 * this will not fail - the nature of the bus ensures this
 	 */
-	request_region(dev->base_addr, 128, dev->name);
+	if (!request_region(dev->base_addr, 128, dev->name))
+		goto free;
 
 	priv = (struct dev_priv *) dev->priv;
 
@@ -868,10 +863,9 @@ static struct net_device * __init ether3_init_one(struct expansion_card *ec)
 		break;
 	}
 
-	printk("%s: %s at %lx, IRQ%d, ether address ",
-		dev->name, name, dev->base_addr, dev->irq);
+	printk("%s: %s in slot %d, ", dev->name, name, ec->slot_no);
 	for (i = 0; i < 6; i++)
-		printk(i == 5 ? "%2.2x\n" : "%2.2x:", dev->dev_addr[i]);
+		printk("%2.2x%c", dev->dev_addr[i], i == 5 ? '\n' : ':');
 
 	if (ether3_init_2(dev))
 		goto failed;
@@ -887,6 +881,7 @@ static struct net_device * __init ether3_init_one(struct expansion_card *ec)
 
 failed:
 	release_region(dev->base_addr, 128);
+free:
 	unregister_netdev(dev);
 	kfree(dev);
 out:

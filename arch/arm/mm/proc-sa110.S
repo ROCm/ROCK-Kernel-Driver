@@ -83,9 +83,9 @@ ENTRY(cpu_sa110_data_abort)
 ENTRY(cpu_sa1100_data_abort)
 	ldr	r1, [r0]			@ read aborted instruction
 	mrc	p15, 0, r0, c6, c0, 0		@ get FAR
-	mov	r1, r1, lsr #19			@ b1 = L
+	tst	r1, r1, lsr #21			@ C = bit 20
 	mrc	p15, 0, r3, c5, c0, 0		@ get FSR
-	and	r1, r1, #2
+	sbc	r1, r1, r1			@ r1 = C - 1
 	and	r3, r3, #255
 	mov	pc, lr
 

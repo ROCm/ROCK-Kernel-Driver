@@ -39,34 +39,31 @@
 
 /* Linux specific includes */
 #include <asm/types.h>
-#define kprintf printk
 #ifdef RC_LINUX_MODULE     /* linux modules need non-library version of string functions */
 #include <linux/string.h>
 #else
 #include <string.h>
 #endif
+#include <linux/delay.h> /* for udelay() */
 
-/* PCI/45 Configuration space values */
-#define RC_PCI45_VENDOR_ID  0x4916
-#define RC_PCI45_DEVICE_ID  0x1960
+#include <linux/netdevice.h>
+#include <linux/if_ether.h>
+#include <linux/etherdevice.h>
+#include <linux/skbuff.h>
+
+#include <asm/io.h>
+
+/* Debug stuff. Define for debug output */
+#define RCDEBUG
+
+#ifdef RCDEBUG
+#define dprintk(args...) printk(KERN_DEBUG "(rcpci45 driver:) " args)
+#else
+#define dprintk(args...) { }
+#endif
 
 
- /* RedCreek API function return values */
-#define RC_RTN_NO_ERROR             0
-#define RC_RTN_I2O_NOT_INIT         1
-#define RC_RTN_FREE_Q_EMPTY         2
-#define RC_RTN_TCB_ERROR            3
-#define RC_RTN_TRANSACTION_ERROR    4
-#define RC_RTN_ADAPTER_ALREADY_INIT 5
-#define RC_RTN_MALLOC_ERROR         6
-#define RC_RTN_ADPTR_NOT_REGISTERED 7
-#define RC_RTN_MSG_REPLY_TIMEOUT    8
-#define RC_RTN_NO_I2O_STATUS        9
-#define RC_RTN_NO_FIRM_VER         10
-#define RC_RTN_NO_LINK_SPEED       11
-
-/* Driver capability flags */
-#define WARM_REBOOT_CAPABLE      0x01
+/* Typedefs */
 
  /* scalar data types */
 typedef __u8		U8;
@@ -77,7 +74,6 @@ typedef __u16*		PU16;
 typedef __u32*		PU32;
 typedef unsigned long   BF;
 typedef int             RC_RETURN;
-
 
  /* 
  ** type PFNWAITCALLBACK
@@ -116,7 +112,7 @@ typedef void (*PFNRXCALLBACK)(U32  Status,
                               U8   PktCount,
                               U32  BucketsRemain,
                               PU32 PacketDescBlock,
-                              U16  AdapterID);
+                              struct net_device *);
 
  /* 
  ** type PFNCALLBACK 
@@ -129,7 +125,105 @@ typedef void (*PFNRXCALLBACK)(U32  Status,
 typedef void (*PFNCALLBACK)(U32  Status,
                               U32  Param1,
                               U32  Param2,
-                              U16  AdapterID);
+                              struct net_device *dev);
+
+/*
+**  Message Unit CSR definitions for RedCreek PCI45 board
+*/
+typedef struct tag_rcatu 
+{
+    volatile unsigned long APICRegSel;  /* APIC Register Select */
+    volatile unsigned long reserved0;
+    volatile unsigned long APICWinReg;  /* APIC Window Register */
+    volatile unsigned long reserved1;
+    volatile unsigned long InMsgReg0;   /* inbound message register 0 */
+    volatile unsigned long InMsgReg1;   /* inbound message register 1 */
+    volatile unsigned long OutMsgReg0;  /* outbound message register 0 */
+    volatile unsigned long OutMsgReg1;  /* outbound message register 1 */
+    volatile unsigned long InDoorReg;   /* inbound doorbell register */
+    volatile unsigned long InIntStat;   /* inbound interrupt status register */
+    volatile unsigned long InIntMask;   /* inbound interrupt mask register */
+    volatile unsigned long OutDoorReg;  /* outbound doorbell register */
+    volatile unsigned long OutIntStat;  /* outbound interrupt status register */
+    volatile unsigned long OutIntMask;  /* outbound interrupt mask register */
+    volatile unsigned long reserved2;
+    volatile unsigned long reserved3;
+    volatile unsigned long InQueue;     /* inbound queue port */
+    volatile unsigned long OutQueue;    /* outbound queue port */
+    volatile unsigned long reserved4;
+    volatile unsigned long reserver5;
+    /* RedCreek extension */
+    volatile unsigned long EtherMacLow;
+    volatile unsigned long EtherMacHi;
+    volatile unsigned long IPaddr;
+    volatile unsigned long IPmask;
+} *PATU;
+
+ /* 
+ ** typedef PAB
+ **
+ ** PCI Adapter Block - holds instance specific information.
+ */
+typedef struct
+{
+    PATU             p_atu;                /* ptr to  ATU register block */
+    PU8              pPci45LinBaseAddr;
+    PU8              pLinOutMsgBlock;
+    U32              outMsgBlockPhyAddr; 
+    PFNTXCALLBACK    pTransCallbackFunc;
+    PFNRXCALLBACK    pRecvCallbackFunc;
+    PFNCALLBACK      pRebootCallbackFunc;
+    PFNCALLBACK      pCallbackFunc;
+    U16              IOPState;
+    U16              InboundMFrameSize;
+} *PPAB;
+
+/*
+ * Driver Private Area, DPA.
+ */
+typedef struct
+{
+    U8     id;                        /* the AdapterID */
+
+    /* These two field are basically for the RCioctl function.
+     * I could not determine if they could be avoided. (RAA)*/
+    U32    pci_addr;               /* the pci address of the adapter */
+    U32    pci_addr_len;
+
+    struct timer_list timer;        /*  timer */
+    struct net_device_stats  stats; /* the statistics structure */
+    unsigned long numOutRcvBuffers;/* number of outstanding receive buffers*/
+    unsigned char shutdown;
+    unsigned char reboot;
+    unsigned char nexus;
+    PU8    msgbuf;            /* Pointer to Lan Api Private Area */
+    PU8    PLanApiPA;         /* Pointer to Lan Api Private Area (aligned) */
+    PPAB   pPab;              /* Pointer to the PCI Adapter Block */
+} *PDPA;
+
+
+
+/* PCI/45 Configuration space values */
+#define RC_PCI45_VENDOR_ID  0x4916
+#define RC_PCI45_DEVICE_ID  0x1960
+
+
+ /* RedCreek API function return values */
+#define RC_RTN_NO_ERROR             0
+#define RC_RTN_I2O_NOT_INIT         1
+#define RC_RTN_FREE_Q_EMPTY         2
+#define RC_RTN_TCB_ERROR            3
+#define RC_RTN_TRANSACTION_ERROR    4
+#define RC_RTN_ADAPTER_ALREADY_INIT 5
+#define RC_RTN_MALLOC_ERROR         6
+#define RC_RTN_ADPTR_NOT_REGISTERED 7
+#define RC_RTN_MSG_REPLY_TIMEOUT    8
+#define RC_RTN_NO_I2O_STATUS        9
+#define RC_RTN_NO_FIRM_VER         10
+#define RC_RTN_NO_LINK_SPEED       11
+
+/* Driver capability flags */
+#define WARM_REBOOT_CAPABLE      0x01
 
 /*
 ** Status - Transmit and Receive callback status word 
@@ -298,21 +392,15 @@ typedef PU32 PRCTCB;
  ** transport layer.  This buffer must be a contigous memory block of a 
  ** minimum of 16K bytes and long word aligned.  The user also must provide
  ** the base address of the RedCreek PCI adapter assigned by BIOS or operating
- ** system.  The user provided value AdapterID is a zero based index of the
- ** Ravlin 45/PCI adapter.  This interface number is used in all subsequent API
- ** calls to identify which adpapter for which the function is intended.  
- ** Up to sixteen interfaces are supported with this API.
+ ** system.  
  **
- ** Inputs:  AdapterID - interface number from 0 to 15
- **          pciBaseAddr - virual base address of PCI (set by BIOS)
- **          p_msgbuf - virual address to private message block (min. 16K)
- **          p_phymsgbuf - physical address of private message block
+ ** Inputs:  dev - the net_device struct for the device.
  **          TransmitCallbackFunction - address of user's TX callback function
  **          ReceiveCallbackFunction  - address of user's RX callback function
+ **          RebootCallbackFunction  - address of user's reboot callback function
  **
  */
-RC_RETURN RCInitI2OMsgLayer(U16 AdapterID, U32 pciBaseAddr, 
-                            PU8 p_msgbuf,  PU8 p_phymsgbuf,
+RC_RETURN RCInitI2OMsgLayer(struct net_device *dev,
                             PFNTXCALLBACK TransmitCallbackFunction,
                             PFNRXCALLBACK ReceiveCallbackFunction,
                             PFNCALLBACK   RebootCallbackFunction);
@@ -327,7 +415,7 @@ RC_RETURN RCInitI2OMsgLayer(U16 AdapterID, U32 pciBaseAddr,
  ** 0x04030201 and 0x00FFFFFF on a little endian machine.
  **
  */
-RC_RETURN RCSetRavlinIPandMask(U16 AdapterID, U32 ipAddr, U32 netMask);
+RC_RETURN RCSetRavlinIPandMask(struct net_device *dev, U32 ipAddr, U32 netMask);
 
 
 /*
@@ -339,7 +427,7 @@ RC_RETURN RCSetRavlinIPandMask(U16 AdapterID, U32 ipAddr, U32 netMask);
 ** =========================================================================
 */
 RC_RETURN
-RCGetRavlinIPandMask(U16 AdapterID, PU32 pIpAddr, PU32 pNetMask, 
+RCGetRavlinIPandMask(struct net_device *dev, PU32 pIpAddr, PU32 pNetMask, 
                         PFNWAITCALLBACK WaitCallback);
 
  /* 
@@ -351,7 +439,7 @@ RCGetRavlinIPandMask(U16 AdapterID, PU32 pIpAddr, PU32 pNetMask,
  ** callback functions, TransmitCallbackFunction or ReceiveCallbackFunction,
  ** if a TX or RX transaction has completed.
  */
-void RCProcI2OMsgQ(U16 AdapterID);
+void RCProcI2OMsgQ(struct net_device *dev);
 
 
  /*
@@ -362,8 +450,8 @@ void RCProcI2OMsgQ(U16 AdapterID);
  ** will prevent hardware interrupt to host even though the outbound I2O msg
  ** queue is not emtpy.
  */
-RC_RETURN RCEnableI2OInterrupts(U16 adapterID);
-RC_RETURN RCDisableI2OInterrupts(U16 AdapterID);
+RC_RETURN RCEnableI2OInterrupts(struct net_device *dev);
+RC_RETURN RCDisableI2OInterrupts(struct net_device *dev);
 
 
  /* 
@@ -378,7 +466,7 @@ RC_RETURN RCDisableI2OInterrupts(U16 AdapterID);
  ** to the RedCreek adapter are considered owned by the adapter until the
  ** context is return to user through the ReceiveCallbackFunction.
  */
-RC_RETURN RCPostRecvBuffers(U16 AdapterID, PRCTCB pTransactionCtrlBlock);
+RC_RETURN RCPostRecvBuffers(struct net_device *dev, PRCTCB pTransactionCtrlBlock);
 #define MAX_NMBR_POST_BUFFERS_PER_MSG 32
 
  /*
@@ -391,7 +479,7 @@ RC_RETURN RCPostRecvBuffers(U16 AdapterID, PRCTCB pTransactionCtrlBlock);
  ** Transmit buffer are considered owned by the adapter until context's
  ** returned to user through the TransmitCallbackFunction.
  */
-RC_RETURN RCI2OSendPacket(U16 AdapterID, 
+RC_RETURN RCI2OSendPacket(struct net_device *dev, 
                           U32 context, 
                           PRCTCB pTransactionCtrlBlock);
 
@@ -425,7 +513,7 @@ typedef struct tag_RC_link_stats
  ** If given, not NULL, the function WaitCallback is called during the wait
  ** loop while waiting for the adapter to respond.
  */
-RC_RETURN RCGetLinkStatistics(U16 AdapterID,
+RC_RETURN RCGetLinkStatistics(struct net_device *dev,
                               P_RCLINKSTATS StatsReturnAddr,
                               PFNWAITCALLBACK WaitCallback);
 
@@ -436,7 +524,7 @@ RC_RETURN RCGetLinkStatistics(U16 AdapterID,
  ** If given, not NULL, the function WaitCallback is called during the wait
  ** loop while waiting for the adapter to respond.
  */
-RC_RETURN RCGetLinkStatus(U16 AdapterID, 
+RC_RETURN RCGetLinkStatus(struct net_device *dev, 
                           PU32 pReturnStatus,
                           PFNWAITCALLBACK WaitCallback);
                                
@@ -453,7 +541,7 @@ RC_RETURN RCGetLinkStatus(U16 AdapterID,
  ** adapter runs in promiscous mode because of the dual address requirement.
  ** The MAC address is returned to the unsigned char array pointer to by mac.
  */
-RC_RETURN RCGetMAC(U16 AdapterID, PU8 mac, PFNWAITCALLBACK WaitCallback);
+RC_RETURN RCGetMAC(struct net_device *dev, PFNWAITCALLBACK WaitCallback);
 
  /*
  ** RCSetMAC()
@@ -461,14 +549,14 @@ RC_RETURN RCGetMAC(U16 AdapterID, PU8 mac, PFNWAITCALLBACK WaitCallback);
  ** Set a new user port MAC address.  This address will be returned on
  ** subsequent RCGetMAC() calls.
  */
-RC_RETURN RCSetMAC(U16 AdapterID, PU8 mac);
+RC_RETURN RCSetMAC(struct net_device *dev, PU8 mac);
 
  /*
  ** RCSetLinkSpeed()
  **
  ** set adapter's link speed based on given input code.
  */
-RC_RETURN RCSetLinkSpeed(U16 AdapterID, U16 LinkSpeedCode);
+RC_RETURN RCSetLinkSpeed(struct net_device *dev, U16 LinkSpeedCode);
  /* Set link speed codes */
 #define LNK_SPD_AUTO_NEG_NWAY   0
 #define LNK_SPD_100MB_FULL      1
@@ -492,10 +580,10 @@ RC_RETURN RCSetLinkSpeed(U16 AdapterID, U16 LinkSpeedCode);
 #define LNK_SPD_10MB_HALF       4
 
 RC_RETURN
-RCGetLinkSpeed(U16 AdapterID, PU32 pLinkSpeedCode, PFNWAITCALLBACK WaitCallback);
+RCGetLinkSpeed(struct net_device *dev, PU32 pLinkSpeedCode, PFNWAITCALLBACK WaitCallback);
 /*
 ** =========================================================================
-** RCSetPromiscuousMode(U16 AdapterID, U16 Mode)
+** RCSetPromiscuousMode(struct net_device *dev, U16 Mode)
 **
 ** Defined values for Mode:
 **  0 - turn off promiscuous mode
@@ -506,10 +594,10 @@ RCGetLinkSpeed(U16 AdapterID, PU32 pLinkSpeedCode, PFNWAITCALLBACK WaitCallback)
 #define PROMISCUOUS_MODE_OFF 0
 #define PROMISCUOUS_MODE_ON  1
 RC_RETURN
-RCSetPromiscuousMode(U16 AdapterID, U16 Mode);
+RCSetPromiscuousMode(struct net_device *dev, U16 Mode);
 /*
 ** =========================================================================
-** RCGetPromiscuousMode(U16 AdapterID, PU32 pMode, PFNWAITCALLBACK WaitCallback)
+** RCGetPromiscuousMode(struct net_device *dev, PU32 pMode, PFNWAITCALLBACK WaitCallback)
 **
 ** get promiscuous mode setting
 **
@@ -520,11 +608,11 @@ RCSetPromiscuousMode(U16 AdapterID, U16 Mode);
 ** =========================================================================
 */
 RC_RETURN
-RCGetPromiscuousMode(U16 AdapterID, PU32 pMode, PFNWAITCALLBACK WaitCallback);
+RCGetPromiscuousMode(struct net_device *dev, PU32 pMode, PFNWAITCALLBACK WaitCallback);
 
 /*
 ** =========================================================================
-** RCSetBroadcastMode(U16 AdapterID, U16 Mode)
+** RCSetBroadcastMode(struct net_device *dev, U16 Mode)
 **
 ** Defined values for Mode:
 **  0 - turn off promiscuous mode
@@ -535,10 +623,10 @@ RCGetPromiscuousMode(U16 AdapterID, PU32 pMode, PFNWAITCALLBACK WaitCallback);
 #define BROADCAST_MODE_OFF 0
 #define BROADCAST_MODE_ON  1
 RC_RETURN
-RCSetBroadcastMode(U16 AdapterID, U16 Mode);
+RCSetBroadcastMode(struct net_device *dev, U16 Mode);
 /*
 ** =========================================================================
-** RCGetBroadcastMode(U16 AdapterID, PU32 pMode, PFNWAITCALLBACK WaitCallback)
+** RCGetBroadcastMode(struct net_device *dev, PU32 pMode, PFNWAITCALLBACK WaitCallback)
 **
 ** get broadcast mode setting
 **
@@ -549,10 +637,10 @@ RCSetBroadcastMode(U16 AdapterID, U16 Mode);
 ** =========================================================================
 */
 RC_RETURN
-RCGetBroadcastMode(U16 AdapterID, PU32 pMode, PFNWAITCALLBACK WaitCallback);
+RCGetBroadcastMode(struct net_device *dev, PU32 pMode, PFNWAITCALLBACK WaitCallback);
 /*
 ** =========================================================================
-** RCReportDriverCapability(U16 AdapterID, U32 capability)
+** RCReportDriverCapability(struct net_device *dev, U32 capability)
 **
 ** Currently defined bits:
 ** WARM_REBOOT_CAPABLE   0x01
@@ -560,7 +648,7 @@ RCGetBroadcastMode(U16 AdapterID, PU32 pMode, PFNWAITCALLBACK WaitCallback);
 ** =========================================================================
 */
 RC_RETURN
-RCReportDriverCapability(U16 AdapterID, U32 capability);
+RCReportDriverCapability(struct net_device *dev, U32 capability);
 
 /*
 ** RCGetFirmwareVer()
@@ -570,7 +658,7 @@ RCReportDriverCapability(U16 AdapterID, U32 capability);
 ** WARNING: user's space pointed to by pFirmString should be at least 60 bytes.
 */
 RC_RETURN
-RCGetFirmwareVer(U16 AdapterID, PU8 pFirmString, PFNWAITCALLBACK WaitCallback);
+RCGetFirmwareVer(struct net_device *dev, PU8 pFirmString, PFNWAITCALLBACK WaitCallback);
 
 /*
 ** ----------------------------------------------
@@ -601,7 +689,7 @@ RCGetFirmwareVer(U16 AdapterID, PU8 pFirmString, PFNWAITCALLBACK WaitCallback);
  ** operation if the receive buffers were returned during LANReset.
  ** Note: The IOP status is not affected by a LAN reset.
  */
-RC_RETURN RCResetLANCard(U16 AdapterID, U16 ResourceFlags, PU32 ReturnAddr, PFNCALLBACK CallbackFunction);
+RC_RETURN RCResetLANCard(struct net_device *dev, U16 ResourceFlags, PU32 ReturnAddr, PFNCALLBACK CallbackFunction);
 
 
  /*
@@ -623,7 +711,7 @@ RC_RETURN RCResetLANCard(U16 AdapterID, U16 ResourceFlags, PU32 ReturnAddr, PFNC
  ** Note: The IOP status is not affected by a LAN shutdown.
  */                                      
 RC_RETURN 
-RCShutdownLANCard(U16 AdapterID, U16 ResourceFlags, PU32 ReturnAddr, PFNCALLBACK CallbackFunction);
+RCShutdownLANCard(struct net_device *dev, U16 ResourceFlags, PU32 ReturnAddr, PFNCALLBACK CallbackFunction);
 
  /*
  ** RCResetIOP();
@@ -633,6 +721,6 @@ RCShutdownLANCard(U16 AdapterID, U16 ResourceFlags, PU32 ReturnAddr, PFNCALLBACK
  **     Clears outbound message Q. 
  */
 RC_RETURN 
-RCResetIOP(U16 AdapterID);
+RCResetIOP(struct net_device *dev);
 
 #endif /* RCLANMTL_H */

@@ -1,11 +1,18 @@
 /*
- * $Id: capi.c,v 1.45 2000/12/02 19:47:29 kai Exp $
+ * $Id: capi.c,v 1.44.6.3 2000/12/17 22:45:08 kai Exp $
  *
  * CAPI 2.0 Interface for Linux
  *
  * Copyright 1996 by Carsten Paeth (calle@calle.in-berlin.de)
  *
  * $Log: capi.c,v $
+ * Revision 1.44.6.3  2000/12/17 22:45:08  kai
+ * That's hopefully it for test13-4
+ *
+ * Revision 1.44.6.2  2000/12/14 23:04:12  kai
+ * Makefile changes and the like for 2.4.0-test13-pre1
+ * No compatiblity code for older kernels yet, but note the branch
+ *
  * Revision 1.45  2000/12/02 19:47:29  kai
  * Change the Makefiles to new style.
  * There may be problems there that I missed, so this shouldn't go into
@@ -247,7 +254,7 @@
 #endif
 #include <linux/slab.h>
 
-static char *revision = "$Revision: 1.45 $";
+static char *revision = "$Revision: 1.44.6.3 $";
 
 MODULE_AUTHOR("Carsten Paeth (calle@calle.in-berlin.de)");
 

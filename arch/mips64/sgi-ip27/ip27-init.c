@@ -472,9 +472,9 @@ void allowboot(void)
 			sprintf(p->comm, "%s%d", "Idle", num_cpus);
 			init_tasks[num_cpus] = p;
 			alloc_cpupda(cpu, num_cpus);
+			del_from_runqueue(p);
 			p->processor = num_cpus;
 			p->has_cpu = 1; /* we schedule the first task manually */
-			del_from_runqueue(p);
 			unhash_process(p);
 			/* Attach to the address space of init_task. */
 			atomic_inc(&init_mm.mm_count);

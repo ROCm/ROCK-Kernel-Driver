@@ -92,8 +92,10 @@ void cpu_idle(void)
 		void (*idle)(void) = pm_idle;
 		if (!idle)
 			idle = arch_idle;
+		leds_event(led_idle_start);
 		while (!current->need_resched)
 			idle();
+		leds_event(led_idle_end);
 		schedule();
 #ifndef CONFIG_NO_PGT_CACHE
 		check_pgt_cache();
@@ -364,20 +366,23 @@ void dump_thread(struct pt_regs * regs, struct user * dump)
  */
 pid_t kernel_thread(int (*fn)(void *), void *arg, unsigned long flags)
 {
-	extern long sys_exit(int) __attribute__((noreturn));
 	pid_t __ret;
 
 	__asm__ __volatile__(
-	"mov	r0, %1		@ kernel_thread sys_clone
+	"orr	r0, %1, %2	@ kernel_thread sys_clone
 	mov	r1, #0
 	"__syscall(clone)"
-	teq	r0, #0		@ if we are the child
-	moveq	fp, #0		@ ensure that fp is zero
-	mov	%0, r0"
+	movs	%0, r0		@ if we are the child
+	bne	1f
+	mov	fp, #0		@ ensure that fp is zero
+	mov	r0, %4
+	mov	lr, pc
+	mov	pc, %3
+	b	sys_exit
+1:	"
         : "=r" (__ret)
-        : "Ir" (flags | CLONE_VM) : "r0", "r1");
-	if (__ret == 0)
-		sys_exit((fn)(arg));
+        : "Ir" (flags), "I" (CLONE_VM), "r" (fn), "r" (arg)
+	: "r0", "r1", "lr");
 	return __ret;
 }
 

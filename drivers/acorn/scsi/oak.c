@@ -59,9 +59,34 @@
 
 #include "../../scsi/scsi.h"
 #include "../../scsi/hosts.h"
-#include "oak.h"
-#include "../../scsi/NCR5380.h"
 #include "../../scsi/constants.h"
+
+#define OAKSCSI_PUBLIC_RELEASE 1
+
+#define NCR5380_read(reg)		oakscsi_read(_instance, reg)
+#define NCR5380_write(reg, value)	oakscsi_write(_instance, reg, value)
+#define do_NCR5380_intr			do_oakscsi_intr
+#define NCR5380_queue_command		oakscsi_queue_command
+#define NCR5380_abort			oakscsi_abort
+#define NCR5380_reset			oakscsi_reset
+#define NCR5380_proc_info		oakscsi_proc_info
+
+int NCR5380_proc_info(char *buffer, char **start, off_t offset,
+		      int length, int hostno, int inout);
+
+#define NCR5380_implementation_fields \
+	int port, ctrl
+
+#define NCR5380_local_declare() \
+        struct Scsi_Host *_instance
+
+#define NCR5380_setup(instance) \
+        _instance = instance
+
+#define BOARD_NORMAL	0
+#define BOARD_NCR53C400	1
+
+#include "../../scsi/NCR5380.h"
 
 #undef START_DMA_INITIATOR_RECEIVE_REG
 #define START_DMA_INITIATOR_RECEIVE_REG (7 + 128)
@@ -129,7 +154,7 @@ int oakscsi_detect(Scsi_Host_Template * tpnt)
 	else
 	    printk (" %d", instance->irq);
 	printk(" options CAN_QUEUE=%d  CMD_PER_LUN=%d release=%d",
-	    CAN_QUEUE, CMD_PER_LUN, OAKSCSI_PUBLIC_RELEASE);
+	    tpnt->can_queue, tpnt->cmd_per_lun, OAKSCSI_PUBLIC_RELEASE);
 	printk("\nscsi%d:", instance->host_no);
 	NCR5380_print_options(instance);
 	printk("\n");
@@ -226,9 +251,37 @@ printk("reading %p len %d\n", addr, len);
 
 #include "../../scsi/NCR5380.c"
 
-#ifdef MODULE
+static Scsi_Host_Template oakscsi_template = {
+	module:		THIS_MODULE,
+	proc_info:	oakscsi_proc_info,
+	name:		"Oak 16-bit SCSI",
+	detect:		oakscsi_detect,
+	release:	oakscsi_release,
+	info:		oakscsi_info,
+	queuecommand:	oakscsi_queue_command,
+	abort:		oakscsi_abort,
+	reset:		oakscsi_reset,
+	can_queue:	16,
+	this_id:	7,
+	sg_tablesize:	SG_ALL,
+	cmd_per_lun:	2,
+	use_clustering:	DISABLE_CLUSTERING
+};
 
-Scsi_Host_Template driver_template = OAK_NCR5380;
+static int __init oakscsi_init(void)
+{
+	scsi_register_module(MODULE_SCSI_HA, &oakscsi_template);
+	if (oakscsi_template.present)
+		return 0;
 
-#include "../../scsi/scsi_module.c"
-#endif
+	scsi_unregister_module(MODULE_SCSI_HA, &oakscsi_template);
+	return -ENODEV;
+}
+
+static void __exit oakscsi_exit(void)
+{
+	scsi_unregister_module(MODULE_SCSI_HA, &oakscsi_template);
+}
+
+module_init(oakscsi_init);
+module_exit(oakscsi_exit);

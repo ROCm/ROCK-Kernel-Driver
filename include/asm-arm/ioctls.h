@@ -65,6 +65,7 @@
 
 #define TIOCMIWAIT	0x545C	/* wait for a change on serial input line(s) */
 #define TIOCGICOUNT	0x545D	/* read serial port inline interrupt counts */
+#define FIOQSIZE	0x545E
 
 /* Used for packet mode */
 #define TIOCPKT_DATA		 0

@@ -26,6 +26,11 @@
 		- Bug fixes and better intr performance (Tjeerd)
 	Version 1.0.2:
 		- Now reads correct MAC address from eeprom
+	Version 1.0.3:
+		- Eliminate redundant priv->tx_full flag
+		- Call netif_start_queue from dev->tx_timeout
+		- wmb() in start_tx() to flush data
+		- Update Tx locking
 
 */
 
@@ -35,7 +40,7 @@ static const char version1[] =
 static const char version2[] =
 "  http://www.scyld.com/network/natsemi.html\n";
 static const char version3[] =
-"  (unofficial 2.4.x kernel port, version 1.0.2, October 6, 2000 Jeff Garzik, Tjeerd Mulder)\n";
+"  (unofficial 2.4.x kernel port, version 1.0.3, January 21, 2001 Jeff Garzik, Tjeerd Mulder)\n";
 /* Updated to recommendations in pci-skeleton v2.03. */
 
 /* Automatically extracted configuration info:
@@ -187,13 +192,14 @@ threaded by the hardware and interrupt handling software.
 
 The send packet thread has partial control over the Tx ring and 'dev->tbusy'
 flag.  It sets the tbusy flag whenever it's queuing a Tx packet. If the next
-queue slot is empty, it clears the tbusy flag when finished otherwise it sets
-the 'lp->tx_full' flag.
+queue slot is empty, it clears the tbusy flag when finished.  Under 2.4, the
+"tbusy flag" is now controlled by netif_{start,stop,wake}_queue() and tested
+by netif_queue_stopped().
 
 The interrupt handler has exclusive control over the Rx ring and records stats
 from the Tx ring.  After reaping the stats, it marks the Tx queue entry as
-empty by incrementing the dirty_tx mark. Iff the 'lp->tx_full' flag is set, it
-clears both the tx_full and tbusy flags.
+empty by incrementing the dirty_tx mark. Iff Tx queueing is stopped and Tx
+entries were reaped, the Tx queue is started and scheduled.
 
 IV. Notes
 
@@ -319,7 +325,6 @@ struct netdev_private {
 	unsigned int cur_rx, dirty_rx;		/* Producer/consumer ring indices */
 	unsigned int cur_tx, dirty_tx;
 	unsigned int rx_buf_sz;				/* Based on MTU+slack. */
-	unsigned int tx_full:1;				/* The Tx queue is full. */
 	/* These values are keep track of the transceiver/media in use. */
 	unsigned int full_duplex:1;			/* Full-duplex operation requested. */
 	unsigned int duplex_lock:1;
@@ -697,7 +702,7 @@ static void tx_timeout(struct net_device *dev)
 
 	dev->trans_start = jiffies;
 	np->stats.tx_errors++;
-	return;
+	netif_start_queue(dev);
 }
 
 
@@ -707,7 +712,6 @@ static void init_ring(struct net_device *dev)
 	struct netdev_private *np = (struct netdev_private *)dev->priv;
 	int i;
 
-	np->tx_full = 0;
 	np->cur_rx = np->cur_tx = 0;
 	np->dirty_rx = np->dirty_tx = 0;
 
@@ -763,11 +767,13 @@ static int start_tx(struct sk_buff *skb, struct net_device *dev)
 	np->cur_tx++;
 
 	/* StrongARM: Explicitly cache flush np->tx_ring and skb->data,skb->len. */
+	wmb();
 
-	if (np->cur_tx - np->dirty_tx >= TX_QUEUE_LEN - 1) {
-		np->tx_full = 1;
+	spin_lock_irq(&np->lock);
+	if (np->cur_tx - np->dirty_tx >= TX_QUEUE_LEN - 1)
 		netif_stop_queue(dev);
-	}
+	spin_unlock_irq(&np->lock);
+
 	/* Wake the potentially-idle transmit channel. */
 	writel(TxOn, dev->base_addr + ChipCmd);
 
@@ -798,9 +804,7 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 #endif
 
 	ioaddr = dev->base_addr;
-	np = (struct netdev_private *)dev->priv;
-
-	spin_lock(&np->lock);
+	np = dev->priv;
 
 	do {
 		u32 intr_status = readl(ioaddr + IntrStatus);
@@ -817,6 +821,8 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 
 		if (intr_status & (IntrRxDone | IntrRxErr | IntrRxIdle | IntrRxOverrun))
 			netdev_rx(dev);
+
+		spin_lock(&np->lock);
 
 		for (; np->cur_tx - np->dirty_tx > 0; np->dirty_tx++) {
 			int entry = np->dirty_tx % TX_RING_SIZE;
@@ -839,12 +845,13 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 			dev_kfree_skb_irq(np->tx_skbuff[entry]);
 			np->tx_skbuff[entry] = 0;
 		}
-		if (np->tx_full
+		if (netif_queue_stopped(dev)
 			&& np->cur_tx - np->dirty_tx < TX_QUEUE_LEN - 4) {
 			/* The ring is no longer full, wake queue. */
-			np->tx_full = 0;
 			netif_wake_queue(dev);
 		}
+
+		spin_unlock(&np->lock);
 
 		/* Abnormal error summary/uncommon events handlers. */
 		if (intr_status & IntrAbnormalSummary)
@@ -873,8 +880,6 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 		}
 	}
 #endif
-
-	spin_unlock(&np->lock);
 }
 
 /* This routine is logically part of the interrupt handler, but separated

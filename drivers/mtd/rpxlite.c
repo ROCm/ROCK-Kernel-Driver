@@ -94,6 +94,7 @@ int __init init_rpxlite(void)
 		return 0;
 	}
 
+	iounmap((void *)rpxlite_map.map_priv_1);
 	return -ENXIO;
 }
 

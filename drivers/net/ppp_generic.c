@@ -1412,6 +1412,7 @@ ppp_receive_nonmp_frame(struct ppp *ppp, struct sk_buff *skb)
 			skb->protocol = htons(npindex_to_ethertype[npi]);
 			skb->mac.raw = skb->data;
 			netif_rx(skb);
+			ppp->dev->last_rx = jiffies;
 		}
 	}
 	return;
@@ -2342,7 +2343,7 @@ ppp_connect_channel(struct channel *pch, int unit)
 	write_lock_bh(&pch->upl);
 	ret = -EINVAL;
 	if (pch->ppp != 0)
-		goto outw;
+		goto outwl;
 	ppp_lock(ppp);
 	spin_lock_bh(&pch->downl);
 	if (pch->chan == 0)		/* need to check this?? */
@@ -2361,7 +2362,7 @@ ppp_connect_channel(struct channel *pch, int unit)
  outr:
 	spin_unlock_bh(&pch->downl);
 	ppp_unlock(ppp);
- outw:
+ outwl:
 	write_unlock_bh(&pch->upl);
  out:
 	spin_unlock(&all_ppp_lock);
@@ -2408,7 +2409,7 @@ static void ppp_destroy_channel(struct channel *pch)
 	kfree(pch);
 }
 
-void __exit ppp_cleanup(void)
+static void __exit ppp_cleanup(void)
 {
 	/* should never happen */
 	if (!list_empty(&all_ppp_units) || !list_empty(&all_channels))

@@ -222,6 +222,21 @@ static int lp_check_status(int minor)
 	return error;
 }
 
+static int lp_wait_ready(int minor)
+{
+	int error = 0;
+	do {
+		error = lp_check_status (minor);
+		if (error && (LP_F(minor) & LP_ABORT))
+			break;
+		if (signal_pending (current)) {
+			error = -EINTR;
+			break;
+		}
+	} while (error);
+	return error;
+}
+
 static ssize_t lp_write(struct file * file, const char * buf,
 		        size_t count, loff_t *ppos)
 {
@@ -259,7 +274,7 @@ static ssize_t lp_write(struct file * file, const char * buf,
 	parport_set_timeout (lp_table[minor].dev,
 			     lp_table[minor].timeout);
 
-	if ((retv = lp_check_status (minor)) == 0)
+	if ((retv = lp_wait_ready (minor)) == 0)
 	do {
 		/* Write the data. */
 		written = parport_write (port, kbuf, copy_size);
@@ -279,9 +294,9 @@ static ssize_t lp_write(struct file * file, const char * buf,
 
 		if (copy_size > 0) {
 			/* incomplete write -> check error ! */
-			int error = lp_check_status (minor);
+			int error = lp_wait_ready (minor);
 
-			if (LP_F(minor) & LP_ABORT) {
+			if (error) {
 				if (retv == 0)
 					retv = error;
 				break;

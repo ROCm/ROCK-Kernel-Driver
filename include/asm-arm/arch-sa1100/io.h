@@ -16,45 +16,17 @@
  * We don't actually have real ISA nor PCI buses, but there is so many 
  * drivers out there that might just work if we fake them...
  */
-#define __io_pci(a)		(PCIO_BASE + (a))
+#define __io(a)			(PCIO_BASE + (a))
 #define __mem_pci(a)		((unsigned long)(a))
 #define __mem_isa(a)		((unsigned long)(a))
-
-#define __ioaddr(p)		__io_pci(p)
 
 /*
  * Generic virtual read/write
  */
-#define __arch_getb(a)		(*(volatile unsigned char *)(a))
-#define __arch_getl(a)		(*(volatile unsigned int  *)(a))
+#define __arch_getw(a)		(*(volatile unsigned short *)(a))
+#define __arch_putw(v,a)	(*(volatile unsigned short *)(a) = (v))
 
-extern __inline__ unsigned int __arch_getw(unsigned long a)
-{
-	unsigned int value;
-	__asm__ __volatile__("ldr%?h	%0, [%1, #0]	@ getw"
-		: "=&r" (value)
-		: "r" (a));
-	return value;
-}
-
-
-#define __arch_putb(v,a)	(*(volatile unsigned char *)(a) = (v))
-#define __arch_putl(v,a)	(*(volatile unsigned int  *)(a) = (v))
-
-extern __inline__ void __arch_putw(unsigned int value, unsigned long a)
-{
-	__asm__ __volatile__("str%?h	%0, [%1, #0]	@ putw"
-		: : "r" (value), "r" (a));
-}
-
-#define inb(p)			__arch_getb(__io_pci(p))
-#define inw(p)			__arch_getw(__io_pci(p))
-#define inl(p)			__arch_getl(__io_pci(p))
-
-#define outb(v,p)		__arch_putb(v,__io_pci(p))
-#define outw(v,p)		__arch_putw(v,__io_pci(p))
-#define outl(v,p)		__arch_putl(v,__io_pci(p))
-
-#define __arch_ioremap		__ioremap
+#define iomem_valid_addr(iomem,sz)	(1)
+#define iomem_to_phys(iomem)		(iomem)
 
 #endif

@@ -45,7 +45,7 @@ Linux 2.4test:
 What Criteria Determine Acceptance
 ----------------------------------
 
-Licensing:	The code must be released to us under the GNU public license. 
+Licensing:	The code must be released to us under the GNU General Public License. 
 		We don't insist on any kind of exclusively GPL licensing,
 		and if you wish the driver to be useful to other communities
 		such as BSD you may well wish to release under multiple

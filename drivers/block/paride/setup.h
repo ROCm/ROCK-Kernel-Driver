@@ -1,6 +1,6 @@
 /*
 	setup.h	   (c) 1997-8   Grant R. Guenther <grant@torque.net>
-		                Under the terms of the GNU public license.
+		                Under the terms of the GNU General Public License.
 
         This is a table driven setup function for kernel modules
         using the module.variable=val,... command line notation.

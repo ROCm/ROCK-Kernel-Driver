@@ -257,11 +257,30 @@ void __init pcibios_fixup_bus(struct pci_bus *bus)
 			(struct arm_pci_sysdata *)bus->sysdata;
 	struct arm_bus_sysdata *busdata;
 
-	if (bus->number < MAX_NR_BUS)
-		busdata = sysdata->bus + bus->number;
-	else
+	if (bus->number >= MAX_NR_BUS)
 		BUG();
 
+	if (bus->self) {
+		struct pci_dev *dev = bus->self;
+		int i;
+
+		for (i = 0; i < 3; i++) {
+			bus->resource[i] = &dev->resource[PCI_BRIDGE_RESOURCES + i];
+			bus->resource[i]->name = bus->name;
+		}
+		bus->resource[0]->start = ioport_resource.start;
+		bus->resource[0]->end   = ioport_resource.end;
+		bus->resource[0]->flags |= pci_bridge_check_io(dev);
+		bus->resource[1]->start = iomem_resource.start;
+		bus->resource[1]->end   = iomem_resource.end;
+		bus->resource[1]->flags |= IORESOURCE_MEM;
+
+		/* Turn off downsteam prefetchable memory address range */
+		bus->resource[2]->start = 1024*1024;
+		bus->resource[2]->end   = bus->resource[2]->start - 1;
+	}
+
+	busdata = sysdata->bus + bus->number;
 	busdata->max_lat = 255;
 
 	/*
@@ -363,10 +382,6 @@ void __init pcibios_fixup_bus(struct pci_bus *bus)
 void __init
 pcibios_fixup_pbus_ranges(struct pci_bus *bus, struct pbus_set_ranges_data *ranges)
 {
-	ranges->io_start -= bus->resource[0]->start;
-	ranges->io_end -= bus->resource[0]->start;
-	ranges->mem_start -= bus->resource[1]->start;
-	ranges->mem_end -= bus->resource[1]->start;
 }
 
 u8 __init no_swizzle(struct pci_dev *dev, u8 *pin)
@@ -442,7 +457,8 @@ void __init pcibios_init(void)
 	hw_pci->init(&sysdata);
 
 	/*
-	 * Other architectures don't seem to do this... should we?
+	 * Claim the currently allocated resources.  This ensures
+	 * that we will not allocate an already inuse region.
 	 */
 	pcibios_claim_resources();
 

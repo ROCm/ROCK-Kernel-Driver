@@ -64,6 +64,7 @@ static struct pending_request *__alloc_pending_request(int flags)
         if (req != NULL) {
                 memset(req, 0, sizeof(struct pending_request));
                 INIT_LIST_HEAD(&req->list);
+                INIT_TQ_LINK(req->tq);
                 req->tq.routine = (void(*)(void*))queue_complete_cb;
         }
 

@@ -92,14 +92,80 @@ ruffian_kill_arch (int mode)
 #endif
 }
 
+/*
+ *  Interrupt routing:
+ *
+ *		Primary bus
+ *	  IdSel		INTA	INTB	INTC	INTD
+ * 21052   13		  -	  -	  -	  -
+ * SIO	   14		 23	  -	  -	  -
+ * 21143   15		 44	  -	  -	  -
+ * Slot 0  17		 43	 42	 41	 40
+ *
+ *		Secondary bus
+ *	  IdSel		INTA	INTB	INTC	INTD
+ * Slot 0   8 (18)	 19	 18	 17	 16
+ * Slot 1   9 (19)	 31	 30	 29	 28
+ * Slot 2  10 (20)	 27	 26	 25	 24
+ * Slot 3  11 (21)	 39	 38	 37	 36
+ * Slot 4  12 (22)	 35	 34	 33	 32
+ * 53c875  13 (23)	 20	  -	  -	  -
+ *
+ */
+
 static int __init
 ruffian_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 {
-	/* We don't know anything about the PCI routing, so leave
-	   the IRQ unchanged.  */
-	return dev->irq;
+        static char irq_tab[11][5] __initdata = {
+	      /*INT  INTA INTB INTC INTD */
+		{-1,  -1,  -1,  -1,  -1},  /* IdSel 13,  21052	     */
+		{-1,  -1,  -1,  -1,  -1},  /* IdSel 14,  SIO	     */
+		{44,  44,  44,  44,  44},  /* IdSel 15,  21143	     */
+		{-1,  -1,  -1,  -1,  -1},  /* IdSel 16,  none	     */
+		{43,  43,  42,  41,  40},  /* IdSel 17,  64-bit slot */
+		/* the next 6 are actually on PCI bus 1, across the bridge */
+		{19,  19,  18,  17,  16},  /* IdSel  8,  slot 0	     */
+		{31,  31,  30,  29,  28},  /* IdSel  9,  slot 1	     */
+		{27,  27,  26,  25,  24},  /* IdSel 10,  slot 2	     */
+		{39,  39,  38,  37,  36},  /* IdSel 11,  slot 3	     */
+		{35,  35,  34,  33,  32},  /* IdSel 12,  slot 4	     */
+		{20,  20,  20,  20,  20},  /* IdSel 13,  53c875	     */
+        };
+	const long min_idsel = 13, max_idsel = 23, irqs_per_slot = 5;
+	return COMMON_TABLE_LOOKUP;
 }
 
+static u8 __init
+ruffian_swizzle(struct pci_dev *dev, u8 *pinp)
+{
+	int slot, pin = *pinp;
+
+	if (dev->bus->number == 0) {
+		slot = PCI_SLOT(dev->devfn);
+	}		
+	/* Check for the built-in bridge.  */
+	else if (PCI_SLOT(dev->bus->self->devfn) == 13) {
+		slot = PCI_SLOT(dev->devfn) + 10;
+	}
+	else 
+	{
+		/* Must be a card-based bridge.  */
+		do {
+			if (PCI_SLOT(dev->bus->self->devfn) == 13) {
+				slot = PCI_SLOT(dev->devfn) + 10;
+				break;
+			}
+			pin = bridge_swizzle(pin, PCI_SLOT(dev->devfn));
+
+			/* Move up the chain of bridges.  */
+			dev = dev->bus->self;
+			/* Slot of the next bridge.  */
+			slot = PCI_SLOT(dev->devfn);
+		} while (dev->bus->self);
+	}
+	*pinp = pin;
+	return slot;
+}
 
 #ifdef BUILDING_FOR_MILO
 /*
@@ -164,6 +230,6 @@ struct alpha_machine_vector ruffian_mv __initmv = {
 	init_pci:		cia_init_pci,
 	kill_arch:		ruffian_kill_arch,
 	pci_map_irq:		ruffian_map_irq,
-	pci_swizzle:		common_swizzle,
+	pci_swizzle:		ruffian_swizzle,
 };
 ALIAS_MV(ruffian)

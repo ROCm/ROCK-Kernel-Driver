@@ -45,10 +45,6 @@ extern void autoirq_setup(int waittime);
 extern unsigned long autoirq_report(int waittime);
 #endif
 
-/* Currently unused - delete in v2.5.x after purging from drivers */
-#define load_8390_module(driver)	0
-#define unload_8390_module()		do { } while (0)
-
 extern int ethdev_init(struct net_device *dev);
 extern void NS8390_init(struct net_device *dev, int startp);
 extern int ei_open(struct net_device *dev);
@@ -67,7 +63,8 @@ struct ei_device {
 	unsigned char mcfilter[8];
 	unsigned open:1;
 	unsigned word16:1;  		/* We have the 16-bit (vs 8-bit) version of the card. */
-	unsigned bigendian:1;		/* 16-bit big endian mode */
+	unsigned bigendian:1;		/* 16-bit big endian mode. Do NOT */
+					/* set this on random 8390 clones! */
 	unsigned txing:1;		/* Transmit Active */
 	unsigned irqlock:1;		/* 8390's intrs disabled when '1'. */
 	unsigned dmaing:1;		/* Remote DMA Active */

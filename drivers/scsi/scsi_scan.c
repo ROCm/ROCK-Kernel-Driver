@@ -492,7 +492,10 @@ static int scan_scsis_single(int channel, int dev, int lun, int *max_dev_lun,
 	SDpnt->expecting_cc_ua = 0;
 	SDpnt->starved = 0;
 
-	SRpnt = scsi_allocate_request(SDpnt);
+	if (NULL == (SRpnt = scsi_allocate_request(SDpnt))) {
+		printk("scan_scsis_single: no memory\n");
+		return 0;
+	}
 
 	/*
 	 * We used to do a TEST_UNIT_READY before the INQUIRY but that was 

@@ -62,6 +62,7 @@ ENTRY(__arch_readsb)
 		ldrb	ip, [r0]
 		orr	r6, r6, ip, lsl #24
 		stmia	r1!, {r3 - r6}
+
 		subs	r2, r2, #16
 		bpl	.insb_16_lp
 
@@ -88,7 +89,7 @@ ENTRY(__arch_readsb)
 		stmia	r1!, {r3, r4}
 
 .insb_no_8:	tst	r2, #4
-		bne	.insb_no_4
+		beq	.insb_no_4
 
 		ldrb	r3, [r0]
 		ldrb	r4, [r0]
@@ -101,6 +102,7 @@ ENTRY(__arch_readsb)
 
 .insb_no_4:	ands	r2, r2, #3
 		LOADREGS(eqfd, sp!, {r4 - r6, pc})
+
 		cmp	r2, #2
 		ldrb	r3, [r0]
 		strb	r3, [r1], #1
@@ -108,4 +110,5 @@ ENTRY(__arch_readsb)
 		strgeb	r3, [r1], #1
 		ldrgtb	r3, [r0]
 		strgtb	r3, [r1]
+
 		LOADREGS(fd, sp!, {r4 - r6, pc})

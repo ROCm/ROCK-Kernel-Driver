@@ -200,6 +200,7 @@ int init_slram(void)
 	if (add_mtd_device(mymtd))
 	{
 		printk("Failed to register new device\n");
+	        iounmap(((struct mypriv *)mymtd->priv)->start);
 		kfree(mymtd->priv);
 		kfree(mymtd);
 		return -EAGAIN;

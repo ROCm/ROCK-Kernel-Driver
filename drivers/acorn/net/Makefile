@@ -14,7 +14,4 @@ obj-$(CONFIG_ARM_ETHERH)	+= etherh.o
 obj-$(CONFIG_ARM_ETHER3)	+= ether3.o
 obj-$(CONFIG_ARM_ETHER1)	+= ether1.o
 
-O_OBJS	:= $(obj-y)
-M_OBJS	:= $(obj-m)
-
 include $(TOPDIR)/Rules.make

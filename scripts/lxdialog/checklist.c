@@ -51,6 +51,10 @@ print_item (WINDOW * win, const char *item, int status,
     mvwaddch(win, choice, item_x, item[0]);
     wattrset (win, selected ? item_selected_attr : item_attr);
     waddstr (win, (char *)item+1);
+    if (selected) {
+    	wmove (win, choice, check_x+1);
+    	wrefresh (win);
+    }
 }
 
 /*

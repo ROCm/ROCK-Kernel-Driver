@@ -99,7 +99,7 @@
 #define HC_EA 0x01L
 
 /* ECARD state structure.  This structure maintains the state
- * for various portions of the the ECARD's onboard hardware.
+ * for various portions of the ECARD's onboard hardware.
  */
 struct ecard_state {
 	u32 control_bits;

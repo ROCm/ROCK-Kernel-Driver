@@ -60,32 +60,32 @@ ENTRY(outsl)
  */
 
 ENTRY(insw)
-		teq	r2, #0
-		RETINSTR(moveq, pc, lr)
 		addr	r0
-		b	__arch_readsw
+		teq	r2, #0
+		bne	__arch_readsw
+		RETINSTR(mov, pc, lr)
 
 ENTRY(insb)
-		teq	r2, #0
-		RETINSTR(moveq, pc, lr)
 		addr	r0
-		b	__arch_readsb
+		teq	r2, #0
+		bne	__arch_readsb
+		RETINSTR(mov, pc, lr)
 
 @ Purpose: write a block of data from memory to a hardware register.
 @ Proto  : outsw(int to_reg, void *from, int len_in_words);
 @ Notes  : increments from
 
 ENTRY(outsw)
-		teq	r2, #0
-		RETINSTR(moveq, pc, lr)
 		addr	r0
-		b	__arch_writesw
+		teq	r2, #0
+		bne	__arch_writesw
+		RETINSTR(mov, pc, lr)
 
 ENTRY(outsb)
-		teq	r2, #0
-		RETINSTR(moveq, pc, lr)
 		addr	r0
-		b	__arch_writesb
+		teq	r2, #0
+		bne	__arch_writesb
+		RETINSTR(mov, pc, lr)
 
 @ Purpose: write a memc register
 @ Proto  : void memc_write(int register, int value);

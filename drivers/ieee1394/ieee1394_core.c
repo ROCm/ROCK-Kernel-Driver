@@ -98,6 +98,7 @@ struct hpsb_packet *alloc_hpsb_packet(size_t data_size)
                 packet->data_size = data_size;
         }
 
+        INIT_TQ_HEAD(packet->complete_tq);
         INIT_LIST_HEAD(&packet->list);
         sema_init(&packet->state_change, 0);
         packet->state = unused;

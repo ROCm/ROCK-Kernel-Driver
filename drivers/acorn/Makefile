@@ -5,8 +5,11 @@
 # removes any old dependencies. DON'T put your own dependencies here
 # unless it's something special (not a .c file).
 
-SUB_DIRS     := block char net scsi
-MOD_SUB_DIRS := $(SUB_DIRS)
-ALL_SUB_DIRS := $(SUB_DIRS)
+subdir-y	:= char
+subdir-m	:= $(subdir-y)
+
+# the BLOCK subdir is included from drivers/block now
+# the SCSI subdir is included from drivers/scsi now
+# the NET subdir is included from drivers/net now
 
 include $(TOPDIR)/Rules.make

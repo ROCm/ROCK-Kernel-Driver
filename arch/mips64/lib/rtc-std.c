@@ -1,5 +1,4 @@
-/* $Id: rtc-std.c,v 1.1 1999/08/21 21:43:01 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -8,6 +7,7 @@
  *
  * Copyright (C) 1998 by Ralf Baechle
  */
+#include <linux/spinlock.h>
 #include <linux/mc146818rtc.h>
 #include <asm/io.h>
 

@@ -7,6 +7,8 @@
  *
  * History:
  *
+ * - Revision 0.1.7 (23 Jan 2001): fix crash resulting from MDA only cards 
+ *				   being detected as Hercules.	 (Paul G.)
  * - Revision 0.1.6 (17 Aug 2000): new style structs
  *                                 documentation
  * - Revision 0.1.5 (13 Mar 2000): spinlocks instead of saveflags();cli();etc
@@ -358,21 +360,22 @@ static int __init hga_card_detect(void)
 		udelay(2);
 	}
 
-	if (p_save != q_save) {
-		switch (inb_p(HGA_STATUS_PORT) & 0x70) {
-			case 0x10:
-				hga_type = TYPE_HERCPLUS;
-				hga_type_name = "HerculesPlus";
-				break;
-			case 0x50:
-				hga_type = TYPE_HERCCOLOR;
-				hga_type_name = "HerculesColor";
-				break;
-			default:
-				hga_type = TYPE_HERC;
-				hga_type_name = "Hercules";
-				break;
-		}
+	if (p_save == q_save) 
+		return 0;
+
+	switch (inb_p(HGA_STATUS_PORT) & 0x70) {
+		case 0x10:
+			hga_type = TYPE_HERCPLUS;
+			hga_type_name = "HerculesPlus";
+			break;
+		case 0x50:
+			hga_type = TYPE_HERCCOLOR;
+			hga_type_name = "HerculesColor";
+			break;
+		default:
+			hga_type = TYPE_HERC;
+			hga_type_name = "Hercules";
+			break;
 	}
 	return 1;
 }

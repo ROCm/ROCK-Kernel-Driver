@@ -598,12 +598,9 @@ fb_mmap(struct file *file, struct vm_area_struct * vma)
 	pgprot_val(vma->vm_page_prot) &= ~_CACHE_MASK;
 	pgprot_val(vma->vm_page_prot) |= _CACHE_UNCACHED;
 #elif defined(__arm__)
-#if defined(CONFIG_CPU_32) && !defined(CONFIG_ARCH_ACORN)
-	/* On Acorn architectures, we want to keep the framebuffer
-	 * cached.
-	 */
-	pgprot_val(vma->vm_page_prot) &= ~(PTE_CACHEABLE | PTE_BUFFERABLE);
-#endif
+	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+	/* This is an IO map - tell maydump to skip this VMA */
+	vma->vm_flags |= VM_IO;
 #elif defined(__sh__)
 	pgprot_val(vma->vm_page_prot) &= ~_PAGE_CACHABLE;
 #else

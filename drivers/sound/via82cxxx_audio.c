@@ -34,8 +34,8 @@
 #include <linux/smp_lock.h>
 #include <linux/ioport.h>
 #include <linux/wrapper.h>
+#include <linux/delay.h>
 #include <asm/io.h>
-#include <asm/delay.h>
 #include <asm/uaccess.h>
 #include <asm/hardirq.h>
 #include <asm/semaphore.h>
@@ -1535,6 +1535,9 @@ static void via_intr_channel (struct via_channel *chan)
 
 	/* acknowledge any flagged bits ASAP */
 	outb (status, chan->iobase);
+
+	if (!chan->sgtable) /* XXX: temporary solution */
+		return;
 
 	/* grab current h/w ptr value */
 	n = atomic_read (&chan->hw_ptr);

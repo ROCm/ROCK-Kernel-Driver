@@ -51,23 +51,52 @@
 #include <linux/signal.h>
 #include <linux/sched.h>
 #include <linux/ioport.h>
-#include <linux/init.h>
 #include <linux/blk.h>
+#include <linux/init.h>
 
 #include <asm/ecard.h>
 #include <asm/io.h>
+#include <asm/irq.h>
 #include <asm/system.h>
 
 #include "../../scsi/scsi.h"
 #include "../../scsi/hosts.h"
-#include "cumana_1.h"
-#include "../../scsi/NCR5380.h"
 #include "../../scsi/constants.h"
+
+#include <scsi/scsicam.h>
+
+#define CUMANASCSI_PUBLIC_RELEASE 1
 
 static const card_ids cumanascsi_cids[] = {
 	{ MANU_CUMANA, PROD_CUMANA_SCSI_1 },
 	{ 0xffff, 0xffff }
 };
+
+#define NCR5380_implementation_fields \
+    int port, ctrl
+
+#define NCR5380_local_declare() \
+        struct Scsi_Host *_instance
+
+#define NCR5380_setup(instance) \
+        _instance = instance
+
+#define NCR5380_read(reg) cumanascsi_read(_instance, reg)
+#define NCR5380_write(reg, value) cumanascsi_write(_instance, reg, value)
+
+#define do_NCR5380_intr do_cumanascsi_intr
+#define NCR5380_queue_command cumanascsi_queue_command
+#define NCR5380_abort cumanascsi_abort
+#define NCR5380_reset cumanascsi_reset
+#define NCR5380_proc_info cumanascsi_proc_info
+
+int NCR5380_proc_info(char *buffer, char **start, off_t offset,
+		      int length, int hostno, int inout);
+
+#define BOARD_NORMAL	0
+#define BOARD_NCR53C400	1
+
+#include "../../scsi/NCR5380.h"
 
 /*
  * Function : cumanascsi_setup(char *str, int *ints)
@@ -79,7 +108,8 @@ static const card_ids cumanascsi_cids[] = {
  *
  */
 
-void cumanascsi_setup(char *str, int *ints) {
+void cumanascsi_setup(char *str, int *ints)
+{
 }
 
 #define CUMANA_ADDRESS(card) (ecard_address((card), ECARD_IOC, ECARD_SLOW) + 0x800)
@@ -141,7 +171,7 @@ int cumanascsi_detect(Scsi_Host_Template * tpnt)
 	else
 	    printk (" %d", instance->irq);
 	printk(" options CAN_QUEUE=%d CMD_PER_LUN=%d release=%d",
-	    CAN_QUEUE, CMD_PER_LUN, CUMANASCSI_PUBLIC_RELEASE);
+	    tpnt->can_queue, tpnt->cmd_per_lun, CUMANASCSI_PUBLIC_RELEASE);
 	printk("\nscsi%d:", instance->host_no);
 	NCR5380_print_options(instance);
 	printk("\n");
@@ -359,9 +389,38 @@ static void cumanascsi_write(struct Scsi_Host *instance, int reg, int value)
 
 #include "../../scsi/NCR5380.c"
 
-#ifdef MODULE
+static Scsi_Host_Template cumanascsi_template = {
+	module:			THIS_MODULE,
+	name:			"Cumana 16-bit SCSI",
+	detect:			cumanascsi_detect,
+	release:		cumanascsi_release,
+	info:			cumanascsi_info,
+	queuecommand:		cumanascsi_queue_command,
+	abort:			cumanascsi_abort,
+	reset:			cumanascsi_reset,
+	bios_param:		scsicam_bios_param,
+	can_queue:		16,
+	this_id:		7,
+	sg_tablesize:		SG_ALL,
+	cmd_per_lun:		2,
+	unchecked_isa_dma:	0,
+	use_clustering:		DISABLE_CLUSTERING
+};
 
-Scsi_Host_Template driver_template = CUMANA_NCR5380;
+static int __init cumanascsi_init(void)
+{
+	scsi_register_module(MODULE_SCSI_HA, &cumanascsi_template);
+	if (cumanascsi_template.present)
+		return 0;
 
-#include "../../scsi/scsi_module.c"
-#endif
+	scsi_unregister_module(MODULE_SCSI_HA, &cumanascsi_template);
+	return -ENODEV;
+}
+
+static void __exit cumanascsi_exit(void)
+{
+	scsi_unregister_module(MODULE_SCSI_HA, &cumanascsi_template);
+}
+
+module_init(cumanascsi_init);
+module_exit(cumanascsi_exit);

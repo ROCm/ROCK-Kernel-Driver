@@ -80,6 +80,10 @@ extern void set_GPIO_IRQ_edge( int gpio_mask, int edge_mask );
  * Implementation specifics
  */
 
+#ifdef CONFIG_SA1100_PANGOLIN
+#include "pangolin.h"
+#endif
+
 #ifdef CONFIG_SA1100_ASSABET
 #include "assabet.h"
 #else
@@ -96,10 +100,6 @@ extern void set_GPIO_IRQ_edge( int gpio_mask, int edge_mask );
 
 #ifdef CONFIG_SA1100_BITSY
 #include "bitsy.h"
-#endif
-
-#if defined(CONFIG_SA1100_THINCLIENT)
-#include "thinclient.h"
 #endif
 
 #if defined(CONFIG_SA1100_GRAPHICSCLIENT)
