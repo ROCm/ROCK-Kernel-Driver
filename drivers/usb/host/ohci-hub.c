@@ -123,11 +123,11 @@ static int ohci_hub_suspend (struct usb_hcd *hcd)
 			if (ohci_readl (&ohci->regs->intrstatus) & OHCI_INTR_SF)
 				break;
 		}
-		dl_done_list (ohci, 0);
+		dl_done_list (ohci, NULL);
 		mdelay (7);
 	}
-	dl_done_list (ohci, 0);
-	finish_unlinks (ohci, OHCI_FRAME_NO(ohci->hcca), 0);
+	dl_done_list (ohci, NULL);
+	finish_unlinks (ohci, OHCI_FRAME_NO(ohci->hcca), NULL);
 	writel (ohci_readl (&ohci->regs->intrstatus), &ohci->regs->intrstatus);
 
 	/* maybe resume can wake root hub */

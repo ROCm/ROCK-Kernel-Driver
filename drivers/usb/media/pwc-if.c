@@ -593,7 +593,8 @@ static void pwc_isoc_handler(struct urb *urb, struct pt_regs *regs)
 	int i, fst, flen;
 	int awake;
 	struct pwc_frame_buf *fbuf;
-	unsigned char *fillptr = 0, *iso_buf = 0;
+	unsigned char *fillptr = NULL;
+	unsigned char *iso_buf = NULL;
 
 	awake = 0;
 	pdev = (struct pwc_device *)urb->context;

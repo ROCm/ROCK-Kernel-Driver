@@ -1499,7 +1499,7 @@ sitd_urb_transaction (
 			list_del (&sitd->sitd_list);
 			sitd_dma = sitd->sitd_dma;
 		} else
-			sitd = 0;
+			sitd = NULL;
 
 		if (!sitd) {
 			spin_unlock_irqrestore (&ehci->lock, flags);
@@ -1600,7 +1600,7 @@ sitd_link_urb (
 	hcd_to_bus (&ehci->hcd)->bandwidth_isoc_reqs++;
 
 	/* fill sITDs frame by frame */
-	for (packet = 0, sitd = 0;
+	for (packet = 0, sitd = NULL;
 			packet < urb->number_of_packets;
 			packet++) {
 
@@ -1626,7 +1626,7 @@ sitd_link_urb (
 
 	/* don't need that schedule data any more */
 	iso_sched_free (stream, sched);
-	urb->hcpriv = 0;
+	urb->hcpriv = NULL;
 
 	timer_action (ehci, TIMER_IO_WATCHDOG);
 	if (!ehci->periodic_sched++)
@@ -1673,8 +1673,8 @@ sitd_complete (
 	}
 
 	usb_put_urb (urb);
-	sitd->urb = 0;
-	sitd->stream = 0;
+	sitd->urb = NULL;
+	sitd->stream = NULL;
 	list_move (&sitd->sitd_list, &stream->free_list);
 	stream->depth -= stream->interval << 3;
 	iso_stream_put (ehci, stream);
@@ -1691,7 +1691,7 @@ sitd_complete (
 	/* give urb back to the driver */
 	dev = usb_get_dev (urb->dev);
 	ehci_urb_done (ehci, urb, regs);
-	urb = 0;
+	urb = NULL;
 
 	/* defer stopping schedule; completion can submit */
 	ehci->periodic_sched--;

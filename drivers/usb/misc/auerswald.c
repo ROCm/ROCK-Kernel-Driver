@@ -699,7 +699,7 @@ static int auerchain_control_msg (pauerchain_t acp, struct usb_device *dev, unsi
 	dr->wLength = cpu_to_le16 (size);
 
 	usb_fill_control_urb (urb, dev, pipe, (unsigned char*)dr, data, size,    /* build urb */
-		          auerchain_blocking_completion,0);
+		          auerchain_blocking_completion, NULL);
 	ret = auerchain_start_wait_urb (acp, urb, timeout, &length);
 
 	usb_free_urb (urb);

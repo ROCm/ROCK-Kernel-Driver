@@ -190,7 +190,7 @@ static struct usb_endpoint_descriptor mdc800_ed [4] =
 
 
 /* The Variable used by the driver */
-static struct mdc800_data* mdc800=0;
+static struct mdc800_data* mdc800;
 
 
 /***************************************************************************
@@ -547,7 +547,7 @@ static void mdc800_usb_disconnect (struct usb_interface *intf)
 		usb_unlink_urb (mdc800->write_urb);
 		usb_unlink_urb (mdc800->download_urb);
 
-		mdc800->dev=0;
+		mdc800->dev = NULL;
 		usb_set_intfdata(intf, NULL);
 	}
 	info ("Mustek MDC800 disconnected from USB.");
@@ -972,8 +972,6 @@ static struct usb_driver mdc800_usb_driver =
 *************************************************************************/
 
 #define try(A)           if ((A) == 0) goto cleanup_on_fail;
-#define try_free_mem(A)  if (A != 0) { kfree (A); A=0; }
-#define try_free_urb(A)  if (A != 0) { usb_free_urb (A); A=0; }
 
 static int __init usb_mdc800_init (void)
 {
@@ -982,7 +980,7 @@ static int __init usb_mdc800_init (void)
 	try (mdc800=kmalloc (sizeof (struct mdc800_data), GFP_KERNEL));
 
 	memset(mdc800, 0, sizeof(struct mdc800_data));
-	mdc800->dev=0;
+	mdc800->dev = NULL;
 	mdc800->open=0;
 	mdc800->state=NOT_CONNECTED;
 	init_MUTEX (&mdc800->io_lock);
@@ -1020,17 +1018,17 @@ cleanup_on_fail:
 	{
 		err ("can't alloc memory!");
 
-		try_free_mem (mdc800->download_urb_buffer);
-		try_free_mem (mdc800->write_urb_buffer);
-		try_free_mem (mdc800->irq_urb_buffer);
+		kfree(mdc800->download_urb_buffer);
+		kfree(mdc800->write_urb_buffer);
+		kfree(mdc800->irq_urb_buffer);
 
-		try_free_urb (mdc800->write_urb);
-		try_free_urb (mdc800->download_urb);
-		try_free_urb (mdc800->irq_urb);
+		usb_free_urb(mdc800->write_urb);
+		usb_free_urb(mdc800->download_urb);
+		usb_free_urb(mdc800->irq_urb);
 
 		kfree (mdc800);
 	}
-	mdc800=0;
+	mdc800 = NULL;
 	return retval;
 }
 
@@ -1048,7 +1046,7 @@ static void __exit usb_mdc800_cleanup (void)
 	kfree (mdc800->download_urb_buffer);
 
 	kfree (mdc800);
-	mdc800=0;
+	mdc800 = NULL;
 }
 
 module_init (usb_mdc800_init);

@@ -1900,7 +1900,7 @@ sensor_get_exposure(struct usb_ov511 *ov, unsigned char *val)
 	case SEN_KS0127:
 	case SEN_KS0127B:
 	case SEN_SAA7111A:
-		val = 0;
+		val = NULL;
 		PDEBUG(3, "Unsupported with this sensor");
 		return -EPERM;
 	default:

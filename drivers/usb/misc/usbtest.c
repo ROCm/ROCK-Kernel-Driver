@@ -121,8 +121,8 @@ get_endpoints (struct usbtest_dev *dev, struct usb_interface *intf)
 	for (tmp = 0; tmp < intf->num_altsetting; tmp++) {
 		unsigned	ep;
 
-		in = out = 0;
-		iso_in = iso_out = 0;
+		in = out = NULL;
+		iso_in = iso_out = NULL;
 		alt = intf->altsetting + tmp;
 
 		/* take the first altsetting with in-bulk + out-bulk;
@@ -216,11 +216,11 @@ static struct urb *simple_alloc_urb (
 	struct urb		*urb;
 
 	if (bytes < 0)
-		return 0;
+		return NULL;
 	urb = usb_alloc_urb (0, SLAB_KERNEL);
 	if (!urb)
 		return urb;
-	usb_fill_bulk_urb (urb, udev, pipe, 0, bytes, simple_callback, 0);
+	usb_fill_bulk_urb (urb, udev, pipe, NULL, bytes, simple_callback, NULL);
 	urb->interval = (udev->speed == USB_SPEED_HIGH)
 			? (INTERRUPT_RATE << 3)
 			: INTERRUPT_RATE;
@@ -231,7 +231,7 @@ static struct urb *simple_alloc_urb (
 			&urb->transfer_dma);
 	if (!urb->transfer_buffer) {
 		usb_free_urb (urb);
-		urb = 0;
+		urb = NULL;
 	} else
 		memset (urb->transfer_buffer, 0, bytes);
 	return urb;
@@ -380,7 +380,7 @@ alloc_sglist (int nents, int max, int vary)
 
 	sg = kmalloc (nents * sizeof *sg, SLAB_KERNEL);
 	if (!sg)
-		return 0;
+		return NULL;
 	memset (sg, 0, nents * sizeof *sg);
 
 	for (i = 0; i < nents; i++) {
@@ -389,7 +389,7 @@ alloc_sglist (int nents, int max, int vary)
 		buf = kmalloc (size, SLAB_KERNEL);
 		if (!buf) {
 			free_sglist (sg, i);
-			return 0;
+			return NULL;
 		}
 		memset (buf, 0, size);
 
@@ -637,7 +637,7 @@ static int ch9_postconfig (struct usbtest_dev *dev)
 
 	/* and sometimes [9.2.6.6] speed dependent descriptors */
 	if (udev->descriptor.bcdUSB == 0x0200) {	/* pre-swapped */
-		struct usb_qualifier_descriptor		*d = 0;
+		struct usb_qualifier_descriptor		*d = NULL;
 
 		/* device qualifier [9.6.2] */
 		retval = usb_get_descriptor (udev,
@@ -817,11 +817,11 @@ error:
 		if ((status = usb_submit_urb (urb, SLAB_ATOMIC)) != 0) {
 			dbg ("can't resubmit ctrl %02x.%02x, err %d",
 				reqp->bRequestType, reqp->bRequest, status);
-			urb->dev = 0;
+			urb->dev = NULL;
 		} else
 			ctx->pending++;
 	} else
-		urb->dev = 0;
+		urb->dev = NULL;
 	
 	/* signal completion when nothing's queued */
 	if (ctx->pending == 0)
@@ -1368,7 +1368,7 @@ static struct urb *iso_alloc_urb (
 	unsigned		i, maxp, packets;
 
 	if (bytes < 0 || !desc)
-		return 0;
+		return NULL;
 	maxp = 0x7ff & desc->wMaxPacketSize;
 	maxp *= 1 + (0x3 & (desc->wMaxPacketSize >> 11));
 	packets = (bytes + maxp - 1) / maxp;
@@ -1385,7 +1385,7 @@ static struct urb *iso_alloc_urb (
 			&urb->transfer_dma);
 	if (!urb->transfer_buffer) {
 		usb_free_urb (urb);
-		return 0;
+		return NULL;
 	}
 	memset (urb->transfer_buffer, 0, bytes);
 	for (i = 0; i < packets; i++) {
