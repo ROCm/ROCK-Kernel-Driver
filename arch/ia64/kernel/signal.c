@@ -1,7 +1,7 @@
 /*
  * Architecture-specific signal handling support.
  *
- * Copyright (C) 1999-2002 Hewlett-Packard Co
+ * Copyright (C) 1999-2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  *
  * Derived from i386 and Alpha versions.
@@ -23,6 +23,7 @@
 #include <linux/wait.h>
 
 #include <asm/ia32.h>
+#include <asm/intrinsics.h>
 #include <asm/uaccess.h>
 #include <asm/rse.h>
 #include <asm/sigcontext.h>
@@ -41,8 +42,12 @@
 # define GET_SIGSET(k,u)	__get_user((k)->sig[0], &(u)->sig[0])
 #endif
 
-#include <asm/intrinsics.h>
 #ifdef ASM_SUPPORTED
+/*
+ * Don't let GCC uses f16-f31 so that when we setup/restore the registers in the signal
+ * context in __kernel_sigtramp(), we can be sure that registers f16-f31 contain user-level
+ * values.
+ */
 register double f16 asm ("f16"); register double f17 asm ("f17");
 register double f18 asm ("f18"); register double f19 asm ("f19");
 register double f20 asm ("f20"); register double f21 asm ("f21");
@@ -195,7 +200,7 @@ copy_siginfo_to_user (siginfo_t *to, siginfo_t *from)
 		      case __SI_TIMER >> 16:
 			err |= __put_user(from->si_tid, &to->si_tid);
 			err |= __put_user(from->si_overrun, &to->si_overrun);
-			err |= __put_user(from->si_value.sival_ptr, &to->si_value.sival_ptr);
+			err |= __put_user(from->si_ptr, &to->si_ptr);
 			break;
 		      case __SI_CHLD >> 16:
 			err |= __put_user(from->si_utime, &to->si_utime);

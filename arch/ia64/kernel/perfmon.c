@@ -39,6 +39,7 @@
 
 #include <asm/bitops.h>
 #include <asm/errno.h>
+#include <asm/intrinsics.h>
 #include <asm/page.h>
 #include <asm/perfmon.h>
 #include <asm/processor.h>
@@ -46,7 +47,6 @@
 #include <asm/system.h>
 #include <asm/uaccess.h>
 #include <asm/delay.h>
-#include <asm/intrinsics.h>
 
 #ifdef CONFIG_PERFMON
 /*
@@ -680,28 +680,28 @@ static int pfm_end_notify_user(pfm_context_t *ctx);
 static inline void
 pfm_clear_psr_pp(void)
 {
-	ia64_rsm(IA64_PSR_PP)
+	ia64_rsm(IA64_PSR_PP);
 	ia64_srlz_i();
 }
 
 static inline void
 pfm_set_psr_pp(void)
 {
-	ia64_ssm(IA64_PSR_PP)
+	ia64_ssm(IA64_PSR_PP);
 	ia64_srlz_i();
 }
 
 static inline void
 pfm_clear_psr_up(void)
 {
-	ia64_rsm(IA64_PSR_UP)
+	ia64_rsm(IA64_PSR_UP);
 	ia64_srlz_i();
 }
 
 static inline void
 pfm_set_psr_up(void)
 {
-	ia64_ssm(IA64_PSR_UP)
+	ia64_ssm(IA64_PSR_UP);
 	ia64_srlz_i();
 }
 
@@ -985,8 +985,7 @@ pfm_restore_monitoring(struct task_struct *task)
 	 */
 	if (ctx->ctx_fl_system && (PFM_CPUINFO_GET() & PFM_CPUINFO_DCR_PP)) {
 		/* disable dcr pp */
-		ia64_setreg(_IA64_REG_CR_DCR,
-				ia64_getreg(_IA64_REG_CR_DCR) & ~IA64_DCR_PP);
+		ia64_setreg(_IA64_REG_CR_DCR, ia64_getreg(_IA64_REG_CR_DCR) & ~IA64_DCR_PP);
 		pfm_clear_psr_pp();
 	} else {
 		pfm_clear_psr_up();
@@ -1033,8 +1032,7 @@ pfm_restore_monitoring(struct task_struct *task)
 	 */
 	if (ctx->ctx_fl_system && (PFM_CPUINFO_GET() & PFM_CPUINFO_DCR_PP)) {
 		/* enable dcr pp */
-		ia64_setreg(_IA64_REG_CR_DCR,
-				ia64_getreg(_IA64_REG_CR_DCR) | IA64_DCR_PP);
+		ia64_setreg(_IA64_REG_CR_DCR, ia64_getreg(_IA64_REG_CR_DCR) | IA64_DCR_PP);
 		ia64_srlz_i();
 	}
 	pfm_set_psr_l(psr);
@@ -1790,8 +1788,7 @@ pfm_syswide_force_stop(void *info)
 	/*
 	 * Update local PMU
 	 */
-	ia64_setreg(_IA64_REG_CR_DCR,
-			ia64_getreg(_IA64_REG_CR_DCR) & ~IA64_DCR_PP);
+	ia64_setreg(_IA64_REG_CR_DCR, ia64_getreg(_IA64_REG_CR_DCR) & ~IA64_DCR_PP);
 	ia64_srlz_i();
 	/*
 	 * update local cpuinfo
@@ -3962,8 +3959,7 @@ pfm_stop(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 		 *
 		 * disable dcr pp
 		 */
-		ia64_setreg(_IA64_REG_CR_DCR,
-				ia64_getreg(_IA64_REG_CR_DCR) & ~IA64_DCR_PP);
+		ia64_setreg(_IA64_REG_CR_DCR, ia64_getreg(_IA64_REG_CR_DCR) & ~IA64_DCR_PP);
 		ia64_srlz_i();
 
 		/*
@@ -4053,8 +4049,7 @@ pfm_start(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 		pfm_set_psr_pp();
 
 		/* enable dcr pp */
-		ia64_setreg(_IA64_REG_CR_DCR,
-				ia64_getreg(_IA64_REG_CR_DCR) | IA64_DCR_PP);
+		ia64_setreg(_IA64_REG_CR_DCR, ia64_getreg(_IA64_REG_CR_DCR) | IA64_DCR_PP);
 		ia64_srlz_i();
 
 		return 0;

@@ -52,10 +52,10 @@ extern unsigned int num_io_spaces;
 
 # ifdef __KERNEL__
 
+#include <asm/intrinsics.h>
 #include <asm/machvec.h>
 #include <asm/page.h>
 #include <asm/system.h>
-#include <asm/intrinsics.h>
 
 /*
  * Change virtual addresses to physical addresses and vv.

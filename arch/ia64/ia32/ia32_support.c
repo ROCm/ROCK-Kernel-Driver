@@ -18,11 +18,11 @@
 #include <linux/personality.h>
 #include <linux/sched.h>
 
+#include <asm/intrinsics.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
 #include <asm/system.h>
 #include <asm/processor.h>
-#include <asm/intrinsics.h>
 
 #include "ia32priv.h"
 

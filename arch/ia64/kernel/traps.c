@@ -14,12 +14,13 @@
 #include <linux/tty.h>
 #include <linux/vt_kern.h>		/* For unblank_screen() */
 
+#include <asm/fpswa.h>
 #include <asm/hardirq.h>
 #include <asm/ia32.h>
+#include <asm/intrinsics.h>
 #include <asm/processor.h>
 #include <asm/uaccess.h>
 
-#include <asm/fpswa.h>
 /*
  * fp_emulate() needs to be able to access and update all floating point registers.  Those
  * saved in pt_regs can be accessed through that structure, but those not saved, will be
@@ -28,7 +29,6 @@
  * by declaring preserved registers that are not marked as "fixed" as global register
  * variables.
  */
-#include <asm/intrinsics.h>
 #ifdef ASM_SUPPORTED
 register double f2 asm ("f2"); register double f3 asm ("f3");
 register double f4 asm ("f4"); register double f5 asm ("f5");

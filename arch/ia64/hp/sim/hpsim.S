@@ -8,4 +8,3 @@ GLOBAL_ENTRY(ia64_ssc)
 	break 0x80001
 	br.ret.sptk.many rp
 END(ia64_ssc)
-

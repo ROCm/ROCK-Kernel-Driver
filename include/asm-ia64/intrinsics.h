@@ -14,9 +14,9 @@
 /* include compiler specific intrinsics */
 #include <asm/ia64regs.h>
 #ifdef __INTEL_COMPILER
-#include <asm/intel_intrin.h>
+# include <asm/intel_intrin.h>
 #else
-#include <asm/gcc_intrin.h>
+# include <asm/gcc_intrin.h>
 #endif
 
 /*
@@ -117,7 +117,7 @@ extern void ia64_xchg_called_with_bad_pointer (void);
  * This function doesn't exist, so you'll get a linker error
  * if something tries to do an invalid cmpxchg().
  */
-extern long ia64_cmpxchg_called_with_bad_pointer(void);
+extern long ia64_cmpxchg_called_with_bad_pointer (void);
 
 #define ia64_cmpxchg(sem,ptr,old,new,size)						\
 ({											\

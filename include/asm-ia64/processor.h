@@ -15,10 +15,10 @@
 
 #include <linux/config.h>
 
-#include <asm/ptrace.h>
-#include <asm/kregs.h>
-#include <asm/ustack.h>
 #include <asm/intrinsics.h>
+#include <asm/kregs.h>
+#include <asm/ptrace.h>
+#include <asm/ustack.h>
 
 #define IA64_NUM_DBG_REGS	8
 /*
@@ -357,13 +357,12 @@ extern unsigned long get_wchan (struct task_struct *p);
 /* Return stack pointer of blocked task TSK.  */
 #define KSTK_ESP(tsk)  ((tsk)->thread.ksp)
 
-extern void ia64_getreg_unknown_kr(void);
-extern void ia64_setreg_unknown_kr(void);
-
+extern void ia64_getreg_unknown_kr (void);
+extern void ia64_setreg_unknown_kr (void);
 
 #define ia64_get_kr(regnum)					\
 ({								\
-	unsigned long r=0;					\
+	unsigned long r = 0;					\
 								\
 	switch (regnum) {					\
 	    case 0: r = ia64_getreg(_IA64_REG_AR_KR0); break;	\
@@ -646,18 +645,18 @@ ia64_get_dbr (__u64 regnum)
 
 /* XXX remove the handcoded version once we have a sufficiently clever compiler... */
 #ifdef SMART_COMPILER
-# define ia64_rotr(w,n)				\
-  ({						\
-	__u64 _w = (w), _n = (n);		\
-						\
-	(_w >> _n) | (_w << (64 - _n));		\
+# define ia64_rotr(w,n)						\
+  ({								\
+	__u64 __ia64_rotr_w = (w), _n = (n);			\
+								\
+	(__ia64_rotr_w >> _n) | (__ia64_rotr_w << (64 - _n));	\
   })
 #else
-# define ia64_rotr(w,n)							\
-  ({									\
-	__u64 result;							\
-	result = ia64_shrp((w), (w), (n));				\
-	result;								\
+# define ia64_rotr(w,n)					\
+  ({							\
+	__u64 __ia64_rotr_w;				\
+	__ia64_rotr_w = ia64_shrp((w), (w), (n));	\
+	__ia64_rotr_w;					\
   })
 #endif
 

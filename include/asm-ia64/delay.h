@@ -5,7 +5,7 @@
  * Delay routines using a pre-computed "cycles/usec" value.
  *
  * Copyright (C) 1998, 1999 Hewlett-Packard Co
- * Copyright (C) 1998, 1999 David Mosberger-Tang <davidm@hpl.hp.com>
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  * Copyright (C) 1999 VA Linux Systems
  * Copyright (C) 1999 Walt Drummond <drummond@valinux.com>
  * Copyright (C) 1999 Asit Mallick <asit.k.mallick@intel.com>
@@ -17,8 +17,8 @@
 #include <linux/sched.h>
 #include <linux/compiler.h>
 
-#include <asm/processor.h>
 #include <asm/intrinsics.h>
+#include <asm/processor.h>
 
 static __inline__ void
 ia64_set_itm (unsigned long val)
@@ -73,7 +73,7 @@ __delay (unsigned long loops)
 	if (loops < 1)
 		return;
 
-	for (;loops--;)
+	while (loops--)
 		ia64_nop(0);
 }
 

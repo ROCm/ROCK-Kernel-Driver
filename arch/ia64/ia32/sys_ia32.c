@@ -51,10 +51,10 @@
 #include <linux/compat.h>
 #include <linux/vfs.h>
 
+#include <asm/intrinsics.h>
+#include <asm/semaphore.h>
 #include <asm/types.h>
 #include <asm/uaccess.h>
-#include <asm/semaphore.h>
-#include <asm/intrinsics.h>
 
 #include "ia32priv.h"
 

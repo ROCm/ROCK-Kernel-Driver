@@ -30,12 +30,12 @@
 
 #include <asm/bitops.h>
 #include <asm/delay.h>
+#include <asm/intrinsics.h>
 #include <asm/io.h>
 #include <asm/hw_irq.h>
 #include <asm/machvec.h>
 #include <asm/pgtable.h>
 #include <asm/system.h>
-#include <asm/intrinsics.h>
 
 #ifdef CONFIG_PERFMON
 # include <asm/perfmon.h>

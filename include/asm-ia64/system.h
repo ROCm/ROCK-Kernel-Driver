@@ -113,19 +113,17 @@ extern struct ia64_boot_param {
 
 /* clearing psr.i is implicitly serialized (visible by next insn) */
 /* setting psr.i requires data serialization */
-#define __local_irq_save(x)					\
-do {								\
-	unsigned long psr;					\
-	psr = ia64_getreg(_IA64_REG_PSR);				\
-	ia64_stop();						\
-	ia64_rsm(IA64_PSR_I);					\
-	(x) = psr;						\
+#define __local_irq_save(x)			\
+do {						\
+	(x) = ia64_getreg(_IA64_REG_PSR);	\
+	ia64_stop();				\
+	ia64_rsm(IA64_PSR_I);			\
 } while (0)
 
-#define __local_irq_disable()					\
-do {								\
-	ia64_stop();						\
-	ia64_rsm(IA64_PSR_I);					\
+#define __local_irq_disable()			\
+do {						\
+	ia64_stop();				\
+	ia64_rsm(IA64_PSR_I);			\
 } while (0)
 
 #define __local_irq_restore(x)	ia64_intrin_local_irq_restore((x) & IA64_PSR_I)
@@ -165,13 +163,13 @@ do {								\
 #endif /* !CONFIG_IA64_DEBUG_IRQ */
 
 #define local_irq_enable()	({ ia64_ssm(IA64_PSR_I); ia64_srlz_d(); })
-#define local_save_flags(flags)	({ (flags) = ia64_getreg(_IA64_REG_PSR); })
+#define local_save_flags(flags)	((flags) = ia64_getreg(_IA64_REG_PSR))
 
 #define irqs_disabled()				\
 ({						\
-	unsigned long flags;			\
-	local_save_flags(flags);		\
-	(flags & IA64_PSR_I) == 0;		\
+	unsigned long __ia64_id_flags;		\
+	local_save_flags(__ia64_id_flags);	\
+	(__ia64_id_flags & IA64_PSR_I) == 0;	\
 })
 
 #ifdef __KERNEL__

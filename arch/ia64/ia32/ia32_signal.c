@@ -24,6 +24,7 @@
 #include <linux/wait.h>
 #include <linux/compat.h>
 
+#include <asm/intrinsics.h>
 #include <asm/uaccess.h>
 #include <asm/rse.h>
 #include <asm/sigcontext.h>
@@ -41,8 +42,11 @@
 #define __IA32_NR_sigreturn            119
 #define __IA32_NR_rt_sigreturn         173
 
-#include <asm/intrinsics.h>
 #ifdef ASM_SUPPORTED
+/*
+ * Don't let GCC uses f16-f31 so that save_ia32_fpstate_live() and
+ * restore_ia32_fpstate_live() can be sure the live register contain user-level state.
+ */
 register double f16 asm ("f16"); register double f17 asm ("f17");
 register double f18 asm ("f18"); register double f19 asm ("f19");
 register double f20 asm ("f20"); register double f21 asm ("f21");
@@ -217,7 +221,7 @@ save_ia32_fpstate_live (struct _fpstate_ia32 *save)
 	if (!access_ok(VERIFY_WRITE, save, sizeof(*save)))
 		return -EFAULT;
 
-	/* Readin fsr, fcr, fir, fdr and copy onto fpstate */
+	/* Read in fsr, fcr, fir, fdr and copy onto fpstate */
 	fsr = ia64_getreg(_IA64_REG_AR_FSR);
 	fcr = ia64_getreg(_IA64_REG_AR_FCR);
 	fir = ia64_getreg(_IA64_REG_AR_FIR);

@@ -741,8 +741,8 @@ cpu_init (void)
 	 * shouldn't be affected by this (moral: keep your ia32 locks aligned and you'll
 	 * be fine).
 	 */
-	ia64_setreg(_IA64_REG_CR_DCR,  IA64_DCR_DP | IA64_DCR_DK | IA64_DCR_DX
-		     | IA64_DCR_DR | IA64_DCR_DA | IA64_DCR_DD | IA64_DCR_LC);
+	ia64_setreg(_IA64_REG_CR_DCR,  (  IA64_DCR_DP | IA64_DCR_DK | IA64_DCR_DX | IA64_DCR_DR
+					| IA64_DCR_DA | IA64_DCR_DD | IA64_DCR_LC));
 	atomic_inc(&init_mm.mm_count);
 	current->active_mm = &init_mm;
 	if (current->mm)

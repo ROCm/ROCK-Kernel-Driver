@@ -10,9 +10,9 @@
 
 #include <linux/mm.h>
 
+#include <asm/intrinsics.h>
 #include <asm/mmu_context.h>
 #include <asm/page.h>
-#include <asm/intrinsics.h>
 
 /*
  * Now for some TLB flushing routines.  This is the kind of stuff that

@@ -8,8 +8,11 @@
 #define _ASM_IA64_IA64REGS_H
 
 /*
-** Register Names for getreg() and setreg()
-*/
+ * Register Names for getreg() and setreg().
+ *
+ * The "magic" numbers happen to match the values used by the Intel compiler's
+ * getreg()/setreg() intrinsics.
+ */
 
 /* Special Registers */
 
@@ -17,15 +20,15 @@
 #define _IA64_REG_PSR		1019
 #define _IA64_REG_PSR_L		1019
 
-    // General Integer Registers
+/* General Integer Registers */
 
-#define _IA64_REG_GP	1025	/* R1 */
-#define _IA64_REG_R8    1032    /* R8 */
-#define _IA64_REG_R9    1033    /* R9 */
-#define _IA64_REG_SP	1036	/* R12 */
-#define _IA64_REG_TP	1037	/* R13 */
+#define _IA64_REG_GP		1025	/* R1 */
+#define _IA64_REG_R8		1032	/* R8 */
+#define _IA64_REG_R9		1033	/* R9 */
+#define _IA64_REG_SP		1036	/* R12 */
+#define _IA64_REG_TP		1037	/* R13 */
 
-    /* Application Registers */
+/* Application Registers */
 
 #define _IA64_REG_AR_KR0	3072
 #define _IA64_REG_AR_KR1	3073
@@ -55,7 +58,7 @@
 #define _IA64_REG_AR_LC		3137
 #define _IA64_REG_AR_EC		3138
 
-    /* Control Registers */
+/* Control Registers */
 
 #define _IA64_REG_CR_DCR	4096
 #define _IA64_REG_CR_ITM	4097
@@ -84,7 +87,7 @@
 #define _IA64_REG_CR_LRR0	4176
 #define _IA64_REG_CR_LRR1	4177
 
-    /* Indirect Registers for getindreg() and setindreg() */
+/* Indirect Registers for getindreg() and setindreg() */
 
 #define _IA64_REG_INDR_CPUID	9000	/* getindreg only */
 #define _IA64_REG_INDR_DBR	9001
@@ -93,6 +96,5 @@
 #define _IA64_REG_INDR_PMC	9004
 #define _IA64_REG_INDR_PMD	9005
 #define _IA64_REG_INDR_RR	9006
-
 
 #endif /* _ASM_IA64_IA64REGS_H */

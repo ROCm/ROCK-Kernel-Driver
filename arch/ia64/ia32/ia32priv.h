@@ -446,8 +446,8 @@ extern unsigned long ia32_do_mmap (struct file *, unsigned long, unsigned long, 
 extern void ia32_load_segment_descriptors (struct task_struct *task);
 
 #define ia32f2ia64f(dst,src)			\
-do { 						\
-	ia64_ldfe(6,src);				\
+do {						\
+	ia64_ldfe(6,src);			\
 	ia64_stop();				\
 	ia64_stf_spill(dst, 6);			\
 } while(0)
@@ -456,7 +456,7 @@ do { 						\
 do {						\
 	ia64_ldf_fill(6, src);			\
 	ia64_stop();				\
-	ia64_stfe(dst, 6);				\
+	ia64_stfe(dst, 6);			\
 } while(0)
 
 struct user_regs_struct32 {
@@ -470,11 +470,8 @@ struct user_regs_struct32 {
 };
 
 /* Prototypes for use in elfcore32.h */
-int save_ia32_fpstate (struct task_struct *tsk,
-                       struct ia32_user_i387_struct *save);
-
-int save_ia32_fpxstate (struct task_struct *tsk,
-			struct ia32_user_fxsr_struct *save);
+extern int save_ia32_fpstate (struct task_struct *tsk, struct ia32_user_i387_struct *save);
+extern int save_ia32_fpxstate (struct task_struct *tsk, struct ia32_user_fxsr_struct *save);
 
 #endif /* !CONFIG_IA32_SUPPORT */
 

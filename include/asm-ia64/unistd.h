@@ -342,8 +342,10 @@ extern pid_t clone (unsigned long flags, void *sp);
 /*
  * "Conditional" syscalls
  *
- * Note, this macro can only be used in the
- * file which defines sys_ni_syscall, i.e., in kernel/sys.c.
+ * Note, this macro can only be used in the file which defines sys_ni_syscall, i.e., in
+ * kernel/sys.c.  This version causes warnings because the declaration isn't a
+ * proper prototype, but we can't use __typeof__ either, because not all cond_syscall()
+ * declarations have prototypes at the moment.
  */
 #define cond_syscall(x) asmlinkage long x() __attribute__((weak,alias("sys_ni_syscall")));
 

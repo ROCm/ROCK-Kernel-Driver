@@ -9,13 +9,13 @@
  * This file is used for SMP configurations only.
  */
 
-#include <linux/kernel.h>
 #include <linux/compiler.h>
+#include <linux/kernel.h>
 
-#include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/atomic.h>
+#include <asm/bitops.h>
 #include <asm/intrinsics.h>
+#include <asm/system.h>
 
 typedef struct {
 	volatile unsigned int lock;

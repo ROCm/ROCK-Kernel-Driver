@@ -292,7 +292,7 @@ ffz (unsigned long x)
 {
 	unsigned long result;
 
-	result = ia64_popcnt((x & (~x - 1)));
+	result = ia64_popcnt(x & (~x - 1));
 	return result;
 }
 

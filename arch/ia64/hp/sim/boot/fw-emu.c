@@ -3,9 +3,6 @@
  *
  * Copyright (C) 1998-2001 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
- *
- * For the HP simulator, this file gets include in boot/bootloader.c.
- * For SoftSDV, this file gets included in sys_softsdv.c.
  */
 #include <linux/config.h>
 
@@ -17,6 +14,8 @@
 #include <asm/io.h>
 #include <asm/pal.h>
 #include <asm/sal.h>
+
+#include "ssc.h"
 
 #define MB	(1024*1024UL)
 
@@ -36,17 +35,6 @@ static char fw_mem[(  sizeof(struct ia64_boot_param)
 		    + sizeof(struct ia64_sal_desc_entry_point)
 		    + NUM_MEM_DESCS*(sizeof(efi_memory_desc_t))
 		    + 1024)] __attribute__ ((aligned (8)));
-
-#if defined(CONFIG_IA64_HP_SIM) || defined(CONFIG_IA64_GENERIC)
-
-/* Simulator system calls: */
-
-#define SSC_EXIT	66
-
-/*
- * Simulator system call.
- */
-extern long ssc (long arg0, long arg1, long arg2, long arg3, int nr);
 
 #define SECS_PER_HOUR   (60 * 60)
 #define SECS_PER_DAY    (SECS_PER_HOUR * 24)
@@ -109,12 +97,6 @@ offtime (unsigned long t, efi_time_t *tp)
 	return 1;
 }
 
-#endif /* CONFIG_IA64_HP_SIM */
-
-/*
- * Very ugly, but we need this in the simulator only.  Once we run on
- * real hw, this can all go away.
- */
 extern void pal_emulator_static (void);
 
 /* Macro to emulate SAL call using legacy IN and OUT calls to CF8, CFC etc.. */
@@ -321,7 +303,7 @@ sys_fw_init (const char *args, int arglen)
 	efi_systab->hdr.headersize = sizeof(efi_systab->hdr);
 	efi_systab->fw_vendor = __pa("H\0e\0w\0l\0e\0t\0t\0-\0P\0a\0c\0k\0a\0r\0d\0\0");
 	efi_systab->fw_revision = 1;
-	efi_systab->runtime = __pa(efi_runtime);
+	efi_systab->runtime = (void *) __pa(efi_runtime);
 	efi_systab->nr_tables = 1;
 	efi_systab->tables = __pa(efi_tables);
 

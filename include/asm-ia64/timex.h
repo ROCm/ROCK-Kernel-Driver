@@ -10,8 +10,8 @@
  *			Also removed cacheflush_time as it's entirely unused.
  */
 
-#include <asm/processor.h>
 #include <asm/intrinsics.h>
+#include <asm/processor.h>
 
 typedef unsigned long cycles_t;
 

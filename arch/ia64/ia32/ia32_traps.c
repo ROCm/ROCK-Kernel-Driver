@@ -14,8 +14,8 @@
 
 #include "ia32priv.h"
 
-#include <asm/ptrace.h>
 #include <asm/intrinsics.h>
+#include <asm/ptrace.h>
 
 int
 ia32_intercept (struct pt_regs *regs, unsigned long isr)

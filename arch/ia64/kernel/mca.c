@@ -531,7 +531,7 @@ void
 ia64_mca_cmc_vector_disable (void *dummy)
 {
 	cmcv_reg_t	cmcv;
-	
+
 	cmcv = (cmcv_reg_t)ia64_getreg(_IA64_REG_CR_CMCV);
 
 	cmcv.cmcv_mask = 1; /* Mask/disable interrupt */
@@ -558,7 +558,7 @@ void
 ia64_mca_cmc_vector_enable (void *dummy)
 {
 	cmcv_reg_t	cmcv;
-	
+
 	cmcv = (cmcv_reg_t)ia64_getreg(_IA64_REG_CR_CMCV);
 
 	cmcv.cmcv_mask = 0; /* Unmask/enable interrupt */
@@ -1146,7 +1146,7 @@ ia64_mca_cmc_int_caller(int cpe_irq, void *arg, struct pt_regs *ptregs)
 	ia64_mca_cmc_int_handler(cpe_irq, arg, ptregs);
 
 	for (++cpuid ; !cpu_online(cpuid) && cpuid < NR_CPUS ; cpuid++);
-		
+
 	if (cpuid < NR_CPUS) {
 		platform_send_ipi(cpuid, IA64_CMCP_VECTOR, IA64_IPI_DM_INT, 0);
 	} else {
@@ -1176,7 +1176,7 @@ ia64_mca_cmc_int_caller(int cpe_irq, void *arg, struct pt_regs *ptregs)
 
 		start_count = -1;
 	}
-		
+
 	return IRQ_HANDLED;
 }
 

@@ -9,8 +9,8 @@
 
 #include <linux/config.h>
 
-#include <asm/types.h>
 #include <asm/intrinsics.h>
+#include <asm/types.h>
 
 /*
  * PAGE_SHIFT determines the actual kernel page size.

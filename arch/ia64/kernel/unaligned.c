@@ -18,11 +18,11 @@
 #include <linux/smp_lock.h>
 #include <linux/tty.h>
 
-#include <asm/uaccess.h>
-#include <asm/rse.h>
-#include <asm/processor.h>
-#include <asm/unaligned.h>
 #include <asm/intrinsics.h>
+#include <asm/processor.h>
+#include <asm/rse.h>
+#include <asm/uaccess.h>
+#include <asm/unaligned.h>
 
 extern void die_if_kernel(char *str, struct pt_regs *regs, long err) __attribute__ ((noreturn));
 
