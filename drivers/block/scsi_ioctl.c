@@ -7,7 +7,7 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
-
+ *
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
@@ -16,26 +16,20 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-
  *
  */
-#include <linux/sched.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/string.h>
-#include <linux/config.h>
-#include <linux/swap.h>
-#include <linux/init.h>
-#include <linux/smp_lock.h>
 #include <linux/module.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/completion.h>
 #include <linux/cdrom.h>
 #include <linux/slab.h>
 #include <linux/bio.h>
+#include <asm/uaccess.h>
 
-#include "../scsi/scsi.h"
 #include <scsi/scsi.h>
 #include <scsi/scsi_ioctl.h>
 
-#include <asm/uaccess.h>
 
 /* Command group 3 is reserved and should never be used.  */
 const unsigned char scsi_command_size[8] =

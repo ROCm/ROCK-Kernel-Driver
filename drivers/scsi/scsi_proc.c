@@ -399,11 +399,8 @@ static void scsi_dump_status(int level)
 static int proc_scsi_gen_write(struct file * file, const char * buf,
                               unsigned long length, void *data)
 {
-	Scsi_Device *sdev;
-	struct Scsi_Host *shost;
-	char *p;
 	int host, channel, id, lun;
-	char * buffer;
+	char *buffer, *p;
 	int err;
 
 	if (!buf || length>PAGE_SIZE)
@@ -529,35 +526,9 @@ static int proc_scsi_gen_write(struct file * file, const char * buf,
 		id = simple_strtoul(p + 1, &p, 0);
 		lun = simple_strtoul(p + 1, &p, 0);
 
-		printk(KERN_INFO "scsi singledevice %d %d %d %d\n", host, channel,
-		       id, lun);
-
-		for (shost = scsi_host_get_next(NULL); shost;
-		     shost = scsi_host_get_next(shost)) {
-			if (shost->host_no == host) {
-				break;
-			}
-		}
-		err = -ENXIO;
-		if (!shost)
-			goto out;
-
-		for (sdev = shost->host_queue; sdev; sdev = sdev->next) {
-			if ((sdev->channel == channel
-			     && sdev->id == id
-			     && sdev->lun == lun)) {
-				break;
-			}
-		}
-
-		err = -ENOSYS;
-		if (sdev)
-			goto out;	/* We do not yet support unplugging */
-
-		scan_scsis(shost, 1, channel, id, lun);
-		err = length;
-		goto out;
-	}
+		err = scsi_add_single_device(host, channel, id, lun);
+		if (err >= 0)
+			err = length;
 	/*
 	 * Usage: echo "scsi remove-single-device 0 1 2 3" >/proc/scsi/scsi
 	 * with  "0 1 2 3" replaced by your "Host Channel Id Lun".
@@ -569,7 +540,7 @@ static int proc_scsi_gen_write(struct file * file, const char * buf,
 	 *     hardware and thoroughly confuse the SCSI subsystem.
 	 *
 	 */
-	else if (!strncmp("remove-single-device", buffer + 5, 20)) {
+	} else if (!strncmp("remove-single-device", buffer + 5, 20)) {
 		p = buffer + 26;
 
 		host = simple_strtoul(p, &p, 0);
@@ -577,39 +548,7 @@ static int proc_scsi_gen_write(struct file * file, const char * buf,
 		id = simple_strtoul(p + 1, &p, 0);
 		lun = simple_strtoul(p + 1, &p, 0);
 
-
-		for (shost = scsi_host_get_next(NULL); shost;
-		     shost = scsi_host_get_next(shost)) {
-			if (shost->host_no == host) {
-				break;
-			}
-		}
-		err = -ENODEV;
-		if (!shost)
-			goto out;
-
-		for (sdev = shost->host_queue; sdev; sdev = sdev->next) {
-			if ((sdev->channel == channel
-			     && sdev->id == id
-			     && sdev->lun == lun)) {
-				break;
-			}
-		}
-
-		if (sdev == NULL)
-			goto out;	/* there is no such device attached */
-
-		err = -EBUSY;
-		if (sdev->access_count)
-			goto out;
-
-		scsi_detach_device(sdev);
-
-		if (sdev->attached == 0) {
-			devfs_unregister (sdev->de);
-			scsi_free_sdev(sdev);
-			err = 0;
-		}
+		err = scsi_remove_single_device(host, channel, id, lun);
 	}
 out:
 	
