@@ -554,13 +554,14 @@ static sctp_xmit_t sctp_packet_append_data(struct sctp_packet *packet,
 	 * if any previously transmitted data on the connection remains
 	 * unacknowledged.
 	 */
-	if (!sp->nodelay && q->outstanding_bytes) {
+	if (!sp->nodelay && SCTP_IP_OVERHEAD == packet->size && 
+	    q->outstanding_bytes && SCTP_STATE_ESTABLISHED == asoc->state) {
 		unsigned len = datasize + q->out_qlen;
+
 		/* Check whether this chunk and all the rest of pending
 		 * data will fit or delay in hopes of bundling a full
 		 * sized packet.
 		 */
-
 		if (len < asoc->pmtu - SCTP_IP_OVERHEAD) {
 			retval = SCTP_XMIT_NAGLE_DELAY;
 			goto finish;

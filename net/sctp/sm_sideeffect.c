@@ -716,12 +716,11 @@ int sctp_gen_sack(sctp_association_t *asoc, int force, sctp_cmd_seq_t *commands)
 		asoc->peer.sack_needed = 1;
 		goto out;
 	} else {
+		if (asoc->a_rwnd > asoc->rwnd)
+			asoc->a_rwnd = asoc->rwnd;
 		sack = sctp_make_sack(asoc);
 		if (!sack)
 			goto nomem;
-
-		/* Update the last advertised rwnd value. */
-		asoc->a_rwnd = asoc->rwnd;
 
 		asoc->peer.sack_needed = 0;
 

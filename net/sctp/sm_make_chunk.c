@@ -598,7 +598,7 @@ sctp_chunk_t *sctp_make_sack(const sctp_association_t *asoc)
 
 	/* Initialize the SACK header.  */
 	sack.cum_tsn_ack	    = htonl(ctsn);
-	sack.a_rwnd 		    = htonl(asoc->rwnd);
+	sack.a_rwnd 		    = htonl(asoc->a_rwnd);
 	sack.num_gap_ack_blocks     = htons(num_gabs);
 	sack.num_dup_tsns           = htons(num_dup_tsns);
 

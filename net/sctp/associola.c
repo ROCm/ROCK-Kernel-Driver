@@ -181,7 +181,7 @@ sctp_association_t *sctp_association_init(sctp_association_t *asoc,
 	else
 		asoc->rwnd = sk->rcvbuf;
 
-	asoc->a_rwnd = 0;
+	asoc->a_rwnd = asoc->rwnd;
 
 	asoc->rwnd_over = 0;
 
@@ -994,6 +994,24 @@ void sctp_assoc_sync_pmtu(sctp_association_t *asoc)
 			  __FUNCTION__, asoc, asoc->pmtu, asoc->frag_point);
 }
 
+/* Should we send a SACK to update our peer? */
+static inline int sctp_peer_needs_update(struct sctp_association *asoc)
+{
+	switch (asoc->state) {
+	case SCTP_STATE_ESTABLISHED:
+	case SCTP_STATE_SHUTDOWN_PENDING:
+	case SCTP_STATE_SHUTDOWN_RECEIVED:
+		if ((asoc->rwnd > asoc->a_rwnd) && 
+		    ((asoc->rwnd - asoc->a_rwnd) >=
+		     min_t(__u32, (asoc->base.sk->rcvbuf >> 1), asoc->pmtu))) 
+			return 1;
+		break;
+	default:
+		break;
+	}
+	return 0;
+}
+
 /* Increase asoc's rwnd by len and send any window update SACK if needed. */
 void sctp_assoc_rwnd_increase(sctp_association_t *asoc, int len)
 {
@@ -1020,19 +1038,14 @@ void sctp_assoc_rwnd_increase(sctp_association_t *asoc, int len)
 	 * The algorithm used is similar to the one described in
 	 * Section 4.2.3.3 of RFC 1122.
 	 */
-	if ((asoc->state == SCTP_STATE_ESTABLISHED) &&
-	    (asoc->rwnd > asoc->a_rwnd) &&
-	    ((asoc->rwnd - asoc->a_rwnd) >=
-		     min_t(__u32, (asoc->base.sk->rcvbuf >> 1), asoc->pmtu))) {
+	if (sctp_peer_needs_update(asoc)) {
+		asoc->a_rwnd = asoc->rwnd;
 		SCTP_DEBUG_PRINTK("%s: Sending window update SACK- asoc: %p "
 				  "rwnd: %u a_rwnd: %u\n", __FUNCTION__,
 				  asoc, asoc->rwnd, asoc->a_rwnd);
 		sack = sctp_make_sack(asoc);
 		if (!sack)
 			return;
-
-		/* Update the last advertised rwnd value. */
-		asoc->a_rwnd = asoc->rwnd;
 
 		asoc->peer.sack_needed = 0;
 
@@ -1057,7 +1070,8 @@ void sctp_assoc_rwnd_decrease(sctp_association_t *asoc, int len)
 		asoc->rwnd = 0;
 	}
 	SCTP_DEBUG_PRINTK("%s: asoc %p rwnd decreased by %d to (%u, %u)\n",
-			  __FUNCTION__, asoc, len, asoc->rwnd, asoc->rwnd_over);
+			  __FUNCTION__, asoc, len, asoc->rwnd, 
+			  asoc->rwnd_over);
 }
 
 /* Build the bind address list for the association based on info from the
