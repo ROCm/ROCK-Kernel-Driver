@@ -2742,6 +2742,7 @@ static int __devinit snd_intel8x0_joystick_probe(struct pci_dev *pci,
 
 	pci_read_config_word(pci, 0xe6, &val);
 #ifdef SUPPORT_JOYSTICK
+	val &= ~0x100;
 	if (joystick[dev]) {
 		if (! request_region(ich_gameport.io, 8, "ICH gameport")) {
 			printk(KERN_WARNING "intel8x0: cannot grab gameport 0x%x\n",  ich_gameport.io);
@@ -2754,6 +2755,7 @@ static int __devinit snd_intel8x0_joystick_probe(struct pci_dev *pci,
 	}
 #endif
 #ifdef SUPPORT_MIDI
+	val &= ~0x20;
 	if (mpu_port[dev] > 0) {
 		if (mpu_port[dev] == 0x300 || mpu_port[dev] == 0x330) {
 			u8 b;
