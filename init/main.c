@@ -318,14 +318,16 @@ static void __init setup_per_cpu_areas(void)
 
 	/* Copy section for each CPU (we discard the original) */
 	size = ALIGN(__per_cpu_end - __per_cpu_start, SMP_CACHE_BYTES);
-	if (!size)
-		return;
+#ifdef CONFIG_MODULES
+	if (size < PERCPU_ENOUGH_ROOM)
+		size = PERCPU_ENOUGH_ROOM;
+#endif
 
 	ptr = alloc_bootmem(size * NR_CPUS);
 
 	for (i = 0; i < NR_CPUS; i++, ptr += size) {
 		__per_cpu_offset[i] = ptr - __per_cpu_start;
-		memcpy(ptr, __per_cpu_start, size);
+		memcpy(ptr, __per_cpu_start, __per_cpu_end - __per_cpu_start);
 	}
 }
 #endif /* !__GENERIC_PER_CPU */

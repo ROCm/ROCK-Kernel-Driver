@@ -2,8 +2,14 @@
 #define __LINUX_PERCPU_H
 #include <linux/spinlock.h> /* For preempt_disable() */
 #include <linux/slab.h> /* For kmalloc() */
+#include <linux/smp.h>
 #include <linux/string.h> /* For memset() */
 #include <asm/percpu.h>
+
+/* Enough to cover all DEFINE_PER_CPUs in kernel, including modules. */
+#ifndef PERCPU_ENOUGH_ROOM
+#define PERCPU_ENOUGH_ROOM 32768
+#endif
 
 /* Must be an lvalue. */
 #define get_cpu_var(var) (*({ preempt_disable(); &__get_cpu_var(var); }))
