@@ -2685,6 +2685,7 @@ static int ibmvscsis_remove(struct vio_dev *dev)
 	release_data_buffer(adapter);
 
 	kobject_unregister(&adapter->stats_kobj);
+	device_remove_file(&dev->dev, &dev_attr_num_buses);
 
 	kfree(adapter);
 
