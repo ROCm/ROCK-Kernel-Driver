@@ -853,8 +853,8 @@ init_cifs(void)
 	GlobalCurrentXid = 0;
 	GlobalTotalActiveXid = 0;
 	GlobalMaxActiveXid = 0;
-	GlobalSMBSeslock = RW_LOCK_UNLOCKED;
-	GlobalMid_Lock = SPIN_LOCK_UNLOCKED;
+	rwlock_init(&GlobalSMBSeslock);
+	spin_lock_init(&GlobalMid_Lock);
 
 	if(cifs_max_pending < 2) {
 		cifs_max_pending = 2;

@@ -1799,7 +1799,7 @@ static int reiserfs_fill_super (struct super_block * s, void * data, int silent)
     reiserfs_proc_info_init( s );
 
     init_waitqueue_head (&(sbi->s_wait));
-    sbi->bitmap_lock = SPIN_LOCK_UNLOCKED;
+    spin_lock_init(&sbi->bitmap_lock);
 
     return (0);
 
