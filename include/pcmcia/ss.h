@@ -170,7 +170,6 @@ struct region_t;
 struct pcmcia_socket {
 	struct module			*owner;
 	spinlock_t			lock;
-	struct pccard_operations *	ss_entry;
 	socket_state_t			socket;
 	u_int				state;
 	u_short				functions;
@@ -206,6 +205,9 @@ struct pcmcia_socket {
 	ioaddr_t			io_offset;
 	u_char				pci_irq;
 	struct pci_dev *		cb_dev;
+
+	/* socket operations */
+	struct pccard_operations *	ops;
 
 	/* state thread */
 	struct semaphore		skt_sem;	/* protects socket h/w state */

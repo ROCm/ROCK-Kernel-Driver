@@ -161,7 +161,7 @@ static int __init i82092aa_pci_probe(struct pci_dev *dev, const struct pci_devic
 
 	for (i = 0; i<socket_count; i++) {
 		sockets[i].socket.dev.dev = &dev->dev;
-		sockets[i].socket.ss_entry = &i82092aa_operations;
+		sockets[i].socket.ops = &i82092aa_operations;
 		ret = pcmcia_register_socket(&sockets[i].socket);
 		if (ret) {
 			goto err_out_free_sockets;
