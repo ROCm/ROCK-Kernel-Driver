@@ -1253,7 +1253,11 @@ static int __devinit tdfxfb_probe(struct pci_dev *pdev,
 	info->fix		= tdfx_fix; 	
 	info->par		= default_par;
 	info->pseudo_palette	= (void *)(default_par + 1); 
-	info->flags		= FBINFO_FLAG_DEFAULT;
+	info->flags		= FBINFO_DEFAULT |
+                                  FBINFO_HWACCEL_COPYAREA |
+                                  FBINFO_HWACCEL_FILLRECT |
+                                  FBINFO_HWACCEL_IMAGEBLIT |
+	                          FBINFO_HWACCEL_YPAN;
 
 #ifndef MODULE
 	if (!mode_option)

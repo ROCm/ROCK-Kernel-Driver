@@ -550,7 +550,7 @@ static void cg14_init_one(struct sbus_dev *sdev, int node, int parent_node)
 	all->par.mode = MDI_8_PIX;
 	all->par.ramsize = (is_8mb ? 0x800000 : 0x400000);
 
-	all->info.flags = FBINFO_FLAG_DEFAULT;
+	all->info.flags = FBINFO_DEFAULT | FBINFO_HWACCEL_YPAN;
 	all->info.fbops = &cg14_ops;
 	all->info.currcon = -1;
 	all->info.par = &all->par;

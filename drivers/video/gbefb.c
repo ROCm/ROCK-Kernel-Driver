@@ -1135,7 +1135,7 @@ int __init gbefb_init(void)
 	fb_info.currcon = -1;
 	fb_info.fbops = &gbefb_ops;
 	fb_info.pseudo_palette = pseudo_palette;
-	fb_info.flags = FBINFO_FLAG_DEFAULT;
+	fb_info.flags = FBINFO_DEFAULT;
 	fb_info.screen_base = gbe_mem;
 	fb_alloc_cmap(&fb_info.cmap, 256, 0);
 

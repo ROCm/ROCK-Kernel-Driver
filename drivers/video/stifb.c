@@ -1325,7 +1325,7 @@ stifb_init_fb(struct sti_struct *sti, int force_bpp)
 	strcpy(fix->id, "stifb");
 	info->fbops = &stifb_ops;
 	info->screen_base = (void*) REGION_BASE(fb,1);
-	info->flags = FBINFO_FLAG_DEFAULT;
+	info->flags = FBINFO_DEFAULT;
 	info->currcon = -1;
 
 	/* This has to been done !!! */

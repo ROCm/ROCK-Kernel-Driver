@@ -1010,7 +1010,7 @@ static void __init acornfb_init_fbinfo(void)
 	first = 0;
 
 	fb_info.fbops		= &acornfb_ops;
-	fb_info.flags		= FBINFO_FLAG_DEFAULT;
+	fb_info.flags		= FBINFO_DEFAULT | FBINFO_HWACCEL_YPAN;
 	fb_info.pseudo_palette	= current_par.pseudo_palette;
 
 	strcpy(fb_info.fix.id, "Acorn");

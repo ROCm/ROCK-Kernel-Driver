@@ -507,7 +507,7 @@ int __init e1355fb_init(void)
 	fb_info.gen.parsize = sizeof(struct e1355_par);
 	fb_info.gen.info.switch_con = &fbgen_switch;
 	fb_info.gen.info.updatevar = &fbgen_update_var;
-	fb_info.gen.info.flags = FBINFO_FLAG_DEFAULT;
+	fb_info.gen.info.flags = FBINFO_DEFAULT;
 	/* This should give a reasonable default video mode */
 	fbgen_get_var(&disp.var, -1, &fb_info.gen.info);
 	fbgen_do_set_var(&disp.var, 1, &fb_info.gen);

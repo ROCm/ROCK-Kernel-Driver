@@ -1040,7 +1040,7 @@ static struct pxafb_info * __init pxafb_init_fbinfo(struct device *dev)
 	fbi->fb.var.vmode	= FB_VMODE_NONINTERLACED;
 
 	fbi->fb.fbops		= &pxafb_ops;
-	fbi->fb.flags		= FBINFO_FLAG_DEFAULT;
+	fbi->fb.flags		= FBINFO_DEFAULT;
 	fbi->fb.node		= -1;
 	fbi->fb.currcon		= -1;
 

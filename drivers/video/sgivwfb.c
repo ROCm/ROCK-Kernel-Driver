@@ -790,7 +790,7 @@ int __init sgivwfb_init(void)
 	fb_info.fbops = &sgivwfb_ops;
 	fb_info.pseudo_palette = pseudo_palette;
 	fb_info.par = &default_par;
-	fb_info.flags = FBINFO_FLAG_DEFAULT;
+	fb_info.flags = FBINFO_DEFAULT;
 
 	fb_info.screen_base = ioremap_nocache((unsigned long) sgivwfb_mem_phys, sgivwfb_mem_size);
 	if (!fb_info.screen_base) {

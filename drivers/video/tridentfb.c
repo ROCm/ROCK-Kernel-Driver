@@ -1149,7 +1149,10 @@ static int __devinit trident_pci_probe(struct pci_dev * dev, const struct pci_de
 	fb_info.fbops = &tridentfb_ops;
 
 
-	fb_info.flags = FBINFO_FLAG_DEFAULT;
+	fb_info.flags = FBINFO_DEFAULT | FBINFO_HWACCEL_YPAN;
+#ifdef CONFIG_FB_TRIDENT_ACCEL
+	fb_info.flags |= FBINFO_HWACCEL_COPYAREA | FBINFO_HWACCEL_FILLRECT;
+#endif
 	fb_info.pseudo_palette = pseudo_pal;
 
 	if (!fb_find_mode(&default_var,&fb_info,mode,NULL,0,NULL,bpp))

@@ -2055,7 +2055,11 @@ static struct fb_info *__devinit neo_alloc_fb_info(struct pci_dev *dev, const st
 	info->fix.accel = id->driver_data;
 
 	info->fbops = &neofb_ops;
-	info->flags = FBINFO_FLAG_DEFAULT;
+	info->flags = FBINFO_DEFAULT |
+	              FBINFO_HWACCEL_IMAGEBLIT |
+                      FBINFO_HWACCEL_FILLRECT |
+                      FBINFO_HWACCEL_COPYAREA |
+                      FBINFO_HWACCEL_YPAN;
 	info->pseudo_palette = (void *) (par + 1);
 	return info;
 }
