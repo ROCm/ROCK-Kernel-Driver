@@ -252,7 +252,7 @@ int sys_sigreturn(struct pt_regs regs)
 	sigdelsetmask(&current->blocked, ~_BLOCKABLE);
 	recalc_sigpending();
 	spin_unlock_irq(&current->sig->siglock);
-	copy_sc_from_user(current->thread.regs, sc);
+	copy_sc_from_user(&current->thread.regs, sc);
 	return(PT_REGS_SYSCALL_RET(&current->thread.regs));
 }
 
@@ -267,7 +267,7 @@ int sys_rt_sigreturn(struct pt_regs regs)
 	sigdelsetmask(&current->blocked, ~_BLOCKABLE);
 	recalc_sigpending();
 	spin_unlock_irq(&current->sig->siglock);
-	copy_sc_from_user(current->thread.regs, sc);
+	copy_sc_from_user(&current->thread.regs, sc);
 	return(PT_REGS_SYSCALL_RET(&current->thread.regs));
 }
 

@@ -3,15 +3,14 @@
 # Licensed under the GPL
 #
 
-O_TARGET = sys-i386.o
-
 obj-y = sigcontext.o
 
 USER_OBJS = sigcontext.o
+USER_OBJS := $(foreach file,$(USER_OBJS),$(obj)/$(file))
 
 include $(TOPDIR)/Rules.make
 
 $(USER_OBJS) : %.o: %.c
-	$(CC) $(CFLAGS_$@) $(USER_CFLAGS) -c -o $@ $<
+	$(CC) $(CFLAGS_$(notdir $@)) $(USER_CFLAGS) -c -o $@ $<
 
 clean :
