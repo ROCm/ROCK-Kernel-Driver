@@ -173,12 +173,10 @@ void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
 	if (iommu_page == -1)
 		goto error; 
 
-   	/* Fill in the GATT, allocating pages as needed. */
+   	/* Fill in the GATT */
 	for (i = 0; i < size; i++) { 
 		unsigned long phys_mem; 
 		void *mem = memory + i*PAGE_SIZE;
-		if (i > 0) 
-			atomic_inc(&virt_to_page(mem)->count); 
 		phys_mem = virt_to_phys(mem); 
 		BUG_ON(phys_mem & ~PHYSICAL_PAGE_MASK); 
 		iommu_gatt_base[iommu_page + i] = GPTE_ENCODE(phys_mem); 
@@ -206,16 +204,14 @@ void pci_free_consistent(struct pci_dev *hwdev, size_t size,
 	size = round_up(size, PAGE_SIZE); 
 	if (bus >= iommu_bus_base && bus <= iommu_bus_base + iommu_size) { 
 		unsigned pages = size >> PAGE_SHIFT;
+		int i;
 		iommu_page = (bus - iommu_bus_base) >> PAGE_SHIFT;
 		vaddr = __va(GPTE_DECODE(iommu_gatt_base[iommu_page]));
-#ifdef CONFIG_IOMMU_DEBUG
-		int i;
 		for (i = 0; i < pages; i++) {
 			u64 pte = iommu_gatt_base[iommu_page + i];
 		BUG_ON((pte & GPTE_VALID) == 0); 
 		iommu_gatt_base[iommu_page + i] = 0; 		
 	} 
-#endif
 		free_iommu(iommu_page, pages);
 	}
 	free_pages((unsigned long)vaddr, get_order(size)); 		
@@ -319,11 +315,6 @@ dma_addr_t pci_map_single(struct pci_dev *dev, void *addr, size_t size, int dir)
 		 */
 		iommu_gatt_base[iommu_page + i] = GPTE_ENCODE(phys_mem);
 
-#ifdef CONFIG_IOMMU_DEBUG
-		/* paranoia check */
-		BUG_ON(GPTE_DECODE(iommu_gatt_base[iommu_page+i]) != phys_mem); 
-#endif
-
 #ifdef CONFIG_IOMMU_LEAK
 		/* XXX need eventually caller of pci_map_sg */
 		if (iommu_leak_tab) 
@@ -350,7 +341,6 @@ void pci_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr,
 		return;
 	iommu_page = (dma_addr - iommu_bus_base)>>PAGE_SHIFT;	
 	npages = round_up(size + (dma_addr & ~PAGE_MASK), PAGE_SIZE) >> PAGE_SHIFT;
-#ifdef CONFIG_IOMMU_DEBUG
 	int i;
 	for (i = 0; i < npages; i++) { 
 		iommu_gatt_base[iommu_page + i] = 0; 
@@ -359,7 +349,6 @@ void pci_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr,
 			iommu_leak_tab[iommu_page + i] = 0; 
 #endif
 	}
-#endif
 	free_iommu(iommu_page, npages);
 }
 

@@ -1,19 +1,18 @@
-/*
- * Copyright 2002 Andi Kleen, SuSE Labs.
- */		 
-	#include <linux/linkage.h>
 
 /*
  * Zero a page. 	
  * rdi	page
  */			
-ENTRY(clear_page)
+	.globl clear_page
+	.p2align 4
+clear_page:
 	xorl   %eax,%eax
-	movl   $4096/128,%ecx
-	movl   $128,%edx
-loop:
+	movl   $4096/64,%ecx
+	.p2align 4
+.Lloop:
+	decl	%ecx
 #define PUT(x) movq %rax,x*8(%rdi) 
-	PUT(0)
+	movq %rax,(%rdi)
 	PUT(1)
 	PUT(2)
 	PUT(3)
@@ -21,17 +20,8 @@ loop:
 	PUT(5)
 	PUT(6)
 	PUT(7)
-	PUT(8)
-	PUT(9)
-	PUT(10)
-	PUT(11)
-	PUT(12)
-	PUT(13)
-	PUT(14)
-	PUT(15)
-	addq    %rdx,%rdi
-	decl	%ecx
-	jnz	loop
-	sfence	
+	leaq	64(%rdi),%rdi
+	jnz	.Lloop
+	nop
 	ret
 	    	

@@ -50,10 +50,10 @@ SECTIONS
   .xtime_lock : AT ((LOADADDR(.vsyscall_0) + SIZEOF(.vsyscall_0) + 63) & ~(63)) { *(.xtime_lock) }
   xtime_lock = LOADADDR(.xtime_lock);
   . = ALIGN(16);
-  .hpet : AT ((LOADADDR(.xtime_lock) + SIZEOF(.xtime_lock) + 15) & ~(15)) { *(.hpet) }
-  hpet = LOADADDR(.hpet);
+  .vxtime : AT ((LOADADDR(.xtime_lock) + SIZEOF(.xtime_lock) + 15) & ~(15)) { *(.vxtime) }
+  vxtime = LOADADDR(.vxtime);
   . = ALIGN(16);
-  .wall_jiffies : AT ((LOADADDR(.hpet) + SIZEOF(.hpet) + 15) & ~(15)) { *(.wall_jiffies) }
+  .wall_jiffies : AT ((LOADADDR(.vxtime) + SIZEOF(.vxtime) + 15) & ~(15)) { *(.wall_jiffies) }
   wall_jiffies = LOADADDR(.wall_jiffies);
   . = ALIGN(16);
   .sys_tz : AT ((LOADADDR(.wall_jiffies) + SIZEOF(.wall_jiffies) + 15) & ~(15)) { *(.sys_tz) }
@@ -105,6 +105,7 @@ SECTIONS
   __con_initcall_start = .;
   .con_initcall.init : { *(.con_initcall.init) }
   __con_initcall_end = .;
+  SECURITY_INIT
   . = ALIGN(4096);
   __initramfs_start = .;
   .init.ramfs : { *(.init.ramfs) }

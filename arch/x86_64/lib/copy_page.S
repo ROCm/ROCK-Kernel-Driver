@@ -1,74 +1,91 @@
-/*
- * Copyright 2002 Andi Kleen, SuSE Labs.
- */	 	
+/* Written 2003 by Andi Kleen, based on a kernel by Evandro Menezes */
 	
-	#include <linux/linkage.h>
-	#include <linux/config.h>
-	#ifdef CONFIG_PREEMPT
-	#warning "check your fpu context saving!"
-	#endif
-
-/*
- * Copy a page. 
- *		
- * rdi destination page
- * rsi source page
- *		
- * src/dst must be aligned to 16 bytes.
- * 
- * Warning: in case of super lazy FP save this needs to be preempt_stop	
- */
-	
-	.globl copy_page
-	.p2align
-copy_page:
-	prefetchnta (%rsi) 
-	prefetchnta 64(%rsi)
+/* Don't use streaming store because it's better when the target
+   ends up in cache. */
 	    
-	movq %rsp,%rax
-	subq $16*4,%rsp
-	andq $~15,%rsp		
-	movdqa %xmm0,(%rsp) 
-	movdqa %xmm1,16(%rsp) 
-	movdqa %xmm2,32(%rsp) 
-	movdqa %xmm3,48(%rsp)
-	
-	movl   $(4096/128)-2,%ecx
-	movl   $128,%edx
-loop:
-	prefetchnta (%rsi) 
-	prefetchnta 64(%rsi) 
-loop_no_prefetch:	
-	movdqa (%rsi),%xmm0 	 			 
-	movdqa 16(%rsi),%xmm1
-	movdqa 32(%rsi),%xmm2 	 			 
-	movdqa 48(%rsi),%xmm3 	 			 
-	movntdq %xmm0,(%rdi)	 
-	movntdq %xmm1,16(%rdi)	 
-	movntdq %xmm2,32(%rdi)	 
-	movntdq %xmm3,48(%rdi)
-	
-	movdqa 64(%rsi),%xmm0 	 			 
-	movdqa 80(%rsi),%xmm1
-	movdqa 96(%rsi),%xmm2 	 			 
-	movdqa 112(%rsi),%xmm3 	 			 
-	movntdq %xmm0,64(%rdi)	 
-	movntdq %xmm1,80(%rdi)	 
-	movntdq %xmm2,96(%rdi)	 
-	movntdq %xmm3,112(%rdi)
+/* Could vary the prefetch distance based on SMP/UP */
 
-	addq   %rdx,%rdi	
-	addq   %rdx,%rsi
+	.globl copy_page
+	.p2align 4
+copy_page:
+	prefetch (%rsi) 
+	prefetch 1*64(%rsi)
+	prefetch 2*64(%rsi)
+	prefetch 3*64(%rsi)
+	prefetch 4*64(%rsi)
+	prefetchw (%rdi) 
+	prefetchw 1*64(%rdi) 
+	prefetchw 2*64(%rdi) 
+	prefetchw 3*64(%rdi)
+	prefetchw 4*64(%rdi)
+
+	subq	$3*8,%rsp
+	movq	%rbx,(%rsp)
+	movq	%r12,1*8(%rsp)
+	movq	%r13,2*8(%rsp)
+			
+	movl	$(4096/64)-5,%ecx
+	.p2align 4
+.Loop64:	
+  	dec     %rcx
+
+	movq        (%rsi), %rax
+	movq      8 (%rsi), %rbx
+	movq     16 (%rsi), %rdx
+	movq     24 (%rsi), %r8
+	movq     32 (%rsi), %r9
+	movq     40 (%rsi), %r10
+	movq     48 (%rsi), %r11
+	movq     56 (%rsi), %r12
+
+	prefetch 5*64(%rsi)
+
+	movq     %rax,    (%rdi)
+	movq     %rbx,  8 (%rdi)
+	movq     %rdx, 16 (%rdi)
+	movq     %r8,  24 (%rdi)
+	movq     %r9,  32 (%rdi)
+	movq     %r10, 40 (%rdi)
+	movq     %r11, 48 (%rdi)
+	movq     %r12, 56 (%rdi)
+
+	prefetchw 5*64(%rdi)
+
+	leaq    64 (%rsi), %rsi
+	leaq    64 (%rdi), %rdi
+
+	jnz     .Loop64
+
+	movl	$5,%ecx
+	.p2align 4
+.Loop2:	
 	decl   %ecx
-	jns    loop
-	cmpl   $-1,%ecx
-	je     loop_no_prefetch
-	
-	sfence
 
-	movdqa (%rsp),%xmm0
-	movdqa 16(%rsp),%xmm1
-	movdqa 32(%rsp),%xmm2
-	movdqa 48(%rsp),%xmm3
-	movq   %rax,%rsp
+	movq        (%rsi), %rax
+	movq      8 (%rsi), %rbx
+	movq     16 (%rsi), %rdx
+	movq     24 (%rsi), %r8
+	movq     32 (%rsi), %r9
+	movq     40 (%rsi), %r10
+	movq     48 (%rsi), %r11
+	movq     56 (%rsi), %r12
+
+	movq     %rax,    (%rdi)
+	movq     %rbx,  8 (%rdi)
+	movq     %rdx, 16 (%rdi)
+	movq     %r8,  24 (%rdi)
+	movq     %r9,  32 (%rdi)
+	movq     %r10, 40 (%rdi)
+	movq     %r11, 48 (%rdi)
+	movq     %r12, 56 (%rdi)
+	
+	leaq	64(%rdi),%rdi			
+	leaq	64(%rsi),%rsi			
+	
+	jnz	.Loop2		
+	
+	movq	(%rsp),%rbx
+	movq	1*8(%rsp),%r12
+	movq	2*8(%rsp),%r13
+	addq	$3*8,%rsp
 	ret
