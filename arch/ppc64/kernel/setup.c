@@ -491,23 +491,44 @@ static int __init set_preferred_console(void)
 	if (strcmp(name, "serial") == 0) {
 		int i;
 		u32 *reg = (u32 *)get_property(prom_stdout, "reg", &i);
-		if (i > 8) {
-			switch (reg[1]) {
-				case 0x3f8:
+ 		char *compat = (char *)get_property(prom_stdout, "compatible", NULL);
+ 
+ 		if (compat && (strcmp(compat, "hvterm-protocol") == 0)) {
+ 			/* Host Virtual Serial Interface */
+			int offset;
+			switch (reg[0]) {
+				case 0x30000000:
 					offset = 0;
 					break;
-				case 0x2f8:
+				case 0x30000001:
 					offset = 1;
 					break;
-				case 0x898:
-					offset = 2;
-					break;
-				case 0x890:
-					offset = 3;
-					break;
 				default:
-					/* We dont recognise the serial port */
 					return -ENODEV;
+			}
+			return add_preferred_console("hvsi", offset, NULL);
+		} else {
+			if (i > 8) {
+				int offset;
+				switch (reg[1]) {
+					case 0x3f8:
+						offset = 0;
+						break;
+					case 0x2f8:
+						offset = 1;
+						break;
+					case 0x898:
+						offset = 2;
+						break;
+					case 0x890:
+						offset = 3;
+						break;
+					default:
+						/* We dont recognise the serial port */
+						return -ENODEV;
+				}
+ 
+				return add_preferred_console("ttyS", offset, NULL);
 			}
 		}
 	} else if (strcmp(name, "vty") == 0)
