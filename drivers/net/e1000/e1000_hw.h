@@ -291,7 +291,7 @@ int32_t e1000_read_mac_addr(struct e1000_hw * hw);
 
 /* Filters (multicast, vlan, receive) */
 void e1000_init_rx_addrs(struct e1000_hw *hw);
-void e1000_mc_addr_list_update(struct e1000_hw *hw, uint8_t * mc_addr_list, uint32_t mc_addr_count, uint32_t pad);
+void e1000_mc_addr_list_update(struct e1000_hw *hw, uint8_t * mc_addr_list, uint32_t mc_addr_count, uint32_t pad, uint32_t rar_used_count);
 uint32_t e1000_hash_mc_addr(struct e1000_hw *hw, uint8_t * mc_addr);
 void e1000_mta_set(struct e1000_hw *hw, uint32_t hash_value);
 void e1000_rar_set(struct e1000_hw *hw, uint8_t * mc_addr, uint32_t rar_index);
@@ -1021,6 +1021,7 @@ struct e1000_hw {
     boolean_t speed_downgraded;
     e1000_dsp_config dsp_config_state;
     boolean_t get_link_status;
+    boolean_t serdes_link_down;
     boolean_t tbi_compatibility_en;
     boolean_t tbi_compatibility_on;
     boolean_t phy_reset_disable;

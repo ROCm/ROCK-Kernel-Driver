@@ -30,10 +30,19 @@
 
 /* Change Log
  *
- * 5.2.20	9/30/03
+ * 5.2.26	11/13/03
+ *   o Fixed endianess bug causing ethtool loopback diags to fail on ppc.
+ *   o Use pdev->irq rather than netdev->irq in preparation for MSI support.
+ *   o Report driver message on user override of InterruptThrottleRate
+ *     module parameter.
+ *   o Change I/O address storage from uint32_t to unsigned long.
+ *   o Added ethtool RINGPARAM support.
+ *
+ * 5.2.22	10/15/03
  *   o Bug fix: SERDES devices might be connected to a back-plane
  *     switch that doesn't support auto-neg, so add the capability
- *     to force 1000/Full.
+ *     to force 1000/Full.  Also, since forcing 1000/Full, sample
+ *     RxSynchronize bit to detect link state.
  *   o Bug fix: Flow control settings for hi/lo watermark didn't
  *     consider changes in the Rx FIFO size, which could occur with
  *     Jumbo Frames or with the reduced FIFO in 82547.
@@ -42,29 +51,18 @@
  *   o Bug fix: hang under heavy Tx stress when running out of Tx
  *     descriptors; wasn't clearing context descriptor when backing
  *     out of send because of no-resource condition.
+ *   o Bug fix: check netif_running in dev->poll so we don't have to
+ *     hang in dev->close until all polls are finished.  [Robert
+ *     Ollson (robert.olsson@data.slu.se)].
+ *   o Revert TxDescriptor ring size back to 256 since change to 1024
+ *     wasn't accepted into the kernel.
  *
  * 5.2.16	8/8/03
- *   o Added support for new controllers: 82545GM, 82546GB, 82541/7_B1
- *   o Bug fix: reset h/w before first EEPROM read because we don't know
- *     who may have been messing with the device before we got there.
- *     [Dave Johnson (ddj -a-t- cascv.brown.edu)]
- *   o Bug fix: read the correct work from EEPROM to detect programmed
- *     WoL settings.
- *   o Bug fix: TSO would hang if space left in FIFO was being miscalculated
- *     when mss dropped without a correspoding drop in the DMA buffer size.
- *   o ASF for Fiber nics isn't supported.
- *   o Bug fix: Workaround added for potential hang with 82544 running in
- *     PCI-X if send buffer terminates within an evenly-aligned dword.
- *   o Feature: Add support for ethtool flow control setting.
- *   o Feature: Add support for ethtool TSO setting.
- *   o Feature: Increase default Tx Descriptor count to 1024 for >= 82544.
- *   
- * 5.1.13	5/28/03
  */
 
 char e1000_driver_name[] = "e1000";
 char e1000_driver_string[] = "Intel(R) PRO/1000 Network Driver";
-char e1000_driver_version[] = "5.2.20-k1";
+char e1000_driver_version[] = "5.2.26-k1";
 char e1000_copyright[] = "Copyright (c) 1999-2003 Intel Corporation.";
 
 /* e1000_pci_tbl - PCI Device ID Table
@@ -1343,10 +1341,17 @@ e1000_watchdog(unsigned long data)
 	struct net_device *netdev = adapter->netdev;
 	struct e1000_desc_ring *txdr = &adapter->tx_ring;
 	unsigned int i;
+	uint32_t link;
 
 	e1000_check_for_link(&adapter->hw);
 
-	if(E1000_READ_REG(&adapter->hw, STATUS) & E1000_STATUS_LU) {
+	if((adapter->hw.media_type == e1000_media_type_internal_serdes) &&
+	   !(E1000_READ_REG(&adapter->hw, TXCW) & E1000_TXCW_ANE))
+		link = !adapter->hw.serdes_link_down;
+	else
+		link = E1000_READ_REG(&adapter->hw, STATUS) & E1000_STATUS_LU;
+
+	if(link) {
 		if(!netif_carrier_ok(netdev)) {
 			e1000_get_speed_and_duplex(&adapter->hw,
 			                           &adapter->link_speed,

@@ -1485,8 +1485,8 @@ e1000_phy_force_speed_duplex(struct e1000_hw *hw)
             if(mii_status_reg & MII_SR_LINK_STATUS) break;
             msec_delay(100);
         }
-        if(i == 0) { /* We didn't get link */
-            /* Reset the DSP and wait again for link. */
+        if((i == 0) && (hw->phy_type == e1000_phy_m88)) {
+            /* We didn't get link.  Reset the DSP and wait again for link. */
             if((ret_val = e1000_phy_reset_dsp(hw))) {
                 DEBUGOUT("Error Resetting PHY DSP\n");
                 return ret_val;
@@ -2081,6 +2081,25 @@ e1000_check_for_link(struct e1000_hw *hw)
         DEBUGOUT("RXing /C/, enable AutoNeg and stop forcing link.\r\n");
         E1000_WRITE_REG(hw, TXCW, hw->txcw);
         E1000_WRITE_REG(hw, CTRL, (ctrl & ~E1000_CTRL_SLU));
+
+        hw->serdes_link_down = FALSE;
+    }
+    /* If we force link for non-auto-negotiation switch, check link status
+     * based on MAC synchronization for internal serdes media type.
+     */
+    else if((hw->media_type == e1000_media_type_internal_serdes) &&
+            !(E1000_TXCW_ANE & E1000_READ_REG(hw, TXCW))) {
+        /* SYNCH bit and IV bit are sticky. */
+        udelay(10);
+        if(E1000_RXCW_SYNCH & E1000_READ_REG(hw, RXCW)) {
+            if(!(rxcw & E1000_RXCW_IV)) {
+                hw->serdes_link_down = FALSE;
+                DEBUGOUT("SERDES: Link is up.\n");
+            }
+        } else {
+            hw->serdes_link_down = TRUE;
+            DEBUGOUT("SERDES: Link is down.\n");
+        }
     }
     return E1000_SUCCESS;
 }
@@ -2481,8 +2500,8 @@ e1000_write_phy_reg_ex(struct e1000_hw *hw,
         E1000_WRITE_REG(hw, MDIC, mdic);
 
         /* Poll the ready bit to see if the MDI read completed */
-        for(i = 0; i < 64; i++) {
-            udelay(50);
+        for(i = 0; i < 640; i++) {
+            udelay(5);
             mdic = E1000_READ_REG(hw, MDIC);
             if(mdic & E1000_MDIC_READY) break;
         }
@@ -3498,10 +3517,12 @@ e1000_write_eeprom(struct e1000_hw *hw,
     if (e1000_acquire_eeprom(hw) != E1000_SUCCESS)
         return -E1000_ERR_EEPROM;
 
-    if(eeprom->type == e1000_eeprom_microwire)
+    if(eeprom->type == e1000_eeprom_microwire) {
         status = e1000_write_eeprom_microwire(hw, offset, words, data);
-    else
+    } else {
         status = e1000_write_eeprom_spi(hw, offset, words, data);
+        msec_delay(10);
+    }
 
     /* Done with writing */
     e1000_release_eeprom(hw);
@@ -3719,12 +3740,9 @@ e1000_read_mac_addr(struct e1000_hw * hw)
         hw->perm_mac_addr[i+1] = (uint8_t) (eeprom_data >> 8);
     }
     if(((hw->mac_type == e1000_82546) || (hw->mac_type == e1000_82546_rev_3)) &&
-       (E1000_READ_REG(hw, STATUS) & E1000_STATUS_FUNC_1)) {
-        if(hw->perm_mac_addr[5] & 0x01)
-            hw->perm_mac_addr[5] &= ~(0x01);
-        else
-            hw->perm_mac_addr[5] |= 0x01;
-    }
+       (E1000_READ_REG(hw, STATUS) & E1000_STATUS_FUNC_1))
+            hw->perm_mac_addr[5] ^= 0x01;
+
     for(i = 0; i < NODE_ADDRESS_SIZE; i++)
         hw->mac_addr[i] = hw->perm_mac_addr[i];
     return E1000_SUCCESS;
@@ -3743,22 +3761,13 @@ void
 e1000_init_rx_addrs(struct e1000_hw *hw)
 {
     uint32_t i;
-    uint32_t addr_low;
-    uint32_t addr_high;
 
     DEBUGFUNC("e1000_init_rx_addrs");
 
     /* Setup the receive address. */
     DEBUGOUT("Programming MAC Address into RAR[0]\n");
-    addr_low = (hw->mac_addr[0] |
-                (hw->mac_addr[1] << 8) |
-                (hw->mac_addr[2] << 16) | (hw->mac_addr[3] << 24));
 
-    addr_high = (hw->mac_addr[4] |
-                 (hw->mac_addr[5] << 8) | E1000_RAH_AV);
-
-    E1000_WRITE_REG_ARRAY(hw, RA, 0, addr_low);
-    E1000_WRITE_REG_ARRAY(hw, RA, 1, addr_high);
+    e1000_rar_set(hw, hw->mac_addr, 0);
 
     /* Zero out the other 15 receive addresses. */
     DEBUGOUT("Clearing RAR[1-15]\n");
@@ -3785,11 +3794,11 @@ void
 e1000_mc_addr_list_update(struct e1000_hw *hw,
                           uint8_t *mc_addr_list,
                           uint32_t mc_addr_count,
-                          uint32_t pad)
+                          uint32_t pad,
+			  uint32_t rar_used_count)
 {
     uint32_t hash_value;
     uint32_t i;
-    uint32_t rar_used_count = 1; /* RAR[0] is used for our MAC address */
 
     DEBUGFUNC("e1000_mc_addr_list_update");
 
