@@ -197,12 +197,10 @@ EXPORT_SYMBOL(class_simple_set_hotplug);
 void class_simple_device_remove(dev_t dev)
 {
 	struct simple_dev *s_dev = NULL;
-	struct list_head *tmp;
 	int found = 0;
 
 	spin_lock(&simple_dev_list_lock);
-	list_for_each(tmp, &simple_dev_list) {
-		s_dev = list_entry(tmp, struct simple_dev, node);
+	list_for_each_entry(s_dev, &simple_dev_list, node) {
 		if (s_dev->dev == dev) {
 			found = 1;
 			break;
