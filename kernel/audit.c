@@ -360,7 +360,7 @@ static int audit_receive_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 		status_set.backlog_limit = audit_backlog_limit;
 		status_set.lost		 = atomic_read(&audit_lost);
 		status_set.backlog	 = atomic_read(&audit_backlog);
-		audit_send_reply(pid, seq, AUDIT_GET, 0, 0,
+		audit_send_reply(NETLINK_CB(skb).pid, seq, AUDIT_GET, 0, 0,
 				 &status_set, sizeof(status_set));
 		break;
 	case AUDIT_SET:
@@ -407,8 +407,8 @@ static int audit_receive_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 		/* fallthrough */
 	case AUDIT_LIST:
 #ifdef CONFIG_AUDITSYSCALL
-		err = audit_receive_filter(nlh->nlmsg_type, pid, uid, seq,
-					   data);
+		err = audit_receive_filter(nlh->nlmsg_type, NETLINK_CB(skb).pid,
+					   uid, seq, data);
 #else
 		err = -EOPNOTSUPP;
 #endif
