@@ -342,10 +342,10 @@ static inline void __activate_task(task_t *p, runqueue_t *rq)
  */
 static inline int activate_task(task_t *p, runqueue_t *rq)
 {
-	unsigned long sleep_time = jiffies - p->last_run;
+	long sleep_time = jiffies - p->last_run - 1;
 	int requeue_waker = 0;
 
-	if (sleep_time) {
+	if (sleep_time > 0) {
 		int sleep_avg;
 
 		/*
