@@ -103,9 +103,6 @@
 
 #define IP_MAX_MEMBERSHIPS 20
 
-#ifdef CONFIG_IP_MULTICAST
-
-
 /* Parameter names and values are taken from igmp-v2-06 draft */
 
 #define IGMP_V1_Router_Present_Timeout		(400*HZ)
@@ -129,9 +126,9 @@
 #define IGMP_V2_SEEN(in_dev) ((in_dev)->mr_v2_seen && \
 		time_before(jiffies, (in_dev)->mr_v2_seen))
 
-#endif
-
+#ifdef CONFIG_MULTICAST
 static void igmpv3_add_delrec(struct in_device *in_dev, struct ip_mc_list *im);
+#endif
 static void igmpv3_del_delrec(struct in_device *in_dev, __u32 multiaddr);
 static void igmpv3_clear_delrec(struct in_device *in_dev);
 static int sf_setstate(struct ip_mc_list *pmc);
@@ -913,6 +910,7 @@ static void ip_mc_filter_del(struct in_device *in_dev, u32 addr)
 		dev_mc_delete(dev,buf,dev->addr_len,0);
 }
 
+#ifdef CONFIG_IP_MULTICAST
 /*
  * deleted ip_mc_list manipulation
  */
@@ -953,6 +951,7 @@ static void igmpv3_add_delrec(struct in_device *in_dev, struct ip_mc_list *im)
 	in_dev->mc_tomb = pmc;
 	write_unlock_bh(&in_dev->mc_lock);
 }
+#endif
 
 static void igmpv3_del_delrec(struct in_device *in_dev, __u32 multiaddr)
 {
@@ -1002,9 +1001,9 @@ static void igmpv3_clear_delrec(struct in_device *in_dev)
 
 static void igmp_group_dropped(struct ip_mc_list *im)
 {
+	struct in_device *in_dev = im->interface;
 #ifdef CONFIG_IP_MULTICAST
 	int reporter;
-	struct in_device *in_dev = im->interface;
 #endif
 
 	if (im->loaded) {
@@ -1185,6 +1184,7 @@ void ip_mc_up(struct in_device *in_dev)
 
 	ASSERT_RTNL();
 
+#ifdef CONFIG_IP_MULTICAST
 	in_dev->mc_lock = RW_LOCK_UNLOCKED;
 	in_dev->mr_gq_running = 0;
 	init_timer(&in_dev->mr_gq_timer);
@@ -1196,6 +1196,7 @@ void ip_mc_up(struct in_device *in_dev)
 	in_dev->mr_ifc_timer.data=(unsigned long) in_dev;
 	in_dev->mr_ifc_timer.function=&igmp_ifc_timer_expire;
 	in_dev->mr_qrv = IGMP_Unsolicited_Report_Count;
+#endif
 
 	ip_mc_inc_group(in_dev, IGMP_ALL_HOSTS);
 
@@ -1299,6 +1300,10 @@ static int ip_mc_del1_src(struct ip_mc_list *pmc, int sfmode,
 	return rv;
 }
 
+#ifndef CONFIG_IP_MULTICAST
+#define igmp_ifc_event(x)	do { } while (0)
+#endif
+
 int ip_mc_del_src(struct in_device *in_dev, __u32 *pmca, int sfmode,
 	int sfcount, __u32 *psfsrc, int delta)
 {
@@ -1347,8 +1352,9 @@ int ip_mc_del_src(struct in_device *in_dev, __u32 *pmca, int sfmode,
 		for (psf=pmc->sources; psf; psf = psf->sf_next)
 			psf->sf_crcount = 0;
 		igmp_ifc_event(pmc->interface);
-	} else if (sf_setstate(pmc) || changerec)
+	} else if (sf_setstate(pmc) || changerec) {
 		igmp_ifc_event(pmc->interface);
+	}
 	spin_unlock_bh(&pmc->lock);
 	return err;
 }
