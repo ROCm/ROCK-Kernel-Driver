@@ -38,7 +38,6 @@
 
 /* Wakes up khubd */
 static spinlock_t hub_event_lock = SPIN_LOCK_UNLOCKED;
-static DECLARE_MUTEX(usb_address0_sem);
 
 static LIST_HEAD(hub_event_list);	/* List of hubs needing servicing */
 static LIST_HEAD(hub_list);		/* List of all hubs (for cleanup) */
@@ -962,7 +961,7 @@ static int hub_port_reset(struct usb_device *hub, int port,
 	return -1;
 }
 
-int hub_port_disable(struct usb_device *hub, int port)
+static int hub_port_disable(struct usb_device *hub, int port)
 {
 	int ret;
 
@@ -1042,6 +1041,8 @@ static int hub_port_debounce(struct usb_device *hub, int port)
 static int
 hub_port_init (struct usb_device *hub, struct usb_device *dev, int port)
 {
+	static DECLARE_MUTEX(usb_address0_sem);
+
 	int			i, j, retval = -ENODEV;
 	unsigned		delay = HUB_SHORT_RESET_TIME;
 	enum usb_device_speed	oldspeed = dev->speed;
@@ -1447,7 +1448,7 @@ static void hub_events(void)
 				hub_port_connect_change(hub, i, portstatus, portchange);
 			} else if (portchange & USB_PORT_STAT_C_ENABLE) {
 				dev_dbg (hubdev (dev),
-					"port %d enable change, status %x\n",
+					"port %d enable change, status %08x\n",
 					i + 1, portstatus);
 				clear_port_feature(dev,
 					i + 1, USB_PORT_FEAT_C_ENABLE);
@@ -1559,6 +1560,9 @@ static struct usb_driver hub_driver = {
 	.id_table =	hub_id_table,
 };
 
+/*
+ * This should be a separate module.
+ */
 int usb_hub_init(void)
 {
 	pid_t pid;
@@ -1602,25 +1606,68 @@ void usb_hub_cleanup(void)
 	usb_deregister(&hub_driver);
 } /* usb_hub_cleanup() */
 
-/*
- * WARNING - If a driver calls usb_reset_device, you should simulate a
- * disconnect() and probe() for other interfaces you doesn't claim. This
- * is left up to the driver writer right now. This insures other drivers
- * have a chance to re-setup their interface.
- *
- * Take a look at proc_resetdevice in devio.c for some sample code to
- * do this.
- * Use this only from within your probe function, otherwise use
- * usb_reset_device() below, which ensure proper locking
+
+static int config_descriptors_changed(struct usb_device *dev)
+{
+	unsigned			index;
+	unsigned			len = 0;
+	struct usb_config_descriptor	*buf;
+
+	for (index = 0; index < dev->descriptor.bNumConfigurations; index++) {
+		if (len < dev->config[index].desc.wTotalLength)
+			len = dev->config[index].desc.wTotalLength;
+	}
+	buf = kmalloc (len, SLAB_KERNEL);
+	if (buf == 0) {
+		dev_err(&dev->dev, "no mem to re-read configs after reset\n");
+		/* assume the worst */
+		return 1;
+	}
+	for (index = 0; index < dev->descriptor.bNumConfigurations; index++) {
+		int length;
+		int old_length = dev->config[index].desc.wTotalLength;
+
+		length = usb_get_descriptor(dev, USB_DT_CONFIG, index, buf,
+				old_length);
+		if (length < old_length) {
+			dev_dbg(&dev->dev, "config index %d, error %d\n",
+					index, length);
+			break;
+		}
+		if (memcmp (buf, dev->rawdescriptors[index], old_length)
+				!= 0) {
+			dev_dbg(&dev->dev, "config index %d changed (#%d)\n",
+				index, buf->bConfigurationValue);
+/* FIXME enable this when we can re-enumerate after reset;
+ * until then DFU-ish drivers need this and other workarounds
  */
-int usb_physical_reset_device(struct usb_device *dev)
+//			break;
+		}
+	}
+	kfree(buf);
+	return index != dev->descriptor.bNumConfigurations;
+}
+
+/*
+ * WARNING - don't reset any device unless drivers for all of its
+ * interfaces are expecting that reset!  Maybe some driver->reset()
+ * method should eventually help ensure sufficient cooperation.
+ *
+ * This is the same as usb_reset_device() except that the caller
+ * already holds dev->serialize.  For example, it's safe to use
+ * this from a driver probe() routine after downloading new firmware.
+ */
+int __usb_reset_device(struct usb_device *dev)
 {
 	struct usb_device *parent = dev->parent;
-	struct usb_device_descriptor *descriptor;
+	struct usb_device_descriptor descriptor = dev->descriptor;
 	int i, ret, port = -1;
 
-	if (!parent) {
-		err("attempting to reset root hub!");
+	if (dev->maxchild) {
+		/* this requires hub- or hcd-specific logic;
+		 * see hub_reset() and OHCI hc_restart()
+		 */
+		dev_dbg(&dev->dev, "%s for hub!\n", __FUNCTION__);
 		return -EINVAL;
 	}
 
@@ -1633,114 +1680,69 @@ int usb_physical_reset_device(struct usb_device *dev)
 	if (port < 0)
 		return -ENOENT;
 
-	descriptor = kmalloc(sizeof *descriptor, GFP_NOIO);
-	if (!descriptor) {
-		return -ENOMEM;
-	}
-
-	down(&usb_address0_sem);
-
-	/* Send a reset to the device */
-	if (hub_port_reset(parent, port, dev, HUB_SHORT_RESET_TIME)) {
-		hub_port_disable(parent, port);
-		up(&usb_address0_sem);
-		kfree(descriptor);
-		return(-ENODEV);
-	}
-
-	/* Reprogram the Address */
-	ret = usb_set_address(dev);
-	if (ret < 0) {
-		err("USB device not accepting new address (error=%d)", ret);
-		hub_port_disable(parent, port);
-		up(&usb_address0_sem);
-		kfree(descriptor);
-		return ret;
-	}
-
-	/* Let the SET_ADDRESS settle */
-	wait_ms(10);
-
-	up(&usb_address0_sem);
-
-	/*
-	 * Now we fetch the configuration descriptors for the device and
-	 * see if anything has changed. If it has, we dump the current
-	 * parsed descriptors and reparse from scratch. Then we leave
-	 * the device alone for the caller to finish setting up.
-	 *
-	 * If nothing changed, we reprogram the configuration and then
-	 * the alternate settings.
-	 */
-
-	ret = usb_get_descriptor(dev, USB_DT_DEVICE, 0, descriptor,
-			sizeof(*descriptor));
-	if (ret < 0) {
-		kfree(descriptor);
-		return ret;
-	}
-
-	le16_to_cpus(&descriptor->bcdUSB);
-	le16_to_cpus(&descriptor->idVendor);
-	le16_to_cpus(&descriptor->idProduct);
-	le16_to_cpus(&descriptor->bcdDevice);
-
-	if (memcmp(&dev->descriptor, descriptor, sizeof(*descriptor))) {
-		kfree(descriptor);
-		usb_destroy_configuration(dev);
-
-		/* FIXME Linux doesn't yet handle these "device morphed"
-		 * paths.  DFU variants need this to work ... and they
-		 * include the "config descriptors changed" case this
-		 * doesn't yet detect!
-		 */
-		dev->state = USB_STATE_NOTATTACHED;
-		dev_err(&dev->dev, "device morphed (DFU?), nyet supported\n");
-
-		return -ENODEV;
-	}
-
-	kfree(descriptor);
+	ret = hub_port_init(parent, dev, port);
+	if (ret < 0)
+		goto re_enumerate;
+ 
+	/* Device might have changed firmware (DFU or similar) */
+	if (memcmp(&dev->descriptor, &descriptor, sizeof descriptor)
+			|| config_descriptors_changed (dev)) {
+		dev_info(&dev->dev, "device firmware changed\n");
+		dev->descriptor = descriptor;	/* for disconnect() calls */
+		goto re_enumerate;
+  	}
+  
+	if (!dev->actconfig)
+		return 0;
 
 	ret = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
 			USB_REQ_SET_CONFIGURATION, 0,
 			dev->actconfig->desc.bConfigurationValue, 0,
 			NULL, 0, HZ * USB_CTRL_SET_TIMEOUT);
 	if (ret < 0) {
-		err("failed to set dev %s active configuration (error=%d)",
-			dev->devpath, ret);
-		return ret;
-	}
+		dev_err(&dev->dev,
+			"can't restore configuration #%d (error=%d)\n",
+			dev->actconfig->desc.bConfigurationValue, ret);
+		goto re_enumerate;
+  	}
 	dev->state = USB_STATE_CONFIGURED;
 
 	for (i = 0; i < dev->actconfig->desc.bNumInterfaces; i++) {
 		struct usb_interface *intf = dev->actconfig->interface[i];
 		struct usb_interface_descriptor *desc;
 
+		/* set_interface resets host side toggle and halt status even
+		 * for altsetting zero.  the interface may have no driver.
+		 */
 		desc = &intf->cur_altsetting->desc;
 		ret = usb_set_interface(dev, desc->bInterfaceNumber,
 			desc->bAlternateSetting);
 		if (ret < 0) {
-			err("failed to set active alternate setting "
-				"for dev %s interface %d (error=%d)",
-				dev->devpath, desc->bInterfaceNumber, ret);
-			return ret;
+			dev_err(&dev->dev, "failed to restore interface %d "
+				"altsetting %d (error=%d)\n",
+				desc->bInterfaceNumber,
+				desc->bAlternateSetting,
+				ret);
+			goto re_enumerate;
 		}
 	}
 
 	return 0;
+ 
+re_enumerate:
+	/* FIXME make some task re-enumerate; don't just mark unusable */
+	dev->state = USB_STATE_NOTATTACHED;
+	return -ENODEV;
 }
+EXPORT_SYMBOL(__usb_reset_device);
 
 int usb_reset_device(struct usb_device *udev)
 {
-	struct device *gdev = &udev->dev;
 	int r;
 	
-	down_read(&gdev->bus->subsys.rwsem);
-	r = usb_physical_reset_device(udev);
-	up_read(&gdev->bus->subsys.rwsem);
+	down(&udev->serialize);
+	r = __usb_reset_device(udev);
+	up(&udev->serialize);
 
 	return r;
 }
-
-
