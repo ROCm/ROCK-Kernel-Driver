@@ -1006,6 +1006,7 @@ _GLOBAL(kernel_thread)
 	mr	r31,r4		/* argument */
 	ori	r3,r5,CLONE_VM	/* flags */
 	oris	r3,r3,CLONE_UNTRACED>>16
+	li	r4,0		/* new sp (unused) */
 	li	r0,__NR_clone
 	sc
 	cmpi	0,r3,0		/* parent or child? */
