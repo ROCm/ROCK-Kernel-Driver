@@ -2566,15 +2566,7 @@ static struct pci_driver driver = {
 
 static int __init alsa_card_rme96_init(void)
 {
-	int err;
-
-	if ((err = pci_module_init(&driver)) < 0) {
-#ifdef MODULE
-		printk(KERN_ERR "No RME Digi96 cards found\n");
-#endif
-		return err;
-	}
-	return 0;
+	return pci_module_init(&driver);
 }
 
 static void __exit alsa_card_rme96_exit(void)

@@ -2505,15 +2505,14 @@ snd_korg1212_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		return err;
 	}
-	pci_set_drvdata(pci, korg1212);
+	pci_set_drvdata(pci, card);
 	dev++;
 	return 0;
 }
 
 static void __devexit snd_korg1212_remove(struct pci_dev *pci)
 {
-	korg1212_t *korg1212 = pci_get_drvdata(pci);
-	snd_card_free(korg1212->card);
+	snd_card_free(pci_get_drvdata(pci));
 	pci_set_drvdata(pci, NULL);
 }
 
@@ -2526,15 +2525,7 @@ static struct pci_driver driver = {
 
 static int __init alsa_card_korg1212_init(void)
 {
-	int err;
-
-	if ((err = pci_module_init(&driver)) < 0) {
-#ifdef MODULE
-		printk(KERN_ERR "No Korg 1212IO cards found\n");
-#endif
-		return err;
-	}
-	return 0;
+	return pci_module_init(&driver);
 }
 
 static void __exit alsa_card_korg1212_exit(void)

@@ -2749,14 +2749,7 @@ static struct pci_driver driver = {
 
 static int __init alsa_card_hammerfall_init(void)
 {
-	if (pci_module_init(&driver) < 0) {
-#ifdef MODULE
-		printk(KERN_ERR "RME Digi9652/Digi9636: no cards found\n");
-#endif
-		return -ENODEV;
-	}
-
-	return 0;
+	return pci_module_init(&driver);
 }
 
 static void __exit alsa_card_hammerfall_exit(void)

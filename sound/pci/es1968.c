@@ -2743,22 +2743,11 @@ static struct pci_driver driver = {
 
 static int __init alsa_card_es1968_init(void)
 {
-	int err;
-
-        if ((err = pci_module_init(&driver)) < 0) {
-#ifdef MODULE
-		printk(KERN_ERR "ESS Maestro soundcard not found or device busy\n");
-#endif
-		return err;
-	}
-	return 0;
+	return pci_module_init(&driver);
 }
 
 static void __exit alsa_card_es1968_exit(void)
 {
-#if 0 // do we really need this?
-	unregister_reboot_notifier(&snd_es1968_nb);
-#endif
 	pci_unregister_driver(&driver);
 }
 

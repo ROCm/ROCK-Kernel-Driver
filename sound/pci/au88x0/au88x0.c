@@ -353,7 +353,7 @@ snd_vortex_probe(struct pci_dev *pci, const struct pci_device_id *pci_id)
 		return err;
 	}
 	// (7)
-	pci_set_drvdata(pci, chip);
+	pci_set_drvdata(pci, card);
 	dev++;
 	vortex_connect_default(chip, 1);
 	vortex_enable_int(chip);
@@ -363,16 +363,8 @@ snd_vortex_probe(struct pci_dev *pci, const struct pci_device_id *pci_id)
 // destructor -- see "Destructor" sub-section
 static void __devexit snd_vortex_remove(struct pci_dev *pci)
 {
-	vortex_t *vortex = snd_magic_cast(vortex_t,
-					  pci_get_drvdata(pci), return);
-
-	if (vortex) {
-		// Release ALSA stuff.
-		snd_card_free(vortex->card);
-		// Free Vortex struct.
-		pci_set_drvdata(pci, NULL);
-	} else
-		printk("snd_vortex_remove called more than one time!\n");
+	snd_card_free(pci_get_drvdata(pci));
+	pci_set_drvdata(pci, NULL);
 }
 
 // pci_driver definition
@@ -386,16 +378,7 @@ static struct pci_driver driver = {
 // initialization of the module
 static int __init alsa_card_vortex_init(void)
 {
-	int err;
-
-	if ((err = pci_module_init(&driver)) < 0) {
-#ifdef MODULE
-		printk(KERN_ERR "Aureal soundcard not found "
-		       "or device busy\n");
-#endif
-		return err;
-	}
-	return 0;
+	return pci_module_init(&driver);
 }
 
 // clean up the module

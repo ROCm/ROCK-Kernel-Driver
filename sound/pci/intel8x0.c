@@ -2779,12 +2779,9 @@ static int __init alsa_card_intel8x0_init(void)
 {
 	int err;
 
-        if ((err = pci_module_init(&driver)) < 0) {
-#ifdef MODULE
-		printk(KERN_ERR "Intel ICH soundcard not found or device busy\n");
-#endif
+        if ((err = pci_module_init(&driver)) < 0)
                 return err;
-        }
+
 #if defined(SUPPORT_JOYSTICK) || defined(SUPPORT_MIDI)
 	if (pci_module_init(&joystick_driver) < 0) {
 		snd_printdd(KERN_INFO "no joystick found\n");

@@ -1433,15 +1433,7 @@ static struct pci_driver driver = {
 
 static int __init alsa_card_mixart_init(void)
 {
-	int err;
-
-	if ((err = pci_module_init(&driver)) < 0) {
-#ifdef MODULE
-		snd_printk(KERN_ERR "Digigram miXart soundcard not found or device busy\n");
-#endif
-		return err;
-	}
-	return 0;
+	return pci_module_init(&driver);
 }
 
 static void __exit alsa_card_mixart_exit(void)

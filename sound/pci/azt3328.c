@@ -1268,6 +1268,10 @@ static int snd_azf3328_free(azf3328_t *chip)
         if (chip->irq < 0)
                 goto __end_hw;
 
+	/* reset (close) mixer */
+	snd_azf3328_mixer_set_mute(chip, IDX_MIXER_PLAY_MASTER, 1); /* first mute master volume */
+	snd_azf3328_mixer_write(chip, IDX_MIXER_RESET, 0x0, WORD_VALUE);
+
         /* interrupt setup - mask everything */
 	/* FIXME */
 
@@ -1541,7 +1545,7 @@ static int __devinit snd_azf3328_probe(struct pci_dev *pci,
 	snd_azf3328_config_joystick(chip, joystick[dev]);
 #endif
 
-	pci_set_drvdata(pci, chip);
+	pci_set_drvdata(pci, card);
 	dev++;
 
 	snd_azf3328_dbgcallleave();
@@ -1550,16 +1554,8 @@ static int __devinit snd_azf3328_probe(struct pci_dev *pci,
 
 static void __devexit snd_azf3328_remove(struct pci_dev *pci)
 {
-        azf3328_t *chip = snd_magic_cast(azf3328_t, pci_get_drvdata(pci), return);
-	
 	snd_azf3328_dbgcallenter();
-
-	/* reset (close) mixer */
-	snd_azf3328_mixer_set_mute(chip, IDX_MIXER_PLAY_MASTER, 1); /* first mute master volume */
-	snd_azf3328_mixer_write(chip, IDX_MIXER_RESET, 0x0, WORD_VALUE);
-
-        if (chip)
-		snd_card_free(chip->card);
+	snd_card_free(pci_get_drvdata(pci));
 	pci_set_drvdata(pci, NULL);
 	snd_azf3328_dbgcallleave();
 }
@@ -1574,18 +1570,10 @@ static struct pci_driver driver = {
 static int __init alsa_card_azf3328_init(void)
 {
 	int err;
-	
 	snd_azf3328_dbgcallenter();
-
-	if ((err = pci_module_init(&driver)) < 0)
-	{
-#ifdef MODULE
-		printk(KERN_ERR "azt3328: no AZF3328 based soundcards found or device busy\n");
-#endif
-		return err;
-	}
+	err = pci_module_init(&driver);
 	snd_azf3328_dbgcallleave();
-	return 0;
+	return err;
 }
 
 static void __exit alsa_card_azf3328_exit(void)

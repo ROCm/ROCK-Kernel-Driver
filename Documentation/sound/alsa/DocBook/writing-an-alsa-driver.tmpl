@@ -1341,16 +1341,7 @@
   // initialization of the module
   static int __init alsa_card_mychip_init(void)
   {
-          int err;
-
-          if ((err = pci_module_init(&driver)) < 0) {
-  #ifdef MODULE
-                  printk(KERN_ERR "My chip soundcard not found "
-                                  "or device busy\n");
-  #endif
-                  return err;
-          }
-          return 0;
+          return pci_module_init(&driver);
   }
 
   // clean up the module
@@ -1767,16 +1758,7 @@
 <![CDATA[
   static int __init alsa_card_mychip_init(void)
   {
-          int err;
-
-          if ((err = pci_module_init(&driver)) < 0) {
-  #ifdef MODULE
-                  printk(KERN_ERR "My chip soundcard not found"
-                                  " or device busy\n");
-  #endif
-                  return err;
-          }
-          return 0;
+          return pci_module_init(&driver);
   }
 
   static void __exit alsa_card_mychip_exit(void)

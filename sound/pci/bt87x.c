@@ -809,7 +809,7 @@ static int __devinit snd_bt87x_probe(struct pci_dev *pci,
 	if (err < 0)
 		goto _error;
 
-	pci_set_drvdata(pci, chip);
+	pci_set_drvdata(pci, card);
 	++dev;
 	return 0;
 
@@ -820,9 +820,7 @@ _error:
 
 static void __devexit snd_bt87x_remove(struct pci_dev *pci)
 {
-	bt87x_t *chip = snd_magic_cast(bt87x_t, pci_get_drvdata(pci), return);
-	if (chip)
-		snd_card_free(chip->card);
+	snd_card_free(pci_get_drvdata(pci));
 	pci_set_drvdata(pci, NULL);
 }
 
@@ -852,16 +850,7 @@ static struct pci_driver driver = {
 
 static int __init alsa_card_bt87x_init(void)
 {
-	int err;
-
-	err = pci_module_init(&driver);
-	if (err < 0) {
-#ifdef MODULE
-		printk(KERN_ERR "Bt87x soundcard not found or device busy\n");
-#endif
-		return err;
-	}
-	return 0;
+	return pci_module_init(&driver);
 }
 
 static void __exit alsa_card_bt87x_exit(void)
