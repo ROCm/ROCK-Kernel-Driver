@@ -222,7 +222,7 @@ cmd_link_vmlinux = $(LD) $(LINKFLAGS) $(HEAD) $(INIT) \
 
 define rule_link_vmlinux
 	set -e
-	echo Generating build number
+	echo '  Generating build number'
 	. scripts/mkversion > .tmpversion
 	mv -f .tmpversion .version
 	+$(MAKE) -C init
@@ -273,13 +273,13 @@ prepare: include/linux/version.h include/asm include/config/MARKER
 #	before switching between archs anyway.
 
 include/asm:
-	@echo 'Making asm->asm-$(ARCH) symlink'
+	@echo '  Making asm->asm-$(ARCH) symlink'
 	@ln -s asm-$(ARCH) $@
 
 # 	Split autoconf.h into include/linux/config/*
 
 include/config/MARKER: scripts/split-include include/linux/autoconf.h
-	@echo 'Splitting include/linux/autoconf.h -> include/config'
+	@echo '  SPLIT  include/linux/autoconf.h -> include/config/*'
 	@scripts/split-include include/linux/autoconf.h include/config
 	@touch $@
 
@@ -306,7 +306,7 @@ include/linux/version.h: Makefile
 	  echo '"$(KERNELRELEASE)" exceeds $(uts_len) characters' >&2; \
 	  exit 1; \
 	fi;
-	@echo -n 'Generating $@'
+	@echo -n '  Generating $@'
 	@(echo \#define UTS_RELEASE \"$(KERNELRELEASE)\"; \
 	  echo \#define LINUX_VERSION_CODE `expr $(VERSION) \\* 65536 + $(PATCHLEVEL) \\* 256 + $(SUBLEVEL)`; \
 	 echo '#define KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))'; \
@@ -349,7 +349,7 @@ ifdef CONFIG_MODVERSIONS
 include/linux/modversions.h: scripts/fixdep prepare FORCE
 	@rm -rf .tmp_export-objs
 	@$(MAKE) $(patsubst %,_sfdep_%,$(SUBDIRS))
-	@echo -n 'Generating $@'
+	@echo -n '  Generating $@'
 	@( echo "#ifndef _LINUX_MODVERSIONS_H";\
 	   echo "#define _LINUX_MODVERSIONS_H"; \
 	   echo "#include <linux/modsetver.h>"; \

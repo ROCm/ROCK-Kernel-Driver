@@ -239,7 +239,7 @@ cmd_cc_o_c       = $(CC) $(c_flags) -c -o $@ $<
 %.o: %.c FORCE
 	$(call if_changed_dep,cc_o_c)
 
-quiet_cmd_cc_lst_c = Generating $(RELDIR)/$@
+quiet_cmd_cc_lst_c = '  Generating $(RELDIR)/$@'
 cmd_cc_lst_c     = $(CC) $(c_flags) -g -c -o $*.o $< && $(TOPDIR)/scripts/makelst $*.o $(TOPDIR)/System.map $(OBJDUMP) > $@
 
 %.lst: %.c FORCE

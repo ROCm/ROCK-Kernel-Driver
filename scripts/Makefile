@@ -22,7 +22,7 @@ TAIL=tail.tk
 # Config.in files to depend on anyways.  So I'll force it to remake.
 
 kconfig.tk: $(TOPDIR)/arch/$(ARCH)/config.in tkparse $(HEADER) $(TAIL) FORCE
-	@echo Generating $@
+	@echo '  Generating $@'
 	@(                                                      \
 	  if [ -f /usr/local/bin/wish ];	then            \
 		echo '#!'"/usr/local/bin/wish -f";              \
