@@ -616,17 +616,17 @@ struct ixgb_context_desc {
 #define IXGB_CONTEXT_DESC_STATUS_DD 0x01
 
 /* Filters */
-#define IXGB_RAR_ENTRIES          16	/* Number of entries in Rx Address array */
 #define IXGB_MC_TBL_SIZE          128	/* Multicast Filter Table (4096 bits) */
 #define IXGB_VLAN_FILTER_TBL_SIZE 128	/* VLAN Filter Table (4096 bits) */
+#define IXGB_RAR_ENTRIES		  3	/* Number of entries in Rx Address array */
 
 #define IXGB_MEMORY_REGISTER_BASE_ADDRESS   0
-#define ENET_HEADER_SIZE            14
-#define ENET_FCS_LENGTH             4
-#define IXGB_MAX_NUM_MULTICAST_ADDRESSES    128
-#define IXGB_MIN_ENET_FRAME_SIZE_WITHOUT_FCS    60
-#define IXGB_MAX_ENET_FRAME_SIZE_WITHOUT_FCS    1514
-#define IXGB_MAX_JUMBO_FRAME_SIZE       0x3F00
+#define ENET_HEADER_SIZE			14
+#define ENET_FCS_LENGTH			 4
+#define IXGB_MAX_NUM_MULTICAST_ADDRESSES	128
+#define IXGB_MIN_ENET_FRAME_SIZE_WITHOUT_FCS	60
+#define IXGB_MAX_ENET_FRAME_SIZE_WITHOUT_FCS	1514
+#define IXGB_MAX_JUMBO_FRAME_SIZE		0x3F00
 
 /* Phy Addresses */
 #define IXGB_OPTICAL_PHY_ADDR 0x0	/* Optical Module phy address */
@@ -789,32 +789,39 @@ extern void ixgb_check_for_link(struct ixgb_hw *hw);
 extern boolean_t ixgb_check_for_bad_link(struct ixgb_hw *hw);
 extern boolean_t ixgb_setup_fc(struct ixgb_hw *hw);
 extern void ixgb_clear_hw_cntrs(struct ixgb_hw *hw);
-extern boolean_t mac_addr_valid(uint8_t * mac_addr);
+extern boolean_t mac_addr_valid(uint8_t *mac_addr);
 
 extern uint16_t ixgb_read_phy_reg(struct ixgb_hw *hw,
-				  uint32_t reg_addr,
-				  uint32_t phy_addr, uint32_t device_type);
+				uint32_t reg_addr,
+				uint32_t phy_addr,
+				uint32_t device_type);
 
 extern void ixgb_write_phy_reg(struct ixgb_hw *hw,
-			       uint32_t reg_addr,
-			       uint32_t phy_addr,
-			       uint32_t device_type, uint16_t data);
+				uint32_t reg_addr,
+				uint32_t phy_addr,
+				uint32_t device_type,
+				uint16_t data);
 
-extern void ixgb_rar_set(struct ixgb_hw *hw, uint8_t * addr, uint32_t index);
+extern void ixgb_rar_set(struct ixgb_hw *hw,
+				uint8_t *addr,
+				uint32_t index);
+
 
 /* Filters (multicast, vlan, receive) */
 extern void ixgb_mc_addr_list_update(struct ixgb_hw *hw,
-				     uint8_t * mc_addr_list,
-				     uint32_t mc_addr_count, uint32_t pad);
+				   uint8_t *mc_addr_list,
+				   uint32_t mc_addr_count,
+				   uint32_t pad);
 
 /* Vfta functions */
 extern void ixgb_write_vfta(struct ixgb_hw *hw,
-			    uint32_t offset, uint32_t value);
+				 uint32_t offset,
+				 uint32_t value);
 
 extern void ixgb_clear_vfta(struct ixgb_hw *hw);
 
 /* Access functions to eeprom data */
-void ixgb_get_ee_mac_addr(struct ixgb_hw *hw, uint8_t * mac_addr);
+void ixgb_get_ee_mac_addr(struct ixgb_hw *hw, uint8_t *mac_addr);
 uint16_t ixgb_get_ee_compatibility(struct ixgb_hw *hw);
 uint32_t ixgb_get_ee_pba_number(struct ixgb_hw *hw);
 uint16_t ixgb_get_ee_init_ctrl_reg_1(struct ixgb_hw *hw);
@@ -832,6 +839,9 @@ uint16_t ixgb_get_eeprom_word(struct ixgb_hw *hw, uint16_t index);
 /* Everything else */
 void ixgb_led_on(struct ixgb_hw *hw);
 void ixgb_led_off(struct ixgb_hw *hw);
-void ixgb_write_pci_cfg(struct ixgb_hw *hw, uint32_t reg, uint16_t * value);
+void ixgb_write_pci_cfg(struct ixgb_hw *hw,
+			 uint32_t reg,
+			 uint16_t * value);
 
-#endif				/* _IXGB_HW_H_ */
+
+#endif /* _IXGB_HW_H_ */
