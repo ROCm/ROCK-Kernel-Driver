@@ -68,7 +68,7 @@
 #define BN_ALIGN_MASK	((1 << (PAGE_CACHE_SHIFT - BBSHIFT)) - 1)
 
 #ifndef GFP_READAHEAD
-#define GFP_READAHEAD	__GFP_NOWARN
+#define GFP_READAHEAD	(__GFP_NOWARN|__GFP_NORETRY)
 #endif
 
 /*
