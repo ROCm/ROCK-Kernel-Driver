@@ -16,7 +16,7 @@
  *
  *    You should have received a copy of the GNU General Public License
  *    along with this program; if not, write to the Free Software
- *    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ *    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 /*
  * BEGIN_DESC
@@ -347,7 +347,7 @@ decode_fpu(unsigned int Fpu_register[], unsigned int trap_counts[])
 		return SIGNALCODE(SIGFPE, FPE_FLTRES);
 	  default:
 		update_trap_counts(Fpu_register, aflags, bflags, trap_counts);
-		printk(__FILE__ "(%d) Unknown FPU exception 0x%x\n",
+		printk("%s(%d) Unknown FPU exception 0x%x\n", __FILE__,
 			__LINE__, Excp_type(exception_index));
 		return SIGNALCODE(SIGILL, ILL_COPROC);
 	  case NOEXCEPTION:	/* no exception */

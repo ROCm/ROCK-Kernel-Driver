@@ -16,6 +16,7 @@
 #include <linux/user.h>
 #include <linux/personality.h>
 #include <linux/security.h>
+#include <linux/compat.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -35,8 +36,6 @@
 #endif
 
 #ifdef __LP64__
-
-#define CHILD_IS_32BIT	(child->personality == PER_LINUX_32BIT)
 
 /* This function is needed to translate 32 bit pt_regs offsets in to
  * 64 bit pt_regs offsets.  For example, a 32 bit gdb under a 64 bit kernel
@@ -130,7 +129,7 @@ long sys_ptrace(long request, pid_t pid, long addr, long data)
 		int copied;
 
 #ifdef __LP64__
-		if (CHILD_IS_32BIT) {
+		if (is_compat_task(child)) {
 			unsigned int tmp;
 
 			addr &= 0xffffffffL;
@@ -162,7 +161,7 @@ long sys_ptrace(long request, pid_t pid, long addr, long data)
 	case PTRACE_POKEDATA:
 		ret = 0;
 #ifdef __LP64__
-		if (CHILD_IS_32BIT) {
+		if (is_compat_task(child)) {
 			unsigned int tmp = (unsigned int)data;
 			DBG(("sys_ptrace(POKE%s, %d, %lx, %lx)\n",
 				request == PTRACE_POKETEXT ? "TEXT" : "DATA",
@@ -185,7 +184,7 @@ long sys_ptrace(long request, pid_t pid, long addr, long data)
 	case PTRACE_PEEKUSR: {
 		ret = -EIO;
 #ifdef __LP64__
-		if (CHILD_IS_32BIT) {
+		if (is_compat_task(child)) {
 			unsigned int tmp;
 
 			if (addr & (sizeof(int)-1))
@@ -244,7 +243,7 @@ long sys_ptrace(long request, pid_t pid, long addr, long data)
 			goto out_tsk;
 		}
 #ifdef __LP64__
-		if (CHILD_IS_32BIT) {
+		if (is_compat_task(child)) {
 			if (addr & (sizeof(int)-1))
 				goto out_tsk;
 			if ((addr = translate_usr_offset(addr)) < 0)

@@ -229,7 +229,7 @@ void __devinit pcibios_resource_to_bus(struct pci_dev *dev,
 		struct pci_bus_region *region, struct resource *res)
 {
 	struct pci_bus *bus = dev->bus;
-	struct pci_hba_data *hba = HBA_DATA(bus->dev->platform_data);
+	struct pci_hba_data *hba = HBA_DATA(bus->bridge->platform_data);
 
 	if (res->flags & IORESOURCE_IO) {
 		/*

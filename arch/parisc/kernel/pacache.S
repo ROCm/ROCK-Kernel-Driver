@@ -1,6 +1,8 @@
 /*
- *  Parisc tlb and cache flushing support
- *  Copyright (C) 2000 Hewlett-Packard (John Marvin)
+ *  PARISC TLB and cache flushing support
+ *  Copyright (C) 2000-2001 Hewlett-Packard (John Marvin)
+ *  Copyright (C) 2001 Matthew Wilcox (willy at parisc-linux.org)
+ *  Copyright (C) 2002 Richard Hirst (rhirst with parisc-linux.org)
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -14,7 +16,7 @@
  *
  *    You should have received a copy of the GNU General Public License
  *    along with this program; if not, write to the Free Software
- *    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ *    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 /*

@@ -478,7 +478,11 @@ extern int pdc_type;
 #define PDC_TYPE_SYSTEM_MAP	 1 /* 32-bit, but supports PDC_SYSTEM_MAP */
 #define PDC_TYPE_SNAKE		 2 /* Doesn't support SYSTEM_MAP */
 
-#define is_pdc_pat()    (pdc_type == PDC_TYPE_PAT)
+#ifdef CONFIG_PARISC64
+#define is_pdc_pat()    (PDC_TYPE_PAT == pdc_type)
+#else
+#define is_pdc_pat()    (0)
+#endif
 
 struct pdc_chassis_info {       /* for PDC_CHASSIS_INFO */
 	unsigned long actcnt;   /* actual number of bytes returned */
