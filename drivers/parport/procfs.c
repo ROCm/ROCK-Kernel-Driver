@@ -14,6 +14,7 @@
 
 #include <linux/string.h>
 #include <linux/config.h>
+#include <linux/init.h>
 #include <linux/module.h>
 #include <linux/errno.h>
 #include <linux/kernel.h>
@@ -480,21 +481,20 @@ int parport_device_proc_unregister(struct pardevice *device)
 	return 0;
 }
 
-int parport_default_proc_register(void)
+static int __init parport_default_proc_register(void)
 {
 	parport_default_sysctl_table.sysctl_header =
 		register_sysctl_table(parport_default_sysctl_table.dev_dir, 0);
 	return 0;
 }
 
-int parport_default_proc_unregister(void)
+static void __exit parport_default_proc_unregister(void)
 {
 	if (parport_default_sysctl_table.sysctl_header) {
 		unregister_sysctl_table(parport_default_sysctl_table.
 					sysctl_header);
 		parport_default_sysctl_table.sysctl_header = NULL;
 	}
-	return 0;
 }
 
 #else /* no sysctl or no procfs*/
@@ -519,12 +519,12 @@ int parport_device_proc_unregister(struct pardevice *device)
 	return 0;
 }
 
-int parport_default_proc_register (void)
+static int __init parport_default_proc_register (void)
 {
 	return 0;
 }
 
-int parport_default_proc_unregister (void)
+static void __exit parport_default_proc_unregister (void)
 {
 	return 0;
 }
@@ -534,5 +534,6 @@ EXPORT_SYMBOL(parport_proc_register);
 EXPORT_SYMBOL(parport_proc_unregister);
 EXPORT_SYMBOL(parport_device_proc_register);
 EXPORT_SYMBOL(parport_device_proc_unregister);
-EXPORT_SYMBOL(parport_default_proc_register);
-EXPORT_SYMBOL(parport_default_proc_unregister);
+
+module_init(parport_default_proc_register)
+module_exit(parport_default_proc_unregister)

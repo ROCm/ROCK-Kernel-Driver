@@ -113,35 +113,10 @@ static int __init parport_setup (char *str)
 
 __setup ("parport=", parport_setup);
 
-#endif
-
-#ifdef MODULE
-int init_module(void)
-{
-#ifdef CONFIG_SYSCTL
-	parport_default_proc_register ();
-#endif
-	return 0;
-}
-
-void cleanup_module(void)
-{
-#ifdef CONFIG_SYSCTL
-	parport_default_proc_unregister ();
-#endif
-}
-
-#else
-
 int __init parport_init (void)
 {
 	if (io[0] == PARPORT_DISABLE) 
 		return 1;
-
-#ifdef CONFIG_SYSCTL
-	parport_default_proc_register ();
-#endif
-
 #ifdef CONFIG_PARPORT_PC
 	parport_pc_init(io, io_hi, irq, dma);
 #endif
