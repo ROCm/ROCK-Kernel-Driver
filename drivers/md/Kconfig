@@ -193,5 +193,12 @@ config DM_MIRROR
          Allow volume managers to mirror logical volumes, also
          needed for live data migration tools such as 'pvmove'.
 
+config DM_ZERO
+	tristate "Zero target (EXPERIMENTAL)"
+	depends on BLK_DEV_DM && EXPERIMENTAL
+	---help---
+	  A target that discards writes, and returns all zeroes for
+	  reads.  Useful in some recovery situations.
+
 endmenu
 
