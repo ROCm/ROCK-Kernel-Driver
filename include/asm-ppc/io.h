@@ -360,6 +360,7 @@ static inline void memcpy_toio(volatile void __iomem *dst, const void *src, int 
 {
 	memcpy((void __force *) dst, src, count);
 }
+#endif
 
 #define eth_io_copy_and_sum(a,b,c,d)		eth_copy_and_sum((a),(void __force *)(void __iomem *)(b),(c),(d))
 
@@ -408,7 +409,7 @@ extern inline void * bus_to_virt(unsigned long address)
 	return (void*) mm_ptov (address);
 #endif
 }
-#endif
+
 /*
  * Change virtual addresses to physical addresses and vv, for
  * addresses in the area where the kernel has the RAM mapped.
