@@ -80,7 +80,7 @@ unsigned long decr_overclock_proc0_set = 0;
 
 int powersave_nap;
 
-char saved_command_line[256];
+char saved_command_line[COMMAND_LINE_SIZE];
 unsigned char aux_device_present;
 
 void parse_cmd_line(unsigned long r3, unsigned long r4, unsigned long r5,
@@ -536,7 +536,7 @@ int parse_bootinfo(void)
 	for ( ; rec->tag != BI_LAST ; rec = bi_rec_next(rec) ) {
 		switch (rec->tag) {
 		case BI_CMD_LINE:
-			memcpy(cmd_line, (void *)rec->data, rec->size);
+			strlcpy(cmd_line, (void *)rec->data, sizeof(cmd_line));
 			break;
 		case BI_SYSMAP:
 			sysmap = __va(rec->data[0]);
@@ -620,7 +620,7 @@ void __init setup_arch(char **cmdline_p)
 	init_mm.brk = klimit;
 	
 	/* Save unparsed command line copy for /proc/cmdline */
-	strcpy(saved_command_line, cmd_line);
+	strlcpy(saved_command_line, cmd_line, sizeof(saved_command_line));
 	*cmdline_p = cmd_line;
 
 	/* set up the bootmem stuff with available memory */
