@@ -127,7 +127,7 @@ static int gemtek_setfreq(struct gemtek_device *dev, unsigned long freq)
 	return 0;
 }
 
-int gemtek_getsigstr(struct gemtek_device *dev)
+static int gemtek_getsigstr(struct gemtek_device *dev)
 {
 	spin_lock(&lock);
 	inb(io);

@@ -169,7 +169,7 @@ static int zol_setfreq(struct zol_device *dev, unsigned long freq)
 
 /* Get signal strength */
 
-int zol_getsigstr(struct zol_device *dev)
+static int zol_getsigstr(struct zol_device *dev)
 {
 	int a, b;
 
@@ -194,7 +194,7 @@ int zol_getsigstr(struct zol_device *dev)
  	return (0);
 }
 
-int zol_is_stereo (struct zol_device *dev)
+static int zol_is_stereo (struct zol_device *dev)
 {
 	int x1, x2;
 

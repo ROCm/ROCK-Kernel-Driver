@@ -130,7 +130,7 @@ static int rt_setvol(struct rt_device *dev, int vol)
  * and bit 4 (+16) is to keep the signal strength meter enabled
  */
 
-void send_0_byte(int port, struct rt_device *dev)
+static void send_0_byte(int port, struct rt_device *dev)
 {
 	if ((dev->curvol == 0) || (dev->muted)) {
 		outb_p(128+64+16+  1, port);   /* wr-enable + data low */
@@ -143,7 +143,7 @@ void send_0_byte(int port, struct rt_device *dev)
 	sleep_delay(1000); 
 }
 
-void send_1_byte(int port, struct rt_device *dev)
+static void send_1_byte(int port, struct rt_device *dev)
 {
 	if ((dev->curvol == 0) || (dev->muted)) {
 		outb_p(128+64+16+4  +1, port);   /* wr-enable+data high */

@@ -335,12 +335,12 @@ static struct pci_driver maxiradio_driver = {
 	.remove		= __devexit_p(maxiradio_remove_one),
 };
 
-int __init maxiradio_radio_init(void)
+static int __init maxiradio_radio_init(void)
 {
 	return pci_module_init(&maxiradio_driver);
 }
 
-void __exit maxiradio_radio_exit(void)
+static void __exit maxiradio_radio_exit(void)
 {
 	pci_unregister_driver(&maxiradio_driver);
 }

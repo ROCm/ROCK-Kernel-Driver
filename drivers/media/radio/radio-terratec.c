@@ -175,7 +175,7 @@ static int tt_setfreq(struct tt_device *dev, unsigned long freq1)
   	return 0;
 }
 
-int tt_getsigstr(struct tt_device *dev)		/* TODO */
+static int tt_getsigstr(struct tt_device *dev)		/* TODO */
 {
 	if (inb(io) & 2)	/* bit set = no signal present	*/
 		return 0;

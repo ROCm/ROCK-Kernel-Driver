@@ -46,7 +46,7 @@ static int curtuner=0;
 static int tunestat=0;
 static int sigstrength=0;
 static wait_queue_head_t read_queue;
-struct timer_list tunertimer,rdstimer,readtimer;
+static struct timer_list readtimer;
 static __u8 rdsin=0,rdsout=0,rdsstat=0;
 static unsigned char rdsbuf[RDS_BUFFER];
 static spinlock_t cadet_io_lock;
@@ -280,7 +280,7 @@ static void cadet_setvol(int vol)
 	spin_unlock(&cadet_io_lock);
 }  
 
-void cadet_handler(unsigned long data)
+static void cadet_handler(unsigned long data)
 {
 	/*
 	 * Service the RDS fifo
