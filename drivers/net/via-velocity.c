@@ -269,8 +269,9 @@ static int velocity_resume(struct pci_dev *pdev);
 static int velocity_netdev_event(struct notifier_block *nb, unsigned long notification, void *ptr);
 
 static struct notifier_block velocity_inetaddr_notifier = {
-      notifier_call:velocity_netdev_event,
+      .notifier_call	= velocity_netdev_event,
 };
+static int velocity_notifier_registered;
 
 #endif				/* CONFIG_PM */
 
@@ -783,6 +784,12 @@ static int __devinit velocity_found1(struct pci_dev *pdev, const struct pci_devi
 	
 	pci_set_power_state(pdev, 3);
 out:
+#ifdef CONFIG_PM
+	if (ret == 0 && !velocity_notifier_registered) {
+		velocity_notifier_registered = 1;
+		register_inetaddr_notifier(&velocity_inetaddr_notifier);
+	}
+#endif
 	return ret;
 
 err_iounmap:
@@ -2145,13 +2152,13 @@ static int velocity_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
  */
  
 static struct pci_driver velocity_driver = {
-      name:VELOCITY_NAME,
-      id_table:velocity_id_table,
-      probe:velocity_found1,
-      remove:velocity_remove1,
+      .name	= VELOCITY_NAME,
+      .id_table	= velocity_id_table,
+      .probe	= velocity_found1,
+      .remove	= __devexit_p(velocity_remove1),
 #ifdef CONFIG_PM
-      suspend:velocity_suspend,
-      resume:velocity_resume,
+      .suspend	= velocity_suspend,
+      .resume	= velocity_resume,
 #endif
 };
 
@@ -2169,9 +2176,6 @@ static int __init velocity_init_module(void)
 	int ret;
 	ret = pci_module_init(&velocity_driver);
 
-#ifdef CONFIG_PM
-	register_inetaddr_notifier(&velocity_inetaddr_notifier);
-#endif
 	return ret;
 }
 
@@ -2187,7 +2191,10 @@ static int __init velocity_init_module(void)
 static void __exit velocity_cleanup_module(void)
 {
 #ifdef CONFIG_PM
-	unregister_inetaddr_notifier(&velocity_inetaddr_notifier);
+	if (velocity_notifier_registered) {
+		unregister_inetaddr_notifier(&velocity_inetaddr_notifier);
+		velocity_notifier_registered = 0;
+	}
 #endif
 	pci_unregister_driver(&velocity_driver);
 }
