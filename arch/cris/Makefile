@@ -93,7 +93,7 @@ arch/$(ARCH)/.links:
 	@ln -sfn $(SARCH)/drivers arch/$(ARCH)/drivers
 	@ln -sfn $(SARCH)/boot arch/$(ARCH)/boot
 	@ln -sfn $(SARCH)/lib arch/$(ARCH)/lib
-	@ln -sfn $(SARCH)/vmlinux.lds.S arch/$(ARCH)/vmlinux.lds.S
+	@ln -sfn $(SARCH)/vmlinux.lds.S arch/$(ARCH)/kernel/vmlinux.lds.S
 	@touch $@
 
 # Create link to sub arch includes

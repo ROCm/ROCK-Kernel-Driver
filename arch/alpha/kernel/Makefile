@@ -2,7 +2,7 @@
 # Makefile for the linux kernel.
 #
 
-extra-y		:= head.o
+extra-y		:= head.o vmlinux.lds.s
 EXTRA_AFLAGS	:= $(CFLAGS)
 EXTRA_CFLAGS	:= -Werror -Wno-sign-compare
 

@@ -2,7 +2,7 @@
 # Makefile for the linux kernel.
 #
 
-extra-y		:= head.o init_task.o
+extra-y		:= head.o init_task.o vmlinux.lds.s
 
 EXTRA_AFLAGS	:= -ansi
 
