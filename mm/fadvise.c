@@ -56,7 +56,7 @@ long sys_fadvise64(int fd, loff_t offset, size_t len, int advice)
 			ret = -EINVAL;
 			break;
 		}
-		ret = do_page_cache_readahead(mapping, file,
+		ret = force_page_cache_readahead(mapping, file,
 				offset >> PAGE_CACHE_SHIFT,
 				max_sane_readahead(len >> PAGE_CACHE_SHIFT));
 		if (ret > 0)

@@ -570,6 +570,8 @@ int write_one_page(struct page *page, int wait);
 
 int do_page_cache_readahead(struct address_space *mapping, struct file *filp,
 			unsigned long offset, unsigned long nr_to_read);
+int force_page_cache_readahead(struct address_space *mapping, struct file *filp,
+			unsigned long offset, unsigned long nr_to_read);
 void page_cache_readahead(struct address_space *mapping, 
 			  struct file_ra_state *ra,
 			  struct file *filp,
