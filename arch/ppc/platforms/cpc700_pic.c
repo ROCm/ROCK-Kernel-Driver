@@ -8,7 +8,7 @@
  *          mporter@mvista.com
  *          jpeters@mvista.com
  *
- * Copyright 2001 MontaVista Software Inc.
+ * Copyright 2001-2002 MontaVista Software Inc.
  *
  * This program is free software; you can redistribute  it and/or modify it
  * under  the terms of  the GNU General  Public License as published by the
@@ -168,7 +168,7 @@ cpc700_init_IRQ(void)
 		cpc700_pic_init_irq(i);
 	}
 
-	for (i = 20; i < 27; i++) {
+	for (i = 20; i < 32; i++) {
 		irq_desc[i].handler = &cpc700_pic;
 		cpc700_pic_init_irq(i);
 	}
