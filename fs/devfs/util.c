@@ -58,6 +58,8 @@
                Fixed shift warning on 64 bit machines.
     20020428   Richard Gooch <rgooch@atnf.csiro.au>
                Copied and used macro for error messages from fs/devfs/base.c 
+    20021013   Richard Gooch <rgooch@atnf.csiro.au>
+               Documentation fix.
 */
 #include <linux/module.h>
 #include <linux/init.h>
@@ -309,7 +311,7 @@ EXPORT_SYMBOL(devfs_alloc_devnum);
  *	@type: The type (DEVFS_SPECIAL_CHR or DEVFS_SPECIAL_BLK).
  *	@devnum: The device number.
  *
- *	This routine is thread safe and does not block.
+ *	This routine is thread safe and may block.
  */
 
 void devfs_dealloc_devnum (char type, kdev_t devnum)

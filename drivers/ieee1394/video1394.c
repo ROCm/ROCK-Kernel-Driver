@@ -1367,8 +1367,7 @@ static int video1394_init(struct ti_ohci *ohci)
 
 	sprintf(name, "%d", video->id);
 	minor = IEEE1394_MINOR_BLOCK_VIDEO1394 * 16 + video->id;
-	video->devfs = devfs_register(devfs_handle, name,
-				      DEVFS_FL_AUTO_OWNER,
+	video->devfs = devfs_register(devfs_handle, name, DEVFS_FL_DEFAULT,
 				      IEEE1394_MAJOR, minor,
 				      S_IFCHR | S_IRUSR | S_IWUSR,
 				      &video1394_fops, NULL);
