@@ -1921,6 +1921,8 @@ static int b44_suspend(struct pci_dev *pdev, u32 state)
 	b44_free_rings(bp);
 
 	spin_unlock_irq(&bp->lock);
+
+	free_irq(dev->irq, dev);
 	return 0;
 }
 
@@ -1933,6 +1935,9 @@ static int b44_resume(struct pci_dev *pdev)
 
 	if (!netif_running(dev))
 		return 0;
+
+	if (request_irq(dev->irq, b44_interrupt, SA_SHIRQ, dev->name, dev))
+		printk(KERN_ERR PFX "%s: request_irq failed\n", dev->name);
 
 	spin_lock_irq(&bp->lock);
 

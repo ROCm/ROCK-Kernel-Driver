@@ -3212,7 +3212,8 @@ static int velocity_set_wol(struct velocity_info *vptr)
 
 static int velocity_suspend(struct pci_dev *pdev, u32 state)
 {
-	struct velocity_info *vptr = pci_get_drvdata(pdev);
+	struct net_device *dev = pci_get_drvdata(pdev);
+	struct velocity_info *vptr = dev->priv;
 	unsigned long flags;
 
 	if(!netif_running(vptr->dev))
@@ -3245,7 +3246,8 @@ static int velocity_suspend(struct pci_dev *pdev, u32 state)
 
 static int velocity_resume(struct pci_dev *pdev)
 {
-	struct velocity_info *vptr = pci_get_drvdata(pdev);
+	struct net_device *dev = pci_get_drvdata(pdev);
+	struct velocity_info *vptr = dev->priv;
 	unsigned long flags;
 	int i;
 
