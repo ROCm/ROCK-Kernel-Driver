@@ -189,6 +189,8 @@ struct dev_info scsi_static_device_list[] __initdata = {
 	{"HITACHI", "DF500", "*", BLIST_SPARSELUN},
 	{"HITACHI", "DF600", "*", BLIST_SPARSELUN},
 	{"IBM", "ProFibre 4000R", "*", BLIST_SPARSELUN | BLIST_LARGELUN},
+	{"SUN", "T300", "*", BLIST_SPARSELUN},
+	{"SUN", "T4", "*", BLIST_SPARSELUN},
 	{ NULL, NULL, NULL, 0 },
 };
 
