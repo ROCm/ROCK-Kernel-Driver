@@ -1,7 +1,7 @@
 /* Hey EMACS -*- linux-c -*- */
 /*
  *
- * Copyright (C) 2002-2003 Romain Lievin <roms@lpg.ticalc.org>
+ * Copyright (C) 2002-2003 Romain Lievin <roms@tilp.info>
  * Released under the terms of the GNU GPL v2.0.
  *
  */
@@ -1046,7 +1046,8 @@ on_treeview2_button_press_event(GtkWidget * widget,
 	if (path == NULL)
 		return FALSE;
 
-	gtk_tree_model_get_iter(model2, &iter, path);
+	if (!gtk_tree_model_get_iter(model2, &iter, path))
+		return FALSE;
 	gtk_tree_model_get(model2, &iter, COL_MENU, &menu, -1);
 
 	col = column2index(column);
