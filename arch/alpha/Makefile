@@ -12,6 +12,7 @@ NM := $(NM) -B
 
 LDFLAGS_vmlinux = -static -N #-relax
 CFLAGS := $(CFLAGS) -pipe -mno-fp-regs -ffixed-8
+ARCHBLOBLFLAGS := -I binary -O elf64-alpha -B alpha
 
 # Determine if we can use the BWX instructions with GAS.
 old_gas := $(shell if $(AS) --version 2>&1 | grep 'version 2.7' > /dev/null; then echo y; else echo n; fi)

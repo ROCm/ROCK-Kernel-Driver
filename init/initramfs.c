@@ -26,7 +26,7 @@ asmlinkage long sys_mkdir(char *name, int mode);
 asmlinkage long sys_mknod(char *name, int mode, dev_t dev);
 asmlinkage long sys_symlink(char *old, char *new);
 asmlinkage long sys_link(char *old, char *new);
-asmlinkage long sys_write(int fd, void *buf, ssize_t size);
+asmlinkage long sys_write(int fd, const char *buf, size_t size);
 asmlinkage long sys_chown(char *name, uid_t uid, gid_t gid);
 asmlinkage long sys_lchown(char *name, uid_t uid, gid_t gid);
 asmlinkage long sys_fchown(int fd, uid_t uid, gid_t gid);
