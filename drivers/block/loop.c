@@ -1027,14 +1027,18 @@ int __init loop_init(void)
 		sprintf(disk->devfs_name, "loop/%d", i);
 		disk->private_data = lo;
 		disk->queue = lo->lo_queue;
-		add_disk(disk);
 	}
+
+	/* We cannot fail after we call this, so another loop!*/
+	for (i = 0; i < max_loop; i++)
+		add_disk(disks[i]);
 	printk(KERN_INFO "loop: loaded (max %d devices)\n", max_loop);
 	return 0;
 
 out_mem4:
 	while (i--)
 		blk_put_queue(loop_dev[i].lo_queue);
+	devfs_remove("loop");
 	i = max_loop;
 out_mem3:
 	while (i--)
