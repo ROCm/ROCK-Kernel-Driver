@@ -250,7 +250,7 @@ extern void pagebuf_iodone(		/* mark buffer I/O complete	*/
 
 extern void pagebuf_ioerror(		/* mark buffer in error	(or not) */
 		xfs_buf_t *,		/* buffer to mark		*/
-		unsigned int);		/* error to store (0 if none)	*/
+		int);			/* error to store (0 if none)	*/
 
 extern int pagebuf_iostart(		/* start I/O on a buffer	*/
 		xfs_buf_t *,		/* buffer to start		*/

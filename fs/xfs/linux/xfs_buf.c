@@ -1151,9 +1151,10 @@ pagebuf_iodone(
 void
 pagebuf_ioerror(			/* mark/clear buffer error flag */
 	xfs_buf_t		*pb,	/* buffer to mark		*/
-	unsigned int		error)	/* error to store (0 if none)	*/
+	int			error)	/* error to store (0 if none)	*/
 {
-	pb->pb_error = error;
+	ASSERT(error >= 0 && error <= 0xffff);
+	pb->pb_error = (unsigned short)error;
 	PB_TRACE(pb, "ioerror", (unsigned long)error);
 }
 
