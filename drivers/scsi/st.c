@@ -3533,7 +3533,7 @@ static ssize_t st_device_kdev_read(struct device *driverfs_dev,
 	kdev.value=(int)driverfs_dev->driver_data;
 	return off ? 0 : sprintf(page, "%x\n",kdev.value);
 }
-static struct driver_file_entry st_device_kdev_file = {
+static struct device_attribute st_device_kdev_file = {
 	name: "kdev",
 	mode: S_IRUGO,
 	show: st_device_kdev_read,
@@ -3544,7 +3544,7 @@ static ssize_t st_device_type_read(struct device *driverfs_dev,
 {
 	return off ? 0 : sprintf (page, "CHR\n");
 }
-static struct driver_file_entry st_device_type_file = {
+static struct device_attribute st_device_type_file = {
 	name: "type",
 	mode: S_IRUGO,
 	show: st_device_type_read,

@@ -210,7 +210,7 @@ static ssize_t partition_device_kdev_read(struct device *driverfs_dev,
 	kdev.value=(int)(long)driverfs_dev->driver_data;
 	return off ? 0 : sprintf (page, "%x\n",kdev.value);
 }
-static struct driver_file_entry partition_device_kdev_file = {
+static struct device_attribute partition_device_kdev_file = {
 	name: "kdev",
 	mode: S_IRUGO,
 	show: partition_device_kdev_read,
@@ -221,7 +221,7 @@ static ssize_t partition_device_type_read(struct device *driverfs_dev,
 {
 	return off ? 0 : sprintf (page, "BLK\n");
 }
-static struct driver_file_entry partition_device_type_file = {
+static struct device_attribute partition_device_type_file = {
 	name: "type",
 	mode: S_IRUGO,
 	show: partition_device_type_read,

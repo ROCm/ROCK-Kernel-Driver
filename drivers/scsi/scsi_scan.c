@@ -306,7 +306,7 @@ static ssize_t scsi_device_type_read(struct device *driverfs_dev, char *page,
 	return 0;
 }
 
-static struct driver_file_entry scsi_device_type_file = {
+static struct device_attribute scsi_device_type_file = {
 	name: "type",
 	mode: S_IRUGO,
 	show: scsi_device_type_read,

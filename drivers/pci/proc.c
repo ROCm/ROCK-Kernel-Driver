@@ -378,7 +378,7 @@ static ssize_t pci_show_irq(struct device * dev, char * buf, size_t count, loff_
 	return off ? 0 : sprintf(buf,"%u\n",pci_dev->irq);
 }
 
-static struct driver_file_entry pci_irq_entry = {
+static struct device_attribute pci_irq_entry = {
 	name:	"irq",
 	mode:	S_IRUGO,
 	show:	pci_show_irq,
@@ -406,7 +406,7 @@ static ssize_t pci_show_resources(struct device * dev, char * buf, size_t count,
 	return (str - buf);
 }
 
-static struct driver_file_entry pci_resource_entry = {
+static struct device_attribute pci_resource_entry = {
 	name:	"resources",
 	mode:	S_IRUGO,
 	show:	pci_show_resources,

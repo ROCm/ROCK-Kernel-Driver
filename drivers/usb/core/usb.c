@@ -835,7 +835,7 @@ show_config (struct device *dev, char *buf, size_t count, loff_t off)
 	udev = to_usb_device (dev);
 	return sprintf (buf, "%u\n", udev->actconfig->bConfigurationValue);
 }
-static struct driver_file_entry usb_config_entry = {
+static struct device_attribute usb_config_entry = {
 	.name =	"configuration",
 	.mode =	S_IRUGO,
 	.show =	show_config,
@@ -854,7 +854,7 @@ show_altsetting (struct device *dev, char *buf, size_t count, loff_t off)
 	interface = to_usb_interface (dev);
 	return sprintf (buf, "%u\n", interface->altsetting->bAlternateSetting);
 }
-static struct driver_file_entry usb_altsetting_entry = {
+static struct device_attribute usb_altsetting_entry = {
 	.name =	"altsetting",
 	.mode =	S_IRUGO,
 	.show =	show_altsetting,
@@ -875,7 +875,7 @@ static ssize_t show_product (struct device *dev, char *buf, size_t count, loff_t
 	buf[len+1] = 0x00;
 	return len+1;
 }
-static struct driver_file_entry usb_product_entry = {
+static struct device_attribute usb_product_entry = {
 	.name =	"product",
 	.mode =	S_IRUGO,
 	.show =	show_product,
@@ -897,7 +897,7 @@ show_manufacturer (struct device *dev, char *buf, size_t count, loff_t off)
 	buf[len+1] = 0x00;
 	return len+1;
 }
-static struct driver_file_entry usb_manufacturer_entry = {
+static struct device_attribute usb_manufacturer_entry = {
 	.name =	"manufacturer",
 	.mode =	S_IRUGO,
 	.show =	show_manufacturer,
@@ -919,7 +919,7 @@ show_serial (struct device *dev, char *buf, size_t count, loff_t off)
 	buf[len+1] = 0x00;
 	return len+1;
 }
-static struct driver_file_entry usb_serial_entry = {
+static struct device_attribute usb_serial_entry = {
 	.name =	"serial",
 	.mode =	S_IRUGO,
 	.show =	show_serial,
