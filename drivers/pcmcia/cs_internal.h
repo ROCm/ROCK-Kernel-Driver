@@ -198,8 +198,6 @@ typedef struct socket_info_t {
 /* In cardbus.c */
 int cb_alloc(socket_info_t *s);
 void cb_free(socket_info_t *s);
-int cb_config(socket_info_t *s);
-void cb_release(socket_info_t *s);
 void cb_enable(socket_info_t *s);
 void cb_disable(socket_info_t *s);
 int read_cb_mem(socket_info_t *s, u_char fn, int space,

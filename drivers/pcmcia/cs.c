@@ -1569,7 +1569,6 @@ int pcmcia_release_io(client_handle_t handle, io_req_t *req)
     
 #ifdef CONFIG_CARDBUS
     if (handle->state & CLIENT_CARDBUS) {
-	cb_release(s);
 	return CS_SUCCESS;
     }
 #endif
@@ -1811,10 +1810,8 @@ int pcmcia_request_io(client_handle_t handle, io_req_t *req)
 
     if (handle->state & CLIENT_CARDBUS) {
 #ifdef CONFIG_CARDBUS
-	int ret = cb_config(s);
-	if (ret == CS_SUCCESS)
-	    handle->state |= CLIENT_IO_REQ;
-	return ret;
+	handle->state |= CLIENT_IO_REQ;
+	return CS_SUCCESS;
 #else
 	return CS_UNSUPPORTED_FUNCTION;
 #endif

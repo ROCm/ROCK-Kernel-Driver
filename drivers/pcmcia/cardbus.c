@@ -335,38 +335,6 @@ void cb_free(socket_info_t * s)
 
 /*=====================================================================
 
-    cb_config() has the job of allocating all system resources that
-    a Cardbus card requires.  Rather than using the CIS (which seems
-    to not always be present), it treats the card as an ordinary PCI
-    device, and probes the base address registers to determine each
-    function's IO and memory space needs.
-
-    It is called from the RequestIO card service.
-    
-======================================================================*/
-
-int cb_config(socket_info_t * s)
-{
-	return CS_SUCCESS;
-}
-
-/*======================================================================
-
-    cb_release() releases all the system resources (IO and memory
-    space, and interrupt) committed for a Cardbus card by a prior call
-    to cb_config().
-
-    It is called from the ReleaseIO() service.
-    
-======================================================================*/
-
-void cb_release(socket_info_t * s)
-{
-	DEBUG(0, "cs: cb_release(bus %d)\n", s->cap.cb_dev->subordinate->number);
-}
-
-/*=====================================================================
-
     cb_enable() has the job of configuring a socket for a Cardbus
     card, and initializing the card's PCI configuration registers.
 
