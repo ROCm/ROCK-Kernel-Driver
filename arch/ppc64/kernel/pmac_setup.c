@@ -126,7 +126,6 @@ void __pmac pmac_show_cpuinfo(struct seq_file *m)
 	/* print parsed model */
 	seq_printf(m, "detected as\t: %d (%s)\n", mbmodel, mbname);
 	seq_printf(m, "pmac flags\t: %08x\n", mbflags);
-	seq_printf(m, "memory\t\t: %luMB\n", lmb_phys_mem_size() >> 20);
 
 	/* Checks "l2cr-value" property in the registry */
 	np = find_devices("cpus");	
