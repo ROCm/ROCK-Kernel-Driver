@@ -540,7 +540,6 @@ static int __init swap_init(void *start_mem, void *swap_data)
 	p->flags        = SWP_USED;
 	p->swap_file    = &fake_dentry;
 	p->swap_vfsmnt  = &fake_vfsmnt;
-	p->swap_device  = 0;
 	p->swap_map	= swap_data;
 	p->cluster_nr   = 0;
 	p->next         = -1;
@@ -549,8 +548,7 @@ static int __init swap_init(void *start_mem, void *swap_data)
 
 	/* call stram_open() directly, avoids at least the overhead in
 	 * constructing a dummy file structure... */
-	p->swap_device = MKDEV( STRAM_MAJOR, STRAM_MINOR );
-	swap_inode.i_rdev = p->swap_device;
+	swap_inode.i_rdev = MKDEV( STRAM_MAJOR, STRAM_MINOR );
 	stram_open( &swap_inode, MAGIC_FILE_P );
 	p->max = SWAP_NR(swap_end);
 
