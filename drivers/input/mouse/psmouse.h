@@ -69,13 +69,17 @@ struct psmouse {
 	void (*pt_deactivate)(struct psmouse *psmouse);
 };
 
-#define PSMOUSE_PS2		1
-#define PSMOUSE_PS2PP		2
-#define PSMOUSE_PS2TPP		3
-#define PSMOUSE_GENPS		4
-#define PSMOUSE_IMPS		5
-#define PSMOUSE_IMEX		6
-#define PSMOUSE_SYNAPTICS 	7
+enum psmouse_type {
+	PSMOUSE_NONE,
+	PSMOUSE_PS2,
+	PSMOUSE_PS2PP,
+	PSMOUSE_PS2TPP,
+	PSMOUSE_THINKPS,
+	PSMOUSE_GENPS,
+	PSMOUSE_IMPS,
+	PSMOUSE_IMEX,
+	PSMOUSE_SYNAPTICS,
+};
 
 int psmouse_command(struct psmouse *psmouse, unsigned char *param, int command);
 int psmouse_sliced_command(struct psmouse *psmouse, unsigned char command);

@@ -55,7 +55,7 @@ __obsolete_setup("psmouse_smartscroll=");
 __obsolete_setup("psmouse_resetafter=");
 __obsolete_setup("psmouse_rate=");
 
-static char *psmouse_protocols[] = { "None", "PS/2", "PS2++", "PS2T++", "GenPS/2", "ImPS/2", "ImExPS/2", "SynPS/2"};
+static char *psmouse_protocols[] = { "None", "PS/2", "PS2++", "PS2T++", "ThinkPS/2", "GenPS/2", "ImPS/2", "ImExPS/2", "SynPS/2"};
 
 /*
  * psmouse_process_byte() analyzes the PS/2 data stream and reports
@@ -110,6 +110,15 @@ static psmouse_ret_t psmouse_process_byte(struct psmouse *psmouse, struct pt_reg
 	}
 
 /*
+ * Extra button on ThinkingMouse
+ */
+	if (psmouse->type == PSMOUSE_THINKPS) {
+		input_report_key(dev, BTN_EXTRA, (packet[0] >> 3) & 1);
+		/* Without this bit of weirdness moving up gives wildly high Y changes. */
+		packet[1] |= (packet[0] & 0x40) << 1;
+	}
+
+/*
  * Generic PS/2 Mouse
  */
 
@@ -146,7 +155,7 @@ static irqreturn_t psmouse_interrupt(struct serio *serio,
 				flags & SERIO_PARITY ? " bad parity" : "");
 		psmouse->nak = 1;
 		clear_bit(PSMOUSE_FLAG_ACK, &psmouse->flags);
-		clear_bit(PSMOUSE_FLAG_CMD,  &psmouse->flags);
+		clear_bit(PSMOUSE_FLAG_CMD, &psmouse->flags);
 		wake_up_interruptible(&psmouse->wait);
 		goto out;
 	}
@@ -458,6 +467,26 @@ static int im_explorer_detect(struct psmouse *psmouse)
 }
 
 /*
+ * Kensington ThinkingMouse / ExpertMouse magic init.
+ */
+static int thinking_detect(struct psmouse *psmouse)
+{
+	unsigned char param[2];
+	unsigned char seq[] = { 20, 60, 40, 20, 20, 60, 40, 20, 20, 0 };
+	int i;
+
+	param[0] = 10;
+	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRATE);
+	param[0] = 0;
+	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
+	for (i = 0; seq[i]; i++)
+		psmouse_command(psmouse, seq + i, PSMOUSE_CMD_SETRATE);
+	psmouse_command(psmouse, param, PSMOUSE_CMD_GETID);
+
+	return param[0] == 2;
+}
+
+/*
  * psmouse_extensions() probes for any extensions to the basic PS/2 protocol
  * the mouse may have.
  */
@@ -466,6 +495,22 @@ static int psmouse_extensions(struct psmouse *psmouse,
 			      unsigned int max_proto, int set_properties)
 {
 	int synaptics_hardware = 0;
+
+/*
+ * Try Kensington ThinkingMouse (we try first, because synaptics probe
+ * upsets the thinkingmouse).
+ */
+
+	if (max_proto > PSMOUSE_PS2 && thinking_detect(psmouse)) {
+
+		if (set_properties) {
+			set_bit(BTN_EXTRA, psmouse->dev.keybit);
+			psmouse->vendor = "Kensington";
+			psmouse->name = "ThinkingMouse";
+		}
+
+		return PSMOUSE_THINKPS;
+	}
 
 /*
  * Try Synaptics TouchPad
@@ -608,7 +653,7 @@ static void psmouse_set_resolution(struct psmouse *psmouse)
 	else if (psmouse_resolution)
 		param[0] = 0;
 
-        psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
+	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
 }
 
 /*
@@ -639,7 +684,7 @@ static void psmouse_initialize(struct psmouse *psmouse)
 	if (psmouse_max_proto != PSMOUSE_PS2) {
 		psmouse_set_rate(psmouse);
 		psmouse_set_resolution(psmouse);
-		psmouse_command(psmouse,  NULL, PSMOUSE_CMD_SETSCALE11);
+		psmouse_command(psmouse, NULL, PSMOUSE_CMD_SETSCALE11);
 	}
 
 /*
@@ -846,7 +891,7 @@ static int psmouse_reconnect(struct serio *serio)
 	psmouse_set_state(psmouse, PSMOUSE_INITIALIZING);
 
 	if (psmouse->reconnect) {
-	       if (psmouse->reconnect(psmouse))
+		if (psmouse->reconnect(psmouse))
 			goto out;
 	} else if (psmouse_probe(psmouse) < 0 ||
 		   psmouse->type != psmouse_extensions(psmouse, psmouse_max_proto, 0))
