@@ -46,6 +46,7 @@
 #include <linux/random.h>
 #include <linux/seq_file.h>
 #include <linux/cpumask.h>
+#include <linux/profile.h>
 
 #include <asm/uaccess.h>
 #include <asm/bitops.h>

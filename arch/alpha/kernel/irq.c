@@ -25,6 +25,7 @@
 #include <linux/irq.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
+#include <linux/profile.h>
 
 #include <asm/system.h>
 #include <asm/io.h>
@@ -330,9 +331,6 @@ register_irq_proc (unsigned int irq)
 void
 init_irq_proc (void)
 {
-#ifdef CONFIG_SMP
-	struct proc_dir_entry *entry;
-#endif
 	int i;
 
 	/* create /proc/irq */
