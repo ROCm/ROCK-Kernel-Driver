@@ -79,7 +79,7 @@ ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_regs *re
 
 #	if (((1 << VM_READ_BIT) != VM_READ || (1 << VM_WRITE_BIT) != VM_WRITE) \
 	    || (1 << VM_EXEC_BIT) != VM_EXEC)
-#		error File is out of sync with <linux/mm.h>.  Pleaes update.
+#		error File is out of sync with <linux/mm.h>.  Please update.
 #	endif
 
 	mask = (  (((isr >> IA64_ISR_X_BIT) & 1UL) << VM_EXEC_BIT)
