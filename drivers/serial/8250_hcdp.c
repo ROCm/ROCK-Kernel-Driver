@@ -11,6 +11,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/console.h>
 #include <linux/kernel.h>
 #include <linux/efi.h>
 #include <linux/init.h>
@@ -44,6 +45,7 @@ setup_serial_hcdp(void *tablep)
 	unsigned long iobase;
 	hcdp_t hcdp;
 	int gsi, nr;
+	static char options[16];
 #if 0
 	static int shift_once = 1;
 #endif
@@ -209,6 +211,12 @@ setup_serial_hcdp(void *tablep)
 				"Will try any additional consoles in HCDP.\n");
 			memset(&port, 0, sizeof(port));
 			continue;
+		}
+
+		if (efi_uart_console_only()) {
+			snprintf(options, sizeof(options), "%lun%d",
+				hcdp_dev->baud, hcdp_dev->bits);
+			add_preferred_console("ttyS", port.line, options);
 		}
 		break;
 	}
