@@ -692,10 +692,11 @@ lec_push(struct atm_vcc *vcc, struct sk_buff *skb)
 
                 atm_return(vcc,skb->truesize);
                 if (*(uint16_t *)skb->data == htons(priv->lecid) ||
-                    !priv->lecd) { 
+                    !priv->lecd ||
+                    !(dev->flags & IFF_UP)) { 
                         /* Probably looping back, or if lecd is missing,
                            lecd has gone down */
-                        DPRINTK("Ignoring loopback frame...\n");
+                        DPRINTK("Ignoring frame...\n");
                         dev_kfree_skb(skb);
                         return;
                 }
