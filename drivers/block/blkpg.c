@@ -271,11 +271,11 @@ int blk_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long arg)
 
 		case BLKGETSIZE:
 			/* size in sectors, works up to 2 TB */
-			ullval = blkdev_size_in_bytes(dev);
+			ullval = bdev->bd_inode->i_size;
 			return put_user((unsigned long)(ullval >> 9), (unsigned long *) arg);
 		case BLKGETSIZE64:
 			/* size in bytes */
-			ullval = blkdev_size_in_bytes(dev);
+			ullval = bdev->bd_inode->i_size;
 			return put_user(ullval, (u64 *) arg);
 #if 0
 		case BLKRRPART: /* Re-read partition tables */
