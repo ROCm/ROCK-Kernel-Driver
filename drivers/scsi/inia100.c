@@ -664,12 +664,12 @@ int inia100_biosparam(Scsi_Disk * disk, struct block_device *dev, int *info_arra
 	if (pTcb->TCS_DrvHead) {
 		info_array[0] = pTcb->TCS_DrvHead;
 		info_array[1] = pTcb->TCS_DrvSector;
-		info_array[2] = disk->capacity / pTcb->TCS_DrvHead / pTcb->TCS_DrvSector;
+		info_array[2] = (unsigned long)disk->capacity / pTcb->TCS_DrvHead / pTcb->TCS_DrvSector;
 	} else {
 		if (pTcb->TCS_DrvFlags & TCF_DRV_255_63) {
 			info_array[0] = 255;
 			info_array[1] = 63;
-			info_array[2] = disk->capacity / 255 / 63;
+			info_array[2] = (unsigned long)disk->capacity / 255 / 63;
 		} else {
 			info_array[0] = 64;
 			info_array[1] = 32;

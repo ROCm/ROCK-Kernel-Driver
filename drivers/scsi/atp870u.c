@@ -2719,12 +2719,12 @@ static int atp870u_biosparam(Scsi_Disk * disk, struct block_device *dev, int *ip
 
 	heads = 64;
 	sectors = 32;
-	cylinders = disk->capacity / (heads * sectors);
+	cylinders = (unsigned long)disk->capacity / (heads * sectors);
 
 	if (cylinders > 1024) {
 		heads = 255;
 		sectors = 63;
-		cylinders = disk->capacity / (heads * sectors);
+		cylinders = (unsigned long)disk->capacity / (heads * sectors);
 	}
 	ip[0] = heads;
 	ip[1] = sectors;

@@ -1838,7 +1838,7 @@ int aha152x_biosparam(Scsi_Disk * disk, struct block_device *bdev, int *info_arr
 	/* try default translation */
 	info_array[0] = 64;
 	info_array[1] = 32;
-	info_array[2] = disk->capacity / (64 * 32);
+	info_array[2] = (unsigned long)disk->capacity / (64 * 32);
 
 	/* for disks >1GB do some guessing */
 	if (info_array[2] >= 1024) {
@@ -1853,7 +1853,7 @@ int aha152x_biosparam(Scsi_Disk * disk, struct block_device *bdev, int *info_arr
 				       "         using extended translation.\n");
 				info_array[0] = 255;
 				info_array[1] = 63;
-				info_array[2] = disk->capacity / (255 * 63);
+				info_array[2] = (unsigned long)disk->capacity / (255 * 63);
 			} else {
 				printk(KERN_NOTICE
 				       "aha152x: unable to verify geometry for disk with >1GB.\n"
