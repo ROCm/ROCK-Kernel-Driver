@@ -72,9 +72,6 @@ static inline int pa_to_nid(unsigned long pa)
 #define local_mapnr(kvaddr) \
 	( (__pa(kvaddr) >> PAGE_SHIFT) - node_start_pfn(kvaddr_to_nid(kvaddr)) 
 
-/* XXX fix - Anton - and wli */
-#define kern_addr_valid(kaddr)	(0)
-
 /* Written this way to avoid evaluating arguments twice */
 #define discontigmem_pfn_to_page(pfn) \
 ({ \

@@ -140,7 +140,8 @@ void __init htab_initialize(void)
 	htab_data.htab_num_ptegs = pteg_count;
 	htab_data.htab_hash_mask = pteg_count - 1;
 
-	if (systemcfg->platform == PLATFORM_PSERIES) {
+	if (systemcfg->platform == PLATFORM_PSERIES ||
+	    systemcfg->platform == PLATFORM_POWERMAC) {
 		/* Find storage for the HPT.  Must be contiguous in
 		 * the absolute address space.
 		 */

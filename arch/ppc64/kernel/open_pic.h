@@ -40,6 +40,8 @@ extern void openpic_cause_IPI(u_int ipi, u_int cpumask);
 
 extern inline int openpic_to_irq(int irq)
 {
+	if (systemcfg->platform == PLATFORM_POWERMAC)
+		return irq;
 	return irq += NUM_8259_INTERRUPTS;
 }
 /*extern int open_pic_irq_offset;*/

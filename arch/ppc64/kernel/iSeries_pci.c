@@ -241,9 +241,9 @@ void iSeries_pcibios_init(void)
 }
 
 /*
- * pcibios_final_fixup(void)  
+ * iSeries_pci_final_fixup(void)  
  */
-void __init pcibios_final_fixup(void)
+void __init iSeries_pci_final_fixup(void)
 {
 	struct pci_dev *pdev = NULL;
 	struct iSeries_Device_Node *node;

@@ -32,6 +32,7 @@
 #ifdef CONFIG_PPC_OF
 #include <linux/pci.h>
 #include <asm/prom.h>
+#include <asm/pci-bridge.h>
 #endif
 #include <video/edid.h>
 #include "edid.h"

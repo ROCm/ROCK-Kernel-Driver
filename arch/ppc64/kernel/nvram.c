@@ -9,6 +9,10 @@
  * /dev/nvram driver for PPC64
  *
  * This perhaps should live in drivers/char
+ *
+ * TODO: Split the /dev/nvram part (that one can use
+ *       drivers/char/generic_nvram.c) from the arch & partition
+ *       parsing code.
  */
 
 #include <linux/module.h>
@@ -34,16 +38,10 @@ static int nvram_scan_partitions(void);
 static int nvram_setup_partition(void);
 static int nvram_create_os_partition(void);
 static int nvram_remove_os_partition(void);
-static unsigned char nvram_checksum(struct nvram_header *p);
-static int nvram_write_header(struct nvram_partition * part);
 
-static unsigned int nvram_size;
-static unsigned int nvram_fetch, nvram_store;
-static char nvram_buf[NVRW_CNT];	/* assume this is in the first 4GB */
 static struct nvram_partition * nvram_part;
 static long nvram_error_log_index = -1;
 static long nvram_error_log_size = 0;
-static spinlock_t nvram_lock = SPIN_LOCK_UNLOCKED;
 
 volatile int no_more_logging = 1; /* Until we initialize everything,
 				   * make sure we don't try logging
@@ -58,12 +56,18 @@ struct err_log_info {
 
 static loff_t dev_nvram_llseek(struct file *file, loff_t offset, int origin)
 {
+	int size;
+
+	if (ppc_md.nvram_size == NULL)
+		return -ENODEV;
+	size = ppc_md.nvram_size();
+
 	switch (origin) {
 	case 1:
 		offset += file->f_pos;
 		break;
 	case 2:
-		offset += nvram_size;
+		offset += size;
 		break;
 	}
 	if (offset < 0)
@@ -78,13 +82,18 @@ static ssize_t dev_nvram_read(struct file *file, char *buf,
 {
 	ssize_t len;
 	char *tmp_buffer;
+	int size;
+
+	if (ppc_md.nvram_size == NULL)
+		return -ENODEV;
+	size = ppc_md.nvram_size();
 
 	if (verify_area(VERIFY_WRITE, buf, count))
 		return -EFAULT;
-	if (*ppos >= nvram_size)
+	if (*ppos >= size)
 		return 0;
-	if (count > nvram_size) 
-		count = nvram_size;
+	if (count > size) 
+		count = size;
 
 	tmp_buffer = (char *) kmalloc(count, GFP_KERNEL);
 	if (!tmp_buffer) {
@@ -113,13 +122,18 @@ static ssize_t dev_nvram_write(struct file *file, const char *buf,
 {
 	ssize_t len;
 	char * tmp_buffer;
+	int size;
+
+	if (ppc_md.nvram_size == NULL)
+		return -ENODEV;
+	size = ppc_md.nvram_size();
 
 	if (verify_area(VERIFY_READ, buf, count))
 		return -EFAULT;
-	if (*ppos >= nvram_size)
+	if (*ppos >= size)
 		return 0;
-	if (count > nvram_size)
-		count = nvram_size;
+	if (count > size)
+		count = size;
 
 	tmp_buffer = (char *) kmalloc(count, GFP_KERNEL);
 	if (!tmp_buffer) {
@@ -145,6 +159,28 @@ static ssize_t dev_nvram_write(struct file *file, const char *buf,
 static int dev_nvram_ioctl(struct inode *inode, struct file *file,
 	unsigned int cmd, unsigned long arg)
 {
+	switch(cmd) {
+#ifdef CONFIG_PPC_PMAC
+	case OBSOLETE_PMAC_NVRAM_GET_OFFSET:
+		printk(KERN_WARNING "nvram: Using obsolete PMAC_NVRAM_GET_OFFSET ioctl\n");
+	case IOC_NVRAM_GET_OFFSET: {
+		int part, offset;
+
+		if (systemcfg->platform != PLATFORM_POWERMAC)
+			return -EINVAL;
+		if (copy_from_user(&part, (void __user*)arg, sizeof(part)) != 0)
+			return -EFAULT;
+		if (part < pmac_nvram_OF || part > pmac_nvram_NR)
+			return -EINVAL;
+		offset = pmac_get_partition(part);
+		if (offset < 0)
+			return offset;
+		if (copy_to_user((void __user*)arg, &offset, sizeof(offset)) != 0)
+			return -EFAULT;
+		return 0;
+	}
+#endif /* CONFIG_PPC_PMAC */
+	}
 	return -EINVAL;
 }
 
@@ -162,259 +198,75 @@ static struct miscdevice nvram_dev = {
 	&nvram_fops
 };
 
-ssize_t pSeries_nvram_read(char *buf, size_t count, loff_t *index)
-{
-	unsigned int i;
-	unsigned long len, done;
-	unsigned long flags;
-	char *p = buf;
 
-	if (*index >= nvram_size)
-		return 0;
 
-	i = *index;
-	if (i + count > nvram_size)
-		count = nvram_size - i;
-
-	spin_lock_irqsave(&nvram_lock, flags);
-
-	for (; count != 0; count -= len) {
-		len = count;
-		if (len > NVRW_CNT)
-			len = NVRW_CNT;
-		
-		if ((rtas_call(nvram_fetch, 3, 2, &done, i, __pa(nvram_buf),
-			       len) != 0) || len != done) {
-			spin_unlock_irqrestore(&nvram_lock, flags);
-			return -EIO;
-		}
-		
-		memcpy(p, nvram_buf, len);
-
-		p += len;
-		i += len;
-	}
-
-	spin_unlock_irqrestore(&nvram_lock, flags);
-	
-	*index = i;
-	return p - buf;
-}
-
-ssize_t pSeries_nvram_write(char *buf, size_t count, loff_t *index)
-{
-	unsigned int i;
-	unsigned long len, done;
-	unsigned long flags;
-	const char *p = buf;
-
-	if (*index >= nvram_size)
-		return 0;
-
-	i = *index;
-	if (i + count > nvram_size)
-		count = nvram_size - i;
-
-	spin_lock_irqsave(&nvram_lock, flags);
-
-	for (; count != 0; count -= len) {
-		len = count;
-		if (len > NVRW_CNT)
-			len = NVRW_CNT;
-
-		memcpy(nvram_buf, p, len);
-
-		if ((rtas_call(nvram_store, 3, 2, &done, i, __pa(nvram_buf),
-			       len) != 0) || len != done) {
-			spin_unlock_irqrestore(&nvram_lock, flags);
-			return -EIO;
-		}
-		
-		p += len;
-		i += len;
-	}
-	spin_unlock_irqrestore(&nvram_lock, flags);
-	
-	*index = i;
-	return p - buf;
-}
- 
-int __init nvram_init(void)
-{
-	struct device_node *nvram;
-	unsigned int *nbytes_p, proplen;
-	int error;
-	int rc;
-	
-	if ((nvram = of_find_node_by_type(NULL, "nvram")) != NULL) {
-		nbytes_p = (unsigned int *)get_property(nvram, "#bytes", &proplen);
-		if (nbytes_p && proplen == sizeof(unsigned int)) {
-			nvram_size = *nbytes_p;
-		} else {
-			return -EIO;
-		}
-	}
-	nvram_fetch = rtas_token("nvram-fetch");
-	nvram_store = rtas_token("nvram-store");
-	printk(KERN_INFO "PPC64 nvram contains %d bytes\n", nvram_size);
-	of_node_put(nvram);
-
-  	rc = misc_register(&nvram_dev);
-  
-  	/* If we don't know how big NVRAM is then we shouldn't touch
-  	   the nvram partitions */
-  	if (nvram == NULL) {
-  		return rc;
-  	}
-  	
-  	/* initialize our anchor for the nvram partition list */
-  	nvram_part = (struct nvram_partition *) kmalloc(sizeof(struct nvram_partition), GFP_KERNEL);
-  	if (!nvram_part) {
-  		printk(KERN_ERR "nvram_init: Failed kmalloc\n");
-  		return -ENOMEM;
-  	}
-  	INIT_LIST_HEAD(&nvram_part->partition);
-  
-  	/* Get all the NVRAM partitions */
-  	error = nvram_scan_partitions();
-  	if (error) {
-  		printk(KERN_ERR "nvram_init: Failed nvram_scan_partitions\n");
-  		return error;
-  	}
-  		
-  	if(nvram_setup_partition()) 
-  		printk(KERN_WARNING "nvram_init: Could not find nvram partition"
-  		       " for nvram buffered error logging.\n");
-  
-#ifdef DEBUG_NVRAM
-	nvram_print_partitions("NVRAM Partitions");
-#endif
-
-  	return rc;
-}
-
-void __exit nvram_cleanup(void)
-{
-        misc_deregister( &nvram_dev );
-}
-
-static int nvram_scan_partitions(void)
-{
-	loff_t cur_index = 0;
-	struct nvram_header phead;
-	struct nvram_partition * tmp_part;
-	unsigned char c_sum;
-	char * header;
-	long size;
-	
-	header = (char *) kmalloc(NVRAM_HEADER_LEN, GFP_KERNEL);
-	if (!header) {
-		printk(KERN_ERR "nvram_scan_partitions: Failed kmalloc\n");
-		return -ENOMEM;
-	}
-
-	while (cur_index < nvram_size) {
-
-		size = ppc_md.nvram_read(header, NVRAM_HEADER_LEN, &cur_index);
-		if (size != NVRAM_HEADER_LEN) {
-			printk(KERN_ERR "nvram_scan_partitions: Error parsing "
-			       "nvram partitions\n");
-			kfree(header);
-			return size;
-		}
-
-		cur_index -= NVRAM_HEADER_LEN; /* nvram_read will advance us */
-
-		memcpy(&phead, header, NVRAM_HEADER_LEN);
-
-		c_sum = nvram_checksum(&phead);
-		if (c_sum != phead.checksum)
-			printk(KERN_WARNING "WARNING: nvram partition checksum "
-			       "was %02x, should be %02x!\n", phead.checksum, c_sum);
-		
-		tmp_part = (struct nvram_partition *)
-			kmalloc(sizeof(struct nvram_partition), GFP_KERNEL);
-		if (!tmp_part) {
-			printk(KERN_ERR "nvram_scan_partitions: kmalloc failed\n");
-			kfree(header);
-			return -ENOMEM;
-		}
-		
-		memcpy(&tmp_part->header, &phead, NVRAM_HEADER_LEN);
-		tmp_part->index = cur_index;
-		list_add_tail(&tmp_part->partition, &nvram_part->partition);
-		
-		cur_index += phead.length * NVRAM_BLOCK_LEN;
-	}
-
-	kfree(header);
-	return 0;
-}
-
-/* nvram_setup_partition
- *
- * This will setup the partition we need for buffering the
- * error logs and cleanup partitions if needed.
- *
- * The general strategy is the following:
- * 1.) If there is ppc64,linux partition large enough then use it.
- * 2.) If there is not a ppc64,linux partition large enough, search
- * for a free partition that is large enough.
- * 3.) If there is not a free partition large enough remove 
- * _all_ OS partitions and consolidate the space.
- * 4.) Will first try getting a chunk that will satisfy the maximum
- * error log size (NVRAM_MAX_REQ).
- * 5.) If the max chunk cannot be allocated then try finding a chunk
- * that will satisfy the minum needed (NVRAM_MIN_REQ).
- */
-static int nvram_setup_partition(void)
+static void nvram_print_partitions(char * label)
 {
 	struct list_head * p;
-	struct nvram_partition * part;
-	int rc;
+	struct nvram_partition * tmp_part;
+	
+	printk(KERN_WARNING "--------%s---------\n", label);
+	printk(KERN_WARNING "indx\t\tsig\tchks\tlen\tname\n");
+	list_for_each(p, &nvram_part->partition) {
+		tmp_part = list_entry(p, struct nvram_partition, partition);
+		printk(KERN_WARNING "%d    \t%02x\t%02x\t%d\t%s\n",
+		       tmp_part->index, tmp_part->header.signature,
+		       tmp_part->header.checksum, tmp_part->header.length,
+		       tmp_part->header.name);
+	}
+}
 
-	/* see if we have an OS partition that meets our needs.
-	   will try getting the max we need.  If not we'll delete
-	   partitions and try again. */
+
+static int nvram_write_header(struct nvram_partition * part)
+{
+	loff_t tmp_index;
+	int rc;
+	
+	tmp_index = part->index;
+	rc = ppc_md.nvram_write((char *)&part->header, NVRAM_HEADER_LEN, &tmp_index); 
+
+	return rc;
+}
+
+
+static unsigned char nvram_checksum(struct nvram_header *p)
+{
+	unsigned int c_sum, c_sum2;
+	unsigned short *sp = (unsigned short *)p->name; /* assume 6 shorts */
+	c_sum = p->signature + p->length + sp[0] + sp[1] + sp[2] + sp[3] + sp[4] + sp[5];
+
+	/* The sum may have spilled into the 3rd byte.  Fold it back. */
+	c_sum = ((c_sum & 0xffff) + (c_sum >> 16)) & 0xffff;
+	/* The sum cannot exceed 2 bytes.  Fold it into a checksum */
+	c_sum2 = (c_sum >> 8) + (c_sum << 8);
+	c_sum = ((c_sum + c_sum2) >> 8) & 0xff;
+	return c_sum;
+}
+
+
+/*
+ * Find an nvram partition, sig can be 0 for any
+ * partition or name can be NULL for any name, else
+ * tries to match both
+ */
+struct nvram_partition *nvram_find_partition(int sig, const char *name)
+{
+	struct nvram_partition * part;
+	struct list_head * p;
+
 	list_for_each(p, &nvram_part->partition) {
 		part = list_entry(p, struct nvram_partition, partition);
-		if (part->header.signature != NVRAM_SIG_OS)
-			continue;
 
-		if (strcmp(part->header.name, "ppc64,linux"))
+		if (sig && part->header.signature != sig)
 			continue;
-
-		if (part->header.length >= NVRAM_MIN_REQ) {
-			/* found our partition */
-			nvram_error_log_index = part->index + NVRAM_HEADER_LEN;
-			nvram_error_log_size = ((part->header.length - 1) *
-						NVRAM_BLOCK_LEN) - sizeof(struct err_log_info);
-			return 0;
-		}
+		if (name && 0 != strncmp(name, part->header.name, 12))
+			continue;
+		return part; 
 	}
-	
-	/* try creating a partition with the free space we have */
-	rc = nvram_create_os_partition();
-	if (!rc) {
-		return 0;
-	}
-		
-	/* need to free up some space */
-	rc = nvram_remove_os_partition();
-	if (rc) {
-		return rc;
-	}
-	
-	/* create a partition in this new space */
-	rc = nvram_create_os_partition();
-	if (rc) {
-		printk(KERN_ERR "nvram_create_os_partition: Could not find a "
-		       "NVRAM partition large enough\n");
-		return rc;
-	}
-	
-	return 0;
+	return NULL;
 }
+EXPORT_SYMBOL(nvram_find_partition);
+
 
 static int nvram_remove_os_partition(void)
 {
@@ -572,21 +424,184 @@ static int nvram_create_os_partition(void)
 }
 
 
-void nvram_print_partitions(char * label)
+/* nvram_setup_partition
+ *
+ * This will setup the partition we need for buffering the
+ * error logs and cleanup partitions if needed.
+ *
+ * The general strategy is the following:
+ * 1.) If there is ppc64,linux partition large enough then use it.
+ * 2.) If there is not a ppc64,linux partition large enough, search
+ * for a free partition that is large enough.
+ * 3.) If there is not a free partition large enough remove 
+ * _all_ OS partitions and consolidate the space.
+ * 4.) Will first try getting a chunk that will satisfy the maximum
+ * error log size (NVRAM_MAX_REQ).
+ * 5.) If the max chunk cannot be allocated then try finding a chunk
+ * that will satisfy the minum needed (NVRAM_MIN_REQ).
+ */
+static int nvram_setup_partition(void)
 {
 	struct list_head * p;
-	struct nvram_partition * tmp_part;
-	
-	printk(KERN_WARNING "--------%s---------\n", label);
-	printk(KERN_WARNING "indx\t\tsig\tchks\tlen\tname\n");
+	struct nvram_partition * part;
+	int rc;
+
+	/* For now, we don't do any of this on pmac, until I
+	 * have figured out if it's worth killing some unused stuffs
+	 * in our nvram, as Apple defined partitions use pretty much
+	 * all of the space
+	 */
+	if (systemcfg->platform == PLATFORM_POWERMAC)
+		return -ENOSPC;
+
+	/* see if we have an OS partition that meets our needs.
+	   will try getting the max we need.  If not we'll delete
+	   partitions and try again. */
 	list_for_each(p, &nvram_part->partition) {
-		tmp_part = list_entry(p, struct nvram_partition, partition);
-		printk(KERN_WARNING "%d    \t%02x\t%02x\t%d\t%s\n",
-		       tmp_part->index, tmp_part->header.signature,
-		       tmp_part->header.checksum, tmp_part->header.length,
-		       tmp_part->header.name);
+		part = list_entry(p, struct nvram_partition, partition);
+		if (part->header.signature != NVRAM_SIG_OS)
+			continue;
+
+		if (strcmp(part->header.name, "ppc64,linux"))
+			continue;
+
+		if (part->header.length >= NVRAM_MIN_REQ) {
+			/* found our partition */
+			nvram_error_log_index = part->index + NVRAM_HEADER_LEN;
+			nvram_error_log_size = ((part->header.length - 1) *
+						NVRAM_BLOCK_LEN) - sizeof(struct err_log_info);
+			return 0;
+		}
 	}
+	
+	/* try creating a partition with the free space we have */
+	rc = nvram_create_os_partition();
+	if (!rc) {
+		return 0;
+	}
+		
+	/* need to free up some space */
+	rc = nvram_remove_os_partition();
+	if (rc) {
+		return rc;
+	}
+	
+	/* create a partition in this new space */
+	rc = nvram_create_os_partition();
+	if (rc) {
+		printk(KERN_ERR "nvram_create_os_partition: Could not find a "
+		       "NVRAM partition large enough\n");
+		return rc;
+	}
+	
+	return 0;
 }
+
+
+static int nvram_scan_partitions(void)
+{
+	loff_t cur_index = 0;
+	struct nvram_header phead;
+	struct nvram_partition * tmp_part;
+	unsigned char c_sum;
+	char * header;
+	long size;
+	int total_size;
+
+	if (ppc_md.nvram_size == NULL)
+		return -ENODEV;
+	total_size = ppc_md.nvram_size();
+	
+	header = (char *) kmalloc(NVRAM_HEADER_LEN, GFP_KERNEL);
+	if (!header) {
+		printk(KERN_ERR "nvram_scan_partitions: Failed kmalloc\n");
+		return -ENOMEM;
+	}
+
+	while (cur_index < total_size) {
+
+		size = ppc_md.nvram_read(header, NVRAM_HEADER_LEN, &cur_index);
+		if (size != NVRAM_HEADER_LEN) {
+			printk(KERN_ERR "nvram_scan_partitions: Error parsing "
+			       "nvram partitions\n");
+			kfree(header);
+			return size;
+		}
+
+		cur_index -= NVRAM_HEADER_LEN; /* nvram_read will advance us */
+
+		memcpy(&phead, header, NVRAM_HEADER_LEN);
+
+		c_sum = nvram_checksum(&phead);
+		if (c_sum != phead.checksum)
+			printk(KERN_WARNING "WARNING: nvram partition checksum "
+			       "was %02x, should be %02x!\n", phead.checksum, c_sum);
+		
+		tmp_part = (struct nvram_partition *)
+			kmalloc(sizeof(struct nvram_partition), GFP_KERNEL);
+		if (!tmp_part) {
+			printk(KERN_ERR "nvram_scan_partitions: kmalloc failed\n");
+			kfree(header);
+			return -ENOMEM;
+		}
+		
+		memcpy(&tmp_part->header, &phead, NVRAM_HEADER_LEN);
+		tmp_part->index = cur_index;
+		list_add_tail(&tmp_part->partition, &nvram_part->partition);
+		
+		cur_index += phead.length * NVRAM_BLOCK_LEN;
+	}
+
+	kfree(header);
+	return 0;
+}
+
+static int __init nvram_init(void)
+{
+	int error;
+	int rc;
+	
+	if (ppc_md.nvram_size == NULL || ppc_md.nvram_size() <= 0)
+		return  -ENODEV;
+
+  	rc = misc_register(&nvram_dev);
+	if (rc != 0) {
+		printk(KERN_ERR "nvram_init: failed to register device\n");
+		return rc;
+	}
+  	
+  	/* initialize our anchor for the nvram partition list */
+  	nvram_part = (struct nvram_partition *) kmalloc(sizeof(struct nvram_partition), GFP_KERNEL);
+  	if (!nvram_part) {
+  		printk(KERN_ERR "nvram_init: Failed kmalloc\n");
+  		return -ENOMEM;
+  	}
+  	INIT_LIST_HEAD(&nvram_part->partition);
+  
+  	/* Get all the NVRAM partitions */
+  	error = nvram_scan_partitions();
+  	if (error) {
+  		printk(KERN_ERR "nvram_init: Failed nvram_scan_partitions\n");
+  		return error;
+  	}
+  		
+  	if(nvram_setup_partition()) 
+  		printk(KERN_WARNING "nvram_init: Could not find nvram partition"
+  		       " for nvram buffered error logging.\n");
+  
+#ifdef DEBUG_NVRAM
+	nvram_print_partitions("NVRAM Partitions");
+#endif
+
+  	return rc;
+}
+
+void __exit nvram_cleanup(void)
+{
+        misc_deregister( &nvram_dev );
+}
+
+
 
 /* nvram_write_error_log
  *
@@ -711,30 +726,6 @@ int nvram_clear_error_log()
 	return 0;
 }
 
-static int nvram_write_header(struct nvram_partition * part)
-{
-	loff_t tmp_index;
-	int rc;
-	
-	tmp_index = part->index;
-	rc = ppc_md.nvram_write((char *)&part->header, NVRAM_HEADER_LEN, &tmp_index); 
-
-	return rc;
-}
-
-static unsigned char nvram_checksum(struct nvram_header *p)
-{
-	unsigned int c_sum, c_sum2;
-	unsigned short *sp = (unsigned short *)p->name; /* assume 6 shorts */
-	c_sum = p->signature + p->length + sp[0] + sp[1] + sp[2] + sp[3] + sp[4] + sp[5];
-
-	/* The sum may have spilled into the 3rd byte.  Fold it back. */
-	c_sum = ((c_sum & 0xffff) + (c_sum >> 16)) & 0xffff;
-	/* The sum cannot exceed 2 bytes.  Fold it into a checksum */
-	c_sum2 = (c_sum >> 8) + (c_sum << 8);
-	c_sum = ((c_sum + c_sum2) >> 8) & 0xff;
-	return c_sum;
-}
 
 module_init(nvram_init);
 module_exit(nvram_cleanup);
