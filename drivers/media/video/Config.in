@@ -22,10 +22,8 @@ if [ "$CONFIG_PARPORT" != "n" ]; then
    fi
 fi
 if [ "$CONFIG_PARPORT" != "n" ]; then
-   if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
-      if [ "$CONFIG_PARPORT_1284" != "n" ]; then
-         dep_tristate '  Winbond W9966CF Webcam Video For Linux (EXPERIMENTAL)' CONFIG_VIDEO_W9966 $CONFIG_VIDEO_DEV $CONFIG_PARPORT
-      fi
+   if [ "$CONFIG_PARPORT_1284" != "n" ]; then
+      dep_tristate '  W9966CF Webcam (FlyCam Supra and others) Video For Linux' CONFIG_VIDEO_W9966 $CONFIG_VIDEO_DEV $CONFIG_PARPORT
    fi
 fi
 dep_tristate '  CPiA Video For Linux' CONFIG_VIDEO_CPIA $CONFIG_VIDEO_DEV
