@@ -296,7 +296,6 @@ extern int pagebuf_ispin(		/* check if buffer is pinned	*/
 
 /* Delayed Write Buffer Routines */
 
-extern void pagebuf_delwri_flush(xfs_buftarg_t *, int, int *);
 extern void pagebuf_delwri_dequeue(xfs_buf_t *);
 
 /* Buffer Daemon Setup Routines */
@@ -565,21 +564,6 @@ static inline int xfs_bdwrite(void *mp, xfs_buf_t *bp)
 
 #define xfs_iowait(pb)	pagebuf_iowait(pb)
 
-
-/*
- * Go through all incore buffers, and release buffers
- * if they belong to the given device. This is used in
- * filesystem error handling to preserve the consistency
- * of its metadata.
- */
-
-#define xfs_binval(buftarg)	xfs_flush_buftarg(buftarg)
-
-#define XFS_bflush(buftarg)	xfs_flush_buftarg(buftarg)
-
-#define xfs_incore_relse(buftarg,delwri_only,wait)	\
-	xfs_relse_buftarg(buftarg)
-
 #define xfs_baread(target, rablkno, ralen)  \
 	pagebuf_readahead((target), (rablkno), (ralen), PBF_DONT_BLOCK)
 
@@ -587,5 +571,24 @@ static inline int xfs_bdwrite(void *mp, xfs_buf_t *bp)
 #define xfs_buf_get_noaddr(len, target)	pagebuf_get_no_daddr((len), (target))
 #define xfs_buf_free(bp)		pagebuf_free(bp)
 
-#endif	/* __XFS_BUF_H__ */
 
+/*
+ *	Handling of buftargs.
+ */
+
+extern xfs_buftarg_t *xfs_alloc_buftarg(struct block_device *);
+extern void xfs_free_buftarg(xfs_buftarg_t *, int);
+extern void xfs_setsize_buftarg(xfs_buftarg_t *, unsigned int, unsigned int);
+extern void xfs_incore_relse(xfs_buftarg_t *, int, int);
+extern int xfs_flush_buftarg(xfs_buftarg_t *, int);
+
+#define xfs_getsize_buftarg(buftarg) \
+	block_size((buftarg)->pbr_bdev)
+#define xfs_readonly_buftarg(buftarg) \
+	bdev_read_only((buftarg)->pbr_bdev)
+#define xfs_binval(buftarg) \
+	xfs_flush_buftarg(buftarg, 1)
+#define XFS_bflush(buftarg) \
+	xfs_flush_buftarg(buftarg, 1)
+
+#endif	/* __XFS_BUF_H__ */

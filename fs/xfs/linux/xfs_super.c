@@ -67,7 +67,6 @@
 #include "xfs_utils.h"
 #include "xfs_version.h"
 
-#include <linux/blkdev.h>
 #include <linux/namei.h>
 #include <linux/init.h>
 #include <linux/mount.h>
@@ -282,75 +281,6 @@ xfs_blkdev_put(
 		close_bdev_excl(bdev);
 }
 
-void
-xfs_flush_buftarg(
-	xfs_buftarg_t		*btp)
-{
-	pagebuf_delwri_flush(btp, 1, NULL);
-}
-
-void
-xfs_free_buftarg(
-	xfs_buftarg_t		*btp)
-{
-	xfs_flush_buftarg(btp);
-	kmem_free(btp, sizeof(*btp));
-}
-
-int
-xfs_readonly_buftarg(
-	xfs_buftarg_t		*btp)
-{
-	return bdev_read_only(btp->pbr_bdev);
-}
-
-void
-xfs_relse_buftarg(
-	xfs_buftarg_t		*btp)
-{
-	invalidate_bdev(btp->pbr_bdev, 1);
-	truncate_inode_pages(btp->pbr_mapping, 0LL);
-}
-
-unsigned int
-xfs_getsize_buftarg(
-	xfs_buftarg_t		*btp)
-{
-	return block_size(btp->pbr_bdev);
-}
-
-void
-xfs_setsize_buftarg(
-	xfs_buftarg_t		*btp,
-	unsigned int		blocksize,
-	unsigned int		sectorsize)
-{
-	btp->pbr_bsize = blocksize;
-	btp->pbr_sshift = ffs(sectorsize) - 1;
-	btp->pbr_smask = sectorsize - 1;
-
-	if (set_blocksize(btp->pbr_bdev, sectorsize)) {
-		printk(KERN_WARNING
-			"XFS: Cannot set_blocksize to %u on device %s\n",
-			sectorsize, XFS_BUFTARG_NAME(btp));
-	}
-}
-
-xfs_buftarg_t *
-xfs_alloc_buftarg(
-	struct block_device	*bdev)
-{
-	xfs_buftarg_t		*btp;
-
-	btp = kmem_zalloc(sizeof(*btp), KM_SLEEP);
-
-	btp->pbr_dev =  bdev->bd_dev;
-	btp->pbr_bdev = bdev;
-	btp->pbr_mapping = bdev->bd_inode->i_mapping;
-	xfs_setsize_buftarg(btp, PAGE_CACHE_SIZE, bdev_hardsect_size(bdev));
-
-	return btp;
-}
 
 STATIC struct inode *
 linvfs_alloc_inode(

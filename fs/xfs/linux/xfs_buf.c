@@ -47,7 +47,6 @@
 #include <linux/pagemap.h>
 #include <linux/init.h>
 #include <linux/vmalloc.h>
-#include <linux/blkdev.h>
 #include <linux/bio.h>
 #include <linux/sysctl.h>
 #include <linux/proc_fs.h>
@@ -1472,6 +1471,64 @@ pagebuf_iomove(
 	}
 }
 
+/*
+ *	Handling of buftargs.
+ */
+
+void
+xfs_free_buftarg(
+	xfs_buftarg_t		*btp,
+	int			external)
+{
+	xfs_flush_buftarg(btp, 1);
+	if (external)
+		xfs_blkdev_put(btp->pbr_bdev);
+	kmem_free(btp, sizeof(*btp));
+}
+
+void
+xfs_incore_relse(
+	xfs_buftarg_t		*btp,
+	int			delwri_only,
+	int			wait)
+{
+	invalidate_bdev(btp->pbr_bdev, 1);
+	truncate_inode_pages(btp->pbr_mapping, 0LL);
+}
+
+void
+xfs_setsize_buftarg(
+	xfs_buftarg_t		*btp,
+	unsigned int		blocksize,
+	unsigned int		sectorsize)
+{
+	btp->pbr_bsize = blocksize;
+	btp->pbr_sshift = ffs(sectorsize) - 1;
+	btp->pbr_smask = sectorsize - 1;
+
+	if (set_blocksize(btp->pbr_bdev, sectorsize)) {
+		printk(KERN_WARNING
+			"XFS: Cannot set_blocksize to %u on device %s\n",
+			sectorsize, XFS_BUFTARG_NAME(btp));
+	}
+}
+
+xfs_buftarg_t *
+xfs_alloc_buftarg(
+	struct block_device	*bdev)
+{
+	xfs_buftarg_t		*btp;
+
+	btp = kmem_zalloc(sizeof(*btp), KM_SLEEP);
+
+	btp->pbr_dev =  bdev->bd_dev;
+	btp->pbr_bdev = bdev;
+	btp->pbr_mapping = bdev->bd_inode->i_mapping;
+	xfs_setsize_buftarg(btp, PAGE_CACHE_SIZE, bdev_hardsect_size(bdev));
+
+	return btp;
+}
+
 
 /*
  * Pagebuf delayed write buffer handling
@@ -1598,11 +1655,15 @@ pagebuf_daemon(
 	complete_and_exit(&pagebuf_daemon_done, 0);
 }
 
-void
-pagebuf_delwri_flush(
+/*
+ * Go through all incore buffers, and release buffers if they belong to
+ * the given device. This is used in filesystem error handling to
+ * preserve the consistency of its metadata.
+ */
+int
+xfs_flush_buftarg(
 	xfs_buftarg_t		*target,
-	int			wait,
-	int			*pinptr)
+	int			wait)
 {
 	struct list_head	tmp;
 	xfs_buf_t		*pb, *n;
@@ -1658,8 +1719,7 @@ pagebuf_delwri_flush(
 	if (wait)
 		blk_run_address_space(target->pbr_mapping);
 
-	if (pinptr)
-		*pinptr = pincount;
+	return pincount;
 }
 
 STATIC int
