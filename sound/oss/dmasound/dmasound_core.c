@@ -226,7 +226,7 @@ static int shared_resources_initialised;
      *  Mid level stuff
      */
 
-struct sound_settings dmasound;
+struct sound_settings dmasound = { .lock = SPIN_LOCK_UNLOCKED };
 
 static inline void sound_silence(void)
 {
@@ -374,7 +374,7 @@ static struct file_operations mixer_fops =
 	.release	= mixer_release,
 };
 
-static void __init mixer_init(void)
+static void mixer_init(void)
 {
 #ifndef MODULE
 	int mixer_unit;
@@ -1339,7 +1339,7 @@ static struct file_operations sq_fops =
 #endif
 };
 
-static int __init sq_init(void)
+static int sq_init(void)
 {
 #ifndef MODULE
 	int sq_unit;
@@ -1349,7 +1349,6 @@ static int __init sq_init(void)
 	if (dmasound.mach.record)
 		sq_fops.read = sq_read ;
 #endif
-	spin_lock_init(&dmasound.lock);
 	sq_unit = register_sound_dsp(&sq_fops, -1);
 	if (sq_unit < 0) {
 		printk(KERN_ERR "dmasound_core: couldn't register fops\n") ;
@@ -1557,7 +1556,7 @@ static struct file_operations state_fops = {
 	.release	= state_release,
 };
 
-static int __init state_init(void)
+static int state_init(void)
 {
 #ifndef MODULE
 	int state_unit;
@@ -1576,7 +1575,7 @@ static int __init state_init(void)
      *  This function is called by _one_ chipset-specific driver
      */
 
-int __init dmasound_init(void)
+int dmasound_init(void)
 {
 	int res ;
 #ifdef MODULE
@@ -1647,7 +1646,7 @@ void dmasound_deinit(void)
 
 #else /* !MODULE */
 
-static int __init dmasound_setup(char *str)
+static int dmasound_setup(char *str)
 {
 	int ints[6], size;
 
