@@ -12,6 +12,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/sched.h>
 #include <linux/ptrace.h>
 #include <linux/errno.h>
 #include <linux/linkage.h>

@@ -508,6 +508,8 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long sp,
 #endif
 	}
 
+	p->user_tid = NULL;
+
 	/* Calculate offset to stack_frame & pt_regs */
 	stack_offset = THREAD_SIZE - TRACEREG_SZ;
 
@@ -580,6 +582,16 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long sp,
 
 	/* Set the return value for the parent. */
 	regs->u_regs[UREG_I1] = 0;
+
+	if (!(clone_flags & (CLONE_SETTID | CLONE_CLEARTID)))
+		return 0;
+
+	if (clone_flags & CLONE_SETTID)
+		if (put_user(p->pid, (int *)childregs->u_regs[UREG_G2]))
+			return -EFAULT;
+
+	if (clone_flags & CLONE_CLEARTID)
+		p->user_tid = (int *) childregs->u_regs[UREG_G2];
 
 	return 0;
 }
@@ -681,6 +693,8 @@ asmlinkage int sparc_execve(struct pt_regs *regs)
 	error = do_execve(filename, (char **) regs->u_regs[base + UREG_I1],
 			  (char **) regs->u_regs[base + UREG_I2], regs);
 	putname(filename);
+	if (error == 0)
+		current->ptrace &= ~PT_DTRACE;
 out:
 	return error;
 }
