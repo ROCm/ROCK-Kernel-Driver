@@ -647,7 +647,7 @@ static ax25_digi *nr_call_to_digi(int ndigis, ax25_address *digipeaters)
 /*
  *	Handle the ioctls that control the routing functions.
  */
-int nr_rt_ioctl(unsigned int cmd, void *arg)
+int nr_rt_ioctl(unsigned int cmd, void __user *arg)
 {
 	struct nr_route_struct nr_route;
 	struct net_device *dev;
