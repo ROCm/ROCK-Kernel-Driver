@@ -117,12 +117,30 @@ static void __init sa1100_timer_init(void)
 }
 
 #ifdef CONFIG_PM
+unsigned long osmr[4], oier;
+
 static void sa1100_timer_suspend(void)
 {
+	osmr[0] = OSMR0;
+	osmr[1] = OSMR1;
+	osmr[2] = OSMR2;
+	osmr[3] = OSMR3;
+	oier = OIER;
 }
 
 static void sa1100_timer_resume(void)
 {
+	OSSR = 0x0f;
+	OSMR0 = osmr[0];
+	OSMR1 = osmr[1];
+	OSMR2 = osmr[2];
+	OSMR3 = osmr[3];
+	OIER = oier;
+
+	/*
+	 * OSMR0 is the system timer: make sure OSCR is sufficiently behind
+	 */
+	OSCR = OSMR0 - LATCH;
 }
 #else
 #define sa1100_timer_suspend NULL
