@@ -33,7 +33,7 @@ extern spinlock_t i8253_lock;
 
 static int use_tsc;
 /* Number of usecs that the last interrupt was delayed */
-static int delay_at_last_interrupt;
+int tsc_delay_at_last_interrupt;
 
 static unsigned long last_tsc_low; /* lsb 32 bits of Time Stamp Counter */
 static unsigned long last_tsc_high; /* msb 32 bits of Time Stamp Counter */
@@ -104,7 +104,7 @@ static unsigned long get_offset_tsc(void)
 		 "0" (eax));
 
 	/* our adjusted time offset in microseconds */
-	return delay_at_last_interrupt + edx;
+	return tsc_delay_at_last_interrupt + edx;
 }
 
 static unsigned long long monotonic_clock_tsc(void)
@@ -223,7 +223,7 @@ static void mark_offset_tsc(void)
 		 "0" (eax));
 		delta = edx;
 	}
-	delta += delay_at_last_interrupt;
+	delta += tsc_delay_at_last_interrupt;
 	lost = delta/(1000000/HZ);
 	delay = delta%(1000000/HZ);
 	if (lost >= 2) {
@@ -248,15 +248,15 @@ static void mark_offset_tsc(void)
 	monotonic_base += cycles_2_ns(this_offset - last_offset);
 	write_sequnlock(&monotonic_lock);
 
-	/* calculate delay_at_last_interrupt */
+	/* calculate tsc_delay_at_last_interrupt */
 	count = ((LATCH-1) - count) * TICK_SIZE;
-	delay_at_last_interrupt = (count + LATCH/2) / LATCH;
+	tsc_delay_at_last_interrupt = (count + LATCH/2) / LATCH;
 
 	/* catch corner case where tick rollover occured 
 	 * between tsc and pit reads (as noted when 
 	 * usec delta is > 90% # of usecs/tick)
 	 */
-	if (lost && abs(delay - delay_at_last_interrupt) > (900000/HZ))
+	if (lost && abs(delay - tsc_delay_at_last_interrupt) > (900000/HZ))
 		jiffies_64++;
 }
 
@@ -308,7 +308,7 @@ static void mark_offset_tsc_hpet(void)
 	monotonic_base += cycles_2_ns(this_offset - last_offset);
 	write_sequnlock(&monotonic_lock);
 
-	/* calculate delay_at_last_interrupt */
+	/* calculate tsc_delay_at_last_interrupt */
 	/*
 	 * Time offset = (hpet delta) * ( usecs per HPET clock )
 	 *             = (hpet delta) * ( usecs per tick / HPET clocks per tick)
@@ -316,9 +316,9 @@ static void mark_offset_tsc_hpet(void)
 	 * Where,
 	 * hpet_usec_quotient = (2^32 * usecs per tick)/HPET clocks per tick
 	 */
-	delay_at_last_interrupt = hpet_current - offset;
-	ASM_MUL64_REG(temp, delay_at_last_interrupt,
-			hpet_usec_quotient, delay_at_last_interrupt);
+	tsc_delay_at_last_interrupt = hpet_current - offset;
+	ASM_MUL64_REG(temp, tsc_delay_at_last_interrupt,
+			hpet_usec_quotient, tsc_delay_at_last_interrupt);
 }
 #endif
 

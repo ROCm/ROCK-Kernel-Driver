@@ -393,5 +393,8 @@ void __init time_init(void)
 	cur_timer = select_timer();
 	printk(KERN_INFO "Using %s for high-res timesource\n",cur_timer->name);
 
+	/* set vsyscall to use selected time source */
+	vsyscall_set_timesource(cur_timer->name);
+
 	time_init_hook();
 }

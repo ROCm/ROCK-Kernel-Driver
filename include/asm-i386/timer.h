@@ -20,6 +20,7 @@ struct timer_opts{
 };
 
 #define TICK_SIZE (tick_nsec / 1000)
+#define CYCLONE_TIMER_FREQ 100000000
 
 extern struct timer_opts* select_timer(void);
 extern void clock_fallback(void);

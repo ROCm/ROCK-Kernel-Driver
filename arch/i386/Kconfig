@@ -432,6 +432,10 @@ config HPET_TIMER
 config HPET_EMULATE_RTC
 	def_bool HPET_TIMER && RTC=y
 
+config VSYSCALL_GTOD
+	depends on EXPERIMENTAL
+	bool "VSYSCALL gettimeofday() interface"
+
 config SMP
 	bool "Symmetric multi-processing support"
 	---help---

@@ -47,6 +47,7 @@
 #include <asm/sections.h>
 #include <asm/io_apic.h>
 #include <asm/ist.h>
+#include <asm/vsyscall-gtod.h>
 #include "setup_arch_pre.h"
 #include "mach_resources.h"
 
@@ -1261,6 +1262,7 @@ void __init setup_arch(char **cmdline_p)
 	conswitchp = &dummy_con;
 #endif
 #endif
+	vsyscall_init();
 }
 
 #include "setup_arch_post.h"
