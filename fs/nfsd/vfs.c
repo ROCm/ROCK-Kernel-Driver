@@ -1226,7 +1226,7 @@ int
 nfsd_rename(struct svc_rqst *rqstp, struct svc_fh *ffhp, char *fname, int flen,
 			    struct svc_fh *tfhp, char *tname, int tlen)
 {
-	struct dentry	*fdentry, *tdentry, *odentry, *ndentry;
+	struct dentry	*fdentry, *tdentry, *odentry, *ndentry, *trap;
 	struct inode	*fdir, *tdir;
 	int		err;
 
@@ -1253,7 +1253,7 @@ nfsd_rename(struct svc_rqst *rqstp, struct svc_fh *ffhp, char *fname, int flen,
 
 	/* cannot use fh_lock as we need deadlock protective ordering
 	 * so do it by hand */
-	double_down(&tdir->i_sem, &fdir->i_sem);
+	trap = lock_rename(tdentry, fdentry);
 	ffhp->fh_locked = tfhp->fh_locked = 1;
 	fill_pre_wcc(ffhp);
 	fill_pre_wcc(tfhp);
@@ -1266,12 +1266,17 @@ nfsd_rename(struct svc_rqst *rqstp, struct svc_fh *ffhp, char *fname, int flen,
 	err = -ENOENT;
 	if (!odentry->d_inode)
 		goto out_dput_old;
+	err = -EINVAL;
+	if (odentry == trap)
+		goto out_dput_old;
 
 	ndentry = lookup_one_len(tname, tdentry, tlen);
 	err = PTR_ERR(ndentry);
 	if (IS_ERR(ndentry))
 		goto out_dput_old;
-
+	err = -ENOTEMPTY;
+	if (ndentry == trap)
+		goto out_dput_new;
 
 #ifdef MSNFS
 	if ((ffhp->fh_export->ex_flags & NFSEXP_MSNFS) &&
@@ -1287,6 +1292,8 @@ nfsd_rename(struct svc_rqst *rqstp, struct svc_fh *ffhp, char *fname, int flen,
 	}
 	dput(ndentry);
 
+ out_dput_new:
+	dput(ndentry);
  out_dput_old:
 	dput(odentry);
  out_nfserr:
@@ -1299,9 +1306,9 @@ nfsd_rename(struct svc_rqst *rqstp, struct svc_fh *ffhp, char *fname, int flen,
 	 */
 	fill_post_wcc(ffhp);
 	fill_post_wcc(tfhp);
-	double_up(&tdir->i_sem, &fdir->i_sem);
+	unlock_rename(tdentry, fdentry);
 	ffhp->fh_locked = tfhp->fh_locked = 0;
-	
+
 out:
 	return err;
 }

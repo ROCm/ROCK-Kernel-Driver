@@ -93,6 +93,11 @@
  * hopefully we will be able to get rid of that wart in 2.5. So far only
  * XEmacs seems to be relying on it...
  */
+/*
+ * [Sep 2001 AV] Single-semaphore locking scheme (kudos to David Holland)
+ * implemented.  Let's see if raised priority of ->s_vfs_rename_sem gives
+ * any extra contention...
+ */
 
 /* In order to reduce some races, while at the same time doing additional
  * checking and hopefully speeding things up, we copy filenames to the
@@ -931,28 +936,67 @@ static inline int lookup_flags(unsigned int f)
 	return retval;
 }
 
+/*
+ * p1 and p2 should be directories on the same fs.
+ */
+struct dentry *lock_rename(struct dentry *p1, struct dentry *p2)
+{
+	struct dentry *p;
+
+	if (p1 == p2) {
+		down(&p1->d_inode->i_sem);
+		return NULL;
+	}
+
+	down(&p1->d_inode->i_sb->s_vfs_rename_sem);
+
+	for (p = p1; p->d_parent != p; p = p->d_parent) {
+		if (p->d_parent == p2) {
+			down(&p2->d_inode->i_sem);
+			down(&p1->d_inode->i_sem);
+			return p;
+		}
+	}
+
+	for (p = p2; p->d_parent != p; p = p->d_parent) {
+		if (p->d_parent == p1) {
+			down(&p1->d_inode->i_sem);
+			down(&p2->d_inode->i_sem);
+			return p;
+		}
+	}
+
+	down(&p1->d_inode->i_sem);
+	down(&p2->d_inode->i_sem);
+	return NULL;
+}
+
+void unlock_rename(struct dentry *p1, struct dentry *p2)
+{
+	up(&p1->d_inode->i_sem);
+	if (p1 != p2) {
+		up(&p2->d_inode->i_sem);
+		up(&p1->d_inode->i_sb->s_vfs_rename_sem);
+	}
+}
+
 int vfs_create(struct inode *dir, struct dentry *dentry, int mode)
 {
-	int error;
+	int error = may_create(dir, dentry);
+
+	if (error)
+		return error;
+
+	if (!dir->i_op || !dir->i_op->create)
+		return -EACCES;	/* shouldn't it be ENOSYS? */
+
+	DQUOT_INIT(dir);
 
 	mode &= S_IALLUGO;
 	mode |= S_IFREG;
-
-	down(&dir->i_zombie);
-	error = may_create(dir, dentry);
-	if (error)
-		goto exit_lock;
-
-	error = -EACCES;	/* shouldn't it be ENOSYS? */
-	if (!dir->i_op || !dir->i_op->create)
-		goto exit_lock;
-
-	DQUOT_INIT(dir);
 	lock_kernel();
 	error = dir->i_op->create(dir, dentry, mode);
 	unlock_kernel();
-exit_lock:
-	up(&dir->i_zombie);
 	if (!error)
 		inode_dir_notify(dir, DN_CREATE);
 	return error;
@@ -1212,26 +1256,21 @@ fail:
 
 int vfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t dev)
 {
-	int error = -EPERM;
+	int error = may_create(dir, dentry);
 
-	down(&dir->i_zombie);
-	if ((S_ISCHR(mode) || S_ISBLK(mode)) && !capable(CAP_MKNOD))
-		goto exit_lock;
-
-	error = may_create(dir, dentry);
 	if (error)
-		goto exit_lock;
+		return error;
 
-	error = -EPERM;
+	if ((S_ISCHR(mode) || S_ISBLK(mode)) && !capable(CAP_MKNOD))
+		return -EPERM;
+
 	if (!dir->i_op || !dir->i_op->mknod)
-		goto exit_lock;
+		return -EPERM;
 
 	DQUOT_INIT(dir);
 	lock_kernel();
 	error = dir->i_op->mknod(dir, dentry, mode, dev);
 	unlock_kernel();
-exit_lock:
-	up(&dir->i_zombie);
 	if (!error)
 		inode_dir_notify(dir, DN_CREATE);
 	return error;
@@ -1284,25 +1323,19 @@ out:
 
 int vfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 {
-	int error;
+	int error = may_create(dir, dentry);
 
-	down(&dir->i_zombie);
-	error = may_create(dir, dentry);
 	if (error)
-		goto exit_lock;
+		return error;
 
-	error = -EPERM;
 	if (!dir->i_op || !dir->i_op->mkdir)
-		goto exit_lock;
+		return -EPERM;
 
 	DQUOT_INIT(dir);
 	mode &= (S_IRWXUGO|S_ISVTX);
 	lock_kernel();
 	error = dir->i_op->mkdir(dir, dentry, mode);
 	unlock_kernel();
-
-exit_lock:
-	up(&dir->i_zombie);
 	if (!error)
 		inode_dir_notify(dir, DN_CREATE);
 	return error;
@@ -1369,9 +1402,8 @@ static void d_unhash(struct dentry *dentry)
 
 int vfs_rmdir(struct inode *dir, struct dentry *dentry)
 {
-	int error;
+	int error = may_delete(dir, dentry, 1);
 
-	error = may_delete(dir, dentry, 1);
 	if (error)
 		return error;
 
@@ -1380,7 +1412,7 @@ int vfs_rmdir(struct inode *dir, struct dentry *dentry)
 
 	DQUOT_INIT(dir);
 
-	double_down(&dir->i_zombie, &dentry->d_inode->i_zombie);
+	down(&dentry->d_inode->i_sem);
 	d_unhash(dentry);
 	if (IS_DEADDIR(dir))
 		error = -ENOENT;
@@ -1393,7 +1425,7 @@ int vfs_rmdir(struct inode *dir, struct dentry *dentry)
 		if (!error)
 			dentry->d_inode->i_flags |= S_DEAD;
 	}
-	double_up(&dir->i_zombie, &dentry->d_inode->i_zombie);
+	up(&dentry->d_inode->i_sem);
 	if (!error) {
 		inode_dir_notify(dir, DN_DELETE);
 		d_delete(dentry);
@@ -1447,28 +1479,33 @@ exit:
 
 int vfs_unlink(struct inode *dir, struct dentry *dentry)
 {
-	int error;
+	int error = may_delete(dir, dentry, 0);
 
-	down(&dir->i_zombie);
-	error = may_delete(dir, dentry, 0);
-	if (!error) {
-		error = -EPERM;
-		if (dir->i_op && dir->i_op->unlink) {
-			DQUOT_INIT(dir);
-			if (d_mountpoint(dentry))
-				error = -EBUSY;
-			else {
-				lock_kernel();
-				error = dir->i_op->unlink(dir, dentry);
-				unlock_kernel();
-				if (!error)
-					d_delete(dentry);
-			}
-		}
+	if (error)
+		return error;
+
+	if (!dir->i_op || !dir->i_op->unlink)
+		return -EPERM;
+
+	DQUOT_INIT(dir);
+
+	dget(dentry);
+	down(&dentry->d_inode->i_sem);
+	if (d_mountpoint(dentry))
+		error = -EBUSY;
+	else {
+		lock_kernel();
+		error = dir->i_op->unlink(dir, dentry);
+		unlock_kernel();
+		if (!error)
+			d_delete(dentry);
 	}
-	up(&dir->i_zombie);
+	up(&dentry->d_inode->i_sem);
+	dput(dentry);
+
 	if (!error)
 		inode_dir_notify(dir, DN_DELETE);
+
 	return error;
 }
 
@@ -1517,24 +1554,18 @@ slashes:
 
 int vfs_symlink(struct inode *dir, struct dentry *dentry, const char *oldname)
 {
-	int error;
+	int error = may_create(dir, dentry);
 
-	down(&dir->i_zombie);
-	error = may_create(dir, dentry);
 	if (error)
-		goto exit_lock;
+		return error;
 
-	error = -EPERM;
 	if (!dir->i_op || !dir->i_op->symlink)
-		goto exit_lock;
+		return -EPERM;
 
 	DQUOT_INIT(dir);
 	lock_kernel();
 	error = dir->i_op->symlink(dir, dentry, oldname);
 	unlock_kernel();
-
-exit_lock:
-	up(&dir->i_zombie);
 	if (!error)
 		inode_dir_notify(dir, DN_CREATE);
 	return error;
@@ -1576,39 +1607,31 @@ out:
 
 int vfs_link(struct dentry *old_dentry, struct inode *dir, struct dentry *new_dentry)
 {
-	struct inode *inode;
+	struct inode *inode = old_dentry->d_inode;
 	int error;
 
-	down(&dir->i_zombie);
-	error = -ENOENT;
-	inode = old_dentry->d_inode;
 	if (!inode)
-		goto exit_lock;
+		return -ENOENT;
 
 	error = may_create(dir, new_dentry);
 	if (error)
-		goto exit_lock;
+		return error;
 
-	error = -EXDEV;
 	if (dir->i_sb != inode->i_sb)
-		goto exit_lock;
+		return -EXDEV;
 
 	/*
 	 * A link to an append-only or immutable file cannot be created.
 	 */
-	error = -EPERM;
 	if (IS_APPEND(inode) || IS_IMMUTABLE(inode))
-		goto exit_lock;
+		return -EPERM;
 	if (!dir->i_op || !dir->i_op->link)
-		goto exit_lock;
+		return -EPERM;
 
 	DQUOT_INIT(dir);
 	lock_kernel();
 	error = dir->i_op->link(old_dentry, dir, new_dentry);
 	unlock_kernel();
-
-exit_lock:
-	up(&dir->i_zombie);
 	if (!error)
 		inode_dir_notify(dir, DN_CREATE);
 	return error;
@@ -1680,17 +1703,23 @@ exit:
  *	   story.
  *	c) we have to lock _three_ objects - parents and victim (if it exists).
  *	   And that - after we got ->i_sem on parents (until then we don't know
- *	   whether the target exists at all, let alone whether it is a directory
- *	   or not). Solution: ->i_zombie. Taken only after ->i_sem. Always taken
- *	   on link creation/removal of any kind. And taken (without ->i_sem) on
- *	   directory that will be removed (both in rmdir() and here).
+ *	   whether the target exists).  Solution: try to be smart with locking
+ *	   order for inodes.  We rely on the fact that tree topology may change
+ *	   only under ->s_vfs_rename_sem _and_ that parent of the object we
+ *	   move will be locked.  Thus we can rank directories by the tree
+ *	   (ancestors first) and rank all non-directories after them.
+ *	   That works since everybody except rename does "lock parent, lookup,
+ *	   lock child" and rename is under ->s_vfs_rename_sem.
+ *	   HOWEVER, it relies on the assumption that any object with ->lookup()
+ *	   has no more than 1 dentry.  If "hybrid" objects will ever appear,
+ *	   we'd better make sure that there's no link(2) for them.
  *	d) some filesystems don't support opened-but-unlinked directories,
  *	   either because of layout or because they are not ready to deal with
  *	   all cases correctly. The latter will be fixed (taking this sort of
  *	   stuff into VFS), but the former is not going away. Solution: the same
  *	   trick as in rmdir().
  *	e) conversion from fhandle to dentry may come in the wrong moment - when
- *	   we are removing the target. Solution: we will have to grab ->i_zombie
+ *	   we are removing the target. Solution: we will have to grab ->i_sem
  *	   in the fhandle_to_dentry code. [FIXME - current nfsfh.c relies on
  *	   ->i_sem on parents, which works but leads to some truely excessive
  *	   locking].
@@ -1698,131 +1727,96 @@ exit:
 int vfs_rename_dir(struct inode *old_dir, struct dentry *old_dentry,
 	       struct inode *new_dir, struct dentry *new_dentry)
 {
-	int error;
+	int error = 0;
 	struct inode *target;
-
-	if (old_dentry->d_inode == new_dentry->d_inode)
-		return 0;
-
-	error = may_delete(old_dir, old_dentry, 1);
-	if (error)
-		return error;
-
-	if (new_dir->i_sb != old_dir->i_sb)
-		return -EXDEV;
-
-	if (!new_dentry->d_inode)
-		error = may_create(new_dir, new_dentry);
-	else
-		error = may_delete(new_dir, new_dentry, 1);
-	if (error)
-		return error;
-
-	if (!old_dir->i_op || !old_dir->i_op->rename)
-		return -EPERM;
 
 	/*
 	 * If we are going to change the parent - check write permissions,
 	 * we'll need to flip '..'.
 	 */
-	if (new_dir != old_dir) {
+	if (new_dir != old_dir)
 		error = permission(old_dentry->d_inode, MAY_WRITE);
-	}
+
 	if (error)
 		return error;
 
-	DQUOT_INIT(old_dir);
-	DQUOT_INIT(new_dir);
-	down(&old_dir->i_sb->s_vfs_rename_sem);
-	error = -EINVAL;
-	if (is_subdir(new_dentry, old_dentry))
-		goto out_unlock;
-	/* Don't eat your daddy, dear... */
-	/* This also avoids locking issues */
-	if (old_dentry->d_parent == new_dentry)
-		goto out_unlock;
 	target = new_dentry->d_inode;
-	if (target) { /* Hastur! Hastur! Hastur! */
-		triple_down(&old_dir->i_zombie,
-			    &new_dir->i_zombie,
-			    &target->i_zombie);
+	if (target) {
+		down(&target->i_sem);
 		d_unhash(new_dentry);
-	} else
-		double_down(&old_dir->i_zombie,
-			    &new_dir->i_zombie);
-	if (IS_DEADDIR(old_dir)||IS_DEADDIR(new_dir))
-		error = -ENOENT;
-	else if (d_mountpoint(old_dentry)||d_mountpoint(new_dentry))
+	}
+	if (d_mountpoint(old_dentry)||d_mountpoint(new_dentry))
 		error = -EBUSY;
 	else 
 		error = old_dir->i_op->rename(old_dir, old_dentry, new_dir, new_dentry);
 	if (target) {
 		if (!error)
 			target->i_flags |= S_DEAD;
-		triple_up(&old_dir->i_zombie,
-			  &new_dir->i_zombie,
-			  &target->i_zombie);
+		up(&target->i_sem);
 		if (d_unhashed(new_dentry))
 			d_rehash(new_dentry);
 		dput(new_dentry);
-	} else
-		double_up(&old_dir->i_zombie,
-			  &new_dir->i_zombie);
-		
+	}
 	if (!error)
 		d_move(old_dentry,new_dentry);
-out_unlock:
-	up(&old_dir->i_sb->s_vfs_rename_sem);
 	return error;
 }
 
 int vfs_rename_other(struct inode *old_dir, struct dentry *old_dentry,
 	       struct inode *new_dir, struct dentry *new_dentry)
 {
+	struct inode *target;
 	int error;
 
-	if (old_dentry->d_inode == new_dentry->d_inode)
-		return 0;
-
-	error = may_delete(old_dir, old_dentry, 0);
-	if (error)
-		return error;
-
-	if (new_dir->i_sb != old_dir->i_sb)
-		return -EXDEV;
-
-	if (!new_dentry->d_inode)
-		error = may_create(new_dir, new_dentry);
-	else
-		error = may_delete(new_dir, new_dentry, 0);
-	if (error)
-		return error;
-
-	if (!old_dir->i_op || !old_dir->i_op->rename)
-		return -EPERM;
-
-	DQUOT_INIT(old_dir);
-	DQUOT_INIT(new_dir);
-	double_down(&old_dir->i_zombie, &new_dir->i_zombie);
+	dget(new_dentry);
+	target = new_dentry->d_inode;
+	if (target)
+		down(&target->i_sem);
 	if (d_mountpoint(old_dentry)||d_mountpoint(new_dentry))
 		error = -EBUSY;
 	else
 		error = old_dir->i_op->rename(old_dir, old_dentry, new_dir, new_dentry);
-	double_up(&old_dir->i_zombie, &new_dir->i_zombie);
-	if (error)
-		return error;
-	/* The following d_move() should become unconditional */
-	if (!(old_dir->i_sb->s_type->fs_flags & FS_ODD_RENAME)) {
-		d_move(old_dentry, new_dentry);
+	if (!error) {
+		/* The following d_move() should become unconditional */
+		if (!(old_dir->i_sb->s_type->fs_flags & FS_ODD_RENAME)) {
+			d_move(old_dentry, new_dentry);
+		}
 	}
-	return 0;
+	if (target)
+		up(&target->i_sem);
+	dput(new_dentry);
+	return error;
 }
 
 int vfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	       struct inode *new_dir, struct dentry *new_dentry)
 {
 	int error;
-	if (S_ISDIR(old_dentry->d_inode->i_mode))
+	int is_dir = S_ISDIR(old_dentry->d_inode->i_mode);
+
+	if (old_dentry->d_inode == new_dentry->d_inode)
+ 		return 0;
+ 
+	error = may_delete(old_dir, old_dentry, is_dir);
+	if (error)
+		return error;
+
+	if (!new_dentry->d_inode)
+		error = may_create(new_dir, new_dentry);
+	else
+		error = may_delete(new_dir, new_dentry, is_dir);
+	if (error)
+		return error;
+
+	if (!old_dir->i_op || !old_dir->i_op->rename)
+		return -EPERM;
+
+	if (IS_DEADDIR(old_dir)||IS_DEADDIR(new_dir))
+		return -ENOENT;
+	DQUOT_INIT(old_dir);
+	DQUOT_INIT(new_dir);
+
+	if (is_dir)
 		error = vfs_rename_dir(old_dir,old_dentry,new_dir,new_dentry);
 	else
 		error = vfs_rename_other(old_dir,old_dentry,new_dir,new_dentry);
@@ -1842,6 +1836,7 @@ static inline int do_rename(const char * oldname, const char * newname)
 	int error = 0;
 	struct dentry * old_dir, * new_dir;
 	struct dentry * old_dentry, *new_dentry;
+	struct dentry * trap;
 	struct nameidata oldnd, newnd;
 
 	if (path_init(oldname, LOOKUP_PARENT, &oldnd))
@@ -1868,7 +1863,7 @@ static inline int do_rename(const char * oldname, const char * newname)
 	if (newnd.last_type != LAST_NORM)
 		goto exit2;
 
-	double_lock(new_dir, old_dir);
+	trap = lock_rename(new_dir, old_dir);
 
 	old_dentry = lookup_hash(&oldnd.last, old_dir);
 	error = PTR_ERR(old_dentry);
@@ -1886,21 +1881,30 @@ static inline int do_rename(const char * oldname, const char * newname)
 		if (newnd.last.name[newnd.last.len])
 			goto exit4;
 	}
+	/* source should not be ancestor of target */
+	error = -EINVAL;
+	if (old_dentry == trap)
+		goto exit4;
 	new_dentry = lookup_hash(&newnd.last, new_dir);
 	error = PTR_ERR(new_dentry);
 	if (IS_ERR(new_dentry))
 		goto exit4;
+	/* target should not be an ancestor of source */
+	error = -ENOTEMPTY;
+	if (new_dentry == trap)
+		goto exit5;
 
 	lock_kernel();
 	error = vfs_rename(old_dir->d_inode, old_dentry,
 				   new_dir->d_inode, new_dentry);
 	unlock_kernel();
 
+exit5:
 	dput(new_dentry);
 exit4:
 	dput(old_dentry);
 exit3:
-	double_up(&new_dir->d_inode->i_sem, &old_dir->d_inode->i_sem);
+	unlock_rename(new_dir, old_dir);
 exit2:
 	path_release(&newnd);
 exit1:

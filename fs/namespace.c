@@ -466,7 +466,7 @@ static int graft_tree(struct vfsmount *mnt, struct nameidata *nd)
 		return -ENOTDIR;
 
 	err = -ENOENT;
-	down(&nd->dentry->d_inode->i_zombie);
+	down(&nd->dentry->d_inode->i_sem);
 	if (IS_DEADDIR(nd->dentry->d_inode))
 		goto out_unlock;
 
@@ -481,7 +481,7 @@ static int graft_tree(struct vfsmount *mnt, struct nameidata *nd)
 	}
 	spin_unlock(&dcache_lock);
 out_unlock:
-	up(&nd->dentry->d_inode->i_zombie);
+	up(&nd->dentry->d_inode->i_sem);
 	return err;
 }
 
@@ -577,7 +577,7 @@ static int do_move_mount(struct nameidata *nd, char *old_name)
 		goto out;
 
 	err = -ENOENT;
-	down(&nd->dentry->d_inode->i_zombie);
+	down(&nd->dentry->d_inode->i_sem);
 	if (IS_DEADDIR(nd->dentry->d_inode))
 		goto out1;
 
@@ -607,7 +607,7 @@ static int do_move_mount(struct nameidata *nd, char *old_name)
 out2:
 	spin_unlock(&dcache_lock);
 out1:
-	up(&nd->dentry->d_inode->i_zombie);
+	up(&nd->dentry->d_inode->i_sem);
 out:
 	up_write(&current->namespace->sem);
 	if (!err)
@@ -949,7 +949,7 @@ asmlinkage long sys_pivot_root(const char *new_root, const char *put_old)
 	user_nd.dentry = dget(current->fs->root);
 	read_unlock(&current->fs->lock);
 	down_write(&current->namespace->sem);
-	down(&old_nd.dentry->d_inode->i_zombie);
+	down(&old_nd.dentry->d_inode->i_sem);
 	error = -EINVAL;
 	if (!check_mnt(user_nd.mnt))
 		goto out2;
@@ -992,7 +992,7 @@ asmlinkage long sys_pivot_root(const char *new_root, const char *put_old)
 	path_release(&root_parent);
 	path_release(&parent_nd);
 out2:
-	up(&old_nd.dentry->d_inode->i_zombie);
+	up(&old_nd.dentry->d_inode->i_sem);
 	up_write(&current->namespace->sem);
 	path_release(&user_nd);
 	path_release(&old_nd);

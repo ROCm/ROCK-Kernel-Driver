@@ -48,34 +48,39 @@ prototypes:
 
 locking rules:
 	all may block
-		BKL	i_sem(inode)	i_zombie(inode)
-lookup:		yes	yes		no
-create:		yes	yes		yes
-link:		yes	yes		yes
-mknod:		yes	yes		yes
-mkdir:		yes	yes		yes
-unlink:		yes	yes		yes
-rmdir:		yes	yes		yes		(see below)
-rename:		yes	yes (both)	yes (both)	(see below)
-readlink:	no	no		no
-follow_link:	no	no		no
-truncate:	yes	yes		no		(see below)
-setattr:	yes	if ATTR_SIZE	no
-permssion:	yes	no		no
-getattr:						(see below)
-revalidate:	no					(see below)
-	Additionally, ->rmdir() has i_zombie on victim and so does ->rename()
-in case when target exists and is a directory.
-	->rename() on directories has (per-superblock) ->s_vfs_rename_sem.
+		BKL	i_sem(inode)
+lookup:		yes	yes
+create:		yes	yes
+link:		yes	yes
+mknod:		yes	yes
+mkdir:		yes	yes
+unlink:		yes	yes (both)
+rmdir:		yes	yes (both)	(see below)
+rename:		yes	yes (all)	(see below)
+readlink:	no	no
+follow_link:	no	no
+truncate:	yes	yes		(see below)
+setattr:	yes	if ATTR_SIZE
+permssion:	yes	no
+getattr:				(see below)
+revalidate:	no			(see below)
+setxattr:	DOCUMENT_ME
+getxattr:	DOCUMENT_ME
+removexattr:	DOCUMENT_ME
+	Additionally, ->rmdir(), ->unlink() and ->rename() have ->i_sem on
+victim.
+	cross-directory ->rename() has (per-superblock) ->s_vfs_rename_sem.
 	->revalidate(), it may be called both with and without the i_sem
-on dentry->d_inode. VFS never calls it with i_zombie on dentry->d_inode,
-but watch for other methods directly calling this one...
+on dentry->d_inode.
 	->truncate() is never called directly - it's a callback, not a
 method. It's called by vmtruncate() - library function normally used by
 ->setattr(). Locking information above applies to that call (i.e. is
 inherited from ->setattr() - vmtruncate() is used when ATTR_SIZE had been
 passed).
 	->getattr() is currently unused.
+
+See Documentation/filesystems/directory-locking for more detailed discussion
+of the locking scheme for directory operations.
 
 --------------------------- super_operations ---------------------------
 prototypes:

@@ -472,11 +472,9 @@ static ssize_t bm_entry_write(struct file *file, const char *buffer,
 			break;
 		case 3: root = dget(file->f_vfsmnt->mnt_sb->s_root);
 			down(&root->d_inode->i_sem);
-			down(&root->d_inode->i_zombie);
 
 			kill_node(e);
 
-			up(&root->d_inode->i_zombie);
 			up(&root->d_inode->i_sem);
 			dput(root);
 			break;
@@ -516,8 +514,6 @@ static ssize_t bm_register_write(struct file *file, const char *buffer,
 	if (IS_ERR(dentry))
 		goto out;
 
-	down(&root->d_inode->i_zombie);
-
 	err = -EEXIST;
 	if (dentry->d_inode)
 		goto out2;
@@ -556,7 +552,6 @@ static ssize_t bm_register_write(struct file *file, const char *buffer,
 	mntput(mnt);
 	err = 0;
 out2:
-	up(&root->d_inode->i_zombie);
 	dput(dentry);
 out:
 	up(&root->d_inode->i_sem);
@@ -605,12 +600,10 @@ static ssize_t bm_status_write(struct file * file, const char * buffer,
 		case 2: enabled = 1; break;
 		case 3: root = dget(file->f_vfsmnt->mnt_sb->s_root);
 			down(&root->d_inode->i_sem);
-			down(&root->d_inode->i_zombie);
 
 			while (!list_empty(&entries))
 				kill_node(list_entry(entries.next, Node, list));
 
-			up(&root->d_inode->i_zombie);
 			up(&root->d_inode->i_sem);
 			dput(root);
 		default: return res;
