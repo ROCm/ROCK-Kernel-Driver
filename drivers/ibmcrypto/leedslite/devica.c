@@ -39,6 +39,7 @@
 #include <linux/devfs_fs_kernel.h>
 #include <linux/kmod.h>
 #include <linux/list.h>
+#include <linux/device.h>
 
 #include <asm/bitops.h>
 #include <asm/io.h>
@@ -58,6 +59,8 @@
 #endif
 
 typedef struct devfs_entry *devfs_handle_t;
+
+static struct class_simple *ica_dev_class;
 
 /* Dynamic ioctl32 compatability, necessary for PPC64 and possibly
    other 64 bit platforms
@@ -88,7 +91,7 @@ static const char *version =
 static const char *modname_template =
 "ica-slot-%d";
 
-static int driver_major;
+static int driver_major = 0;
 static int maxdevices = 1;
 static int maxmodules = 1;
 
@@ -618,7 +621,6 @@ int __init ica_driver_init(void)
 	memset(devices, 0, maxdevices * sizeof(ica_dev_t *));
 
 	rc = register_chrdev(driver_major, "ica", &ica_fops);
-
 	if(rc < 0){
 		printk("ica_register_chrdev(ica) returned %d\n", rc);
 		assertk(rc >= 0);
@@ -627,6 +629,14 @@ int __init ica_driver_init(void)
 
 	if(driver_major == 0)
 		driver_major = rc;
+
+	ica_dev_class = class_simple_create(THIS_MODULE, "ica");
+	if (IS_ERR(ica_dev_class)) {
+		rc = PTR_ERR(ica_dev_class);
+		goto err_unregclass;
+	}
+	class_simple_device_add(ica_dev_class, MKDEV(driver_major, 0), NULL,
+		"ica");
 
 	ica_register_devfs(driver_major);
 
@@ -655,9 +665,12 @@ int __init ica_driver_init(void)
 	unregister_conversion_handlers();
 #endif
 	unregister_chrdev(driver_major, "ica");
- err_ica_init_register_chrdev:
+	class_simple_device_remove(MKDEV(driver_major, 0));
+err_unregclass:
+	class_simple_destroy(ica_dev_class);
+err_ica_init_register_chrdev:
 	kfree(devices);
- err_ica_init:
+err_ica_init:
 	return rc;
 }
 
@@ -674,6 +687,7 @@ static void __exit ica_cleanup_module(void)
 #endif
 	devfs_remove("ica");
 	devfs_remove("devica");
+	class_simple_destroy(ica_dev_class);
 
 	unregister_chrdev(driver_major, "ica");
 	kfree(devices);

@@ -120,7 +120,7 @@ static const char *version =
 "leedslite.c:v0.22 05/27/03 Jon Grimm (c) IBM Corp.";
 
 
-static int driver_major;
+static int driver_major = 0;
 static int devica = 1;          /* register with /dev/ica partition */    
 static int maxdevices = 12;
 static int desbuffersize = 8192;
