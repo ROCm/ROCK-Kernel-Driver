@@ -488,7 +488,7 @@ typedef struct {
 int pfault_init(void)
 {
 	pfault_refbk_t refbk =
-		{ 0x258, 0, 5, 2, __LC_KERNEL_STACK, 1ULL << 48, 1ULL << 48,
+		{ 0x258, 0, 5, 2, __LC_CURRENT, 1ULL << 48, 1ULL << 48,
 		  __PF_RES_FIELD };
         int rc;
 
@@ -555,8 +555,7 @@ pfault_interrupt(struct pt_regs *regs, __u16 error_code)
 	/*
 	 * Get the token (= address of kernel stack of affected task).
 	 */
-	tsk = (struct task_struct *)
-		(*((unsigned long *) __LC_PFAULT_INTPARM) - THREAD_SIZE);
+	tsk = *(struct task_struct **) __LC_PFAULT_INTPARM;
 
 	/*
 	 * We got all needed information from the lowcore and can

@@ -221,18 +221,18 @@ extern inline int _raw_write_trylock(rwlock_t *rw)
 	
 	__asm__ __volatile__(
 #ifndef __s390x__
-			     "   lhi  %0,1\n"
-			     "   sll  %0,31\n"
-			     "   basr %1,0\n"
-			     "0: cs   %0,%1,0(%3)\n"
+			     "   slr  %0,%0\n"
+			     "   lhi  %1,1\n"
+			     "   sll  %1,31\n"
+			     "   cs   %0,%1,0(%3)"
 #else /* __s390x__ */
-			     "   llihh %0,0x8000\n"
-			     "   basr  %1,0\n"
+			     "   slgr  %0,%0\n"
+			     "   llihh %1,0x8000\n"
 			     "0: csg %0,%1,0(%3)\n"
 #endif /* __s390x__ */
 			     : "=&d" (result), "=&d" (reg), "+m" (rw->lock)
 			     : "a" (&rw->lock) : "cc" );
-	return !result;
+	return result == 0;
 }
 
 #endif /* __ASM_SPINLOCK_H */

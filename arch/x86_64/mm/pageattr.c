@@ -57,7 +57,7 @@ static void flush_kernel_map(void *address)
 		/* is this worth it? */ 
 		int i;
 		for (i = 0; i < PAGE_SIZE; i += boot_cpu_data.x86_clflush_size) 
-			asm volatile("clflush %0" :: "m" (address + i)); 
+			asm volatile("clflush (%0)" :: "r" (address + i)); 
 	} else
 		asm volatile("wbinvd":::"memory"); 
 	__flush_tlb_one(address);

@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/device.c
  *  bus driver for ccw devices
- *   $Revision: 1.60 $
+ *   $Revision: 1.70 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *			 IBM Corporation
@@ -229,7 +229,7 @@ online_show (struct device *dev, char *buf)
 {
 	struct ccw_device *cdev = to_ccwdev(dev);
 
-	return sprintf(buf, cdev->online ? "yes\n" : "no\n");
+	return sprintf(buf, cdev->online ? "1\n" : "0\n");
 }
 
 void
@@ -373,30 +373,43 @@ ccw_device_unbox_recog(void *data)
 	spin_unlock_irq(cdev->ccwlock);
 }
 
+static struct attribute * subch_attrs[] = {
+	&dev_attr_chpids.attr,
+	&dev_attr_pimpampom.attr,
+	NULL,
+};
+
+static struct attribute_group subch_attr_group = {
+	.attrs = subch_attrs,
+};
+
 static inline int
 subchannel_add_files (struct device *dev)
 {
-	int ret;
-
-	if ((ret = device_create_file(dev, &dev_attr_chpids)) ||
-	    (ret = device_create_file(dev, &dev_attr_pimpampom))) {
-		device_remove_file(dev, &dev_attr_chpids);
-	}
-	return ret;
+	return sysfs_create_group(&dev->kobj, &subch_attr_group);
 }
+
+static struct attribute * ccwdev_attrs[] = {
+	&dev_attr_devtype.attr,
+	&dev_attr_cutype.attr,
+	&dev_attr_online.attr,
+	NULL,
+};
+
+static struct attribute_group ccwdev_attr_group = {
+	.attrs = ccwdev_attrs,
+};
 
 static inline int
 device_add_files (struct device *dev)
 {
-	int ret;
+	return sysfs_create_group(&dev->kobj, &ccwdev_attr_group);
+}
 
-	if ((ret = device_create_file(dev, &dev_attr_devtype)) ||
-	    (ret = device_create_file(dev, &dev_attr_cutype))  ||
-	    (ret = device_create_file(dev, &dev_attr_online))) {
-		device_remove_file(dev, &dev_attr_cutype);
-		device_remove_file(dev, &dev_attr_devtype);
-	}
-	return ret;
+static inline void
+device_remove_files(struct device *dev)
+{
+	sysfs_remove_group(&dev->kobj, &ccwdev_attr_group);
 }
 
 /*
@@ -437,7 +450,12 @@ ccw_device_register(struct ccw_device *cdev)
 void
 ccw_device_unregister(void *data)
 {
-	device_unregister((struct device *)data);
+	struct device *dev;
+
+	dev = (struct device *)data;
+
+	device_remove_files(dev);
+	device_unregister(dev);
 }
 	
 
@@ -537,8 +555,7 @@ io_subchannel_recog(struct ccw_device *cdev, struct subchannel *sch)
 	init_timer(&cdev->private->timer);
 
 	/* Set an initial name for the device. */
-	snprintf (cdev->dev.name, DEVICE_NAME_SIZE,"ccw device");
-	snprintf (cdev->dev.bus_id, DEVICE_ID_SIZE, "0:%04x",
+	snprintf (cdev->dev.bus_id, BUS_ID_SIZE, "0.0.%04x",
 		  sch->schib.pmcw.dev);
 
 	/* Increase counter of devices currently in recognition. */
@@ -679,6 +696,7 @@ ccw_device_probe_console(void)
 		console_cdev_in_use = 0;
 		return ERR_PTR(ret);
 	}
+	console_cdev.online = 1;
 	return &console_cdev;
 }
 #endif
@@ -702,10 +720,12 @@ get_ccwdev_by_busid(struct ccw_driver *cdrv, const char *bus_id)
 	list_for_each_entry(d, &drv->devices, driver_list) {
 		dev = get_device(d);
 
-		if (dev && !strncmp(bus_id, dev->bus_id, DEVICE_ID_SIZE))
+		if (dev && !strncmp(bus_id, dev->bus_id, BUS_ID_SIZE))
 			break;
-		else
+		else if (dev) {
 			put_device(dev);
+			dev = NULL;
+		}
 	}
 	up_read(&drv->bus->subsys.rwsem);
 	put_driver(drv);

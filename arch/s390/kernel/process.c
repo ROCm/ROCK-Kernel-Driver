@@ -118,9 +118,6 @@ int cpu_idle(void)
 	return 0;
 }
 
-extern void show_registers(struct pt_regs *regs);
-extern void show_trace(unsigned long *sp);
-
 void show_regs(struct pt_regs *regs)
 {
 	struct task_struct *tsk = current;
@@ -133,7 +130,7 @@ void show_regs(struct pt_regs *regs)
 	show_registers(regs);
 	/* Show stack backtrace if pt_regs is from kernel mode */
 	if (!(regs->psw.mask & PSW_MASK_PSTATE))
-		show_trace((unsigned long *) regs->gprs[15]);
+		show_trace(0,(unsigned long *) regs->gprs[15]);
 }
 
 extern void kernel_thread_starter(void);

@@ -7,7 +7,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.46 $
+ * $Revision: 1.47 $
  */
 
 #include <linux/config.h>
@@ -503,12 +503,6 @@ dasd_eckd_check_characteristics(struct dasd_device *device)
 	memcpy(&private->conf_data, conf_data,
 	       sizeof (struct dasd_eckd_confdata));
 
-	DEV_MESSAGE(KERN_INFO, device,
-		    "%04X/%02X(CU:%04X/%02X): Configuration data read",
-		    private->rdc_data.dev_type,
-		    private->rdc_data.dev_model,
-		    private->rdc_data.cu_type,
-		    private->rdc_data.cu_model.model);
 	return 0;
 }
 
@@ -843,8 +837,9 @@ dasd_eckd_format_device(struct dasd_device * device,
 		ccw->flags = CCW_FLAG_SLI;
 		ccw->count = 8;
 		ccw->cda = (__u32)(addr_t) ect;
+		ccw++;
 	}
-	if (fdata->intensity & 0x04) {	/* erase track */
+	if ((fdata->intensity & ~0x08) & 0x04) {	/* erase track */
 		ect = (struct eckd_count *) data;
 		data += sizeof(struct eckd_count);
 		ect->cyl = cyl;
@@ -884,6 +879,7 @@ dasd_eckd_format_device(struct dasd_device * device,
 			ccw->flags = CCW_FLAG_SLI;
 			ccw->count = 8;
 			ccw->cda = (__u32)(addr_t) ect;
+			ccw++;
 		}
 	}
 	fcp->device = device;

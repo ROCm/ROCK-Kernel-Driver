@@ -34,7 +34,8 @@ void __delay(unsigned long loops)
 }
 
 /*
- * Waits for 'usecs' microseconds using the tod clock
+ * Waits for 'usecs' microseconds using the tod clock, giving up the time slice
+ * of the virtual PU inbetween to avoid congestion.
  */
 void __udelay(unsigned long usecs)
 {
@@ -44,7 +45,7 @@ void __udelay(unsigned long usecs)
                 return;
         asm volatile ("STCK %0" : "=m" (start_cc));
         do {
+		cpu_relax();
                 asm volatile ("STCK %0" : "=m" (end_cc));
         } while (((end_cc - start_cc)/4096) < usecs);
 }
-

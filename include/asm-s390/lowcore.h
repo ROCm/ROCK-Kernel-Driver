@@ -65,6 +65,8 @@
 #define __LC_CPUADDR                    0xC68
 #define __LC_IPLDEV                     0xC7C
 #define __LC_JIFFY_TIMER		0xC80
+#define __LC_CURRENT			0xC90
+#define __LC_INT_CLOCK			0xC98
 #else /* __s390x__ */
 #define __LC_KERNEL_STACK               0xD40
 #define __LC_ASYNC_STACK                0xD48
@@ -72,6 +74,8 @@
 #define __LC_CPUADDR                    0xD98
 #define __LC_IPLDEV                     0xDB8
 #define __LC_JIFFY_TIMER		0xDC0
+#define __LC_CURRENT			0xDD8
+#define __LC_INT_CLOCK			0xDE8
 #endif /* __s390x__ */
 
 #define __LC_PANIC_MAGIC                0xE00
@@ -169,7 +173,11 @@ struct _lowcore
         /* SMP info area: defined by DJB */
         __u64        jiffy_timer;              /* 0xc80 */
 	__u32        ext_call_fast;            /* 0xc88 */
-        __u8         pad11[0xe00-0xc8c];       /* 0xc8c */
+	__u32        percpu_offset;            /* 0xc8c */
+	__u32        current_task;	       /* 0xc90 */
+	__u32        softirq_pending;	       /* 0xc94 */
+	__u64        int_clock;                /* 0xc98 */
+        __u8         pad11[0xe00-0xca0];       /* 0xca0 */
 
         /* 0xe00 is used as indicator for dump tools */
         /* whether the kernel died with panic() or not */
@@ -244,7 +252,11 @@ struct _lowcore
         /* SMP info area: defined by DJB */
         __u64        jiffy_timer;              /* 0xdc0 */
 	__u64        ext_call_fast;            /* 0xdc8 */
-        __u8         pad12[0xe00-0xdd0];       /* 0xdd0 */
+	__u64        percpu_offset;            /* 0xdd0 */
+	__u64        current_task;	       /* 0xdd8 */
+	__u64        softirq_pending;	       /* 0xde0 */
+	__u64        int_clock;                /* 0xde8 */
+        __u8         pad12[0xe00-0xdf0];       /* 0xdf0 */
 
         /* 0xe00 is used as indicator for dump tools */
         /* whether the kernel died with panic() or not */

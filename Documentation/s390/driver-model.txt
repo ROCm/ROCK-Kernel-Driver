@@ -14,19 +14,18 @@ root/
      - sys
      - legacy
      - css0/
-           - 0:0000/0:0815/
-	   - 0:0001/0:4711/
-	   - 0:0002/
+           - 0.0.0000/0.0.0815/
+	   - 0.0.0001/0.0.4711/
+	   - 0.0.0002/
 	   ...
 
 In this example, device 0815 is accessed via subchannel 0, device 4711 via 
 subchannel 1, and subchannel 2 is a non-I/O subchannel.
 
-You should address a ccw device via its bus id (e.g. 0:4711); the device can
+You should address a ccw device via its bus id (e.g. 0.0.4711); the device can
 be found under bus/ccw/devices/.
 
-All ccw devices export some data via sysfs additional to the standard 'name'
-and 'power' entries.
+All ccw devices export some data via sysfs.
 
 cutype:	    The control unit type / model.
 
@@ -177,6 +176,10 @@ this attributes creates a ccwgroup device consisting of these ccw devices (if
 possible). This ccwgroup device can be set online or offline just like a normal
 ccw device.
 
+Each ccwgroup device also provides an 'ungroup' attribute to destroy the device
+again (only when offline). This is a generic ccwgroup mechanism (the driver does
+not need to implement anything beyond normal removal routines).
+
 To implement a ccwgroup driver, please refer to include/asm/ccwgroup.h. Keep in
 mind that most drivers will need to implement both a ccwgroup and a ccw driver
 (unless you have a meta ccw driver, like cu3088 for lcs and ctc).
@@ -186,7 +189,7 @@ mind that most drivers will need to implement both a ccwgroup and a ccw driver
 -----------------
 
 Channel paths show up, like subchannels, under the channel subsystem root (css0)
-and are called 'chp<chpid>'. They have no driver and do not belong to any bus.
+and are called 'chp0.<chpid>'. They have no driver and do not belong to any bus.
 
 status - Can be 'online', 'logically offline' or 'n/a'.
 	 Piping 'on' or 'off' sets the chpid logically online/offline.
@@ -215,7 +218,9 @@ connection to the specified host.
 
 Netiucv connections show up under devices/iucv/ as "netiucv<ifnum>". The interface
 number is assigned sequentially to the connections defined via the 'connection'
-attribute. 'name' shows the connection partner.
+attribute.
+
+user			  - shows the connection partner.
 
 buffer			  - maximum buffer size.
 			    Pipe to it to change buffer size.

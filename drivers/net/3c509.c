@@ -382,9 +382,7 @@ static int __init el3_probe(int card_idx)
 #if defined(__ISAPNP__) && !defined(CONFIG_X86_PC9800)
 	static int pnp_cards;
 	struct pnp_dev *idev = NULL;
-#endif /* __ISAPNP__ */
 
-#if defined(__ISAPNP__) && !defined(CONFIG_X86_PC9800)
 	if (nopnp == 1)
 		goto no_pnp;
 
@@ -440,12 +438,15 @@ no_pnp:
 #else
 	/* Select an open I/O location at 0x1*0 to do contention select. */
 	for ( ; id_port < 0x200; id_port += 0x10) {
-		if (check_region(id_port, 1))
+		if (!request_region(id_port, 1, "3c509"))
 			continue;
 		outb(0x00, id_port);
 		outb(0xff, id_port);
-		if (inb(id_port) & 0x01)
+		if (inb(id_port) & 0x01){
+			release_region(id_port, 1);
 			break;
+		} else
+			release_region(id_port, 1);
 	}
 	if (id_port >= 0x200) {
 		/* Rare -- do we really need a warning? */

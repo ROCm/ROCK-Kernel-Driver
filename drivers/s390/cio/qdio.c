@@ -55,7 +55,7 @@
 #include "ioasm.h"
 #include "chsc.h"
 
-#define VERSION_QDIO_C "$Revision: 1.55 $"
+#define VERSION_QDIO_C "$Revision: 1.61 $"
 
 /****************** MODULE PARAMETER VARIABLES ********************/
 MODULE_AUTHOR("Utz Bacher <utz.bacher@de.ibm.com>");
@@ -117,60 +117,6 @@ qdio_get_micros(void)
         asm volatile ("STCK %0" : "=m" (time));
         return time>>12; /* time>>12 is microseconds*/
 }
-static inline unsigned long 
-qdio_get_millis(void)
-{
-	return (unsigned long)(qdio_get_micros()>>12);
-}
-
-static __inline__ int 
-atomic_return_add (int i, atomic_t *v)
-{
-	int old, new;
-	__CS_LOOP(old, new, v, i, "ar");
-	return old;
-}
-
-static void 
-qdio_wait_nonbusy(unsigned int timeout)
-{
-        unsigned int start;
-        char dbf_text[15];
-
-	sprintf(dbf_text,"wtnb%4x",timeout);
-	QDIO_DBF_TEXT3(0,trace,dbf_text);
-
-	start=qdio_get_millis();
-	for (;;) {
-		set_task_state(current,TASK_INTERRUPTIBLE);
-		if (qdio_get_millis()-start>timeout) {
-			goto out;
-		}
-		schedule_timeout(((start+timeout-qdio_get_millis())>>10)*HZ);
-	}
-out:
-	set_task_state(current,TASK_RUNNING);
-}
-
-static int 
-qdio_wait_for_no_use_count(atomic_t *use_count)
-{
-	unsigned long start;
-
-	QDIO_DBF_TEXT3(0,trace,"wtnousec");
-	start=qdio_get_millis();
-	for (;;) {
-		if (qdio_get_millis()-start>QDIO_NO_USE_COUNT_TIMEOUT) {
-			QDIO_DBF_TEXT1(1,trace,"WTNOUSTO");
-			return -ETIME;
-		}
-		if (!atomic_read(use_count)) {
-			QDIO_DBF_TEXT3(0,trace,"wtnoused");
-			return 0;
-		}
-		qdio_wait_nonbusy(QDIO_NO_USE_COUNT_TIME);
-	}
-}
 
 /* 
  * unfortunately, we can't just xchg the values; in do_QDIO we want to reserve
@@ -181,7 +127,7 @@ qdio_wait_for_no_use_count(atomic_t *use_count)
 static inline int 
 qdio_reserve_q(struct qdio_q *q)
 {
-	return atomic_return_add(1,&q->use_count);
+	return atomic_add_return(1,&q->use_count) - 1;
 }
 
 static inline void 
@@ -1221,21 +1167,18 @@ static void
 qdio_release_irq_memory(struct qdio_irq *irq_ptr)
 {
 	int i;
-	int available;
 
 	for (i=0;i<QDIO_MAX_QUEUES_PER_IRQ;i++) {
 		if (!irq_ptr->input_qs[i])
 			goto next;
-		available=0;
 
 		if (irq_ptr->input_qs[i]->slib)
 			kfree(irq_ptr->input_qs[i]->slib);
-			kfree(irq_ptr->input_qs[i]);
+		kfree(irq_ptr->input_qs[i]);
 
 next:
 		if (!irq_ptr->output_qs[i])
 			continue;
-		available=0;
 
 		if (irq_ptr->output_qs[i]->slib)
 			kfree(irq_ptr->output_qs[i]->slib);
@@ -1285,20 +1228,12 @@ qdio_set_impl_params(struct qdio_irq *irq_ptr,
 }
 
 static int
-qdio_alloc_qs(struct qdio_irq *irq_ptr, struct ccw_device *cdev,
-	      int no_input_qs, int no_output_qs,
-	      qdio_handler_t *input_handler,
-	      qdio_handler_t *output_handler,
-	      unsigned long int_parm,int q_format,
-	      unsigned long flags,
-	      void **inbound_sbals_array,
-	      void **outbound_sbals_array)
+qdio_alloc_qs(struct qdio_irq *irq_ptr,
+	      int no_input_qs, int no_output_qs)
 {
+	int i;
 	struct qdio_q *q;
-	int i,j,result=0;
-	char dbf_text[20]; /* see qdio_initialize */
-	void *ptr;
-	int available;
+	int result=-ENOMEM;
 
 	for (i=0;i<no_input_qs;i++) {
 		q=kmalloc(sizeof(struct qdio_q),GFP_KERNEL);
@@ -1307,17 +1242,67 @@ qdio_alloc_qs(struct qdio_irq *irq_ptr, struct ccw_device *cdev,
 			QDIO_PRINT_ERR("kmalloc of q failed!\n");
 			goto out;
 		}
-		memset(q,0,sizeof(struct qdio_q));
 
-		sprintf(dbf_text,"in-q%4x",i);
-		QDIO_DBF_TEXT0(0,setup,dbf_text);
-		QDIO_DBF_HEX0(0,setup,&q,sizeof(void*));
+		memset(q,0,sizeof(struct qdio_q));
 
 		q->slib=kmalloc(PAGE_SIZE,GFP_KERNEL);
 		if (!q->slib) {
 			QDIO_PRINT_ERR("kmalloc of slib failed!\n");
 			goto out;
 		}
+
+		irq_ptr->input_qs[i]=q;
+	}
+
+	for (i=0;i<no_output_qs;i++) {
+		q=kmalloc(sizeof(struct qdio_q),GFP_KERNEL);
+
+		if (!q) {
+			goto out;
+		}
+
+		memset(q,0,sizeof(struct qdio_q));
+
+		q->slib=kmalloc(PAGE_SIZE,GFP_KERNEL);
+		if (!q->slib) {
+			QDIO_PRINT_ERR("kmalloc of slib failed!\n");
+			goto out;
+		}
+
+		irq_ptr->output_qs[i]=q;
+	}
+
+	result=0;
+out:
+	return result;
+}
+
+static void
+qdio_fill_qs(struct qdio_irq *irq_ptr, struct ccw_device *cdev,
+       	     int no_input_qs, int no_output_qs,
+	     qdio_handler_t *input_handler,
+	     qdio_handler_t *output_handler,
+	     unsigned long int_parm,int q_format,
+	     unsigned long flags,
+	     void **inbound_sbals_array,
+	     void **outbound_sbals_array)
+{
+	struct qdio_q *q;
+	int i,j;
+	char dbf_text[20]; /* see qdio_initialize */
+	void *ptr;
+	int available;
+
+	sprintf(dbf_text,"qfqs%4x",cdev->private->irq);
+	QDIO_DBF_TEXT0(0,setup,dbf_text);
+	for (i=0;i<no_input_qs;i++) {
+		q=irq_ptr->input_qs[i];
+
+		memset(q,0,((char*)&q->slib)-((char*)q));
+		sprintf(dbf_text,"in-q%4x",i);
+		QDIO_DBF_TEXT0(0,setup,dbf_text);
+		QDIO_DBF_HEX0(0,setup,&q,sizeof(void*));
+
 		memset(q->slib,0,PAGE_SIZE);
 		q->sl=(struct sl*)(((char*)q->slib)+PAGE_SIZE/2);
 
@@ -1328,7 +1313,6 @@ qdio_alloc_qs(struct qdio_irq *irq_ptr, struct ccw_device *cdev,
 
                 q->queue_type=q_format;
 		q->int_parm=int_parm;
-		irq_ptr->input_qs[i]=q;
 		q->irq=irq_ptr->irq;
 		q->irq_ptr = irq_ptr;
 		q->cdev = cdev;
@@ -1380,22 +1364,13 @@ qdio_alloc_qs(struct qdio_irq *irq_ptr, struct ccw_device *cdev,
 	}
 
 	for (i=0;i<no_output_qs;i++) {
-		q=kmalloc(sizeof(struct qdio_q),GFP_KERNEL);
-
-		if (!q) {
-			goto out;
-		}
-		memset(q,0,sizeof(struct qdio_q));
+		q=irq_ptr->output_qs[i];
+		memset(q,0,((char*)&q->slib)-((char*)q));
 
 		sprintf(dbf_text,"outq%4x",i);
 		QDIO_DBF_TEXT0(0,setup,dbf_text);
 		QDIO_DBF_HEX0(0,setup,&q,sizeof(void*));
 
-		q->slib=kmalloc(PAGE_SIZE,GFP_KERNEL);
-		if (!q->slib) {
-			QDIO_PRINT_ERR("kmalloc of slib failed!\n");
-			goto out;
-		}
 		memset(q->slib,0,PAGE_SIZE);
 		q->sl=(struct sl*)(((char*)q->slib)+PAGE_SIZE/2);
 
@@ -1406,7 +1381,6 @@ qdio_alloc_qs(struct qdio_irq *irq_ptr, struct ccw_device *cdev,
 
                 q->queue_type=q_format;
 		q->int_parm=int_parm;
-		irq_ptr->output_qs[i]=q;
 		q->is_input_q=0;
 		q->irq=irq_ptr->irq;
 		q->cdev = cdev;
@@ -1446,10 +1420,6 @@ qdio_alloc_qs(struct qdio_irq *irq_ptr, struct ccw_device *cdev,
 /*			q->sbal[j]->element[1].sbalf.i1.key=QDIO_STORAGE_KEY;*/
 		}
 	}
-
-	result=1;
-out:
-	return result;
 }
 
 static void
@@ -1645,7 +1615,6 @@ qdio_timeout_handler(struct ccw_device *cdev)
 	}
 	ccw_device_set_timeout(cdev, 0);
 	wake_up(&cdev->private->wait_q);
-
 }
 
 static void
@@ -1703,7 +1672,6 @@ qdio_handler(struct ccw_device *cdev, unsigned long intparm, struct irb *irb)
 
 	switch (irq_ptr->state) {
 	case QDIO_IRQ_STATE_INACTIVE:
-		/* FIXME: defer this past interrupt time */
 		qdio_establish_handle_irq(cdev, cstat, dstat);
 		break;
 
@@ -2128,8 +2096,12 @@ qdio_shutdown(struct ccw_device *cdev, int how)
 	for (i=0;i<irq_ptr->no_input_qs;i++) {
 		qdio_unmark_q(irq_ptr->input_qs[i]);
 		tasklet_kill(&irq_ptr->input_qs[i]->tasklet);
-		if (qdio_wait_for_no_use_count(&irq_ptr->input_qs[i]->
-					       use_count))
+		wait_event_interruptible_timeout(cdev->private->wait_q,
+						 !atomic_read(&irq_ptr->
+							      input_qs[i]->
+							      use_count),
+						 QDIO_NO_USE_COUNT_TIMEOUT*HZ);
+		if (atomic_read(&irq_ptr->input_qs[i]->use_count))
 			/*
 			 * FIXME:
 			 * nobody cares about such retval,
@@ -2142,8 +2114,12 @@ qdio_shutdown(struct ccw_device *cdev, int how)
 
 	for (i=0;i<irq_ptr->no_output_qs;i++) {
 		tasklet_kill(&irq_ptr->output_qs[i]->tasklet);
-		if (qdio_wait_for_no_use_count(&irq_ptr->output_qs[i]->
-					       use_count))
+		wait_event_interruptible_timeout(cdev->private->wait_q,
+						 !atomic_read(&irq_ptr->
+							      output_qs[i]->
+							      use_count),
+						 QDIO_NO_USE_COUNT_TIMEOUT*HZ);
+		if (atomic_read(&irq_ptr->output_qs[i]->use_count))
 			/*
 			 * FIXME:
 			 * nobody cares about such retval,
@@ -2176,16 +2152,7 @@ qdio_shutdown(struct ccw_device *cdev, int how)
 	wait_event(cdev->private->wait_q,
 		   irq_ptr->state == QDIO_IRQ_STATE_INACTIVE ||
 		   irq_ptr->state == QDIO_IRQ_STATE_ERR);
-	/* Ignore errors. */
-	qdio_set_state(irq_ptr, QDIO_IRQ_STATE_INACTIVE);
-out:
-	up(&irq_ptr->setting_up_sema);
-	return result;
-}
 
-static inline void
-qdio_cleanup_finish(struct ccw_device *cdev, struct qdio_irq *irq_ptr)
-{
 	if (irq_ptr->is_thinint_irq) {
 		qdio_put_indicator((__u32*)irq_ptr->dev_st_chg_ind);
 		tiqdio_set_subchannel_ind(irq_ptr,1); 
@@ -2196,8 +2163,12 @@ qdio_cleanup_finish(struct ccw_device *cdev, struct qdio_irq *irq_ptr)
  	if ((void*)cdev->handler == (void*)qdio_handler)
  		cdev->handler=irq_ptr->original_int_handler;
 
-	qdio_set_state(irq_ptr,QDIO_IRQ_STATE_INACTIVE);
-
+	/* Ignore errors. */
+	qdio_set_state(irq_ptr, QDIO_IRQ_STATE_INACTIVE);
+	ccw_device_set_timeout(cdev, 0);
+out:
+	up(&irq_ptr->setting_up_sema);
+	return result;
 }
 
 int
@@ -2216,10 +2187,6 @@ qdio_free(struct ccw_device *cdev)
 	QDIO_DBF_TEXT1(0,trace,dbf_text);
 	QDIO_DBF_TEXT0(0,setup,dbf_text);
 
-	if (cdev->private->state != DEV_STATE_ONLINE)
-		return -EINVAL;
-
-	qdio_cleanup_finish(cdev, irq_ptr);
 	cdev->private->qdio_data = 0;
 
 	up(&irq_ptr->setting_up_sema);
@@ -2234,9 +2201,6 @@ qdio_allocate_do_dbf(struct qdio_initialize *init_data)
 {
 	char dbf_text[20]; /* if a printf would print out more than 8 chars */
 
-	sprintf(dbf_text,"qalc%4x",init_data->cdev->private->irq);
-	QDIO_DBF_TEXT0(0,setup,dbf_text);
-	QDIO_DBF_TEXT0(0,trace,dbf_text);
 	sprintf(dbf_text,"qfmt:%x",init_data->q_format);
 	QDIO_DBF_TEXT0(0,setup,dbf_text);
 	QDIO_DBF_TEXT0(0,setup,init_data->adapter_name);
@@ -2409,6 +2373,8 @@ qdio_establish_handle_irq(struct ccw_device *cdev, int cstat, int dstat)
 	struct qdio_irq *irq_ptr;
 	char dbf_text[15];
 
+	irq_ptr = cdev->private->qdio_data;
+
 	sprintf(dbf_text,"qehi%4x",cdev->private->irq);
 	QDIO_DBF_TEXT0(0,setup,dbf_text);
 	QDIO_DBF_TEXT0(0,trace,dbf_text);
@@ -2417,28 +2383,6 @@ qdio_establish_handle_irq(struct ccw_device *cdev, int cstat, int dstat)
 		ccw_device_set_timeout(cdev, 0);
 		return;
 	}
-
-	irq_ptr = cdev->private->qdio_data;
-
-	if (MACHINE_IS_VM)
-		irq_ptr->qdioac=qdio_check_siga_needs(irq_ptr->irq);
-	else
-                irq_ptr->qdioac=CHSC_FLAG_SIGA_INPUT_NECESSARY
-                        | CHSC_FLAG_SIGA_OUTPUT_NECESSARY;
-
-	sprintf(dbf_text,"qdioac%2x",irq_ptr->qdioac);
-	QDIO_DBF_TEXT2(0,setup,dbf_text);
-
-	sprintf(dbf_text,"qib ac%2x",irq_ptr->qib.ac);
-	QDIO_DBF_TEXT2(0,setup,dbf_text);
-
-	irq_ptr->hydra_gives_outbound_pcis=
-		irq_ptr->qib.ac&QIB_AC_OUTBOUND_PCI_SUPPORTED;
-	irq_ptr->sync_done_on_outb_pcis=
-		irq_ptr->qdioac&CHSC_FLAG_SIGA_SYNC_DONE_ON_OUTB_PCIS;
-
-	qdio_initialize_set_siga_flags_input(irq_ptr);
-	qdio_initialize_set_siga_flags_output(irq_ptr);
 
 	qdio_set_state(irq_ptr,QDIO_IRQ_STATE_ESTABLISHED);
 	ccw_device_set_timeout(cdev, 0);
@@ -2456,7 +2400,7 @@ qdio_initialize(struct qdio_initialize *init_data)
 
 	rc = qdio_allocate(init_data);
 	if (rc == 0) {
-		rc = qdio_establish(init_data->cdev);
+		rc = qdio_establish(init_data);
 		if (rc != 0)
 			qdio_free(init_data->cdev);
 	}
@@ -2468,13 +2412,12 @@ qdio_initialize(struct qdio_initialize *init_data)
 int
 qdio_allocate(struct qdio_initialize *init_data)
 {
-	int i;
 	struct qdio_irq *irq_ptr;
-	struct ciw *ciw;
-	int result;
-	int is_iqdio;
 	char dbf_text[15];
 
+	sprintf(dbf_text,"qalc%4x",init_data->cdev->private->irq);
+	QDIO_DBF_TEXT0(0,setup,dbf_text);
+	QDIO_DBF_TEXT0(0,trace,dbf_text);
 	if ( (init_data->no_input_qs>QDIO_MAX_QUEUES_PER_IRQ) ||
 	     (init_data->no_output_qs>QDIO_MAX_QUEUES_PER_IRQ) ||
 	     ((init_data->no_input_qs) && (!init_data->input_handler)) ||
@@ -2501,7 +2444,8 @@ qdio_allocate(struct qdio_initialize *init_data)
 	}
 
 	memset(irq_ptr,0,sizeof(struct qdio_irq));
-        /* wipes qib.ac, required by ar7063 */
+
+	init_MUTEX(&irq_ptr->setting_up_sema);
 
 	irq_ptr->qdr=kmalloc(sizeof(struct qdr), GFP_KERNEL | GFP_DMA);
   	if (!(irq_ptr->qdr)) {
@@ -2510,9 +2454,37 @@ qdio_allocate(struct qdio_initialize *init_data)
     		QDIO_PRINT_ERR("kmalloc of irq_ptr->qdr failed!\n");
 		return -ENOMEM;
        	}
-	memset(irq_ptr->qdr,0,sizeof(struct qdr));
 	QDIO_DBF_TEXT0(0,setup,"qdr:");
 	QDIO_DBF_HEX0(0,setup,&irq_ptr->qdr,sizeof(void*));
+
+	if (qdio_alloc_qs(irq_ptr,
+       			  init_data->no_input_qs,
+			  init_data->no_output_qs)) {
+		qdio_release_irq_memory(irq_ptr);
+		return -ENOMEM;
+	}
+
+	init_data->cdev->private->qdio_data = irq_ptr;
+
+	qdio_set_state(irq_ptr,QDIO_IRQ_STATE_INACTIVE);
+
+	return 0;
+}
+
+int qdio_fill_irq(struct qdio_initialize *init_data)
+{
+	int i;
+	char dbf_text[15];
+	struct ciw *ciw;
+	int is_iqdio;
+	struct qdio_irq *irq_ptr;
+
+	irq_ptr = init_data->cdev->private->qdio_data;
+
+	memset(irq_ptr,0,((char*)&irq_ptr->qdr)-((char*)irq_ptr));
+
+        /* wipes qib.ac, required by ar7063 */
+	memset(irq_ptr->qdr,0,sizeof(struct qdr));
 
 	irq_ptr->int_parm=init_data->int_parm;
 
@@ -2548,29 +2520,20 @@ qdio_allocate(struct qdio_initialize *init_data)
 	irq_ptr->aqueue.cmd=DEFAULT_ACTIVATE_QS_CMD;
 	irq_ptr->aqueue.count=DEFAULT_ACTIVATE_QS_COUNT;
 
-	if (!qdio_alloc_qs(irq_ptr, init_data->cdev,
-			   init_data->no_input_qs,
-			   init_data->no_output_qs,
-			   init_data->input_handler,
-			   init_data->output_handler,init_data->int_parm,
-			   init_data->q_format,init_data->flags,
-			   init_data->input_sbal_addr_array,
-			   init_data->output_sbal_addr_array)) {
-		qdio_release_irq_memory(irq_ptr);
-		return -ENOMEM;
-	}
-
-	qdio_set_state(irq_ptr,QDIO_IRQ_STATE_INACTIVE);
+	qdio_fill_qs(irq_ptr, init_data->cdev,
+		     init_data->no_input_qs,
+		     init_data->no_output_qs,
+		     init_data->input_handler,
+		     init_data->output_handler,init_data->int_parm,
+		     init_data->q_format,init_data->flags,
+	   	     init_data->input_sbal_addr_array,
+   		     init_data->output_sbal_addr_array);
 
 	if (!try_module_get(THIS_MODULE)) {
 		QDIO_PRINT_CRIT("try_module_get() failed!\n");
 		qdio_release_irq_memory(irq_ptr);
 		return -EINVAL;
 	}
-
-	init_MUTEX_LOCKED(&irq_ptr->setting_up_sema);
-
-	init_data->cdev->private->qdio_data = irq_ptr;
 
 	qdio_fill_thresholds(irq_ptr,init_data->no_input_qs,
 			     init_data->no_output_qs,
@@ -2636,31 +2599,21 @@ qdio_allocate(struct qdio_initialize *init_data)
 	irq_ptr->original_int_handler = init_data->cdev->handler;
 	init_data->cdev->handler = qdio_handler;
 
-	/* the thinint CHSC stuff */
-	if (irq_ptr->is_thinint_irq) {
-
-		result = tiqdio_set_subchannel_ind(irq_ptr,0);
-		if (result) {
-			up(&irq_ptr->setting_up_sema);
-			qdio_cleanup(init_data->cdev, QDIO_FLAG_CLEANUP_USING_CLEAR);
-			return result;
-		}
-		tiqdio_set_delay_target(irq_ptr,TIQDIO_DELAY_TARGET);
-	}
-
 	up(&irq_ptr->setting_up_sema);
 
 	return 0;
 }
 
 int
-qdio_establish(struct ccw_device *cdev)
+qdio_establish(struct qdio_initialize *init_data)
 {
 	struct qdio_irq *irq_ptr;
 	unsigned long saveflags;
 	int result, result2;
+	struct ccw_device *cdev;
 	char dbf_text[20];
 
+	cdev=init_data->cdev;
 	irq_ptr = cdev->private->qdio_data;
 	if (!irq_ptr)
 		return -EINVAL;
@@ -2669,6 +2622,20 @@ qdio_establish(struct ccw_device *cdev)
 		return -EINVAL;
 	
 	down(&irq_ptr->setting_up_sema);
+
+	qdio_fill_irq(init_data);
+
+	/* the thinint CHSC stuff */
+	if (irq_ptr->is_thinint_irq) {
+
+		result = tiqdio_set_subchannel_ind(irq_ptr,0);
+		if (result) {
+			up(&irq_ptr->setting_up_sema);
+			qdio_cleanup(cdev, QDIO_FLAG_CLEANUP_USING_CLEAR);
+			return result;
+		}
+		tiqdio_set_delay_target(irq_ptr,TIQDIO_DELAY_TARGET);
+	}
 
 	sprintf(dbf_text,"qest%4x",cdev->private->irq);
 	QDIO_DBF_TEXT0(0,setup,dbf_text);
@@ -2723,6 +2690,26 @@ qdio_establish(struct ccw_device *cdev)
 		qdio_shutdown(cdev, QDIO_FLAG_CLEANUP_USING_CLEAR);
 		result = -EIO;
 	}
+
+	if (MACHINE_IS_VM)
+		irq_ptr->qdioac=qdio_check_siga_needs(irq_ptr->irq);
+	else
+                irq_ptr->qdioac=CHSC_FLAG_SIGA_INPUT_NECESSARY
+                        | CHSC_FLAG_SIGA_OUTPUT_NECESSARY;
+
+	sprintf(dbf_text,"qdioac%2x",irq_ptr->qdioac);
+	QDIO_DBF_TEXT2(0,setup,dbf_text);
+
+	sprintf(dbf_text,"qib ac%2x",irq_ptr->qib.ac);
+	QDIO_DBF_TEXT2(0,setup,dbf_text);
+
+	irq_ptr->hydra_gives_outbound_pcis=
+		irq_ptr->qib.ac&QIB_AC_OUTBOUND_PCI_SUPPORTED;
+	irq_ptr->sync_done_on_outb_pcis=
+		irq_ptr->qdioac&CHSC_FLAG_SIGA_SYNC_DONE_ON_OUTB_PCIS;
+
+	qdio_initialize_set_siga_flags_input(irq_ptr);
+	qdio_initialize_set_siga_flags_output(irq_ptr);
 
 	up(&irq_ptr->setting_up_sema);
 
@@ -2806,10 +2793,23 @@ qdio_activate(struct ccw_device *cdev, int flags)
 		}
 	}
 
-	qdio_wait_nonbusy(QDIO_ACTIVATE_TIMEOUT);
+	wait_event_interruptible_timeout(cdev->private->wait_q,
+					 ((irq_ptr->state ==
+					  QDIO_IRQ_STATE_STOPPED) ||
+					  (irq_ptr->state ==
+					   QDIO_IRQ_STATE_ERR)),
+					 (QDIO_ACTIVATE_TIMEOUT>>10)*HZ);
 
-	qdio_set_state(irq_ptr, QDIO_IRQ_STATE_ACTIVE);
-
+	switch (irq_ptr->state) {
+	case QDIO_IRQ_STATE_STOPPED:
+	case QDIO_IRQ_STATE_ERR:
+		qdio_shutdown(cdev, QDIO_FLAG_CLEANUP_USING_CLEAR);
+		result = -EIO;
+		break;
+	default:
+		qdio_set_state(irq_ptr, QDIO_IRQ_STATE_ACTIVE);
+		result = 0;
+	}
  out:
 	up(&irq_ptr->setting_up_sema);
 
@@ -2855,7 +2855,7 @@ do_qdio_handle_inbound(struct qdio_q *q, unsigned int callflags,
 	int used_elements;
 
         /* This is the inbound handling of queues */
-	used_elements=atomic_return_add(count, &q->number_of_buffers_used);
+	used_elements=atomic_add_return(count, &q->number_of_buffers_used) - count;
 	
 	qdio_do_qdio_fill_input(q,qidx,count,buffers);
 	
@@ -2897,7 +2897,7 @@ do_qdio_handle_outbound(struct qdio_q *q, unsigned int callflags,
 
 	qdio_do_qdio_fill_output(q,qidx,count,buffers);
 
-	used_elements=atomic_return_add(count, &q->number_of_buffers_used);
+	used_elements=atomic_add_return(count, &q->number_of_buffers_used) - count;
 
 	if (callflags&QDIO_FLAG_DONT_SIGA) {
 #ifdef QDIO_PERFORMANCE_STATS

@@ -6,7 +6,7 @@
 #include <linux/workqueue.h>
 #include <asm/ccwdev.h>
 
-#define VERSION_LCS_H "$Revision: 1.12 $"
+#define VERSION_LCS_H "$Revision: 1.13 $"
 
 #define LCS_DBF_TEXT(level, name, text) \
 	do { \
@@ -83,6 +83,7 @@
 #define LCS_NUM_BUFFS			8	/* needs to be power of 2 */
 #define LCS_MAC_LENGTH			6
 #define LCS_INVALID_PORT_NO		-1
+#define LCS_LANCMD_TIMEOUT_DEFAULT      5
 
 /**
  * Multicast state
@@ -263,6 +264,7 @@ struct lcs_card {
 	struct lcs_buffer *tx_buffer;
 	int tx_emitted;
 	struct list_head lancmd_waiters;
+	int lancmd_timeout;
 
 	struct work_struct kernel_thread_starter;
 	unsigned long thread_mask;

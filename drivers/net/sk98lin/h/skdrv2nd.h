@@ -2,8 +2,8 @@
  *
  * Name:	skdrv2nd.h
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.19 $
- * Date:	$Date: 2003/07/07 09:53:10 $
+ * Version:	$Revision: 1.3 $
+ * Date:	$Date: 2003/08/12 16:51:18 $
  * Purpose:	Second header file for driver and all other modules
  *
  ******************************************************************************/
@@ -26,6 +26,16 @@
  * History:
  *
  *	$Log: skdrv2nd.h,v $
+ *	Revision 1.3  2003/08/12 16:51:18  mlindner
+ *	Fix: UDP and TCP Proto checks
+ *	Fix: UDP header offset
+ *	
+ *	Revision 1.2  2003/08/07 10:50:54  mlindner
+ *	Add: Speed and HW-Csum support for Yukon Lite chipset
+ *	
+ *	Revision 1.1  2003/07/21 07:25:29  rroesler
+ *	Fix: Re-Enter after CVS crash
+ *	
  *	Revision 1.19  2003/07/07 09:53:10  rroesler
  *	Fix: Removed proprietary RxTx defines and used the ones from skgehw.h instead
  *	
@@ -315,12 +325,13 @@ struct s_IOCTL {
 #define C_OFFSET_IPHEADER               C_LEN_ETHERMAC_HEADER
 #define C_OFFSET_IPHEADER_IPPROTO       9
 #define C_OFFSET_TCPHEADER_TCPCS        16
+#define C_OFFSET_UDPHEADER_UDPCS        6
 
 #define C_OFFSET_IPPROTO                ( (C_LEN_ETHERMAC_HEADER) + \
                                           (C_OFFSET_IPHEADER_IPPROTO) )
 
-#define C_PROTO_ID_UDP                  6       /* refer to RFC 790 or Stevens'   */
-#define C_PROTO_ID_TCP                  17      /* TCP/IP illustrated for details */
+#define C_PROTO_ID_UDP                  17       /* refer to RFC 790 or Stevens'   */
+#define C_PROTO_ID_TCP                  6        /* TCP/IP illustrated for details */
 
 /* TX and RX descriptors *****************************************************/
 
@@ -390,6 +401,7 @@ struct s_TxD {
 typedef struct s_DevNet DEV_NET;
 
 struct s_DevNet {
+	struct			proc_dir_entry *proc;
 	int             PortNr;
 	int             NetNr;
 	int             Mtu;
@@ -550,6 +562,10 @@ struct s_AC  {
 	/* Only for tests */
 	int		PortUp;
 	int		PortDown;
+	int		ChipsetType;	/*  Chipset family type 
+							 *  0 == Genesis family support
+							 *  1 == Yukon family support
+							 */
 };
 
 

@@ -23,11 +23,9 @@ config DE2104X
 	  will say Y here.) Do read the Ethernet-HOWTO, available from
 	  <http://www.tldp.org/docs.html#howto>.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called de2104x.  If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt> as well
-	  as <file:Documentation/networking/net-modules.txt>.
+	  To compile this driver as a module, choose M here and read
+	  <file:Documentation/networking/net-modules.txt>.  The module will
+	  be called de2104x.
 
 config TULIP
 	tristate "DECchip Tulip (dc2114x) PCI support"
@@ -44,11 +42,9 @@ config TULIP
 	  information is contained in 
 	  <file:Documentation/networking/tulip.txt>.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called tulip.  If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt> as well
-	  as <file:Documentation/networking/net-modules.txt>.
+	  To compile this driver as a module, choose M here and read
+	  <file:Documentation/networking/net-modules.txt>.  The module will
+	  be called tulip.
 
 config TULIP_MWI
 	bool "New bus configuration (EXPERIMENTAL)"
@@ -82,11 +78,9 @@ config DE4X5
 	  information is contained in
 	  <file:Documentation/networking/de4x5.txt>.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called de4x5.  If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt> as well
-	  as <file:Documentation/networking/net-modules.txt>.
+	  To compile this driver as a module, choose M here and read
+	  <file:Documentation/networking/net-modules.txt>.  The module will
+	  be called de4x5.
 
 config WINBOND_840
 	tristate "Winbond W89c840 Ethernet support"
@@ -106,11 +100,9 @@ config DM9102
 	  (Ethernet) card, say Y.  Some information is contained in the file
 	  <file:Documentation/networking/dmfe.txt>.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called dmfe.  If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt> as well
-	  as <file:Documentation/networking/net-modules.txt>.
+	  To compile this driver as a module, choose M here and read
+	  <file:Documentation/networking/net-modules.txt>.  The module will
+	  be called dmfe.
 
 config PCMCIA_XIRCOM
 	tristate "Xircom CardBus support (new driver)"
@@ -121,11 +113,9 @@ config PCMCIA_XIRCOM
 	  as with work-alike chips from Lite-On (PNIC) and Macronix (MXIC) and
 	  ASIX.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called xircom_cb.  If you want to compile
-	  it as a module, say M here and read
-	  <file:Documentation/modules.txt>. If unsure, say N.
+	  To compile this driver as a module, choose M here and read
+	  <file:Documentation/networking/net-modules.txt>.  The module will
+	  be called xircom_cb.  If unsure, say N.
 
 config PCMCIA_XIRTULIP
 	tristate "Xircom Tulip-like CardBus support (old driver)"
@@ -136,11 +126,9 @@ config PCMCIA_XIRTULIP
 	  as with work-alike chips from Lite-On (PNIC) and Macronix (MXIC) and
 	  ASIX.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called xircom_tulip_cb.  If you want to compile
-	  it as a module, say M here and read
-	  <file:Documentation/modules.txt>. If unsure, say N.
+	  To compile this driver as a module, choose M here and read
+	  <file:Documentation/networking/net-modules.txt>.  The module will
+	  be called xircom_tulip_cb.  If unsure, say N.
 
 endmenu
 

@@ -21,6 +21,11 @@
  *
  * SAA9730 ethernet driver.
  *
+ * Changes:
+ * Angelo Dell'Aera <buffer@antifork.org> : Conversion to the new PCI API (pci_driver).
+ *                                          Conversion to spinlocks.
+ *                                          Error handling fixes.
+ *                                           
  */
 
 #include <linux/init.h>
@@ -30,6 +35,7 @@
 #include <linux/module.h>
 #include <linux/skbuff.h>
 #include <linux/pci.h>
+#include <linux/spinlock.h>
 
 #include <asm/addrspace.h>
 #include <asm/mips-boards/prom.h>
@@ -42,6 +48,15 @@ int lan_saa9730_debug = LAN_SAA9730_DEBUG;
 int lan_saa9730_debug;
 #endif
 
+#define DRV_MODULE_NAME "saa9730"
+
+static struct pci_device_id saa9730_pci_tbl[] = {
+	{ PCI_VENDOR_ID_PHILIPS, PCI_DEVICE_ID_PHILIPS_SAA9370,
+          PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ 0, }
+};
+
+MODULE_DEVICE_TABLE(pci, saa9730_pci_tbl);
 
 /* Non-zero only if the current card is a PCI with BIOS-set IRQ. */
 static unsigned int pci_irq_line;
@@ -215,6 +230,9 @@ static int lan_saa9730_allocate_buffers(struct lan_saa9730_private *lp)
 	    LAN_SAA9730_PACKET_SIZE;
 	buffer_start =
 	    (unsigned int) kmalloc(mem_size, GFP_DMA | GFP_KERNEL);
+
+	if (!buffer_start)
+		return -ENOMEM;
 
 	/* 
 	 * Set DMA buffer to kseg1 (uncached).
@@ -887,13 +905,14 @@ static int lan_saa9730_start_xmit(struct sk_buff *skb,
 		printk("Send packet: skb=%08x\n", (unsigned int) skb);
 
 	skblen = skb->len;
-	save_and_cli(flags);
+
+	spin_lock_irqsave(&lp->lock, flags);
+
 	len = (skblen <= ETH_ZLEN) ? ETH_ZLEN : skblen;
 
 	if (lan_saa9730_write(lp, skb, skblen)) {
-		restore_flags(flags);
-		printk
-		    ("Error when writing packet to controller: skb=%08x\n",
+		spin_unlock_irqrestore(&lp->lock, flags);
+		printk("Error when writing packet to controller: skb=%08x\n",
 		     (unsigned int) skb);
 		netif_stop_queue(dev);
 		return -1;
@@ -906,7 +925,7 @@ static int lan_saa9730_start_xmit(struct sk_buff *skb,
 	netif_start_queue(dev);
 	dev_kfree_skb(skb);
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&lp->lock, flags);
 
 	return 0;
 }
@@ -971,21 +990,47 @@ static void lan_saa9730_set_multicast(struct net_device *dev)
 	lan_saa9730_restart(lp);
 }
 
+
+static void __devexit saa9730_remove_one(struct pci_dev *pdev)
+{
+        struct net_device *dev = pci_get_drvdata(pdev);
+
+        if (dev) {
+		
+		if (dev->priv)
+			kfree(dev->priv);
+
+                unregister_netdev(dev);
+                free_netdev(dev);
+                pci_release_regions(pdev);
+                pci_disable_device(pdev);
+                pci_set_drvdata(pdev, NULL);
+        }
+}
+
+
 static int lan_saa9730_init(struct net_device *dev, int ioaddr, int irq)
 {
 	struct lan_saa9730_private *lp;
 	unsigned char ethernet_addr[6];
+	int ret = 0;
 
 	dev = init_etherdev(dev, 0);
 
+	if (!dev) 
+		return -ENOMEM;
+	
 	dev->open = lan_saa9730_open_fail;
-	if (get_ethernet_addr(ethernet_addr))
-		return -1;
 
+	if (get_ethernet_addr(ethernet_addr)) {
+		ret = -ENODEV;
+		goto out;
+	}
+	
 	memcpy(dev->dev_addr, ethernet_addr, 6);
 	dev->base_addr = ioaddr;
 	dev->irq = irq;
-
+	
 	/* 
 	 * Make certain the data structures used by the controller are aligned 
 	 * and DMAble. 
@@ -994,6 +1039,11 @@ static int lan_saa9730_init(struct net_device *dev, int ioaddr, int irq)
 					      kmalloc(sizeof(*lp) + 7,
 						      GFP_DMA | GFP_KERNEL)
 					      + 7) & ~7);
+
+	if (!lp) {
+		ret = -ENOMEM;
+                goto out;
+        }
 
 	dev->priv = lp;
 	memset(lp, 0, sizeof(*lp));
@@ -1007,33 +1057,35 @@ static int lan_saa9730_init(struct net_device *dev, int ioaddr, int irq)
 							 SAA9730_EVM_REGS_ADDR);
 
 	/* Allocate LAN RX/TX frame buffer space. */
-	if (lan_saa9730_allocate_buffers(lp))
-		return -1;
+	if ((ret = lan_saa9730_allocate_buffers(lp)))
+		goto out;
 
 	/* Stop LAN controller. */
-	if (lan_saa9730_stop(lp))
-		return -1;
-
+	if ((ret = lan_saa9730_stop(lp))) 
+		goto out;
+	
 	/* Initialize CAM registers. */
-	if (lan_saa9730_cam_init(dev))
-		return -1;
+	if ((ret = lan_saa9730_cam_init(dev)))
+		goto out;
 
 	/* Initialize MII registers. */
-	if (lan_saa9730_mii_init(lp))
-		return -1;
+	if ((ret = lan_saa9730_mii_init(lp)))
+		goto out;
 
 	/* Initialize control registers. */
-	if (lan_saa9730_control_init(lp))
-		return -1;
-
+	if ((ret = lan_saa9730_control_init(lp))) 
+		goto out;
+        
 	/* Load CAM registers. */
-	if (lan_saa9730_cam_load(lp))
-		return -1;
-
+	if ((ret = lan_saa9730_cam_load(lp))) 
+		goto out;
+	
 	/* Initialize DMA context registers. */
-	if (lan_saa9730_dma_init(lp))
-		return -1;
-
+	if ((ret = lan_saa9730_dma_init(lp)))
+		goto out;
+	
+	spin_lock_init(&lp->lock);
+		
 	dev->open = lan_saa9730_open;
 	dev->hard_start_xmit = lan_saa9730_start_xmit;
 	dev->stop = lan_saa9730_close;
@@ -1042,42 +1094,89 @@ static int lan_saa9730_init(struct net_device *dev, int ioaddr, int irq)
 	dev->tx_timeout = lan_saa9730_tx_timeout;
 	dev->watchdog_timeo = (HZ >> 1);
 	dev->dma = 0;
-
+	
 	return 0;
+
+ out:
+	if (dev) {
+		if (dev->priv)
+			kfree(dev->priv);
+		unregister_netdevice(dev);
+		free_netdev(dev);
+	}
+		
+	return ret;
 }
 
 
-static int __init saa9730_probe(void)
+static int __devinit saa9730_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
 	struct net_device *dev = NULL;
-	struct pci_dev *pdev = NULL;
+	unsigned int pci_ioaddr;
+	int err;
 
 	if (lan_saa9730_debug > 1)
-		printk
-		    ("saa9730.c: PCI bios is present, checking for devices...\n");
+		printk("saa9730.c: PCI bios is present, checking for devices...\n");
 
-	while ((pdev = pci_find_device(PCI_VENDOR_ID_PHILIPS,
-				       PCI_DEVICE_ID_PHILIPS_SAA9730,
-				       pdev))) {
-		unsigned int pci_ioaddr;
+	err = pci_enable_device(pdev);
+        if (err) {
+                printk(KERN_ERR "Cannot enable PCI device, aborting.\n");
+                goto out;
+        }
 
-		pci_irq_line = pdev->irq;
-		/* LAN base address in located at BAR 1. */
-
-		pci_ioaddr = pci_resource_start(pdev, 1);
-		pci_set_master(pdev);
-
-		printk("Found SAA9730 (PCI) at %#x, irq %d.\n",
-		       pci_ioaddr, pci_irq_line);
-		if (!lan_saa9730_init
-		    (dev, pci_ioaddr, pci_irq_line))
-			return 0;
-		else
-			printk("Lan init failed.\n");
+	err = pci_request_regions(pdev, DRV_MODULE_NAME);
+	if (err) {
+		printk(KERN_ERR "Cannot obtain PCI resources, aborting.\n");
+		goto out_disable_pdev;
 	}
 
-	return -ENODEV;
+	pci_irq_line = pdev->irq;
+	/* LAN base address in located at BAR 1. */
+	
+	pci_ioaddr = pci_resource_start(pdev, 1);
+	pci_set_master(pdev);
+	
+	printk("Found SAA9730 (PCI) at %#x, irq %d.\n",
+	       pci_ioaddr, pci_irq_line);
+
+	err = lan_saa9730_init(dev, pci_ioaddr, pci_irq_line);
+	if (err) {
+		printk("Lan init failed");
+		goto out_disable_pdev;
+	}
+	
+	pci_set_drvdata(pdev, dev);
+	return 0;
+	
+ out_disable_pdev:
+	pci_disable_device(pdev);
+ out:
+	pci_set_drvdata(pdev, NULL);
+	return err;
 }
 
-module_init(saa9730_probe);
+
+static struct pci_driver saa9730_driver = {
+	.name           = DRV_MODULE_NAME,
+	.id_table       = saa9730_pci_tbl,
+	.probe          = saa9730_init_one,
+	.remove         = __devexit_p(saa9730_remove_one),
+};
+
+
+static int __init saa9730_init(void)
+{
+        return pci_module_init(&saa9730_driver);
+}
+
+static void __exit saa9730_cleanup(void)
+{
+        pci_unregister_driver(&saa9730_driver);
+}
+
+module_init(saa9730_init);
+module_exit(saa9730_cleanup);
+
+
+
 MODULE_LICENSE("GPL");

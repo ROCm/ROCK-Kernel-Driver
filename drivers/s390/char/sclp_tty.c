@@ -779,7 +779,7 @@ sclp_tty_init(void)
 
 	driver->owner = THIS_MODULE;
 	driver->driver_name = "sclp_line";
-	driver->name = "ttyS";
+	driver->name = "sclp_line";
 	driver->major = TTY_MAJOR;
 	driver->minor_start = 64;
 	driver->type = TTY_DRIVER_TYPE_SYSTEM;

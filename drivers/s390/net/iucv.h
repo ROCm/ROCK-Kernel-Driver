@@ -202,6 +202,9 @@ typedef struct {
 	u32 length;
 } iucv_array_t __attribute__ ((aligned (8)));
 
+extern struct bus_type iucv_bus;
+extern struct device iucv_root;
+
 /*   -prototypes-    */
 /*                                                                
  * Name: iucv_register_program                                    

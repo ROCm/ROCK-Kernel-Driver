@@ -98,6 +98,7 @@ SECTIONS
   . = ALIGN(256);
   __initramfs_start = .;
   .init.ramfs : { *(.init.initramfs) }
+  . = ALIGN(2);
   __initramfs_end = .;
   . = ALIGN(256);
   __per_cpu_start = .;
@@ -109,6 +110,7 @@ SECTIONS
 
   __bss_start = .;		/* BSS */
   .bss : { *(.bss) }
+  . = ALIGN(2);
   __bss_stop = .;
 
   _end = . ;

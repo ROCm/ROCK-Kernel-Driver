@@ -31,6 +31,7 @@
 #include <asm/smp.h>
 #include <asm/tlbflush.h>
 #include <asm/proto.h>
+#include <asm/kdebug.h>
 
 void bust_spinlocks(int yes)
 {

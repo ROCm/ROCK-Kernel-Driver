@@ -11,6 +11,7 @@ obj-$(CONFIG_TN3215) += con3215.o
 obj-$(CONFIG_SCLP) += sclp.o sclp_rw.o
 obj-$(CONFIG_SCLP_TTY) += sclp_tty.o
 obj-$(CONFIG_SCLP_CONSOLE) += sclp_con.o
+obj-$(CONFIG_SCLP_VT220_TTY) += sclp_vt220.o
 obj-$(CONFIG_SCLP_CPI) += sclp_cpi.o
 obj-$(CONFIG_TN3270) += tub3270.o
 tape-$(CONFIG_S390_TAPE_BLOCK) += tape_block.o

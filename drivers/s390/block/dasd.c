@@ -7,7 +7,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999-2001
  *
- * $Revision: 1.101 $
+ * $Revision: 1.110 $
  */
 
 #include <linux/config.h>
@@ -49,8 +49,9 @@ MODULE_LICENSE("GPL");
 /*
  * SECTION: prototypes for static functions of dasd.c
  */
-static int  dasd_setup_blkdev(struct dasd_device * device);
-static void dasd_disable_blkdev(struct dasd_device * device);
+static int  dasd_alloc_queue(struct dasd_device * device);
+static void dasd_setup_queue(struct dasd_device * device);
+static void dasd_free_queue(struct dasd_device * device);
 static void dasd_flush_request_queue(struct dasd_device *);
 static void dasd_int_handler(struct ccw_device *, unsigned long, struct irb *);
 static void dasd_flush_ccw_queue(struct dasd_device *, int);
@@ -67,10 +68,9 @@ static wait_queue_head_t dasd_init_waitq;
  * Allocate memory for a new device structure.
  */
 struct dasd_device *
-dasd_alloc_device(unsigned int devindex)
+dasd_alloc_device(void)
 {
 	struct dasd_device *device;
-	struct gendisk *gdp;
 
 	device = kmalloc(sizeof (struct dasd_device), GFP_ATOMIC);
 	if (device == NULL)
@@ -90,17 +90,6 @@ dasd_alloc_device(unsigned int devindex)
 		kfree(device);
 		return ERR_PTR(-ENOMEM);
 	}
-
-	/* Allocate gendisk structure for device. */
-	gdp = dasd_gendisk_alloc(devindex);
-	if (IS_ERR(gdp)) {
-		free_page((unsigned long) device->erp_mem);
-		free_pages((unsigned long) device->ccw_mem, 1);
-		kfree(device);
-		return (struct dasd_device *) gdp;
-	}
-	gdp->private_data = device;
-	device->gdp = gdp;
 
 	dasd_init_chunklist(&device->ccw_chunks, device->ccw_mem, PAGE_SIZE*2);
 	dasd_init_chunklist(&device->erp_chunks, device->erp_mem, PAGE_SIZE);
@@ -128,7 +117,6 @@ dasd_free_device(struct dasd_device *device)
 		kfree(device->private);
 	free_page((unsigned long) device->erp_mem);
 	free_pages((unsigned long) device->ccw_mem, 1);
-	put_disk(device->gdp);
 	kfree(device);
 }
 
@@ -138,14 +126,19 @@ dasd_free_device(struct dasd_device *device)
 static inline int
 dasd_state_new_to_known(struct dasd_device *device)
 {
+	int rc;
+
 	/*
 	 * As long as the device is not in state DASD_STATE_NEW we want to 
 	 * keep the reference count > 0.
 	 */
 	dasd_get_device(device);
 
- 	sprintf(device->gdp->devfs_name, "dasd/%04x",
-		_ccw_device_get_device_number(device->cdev));
+	rc = dasd_alloc_queue(device);
+	if (rc) {
+		dasd_put_device(device);
+		return rc;
+	}
 
 	device->state = DASD_STATE_KNOWN;
 	return 0;
@@ -161,6 +154,8 @@ dasd_state_known_to_new(struct dasd_device * device)
 	device->discipline = NULL;
 	device->state = DASD_STATE_NEW;
 
+	dasd_free_queue(device);
+
 	/* Give up reference we took in dasd_state_new_to_known. */
 	dasd_put_device(device);
 }
@@ -171,8 +166,15 @@ dasd_state_known_to_new(struct dasd_device * device)
 static inline int
 dasd_state_known_to_basic(struct dasd_device * device)
 {
+	int rc;
+
+	/* Allocate and register gendisk structure. */
+	rc = dasd_gendisk_alloc(device);
+	if (rc)
+		return rc;
+
 	/* register 'device' debug area, used for all DBF_DEV_XXX calls */
-	device->debug_area = debug_register(device->gdp->disk_name, 0, 2,
+	device->debug_area = debug_register(device->cdev->dev.bus_id, 0, 2,
 					    8 * sizeof (long));
 	debug_register_view(device->debug_area, &debug_sprintf_view);
 	debug_set_level(device->debug_area, DBF_ERR);
@@ -188,6 +190,7 @@ dasd_state_known_to_basic(struct dasd_device * device)
 static inline void
 dasd_state_basic_to_known(struct dasd_device * device)
 {
+	dasd_gendisk_free(device);
 	dasd_flush_ccw_queue(device, 1);
 	DBF_DEV_EVENT(DBF_EMERG, device, "%p debug area deleted", device);
 	if (device->debug_area != NULL) {
@@ -206,59 +209,41 @@ dasd_state_basic_to_known(struct dasd_device * device)
  * interrupt for this detection ccw uses the kernel event daemon to
  * trigger the call to dasd_change_state. All this is done in the
  * discipline code, see dasd_eckd.c.
+ * After the analysis ccw is done (do_analysis returned 0 or error)
+ * the block device is setup. Either a fake disk is added to allow
+ * formatting or a proper device request queue is created.
  */
 static inline int
-dasd_state_basic_to_accept(struct dasd_device * device)
+dasd_state_basic_to_ready(struct dasd_device * device)
 {
 	int rc;
 
 	rc = 0;
 	if (device->discipline->do_analysis != NULL)
 		rc = device->discipline->do_analysis(device);
-	if (rc == 0)
-		device->state = DASD_STATE_ACCEPT;
-	return rc;
-}
-
-/*
- * Forget everything the initial analysis found out.
- */
-static inline void
-dasd_state_accept_to_basic(struct dasd_device * device)
-{
-	device->blocks = 0;
-	device->bp_block = 0;
-	device->s2b_shift = 0;
-	device->state = DASD_STATE_BASIC;
-}
-
-/*
- * Setup block device.
- */
-static inline int
-dasd_state_accept_to_ready(struct dasd_device * device)
-{
-	int rc;
-
-	rc = dasd_setup_blkdev(device);
-	if (rc == 0) {
-		dasd_setup_partitions(device);
-		device->state = DASD_STATE_READY;
-	}
-	return rc;
+	if (rc)
+		return rc;
+	dasd_setup_queue(device);
+	device->state = DASD_STATE_READY;
+	dasd_scan_partitions(device);
+	return 0;
 }
 
 /*
  * Remove device from block device layer. Destroy dirty buffers.
+ * Forget format information. Check if the target level is basic
+ * and if it is create fake disk for formatting.
  */
 static inline void
-dasd_state_ready_to_accept(struct dasd_device * device)
+dasd_state_ready_to_basic(struct dasd_device * device)
 {
 	dasd_flush_ccw_queue(device, 0);
 	dasd_destroy_partitions(device);
 	dasd_flush_request_queue(device);
-	dasd_disable_blkdev(device);
-	device->state = DASD_STATE_ACCEPT;
+	device->blocks = 0;
+	device->bp_block = 0;
+	device->s2b_shift = 0;
+	device->state = DASD_STATE_BASIC;
 }
 
 /*
@@ -303,13 +288,8 @@ dasd_increase_state(struct dasd_device *device)
 
 	if (!rc &&
 	    device->state == DASD_STATE_BASIC &&
-	    device->target >= DASD_STATE_ACCEPT)
-		rc = dasd_state_basic_to_accept(device);
-
-	if (!rc &&
-	    device->state == DASD_STATE_ACCEPT &&
 	    device->target >= DASD_STATE_READY)
-		rc = dasd_state_accept_to_ready(device);
+		rc = dasd_state_basic_to_ready(device);
 
 	if (!rc &&
 	    device->state == DASD_STATE_READY &&
@@ -330,12 +310,8 @@ dasd_decrease_state(struct dasd_device *device)
 		dasd_state_online_to_ready(device);
 	
 	if (device->state == DASD_STATE_READY &&
-	    device->target <= DASD_STATE_ACCEPT)
-		dasd_state_ready_to_accept(device);
-	
-	if (device->state == DASD_STATE_ACCEPT && 
 	    device->target <= DASD_STATE_BASIC)
-		dasd_state_accept_to_basic(device);
+		dasd_state_ready_to_basic(device);
 	
 	if (device->state == DASD_STATE_BASIC && 
 	    device->target <= DASD_STATE_KNOWN)
@@ -363,13 +339,8 @@ dasd_change_state(struct dasd_device *device)
 		rc = dasd_increase_state(device);
 	else
 		rc = dasd_decrease_state(device);
-        if (rc && rc != -EAGAIN) {
-		if (rc != -ENODEV)
-			MESSAGE (KERN_INFO, "giving up on dasd device with "
-				 "devno %04x",
-				 _ccw_device_get_device_number(device->cdev));
+        if (rc && rc != -EAGAIN)
                 device->target = device->state;
-        }
 
 	if (device->state == device->target)
 		wake_up(&dasd_init_waitq);
@@ -406,12 +377,12 @@ dasd_kick_device(struct dasd_device *device)
 void
 dasd_set_target_state(struct dasd_device *device, int target)
 {
-	/* If we are in probeonly mode stop at DASD_STATE_ACCEPT. */
-	if (dasd_probeonly && target > DASD_STATE_ACCEPT)
-		target = DASD_STATE_ACCEPT;
+	/* If we are in probeonly mode stop at DASD_STATE_READY. */
+	if (dasd_probeonly && target > DASD_STATE_READY)
+		target = DASD_STATE_READY;
 	if (device->target != target) {
                 if (device->state == target)
-                        wake_up(&dasd_init_waitq);
+			wake_up(&dasd_init_waitq);
 		device->target = target;
 	}
 	if (device->state != device->target)
@@ -427,7 +398,6 @@ _wait_for_device(struct dasd_device *device)
 	return (device->state == device->target);
 }
 
-// FIXME: if called from dasd_devices_write discpline is not set -> oops.
 void
 dasd_enable_device(struct dasd_device *device)
 {
@@ -1153,12 +1123,12 @@ __dasd_process_blk_queue(struct dasd_device * device)
 
 	/*
 	 * We requeue request from the block device queue to the ccw
-	 * queue only in two states. In state DASD_STATE_ACCEPT the
+	 * queue only in two states. In state DASD_STATE_READY the
 	 * partition detection is done and we need to requeue requests
 	 * for that. State DASD_STATE_ONLINE is normal block device
 	 * operation.
 	 */
-	if (device->state != DASD_STATE_ACCEPT &&
+	if (device->state != DASD_STATE_READY &&
 	    device->state != DASD_STATE_ONLINE)
 		return;
 	nr_queued = 0;
@@ -1599,14 +1569,13 @@ do_dasd_request(request_queue_t * queue)
 }
 
 /*
- * Allocate request queue and initialize gendisk info for device.
+ * Allocate and initialize request queue.
  */
 static int
-dasd_setup_blkdev(struct dasd_device * device)
+dasd_alloc_queue(struct dasd_device * device)
 {
-	int max, rc;
-
-	device->request_queue = blk_init_queue(do_dasd_request, &device->request_queue_lock);
+	device->request_queue = blk_init_queue(do_dasd_request,
+					       &device->request_queue_lock);
 	if (device->request_queue == NULL)
 		return -ENOMEM;
 
@@ -1619,6 +1588,17 @@ dasd_setup_blkdev(struct dasd_device * device)
 		return rc;
 	}
 #endif
+	return 0;
+}
+
+/*
+ * Allocate and initialize request queue.
+ */
+static void
+dasd_setup_queue(struct dasd_device * device)
+{
+	int max;
+
 	blk_queue_hardsect_size(device->request_queue, device->bp_block);
 	max = device->discipline->max_blocks << device->s2b_shift;
 	blk_queue_max_sectors(device->request_queue, max);
@@ -1626,14 +1606,13 @@ dasd_setup_blkdev(struct dasd_device * device)
 	blk_queue_max_hw_segments(device->request_queue, -1L);
 	blk_queue_max_segment_size(device->request_queue, -1L);
 	blk_queue_segment_boundary(device->request_queue, -1L);
-	return 0;
 }
 
 /*
  * Deactivate and free request queue.
  */
 static void
-dasd_disable_blkdev(struct dasd_device * device)
+dasd_free_queue(struct dasd_device * device)
 {
 	if (device->request_queue) {
 		blk_cleanup_queue(device->request_queue);
@@ -1703,7 +1682,7 @@ dasd_release(struct inode *inp, struct file *filp)
 	struct gendisk *disk = inp->i_bdev->bd_disk;
 	struct dasd_device *device = disk->private_data;
 
-	if (device->state < DASD_STATE_ACCEPT) {
+	if (device->state < DASD_STATE_BASIC) {
 		DBF_DEV_EVENT(DBF_ERR, device, " %s",
 			      " Cannot release unrecognized device");
 		return -EINVAL;
@@ -1751,9 +1730,6 @@ dasd_generic_probe (struct ccw_device *cdev,
 {
 	int devno;
 	int ret = 0;
-
-	snprintf(cdev->dev.name, DEVICE_NAME_SIZE,
-		 "Direct Access Storage Device");
 
 	devno = _ccw_device_get_device_number(cdev);
 	if (dasd_autodetect
@@ -1996,20 +1972,22 @@ dasd_discipline_show(struct device *dev, char *buf)
 
 static DEVICE_ATTR(discipline, 0444, dasd_discipline_show, NULL);
 
+static struct attribute * dasd_attrs[] = {
+	//&dev_attr_dasd.attr,
+	&dev_attr_readonly.attr,
+	&dev_attr_discipline.attr,
+	&dev_attr_use_diag.attr,
+	NULL,
+};
+
+static struct attribute_group dasd_attr_group = {
+	.attrs = dasd_attrs,
+};
+
 static int
 dasd_add_sysfs_files(struct ccw_device *cdev)
 {
-	int ret;
-
-	if (/* (ret = device_create_file(&cdev->dev, &dev_attr_dasd)) || */
-	    (ret = device_create_file(&cdev->dev, &dev_attr_readonly)) ||
-	    (ret = device_create_file(&cdev->dev, &dev_attr_discipline)) ||
-	    (ret = device_create_file(&cdev->dev, &dev_attr_use_diag))) {
-		device_remove_file(&cdev->dev, &dev_attr_discipline);
-		device_remove_file(&cdev->dev, &dev_attr_readonly);
-		/* device_remove_file(&cdev->dev, &dev_attr_dasd); */
-	}
-	return ret;
+	return sysfs_create_group(&cdev->dev.kobj, &dasd_attr_group);
 }
 
 static int __init
@@ -2082,6 +2060,12 @@ EXPORT_SYMBOL(dasd_sleep_on_interruptible);
 EXPORT_SYMBOL(dasd_smalloc_request);
 EXPORT_SYMBOL(dasd_start_IO);
 EXPORT_SYMBOL(dasd_term_IO);
+
+EXPORT_SYMBOL_GPL(dasd_generic_probe);
+EXPORT_SYMBOL_GPL(dasd_generic_remove);
+EXPORT_SYMBOL_GPL(dasd_generic_set_online);
+EXPORT_SYMBOL_GPL(dasd_generic_set_offline);
+EXPORT_SYMBOL_GPL(dasd_generic_auto_online);
 
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.

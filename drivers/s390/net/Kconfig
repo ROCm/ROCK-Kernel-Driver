@@ -49,18 +49,16 @@ config QETH
 comment "Gigabit Ethernet default settings"
 	depends on QETH
 
-# FIXME IPV6=m && QETH=y
 config QETH_IPV6
 	bool "IPv6 support for gigabit ethernet"
-	depends on QETH && IPV6
+	depends on (QETH = IPV6) || (QETH && IPV6 = 'y')
 	help
 	  If CONFIG_QETH is switched on, this option will include IPv6
 	  support in the qeth device driver.
-
-# FIXME VLAN_8021Q=m && QETH=y
+	
 config QETH_VLAN
 	bool "VLAN support for gigabit ethernet"
-	depends on QETH && VLAN_8021Q
+	depends on (QETH = VLAN_8021Q) || (QETH && VLAN_8021Q = 'y')
 	help
 	  If CONFIG_QETH is switched on, this option will include IEEE
 	  802.1q VLAN support in the qeth device driver.
@@ -76,8 +74,6 @@ config QETH_PERF_STATS
 
 config CCWGROUP
  	tristate
- 	depends on LCS || CTC  || QETH
-	default m if LCS!=y && CTC!=y && QETH!=y
-	default y if LCS=y || CTC=y || QETH=y
+	default (LCS || CTC || QETH)
 
 endmenu

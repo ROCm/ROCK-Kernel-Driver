@@ -1,5 +1,5 @@
 /* 
- * $Id: iucv.c,v 1.11 2003/04/15 16:45:37 aberg Exp $
+ * $Id: iucv.c,v 1.14 2003/09/23 16:48:17 mschwide Exp $
  *
  * IUCV network driver
  *
@@ -29,11 +29,12 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: IUCV lowlevel driver $Revision: 1.11 $
+ * RELEASE-TAG: IUCV lowlevel driver $Revision: 1.14 $
  *
  */
 
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/config.h>
 
 #include <linux/spinlock.h>
@@ -43,6 +44,7 @@
 #include <linux/interrupt.h>
 #include <linux/list.h>
 #include <linux/errno.h>
+#include <linux/device.h>
 #include <asm/atomic.h>
 #include "iucv.h"
 #include <asm/io.h>
@@ -70,6 +72,21 @@
 #define IPFGMID         0x04
 #define IPANSLST        0x08
 #define IPBUFLST        0x40
+
+static int
+iucv_bus_match (struct device *dev, struct device_driver *drv)
+{
+	return 0;
+}
+
+struct bus_type iucv_bus = {
+	.name = "iucv",
+	.match = iucv_bus_match,
+};	
+
+struct device iucv_root = {
+	.bus_id = "iucv",
+};
 
 /* General IUCV interrupt structure */
 typedef struct {
@@ -283,7 +300,7 @@ MODULE_LICENSE("GPL");
 #ifdef DEBUG
 static int debuglevel = 0;
 
-MODULE_PARM(debuglevel, "i");
+module_param(debuglevel, int, 0);
 MODULE_PARM_DESC(debuglevel,
  "Specifies the debug level (0=off ... 3=all)");
 
@@ -332,7 +349,7 @@ do { \
 static void
 iucv_banner(void)
 {
-	char vbuf[] = "$Revision: 1.11 $";
+	char vbuf[] = "$Revision: 1.14 $";
 	char *version = vbuf;
 
 	if ((version = strchr(version, ':'))) {
@@ -353,8 +370,23 @@ iucv_banner(void)
 static int
 iucv_init(void)
 {
+	int ret;
+
 	if (iucv_external_int_buffer)
 		return 0;
+
+	ret = bus_register(&iucv_bus);
+	if (ret != 0) {
+		printk(KERN_ERR "IUCV: failed to register bus.\n");
+		return ret;
+	}
+
+	ret = device_register(&iucv_root);
+	if (ret != 0) {
+		printk(KERN_ERR "IUCV: failed to register iucv root.\n");
+		bus_unregister(&iucv_bus);
+		return ret;
+	}
 
 	/* Note: GFP_DMA used used to get memory below 2G */
 	iucv_external_int_buffer = kmalloc(sizeof(iucv_GeneralInterrupt),
@@ -401,6 +433,8 @@ iucv_exit(void)
 		kfree(iucv_external_int_buffer);
 	if (iucv_param_pool)
 		kfree(iucv_param_pool);
+	device_unregister(&iucv_root);
+	bus_unregister(&iucv_bus);
 	printk(KERN_INFO "IUCV lowlevel driver unloaded\n");
 }
 
@@ -528,9 +562,8 @@ b2f0(__u32 code, void *parm)
  *	   - ENOMEM - storage allocation for a new pathid table failed
 */
 static int
-iucv_add_pathid(__u16 pathid, handler *handler)
+__iucv_add_pathid(__u16 pathid, handler *handler)
 {
-	ulong flags;
 
 	iucv_debug(1, "entering");
 
@@ -539,20 +572,29 @@ iucv_add_pathid(__u16 pathid, handler *handler)
 	if (pathid > (max_connections - 1))
 		return -EINVAL;
 
-	spin_lock_irqsave (&iucv_lock, flags);
 	if (iucv_pathid_table[pathid]) {
-		spin_unlock_irqrestore (&iucv_lock, flags);
 		iucv_debug(1, "pathid entry is %p", iucv_pathid_table[pathid]);
 		printk(KERN_WARNING
 		       "%s: Pathid being used, error.\n", __FUNCTION__);
 		return -EINVAL;
 	}
 	iucv_pathid_table[pathid] = handler;
-	spin_unlock_irqrestore (&iucv_lock, flags);
 
 	iucv_debug(1, "exiting");
 	return 0;
 }				/* end of add_pathid function */
+
+static int
+iucv_add_pathid(__u16 pathid, handler *handler)
+{
+	ulong flags;
+	int rc;
+
+	spin_lock_irqsave (&iucv_lock, flags);
+	rc = __iucv_add_pathid(pathid, handler);
+	spin_unlock_irqrestore (&iucv_lock, flags);
+	return rc;
+}
 
 static void
 iucv_remove_pathid(__u16 pathid)
@@ -1090,15 +1132,18 @@ iucv_connect (__u16 *pathid, __u16 msglim_reqstd,
 		EBC_TOUPPER(parm->iptarget, sizeof(parm->iptarget));
 	}
 
+	spin_lock_irqsave (&iucv_lock, flags);
 	parm->ipflags1 = (__u8)flags1;
 	b2f0_result = b2f0(CONNECT, parm);
+	if (b2f0_result == 0)
+		add_pathid_result = __iucv_add_pathid(parm->ippathid, h);
+	spin_unlock_irqrestore (&iucv_lock, flags);
 
 	if (b2f0_result) {
 		release_param(parm);
 		return b2f0_result;
 	}
 
-	add_pathid_result = iucv_add_pathid(parm->ippathid, h);
 	*pathid = parm->ippathid;
 
 	if (msglim)
@@ -2171,8 +2216,6 @@ iucv_irq_handler(struct pt_regs *regs, __u16 code)
 {
 	iucv_irqdata *irqdata;
 
-	irq_enter();
-
 	irqdata = kmalloc(sizeof(iucv_irqdata), GFP_ATOMIC);
 	if (!irqdata) {
 		printk(KERN_WARNING "%s: out of memory\n", __FUNCTION__);
@@ -2188,9 +2231,6 @@ iucv_irq_handler(struct pt_regs *regs, __u16 code)
 	spin_unlock(&iucv_irq_queue_lock);
 
 	tasklet_schedule(&iucv_tasklet);
-
-	irq_exit();
-	return;
 }
 
 /**
@@ -2407,6 +2447,8 @@ module_exit(iucv_exit);
  * 	  using them or should some of them be made
  * 	  static / removed? pls review. Arnd
  */
+EXPORT_SYMBOL (iucv_bus);
+EXPORT_SYMBOL (iucv_root);
 EXPORT_SYMBOL (iucv_accept);
 EXPORT_SYMBOL (iucv_connect);
 #if 0

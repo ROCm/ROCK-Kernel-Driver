@@ -30,6 +30,7 @@
 #include <linux/config.h>
 #include <asm/setup.h>
 #include <asm/lowcore.h>
+#include <asm/offsets.h>
 
 #ifndef CONFIG_IPL
         .org   0
@@ -642,6 +643,8 @@ _stext:	basr  %r13,0                    # get base
 # Setup stack
 #
 	larl  %r15,init_thread_union
+	lg    %r14,__TI_task(%r15)      # cache current in lowcore
+	stg   %r14,__LC_CURRENT
         aghi  %r15,16384                # init_task_union + 16384
         stg   %r15,__LC_KERNEL_STACK    # set end of kernel stack
         aghi  %r15,-160

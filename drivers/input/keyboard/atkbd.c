@@ -10,6 +10,13 @@
  * the Free Software Foundation.
  */
 
+/*
+ * This driver can handle standard AT keyboards and PS/2 keyboards in
+ * Translated and Raw Set 2 and Set 3, as well as AT keyboards on dumb
+ * input-only controllers and AT keyboards connected over a one way RS232
+ * converter.
+ */
+
 #include <linux/delay.h>
 #include <linux/module.h>
 #include <linux/slab.h>
@@ -24,6 +31,7 @@ MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
 MODULE_DESCRIPTION("AT and PS/2 keyboard driver");
 MODULE_PARM(atkbd_set, "1i");
 MODULE_PARM(atkbd_reset, "1i");
+MODULE_PARM(atkbd_softrepeat, "1i");
 MODULE_LICENSE("GPL");
 
 static int atkbd_set = 2;
@@ -32,6 +40,7 @@ static int atkbd_reset;
 #else
 static int atkbd_reset = 1;
 #endif
+static int atkbd_softrepeat;
 
 /*
  * Scancode to keycode tables. These are just the default setting, and
@@ -47,19 +56,19 @@ static unsigned char atkbd_set2_keycode[512] = {
 	122, 89, 40,120, 26, 13,  0,  0, 58, 54, 28, 27,  0, 43,  0,  0,
 	 85, 86, 90, 91, 92, 93, 14, 94, 95, 79,183, 75, 71,121,  0,123,
 	 82, 83, 80, 76, 77, 72,  1, 69, 87, 78, 81, 74, 55, 73, 70, 99,
-	252,  0,  0, 65, 99,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-	  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-	  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,251,  0,  0,  0,  0,  0,
+	  0,  0,  0, 65, 99,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
 	  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
 	  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
 	  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-	252,253,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-	254,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,255,
+	  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+	  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+	  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+	  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,255,
 	  0,  0, 92, 90, 85,  0,137,  0,  0,  0,  0, 91, 89,144,115,  0,
 	217,100,255,  0, 97,165,164,  0,156,  0,  0,140,115,  0,  0,125,
 	173,114,  0,113,152,163,151,126,128,166,  0,140,  0,147,  0,127,
 	159,167,115,160,164,  0,  0,116,158,  0,150,166,  0,  0,  0,142,
-	157,  0,114,166,168,  0,  0,  0,155,  0, 98,113,  0,163,  0,138,
+	157,  0,114,166,168,  0,  0,213,155,  0, 98,113,  0,163,  0,138,
 	226,  0,  0,  0,  0,  0,153,140,  0,255, 96,  0,  0,  0,143,  0,
 	133,  0,116,  0,143,  0,174,133,  0,107,  0,105,102,  0,  0,112,
 	110,111,108,112,106,103,  0,119,  0,118,109,  0, 99,104,119
@@ -76,12 +85,23 @@ static unsigned char atkbd_set3_keycode[512] = {
 	 82, 83, 80, 76, 77, 72, 69, 98,  0, 96, 81,  0, 78, 73, 55, 85,
 	 89, 90, 91, 92, 74,185,184,182,  0,  0,  0,125,126,127,112,  0,
 	  0,139,150,163,165,115,152,150,166,140,160,154,113,114,167,168,
-	148,149,147,140,  0,  0,  0,  0,  0,  0,251,  0,  0,  0,  0,  0,
+	148,149,147,140,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
 	  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
 	  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
 	  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-	252,253,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-	254,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,255
+	  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+	  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,255
+};
+
+static unsigned char atkbd_unxlate_table[128] = {
+	  0,118, 22, 30, 38, 37, 46, 54, 61, 62, 70, 69, 78, 85,102, 13,
+	 21, 29, 36, 45, 44, 53, 60, 67, 68, 77, 84, 91, 90, 20, 28, 27,
+	 35, 43, 52, 51, 59, 66, 75, 76, 82, 14, 18, 93, 26, 34, 33, 42,
+	 50, 49, 58, 65, 73, 74, 89,124, 17, 41, 88,  5,  6,  4, 12,  3,
+	 11,  2, 10,  1,  9,119,126,108,117,125,123,107,115,116,121,105,
+	114,122,112,113,127, 96, 97,120,  7, 15, 23, 31, 39, 47, 55, 63,
+	 71, 79, 86, 94,  8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 87,111,
+	 19, 25, 57, 81, 83, 92, 95, 98, 99,100,101,103,104,106,109,110
 };
 
 #define ATKBD_CMD_SETLEDS	0x10ed
@@ -99,12 +119,13 @@ static unsigned char atkbd_set3_keycode[512] = {
 
 #define ATKBD_RET_ACK		0xfa
 #define ATKBD_RET_NAK		0xfe
+#define ATKBD_RET_BAT		0xaa
+#define ATKBD_RET_EMUL0		0xe0
+#define ATKBD_RET_EMULX		0x80
+#define ATKBD_RET_EMUL1		0xe1
+#define ATKBD_RET_RELEASE	0xf0
 
 #define ATKBD_KEY_UNKNOWN	  0
-#define ATKBD_KEY_BAT		251
-#define ATKBD_KEY_EMUL0		252
-#define ATKBD_KEY_EMUL1		253
-#define ATKBD_KEY_RELEASE	254
 #define ATKBD_KEY_NULL		255
 
 /*
@@ -127,7 +148,11 @@ struct atkbd {
 	unsigned char emul;
 	unsigned short id;
 	unsigned char write;
+	unsigned char translated;
 	unsigned char resend;
+	unsigned char bat_xl;
+	unsigned int last;
+	unsigned long time;
 };
 
 /*
@@ -139,7 +164,8 @@ static irqreturn_t atkbd_interrupt(struct serio *serio, unsigned char data,
 			unsigned int flags, struct pt_regs *regs)
 {
 	struct atkbd *atkbd = serio->private;
-	int code = data;
+	unsigned int code = data;
+	int value;
 
 #ifdef ATKBD_DEBUG
 	printk(KERN_DEBUG "atkbd.c: Received %02x flags %02x\n", data, flags);
@@ -153,9 +179,37 @@ static irqreturn_t atkbd_interrupt(struct serio *serio, unsigned char data,
 		goto out;
 	}
 	
-	if (!flags)
+	if (!flags && data == ATKBD_RET_ACK)
 		atkbd->resend = 0;
 #endif
+
+	if (atkbd->translated) do {
+
+		if (atkbd->emul != 1) {
+			if (code == ATKBD_RET_EMUL0 || code == ATKBD_RET_EMUL1 ||
+			    code == ATKBD_RET_ACK || code == ATKBD_RET_NAK)
+				break;
+			if (code == ATKBD_RET_BAT) {
+				if (!atkbd->bat_xl)
+					break;
+				atkbd->bat_xl = 0;
+			}
+			if (code == (ATKBD_RET_BAT & 0x7f))
+				atkbd->bat_xl = 1;
+		}
+
+		if (code < 0x80) {
+			code = atkbd_unxlate_table[code];
+			break;
+		}
+
+		if (atkbd->cmdcnt)
+			break;
+
+		code = atkbd_unxlate_table[code & 0x7f];
+		atkbd->release = 1;
+
+	} while (0);
 
 	switch (code) {
 		case ATKBD_RET_ACK:
@@ -171,17 +225,17 @@ static irqreturn_t atkbd_interrupt(struct serio *serio, unsigned char data,
 		goto out;
 	}
 
-	switch (atkbd->keycode[code]) {
-		case ATKBD_KEY_BAT:
+	switch (code) {
+		case ATKBD_RET_BAT:
 			serio_rescan(atkbd->serio);
 			goto out;
-		case ATKBD_KEY_EMUL0:
+		case ATKBD_RET_EMUL0:
 			atkbd->emul = 1;
 			goto out;
-		case ATKBD_KEY_EMUL1:
+		case ATKBD_RET_EMUL1:
 			atkbd->emul = 2;
 			goto out;
-		case ATKBD_KEY_RELEASE:
+		case ATKBD_RET_RELEASE:
 			atkbd->release = 1;
 			goto out;
 	}
@@ -196,34 +250,37 @@ static irqreturn_t atkbd_interrupt(struct serio *serio, unsigned char data,
 		case ATKBD_KEY_NULL:
 			break;
 		case ATKBD_KEY_UNKNOWN:
-			printk(KERN_WARNING "atkbd.c: Unknown key (set %d, scancode %#x, on %s) %s.\n",
-				atkbd->set, code, serio->phys, atkbd->release ? "released" : "pressed");
+			printk(KERN_WARNING "atkbd.c: Unknown key %s (%s set %d, code %#x, data %#x, on %s).\n",
+				atkbd->release ? "released" : "pressed",
+				atkbd->translated ? "translated" : "raw", 
+				atkbd->set, code, data, serio->phys);
 			break;
 		default:
-#if 0
-			if (!atkbd->release) {
-				mod_timer(&atkbd->timer,
-					jiffies + (test_bit(atkbd->keycode[code],
-						atkbd->dev.key) ? HZ/33 : HZ/4) + HZ/100);
-				atkbd->lastkey = atkbd->keycode[code];
+			value = atkbd->release ? 0 :
+				(1 + (!atkbd_softrepeat && test_bit(atkbd->keycode[code], atkbd->dev.key)));
+
+			switch (value) { 	/* Workaround Toshiba laptop multiple keypress */
+				case 0:
+					atkbd->last = 0;
+					break;
+				case 1:
+					atkbd->last = code;
+					atkbd->time = jiffies + (atkbd->dev.rep[REP_DELAY] * HZ + 500) / 1000 / 2;
+					break;
+				case 2:
+					if (!time_after(jiffies, atkbd->time) && atkbd->last == code)
+						value = 1;
+					break;
 			}
-#endif
 
 			input_regs(&atkbd->dev, regs);
-			input_report_key(&atkbd->dev, atkbd->keycode[code], !atkbd->release);
+			input_event(&atkbd->dev, EV_KEY, atkbd->keycode[code], value);
 			input_sync(&atkbd->dev);
 	}
 
 	atkbd->release = 0;
 out:
 	return IRQ_HANDLED;
-}
-
-static void atkbd_force_key_up(unsigned long data)
-{
-	struct atkbd *atkbd = (void *) data;
-	input_report_key(&atkbd->dev, atkbd->lastkey, 0);
-	input_sync(&atkbd->dev);
 }
 
 /*
@@ -312,7 +369,12 @@ static int atkbd_command(struct atkbd *atkbd, unsigned char *param, int command)
 static int atkbd_event(struct input_dev *dev, unsigned int type, unsigned int code, int value)
 {
 	struct atkbd *atkbd = dev->private;
+	struct { int p; u8 v; } period[] =	
+		{ {30, 0x00}, {25, 0x02}, {20, 0x04}, {15, 0x08}, {10, 0x0c}, {7, 0x10}, {5, 0x14}, {0, 0x14} };
+	struct { int d; u8 v; } delay[] =
+        	{ {1000, 0x60}, {750, 0x40}, {500, 0x20}, {250, 0x00}, {0, 0x00} };
 	char param[2];
+	int i, j;
 
 	if (!atkbd->write)
 		return -1;
@@ -335,6 +397,21 @@ static int atkbd_event(struct input_dev *dev, unsigned int type, unsigned int co
 				         | (test_bit(LED_MUTE,    dev->led) ? 0x20 : 0);
 				atkbd_command(atkbd, param, ATKBD_CMD_EX_SETLEDS);
 			}
+
+			return 0;
+
+
+		case EV_REP:
+
+			if (atkbd_softrepeat) return 0;
+
+			i = j = 0;
+			while (period[i].p > dev->rep[REP_PERIOD]) i++;
+			while (delay[j].d > dev->rep[REP_DELAY]) j++;
+			dev->rep[REP_PERIOD] = period[i].p;
+			dev->rep[REP_DELAY] = delay[j].d;
+			param[0] = period[i].v | delay[j].v;
+			atkbd_command(atkbd, param, ATKBD_CMD_SETREP);
 
 			return 0;
 	}
@@ -405,6 +482,9 @@ static int atkbd_set_3(struct atkbd *atkbd)
  * IBM RapidAccess / IBM EzButton / Chicony KBP-8993 keyboards.
  */
 
+	if (atkbd->translated)
+		return 2;
+
 	if (atkbd->id == 0xaca1) {
 		param[0] = 3;
 		atkbd_command(atkbd, param, ATKBD_CMD_SSCANSET);
@@ -434,8 +514,11 @@ static int atkbd_set_3(struct atkbd *atkbd)
 	if (atkbd_command(atkbd, param, ATKBD_CMD_GSCANSET))
 		return 2;
 
-	if (param[0] != 3)
+	if (param[0] != 3) {
+		param[0] = 2;
+		if (atkbd_command(atkbd, param, ATKBD_CMD_SSCANSET))
 		return 2;
+	}
 
 	return 3;
 }
@@ -508,25 +591,35 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 	struct atkbd *atkbd;
 	int i;
 
-	if ((serio->type & SERIO_TYPE) != SERIO_8042 &&
-		(((serio->type & SERIO_TYPE) != SERIO_RS232) || (serio->type & SERIO_PROTO) != SERIO_PS2SER))
-		        return;
-
 	if (!(atkbd = kmalloc(sizeof(struct atkbd), GFP_KERNEL)))
 		return;
-
 	memset(atkbd, 0, sizeof(struct atkbd));
 
-	if ((serio->type & SERIO_TYPE) == SERIO_8042 && serio->write)
-		atkbd->write = 1;
+	switch (serio->type & SERIO_TYPE) {
 
+		case SERIO_8042_XL: 
+			atkbd->translated = 1;
+		case SERIO_8042:
+			if (serio->write)
+				atkbd->write = 1;
+			break;
+		case SERIO_RS232:
+			if ((serio->type & SERIO_PROTO) == SERIO_PS2SER)
+				break;
+		default:
+			kfree(atkbd);
+			return;
+	}
+			
 	if (atkbd->write) {
 		atkbd->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_LED) | BIT(EV_REP);
 		atkbd->dev.ledbit[0] = BIT(LED_NUML) | BIT(LED_CAPSL) | BIT(LED_SCROLLL);
 	} else  atkbd->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_REP);
 
-	atkbd->dev.rep[REP_DELAY] = HZ/4 + HZ/50;
-	atkbd->dev.rep[REP_PERIOD] = HZ/33;
+	if (!atkbd_softrepeat) {
+		atkbd->dev.rep[REP_DELAY] = 250;
+		atkbd->dev.rep[REP_PERIOD] = 33;
+	}
 
 	atkbd->serio = serio;
 
@@ -539,10 +632,6 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 	atkbd->dev.private = atkbd;
 
 	serio->private = atkbd;
-
-	init_timer(&atkbd->timer);
-	atkbd->timer.data = (long) atkbd;
-	atkbd->timer.function = atkbd_force_key_up;
 
 	if (serio_open(serio, dev)) {
 		kfree(atkbd);
@@ -569,7 +658,8 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 		atkbd->dev.ledbit[0] |= BIT(LED_COMPOSE) | BIT(LED_SUSPEND) | BIT(LED_SLEEP) | BIT(LED_MUTE) | BIT(LED_MISC);
 		sprintf(atkbd->name, "AT Set 2 Extended keyboard");
 	} else
-		sprintf(atkbd->name, "AT Set %d keyboard", atkbd->set);
+		sprintf(atkbd->name, "AT %s Set %d keyboard",
+			atkbd->translated ? "Translated" : "Raw", atkbd->set);
 
 	sprintf(atkbd->phys, "%s/input0", serio->phys);
 
@@ -586,7 +676,7 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 	atkbd->dev.id.version = atkbd->id;
 
 	for (i = 0; i < 512; i++)
-		if (atkbd->keycode[i] && atkbd->keycode[i] <= 250)
+		if (atkbd->keycode[i] && atkbd->keycode[i] < 255)
 			set_bit(atkbd->keycode[i], atkbd->dev.keybit);
 
 	input_register_device(&atkbd->dev);
