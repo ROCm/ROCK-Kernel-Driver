@@ -1207,6 +1207,13 @@ W:	http://linuxppc64.org
 L:	linuxppc64-dev@lists.linuxppc.org
 S:	Supported
 
+LINUX SECURITY MODULE (LSM) FRAMEWORK
+P:	Chris Wright
+M:	chrisw@osdl.org
+L:	linux-security-module@wirex.com
+W:	http://lsm.immunix.org
+S:	Supported
+
 LOGICAL DISK MANAGER SUPPORT (LDM, Windows 2000/XP Dynamic Disks)
 P:	Richard Russon (FlatCap)
 M:	ldm@flatcap.org
