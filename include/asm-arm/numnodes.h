@@ -10,7 +10,10 @@
 #ifndef __ASM_ARM_NUMNODES_H
 #define __ASM_ARM_NUMNODES_H
 
-/* Max 4 Nodes */
-#define NODES_SHIFT	2
+#ifdef CONFIG_ARCH_LH7A40X
+# define NODES_SHIFT	4	/* Max 16 nodes for the Sharp CPUs */
+#else
+# define NODES_SHIFT	2	/* Normally, Max 4 Nodes */
+#endif
 
 #endif
