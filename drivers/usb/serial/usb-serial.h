@@ -121,7 +121,9 @@ struct usb_serial_port {
 	int			open_count;
 	struct semaphore	sem;
 	void *			private;
+	struct device		dev;
 };
+#define to_usb_serial_port(d) container_of(d, struct usb_serial_port, dev)
 
 /**
  * usb_serial - structure used by the usb-serial core for a device
@@ -206,12 +208,16 @@ struct usb_serial_device_type {
 	char	num_ports;
 
 	struct list_head	driver_list;
-	
+	struct device_driver	driver;
+
 	int (*probe) (struct usb_serial *serial);
 	int (*attach) (struct usb_serial *serial);
 	int (*calc_num_ports) (struct usb_serial *serial);
 
 	void (*shutdown) (struct usb_serial *serial);
+
+	int (*port_probe) (struct usb_serial_port *port);
+	int (*port_remove) (struct usb_serial_port *port);
 
 	/* serial function calls */
 	int  (*open)		(struct usb_serial_port *port, struct file * filp);
@@ -229,6 +235,7 @@ struct usb_serial_device_type {
 	void (*read_bulk_callback)(struct urb *urb, struct pt_regs *regs);
 	void (*write_bulk_callback)(struct urb *urb, struct pt_regs *regs);
 };
+#define to_usb_serial_driver(d) container_of(d, struct usb_serial_device_type, driver)
 
 extern int  usb_serial_register(struct usb_serial_device_type *new_device);
 extern void usb_serial_deregister(struct usb_serial_device_type *device);
@@ -262,7 +269,12 @@ extern void usb_serial_generic_shutdown (struct usb_serial *serial);
 extern int usb_serial_generic_register (int debug);
 extern void usb_serial_generic_deregister (void);
 
+extern int usb_serial_bus_register (struct usb_serial_device_type *device);
+extern void usb_serial_bus_deregister (struct usb_serial_device_type *device);
+
 extern struct usb_serial_device_type usb_serial_generic_device;
+extern struct bus_type usb_serial_bus_type;
+extern struct tty_driver usb_serial_tty_driver;
 
 /* Inline functions to check the sanity of a pointer that is passed to us */
 static inline int serial_paranoia_check (struct usb_serial *serial, const char *function)

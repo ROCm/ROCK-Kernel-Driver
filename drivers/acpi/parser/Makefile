@@ -6,5 +6,3 @@ obj-y := psargs.o    psparse.o  pstree.o   pswalk.o  \
 	 psopcode.o  psscope.o  psutils.o  psxface.o
 
 EXTRA_CFLAGS += $(ACPI_CFLAGS)
-
-include $(TOPDIR)/Rules.make

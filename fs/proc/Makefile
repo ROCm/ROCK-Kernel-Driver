@@ -12,5 +12,3 @@ proc-objs    := inode.o root.o base.o generic.o array.o \
 ifeq ($(CONFIG_PROC_DEVICETREE),y)
 proc-objs    += proc_devtree.o
 endif
-
-include $(TOPDIR)/Rules.make

@@ -8,6 +8,3 @@ obj-$(CONFIG_USB_AUDIO)		+= audio.o
 obj-$(CONFIG_USB_BLUETOOTH_TTY)	+= bluetty.o
 obj-$(CONFIG_USB_MIDI)		+= usb-midi.o
 obj-$(CONFIG_USB_PRINTER)	+= usblp.o
-
-
-include $(TOPDIR)/Rules.make

@@ -3,6 +3,3 @@
 #
 
 obj-y		:= config.o 147ints.o
-
-include $(TOPDIR)/Rules.make
-

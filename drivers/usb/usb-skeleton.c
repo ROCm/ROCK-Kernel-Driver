@@ -1,5 +1,5 @@
 /*
- * USB Skeleton driver - 0.8
+ * USB Skeleton driver - 0.9
  *
  * Copyright (c) 2001-2002 Greg Kroah-Hartman (greg@kroah.com)
  *
@@ -17,10 +17,10 @@
  *
  * TODO:
  *	- fix urb->status race condition in write sequence
- *	- move minor_table to a dynamic list.
  *
  * History:
  *
+ * 2002_12_12 - 0.9 - compile fixes and got rid of fixed minor array.
  * 2002_09_26 - 0.8 - changes due to USB core conversion to struct device
  *			driver.
  * 2002_02_12 - 0.7 - zero out dev in probe function for devices that do
@@ -83,18 +83,10 @@ MODULE_DEVICE_TABLE (usb, skel_table);
 
 
 #ifdef CONFIG_USB_DYNAMIC_MINORS
-/* 
- * if the user wants to use dynamic minor numbers, then we can have up to 256
- * devices
- */
 #define USB_SKEL_MINOR_BASE	0
-#define MAX_DEVICES		256
 #else
 /* Get a minor range for your devices from the usb maintainer */
 #define USB_SKEL_MINOR_BASE	200
-
-/* we can have up to this number of device plugged in at once */
-#define MAX_DEVICES		16
 #endif
 
 /* Structure to hold all of our device specific stuff */
@@ -117,8 +109,8 @@ struct usb_skel {
 	struct urb *		write_urb;		/* the urb used to send data */
 	__u8			bulk_out_endpointAddr;	/* the address of the bulk out endpoint */
 
-	struct work_struct			work;			/* work queue entry for line discipline waking up */
-	int			open_count;		/* number of times this port has been opened */
+	struct work_struct	work;			/* work queue entry for line discipline waking up */
+	int			open;			/* if the port is open or not */
 	struct semaphore	sem;			/* locks this structure */
 };
 
@@ -138,13 +130,6 @@ static int skel_probe		(struct usb_interface *intf, const struct usb_device_id *
 static void skel_disconnect	(struct usb_interface *intf);
 
 static void skel_write_bulk_callback	(struct urb *urb, struct pt_regs *regs);
-
-
-/* array of pointers to our devices that are currently connected */
-static struct usb_skel		*minor_table[MAX_DEVICES];
-
-/* lock to protect the minor_table structure */
-static DECLARE_MUTEX (minor_table_mutex);
 
 /*
  * File operations needed when we register this driver.
@@ -218,7 +203,6 @@ static inline void usb_skel_debug_data (const char *function, int size, const un
  */
 static inline void skel_delete (struct usb_skel *dev)
 {
-	minor_table[dev->minor] = NULL;
 	if (dev->bulk_in_buffer != NULL)
 		kfree (dev->bulk_in_buffer);
 	if (dev->bulk_out_buffer != NULL)
@@ -235,41 +219,31 @@ static inline void skel_delete (struct usb_skel *dev)
 static int skel_open (struct inode *inode, struct file *file)
 {
 	struct usb_skel *dev = NULL;
+	struct usb_interface *interface;
 	int subminor;
 	int retval = 0;
 	
-	dbg(__FUNCTION__);
+	dbg("%s", __FUNCTION__);
 
-	subminor = MINOR (inode->i_rdev) - USB_SKEL_MINOR_BASE;
-	if ((subminor < 0) ||
-	    (subminor >= MAX_DEVICES)) {
+	subminor = minor (inode->i_rdev);
+
+	interface = usb_find_interface (&skel_driver,
+					mk_kdev(USB_MAJOR, subminor));
+	if (!interface) {
+		err ("%s - error, can't find device for minor %d",
+		     __FUNCTION__, subminor);
 		return -ENODEV;
 	}
-
-	/* Increment our usage count for the module.
-	 * This is redundant here, because "struct file_operations"
-	 * has an "owner" field. This line is included here soley as
-	 * a reference for drivers using lesser structures... ;-)
-	 */
-	MOD_INC_USE_COUNT;
-
-	/* lock our minor table and get our local data for this minor */
-	down (&minor_table_mutex);
-	dev = minor_table[subminor];
-	if (dev == NULL) {
-		up (&minor_table_mutex);
-		MOD_DEC_USE_COUNT;
+			
+	dev = dev_get_drvdata (&interface->dev);
+	if (!dev)
 		return -ENODEV;
-	}
 
 	/* lock this device */
 	down (&dev->sem);
 
-	/* unlock the minor table */
-	up (&minor_table_mutex);
-
 	/* increment our usage count for the driver */
-	++dev->open_count;
+	++dev->open;
 
 	/* save our object in the file's private structure */
 	file->private_data = dev;
@@ -291,20 +265,17 @@ static int skel_release (struct inode *inode, struct file *file)
 
 	dev = (struct usb_skel *)file->private_data;
 	if (dev == NULL) {
-		dbg (__FUNCTION__ " - object is NULL");
+		dbg ("%s - object is NULL", __FUNCTION__);
 		return -ENODEV;
 	}
 
-	dbg(__FUNCTION__ " - minor %d", dev->minor);
-
-	/* lock our minor table */
-	down (&minor_table_mutex);
+	dbg("%s - minor %d", __FUNCTION__, dev->minor);
 
 	/* lock our device */
 	down (&dev->sem);
 
-	if (dev->open_count <= 0) {
-		dbg (__FUNCTION__ " - device not opened");
+	if (dev->open <= 0) {
+		dbg ("%s - device not opened", __FUNCTION__);
 		retval = -ENODEV;
 		goto exit_not_opened;
 	}
@@ -313,25 +284,16 @@ static int skel_release (struct inode *inode, struct file *file)
 		/* the device was unplugged before the file was released */
 		up (&dev->sem);
 		skel_delete (dev);
-		up (&minor_table_mutex);
-		MOD_DEC_USE_COUNT;
 		return 0;
 	}
 
-	/* decrement our usage count for the device */
-	--dev->open_count;
-	if (dev->open_count <= 0) {
-		/* shutdown any bulk writes that might be going on */
-		usb_unlink_urb (dev->write_urb);
-		dev->open_count = 0;
-	}
+	/* shutdown any bulk writes that might be going on */
+	usb_unlink_urb (dev->write_urb);
 
-	/* decrement our usage count for the module */
-	MOD_DEC_USE_COUNT;
+	dev->open = 0;
 
 exit_not_opened:
 	up (&dev->sem);
-	up (&minor_table_mutex);
 
 	return retval;
 }
@@ -347,7 +309,7 @@ static ssize_t skel_read (struct file *file, char *buffer, size_t count, loff_t 
 
 	dev = (struct usb_skel *)file->private_data;
 	
-	dbg(__FUNCTION__ " - minor %d, count = %d", dev->minor, count);
+	dbg("%s - minor %d, count = %d", __FUNCTION__, dev->minor, count);
 
 	/* lock this object */
 	down (&dev->sem);
@@ -390,7 +352,7 @@ static ssize_t skel_write (struct file *file, const char *buffer, size_t count, 
 
 	dev = (struct usb_skel *)file->private_data;
 
-	dbg(__FUNCTION__ " - minor %d, count = %d", dev->minor, count);
+	dbg("%s - minor %d, count = %d", __FUNCTION__, dev->minor, count);
 
 	/* lock this object */
 	down (&dev->sem);
@@ -403,13 +365,13 @@ static ssize_t skel_write (struct file *file, const char *buffer, size_t count, 
 
 	/* verify that we actually have some data to write */
 	if (count == 0) {
-		dbg(__FUNCTION__ " - write request of 0 bytes");
+		dbg("%s - write request of 0 bytes", __FUNCTION__);
 		goto exit;
 	}
 
 	/* see if we are already in the middle of a write */
 	if (dev->write_urb->status == -EINPROGRESS) {
-		dbg (__FUNCTION__ " - already writing");
+		dbg ("%s - already writing", __FUNCTION__);
 		goto exit;
 	}
 
@@ -438,8 +400,8 @@ static ssize_t skel_write (struct file *file, const char *buffer, size_t count, 
 	 unless a spinlock is held */
 	retval = usb_submit_urb(dev->write_urb, GFP_KERNEL);
 	if (retval) {
-		err(__FUNCTION__ " - failed submitting write urb, error %d",
-		    retval);
+		err("%s - failed submitting write urb, error %d",
+		    __FUNCTION__, retval);
 	} else {
 		retval = bytes_written;
 	}
@@ -470,7 +432,7 @@ static int skel_ioctl (struct inode *inode, struct file *file, unsigned int cmd,
 		return -ENODEV;
 	}
 
-	dbg(__FUNCTION__ " - minor %d, cmd 0x%.4x, arg %ld", 
+	dbg("%s - minor %d, cmd 0x%.4x, arg %ld", __FUNCTION__,
 	    dev->minor, cmd, arg);
 
 
@@ -491,12 +453,12 @@ static void skel_write_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_skel *dev = (struct usb_skel *)urb->context;
 
-	dbg(__FUNCTION__ " - minor %d", dev->minor);
+	dbg("%s - minor %d", __FUNCTION__, dev->minor);
 
 	if ((urb->status != -ENOENT) && 
 	    (urb->status != -ECONNRESET)) {
-		dbg(__FUNCTION__ " - nonzero write bulk status received: %d",
-		    urb->status);
+		dbg("%s - nonzero write bulk status received: %d",
+		    __FUNCTION__, urb->status);
 		return;
 	}
 
@@ -514,7 +476,7 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 {
 	struct usb_device *udev = interface_to_usbdev(interface);
 	struct usb_skel *dev = NULL;
-	struct usb_interface_descriptor *iface_desc;
+	struct usb_host_interface *iface_desc;
 	struct usb_endpoint_descriptor *endpoint;
 	int minor;
 	int buffer_size;
@@ -529,7 +491,6 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 		return -ENODEV;
 	}
 
-	down (&minor_table_mutex);
 	retval = usb_register_dev (&skel_fops, USB_SKEL_MINOR_BASE, 1, &minor);
 	if (retval) {
 		/* something prevented us from registering this driver */
@@ -544,7 +505,6 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 		goto exit_minor;
 	}
 	memset (dev, 0x00, sizeof (*dev));
-	minor_table[minor] = dev;
 
 	init_MUTEX (&dev->sem);
 	dev->udev = udev;
@@ -554,7 +514,7 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 	/* set up the endpoint information */
 	/* check out the endpoints */
 	iface_desc = &interface->altsetting[0];
-	for (i = 0; i < iface_desc->bNumEndpoints; ++i) {
+	for (i = 0; i < iface_desc->desc.bNumEndpoints; ++i) {
 		endpoint = &iface_desc->endpoint[i].desc;
 
 		if ((endpoint->bEndpointAddress & 0x80) &&
@@ -600,13 +560,17 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 	
 	dev->devfs = devfs_register (usb_devfs_handle, name,
 				     DEVFS_FL_DEFAULT, USB_MAJOR,
-				     USB_SKEL_MINOR_BASE + dev->minor,
+				     dev->minor,
 				     S_IFCHR | S_IRUSR | S_IWUSR | 
 				     S_IRGRP | S_IWGRP | S_IROTH, 
 				     &skel_fops, NULL);
 
 	/* let the user know what node this device is now attached to */
 	info ("USB Skeleton device now attached to USBSkel%d", dev->minor);
+
+	/* add device id so the device works when advertised */
+	interface->kdev = mk_kdev(USB_MAJOR, dev->minor);
+
 	goto exit;
 	
 error:
@@ -617,7 +581,6 @@ exit_minor:
 	usb_deregister_dev (1, minor);
 
 exit:
-	up (&minor_table_mutex);
 	if (dev) {
 		dev_set_drvdata (&interface->dev, dev);
 		return 0;
@@ -642,9 +605,11 @@ static void skel_disconnect(struct usb_interface *interface)
 	if (!dev)
 		return;
 
-	down (&minor_table_mutex);
 	down (&dev->sem);
 		
+	/* remove device id to disable open() */
+	interface->kdev = NODEV;
+
 	minor = dev->minor;
 
 	/* remove our devfs node */
@@ -654,7 +619,7 @@ static void skel_disconnect(struct usb_interface *interface)
 	usb_deregister_dev (1, minor);
 	
 	/* if the device is not opened, then we clean up right now */
-	if (!dev->open_count) {
+	if (!dev->open) {
 		up (&dev->sem);
 		skel_delete (dev);
 	} else {
@@ -663,7 +628,6 @@ static void skel_disconnect(struct usb_interface *interface)
 	}
 
 	info("USB Skeleton #%d now disconnected", minor);
-	up (&minor_table_mutex);
 }
 
 

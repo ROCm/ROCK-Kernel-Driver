@@ -4,8 +4,8 @@
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 
-#include <linux/intermezzo_fs.h>
-#include <linux/intermezzo_kml.h>
+#include "intermezzo_fs.h"
+#include "intermezzo_kml.h"
 
 
 // dlogit -- oppsite to logit ()

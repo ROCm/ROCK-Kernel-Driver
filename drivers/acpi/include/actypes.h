@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: actypes.h - Common data types for the entire ACPI subsystem
- *       $Revision: 242 $
+ *       $Revision: 244 $
  *
  *****************************************************************************/
 
@@ -629,7 +629,7 @@ typedef union acpi_obj
 	{
 		acpi_object_type            type;
 		u32                         length;     /* # of bytes in string, excluding trailing null */
-		NATIVE_CHAR                 *pointer;   /* points to the string value */
+		char                        *pointer;   /* points to the string value */
 	} string;
 
 	struct
@@ -835,8 +835,8 @@ typedef struct
 	ACPI_COMMON_OBJ_INFO;
 
 	u32                         valid;              /*  Are the next bits legit? */
-	NATIVE_CHAR                 hardware_id[9];     /*  _HID value if any */
-	NATIVE_CHAR                 unique_id[9];       /*  _UID value if any */
+	char                        hardware_id[9];     /*  _HID value if any */
+	char                        unique_id[9];       /*  _UID value if any */
 	acpi_integer                address;            /*  _ADR value if any */
 	u32                         current_status;     /*  _STA value */
 } acpi_device_info;
@@ -1070,7 +1070,7 @@ typedef struct
 {
 	u32                         index;
 	u32                         string_length;
-	NATIVE_CHAR                 *string_ptr;
+	char                        *string_ptr;
 
 } acpi_resource_source;
 
@@ -1209,7 +1209,7 @@ typedef struct acpi_pci_routing_table
 	u32                         pin;
 	acpi_integer                address;        /* here for 64-bit alignment */
 	u32                         source_index;
-	NATIVE_CHAR                 source[4];      /* pad to 64 bits so sizeof() works in all cases */
+	char                        source[4];      /* pad to 64 bits so sizeof() works in all cases */
 
 } acpi_pci_routing_table;
 

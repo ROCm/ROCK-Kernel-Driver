@@ -282,8 +282,8 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 				; /* try to free the page below */
 			}
 		}
-		pte_chain_unlock(page);
 #endif /* CONFIG_SWAP */
+		pte_chain_unlock(page);
 
 		/*
 		 * If the page is dirty, only perform writeback if that write
@@ -309,7 +309,7 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 				goto keep_locked;
 			if (!mapping)
 				goto keep_locked;
-			if (mapping->a_ops->writepage == fail_writepage)
+			if (mapping->a_ops->writepage == NULL)
 				goto activate_locked;
 			if (!may_enter_fs)
 				goto keep_locked;
@@ -319,22 +319,26 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 				goto keep_locked;
 			if (test_clear_page_dirty(page)) {
 				int res;
+				struct writeback_control wbc = {
+					.sync_mode = WB_SYNC_NONE,
+					.nr_to_write = SWAP_CLUSTER_MAX,
+					.nonblocking = 1,
+					.for_reclaim = 1,
+				};
 
 				write_lock(&mapping->page_lock);
 				list_move(&page->list, &mapping->locked_pages);
 				write_unlock(&mapping->page_lock);
 
 				SetPageReclaim(page);
-				res = mapping->a_ops->writepage(page);
+				res = mapping->a_ops->writepage(page, &wbc);
 
-				if (res == -EAGAIN) {
+				if (res == WRITEPAGE_ACTIVATE) {
 					ClearPageReclaim(page);
-					__set_page_dirty_nobuffers(page);
-				} else if (!PageWriteback(page)) {
-					/*
-					 * synchronous writeout or broken
-					 * a_ops?
-					 */
+					goto activate_locked;
+				}
+				if (!PageWriteback(page)) {
+					/* synchronous write or broken a_ops? */
 					ClearPageReclaim(page);
 				}
 				goto keep;
@@ -799,7 +803,7 @@ try_to_free_pages(struct zone *classzone,
 	const int nr_pages = SWAP_CLUSTER_MAX;
 	int nr_reclaimed = 0;
 
-	inc_page_state(pageoutrun);
+	inc_page_state(allocstall);
 
 	for (priority = DEF_PRIORITY; priority >= 0; priority--) {
 		int total_scanned = 0;
@@ -811,8 +815,6 @@ try_to_free_pages(struct zone *classzone,
 					nr_pages, &ps);
 		if (nr_reclaimed >= nr_pages)
 			return 1;
-		if (total_scanned == 0)
-			printk("%s: I am buggy\n", __FUNCTION__);
 		if (!(gfp_mask & __GFP_FS))
 			break;		/* Let the caller handle it */
 		/*
@@ -854,6 +856,8 @@ static int balance_pgdat(pg_data_t *pgdat, int nr_pages, struct page_state *ps)
 	int to_free = nr_pages;
 	int priority;
 	int i;
+
+	inc_page_state(pageoutrun);
 
 	for (priority = DEF_PRIORITY; priority; priority--) {
 		int all_zones_ok = 1;

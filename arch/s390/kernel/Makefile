@@ -17,5 +17,3 @@ obj-$(CONFIG_SMP)		+= smp.o
 # Kernel debugging
 #
 obj-$(CONFIG_REMOTE_DEBUG)	+= gdb-stub.o #gdb-low.o 
-
-include $(TOPDIR)/Rules.make

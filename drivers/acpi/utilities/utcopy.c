@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utcopy - Internal to external object translation utilities
- *              $Revision: 107 $
+ *              $Revision: 109 $
  *
  *****************************************************************************/
 
@@ -87,7 +87,7 @@ acpi_ut_copy_isimple_to_esimple (
 	switch (ACPI_GET_OBJECT_TYPE (internal_object)) {
 	case ACPI_TYPE_STRING:
 
-		external_object->string.pointer = (NATIVE_CHAR *) data_space;
+		external_object->string.pointer = (char *) data_space;
 		external_object->string.length = internal_object->string.length;
 		*buffer_space_used = ACPI_ROUND_UP_TO_NATIVE_WORD ((ACPI_SIZE) internal_object->string.length + 1);
 

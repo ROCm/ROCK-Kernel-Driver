@@ -3,5 +3,3 @@
 #
 
 obj-y		:= ksyms.o config.o ints.o time.o reboot.o
-
-include $(TOPDIR)/Rules.make

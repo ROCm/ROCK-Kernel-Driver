@@ -207,22 +207,22 @@
 #else
 #define MEGARAID \
   {\
-    name:	    	"MegaRAID",		/* Driver Name			*/\
-    proc_info:		megaraid_proc_info,     /* /proc driver info		*/\
-    detect:		megaraid_detect,	/* Detect Host Adapter		*/\
-    release:	  	megaraid_release,	/* Release Host Adapter		*/\
-    info:	     	megaraid_info,	   	/* Driver Info Function		*/\
-    command:	  	megaraid_command,	/* Command Function		*/\
-    queuecommand:  	megaraid_queue,		/* Queue Command Function	*/\
-    bios_param:     	megaraid_biosparam, 	/* Disk BIOS Parameters		*/\
-    can_queue:		MAX_COMMANDS,	    	/* Can Queue			*/\
-    this_id:	  	7,		       	/* HBA Target ID		*/\
-    sg_tablesize:   	MAX_SGLIST,	  	/* Scatter/Gather Table Size	*/\
-    cmd_per_lun:    	MAX_CMD_PER_LUN,	/* SCSI Commands per LUN	*/\
-    present:	  	0,		       	/* Present			*/\
-    unchecked_isa_dma:	0,		       	/* Default Unchecked ISA DMA	*/\
-    use_clustering:   	ENABLE_CLUSTERING,  	/* Enable Clustering		*/\
-	highmem_io:		1,													\
+    .name	    	= "MegaRAID",		/* Driver Name			*/\
+    .proc_info		= megaraid_proc_info,     /* /proc driver info		*/\
+    .detect		= megaraid_detect,	/* Detect Host Adapter		*/\
+    .release	  	= megaraid_release,	/* Release Host Adapter		*/\
+    .info	     	= megaraid_info,	   	/* Driver Info Function		*/\
+    .command	  	= megaraid_command,	/* Command Function		*/\
+    .queuecommand  	= megaraid_queue,		/* Queue Command Function	*/\
+    .bios_param     	= megaraid_biosparam, 	/* Disk BIOS Parameters		*/\
+    .can_queue		= MAX_COMMANDS,	    	/* Can Queue			*/\
+    .this_id	  	= 7,		       	/* HBA Target ID		*/\
+    .sg_tablesize   	= MAX_SGLIST,	  	/* Scatter/Gather Table Size	*/\
+    .cmd_per_lun    	= MAX_CMD_PER_LUN,	/* SCSI Commands per LUN	*/\
+    .present	  	= 0,		       	/* Present			*/\
+    .unchecked_isa_dma	= 0,		       	/* Default Unchecked ISA DMA	*/\
+    .use_clustering   	= ENABLE_CLUSTERING,  	/* Enable Clustering		*/\
+	.highmem_io		= 1,													\
   }
 #endif
 

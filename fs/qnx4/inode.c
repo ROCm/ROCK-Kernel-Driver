@@ -424,9 +424,9 @@ static void qnx4_put_super(struct super_block *sb)
 	return;
 }
 
-static int qnx4_writepage(struct page *page)
+static int qnx4_writepage(struct page *page, struct writeback_control *wbc)
 {
-	return block_write_full_page(page,qnx4_get_block);
+	return block_write_full_page(page,qnx4_get_block, wbc);
 }
 static int qnx4_readpage(struct file *file, struct page *page)
 {

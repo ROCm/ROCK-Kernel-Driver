@@ -196,6 +196,16 @@ enum open_delegation_type4 {
 #define NFS4_MINOR_VERSION 0
 #define NFS4_DEBUG 1
 
+#ifdef __KERNEL__
+
+/* Index of predefined Linux client operations */
+
+enum {
+	NFSPROC4_CLNT_NULL = 0,		/* Unused */
+	NFSPROC4_CLNT_COMPOUND,		/* Soon to be unused */
+};
+
+#endif
 #endif
 
 /*

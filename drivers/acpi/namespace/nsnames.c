@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: nsnames - Name manipulation and search
- *              $Revision: 80 $
+ *              $Revision: 81 $
  *
  ******************************************************************************/
 
@@ -52,7 +52,7 @@ void
 acpi_ns_build_external_path (
 	acpi_namespace_node     *node,
 	ACPI_SIZE               size,
-	NATIVE_CHAR             *name_buffer)
+	char                    *name_buffer)
 {
 	ACPI_SIZE               index;
 	acpi_namespace_node     *parent_node;
@@ -118,11 +118,11 @@ acpi_ns_build_external_path (
  *
  ******************************************************************************/
 
-NATIVE_CHAR *
+char *
 acpi_ns_get_external_pathname (
 	acpi_namespace_node     *node)
 {
-	NATIVE_CHAR             *name_buffer;
+	char                    *name_buffer;
 	ACPI_SIZE               size;
 
 

@@ -46,8 +46,8 @@
 #endif
 #endif
 
-#include <linux/intermezzo_fs.h>
-#include <linux/intermezzo_psdev.h>
+#include "intermezzo_fs.h"
+#include "intermezzo_psdev.h"
 
 #if defined(CONFIG_TMPFS)
 

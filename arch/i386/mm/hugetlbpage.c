@@ -20,6 +20,8 @@
 #include <asm/tlb.h>
 #include <asm/tlbflush.h>
 
+#include <linux/sysctl.h>
+
 static long    htlbpagemem;
 int     htlbpage_max;
 static long    htlbzone_pages;
@@ -555,6 +557,53 @@ int alloc_hugetlb_pages(int key, unsigned long addr, unsigned long len, int prot
 		return alloc_shared_hugetlb_pages(key, addr, len, prot, flag);
 	return alloc_private_hugetlb_pages(key, addr, len, prot, flag);
 }
+void update_and_free_page(struct page *page)
+{
+	int j;
+	struct page *map;
+
+	map = page;
+	htlbzone_pages--;
+	for (j = 0; j < (HPAGE_SIZE / PAGE_SIZE); j++) {
+		map->flags &= ~(1 << PG_locked | 1 << PG_error | 1 << PG_referenced |
+				1 << PG_dirty | 1 << PG_active | 1 << PG_reserved |
+				1 << PG_private | 1<< PG_writeback);
+		set_page_count(map, 0);
+		map++;
+	}
+	set_page_count(page, 1);
+	__free_pages(page, HUGETLB_PAGE_ORDER);
+}
+
+int try_to_free_low(int count)
+{
+	struct list_head *p;
+	struct page *page, *map;
+
+	map = NULL;
+	spin_lock(&htlbpage_lock);
+	list_for_each(p, &htlbpage_freelist) {
+		if (map) {
+			list_del(&map->list);
+			update_and_free_page(map);
+			htlbpagemem--;
+			map = NULL;
+			if (++count == 0)
+				break;
+		}
+		page = list_entry(p, struct page, list);
+		if ((page_zone(page))->name[0] != 'H') // Look for non-Highmem
+				map = page;
+	}
+	if (map) {
+		list_del(&map->list);
+		update_and_free_page(map);
+		htlbpagemem--;
+		count++;
+	}
+	spin_unlock(&htlbpage_lock);
+	return count;
+}
 
 int set_hugetlb_mem_size(int count)
 {
@@ -568,6 +617,8 @@ int set_hugetlb_mem_size(int count)
 	else
 		lcount = count - htlbzone_pages;
 
+	if (lcount == 0)
+		return (int)htlbzone_pages;
 	if (lcount > 0) {	/* Increase the mem size. */
 		while (lcount--) {
 			page = alloc_pages(__GFP_HIGHMEM, HUGETLB_PAGE_ORDER);
@@ -587,23 +638,14 @@ int set_hugetlb_mem_size(int count)
 		return (int) htlbzone_pages;
 	}
 	/* Shrink the memory size. */
+	lcount = try_to_free_low(lcount);
 	while (lcount++) {
 		page = alloc_hugetlb_page();
 		if (page == NULL)
 			break;
 		spin_lock(&htlbpage_lock);
-		htlbzone_pages--;
+		update_and_free_page(page);
 		spin_unlock(&htlbpage_lock);
-		map = page;
-		for (j = 0; j < (HPAGE_SIZE / PAGE_SIZE); j++) {
-			map->flags &= ~(1 << PG_locked | 1 << PG_error | 1 << PG_referenced |
-					1 << PG_dirty | 1 << PG_active | 1 << PG_reserved |
-					1 << PG_private | 1<< PG_writeback);
-			set_page_count(map, 0);
-			map++;
-		}
-		set_page_count(page, 1);
-		__free_pages(page, HUGETLB_PAGE_ORDER);
 	}
 	return (int) htlbzone_pages;
 }
@@ -657,6 +699,13 @@ int hugetlb_report_meminfo(char *buf)
 			htlbzone_pages,
 			htlbpagemem,
 			HPAGE_SIZE/1024);
+}
+
+int is_hugepage_mem_enough(size_t size)
+{
+	if (size > (htlbpagemem << HPAGE_SHIFT))
+		return 0;
+	return 1;
 }
 
 static struct page * hugetlb_nopage(struct vm_area_struct * area, unsigned long address, int unused)

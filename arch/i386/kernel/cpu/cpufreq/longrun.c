@@ -121,8 +121,9 @@ static int longrun_verify_policy(struct cpufreq_policy *policy)
 		return -EINVAL;
 
 	policy->cpu = 0;
-	cpufreq_verify_within_limits(policy, 0, 
-		longrun_driver->policy[0].max_cpu_freq);
+	cpufreq_verify_within_limits(policy, 
+		longrun_driver->policy[0].cpuinfo.min_freq, 
+		longrun_driver->policy[0].cpuinfo.max_freq);
 
 	return 0;
 }
@@ -247,12 +248,13 @@ static int __init longrun_init(void)
 		kfree(driver);
 		return -EIO;
 	}
-	driver->policy[0].max_cpu_freq  = longrun_high_freq;
+	driver->policy[0].cpuinfo.min_freq = longrun_low_freq;
+	driver->policy[0].cpuinfo.max_freq = longrun_high_freq;
+	driver->policy[0].cpuinfo.transition_latency = CPUFREQ_ETERNAL;
 
 	longrun_get_policy(&driver->policy[0]);
 
 #ifdef CONFIG_CPU_FREQ_24_API
-	driver->cpu_min_freq[0] = longrun_low_freq;
 	driver->cpu_cur_freq[0] = longrun_high_freq; /* dummy value */
 #endif
 

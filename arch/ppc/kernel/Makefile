@@ -40,7 +40,5 @@ endif
 endif
 obj-$(CONFIG_PPC_ISERIES)	+= iSeries_misc.o
 
-include $(TOPDIR)/Rules.make
-
 find_name : find_name.c
 	$(HOSTCC) $(HOSTCFLAGS) -o find_name find_name.c

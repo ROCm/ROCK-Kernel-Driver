@@ -108,5 +108,3 @@ obj-$(CONFIG_LEDS) += $(led-y)
 
 # Miscelaneous functions
 obj-$(CONFIG_PM) += pm.o sleep.o
-
-include $(TOPDIR)/Rules.make

@@ -49,6 +49,8 @@ spinlock_t sb_lock = SPIN_LOCK_UNLOCKED;
 static struct super_block *alloc_super(void)
 {
 	struct super_block *s = kmalloc(sizeof(struct super_block),  GFP_USER);
+	static struct super_operations default_op;
+
 	if (s) {
 		memset(s, 0, sizeof(struct super_block));
 		if (security_sb_alloc(s)) {
@@ -72,6 +74,7 @@ static struct super_block *alloc_super(void)
 		s->s_maxbytes = MAX_NON_LFS;
 		s->dq_op = sb_dquot_ops;
 		s->s_qcop = sb_quotactl_ops;
+		s->s_op = &default_op;
 	}
 out:
 	return s;
@@ -186,12 +189,13 @@ void generic_shutdown_super(struct super_block *sb)
 		sb->s_flags &= ~MS_ACTIVE;
 		/* bad name - it should be evict_inodes() */
 		invalidate_inodes(sb);
-		if (sop) {
-			if (sop->write_super && sb->s_dirt)
-				sop->write_super(sb);
-			if (sop->put_super)
-				sop->put_super(sb);
-		}
+
+		if (sop->write_super && sb->s_dirt)
+			sop->write_super(sb);
+		if (sop->sync_fs)
+			sop->sync_fs(sb, 1);
+		if (sop->put_super)
+			sop->put_super(sb);
 
 		/* Forget any remaining inodes */
 		if (invalidate_inodes(sb)) {
@@ -267,7 +271,7 @@ static inline void write_super(struct super_block *sb)
 {
 	lock_super(sb);
 	if (sb->s_root && sb->s_dirt)
-		if (sb->s_op && sb->s_op->write_super)
+		if (sb->s_op->write_super)
 			sb->s_op->write_super(sb);
 	unlock_super(sb);
 }
@@ -293,6 +297,44 @@ restart:
 			goto restart;
 		} else
 			sb = sb_entry(sb->s_list.next);
+	spin_unlock(&sb_lock);
+}
+
+/*
+ * Call the ->sync_fs super_op against all filesytems which are r/w and
+ * which implement it.
+ */
+void sync_filesystems(int wait)
+{
+	struct super_block * sb;
+
+	spin_lock(&sb_lock);
+	for (sb = sb_entry(super_blocks.next); sb != sb_entry(&super_blocks);
+			sb = sb_entry(sb->s_list.next)) {
+		if (!sb->s_op->sync_fs);
+			continue;
+		if (sb->s_flags & MS_RDONLY)
+			continue;
+		sb->s_need_sync_fs = 1;
+	}
+	spin_unlock(&sb_lock);
+
+restart:
+	spin_lock(&sb_lock);
+	for (sb = sb_entry(super_blocks.next); sb != sb_entry(&super_blocks);
+			sb = sb_entry(sb->s_list.next)) {
+		if (!sb->s_need_sync_fs)
+			continue;
+		sb->s_need_sync_fs = 0;
+		if (sb->s_flags & MS_RDONLY)
+			continue;	/* hm.  Was remounted r/w meanwhile */
+		sb->s_count++;
+		spin_unlock(&sb_lock);
+		down_read(&sb->s_umount);
+		sb->s_op->sync_fs(sb, wait);
+		drop_super(sb);
+		goto restart;
+	}
 	spin_unlock(&sb_lock);
 }
 
@@ -396,7 +438,7 @@ int do_remount_sb(struct super_block *sb, int flags, void *data)
 	if ((flags & MS_RDONLY) && !(sb->s_flags & MS_RDONLY))
 		if (!fs_may_remount_ro(sb))
 			return -EBUSY;
-	if (sb->s_op && sb->s_op->remount_fs) {
+	if (sb->s_op->remount_fs) {
 		lock_super(sb);
 		retval = sb->s_op->remount_fs(sb, &flags, data);
 		unlock_super(sb);
@@ -463,55 +505,25 @@ struct super_block *get_sb_bdev(struct file_system_type *fs_type,
 	int flags, char *dev_name, void * data,
 	int (*fill_super)(struct super_block *, void *, int))
 {
-	struct inode *inode;
 	struct block_device *bdev;
-	struct super_block * s;
-	struct nameidata nd;
+	struct super_block *s;
 	int error = 0;
-	mode_t mode = FMODE_READ; /* we always need it ;-) */
 
-	/* What device it is? */
-	if (!dev_name || !*dev_name)
-		return ERR_PTR(-EINVAL);
-	error = path_lookup(dev_name, LOOKUP_FOLLOW, &nd);
-	if (error)
-		return ERR_PTR(error);
-	inode = nd.dentry->d_inode;
-	error = -ENOTBLK;
-	if (!S_ISBLK(inode->i_mode))
-		goto out;
-	error = -EACCES;
-	if (nd.mnt->mnt_flags & MNT_NODEV)
-		goto out;
-	error = bd_acquire(inode);
-	if (error)
-		goto out;
-	bdev = inode->i_bdev;
-	/* Done with lookups, semaphore down */
-	if (!(flags & MS_RDONLY))
-		mode |= FMODE_WRITE;
-	error = blkdev_get(bdev, mode, 0, BDEV_FS);
-	if (error)
-		goto out;
-	error = -EACCES;
-	if (!(flags & MS_RDONLY) && bdev_read_only(bdev))
-		goto out1;
-	error = bd_claim(bdev, fs_type);
-	if (error)
-		goto out1;
+	bdev = open_bdev_excl(dev_name, flags, BDEV_FS, fs_type);
+	if (IS_ERR(bdev))
+		return (struct super_block *)bdev;
 
 	s = sget(fs_type, test_bdev_super, set_bdev_super, bdev);
-	if (IS_ERR(s)) {
-		bd_release(bdev);
-		blkdev_put(bdev, BDEV_FS);
-	} else if (s->s_root) {
+	if (IS_ERR(s))
+		goto out;
+
+	if (s->s_root) {
 		if ((flags ^ s->s_flags) & MS_RDONLY) {
 			up_write(&s->s_umount);
 			deactivate_super(s);
 			s = ERR_PTR(-EBUSY);
 		}
-		bd_release(bdev);
-		blkdev_put(bdev, BDEV_FS);
+		goto out;
 	} else {
 		s->s_flags = flags;
 		strncpy(s->s_id, bdevname(bdev), sizeof(s->s_id));
@@ -525,14 +537,12 @@ struct super_block *get_sb_bdev(struct file_system_type *fs_type,
 		} else
 			s->s_flags |= MS_ACTIVE;
 	}
-	path_release(&nd);
+
 	return s;
 
-out1:
-	blkdev_put(bdev, BDEV_FS);
 out:
-	path_release(&nd);
-	return ERR_PTR(error);
+	close_bdev_excl(bdev, BDEV_FS);
+	return s;
 }
 
 void kill_block_super(struct super_block *sb)
@@ -540,8 +550,7 @@ void kill_block_super(struct super_block *sb)
 	struct block_device *bdev = sb->s_bdev;
 	generic_shutdown_super(sb);
 	set_blocksize(bdev, sb->s_old_blocksize);
-	bd_release(bdev);
-	blkdev_put(bdev, BDEV_FS);
+	close_bdev_excl(bdev, BDEV_FS);
 }
 
 struct super_block *get_sb_nodev(struct file_system_type *fs_type,

@@ -157,5 +157,3 @@ ifneq ($(CONFIG_KDB_MODULES),)
 endif
 
 CFLAGS_xfsidbg.o += -Iarch/$(ARCH)/kdb
-
-include $(TOPDIR)/Rules.make

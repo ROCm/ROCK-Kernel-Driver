@@ -196,8 +196,7 @@ EXPORT_SYMBOL(radix_tree_lookup);
 
 static /* inline */ unsigned int
 __lookup(struct radix_tree_root *root, void **results, unsigned long index,
-	unsigned int max_items, unsigned long *next_index,
-	unsigned long max_index)
+	unsigned int max_items, unsigned long *next_index)
 {
 	unsigned int nr_found = 0;
 	unsigned int shift;
@@ -209,23 +208,21 @@ __lookup(struct radix_tree_root *root, void **results, unsigned long index,
 
 	while (height > 0) {
 		unsigned long i = (index >> shift) & RADIX_TREE_MAP_MASK;
+
 		for ( ; i < RADIX_TREE_MAP_SIZE; i++) {
 			if (slot->slots[i] != NULL)
 				break;
 			index &= ~((1 << shift) - 1);
 			index += 1 << shift;
+			if (index == 0)
+				goto out;	/* 32-bit wraparound */
 		}
 		if (i == RADIX_TREE_MAP_SIZE)
 			goto out;
 		height--;
-		shift -= RADIX_TREE_MAP_SHIFT;
-		if (height == 0) {
-			/* Bottom level: grab some items */
-			unsigned long j;
+		if (height == 0) {	/* Bottom level: grab some items */
+			unsigned long j = index & RADIX_TREE_MAP_MASK;
 
-			BUG_ON((shift + RADIX_TREE_MAP_SHIFT) != 0);
-			
-			j = index & RADIX_TREE_MAP_MASK;
 			for ( ; j < RADIX_TREE_MAP_SIZE; j++) {
 				index++;
 				if (slot->slots[j]) {
@@ -235,6 +232,7 @@ __lookup(struct radix_tree_root *root, void **results, unsigned long index,
 				}
 			}
 		}
+		shift -= RADIX_TREE_MAP_SHIFT;
 		slot = slot->slots[i];
 	}
 out:
@@ -281,9 +279,9 @@ radix_tree_gang_lookup(struct radix_tree_root *root, void **results,
 		if (cur_index > max_index)
 			break;
 		nr_found = __lookup(root, results + ret, cur_index,
-				max_items - ret, &next_index, max_index);
+					max_items - ret, &next_index);
 		ret += nr_found;
-		if (next_index == max_index)
+		if (next_index == 0)
 			break;
 		cur_index = next_index;
 	}

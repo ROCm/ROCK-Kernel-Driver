@@ -693,7 +693,6 @@ static int __init speedstep_init(void)
 	driver->policy = (struct cpufreq_policy *) (driver + 1);
 
 #ifdef CONFIG_CPU_FREQ_24_API
-	driver->cpu_min_freq[0] = speedstep_low_freq;
 	driver->cpu_cur_freq[0] = speed;
 #endif
 
@@ -703,7 +702,10 @@ static int __init speedstep_init(void)
 	driver->policy[0].cpu    = 0;
 	driver->policy[0].min    = speedstep_low_freq;
 	driver->policy[0].max    = speedstep_high_freq;
-	driver->policy[0].max_cpu_freq = speedstep_high_freq;
+	driver->policy[0].cpuinfo.min_freq = speedstep_low_freq;
+	driver->policy[0].cpuinfo.max_freq = speedstep_high_freq;
+	driver->policy[0].cpuinfo.transition_latency = CPUFREQ_ETERNAL;
+
 	driver->policy[0].policy = (speed == speedstep_low_freq) ? 
 	    CPUFREQ_POLICY_POWERSAVE : CPUFREQ_POLICY_PERFORMANCE;
 

@@ -18,7 +18,3 @@ ifeq ($(CONFIG_JOYSTICK_IFORCE_USB),y)
 endif
 
 EXTRA_CFLAGS = -Werror-implicit-function-declaration
-
-# The global Rules.make.
-
-include $(TOPDIR)/Rules.make

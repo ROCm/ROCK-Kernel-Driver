@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acdebug.h - ACPI/AML debugger
- *       $Revision: 64 $
+ *       $Revision: 65 $
  *
  *****************************************************************************/
 
@@ -31,7 +31,7 @@
 
 typedef struct command_info
 {
-	NATIVE_CHAR             *name;          /* Command Name */
+	char                    *name;          /* Command Name */
 	u8                      min_args;       /* Minimum arguments required */
 
 } COMMAND_INFO;
@@ -39,7 +39,7 @@ typedef struct command_info
 
 typedef struct argument_info
 {
-	NATIVE_CHAR             *name;          /* Argument Name */
+	char                    *name;          /* Argument Name */
 
 } ARGUMENT_INFO;
 
@@ -83,16 +83,16 @@ acpi_db_single_step (
 
 void
 acpi_db_display_table_info (
-	NATIVE_CHAR             *table_arg);
+	char                    *table_arg);
 
 void
 acpi_db_unload_acpi_table (
-	NATIVE_CHAR             *table_arg,
-	NATIVE_CHAR             *instance_arg);
+	char                    *table_arg,
+	char                    *instance_arg);
 
 void
 acpi_db_set_method_breakpoint (
-	NATIVE_CHAR             *location,
+	char                    *location,
 	acpi_walk_state         *walk_state,
 	acpi_parse_object       *op);
 
@@ -102,46 +102,46 @@ acpi_db_set_method_call_breakpoint (
 
 void
 acpi_db_disassemble_aml (
-	NATIVE_CHAR             *statements,
+	char                    *statements,
 	acpi_parse_object       *op);
 
 void
 acpi_db_dump_namespace (
-	NATIVE_CHAR             *start_arg,
-	NATIVE_CHAR             *depth_arg);
+	char                    *start_arg,
+	char                    *depth_arg);
 
 void
 acpi_db_dump_namespace_by_owner (
-	NATIVE_CHAR             *owner_arg,
-	NATIVE_CHAR             *depth_arg);
+	char                    *owner_arg,
+	char                    *depth_arg);
 
 void
 acpi_db_send_notify (
-	NATIVE_CHAR             *name,
+	char                    *name,
 	u32                     value);
 
 void
 acpi_db_set_method_data (
-	NATIVE_CHAR             *type_arg,
-	NATIVE_CHAR             *index_arg,
-	NATIVE_CHAR             *value_arg);
+	char                    *type_arg,
+	char                    *index_arg,
+	char                    *value_arg);
 
 acpi_status
 acpi_db_display_objects (
-	NATIVE_CHAR             *obj_type_arg,
-	NATIVE_CHAR             *display_count_arg);
+	char                    *obj_type_arg,
+	char                    *display_count_arg);
 
 acpi_status
 acpi_db_find_name_in_namespace (
-	NATIVE_CHAR             *name_arg);
+	char                    *name_arg);
 
 void
 acpi_db_set_scope (
-	NATIVE_CHAR             *name);
+	char                    *name);
 
 void
 acpi_db_find_references (
-	NATIVE_CHAR             *object_arg);
+	char                    *object_arg);
 
 void
 acpi_db_display_locks (void);
@@ -149,7 +149,7 @@ acpi_db_display_locks (void);
 
 void
 acpi_db_display_resources (
-	NATIVE_CHAR             *object_arg);
+	char                    *object_arg);
 
 void
 acpi_db_check_integrity (
@@ -194,8 +194,8 @@ acpi_db_display_method_info (
 
 void
 acpi_db_decode_and_display_object (
-	NATIVE_CHAR             *target,
-	NATIVE_CHAR             *output_type);
+	char                    *target,
+	char                    *output_type);
 
 void
 acpi_db_decode_node (
@@ -208,7 +208,7 @@ acpi_db_display_result_object (
 
 acpi_status
 acpi_db_display_all_methods (
-	NATIVE_CHAR             *display_count_arg);
+	char                    *display_count_arg);
 
 void
 acpi_db_display_internal_object (
@@ -255,15 +255,15 @@ acpi_db_decode_internal_object (
 
 void
 acpi_db_execute (
-	NATIVE_CHAR             *name,
-	NATIVE_CHAR             **args,
+	char                    *name,
+	char                    **args,
 	u32                     flags);
 
 void
 acpi_db_create_execution_threads (
-	NATIVE_CHAR             *num_threads_arg,
-	NATIVE_CHAR             *num_loops_arg,
-	NATIVE_CHAR             *method_name_arg);
+	char                    *num_threads_arg,
+	char                    *num_loops_arg,
+	char                    *method_name_arg);
 
 acpi_status
 acpi_db_execute_method (
@@ -289,7 +289,7 @@ acpi_db_method_thread (
 
 acpi_object_type
 acpi_db_match_argument (
-	NATIVE_CHAR             *user_argument,
+	char                    *user_argument,
 	ARGUMENT_INFO           *arguments);
 
 acpi_status
@@ -302,15 +302,15 @@ acpi_db_close_debug_file (
 
 void
 acpi_db_open_debug_file (
-	NATIVE_CHAR             *name);
+	char                    *name);
 
 acpi_status
 acpi_db_load_acpi_table (
-	NATIVE_CHAR             *filename);
+	char                    *filename);
 
 acpi_status
 acpi_db_get_acpi_table (
-	NATIVE_CHAR             *filename);
+	char                    *filename);
 
 /*
  * dbhistry - debugger HISTORY command
@@ -318,14 +318,14 @@ acpi_db_get_acpi_table (
 
 void
 acpi_db_add_to_history (
-	NATIVE_CHAR             *command_line);
+	char                    *command_line);
 
 void
 acpi_db_display_history (void);
 
-NATIVE_CHAR *
+char *
 acpi_db_get_from_history (
-	NATIVE_CHAR             *command_num_arg);
+	char                    *command_num_arg);
 
 
 /*
@@ -334,7 +334,7 @@ acpi_db_get_from_history (
 
 acpi_status
 acpi_db_command_dispatch (
-	NATIVE_CHAR             *input_buffer,
+	char                    *input_buffer,
 	acpi_walk_state         *walk_state,
 	acpi_parse_object       *op);
 
@@ -344,25 +344,25 @@ acpi_db_execute_thread (
 
 acpi_status
 acpi_db_user_commands (
-	NATIVE_CHAR             prompt,
+	char                    prompt,
 	acpi_parse_object       *op);
 
 void
 acpi_db_display_help (
-	NATIVE_CHAR             *help_type);
+	char                    *help_type);
 
-NATIVE_CHAR *
+char *
 acpi_db_get_next_token (
-	NATIVE_CHAR             *string,
-	NATIVE_CHAR             **next);
+	char                    *string,
+	char                    **next);
 
 u32
 acpi_db_get_line (
-	NATIVE_CHAR             *input_buffer);
+	char                    *input_buffer);
 
 u32
 acpi_db_match_command (
-	NATIVE_CHAR             *user_command);
+	char                    *user_command);
 
 void
 acpi_db_single_thread (
@@ -381,7 +381,7 @@ acpi_db_generate_statistics (
 
 acpi_status
 acpi_db_display_statistics (
-	NATIVE_CHAR             *type_arg);
+	char                    *type_arg);
 
 acpi_status
 acpi_db_classify_one_object (
@@ -418,7 +418,7 @@ acpi_db_dump_object (
 
 void
 acpi_db_prep_namestring (
-	NATIVE_CHAR             *name);
+	char                    *name);
 
 
 acpi_status
@@ -427,7 +427,7 @@ acpi_db_second_pass_parse (
 
 acpi_namespace_node *
 acpi_db_local_ns_lookup (
-	NATIVE_CHAR             *name);
+	char                    *name);
 
 
 #endif  /* __ACDEBUG_H__ */

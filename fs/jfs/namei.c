@@ -544,8 +544,7 @@ int jfs_unlink(struct inode *dip, struct dentry *dentry)
 	if (ip->i_nlink == 0)
 		set_cflag(COMMIT_Nolink, ip);
 
-	if (!test_cflag(COMMIT_Holdlock, ip))
-		IWRITE_UNLOCK(ip);
+	IWRITE_UNLOCK(ip);
 
 	/*
 	 * Truncating the directory index table is not guaranteed.  It
@@ -602,7 +601,7 @@ s64 commitZeroLink(tid_t tid, struct inode *ip)
 		break;
 	case S_IFLNK:
 		/* fast symbolic link */
-		if (ip->i_size <= 256) {
+		if (ip->i_size < IDATASIZE) {
 			ip->i_size = 0;
 			return 0;
 		}
@@ -674,7 +673,7 @@ int freeZeroLink(struct inode *ip)
 		break;
 	case S_IFLNK:
 		/* if its contained in inode nothing to do */
-		if (ip->i_size <= 256)
+		if (ip->i_size < IDATASIZE)
 			return 0;
 		break;
 	default:
@@ -1255,14 +1254,6 @@ int jfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 		commit_flag = 0;
 
 	rc = txCommit(tid, ipcount, iplist, commit_flag);
-
-	/*
-	 * Don't unlock new_ip if COMMIT_HOLDLOCK is set
-	 */
-	if (new_ip && test_cflag(COMMIT_Holdlock, new_ip)) {
-		up(&JFS_IP(new_ip)->commit_sem);
-		new_ip = 0;
-	}
 
       out4:
 	txEnd(tid);

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: uteval - Object evaluation
- *              $Revision: 42 $
+ *              $Revision: 44 $
  *
  *****************************************************************************/
 
@@ -55,7 +55,7 @@
 acpi_status
 acpi_ut_evaluate_object (
 	acpi_namespace_node     *prefix_node,
-	NATIVE_CHAR             *path,
+	char                    *path,
 	u32                     expected_return_btypes,
 	acpi_operand_object     **return_desc)
 {
@@ -162,7 +162,7 @@ acpi_ut_evaluate_object (
 
 acpi_status
 acpi_ut_evaluate_numeric_object (
-	NATIVE_CHAR             *object_name,
+	char                    *object_name,
 	acpi_namespace_node     *device_node,
 	acpi_integer            *address)
 {

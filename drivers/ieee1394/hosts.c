@@ -121,6 +121,7 @@ void hpsb_unref_host(struct hpsb_host *host)
 struct hpsb_host *hpsb_alloc_host(struct hpsb_host_driver *drv, size_t extra)
 {
         struct hpsb_host *h;
+	int i;
 
         h = kmalloc(sizeof(struct hpsb_host) + extra, SLAB_KERNEL);
         if (!h) return NULL;
@@ -133,8 +134,8 @@ struct hpsb_host *hpsb_alloc_host(struct hpsb_host_driver *drv, size_t extra)
         INIT_LIST_HEAD(&h->pending_packets);
         spin_lock_init(&h->pending_pkt_lock);
 
-        sema_init(&h->tlabel_count, 64);
-        spin_lock_init(&h->tlabel_lock);
+	for (i = 0; i < ARRAY_SIZE(h->tpool); i++)
+		HPSB_TPOOL_INIT(&h->tpool[i]);
 
 	atomic_set(&h->generation, 0);
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbxfroot - Find the root ACPI table (RSDT)
- *              $Revision: 66 $
+ *              $Revision: 67 $
  *
  *****************************************************************************/
 
@@ -49,9 +49,9 @@
 
 acpi_status
 acpi_tb_find_table (
-	NATIVE_CHAR             *signature,
-	NATIVE_CHAR             *oem_id,
-	NATIVE_CHAR             *oem_table_id,
+	char                    *signature,
+	char                    *oem_id,
+	char                    *oem_table_id,
 	acpi_table_header       **table_ptr)
 {
 	acpi_status             status;
@@ -173,7 +173,7 @@ acpi_get_firmware_table (
 		/*
 		 *  The signature and checksum must both be correct
 		 */
-		if (ACPI_STRNCMP ((NATIVE_CHAR *) acpi_gbl_RSDP, RSDP_SIG, sizeof (RSDP_SIG)-1) != 0) {
+		if (ACPI_STRNCMP ((char *) acpi_gbl_RSDP, RSDP_SIG, sizeof (RSDP_SIG)-1) != 0) {
 			/* Nope, BAD Signature */
 
 			return_ACPI_STATUS (AE_BAD_SIGNATURE);
@@ -227,8 +227,8 @@ acpi_get_firmware_table (
 			address.pointer.value = ((RSDT_DESCRIPTOR *) rsdt_info.pointer)->table_offset_entry[i];
 		}
 		else {
-			address.pointer.value = ACPI_GET_ADDRESS (
-				((xsdt_descriptor *) rsdt_info.pointer)->table_offset_entry[i]);
+			address.pointer.value =
+				((xsdt_descriptor *) rsdt_info.pointer)->table_offset_entry[i];
 		}
 
 		/* Get the table header */
@@ -346,7 +346,7 @@ acpi_tb_scan_memory_for_rsdp (
 
 		/* The signature and checksum must both be correct */
 
-		if (ACPI_STRNCMP ((NATIVE_CHAR *) mem_rover,
+		if (ACPI_STRNCMP ((char *) mem_rover,
 				RSDP_SIG, sizeof (RSDP_SIG)-1) == 0 &&
 			acpi_tb_checksum (mem_rover, ACPI_RSDP_CHECKSUM_LENGTH) == 0) {
 			/* If so, we have found the RSDP */

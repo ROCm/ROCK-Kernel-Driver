@@ -13,9 +13,6 @@ ifndef TOPDIR
 TOPDIR = ../..
 endif
 
-include $(TOPDIR)/Rules.make
-
-
 # Rule to build documentation
 doc:	base.c util.c
 	@echo '$$PACKAGE devfs' > devfs.doc

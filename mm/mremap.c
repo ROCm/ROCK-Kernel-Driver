@@ -233,7 +233,6 @@ static unsigned long move_vma(struct vm_area_struct * vma,
 			new_vma->vm_start = new_addr;
 			new_vma->vm_end = new_addr+new_len;
 			new_vma->vm_pgoff += (addr - vma->vm_start) >> PAGE_SHIFT;
-			new_vma->vm_raend = 0;
 			if (new_vma->vm_file)
 				get_file(new_vma->vm_file);
 			if (new_vma->vm_ops && new_vma->vm_ops->open)

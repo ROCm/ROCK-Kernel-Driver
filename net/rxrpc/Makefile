@@ -23,5 +23,3 @@ rxrpc-objs += sysctl.o
 endif
 
 obj-$(CONFIG_RXRPC) := rxrpc.o
-
-include $(TOPDIR)/Rules.make

@@ -16,5 +16,3 @@ obj-y		+= legacy.o
 
 endif		# CONFIG_X86_NUMAQ
 obj-y		+= irq.o common.o
-
-include $(TOPDIR)/Rules.make

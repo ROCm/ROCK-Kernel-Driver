@@ -939,7 +939,8 @@ __send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 	if (sig_ignored(p, sig))
 		goto out_unlock;
 
-	if (sig_kernel_specific(sig))
+	if (sig_kernel_specific(sig) ||
+		       ((p->ptrace & PT_PTRACED) && !sig_kernel_only(sig)))
 		goto out_send;
 
 	/* Does any of the threads unblock the signal? */
@@ -1313,7 +1314,7 @@ int get_signal_to_deliver(siginfo_t *info, struct pt_regs *regs)
 			case SIGQUIT: case SIGILL: case SIGTRAP:
 			case SIGABRT: case SIGFPE: case SIGSEGV:
 			case SIGBUS: case SIGSYS: case SIGXCPU: case SIGXFSZ:
-				if (do_coredump(signr, regs))
+				if (do_coredump(signr, exit_code, regs))
 					exit_code |= 0x80;
 				/* FALLTHRU */
 

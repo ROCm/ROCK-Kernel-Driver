@@ -9,5 +9,3 @@ ifneq ($(CONFIG_SND_SEQUENCER),n)
 endif
 
 obj-$(CONFIG_SND_BIT32_EMUL) += snd-ioctl32.o
-
-include $(TOPDIR)/Rules.make

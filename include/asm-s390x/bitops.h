@@ -1,3 +1,6 @@
+#ifndef _S390_BITOPS_H
+#define _S390_BITOPS_H
+
 /*
  *  include/asm-s390/bitops.h
  *
@@ -9,9 +12,7 @@
  *    Copyright (C) 1992, Linus Torvalds
  *
  */
-
-#ifndef _S390_BITOPS_H
-#define _S390_BITOPS_H
+#include <linux/config.h>
 
 /*
  * bit 0 is the LSB of *addr; bit 63 is the MSB of *addr;
@@ -32,7 +33,6 @@
  * of the form "flags |= (1 << bitnr)" are used INTERMIXED
  * with operation of the form "set_bit(bitnr, flags)".
  */
-#include <linux/config.h>
 
 /* set ALIGN_CS to 1 if the SMP safe bit operations should
  * align the address to 4 byte boundary. It seems to work
@@ -57,7 +57,7 @@ extern const char _sb_findmap[];
 /*
  * SMP save set_bit routine based on compare and swap (CS)
  */
-static inline void set_bit_cs(unsigned long nr, volatile void *ptr)
+static inline void set_bit_cs(unsigned long nr, volatile unsigned long *ptr)
 {
         unsigned long addr, old, new, mask;
 
@@ -82,7 +82,7 @@ static inline void set_bit_cs(unsigned long nr, volatile void *ptr)
 /*
  * SMP save clear_bit routine based on compare and swap (CS)
  */
-static inline void clear_bit_cs(unsigned long nr, volatile void *ptr)
+static inline void clear_bit_cs(unsigned long nr, volatile unsigned long *ptr)
 {
         unsigned long addr, old, new, mask;
 
@@ -107,7 +107,7 @@ static inline void clear_bit_cs(unsigned long nr, volatile void *ptr)
 /*
  * SMP save change_bit routine based on compare and swap (CS)
  */
-static inline void change_bit_cs(unsigned long nr, volatile void *ptr)
+static inline void change_bit_cs(unsigned long nr, volatile unsigned long *ptr)
 {
         unsigned long addr, old, new, mask;
 
@@ -132,8 +132,8 @@ static inline void change_bit_cs(unsigned long nr, volatile void *ptr)
 /*
  * SMP save test_and_set_bit routine based on compare and swap (CS)
  */
-static inline int 
-test_and_set_bit_cs(unsigned long nr, volatile void *ptr)
+static inline int
+test_and_set_bit_cs(unsigned long nr, volatile unsigned long *ptr)
 {
         unsigned long addr, old, new, mask;
 
@@ -160,7 +160,7 @@ test_and_set_bit_cs(unsigned long nr, volatile void *ptr)
  * SMP save test_and_clear_bit routine based on compare and swap (CS)
  */
 static inline int
-test_and_clear_bit_cs(unsigned long nr, volatile void *ptr)
+test_and_clear_bit_cs(unsigned long nr, volatile unsigned long *ptr)
 {
         unsigned long addr, old, new, mask;
 
@@ -187,7 +187,7 @@ test_and_clear_bit_cs(unsigned long nr, volatile void *ptr)
  * SMP save test_and_change_bit routine based on compare and swap (CS) 
  */
 static inline int
-test_and_change_bit_cs(unsigned long nr, volatile void *ptr)
+test_and_change_bit_cs(unsigned long nr, volatile unsigned long *ptr)
 {
         unsigned long addr, old, new, mask;
 
@@ -214,7 +214,7 @@ test_and_change_bit_cs(unsigned long nr, volatile void *ptr)
 /*
  * fast, non-SMP set_bit routine
  */
-static inline void __set_bit(unsigned long nr, volatile void *ptr)
+static inline void __set_bit(unsigned long nr, volatile unsigned long *ptr)
 {
 	unsigned long addr;
 
@@ -226,7 +226,7 @@ static inline void __set_bit(unsigned long nr, volatile void *ptr)
 }
 
 static inline void 
-__constant_set_bit(const unsigned long nr, volatile void *ptr)
+__constant_set_bit(const unsigned long nr, volatile unsigned long *ptr)
 {
 	unsigned long addr;
 
@@ -276,7 +276,7 @@ __constant_set_bit(const unsigned long nr, volatile void *ptr)
  * fast, non-SMP clear_bit routine
  */
 static inline void 
-__clear_bit(unsigned long nr, volatile void *ptr)
+__clear_bit(unsigned long nr, volatile unsigned long *ptr)
 {
 	unsigned long addr;
 
@@ -288,7 +288,7 @@ __clear_bit(unsigned long nr, volatile void *ptr)
 }
 
 static inline void 
-__constant_clear_bit(const unsigned long nr, volatile void *ptr)
+__constant_clear_bit(const unsigned long nr, volatile unsigned long *ptr)
 {
 	unsigned long addr;
 
@@ -337,7 +337,7 @@ __constant_clear_bit(const unsigned long nr, volatile void *ptr)
 /* 
  * fast, non-SMP change_bit routine 
  */
-static inline void __change_bit(unsigned long nr, volatile void *ptr)
+static inline void __change_bit(unsigned long nr, volatile unsigned long *ptr)
 {
 	unsigned long addr;
 
@@ -349,7 +349,7 @@ static inline void __change_bit(unsigned long nr, volatile void *ptr)
 }
 
 static inline void 
-__constant_change_bit(const unsigned long nr, volatile void *ptr) 
+__constant_change_bit(const unsigned long nr, volatile unsigned long *ptr) 
 {
 	unsigned long addr;
 
@@ -399,7 +399,7 @@ __constant_change_bit(const unsigned long nr, volatile void *ptr)
  * fast, non-SMP test_and_set_bit routine
  */
 static inline int
-test_and_set_bit_simple(unsigned long nr, volatile void *ptr)
+test_and_set_bit_simple(unsigned long nr, volatile unsigned long *ptr)
 {
 	unsigned long addr;
 	unsigned char ch;
@@ -418,7 +418,7 @@ test_and_set_bit_simple(unsigned long nr, volatile void *ptr)
  * fast, non-SMP test_and_clear_bit routine
  */
 static inline int
-test_and_clear_bit_simple(unsigned long nr, volatile void *ptr)
+test_and_clear_bit_simple(unsigned long nr, volatile unsigned long *ptr)
 {
 	unsigned long addr;
 	unsigned char ch;
@@ -437,7 +437,7 @@ test_and_clear_bit_simple(unsigned long nr, volatile void *ptr)
  * fast, non-SMP test_and_change_bit routine
  */
 static inline int
-test_and_change_bit_simple(unsigned long nr, volatile void *ptr)
+test_and_change_bit_simple(unsigned long nr, volatile unsigned long *ptr)
 {
 	unsigned long addr;
 	unsigned char ch;
@@ -473,7 +473,7 @@ test_and_change_bit_simple(unsigned long nr, volatile void *ptr)
  * This routine doesn't need to be atomic.
  */
 
-static inline int __test_bit(unsigned long nr, volatile void *ptr)
+static inline int __test_bit(unsigned long nr, volatile unsigned long *ptr)
 {
 	unsigned long addr;
 	unsigned char ch;
@@ -484,7 +484,7 @@ static inline int __test_bit(unsigned long nr, volatile void *ptr)
 }
 
 static inline int 
-__constant_test_bit(unsigned long nr, volatile void *addr) {
+__constant_test_bit(unsigned long nr, volatile unsigned long *addr) {
     return (((volatile char *) addr)[(nr>>3)^7] & (1<<(nr&7))) != 0;
 }
 
@@ -497,7 +497,7 @@ __constant_test_bit(unsigned long nr, volatile void *addr) {
  * Find-bit routines..
  */
 static inline unsigned long
-find_first_zero_bit(void * addr, unsigned long size)
+find_first_zero_bit(unsigned long * addr, unsigned long size)
 {
         unsigned long res, cmp, count;
 
@@ -539,7 +539,7 @@ find_first_zero_bit(void * addr, unsigned long size)
 }
 
 static inline unsigned long
-find_first_bit(void * addr, unsigned long size)
+find_first_bit(unsigned long * addr, unsigned long size)
 {
         unsigned long res, cmp, count;
 
@@ -581,7 +581,7 @@ find_first_bit(void * addr, unsigned long size)
 }
 
 static inline unsigned long
-find_next_zero_bit (void * addr, unsigned long size, unsigned long offset)
+find_next_zero_bit (unsigned long * addr, unsigned long size, unsigned long offset)
 {
         unsigned long * p = ((unsigned long *) addr) + (offset >> 6);
         unsigned long bitvec, reg;
@@ -625,7 +625,7 @@ find_next_zero_bit (void * addr, unsigned long size, unsigned long offset)
 }
 
 static inline unsigned long
-find_next_bit (void * addr, unsigned long size, unsigned long offset)
+find_next_bit (unsigned long * addr, unsigned long size, unsigned long offset)
 {
         unsigned long * p = ((unsigned long *) addr) + (offset >> 6);
         unsigned long bitvec, reg;
@@ -744,7 +744,7 @@ static inline int sched_find_first_bit(unsigned long *b)
  * the libc and compiler builtin ffs routines, therefore
  * differs in spirit from the above ffz (man ffs).
  */
-extern int inline ffs (int x)
+extern inline int ffs (int x)
 {
         int r = 1;
 
@@ -836,9 +836,13 @@ extern __inline__ int fls(int x)
  *    23 22 21 20 19 18 17 16 31 30 29 28 27 26 25 24
  */
 
-#define ext2_set_bit(nr, addr)       test_and_set_bit((nr)^56, addr)
-#define ext2_clear_bit(nr, addr)     test_and_clear_bit((nr)^56, addr)
-#define ext2_test_bit(nr, addr)      test_bit((nr)^56, addr)
+#define ext2_set_bit(nr, addr)       \
+	test_and_set_bit((nr)^56, (unsigned long *)addr)
+#define ext2_clear_bit(nr, addr)     \
+	test_and_clear_bit((nr)^56, (unsigned long *)addr)
+#define ext2_test_bit(nr, addr)      \
+	test_bit((nr)^56, (unsigned long *)addr)
+
 static inline unsigned long
 ext2_find_first_zero_bit(void *vaddr, unsigned long size)
 {

@@ -15,5 +15,3 @@ jfs-objs += acl.o
 endif
 
 EXTRA_CFLAGS += -D_JFS_4K
-
-include $(TOPDIR)/Rules.make

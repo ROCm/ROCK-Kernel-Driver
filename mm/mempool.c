@@ -221,7 +221,7 @@ repeat_alloc:
 	spin_unlock_irqrestore(&pool->lock, flags);
 
 	/* We must not sleep in the GFP_ATOMIC case */
-	if (gfp_mask == gfp_nowait)
+	if (!(gfp_mask & __GFP_WAIT))
 		return NULL;
 
 	blk_run_queues();

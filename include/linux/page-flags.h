@@ -79,35 +79,36 @@
  * allowed.
  */
 struct page_state {
-	unsigned long nr_dirty;
-	unsigned long nr_writeback;
-	unsigned long nr_pagecache;
-	unsigned long nr_page_table_pages;
-	unsigned long nr_reverse_maps;
-	unsigned long nr_mapped;
-	unsigned long nr_slab;
+	unsigned long nr_dirty;		/* Dirty writeable pages */
+	unsigned long nr_writeback;	/* Pages under writeback */
+	unsigned long nr_pagecache;	/* Pages in pagecache */
+	unsigned long nr_page_table_pages;/* Pages used for pagetables */
+	unsigned long nr_reverse_maps;	/* includes PageDirect */
+	unsigned long nr_mapped;	/* mapped into pagetables */
+	unsigned long nr_slab;		/* In slab */
 #define GET_PAGE_STATE_LAST nr_slab
 
 	/*
 	 * The below are zeroed by get_page_state().  Use get_full_page_state()
 	 * to add up all these.
 	 */
-	unsigned long pgpgin;
-	unsigned long pgpgout;
-	unsigned long pswpin;
-	unsigned long pswpout;
-	unsigned long pgalloc;
-	unsigned long pgfree;
-	unsigned long pgactivate;
-	unsigned long pgdeactivate;
-	unsigned long pgfault;
-	unsigned long pgmajfault;
-	unsigned long pgscan;
-	unsigned long pgrefill;
-	unsigned long pgsteal;
-	unsigned long kswapd_steal;
-	unsigned long pageoutrun;
-	unsigned long allocstall;
+	unsigned long pgpgin;		/* Disk reads */
+	unsigned long pgpgout;		/* Disk writes */
+	unsigned long pswpin;		/* swap reads */
+	unsigned long pswpout;		/* swap writes */
+	unsigned long pgalloc;		/* page allocations */
+	unsigned long pgfree;		/* page freeings */
+	unsigned long pgactivate;	/* pages moved inactive->active */
+	unsigned long pgdeactivate;	/* pages moved active->inactive */
+	unsigned long pgfault;		/* faults (major+minor) */
+	unsigned long pgmajfault;	/* faults (major only) */
+	unsigned long pgscan;		/* pages scanned by page reclaim */
+	unsigned long pgrefill;		/* inspected in refill_inactive_zone */
+	unsigned long pgsteal;		/* total pages reclaimed */
+	unsigned long kswapd_steal;	/* pages reclaimed by kswapd */
+	unsigned long pageoutrun;	/* kswapd's calls to page reclaim */
+	unsigned long allocstall;	/* direct reclaim calls */
+	unsigned long pgrotated;	/* pages rotated to tail of the LRU */
 } ____cacheline_aligned;
 
 DECLARE_PER_CPU(struct page_state, page_states);

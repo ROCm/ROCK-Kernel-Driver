@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utglobal - Global variables for the ACPI subsystem
- *              $Revision: 176 $
+ *              $Revision: 177 $
  *
  *****************************************************************************/
 
@@ -153,7 +153,7 @@ u8                          acpi_gbl_shutdown = TRUE;
 
 const u8                    acpi_gbl_decode_to8bit [8] = {1,2,4,8,16,32,64,128};
 
-const NATIVE_CHAR           *acpi_gbl_db_sleep_states[ACPI_S_STATE_COUNT] = {
+const char                  *acpi_gbl_db_sleep_states[ACPI_S_STATE_COUNT] = {
 			  "\\_S0_",
 			  "\\_S1_",
 			  "\\_S2_",
@@ -239,7 +239,7 @@ const u8                        acpi_gbl_ns_properties[] =
 
 /* Hex to ASCII conversion table */
 
-static const NATIVE_CHAR    acpi_gbl_hex_to_ascii[] =
+static const char           acpi_gbl_hex_to_ascii[] =
 			  {'0','1','2','3','4','5','6','7',
 					 '8','9','A','B','C','D','E','F'};
 
@@ -357,7 +357,7 @@ acpi_fixed_event_info       acpi_gbl_fixed_event_info[ACPI_NUM_FIXED_EVENTS] =
 
 /* Region type decoding */
 
-const NATIVE_CHAR *acpi_gbl_region_types[ACPI_NUM_PREDEFINED_REGIONS] =
+const char        *acpi_gbl_region_types[ACPI_NUM_PREDEFINED_REGIONS] =
 {
 	"System_memory",
 	"System_iO",
@@ -370,7 +370,7 @@ const NATIVE_CHAR *acpi_gbl_region_types[ACPI_NUM_PREDEFINED_REGIONS] =
 };
 
 
-NATIVE_CHAR *
+char *
 acpi_ut_get_region_name (
 	u8                      space_id)
 {
@@ -385,7 +385,7 @@ acpi_ut_get_region_name (
 		return ("Invalid_space_iD");
 	}
 
-	return ((NATIVE_CHAR *) acpi_gbl_region_types[space_id]);
+	return ((char *) acpi_gbl_region_types[space_id]);
 }
 
 
@@ -403,7 +403,7 @@ acpi_ut_get_region_name (
 
 /* Event type decoding */
 
-static const NATIVE_CHAR *acpi_gbl_event_types[ACPI_NUM_FIXED_EVENTS] =
+static const char        *acpi_gbl_event_types[ACPI_NUM_FIXED_EVENTS] =
 {
 	"PM_Timer",
 	"Global_lock",
@@ -413,7 +413,7 @@ static const NATIVE_CHAR *acpi_gbl_event_types[ACPI_NUM_FIXED_EVENTS] =
 };
 
 
-NATIVE_CHAR *
+char *
 acpi_ut_get_event_name (
 	u32                     event_id)
 {
@@ -423,7 +423,7 @@ acpi_ut_get_event_name (
 		return ("Invalid_event_iD");
 	}
 
-	return ((NATIVE_CHAR *) acpi_gbl_event_types[event_id]);
+	return ((char *) acpi_gbl_event_types[event_id]);
 }
 
 
@@ -448,10 +448,10 @@ acpi_ut_get_event_name (
  * indicatewhat type is actually going to be stored for this entry.
  */
 
-static const NATIVE_CHAR    acpi_gbl_bad_type[] = "UNDEFINED";
+static const char           acpi_gbl_bad_type[] = "UNDEFINED";
 #define TYPE_NAME_LENGTH    12                           /* Maximum length of each string */
 
-static const NATIVE_CHAR    *acpi_gbl_ns_type_names[] = /* printable names of ACPI types */
+static const char           *acpi_gbl_ns_type_names[] = /* printable names of ACPI types */
 {
 	/* 00 */ "Untyped",
 	/* 01 */ "Integer",
@@ -486,21 +486,21 @@ static const NATIVE_CHAR    *acpi_gbl_ns_type_names[] = /* printable names of AC
 };
 
 
-NATIVE_CHAR *
+char *
 acpi_ut_get_type_name (
 	acpi_object_type        type)
 {
 
 	if (type > ACPI_TYPE_INVALID)
 	{
-		return ((NATIVE_CHAR *) acpi_gbl_bad_type);
+		return ((char *) acpi_gbl_bad_type);
 	}
 
-	return ((NATIVE_CHAR *) acpi_gbl_ns_type_names[type]);
+	return ((char *) acpi_gbl_ns_type_names[type]);
 }
 
 
-NATIVE_CHAR *
+char *
 acpi_ut_get_object_type_name (
 	acpi_operand_object     *obj_desc)
 {
@@ -533,7 +533,7 @@ acpi_ut_get_object_type_name (
  *
  ****************************************************************************/
 
-NATIVE_CHAR *
+char *
 acpi_ut_get_mutex_name (
 	u32                     mutex_id)
 {

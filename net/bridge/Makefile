@@ -15,5 +15,3 @@ bridge-objs	+= br_netfilter.o
 endif
 
 obj-$(CONFIG_BRIDGE_NF_EBTABLES) += netfilter/
-
-include $(TOPDIR)/Rules.make

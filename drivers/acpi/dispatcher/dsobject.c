@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dsobject - Dispatcher object management routines
- *              $Revision: 111 $
+ *              $Revision: 112 $
  *
  *****************************************************************************/
 
@@ -187,21 +187,21 @@ acpi_ds_build_internal_buffer_obj (
 	if (obj_desc->buffer.length == 0) {
 		obj_desc->buffer.pointer = NULL;
 		ACPI_REPORT_WARNING (("Buffer created with zero length in AML\n"));
-		return_ACPI_STATUS (AE_OK);
 	}
+	else {
+		obj_desc->buffer.pointer = ACPI_MEM_CALLOCATE (
+				   obj_desc->buffer.length);
+		if (!obj_desc->buffer.pointer) {
+			acpi_ut_delete_object_desc (obj_desc);
+			return_ACPI_STATUS (AE_NO_MEMORY);
+		}
 
-	obj_desc->buffer.pointer = ACPI_MEM_CALLOCATE (
-			   obj_desc->buffer.length);
-	if (!obj_desc->buffer.pointer) {
-		acpi_ut_delete_object_desc (obj_desc);
-		return_ACPI_STATUS (AE_NO_MEMORY);
-	}
+		/* Initialize buffer from the Byte_list (if present) */
 
-	/* Initialize buffer from the Byte_list (if present) */
-
-	if (byte_list) {
-		ACPI_MEMCPY (obj_desc->buffer.pointer, byte_list->named.data,
-				  byte_list_length);
+		if (byte_list) {
+			ACPI_MEMCPY (obj_desc->buffer.pointer, byte_list->named.data,
+					  byte_list_length);
+		}
 	}
 
 	obj_desc->buffer.flags |= AOPOBJ_DATA_VALID;

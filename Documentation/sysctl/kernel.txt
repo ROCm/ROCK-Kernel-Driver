@@ -237,11 +237,6 @@ the different loglevels.
   console_loglevel can be set
 - default_console_loglevel: default value for console_loglevel
 
-Note: a quick look in linux/kernel/printk.c will reveal that
-these variables aren't put inside a structure, so their order
-in-core isn't formally guaranteed and garbage values _might_
-occur when the compiler changes. (???)
-
 ==============================================================
 
 reboot-cmd: (Sparc only)

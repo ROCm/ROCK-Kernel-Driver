@@ -8,5 +8,3 @@ obj-y := exconfig.o  exfield.o  exnames.o   exoparg6.o  exresolv.o  exstorob.o\
 	 exdump.o    exmutex.o  exoparg3.o  exresnte.o  exstoren.o
 
 EXTRA_CFLAGS += $(ACPI_CFLAGS)
-
-include $(TOPDIR)/Rules.make

@@ -69,8 +69,8 @@ unsigned int sa11x0_freq_to_ppcr(unsigned int khz)
  */
 int sa11x0_verify_speed(struct cpufreq_policy *policy)
 {
-	if (policy->max > policy->max_cpu_freq)
-		policy->max = policy->max_cpu_freq;
+	if (policy->max > policy->cpuinfo.max_freq)
+		policy->max = policy->cpuinfo.max_freq;
 
 	policy->max = cclk_frequency_100khz[sa11x0_freq_to_ppcr(policy->max)] * 100;
 	policy->min = policy->max;

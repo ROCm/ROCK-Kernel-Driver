@@ -19,6 +19,16 @@
  * Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
+/*
+ * Contributions:
+ *
+ * Manfred Weihs <weihs@ict.tuwien.ac.at>
+ *        reading bus info block (containing GUID) from serial 
+ *            eeprom via i2c and storing it in config ROM
+ *        Reworked code for initiating bus resets
+ *            (long, short, with or without hold-off)
+ */
+
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
@@ -450,7 +460,7 @@ static void handle_selfid(struct ti_lynx *lynx, struct hpsb_host *host)
 
         if (host->in_bus_reset) return; /* in bus reset again */
 
-        if (isroot) reg_set_bits(lynx, LINK_CONTROL, LINK_CONTROL_CYCMASTER);
+        if (isroot) reg_set_bits(lynx, LINK_CONTROL, LINK_CONTROL_CYCMASTER); //FIXME: I do not think, we need this here
         reg_set_bits(lynx, LINK_CONTROL,
                      LINK_CONTROL_RCV_CMP_VALID | LINK_CONTROL_TX_ASYNC_EN
                      | LINK_CONTROL_RX_ASYNC_EN | LINK_CONTROL_CYCTIMEREN);
@@ -563,6 +573,7 @@ static int lynx_devctl(struct hpsb_host *host, enum devctl_cmd cmd, int arg)
         struct hpsb_packet *packet;
 	LIST_HEAD(packet_list);
         unsigned long flags;
+	int phy_reg;
 
         switch (cmd) {
         case RESET_BUS:
@@ -571,21 +582,140 @@ static int lynx_devctl(struct hpsb_host *host, enum devctl_cmd cmd, int arg)
                         break;
                 }
 
-                if (arg) {
-                        arg = 3 << 6;
-                } else {
-                        arg = 1 << 6;
-                }
+		switch (arg) {
+		case SHORT_RESET:
+			if (lynx->phyic.reg_1394a) {
+				phy_reg = get_phy_reg(lynx, 5);
+				if (phy_reg == -1) {
+					PRINT(KERN_ERR, lynx->id, "cannot reset bus, because read phy reg failed");
+					retval = -1;
+					break;
+				}
+				phy_reg |= 0x40;
 
-                retval = get_phy_reg(lynx, 1);
-                arg |= (retval == -1 ? 63 : retval);
-                retval = 0;
+				PRINT(KERN_INFO, lynx->id, "resetting bus (short bus reset) on request");
 
-                PRINT(KERN_INFO, lynx->id, "resetting bus on request");
+				lynx->selfid_size = -1;
+				lynx->phy_reg0 = -1;
+				set_phy_reg(lynx, 5, phy_reg); /* set ISBR */
+				break;
+			} else {
+				PRINT(KERN_INFO, lynx->id, "cannot do short bus reset, because of old phy");
+				/* fall through to long bus reset */
+			}
+		case LONG_RESET:
+			phy_reg = get_phy_reg(lynx, 1);
+			if (phy_reg == -1) {
+				PRINT(KERN_ERR, lynx->id, "cannot reset bus, because read phy reg failed");
+				retval = -1;
+				break;
+			}
+			phy_reg |= 0x40;
 
-                lynx->selfid_size = -1;
-                lynx->phy_reg0 = -1;
-                set_phy_reg(lynx, 1, arg);
+			PRINT(KERN_INFO, lynx->id, "resetting bus (long bus reset) on request");
+
+			lynx->selfid_size = -1;
+			lynx->phy_reg0 = -1;
+			set_phy_reg(lynx, 1, phy_reg); /* clear RHB, set IBR */
+			break;
+		case SHORT_RESET_NO_FORCE_ROOT:
+			if (lynx->phyic.reg_1394a) {
+				phy_reg = get_phy_reg(lynx, 1);
+				if (phy_reg == -1) {
+					PRINT(KERN_ERR, lynx->id, "cannot reset bus, because read phy reg failed");
+					retval = -1;
+					break;
+				}
+				if (phy_reg & 0x80) {
+					phy_reg &= ~0x80;
+					set_phy_reg(lynx, 1, phy_reg); /* clear RHB */
+				}
+
+				phy_reg = get_phy_reg(lynx, 5);
+				if (phy_reg == -1) {
+					PRINT(KERN_ERR, lynx->id, "cannot reset bus, because read phy reg failed");
+					retval = -1;
+					break;
+				}
+				phy_reg |= 0x40;
+
+				PRINT(KERN_INFO, lynx->id, "resetting bus (short bus reset, no force_root) on request");
+
+				lynx->selfid_size = -1;
+				lynx->phy_reg0 = -1;
+				set_phy_reg(lynx, 5, phy_reg); /* set ISBR */
+				break;
+			} else {
+				PRINT(KERN_INFO, lynx->id, "cannot do short bus reset, because of old phy");
+				/* fall through to long bus reset */
+			}
+		case LONG_RESET_NO_FORCE_ROOT:
+			phy_reg = get_phy_reg(lynx, 1);
+			if (phy_reg == -1) {
+				PRINT(KERN_ERR, lynx->id, "cannot reset bus, because read phy reg failed");
+				retval = -1;
+				break;
+			}
+			phy_reg &= ~0x80;
+			phy_reg |= 0x40;
+
+			PRINT(KERN_INFO, lynx->id, "resetting bus (long bus reset, no force_root) on request");
+
+			lynx->selfid_size = -1;
+			lynx->phy_reg0 = -1;
+			set_phy_reg(lynx, 1, phy_reg); /* clear RHB, set IBR */
+			break;
+		case SHORT_RESET_FORCE_ROOT:
+			if (lynx->phyic.reg_1394a) {
+				phy_reg = get_phy_reg(lynx, 1);
+				if (phy_reg == -1) {
+					PRINT(KERN_ERR, lynx->id, "cannot reset bus, because read phy reg failed");
+					retval = -1;
+					break;
+				}
+				if (!(phy_reg & 0x80)) {
+					phy_reg |= 0x80;
+					set_phy_reg(lynx, 1, phy_reg); /* set RHB */
+				}
+
+				phy_reg = get_phy_reg(lynx, 5);
+				if (phy_reg == -1) {
+					PRINT(KERN_ERR, lynx->id, "cannot reset bus, because read phy reg failed");
+					retval = -1;
+					break;
+				}
+				phy_reg |= 0x40;
+
+				PRINT(KERN_INFO, lynx->id, "resetting bus (short bus reset, force_root set) on request");
+
+				lynx->selfid_size = -1;
+				lynx->phy_reg0 = -1;
+				set_phy_reg(lynx, 5, phy_reg); /* set ISBR */
+				break;
+			} else {
+				PRINT(KERN_INFO, lynx->id, "cannot do short bus reset, because of old phy");
+				/* fall through to long bus reset */
+			}
+		case LONG_RESET_FORCE_ROOT:
+			phy_reg = get_phy_reg(lynx, 1);
+			if (phy_reg == -1) {
+				PRINT(KERN_ERR, lynx->id, "cannot reset bus, because read phy reg failed");
+				retval = -1;
+				break;
+			}
+			phy_reg |= 0xc0;
+
+			PRINT(KERN_INFO, lynx->id, "resetting bus (long bus reset, force_root set) on request");
+
+			lynx->selfid_size = -1;
+			lynx->phy_reg0 = -1;
+			set_phy_reg(lynx, 1, phy_reg); /* set IBR and RHB */
+			break;
+		default:
+			PRINT(KERN_ERR, lynx->id, "unknown argument for reset_bus command %d", arg);
+			retval = -1;
+		}
+
                 break;
 
         case GET_CYCLE_COUNTER:
@@ -1706,6 +1836,7 @@ static struct hpsb_host_driver lynx_driver = {
         .get_rom =         get_lynx_rom,
         .transmit_packet = lynx_transmit,
         .devctl =          lynx_devctl,
+	.isoctl =          NULL,
 };
 
 MODULE_AUTHOR("Andreas E. Bombe <andreas.bombe@munich.netsurf.de>");

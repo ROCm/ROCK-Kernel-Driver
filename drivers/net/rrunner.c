@@ -1761,10 +1761,10 @@ static struct pci_device_id rr_pci_tbl[] __devinitdata = {
 MODULE_DEVICE_TABLE(pci, rr_pci_tbl);
 
 static struct pci_driver rr_driver = {
-	name:		"rrunner",
-	id_table:	rr_pci_tbl,
-	probe:		rr_init_one,
-	remove:		rr_remove_one,
+	.name		= "rrunner",
+	.id_table	= rr_pci_tbl,
+	.probe		= rr_init_one,
+	.remove		= rr_remove_one,
 };
 
 static int __init rr_init_module(void)

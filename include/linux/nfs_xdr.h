@@ -488,7 +488,6 @@ struct nfs4_write {
 
 struct nfs4_op {
 	u32				opnum;
-	u32				nfserr;
 	union {
 		struct nfs4_access	access;
 		struct nfs4_close	close;

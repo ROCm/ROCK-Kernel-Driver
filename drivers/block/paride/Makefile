@@ -28,5 +28,3 @@ obj-$(CONFIG_PARIDE_PCD)	+= pcd.o
 obj-$(CONFIG_PARIDE_PF)		+= pf.o
 obj-$(CONFIG_PARIDE_PT)		+= pt.o
 obj-$(CONFIG_PARIDE_PG)		+= pg.o
-
-include $(TOPDIR)/Rules.make

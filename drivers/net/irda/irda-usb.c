@@ -75,16 +75,16 @@ static struct irda_usb_cb irda_instance[NIRUSB];
 /* These are the currently known IrDA USB dongles. Add new dongles here */
 static struct usb_device_id dongles[] = {
 	/* ACTiSYS Corp,  ACT-IR2000U FIR-USB Adapter */
-	{ USB_DEVICE(0x9c4, 0x011), driver_info: IUC_SPEED_BUG | IUC_NO_WINDOW },
+	{ USB_DEVICE(0x9c4, 0x011), .driver_info = IUC_SPEED_BUG | IUC_NO_WINDOW },
 	/* KC Technology Inc.,  KC-180 USB IrDA Device */
-	{ USB_DEVICE(0x50f, 0x180), driver_info: IUC_SPEED_BUG | IUC_NO_WINDOW },
+	{ USB_DEVICE(0x50f, 0x180), .driver_info = IUC_SPEED_BUG | IUC_NO_WINDOW },
 	/* Extended Systems, Inc.,  XTNDAccess IrDA USB (ESI-9685) */
-	{ USB_DEVICE(0x8e9, 0x100), driver_info: IUC_SPEED_BUG | IUC_NO_WINDOW },
-	{ match_flags: USB_DEVICE_ID_MATCH_INT_CLASS |
+	{ USB_DEVICE(0x8e9, 0x100), .driver_info = IUC_SPEED_BUG | IUC_NO_WINDOW },
+	{ .match_flags = USB_DEVICE_ID_MATCH_INT_CLASS |
 	               USB_DEVICE_ID_MATCH_INT_SUBCLASS,
-	  bInterfaceClass: USB_CLASS_APP_SPEC,
-	  bInterfaceSubClass: USB_CLASS_IRDA,
-	  driver_info: IUC_DEFAULT, },
+	  .bInterfaceClass = USB_CLASS_APP_SPEC,
+	  .bInterfaceSubClass = USB_CLASS_IRDA,
+	  .driver_info = IUC_DEFAULT, },
 	{ }, /* The end */
 };
 

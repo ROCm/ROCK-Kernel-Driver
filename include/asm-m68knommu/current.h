@@ -10,7 +10,7 @@
  *	current and lose _current_task.
  */
 
-#include <asm/thread_info.h>
+#include <linux/thread_info.h>
 
 struct task_struct;
 

@@ -24,5 +24,3 @@ kafs-objs := \
 	volume.o
 
 obj-$(CONFIG_AFS_FS)  := kafs.o
-
-include $(TOPDIR)/Rules.make

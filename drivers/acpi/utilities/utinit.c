@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utinit - Common ACPI subsystem initialization
- *              $Revision: 114 $
+ *              $Revision: 115 $
  *
  *****************************************************************************/
 
@@ -49,7 +49,7 @@
 
 static void
 acpi_ut_fadt_register_error (
-	NATIVE_CHAR             *register_name,
+	char                    *register_name,
 	u32                     value,
 	ACPI_SIZE               offset)
 {
@@ -92,22 +92,22 @@ acpi_ut_validate_fadt (
 				  ACPI_FADT_OFFSET (pm1_cnt_len));
 	}
 
-	if (!ACPI_VALID_ADDRESS (acpi_gbl_FADT->Xpm1a_evt_blk.address)) {
+	if (!acpi_gbl_FADT->Xpm1a_evt_blk.address) {
 		acpi_ut_fadt_register_error ("X_PM1a_EVT_BLK", 0,
 				  ACPI_FADT_OFFSET (Xpm1a_evt_blk.address));
 	}
 
-	if (!ACPI_VALID_ADDRESS (acpi_gbl_FADT->Xpm1a_cnt_blk.address)) {
+	if (!acpi_gbl_FADT->Xpm1a_cnt_blk.address) {
 		acpi_ut_fadt_register_error ("X_PM1a_CNT_BLK", 0,
 				  ACPI_FADT_OFFSET (Xpm1a_cnt_blk.address));
 	}
 
-	if (!ACPI_VALID_ADDRESS (acpi_gbl_FADT->Xpm_tmr_blk.address)) {
+	if (!acpi_gbl_FADT->Xpm_tmr_blk.address) {
 		acpi_ut_fadt_register_error ("X_PM_TMR_BLK", 0,
 				  ACPI_FADT_OFFSET (Xpm_tmr_blk.address));
 	}
 
-	if ((ACPI_VALID_ADDRESS (acpi_gbl_FADT->Xpm2_cnt_blk.address) &&
+	if ((acpi_gbl_FADT->Xpm2_cnt_blk.address &&
 		!acpi_gbl_FADT->pm2_cnt_len)) {
 		acpi_ut_fadt_register_error ("PM2_CNT_LEN",
 				  (u32) acpi_gbl_FADT->pm2_cnt_len,
@@ -122,14 +122,14 @@ acpi_ut_validate_fadt (
 
 	/* Length of GPE blocks must be a multiple of 2 */
 
-	if (ACPI_VALID_ADDRESS (acpi_gbl_FADT->Xgpe0_blk.address) &&
+	if (acpi_gbl_FADT->Xgpe0_blk.address &&
 		(acpi_gbl_FADT->gpe0_blk_len & 1)) {
 		acpi_ut_fadt_register_error ("(x)GPE0_BLK_LEN",
 				  (u32) acpi_gbl_FADT->gpe0_blk_len,
 				  ACPI_FADT_OFFSET (gpe0_blk_len));
 	}
 
-	if (ACPI_VALID_ADDRESS (acpi_gbl_FADT->Xgpe1_blk.address) &&
+	if (acpi_gbl_FADT->Xgpe1_blk.address &&
 		(acpi_gbl_FADT->gpe1_blk_len & 1)) {
 		acpi_ut_fadt_register_error ("(x)GPE1_BLK_LEN",
 				  (u32) acpi_gbl_FADT->gpe1_blk_len,

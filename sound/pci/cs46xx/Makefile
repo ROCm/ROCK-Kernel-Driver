@@ -10,5 +10,3 @@ endif
 
 # Toplevel Module Dependency
 obj-$(CONFIG_SND_CS46XX) += snd-cs46xx.o
-
-include $(TOPDIR)/Rules.make

@@ -53,11 +53,8 @@ static inline unsigned long get_min_readahead(struct file_ra_state *ra)
  *
  * Hides the details of the LRU cache etc from the filesystems.
  */
-int
-read_cache_pages(struct address_space *mapping,
-		 struct list_head *pages,
-		 int (*filler)(void *, struct page *),
-		 void *data)
+int read_cache_pages(struct address_space *mapping, struct list_head *pages,
+		 int (*filler)(void *, struct page *), void *data)
 {
 	struct page *page;
 	struct pagevec lru_pvec;
@@ -82,8 +79,7 @@ read_cache_pages(struct address_space *mapping,
 	return ret;
 }
 
-static int
-read_pages(struct address_space *mapping, struct file *filp,
+static int read_pages(struct address_space *mapping, struct file *filp,
 		struct list_head *pages, unsigned nr_pages)
 {
 	unsigned page_idx;
@@ -184,10 +180,9 @@ read_pages(struct address_space *mapping, struct file *filp,
  *
  * Returns the number of pages which actually had IO started against them.
  */
-int do_page_cache_readahead(struct address_space *mapping,
-			    struct file *filp,
-			    unsigned long offset,
-			    unsigned long nr_to_read)
+static inline int
+__do_page_cache_readahead(struct address_space *mapping, struct file *filp,
+			unsigned long offset, unsigned long nr_to_read)
 {
 	struct inode *inode = mapping->host;
 	struct page *page;
@@ -241,6 +236,30 @@ out:
 }
 
 /*
+ * Chunk the readahead into 2 megabyte units, so that we don't pin too much
+ * memory at once.
+ */
+int do_page_cache_readahead(struct address_space *mapping, struct file *filp,
+			unsigned long offset, unsigned long nr_to_read)
+{
+	int ret = 0;
+
+	while (nr_to_read) {
+		unsigned long this_chunk = (2 * 1024 * 1024) / PAGE_CACHE_SIZE;
+
+		if (this_chunk > nr_to_read)
+			this_chunk = nr_to_read;
+		ret = __do_page_cache_readahead(mapping, filp,
+						offset, this_chunk);
+		if (ret < 0)
+			break;
+		offset += this_chunk;
+		nr_to_read -= this_chunk;
+	}
+	return ret;
+}
+
+/*
  * Check how effective readahead is being.  If the amount of started IO is
  * less than expected then the file is partly or fully in pagecache and
  * readahead isn't helping.  Shrink the window.
@@ -267,8 +286,9 @@ check_ra_success(struct file_ra_state *ra, pgoff_t attempt,
  * page_cache_readahead is the main function.  If performs the adaptive
  * readahead window size management and submits the readahead I/O.
  */
-void page_cache_readahead(struct address_space *mapping, struct file_ra_state *ra,
-			  struct file *filp, unsigned long offset)
+void
+page_cache_readahead(struct address_space *mapping, struct file_ra_state *ra,
+			struct file *filp, unsigned long offset)
 {
 	unsigned max;
 	unsigned min;
@@ -394,8 +414,9 @@ out:
  * but somewhat ascending.  So readaround favours pages beyond the target one.
  * We also boost the window size, as it can easily shrink due to misses.
  */
-void page_cache_readaround(struct address_space *mapping, struct file_ra_state *ra,
-			   struct file *filp, unsigned long offset)
+void
+page_cache_readaround(struct address_space *mapping, struct file_ra_state *ra,
+			struct file *filp, unsigned long offset)
 {
 	if (ra->next_size != -1UL) {
 		const unsigned long min = get_min_readahead(ra) * 2;
@@ -445,4 +466,17 @@ void handle_ra_miss(struct address_space *mapping, struct file_ra_state *ra)
 		if (ra->next_size < min)
 			ra->next_size = min;
 	}
+}
+
+/*
+ * Given a desired number of PAGE_CACHE_SIZE readahead pages, return a
+ * sensible upper limit.
+ */
+unsigned long max_sane_readahead(unsigned long nr)
+{
+	unsigned long active;
+	unsigned long inactive;
+
+	get_zone_counts(&active, &inactive);
+	return min(nr, inactive / 2);
 }

@@ -34,5 +34,3 @@ ifeq ($(subst m,y,$(CONFIG_SND_SEQUENCER)),y)
 endif
 
 obj-m := $(sort $(obj-m))
-
-include $(TOPDIR)/Rules.make

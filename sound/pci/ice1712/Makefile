@@ -9,5 +9,3 @@ snd-ice1712-objs := ice1712.o ak4524.o delta.o hoontech.o ews.o
 
 # Toplevel Module Dependency
 obj-$(CONFIG_SND_ICE1712) += snd-ice1712.o
-
-include $(TOPDIR)/Rules.make

@@ -12,5 +12,3 @@ ifeq ($(CONFIG_SND),y)
 endif
 
 soundcore-objs  := sound_core.o sound_firmware.o
-
-include $(TOPDIR)/Rules.make

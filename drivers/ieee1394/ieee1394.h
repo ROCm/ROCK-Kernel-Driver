@@ -15,6 +15,7 @@
 #define TCODE_CYCLE_START        0x8
 #define TCODE_LOCK_REQUEST       0x9
 #define TCODE_ISO_DATA           0xa
+#define TCODE_STREAM_DATA        0xa
 #define TCODE_LOCK_RESPONSE      0xb
 
 #define RCODE_COMPLETE           0x0

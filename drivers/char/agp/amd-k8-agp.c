@@ -151,7 +151,7 @@ static int amd_x86_64_fetch_size(void)
 }
 
 
-static void inline flush_x86_64_tlb(struct pci_dev *dev)
+static void flush_x86_64_tlb(struct pci_dev *dev)
 {
 	u32 tmp;
 

@@ -286,6 +286,7 @@ static void wb_kupdate(unsigned long arg)
 		.older_than_this = &oldest_jif,
 		.nr_to_write	= 0,
 		.nonblocking	= 1,
+		.for_kupdate	= 1,
 	};
 
 	sync_supers();
@@ -299,7 +300,7 @@ static void wb_kupdate(unsigned long arg)
 		wbc.encountered_congestion = 0;
 		wbc.nr_to_write = MAX_WRITEBACK_PAGES;
 		writeback_inodes(&wbc);
-		if (wbc.nr_to_write == MAX_WRITEBACK_PAGES) {
+		if (wbc.nr_to_write > 0) {
 			if (wbc.encountered_congestion)
 				blk_congestion_wait(WRITE, HZ);
 			else
@@ -411,6 +412,9 @@ int write_one_page(struct page *page, int wait)
 {
 	struct address_space *mapping = page->mapping;
 	int ret = 0;
+	struct writeback_control wbc = {
+		.sync_mode = WB_SYNC_ALL,
+	};
 
 	BUG_ON(!PageLocked(page));
 
@@ -423,11 +427,7 @@ int write_one_page(struct page *page, int wait)
 		list_add(&page->list, &mapping->locked_pages);
 		page_cache_get(page);
 		write_unlock(&mapping->page_lock);
-		ret = mapping->a_ops->writepage(page);
-		if (ret == -EAGAIN) {
-			__set_page_dirty_nobuffers(page);
-			ret = 0;
-		}
+		ret = mapping->a_ops->writepage(page, &wbc);
 		if (ret == 0 && wait) {
 			wait_on_page_writeback(page);
 			if (PageError(page))

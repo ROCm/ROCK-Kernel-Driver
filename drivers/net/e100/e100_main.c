@@ -145,17 +145,17 @@ static int e100_notify_reboot(struct notifier_block *, unsigned long event, void
 static int e100_suspend(struct pci_dev *pcid, u32 state);
 static int e100_resume(struct pci_dev *pcid);
 struct notifier_block e100_notifier_reboot = {
-        notifier_call:  e100_notify_reboot,
-        next:           NULL,
-        priority:       0
+        .notifier_call  = e100_notify_reboot,
+        .next           = NULL,
+        .priority       = 0
 };
 #endif
 static int e100_notify_netdev(struct notifier_block *, unsigned long event, void *ptr);
  
 struct notifier_block e100_notifier_netdev = {
-	notifier_call:  e100_notify_netdev,
-	next:           NULL,
-	priority:       0
+	.notifier_call  = e100_notify_netdev,
+	.next           = NULL,
+	.priority       = 0
 };
 
 static void e100_get_mdix_status(struct e100_private *bdp);

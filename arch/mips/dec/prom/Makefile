@@ -9,7 +9,5 @@ obj-y := init.o memory.o cmdline.o identify.o locore.o
 
 EXTRA_AFLAGS := $(CFLAGS)
 
-include $(TOPDIR)/Rules.make
-
 dep:
 	$(CPP) $(CPPFLAGS) -M *.c > .depend

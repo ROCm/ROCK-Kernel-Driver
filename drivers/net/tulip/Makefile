@@ -15,5 +15,3 @@ obj-$(CONFIG_DE4X5)		+= de4x5.o
 tulip-objs			:= eeprom.o interrupt.o media.o \
 				   timer.o tulip_core.o		\
 				   21142.o pnic.o pnic2.o
-
-include $(TOPDIR)/Rules.make

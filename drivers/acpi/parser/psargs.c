@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: psargs - Parse AML opcode arguments
- *              $Revision: 65 $
+ *              $Revision: 67 $
  *
  *****************************************************************************/
 
@@ -151,7 +151,7 @@ acpi_ps_get_next_package_end (
  *
  ******************************************************************************/
 
-NATIVE_CHAR *
+char *
 acpi_ps_get_next_namestring (
 	acpi_parse_state        *parser_state)
 {
@@ -206,7 +206,7 @@ acpi_ps_get_next_namestring (
 	}
 
 	parser_state->aml = (u8*) end;
-	return_PTR ((NATIVE_CHAR *) start);
+	return_PTR ((char *) start);
 }
 
 
@@ -238,7 +238,7 @@ acpi_ps_get_next_namepath (
 	acpi_parse_object       *arg,
 	u8                      method_call)
 {
-	NATIVE_CHAR             *path;
+	char                    *path;
 	acpi_parse_object       *name_op;
 	acpi_status             status = AE_OK;
 	acpi_operand_object     *method_desc;

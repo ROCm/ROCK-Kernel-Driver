@@ -228,7 +228,7 @@ static inline void __downgrade_write(struct rw_semaphore *sem)
                 : "=&d" (old), "=&d" (new)
 		: "a" (&sem->count), "m" (tmp)
 		: "cc", "memory" );
-	if (new > 1) // FIXME: is this correct ?!?
+	if (new > 1)
 		rwsem_downgrade_wake(sem);
 }
 

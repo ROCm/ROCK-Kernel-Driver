@@ -488,14 +488,14 @@ int scsi_register_host(Scsi_Host_Template *shost_tp)
 	if (!shost_tp->max_sectors) {
 		printk(KERN_WARNING
 		    "scsi HBA driver %s didn't set max_sectors, "
-		    "please fix the template", shost_tp->name);
+		    "please fix the template\n", shost_tp->name);
 		shost_tp->max_sectors = 1024;
 	}
 
 	if (!shost_tp->release) {
 		printk(KERN_WARNING
 		    "scsi HBA driver %s didn't set a release method, "
-		    "please fix the template", shost_tp->name);
+		    "please fix the template\n", shost_tp->name);
 		shost_tp->release = &scsi_host_legacy_release;
 	}
 

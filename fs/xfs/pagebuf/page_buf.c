@@ -104,7 +104,7 @@ pb_trace_func(
 	pb_trace.buf[j].event = event;
 	pb_trace.buf[j].flags = pb->pb_flags;
 	pb_trace.buf[j].hold = pb->pb_hold.counter;
-	pb_trace.buf[j].lock_value = PBP(pb)->pb_sema.count.counter;
+	pb_trace.buf[j].lock_value = pb->pb_sema.count.counter;
 	pb_trace.buf[j].task = (void *)current;
 	pb_trace.buf[j].misc = misc;
 	pb_trace.buf[j].ra = ra;
@@ -118,7 +118,6 @@ pb_trace_func(
  */
 
 STATIC kmem_cache_t *pagebuf_cache;
-STATIC pagebuf_daemon_t *pb_daemon;
 STATIC void pagebuf_daemon_wakeup(int);
 STATIC struct workqueue_struct *pagebuf_workqueue;
 
@@ -272,12 +271,12 @@ _pagebuf_initialize(
 	 */
 	flags &= ~(PBF_LOCK|PBF_MAPPED|PBF_DONT_BLOCK|PBF_READ_AHEAD);
 
-	memset(pb, 0, sizeof(page_buf_private_t));
+	memset(pb, 0, sizeof(page_buf_t));
 	atomic_set(&pb->pb_hold, 1);
 	init_MUTEX_LOCKED(&pb->pb_iodonesema);
 	INIT_LIST_HEAD(&pb->pb_list);
 	INIT_LIST_HEAD(&pb->pb_hash_list);
-	init_MUTEX_LOCKED(&PBP(pb)->pb_sema); /* held, no waiters */
+	init_MUTEX_LOCKED(&pb->pb_sema); /* held, no waiters */
 	PB_SET_OWNER(pb);
 	pb->pb_target = target;
 	pb->pb_file_offset = range_base;
@@ -289,8 +288,8 @@ _pagebuf_initialize(
 	pb->pb_buffer_length = pb->pb_count_desired = range_length;
 	pb->pb_flags = flags | PBF_NONE;
 	pb->pb_bn = PAGE_BUF_DADDR_NULL;
-	atomic_set(&PBP(pb)->pb_pin_count, 0);
-	init_waitqueue_head(&PBP(pb)->pb_waiters);
+	atomic_set(&pb->pb_pin_count, 0);
+	init_waitqueue_head(&pb->pb_waiters);
 
 	PB_STATS_INC(pbstats.pb_create);
 	PB_TRACE(pb, PB_TRACE_REC(get), target);
@@ -657,7 +656,7 @@ found:
 	 * if this does not work then we need to drop the
 	 * spinlock and do a hard attempt on the semaphore.
 	 */
-	not_locked = down_trylock(&PBP(pb)->pb_sema);
+	not_locked = down_trylock(&pb->pb_sema);
 	if (not_locked) {
 		if (!(flags & PBF_TRYLOCK)) {
 			/* wait for buffer ownership */
@@ -788,28 +787,6 @@ pagebuf_get(				/* allocate a buffer		*/
 }
 
 /*
- * Create a pagebuf and populate it with pages from the address
- * space of the passed in inode.
- */
-page_buf_t *
-pagebuf_lookup(
-	struct pb_target	*target,
-	struct inode		*inode,
-	loff_t			ioff,
-	size_t			isize,
-	page_buf_flags_t	flags)
-{
-	page_buf_t		*pb = NULL;
-
-	flags |= _PBF_PRIVATE_BH;
-	pb = pagebuf_allocate(flags);
-	if (pb) {
-		_pagebuf_initialize(pb, target, ioff, isize, flags);
-	}
-	return pb;
-}
-
-/*
  * If we are not low on memory then do the readahead in a deadlock
  * safe manner.
  */
@@ -906,7 +883,7 @@ pagebuf_associate_memory(
 	pb->pb_locked = 0;
 
 	pb->pb_count_desired = pb->pb_buffer_length = len;
-	pb->pb_flags |= PBF_MAPPED | _PBF_PRIVATE_BH;
+	pb->pb_flags |= PBF_MAPPED;
 
 	return 0;
 }
@@ -952,7 +929,7 @@ pagebuf_get_no_daddr(
 	/* otherwise pagebuf_free just ignores it */
 	pb->pb_flags |= _PBF_MEM_ALLOCATED;
 	PB_CLEAR_OWNER(pb);
-	up(&PBP(pb)->pb_sema);	/* Return unlocked pagebuf */
+	up(&pb->pb_sema);	/* Return unlocked pagebuf */
 
 	PB_TRACE(pb, PB_TRACE_REC(no_daddr), rmem);
 
@@ -1070,8 +1047,8 @@ void
 pagebuf_pin(
 	page_buf_t		*pb)
 {
-	atomic_inc(&PBP(pb)->pb_pin_count);
-	PB_TRACE(pb, PB_TRACE_REC(pin), PBP(pb)->pb_pin_count.counter);
+	atomic_inc(&pb->pb_pin_count);
+	PB_TRACE(pb, PB_TRACE_REC(pin), pb->pb_pin_count.counter);
 }
 
 /*
@@ -1085,17 +1062,17 @@ void
 pagebuf_unpin(
 	page_buf_t		*pb)
 {
-	if (atomic_dec_and_test(&PBP(pb)->pb_pin_count)) {
-		wake_up_all(&PBP(pb)->pb_waiters);
+	if (atomic_dec_and_test(&pb->pb_pin_count)) {
+		wake_up_all(&pb->pb_waiters);
 	}
-	PB_TRACE(pb, PB_TRACE_REC(unpin), PBP(pb)->pb_pin_count.counter);
+	PB_TRACE(pb, PB_TRACE_REC(unpin), pb->pb_pin_count.counter);
 }
 
 int
 pagebuf_ispin(
 	page_buf_t		*pb)
 {
-	return atomic_read(&PBP(pb)->pb_pin_count);
+	return atomic_read(&pb->pb_pin_count);
 }
 
 /*
@@ -1111,19 +1088,19 @@ _pagebuf_wait_unpin(
 {
 	DECLARE_WAITQUEUE	(wait, current);
 
-	if (atomic_read(&PBP(pb)->pb_pin_count) == 0)
+	if (atomic_read(&pb->pb_pin_count) == 0)
 		return;
 
-	add_wait_queue(&PBP(pb)->pb_waiters, &wait);
+	add_wait_queue(&pb->pb_waiters, &wait);
 	for (;;) {
 		current->state = TASK_UNINTERRUPTIBLE;
-		if (atomic_read(&PBP(pb)->pb_pin_count) == 0) {
+		if (atomic_read(&pb->pb_pin_count) == 0) {
 			break;
 		}
 		pagebuf_run_queues(pb);
 		schedule();
 	}
-	remove_wait_queue(&PBP(pb)->pb_waiters, &wait);
+	remove_wait_queue(&pb->pb_waiters, &wait);
 	current->state = TASK_RUNNING;
 }
 
@@ -1503,44 +1480,6 @@ pagebuf_offset(
 }
 
 /*
- *	pagebuf_segment
- *
- *	pagebuf_segment is used to retrieve the various contiguous
- *	segments of a buffer.  The variable addressed by the
- *	loff_t * should be initialized to 0, and successive
- *	calls will update to point to the segment following the one
- *	returned.
- */
-STATIC void
-pagebuf_segment(
-	page_buf_t		*pb,	/* buffer to examine		*/
-	loff_t			*boff_p,/* offset in buffer of next	*/
-					/* next segment (updated)	*/
-	struct page		**spage_p, /* page (updated)		*/
-					/* (NULL if not in page array)	*/
-	size_t			*soff_p,/* offset in page (updated)	*/
-	size_t			*ssize_p) /* segment length (updated)	*/
-{
-	loff_t			kpboff;	/* offset in pagebuf		*/
-	int			kpi;	/* page index in pagebuf	*/
-	size_t			slen;	/* segment length		*/
-
-	kpboff = *boff_p;
-
-	kpi = page_buf_btoct(kpboff + pb->pb_offset);
-
-	*spage_p = pb->pb_pages[kpi];
-
-	*soff_p = page_buf_poff(kpboff + pb->pb_offset);
-	slen = PAGE_CACHE_SIZE - *soff_p;
-	if (slen > (pb->pb_count_desired - kpboff))
-		slen = (pb->pb_count_desired - kpboff);
-	*ssize_p = slen;
-
-	*boff_p = *boff_p + slen;
-}
-
-/*
  *	pagebuf_iomove
  *
  *	Move data into or out of a buffer.
@@ -1548,21 +1487,21 @@ pagebuf_segment(
 void
 pagebuf_iomove(
 	page_buf_t		*pb,	/* buffer to process		*/
-	off_t			boff,	/* starting buffer offset	*/
+	size_t			boff,	/* starting buffer offset	*/
 	size_t			bsize,	/* length to copy		*/
 	caddr_t			data,	/* data address			*/
 	page_buf_rw_t		mode)	/* read/write flag		*/
 {
-	loff_t			cboff;
-	size_t			cpoff;
-	size_t			csize;
+	size_t			bend, cpoff, csize;
 	struct page		*page;
 
-	cboff = boff;
-	boff += bsize; /* last */
+	bend = boff + bsize;
+	while (boff < bend) {
+		page = pb->pb_pages[page_buf_btoct(boff + pb->pb_offset)];
+		cpoff = page_buf_poff(boff + pb->pb_offset);
+		csize = min_t(size_t,
+			      PAGE_CACHE_SIZE-cpoff, pb->pb_count_desired-boff);
 
-	while (cboff < boff) {
-		pagebuf_segment(pb, &cboff, &page, &cpoff, &csize);
 		ASSERT(((csize + cpoff) <= PAGE_CACHE_SIZE));
 
 		switch (mode) {
@@ -1576,6 +1515,7 @@ pagebuf_iomove(
 			memcpy(page_address(page) + cpoff, data, csize);
 		}
 
+		boff += csize;
 		data += csize;
 	}
 }
@@ -1584,13 +1524,17 @@ pagebuf_iomove(
  * Pagebuf delayed write buffer handling
  */
 
+STATIC int pbd_active = 1;
+STATIC LIST_HEAD(pbd_delwrite_queue);
+STATIC spinlock_t pbd_delwrite_lock = SPIN_LOCK_UNLOCKED;
+
 void
 pagebuf_delwri_queue(
 	page_buf_t		*pb,
 	int			unlock)
 {
 	PB_TRACE(pb, PB_TRACE_REC(delwri_q), unlock);
-	spin_lock(&pb_daemon->pb_delwrite_lock);
+	spin_lock(&pbd_delwrite_lock);
 	/* If already in the queue, dequeue and place at tail */
 	if (!list_empty(&pb->pb_list)) {
 		if (unlock) {
@@ -1599,9 +1543,9 @@ pagebuf_delwri_queue(
 		list_del(&pb->pb_list);
 	}
 
-	list_add_tail(&pb->pb_list, &pb_daemon->pb_delwrite_l);
-	PBP(pb)->pb_flushtime = jiffies + pb_params.p_un.age_buffer;
-	spin_unlock(&pb_daemon->pb_delwrite_lock);
+	list_add_tail(&pb->pb_list, &pbd_delwrite_queue);
+	pb->pb_flushtime = jiffies + pb_params.p_un.age_buffer;
+	spin_unlock(&pbd_delwrite_lock);
 
 	if (unlock && (pb->pb_flags & _PBF_LOCKABLE)) {
 		pagebuf_unlock(pb);
@@ -1613,10 +1557,10 @@ pagebuf_delwri_dequeue(
 	page_buf_t		*pb)
 {
 	PB_TRACE(pb, PB_TRACE_REC(delwri_uq), 0);
-	spin_lock(&pb_daemon->pb_delwrite_lock);
+	spin_lock(&pbd_delwrite_lock);
 	list_del_init(&pb->pb_list);
 	pb->pb_flags &= ~PBF_DELWRI;
-	spin_unlock(&pb_daemon->pb_delwrite_lock);
+	spin_unlock(&pbd_delwrite_lock);
 }
 
 /* Defines for pagebuf daemon */
@@ -1659,7 +1603,7 @@ pagebuf_daemon(
 
 	INIT_LIST_HEAD(&tmp);
 	do {
-		if (pb_daemon->active == 1) {
+		if (pbd_active == 1) {
 			del_timer(&pb_daemon_timer);
 			pb_daemon_timer.expires = jiffies +
 					pb_params.p_un.flush_interval;
@@ -1667,14 +1611,14 @@ pagebuf_daemon(
 			interruptible_sleep_on(&pbd_waitq);
 		}
 
-		if (pb_daemon->active == 0) {
+		if (pbd_active == 0) {
 			del_timer(&pb_daemon_timer);
 		}
 
-		spin_lock(&pb_daemon->pb_delwrite_lock);
+		spin_lock(&pbd_delwrite_lock);
 
 		count = 0;
-		list_for_each_safe(curr, next, &pb_daemon->pb_delwrite_l) {
+		list_for_each_safe(curr, next, &pbd_delwrite_queue) {
 			pb = list_entry(curr, page_buf_t, pb_list);
 
 			PB_TRACE(pb, PB_TRACE_REC(walkq1), pagebuf_ispin(pb));
@@ -1683,8 +1627,8 @@ pagebuf_daemon(
 			    (((pb->pb_flags & _PBF_LOCKABLE) == 0) ||
 			     !pagebuf_cond_lock(pb))) {
 
-				if (!force_flush && time_before(jiffies,
-						PBP(pb)->pb_flushtime)) {
+				if (!force_flush &&
+				    time_before(jiffies, pb->pb_flushtime)) {
 					pagebuf_unlock(pb);
 					break;
 				}
@@ -1696,7 +1640,7 @@ pagebuf_daemon(
 			}
 		}
 
-		spin_unlock(&pb_daemon->pb_delwrite_lock);
+		spin_unlock(&pbd_delwrite_lock);
 		while (!list_empty(&tmp)) {
 			pb = list_entry(tmp.next, page_buf_t, pb_list);
 			list_del_init(&pb->pb_list);
@@ -1712,9 +1656,9 @@ pagebuf_daemon(
 			pagebuf_run_queues(NULL);
 
 		force_flush = 0;
-	} while (pb_daemon->active == 1);
+	} while (pbd_active == 1);
 
-	pb_daemon->active = -1;
+	pbd_active = -1;
 	wake_up_interruptible(&pbd_waitq);
 
 	return 0;
@@ -1730,10 +1674,10 @@ pagebuf_delwri_flush(
 	struct list_head	*curr, *next, tmp;
 	int			pincount = 0;
 
-	spin_lock(&pb_daemon->pb_delwrite_lock);
+	spin_lock(&pbd_delwrite_lock);
 	INIT_LIST_HEAD(&tmp);
 
-	list_for_each_safe(curr, next, &pb_daemon->pb_delwrite_l) {
+	list_for_each_safe(curr, next, &pbd_delwrite_queue) {
 		pb = list_entry(curr, page_buf_t, pb_list);
 
 		/*
@@ -1764,7 +1708,7 @@ pagebuf_delwri_flush(
 			pb->pb_flags &= ~PBF_ASYNC;
 		}
 
-		spin_unlock(&pb_daemon->pb_delwrite_lock);
+		spin_unlock(&pbd_delwrite_lock);
 
 		if ((flags & PBDF_TRYLOCK) == 0) {
 			pagebuf_lock(pb);
@@ -1775,10 +1719,10 @@ pagebuf_delwri_flush(
 
 		__pagebuf_iorequest(pb);
 
-		spin_lock(&pb_daemon->pb_delwrite_lock);
+		spin_lock(&pbd_delwrite_lock);
 	}
 
-	spin_unlock(&pb_daemon->pb_delwrite_lock);
+	spin_unlock(&pbd_delwrite_lock);
 
 	pagebuf_run_queues(NULL);
 
@@ -1802,26 +1746,17 @@ pagebuf_delwri_flush(
 STATIC int
 pagebuf_daemon_start(void)
 {
-	if (!pb_daemon) {
-		pb_daemon = (pagebuf_daemon_t *)
-				kmalloc(sizeof(pagebuf_daemon_t), GFP_KERNEL);
-		if (!pb_daemon) {
-			return -1; /* error */
-		}
+	int		rval;
 
-		pb_daemon->active = 1;
-		pb_daemon->pb_delwrite_lock = SPIN_LOCK_UNLOCKED;
+	pagebuf_workqueue = create_workqueue("pagebuf");
+	if (!pagebuf_workqueue)
+		return -ENOMEM;
 
-		INIT_LIST_HEAD(&pb_daemon->pb_delwrite_l);
+	rval = kernel_thread(pagebuf_daemon, NULL, CLONE_FS|CLONE_FILES);
+	if (rval < 0)
+		destroy_workqueue(pagebuf_workqueue);
 
-		kernel_thread(pagebuf_daemon, (void *)pb_daemon,
-				CLONE_FS|CLONE_FILES|CLONE_VM);
-
-		pagebuf_workqueue = create_workqueue("pagebuf");
-		if (!pagebuf_workqueue)
-			return -1;
-	}
-	return 0;
+	return rval;
 }
 
 /*
@@ -1832,19 +1767,10 @@ pagebuf_daemon_start(void)
 STATIC void
 pagebuf_daemon_stop(void)
 {
-	if (pb_daemon) {
-		destroy_workqueue(pagebuf_workqueue);
-
-		pb_daemon->active = 0;
-
-		wake_up_interruptible(&pbd_waitq);
-		while (pb_daemon->active == 0) {
-			interruptible_sleep_on(&pbd_waitq);
-		}
-
-		kfree(pb_daemon);
-		pb_daemon = NULL;
-	}
+	pbd_active = 0;
+	wake_up_interruptible(&pbd_waitq);
+	wait_event_interruptible(pbd_waitq, pbd_active);
+	destroy_workqueue(pagebuf_workqueue);
 }
 
 
@@ -1965,8 +1891,7 @@ pagebuf_init(void)
 			"fs/pagebuf/stat", 0, 0, pagebuf_readstats, NULL);
 #endif
 
-	pagebuf_cache = kmem_cache_create("page_buf_t",
-			sizeof(page_buf_private_t), 0,
+	pagebuf_cache = kmem_cache_create("page_buf_t", sizeof(page_buf_t), 0,
 			SLAB_HWCACHE_ALIGN, NULL, NULL);
 	if (pagebuf_cache == NULL) {
 		printk("pagebuf: couldn't init pagebuf cache\n");

@@ -113,7 +113,6 @@ struct subchannel {
 #define to_subchannel(n) container_of(n, struct subchannel, dev)
 
 extern int cio_validate_subchannel (struct subchannel *, unsigned int);
-extern int cio_modify (struct subchannel *);
 extern int cio_enable_subchannel (struct subchannel *, unsigned int);
 extern int cio_disable_subchannel (struct subchannel *);
 extern int cio_cancel (struct subchannel *);
@@ -127,7 +126,6 @@ extern int cio_set_options (struct subchannel *, int);
 extern int cio_get_options (struct subchannel *);
 
 /* Use with care. */
-extern int cio_tpi (void);
 extern struct subchannel *cio_probe_console(void);
 extern void cio_release_console(void);
 

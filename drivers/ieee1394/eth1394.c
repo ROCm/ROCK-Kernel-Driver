@@ -55,9 +55,9 @@
 #include <linux/ip.h>
 #include <linux/tcp.h>
 #include <linux/skbuff.h>
+#include <linux/bitops.h>
 #include <asm/delay.h>
 #include <asm/semaphore.h>
-#include <asm/bitops.h>
 #include <net/arp.h>
 
 #include "ieee1394_types.h"
@@ -77,7 +77,7 @@
 	printk(KERN_ERR fmt, ## args)
 
 static char version[] __devinitdata =
-	"$Rev: 601 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 641 $ Ben Collins <bcollins@debian.org>";
 
 /* Our ieee1394 highlevel driver */
 #define ETHER1394_DRIVER_NAME "ether1394"
@@ -360,7 +360,7 @@ static void ether1394_add_host (struct hpsb_host *host)
 	priv->host = host;
 
 	hi = (struct host_info *)kmalloc (sizeof (struct host_info),
-					  GFP_KERNEL);
+					  in_interrupt() ? SLAB_ATOMIC : SLAB_KERNEL);
 
 	if (hi == NULL)
 		goto out;
@@ -682,6 +682,8 @@ static int ether1394_tx (struct sk_buff *skb, struct net_device *dev)
 	ptask->skb = skb;
 	ptask->addr = addr;
 	ptask->dest_node = dest_node;
+	/* TODO: When 2.4 is out of the way, give each of our ethernet
+	 * dev's a workqueue to handle these.  */
 	HPSB_INIT_WORK(&ptask->tq, hpsb_write_sched, ptask);
 	hpsb_schedule_work(&ptask->tq);
 

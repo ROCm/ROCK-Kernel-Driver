@@ -15,5 +15,3 @@ endif
 ifdef CONFIG_MIDI_EMU10K1
     EXTRA_CFLAGS += -DEMU10K1_SEQUENCER
 endif
-
-include $(TOPDIR)/Rules.make

@@ -415,7 +415,7 @@ cifs_partialpagewrite(struct page *page,unsigned from, unsigned to)
 }
 
 static int
-cifs_writepage(struct page* page)
+cifs_writepage(struct page* page, struct writeback_control *wbc)
 {
 	int rc = -EFAULT;
 	int xid;
