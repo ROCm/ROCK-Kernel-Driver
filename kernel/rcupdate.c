@@ -47,7 +47,7 @@
 
 /* Definition for rcupdate control block. */
 struct rcu_ctrlblk rcu_ctrlblk = 
-	{ .batch = { .cur = -300, .completed = -300 },
+	{ .batch = { .cur = -300, .completed = -300 , .lock = SEQCNT_ZERO },
 	  .state = {.mutex = SPIN_LOCK_UNLOCKED, .rcu_cpu_mask = CPU_MASK_NONE } };
 DEFINE_PER_CPU(struct rcu_data, rcu_data) = { 0L };
 
@@ -124,16 +124,18 @@ static void rcu_start_batch(int next_pending)
 	cpumask_t active;
 
 	if (next_pending)
-		rcu_ctrlblk.state.next_pending = 1;
+		rcu_ctrlblk.batch.next_pending = 1;
 
-	if (rcu_ctrlblk.state.next_pending &&
+	if (rcu_ctrlblk.batch.next_pending &&
 			rcu_ctrlblk.batch.completed == rcu_ctrlblk.batch.cur) {
-		rcu_ctrlblk.state.next_pending = 0;
 		/* Can't change, since spin lock held. */
 		active = nohz_cpu_mask;
 		cpus_complement(active);
 		cpus_and(rcu_ctrlblk.state.rcu_cpu_mask, cpu_online_map, active);
+		write_seqcount_begin(&rcu_ctrlblk.batch.lock);
+		rcu_ctrlblk.batch.next_pending = 0;
 		rcu_ctrlblk.batch.cur++;
+		write_seqcount_end(&rcu_ctrlblk.batch.lock);
 	}
 }
 
@@ -261,6 +263,8 @@ static void rcu_process_callbacks(unsigned long unused)
 
 	local_irq_disable();
 	if (!list_empty(&RCU_nxtlist(cpu)) && list_empty(&RCU_curlist(cpu))) {
+		int next_pending, seq;
+
 		__list_splice(&RCU_nxtlist(cpu), &RCU_curlist(cpu));
 		INIT_LIST_HEAD(&RCU_nxtlist(cpu));
 		local_irq_enable();
@@ -268,10 +272,19 @@ static void rcu_process_callbacks(unsigned long unused)
 		/*
 		 * start the next batch of callbacks
 		 */
-		spin_lock(&rcu_ctrlblk.state.mutex);
-		RCU_batch(cpu) = rcu_ctrlblk.batch.cur + 1;
-		rcu_start_batch(1);
-		spin_unlock(&rcu_ctrlblk.state.mutex);
+		do {
+			seq = read_seqcount_begin(&rcu_ctrlblk.batch.lock);
+			/* determine batch number */
+			RCU_batch(cpu) = rcu_ctrlblk.batch.cur + 1;
+			next_pending = rcu_ctrlblk.batch.next_pending;
+		} while (read_seqcount_retry(&rcu_ctrlblk.batch.lock, seq));
+
+		if (!next_pending) {
+			/* and start it/schedule start if it's a new batch */
+			spin_lock(&rcu_ctrlblk.state.mutex);
+			rcu_start_batch(1);
+			spin_unlock(&rcu_ctrlblk.state.mutex);
+		}
 	} else {
 		local_irq_enable();
 	}

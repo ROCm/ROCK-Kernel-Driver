@@ -41,6 +41,7 @@
 #include <linux/threads.h>
 #include <linux/percpu.h>
 #include <linux/cpumask.h>
+#include <linux/seqlock.h>
 
 /**
  * struct rcu_head - callback structure for use with RCU
@@ -69,11 +70,14 @@ struct rcu_ctrlblk {
 	struct {
 		long	cur;		/* Current batch number.	      */
 		long	completed;	/* Number of the last completed batch */
+		int	next_pending;	/* Is the next batch already waiting? */
+		seqcount_t lock;	/* for atomically reading cur and     */
+		                        /* next_pending. Spinlock not used,   */
+		                        /* protected by state.mutex           */
 	} batch ____cacheline_maxaligned_in_smp;
 	/* remaining members: bookkeeping of the progress of the grace period */
 	struct {
 		spinlock_t	mutex;	/* Guard this struct                  */
-		int	next_pending;	/* Is the next batch already waiting? */
 		cpumask_t	rcu_cpu_mask; 	/* CPUs that need to switch   */
 				/* in order for current batch to proceed.     */
 	} state ____cacheline_maxaligned_in_smp;
