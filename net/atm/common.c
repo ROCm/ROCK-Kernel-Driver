@@ -148,7 +148,7 @@ int vcc_create(struct socket *sock, int protocol, int family)
 	sk->sk_state_change = vcc_def_wakeup;
 	sk->sk_write_space = vcc_write_space;
 
-	vcc = atm_sk(sk) = kmalloc(sizeof(*vcc), GFP_KERNEL);
+	vcc = sk->sk_protinfo = kmalloc(sizeof(*vcc), GFP_KERNEL);
 	if (!vcc) {
 		sk_free(sk);
 		return -ENOMEM;

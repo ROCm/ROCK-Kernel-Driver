@@ -456,7 +456,7 @@ struct sock *dn_alloc_sock(struct socket *sock, int gfp)
 	if  (!sk)
 		goto out;
 
-	DN_SK(sk) = scp = (struct dn_scp *)(sk + 1);
+	sk->sk_protinfo = scp = (struct dn_scp *)(sk + 1);
 
 	if (sock)
 		sock->ops = &dn_proto_ops;
