@@ -464,6 +464,7 @@ dasd_ioctl_set_ro(struct block_device *bdev, int no, long args)
 		devmap->features &= ~DASD_FEATURE_READONLY;
 	for (i = 0; i < (1 << DASD_PARTN_BITS); i++)
 		set_device_ro(to_kdev_t(bdev->bd_dev + i), intval);
+	device->ro_flag = intval;
 	dasd_put_device(devmap);
 	return 0;
 }

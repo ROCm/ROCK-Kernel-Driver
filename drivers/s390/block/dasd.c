@@ -236,7 +236,7 @@ dasd_alloc_device(dasd_devmap_t *devmap)
 	}
 
 	/* Allocate gendisk structure for device. */
-	gdp = dasd_gendisk_alloc(device->name, devmap->devindex);
+	gdp = dasd_gendisk_alloc(devmap->devindex);
 	if (IS_ERR(gdp)) {
 		free_page((unsigned long) device->erp_mem);
 		free_pages((unsigned long) device->ccw_mem, 1);
@@ -294,10 +294,6 @@ dasd_state_new_to_known(dasd_device_t *device)
 		return -ENODEV;
 	minor = devmap->devindex % DASD_PER_MAJOR;
 
-	/* Set bdev and the device name. */
-	device->bdev = bdget(MKDEV(major, minor << DASD_PARTN_BITS));
-	strcpy(device->name, device->gdp->disk_name);
-
 	/* Find a discipline for the device. */
 	rc = dasd_find_disc(device);
 	if (rc)
@@ -341,8 +337,8 @@ dasd_state_known_to_new(dasd_device_t * device)
 	device->state = DASD_STATE_NEW;
 
 	/* Forget the block device */
-	bdev = device->bdev;
-	device->bdev = NULL;
+	bdev = bdget(MKDEV(device->gdp->major, device->gdp->first_minor));
+	bdput(bdev);
 	bdput(bdev);
 }
 
@@ -355,7 +351,7 @@ dasd_state_known_to_basic(dasd_device_t * device)
 	int rc;
 
 	/* register 'device' debug area, used for all DBF_DEV_XXX calls */
-	device->debug_area = debug_register(device->name, 0, 2,
+	device->debug_area = debug_register(device->gdp->disk_name, 0, 2,
 					    8 * sizeof (long));
 	debug_register_view(device->debug_area, &debug_sprintf_view);
 	debug_set_level(device->debug_area, DBF_ERR);
@@ -436,7 +432,7 @@ dasd_state_accept_to_basic(dasd_device_t * device)
 static inline kdev_t
 dasd_partition_to_kdev_t(dasd_device_t *device, unsigned int partition)
 {
-	return to_kdev_t(device->bdev->bd_dev+partition);
+	return mk_kdev(device->gdp->major, device->gdp->first_minor+partition);
 }
 
 
@@ -453,6 +449,7 @@ dasd_state_accept_to_ready(dasd_device_t * device)
 	if (devmap->features & DASD_FEATURE_READONLY) {
 		for (i = 0; i < (1 << DASD_PARTN_BITS); i++)
 			set_device_ro(dasd_partition_to_kdev_t(device, i), 1);
+		device->ro_flag = 1;
 		DEV_MESSAGE (KERN_WARNING, device, "%s",
 			     "setting read-only mode ");
 	}
@@ -1582,17 +1579,12 @@ dasd_end_request_cb(dasd_ccw_req_t * cqr, void *data)
 static inline void
 __dasd_process_blk_queue(dasd_device_t * device)
 {
-	struct block_device *bdev;
 	request_queue_t *queue;
 	struct list_head *l;
 	struct request *req;
 	dasd_ccw_req_t *cqr;
 	int nr_queued;
 
-	/* No bdev, no queue. */
-	bdev = device->bdev;
-	if (!bdev)
-		return;
 	queue = device->request_queue;
 	/* No queue ? Then there is nothing to do. */
 	if (queue == NULL)
@@ -1619,7 +1611,7 @@ __dasd_process_blk_queue(dasd_device_t * device)
 	       !blk_queue_empty(queue) &&
 		nr_queued < DASD_CHANQ_MAX_SIZE) {
 		req = elv_next_request(queue);
-		if (bdev_read_only(bdev) && rq_data_dir(req) == WRITE) {
+		if (device->ro_flag && rq_data_dir(req) == WRITE) {
 			DBF_EVENT(DBF_ERR,
 				  "(%04x) Rejecting write request %p",
 				  device->devinfo.devno, req);
