@@ -293,10 +293,6 @@ static void iommu_table_setparms_lpar(struct pci_controller *phb,
 				      struct iommu_table *tbl,
 				      unsigned int *dma_window)
 {
-	if (!dma_window)
-		panic("iommu_table_setparms_lpar: device %s has no"
-		      " ibm,dma-window property!\n", dn->full_name);
-
 	tbl->it_busno  = dn->bussubno;
 
 	/* TODO: Parse field size properties properly. */
@@ -385,7 +381,10 @@ static void iommu_bus_setup_pSeriesLP(struct pci_bus *bus)
 			break;
 	}
 
-	WARN_ON(dma_window == NULL);
+	if (dma_window == NULL) {
+		DBG("iommu_bus_setup_pSeriesLP: bus %s seems to have no ibm,dma-window property\n", dn->full_name);
+		return;
+	}
 
 	if (!pdn->iommu_table) {
 		/* Bussubno hasn't been copied yet.
@@ -420,10 +419,11 @@ static void iommu_dev_setup_pSeries(struct pci_dev *dev)
 	while (dn && dn->iommu_table == NULL)
 		dn = dn->parent;
 
-	WARN_ON(!dn);
-
-	if (dn)
+	if (dn) {
 		mydn->iommu_table = dn->iommu_table;
+	} else {
+		DBG("iommu_dev_setup_pSeries, dev %p (%s) has no iommu table\n", dev, dev->pretty_name);
+	}
 }
 
 static void iommu_bus_setup_null(struct pci_bus *b) { }
