@@ -756,12 +756,6 @@ static ide_startstop_t promise_rw_disk (ide_drive_t *drive, struct request *rq, 
 
 	BUG_ON(rq->nr_sectors > 127);
 
-	if (!blk_fs_request(rq)) {
-		blk_dump_rq_flags(rq, "promise_rw_disk - bad command");
-		DRIVER(drive)->end_request(drive, 0, 0);
-		return ide_stopped;
-	}
-
 #ifdef DEBUG
 	printk(KERN_DEBUG "%s: %sing: LBAsect=%lu, sectors=%lu\n",
 			  drive->name, rq_data_dir(rq) ? "writ" : "read",
