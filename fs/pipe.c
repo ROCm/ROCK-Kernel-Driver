@@ -235,6 +235,12 @@ pipe_writev(struct file *filp, const struct iovec *_iov,
 	down(PIPE_SEM(*inode));
 	info = inode->i_pipe;
 
+	if (!PIPE_READERS(*inode)) {
+		send_sig(SIGPIPE, current, 0);
+		ret = -EPIPE;
+		goto out;
+	}
+
 	/* We try to merge small writes */
 	if (info->nrbufs && total_len < PAGE_SIZE) {
 		int lastbuf = (info->curbuf + info->nrbufs - 1) & (PIPE_BUFFERS-1);
