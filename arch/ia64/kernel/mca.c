@@ -322,7 +322,7 @@ fetch_min_state (pal_min_state_area_t *ms, struct pt_regs *pt, struct switch_sta
 }
 
 void
-init_handler_platform (sal_log_processor_info_t *proc_ptr,
+init_handler_platform (pal_min_state_area_t *ms,
 		       struct pt_regs *pt, struct switch_stack *sw)
 {
 	struct unw_frame_info info;
@@ -337,10 +337,10 @@ init_handler_platform (sal_log_processor_info_t *proc_ptr,
 	 */
 	printk("Delaying for 5 seconds...\n");
 	udelay(5*1000000);
-	show_min_state(&SAL_LPI_PSI_INFO(proc_ptr)->min_state_area);
+	show_min_state(ms);
 
 	printk("Backtrace of current task (pid %d, %s)\n", current->pid, current->comm);
-	fetch_min_state(&SAL_LPI_PSI_INFO(proc_ptr)->min_state_area, pt, sw);
+	fetch_min_state(ms, pt, sw);
 	unw_init_from_interruption(&info, current, pt, sw);
 	ia64_do_show_stack(&info, NULL);
 
@@ -1240,32 +1240,19 @@ device_initcall(ia64_mca_late_init);
 void
 ia64_init_handler (struct pt_regs *pt, struct switch_stack *sw)
 {
-	sal_log_processor_info_t *proc_ptr;
-	ia64_err_rec_t *plog_ptr;
+	pal_min_state_area_t *ms;
 
-	printk(KERN_INFO "Entered OS INIT handler\n");
-
-	/* Get the INIT processor log */
-	if (!ia64_log_get(SAL_INFO_TYPE_INIT, (prfunc_t)printk))
-		return;                 // no record retrieved
-
-#ifdef IA64_DUMP_ALL_PROC_INFO
-	ia64_log_print(SAL_INFO_TYPE_INIT, (prfunc_t)printk);
-#endif
+	printk(KERN_INFO "Entered OS INIT handler. PSP=%lx\n",
+		ia64_sal_to_os_handoff_state.proc_state_param);
 
 	/*
-	 * get pointer to min state save area
-	 *
+	 * Address of minstate area provided by PAL is physical,
+	 * uncacheable (bit 63 set). Convert to Linux virtual
+	 * address in region 6.
 	 */
-	plog_ptr=(ia64_err_rec_t *)IA64_LOG_CURR_BUFFER(SAL_INFO_TYPE_INIT);
-	proc_ptr = &plog_ptr->proc_err;
+	ms = (pal_min_state_area_t *)(ia64_sal_to_os_handoff_state.pal_min_state | (6ul<<61));
 
-	ia64_process_min_state_save(&SAL_LPI_PSI_INFO(proc_ptr)->min_state_area);
-
-	/* Clear the INIT SAL logs now that they have been saved in the OS buffer */
-	ia64_sal_clear_state_info(SAL_INFO_TYPE_INIT);
-
-	init_handler_platform(proc_ptr, pt, sw);	/* call platform specific routines */
+	init_handler_platform(ms, pt, sw);	/* call platform specific routines */
 }
 
 /*
