@@ -1,5 +1,5 @@
 ====================================================================
-=             Adaptec Ultra320 Family Manager Set v1.10.1          =
+=             Adaptec Ultra320 Family Manager Set v1.1.1           =
 =                                                                  =
 =                            README for                            =
 =                    The Linux Operating System                    =
@@ -43,12 +43,12 @@ The following information is available in this file:
 
 2. Version History
 
-   (V1.10.1, September 2002) Added support for the Linux 2.5.X kernel series
+   (V1.1.1, September 2002) Added support for the Linux 2.5.X kernel series
 
-   (V1.10, August 2002) Added support for four additional SCSI
+   (V1.1, August 2002) Added support for four additional SCSI
    products: ASC-39320, ASC-29320, ASC-29320LP, AIC-7901.
 
-   (V1.00, May 2002) This is the initial release of the 
+   (V1.0, May 2002) This is the initial release of the 
    Ultra320 FMS.  The following is a list of supported features:
 
    2.1. Software/Hardware Features
