@@ -1461,8 +1461,8 @@ static struct net_device_stats *ixgb_get_stats(struct net_device *netdev)
 static int ixgb_change_mtu(struct net_device *netdev, int new_mtu)
 {
 	struct ixgb_adapter *adapter = netdev->priv;
-	uint32_t old_mtu = adapter->rx_buffer_len;
 	int max_frame = new_mtu + ENET_HEADER_SIZE + ENET_FCS_LENGTH;
+	int old_max_frame = netdev->mtu + ENET_HEADER_SIZE + ENET_FCS_LENGTH;
 
 	if ((max_frame < IXGB_MIN_ENET_FRAME_SIZE_WITHOUT_FCS + ENET_FCS_LENGTH)
 	    || (max_frame > IXGB_MAX_JUMBO_FRAME_SIZE + ENET_FCS_LENGTH)) {
@@ -1487,7 +1487,7 @@ static int ixgb_change_mtu(struct net_device *netdev, int new_mtu)
 
 	netdev->mtu = new_mtu;
 
-	if (old_mtu != adapter->rx_buffer_len && netif_running(netdev)) {
+	if(old_max_frame != max_frame && netif_running(netdev)) {
 
 		ixgb_down(adapter, TRUE);
 		ixgb_up(adapter);
