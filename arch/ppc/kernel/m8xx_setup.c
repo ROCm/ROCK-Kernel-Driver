@@ -396,14 +396,6 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.find_end_of_memory	= m8xx_find_end_of_memory;
 	ppc_md.setup_io_mappings	= m8xx_map_io;
 
-	ppc_md.kbd_setkeycode		= NULL;
-	ppc_md.kbd_getkeycode		= NULL;
-	ppc_md.kbd_translate		= NULL;
-	ppc_md.kbd_unexpected_up	= NULL;
-	ppc_md.kbd_leds			= NULL;
-	ppc_md.kbd_init_hw		= NULL;
-	ppc_md.ppc_kbd_sysrq_xlate	= NULL;
-
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
 	m8xx_ide_init();
 #endif

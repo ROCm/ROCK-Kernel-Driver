@@ -97,15 +97,6 @@
 extern u_int openpic_irq(void);
 extern void openpic_eoi(void);
 
-extern int pckbd_setkeycode(unsigned int scancode, unsigned int keycode);
-extern int pckbd_getkeycode(unsigned int scancode);
-extern int pckbd_translate(unsigned char scancode, unsigned char *keycode,
-		                           char raw_mode);
-extern char pckbd_unexpected_up(unsigned char keycode);
-extern void pckbd_leds(unsigned char leds);
-extern void pckbd_init_hw(void);
-extern unsigned char pckbd_sysrq_xlate[128];
-
 static void	sandpoint_halt(void);
 
 
@@ -644,19 +635,6 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 #else	/* !CONFIG_SERIAL_TEXT_DEBUG */
 	ppc_md.progress = NULL;
 #endif	/* CONFIG_SERIAL_TEXT_DEBUG */
-
-#ifdef CONFIG_VT
-	ppc_md.kbd_setkeycode    = pckbd_setkeycode;
-	ppc_md.kbd_getkeycode    = pckbd_getkeycode;
-	ppc_md.kbd_translate     = pckbd_translate;
-	ppc_md.kbd_unexpected_up = pckbd_unexpected_up;
-	ppc_md.kbd_leds          = pckbd_leds;
-	ppc_md.kbd_init_hw       = pckbd_init_hw;
-#ifdef CONFIG_MAGIC_SYSRQ
-	ppc_md.ppc_kbd_sysrq_xlate       = pckbd_sysrq_xlate;
-	SYSRQ_KEY = 0x54;
-#endif
-#endif
 
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
         ppc_ide_md.default_irq = sandpoint_ide_default_irq;
