@@ -52,8 +52,8 @@
 #define TIOCMBIC	_IOW('t', 107, int)
 #define TIOCMBIS	_IOW('t', 108, int)
 #define TIOCMSET	_IOW('t', 109, int)
-#define __TIOCSTART       _IO('t', 110) /* SunOS Specific */
-#define __TIOCSTOP        _IO('t', 111) /* SunOS Specific */
+#define TIOCSTART       _IO('t', 110)
+#define TIOCSTOP        _IO('t', 111)
 #define TIOCPKT		_IOW('t', 112, int)
 #define TIOCNOTTY	_IO('t', 113)
 #define TIOCSTI		_IOW('t', 114, char)
