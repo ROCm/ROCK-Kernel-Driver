@@ -75,7 +75,7 @@ typedef __s64	Elf64_Sxword;
 
 #define EM_IA_64	50	/* HP/Intel IA-64 */
 
-#define EM_X8664	62	/* AMD x86-64 */
+#define EM_X86_64	62	/* AMD x86-64 */
 
 #define EM_S390		22	/* IBM S/390 */
 
