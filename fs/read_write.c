@@ -567,8 +567,12 @@ static ssize_t do_sendfile(int out_fd, int in_fd, loff_t *ppos,
 		goto fput_in;
 	if (!in_file->f_op || !in_file->f_op->sendfile)
 		goto fput_in;
+	retval = -ESPIPE;
 	if (!ppos)
 		ppos = &in_file->f_pos;
+	else
+		if (!(in_file->f_mode & FMODE_PREAD))
+			goto fput_in;
 	retval = locks_verify_area(FLOCK_VERIFY_READ, in_inode, in_file, *ppos, count);
 	if (retval)
 		goto fput_in;

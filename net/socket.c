@@ -727,9 +727,6 @@ ssize_t sock_sendpage(struct file *file, struct page *page,
 	struct socket *sock;
 	int flags;
 
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
-
 	sock = SOCKET_I(file->f_dentry->d_inode);
 
 	flags = !(file->f_flags & O_NONBLOCK) ? 0 : MSG_DONTWAIT;
