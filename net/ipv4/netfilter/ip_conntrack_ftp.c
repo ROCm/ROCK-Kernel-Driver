@@ -381,6 +381,7 @@ static int help(struct sk_buff *skb,
 		   problem (DMZ machines opening holes to internal
 		   networks, or the packet filter itself). */
 		if (!loose) {
+			ip_conntrack_expect_put(exp);
 			ret = NF_ACCEPT;
 			goto out;
 		}
