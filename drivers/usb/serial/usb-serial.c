@@ -1,7 +1,7 @@
 /*
  * USB Serial Converter driver
  *
- * Copyright (C) 1999 - 2003 Greg Kroah-Hartman (greg@kroah.com)
+ * Copyright (C) 1999 - 2004 Greg Kroah-Hartman (greg@kroah.com)
  * Copyright (C) 2000 Peter Berger (pberger@brimson.com)
  * Copyright (C) 2000 Al Borchers (borchers@steinerpoint.com)
  *
@@ -330,6 +330,7 @@
 #include <linux/tty_driver.h>
 #include <linux/tty_flip.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/spinlock.h>
 #include <linux/list.h>
 #include <linux/smp_lock.h>
@@ -1409,5 +1410,5 @@ MODULE_AUTHOR( DRIVER_AUTHOR );
 MODULE_DESCRIPTION( DRIVER_DESC );
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(debug, "i");
+module_param(debug, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(debug, "Debug enabled or not");

@@ -16,6 +16,7 @@
 #include <linux/tty.h>
 #include <linux/tty_flip.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/usb.h>
 #include <asm/uaccess.h>
 
@@ -32,10 +33,10 @@
 static __u16 vendor  = 0x05f9;
 static __u16 product = 0xffff;
 
-MODULE_PARM(vendor, "h");
+module_param(vendor, ushort, 0);
 MODULE_PARM_DESC(vendor, "User specified USB idVendor");
 
-MODULE_PARM(product, "h");
+module_param(product, ushort, 0);
 MODULE_PARM_DESC(product, "User specified USB idProduct");
 
 static struct usb_device_id generic_device_ids[2]; /* Initially all zeroes. */
