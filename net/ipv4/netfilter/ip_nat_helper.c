@@ -122,7 +122,6 @@ static void mangle_contents(struct sk_buff *skb,
 	/* fix IP hdr checksum information */
 	skb->nh.iph->tot_len = htons(skb->len);
 	ip_send_check(skb->nh.iph);
-	skb->csum = csum_partial(data, skb->len - dataoff, 0);
 }
 
 /* Unusual, but possible case. */
@@ -167,6 +166,7 @@ ip_nat_mangle_tcp_packet(struct sk_buff **pskb,
 {
 	struct iphdr *iph;
 	struct tcphdr *tcph;
+	int datalen;
 
 	if (!skb_ip_make_writable(pskb, (*pskb)->len))
 		return 0;
@@ -184,11 +184,11 @@ ip_nat_mangle_tcp_packet(struct sk_buff **pskb,
 	mangle_contents(*pskb, iph->ihl*4 + tcph->doff*4,
 			match_offset, match_len, rep_buffer, rep_len);
 
+	datalen = (*pskb)->len - iph->ihl*4;
 	tcph->check = 0;
-	tcph->check = tcp_v4_check(tcph, (*pskb)->len - iph->ihl*4,
-				   iph->saddr, iph->daddr,
-				   csum_partial((char *)tcph, tcph->doff*4,
-						(*pskb)->csum));
+	tcph->check = tcp_v4_check(tcph, datalen, iph->saddr, iph->daddr,
+				   csum_partial((char *)tcph, datalen, 0));
+
 	adjust_tcp_sequence(ntohl(tcph->seq),
 			    (int)rep_len - (int)match_len,
 			    ct, ctinfo);
@@ -216,7 +216,12 @@ ip_nat_mangle_udp_packet(struct sk_buff **pskb,
 {
 	struct iphdr *iph;
 	struct udphdr *udph;
-	int need_csum = ((*pskb)->csum != 0);
+
+	/* UDP helpers might accidentally mangle the wrong packet */
+	iph = (*pskb)->nh.iph;
+	if ((*pskb)->len < iph->ihl*4 + sizeof(*udph) + 
+	                       match_offset + match_len)
+		return 0;
 
 	if (!skb_ip_make_writable(pskb, (*pskb)->len))
 		return 0;
@@ -235,17 +240,15 @@ ip_nat_mangle_udp_packet(struct sk_buff **pskb,
 	udph->len = htons((*pskb)->len - iph->ihl*4);
 
 	/* fix udp checksum if udp checksum was previously calculated */
-	if (need_csum) {
+	if (udph->check) {
+		int datalen = (*pskb)->len - iph->ihl * 4;
 		udph->check = 0;
-		udph->check
-			= csum_tcpudp_magic(iph->saddr, iph->daddr,
-					    (*pskb)->len - iph->ihl*4,
-					    IPPROTO_UDP,
-					    csum_partial((char *)udph,
-							 sizeof(struct udphdr),
-							 (*pskb)->csum));
-	} else
-		(*pskb)->csum = 0;
+		udph->check = csum_tcpudp_magic(iph->saddr, iph->daddr,
+		                                datalen, IPPROTO_UDP,
+		                                csum_partial((char *)udph,
+		                                             datalen, 0));
+	}
+
 	return 1;
 }
 
