@@ -1243,6 +1243,25 @@ force_sig(int sig, struct task_struct *p)
 	force_sig_info(sig, (void*)1L, p);
 }
 
+/*
+ * When things go south during signal handling, we
+ * will force a SIGSEGV. And if the signal that caused
+ * the problem was already a SIGSEGV, we'll want to
+ * make sure we don't even try to deliver the signal..
+ */
+int
+force_sigsegv(int sig, struct task_struct *p)
+{
+	if (sig == SIGSEGV) {
+		unsigned long flags;
+		spin_lock_irqsave(&p->sighand->siglock, flags);
+		p->sighand->action[sig - 1].sa.sa_handler = SIG_DFL;
+		spin_unlock_irqrestore(&p->sighand->siglock, flags);
+	}
+	force_sig(SIGSEGV, p);
+	return 0;
+}
+
 int
 kill_pg(pid_t pgrp, int sig, int priv)
 {
