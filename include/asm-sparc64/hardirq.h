@@ -11,15 +11,9 @@
 #include <linux/spinlock.h>
 #include <linux/cache.h>
 
-/* entry.S is sensitive to the offsets of these fields */
-/* rtrap.S is sensitive to the size of this structure */
+/* rtrap.S is sensitive to the offsets of these fields */
 typedef struct {
 	unsigned int __softirq_pending;
-	unsigned int __unused_1;
-	unsigned int __unused_2;
-	unsigned int __unused_3;
-	unsigned int __syscall_count;
-        struct task_struct * __ksoftirqd_task;
 } ____cacheline_aligned irq_cpustat_t;
 
 #include <linux/irq_cpustat.h>	/* Standard mappings for irq_cpustat_t above */
