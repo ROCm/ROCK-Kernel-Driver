@@ -111,6 +111,6 @@ static void __exit exit_script_binfmt(void)
 	unregister_binfmt(&script_format);
 }
 
-module_init(init_script_binfmt)
-module_exit(exit_script_binfmt)
+core_initcall(init_script_binfmt);
+module_exit(exit_script_binfmt);
 MODULE_LICENSE("GPL");

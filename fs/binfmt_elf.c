@@ -1543,6 +1543,6 @@ static void __exit exit_elf_binfmt(void)
 	unregister_binfmt(&elf_format);
 }
 
-module_init(init_elf_binfmt)
-module_exit(exit_elf_binfmt)
+core_initcall(init_elf_binfmt);
+module_exit(exit_elf_binfmt);
 MODULE_LICENSE("GPL");
