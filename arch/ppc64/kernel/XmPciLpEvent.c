@@ -26,10 +26,13 @@ long Pci_Event_Count     = 0;
 
 enum XmPciLpEvent_Subtype {
 	XmPciLpEvent_BusCreated	   = 0,		// PHB has been created
-	XmPciLpEvent_BusFailed	   = 1,		// PHB has failed
-	XmPciLpEvent_BusRecovered  = 12,	// PHB has been recovered
+	XmPciLpEvent_BusError	   = 1,		// PHB has failed
+	XmPciLpEvent_BusFailed	   = 2,		// Msg to Seconday, Primary failed bus
 	XmPciLpEvent_NodeFailed	   = 4,		// Multi-adapter bridge has failed
 	XmPciLpEvent_NodeRecovered = 5,		// Multi-adapter bridge has recovered
+	XmPciLpEvent_BusRecovered  = 12,	// PHB has been recovered
+	XmPciLpEvent_UnQuiesceBus  = 18,	// Secondary bus unqiescing
+	XmPciLpEvent_BridgeError   = 21,	// Bridge Error
 	XmPciLpEvent_SlotInterrupt = 22		// Slot interrupt
 };
 
@@ -116,13 +119,16 @@ static void intReceived(struct XmPciLpEvent* eventParm, struct pt_regs* regsParm
 	case XmPciLpEvent_BusCreated:
 		printk(KERN_INFO "XmPciLpEvent.c: system bus %d created\n", eventParm->eventData.busCreated.busNumber);
 		break;
+	case XmPciLpEvent_BusError:
 	case XmPciLpEvent_BusFailed:
 		printk(KERN_INFO "XmPciLpEvent.c: system bus %d failed\n", eventParm->eventData.busFailed.busNumber);
 		break;
 	case XmPciLpEvent_BusRecovered:
+	case XmPciLpEvent_UnQuiesceBus:
 		printk(KERN_INFO "XmPciLpEvent.c: system bus %d recovered\n", eventParm->eventData.busRecovered.busNumber);
 		break;
 	case XmPciLpEvent_NodeFailed:
+	case XmPciLpEvent_BridgeError:
 		printk(KERN_INFO "XmPciLpEvent.c: multi-adapter bridge %d/%d/%d failed\n", eventParm->eventData.nodeFailed.busNumber, eventParm->eventData.nodeFailed.subBusNumber, eventParm->eventData.nodeFailed.deviceId);
 		break;
 	case XmPciLpEvent_NodeRecovered:

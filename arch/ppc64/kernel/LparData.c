@@ -24,6 +24,7 @@
 #include <asm/iSeries/LparMap.h>
 #include <asm/iSeries/ItVpdAreas.h>
 #include <asm/iSeries/ItIplParmsReal.h>
+#include <asm/iSeries/ItExtVpdPanel.h>
 #include <asm/iSeries/ItLpQueue.h>
 #include <asm/iSeries/IoHriProcessorVpd.h>
 #include <asm/iSeries/ItSpCommArea.h>
@@ -143,6 +144,8 @@ struct ItLpNaca itLpNaca = {
 
 struct ItIplParmsReal xItIplParmsReal = {};
 
+struct ItExtVpdPanel xItExtVpdPanel = {};
+
 #define maxPhysicalProcessors 32
 
 struct IoHriProcessorVpd xIoHriProcessorVpd[maxPhysicalProcessors] = {
@@ -184,7 +187,8 @@ struct ItVpdAreas itVpdAreas = {
 	{0},		/* DMA lengths */
 	{0},		/* DMA tokens */
 	{		/* VPD lengths */
-		0,0,0,0,		/*  0 -  3 */
+	        0,0,0,		        /*  0 - 2 */
+		sizeof(xItExtVpdPanel), /*       3 Extended VPD   */
 		sizeof(struct paca_struct),	/*       4 length of Paca  */
 		0,			/*       5 */
 		sizeof(struct ItIplParmsReal),/* 6 length of IPL parms */
@@ -201,7 +205,8 @@ struct ItVpdAreas itVpdAreas = {
 		0,0			/* 24 - 25 */
 		},
 	{			/* VPD addresses */
-		0,0,0,0,		/*	 0 -  3 */
+		0,0,0,  		/*	 0 -  2 */
+		&xItExtVpdPanel,        /*       3 Extended VPD */
 		&paca[0],		/*       4 first Paca */
 		0,			/*       5 */
 		&xItIplParmsReal,	/*	 6 IPL parms */
@@ -243,6 +248,7 @@ msChunks_alloc(unsigned long mem, unsigned long num_chunks, unsigned long chunk_
 
 	return mem;
 }
+
 
 
 

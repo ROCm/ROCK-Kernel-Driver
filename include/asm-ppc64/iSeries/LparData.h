@@ -37,6 +37,7 @@
 #include <asm/iSeries/LparMap.h>
 #include <asm/iSeries/ItVpdAreas.h>
 #include <asm/iSeries/ItIplParmsReal.h>
+#include <asm/iSeries/ItExtVpdPanel.h>
 #include <asm/iSeries/ItLpQueue.h>
 #include <asm/iSeries/IoHriProcessorVpd.h>
 #include <asm/page.h>
@@ -45,6 +46,7 @@ extern struct LparMap	xLparMap;
 extern struct HvReleaseData hvReleaseData;
 extern struct ItLpNaca	itLpNaca;
 extern struct ItIplParmsReal xItIplParmsReal;
+extern struct ItExtVpdPanel xItExtVpdPanel;
 extern struct IoHriProcessorVpd xIoHriProcessorVpd[];
 extern struct ItLpQueue xItLpQueue;
 extern struct ItVpdAreas itVpdAreas;
