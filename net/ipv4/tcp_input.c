@@ -87,6 +87,7 @@ int sysctl_tcp_rfc1337;
 int sysctl_tcp_max_orphans = NR_FILE;
 int sysctl_tcp_frto;
 int sysctl_tcp_westwood;
+int sysctl_tcp_nometrics_save;
 
 #define FLAG_DATA		0x01 /* Incoming frame contained data.		*/
 #define FLAG_WIN_UPDATE		0x02 /* Incoming ACK was a window update.	*/
@@ -517,6 +518,9 @@ void tcp_update_metrics(struct sock *sk)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
 	struct dst_entry *dst = __sk_dst_get(sk);
+
+	if (sysctl_tcp_nometrics_save)
+		return;
 
 	dst_confirm(dst);
 

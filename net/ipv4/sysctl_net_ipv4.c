@@ -594,6 +594,14 @@ ctl_table ipv4_table[] = {
 		.strategy	= &sysctl_jiffies
 	},
 	{
+		.ctl_name	= NET_TCP_NO_METRICS_SAVE,
+		.procname	= "tcp_no_metrics_save",
+		.data		= &sysctl_tcp_nometrics_save,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
 		.ctl_name	= NET_TCP_WESTWOOD, 
 		.procname	= "tcp_westwood",
 		.data		= &sysctl_tcp_westwood,
@@ -601,6 +609,7 @@ ctl_table ipv4_table[] = {
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
 	},
+
 	{ .ctl_name = 0 }
 };
 
