@@ -246,9 +246,9 @@
 #define __NR_fadvise64		233
 #define __NR_exit_group		234
 #define __NR_lookup_dcookie	235
-#define __NR_sys_epoll_create	236
-#define __NR_sys_epoll_ctl	237
-#define __NR_sys_epoll_wait	238
+#define __NR_epoll_create	236
+#define __NR_epoll_ctl		237
+#define __NR_epoll_wait		238
 #define __NR_remap_file_pages	239
 #define __NR_timer_create	240
 #define __NR_timer_settime	241
