@@ -184,7 +184,6 @@ struct snd_usb_stream {
 	int pcm_index;
 	snd_usb_substream_t substream[2];
 	struct list_head list;
-	snd_info_entry_t *proc_entry;
 };
 
 #define chip_t snd_usb_stream_t
@@ -931,6 +930,70 @@ static struct audioformat *find_format(snd_usb_substream_t *subs, snd_pcm_runtim
 
 
 /*
+ * initialize the picth control and sample rate
+ */
+static int init_usb_pitch(struct usb_device *dev, int iface,
+			  struct usb_host_interface *alts,
+			  struct audioformat *fmt)
+{
+	unsigned int ep;
+	unsigned char data[1];
+	int err;
+
+	ep = get_endpoint(alts, 0)->bEndpointAddress;
+	/* if endpoint has pitch control, enable it */
+	if (fmt->attributes & EP_CS_ATTR_PITCH_CONTROL) {
+		data[0] = 1;
+		if ((err = usb_control_msg(dev, usb_sndctrlpipe(dev, 0), SET_CUR,
+					   USB_TYPE_CLASS|USB_RECIP_ENDPOINT|USB_DIR_OUT, 
+					   PITCH_CONTROL << 8, ep, data, 1, HZ)) < 0) {
+			snd_printk(KERN_ERR "%d:%d:%d: cannot set enable PITCH\n",
+				   dev->devnum, iface, ep);
+			return err;
+		}
+	}
+	return 0;
+}
+
+static int init_usb_sample_rate(struct usb_device *dev, int iface,
+				struct usb_host_interface *alts,
+				struct audioformat *fmt, int rate)
+{
+	unsigned int ep;
+	unsigned char data[3];
+	int err;
+
+	ep = get_endpoint(alts, 0)->bEndpointAddress;
+	/* if endpoint has sampling rate control, set it */
+	if (fmt->attributes & EP_CS_ATTR_SAMPLE_RATE) {
+		int crate;
+		data[0] = rate;
+		data[1] = rate >> 8;
+		data[2] = rate >> 16;
+		if ((err = usb_control_msg(dev, usb_sndctrlpipe(dev, 0), SET_CUR,
+					   USB_TYPE_CLASS|USB_RECIP_ENDPOINT|USB_DIR_OUT, 
+					   SAMPLING_FREQ_CONTROL << 8, ep, data, 3, HZ)) < 0) {
+			snd_printk(KERN_ERR "%d:%d:%d: cannot set freq %d to ep 0x%x\n",
+				   dev->devnum, iface, fmt->altsetting, rate, ep);
+			return err;
+		}
+		if ((err = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0), GET_CUR,
+					   USB_TYPE_CLASS|USB_RECIP_ENDPOINT|USB_DIR_IN,
+					   SAMPLING_FREQ_CONTROL << 8, ep, data, 3, HZ)) < 0) {
+			snd_printk(KERN_ERR "%d:%d:%d: cannot get freq at ep 0x%x\n",
+				   dev->devnum, iface, fmt->altsetting, ep);
+			return err;
+		}
+		crate = data[0] | (data[1] << 8) | (data[2] << 16);
+		if (crate != rate) {
+			snd_printd(KERN_WARNING "current rate %d is different from the runtime rate %d\n", crate, rate);
+			// runtime->rate = crate;
+		}
+	}
+	return 0;
+}
+
+/*
  * find a matching format and set up the interface
  */
 static int set_format(snd_usb_substream_t *subs, snd_pcm_runtime_t *runtime)
@@ -942,7 +1005,6 @@ static int set_format(snd_usb_substream_t *subs, snd_pcm_runtime_t *runtime)
 	struct usb_interface *iface;
 	struct audioformat *fmt;
 	unsigned int ep, attr;
-	unsigned char data[3];
 	int is_playback = subs->direction == SNDRV_PCM_STREAM_PLAYBACK;
 	int err;
 
@@ -1015,44 +1077,11 @@ static int set_format(snd_usb_substream_t *subs, snd_pcm_runtime_t *runtime)
 		subs->syncinterval = get_endpoint(alts, 1)->bRefresh;
 	}
 
-	ep = get_endpoint(alts, 0)->bEndpointAddress;
-	/* if endpoint has pitch control, enable it */
-	if (fmt->attributes & EP_CS_ATTR_PITCH_CONTROL) {
-		data[0] = 1;
-		if ((err = usb_control_msg(dev, usb_sndctrlpipe(dev, 0), SET_CUR,
-					   USB_TYPE_CLASS|USB_RECIP_ENDPOINT|USB_DIR_OUT, 
-					   PITCH_CONTROL << 8, ep, data, 1, HZ)) < 0) {
-			snd_printk(KERN_ERR "%d:%d:%d: cannot set enable PITCH\n",
-				   dev->devnum, subs->interface, ep);
-			return err;
-		}
-	}
-	/* if endpoint has sampling rate control, set it */
-	if (fmt->attributes & EP_CS_ATTR_SAMPLE_RATE) {
-		int crate;
-		data[0] = runtime->rate;
-		data[1] = runtime->rate >> 8;
-		data[2] = runtime->rate >> 16;
-		if ((err = usb_control_msg(dev, usb_sndctrlpipe(dev, 0), SET_CUR,
-					   USB_TYPE_CLASS|USB_RECIP_ENDPOINT|USB_DIR_OUT, 
-					   SAMPLING_FREQ_CONTROL << 8, ep, data, 3, HZ)) < 0) {
-			snd_printk(KERN_ERR "%d:%d:%d: cannot set freq %d to ep 0x%x\n",
-				   dev->devnum, subs->interface, fmt->altsetting, runtime->rate, ep);
-			return err;
-		}
-		if ((err = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0), GET_CUR,
-					   USB_TYPE_CLASS|USB_RECIP_ENDPOINT|USB_DIR_IN,
-					   SAMPLING_FREQ_CONTROL << 8, ep, data, 3, HZ)) < 0) {
-			snd_printk(KERN_ERR "%d:%d:%d: cannot get freq at ep 0x%x\n",
-				   dev->devnum, subs->interface, fmt->altsetting, ep);
-			return err;
-		}
-		crate = data[0] | (data[1] << 8) | (data[2] << 16);
-		if (crate != runtime->rate) {
-			snd_printd(KERN_WARNING "current rate %d is different from the runtime rate %d\n", crate, runtime->rate);
-			// runtime->rate = crate;
-		}
-	}
+	if ((err = init_usb_pitch(dev, subs->interface, alts, fmt)) < 0 ||
+	    (err = init_usb_sample_rate(dev, subs->interface, alts, fmt,
+					runtime->rate)) < 0)
+		return err;
+
 	/* always fill max packet size */
 	if (fmt->attributes & EP_CS_ATTR_FILL_MAX)
 		subs->fill_max = 1;
@@ -1426,18 +1455,8 @@ static void proc_pcm_format_add(snd_usb_stream_t *stream)
 	snd_card_t *card = stream->chip->card;
 
 	sprintf(name, "stream%d", stream->pcm_index);
-	if ((entry = snd_info_create_card_entry(card, name, card->proc_root)) != NULL) {
-		entry->content = SNDRV_INFO_CONTENT_TEXT;
-		entry->private_data = stream;
-		entry->mode = S_IFREG | S_IRUGO | S_IWUSR;
-		entry->c.text.read_size = 4096;
-		entry->c.text.read = proc_pcm_format_read;
-		if (snd_info_register(entry) < 0) {
-			snd_info_free_entry(entry);
-			entry = NULL;
-		}
-	}
-	stream->proc_entry = entry;
+	if (! snd_card_proc_new(card, name, &entry))
+		snd_info_set_text_ops(entry, stream, proc_pcm_format_read);
 }
 
 
@@ -1492,10 +1511,6 @@ static void free_substream(snd_usb_substream_t *subs)
  */
 static void snd_usb_audio_stream_free(snd_usb_stream_t *stream)
 {
-	if (stream->proc_entry) {
-		snd_info_unregister(stream->proc_entry);
-		stream->proc_entry = NULL;
-	}
 	free_substream(&stream->substream[0]);
 	free_substream(&stream->substream[1]);
 	list_del(&stream->list);
@@ -1828,6 +1843,10 @@ static int parse_audio_endpoints(snd_usb_audio_t *chip, unsigned char *buffer, i
 			kfree(fp);
 			return err;
 		}
+		/* try to set the interface... */
+		usb_set_interface(chip->dev, iface_no, i);
+		init_usb_pitch(chip->dev, iface_no, alts, fp);
+		init_usb_sample_rate(chip->dev, iface_no, alts, fp, fp->rate_max);
 	}
 	return 0;
 }
@@ -1890,9 +1909,10 @@ static int snd_usb_create_streams(snd_usb_audio_t *chip, int ctrlif,
 			/* skip non-supported classes */
 			continue;
 		}
-		parse_audio_endpoints(chip, buffer, buflen, j);
-		usb_set_interface(dev, j, 0); /* reset the current interface */
-		usb_driver_claim_interface(&usb_audio_driver, iface, (void *)-1);
+		if (! parse_audio_endpoints(chip, buffer, buflen, j)) {
+			usb_set_interface(dev, j, 0); /* reset the current interface */
+			usb_driver_claim_interface(&usb_audio_driver, iface, (void *)-1);
+		}
 	}
 
 	return 0;

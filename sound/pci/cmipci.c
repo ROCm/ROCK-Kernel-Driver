@@ -472,7 +472,6 @@ struct snd_stru_cmipci {
 	snd_rawmidi_t *rmidi;
 
 	spinlock_t reg_lock;
-	snd_info_entry_t *proc_entry;
 };
 
 
@@ -2746,26 +2745,8 @@ static void __devinit snd_cmipci_proc_init(cmipci_t *cm)
 {
 	snd_info_entry_t *entry;
 
-	if ((entry = snd_info_create_card_entry(cm->card, "cmipci", cm->card->proc_root)) != NULL) {
-		entry->content = SNDRV_INFO_CONTENT_TEXT;
-		entry->private_data = cm;
-		entry->mode = S_IFREG | S_IRUGO | S_IWUSR;
-		entry->c.text.read_size = 256;
-		entry->c.text.read = snd_cmipci_proc_read;
-		if (snd_info_register(entry) < 0) {
-			snd_info_free_entry(entry);
-			entry = NULL;
-		}
-	}
-	cm->proc_entry = entry;
-}
-
-static void snd_cmipci_proc_done(cmipci_t *cm)
-{
-	if (cm->proc_entry) {
-		snd_info_unregister(cm->proc_entry);
-		cm->proc_entry = NULL;
-	}
+	if (! snd_card_proc_new(cm->card, "cmipci", &entry))
+		snd_info_set_text_ops(entry, cm, snd_cmipci_proc_read);
 }
 
 
@@ -2832,8 +2813,6 @@ static void __devinit query_chip(cmipci_t *cm)
 
 static int snd_cmipci_free(cmipci_t *cm)
 {
-	snd_cmipci_proc_done(cm);
-
 	if (cm->irq >= 0) {
 		snd_cmipci_clear_bit(cm, CM_REG_MISC_CTRL, CM_FM_EN);
 		snd_cmipci_clear_bit(cm, CM_REG_LEGACY_CTRL, CM_ENSPDOUT);
@@ -2949,20 +2928,10 @@ static int __devinit snd_cmipci_create(snd_card_t *card,
 
 	/* Assume TX and compatible chip set (Autodetection required for VX chip sets) */
 	switch (pci->device) {
-		struct list_head *pos;
-		int txvx;
 	case PCI_DEVICE_ID_CMEDIA_CM8738:
 	case PCI_DEVICE_ID_CMEDIA_CM8738B:
-		txvx = 1;
-		list_for_each(pos, &(pci->global_list)) {
-			struct pci_dev * cur = list_entry(pos, struct pci_dev, global_list);
-			if (cur->vendor != 0x8086) /* PCI_VENDOR_ID_INTEL */
-				continue;
-			if (cur->device != 0x7030) /* PCI_DEVICE_ID_INTEL_82437VX */
-				continue;
-			txvx = 0;
-		}
-		if (txvx)
+		/* PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82437VX */
+		if (! pci_find_device(0x8086, 0x7030, NULL))
 			snd_cmipci_set_bit(cm, CM_REG_MISC_CTRL, CM_TXVX);
 		break;
 	default:

@@ -676,6 +676,9 @@ static inline void snd_pcm_post_start(snd_pcm_substream_t *substream, int state)
 		snd_pcm_tick_prepare(substream);
 }
 
+/**
+ * snd_pcm_sart
+ */
 int snd_pcm_start(snd_pcm_substream_t *substream)
 {
 	SND_PCM_ACTION(start, substream, 0);
@@ -705,6 +708,9 @@ static inline void snd_pcm_post_stop(snd_pcm_substream_t *substream, int state)
 	wake_up(&runtime->sleep);
 }
 
+/**
+ * snd_pcm_stop
+ */
 int snd_pcm_stop(snd_pcm_substream_t *substream, int state)
 {
 	SND_PCM_ACTION(stop, substream, state);
@@ -781,11 +787,17 @@ static inline void snd_pcm_post_suspend(snd_pcm_substream_t *substream, int stat
 	wake_up(&runtime->sleep);
 }
 
+/**
+ * snd_pcm_suspend
+ */
 int snd_pcm_suspend(snd_pcm_substream_t *substream)
 {
 	SND_PCM_ACTION(suspend, substream, 0);
 }
 
+/**
+ * snd_pcm_suspend_all
+ */
 int snd_pcm_suspend_all(snd_pcm_t *pcm)
 {
 	snd_pcm_substream_t *substream;
@@ -978,6 +990,9 @@ static inline void snd_pcm_post_prepare(snd_pcm_substream_t * substream, int sta
 	runtime->status->state = SNDRV_PCM_STATE_PREPARED;
 }
 
+/**
+ * snd_pcm_prepare
+ */
 int snd_pcm_prepare(snd_pcm_substream_t *substream)
 {
 	int res;

@@ -141,6 +141,19 @@ struct proc_dir_entry *snd_create_proc_entry(const char *name, mode_t mode,
 void snd_remove_proc_entry(struct proc_dir_entry *parent,
 			   struct proc_dir_entry *de);
 
+/* for card drivers */
+int snd_card_proc_new(snd_card_t *card, const char *name, snd_info_entry_t **entryp);
+
+inline static void snd_info_set_text_ops(snd_info_entry_t *entry, 
+					 void *private_data,
+					 void (*read)(snd_info_entry_t *, snd_info_buffer_t *))
+{
+	entry->private_data = private_data;
+	entry->c.text.read_size = 1024;
+	entry->c.text.read = read;
+}
+
+
 #else
 
 #define snd_seq_root NULL
@@ -168,6 +181,9 @@ static inline int snd_info_unregister(snd_info_entry_t * entry) { return 0; }
 static inline struct proc_dir_entry *snd_create_proc_entry(const char *name, mode_t mode, struct proc_dir_entry *parent) { return NULL; }
 static inline void snd_remove_proc_entry(struct proc_dir_entry *parent,
 					 struct proc_dir_entry *de) { ; }
+
+#define snd_card_proc_new(card,name,entryp)  0 /* always success */
+#define snd_info_set_text_ops(entry,private_data,read) /*NOP*/
 
 #endif
 

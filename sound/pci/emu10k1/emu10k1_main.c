@@ -494,7 +494,6 @@ static int __devinit snd_emu10k1_ecard_init(emu10k1_t * emu)
 
 static int snd_emu10k1_free(emu10k1_t *emu)
 {
-	snd_emu10k1_proc_done(emu);
 	if (emu->res_port != NULL) {	/* avoid access to already used hardware */
 	       	snd_emu10k1_fx8010_tram_setup(emu, 0);
 		snd_emu10k1_done(emu);

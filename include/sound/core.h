@@ -55,6 +55,7 @@ typedef enum {
 	SNDRV_DEV_TIMER,
 	SNDRV_DEV_SEQUENCER,
 	SNDRV_DEV_HWDEP,
+	SNDRV_DEV_INFO,
 	SNDRV_DEV_LOWLEVEL =		(2*SNDRV_DEV_TYPE_RANGE_SIZE)
 } snd_device_type_t;
 
@@ -281,6 +282,8 @@ void snd_free_pages(void *ptr, unsigned long size);
 void *snd_malloc_pci_pages(struct pci_dev *pci, unsigned long size, dma_addr_t *dma_addr);
 void *snd_malloc_pci_pages_fallback(struct pci_dev *pci, unsigned long size, dma_addr_t *dma_addr, unsigned long *res_size);
 void snd_free_pci_pages(struct pci_dev *pci, unsigned long size, void *ptr, dma_addr_t dma_addr);
+void *snd_malloc_pci_page(struct pci_dev *pci, dma_addr_t *dma_addr);
+#define snd_free_pci_page(pci,ptr,addr) snd_free_pci_pages(pci,PAGE_SIZE,ptr,addr)
 #endif
 #ifdef CONFIG_SBUS
 void *snd_malloc_sbus_pages(struct sbus_dev *sdev, unsigned long size, dma_addr_t *dma_addr);

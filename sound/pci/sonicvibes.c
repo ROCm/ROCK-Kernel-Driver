@@ -247,7 +247,6 @@ struct _snd_sonicvibes {
 	snd_hwdep_t *fmsynth;	/* S3FM */
 
 	spinlock_t reg_lock;
-	snd_info_entry_t *proc_entry;
 
 	unsigned int p_dma_size;
 	unsigned int c_dma_size;
@@ -1175,26 +1174,8 @@ static void __devinit snd_sonicvibes_proc_init(sonicvibes_t * sonic)
 {
 	snd_info_entry_t *entry;
 
-	if ((entry = snd_info_create_card_entry(sonic->card, "sonicvibes", sonic->card->proc_root)) != NULL) {
-		entry->content = SNDRV_INFO_CONTENT_TEXT;
-		entry->private_data = sonic;
-		entry->mode = S_IFREG | S_IRUGO | S_IWUSR;
-		entry->c.text.read_size = 256;
-		entry->c.text.read = snd_sonicvibes_proc_read;
-		if (snd_info_register(entry) < 0) {
-			snd_info_free_entry(entry);
-			entry = NULL;
-		}
-	}
-	sonic->proc_entry = entry;
-}
-
-static void snd_sonicvibes_proc_done(sonicvibes_t * sonic)
-{
-	if (sonic->proc_entry) {
-		snd_info_unregister(sonic->proc_entry);
-		sonic->proc_entry = NULL;
-	}
+	if (! snd_card_proc_new(sonic->card, "sonicvibes", &entry))
+		snd_info_set_text_ops(entry, sonic, snd_sonicvibes_proc_read);
 }
 
 /*
@@ -1210,7 +1191,6 @@ static int snd_sonicvibes_free(sonicvibes_t *sonic)
 	if (sonic->gameport.io)
 		gameport_unregister_port(&sonic->gameport);
 #endif
-	snd_sonicvibes_proc_done(sonic);
 	pci_write_config_dword(sonic->pci, 0x40, sonic->dmaa_port);
 	pci_write_config_dword(sonic->pci, 0x48, sonic->dmac_port);
 	if (sonic->res_sb_port) {

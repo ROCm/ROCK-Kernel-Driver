@@ -936,6 +936,12 @@ int snd_ad1848_pcm(ad1848_t *chip, int device, snd_pcm_t **rpcm)
 	return 0;
 }
 
+const snd_pcm_ops_t *snd_ad1848_get_pcm_ops(int direction)
+{
+	return direction == SNDRV_PCM_STREAM_PLAYBACK ?
+		&snd_ad1848_playback_ops : &snd_ad1848_capture_ops;
+}
+
 /*
  *  MIXER part
  */
@@ -1160,6 +1166,7 @@ EXPORT_SYMBOL(snd_ad1848_mce_down);
 EXPORT_SYMBOL(snd_ad1848_interrupt);
 EXPORT_SYMBOL(snd_ad1848_create);
 EXPORT_SYMBOL(snd_ad1848_pcm);
+EXPORT_SYMBOL(snd_ad1848_get_pcm_ops);
 EXPORT_SYMBOL(snd_ad1848_mixer);
 EXPORT_SYMBOL(snd_ad1848_info_single);
 EXPORT_SYMBOL(snd_ad1848_get_single);

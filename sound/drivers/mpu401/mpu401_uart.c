@@ -74,6 +74,14 @@ static void _snd_mpu401_uart_interrupt(mpu401_t *mpu)
 		snd_mpu401_uart_output_write(mpu);
 }
 
+/**
+ * snd_mpu401_uart_interrupt - generic MPU401-UART interrupt handler
+ * @irq: the irq number
+ * @dev_id: mpu401 instance
+ * @regs: the reigster
+ *
+ * Processes the interrupt for MPU401-UART i/o.
+ */
 void snd_mpu401_uart_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	mpu401_t *mpu = snd_magic_cast(mpu401_t, dev_id, return);
@@ -375,6 +383,25 @@ static void snd_mpu401_uart_free(snd_rawmidi_t *rmidi)
 	snd_magic_kfree(mpu);
 }
 
+/**
+ * snd_mpu401_uart_new - create an MPU401-UART instance
+ * @card: the card instance
+ * @device: the device index, zero-based
+ * @hardware: the hardware type, MPU401_HW_XXXX
+ * @port: the base address of MPU401 port
+ * @integrated: non-zero if the port was already reserved by the chip
+ * @irq: the irq number, -1 if no interrupt for mpu
+ * @irq_flags: the irq request flags (SA_XXX), 0 if irq was already reserved.
+ * @rrawmidi: the pointer to store the new rawmidi instance
+ *
+ * Creates a new MPU-401 instance.
+ *
+ * Note that the rawmidi instance is returned on the rrawmidi argument,
+ * not the mpu401 instance itself.  To access to the mpu401 instance,
+ * cast from rawmidi->private_data (with mpu401_t magic-cast).
+ *
+ * Returns zero if successful, or a negative error code.
+ */
 int snd_mpu401_uart_new(snd_card_t * card, int device,
 			unsigned short hardware,
 			unsigned long port, int integrated,
@@ -418,9 +445,9 @@ int snd_mpu401_uart_new(snd_card_t * card, int device,
 			snd_device_free(card, rmidi);
 			return -EBUSY;
 		}
-		mpu->irq = irq;
-		mpu->irq_flags = irq_flags;
 	}
+	mpu->irq = irq;
+	mpu->irq_flags = irq_flags;
 	strcpy(rmidi->name, "MPU-401 (UART)");
 	snd_rawmidi_set_ops(rmidi, SNDRV_RAWMIDI_STREAM_OUTPUT, &snd_mpu401_uart_output);
 	snd_rawmidi_set_ops(rmidi, SNDRV_RAWMIDI_STREAM_INPUT, &snd_mpu401_uart_input);

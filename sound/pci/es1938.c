@@ -202,8 +202,6 @@ MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 typedef struct _snd_es1938 es1938_t;
 
 struct _snd_es1938 {
-	unsigned long dma1size;
-	unsigned long dma2size;
 	int irq;
 
 	unsigned long io_port;
@@ -840,6 +838,25 @@ static int snd_es1938_capture_copy(snd_pcm_substream_t *substream,
 	return 0;
 }
 
+/*
+ * buffer management
+ */
+static int snd_es1938_pcm_hw_params(snd_pcm_substream_t *substream,
+				    snd_pcm_hw_params_t * hw_params)
+
+{
+	int err;
+
+	if ((err = snd_pcm_lib_malloc_pages(substream, params_buffer_bytes(hw_params))) < 0)
+		return err;
+	return 0;
+}
+
+static int snd_es1938_pcm_hw_free(snd_pcm_substream_t *substream)
+{
+	return snd_pcm_lib_free_pages(substream);
+}
+
 /* ----------------------------------------------------------------------
  * Audio1 Capture (ADC)
  * ----------------------------------------------------------------------*/
@@ -890,8 +907,6 @@ static int snd_es1938_capture_open(snd_pcm_substream_t * substream)
 
 	if (chip->playback2_substream)
 		return -EAGAIN;
-	if ((runtime->dma_area = snd_malloc_pci_pages_fallback(chip->pci, chip->dma2size, &runtime->dma_addr, &runtime->dma_bytes)) == NULL)
-		return -ENOMEM;
 	chip->capture_substream = substream;
 	runtime->hw = snd_es1938_capture;
 	snd_pcm_hw_constraint_ratnums(runtime, 0, SNDRV_PCM_HW_PARAM_RATE,
@@ -907,15 +922,11 @@ static int snd_es1938_playback_open(snd_pcm_substream_t * substream)
 
 	switch (substream->number) {
 	case 0:
-		if ((runtime->dma_area = snd_malloc_pci_pages_fallback(chip->pci, chip->dma1size, &runtime->dma_addr, &runtime->dma_bytes)) == NULL)
-			return -ENOMEM;
 		chip->playback1_substream = substream;
 		break;
 	case 1:
 		if (chip->capture_substream)
 			return -EAGAIN;
-		if ((runtime->dma_area = snd_malloc_pci_pages_fallback(chip->pci, chip->dma1size, &runtime->dma_addr, &runtime->dma_bytes)) == NULL)
-			return -ENOMEM;
 		chip->playback2_substream = substream;
 		break;
 	default:
@@ -963,6 +974,8 @@ static snd_pcm_ops_t snd_es1938_playback_ops = {
 	.open =		snd_es1938_playback_open,
 	.close =	snd_es1938_playback_close,
 	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_es1938_pcm_hw_params,
+	.hw_free =	snd_es1938_pcm_hw_free,
 	.prepare =	snd_es1938_playback_prepare,
 	.trigger =	snd_es1938_playback_trigger,
 	.pointer =	snd_es1938_playback_pointer,
@@ -972,6 +985,8 @@ static snd_pcm_ops_t snd_es1938_capture_ops = {
 	.open =		snd_es1938_capture_open,
 	.close =	snd_es1938_capture_close,
 	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_es1938_pcm_hw_params,
+	.hw_free =	snd_es1938_pcm_hw_free,
 	.prepare =	snd_es1938_capture_prepare,
 	.trigger =	snd_es1938_capture_trigger,
 	.pointer =	snd_es1938_capture_pointer,
@@ -1364,8 +1379,6 @@ static int snd_es1938_dev_free(snd_device_t *device)
 
 static int __devinit snd_es1938_create(snd_card_t * card,
 				    struct pci_dev * pci,
-				    unsigned long dma1size,
-				    unsigned long dma2size,
 				    es1938_t ** rchip)
 {
 	es1938_t *chip;
@@ -1393,8 +1406,6 @@ static int __devinit snd_es1938_create(snd_card_t * card,
 	spin_lock_init(&chip->mixer_lock);
 	chip->card = card;
 	chip->pci = pci;
-	chip->dma1size = dma1size;
-	chip->dma2size = dma2size;
 	chip->io_port = pci_resource_start(pci, 0);
 	if ((chip->res_io_port = request_region(chip->io_port, 8, "ESS Solo-1")) == NULL) {
 		snd_es1938_free(chip);
@@ -1608,10 +1619,7 @@ static int __devinit snd_es1938_probe(struct pci_dev *pci,
 		    	return -ENODEV;
 		}
 	}
-	if ((err = snd_es1938_create(card, pci,
-				     64 * 1024,
-				     64 * 1024,
-				     &chip)) < 0) {
+	if ((err = snd_es1938_create(card, pci, &chip)) < 0) {
 		snd_card_free(card);
 		return err;
 	}

@@ -220,7 +220,6 @@ typedef struct snd_rme32 {
 	snd_pcm_t *spdif_pcm;
 	snd_pcm_t *adat_pcm;
 	struct pci_dev *pci;
-	snd_info_entry_t *proc_entry;
 	snd_kcontrol_t *spdif_ctl;
 } rme32_t;
 
@@ -561,18 +560,22 @@ static int snd_rme32_setclockmode(rme32_t * rme32, int mode)
 {
 	switch (mode) {
 	case RME32_CLOCKMODE_SLAVE:
+		/* AutoSync */
 		rme32->wcreg = (rme32->wcreg & ~RME32_WCR_FREQ_0) & 
 			~RME32_WCR_FREQ_1;
 		break;
 	case RME32_CLOCKMODE_MASTER_32:
+		/* Internal 32.0kHz */
 		rme32->wcreg = (rme32->wcreg | RME32_WCR_FREQ_0) & 
 			~RME32_WCR_FREQ_1;
 		break;
 	case RME32_CLOCKMODE_MASTER_44:
+		/* Internal 44.1kHz */
 		rme32->wcreg = (rme32->wcreg & ~RME32_WCR_FREQ_0) | 
 			RME32_WCR_FREQ_1;
 		break;
 	case RME32_CLOCKMODE_MASTER_48:
+		/* Internal 48.0kHz */
 		rme32->wcreg = (rme32->wcreg | RME32_WCR_FREQ_0) | 
 			RME32_WCR_FREQ_1;
 		break;
@@ -1240,7 +1243,6 @@ static void snd_rme32_free(void *private_data)
 	if (rme32->irq >= 0) {
 		snd_rme32_playback_stop(rme32);
 		snd_rme32_capture_stop(rme32);
-		snd_rme32_proc_done(rme32);
 		free_irq(rme32->irq, (void *) rme32);
 		rme32->irq = -1;
 	}
@@ -1464,9 +1466,9 @@ snd_rme32_proc_read(snd_info_entry_t * entry, snd_info_buffer_t * buffer)
 			    snd_rme32_playback_getrate(rme32));
 	}
 	if (rme32->wcreg & RME32_RCR_KMODE) {
-		snd_iprintf(buffer, "  clock mode: slave\n");
+		snd_iprintf(buffer, "  sample clock source: AutoSync\n");
 	} else {
-		snd_iprintf(buffer, "  clock mode: master\n");
+		snd_iprintf(buffer, "  sample clock source: Internal\n");
 	}
 	if (rme32->wcreg & RME32_WCR_PRO) {
 		snd_iprintf(buffer, "  format: AES/EBU (professional)\n");
@@ -1484,26 +1486,8 @@ static void __devinit snd_rme32_proc_init(rme32_t * rme32)
 {
 	snd_info_entry_t *entry;
 
-	if ((entry = snd_info_create_card_entry(rme32->card, "rme32", rme32->card->proc_root)) != NULL) {
-		entry->content = SNDRV_INFO_CONTENT_TEXT;
-		entry->private_data = rme32;
-		entry->mode = S_IFREG | S_IRUGO | S_IWUSR;
-		entry->c.text.read_size = 256;
-		entry->c.text.read = snd_rme32_proc_read;
-		if (snd_info_register(entry) < 0) {
-			snd_info_free_entry(entry);
-			entry = NULL;
-		}
-	}
-	rme32->proc_entry = entry;
-}
-
-static void snd_rme32_proc_done(rme32_t * rme32)
-{
-	if (rme32->proc_entry) {
-		snd_info_unregister(rme32->proc_entry);
-		rme32->proc_entry = NULL;
-	}
+	if (! snd_card_proc_new(rme32->card, "rme32", &entry))
+		snd_info_set_text_ops(entry, rme32, snd_rme32_proc_read);
 }
 
 /*
@@ -1646,7 +1630,10 @@ static int
 snd_rme32_info_clockmode_control(snd_kcontrol_t * kcontrol,
 				 snd_ctl_elem_info_t * uinfo)
 {
-	static char *texts[4] = { "Slave", "Master (32.0 kHz)", "Master (44.1 kHz)", "Master (48.0 kHz)" };
+	static char *texts[4] = { "AutoSync", 
+				  "Internal 32.0kHz", 
+				  "Internal 44.1kHz", 
+				  "Internal 48.0kHz" };
 
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
 	uinfo->count = 1;

@@ -305,6 +305,7 @@ int snd_sb8dsp_midi(sb_t *chip, int device, snd_rawmidi_t ** rrawmidi);
 
 /* sb16_init.c */
 int snd_sb16dsp_pcm(sb_t *chip, int device, snd_pcm_t ** rpcm);
+const snd_pcm_ops_t *snd_sb16dsp_get_pcm_ops(int direction);
 int snd_sb16dsp_configure(sb_t *chip);
 /* sb16.c */
 void snd_sb16dsp_interrupt(int irq, void *dev_id, struct pt_regs *regs);

@@ -77,5 +77,6 @@ obj-$(CONFIG_SND_EMU10K1) += $(RAWMIDI_OBJS) snd-seq-midi-emul.o snd-seq-virmidi
 obj-$(CONFIG_SND_TRIDENT) += $(RAWMIDI_OBJS) snd-seq-midi-emul.o snd-seq-instr.o
 obj-$(CONFIG_SND_YMFPCI) += $(RAWMIDI_OBJS) $(OPL3_OBJS)
 obj-$(CONFIG_SND_USB_AUDIO) += $(RAWMIDI_OBJS)
+obj-$(CONFIG_SND_HDSP) += $(RAWMIDI_OBJS)
 
 obj-m := $(sort $(obj-m))

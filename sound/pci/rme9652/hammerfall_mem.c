@@ -25,7 +25,7 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
 
-    $Id: hammerfall_mem.c,v 1.6 2002/12/19 15:59:18 tiwai Exp $
+    $Id: hammerfall_mem.c,v 1.7 2003/01/06 14:21:28 perex Exp $
 
 
     Tue Oct 17 2000  Jaroslav Kysela <perex@suse.cz>
@@ -179,7 +179,7 @@ void snd_hammerfall_free_buffer (struct pci_dev *pcidev, void *addr)
 	printk ("Hammerfall memory allocator: unknown buffer address or PCI device ID");
 }
 
-static void __exit hammerfall_free_buffers (void)
+static void hammerfall_free_buffers (void)
 
 {
 	int i;

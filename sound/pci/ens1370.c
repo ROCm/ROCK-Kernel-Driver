@@ -398,8 +398,6 @@ struct _snd_ensoniq {
 	unsigned int spdif_default;
 	unsigned int spdif_stream;
 
-	snd_info_entry_t *proc_entry;
-
 #ifdef CHIP1370
 	unsigned char *bugbuf;
 	dma_addr_t bugbuf_addr;
@@ -1264,9 +1262,10 @@ static int __devinit snd_ensoniq_pcm2(ensoniq_t * ensoniq, int device, snd_pcm_t
  *  Mixer section
  */
 
+/*
+ * ENS1371 mixer (including SPDIF interface)
+ */
 #ifdef CHIP1371
-
-
 static int snd_ens1373_spdif_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_IEC958;
@@ -1490,6 +1489,8 @@ static int snd_ensoniq_1371_mixer(ensoniq_t * ensoniq)
 
 #endif /* CHIP1371 */
 
+/* generic control callbacks for ens1370 and for joystick */
+#if defined(CHIP1370) || defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
 #define ENSONIQ_CONTROL(xname, mask) \
 { .iface = SNDRV_CTL_ELEM_IFACE_CARD, .name = xname, .info = snd_ensoniq_control_info, \
   .get = snd_ensoniq_control_get, .put = snd_ensoniq_control_put, \
@@ -1517,7 +1518,6 @@ static int snd_ensoniq_control_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_value
 }
 
 #ifdef CHIP1370
-
 static int snd_ensoniq_control_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	ensoniq_t *ensoniq = snd_kcontrol_chip(kcontrol);
@@ -1535,13 +1535,20 @@ static int snd_ensoniq_control_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value
 	spin_unlock_irqrestore(&ensoniq->reg_lock, flags);
 	return change;
 }
+#endif /* CHIP1370 */
+#endif /* CHIP1370 || GAMEPORT */
 
-#define ES1370_CONTROLS 2
+/*
+ * ENS1370 mixer
+ */
 
+#ifdef CHIP1370
 static snd_kcontrol_new_t snd_es1370_controls[2] __devinitdata = {
 ENSONIQ_CONTROL("PCM 0 Output also on Line-In Jack", ES_1370_XCTL0),
 ENSONIQ_CONTROL("Mic +5V bias", ES_1370_XCTL1)
 };
+
+#define ES1370_CONTROLS ARRAY_SIZE(snd_es1370_controls)
 
 static void snd_ensoniq_mixer_free_ak4531(ak4531_t *ak4531)
 {
@@ -1725,26 +1732,8 @@ static void __devinit snd_ensoniq_proc_init(ensoniq_t * ensoniq)
 {
 	snd_info_entry_t *entry;
 
-	if ((entry = snd_info_create_card_entry(ensoniq->card, "audiopci", ensoniq->card->proc_root)) != NULL) {
-		entry->content = SNDRV_INFO_CONTENT_TEXT;
-		entry->private_data = ensoniq;
-		entry->mode = S_IFREG | S_IRUGO | S_IWUSR;
-		entry->c.text.read_size = 256;
-		entry->c.text.read = snd_ensoniq_proc_read;
-		if (snd_info_register(entry) < 0) {
-			snd_info_free_entry(entry);
-			entry = NULL;
-		}
-	}
-	ensoniq->proc_entry = entry;
-}
-
-static void snd_ensoniq_proc_done(ensoniq_t * ensoniq)
-{
-	if (ensoniq->proc_entry) {
-		snd_info_unregister(ensoniq->proc_entry);
-		ensoniq->proc_entry = NULL;
-	}
+	if (! snd_card_proc_new(ensoniq->card, "audiopci", &entry))
+		snd_info_set_text_ops(entry, ensoniq, snd_ensoniq_proc_read);
 }
 
 /*
@@ -1757,7 +1746,6 @@ static int snd_ensoniq_free(ensoniq_t *ensoniq)
 	if (ensoniq->ctrl & ES_JYSTK_EN)
 		snd_ensoniq_joy_disable(ensoniq);
 #endif
-	snd_ensoniq_proc_done(ensoniq);
 	if (ensoniq->irq < 0)
 		goto __hw_end;
 #ifdef CHIP1370

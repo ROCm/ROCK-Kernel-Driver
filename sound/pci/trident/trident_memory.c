@@ -28,6 +28,7 @@
 #include <linux/time.h>
 #include <sound/core.h>
 #include <sound/trident.h>
+#include <sound/pcm_sgbuf.h>
 
 /* page arguments of these two macros are Trident page (4096 bytes), not like
  * aligned pages in others
@@ -166,9 +167,8 @@ __found_pages:
 /*
  * check if the given pointer is valid for pages
  */
-static int is_valid_page(void *pages)
+static int is_valid_page(unsigned long ptr)
 {
-	unsigned long ptr = (unsigned long)virt_to_phys(pages);
 	if (ptr & ~0x3fffffffUL) {
 		snd_printk("max memory size is 1GB!!\n");
 		return 0;
@@ -184,33 +184,42 @@ static int is_valid_page(void *pages)
  * page allocation for DMA
  */
 snd_util_memblk_t *
-snd_trident_alloc_pages(trident_t *trident, void *pages, dma_addr_t addr, unsigned long size)
+snd_trident_alloc_pages(trident_t *trident, snd_pcm_substream_t *substream)
 {
-	unsigned long ptr;
 	snd_util_memhdr_t *hdr;
 	snd_util_memblk_t *blk;
-	int page;
+	int idx, page;
+	struct snd_sg_buf *sgbuf = snd_magic_cast(snd_pcm_sgbuf_t, _snd_pcm_substream_sgbuf(substream), return NULL);
 
 	snd_assert(trident != NULL, return NULL);
-	snd_assert(size > 0 && size < SNDRV_TRIDENT_MAX_PAGES * SNDRV_TRIDENT_PAGE_SIZE, return NULL);
+	snd_assert(sgbuf->size > 0 && sgbuf->size < SNDRV_TRIDENT_MAX_PAGES * SNDRV_TRIDENT_PAGE_SIZE, return NULL);
 	hdr = trident->tlb.memhdr;
 	snd_assert(hdr != NULL, return NULL);
 
-	if (! is_valid_page(pages))
-		return NULL;
-
 	down(&hdr->block_mutex);
-	blk = search_empty(hdr, size);
+	blk = search_empty(hdr, sgbuf->size);
 	if (blk == NULL) {
 		up(&hdr->block_mutex);
 		return NULL;
 	}
+	if (lastpg(blk) - firstpg(blk) >= sgbuf->pages) {
+		snd_printk(KERN_ERR "page calculation doesn't match: allocated pages = %d, trident = %d/%d\n", sgbuf->pages, firstpg(blk), lastpg(blk));
+		__snd_util_mem_free(hdr, blk);
+		up(&hdr->block_mutex);
+		return NULL;
+	}
+			   
 	/* set TLB entries */
-	ptr = (unsigned long)pages;
-	for (page = firstpg(blk); page <= lastpg(blk); page++) {
+	idx = 0;
+	for (page = firstpg(blk); page <= lastpg(blk); page++, idx++) {
+		dma_addr_t addr = sgbuf->table[idx].addr;
+		unsigned long ptr = (unsigned long)sgbuf->table[idx].buf;
+		if (! is_valid_page(addr)) {
+			__snd_util_mem_free(hdr, blk);
+			up(&hdr->block_mutex);
+			return NULL;
+		}
 		set_tlb_bus(trident, page, ptr, addr);
-		ptr += ALIGN_PAGE_SIZE;
-		addr += ALIGN_PAGE_SIZE;
 	}
 	up(&hdr->block_mutex);
 	return blk;
@@ -301,7 +310,8 @@ static void clear_tlb(trident_t *trident, int page)
 	void *ptr = page_to_ptr(trident, page);
 	dma_addr_t addr = page_to_addr(trident, page);
 	set_silent_tlb(trident, page);
-	snd_free_pci_pages(trident->pci, ALIGN_PAGE_SIZE, ptr, addr);
+	if (ptr)
+		snd_free_pci_pages(trident->pci, ALIGN_PAGE_SIZE, ptr, addr);
 }
 
 /* check new allocation range */
@@ -346,7 +356,7 @@ static int synth_alloc_pages(trident_t *hw, snd_util_memblk_t *blk)
 		ptr = snd_malloc_pci_pages(hw->pci, ALIGN_PAGE_SIZE, &addr);
 		if (ptr == NULL)
 			goto __fail;
-		if (! is_valid_page(ptr)) {
+		if (! is_valid_page(addr)) {
 			snd_free_pci_pages(hw->pci, ALIGN_PAGE_SIZE, ptr, addr);
 			goto __fail;
 		}

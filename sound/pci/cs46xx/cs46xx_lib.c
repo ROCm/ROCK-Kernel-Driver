@@ -26,7 +26,7 @@
  *           at Cirrus for have helping me out with the DSP, however we
  *           still dont have sufficient documentation and technical
  *           references to be able to implement all fancy feutures
- *           supported by the cs46xx DPS's. 
+ *           supported by the cs46xx DSP's. 
  *           Benny <benny@hostmobility.com>
  *                
  *   This program is free software; you can redistribute it and/or modify
@@ -57,6 +57,8 @@
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/info.h>
+#include <sound/pcm.h>
+#include <sound/pcm_params.h>
 #include <sound/cs46xx.h>
 
 #include <asm/io.h>
@@ -730,9 +732,11 @@ static int snd_cs46xx_playback_transfer(snd_pcm_substream_t *substream,
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	snd_pcm_sframes_t diff;
 	cs46xx_pcm_t * cpcm;
-	int buffer_size = runtime->period_size * CS46XX_FRAGS * 4;
+	int buffer_size;
 
 	cpcm = snd_magic_cast(cs46xx_pcm_t, substream->runtime->private_data, return -ENXIO);
+
+	buffer_size = runtime->period_size * CS46XX_FRAGS << cpcm->shift;
 
 	diff = runtime->control->appl_ptr - cpcm->appl_ptr;
 	if (diff) {
@@ -774,7 +778,7 @@ static int snd_cs46xx_capture_transfer(snd_pcm_substream_t *substream,
 	cs46xx_t *chip = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	snd_pcm_sframes_t diff = runtime->control->appl_ptr - chip->capt.appl_ptr;
-	int buffer_size = runtime->period_size * CS46XX_FRAGS * 4;
+	int buffer_size = runtime->period_size * CS46XX_FRAGS << chip->capt.shift;
 	if (diff) {
 		if (diff < -(snd_pcm_sframes_t) (runtime->boundary / 2))
 			diff += runtime->boundary;
@@ -830,7 +834,7 @@ static snd_pcm_uframes_t snd_cs46xx_playback_indirect_pointer(snd_pcm_substream_
 	size_t ptr;
 	cs46xx_pcm_t *cpcm = snd_magic_cast(cs46xx_pcm_t, substream->runtime->private_data, return -ENXIO);
 	ssize_t bytes;
-	int buffer_size = substream->runtime->period_size * CS46XX_FRAGS * 4;
+	int buffer_size = substream->runtime->period_size * CS46XX_FRAGS << cpcm->shift;
 
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
 	snd_assert (cpcm->pcm_channel,return -ENXIO);
@@ -865,7 +869,7 @@ static snd_pcm_uframes_t snd_cs46xx_capture_indirect_pointer(snd_pcm_substream_t
 	cs46xx_t *chip = snd_pcm_substream_chip(substream);
 	size_t ptr = snd_cs46xx_peek(chip, BA1_CBA) - chip->capt.hw_addr;
 	ssize_t bytes = ptr - chip->capt.hw_io;
-	int buffer_size = substream->runtime->period_size * CS46XX_FRAGS * 4;
+	int buffer_size = substream->runtime->period_size * CS46XX_FRAGS << chip->capt.shift;
 
 	if (bytes < 0)
 		bytes += buffer_size;
@@ -1071,7 +1075,7 @@ static int snd_cs46xx_playback_hw_params(snd_pcm_substream_t * substream,
 	int err;
 	cs46xx_t *chip = snd_pcm_substream_chip(substream);
 	int sample_rate = params_rate(hw_params);
-	int period_size = params_period_size(hw_params);
+	int period_size = params_period_bytes(hw_params);
 	cpcm = snd_magic_cast(cs46xx_pcm_t, runtime->private_data, return -ENXIO);
 
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
@@ -1090,12 +1094,15 @@ static int snd_cs46xx_playback_hw_params(snd_pcm_substream_t * substream,
 		return -ENXIO;
 	}
 
-	if (cs46xx_dsp_pcm_channel_set_period (chip,cpcm->pcm_channel,period_size * 4)) {
+
+	if (cs46xx_dsp_pcm_channel_set_period (chip,cpcm->pcm_channel,period_size)) {
 		 up (&chip->spos_mutex);
 		 return -EINVAL;
 	 }
-	snd_printdd ("period_size (%d), periods (%d)\n",
-		     period_size, params_periods(hw_params));
+
+	snd_printdd ("period_size (%d), periods (%d) buffer_size(%d)\n",
+		     period_size, params_periods(hw_params),
+		     params_buffer_bytes(hw_params));
 #endif
 
 	if (params_periods(hw_params) == CS46XX_FRAGS) {
@@ -1255,12 +1262,10 @@ static int snd_cs46xx_capture_hw_params(snd_pcm_substream_t * substream,
 	cs46xx_t *chip = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	int err;
-	int period_size = params_period_size(hw_params);
+	int period_size = params_period_bytes(hw_params);
 
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
-	snd_printdd ("capture period size (%d)\n",period_size);
-
-	cs46xx_dsp_pcm_ostream_set_period (chip,period_size * 4);
+	cs46xx_dsp_pcm_ostream_set_period (chip,period_size);
 #endif
 	if (runtime->periods == CS46XX_FRAGS) {
 		if (runtime->dma_area != chip->capt.hw_area)
@@ -1445,7 +1450,7 @@ static snd_pcm_hardware_t snd_cs46xx_capture =
 	.fifo_size =		0,
 };
 
-static unsigned int period_sizes[] = { 8, 16, 32, 64, 128, 256, 512 };
+static unsigned int period_sizes[] = { 32, 64, 128, 256, 512, 1024, 2048 };
 
 #define PERIOD_SIZES sizeof(period_sizes) / sizeof(period_sizes[0])
 
@@ -1488,8 +1493,11 @@ static int _cs46xx_playback_open_channel (snd_pcm_substream_t * substream,int pc
 	cpcm->pcm_channel = NULL; 
 	cpcm->pcm_channel_id = pcm_channel_id;
 
-	snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_PERIOD_SIZE, 
+
+	snd_pcm_hw_constraint_list(runtime, 0,
+				   SNDRV_PCM_HW_PARAM_PERIOD_BYTES, 
 				   &hw_constraints_period_sizes);
+
 	up (&chip->spos_mutex);
 #else
 	chip->playback_pcm = cpcm; /* HACK */
@@ -1565,7 +1573,8 @@ static int snd_cs46xx_capture_open(snd_pcm_substream_t * substream)
 	chip->amplifier_ctrl(chip, 1);
 
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
-	snd_pcm_hw_constraint_list(substream->runtime, 0, SNDRV_PCM_HW_PARAM_PERIOD_SIZE, 
+	snd_pcm_hw_constraint_list(substream->runtime, 0,
+				   SNDRV_PCM_HW_PARAM_PERIOD_BYTES, 
 				   &hw_constraints_period_sizes);
 #endif
 	return 0;
@@ -2874,19 +2883,13 @@ static int __devinit snd_cs46xx_proc_init(snd_card_t * card, cs46xx_t *chip)
 	
 	for (idx = 0; idx < 5; idx++) {
 		snd_cs46xx_region_t *region = &chip->region.idx[idx];
-		entry = snd_info_create_card_entry(card, region->name, card->proc_root);
-		if (entry) {
+		if (! snd_card_proc_new(card, region->name, &entry)) {
 			entry->content = SNDRV_INFO_CONTENT_DATA;
 			entry->private_data = chip;
 			entry->c.ops = &snd_cs46xx_proc_io_ops;
 			entry->size = region->size;
 			entry->mode = S_IFREG | S_IRUSR;
-			if (snd_info_register(entry) < 0) {
-				snd_info_unregister(entry);
-				entry = NULL;
-			}
 		}
-		region->proc_entry = entry;
 	}
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
 	cs46xx_dsp_proc_init(card, chip);
@@ -2896,15 +2899,6 @@ static int __devinit snd_cs46xx_proc_init(snd_card_t * card, cs46xx_t *chip)
 
 static int snd_cs46xx_proc_done(cs46xx_t *chip)
 {
-	int idx;
-
-	for (idx = 0; idx < 5; idx++) {
-		snd_cs46xx_region_t *region = &chip->region.idx[idx];
-		if (region->proc_entry) {
-			snd_info_unregister((snd_info_entry_t *) region->proc_entry);
-			region->proc_entry = NULL;
-		}
-	}
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
 	cs46xx_dsp_proc_done(chip);
 #endif
@@ -3716,16 +3710,13 @@ void snd_cs46xx_suspend(cs46xx_t *chip)
 {
 	snd_card_t *card = chip->card;
 
-	snd_power_lock(card);
 	if (card->power_state == SNDRV_CTL_POWER_D3hot)
-		goto __skip;
+		return;
 	snd_pcm_suspend_all(chip->pcm);
 	// chip->ac97_powerdown = snd_cs46xx_codec_read(chip, AC97_POWER_CONTROL);
 	// chip->ac97_general_purpose = snd_cs46xx_codec_read(chip, BA0_AC97_GENERAL_PURPOSE);
 	snd_cs46xx_hw_stop(chip);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
-      __skip:
-      	snd_power_unlock(card);
 }
 
 void snd_cs46xx_resume(cs46xx_t *chip)
@@ -3733,9 +3724,8 @@ void snd_cs46xx_resume(cs46xx_t *chip)
 	snd_card_t *card = chip->card;
 	int amp_saved;
 
-	snd_power_lock(card);
 	if (card->power_state == SNDRV_CTL_POWER_D0)
-		goto __skip;
+		return;
 
 	pci_enable_device(chip->pci);
 	amp_saved = chip->amplifier;
@@ -3764,8 +3754,6 @@ void snd_cs46xx_resume(cs46xx_t *chip)
 		chip->active_ctrl(chip, -1);
 	}
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
-      __skip:
-      	snd_power_unlock(card);
 }
 
 static int snd_cs46xx_set_power_state(snd_card_t *card, unsigned int power_state)

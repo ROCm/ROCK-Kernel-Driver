@@ -2377,9 +2377,8 @@ static void m3_suspend(m3_t *chip)
 	snd_card_t *card = chip->card;
 	int i, index;
 
-	snd_power_lock(card);
 	if (card->power_state == SNDRV_CTL_POWER_D3hot)
-		goto __skip;
+		return;
 
 	snd_pcm_suspend_all(chip->pcm);
 
@@ -2400,8 +2399,6 @@ static void m3_suspend(m3_t *chip)
 	snd_m3_outw(chip, 0xffff, 0x54);
 	snd_m3_outw(chip, 0xffff, 0x56);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
-      __skip:
-      	snd_power_unlock(card);
 }
 
 static void m3_resume(m3_t *chip)
@@ -2409,9 +2406,8 @@ static void m3_resume(m3_t *chip)
 	snd_card_t *card = chip->card;
 	int i, index;
 
-	snd_power_lock(card);
 	if (card->power_state == SNDRV_CTL_POWER_D0)
-		goto __skip;
+		return;
 
 	/* first lets just bring everything back. .*/
 	snd_m3_outw(chip, 0, 0x54);
@@ -2442,8 +2438,6 @@ static void m3_resume(m3_t *chip)
 	snd_m3_amp_enable(chip, 1);
 
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
-      __skip:
-      	snd_power_unlock(card);
 }
 
 #ifndef PCI_OLD_SUSPEND

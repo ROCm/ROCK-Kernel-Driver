@@ -815,6 +815,16 @@ int snd_rawmidi_control_ioctl(snd_card_t * card, snd_ctl_file_t * control,
 	return -ENOIOCTLCMD;
 }
 
+/**
+ * snd_rawmidi_receive - receive the input data from the device
+ * @substream: the rawmidi substream
+ * @buffer: the buffer pointer
+ * @count: the data size to read
+ *
+ * Reads the data from the internal buffer.
+ *
+ * Returns the size of read data, or a negative error code on failure.
+ */
 int snd_rawmidi_receive(snd_rawmidi_substream_t * substream, const unsigned char *buffer, int count)
 {
 	unsigned long flags;
@@ -959,6 +969,12 @@ static ssize_t snd_rawmidi_read(struct file *file, char *buf, size_t count, loff
 	return result;
 }
 
+/**
+ * snd_rawmidi_transmit_empty - check whether the output buffer is empty
+ * @substream: the rawmidi substream
+ * 
+ * Returns 1 if the internal output buffer is empty, 0 if not.
+ */
 int snd_rawmidi_transmit_empty(snd_rawmidi_substream_t * substream)
 {
 	snd_rawmidi_runtime_t *runtime = substream->runtime;
@@ -977,6 +993,20 @@ int snd_rawmidi_transmit_empty(snd_rawmidi_substream_t * substream)
 	return result;		
 }
 
+/**
+ * snd_rawmidi_transmit_peek - copy data from the internal buffer
+ * @substream: the rawmidi substream
+ * @buffer: the buffer pointer
+ * @count: data size to transfer
+ *
+ * Copies data from the internal output buffer to the given buffer.
+ *
+ * Call this in the interrupt handler when the midi output is ready,
+ * and call snd_rawmidi_transmit_ack() after the transmission is
+ * finished.
+ *
+ * Returns the size of copied data, or a negative error code on failure.
+ */
 int snd_rawmidi_transmit_peek(snd_rawmidi_substream_t * substream, unsigned char *buffer, int count)
 {
 	unsigned long flags;
@@ -1014,6 +1044,17 @@ int snd_rawmidi_transmit_peek(snd_rawmidi_substream_t * substream, unsigned char
 	return result;
 }
 
+/**
+ * snd_rawmidi_transmit_ack - acknowledge the transmission
+ * @substream: the rawmidi substream
+ * @count: the tranferred count
+ *
+ * Advances the hardware pointer for the internal output buffer with
+ * the given size and updates the condition.
+ * Call after the transmission is finished.
+ *
+ * Returns the advanced size if successful, or a negative error code on failure.
+ */
 int snd_rawmidi_transmit_ack(snd_rawmidi_substream_t * substream, int count)
 {
 	unsigned long flags;
@@ -1041,6 +1082,16 @@ int snd_rawmidi_transmit_ack(snd_rawmidi_substream_t * substream, int count)
 	return count;
 }
 
+/**
+ * snd_rawmidi_transmit - copy from the buffer to the device
+ * @substream: the rawmidi substream
+ * @buf: the buffer pointer
+ * @count: the data size to transfer
+ * 
+ * Copies data from the buffer to the device and advances the pointer.
+ *
+ * Returns the copied size if successful, or a negative error code on failure.
+ */
 int snd_rawmidi_transmit(snd_rawmidi_substream_t * substream, unsigned char *buffer, int count)
 {
 	count = snd_rawmidi_transmit_peek(substream, buffer, count);
@@ -1304,6 +1355,20 @@ static int snd_rawmidi_alloc_substreams(snd_rawmidi_t *rmidi,
 	return 0;
 }
 
+/**
+ * snd_rawmidi_new - create a rawmidi instance
+ * @card: the card instance
+ * @id: the id string
+ * @device: the device index
+ * @output_count: the number of output streams
+ * @input_count: the number of input streams
+ * @rrawmidi: the pointer to store the new rawmidi instance
+ *
+ * Creates a new rawmidi instance.
+ * Use snd_rawmidi_set_ops() to set the operators to the new instance.
+ *
+ * Returns zero if successful, or a negative error code on failure.
+ */
 int snd_rawmidi_new(snd_card_t * card, char *id, int device,
 		    int output_count, int input_count,
 		    snd_rawmidi_t ** rrawmidi)
@@ -1513,6 +1578,14 @@ static int snd_rawmidi_dev_unregister(snd_device_t *device)
 	return snd_rawmidi_free(rmidi);
 }
 
+/**
+ * snd_rawmidi_set_ops - set the rawmidi operators
+ * @rmidi: the rawmidi instance
+ * @stream: the stream direction, SNDRV_RAWMIDI_STREAM_XXX
+ * @ops: the operator table
+ *
+ * Sets the rawmidi operators for the given stream direction.
+ */
 void snd_rawmidi_set_ops(snd_rawmidi_t *rmidi, int stream, snd_rawmidi_ops_t *ops)
 {
 	struct list_head *list;

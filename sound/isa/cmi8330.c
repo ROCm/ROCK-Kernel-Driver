@@ -147,6 +147,15 @@ struct snd_cmi8330 {
 	struct isapnp_dev *cap;
 	struct isapnp_dev *play;
 #endif
+	snd_card_t *card;
+	ad1848_t *wss;
+	sb_t *sb;
+
+	snd_pcm_t *pcm;
+	snd_pcm_ops_t playback_ops;
+	int (*playback_open)(snd_pcm_substream_t *);
+	snd_pcm_ops_t capture_ops;
+	int (*capture_open)(snd_pcm_substream_t *);
 };
 
 static snd_card_t *snd_cmi8330_cards[SNDRV_CARDS] = SNDRV_DEFAULT_PTR;
@@ -294,6 +303,79 @@ static void snd_cmi8330_deactivate(struct snd_cmi8330 *acard)
 }
 #endif
 
+/*
+ * PCM interface
+ *
+ * since we call the different chip interfaces for playback and capture
+ * directions, we need a trick.
+ *
+ * - copy the ops for each direction into a local record.
+ * - replace the open callback with the new one, which replaces the
+ *   substream->private_data with the corresponding chip instance
+ *   and calls again the original open callback of the chip.
+ *
+ */
+
+static int snd_cmi8330_playback_open(snd_pcm_substream_t * substream)
+{
+	struct snd_cmi8330 *chip = (struct snd_cmi8330 *)_snd_pcm_substream_chip(substream);
+
+	/* replace the private_data and call the original open callback */
+	substream->private_data = chip->sb;
+	return chip->playback_open(substream);
+}
+
+static int snd_cmi8330_capture_open(snd_pcm_substream_t * substream)
+{
+	struct snd_cmi8330 *chip = (struct snd_cmi8330 *)_snd_pcm_substream_chip(substream);
+
+	/* replace the private_data and call the original open callback */
+	substream->private_data = chip->wss;
+	return chip->capture_open(substream);
+}
+
+static void snd_cmi8330_pcm_free(snd_pcm_t *pcm)
+{
+	snd_pcm_lib_preallocate_free_for_all(pcm);
+}
+
+static int __init snd_cmi8330_pcm(snd_card_t *card, struct snd_cmi8330 *chip)
+{
+	snd_pcm_t *pcm;
+	const snd_pcm_ops_t *ops;
+	int err;
+	
+	if ((err = snd_pcm_new(card, "CMI8330", 0, 1, 1, &pcm)) < 0)
+		return err;
+	strcpy(pcm->name, "CMI8330");
+	pcm->private_data = chip;
+	pcm->private_free = snd_cmi8330_pcm_free;
+	
+	/* playback - SB16 */
+	ops = snd_sb16dsp_get_pcm_ops(SNDRV_PCM_STREAM_PLAYBACK);
+	chip->playback_ops = *ops;
+	chip->playback_open = ops->open;
+	chip->playback_ops.open = snd_cmi8330_playback_open;
+
+	/* capture - AD1848 */
+	ops = snd_ad1848_get_pcm_ops(SNDRV_PCM_STREAM_CAPTURE);
+	chip->capture_ops = *ops;
+	chip->capture_open = ops->open;
+	chip->capture_ops.open = snd_cmi8330_capture_open;
+
+	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &chip->playback_ops);
+	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &chip->capture_ops);
+
+	snd_pcm_lib_preallocate_isa_pages_for_all(pcm, 64*1024, 128*1024);
+	chip->pcm = pcm;
+
+	return 0;
+}
+
+
+/*
+ */
+
 static void snd_cmi8330_free(snd_card_t *card)
 {
 	struct snd_cmi8330 *acard = (struct snd_cmi8330 *)card->private_data;
@@ -309,12 +391,8 @@ static int __init snd_cmi8330_probe(int dev)
 {
 	snd_card_t *card;
 	struct snd_cmi8330 *acard;
-	ad1848_t *chip_wss;
-	sb_t *chip_sb;
 	unsigned long flags;
 	int i, err;
-	snd_pcm_t *pcm, *wss_pcm, *sb_pcm;
-	snd_pcm_str_t *pstr;
 
 #ifdef __ISAPNP__
 	if (!isapnp[dev]) {
@@ -337,6 +415,7 @@ static int __init snd_cmi8330_probe(int dev)
 		return -ENOMEM;
 	}
 	acard = (struct snd_cmi8330 *)card->private_data;
+	acard->card = card;
 	card->private_free = snd_cmi8330_free;
 
 #ifdef __ISAPNP__
@@ -352,20 +431,15 @@ static int __init snd_cmi8330_probe(int dev)
 				     wssirq[dev],
 				     wssdma[dev],
 				     AD1848_HW_DETECT,
-				     &chip_wss)) < 0) {
+				     &acard->wss)) < 0) {
 		snd_printk("(AD1848) device busy??\n");
 		snd_card_free(card);
 		return err;
 	}
-	if (chip_wss->hardware != AD1848_HW_CMI8330) {
+	if (acard->wss->hardware != AD1848_HW_CMI8330) {
 		snd_printk("(AD1848) not found during probe\n");
 		snd_card_free(card);
 		return -ENODEV;
-	}
-	if ((err = snd_ad1848_pcm(chip_wss, 0, &wss_pcm)) < 0) {
-		snd_printk("(AD1848) no enough memory??\n");
-		snd_card_free(card);
-		return err;
 	}
 
 	if ((err = snd_sbdsp_create(card, sbport[dev],
@@ -373,62 +447,44 @@ static int __init snd_cmi8330_probe(int dev)
 				    snd_sb16dsp_interrupt,
 				    sbdma8[dev],
 				    sbdma16[dev],
-				    SB_HW_AUTO, &chip_sb)) < 0) {
+				    SB_HW_AUTO, &acard->sb)) < 0) {
 		snd_printk("(SB16) device busy??\n");
 		snd_card_free(card);
 		return err;
 	}
-	if ((err = snd_sb16dsp_pcm(chip_sb, 1, &sb_pcm)) < 0) {
-		snd_printk("(SB16) no enough memory??\n");
-		snd_card_free(card);
-		return err;
-	}
-
-	if (chip_sb->hardware != SB_HW_16) {
+	if (acard->sb->hardware != SB_HW_16) {
 		snd_printk("(SB16) not found during probe\n");
 		snd_card_free(card);
 		return -ENODEV;
 	}
+	memcpy(&acard->wss->image[16], &snd_cmi8330_image, sizeof(snd_cmi8330_image));
 
-	memcpy(&chip_wss->image[16], &snd_cmi8330_image, sizeof(snd_cmi8330_image));
+	spin_lock_irqsave(&acard->wss->reg_lock, flags);
+	snd_ad1848_out(acard->wss, AD1848_MISC_INFO,	/* switch on MODE2 */
+		       acard->wss->image[AD1848_MISC_INFO] |= 0x40);
+	spin_unlock_irqrestore(&acard->wss->reg_lock, flags);
 
-	spin_lock_irqsave(&chip_wss->reg_lock, flags);
-	snd_ad1848_out(chip_wss, AD1848_MISC_INFO,	/* switch on MODE2 */
-		       chip_wss->image[AD1848_MISC_INFO] |= 0x40);
-	spin_unlock_irqrestore(&chip_wss->reg_lock, flags);
-
-	if ((err = snd_cmi8330_mixer(card, chip_wss)) < 0) {
+	if ((err = snd_cmi8330_mixer(card, acard->wss)) < 0) {
 		snd_printk("failed to create mixers\n");
 		snd_card_free(card);
 		return err;
 	}
-	spin_lock_irqsave(&chip_wss->reg_lock, flags);
+	spin_lock_irqsave(&acard->wss->reg_lock, flags);
 	for (i = CMI8330_RMUX3D; i <= CMI8330_CDINGAIN; i++)
-		snd_ad1848_out(chip_wss, i, chip_wss->image[i]);
-	spin_unlock_irqrestore(&chip_wss->reg_lock, flags);
+		snd_ad1848_out(acard->wss, i, acard->wss->image[i]);
+	spin_unlock_irqrestore(&acard->wss->reg_lock, flags);
 
-	/*
-	 * KLUDGE ALERT
-	 *  disable AD1848 playback
-	 *  disable SB16 capture
-	 */
-	pcm = wss_pcm;
-	pstr = &pcm->streams[SNDRV_PCM_STREAM_PLAYBACK];
-	snd_magic_kfree(pstr->substream);
-	pstr->substream = 0;
-	pstr->substream_count = 0;
-
-	pcm = sb_pcm;
-	pstr = &pcm->streams[SNDRV_PCM_STREAM_CAPTURE];
-	snd_magic_kfree(pstr->substream);
-	pstr->substream = 0;
-	pstr->substream_count = 0;
+	if ((err = snd_cmi8330_pcm(card, acard)) < 0) {
+		snd_printk("failed to create pcms\n");
+		snd_card_free(card);
+		return err;
+	}
 
 	strcpy(card->driver, "CMI8330/C3D");
 	strcpy(card->shortname, "C-Media CMI8330/C3D");
 	sprintf(card->longname, "%s at 0x%lx, irq %d, dma %d",
-		wss_pcm->name,
-		chip_wss->port,
+		card->shortname,
+		acard->wss->port,
 		wssirq[dev],
 		wssdma[dev]);
 

@@ -162,6 +162,7 @@ int snd_ad1848_create(snd_card_t * card,
 		      ad1848_t ** chip);
 
 int snd_ad1848_pcm(ad1848_t * chip, int device, snd_pcm_t **rpcm);
+const snd_pcm_ops_t *snd_ad1848_get_pcm_ops(int direction);
 int snd_ad1848_mixer(ad1848_t * chip);
 void snd_ad1848_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 

@@ -51,14 +51,16 @@ static void snd_card_id_read(snd_info_entry_t *entry, snd_info_buffer_t * buffer
 }
 
 /**
- *  snd_card_new: create and initialize a soundcard structure
+ *  snd_card_new - create and initialize a soundcard structure
  *  @idx: card index (address) [0 ... (SNDRV_CARDS-1)]
  *  @xid: card identification (ASCII string)
  *  @module: top level module for locking
  *  @extra_size: allocate this extra size after the main soundcard structure
  *
+ *  Creates and initializes a soundcard structure.
+ *
  *  Returns kmallocated snd_card_t structure. Creates the ALSA control interface
- *  (which is blocked until #snd_card_register function is called).
+ *  (which is blocked until snd_card_register function is called).
  */
 snd_card_t *snd_card_new(int idx, const char *xid,
 			 struct module *module, int extra_size)
@@ -136,10 +138,12 @@ static unsigned int snd_disconnect_poll(struct file * file, poll_table * wait)
 }
 
 /**
- *  snd_card_disconnect: disconnect all APIs from the file-operations (user space)
+ *  snd_card_disconnect - disconnect all APIs from the file-operations (user space)
  *  @card: soundcard structure
  *
- *  Returns - zero, otherwise a negative error code.
+ *  Disconnects all APIs from the file-operations (user space).
+ *
+ *  Returns zero, otherwise a negative error code.
  *
  *  Note: The current implementation replaces all active file->f_op with special
  *        dummy file operations (they do nothing except release).
@@ -219,19 +223,18 @@ int snd_card_disconnect(snd_card_t * card)
 }
 
 /**
- *  snd_card_free: frees given soundcard structure
+ *  snd_card_free - frees given soundcard structure
  *  @card: soundcard structure
  *
  *  This function releases the soundcard structure and the all assigned
  *  devices automatically.  That is, you don't have to release the devices
  *  by yourself.
  *
- *  Returns - zero. Frees all associated devices and frees the control
+ *  Returns zero. Frees all associated devices and frees the control
  *  interface associated to given soundcard.
  */
 int snd_card_free(snd_card_t * card)
 {
-	wait_queue_t wait;
 	struct snd_shutdown_f_ops *s_f_ops;
 
 	if (card == NULL)
@@ -242,13 +245,7 @@ int snd_card_free(snd_card_t * card)
 	write_unlock(&snd_card_rwlock);
 
 	/* wait, until all devices are ready for the free operation */
-	init_waitqueue_entry(&wait, current);
-	add_wait_queue(&card->shutdown_sleep, &wait);
-	while (card->files) {
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(30 * HZ);
-	}
-	remove_wait_queue(&card->shutdown_sleep, &wait);
+	wait_event(card->shutdown_sleep, card->files == NULL);
 
 #if defined(CONFIG_SND_MIXER_OSS) || defined(CONFIG_SND_MIXER_OSS_MODULE)
 	if (snd_mixer_oss_notify_callback)
@@ -299,24 +296,22 @@ static void snd_card_free_thread(void * __card)
 		module = NULL;
 	}
 
-	wait_event(card->shutdown_sleep, card->files == NULL);
-
 	snd_card_free(card);
 
 	module_put(module);
 }
 
 /**
- *  snd_card_free_in_thread: call snd_card_free() in thread
+ *  snd_card_free_in_thread - call snd_card_free() in thread
  *  @card: soundcard structure
  *
- *  This function schedules the call of #snd_card_free function in a
+ *  This function schedules the call of snd_card_free() function in a
  *  work queue.  When all devices are released (non-busy), the work
- *  is woken up and calls #snd_card_free.
+ *  is woken up and calls snd_card_free().
  *
  *  When a card can be disconnected at any time by hotplug service,
  *  this function should be used in disconnect (or detach) callback
- *  instead of calling #snd_card_free directly.
+ *  instead of calling snd_card_free() directly.
  *  
  *  Returns - zero otherwise a negative error code if the start of thread failed.
  */
@@ -392,7 +387,7 @@ static void choose_default_id(snd_card_t * card)
 }
 
 /**
- *  snd_card_register: register the soundcard
+ *  snd_card_register - register the soundcard
  *  @card: soundcard structure
  *
  *  This function registers all the devices assigned to the soundcard.
@@ -400,7 +395,7 @@ static void choose_default_id(snd_card_t * card)
  *  external accesses.  Thus, you should call this function at the end
  *  of the initialization of the card.
  *
- *  Returns - zero otherwise a negative error code if the registrain failed.
+ *  Returns zero otherwise a negative error code if the registrain failed.
  */
 int snd_card_register(snd_card_t * card)
 {
@@ -517,14 +512,14 @@ int __exit snd_card_info_done(void)
 }
 
 /**
- *  snd_component_add: add a component string
+ *  snd_component_add - add a component string
  *  @card: soundcard structure
  *  @component: the component id string
  *
  *  This function adds the component id string to the supported list.
  *  The component can be referred from the alsa-lib.
  *
- *  Returns - zero otherwise a negative error code.
+ *  Returns zero otherwise a negative error code.
  */
   
 int snd_component_add(snd_card_t *card, const char *component)
@@ -548,7 +543,7 @@ int snd_component_add(snd_card_t *card, const char *component)
 }
 
 /**
- *  snd_card_file_add: add the file to the file list of the card
+ *  snd_card_file_add - add the file to the file list of the card
  *  @card: soundcard structure
  *  @file: file pointer
  *
@@ -580,15 +575,15 @@ int snd_card_file_add(snd_card_t *card, struct file *file)
 }
 
 /**
- *  snd_card_file_remove: remove the file from the file list
+ *  snd_card_file_remove - remove the file from the file list
  *  @card: soundcard structure
  *  @file: file pointer
  *
  *  This function removes the file formerly added to the card via
- *  #snd_card_file_add function.
+ *  snd_card_file_add() function.
  *  If all files are removed and the release of the card is
- *  scheduled, it will wake up the the thread to call #snd_card_free
- *  (see #snd_card_free_in_thread function).
+ *  scheduled, it will wake up the the thread to call snd_card_free()
+ *  (see snd_card_free_in_thread() function).
  *
  *  Returns zero or a negative error code.
  */
@@ -623,8 +618,10 @@ int snd_card_file_remove(snd_card_t *card, struct file *file)
 
 #ifdef CONFIG_PM
 /**
- *  snd_power_wait: wait until the power-state is changed.
+ *  snd_power_wait - wait until the power-state is changed.
  *  @card: soundcard structure
+ *
+ *  Waits until the power-state is changed.
  *
  *  Note: the power lock must be active before call.
  */

@@ -51,7 +51,6 @@ MODULE_PARM_SYNTAX(enable_loopback, SNDRV_BOOLEAN_FALSE_DESC);
  */
 
 static void snd_ac97_proc_init(snd_card_t * card, ac97_t * ac97);
-static void snd_ac97_proc_done(ac97_t * ac97);
 
 typedef struct {
 	unsigned int id;
@@ -240,6 +239,18 @@ static int snd_ac97_valid_reg(ac97_t *ac97, unsigned short reg)
 	return 1;
 }
 
+/**
+ * snd_ac97_write - write a value on the given register
+ * @ac97: the ac97 instance
+ * @reg: the register to change
+ * @value: the value to set
+ *
+ * Writes a value on the given register.  This will invoke the write
+ * callback directly after the register check.
+ * This function doesn't change the register cache unlike
+ * #snd_ca97_write_cache(), so use this only when you don't want to
+ * reflect the change to the suspend/resume state.
+ */
 void snd_ac97_write(ac97_t *ac97, unsigned short reg, unsigned short value)
 {
 	if (!snd_ac97_valid_reg(ac97, reg))
@@ -247,6 +258,17 @@ void snd_ac97_write(ac97_t *ac97, unsigned short reg, unsigned short value)
 	ac97->write(ac97, reg, value);
 }
 
+/**
+ * snd_ac97_read - read a value from the given register
+ * 
+ * @ac97: the ac97 instance
+ * @reg: the register to read
+ *
+ * Reads a value from the given register.  This will invoke the read
+ * callback directly after the register check.
+ *
+ * Returns the read value.
+ */
 unsigned short snd_ac97_read(ac97_t *ac97, unsigned short reg)
 {
 	if (!snd_ac97_valid_reg(ac97, reg))
@@ -254,6 +276,16 @@ unsigned short snd_ac97_read(ac97_t *ac97, unsigned short reg)
 	return ac97->read(ac97, reg);
 }
 
+/**
+ * snd_ac97_write_cache - write a value on the given register and update the cache
+ * @ac97: the ac97 instance
+ * @reg: the register to change
+ * @value: the value to set
+ *
+ * Writes a value on the given register and updates the register
+ * cache.  The cached values are used for the cached-read and the
+ * suspend/resume.
+ */
 void snd_ac97_write_cache(ac97_t *ac97, unsigned short reg, unsigned short value)
 {
 	if (!snd_ac97_valid_reg(ac97, reg))
@@ -279,6 +311,18 @@ static void snd_ac97_write_cache_test(ac97_t *ac97, unsigned short reg, unsigned
 	snd_ac97_write_cache(ac97, reg, value);
 }
 
+/**
+ * snd_ac97_update - update the value on the given register
+ * @ac97: the ac97 instance
+ * @reg: the register to change
+ * @value: the value to set
+ *
+ * Compares the value with the register cache and updates the value
+ * only when the value is changed.
+ *
+ * Retruns 1 if the value is changed, 0 if no change, or a negative
+ * code on failure.
+ */
 int snd_ac97_update(ac97_t *ac97, unsigned short reg, unsigned short value)
 {
 	int change;
@@ -295,7 +339,7 @@ int snd_ac97_update(ac97_t *ac97, unsigned short reg, unsigned short value)
 	return change;
 }
 
-int snd_ac97_update_bits_nolock(ac97_t *ac97, unsigned short reg, unsigned short mask, unsigned short value)
+static int snd_ac97_update_bits_nolock(ac97_t *ac97, unsigned short reg, unsigned short mask, unsigned short value)
 {
 	int change;
 	unsigned short old, new;
@@ -312,6 +356,19 @@ int snd_ac97_update_bits_nolock(ac97_t *ac97, unsigned short reg, unsigned short
 	return change;
 }
 
+/**
+ * snd_ac97_update_bits - update the bits on the given register
+ * @ac97: the ac97 instance
+ * @reg: the register to change
+ * @mask: the bit-mask to change
+ * @value: the value to set
+ *
+ * Updates the masked-bits on the given register onle when the value
+ * is changed.
+ *
+ * Returns 1 if the bits are changed, 0 if no change, or a negative
+ * code on failure.
+ */
 int snd_ac97_update_bits(ac97_t *ac97, unsigned short reg, unsigned short mask, unsigned short value)
 {
 	int change;
@@ -321,7 +378,7 @@ int snd_ac97_update_bits(ac97_t *ac97, unsigned short reg, unsigned short mask, 
 	return change;
 }
 
-int snd_ac97_ad18xx_update_pcm_bits(ac97_t *ac97, int codec, unsigned short mask, unsigned short value)
+static int snd_ac97_ad18xx_update_pcm_bits(ac97_t *ac97, int codec, unsigned short mask, unsigned short value)
 {
 	int change;
 	unsigned short old, new;
@@ -935,6 +992,11 @@ static const snd_kcontrol_new_t snd_ac97_controls_alc650[] = {
 	AC97_SINGLE("Surround Down Mix", AC97_ALC650_MULTICH, 1, 1, 0),
 	AC97_SINGLE("Center/LFE Down Mix", AC97_ALC650_MULTICH, 2, 1, 0),
 	AC97_SINGLE("Exchange Center/LFE", AC97_ALC650_MULTICH, 3, 1, 0),
+	/* 4: Analog Input To Surround */
+	/* 5: Analog Input To Center/LFE */
+	/* 6: Indepedent Master Volume Right */
+	/* 7: Indepedent Master Volume Left */
+	/* 8: reserved */
 	AC97_SINGLE("Line-In As Surround", AC97_ALC650_MULTICH, 9, 1, 0),
 	AC97_SINGLE("Mic As Center/LFE", AC97_ALC650_MULTICH, 10, 1, 0),
 	AC97_SINGLE("IEC958 Capture Switch", AC97_ALC650_MULTICH, 11, 1, 0),
@@ -944,6 +1006,10 @@ static const snd_kcontrol_new_t snd_ac97_controls_alc650[] = {
 	AC97_SINGLE("IEC958 Input Clock Enable", AC97_ALC650_CLOCK, 0, 1, 0),
 	AC97_SINGLE("IEC958 Input Pin Enable", AC97_ALC650_CLOCK, 1, 1, 0),
 #endif
+	AC97_SINGLE("Surround DAC Switch", AC97_ALC650_SURR_DAC_VOL, 15, 1, 1),
+	AC97_DOUBLE("Surround DAC Volume", AC97_ALC650_SURR_DAC_VOL, 8, 0, 31, 1),
+	AC97_SINGLE("Center/LFE DAC Switch", AC97_ALC650_LFE_DAC_VOL, 15, 1, 1),
+	AC97_DOUBLE("Center/LFE DAC Volume", AC97_ALC650_LFE_DAC_VOL, 8, 0, 31, 1),
 };
 
 /* The following snd_ac97_ymf753_... items added by David Shust (dshust@shustring.com) */
@@ -1098,7 +1164,6 @@ static const snd_kcontrol_new_t snd_ac97_ymf753_controls_spdif[3] = {
 static int snd_ac97_free(ac97_t *ac97)
 {
 	if (ac97) {
-		snd_ac97_proc_done(ac97);
 		if (ac97->private_free)
 			ac97->private_free(ac97);
 		snd_magic_kfree(ac97);
@@ -1686,6 +1751,32 @@ static void snd_ac97_get_name(ac97_t *ac97, unsigned int id, char *name)
 	sprintf(name + strlen(name), " (%x)", id & 0xff);
 }
 
+
+/**
+ * snd_ac97_mixer - create an AC97 codec component
+ * @card: the card instance
+ * @_ac97: the template of ac97, including index, callbacks and
+ *         the private data.
+ * @rac97: the pointer to store the new ac97 instance.
+ *
+ * Creates an AC97 codec component.  An ac97_t instance is newly
+ * allocated and initialized from the template (_ac97).  The codec
+ * is then initialized by the standard procedure.
+ *
+ * The template must include the valid callbacks (at least read and
+ * write), the codec number (num) and address (addr), and the private
+ * data (private_data).  The other callbacks, wait and reset, are not
+ * mandantory.
+ * 
+ * The clock is set to 48000.  If another clock is needed, reset
+ * ac97->clock manually afterwards.
+ *
+ * The ac97 instance is registered as a low-level device, so you don't
+ * have to release it manually.
+ *
+ * Returns zero if sucessful, or a negative error code on failure.
+ */
+
 int snd_ac97_mixer(snd_card_t * card, ac97_t * _ac97, ac97_t ** rac97)
 {
 	int err;
@@ -1866,7 +1957,7 @@ int snd_ac97_mixer(snd_card_t * card, ac97_t * _ac97, ac97_t ** rac97)
 }
 
 /*
-
+ * proc interface
  */
 
 static void snd_ac97_proc_read_main(ac97_t *ac97, snd_info_buffer_t * buffer, int subidx)
@@ -2089,46 +2180,14 @@ static void snd_ac97_proc_init(snd_card_t * card, ac97_t * ac97)
 		sprintf(name, "ac97#%d-%d", ac97->addr, ac97->num);
 	else
 		sprintf(name, "ac97#%d", ac97->addr);
-	if ((entry = snd_info_create_card_entry(card, name, card->proc_root)) != NULL) {
-		entry->content = SNDRV_INFO_CONTENT_TEXT;
-		entry->private_data = ac97;
-		entry->mode = S_IFREG | S_IRUGO | S_IWUSR;
-		entry->c.text.read_size = 512;
-		entry->c.text.read = snd_ac97_proc_read;
-		if (snd_info_register(entry) < 0) {
-			snd_info_free_entry(entry);
-			entry = NULL;
-		}
-	}
-	ac97->proc_entry = entry;
+	if (! snd_card_proc_new(card, name, &entry))
+		snd_info_set_text_ops(entry, ac97, snd_ac97_proc_read);
 	if (ac97->num)
 		sprintf(name, "ac97#%d-%dregs", ac97->addr, ac97->num);
 	else
 		sprintf(name, "ac97#%dregs", ac97->addr);
-	if ((entry = snd_info_create_card_entry(card, name, card->proc_root)) != NULL) {
-		entry->content = SNDRV_INFO_CONTENT_TEXT;
-		entry->private_data = ac97;
-		entry->mode = S_IFREG | S_IRUGO | S_IWUSR;
-		entry->c.text.read_size = 1024;
-		entry->c.text.read = snd_ac97_proc_regs_read;
-		if (snd_info_register(entry) < 0) {
-			snd_info_free_entry(entry);
-			entry = NULL;
-		}
-	}
-	ac97->proc_regs_entry = entry;
-}
-
-static void snd_ac97_proc_done(ac97_t * ac97)
-{
-	if (ac97->proc_regs_entry) {
-		snd_info_unregister(ac97->proc_regs_entry);
-		ac97->proc_regs_entry = NULL;
-	}
-	if (ac97->proc_entry) {
-		snd_info_unregister(ac97->proc_entry);
-		ac97->proc_entry = NULL;
-	}
+	if (! snd_card_proc_new(card, name, &entry))
+		snd_info_set_text_ops(entry, ac97, snd_ac97_proc_regs_read);
 }
 
 /*
@@ -2174,6 +2233,23 @@ static int set_spdif_rate(ac97_t *ac97, unsigned short rate)
 	return 0;
 }
 
+/**
+ * snd_ac97_set_rate - change the rate of the given input/output.
+ * @ac97: the ac97 instance
+ * @reg: the register to change
+ * @rate: the sample rate to set
+ *
+ * Changes the rate of the given input/output on the codec.
+ * If the codec doesn't support VAR, the rate must be 48000 (except
+ * for SPDIF).
+ *
+ * The valid registers are AC97_PMC_MIC_ADC_RATE,
+ * AC97_PCM_FRONT_DAC_RATE, AC97_PCM_LR_ADC_RATE and AC97_SPDIF.
+ * The SPDIF register is a pseudo-register to change the rate of SPDIF
+ * (only if supported).
+ *
+ * Returns zero if successful, or a negative error code on failure.
+ */
 int snd_ac97_set_rate(ac97_t *ac97, int reg, unsigned short rate)
 {
 	unsigned short mask;
@@ -2213,8 +2289,11 @@ int snd_ac97_set_rate(ac97_t *ac97, int reg, unsigned short rate)
 
 
 #ifdef CONFIG_PM
-/*
- * general suspend procedure
+/**
+ * snd_ac97_suspend - General suspend function for AC97 codec
+ * @ac97: the ac97 instance
+ *
+ * Suspends the codec, power down the chip.
  */
 void snd_ac97_suspend(ac97_t *ac97)
 {
@@ -2231,8 +2310,12 @@ void snd_ac97_suspend(ac97_t *ac97)
 	snd_ac97_write(ac97, AC97_POWERDOWN, power);
 }
 
-/*
- * general resume procedure
+/**
+ * snd_ac97_resume - General resume function for AC97 codec
+ * @ac97: the ac97 instance
+ *
+ * Do the standard resume procedure, power up and restoring the
+ * old register values.
  */
 void snd_ac97_resume(ac97_t *ac97)
 {

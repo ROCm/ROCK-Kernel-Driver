@@ -365,7 +365,7 @@ static int snd_emu10k1_playback_hw_params(snd_pcm_substream_t * substream,
 		snd_util_memblk_t *memblk;
 		if (epcm->memblk != NULL)
 			snd_emu10k1_free_pages(emu, epcm->memblk);
-		memblk = snd_emu10k1_alloc_pages(emu, (struct snd_sg_buf *)substream->dma_private);
+		memblk = snd_emu10k1_alloc_pages(emu, substream);
 		if ((epcm->memblk = memblk) == NULL || ((emu10k1_memblk_t *)memblk)->mapped_page < 0) {
 			epcm->start_addr = 0;
 			return -ENOMEM;

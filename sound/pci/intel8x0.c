@@ -322,7 +322,6 @@ typedef struct {
 	unsigned char piv_saved;
 	unsigned short picb_saved;
 #endif
-	snd_info_entry_t *proc_entry;
 } ichdev_t;
 
 typedef struct _snd_intel8x0 intel8x0_t;
@@ -368,7 +367,6 @@ struct _snd_intel8x0 {
 
 	spinlock_t reg_lock;
 	spinlock_t ac97_lock;
-	snd_info_entry_t *proc_entry;
 	
 	u32 bdbars_count;
 	u32 *bdbars;
@@ -1854,8 +1852,6 @@ static int snd_intel8x0_chip_init(intel8x0_t *chip)
 	return 0;
 }
 
-static void snd_intel8x0_proc_done(intel8x0_t * chip);
-
 static int snd_intel8x0_free(intel8x0_t *chip)
 {
 	int i;
@@ -1871,7 +1867,6 @@ static int snd_intel8x0_free(intel8x0_t *chip)
 	/* --- */
 	synchronize_irq(chip->irq);
       __hw_end:
-	snd_intel8x0_proc_done(chip);
 	if (chip->bdbars)
 		snd_free_pci_pages(chip->pci, chip->bdbars_count * sizeof(u32) * ICH_MAX_FRAGS * 2, chip->bdbars, chip->bdbars_addr);
 	if (chip->remap_addr)
@@ -1900,17 +1895,15 @@ static void intel8x0_suspend(intel8x0_t *chip)
 {
 	snd_card_t *card = chip->card;
 
-	chip->in_suspend = 1;
-	snd_power_lock(card);
-	if (card->power_state == SNDRV_CTL_POWER_D3hot)
-		goto __skip;
+	if (chip->in_suspend ||
+	    card->power_state == SNDRV_CTL_POWER_D3hot)
+		return;
 
+	chip->in_suspend = 1;
 	snd_pcm_suspend_all(chip->pcm);
 	if (chip->pcm_mic)
 		snd_pcm_suspend_all(chip->pcm_mic);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
-      __skip:
-      	snd_power_unlock(card);
 }
 
 static void intel8x0_resume(intel8x0_t *chip)
@@ -1918,9 +1911,9 @@ static void intel8x0_resume(intel8x0_t *chip)
 	snd_card_t *card = chip->card;
 	int i;
 
-	snd_power_lock(card);
-	if (card->power_state == SNDRV_CTL_POWER_D0)
-		goto __skip;
+	if (! chip->in_suspend ||
+	    card->power_state == SNDRV_CTL_POWER_D0)
+		return;
 
 	pci_enable_device(chip->pci);
 	snd_intel8x0_chip_init(chip);
@@ -1930,8 +1923,6 @@ static void intel8x0_resume(intel8x0_t *chip)
 
 	chip->in_suspend = 0;
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
-      __skip:
-      	snd_power_unlock(card);
 }
 
 #ifndef PCI_OLD_SUSPEND
@@ -2100,26 +2091,8 @@ static void __devinit snd_intel8x0_proc_init(intel8x0_t * chip)
 {
 	snd_info_entry_t *entry;
 
-	if ((entry = snd_info_create_card_entry(chip->card, "intel8x0", chip->card->proc_root)) != NULL) {
-		entry->content = SNDRV_INFO_CONTENT_TEXT;
-		entry->private_data = chip;
-		entry->mode = S_IFREG | S_IRUGO | S_IWUSR;
-		entry->c.text.read_size = 2048;
-		entry->c.text.read = snd_intel8x0_proc_read;
-		if (snd_info_register(entry) < 0) {
-			snd_info_free_entry(entry);
-			entry = NULL;
-		}
-	}
-	chip->proc_entry = entry;
-}
-
-static void snd_intel8x0_proc_done(intel8x0_t * chip)
-{
-	if (chip->proc_entry) {
-		snd_info_unregister(chip->proc_entry);
-		chip->proc_entry = NULL;
-	}
+	if (! snd_card_proc_new(chip->card, "intel8x0", &entry))
+		snd_info_set_text_ops(entry, chip, snd_intel8x0_proc_read);
 }
 
 static int snd_intel8x0_dev_free(snd_device_t *device)
@@ -2493,6 +2466,8 @@ static struct pci_device_id snd_intel8x0_joystick_ids[] __devinitdata = {
 	// { 0x8086, 0x7195, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },	/* 440MX */
 	// { 0x1039, 0x7012, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },	/* SI7012 */
 	{ 0x10de, 0x01b2, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },	/* NFORCE */
+	{ 0x10de, 0x006b, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },	/* NFORCE2 */
+	{ 0x10de, 0x00db, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },	/* NFORCE3 */
 	{ 0, }
 };
 

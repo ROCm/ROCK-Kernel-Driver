@@ -64,7 +64,8 @@ unsigned char snd_sbmixer_read(sb_t *chip, unsigned char reg)
 { .iface = SNDRV_CTL_ELEM_IFACE_MIXER, \
   .name = xname, \
   .info = snd_sbmixer_info_single, \
-  .get = snd_sbmixer_get_single, put: snd_sbmixer_put_single, \
+  .get = snd_sbmixer_get_single, \
+  .put = snd_sbmixer_put_single, \
   .private_value = reg | (shift << 16) | (mask << 24) }
 
 static int snd_sbmixer_info_single(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
@@ -123,7 +124,8 @@ static int snd_sbmixer_put_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_
 { .iface = SNDRV_CTL_ELEM_IFACE_MIXER, \
   .name = xname, \
   .info = snd_sbmixer_info_double, \
-  .get = snd_sbmixer_get_double, put: snd_sbmixer_put_double, \
+  .get = snd_sbmixer_get_double, \
+  .put = snd_sbmixer_put_double, \
   .private_value = left_reg | (right_reg << 8) | (left_shift << 16) | (right_shift << 19) | (mask << 24) }
 
 static int snd_sbmixer_info_double(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
@@ -366,7 +368,8 @@ static int snd_sb8mixer_put_mux(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
 { .iface = SNDRV_CTL_ELEM_IFACE_MIXER, \
   .name = xname, \
   .info = snd_sb16mixer_info_input_sw, \
-  .get = snd_sb16mixer_get_input_sw, put: snd_sb16mixer_put_input_sw, \
+  .get = snd_sb16mixer_get_input_sw, \
+  .put = snd_sb16mixer_put_input_sw, \
   .private_value = reg1 | (reg2 << 8) | (left_shift << 16) | (right_shift << 24) }
 
 static int snd_sb16mixer_info_input_sw(snd_kcontrol_t * kcontrol, snd_ctl_elem_info_t * uinfo)
