@@ -246,7 +246,7 @@ extern inline void * ioremap (unsigned long offset, unsigned long size)
 
 #define eth_io_copy_and_sum(a,b,c,d)	eth_copy_and_sum((a),(void *)(b),(c),(d))
 
-/* The following is junk needed for the arch-independant code but which
+/* The following is junk needed for the arch-independent code but which
  * we never use in the CRIS port
  */
 

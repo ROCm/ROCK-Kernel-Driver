@@ -210,8 +210,7 @@ static int scsi_sdev_check_buf_bit(const char *buf)
  * Create the actual show/store functions and data structures.
  */
 sdev_rd_attr (device_blocked, "%d\n");
-sdev_rd_attr (current_queue_depth, "%d\n");
-sdev_rd_attr (new_queue_depth, "%d\n");
+sdev_rd_attr (queue_depth, "%d\n");
 sdev_rd_attr (type, "%d\n");
 sdev_rd_attr (scsi_level, "%d\n");
 sdev_rd_attr (access_count, "%d\n");
@@ -222,8 +221,7 @@ sdev_rw_attr_bit (online);
 
 static struct device_attribute * const sdev_attrs[] = {
 	&dev_attr_device_blocked,
-	&dev_attr_current_queue_depth,
-	&dev_attr_new_queue_depth,
+	&dev_attr_queue_depth,
 	&dev_attr_type,
 	&dev_attr_scsi_level,
 	&dev_attr_access_count,

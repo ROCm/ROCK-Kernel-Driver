@@ -206,20 +206,22 @@ do {									\
 		var -= ((journal)->j_last - (journal)->j_first);	\
 } while (0)
 
-/*
- * journal_recover
- *
+/**
+ * int journal_recover(journal_t *journal) - recovers a on-disk journal
+ * @journal: the journal to recover
+ * 
  * The primary function for recovering the log contents when mounting a
  * journaled device.  
- * 
+ */
+int journal_recover(journal_t *journal)
+{
+/*
  * Recovery is done in three passes.  In the first pass, we look for the
  * end of the log.  In the second, we assemble the list of revoke
  * blocks.  In the third and final pass, we replay any un-revoked blocks
  * in the log.  
  */
 
-int journal_recover(journal_t *journal)
-{
 	int			err;
 	journal_superblock_t *	sb;
 
@@ -263,20 +265,23 @@ int journal_recover(journal_t *journal)
 	return err;
 }
 
-/*
- * journal_skip_recovery
- *
+/**
+ * int journal_skip_recovery() - Start journal and wipe exiting records 
+ * @journal: journal to startup
+ * 
  * Locate any valid recovery information from the journal and set up the
  * journal structures in memory to ignore it (presumably because the
  * caller has evidence that it is out of date).  
- *
+ * This function does'nt appear to be exorted..
+ */
+int journal_skip_recovery(journal_t *journal)
+{
+/*
  * We perform one pass over the journal to allow us to tell the user how
  * much recovery information is being erased, and to let us initialise
  * the journal transaction sequence numbers to the next unused ID. 
  */
 
-int journal_skip_recovery(journal_t *journal)
-{
 	int			err;
 	journal_superblock_t *	sb;
 

@@ -259,9 +259,10 @@ void wait_on_page_bit(struct page *page, int bit_nr)
 
 	do {
 		prepare_to_wait(waitqueue, &wait, TASK_UNINTERRUPTIBLE);
-		sync_page(page);
-		if (test_bit(bit_nr, &page->flags))
+		if (test_bit(bit_nr, &page->flags)) {
+			sync_page(page);
 			io_schedule();
+		}
 	} while (test_bit(bit_nr, &page->flags));
 	finish_wait(waitqueue, &wait);
 }
@@ -326,9 +327,10 @@ void __lock_page(struct page *page)
 
 	while (TestSetPageLocked(page)) {
 		prepare_to_wait(wqh, &wait, TASK_UNINTERRUPTIBLE);
-		sync_page(page);
-		if (PageLocked(page))
+		if (PageLocked(page)) {
+			sync_page(page);
 			io_schedule();
+		}
 	}
 	finish_wait(wqh, &wait);
 }

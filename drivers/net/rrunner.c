@@ -386,7 +386,7 @@ static int rr_reset(struct net_device *dev)
 		writel(0, &regs->CmdRing[i]);
 
 /*
- * Why 32 ? is this not cache line size dependant?
+ * Why 32 ? is this not cache line size dependent?
  */
 	writel(RBURST_64|WBURST_64, &regs->PciState);
 	wmb();

@@ -13,7 +13,7 @@
  ******************************************************************************/
 
 /* 
- * Operating system-dependant definitions that have to be defined
+ * Operating system-dependent definitions that have to be defined
  * before any other header files are included.
  */
 

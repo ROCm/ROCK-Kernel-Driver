@@ -208,7 +208,7 @@ like the following:
 	char *mem;		/* Address in the CPU space */
 	u32 busa;		/* Address in the SBus space */
 
-	mem = (char *) sbus_alloc_consistant(sdev, MYMEMSIZE, &busa);
+	mem = (char *) sbus_alloc_consistent(sdev, MYMEMSIZE, &busa);
 
 	Then mem is used when CPU accesses this memory and u32
 is fed to the device so that it can do DVMA. This is typically
@@ -216,7 +216,7 @@ done with an sbus_writel() into some device register.
 
 	Do not forget to free the DVMA resources once you are done:
 
-	sbus_free_consistant(sdev, MYMEMSIZE, mem, busa);
+	sbus_free_consistent(sdev, MYMEMSIZE, mem, busa);
 
 	Streaming DVMA is more interesting. First you allocate some
 memory suitable for it or pin down some user pages. Then it all works

@@ -113,7 +113,7 @@ struct sixpack {
 
 	/* 6pack stuff */
 	unsigned char		tx_delay;
-	unsigned char		persistance;
+	unsigned char		persistence;
 	unsigned char		slottime;
 	unsigned char		duplex;
 	unsigned char		led_state;
@@ -302,7 +302,7 @@ static void sp_encaps(struct sixpack *sp, unsigned char *icp, int len)
 
 	switch (p[0]) {
 		case 1:	sp->tx_delay = p[1];		return;
-		case 2:	sp->persistance = p[1];		return;
+		case 2:	sp->persistence = p[1];		return;
 		case 3: sp->slottime = p[1];		return;
 		case 4: /* ignored */			return;
 		case 5: sp->duplex = p[1];		return;
@@ -392,7 +392,7 @@ static void sp_xmit_on_air(unsigned long channel)
 
 	random = random * 17 + 41;
 
-	if (((sp->status1 & SIXP_DCD_MASK) == 0) && (random < sp->persistance)) {
+	if (((sp->status1 & SIXP_DCD_MASK) == 0) && (random < sp->persistence)) {
 		sp->led_state = 0x70;
 		sp->tty->driver.write(sp->tty, 0, &sp->led_state, 1);
 		sp->tx_enable = 1;
@@ -469,7 +469,7 @@ static int sp_open(struct net_device *dev)
 
 	sp->duplex = 0;
 	sp->tx_delay    = SIXP_TXDELAY;
-	sp->persistance = SIXP_PERSIST;
+	sp->persistence = SIXP_PERSIST;
 	sp->slottime    = SIXP_SLOTTIME;
 	sp->led_state   = 0x60;
 	sp->status      = 1;

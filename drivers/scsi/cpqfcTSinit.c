@@ -1604,7 +1604,7 @@ return -ENOTSUPP;
 
   scsi_cdb[0] = RELEASE;
 
-  SCpnt = scsi_getset_command(ScsiDev, GFP_KERNEL);
+  SCpnt = scsi_get_command(ScsiDev, GFP_KERNEL);
   {
     CPQFC_DECLARE_COMPLETION(wait);
     

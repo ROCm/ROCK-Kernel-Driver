@@ -2557,7 +2557,7 @@ aic7xxx_allocate_scb(struct aic7xxx_host *p)
      * than the right hand side.  If the number of SG array elements
      * is changed, this function may not be near so efficient any more.
      *
-     * Since the DMA'able buffers are now allocated in a seperate
+     * Since the DMA'able buffers are now allocated in a separate
      * chunk this algorithm has been modified to match.  The '12'
      * and '6' factors in scb_size are for the DMA'able command byte
      * and sensebuffers respectively.  -DaveM
@@ -4068,7 +4068,7 @@ aic7xxx_handle_seqint(struct aic7xxx_host *p, unsigned char intstat)
              * normal.
              */
 	    scsi_adjust_queue_depth(scb->cmd->device, MSG_SIMPLE_TAG,
-			    scb->cmd->device->new_queue_depth);
+			    scb->cmd->device->queue_depth);
             scb->tag_action = MSG_SIMPLE_Q_TAG;
             scb->hscb->control &= ~SCB_TAG_TYPE;
             scb->hscb->control |= MSG_SIMPLE_Q_TAG;

@@ -36,7 +36,7 @@ struct orinoco_key {
 
 
 struct orinoco_private {
-	void *card;	/* Pointer to card dependant structure */
+	void *card;	/* Pointer to card dependent structure */
 	int (*hard_reset)(struct orinoco_private *);
 
 	/* Synchronisation stuff */

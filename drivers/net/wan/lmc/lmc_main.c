@@ -1074,7 +1074,7 @@ int lmc_probe (struct net_device *dev) /*fold00*/
          * This prevents taking someone else's device.
          *
          * Check either the subvendor or the subdevice, some systems reverse
-         * the setting in the bois, seems to be version and arch dependant?
+         * the setting in the bois, seems to be version and arch dependent?
          * Fix the two variables
          *
          */

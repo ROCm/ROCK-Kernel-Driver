@@ -1069,7 +1069,7 @@ pcibios_init(void)
 	if (ppc_md.pci_swizzle && ppc_md.pci_map_irq)
 		pci_fixup_irqs(ppc_md.pci_swizzle, ppc_md.pci_map_irq);
 
-	/* Call machine dependant fixup */
+	/* Call machine dependent fixup */
 	if (ppc_md.pcibios_fixup)
 		ppc_md.pcibios_fixup();
 

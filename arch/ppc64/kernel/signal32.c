@@ -181,10 +181,10 @@ long sys32_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 	 */
 	set.sig[0] = sigctx.oldmask + ((long)(sigctx._unused[3]) << 32);
 	sigdelsetmask(&set, ~_BLOCKABLE);
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	current->blocked = set;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 	if (regs->msr & MSR_FP )
 		giveup_fpu(current);
 	/* Last stacked signal - restore registers */
@@ -400,10 +400,10 @@ long sys32_rt_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 	 */
 	sigdelsetmask(&set, ~_BLOCKABLE); 
 	/* update the current based on the sigmask found in the rt_stackframe */
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	current->blocked = set;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 
 	/* If currently owning the floating point - give them up */
 	if (regs->msr & MSR_FP)
@@ -776,11 +776,11 @@ int sys32_rt_sigsuspend(compat_sigset_t* unewset, size_t sigsetsize, int p3,
 
 	sigdelsetmask(&newset, ~_BLOCKABLE);
 
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	saveset = current->blocked;
 	current->blocked = newset;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 
 	regs->result = -EINTR;
 	regs->gpr[3] = EINTR;
@@ -968,11 +968,11 @@ static void handle_signal32(unsigned long sig, siginfo_t *info,
 		ka->sa.sa_handler = SIG_DFL;
 
 	if (!(ka->sa.sa_flags & SA_NODEFER)) {
-		spin_lock_irq(&current->sig->siglock);
+		spin_lock_irq(&current->sighand->siglock);
 		sigorsets(&current->blocked,&current->blocked,&ka->sa.sa_mask);
 		sigaddset(&current->blocked,sig);
 		recalc_sigpending();
-		spin_unlock_irq(&current->sig->siglock);
+		spin_unlock_irq(&current->sighand->siglock);
 	}
 	return;
 

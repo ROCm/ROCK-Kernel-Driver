@@ -1,7 +1,7 @@
 /*
  * Architecture-specific setup.
  *
- * Copyright (C) 1998-2001 Hewlett-Packard Co
+ * Copyright (C) 1998-2001, 2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  *	Stephane Eranian <eranian@hpl.hp.com>
  * Copyright (C) 2000, Rohit Seth <rohit.seth@intel.com>
@@ -171,7 +171,7 @@ filter_rsvd_memory (unsigned long start, unsigned long end, void *arg)
 
 #if IGNORE_PFN0
 	if (start == PAGE_OFFSET) {
-		printk("warning: skipping physical page 0\n");
+		printk(KERN_WARNING "warning: skipping physical page 0\n");
 		start += PAGE_SIZE;
 		if (start >= end) return 0;
 	}
@@ -341,7 +341,7 @@ find_memory (void)
 		initrd_start = (unsigned long)__va(ia64_boot_param->initrd_start);
 		initrd_end   = initrd_start+ia64_boot_param->initrd_size;
 
-		printk("Initial ramdisk at: 0x%lx (%lu bytes)\n",
+		printk(KERN_INFO "Initial ramdisk at: 0x%lx (%lu bytes)\n",
 		       initrd_start, ia64_boot_param->initrd_size);
 	}
 #endif
@@ -409,8 +409,9 @@ setup_arch (char **cmdline_p)
 		ia64_set_kr(IA64_KR_IO_BASE, phys_iobase);
 	else {
 		phys_iobase = ia64_get_kr(IA64_KR_IO_BASE);
-		printk("No I/O port range found in EFI memory map, falling back to AR.KR0\n");
-		printk("I/O port base = 0x%lx\n", phys_iobase);
+		printk(KERN_INFO "No I/O port range found in EFI memory map, falling back "
+		       "to AR.KR0\n");
+		printk(KERN_INFO "I/O port base = 0x%lx\n", phys_iobase);
 	}
 	ia64_iobase = (unsigned long) ioremap(phys_iobase, 0);
 
@@ -615,7 +616,7 @@ identify_cpu (struct cpuinfo_ia64 *c)
 		impl_va_msb = vm2.pal_vm_info_2_s.impl_va_msb;
 		phys_addr_size = vm1.pal_vm_info_1_s.phys_add_size;
 	}
-	printk("CPU %d: %lu virtual and %lu physical address bits\n",
+	printk(KERN_INFO "CPU %d: %lu virtual and %lu physical address bits\n",
 	       smp_processor_id(), impl_va_msb + 1, phys_addr_size);
 	c->unimpl_va_mask = ~((7L<<61) | ((1L << (impl_va_msb + 1)) - 1));
 	c->unimpl_pa_mask = ~((1L<<63) | ((1L << phys_addr_size) - 1));
@@ -738,7 +739,7 @@ cpu_init (void)
 	if (ia64_pal_vm_summary(NULL, &vmi) == 0)
 		max_ctx = (1U << (vmi.pal_vm_info_2_s.rid_size - 3)) - 1;
 	else {
-		printk("cpu_init: PAL VM summary failed, assuming 18 RID bits\n");
+		printk(KERN_WARNING "cpu_init: PAL VM summary failed, assuming 18 RID bits\n");
 		max_ctx = (1U << 15) - 1;	/* use architected minimum */
 	}
 	while (max_ctx < ia64_ctx.max_ctx) {
@@ -748,10 +749,39 @@ cpu_init (void)
 	}
 
 	if (ia64_pal_rse_info(&num_phys_stacked, 0) != 0) {
-		printk ("cpu_init: PAL RSE info failed, assuming 96 physical stacked regs\n");
+		printk(KERN_WARNING "cpu_init: PAL RSE info failed; assuming 96 physical "
+		       "stacked regs\n");
 		num_phys_stacked = 96;
 	}
 	/* size of physical stacked register partition plus 8 bytes: */
 	__get_cpu_var(ia64_phys_stacked_size_p8) = num_phys_stacked*8 + 8;
 	platform_cpu_init();
+}
+
+void
+check_bugs (void)
+{
+	extern int __start___mckinley_e9_bundles[];
+	extern int __end___mckinley_e9_bundles[];
+	u64 *bundle;
+	int *wp;
+
+	if (local_cpu_data->family == 0x1f && local_cpu_data->model == 0)
+		printk(KERN_INFO "check_bugs: leaving McKinley Errata 9 workaround enabled\n");
+	else {
+		printk(KERN_INFO "check_bugs: McKinley Errata 9 workaround not needed; "
+		       "disabling it\n");
+		for (wp = __start___mckinley_e9_bundles; wp < __end___mckinley_e9_bundles; ++wp) {
+			bundle = (u64 *) ((char *) wp + *wp);
+			/* install a bundle of NOPs: */
+			bundle[0] = 0x0000000100000000;
+			bundle[1] = 0x0004000000000200;
+			ia64_fc(bundle);
+		}
+		ia64_insn_group_barrier();
+		ia64_sync_i();
+		ia64_insn_group_barrier();
+		ia64_srlz_i();
+		ia64_insn_group_barrier();
+	}
 }

@@ -8,7 +8,7 @@ Description:
 ------------
 The goal of this feature is to provide a kernel debug logging API 
 where log records can be stored efficiently in memory, where each component 
-(e.g. device drivers) can have one seperate debug log.
+(e.g. device drivers) can have one separate debug log.
 One purpose of this is to inspect the debug logs after a production system crash
 in order to analyze the reason for the crash.
 If the system still runs but only a subcomponent which uses dbf failes,

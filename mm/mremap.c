@@ -24,9 +24,9 @@
 
 static pte_t *get_one_pte_map_nested(struct mm_struct *mm, unsigned long addr)
 {
-	pgd_t * pgd;
-	pmd_t * pmd;
-	pte_t * pte = NULL;
+	pgd_t *pgd;
+	pmd_t *pmd;
+	pte_t *pte = NULL;
 
 	pgd = pgd_offset(mm, addr);
 	if (pgd_none(*pgd))
@@ -73,8 +73,8 @@ static inline int page_table_present(struct mm_struct *mm, unsigned long addr)
 
 static inline pte_t *alloc_one_pte_map(struct mm_struct *mm, unsigned long addr)
 {
-	pmd_t * pmd;
-	pte_t * pte = NULL;
+	pmd_t *pmd;
+	pte_t *pte = NULL;
 
 	pmd = pmd_alloc(mm, pgd_offset(mm, addr), addr);
 	if (pmd)
@@ -88,7 +88,7 @@ copy_one_pte(struct mm_struct *mm, pte_t *src, pte_t *dst,
 {
 	int error = 0;
 	pte_t pte;
-	struct page * page = NULL;
+	struct page *page = NULL;
 
 	if (pte_present(*src))
 		page = pte_page(*src);
@@ -183,12 +183,12 @@ oops_we_failed:
 	return -1;
 }
 
-static unsigned long move_vma(struct vm_area_struct * vma,
+static unsigned long move_vma(struct vm_area_struct *vma,
 	unsigned long addr, unsigned long old_len, unsigned long new_len,
 	unsigned long new_addr)
 {
-	struct mm_struct * mm = vma->vm_mm;
-	struct vm_area_struct * new_vma, * next, * prev;
+	struct mm_struct *mm = vma->vm_mm;
+	struct vm_area_struct *new_vma, *next, *prev;
 	int allocated_vma;
 	int split = 0;
 
@@ -196,14 +196,16 @@ static unsigned long move_vma(struct vm_area_struct * vma,
 	next = find_vma_prev(mm, new_addr, &prev);
 	if (next) {
 		if (prev && prev->vm_end == new_addr &&
-		    can_vma_merge(prev, vma->vm_flags) && !vma->vm_file && !(vma->vm_flags & VM_SHARED)) {
+		    can_vma_merge(prev, vma->vm_flags) && !vma->vm_file &&
+					!(vma->vm_flags & VM_SHARED)) {
 			spin_lock(&mm->page_table_lock);
 			prev->vm_end = new_addr + new_len;
 			spin_unlock(&mm->page_table_lock);
 			new_vma = prev;
 			if (next != prev->vm_next)
 				BUG();
-			if (prev->vm_end == next->vm_start && can_vma_merge(next, prev->vm_flags)) {
+			if (prev->vm_end == next->vm_start &&
+					can_vma_merge(next, prev->vm_flags)) {
 				spin_lock(&mm->page_table_lock);
 				prev->vm_end = next->vm_end;
 				__vma_unlink(mm, next, prev);
@@ -214,7 +216,8 @@ static unsigned long move_vma(struct vm_area_struct * vma,
 				kmem_cache_free(vm_area_cachep, next);
 			}
 		} else if (next->vm_start == new_addr + new_len &&
-			   can_vma_merge(next, vma->vm_flags) && !vma->vm_file && !(vma->vm_flags & VM_SHARED)) {
+			  	can_vma_merge(next, vma->vm_flags) &&
+				!vma->vm_file && !(vma->vm_flags & VM_SHARED)) {
 			spin_lock(&mm->page_table_lock);
 			next->vm_start = new_addr;
 			spin_unlock(&mm->page_table_lock);
@@ -223,7 +226,8 @@ static unsigned long move_vma(struct vm_area_struct * vma,
 	} else {
 		prev = find_vma(mm, new_addr-1);
 		if (prev && prev->vm_end == new_addr &&
-		    can_vma_merge(prev, vma->vm_flags) && !vma->vm_file && !(vma->vm_flags & VM_SHARED)) {
+		    can_vma_merge(prev, vma->vm_flags) && !vma->vm_file &&
+				!(vma->vm_flags & VM_SHARED)) {
 			spin_lock(&mm->page_table_lock);
 			prev->vm_end = new_addr + new_len;
 			spin_unlock(&mm->page_table_lock);
@@ -249,7 +253,7 @@ static unsigned long move_vma(struct vm_area_struct * vma,
 			INIT_LIST_HEAD(&new_vma->shared);
 			new_vma->vm_start = new_addr;
 			new_vma->vm_end = new_addr+new_len;
-			new_vma->vm_pgoff += (addr - vma->vm_start) >> PAGE_SHIFT;
+			new_vma->vm_pgoff += (addr-vma->vm_start) >> PAGE_SHIFT;
 			if (new_vma->vm_file)
 				get_file(new_vma->vm_file);
 			if (new_vma->vm_ops && new_vma->vm_ops->open)
@@ -428,7 +432,8 @@ unsigned long do_mremap(unsigned long addr,
 			if (vma->vm_flags & VM_SHARED)
 				map_flags |= MAP_SHARED;
 
-			new_addr = get_unmapped_area(vma->vm_file, 0, new_len, vma->vm_pgoff, map_flags);
+			new_addr = get_unmapped_area(vma->vm_file, 0, new_len,
+						vma->vm_pgoff, map_flags);
 			ret = new_addr;
 			if (new_addr & ~PAGE_MASK)
 				goto out;

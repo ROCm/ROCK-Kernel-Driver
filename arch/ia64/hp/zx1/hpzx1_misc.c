@@ -1,9 +1,9 @@
 /*
  * Misc. support for HP zx1 chipset support
  *
- * Copyright (C) 2002 Hewlett-Packard Co
- * Copyright (C) 2002 Alex Williamson <alex_williamson@hp.com>
- * Copyright (C) 2002 Bjorn Helgaas <bjorn_helgaas@hp.com>
+ * Copyright (C) 2002-2003 Hewlett-Packard Co
+ *	Alex Williamson <alex_williamson@hp.com>
+ *	Bjorn Helgaas <bjorn_helgaas@hp.com>
  */
 
 
@@ -17,7 +17,7 @@
 #include <asm/dma.h>
 #include <asm/iosapic.h>
 
-extern acpi_status acpi_evaluate_integer (acpi_handle, acpi_string, acpi_object_list *,
+extern acpi_status acpi_evaluate_integer (acpi_handle, acpi_string, struct acpi_object_list *,
 					  unsigned long *);
 
 #define PFX "hpzx1: "
@@ -190,31 +190,31 @@ hpzx1_fake_pci_dev(char *name, unsigned int busnum, unsigned long addr, unsigned
 	hpzx1_devices++;
 }
 
-typedef struct {
+struct acpi_hp_vendor_long {
 	u8	guid_id;
 	u8	guid[16];
 	u8	csr_base[8];
 	u8	csr_length[8];
-} acpi_hp_vendor_long;
+};
 
 #define HP_CCSR_LENGTH	0x21
 #define HP_CCSR_TYPE	0x2
 #define HP_CCSR_GUID	EFI_GUID(0x69e9adf9, 0x924f, 0xab5f,				\
 				 0xf6, 0x4a, 0x24, 0xd2, 0x01, 0x37, 0x0e, 0xad)
 
-extern acpi_status acpi_get_crs(acpi_handle, acpi_buffer *);
-extern acpi_resource *acpi_get_crs_next(acpi_buffer *, int *);
-extern acpi_resource_data *acpi_get_crs_type(acpi_buffer *, int *, int);
-extern void acpi_dispose_crs(acpi_buffer *);
+extern acpi_status acpi_get_crs(acpi_handle, struct acpi_buffer *);
+extern struct acpi_resource *acpi_get_crs_next(struct acpi_buffer *, int *);
+extern union acpi_resource_data *acpi_get_crs_type(struct acpi_buffer *, int *, int);
+extern void acpi_dispose_crs(struct acpi_buffer *);
 
 static acpi_status
 hp_csr_space(acpi_handle obj, u64 *csr_base, u64 *csr_length)
 {
 	int i, offset = 0;
 	acpi_status status;
-	acpi_buffer buf;
-	acpi_resource_vendor *res;
-	acpi_hp_vendor_long *hp_res;
+	struct acpi_buffer buf;
+	struct acpi_resource_vendor *res;
+	struct acpi_hp_vendor_long *hp_res;
 	efi_guid_t vendor_guid;
 
 	*csr_base = 0;
@@ -226,14 +226,14 @@ hp_csr_space(acpi_handle obj, u64 *csr_base, u64 *csr_length)
 		return status;
 	}
 
-	res = (acpi_resource_vendor *)acpi_get_crs_type(&buf, &offset, ACPI_RSTYPE_VENDOR);
+	res = (struct acpi_resource_vendor *)acpi_get_crs_type(&buf, &offset, ACPI_RSTYPE_VENDOR);
 	if (!res) {
 		printk(KERN_ERR PFX "Failed to find config space for device\n");
 		acpi_dispose_crs(&buf);
 		return AE_NOT_FOUND;
 	}
 
-	hp_res = (acpi_hp_vendor_long *)(res->reserved);
+	hp_res = (struct acpi_hp_vendor_long *)(res->reserved);
 
 	if (res->length != HP_CCSR_LENGTH || hp_res->guid_id != HP_CCSR_TYPE) {
 		printk(KERN_ERR PFX "Unknown Vendor data\n");
@@ -288,7 +288,7 @@ hpzx1_lba_probe(acpi_handle obj, u32 depth, void *context, void **ret)
 {
 	u64 csr_base = 0, csr_length = 0;
 	acpi_status status;
-	NATIVE_UINT busnum;
+	acpi_native_uint busnum;
 	char *name = context;
 	char fullname[32];
 

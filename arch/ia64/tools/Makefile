@@ -4,14 +4,7 @@ TARGET	= include/asm-ia64/offsets.h
 
 src = $(obj)
 
-all:
-
-fastdep:
-
-mrproper: clean
-
-clean:
-	rm -f $(obj)/print_offsets.s $(obj)/print_offsets $(obj)/offsets.h
+clean-files := print_offsets.s print_offsets offsets.h
 
 $(TARGET): $(obj)/offsets.h
 	@if ! cmp -s $(obj)/offsets.h ${TARGET}; then	\

@@ -362,6 +362,7 @@ static void vma_link(struct mm_struct *mm, struct vm_area_struct *vma,
 	if (mapping)
 		up(&mapping->i_shared_sem);
 
+	mark_mm_hugetlb(mm, vma);
 	mm->map_count++;
 	validate_mm(mm);
 }
@@ -431,7 +432,7 @@ static int vma_merge(struct mm_struct *mm, struct vm_area_struct *prev,
 	if (prev->vm_end == addr &&
 			can_vma_merge_after(prev, vm_flags, file, pgoff)) {
 		struct vm_area_struct *next;
-		struct inode *inode = file ? file->f_dentry->d_inode : inode;
+		struct inode *inode = file ? file->f_dentry->d_inode : NULL;
 		int need_up = 0;
 
 		if (unlikely(file && prev->vm_next &&
@@ -1222,6 +1223,11 @@ int do_munmap(struct mm_struct *mm, unsigned long start, size_t len)
 		return 0;
 	/* we have  start < mpnt->vm_end  */
 
+	if (is_vm_hugetlb_page(mpnt)) {
+		if ((start & ~HPAGE_MASK) || (len & ~HPAGE_MASK))
+			return -EINVAL;
+	}
+
 	/* if it doesn't overlap, we have nothing.. */
 	end = start + len;
 	if (mpnt->vm_start >= end)
@@ -1423,7 +1429,6 @@ void exit_mmap(struct mm_struct *mm)
 		kmem_cache_free(vm_area_cachep, vma);
 		vma = next;
 	}
-		
 }
 
 /* Insert vm structure into process list sorted by address

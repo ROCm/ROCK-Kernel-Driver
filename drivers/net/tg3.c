@@ -1872,7 +1872,7 @@ static int tg3_vlan_rx(struct tg3 *tp, struct sk_buff *skb, u16 vlan_tag)
  * Each TG3_BDINFO specifies a MAXLEN field and the first TG3_BDINFO
  * which is within the range of the new packet's length is chosen.
  *
- * The "seperate ring for rx status" scheme may sound queer, but it makes
+ * The "separate ring for rx status" scheme may sound queer, but it makes
  * sense from a cache coherency perspective.  If only the host writes
  * to the buffer post rings, and only the chip writes to the rx status
  * rings, then cache lines never move beyond shared-modified state.

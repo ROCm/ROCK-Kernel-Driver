@@ -1843,7 +1843,7 @@ static void sym_free_resources(hcb_p np)
 		pci_unmap_mem(np->s.ram_va, np->ram_ws);
 #endif
 	/*
-	 *  Free O/S independant resources.
+	 *  Free O/S independent resources.
 	 */
 	sym_hcb_free(np);
 
@@ -2043,7 +2043,7 @@ sym_attach (Scsi_Host_Template *tpnt, int unit, sym_device *dev)
 	}
 
 	/*
-	 *  Perform O/S independant stuff.
+	 *  Perform O/S independent stuff.
 	 */
 	if (sym_hcb_attach(np, fw, nvram))
 		goto attach_failed;

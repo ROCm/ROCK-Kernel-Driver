@@ -529,7 +529,7 @@ Sun Nov 1  14H00 1998 Gerard Roudier (groudier@club-internet.fr)
 	* version pre-sym53c8xx-0.13
 	- Some rewrite of the device detection code. This code had been 
 	  patched too much and needed to be face-lifted a bit.
-	  Remove all platform dependant fix-ups that was not needed or
+	  Remove all platform dependent fix-ups that was not needed or
 	  conflicted with some other driver code as work-arounds.
 	  Reread the NVRAM before the calling of ncr_attach(). This spares 
 	  stack space and so allows to handle more boards.

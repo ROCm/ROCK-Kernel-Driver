@@ -4,6 +4,8 @@
 #include <linux/major.h>
 #include <linux/genhd.h>
 #include <linux/list.h>
+#include <linux/timer.h>
+#include <linux/workqueue.h>
 #include <linux/pagemap.h>
 #include <linux/backing-dev.h>
 #include <linux/wait.h>
@@ -187,6 +189,14 @@ struct request_queue
 	prep_rq_fn		*prep_rq_fn;
 	unplug_fn		*unplug_fn;
 	merge_bvec_fn		*merge_bvec_fn;
+
+	/*
+	 * Auto-unplugging state
+	 */
+	struct timer_list	unplug_timer;
+	int			unplug_thresh;	/* After this many requests */
+	unsigned long		unplug_delay;	/* After this many jiffies */
+	struct work_struct	unplug_work;
 
 	struct backing_dev_info	backing_dev_info;
 

@@ -769,7 +769,7 @@ ahd_queue_scb(struct ahd_softc *ahd, struct scb *scb)
 	ahd_setup_scb_common(ahd, scb);
 
 	/*
-	 * Make sure our data is consistant from the
+	 * Make sure our data is consistent from the
 	 * perspective of the adapter.
 	 */
 	ahd_sync_scb(ahd, scb, BUS_DMASYNC_PREREAD|BUS_DMASYNC_PREWRITE);

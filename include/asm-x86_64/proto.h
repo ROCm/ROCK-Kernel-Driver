@@ -1,6 +1,8 @@
 #ifndef _ASM_X8664_PROTO_H
 #define _ASM_X8664_PROTO_H 1
 
+#include <asm/ldt.h>
+
 /* misc architecture specific prototypes */
 
 struct cpuinfo_x86; 

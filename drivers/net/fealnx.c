@@ -1563,7 +1563,7 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 }
 
 
-/* This routine is logically part of the interrupt handler, but seperated
+/* This routine is logically part of the interrupt handler, but separated
    for clarity and better register allocation. */
 static int netdev_rx(struct net_device *dev)
 {

@@ -21,15 +21,15 @@
 */
 
 /*
- *	Hardware independant state machine implemantation
+ *	Hardware independent state machine implemantation
  *	The following external SMT functions are referenced :
  *
  *		queue_event()
  *
- *	The following external HW dependant functions are referenced :
+ *	The following external HW dependent functions are referenced :
  *		config_mux()
  *
- *	The following HW dependant events are required :
+ *	The following HW dependent events are required :
  *		NONE 
  */
 

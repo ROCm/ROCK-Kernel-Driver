@@ -95,8 +95,6 @@ ia32_load_state (struct task_struct *t)
 	struct pt_regs *regs = ia64_task_regs(t);
 	int nr = smp_processor_id();	/* LDT and TSS depend on CPU number: */
 
-	nr = smp_processor_id();
-
 	eflag = t->thread.eflag;
 	fsr = t->thread.fsr;
 	fcr = t->thread.fcr;

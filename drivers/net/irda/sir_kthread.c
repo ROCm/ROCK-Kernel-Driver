@@ -116,10 +116,10 @@ static int irda_thread(void *startup)
 	daemonize();
 	strcpy(current->comm, "kIrDAd");
 
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	sigfillset(&current->blocked);
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 
 	set_fs(KERNEL_DS);
 

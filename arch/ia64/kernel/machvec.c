@@ -47,7 +47,7 @@ machvec_init (const char *name)
 		panic("generic kernel failed to find machine vector for platform %s!", name);
 	}
 	ia64_mv = *mv;
-	printk("booting generic kernel on platform %s\n", name);
+	printk(KERN_INFO "booting generic kernel on platform %s\n", name);
 }
 
 #endif /* CONFIG_IA64_GENERIC */

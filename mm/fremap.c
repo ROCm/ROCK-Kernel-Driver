@@ -53,8 +53,11 @@ int install_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	pte_t *pte, entry;
 	pgd_t *pgd;
 	pmd_t *pmd;
-	struct pte_chain *pte_chain = NULL;
+	struct pte_chain *pte_chain;
 
+	pte_chain = pte_chain_alloc(GFP_KERNEL);
+	if (!pte_chain)
+		goto err;
 	pgd = pgd_offset(mm, addr);
 	spin_lock(&mm->page_table_lock);
 
@@ -62,7 +65,6 @@ int install_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	if (!pmd)
 		goto err_unlock;
 
-	pte_chain = pte_chain_alloc(GFP_KERNEL);
 	pte = pte_alloc_map(mm, pmd, addr);
 	if (!pte)
 		goto err_unlock;
@@ -87,6 +89,7 @@ int install_page(struct mm_struct *mm, struct vm_area_struct *vma,
 err_unlock:
 	spin_unlock(&mm->page_table_lock);
 	pte_chain_free(pte_chain);
+err:
 	return err;
 }
 

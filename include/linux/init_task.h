@@ -45,9 +45,13 @@
 
 #define INIT_SIGNALS(sig) {	\
 	.count		= ATOMIC_INIT(1), 		\
+	.shared_pending	= { NULL, &sig.shared_pending.head, {{0}}}, \
+}
+
+#define INIT_SIGHAND(sighand) {	\
+	.count		= ATOMIC_INIT(1), 		\
 	.action		= { {{0,}}, }, 			\
 	.siglock	= SPIN_LOCK_UNLOCKED, 		\
-	.shared_pending	= { NULL, &sig.shared_pending.head, {{0}}}, \
 }
 
 /*
@@ -90,7 +94,8 @@
 	.thread		= INIT_THREAD,					\
 	.fs		= &init_fs,					\
 	.files		= &init_files,					\
-	.sig		= &init_signals,				\
+	.signal		= &init_signals,				\
+	.sighand	= &init_sighand,				\
 	.pending	= { NULL, &tsk.pending.head, {{0}}},		\
 	.blocked	= {{0}},					\
 	.alloc_lock	= SPIN_LOCK_UNLOCKED,				\

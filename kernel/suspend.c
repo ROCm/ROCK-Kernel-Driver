@@ -65,7 +65,6 @@
 #include <asm/pgtable.h>
 #include <asm/io.h>
 
-extern void signal_wake_up(struct task_struct *t);
 extern int sys_sync(void);
 
 unsigned char software_suspend_enabled = 0;
@@ -219,9 +218,9 @@ int freeze_processes(void)
 			/* FIXME: smp problem here: we may not access other process' flags
 			   without locking */
 			p->flags |= PF_FREEZE;
-			spin_lock_irqsave(&p->sig->siglock, flags);
-			signal_wake_up(p);
-			spin_unlock_irqrestore(&p->sig->siglock, flags);
+			spin_lock_irqsave(&p->sighand->siglock, flags);
+			signal_wake_up(p, 0);
+			spin_unlock_irqrestore(&p->sighand->siglock, flags);
 			todo++;
 		} while_each_thread(g, p);
 		read_unlock(&tasklist_lock);

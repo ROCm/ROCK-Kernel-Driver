@@ -454,7 +454,7 @@ static int i830_dma_initialize(drm_device_t *dev,
 	DRM_DEBUG("pitch_bits %x\n",    init->pitch_bits);
 
 	dev_priv->cpp = init->cpp;
-	/* We are using seperate values as placeholders for mechanisms for
+	/* We are using separate values as placeholders for mechanisms for
 	 * private backbuffer/depthbuffer usage.
 	 */
 
