@@ -327,7 +327,8 @@ static struct {
 
 static int mixer_open(struct inode *inode, struct file *file)
 {
-	dmasound.mach.open();
+	if (!try_module_get(dmasound.mach.owner))
+		return -ENODEV;
 	mixer.busy = 1;
 	return 0;
 }
@@ -336,7 +337,7 @@ static int mixer_release(struct inode *inode, struct file *file)
 {
 	lock_kernel();
 	mixer.busy = 0;
-	dmasound.mach.release();
+	module_put(dmasound.mach.owner);
 	unlock_kernel();
 	return 0;
 }
@@ -869,31 +870,29 @@ static int sq_open(struct inode *inode, struct file *file)
 {
 	int rc;
 
-	dmasound.mach.open();
+	if (!try_module_get(dmasound.mach.owner))
+		return -ENODEV;
 
-	if ((rc = write_sq_open(file))) { /* checks the f_mode */
-		dmasound.mach.release();
-		return rc;
-	}
+	rc = write_sq_open(file); /* checks the f_mode */
+	if (rc)
+		goto out;
 #ifdef HAS_RECORD
 	if (dmasound.mach.record) {
-		if ((rc = read_sq_open(file))) { /* checks the f_mode */
-			dmasound.mach.release();
-			return rc;
-		}
+		rc = read_sq_open(file); /* checks the f_mode */
+		if (rc)
+			goto out;
 	} else { /* no record function installed; in compat mode */
 		if (file->f_mode & FMODE_READ) {
 			/* TODO: if O_RDWR, release any resources grabbed by write part */
-			dmasound.mach.release() ;
-			/* I think this is what is required by open(2) */
-			return -ENXIO ;
+			rc = -ENXIO;
+			goto out;
 		}
 	}
 #else /* !HAS_RECORD */
 	if (file->f_mode & FMODE_READ) {
 		/* TODO: if O_RDWR, release any resources grabbed by write part */
-		dmasound.mach.release() ;
-		return -ENXIO ; /* I think this is what is required by open(2) */
+		rc = -ENXIO ; /* I think this is what is required by open(2) */
+		goto out;
 	}
 #endif /* HAS_RECORD */
 
@@ -931,6 +930,9 @@ static int sq_open(struct inode *inode, struct file *file)
 #endif
 
 	return 0;
+ out:
+	module_put(dmasound.mach.owner);
+	return rc;
 }
 
 static void sq_reset_output(void)
@@ -1050,7 +1052,7 @@ static int sq_release(struct inode *inode, struct file *file)
 		dmasound.hard = dmasound.mach.default_hard ;
 	}
 
-	dmasound.mach.release();
+	module_put(dmasound.mach.owner);
 
 #if 0 /* blocking open() */
 	/* Wake up a process waiting for the queue being released.
@@ -1447,7 +1449,8 @@ static int state_open(struct inode *inode, struct file *file)
 	if (state.busy)
 		return -EBUSY;
 
-	dmasound.mach.open();
+	if (!try_module_get(dmasound.mach.owner))
+		return -ENODEV;
 	state.ptr = 0;
 	state.busy = 1;
 
@@ -1529,7 +1532,7 @@ static int state_release(struct inode *inode, struct file *file)
 {
 	lock_kernel();
 	state.busy = 0;
-	dmasound.mach.release();
+	module_put(dmasound.mach.owner);
 	unlock_kernel();
 	return 0;
 }

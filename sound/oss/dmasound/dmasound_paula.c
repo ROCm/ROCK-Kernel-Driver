@@ -69,8 +69,6 @@ static int write_sq_block_size_half, write_sq_block_size_quarter;
 /*** Low level stuff *********************************************************/
 
 
-static void AmiOpen(void);
-static void AmiRelease(void);
 static void *AmiAlloc(unsigned int size, int flags);
 static void AmiFree(void *obj, unsigned int size);
 static int AmiIrqInit(void);
@@ -310,17 +308,6 @@ static TRANS transAmiga = {
 };
 
 /*** Low level stuff *********************************************************/
-
-
-static void AmiOpen(void)
-{
-	MOD_INC_USE_COUNT;
-}
-
-static void AmiRelease(void)
-{
-	MOD_DEC_USE_COUNT;
-}
 
 static inline void StopDMA(void)
 {
@@ -699,8 +686,7 @@ static SETTINGS def_soft = {
 static MACHINE machAmiga = {
 	.name		= "Amiga",
 	.name2		= "AMIGA",
-	.open		= AmiOpen,
-	.release	= AmiRelease,
+	.owner		= THIS_MODULE,
 	.dma_alloc	= AmiAlloc,
 	.dma_free	= AmiFree,
 	.irqinit	= AmiIrqInit,

@@ -115,8 +115,6 @@ static ssize_t ata_ctx_u16le(const u_char *userPtr, size_t userCount,
 /*** Low level stuff *********************************************************/
 
 
-static void AtaOpen(void);
-static void AtaRelease(void);
 static void *AtaAlloc(unsigned int size, int flags);
 static void AtaFree(void *, unsigned int size);
 static int AtaIrqInit(void);
@@ -812,16 +810,6 @@ static TRANS transFalconExpanding = {
 /*
  * Atari (TT/Falcon)
  */
-
-static void AtaOpen(void)
-{
-	MOD_INC_USE_COUNT;
-}
-
-static void AtaRelease(void)
-{
-	MOD_DEC_USE_COUNT;
-}
 
 static void *AtaAlloc(unsigned int size, int flags)
 {
@@ -1521,8 +1509,7 @@ static SETTINGS def_soft = {
 static MACHINE machTT = {
 	.name		= "Atari",
 	.name2		= "TT",
-	.open		= AtaOpen,
-	.release	= AtaRelease,
+	.owner		= THIS_MODULE,
 	.dma_alloc	= AtaAlloc,
 	.dma_free	= AtaFree,
 	.irqinit	= AtaIrqInit,

@@ -36,8 +36,6 @@ static int expand_data;	/* Data for expanding */
 /*** Low level stuff *********************************************************/
 
 
-static void Q40Open(void);
-static void Q40Release(void);
 static void *Q40Alloc(unsigned int size, int flags);
 static void Q40Free(void *, unsigned int);
 static int Q40IrqInit(void);
@@ -360,18 +358,6 @@ static TRANS transQ40Compressing = {
 
 /*** Low level stuff *********************************************************/
 
-
-static void Q40Open(void)
-{
-	MOD_INC_USE_COUNT;
-}
-
-static void Q40Release(void)
-{
-	MOD_DEC_USE_COUNT;
-}
-
-
 static void *Q40Alloc(unsigned int size, int flags)
 {
          return kmalloc(size, flags); /* change to vmalloc */
@@ -603,8 +589,7 @@ static SETTINGS def_soft = {
 static MACHINE machQ40 = {
 	.name		= "Q40",
 	.name2		= "Q40",
-	.open		= Q40Open,
-	.release	= Q40Release,
+	.owner		= THIS_MODULE,
 	.dma_alloc	= Q40Alloc,
 	.dma_free	= Q40Free,
 	.irqinit	= Q40IrqInit,
