@@ -250,12 +250,12 @@ callback_init(void * kernel_end)
 		/* Set up the third level PTEs and update the virtual
 		   addresses of the CRB entries.  */
 		for (i = 0; i < crb->map_entries; ++i) {
-			unsigned long paddr = crb->map[i].pa;
+			unsigned long pfn = crb->map[i].pa >> PAGE_SHIFT;
 			crb->map[i].va = vaddr;
 			for (j = 0; j < crb->map[i].count; ++j) {
 				set_pte(pte_offset_kernel(pmd, vaddr),
-					mk_pte_phys(paddr, PAGE_KERNEL));
-				paddr += PAGE_SIZE;
+					pfn_pte(pfn, PAGE_KERNEL));
+				pfn++;
 				vaddr += PAGE_SIZE;
 			}
 		}

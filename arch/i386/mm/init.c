@@ -122,7 +122,7 @@ static inline void set_pte_phys (unsigned long vaddr,
 	}
 	pte = pte_offset_kernel(pmd, vaddr);
 	/* <phys,flags> stored as-is, to permit clearing entries */
-	set_pte(pte, mk_pte_phys(phys, flags));
+	set_pte(pte, pfn_pte(phys >> PAGE_SHIFT, flags));
 
 	/*
 	 * It's enough to flush this one mapping.
@@ -239,7 +239,7 @@ static void __init pagetable_init (void)
 				vaddr = i*PGDIR_SIZE + j*PMD_SIZE + k*PAGE_SIZE;
 				if (end && (vaddr >= end))
 					break;
-				*pte = mk_pte_phys(__pa(vaddr), PAGE_KERNEL);
+				*pte = pfn_pte(__pa(vaddr) >> PAGE_SHIFT, PAGE_KERNEL);
 			}
 			set_pmd(pmd, __pmd(_KERNPG_TABLE + __pa(pte_base)));
 			if (pte_base != pte_offset_kernel(pmd, 0))
@@ -375,7 +375,7 @@ void __init test_wp_bit(void)
 	pmd = pmd_offset(pgd, vaddr);
 	pte = pte_offset_kernel(pmd, vaddr);
 	old_pte = *pte;
-	*pte = mk_pte_phys(0, PAGE_READONLY);
+	*pte = pfn_pte(0, PAGE_READONLY);
 	local_flush_tlb();
 
 	boot_cpu_data.wp_works_ok = do_test_wp_bit(vaddr);

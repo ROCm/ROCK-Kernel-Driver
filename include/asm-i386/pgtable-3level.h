@@ -90,7 +90,7 @@ static inline int pte_same(pte_t a, pte_t b)
 #define pte_none(x)	(!(x).pte_low && !(x).pte_high)
 #define pte_pfn(x)	(((x).pte_low >> PAGE_SHIFT) | ((x).pte_high << (32 - PAGE_SHIFT)))
 
-static inline pte_t __mk_pte(unsigned long page_nr, pgprot_t pgprot)
+static inline pte_t pfn_pte(unsigned long page_nr, pgprot_t pgprot)
 {
 	pte_t pte;
 

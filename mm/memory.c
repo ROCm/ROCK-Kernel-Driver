@@ -866,21 +866,22 @@ static inline void remap_pte_range(pte_t * pte, unsigned long address, unsigned 
 	unsigned long phys_addr, pgprot_t prot)
 {
 	unsigned long end;
+	unsigned long pfn;
 
 	address &= ~PMD_MASK;
 	end = address + size;
 	if (end > PMD_SIZE)
 		end = PMD_SIZE;
+	pfn = phys_addr >> PAGE_SHIFT;
 	do {
 		struct page *page;
 		pte_t oldpage = ptep_get_and_clear(pte);
-		unsigned long pfn = phys_addr >> PAGE_SHIFT;
 
 		if (!pfn_valid(pfn) || PageReserved(pfn_to_page(pfn)))
- 			set_pte(pte, mk_pte_phys(phys_addr, prot));
+ 			set_pte(pte, pfn_pte(pfn, prot));
 		forget_pte(oldpage);
 		address += PAGE_SIZE;
-		phys_addr += PAGE_SIZE;
+		pfn++;
 		pte++;
 	} while (address && (address < end));
 }

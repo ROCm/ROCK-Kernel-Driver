@@ -240,7 +240,7 @@ static void map_io_page(unsigned long ea, unsigned long pa, int flags)
 		ptep = pte_alloc_kernel(&ioremap_mm, pmdp, ea);
 
 		pa = absolute_to_phys(pa);
-		set_pte(ptep, mk_pte_phys(pa & PAGE_MASK, __pgprot(flags)));
+		set_pte(ptep, pfn_pte(pa >> PAGE_SHIFT, __pgprot(flags)));
 		spin_unlock(&ioremap_mm.page_table_lock);
 	} else {
 		/* If the mm subsystem is not fully up, we cannot create a

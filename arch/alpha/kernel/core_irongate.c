@@ -421,6 +421,7 @@ irongate_remap_area_pte(pte_t * pte, unsigned long address, unsigned long size,
 		     unsigned long phys_addr, unsigned long flags)
 {
 	unsigned long end;
+	unsigned long pfn;
 
 	address &= ~PMD_MASK;
 	end = address + size;
@@ -428,17 +429,17 @@ irongate_remap_area_pte(pte_t * pte, unsigned long address, unsigned long size,
 		end = PMD_SIZE;
 	if (address >= end)
 		BUG();
+	pfn = phys_addr >> PAGE_SHIFT;
 	do {
 		if (!pte_none(*pte)) {
 			printk("irongate_remap_area_pte: page already exists\n");
 			BUG();
 		}
-		set_pte(pte, 
-			mk_pte_phys(phys_addr, 
-				    __pgprot(_PAGE_VALID | _PAGE_ASM | 
-					     _PAGE_KRE | _PAGE_KWE | flags)));
+		set_pte(pte, pfn_pte(pfn,
+				     __pgprot(_PAGE_VALID | _PAGE_ASM | 
+					      _PAGE_KRE | _PAGE_KWE | flags)));
 		address += PAGE_SIZE;
-		phys_addr += PAGE_SIZE;
+		pfn++;
 		pte++;
 	} while (address && (address < end));
 }

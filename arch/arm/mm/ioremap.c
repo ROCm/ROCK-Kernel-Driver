@@ -51,7 +51,7 @@ static inline void remap_area_pte(pte_t * pte, unsigned long address, unsigned l
 			printk("remap_area_pte: page already exists\n");
 			BUG();
 		}
-		set_pte(pte, mk_pte_phys(phys_addr, pgprot));
+		set_pte(pte, pfn_pte(phys_addr >> PAGE_SHIFT, pgprot));
 		address += PAGE_SIZE;
 		phys_addr += PAGE_SIZE;
 		pte++;

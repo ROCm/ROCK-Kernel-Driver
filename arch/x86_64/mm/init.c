@@ -125,7 +125,7 @@ static void set_pte_phys(unsigned long vaddr,
 	pte = pte_offset_kernel(pmd, vaddr);
 	if (pte_val(*pte))
 		pte_ERROR(*pte);
-	set_pte(pte, mk_pte_phys(phys, prot));
+	set_pte(pte, pfn_pte(phys >> PAGE_SHIFT, prot));
 
 	/*
 	 * It's enough to flush this one mapping.

@@ -291,7 +291,7 @@ ia64_mmu_init (void *my_cpu_data)
 	ia64_srlz_d();
 
 	ia64_itr(0x2, IA64_TR_PERCPU_DATA, PERCPU_ADDR,
-		 pte_val(mk_pte_phys(__pa(my_cpu_data), PAGE_KERNEL)), PAGE_SHIFT);
+		 pte_val(pfn_pte(__pa(my_cpu_data) >> PAGE_SHIFT, PAGE_KERNEL)), PAGE_SHIFT);
 
 	__restore_flags(flags);
 	ia64_srlz_i();

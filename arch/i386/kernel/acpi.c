@@ -550,7 +550,7 @@ static void acpi_create_identity_pmd (void)
 
 	/* fill page with low mapping */
 	for (i = 0; i < PTRS_PER_PTE; i++)
-		set_pte(ptep + i, mk_pte_phys(i << PAGE_SHIFT, PAGE_SHARED));
+		set_pte(ptep + i, pfn_pte(i, PAGE_SHARED));
 
 	pgd = pgd_offset(current->active_mm, 0);
 	pmd = pmd_alloc(current->mm,pgd, 0);
