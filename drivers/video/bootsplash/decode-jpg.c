@@ -262,7 +262,7 @@ struct jpeg_decdata *decdata;
 	int mcusx, mcusy, mx, my;
 	int max[6];
 
-	if (!decdata)
+	if (!decdata || !buf || !pic)
 		return -1;
 	datap = buf;
 	if (getbyte() != 0xff)

@@ -564,18 +564,18 @@ void accel_putcs(struct vc_data *vc, struct fb_info *info,
 	struct fb_image image;
 	u8 *src, *dst, *buf = NULL;
 
-	if (attribute) {
-		buf = kmalloc(cellsize, GFP_KERNEL);
-		if (!buf)
-			return;
-	}
-
 #ifdef CONFIG_BOOTSPLASH
 	if (info->splash_data) {
 		splash_putcs(info->splash_data, vc, info, s, count, yy, xx);
 		return;
 	}
 #endif
+
+	if (attribute) {
+		buf = kmalloc(cellsize, GFP_KERNEL);
+		if (!buf)
+			return;
+	}
 
 	image.fg_color = get_color(vc, info, scr_readw(s), 1);
 	image.bg_color = get_color(vc, info, scr_readw(s), 0);
@@ -1140,19 +1140,13 @@ static void fbcon_putcs(struct vc_data *vc, const unsigned short *s,
 	if (vt_cons[vc->vc_num]->vc_mode != KD_TEXT)
 		return;
 
-#ifdef CONFIG_BOOTSPLASH
-	if (info->splash_data) {
-		splash_putc(info->splash_data, vc, info, c, ypos, xpos);
-		return;
-	}
-#endif
-
 	accel_putcs(vc, info, s, count, real_y(p, ypos), xpos);
 }
 
 static void fbcon_putc(struct vc_data *vc, int c, int ypos, int xpos)
 {
-	fbcon_putcs(vc, (const unsigned short *) &c, 1, ypos, xpos);
+	unsigned short cc = c;
+	fbcon_putcs(vc, &cc, 1, ypos, xpos);
 }
 
 static void fbcon_cursor(struct vc_data *vc, int mode)

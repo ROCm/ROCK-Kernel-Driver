@@ -416,9 +416,7 @@ static int splash_getraw(unsigned char *start, unsigned char *end, int *update)
 	if (unit >= MAX_NR_CONSOLES)
 	    continue;
 	if (unit) {
-		acquire_console_sem();
 		vc_allocate(unit);
-		release_console_sem();
 	}
 	vc = vc_cons[unit].d;
 	info = registered_fb[(int)con2fb_map[unit]];
@@ -732,7 +730,6 @@ static int splash_status(struct vc_data *vc)
 		splash_prepare(vc, info);
 	if (vc->vc_splash_data && vc->vc_splash_data->splash_state) {
 		con_remap_def_color(vc->vc_num, vc->vc_splash_data->splash_color << 4 | vc->vc_splash_data->splash_fg_color);
-		acquire_console_sem();
 		/* vc_resize also calls con_switch which resets yscroll */
 		vc_resize(vc->vc_num, vc->vc_splash_data->splash_text_wi / vc->vc_font.width, vc->vc_splash_data->splash_text_he / vc->vc_font.height);
 		if (fg_console == vc->vc_num) {
@@ -741,13 +738,10 @@ static int splash_status(struct vc_data *vc)
 				      vc->vc_size_row * (vc->vc_bottom - vc->vc_top) / 2);
 			splash_clear_margins(vc->vc_splash_data, vc, info, 0);
 		}
-		release_console_sem();
 	} else {
 	  	/* Switch bootsplash off */
 		con_remap_def_color(vc->vc_num, 0x07);
-		acquire_console_sem();
 		vc_resize(vc->vc_num, info->var.xres / vc->vc_font.width, info->var.yres / vc->vc_font.height);
-		release_console_sem();
 	}
 	return 0;
 }
@@ -783,6 +777,7 @@ static int splash_write_proc(struct file *file, const char *buffer,
 	if (!buffer || !splash_default)
 		return count;
 
+	acquire_console_sem();
 	if (!strncmp(buffer, "show", 4) || !strncmp(buffer, "hide", 4)) {
 		int pe, oldpe;
 
@@ -805,8 +800,10 @@ static int splash_write_proc(struct file *file, const char *buffer,
 
 			oldpe = vc->vc_splash_data->splash_percent;
 			vc->vc_splash_data->splash_percent = pe;
-			if (fg_console != 0 || !vc->vc_splash_data->splash_state)
-			    return count;
+			if (fg_console != 0 || !vc->vc_splash_data->splash_state) {
+				release_console_sem();
+				return count;
+			}
 			info = registered_fb[(int) con2fb_map[vc->vc_num]];
 			if (!vc->vc_splash_data->splash_overpaintok || pe == 65536 || pe < oldpe) {
 				if (splash_hasinter(vc->vc_splash_data->splash_boxes, vc->vc_splash_data->splash_boxcount))
@@ -819,6 +816,7 @@ static int splash_write_proc(struct file *file, const char *buffer,
 				boxit(info->screen_base, info->fix.line_length, vc->vc_splash_data->splash_boxes, vc->vc_splash_data->splash_boxcount, vc->vc_splash_data->splash_percent, 1);
 			}
 		}
+		release_console_sem();
 		return count;
 	}
 	if (!strncmp(buffer,"silent\n",7) || !strncmp(buffer,"verbose\n",8)) {
@@ -829,6 +827,7 @@ static int splash_write_proc(struct file *file, const char *buffer,
 			splash_status(vc);
 		    }
 		}
+		release_console_sem();
 		return count;
 	}
 	if (!strncmp(buffer,"freesilent\n",11)) {
@@ -843,6 +842,7 @@ static int splash_write_proc(struct file *file, const char *buffer,
 			splash_status(vc);
 		    vc->vc_splash_data->splash_dosilent = 0;
 		}
+		release_console_sem();
 		return count;
 	}
 
@@ -861,14 +861,18 @@ static int splash_write_proc(struct file *file, const char *buffer,
 			    boxit(info->screen_base, info->fix.line_length, vc->vc_splash_data->splash_boxes, vc->vc_splash_data->splash_boxcount, vc->vc_splash_data->splash_percent, 1);
 		}
 	    }
+	    release_console_sem();
 	    return count;
 	}
 	vc = vc_cons[0].d;
-	if (!vc->vc_splash_data)
+	if (!vc->vc_splash_data) {
+		release_console_sem();
 		return count;
+	}
 	if (buffer[0] == 't') {
 	        vc->vc_splash_data->splash_state ^= 1;
 		splash_status(vc);
+		release_console_sem();
 		return count;
 	}
 	new = simple_strtoul(buffer, NULL, 0);
@@ -883,6 +887,7 @@ static int splash_write_proc(struct file *file, const char *buffer,
 		vc->vc_splash_data->splash_state = new & 1;
 		splash_status(vc);
 	}
+	release_console_sem();
 	return count;
 }
 
@@ -950,8 +955,10 @@ void splash_init(void)
 
 	mem = vmalloc(len);
 	if (mem) {
+		acquire_console_sem();
 		if ((int)sys_read(fd, mem, len) == len && splash_getraw((unsigned char *)mem, (unsigned char *)mem + len, (int *)0) == 0 && vc->vc_splash_data)
 			vc->vc_splash_data->splash_state = splash_default & 1;
+		release_console_sem();
 		vfree(mem);
 	}
 	sys_close(fd);
