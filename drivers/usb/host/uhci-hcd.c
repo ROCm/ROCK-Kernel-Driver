@@ -1762,7 +1762,7 @@ static void uhci_remove_pending_urbps(struct uhci_hcd *uhci)
 static irqreturn_t uhci_irq(struct usb_hcd *hcd, struct pt_regs *regs)
 {
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
-	unsigned int io_addr = uhci->io_addr;
+	unsigned long io_addr = uhci->io_addr;
 	unsigned short status;
 	struct list_head *tmp, *head;
 	unsigned int age;
@@ -1835,7 +1835,7 @@ static irqreturn_t uhci_irq(struct usb_hcd *hcd, struct pt_regs *regs)
 
 static void reset_hc(struct uhci_hcd *uhci)
 {
-	unsigned int io_addr = uhci->io_addr;
+	unsigned long io_addr = uhci->io_addr;
 
 	/* Turn off PIRQ, SMI, and all interrupts.  This also turns off
 	 * the BIOS's USB Legacy Support.
@@ -1856,7 +1856,7 @@ static void reset_hc(struct uhci_hcd *uhci)
 
 static void suspend_hc(struct uhci_hcd *uhci)
 {
-	unsigned int io_addr = uhci->io_addr;
+	unsigned long io_addr = uhci->io_addr;
 
 	dev_dbg(uhci_dev(uhci), "%s\n", __FUNCTION__);
 	uhci->state = UHCI_SUSPENDED;
@@ -1866,7 +1866,7 @@ static void suspend_hc(struct uhci_hcd *uhci)
 
 static void wakeup_hc(struct uhci_hcd *uhci)
 {
-	unsigned int io_addr = uhci->io_addr;
+	unsigned long io_addr = uhci->io_addr;
 
 	switch (uhci->state) {
 		case UHCI_SUSPENDED:		/* Start the resume */
@@ -1906,7 +1906,7 @@ static void wakeup_hc(struct uhci_hcd *uhci)
 
 static int ports_active(struct uhci_hcd *uhci)
 {
-	unsigned int io_addr = uhci->io_addr;
+	unsigned long io_addr = uhci->io_addr;
 	int connection = 0;
 	int i;
 
@@ -1918,7 +1918,7 @@ static int ports_active(struct uhci_hcd *uhci)
 
 static int suspend_allowed(struct uhci_hcd *uhci)
 {
-	unsigned int io_addr = uhci->io_addr;
+	unsigned long io_addr = uhci->io_addr;
 	int i;
 
 	if (to_pci_dev(uhci_dev(uhci))->vendor != PCI_VENDOR_ID_INTEL)
@@ -1983,7 +1983,7 @@ static void hc_state_transitions(struct uhci_hcd *uhci)
 
 static void start_hc(struct uhci_hcd *uhci)
 {
-	unsigned int io_addr = uhci->io_addr;
+	unsigned long io_addr = uhci->io_addr;
 	int timeout = 1000;
 
 	/*

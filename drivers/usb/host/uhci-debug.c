@@ -248,7 +248,7 @@ static int uhci_show_sc(int port, unsigned short status, char *buf, int len)
 static int uhci_show_status(struct uhci_hcd *uhci, char *buf, int len)
 {
 	char *out = buf;
-	unsigned int io_addr = uhci->io_addr;
+	unsigned long io_addr = uhci->io_addr;
 	unsigned short usbcmd, usbstat, usbint, usbfrnum;
 	unsigned int flbaseadd;
 	unsigned char sof;
