@@ -980,7 +980,7 @@ static int __devinit rtl8139_init_one (struct pci_dev *pdev,
 
 	dev->irq = pdev->irq;
 
-	/* dev->priv/tp zeroed and aligned in init_etherdev */
+	/* dev->priv/tp zeroed and aligned in alloc_etherdev */
 	tp = dev->priv;
 
 	/* note: tp->chipset set in rtl8139_init_board */
