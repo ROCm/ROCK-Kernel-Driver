@@ -846,8 +846,9 @@ static void dscc4_init_registers(struct dscc4_dev_priv *dpriv,
 	 * No address recognition/crc-CCITT/cts enabled
 	 * Shared flags transmission disabled - cf errata DS5 p.11
 	 * Carrier detect disabled - cf errata p.14
+	 * FIXME: carrier detection/polarity may be handled more gracefully.
 	 */
-	scc_writel(0x021c8000, dpriv, dev, CCR1);
+	scc_writel(0x02408000, dpriv, dev, CCR1);
 
 	/* crc not forwarded - Cf errata DS5 p.11 */
 	scc_writel(0x00050008 & ~RxActivate, dpriv, dev, CCR2);
