@@ -267,7 +267,7 @@ int copy_to_user_fromio(void __user *dst, const void __iomem *src, size_t count)
 		size_t c = count;
 		if (c > sizeof(buf))
 			c = sizeof(buf);
-		memcpy_fromio(buf, src, c);
+		memcpy_fromio(buf, (void __iomem *)src, c);
 		if (copy_to_user(dst, buf, c))
 			return -EFAULT;
 		count -= c;
