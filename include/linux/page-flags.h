@@ -82,7 +82,6 @@
 struct page_state {
 	unsigned long nr_dirty;		/* Dirty writeable pages */
 	unsigned long nr_writeback;	/* Pages under writeback */
-	unsigned long nr_pagecache;	/* Pages in pagecache */
 	unsigned long nr_page_table_pages;/* Pages used for pagetables */
 	unsigned long nr_reverse_maps;	/* includes PageDirect */
 	unsigned long nr_mapped;	/* mapped into pagetables */

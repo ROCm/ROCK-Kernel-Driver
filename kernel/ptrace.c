@@ -336,5 +336,8 @@ void ptrace_notify(int exit_code)
 	/*
 	 * Signals sent while we were stopped might set TIF_SIGPENDING.
 	 */
+
+	spin_lock_irq(&current->sighand->siglock);
 	recalc_sigpending();
+	spin_unlock_irq(&current->sighand->siglock);
 }

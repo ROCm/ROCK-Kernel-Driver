@@ -867,9 +867,11 @@ static int flush_older_journal_lists(struct super_block *p_s_sb, struct reiserfs
 }
 
 static void reiserfs_end_buffer_io_sync(struct buffer_head *bh, int uptodate) {
+    char b[BDEVNAME_SIZE];
+
     if (buffer_journaled(bh)) {
         reiserfs_warning("clm-2084: pinned buffer %lu:%s sent to disk\n",
-	                 bh->b_blocknr, bdevname(bh->b_bdev)) ;
+	                 bh->b_blocknr, bdevname(bh->b_bdev, b)) ;
     }
     if (uptodate)
     	set_buffer_uptodate(bh) ;
@@ -1652,10 +1654,12 @@ static int journal_read(struct super_block *p_s_sb) {
   int replay_count = 0 ;
   int continue_replay = 1 ;
   int ret ;
+  char b[BDEVNAME_SIZE];
 
   cur_dblock = SB_ONDISK_JOURNAL_1st_BLOCK(p_s_sb) ;
   printk("reiserfs: checking transaction log (%s) for (%s)\n",
-	 bdevname(SB_JOURNAL(p_s_sb)->j_dev_bd), reiserfs_bdevname(p_s_sb));
+	 bdevname(SB_JOURNAL(p_s_sb)->j_dev_bd, b),
+	 reiserfs_bdevname(p_s_sb));
   start = get_seconds() ;
 
   /* step 1, read in the journal header block.  Check the transaction it says 
@@ -1893,6 +1897,7 @@ static int journal_init_dev( struct super_block *super,
 	int result;
 	dev_t jdev;
 	int blkdev_mode = FMODE_READ | FMODE_WRITE;
+	char b[BDEVNAME_SIZE];
 
 	result = 0;
 
@@ -1915,7 +1920,7 @@ static int journal_init_dev( struct super_block *super,
 			result = -ENOMEM;
 		if( result != 0 )
 			printk( "sh-458: journal_init_dev: cannot init journal device\n '%s': %i", 
-				bdevname(journal->j_dev_bd), result );
+				bdevname(journal->j_dev_bd, b), result );
 
 		else if (jdev != super->s_dev) {
 			set_blocksize(journal->j_dev_bd, super->s_blocksize);
@@ -1948,7 +1953,8 @@ static int journal_init_dev( struct super_block *super,
 	if( result != 0 ) {
 		release_journal_dev( super, journal );
 	}
-	printk( "journal_init_dev: journal device: %s\n", bdevname(journal->j_dev_bd));
+	printk( "journal_init_dev: journal device: %s\n",
+		bdevname(journal->j_dev_bd, b));
 	return result;
 }
 
@@ -1961,6 +1967,7 @@ int journal_init(struct super_block *p_s_sb, const char * j_dev_name, int old_fo
     struct reiserfs_super_block * rs;
     struct reiserfs_journal_header *jh;
     struct reiserfs_journal *journal;
+    char b[BDEVNAME_SIZE];
 
     if (sizeof(struct reiserfs_journal_commit) != 4096 ||
       sizeof(struct reiserfs_journal_desc) != 4096) {
@@ -2007,7 +2014,8 @@ int journal_init(struct super_block *p_s_sb, const char * j_dev_name, int old_fo
      if (is_reiserfs_jr(rs) && (jh->jh_journal.jp_journal_magic != sb_jp_journal_magic(rs))) {
 	 printk("sh-460: journal header magic %x (device %s) does not match "
 		"to magic found in super block %x (device %s)\n",
-		jh->jh_journal.jp_journal_magic, bdevname( SB_JOURNAL(p_s_sb)->j_dev_bd ),
+		jh->jh_journal.jp_journal_magic,
+		bdevname( SB_JOURNAL(p_s_sb)->j_dev_bd, b),
 		sb_jp_journal_magic(rs), reiserfs_bdevname (p_s_sb));
 	 brelse (bhjh);
 	 goto free_and_return;
@@ -2058,7 +2066,7 @@ int journal_init(struct super_block *p_s_sb, const char * j_dev_name, int old_fo
   printk ("Reiserfs journal params: device %s, size %u, "
 	  "journal first block %u, max trans len %u, max batch %u, "
 	  "max commit age %u, max trans age %u\n",
-	  bdevname( SB_JOURNAL(p_s_sb)->j_dev_bd ),
+	  bdevname( SB_JOURNAL(p_s_sb)->j_dev_bd, b),
 	  SB_ONDISK_JOURNAL_SIZE(p_s_sb),
 	  SB_ONDISK_JOURNAL_1st_BLOCK(p_s_sb),
 	  SB_JOURNAL_TRANS_MAX(p_s_sb),

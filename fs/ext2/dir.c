@@ -259,8 +259,6 @@ ext2_readdir (struct file * filp, void * dirent, filldir_t filldir)
 	int need_revalidate = (filp->f_version != inode->i_version);
 	int ret = 0;
 
-	lock_kernel();
-
 	if (pos > inode->i_size - EXT2_DIR_REC_LEN(1))
 		goto done;
 
@@ -313,7 +311,6 @@ done:
 	filp->f_pos = (n << PAGE_CACHE_SHIFT) | offset;
 	filp->f_version = inode->i_version;
 	UPDATE_ATIME(inode);
-	unlock_kernel();
 	return 0;
 }
 
@@ -660,6 +657,7 @@ not_empty:
 }
 
 struct file_operations ext2_dir_operations = {
+	.llseek		= generic_file_llseek,
 	.read		= generic_read_dir,
 	.readdir	= ext2_readdir,
 	.ioctl		= ext2_ioctl,

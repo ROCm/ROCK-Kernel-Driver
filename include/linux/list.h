@@ -84,7 +84,7 @@ static __inline__ void __list_add_rcu(struct list_head * new,
 {
 	new->next = next;
 	new->prev = prev;
-	wmb();
+	smp_wmb();
 	next->prev = new;
 	prev->next = new;
 }
@@ -303,11 +303,11 @@ static inline void list_splice_init(struct list_head *list,
  */
 #define list_for_each_rcu(pos, head) \
 	for (pos = (head)->next, prefetch(pos->next); pos != (head); \
-        	pos = pos->next, ({ read_barrier_depends(); 0;}), prefetch(pos->next))
+        	pos = pos->next, ({ smp_read_barrier_depends(); 0;}), prefetch(pos->next))
         	
 #define __list_for_each_rcu(pos, head) \
 	for (pos = (head)->next; pos != (head); \
-        	pos = pos->next, ({ read_barrier_depends(); 0;}))
+        	pos = pos->next, ({ smp_read_barrier_depends(); 0;}))
         	
 /**
  * list_for_each_safe_rcu	-	iterate over an rcu-protected list safe
@@ -318,7 +318,7 @@ static inline void list_splice_init(struct list_head *list,
  */
 #define list_for_each_safe_rcu(pos, n, head) \
 	for (pos = (head)->next, n = pos->next; pos != (head); \
-		pos = n, ({ read_barrier_depends(); 0;}), n = pos->next)
+		pos = n, ({ smp_read_barrier_depends(); 0;}), n = pos->next)
 
 /* 
  * Double linked lists with a single pointer list head. 

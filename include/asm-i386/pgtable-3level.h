@@ -115,4 +115,12 @@ static inline pmd_t pfn_pmd(unsigned long page_nr, pgprot_t pgprot)
 	return __pmd(((unsigned long long)page_nr << PAGE_SHIFT) | pgprot_val(pgprot));
 }
 
+/*
+ * Bits 0, 6 and 7 are taken in the low part of the pte,
+ * put the 32 bits of offset into the high part.
+ */
+#define pte_to_pgoff(pte) ((pte).pte_high)
+#define pgoff_to_pte(off) ((pte_t) { _PAGE_FILE, (off) })
+#define PTE_FILE_MAX_BITS       32
+
 #endif /* _I386_PGTABLE_3LEVEL_H */

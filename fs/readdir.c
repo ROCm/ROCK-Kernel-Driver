@@ -85,7 +85,7 @@ static int fillonedir(void * __buf, const char * name, int namlen, loff_t offset
 	return 0;
 }
 
-asmlinkage int old_readdir(unsigned int fd, void * dirent, unsigned int count)
+asmlinkage long old_readdir(unsigned int fd, void * dirent, unsigned int count)
 {
 	int error;
 	struct file * file;

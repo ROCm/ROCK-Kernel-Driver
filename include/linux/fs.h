@@ -110,6 +110,7 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 #define MS_REC		16384
 #define MS_VERBOSE	32768
 #define MS_POSIXACL	(1<<16)	/* VFS does not apply the umask */
+#define MS_ONE_SECOND	(1<<17)	/* fs has 1 sec a/m/ctime resolution */
 #define MS_ACTIVE	(1<<30)
 #define MS_NOUSER	(1<<31)
 
@@ -165,6 +166,7 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 #define IS_NOATIME(inode)	(__IS_FLG(inode, MS_NOATIME) || ((inode)->i_flags & S_NOATIME))
 #define IS_NODIRATIME(inode)	__IS_FLG(inode, MS_NODIRATIME)
 #define IS_POSIXACL(inode)	__IS_FLG(inode, MS_POSIXACL)
+#define IS_ONE_SECOND(inode)	__IS_FLG(inode, MS_ONE_SECOND)
 
 #define IS_DEADDIR(inode)	((inode)->i_flags & S_DEAD)
 
@@ -329,12 +331,6 @@ struct address_space {
 	struct address_space	*assoc_mapping;	/* ditto */
 };
 
-struct char_device {
-	struct list_head	hash;
-	atomic_t		count;
-	dev_t			dev;
-};
-
 struct block_device {
 	struct list_head	bd_hash;
 	atomic_t		bd_count;
@@ -386,7 +382,6 @@ struct inode {
 	struct list_head	i_devices;
 	struct pipe_inode_info	*i_pipe;
 	struct block_device	*i_bdev;
-	struct char_device	*i_cdev;
 
 	unsigned long		i_dnotify_mask; /* Directory notify events */
 	struct dnotify_struct	*i_dnotify; /* for directory notifications */
@@ -1044,8 +1039,6 @@ extern struct block_device *bdget(dev_t);
 extern int bd_acquire(struct inode *inode);
 extern void bd_forget(struct inode *inode);
 extern void bdput(struct block_device *);
-extern struct char_device *cdget(dev_t);
-extern void cdput(struct char_device *);
 extern int blkdev_open(struct inode *, struct file *);
 extern int blkdev_close(struct inode *, struct file *);
 extern struct file_operations def_blk_fops;
@@ -1062,15 +1055,19 @@ extern void bd_release(struct block_device *);
 extern void blk_run_queues(void);
 
 /* fs/char_dev.c */
-extern int register_chrdev(unsigned int, const char *, struct file_operations *);
+extern int register_chrdev_region(unsigned int, unsigned int, int,
+				  const char *, struct file_operations *);
+extern int register_chrdev(unsigned int, const char *,
+			   struct file_operations *);
 extern int unregister_chrdev(unsigned int, const char *);
 extern int chrdev_open(struct inode *, struct file *);
 
 /* fs/block_dev.c */
-extern const char *__bdevname(dev_t);
-extern inline const char *bdevname(struct block_device *bdev)
+#define BDEVNAME_SIZE	32	/* Largest string for a blockdev identifier */
+extern const char *__bdevname(dev_t, char *buffer);
+extern inline const char *bdevname(struct block_device *bdev, char *buffer)
 {
-	return __bdevname(bdev->bd_dev);
+	return __bdevname(bdev->bd_dev, buffer);
 }
 extern struct block_device *lookup_bdev(const char *);
 extern struct block_device *open_bdev_excl(const char *, int, int, void *);

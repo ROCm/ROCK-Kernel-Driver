@@ -93,24 +93,8 @@ int ext3_mark_inode_dirty(handle_t *handle, struct inode *inode);
  * been done yet.
  */
 
-static inline void ext3_journal_abort_handle(const char *caller, 
-					     const char *err_fn,
-					     struct buffer_head *bh,
-					     handle_t *handle,
-					     int err)
-{
-	char nbuf[16];
-	const char *errstr = ext3_decode_error(NULL, err, nbuf);
-	
-	printk(KERN_ERR "%s: aborting transaction: %s in %s", 
-	       caller, errstr, err_fn);
-
-	if (bh)
-		BUFFER_TRACE(bh, "abort");
-	journal_abort_handle(handle);
-	if (!handle->h_err)
-		handle->h_err = err;
-}
+void ext3_journal_abort_handle(const char *caller, const char *err_fn,
+		struct buffer_head *bh, handle_t *handle, int err);
 
 static inline int
 __ext3_journal_get_undo_access(const char *where,
@@ -180,57 +164,11 @@ __ext3_journal_dirty_metadata(const char *where,
 #define ext3_journal_dirty_metadata(handle, bh) \
 	__ext3_journal_dirty_metadata(__FUNCTION__, (handle), (bh))
 
+handle_t *ext3_journal_start(struct inode *inode, int nblocks);
+int __ext3_journal_stop(const char *where, handle_t *handle);
 
-
-/* 
- * Wrappers for journal_start/end.
- *
- * The only special thing we need to do here is to make sure that all
- * journal_end calls result in the superblock being marked dirty, so
- * that sync() will call the filesystem's write_super callback if
- * appropriate. 
- */
-static inline handle_t *ext3_journal_start(struct inode *inode, int nblocks)
-{
-	journal_t *journal;
-	
-	if (inode->i_sb->s_flags & MS_RDONLY)
-		return ERR_PTR(-EROFS);
-
-	/* Special case here: if the journal has aborted behind our
-	 * backs (eg. EIO in the commit thread), then we still need to
-	 * take the FS itself readonly cleanly. */
-	journal = EXT3_JOURNAL(inode);
-	if (is_journal_aborted(journal)) {
-		ext3_abort(inode->i_sb, __FUNCTION__,
-			   "Detected aborted journal");
-		return ERR_PTR(-EROFS);
-	}
-	
-	return journal_start(journal, nblocks);
-}
-
-/* 
- * The only special thing we need to do here is to make sure that all
- * journal_stop calls result in the superblock being marked dirty, so
- * that sync() will call the filesystem's write_super callback if
- * appropriate. 
- */
-static inline int __ext3_journal_stop(const char *where,
-				      handle_t *handle, struct inode *inode)
-{
-	int err = handle->h_err;
-	int rc = journal_stop(handle);
-
-	inode->i_sb->s_dirt = 1;
-	if (!err)
-		err = rc;
-	if (err)
-		__ext3_std_error(inode->i_sb, where, err);
-	return err;
-}
-#define ext3_journal_stop(handle, inode) \
-	__ext3_journal_stop(__FUNCTION__, (handle), (inode))
+#define ext3_journal_stop(handle) \
+	__ext3_journal_stop(__FUNCTION__, (handle))
 
 static inline handle_t *ext3_journal_current_handle(void)
 {

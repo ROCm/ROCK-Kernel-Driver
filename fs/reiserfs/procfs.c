@@ -460,6 +460,7 @@ int reiserfs_journal_in_proc( char *buffer, char **start, off_t offset,
 	struct reiserfs_super_block *rs;
 	struct journal_params *jp;	
 	int len = 0;
+	char b[BDEVNAME_SIZE];
     
 	sb = procinfo_prologue((int)data);
 	if( sb == NULL )
@@ -516,7 +517,7 @@ int reiserfs_journal_in_proc( char *buffer, char **start, off_t offset,
 			"prepare_retry: \t%12lu\n",
 
                         DJP( jp_journal_1st_block ),
-                        bdevname(SB_JOURNAL(sb)->j_dev_bd),
+                        bdevname(SB_JOURNAL(sb)->j_dev_bd, b),
                         DJP( jp_journal_dev ),
                         DJP( jp_journal_size ),
                         DJP( jp_journal_trans_max ),

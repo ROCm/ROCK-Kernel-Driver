@@ -197,8 +197,13 @@ static int linear_make_request (request_queue_t *q, struct bio *bio)
     
 	if (unlikely(block >= (tmp_dev->size + tmp_dev->offset)
 		     || block < tmp_dev->offset)) {
-		printk ("linear_make_request: Block %llu out of bounds on dev %s size %ld offset %ld\n",
-			(unsigned long long)block, bdevname(tmp_dev->rdev->bdev), tmp_dev->size, tmp_dev->offset);
+		char b[BDEVNAME_SIZE];
+
+		printk ("linear_make_request: Block %llu out of bounds on "
+			"dev %s size %ld offset %ld\n",
+			(unsigned long long)block,
+			bdevname(tmp_dev->rdev->bdev, b),
+			tmp_dev->size, tmp_dev->offset);
 		bio_io_error(bio, bio->bi_size);
 		return 0;
 	}

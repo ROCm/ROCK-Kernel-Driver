@@ -37,10 +37,11 @@ static int ext3_release_dir (struct inode * inode,
 				struct file * filp);
 
 struct file_operations ext3_dir_operations = {
+	.llseek		= generic_file_llseek,
 	.read		= generic_read_dir,
 	.readdir	= ext3_readdir,		/* we take BKL. needed?*/
 	.ioctl		= ext3_ioctl,		/* BKL held */
-	.fsync		= ext3_sync_file,		/* BKL held */
+	.fsync		= ext3_sync_file,	/* BKL held */
 #ifdef CONFIG_EXT3_INDEX
 	.release	= ext3_release_dir,
 #endif
@@ -98,16 +99,15 @@ static int ext3_readdir(struct file * filp,
 	struct super_block * sb;
 	int err;
 	struct inode *inode = filp->f_dentry->d_inode;
-
-	lock_kernel();
+	int ret = 0;
 
 	sb = inode->i_sb;
 
 	if (is_dx(inode)) {
 		err = ext3_dx_readdir(filp, dirent, filldir);
 		if (err != ERR_BAD_DX_DIR) {
-			unlock_kernel();
-			return err;
+			ret = err;
+			goto out;
 		}
 		/*
 		 * We don't set the inode dirty flag since it's not
@@ -186,8 +186,8 @@ revalidate:
 				filp->f_pos = (filp->f_pos |
 						(sb->s_blocksize - 1)) + 1;
 				brelse (bh);
-				unlock_kernel();
-				return stored;
+				ret = stored;
+				goto out;
 			}
 			offset += le16_to_cpu(de->rec_len);
 			if (le32_to_cpu(de->inode)) {
@@ -217,8 +217,8 @@ revalidate:
 		brelse (bh);
 	}
 	UPDATE_ATIME(inode);
-	unlock_kernel();
-	return 0;
+out:
+	return ret;
 }
 
 #ifdef CONFIG_EXT3_INDEX

@@ -166,6 +166,7 @@ static int blkmtd_readpage(mtd_raw_dev_data_t *rawdevice, struct page *page)
   int sectornr, sectors, i;
   struct kiobuf *iobuf;
   sector_t *blocks;
+  char b[BDEVNAME_SIZE];
 
   if(!rawdevice) {
     printk("blkmtd: readpage: PANIC file->private_data == NULL\n");
@@ -173,7 +174,7 @@ static int blkmtd_readpage(mtd_raw_dev_data_t *rawdevice, struct page *page)
   }
 
   DEBUG(2, "blkmtd: readpage called, dev = `%s' page = %p index = %ld\n",
-	bdevname(rawdevice->binding), page, page->index);
+	bdevname(rawdevice->binding, b), page, page->index);
 
   if(PageUptodate(page)) {
     DEBUG(2, "blkmtd: readpage page %ld is already upto date\n", page->index);
@@ -523,6 +524,7 @@ static int blkmtd_erase(struct mtd_info *mtd, struct erase_info *instr)
   size_t from;
   u_long len;
   int err = 0;
+  char b[BDEVNAME_SIZE];
 
   /* check readonly */
   if(rawdevice->readonly) {
@@ -537,7 +539,7 @@ static int blkmtd_erase(struct mtd_info *mtd, struct erase_info *instr)
 
   /* check erase region has valid start and length */
   DEBUG(2, "blkmtd: erase: dev = `%s' from = 0x%x len = 0x%lx\n",
-	bdevname(rawdevice->binding), from, len);
+	bdevname(rawdevice->binding, b), from, len);
   while(numregions) {
     DEBUG(3, "blkmtd: checking erase region = 0x%08X size = 0x%X num = 0x%x\n",
 	  einfo->offset, einfo->erasesize, einfo->numblocks);
@@ -635,11 +637,12 @@ static int blkmtd_read(struct mtd_info *mtd, loff_t from, size_t len,
   int err = 0;
   int offset;
   int pagenr, pages;
+  char b[BDEVNAME_SIZE];
 
   *retlen = 0;
 
   DEBUG(2, "blkmtd: read: dev = `%s' from = %ld len = %d buf = %p\n",
-	bdevname(rawdevice->binding), (long int)from, len, buf);
+	bdevname(rawdevice->binding, b), (long int)from, len, buf);
 
   pagenr = from >> PAGE_SHIFT;
   offset = from - (pagenr << PAGE_SHIFT);
@@ -706,10 +709,11 @@ static int blkmtd_write(struct mtd_info *mtd, loff_t to, size_t len,
   size_t len1 = 0, len2 = 0, len3 = 0;
   struct page **pages;
   int pagecnt = 0;
-
+  char b[BDEVNAME_SIZE];
+21 e3 
   *retlen = 0;
   DEBUG(2, "blkmtd: write: dev = `%s' to = %ld len = %d buf = %p\n",
-	bdevname(rawdevice->binding), (long int)to, len, buf);
+	bdevname(rawdevice->binding, b), (long int)to, len, buf);
 
   /* handle readonly and out of range numbers */
 
@@ -1060,6 +1064,7 @@ static int __init init_blkmtd(void)
   int err;
   int mode;
   int regions;
+  char b[BDEVNAME_SIZE];
 
   /* Check args */
   if(device == 0) {
@@ -1128,7 +1133,7 @@ static int __init init_blkmtd(void)
   if (err)
     return 1;
 
-  DEBUG(1, "blkmtd: devname = %s\n", bdevname(bdev));
+  DEBUG(1, "blkmtd: devname = %s\n", bdevname(bdev, b));
   blocksize = BLOCK_SIZE;
 
   blocksize = bs ? bs : block_size(bdev);
