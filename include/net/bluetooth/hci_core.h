@@ -53,7 +53,8 @@ struct inquiry_cache {
 struct hci_conn_hash {
 	struct list_head list;
 	spinlock_t       lock;
-	unsigned int     num;
+	unsigned int     acl_num;
+	unsigned int     sco_num;
 };
 
 struct hci_dev {
@@ -209,21 +210,28 @@ static inline void hci_conn_hash_init(struct hci_dev *hdev)
 	struct hci_conn_hash *h = &hdev->conn_hash;
 	INIT_LIST_HEAD(&h->list);
 	spin_lock_init(&h->lock);
-	h->num = 0;
+	h->acl_num = 0;
+	h->sco_num = 0;
 }
 
 static inline void hci_conn_hash_add(struct hci_dev *hdev, struct hci_conn *c)
 {
 	struct hci_conn_hash *h = &hdev->conn_hash;
 	list_add(&c->list, &h->list);
-	h->num++;
+	if (c->type == ACL_LINK)
+		h->acl_num++;
+	else
+		h->sco_num++;
 }
 
 static inline void hci_conn_hash_del(struct hci_dev *hdev, struct hci_conn *c)
 {
 	struct hci_conn_hash *h = &hdev->conn_hash;
 	list_del(&c->list);
-	h->num--;
+	if (c->type == ACL_LINK)
+		h->acl_num++;
+	else
+		h->sco_num--;
 }
 
 static inline struct hci_conn *hci_conn_hash_lookup_handle(struct hci_dev *hdev,
