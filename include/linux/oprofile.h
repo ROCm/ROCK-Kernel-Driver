@@ -21,12 +21,22 @@ struct super_block;
 struct dentry;
 struct file_operations;
  
+/* This is duplicated from user-space so
+ * must be kept in sync :(
+ */
 enum oprofile_cpu {
 	OPROFILE_CPU_PPRO,
 	OPROFILE_CPU_PII,
 	OPROFILE_CPU_PIII,
 	OPROFILE_CPU_ATHLON,
-	OPROFILE_CPU_TIMER
+	OPROFILE_CPU_TIMER,
+	OPROFILE_UNUSED1, /* 2.4's RTC mode */
+	OPROFILE_CPU_P4,
+	OPROFILE_CPU_IA64,
+	OPROFILE_CPU_IA64_1,
+	OPROFILE_CPU_IA64_2,
+	OPROFILE_CPU_HAMMER,
+	OPROFILE_CPU_P4_HT2
 };
 
 /* Operations structure to be filled in */

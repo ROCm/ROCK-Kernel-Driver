@@ -11,8 +11,8 @@
 #ifndef OP_X86_MODEL_H
 #define OP_X86_MODEL_H
 
-/* will need re-working for Pentium IV */
-#define MAX_MSR 4
+/* Pentium IV needs all these */
+#define MAX_MSR 63
  
 struct op_saved_msr {
 	unsigned int high;
@@ -47,6 +47,8 @@ struct op_x86_model_spec {
 };
 
 extern struct op_x86_model_spec const op_ppro_spec;
+extern struct op_x86_model_spec const op_p4_spec;
+extern struct op_x86_model_spec const op_p4_ht2_spec;
 extern struct op_x86_model_spec const op_athlon_spec;
 
 #endif /* OP_X86_MODEL_H */
