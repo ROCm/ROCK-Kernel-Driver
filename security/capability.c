@@ -18,6 +18,7 @@
 #include <linux/smp_lock.h>
 #include <linux/skbuff.h>
 #include <linux/netlink.h>
+#include <linux/ptrace.h>
 
 int cap_capable (struct task_struct *tsk, int cap)
 {

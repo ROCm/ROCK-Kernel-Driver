@@ -383,7 +383,7 @@ static void input_call_hotplug(char *verb, struct input_dev *dev)
 		argv[0], argv[1], envp[0], envp[1], envp[2], envp[3], envp[4]);
 #endif
 
-	value = call_usermodehelper(argv [0], argv, envp);
+	value = call_usermodehelper(argv [0], argv, envp, 0);
 
 	kfree(buf);
 	kfree(envp);

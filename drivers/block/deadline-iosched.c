@@ -297,6 +297,9 @@ static void deadline_remove_request(request_queue_t *q, struct request *rq)
 		deadline_del_drq_rb(dd, drq);
 	}
 
+	if (q->last_merge == &rq->queuelist)
+		q->last_merge = NULL;
+
 	list_del_init(&rq->queuelist);
 }
 
@@ -424,12 +427,7 @@ deadline_move_to_dispatch(struct deadline_data *dd, struct deadline_rq *drq)
 {
 	request_queue_t *q = drq->request->q;
 
-	if (q->last_merge == &drq->request->queuelist)
-		q->last_merge = NULL;
-
-	deadline_del_drq_hash(drq);
-	deadline_del_drq_rb(dd, drq);
-	list_del_init(&drq->fifo);
+	deadline_remove_request(q, drq->request);
 	list_add_tail(&drq->request->queuelist, dd->dispatch);
 }
 

@@ -6,6 +6,7 @@
 #include "linux/types.h"
 #include "linux/utime.h"
 #include "linux/sys.h"
+#include "linux/ptrace.h"
 #include "asm/unistd.h"
 #include "asm/ptrace.h"
 #include "asm/uaccess.h"

@@ -261,7 +261,7 @@ void ne2000_outsw(unsigned int addr, const void *vbuf, unsigned long len)
 
 /*
  *	Lastly the interrupt set up code...
- *	Minor diferences between the different board types.
+ *	Minor differences between the different board types.
  */
 
 #if defined(CONFIG_M5206) && defined(CONFIG_ARNEWSH)

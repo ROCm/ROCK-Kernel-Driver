@@ -56,9 +56,9 @@
 /* Note:
  * 
  * The book states 2 confusing things about befs b+trees. First, 
- * it states that the overflow feild of node headers is used by internal nodes 
- * to point to another node that "effectivly continues this one". Here is what 
- * I belive that means. Each key in internal nodes points to another node that
+ * it states that the overflow field of node headers is used by internal nodes
+ * to point to another node that "effectively continues this one". Here is what
+ * I believe that means. Each key in internal nodes points to another node that
  * contains key values less than itself. Inspection reveals that the last key 
  * in the internal node is not the last key in the index. Keys that are 
  * greater than the last key in the internal node go into the overflow node. 
@@ -124,7 +124,7 @@ static int befs_compare_strings(const void *key1, int keylen1,
  * @sup: Buffer in which to place the btree superblock
  *
  * Calls befs_read_datastream to read in the btree superblock and
- * makes sure it is in cpu byteorder, byteswapping if nessisary.
+ * makes sure it is in cpu byteorder, byteswapping if necessary.
  *
  * On success, returns BEFS_OK and *@sup contains the btree superblock,
  * in cpu byte order.
@@ -179,8 +179,8 @@ befs_bt_read_super(struct super_block *sb, befs_data_stream * ds,
  * @node_off: Starting offset (in bytes) of the node in @ds
  *
  * Calls befs_read_datastream to read in the indicated btree node and
- * makes sure its header feilds are in cpu byteorder, byteswapping if 
- * nessisary.
+ * makes sure its header fields are in cpu byteorder, byteswapping if
+ * necessary.
  * Note: node->bh must be NULL when this function called first
  * time. Don't forget brelse(node->bh) after last call.
  *

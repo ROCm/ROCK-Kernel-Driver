@@ -15,7 +15,7 @@
  * Derived from arch/ppc/boot/prep/head.S (Cort Dougan, many others).
  *
  * 2001 (c) MontaVista, Software, Inc.  This file is licensed under
- * the terms of the GNU General Public License version 2.1.  This program
+ * the terms of the GNU General Public License version 2.  This program
  * is licensed "as is" without any warranty of any kind, whether express
  * or implied.
  */

@@ -114,7 +114,7 @@ static int hci_run_hotplug(char *dev, char *action)
 	envp[3] = astr;
 	envp[4] = NULL;
 	
-	return call_usermodehelper(argv[0], argv, envp);
+	return call_usermodehelper(argv[0], argv, envp, 0);
 }
 #else
 #define hci_run_hotplug(A...)

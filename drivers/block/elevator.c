@@ -399,7 +399,7 @@ struct request *elv_former_request(request_queue_t *q, struct request *rq)
 	elevator_t *e = &q->elevator;
 
 	if (e->elevator_former_req_fn)
-		return e->elevator_latter_req_fn(q, rq);
+		return e->elevator_former_req_fn(q, rq);
 
 	prev = rq->queuelist.prev;
 	if (prev != &q->queue_head && prev != &rq->queuelist)

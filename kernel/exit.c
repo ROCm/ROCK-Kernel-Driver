@@ -694,10 +694,8 @@ static void exit_notify(struct task_struct *tsk)
 	 * only has special meaning to our real parent.
 	 */
 	if (tsk->exit_signal != -1) {
-		if (tsk->parent == tsk->real_parent)
-			do_notify_parent(tsk, tsk->exit_signal);
-		else
-			do_notify_parent(tsk, SIGCHLD);
+		int signal = tsk->parent == tsk->real_parent ? tsk->exit_signal : SIGCHLD;
+		do_notify_parent(tsk, signal);
 	}
 
 	tsk->state = TASK_ZOMBIE;
@@ -731,8 +729,10 @@ NORET_TYPE void do_exit(long code)
 
 	profile_exit_task(tsk);
  
-	if (unlikely(current->ptrace & PT_TRACE_EXIT))
+	if (unlikely(current->ptrace & PT_TRACE_EXIT)) {
+		current->ptrace_message = code;
 		ptrace_notify((PTRACE_EVENT_EXIT << 8) | SIGTRAP);
+	}
 
 	acct_process(code);
 	__exit_mm(tsk);

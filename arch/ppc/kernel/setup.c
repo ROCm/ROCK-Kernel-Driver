@@ -129,6 +129,8 @@ void machine_halt(void)
 	ppc_md.halt();
 }
 
+void (*pm_power_off)(void) = machine_power_off;
+
 #ifdef CONFIG_TAU
 extern u32 cpu_temp(unsigned long cpu);
 extern u32 cpu_temp_both(unsigned long cpu);

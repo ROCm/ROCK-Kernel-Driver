@@ -16,6 +16,7 @@
 #include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/utsname.h>
+#include <linux/ptrace.h>
 
 #include <asm/cachectl.h>
 #include <asm/pgalloc.h>

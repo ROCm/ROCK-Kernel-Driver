@@ -446,21 +446,6 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define PF_FSTRANS	0x00020000	/* inside a filesystem transaction */
 #define PF_KSWAPD	0x00040000	/* I am kswapd */
 
-/*
- * Ptrace flags
- */
-
-#define PT_PTRACED	0x00000001
-#define PT_DTRACE	0x00000002	/* delayed trace (used on m68k, i386) */
-#define PT_TRACESYSGOOD	0x00000004
-#define PT_PTRACE_CAP	0x00000008	/* ptracer can follow suid-exec */
-#define PT_TRACE_FORK	0x00000010
-#define PT_TRACE_VFORK	0x00000020
-#define PT_TRACE_CLONE	0x00000040
-#define PT_TRACE_EXEC	0x00000080
-#define PT_TRACE_VFORK_DONE	0x00000100
-#define PT_TRACE_EXIT	0x00000200
-
 #if CONFIG_SMP
 extern void set_cpus_allowed(task_t *p, unsigned long new_mask);
 #else
