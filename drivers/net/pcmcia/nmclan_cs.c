@@ -520,7 +520,7 @@ static dev_link_t *nmclan_attach(void)
     client_reg.event_handler = &nmclan_event;
     client_reg.Version = 0x0210;
     client_reg.event_callback_args.client_data = link;
-    ret = CardServices(RegisterClient, &link->handle, &client_reg);
+    ret = pcmcia_register_client(&link->handle, &client_reg);
     if (ret != 0) {
 	cs_error(link->handle, RegisterClient, ret);
 	nmclan_detach(link);
@@ -558,7 +558,7 @@ static void nmclan_detach(dev_link_t *link)
     }
 
     if (link->handle)
-	CardServices(DeregisterClient, link->handle);
+	pcmcia_deregister_client(link->handle);
 
     /* Unlink device structure, free bits */
     *linkp = link->next;
@@ -706,8 +706,8 @@ nmclan_config
 	ethernet device available to the system.
 ---------------------------------------------------------------------------- */
 
-#define CS_CHECK(fn, args...) \
-while ((last_ret=CardServices(last_fn=(fn), args))!=0) goto cs_failed
+#define CS_CHECK(fn, ret) \
+  do { last_fn = (fn); if ((last_ret = (ret)) != 0) goto cs_failed; } while (0)
 
 static void nmclan_config(dev_link_t *link)
 {
@@ -727,17 +727,17 @@ static void nmclan_config(dev_link_t *link)
   tuple.TupleDataMax = 64;
   tuple.TupleOffset = 0;
   tuple.DesiredTuple = CISTPL_CONFIG;
-  CS_CHECK(GetFirstTuple, handle, &tuple);
-  CS_CHECK(GetTupleData, handle, &tuple);
-  CS_CHECK(ParseTuple, handle, &tuple, &parse);
+  CS_CHECK(GetFirstTuple, pcmcia_get_first_tuple(handle, &tuple));
+  CS_CHECK(GetTupleData, pcmcia_get_tuple_data(handle, &tuple));
+  CS_CHECK(ParseTuple, pcmcia_parse_tuple(handle, &tuple, &parse));
   link->conf.ConfigBase = parse.config.base;
 
   /* Configure card */
   link->state |= DEV_CONFIG;
 
-  CS_CHECK(RequestIO, handle, &link->io);
-  CS_CHECK(RequestIRQ, handle, &link->irq);
-  CS_CHECK(RequestConfiguration, handle, &link->conf);
+  CS_CHECK(RequestIO, pcmcia_request_io(handle, &link->io));
+  CS_CHECK(RequestIRQ, pcmcia_request_irq(handle, &link->irq));
+  CS_CHECK(RequestConfiguration, pcmcia_request_configuration(handle, &link->conf));
   dev->irq = link->irq.AssignedIRQ;
   dev->base_addr = link->io.BasePort1;
   i = register_netdev(dev);
@@ -753,8 +753,8 @@ static void nmclan_config(dev_link_t *link)
   tuple.TupleData = buf;
   tuple.TupleDataMax = 64;
   tuple.TupleOffset = 0;
-  CS_CHECK(GetFirstTuple, handle, &tuple);
-  CS_CHECK(GetTupleData, handle, &tuple);
+  CS_CHECK(GetFirstTuple, pcmcia_get_first_tuple(handle, &tuple));
+  CS_CHECK(GetTupleData, pcmcia_get_tuple_data(handle, &tuple));
   memcpy(dev->dev_addr, tuple.TupleData, ETHER_ADDR_LEN);
 
   /* Verify configuration by reading the MACE ID. */
@@ -819,9 +819,9 @@ static void nmclan_release(dev_link_t *link)
     return;
   }
 
-  CardServices(ReleaseConfiguration, link->handle);
-  CardServices(ReleaseIO, link->handle, &link->io);
-  CardServices(ReleaseIRQ, link->handle, &link->irq);
+  pcmcia_release_configuration(link->handle);
+  pcmcia_release_io(link->handle, &link->io);
+  pcmcia_release_irq(link->handle, &link->irq);
 
   link->state &= ~DEV_CONFIG;
 
@@ -863,7 +863,7 @@ static int nmclan_event(event_t event, int priority,
       if (link->state & DEV_CONFIG) {
 	if (link->open)
 	  netif_device_detach(dev);
-	CardServices(ReleaseConfiguration, link->handle);
+	pcmcia_release_configuration(link->handle);
       }
       break;
     case CS_EVENT_PM_RESUME:
@@ -871,7 +871,7 @@ static int nmclan_event(event_t event, int priority,
       /* Fall through... */
     case CS_EVENT_CARD_RESET:
       if (link->state & DEV_CONFIG) {
-	CardServices(RequestConfiguration, link->handle, &link->conf);
+	pcmcia_request_configuration(link->handle, &link->conf);
 	if (link->open) {
 	  nmclan_reset(dev);
 	  netif_device_attach(dev);
@@ -903,7 +903,7 @@ static void nmclan_reset(struct net_device *dev)
   reg.Action = CS_READ;
   reg.Offset = CISREG_COR;
   reg.Value = 0;
-  CardServices(AccessConfigurationRegister, link->handle, &reg);
+  pcmcia_access_configuration_register(link->handle, &reg);
   OrigCorValue = reg.Value;
 
   /* Reset Xilinx */
@@ -912,12 +912,12 @@ static void nmclan_reset(struct net_device *dev)
   DEBUG(1, "nmclan_reset: OrigCorValue=0x%lX, resetting...\n",
 	OrigCorValue);
   reg.Value = COR_SOFT_RESET;
-  CardServices(AccessConfigurationRegister, link->handle, &reg);
+  pcmcia_access_configuration_register(link->handle, &reg);
   /* Need to wait for 20 ms for PCMCIA to finish reset. */
 
   /* Restore original COR configuration index */
   reg.Value = COR_LEVEL_REQ | (OrigCorValue & COR_CONFIG_MASK);
-  CardServices(AccessConfigurationRegister, link->handle, &reg);
+  pcmcia_access_configuration_register(link->handle, &reg);
   /* Xilinx is now completely reset along with the MACE chip. */
   lp->tx_free_frames=AM2150_MAX_TX_FRAMES;
 
@@ -1046,7 +1046,7 @@ static void mace_tx_timeout(struct net_device *dev)
   printk(KERN_NOTICE "%s: transmit timed out -- ", dev->name);
 #if RESET_ON_TIMEOUT
   printk("resetting card\n");
-  CardServices(ResetCard, link->handle);
+  pcmcia_reset_card(link->handle, NULL);
 #else /* #if RESET_ON_TIMEOUT */
   printk("NOT resetting card\n");
 #endif /* #if RESET_ON_TIMEOUT */
