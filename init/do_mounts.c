@@ -407,6 +407,9 @@ void __init prepare_namespace(void)
 
 	md_run_setup();
 
+	if (sysfs_mounted)
+		sys_umount("/sys",0);
+
 	if (saved_root_name[0]) {
 		root_device_name = saved_root_name;
 		ROOT_DEV = name_to_dev_t(root_device_name);
@@ -415,9 +418,6 @@ void __init prepare_namespace(void)
 	}
 
 	is_floppy = MAJOR(ROOT_DEV) == FLOPPY_MAJOR;
-
-	if (sysfs_mounted)
-		sys_umount("/sys",0);
 
 	if (initrd_load())
 		goto out;
