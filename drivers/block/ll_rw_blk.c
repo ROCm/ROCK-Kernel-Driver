@@ -1821,13 +1821,14 @@ EXPORT_SYMBOL(blk_rq_map_user);
  * Description:
  *    Unmap a request previously mapped by blk_rq_map_user().
  */
-int blk_rq_unmap_user(struct request *rq, void __user *ubuf, unsigned int ulen)
+int blk_rq_unmap_user(struct request *rq, void __user *ubuf, struct bio *bio,
+		      unsigned int ulen)
 {
 	const int read = rq_data_dir(rq) == READ;
 	int ret = 0;
 
-	if (rq->biotail)
-		bio_unmap_user(rq->biotail, read);
+	if (bio)
+		bio_unmap_user(bio, read);
 	if (rq->buffer) {
 		if (read && copy_to_user(ubuf, rq->buffer, ulen))
 			ret = -EFAULT;
