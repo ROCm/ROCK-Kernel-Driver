@@ -791,7 +791,7 @@ asmlinkage long sys_swapoff(const char * specialfile)
 	if (S_ISBLK(swap_file->f_dentry->d_inode->i_mode)) {
 		struct block_device *bdev;
 		bdev = swap_file->f_dentry->d_inode->i_bdev;
-		set_blocksize(to_kdev_t(bdev->bd_dev), p->old_block_size);
+		set_blocksize(bdev, p->old_block_size);
 		bd_release(bdev);
 	}
 	filp_close(swap_file, NULL);
@@ -921,7 +921,7 @@ asmlinkage long sys_swapon(const char * specialfile, int swap_flags)
 			goto bad_swap;
 		}
 		p->old_block_size = block_size(to_kdev_t(bdev->bd_dev));
-		error = set_blocksize(swap_file->f_dentry->d_inode->i_rdev,
+		error = set_blocksize(swap_file->f_dentry->d_inode->i_bdev,
 				      PAGE_SIZE);
 		if (error < 0)
 			goto bad_swap;
@@ -1074,7 +1074,7 @@ asmlinkage long sys_swapon(const char * specialfile, int swap_flags)
 	goto out;
 bad_swap:
 	if (bdev) {
-		set_blocksize(to_kdev_t(bdev->bd_dev), p->old_block_size);
+		set_blocksize(bdev, p->old_block_size);
 		bd_release(bdev);
 	}
 bad_swap_2:

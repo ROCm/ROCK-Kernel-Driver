@@ -721,13 +721,13 @@ efi_partition(struct gendisk *hd, struct block_device *bdev,
 	/* Need to change the block size that the block layer uses */
 
 	if (orig_blksize_size != hardblocksize)
-		set_blocksize(dev, hardblocksize);
+		set_blocksize(bdev, hardblocksize);
 
 	rc = add_gpt_partitions(hd, bdev, first_part_minor);
 
 	/* change back */
 	if (orig_blksize_size != hardblocksize)
-		set_blocksize(dev, orig_blksize_size);
+		set_blocksize(bdev, orig_blksize_size);
 
 	return rc;
 }

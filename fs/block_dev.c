@@ -53,10 +53,10 @@ static void kill_bdev(struct block_device *bdev)
 	truncate_inode_pages(bdev->bd_inode->i_mapping, 0);
 }	
 
-int set_blocksize(kdev_t dev, int size)
+int set_blocksize(struct block_device *bdev, int size)
 {
 	int oldsize;
-	struct block_device *bdev;
+	kdev_t dev = to_kdev_t(bdev->bd_dev);
 
 	/* Size must be a power of two, and between 512 and PAGE_SIZE */
 	if (size > PAGE_SIZE || size < 512 || (size & (size-1)))
@@ -83,19 +83,17 @@ int set_blocksize(kdev_t dev, int size)
 	}
 
 	/* Ok, we're actually changing the blocksize.. */
-	bdev = bdget(kdev_t_to_nr(dev));
 	sync_blockdev(bdev);
 	blksize_size[major(dev)][minor(dev)] = size;
 	bdev->bd_inode->i_blkbits = blksize_bits(size);
 	kill_bdev(bdev);
-	bdput(bdev);
 	return 0;
 }
 
 int sb_set_blocksize(struct super_block *sb, int size)
 {
 	int bits;
-	if (set_blocksize(sb->s_dev, size) < 0)
+	if (set_blocksize(sb->s_bdev, size) < 0)
 		return 0;
 	sb->s_blocksize = size;
 	for (bits = 9, size >>= 9; size >>= 1; bits++)

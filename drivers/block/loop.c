@@ -649,7 +649,7 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 	lo->old_gfp_mask = inode->i_mapping->gfp_mask;
 	inode->i_mapping->gfp_mask = GFP_NOIO;
 
-	set_blocksize(dev, block_size(to_kdev_t(lo_device->bd_dev)));
+	set_blocksize(bdev, block_size(to_kdev_t(lo_device->bd_dev)));
 
 	lo->lo_bio = lo->lo_biotail = NULL;
 	kernel_thread(loop_thread, lo, CLONE_FS | CLONE_FILES | CLONE_SIGHAND);

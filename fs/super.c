@@ -540,7 +540,7 @@ void kill_block_super(struct super_block *sb)
 {
 	struct block_device *bdev = sb->s_bdev;
 	generic_shutdown_super(sb);
-	set_blocksize(to_kdev_t(bdev->bd_dev), sb->s_old_blocksize);
+	set_blocksize(bdev, sb->s_old_blocksize);
 	bd_release(bdev);
 	blkdev_put(bdev, BDEV_FS);
 }

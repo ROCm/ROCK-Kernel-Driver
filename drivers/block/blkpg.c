@@ -320,7 +320,7 @@ int blk_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long arg)
 				return -EINVAL;
 			if (bd_claim(bdev, &holder) < 0)
 				return -EBUSY;
-			set_blocksize(dev, intval);
+			set_blocksize(bdev, intval);
 			bd_release(bdev);
 			return 0;
 
