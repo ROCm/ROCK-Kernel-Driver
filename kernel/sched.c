@@ -13,7 +13,7 @@
  *  		hybrid priority-list and round-robin design with
  *  		an array-switch method of distributing timeslices
  *  		and per-CPU runqueues.  Additional code by Davide
- *  		Libenzi, Robert Love, and Rusty Russel.
+ *  		Libenzi, Robert Love, and Rusty Russell.
  */
 
 #include <linux/mm.h>
