@@ -2307,8 +2307,8 @@ static int __end_that_request_first(struct request *req, int uptodate,
 			 * not a complete bvec done
 			 */
 			if (unlikely(nbytes > nr_bytes)) {
-				bio_iovec(bio)->bv_offset += nr_bytes;
-				bio_iovec(bio)->bv_len -= nr_bytes;
+				bio_iovec_idx(bio, idx)->bv_offset += nr_bytes;
+				bio_iovec_idx(bio, idx)->bv_len -= nr_bytes;
 				bio_nbytes += nr_bytes;
 				total_bytes += nr_bytes;
 				break;
