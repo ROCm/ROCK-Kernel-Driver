@@ -2616,6 +2616,48 @@ void tcp4_proc_exit(void)
 }
 #endif /* CONFIG_PROC_FS */
 
+static void tcpv4_zap_addr(__u32 addr) 
+{ 
+	int i;
+
+	for (i = 0; i < tcp_ehash_size; i++) { 
+		struct tcp_ehash_bucket *head = &tcp_ehash[i];
+		struct sock *sk;
+		struct hlist_node *node;
+		
+		/* O(n^2) on number of zapped sockets. hopefully there
+		   is only a small number of them. */
+	again:
+		read_lock(&head->lock); 
+		sk_for_each(sk, node, &head->chain) {
+			struct inet_opt *inet = inet_sk(sk);
+
+			if (sock_flag(sk, SOCK_DEAD))
+				continue;
+			if (sk->sk_err || sk->sk_zapped)
+				continue;
+			if (sk->sk_state == TCP_SYN_RECV)
+				continue;
+			if (sk->sk_state == TCP_SYN_SENT && sysctl_ip_dynaddr)
+				continue;
+			if (inet->rcv_saddr != addr)
+				continue;
+			printk(KERN_INFO 
+      "TCP: zapping lost address %d.%d.%d.%d:%d -> %d.%d.%d.%d:%d\n", 
+			       NIPQUAD(addr), ntohs(inet->sport), 
+			       NIPQUAD(inet->daddr), ntohs(inet->dport)); 
+			sock_hold(sk); 
+			read_unlock(&head->lock); 
+			lock_sock(sk);
+			tcp_reset(sk); 
+			release_sock(sk);
+			sock_put(sk); 
+			goto again; 
+		}		
+		read_unlock(&head->lock); 
+	}      
+} 
+
 struct proto tcp_prot = {
 	.name		=	"TCP",
 	.close		=	tcp_close,
@@ -2637,6 +2679,50 @@ struct proto tcp_prot = {
 };
 
 
+/* 
+ * Gets told when a dynamic IP address vanishes.
+ * Runs under the RTNL semaphore.
+ */ 
+static int tcpv4_inetaddr_event(struct notifier_block *this, 
+				unsigned long event, 
+				void *ptr)
+{
+	struct in_ifaddr *ifa = (struct in_ifaddr *)ptr; 
+	struct in_device *idev; 
+	struct net_device *dev;
+
+	if (!(idev = ifa->ifa_dev) || !idev->dev || 
+	    !(idev->dev->flags & IFF_DYNAMIC))
+		return NOTIFY_DONE;
+
+	/* 
+	 * Don't do anything when the address still exists on another
+	 * interface.  Depends on running after the IP notifier.  
+	 */
+	if ((dev = ip_dev_find(ifa->ifa_local)) != NULL) { 
+		dev_put(dev);
+		return NOTIFY_DONE; 
+	} 
+
+	switch (event) { 
+	case NETDEV_REBOOT: 
+		if (!(idev->dev->flags & IFF_UP)) { 
+			printk(KERN_DEBUG "tcp_inetaddr_event: netdev_reboot: interface not up\n");
+			break; 
+		}
+		/*FALL THROUGH*/
+	case NETDEV_DOWN:
+		tcpv4_zap_addr(ifa->ifa_local);
+		break; 
+	}
+
+	return NOTIFY_DONE; 
+}
+
+static struct notifier_block tcpv4_inetaddr_notifier = {
+	.notifier_call	= tcpv4_inetaddr_event,
+	.priority	= -1,
+};
 
 void __init tcp_v4_init(struct net_proto_family *ops)
 {
@@ -2651,6 +2737,7 @@ void __init tcp_v4_init(struct net_proto_family *ops)
 	 * packets.
 	 */
 	tcp_socket->sk->sk_prot->unhash(tcp_socket->sk);
+	register_inetaddr_notifier(&tcpv4_inetaddr_notifier);
 }
 
 EXPORT_SYMBOL(ipv4_specific);

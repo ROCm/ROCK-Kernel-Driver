@@ -835,6 +835,8 @@ extern void			tcp_enter_loss(struct sock *sk, int how);
 extern void			tcp_clear_retrans(struct tcp_opt *tp);
 extern void			tcp_update_metrics(struct sock *sk);
 
+extern void			tcp_reset(struct sock *sk); 
+
 extern void			tcp_close(struct sock *sk, 
 					  long timeout);
 extern struct sock *		tcp_accept(struct sock *sk, int flags, int *err);

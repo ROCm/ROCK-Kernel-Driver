@@ -2600,7 +2600,7 @@ static inline int tcp_sequence(struct tcp_opt *tp, u32 seq, u32 end_seq)
 }
 
 /* When we get a reset we do this. */
-static void tcp_reset(struct sock *sk)
+void tcp_reset(struct sock *sk)
 {
 	/* We want the right error as BSD sees it (and indeed as we do). */
 	switch (sk->sk_state) {
