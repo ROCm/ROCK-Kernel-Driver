@@ -543,25 +543,31 @@ static int wl3501_get_mib_value(struct wl3501_card *this, u8 index,
 				void *bf, int size)
 {
 	struct wl3501_get_req signal;
+	unsigned long flags;
 	int rc = -EIO;
     
 	signal.next_blk	  = 0;
 	signal.sig_id	  = WL3501_SIG_GET_REQ;
 	signal.mib_attrib = index;
 
+	spin_lock_irqsave(&this->lock, flags);
 	if (wl3501_esbq_req_test(this)) {
 		u16 ptr = wl3501_get_tx_buffer(this, sizeof(signal));
 		if (ptr) {
 			wl3501_set_to_wla(this, ptr, &signal, sizeof(signal));
 			wl3501_esbq_req(this, &ptr);
 			this->sig_get_confirm.mib_status = 255;
+			spin_unlock_irqrestore(&this->lock, flags);
 			rc = wait_event_interruptible(this->wait,
 				this->sig_get_confirm.mib_status != 255);
 			if (!rc)
 				memcpy(bf, this->sig_get_confirm.mib_value,
 				       size);
+			goto out;
 		}
 	}
+	spin_unlock_irqrestore(&this->lock, flags);
+out:
 	return rc;
 }
 
@@ -1657,15 +1663,34 @@ struct iw_statistics *wl3501_get_wireless_stats(struct net_device *dev)
 {
 	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
 	struct iw_statistics *wstats = &this->wstats;
+	u16 value;
 
+	memset(wstats, 0, sizeof(*wstats));
 	wstats->status = netif_running(dev);
-	wstats->qual.qual    = 0;
-	wstats->qual.level   = 0;
-	wstats->qual.noise   = 0;
-	wstats->discard.nwid = 0;
-	wstats->discard.code = 0;
-	wstats->discard.misc = 0;
-
+	if (!wl3501_get_mib_value(this, WL3501_MIB_ATTR_WEP_ICV_ERROR_COUNT,
+				  &value, sizeof(value)))
+		wstats->discard.code += value;
+	if (!wl3501_get_mib_value(this, WL3501_MIB_ATTR_WEP_UNDECRYPTABLE_COUNT,
+				  &value, sizeof(value)))
+		wstats->discard.code += value;
+	if (!wl3501_get_mib_value(this, WL3501_MIB_ATTR_WEP_EXCLUDED_COUNT,
+				  &value, sizeof(value)))
+		wstats->discard.code += value;
+	if (!wl3501_get_mib_value(this, WL3501_MIB_ATTR_RETRY_COUNT,
+				  &value, sizeof(value)))
+		wstats->discard.retries	= value;
+	if (!wl3501_get_mib_value(this, WL3501_MIB_ATTR_FAILED_COUNT,
+				  &value, sizeof(value)))
+		wstats->discard.misc += value;
+	if (!wl3501_get_mib_value(this, WL3501_MIB_ATTR_RTS_FAILURE_COUNT,
+				  &value, sizeof(value)))
+		wstats->discard.misc += value;
+	if (!wl3501_get_mib_value(this, WL3501_MIB_ATTR_ACK_FAILURE_COUNT,
+				  &value, sizeof(value)))
+		wstats->discard.misc += value;
+	if (!wl3501_get_mib_value(this, WL3501_MIB_ATTR_FRAME_DUPLICATE_COUNT,
+				  &value, sizeof(value)))
+		wstats->discard.misc += value;
 	return wstats;
 }
 
@@ -2157,19 +2182,10 @@ static int wl3501_get_encode(struct net_device *dev,
 			     struct iw_request_info *info,
 			     union iwreq_data *wrqu, char *extra)
 {
-	u8 implemented, restricted, keys[100], len_keys, tocopy;
+	u8 restricted, keys[100], len_keys, tocopy;
 	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
-	int rc = wl3501_get_mib_value(this,
-				      WL3501_MIB_ATTR_PRIV_OPT_IMPLEMENTED,
-				      &implemented, sizeof(implemented));
-	if (rc)
-		goto out;
-	if (!implemented) {
-		wrqu->encoding.flags = IW_ENCODE_DISABLED;
-		goto out;
-	}
-	rc = wl3501_get_mib_value(this, WL3501_MIB_ATTR_EXCLUDE_UNENCRYPTED,
-				  &restricted, sizeof(restricted));
+	int rc = wl3501_get_mib_value(this, WL3501_MIB_ATTR_EXCLUDE_UNENCRYPTED,
+				      &restricted, sizeof(restricted));
 	if (rc)
 		goto out;
 	wrqu->encoding.flags = restricted ? IW_ENCODE_RESTRICTED :
