@@ -136,9 +136,9 @@ boot-$(CONFIG_RPXLITE)		+= iic.o
 ifeq ($(CONFIG_SERIAL_CONSOLE),y)
 boot-$(CONFIG_8xx)		+= m8xx_tty.o
 boot-$(CONFIG_8260)		+= m8260_tty.o
-boot-$(CONFIG_GT64260_CONSOLE)   += gt64260_tty.o
-boot-$(CONFIG_SERIAL)		+= ../common/ns16550.o
+boot-$(CONFIG_GT64260_CONSOLE)	+= gt64260_tty.o
 endif
+boot-$(CONFIG_SERIAL_8250_CONSOLE) += ../common/ns16550.o
 
 EXTRA_TARGETS			:= $(boot-y)
 LIBS				:= ../lib/zlib.a
