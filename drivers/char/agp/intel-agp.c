@@ -1730,8 +1730,13 @@ static void __devexit agp_intel_remove(struct pci_dev *pdev)
 {
 	struct agp_bridge_data *bridge = pci_get_drvdata(pdev);
 
-	pci_dev_put(pdev);
 	agp_remove_bridge(bridge);
+
+	if (intel_i810_private.i810_dev)
+		pci_dev_put(intel_i810_private.i810_dev);
+	if (intel_i830_private.i830_dev)
+		pci_dev_put(intel_i830_private.i830_dev);
+
 	agp_put_bridge(bridge);
 }
 
