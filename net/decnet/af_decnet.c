@@ -485,6 +485,7 @@ struct sock *dn_alloc_sock(struct socket *sock, int gfp)
 	if (sock)
 		sock->ops = &dn_proto_ops;
 	sock_init_data(sock, sk);
+	sk_set_owner(sk, THIS_MODULE);
 
 	sk->backlog_rcv = dn_nsp_backlog_rcv;
 	sk->destruct    = dn_destruct;
@@ -2235,7 +2236,7 @@ static struct net_proto_family	dn_family_ops = {
 
 static struct proto_ops dn_proto_ops = {
 	.family =	AF_DECnet,
-
+	.owner =	THIS_MODULE,
 	.release =	dn_release,
 	.bind =		dn_bind,
 	.connect =	dn_connect,
