@@ -2224,6 +2224,9 @@ void __init console_init(void)
 #ifdef CONFIG_SERIAL_TX3912_CONSOLE
 	tx3912_console_init();
 #endif
+#ifdef CONFIG_HVC_CONSOLE
+	hvc_console_init();
+#endif
 }
 
 static struct tty_driver dev_tty_driver, dev_syscons_driver;
