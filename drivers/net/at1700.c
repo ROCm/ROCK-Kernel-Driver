@@ -572,7 +572,9 @@ static int net_send_packet (struct sk_buff *skb, struct net_device *dev)
 	struct net_local *lp = (struct net_local *) dev->priv;
 	int ioaddr = dev->base_addr;
 	short length = ETH_ZLEN < skb->len ? skb->len : ETH_ZLEN;
+	short len = skb->len;
 	unsigned char *buf = skb->data;
+	static u8 pad[ETH_ZLEN];
 
 	netif_stop_queue (dev);
 
@@ -584,7 +586,16 @@ static int net_send_packet (struct sk_buff *skb, struct net_device *dev)
 	lp->tx_queue_ready = 0;
 	{
 		outw (length, ioaddr + DATAPORT);
-		outsw (ioaddr + DATAPORT, buf, (length + 1) >> 1);
+		/* Packet data */
+		outsw (ioaddr + DATAPORT, buf, len >> 1);
+		/* Check for dribble byte */
+		if (len & 1) {
+			outw(skb->data[skb->len-1], ioaddr + DATAPORT);
+			len++;
+		}
+		/* Check for packet padding */
+		if (length != skb->len)
+			outsw(ioaddr + DATAPORT, pad, (length - len + 1) >> 1);
 
 		lp->tx_queue++;
 		lp->tx_queue_len += length + 2;
