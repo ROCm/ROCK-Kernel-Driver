@@ -347,14 +347,14 @@ __EXTERN_INLINE unsigned int cia_ioread8(void __iomem *xaddr)
 	unsigned long addr = (unsigned long) xaddr;
 	unsigned long result, base_and_type;
 
-	/* We can use CIA_MEM_R1_MASK for io ports too, since it is large
-	   enough to cover all io ports, and smaller than CIA_IO.  */
-	addr &= CIA_MEM_R1_MASK;
 	if (addr >= CIA_DENSE_MEM)
 		base_and_type = CIA_SPARSE_MEM + 0x00;
 	else
 		base_and_type = CIA_IO + 0x00;
 
+	/* We can use CIA_MEM_R1_MASK for io ports too, since it is large
+	   enough to cover all io ports, and smaller than CIA_IO.  */
+	addr &= CIA_MEM_R1_MASK;
 	result = *(vip) ((addr << 5) + base_and_type);
 	return __kernel_extbl(result, addr & 3);
 }
@@ -364,12 +364,12 @@ __EXTERN_INLINE void cia_iowrite8(u8 b, void __iomem *xaddr)
 	unsigned long addr = (unsigned long) xaddr;
 	unsigned long w, base_and_type;
 
-	addr &= CIA_MEM_R1_MASK;
 	if (addr >= CIA_DENSE_MEM)
 		base_and_type = CIA_SPARSE_MEM + 0x00;
 	else
 		base_and_type = CIA_IO + 0x00;
 
+	addr &= CIA_MEM_R1_MASK;
 	w = __kernel_insbl(b, addr & 3);
 	*(vuip) ((addr << 5) + base_and_type) = w;
 }
@@ -379,12 +379,12 @@ __EXTERN_INLINE unsigned int cia_ioread16(void __iomem *xaddr)
 	unsigned long addr = (unsigned long) xaddr;
 	unsigned long result, base_and_type;
 
-	addr &= CIA_MEM_R1_MASK;
 	if (addr >= CIA_DENSE_MEM)
 		base_and_type = CIA_SPARSE_MEM + 0x08;
 	else
 		base_and_type = CIA_IO + 0x08;
 
+	addr &= CIA_MEM_R1_MASK;
 	result = *(vip) ((addr << 5) + base_and_type);
 	return __kernel_extwl(result, addr & 3);
 }
@@ -394,12 +394,12 @@ __EXTERN_INLINE void cia_iowrite16(u16 b, void __iomem *xaddr)
 	unsigned long addr = (unsigned long) xaddr;
 	unsigned long w, base_and_type;
 
-	addr &= CIA_MEM_R1_MASK;
 	if (addr >= CIA_DENSE_MEM)
 		base_and_type = CIA_SPARSE_MEM + 0x08;
 	else
 		base_and_type = CIA_IO + 0x08;
 
+	addr &= CIA_MEM_R1_MASK;
 	w = __kernel_inswl(b, addr & 3);
 	*(vuip) ((addr << 5) + base_and_type) = w;
 }
