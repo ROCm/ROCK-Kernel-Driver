@@ -111,7 +111,10 @@ typedef struct {
  * These are the so far known RESTART_AREA_* flags (16-bit) which contain
  * information about the log file in which they are present.
  */
-#define RESTART_VOLUME_IS_CLEAN	const_cpu_to_le16(0x0002)
+enum {
+	RESTART_VOLUME_IS_CLEAN	= const_cpu_to_le16(0x0002),
+	RESTART_SPACE_FILLER	= 0xffff, /* gcc: Force enum bit width to 16. */
+} __attribute__ ((__packed__));
 
 typedef le16 RESTART_AREA_FLAGS;
 
