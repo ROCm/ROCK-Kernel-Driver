@@ -76,19 +76,27 @@ static struct vm_region consistent_head = {
 	.vm_end		= CONSISTENT_END,
 };
 
-static int vm_region_alloc(struct vm_region *head, struct vm_region *new, size_t size)
+static struct vm_region *
+vm_region_alloc(struct vm_region *head, size_t size, int gfp)
 {
 	unsigned long addr = head->vm_start, end = head->vm_end - size;
-	struct vm_region *c;
+	unsigned long flags;
+	struct vm_region *c, *new;
+
+	new = kmalloc(sizeof(struct vm_region), gfp);
+	if (!new)
+		goto out;
+
+	spin_lock_irqsave(&consistent_lock, flags);
 
 	list_for_each_entry(c, &head->vm_list, vm_list) {
 		if ((addr + size) < addr)
-			goto out;
+			goto nospc;
 		if ((addr + size) <= c->vm_start)
 			goto found;
 		addr = c->vm_end;
 		if (addr > end)
-			goto out;
+			goto nospc;
 	}
 
  found:
@@ -99,10 +107,14 @@ static int vm_region_alloc(struct vm_region *head, struct vm_region *new, size_t
 	new->vm_start = addr;
 	new->vm_end = addr + size;
 
-	return 0;
+	spin_unlock_irqrestore(&consistent_lock, flags);
+	return new;
 
+ nospc:
+	spin_unlock_irqrestore(&consistent_lock, flags);
+	kfree(new);
  out:
-	return -ENOMEM;
+	return NULL;
 }
 
 static struct vm_region *vm_region_find(struct vm_region *head, unsigned long addr)
@@ -154,25 +166,11 @@ void *consistent_alloc(int gfp, size_t size, dma_addr_t *handle,
 	}
 
 	/*
-	 * Our housekeeping doesn't need to come from DMA,
-	 * but it must not come from highmem.
+	 * Allocate a virtual address in the consistent mapping region.
 	 */
-	c = kmalloc(sizeof(struct vm_region),
-		    gfp & ~(__GFP_DMA | __GFP_HIGHMEM));
-	if (!c)
-		goto no_remap;
-
-	/*
-	 * Attempt to allocate a virtual address in the
-	 * consistent mapping region.
-	 */
-	spin_lock_irqsave(&consistent_lock, flags);
-
-	res = vm_region_alloc(&consistent_head, c, size);
-
-	spin_unlock_irqrestore(&consistent_lock, flags);
-
-	if (!res) {
+	c = vm_region_alloc(&consistent_head, size,
+			    gfp & ~(__GFP_DMA | __GFP_HIGHMEM));
+	if (c) {
 		pte_t *pte = consistent_pte + CONSISTENT_OFFSET(c->vm_start);
 		struct page *end = page + (1 << order);
 		pgprot_t prot = __pgprot(L_PTE_PRESENT | L_PTE_YOUNG |
@@ -203,16 +201,13 @@ void *consistent_alloc(int gfp, size_t size, dma_addr_t *handle,
 			page++;
 		}
 
-		ret = (void *)c->vm_start;
+		return (void *)c->vm_start;
 	}
 
- no_remap:
-	if (ret == NULL) {
-		kfree(c);
+	if (page)
 		__free_pages(page, order);
-	}
  no_page:
-	return ret;
+	return NULL;
 }
 EXPORT_SYMBOL(consistent_alloc);
 
