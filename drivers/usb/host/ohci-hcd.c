@@ -197,7 +197,7 @@ static int ohci_urb_enqueue (
 
 	/* allocate the TDs (updating hash chains) */
 	spin_lock_irqsave (&ohci->lock, flags);
-	for (i = 0; i < size; i++) { 
+	for (i = 0; i < size; i++) {
 		urb_priv->td [i] = td_alloc (ohci, SLAB_ATOMIC);
 		if (!urb_priv->td [i]) {
 			urb_priv->length = i;
@@ -208,6 +208,8 @@ static int ohci_urb_enqueue (
 	}	
 
 // FIXME:  much of this switch should be generic, move to hcd code ...
+// ... and what's not generic can't really be handled this way.
+// need to consider periodicity for both types!
 
 	/* allocate and claim bandwidth if needed; ISO
 	 * needs start frame index if it was't provided.
@@ -247,14 +249,14 @@ static int ohci_urb_enqueue (
 
 	spin_unlock_irqrestore (&ohci->lock, flags);
 
-	return 0;	
+	return 0;
 }
 
 /*
  * decouple the URB from the HC queues (TDs, urb_priv); it's
- * already marked for deletion.  reporting is always done
+ * already marked using urb->status.  reporting is always done
  * asynchronously, and we might be dealing with an urb that's
- * almost completed anyway...
+ * partially transferred, or an ED with other urbs being unlinked.
  */
 static int ohci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
 {

@@ -97,7 +97,7 @@ static void wbflush_kn02ba(void)
 }
 
 /*
- * The DS500/2x0 doesnt need to write back the WB.
+ * The DS500/2x0 doesn't need to write back the WB.
  */
 static void wbflush_kn03(void)
 {

@@ -1,9 +1,6 @@
 #ifndef _LINUX_NFS_XDR_H
 #define _LINUX_NFS_XDR_H
 
-extern struct rpc_program	nfs_program;
-extern struct rpc_stat		nfs_rpcstat;
-
 struct nfs_fattr {
 	unsigned short		valid;		/* which fields are valid */
 	__u64			pre_size;	/* pre_op_attr.size	  */
@@ -354,5 +351,6 @@ extern struct nfs_rpc_ops	nfs_v3_clientops;
 extern struct rpc_version	nfs_version2;
 extern struct rpc_version	nfs_version3;
 extern struct rpc_program	nfs_program;
+extern struct rpc_stat		nfs_rpcstat;
 
 #endif

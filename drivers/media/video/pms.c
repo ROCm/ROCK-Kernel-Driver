@@ -11,7 +11,7 @@
  *
  *	Most of this code is directly derived from his userspace driver.
  *	His driver works so send any reports to alan@redhat.com unless the
- *	userspace driver also doesnt work for you...
+ *	userspace driver also doesn't work for you...
  */
 
 #include <linux/module.h>

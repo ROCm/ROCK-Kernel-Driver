@@ -456,7 +456,6 @@ extern int sysctl_tcp_syncookies;
 extern int sysctl_tcp_retrans_collapse;
 extern int sysctl_tcp_stdurg;
 extern int sysctl_tcp_rfc1337;
-extern int sysctl_tcp_tw_recycle;
 extern int sysctl_tcp_abort_on_overflow;
 extern int sysctl_tcp_max_orphans;
 extern int sysctl_tcp_max_tw_buckets;

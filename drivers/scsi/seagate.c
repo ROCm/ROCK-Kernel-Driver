@@ -21,7 +21,7 @@
  * linux 2.1.112, simplified some #defines etc. <pavel@ucw.cz>
  *
  * Aug 2000 - aeb - deleted seagate_st0x_biosparam(). It would try to
- * read the physical disk geometry, a bad mistake. Of course it doesnt
+ * read the physical disk geometry, a bad mistake. Of course it doesn't
  * matter much what geometry one invents, but on large disks it
  * returned 256 (or more) heads, causing all kind of failures.
  * Of course this means that people might see a different geometry now,

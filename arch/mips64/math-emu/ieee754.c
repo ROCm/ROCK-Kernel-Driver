@@ -3,7 +3,7 @@
  *
  * BUGS
  * not much dp done
- * doesnt generate IEEE754_INEXACT
+ * doesn't generate IEEE754_INEXACT
  *
  */
 /*

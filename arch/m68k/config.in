@@ -522,7 +522,7 @@ endmenu
 mainmenu_option next_comment
 comment 'Sound support'
 
-tristate 'Sound support' CONFIG_SOUND
+tristate 'Sound card support' CONFIG_SOUND
 if [ "$CONFIG_SOUND" != "n" ]; then
    source sound/oss/dmasound/Config.in
 fi

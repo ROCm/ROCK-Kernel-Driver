@@ -20,7 +20,7 @@
 #define awc_RID_gen_RidLen 				{(const struct aironet4500_rid_selector *)&aironet4500_RID_Select_General_Config,0x0000, 8,1,1,1,0, 0xffffffff,0x0000, "Length of RID" }
 #define awc_RID_gen_OperatingMode_adhoc 		{&aironet4500_RID_Select_General_Config,0x0002,16,1,1,0,0, 0x00000003,0x0000,"Opmode IBSS Adhoc operation" } // Without AP
 #define awc_RID_gen_OperatingMode_Infrastructure 	{&aironet4500_RID_Select_General_Config,0x0002,16,1,1,0,0, 0x00000003,0x0001,"Opmode Infrastructure Station operation" }// With AP
-#define awc_RID_gen_OperatingMode_AP			{&aironet4500_RID_Select_General_Config,0x0002,16,1,1,0,0, 0x00000003,0x0002,"Opmode Access Point" } // Aironet doesnt release info on use 
+#define awc_RID_gen_OperatingMode_AP			{&aironet4500_RID_Select_General_Config,0x0002,16,1,1,0,0, 0x00000003,0x0002,"Opmode Access Point" } // Aironet doesn't release info on use 
 #define awc_RID_gen_OperatingMode_AP_and_repeater 	{&aironet4500_RID_Select_General_Config,0x0002,16,1,1,0,0, 0x00000003,0x0003,"Opmode Access Point and Repeater" } // no info
 #define awc_RID_gen_OperatingMode_No_payload_modify	{&aironet4500_RID_Select_General_Config,0x0002,16,1,1,0,0, 0x00000100,0x0100,"Opmode Payload without modify" } 
 #define awc_RID_gen_OperatingMode_LLC_802_3_convert	{&aironet4500_RID_Select_General_Config,0x0002,16,1,1,0,0, 0x00000100,0x0000,"Opmode LLC -> 802.3 convert" }

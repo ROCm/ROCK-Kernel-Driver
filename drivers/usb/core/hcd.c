@@ -1232,7 +1232,7 @@ static int hcd_free_dev (struct usb_device *udev)
 	return 0;
 }
 
-/**
+/*
  * usb_hcd_operations - adapts usb_bus framework to HCD framework (bus glue)
  *
  * When registering a USB bus through the HCD framework code, use this

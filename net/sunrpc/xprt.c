@@ -335,7 +335,7 @@ xprt_close(struct rpc_xprt *xprt)
 
 	sock_release(sock);
 	/*
-	 *	TCP doesnt require the rpciod now - other things may
+	 *	TCP doesn't require the rpciod now - other things may
 	 *	but rpciod handles that not us.
 	 */
 	if(xprt->stream)

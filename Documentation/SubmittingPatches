@@ -161,7 +161,7 @@ you to re-send them using MIME.
 When sending patches to Linus, always follow step #6.
 
 Large changes are not appropriate for mailing lists, and some
-maintainers.  If your patch, uncompressed, exceeds 40Kb in size,
+maintainers.  If your patch, uncompressed, exceeds 40 kB in size,
 it is preferred that you store your patch on an Internet-accessible
 server, and provide instead a URL (link) pointing to your patch.
 

@@ -453,8 +453,8 @@ static int handle_ide_mess(struct block_device *bdev)
 	/*
 	 * The i386 partition handling programs very often
 	 * make partitions end on cylinder boundaries.
-	 * There is no need to do so, and Linux fdisk doesnt always
-	 * do this, and Windows NT on Alpha doesnt do this either,
+	 * There is no need to do so, and Linux fdisk doesn't always
+	 * do this, and Windows NT on Alpha doesn't do this either,
 	 * but still, this helps to guess #heads.
 	 */
 	data = read_dev_sector(bdev, 0, &sect);
