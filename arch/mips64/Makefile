@@ -149,7 +149,7 @@ endif
 
 vmlinux: arch/mips64/vmlinux.lds.s
 
-CPPFLAGS_arch/mips64/vmlinux.lds.s := -imacros $(srctree)/include/asm-mips64/sn/mapped_kernel.h
+AFLAGS_vmlinux.lds.o := -imacros $(srctree)/include/asm-mips64/sn/mapped_kernel.h
 
 ifdef CONFIG_MAPPED_KERNEL
 vmlinux.64: vmlinux

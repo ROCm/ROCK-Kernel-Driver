@@ -21,7 +21,7 @@
 
 #include <linux/pagemap.h>
 
-typedef struct metapage {
+struct metapage {
 	/* Common logsyncblk prefix (see jfs_logmgr.h) */
 	u16 xflag;
 	u16 unused;
@@ -55,7 +55,7 @@ typedef struct metapage {
 	int clsn;
 	atomic_t nohomeok;
 	struct jfs_log *log;
-} metapage_t;
+};
 
 /* metapage flag */
 #define META_locked	0
@@ -69,7 +69,7 @@ typedef struct metapage {
 #define mark_metapage_dirty(mp) set_bit(META_dirty, &(mp)->flag)
 
 /* function prototypes */
-extern metapage_t *__get_metapage(struct inode *inode,
+extern struct metapage *__get_metapage(struct inode *inode,
 				  unsigned long lblock, unsigned int size,
 				  int absolute, unsigned long new);
 
@@ -79,22 +79,22 @@ extern metapage_t *__get_metapage(struct inode *inode,
 #define get_metapage(inode, lblock, size, absolute)\
 	 __get_metapage(inode, lblock, size, absolute, TRUE)
 
-extern void release_metapage(metapage_t *);
-extern void hold_metapage(metapage_t *, int);
+extern void release_metapage(struct metapage *);
+extern void hold_metapage(struct metapage *, int);
 
-static inline void write_metapage(metapage_t *mp)
+static inline void write_metapage(struct metapage *mp)
 {
 	set_bit(META_dirty, &mp->flag);
 	release_metapage(mp);
 }
 
-static inline void flush_metapage(metapage_t *mp)
+static inline void flush_metapage(struct metapage *mp)
 {
 	set_bit(META_sync, &mp->flag);
 	write_metapage(mp);
 }
 
-static inline void discard_metapage(metapage_t *mp)
+static inline void discard_metapage(struct metapage *mp)
 {
 	clear_bit(META_dirty, &mp->flag);
 	set_bit(META_discard, &mp->flag);

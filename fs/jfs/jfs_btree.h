@@ -25,18 +25,18 @@
  */
 
 /*
- *	basic btree page - btpage_t
- */
-typedef struct {
-	s64 next;		/* 8: right sibling bn */
-	s64 prev;		/* 8: left sibling bn */
+ *	basic btree page - btpage
+ *
+struct btpage {
+	s64 next;		right sibling bn
+	s64 prev;		left sibling bn
 
-	u8 flag;		/* 1: */
-	u8 rsrvd[7];		/* 7: type specific */
-	s64 self;		/* 8: self address */
+	u8 flag;
+	u8 rsrvd[7];		type specific
+	s64 self;		self address
 
-	u8 entry[4064];		/* 4064: */
-} btpage_t;			/* (4096) */
+	u8 entry[4064];
+};						*/
 
 /* btpaget_t flag */
 #define BT_TYPE		0x07	/* B+-tree index */
@@ -68,7 +68,7 @@ typedef struct {
 {\
 	if ((BN) == 0)\
 	{\
-		MP = (metapage_t *)&JFS_IP(IP)->bxflag;\
+		MP = (struct metapage *)&JFS_IP(IP)->bxflag;\
 		P = (TYPE *)&JFS_IP(IP)->ROOT;\
 		RC = 0;\
 		jEVENT(0,("%d BT_GETPAGE returning root\n", __LINE__));\
@@ -112,18 +112,18 @@ typedef struct {
  * top frame record the leaf page/entry selected.
  */
 #define	MAXTREEHEIGHT		8
-typedef struct btframe {	/* stack frame */
+struct btframe {	/* stack frame */
 	s64 bn;			/* 8: */
 	s16 index;		/* 2: */
 	s16 lastindex;		/* 2: */
 	struct metapage *mp;	/* 4: */
-} btframe_t;			/* (16) */
+};				/* (16) */
 
-typedef struct btstack {
-	btframe_t *top;		/* 4: */
-	int nsplit;		/* 4: */
-	btframe_t stack[MAXTREEHEIGHT];
-} btstack_t;
+struct btstack {
+	struct btframe *top;
+	int nsplit;
+	struct btframe stack[MAXTREEHEIGHT];
+};
 
 #define BT_CLR(btstack)\
 	(btstack)->top = (btstack)->stack

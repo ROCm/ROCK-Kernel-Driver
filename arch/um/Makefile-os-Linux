@@ -1,0 +1,7 @@
+# 
+# Copyright (C) 2000 Jeff Dike (jdike@karaya.com)
+# Licensed under the GPL
+#
+
+SUBDIRS += $(ARCH_DIR)/os-$(OS)/drivers
+LIBS += $(ARCH_DIR)/os-$(OS)/drivers/drivers.o

@@ -61,7 +61,7 @@
 
 #define MAX_ACTIVE	128	/* Max active file systems sharing log */
 
-typedef struct {
+struct logsuper {
 	u32 magic;		/* 4: log lv identifier */
 	s32 version;		/* 4: version number */
 	s32 serial;		/* 4: log open/mount counter */
@@ -78,7 +78,7 @@ typedef struct {
 	struct {
 		char uuid[16];
 	} active[MAX_ACTIVE];	/* 2048: active file systems list */
-} logsuper_t;
+};
 
 #define NULL_UUID "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
 
@@ -119,7 +119,7 @@ typedef struct {
  * the two and h.eor and t.eor set to 8 (i.e. empty page). if (only) 
  * h.eor != t.eor they were set to the smaller of their two values.
  */
-typedef struct {
+struct logpage {
 	struct {		/* header */
 		s32 page;	/* 4: log sequence page number */
 		s16 rsrvd;	/* 2: */
@@ -133,7 +133,7 @@ typedef struct {
 		s16 rsrvd;	/* 2: */
 		s16 eor;	/* 2: normally the same as h.eor */
 	} t;
-} logpage_t;
+};
 
 #define LOGPHDRSIZE	8	/* log page header size */
 #define LOGPTLRSIZE	8	/* log page trailer size */
@@ -198,7 +198,7 @@ typedef struct {
 #define	LOG_FREEPXD		0x0001
 
 
-typedef struct lrd {
+struct lrd {
 	/*
 	 * type independent area
 	 */
@@ -349,23 +349,23 @@ typedef struct lrd {
 		 * no type-dependent information
 		 */
 	} log;
-} lrd_t;			/* (36) */
+};					/* (36) */
 
 #define	LOGRDSIZE	(sizeof(struct lrd))
 
 /*
  *	line vector descriptor
  */
-typedef struct {
+struct lvd {
 	s16 offset;
 	s16 length;
-} lvd_t;
+};
 
 
 /*
  *	log logical volume
  */
-typedef struct jfs_log {
+struct jfs_log {
 
 	struct super_block *sb;	/* 4: This is used to sync metadata
 				 *    before writing syncpt.  Will
@@ -416,7 +416,7 @@ typedef struct jfs_log {
 	struct lbuf *wqueue;	/* 4: log pageout queue */
 	int count;		/* 4: count */
 	char uuid[16];		/* 16: 128-bit uuid of log device */
-} log_t;
+};
 
 /*
  * Log flag
@@ -428,10 +428,10 @@ typedef struct jfs_log {
 /*
  * group commit flag
  */
-/* log_t */
+/* jfs_log */
 #define logGC_PAGEOUT	0x00000001
 
-/* tblock_t/lbuf_t */
+/* tblock/lbuf */
 #define tblkGC_QUEUE		0x0001
 #define tblkGC_READY		0x0002
 #define tblkGC_COMMIT		0x0004
@@ -446,8 +446,8 @@ typedef struct jfs_log {
 /*
  *		log cache buffer header
  */
-typedef struct lbuf {
-	log_t *l_log;		/* 4: log associated with buffer */
+struct lbuf {
+	struct jfs_log *l_log;	/* 4: log associated with buffer */
 
 	/*
 	 * data buffer base area
@@ -466,7 +466,7 @@ typedef struct lbuf {
 
 	wait_queue_head_t l_ioevent;	/* 4: i/o done event */
 	struct page *l_page;	/* The page itself */
-} lbuf_t;
+};
 
 /* Reuse l_freelist for redrive list */
 #define l_redrive_next l_freelist
@@ -474,15 +474,15 @@ typedef struct lbuf {
 /*
  *	logsynclist block
  *
- * common logsyncblk prefix for jbuf_t and tblock_t
+ * common logsyncblk prefix for jbuf_t and tblock
  */
-typedef struct logsyncblk {
+struct logsyncblk {
 	u16 xflag;		/* flags */
-	u16 flag;		/* only meaninful in tblock_t */
+	u16 flag;		/* only meaninful in tblock */
 	lid_t lid;		/* lock id */
 	s32 lsn;		/* log sequence number */
 	struct list_head synclist;	/* log sync list link */
-} logsyncblk_t;
+};
 
 /*
  *	logsynclist serialization (per log)
@@ -500,12 +500,12 @@ typedef struct logsyncblk {
 		diff += (log)->logsize;\
 }
 
-extern int lmLogOpen(struct super_block *sb, log_t ** log);
-extern void lmLogWait(log_t * log);
-extern int lmLogClose(struct super_block *sb, log_t * log);
-extern int lmLogSync(log_t * log, int nosyncwait);
-extern int lmLogShutdown(log_t * log);
-extern int lmLogInit(log_t * log);
-extern int lmLogFormat(log_t *log, s64 logAddress, int logSize);
+extern int lmLogOpen(struct super_block *sb, struct jfs_log ** log);
+extern void lmLogWait(struct jfs_log * log);
+extern int lmLogClose(struct super_block *sb, struct jfs_log * log);
+extern int lmLogSync(struct jfs_log * log, int nosyncwait);
+extern int lmLogShutdown(struct jfs_log * log);
+extern int lmLogInit(struct jfs_log * log);
+extern int lmLogFormat(struct jfs_log *log, s64 logAddress, int logSize);
 
 #endif				/* _H_JFS_LOGMGR */
