@@ -69,7 +69,7 @@ int allocate_compression_buffers(void)
 
 	BUG_ON(ntfs_compression_buffers);
 
-	ntfs_compression_buffers =  (u8**)kmalloc(smp_num_cpus * sizeof(u8 *),
+	ntfs_compression_buffers =  (u8**)kmalloc(smp_num_cpus * sizeof(u8*),
 			GFP_KERNEL);
 	if (!ntfs_compression_buffers)
 		return -ENOMEM;
@@ -81,7 +81,7 @@ int allocate_compression_buffers(void)
 	if (i == smp_num_cpus)
 		return 0;
 	/* Allocation failed, cleanup and return error. */
-	for (j = 0; i < j; j++)
+	for (j = 0; j < i; j++)
 		vfree(ntfs_compression_buffers[j]);
 	kfree(ntfs_compression_buffers);
 	return -ENOMEM;

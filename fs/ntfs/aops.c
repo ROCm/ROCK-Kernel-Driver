@@ -1,4 +1,4 @@
-/*
+/**
  * aops.c - NTFS kernel address space operations and page cache handling.
  * 	    Part of the Linux-NTFS project.
  *
@@ -35,7 +35,9 @@
 #define page_buffers(page)	(page)->buffers
 #endif
 
-/*
+/**
+ * end_buffer_read_file_async -
+ *
  * Async io completion handler for accessing files. Adapted from
  * end_buffer_read_mst_async().
  */
@@ -94,7 +96,11 @@ still_busy:
 	return;
 }
 
-/* NTFS version of block_read_full_page(). Adapted from ntfs_mst_readpage(). */
+/**
+ * ntfs_file_read_block -
+ *
+ * NTFS version of block_read_full_page(). Adapted from ntfs_mst_readpage().
+ */
 static int ntfs_file_read_block(struct page *page)
 {
 	VCN vcn;
@@ -102,7 +108,7 @@ static int ntfs_file_read_block(struct page *page)
 	ntfs_inode *ni;
 	ntfs_volume *vol;
 	struct buffer_head *bh, *head, *arr[MAX_BUF_PER_PAGE];
-	sector_t iblock, lblock;
+	sector_t iblock, lblock, zblock;
 	unsigned int blocksize, blocks, vcn_ofs;
 	int i, nr;
 	unsigned char blocksize_bits;
@@ -113,7 +119,8 @@ static int ntfs_file_read_block(struct page *page)
 	blocksize_bits = VFS_I(ni)->i_blkbits;
 	blocksize = 1 << blocksize_bits;
 
-	create_empty_buffers(page, blocksize);
+	if (!page_has_buffers(page))
+		create_empty_buffers(page, blocksize);
 	bh = head = page_buffers(page);
 	if (!bh)
 		return -ENOMEM;
@@ -121,6 +128,7 @@ static int ntfs_file_read_block(struct page *page)
 	blocks = PAGE_CACHE_SIZE >> blocksize_bits;
 	iblock = page->index << (PAGE_CACHE_SHIFT - blocksize_bits);
 	lblock = (ni->allocated_size + blocksize - 1) >> blocksize_bits;
+	zblock = (ni->initialized_size + blocksize - 1) >> blocksize_bits;
 
 #ifdef DEBUG
 	if (unlikely(!ni->mft_no)) {
@@ -133,7 +141,12 @@ static int ntfs_file_read_block(struct page *page)
 	/* Loop through all the buffers in the page. */
 	nr = i = 0;
 	do {
-		BUG_ON(buffer_mapped(bh) || buffer_uptodate(bh));
+		if (unlikely(buffer_uptodate(bh)))
+			continue;
+		if (unlikely(buffer_mapped(bh))) {
+			arr[nr++] = bh;
+			continue;
+		}
 		bh->b_dev = VFS_I(ni)->i_dev;
 		/* Is the block within the allowed limits? */
 		if (iblock < lblock) {
@@ -155,8 +168,13 @@ retry_remap:
 				bh->b_blocknr = ((lcn << vol->cluster_size_bits)
 						+ vcn_ofs) >> blocksize_bits;
 				bh->b_state |= (1UL << BH_Mapped);
-				arr[nr++] = bh;
-				continue;
+				/* Only read initialized data blocks. */
+				if (iblock < zblock) {
+					arr[nr++] = bh;
+					continue;
+				}
+				/* Fully non-initialized data block, zero it. */
+				goto handle_zblock;
 			}
 			/* It is a hole, need to zero it. */
 			if (lcn == LCN_HOLE)
@@ -183,6 +201,7 @@ retry_remap:
 handle_hole:
 		bh->b_blocknr = -1UL;
 		bh->b_state &= ~(1UL << BH_Mapped);
+handle_zblock:
 		memset(kmap(page) + i * blocksize, 0, blocksize);
 		flush_dcache_page(page);
 		kunmap(page);
@@ -301,6 +320,7 @@ static int ntfs_file_readpage(struct file *file, struct page *page)
 				bytes);
 	} else
 		memset(addr, 0, PAGE_CACHE_SIZE);
+	flush_dcache_page(page);
 	kunmap(page);
 
 	SetPageUptodate(page);
@@ -313,7 +333,9 @@ unl_err_out:
 	return err;
 }
 
-/*
+/**
+ * end_buffer_read_mftbmp_async -
+ *
  * Async io completion handler for accessing mft bitmap. Adapted from
  * end_buffer_read_mst_async().
  */
@@ -373,13 +395,17 @@ still_busy:
 	return;
 }
 
-/* Readpage for accessing mft bitmap. Adapted from ntfs_mst_readpage(). */
+/**
+ * ntfs_mftbmp_readpage -
+ *
+ * Readpage for accessing mft bitmap. Adapted from ntfs_mst_readpage().
+ */
 static int ntfs_mftbmp_readpage(ntfs_volume *vol, struct page *page)
 {
 	VCN vcn;
 	LCN lcn;
 	struct buffer_head *bh, *head, *arr[MAX_BUF_PER_PAGE];
-	sector_t iblock, lblock;
+	sector_t iblock, lblock, zblock;
 	unsigned int blocksize, blocks, vcn_ofs;
 	int nr, i;
 	unsigned char blocksize_bits;
@@ -389,20 +415,28 @@ static int ntfs_mftbmp_readpage(ntfs_volume *vol, struct page *page)
 
 	blocksize = vol->sb->s_blocksize;
 	blocksize_bits = vol->sb->s_blocksize_bits;
-	
-	create_empty_buffers(page, blocksize);
+
+	if (!page_has_buffers(page))
+		create_empty_buffers(page, blocksize);
 	bh = head = page_buffers(page);
 	if (!bh)
 		return -ENOMEM;
-	
+
 	blocks = PAGE_CACHE_SIZE >> blocksize_bits;
 	iblock = page->index << (PAGE_CACHE_SHIFT - blocksize_bits);
 	lblock = (vol->mftbmp_allocated_size + blocksize - 1) >> blocksize_bits;
-	
+	zblock = (vol->mftbmp_initialized_size + blocksize - 1) >>
+			blocksize_bits;
+
 	/* Loop through all the buffers in the page. */
 	nr = i = 0;
 	do {
-		BUG_ON(buffer_mapped(bh) || buffer_uptodate(bh));
+		if (unlikely(buffer_uptodate(bh)))
+			continue;
+		if (unlikely(buffer_mapped(bh))) {
+			arr[nr++] = bh;
+			continue;
+		}
 		bh->b_dev = vol->mft_ino->i_dev;
 		/* Is the block within the allowed limits? */
 		if (iblock < lblock) {
@@ -421,8 +455,13 @@ static int ntfs_mftbmp_readpage(ntfs_volume *vol, struct page *page)
 				bh->b_blocknr = ((lcn << vol->cluster_size_bits)
 						+ vcn_ofs) >> blocksize_bits;
 				bh->b_state |= (1UL << BH_Mapped);
-				arr[nr++] = bh;
-				continue;
+				/* Only read initialized data blocks. */
+				if (iblock < zblock) {
+					arr[nr++] = bh;
+					continue;
+				}
+				/* Fully non-initialized data block, zero it. */
+				goto handle_zblock;
 			}
 			if (lcn != LCN_HOLE) {
 				/* Hard error, zero out region. */
@@ -442,6 +481,7 @@ static int ntfs_mftbmp_readpage(ntfs_volume *vol, struct page *page)
 		 */
 		bh->b_blocknr = -1UL;
 		bh->b_state &= ~(1UL << BH_Mapped);
+handle_zblock:
 		memset(kmap(page) + i * blocksize, 0, blocksize);
 		flush_dcache_page(page);
 		kunmap(page);
@@ -593,15 +633,6 @@ still_busy:
  * the page before finally marking it uptodate and unlocking it.
  *
  * Contains an adapted version of fs/buffer.c::block_read_full_page().
- *
- * TODO:/FIXME: The current implementation is simple but wasteful as we perform
- * actual i/o from disk for all data up to allocated size completely ignoring
- * the fact that initialized size, and data size for that matter, may well be
- * lower and hence there is no point in reading them in. We can just zero the
- * page range, which is what is currently done in our async i/o completion
- * handler anyway, once the read from disk completes. However, I am not sure how
- * to setup the buffer heads in that case, so for now we do the pointless i/o.
- * Any help with this would be appreciated...
  */
 int ntfs_mst_readpage(struct file *dir, struct page *page)
 {
@@ -610,7 +641,7 @@ int ntfs_mst_readpage(struct file *dir, struct page *page)
 	ntfs_inode *ni;
 	ntfs_volume *vol;
 	struct buffer_head *bh, *head, *arr[MAX_BUF_PER_PAGE];
-	sector_t iblock, lblock;
+	sector_t iblock, lblock, zblock;
 	unsigned int blocksize, blocks, vcn_ofs;
 	int i, nr;
 	unsigned char blocksize_bits;
@@ -624,7 +655,8 @@ int ntfs_mst_readpage(struct file *dir, struct page *page)
 	blocksize_bits = VFS_I(ni)->i_blkbits;
 	blocksize = 1 << blocksize_bits;
 
-	create_empty_buffers(page, blocksize);
+	if (!page_has_buffers(page))
+		create_empty_buffers(page, blocksize);
 	bh = head = page_buffers(page);
 	if (!bh)
 		return -ENOMEM;
@@ -632,6 +664,7 @@ int ntfs_mst_readpage(struct file *dir, struct page *page)
 	blocks = PAGE_CACHE_SIZE >> blocksize_bits;
 	iblock = page->index << (PAGE_CACHE_SHIFT - blocksize_bits);
 	lblock = (ni->allocated_size + blocksize - 1) >> blocksize_bits;
+	zblock = (ni->initialized_size + blocksize - 1) >> blocksize_bits;
 
 #ifdef DEBUG
 	if (unlikely(!ni->run_list.rl && !ni->mft_no))
@@ -642,7 +675,12 @@ int ntfs_mst_readpage(struct file *dir, struct page *page)
 	/* Loop through all the buffers in the page. */
 	nr = i = 0;
 	do {
-		BUG_ON(buffer_mapped(bh) || buffer_uptodate(bh));
+		if (unlikely(buffer_uptodate(bh)))
+			continue;
+		if (unlikely(buffer_mapped(bh))) {
+			arr[nr++] = bh;
+			continue;
+		}
 		bh->b_dev = VFS_I(ni)->i_dev;
 		/* Is the block within the allowed limits? */
 		if (iblock < lblock) {
@@ -664,8 +702,13 @@ retry_remap:
 				bh->b_blocknr = ((lcn << vol->cluster_size_bits)
 						+ vcn_ofs) >> blocksize_bits;
 				bh->b_state |= (1UL << BH_Mapped);
-				arr[nr++] = bh;
-				continue;
+				/* Only read initialized data blocks. */
+				if (iblock < zblock) {
+					arr[nr++] = bh;
+					continue;
+				}
+				/* Fully non-initialized data block, zero it. */
+				goto handle_zblock;
 			}
 			/* It is a hole, need to zero it. */
 			if (lcn == LCN_HOLE)
@@ -692,6 +735,7 @@ retry_remap:
 handle_hole:
 		bh->b_blocknr = -1UL;
 		bh->b_state &= ~(1UL << BH_Mapped);
+handle_zblock:
 		memset(kmap(page) + i * blocksize, 0, blocksize);
 		flush_dcache_page(page);
 		kunmap(page);
@@ -721,7 +765,9 @@ handle_hole:
 	return nr;
 }
 
-/* Address space operations for accessing normal file data. */
+/**
+ * ntfs_file_aops - address space operations for accessing normal file data
+ */
 struct address_space_operations ntfs_file_aops = {
 	writepage:	NULL,			/* Write dirty page to disk. */
 	readpage:	ntfs_file_readpage,	/* Fill page with data. */
@@ -733,7 +779,9 @@ struct address_space_operations ntfs_file_aops = {
 
 typedef int readpage_t(struct file *, struct page *);
 
-/* Address space operations for accessing mftbmp. */
+/**
+ * ntfs_mftbmp_aops - address space operations for accessing mftbmp
+ */
 struct address_space_operations ntfs_mftbmp_aops = {
 	writepage:	NULL,			/* Write dirty page to disk. */
 	readpage:	(readpage_t*)ntfs_mftbmp_readpage, /* Fill page with
@@ -744,7 +792,9 @@ struct address_space_operations ntfs_mftbmp_aops = {
 	commit_write:	NULL,			/* . */
 };
 
-/*
+/**
+ * ntfs_dir_aops -
+ *
  * Address space operations for accessing normal directory data (i.e. index
  * allocation attribute). We can't just use the same operations as for files
  * because 1) the attribute is different and even more importantly 2) the index

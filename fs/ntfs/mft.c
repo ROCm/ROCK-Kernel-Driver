@@ -70,44 +70,6 @@ static void __format_mft_record(MFT_RECORD *m, const int size,
 }
 
 /**
- * format_mft_record2 - initialize an empty mft record
- * @vfs_sb:	vfs super block of volume
- * @inum:	mft record number / inode number to format
- * @mft_rec:	mapped, pinned and locked mft record (optional)
- *
- * Initialize an empty mft record. This is used when extending the MFT.
- *
- * If @mft_rec is NULL, we call map_mft_record() to obtain the record and we
- * unmap it again when finished.
- *
- * We return 0 on success or -errno on error.
- */
-#if 0
-// Can't do this as iget_map_mft_record no longer exists...
-int format_mft_record2(struct super_block *vfs_sb, const unsigned long inum,
-		MFT_RECORD *mft_rec)
-{
-	MFT_RECORD *m;
-	ntfs_inode *ni;
-
-	if (mft_rec)
-		m = mft_rec;
-	else {
-		m = iget_map_mft_record(WRITE, vfs_sb, inum, &ni);
-		if (IS_ERR(m))
-			return PTR_ERR(m);
-	}
-	__format_mft_record(m, NTFS_SB(vfs_sb)->mft_record_size, inum);
-	if (!mft_rec) {
-		// TODO: dirty mft record
-		unmap_mft_record(WRITE, ni);
-		// TODO: Do stuff to get rid of the ntfs_inode
-	}
-	return 0;
-}
-#endif
-
-/**
  * format_mft_record - initialize an empty mft record
  * @ni:		ntfs inode of mft record
  * @mft_rec:	mapped, pinned and locked mft record (optional)
@@ -339,71 +301,6 @@ MFT_RECORD *map_mft_record(const int rw, ntfs_inode *ni)
 	atomic_dec(&ni->count);
 	return m;
 }
-
-/**
- * iget_map_mft_record - iget, map, pin, lock an mft record
- * @rw:		map for read (rw = READ) or write (rw = WRITE)
- * @vfs_sb:	vfs super block of mounted volume
- * @inum:	inode number / MFT record number whose mft record to map
- * @vfs_ino:	output parameter which we set to the inode on successful return
- *
- * Does the same as map_mft_record(), except that it starts out only with the
- * knowledge of the super block (@vfs_sb) and the mft record number which is of
- * course the same as the inode number (@inum).
- *
- * On success, *@vfs_ino will contain a pointer to the inode structure of the
- * mft record on return. On error return, *@vfs_ino is undefined.
- *
- * See map_mft_record() description for details and for a description of how
- * errors are returned and what error codes are defined.
- *
- * IMPROTANT: The caller is responsible for calling iput(@vfs_ino) when
- * finished with the inode, i.e. after unmap_mft_record() has been called. If
- * that is omitted you will get busy inodes upon umount...
- */
-#if 0
-// this is no longer possible. iget() cannot be called as we may be loading
-// an ntfs inode which will never have a corresponding vfs inode counter part.
-// this is not going to be pretty. )-:
-// we need our own hash for ntfs inodes now, ugh. )-:
-// not having vfs inodes associated with all ntfs inodes is a bad mistake I am
-// getting the impression. this will in the end turn out uglier than just
-// having iget_no_wait().
-// my only hope is that we can get away without this functionality in the driver
-// altogether. we are ok for extent inodes already because we only handle them
-// via map_extent_mft_record().
-// if we really need it, we could have a list or hash of "pure ntfs inodes"
-// to cope with this situation, so the lookup would be:
-// look for the inode and if not present look for pure ntfs inode and if not
-// present add a new pure ntfs inode. under this scheme extent inodes have to
-// also be added to the list/hash of pure inodes.
-MFT_RECORD *iget_map_mft_record(const int rw, struct super_block *vfs_sb,
-		const unsigned long inum, struct inode **vfs_ino)
-{
-	struct inode *inode;
-	MFT_RECORD *mrec;
-
-	/*
-	 * The corresponding iput() happens when clear_inode() is called on the
-	 * base mft record of this extent mft record.
-	 * When used on base mft records, caller has to perform the iput().
-	 */
-	inode = iget(vfs_sb, inum);
-	if (inode && !is_bad_inode(inode)) {
-		mrec = map_mft_record(rw, inode);
-		if (!IS_ERR(mrec)) {
-			ntfs_debug("Success for i_ino 0x%lx.", inum);
-			*vfs_ino = inode;
-			return mrec;
-		}
-	} else
-		mrec = ERR_PTR(-EIO);
-	if (inode)
-		iput(inode);
-	ntfs_debug("Failed for i_ino 0x%lx.", inum);
-	return mrec;
-}
-#endif
 
 /**
  * unmap_mft_record - release a mapped mft record

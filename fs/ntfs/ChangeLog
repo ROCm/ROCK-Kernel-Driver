@@ -27,6 +27,25 @@ ToDo:
 	  quite big. Modularising them a bit, e.g. a-la get_block(), will make
 	  them cleaner and make code reuse easier.
 
+2.0.3 - Small bug fixes, cleanups, and performance improvements.
+
+	- Remove some dead code from mft.c.
+	- Optimize readpage and read_block functions throughout aops.c so that
+	  only initialized blocks are read. Non-initialized ones have their
+	  buffer head mapped, zeroed, and set up to date, without scheduling
+	  any i/o. Thanks to Al Viro for advice on how to avoid the device i/o.
+	Thanks go to Andrew Morton for spotting the below:
+	- Fix buglet in allocate_compression_buffers() error code path.
+	- Call flush_dcache_page() after modifying page cache page contents in
+	  ntfs_file_readpage().
+	- Check for existence of page buffers throughout aops.c before calling
+	  create_empty_buffers(). This happens when an I/O error occurs and the
+	  read is retried. (It also happens once writing is implemented so that
+	  needed doing anyway but I had left it for later...)
+	- Don't BUG_ON() uptodate and/or mapped buffers throughout aops.c in
+	  readpage and read_block functions. Reasoning same as above (i.e. I/O
+	  error retries and future write code paths.)
+
 2.0.2 - Minor updates and cleanups.
 
 	- Cleanup: rename mst.c::__post_read_mst_fixup to post_write_mst_fixup

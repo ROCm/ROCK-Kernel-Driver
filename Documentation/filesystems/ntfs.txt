@@ -168,6 +168,8 @@ ChangeLog
 
 Note that a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
 
+2.0.3:
+	- Small bug fixes, cleanups, and performance improvements.
 2.0.2:
 	- Use default fmask of 0177 so that files are no executable by default.
 	  If you want owner executable files, just use fmask=0077.
@@ -177,7 +179,6 @@ Note that a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
 2.0.1:
 	- Minor updates, primarily set the executable bit by default on files
 	  so they can be executed.
-
 2.0.0:
 	- Started ChangeLog.
 
