@@ -1,7 +1,7 @@
 /*
  *	vmlinux.lds.S -- master linker script for m68knommu arch
  *
- *	(C) Copyright 2002, Greg Ungerer <gerg@snapgear.com>
+ *	(C) Copyright 2002-2003, Greg Ungerer <gerg@snapgear.com>
  *
  *	This ends up looking compilcated, because of the number of
  *	address variations for ram and rom/flash layouts. The real
@@ -226,7 +226,32 @@ SECTIONS {
 		*(__ex_table)
 		__stop___ex_table = .;
 
-		RODATA
+		*(.rodata) *(.rodata.*)
+		*(__vermagic)		/* Kernel version magic */
+		*(.rodata1)
+
+		/* Kernel symbol table: Normal symbols */
+		__start___ksymtab = .;
+		*(__ksymtab)
+		__stop___ksymtab = .;
+
+		/* Kernel symbol table: GPL-only symbols */
+		__start___ksymtab_gpl = .;
+		*(__ksymtab_gpl)
+		__stop___ksymtab_gpl = .;
+
+		/* Kernel symbol table: Normal symbols */
+		__start___kcrctab = .;
+		*(__kcrctab)
+		__stop___kcrctab = .;
+
+		/* Kernel symbol table: GPL-only symbols */
+		__start___kcrctab_gpl = .;
+		*(__kcrctab_gpl)
+		__stop___kcrctab_gpl = .;
+
+		/* Kernel symbol table: strings */
+		*(__ksymtab_strings)
 
 		. = ALIGN(4) ;
 		_etext = . ;
