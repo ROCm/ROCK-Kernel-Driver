@@ -235,7 +235,7 @@ static __inline__ void __tcp_v6_hash(struct sock *sk)
 static void tcp_v6_hash(struct sock *sk)
 {
 	if (sk->sk_state != TCP_CLOSE) {
-		struct tcp_opt *tp = tcp_sk(sk);
+		struct tcp_sock *tp = tcp_sk(sk);
 
 		if (tp->af_specific == &ipv6_mapped) {
 			tcp_prot.hash(sk);
@@ -391,7 +391,7 @@ static u32 tcp_v6_synq_hash(struct in6_addr *raddr, u16 rport, u32 rnd)
 	return c & (TCP_SYNQ_HSIZE - 1);
 }
 
-static struct open_request *tcp_v6_search_req(struct tcp_opt *tp,
+static struct open_request *tcp_v6_search_req(struct tcp_sock *tp,
 					      struct open_request ***prevp,
 					      __u16 rport,
 					      struct in6_addr *raddr,
@@ -466,7 +466,7 @@ static int tcp_v6_check_established(struct sock *sk)
 		   ipv6_addr_equal(&tw->tw_v6_daddr, saddr)	&&
 		   ipv6_addr_equal(&tw->tw_v6_rcv_saddr, daddr)	&&
 		   sk2->sk_bound_dev_if == sk->sk_bound_dev_if) {
-			struct tcp_opt *tp = tcp_sk(sk);
+			struct tcp_sock *tp = tcp_sk(sk);
 
 			if (tw->tw_ts_recent_stamp) {
 				/* See comment in tcp_ipv4.c */
@@ -551,7 +551,7 @@ static int tcp_v6_connect(struct sock *sk, struct sockaddr *uaddr,
 	struct sockaddr_in6 *usin = (struct sockaddr_in6 *) uaddr;
 	struct inet_sock *inet = inet_sk(sk);
 	struct ipv6_pinfo *np = inet6_sk(sk);
-	struct tcp_opt *tp = tcp_sk(sk);
+	struct tcp_sock *tp = tcp_sk(sk);
 	struct in6_addr *saddr = NULL, *final_p = NULL, final;
 	struct flowi fl;
 	struct dst_entry *dst;
@@ -741,7 +741,7 @@ static void tcp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 	struct ipv6_pinfo *np;
 	struct sock *sk;
 	int err;
-	struct tcp_opt *tp; 
+	struct tcp_sock *tp; 
 	__u32 seq;
 
 	sk = tcp_v6_lookup(&hdr->daddr, th->dest, &hdr->saddr, th->source, skb->dev->ifindex);
@@ -1146,7 +1146,7 @@ static struct sock *tcp_v6_hnd_req(struct sock *sk,struct sk_buff *skb)
 {
 	struct open_request *req, **prev;
 	struct tcphdr *th = skb->h.th;
-	struct tcp_opt *tp = tcp_sk(sk);
+	struct tcp_sock *tp = tcp_sk(sk);
 	struct sock *nsk;
 
 	/* Find possible connection requests. */
@@ -1179,7 +1179,7 @@ static struct sock *tcp_v6_hnd_req(struct sock *sk,struct sk_buff *skb)
 
 static void tcp_v6_synq_add(struct sock *sk, struct open_request *req)
 {
-	struct tcp_opt *tp = tcp_sk(sk);
+	struct tcp_sock *tp = tcp_sk(sk);
 	struct tcp_listen_opt *lopt = tp->listen_opt;
 	u32 h = tcp_v6_synq_hash(&req->af.v6_req.rmt_addr, req->rmt_port, lopt->hash_rnd);
 
@@ -1202,7 +1202,7 @@ static void tcp_v6_synq_add(struct sock *sk, struct open_request *req)
 static int tcp_v6_conn_request(struct sock *sk, struct sk_buff *skb)
 {
 	struct ipv6_pinfo *np = inet6_sk(sk);
-	struct tcp_opt tmptp, *tp = tcp_sk(sk);
+	struct tcp_sock tmptp, *tp = tcp_sk(sk);
 	struct open_request *req = NULL;
 	__u32 isn = TCP_SKB_CB(skb)->when;
 
@@ -1282,7 +1282,7 @@ static struct sock * tcp_v6_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 	struct ipv6_pinfo *newnp, *np = inet6_sk(sk);
 	struct tcp6_sock *newtcp6sk;
 	struct inet_sock *newinet;
-	struct tcp_opt *newtp;
+	struct tcp_sock *newtp;
 	struct sock *newsk;
 	struct ipv6_txoptions *opt;
 
@@ -1297,7 +1297,7 @@ static struct sock * tcp_v6_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 			return NULL;
 
 		newtcp6sk = (struct tcp6_sock *)newsk;
-		newtcp6sk->inet.pinet6 = &newtcp6sk->inet6;
+		inet_sk(newsk)->pinet6 = &newtcp6sk->inet6;
 
 		newinet = inet_sk(newsk);
 		newnp = inet6_sk(newsk);
@@ -1390,7 +1390,7 @@ static struct sock * tcp_v6_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 		~(NETIF_F_IP_CSUM | NETIF_F_TSO);
 
 	newtcp6sk = (struct tcp6_sock *)newsk;
-	newtcp6sk->inet.pinet6 = &newtcp6sk->inet6;
+	inet_sk(newsk)->pinet6 = &newtcp6sk->inet6;
 
 	newtp = tcp_sk(newsk);
 	newinet = inet_sk(newsk);
@@ -1497,7 +1497,7 @@ static int tcp_v6_checksum_init(struct sk_buff *skb)
 static int tcp_v6_do_rcv(struct sock *sk, struct sk_buff *skb)
 {
 	struct ipv6_pinfo *np = inet6_sk(sk);
-	struct tcp_opt *tp;
+	struct tcp_sock *tp;
 	struct sk_buff *opt_skb = NULL;
 
 	/* Imagine: socket is IPv6. IPv4 packet arrives,
@@ -1919,7 +1919,7 @@ static struct tcp_func ipv6_mapped = {
  */
 static int tcp_v6_init_sock(struct sock *sk)
 {
-	struct tcp_opt *tp = tcp_sk(sk);
+	struct tcp_sock *tp = tcp_sk(sk);
 
 	skb_queue_head_init(&tp->out_of_order_queue);
 	tcp_init_xmit_timers(sk);
@@ -2007,7 +2007,7 @@ static void get_tcp6_sock(struct seq_file *seq, struct sock *sp, int i)
 	int timer_active;
 	unsigned long timer_expires;
 	struct inet_sock *inet = inet_sk(sp);
-	struct tcp_opt *tp = tcp_sk(sp);
+	struct tcp_sock *tp = tcp_sk(sp);
 	struct ipv6_pinfo *np = inet6_sk(sp);
 
 	dest  = &np->daddr;
