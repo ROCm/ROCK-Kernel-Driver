@@ -9,7 +9,6 @@
  */
 
 #include <linux/config.h>
-#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/kmod.h>
 #include <linux/bootmem.h>
@@ -24,14 +23,6 @@
 #include "sclp.h"
 
 #define SCLP_CORE_PRINT_HEADER "sclp low level driver: "
-
-/*
- * decides whether we make use of the macro MACHINE_IS_VM to
- * configure the driver for VM at run time (a little bit
- * different behaviour); otherwise we use the default
- * settings in sclp_data.init_ioctls
- */
-#define USE_VM_DETECTION
 
 /* Structure for register_early_external_interrupt. */
 static ext_int_info_t ext_int_info_hwc;
@@ -111,30 +102,32 @@ __service_call(sclp_cmdw_t command, void *sccb)
 }
 
 static int
-__sclp_start_request(void)
+sclp_start_request(void)
 {
 	struct sclp_req *req;
 	int rc;
+	unsigned long flags;
 
 	/* quick exit if sclp is already in use */
 	if (test_bit(SCLP_RUNNING, &sclp_status))
 		return -EBUSY;
-	/* quick exit if queue is empty */
-	if (list_empty(&sclp_req_queue))
-		return -EINVAL;
-	/* try to start the first request on the request queue. */
-	req = list_entry(sclp_req_queue.next, struct sclp_req, list);
-	rc = __service_call(req->command, req->sccb);
-	switch (rc) {
-	case 0:
-		req->status = SCLP_REQ_RUNNING;
-		break;
-	case -EIO:
-		req->status = SCLP_REQ_FAILED;
-		if (req->callback != NULL)
-			req->callback(req, req->callback_data);
-		break;
-	}
+	spin_lock_irqsave(&sclp_lock, flags);
+	/* Get first request on queue if available */
+	req = NULL;
+	if (!list_empty(&sclp_req_queue))
+		req = list_entry(sclp_req_queue.next, struct sclp_req, list);
+	if (req) {
+		rc = __service_call(req->command, req->sccb);
+		if (rc) {
+			req->status = SCLP_REQ_FAILED;
+			list_del(&req->list);
+		} else
+			req->status = SCLP_REQ_RUNNING;
+	} else
+		rc = -EINVAL;
+	spin_unlock_irqrestore(&sclp_lock, flags);
+	if (rc == -EIO && req->callback != NULL)
+		req->callback(req, req->callback_data);
 	return rc;
 }
 
@@ -156,8 +149,12 @@ sclp_process_evbufs(struct sccb_header *sccb)
 		list_for_each(l, &sclp_reg_list) {
 			t = list_entry(l, struct sclp_register, list);
 			if (t->receive_mask & (1 << (32 - evbuf->type))) {
-				if (t->receiver_fn != NULL)
+				if (t->receiver_fn != NULL) {
+					spin_unlock_irqrestore(&sclp_lock,
+							       flags);
 					t->receiver_fn(evbuf);
+					spin_lock_irqsave(&sclp_lock, flags);
+				}
 				break;
 			}
 			else
@@ -230,7 +227,7 @@ sclp_unconditional_read_cb(struct sclp_req *read_req, void *data)
 }
 
 /*
- * Function to issue Read Event Data/Unconditional Read
+ * Function to queue Read Event Data/Unconditional Read
  */
 static void
 __sclp_unconditional_read(void)
@@ -278,45 +275,44 @@ sclp_interrupt_handler(struct pt_regs *regs, __u16 code)
 	struct list_head *l;
 	struct sclp_req *req, *tmp;
 
+	/*
+	 * Only process interrupt if sclp is initialized.
+	 * This avoids strange effects for a pending request
+	 * from before the last re-ipl.
+	 */
+	if (!test_bit(SCLP_INIT, &sclp_status))
+		return;
 	ext_int_param = S390_lowcore.ext_params;
 	finished_sccb = ext_int_param & EXT_INT_SCCB_MASK;
 	evbuf_pending = ext_int_param & (EXT_INT_EVBUF_PENDING |
 					 EXT_INT_STATECHANGE_PENDING);
 	irq_enter();
-	/*
-	 * Only do request callbacks if sclp is initialized.
-	 * This avoids strange effects for a pending request
-	 * from before the last re-ipl.
-	 */
-	if (test_bit(SCLP_INIT, &sclp_status)) {
-		spin_lock(&sclp_lock);
-		req = NULL;
-		if (finished_sccb != 0U) {
-			list_for_each(l, &sclp_req_queue) {
-				tmp = list_entry(l, struct sclp_req, list);
-				if (finished_sccb == (u32)(addr_t) tmp->sccb) {
-					list_del(&tmp->list);
-					req = tmp;
-					break;
-				}
+	req = NULL;
+	spin_lock(&sclp_lock);
+	if (finished_sccb != 0U) {
+		list_for_each(l, &sclp_req_queue) {
+			tmp = list_entry(l, struct sclp_req, list);
+			if (finished_sccb == (u32)(addr_t) tmp->sccb) {
+				list_del(&tmp->list);
+				req = tmp;
+				break;
 			}
 		}
-		spin_unlock(&sclp_lock);
-		if (req != NULL) {
-			req->status = SCLP_REQ_DONE;
-			if (req->callback != NULL)
-				req->callback(req, req->callback_data);
-		}
 	}
-	spin_lock(&sclp_lock);
 	/* Head queue a read sccb if an event buffer is pending */
 	if (evbuf_pending)
 		__sclp_unconditional_read();
+	spin_unlock(&sclp_lock);
+	/* Perform callback */
+	if (req != NULL) {
+		req->status = SCLP_REQ_DONE;
+		if (req->callback != NULL)
+			req->callback(req, req->callback_data);
+	}
 	/* Now clear the running bit */
 	clear_bit(SCLP_RUNNING, &sclp_status);
 	/* and start next request on the queue */
-	__sclp_start_request();
-	spin_unlock(&sclp_lock);
+	sclp_start_request();
 	irq_exit();
 }
 
@@ -368,15 +364,19 @@ sclp_add_request(struct sclp_req *req)
 {
 	unsigned long flags;
 
-	if (!test_bit(SCLP_INIT, &sclp_status))
+	if (!test_bit(SCLP_INIT, &sclp_status)) {
+		req->status = SCLP_REQ_FAILED;
+		if (req->callback != NULL)
+			req->callback(req, req->callback_data);
 		return;
+	}
 	spin_lock_irqsave(&sclp_lock, flags);
 	/* queue the request */
 	req->status = SCLP_REQ_QUEUED;
 	list_add_tail(&req->list, &sclp_req_queue);
-	/* try to start the first request on the queue */
-	__sclp_start_request();
 	spin_unlock_irqrestore(&sclp_lock, flags);
+	/* try to start the first request on the queue */
+	sclp_start_request();
 }
 
 /* state change notification */
@@ -566,10 +566,9 @@ sclp_init_mask(void)
 	if (test_bit(SCLP_INIT, &sclp_status)) {
 		/* add request to sclp queue */
 		list_add_tail(&req->list, &sclp_req_queue);
-		/* and start if SCLP is idle */
-		if (!test_bit(SCLP_RUNNING, &sclp_status))
-			__sclp_start_request();
 		spin_unlock_irqrestore(&sclp_lock, flags);
+		/* and start if SCLP is idle */
+		sclp_start_request();
 		/* now wait for completion */
 		while (req->status != SCLP_REQ_DONE &&
 		       req->status != SCLP_REQ_FAILED)
@@ -730,7 +729,41 @@ sclp_unregister(struct sclp_register *reg)
 	sclp_init_mask();
 }
 
+#define	SCLP_EVBUF_PROCESSED	0x80
+
+/*
+ * Traverse array of event buffers contained in SCCB and remove all buffers
+ * with a set "processed" flag. Return the number of unprocessed buffers.
+ */
+int
+sclp_remove_processed(struct sccb_header *sccb)
+{
+	struct evbuf_header *evbuf;
+	int unprocessed;
+	u16 remaining;
+
+	evbuf = (struct evbuf_header *) (sccb + 1);
+	unprocessed = 0;
+	remaining = sccb->length - sizeof(struct sccb_header);
+	while (remaining > 0) {
+		remaining -= evbuf->length;
+		if (evbuf->flags & SCLP_EVBUF_PROCESSED) {
+			sccb->length -= evbuf->length;
+			memcpy((void *) evbuf,
+			       (void *) ((addr_t) evbuf + evbuf->length),
+			       remaining);
+		} else {
+			unprocessed++;
+			evbuf = (struct evbuf_header *)
+					((addr_t) evbuf + evbuf->length);
+		}
+	}
+
+	return unprocessed;
+}
+
 EXPORT_SYMBOL(sclp_add_request);
 EXPORT_SYMBOL(sclp_sync_wait);
 EXPORT_SYMBOL(sclp_register);
 EXPORT_SYMBOL(sclp_unregister);
+EXPORT_SYMBOL(sclp_error_message);

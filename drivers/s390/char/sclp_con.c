@@ -9,7 +9,6 @@
  */
 
 #include <linux/config.h>
-#include <linux/version.h>
 #include <linux/kmod.h>
 #include <linux/console.h>
 #include <linux/init.h>
@@ -24,7 +23,7 @@
 
 #define sclp_console_major 4		/* TTYAUX_MAJOR */
 #define sclp_console_minor 64
-#define sclp_console_name  "console"
+#define sclp_console_name  "ttyS"
 
 /* Lock to guard over changes to global variables */
 static spinlock_t sclp_con_lock;
@@ -193,28 +192,29 @@ static struct console sclp_console =
 	.write = sclp_console_write,
 	.device = sclp_console_device,
 	.unblank = sclp_console_unblank,
-	.flags = CON_PRINTBUFFER
+	.flags = CON_PRINTBUFFER,
+	.index = 0 /* ttyS0 */
 };
 
 /*
  * called by console_init() in drivers/char/tty_io.c at boot-time.
  */
-void __init
+static int __init
 sclp_console_init(void)
 {
 	void *page;
 	int i;
 
 	if (!CONSOLE_IS_SCLP)
-		return;
+		return 0;
 	if (sclp_rw_init() != 0)
-		return;
+		return 0;
 	/* Allocate pages for output buffering */
 	INIT_LIST_HEAD(&sclp_con_pages);
 	for (i = 0; i < MAX_CONSOLE_PAGES; i++) {
 		page = alloc_bootmem_low_pages(PAGE_SIZE);
 		if (page == NULL)
-			return;
+			return 0;
 		list_add_tail((struct list_head *) page, &sclp_con_pages);
 	}
 	INIT_LIST_HEAD(&sclp_con_outqueue);
@@ -236,6 +236,7 @@ sclp_console_init(void)
 
 	/* enable printk-access to this driver */
 	register_console(&sclp_console);
+	return 0;
 }
 
 console_initcall(sclp_console_init);

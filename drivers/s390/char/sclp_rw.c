@@ -9,7 +9,6 @@
  */
 
 #include <linux/config.h>
-#include <linux/version.h>
 #include <linux/kmod.h>
 #include <linux/types.h>
 #include <linux/err.h>
@@ -374,39 +373,6 @@ sclp_rw_init(void)
 	return rc;
 }
 
-#define	SCLP_EVBUF_PROCESSED	0x80
-
-/*
- * Traverse array of event buffers contained in SCCB and remove all buffers
- * with a set "processed" flag. Return the number of unprocessed buffers.
- */
-static int
-sclp_remove_processed(struct sccb_header *sccb)
-{
-	struct evbuf_header *evbuf;
-	int unprocessed;
-	u16 remaining;
-
-	evbuf = (struct evbuf_header *) (sccb + 1);
-	unprocessed = 0;
-	remaining = sccb->length - sizeof(struct sccb_header);
-	while (remaining > 0) {
-		remaining -= evbuf->length;
-		if (evbuf->flags & SCLP_EVBUF_PROCESSED) {
-			sccb->length -= evbuf->length;
-			memcpy((void *) evbuf,
-			       (void *) ((addr_t) evbuf + evbuf->length),
-			       remaining);
-		} else {
-			unprocessed++;
-			evbuf = (struct evbuf_header *)
-					((addr_t) evbuf + evbuf->length);
-		}
-	}
-
-	return unprocessed;
-}
-
 static void
 sclp_buffer_retry(unsigned long data)
 {
@@ -480,10 +446,6 @@ sclp_writedata_callback(struct sclp_req *request, void *data)
 			rc = -ENOMEM;
 		else
 			rc = -EINVAL;
-		printk(KERN_WARNING SCLP_RW_PRINT_HEADER
-		       "sclp_writedata_callback: %s (response code=0x%x).\n",
-		       sclp_error_message(sccb->header.response_code),
-		       sccb->header.response_code);
 		break;
 	}
 	if (buffer->callback != NULL)
@@ -505,8 +467,11 @@ sclp_emit_buffer(struct sclp_buffer *buffer,
 		sclp_finalize_mto(buffer);
 
 	/* Are there messages in the output buffer ? */
-	if (buffer->mto_number == 0)
+	if (buffer->mto_number == 0) {
+		if (callback != NULL)
+			callback(buffer, 0);
 		return;
+	}
 
 	sccb = buffer->sccb;
 	if (sclp_rw_event.sclp_send_mask & EvTyp_Msg_Mask)
@@ -516,7 +481,8 @@ sclp_emit_buffer(struct sclp_buffer *buffer,
 		/* Use write priority message */
 		sccb->msg_buf.header.type = EvTyp_PMsgCmd;
 	else {
-		callback(buffer, -ENOSYS);
+		if (callback != NULL)
+			callback(buffer, -ENOSYS);
 		return;
 	}
 	buffer->request.command = SCLP_CMDW_WRITEDATA;

@@ -151,7 +151,7 @@ static int tty_fasync(int fd, struct file * filp, int on);
 extern int vme_scc_init (void);
 extern int serial167_init(void);
 extern int rs_8xx_init(void);
-extern void hwc_tty_init(void);
+extern void sclp_tty_init(void);
 extern void tty3215_init(void);
 extern void tub3270_init(void);
 extern void rs_360_init(void);

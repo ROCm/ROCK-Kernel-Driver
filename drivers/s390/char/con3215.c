@@ -872,7 +872,7 @@ con3215_consetup(struct console *co, char *options)
  *  The console structure for the 3215 console
  */
 static struct console con3215 = {
-	.name	 = "tty3215",
+	.name	 = "ttyS",
 	.write	 = con3215_write,
 	.device	 = con3215_device,
 	.unblank = con3215_unblank,
@@ -884,7 +884,7 @@ static struct console con3215 = {
  * 3215 console initialization code called from console_init().
  * NOTE: This is called before kmalloc is available.
  */
-static void __init
+static int __init
 con3215_init(void)
 {
 	struct ccw_device *cdev;
@@ -894,7 +894,7 @@ con3215_init(void)
 
 	/* Check if 3215 is to be the console */
 	if (!CONSOLE_IS_3215)
-		return;
+		return -ENODEV;
 
 	/* Set the console mode for VM */
 	if (MACHINE_IS_VM) {
@@ -913,7 +913,7 @@ con3215_init(void)
 
 	cdev = ccw_device_probe_console();
 	if (!cdev)
-		return;
+		return -ENODEV;
 
 	raw3215[0] = raw = (struct raw3215_info *)
 		alloc_bootmem_low(sizeof(struct raw3215_info));
@@ -938,10 +938,12 @@ con3215_init(void)
 		free_bootmem((unsigned long) raw, sizeof(struct raw3215_info));
 		raw3215[0] = NULL;
 		printk("Couldn't find a 3215 console device\n");
-		return;
+		return -ENODEV;
 	}
 	register_console(&con3215);
+	return 0;
 }
+console_initcall(con3215_init);
 #endif
 
 /*
@@ -1122,7 +1124,6 @@ tty3215_unthrottle(struct tty_struct * tty)
 		spin_unlock_irqrestore(raw->lock, flags);
 	}
 }
-console_initcall(con3215_init);
 
 /*
  * Disable writing to a 3215 tty

@@ -9,7 +9,7 @@
  */
 
 #include <linux/config.h>
-#include <linux/version.h>
+#include <linux/module.h>
 #include <linux/kmod.h>
 #include <linux/tty.h>
 #include <linux/tty_driver.h>
@@ -81,9 +81,6 @@ static struct sclp_ioctls sclp_ioctls_init =
 static int
 sclp_tty_open(struct tty_struct *tty, struct file *filp)
 {
-	/* only 1 SCLP terminal supported */
-	if (minor(tty->device) != tty->driver.minor_start)
-		return -ENODEV;
 	sclp_tty = tty;
 	tty->driver_data = NULL;
 	tty->low_latency = 0;
@@ -94,9 +91,6 @@ sclp_tty_open(struct tty_struct *tty, struct file *filp)
 static void
 sclp_tty_close(struct tty_struct *tty, struct file *filp)
 {
-	/* only 1 SCLP terminal supported */
-	if (minor(tty->device) != tty->driver.minor_start)
-		return;
 	if (tty->count > 1)
 		return;
 	sclp_tty = NULL;
@@ -294,8 +288,15 @@ sclp_ttybuf_callback(struct sclp_buffer *buffer, int rc)
 static inline void
 __sclp_ttybuf_emit(struct sclp_buffer *buffer)
 {
+	unsigned long flags;
+	int count;
+
+	spin_lock_irqsave(&sclp_tty_lock, flags);
 	list_add_tail(&buffer->list, &sclp_tty_outqueue);
-	if (sclp_tty_buffer_count++ == 0)
+	count = sclp_tty_buffer_count++;
+	spin_unlock_irqrestore(&sclp_tty_lock, flags);
+
+	if (count == 0)
 		sclp_emit_buffer(buffer, sclp_ttybuf_callback);
 }
 
@@ -307,13 +308,16 @@ static void
 sclp_tty_timeout(unsigned long data)
 {
 	unsigned long flags;
+	struct sclp_buffer *buf;
 
 	spin_lock_irqsave(&sclp_tty_lock, flags);
-	if (sclp_ttybuf != NULL) {
-		__sclp_ttybuf_emit(sclp_ttybuf);
-		sclp_ttybuf = NULL;
-	}
+	buf = sclp_ttybuf;
+	sclp_ttybuf = NULL;
 	spin_unlock_irqrestore(&sclp_tty_lock, flags);
+
+	if (buf != NULL) {
+		__sclp_ttybuf_emit(buf);
+	}
 }
 
 /*
@@ -325,6 +329,7 @@ sclp_tty_write_string(const unsigned char *str, int count, int from_user)
 	unsigned long flags;
 	void *page;
 	int written;
+	struct sclp_buffer *buf;
 
 	if (count <= 0)
 		return;
@@ -353,8 +358,11 @@ sclp_tty_write_string(const unsigned char *str, int count, int from_user)
 		 * output buffer. Emit the buffer, create a new buffer
 		 * and then output the rest of the string.
 		 */
-		__sclp_ttybuf_emit(sclp_ttybuf);
+		buf = sclp_ttybuf;
 		sclp_ttybuf = NULL;
+		spin_unlock_irqrestore(&sclp_tty_lock, flags);
+		__sclp_ttybuf_emit(buf);
+		spin_lock_irqsave(&sclp_tty_lock, flags);
 		str += written;
 		count -= written;
 	} while (count > 0);
@@ -466,7 +474,8 @@ sclp_tty_flush_buffer(struct tty_struct *tty)
 /*
  * push input to tty
  */
-static void sclp_tty_input(unsigned char* buf, unsigned int count)
+static void
+sclp_tty_input(unsigned char* buf, unsigned int count)
 {
 	unsigned int cchar;
 
@@ -706,15 +715,21 @@ sclp_tty_init(void)
 {
 	void *page;
 	int i;
+	int rc;
 
 	if (!CONSOLE_IS_SCLP)
 		return;
-	if (sclp_rw_init() != 0)
+	rc = sclp_rw_init();
+	if (rc != 0) {
+		printk(KERN_ERR SCLP_TTY_PRINT_HEADER
+		       "could not register tty - "
+		       "sclp_rw_init returned %d\n", rc);
 		return;
+	}
 	/* Allocate pages for output buffering */
 	INIT_LIST_HEAD(&sclp_tty_pages);
 	for (i = 0; i < MAX_KMEM_PAGES; i++) {
-		page = (void *) get_zeroed_page(GFP_KERNEL);
+		page = (void *) get_zeroed_page(GFP_KERNEL | GFP_DMA);
 		if (page == NULL)
 			return;
 		list_add_tail((struct list_head *) page, &sclp_tty_pages);
@@ -744,7 +759,7 @@ sclp_tty_init(void)
 	memset (&sclp_tty_driver, 0, sizeof(struct tty_driver));
 	sclp_tty_driver.magic = TTY_DRIVER_MAGIC;
 	sclp_tty_driver.owner = THIS_MODULE;
-	sclp_tty_driver.driver_name = "tty_sclp";
+	sclp_tty_driver.driver_name = "sclp_line";
 	sclp_tty_driver.name = "ttyS";
 	sclp_tty_driver.name_base = 0;
 	sclp_tty_driver.major = TTY_MAJOR;
@@ -795,9 +810,9 @@ sclp_tty_init(void)
 	sclp_tty_driver.read_proc = NULL;
 	sclp_tty_driver.write_proc = NULL;
 
-	if (tty_register_driver(&sclp_tty_driver))
-		panic("Couldn't register sclp_tty driver\n");
+	rc = tty_register_driver(&sclp_tty_driver);
+	if (rc != 0)
+		printk(KERN_ERR SCLP_TTY_PRINT_HEADER
+		       "could not register tty - "
+		       "sclp_drv_register returned %d\n", rc);
 }
-
-console_initcall(sclp_tty_init);
-

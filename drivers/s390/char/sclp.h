@@ -126,6 +126,7 @@ void sclp_sync_wait(void);
 int sclp_register(struct sclp_register *reg);
 void sclp_unregister(struct sclp_register *reg);
 char *sclp_error_message(u16 response_code);
+int sclp_remove_processed(struct sccb_header *sccb);
 
 /* useful inlines */
 
