@@ -1536,7 +1536,6 @@ static void __exit rose_exit(void)
 			dev_rose[i].priv = NULL;
 			unregister_netdev(&dev_rose[i]);
 		}
-		kfree(dev_rose[i].name);
 	}
 
 	kfree(dev_rose);
