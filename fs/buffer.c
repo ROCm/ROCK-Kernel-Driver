@@ -2317,6 +2317,28 @@ int generic_commit_write(struct file *file, struct page *page,
 	return 0;
 }
 
+
+/*
+ * nobh_prepare_write()'s prereads are special: the buffer_heads are freed
+ * immediately, while under the page lock.  So it needs a special end_io
+ * handler which does not touch the bh after unlocking it.
+ *
+ * Note: unlock_buffer() sort-of does touch the bh after unlocking it, but
+ * a race there is benign: unlock_buffer() only use the bh's address for
+ * hashing after unlocking the buffer, so it doesn't actually touch the bh
+ * itself.
+ */
+static void end_buffer_read_nobh(struct buffer_head *bh, int uptodate)
+{
+	if (uptodate) {
+		set_buffer_uptodate(bh);
+	} else {
+		/* This happens, due to failed READA attempts. */
+		clear_buffer_uptodate(bh);
+	}
+	unlock_buffer(bh);
+}
+
 /*
  * On entry, the page is fully not uptodate.
  * On exit the page is fully uptodate in the areas outside (from,to)
@@ -2408,12 +2430,25 @@ int nobh_prepare_write(struct page *page, unsigned from, unsigned to,
 	}
 
 	if (nr_reads) {
-		ll_rw_block(READ, nr_reads, read_bh);
+		struct buffer_head *bh;
+
+		/*
+		 * The page is locked, so these buffers are protected from
+		 * any VM or truncate activity.  Hence we don't need to care
+		 * for the buffer_head refcounts.
+		 */
 		for (i = 0; i < nr_reads; i++) {
-			wait_on_buffer(read_bh[i]);
-			if (!buffer_uptodate(read_bh[i]))
+			bh = read_bh[i];
+			lock_buffer(bh);
+			bh->b_end_io = end_buffer_read_nobh;
+			submit_bh(READ, bh);
+		}
+		for (i = 0; i < nr_reads; i++) {
+			bh = read_bh[i];
+			wait_on_buffer(bh);
+			if (!buffer_uptodate(bh))
 				ret = -EIO;
-			free_buffer_head(read_bh[i]);
+			free_buffer_head(bh);
 			read_bh[i] = NULL;
 		}
 		if (ret)
