@@ -1,5 +1,5 @@
 /*
- * $Id: atkbd.c,v 1.31 2002/01/27 01:48:54 vojtech Exp $
+ * $Id: atkbd.c,v 1.33 2002/02/12 09:34:34 vojtech Exp $
  *
  *  Copyright (c) 1999-2001 Vojtech Pavlik
  */
@@ -31,7 +31,6 @@
 #include <linux/init.h>
 #include <linux/input.h>
 #include <linux/serio.h>
-#include <linux/tqueue.h>
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
 MODULE_DESCRIPTION("AT and PS/2 keyboard driver");
@@ -204,7 +203,7 @@ static void atkbd_interrupt(struct serio *serio, unsigned char data, unsigned in
 
 static int atkbd_sendbyte(struct atkbd *atkbd, unsigned char byte)
 {
-	int timeout = 1000; /* 10 msec */
+	int timeout = 10000; /* 100 msec */
 	atkbd->ack = 0;
 
 #ifdef ATKBD_DEBUG
@@ -223,7 +222,7 @@ static int atkbd_sendbyte(struct atkbd *atkbd, unsigned char byte)
 
 static int atkbd_command(struct atkbd *atkbd, unsigned char *param, int command)
 {
-	int timeout = 10000; /* 100 msec */
+	int timeout = 50000; /* 500 msec */
 	int send = (command >> 12) & 0xf;
 	int receive = (command >> 8) & 0xf;
 	int i;
@@ -258,6 +257,9 @@ static int atkbd_event(struct input_dev *dev, unsigned int type, unsigned int co
 {
 	struct atkbd *atkbd = dev->private;
 	char param[2];
+
+	if (!atkbd->serio->write)
+		return -1;
 
 	switch (type) {
 
@@ -463,8 +465,10 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 
 	memset(atkbd, 0, sizeof(struct atkbd));
 
-	atkbd->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_LED) | BIT(EV_REP);
-	atkbd->dev.ledbit[0] = BIT(LED_NUML) | BIT(LED_CAPSL) | BIT(LED_SCROLLL);
+	if (serio->write) {
+		atkbd->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_LED) | BIT(EV_REP);
+		atkbd->dev.ledbit[0] = BIT(LED_NUML) | BIT(LED_CAPSL) | BIT(LED_SCROLLL);
+	} else  atkbd->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_REP);
 
 	atkbd->serio = serio;
 
@@ -482,13 +486,20 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 		return;
 	}
 
-	if (atkbd_probe(atkbd)) {
-		serio_close(serio);
-		kfree(atkbd);
-		return;
+	if (serio->write) {
+
+		if (atkbd_probe(atkbd)) {
+			serio_close(serio);
+			kfree(atkbd);
+			return;
+		}
+		
+		atkbd->set = atkbd_set_3(atkbd);
+
+	} else {
+		atkbd->set = 2;
+		atkbd->id = 0xab00;
 	}
-	
-	atkbd->set = atkbd_set_3(atkbd);
 
 	if (atkbd->set == 4) {
 		atkbd->dev.ledbit[0] |= BIT(LED_COMPOSE) | BIT(LED_SUSPEND) | BIT(LED_SLEEP) | BIT(LED_MUTE);
@@ -518,7 +529,8 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 
 	printk(KERN_INFO "input: %s on %s\n", atkbd->name, serio->phys);
 
-	atkbd_initialize(atkbd);
+	if (serio->write)
+		atkbd_initialize(atkbd);
 }
 
 
