@@ -144,7 +144,7 @@ static int read_only = 0;
 /* This is the driver that will be inserted */
 static struct i2c_driver adm1021_driver = {
 	.owner		= THIS_MODULE,
-	.name		= "ADM1021, MAX1617 sensor driver",
+	.name		= "ADM1021-MAX1617",
 	.id		= I2C_DRIVERID_ADM1021,
 	.flags		= I2C_DF_NOTIFY,
 	.attach_adapter	= adm1021_attach_adapter,
@@ -221,10 +221,12 @@ static int adm1021_detect(struct i2c_adapter *adapter, int address,
 		err = -ENOMEM;
 		goto error0;
 	}
+	memset(new_client, 0x00, sizeof(struct i2c_client) +
+				 sizeof(struct adm1021_data));
 
 	data = (struct adm1021_data *) (new_client + 1);
+	i2c_set_clientdata(new_client, data);
 	new_client->addr = address;
-	new_client->data = data;
 	new_client->adapter = adapter;
 	new_client->driver = &adm1021_driver;
 	new_client->flags = 0;
@@ -299,7 +301,7 @@ static int adm1021_detect(struct i2c_adapter *adapter, int address,
 	}
 
 	/* Fill in the remaining client fields and put it into the global list */
-	strcpy(new_client->name, client_name);
+	strncpy(new_client->dev.name, client_name, DEVICE_NAME_SIZE);
 	data->type = kind;
 
 	new_client->id = adm1021_id++;
@@ -354,8 +356,7 @@ static int adm1021_detach_client(struct i2c_client *client)
 
 	int err;
 
-	i2c_deregister_entry(((struct adm1021_data *) (client->data))->
-				 sysctl_id);
+	i2c_deregister_entry(((struct adm1021_data *) (i2c_get_clientdata(client)))->sysctl_id);
 
 	if ((err = i2c_detach_client(client))) {
 		printk
@@ -384,7 +385,7 @@ static int adm1021_write_value(struct i2c_client *client, u8 reg, u16 value)
 
 static void adm1021_update_client(struct i2c_client *client)
 {
-	struct adm1021_data *data = client->data;
+	struct adm1021_data *data = i2c_get_clientdata(client);
 
 	down(&data->update_lock);
 
@@ -435,7 +436,7 @@ static void adm1021_update_client(struct i2c_client *client)
 static void adm1021_temp(struct i2c_client *client, int operation,
 			 int ctl_name, int *nrels_mag, long *results)
 {
-	struct adm1021_data *data = client->data;
+	struct adm1021_data *data = i2c_get_clientdata(client);
 
 	if (operation == SENSORS_PROC_REAL_INFO)
 		*nrels_mag = 0;
@@ -462,7 +463,7 @@ static void adm1021_temp(struct i2c_client *client, int operation,
 static void adm1021_remote_temp(struct i2c_client *client, int operation,
 				int ctl_name, int *nrels_mag, long *results)
 {
-	struct adm1021_data *data = client->data;
+	struct adm1021_data *data = i2c_get_clientdata(client);
 	int prec = 0;
 
 	if (operation == SENSORS_PROC_REAL_INFO)
@@ -535,7 +536,7 @@ static void adm1021_remote_temp(struct i2c_client *client, int operation,
 static void adm1021_die_code(struct i2c_client *client, int operation,
 			     int ctl_name, int *nrels_mag, long *results)
 {
-	struct adm1021_data *data = client->data;
+	struct adm1021_data *data = i2c_get_clientdata(client);
 
 	if (operation == SENSORS_PROC_REAL_INFO)
 		*nrels_mag = 0;
@@ -551,7 +552,7 @@ static void adm1021_die_code(struct i2c_client *client, int operation,
 static void adm1021_alarms(struct i2c_client *client, int operation,
 			   int ctl_name, int *nrels_mag, long *results)
 {
-	struct adm1021_data *data = client->data;
+	struct adm1021_data *data = i2c_get_clientdata(client);
 	if (operation == SENSORS_PROC_REAL_INFO)
 		*nrels_mag = 0;
 	else if (operation == SENSORS_PROC_REAL_READ) {

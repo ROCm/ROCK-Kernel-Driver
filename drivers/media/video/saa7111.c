@@ -120,6 +120,7 @@ static int saa7111_attach(struct i2c_adapter *adap, int addr, unsigned short fla
 	client = kmalloc(sizeof(*client), GFP_KERNEL);
 	if(client == NULL) 
 		return -ENOMEM;
+	memset(client, 0, sizeof(*client));
 	client_template.adapter = adap;
 	client_template.addr = addr;
 	memcpy(client, &client_template, sizeof(*client));
@@ -132,9 +133,9 @@ static int saa7111_attach(struct i2c_adapter *adap, int addr, unsigned short fla
 	}
 
 	memset(decoder, 0, sizeof(*decoder));
-	strcpy(client->name, "saa7111");
+	strncpy(client->dev.name, "saa7111", DEVICE_NAME_SIZE);
 	decoder->client = client;
-	client->data = decoder;
+	i2c_set_clientdata(client, decoder);
 	decoder->addr = addr;
 	decoder->norm = VIDEO_MODE_NTSC;
 	decoder->input = 0;
@@ -147,10 +148,10 @@ static int saa7111_attach(struct i2c_adapter *adap, int addr, unsigned short fla
 	i = i2c_master_send(client, init, sizeof(init));
 	if (i < 0) {
 		printk(KERN_ERR "%s_attach: init status %d\n",
-		       client->name, i);
+		       client->dev.name, i);
 	} else {
 		printk(KERN_INFO "%s_attach: chip version %x\n",
-		       client->name, i2c_smbus_read_byte_data(client, 0x00) >> 4);
+		       client->dev.name, i2c_smbus_read_byte_data(client, 0x00) >> 4);
 	}
 	init_MUTEX(&decoder->lock);
 	i2c_attach_client(client);
@@ -164,7 +165,7 @@ static int saa7111_probe(struct i2c_adapter *adap)
 
 static int saa7111_detach(struct i2c_client *client)
 {
-	struct saa7111 *decoder = client->data;
+	struct saa7111 *decoder = i2c_get_clientdata(client);
 	i2c_detach_client(client);
 	kfree(decoder);
 	kfree(client);
@@ -175,7 +176,7 @@ static int saa7111_detach(struct i2c_client *client)
 static int saa7111_command(struct i2c_client *client, unsigned int cmd,
 			   void *arg)
 {
-	struct saa7111 *decoder = client->data;
+	struct saa7111 *decoder = i2c_get_clientdata(client);
 
 	switch (cmd) {
 
@@ -187,7 +188,7 @@ static int saa7111_command(struct i2c_client *client, unsigned int cmd,
 			for (i = 0; i < 32; i += 16) {
 				int j;
 
-				printk("KERN_DEBUG %s: %03x", client->name,
+				printk("KERN_DEBUG %s: %03x", client->dev.name,
 				       i);
 				for (j = 0; j < 16; ++j) {
 					printk(" %02x",
@@ -407,9 +408,11 @@ static struct i2c_driver i2c_driver_saa7111 = {
 };
 
 static struct i2c_client client_template = {
-	.name 	= "saa7111_client",
 	.id 	= -1,
-	.driver = &i2c_driver_saa7111
+	.driver	= &i2c_driver_saa7111,
+	.dev	= {
+		.name	= "saa7111_client",
+	},
 };
 
 static int saa7111_init(void)

@@ -194,7 +194,7 @@ static int bttv_bit_getsda(void *data)
 
 static int attach_inform(struct i2c_client *client)
 {
-        struct bttv *btv = (struct bttv*)client->adapter->data;
+        struct bttv *btv = i2c_get_adapdata(client->adapter);
 	int i;
 
 	for (i = 0; i < I2C_CLIENTS_MAX; i++) {
@@ -207,13 +207,13 @@ static int attach_inform(struct i2c_client *client)
 		bttv_call_i2c_clients(btv,TUNER_SET_TYPE,&btv->tuner_type);
         if (bttv_verbose)
 		printk("bttv%d: i2c attach [client=%s,%s]\n",btv->nr,
-		       client->name, (i < I2C_CLIENTS_MAX) ?  "ok" : "failed");
+		       client->dev.name, (i < I2C_CLIENTS_MAX) ?  "ok" : "failed");
         return 0;
 }
 
 static int detach_inform(struct i2c_client *client)
 {
-        struct bttv *btv = (struct bttv*)client->adapter->data;
+        struct bttv *btv = i2c_get_adapdata(client->adapter);
 	int i;
 
 	for (i = 0; i < I2C_CLIENTS_MAX; i++) {
@@ -224,7 +224,7 @@ static int detach_inform(struct i2c_client *client)
 	}
         if (bttv_verbose)
 		printk("bttv%d: i2c detach [client=%s,%s]\n",btv->nr,
-		       client->name, (i < I2C_CLIENTS_MAX) ?  "ok" : "failed");
+		       client->dev.name, (i < I2C_CLIENTS_MAX) ?  "ok" : "failed");
         return 0;
 }
 
@@ -261,15 +261,19 @@ static struct i2c_algo_bit_data bttv_i2c_algo_template = {
 
 static struct i2c_adapter bttv_i2c_adap_template = {
 	.owner          = THIS_MODULE,
-	.name              = "bt848",
 	.id                = I2C_HW_B_BT848,
 	.client_register   = attach_inform,
 	.client_unregister = detach_inform,
+	.dev		= {
+		.name	= "bt848",
+	},
 };
 
 static struct i2c_client bttv_i2c_client_template = {
-        .name = "bttv internal use only",
-        .id   = -1,
+        .id	= -1,
+        .dev	= {
+		.name = "bttv internal",
+	},
 };
 
 
@@ -343,10 +347,10 @@ int __devinit init_bttv_i2c(struct bttv *btv)
 	memcpy(&btv->i2c_client, &bttv_i2c_client_template,
 	       sizeof(struct i2c_client));
 
-	sprintf(btv->i2c_adap.name+strlen(btv->i2c_adap.name),
+	sprintf(btv->i2c_adap.dev.name+strlen(btv->i2c_adap.dev.name),
 		" #%d", btv->nr);
         btv->i2c_algo.data = btv;
-        btv->i2c_adap.data = btv;
+        i2c_set_adapdata(&btv->i2c_adap, btv);
         btv->i2c_adap.algo_data = &btv->i2c_algo;
         btv->i2c_client.adapter = &btv->i2c_adap;
 

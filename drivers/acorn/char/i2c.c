@@ -303,11 +303,13 @@ static int ioc_client_unreg(struct i2c_client *client)
 }
 
 static struct i2c_adapter ioc_ops = {
-	.name			= "IOC/IOMD",
 	.id			= I2C_HW_B_IOC,
 	.algo_data		= &ioc_data,
 	.client_register	= ioc_client_reg,
 	.client_unregister	= ioc_client_unreg
+	.dev			= {
+		.name		= "IOC/IOMD",
+	},
 };
 
 static int __init i2c_ioc_init(void)
