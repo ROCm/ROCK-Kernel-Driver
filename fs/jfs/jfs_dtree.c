@@ -852,7 +852,7 @@ int dtInsert(tid_t tid, struct inode *ip,
 		n = NDTLEAF_LEGACY(name->namlen);
 		data.leaf.ip = NULL;	/* signifies legacy directory format */
 	}
-	data.leaf.ino = cpu_to_le32(*fsn);
+	data.leaf.ino = *fsn;
 
 	/*
 	 *      leaf page does not have enough room for new entry:
@@ -3570,7 +3570,8 @@ static int dtCompare(struct component_name * key,	/* search key */
 		     dtpage_t * p,	/* directory page */
 		     int si)
 {				/* entry slot index */
-	wchar_t *kname, *name;
+	wchar_t *kname;
+	__le16 *name;
 	int klen, namlen, len, rc;
 	struct idtentry *ih;
 	struct dtslot *t;
@@ -3646,7 +3647,8 @@ static int ciCompare(struct component_name * key,	/* search key */
 		     int si,	/* entry slot index */
 		     int flag)
 {
-	wchar_t *kname, *name, x;
+	wchar_t *kname, x;
+	__le16 *name;
 	int klen, namlen, len, rc;
 	struct ldtentry *lh;
 	struct idtentry *ih;
@@ -3824,7 +3826,8 @@ static void dtGetKey(dtpage_t * p, int i,	/* entry index */
 	struct idtentry *ih;
 	struct dtslot *t;
 	int namlen, len;
-	wchar_t *name, *kname;
+	wchar_t *kname;
+	__le16 *name;
 
 	/* get entry */
 	stbl = DT_GETSTBL(p);
@@ -3852,7 +3855,7 @@ static void dtGetKey(dtpage_t * p, int i,	/* entry index */
 	/*
 	 * move head/only segment
 	 */
-	UniStrncpy_le(kname, name, len);
+	UniStrncpy_from_le(kname, name, len);
 
 	/*
 	 * move additional segment(s)
@@ -3863,7 +3866,7 @@ static void dtGetKey(dtpage_t * p, int i,	/* entry index */
 		kname += len;
 		namlen -= len;
 		len = min(namlen, DTSLOTDATALEN);
-		UniStrncpy_le(kname, t->name, len);
+		UniStrncpy_from_le(kname, t->name, len);
 
 		si = t->next;
 	}
@@ -3885,7 +3888,8 @@ static void dtInsertEntry(dtpage_t * p, int index, struct component_name * key,
 	struct ldtentry *lh = NULL;
 	struct idtentry *ih = NULL;
 	int hsi, fsi, klen, len, nextindex;
-	wchar_t *kname, *name;
+	wchar_t *kname;
+	__le16 *name;
 	s8 *stbl;
 	pxd_t *xd;
 	struct dt_lock *dtlck = *dtlock;
@@ -3914,7 +3918,7 @@ static void dtInsertEntry(dtpage_t * p, int index, struct component_name * key,
 	if (p->header.flag & BT_LEAF) {
 		lh = (struct ldtentry *) h;
 		lh->next = h->next;
-		lh->inumber = data->leaf.ino;	/* little-endian */
+		lh->inumber = cpu_to_le32(data->leaf.ino);
 		lh->namlen = klen;
 		name = lh->name;
 		if (data->leaf.ip) {
@@ -3936,7 +3940,7 @@ static void dtInsertEntry(dtpage_t * p, int index, struct component_name * key,
 		len = min(klen, DTIHDRDATALEN);
 	}
 
-	UniStrncpy_le(name, kname, len);
+	UniStrncpy_to_le(name, kname, len);
 
 	n = 1;
 	xsi = hsi;
@@ -3971,7 +3975,7 @@ static void dtInsertEntry(dtpage_t * p, int index, struct component_name * key,
 
 		kname += len;
 		len = min(klen, DTSLOTDATALEN);
-		UniStrncpy_le(t->name, kname, len);
+		UniStrncpy_to_le(t->name, kname, len);
 
 		n++;
 		xsi = fsi;
@@ -4174,7 +4178,7 @@ static void dtMoveEntry(dtpage_t * sp, int si, dtpage_t * dp,
 			d++;
 
 			len = min(snamlen, DTSLOTDATALEN);
-			UniStrncpy(d->name, s->name, len);
+			UniStrncpy_le(d->name, s->name, len);
 
 			ns++;
 			nd++;

@@ -60,16 +60,16 @@
  *	inode allocation group page (per 4096 inodes of an AG)
  */
 struct iag {
-	s64 agstart;		/* 8: starting block of ag              */
-	s32 iagnum;		/* 4: inode allocation group number     */
-	s32 inofreefwd;		/* 4: ag inode free list forward        */
-	s32 inofreeback;	/* 4: ag inode free list back           */
-	s32 extfreefwd;		/* 4: ag inode extent free list forward */
-	s32 extfreeback;	/* 4: ag inode extent free list back    */
-	s32 iagfree;		/* 4: iag free list                     */
+	__le64 agstart;		/* 8: starting block of ag              */
+	__le32 iagnum;		/* 4: inode allocation group number     */
+	__le32 inofreefwd;	/* 4: ag inode free list forward        */
+	__le32 inofreeback;	/* 4: ag inode free list back           */
+	__le32 extfreefwd;	/* 4: ag inode extent free list forward */
+	__le32 extfreeback;	/* 4: ag inode extent free list back    */
+	__le32 iagfree;		/* 4: iag free list                     */
 
 	/* summary map: 1 bit per inode extent */
-	s32 inosmap[SMAPSZ];	/* 16: sum map of mapwords w/ free inodes;
+	__le32 inosmap[SMAPSZ];	/* 16: sum map of mapwords w/ free inodes;
 				 *      note: this indicates free and backed
 				 *      inodes, if the extent is not backed the
 				 *      value will be 1.  if the extent is
@@ -78,43 +78,61 @@ struct iag {
 				 *      backed but at least one of the inodes is
 				 *      free the value will be 0.
 				 */
-	s32 extsmap[SMAPSZ];	/* 16: sum map of mapwords w/ free extents */
-	s32 nfreeinos;		/* 4: number of free inodes             */
-	s32 nfreeexts;		/* 4: number of free extents            */
+	__le32 extsmap[SMAPSZ];	/* 16: sum map of mapwords w/ free extents */
+	__le32 nfreeinos;		/* 4: number of free inodes             */
+	__le32 nfreeexts;		/* 4: number of free extents            */
 	/* (72) */
 	u8 pad[1976];		/* 1976: pad to 2048 bytes */
 	/* allocation bit map: 1 bit per inode (0 - free, 1 - allocated) */
-	u32 wmap[EXTSPERIAG];	/* 512: working allocation map  */
-	u32 pmap[EXTSPERIAG];	/* 512: persistent allocation map */
+	__le32 wmap[EXTSPERIAG];	/* 512: working allocation map  */
+	__le32 pmap[EXTSPERIAG];	/* 512: persistent allocation map */
 	pxd_t inoext[EXTSPERIAG];	/* 1024: inode extent addresses */
 };				/* (4096) */
 
 /*
  *	per AG control information (in inode map control page)
  */
-struct iagctl {
-	s32 inofree;		/* 4: free inode list anchor            */
-	s32 extfree;		/* 4: free extent list anchor           */
-	s32 numinos;		/* 4: number of backed inodes           */
-	s32 numfree;		/* 4: number of free inodes             */
+struct iagctl_disk {
+	__le32 inofree;		/* 4: free inode list anchor            */
+	__le32 extfree;		/* 4: free extent list anchor           */
+	__le32 numinos;		/* 4: number of backed inodes           */
+	__le32 numfree;		/* 4: number of free inodes             */
 };				/* (16) */
+
+struct iagctl {
+	int inofree;		/* free inode list anchor            */
+	int extfree;		/* free extent list anchor           */
+	int numinos;		/* number of backed inodes           */
+	int numfree;		/* number of free inodes             */
+};
 
 /*
  *	per fileset/aggregate inode map control page
  */
-struct dinomap {
-	s32 in_freeiag;		/* 4: free iag list anchor     */
-	s32 in_nextiag;		/* 4: next free iag number     */
-	s32 in_numinos;		/* 4: num of backed inodes */
-	s32 in_numfree;		/* 4: num of free backed inodes */
-	s32 in_nbperiext;	/* 4: num of blocks per inode extent */
-	s32 in_l2nbperiext;	/* 4: l2 of in_nbperiext */
-	s32 in_diskblock;	/* 4: for standalone test driver  */
-	s32 in_maxag;		/* 4: for standalone test driver  */
+struct dinomap_disk {
+	__le32 in_freeiag;	/* 4: free iag list anchor     */
+	__le32 in_nextiag;	/* 4: next free iag number     */
+	__le32 in_numinos;	/* 4: num of backed inodes */
+	__le32 in_numfree;	/* 4: num of free backed inodes */
+	__le32 in_nbperiext;	/* 4: num of blocks per inode extent */
+	__le32 in_l2nbperiext;	/* 4: l2 of in_nbperiext */
+	__le32 in_diskblock;	/* 4: for standalone test driver  */
+	__le32 in_maxag;	/* 4: for standalone test driver  */
 	u8 pad[2016];		/* 2016: pad to 2048 */
-	struct iagctl in_agctl[MAXAG];	/* 2048: AG control information */
+	struct iagctl_disk in_agctl[MAXAG]; /* 2048: AG control information */
 };				/* (4096) */
 
+struct dinomap {
+	int in_freeiag;		/* free iag list anchor     */
+	int in_nextiag;		/* next free iag number     */
+	int in_numinos;		/* num of backed inodes */
+	int in_numfree;		/* num of free backed inodes */
+	int in_nbperiext;	/* num of blocks per inode extent */
+	int in_l2nbperiext;	/* l2 of in_nbperiext */
+	int in_diskblock;	/* for standalone test driver  */
+	int in_maxag;		/* for standalone test driver  */
+	struct iagctl in_agctl[MAXAG];	/* AG control information */
+};
 
 /*
  *	In-core inode map control page
