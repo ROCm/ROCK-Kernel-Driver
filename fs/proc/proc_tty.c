@@ -29,39 +29,18 @@ static struct proc_dir_entry *proc_tty_ldisc, *proc_tty_driver;
 /*
  * This is the handler for /proc/tty/drivers
  */
-static int show_tty_driver(struct seq_file *m, void *v)
+static void show_tty_range(struct seq_file *m, struct tty_driver *p,
+	dev_t from, int num)
 {
-	struct tty_driver *p = v;
- 
-	if (&p->tty_drivers == tty_drivers.next) {
-		/* pseudo-drivers first */
-		seq_printf(m, "%-20s /dev/%-8s ", "/dev/tty", "tty");
-		seq_printf(m, "%3d %7d ", TTYAUX_MAJOR, 0);
-		seq_printf(m, "system:/dev/tty\n");
-		seq_printf(m, "%-20s /dev/%-8s ", "/dev/console", "console");
-		seq_printf(m, "%3d %7d ", TTYAUX_MAJOR, 1);
-		seq_printf(m, "system:console\n");
-#ifdef CONFIG_UNIX98_PTYS
-		seq_printf(m, "%-20s /dev/%-8s ", "/dev/ptmx", "ptmx");
-		seq_printf(m, "%3d %7d ", TTYAUX_MAJOR, 2);
-		seq_printf(m, "system\n");
-#endif
-#ifdef CONFIG_VT
-		seq_printf(m, "%-20s /dev/%-8s ", "/dev/vc/0", "vc/0");
-		seq_printf(m, "%3d %7d ", TTY_MAJOR, 0);
-		seq_printf(m, "system:vtmaster\n");
-#endif
-	}
-
 	seq_printf(m, "%-20s ", p->driver_name ? p->driver_name : "unknown");
 	seq_printf(m, "/dev/%-8s ", p->name);
 	if (p->num > 1) {
 		char	range[20];
-		sprintf(range, "%d-%d", p->minor_start,
-			p->minor_start + p->num - 1);
-		seq_printf(m, "%3d %7s ", p->major, range);
+		sprintf(range, "%d-%d", MINOR(from),
+			MINOR(from) + num - 1);
+		seq_printf(m, "%3d %7s ", MAJOR(from), range);
 	} else {
-		seq_printf(m, "%3d %7d ", p->major, p->minor_start);
+		seq_printf(m, "%3d %7d ", MAJOR(from), MINOR(from));
 	}
 	switch (p->type) {
 	case TTY_DRIVER_TYPE_SYSTEM:
@@ -93,6 +72,41 @@ static int show_tty_driver(struct seq_file *m, void *v)
 		seq_printf(m, "type:%d.%d", p->type, p->subtype);
 	}
 	seq_putc(m, '\n');
+}
+
+static int show_tty_driver(struct seq_file *m, void *v)
+{
+	struct tty_driver *p = v;
+	dev_t from = MKDEV(p->major, p->minor_start);
+	dev_t to = from + p->num;
+
+	if (&p->tty_drivers == tty_drivers.next) {
+		/* pseudo-drivers first */
+		seq_printf(m, "%-20s /dev/%-8s ", "/dev/tty", "tty");
+		seq_printf(m, "%3d %7d ", TTYAUX_MAJOR, 0);
+		seq_printf(m, "system:/dev/tty\n");
+		seq_printf(m, "%-20s /dev/%-8s ", "/dev/console", "console");
+		seq_printf(m, "%3d %7d ", TTYAUX_MAJOR, 1);
+		seq_printf(m, "system:console\n");
+#ifdef CONFIG_UNIX98_PTYS
+		seq_printf(m, "%-20s /dev/%-8s ", "/dev/ptmx", "ptmx");
+		seq_printf(m, "%3d %7d ", TTYAUX_MAJOR, 2);
+		seq_printf(m, "system\n");
+#endif
+#ifdef CONFIG_VT
+		seq_printf(m, "%-20s /dev/%-8s ", "/dev/vc/0", "vc/0");
+		seq_printf(m, "%3d %7d ", TTY_MAJOR, 0);
+		seq_printf(m, "system:vtmaster\n");
+#endif
+	}
+
+	while (MAJOR(from) < MAJOR(to)) {
+		dev_t next = MKDEV(MAJOR(from)+1, 0);
+		show_tty_range(m, p, from, next - from);
+		from = next;
+	}
+	if (from != to)
+		show_tty_range(m, p, from, to - from);
 	return 0;
 }
 

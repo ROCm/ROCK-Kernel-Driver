@@ -126,8 +126,8 @@ LIST_HEAD(tty_drivers);			/* linked list of tty drivers */
 struct tty_ldisc ldiscs[NR_LDISCS];	/* line disc dispatch table	*/
 
 #ifdef CONFIG_UNIX98_PTYS
-extern struct tty_driver ptm_driver[];	/* Unix98 pty masters; for /dev/ptmx */
-extern struct tty_driver pts_driver[];	/* Unix98 pty slaves;  for /dev/ptmx */
+extern struct tty_driver ptm_driver;	/* Unix98 pty masters; for /dev/ptmx */
+extern struct tty_driver pts_driver;	/* Unix98 pty slaves;  for /dev/ptmx */
 #endif
 
 extern void disable_early_printk(void);
@@ -313,21 +313,15 @@ static int tty_set_ldisc(struct tty_struct *tty, int ldisc)
 /*
  * This routine returns a tty driver structure, given a device number
  */
-struct tty_driver *get_tty_driver(kdev_t device)
+struct tty_driver *get_tty_driver(dev_t device, int *index)
 {
-	int	major, minor;
 	struct tty_driver *p;
-	
-	minor = minor(device);
-	major = major(device);
 
 	list_for_each_entry(p, &tty_drivers, tty_drivers) {
-		if (p->major != major)
+		dev_t base = MKDEV(p->major, p->minor_start);
+		if (device < base || device >= base + p->num)
 			continue;
-		if (minor < p->minor_start)
-			continue;
-		if (minor >= p->minor_start + p->num)
-			continue;
+		*index = device - base;
 		return p;
 	}
 	return NULL;
@@ -1345,32 +1339,24 @@ retry_open:
 
 	if (IS_PTMX_DEV(device)) {
 #ifdef CONFIG_UNIX98_PTYS
-		/* find a free pty. */
-		int major;
-
 		/* find a device that is not in use. */
 		retval = -1;
-		for (major = 0 ; major < UNIX98_NR_MAJORS ; major++) {
-			driver = &ptm_driver[major];
-			for (index = 0; index < driver->num ; index++)
-				if (!init_dev(driver, index, &tty))
-					goto ptmx_found; /* ok! */
-			}
-		}
+		driver = &ptm_driver;
+		for (index = 0; index < driver->num ; index++)
+			if (!init_dev(driver, index, &tty))
+				goto ptmx_found; /* ok! */
 		return -EIO; /* no free ptys */
-
 	ptmx_found:
 		set_bit(TTY_PTY_LOCK, &tty->flags); /* LOCK THE SLAVE */
-		devpts_pty_new(driver->other->name_base + index, MKDEV(driver->other->major, index + driver->other->minor_start));
+		devpts_pty_new(index, MKDEV(pts_driver.major, pts_driver.minor_start) + index);
 		noctty = 1;
 #else
 		return -ENODEV;
 #endif  /* CONFIG_UNIX_98_PTYS */
 	} else {
-		driver = get_tty_driver(device);
+		driver = get_tty_driver(kdev_t_to_nr(device), &index);
 		if (!driver)
 			return -ENODEV;
-		index = minor(device) - driver->minor_start;
 
 		retval = init_dev(driver, index, &tty);
 		if (retval)
@@ -2094,21 +2080,18 @@ static void tty_default_put_char(struct tty_struct *tty, unsigned char ch)
 #ifdef CONFIG_DEVFS_FS
 static void tty_register_devfs(struct tty_driver *driver, unsigned index)
 {
-	umode_t mode = S_IFCHR | S_IRUSR | S_IWUSR;
-	unsigned minor = driver->minor_start + index;
-	kdev_t dev = mk_kdev(driver->major, minor);
+	dev_t dev = MKDEV(driver->major, driver->minor_start) + index;
 	char buf[32];
 
-	if ((minor < driver->minor_start) || 
-	    (minor >= driver->minor_start + driver->num)) {
-		printk(KERN_ERR "Attempt to register invalid minor number "
-		       "with devfs (%d:%d).\n", (int)driver->major,(int)minor);
+	if (index >= driver->num) {
+		printk(KERN_ERR "Attempt to register invalid tty line number "
+		       "with devfs (%d).\n", index);
 		return;
 	}
 
 	tty_line_name(driver, index, buf);
-	devfs_register(NULL, buf, 0, driver->major, minor, mode,
-		       &tty_fops, NULL);
+	devfs_register(NULL, buf, 0, MAJOR(dev), MINOR(dev),
+		S_IFCHR | S_IRUSR | S_IWUSR, &tty_fops, NULL);
 }
 
 static void tty_unregister_devfs(struct tty_driver *driver, int index)
@@ -2138,6 +2121,53 @@ void tty_unregister_device(struct tty_driver *driver, unsigned index)
 EXPORT_SYMBOL(tty_register_device);
 EXPORT_SYMBOL(tty_unregister_device);
 
+/* that should be handled by register_chrdev_region() */
+static int get_range(struct tty_driver *driver)
+{
+	dev_t from = MKDEV(driver->major, driver->minor_start);
+	dev_t to = from + driver->num;
+	dev_t n, next;
+	int error = 0;
+
+	for (n = from; MAJOR(n) < MAJOR(to); n = next) {
+		next = MKDEV(MAJOR(n)+1, 0);
+		error = register_chrdev_region(MAJOR(n), MINOR(n),
+			       next - n, driver->name, &tty_fops);
+		if (error)
+			goto fail;
+	}
+	if (n != to)
+		error = register_chrdev_region(MAJOR(n), MINOR(n),
+			       to - n, driver->name, &tty_fops);
+	if (!error)
+		return 0;
+fail:
+	to = n;
+	for (n = from; MAJOR(n) < MAJOR(to); n = next) {
+		next = MKDEV(MAJOR(n)+1, 0);
+		unregister_chrdev_region(MAJOR(n), MINOR(n),
+			       next - n, driver->name);
+	}
+	return error;
+}
+
+/* that should be handled by unregister_chrdev_region() */
+static void put_range(struct tty_driver *driver)
+{
+	dev_t from = MKDEV(driver->major, driver->minor_start);
+	dev_t to = from + driver->num;
+	dev_t n, next;
+
+	for (n = from; MAJOR(n) < MAJOR(to); n = next) {
+		next = MKDEV(MAJOR(n)+1, 0);
+		unregister_chrdev_region(MAJOR(n), MINOR(n),
+			       next - n, driver->name);
+	}
+	if (n != to)
+		unregister_chrdev_region(MAJOR(n), MINOR(n),
+			       to - n, driver->name);
+}
+
 /*
  * Called by a tty driver to register itself.
  */
@@ -2149,12 +2179,16 @@ int tty_register_driver(struct tty_driver *driver)
 	if (driver->flags & TTY_DRIVER_INSTALLED)
 		return 0;
 
-	error = register_chrdev_region(driver->major, driver->minor_start,
+	if (!driver->major) {
+		error = register_chrdev_region(0, driver->minor_start,
 				       driver->num, driver->name, &tty_fops);
+		if (error > 0)
+			driver->major = error;
+	} else {
+		error = get_range(driver);
+	}
 	if (error < 0)
 		return error;
-	else if(driver->major == 0)
-		driver->major = error;
 
 	if (!driver->put_char)
 		driver->put_char = tty_default_put_char;
@@ -2174,16 +2208,13 @@ int tty_register_driver(struct tty_driver *driver)
  */
 int tty_unregister_driver(struct tty_driver *driver)
 {
-	int retval, i;
+	int i;
 	struct termios *tp;
 
 	if (*driver->refcount)
 		return -EBUSY;
 
-	retval = unregister_chrdev_region(driver->major, driver->minor_start,
-					  driver->num, driver->name);
-	if (retval)
-		return retval;
+	put_range(driver);
 
 	list_del(&driver->tty_drivers);
 
