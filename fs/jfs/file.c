@@ -34,10 +34,12 @@ int jfs_fsync(struct file *file, struct dentry *dentry, int datasync)
 	struct inode *inode = dentry->d_inode;
 	int rc = 0;
 
-	if (!(inode->i_state & I_DIRTY))
+	if (!(inode->i_state & I_DIRTY) ||
+	    (datasync && !(inode->i_state & I_DIRTY_DATASYNC))) {
+		/* Make sure committed changes hit the disk */
+		jfs_flush_journal(JFS_SBI(inode->i_sb)->log, 1);
 		return rc;
-	if (datasync && !(inode->i_state & I_DIRTY_DATASYNC))
-		return rc;
+	}
 
 	rc |= jfs_commit_inode(inode, 1);
 
