@@ -195,20 +195,22 @@ struct sbp2_status_block {
  * Miscellaneous SBP2 related config rom defines
  */
 
-/* 
- * The status fifo address definition below is used as a status base, with a chunk
- * separately assigned for each sbp2 device detected. For example, 0xfffe00000000ULL 
- * is used for the first sbp2 device detected, 0xfffe00000020ULL for the next sbp2 
- * device, and so on.
+/* The status fifo address definition below is used as a base for each
+ * node, which a chunk seperately assigned to each unit directory in the
+ * node.  For example, 0xfffe00000000ULL is used for the first sbp2 device
+ * detected on node 0, 0xfffe00000020ULL for the next sbp2 device on node
+ * 0, and so on.
  *
- * Note: We could use a single status fifo address for all sbp2 devices, and figure 
- * out which sbp2 device the status belongs to by looking at the source node id of
- * the status write... but, using separate addresses for each sbp2 device allows for
- * better code and the ability to support multiple luns within a single 1394 node.
+ * Note: We could use a single status fifo address for all sbp2 devices,
+ * and figure out which sbp2 device the status belongs to by looking at
+ * the source node id of the status write... but, using separate addresses
+ * for each sbp2 unit directory allows for better code and the ability to
+ * support multiple luns within a single 1394 node.
  *
- * Also note that we choose the address range below as it is a region specified for
- * write posting, where the ohci controller will automatically send an ack_complete
- * when the status is written by the sbp2 device... saving a split transaction.   =)
+ * Also note that we choose the address range below as it is a region
+ * specified for write posting, where the ohci controller will
+ * automatically send an ack_complete when the status is written by the
+ * sbp2 device... saving a split transaction.   =)
  */ 
 #define SBP2_STATUS_FIFO_ADDRESS				0xfffe00000000ULL
 #define SBP2_STATUS_FIFO_ADDRESS_HI                             0xfffe
@@ -261,7 +263,7 @@ struct sbp2_status_block {
  */
 
 #define SBP2_MAX_SG_ELEMENT_LENGTH	0xf000
-#define SBP2SCSI_MAX_SCSI_IDS		32	/* Max sbp2 device instances supported */
+#define SBP2_MAX_UDS_PER_NODE		16	/* Maximum scsi devices per node */
 #define SBP2_MAX_SECTORS		255	/* Max sectors supported */
 
 #ifndef TYPE_SDAD
@@ -304,11 +306,8 @@ static unchar sbp2scsi_direction_table[0x100] = {
 	DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN
 };
 
-/* This should be safe. If there's more than one LUN per node, we could
- * saturate the tlabel's though.  */
-#define SBP2_MAX_CMDS_PER_LUN   8
-#define SBP2_MAX_SCSI_QUEUE	(SBP2_MAX_CMDS_PER_LUN * SBP2SCSI_MAX_SCSI_IDS)
-#define SBP2_MAX_COMMAND_ORBS	SBP2_MAX_SCSI_QUEUE
+/* This should be safe */
+#define SBP2_MAX_CMDS		8
 
 /* This is the two dma types we use for cmd_dma below */
 enum cmd_dma_types {
@@ -351,9 +350,6 @@ struct sbp2scsi_host_info;
  * Information needed on a per scsi id basis (one for each sbp2 device)
  */
 struct scsi_id_instance_data {
-	/* SCSI ID */
-	int id;
-
 	/*
 	 * Various sbp2 specific structures
 	 */
@@ -402,7 +398,7 @@ struct scsi_id_instance_data {
 	struct list_head sbp2_command_orb_inuse;
 	struct list_head sbp2_command_orb_completed;
 
-	struct list_head list;
+	struct list_head scsi_list;
 
 	/* Node entry, as retrieved from NodeMgr entries */
 	struct node_entry *ne;
@@ -411,42 +407,19 @@ struct scsi_id_instance_data {
 	/* A backlink to our host_info */
 	struct sbp2scsi_host_info *hi;
 
-	/* The scsi_device associated with this scsi_id */
+	/* SCSI related pointers */
 	struct scsi_device *sdev;
+	struct Scsi_Host *scsi_host;
 
 	/* Device specific workarounds/brokeness */
 	u32 workarounds;
 };
 
 
-/* Describes a per-ud scsi_id group */
-struct scsi_id_group {
-	struct list_head scsi_id_list;
-};
-
-
-/*
- * Sbp2 host data structure (one per sbp2 host)
- */
+/* Sbp2 host data structure (one per IEEE1394 host) */
 struct sbp2scsi_host_info {
-	struct hpsb_host *host;
-
-	/*
-	 * Spin locks for command processing
-	 */
-	spinlock_t sbp2_command_lock;
-
-	/*
-	 * This is the scsi host we register with the scsi mid level.
-	 * We keep a reference to it here, so we can unregister it
-	 * when the hpsb_host is removed.
-	 */
-	struct Scsi_Host *scsi_host;
-
-	/*
-	 * SCSI ID instance data (one for each sbp2 device instance possible)
-	 */
-	struct scsi_id_instance_data *scsi_id[SBP2SCSI_MAX_SCSI_IDS];
+	struct hpsb_host *host;		/* IEEE1394 host */
+	struct list_head scsi_ids;	/* List of scsi ids on this host */
 };
 
 /*
@@ -469,16 +442,10 @@ static void sbp2util_mark_command_completed(struct scsi_id_instance_data *scsi_i
 /*
  * IEEE-1394 core driver related prototypes
  */
-static struct sbp2scsi_host_info *sbp2_add_host(struct hpsb_host *host);
-static void sbp2_remove_host(struct hpsb_host *host);
-static void sbp2_host_reset(struct hpsb_host *host);
-
 static int sbp2_probe(struct device *dev);
 static int sbp2_remove(struct device *dev);
 static void sbp2_update(struct unit_directory *ud);
 
-static int sbp2_start_ud(struct sbp2scsi_host_info *hi,
-			 struct unit_directory *ud);
 static int sbp2_start_device(struct scsi_id_instance_data *scsi_id);
 static void sbp2_remove_device(struct scsi_id_instance_data *scsi_id);
 
@@ -513,9 +480,8 @@ static int sbp2_send_command(struct scsi_id_instance_data *scsi_id,
 static unsigned int sbp2_status_to_sense_data(unchar *sbp2_status, unchar *sense_data);
 static void sbp2_check_sbp2_command(struct scsi_id_instance_data *scsi_id, unchar *cmd);
 static void sbp2_check_sbp2_response(struct scsi_id_instance_data *scsi_id, Scsi_Cmnd *SCpnt);
-static void sbp2_parse_unit_directory(struct scsi_id_group *scsi_group,
-				      struct unit_directory *ud,
-				      struct sbp2scsi_host_info *hi);
+static void sbp2_parse_unit_directory(struct scsi_id_instance_data *scsi_id,
+				      struct unit_directory *ud);
 static int sbp2_set_busy_timeout(struct scsi_id_instance_data *scsi_id);
 static int sbp2_max_speed_and_size(struct scsi_id_instance_data *scsi_id);
 
