@@ -1433,11 +1433,8 @@ static int run (mddev_t *mddev)
 	struct disk_info *disk;
 	struct list_head *tmp;
 
-	MOD_INC_USE_COUNT;
-
 	if (mddev->level != 5 && mddev->level != 4) {
 		printk("raid5: md%d: raid level not set to 4/5 (%d)\n", mdidx(mddev), mddev->level);
-		MOD_DEC_USE_COUNT;
 		return -EIO;
 	}
 
@@ -1563,7 +1560,6 @@ abort:
 	}
 	mddev->private = NULL;
 	printk(KERN_ALERT "raid5: failed to run raid set md%d\n", mdidx(mddev));
-	MOD_DEC_USE_COUNT;
 	return -EIO;
 }
 
@@ -1579,7 +1575,6 @@ static int stop (mddev_t *mddev)
 	free_pages((unsigned long) conf->stripe_hashtbl, HASH_PAGES_ORDER);
 	kfree(conf);
 	mddev->private = NULL;
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -1735,6 +1730,7 @@ static int raid5_add_disk(mddev_t *mddev, mdk_rdev_t *rdev)
 static mdk_personality_t raid5_personality=
 {
 	.name		= "raid5",
+	.owner		= THIS_MODULE,
 	.make_request	= make_request,
 	.run		= run,
 	.stop		= stop,

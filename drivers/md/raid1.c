@@ -1061,8 +1061,6 @@ static int run(mddev_t *mddev)
 	mdk_rdev_t *rdev;
 	struct list_head *tmp;
 
-	MOD_INC_USE_COUNT;
-
 	if (mddev->level != 1) {
 		printk("raid1: md%d: raid level not set to mirroring (%d)\n",
 		       mdidx(mddev), mddev->level);
@@ -1166,7 +1164,6 @@ out_free_conf:
 	kfree(conf);
 	mddev->private = NULL;
 out:
-	MOD_DEC_USE_COUNT;
 	return -EIO;
 }
 
@@ -1180,13 +1177,13 @@ static int stop(mddev_t *mddev)
 		mempool_destroy(conf->r1bio_pool);
 	kfree(conf);
 	mddev->private = NULL;
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
 static mdk_personality_t raid1_personality =
 {
 	.name		= "raid1",
+	.owner		= THIS_MODULE,
 	.make_request	= make_request,
 	.run		= run,
 	.stop		= stop,

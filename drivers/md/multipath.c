@@ -365,8 +365,6 @@ static int multipath_run (mddev_t *mddev)
 	mdk_rdev_t *rdev;
 	struct list_head *tmp;
 
-	MOD_INC_USE_COUNT;
-
 	if (mddev->level != LEVEL_MULTIPATH) {
 		printk("multipath: md%d: raid level not set to multipath IO (%d)\n",
 		       mdidx(mddev), mddev->level);
@@ -448,7 +446,6 @@ out_free_conf:
 	kfree(conf);
 	mddev->private = NULL;
 out:
-	MOD_DEC_USE_COUNT;
 	return -EIO;
 }
 
@@ -461,13 +458,13 @@ static int multipath_stop (mddev_t *mddev)
 	mempool_destroy(conf->pool);
 	kfree(conf);
 	mddev->private = NULL;
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
 static mdk_personality_t multipath_personality=
 {
 	.name		= "multipath",
+	.owner		= THIS_MODULE,
 	.make_request	= multipath_make_request,
 	.run		= multipath_run,
 	.stop		= multipath_stop,

@@ -197,8 +197,6 @@ static int raid0_run (mddev_t *mddev)
 	s64 size;
 	raid0_conf_t *conf;
 
-	MOD_INC_USE_COUNT;
-
 	conf = vmalloc(sizeof (raid0_conf_t));
 	if (!conf)
 		goto out;
@@ -275,7 +273,6 @@ out_free_conf:
 	vfree(conf);
 	mddev->private = NULL;
 out:
-	MOD_DEC_USE_COUNT;
 	return 1;
 }
 
@@ -290,7 +287,6 @@ static int raid0_stop (mddev_t *mddev)
 	vfree (conf);
 	mddev->private = NULL;
 
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -424,6 +420,7 @@ static void raid0_status (struct seq_file *seq, mddev_t *mddev)
 static mdk_personality_t raid0_personality=
 {
 	.name		= "raid0",
+	.owner		= THIS_MODULE,
 	.make_request	= raid0_make_request,
 	.run		= raid0_run,
 	.stop		= raid0_stop,

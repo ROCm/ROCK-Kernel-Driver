@@ -79,8 +79,6 @@ static int linear_run (mddev_t *mddev)
 	unsigned int curr_offset;
 	struct list_head *tmp;
 
-	MOD_INC_USE_COUNT;
-
 	conf = kmalloc (sizeof (*conf), GFP_KERNEL);
 	if (!conf)
 		goto out;
@@ -167,7 +165,6 @@ static int linear_run (mddev_t *mddev)
 out:
 	if (conf)
 		kfree(conf);
-	MOD_DEC_USE_COUNT;
 	return 1;
 }
 
@@ -177,8 +174,6 @@ static int linear_stop (mddev_t *mddev)
   
 	kfree(conf->hash_table);
 	kfree(conf);
-
-	MOD_DEC_USE_COUNT;
 
 	return 0;
 }
@@ -246,6 +241,7 @@ static void linear_status (struct seq_file *seq, mddev_t *mddev)
 static mdk_personality_t linear_personality=
 {
 	.name		= "linear",
+	.owner		= THIS_MODULE,
 	.make_request	= linear_make_request,
 	.run		= linear_run,
 	.stop		= linear_stop,

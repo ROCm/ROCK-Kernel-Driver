@@ -64,6 +64,7 @@ static void autostart_arrays (void);
 #endif
 
 static mdk_personality_t *pers[MAX_PERSONALITY];
+static spinlock_t pers_lock = SPIN_LOCK_UNLOCKED;
 
 /*
  * Current RAID-1,4,5 parallel reconstruction 'guaranteed speed limit'
@@ -1648,20 +1649,14 @@ static int do_md_run(mddev_t * mddev)
 		return -EINVAL;
 	}
 
+#ifdef CONFIG_KMOD
 	if (!pers[pnum])
 	{
-#ifdef CONFIG_KMOD
 		char module_name[80];
 		sprintf (module_name, "md-personality-%d", pnum);
 		request_module (module_name);
-		if (!pers[pnum])
-#endif
-		{
-			printk(KERN_ERR "md: personality %d is not loaded!\n",
-				pnum);
-			return -EINVAL;
-		}
 	}
+#endif
 
 	if (device_size_calculation(mddev))
 		return -EINVAL;
@@ -1695,7 +1690,17 @@ static int do_md_run(mddev_t * mddev)
 	disk = disks[mdidx(mddev)];
 	if (!disk)
 		return -ENOMEM;
+
+	spin_lock(&pers_lock);
+	if (!pers[pnum] || !try_module_get(pers[pnum]->owner)) {
+		spin_unlock(&pers_lock);
+		printk(KERN_ERR "md: personality %d is not loaded!\n",
+		       pnum);
+		return -EINVAL;
+	}
+
 	mddev->pers = pers[pnum];
+	spin_unlock(&pers_lock);
 
 	blk_queue_make_request(&mddev->queue, mddev->pers->make_request);
 	printk("%s: setting max_sectors to %d, segment boundary to %d\n",
@@ -1710,6 +1715,7 @@ static int do_md_run(mddev_t * mddev)
 	if (err) {
 		printk(KERN_ERR "md: pers->run() failed ...\n");
 		mddev->pers = NULL;
+		module_put(mddev->pers->owner);
 		return -EINVAL;
 	}
  	atomic_set(&mddev->writes_pending,0);
@@ -1800,6 +1806,7 @@ static int do_md_stop(mddev_t * mddev, int ro)
 					set_disk_ro(disk, 1);
 				goto out;
 			}
+			module_put(mddev->pers->owner);
 			mddev->pers = NULL;
 			if (mddev->ro)
 				mddev->ro = 0;
@@ -3006,10 +3013,12 @@ static int md_seq_show(struct seq_file *seq, void *v)
 
 	if (v == (void*)1) {
 		seq_printf(seq, "Personalities : ");
+		spin_lock(&pers_lock);
 		for (i = 0; i < MAX_PERSONALITY; i++)
 			if (pers[i])
 				seq_printf(seq, "[%s] ", pers[i]->name);
 
+		spin_unlock(&pers_lock);
 		seq_printf(seq, "\n");
 		return 0;
 	}
@@ -3093,13 +3102,16 @@ int register_md_personality(int pnum, mdk_personality_t *p)
 		return -EINVAL;
 	}
 
+	spin_lock(&pers_lock);
 	if (pers[pnum]) {
+		spin_unlock(&pers_lock);
 		MD_BUG();
 		return -EBUSY;
 	}
 
 	pers[pnum] = p;
 	printk(KERN_INFO "md: %s personality registered as nr %d\n", p->name, pnum);
+	spin_unlock(&pers_lock);
 	return 0;
 }
 
@@ -3111,7 +3123,9 @@ int unregister_md_personality(int pnum)
 	}
 
 	printk(KERN_INFO "md: %s personality unregistered\n", pers[pnum]->name);
+	spin_lock(&pers_lock);
 	pers[pnum] = NULL;
+	spin_unlock(&pers_lock);
 	return 0;
 }
 
