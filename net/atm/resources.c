@@ -30,7 +30,7 @@ static struct atm_dev *__alloc_atm_dev(const char *type)
 {
 	struct atm_dev *dev;
 
-	dev = kmalloc(sizeof(*dev), GFP_ATOMIC);
+	dev = kmalloc(sizeof(*dev), GFP_KERNEL);
 	if (!dev)
 		return NULL;
 	memset(dev, 0, sizeof(*dev));
