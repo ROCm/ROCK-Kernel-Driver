@@ -293,7 +293,7 @@ cifs_get_inode_info(struct inode **pinode, const unsigned char *search_path,
 
 		/* 512 bytes (2**9) is the fake blocksize that must be used */
 		/* for this calculation */
-			inode->i_blocks = (512 - 1 + pfindData->AllocationSize)
+			inode->i_blocks = (512 - 1 + le64_to_cpu(pfindData->AllocationSize))
 				 >> 9;
 		}
 		pfindData->AllocationSize = le64_to_cpu(pfindData->AllocationSize);
