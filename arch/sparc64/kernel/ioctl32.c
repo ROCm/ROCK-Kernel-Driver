@@ -46,6 +46,7 @@
 #include <linux/netdevice.h>
 #include <linux/raw.h>
 #include <linux/smb_fs.h>
+#include <linux/ncp_fs.h>
 #include <linux/blkpg.h>
 #include <linux/blk.h>
 #include <linux/elevator.h>
@@ -2224,6 +2225,307 @@ static int do_smb_getmountuid(unsigned int fd, unsigned int cmd, unsigned long a
 
 	return err;
 }
+
+struct ncp_ioctl_request_32 {
+	unsigned int function;
+	unsigned int size;
+	__kernel_caddr_t32 data;
+};
+
+struct ncp_fs_info_v2_32 {
+	int version;
+	unsigned int mounted_uid;
+	unsigned int connection;
+	unsigned int buffer_size;
+
+	unsigned int volume_number;
+	__u32 directory_id;
+
+	__u32 dummy1;
+	__u32 dummy2;
+	__u32 dummy3;
+};
+
+struct ncp_objectname_ioctl_32
+{
+	int		auth_type;
+	unsigned int	object_name_len;
+	__kernel_caddr_t32	object_name;	/* an userspace data, in most cases user name */
+};
+
+struct ncp_privatedata_ioctl_32
+{
+	unsigned int	len;
+	__kernel_caddr_t32	data;		/* ~1000 for NDS */
+};
+
+#define	NCP_IOC_NCPREQUEST_32		_IOR('n', 1, struct ncp_ioctl_request_32)
+
+#define NCP_IOC_GETMOUNTUID2_32		_IOW('n', 2, unsigned int)
+
+#define NCP_IOC_GET_FS_INFO_V2_32	_IOWR('n', 4, struct ncp_fs_info_v2_32)
+
+#define NCP_IOC_GETOBJECTNAME_32	_IOWR('n', 9, struct ncp_objectname_ioctl_32)
+#define NCP_IOC_SETOBJECTNAME_32	_IOR('n', 9, struct ncp_objectname_ioctl_32)
+#define NCP_IOC_GETPRIVATEDATA_32	_IOWR('n', 10, struct ncp_privatedata_ioctl_32)
+#define NCP_IOC_SETPRIVATEDATA_32	_IOR('n', 10, struct ncp_privatedata_ioctl_32)
+
+static int do_ncp_ncprequest(unsigned int fd, unsigned int cmd, unsigned long arg)
+{
+	struct ncp_ioctl_request_32 n32;
+	struct ncp_ioctl_request n;
+	mm_segment_t old_fs;
+	int err;
+
+	if (copy_from_user(&n32, (struct ncp_ioctl_request_32*)arg,
+	    sizeof(n32)))
+		return -EFAULT;
+
+	n.function = n32.function;
+	n.size = n32.size;
+	if (n.size > 65536)
+		return -EINVAL;
+	n.data = vmalloc(65536);	/* 65536 must be same as NCP_PACKET_SIZE_INTERNAL in ncpfs */
+	if (!n.data)
+		return -ENOMEM;
+	err = -EFAULT;
+	if (copy_from_user(n.data, A(n32.data), n.size))
+		goto out;
+
+	old_fs = get_fs(); set_fs (KERNEL_DS);
+	err = sys_ioctl (fd, NCP_IOC_NCPREQUEST, (unsigned long)&n);
+	set_fs (old_fs);
+        if(err <= 0)
+		goto out;
+	if (err > 65536) {
+		err = -EINVAL;
+		goto out;
+	}
+	if (copy_to_user(A(n32.data), n.data, err)) {
+		err = -EFAULT;
+		goto out;
+	}
+ out:
+	vfree(n.data);
+	return err;
+}
+
+static int do_ncp_getmountuid2(unsigned int fd, unsigned int cmd, unsigned long arg)
+{
+	mm_segment_t old_fs = get_fs();
+	__kernel_uid_t kuid;
+	int err;
+
+	cmd = NCP_IOC_GETMOUNTUID2;
+
+	set_fs(KERNEL_DS);
+	err = sys_ioctl(fd, cmd, (unsigned long)&kuid);
+	set_fs(old_fs);
+
+	if (!err)
+		err = put_user(kuid, (unsigned int*)arg);
+
+	return err;
+}
+
+static int do_ncp_getfsinfo2(unsigned int fd, unsigned int cmd, unsigned long arg)
+{
+	mm_segment_t old_fs = get_fs();
+	struct ncp_fs_info_v2_32 n32;
+	struct ncp_fs_info_v2 n;
+	int err;
+
+	if (copy_from_user(&n32, (struct ncp_fs_info_v2_32*)arg, sizeof(n32)))
+		return -EFAULT;
+	if (n32.version != NCP_GET_FS_INFO_VERSION_V2)
+		return -EINVAL;
+	n.version = NCP_GET_FS_INFO_VERSION_V2;
+
+	set_fs(KERNEL_DS);
+	err = sys_ioctl(fd, NCP_IOC_GET_FS_INFO_V2, (unsigned long)&n);
+	set_fs(old_fs);
+
+	if (!err) {
+		n32.version = n.version;
+		n32.mounted_uid = n.mounted_uid;
+		n32.connection = n.connection;
+		n32.buffer_size = n.buffer_size;
+		n32.volume_number = n.volume_number;
+		n32.directory_id = n.directory_id;
+		n32.dummy1 = n.dummy1;
+		n32.dummy2 = n.dummy2;
+		n32.dummy3 = n.dummy3;
+		err = copy_to_user((struct ncp_fs_info_v2_32*)arg, &n32, sizeof(n32)) ? -EFAULT : 0;
+	}
+	return err;
+}
+
+static int do_ncp_getobjectname(unsigned int fd, unsigned int cmd, unsigned long arg)
+{
+	struct ncp_objectname_ioctl_32 n32;
+	struct ncp_objectname_ioctl n;
+	mm_segment_t old_fs;
+	int err;
+	size_t tl;
+
+	if (copy_from_user(&n32, (struct ncp_objectname_ioctl_32*)arg,
+	    sizeof(n32)))
+		return -EFAULT;
+
+	n.object_name_len = tl = n32.object_name_len;
+	if (tl) {
+		n.object_name = kmalloc(tl, GFP_KERNEL);
+		if (!n.object_name)
+			return -ENOMEM;
+	} else {
+		n.object_name = NULL;
+	}
+
+	old_fs = get_fs(); set_fs (KERNEL_DS);
+	err = sys_ioctl (fd, NCP_IOC_GETOBJECTNAME, (unsigned long)&n);
+	set_fs (old_fs);
+        if(err)
+		goto out;
+		
+	if (tl > n.object_name_len)
+		tl = n.object_name_len;
+
+	err = -EFAULT;
+	if (tl && copy_to_user(A(n32.object_name), n.object_name, tl))
+		goto out;
+
+	n32.auth_type = n.auth_type;
+	n32.object_name_len = n.object_name_len;
+	
+	if (copy_to_user((struct ncp_objectname_ioctl_32*)arg, &n32, sizeof(n32)))
+		goto out;
+	
+	err = 0;
+ out:
+ 	if (n.object_name)
+		kfree(n.object_name);
+
+	return err;
+}
+
+static int do_ncp_setobjectname(unsigned int fd, unsigned int cmd, unsigned long arg)
+{
+	struct ncp_objectname_ioctl_32 n32;
+	struct ncp_objectname_ioctl n;
+	mm_segment_t old_fs;
+	int err;
+	size_t tl;
+
+	if (copy_from_user(&n32, (struct ncp_objectname_ioctl_32*)arg,
+	    sizeof(n32)))
+		return -EFAULT;
+
+	n.auth_type = n32.auth_type;
+	n.object_name_len = tl = n32.object_name_len;
+	if (tl) {
+		n.object_name = kmalloc(tl, GFP_KERNEL);
+		if (!n.object_name)
+			return -ENOMEM;
+		err = -EFAULT;
+		if (copy_from_user(n.object_name, A(n32.object_name), tl))
+			goto out;
+	} else {
+		n.object_name = NULL;
+	}
+	
+	old_fs = get_fs(); set_fs (KERNEL_DS);
+	err = sys_ioctl (fd, NCP_IOC_SETOBJECTNAME, (unsigned long)&n);
+	set_fs (old_fs);
+		
+ out:
+	if (n.object_name)
+		kfree(n.object_name);
+
+	return err;
+}
+
+static int do_ncp_getprivatedata(unsigned int fd, unsigned int cmd, unsigned long arg)
+{
+	struct ncp_privatedata_ioctl_32 n32;
+	struct ncp_privatedata_ioctl n;
+	mm_segment_t old_fs;
+	int err;
+	size_t tl;
+
+	if (copy_from_user(&n32, (struct ncp_privatedata_ioctl_32*)arg,
+	    sizeof(n32)))
+		return -EFAULT;
+
+	n.len = tl = n32.len;
+	if (tl) {
+		n.data = kmalloc(tl, GFP_KERNEL);
+		if (!n.data)
+			return -ENOMEM;
+	} else {
+		n.data = NULL;
+	}
+
+	old_fs = get_fs(); set_fs (KERNEL_DS);
+	err = sys_ioctl (fd, NCP_IOC_GETPRIVATEDATA, (unsigned long)&n);
+	set_fs (old_fs);
+        if(err)
+		goto out;
+		
+	if (tl > n.len)
+		tl = n.len;
+
+	err = -EFAULT;
+	if (tl && copy_to_user(A(n32.data), n.data, tl))
+		goto out;
+
+	n32.len = n.len;
+	
+	if (copy_to_user((struct ncp_privatedata_ioctl_32*)arg, &n32, sizeof(n32)))
+		goto out;
+	
+	err = 0;
+ out:
+ 	if (n.data)
+		kfree(n.data);
+
+	return err;
+}
+
+static int do_ncp_setprivatedata(unsigned int fd, unsigned int cmd, unsigned long arg)
+{
+	struct ncp_privatedata_ioctl_32 n32;
+	struct ncp_privatedata_ioctl n;
+	mm_segment_t old_fs;
+	int err;
+	size_t tl;
+
+	if (copy_from_user(&n32, (struct ncp_privatedata_ioctl_32*)arg,
+	    sizeof(n32)))
+		return -EFAULT;
+
+	n.len = tl = n32.len;
+	if (tl) {
+		n.data = kmalloc(tl, GFP_KERNEL);
+		if (!n.data)
+			return -ENOMEM;
+		err = -EFAULT;
+		if (copy_from_user(n.data, A(n32.data), tl))
+			goto out;
+	} else {
+		n.data = NULL;
+	}
+	
+	old_fs = get_fs(); set_fs (KERNEL_DS);
+	err = sys_ioctl (fd, NCP_IOC_SETPRIVATEDATA, (unsigned long)&n);
+	set_fs (old_fs);
+		
+ out:
+	if (n.data)
+		kfree(n.data);
+
+	return err;
+}
+
 
 struct atmif_sioc32 {
         int                number;
@@ -4508,6 +4810,18 @@ COMPATIBLE_IOCTL(RAW_SETBIND)
 COMPATIBLE_IOCTL(RAW_GETBIND)
 /* SMB ioctls which do not need any translations */
 COMPATIBLE_IOCTL(SMB_IOC_NEWCONN)
+/* NCP ioctls which do not need any translations */
+COMPATIBLE_IOCTL(NCP_IOC_CONN_LOGGED_IN)
+COMPATIBLE_IOCTL(NCP_IOC_SIGN_INIT)
+COMPATIBLE_IOCTL(NCP_IOC_SIGN_WANTED)
+COMPATIBLE_IOCTL(NCP_IOC_SET_SIGN_WANTED)
+COMPATIBLE_IOCTL(NCP_IOC_LOCKUNLOCK)
+COMPATIBLE_IOCTL(NCP_IOC_GETROOT)
+COMPATIBLE_IOCTL(NCP_IOC_SETROOT)
+COMPATIBLE_IOCTL(NCP_IOC_GETCHARSETS)
+COMPATIBLE_IOCTL(NCP_IOC_SETCHARSETS)
+COMPATIBLE_IOCTL(NCP_IOC_GETDENTRYTTL)
+COMPATIBLE_IOCTL(NCP_IOC_SETDENTRYTTL)
 /* Little a */
 COMPATIBLE_IOCTL(ATMSIGD_CTRL)
 COMPATIBLE_IOCTL(ATMARPD_CTRL)
@@ -4754,6 +5068,14 @@ HANDLE_IOCTL(VIDIOCSFREQ32, do_video_ioctl)
 /* One SMB ioctl needs translations. */
 #define SMB_IOC_GETMOUNTUID_32 _IOR('u', 1, __kernel_uid_t32)
 HANDLE_IOCTL(SMB_IOC_GETMOUNTUID_32, do_smb_getmountuid)
+/* NCPFS */
+HANDLE_IOCTL(NCP_IOC_NCPREQUEST_32, do_ncp_ncprequest)
+HANDLE_IOCTL(NCP_IOC_GETMOUNTUID2_32, do_ncp_getmountuid2)
+HANDLE_IOCTL(NCP_IOC_GET_FS_INFO_V2_32, do_ncp_getfsinfo2)
+HANDLE_IOCTL(NCP_IOC_GETOBJECTNAME_32, do_ncp_getobjectname)
+HANDLE_IOCTL(NCP_IOC_SETOBJECTNAME_32, do_ncp_setobjectname)
+HANDLE_IOCTL(NCP_IOC_GETPRIVATEDATA_32, do_ncp_getprivatedata)
+HANDLE_IOCTL(NCP_IOC_SETPRIVATEDATA_32, do_ncp_setprivatedata)
 HANDLE_IOCTL(ATM_GETLINKRATE32, do_atm_ioctl)
 HANDLE_IOCTL(ATM_GETNAMES32, do_atm_ioctl)
 HANDLE_IOCTL(ATM_GETTYPE32, do_atm_ioctl)
