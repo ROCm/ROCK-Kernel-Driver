@@ -67,19 +67,22 @@ static void flush_kernel_map(void *dummy)
 
 static void set_pmd_pte(pte_t *kpte, unsigned long address, pte_t pte) 
 { 
+	struct page *page;
+	unsigned long flags;
+
 	set_pte_atomic(kpte, pte); 	/* change init_mm */
-#ifndef CONFIG_X86_PAE
-	{
-		struct list_head *l;
-		spin_lock(&mmlist_lock);
-		list_for_each(l, &init_mm.mmlist) {
-			struct mm_struct *mm = list_entry(l, struct mm_struct, mmlist);
-			pmd_t *pmd = pmd_offset(pgd_offset(mm, address), address);
-			set_pte_atomic((pte_t *)pmd, pte);
-		}
-		spin_unlock(&mmlist_lock);
+	if (PTRS_PER_PMD > 1)
+		return;
+
+	spin_lock_irqsave(&pgd_lock, flags);
+	for (page = pgd_list; page; page = (struct page *)page->index) {
+		pgd_t *pgd;
+		pmd_t *pmd;
+		pgd = (pgd_t *)page_address(page) + pgd_index(address);
+		pmd = pmd_offset(pgd, address);
+		set_pte_atomic((pte_t *)pmd, pte);
 	}
-#endif
+	spin_unlock_irqrestore(&pgd_lock, flags);
 }
 
 /* 

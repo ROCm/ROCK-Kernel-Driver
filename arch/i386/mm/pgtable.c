@@ -12,6 +12,7 @@
 #include <linux/highmem.h>
 #include <linux/slab.h>
 #include <linux/pagemap.h>
+#include <linux/spinlock.h>
 
 #include <asm/system.h>
 #include <asm/pgtable.h>
@@ -151,30 +152,97 @@ struct page *pte_alloc_one(struct mm_struct *mm, unsigned long address)
 	return pte;
 }
 
-#ifdef CONFIG_X86_PAE
+void pmd_ctor(void *pmd, kmem_cache_t *cache, unsigned long flags)
+{
+	memset(pmd, 0, PTRS_PER_PMD*sizeof(pmd_t));
+}
+
+/*
+ * List of all pgd's needed for non-PAE so it can invalidate entries
+ * in both cached and uncached pgd's; not needed for PAE since the
+ * kernel pmd is shared. If PAE were not to share the pmd a similar
+ * tactic would be needed. This is essentially codepath-based locking
+ * against pageattr.c; it is the unique case in which a valid change
+ * of kernel pagetables can't be lazily synchronized by vmalloc faults.
+ * vmalloc faults work because attached pagetables are never freed.
+ * If the locking proves to be non-performant, a ticketing scheme with
+ * checks at dup_mmap(), exec(), and other mmlist addition points
+ * could be used. The locking scheme was chosen on the basis of
+ * manfred's recommendations and having no core impact whatsoever.
+ * -- wli
+ */
+spinlock_t pgd_lock = SPIN_LOCK_UNLOCKED;
+struct page *pgd_list;
+
+static inline void pgd_list_add(pgd_t *pgd)
+{
+	struct page *page = virt_to_page(pgd);
+	page->index = (unsigned long)pgd_list;
+	if (pgd_list)
+		pgd_list->private = (unsigned long)&page->index;
+	pgd_list = page;
+	page->private = (unsigned long)&pgd_list;
+}
+
+static inline void pgd_list_del(pgd_t *pgd)
+{
+	struct page *next, **pprev, *page = virt_to_page(pgd);
+	next = (struct page *)page->index;
+	pprev = (struct page **)page->private;
+	*pprev = next;
+	if (next)
+		next->private = (unsigned long)pprev;
+}
+
+void pgd_ctor(void *pgd, kmem_cache_t *cache, unsigned long unused)
+{
+	unsigned long flags;
+
+	if (PTRS_PER_PMD == 1)
+		spin_lock_irqsave(&pgd_lock, flags);
+
+	memcpy((pgd_t *)pgd + USER_PTRS_PER_PGD,
+			swapper_pg_dir + USER_PTRS_PER_PGD,
+			(PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
+
+	if (PTRS_PER_PMD > 1)
+		return;
+
+	pgd_list_add(pgd);
+	spin_unlock_irqrestore(&pgd_lock, flags);
+	memset(pgd, 0, USER_PTRS_PER_PGD*sizeof(pgd_t));
+}
+
+/* never called when PTRS_PER_PMD > 1 */
+void pgd_dtor(void *pgd, kmem_cache_t *cache, unsigned long unused)
+{
+	unsigned long flags; /* can be called from interrupt context */
+
+	spin_lock_irqsave(&pgd_lock, flags);
+	pgd_list_del(pgd);
+	spin_unlock_irqrestore(&pgd_lock, flags);
+}
 
 pgd_t *pgd_alloc(struct mm_struct *mm)
 {
 	int i;
-	pgd_t *pgd = kmem_cache_alloc(pae_pgd_cachep, GFP_KERNEL);
+	pgd_t *pgd = kmem_cache_alloc(pgd_cache, GFP_KERNEL);
 
-	if (pgd) {
-		for (i = 0; i < USER_PTRS_PER_PGD; i++) {
-			unsigned long pmd = __get_free_page(GFP_KERNEL);
-			if (!pmd)
-				goto out_oom;
-			clear_page(pmd);
-			set_pgd(pgd + i, __pgd(1 + __pa(pmd)));
-		}
-		memcpy(pgd + USER_PTRS_PER_PGD,
-			swapper_pg_dir + USER_PTRS_PER_PGD,
-			(PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
+	if (PTRS_PER_PMD == 1 || !pgd)
+		return pgd;
+
+	for (i = 0; i < USER_PTRS_PER_PGD; ++i) {
+		pmd_t *pmd = kmem_cache_alloc(pmd_cache, GFP_KERNEL);
+		if (!pmd)
+			goto out_oom;
+		set_pgd(&pgd[i], __pgd(1 + __pa((u64)((u32)pmd))));
 	}
 	return pgd;
+
 out_oom:
 	for (i--; i >= 0; i--)
-		free_page((unsigned long)__va(pgd_val(pgd[i])-1));
-	kmem_cache_free(pae_pgd_cachep, pgd);
+		kmem_cache_free(pmd_cache, (void *)__va(pgd_val(pgd[i])-1));
+	kmem_cache_free(pgd_cache, pgd);
 	return NULL;
 }
 
@@ -182,30 +250,10 @@ void pgd_free(pgd_t *pgd)
 {
 	int i;
 
-	for (i = 0; i < USER_PTRS_PER_PGD; i++)
-		free_page((unsigned long)__va(pgd_val(pgd[i])-1));
-	kmem_cache_free(pae_pgd_cachep, pgd);
+	/* in the PAE case user pgd entries are overwritten before usage */
+	if (PTRS_PER_PMD > 1)
+		for (i = 0; i < USER_PTRS_PER_PGD; ++i)
+			kmem_cache_free(pmd_cache, (void *)__va(pgd_val(pgd[i])-1));
+	/* in the non-PAE case, clear_page_tables() clears user pgd entries */
+	kmem_cache_free(pgd_cache, pgd);
 }
-
-#else
-
-pgd_t *pgd_alloc(struct mm_struct *mm)
-{
-	pgd_t *pgd = (pgd_t *)__get_free_page(GFP_KERNEL);
-
-	if (pgd) {
-		memset(pgd, 0, USER_PTRS_PER_PGD * sizeof(pgd_t));
-		memcpy(pgd + USER_PTRS_PER_PGD,
-			swapper_pg_dir + USER_PTRS_PER_PGD,
-			(PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
-	}
-	return pgd;
-}
-
-void pgd_free(pgd_t *pgd)
-{
-	free_page((unsigned long)pgd);
-}
-
-#endif /* CONFIG_X86_PAE */
-
