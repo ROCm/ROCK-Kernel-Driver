@@ -14,10 +14,22 @@
 #include <linux/agp_backend.h>
 #include "agp.h"
 
-static int agp_try_unsupported __initdata = 0;
-
 static int via_fetch_size(void)
 {
+	int i;
+	u8 temp;
+	struct aper_size_info_32 *values;
+
+	values = A_SIZE_32(agp_bridge.aperture_sizes);
+	pci_read_config_byte(agp_bridge.dev, VIA_AGP3_APSIZE, &temp);
+	for (i = 0; i < agp_bridge.num_aperture_sizes; i++) {
+		if (temp == values[i].size_value) {
+			agp_bridge.previous_size =
+			agp_bridge.current_size = (void *) (values + i);
+			agp_bridge.aperture_size_idx = i;
+			return values[i].size;
+		}
+	}
 	return 0;
 }
 
@@ -41,15 +53,18 @@ static unsigned long via_mask_memory(unsigned long addr, int type)
 	return addr | agp_bridge.masks[0].mask;
 }
 
-static struct aper_size_info_8 via_generic_sizes[7] =
+static struct aper_size_info_32 via_generic_sizes[11] =
 {
-	{256, 65536, 6, 0},
-	{128, 32768, 5, 128},
-	{64, 16384, 4, 192},
-	{32, 8192, 3, 224},
-	{16, 4096, 2, 240},
-	{8, 2048, 1, 248},
-	{4, 1024, 0, 252}
+	{ 4,     1024,  0, 1<<11|1<<10|1<<9|1<<8|1<<5|1<<4|1<<3|1<<2|1<<1|1<<0 },
+	{ 8,     2048,  1, 1<<11|1<<10|1<<9|1<<8|1<<5|1<<4|1<<3|1<<2|1<<1},
+	{ 16,    4096,  2, 1<<11|1<<10|1<<9|1<<8|1<<5|1<<4|1<<3|1<<2},
+	{ 32,    8192,  3, 1<<11|1<<10|1<<9|1<<8|1<<5|1<<4|1<<3},
+	{ 64,   16384,  4, 1<<11|1<<10|1<<9|1<<8|1<<5|1<<4},
+	{ 128,  32768,  5, 1<<11|1<<10|1<<9|1<<8|1<<5},
+	{ 256,  65536,  6, 1<<11|1<<10|1<<9|1<<8},
+	{ 512,  131072, 7, 1<<11|1<<10|1<<9},
+	{ 1024, 262144, 8, 1<<11|1<<10},
+	{ 2048, 524288, 9, 1<<11}	/* 2GB <- Max supported */
 };
 
 static struct gatt_mask via_generic_masks[] =
@@ -158,7 +173,6 @@ static void __exit agp_via_cleanup(void)
 module_init(agp_via_init);
 module_exit(agp_via_cleanup);
 
-MODULE_PARM(agp_try_unsupported, "1i");
 MODULE_AUTHOR("Dave Jones <davej@codemonkey.org.uk>");
 MODULE_LICENSE("GPL and additional rights");
 
