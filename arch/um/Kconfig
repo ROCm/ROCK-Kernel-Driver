@@ -38,6 +38,10 @@ config MODE_SKAS
 	bool
 	default y
 
+config LOG_BUF_SHIFT
+	int
+	default 14
+
 menu "Code maturity level options"
 
 config EXPERIMENTAL
@@ -194,6 +198,10 @@ source "net/Kconfig"
 
 source "fs/Kconfig"
 
+source "security/Kconfig"
+
+source "crypto/Kconfig"
+
 source "lib/Kconfig"
 
 menu "SCSI support"
@@ -220,6 +228,9 @@ menu "Kernel hacking"
 
 config DEBUG_SLAB
 	bool "Debug memory allocations"
+
+config DEBUG_SPINLOCK
+	bool "Debug spinlocks usage"
 
 config DEBUGSYM
 	bool "Enable kernel debugging symbols"

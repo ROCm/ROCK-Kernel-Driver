@@ -4,9 +4,8 @@
 struct page;
 
 #include "asm/arch/page.h"
+#include "asm/bug.h"
 
-#undef BUG
-#undef PAGE_BUG
 #undef __pa
 #undef __va
 #undef pfn_to_page
@@ -22,20 +21,6 @@ extern unsigned long uml_physmem;
 
 #define PAGE_OFFSET (uml_physmem)
 #define KERNELBASE PAGE_OFFSET
-
-#ifndef __ASSEMBLY__
-
-extern void stop(void);
-
-#define BUG() do { \
-	panic("kernel BUG at %s:%d!\n", __FILE__, __LINE__); \
-} while (0)
-
-#define PAGE_BUG(page) do { \
-	BUG(); \
-} while (0)
-
-#endif /* __ASSEMBLY__ */
 
 #define __va_space (8*1024*1024)
 
