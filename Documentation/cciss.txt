@@ -14,6 +14,8 @@ This driver is known to work with the following cards:
 	* SA 6400
 	* SA 6400 U320 Expansion Module
 	* SA 6i
+	* SA 6422
+	* SA V100
 
 If nodes are not already created in the /dev/cciss directory
 
