@@ -503,12 +503,12 @@ void sched_exit(task_t * p)
  * schedule_tail - first thing a freshly forked thread must call.
  * @prev: the thread we just switched away from.
  */
-#if CONFIG_SMP || CONFIG_PREEMPT
 asmlinkage void schedule_tail(task_t *prev)
 {
 	finish_arch_switch(this_rq(), prev);
+	if (current->set_child_tid)
+		put_user(current->pid, current->set_child_tid);
 }
-#endif
 
 /*
  * context_switch - switch to the new MM and the new
