@@ -1210,6 +1210,7 @@ struct airo_info {
 	APListRid		*APList;
 #define	PCI_SHARED_LEN		2*MPI_MAX_FIDS*PKTSIZE+RIDSIZE
 	u32			pci_state[16];
+	char			proc_name[IFNAMSIZ];
 };
 
 static inline int bap_read(struct airo_info *ai, u16 *pu16Dst, int bytelen,
@@ -3162,11 +3163,12 @@ static irqreturn_t airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs)
 			} else
 				hdrlen = ETH_ALEN * 2;
 
-			skb = dev_alloc_skb( len + hdrlen + 2 );
+			skb = dev_alloc_skb( len + hdrlen + 2 + 2 );
 			if ( !skb ) {
 				apriv->stats.rx_dropped++;
 				goto badrx;
 			}
+			skb_reserve(skb, 2); /* This way the IP header is aligned */
 			buffer = (u16*)skb_put (skb, len + hdrlen);
 			if (test_bit(FLAG_802_11, &apriv->flags)) {
 				buffer[0] = fc;
@@ -4369,7 +4371,8 @@ static int setup_proc_entry( struct net_device *dev,
 			     struct airo_info *apriv ) {
 	struct proc_dir_entry *entry;
 	/* First setup the device directory */
-	apriv->proc_entry = create_proc_entry(dev->name,
+	strcpy(apriv->proc_name,dev->name);
+	apriv->proc_entry = create_proc_entry(apriv->proc_name,
 					      S_IFDIR|airo_perm,
 					      airo_entry);
         apriv->proc_entry->uid = proc_uid;
@@ -4470,7 +4473,7 @@ static int takedown_proc_entry( struct net_device *dev,
 	remove_proc_entry("APList",apriv->proc_entry);
 	remove_proc_entry("BSSList",apriv->proc_entry);
 	remove_proc_entry("WepKey",apriv->proc_entry);
-	remove_proc_entry(dev->name,airo_entry);
+	remove_proc_entry(apriv->proc_name,airo_entry);
 	return 0;
 }
 

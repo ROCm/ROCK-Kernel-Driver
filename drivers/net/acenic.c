@@ -2007,6 +2007,11 @@ static void ace_rx_int(struct net_device *dev, u32 rxretprd, u32 rxretcsm)
 		int bd_flags, desc_type, mapsize;
 		u16 csum;
 
+
+		/* make sure the rx descriptor isn't read before rxretprd */
+		if (idx == rxretcsm) 
+			rmb();
+
 		retdesc = &ap->rx_return_ring[idx];
 		skbidx = retdesc->idx;
 		bd_flags = retdesc->flags;

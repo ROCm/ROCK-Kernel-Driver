@@ -57,8 +57,8 @@
 
 #define DRV_MODULE_NAME		"tg3"
 #define PFX DRV_MODULE_NAME	": "
-#define DRV_MODULE_VERSION	"3.7"
-#define DRV_MODULE_RELDATE	"July 2, 2004"
+#define DRV_MODULE_VERSION	"3.8"
+#define DRV_MODULE_RELDATE	"July 14, 2004"
 
 #define TG3_DEF_MAC_MODE	0
 #define TG3_DEF_RX_MODE		0
@@ -2455,6 +2455,11 @@ static int tg3_rx(struct tg3 *tp, int budget)
 	int received;
 
 	hw_idx = tp->hw_status->idx[0].rx_producer;
+	/*
+	 * We need to order the read of hw_idx and the read of
+	 * the opaque cookie.
+	 */
+	rmb();
 	sw_idx = rx_rcb_ptr % TG3_RX_RCB_RING_SIZE(tp);
 	work_mask = 0;
 	received = 0;

@@ -28,10 +28,6 @@ const int frequency_list_bg[] = { 2412, 2417, 2422, 2427, 2432, 2437, 2442,
 	2447, 2452, 2457, 2462, 2467, 2472, 2484
 };
 
-const int frequency_list_a[] = { 5170, 5180, 5190, 5200, 5210, 5220, 5230,
-	5240, 5260, 5280, 5300, 5320
-};
-
 int
 channel_of_freq(int f)
 {
@@ -41,10 +37,8 @@ channel_of_freq(int f)
 		while ((c < 14) && (f != frequency_list_bg[c]))
 			c++;
 		return (c >= 14) ? 0 : ++c;
-	} else if ((f >= (int) 5170) && (f <= (int) 5320)) {
-		while ((c < 12) && (f != frequency_list_a[c]))
-			c++;
-		return (c >= 12) ? 0 : (c + 37);
+	} else if ((f >= (int) 5000) && (f <= (int) 6000)) {
+		return ( (f - 5000) / 5 );
 	} else
 		return 0;
 }
@@ -68,7 +62,7 @@ struct oid_t isl_oid[] = {
 
 	/* 802.11 */
 	OID_U32_C(DOT11_OID_BSSTYPE, 0x10000000),
-	OID_STRUCT_C(DOT11_OID_BSSID, 0x10000001, u8[6], OID_TYPE_SSID),
+	OID_STRUCT_C(DOT11_OID_BSSID, 0x10000001, u8[6], OID_TYPE_RAW),
 	OID_STRUCT_C(DOT11_OID_SSID, 0x10000002, struct obj_ssid,
 		     OID_TYPE_SSID),
 	OID_U32(DOT11_OID_STATE, 0x10000003),
@@ -776,8 +770,9 @@ mgt_response_to_str(enum oid_num_t n, union oid_res_t *r, char *str)
 	case OID_TYPE_SSID:{
 			struct obj_ssid *ssid = r->ptr;
 			return snprintf(str, PRIV_STR_SIZE,
-					"length=%u\noctets=%s\n",
-					ssid->length, ssid->octets);
+					"length=%u\noctets=%.*s\n",
+					ssid->length, ssid->length,
+					ssid->octets);
 		}
 		break;
 	case OID_TYPE_KEY:{
