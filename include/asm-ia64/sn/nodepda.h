@@ -11,8 +11,8 @@
 
 #include <asm/semaphore.h>
 #include <asm/irq.h>
+#include <asm/sn/arch.h>
 #include <asm/sn/intr.h>
-#include <asm/sn/router.h>
 #include <asm/sn/pda.h>
 #include <asm/sn/bte.h>
 
