@@ -168,7 +168,8 @@ void mbx_i8259_action(int cpl, void *dev_id, struct pt_regs *regs)
  * drivers that may mess up the internal interrupt controllers, and also
  * allow them to run without modification on the MBX.
  */
-int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *),
+int request_irq(unsigned int irq,
+	irqreturn_t (*handler)(int, void *, struct pt_regs *),
 	unsigned long irqflags, const char * devname, void *dev_id)
 {
 
