@@ -7,6 +7,7 @@
 #include <linux/config.h>
 #include <linux/sched.h>
 #include <linux/spinlock.h>
+#include <linux/module.h>
 #include <asm/ppc_asm.h>
 #include <asm/smp.h>
 
