@@ -34,6 +34,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/serio.h>
+#include <linux/interrupt.h>
 
 #include <asm/keyboard.h>
 #include <asm/bitops.h>

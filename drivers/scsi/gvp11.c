@@ -4,6 +4,7 @@
 #include <linux/sched.h>
 #include <linux/version.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 
 #include <asm/setup.h>
 #include <asm/page.h>

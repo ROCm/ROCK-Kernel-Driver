@@ -251,6 +251,7 @@
 #include <linux/time.h>
 #include <linux/blk.h>
 #include <linux/spinlock.h>
+#include <linux/interrupt.h>
 #include <asm/pgtable.h>
 
 #ifdef CONFIG_AMIGA

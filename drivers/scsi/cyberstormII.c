@@ -24,6 +24,7 @@
 #include <linux/blk.h>
 #include <linux/proc_fs.h>
 #include <linux/stat.h>
+#include <linux/interrupt.h>
 
 #include "scsi.h"
 #include "hosts.h"

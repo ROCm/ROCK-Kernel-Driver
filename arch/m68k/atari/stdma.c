@@ -33,6 +33,7 @@
 #include <linux/genhd.h>
 #include <linux/sched.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 
 #include <asm/atari_stdma.h>
 #include <asm/atariints.h>

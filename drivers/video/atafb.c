@@ -57,6 +57,7 @@
 #include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 
 #include <asm/setup.h>
 #include <asm/uaccess.h>

@@ -12,6 +12,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/parport.h>
+#include <linux/interrupt.h>
 #include <asm/setup.h>
 #include <asm/atarihw.h>
 #include <asm/irq.h>

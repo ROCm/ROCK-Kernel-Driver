@@ -21,6 +21,7 @@
 #include <linux/delay.h>
 #include <linux/sched.h>
 #include <linux/adb.h>
+#include <linux/interrupt.h>
 #include <asm/macintosh.h>
 #include <asm/macints.h>
 #include <asm/machw.h>

@@ -3,6 +3,7 @@
 #include <linux/blk.h>
 #include <linux/sched.h>
 #include <linux/version.h>
+#include <linux/interrupt.h>
 
 #include <asm/page.h>
 #include <asm/pgtable.h>

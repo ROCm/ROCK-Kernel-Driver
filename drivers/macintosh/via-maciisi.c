@@ -22,6 +22,7 @@
 #include <linux/adb.h>
 #include <linux/cuda.h>
 #include <linux/delay.h>
+#include <linux/interrupt.h>
 #include <asm/macintosh.h>
 #include <asm/macints.h>
 #include <asm/machw.h>

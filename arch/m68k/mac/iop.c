@@ -111,6 +111,7 @@
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/proc_fs.h>
+#include <linux/interrupt.h>
 
 #include <asm/bootinfo.h> 
 #include <asm/macintosh.h> 

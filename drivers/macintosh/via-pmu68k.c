@@ -28,6 +28,7 @@
 #include <linux/pci.h>
 #include <linux/slab.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 
 #include <linux/adb.h>
 #include <linux/pmu.h>

@@ -6,6 +6,7 @@
 #include <linux/ioport.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>
+#include <linux/interrupt.h>
 
 #include <asm/setup.h>
 #include <asm/page.h>
