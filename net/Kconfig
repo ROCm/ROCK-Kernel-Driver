@@ -391,10 +391,10 @@ config BRIDGE
 	  for location. Please read the Bridge mini-HOWTO for more
 	  information.
 
-	  Note that if your box acts as a bridge, it probably contains several
-	  Ethernet devices, but the kernel is not able to recognize more than
-	  one at boot time without help; for details read the Ethernet-HOWTO,
-	  available from in <http://www.linuxdoc.org/docs.html#howto>.
+	  If you enable iptables support along with the bridge support then you
+	  turn your bridge into a bridging firewall.
+	  iptables will then see the IP packets being bridged, so you need to
+	  take this into account when setting up your firewall rules.
 
 	  If you want to compile this code as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),

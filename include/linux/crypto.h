@@ -67,7 +67,8 @@ struct scatterlist;
  * via crypto_register_alg() and crypto_unregister_alg().
  */
 struct cipher_alg {
-	unsigned int cia_keysize;
+	unsigned int cia_min_keysize;
+	unsigned int cia_max_keysize;
 	unsigned int cia_ivsize;
 	int (*cia_setkey)(void *ctx, const u8 *key,
 	                  unsigned int keylen, u32 *flags);
@@ -208,9 +209,14 @@ static inline u32 crypto_tfm_alg_type(struct crypto_tfm *tfm)
 	return tfm->__crt_alg->cra_flags & CRYPTO_ALG_TYPE_MASK;
 }
 
-static inline unsigned int crypto_tfm_alg_keysize(struct crypto_tfm *tfm)
+static inline unsigned int crypto_tfm_alg_min_keysize(struct crypto_tfm *tfm)
 {
-	return tfm->__crt_alg->cra_cipher.cia_keysize;
+	return tfm->__crt_alg->cra_cipher.cia_min_keysize;
+}
+
+static inline unsigned int crypto_tfm_alg_max_keysize(struct crypto_tfm *tfm)
+{
+	return tfm->__crt_alg->cra_cipher.cia_max_keysize;
 }
 
 static inline unsigned int crypto_tfm_alg_ivsize(struct crypto_tfm *tfm)
