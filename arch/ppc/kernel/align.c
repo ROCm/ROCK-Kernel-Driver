@@ -262,8 +262,12 @@ fix_alignment(struct pt_regs *regs)
 			return -EFAULT;	/* bad address */
 	}
 
-	if ((flags & F) && (regs->msr & MSR_FP))
-		giveup_fpu(current);
+	if (flags & F) {
+		preempt_disable();
+		if (regs->msr & MSR_FP)
+			giveup_fpu(current);
+		preempt_enable();
+	}
 	if (flags & M)
 		return 0;		/* too hard for now */
 

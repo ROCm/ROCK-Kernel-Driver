@@ -242,8 +242,10 @@ int sys_ptrace(long request, long pid, long addr, long data)
 		if (index < PT_FPR0) {
 			tmp = get_reg(child, (int) index);
 		} else {
+			preempt_disable();
 			if (child->thread.regs->msr & MSR_FP)
 				giveup_fpu(child);
+			preempt_enable();
 			tmp = ((unsigned long *)child->thread.fpr)[index - PT_FPR0];
 		}
 		ret = put_user(tmp,(unsigned long *) data);
@@ -276,8 +278,10 @@ int sys_ptrace(long request, long pid, long addr, long data)
 		if (index < PT_FPR0) {
 			ret = put_reg(child, index, data);
 		} else {
+			preempt_disable();
 			if (child->thread.regs->msr & MSR_FP)
 				giveup_fpu(child);
+			preempt_enable();
 			((unsigned long *)child->thread.fpr)[index - PT_FPR0] = data;
 			ret = 0;
 		}
@@ -338,8 +342,10 @@ int sys_ptrace(long request, long pid, long addr, long data)
 #ifdef CONFIG_ALTIVEC
 	case PTRACE_GETVRREGS:
 		/* Get the child altivec register state. */
+		preempt_disable();
 		if (child->thread.regs->msr & MSR_VEC)
 			giveup_altivec(child);
+		preempt_enable();
 		ret = get_vrregs((unsigned long *)data, child);
 		break;
 
@@ -347,8 +353,10 @@ int sys_ptrace(long request, long pid, long addr, long data)
 		/* Set the child altivec register state. */
 		/* this is to clear the MSR_VEC bit to force a reload
 		 * of register state from memory */
+		preempt_disable();
 		if (child->thread.regs->msr & MSR_VEC)
 			giveup_altivec(child);
+		preempt_enable();
 		ret = set_vrregs(child, (unsigned long *)data);
 		break;
 #endif
