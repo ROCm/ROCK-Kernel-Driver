@@ -55,18 +55,13 @@
 #define UNW_HASH_SIZE		(1 << UNW_LOG_HASH_SIZE)
 
 #define UNW_STATS	0	/* WARNING: this disabled interrupts for long time-spans!! */
+#define UNW_DEBUG	0
 
 #ifdef UNW_DEBUG
   static unsigned int unw_debug_level = UNW_DEBUG;
-#  ifdef CONFIG_KDB
-#    include <linux/kdb.h>
-#    define UNW_DEBUG_ON(n)	(unw_debug_level >= n && !KDB_IS_RUNNING())
-#    define UNW_DPRINT(n, ...)	if (UNW_DEBUG_ON(n)) kdb_printf(__VA_ARGS__)
-#  else	/* !CONFIG_KDB */
-#    define UNW_DEBUG_ON(n)	unw_debug_level >= n
-     /* Do not code a printk level, not all debug lines end in newline */
-#    define UNW_DPRINT(n, ...)  if (UNW_DEBUG_ON(n)) printk(__VA_ARGS__)
-#  endif /* CONFIG_KDB */
+#  define UNW_DEBUG_ON(n)	unw_debug_level >= n
+   /* Do not code a printk level, not all debug lines end in newline */
+#  define UNW_DPRINT(n, ...)  if (UNW_DEBUG_ON(n)) printk(__VA_ARGS__)
 #  define inline
 #else /* !UNW_DEBUG */
 #  define UNW_DEBUG_ON(n)  0
@@ -2124,7 +2119,7 @@ unw_remove_unwind_table (void *handle)
 	kfree(table);
 }
 
-static void __init
+static int __init
 create_gate_table (void)
 {
 	const struct unw_table_entry *entry, *start, *end;
@@ -2142,7 +2137,7 @@ create_gate_table (void)
 
 	if (!punw) {
 		printk("%s: failed to find gate DSO's unwind table!\n", __FUNCTION__);
-		return;
+		return 0;
 	}
 
 	start = (const struct unw_table_entry *) punw->p_vaddr;
@@ -2159,7 +2154,7 @@ create_gate_table (void)
 	if (!unw.gate_table) {
 		unw.gate_table_size = 0;
 		printk(KERN_ERR "%s: unable to create unwind data for gate page!\n", __FUNCTION__);
-		return;
+		return 0;
 	}
 	unw.gate_table_size = size;
 
@@ -2176,6 +2171,7 @@ create_gate_table (void)
 		lp[2] = info - (char *) unw.gate_table;		/* info */
 	}
 	*lp = 0;	/* end-of-table marker */
+	return 0;
 }
 
 __initcall(create_gate_table);
