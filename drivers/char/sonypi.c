@@ -1,4 +1,4 @@
-/* 
+/*
  * Sony Programmable I/O Control Device driver for VAIO
  *
  * Copyright (C) 2001 Stelian Pop <stelian.pop@fr.alcove.com>, Alcôve
@@ -542,7 +542,7 @@ static int sonypi_misc_ioctl(struct inode *ip, struct file *fp,
 	down(&sonypi_device.lock);
 	switch (cmd) {
 	case SONYPI_IOCGBRT:
-		val8 = sonypi_ecrget(0x96);
+		val8 = sonypi_ecrget(SONYPI_LCD_LIGHT);
 		if (copy_to_user((u8 *)arg, &val8, sizeof(val8))) {
 			ret = -EFAULT;
 			goto out;
@@ -553,38 +553,38 @@ static int sonypi_misc_ioctl(struct inode *ip, struct file *fp,
 			ret = -EFAULT;
 			goto out;
 		}
-		sonypi_ecrset(0x96, val8);
+		sonypi_ecrset(SONYPI_LCD_LIGHT, val8);
 		break;
 	case SONYPI_IOCGBAT1CAP:
-		val16 = sonypi_ecrget16(0xb2);
+		val16 = sonypi_ecrget16(SONYPI_BAT1_FULL);
 		if (copy_to_user((u16 *)arg, &val16, sizeof(val16))) {
 			ret = -EFAULT;
 			goto out;
 		}
 		break;
 	case SONYPI_IOCGBAT1REM:
-		val16 = sonypi_ecrget16(0xa2);
+		val16 = sonypi_ecrget16(SONYPI_BAT1_LEFT);
 		if (copy_to_user((u16 *)arg, &val16, sizeof(val16))) {
 			ret = -EFAULT;
 			goto out;
 		}
 		break;
 	case SONYPI_IOCGBAT2CAP:
-		val16 = sonypi_ecrget16(0xba);
+		val16 = sonypi_ecrget16(SONYPI_BAT2_FULL);
 		if (copy_to_user((u16 *)arg, &val16, sizeof(val16))) {
 			ret = -EFAULT;
 			goto out;
 		}
 		break;
 	case SONYPI_IOCGBAT2REM:
-		val16 = sonypi_ecrget16(0xaa);
+		val16 = sonypi_ecrget16(SONYPI_BAT2_LEFT);
 		if (copy_to_user((u16 *)arg, &val16, sizeof(val16))) {
 			ret = -EFAULT;
 			goto out;
 		}
 		break;
 	case SONYPI_IOCGBATFLAGS:
-		val8 = sonypi_ecrget(0x81) & 0x07;
+		val8 = sonypi_ecrget(SONYPI_BAT_FLAGS) & 0x07;
 		if (copy_to_user((u8 *)arg, &val8, sizeof(val8))) {
 			ret = -EFAULT;
 			goto out;
