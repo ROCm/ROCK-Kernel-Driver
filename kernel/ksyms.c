@@ -286,8 +286,11 @@ EXPORT_SYMBOL(dcache_readdir);
 EXPORT_SYMBOL(fd_install);
 EXPORT_SYMBOL(put_unused_fd);
 EXPORT_SYMBOL(get_sb_bdev);
+EXPORT_SYMBOL(kill_block_super);
 EXPORT_SYMBOL(get_sb_nodev);
 EXPORT_SYMBOL(get_sb_single);
+EXPORT_SYMBOL(kill_anon_super);
+EXPORT_SYMBOL(kill_litter_super);
 
 /* for stackable file systems (lofs, wrapfs, cryptfs, etc.) */
 EXPORT_SYMBOL(default_llseek);

@@ -459,7 +459,10 @@ void kill_super(struct super_block *sb)
 		return;
 
 	down_write(&sb->s_umount);
-	shutdown_super(sb);
+	if (fs->kill_sb)
+		fs->kill_sb(sb);
+	else
+		shutdown_super(sb);
 	put_filesystem(fs);
 }
 
@@ -682,6 +685,22 @@ retry:
 	insert_super(s, type);
 	return s;
 }
+ 
+void kill_anon_super(struct super_block *sb)
+{
+	int slot = minor(sb->s_dev);
+	generic_shutdown_super(sb);
+	spin_lock(&unnamed_dev_lock);
+	clear_bit(slot, unnamed_dev_in_use);
+	spin_unlock(&unnamed_dev_lock);
+}
+
+void kill_litter_super(struct super_block *sb)
+{
+	if (sb->s_root)
+		d_genocide(sb->s_root);
+	kill_anon_super(sb);
+}
 
 struct super_block *get_sb_bdev(struct file_system_type *fs_type,
 	int flags, char *dev_name, void * data,
@@ -781,6 +800,14 @@ out1:
 out:
 	path_release(&nd);
 	return ERR_PTR(error);
+}
+
+void kill_block_super(struct super_block *sb)
+{
+	struct block_device *bdev = sb->s_bdev;
+	generic_shutdown_super(sb);
+	bd_release(bdev);
+	blkdev_put(bdev, BDEV_FS);
 }
 
 struct super_block *get_sb_nodev(struct file_system_type *fs_type,
