@@ -497,7 +497,8 @@ xfs_log_mount(xfs_mount_t	*mp,
 
 #if defined(DEBUG) || defined(XLOG_NOLOG)
 	if (! xlog_debug) {
-		cmn_err(CE_NOTE, "log dev: 0x%x", log_dev);
+		cmn_err(CE_NOTE, "log dev: %u:%u",
+			MAJOR(log_dev), MINOR(log_dev));
 		return 0;
 	}
 #endif

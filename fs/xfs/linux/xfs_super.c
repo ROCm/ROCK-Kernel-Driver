@@ -174,7 +174,7 @@ xfs_revalidate_inode(
 		inode->i_rdev = 0;
 	} else {
 		xfs_dev_t dev = ip->i_df.if_u2.if_rdev;
-		inode->i_rdev = XFS_DEV_TO_KDEVT(dev);
+		inode->i_rdev = XFS_DEV_TO_DEVT(dev);
 	}
 	inode->i_blksize = PAGE_CACHE_SIZE;
 	inode->i_generation = ip->i_d.di_gen;
@@ -315,8 +315,8 @@ xfs_setsize_buftarg(
 
 	if (set_blocksize(btp->pbr_bdev, sectorsize)) {
 		printk(KERN_WARNING
-			"XFS: Cannot set_blocksize to %u on device 0x%lx\n",
-			sectorsize, (unsigned long)btp->pbr_dev);
+			"XFS: Cannot set_blocksize to %u on device %u:%u\n",
+			sectorsize, MAJOR(btp->pbr_dev), MINOR(btp->pbr_dev));
 	}
 }
 

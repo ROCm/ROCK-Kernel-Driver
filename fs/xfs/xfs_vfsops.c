@@ -781,7 +781,7 @@ xfs_statvfs(
 	statp->f_ffree = statp->f_files - (sbp->sb_icount - sbp->sb_ifree);
 	XFS_SB_UNLOCK(mp, s);
 
-	statp->f_fsid.val[0] = mp->m_dev;
+	statp->f_fsid.val[0] = old_encode_dev(mp->m_dev);
 	statp->f_fsid.val[1] = 0;
 	statp->f_namelen = MAXNAMELEN - 1;
 
