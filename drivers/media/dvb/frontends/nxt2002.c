@@ -246,7 +246,7 @@ static int nxt2002_load_firmware (struct dvb_frontend* fe, const struct firmware
 	u16 rambase,position,crc = 0;  
 
 	dprintk("%s\n", __FUNCTION__);
-	dprintk("Firmware is %d bytes\n",fw->size);
+	dprintk("Firmware is %zu bytes\n",fw->size);
 
 	/* Get the RAM base for this nxt2002 */
 	i2c_readbytes(state,0x10,buf,1);
