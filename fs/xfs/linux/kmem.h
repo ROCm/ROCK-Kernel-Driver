@@ -101,7 +101,7 @@ kmem_flags_convert(int flags)
 	if (PFLAGS_TEST_FSTRANS() || (flags & KM_NOFS))
 		lflags &= ~__GFP_FS;
 
-	return lflags | __GFP_NO_COMP;
+	return lflags;
 }
 
 static __inline void *
