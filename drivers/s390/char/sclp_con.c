@@ -97,7 +97,7 @@ sclp_console_timeout(unsigned long data)
 /*
  * Writes the given message to S390 system console
  */
-void
+static void
 sclp_console_write(struct console *console, const char *message,
 		   unsigned int count)
 {
@@ -152,7 +152,7 @@ sclp_console_write(struct console *console, const char *message,
 }
 
 /* returns the device number of the SCLP console */
-kdev_t
+static kdev_t
 sclp_console_device(struct console *c)
 {
 	return	mk_kdev(sclp_console_major, sclp_console_minor);
@@ -163,7 +163,7 @@ sclp_console_device(struct console *c)
  * is going to give up. We have to make sure that all buffers
  * will be flushed to the SCLP.
  */
-void
+static void
 sclp_console_unblank(void)
 {
 	unsigned long flags;
@@ -187,7 +187,7 @@ sclp_console_unblank(void)
  * used to register the SCLP console to the kernel and to
  * give printk necessary information
  */
-struct console sclp_console =
+static struct console sclp_console =
 {
 	.name = sclp_console_name,
 	.write = sclp_console_write,

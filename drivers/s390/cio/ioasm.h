@@ -260,7 +260,7 @@ extern __inline__ int xsch(int irq)
 	return ccode;
 }
 
-extern __inline__ int do_chsc(void *chsc_area)
+extern __inline__ int chsc(void *chsc_area)
 {
 	int cc;
 

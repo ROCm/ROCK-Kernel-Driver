@@ -4,5 +4,5 @@
 
 obj-$(CONFIG_MATHEMU) := math.o qrnnd.o
 
-EXTRA_CFLAGS = -I. -I$(TOPDIR)/include/math-emu -w
-EXTRA_AFLAGS	:= -traditional
+EXTRA_CFLAGS := -I$(src) -Iinclude/math-emu -w
+EXTRA_AFLAGS := -traditional

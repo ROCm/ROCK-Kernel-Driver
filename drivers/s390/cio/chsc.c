@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/chsc.c
  *   S/390 common I/O routines -- channel subsystem call
- *   $Revision: 1.43 $
+ *   $Revision: 1.46 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *			      IBM Corporation
@@ -36,26 +36,6 @@ static struct channel_path *chps[NR_CHPIDS];
 static int cio_chsc_desc_avail;
 
 static int new_channel_path(int chpid, int status);
-
-int
-chsc(void *data)
-{
-	void *area;
-	int cc;
-
-	if (!data)
-		return -EINVAL;
-
-	area = (void *)get_zeroed_page(GFP_KERNEL);
-	if (!area)
-		return -ENOMEM;
-	memcpy(area, data, PAGE_SIZE);
-	cc = do_chsc(area);
-	if (cc == 0)
-		memcpy(data, area, PAGE_SIZE);
-	free_page((unsigned long)area);
-	return cc;
-}
 
 static int
 set_chp_status(int chp, int status)
@@ -114,21 +94,18 @@ chsc_get_sch_desc_irq(int irq)
 	 * be page-aligned. Implement proper locking or dynamic
 	 * allocation or prove that this function does not have to be
 	 * reentrant! */
-	static struct chsc_area __attribute__ ((aligned(PAGE_SIZE))) chsc_area_ssd;
+	static struct ssd_area chsc_area_ssd 
+		__attribute__ ((aligned(PAGE_SIZE)));
 
-	typeof (chsc_area_ssd.response_block.response_block_data.ssd_res)
-		*ssd_res = &chsc_area_ssd.response_block.response_block_data.ssd_res;
+	typeof (chsc_area_ssd.response_block)
+		*ssd_res = &chsc_area_ssd.response_block;
 
-	chsc_area_ssd = (struct chsc_area) {
+	chsc_area_ssd = (struct ssd_area) {
 		.request_block = {
 			.command_code1 = 0x0010,
 			.command_code2 = 0x0004,
-			.request_block_data = {
-				.ssd_req = {
-					.f_sch = irq,
-					.l_sch = irq,
-				}
-			}
+			.f_sch = irq,
+			.l_sch = irq,
 		}
 	};
 
@@ -306,14 +283,59 @@ s390_set_chpid_offline( __u8 chpid)
 #endif
 }
 
-/* this used to be in s390_process_res_acc_*, FIXME: find a better name
- * for this function */
 static int
-s390_check_valid_chpid(u8 chpid)
+s390_process_res_acc_sch(u8 chpid, __u16 fla, u32 fla_mask,
+			 struct subchannel *sch)
 {
+	int found;
+	int chp;
+	int ccode;
+	
+	/* Update our ssd_info */
+	if (chsc_get_sch_desc_irq(sch->irq))
+		return 0;
+	
+	found = 0;
+	for (chp = 0; chp <= 7; chp++)
+		/*
+		 * check if chpid is in information updated by ssd
+		 */
+		if (sch->ssd_info.valid &&
+		    sch->ssd_info.chpid[chp] == chpid &&
+		    (sch->ssd_info.fla[chp] & fla_mask) == fla) {
+			found = 1;
+			break;
+		}
+	
+	if (found == 0)
+		return 0;
+
+	/*
+	 * Do a stsch to update our subchannel structure with the
+	 * new path information and eventually check for logically
+	 * offline chpids.
+	 */
+	ccode = stsch(sch->irq, &sch->schib);
+	if (ccode > 0)
+		return 0;
+
+	return 0x80 >> chp;
+}
+
+static void
+s390_process_res_acc (u8 chpid, __u16 fla, u32 fla_mask)
+{
+	struct subchannel *sch;
+	int irq;
+	int ret;
 	char dbf_txt[15];
+
 	sprintf(dbf_txt, "accpr%x", chpid);
 	CIO_TRACE_EVENT( 2, dbf_txt);
+	if (fla != 0) {
+		sprintf(dbf_txt, "fla%x", fla);
+		CIO_TRACE_EVENT( 2, dbf_txt);
+	}
 
 	/*
 	 * I/O resources may have become accessible.
@@ -333,31 +355,14 @@ s390_check_valid_chpid(u8 chpid)
 		CIO_CRW_EVENT(0, "Error: Could not retrieve "
 			      "subchannel descriptions, will not process css"
 			      "machine check...\n");
-		return 0;
+		return;
 	}
 
 	if (!test_bit(chpid, chpids_logical))
-		return 0; /* no need to do the rest */
-
-	return 1;
-}
-
-static void
-s390_process_res_acc_chpid (u8 chpid)
-{
-	struct subchannel *sch;
-	int irq;
-	int ccode;
-	int chp;
-	int ret;
-
-	if (!s390_check_valid_chpid(chpid))
-		return;
-
-	pr_debug( KERN_DEBUG "Looking at chpid %x...\n", chpid);
+		return; /* no need to do the rest */
 
 	for (irq = 0; irq <= __MAX_SUBCHANNELS; irq++) {
-		int found;
+		int chp_mask;
 
 		sch = ioinfo[irq];
 		if (!sch) {
@@ -375,122 +380,33 @@ s390_process_res_acc_chpid (u8 chpid)
 				return;
 			continue;
 		}
-
+	
 		spin_lock_irq(&sch->lock);
 
-		/* Update our ssd_info */
-		if (chsc_get_sch_desc_irq(sch->irq))
-			break;
+		chp_mask = s390_process_res_acc_sch(chpid, fla, fla_mask, sch);
+		if (chp_mask == 0) {
 
-		found = 0;
-		for (chp = 0; chp <= 7; chp++)
-			/*
-			 * check if chpid is in information updated by ssd
-			 */
-			if (sch->ssd_info.valid &&
-			    (sch->ssd_info.chpid[chp] == chpid)) {
-				found = 1;
+			spin_unlock_irq(&sch->lock);
+
+			if (fla_mask != 0)
 				break;
-			}
-
-		if (found == 0) {
-			spin_unlock_irq(&sch->lock);
-			continue;
-		}
-		/*
-		 * Do a stsch to update our subchannel structure with the
-		 * new path information and eventually check for logically
-		 * offline chpids.
-		 */
-		ccode = stsch(sch->irq, &sch->schib);
-		if (ccode > 0) {
-// FIXME:		ccw_device_recognition(cdev);
-			spin_unlock_irq(&sch->lock);
-			continue;
+			else
+				continue;
 		}
 
-		sch->lpm = sch->schib.pmcw.pim &
-			sch->schib.pmcw.pam &
-			sch->schib.pmcw.pom;
+		sch->lpm = (sch->schib.pmcw.pim &
+			    sch->schib.pmcw.pam &
+			    sch->schib.pmcw.pom)
+			| chp_mask;
 
 		chsc_validate_chpids(sch);
 
-		sch->lpm |= (0x80 >> chp);
 		dev_fsm_event(sch->dev.driver_data, DEV_EVENT_VERIFY);
 
 		spin_unlock_irq(&sch->lock);
-	}
-}
 
-static void
-s390_process_res_acc_linkaddr ( __u8 chpid, __u16 fla, u32 fla_mask)
-{
-	char dbf_txt[15];
-	struct subchannel *sch;
-	int irq;
-	int ccode;
-	int ret;
-	int j;
-
-	if (!s390_check_valid_chpid(chpid))
-		return;
-
-	sprintf(dbf_txt, "fla%x", fla);
-	CIO_TRACE_EVENT( 2, dbf_txt);
-
-	pr_debug(KERN_DEBUG "Looking at chpid %x, link addr %x...\n", chpid, fla);
-	for (irq = 0; irq <= __MAX_SUBCHANNELS; irq++) {
-		int found;
-		
-		sch = ioinfo[irq];
-		if (!sch) {
-			/* The full program again (see above), grr... */
-			ret = css_probe_device(irq);
-			if (ret == -ENXIO)
-				/* We're through */
-				return;
-			return;
-		}
-
-		/*
-		 * Walk through all subchannels and
-		 * look if our chpid and our (masked) link
-		 * address are in somewhere
-		 * Do a stsch for the found subchannels and
-		 * perform path grouping
-		 */
-
-		/* Update our ssd_info */
-		if (chsc_get_sch_desc_irq(sch->irq))
+		if (fla_mask != 0)
 			break;
-
-		found = 0;
-		for (j = 0; j < 8; j++)
-			if (sch->ssd_info.valid &&
-			    sch->ssd_info.chpid[j] == chpid &&
-			    (sch->ssd_info.fla[j] & fla_mask) == fla) {
-				found = 1;
-				break;
-			}
-
-		if (found == 0)
-			continue;
-
-		ccode = stsch(sch->irq, &sch->schib);
-		if (ccode > 0)
-			break;
-
-		sch->lpm = sch->schib.pmcw.pim &
-			sch->schib.pmcw.pam &
-			sch->schib.pmcw.pom;
-		
-		chsc_validate_chpids(sch);
-		
-		sch->lpm |= (0x80 >> j);
-		dev_fsm_event(sch->dev.driver_data, DEV_EVENT_VERIFY);
-						
-		/* We've found it, get out of here. */
-		break;
 	}
 }
 
@@ -508,7 +424,7 @@ do_process_crw(void *ignore)
 	 * be page-aligned. Implement proper locking or dynamic
 	 * allocation or prove that this function does not have to be
 	 * reentrant! */
-	static struct chsc_area chsc_area_sei
+	static struct sei_area chsc_area_sei
 		__attribute__ ((aligned(PAGE_SIZE))) = {
 			.request_block = {
 				.command_code1 = 0x0010,
@@ -516,8 +432,8 @@ do_process_crw(void *ignore)
 			}
 		};
 
-	typeof (chsc_area_sei.response_block.response_block_data.sei_res)
-		*sei_res = &chsc_area_sei.response_block.response_block_data.sei_res;
+	typeof (chsc_area_sei.response_block)
+		*sei_res = &chsc_area_sei.response_block;
 
 
 	CIO_TRACE_EVENT( 2, "prcss");
@@ -582,17 +498,17 @@ do_process_crw(void *ignore)
 
 		if ((sei_res->vf & 0x80) == 0) {
 			pr_debug( KERN_DEBUG "chpid: %x\n", sei_res->rsid);
-			s390_process_res_acc_chpid (sei_res->rsid);
+			s390_process_res_acc(sei_res->rsid, 0, 0);
 		} else if ((sei_res->vf & 0xc0) == 0x80) {
 			pr_debug( KERN_DEBUG "chpid: %x link addr: %x\n",
 			       sei_res->rsid, sei_res->fla);
-			s390_process_res_acc_linkaddr (sei_res->rsid,
-						       sei_res->fla, 0xff00);
+			s390_process_res_acc(sei_res->rsid, sei_res->fla,
+					     0xff00);
 		} else if ((sei_res->vf & 0xc0) == 0xc0) {
 			pr_debug( KERN_DEBUG "chpid: %x full link addr: %x\n",
 			       sei_res->rsid, sei_res->fla);
-			s390_process_res_acc_linkaddr (sei_res->rsid,
-						       sei_res->fla, 0xffff);
+			s390_process_res_acc(sei_res->rsid, sei_res->fla,
+					     0xffff);
 		}
 		pr_debug( KERN_DEBUG "\n");
 
@@ -810,4 +726,3 @@ register_channel_paths(void)
 }
 
 module_init(register_channel_paths);
-EXPORT_SYMBOL(chsc);

@@ -112,7 +112,10 @@ ccw_device_recog_done(struct ccw_device *cdev, int state)
 		CIO_DEBUG(KERN_WARNING, 2,
 			  "SenseID : unknown device %04X on subchannel %04X\n",
 			  sch->schib.pmcw.dev, sch->irq);
-		device_unregister(&cdev->dev);
+		sch->dev.driver_data = 0;
+		put_device(&sch->dev);
+		if (cdev->dev.release)
+			cdev->dev.release(&cdev->dev);
 		break;
 	case DEV_STATE_OFFLINE:
 		/* fill out sense information */
@@ -235,10 +238,8 @@ ccw_device_done(struct ccw_device *cdev, int state)
 
 	sch = to_subchannel(cdev->dev.parent);
 
-	if (state != DEV_STATE_ONLINE) {
+	if (state != DEV_STATE_ONLINE)
 		cio_disable_subchannel(sch);
-		device_unregister(&cdev->dev);
-	}
 
 	/* Reset device status. */
 	memset(&cdev->private->irb, 0, sizeof(struct irb));
@@ -246,6 +247,9 @@ ccw_device_done(struct ccw_device *cdev, int state)
 	cdev->private->state = state;
 
 	wake_up(&cdev->private->wait_q);
+
+	if (state != DEV_STATE_ONLINE)
+		put_device (&cdev->dev);
 }
 
 void
@@ -275,6 +279,8 @@ ccw_device_online(struct ccw_device *cdev)
 	if (cdev->private->state != DEV_STATE_OFFLINE)
 		return -EINVAL;
 	sch = to_subchannel(cdev->dev.parent);
+	if (!get_device(&cdev->dev))
+		return -ENODEV;
 	if (cio_enable_subchannel(sch, sch->schib.pmcw.isc) != 0) {
 		/* Couldn't enable the subchannel for i/o. Sick device. */
 		dev_fsm_event(cdev, DEV_EVENT_NOTOPER);
@@ -683,19 +689,19 @@ fsm_func_t *dev_jumptable[NR_DEV_STATES][NR_DEV_EVENTS] = {
 		[DEV_EVENT_NOTOPER]     ccw_device_online_notoper,
 		[DEV_EVENT_INTERRUPT]   ccw_device_qdio_init_irq,
 		[DEV_EVENT_TIMEOUT]     ccw_device_qdio_init_timeout,
-		[DEV_EVENT_VERIFY]      ccw_device_nop, //FIXME
+		[DEV_EVENT_VERIFY]      ccw_device_nop,
 	},
 	[DEV_STATE_QDIO_ACTIVE] {
 		[DEV_EVENT_NOTOPER]     ccw_device_online_notoper,
 		[DEV_EVENT_INTERRUPT]   ccw_device_irq,
 		[DEV_EVENT_TIMEOUT]     ccw_device_nop,
-		[DEV_EVENT_VERIFY]      ccw_device_nop, //FIXME
+		[DEV_EVENT_VERIFY]      ccw_device_nop,
 	},
 	[DEV_STATE_QDIO_CLEANUP] {
 		[DEV_EVENT_NOTOPER]     ccw_device_online_notoper,
 		[DEV_EVENT_INTERRUPT]   ccw_device_qdio_cleanup_irq,
 		[DEV_EVENT_TIMEOUT]     ccw_device_qdio_cleanup_timeout,
-		[DEV_EVENT_VERIFY]      ccw_device_nop, //FIXME
+		[DEV_EVENT_VERIFY]      ccw_device_nop,
 	},
 	/* states to wait for i/o completion before doing something */
 	[DEV_STATE_ONLINE_VERIFY] {
