@@ -1489,24 +1489,20 @@ static int __init init_scsi(void)
 	error = scsi_init_procfs();
 	if (error)
 		goto cleanup_queue;
-	error = -ENOMEM;
-	if (!devfs_mk_dir(NULL, "scsi", NULL))
-		goto cleanup_procfs;
 	error = scsi_dev_info_list_init(scsi_dev_flags);
 	if (error)
-		goto cleanup_devfs;
+		goto cleanup_procfs;
 	error = scsi_sysfs_register();
 	if (error)
 		goto cleanup_devlist;
 
 	scsi_host_init();
+	devfs_mk_dir(NULL, "scsi", NULL);
 	open_softirq(SCSI_SOFTIRQ, scsi_softirq, NULL);
 	return 0;
 
 cleanup_devlist:
 	scsi_dev_info_list_delete();
-cleanup_devfs:
-	devfs_remove("scsi");
 cleanup_procfs:
 	scsi_exit_procfs();
 cleanup_queue:
