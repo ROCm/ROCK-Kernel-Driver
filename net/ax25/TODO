@@ -9,3 +9,4 @@ af_ax25.c:ax25_connect:
                 return sock_error(sk);  /* Always set at this point */
         }
 
+Do the spinlocks ax25_list_lock and ax25_uid_lock really have to be interrupt safe?
