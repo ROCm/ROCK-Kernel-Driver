@@ -102,8 +102,12 @@ static inline void appldata_debug_print(struct appldata_mem_data *mem_data)
  */
 static void appldata_get_mem_data(void *data)
 {
-	struct sysinfo val;
-	struct page_state ps;
+	/*
+	 * don't put large structures on the stack, we are
+	 * serialized through the appldata_ops_lock and can use static
+	 */
+	static struct sysinfo val;
+	static struct page_state ps;
 	struct appldata_mem_data *mem_data;
 
 	mem_data = data;
