@@ -452,6 +452,10 @@ sub output_struct_html(%) {
     print "<h2>".$args{'type'}." ".$args{'struct'}."</h2>\n";
     print "<b>".$args{'type'}." ".$args{'struct'}."</b> {<br>\n";
     foreach $parameter (@{$args{'parameterlist'}}) {
+	if ($parameter =~ /^#/) {
+		print "$parameter<br>\n";
+		next;
+	}
 	my $parameter_name = $parameter;
 	$parameter_name =~ s/\[.*//;
 
@@ -471,6 +475,8 @@ sub output_struct_html(%) {
     print "<h3>Members</h3>\n";
     print "<dl>\n";
     foreach $parameter (@{$args{'parameterlist'}}) {
+	($parameter =~ /^#/) && next;
+
 	my $parameter_name = $parameter;
 	$parameter_name =~ s/\[.*//;
 
@@ -656,6 +662,11 @@ sub output_struct_sgml(%) {
     print "  <programlisting>\n";
     print $args{'type'}." ".$args{'struct'}." {\n";
     foreach $parameter (@{$args{'parameterlist'}}) {
+	if ($parameter =~ /^#/) {
+	    print "$parameter\n";
+	    next;
+	}
+
 	my $parameter_name = $parameter;
 	$parameter_name =~ s/\[.*//;
 
@@ -680,6 +691,8 @@ sub output_struct_sgml(%) {
 
     print "  <variablelist>\n";
     foreach $parameter (@{$args{'parameterlist'}}) {
+      ($parameter =~ /^#/) && next;
+
       my $parameter_name = $parameter;
       $parameter_name =~ s/\[.*//;
 
@@ -995,14 +1008,17 @@ sub output_struct_man(%) {
     print $args{'type'}." ".$args{'struct'}." \\- ".$args{'purpose'}."\n";
 
     print ".SH SYNOPSIS\n";
-    print $args{'type'}." ".$args{'struct'}." {\n";
+    print $args{'type'}." ".$args{'struct'}." {\n.br\n";
 
     foreach my $parameter (@{$args{'parameterlist'}}) {
+	if ($parameter =~ /^#/) {
+	    print ".BI \"$parameter\"\n.br\n";
+	    next;
+	}
 	my $parameter_name = $parameter;
 	$parameter_name =~ s/\[.*//;
 
         ($args{'parameterdescs'}{$parameter_name} ne $undescribed) || next;
-	print "\n.br\n";
 	$type = $args{'parametertypes'}{$parameter};
 	if ($type =~ m/([^\(]*\(\*)\s*\)\s*\(([^\)]*)\)/) {
 	    # pointer-to-function
@@ -1019,6 +1035,8 @@ sub output_struct_man(%) {
 
     print ".SH Arguments\n";
     foreach $parameter (@{$args{'parameterlist'}}) {
+	($parameter =~ /^#/) && next;
+
 	my $parameter_name = $parameter;
 	$parameter_name =~ s/\[.*//;
 
@@ -1159,6 +1177,11 @@ sub output_struct_text(%) {
     print $args{'type'}." ".$args{'struct'}.":\n\n";
     print $args{'type'}." ".$args{'struct'}." {\n";
     foreach $parameter (@{$args{'parameterlist'}}) {
+	if ($parameter =~ /^#/) {
+	    print "$parameter\n";
+	    next;
+	}
+
 	my $parameter_name = $parameter;
 	$parameter_name =~ s/\[.*//;
 
@@ -1177,6 +1200,8 @@ sub output_struct_text(%) {
 
     print "Members:\n\n";
     foreach $parameter (@{$args{'parameterlist'}}) {
+	($parameter =~ /^#/) && next;
+
 	my $parameter_name = $parameter;
 	$parameter_name =~ s/\[.*//;
 
@@ -1353,7 +1378,12 @@ sub create_parameterlist($$$) {
 	$arg =~ s/\s*$//;
 	$arg =~ s/\s+/ /;
 
-	if ($arg =~ m/\(/) {
+	if ($arg =~ /^#/) {
+	    # Treat preprocessor directive as a typeless variable just to fill
+	    # corresponding data structures "correctly". Catch it later in
+	    # output_* subs.
+	    push_parameter($arg, "", $file);
+	} elsif ($arg =~ m/\(/) {
 	    # pointer-to-function
 	    $arg =~ tr/#/,/;
 	    $arg =~ m/[^\(]+\(\*([^\)]+)\)/;
@@ -1571,6 +1601,10 @@ sub process_state3_type($$) {
     $x =~ s@[\r\n]+@ @gos; # strip newlines/cr's.
     $x =~ s@^\s+@@gos; # strip leading spaces
     $x =~ s@\s+$@@gos; # strip trailing spaces
+    if ($x =~ /^#/) {
+	# To distinguish preprocessor directive from regular declaration later.
+	$x .= ";";
+    }
 
     while (1) {
         if ( $x =~ /([^{};]*)([{};])(.*)/ ) {
