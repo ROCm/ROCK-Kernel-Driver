@@ -1,7 +1,8 @@
 /*
  *   ALSA driver for RME Digi32, Digi32/8 and Digi32 PRO audio interfaces
  *
- *	Copyright (c) 2002, 2003 Martin Langer <martin-langer@gmx.de>
+ *      Copyright (c) 2002-2004 Martin Langer <martin-langer@gmx.de>,
+ *                              Pilo Chambert <pilo.c@wanadoo.fr>
  *
  *      Thanks to :        Anders Torger <torger@ludd.luth.se>,
  *                         Henk Hesselink <henk@anda.nl>
@@ -101,7 +102,7 @@ module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable RME Digi32 soundcard.");
 module_param_array(fullduplex, bool, boot_devs, 0444);
 MODULE_PARM_DESC(fullduplex, "Support full-duplex mode.");
-MODULE_AUTHOR("Martin Langer <martin-langer@gmx.de>");
+MODULE_AUTHOR("Martin Langer <martin-langer@gmx.de>, Pilo Chambert <pilo.c@wanadoo.fr>");
 MODULE_DESCRIPTION("RME Digi32, Digi32/8, Digi32 PRO");
 MODULE_LICENSE("GPL");
 MODULE_SUPPORTED_DEVICE("{{RME,Digi32}," "{RME,Digi32/8}," "{RME,Digi32 PRO}}");
@@ -153,7 +154,7 @@ MODULE_SUPPORTED_DEVICE("{{RME,Digi32}," "{RME,Digi32/8}," "{RME,Digi32 PRO}}");
 #define RME32_WCR_BITPOS_INP_1 7
 
 /* Read control register bits */
-#define RME32_RCR_AUDIO_ADDR_MASK 0x10001
+#define RME32_RCR_AUDIO_ADDR_MASK 0x1ffff
 #define RME32_RCR_LOCK      (1 << 23)   /* 1=locked, 0=not locked */
 #define RME32_RCR_ERF       (1 << 26)   /* 1=Error, 0=no Error */
 #define RME32_RCR_FREQ_0    (1 << 27)   /* CS841x frequency (record) */
@@ -1193,7 +1194,7 @@ static int snd_rme32_playback_fd_ack(snd_pcm_substream_t *substream)
 	spin_lock_irqsave(&rme32->lock, flags);
 	rec->hw_queue_size = RME32_BUFFER_SIZE;
 	if (rme32->running & (1 << SNDRV_PCM_STREAM_CAPTURE))
-		rec->queue_size -= cprec->hw_ready;
+		rec->hw_queue_size -= cprec->hw_ready;
 	spin_unlock_irqrestore(&rme32->lock, flags);
 	snd_pcm_indirect_playback_transfer(substream, rec,
 					   snd_rme32_pb_trans_copy);
