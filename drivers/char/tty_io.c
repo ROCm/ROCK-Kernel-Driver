@@ -611,6 +611,8 @@ void stop_tty(struct tty_struct *tty)
 		(tty->driver->stop)(tty);
 }
 
+EXPORT_SYMBOL(stop_tty);
+
 void start_tty(struct tty_struct *tty)
 {
 	if (!tty->stopped || tty->flow_stopped)
@@ -628,6 +630,8 @@ void start_tty(struct tty_struct *tty)
 		(tty->ldisc.write_wakeup)(tty);
 	wake_up_interruptible(&tty->write_wait);
 }
+
+EXPORT_SYMBOL(start_tty);
 
 static ssize_t tty_read(struct file * file, char * buf, size_t count, 
 			loff_t *ppos)
