@@ -544,7 +544,19 @@ enum
 	FS_LEASES=13,	/* int: leases enabled */
 	FS_DIR_NOTIFY=14,	/* int: directory notification enabled */
 	FS_LEASE_TIME=15,	/* int: maximum time to wait for a lease break */
-	FS_DQSTATS=16,	/* int: disc quota suage statistics */
+	FS_DQSTATS=16,	/* disc quota usage statistics */
+};
+
+/* /proc/sys/fs/quota/ */
+enum {
+	FS_DQ_LOOKUPS = 1,
+	FS_DQ_DROPS = 2,
+	FS_DQ_READS = 3,
+	FS_DQ_WRITES = 4,
+	FS_DQ_CACHE_HITS = 5,
+	FS_DQ_ALLOCATED = 6,
+	FS_DQ_FREE = 7,
+	FS_DQ_SYNCS = 8,
 };
 
 /* CTL_DEBUG names: */
