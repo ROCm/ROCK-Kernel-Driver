@@ -143,8 +143,9 @@ static int snd_usbmidi_urb_error(int status)
 	if (status == -ENOENT)
 		return status; /* killed */
 	if (status == -EILSEQ ||
+	    status == -ECONNRESET ||
 	    status == -ETIMEDOUT)
-		return -ENODEV; /* device removed */
+		return -ENODEV; /* device removed/shutdown */
 	snd_printk(KERN_ERR "urb status %d\n", status);
 	return 0; /* continue */
 }
@@ -706,7 +707,6 @@ void snd_usbmidi_disconnect(struct list_head* p, struct usb_driver *driver)
 	int i;
 
 	umidi = list_entry(p, snd_usb_midi_t, list);
-	usb_driver_release_interface(driver, umidi->iface);
 	for (i = 0; i < MIDI_MAX_ENDPOINTS; ++i) {
 		snd_usb_midi_endpoint_t* ep = &umidi->endpoints[i];
 		if (ep->out && ep->out->urb)
@@ -714,6 +714,7 @@ void snd_usbmidi_disconnect(struct list_head* p, struct usb_driver *driver)
 		if (ep->in && ep->in->urb)
 			usb_unlink_urb(ep->in->urb);
 	}
+	usb_driver_release_interface(driver, umidi->iface);
 }
 
 static void snd_usbmidi_rawmidi_free(snd_rawmidi_t* rmidi)
