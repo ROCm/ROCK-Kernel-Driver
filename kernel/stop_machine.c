@@ -3,6 +3,7 @@
 #include <linux/sched.h>
 #include <linux/cpu.h>
 #include <linux/err.h>
+#include <linux/syscalls.h>
 #include <asm/atomic.h>
 #include <asm/semaphore.h>
 
