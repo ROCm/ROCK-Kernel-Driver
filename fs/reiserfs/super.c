@@ -750,11 +750,19 @@ static int reiserfs_parse_options (struct super_block * s, char * options, /* st
 	{"conv",	.setmask = 1<<REISERFS_CONVERT},
 	{"attrs",	.setmask = 1<<REISERFS_ATTRS},
 	{"noattrs",	.clrmask = 1<<REISERFS_ATTRS},
+#ifdef CONFIG_REISERFS_FS_XATTR
 	{"user_xattr",	.setmask = 1<<REISERFS_XATTRS_USER},
 	{"nouser_xattr",.clrmask = 1<<REISERFS_XATTRS_USER},
+#else
+	{"user_xattr",	.setmask = 1<<REISERFS_UNSUPPORTED_OPT},
+	{"nouser_xattr",.clrmask = 1<<REISERFS_UNSUPPORTED_OPT},
+#endif
 #ifdef CONFIG_REISERFS_FS_POSIX_ACL
 	{"acl",		.setmask = 1<<REISERFS_POSIXACL},
 	{"noacl",	.clrmask = 1<<REISERFS_POSIXACL},
+#else
+	{"acl",		.setmask = 1<<REISERFS_UNSUPPORTED_OPT},
+	{"noacl",	.clrmask = 1<<REISERFS_UNSUPPORTED_OPT},
 #endif
 	{"nolog",},	 /* This is unsupported */
 	{"replayonly",	.setmask = 1<<REPLAYONLY},
