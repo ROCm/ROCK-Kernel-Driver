@@ -194,25 +194,17 @@ struct _lowcore
 	__u8         pad17[0x2000-0x1400];      /* 0x1400 */
 } __attribute__((packed)); /* End structure*/
 
+#define S390_lowcore (*((struct _lowcore *) 0))
+extern struct _lowcore *lowcore_ptr[];
+
 extern __inline__ void set_prefix(__u32 address)
 {
         __asm__ __volatile__ ("spx %0" : : "m" (address) : "memory" );
 }
 
-#define S390_lowcore (*((struct _lowcore *) 0))
-extern struct _lowcore *lowcore_ptr[];
-
-#ifndef CONFIG_SMP
-#define get_cpu_lowcore(cpu)      (&S390_lowcore)
-#define safe_get_cpu_lowcore(cpu) (&S390_lowcore)
-#else
-#define get_cpu_lowcore(cpu)      (lowcore_ptr[(cpu)])
-#define safe_get_cpu_lowcore(cpu) \
-        ((cpu) == smp_processor_id() ? &S390_lowcore : lowcore_ptr[(cpu)])
-#endif
-#endif /* __ASSEMBLY__ */
-
 #define __PANIC_MAGIC           0xDEADC0DE
+
+#endif
 
 #endif
 

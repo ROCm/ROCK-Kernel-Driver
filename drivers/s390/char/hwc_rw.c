@@ -2215,8 +2215,6 @@ hwc_do_interrupt (u32 ext_int_param)
 void 
 hwc_interrupt_handler (struct pt_regs *regs, __u16 code)
 {
-	int cpu = smp_processor_id ();
-
 	u32 ext_int_param = hwc_ext_int_param ();
 
 	irq_enter ();

@@ -253,8 +253,6 @@ enable_subchannel (unsigned int irq)
 	int retry = 5;
 	char dbf_txt[15];
 
-	SANITY_CHECK (irq);
-
 	sprintf (dbf_txt, "ensch%x", irq);
 	CIO_TRACE_EVENT (2, dbf_txt);
 
@@ -324,7 +322,7 @@ enable_subchannel (unsigned int irq)
 	sprintf (dbf_txt, "ret:%d", ret);
 	CIO_TRACE_EVENT (2, dbf_txt);
 
-	return (ret);
+	return ret;
 }
 
 /*
@@ -337,8 +335,6 @@ disable_subchannel (unsigned int irq)
 	int ret = 0;		/* function return value */
 	int retry = 5;
 	char dbf_txt[15];
-
-	SANITY_CHECK (irq);
 
 	sprintf (dbf_txt, "dissch%x", irq);
 	CIO_TRACE_EVENT (2, dbf_txt);
@@ -427,7 +423,7 @@ disable_subchannel (unsigned int irq)
 	sprintf (dbf_txt, "ret:%d", ret);
 	CIO_TRACE_EVENT (2, dbf_txt);
 
-	return (ret);
+	return ret;
 }
 
 /* FIXME: there must be a cleaner way to express what happens */

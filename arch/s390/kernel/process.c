@@ -302,15 +302,15 @@ void dump_thread(struct pt_regs * regs, struct user * dump)
 	dump->magic = CMAGIC;
 	dump->start_code = 0;
 	dump->start_stack = regs->gprs[15] & ~(PAGE_SIZE - 1);
-	dump->u_tsize = ((unsigned long) current->mm->end_code) >> PAGE_SHIFT;
-	dump->u_dsize = ((unsigned long) (current->mm->brk + (PAGE_SIZE-1))) >> PAGE_SHIFT;
+	dump->u_tsize = current->mm->end_code >> PAGE_SHIFT;
+	dump->u_dsize = (current->mm->brk + PAGE_SIZE - 1) >> PAGE_SHIFT;
 	dump->u_dsize -= dump->u_tsize;
 	dump->u_ssize = 0;
 	if (dump->start_stack < TASK_SIZE)
-		dump->u_ssize = ((unsigned long) (TASK_SIZE - dump->start_stack)) >> PAGE_SHIFT;
-	memcpy(&dump->regs.gprs[0],regs,sizeof(s390_regs));
+		dump->u_ssize = (TASK_SIZE - dump->start_stack) >> PAGE_SHIFT;
+	memcpy(&dump->regs, regs, sizeof(s390_regs));
 	dump_fpu (regs, &dump->regs.fp_regs);
-	memcpy(&dump->regs.per_info,&current->thread.per_info,sizeof(per_struct));
+	dump->regs.per_info = current->thread.per_info;
 }
 
 /*

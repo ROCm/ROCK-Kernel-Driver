@@ -184,18 +184,18 @@ __cmpxchg(volatile void *ptr, unsigned long old, unsigned long new, int size)
 #define local_irq_enable() ({ \
         __u8 __dummy; \
         __asm__ __volatile__ ( \
-                "stosm 0(%0),0x03" : : "a" (&__dummy) : "memory"); \
+                "stosm 0(%1),0x03" : "=m" (__dummy) : "a" (&__dummy) ); \
         })
 
 #define local_irq_disable() ({ \
         __u32 __flags; \
         __asm__ __volatile__ ( \
-                "stnsm 0(%0),0xFC" : : "a" (&__flags) : "memory"); \
+                "stnsm 0(%1),0xFC" : "=m" (__flags) : "a" (&__flags) ); \
         __flags; \
         })
 
 #define local_save_flags(x) \
-        __asm__ __volatile__("stosm 0(%0),0" : : "a" (&x) : "memory")
+        __asm__ __volatile__("stosm 0(%1),0" : "=m" (x) : "a" (&x) )
 
 #define local_irq_restore(x) \
         __asm__ __volatile__("ssm   0(%0)" : : "a" (&x) : "memory")

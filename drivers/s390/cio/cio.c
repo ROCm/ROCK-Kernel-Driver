@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/cio.c
  *   S/390 common I/O routines -- low level i/o calls
- *   $Revision: 1.15 $
+ *   $Revision: 1.25 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *                            IBM Corporation
@@ -52,7 +52,7 @@ s390_displayhex (void *ptr, s32 cnt, int level)
 	}
 	DBG ("%s\n", buffer);
 	if (cio_debug_initialized) 
-		debug_text_event (cio_debug_trace_id, level, buffer);
+		debug_text_event (cio_debug_msg_id, level, buffer);
 }
 
 
@@ -433,8 +433,6 @@ s390_start_IO (int irq,		/* IRQ */
 	int ret = 0;
 	char dbf_txt[15];
 
-	SANITY_CHECK (irq);
-
 	/*
 	 * The flag usage is mutal exclusive ...
 	 */
@@ -456,7 +454,7 @@ s390_start_IO (int irq,		/* IRQ */
 		ret = enable_cpu_sync_isc (irq);
 
 		if (ret) 
-			return (ret);
+			return ret;
 
 	}
 
@@ -556,7 +554,7 @@ s390_start_IO (int irq,		/* IRQ */
 	if (flag & DOIO_DONT_CALL_INTHDLR) 
 		ioinfo[irq]->ui.flags.repnone = 0;
 
-	return (ret);
+	return ret;
 }
 
 int
@@ -618,7 +616,7 @@ do_IO (int irq,			/* IRQ */
 
 	}
 
-	return (ret);
+	return ret;
 
 }
 
@@ -677,7 +675,7 @@ resume_IO (int irq)
 
 	}
 
-	return (ret);
+	return ret;
 }
 
 /*
@@ -720,7 +718,7 @@ halt_IO (int irq, unsigned long user_intparm, unsigned long flag)
 		ret = enable_cpu_sync_isc (irq);
 
 		if (ret)
-			return (ret);
+			return ret;
 	}
 
 	/*
@@ -784,7 +782,7 @@ halt_IO (int irq, unsigned long user_intparm, unsigned long flag)
 	if (flag & DOIO_WAIT_FOR_INTERRUPT) 
 		disable_cpu_sync_isc (irq);
 
-	return (ret);
+	return ret;
 }
 
 /*
@@ -803,7 +801,7 @@ clear_IO (int irq, unsigned long user_intparm, unsigned long flag)
 	SANITY_CHECK (irq);
 
 	if (ioinfo[irq] == INVALID_STORAGE_AREA)
-		return (-ENODEV);
+		return -ENODEV;
 
 	/*
 	 * we only allow for clear_IO if the device has an I/O handler associated
@@ -829,7 +827,7 @@ clear_IO (int irq, unsigned long user_intparm, unsigned long flag)
 		ret = enable_cpu_sync_isc (irq);
 
 		if (ret)
-			return (ret);
+			return ret;
 	}
 
 	/*
@@ -891,7 +889,7 @@ clear_IO (int irq, unsigned long user_intparm, unsigned long flag)
 	if (flag & DOIO_WAIT_FOR_INTERRUPT) 
 		disable_cpu_sync_isc (irq);
 
-	return (ret);
+	return ret;
 }
 
 /*
@@ -907,8 +905,6 @@ cancel_IO (int irq)
 	int ccode;
 	char dbf_txt[15];
 	int ret = 0;
-
-	SANITY_CHECK (irq);
 
 	sprintf (dbf_txt, "cancelIO%x", irq);
 	CIO_TRACE_EVENT (2, dbf_txt);
@@ -955,7 +951,6 @@ do_IRQ (struct pt_regs regs)
 	 * Get interrupt info from lowcore
 	 */
 	volatile tpi_info_t *tpi_info = (tpi_info_t *) (__LC_SUBCHANNEL_ID);
-	int cpu = smp_processor_id ();
 
 	/*
 	 * take fast exit if CPU is in sync. I/O state
@@ -1183,7 +1178,7 @@ s390_process_IRQ_normal(unsigned int irq,
 	 * take fast exit if no handler is available
 	 */
 	if (!ioinfo[irq]->ui.flags.ready)
-		return (ending_status);
+		return ending_status;
 	
 	/*
 	 * Check whether we must issue a SENSE CCW ourselves if there is no
@@ -1485,7 +1480,8 @@ s390_process_IRQ (unsigned int irq)
 		s390_irq_count[cpu]++;
 	}
 
-	sprintf (dbf_txt, "procIRQ%x", irq);
+	CIO_TRACE_EVENT (3, "procIRQ");
+	sprintf (dbf_txt, "%x", irq);
 	CIO_TRACE_EVENT (3, dbf_txt);
 
 	if (ioinfo[irq] == INVALID_STORAGE_AREA) {
@@ -1497,14 +1493,8 @@ s390_process_IRQ (unsigned int irq)
 			  "for non-initialized subchannel!\n", irq);
 
 		tsch (irq, &p_init_irb);
-		return (1);
-
-	}
-
-	if (ioinfo[irq]->st) {
-		/* can't be */
-		BUG();
 		return 1;
+
 	}
 
 	dp = &ioinfo[irq]->devstat;
@@ -1715,8 +1705,6 @@ set_cons_dev (int irq)
 	int rc = 0;
 	char dbf_txt[15];
 
-	SANITY_CHECK (irq);
-
 	if (cons_dev != -1)
 		return -EBUSY;
 
@@ -1750,7 +1738,7 @@ set_cons_dev (int irq)
 		}
 	}
 
-	return (rc);
+	return rc;
 }
 
 int
@@ -1801,7 +1789,7 @@ wait_cons_dev (int irq)
 
 	}
 
-	return (rc);
+	return rc;
 }
 
 /*

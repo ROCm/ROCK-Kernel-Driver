@@ -172,7 +172,7 @@ static inline void do_store_status(void)
         for (i =  0; i < NR_CPUS; i++) {
                 if (!cpu_online(i) || smp_processor_id() == i) 
 			continue;
-		low_core_addr = (unsigned long)get_cpu_lowcore(i);
+		low_core_addr = (unsigned long) lowcore_ptr[i];
 		do {
 			rc = signal_processor_ps(&dummy, low_core_addr, i,
 						 sigp_store_status_at_address);
@@ -187,7 +187,7 @@ static inline void do_store_status(void)
 void smp_send_stop(void)
 {
 	/* write magic number to zero page (absolute 0) */
-	get_cpu_lowcore(smp_processor_id())->panic_magic = __PANIC_MAGIC;
+	lowcore_ptr[smp_processor_id()]->panic_magic = __PANIC_MAGIC;
 
 	/* stop other processors. */
 	do_send_stop();
@@ -298,7 +298,7 @@ static sigp_ccode smp_ext_bitcall(int cpu, ec_bit_sig sig)
         /*
          * Set signaling bit in lowcore of target cpu and kick it
          */
-	set_bit(sig, &(get_cpu_lowcore(cpu)->ext_call_fast));
+	set_bit(sig, &lowcore_ptr[cpu]->ext_call_fast);
         ccode = signal_processor(cpu, sigp_external_call);
         return ccode;
 }
@@ -317,7 +317,7 @@ static void smp_ext_bitcall_others(ec_bit_sig sig)
                 /*
                  * Set signaling bit in lowcore of target cpu and kick it
                  */
-		set_bit(sig, &(get_cpu_lowcore(i)->ext_call_fast));
+		set_bit(sig, &lowcore_ptr[i]->ext_call_fast);
                 while (signal_processor(i, sigp_external_call) == sigp_busy)
 			udelay(10);
         }
@@ -499,7 +499,7 @@ int __cpu_up(unsigned int cpu)
 
         unhash_process(idle);
 
-        cpu_lowcore = get_cpu_lowcore(cpu);
+        cpu_lowcore = lowcore_ptr[cpu];
 	cpu_lowcore->save_area[15] = idle->thread.ksp;
 	cpu_lowcore->kernel_stack = (__u64) idle->thread_info + (4*PAGE_SIZE);
         __asm__ __volatile__("la    1,%0\n\t"
@@ -535,7 +535,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
         /*
          *  Initialize prefix pages and stacks for all possible cpus
          */
-        print_cpu_info(&safe_get_cpu_lowcore(0)->cpu_data);
+        print_cpu_info(&S390_lowcore.cpu_data);
 
         for(i = 0; i < NR_CPUS; i++) {
 		if (!cpu_possible(i))

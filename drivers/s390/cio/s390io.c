@@ -565,17 +565,13 @@ read_dev_chars (int irq, void **buffer, int length)
 
 	char dbf_txt[15];
 
-	if (!buffer || !length) {
-		return (-EINVAL);
-
-	}
+	if (!buffer || !length) 
+		return -EINVAL;
 
 	SANITY_CHECK (irq);
 
-	if (ioinfo[irq]->ui.flags.oper == 0) {
-		return (-ENODEV);
-
-	}
+	if (ioinfo[irq]->ui.flags.oper == 0) 
+		return -ENODEV;
 
 	sprintf (dbf_txt, "rddevch%x", irq);
 	CIO_TRACE_EVENT (4, dbf_txt);
@@ -687,11 +683,11 @@ read_conf_data (int irq, void **buffer, int *length, __u8 lpm)
 	SANITY_CHECK (irq);
 
 	if (!buffer || !length) {
-		return (-EINVAL);
+		return -EINVAL;
 	} else if (ioinfo[irq]->ui.flags.oper == 0) {
-		return (-ENODEV);
+		return -ENODEV;
 	} else if (ioinfo[irq]->ui.flags.esid == 0) {
-		return (-EOPNOTSUPP);
+		return -EOPNOTSUPP;
 
 	}
 
@@ -857,7 +853,7 @@ read_conf_data (int irq, void **buffer, int *length, __u8 lpm)
 
 	}
 
-	return (ret);
+	return ret;
 
 }
 
@@ -1299,7 +1295,7 @@ s390_validate_subchannel (int irq, int enable)
 
 	}
 
-	return (ret);
+	return ret;
 }
 
 /*
@@ -1336,10 +1332,8 @@ s390_SenseID (int irq, senseid_t * sid, __u8 lpm)
 	int i;
 	int failure = 0;	/* nothing went wrong yet */
 
-	SANITY_CHECK (irq);
-
 	if (ioinfo[irq]->ui.flags.oper == 0) {
-		return (-ENODEV);
+		return -ENODEV;
 
 	}
 
@@ -1939,10 +1933,8 @@ s390_SetPGID (int irq, __u8 lpm, pgid_t * pgid)
 	int inlreq = 0;		/* inline request_irq() */
 	int mpath = 1;		/* try multi-path first */
 
-	SANITY_CHECK (irq);
-
 	if (ioinfo[irq]->ui.flags.oper == 0) {
-		return (-ENODEV);
+		return -ENODEV;
 
 	}
 
@@ -2150,7 +2142,7 @@ s390_SetPGID (int irq, __u8 lpm, pgid_t * pgid)
 	if (inlreq)
 		free_irq (irq, pdevstat);
 
-	return (irq_ret);
+	return irq_ret;
 }
 
 /*
@@ -2172,10 +2164,8 @@ s390_SensePGID (int irq, __u8 lpm, pgid_t * pgid)
 	int inlreq = 0;		/* inline request_irq() */
 	unsigned long flags;
 
-	SANITY_CHECK (irq);
-
 	if (ioinfo[irq]->ui.flags.oper == 0) {
-		return (-ENODEV);
+		return -ENODEV;
 
 	}
 
@@ -2339,7 +2329,7 @@ s390_SensePGID (int irq, __u8 lpm, pgid_t * pgid)
 	if (inlreq)
 		free_irq (irq, pdevstat);
 
-	return (irq_ret);
+	return irq_ret;
 }
 
 /*
@@ -2359,8 +2349,6 @@ s390_send_nop(int irq, __u8 lpm)
 	
  	int irq_ret = 0;
  	int inlreq = 0;
-	
- 	SANITY_CHECK(irq);
 	
  	if (!ioinfo[irq]->ui.flags.oper)
  		/* no sense in trying */

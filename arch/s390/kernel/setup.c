@@ -526,7 +526,10 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 			       (loops_per_jiffy/(5000/HZ))%100);
 	}
 	if (cpu_online_map & (1 << n)) {
-		cpuinfo = &safe_get_cpu_lowcore(n)->cpu_data;
+		if (smp_processor_id() == n)
+			cpuinfo = &S390_lowcore.cpu_data;
+		else
+			cpuinfo = &lowcore_ptr[n]->cpu_data;
 		seq_printf(m, "processor %li: "
 			       "version = %02X,  "
 			       "identification = %06X,  "

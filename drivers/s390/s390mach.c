@@ -314,7 +314,7 @@ s390_machine_check_handler(void *parm)
 
 	} while (1);
 
-	return (0);
+	return 0;
 }
 
 /*
@@ -557,7 +557,7 @@ s390_collect_crw_info(void)
 
 	} while (ccode == 0);
 
-	return (count);
+	return count;
 }
 
 #ifdef CONFIG_MACHCHK_WARNING
@@ -587,6 +587,6 @@ s390_post_warning(void)
 
 	DBG(KERN_DEBUG "post_warning : 1 warning machine check posted\n");
 
-	return (1);
+	return 1;
 }
 #endif
