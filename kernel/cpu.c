@@ -46,7 +46,7 @@ int __devinit cpu_up(unsigned int cpu)
 
 	/* Now call notifier in preparation. */
 	printk("CPU %u IS NOW UP!\n", cpu);
-	notifier_call_chain(&cpu_chain, CPU_ONLINE, (void *)cpu);
+	notifier_call_chain(&cpu_chain, CPU_ONLINE, (void *)(long)cpu);
 
  out:
 	up(&cpucontrol);
