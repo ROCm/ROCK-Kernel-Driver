@@ -84,41 +84,16 @@
 #define __HAVE_COUNTER8         _DRM_STAT_SECONDARY
 #define __HAVE_COUNTER9         _DRM_STAT_DMA
 
-/* Driver customization:
- */
-#define __HAVE_RELEASE		1
-#define DRIVER_RELEASE() do {						\
-	i810_reclaim_buffers( filp );					\
-} while (0)
-
-#define DRIVER_PRETAKEDOWN() do {					\
-	i810_dma_cleanup( dev );					\
-} while (0)
-
 /* DMA customization:
  */
 #define __HAVE_DMA		1
 #define __HAVE_DMA_QUEUE	1
-#define __HAVE_DMA_WAITLIST	0
 #define __HAVE_DMA_RECLAIM	1
-
-#define __HAVE_DMA_QUIESCENT	1
-#define DRIVER_DMA_QUIESCENT() do {					\
-	i810_dma_quiescent( dev );					\
-} while (0)
 
 /* Don't need an irq any more.  The template code will make sure that
  * a noop stub is generated for compatibility.
  */
 /* XXX: Add vblank support? */
 #define __HAVE_IRQ		0
-
-/* Buffer customization:
- */
-
-#define DRIVER_BUF_PRIV_T	drm_i810_buf_priv_t
-
-#define DRIVER_AGP_BUFFERS_MAP( dev )					\
-	((drm_i810_private_t *)((dev)->dev_private))->buffer_map
 
 #endif

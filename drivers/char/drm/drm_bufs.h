@@ -44,18 +44,6 @@
 #define __HAVE_SG		0
 #endif
 
-#ifndef DRIVER_BUF_PRIV_T
-#define DRIVER_BUF_PRIV_T		u32
-#endif
-#ifndef DRIVER_AGP_BUFFERS_MAP
-#if __HAVE_AGP && __HAVE_DMA
-#error "You must define DRIVER_AGP_BUFFERS_MAP()"
-#else
-#define DRIVER_AGP_BUFFERS_MAP( dev )	NULL
-#endif
-#endif
-
-
 /**
  * Compute size order.  Returns the exponent of the smaller power of two which
  * is greater or equal to given number.
@@ -348,10 +336,6 @@ static void DRM(cleanup_buf_error)(drm_buf_entry_t *entry)
 			  sizeof(*entry->buflist),
 			  DRM_MEM_BUFS);
 
-#if __HAVE_DMA_FREELIST
-	   	DRM(freelist_destroy)(&entry->freelist);
-#endif
-
 		entry->buf_count = 0;
 	}
 }
@@ -473,8 +457,8 @@ int DRM(addbufs_agp)( struct inode *inode, struct file *filp,
 		init_waitqueue_head( &buf->dma_wait );
 		buf->filp    = NULL;
 
-		buf->dev_priv_size = sizeof(DRIVER_BUF_PRIV_T);
-		buf->dev_private = DRM(alloc)( sizeof(DRIVER_BUF_PRIV_T),
+		buf->dev_priv_size = dev->dev_priv_size;
+		buf->dev_private = DRM(alloc)( buf->dev_priv_size,
 					       DRM_MEM_BUFS );
 		if(!buf->dev_private) {
 			/* Set count correctly so we free the proper amount. */
@@ -520,12 +504,6 @@ int DRM(addbufs_agp)( struct inode *inode, struct file *filp,
 	DRM_DEBUG( "dma->buf_count : %d\n", dma->buf_count );
 	DRM_DEBUG( "entry->buf_count : %d\n", entry->buf_count );
 
-#if __HAVE_DMA_FREELIST
-	DRM(freelist_create)( &entry->freelist, entry->buf_count );
-	for ( i = 0 ; i < entry->buf_count ; i++ ) {
-		DRM(freelist_put)( dev, &entry->freelist, &entry->buflist[i] );
-	}
-#endif
 	up( &dev->struct_sem );
 
 	request.count = entry->buf_count;
@@ -698,8 +676,8 @@ int DRM(addbufs_pci)( struct inode *inode, struct file *filp,
 			init_waitqueue_head( &buf->dma_wait );
 			buf->filp    = NULL;
 
-			buf->dev_priv_size = sizeof(DRIVER_BUF_PRIV_T);
-			buf->dev_private = DRM(alloc)( sizeof(DRIVER_BUF_PRIV_T),
+			buf->dev_priv_size = dev->dev_priv_size;
+			buf->dev_private = DRM(alloc)( dev->dev_priv_size,
 						       DRM_MEM_BUFS );
 			if(!buf->dev_private) {
 				/* Set count correctly so we free the proper amount. */
@@ -759,12 +737,6 @@ int DRM(addbufs_pci)( struct inode *inode, struct file *filp,
 	dma->page_count += entry->seg_count << page_order;
 	dma->byte_count += PAGE_SIZE * (entry->seg_count << page_order);
 
-#if __HAVE_DMA_FREELIST
-	DRM(freelist_create)( &entry->freelist, entry->buf_count );
-	for ( i = 0 ; i < entry->buf_count ; i++ ) {
-		DRM(freelist_put)( dev, &entry->freelist, &entry->buflist[i] );
-	}
-#endif
 	up( &dev->struct_sem );
 
 	request.count = entry->buf_count;
@@ -882,8 +854,8 @@ int DRM(addbufs_sg)( struct inode *inode, struct file *filp,
 		init_waitqueue_head( &buf->dma_wait );
 		buf->filp    = NULL;
 
-		buf->dev_priv_size = sizeof(DRIVER_BUF_PRIV_T);
-		buf->dev_private = DRM(alloc)( sizeof(DRIVER_BUF_PRIV_T),
+		buf->dev_priv_size = dev->dev_priv_size;
+		buf->dev_private = DRM(alloc)( dev->dev_priv_size,
 					       DRM_MEM_BUFS );
 		if(!buf->dev_private) {
 			/* Set count correctly so we free the proper amount. */
@@ -930,12 +902,6 @@ int DRM(addbufs_sg)( struct inode *inode, struct file *filp,
 	DRM_DEBUG( "dma->buf_count : %d\n", dma->buf_count );
 	DRM_DEBUG( "entry->buf_count : %d\n", entry->buf_count );
 
-#if __HAVE_DMA_FREELIST
-	DRM(freelist_create)( &entry->freelist, entry->buf_count );
-	for ( i = 0 ; i < entry->buf_count ; i++ ) {
-		DRM(freelist_put)( dev, &entry->freelist, &entry->buflist[i] );
-	}
-#endif
 	up( &dev->struct_sem );
 
 	request.count = entry->buf_count;
@@ -1221,7 +1187,7 @@ int DRM(mapbufs)( struct inode *inode, struct file *filp,
 	if ( request.count >= dma->buf_count ) {
 		if ( (__HAVE_AGP && (dma->flags & _DRM_DMA_USE_AGP)) ||
 		     (__HAVE_SG && (dma->flags & _DRM_DMA_USE_SG)) ) {
-			drm_map_t *map = DRIVER_AGP_BUFFERS_MAP( dev );
+			drm_map_t *map = dev->agp_buffer_map;
 
 			if ( !map ) {
 				retcode = -EINVAL;

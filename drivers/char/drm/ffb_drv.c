@@ -26,53 +26,7 @@
 #define DRIVER_MINOR		0
 #define DRIVER_PATCHLEVEL	1
 
-#define DRIVER_FOPS						\
-static struct file_operations	DRM(fops) = {			\
-	.owner   		= THIS_MODULE,			\
-	.open	 		= DRM(open),			\
-	.flush	 		= DRM(flush),			\
-	.release 		= DRM(release),			\
-	.ioctl	 		= DRM(ioctl),			\
-	.mmap	 		= DRM(mmap),			\
-	.read	 		= DRM(read),			\
-	.fasync	 		= DRM(fasync),			\
-	.poll	 		= DRM(poll),			\
-	.get_unmapped_area	= ffb_get_unmapped_area,		\
-}
-
 #define DRIVER_COUNT_CARDS()	ffb_count_card_instances()
-/* Allocate private structure and fill it */
-#define DRIVER_PRESETUP()	do {		\
-	int _ret;				\
-	_ret = ffb_presetup(dev);		\
-	if (_ret != 0) return _ret;		\
-} while(0)
-
-/* Free private structure */
-#define DRIVER_PRETAKEDOWN()	do {				\
-	if (dev->dev_private) kfree(dev->dev_private);		\
-} while(0)
-
-#define DRIVER_POSTCLEANUP()	do {				\
-	if (ffb_position != NULL) kfree(ffb_position);		\
-} while(0)
-
-/* We have to free up the rogue hw context state holding error or 
- * else we will leak it.
- */
-#define DRIVER_RELEASE()	do {					\
-	ffb_dev_priv_t *fpriv = (ffb_dev_priv_t *) dev->dev_private;	\
-	int context = _DRM_LOCKING_CONTEXT(dev->lock.hw_lock->lock);	\
-	int idx;							\
-									\
-	idx = context - 1;						\
-	if (fpriv &&							\
-	    context != DRM_KERNEL_CONTEXT &&				\
-	    fpriv->hw_state[idx] != NULL) {				\
-		kfree(fpriv->hw_state[idx]);				\
-		fpriv->hw_state[idx] = NULL;				\
-	}								\
-} while(0)
 
 /* For mmap customization */
 #define DRIVER_GET_MAP_OFS()	(map->offset & 0xffffffff)
@@ -275,11 +229,11 @@ static drm_map_t *ffb_find_map(struct file *filp, unsigned long off)
 	return NULL;
 }
 
-static unsigned long ffb_get_unmapped_area(struct file *filp,
-					   unsigned long hint,
-					   unsigned long len,
-					   unsigned long pgoff,
-					   unsigned long flags)
+unsigned long ffb_get_unmapped_area(struct file *filp,
+				    unsigned long hint,
+				    unsigned long len,
+				    unsigned long pgoff,
+				    unsigned long flags)
 {
 	drm_map_t *map = ffb_find_map(filp, pgoff << PAGE_SHIFT);
 	unsigned long addr = -ENOMEM;
