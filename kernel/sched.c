@@ -645,9 +645,12 @@ void kick_process(task_t *p)
 EXPORT_SYMBOL_GPL(kick_process);
 
 /*
- * Return a low guess at the load of cpu.
+ * Return a low guess at the load of a migration-source cpu.
+ *
+ * We want to under-estimate the load of migration sources, to
+ * balance conservatively.
  */
-static inline unsigned long get_low_cpu_load(int cpu)
+static inline unsigned long source_load(int cpu)
 {
 	runqueue_t *rq = cpu_rq(cpu);
 	unsigned long load_now = rq->nr_running * SCHED_LOAD_SCALE;
@@ -655,7 +658,10 @@ static inline unsigned long get_low_cpu_load(int cpu)
 	return min(rq->cpu_load, load_now);
 }
 
-static inline unsigned long get_high_cpu_load(int cpu)
+/*
+ * Return a high guess at the load of a migration-target cpu
+ */
+static inline unsigned long target_load(int cpu)
 {
 	runqueue_t *rq = cpu_rq(cpu);
 	unsigned long load_now = rq->nr_running * SCHED_LOAD_SCALE;
@@ -751,8 +757,8 @@ static int try_to_wake_up(task_t * p, unsigned int state, int sync)
 	if (cpu == this_cpu || unlikely(!cpu_isset(this_cpu, p->cpus_allowed)))
 		goto out_set_cpu;
 
-	load = get_low_cpu_load(cpu);
-	this_load = get_high_cpu_load(this_cpu);
+	load = source_load(cpu);
+	this_load = target_load(this_cpu);
 
 	/* Don't pull the task off an idle CPU to a busy one */
 	if (load < SCHED_LOAD_SCALE/2 && this_load > SCHED_LOAD_SCALE/2)
@@ -1207,9 +1213,9 @@ static int sched_best_cpu(struct task_struct *p, struct sched_domain *sd)
 	for_each_cpu_mask(i, tmp) {
 		unsigned long load;
 		if (i == this_cpu)
-			load = get_low_cpu_load(i);
+			load = source_load(i);
 		else
-			load = get_high_cpu_load(i) + SCHED_LOAD_SCALE;
+			load = target_load(i) + SCHED_LOAD_SCALE;
 
 		if (min_load > load) {
 			best_cpu = i;
@@ -1426,9 +1432,9 @@ find_busiest_group(struct sched_domain *sd, int this_cpu,
 		for_each_cpu_mask(i, tmp) {
 			/* Bias balancing toward cpus of our domain */
 			if (local_group)
-				load = get_high_cpu_load(i);
+				load = target_load(i);
 			else
-				load = get_low_cpu_load(i);
+				load = source_load(i);
 
 			nr_cpus++;
 			avg_load += load;
@@ -1548,7 +1554,7 @@ static runqueue_t *find_busiest_queue(struct sched_group *group)
 
 	cpus_and(tmp, group->cpumask, cpu_online_map);
 	for_each_cpu_mask(i, tmp) {
-		load = get_low_cpu_load(i);
+		load = source_load(i);
 
 		if (load > max_load) {
 			max_load = load;
