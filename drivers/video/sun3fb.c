@@ -646,7 +646,7 @@ sizechange:
 		kfree(fb);
 		return -EINVAL;
 	}
-	printk("fb%d: %s\n", GET_FB_IDX(fb->info.node), p);
+	printk("fb%d: %s\n", minor(fb->info.node), p);
 
 	return 0;
 }

@@ -772,7 +772,7 @@ set_imstt_regvals (struct fb_info_imstt *p, u_int bpp)
 static inline void
 set_offset (struct display *disp, struct fb_info_imstt *p)
 {
-	__u32 off = disp->var.yoffset * (disp->line_length >> 3)
+	__u32 off = disp->var.yoffset * (p->info.fix.line_length >> 3)
 		    + ((disp->var.xoffset * (disp->var.bits_per_pixel >> 3)) >> 3);
 	out_le32(&p->dc_regs[SSR], off);
 }
@@ -1020,7 +1020,7 @@ imsttfbcon_bmove (struct display *disp, int sy, int sx, int dy, int dx, int heig
 	width *= Bpp;
 	width--;
 
-	line_pitch = disp->line_length;
+	line_pitch = p->info.fix.line_length;
 	bltctl = 0x05;
 	sp = line_pitch << 16;
 	cnt = height << 16;
@@ -1068,7 +1068,7 @@ imsttfbcon_clear (struct vc_data *conp, struct display *disp,
 	bgc |= (bgc << 16);
 
 	Bpp = disp->var.bits_per_pixel >> 3,
-	line_pitch = disp->line_length;
+	line_pitch = p->info.fix.line_length;
 
 	sy *= fontheight(disp);
 	sy *= line_pitch;
@@ -1099,7 +1099,7 @@ imsttfbcon_revc (struct display *disp, int sx, int sy)
 	__u32 Bpp, line_pitch, height, width;
 
 	Bpp = disp->var.bits_per_pixel >> 3,
-	line_pitch = disp->line_length;
+	line_pitch = p->info.fix.line_length;
 
 	height = fontheight(disp);
 	width = fontwidth(disp) * Bpp;
@@ -1246,28 +1246,6 @@ imsttfb_setcolreg (u_int regno, u_int red, u_int green, u_int blue,
 	return 0;
 }
 
-static int
-imsttfb_get_fix (struct fb_fix_screeninfo *fix, int con, struct fb_info *info)
-{
-	struct fb_info_imstt *p = (struct fb_info_imstt *)info;
-	struct fb_var_screeninfo *var = &fb_display[con].var;
-
-	*fix = p->fix;
-	fix->visual = var->bits_per_pixel == 8 ? FB_VISUAL_PSEUDOCOLOR
-					       : FB_VISUAL_DIRECTCOLOR;
-	fix->line_length = var->xres * (var->bits_per_pixel >> 3);
-
-	return 0;
-}
-
-static int
-imsttfb_get_var (struct fb_var_screeninfo *var, int con, struct fb_info *info)
-{
-	*var = fb_display[con].var;
-
-	return 0;
-}
-
 static void
 set_dispsw (struct display *disp, struct fb_info_imstt *p)
 {
@@ -1354,16 +1332,7 @@ set_disp (struct display *disp, struct fb_info_imstt *p)
 
 	set_dispsw(disp, p);
 
-	disp->visual = disp->var.bits_per_pixel == 8 ? FB_VISUAL_PSEUDOCOLOR
-					 	     : FB_VISUAL_DIRECTCOLOR;
-	disp->visual = p->fix.visual;
-	disp->type = p->fix.type;
-	disp->type_aux = p->fix.type_aux;
-	disp->line_length = disp->var.xres * (disp->var.bits_per_pixel >> 3);
 	disp->can_soft_blank = 1;
-	disp->inverse = inverse;
-	disp->ypanstep = 1;
-	disp->ywrapstep = 0;
 	if (accel) {
 		disp->scrollmode = SCROLL_YNOMOVE;
 		if (disp->var.yres == disp->var.yres_virtual) {
@@ -1625,8 +1594,6 @@ static struct pci_driver imsttfb_pci_driver = {
 
 static struct fb_ops imsttfb_ops = {
 	.owner =	THIS_MODULE,
-	.fb_get_fix =	imsttfb_get_fix,
-	.fb_get_var =	imsttfb_get_var,
 	.fb_set_var =	imsttfb_set_var,
 	.fb_get_cmap =	imsttfb_get_cmap,
 	.fb_set_cmap =	gen_set_cmap,
