@@ -569,7 +569,7 @@ CRYPTO API
 P:	James Morris
 M:	jmorris@redhat.com
 P:	David S. Miller
-M:	davem@redhat.com
+M:	davem@davemloft.net
 W	http://samba.org/~jamesm/crypto/
 L:	linux-kernel@vger.kernel.org
 S:	Maintained
@@ -1523,7 +1523,7 @@ S:	Maintained
 
 NETWORKING [IPv4/IPv6]
 P:	David S. Miller
-M:	davem@redhat.com
+M:	davem@davemloft.net
 P:	Alexey Kuznetsov
 M:	kuznet@ms2.inr.ac.ru
 P:	Pekka Savola (ipv6)
@@ -1981,7 +1981,7 @@ S:	Maintained
 
 UltraSPARC (sparc64):
 P:	David S. Miller
-M:	davem@redhat.com
+M:	davem@davemloft.net
 P:	Eddie C. Dost
 M:	ecd@skynet.be
 P:	Jakub Jelinek

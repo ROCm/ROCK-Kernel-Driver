@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.9-rc1
-# Wed Aug 25 21:27:54 2004
+# Fri Aug 27 17:37:00 2004
 #
 CONFIG_64BIT=y
 CONFIG_MMU=y
@@ -1488,6 +1488,7 @@ CONFIG_SND_VIRMIDI=m
 CONFIG_SND_AC97_CODEC=m
 CONFIG_SND_ALI5451=m
 CONFIG_SND_ATIIXP=m
+CONFIG_SND_ATIIXP_MODEM=m
 CONFIG_SND_AU8810=m
 CONFIG_SND_AU8820=m
 CONFIG_SND_AU8830=m
@@ -1527,6 +1528,7 @@ CONFIG_SND_VX222=m
 # ALSA USB devices
 #
 # CONFIG_SND_USB_AUDIO is not set
+CONFIG_SND_USB_USX2Y=m
 
 #
 # ALSA Sparc devices
@@ -1546,6 +1548,7 @@ CONFIG_USB=y
 CONFIG_USB_DEVICEFS=y
 # CONFIG_USB_BANDWIDTH is not set
 # CONFIG_USB_DYNAMIC_MINORS is not set
+# CONFIG_USB_OTG is not set
 
 #
 # USB Host Controller Drivers
@@ -1611,7 +1614,6 @@ CONFIG_USB_HPUSBSCSI=m
 # CONFIG_USB_IBMCAM is not set
 # CONFIG_USB_KONICAWC is not set
 # CONFIG_USB_OV511 is not set
-CONFIG_USB_PWC=m
 # CONFIG_USB_SE401 is not set
 CONFIG_USB_SN9C102=m
 # CONFIG_USB_STV680 is not set

@@ -11,15 +11,15 @@
                 ad1848_control(AD1848_MIXER_REROUTE, ((oldctl)<<8)|(newctl))
 		
 
-int ad1848_init(char *name, int io_base, int irq, int dma_playback,
+int ad1848_init(char *name, struct resource *ports, int irq, int dma_playback,
 	int dma_capture, int share_dma, int *osp, struct module *owner);
 void ad1848_unload (int io_base, int irq, int dma_playback, int dma_capture, int share_dma);
 
-int ad1848_detect (int io_base, int *flags, int *osp);
+int ad1848_detect (struct resource *ports, int *flags, int *osp);
 int ad1848_control(int cmd, int arg);
 
 irqreturn_t adintr(int irq, void *dev_id, struct pt_regs * dummy);
-void attach_ms_sound(struct address_info * hw_config, struct module * owner);
+void attach_ms_sound(struct address_info * hw_config, struct resource *ports, struct module * owner);
 
-int probe_ms_sound(struct address_info *hw_config);
+int probe_ms_sound(struct address_info *hw_config, struct resource *ports);
 void unload_ms_sound(struct address_info *hw_info);

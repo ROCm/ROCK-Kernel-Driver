@@ -809,9 +809,10 @@ static const char * chip_ids[ 16 ] =  {
 	do {								\
 		char *__ptr = (p);					\
 		int __len = (l);					\
-		if (__len >= 2 && (long)__ptr & 2) {			\
+		if (__len >= 2 && (unsigned long)__ptr & 2) {		\
 			__len -= 2;					\
-			SMC_outw( *((u16 *)__ptr)++, ioaddr, DATA_REG );\
+			SMC_outw( *(u16 *)__ptr, ioaddr, DATA_REG );	\
+			__ptr += 2;					\
 		}							\
 		SMC_outsl( ioaddr, DATA_REG, __ptr, __len >> 2);	\
 		if (__len & 2) {					\
@@ -823,7 +824,7 @@ static const char * chip_ids[ 16 ] =  {
 	do {								\
 		char *__ptr = (p);					\
 		int __len = (l);					\
-		if ((long)__ptr & 2) {					\
+		if ((unsigned long)__ptr & 2) {				\
 			/*						\
 			 * We want 32bit alignment here.		\
 			 * Since some buses perform a full 32bit	\
@@ -831,7 +832,7 @@ static const char * chip_ids[ 16 ] =  {
 			 * SMC_inw() here.  Back both source (on chip	\
 			 * and destination) pointers of 2 bytes.	\
 			 */						\
-			(long)__ptr &= ~2;				\
+			__ptr -= 2;					\
 			__len += 2;					\
 			SMC_SET_PTR( 2|PTR_READ|PTR_RCV|PTR_AUTOINC );	\
 		}							\

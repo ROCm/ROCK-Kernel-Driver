@@ -584,7 +584,7 @@ static void ep_aio_complete(struct usb_ep *ep, struct usb_request *req)
 			|| unlikely(kiocbIsCancelled(iocb))) {
 		kfree(req->buf);
 		kfree(priv);
-		iocb->private = 0;
+		iocb->private = NULL;
 		/* aio_complete() reports bytes-transferred _and_ faults */
 		if (unlikely(kiocbIsCancelled(iocb)))
 			aio_put_req(iocb);
@@ -703,7 +703,7 @@ ep_aio_write(struct kiocb *iocb, const char __user *ubuf, size_t len, loff_t o)
 		kfree(buf);
 		return -EFAULT;
 	}
-	return ep_aio_rwtail(iocb, buf, len, epdata, 0);
+	return ep_aio_rwtail(iocb, buf, len, epdata, NULL);
 }
 
 /*----------------------------------------------------------------------*/

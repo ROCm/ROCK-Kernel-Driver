@@ -127,8 +127,8 @@ config SOUND_ES1371
 	  <file:Documentation/sound/oss/es1371>.
 
 config SOUND_ESSSOLO1
-	tristate "ESS Technology Solo1"
-	depends on SOUND_PRIME!=n && SOUND && SOUND_GAMEPORT
+	tristate "ESS Technology Solo1" 
+	depends on SOUND_PRIME!=n && SOUND && SOUND_GAMEPORT && PCI
 	help
 	  Say Y or M if you have a PCI sound card utilizing the ESS Technology
 	  Solo1 chip. To find out if your sound card uses a
@@ -139,7 +139,7 @@ config SOUND_ESSSOLO1
 
 config SOUND_MAESTRO
 	tristate "ESS Maestro, Maestro2, Maestro2E driver"
-	depends on SOUND_PRIME!=n && SOUND
+	depends on SOUND_PRIME!=n && SOUND && PCI
 	help
 	  Say Y or M if you have a sound system driven by ESS's Maestro line
 	  of PCI sound chips.  These include the Maestro 1, Maestro 2, and

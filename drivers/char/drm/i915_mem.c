@@ -80,7 +80,7 @@ static struct mem_block *split_block(struct mem_block *p, int start, int size,
 			goto out;
 		newblock->start = start;
 		newblock->size = p->size - (start - p->start);
-		newblock->filp = 0;
+		newblock->filp = NULL;
 		newblock->next = p->next;
 		newblock->prev = p;
 		p->next->prev = newblock;
@@ -96,7 +96,7 @@ static struct mem_block *split_block(struct mem_block *p, int start, int size,
 			goto out;
 		newblock->start = start + size;
 		newblock->size = p->size - size;
-		newblock->filp = 0;
+		newblock->filp = NULL;
 		newblock->next = p->next;
 		newblock->prev = p;
 		p->next->prev = newblock;
@@ -118,7 +118,7 @@ static struct mem_block *alloc_block(struct mem_block *heap, int size,
 
 	for (p = heap->next; p != heap; p = p->next) {
 		int start = (p->start + mask) & ~mask;
-		if (p->filp == 0 && start + size <= p->start + p->size)
+		if (p->filp == NULL && start + size <= p->start + p->size)
 			return split_block(p, start, size, filp);
 	}
 
@@ -138,12 +138,12 @@ static struct mem_block *find_block(struct mem_block *heap, int start)
 
 static void free_block(struct mem_block *p)
 {
-	p->filp = 0;
+	p->filp = NULL;
 
 	/* Assumes a single contiguous range.  Needs a special filp in
 	 * 'heap' to stop it being subsumed.
 	 */
-	if (p->next->filp == 0) {
+	if (p->next->filp == NULL) {
 		struct mem_block *q = p->next;
 		p->size += q->size;
 		p->next = q->next;
@@ -151,7 +151,7 @@ static void free_block(struct mem_block *p)
 		DRM_FREE(q, sizeof(*q));
 	}
 
-	if (p->prev->filp == 0) {
+	if (p->prev->filp == NULL) {
 		struct mem_block *q = p->prev;
 		q->size += p->size;
 		q->next = p->next;
@@ -177,7 +177,7 @@ static int init_heap(struct mem_block **heap, int start, int size)
 
 	blocks->start = start;
 	blocks->size = size;
-	blocks->filp = 0;
+	blocks->filp = NULL;
 	blocks->next = blocks->prev = *heap;
 
 	memset(*heap, 0, sizeof(**heap));
@@ -197,7 +197,7 @@ void i915_mem_release(drm_device_t * dev, DRMFILE filp, struct mem_block *heap)
 
 	for (p = heap->next; p != heap; p = p->next) {
 		if (p->filp == filp) {
-			p->filp = 0;
+			p->filp = NULL;
 			mark_block(dev, p, 0);
 		}
 	}
@@ -206,7 +206,7 @@ void i915_mem_release(drm_device_t * dev, DRMFILE filp, struct mem_block *heap)
 	 * 'heap' to stop it being subsumed.
 	 */
 	for (p = heap->next; p != heap; p = p->next) {
-		while (p->filp == 0 && p->next->filp == 0) {
+		while (p->filp == NULL && p->next->filp == NULL) {
 			struct mem_block *q = p->next;
 			p->size += q->size;
 			p->next = q->next;

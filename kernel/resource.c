@@ -315,11 +315,12 @@ EXPORT_SYMBOL(allocate_resource);
  */
 int insert_resource(struct resource *parent, struct resource *new)
 {
-	int result = 0;
+	int result;
 	struct resource *first, *next;
 
 	write_lock(&resource_lock);
  begin:
+ 	result = 0;
 	first = __request_resource(parent, new);
 	if (!first)
 		goto out;
@@ -328,15 +329,20 @@ int insert_resource(struct resource *parent, struct resource *new)
 	if (first == parent)
 		goto out;
 
-	for (next = first; next->sibling; next = next->sibling)
+	/* Resource fully contained by the clashing resource? Recurse into it */
+	if (first->start <= new->start && first->end >= new->end) {
+		parent = first;
+		goto begin;
+	}
+
+	for (next = first; ; next = next->sibling) {
+		/* Partial overlap? Bad, and unfixable */
+		if (next->start < new->start || next->end > new->end)
+			goto out;
+		if (!next->sibling)
+			break;
 		if (next->sibling->start > new->end)
 			break;
-
-	/* existing resource includes new resource */
-	if (next->end >= new->end) {
-		parent = next;
-		result = 0;
-		goto begin;
 	}
 
 	result = 0;
