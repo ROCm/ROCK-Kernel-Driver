@@ -30,6 +30,7 @@
 #include <linux/slab.h>
 #include <sound/core.h>
 #include <sound/soundfont.h>
+#include <sound/seq_oss_legacy.h>
 
 /* Prototypes for static functions */
 

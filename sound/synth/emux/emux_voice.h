@@ -81,4 +81,8 @@ void snd_emux_proc_free(snd_emux_t *emu);
 
 #define STATE_IS_PLAYING(s) ((s) & SNDRV_EMUX_ST_ON)
 
+/* emux_hwdep.c */
+int snd_emux_init_hwdep(snd_emux_t *emu);
+void snd_emux_delete_hwdep(snd_emux_t *emu);
+
 #endif

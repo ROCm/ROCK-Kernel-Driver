@@ -103,6 +103,8 @@ struct snd_emux {
 	int midi_ports;		/* number of virtual midi devices */
 	int midi_devidx;	/* device offset of virtual midi */
 	unsigned int linear_panning: 1; /* panning is linear (sbawe = 1, emu10k1 = 0) */
+	int hwdep_idx;		/* hwdep device index */
+	snd_hwdep_t *hwdep;	/* hwdep device */
 
 	/* private */
 	int num_voices;		/* current number of voices */
@@ -113,6 +115,7 @@ struct snd_emux {
 	struct semaphore register_mutex;
 	int client;		/* For the sequencer client */
 	int ports[SNDRV_EMUX_MAX_PORTS];	/* The ports for this device */
+	snd_emux_port_t *portptrs[SNDRV_EMUX_MAX_PORTS];
 	int used;	/* use counter */
 	char *name;	/* name of the device (internal) */
 	snd_rawmidi_t **vmidi;

@@ -71,6 +71,7 @@ static int snd_emu8000_new_device(snd_seq_device_t *dev)
 	emu->midi_ports = hw->seq_ports < 2 ? hw->seq_ports : 2; /* number of virmidi ports */
 	emu->midi_devidx = 1;
 	emu->linear_panning = 1;
+	emu->hwdep_idx = 2; /* FIXED */
 
 	if (snd_emux_register(emu, dev->card, hw->index, "Emu8000") < 0) {
 		snd_emux_free(emu);
