@@ -1353,8 +1353,8 @@ EXPORT_SYMBOL(unblock_all_signals);
 
 asmlinkage long sys_restart_syscall(void)
 {
-	struct thread_info *thread = current_thread_info();
-	return thread->restart_block.fn(&thread->restart_block);
+	struct restart_block *restart = &current_thread_info()->restart_block;
+	return restart->fn(restart);
 }
 
 long do_no_restart_syscall(struct restart_block *param)
