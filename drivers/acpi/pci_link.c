@@ -685,9 +685,6 @@ acpi_pci_link_add (
 	acpi_link.count++;
 
 end:
-	/* disable all links -- to be activated on use */
-	acpi_ut_evaluate_object(link->handle, "_DIS", 0, NULL);
-
 	if (result)
 		kfree(link);
 
