@@ -48,7 +48,6 @@ int llc_conn_ac_clear_remote_busy(struct sock *sk, struct sk_buff *skb)
 
 		llc->remote_busy_flag = 0;
 		del_timer(&llc->busy_state_timer.timer);
-		llc->busy_state_timer.running = 0;
 		nr = LLC_I_GET_NR(pdu);
 		llc_conn_resend_i_pdu_as_cmd(sk, nr, 0);
 	}
@@ -252,10 +251,8 @@ int llc_conn_ac_stop_rej_tmr_if_data_flag_eq_2(struct sock *sk,
 {
 	struct llc_opt *llc = llc_sk(sk);
 
-	if (llc->data_flag == 2) {
+	if (llc->data_flag == 2)
 		del_timer(&llc->rej_sent_timer.timer);
-		llc->rej_sent_timer.running = 0;
-	}
 	return 0;
 }
 
@@ -672,7 +669,6 @@ int llc_conn_ac_set_remote_busy(struct sock *sk, struct sk_buff *skb)
 		llc->busy_state_timer.timer.data     = (unsigned long)sk;
 		llc->busy_state_timer.timer.function = llc_conn_busy_tmr_cb;
 		add_timer(&llc->busy_state_timer.timer);
-		llc->busy_state_timer.running = 1;
 	}
 	return 0;
 }
@@ -915,7 +911,6 @@ int llc_conn_ac_start_p_timer(struct sock *sk, struct sk_buff *skb)
 	llc->pf_cycle_timer.timer.data     = (unsigned long)sk;
 	llc->pf_cycle_timer.timer.function = llc_conn_pf_cycle_tmr_cb;
 	add_timer(&llc->pf_cycle_timer.timer);
-	llc->pf_cycle_timer.running = 1;
 	return 0;
 }
 
@@ -1162,13 +1157,9 @@ int llc_conn_ac_stop_all_timers(struct sock *sk, struct sk_buff *skb)
 	struct llc_opt *llc = llc_sk(sk);
 
 	del_timer(&llc->pf_cycle_timer.timer);
-	llc->pf_cycle_timer.running = 0;
 	del_timer(&llc->ack_timer.timer);
-	llc->ack_timer.running = 0;
 	del_timer(&llc->rej_sent_timer.timer);
-	llc->rej_sent_timer.running = 0;
 	del_timer(&llc->busy_state_timer.timer);
-	llc->busy_state_timer.running = 0;
 	llc->ack_must_be_send = 0;
 	llc->ack_pf = 0;
 	return 0;
@@ -1179,11 +1170,8 @@ int llc_conn_ac_stop_other_timers(struct sock *sk, struct sk_buff *skb)
 	struct llc_opt *llc = llc_sk(sk);
 
 	del_timer(&llc->rej_sent_timer.timer);
-	llc->rej_sent_timer.running = 0;
 	del_timer(&llc->pf_cycle_timer.timer);
-	llc->pf_cycle_timer.running = 0;
 	del_timer(&llc->busy_state_timer.timer);
-	llc->busy_state_timer.running = 0;
 	llc->ack_must_be_send = 0;
 	llc->ack_pf = 0;
 	return 0;
@@ -1198,7 +1186,6 @@ int llc_conn_ac_start_ack_timer(struct sock *sk, struct sk_buff *skb)
 	llc->ack_timer.timer.data     = (unsigned long)sk;
 	llc->ack_timer.timer.function = llc_conn_ack_tmr_cb;
 	add_timer(&llc->ack_timer.timer);
-	llc->ack_timer.running = 1;
 	return 0;
 }
 
@@ -1212,7 +1199,6 @@ int llc_conn_ac_start_rej_timer(struct sock *sk, struct sk_buff *skb)
 	llc->rej_sent_timer.timer.data     = (unsigned long)sk;
 	llc->rej_sent_timer.timer.function = llc_conn_rej_tmr_cb;
 	add_timer(&llc->rej_sent_timer.timer);
-	llc->rej_sent_timer.running = 1;
 	return 0;
 }
 
@@ -1221,13 +1207,12 @@ int llc_conn_ac_start_ack_tmr_if_not_running(struct sock *sk,
 {
 	struct llc_opt *llc = llc_sk(sk);
 
-	if (!llc->ack_timer.running) {
+	if (!timer_pending(&llc->ack_timer.timer)) {
 		llc->ack_timer.timer.expires  = jiffies +
 						llc->ack_timer.expire * HZ;
 		llc->ack_timer.timer.data     = (unsigned long)sk;
 		llc->ack_timer.timer.function = llc_conn_ack_tmr_cb;
 		add_timer(&llc->ack_timer.timer);
-		llc->ack_timer.running = 1;
 	}
 	return 0;
 }
@@ -1235,7 +1220,6 @@ int llc_conn_ac_start_ack_tmr_if_not_running(struct sock *sk,
 int llc_conn_ac_stop_ack_timer(struct sock *sk, struct sk_buff *skb)
 {
 	del_timer(&llc_sk(sk)->ack_timer.timer);
-	llc_sk(sk)->ack_timer.running = 0;
 	return 0;
 }
 
@@ -1244,7 +1228,6 @@ int llc_conn_ac_stop_p_timer(struct sock *sk, struct sk_buff *skb)
 	struct llc_opt *llc = llc_sk(sk);
 
 	del_timer(&llc->pf_cycle_timer.timer);
-	llc->pf_cycle_timer.running = 0;
 	llc->p_flag = 0;
 	return 0;
 }
@@ -1252,7 +1235,6 @@ int llc_conn_ac_stop_p_timer(struct sock *sk, struct sk_buff *skb)
 int llc_conn_ac_stop_rej_timer(struct sock *sk, struct sk_buff *skb)
 {
 	del_timer(&llc_sk(sk)->rej_sent_timer.timer);
-	llc_sk(sk)->rej_sent_timer.running = 0;
 	return 0;
 }
 
@@ -1270,7 +1252,6 @@ int llc_conn_ac_upd_nr_received(struct sock *sk, struct sk_buff *skb)
 	if (acked > 0 || (llc->dev->flags & IFF_LOOPBACK)) {
 		llc->retry_count = 0;
 		del_timer(&llc->ack_timer.timer);
-		llc->ack_timer.running = 0;
 		if (llc->failed_data_req) {
 			/* already, we did not accept data from upper layer
 			 * (tx_window full or unacceptable state). Now, we
@@ -1285,7 +1266,6 @@ int llc_conn_ac_upd_nr_received(struct sock *sk, struct sk_buff *skb)
 			llc->ack_timer.timer.data     = (unsigned long)sk;
 			llc->ack_timer.timer.function = llc_conn_ack_tmr_cb;
 			add_timer(&llc->ack_timer.timer);
-			llc->ack_timer.running = 1;
 	       }
 	} else if (llc->failed_data_req) {
 		llc_pdu_decode_pf_bit(skb, &fbit);
@@ -1423,13 +1403,11 @@ void llc_conn_pf_cycle_tmr_cb(unsigned long timeout_data)
 	struct sk_buff *skb = alloc_skb(0, GFP_ATOMIC);
 
 	bh_lock_sock(sk);
-	llc_sk(sk)->pf_cycle_timer.running = 0;
 	if (skb) {
 		struct llc_conn_state_ev *ev = llc_conn_ev(skb);
 
 		skb->sk  = sk;
 		ev->type = LLC_CONN_EV_TYPE_P_TMR;
-		ev->data.tmr.timer_specific = NULL;
 		llc_process_tmr_ev(sk, skb);
 	}
 	bh_unlock_sock(sk);
@@ -1441,13 +1419,11 @@ static void llc_conn_busy_tmr_cb(unsigned long timeout_data)
 	struct sk_buff *skb = alloc_skb(0, GFP_ATOMIC);
 
 	bh_lock_sock(sk);
-	llc_sk(sk)->busy_state_timer.running = 0;
 	if (skb) {
 		struct llc_conn_state_ev *ev = llc_conn_ev(skb);
 
 		skb->sk  = sk;
 		ev->type = LLC_CONN_EV_TYPE_BUSY_TMR;
-		ev->data.tmr.timer_specific = NULL;
 		llc_process_tmr_ev(sk, skb);
 	}
 	bh_unlock_sock(sk);
@@ -1459,13 +1435,11 @@ void llc_conn_ack_tmr_cb(unsigned long timeout_data)
 	struct sk_buff *skb = alloc_skb(0, GFP_ATOMIC);
 
 	bh_lock_sock(sk);
-	llc_sk(sk)->ack_timer.running = 0;
 	if (skb) {
 		struct llc_conn_state_ev *ev = llc_conn_ev(skb);
 
 		skb->sk  = sk;
 		ev->type = LLC_CONN_EV_TYPE_ACK_TMR;
-		ev->data.tmr.timer_specific = NULL;
 		llc_process_tmr_ev(sk, skb);
 	}
 	bh_unlock_sock(sk);
@@ -1477,13 +1451,11 @@ static void llc_conn_rej_tmr_cb(unsigned long timeout_data)
 	struct sk_buff *skb = alloc_skb(0, GFP_ATOMIC);
 
 	bh_lock_sock(sk);
-	llc_sk(sk)->rej_sent_timer.running = 0;
 	if (skb) {
 		struct llc_conn_state_ev *ev = llc_conn_ev(skb);
 
 		skb->sk  = sk;
 		ev->type = LLC_CONN_EV_TYPE_REJ_TMR;
-		ev->data.tmr.timer_specific = NULL;
 		llc_process_tmr_ev(sk, skb);
 	}
 	bh_unlock_sock(sk);

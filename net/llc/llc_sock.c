@@ -78,6 +78,18 @@ static __inline__ u16 llc_ui_next_link_no(int sap)
 }
 
 /**
+ *	llc_proto_type - return eth protocol for ARP header type
+ *	@arphrd: ARP header type.
+ *
+ *	Given an ARP header type return the corresponding ethernet protocol.
+ */
+static __inline__ u16 llc_proto_type(u16 arphrd)
+{
+	return arphrd == ARPHRD_IEEE802_TR ?
+		         htons(ETH_P_TR_802_2) : htons(ETH_P_802_2);
+}
+
+/**
  *	llc_ui_addr_null - determines if a address structure is null
  *	@addr: Address to test if null.
  */
@@ -117,13 +129,11 @@ static __inline__ u8 llc_ui_header_len(struct sock *sk,
  *	Send data via reliable llc2 connection.
  *	Returns 0 upon success, non-zero if action did not succeed.
  */
-static int llc_ui_send_data(struct sock* sk, struct sk_buff *skb,
-			    struct sockaddr_llc *addr, int noblock)
+static int llc_ui_send_data(struct sock* sk, struct sk_buff *skb, int noblock)
 {
 	struct llc_opt* llc = llc_sk(sk);
 	int rc = 0;
 
-	skb->protocol = llc_proto_type(addr->sllc_arphrd);
 	if (llc_data_accept_state(llc->state) || llc->p_flag) {
 		int timeout = sock_sndtimeo(sk, noblock);
 
@@ -940,28 +950,32 @@ static int llc_ui_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 	skb = sock_alloc_send_skb(sk, size, noblock, &rc);
 	if (!skb)
 		goto release;
-	skb->sk  = sk;
-	skb->dev = dev;
+	skb->sk	      = sk;
+	skb->dev      = dev;
+	skb->protocol = llc_proto_type(addr->sllc_arphrd);
 	skb_reserve(skb, dev->hard_header_len + llc_ui_header_len(sk, addr));
 	rc = memcpy_fromiovec(skb_put(skb, len), msg->msg_iov, len);
 	if (rc)
 		goto out;
 	if (addr->sllc_test) {
-		llc_build_and_send_test_pkt(llc->sap, skb, addr);
+		llc_build_and_send_test_pkt(llc->sap, skb, addr->sllc_dmac,
+					    addr->sllc_dsap);
 		goto out;
 	}
 	if (addr->sllc_xid) {
-		llc_build_and_send_xid_pkt(llc->sap, skb, addr);
+		llc_build_and_send_xid_pkt(llc->sap, skb, addr->sllc_dmac,
+					   addr->sllc_dsap);
 		goto out;
 	}
 	if (sk->type == SOCK_DGRAM || addr->sllc_ua) {
-		llc_build_and_send_ui_pkt(llc->sap, skb, addr);
+		llc_build_and_send_ui_pkt(llc->sap, skb, addr->sllc_dmac,
+					  addr->sllc_dsap);
 		goto out;
 	}
 	rc = -ENOPROTOOPT;
 	if (!(sk->type == SOCK_STREAM && !addr->sllc_ua))
 		goto out;
-	rc = llc_ui_send_data(sk, skb, addr, noblock);
+	rc = llc_ui_send_data(sk, skb, noblock);
 	if (rc)
 		dprintk("%s: llc_ui_send_data failed: %d\n", __FUNCTION__, rc);
 out:

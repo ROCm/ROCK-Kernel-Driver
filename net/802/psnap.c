@@ -86,19 +86,9 @@ out:
 static int snap_request(struct datalink_proto *dl,
 			struct sk_buff *skb, u8 *dest)
 {
-	union llc_u_prim_data prim_data;
-	struct llc_prim_if_block prim;
-
 	memcpy(skb_push(skb, 5), dl->type, 5);
-	prim.data                 = &prim_data;
-	prim.sap                  = snap_sap;
-	prim.prim                 = LLC_DATAUNIT_PRIM;
-	prim_data.test.skb        = skb;
-	prim_data.test.saddr.lsap = snap_sap->laddr.lsap;
-	prim_data.test.daddr.lsap = snap_sap->laddr.lsap;
-	memcpy(prim_data.test.saddr.mac, skb->dev->dev_addr, IFHWADDRLEN);
-	memcpy(prim_data.test.daddr.mac, dest, IFHWADDRLEN);
-	return snap_sap->req(&prim);
+	llc_build_and_send_ui_pkt(snap_sap, skb, dest, snap_sap->laddr.lsap);
+	return 0;
 }
 
 /*

@@ -17,7 +17,6 @@
 
 struct llc_timer {
 	struct timer_list timer;
-	u8		  running;	/* timer is running or no */
 	u16		  expire;	/* timer expire time */
 };
 

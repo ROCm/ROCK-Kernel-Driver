@@ -34,7 +34,6 @@ int llc_station_ac_start_ack_timer(struct llc_station *station,
 	station->ack_timer.data     = (unsigned long)station;
 	station->ack_timer.function = llc_station_ack_tmr_callback;
 	add_timer(&station->ack_timer);
-	station->ack_tmr_running = 1;
 	return 0;
 }
 
@@ -136,12 +135,10 @@ static void llc_station_ack_tmr_callback(unsigned long timeout_data)
 	struct llc_station *station = (struct llc_station *)timeout_data;
 	struct sk_buff *skb = alloc_skb(0, GFP_ATOMIC);
 
-	station->ack_tmr_running = 0;
 	if (skb) {
 		struct llc_station_state_ev *ev = llc_station_ev(skb);
 
 		ev->type = LLC_STATION_EV_TYPE_ACK_TMR;
-		ev->data.tmr.timer_specific = NULL;
 		llc_station_state_process(station, skb);
 	}
 }
