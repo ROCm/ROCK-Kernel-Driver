@@ -473,7 +473,12 @@ static inline __u32 int_ln_12bits(__u32 word)
 #endif
 
 #if 0
-#define DEBUG_ENT(fmt, arg...) printk(KERN_DEBUG "random: " fmt, ## arg)
+#define DEBUG_ENT(fmt, arg...) printk(KERN_DEBUG "random %04d %04d %04d: " \
+	fmt,\
+	random_state->entropy_count,\
+	sec_random_state->entropy_count,\
+	urandom_state->entropy_count,\
+	## arg)
 #else
 #define DEBUG_ENT(fmt, arg...) do {} while (0)
 #endif
@@ -648,8 +653,8 @@ static void credit_entropy_store(struct entropy_store *r, int nbits)
 	} else {
 		r->entropy_count += nbits;
 		if (nbits)
-			DEBUG_ENT("Added %d entropy credits to %s, now %d\n",
-				  nbits, r->name, r->entropy_count);
+			DEBUG_ENT("added %d entropy credits to %s\n",
+				  nbits, r->name);
 	}
 
 	spin_unlock_irqrestore(&r->lock, flags);
@@ -862,6 +867,7 @@ void add_keyboard_randomness(unsigned char scancode)
 {
 	static unsigned char last_scancode;
 	/* ignore autorepeat (multiple key down w/o key up) */
+	DEBUG_ENT("keyboard event\n");
 	if (scancode != last_scancode) {
 		last_scancode = scancode;
 		add_timer_randomness(&keyboard_timer_state, scancode);
@@ -870,6 +876,7 @@ void add_keyboard_randomness(unsigned char scancode)
 
 void add_mouse_randomness(__u32 mouse_data)
 {
+	DEBUG_ENT("mouse event\n");
 	add_timer_randomness(&mouse_timer_state, mouse_data);
 }
 
@@ -880,6 +887,7 @@ void add_interrupt_randomness(int irq)
 	if (irq >= NR_IRQS || irq_timer_state[irq] == 0)
 		return;
 
+	DEBUG_ENT("irq event %d\n", irq);
 	add_timer_randomness(irq_timer_state[irq], 0x100 + irq);
 }
 
@@ -888,6 +896,8 @@ void add_disk_randomness(struct gendisk *disk)
 	if (!disk || !disk->random)
 		return;
 	/* first major is 1, so we get >= 0x200 here */
+	DEBUG_ENT("disk event %d:%d\n", disk->major, disk->first_minor);
+
 	add_timer_randomness(disk->random,
 			     0x100 + MKDEV(disk->major, disk->first_minor));
 }
@@ -1308,10 +1318,8 @@ static inline void xfer_secondary_pool(struct entropy_store *r,
 		int bytes = max_t(int, random_read_wakeup_thresh / 8,
 				min_t(int, nbytes, TMP_BUF_SIZE));
 
-		DEBUG_ENT("%04d %04d : going to reseed %s with %d bits "
+		DEBUG_ENT("going to reseed %s with %d bits "
 			  "(%d of %d requested)\n",
-			  random_state->entropy_count,
-			  sec_random_state->entropy_count,
 			  r->name, bytes * 8, nbytes * 8, r->entropy_count);
 
 		bytes=extract_entropy(random_state, tmp, bytes,
@@ -1352,9 +1360,7 @@ static ssize_t extract_entropy(struct entropy_store *r, void * buf,
 	/* Hold lock while accounting */
 	spin_lock_irqsave(&r->lock, cpuflags);
 
-	DEBUG_ENT("%04d %04d : trying to extract %d bits from %s\n",
-		  random_state->entropy_count,
-		  sec_random_state->entropy_count,
+	DEBUG_ENT("trying to extract %d bits from %s\n",
 		  nbytes * 8, r->name);
 
 	if (flags & EXTRACT_ENTROPY_LIMIT && nbytes >= r->entropy_count / 8)
@@ -1368,7 +1374,7 @@ static ssize_t extract_entropy(struct entropy_store *r, void * buf,
 	if (r->entropy_count < random_write_wakeup_thresh)
 		wake_up_interruptible(&random_write_wait);
 
-	DEBUG_ENT("Debiting %d entropy credits from %s%s\n",
+	DEBUG_ENT("debiting %d entropy credits from %s%s\n",
 		  nbytes * 8, r->name,
 		  flags & EXTRACT_ENTROPY_LIMIT ? "" : " (unlimited)");
 
@@ -1386,15 +1392,7 @@ static ssize_t extract_entropy(struct entropy_store *r, void * buf,
 				break;
 			}
 
-			DEBUG_ENT("%04d %04d : extract feeling sleepy (%d bytes left)\n",
-				  random_state->entropy_count,
-				  sec_random_state->entropy_count, nbytes);
-
 			schedule();
-
-			DEBUG_ENT("%04d %04d : extract woke up\n",
-				  random_state->entropy_count,
-				  sec_random_state->entropy_count);
 		}
 
 		/* Hash the pool to get the output */
@@ -1603,20 +1601,14 @@ random_read(struct file * file, char __user * buf, size_t nbytes, loff_t *ppos)
 		if (n > SEC_XFER_SIZE)
 			n = SEC_XFER_SIZE;
 
-		DEBUG_ENT("%04d %04d : reading %d bits, p: %d s: %d\n",
-			  random_state->entropy_count,
-			  sec_random_state->entropy_count,
-			  n*8, random_state->entropy_count,
-			  sec_random_state->entropy_count);
+		DEBUG_ENT("reading %d bits\n", n*8);
 
 		n = extract_entropy(sec_random_state, buf, n,
 				    EXTRACT_ENTROPY_USER |
 				    EXTRACT_ENTROPY_LIMIT |
 				    EXTRACT_ENTROPY_SECONDARY);
 
-		DEBUG_ENT("%04d %04d : read got %d bits (%d still needed)\n",
-			  random_state->entropy_count,
-			  sec_random_state->entropy_count,
+		DEBUG_ENT("read got %d bits (%d still needed)\n",
 			  n*8, (nbytes-n)*8);
 
 		if (n == 0) {
@@ -1629,10 +1621,6 @@ random_read(struct file * file, char __user * buf, size_t nbytes, loff_t *ppos)
 				break;
 			}
 
-			DEBUG_ENT("%04d %04d : sleeping?\n",
-				  random_state->entropy_count,
-				  sec_random_state->entropy_count);
-
 			set_current_state(TASK_INTERRUPTIBLE);
 			add_wait_queue(&random_read_wait, &wait);
 
@@ -1641,10 +1629,6 @@ random_read(struct file * file, char __user * buf, size_t nbytes, loff_t *ppos)
 
 			set_current_state(TASK_RUNNING);
 			remove_wait_queue(&random_read_wait, &wait);
-
-			DEBUG_ENT("%04d %04d : waking up\n",
-				  random_state->entropy_count,
-				  sec_random_state->entropy_count);
 
 			continue;
 		}
