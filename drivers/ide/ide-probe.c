@@ -434,7 +434,9 @@ static int do_probe (ide_drive_t *drive, u8 cmd)
 		if (hwif->INB(IDE_STATUS_REG) == (BUSY_STAT|READY_STAT))
 			return 4;
 
-		if (rc == 1 && cmd == WIN_PIDENTIFY && drive->autotune != 2) {
+		if ((rc == 1 && cmd == WIN_PIDENTIFY) &&
+			((drive->autotune == IDE_TUNE_DEFAULT) ||
+			(drive->autotune == IDE_TUNE_AUTO))) {
 			unsigned long timeout;
 			printk("%s: no response (status = 0x%02x), "
 				"resetting drive\n", drive->name,
@@ -699,7 +701,8 @@ void probe_hwif (ide_hwif_t *hwif)
 	for (unit = 0; unit < MAX_DRIVES; ++unit) {
 		ide_drive_t *drive = &hwif->drives[unit];
 		if (drive->present) {
-			if (hwif->tuneproc != NULL && drive->autotune == 1)
+			if (hwif->tuneproc != NULL && 
+				drive->autotune == IDE_TUNE_AUTO)
 				/* auto-tune PIO mode */
 				hwif->tuneproc(drive, 255);
 			/*
@@ -711,7 +714,9 @@ void probe_hwif (ide_hwif_t *hwif)
 			 * Move here to prevent module loading clashing.
 			 */
 	//		drive->autodma = hwif->autodma;
-			if ((drive->autotune != 2) && (hwif->ide_dma_check)) {
+			if ((hwif->ide_dma_check) &&
+				((drive->autotune == IDE_TUNE_DEFAULT) ||
+				(drive->autotune == IDE_TUNE_AUTO))) {
 				/*
 				 * Force DMAing for the beginning of the check.
 				 * Some chipsets appear to do interesting
