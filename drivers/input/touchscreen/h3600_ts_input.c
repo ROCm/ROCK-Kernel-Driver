@@ -45,6 +45,10 @@
 #include <asm/arch/hardware.h>
 #include <asm/arch/irqs.h>
 
+MODULE_AUTHOR("James Simmons <jsimmons@transvirtual.com>");
+MODULE_DESCRIPTION("H3600 touchscreen driver");
+MODULE_LICENSE("GPL");
+
 /*
  * Definitions & global arrays.
  */
@@ -103,7 +107,7 @@ struct h3600_dev {
 	char phys[32];
 };
 
-static void action_button_handler(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t action_button_handler(int irq, void *dev_id, struct pt_regs *regs)
 {
         int down = (GPLR & GPIO_BITSY_ACTION_BUTTON) ? 0 : 1;
 	struct input_dev *dev = (struct input_dev *) dev_id;
@@ -111,9 +115,11 @@ static void action_button_handler(int irq, void *dev_id, struct pt_regs *regs)
 	input_regs(dev, regs);
 	input_report_key(dev, KEY_ENTER, down);
 	input_sync(dev);
+
+	return IRQ_HANDLED;
 }
 
-static void npower_button_handler(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t npower_button_handler(int irq, void *dev_id, struct pt_regs *regs)
 {
         int down = (GPLR & GPIO_BITSY_NPOWER_BUTTON) ? 0 : 1;
 	struct input_dev *dev = (struct input_dev *) dev_id;
@@ -126,6 +132,8 @@ static void npower_button_handler(int irq, void *dev_id, struct pt_regs *regs)
 	input_report_key(dev, KEY_SUSPEND, 1);
 	input_report_key(dev, KEY_SUSPEND, down);
 	input_sync(dev);
+
+	return IRQ_HANDLED;
 }
 
 #ifdef CONFIG_PM
@@ -141,7 +149,7 @@ enum flite_pwr {
  * h3600_flite_power: enables or disables power to frontlight, using last bright */
 unsigned int h3600_flite_power(struct input_dev *dev, enum flite_pwr pwr)
 {
-	unsigned char brightness = ((pwr==FLITE_PWR_OFF) ? 0:flite_brightness);
+	unsigned char brightness = (pwr == FLITE_PWR_OFF) ? 0 : flite_brightness;
 	struct h3600_dev *ts = dev->private;
 
 	/* Must be in this order */
@@ -317,8 +325,8 @@ static int state;
 #define STATE_DATA      2       /* state where we decode data */
 #define STATE_EOF       3       /* state where we decode checksum or EOF */
 
-static void h3600ts_interrupt(struct serio *serio, unsigned char data,
-                              unsigned int flags)
+static irqreturn_t h3600ts_interrupt(struct serio *serio, unsigned char data,
+                                     unsigned int flags, struct pt_regs *regs)
 {
         struct h3600_dev *ts = serio->private;
 
@@ -329,7 +337,7 @@ static void h3600ts_interrupt(struct serio *serio, unsigned char data,
 		case STATE_SOF:
         		if (data == CHAR_SOF)
                 		state = STATE_ID;
-			return;
+			break;
         	case STATE_ID:
 			ts->event = (data & 0xf0) >> 4;
 			ts->len = (data & 0xf);
@@ -339,7 +347,7 @@ static void h3600ts_interrupt(struct serio *serio, unsigned char data,
                         	break;
 			}
 			ts->chksum = data;
-                	state=(ts->len > 0 ) ? STATE_DATA : STATE_EOF;
+                	state = (ts->len > 0) ? STATE_DATA : STATE_EOF;
 			break;
 		case STATE_DATA:
 			ts->chksum += data;
@@ -349,13 +357,15 @@ static void h3600ts_interrupt(struct serio *serio, unsigned char data,
 			break;
 		case STATE_EOF:
                 	state = STATE_SOF;
-                	if (data == CHAR_EOF || data == ts->chksum )
-				h3600ts_process_packet(ts);
+                	if (data == CHAR_EOF || data == ts->chksum)
+				h3600ts_process_packet(ts, regs);
                 	break;
         	default:
                 	printk("Error3\n");
                 	break;
 	}
+
+	return IRQ_HANDLED;
 }
 
 /*
@@ -378,8 +388,8 @@ static void h3600ts_connect(struct serio *serio, struct serio_dev *dev)
 	init_input_dev(&ts->dev);
 
 	/* Device specific stuff */
-        set_GPIO_IRQ_edge( GPIO_BITSY_ACTION_BUTTON, GPIO_BOTH_EDGES );
-        set_GPIO_IRQ_edge( GPIO_BITSY_NPOWER_BUTTON, GPIO_RISING_EDGE );
+        set_GPIO_IRQ_edge(GPIO_BITSY_ACTION_BUTTON, GPIO_BOTH_EDGES);
+        set_GPIO_IRQ_edge(GPIO_BITSY_NPOWER_BUTTON, GPIO_RISING_EDGE);
 
         if (request_irq(IRQ_GPIO_BITSY_ACTION_BUTTON, action_button_handler,
 			SA_SHIRQ | SA_INTERRUPT | SA_SAMPLE_RANDOM,
