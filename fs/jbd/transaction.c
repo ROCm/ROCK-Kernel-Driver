@@ -136,11 +136,12 @@ repeat_locked:
 		goto repeat;
 	}
 	
-	/* If there is not enough space left in the log to write all
-	 * potential buffers requested by this operation, we need to
-	 * stall pending a log checkpoint to free some more log
-	 * space. */
-
+	/*
+	 * If there is not enough space left in the log to write all potential
+	 * buffers requested by this operation, we need to stall pending a log
+	 * checkpoint to free some more log space.
+	 */
+	spin_lock(&transaction->t_handle_lock);
 	needed = transaction->t_outstanding_credits + nblocks;
 
 	if (needed > journal->j_max_transaction_buffers) {
@@ -148,6 +149,7 @@ repeat_locked:
 		 * start to commit it: we can then go back and attach
 		 * this handle to a new transaction. */
 		
+		spin_unlock(&transaction->t_handle_lock);
 		jbd_debug(2, "Handle %p starting new commit...\n", handle);
 		log_start_commit(journal, transaction);
 		unlock_journal(journal);
@@ -188,6 +190,7 @@ repeat_locked:
 	
 	if (log_space_left(journal) < needed) {
 		jbd_debug(2, "Handle %p waiting for checkpoint...\n", handle);
+		spin_unlock(&transaction->t_handle_lock);
 		log_wait_for_space(journal, needed);
 		goto repeat_locked;
 	}
@@ -196,14 +199,13 @@ repeat_locked:
 	 * use and add the handle to the running transaction. */
 
 	handle->h_transaction = transaction;
-	spin_lock(&transaction->t_handle_lock);
 	transaction->t_outstanding_credits += nblocks;
 	transaction->t_updates++;
 	transaction->t_handle_count++;
-	spin_unlock(&transaction->t_handle_lock);
 	jbd_debug(4, "Handle %p given %d credits (total %d, free %d)\n",
 		  handle, nblocks, transaction->t_outstanding_credits,
 		  log_space_left(journal));
+	spin_unlock(&transaction->t_handle_lock);
 
 	unlock_journal(journal);
 	
@@ -289,7 +291,7 @@ handle_t *journal_start(journal_t *journal, int nblocks)
  * return code < 0 implies an error
  * return code > 0 implies normal transaction-full status.
  */
-int journal_extend (handle_t *handle, int nblocks)
+int journal_extend(handle_t *handle, int nblocks)
 {
 	transaction_t *transaction = handle->h_transaction;
 	journal_t *journal = transaction->t_journal;
@@ -311,7 +313,8 @@ int journal_extend (handle_t *handle, int nblocks)
 		goto error_out;
 	}
 
-	lock_kernel();	
+	lock_kernel();
+	spin_lock(&transaction->t_handle_lock);
 	wanted = transaction->t_outstanding_credits + nblocks;
 	
 	if (wanted > journal->j_max_transaction_buffers) {
@@ -332,6 +335,7 @@ int journal_extend (handle_t *handle, int nblocks)
 
 	jbd_debug(3, "extended handle %p by %d\n", handle, nblocks);
 unlock:
+	spin_unlock(&transaction->t_handle_lock);
 	unlock_kernel();
 error_out:
 	unlock_journal (journal);
@@ -1351,7 +1355,6 @@ int journal_stop(handle_t *handle)
 		if (journal->j_barrier_count)
 			wake_up(&journal->j_wait_transaction_locked);
 	}
-	spin_unlock(&transaction->t_handle_lock);
 
 	/* Move callbacks from the handle to the transaction. */
 	list_splice(&handle->h_jcb, &transaction->t_jcb);
@@ -1371,6 +1374,7 @@ int journal_stop(handle_t *handle)
 		 * anything to disk. */
 		tid_t tid = transaction->t_tid;
 		
+		spin_unlock(&transaction->t_handle_lock);
 		jbd_debug(2, "transaction too old, requesting commit for "
 					"handle %p\n", handle);
 		/* This is non-blocking */
@@ -1382,7 +1386,10 @@ int journal_stop(handle_t *handle)
 		 */
 		if (handle->h_sync && !(current->flags & PF_MEMALLOC))
 			err = log_wait_commit(journal, tid);
+	} else {
+		spin_unlock(&transaction->t_handle_lock);
 	}
+
 	unlock_kernel();
 	jbd_free_handle(handle);
 	return err;
