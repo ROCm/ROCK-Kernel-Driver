@@ -98,19 +98,14 @@ extern int ucache_bsize;
  * - for compatibility with glibc ARCH_DLINFO must always be defined on PPC,
  *   even if DLINFO_ARCH_ITEMS goes to zero or is undefined.
  */
-#define DLINFO_ARCH_ITEMS	3
 #define ARCH_DLINFO							\
 do {									\
-	sp -= DLINFO_ARCH_ITEMS * 2;					\
-	NEW_AUX_ENT(0, AT_DCACHEBSIZE, dcache_bsize);			\
-	NEW_AUX_ENT(1, AT_ICACHEBSIZE, icache_bsize);			\
-	NEW_AUX_ENT(2, AT_UCACHEBSIZE, ucache_bsize);			\
-	/*								\
-	 * Now handle glibc compatibility.				\
-	 */								\
-	sp -= 2*2;							\
-	NEW_AUX_ENT(0, AT_IGNOREPPC, AT_IGNOREPPC);			\
-	NEW_AUX_ENT(1, AT_IGNOREPPC, AT_IGNOREPPC);			\
+	NEW_AUX_ENT(AT_DCACHEBSIZE, dcache_bsize);			\
+	NEW_AUX_ENT(AT_ICACHEBSIZE, icache_bsize);			\
+	NEW_AUX_ENT(AT_UCACHEBSIZE, ucache_bsize);			\
+	/* Now handle glibc compatibility. */				\
+	NEW_AUX_ENT(AT_IGNOREPPC, AT_IGNOREPPC);			\
+	NEW_AUX_ENT(AT_IGNOREPPC, AT_IGNOREPPC);			\
  } while (0)
 
 #endif /* __KERNEL__ */

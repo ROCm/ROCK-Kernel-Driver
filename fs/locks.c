@@ -1609,6 +1609,14 @@ void locks_remove_posix(struct file *filp, fl_owner_t owner)
 {
 	struct file_lock lock;
 
+	/*
+	 * If there are no locks held on this file, we don't need to call
+	 * posix_lock_file().  Another process could be setting a lock on this
+	 * file at the same time, but we wouldn't remove that lock anyway.
+	 */
+	if (!filp->f_dentry->d_inode->i_flock)
+		return;
+
 	lock.fl_type = F_UNLCK;
 	lock.fl_flags = FL_POSIX;
 	lock.fl_start = 0;

@@ -31,7 +31,7 @@ static inline void pte_free(struct page *page)
         __free_page(page);
 }
 
-static inline void pte_free_tlb(mmu_gather_t *tlb, struct page *page)
+static inline void __pte_free_tlb(mmu_gather_t *tlb, struct page *page)
 {
 	tlb_remove_page(tlb, page);
 }
@@ -76,7 +76,7 @@ static inline void pmd_populate(struct mm_struct *mm, pmd_t *pmd, struct page *p
  * inside the pgd, so has no extra memory associated with it.
  */
 #define pmd_free(x)			do { } while (0)
-#define pmd_free_tlb(tlb, x)		do { } while (0)
+#define __pmd_free_tlb(tlb, x)		do { } while (0)
 
 static inline void pgd_free(pgd_t * pgd)
 {

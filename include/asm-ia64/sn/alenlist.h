@@ -15,7 +15,7 @@
 
 /*
  * An Address/Length List is used when setting up for an I/O DMA operation.
- * A driver creates an Address/Length List that describes to the the DMA 
+ * A driver creates an Address/Length List that describes to the DMA 
  * interface where in memory the DMA should go.  The bus interface sets up 
  * mapping registers, if required, and returns a suitable list of "physical 
  * addresses" or "I/O address" to the driver.  The driver then uses these 

@@ -107,7 +107,8 @@ struct usb_xpad {
 	struct usb_device *udev;		/* usb device */
 	
 	struct urb *irq_in;			/* urb for interrupt in report */
-	unsigned char idata[XPAD_PKT_LEN];	/* input data */
+	unsigned char *idata;			/* input data */
+	dma_addr_t idata_dma;
 	
 	char phys[65];				/* physical device path */
 	int open_count;				/* reference count */
@@ -213,19 +214,29 @@ static void * xpad_probe(struct usb_device *udev, unsigned int ifnum, const stru
 	}
 	memset(xpad, 0, sizeof(struct usb_xpad));
 	
+	xpad->idata = usb_buffer_alloc(udev, XPAD_PKT_LEN,
+				       SLAB_ATOMIC, &xpad->idata_dma);
+	if (!xpad->idata) {
+		kfree(xpad);
+		return NULL;
+	}
+
 	xpad->irq_in = usb_alloc_urb(0, GFP_KERNEL);
         if (!xpad->irq_in) {
 		err("cannot allocate memory for new pad irq urb");
+		usb_buffer_free(udev, XPAD_PKT_LEN, xpad->idata, xpad->idata_dma);
                 kfree(xpad);
                 return NULL;
         }
 	
 	ep_irq_in = udev->actconfig->interface[ifnum].altsetting[0].endpoint + 0;
 	
-	FILL_INT_URB(xpad->irq_in, udev,
-		usb_rcvintpipe(udev, ep_irq_in->bEndpointAddress),
-		xpad->idata, XPAD_PKT_LEN, xpad_irq_in, xpad,
-		ep_irq_in->bInterval);
+	usb_fill_int_urb(xpad->irq_in, udev,
+			 usb_rcvintpipe(udev, ep_irq_in->bEndpointAddress),
+			 xpad->idata, XPAD_PKT_LEN, xpad_irq_in,
+			 xpad, ep_irq_in->bInterval);
+	xpad->irq_in->transfer_dma = xpad->idata_dma;
+	xpad->irq_in->transfer_flags |= URB_NO_DMA_MAP;
 	
 	xpad->udev = udev;
 	
@@ -290,6 +301,7 @@ static void xpad_disconnect(struct usb_device *udev, void *ptr)
 	usb_unlink_urb(xpad->irq_in);
 	input_unregister_device(&xpad->dev);
 	usb_free_urb(xpad->irq_in);
+	usb_buffer_free(udev, XPAD_PKT_LEN, xpad->idata, xpad->idata_dma);
 	kfree(xpad);
 }
 

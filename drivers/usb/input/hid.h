@@ -337,19 +337,23 @@ struct hid_device {							/* device report descriptor */
 	unsigned long iofl;						/* I/O flags (CTRL_RUNNING, OUT_RUNNING) */
 
 	struct urb *urbin;						/* Input URB */
-	char inbuf[HID_BUFFER_SIZE];					/* Input buffer */
+	char *inbuf;							/* Input buffer */
+	dma_addr_t inbuf_dma;						/* Input buffer dma */
 
 	struct urb *urbctrl;						/* Control URB */
-	struct usb_ctrlrequest cr;					/* Control request struct */
+	struct usb_ctrlrequest *cr;					/* Control request struct */
+	dma_addr_t cr_dma;						/* Control request struct dma */
 	struct hid_control_fifo ctrl[HID_CONTROL_FIFO_SIZE];		/* Control fifo */
 	unsigned char ctrlhead, ctrltail;				/* Control fifo head & tail */
-	char ctrlbuf[HID_BUFFER_SIZE];					/* Control buffer */
+	char *ctrlbuf;							/* Control buffer */
+	dma_addr_t ctrlbuf_dma;						/* Control buffer dma */
 	spinlock_t ctrllock;						/* Control fifo spinlock */
 
 	struct urb *urbout;						/* Output URB */
 	struct hid_report *out[HID_CONTROL_FIFO_SIZE];			/* Output pipe fifo */
 	unsigned char outhead, outtail;					/* Output pipe fifo head & tail */
-	char outbuf[HID_BUFFER_SIZE];					/* Output buffer */
+	char *outbuf;							/* Output buffer */
+	dma_addr_t outbuf_dma;						/* Output buffer dma */
 	spinlock_t outlock;						/* Output fifo spinlock */
 
 	unsigned claimed;						/* Claimed by hidinput, hiddev? */	

@@ -51,7 +51,6 @@
 #include <linux/pagemap.h>
 #include <linux/iobuf.h>
 #include <linux/slab.h>
-#include <linux/pagemap.h>
 #include <linux/mtd/compatmac.h>
 #include <linux/mtd/mtd.h>
 

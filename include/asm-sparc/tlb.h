@@ -11,7 +11,7 @@ do {								\
 	flush_tlb_range(vma, vma->vm_start, vma->vm_end);	\
 } while (0)
 
-#define tlb_remove_tlb_entry(tlb, pte, address) \
+#define __tlb_remove_tlb_entry(tlb, pte, address) \
 	do { } while (0)
 
 #define tlb_flush(tlb) \

@@ -52,7 +52,7 @@ static int inline verify (struct security_operations *ops)
 	/* verify the security_operations structure exists */
 	if (!ops) {
 		printk (KERN_INFO "Passed a NULL security_operations "
-			"pointer, " __FUNCTION__ " failed.\n");
+			"pointer, %s failed.\n", __FUNCTION__);
 		return -EINVAL;
 	}
 
@@ -69,8 +69,8 @@ static int inline verify (struct security_operations *ops)
 
 	if (err) {
 		printk (KERN_INFO "Not enough functions specified in the "
-			"security_operation structure, " __FUNCTION__
-			" failed.\n");
+			"security_operation structure, %s failed.\n",
+			__FUNCTION__);
 		return -EINVAL;
 	}
 	return 0;
@@ -108,13 +108,13 @@ int register_security (struct security_operations *ops)
 {
 
 	if (verify (ops)) {
-		printk (KERN_INFO __FUNCTION__ " could not verify "
-			"security_operations structure.\n");
+		printk (KERN_INFO "%s could not verify "
+			"security_operations structure.\n", __FUNCTION__);
 		return -EINVAL;
 	}
 	if (security_ops != &dummy_security_ops) {
 		printk (KERN_INFO "There is already a security "
-			"framework initialized, " __FUNCTION__ " failed.\n");
+			"framework initialized, %s failed.\n", __FUNCTION__);
 		return -EINVAL;
 	}
 
@@ -137,9 +137,9 @@ int register_security (struct security_operations *ops)
 int unregister_security (struct security_operations *ops)
 {
 	if (ops != security_ops) {
-		printk (KERN_INFO __FUNCTION__ ": trying to unregister "
+		printk (KERN_INFO "%s: trying to unregister "
 			"a security_opts structure that is not "
-			"registered, failing.\n");
+			"registered, failing.\n", __FUNCTION__);
 		return -EINVAL;
 	}
 
@@ -163,14 +163,14 @@ int unregister_security (struct security_operations *ops)
 int mod_reg_security (const char *name, struct security_operations *ops)
 {
 	if (verify (ops)) {
-		printk (KERN_INFO __FUNCTION__ " could not verify "
-			"security operations.\n");
+		printk (KERN_INFO "%s could not verify "
+			"security operations.\n", __FUNCTION__);
 		return -EINVAL;
 	}
 
 	if (ops == security_ops) {
-		printk (KERN_INFO __FUNCTION__ " security operations "
-			"already registered.\n");
+		printk (KERN_INFO "%s security operations "
+			"already registered.\n", __FUNCTION__);
 		return -EINVAL;
 	}
 
@@ -193,8 +193,8 @@ int mod_reg_security (const char *name, struct security_operations *ops)
 int mod_unreg_security (const char *name, struct security_operations *ops)
 {
 	if (ops == security_ops) {
-		printk (KERN_INFO __FUNCTION__ " invalid attempt to unregister "
-			" primary security ops.\n");
+		printk (KERN_INFO "%s invalid attempt to unregister "
+			" primary security ops.\n", __FUNCTION__);
 		return -EINVAL;
 	}
 

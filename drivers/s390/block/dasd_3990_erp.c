@@ -2338,10 +2338,10 @@ dasd_3990_erp_additional_erp(dasd_ccw_req_t * cqr)
  * DASD_3990_ERP_ERROR_MATCH
  *
  * DESCRIPTION
- *   check if the the device status of the given cqr is the same.
+ *   Check if the device status of the given cqr is the same.
  *   This means that the failed CCW and the relevant sense data
  *   must match.
- *   I don't distinguish between 24 and 32 byte sense becaus in case of
+ *   I don't distinguish between 24 and 32 byte sense because in case of
  *   24 byte sense byte 25 and 27 is set as well.
  *
  * PARAMETER

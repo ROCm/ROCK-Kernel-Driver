@@ -40,7 +40,7 @@ struct ppc64_tlb_batch {
 
 extern struct ppc64_tlb_batch ppc64_tlb_batch[NR_CPUS];
 
-static inline void tlb_remove_tlb_entry(mmu_gather_t *tlb, pte_t *ptep,
+static inline void __tlb_remove_tlb_entry(mmu_gather_t *tlb, pte_t *ptep,
 					unsigned long address)
 {
 	int cpu = smp_processor_id();

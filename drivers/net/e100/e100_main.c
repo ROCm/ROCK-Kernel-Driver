@@ -1,77 +1,28 @@
 /*******************************************************************************
 
-This software program is available to you under a choice of one of two 
-licenses. You may choose to be licensed under either the GNU General Public 
-License 2.0, June 1991, available at http://www.fsf.org/copyleft/gpl.html, 
-or the Intel BSD + Patent License, the text of which follows:
-
-Recipient has requested a license and Intel Corporation ("Intel") is willing
-to grant a license for the software entitled Linux Base Driver for the 
-Intel(R) PRO/100 Family of Adapters (e100) (the "Software") being provided 
-by Intel Corporation. The following definitions apply to this license:
-
-"Licensed Patents" means patent claims licensable by Intel Corporation which 
-are necessarily infringed by the use of sale of the Software alone or when 
-combined with the operating system referred to below.
-
-"Recipient" means the party to whom Intel delivers this Software.
-
-"Licensee" means Recipient and those third parties that receive a license to 
-any operating system available under the GNU General Public License 2.0 or 
-later.
-
-Copyright (c) 1999 - 2002 Intel Corporation.
-All rights reserved.
-
-The license is provided to Recipient and Recipient's Licensees under the 
-following terms.
-
-Redistribution and use in source and binary forms of the Software, with or 
-without modification, are permitted provided that the following conditions 
-are met:
-
-Redistributions of source code of the Software may retain the above 
-copyright notice, this list of conditions and the following disclaimer.
-
-Redistributions in binary form of the Software may reproduce the above 
-copyright notice, this list of conditions and the following disclaimer in 
-the documentation and/or materials provided with the distribution.
-
-Neither the name of Intel Corporation nor the names of its contributors 
-shall be used to endorse or promote products derived from this Software 
-without specific prior written permission.
-
-Intel hereby grants Recipient and Licensees a non-exclusive, worldwide, 
-royalty-free patent license under Licensed Patents to make, use, sell, offer 
-to sell, import and otherwise transfer the Software, if any, in source code 
-and object code form. This license shall include changes to the Software 
-that are error corrections or other minor changes to the Software that do 
-not add functionality or features when the Software is incorporated in any 
-version of an operating system that has been distributed under the GNU 
-General Public License 2.0 or later. This patent license shall apply to the 
-combination of the Software and any operating system licensed under the GNU 
-General Public License 2.0 or later if, at the time Intel provides the 
-Software to Recipient, such addition of the Software to the then publicly 
-available versions of such operating systems available under the GNU General 
-Public License 2.0 or later (whether in gold, beta or alpha form) causes 
-such combination to be covered by the Licensed Patents. The patent license 
-shall not apply to any other combinations which include the Software. NO 
-hardware per se is licensed hereunder.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" 
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE 
-IMPLIED WARRANTIES OF MECHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
-ARE DISCLAIMED. IN NO EVENT SHALL INTEL OR IT CONTRIBUTORS BE LIABLE FOR ANY 
-DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES 
-(INCLUDING, BUT NOT LIMITED, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; 
-ANY LOSS OF USE; DATA, OR PROFITS; OR BUSINESS INTERUPTION) HOWEVER CAUSED 
-AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY OR 
-TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE 
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*******************************************************************************
-
-Portions (C) 2002 Red Hat, Inc. under the terms of the GNU GPL v2.
-
+  
+  Copyright(c) 1999 - 2002 Intel Corporation. All rights reserved.
+  
+  This program is free software; you can redistribute it and/or modify it 
+  under the terms of the GNU General Public License as published by the Free 
+  Software Foundation; either version 2 of the License, or (at your option) 
+  any later version.
+  
+  This program is distributed in the hope that it will be useful, but WITHOUT 
+  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or 
+  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for 
+  more details.
+  
+  You should have received a copy of the GNU General Public License along with
+  this program; if not, write to the Free Software Foundation, Inc., 59 
+  Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+  
+  The full GNU General Public License is included in this distribution in the
+  file called LICENSE.
+  
+  Contact Information:
+  Linux NICS <linux.nics@intel.com>
+  Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
 *******************************************************************************/
 
 /**********************************************************************
@@ -94,6 +45,21 @@ Portions (C) 2002 Red Hat, Inc. under the terms of the GNU GPL v2.
 **********************************************************************/
 
 /* Change Log
+ *
+ * 2.1.12       8/2/02
+ *   o Feature: ethtool register dump
+ *   o Bug fix: Driver passes wrong name to /proc/interrupts
+ *   o Bug fix: Ethernet bridging not working 
+ *   o Bug fix: Promiscuous mode is not working
+ *   o Bug fix: Checked return value from copy_from_user (William Stinson,
+ *     wstinson@infonie.fr)
+ *   o Bug fix: ARP wake on LAN fails
+ *   o Bug fix: mii-diag does not update driver level's speed, duplex and
+ *     re-configure flow control
+ *   o Bug fix: Ethtool shows wrong speed/duplex when not connected
+ *   o Bug fix: Ethtool shows wrong speed/duplex when reconnected if forced 
+ *     speed/duplex
+ *   o Bug fix: PHY loopback diagnostic fails
  *
  * 2.1.6        7/5/02
  *   o Added device ID support for Dell LOM.
@@ -145,6 +111,7 @@ static int e100_ethtool_eeprom(struct net_device *, struct ifreq *);
 
 #define E100_EEPROM_MAGIC 0x1234
 static int e100_ethtool_glink(struct net_device *, struct ifreq *);
+static int e100_ethtool_gregs(struct net_device *, struct ifreq *);
 static int e100_ethtool_nway_rst(struct net_device *, struct ifreq *);
 static int e100_ethtool_wol(struct net_device *, struct ifreq *);
 static unsigned char e100_setup_filter(struct e100_private *bdp);
@@ -176,7 +143,7 @@ static void e100_non_tx_background(unsigned long);
 
 /* Global Data structures and variables */
 char e100_copyright[] __devinitdata = "Copyright (c) 2002 Intel Corporation";
-char e100_driver_version[]="2.1.6-k1";
+char e100_driver_version[]="2.1.15-k1";
 const char *e100_full_driver_name = "Intel(R) PRO/100 Network Driver";
 char e100_short_driver_name[] = "e100";
 static int e100nics = 0;
@@ -397,7 +364,7 @@ static void e100_set_multi_exec(struct net_device *dev);
 
 MODULE_AUTHOR("Intel Corporation, <linux.nics@intel.com>");
 MODULE_DESCRIPTION("Intel(R) PRO/100 Network Driver");
-MODULE_LICENSE("Dual BSD/GPL");
+MODULE_LICENSE("GPL");
 
 E100_PARAM(TxDescriptors, "Number of transmit descriptors");
 E100_PARAM(RxDescriptors, "Number of receive descriptors");
@@ -779,16 +746,6 @@ e100_remove1(struct pci_dev *pcid)
 		bdp->non_tx_command_state = E100_NON_TX_IDLE;
 	}
 
-	/* Set up wol options and enable PME if wol is enabled */
-	if (bdp->wolopts) {
-		e100_do_wol(pcid, bdp);
-		/* Enable PME for power state D3 */
-		pci_enable_wake(pcid, 3, 1);
-		/* Set power state to D1 in case driver is RELOADED */
-		/* If system powers down, device is switched from D1 to D3 */
-		pci_set_power_state(pcid, 1);
-	}
-
 	e100_clear_structs(dev);
 
 	--e100nics;
@@ -1028,7 +985,7 @@ e100_open(struct net_device *dev)
 
 	e100_start_ru(bdp);
 	if ((rc = request_irq(dev->irq, &e100intr, SA_SHIRQ,
-			      e100_short_driver_name, dev)) != 0) {
+			      dev->name, dev)) != 0) {
 		del_timer_sync(&bdp->watchdog_timer);
 		goto err_exit;
 	}
@@ -1059,7 +1016,9 @@ e100_close(struct net_device *dev)
 	bdp->intr_mask = SCB_INT_MASK;
 	e100_isolate_driver(bdp);
 
-	bdp->ip_lbytes = e100_get_ip_lbytes(dev);
+	netif_carrier_off(bdp->device);
+	bdp->cur_line_speed = 0;
+	bdp->cur_dplx_mode = 0;
 	free_irq(dev->irq, dev);
 	e100_clear_pools(bdp);
 
@@ -1243,7 +1202,7 @@ e100_set_multi(struct net_device *dev)
 	if (bdp->driver_isolated) {
 		goto exit;
 	}
-	promisc_enbl = (dev->flags & IFF_PROMISC);
+	promisc_enbl = ((dev->flags & IFF_PROMISC) == IFF_PROMISC);
 	mulcast_enbl = ((dev->flags & IFF_ALLMULTI) ||
 			(dev->mc_count > MAX_MULTICAST_ADDRS));
 
@@ -3343,6 +3302,9 @@ e100_do_ethtool_ioctl(struct net_device *dev, struct ifreq *ifr)
 	case ETHTOOL_GDRVINFO:
 		rc = e100_ethtool_get_drvinfo(dev, ifr);
 		break;
+	case ETHTOOL_GREGS:
+		rc = e100_ethtool_gregs(dev, ifr);
+		break;
 	case ETHTOOL_NWAY_RST:
 		rc = e100_ethtool_nway_rst(dev, ifr);
 		break;
@@ -3390,9 +3352,15 @@ e100_ethtool_get_settings(struct net_device *dev, struct ifreq *ifr)
 	ecmd.transceiver = XCVR_INTERNAL;
 	ecmd.phy_address = bdp->phy_addr;
 
-	ecmd.speed = bdp->cur_line_speed;
-	ecmd.duplex =
-		(bdp->cur_dplx_mode == HALF_DUPLEX) ? DUPLEX_HALF : DUPLEX_FULL;
+	if (netif_carrier_ok(bdp->device)) {
+		ecmd.speed = bdp->cur_line_speed;
+		ecmd.duplex =
+			(bdp->cur_dplx_mode == HALF_DUPLEX) ? DUPLEX_HALF : DUPLEX_FULL;
+	}
+	else {
+		ecmd.speed = -1;
+		ecmd.duplex = -1;
+	}
 
 	ecmd.advertising = ADVERTISED_TP;
 
@@ -3514,7 +3482,8 @@ e100_ethtool_glink(struct net_device *dev, struct ifreq *ifr)
 	bdp = dev->priv;
 	info.cmd = ETHTOOL_GLINK;
 
-	info.data = e100_get_link_state(bdp);
+	/* Consider both PHY link and netif_running */
+	info.data = e100_update_link_state(bdp);
 
 	if (copy_to_user(ifr->ifr_data, &info, sizeof (info)))
 		return -EFAULT;
@@ -3532,7 +3501,7 @@ e100_ethtool_test(struct net_device *dev, struct ifreq *ifr)
 		       GFP_ATOMIC);
 
 	if (!info)
-		return -EFAULT;
+		return -ENOMEM;
 
 	memset((void *) info, 0, sizeof(*info) +
 				 E100_MAX_TEST_RES * sizeof(u64));
@@ -3548,6 +3517,36 @@ e100_ethtool_test(struct net_device *dev, struct ifreq *ifr)
 exit:
 	kfree(info);
 	return rc;
+}
+
+static int
+e100_ethtool_gregs(struct net_device *dev, struct ifreq *ifr)
+{
+	struct e100_private *bdp;
+	u32 regs_buff[E100_REGS_LEN];
+	struct ethtool_regs regs = {ETHTOOL_GREGS};
+	void *addr = ifr->ifr_data;
+
+	if (!capable(CAP_NET_ADMIN))
+		return -EPERM;
+	bdp = dev->priv;
+
+	if(copy_from_user(&regs, addr, sizeof(regs)))
+		return -EFAULT;
+
+	regs.version = (1 << 24) | bdp->rev_id;
+	regs_buff[0] = readb(&(bdp->scb->scb_cmd_hi)) << 24 |
+		readb(&(bdp->scb->scb_cmd_low)) << 16 |
+		readw(&(bdp->scb->scb_status));
+
+	if(copy_to_user(addr, &regs, sizeof(regs)))
+		return -EFAULT;
+
+	addr += offsetof(struct ethtool_regs, data);
+	if(copy_to_user(addr, regs_buff, regs.len))
+		return -EFAULT;
+
+	return 0;
 }
 
 static int
@@ -3581,10 +3580,11 @@ e100_ethtool_get_drvinfo(struct net_device *dev, struct ifreq *ifr)
 
 	strncpy(info.driver, e100_short_driver_name, sizeof (info.driver) - 1);
 	strncpy(info.version, e100_driver_version, sizeof (info.version) - 1);
-	strncpy(info.fw_version, e100_get_brand_msg(bdp),
+	strncpy(info.fw_version, "N/A",
 		sizeof (info.fw_version) - 1);
 	strncpy(info.bus_info, bdp->pdev->slot_name,
 		sizeof (info.bus_info) - 1);
+	info.regdump_len  = E100_REGS_LEN * sizeof(u32);
 	info.eedump_len = (bdp->eeprom_size << 1);	
 	info.testinfo_len = E100_MAX_TEST_RES;
 	if (copy_to_user(ifr->ifr_data, &info, sizeof (info)))
@@ -3616,6 +3616,10 @@ e100_ethtool_eeprom(struct net_device *dev, struct ifreq *ifr)
 		(u16 *) (ifr->ifr_data + offsetof(struct ethtool_eeprom, data));
 
         max_len = bdp->eeprom_size * 2;
+        
+        if (ecmd.offset > ecmd.offset + ecmd.len)
+        	return -EINVAL;
+        	
 	if ((ecmd.offset + ecmd.len) > max_len)
 		ecmd.len = (max_len - ecmd.offset);
 
@@ -3892,7 +3896,6 @@ e100_ethtool_wol(struct net_device *dev, struct ifreq *ifr)
 		if (copy_to_user(ifr->ifr_data, &wolinfo, sizeof (wolinfo)))
 			res = -EFAULT;
 		break;
-
 	case ETHTOOL_SWOL:
 		/* If ALL requests are supported or request is DISABLE wol */
 		if (((wolinfo.wolopts & bdp->wolsupported) == wolinfo.wolopts)
@@ -3901,6 +3904,8 @@ e100_ethtool_wol(struct net_device *dev, struct ifreq *ifr)
 		} else {
 			res = -EOPNOTSUPP;
 		}
+		if (wolinfo.wolopts & WAKE_ARP)
+			bdp->ip_lbytes = e100_get_ip_lbytes(dev);
 		break;
 	default:
 		break;
@@ -3929,7 +3934,7 @@ static int e100_ethtool_gstrings(struct net_device *dev, struct ifreq *ifr)
 			info.len = E100_MAX_TEST_RES;
 		strings = kmalloc(info.len * ETH_GSTRING_LEN, GFP_ATOMIC);
 		if (!strings)
-			return -EFAULT;
+			return -ENOMEM;
 		memset(strings, 0, info.len * ETH_GSTRING_LEN);
 
 		for (i = 0; i < info.len; i++) {
@@ -3978,8 +3983,30 @@ e100_mii_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		if (netif_running(dev)) {
 			return -EBUSY;
 		}
-		e100_mdi_write(bdp, data_ptr->reg_num & 0x1f, bdp->phy_addr,
+		/* If reg = 0 && change speed/duplex */
+		if (data_ptr->reg_num == 0 && 
+			(data_ptr->val_in == (BMCR_ANENABLE | BMCR_ANRESTART) /* restart cmd */
+			|| data_ptr->val_in == (BMCR_RESET) /* reset cmd */ 
+			|| data_ptr->val_in & (BMCR_SPEED100 | BMCR_FULLDPLX) 
+			|| data_ptr->val_in == 0)) {
+				if (data_ptr->val_in == (BMCR_ANENABLE | BMCR_ANRESTART)
+					|| data_ptr->val_in == (BMCR_RESET))
+					bdp->params.e100_speed_duplex = E100_AUTONEG;
+				else if (data_ptr->val_in == (BMCR_SPEED100 | BMCR_FULLDPLX))
+					bdp->params.e100_speed_duplex = E100_SPEED_100_FULL;
+				else if (data_ptr->val_in == (BMCR_SPEED100))
+					bdp->params.e100_speed_duplex = E100_SPEED_100_HALF;
+				else if (data_ptr->val_in == (BMCR_FULLDPLX))
+					bdp->params.e100_speed_duplex = E100_SPEED_10_FULL;
+				else
+					bdp->params.e100_speed_duplex = E100_SPEED_10_HALF;
+				e100_set_speed_duplex(bdp);
+		}
+		else {
+			e100_mdi_write(bdp, data_ptr->reg_num, bdp->phy_addr,
 			       data_ptr->val_in);
+		}
+		
 		break;
 
 	default:
@@ -4150,6 +4177,7 @@ static int
 e100_notify_reboot(struct notifier_block *nb, unsigned long event, void *p)
 {
         struct pci_dev *pdev = NULL;
+	
         switch(event) {
         case SYS_DOWN:
         case SYS_HALT:
@@ -4159,7 +4187,8 @@ e100_notify_reboot(struct notifier_block *nb, unsigned long event, void *p)
 				/* If net_device struct is allocated? */
                                 if (pci_get_drvdata(pdev))
 					e100_suspend(pdev, 3);
-                	}
+
+			}
 		}
         }
         return NOTIFY_DONE;
@@ -4176,7 +4205,6 @@ e100_suspend(struct pci_dev *pcid, u32 state)
 
 	/* If wol is enabled */
 	if (bdp->wolopts) {
-		bdp->ip_lbytes = e100_get_ip_lbytes(netdev);
 		e100_do_wol(pcid, bdp);
 		pci_enable_wake(pcid, 3, 1);	/* Enable PME for power state D3 */
 		pci_set_power_state(pcid, 3);	/* Set power state to D3.        */
@@ -4185,7 +4213,6 @@ e100_suspend(struct pci_dev *pcid, u32 state)
 		pci_disable_device(pcid);
 		pci_set_power_state(pcid, state);
 	}
-
 	return 0;
 }
 
@@ -4213,7 +4240,6 @@ e100_resume(struct pci_dev *pcid)
 
 	return 0;
 }
-
 #endif /* CONFIG_PM */
 
 static void
