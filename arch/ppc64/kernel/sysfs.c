@@ -208,8 +208,8 @@ static ssize_t show_##NAME(struct sys_device *dev, char *buf) \
 	unsigned long val = run_on_cpu(cpu->sysdev.id, read_##NAME, 0); \
 	return sprintf(buf, "%lx\n", val); \
 } \
-static ssize_t store_##NAME(struct sys_device *dev, const char *buf, \
-			    size_t count) \
+static ssize_t __attribute_used__ \
+	store_##NAME(struct sys_device *dev, const char *buf, size_t count) \
 { \
 	struct cpu *cpu = container_of(dev, struct cpu, sysdev); \
 	unsigned long val; \
