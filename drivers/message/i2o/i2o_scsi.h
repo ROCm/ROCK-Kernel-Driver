@@ -14,15 +14,14 @@
 #define I2O_SCSI_CAN_QUEUE 4
 #define I2O_SCSI_CMD_PER_LUN 6
 
-extern int i2o_scsi_detect(Scsi_Host_Template *);
-extern const char *i2o_scsi_info(struct Scsi_Host *);
-extern int i2o_scsi_command(Scsi_Cmnd *);
-extern int i2o_scsi_queuecommand(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
-extern int i2o_scsi_abort(Scsi_Cmnd *);
-extern int i2o_scsi_reset(Scsi_Cmnd *, unsigned int);
-extern int i2o_scsi_bios_param(Disk *, struct block_device *, int *);
-extern void i2o_scsi_setup(char *str, int *ints);
-extern int i2o_scsi_release(struct Scsi_Host *host);
+static int i2o_scsi_detect(Scsi_Host_Template *);
+static const char *i2o_scsi_info(struct Scsi_Host *);
+static int i2o_scsi_command(Scsi_Cmnd *);
+static int i2o_scsi_queuecommand(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
+static int i2o_scsi_abort(Scsi_Cmnd *);
+static int i2o_scsi_reset(Scsi_Cmnd *, unsigned int);
+static int i2o_scsi_bios_param(Disk *, struct block_device *, int *);
+static int i2o_scsi_release(struct Scsi_Host *host);
 
 #define I2OSCSI {                                          \
 		  next: NULL,				    \

@@ -481,6 +481,7 @@ extern int scsi_dispatch_cmd(Scsi_Cmnd * SCpnt);
 extern void scsi_bottom_half_handler(void);
 extern void scsi_release_commandblocks(Scsi_Device * SDpnt);
 extern void scsi_build_commandblocks(Scsi_Device * SDpnt);
+extern void scsi_adjust_queue_depth(Scsi_Device *, int, int);
 extern void scsi_done(Scsi_Cmnd * SCpnt);
 extern void scsi_finish_command(Scsi_Cmnd *);
 extern int scsi_retry_command(Scsi_Cmnd *);
@@ -563,6 +564,8 @@ struct scsi_device {
 	volatile unsigned short device_busy;	/* commands actually active on low-level */
 	Scsi_Cmnd *device_queue;	/* queue of SCSI Command structures */
         Scsi_Cmnd *current_cmnd;	/* currently active command */
+	unsigned short queue_depth;	/* How deep of a queue we have */
+	unsigned short new_queue_depth; /* How deep of a queue we want */
 
 	unsigned int id, lun, channel;
 
@@ -586,24 +589,25 @@ struct scsi_device {
 	unsigned char current_tag;	/* current tag */
 	unsigned char sync_min_period;	/* Not less than this period */
 	unsigned char sync_max_offset;	/* Not greater than this offset */
-	unsigned char queue_depth;	/* How deep a queue to use */
 
 	unsigned online:1;
 	unsigned writeable:1;
 	unsigned removable:1;
 	unsigned random:1;
-	unsigned has_cmdblocks:1;
 	unsigned changed:1;	/* Data invalid due to media change */
 	unsigned busy:1;	/* Used to prevent races */
 	unsigned lockable:1;	/* Able to prevent media removal */
 	unsigned borken:1;	/* Tell the Seagate driver to be 
 				 * painfully slow on this device */
-	unsigned tagged_supported:1;	/* Supports SCSI-II tagged queuing */
-	unsigned tagged_queue:1;	/* SCSI-II tagged queuing enabled */
 	unsigned disconnect:1;	/* can disconnect */
 	unsigned soft_reset:1;	/* Uses soft reset option */
-	unsigned sync:1;	/* Negotiate for sync transfers */
-	unsigned wide:1;	/* Negotiate for WIDE transfers */
+	unsigned sdtr:1;	/* Device supports SDTR messages */
+	unsigned wdtr:1;	/* Device supports WDTR messages */
+	unsigned ppr:1;		/* Device supports PPR messages */
+	unsigned tagged_supported:1;	/* Supports SCSI-II tagged queuing */
+	unsigned tagged_queue:1;	/* SCSI-II tagged queuing enabled */
+	unsigned simple_tags:1;	/* Device supports simple queue tag messages */
+	unsigned ordered_tags:1;/* Device supports ordered queue tag messages */
 	unsigned single_lun:1;	/* Indicates we should only allow I/O to
 				 * one of the luns for the device at a 
 				 * time. */

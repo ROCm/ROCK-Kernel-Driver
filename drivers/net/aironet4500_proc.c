@@ -17,7 +17,6 @@
 #include <linux/version.h>
 
 #include <linux/sched.h>
-#include <linux/tqueue.h>
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/timer.h>

@@ -27,7 +27,9 @@ const char* dmx3191d_info(struct Scsi_Host *);
 int dmx3191d_proc_info(char *, char **, off_t, int, int, int);
 int dmx3191d_queue_command(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
 int dmx3191d_release_resources(struct Scsi_Host *);
-int dmx3191d_reset(Scsi_Cmnd *, unsigned int);
+int dmx3191d_bus_reset(Scsi_Cmnd *);
+int dmx3191d_host_reset(Scsi_Cmnd *);
+int dmx3191d_device_reset(Scsi_Cmnd *);
 
 
 #define DMX3191D {				\
@@ -37,8 +39,10 @@ int dmx3191d_reset(Scsi_Cmnd *, unsigned int);
 	release:	dmx3191d_release_resources,	\
 	info:		dmx3191d_info,			\
 	queuecommand:	dmx3191d_queue_command,		\
-	abort:		dmx3191d_abort,			\
-	reset:		dmx3191d_reset, 		\
+	eh_abort_handler:	dmx3191d_abort,		\
+	eh_bus_reset_handler:	dmx3191d_bus_reset, 	\
+	eh_device_reset_handler:dmx3191d_device_reset, 	\
+	eh_host_reset_handler:	dmx3191d_host_reset, 	\
 	bios_param:	NULL,				\
 	can_queue:	32,				\
         this_id:	7,				\

@@ -250,6 +250,7 @@
 
 #include "aha152x.h"
 #include <linux/stat.h>
+#include <linux/workqueue.h>
 
 #include <scsi/scsicam.h>
 

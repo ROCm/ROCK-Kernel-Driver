@@ -28,6 +28,7 @@
 #include <linux/time.h>
 */
 #include <linux/802_11.h>
+#include <linux/workqueue.h>
 
 //damn idiot PCMCIA stuff
 #ifndef DEV_NAME_LEN

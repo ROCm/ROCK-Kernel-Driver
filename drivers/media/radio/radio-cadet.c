@@ -57,7 +57,7 @@ static int isapnp_cadet_probe(void);
  */
 static __u16 sigtable[2][4]={{5,10,30,150},{28,40,63,1000}};
 
-void cadet_wake(unsigned long qnum)
+static void cadet_wake(unsigned long qnum)
 {
         switch(qnum) {
 	case 0:           /* cadet_setfreq */

@@ -22,7 +22,6 @@ static const char *awc_version =
 
 #include <linux/kernel.h>
 #include <linux/sched.h>
-#include <linux/tqueue.h>
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/timer.h>

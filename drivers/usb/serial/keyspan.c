@@ -530,7 +530,7 @@ static void	usa26_instat_callback(struct urb *urb)
 	if ((err = usb_submit_urb(urb, GFP_ATOMIC)) != 0) {
 		dbg("%s - resubmit read urb failed. (%d)", __FUNCTION__, err);
 	}
-exit:
+exit: ;
 }
 
 static void	usa26_glocont_callback(struct urb *urb)
@@ -665,7 +665,7 @@ static void	usa28_instat_callback(struct urb *urb)
 	if ((err = usb_submit_urb(urb, GFP_ATOMIC)) != 0) {
 		dbg("%s - resubmit read urb failed. (%d)", __FUNCTION__, err);
 	}
-exit:	
+exit: ;
 }
 
 static void	usa28_glocont_callback(struct urb *urb)
@@ -758,7 +758,7 @@ static void	usa49_instat_callback(struct urb *urb)
 	if ((err = usb_submit_urb(urb, GFP_ATOMIC)) != 0) {
 		dbg("%s - resubmit read urb failed. (%d)", __FUNCTION__, err);
 	}
-exit:	
+exit:	;
 }
 
 static void	usa49_inack_callback(struct urb *urb)

@@ -78,7 +78,6 @@
 #include  <linux/stddef.h>
 #include  <linux/module.h>
 #include  <linux/kernel.h>
-#include  <linux/tqueue.h>
 #include  <linux/ioport.h>
 #include  <linux/delay.h>
 #include  <linux/proc_fs.h>

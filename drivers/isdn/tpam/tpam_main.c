@@ -14,8 +14,7 @@
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/sched.h>
-#include <linux/tqueue.h>
-#include <linux/interrupt.h>
+
 #include <linux/init.h>
 #include <asm/io.h>
 

@@ -10,7 +10,6 @@
 #undef N_DATA
 
 #include <linux/kernel.h>
-#include <linux/tqueue.h>
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/ioport.h>

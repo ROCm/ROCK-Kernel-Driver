@@ -407,10 +407,11 @@ static void i8042_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		}
 
 		if (data > 0x7f) {
-			if (test_and_clear_bit((data & 0x7f) | (i8042_last_e0 << 7), i8042_unxlate_seen)) {
+			unsigned char index = (data & 0x7f) | (i8042_last_e0 << 7);
+			if (index == 0xaa || index == 0xb6)
+				set_bit(index, i8042_unxlate_seen);
+			if (test_and_clear_bit(index, i8042_unxlate_seen)) {
 				serio_interrupt(&i8042_kbd_port, 0xf0, dfl);
-				if (i8042_last_e0 && (data == 0xaa || data == 0xb6))
-					set_bit((data & 0x7f) | (i8042_last_e0 << 7), i8042_unxlate_seen);
 				data = i8042_unxlate_table[data & 0x7f];
 			}
 		} else {

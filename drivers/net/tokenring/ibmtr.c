@@ -243,7 +243,7 @@ static void __devinit HWPrtChanID(void * pcid, short stride)
 static void __devinit find_turbo_adapters(int *iolist) {
 	int ram_addr;
 	int index=0;
-	__u32 chanid;
+	void *chanid;
 	int found_turbo=0;
 	unsigned char *tchanid, ctemp;
 	int i,j;
@@ -300,7 +300,7 @@ static void __devinit find_turbo_adapters(int *iolist) {
 		printk("ibmtr::find_turbo_adapters, ibmtr card found at"
 			" %x but not a Turbo model\n",ram_addr);
 #endif
-	iounmap(ram_addr) ; 	
+	iounmap(ram_mapped) ; 	
 	} /* for */
 	for(i=0; i<IBMTR_MAX_ADAPTERS; i++) {
 		if(!turbo_io[i]) break;

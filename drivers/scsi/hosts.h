@@ -97,6 +97,10 @@ typedef struct	SHT
      */
     int (* detect)(struct SHT *);
 
+    /*
+     * This function is only used by one driver and will be going away
+     * once it switches over to using the slave_detach() function instead.
+     */
     int (*revoke)(Scsi_Device *);
 
     /* Used with loadable modules to unload the host structures.  Note:
@@ -200,11 +204,59 @@ typedef struct	SHT
     int (* reset)(Scsi_Cmnd *, unsigned int);
 
     /*
-     * This function is used to select synchronous communications,
-     * which will result in a higher data throughput.  Not implemented
-     * yet.
+     * Once the device has responded to an INQUIRY and we know the device
+     * is online, call into the low level driver with the Scsi_Device *
+     * (so that the low level driver may save it off in a safe location
+     * for later use in calling scsi_adjust_queue_depth() or possibly
+     * other scsi_* functions) and char * to the INQUIRY return data buffer.
+     * This way, low level drivers will no longer have to snoop INQUIRY data
+     * to see if a drive supports PPR message protocol for Ultra160 speed
+     * negotiations or other similar items.  Instead it can simply wait until
+     * the scsi mid layer calls them with the data in hand and then it can
+     * do it's checking of INQUIRY data.  This will happen once for each new
+     * device added on this controller (including once for each lun on
+     * multi-lun devices, so low level drivers should take care to make
+     * sure that if they do tagged queueing on a per physical unit basis
+     * instead of a per logical unit basis that they have the mid layer
+     * allocate tags accordingly).
+     *
+     * Things currently recommended to be handled at this time include:
+     *
+     * 1.  Checking for tagged queueing capability and if able then calling
+     *     scsi_adjust_queue_depth() with the device pointer and the
+     *     suggested new queue depth.
+     * 2.  Checking for things such as SCSI level or DT bit in order to
+     *     determine if PPR message protocols are appropriate on this
+     *     device (or any other scsi INQUIRY data specific things the
+     *     driver wants to know in order to properly handle this device).
+     * 3.  Allocating command structs that the device will need.
+     * 4.  Setting the default timeout on this device (if needed).
+     * 5.  Saving the Scsi_Device pointer so that the low level driver
+     *     will be able to easily call back into scsi_adjust_queue_depth
+     *     again should it be determined that the queue depth for this
+     *     device should be lower or higher than it is initially set to.
+     * 6.  Allocate device data structures as needed that can be attached
+     *     to the Scsi_Device * via SDpnt->host_device_ptr
+     * 7.  Anything else the low level driver might want to do on a device
+     *     specific setup basis...
+     * 8.  Return 0 on success, non-0 on error.  The device will be marked
+     *     as offline on error so that no access will occur.
      */
-    int (* slave_attach)(int, int);
+    int (* slave_attach)(Scsi_Device *);
+
+    /*
+     * If we are getting ready to remove a device from the scsi chain then
+     * we call into the low level driver to let them know.  Once a low
+     * level driver has been informed that a drive is going away, the low
+     * level driver *must* remove it's pointer to the Scsi_Device because
+     * it is going to be kfree()'ed shortly.  It is no longer safe to call
+     * any mid layer functions with this Scsi_Device *.  Additionally, the
+     * mid layer will not make any more calls into the low level driver's
+     * queue routine with this device, so it is safe for the device driver
+     * to deallocate all structs/commands/etc that is has allocated
+     * specifically for this device at the time of this call.
+     */
+    void (* slave_detach)(Scsi_Device *);
 
     /*
      * This function determines the bios parameters for a given
@@ -217,6 +269,8 @@ typedef struct	SHT
 
     /*
      * Used to set the queue depth for a specific device.
+     *
+     * Once the slave_attach() function is in full use, this will go away.
      */
     void (*select_queue_depths)(struct Scsi_Host *, Scsi_Device *);
 

@@ -19,7 +19,9 @@
 #include "isdn_net.h"
 #include <linux/concap.h>
 #include "isdn_concap.h"
+#include <linux/if_arp.h>
 
+#ifdef CONFIG_ISDN_X25
 
 /* The following set of device service operations are for encapsulation
    protocols that require for reliable datalink semantics. That means:

@@ -421,4 +421,23 @@ extern int device_suspend(u32 state, u32 level);
 extern void device_resume(u32 level);
 extern void device_shutdown(void);
 
+/* debugging and troubleshooting/diagnostic helpers. */
+#ifdef DEBUG
+#define dev_dbg(dev, format, arg...)		\
+	printk (KERN_DEBUG "%s %s: " format ,	\
+		dev.driver->name , dev.bus_id , ## arg)
+#else
+#define dev_dbg(dev, format, arg...) do {} while (0)
+#endif
+
+#define dev_err(dev, format, arg...)		\
+	printk (KERN_ERR "%s %s: " format ,	\
+		dev.driver->name , dev.bus_id , ## arg)
+#define dev_info(dev, format, arg...)		\
+	printk (KERN_INFO "%s %s: " format ,	\
+		dev.driver->name , dev.bus_id , ## arg)
+#define dev_warn(dev, format, arg...)		\
+	printk (KERN_WARN "%s %s: " format ,	\
+		dev.driver->name , dev.bus_id , ## arg)
+
 #endif /* _DEVICE_H_ */

@@ -69,7 +69,6 @@ extern unsigned int pcibios_irq_mask;
 extern int pcibios_scanned;
 extern spinlock_t pci_config_lock;
 
-void pcibios_fixup_irqs(void);
 int pirq_enable_irq(struct pci_dev *dev);
 
 extern int (*pcibios_enable_irq)(struct pci_dev *dev);

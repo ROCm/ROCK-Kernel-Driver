@@ -165,12 +165,14 @@ void __init fork_init(unsigned long mempages)
 	 * of memory.
 	 */
 	max_threads = mempages / (THREAD_SIZE/PAGE_SIZE) / 8;
-
 	/*
-	 * we need to allow at least 10 threads to boot a system
+	 * we need to allow at least 20 threads to boot a system
 	 */
-	init_task.rlim[RLIMIT_NPROC].rlim_cur = max(10, max_threads/2);
-	init_task.rlim[RLIMIT_NPROC].rlim_max = max(10, max_threads/2);
+	if(max_threads < 20)
+		max_threads = 20;
+
+	init_task.rlim[RLIMIT_NPROC].rlim_cur = max_threads/2;
+	init_task.rlim[RLIMIT_NPROC].rlim_max = max_threads/2;
 }
 
 static struct task_struct *dup_task_struct(struct task_struct *orig)
