@@ -98,17 +98,6 @@ extern int		ip_do_nat(struct sk_buff *skb);
 extern void		ip_send_check(struct iphdr *ip);
 extern int		ip_queue_xmit(struct sk_buff *skb);
 extern void		ip_init(void);
-extern int		ip_build_xmit(struct sock *sk,
-				      int getfrag (const void *,
-						   char *,
-						   unsigned int,
-						   unsigned int,
-						   struct sk_buff *),
-				      const void *frag,
-				      unsigned length,
-				      struct ipcm_cookie *ipc,
-				      struct rtable *rt,
-				      int flags);
 extern int		ip_append_data(struct sock *sk,
 				       int getfrag(void *from, char *to, int offset, int len,
 						   int odd, struct sk_buff *skb),

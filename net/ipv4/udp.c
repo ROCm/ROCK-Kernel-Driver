@@ -464,69 +464,6 @@ static unsigned short udp_check(struct udphdr *uh, int len, unsigned long saddr,
 	return(csum_tcpudp_magic(saddr, daddr, len, IPPROTO_UDP, base));
 }
 
-struct udpfakehdr 
-{
-	struct udphdr uh;
-	u32 saddr;
-	u32 daddr;
-	struct iovec *iov;
-	u32 wcheck;
-};
-
-/*
- *	Copy and checksum a UDP packet from user space into a buffer.
- */
- 
-static int udp_getfrag(const void *p, char * to, unsigned int offset, unsigned int fraglen, struct sk_buff *skb) 
-{
-	struct udpfakehdr *ufh = (struct udpfakehdr *)p;
-	if (offset==0) {
-		if (skb->ip_summed == CHECKSUM_HW) {
-			skb->csum = offsetof(struct udphdr, check);
-			ufh->uh.check = ~csum_tcpudp_magic(ufh->saddr, ufh->daddr, 
-					  ntohs(ufh->uh.len), IPPROTO_UDP, 0);
-			memcpy(to, ufh, sizeof(struct udphdr));
-			return memcpy_fromiovecend(to+sizeof(struct udphdr), ufh->iov, offset,
-					   fraglen-sizeof(struct udphdr));
-		}
-
-		if (csum_partial_copy_fromiovecend(to+sizeof(struct udphdr), ufh->iov, offset,
-						   fraglen-sizeof(struct udphdr), &ufh->wcheck))
-			return -EFAULT;
- 		ufh->wcheck = csum_partial((char *)ufh, sizeof(struct udphdr),
-					   ufh->wcheck);
-		ufh->uh.check = csum_tcpudp_magic(ufh->saddr, ufh->daddr, 
-					  ntohs(ufh->uh.len),
-					  IPPROTO_UDP, ufh->wcheck);
-		if (ufh->uh.check == 0)
-			ufh->uh.check = -1;
-		memcpy(to, ufh, sizeof(struct udphdr));
-		return 0;
-	}
-	if (csum_partial_copy_fromiovecend(to, ufh->iov, offset-sizeof(struct udphdr),
-					   fraglen, &ufh->wcheck))
-		return -EFAULT;
-	return 0;
-}
-
-/*
- *	Copy a UDP packet from user space into a buffer without checksumming.
- */
- 
-static int udp_getfrag_nosum(const void *p, char * to, unsigned int offset, unsigned int fraglen, struct sk_buff *skb) 
-{
-	struct udpfakehdr *ufh = (struct udpfakehdr *)p;
-
-	skb->ip_summed = CHECKSUM_NONE;
-	if (offset==0) {
-		memcpy(to, ufh, sizeof(struct udphdr));
-		return memcpy_fromiovecend(to+sizeof(struct udphdr), ufh->iov, offset,
-					   fraglen-sizeof(struct udphdr));
-	}
-	return memcpy_fromiovecend(to, ufh->iov, offset-sizeof(struct udphdr),
-				   fraglen);
-}
-
 int udp_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 		int len)
 {
@@ -534,18 +471,18 @@ int udp_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 	struct udp_opt *up = udp_sk(sk);
 	int ulen = len;
 	struct ipcm_cookie ipc;
-	struct udpfakehdr ufh;
 	struct rtable *rt = NULL;
 	int free = 0;
 	int connected = 0;
-	u32 daddr;
+	u32 daddr, faddr, saddr;
+	u16 dport;
 	u8  tos;
 	int err;
 	int corkreq = up->corkflag || msg->msg_flags&MSG_MORE;
 
 	/* This check is ONLY to check for arithmetic overflow
 	   on integer(!) len. Not more! Real check will be made
-	   in ip_build_xmit --ANK
+	   in ip_append_* --ANK
 
 	   BTW socket.c -> af_*.c -> ... make multiple
 	   invalid conversions size_t -> int. We MUST repair it f.e.
@@ -593,22 +530,21 @@ int udp_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 				return -EINVAL;
 		}
 
-		ufh.daddr = usin->sin_addr.s_addr;
-		ufh.uh.dest = usin->sin_port;
-		if (ufh.uh.dest == 0)
+		daddr = usin->sin_addr.s_addr;
+		dport = usin->sin_port;
+		if (dport == 0)
 			return -EINVAL;
 	} else {
 		if (sk->state != TCP_ESTABLISHED)
 			return -ENOTCONN;
-		ufh.daddr   = inet->daddr;
-		ufh.uh.dest = inet->dport;
+		daddr = inet->daddr;
+		dport = inet->dport;
 		/* Open fast path for connected socket.
 		   Route will not be used, if at least one option is set.
 		 */
 		connected = 1;
   	}
 	ipc.addr = inet->saddr;
-	ufh.uh.source = inet->sport;
 
 	ipc.oif = sk->bound_dev_if;
 	if (msg->msg_controllen) {
@@ -622,13 +558,13 @@ int udp_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 	if (!ipc.opt)
 		ipc.opt = inet->opt;
 
-	ufh.saddr = ipc.addr;
-	ipc.addr = daddr = ufh.daddr;
+	saddr = ipc.addr;
+	ipc.addr = faddr = daddr;
 
 	if (ipc.opt && ipc.opt->srr) {
 		if (!daddr)
 			return -EINVAL;
-		daddr = ipc.opt->faddr;
+		faddr = ipc.opt->faddr;
 		connected = 0;
 	}
 	tos = RT_TOS(inet->tos);
@@ -641,8 +577,8 @@ int udp_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 	if (MULTICAST(daddr)) {
 		if (!ipc.oif)
 			ipc.oif = inet->mc_index;
-		if (!ufh.saddr)
-			ufh.saddr = inet->mc_addr;
+		if (!saddr)
+			saddr = inet->mc_addr;
 		connected = 0;
 	}
 
@@ -651,8 +587,8 @@ int udp_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 
 	if (rt == NULL) {
 		struct flowi fl = { .nl_u = { .ip4_u =
-					      { .daddr = daddr,
-						.saddr = ufh.saddr,
+					      { .daddr = faddr,
+						.saddr = saddr,
 						.tos = tos } },
 				    .oif = ipc.oif };
 		err = ip_route_output_key(&rt, &fl);
@@ -670,46 +606,39 @@ int udp_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 		goto do_confirm;
 back_from_confirm:
 
-	ufh.saddr = rt->rt_src;
+	saddr = rt->rt_src;
 	if (!ipc.addr)
-		ufh.daddr = ipc.addr = rt->rt_dst;
-	ufh.uh.len = htons(ulen);
-	ufh.uh.check = 0;
-	ufh.iov = msg->msg_iov;
-	ufh.wcheck = 0;
+		daddr = ipc.addr = rt->rt_dst;
 
-	/* 0x80000000 is temporary hook for testing new output path */
-	if (corkreq || rt->u.dst.header_len || (msg->msg_flags&0x80000000)) {
-		lock_sock(sk);
-		if (unlikely(up->pending)) {
-			/* The socket is already corked while preparing it. */
-			/* ... which is an evident application bug. --ANK */
-			release_sock(sk);
+	lock_sock(sk);
+	if (unlikely(up->pending)) {
+		/* The socket is already corked while preparing it. */
+		/* ... which is an evident application bug. --ANK */
+		release_sock(sk);
 
-			NETDEBUG(if (net_ratelimit()) printk(KERN_DEBUG "udp cork app bug 2\n"));
-			err = -EINVAL;
-			goto out;
-		}
-		/*
-		 *	Now cork the socket to pend data.
-		 */
-		up->daddr = ufh.daddr;
-		up->dport = ufh.uh.dest;
-		up->saddr = ufh.saddr;
-		up->sport = ufh.uh.source;
-		up->pending = 1;
-		goto do_append_data;
+		NETDEBUG(if (net_ratelimit()) printk(KERN_DEBUG "udp cork app bug 2\n"));
+		err = -EINVAL;
+		goto out;
 	}
+	/*
+	 *	Now cork the socket to pend data.
+	 */
+	up->daddr = daddr;
+	up->dport = dport;
+	up->saddr = saddr;
+	up->sport = inet->sport;
+	up->pending = 1;
 
-	/* RFC1122: OK.  Provides the checksumming facility (MUST) as per */
-	/* 4.1.3.4. It's configurable by the application via setsockopt() */
-	/* (MAY) and it defaults to on (MUST). */
-
-	err = ip_build_xmit(sk,
-			    (sk->no_check == UDP_CSUM_NOXMIT ?
-			     udp_getfrag_nosum :
-			     udp_getfrag),
-			    &ufh, ulen, &ipc, rt, msg->msg_flags);
+do_append_data:
+	up->len += ulen;
+	err = ip_append_data(sk, ip_generic_getfrag, msg->msg_iov, ulen, 
+			sizeof(struct udphdr), &ipc, rt, 
+			corkreq ? msg->msg_flags|MSG_MORE : msg->msg_flags);
+	if (err)
+		udp_flush_pending_frames(sk);
+	else if (!corkreq)
+		err = udp_push_pending_frames(sk, up);
+	release_sock(sk);
 
 out:
 	ip_rt_put(rt);
@@ -726,18 +655,6 @@ do_confirm:
 	if (!(msg->msg_flags&MSG_PROBE) || len)
 		goto back_from_confirm;
 	err = 0;
-	goto out;
-
-do_append_data:
-	up->len += ulen;
-	err = ip_append_data(sk, ip_generic_getfrag, msg->msg_iov, ulen, 
-			sizeof(struct udphdr), &ipc, rt, 
-			corkreq ? msg->msg_flags|MSG_MORE : msg->msg_flags);
-	if (err)
-		udp_flush_pending_frames(sk);
-	else if (!corkreq)
-		err = udp_push_pending_frames(sk, up);
-	release_sock(sk);
 	goto out;
 }
 
