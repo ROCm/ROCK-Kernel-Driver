@@ -45,6 +45,7 @@
 
 #include <acpi/acpi.h>
 #include <acpi/acnamesp.h>
+#include <acpi/acinterp.h>
 
 
 #define _COMPONENT          ACPI_NAMESPACE
@@ -149,11 +150,11 @@ acpi_evaluate_object_typed (
  * FUNCTION:    acpi_evaluate_object
  *
  * PARAMETERS:  Handle              - Object handle (optional)
- *              *Pathname           - Object pathname (optional)
- *              **external_params   - List of parameters to pass to method,
+ *              Pathname            - Object pathname (optional)
+ *              external_params     - List of parameters to pass to method,
  *                                    terminated by NULL.  May be NULL
  *                                    if no parameters are being passed.
- *              *return_buffer      - Where to put method's return value (if
+ *              return_buffer       - Where to put method's return value (if
  *                                    any).  If NULL, no value is returned.
  *
  * RETURN:      Status
@@ -172,6 +173,7 @@ acpi_evaluate_object (
 	struct acpi_buffer              *return_buffer)
 {
 	acpi_status                     status;
+	acpi_status                     status2;
 	union acpi_operand_object       **internal_params = NULL;
 	union acpi_operand_object       *internal_return_obj = NULL;
 	acpi_size                       buffer_space_needed;
@@ -203,7 +205,7 @@ acpi_evaluate_object (
 		 */
 		for (i = 0; i < external_params->count; i++) {
 			status = acpi_ut_copy_eobject_to_iobject (&external_params->pointer[i],
-					 &internal_params[i]);
+					  &internal_params[i]);
 			if (ACPI_FAILURE (status)) {
 				acpi_ut_delete_internal_object_list (internal_params);
 				return_ACPI_STATUS (status);
@@ -321,14 +323,20 @@ acpi_evaluate_object (
 		}
 	}
 
-	/* Delete the return and parameter objects */
-
 	if (internal_return_obj) {
 		/*
-		 * Delete the internal return object. (Or at least
-		 * decrement the reference count by one)
+		 * Delete the internal return object.  NOTE: Interpreter
+		 * must be locked to avoid race condition.
 		 */
-		acpi_ut_remove_reference (internal_return_obj);
+		status2 = acpi_ex_enter_interpreter ();
+		if (ACPI_SUCCESS (status2)) {
+			/*
+			 * Delete the internal return object. (Or at least
+			 * decrement the reference count by one)
+			 */
+			acpi_ut_remove_reference (internal_return_obj);
+			acpi_ex_exit_interpreter ();
+		}
 	}
 
 	/*

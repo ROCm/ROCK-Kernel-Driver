@@ -97,6 +97,20 @@ acpi_ev_is_notify_object (
  *
  ******************************************************************************/
 
+#ifdef ACPI_DEBUG_OUTPUT
+static const char                *acpi_notify_value_names[] =
+{
+	"Bus Check",
+	"Device Check",
+	"Device Wake",
+	"Eject request",
+	"Device Check Light",
+	"Frequency Mismatch",
+	"Bus Mode Mismatch",
+	"Power Fault"
+};
+#endif
+
 acpi_status
 acpi_ev_queue_notify_request (
 	struct acpi_namespace_node      *node,
@@ -112,7 +126,7 @@ acpi_ev_queue_notify_request (
 
 
 	/*
-	 * For value 1 (Ejection Request), some device method may need to be run.
+	 * For value 3 (Ejection Request), some device method may need to be run.
 	 * For value 2 (Device Wake) if _PRW exists, the _PS0 method may need to be run.
 	 * For value 0x80 (Status Change) on the power button or sleep button,
 	 * initiate soft-off or sleep operation?
@@ -120,26 +134,13 @@ acpi_ev_queue_notify_request (
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
 		"Dispatching Notify(%X) on node %p\n", notify_value, node));
 
-	switch (notify_value) {
-	case 0:
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Notify value: Re-enumerate Devices\n"));
-		break;
-
-	case 1:
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Notify value: Ejection Request\n"));
-		break;
-
-	case 2:
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Notify value: Device Wake\n"));
-		break;
-
-	case 0x80:
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Notify value: Status Change\n"));
-		break;
-
-	default:
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Unknown Notify Value: %X \n", notify_value));
-		break;
+	if (notify_value <= 7) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Notify value: %s\n",
+				acpi_notify_value_names[notify_value]));
+	}
+	else {
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "notify value: 0x2.2_x **Device Specific**\n",
+				notify_value));
 	}
 
 	/*

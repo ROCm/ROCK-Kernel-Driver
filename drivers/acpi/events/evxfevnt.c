@@ -247,16 +247,29 @@ acpi_enable_gpe (
 		goto unlock_and_exit;
 	}
 
-	/* Enable the requested GPE number */
-
-	status = acpi_hw_enable_gpe (gpe_event_info);
-	if (ACPI_FAILURE (status)) {
-		goto unlock_and_exit;
-	}
+	/* Check for Wake vs Runtime GPE */
 
 	if (flags & ACPI_EVENT_WAKE_ENABLE) {
+		/* Ensure the requested wake GPE is disabled */
+
+		status = acpi_hw_disable_gpe (gpe_event_info);
+		if (ACPI_FAILURE (status)) {
+			goto unlock_and_exit;
+		}
+
+		/* Defer Enable of Wake GPE until sleep time */
+
 		acpi_hw_enable_gpe_for_wakeup (gpe_event_info);
 	}
+	else {
+		/* Enable the requested runtime GPE  */
+
+		status = acpi_hw_enable_gpe (gpe_event_info);
+		if (ACPI_FAILURE (status)) {
+			goto unlock_and_exit;
+		}
+	}
+
 
 unlock_and_exit:
 	if (flags & ACPI_NOT_ISR) {

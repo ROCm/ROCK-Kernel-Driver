@@ -149,11 +149,11 @@ acpi_hw_get_gpe_status (
 	acpi_event_status               *event_status);
 
 acpi_status
-acpi_hw_disable_non_wakeup_gpes (
+acpi_hw_prepare_gpes_for_sleep (
 	void);
 
 acpi_status
-acpi_hw_enable_non_wakeup_gpes (
+acpi_hw_restore_gpes_on_wake (
 	void);
 
 

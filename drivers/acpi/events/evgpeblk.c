@@ -168,11 +168,11 @@ unlock_and_exit:
  *              information for quick lookup during GPE dispatch
  *
  *              The name of each GPE control method is of the form:
- *                  "_Lnn" or "_Enn"
- *                  Where:
- *                      L      - means that the GPE is level triggered
- *                      E      - means that the GPE is edge triggered
- *                      nn     - is the GPE number [in HEX]
+ *              "_Lxx" or "_Exx"
+ *              Where:
+ *                  L      - means that the GPE is level triggered
+ *                  E      - means that the GPE is edge triggered
+ *                  xx     - is the GPE number [in HEX]
  *
  ******************************************************************************/
 
@@ -188,36 +188,41 @@ acpi_ev_save_method_info (
 	u32                             gpe_number;
 	char                            name[ACPI_NAME_SIZE + 1];
 	u8                              type;
-	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("ev_save_method_info");
 
 
-	/* Extract the name from the object and convert to a string */
-
+	/*
+	 * _Lxx and _Exx GPE method support
+	 *
+	 * 1) Extract the name from the object and convert to a string
+	 */
 	ACPI_MOVE_32_TO_32 (name,
 			   &((struct acpi_namespace_node *) obj_handle)->name.integer);
 	name[ACPI_NAME_SIZE] = 0;
 
 	/*
-	 * Edge/Level determination is based on the 2nd character
-	 * of the method name
+	 * 2) Edge/Level determination is based on the 2nd character
+	 *    of the method name
+	 *
+	 * NOTE: Default GPE type is RUNTIME.  May be changed later to WAKE if a
+	 * _PRW object is found that points to this GPE.
 	 */
 	switch (name[1]) {
 	case 'L':
-		type = ACPI_EVENT_LEVEL_TRIGGERED;
+		type = ACPI_GPE_LEVEL_TRIGGERED | ACPI_GPE_TYPE_RUNTIME;
 		break;
 
 	case 'E':
-		type = ACPI_EVENT_EDGE_TRIGGERED;
+		type = ACPI_GPE_EDGE_TRIGGERED | ACPI_GPE_TYPE_RUNTIME;
 		break;
 
 	default:
 		/* Unknown method type, just ignore it! */
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-			"Unknown GPE method type: %s (name not of form _Lnn or _Enn)\n",
+			"Unknown GPE method type: %s (name not of form _Lxx or _Exx)\n",
 			name));
 		return_ACPI_STATUS (AE_OK);
 	}
@@ -229,7 +234,7 @@ acpi_ev_save_method_info (
 		/* Conversion failed; invalid method, just ignore it */
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-			"Could not extract GPE number from name: %s (name is not of form _Lnn or _Enn)\n",
+			"Could not extract GPE number from name: %s (name is not of form _Lxx or _Exx)\n",
 			name));
 		return_ACPI_STATUS (AE_OK);
 	}
@@ -255,17 +260,126 @@ acpi_ev_save_method_info (
 	gpe_event_info->flags    = type;
 	gpe_event_info->method_node = (struct acpi_namespace_node *) obj_handle;
 
-	/* Enable the GPE (SCIs should be disabled at this point) */
-
-	status = acpi_hw_enable_gpe (gpe_event_info);
-	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
-	}
-
 	ACPI_DEBUG_PRINT ((ACPI_DB_LOAD,
 		"Registered GPE method %s as GPE number 0x%.2X\n",
 		name, gpe_number));
 	return_ACPI_STATUS (AE_OK);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    acpi_ev_get_gpe_type
+ *
+ * PARAMETERS:  Callback from walk_namespace
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Called from acpi_walk_namespace. Expects each object to be a
+ *              Device.  Run the _PRW method.  If present, extract the GPE
+ *              number and mark the GPE as a WAKE GPE.
+ *
+ ******************************************************************************/
+
+static acpi_status
+acpi_ev_get_gpe_type (
+	acpi_handle                     obj_handle,
+	u32                             level,
+	void                            *info,
+	void                            **return_value)
+{
+	struct acpi_gpe_walk_info       *gpe_info = (void *) info;
+	struct acpi_namespace_node      *gpe_device;
+	struct acpi_gpe_block_info      *gpe_block;
+	struct acpi_namespace_node      *target_gpe_device;
+	struct acpi_gpe_event_info      *gpe_event_info;
+	union acpi_operand_object       *pkg_desc;
+	union acpi_operand_object       *obj_desc;
+	u32                             gpe_number;
+	acpi_status                     status;
+
+
+	ACPI_FUNCTION_TRACE ("ev_get_gpe_type");
+
+
+	/* Check for a _PRW method under this device */
+
+	status = acpi_ut_evaluate_object (obj_handle, METHOD_NAME__PRW,
+			 ACPI_BTYPE_PACKAGE, &pkg_desc);
+	if (status == AE_NOT_FOUND) {
+		return_ACPI_STATUS (AE_OK);
+	}
+	else if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
+
+	/* The returned _PRW package must have at least two elements */
+
+	if (pkg_desc->package.count < 2) {
+		goto cleanup;
+	}
+
+	/* Extract pointers from the input context */
+
+	gpe_device = gpe_info->gpe_device;
+	gpe_block = gpe_info->gpe_block;
+
+	/*
+	 * The _PRW object must return a package, we are only interested
+	 * in the first element
+	 */
+	obj_desc = pkg_desc->package.elements[0];
+
+	if (ACPI_GET_OBJECT_TYPE (obj_desc) == ACPI_TYPE_INTEGER) {
+		/* Use FADT-defined GPE device (from definition of _PRW) */
+
+		target_gpe_device = acpi_gbl_fadt_gpe_device;
+
+		/* Integer is the GPE number in the FADT described GPE blocks */
+
+		gpe_number = (u32) obj_desc->integer.value;
+	}
+	else if (ACPI_GET_OBJECT_TYPE (obj_desc) == ACPI_TYPE_PACKAGE) {
+		/* Package contains a GPE reference and GPE number within a GPE block */
+
+		if ((obj_desc->package.count < 2) ||
+			(ACPI_GET_OBJECT_TYPE (obj_desc->package.elements[0]) != ACPI_TYPE_LOCAL_REFERENCE) ||
+			(ACPI_GET_OBJECT_TYPE (obj_desc->package.elements[1]) != ACPI_TYPE_INTEGER)) {
+			goto cleanup;
+		}
+
+		/* Get GPE block reference and decode */
+
+		target_gpe_device = obj_desc->package.elements[0]->reference.node;
+		gpe_number = (u32) obj_desc->package.elements[1]->integer.value;
+	}
+	else {
+		/* Unknown type, just ignore it */
+
+		goto cleanup;
+	}
+
+	/*
+	 * Is this GPE within this block?
+	 *
+	 * TRUE iff these conditions are true:
+	 *     1) The GPE devices match.
+	 *     2) The GPE index(number) is within the range of the Gpe Block
+	 *          associated with the GPE device.
+	 */
+	if ((gpe_device == target_gpe_device) &&
+		(gpe_number >= gpe_block->block_base_number) &&
+		(gpe_number < gpe_block->block_base_number + (gpe_block->register_count * 8))) {
+		/* Mark GPE for WAKE but DISABLED (even for wake) */
+
+		gpe_event_info = &gpe_block->event_info[gpe_number - gpe_block->block_base_number];
+		gpe_event_info->flags |= ACPI_GPE_TYPE_WAKE;
+	}
+
+cleanup:
+	acpi_ut_remove_reference (pkg_desc);
+
+	return_ACPI_STATUS (status);
 }
 
 
@@ -695,8 +809,13 @@ acpi_ev_create_gpe_block (
 	struct acpi_gpe_block_info      **return_gpe_block)
 {
 	struct acpi_gpe_block_info      *gpe_block;
+	struct acpi_gpe_event_info      *gpe_event_info;
+	acpi_native_uint                i;
+	acpi_native_uint                j;
+	u32                             wake_gpe_count;
+	u32                             gpe_enabled_count;
 	acpi_status                     status;
-
+	struct acpi_gpe_walk_info       gpe_info;
 
 	ACPI_FUNCTION_TRACE ("ev_create_gpe_block");
 
@@ -737,7 +856,8 @@ acpi_ev_create_gpe_block (
 
 	/* Dump info about this GPE block */
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INIT, "GPE %02d to %02d [%4.4s] %d regs at %8.8X%8.8X on int %d\n",
+	ACPI_DEBUG_PRINT ((ACPI_DB_INIT,
+		"GPE %02d to %02d [%4.4s] %d regs at %8.8X%8.8X on int %d\n",
 		gpe_block->block_base_number,
 		(u32) (gpe_block->block_base_number +
 				((gpe_block->register_count * ACPI_GPE_REGISTER_WIDTH) -1)),
@@ -751,6 +871,58 @@ acpi_ev_create_gpe_block (
 	status = acpi_ns_walk_namespace (ACPI_TYPE_METHOD, gpe_device,
 			  ACPI_UINT32_MAX, ACPI_NS_WALK_NO_UNLOCK, acpi_ev_save_method_info,
 			  gpe_block, NULL);
+
+	/*
+	 * Runtime option: Should Wake GPEs be enabled at runtime?  The default is
+	 * No,they should only be enabled just as the machine goes to sleep.
+	 */
+	if (acpi_gbl_leave_wake_gpes_disabled) {
+		/*
+		 * Differentiate RUNTIME vs WAKE GPEs, via the _PRW control methods. (Each
+		 * GPE that has one or more _PRWs that reference it is by definition a
+		 * WAKE GPE and will not be enabled while the machine is running.)
+		 */
+		gpe_info.gpe_block = gpe_block;
+		gpe_info.gpe_device = gpe_device;
+
+		status = acpi_ns_walk_namespace (ACPI_TYPE_DEVICE, ACPI_ROOT_OBJECT,
+				  ACPI_UINT32_MAX, ACPI_NS_WALK_UNLOCK, acpi_ev_get_gpe_type,
+				  &gpe_info, NULL);
+	}
+
+	/*
+	 * Enable all GPEs in this block that are 1) "runtime" GPEs, and 2) have
+	 * a corresponding _Lxx or _Exx method.  All other GPEs must be enabled via
+	 * the acpi_enable_gpe() external interface.
+	 */
+	wake_gpe_count = 0;
+	gpe_enabled_count = 0;
+
+	for (i = 0; i < gpe_block->register_count; i++) {
+		for (j = 0; j < 8; j++) {
+			/* Get the info block for this particular GPE */
+
+			gpe_event_info = &gpe_block->event_info[(i * ACPI_GPE_REGISTER_WIDTH) + j];
+			if ((gpe_event_info->method_node) &&
+			   ((gpe_event_info->flags & ACPI_GPE_TYPE_MASK) == ACPI_GPE_TYPE_RUNTIME)) {
+				/* Enable this GPE, it is 1) RUNTIME and 2) has an _Lxx or _Exx method */
+
+				status = acpi_hw_enable_gpe (gpe_event_info);
+				if (ACPI_FAILURE (status)) {
+					return_ACPI_STATUS (status);
+				}
+				gpe_enabled_count++;
+			}
+
+			if ((gpe_event_info->flags & ACPI_GPE_TYPE_MASK) == ACPI_GPE_TYPE_WAKE) {
+				wake_gpe_count++;
+			}
+		}
+	}
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_INIT,
+			"Found %u Wake, Enabled %u Runtime GPEs in this block\n",
+			wake_gpe_count, gpe_enabled_count));
 
 	/* Return the new block */
 
@@ -775,27 +947,25 @@ acpi_ev_create_gpe_block (
  ******************************************************************************/
 
 acpi_status
-acpi_ev_gpe_initialize (void)
+acpi_ev_gpe_initialize (
+	void)
 {
 	u32                             register_count0 = 0;
 	u32                             register_count1 = 0;
 	u32                             gpe_number_max = 0;
-	acpi_handle                     gpe_device;
 	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("ev_gpe_initialize");
 
 
-	/* Get a handle to the predefined _GPE object */
-
-	status = acpi_get_handle (NULL, "\\_GPE", &gpe_device);
+	status = acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
 
 	/*
-	 * Initialize the GPE Blocks defined in the FADT
+	 * Initialize the GPE Block(s) defined in the FADT
 	 *
 	 * Why the GPE register block lengths are divided by 2:  From the ACPI Spec,
 	 * section "General-Purpose Event Registers", we have:
@@ -829,8 +999,9 @@ acpi_ev_gpe_initialize (void)
 
 		/* Install GPE Block 0 */
 
-		status = acpi_ev_create_gpe_block (gpe_device, &acpi_gbl_FADT->xgpe0_blk,
+		status = acpi_ev_create_gpe_block (acpi_gbl_fadt_gpe_device, &acpi_gbl_FADT->xgpe0_blk,
 				 register_count0, 0, acpi_gbl_FADT->sci_int, &acpi_gbl_gpe_fadt_blocks[0]);
+
 		if (ACPI_FAILURE (status)) {
 			ACPI_REPORT_ERROR ((
 				"Could not create GPE Block 0, %s\n",
@@ -861,9 +1032,10 @@ acpi_ev_gpe_initialize (void)
 		else {
 			/* Install GPE Block 1 */
 
-			status = acpi_ev_create_gpe_block (gpe_device, &acpi_gbl_FADT->xgpe1_blk,
+			status = acpi_ev_create_gpe_block (acpi_gbl_fadt_gpe_device, &acpi_gbl_FADT->xgpe1_blk,
 					 register_count1, acpi_gbl_FADT->gpe1_base,
 					 acpi_gbl_FADT->sci_int, &acpi_gbl_gpe_fadt_blocks[1]);
+
 			if (ACPI_FAILURE (status)) {
 				ACPI_REPORT_ERROR ((
 					"Could not create GPE Block 1, %s\n",
@@ -885,7 +1057,8 @@ acpi_ev_gpe_initialize (void)
 		/* GPEs are not required by ACPI, this is OK */
 
 		ACPI_REPORT_INFO (("There are no GPE blocks defined in the FADT\n"));
-		return_ACPI_STATUS (AE_OK);
+		status = AE_OK;
+		goto cleanup;
 	}
 
 	/* Check for Max GPE number out-of-range */
@@ -893,9 +1066,12 @@ acpi_ev_gpe_initialize (void)
 	if (gpe_number_max > ACPI_GPE_MAX) {
 		ACPI_REPORT_ERROR (("Maximum GPE number from FADT is too large: 0x%X\n",
 			gpe_number_max));
-		return_ACPI_STATUS (AE_BAD_VALUE);
+		status = AE_BAD_VALUE;
+		goto cleanup;
 	}
 
+cleanup:
+	(void) acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 	return_ACPI_STATUS (AE_OK);
 }
 

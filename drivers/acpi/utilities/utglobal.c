@@ -253,14 +253,15 @@ const u8                                acpi_gbl_ns_properties[] =
 	ACPI_NS_NORMAL,                     /* 19 index_field      */
 	ACPI_NS_NORMAL,                     /* 20 Reference        */
 	ACPI_NS_NORMAL,                     /* 21 Alias            */
-	ACPI_NS_NORMAL,                     /* 22 Notify           */
-	ACPI_NS_NORMAL,                     /* 23 Address Handler  */
-	ACPI_NS_NEWSCOPE | ACPI_NS_LOCAL,   /* 24 Resource Desc    */
-	ACPI_NS_NEWSCOPE | ACPI_NS_LOCAL,   /* 25 Resource Field   */
-	ACPI_NS_NEWSCOPE,                   /* 26 Scope            */
-	ACPI_NS_NORMAL,                     /* 27 Extra            */
-	ACPI_NS_NORMAL,                     /* 28 Data             */
-	ACPI_NS_NORMAL                      /* 29 Invalid          */
+	ACPI_NS_NORMAL,                     /* 22 method_alias     */
+	ACPI_NS_NORMAL,                     /* 23 Notify           */
+	ACPI_NS_NORMAL,                     /* 24 Address Handler  */
+	ACPI_NS_NEWSCOPE | ACPI_NS_LOCAL,   /* 25 Resource Desc    */
+	ACPI_NS_NEWSCOPE | ACPI_NS_LOCAL,   /* 26 Resource Field   */
+	ACPI_NS_NEWSCOPE,                   /* 27 Scope            */
+	ACPI_NS_NORMAL,                     /* 28 Extra            */
+	ACPI_NS_NORMAL,                     /* 29 Data             */
+	ACPI_NS_NORMAL                      /* 30 Invalid          */
 };
 
 
@@ -501,14 +502,15 @@ static const char                   *acpi_gbl_ns_type_names[] = /* printable nam
 	/* 19 */ "index_field",
 	/* 20 */ "Reference",
 	/* 21 */ "Alias",
-	/* 22 */ "Notify",
-	/* 23 */ "addr_handler",
-	/* 24 */ "resource_desc",
-	/* 25 */ "resource_fld",
-	/* 26 */ "Scope",
-	/* 27 */ "Extra",
-	/* 28 */ "Data",
-	/* 39 */ "Invalid"
+	/* 22 */ "method_alias",
+	/* 23 */ "Notify",
+	/* 24 */ "addr_handler",
+	/* 25 */ "resource_desc",
+	/* 26 */ "resource_fld",
+	/* 27 */ "Scope",
+	/* 28 */ "Extra",
+	/* 29 */ "Data",
+	/* 30 */ "Invalid"
 };
 
 
@@ -556,7 +558,7 @@ char *
 acpi_ut_get_node_name (
 	void                            *object)
 {
-	struct acpi_namespace_node      *node;
+	struct acpi_namespace_node      *node = (struct acpi_namespace_node *) object;
 
 
 	if (!object)
@@ -564,7 +566,10 @@ acpi_ut_get_node_name (
 		return ("NULL NODE");
 	}
 
-	node = (struct acpi_namespace_node *) object;
+	if (object == ACPI_ROOT_OBJECT)
+	{
+		node = acpi_gbl_root_node;
+	}
 
 	if (node->descriptor != ACPI_DESC_TYPE_NAMED)
 	{
@@ -782,6 +787,7 @@ acpi_ut_init_globals (
 
 	acpi_gbl_create_osi_method = TRUE;
 	acpi_gbl_all_methods_serialized = FALSE;
+	acpi_gbl_leave_wake_gpes_disabled = TRUE;
 
 	/* Memory allocation and cache lists */
 

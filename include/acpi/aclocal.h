@@ -360,6 +360,13 @@ struct acpi_gpe_xrupt_info
 };
 
 
+struct acpi_gpe_walk_info
+{
+	struct acpi_namespace_node              *gpe_device;
+	struct acpi_gpe_block_info              *gpe_block;
+};
+
+
 typedef acpi_status (*ACPI_GPE_CALLBACK) (
 	struct acpi_gpe_xrupt_info      *gpe_xrupt_info,
 	struct acpi_gpe_block_info      *gpe_block);

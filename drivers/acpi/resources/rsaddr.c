@@ -88,6 +88,7 @@ acpi_rs_address16_resource (
 
 	ACPI_FUNCTION_TRACE ("rs_address16_resource");
 
+
 	/*
 	 * Point past the Descriptor to get the number of bytes consumed
 	 */
@@ -149,7 +150,7 @@ acpi_rs_address16_resource (
 		output_struct->data.address16.attribute.memory.read_write_attribute =
 				(u16) (temp8 & 0x01);
 		output_struct->data.address16.attribute.memory.cache_attribute =
-				(u16) ((temp8 >> 1) & 0x0F);
+				(u16) ((temp8 >> 1) & 0x03);
 	}
 	else {
 		if (ACPI_IO_RANGE == output_struct->data.address16.resource_type) {
@@ -347,7 +348,7 @@ acpi_rs_address16_stream (
 
 		temp8 |=
 			(linked_list->data.address16.attribute.memory.cache_attribute &
-			 0x0F) << 1;
+			 0x03) << 1;
 	}
 	else if (ACPI_IO_RANGE == linked_list->data.address16.resource_type) {
 		temp8 = (u8)
@@ -539,7 +540,7 @@ acpi_rs_address32_resource (
 				(u16) (temp8 & 0x01);
 
 		output_struct->data.address32.attribute.memory.cache_attribute =
-				(u16) ((temp8 >> 1) & 0x0F);
+				(u16) ((temp8 >> 1) & 0x03);
 	}
 	else {
 		if (ACPI_IO_RANGE == output_struct->data.address32.resource_type) {
@@ -735,7 +736,7 @@ acpi_rs_address32_stream (
 
 		temp8 |=
 			(linked_list->data.address32.attribute.memory.cache_attribute &
-			 0x0F) << 1;
+			 0x03) << 1;
 	}
 	else if (ACPI_IO_RANGE == linked_list->data.address32.resource_type) {
 		temp8 = (u8)
@@ -926,7 +927,7 @@ acpi_rs_address64_resource (
 				(u16) (temp8 & 0x01);
 
 		output_struct->data.address64.attribute.memory.cache_attribute =
-				(u16) ((temp8 >> 1) & 0x0F);
+				(u16) ((temp8 >> 1) & 0x03);
 	}
 	else {
 		if (ACPI_IO_RANGE == output_struct->data.address64.resource_type) {
@@ -1124,7 +1125,7 @@ acpi_rs_address64_stream (
 
 		temp8 |=
 			(linked_list->data.address64.attribute.memory.cache_attribute &
-			 0x0F) << 1;
+			 0x03) << 1;
 	}
 	else if (ACPI_IO_RANGE == linked_list->data.address64.resource_type) {
 		temp8 = (u8)
