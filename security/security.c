@@ -22,16 +22,16 @@
 
 /* things that live in dummy.c */
 extern struct security_operations dummy_security_ops;
-extern void security_fixup_ops (struct security_operations *ops);
+extern void security_fixup_ops(struct security_operations *ops);
 
 struct security_operations *security_ops;	/* Initialized to NULL */
 
-static inline int verify (struct security_operations *ops)
+static inline int verify(struct security_operations *ops)
 {
 	/* verify the security_operations structure exists */
 	if (!ops)
 		return -EINVAL;
-	security_fixup_ops (ops);
+	security_fixup_ops(ops);
 	return 0;
 }
 
@@ -40,7 +40,7 @@ static void __init do_security_initcalls(void)
 	initcall_t *call;
 	call = &__security_initcall_start;
 	while (call < &__security_initcall_end) {
-		(*call)();
+		(*call) ();
 		call++;
 	}
 }
@@ -52,12 +52,12 @@ static void __init do_security_initcalls(void)
  */
 int __init security_init(void)
 {
-	printk (KERN_INFO "Security Framework v" SECURITY_FRAMEWORK_VERSION
-		" initialized\n");
+	printk(KERN_INFO "Security Framework v" SECURITY_FRAMEWORK_VERSION
+	       " initialized\n");
 
-	if (verify (&dummy_security_ops)) {
-		printk (KERN_ERR "%s could not verify "
-			"dummy_security_ops structure.\n", __FUNCTION__);
+	if (verify(&dummy_security_ops)) {
+		printk(KERN_ERR "%s could not verify "
+		       "dummy_security_ops structure.\n", __FUNCTION__);
 		return -EIO;
 	}
 
@@ -79,11 +79,11 @@ int __init security_init(void)
  * If there is already a security module registered with the kernel,
  * an error will be returned.  Otherwise 0 is returned on success.
  */
-int register_security (struct security_operations *ops)
+int register_security(struct security_operations *ops)
 {
-	if (verify (ops)) {
+	if (verify(ops)) {
 		printk(KERN_DEBUG "%s could not verify "
-			"security_operations structure.\n", __FUNCTION__);
+		       "security_operations structure.\n", __FUNCTION__);
 		return -EINVAL;
 	}
 
@@ -106,12 +106,12 @@ int register_security (struct security_operations *ops)
  * an error is returned.  Otherwise the default security options is set to the
  * the dummy_security_ops structure, and 0 is returned.
  */
-int unregister_security (struct security_operations *ops)
+int unregister_security(struct security_operations *ops)
 {
 	if (ops != security_ops) {
-		printk (KERN_INFO "%s: trying to unregister "
-			"a security_opts structure that is not "
-			"registered, failing.\n", __FUNCTION__);
+		printk(KERN_INFO "%s: trying to unregister "
+		       "a security_opts structure that is not "
+		       "registered, failing.\n", __FUNCTION__);
 		return -EINVAL;
 	}
 
@@ -132,21 +132,21 @@ int unregister_security (struct security_operations *ops)
  * The return value depends on the currently loaded security module, with 0 as
  * success.
  */
-int mod_reg_security (const char *name, struct security_operations *ops)
+int mod_reg_security(const char *name, struct security_operations *ops)
 {
-	if (verify (ops)) {
-		printk (KERN_INFO "%s could not verify "
-			"security operations.\n", __FUNCTION__);
+	if (verify(ops)) {
+		printk(KERN_INFO "%s could not verify "
+		       "security operations.\n", __FUNCTION__);
 		return -EINVAL;
 	}
 
 	if (ops == security_ops) {
-		printk (KERN_INFO "%s security operations "
-			"already registered.\n", __FUNCTION__);
+		printk(KERN_INFO "%s security operations "
+		       "already registered.\n", __FUNCTION__);
 		return -EINVAL;
 	}
 
-	return security_ops->register_security (name, ops);
+	return security_ops->register_security(name, ops);
 }
 
 /**
@@ -162,15 +162,15 @@ int mod_reg_security (const char *name, struct security_operations *ops)
  * The return value depends on the currently loaded security module, with 0 as
  * success.
  */
-int mod_unreg_security (const char *name, struct security_operations *ops)
+int mod_unreg_security(const char *name, struct security_operations *ops)
 {
 	if (ops == security_ops) {
-		printk (KERN_INFO "%s invalid attempt to unregister "
-			" primary security ops.\n", __FUNCTION__);
+		printk(KERN_INFO "%s invalid attempt to unregister "
+		       " primary security ops.\n", __FUNCTION__);
 		return -EINVAL;
 	}
 
-	return security_ops->unregister_security (name, ops);
+	return security_ops->unregister_security(name, ops);
 }
 
 /**
@@ -183,9 +183,9 @@ int mod_unreg_security (const char *name, struct security_operations *ops)
  * This allows the security module to implement the capable function call
  * however it chooses to.
  */
-int capable (int cap)
+int capable(int cap)
 {
-	if (security_ops->capable (current, cap)) {
+	if (security_ops->capable(current, cap)) {
 		/* capability denied */
 		return 0;
 	}
