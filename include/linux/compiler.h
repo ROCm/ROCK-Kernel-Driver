@@ -39,6 +39,20 @@
 #define likely(x)	__builtin_expect(!!(x), 1)
 #define unlikely(x)	__builtin_expect(!!(x), 0)
 
+/* Optimization barrier */
+#ifndef barrier
+# define barrier() __memory_barrier()
+#endif
+
+#ifndef RELOC_HIDE
+# define RELOC_HIDE(ptr, off)					\
+  ({ unsigned long __ptr;					\
+     __ptr = (unsigned long) (ptr);				\
+    (typeof(ptr)) (__ptr + (off)); })
+#endif
+
+#endif /* __KERNEL__ */
+
 /*
  * Allow us to mark functions as 'deprecated' and have gcc emit a nice
  * warning for each use, in hopes of speeding the functions removal.
@@ -99,19 +113,5 @@
 #ifndef noinline
 #define noinline
 #endif
-
-/* Optimization barrier */
-#ifndef barrier
-# define barrier() __memory_barrier()
-#endif
-
-#ifndef RELOC_HIDE
-# define RELOC_HIDE(ptr, off)					\
-  ({ unsigned long __ptr;					\
-     __ptr = (unsigned long) (ptr);				\
-    (typeof(ptr)) (__ptr + (off)); })
-#endif
-
-#endif /* __KERNEL__ */
 
 #endif /* __LINUX_COMPILER_H */
