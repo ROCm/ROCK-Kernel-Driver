@@ -523,14 +523,16 @@ static int snd_via82xx_codec_ready(via82xx_t *chip, int secondary)
 static int snd_via82xx_codec_valid(via82xx_t *chip, int secondary)
 {
 	unsigned int timeout = 1000;	/* 1ms */
-	unsigned int val;
+	unsigned int val, val1;
 	unsigned int stat = !secondary ? VIA_REG_AC97_PRIMARY_VALID :
 					 VIA_REG_AC97_SECONDARY_VALID;
 	
 	while (timeout-- > 0) {
-		udelay(1);
-		if ((val = snd_via82xx_codec_xread(chip)) & stat)
+		val = snd_via82xx_codec_xread(chip);
+		val1 = val & (VIA_REG_AC97_BUSY | stat);
+		if (val1 == stat)
 			return val & 0xffff;
+		udelay(1);
 	}
 	return -EIO;
 }
@@ -580,8 +582,6 @@ static unsigned short snd_via82xx_codec_read(ac97_t *ac97, unsigned short reg)
 		      	return 0xffff;
 		}
 		snd_via82xx_codec_xwrite(chip, xval);
-		if (snd_via82xx_codec_ready(chip, ac97->num) < 0)
-			continue;
 		if (snd_via82xx_codec_valid(chip, ac97->num) >= 0) {
 			udelay(25);
 			val = snd_via82xx_codec_xread(chip);
@@ -1987,6 +1987,7 @@ static int __devinit check_dxs_list(struct pci_dev *pci)
 		{ .vendor = 0x1458, .device = 0xa002, .action = VIA_DXS_ENABLE }, /* Gigabyte GA-7VAXP */
 		{ .vendor = 0x147b, .device = 0x1401, .action = VIA_DXS_ENABLE }, /* ABIT KD7(-RAID) */
 		{ .vendor = 0x14ff, .device = 0x0403, .action = VIA_DXS_ENABLE }, /* Twinhead mobo */
+		{ .vendor = 0x1462, .device = 0x3800, .action = VIA_DXS_ENABLE }, /* MSI KT266 */
 		{ .vendor = 0x1462, .device = 0x7120, .action = VIA_DXS_ENABLE }, /* MSI KT4V */
 		{ .vendor = 0x1631, .device = 0xe004, .action = VIA_DXS_ENABLE }, /* Easy Note 3174, Packard Bell */
 		{ .vendor = 0x1695, .device = 0x3005, .action = VIA_DXS_ENABLE }, /* EPoX EP-8K9A */
