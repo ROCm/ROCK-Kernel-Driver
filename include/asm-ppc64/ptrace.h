@@ -64,9 +64,8 @@ struct pt_regs32 {
 
 #define STACK_FRAME_OVERHEAD	112	/* size of minimum stack frame */
 
-/* Size of stack frame allocated when calling signal handler. */
-/* FIXME: What should this be on 64-bit kernel (64 for 32-bit) */
-#define __SIGNAL_FRAMESIZE	64
+/* Size of dummy stack frame allocated when calling signal handler. */
+#define __SIGNAL_FRAMESIZE	128
 #define __SIGNAL_FRAMESIZE32	64
 
 #define instruction_pointer(regs) ((regs)->nip)

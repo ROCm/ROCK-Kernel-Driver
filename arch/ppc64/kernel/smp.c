@@ -179,7 +179,7 @@ void __init smp_init_iSeries(void)
 	smp_ops->kick_cpu     = smp_iSeries_kick_cpu;
 	smp_ops->setup_cpu    = smp_iSeries_setup_cpu;
 #warning fix for iseries
-	naca->processorCount	= smp_iSeries_numProcs();
+	systemcfg->processorCount	= smp_iSeries_numProcs();
 }
 #endif
 
@@ -343,7 +343,7 @@ void __init smp_init_pSeries(void)
 		smp_ops->probe		= smp_xics_probe;
 	}
 
-	if (naca->platform == PLATFORM_PSERIES) {
+	if (systemcfg->platform == PLATFORM_PSERIES) {
 		smp_ops->give_timebase = pSeries_give_timebase;
 		smp_ops->take_timebase = pSeries_take_timebase;
 	}

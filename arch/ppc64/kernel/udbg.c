@@ -176,7 +176,7 @@ udbg_puthex(unsigned long val)
 void
 udbg_printSP(const char *s)
 {
-	if (naca->platform == PLATFORM_PSERIES) {
+	if (systemcfg->platform == PLATFORM_PSERIES) {
 		unsigned long sp;
 		asm("mr %0,1" : "=r" (sp) :);
 		if (s)

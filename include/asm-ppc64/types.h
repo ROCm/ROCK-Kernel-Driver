@@ -66,6 +66,11 @@ typedef __vector128 vector128;
 typedef u32 dma_addr_t;
 typedef u64 dma64_addr_t;
 
+typedef struct {
+	unsigned long entry;
+	unsigned long toc;
+	unsigned long env;
+} func_descr_t;
 #endif /* __ASSEMBLY__ */
 
 #endif /* __KERNEL__ */

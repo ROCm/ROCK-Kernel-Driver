@@ -59,14 +59,14 @@ int main(void)
 
 	/* naca */
         DEFINE(PACA, offsetof(struct naca_struct, paca));
-	DEFINE(DCACHEL1LINESIZE, offsetof(struct naca_struct, dCacheL1LineSize));
+	DEFINE(DCACHEL1LINESIZE, offsetof(struct systemcfg, dCacheL1LineSize));
         DEFINE(DCACHEL1LOGLINESIZE, offsetof(struct naca_struct, dCacheL1LogLineSize));
         DEFINE(DCACHEL1LINESPERPAGE, offsetof(struct naca_struct, dCacheL1LinesPerPage));
-        DEFINE(ICACHEL1LINESIZE, offsetof(struct naca_struct, iCacheL1LineSize));
+        DEFINE(ICACHEL1LINESIZE, offsetof(struct systemcfg, iCacheL1LineSize));
         DEFINE(ICACHEL1LOGLINESIZE, offsetof(struct naca_struct, iCacheL1LogLineSize));
         DEFINE(ICACHEL1LINESPERPAGE, offsetof(struct naca_struct, iCacheL1LinesPerPage));
 	DEFINE(SLBSIZE, offsetof(struct naca_struct, slb_size));
-	DEFINE(PLATFORM, offsetof(struct naca_struct, platform));
+	DEFINE(PLATFORM, offsetof(struct systemcfg, platform));
 
 	/* paca */
         DEFINE(PACA_SIZE, sizeof(struct paca_struct));
