@@ -140,10 +140,6 @@ nfsd4_open(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_open 
 	status = nfsd4_process_open2(rqstp, current_fh, open);
 	if (status)
 		return status;
-	/*
-	 * To finish the open response, we just need to set the rflags.
-	 */
-	open->op_rflags = 0;
 	return 0;
 }
 
@@ -608,6 +604,9 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 			break;
 		case OP_OPEN:
 			op->status = nfsd4_open(rqstp, &current_fh, &op->u.open);
+			break;
+		case OP_OPEN_CONFIRM:
+			op->status = nfsd4_open_confirm(rqstp, &current_fh, &op->u.open_confirm);
 			break;
 		case OP_PUTFH:
 			op->status = nfsd4_putfh(rqstp, &current_fh, &op->u.putfh);

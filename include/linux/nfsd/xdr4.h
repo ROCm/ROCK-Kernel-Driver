@@ -147,6 +147,13 @@ struct nfsd4_open {
 #define op_iattr	u.iattr
 #define op_verf		u.verf
 
+struct nfsd4_open_confirm {
+	stateid_t	oc_req_stateid		/* request */;
+	u32		oc_seqid    		/* request */;
+	stateid_t	oc_resp_stateid		/* response */;
+	struct nfs4_stateowner * oc_stateowner;	/* response */
+};
+
 struct nfsd4_read {
 	stateid_t	rd_stateid;         /* request */
 	u64		rd_offset;          /* request */
@@ -252,6 +259,7 @@ struct nfsd4_op {
 		struct nfsd4_lookup		lookup;
 		struct nfsd4_verify		nverify;
 		struct nfsd4_open		open;
+		struct nfsd4_open_confirm	open_confirm;
 		struct nfsd4_putfh		putfh;
 		struct nfsd4_read		read;
 		struct nfsd4_readdir		readdir;
@@ -315,16 +323,23 @@ set_change_info(struct nfsd4_change_info *cinfo, struct svc_fh *fhp)
 }
 
 int nfs4svc_encode_voidres(struct svc_rqst *, u32 *, void *);
-int nfs4svc_decode_compoundargs(struct svc_rqst *, u32 *, struct nfsd4_compoundargs *);
-int nfs4svc_encode_compoundres(struct svc_rqst *, u32 *, struct nfsd4_compoundres *);
-
+int nfs4svc_decode_compoundargs(struct svc_rqst *, u32 *, 
+		struct nfsd4_compoundargs *);
+int nfs4svc_encode_compoundres(struct svc_rqst *, u32 *, 
+		struct nfsd4_compoundres *);
 void nfsd4_encode_operation(struct nfsd4_compoundres *, struct nfsd4_op *);
 int nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
-		       struct dentry *dentry, u32 *buffer, int *countp, u32 *bmval);
-extern int nfsd4_setclientid(struct svc_rqst *rqstp, struct nfsd4_setclientid *setclid);
-extern int nfsd4_setclientid_confirm(struct svc_rqst *rqstp, struct nfsd4_setclientid_confirm *setclientid_confirm);
+		       struct dentry *dentry, u32 *buffer, int *countp, 
+		       u32 *bmval);
+extern int nfsd4_setclientid(struct svc_rqst *rqstp, 
+		struct nfsd4_setclientid *setclid);
+extern int nfsd4_setclientid_confirm(struct svc_rqst *rqstp, 
+		struct nfsd4_setclientid_confirm *setclientid_confirm);
 extern int nfsd4_process_open1(struct nfsd4_open *open);
-extern int nfsd4_process_open2(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_open *open);
+extern int nfsd4_process_open2(struct svc_rqst *rqstp, 
+		struct svc_fh *current_fh, struct nfsd4_open *open);
+extern int nfsd4_open_confirm(struct svc_rqst *rqstp, 
+		struct svc_fh *current_fh, struct nfsd4_open_confirm *oc);
 #endif
 
 /*

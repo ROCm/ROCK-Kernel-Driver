@@ -660,6 +660,19 @@ nfsd4_decode_open(struct nfsd4_compoundargs *argp, struct nfsd4_open *open)
 }
 
 static int
+nfsd4_decode_open_confirm(struct nfsd4_compoundargs *argp, struct nfsd4_open_confirm *open_conf)
+{
+	DECODE_HEAD;
+		    
+	READ_BUF(4 + sizeof(stateid_t));
+	READ32(open_conf->oc_req_stateid.si_generation);
+	COPYMEM(&open_conf->oc_req_stateid.si_opaque, sizeof(stateid_opaque_t));
+	READ32(open_conf->oc_seqid);
+						        
+	DECODE_TAIL;
+}
+
+static int
 nfsd4_decode_putfh(struct nfsd4_compoundargs *argp, struct nfsd4_putfh *putfh)
 {
 	DECODE_HEAD;
@@ -953,6 +966,9 @@ nfsd4_decode_compound(struct nfsd4_compoundargs *argp)
 		case OP_OPEN:
 			op->status = nfsd4_decode_open(argp, &op->u.open);
 			break;
+		case OP_OPEN_CONFIRM:
+			op->status = nfsd4_decode_open_confirm(argp, &op->u.open_confirm);
+			break;
 		case OP_PUTFH:
 			op->status = nfsd4_decode_putfh(argp, &op->u.putfh);
 			break;
@@ -1056,6 +1072,21 @@ nfsd4_decode_compound(struct nfsd4_compoundargs *argp)
 	BUG_ON(p + XDR_QUADLEN(nbytes) > resp->end);		\
 } while (0)
 #define ADJUST_ARGS()		resp->p = p
+
+/*
+ * Routine for encoding the result of a
+ * "seqid-mutating" NFSv4 operation.  This is
+ * where seqids are incremented
+ */
+
+#define ENCODE_SEQID_OP_TAIL(stateowner)		\
+	BUG_ON(!stateowner);				\
+	if (seqid_mutating_err(nfserr) && stateowner) {	\
+		if (stateowner->so_confirmed)		\
+			stateowner->so_seqid++;		\
+	}						\
+	return nfserr;
+
 
 static u32 nfs4_ftypes[16] = {
         NF4BAD,  NF4FIFO, NF4CHR, NF4BAD,
@@ -1702,6 +1733,21 @@ nfsd4_encode_open(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_open 
 }
 
 static int
+nfsd4_encode_open_confirm(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_open_confirm *oc)
+{
+	ENCODE_HEAD;
+				        
+	if (!nfserr) {
+		RESERVE_SPACE(sizeof(stateid_t));
+		WRITE32(oc->oc_resp_stateid.si_generation);
+		WRITEMEM(&oc->oc_resp_stateid.si_opaque, sizeof(stateid_opaque_t));
+		ADJUST_ARGS();
+	}
+
+	ENCODE_SEQID_OP_TAIL(oc->oc_stateowner);
+}
+
+static int
 nfsd4_encode_read(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_read *read)
 {
 	u32 eof;
@@ -2012,6 +2058,9 @@ nfsd4_encode_operation(struct nfsd4_compoundres *resp, struct nfsd4_op *op)
 		break;
 	case OP_OPEN:
 		nfsd4_encode_open(resp, op->status, &op->u.open);
+		break;
+	case OP_OPEN_CONFIRM:
+		nfsd4_encode_open_confirm(resp, op->status, &op->u.open_confirm);
 		break;
 	case OP_PUTFH:
 		break;

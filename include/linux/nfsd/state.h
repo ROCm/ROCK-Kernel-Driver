@@ -92,7 +92,6 @@ update_stateid(stateid_t *stateid)
 stateid->si_generation++;
 }
 
-
 /*
 * nfs4_stateowner can either be an open_owner, or (eventually) a lock_owner
 *
@@ -100,6 +99,7 @@ stateid->si_generation++;
 *              reverences when we release a stateowner.
 */
 struct nfs4_stateowner {
+	struct list_head        so_idhash;   /* hash by so_id */
 	struct list_head        so_strhash;   /* hash by op_name */
 	struct list_head        so_perclient; /* nfs4_client->cl_perclient */
 	struct list_head        so_peropenstate; /* list: nfs4_stateid */
@@ -136,6 +136,7 @@ struct nfs4_file {
 */
 
 struct nfs4_stateid {
+	struct list_head              st_hash; /* openstateid_hashtbl[]*/
 	struct list_head              st_perfile; /* file_hashtbl[]*/
 	struct list_head              st_peropenstate; /* nfs4_stateowner->so_peropenstate */
 	struct nfs4_stateowner      * st_stateowner;
@@ -146,5 +147,15 @@ struct nfs4_stateid {
 	unsigned int                  st_share_access;
 	unsigned int                  st_share_deny;
 };
+
+/* flags for preprocess_seqid_op() */
+#define CHECK_FH                0x00000001
+#define CONFIRM                 0x00000002
+
+#define seqid_mutating_err(err)                       \
+	(((err) != nfserr_stale_clientid) &&    \
+	((err) != nfserr_bad_seqid) &&          \
+	((err) != nfserr_stale_stateid) &&      \
+	((err) != nfserr_bad_stateid))
 
 #endif   /* NFSD4_STATE_H */
