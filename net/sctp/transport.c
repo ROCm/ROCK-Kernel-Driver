@@ -88,7 +88,6 @@ static struct sctp_transport *sctp_transport_init(struct sctp_transport *peer,
 
 	/* Initialize the default path max_retrans.  */
 	peer->max_retrans = sctp_max_retrans_path;
-	peer->error_threshold = 0;
 	peer->error_count = 0;
 
 	INIT_LIST_HEAD(&peer->transmitted);

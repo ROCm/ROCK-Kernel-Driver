@@ -1711,10 +1711,13 @@ static int sctp_setsockopt_peer_addr_params(struct sock *sk,
 	/* update default value for endpoint (all future associations) */
 	if (!params.spp_assoc_id && 
 	    sctp_is_any(( union sctp_addr *)&params.spp_address)) {
-		if (params.spp_hbinterval)
+		/* Manual heartbeat on an endpoint is invalid. */
+		if (0xffffffff == params.spp_hbinterval)
+			return -EINVAL;
+		else if (params.spp_hbinterval)
 			sctp_sk(sk)->paddrparam.spp_hbinterval =
 						params.spp_hbinterval;
-		if (sctp_max_retrans_path)
+		if (params.spp_pathmaxrxt)
 			sctp_sk(sk)->paddrparam.spp_pathmaxrxt =
 						params.spp_pathmaxrxt;
 		return 0;
@@ -1756,7 +1759,8 @@ static int sctp_setsockopt_peer_addr_params(struct sock *sk,
 	/* spp_pathmaxrxt contains the maximum number of retransmissions
 	 * before this address shall be considered unreachable.
 	 */
-	trans->error_threshold = params.spp_pathmaxrxt;
+	if (params.spp_pathmaxrxt)
+		trans->max_retrans = params.spp_pathmaxrxt;
 
 	return 0;
 }
@@ -2935,7 +2939,7 @@ static int sctp_getsockopt_peer_addr_params(struct sock *sk, int len,
 	/* spp_pathmaxrxt contains the maximum number of retransmissions
 	 * before this address shall be considered unreachable.
 	 */
-	params.spp_pathmaxrxt = trans->error_threshold;
+	params.spp_pathmaxrxt = trans->max_retrans;
 
 done:
 	if (copy_to_user(optval, &params, len))

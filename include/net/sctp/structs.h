@@ -856,12 +856,6 @@ struct sctp_transport {
 	/* Error count : The current error count for this destination.	*/
 	unsigned short error_count;
 
-	/* Error       : Current error threshold for this destination
-	 * Threshold   : i.e. what value marks the destination down if
-	 *	       : errorCount reaches this value.
-	 */
-	unsigned short error_threshold;
-
 	/* This is the max_retrans value for the transport and will
 	 * be initialized to proto.max_retrans.path.  This can be changed
 	 * using SCTP_SET_PEER_ADDR_PARAMS socket option.
