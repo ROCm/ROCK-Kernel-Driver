@@ -84,7 +84,7 @@ config GAMEPORT_FM801
 	tristate "ForteMedia FM801 gameport support"
 	depends on GAMEPORT
 
-config GAMEPORT_CS461x
+config GAMEPORT_CS461X
 	tristate "Crystal SoundFusion gameport support"
 	depends on GAMEPORT
 
