@@ -43,11 +43,7 @@
 
 static LIST_HEAD(slot_list);
 
-#if !defined(CONFIG_HOTPLUG_PCI_ACPI_MODULE)
-	#define MY_NAME	"acpiphp"
-#else
-	#define MY_NAME	THIS_MODULE->name
-#endif
+#define MY_NAME	"acpiphp"
 
 static int debug;
 int acpiphp_debug;
@@ -140,9 +136,6 @@ static int enable_slot (struct hotplug_slot *hotplug_slot)
 	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
 	int retval = 0;
 
-	if (slot == NULL)
-		return -ENODEV;
-
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
 	/* enable the specified slot */
@@ -163,9 +156,6 @@ static int disable_slot (struct hotplug_slot *hotplug_slot)
 {
 	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
 	int retval = 0;
-
-	if (slot == NULL)
-		return -ENODEV;
 
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
@@ -218,9 +208,6 @@ static int hardware_test (struct hotplug_slot *hotplug_slot, u32 value)
 	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
 	int retval = 0;
 
-	if (slot == NULL)
-		return -ENODEV;
-
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
 	err("No hardware tests are defined for this driver\n");
@@ -243,9 +230,6 @@ static int get_power_status (struct hotplug_slot *hotplug_slot, u8 *value)
 {
 	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
 	int retval = 0;
-
-	if (slot == NULL)
-		return -ENODEV;
 
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
@@ -288,9 +272,6 @@ static int get_latch_status (struct hotplug_slot *hotplug_slot, u8 *value)
 	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
 	int retval = 0;
 
-	if (slot == NULL)
-		return -ENODEV;
-
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
 	*value = acpiphp_get_latch_status(slot->acpi_slot);
@@ -313,9 +294,6 @@ static int get_adapter_status (struct hotplug_slot *hotplug_slot, u8 *value)
 	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
 	int retval = 0;
 
-	if (slot == NULL)
-		return -ENODEV;
-
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
 	*value = acpiphp_get_adapter_status(slot->acpi_slot);
@@ -335,9 +313,6 @@ static int get_address (struct hotplug_slot *hotplug_slot, u32 *value)
 	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
 	int retval = 0;
 
-	if (slot == NULL)
-		return -ENODEV;
-
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
 	*value = acpiphp_get_address(slot->acpi_slot);
@@ -351,9 +326,6 @@ static int get_max_bus_speed (struct hotplug_slot *hotplug_slot, enum pci_bus_sp
 {
 	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
 
-	if (slot == NULL)
-		return -ENODEV;
-
 	*value = PCI_SPEED_UNKNOWN;
 
 	return 0;
@@ -364,9 +336,6 @@ static int get_max_bus_speed (struct hotplug_slot *hotplug_slot, enum pci_bus_sp
 static int get_cur_bus_speed (struct hotplug_slot *hotplug_slot, enum pci_bus_speed *value)
 {
 	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
-
-	if (slot == NULL)
-		return -ENODEV;
 
 	*value = PCI_SPEED_UNKNOWN;
 
@@ -410,9 +379,6 @@ static void make_slot_name (struct slot *slot)
 static void release_slot(struct hotplug_slot *hotplug_slot)
 {
 	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
-
-	if (slot == NULL)
-		return;
 
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
