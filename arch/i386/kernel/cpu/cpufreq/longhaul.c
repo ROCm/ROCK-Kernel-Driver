@@ -38,6 +38,10 @@
 
 #define PFX "longhaul: "
 
+#define TYPE_LONGHAUL_V1	1
+#define TYPE_LONGHAUL_V2	2
+#define TYPE_POWERSAVER		3
+
 static unsigned int numscales=16, numvscales;
 static unsigned int fsb;
 static int minvid, maxvid;
@@ -92,7 +96,7 @@ static int longhaul_get_cpu_mult(void)
 
 	rdmsr (MSR_IA32_EBL_CR_POWERON, lo, hi);
 	invalue = (lo & (1<<22|1<<23|1<<24|1<<25)) >>22;
-	if (longhaul_version==2 || longhaul_version==3) {
+	if (longhaul_version==TYPE_LONGHAUL_V2 || longhaul_version==TYPE_POWERSAVER) {
 		if (lo & (1<<27))
 			invalue+=16;
 	}
@@ -101,8 +105,20 @@ static int longhaul_get_cpu_mult(void)
 
 
 static void do_powersaver(union msr_longhaul *longhaul,
-			unsigned int clock_ratio_index, int version)
+			unsigned int clock_ratio_index)
 {
+	struct cpuinfo_x86 *c = cpu_data;
+	int version;
+
+	switch (c->x86_model) {
+		case 8:	version = 3;
+				break;
+		case 9:	version = 0xf;
+				break;
+		default:
+				return;
+	}
+
 	rdmsrl(MSR_VIA_LONGHAUL, longhaul->val);
 	longhaul->bits.SoftBusRatio = clock_ratio_index & 0xf;
 	longhaul->bits.SoftBusRatio4 = (clock_ratio_index & 0x10) >> 4;
@@ -160,7 +176,8 @@ static void longhaul_setstate(unsigned int clock_ratio_index)
 	 * *NB* Until we get voltage scaling working v1 & v2 are the same code.
 	 * Longhaul v2 appears in Samuel2 Steppings 1->7 [C5b] and Ezra [C5C]
 	 */
-	case 1:
+	case TYPE_LONGHAUL_V1:
+	case TYPE_LONGHAUL_V2:
 		rdmsrl (MSR_VIA_BCR2, bcr2.val);
 		/* Enable software clock multiplier */
 		bcr2.bits.ESOFTBF = 1;
@@ -180,26 +197,18 @@ static void longhaul_setstate(unsigned int clock_ratio_index)
 		break;
 
 	/*
-	 * Longhaul v3 (aka Powersaver). (Ezra-T [C5M])
+	 * Longhaul v3 (aka Powersaver). (Ezra-T [C5M] & Nehemiah [C5N])
 	 * We can scale voltage with this too, but that's currently
 	 * disabled until we come up with a decent 'match freq to voltage'
 	 * algorithm.
 	 * When we add voltage scaling, we will also need to do the
 	 * voltage/freq setting in order depending on the direction
 	 * of scaling (like we do in powernow-k7.c)
-	 */
-	case 2:
-		do_powersaver(&longhaul, clock_ratio_index, 3);
-		break;
-
-	/*
-	 * Powersaver. (Nehemiah [C5N])
-	 * As for Ezra-T, we don't do voltage yet.
-	 * This can do FSB scaling too, but it has never been proven
+	 * Nehemiah can do FSB scaling too, but this has never been proven
 	 * to work in practice.
 	 */
-	case 3:
-		do_powersaver(&longhaul, clock_ratio_index, 0xf);
+	case TYPE_POWERSAVER:
+		do_powersaver(&longhaul, clock_ratio_index);
 		break;
 	}
 
@@ -261,7 +270,8 @@ static int __init longhaul_get_ranges(void)
 	unsigned int eblcr_fsb_table_v2[] = { 133, 100, -1, 66 };
 
 	switch (longhaul_version) {
-	case 1:
+	case TYPE_LONGHAUL_V1:
+	case TYPE_LONGHAUL_V2:
 		/* Ugh, Longhaul v1 didn't have the min/max MSRs.
 		   Assume min=3.0x & max = whatever we booted at. */
 		minmult = 30;
@@ -274,46 +284,49 @@ static int __init longhaul_get_ranges(void)
 			fsb = guess_fsb();
 		break;
 
-	case 2:
-		rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
+	case TYPE_POWERSAVER:
+		/* Ezra-T */
+		if (c->x86_model == 8) {
+			rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
+			invalue = longhaul.bits.MaxMHzBR;
+			if (longhaul.bits.MaxMHzBR4)
+				invalue += 16;
+			maxmult=multipliers[invalue];
 
-		invalue = longhaul.bits.MaxMHzBR;
-		if (longhaul.bits.MaxMHzBR4)
-			invalue += 16;
-		maxmult=multipliers[invalue];
-
-		invalue = longhaul.bits.MinMHzBR;
-		if (longhaul.bits.MinMHzBR4 == 1)
-			minmult = 30;
-		else
-			minmult = multipliers[invalue];
-
-		fsb = eblcr_fsb_table_v2[longhaul.bits.MaxMHzFSB];
-		break;
-
-	case 3:
-		rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
-
-		/*
-		 * TODO: This code works, but raises a lot of questions.
-		 * - Some Nehemiah's seem to have broken Min/MaxMHzBR's.
-		 *   We get around this by using a hardcoded multiplier of 5.0x
-		 *   for the minimimum speed, and the speed we booted up at for the max.
-		 *   This is done in longhaul_get_cpu_mult() by reading the EBLCR register.
-		 * - According to some VIA documentation EBLCR is only
-		 *   in pre-Nehemiah C3s. How this still works is a mystery.
-		 *   We're possibly using something undocumented and unsupported,
-		 *   But it works, so we don't grumble.
-		 */
-		minmult=50;
-		maxmult=longhaul_get_cpu_mult();
-
-		/* Starting with the 1.2GHz parts, theres a 200MHz bus. */
-		if ((cpu_khz/1000) > 1200)
-			fsb = 200;
-		else
+			invalue = longhaul.bits.MinMHzBR;
+			if (longhaul.bits.MinMHzBR4 == 1)
+				minmult = 30;
+			else
+				minmult = multipliers[invalue];
 			fsb = eblcr_fsb_table_v2[longhaul.bits.MaxMHzFSB];
-		break;
+			break;
+		}
+
+		/* Nehemiah */
+		if (c->x86_model == 9) {
+			rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
+
+			/*
+			 * TODO: This code works, but raises a lot of questions.
+			 * - Some Nehemiah's seem to have broken Min/MaxMHzBR's.
+			 *   We get around this by using a hardcoded multiplier of 4.0x
+			 *   for the minimimum speed, and the speed we booted up at for the max.
+			 *   This is done in longhaul_get_cpu_mult() by reading the EBLCR register.
+			 * - According to some VIA documentation EBLCR is only
+			 *   in pre-Nehemiah C3s. How this still works is a mystery.
+			 *   We're possibly using something undocumented and unsupported,
+			 *   But it works, so we don't grumble.
+			 */
+			minmult=40;
+			maxmult=longhaul_get_cpu_mult();
+
+			/* Starting with the 1.2GHz parts, theres a 200MHz bus. */
+			if ((cpu_khz/1000) > 1200)
+				fsb = 200;
+			else
+				fsb = eblcr_fsb_table_v2[longhaul.bits.MaxMHzFSB];
+			break;
+		}
 	}
 
 	dprintk (KERN_INFO PFX "MinMult=%d.%dx MaxMult=%d.%dx\n",
@@ -458,13 +471,13 @@ static int __init longhaul_cpu_init(struct cpufreq_policy *policy)
 	switch (c->x86_model) {
 	case 6:
 		cpuname = "C3 'Samuel' [C5A]";
-		longhaul_version=1;
+		longhaul_version = TYPE_LONGHAUL_V1;
 		memcpy (clock_ratio, samuel1_clock_ratio, sizeof(samuel1_clock_ratio));
 		memcpy (eblcr_table, samuel1_eblcr, sizeof(samuel1_eblcr));
 		break;
 
-	case 7:		/* C5B / C5C */
-		longhaul_version=1;
+	case 7:
+		longhaul_version = TYPE_LONGHAUL_V1;
 		switch (c->x86_mask) {
 		case 0:
 			cpuname = "C3 'Samuel 2' [C5B]";
@@ -485,14 +498,14 @@ static int __init longhaul_cpu_init(struct cpufreq_policy *policy)
 
 	case 8:
 		cpuname = "C3 'Ezra-T' [C5M]";
-		longhaul_version=2;
+		longhaul_version = TYPE_POWERSAVER;
 		numscales=32;
 		memcpy (clock_ratio, ezrat_clock_ratio, sizeof(ezrat_clock_ratio));
 		memcpy (eblcr_table, ezrat_eblcr, sizeof(ezrat_eblcr));
 		break;
 
 	case 9:
-		longhaul_version=3;
+		longhaul_version = TYPE_POWERSAVER;
 		numscales=32;
 		switch (c->x86_mask) {
 		case 0 ... 1:
@@ -518,14 +531,23 @@ static int __init longhaul_cpu_init(struct cpufreq_policy *policy)
 		break;
 	}
 
-	printk (KERN_INFO PFX "VIA %s CPU detected. Longhaul v%d supported.\n",
-					cpuname, longhaul_version);
+	printk (KERN_INFO PFX "VIA %s CPU detected.", cpuname);
+	switch (longhaul_version) {
+		case TYPE_LONGHAUL_V1:
+		case TYPE_LONGHAUL_V2:
+				printk ("Longhaul v%d supported.\n", longhaul_version);
+				break;
+		case TYPE_POWERSAVER:
+				printk ("Powersaver supported.\n");
+				break;
+	};
 
 	ret = longhaul_get_ranges();
 	if (ret != 0)
 		return ret;
 
-	if ((longhaul_version==2) && (dont_scale_voltage==0))
+	if ((longhaul_version==TYPE_LONGHAUL_V2 || longhaul_version==TYPE_POWERSAVER) &&
+		 (dont_scale_voltage==0))
 		longhaul_setup_voltagescaling();
 
 	policy->governor = CPUFREQ_DEFAULT_GOVERNOR;
