@@ -99,8 +99,10 @@ extern void  isdn_slot_set_priv(int sl, void *);
 extern void *isdn_slot_priv(int sl);
 extern int   isdn_hard_header_len(void);
 
-int  isdn_drv_queue_empty(int di, int ch);
-void isdn_drv_queue_tail(int di, int ch, struct sk_buff *skb, int len);
-int  isdn_drv_maxbufsize(int di);
-int  isdn_drv_writebuf_skb(int di, int ch, int x, struct sk_buff *skb);
-int  isdn_drv_hdrlen(int di);
+int   isdn_drv_queue_empty(int di, int ch);
+void  isdn_drv_queue_tail(int di, int ch, struct sk_buff *skb, int len);
+int   isdn_drv_maxbufsize(int di);
+int   isdn_drv_writebuf_skb(int di, int ch, int x, struct sk_buff *skb);
+int   isdn_drv_hdrlen(int di);
+int   isdn_drv_lookup(char *drvid);
+char *isdn_drv_drvid(int di);

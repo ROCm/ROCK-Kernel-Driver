@@ -426,7 +426,6 @@ typedef struct isdn_devt {
 	infostruct        *infochain;                /* List of open info-devs.    */
 	wait_queue_head_t info_waitq;               /* Wait-Queue for isdninfo    */
 	struct timer_list timer;		       /* Misc.-function Timer       */
-	char              drvid[ISDN_MAX_DRIVERS][20];/* Driver-ID                 */
 	struct task_struct *profd;                   /* For iprofd                 */
 	modem             mdm;		       /* tty-driver-data            */
 	struct semaphore  sem;                       /* serialize list access*/

@@ -109,6 +109,42 @@ isdn_drv_hdrlen(int di)
 	return drivers[di]->interface->hl_hdrlen;
 }
 
+int
+__isdn_drv_lookup(char *drvid)
+{
+	int drvidx;
+
+	for (drvidx = 0; drvidx < ISDN_MAX_DRIVERS; drvidx++) {
+		if (!drivers[drvidx])
+			continue;
+
+		if (strcmp(drivers[drvidx]->interface->id, drvid) == 0)
+			return drvidx;
+	}
+	return -1;
+}
+
+int
+isdn_drv_lookup(char *drvid)
+{
+	unsigned long flags;
+	int drvidx;
+
+	spin_lock_irqsave(&drivers_lock, flags);
+	drvidx = __isdn_drv_lookup(drvid);
+	spin_unlock_irqrestore(&drivers_lock, flags);
+	return drvidx;
+}
+
+char *isdn_drv_drvid(int di)
+{
+	if (!drivers[di]) {
+		isdn_BUG();
+		return "";
+	}
+	return drivers[di]->interface->id;
+}
+
 static int  isdn_add_channels(struct isdn_driver *, int, int, int);
 static void isdn_receive_skb_callback(int di, int ch, struct sk_buff *skb);
 static int  isdn_status_callback(isdn_ctrl * c);
@@ -169,11 +205,8 @@ register_isdn(isdn_if *iif)
 	if (!strlen(iif->id))
 		sprintf(iif->id, "line%d", drvidx);
 
-	strcpy(dev->drvid[drvidx], iif->id);
-
-	for (drvidx = 0; drvidx < ISDN_MAX_DRIVERS; drvidx++)
-		if (strcmp(iif->id, dev->drvid[drvidx]) == 0)
-			goto fail_unlock;
+	if (__isdn_drv_lookup(iif->id) >= 0)
+		goto fail_unlock;
 
 	if (isdn_add_channels(drv, drvidx, iif->channels, 0))
 		goto fail_unlock;
@@ -693,7 +726,7 @@ isdn_status_callback(isdn_ctrl * c)
 		case ISDN_STAT_CAUSE:
 			dbg_statcallb("CAUSE: %d %s\n", i, c->parm.num);
 			printk(KERN_INFO "isdn: %s,ch%ld cause: %s\n",
-			       dev->drvid[di], c->arg, c->parm.num);
+			       isdn_drv_drvid(di), c->arg, c->parm.num);
 			isdn_tty_stat_callback(i, c);
                         if (divert_if)
 				divert_if->stat_callback(c); 
@@ -819,7 +852,6 @@ isdn_status_callback(isdn_ctrl * c)
 			kfree(drivers[di]->rpqueue);
 			kfree(drivers[di]);
 			drivers[di] = NULL;
-			dev->drvid[di][0] = '\0';
 			isdn_info_update();
 			set_global_features();
 			restore_flags(flags);
@@ -987,7 +1019,7 @@ isdn_statstr(void)
 	sprintf(istatbuf, "idmap:\t");
 	p = istatbuf + strlen(istatbuf);
 	for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
-		sprintf(p, "%s ", (slot[i].di < 0) ? "-" : dev->drvid[slot[i].di]);
+		sprintf(p, "%s ", (slot[i].di < 0) ? "-" : isdn_drv_drvid(slot[i].di));
 		p = istatbuf + strlen(istatbuf);
 	}
 	sprintf(p, "\nchmap:\t");
@@ -1395,7 +1427,6 @@ isdn_ctrl_ioctl(struct inode *inode, struct file *file, uint cmd, ulong arg)
 	case IIOCSETBRJ:
 		drvidx = -1;
 		if (arg) {
-			int i;
 			char *p;
 			if (copy_from_user((char *) &iocts, (char *) arg,
 					   sizeof(isdn_ioctl_struct)))
@@ -1403,12 +1434,7 @@ isdn_ctrl_ioctl(struct inode *inode, struct file *file, uint cmd, ulong arg)
 			if (strlen(iocts.drvid)) {
 				if ((p = strchr(iocts.drvid, ',')))
 					*p = 0;
-				drvidx = -1;
-				for (i = 0; i < ISDN_MAX_DRIVERS; i++)
-					if (!(strcmp(dev->drvid[i], iocts.drvid))) {
-						drvidx = i;
-						break;
-					}
+				drvidx = isdn_drv_lookup(iocts.drvid);
 			}
 		}
 		if (drvidx == -1)
@@ -1485,15 +1511,7 @@ isdn_ctrl_ioctl(struct inode *inode, struct file *file, uint cmd, ulong arg)
 					   (char *) arg,
 					   sizeof(isdn_ioctl_struct)))
 				return -EFAULT;
-			if (strlen(iocts.drvid)) {
-				drvidx = -1;
-				for (i = 0; i < ISDN_MAX_DRIVERS; i++)
-					if (!(strcmp(dev->drvid[i], iocts.drvid))) {
-						drvidx = i;
-						break;
-					}
-			} else
-				drvidx = 0;
+			drvidx = isdn_drv_lookup(iocts.drvid);
 			if (drvidx == -1)
 				return -ENODEV;
 			if (cmd == IIOCSETMAP) {
@@ -1555,21 +1573,9 @@ isdn_ctrl_ioctl(struct inode *inode, struct file *file, uint cmd, ulong arg)
 		else
 			return -EINVAL;
 		if (arg) {
-			int i;
-			char *p;
 			if (copy_from_user((char *) &iocts, (char *) arg, sizeof(isdn_ioctl_struct)))
 				return -EFAULT;
-			if (strlen(iocts.drvid)) {
-				if ((p = strchr(iocts.drvid, ',')))
-					*p = 0;
-				drvidx = -1;
-				for (i = 0; i < ISDN_MAX_DRIVERS; i++)
-					if (!(strcmp(dev->drvid[i], iocts.drvid))) {
-						drvidx = i;
-						break;
-					}
-			} else
-				drvidx = 0;
+			drvidx = isdn_drv_lookup(iocts.drvid);
 			if (drvidx == -1)
 				return -ENODEV;
 			if ((ret = verify_area(VERIFY_WRITE, (void *) arg,
