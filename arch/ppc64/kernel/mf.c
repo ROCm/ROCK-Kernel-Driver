@@ -48,13 +48,8 @@
  * This is the structure layout for the Machine Facilites LPAR event
  * flows.
  */
-union safe_cast {
-	u64 ptr_as_u64;
-	void *ptr;
-};
-
 struct VspCmdData {
-	union safe_cast token;
+	u64 token;
 	u16 cmd;
 	HvLpIndex lp_index;
 	u8 result_code;
@@ -215,12 +210,8 @@ static int signal_event(struct pending_event *ev)
 
 			if (ev1 == ev)
 				rc = -EIO;
-			else if (ev1->hdlr != NULL) {
-				union safe_cast mySafeCast;
-
-				mySafeCast.ptr_as_u64 = ev1->event.hp_lp_event.xCorrelationToken;
-				(*ev1->hdlr)(mySafeCast.ptr, -EIO);
-			}
+			else if (ev1->hdlr != NULL)
+				(*ev1->hdlr)((void *)ev1->event.hp_lp_event.xCorrelationToken, -EIO);
 
 			spin_lock_irqsave(&pending_event_spinlock, flags);
 			free_pending_event(ev1);
@@ -287,7 +278,7 @@ static int signal_vsp_instruction(struct VspCmdData *vspCmd)
 	ev->event.hp_lp_event.xSubtype = 6;
 	ev->event.hp_lp_event.x.xSubtypeData =
 		subtype_data('M', 'F',  'V',  'I');
-	ev->event.data.vsp_cmd.token.ptr = &response;
+	ev->event.data.vsp_cmd.token = (u64)&response;
 	ev->event.data.vsp_cmd.cmd = vspCmd->cmd;
 	ev->event.data.vsp_cmd.lp_index = HvLpConfig_getLpIndex();
 	ev->event.data.vsp_cmd.result_code = 0xFF;
@@ -319,6 +310,18 @@ static int signal_ce_msg(char *ce_msg, struct CeMsgCompleteData *completion)
 	memcpy(ev->event.data.ce_msg.ce_msg, ce_msg, 12);
 	ev->event.data.ce_msg.completion = completion;
 	return signal_event(ev);
+}
+
+/*
+ * Send a 12-byte CE message (with no data) to the primary partition VSP object
+ */
+static int signal_ce_msg_simple(u8 ce_op, struct CeMsgCompleteData *completion)
+{
+	u8 ce_msg[12];
+
+	memset(ce_msg, 0, sizeof(ce_msg));
+	ce_msg[3] = ce_op;
+	return signal_ce_msg(ce_msg, completion);
 }
 
 /*
@@ -385,7 +388,7 @@ static void intReceived(struct IoMFLpEvent *event)
 			if ((event->data.ce_msg.ce_msg[5] & 0x20) != 0) {
 				printk(KERN_INFO "mf.c: Commencing partition shutdown\n");
 				if (shutdown() == 0)
-					signal_ce_msg("\x00\x00\x00\xDB\x00\x00\x00\x00\x00\x00\x00\x00", NULL);
+					signal_ce_msg_simple(0xDB, NULL);
 			}
 			break;
 		case 0xC0:	/* get time */
@@ -464,16 +467,13 @@ static void ackReceived(struct IoMFLpEvent *event)
 		case 4:	/* allocate */
 		case 5:	/* deallocate */
 			if (pending_event_head->hdlr != NULL) {
-				union safe_cast mySafeCast;
-
-				mySafeCast.ptr_as_u64 = event->hp_lp_event.xCorrelationToken;
-				(*pending_event_head->hdlr)(mySafeCast.ptr, event->data.alloc.count);
+				(*pending_event_head->hdlr)((void *)event->hp_lp_event.xCorrelationToken, event->data.alloc.count);
 			}
 			freeIt = 1;
 			break;
 		case 6:
 			{
-				struct VspRspData *rsp = (struct VspRspData *)event->data.vsp_cmd.token.ptr;
+				struct VspRspData *rsp = (struct VspRspData *)event->data.vsp_cmd.token;
 
 				if (rsp != NULL) {
 					if (rsp->response != NULL)
@@ -543,11 +543,8 @@ void mf_allocate_lp_events(HvLpIndex targetLp, HvLpEvent_Type type,
 	if (ev == NULL) {
 		rc = -ENOMEM;
 	} else {
-		union safe_cast mine;
-
-		mine.ptr = userToken;
 		ev->event.hp_lp_event.xSubtype = 4;
-		ev->event.hp_lp_event.xCorrelationToken = mine.ptr_as_u64;
+		ev->event.hp_lp_event.xCorrelationToken = (u64)userToken;
 		ev->event.hp_lp_event.x.xSubtypeData =
 			subtype_data('M', 'F', 'M', 'A');
 		ev->event.data.alloc.target_lp = targetLp;
@@ -575,11 +572,8 @@ void mf_deallocate_lp_events(HvLpIndex targetLp, HvLpEvent_Type type,
 	if (ev == NULL)
 		rc = -ENOMEM;
 	else {
-		union safe_cast mine;
-
-		mine.ptr = userToken;
 		ev->event.hp_lp_event.xSubtype = 5;
-		ev->event.hp_lp_event.xCorrelationToken = mine.ptr_as_u64;
+		ev->event.hp_lp_event.xCorrelationToken = (u64)userToken;
 		ev->event.hp_lp_event.x.xSubtypeData =
 			subtype_data('M', 'F', 'M', 'D');
 		ev->event.data.alloc.target_lp = targetLp;
@@ -600,8 +594,9 @@ EXPORT_SYMBOL(mf_deallocate_lp_events);
 void mf_power_off(void)
 {
 	printk(KERN_INFO "mf.c: Down it goes...\n");
-	signal_ce_msg("\x00\x00\x00\x4D\x00\x00\x00\x00\x00\x00\x00\x00", NULL);
-	for (;;);
+	signal_ce_msg_simple(0x4d, NULL);
+	for (;;)
+		;
 }
 
 /*
@@ -611,8 +606,9 @@ void mf_power_off(void)
 void mf_reboot(void)
 {
 	printk(KERN_INFO "mf.c: Preparing to bounce...\n");
-	signal_ce_msg("\x00\x00\x00\x4E\x00\x00\x00\x00\x00\x00\x00\x00", NULL);
-	for (;;);
+	signal_ce_msg_simple(0x4e, NULL);
+	for (;;)
+		;
 }
 
 /*
@@ -659,7 +655,7 @@ void mf_display_progress(u16 value)
  */
 void mf_clear_src(void)
 {
-	signal_ce_msg("\x00\x00\x00\x4B\x00\x00\x00\x00\x00\x00\x00\x00", NULL);
+	signal_ce_msg_simple(0x4b, NULL);
 }
 
 /*
@@ -678,7 +674,7 @@ void mf_init(void)
 	HvLpEvent_registerHandler(HvLpEvent_Type_MachineFac, &hvHandler);
 
 	/* virtual continue ack */
-	signal_ce_msg("\x00\x00\x00\x57\x00\x00\x00\x00\x00\x00\x00\x00", NULL);
+	signal_ce_msg_simple(0x57, NULL);
 
 	/* initialization complete */
 	printk(KERN_NOTICE "mf.c: iSeries Linux LPAR Machine Facilities initialized\n");
@@ -935,8 +931,7 @@ int mf_get_rtc(struct rtc_time *tm)
 	init_completion(&rtcData.com);
 	ceComplete.handler = &getRtcTimeComplete;
 	ceComplete.token = (void *)&rtcData;
-	rc = signal_ce_msg("\x00\x00\x00\x40\x00\x00\x00\x00\x00\x00\x00\x00",
-			&ceComplete);
+	rc = signal_ce_msg_simple(0x40, &ce_complete);
 	if (rc == 0) {
 		wait_for_completion(&rtcData.com);
 
@@ -953,14 +948,13 @@ int mf_get_rtc(struct rtc_time *tm)
 				mf_set_rtc(tm);
 			}
 			{
-				u32 dataWord1 = *((u32 *)(rtcData.xCeMsg.ce_msg+4));
-				u32 dataWord2 = *((u32 *)(rtcData.xCeMsg.ce_msg+8));
-				u8 year = (dataWord1 >> 16) & 0x000000FF;
-				u8 sec = (dataWord1 >> 8) & 0x000000FF;
-				u8 min = dataWord1 & 0x000000FF;
-				u8 hour = (dataWord2 >> 24) & 0x000000FF;
-				u8 day = (dataWord2 >> 8) & 0x000000FF;
-				u8 mon = dataWord2 & 0x000000FF;
+				u8 *ce_msg = rtcData.xCeMsg.ce_msg;
+				u8 year = ce_msg[5];
+				u8 sec = ce_msg[6];
+				u8 min = ce_msg[7];
+				u8 hour = ce_msg[8];
+				u8 day = ce_msg[10];
+				u8 mon = ce_msg[11];
 
 				BCD_TO_BIN(sec);
 				BCD_TO_BIN(min);
@@ -997,7 +991,7 @@ int mf_get_rtc(struct rtc_time *tm)
 	return rc;
 }
 
-int mf_set_rtc(struct rtc_time * tm)
+int mf_set_rtc(struct rtc_time *tm)
 {
 	char ceTime[12] = "\x00\x00\x00\x41\x00\x00\x00\x00\x00\x00\x00\x00";
 	u8 day, mon, hour, min, sec, y1, y2;
