@@ -197,8 +197,6 @@ static int num_fddi;
 static int autoprobed;
 
 #ifdef MODULE
-int init_module(void);
-void cleanup_module(void);
 static struct net_device *unlink_modules(struct net_device *p);
 static int loading_module = 1;
 #else
