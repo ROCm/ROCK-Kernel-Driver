@@ -294,23 +294,12 @@ int readdir_search_pagecache(nfs_readdir_descriptor_t *desc)
 	return res;
 }
 
-static unsigned int nfs_type2dtype[] = {
-	DT_UNKNOWN,
-	DT_REG,
-	DT_DIR,
-	DT_BLK,
-	DT_CHR,
-	DT_LNK,
-	DT_SOCK,
-	DT_UNKNOWN,
-	DT_FIFO
-};
-
-static inline
-unsigned int nfs_type_to_d_type(enum nfs_ftype type)
+static inline unsigned int dt_type(struct inode *inode)
 {
-	return nfs_type2dtype[type];
+	return (inode->i_mode >> 12) & 15;
 }
+
+static struct dentry *nfs_readdir_lookup(nfs_readdir_descriptor_t *desc);
 
 /*
  * Once we've found the start of the dirent within a page: fill 'er up...
@@ -321,6 +310,7 @@ int nfs_do_filldir(nfs_readdir_descriptor_t *desc, void *dirent,
 {
 	struct file	*file = desc->file;
 	struct nfs_entry *entry = desc->entry;
+	struct dentry	*dentry = NULL;
 	unsigned long	fileid;
 	int		loop_count = 0,
 			res;
@@ -333,9 +323,16 @@ int nfs_do_filldir(nfs_readdir_descriptor_t *desc, void *dirent,
 		 *	 retrieving the current dirent on the server */
 		fileid = nfs_fileid_to_ino_t(entry->ino);
 
+		/* Get a dentry if we have one */
+		if (dentry != NULL)
+			dput(dentry);
+		dentry = nfs_readdir_lookup(desc);
+
 		/* Use readdirplus info */
-		if (desc->plus && (entry->fattr->valid & NFS_ATTR_FATTR))
-			d_type = nfs_type_to_d_type(entry->fattr->type);
+		if (dentry != NULL && dentry->d_inode != NULL) {
+			d_type = dt_type(dentry->d_inode);
+			fileid = dentry->d_inode->i_ino;
+		}
 
 		res = filldir(dirent, entry->name, entry->len, 
 			      entry->prev_cookie, fileid, d_type);
@@ -352,7 +349,8 @@ int nfs_do_filldir(nfs_readdir_descriptor_t *desc, void *dirent,
 		}
 	}
 	dir_page_release(desc);
-
+	if (dentry != NULL)
+		dput(dentry);
 	dfprintk(VFS, "NFS: nfs_do_filldir() filling ended @ cookie %Lu; returning = %d\n", (long long)desc->target, res);
 	return res;
 }
@@ -905,6 +903,49 @@ no_open:
 	return nfs_lookup_revalidate(dentry, nd);
 }
 #endif /* CONFIG_NFSV4 */
+
+static struct dentry *nfs_readdir_lookup(nfs_readdir_descriptor_t *desc)
+{
+	struct dentry *parent = desc->file->f_dentry;
+	struct inode *dir = parent->d_inode;
+	struct nfs_entry *entry = desc->entry;
+	struct dentry *dentry;
+	struct qstr name = {
+		.name = entry->name,
+		.len = entry->len,
+	};
+	struct inode *inode;
+
+	switch (name.len) {
+		case 2:
+			if (name.name[0] == '.' && name.name[1] == '.')
+				return dget_parent(parent);
+			break;
+		case 1:
+			if (name.name[0] == '.')
+				return dget(parent);
+	}
+	name.hash = full_name_hash(name.name, name.len);
+	dentry = d_lookup(parent, &name);
+	if (dentry != NULL)
+		return dentry;
+	if (!desc->plus || !(entry->fattr->valid & NFS_ATTR_FATTR))
+		return NULL;
+	/* Note: caller is already holding the dir->i_sem! */
+	dentry = d_alloc(parent, &name);
+	if (dentry == NULL)
+		return NULL;
+	dentry->d_op = NFS_PROTO(dir)->dentry_ops;
+	inode = nfs_fhget(dentry->d_sb, entry->fh, entry->fattr);
+	if (!inode) {
+		dput(dentry);
+		return NULL;
+	}
+	d_add(dentry, inode);
+	nfs_renew_times(dentry);
+	nfs_set_verifier(dentry, nfs_save_change_attribute(dir));
+	return dentry;
+}
 
 static inline
 int find_dirent_name(nfs_readdir_descriptor_t *desc, struct page *page, struct dentry *dentry)
