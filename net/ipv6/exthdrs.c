@@ -367,7 +367,7 @@ ipv6_invert_rthdr(struct sock *sk, struct ipv6_rt_hdr *hdr)
 	   Inverted result:
 	   [ H_prev -> ... -> H1 ] daddr =sender
 
-	   Note, that IP output engine will rewrire this rthdr
+	   Note, that IP output engine will rewrite this rthdr
 	   by rotating it left by one addr.
 	 */
 

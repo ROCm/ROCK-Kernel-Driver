@@ -199,7 +199,7 @@ int ah_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_buf
 			goto out;
 	}
         {
-		u8 auth_data[ahp->icv_trunc_len];
+		u8 auth_data[MAX_AH_AUTH_LEN];
 		
 		memcpy(auth_data, ah->auth_data, ahp->icv_trunc_len);
 		skb_push(skb, skb->data - skb->nh.raw);
@@ -284,6 +284,8 @@ static int ah_init_state(struct xfrm_state *x, void *args)
 	
 	ahp->icv_full_len = aalg_desc->uinfo.auth.icv_fullbits/8;
 	ahp->icv_trunc_len = aalg_desc->uinfo.auth.icv_truncbits/8;
+	
+	BUG_ON(ahp->icv_trunc_len > MAX_AH_AUTH_LEN);
 	
 	ahp->work_icv = kmalloc(ahp->icv_full_len, GFP_KERNEL);
 	if (!ahp->work_icv)
