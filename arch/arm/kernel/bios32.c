@@ -426,6 +426,9 @@ void __init pcibios_fixup_bus(struct pci_bus *bus)
 		pci_read_config_word(dev, PCI_COMMAND, &cmd);
 		cmd |= features;
 		pci_write_config_word(dev, PCI_COMMAND, cmd);
+
+		pci_write_config_byte(dev, PCI_CACHE_LINE_SIZE,
+				      SMP_CACHE_BYTES >> 2);
 	}
 
 	/*
