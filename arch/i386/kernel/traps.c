@@ -580,7 +580,7 @@ asmlinkage int do_int3(struct pt_regs *regs, long error_code)
 
 #ifdef	CONFIG_KDB
 	if (kdb(KDB_REASON_BREAK, error_code, regs))
-		return;
+		return 0;
 #endif	/* CONFIG_KDB */
 
 	/* This is an interrupt gate, because kprobes wants interrupts
@@ -628,7 +628,7 @@ asmlinkage int do_debug(struct pt_regs * regs, long error_code)
 
 #ifdef	CONFIG_KDB
 	if (kdb(KDB_REASON_DEBUG, error_code, regs))
-		return;
+		return 0;
 #endif	/* CONFIG_KDB */
 
 	/* It's safe to allow irq's after DR6 has been saved */
