@@ -707,7 +707,7 @@ static void radeon_get_EDID(struct radeonfb_info *rinfo);
 static int radeon_dfp_parse_EDID(struct radeonfb_info *rinfo);
 static void radeon_update_default_var(struct radeonfb_info *rinfo);
 
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_OF
 
 static int radeon_read_OF (struct radeonfb_info *rinfo);
 static int radeon_get_EDID_OF(struct radeonfb_info *rinfo);
@@ -728,7 +728,7 @@ static struct backlight_controller radeon_backlight_controller = {
 };
 #endif /* CONFIG_PMAC_BACKLIGHT */
 
-#endif /* CONFIG_ALL_PPC */
+#endif /* CONFIG_PPC_OF */
 
 
 static char *radeon_find_rom(struct radeonfb_info *rinfo)
@@ -830,7 +830,7 @@ static void radeon_get_pllinfo(struct radeonfb_info *rinfo, char *bios_seg)
 		printk("radeonfb: ref_clk=%d, ref_div=%d, xclk=%d from BIOS\n",
 			rinfo->pll.ref_clk, rinfo->pll.ref_div, rinfo->pll.xclk);
 	} else {
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_OF
 		if (radeon_read_OF(rinfo)) {
 			unsigned int tmp, Nx, M, ref_div, xclk;
 
@@ -965,7 +965,7 @@ static void radeon_get_moninfo (struct radeonfb_info *rinfo)
 
 static void radeon_get_EDID(struct radeonfb_info *rinfo)
 {
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_OF
 	if (!radeon_get_EDID_OF(rinfo))
 		RTRACE("radeonfb: could not retrieve EDID from OF\n");
 #else
@@ -974,7 +974,7 @@ static void radeon_get_EDID(struct radeonfb_info *rinfo)
 }
 
 
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_OF
 static int radeon_get_EDID_OF(struct radeonfb_info *rinfo)
 {
         struct device_node *dp;
@@ -996,7 +996,7 @@ static int radeon_get_EDID_OF(struct radeonfb_info *rinfo)
         }
         return 0;
 }
-#endif /* CONFIG_ALL_PPC */
+#endif /* CONFIG_PPC_OF */
 
 
 static int radeon_dfp_parse_EDID(struct radeonfb_info *rinfo)
@@ -1209,7 +1209,7 @@ static int radeon_get_dfpinfo (struct radeonfb_info *rinfo)
 }
 
 
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_OF
 static int radeon_read_OF (struct radeonfb_info *rinfo)
 {
 	struct device_node *dp;
@@ -1957,11 +1957,11 @@ static int radeonfb_set_par (struct fb_info *info)
 	}
 	newmode.vclk_ecp_cntl = rinfo->init_state.vclk_ecp_cntl;
 
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_OF
 	/* Gross hack for iBook with M7 until I find out a proper fix */
 	if (machine_is_compatible("PowerBook4,3") && rinfo->arch == RADEON_M7)
 		newmode.ppll_div_3 = 0x000600ad;
-#endif /* CONFIG_ALL_PPC */	
+#endif /* CONFIG_PPC_OF */	
 
 	RTRACE("post div = 0x%x\n", rinfo->post_div);
 	RTRACE("fb_div = 0x%x\n", rinfo->fb_div);

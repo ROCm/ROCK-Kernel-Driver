@@ -268,7 +268,7 @@ config BLK_DEV_IDEPNP
 config BLK_DEV_IDEPCI
 	bool "PCI IDE chipset support" if PCI
 	depends on BLK_DEV_IDE
-	default BLK_DEV_IDEDMA_PMAC if ALL_PPC && BLK_DEV_IDEDMA_PMAC
+	default BLK_DEV_IDEDMA_PMAC if PPC_PMAC && BLK_DEV_IDEDMA_PMAC
 	help
 	  Say Y here for PCI systems which use IDE drive(s).
 	  This option helps the IDE driver to automatically detect and
@@ -409,7 +409,7 @@ config BLK_DEV_IDEDMA
 	bool
 	depends on BLK_DEV_IDE
 	default BLK_DEV_IDEDMA_ICS if ARCH_ACORN
-	default BLK_DEV_IDEDMA_PMAC if ALL_PPC && BLK_DEV_IDE_PMAC
+	default BLK_DEV_IDEDMA_PMAC if PPC_PMAC && BLK_DEV_IDE_PMAC
 	default BLK_DEV_IDEDMA_PCI if PCI && BLK_DEV_IDEPCI
 
 config IDEDMA_PCI_WIP
@@ -734,7 +734,7 @@ config BLK_DEV_SL82C105
 
 config BLK_DEV_IDE_PMAC
 	bool "Builtin PowerMac IDE support"
-	depends on BLK_DEV_IDE && ALL_PPC
+	depends on BLK_DEV_IDE && PPC_PMAC
 	help
 	  This driver provides support for the built-in IDE controller on
 	  most of the recent Apple Power Macintoshes and PowerBooks.

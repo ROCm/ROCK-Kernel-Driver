@@ -120,7 +120,7 @@ mem_pieces_print(struct mem_pieces *mp)
 	printk("\n");
 }
 
-#if defined(CONFIG_APUS) || defined(CONFIG_ALL_PPC)
+#if defined(CONFIG_APUS) || defined(CONFIG_PPC_OF)
 /*
  * Add some memory to an array of pieces
  */
@@ -135,7 +135,7 @@ mem_pieces_append(struct mem_pieces *mp, unsigned int start, unsigned int size)
 	rp->address = start;
 	rp->size = size;
 }
-#endif /* CONFIG_APUS || CONFIG_ALL_PPC */
+#endif /* CONFIG_APUS || CONFIG_PPC_OF */
 
 void __init
 mem_pieces_sort(struct mem_pieces *mp)

@@ -52,7 +52,7 @@
 
 #include "../console/fbcon.h"
 
-#if defined(CONFIG_ALL_PPC)
+#if defined(CONFIG_PPC_PMAC)
 #include <asm/prom.h>
 #include <asm/pci-bridge.h>
 #include <video/macmodes.h>

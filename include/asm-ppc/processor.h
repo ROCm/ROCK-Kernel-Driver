@@ -559,7 +559,7 @@
 
 /* We only need to define a new _MACH_xxx for machines which are part of
  * a configuration which supports more than one type of different machine.
- * This is currently limited to CONFIG_ALL_PPC and CHRP/PReP/PMac. -- Tom
+ * This is currently limited to CONFIG_PPC_MULTIPLATFORM and CHRP/PReP/PMac. -- Tom
  */
 #define _MACH_prep	0x00000001
 #define _MACH_Pmac	0x00000002	/* pmac or pmac clone (non-chrp) */
@@ -620,7 +620,7 @@ n:
 #define SR15	15
 
 #ifndef __ASSEMBLY__
-#if defined(CONFIG_ALL_PPC)
+#ifdef CONFIG_PPC_MULTIPLATFORM
 extern int _machine;
 
 /* what kind of prep workstation we are */
@@ -635,7 +635,7 @@ extern unsigned char ucBoardRev;
 extern unsigned char ucBoardRevMaj, ucBoardRevMin;
 #else
 #define _machine 0
-#endif /* CONFIG_ALL_PPC */
+#endif /* CONFIG_PPC_MULTIPLATFORM */
 
 struct task_struct;
 void start_thread(struct pt_regs *regs, unsigned long nip, unsigned long sp);

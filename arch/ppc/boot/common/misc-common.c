@@ -20,10 +20,10 @@
 #include "zlib.h"
 #include "nonstdio.h"
 
-/* If we're on a ALL_PPC, assume we have a keyboard controller
- * Also note, if we're not ALL_PPC, we assume you are a serial
+/* If we're on a PReP, assume we have a keyboard controller
+ * Also note, if we're not PReP, we assume you are a serial
  * console - Tom */
-#if defined(CONFIG_ALL_PPC) && defined(CONFIG_VGA_CONSOLE)
+#if defined(CONFIG_PPC_PREP) && defined(CONFIG_VGA_CONSOLE)
 extern void cursor(int x, int y);
 extern void scroll(void);
 extern char *vidmem;
