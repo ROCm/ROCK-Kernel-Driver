@@ -368,7 +368,7 @@ _pagebuf_lookup_pages(
 	size_t			size = bp->pb_count_desired, nbytes;
 	size_t			offset = bp->pb_offset;
 	int			gfp_mask = pb_to_gfp(flags);
-	unsigned long		page_count, i;
+	unsigned short		page_count, i;
 	pgoff_t			first;
 	loff_t			end;
 	int			error;

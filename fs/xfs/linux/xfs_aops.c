@@ -265,7 +265,7 @@ xfs_map_at_offset(
 STATIC struct page *
 xfs_probe_unwritten_page(
 	struct address_space	*mapping,
-	unsigned long		index,
+	pgoff_t			index,
 	xfs_iomap_t		*iomapp,
 	xfs_buf_t		*pb,
 	unsigned long		max_offset,
@@ -316,7 +316,7 @@ out:
 STATIC unsigned int
 xfs_probe_unmapped_page(
 	struct address_space	*mapping,
-	unsigned long		index,
+	pgoff_t			index,
 	unsigned int		pg_offset)
 {
 	struct page		*page;
@@ -356,8 +356,8 @@ xfs_probe_unmapped_cluster(
 	struct buffer_head	*bh,
 	struct buffer_head	*head)
 {
-	unsigned long		tindex, tlast, tloff;
-	unsigned int		len, total = 0;
+	pgoff_t			tindex, tlast, tloff;
+	unsigned int		pg_offset, len, total = 0;
 	struct address_space	*mapping = inode->i_mapping;
 
 	/* First sum forwards in this page */
@@ -382,9 +382,9 @@ xfs_probe_unmapped_cluster(
 			total += len;
 		}
 		if (tindex == tlast &&
-		    (tloff = i_size_read(inode) & (PAGE_CACHE_SIZE - 1))) {
+		    (pg_offset = i_size_read(inode) & (PAGE_CACHE_SIZE - 1))) {
 			total += xfs_probe_unmapped_page(mapping,
-							tindex, tloff);
+							tindex, pg_offset);
 		}
 	}
 	return total;
@@ -398,7 +398,7 @@ xfs_probe_unmapped_cluster(
 STATIC struct page *
 xfs_probe_delalloc_page(
 	struct inode		*inode,
-	unsigned long		index)
+	pgoff_t			index)
 {
 	struct page		*page;
 
@@ -497,8 +497,9 @@ xfs_map_unwritten(
 	 */
 	if (bh == head) {
 		struct address_space	*mapping = inode->i_mapping;
-		unsigned long		tindex, tloff, tlast, bs;
-		unsigned int		bbits = inode->i_blkbits;
+		pgoff_t			tindex, tloff, tlast;
+		unsigned long		bs;
+		unsigned int		pg_offset, bbits = inode->i_blkbits;
 		struct page		*page;
 
 		tlast = i_size_read(inode) >> PAGE_CACHE_SHIFT;
@@ -522,10 +523,10 @@ xfs_map_unwritten(
 		}
 
 		if (tindex == tlast &&
-		    (tloff = (i_size_read(inode) & (PAGE_CACHE_SIZE - 1)))) {
+		    (pg_offset = (i_size_read(inode) & (PAGE_CACHE_SIZE - 1)))) {
 			page = xfs_probe_unwritten_page(mapping,
 							tindex, iomapp, pb,
-							tloff, &bs, bbits);
+							pg_offset, &bs, bbits);
 			if (page) {
 				nblocks += bs;
 				atomic_add(bs, &pb->pb_io_remaining);
@@ -603,7 +604,8 @@ xfs_convert_page(
 {
 	struct buffer_head	*bh_arr[MAX_BUF_PER_PAGE], *bh, *head;
 	xfs_iomap_t		*mp = iomapp, *tmp;
-	unsigned long		end, offset, end_index;
+	unsigned long		end, offset;
+	pgoff_t			end_index;
 	int			i = 0, index = 0;
 	int			bbits = inode->i_blkbits;
 
@@ -671,12 +673,12 @@ xfs_convert_page(
 STATIC void
 xfs_cluster_write(
 	struct inode		*inode,
-	unsigned long		tindex,
+	pgoff_t			tindex,
 	xfs_iomap_t		*iomapp,
 	int			startio,
 	int			all_bh)
 {
-	unsigned long		tlast;
+	pgoff_t			tlast;
 	struct page		*page;
 
 	tlast = (iomapp->iomap_offset + iomapp->iomap_bsize) >> PAGE_CACHE_SHIFT;
@@ -716,9 +718,9 @@ xfs_page_state_convert(
 {
 	struct buffer_head	*bh_arr[MAX_BUF_PER_PAGE], *bh, *head;
 	xfs_iomap_t		*iomp, iomap;
-	unsigned long		p_offset = 0, end_index;
+	pgoff_t			end_index;
+	unsigned long		end_index;
 	loff_t			offset;
-	unsigned long long	end_offset;
 	int			len, err, i, cnt = 0, uptodate = 1;
 	int			flags = startio ? 0 : BMAPI_TRYLOCK;
 	int			page_dirty = 1;
