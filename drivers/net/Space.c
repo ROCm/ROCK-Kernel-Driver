@@ -72,7 +72,7 @@ extern struct net_device *ni5010_probe(int unit);
 extern struct net_device *ni52_probe(int unit);
 extern struct net_device *ni65_probe(int unit);
 extern int sonic_probe(struct net_device *);
-extern int SK_init(struct net_device *);
+extern struct net_device *SK_init(int unit);
 extern int seeq8005_probe(struct net_device *);
 extern int smc_init( struct net_device * );
 extern int atarilance_probe(struct net_device *);
@@ -277,13 +277,13 @@ static struct devprobe isa_probes[] __initdata = {
 #ifdef CONFIG_ELPLUS		/* 3c505 */
 	{elplus_probe, 0},
 #endif
-#ifdef CONFIG_SK_G16
-	{SK_init, 0},
-#endif
 	{NULL, 0},
 };
 
 static struct devprobe2 isa_probes2[] __initdata = {
+#ifdef CONFIG_SK_G16
+	{SK_init, 0},
+#endif
 #ifdef CONFIG_NI5010
 	{ni5010_probe, 0},
 #endif
