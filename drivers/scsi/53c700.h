@@ -121,22 +121,22 @@ NCR_700_get_depth(struct scsi_device *SDp)
 static inline int
 NCR_700_is_flag_set(struct scsi_device *SDp, __u32 flag)
 {
-	return (((unsigned long)SDp->hostdata) & flag) == flag;
+	return (spi_flags(SDp->sdev_target) & flag) == flag;
 }
 static inline int
 NCR_700_is_flag_clear(struct scsi_device *SDp, __u32 flag)
 {
-	return (((unsigned long)SDp->hostdata) & flag) == 0;
+	return (spi_flags(SDp->sdev_target) & flag) == 0;
 }
 static inline void
 NCR_700_set_flag(struct scsi_device *SDp, __u32 flag)
 {
-	SDp->hostdata = (void *)((long)SDp->hostdata | (flag & 0xffff0000));
+	spi_flags(SDp->sdev_target) |= flag;
 }
 static inline void
 NCR_700_clear_flag(struct scsi_device *SDp, __u32 flag)
 {
-	SDp->hostdata = (void *)((long)SDp->hostdata & ~(flag & 0xffff0000));
+	spi_flags(SDp->sdev_target) &= ~flag;
 }
 
 struct NCR_700_command_slot {

@@ -36,6 +36,9 @@
 #include <linux/eisa.h>
 #include <linux/interrupt.h>
 #include <scsi/scsi_host.h>
+#include <scsi/scsi_device.h>
+#include <scsi/scsi_transport.h>
+#include <scsi/scsi_transport_spi.h>
 
 #include "53c700.h"
 

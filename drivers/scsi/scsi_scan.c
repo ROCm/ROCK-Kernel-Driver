@@ -202,11 +202,12 @@ static void print_inquiry(unsigned char *inq_result)
 static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 	       	uint channel, uint id, uint lun, void *hostdata)
 {
-	struct scsi_device *sdev, *device;
+	struct scsi_device *sdev;
 	unsigned long flags;
 	int display_failure_msg = 1, ret;
 
-	sdev = kmalloc(sizeof(*sdev) + shost->transportt->size, GFP_ATOMIC);
+	sdev = kmalloc(sizeof(*sdev) + shost->transportt->device_size,
+		       GFP_ATOMIC);
 	if (!sdev)
 		goto out;
 
@@ -265,67 +266,28 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 		}
 	}
 
-	if (shost->transportt->setup) {
-		if (shost->transportt->setup(sdev))
+	if (shost->transportt->device_setup) {
+		if (shost->transportt->device_setup(sdev))
 			goto out_cleanup_slave;
 	}
 
-	if (get_device(&sdev->host->shost_gendev)) {
+	if (get_device(&sdev->host->shost_gendev) == NULL ||
+	    scsi_sysfs_device_initialize(sdev) != 0)
+		goto out_cleanup_slave;
 
-		device_initialize(&sdev->sdev_gendev);
-		sdev->sdev_gendev.parent = &sdev->host->shost_gendev;
-		sdev->sdev_gendev.bus = &scsi_bus_type;
-		sdev->sdev_gendev.release = scsi_device_dev_release;
-		sprintf(sdev->sdev_gendev.bus_id,"%d:%d:%d:%d",
-			sdev->host->host_no, sdev->channel, sdev->id,
-			sdev->lun);
 
-		class_device_initialize(&sdev->sdev_classdev);
-		sdev->sdev_classdev.dev = &sdev->sdev_gendev;
-		sdev->sdev_classdev.class = &sdev_class;
-		snprintf(sdev->sdev_classdev.class_id, BUS_ID_SIZE,
-			 "%d:%d:%d:%d", sdev->host->host_no,
-			 sdev->channel, sdev->id, sdev->lun);
+	/* NOTE: this target initialisation code depends critically on
+	 * lun scanning being sequential. */
+	if (scsi_sysfs_target_initialize(sdev))
+		goto out_remove_siblings;
 
-		class_device_initialize(&sdev->transport_classdev);
-		sdev->transport_classdev.dev = &sdev->sdev_gendev;
-		sdev->transport_classdev.class = sdev->host->transportt->class;
-		snprintf(sdev->transport_classdev.class_id, BUS_ID_SIZE,
-			 "%d:%d:%d:%d", sdev->host->host_no,
-			 sdev->channel, sdev->id, sdev->lun);
-	} else
-		goto out_cleanup_transport;
-
-	/*
-	 * If there are any same target siblings, add this to the
-	 * sibling list
-	 */
-	spin_lock_irqsave(shost->host_lock, flags);
-	list_for_each_entry(device, &shost->__devices, siblings) {
-		if (device->id == sdev->id &&
-		    device->channel == sdev->channel) {
-			list_add_tail(&sdev->same_target_siblings,
-				      &device->same_target_siblings);
-			sdev->scsi_level = device->scsi_level;
-			break;
-		}
-	}
-
-	/*
-	 * If there wasn't another lun already configured at this
-	 * target, then default this device to SCSI_2 until we
-	 * know better
-	 */
-	if (!sdev->scsi_level)
-		sdev->scsi_level = SCSI_2;
-
-	list_add_tail(&sdev->siblings, &shost->__devices);
-	spin_unlock_irqrestore(shost->host_lock, flags);
 	return sdev;
 
-out_cleanup_transport:
-	if (shost->transportt->cleanup)
-		shost->transportt->cleanup(sdev);
+out_remove_siblings:
+	spin_lock_irqsave(shost->host_lock, flags);
+	list_del(&sdev->siblings);
+	list_del(&sdev->same_target_siblings);
+	spin_unlock_irqrestore(shost->host_lock, flags);
 out_cleanup_slave:
 	if (shost->hostt->slave_destroy)
 		shost->hostt->slave_destroy(sdev);
@@ -510,10 +472,6 @@ static void scsi_probe_lun(struct scsi_request *sreq, char *inq_result,
  **/
 static int scsi_add_lun(struct scsi_device *sdev, char *inq_result, int *bflags)
 {
-	struct scsi_device *sdev_sibling;
-	struct scsi_target *starget;
-	unsigned long flags;
-
 	/*
 	 * XXX do not save the inquiry, since it can change underneath us,
 	 * save just vendor/model/rev.
@@ -630,40 +588,9 @@ static int scsi_add_lun(struct scsi_device *sdev, char *inq_result, int *bflags)
 	if (*bflags & BLIST_NOSTARTONADD)
 		sdev->no_start_on_add = 1;
 
-	/*
-	 * If we need to allow I/O to only one of the luns attached to
-	 * this target id at a time set single_lun, and allocate or modify
-	 * sdev_target.
-	 */
-	if (*bflags & BLIST_SINGLELUN) {
+	if (*bflags & BLIST_SINGLELUN)
 		sdev->single_lun = 1;
-		spin_lock_irqsave(sdev->host->host_lock, flags);
-		starget = NULL;
-		/*
-		 * Search for an existing target for this sdev.
-		 */
-		list_for_each_entry(sdev_sibling, &sdev->same_target_siblings,
-				    same_target_siblings) {
-			if (sdev_sibling->sdev_target != NULL) {
-				starget = sdev_sibling->sdev_target;
-				break;
-			}
-		}
-		if (!starget) {
-			starget = kmalloc(sizeof(*starget), GFP_ATOMIC);
-			if (!starget) {
-				printk(ALLOC_FAILURE_MSG, __FUNCTION__);
-				spin_unlock_irqrestore(sdev->host->host_lock,
-						       flags);
-				return SCSI_SCAN_NO_RESPONSE;
-			}
-			starget->starget_refcnt = 0;
-			starget->starget_sdev_user = NULL;
-		}
-		starget->starget_refcnt++;
-		sdev->sdev_target = starget;
-		spin_unlock_irqrestore(sdev->host->host_lock, flags);
-	}
+
 
 	sdev->use_10_for_rw = 1;
 
@@ -686,7 +613,10 @@ static int scsi_add_lun(struct scsi_device *sdev, char *inq_result, int *bflags)
 	if (*bflags & BLIST_NOT_LOCKABLE)
 		sdev->lockable = 0;
 
-	if(sdev->host->hostt->slave_configure)
+	if (sdev->host->transportt->device_configure)
+		sdev->host->transportt->device_configure(sdev);
+
+	if (sdev->host->hostt->slave_configure)
 		sdev->host->hostt->slave_configure(sdev);
 
 	/*
@@ -803,8 +733,6 @@ static int scsi_probe_and_add_lun(struct Scsi_Host *host,
 	} else {
 		if (sdev->host->hostt->slave_destroy)
 			sdev->host->hostt->slave_destroy(sdev);
-		if (sdev->host->transportt->cleanup)
-			sdev->host->transportt->cleanup(sdev);
 		put_device(&sdev->sdev_gendev);
 	}
  out:
@@ -1363,7 +1291,5 @@ void scsi_free_host_dev(struct scsi_device *sdev)
 
 	if (sdev->host->hostt->slave_destroy)
 		sdev->host->hostt->slave_destroy(sdev);
-	if (sdev->host->transportt->cleanup)
-		sdev->host->transportt->cleanup(sdev);
 	put_device(&sdev->sdev_gendev);
 }

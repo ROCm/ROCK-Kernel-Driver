@@ -99,6 +99,9 @@
 #include <linux/mca.h>
 #include <asm/io.h>
 #include <scsi/scsi_host.h>
+#include <scsi/scsi_device.h>
+#include <scsi/scsi_transport.h>
+#include <scsi/scsi_transport_spi.h>
 
 #include "53c700.h"
 #include "NCR_D700.h"
