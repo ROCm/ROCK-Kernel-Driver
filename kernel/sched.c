@@ -1143,7 +1143,7 @@ out:
 int fastcall wake_up_process(task_t * p)
 {
 	return try_to_wake_up(p, TASK_STOPPED | TASK_TRACED |
-		       		 TASK_INTERRUPTIBLE | TASK_UNINTERRUPTIBLE, 0);
+				 TASK_INTERRUPTIBLE | TASK_UNINTERRUPTIBLE, 0);
 }
 
 EXPORT_SYMBOL(wake_up_process);
@@ -2031,7 +2031,7 @@ static int load_balance(int this_cpu, runqueue_t *this_rq,
 		if (sd->balance_interval < sd->max_interval)
 			sd->balance_interval++;
 	} else {
-                sd->nr_balance_failed = 0;
+		sd->nr_balance_failed = 0;
 
 		/* We were unbalanced, so reset the balancing interval */
 		sd->balance_interval = sd->min_interval;
