@@ -1197,6 +1197,13 @@ send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 	unsigned long flags;
 
 	/*
+	 * Make sure legacy kernel users don't send in bad values
+	 * (normal paths check this in check_kill_permission).
+	 */
+	if (sig < 0 || sig > _NSIG)
+		return -EINVAL;
+
+	/*
 	 * We need the tasklist lock even for the specific
 	 * thread case (when we don't need to follow the group
 	 * lists) in order to avoid races with "p->sighand"
