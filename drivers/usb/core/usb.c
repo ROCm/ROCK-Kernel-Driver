@@ -790,6 +790,7 @@ void usb_disconnect(struct usb_device **pdev)
 			usb_disconnect(child);
 	}
 
+	dbg ("unregistering interfaces on device %d", dev->devnum);
 	if (dev->actconfig) {
 		for (i = 0; i < dev->actconfig->bNumInterfaces; i++) {
 			struct usb_interface *interface = &dev->actconfig->interface[i];
@@ -799,12 +800,13 @@ void usb_disconnect(struct usb_device **pdev)
 		}
 	}
 
+	dbg ("unregistering the device %d", dev->devnum);
 	/* Free the device number and remove the /proc/bus/usb entry */
 	if (dev->devnum > 0) {
 		clear_bit(dev->devnum, dev->bus->devmap.devicemap);
 		usbfs_remove_device(dev);
-		device_unregister(&dev->dev);
 	}
+	device_unregister(&dev->dev);
 
 	/* Decrement the reference count, it'll auto free everything when */
 	/* it hits 0 which could very well be now */
