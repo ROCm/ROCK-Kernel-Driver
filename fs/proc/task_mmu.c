@@ -78,7 +78,6 @@ int task_statm(struct mm_struct *mm, int *shared, int *text,
 
 #ifdef AT_SYSINFO_EHDR
 
-char gate_dso_path[256] = "";
 static struct vm_area_struct gate_vmarea = {
 	/* Do _not_ mark this area as readable, cuz not the entire range may be readable
 	   (e.g., due to execute-only pages or holes) and the tools that read
@@ -118,17 +117,12 @@ static int show_map(struct seq_file *m, void *v)
 			map->vm_pgoff << PAGE_SHIFT,
 			MAJOR(dev), MINOR(dev), ino, &len);
 
-	if (map->vm_file || map == gate_map()) {
+	if (map->vm_file) {
 		len = 25 + sizeof(void*) * 6 - len;
 		if (len < 1)
 			len = 1;
 		seq_printf(m, "%*c", len, ' ');
-#ifdef AT_SYSINFO_EHDR
-		if (map == gate_map())
-			seq_printf (m, "%s", gate_dso_path);
-		else
-#endif
-			seq_path(m, file->f_vfsmnt, file->f_dentry, " \t\n\\");
+		seq_path(m, file->f_vfsmnt, file->f_dentry, " \t\n\\");
 	}
 	seq_putc(m, '\n');
 	return 0;

@@ -127,8 +127,7 @@ enum
 	KERN_PANIC_ON_OOPS=57,  /* int: whether we will panic on an oops */
 	KERN_HPPA_PWRSW=58,	/* int: hppa soft-power enable */
 	KERN_HPPA_UNALIGNED=59,	/* int: hppa unaligned-trap enable */
-	KERN_GATE_DSO=60,	/* string: path to gate DSO file */
-	KERN_KDB=61,		/* int: kdb on/off */
+	KERN_KDB=60,		/* int: kdb on/off */
 };
 
 

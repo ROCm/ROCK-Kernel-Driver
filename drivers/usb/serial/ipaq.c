@@ -222,7 +222,7 @@ static int ipaq_open(struct usb_serial_port *port, struct file *filp)
 	 * discipline instead of queueing.
 	 */
 
-	port->tty->low_latency = 1;
+	port->tty->low_latency = 0;
 	port->tty->raw = 1;
 	port->tty->real_raw = 1;
 

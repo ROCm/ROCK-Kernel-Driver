@@ -1,4 +1,5 @@
 #include <linux/config.h>
+#include <linux/module.h>
 
 #include <asm/system.h>
 
@@ -11,6 +12,7 @@
 #include <asm/page.h>
 
 struct ia64_machine_vector ia64_mv;
+EXPORT_SYMBOL(ia64_mv);
 
 static struct ia64_machine_vector *
 lookup_machvec (const char *name)
@@ -45,9 +47,11 @@ void
 machvec_noop (void)
 {
 }
+EXPORT_SYMBOL(machvec_noop);
 
 void
 machvec_memory_fence (void)
 {
 	mb();
 }
+EXPORT_SYMBOL(machvec_memory_fence);

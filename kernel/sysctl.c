@@ -37,7 +37,6 @@
 #include <linux/hugetlb.h>
 #include <linux/security.h>
 #include <linux/initrd.h>
-#include <asm/elf.h>
 #include <asm/uaccess.h>
 
 #ifdef CONFIG_ROOT_NFS
@@ -70,9 +69,6 @@ extern int min_free_kbytes;
 static int maxolduid = 65535;
 static int minolduid;
 
-#ifdef AT_SYSINFO_EHDR
-extern char gate_dso_path[];
-#endif
 #ifdef CONFIG_KMOD
 extern char modprobe_path[];
 #endif
@@ -397,17 +393,6 @@ static ctl_table kern_table[] = {
 		.ctl_name	= KERN_HOTPLUG,
 		.procname	= "hotplug",
 		.data		= &hotplug_path,
-		.maxlen		= 256,
-		.mode		= 0644,
-		.proc_handler	= &proc_dostring,
-		.strategy	= &sysctl_string,
-	},
-#endif
-#ifdef AT_SYSINFO_EHDR
-	{
-		.ctl_name	= KERN_GATE_DSO,
-		.procname	= "gate_dso",
-		.data		= &gate_dso_path,
 		.maxlen		= 256,
 		.mode		= 0644,
 		.proc_handler	= &proc_dostring,

@@ -16,6 +16,7 @@
 
 #include <linux/config.h>
 
+#include <linux/module.h>
 #include <linux/acpi.h>
 #include <linux/bootmem.h>
 #include <linux/delay.h>
@@ -81,10 +82,13 @@ task_t *task_for_booting_cpu;
 
 /* Bitmask of currently online CPUs */
 cpumask_t cpu_online_map;
+EXPORT_SYMBOL(cpu_online_map);
 cpumask_t phys_cpu_present_map;
+EXPORT_SYMBOL(phys_cpu_present_map);
 
 /* which logical CPU number maps to which CPU (physical APIC ID) */
 volatile int ia64_cpu_to_sapicid[NR_CPUS];
+EXPORT_SYMBOL(ia64_cpu_to_sapicid);
 
 static volatile cpumask_t cpu_callin_map;
 
@@ -467,6 +471,7 @@ smp_build_cpu_map (void)
 
 /* on which node is each logical CPU (one cacheline even for 64 CPUs) */
 volatile u8 cpu_to_node_map[NR_CPUS] __cacheline_aligned;
+EXPORT_SYMBOL(cpu_to_node_map);
 /* which logical CPUs are on which nodes */
 volatile cpumask_t node_to_cpu_mask[MAX_NUMNODES] __cacheline_aligned;
 
