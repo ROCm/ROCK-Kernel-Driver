@@ -682,6 +682,14 @@ static int intel_815_configure(void)
 	u8 temp2;
 	struct aper_size_info_8 *current_size;
 
+	/* attbase - aperture base */
+	/* the Intel 815 chipset spec. says that bits 29-31 in the
+	* ATTBASE register are reserved -> try not to write them */
+	if (agp_bridge->gatt_bus_addr & INTEL_815_ATTBASE_MASK) {
+		printk (KERN_EMERG "gatt bus addr too high");
+		return -EINVAL;
+	}
+
 	current_size = A_SIZE_8(agp_bridge->current_size);
 
 	/* aperture size */
@@ -692,11 +700,6 @@ static int intel_815_configure(void)
 	pci_read_config_dword(agp_bridge->dev, INTEL_APBASE, &temp);
 	agp_bridge->gart_bus_addr = (temp & PCI_BASE_ADDRESS_MEM_MASK);
 
-	/* attbase - aperture base */
-	/* the Intel 815 chipset spec. says that bits 29-31 in the
-	* ATTBASE register are reserved -> try not to write them */
-	if (agp_bridge->gatt_bus_addr & INTEL_815_ATTBASE_MASK)
-		panic("gatt bus addr too high");
 	pci_read_config_dword(agp_bridge->dev, INTEL_ATTBASE, &addr);
 	addr &= INTEL_815_ATTBASE_MASK;
 	addr |= agp_bridge->gatt_bus_addr;
