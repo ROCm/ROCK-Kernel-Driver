@@ -1056,7 +1056,7 @@ SYSCALL(waitpid)
 	.data
 	.align 4
 _GLOBAL(sys_call_table)
-	.long sys_ni_syscall	/* 0  -  old "setup()" system call */
+	.long sys_restart_syscall /* 0 */
 	.long sys_exit
 	.long ppc_fork
 	.long sys_read

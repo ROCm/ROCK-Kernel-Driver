@@ -23,6 +23,7 @@ struct thread_info {
 	unsigned long		flags;		/* low level flags */
 	int			cpu;		/* cpu we're on */
 	int			preempt_count;
+	struct restart_block	restart_block;
 };
 
 #define INIT_THREAD_INFO(tsk)			\
@@ -31,7 +32,10 @@ struct thread_info {
 	.exec_domain =	&default_exec_domain,	\
 	.flags =	0,			\
 	.cpu =		0,			\
-	.preempt_count = 1			\
+	.preempt_count = 1,			\
+	.restart_block = {			\
+		.fn = do_no_restart_syscall,	\
+	},					\
 }
 
 #define init_thread_info	(init_thread_union.thread_info)
@@ -70,8 +74,6 @@ static inline struct thread_info *current_thread_info(void)
 #define TI_FLAGS	8
 #define TI_CPU		12
 #define TI_PREEMPT	16
-#define TI_SOFTIRQ	20
-#define TI_HARDIRQ	24
 
 #define PREEMPT_ACTIVE		0x4000000
 

@@ -393,8 +393,12 @@ handle_signal(unsigned long sig, siginfo_t *info, sigset_t *oldset,
 
 	if (TRAP(regs) == 0x0C00 /* System Call! */
 	    && ((int)regs->result == -ERESTARTNOHAND ||
+		(int)regs->result == -ERESTART_RESTARTBLOCK ||
 		((int)regs->result == -ERESTARTSYS &&
 		 !(ka->sa.sa_flags & SA_RESTART)))) {
+		if ((int)regs->result == -ERESTART_RESTARTBLOCK)
+			current_thread_info()->restart_block.fn
+				= do_no_restart_syscall;
 		regs->result = -EINTR;
 		regs->gpr[3] = EINTR;
 		regs->ccr |= 0x10000000;
@@ -494,13 +498,18 @@ int do_signal(sigset_t *oldset, struct pt_regs *regs)
 		handle_signal(signr, &info, oldset, regs, &newsp, frame);
 	}
 
-	if (TRAP(regs) == 0x0C00 /* System Call! */ &&
-	    ((int)regs->result == -ERESTARTNOHAND ||
-	     (int)regs->result == -ERESTARTSYS ||
-	     (int)regs->result == -ERESTARTNOINTR)) {
-		regs->gpr[3] = regs->orig_gpr3;
-		regs->nip -= 4;		/* Back up & retry system call */
-		regs->result = 0;
+	if (TRAP(regs) == 0x0C00) {	/* System Call! */
+		if ((int)regs->result == -ERESTARTNOHAND ||
+		    (int)regs->result == -ERESTARTSYS ||
+		    (int)regs->result == -ERESTARTNOINTR) {
+			regs->gpr[3] = regs->orig_gpr3;
+			regs->nip -= 4;	/* Back up & retry system call */
+			regs->result = 0;
+		} else if ((int)regs->result == -ERESTART_RESTARTBLOCK) {
+			regs->gpr[0] = __NR_restart_syscall;
+			regs->nip -= 4;
+			regs->result = 0;
+		}
 	}
 
 	if (newsp == frame)
