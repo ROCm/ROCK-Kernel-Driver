@@ -514,7 +514,7 @@ int jfs_extendfs(struct super_block *sb, s64 newLVSize, int newLogSize)
 		mark_buffer_dirty(bh);
 		ll_rw_block(WRITE, 1, &bh2);
 		wait_on_buffer(bh2);
-		brelse(bh);
+		brelse(bh2);
 	}
 
 	/* write primary superblock */
