@@ -418,7 +418,7 @@ static int help(struct sk_buff **pskb,
 	exp->tuple.dst.protonum = IPPROTO_TCP;
 	exp->mask = ((struct ip_conntrack_tuple)
 		{ { 0xFFFFFFFF, { 0 } },
-		  { 0xFFFFFFFF, { .tcp = { 0xFFFF } }, 0xFFFF }});
+		  { 0xFFFFFFFF, { .tcp = { 0xFFFF } }, 0xFF }});
 
 	exp->expectfn = NULL;
 	exp->master = ct;
@@ -473,7 +473,7 @@ static int __init init(void)
 		ftp[i].tuple.src.u.tcp.port = htons(ports[i]);
 		ftp[i].tuple.dst.protonum = IPPROTO_TCP;
 		ftp[i].mask.src.u.tcp.port = 0xFFFF;
-		ftp[i].mask.dst.protonum = 0xFFFF;
+		ftp[i].mask.dst.protonum = 0xFF;
 		ftp[i].max_expected = 1;
 		ftp[i].timeout = 5 * 60; /* 5 minutes */
 		ftp[i].me = THIS_MODULE;

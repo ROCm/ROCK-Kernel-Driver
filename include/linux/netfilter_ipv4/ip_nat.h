@@ -66,6 +66,8 @@ struct ip_nat_info
 	struct ip_nat_seq seq[IP_CT_DIR_MAX];
 };
 
+struct ip_conntrack;
+
 /* Set up the info structure to map into this range. */
 extern unsigned int ip_nat_setup_info(struct ip_conntrack *conntrack,
 				      const struct ip_nat_range *range,

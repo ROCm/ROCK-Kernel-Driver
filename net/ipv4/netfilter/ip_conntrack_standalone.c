@@ -66,7 +66,8 @@ print_tuple(struct seq_file *s, const struct ip_conntrack_tuple *tuple,
 
 #ifdef CONFIG_IP_NF_CT_ACCT
 static unsigned int
-seq_print_counters(struct seq_file *s, struct ip_conntrack_counter *counter)
+seq_print_counters(struct seq_file *s,
+		   const struct ip_conntrack_counter *counter)
 {
 	return seq_printf(s, "packets=%llu bytes=%llu ",
 			  (unsigned long long)counter->packets,
@@ -99,7 +100,7 @@ static void *ct_seq_next(struct seq_file *s, void *v, loff_t *pos)
 static int ct_seq_real_show(const struct ip_conntrack_tuple_hash *hash,
 			    struct seq_file *s)
 {
-	struct ip_conntrack *conntrack = hash->ctrack;
+	const struct ip_conntrack *conntrack = tuplehash_to_ctrack(hash);
 	struct ip_conntrack_protocol *proto;
 
 	MUST_BE_READ_LOCKED(&ip_conntrack_lock);

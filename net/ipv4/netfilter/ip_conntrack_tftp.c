@@ -73,7 +73,7 @@ static int tftp_help(struct sk_buff **pskb,
 		exp->mask.src.ip = 0xffffffff;
 		exp->mask.dst.ip = 0xffffffff;
 		exp->mask.dst.u.udp.port = 0xffff;
-		exp->mask.dst.protonum = 0xffff;
+		exp->mask.dst.protonum = 0xff;
 		exp->expectfn = NULL;
 		exp->master = ct;
 
@@ -128,7 +128,7 @@ static int __init init(void)
 
 		tftp[i].tuple.dst.protonum = IPPROTO_UDP;
 		tftp[i].tuple.src.u.udp.port = htons(ports[i]);
-		tftp[i].mask.dst.protonum = 0xFFFF;
+		tftp[i].mask.dst.protonum = 0xFF;
 		tftp[i].mask.src.u.udp.port = 0xFFFF;
 		tftp[i].max_expected = 1;
 		tftp[i].timeout = 5 * 60; /* 5 minutes */

@@ -192,6 +192,13 @@ struct ip_conntrack
 	struct ip_conntrack_tuple_hash tuplehash[IP_CT_DIR_MAX];
 };
 
+static inline struct ip_conntrack *
+tuplehash_to_ctrack(const struct ip_conntrack_tuple_hash *hash)
+{
+	return container_of(hash, struct ip_conntrack,
+			    tuplehash[hash->tuple.dst.dir]);
+}
+
 /* get master conntrack via master expectation */
 #define master_ct(conntr) (conntr->master)
 

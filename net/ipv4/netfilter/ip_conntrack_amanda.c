@@ -120,7 +120,7 @@ static int help(struct sk_buff **pskb,
 		exp->mask.src.ip = 0xFFFFFFFF;
 		exp->mask.src.u.tcp.port = 0;
 		exp->mask.dst.ip = 0xFFFFFFFF;
-		exp->mask.dst.protonum = 0xFFFF;
+		exp->mask.dst.protonum = 0xFF;
 		exp->mask.dst.u.tcp.port = 0xFFFF;
 
 		if (ip_nat_amanda_hook)
@@ -149,7 +149,7 @@ static struct ip_conntrack_helper amanda_helper = {
 		   .dst = { .protonum = IPPROTO_UDP },
 	},
 	.mask = { .src = { .u = { 0xFFFF } },
-		 .dst = { .protonum = 0xFFFF },
+		 .dst = { .protonum = 0xFF },
 	},
 };
 
