@@ -501,6 +501,7 @@ static int coda_rename(struct inode *old_dir, struct dentry *old_dentry,
         int link_adjust = 0;
         int error;
 
+	lock_kernel();
 	coda_vfs_stat.rename++;
 
         CDEBUG(D_INODE, "old: %s, (%d length), new: %s"
@@ -527,6 +528,7 @@ static int coda_rename(struct inode *old_dir, struct dentry *old_dentry,
 	}
 
 	CDEBUG(D_INODE, "result %d\n", error); 
+	unlock_kernel();
 
 	return error;
 }

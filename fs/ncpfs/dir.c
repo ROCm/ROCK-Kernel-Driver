@@ -1035,6 +1035,7 @@ static int ncp_rename(struct inode *old_dir, struct dentry *old_dentry,
 		new_dentry->d_parent->d_name.name, new_dentry->d_name.name);
 
 	error = -EIO;
+	lock_kernel();
 	if (!ncp_conn_valid(server))
 		goto out;
 
@@ -1078,6 +1079,7 @@ static int ncp_rename(struct inode *old_dir, struct dentry *old_dentry,
 			break;
 	}
 out:
+	unlock_kernel();
 	return error;
 }
 

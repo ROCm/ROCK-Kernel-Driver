@@ -6,7 +6,6 @@
 
 #include <linux/fs.h>
 #include <linux/minix_fs.h>
-#include <linux/smp_lock.h>
 #include <linux/pagemap.h>
 
 static inline void inc_count(struct inode *inode)

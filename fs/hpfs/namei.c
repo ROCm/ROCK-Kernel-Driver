@@ -482,6 +482,7 @@ int hpfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	err = 0;
 	hpfs_adjust_length((char *)old_name, &old_len);
 
+	lock_kernel();
 	hpfs_lock_3inodes(old_dir, new_dir, i);
 	
 	/* Erm? Moving over the empty non-busy directory is perfectly legal */
@@ -562,5 +563,6 @@ int hpfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	hpfs_decide_conv(i, (char *)new_name, new_len);
 	end1:
 	hpfs_unlock_3inodes(old_dir, new_dir, i);
+	unlock_kernel();
 	return err;
 }

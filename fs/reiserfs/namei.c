@@ -1101,13 +1101,17 @@ static int reiserfs_rename (struct inode * old_dir, struct dentry *old_dentry,
     // make sure, that oldname still exists and points to an object we
     // are going to rename
     old_de.de_gen_number_bit_string = 0;
+    lock_kernel();
     retval = reiserfs_find_entry (old_dir, old_dentry->d_name.name, old_dentry->d_name.len,
 				  &old_entry_path, &old_de);
     pathrelse (&old_entry_path);
-    if (retval == IO_ERROR)
+    if (retval == IO_ERROR) {
+	unlock_kernel();
 	return -EIO;
+    }
 
     if (retval != NAME_FOUND || old_de.de_objectid != old_inode->i_ino) {
+	unlock_kernel();
 	return -ENOENT;
     }
 
@@ -1118,6 +1122,7 @@ static int reiserfs_rename (struct inode * old_dir, struct dentry *old_dentry,
 
 	if (new_inode) {
 	    if (!reiserfs_empty_dir(new_inode)) {
+		unlock_kernel();
 		return -ENOTEMPTY;
 	    }
 	}
@@ -1128,12 +1133,16 @@ static int reiserfs_rename (struct inode * old_dir, struct dentry *old_dentry,
 	dot_dot_de.de_gen_number_bit_string = 0;
 	retval = reiserfs_find_entry (old_inode, "..", 2, &dot_dot_entry_path, &dot_dot_de);
 	pathrelse (&dot_dot_entry_path);
-	if (retval != NAME_FOUND)
+	if (retval != NAME_FOUND) {
+	    unlock_kernel();
 	    return -EIO;
+	}
 
 	/* inode number of .. must equal old_dir->i_ino */
-	if (dot_dot_de.de_objectid != old_dir->i_ino)
+	if (dot_dot_de.de_objectid != old_dir->i_ino) {
+	    unlock_kernel();
 	    return -EIO;
+	}
     }
 
     journal_begin(&th, old_dir->i_sb, jbegin_count) ;
@@ -1152,6 +1161,7 @@ static int reiserfs_rename (struct inode * old_dir, struct dentry *old_dentry,
     } else if (retval) {
 	pop_journal_writer(windex) ;
 	journal_end(&th, old_dir->i_sb, jbegin_count) ;
+	unlock_kernel();
 	return retval;
     }
 
@@ -1298,6 +1308,7 @@ static int reiserfs_rename (struct inode * old_dir, struct dentry *old_dentry,
 
     pop_journal_writer(windex) ;
     journal_end(&th, old_dir->i_sb, jbegin_count) ;
+    unlock_kernel();
     return 0;
 }
 

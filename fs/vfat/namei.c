@@ -1199,6 +1199,7 @@ int vfat_rename(struct inode *old_dir,struct dentry *old_dentry,
 	old_bh = new_bh = dotdot_bh = NULL;
 	old_inode = old_dentry->d_inode;
 	new_inode = new_dentry->d_inode;
+	lock_kernel();
 	res = vfat_find(old_dir,&old_dentry->d_name,&old_sinfo,&old_bh,&old_de);
 	PRINTK3(("vfat_rename 2\n"));
 	if (res < 0) goto rename_done;
@@ -1265,6 +1266,7 @@ rename_done:
 	fat_brelse(sb, dotdot_bh);
 	fat_brelse(sb, old_bh);
 	fat_brelse(sb, new_bh);
+	unlock_kernel();
 	return res;
 
 }

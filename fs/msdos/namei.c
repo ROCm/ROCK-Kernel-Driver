@@ -561,6 +561,7 @@ int msdos_rename(struct inode *old_dir,struct dentry *old_dentry,
 	int is_hid,old_hid; /* if new file and old file are hidden */
 	char old_msdos_name[MSDOS_NAME], new_msdos_name[MSDOS_NAME];
 
+	lock_kernel();
 	error = msdos_format_name(old_dentry->d_name.name,
 				  old_dentry->d_name.len,old_msdos_name,
 				  &MSDOS_SB(old_dir->i_sb)->options);
@@ -584,6 +585,7 @@ int msdos_rename(struct inode *old_dir,struct dentry *old_dentry,
 	fat_brelse(sb, old_bh);
 
 rename_done:
+	unlock_kernel();
 	return error;
 }
 

@@ -61,7 +61,7 @@ symlink:	no	yes
 mkdir:		no	yes
 unlink:		no	yes (both)
 rmdir:		no	yes (both)	(see below)
-rename:		yes	yes (all)	(see below)
+rename:		no	yes (all)	(see below)
 readlink:	no	no
 follow_link:	no	no
 truncate:	no	yes		(see below)

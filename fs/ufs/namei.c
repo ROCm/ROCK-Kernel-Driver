@@ -282,6 +282,7 @@ static int ufs_rename (struct inode * old_dir, struct dentry * old_dentry,
 	struct ufs_dir_entry *old_de;
 	int err = -ENOENT;
 
+	lock_kernel();
 	old_de = ufs_find_entry (old_dentry, &old_bh);
 	if (!old_de)
 		goto out;
@@ -334,6 +335,7 @@ static int ufs_rename (struct inode * old_dir, struct dentry * old_dentry,
 		ufs_set_link(old_inode, dir_de, dir_bh, new_dir);
 		ufs_dec_count(old_dir);
 	}
+	unlock_kernel();
 	return 0;
 
 out_dir:
@@ -342,6 +344,7 @@ out_dir:
 out_old:
 	brelse (old_bh);
 out:
+	unlock_kernel();
 	return err;
 }
 

@@ -213,6 +213,7 @@ static int bfs_rename(struct inode * old_dir, struct dentry * old_dentry,
 	if (S_ISDIR(old_inode->i_mode))
 		return -EINVAL;
 
+	lock_kernel();
 	old_bh = bfs_find_entry(old_dir, 
 				old_dentry->d_name.name, 
 				old_dentry->d_name.len, &old_de);
@@ -249,6 +250,7 @@ static int bfs_rename(struct inode * old_dir, struct dentry * old_dentry,
 	error = 0;
 
 end_rename:
+	unlock_kernel();
 	brelse(old_bh);
 	brelse(new_bh);
 	return error;

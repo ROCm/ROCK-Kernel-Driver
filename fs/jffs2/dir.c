@@ -978,9 +978,12 @@ static int jffs2_rename (struct inode *old_dir_i, struct dentry *old_dentry,
 	*/
 
 	/* Make a hard link */
+	lock_kernel();
 	ret = jffs2_do_link(old_dentry, new_dir_i, new_dentry, 1);
-	if (ret)
+	if (ret) {
+		unlock_kernel();
 		return ret;
+	}
 
 	/* Unlink the original */
 	ret = jffs2_do_unlink(old_dir_i, old_dentry, 1);
@@ -1001,6 +1004,7 @@ static int jffs2_rename (struct inode *old_dir_i, struct dentry *old_dentry,
 		}
 		
 	}
+	unlock_kernel();
 	return ret;
 }
 

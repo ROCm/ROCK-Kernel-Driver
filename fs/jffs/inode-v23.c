@@ -422,10 +422,12 @@ jffs_rename(struct inode *old_dir, struct dentry *old_dentry,
 		 old_dir, old_dentry->d_name.name,
 		 new_dir, new_dentry->d_name.name));
 
+	lock_kernel();
 	c = (struct jffs_control *)old_dir->i_sb->u.generic_sbp;
 	ASSERT(if (!c) {
 		printk(KERN_ERR "jffs_rename(): The old_dir inode "
 		       "didn't have a reference to a jffs_file struct\n");
+		unlock_kernel();
 		return -EIO;
 	});
 
@@ -544,6 +546,7 @@ jffs_rename(struct inode *old_dir, struct dentry *old_dentry,
 jffs_rename_end:
 	D3(printk (KERN_NOTICE "rename(): up biglock\n"));
 	up(&c->fmc->biglock);
+	unlock_kernel();
 	return result;
 } /* jffs_rename()  */
 

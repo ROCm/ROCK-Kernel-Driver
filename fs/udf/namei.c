@@ -1167,6 +1167,7 @@ static int udf_rename (struct inode * old_dir, struct dentry * old_dentry,
 	struct buffer_head *dir_bh = NULL;
 	int retval = -ENOENT;
 
+	lock_kernel();
 	if ((ofi = udf_find_entry(old_dir, old_dentry, &ofibh, &ocfi)))
 	{
 		if (ofibh.sbh != ofibh.ebh)
@@ -1296,6 +1297,7 @@ end_rename:
 			udf_release_data(nfibh.ebh);
 		udf_release_data(nfibh.sbh);
 	}
+	unlock_kernel();
 	return retval;
 }
 

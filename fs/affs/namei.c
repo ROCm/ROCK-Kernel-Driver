@@ -462,6 +462,7 @@ affs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	struct buffer_head *bh = NULL;
 	int retval;
 
+	lock_kernel();
 	pr_debug("AFFS: rename(old=%u,\"%*s\" to new=%u,\"%*s\")\n",
 		 (u32)old_dir->i_ino, (int)old_dentry->d_name.len, old_dentry->d_name.name,
 		 (u32)new_dir->i_ino, (int)new_dentry->d_name.len, new_dentry->d_name.name);
@@ -472,8 +473,10 @@ affs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	/* Unlink destination if it already exists */
 	if (new_dentry->d_inode) {
 		retval = affs_remove_header(new_dentry);
-		if (retval)
+		if (retval) {
+			unlock_kernel();
 			return retval;
+		}
 	}
 
 	retval = -EIO;
@@ -499,5 +502,6 @@ affs_rename(struct inode *old_dir, struct dentry *old_dentry,
 done:
 	mark_buffer_dirty_inode(bh, retval ? old_dir : new_dir);
 	affs_brelse(bh);
+	unlock_kernel();
 	return retval;
 }

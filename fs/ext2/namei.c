@@ -31,7 +31,6 @@
 
 #include "ext2.h"
 #include <linux/pagemap.h>
-#include <linux/smp_lock.h>
 
 /*
  * Couple of helper functions - make the code slightly cleaner.

@@ -366,6 +366,7 @@ static int dbl_rename(struct inode *old_dir, struct dentry *old_dentry,
 {
 	int error;
 
+	lock_kernel();
 	if (is_hdr(new_dir, new_dentry->d_name.name,
 		   new_dentry->d_name.len)) {
 		error = -EPERM;
@@ -378,6 +379,7 @@ static int dbl_rename(struct inode *old_dir, struct dentry *old_dentry,
 			error = -EPERM;
 		}
 	}
+	unlock_kernel();
 	return error;
 }
 

@@ -1027,9 +1027,12 @@ static int ext3_rename (struct inode * old_dir, struct dentry *old_dentry,
 
 	old_bh = new_bh = dir_bh = NULL;
 
+	lock_kernel();
 	handle = ext3_journal_start(old_dir, 2 * EXT3_DATA_TRANS_BLOCKS + 2);
-	if (IS_ERR(handle))
+	if (IS_ERR(handle)) {
+		unlock_kernel();
 		return PTR_ERR(handle);
+	}
 
 	if (IS_SYNC(old_dir) || IS_SYNC(new_dir))
 		handle->h_sync = 1;
@@ -1138,6 +1141,7 @@ end_rename:
 	brelse (old_bh);
 	brelse (new_bh);
 	ext3_journal_stop(handle, old_dir);
+	unlock_kernel();
 	return retval;
 }
 
@@ -1153,5 +1157,5 @@ struct inode_operations ext3_dir_inode_operations = {
 	mkdir:		ext3_mkdir,
 	rmdir:		ext3_rmdir,
 	mknod:		ext3_mknod,
-	rename:		ext3_rename,		/* BKL held */
+	rename:		ext3_rename,
 };

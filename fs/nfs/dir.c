@@ -998,6 +998,7 @@ static int nfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	 * To prevent any new references to the target during the rename,
 	 * we unhash the dentry and free the inode in advance.
 	 */
+	lock_kernel();
 	if (!d_unhashed(new_dentry)) {
 		d_drop(new_dentry);
 		rehash = new_dentry;
@@ -1074,6 +1075,7 @@ out:
 	/* new dentry created? */
 	if (dentry)
 		dput(dentry);
+	unlock_kernel();
 	return error;
 }
 

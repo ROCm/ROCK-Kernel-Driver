@@ -425,9 +425,11 @@ static int nat_hdr_unlink(struct inode *dir, struct dentry *dentry)
 static int nat_hdr_rename(struct inode *old_dir, struct dentry *old_dentry,
 			  struct inode *new_dir, struct dentry *new_dentry)
 {
-	struct hfs_cat_entry *entry = HFS_I(old_dir)->entry;
+	struct hfs_cat_entry *entry;
 	int error = 0;
 
+	lock_kernel();
+	entry = HFS_I(old_dir)->entry;
 	if (!HFS_SB(old_dir->i_sb)->s_afpd) {
 		/* Not in AFPD compatibility mode */
 		error = -EPERM;
@@ -456,5 +458,6 @@ static int nat_hdr_rename(struct inode *old_dir, struct dentry *old_dentry,
 			error = -EPERM;
 		}
 	}
+	unlock_kernel();
 	return error;
 }

@@ -570,6 +570,7 @@ smb_rename(struct inode *old_dir, struct dentry *old_dentry,
 	 * Close any open files, and check whether to delete the
 	 * target before attempting the rename.
 	 */
+	lock_kernel();
 	if (old_dentry->d_inode)
 		smb_close(old_dentry->d_inode);
 	if (new_dentry->d_inode) {
@@ -592,5 +593,6 @@ smb_rename(struct inode *old_dir, struct dentry *old_dentry,
 		smb_renew_times(new_dentry);
 	}
 out:
+	unlock_kernel();
 	return error;
 }

@@ -1743,8 +1743,11 @@ int vfs_rename_dir(struct inode *old_dir, struct dentry *old_dentry,
 			d_rehash(new_dentry);
 		dput(new_dentry);
 	}
-	if (!error)
+	if (!error) {
+		lock_kernel();
 		d_move(old_dentry,new_dentry);
+		unlock_kernel();
+	}
 	return error;
 }
 
@@ -1765,7 +1768,9 @@ int vfs_rename_other(struct inode *old_dir, struct dentry *old_dentry,
 	if (!error) {
 		/* The following d_move() should become unconditional */
 		if (!(old_dir->i_sb->s_type->fs_flags & FS_ODD_RENAME)) {
+			lock_kernel();
 			d_move(old_dentry, new_dentry);
+			unlock_kernel();
 		}
 	}
 	if (target)
@@ -1880,11 +1885,8 @@ static inline int do_rename(const char * oldname, const char * newname)
 	if (new_dentry == trap)
 		goto exit5;
 
-	lock_kernel();
 	error = vfs_rename(old_dir->d_inode, old_dentry,
 				   new_dir->d_inode, new_dentry);
-	unlock_kernel();
-
 exit5:
 	dput(new_dentry);
 exit4:

@@ -376,20 +376,27 @@ hfs_rmdir_put:
 int hfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	       struct inode *new_dir, struct dentry *new_dentry)
 {
-	struct hfs_cat_entry *old_parent = HFS_I(old_dir)->entry;
-	struct hfs_cat_entry *new_parent = HFS_I(new_dir)->entry;
+	struct hfs_cat_entry *old_parent;
+	struct hfs_cat_entry *new_parent;
 	struct hfs_cat_entry *victim = NULL;
 	struct hfs_cat_entry *deleted;
 	struct hfs_cat_key key;
 	int error;
 
+	lock_kernel();
+	old_parent = HFS_I(old_dir)->entry;
+	new_parent = HFS_I(new_dir)->entry;
 	if (build_key(&key, old_dir, old_dentry->d_name.name,
 		      old_dentry->d_name.len) ||
-	    (HFS_ITYPE(old_dir->i_ino) != HFS_ITYPE(new_dir->i_ino))) 
+	    (HFS_ITYPE(old_dir->i_ino) != HFS_ITYPE(new_dir->i_ino))) {
+		unlock_kernel();
 		return -EPERM;
+	}
 
-	if (!(victim = hfs_cat_get(old_parent->mdb, &key))) 
+	if (!(victim = hfs_cat_get(old_parent->mdb, &key))) {
+		unlock_kernel();
 		return -ENOENT;
+	}
 
 	error = -EPERM;
 	if (build_key(&key, new_dir, new_dentry->d_name.name,
@@ -418,5 +425,6 @@ int hfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 
 hfs_rename_put:
 	hfs_cat_put(victim);	/* Note that hfs_cat_put(NULL) is safe. */
+	unlock_kernel();
 	return error;
 }
