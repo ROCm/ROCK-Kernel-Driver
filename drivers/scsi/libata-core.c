@@ -2059,6 +2059,43 @@ static void ata_pio_complete (struct ata_port *ap)
 	ata_qc_complete(qc, drv_stat);
 }
 
+static void ata_mmio_data_xfer(struct ata_port *ap, unsigned char *buf,
+			       unsigned int buflen, int write_data)
+{
+	unsigned int i;
+	unsigned int words = buflen >> 1;
+	u16 *buf16 = (u16 *) buf;
+	void *mmio = (void *)ap->ioaddr.data_addr;
+
+	if (write_data) {
+		for (i = 0; i < words; i++)
+			writew(buf16[i], mmio);
+	} else {
+		for (i = 0; i < words; i++)
+			buf16[i] = readw(mmio);
+	}
+}
+
+static void ata_pio_data_xfer(struct ata_port *ap, unsigned char *buf,
+			      unsigned int buflen, int write_data)
+{
+	unsigned int dwords = buflen >> 2;
+
+	if (write_data)
+		outsl(ap->ioaddr.data_addr, buf, dwords);
+	else
+		insl(ap->ioaddr.data_addr, buf, dwords);
+}
+
+static void ata_data_xfer(struct ata_port *ap, unsigned char *buf,
+			  unsigned int buflen, int do_write)
+{
+	if (ap->flags & ATA_FLAG_MMIO)
+		ata_mmio_data_xfer(ap, buf, buflen, do_write);
+	else
+		ata_pio_data_xfer(ap, buf, buflen, do_write);
+}
+
 /**
  *	ata_pio_sector -
  *	@ap:
@@ -2072,6 +2109,7 @@ static void ata_pio_sector(struct ata_port *ap)
 	struct scatterlist *sg;
 	unsigned char *buf;
 	u8 status;
+	int do_write;
 
 	/*
 	 * This is purely hueristic.  This is a fast path.
@@ -2122,25 +2160,8 @@ static void ata_pio_sector(struct ata_port *ap)
 		status);
 
 	/* do the actual data transfer */
-	if (ap->flags & ATA_FLAG_MMIO) {
-		unsigned int i;
-		unsigned int words = ATA_SECT_SIZE / 2;
-		u16 *buf16 = (u16 *) buf;
-		void *mmio = (void *)ap->ioaddr.data_addr;
-
-		if (qc->tf.flags & ATA_TFLAG_WRITE) {
-			for (i = 0; i < words; i++)
-				writew(buf16[i], mmio);
-		} else {
-			for (i = 0; i < words; i++)
-				buf16[i] = readw(mmio);
-		}
-	} else {
-		if (qc->tf.flags & ATA_TFLAG_WRITE)
-			outsl(ap->ioaddr.data_addr, buf, ATA_SECT_DWORDS);
-		else
-			insl(ap->ioaddr.data_addr, buf, ATA_SECT_DWORDS);
-	}
+	do_write = (qc->tf.flags & ATA_TFLAG_WRITE);
+	ata_data_xfer(ap, buf, ATA_SECT_SIZE, do_write);
 
 	kunmap(sg[qc->cursg].page);
 }
@@ -2778,10 +2799,8 @@ static void atapi_packet_task(void *_data)
 		goto err_out;
 
 	/* send SCSI cdb */
-	/* FIXME: mmio-ize */
 	DPRINTK("send cdb\n");
-	outsl(ap->ioaddr.data_addr,
-	      qc->scsicmd->cmnd, ap->host->max_cmd_len / 4);
+	ata_data_xfer(ap, qc->scsicmd->cmnd, ap->host->max_cmd_len, 1);
 
 	/* if we are DMA'ing, irq handler takes over from here */
 	if (qc->tf.protocol == ATA_PROT_ATAPI_DMA)

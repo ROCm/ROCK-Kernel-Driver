@@ -339,14 +339,10 @@ static int ata_scsi_qc_complete(struct ata_queued_cmd *qc, u8 drv_stat)
 {
 	struct scsi_cmnd *cmd = qc->scsicmd;
 
-	if (unlikely(drv_stat & (ATA_ERR | ATA_BUSY | ATA_DRQ))) {
-		if (is_atapi_taskfile(&qc->tf))
-			cmd->result = SAM_STAT_CHECK_CONDITION;
-		else
-			ata_to_sense_error(qc);
-	} else {
+	if (unlikely(drv_stat & (ATA_ERR | ATA_BUSY | ATA_DRQ)))
+		ata_to_sense_error(qc);
+	else
 		cmd->result = SAM_STAT_GOOD;
-	}
 
 	qc->scsidone(cmd);
 
@@ -964,6 +960,31 @@ void ata_scsi_badcmd(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *), u8
 	done(cmd);
 }
 
+static int atapi_qc_complete(struct ata_queued_cmd *qc, u8 drv_stat)
+{
+	struct scsi_cmnd *cmd = qc->scsicmd;
+
+	if (unlikely(drv_stat & (ATA_ERR | ATA_BUSY | ATA_DRQ)))
+		cmd->result = SAM_STAT_CHECK_CONDITION;
+	else {
+		u8 *scsicmd = cmd->cmnd;
+
+		if (scsicmd[0] == INQUIRY) {
+			u8 *buf = NULL;
+			unsigned int buflen;
+
+			buflen = ata_scsi_rbuf_get(cmd, &buf);
+			buf[2] = 0x5;
+			buf[3] = (buf[3] & 0xf0) | 2;
+			ata_scsi_rbuf_put(cmd);
+		}
+		cmd->result = SAM_STAT_GOOD;
+	}
+
+	qc->scsidone(cmd);
+
+	return 0;
+}
 /**
  *	atapi_xlat - Initialize PACKET taskfile
  *	@qc: command structure to be initialized
@@ -981,6 +1002,8 @@ static unsigned int atapi_xlat(struct ata_queued_cmd *qc, u8 *scsicmd)
 	struct scsi_cmnd *cmd = qc->scsicmd;
 	struct ata_device *dev = qc->dev;
 	int using_pio = (dev->flags & ATA_DFLAG_PIO);
+
+	qc->complete_fn = atapi_qc_complete;
 
 	qc->tf.flags |= ATA_TFLAG_ISADDR | ATA_TFLAG_DEVICE;
 	if (cmd->sc_data_direction == SCSI_DATA_WRITE) {
