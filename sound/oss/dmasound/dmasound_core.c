@@ -904,7 +904,7 @@ static int sq_open(struct inode *inode, struct file *file)
 	  O_RDONLY and dsp1 could be opened O_WRONLY
 	*/
 
-	dmasound.minDev = MINOR(inode->i_rdev) & 0x0f;
+	dmasound.minDev = minor(inode->i_rdev) & 0x0f;
 
 	/* OK. - we should make some attempt at consistency. At least the H'ware
 	   options should be set with a valid mode.  We will make it that the LL
