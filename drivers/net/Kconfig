@@ -215,6 +215,7 @@ source "drivers/net/arm/Kconfig"
 config MACE
 	tristate "MACE (Power Mac ethernet) support"
 	depends on NET_ETHERNET && PPC_PMAC
+	select CRC32
 	help
 	  Power Macintoshes and clones with Ethernet built-in on the
 	  motherboard will usually use a MACE (Medium Access Control for
@@ -237,6 +238,7 @@ config MACE_AAUI_PORT
 config BMAC
 	tristate "BMAC (G3 ethernet) support"
 	depends on NET_ETHERNET && PPC_PMAC
+	select CRC32
 	help
 	  Say Y for support of BMAC Ethernet interfaces. These are used on G3
 	  computers.
@@ -247,6 +249,7 @@ config BMAC
 config OAKNET
 	tristate "National DP83902AV (Oak ethernet) support"
 	depends on NET_ETHERNET && PPC
+	select CRC32
 	help
 	  Say Y if your machine has this type of Ethernet network card.
 
@@ -266,6 +269,7 @@ config ARIADNE
 config A2065
 	tristate "A2065 support"
 	depends on NET_ETHERNET && ZORRO
+	select CRC32
 	help
 	  If you have a Commodore A2065 Ethernet adapter, say Y. Otherwise,
 	  say N.
@@ -276,6 +280,7 @@ config A2065
 config HYDRA
 	tristate "Hydra support"
 	depends on NET_ETHERNET && ZORRO
+	select CRC32
 	help
 	  If you have a Hydra Ethernet adapter, say Y. Otherwise, say N.
 
@@ -285,6 +290,7 @@ config HYDRA
 config ZORRO8390
 	tristate "Zorro NS8390-based Ethernet support"
 	depends on NET_ETHERNET && ZORRO
+	select CRC32
 	help
 	  This driver is for Zorro Ethernet cards using an NS8390-compatible
 	  chipset, like the Village Tronic Ariadne II and the Individual
@@ -297,6 +303,7 @@ config ZORRO8390
 config APNE
 	tristate "PCMCIA NE2000 support"
 	depends on NETDEVICES && AMIGA_PCMCIA
+	select CRC32
 	help
 	  If you have a PCMCIA NE2000 compatible adapter, say Y.  Otherwise,
 	  say N.
@@ -316,6 +323,7 @@ config APOLLO_ELPLUS
 config MAC8390
 	bool "Macintosh NS 8390 based ethernet cards"
 	depends on NETDEVICES && MAC
+	select CRC32
 	help
 	  If you want to include a driver to support Nubus or LC-PDS
 	  Ethernet cards using an NS8390 chipset or its equivalent, say Y
@@ -352,6 +360,7 @@ config MACSONIC
 config MACMACE
 	bool "Macintosh (AV) onboard MACE ethernet (EXPERIMENTAL)"
 	depends on NETDEVICES && MAC && EXPERIMENTAL
+	select CRC32
 	help
 	  Support for the onboard AMD 79C940 MACE Ethernet controller used in
 	  the 660AV and 840AV Macintosh.  If you have one of these Macintoshes
@@ -361,6 +370,7 @@ config MACMACE
 config MVME147_NET
 	tristate "MVME147 (Lance) Ethernet support"
 	depends on NETDEVICES && MVME147
+	select CRC32
 	help
 	  Support for the on-board Ethernet interface on the Motorola MVME147
 	  single-board computer.  Say Y here to include the
@@ -434,6 +444,7 @@ config SUN3_82586
 config HPLANCE
 	bool "HP on-board LANCE support"
 	depends on NETDEVICES && HP300
+	select CRC32
 	help
 	  If you want to use the builtin "LANCE" Ethernet controller on an
 	  HP300 machine, say Y here.
@@ -461,6 +472,7 @@ config MIPS_GT96100ETH
 config MIPS_AU1X00_ENET
 	bool "MIPS AU1000 Ethernet support"
 	depends on NET_ETHERNET && SOC_AU1X00
+	select CRC32
 	help
 	  If you have an Alchemy Semi AU1X00 based system
 	  say Y.  Otherwise, say N.
@@ -472,6 +484,7 @@ config NET_SB1250_MAC
 config SGI_IOC3_ETH
 	bool "SGI IOC3 Ethernet"
 	depends on NET_ETHERNET && SGI_IP27
+	select CRC32
 	help
 	  If you have a network (Ethernet) card of this type, say Y and read
 	  the Ethernet-HOWTO, available from
@@ -484,6 +497,7 @@ config SGI_O2MACE_ETH
 config STNIC
 	tristate "National DP83902AV  support"
 	depends on NET_ETHERNET && SUPERH
+	select CRC32
 	help
 	  Support for cards based on the National Semiconductor DP83902AV
 	  ST-NIC Serial Network Interface Controller for Twisted Pair.  This
@@ -495,6 +509,7 @@ config STNIC
 config SUNLANCE
 	tristate "Sun LANCE support"
 	depends on NET_ETHERNET && SBUS
+	select CRC32
 	help
 	  This driver supports the "le" interface present on all 32-bit Sparc
 	  systems, on some older Ultra systems and as an Sbus option.  These
@@ -507,6 +522,7 @@ config SUNLANCE
 config HAPPYMEAL
 	tristate "Sun Happy Meal 10/100baseT support"
 	depends on NET_ETHERNET && (SBUS || PCI)
+	select CRC32
 	help
 	  This driver supports the "hme" interface present on most Ultra
 	  systems and as an option on older Sbus systems. This driver supports
@@ -519,6 +535,7 @@ config HAPPYMEAL
 config SUNBMAC
 	tristate "Sun BigMAC 10/100baseT support (EXPERIMENTAL)"
 	depends on NET_ETHERNET && SBUS && EXPERIMENTAL
+	select CRC32
 	help
 	  This driver supports the "be" interface available as an Sbus option.
 	  This is Sun's older 100baseT Ethernet device.
@@ -529,6 +546,7 @@ config SUNBMAC
 config SUNQE
 	tristate "Sun QuadEthernet support"
 	depends on NET_ETHERNET && SBUS
+	select CRC32
 	help
 	  This driver supports the "qe" 10baseT Ethernet device, available as
 	  an Sbus option. Note that this is not the same as Quad FastEthernet
@@ -540,6 +558,7 @@ config SUNQE
 config SUNGEM
 	tristate "Sun GEM support"
 	depends on NET_ETHERNET && PCI
+	select CRC32
 	help
 	  Support for the Sun GEM chip, aka Sun GigabitEthernet/P 2.0.  See also
 	  <http://www.sun.com/products-n-solutions/hardware/docs/pdf/806-3985-10.pdf>.
@@ -575,6 +594,7 @@ config EL1
 config EL2
 	tristate "3c503 \"EtherLink II\" support"
 	depends on NET_VENDOR_3COM && ISA
+	select CRC32
 	help
 	  If you have a network (Ethernet) card of this type, say Y and read
 	  the Ethernet-HOWTO, available from
@@ -686,6 +706,7 @@ config VORTEX
 config TYPHOON
 	tristate "3cr990 series \"Typhoon\" support"
 	depends on NET_VENDOR_3COM && PCI
+	select CRC32
 	---help---
 	  This option enables driver support for the 3cr990 series of cards:
 
@@ -729,6 +750,7 @@ config NET_VENDOR_SMC
 config WD80x3
 	tristate "WD80*3 support"
 	depends on NET_VENDOR_SMC && ISA
+	select CRC32
 	help
 	  If you have a network (Ethernet) card of this type, say Y and read
 	  the Ethernet-HOWTO, available from
@@ -741,6 +763,7 @@ config WD80x3
 config ULTRAMCA
 	tristate "SMC Ultra MCA support"
 	depends on NET_VENDOR_SMC && MCA
+	select CRC32
 	help
 	  If you have a network (Ethernet) card of this type and are running
 	  an MCA based system (PS/2), say Y and read the Ethernet-HOWTO,
@@ -753,6 +776,7 @@ config ULTRAMCA
 config ULTRA
 	tristate "SMC Ultra support"
 	depends on NET_VENDOR_SMC && ISA
+	select CRC32
 	---help---
 	  If you have a network (Ethernet) card of this type, say Y and read
 	  the Ethernet-HOWTO, available from
@@ -772,6 +796,7 @@ config ULTRA
 config ULTRA32
 	tristate "SMC Ultra32 EISA support"
 	depends on NET_VENDOR_SMC && EISA
+	select CRC32
 	help
 	  If you have a network (Ethernet) card of this type, say Y and read
 	  the Ethernet-HOWTO, available from
@@ -784,6 +809,7 @@ config ULTRA32
 config SMC9194
 	tristate "SMC 9194 support"
 	depends on NET_VENDOR_SMC && (ISA || MAC)
+	select CRC32
 	---help---
 	  This is support for the SMC9xxx based Ethernet cards. Choose this
 	  option if you have a DELL laptop with the docking station, or
@@ -851,6 +877,7 @@ source "drivers/net/tulip/Kconfig"
 config AT1700
 	tristate "AT1700/1720/RE1000Plus(C-Bus) support (EXPERIMENTAL)"
 	depends on NET_ETHERNET && (ISA || MCA) && EXPERIMENTAL
+	select CRC32
 	---help---
 	  If you have a network (Ethernet) card of this type, say Y and read
 	  the Ethernet-HOWTO, available from
@@ -863,6 +890,7 @@ config AT1700
 config DEPCA
 	tristate "DEPCA, DE10x, DE200, DE201, DE202, DE422 support"
 	depends on NET_ETHERNET && (ISA || EISA || MCA)
+	select CRC32
 	---help---
 	  If you have a network (Ethernet) card of this type, say Y and read
 	  the Ethernet-HOWTO, available from
@@ -905,6 +933,7 @@ config NET_ISA
 config E2100
 	tristate "Cabletron E21xx support"
 	depends on NET_ISA
+	select CRC32
 	help
 	  If you have a network (Ethernet) card of this type, say Y and read
 	  the Ethernet-HOWTO, available from
@@ -917,6 +946,7 @@ config E2100
 config EWRK3
 	tristate "EtherWORKS 3 (DE203, DE204, DE205) support"
 	depends on NET_ISA
+	select CRC32
 	---help---
 	  This driver supports the DE203, DE204 and DE205 network (Ethernet)
 	  cards. If this is for you, say Y and read
@@ -975,6 +1005,7 @@ config FMV18X
 config HPLAN_PLUS
 	tristate "HP PCLAN+ (27247B and 27252A) support"
 	depends on NET_ISA
+	select CRC32
 	help
 	  If you have a network (Ethernet) card of this type, say Y and read
 	  the Ethernet-HOWTO, available from
@@ -987,6 +1018,7 @@ config HPLAN_PLUS
 config HPLAN
 	tristate "HP PCLAN (27245 and other 27xxx series) support"
 	depends on NET_ISA
+	select CRC32
 	help
 	  If you have a network (Ethernet) card of this type, say Y and read
 	  the Ethernet-HOWTO, available from
@@ -1019,6 +1051,7 @@ config ETH16I
 config NE2000
 	tristate "NE2000/NE1000 support"
 	depends on NET_ISA || (Q40 && m)
+	select CRC32
 	---help---
 	  If you have a network (Ethernet) card of this type, say Y and read
 	  the Ethernet-HOWTO, available from
@@ -1076,6 +1109,7 @@ config NET_CBUS
 config NE2K_CBUS
 	tristate "Most NE2000-based Ethernet support"
 	depends on NET_CBUS
+	select CRC32
 
 config NE2K_CBUS_EGY98
 	bool "Melco EGY-98 support"
@@ -1132,6 +1166,7 @@ config SKMC
 config NE2_MCA
 	tristate "NE/2 (ne2000 MCA version) support"
 	depends on NET_ETHERNET && MCA
+	select CRC32
 	help
 	  If you have a network (Ethernet) card of this type, say Y and read
 	  the Ethernet-HOWTO, available from
@@ -1174,6 +1209,7 @@ config NET_PCI
 config PCNET32
 	tristate "AMD PCnet32 PCI support"
 	depends on NET_PCI && PCI
+	select CRC32
 	help
 	  If you have a PCnet32 or PCnetPCI based network (Ethernet) card,
 	  answer Y here and read the Ethernet-HOWTO, available from
@@ -1186,6 +1222,7 @@ config PCNET32
 config AMD8111_ETH
 	tristate "AMD 8111 (new PCI lance) support"
 	depends on NET_PCI && PCI
+	select CRC32
 	help
 	  If you have an AMD 8111-based PCI lance ethernet card,
 	  answer Y here and read the Ethernet-HOWTO, available from
@@ -1198,6 +1235,7 @@ config AMD8111_ETH
 config ADAPTEC_STARFIRE
 	tristate "Adaptec Starfire/DuraLAN support"
 	depends on NET_PCI && PCI
+	select CRC32
 	help
 	  Say Y here if you have an Adaptec Starfire (or DuraLAN) PCI network
 	  adapter. The DuraLAN chip is used on the 64 bit PCI boards from
@@ -1222,6 +1260,7 @@ config ADAPTEC_STARFIRE_NAPI
 config AC3200
 	tristate "Ansel Communications EISA 3200 support (EXPERIMENTAL)"
 	depends on NET_PCI && (ISA || EISA) && EXPERIMENTAL
+	select CRC32
 	help
 	  If you have a network (Ethernet) card of this type, say Y and read
 	  the Ethernet-HOWTO, available from
@@ -1389,6 +1428,7 @@ config E100
 config LNE390
 	tristate "Mylex EISA LNE390A/B support (EXPERIMENTAL)"
 	depends on NET_PCI && EISA && EXPERIMENTAL
+	select CRC32
 	help
 	  If you have a network (Ethernet) card of this type, say Y and read
 	  the Ethernet-HOWTO, available from
@@ -1401,6 +1441,7 @@ config LNE390
 config FEALNX
 	tristate "Myson MTD-8xx PCI Ethernet support"
 	depends on NET_PCI && PCI
+	select CRC32
 	help
 	  Say Y here to support the Mysom MTD-800 family of PCI-based Ethernet
 	  cards. Specifications and data at
@@ -1409,6 +1450,7 @@ config FEALNX
 config NATSEMI
 	tristate "National Semiconductor DP8381x series PCI Ethernet support"
 	depends on NET_PCI && PCI
+	select CRC32
 	help
 	  This driver is for the National Semiconductor DP83810 series,
 	  which is used in cards from PureData, NetGear, Linksys
@@ -1419,6 +1461,7 @@ config NATSEMI
 config NE2K_PCI
 	tristate "PCI NE2000 and clones support (see help)"
 	depends on NET_PCI && PCI
+	select CRC32
 	---help---
 	  This driver is for NE2000 compatible PCI cards. It will not work
 	  with ISA NE2000 cards (they have their own driver, "NE2000/NE1000
@@ -1438,6 +1481,7 @@ config NE2K_PCI
 config NE3210
 	tristate "Novell/Eagle/Microdyne NE3210 EISA support (EXPERIMENTAL)"
 	depends on NET_PCI && EISA && EXPERIMENTAL
+	select CRC32
 	---help---
 	  If you have a network (Ethernet) card of this type, say Y and read
 	  the Ethernet-HOWTO, available from
@@ -1451,6 +1495,7 @@ config NE3210
 config ES3210
 	tristate "Racal-Interlan EISA ES3210 support (EXPERIMENTAL)"
 	depends on NET_PCI && EISA && EXPERIMENTAL
+	select CRC32
 	help
 	  If you have a network (Ethernet) card of this type, say Y and read
 	  the Ethernet-HOWTO, available from
@@ -1463,6 +1508,7 @@ config ES3210
 config 8139CP
 	tristate "RealTek RTL-8139 C+ PCI Fast Ethernet Adapter support (EXPERIMENTAL)"
 	depends on NET_PCI && PCI && EXPERIMENTAL
+	select CRC32
 	help
 	  This is a driver for the Fast Ethernet PCI network cards based on
 	  the RTL8139C+ chips. If you have one of those, say Y and read
@@ -1475,6 +1521,7 @@ config 8139CP
 config 8139TOO
 	tristate "RealTek RTL-8139 PCI Fast Ethernet Adapter support"
 	depends on NET_PCI && PCI
+	select CRC32
 	---help---
 	  This is a driver for the Fast Ethernet PCI network cards based on
 	  the RTL8139 chips. If you have one of those, say Y and read
@@ -1527,6 +1574,7 @@ config 8139_OLD_RX_RESET
 config SIS900
 	tristate "SiS 900/7016 PCI Fast Ethernet Adapter support"
 	depends on NET_PCI && PCI
+	select CRC32
 	---help---
 	  This is a driver for the Fast Ethernet PCI network cards based on
 	  the SiS 900 and SiS 7016 chips. The SiS 900 core is also embedded in
@@ -1545,6 +1593,7 @@ config SIS900
 config EPIC100
 	tristate "SMC EtherPower II"
 	depends on NET_PCI && PCI
+	select CRC32
 	help
 	  This driver is for the SMC EtherPower II 9432 PCI Ethernet NIC,
 	  which is based on the SMC83c17x (EPIC/100).
@@ -1554,6 +1603,7 @@ config EPIC100
 config SUNDANCE
 	tristate "Sundance Alta support"
 	depends on NET_PCI && PCI
+	select CRC32
 	help
 	  This driver is for the Sundance "Alta" chip.
 	  More specific information and updates are available from
@@ -1591,6 +1641,7 @@ config TLAN
 config VIA_RHINE
 	tristate "VIA Rhine support"
 	depends on NET_PCI && PCI
+	select CRC32
 	help
 	  If you have a VIA "rhine" based network card (Rhine-I (3043) or
 	  Rhine-2 (VT86c100A)), say Y here.
@@ -1647,6 +1698,7 @@ config NET_POCKET
 config ATP
 	tristate "AT-LAN-TEC/RealTek pocket adapter support"
 	depends on NET_POCKET && ISA && X86
+	select CRC32
 	---help---
 	  This is a network (Ethernet) device which attaches to your parallel
 	  port. Read <file:drivers/net/atp.c> as well as the Ethernet-HOWTO,
@@ -1698,6 +1750,7 @@ config SGISEEQ
 config DECLANCE
 	tristate "DEC LANCE ethernet controller support"
 	depends on NET_ETHERNET && DECSTATION
+	select CRC32
 	help
 	  This driver is for the series of Ethernet controllers produced by
 	  DEC (now Compaq) based on the AMD Lance chipset, including the
@@ -1764,6 +1817,7 @@ config ACENIC_OMIT_TIGON_I
 config DL2K
 	tristate "D-Link DL2000-based Gigabit Ethernet support"
 	depends on PCI
+	select CRC32
 	help
 	  This driver supports D-Link 2000-based gigabit ethernet cards, which
 	  includes
@@ -1854,6 +1908,7 @@ config HAMACHI
 config YELLOWFIN
 	tristate "Packet Engines Yellowfin Gigabit-NIC support (EXPERIMENTAL)"
 	depends on PCI && EXPERIMENTAL
+	select CRC32
 	---help---
 	  Say Y here if you have a Packet Engines G-NIC PCI Gigabit Ethernet
 	  adapter or the SYM53C885 Ethernet controller. The Gigabit adapter is
@@ -1867,6 +1922,7 @@ config YELLOWFIN
 config R8169
 	tristate "Realtek 8169 gigabit ethernet support"
 	depends on PCI
+	select CRC32
 	---help---
 	  Say Y here if you have a Realtek 8169 PCI Gigabit Ethernet adapter.
 
@@ -1876,6 +1932,7 @@ config R8169
 config SIS190
 	tristate "SiS190 gigabit ethernet support (EXPERIMENTAL)"
 	depends on PCI && EXPERIMENTAL
+	select CRC32
 	---help---
 	  Say Y here if you have a SiS 190 PCI Gigabit Ethernet adapter.
 

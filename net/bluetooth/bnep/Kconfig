@@ -1,6 +1,7 @@
 config BT_BNEP
 	tristate "BNEP protocol support"
 	depends on BT && BT_L2CAP
+	select CRC32
 	help
 	  BNEP (Bluetooth Network Encapsulation Protocol) is Ethernet
 	  emulation layer on top of Bluetooth. BNEP is required for Bluetooth

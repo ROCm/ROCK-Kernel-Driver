@@ -20,12 +20,6 @@ obj-$(CONFIG_CRC32)	+= crc32.o
 obj-$(CONFIG_ZLIB_INFLATE) += zlib_inflate/
 obj-$(CONFIG_ZLIB_DEFLATE) += zlib_deflate/
 
-include drivers/net/Makefile.lib
-include drivers/usb/Makefile.lib
-include fs/Makefile.lib
-include net/bluetooth/bnep/Makefile.lib
-include drivers/media/dvb/dvb-core/Makefile.lib
-
 host-progs	:= gen_crc32table
 clean-files	:= crc32table.h
 

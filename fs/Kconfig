@@ -1046,6 +1046,7 @@ config JFFS_PROC_FS
 config JFFS2_FS
 	tristate "Journalling Flash File System v2 (JFFS2) support"
 	depends on MTD
+	select CRC32
 	help
 	  JFFS2 is the second generation of the Journalling Flash File System
 	  for use on diskless embedded devices. It provides improved wear
