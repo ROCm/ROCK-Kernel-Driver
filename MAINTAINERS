@@ -632,7 +632,7 @@ S:	Maintained
 
 DEFXX FDDI NETWORK DRIVER
 P:	Maciej W. Rozycki
-M:	macro@ds2.pg.gda.pl
+M:	macro@linux-mips.org
 S:	Maintained
 
 DELL LAPTOP SMM DRIVER
