@@ -1,0 +1,21 @@
+--- linux-2.6.0-test9/drivers/scsi/Kconfig.orig	2003-10-25 11:44:40.000000000 -0700
++++ linux-2.6.0-test9/drivers/scsi/Kconfig	2003-11-04 14:18:19.072377672 -0800
+@@ -1212,6 +1212,8 @@
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called qlogicpti.
+ 
++source "drivers/scsi/qla2xxx/Kconfig"
++
+ config SCSI_SEAGATE
+ 	tristate "Seagate ST-02 and Future Domain TMC-8xx SCSI support"
+ 	depends on X86 && ISA && SCSI && BROKEN
+--- linux-2.6.0-test9/drivers/scsi/Makefile.orig	2003-11-04 14:17:44.627614072 -0800
++++ linux-2.6.0-test9/drivers/scsi/Makefile	2003-11-04 14:18:19.074377368 -0800
+@@ -74,6 +74,7 @@
+ obj-$(CONFIG_SCSI_QLOGIC_ISP)	+= qlogicisp.o 
+ obj-$(CONFIG_SCSI_QLOGIC_FC)	+= qlogicfc.o 
+ obj-$(CONFIG_SCSI_QLOGIC_1280)	+= qla1280.o 
++obj-$(CONFIG_SCSI_QLA2XXX)	+= qla2xxx/
+ obj-$(CONFIG_SCSI_PAS16)	+= pas16.o
+ obj-$(CONFIG_SCSI_SEAGATE)	+= seagate.o
+ obj-$(CONFIG_SCSI_FD_8xx)	+= seagate.o
