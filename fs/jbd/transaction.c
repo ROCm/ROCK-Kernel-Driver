@@ -1941,6 +1941,8 @@ void __journal_file_buffer(struct journal_head *jh,
 			transaction_t *transaction, int jlist)
 {
 	struct journal_head **list = 0;
+	int was_dirty = 0;
+	struct buffer_head *bh = jh2bh(jh);
 
 	assert_spin_locked(&journal_datalist_lock);
 	
@@ -1951,13 +1953,24 @@ void __journal_file_buffer(struct journal_head *jh,
 	J_ASSERT_JH(jh, jh->b_transaction == transaction ||
 				jh->b_transaction == 0);
 
-	if (jh->b_transaction) {
-		if (jh->b_jlist == jlist)
-			return;
-		__journal_unfile_buffer(jh);
-	} else {
-		jh->b_transaction = transaction;
+	if (jh->b_transaction && jh->b_jlist == jlist)
+		return;
+	
+	/* The following list of buffer states needs to be consistent
+	 * with __jbd_unexpected_dirty_buffer()'s handling of dirty
+	 * state. */
+
+	if (jlist == BJ_Metadata || jlist == BJ_Reserved || 
+	    jlist == BJ_Shadow || jlist == BJ_Forget) {
+		if (test_clear_buffer_dirty(bh) ||
+		    test_clear_buffer_jbddirty(bh))
+			was_dirty = 1;
 	}
+
+	if (jh->b_transaction)
+		__journal_unfile_buffer(jh);
+	else
+		jh->b_transaction = transaction;
 
 	switch (jlist) {
 	case BJ_None:
@@ -1994,12 +2007,8 @@ void __journal_file_buffer(struct journal_head *jh,
 	__blist_add_buffer(list, jh);
 	jh->b_jlist = jlist;
 
-	if (jlist == BJ_Metadata || jlist == BJ_Reserved || 
-	    jlist == BJ_Shadow || jlist == BJ_Forget) {
-		if (test_clear_buffer_dirty(jh2bh(jh))) {
-			set_bit(BH_JBDDirty, &jh2bh(jh)->b_state);
-		}
-	}
+	if (was_dirty)
+		set_buffer_jbddirty(bh);
 }
 
 void journal_file_buffer(struct journal_head *jh,
