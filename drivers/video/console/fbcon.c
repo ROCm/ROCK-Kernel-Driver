@@ -580,8 +580,8 @@ void accel_clear_margins(struct vc_data *vc, struct display *p,
 	struct fb_info *info = p->fb_info;
 	unsigned int cw = vc->vc_font.width;
 	unsigned int ch = vc->vc_font.height;
-	unsigned int rw = info->var.xres % cw;
-	unsigned int bh = info->var.yres % ch;
+	unsigned int rw = info->var.xres - (vc->vc_cols*cw);
+	unsigned int bh = info->var.yres - (vc->vc_rows*ch);
 	unsigned int rs = info->var.xres - rw;
 	unsigned int bs = info->var.yres - bh;
 	struct fb_fillrect region;
