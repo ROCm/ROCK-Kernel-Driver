@@ -61,13 +61,13 @@ static inline void check_for_tasks(int cpu)
  * cpu' with certain environment variables set.  */
 static int cpu_run_sbin_hotplug(unsigned int cpu, const char *action)
 {
-	char *argv[3], *envp[5], cpu_str[12], action_str[32];
+	char *argv[3], *envp[6], cpu_str[12], action_str[32], devpath_str[40];
 	int i;
 
 	sprintf(cpu_str, "CPU=%d", cpu);
 	sprintf(action_str, "ACTION=%s", action);
-	/* FIXME: Add DEVPATH. --RR */
-
+	sprintf(devpath_str, "DEVPATH=devices/system/cpu/cpu%d", cpu);
+	
 	i = 0;
 	argv[i++] = hotplug_path;
 	argv[i++] = "cpu";
@@ -79,6 +79,7 @@ static int cpu_run_sbin_hotplug(unsigned int cpu, const char *action)
 	envp[i++] = "PATH=/sbin:/bin:/usr/sbin:/usr/bin";
 	envp[i++] = cpu_str;
 	envp[i++] = action_str;
+	envp[i++] = devpath_str;
 	envp[i] = NULL;
 
 	return call_usermodehelper(argv[0], argv, envp, 0);
