@@ -728,7 +728,7 @@ unmap_and_free_vma:
 	fput(file);
 
 	/* Undo any partial mapping done by a device driver. */
-	zap_page_range(vma, vma->vm_start, vma->vm_end - vma->vm_start);
+	zap_page_range(vma, vma->vm_start, vma->vm_end - vma->vm_start, NULL);
 free_vma:
 	kmem_cache_free(vm_area_cachep, vma);
 unacct_error:
@@ -1160,7 +1160,7 @@ static void unmap_region(struct mm_struct *mm,
 
 	lru_add_drain();
 	tlb = tlb_gather_mmu(mm, 0);
-	unmap_vmas(&tlb, mm, vma, start, end, &nr_accounted);
+	unmap_vmas(&tlb, mm, vma, start, end, &nr_accounted, NULL);
 	vm_unacct_memory(nr_accounted);
 
 	if (is_hugepage_only_range(start, end - start))
@@ -1446,7 +1446,7 @@ void exit_mmap(struct mm_struct *mm)
 	flush_cache_mm(mm);
 	/* Use ~0UL here to ensure all VMAs in the mm are unmapped */
 	mm->map_count -= unmap_vmas(&tlb, mm, mm->mmap, 0,
-					~0UL, &nr_accounted);
+					~0UL, &nr_accounted, NULL);
 	vm_unacct_memory(nr_accounted);
 	BUG_ON(mm->map_count);	/* This is just debugging */
 	clear_page_tables(tlb, FIRST_USER_PGD_NR, USER_PTRS_PER_PGD);

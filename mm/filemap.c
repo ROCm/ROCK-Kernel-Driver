@@ -62,7 +62,7 @@
  *          ->mapping->tree_lock
  *
  *  ->i_sem
- *    ->i_shared_sem		(truncate->invalidate_mmap_range)
+ *    ->i_shared_sem		(truncate->unmap_mapping_range)
  *
  *  ->mmap_sem
  *    ->i_shared_sem		(various places)
@@ -1363,11 +1363,7 @@ repeat:
 		 * If a nonlinear mapping then store the file page offset
 		 * in the pte.
 		 */
-	    	unsigned long pgidx;
-		pgidx = (addr - vma->vm_start) >> PAGE_SHIFT;
-		pgidx += vma->vm_pgoff;
-		pgidx >>= PAGE_CACHE_SHIFT - PAGE_SHIFT;
-		if (pgoff != pgidx) {
+		if (pgoff != linear_page_index(vma, addr)) {
 	    		err = install_file_pte(mm, vma, addr, pgoff, prot);
 			if (err)
 		    		return err;
