@@ -314,7 +314,7 @@ static void agp_3_5_nonisochronous_node_enable(struct agp_bridge_data *bridge,
  * Fully configure and enable an AGP 3.0 host bridge and all the devices
  * lying behind it.
  */
-int agp_3_5_enable(struct agp_bridge_data *bridge, u32 mode)
+int agp_3_5_enable(struct agp_bridge_data *bridge)
 {
 	struct pci_dev *td = bridge->dev, *dev;
 	u8 mcapndx;
@@ -448,6 +448,8 @@ int agp_3_5_enable(struct agp_bridge_data *bridge, u32 mode)
 			printk(KERN_INFO PFX "Something bad happened setting "
 			       "up isochronous xfers.  Falling back to "
 			       "non-isochronous xfer mode.\n");
+		} else {
+			goto free_and_exit;
 		}
 	}
 	agp_3_5_nonisochronous_node_enable(bridge, dev_list, ndevs);

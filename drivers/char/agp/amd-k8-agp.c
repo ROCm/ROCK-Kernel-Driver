@@ -212,20 +212,13 @@ static void amd_8151_cleanup(void)
 }
 
 
-static unsigned long amd_8151_mask_memory(unsigned long addr, int type)
-{
-	return addr | agp_bridge->driver->masks[0].mask;
-}
-
-
 static struct gatt_mask amd_8151_masks[] =
 {
-	{.mask = 0x00000001, .type = 0}
+	{ .mask = 1, .type = 0 }
 };
 
 struct agp_bridge_driver amd_8151_driver = {
 	.owner			= THIS_MODULE,
-	.masks			= amd_8151_masks,
 	.aperture_sizes		= amd_8151_sizes,
 	.size_type		= U32_APER_SIZE,
 	.num_aperture_sizes	= 7,
@@ -233,7 +226,8 @@ struct agp_bridge_driver amd_8151_driver = {
 	.fetch_size		= amd_x86_64_fetch_size,
 	.cleanup		= amd_8151_cleanup,
 	.tlb_flush		= amd_x86_64_tlbflush,
-	.mask_memory		= amd_8151_mask_memory,
+	.mask_memory		= agp_generic_mask_memory,
+	.masks			= amd_8151_masks,
 	.agp_enable		= agp_generic_enable,
 	.cache_flush		= global_cache_flush,
 	.create_gatt_table	= agp_generic_create_gatt_table,
@@ -244,8 +238,6 @@ struct agp_bridge_driver amd_8151_driver = {
 	.free_by_type		= agp_generic_free_by_type,
 	.agp_alloc_page		= agp_generic_alloc_page,
 	.agp_destroy_page	= agp_generic_destroy_page,
-	.suspend		= agp_generic_suspend,
-	.resume			= agp_generic_resume,
 };
 
 static int __init agp_amdk8_probe(struct pci_dev *pdev,
@@ -268,9 +260,11 @@ static int __init agp_amdk8_probe(struct pci_dev *pdev,
 	if (!bridge)
 		return -ENOMEM;
 
-	/* Assume here we have an 8151. (Later this assumption will be fixed). */
-	pci_read_config_byte(pdev, PCI_REVISION_ID, &rev_id);
-	switch (rev_id) {
+	if (pdev->vendor == PCI_VENDOR_ID_AMD &&
+	    pdev->device == PCI_DEVICE_ID_AMD_8151_0) {
+
+		pci_read_config_byte(pdev, PCI_REVISION_ID, &rev_id);
+		switch (rev_id) {
 		case 0x01:	revstring="A0";
 				break;
 		case 0x02:	revstring="A1";
@@ -283,15 +277,16 @@ static int __init agp_amdk8_probe(struct pci_dev *pdev,
 				break;
 		default:	revstring="??";
 				break;
-	}
-	printk ("Detected AMD 8151 AGP Bridge rev %s", revstring);
-	/*
-	 * Work around errata.
-	 * Chips before B2 stepping incorrectly reporting v3.5
-	 */
-	if (rev_id < 0x13) {
-		bridge->major_version = 3;
-		bridge->minor_version = 0;
+		}
+		printk ("Detected AMD 8151 AGP Bridge rev %s", revstring);
+		/*
+		 * Work around errata.
+		 * Chips before B2 stepping incorrectly reporting v3.5
+		 */
+		if (rev_id < 0x13) {
+			bridge->major_version = 3;
+			bridge->minor_version = 0;
+		}
 	}
 
 	bridge->driver = &amd_8151_driver;
@@ -338,12 +333,20 @@ static struct pci_device_id agp_amdk8_pci_table[] __initdata = {
 	.subvendor	= PCI_ANY_ID,
 	.subdevice	= PCI_ANY_ID,
 	},
+	{
+	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
+	.class_mask	= ~0,
+	.vendor		= PCI_VENDOR_ID_VIA,
+	.device		= PCI_DEVICE_ID_VIA_K8T400M_0,
+	.subvendor	= PCI_ANY_ID,
+	.subdevice	= PCI_ANY_ID,
+	},
 	{ }
 };
 
 MODULE_DEVICE_TABLE(pci, agp_amdk8_pci_table);
 
-static struct __initdata pci_driver agp_amdk8_pci_driver = {
+static struct pci_driver agp_amdk8_pci_driver = {
 	.name		= "agpgart-amd-k8",
 	.id_table	= agp_amdk8_pci_table,
 	.probe		= agp_amdk8_probe,
