@@ -95,7 +95,7 @@ static struct dvb_frontend_info ves1820_info = {
 
 static u8 ves1820_inittab [] =
 {
-	0x69, 0x6A, 0x9B, 0x0A, 0x52, 0x46, 0x26, 0x1A,
+	0x69, 0x6A, 0x9B, 0x12, 0x12, 0x46, 0x26, 0x1A,
 	0x43, 0x6A, 0xAA, 0xAA, 0x1E, 0x85, 0x43, 0x28,
 	0xE0, 0x00, 0xA1, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00,
@@ -109,7 +109,7 @@ static int ves1820_writereg (struct dvb_frontend *fe, u8 reg, u8 data)
 {
 	u8 addr = GET_DEMOD_ADDR(fe->data);
         u8 buf[] = { 0x00, reg, data };
-	struct i2c_msg msg = { addr: addr, .flags = 0, .buf = buf, .len = 3 };
+	struct i2c_msg msg = { .addr = addr, .flags = 0, .buf = buf, .len = 3 };
 	struct dvb_i2c_bus *i2c = fe->i2c;
         int ret;
 
@@ -130,8 +130,8 @@ static u8 ves1820_readreg (struct dvb_frontend *fe, u8 reg)
 	u8 b0 [] = { 0x00, reg };
 	u8 b1 [] = { 0 };
 	u8 addr = GET_DEMOD_ADDR(fe->data);
-	struct i2c_msg msg [] = { { addr: addr, .flags = 0, .buf = b0, .len = 2 },
-	                   { addr: addr, .flags = I2C_M_RD, .buf = b1, .len = 1 } };
+	struct i2c_msg msg [] = { { .addr = addr, .flags = 0, .buf = b0, .len = 2 },
+	                   { .addr = addr, .flags = I2C_M_RD, .buf = b1, .len = 1 } };
 	struct dvb_i2c_bus *i2c = fe->i2c;
 	int ret;
 
@@ -147,7 +147,7 @@ static u8 ves1820_readreg (struct dvb_frontend *fe, u8 reg)
 static int tuner_write (struct dvb_i2c_bus *i2c, u8 addr, u8 data [4])
 {
         int ret;
-        struct i2c_msg msg = { addr: addr, .flags = 0, .buf = data, .len = 4 };
+        struct i2c_msg msg = { .addr = addr, .flags = 0, .buf = data, .len = 4 };
 
         ret = i2c->xfer (i2c, &msg, 1);
 
