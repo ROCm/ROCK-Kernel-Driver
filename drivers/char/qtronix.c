@@ -51,6 +51,7 @@
 
 #ifdef CONFIG_QTRONIX_KEYBOARD
 
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/pci.h>
 #include <linux/kernel.h>
@@ -121,7 +122,7 @@ static unsigned char fn_keys[NUM_FN_KEYS] = {
 
 };
 
-void init_qtronix_990P_kbd(void)
+void __init init_qtronix_990P_kbd(void)
 {
 	int retval;
 
@@ -592,4 +593,5 @@ static int __init psaux_init(void)
 
 	return 0;
 }
+module_init(init_qtronix_990P_kbd);
 #endif
