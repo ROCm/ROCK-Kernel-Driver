@@ -52,6 +52,7 @@
 #include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
+#include <linux/gameport.h>
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/pcm.h>
@@ -59,9 +60,6 @@
 #include <sound/mpu401.h>
 #define SNDRV_GET_ID
 #include <sound/initval.h>
-#ifndef LINUX_2_2
-#include <linux/gameport.h>
-#endif
 
 #include <asm/io.h>
 
@@ -248,7 +246,7 @@ struct _snd_es1938 {
 	spinlock_t mixer_lock;
         snd_info_entry_t *proc_entry;
 
-#ifndef LINUX_2_2
+#if defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
 	struct gameport gameport;
 #endif
 };
@@ -1328,7 +1326,7 @@ ES1938_SINGLE("Mic Boost (+26dB)", 0, 0x7d, 3, 1, 0)
 
 static int snd_es1938_free(es1938_t *chip)
 {
-#ifndef LINUX_2_2
+#if defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
 	if (chip->gameport.io)
 		gameport_unregister_port(&chip->gameport);
 #endif
@@ -1645,7 +1643,7 @@ static int __devinit snd_es1938_probe(struct pci_dev *pci,
 				chip->mpu_port, 1, chip->irq, 0, &chip->rmidi) < 0) {
 		printk(KERN_ERR "es1938: unable to initialize MPU-401\n");
 	}
-#ifndef LINUX_2_2
+#if defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
 	chip->gameport.io = chip->game_port;
 	gameport_register_port(&chip->gameport);
 #endif

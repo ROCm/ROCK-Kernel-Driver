@@ -293,9 +293,6 @@ static int snd_info_entry_open(struct inode *inode, struct file *file)
 		up(&info_mutex);
 		return -ENODEV;
 	}
-#ifdef LINUX_2_2
-	MOD_INC_USE_COUNT;
-#endif
 	if (!try_module_get(entry->module)) {
 		err = -EFAULT;
 		goto __error1;
@@ -403,9 +400,6 @@ static int snd_info_entry_open(struct inode *inode, struct file *file)
       __error:
 	module_put(entry->module);
       __error1:
-#ifdef LINUX_2_2
-	MOD_DEC_USE_COUNT;
-#endif
 	up(&info_mutex);
 	return err;
 }
@@ -445,9 +439,6 @@ static int snd_info_entry_release(struct inode *inode, struct file *file)
 		break;
 	}
 	module_put(entry->module);
-#ifdef LINUX_2_2
-	MOD_DEC_USE_COUNT;
-#endif
 	snd_magic_kfree(data);
 	return 0;
 }

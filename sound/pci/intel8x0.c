@@ -131,6 +131,9 @@ MODULE_PARM_SYNTAX(mpu_port, SNDRV_ENABLED ",allows:{{0},{0x330},{0x300}},dialog
 #ifndef PCI_DEVICE_ID_NVIDIA_MCP2_AUDIO
 #define PCI_DEVICE_ID_NVIDIA_MCP2_AUDIO	0x006a
 #endif
+#ifndef PCI_DEVICE_ID_NVIDIA_MCP3_AUDIO
+#define PCI_DEVICE_ID_NVIDIA_MCP3_AUDIO	0x00da
+#endif
 
 enum { DEVICE_INTEL, DEVICE_INTEL_ICH4, DEVICE_SIS, DEVICE_ALI };
 
@@ -388,6 +391,7 @@ static struct pci_device_id snd_intel8x0_ids[] __devinitdata = {
 	{ 0x1039, 0x7012, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_SIS },	/* SI7012 */
 	{ 0x10de, 0x01b1, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* NFORCE */
 	{ 0x10de, 0x006a, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* NFORCE2 */
+	{ 0x10de, 0x00da, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* NFORCE3 */
 	{ 0x1022, 0x746d, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* AMD8111 */
 	{ 0x1022, 0x7445, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* AMD768 */
 	{ 0x10b9, 0x5455, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_ALI },   /* Ali5455 */
@@ -2247,7 +2251,7 @@ static int __devinit snd_intel8x0_create(snd_card_t * card,
 	chip->bdbars_count = 3;
 	if (device_type == DEVICE_INTEL_ICH4 || device_type == DEVICE_ALI)
 		chip->bdbars_count = 6;
-	chip->bdbars = (u32 *)snd_malloc_pci_pages(pci, chip->bdbars_count * sizeof(unsigned int) * ICH_MAX_FRAGS * 2, &chip->bdbars_addr);
+	chip->bdbars = (u32 *)snd_malloc_pci_pages(pci, chip->bdbars_count * sizeof(u32) * ICH_MAX_FRAGS * 2, &chip->bdbars_addr);
 	if (chip->bdbars == NULL) {
 		snd_intel8x0_free(chip);
 		return -ENOMEM;
@@ -2304,6 +2308,7 @@ static struct shortname_table {
 	{ PCI_DEVICE_ID_SI_7012, "SiS SI7012" },
 	{ PCI_DEVICE_ID_NVIDIA_MCP_AUDIO, "NVidia NForce" },
 	{ PCI_DEVICE_ID_NVIDIA_MCP2_AUDIO, "NVidia NForce2" },
+	{ PCI_DEVICE_ID_NVIDIA_MCP3_AUDIO, "NVidia NForce3" },
 	{ 0x746d, "AMD AMD8111" },
 	{ 0x7445, "AMD AMD768" },
 	{ 0x5455, "ALi M5455" },

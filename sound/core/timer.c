@@ -942,9 +942,6 @@ static int snd_timer_user_open(struct inode *inode, struct file *file)
 		return -ENOMEM;
 	}
 	file->private_data = tu;
-#ifdef LINUX_2_2
-	MOD_INC_USE_COUNT;
-#endif
 	return 0;
 }
 
@@ -961,9 +958,6 @@ static int snd_timer_user_release(struct inode *inode, struct file *file)
 			kfree(tu->queue);
 		snd_magic_kfree(tu);
 	}
-#ifdef LINUX_2_2
-	MOD_DEC_USE_COUNT;
-#endif
 	return 0;
 }
 

@@ -34,15 +34,13 @@
 #include <linux/pci.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
+#include <linux/gameport.h>
 
 #include <sound/core.h>
 #include <sound/info.h>
 #include <sound/control.h>
 #include <sound/trident.h>
 #include <sound/asoundef.h>
-#ifndef LINUX_2_2
-#include <linux/gameport.h>
-#endif
 
 #include <asm/io.h>
 
@@ -2987,7 +2985,7 @@ static int __devinit snd_trident_mixer(trident_t * trident, int pcm_spdif_device
 /*
  * gameport interface
  */
-#ifndef LINUX_2_2
+#if defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
 
 typedef struct snd_trident_gameport {
 	struct gameport info;
@@ -3076,7 +3074,7 @@ void __devinit snd_trident_gameport(trident_t *chip)
 void __devinit snd_trident_gameport(trident_t *chip)
 {
 }
-#endif
+#endif /* CONFIG_GAMEPORT */
 
 /*
  *  SiS reset routine
@@ -3482,7 +3480,7 @@ int __devinit snd_trident_create(snd_card_t * card,
 
 int snd_trident_free(trident_t *trident)
 {
-#ifndef LINUX_2_2
+#if defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
 	if (trident->gameport) {
 		gameport_unregister_port(&trident->gameport->info);
 		kfree(trident->gameport);

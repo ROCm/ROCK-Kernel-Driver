@@ -405,8 +405,10 @@ struct _snd_ensoniq {
 	dma_addr_t bugbuf_addr;
 #endif
 
+#if defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
 	struct gameport gameport;
 	struct semaphore joy_sem;	// gameport configuration semaphore
+#endif
 };
 
 static void snd_audiopci_interrupt(int irq, void *dev_id, struct pt_regs *regs);
@@ -1576,6 +1578,7 @@ static int __devinit snd_ensoniq_1370_mixer(ensoniq_t * ensoniq)
  *  General Switches...
  */
 
+#if defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
 /* MQ: gameport driver connectivity */
 #define ENSONIQ_JOY_CONTROL(xname, mask) \
 { .iface = SNDRV_CTL_ELEM_IFACE_CARD, .name = xname, .info = snd_ensoniq_control_info, \
@@ -1693,6 +1696,7 @@ static snd_kcontrol_new_t snd_es1371_joystick_addr __devinitdata =
 ES1371_JOYSTICK_ADDR("Joystick Address");
 
 #endif /* CHIP1371 */
+#endif /* CONFIG_GAMEPORT */
 
 /*
 
@@ -1749,8 +1753,10 @@ static void snd_ensoniq_proc_done(ensoniq_t * ensoniq)
 
 static int snd_ensoniq_free(ensoniq_t *ensoniq)
 {
+#if defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
 	if (ensoniq->ctrl & ES_JYSTK_EN)
 		snd_ensoniq_joy_disable(ensoniq);
+#endif
 	snd_ensoniq_proc_done(ensoniq);
 	if (ensoniq->irq < 0)
 		goto __hw_end;
@@ -1831,7 +1837,6 @@ static int __devinit snd_ensoniq_create(snd_card_t * card,
 	if (ensoniq == NULL)
 		return -ENOMEM;
 	spin_lock_init(&ensoniq->reg_lock);
-	init_MUTEX(&ensoniq->joy_sem);
 	ensoniq->card = card;
 	ensoniq->pci = pci;
 	ensoniq->irq = -1;
@@ -1946,11 +1951,14 @@ static int __devinit snd_ensoniq_create(snd_card_t * card,
 	outb(ensoniq->uartc = 0x00, ES_REG(ensoniq, UART_CONTROL));
 	outb(0x00, ES_REG(ensoniq, UART_RES));
 	outl(ensoniq->cssr, ES_REG(ensoniq, STATUS));
+#if defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
+	init_MUTEX(&ensoniq->joy_sem);
 #ifdef CHIP1371
 	snd_ctl_add(card, snd_ctl_new1(&snd_es1371_joystick_addr, ensoniq));
 #endif
 	snd_ctl_add(card, snd_ctl_new1(&snd_ensoniq_control_joystick, ensoniq));
 	ensoniq->gameport.io = 0x200;	// FIXME: is ES1371 configured like this above ?
+#endif
 	synchronize_irq(ensoniq->irq);
 
 	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, ensoniq, &ops)) < 0) {

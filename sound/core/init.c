@@ -292,15 +292,17 @@ int snd_card_free(snd_card_t * card)
 static void snd_card_free_thread(void * __card)
 {
 	snd_card_t *card = __card;
-	struct module * module;
+	struct module * module = card->module;
 
-	if (!try_module_get(module = card->module)) {
+	if (!try_module_get(module)) {
 		snd_printk(KERN_ERR "unable to lock toplevel module for card %i in free thread\n", card->number);
 		module = NULL;
 	}
 
 	wait_event(card->shutdown_sleep, card->files == NULL);
+
 	snd_card_free(card);
+
 	module_put(module);
 }
 

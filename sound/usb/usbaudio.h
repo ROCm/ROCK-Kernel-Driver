@@ -208,4 +208,8 @@ int snd_usb_create_midi_interface(snd_usb_audio_t *chip, struct usb_interface *i
 #define usb_pipe_needs_resubmit(pipe) 1
 #endif
 
+#ifndef snd_usb_complete_callback
+#define snd_usb_complete_callback(x) (x)
+#endif
+
 #endif /* __USBAUDIO_H */

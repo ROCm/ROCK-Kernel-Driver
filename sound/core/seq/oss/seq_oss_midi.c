@@ -217,7 +217,6 @@ snd_seq_oss_midi_check_new_port(snd_seq_port_info_t *pinfo)
 	midi_devs[mdev->seq_device] = mdev;
 	spin_unlock_irqrestore(&register_lock, flags);
 
-	/*MOD_INC_USE_COUNT;*/
 	return 0;
 }
 

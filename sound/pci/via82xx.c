@@ -40,6 +40,10 @@
 #define SNDRV_GET_ID
 #include <sound/initval.h>
 
+#if 0
+#define POINTER_DEBUG
+#endif
+
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("VIA VT82xx audio");
 MODULE_LICENSE("GPL");
@@ -198,6 +202,9 @@ typedef struct {
 	u32 *table; /* physical address + flag */
 	dma_addr_t table_addr;
 	struct snd_via_sg_table *idx_table;
+	unsigned int lastpos;
+	unsigned int bufsize;
+	unsigned int bufsize2;
 } viadev_t;
 
 
@@ -208,9 +215,9 @@ typedef struct {
  */
 static int build_via_table(viadev_t *dev, snd_pcm_substream_t *substream,
 			   struct pci_dev *pci,
-			   int periods, int fragsize)
+			   unsigned int periods, unsigned int fragsize)
 {
-	int i, idx, ofs, rest;
+	unsigned int i, idx, ofs, rest;
 	struct snd_sg_buf *sgbuf = snd_magic_cast(snd_pcm_sgbuf_t, substream->dma_private, return -EINVAL);
 
 	if (! dev->table) {
@@ -237,8 +244,13 @@ static int build_via_table(viadev_t *dev, snd_pcm_substream_t *substream,
 		 * over page boundary.
 		 */
 		do {
-			int r;
+			unsigned int r;
 			unsigned int flag;
+
+			if (idx >= VIA_TABLE_SIZE) {
+				snd_printk(KERN_ERR "via82xx: too much table size!\n");
+				return -EINVAL;
+			}
 			dev->table[idx << 1] = cpu_to_le32((u32)snd_pcm_sgbuf_get_addr(sgbuf, ofs));
 			r = PAGE_SIZE - (ofs % PAGE_SIZE);
 			if (rest < r)
@@ -257,13 +269,11 @@ static int build_via_table(viadev_t *dev, snd_pcm_substream_t *substream,
 			dev->idx_table[idx].size = r;
 			ofs += r;
 			idx++;
-			if (idx >= VIA_TABLE_SIZE) {
-				snd_printk(KERN_ERR "via82xx: too much table size!\n");
-				return -EINVAL;
-			}
 		} while (rest > 0);
 	}
 	dev->tbl_entries = idx;
+	dev->bufsize = periods * fragsize;
+	dev->bufsize2 = dev->bufsize / 2;
 	return 0;
 }
 
@@ -439,6 +449,7 @@ static void snd_via82xx_channel_reset(via82xx_t *chip, viadev_t *viadev)
 	outb(0x03, port + VIA_REG_OFFSET_STATUS);
 	outb(0x00, port + VIA_REG_OFFSET_TYPE); /* for via686 */
 	outl(0, port + VIA_REG_OFFSET_CURR_PTR);
+	viadev->lastpos = 0;
 }
 
 static int snd_via82xx_trigger(via82xx_t *chip, viadev_t *viadev, int cmd)
@@ -641,19 +652,22 @@ static int snd_via82xx_capture_prepare(snd_pcm_substream_t * substream)
 
 static inline unsigned int snd_via82xx_cur_ptr(via82xx_t *chip, viadev_t *viadev)
 {
-	unsigned int val, ptr, count;
-	
+	unsigned int val, ptr, count, res;
+
 	snd_assert(viadev->tbl_entries, return 0);
 	if (!(inb(VIAREG(chip, OFFSET_STATUS) + viadev->reg_offset) & VIA_REG_STAT_ACTIVE))
 		return 0;
 
-	count = inl(VIAREG(chip, OFFSET_CURR_COUNT) + viadev->reg_offset) & 0xffffff;
+	spin_lock(&chip->reg_lock);
+
 	switch (chip->chip_type) {
 	case TYPE_VIA686:
+		count &= 0xffffff;
 		/* The via686a does not have the current index register,
 		 * so we need to calculate the index from CURR_PTR.
 		 */
 		ptr = inl(VIAREG(chip, OFFSET_CURR_PTR) + viadev->reg_offset);
+		count = inl(VIAREG(chip, OFFSET_CURR_COUNT) + viadev->reg_offset) & 0xffffff;
 		if (ptr <= (unsigned int)viadev->table_addr)
 			val = 0;
 		else /* CURR_PTR holds the address + 8 */
@@ -662,14 +676,37 @@ static inline unsigned int snd_via82xx_cur_ptr(via82xx_t *chip, viadev_t *viadev
 
 	case TYPE_VIA8233:
 	default:
-		/* ah, this register makes life easier for us here. */
-		val = inb(VIAREG(chip, OFFSET_CURR_INDEX) + viadev->reg_offset) % viadev->tbl_entries;
+		count = inl(VIAREG(chip, OFFSET_CURR_COUNT) + viadev->reg_offset);
+		val = count >> 24;
+		count &= 0xffffff;
 		break;
 	}
 
 	/* convert to the linear position */
-	return viadev->idx_table[val].offset +
-		viadev->idx_table[val].size - count;
+	ptr = viadev->idx_table[val].size;
+	res = viadev->idx_table[val].offset + ptr - count;
+
+	if (ptr < count || (res < viadev->lastpos && (res >= viadev->bufsize2 || viadev->lastpos < viadev->bufsize2))) {
+#ifdef POINTER_DEBUG
+		printk("fail: val = %i/%i, lastpos = 0x%x, bufsize2 = 0x%x, offsize = 0x%x, size = 0x%x, count = 0x%x\n", val, viadev->tbl_entries, viadev->lastpos, viadev->bufsize2, viadev->idx_table[val].offset, viadev->idx_table[val].size, count);
+#endif
+		/* VIA8233 count register returns full size when end of buffer is reached */
+		if (ptr != count) {
+			snd_printk("invalid via82xx_cur_ptr, using last valid pointer\n");
+			res = viadev->lastpos;
+		} else {
+			res = viadev->idx_table[val].offset + ptr;
+			if (res < viadev->lastpos && (res >= viadev->bufsize2 || viadev->lastpos < viadev->bufsize2)) {
+				snd_printk("invalid via82xx_cur_ptr (2), using last valid pointer\n");
+				res = viadev->lastpos;
+			}
+		}
+	}
+
+	viadev->lastpos = res;
+	spin_unlock(&chip->reg_lock);
+
+	return res;
 }
 
 static snd_pcm_uframes_t snd_via82xx_playback_pointer(snd_pcm_substream_t * substream)
@@ -1223,7 +1260,6 @@ static int __devinit snd_via82xx_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		return err;
 	}
-
 
 	if (snd_via82xx_mixer(chip) < 0) {
 		snd_card_free(card);

@@ -1603,11 +1603,8 @@ int
 snd_wavefront_synth_open (snd_hwdep_t *hw, struct file *file)
 
 {
-	MOD_INC_USE_COUNT;
-	if (!try_module_get(hw->card->module)) {
-		MOD_DEC_USE_COUNT;
+	if (!try_module_get(hw->card->module))
 		return -EFAULT;
-	}
 	file->private_data = hw;
 	return 0;
 }
@@ -1617,7 +1614,6 @@ snd_wavefront_synth_release (snd_hwdep_t *hw, struct file *file)
 
 {
 	module_put(hw->card->module);
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 

@@ -181,9 +181,6 @@ int snd_rawmidi_kernel_open(int cardnum, int device, int subdevice,
 
 	if (rfile)
 		rfile->input = rfile->output = NULL;
-#ifdef LINUX_2_2
-	MOD_INC_USE_COUNT;
-#endif
 	rmidi = snd_rawmidi_devices[(cardnum * SNDRV_RAWMIDI_DEVICES) + device];
 	if (rmidi == NULL) {
 		err = -ENODEV;
@@ -342,9 +339,6 @@ int snd_rawmidi_kernel_open(int cardnum, int device, int subdevice,
 	module_put(rmidi->card->module);
 	up(&rmidi->open_mutex);
       __error1:
-#ifdef LINUX_2_2
-	MOD_DEC_USE_COUNT;
-#endif
 	return err;
 }
 
@@ -499,9 +493,6 @@ int snd_rawmidi_kernel_release(snd_rawmidi_file_t * rfile)
 	}
 	up(&rmidi->open_mutex);
 	module_put(rmidi->card->module);
-#ifdef LINUX_2_2
-	MOD_DEC_USE_COUNT;
-#endif
 	return 0;
 }
 

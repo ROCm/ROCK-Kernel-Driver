@@ -671,6 +671,11 @@ AC97_DOUBLE("Surround Playback Switch", AC97_SURROUND_MASTER, 15, 7, 1, 1),
 AC97_DOUBLE("Surround Playback Volume", AC97_SURROUND_MASTER, 8, 0, 31, 1),
 };
 
+static const snd_kcontrol_new_t snd_ac97_sigmatel_surround[2] = {
+AC97_SINGLE("Sigmatel Surround Playback Switch", AC97_HEADPHONE, 15, 1, 1),
+AC97_DOUBLE("Sigmatel Surround Playback Volume", AC97_HEADPHONE, 8, 0, 31, 1)
+};
+
 static const snd_kcontrol_new_t snd_ac97_sigmatel_controls[] = {
 AC97_SINGLE("Sigmatel DAC 6dB Attenuate", AC97_SIGMATEL_ANALOG, 1, 1, 0),
 AC97_SINGLE("Sigmatel ADC 6dB Attenuate", AC97_SIGMATEL_ANALOG, 0, 1, 0)
@@ -1236,6 +1241,7 @@ static snd_kcontrol_t *snd_ac97_cnew(const snd_kcontrol_new_t *_template, ac97_t
 static int snd_ac97_mixer_build(snd_card_t * card, ac97_t * ac97)
 {
 	snd_kcontrol_t *kctl;
+	const snd_kcontrol_new_t *knew;
 	int err, idx;
 	unsigned char max;
 
@@ -1291,10 +1297,11 @@ static int snd_ac97_mixer_build(snd_card_t * card, ac97_t * ac97)
 	}
 
 	/* build headphone controls */
-	if (snd_ac97_try_volume_mix(ac97, AC97_HEADPHONE)) {
-		if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_controls_headphone[0], ac97))) < 0)
+	if (snd_ac97_try_volume_mix(ac97, AC97_HEADPHONE) || ac97->id == AC97_ID_STAC9708) {
+		knew = ac97->id == AC97_ID_STAC9708 ? snd_ac97_sigmatel_surround : snd_ac97_controls_headphone;
+		if ((err = snd_ctl_add(card, snd_ac97_cnew(knew, ac97))) < 0)
 			return err;
-		if ((err = snd_ctl_add(card, kctl = snd_ac97_cnew(&snd_ac97_controls_headphone[1], ac97))) < 0)
+		if ((err = snd_ctl_add(card, kctl = snd_ac97_cnew(knew + 1, ac97))) < 0)
 			return err;
 		snd_ac97_change_volume_params1(ac97, AC97_HEADPHONE, &max);
 		kctl->private_value &= ~(0xff << 16);

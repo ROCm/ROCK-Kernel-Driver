@@ -526,11 +526,7 @@ static struct snd_urb_ops audio_urb_ops[2] = {
 /*
  * complete callback from data urb
  */
-#ifndef OLD_USB
 static void snd_complete_urb(struct urb *urb, struct pt_regs *regs)
-#else
-static void snd_complete_urb(struct urb *urb)
-#endif
 {
 	snd_urb_ctx_t *ctx = (snd_urb_ctx_t *)urb->context;
 	snd_usb_substream_t *subs = ctx->subs;
@@ -555,11 +551,7 @@ static void snd_complete_urb(struct urb *urb)
 /*
  * complete callback from sync urb
  */
-#ifndef OLD_USB
 static void snd_complete_sync_urb(struct urb *urb, struct pt_regs *regs)
-#else
-static void snd_complete_sync_urb(struct urb *urb)
-#endif
 {
 	snd_urb_ctx_t *ctx = (snd_urb_ctx_t *)urb->context;
 	snd_usb_substream_t *subs = ctx->subs;
@@ -881,7 +873,7 @@ static int init_substream_urbs(snd_usb_substream_t *subs, snd_pcm_runtime_t *run
 		u->urb->transfer_flags = URB_ISO_ASAP | UNLINK_FLAGS;
 		u->urb->number_of_packets = u->packets;
 		u->urb->context = u;
-		u->urb->complete = (usb_complete_t)snd_complete_urb;
+		u->urb->complete = snd_usb_complete_callback(snd_complete_urb);
 	}
 
 	if (subs->syncpipe) {
@@ -903,7 +895,7 @@ static int init_substream_urbs(snd_usb_substream_t *subs, snd_pcm_runtime_t *run
 			u->urb->transfer_flags = URB_ISO_ASAP | UNLINK_FLAGS;
 			u->urb->number_of_packets = u->packets;
 			u->urb->context = u;
-			u->urb->complete = (usb_complete_t)snd_complete_sync_urb;
+			u->urb->complete = snd_usb_complete_callback(snd_complete_sync_urb);
 		}
 	}
 	return 0;
@@ -1325,11 +1317,7 @@ void *snd_usb_find_csint_desc(void *buffer, int buflen, void *after, u8 dsubtype
  * entry point for linux usb interface
  */
 
-#ifdef OLD_USB
-static void * usb_audio_probe(struct usb_device *dev, unsigned int ifnum,
-			      const struct usb_device_id *id);
-static void usb_audio_disconnect(struct usb_device *dev, void *ptr);
-#else
+#ifndef OLD_USB
 static int usb_audio_probe(struct usb_interface *intf,
 			   const struct usb_device_id *id);
 static void usb_audio_disconnect(struct usb_interface *intf);
@@ -2295,25 +2283,7 @@ static void snd_usb_audio_disconnect(struct usb_device *dev, void *ptr)
 	}
 }
 
-
-#ifdef OLD_USB
-
-/*
- * 2.4 USB kernel API
- */
-static void *usb_audio_probe(struct usb_device *dev, unsigned int ifnum,
-			     const struct usb_device_id *id)
-{
-	return snd_usb_audio_probe(dev, usb_ifnum_to_if(dev, ifnum), id);
-}
-
-static void usb_audio_disconnect(struct usb_device *dev, void *ptr)
-{
-	snd_usb_audio_disconnect(dev, ptr);
-}
-
-#else
-
+#ifndef OLD_USB
 /*
  * new 2.5 USB kernel API
  */
@@ -2323,7 +2293,7 @@ static int usb_audio_probe(struct usb_interface *intf,
 	void *chip;
 	chip = snd_usb_audio_probe(interface_to_usbdev(intf), intf, id);
 	if (chip) {
-		usb_set_intfdata(intf, chip);
+		dev_set_drvdata(&intf->dev, chip);
 		return 0;
 	} else
 		return -EIO;
@@ -2332,7 +2302,7 @@ static int usb_audio_probe(struct usb_interface *intf,
 static void usb_audio_disconnect(struct usb_interface *intf)
 {
 	snd_usb_audio_disconnect(interface_to_usbdev(intf),
-				 usb_get_intfdata(intf));
+				 dev_get_drvdata(&intf->dev));
 }
 #endif
 

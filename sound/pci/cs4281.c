@@ -26,6 +26,7 @@
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
+#include <linux/gameport.h>
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/pcm.h>
@@ -35,9 +36,6 @@
 #define SNDRV_GET_ID
 #include <sound/initval.h>
 
-#ifndef LINUX_2_2
-#include <linux/gameport.h>
-#endif
 
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("Cirrus Logic CS4281");
@@ -1309,7 +1307,7 @@ static void snd_cs4281_proc_done(cs4281_t * chip)
  * joystick support
  */
 
-#ifndef LINUX_2_2
+#if defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
 
 typedef struct snd_cs4281_gameport {
 	struct gameport info;
@@ -1399,7 +1397,9 @@ static void __devinit snd_cs4281_gameport(cs4281_t *chip)
 	gameport_register_port(&gp->info);
 }
 
-#endif /* !LINUX_2_2 */
+#else
+#define snd_cs4281_gameport(chip) /*NOP*/
+#endif /* CONFIG_GAMEPORT || CONFIG_GAMEPORT_MODULE */
 
 
 /*
@@ -1408,7 +1408,7 @@ static void __devinit snd_cs4281_gameport(cs4281_t *chip)
 
 static int snd_cs4281_free(cs4281_t *chip)
 {
-#ifndef LINUX_2_2
+#if defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
 	if (chip->gameport) {
 		gameport_unregister_port(&chip->gameport->info);
 		kfree(chip->gameport);
@@ -2041,9 +2041,7 @@ static int __devinit snd_cs4281_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		return err;
 	}
-#ifndef LINUX_2_2
 	snd_cs4281_gameport(chip);
-#endif
 	strcpy(card->driver, "CS4281");
 	strcpy(card->shortname, "Cirrus Logic CS4281");
 	sprintf(card->longname, "%s at 0x%lx, irq %d",

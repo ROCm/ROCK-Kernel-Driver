@@ -51,8 +51,8 @@ config SND_RME32
 	tristate "RME Digi32, 32/8, 32 PRO"
 	depends on SND
 	help
-	  Say 'Y' or 'M' to include support for RME Digi32, Digi32/8 and
-	  Digi32 PRO audio devices.
+	  Say 'Y' or 'M' to include support for RME Digi32, Digi32 PRO and
+	  Digi32/8 (Sek'd Prodif32, Prodif96 and Prodif Gold) audio devices.
 
 config SND_RME96
 	tristate "RME Digi96, 96/8, 96/8 PRO"

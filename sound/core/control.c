@@ -48,9 +48,6 @@ static int snd_ctl_open(struct inode *inode, struct file *file)
 	snd_ctl_file_t *ctl;
 	int err;
 
-#ifdef LINUX_2_2
-	MOD_INC_USE_COUNT;
-#endif
 	card = snd_cards[cardnum];
 	if (!card) {
 		err = -ENODEV;
@@ -82,13 +79,10 @@ static int snd_ctl_open(struct inode *inode, struct file *file)
 	return 0;
 
       __error:
-      	module_put(card->module);
+	module_put(card->module);
       __error2:
 	snd_card_file_remove(card, file);
       __error1:
-#ifdef LINUX_2_2
-      	MOD_DEC_USE_COUNT;
-#endif
       	return err;
 }
 
@@ -131,9 +125,6 @@ static int snd_ctl_release(struct inode *inode, struct file *file)
 	snd_magic_kfree(ctl);
 	module_put(card->module);
 	snd_card_file_remove(card, file);
-#ifdef LINUX_2_2
-	MOD_DEC_USE_COUNT;
-#endif
 	return 0;
 }
 

@@ -1540,9 +1540,6 @@ static int snd_pcm_oss_open(struct inode *inode, struct file *file)
 	device = SNDRV_MINOR_OSS_DEVICE(minor) == SNDRV_MINOR_OSS_PCM1 ?
 		adsp_map[cardnum] : dsp_map[cardnum];
 
-#ifdef LINUX_2_2
-	MOD_INC_USE_COUNT;
-#endif
 	pcm = snd_pcm_devices[(cardnum * SNDRV_PCM_DEVICES) + device];
 	if (pcm == NULL) {
 		err = -ENODEV;
@@ -1611,13 +1608,10 @@ static int snd_pcm_oss_open(struct inode *inode, struct file *file)
 	return err;
 
       __error:
-      	module_put(pcm->card->module);
+     	module_put(pcm->card->module);
       __error2:
       	snd_card_file_remove(pcm->card, file);
       __error1:
-#ifdef LINUX_2_2
-	MOD_DEC_USE_COUNT;
-#endif
 	return err;
 }
 
@@ -1640,9 +1634,6 @@ static int snd_pcm_oss_release(struct inode *inode, struct file *file)
 	wake_up(&pcm->open_wait);
 	module_put(pcm->card->module);
 	snd_card_file_remove(pcm->card, file);
-#ifdef LINUX_2_2
-	MOD_DEC_USE_COUNT;
-#endif
 	return 0;
 }
 
