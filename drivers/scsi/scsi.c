@@ -979,7 +979,7 @@ int scsi_device_get(struct scsi_device *sdev)
 {
 	if (!sdev)
 		return -ENXIO;
-	if (sdev->sdev_state == SDEV_DEL)
+	if (sdev->sdev_state == SDEV_DEL || sdev->sdev_state == SDEV_CANCEL)
 		return -ENXIO;
 	if (!get_device(&sdev->sdev_gendev))
 		return -ENXIO;
