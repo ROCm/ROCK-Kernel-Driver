@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: nodelist.c,v 1.88 2004/11/16 20:36:11 dwmw2 Exp $
+ * $Id: nodelist.c,v 1.89 2004/11/28 12:20:35 dedekind Exp $
  *
  */
 
@@ -182,7 +182,6 @@ int jffs2_get_inode_nodes(struct jffs2_sb_info *c, struct jffs2_inode_info *f,
 				err = -ENOMEM;
 				goto free_out;
 			}
-			memset(fd,0,sizeof(struct jffs2_full_dirent) + node.d.nsize+1);
 			fd->raw = ref;
 			fd->version = je32_to_cpu(node.d.version);
 			fd->ino = je32_to_cpu(node.d.ino);
@@ -220,6 +219,7 @@ int jffs2_get_inode_nodes(struct jffs2_sb_info *c, struct jffs2_inode_info *f,
 			}
 			fd->nhash = full_name_hash(fd->name, node.d.nsize);
 			fd->next = NULL;
+			fd->name[node.d.nsize] = '\0';
 				/* Wheee. We now have a complete jffs2_full_dirent structure, with
 				   the name in it and everything. Link it into the list 
 				*/
