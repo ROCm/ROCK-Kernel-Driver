@@ -4079,10 +4079,9 @@ static int selinux_setprocattr(struct task_struct *p,
 	u32 sid = 0;
 	int error;
 
-	if (current != p || !strcmp(name, "current")) {
+	if (current != p) {
 		/* SELinux only allows a process to change its own
-		   security attributes, and it only allows the process
-		   current SID to change via exec. */
+		   security attributes. */
 		return -EACCES;
 	}
 
@@ -4095,6 +4094,8 @@ static int selinux_setprocattr(struct task_struct *p,
 		error = task_has_perm(current, p, PROCESS__SETEXEC);
 	else if (!strcmp(name, "fscreate"))
 		error = task_has_perm(current, p, PROCESS__SETFSCREATE);
+	else if (!strcmp(name, "current"))
+		error = task_has_perm(current, p, PROCESS__SETCURRENT);
 	else
 		error = -EINVAL;
 	if (error)
@@ -4119,6 +4120,51 @@ static int selinux_setprocattr(struct task_struct *p,
 		tsec->exec_sid = sid;
 	else if (!strcmp(name, "fscreate"))
 		tsec->create_sid = sid;
+	else if (!strcmp(name, "current")) {
+		struct av_decision avd;
+
+		if (sid == 0)
+			return -EINVAL;
+
+		/* Only allow single threaded processes to change context */
+		if (atomic_read(&p->mm->mm_users) != 1) {
+			struct task_struct *g, *t;
+			struct mm_struct *mm = p->mm;
+			read_lock(&tasklist_lock);
+			do_each_thread(g, t)
+				if (t->mm == mm && t != p) {
+					read_unlock(&tasklist_lock);
+					return -EPERM;
+				}
+			while_each_thread(g, t);
+			read_unlock(&tasklist_lock);
+                }
+
+		/* Check permissions for the transition. */
+		error = avc_has_perm(tsec->sid, sid, SECCLASS_PROCESS,
+		                     PROCESS__DYNTRANSITION, NULL);
+		if (error)
+			return error;
+
+		/* Check for ptracing, and update the task SID if ok.
+		   Otherwise, leave SID unchanged and fail. */
+		task_lock(p);
+		if (p->ptrace & PT_PTRACED) {
+			error = avc_has_perm_noaudit(tsec->ptrace_sid, sid,
+						     SECCLASS_PROCESS,
+						     PROCESS__PTRACE, &avd);
+			if (!error)
+				tsec->sid = sid;
+			task_unlock(p);
+			avc_audit(tsec->ptrace_sid, sid, SECCLASS_PROCESS,
+				  PROCESS__PTRACE, &avd, error, NULL);
+			if (error)
+				return error;
+		} else {
+			tsec->sid = sid;
+			task_unlock(p);
+		}
+	}
 	else
 		return -EINVAL;
 

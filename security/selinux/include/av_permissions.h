@@ -456,6 +456,8 @@
 #define PROCESS__SIGINH                           0x00100000UL
 #define PROCESS__SETRLIMIT                        0x00200000UL
 #define PROCESS__RLIMITINH                        0x00400000UL
+#define PROCESS__DYNTRANSITION                    0x00800000UL
+#define PROCESS__SETCURRENT                       0x01000000UL
 
 #define IPC__CREATE                               0x00000001UL
 #define IPC__DESTROY                              0x00000002UL
