@@ -28,6 +28,7 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/netdevice.h>
+#include <linux/etherdevice.h>
 #include <linux/ip.h>
 #include <linux/atalk.h>
 #include <linux/if_arp.h>
@@ -55,34 +56,24 @@ static struct ipddp_route* ipddp_find_route(struct ipddp_route *rt);
 static int ipddp_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd);
 
 
-static int __init ipddp_init(struct net_device *dev)
+static struct net_device * __init ipddp_init(void)
 {
 	static unsigned version_printed;
+	struct net_device *dev;
+	int err;
+
+	dev = alloc_etherdev(sizeof(struct net_device_stats));
+	if (!dev)
+		return ERR_PTR(-ENOMEM);
 
 	SET_MODULE_OWNER(dev);
+	strcpy(dev->name, "ipddp%d");
 
 	if (version_printed++ == 0)
                 printk(version);
 
-	/* Let the user now what mode we are in */
-	if(ipddp_mode == IPDDP_ENCAP)
-		printk("%s: Appletalk-IP Encap. mode by Bradford W. Johnson <johns393@maroon.tc.umn.edu>\n", 
-			dev->name);
-	if(ipddp_mode == IPDDP_DECAP)
-		printk("%s: Appletalk-IP Decap. mode by Jay Schulist <jschlst@samba.org>\n", 
-			dev->name);
-
-	/* Fill in the device structure with ethernet-generic values. */
-        ether_setup(dev);
-
 	/* Initalize the device structure. */
         dev->hard_start_xmit = ipddp_xmit;
-
-        dev->priv = kmalloc(sizeof(struct net_device_stats), GFP_KERNEL);
-        if(!dev->priv)
-                return -ENOMEM;
-        memset(dev->priv,0,sizeof(struct net_device_stats));
-
         dev->get_stats      = ipddp_get_stats;
         dev->do_ioctl       = ipddp_ioctl;
 
@@ -97,7 +88,21 @@ static int __init ipddp_init(struct net_device *dev)
          */
         dev->hard_header_len = 14+8+sizeof(struct ddpehdr)+1;
 
-        return 0;
+	err = register_netdev(dev);
+	if (err) {
+		free_netdev(dev);
+		return ERR_PTR(err);
+	}
+
+	/* Let the user now what mode we are in */
+	if(ipddp_mode == IPDDP_ENCAP)
+		printk("%s: Appletalk-IP Encap. mode by Bradford W. Johnson <johns393@maroon.tc.umn.edu>\n", 
+			dev->name);
+	if(ipddp_mode == IPDDP_DECAP)
+		printk("%s: Appletalk-IP Decap. mode by Jay Schulist <jschlst@samba.org>\n", 
+			dev->name);
+
+        return dev;
 }
 
 /*
@@ -281,23 +286,16 @@ static int ipddp_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
         }
 }
 
-static struct net_device dev_ipddp;
+static struct net_device *dev_ipddp;
 
 MODULE_LICENSE("GPL");
 MODULE_PARM(ipddp_mode, "i");
 
 static int __init ipddp_init_module(void)
 {
-	int err;
-
-	dev_ipddp.init = ipddp_init;
-	err=dev_alloc_name(&dev_ipddp, "ipddp%d");
-        if(err < 0)
-                return err;
-
-	if(register_netdev(&dev_ipddp) != 0)
-                return -EIO;
-
+	dev_ipddp = ipddp_init();
+        if (IS_ERR(dev_ipddp))
+                return PTR_ERR(dev_ipddp);
 	return 0;
 }
 
@@ -305,8 +303,8 @@ static void __exit ipddp_cleanup_module(void)
 {
         struct ipddp_route *p;
 
-	unregister_netdev(&dev_ipddp);
-        kfree(dev_ipddp.priv);
+	unregister_netdev(dev_ipddp);
+        free_netdev(dev_ipddp);
 
         while (ipddp_route_list) {
                 p = ipddp_route_list->next;
