@@ -41,11 +41,48 @@
 #define DRIVER_DATE		"20020828"
 
 #define DRIVER_MAJOR		1
-#define DRIVER_MINOR		11
+#define DRIVER_MINOR		12
 #define DRIVER_PATCHLEVEL	0
 
 #define GET_RING_HEAD(dev_priv)		DRM_READ32(  (dev_priv)->ring_rptr, 0 )
 #define SET_RING_HEAD(dev_priv,val)	DRM_WRITE32( (dev_priv)->ring_rptr, 0, (val) )
+
+/*
+ * Radeon chip families
+ */
+enum radeon_family {
+	CHIP_R100,
+	CHIP_RS100,
+	CHIP_RV100,
+	CHIP_R200,
+	CHIP_RV200,
+	CHIP_RS200,
+	CHIP_R250,
+	CHIP_RS250,
+	CHIP_RV250,
+	CHIP_RV280,
+	CHIP_R300,
+	CHIP_RS300,
+	CHIP_RV350,
+	CHIP_LAST,
+};
+
+enum radeon_cp_microcode_version {
+	UCODE_R100,
+	UCODE_R200,
+	UCODE_R300,
+};
+
+/*
+ * Chip flags
+ */
+enum radeon_chip_flags {
+	CHIP_FAMILY_MASK = 0x0000ffffUL,
+	CHIP_FLAGS_MASK = 0xffff0000UL,
+	CHIP_IS_MOBILITY = 0x00010000UL,
+	CHIP_IS_IGP = 0x00020000UL,
+	CHIP_SINGLE_CRTC = 0x00040000UL,
+};
 
 typedef struct drm_radeon_freelist {
    	unsigned int age;
@@ -106,7 +143,7 @@ typedef struct drm_radeon_private {
 
 	int usec_timeout;
 
-	int is_r200;
+	int microcode_version;
 
 	int is_pci;
 	unsigned long phys_pci_gart;

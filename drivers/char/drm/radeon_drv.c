@@ -101,6 +101,8 @@ static struct pci_device_id pciidlist[] = {
  *       located in the card's address space
  * 1.11- Add packet R200_EMIT_RB3D_BLENDCOLOR to support GL_EXT_blend_color
  *       and GL_EXT_blend_[func|equation]_separate on r200
+ * 1.12- Add R300 CP microcode support - this just loads the CP on r300
+ *       (No 3D support yet - just microcode loading)
  */
 static drm_ioctl_desc_t ioctls[] = {
  [DRM_IOCTL_NR(DRM_RADEON_CP_INIT)]    = { radeon_cp_init,      1, 1 },

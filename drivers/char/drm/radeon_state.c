@@ -782,8 +782,8 @@ static void radeon_cp_dispatch_clear( drm_device_t *dev,
 	 * rendering a quad into just those buffers.  Thus, we have to
 	 * make sure the 3D engine is configured correctly.
 	 */
-	if ( dev_priv->is_r200 &&
-	     (flags & (RADEON_DEPTH | RADEON_STENCIL)) ) {
+	if ((dev_priv->microcode_version == UCODE_R200) &&
+	    (flags & (RADEON_DEPTH | RADEON_STENCIL))) {
 
 		int tempPP_CNTL;
 		int tempRE_CNTL;
