@@ -1487,55 +1487,14 @@ struct iw_statistics *wl3501_get_wireless_stats(struct net_device *dev)
 	return wstats;
 }
 
-static inline int wl3501_ethtool_ioctl(struct net_device *dev, void __user *uaddr)
+static void wl3501_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
 {
-	u32 ethcmd;
-	int rc = -EFAULT;
-
-	if (copy_from_user(&ethcmd, uaddr, sizeof(ethcmd)))
-		goto out;
-
-	switch (ethcmd) {
-	case ETHTOOL_GDRVINFO: {
-		struct ethtool_drvinfo info = { .cmd = ETHTOOL_GDRVINFO, };
-
-		strlcpy(info.driver, wl3501_dev_info, sizeof(info.driver));
-		rc = copy_to_user(uaddr, &info, sizeof(info)) ? -EFAULT : 1;
-	}
-	default:
-		rc = -EOPNOTSUPP;
-		break;
-	}
-out:
-	return rc;
+	strlcpy(info->driver, wl3501_dev_info, sizeof(info->driver));
 }
 
-/**
- * wl3501_ioctl - Perform IOCTL call functions
- * @dev - network device
- * @ifreq - request
- * @cmd - command
- *
- * Perform IOCTL call functions here. Some are privileged operations and the
- * effective uid is checked in those cases.
- *
- * This part is optional. Needed only if you want to run wlu (unix version).
- *
- * CAUTION: To prevent interrupted by wl3501_interrupt() and timer-based
- * wl3501_hard_start_xmit() from other interrupts, this should be run
- * single-threaded.
- */
-static int wl3501_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
-{
-	int rc = -ENODEV;
-
-	if (netif_device_present(dev)) {
-		rc = -EOPNOTSUPP;
-		if (cmd == SIOCETHTOOL)
-			rc = wl3501_ethtool_ioctl(dev, rq->ifr_data);
-	}
-	return rc;
-}
+static struct ethtool_ops ops = {
+	.get_drvinfo = wl3501_get_drvinfo
+};
 
 /**
  * wl3501_detach - deletes a driver "instance"
@@ -2047,8 +2006,8 @@ static dev_link_t *wl3501_attach(void)
 	dev->watchdog_timeo	= 5 * HZ;
 	dev->get_stats		= wl3501_get_stats;
 	dev->get_wireless_stats = wl3501_get_wireless_stats;
-	dev->do_ioctl		= wl3501_ioctl;
 	dev->wireless_handlers	= (struct iw_handler_def *)&wl3501_handler_def;
+	SET_ETHTOOL_OPS(dev, &ops);
 	netif_stop_queue(dev);
 	link->priv = link->irq.Instance = dev;
 
