@@ -865,12 +865,50 @@ int fastcall wake_up_state(task_t *p, unsigned int state)
 	return try_to_wake_up(p, state, 0);
 }
 
+#ifdef CONFIG_SMP
+static int find_idlest_cpu(struct task_struct *p, int this_cpu,
+			   struct sched_domain *sd);
+#endif
+
 /*
  * Perform scheduler related setup for a newly forked process p.
- * p is forked by current.
+ * p is forked by current. It also does runqueue balancing.
+ * The cpu hotplug lock is held.
  */
-void fastcall sched_fork(task_t *p)
+void fastcall sched_fork(task_t *p, unsigned long clone_flags)
 {
+	int cpu;
+#ifdef CONFIG_SMP
+	struct sched_domain *tmp, *sd = NULL;
+	preempt_disable();
+	cpu = smp_processor_id();
+
+	if ((clone_flags & (CLONE_VM|CLONE_VFORK)) == CLONE_VM) {
+		/*
+		 * New thread that is not a vfork.
+		 * Find the largest domain that this CPU is part of that
+		 * is willing to balance on clone:
+		 */
+		for_each_domain(cpu, tmp)
+			if (tmp->flags & SD_BALANCE_CLONE)
+				sd = tmp;
+		if (sd)
+			cpu = find_idlest_cpu(p, cpu, sd);
+	}
+	preempt_enable();
+#else
+	cpu = smp_processor_id();
+#endif
+	/*
+	 * The task hasn't been attached yet, so cpus_allowed mask cannot
+	 * change. The cpus_allowed mask of the parent may have changed
+	 * after it is copied, and it may then move to a CPU that is not
+	 * allowed for the child.
+	 */
+	if (unlikely(!cpu_isset(cpu, p->cpus_allowed)))
+		cpu = any_online_cpu(p->cpus_allowed);
+	set_task_cpu(p, cpu);
+
 	/*
 	 * We mark the process as running here, but have not actually
 	 * inserted it onto the runqueue yet. This guarantees that
@@ -920,43 +958,81 @@ void fastcall sched_fork(task_t *p)
 }
 
 /*
- * wake_up_forked_process - wake up a freshly forked process.
+ * wake_up_new_task - wake up a newly created task for the first time.
  *
  * This function will do some initial scheduler statistics housekeeping
- * that must be done for every newly created process.
+ * that must be done for every newly created context, then puts the task
+ * on the runqueue and wakes it.
  */
-void fastcall wake_up_forked_process(task_t * p)
+void fastcall wake_up_new_task(task_t * p, unsigned long clone_flags)
 {
 	unsigned long flags;
-	runqueue_t *rq = task_rq_lock(current, &flags);
+	int this_cpu, cpu;
+	runqueue_t *rq;
+
+	rq = task_rq_lock(p, &flags);
+	cpu = task_cpu(p);
+	this_cpu = smp_processor_id();
 
 	BUG_ON(p->state != TASK_RUNNING);
 
 	/*
 	 * We decrease the sleep average of forking parents
 	 * and children as well, to keep max-interactive tasks
-	 * from forking tasks that are max-interactive.
+	 * from forking tasks that are max-interactive. The parent
+	 * (current) is done further down, under its lock.
 	 */
-	current->sleep_avg = JIFFIES_TO_NS(CURRENT_BONUS(current) *
-		PARENT_PENALTY / 100 * MAX_SLEEP_AVG / MAX_BONUS);
-
 	p->sleep_avg = JIFFIES_TO_NS(CURRENT_BONUS(p) *
 		CHILD_PENALTY / 100 * MAX_SLEEP_AVG / MAX_BONUS);
 
 	p->interactive_credit = 0;
 
 	p->prio = effective_prio(p);
-	set_task_cpu(p, smp_processor_id());
 
-	if (unlikely(!current->array))
+	if (likely(cpu == this_cpu)) {
+		if (!(clone_flags & CLONE_VM)) {
+			/*
+			 * The VM isn't cloned, so we're in a good position to
+			 * do child-runs-first in anticipation of an exec. This
+			 * usually avoids a lot of COW overhead.
+			 */
+			if (unlikely(!current->array))
+				__activate_task(p, rq);
+			else {
+				p->prio = current->prio;
+				list_add_tail(&p->run_list, &current->run_list);
+				p->array = current->array;
+				p->array->nr_active++;
+				rq->nr_running++;
+			}
+			set_need_resched();
+		} else {
+			/* Run child last */
+			__activate_task(p, rq);
+		}
+	} else {
+		runqueue_t *this_rq = cpu_rq(this_cpu);
+
+		/*
+		 * Not the local CPU - must adjust timestamp. This should
+		 * get optimised away in the !CONFIG_SMP case.
+		 */
+		p->timestamp = (p->timestamp - this_rq->timestamp_last_tick)
+					+ rq->timestamp_last_tick;
 		__activate_task(p, rq);
-	else {
-		p->prio = current->prio;
-		list_add_tail(&p->run_list, &current->run_list);
-		p->array = current->array;
-		p->array->nr_active++;
-		rq->nr_running++;
+		if (TASK_PREEMPTS_CURR(p, rq))
+			resched_task(rq->curr);
+
+		current->sleep_avg = JIFFIES_TO_NS(CURRENT_BONUS(current) *
+			PARENT_PENALTY / 100 * MAX_SLEEP_AVG / MAX_BONUS);
 	}
+
+	if (unlikely(cpu != this_cpu)) {
+		task_rq_unlock(rq, &flags);
+		rq = task_rq_lock(current, &flags);
+	}
+	current->sleep_avg = JIFFIES_TO_NS(CURRENT_BONUS(current) *
+		PARENT_PENALTY / 100 * MAX_SLEEP_AVG / MAX_BONUS);
 	task_rq_unlock(rq, &flags);
 }
 
@@ -1226,89 +1302,6 @@ static int find_idlest_cpu(struct task_struct *p, int this_cpu,
 }
 
 /*
- * wake_up_forked_thread - wake up a freshly forked thread.
- *
- * This function will do some initial scheduler statistics housekeeping
- * that must be done for every newly created context, and it also does
- * runqueue balancing.
- */
-void fastcall wake_up_forked_thread(task_t * p)
-{
-	unsigned long flags;
-	int this_cpu = get_cpu(), cpu;
-	struct sched_domain *tmp, *sd = NULL;
-	runqueue_t *this_rq = cpu_rq(this_cpu), *rq;
-
-	/*
-	 * Find the largest domain that this CPU is part of that
-	 * is willing to balance on clone:
-	 */
-	for_each_domain(this_cpu, tmp)
-		if (tmp->flags & SD_BALANCE_CLONE)
-			sd = tmp;
-	if (sd)
-		cpu = find_idlest_cpu(p, this_cpu, sd);
-	else
-		cpu = this_cpu;
-
-	local_irq_save(flags);
-lock_again:
-	rq = cpu_rq(cpu);
-	double_rq_lock(this_rq, rq);
-
-	BUG_ON(p->state != TASK_RUNNING);
-
-	/*
-	 * We did find_idlest_cpu() unlocked, so in theory
-	 * the mask could have changed - just dont migrate
-	 * in this case:
-	 */
-	if (unlikely(!cpu_isset(cpu, p->cpus_allowed))) {
-		cpu = this_cpu;
-		double_rq_unlock(this_rq, rq);
-		goto lock_again;
-	}
-	/*
-	 * We decrease the sleep average of forking parents
-	 * and children as well, to keep max-interactive tasks
-	 * from forking tasks that are max-interactive.
-	 */
-	current->sleep_avg = JIFFIES_TO_NS(CURRENT_BONUS(current) *
-		PARENT_PENALTY / 100 * MAX_SLEEP_AVG / MAX_BONUS);
-
-	p->sleep_avg = JIFFIES_TO_NS(CURRENT_BONUS(p) *
-		CHILD_PENALTY / 100 * MAX_SLEEP_AVG / MAX_BONUS);
-
-	p->interactive_credit = 0;
-
-	p->prio = effective_prio(p);
-	set_task_cpu(p, cpu);
-
-	if (cpu == this_cpu) {
-		if (unlikely(!current->array))
-			__activate_task(p, rq);
-		else {
-			p->prio = current->prio;
-			list_add_tail(&p->run_list, &current->run_list);
-			p->array = current->array;
-			p->array->nr_active++;
-			rq->nr_running++;
-		}
-	} else {
-		/* Not the local CPU - must adjust timestamp */
-		p->timestamp = (p->timestamp - this_rq->timestamp_last_tick)
-					+ rq->timestamp_last_tick;
-		__activate_task(p, rq);
-		if (TASK_PREEMPTS_CURR(p, rq))
-			resched_task(rq->curr);
-	}
-
-	double_rq_unlock(this_rq, rq);
-	local_irq_restore(flags);
-	put_cpu();
-}
-
-/*
  * If dest_cpu is allowed for this process, migrate the task to it.
  * This is accomplished by forcing the cpu_allowed mask to only
  * allow dest_cpu, which will force the cpu onto dest_cpu.  Then
@@ -1341,13 +1334,13 @@ out:
 }
 
 /*
- * sched_balance_exec(): find the highest-level, exec-balance-capable
+ * sched_exec(): find the highest-level, exec-balance-capable
  * domain and try to migrate the task to the least loaded CPU.
  *
  * execve() is a valuable balancing opportunity, because at this point
  * the task has the smallest effective memory and cache footprint.
  */
-void sched_balance_exec(void)
+void sched_exec(void)
 {
 	struct sched_domain *tmp, *sd = NULL;
 	int new_cpu, this_cpu = get_cpu();

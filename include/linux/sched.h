@@ -692,10 +692,11 @@ static inline int set_cpus_allowed(task_t *p, cpumask_t new_mask)
 
 extern unsigned long long sched_clock(void);
 
+/* sched_exec is called by processes performing an exec */
 #ifdef CONFIG_SMP
-extern void sched_balance_exec(void);
+extern void sched_exec(void);
 #else
-#define sched_balance_exec()   {}
+#define sched_exec()   {}
 #endif
 
 extern void sched_idle_next(void);
@@ -754,18 +755,14 @@ extern void do_timer(struct pt_regs *);
 
 extern int FASTCALL(wake_up_state(struct task_struct * tsk, unsigned int state));
 extern int FASTCALL(wake_up_process(struct task_struct * tsk));
-extern void FASTCALL(wake_up_forked_process(struct task_struct * tsk));
+extern void FASTCALL(wake_up_new_task(struct task_struct * tsk,
+						unsigned long clone_flags));
 #ifdef CONFIG_SMP
  extern void kick_process(struct task_struct *tsk);
- extern void FASTCALL(wake_up_forked_thread(struct task_struct * tsk));
 #else
  static inline void kick_process(struct task_struct *tsk) { }
- static inline void wake_up_forked_thread(struct task_struct * tsk)
- {
-	wake_up_forked_process(tsk);
- }
 #endif
-extern void FASTCALL(sched_fork(task_t * p));
+extern void FASTCALL(sched_fork(task_t * p, unsigned long clone_flags));
 extern void FASTCALL(sched_exit(task_t * p));
 
 extern int in_group_p(gid_t);

@@ -893,6 +893,16 @@ struct task_struct *copy_process(unsigned long clone_flags,
 	if ((clone_flags & CLONE_SIGHAND) && !(clone_flags & CLONE_VM))
 		return ERR_PTR(-EINVAL);
 
+	/*
+	 * The newly dup'ed task shares the same cpus_allowed mask as its
+	 * parent (ie. current), and it is not attached to the tasklist.
+	 * The end result is that this CPU might go down and the parent
+	 * be migrated away, leaving the task on a dead CPU. So take the
+	 * hotplug lock here and release it after the child has been attached
+	 * to the tasklist.
+	 */
+	lock_cpu_hotplug();
+
 	retval = security_task_create(clone_flags);
 	if (retval)
 		goto fork_out;
@@ -1020,7 +1030,7 @@ struct task_struct *copy_process(unsigned long clone_flags,
 	p->pdeath_signal = 0;
 
 	/* Perform scheduler related setup */
-	sched_fork(p);
+	sched_fork(p, clone_flags);
 
 	/*
 	 * Ok, make it visible to the rest of the system.
@@ -1098,6 +1108,7 @@ struct task_struct *copy_process(unsigned long clone_flags,
 	retval = 0;
 
 fork_out:
+	unlock_cpu_hotplug();
 	if (retval)
 		return ERR_PTR(retval);
 	return p;
@@ -1204,31 +1215,10 @@ long do_fork(unsigned long clone_flags,
 			set_tsk_thread_flag(p, TIF_SIGPENDING);
 		}
 
-		if (!(clone_flags & CLONE_STOPPED)) {
-			/*
-			 * Do the wakeup last. On SMP we treat fork() and
-			 * CLONE_VM separately, because fork() has already
-			 * created cache footprint on this CPU (due to
-			 * copying the pagetables), hence migration would
-			 * probably be costy. Threads on the other hand
-			 * have less traction to the current CPU, and if
-			 * there's an imbalance then the scheduler can
-			 * migrate this fresh thread now, before it
-			 * accumulates a larger cache footprint:
-			 */
-			if (clone_flags & CLONE_VM)
-				wake_up_forked_thread(p);
-			else
-				wake_up_forked_process(p);
-		} else {
-			int cpu = get_cpu();
-
+		if (!(clone_flags & CLONE_STOPPED))
+			wake_up_new_task(p, clone_flags);
+		else
 			p->state = TASK_STOPPED;
-			if (cpu_is_offline(task_cpu(p)))
-				set_task_cpu(p, cpu);
-
-			put_cpu();
-		}
 		++total_forks;
 
 		if (unlikely (trace)) {
@@ -1240,12 +1230,7 @@ long do_fork(unsigned long clone_flags,
 			wait_for_completion(&vfork);
 			if (unlikely (current->ptrace & PT_TRACE_VFORK_DONE))
 				ptrace_notify ((PTRACE_EVENT_VFORK_DONE << 8) | SIGTRAP);
-		} else
-			/*
-			 * Let the child process run first, to avoid most of the
-			 * COW overhead when the child exec()s afterwards.
-			 */
-			set_need_resched();
+		}
 	}
 	return pid;
 }
