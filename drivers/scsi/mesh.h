@@ -9,25 +9,26 @@
 
 int mesh_detect(Scsi_Host_Template *);
 int mesh_release(struct Scsi_Host *);
-int mesh_command(Scsi_Cmnd *);
 int mesh_queue(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
 int mesh_abort(Scsi_Cmnd *);
-int mesh_reset(Scsi_Cmnd *, unsigned int);
+int mesh_host_reset(Scsi_Cmnd *);
 
-#define SCSI_MESH {					\
-	proc_name:	"mesh",				\
-	name:		"MESH",				\
-	detect:		mesh_detect,			\
-	release:	mesh_release,			\
-	command:	mesh_command,			\
-	queuecommand:	mesh_queue,			\
-	abort:		mesh_abort,			\
-	reset:		mesh_reset,			\
-	can_queue:	20,				\
-	this_id:	7,				\
-	sg_tablesize:	SG_ALL,				\
-	cmd_per_lun:	2,				\
-	use_clustering:	DISABLE_CLUSTERING,		\
+#define SCSI_MESH {						\
+	proc_name:			"mesh",			\
+	name:				"MESH",			\
+	detect:				mesh_detect,		\
+	release:			mesh_release,		\
+	command:			NULL,			\
+	queuecommand:			mesh_queue,		\
+	eh_abort_handler:		mesh_abort,		\
+	eh_device_reset_handler:	NULL,			\
+	eh_bus_reset_handler:		NULL,			\
+	eh_host_reset_handler:		mesh_host_reset,	\
+	can_queue:			20,			\
+	this_id:			7,			\
+	sg_tablesize:			SG_ALL,			\
+	cmd_per_lun:			2,			\
+	use_clustering:			DISABLE_CLUSTERING,	\
 }
 
 /*
