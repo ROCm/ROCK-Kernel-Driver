@@ -148,15 +148,13 @@ static int sctp_v6_xmit(struct sk_buff *skb, struct sctp_transport *transport,
 	struct sock *sk = skb->sk;
 	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct flowi fl;
-	struct dst_entry *dst = skb->dst;
-	struct rt6_info *rt6 = (struct rt6_info *)dst;
 
 	fl.proto = sk->protocol;
 
 	/* Fill in the dest address from the route entry passed with the skb
 	 * and the source address from the transport.
 	 */
-	fl.fl6_dst = &rt6->rt6i_dst.addr;
+	fl.fl6_dst = &transport->ipaddr.v6.sin6_addr;
 	fl.fl6_src = &transport->saddr.v6.sin6_addr;
 
 	fl.fl6_flowlabel = np->flow_label;
