@@ -308,12 +308,8 @@ void __init softirq_init(void)
 
 static int ksoftirqd(void * __bind_cpu)
 {
-	int cpu = (int) (long) __bind_cpu;
-
 	set_user_nice(current, 19);
 	current->flags |= PF_IOTHREAD;
-
-	BUG_ON(smp_processor_id() != cpu);
 
 	set_current_state(TASK_INTERRUPTIBLE);
 
@@ -324,12 +320,31 @@ static int ksoftirqd(void * __bind_cpu)
 		__set_current_state(TASK_RUNNING);
 
 		while (local_softirq_pending()) {
+			/* Preempt disable stops cpu going offline.
+			   If already offline, we'll be on wrong CPU:
+			   don't process */
+			preempt_disable();
+			if (cpu_is_offline((long)__bind_cpu))
+				goto wait_to_die;
 			do_softirq();
+			preempt_enable();
 			cond_resched();
 		}
 
 		__set_current_state(TASK_INTERRUPTIBLE);
 	}
+	__set_current_state(TASK_RUNNING);
+	return 0;
+
+wait_to_die:
+	preempt_enable();
+	/* Wait for kthread_stop */
+	__set_current_state(TASK_INTERRUPTIBLE);
+	while (!kthread_should_stop()) {
+		schedule();
+		__set_current_state(TASK_INTERRUPTIBLE);
+	}
+	__set_current_state(TASK_RUNNING);
 	return 0;
 }
 
@@ -362,6 +377,27 @@ void tasklet_kill_immediate(struct tasklet_struct *t, unsigned int cpu)
 	}
 	BUG();
 }
+
+static void takeover_tasklets(unsigned int cpu)
+{
+	struct tasklet_struct **i;
+
+	/* CPU is dead, so no lock needed. */
+	local_irq_disable();
+
+	/* Find end, append list for that CPU. */
+	for (i = &__get_cpu_var(tasklet_vec).list; *i; i = &(*i)->next);
+	*i = per_cpu(tasklet_vec, cpu).list;
+	per_cpu(tasklet_vec, cpu).list = NULL;
+	raise_softirq_irqoff(TASKLET_SOFTIRQ);
+
+	for (i = &__get_cpu_var(tasklet_hi_vec).list; *i; i = &(*i)->next);
+	*i = per_cpu(tasklet_hi_vec, cpu).list;
+	per_cpu(tasklet_hi_vec, cpu).list = NULL;
+	raise_softirq_irqoff(HI_SOFTIRQ);
+
+	local_irq_enable();
+}
 #endif /* CONFIG_HOTPLUG_CPU */
 
 static int __devinit cpu_callback(struct notifier_block *nfb,
@@ -380,13 +416,23 @@ static int __devinit cpu_callback(struct notifier_block *nfb,
 			printk("ksoftirqd for %i failed\n", hotcpu);
 			return NOTIFY_BAD;
 		}
-		per_cpu(ksoftirqd, hotcpu) = p;
 		kthread_bind(p, hotcpu);
   		per_cpu(ksoftirqd, hotcpu) = p;
  		break;
 	case CPU_ONLINE:
 		wake_up_process(per_cpu(ksoftirqd, hotcpu));
 		break;
+#ifdef CONFIG_HOTPLUG_CPU
+	case CPU_UP_CANCELED:
+		/* Unbind so it can run.  Fall thru. */
+		kthread_bind(per_cpu(ksoftirqd, hotcpu), smp_processor_id());
+	case CPU_DEAD:
+		p = per_cpu(ksoftirqd, hotcpu);
+		per_cpu(ksoftirqd, hotcpu) = NULL;
+		kthread_stop(p);
+		takeover_tasklets(hotcpu);
+		break;
+#endif /* CONFIG_HOTPLUG_CPU */
  	}
 	return NOTIFY_OK;
 }
