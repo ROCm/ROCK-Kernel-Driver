@@ -127,7 +127,8 @@ EXPORT_SYMBOL(enable_irq);
 EXPORT_SYMBOL(disable_irq);
 EXPORT_SYMBOL(probe_irq_mask);
 EXPORT_SYMBOL(set_irq_type);
-EXPORT_SYMBOL(set_irq_wake);
+EXPORT_SYMBOL(enable_irq_wake);
+EXPORT_SYMBOL(disable_irq_wake);
 EXPORT_SYMBOL(pm_idle);
 EXPORT_SYMBOL(pm_power_off);
 EXPORT_SYMBOL(fp_init);
@@ -201,7 +202,6 @@ EXPORT_SYMBOL(__arch_clear_user);
 EXPORT_SYMBOL(__arch_strnlen_user);
 
 	/* consistent area handling */
-EXPORT_SYMBOL(pci_alloc_consistent);
 EXPORT_SYMBOL(consistent_alloc);
 EXPORT_SYMBOL(consistent_free);
 EXPORT_SYMBOL(consistent_sync);

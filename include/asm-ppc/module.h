@@ -28,7 +28,7 @@ struct mod_arch_specific
 
 /* Make empty sections for module_frob_arch_sections to expand. */
 #ifdef MODULE
-asm(".section .plt,\"aws\",@nobits; .align 3; .previous");
-asm(".section .plt.init,\"aws\",@nobits; .align 3; .previous");
+asm(".section .plt,\"ax\",@nobits; .align 3; .previous");
+asm(".section .init.plt,\"ax\",@nobits; .align 3; .previous");
 #endif
 #endif /* _ASM_PPC_MODULE_H */

@@ -603,7 +603,7 @@ static int do_signal(sigset_t *oldset, struct pt_regs *regs, int syscall)
 			case SIGQUIT: case SIGILL: case SIGTRAP:
 			case SIGABRT: case SIGFPE: case SIGSEGV:
 			case SIGBUS: case SIGSYS: case SIGXCPU: case SIGXFSZ:
-				if (do_coredump(signr, regs))
+				if (do_coredump(signr, exit_code, regs))
 					exit_code |= 0x80;
 				/* FALLTHRU */
 
@@ -615,7 +615,11 @@ static int do_signal(sigset_t *oldset, struct pt_regs *regs, int syscall)
 
 		/* Are we from a system call? */
 		if (syscall) {
+			/* If so, check system call restarting.. */
 			switch (regs->ARM_r0) {
+			case -ERESTART_RESTARTBLOCK:
+				current_thread_info()->restart_block.fn =
+					do_no_restart_syscall;
 			case -ERESTARTNOHAND:
 				regs->ARM_r0 = -EINTR;
 				break;
@@ -638,12 +642,35 @@ static int do_signal(sigset_t *oldset, struct pt_regs *regs, int syscall)
 		return 1;
 	}
 
-	if (syscall &&
-	    (regs->ARM_r0 == -ERESTARTNOHAND ||
-	     regs->ARM_r0 == -ERESTARTSYS ||
-	     regs->ARM_r0 == -ERESTARTNOINTR)) {
-		regs->ARM_r0 = regs->ARM_ORIG_r0;
-		regs->ARM_pc -= 4;
+	/*
+	 * No signal to deliver to the process - restart the syscall.
+	 */
+	if (syscall) {
+		if (regs->ARM_r0 == -ERESTART_RESTARTBLOCK) {
+			if (thumb_mode(regs)) {
+				regs->ARM_r7 = __NR_restart_syscall;
+				regs->ARM_pc -= 2;
+			} else {
+				u32 *usp;
+
+				regs->ARM_sp -= 12;
+				usp = (u32 *)regs->ARM_sp;
+
+				put_user(regs->ARM_pc, &usp[0]);
+				/* swi __NR_restart_syscall */
+				put_user(0xef000000 | __NR_restart_syscall, &usp[1]);
+				/* ldr	pc, [sp], #12 */
+				put_user(0xe49df00c, &usp[2]);
+
+				regs->ARM_pc = regs->ARM_sp + 4;
+			}
+		}
+		if (regs->ARM_r0 == -ERESTARTNOHAND ||
+		    regs->ARM_r0 == -ERESTARTSYS ||
+		    regs->ARM_r0 == -ERESTARTNOINTR) {
+			regs->ARM_r0 = regs->ARM_ORIG_r0;
+			regs->ARM_pc -= 4;
+		}
 	}
 	if (single_stepping)
 		ptrace_set_bpt(current);

@@ -6,9 +6,13 @@
 #include <linux/kernel.h>
 #include <linux/tty.h>
 #include <linux/delay.h>
+#include <linux/device.h>
 #include <linux/ioport.h>
 
 #include <asm/hardware.h>
+#include <asm/hardware/sa1111.h>
+#include <asm/irq.h>
+#include <asm/mach-types.h>
 #include <asm/setup.h>
 
 #include <asm/mach/arch.h>
@@ -19,33 +23,29 @@
 
 
 #define JORTUCR_VAL	0x20000400
-#define JORSKCR_INIT	0x00002081	/* Turn off VCO to enable PLL, set Ready En and enable nOE assertion from DC */
-#define JORSKCR_RCLK	0x00002083	/* Add turning on RCLK to above */
-#define JORSKCR_VAL	0x0000001B	/* sets the 1101 control register to on */
 
 static int __init jornada720_init(void)
 {
-	GPDR |= GPIO_GPIO20;
-	TUCR = JORTUCR_VAL;	/* set the oscillator out to the SA-1101 */
+	int ret = -ENODEV;
 
-	GPSR = GPIO_GPIO20;
-	udelay(1);
-	GPCR = GPIO_GPIO20;
-	udelay(1);
-	GPSR = GPIO_GPIO20;
-	udelay(20);
-	SKCR = JORSKCR_INIT;	/* Turn on the PLL, enable Ready and enable nOE assertion from DC */
-	mdelay(100);
+	if (machine_is_jornada720()) {
+		GPDR |= GPIO_GPIO20;
+		TUCR = JORTUCR_VAL;	/* set the oscillator out to the SA-1101 */
 
-	SBI_SKCR = JORSKCR_RCLK;/* turn on the RCLOCK */
-	SBI_SMCR = 0x35;	/* initialize the SMC (debug SA-1111 reset */
-	PCCR = 0;		/* initialize the S2MC (debug SA-1111 reset) */
+		GPSR = GPIO_GPIO20;
+		udelay(1);
+		GPCR = GPIO_GPIO20;
+		udelay(1);
+		GPSR = GPIO_GPIO20;
+		udelay(20);
 
-	/* LDD4 is speaker, LDD3 is microphone */
-	PPSR &= ~(PPC_LDD3 | PPC_LDD4);
-	PPDR |= PPC_LDD3 | PPC_LDD4;
+		/* LDD4 is speaker, LDD3 is microphone */
+		PPSR &= ~(PPC_LDD3 | PPC_LDD4);
+		PPDR |= PPC_LDD3 | PPC_LDD4;
 
-	return sa1111_init(0x40000000, IRQ_GPIO1);
+		ret = sa1111_init(0x40000000, IRQ_GPIO1);
+	}
+	return ret;
 }
 
 arch_initcall(jornada720_init);

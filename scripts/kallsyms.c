@@ -144,7 +144,7 @@ write_src(void)
 		for (k = 0; table[i].sym[k] && table[i].sym[k] == prev[k]; ++k)
 			; 
 
-		printf("\t.asciz\t\"\\x%02x%s\"\n", k, table[i].sym + k);
+		printf("\t.byte 0x%02x ; .asciz\t\"%s\"\n", k, table[i].sym + k);
 		last_addr = table[i].addr;
 		prev = table[i].sym;
 	}

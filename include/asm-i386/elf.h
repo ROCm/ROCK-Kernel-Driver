@@ -8,6 +8,7 @@
 #include <asm/ptrace.h>
 #include <asm/user.h>
 #include <asm/processor.h>
+#include <asm/system.h>		/* for savesegment */
 
 #include <linux/utsname.h>
 
@@ -57,11 +58,6 @@ typedef struct user_fxsr_struct elf_fpxregset_t;
    that it will "exec", and that there is sufficient room for the brk.  */
 
 #define ELF_ET_DYN_BASE         (TASK_SIZE / 3 * 2)
-
-/* Wow, the "main" arch needs arch dependent functions too.. :) */
-
-#define savesegment(seg,value) \
-	asm volatile("movl %%" #seg ",%0":"=m" (*(int *)&(value)))
 
 /* regs is struct pt_regs, pr_reg is elf_gregset_t (which is
    now struct_user_regs, they are different) */

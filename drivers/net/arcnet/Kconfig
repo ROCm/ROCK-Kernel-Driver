@@ -3,7 +3,7 @@
 #
 
 menu "ARCnet devices"
-	depends on NETDEVICES
+	depends on NETDEVICES && (ISA || PCI)
 
 config ARCNET
 	tristate "ARCnet support"

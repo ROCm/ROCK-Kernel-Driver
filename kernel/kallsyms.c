@@ -32,6 +32,7 @@ const char *kallsyms_lookup(unsigned long addr,
 		BUG();
 
 	namebuf[127] = 0;
+	namebuf[0] = 0;
 
 	if (addr >= (unsigned long)_stext && addr <= (unsigned long)_etext) {
 		unsigned long symbol_end;
@@ -46,10 +47,10 @@ const char *kallsyms_lookup(unsigned long addr,
 
 		/* Grab name */
 		for (i = 0; i < best; i++) { 
-			++name;
-			strncpy(namebuf + name[-1], name, 127); 
-			name += strlen(name)+1;
-		} 
+			unsigned prefix = *name++;
+			strncpy(namebuf + prefix, name, 127 - prefix);
+			name += strlen(name) + 1;
+		}
 
 		/* Base symbol size on next symbol. */
 		if (best + 1 < kallsyms_num_syms)

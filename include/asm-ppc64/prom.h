@@ -155,12 +155,6 @@ struct prom_args {
         prom_arg_t *rets;     /* Pointer to return values in args[16]. */
 };
 
-typedef struct {
-	u32  printf;	/* void (*printf)(char *, ...); */
-	u32  memdump;	/* void (*memdump)(unsigned char *, unsigned long); */
-	u32  dummy;		/* void (*dummy)(void); */
-} yaboot_debug_t;
-
 struct prom_t {
 	unsigned long entry;
 	ihandle chosen;
@@ -171,9 +165,6 @@ struct prom_t {
 	unsigned long version;
 	unsigned long encode_phys_size;
 	struct bi_record *bi_recs;
-#ifdef DEBUG_YABOOT
-	yaboot_debug_t *yaboot;
-#endif
 };
 
 extern struct prom_t prom;
@@ -183,7 +174,7 @@ extern int boot_cpuid;
 /* Prototypes */
 extern void abort(void);
 extern unsigned long prom_init(unsigned long, unsigned long, unsigned long,
-    unsigned long, unsigned long, yaboot_debug_t *);
+    unsigned long, unsigned long);
 extern void prom_print(const char *msg);
 extern void relocate_nodes(void);
 extern void finish_device_tree(void);

@@ -88,6 +88,15 @@ static inline void __init neponset_init_irq(void)
 	set_irq_chained_handler(IRQ_GPIO25, neponset_irq_handler);
 
 	/*
+	 * We would set IRQ_GPIO25 to be a wake-up IRQ, but
+	 * unfortunately something on the Neponset activates
+	 * this IRQ on sleep (ethernet?)
+	 */
+#if 0
+	enable_irq_wake(IRQ_GPIO25);
+#endif
+
+	/*
 	 * Setup other Neponset IRQs.  SA1111 will be done by the
 	 * generic SA1111 code.
 	 */
@@ -191,7 +200,7 @@ static int neponset_resume(struct device *dev, u32 level)
 }
 
 static struct device_driver neponset_device_driver = {
-	.name		= "NEPONSET",
+	.name		= "neponset",
 	.bus		= &system_bus_type,
 	.suspend	= neponset_suspend,
 	.resume		= neponset_resume,

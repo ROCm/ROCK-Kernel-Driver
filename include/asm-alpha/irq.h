@@ -31,7 +31,6 @@
 # define NR_IRQS	32
 
 #elif defined(CONFIG_ALPHA_ALCOR)     || \
-      defined(CONFIG_ALPHA_XLT)       || \
       defined(CONFIG_ALPHA_MIATA)     || \
       defined(CONFIG_ALPHA_RUFFIAN)   || \
       defined(CONFIG_ALPHA_RX164)     || \

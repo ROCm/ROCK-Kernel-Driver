@@ -249,6 +249,19 @@ static int sa1111_type_lowirq(unsigned int irq, unsigned int flags)
 		INTPOL0 &= ~mask;
 	else
 		INTPOL0 |= mask;
+	WAKE_POL0 = INTPOL0;
+
+	return 0;
+}
+
+static int sa1111_wake_lowirq(unsigned int irq, unsigned int on)
+{
+	unsigned int mask = SA1111_IRQMASK_LO(irq);
+
+	if (on)
+		WAKE_EN0 |= mask;
+	else
+		WAKE_EN0 &= ~mask;
 
 	return 0;
 }
@@ -259,6 +272,7 @@ static struct irqchip sa1111_low_chip = {
 	.unmask		= sa1111_unmask_lowirq,
 	.rerun		= sa1111_rerun_lowirq,
 	.type		= sa1111_type_lowirq,
+	.wake		= sa1111_wake_lowirq,
 };
 
 static void sa1111_mask_highirq(unsigned int irq)
@@ -309,6 +323,19 @@ static int sa1111_type_highirq(unsigned int irq, unsigned int flags)
 		INTPOL1 &= ~mask;
 	else
 		INTPOL1 |= mask;
+	WAKE_POL1 = INTPOL1;
+
+	return 0;
+}
+
+static int sa1111_wake_highirq(unsigned int irq, unsigned int on)
+{
+	unsigned int mask = SA1111_IRQMASK_HI(irq);
+
+	if (on)
+		WAKE_EN1 |= mask;
+	else
+		WAKE_EN1 &= ~mask;
 
 	return 0;
 }
@@ -319,6 +346,7 @@ static struct irqchip sa1111_high_chip = {
 	.unmask		= sa1111_unmask_highirq,
 	.rerun		= sa1111_rerun_highirq,
 	.type		= sa1111_type_highirq,
+	.wake		= sa1111_wake_highirq,
 };
 
 static void __init sa1111_init_irq(struct sa1111_dev *sadev)
@@ -854,7 +882,7 @@ static int sa1111_remove(struct device *dev)
  *	PXA250/SA1110 machine classes.
  */
 static struct device_driver sa1111_device_driver = {
-	.name		= "SA1111",
+	.name		= "sa1111",
 	.bus		= &system_bus_type,
 	.probe		= sa1111_probe,
 	.remove		= sa1111_remove,

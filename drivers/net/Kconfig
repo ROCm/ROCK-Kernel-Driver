@@ -1,7 +1,42 @@
 #
 # Network device configuration
 #
-source "drivers/net/arcnet/Kconfig"
+
+config NETDEVICES
+	depends on NET
+	bool "Network device support"
+	---help---
+	  You can say N here if you don't intend to connect your Linux box to
+	  any other computer at all or if all your connections will be over a
+	  telephone line with a modem either via UUCP (UUCP is a protocol to
+	  forward mail and news between unix hosts over telephone lines; read
+	  the UUCP-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>) or dialing up a shell
+	  account or a BBS, even using term (term is a program which gives you
+	  almost full Internet connectivity if you have a regular dial up
+	  shell account on some Internet connected Unix computer. Read
+	  <http://www.bart.nl/~patrickr/term-howto/Term-HOWTO.html>).
+
+	  You'll have to say Y if your computer contains a network card that
+	  you want to use under Linux (make sure you know its name because you
+	  will be asked for it and read the Ethernet-HOWTO (especially if you
+	  plan to use more than one network card under Linux)) or if you want
+	  to use SLIP (Serial Line Internet Protocol is the protocol used to
+	  send Internet traffic over telephone lines or null modem cables) or
+	  CSLIP (compressed SLIP) or PPP (Point to Point Protocol, a better
+	  and newer replacement for SLIP) or PLIP (Parallel Line Internet
+	  Protocol is mainly used to create a mini network by connecting the
+	  parallel ports of two local machines) or AX.25/KISS (protocol for
+	  sending Internet traffic over amateur radio links).
+
+	  Make sure to read the NET-3-HOWTO. Eventually, you will have to read
+	  Olaf Kirch's excellent and free book "Network Administrator's
+	  Guide", to be found in <http://www.linuxdoc.org/docs.html#guide>. If
+	  unsure, say Y.
+
+if NETDEVICES
+	source "drivers/net/arcnet/Kconfig"
+endif
 
 config DUMMY
 	tristate "Dummy net driver support"
@@ -245,6 +280,19 @@ config ARIADNE
 	  want). The module is called ariadne.o. If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt>.
 
+config ARIADNE2
+	tristate "Ariadne II support"
+	depends on NETDEVICES && ZORRO
+	help
+	  This driver is for the Village Tronic Ariadne II and the Individual
+	  Computers X-Surf Ethernet cards. If you have such a card, say Y.
+	  Otherwise, say N.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called ariadne2.o. If you want to compile it as
+	  a module, say M here and read <file:Documentation/modules.txt>.
+
 config NE2K_ZORRO
 	tristate "Ariadne II and X-Surf support"
 	depends on NET_ETHERNET && ZORRO
@@ -271,6 +319,156 @@ config HYDRA
 	  inserted in and removed from the running kernel whenever you
 	  want). The module is called hydra.o. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
+
+config APNE
+	tristate "PCMCIA NE2000 support"
+	depends on NETDEVICES && AMIGA_PCMCIA
+	help
+	  If you have a PCMCIA NE2000 compatible adapter, say Y.  Otherwise,
+	  say N.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you
+	  want). The module is called apne.o. If you want to compile it as a
+	  module, say M here and read <file:Documentation/modules.txt>.
+
+config APOLLO_ELPLUS
+	tristate "Apollo 3c505 support"
+	depends on NETDEVICES && APOLLO
+	help
+	  Say Y or M here if your Apollo has a 3Com 3c505 ISA Ethernet card.
+	  If you don't have one made for Apollos, you can use one from a PC,
+	  except that your Apollo won't be able to boot from it (because the
+	  code in the ROM will be for a PC).
+
+config MAC8390
+	bool "Macintosh NS 8390 based ethernet cards"
+	depends on NETDEVICES && MAC
+	help
+	  If you want to include a driver to support Nubus or LC-PDS
+	  Ethernet cards using an NS8390 chipset or its equivalent, say Y
+	  and read the Ethernet-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>.
+
+config MAC89x0
+	tristate "Macintosh CS89x0 based ethernet cards"
+	depends on NETDEVICES && MAC
+	---help---
+	  Support for CS89x0 chipset based Ethernet cards.  If you have a
+	  Nubus or LC-PDS network (Ethernet) card of this type, say Y and
+	  read the Ethernet-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>.
+
+	  If you want to compile this as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want),
+	  say M here and read <file:Documentation/modules.txt> as well as
+	  <file:Documentation/networking/net-modules.txt>.  This module will
+	  be called mac89x0.o.
+
+config MACSONIC
+	tristate "Macintosh SONIC based ethernet (onboard, NuBus, LC, CS)"
+	depends on NETDEVICES && MAC
+	---help---
+	  Support for NatSemi SONIC based Ethernet devices.  This includes
+	  the onboard Ethernet in many Quadras as well as some LC-PDS,
+	  a few Nubus and all known Comm Slot Ethernet cards.  If you have
+	  one of these say Y and read the Ethernet-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>.
+
+	  If you want to compile this as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want),
+	  say M here and read <file:Documentation/modules.txt> as well as
+	  <file:Documentation/networking/net-modules.txt>.  This module will
+	  be called macsonic.o.
+
+config MACMACE
+	bool "Macintosh (AV) onboard MACE ethernet (EXPERIMENTAL)"
+	depends on NETDEVICES && MAC && EXPERIMENTAL
+	help
+	  Support for the onboard AMD 79C940 MACE Ethernet controller used in
+	  the 660AV and 840AV Macintosh.  If you have one of these Macintoshes
+	  say Y and read the Ethernet-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>.
+
+config MVME147_NET
+	tristate "MVME147 (Lance) Ethernet support"
+	depends on NETDEVICES && MVME147
+	help
+	  Support for the on-board Ethernet interface on the Motorola MVME147
+	  single-board computer.  Say Y here to include the
+	  driver for this chip in your kernel.   If you want to compile it as
+	  a module, say M here and read <file:Documentation/modules.txt>.
+
+config MVME16x_NET
+	tristate "MVME16x Ethernet support"
+	depends on NETDEVICES && MVME16x
+	help
+	  This is the driver for the Ethernet interface on the Motorola
+	  MVME162, 166, 167, 172 and 177 boards.  Say Y here to include the
+	  driver for this chip in your kernel.   If you want to compile it as
+	  a module, say M here and read <file:Documentation/modules.txt>.
+
+config BVME6000_NET
+	tristate "BVME6000 Ethernet support"
+	depends on NETDEVICES && BVME6000
+	help
+	  This is the driver for the Ethernet interface on BVME4000 and
+	  BVME6000 VME boards.  Say Y here to include the driver for this chip
+	  in your kernel.   If you want to compile it as a module, say M here
+	  and read <file:Documentation/modules.txt>.
+
+config ATARILANCE
+	tristate "Atari Lance support"
+	depends on NETDEVICES && ATARI
+	help
+	  Say Y to include support for several Atari Ethernet adapters based
+	  on the AMD Lance chipset: RieblCard (with or without battery), or
+	  PAMCard VME (also the version by Rhotron, with different addresses).
+
+config ATARI_BIONET
+	tristate "BioNet-100 support"
+	depends on NETDEVICES && ATARI && ATARI_ACSI!=n
+	help
+	  Say Y to include support for BioData's BioNet-100 Ethernet adapter
+	  for the ACSI port. The driver works (has to work...) with a polled
+	  I/O scheme, so it's rather slow :-(
+
+config ATARI_PAMSNET
+	tristate "PAMsNet support"
+	depends on NETDEVICES && ATARI && ATARI_ACSI!=n
+	help
+	  Say Y to include support for the PAMsNet Ethernet adapter for the
+	  ACSI port ("ACSI node"). The driver works (has to work...) with a
+	  polled I/O scheme, so it's rather slow :-(
+
+config SUN3LANCE
+	tristate "Sun3/Sun3x on-board LANCE support"
+	depends on NETDEVICES && (SUN3 || SUN3X)
+	help
+	  Most Sun3 and Sun3x motherboards (including the 3/50, 3/60 and 3/80)
+	  featured an AMD Lance 10Mbit Ethernet controller on board; say Y
+	  here to compile in the Linux driver for this and enable Ethernet.
+	  General Linux information on the Sun 3 and 3x series (now
+	  discontinued) is at
+	  <http://www.angelfire.com/ca2/tech68k/sun3.html>.
+
+	  If you're not building a kernel for a Sun 3, say N.
+
+config SUN3_82586
+	tristate "Sun3 on-board Intel 82586 support"
+	depends on NETDEVICES && SUN3
+	help
+	  This driver enables support for the on-board Intel 82586 based
+	  Ethernet adapter found on Sun 3/1xx and 3/2xx motherboards.  Note
+	  that this driver does not support 82586-based adapters on additional
+	  VME boards.
+
+config HPLANCE
+	bool "HP on-board LANCE support"
+	depends on NETDEVICES && HP300
+	help
+	  If you want to use the builtin "LANCE" Ethernet controller on an
+	  HP300 machine, say Y here.
 
 config LASI_82596
 	tristate "Lasi ethernet"
@@ -384,7 +582,7 @@ config SUNGEM
 
 config NET_VENDOR_3COM
 	bool "3COM cards"
-	depends on NET_ETHERNET
+	depends on NET_ETHERNET && (ISA || EISA || MCA || PCI)
 	help
 	  If you have a network (Ethernet) card belonging to this class, say Y
 	  and read the Ethernet-HOWTO, available from
@@ -555,7 +753,7 @@ config LANCE
 
 config NET_VENDOR_SMC
 	bool "Western Digital/SMC cards"
-	depends on NET_ETHERNET
+	depends on NET_ETHERNET && (ISA || MCA || EISA || MAC)
 	help
 	  If you have a network (Ethernet) card belonging to this class, say Y
 	  and read the Ethernet-HOWTO, available from
@@ -631,7 +829,7 @@ config ULTRA32
 
 config SMC9194
 	tristate "SMC 9194 support"
-	depends on NET_VENDOR_SMC && ISA
+	depends on NET_VENDOR_SMC && (ISA || MAC)
 	---help---
 	  This is support for the SMC9xxx based Ethernet cards. Choose this
 	  option if you have a DELL laptop with the docking station, or
@@ -648,7 +846,7 @@ config SMC9194
 
 config NET_VENDOR_RACAL
 	bool "Racal-Interlan (Micom) NI cards"
-	depends on NET_ETHERNET
+	depends on NET_ETHERNET && ISA
 	help
 	  If you have a network (Ethernet) card belonging to this class, such
 	  as the NI5010, NI5210 or NI6210, say Y and read the Ethernet-HOWTO,
@@ -898,7 +1096,7 @@ config ETH16I
 
 config NE2000
 	tristate "NE2000/NE1000 support"
-	depends on NET_ISA
+	depends on NET_ISA || (Q40 && m)
 	---help---
 	  If you have a network (Ethernet) card of this type, say Y and read
 	  the Ethernet-HOWTO, available from
@@ -1459,7 +1657,7 @@ config LAN_SAA9730
 
 config NET_POCKET
 	bool "Pocket and portable adapters"
-	depends on NET_ETHERNET
+	depends on NET_ETHERNET && ISA
 	---help---
 	  Cute little network (Ethernet) devices which attach to the parallel
 	  port ("pocket adapters"), commonly used with laptops. If you have
@@ -1777,7 +1975,7 @@ config VETH
 
 config FDDI
 	bool "FDDI driver support"
-	depends on NETDEVICES
+	depends on NETDEVICES && (PCI || EISA)
 	help
 	  Fiber Distributed Data Interface is a high speed local area network
 	  design; essentially a replacement for high speed Ethernet. FDDI can
@@ -1828,7 +2026,7 @@ config SKFP
 
 config HIPPI
 	bool "HIPPI driver support (EXPERIMENTAL)"
-	depends on NETDEVICES && EXPERIMENTAL && INET
+	depends on NETDEVICES && EXPERIMENTAL && INET && PCI
 	help
 	  HIgh Performance Parallel Interface (HIPPI) is a 800Mbit/sec and
 	  1600Mbit/sec dual-simplex switched or point-to-point network. HIPPI
@@ -2181,7 +2379,7 @@ config ARLAN
 
 config AIRONET4500
 	tristate "Aironet 4500/4800 series adapters"
-	depends on NET_RADIO
+	depends on NET_RADIO && (PCI || ISA || PCMCIA)
 	---help---
 	  www.aironet.com (recently bought by Cisco) makes these 802.11 DS
 	  adapters.  Driver by Elmer Joandi (elmer@ylenurme.ee).
@@ -2286,7 +2484,7 @@ source "drivers/net/tokenring/Kconfig"
 
 config NET_FC
 	bool "Fibre Channel driver support"
-	depends on NETDEVICES
+	depends on NETDEVICES && SCSI && PCI
 	help
 	  Fibre Channel is a high speed serial protocol mainly used to connect
 	  large storage devices to the computer; it is compatible with and
@@ -2348,3 +2546,4 @@ source "drivers/net/wan/Kconfig"
 
 source "drivers/net/pcmcia/Kconfig"
 
+source "drivers/atm/Kconfig"

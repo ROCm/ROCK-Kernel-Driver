@@ -108,15 +108,15 @@ int module_frob_arch_sections(Elf32_Ehdr *hdr,
 {
 	unsigned int i;
 
-	/* Find .plt and .pltinit sections */
+	/* Find .plt and .init.plt sections */
 	for (i = 0; i < hdr->e_shnum; i++) {
-		if (strcmp(secstrings + sechdrs[i].sh_name, ".plt.init") == 0)
+		if (strcmp(secstrings + sechdrs[i].sh_name, ".init.plt") == 0)
 			me->arch.init_plt_section = i;
 		else if (strcmp(secstrings + sechdrs[i].sh_name, ".plt") == 0)
 			me->arch.core_plt_section = i;
 	}
 	if (!me->arch.core_plt_section || !me->arch.init_plt_section) {
-		printk("Module doesn't contain .plt or .plt.init sections.\n");
+		printk("Module doesn't contain .plt or .init.plt sections.\n");
 		return -ENOEXEC;
 	}
 

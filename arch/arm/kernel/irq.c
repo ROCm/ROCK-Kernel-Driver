@@ -129,6 +129,31 @@ void enable_irq(unsigned int irq)
 	spin_unlock_irqrestore(&irq_controller_lock, flags);
 }
 
+/*
+ * Enable wake on selected irq
+ */
+void enable_irq_wake(unsigned int irq)
+{
+	struct irqdesc *desc = irq_desc + irq;
+	unsigned long flags;
+
+	spin_lock_irqsave(&irq_controller_lock, flags);
+	if (desc->chip->wake)
+		desc->chip->wake(irq, 1);
+	spin_unlock_irqrestore(&irq_controller_lock, flags);
+}
+
+void disable_irq_wake(unsigned int irq)
+{
+	struct irqdesc *desc = irq_desc + irq;
+	unsigned long flags;
+
+	spin_lock_irqsave(&irq_controller_lock, flags);
+	if (desc->chip->wake)
+		desc->chip->wake(irq, 0);
+	spin_unlock_irqrestore(&irq_controller_lock, flags);
+}
+
 int show_interrupts(struct seq_file *p, void *v)
 {
 	int i;

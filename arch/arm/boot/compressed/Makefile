@@ -9,7 +9,7 @@
 
 HEAD	= head.o
 OBJS	= misc.o
-FONTC	= drivers/video/font_acorn_8x8.c
+FONTC	= drivers/video/console/font_acorn_8x8.c
 
 #
 # Architecture dependencies

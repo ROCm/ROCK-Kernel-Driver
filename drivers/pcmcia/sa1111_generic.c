@@ -36,11 +36,11 @@ int sa1111_pcmcia_init(struct pcmcia_init *init)
 	int i, ret;
 
 	for (i = ret = 0; i < ARRAY_SIZE(irqs); i++) {
-		set_irq_type(irqs[i].irq, IRQT_FALLING);
 		ret = request_irq(irqs[i].irq, init->handler, SA_INTERRUPT,
 				  irqs[i].str, NULL);
 		if (ret)
 			break;
+		set_irq_type(irqs[i].irq, IRQT_FALLING);
 	}
 
 	if (i < ARRAY_SIZE(irqs)) {
@@ -280,7 +280,7 @@ static int pcmcia_resume(struct device *dev, u32 level)
 
 static struct sa1111_driver pcmcia_driver = {
 	.drv = {
-		.name		= "SA1111 PCMCIA",
+		.name		= "sa1111-pcmcia",
 		.bus		= &sa1111_bus_type,
 		.probe		= pcmcia_probe,
 		.remove		= __devexit_p(pcmcia_remove),
