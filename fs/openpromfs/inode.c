@@ -1018,16 +1018,23 @@ static void openprom_read_inode(struct inode * inode)
 	}
 }
 
+static int openprom_remount(struct super_block *sb, int *flags, char *data)
+{
+	*flags |= MS_NOATIME;
+	return 0;
+}
+
 static struct super_operations openprom_sops = { 
 	.read_inode	= openprom_read_inode,
 	.statfs		= simple_statfs,
+	.remount	= openprom_remount,
 };
 
 static int openprom_fill_super(struct super_block *s, void *data, int silent)
 {
 	struct inode * root_inode;
 
-	s->s_flags |= MS_NODIRATIME;
+	s->s_flags |= MS_NOATIME;
 	s->s_blocksize = 1024;
 	s->s_blocksize_bits = 10;
 	s->s_magic = OPENPROM_SUPER_MAGIC;
