@@ -257,7 +257,7 @@ static __inline__ u16 tcp_select_window(struct sock *sk)
  * We are working here with either a clone of the original
  * SKB, or a fresh unique copy made by the retransmit engine.
  */
-int tcp_transmit_skb(struct sock *sk, struct sk_buff *skb)
+static int tcp_transmit_skb(struct sock *sk, struct sk_buff *skb)
 {
 	if (skb != NULL) {
 		struct inet_opt *inet = inet_sk(sk);
@@ -1624,6 +1624,5 @@ EXPORT_SYMBOL(tcp_make_synack);
 EXPORT_SYMBOL(tcp_send_synack);
 EXPORT_SYMBOL(tcp_simple_retransmit);
 EXPORT_SYMBOL(tcp_sync_mss);
-EXPORT_SYMBOL(tcp_transmit_skb);
 EXPORT_SYMBOL(tcp_write_wakeup);
 EXPORT_SYMBOL(tcp_write_xmit);

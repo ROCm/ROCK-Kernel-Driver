@@ -954,7 +954,6 @@ extern int  tcp_write_wakeup(struct sock *);
 extern void tcp_send_fin(struct sock *sk);
 extern void tcp_send_active_reset(struct sock *sk, int priority);
 extern int  tcp_send_synack(struct sock *);
-extern int  tcp_transmit_skb(struct sock *, struct sk_buff *);
 extern void tcp_push_one(struct sock *, unsigned mss_now);
 extern void tcp_send_ack(struct sock *sk);
 extern void tcp_send_delayed_ack(struct sock *sk);
