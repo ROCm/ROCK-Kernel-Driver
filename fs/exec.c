@@ -609,7 +609,9 @@ static inline int de_thread(struct task_struct *tsk)
 		newsig->group_stop_count = 0;
 		newsig->curr_target = NULL;
 		init_sigpending(&newsig->shared_pending);
+		INIT_LIST_HEAD(&newsig->posix_timers);
 
+		newsig->tty = oldsig->tty;
 		newsig->pgrp = oldsig->pgrp;
 		newsig->session = oldsig->session;
 		newsig->leader = oldsig->leader;
