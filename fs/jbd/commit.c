@@ -212,7 +212,7 @@ write_out_data_locked:
 				BUFFER_TRACE(bh, "writeout complete: unfile");
 				__journal_unfile_buffer(jh);
 				jh->b_transaction = NULL;
-				__journal_remove_journal_head(bh);
+				journal_remove_journal_head(bh);
 				__brelse(bh);
 			}
 		}
@@ -692,7 +692,7 @@ skip_commit: /* The journal should be unlocked by now. */
 			J_ASSERT_JH(jh, jh->b_next_transaction == NULL);
 			__journal_unfile_buffer(jh);
 			jh->b_transaction = 0;
-			__journal_remove_journal_head(bh);
+			journal_remove_journal_head(bh);
 			__brelse(bh);
 		}
 		spin_unlock(&journal_datalist_lock);

@@ -293,6 +293,7 @@ enum jbd_state_bits {
 	BH_RevokeValid,		/* Revoked flag is valid */
 	BH_JBDDirty,		/* Is dirty but journaled */
 	BH_State,		/* Pins most journal_head state */
+	BH_JournalHead,		/* Pins bh->b_private and jh->b_bh */
 };
 
 BUFFER_FNS(JBD, jbd)
@@ -324,6 +325,16 @@ static inline int jbd_trylock_bh_state(struct buffer_head *bh)
 static inline void jbd_unlock_bh_state(struct buffer_head *bh)
 {
 	bit_spin_unlock(BH_State, &bh->b_state);
+}
+
+static inline void jbd_lock_bh_journal_head(struct buffer_head *bh)
+{
+	bit_spin_lock(BH_JournalHead, &bh->b_state);
+}
+
+static inline void jbd_unlock_bh_journal_head(struct buffer_head *bh)
+{
+	bit_spin_unlock(BH_JournalHead, &bh->b_state);
 }
 
 #define HAVE_JOURNAL_CALLBACK_STATUS
@@ -956,7 +967,6 @@ extern int	   journal_force_commit(journal_t *);
 extern struct journal_head
 		*journal_add_journal_head(struct buffer_head *bh);
 extern void	journal_remove_journal_head(struct buffer_head *bh);
-extern void	__journal_remove_journal_head(struct buffer_head *bh);
 extern void	journal_unlock_journal_head(struct journal_head *jh);
 
 /*

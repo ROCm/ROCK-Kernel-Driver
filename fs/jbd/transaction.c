@@ -1204,7 +1204,7 @@ void journal_forget (handle_t *handle, struct buffer_head *bh)
 		if (jh->b_cp_transaction) {
 			__journal_file_buffer(jh, transaction, BJ_Forget);
 		} else {
-			__journal_remove_journal_head(bh);
+			journal_remove_journal_head(bh);
 			__brelse(bh);
 			if (!buffer_jbd(bh)) {
 				spin_unlock(&journal_datalist_lock);
@@ -1608,7 +1608,7 @@ static inline int __journal_try_to_free_buffer(struct buffer_head *bh)
 			JBUFFER_TRACE(jh, "release data");
 			__journal_unfile_buffer(jh);
 			jh->b_transaction = 0;
-			__journal_remove_journal_head(bh);
+			journal_remove_journal_head(bh);
 			__brelse(bh);
 		}
 	} else if (jh->b_cp_transaction != 0 && jh->b_transaction == 0) {
@@ -1616,7 +1616,7 @@ static inline int __journal_try_to_free_buffer(struct buffer_head *bh)
 		if (jh->b_jlist == BJ_None) {
 			JBUFFER_TRACE(jh, "remove from checkpoint list");
 			__journal_remove_checkpoint(jh);
-			__journal_remove_journal_head(bh);
+			journal_remove_journal_head(bh);
 			__brelse(bh);
 		}
 	}
@@ -1710,7 +1710,7 @@ static int dispose_buffer(struct journal_head *jh,
 		may_free = 0;
 	} else {
 		JBUFFER_TRACE(jh, "on running transaction");
-		__journal_remove_journal_head(bh);
+		journal_remove_journal_head(bh);
 		__brelse(bh);
 	}
 	spin_unlock(&journal_datalist_lock);
@@ -2051,7 +2051,7 @@ void journal_refile_buffer(struct journal_head *jh)
 	bh = jh2bh(jh);
 
 	__journal_refile_buffer(jh);
-	__journal_remove_journal_head(bh);
+	journal_remove_journal_head(bh);
 
 	spin_unlock(&journal_datalist_lock);
 	__brelse(bh);

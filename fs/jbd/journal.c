@@ -297,7 +297,7 @@ restart:
 			BUFFER_TRACE(bh, "data writeout complete: unfile");
 			__journal_unfile_buffer(jh);
 			jh->b_transaction = NULL;
-			__journal_remove_journal_head(bh);
+			journal_remove_journal_head(bh);
 			__brelse(bh);
 			goto restart;
 		}
@@ -1710,35 +1710,65 @@ static void journal_free_journal_head(struct journal_head *jh)
 struct journal_head *journal_add_journal_head(struct buffer_head *bh)
 {
 	struct journal_head *jh;
+	struct journal_head *new_jh = NULL;
 
-	spin_lock(&journal_datalist_lock);
+repeat:
+	if (!buffer_jbd(bh)) {
+		new_jh = journal_alloc_journal_head();
+		memset(new_jh, 0, sizeof(*new_jh));
+	}
+
+	jbd_lock_bh_journal_head(bh);
 	if (buffer_jbd(bh)) {
 		jh = bh2jh(bh);
 	} else {
 		J_ASSERT_BH(bh,
 			(atomic_read(&bh->b_count) > 0) ||
 			(bh->b_page && bh->b_page->mapping));
-		spin_unlock(&journal_datalist_lock);
-		jh = journal_alloc_journal_head();
-		memset(jh, 0, sizeof(*jh));
-		spin_lock(&journal_datalist_lock);
 
-		if (buffer_jbd(bh)) {
-			/* Someone did it for us! */
-			J_ASSERT_BH(bh, bh->b_private != NULL);
-			journal_free_journal_head(jh);
-			jh = bh->b_private;
-		} else {
-			set_bit(BH_JBD, &bh->b_state);
-			bh->b_private = jh;
-			jh->b_bh = bh;
-			atomic_inc(&bh->b_count);
-			BUFFER_TRACE(bh, "added journal_head");
+		if (!new_jh) {
+			jbd_unlock_bh_journal_head(bh);
+			goto repeat;
 		}
+
+		jh = new_jh;
+		new_jh = NULL;		/* We consumed it */
+		set_buffer_jbd(bh);
+		bh->b_private = jh;
+		jh->b_bh = bh;
+		get_bh(bh);
+		BUFFER_TRACE(bh, "added journal_head");
 	}
 	jh->b_jcount++;
-	spin_unlock(&journal_datalist_lock);
+	jbd_unlock_bh_journal_head(bh);
+	if (new_jh)
+		journal_free_journal_head(new_jh);
 	return bh->b_private;
+}
+
+static void __journal_remove_journal_head(struct buffer_head *bh)
+{
+	struct journal_head *jh = bh2jh(bh);
+
+	J_ASSERT_JH(jh, jh->b_jcount >= 0);
+
+	get_bh(bh);
+	if (jh->b_jcount == 0) {
+		if (jh->b_transaction == NULL &&
+				jh->b_next_transaction == NULL &&
+				jh->b_cp_transaction == NULL) {
+			J_ASSERT_BH(bh, buffer_jbd(bh));
+			J_ASSERT_BH(bh, jh2bh(jh) == bh);
+			BUFFER_TRACE(bh, "remove journal_head");
+			bh->b_private = NULL;
+			jh->b_bh = NULL;	/* debug, really */
+			clear_buffer_jbd(bh);
+			__brelse(bh);
+			journal_free_journal_head(jh);
+		} else {
+			BUFFER_TRACE(bh, "journal_head was locked");
+		}
+	}
 }
 
 /*
@@ -1753,54 +1783,26 @@ struct journal_head *journal_add_journal_head(struct buffer_head *bh)
  * The caller of journal_remove_journal_head() *must* run __brelse(bh) at some
  * time.  Once the caller has run __brelse(), the buffer is eligible for
  * reaping by try_to_free_buffers().
- *
- * Requires journal_datalist_lock.
  */
-void __journal_remove_journal_head(struct buffer_head *bh)
+void journal_remove_journal_head(struct buffer_head *bh)
 {
-	struct journal_head *jh = bh2jh(bh);
-
-	assert_spin_locked(&journal_datalist_lock);
-	J_ASSERT_JH(jh, jh->b_jcount >= 0);
-	atomic_inc(&bh->b_count);
-	if (jh->b_jcount == 0) {
-		if (jh->b_transaction == NULL &&
-				jh->b_next_transaction == NULL &&
-				jh->b_cp_transaction == NULL) {
-			J_ASSERT_BH(bh, buffer_jbd(bh));
-			J_ASSERT_BH(bh, jh2bh(jh) == bh);
-			BUFFER_TRACE(bh, "remove journal_head");
-			bh->b_private = NULL;
-			jh->b_bh = NULL;	/* debug, really */
-			clear_bit(BH_JBD, &bh->b_state);
-			__brelse(bh);
-			journal_free_journal_head(jh);
-		} else {
-			BUFFER_TRACE(bh, "journal_head was locked");
-		}
-	}
+	jbd_lock_bh_journal_head(bh);
+	__journal_remove_journal_head(bh);
+	jbd_unlock_bh_journal_head(bh);
 }
 
 void journal_unlock_journal_head(struct journal_head *jh)
 {
-	spin_lock(&journal_datalist_lock);
+	struct buffer_head *bh = jh2bh(jh);
+
+	jbd_lock_bh_journal_head(bh);
 	J_ASSERT_JH(jh, jh->b_jcount > 0);
 	--jh->b_jcount;
 	if (!jh->b_jcount && !jh->b_transaction) {
-		struct buffer_head *bh;
-		bh = jh2bh(jh);
 		__journal_remove_journal_head(bh);
 		__brelse(bh);
 	}
-	
-	spin_unlock(&journal_datalist_lock);
-}
-
-void journal_remove_journal_head(struct buffer_head *bh)
-{
-	spin_lock(&journal_datalist_lock);
-	__journal_remove_journal_head(bh);
-	spin_unlock(&journal_datalist_lock);
+	jbd_unlock_bh_journal_head(bh);
 }
 
 /*

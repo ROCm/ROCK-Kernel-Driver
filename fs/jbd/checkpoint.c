@@ -59,7 +59,7 @@ static int __try_to_free_cp_buf(struct journal_head *jh)
 	if (jh->b_jlist == BJ_None && !buffer_locked(bh) && !buffer_dirty(bh)) {
 		JBUFFER_TRACE(jh, "remove from checkpoint list");
 		__journal_remove_checkpoint(jh);
-		__journal_remove_journal_head(bh);
+		journal_remove_journal_head(bh);
 		BUFFER_TRACE(bh, "release");
 		__brelse(bh);
 		ret = 1;
@@ -156,7 +156,7 @@ static int __cleanup_transaction(journal_t *journal, transaction_t *transaction)
 		if (!buffer_dirty(bh) && !buffer_jbddirty(bh)) {
 			BUFFER_TRACE(bh, "remove from checkpoint");
 			__journal_remove_checkpoint(jh);
-			__journal_remove_journal_head(bh);
+			journal_remove_journal_head(bh);
 			__brelse(bh);
 			ret = 1;
 		}
