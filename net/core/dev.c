@@ -1261,11 +1261,6 @@ int dev_queue_xmit(struct sk_buff *skb)
 	struct Qdisc *q;
 	int rc = -ENOMEM;
 
-	/* Disable soft irqs for various locks below. Also 
-	 * stops preemption for RCU. 
-	 */
-	local_bh_disable(); 
-
 	if (skb_shinfo(skb)->frag_list &&
 	    !(dev->features & NETIF_F_FRAGLIST) &&
 	    __skb_linearize(skb, GFP_ATOMIC))
@@ -1289,6 +1284,11 @@ int dev_queue_xmit(struct sk_buff *skb)
 	      skb->protocol != htons(ETH_P_IP))))
 	      	if (skb_checksum_help(skb, 0))
 	      		goto out_kfree_skb;
+
+	/* Disable soft irqs for various locks below. Also 
+	 * stops preemption for RCU. 
+	 */
+	local_bh_disable(); 
 
 	/* Updates of qdisc are serialized by queue_lock. 
 	 * The struct Qdisc which is pointed to by qdisc is now a 
@@ -1352,7 +1352,6 @@ int dev_queue_xmit(struct sk_buff *skb)
 			if (net_ratelimit())
 				printk(KERN_CRIT "Virtual device %s asks to "
 				       "queue packet!\n", dev->name);
-			goto out_enetdown;
 		} else {
 			/* Recursion is detected! It is possible,
 			 * unfortunately */
@@ -1361,10 +1360,13 @@ int dev_queue_xmit(struct sk_buff *skb)
 				       "%s, fix it urgently!\n", dev->name);
 		}
 	}
-out_enetdown:
+
 	rc = -ENETDOWN;
+	local_bh_enable();
+
 out_kfree_skb:
 	kfree_skb(skb);
+	return rc;
 out:
 	local_bh_enable();
 	return rc;
