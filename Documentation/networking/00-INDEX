@@ -104,8 +104,6 @@ smc9.txt
 	- the driver for SMC's 9000 series of Ethernet cards
 smctr.txt
 	- SMC TokenCard TokenRing Linux driver info.
-soundmodem.txt
-	- Linux driver for sound cards as AX.25 modems
 tcp.txt
 	- short blurb on how TCP output takes place.
 tlan.txt
