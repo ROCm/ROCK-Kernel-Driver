@@ -314,6 +314,18 @@ config SA1100_STORK
 	  Say Y here if you intend to run this kernel on the Stork
 	  handheld computer.
 
+#config SA1100_TRIZEPS
+#	bool "Trizeps"
+#	depends on ARCH_SA1100
+#	help
+#	  :: write me ::
+
+#config TRIZEPS_MFTB2
+#	bool "MFTB2"
+#	depends on SA1100_TRIZEPS
+#	help
+#	  :: write me ::
+
 config SA1100_USB
 	tristate "SA1100 USB function support"
 	depends on ARCH_SA1100
