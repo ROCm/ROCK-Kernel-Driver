@@ -137,11 +137,6 @@ char *disk_name (struct gendisk *hd, int minor, char *buf)
 			sprintf(s, "%s%d", "md", unit);
 			maj = s;
 			break;
-		case COMPAQ_CISS_MAJOR ... COMPAQ_CISS_MAJOR+7:
-			sprintf(s, "cciss/c%dd%d",
-				hd->major - COMPAQ_CISS_MAJOR, unit);
-			maj = s;
-			break;
 		case ATARAID_MAJOR:
 			sprintf(s, "ataraid/d%d", unit);
 			maj = s;
