@@ -13,6 +13,7 @@
 #include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/binfmts.h>
+#include <linux/mm.h>
 #include <asm/segment.h> 
 #include <asm/ptrace.h>
 #include <asm/processor.h>
@@ -272,9 +273,6 @@ static void elf32_init(struct pt_regs *regs)
 	set_thread_flag(TIF_IA32); 
 }
 
-extern void put_dirty_page(struct task_struct * tsk, struct page *page, unsigned long address);
- 
-
 int setup_arg_pages(struct linux_binprm *bprm)
 {
 	unsigned long stack_base;
@@ -319,7 +317,7 @@ int setup_arg_pages(struct linux_binprm *bprm)
 		struct page *page = bprm->page[i];
 		if (page) {
 			bprm->page[i] = NULL;
-			put_dirty_page(current,page,stack_base);
+			put_dirty_page(current,page,stack_base,PAGE_COPY_EXEC);
 		}
 		stack_base += PAGE_SIZE;
 	}

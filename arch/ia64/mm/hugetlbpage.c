@@ -12,12 +12,11 @@
 #include <linux/pagemap.h>
 #include <linux/smp_lock.h>
 #include <linux/slab.h>
+#include <linux/sysctl.h>
 #include <asm/mman.h>
 #include <asm/pgalloc.h>
 #include <asm/tlb.h>
 #include <asm/tlbflush.h>
-
-#include <linux/sysctl.h>
 
 #define TASK_HPAGE_BASE (REGION_HPAGE << REGION_SHIFT)
 
@@ -392,8 +391,6 @@ int set_hugetlb_mem_size(int count)
 {
 	int  lcount;
 	struct page *page ;
-	extern long htlbzone_pages;
-	extern struct list_head htlbpage_freelist;
 
 	if (count < 0)
 		lcount = count;

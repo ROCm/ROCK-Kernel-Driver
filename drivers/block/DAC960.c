@@ -48,8 +48,7 @@
 
 static DAC960_Controller_T *DAC960_Controllers[DAC960_MaxControllers];
 static int DAC960_ControllerCount;
-static PROC_DirectoryEntry_T *DAC960_ProcDirectoryEntry;
-
+static struct proc_dir_entry *DAC960_ProcDirectoryEntry;
 
 static long disk_size(DAC960_Controller_T *p, int drive_nr)
 {
@@ -759,12 +758,15 @@ static void DAC960_ExecuteCommand(DAC960_Command_T *Command)
 {
   DAC960_Controller_T *Controller = Command->Controller;
   DECLARE_COMPLETION(Completion);
-  unsigned long ProcessorFlags;
+  unsigned long flags;
   Command->Completion = &Completion;
-  DAC960_AcquireControllerLock(Controller, &ProcessorFlags);
+
+  spin_lock_irqsave(&Controller->queue_lock, flags);
   DAC960_QueueCommand(Command);
-  DAC960_ReleaseControllerLock(Controller, &ProcessorFlags);
-  if (in_interrupt()) return;
+  spin_unlock_irqrestore(&Controller->queue_lock, flags);
+ 
+  if (in_interrupt())
+	  return;
   wait_for_completion(&Completion);
 }
 
@@ -1132,7 +1134,7 @@ static boolean DAC960_V1_EnableMemoryMailboxInterface(DAC960_Controller_T
 {
   void *ControllerBaseAddress = Controller->BaseAddress;
   DAC960_HardwareType_T hw_type = Controller->HardwareType;
-  PCI_Device_T	*PCI_Device = Controller->PCIDevice;
+  struct pci_dev *PCI_Device = Controller->PCIDevice;
   struct dma_loaf *DmaPages = &Controller->DmaPages;
   size_t DmaPagesSize;
   size_t CommandMailboxesSize;
@@ -1337,7 +1339,7 @@ static boolean DAC960_V2_EnableMemoryMailboxInterface(DAC960_Controller_T
 						      *Controller)
 {
   void *ControllerBaseAddress = Controller->BaseAddress;
-  PCI_Device_T	*PCI_Device = Controller->PCIDevice;
+  struct pci_dev *PCI_Device = Controller->PCIDevice;
   struct dma_loaf *DmaPages = &Controller->DmaPages;
   size_t DmaPagesSize;
   size_t CommandMailboxesSize;
@@ -1915,8 +1917,8 @@ static boolean DAC960_V1_ReadDeviceConfiguration(DAC960_Controller_T
   dma_addr_t SCSI_NewInquiryUnitSerialNumberDMA[DAC960_V1_MaxChannels];
   DAC960_SCSI_Inquiry_UnitSerialNumber_T *SCSI_NewInquiryUnitSerialNumberCPU[DAC960_V1_MaxChannels];
 
-  Completion_T Completions[DAC960_V1_MaxChannels];
-  unsigned long ProcessorFlags;
+  struct completion Completions[DAC960_V1_MaxChannels];
+  unsigned long flags;
   int Channel, TargetID;
 
   if (!init_dma_loaf(Controller->PCIDevice, &local_dma, 
@@ -1951,7 +1953,7 @@ static boolean DAC960_V1_ReadDeviceConfiguration(DAC960_Controller_T
   	  DAC960_V1_DCDB_T *DCDB = DCDBs_cpu[Channel];
   	  dma_addr_t DCDB_dma = DCDBs_dma[Channel];
 	  DAC960_Command_T *Command = Controller->Commands[Channel];
-          Completion_T *Completion = &Completions[Channel];
+          struct completion *Completion = &Completions[Channel];
 
 	  init_completion(Completion);
 	  DAC960_V1_ClearCommand(Command);
@@ -1977,9 +1979,10 @@ static boolean DAC960_V1_ReadDeviceConfiguration(DAC960_Controller_T
 	  DCDB->CDB[3] = 0; /* Reserved */
 	  DCDB->CDB[4] = sizeof(DAC960_SCSI_Inquiry_T);
 	  DCDB->CDB[5] = 0; /* Control */
-	  DAC960_AcquireControllerLock(Controller, &ProcessorFlags);
+
+	  spin_lock_irqsave(&Controller->queue_lock, flags);
 	  DAC960_QueueCommand(Command);
-	  DAC960_ReleaseControllerLock(Controller, &ProcessorFlags);
+	  spin_unlock_irqrestore(&Controller->queue_lock, flags);
 	}
       /*
        * Wait for the problems submitted in the previous loop
@@ -1999,7 +2002,7 @@ static boolean DAC960_V1_ReadDeviceConfiguration(DAC960_Controller_T
 	    &Controller->V1.InquiryUnitSerialNumber[Channel][TargetID];
 	  DAC960_Command_T *Command = Controller->Commands[Channel];
   	  DAC960_V1_DCDB_T *DCDB = DCDBs_cpu[Channel];
-          Completion_T *Completion = &Completions[Channel];
+          struct completion *Completion = &Completions[Channel];
 
 	  wait_for_completion(Completion);
 
@@ -2021,9 +2024,10 @@ static boolean DAC960_V1_ReadDeviceConfiguration(DAC960_Controller_T
 	  DCDB->CDB[3] = 0; /* Reserved */
 	  DCDB->CDB[4] = sizeof(DAC960_SCSI_Inquiry_UnitSerialNumber_T);
 	  DCDB->CDB[5] = 0; /* Control */
-	  DAC960_AcquireControllerLock(Controller, &ProcessorFlags);
+
+	  spin_lock_irqsave(&Controller->queue_lock, flags);
 	  DAC960_QueueCommand(Command);
-	  DAC960_ReleaseControllerLock(Controller, &ProcessorFlags);
+	  spin_unlock_irqrestore(&Controller->queue_lock, flags);
 	  wait_for_completion(Completion);
 
 	  if (Command->V1.CommandStatus != DAC960_V1_NormalCompletion) {
@@ -2457,7 +2461,7 @@ static boolean DAC960_V2_ReportDeviceConfiguration(DAC960_Controller_T
 static boolean DAC960_RegisterBlockDevice(DAC960_Controller_T *Controller)
 {
   int MajorNumber = DAC960_MAJOR + Controller->ControllerNumber;
-  RequestQueue_T *RequestQueue;
+  struct request_queue *RequestQueue;
   int n;
 
   /*
@@ -2642,11 +2646,13 @@ static void DAC960_DetectCleanup(DAC960_Controller_T *Controller)
 */
 
 static DAC960_Controller_T * 
-DAC960_DetectController(PCI_Device_T *PCI_Device,
-					const struct pci_device_id *entry)
+DAC960_DetectController(struct pci_dev *PCI_Device,
+			const struct pci_device_id *entry)
 {
-  struct DAC960_privdata *privdata = (struct DAC960_privdata *)entry->driver_data;
-  irqreturn_t (*InterruptHandler)(int, void *, Registers_T *) = privdata->InterruptHandler;
+  struct DAC960_privdata *privdata =
+	  	(struct DAC960_privdata *)entry->driver_data;
+  irqreturn_t (*InterruptHandler)(int, void *, struct pt_regs *) =
+	  	privdata->InterruptHandler;
   unsigned int MemoryWindowSize = privdata->MemoryWindowSize;
   DAC960_Controller_T *Controller = NULL;
   unsigned char DeviceFunction = PCI_Device->devfn;
@@ -3001,7 +3007,7 @@ static void DAC960_FinalizeController(DAC960_Controller_T *Controller)
 {
   if (Controller->ControllerInitialized)
     {
-      unsigned long ProcessorFlags;
+      unsigned long flags;
 
       /*
        * Acquiring and releasing lock here eliminates
@@ -3019,9 +3025,11 @@ static void DAC960_FinalizeController(DAC960_Controller_T *Controller)
        * commands that complete from this time on will NOT return
        * their command structure to the free list.
        */
-      DAC960_AcquireControllerLock(Controller, &ProcessorFlags);
+
+      spin_lock_irqsave(&Controller->queue_lock, flags);
       Controller->ShutdownMonitoringTimer = 1;
-      DAC960_ReleaseControllerLock(Controller, &ProcessorFlags);
+      spin_unlock_irqrestore(&Controller->queue_lock, flags);
+
       del_timer_sync(&Controller->MonitoringTimer);
       if (Controller->FirmwareType == DAC960_V1_Controller)
 	{
@@ -3088,7 +3096,7 @@ DAC960_Probe(struct pci_dev *dev, const struct pci_device_id *entry)
   DAC960_Finalize finalizes the DAC960 Driver.
 */
 
-static void DAC960_Remove(PCI_Device_T *PCI_Device)
+static void DAC960_Remove(struct pci_dev *PCI_Device)
 {
   int Controller_Number = (int)pci_get_drvdata(PCI_Device);
   DAC960_Controller_T *Controller = DAC960_Controllers[Controller_Number];
@@ -3236,8 +3244,8 @@ static void DAC960_V2_QueueReadWriteCommand(DAC960_Command_T *Command)
 static boolean DAC960_ProcessRequest(DAC960_Controller_T *Controller,
 				     boolean WaitForCommand)
 {
-  RequestQueue_T *RequestQueue = &Controller->RequestQueue;
-  IO_Request_T *Request;
+  struct request_queue *RequestQueue = &Controller->RequestQueue;
+  struct request *Request;
   DAC960_Command_T *Command;
 
   if (!Controller->ControllerInitialized)
@@ -3293,7 +3301,7 @@ static boolean DAC960_ProcessRequest(DAC960_Controller_T *Controller,
 static void DAC960_queue_partial_rw(DAC960_Command_T *Command)
 {
   DAC960_Controller_T *Controller = Command->Controller;
-  IO_Request_T *Request = Command->Request;
+  struct request *Request = Command->Request;
 
   if (Command->DmaDirection == PCI_DMA_FROMDEVICE)
     Command->CommandType = DAC960_ReadRetryCommand;
@@ -3324,42 +3332,16 @@ static void DAC960_queue_partial_rw(DAC960_Command_T *Command)
   return;
 }
 
-
-/*
-  DAC960_ProcessRequests attempts to remove as many I/O Requests as possible
-  from Controller's I/O Request Queue and queue them to the Controller.
-*/
-
-static inline void DAC960_ProcessRequests(DAC960_Controller_T *Controller)
-{
-  int Counter = 0;
-  while (DAC960_ProcessRequest(Controller, Counter++ == 0)) ;
-}
-
-
 /*
   DAC960_RequestFunction is the I/O Request Function for DAC960 Controllers.
 */
 
-static void DAC960_RequestFunction(RequestQueue_T *RequestQueue)
+static void DAC960_RequestFunction(struct request_queue *RequestQueue)
 {
-  DAC960_Controller_T *Controller =
-    (DAC960_Controller_T *) RequestQueue->queuedata;
-  ProcessorFlags_T ProcessorFlags;
-  /*
-    Acquire exclusive access to Controller.
-  */
-  DAC960_AcquireControllerLockRF(Controller, &ProcessorFlags);
-  /*
-    Process I/O Requests for Controller.
-  */
-  DAC960_ProcessRequests(Controller);
-  /*
-    Release exclusive access to Controller.
-  */
-  DAC960_ReleaseControllerLockRF(Controller, &ProcessorFlags);
+	int i = 0;
+	while (DAC960_ProcessRequest(RequestQueue->queuedata, (i++ == 0)))
+		;
 }
-
 
 /*
   DAC960_ProcessCompletedBuffer performs completion processing for an
@@ -3369,7 +3351,7 @@ static void DAC960_RequestFunction(RequestQueue_T *RequestQueue)
 static inline boolean DAC960_ProcessCompletedRequest(DAC960_Command_T *Command,
 						 boolean SuccessfulIO)
 {
-	IO_Request_T *Request = Command->Request;
+	struct request *Request = Command->Request;
 	int UpToDate;
 
 	UpToDate = 0;
@@ -5174,20 +5156,14 @@ static void DAC960_V2_ProcessCompletedCommand(DAC960_Command_T *Command)
 
 static irqreturn_t DAC960_BA_InterruptHandler(int IRQ_Channel,
 				       void *DeviceIdentifier,
-				       Registers_T *InterruptRegisters)
+				       struct pt_regs *InterruptRegisters)
 {
   DAC960_Controller_T *Controller = (DAC960_Controller_T *) DeviceIdentifier;
   void *ControllerBaseAddress = Controller->BaseAddress;
   DAC960_V2_StatusMailbox_T *NextStatusMailbox;
-  ProcessorFlags_T ProcessorFlags;
+  unsigned long flags;
 
-  /*
-    Acquire exclusive access to Controller.
-  */
-  DAC960_AcquireControllerLockIH(Controller, &ProcessorFlags);
-  /*
-    Process Hardware Interrupts for Controller.
-  */
+  spin_lock_irqsave(&Controller->queue_lock, flags);
   DAC960_BA_AcknowledgeInterrupt(ControllerBaseAddress);
   NextStatusMailbox = Controller->V2.NextStatusMailbox;
   while (NextStatusMailbox->Fields.CommandIdentifier > 0)
@@ -5210,11 +5186,9 @@ static irqreturn_t DAC960_BA_InterruptHandler(int IRQ_Channel,
     Attempt to remove additional I/O Requests from the Controller's
     I/O Request Queue and queue them to the Controller.
   */
-  while (DAC960_ProcessRequest(Controller, false)) ;
-  /*
-    Release exclusive access to Controller.
-  */
-  DAC960_ReleaseControllerLockIH(Controller, &ProcessorFlags);
+  while (DAC960_ProcessRequest(Controller, false))
+	  ;
+  spin_unlock_irqrestore(&Controller->queue_lock, flags);
   return IRQ_HANDLED;
 }
 
@@ -5226,19 +5200,14 @@ static irqreturn_t DAC960_BA_InterruptHandler(int IRQ_Channel,
 
 static irqreturn_t DAC960_LP_InterruptHandler(int IRQ_Channel,
 				       void *DeviceIdentifier,
-				       Registers_T *InterruptRegisters)
+				       struct pt_regs *InterruptRegisters)
 {
   DAC960_Controller_T *Controller = (DAC960_Controller_T *) DeviceIdentifier;
   void *ControllerBaseAddress = Controller->BaseAddress;
   DAC960_V2_StatusMailbox_T *NextStatusMailbox;
-  ProcessorFlags_T ProcessorFlags;
-  /*
-    Acquire exclusive access to Controller.
-  */
-  DAC960_AcquireControllerLockIH(Controller, &ProcessorFlags);
-  /*
-    Process Hardware Interrupts for Controller.
-  */
+  unsigned long flags;
+
+  spin_lock_irqsave(&Controller->queue_lock, flags);
   DAC960_LP_AcknowledgeInterrupt(ControllerBaseAddress);
   NextStatusMailbox = Controller->V2.NextStatusMailbox;
   while (NextStatusMailbox->Fields.CommandIdentifier > 0)
@@ -5261,11 +5230,9 @@ static irqreturn_t DAC960_LP_InterruptHandler(int IRQ_Channel,
     Attempt to remove additional I/O Requests from the Controller's
     I/O Request Queue and queue them to the Controller.
   */
-  while (DAC960_ProcessRequest(Controller, false)) ;
-  /*
-    Release exclusive access to Controller.
-  */
-  DAC960_ReleaseControllerLockIH(Controller, &ProcessorFlags);
+  while (DAC960_ProcessRequest(Controller, false))
+	  ;
+  spin_unlock_irqrestore(&Controller->queue_lock, flags);
   return IRQ_HANDLED;
 }
 
@@ -5277,19 +5244,14 @@ static irqreturn_t DAC960_LP_InterruptHandler(int IRQ_Channel,
 
 static irqreturn_t DAC960_LA_InterruptHandler(int IRQ_Channel,
 				       void *DeviceIdentifier,
-				       Registers_T *InterruptRegisters)
+				       struct pt_regs *InterruptRegisters)
 {
   DAC960_Controller_T *Controller = (DAC960_Controller_T *) DeviceIdentifier;
   void *ControllerBaseAddress = Controller->BaseAddress;
   DAC960_V1_StatusMailbox_T *NextStatusMailbox;
-  ProcessorFlags_T ProcessorFlags;
-  /*
-    Acquire exclusive access to Controller.
-  */
-  DAC960_AcquireControllerLockIH(Controller, &ProcessorFlags);
-  /*
-    Process Hardware Interrupts for Controller.
-  */
+  unsigned long flags;
+
+  spin_lock_irqsave(&Controller->queue_lock, flags);
   DAC960_LA_AcknowledgeInterrupt(ControllerBaseAddress);
   NextStatusMailbox = Controller->V1.NextStatusMailbox;
   while (NextStatusMailbox->Fields.Valid)
@@ -5308,11 +5270,9 @@ static irqreturn_t DAC960_LA_InterruptHandler(int IRQ_Channel,
     Attempt to remove additional I/O Requests from the Controller's
     I/O Request Queue and queue them to the Controller.
   */
-  while (DAC960_ProcessRequest(Controller, false)) ;
-  /*
-    Release exclusive access to Controller.
-  */
-  DAC960_ReleaseControllerLockIH(Controller, &ProcessorFlags);
+  while (DAC960_ProcessRequest(Controller, false))
+	  ;
+  spin_unlock_irqrestore(&Controller->queue_lock, flags);
   return IRQ_HANDLED;
 }
 
@@ -5324,19 +5284,14 @@ static irqreturn_t DAC960_LA_InterruptHandler(int IRQ_Channel,
 
 static irqreturn_t DAC960_PG_InterruptHandler(int IRQ_Channel,
 				       void *DeviceIdentifier,
-				       Registers_T *InterruptRegisters)
+				       struct pt_regs *InterruptRegisters)
 {
   DAC960_Controller_T *Controller = (DAC960_Controller_T *) DeviceIdentifier;
   void *ControllerBaseAddress = Controller->BaseAddress;
   DAC960_V1_StatusMailbox_T *NextStatusMailbox;
-  ProcessorFlags_T ProcessorFlags;
-  /*
-    Acquire exclusive access to Controller.
-  */
-  DAC960_AcquireControllerLockIH(Controller, &ProcessorFlags);
-  /*
-    Process Hardware Interrupts for Controller.
-  */
+  unsigned long flags;
+
+  spin_lock_irqsave(&Controller->queue_lock, flags);
   DAC960_PG_AcknowledgeInterrupt(ControllerBaseAddress);
   NextStatusMailbox = Controller->V1.NextStatusMailbox;
   while (NextStatusMailbox->Fields.Valid)
@@ -5355,11 +5310,9 @@ static irqreturn_t DAC960_PG_InterruptHandler(int IRQ_Channel,
     Attempt to remove additional I/O Requests from the Controller's
     I/O Request Queue and queue them to the Controller.
   */
-  while (DAC960_ProcessRequest(Controller, false)) ;
-  /*
-    Release exclusive access to Controller.
-  */
-  DAC960_ReleaseControllerLockIH(Controller, &ProcessorFlags);
+  while (DAC960_ProcessRequest(Controller, false))
+	  ;
+  spin_unlock_irqrestore(&Controller->queue_lock, flags);
   return IRQ_HANDLED;
 }
 
@@ -5371,18 +5324,13 @@ static irqreturn_t DAC960_PG_InterruptHandler(int IRQ_Channel,
 
 static irqreturn_t DAC960_PD_InterruptHandler(int IRQ_Channel,
 				       void *DeviceIdentifier,
-				       Registers_T *InterruptRegisters)
+				       struct pt_regs *InterruptRegisters)
 {
   DAC960_Controller_T *Controller = (DAC960_Controller_T *) DeviceIdentifier;
   void *ControllerBaseAddress = Controller->BaseAddress;
-  ProcessorFlags_T ProcessorFlags;
-  /*
-    Acquire exclusive access to Controller.
-  */
-  DAC960_AcquireControllerLockIH(Controller, &ProcessorFlags);
-  /*
-    Process Hardware Interrupts for Controller.
-  */
+  unsigned long flags;
+
+  spin_lock_irqsave(&Controller->queue_lock, flags);
   while (DAC960_PD_StatusAvailableP(ControllerBaseAddress))
     {
       DAC960_V1_CommandIdentifier_T CommandIdentifier =
@@ -5398,11 +5346,9 @@ static irqreturn_t DAC960_PD_InterruptHandler(int IRQ_Channel,
     Attempt to remove additional I/O Requests from the Controller's
     I/O Request Queue and queue them to the Controller.
   */
-  while (DAC960_ProcessRequest(Controller, false)) ;
-  /*
-    Release exclusive access to Controller.
-  */
-  DAC960_ReleaseControllerLockIH(Controller, &ProcessorFlags);
+  while (DAC960_ProcessRequest(Controller, false))
+	  ;
+  spin_unlock_irqrestore(&Controller->queue_lock, flags);
   return IRQ_HANDLED;
 }
 
@@ -5418,18 +5364,13 @@ static irqreturn_t DAC960_PD_InterruptHandler(int IRQ_Channel,
 
 static irqreturn_t DAC960_P_InterruptHandler(int IRQ_Channel,
 				      void *DeviceIdentifier,
-				      Registers_T *InterruptRegisters)
+				      struct pt_regs *InterruptRegisters)
 {
   DAC960_Controller_T *Controller = (DAC960_Controller_T *) DeviceIdentifier;
   void *ControllerBaseAddress = Controller->BaseAddress;
-  ProcessorFlags_T ProcessorFlags;
-  /*
-    Acquire exclusive access to Controller.
-  */
-  DAC960_AcquireControllerLockIH(Controller, &ProcessorFlags);
-  /*
-    Process Hardware Interrupts for Controller.
-  */
+  unsigned long flags;
+
+  spin_lock_irqsave(&Controller->queue_lock, flags);
   while (DAC960_PD_StatusAvailableP(ControllerBaseAddress))
     {
       DAC960_V1_CommandIdentifier_T CommandIdentifier =
@@ -5480,11 +5421,9 @@ static irqreturn_t DAC960_P_InterruptHandler(int IRQ_Channel,
     Attempt to remove additional I/O Requests from the Controller's
     I/O Request Queue and queue them to the Controller.
   */
-  while (DAC960_ProcessRequest(Controller, false)) ;
-  /*
-    Release exclusive access to Controller.
-  */
-  DAC960_ReleaseControllerLockIH(Controller, &ProcessorFlags);
+  while (DAC960_ProcessRequest(Controller, false))
+	  ;
+  spin_unlock_irqrestore(&Controller->queue_lock, flags);
   return IRQ_HANDLED;
 }
 
@@ -5547,13 +5486,11 @@ static void DAC960_MonitoringTimerFunction(unsigned long TimerData)
 {
   DAC960_Controller_T *Controller = (DAC960_Controller_T *) TimerData;
   DAC960_Command_T *Command;
-  ProcessorFlags_T ProcessorFlags;
+  unsigned long flags;
+
   if (Controller->FirmwareType == DAC960_V1_Controller)
     {
-      /*
-	Acquire exclusive access to Controller.
-      */
-      DAC960_AcquireControllerLock(Controller, &ProcessorFlags);
+      spin_lock_irqsave(&Controller->queue_lock, flags);
       /*
 	Queue a Status Monitoring Command to Controller.
       */
@@ -5561,10 +5498,7 @@ static void DAC960_MonitoringTimerFunction(unsigned long TimerData)
       if (Command != NULL)
 	DAC960_V1_QueueMonitoringCommand(Command);
       else Controller->MonitoringCommandDeferred = true;
-      /*
-	Release exclusive access to Controller.
-      */
-      DAC960_ReleaseControllerLock(Controller, &ProcessorFlags);
+      spin_unlock_irqrestore(&Controller->queue_lock, flags);
     }
   else
     {
@@ -5613,10 +5547,8 @@ static void DAC960_MonitoringTimerFunction(unsigned long TimerData)
 	}
       Controller->V2.StatusChangeCounter = StatusChangeCounter;
       Controller->PrimaryMonitoringTime = jiffies;
-      /*
-	Acquire exclusive access to Controller.
-      */
-      DAC960_AcquireControllerLock(Controller, &ProcessorFlags);
+
+      spin_lock_irqsave(&Controller->queue_lock, flags);
       /*
 	Queue a Status Monitoring Command to Controller.
       */
@@ -5624,10 +5556,7 @@ static void DAC960_MonitoringTimerFunction(unsigned long TimerData)
       if (Command != NULL)
 	DAC960_V2_QueueMonitoringCommand(Command);
       else Controller->MonitoringCommandDeferred = true;
-      /*
-	Release exclusive access to Controller.
-      */
-      DAC960_ReleaseControllerLock(Controller, &ProcessorFlags);
+      spin_unlock_irqrestore(&Controller->queue_lock, flags);
       /*
 	Wake up any processes waiting on a Health Status Buffer change.
       */
@@ -5639,7 +5568,7 @@ static void DAC960_MonitoringTimerFunction(unsigned long TimerData)
   DAC960_UserIOCTL is the User IOCTL Function for the DAC960 Driver.
 */
 
-static int DAC960_UserIOCTL(Inode_T *Inode, File_T *File,
+static int DAC960_UserIOCTL(struct inode *inode, struct file *file,
 			    unsigned int Request, unsigned long Argument)
 {
   int ErrorCode = 0;
@@ -5691,7 +5620,7 @@ static int DAC960_UserIOCTL(Inode_T *Inode, File_T *File,
 	DAC960_V1_DCDB_T DCDB;
 	DAC960_V1_DCDB_T *DCDB_IOBUF = NULL;
 	dma_addr_t	DCDB_IOBUFDMA;
-	ProcessorFlags_T ProcessorFlags;
+	unsigned long flags;
 	int ControllerNumber, DataTransferLength;
 	unsigned char *DataTransferBuffer = NULL;
 	dma_addr_t DataTransferBufferDMA;
@@ -5764,7 +5693,7 @@ static int DAC960_UserIOCTL(Inode_T *Inode, File_T *File,
 	  }
 	if (CommandOpcode == DAC960_V1_DCDB)
 	  {
-	    DAC960_AcquireControllerLock(Controller, &ProcessorFlags);
+	    spin_lock_irqsave(&Controller->queue_lock, flags);
 	    while ((Command = DAC960_AllocateCommand(Controller)) == NULL)
 	      DAC960_WaitForCommand(Controller);
 	    while (Controller->V1.DirectCommandActive[DCDB.Channel]
@@ -5778,7 +5707,7 @@ static int DAC960_UserIOCTL(Inode_T *Inode, File_T *File,
 	      }
 	    Controller->V1.DirectCommandActive[DCDB.Channel]
 					      [DCDB.TargetID] = true;
-	    DAC960_ReleaseControllerLock(Controller, &ProcessorFlags);
+	    spin_unlock_irqrestore(&Controller->queue_lock, flags);
 	    DAC960_V1_ClearCommand(Command);
 	    Command->CommandType = DAC960_ImmediateCommand;
 	    memcpy(&Command->V1.CommandMailbox, &UserCommand.CommandMailbox,
@@ -5789,10 +5718,10 @@ static int DAC960_UserIOCTL(Inode_T *Inode, File_T *File,
 	  }
 	else
 	  {
-	    DAC960_AcquireControllerLock(Controller, &ProcessorFlags);
+	    spin_lock_irqsave(&Controller->queue_lock, flags);
 	    while ((Command = DAC960_AllocateCommand(Controller)) == NULL)
 	      DAC960_WaitForCommand(Controller);
-	    DAC960_ReleaseControllerLock(Controller, &ProcessorFlags);
+	    spin_unlock_irqrestore(&Controller->queue_lock, flags);
 	    DAC960_V1_ClearCommand(Command);
 	    Command->CommandType = DAC960_ImmediateCommand;
 	    memcpy(&Command->V1.CommandMailbox, &UserCommand.CommandMailbox,
@@ -5803,9 +5732,9 @@ static int DAC960_UserIOCTL(Inode_T *Inode, File_T *File,
 	  }
 	DAC960_ExecuteCommand(Command);
 	CommandStatus = Command->V1.CommandStatus;
-	DAC960_AcquireControllerLock(Controller, &ProcessorFlags);
+	spin_lock_irqsave(&Controller->queue_lock, flags);
 	DAC960_DeallocateCommand(Command);
-	DAC960_ReleaseControllerLock(Controller, &ProcessorFlags);
+	spin_unlock_irqrestore(&Controller->queue_lock, flags);
 	if (DataTransferLength > 0)
 	  {
 	    if (copy_to_user(UserCommand.DataTransferBuffer,
@@ -5848,7 +5777,7 @@ static int DAC960_UserIOCTL(Inode_T *Inode, File_T *File,
 	DAC960_Command_T *Command = NULL;
 	DAC960_V2_CommandMailbox_T *CommandMailbox;
 	DAC960_V2_CommandStatus_T CommandStatus;
-	ProcessorFlags_T ProcessorFlags;
+	unsigned long flags;
 	int ControllerNumber, DataTransferLength;
 	int DataTransferResidue, RequestSenseLength;
 	unsigned char *DataTransferBuffer = NULL;
@@ -5900,10 +5829,10 @@ static int DAC960_UserIOCTL(Inode_T *Inode, File_T *File,
 	      }
 	    memset(RequestSenseBuffer, 0, RequestSenseLength);
 	  }
-	DAC960_AcquireControllerLock(Controller, &ProcessorFlags);
+	spin_lock_irqsave(&Controller->queue_lock, flags);
 	while ((Command = DAC960_AllocateCommand(Controller)) == NULL)
 	  DAC960_WaitForCommand(Controller);
-	DAC960_ReleaseControllerLock(Controller, &ProcessorFlags);
+	spin_unlock_irqrestore(&Controller->queue_lock, flags);
 	DAC960_V2_ClearCommand(Command);
 	Command->CommandType = DAC960_ImmediateCommand;
 	CommandMailbox = &Command->V2.CommandMailbox;
@@ -5951,9 +5880,9 @@ static int DAC960_UserIOCTL(Inode_T *Inode, File_T *File,
 	CommandStatus = Command->V2.CommandStatus;
 	RequestSenseLength = Command->V2.RequestSenseLength;
 	DataTransferResidue = Command->V2.DataTransferResidue;
-	DAC960_AcquireControllerLock(Controller, &ProcessorFlags);
+	spin_lock_irqsave(&Controller->queue_lock, flags);
 	DAC960_DeallocateCommand(Command);
-	DAC960_ReleaseControllerLock(Controller, &ProcessorFlags);
+	spin_unlock_irqrestore(&Controller->queue_lock, flags);
 	if (RequestSenseLength > UserCommand.RequestSenseLength)
 	  RequestSenseLength = UserCommand.RequestSenseLength;
 	if (copy_to_user(&UserSpaceUserCommand->DataTransferLength,
@@ -6302,12 +6231,13 @@ static boolean DAC960_V1_ExecuteUserCommand(DAC960_Controller_T *Controller,
 {
   DAC960_Command_T *Command;
   DAC960_V1_CommandMailbox_T *CommandMailbox;
-  ProcessorFlags_T ProcessorFlags;
+  unsigned long flags;
   unsigned char Channel, TargetID, LogicalDriveNumber;
-  DAC960_AcquireControllerLock(Controller, &ProcessorFlags);
+
+  spin_lock_irqsave(&Controller->queue_lock, flags);
   while ((Command = DAC960_AllocateCommand(Controller)) == NULL)
     DAC960_WaitForCommand(Controller);
-  DAC960_ReleaseControllerLock(Controller, &ProcessorFlags);
+  spin_unlock_irqrestore(&Controller->queue_lock, flags);
   Controller->UserStatusLength = 0;
   DAC960_V1_ClearCommand(Command);
   Command->CommandType = DAC960_ImmediateCommand;
@@ -6497,9 +6427,10 @@ failure:
     }
   else DAC960_UserCritical("Illegal User Command: '%s'\n",
 			   Controller, UserCommand);
-  DAC960_AcquireControllerLock(Controller, &ProcessorFlags);
+
+  spin_lock_irqsave(&Controller->queue_lock, flags);
   DAC960_DeallocateCommand(Command);
-  DAC960_ReleaseControllerLock(Controller, &ProcessorFlags);
+  spin_unlock_irqrestore(&Controller->queue_lock, flags);
   return true;
 }
 
@@ -6562,13 +6493,14 @@ static boolean DAC960_V2_ExecuteUserCommand(DAC960_Controller_T *Controller,
 {
   DAC960_Command_T *Command;
   DAC960_V2_CommandMailbox_T *CommandMailbox;
-  ProcessorFlags_T ProcessorFlags;
+  unsigned long flags;
   unsigned char Channel, TargetID, LogicalDriveNumber;
   unsigned short LogicalDeviceNumber;
-  DAC960_AcquireControllerLock(Controller, &ProcessorFlags);
+
+  spin_lock_irqsave(&Controller->queue_lock, flags);
   while ((Command = DAC960_AllocateCommand(Controller)) == NULL)
     DAC960_WaitForCommand(Controller);
-  DAC960_ReleaseControllerLock(Controller, &ProcessorFlags);
+  spin_unlock_irqrestore(&Controller->queue_lock, flags);
   Controller->UserStatusLength = 0;
   DAC960_V2_ClearCommand(Command);
   Command->CommandType = DAC960_ImmediateCommand;
@@ -6758,9 +6690,10 @@ static boolean DAC960_V2_ExecuteUserCommand(DAC960_Controller_T *Controller,
     Controller->SuppressEnclosureMessages = true;
   else DAC960_UserCritical("Illegal User Command: '%s'\n",
 			   Controller, UserCommand);
-  DAC960_AcquireControllerLock(Controller, &ProcessorFlags);
+
+  spin_lock_irqsave(&Controller->queue_lock, flags);
   DAC960_DeallocateCommand(Command);
-  DAC960_ReleaseControllerLock(Controller, &ProcessorFlags);
+  spin_unlock_irqrestore(&Controller->queue_lock, flags);
   return true;
 }
 
@@ -6893,7 +6826,7 @@ static int DAC960_ProcReadUserCommand(char *Page, char **Start, off_t Offset,
   DAC960_ProcWriteUserCommand implements writing /proc/rd/cN/user_command.
 */
 
-static int DAC960_ProcWriteUserCommand(File_T *File, const char *Buffer,
+static int DAC960_ProcWriteUserCommand(struct file *file, const char *Buffer,
 				       unsigned long Count, void *Data)
 {
   DAC960_Controller_T *Controller = (DAC960_Controller_T *) Data;
@@ -6921,9 +6854,9 @@ static int DAC960_ProcWriteUserCommand(File_T *File, const char *Buffer,
 
 static void DAC960_CreateProcEntries(DAC960_Controller_T *Controller)
 {
-	PROC_DirectoryEntry_T *StatusProcEntry;
-	PROC_DirectoryEntry_T *ControllerProcEntry;
-	PROC_DirectoryEntry_T *UserCommandProcEntry;
+	struct proc_dir_entry *StatusProcEntry;
+	struct proc_dir_entry *ControllerProcEntry;
+	struct proc_dir_entry *UserCommandProcEntry;
 
 	if (DAC960_ProcDirectoryEntry == NULL) {
   		DAC960_ProcDirectoryEntry = proc_mkdir("rd", NULL);

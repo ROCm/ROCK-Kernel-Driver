@@ -49,7 +49,7 @@ mtrr_file_del(unsigned long base, unsigned long size,
 	      struct file *file, int page)
 {
 	int reg;
-	unsigned int *fcount = file->private_data;
+	unsigned int *fcount = FILE_FCOUNT(file);
 
 	if (!page) {
 		if ((base & (PAGE_SIZE - 1)) || (size & (PAGE_SIZE - 1)))

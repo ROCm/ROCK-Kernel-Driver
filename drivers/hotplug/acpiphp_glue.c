@@ -203,6 +203,7 @@ register_slot (acpi_handle handle, u32 lvl, void *context, void **rv)
 
 	if (ACPI_FAILURE(status)) {
 		err("failed to register interrupt notify handler\n");
+		kfree(newfunc);
 		return status;
 	}
 

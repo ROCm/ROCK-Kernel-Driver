@@ -1630,16 +1630,21 @@ static void set_multicast_list(struct net_device *dev)
 }
 
 
-static int set_mac_address(struct net_device *dev, void *addr)
+static int set_mac_address(struct net_device *dev, void *p)
 {
 	int i;
+	struct sockaddr *addr = p;
+
 
 	if (netif_running(dev))
 		return -EBUSY;
+
+	memcpy(dev->dev_addr, addr->sa_data, dev->addr_len);
+
 	if (net_debug) {
 		printk("%s: Setting MAC address to ", dev->name);
-		for (i = 0; i < 6; i++)
-			printk(" %2.2x", dev->dev_addr[i] = ((unsigned char *)addr)[i]);
+		for (i = 0; i < dev->addr_len; i++)
+			printk(" %2.2x", dev->dev_addr[i]);
 		printk(".\n");
 	}
 	/* set the Ethernet address */
