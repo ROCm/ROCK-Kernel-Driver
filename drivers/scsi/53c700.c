@@ -1769,7 +1769,7 @@ NCR_700_queuecommand(Scsi_Cmnd *SCp, void (*done)(Scsi_Cmnd *))
 	NCR_700_set_depth(SCp->device, NCR_700_get_depth(SCp->device) + 1);
 
 	/* begin the command here */
-	/* no need to check for NULL, test for command_slot_cound above
+	/* no need to check for NULL, test for command_slot_count above
 	 * ensures a slot is free */
 	slot = find_empty_slot(hostdata);
 

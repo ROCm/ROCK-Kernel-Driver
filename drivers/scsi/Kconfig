@@ -471,10 +471,6 @@ config SCSI_EATA
 	  SCSI-HOWTO, available from
 	  <http://www.linuxdoc.org/docs.html#howto>.
 
-	  Note that there is also another driver for the same hardware
-	  available: "EATA-DMA [Obsolete] (DPT, NEC, AT&T, SNI, AST, Olivetti,
-	  Alphatronix) support". You should say Y to only one of them.
-
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
@@ -511,24 +507,6 @@ config SCSI_EATA_MAX_TAGS
 	  used by the elevator sorting option above. The effective value used
 	  by the driver for each probed SCSI device is reported at boot time.
 	  This is equivalent to the "eata=mq:8" boot option.
-
-config SCSI_EATA_DMA
-	tristate "EATA-DMA [Obsolete] (DPT, NEC, AT&T, SNI, AST, Olivetti, Alphatronix) support"
-	depends on SCSI
-	---help---
-	  This is support for the EATA-DMA protocol compliant SCSI Host
-	  Adapters like the SmartCache III/IV, SmartRAID controller families
-	  and the DPT PM2011B and PM2012B controllers.
-
-	  Note that this driver is obsolete; if you have one of the above
-	  SCSI Host Adapters, you should normally say N here and Y to "EATA
-	  ISA/EISA/PCI support", below.  Please read the SCSI-HOWTO, available
-	  from <http://www.linuxdoc.org/docs.html#howto>.
-
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called eata_dma.  If you want to compile it as
-	  a module, say M here and read <file:Documentation/modules.txt>.
 
 config SCSI_EATA_PIO
 	tristate "EATA-PIO (old DPT PM2001, PM2012A) support"
@@ -1728,6 +1706,13 @@ config OKTAGON_SCSI
 	  Y to this question.  If you're in doubt about whether you have one,
 	  see the picture at
 	  <http://amiga.multigraph.com/photos/oktagon.html>.
+
+config SCSI_PC980155
+	tristate "NEC PC-9801-55 SCSI support"
+	depends on X86_PC9800 && SCSI
+	help
+	  If you have the NEC PC-9801-55 SCSI interface card or compatibles
+	  for NEC PC-9801/PC-9821, say Y.
 
 #      bool 'Cyberstorm Mk III SCSI support (EXPERIMENTAL)' CONFIG_CYBERSTORMIII_SCSI
 #      bool 'GVP Turbo 040/060 SCSI support (EXPERIMENTAL)' CONFIG_GVP_TURBO_SCSI

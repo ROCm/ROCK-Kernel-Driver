@@ -54,13 +54,36 @@ static struct file *do_open(char *name, int flags)
 static struct {
 	char *name; int wsize; int rsize;
 } map[] = {
-	[NFSCTL_SVC]={".svc", sizeof(struct nfsctl_svc)},
-	[NFSCTL_ADDCLIENT]={".add", sizeof(struct nfsctl_client)},
-	[NFSCTL_DELCLIENT]={".del", sizeof(struct nfsctl_client)},
-	[NFSCTL_EXPORT]={".export", sizeof(struct nfsctl_export)},
-	[NFSCTL_UNEXPORT]={".unexport", sizeof(struct nfsctl_export)},
-	[NFSCTL_GETFD]={".getfd", sizeof(struct nfsctl_fdparm), NFS_FHSIZE},
-	[NFSCTL_GETFS]={".getfs", sizeof(struct nfsctl_fsparm), sizeof(struct knfsd_fh)},
+	[NFSCTL_SVC] = {
+		.name	= ".svc",
+		.wsize	= sizeof(struct nfsctl_svc)
+	},
+	[NFSCTL_ADDCLIENT] = {
+		.name	= ".add",
+		.wsize	= sizeof(struct nfsctl_client)
+	},
+	[NFSCTL_DELCLIENT] = {
+		.name	= ".del",
+		.wsize	= sizeof(struct nfsctl_client)
+	},
+	[NFSCTL_EXPORT] = {
+		.name	= ".export",
+		.wsize	= sizeof(struct nfsctl_export)
+	},
+	[NFSCTL_UNEXPORT] = {
+		.name	= ".unexport",
+		.wsize	= sizeof(struct nfsctl_export)
+	},
+	[NFSCTL_GETFD] = {
+		.name	= ".getfd",
+		.wsize	= sizeof(struct nfsctl_fdparm),
+		.rsize	= NFS_FHSIZE
+	},
+	[NFSCTL_GETFS] = {
+		.name	= ".getfs",
+		.wsize	= sizeof(struct nfsctl_fsparm),
+		.rsize	= sizeof(struct knfsd_fh)
+	},
 };
 
 long

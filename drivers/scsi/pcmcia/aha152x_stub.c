@@ -408,7 +408,7 @@ static int aha152x_event(event_t event, int priority,
 	if (link->state & DEV_CONFIG) {
 	    Scsi_Cmnd tmp;
 	    CardServices(RequestConfiguration, link->handle, &link->conf);
-	    tmp.host = info->host;
+	    tmp.device->host = info->host;
 	    aha152x_host_reset(&tmp);
 	}
 	break;

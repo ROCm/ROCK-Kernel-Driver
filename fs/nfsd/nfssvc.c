@@ -264,6 +264,7 @@ nfsd_dispatch(struct svc_rqst *rqstp, u32 *statp)
 	struct svc_procedure	*proc;
 	kxdrproc_t		xdr;
 	u32			nfserr;
+	u32			*nfserrp;
 
 	dprintk("nfsd_dispatch: vers %d proc %d\n",
 				rqstp->rq_vers, rqstp->rq_proc);
@@ -290,6 +291,13 @@ nfsd_dispatch(struct svc_rqst *rqstp, u32 *statp)
 		return 1;
 	}
 
+	/* need to grab the location to store the status, as
+	 * nfsv4 does some encoding while processing 
+	 */
+	nfserrp = rqstp->rq_res.head[0].iov_base
+		+ rqstp->rq_res.head[0].iov_len;
+	rqstp->rq_res.head[0].iov_len += sizeof(u32);
+
 	/* Now call the procedure handler, and encode NFS status. */
 	nfserr = proc->pc_func(rqstp, rqstp->rq_argp, rqstp->rq_resp);
 	if (nfserr == nfserr_dropit) {
@@ -297,16 +305,16 @@ nfsd_dispatch(struct svc_rqst *rqstp, u32 *statp)
 		nfsd_cache_update(rqstp, RC_NOCACHE, NULL);
 		return 0;
 	}
-		
+
 	if (rqstp->rq_proc != 0)
-		svc_putu32(&rqstp->rq_res.head[0], nfserr);
+		*nfserrp++ = nfserr;
 
 	/* Encode result.
 	 * For NFSv2, additional info is never returned in case of an error.
 	 */
 	if (!(nfserr && rqstp->rq_vers == 2)) {
 		xdr = proc->pc_encode;
-		if (xdr && !xdr(rqstp, (u32*)(rqstp->rq_res.head[0].iov_base+rqstp->rq_res.head[0].iov_len),
+		if (xdr && !xdr(rqstp, nfserrp,
 				rqstp->rq_resp)) {
 			/* Failed to encode result. Release cache entry */
 			dprintk("nfsd: failed to encode result!\n");

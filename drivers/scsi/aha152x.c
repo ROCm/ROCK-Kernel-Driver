@@ -306,9 +306,9 @@
 #define ERR_LEAD	KERN_ERR	LEAD
 #define DEBUG_LEAD	KERN_DEBUG	LEAD
 #define CMDINFO(cmd) \
-			(cmd) ? ((cmd)->host->host_no) : -1, \
-                        (cmd) ? ((cmd)->target & 0x0f) : -1, \
-			(cmd) ? ((cmd)->lun & 0x07) : -1
+			(cmd) ? ((cmd)->device->host->host_no) : -1, \
+                        (cmd) ? ((cmd)->device->id & 0x0f) : -1, \
+			(cmd) ? ((cmd)->device->lun & 0x07) : -1
 
 #define DELAY_DEFAULT 1000
 
@@ -583,8 +583,8 @@ struct aha152x_scdata {
 
 #define DATA_LEN		(HOSTDATA(shpnt)->data_len)
 
-#define SYNCRATE		(HOSTDATA(shpnt)->syncrate[CURRENT_SC->target])
-#define SYNCNEG			(HOSTDATA(shpnt)->syncneg[CURRENT_SC->target])
+#define SYNCRATE		(HOSTDATA(shpnt)->syncrate[CURRENT_SC->device->id])
+#define SYNCNEG			(HOSTDATA(shpnt)->syncneg[CURRENT_SC->device->id])
 
 #define DELAY			(HOSTDATA(shpnt)->delay)
 #define EXT_TRANS		(HOSTDATA(shpnt)->ext_trans)
@@ -771,7 +771,7 @@ static inline Scsi_Cmnd *remove_lun_SC(Scsi_Cmnd ** SC, int target, int lun)
 	Scsi_Cmnd *ptr, *prev;
 
 	for (ptr = *SC, prev = NULL;
-	     ptr && ((ptr->target != target) || (ptr->lun != lun));
+	     ptr && ((ptr->device->id != target) || (ptr->device->lun != lun));
 	     prev = ptr, ptr = SCNEXT(ptr))
 	     ;
 
@@ -1476,7 +1476,7 @@ static int setup_expected_interrupts(struct Scsi_Host *shpnt)
  */
 int aha152x_internal_queue(Scsi_Cmnd *SCpnt, struct semaphore *sem, int phase, Scsi_Cmnd *done_SC, void (*done)(Scsi_Cmnd *))
 {
-	struct Scsi_Host *shpnt = SCpnt->host;
+	struct Scsi_Host *shpnt = SCpnt->device->host;
 	unsigned long flags;
 
 #if defined(AHA152X_DEBUG)
@@ -1589,7 +1589,7 @@ int aha152x_command(Scsi_Cmnd * SCpnt)
  */
 int aha152x_abort(Scsi_Cmnd *SCpnt)
 {
-	struct Scsi_Host *shpnt = SCpnt->host;
+	struct Scsi_Host *shpnt = SCpnt->device->host;
 	Scsi_Cmnd *ptr;
 	unsigned long flags;
 
@@ -1641,7 +1641,7 @@ static void timer_expired(unsigned long p)
 {
 	Scsi_Cmnd	 *SCp   = (Scsi_Cmnd *)p;
 	struct semaphore *sem   = SCSEM(SCp);
-	struct Scsi_Host *shpnt = SCp->host;
+	struct Scsi_Host *shpnt = SCp->device->host;
 
 	/* remove command from issue queue */
 	if(remove_SC(&ISSUE_SC, SCp)) {
@@ -1663,10 +1663,11 @@ static void timer_expired(unsigned long p)
  */
 int aha152x_device_reset(Scsi_Cmnd * SCpnt)
 {
-	struct Scsi_Host *shpnt = SCpnt->host;
+	struct Scsi_Host *shpnt = SCpnt->device->host;
 	DECLARE_MUTEX_LOCKED(sem);
 	struct timer_list timer;
-	Scsi_Cmnd cmnd;
+	Scsi_Cmnd *cmd;
+	int ret;
 
 #if defined(AHA152X_DEBUG)
 	if(HOSTDATA(shpnt)->debug & debug_eh) {
@@ -1680,31 +1681,42 @@ int aha152x_device_reset(Scsi_Cmnd * SCpnt)
 		return FAILED;
 	}
 
-	cmnd.cmd_len         = 0;
-	cmnd.host            = SCpnt->host;
-	cmnd.target          = SCpnt->target;
-	cmnd.lun             = SCpnt->lun;
-	cmnd.use_sg          = 0;
-	cmnd.request_buffer  = 0;
-	cmnd.request_bufflen = 0;
+	spin_unlock_irq(shpnt->host_lock);
+	cmd = scsi_get_command(SCpnt->device, GFP_ATOMIC);
+	if (!cmd) {
+		spin_lock_irq(shpnt->host_lock);
+		return FAILED;
+	}
+
+	cmd->cmd_len         = 0;
+	cmd->device->host    = SCpnt->device->host;
+	cmd->device->id      = SCpnt->device->id;
+	cmd->device->lun     = SCpnt->device->lun;
+	cmd->use_sg          = 0;
+	cmd->request_buffer  = 0;
+	cmd->request_bufflen = 0;
 
 	init_timer(&timer);
-	timer.data     = (unsigned long) &cmnd;
+	timer.data     = (unsigned long) cmd;
 	timer.expires  = jiffies + 100*HZ;   /* 10s */
 	timer.function = (void (*)(unsigned long)) timer_expired;
 
-	aha152x_internal_queue(&cmnd, &sem, resetting, 0, internal_done);
+	aha152x_internal_queue(cmd, &sem, resetting, 0, internal_done);
 
 	add_timer(&timer);
 	down(&sem);
 
 	del_timer(&timer);
 
-	if(cmnd.SCp.phase & resetted) {
-		return SUCCESS;
+	if(cmd->SCp.phase & resetted) {
+		ret = SUCCESS;
 	} else {
-		return FAILED;
+		ret = FAILED;
 	}
+
+	scsi_put_command(cmd);
+	spin_lock_irq(shpnt->host_lock);
+	return ret;
 }
 
 void free_hard_reset_SCs(struct Scsi_Host *shpnt, Scsi_Cmnd **SCs)
@@ -1738,7 +1750,7 @@ void free_hard_reset_SCs(struct Scsi_Host *shpnt, Scsi_Cmnd **SCs)
  */
 int aha152x_bus_reset(Scsi_Cmnd *SCpnt)
 {
-	struct Scsi_Host *shpnt = SCpnt->host;
+	struct Scsi_Host *shpnt = SCpnt->device->host;
 	unsigned long flags;
 
 #if defined(AHA152X_DEBUG)
@@ -1822,7 +1834,7 @@ int aha152x_host_reset(Scsi_Cmnd * SCpnt)
 	aha152x_bus_reset(SCpnt);
 
 	DPRINTK(debug_eh, DEBUG_LEAD "resetting ports\n", CMDINFO(SCpnt));
-	reset_ports(SCpnt->host);
+	reset_ports(SCpnt->device->host);
 
 	return SUCCESS;
 }
@@ -2052,9 +2064,9 @@ static void busfree_run(struct Scsi_Host *shpnt)
 					cmnd->cmnd[4]         = sizeof(ptr->sense_buffer);
 					cmnd->cmnd[5]         = 0;
 					cmnd->cmd_len	      = 6;
-					cmnd->host            = ptr->host;
-					cmnd->target          = ptr->target;
-					cmnd->lun             = ptr->lun;
+					cmnd->device->host    = ptr->device->host;
+					cmnd->device->id      = ptr->device->id;
+					cmnd->device->lun     = ptr->device->lun;
 					cmnd->use_sg          = 0; 
 					cmnd->request_buffer  = ptr->sense_buffer;
 					cmnd->request_bufflen = sizeof(ptr->sense_buffer);
@@ -2113,7 +2125,7 @@ static void busfree_run(struct Scsi_Host *shpnt)
 		/* clear selection timeout */
 		SETPORT(SSTAT1, SELTO);
 
-		SETPORT(SCSIID, (shpnt->this_id << OID_) | CURRENT_SC->target);
+		SETPORT(SCSIID, (shpnt->this_id << OID_) | CURRENT_SC->device->id);
 		SETPORT(SXFRCTL1, (PARITY ? ENSPCHK : 0 ) | ENSTIMER);
 		SETPORT(SCSISEQ, ENSELO | ENAUTOATNO | (DISCONNECTED_SC ? ENRESELI : 0));
 	} else {
@@ -2152,7 +2164,7 @@ static void seldo_run(struct Scsi_Host *shpnt)
 
 	SETPORT(SSTAT0, CLRSELDO);
 	
-	ADDMSGO(IDENTIFY(RECONNECT, CURRENT_SC->lun));
+	ADDMSGO(IDENTIFY(RECONNECT, CURRENT_SC->device->lun));
 
 	if (CURRENT_SC->SCp.phase & aborting) {
 		ADDMSGO(ABORT);
@@ -2472,7 +2484,7 @@ static void msgo_init(struct Scsi_Host *shpnt)
 {
 	if(MSGOLEN==0) {
 		if((CURRENT_SC->SCp.phase & syncneg) && SYNCNEG==2 && SYNCRATE==0) {
-			ADDMSGO(IDENTIFY(RECONNECT, CURRENT_SC->lun));
+			ADDMSGO(IDENTIFY(RECONNECT, CURRENT_SC->device->lun));
 		} else {
 			printk(INFO_LEAD "unexpected MESSAGE OUT phase; rejecting\n", CMDINFO(CURRENT_SC));
 			ADDMSGO(MESSAGE_REJECT);
@@ -3376,7 +3388,7 @@ static void disp_enintr(struct Scsi_Host *shpnt)
 static void show_command(Scsi_Cmnd *ptr)
 {
 	printk(KERN_DEBUG "0x%08x: target=%d; lun=%d; cmnd=(",
-	       (unsigned int) ptr, ptr->target, ptr->lun);
+	       (unsigned int) ptr, ptr->device->id, ptr->device->lun);
 
 	print_command(ptr->cmnd);
 
@@ -3441,7 +3453,7 @@ static int get_command(char *pos, Scsi_Cmnd * ptr)
 	int i;
 
 	SPRINTF("0x%08x: target=%d; lun=%d; cmnd=( ",
-		(unsigned int) ptr, ptr->target, ptr->lun);
+		(unsigned int) ptr, ptr->device->id, ptr->device->lun);
 
 	for (i = 0; i < COMMAND_SIZE(ptr->cmnd[0]); i++)
 		SPRINTF("0x%02x ", ptr->cmnd[i]);

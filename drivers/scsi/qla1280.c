@@ -814,7 +814,7 @@ qla1280_do_device_init(struct pci_dev *pdev,
 		goto error;
 	}
 
-	scsi_set_pci_device(host, pdev);
+	scsi_set_device(host, &pdev->dev);
 	ha = (struct scsi_qla_host *)host->hostdata;
 	/* Clear our data area */
 	memset(ha, 0, sizeof(struct scsi_qla_host));
