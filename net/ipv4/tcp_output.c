@@ -38,6 +38,7 @@
 
 #include <net/tcp.h>
 
+#include <linux/compiler.h>
 #include <linux/smp_lock.h>
 
 /* People can turn this off for buggy TCP's found in printers etc. */
@@ -1156,13 +1157,13 @@ struct sk_buff * tcp_make_synack(struct sock *sk, struct dst_entry *dst,
 	return skb;
 }
 
-int tcp_connect(struct sock *sk, struct sk_buff *buff)
+/* 
+ * Do all connect socket setups that can be done AF independent.
+ */ 
+static inline void tcp_connect_init(struct sock *sk)
 {
 	struct dst_entry *dst = __sk_dst_get(sk);
 	struct tcp_opt *tp = tcp_sk(sk);
-
-	/* Reserve space for headers. */
-	skb_reserve(buff, MAX_TCP_HEADER);
 
 	/* We'll fix this up when we get a response from the other end.
 	 * See tcp_input.c:tcp_rcv_state_process case TCP_SYN_SENT.
@@ -1190,14 +1191,6 @@ int tcp_connect(struct sock *sk, struct sk_buff *buff)
 
 	tp->rcv_ssthresh = tp->rcv_wnd;
 
-	/* Socket identity change complete, no longer
-	 * in TCP_CLOSE, so enter ourselves into the
-	 * hash tables.
-	 */
-	tcp_set_state(sk,TCP_SYN_SENT);
-	if (tp->af_specific->hash_connecting(sk))
-		goto err_out;
-
 	sk->err = 0;
 	sk->done = 0;
 	tp->snd_wnd = 0;
@@ -1211,6 +1204,24 @@ int tcp_connect(struct sock *sk, struct sk_buff *buff)
 	tp->rto = TCP_TIMEOUT_INIT;
 	tp->retransmits = 0;
 	tcp_clear_retrans(tp);
+}
+
+/*
+ * Build a SYN and send it off.
+ */ 
+int tcp_connect(struct sock *sk)
+{
+	struct tcp_opt *tp = &(sk->tp_pinfo.af_tcp);
+	struct sk_buff *buff;
+
+	tcp_connect_init(sk);
+
+	buff = alloc_skb(MAX_TCP_HEADER + 15, sk->allocation);
+	if (unlikely(buff == NULL))
+		return -ENOBUFS;
+
+	/* Reserve space for headers. */
+	skb_reserve(buff, MAX_TCP_HEADER);
 
 	TCP_SKB_CB(buff)->flags = TCPCB_FLAG_SYN;
 	TCP_ECN_send_syn(tp, buff);
@@ -1233,11 +1244,6 @@ int tcp_connect(struct sock *sk, struct sk_buff *buff)
 	/* Timer for repeating the SYN until an answer. */
 	tcp_reset_xmit_timer(sk, TCP_TIME_RETRANS, tp->rto);
 	return 0;
-
-err_out:
-	tcp_set_state(sk,TCP_CLOSE);
-	kfree_skb(buff);
-	return -EADDRNOTAVAIL;
 }
 
 /* Send out a delayed ack, the caller does the policy checking
