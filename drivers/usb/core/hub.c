@@ -36,6 +36,9 @@
 #include "hcd.h"
 #include "hub.h"
 
+/* Protect all struct usb_device state members */
+static spinlock_t device_state_lock = SPIN_LOCK_UNLOCKED;
+
 /* Wakes up khubd */
 static spinlock_t hub_event_lock = SPIN_LOCK_UNLOCKED;
 
@@ -814,6 +817,7 @@ static int hub_reset(struct usb_hub *hub)
 	return 0;
 }
 
+/* FIXME!  This routine should be subsumed into hub_reset */
 static void hub_start_disconnect(struct usb_device *hdev)
 {
 	struct usb_device *parent = hdev->parent;
@@ -830,6 +834,51 @@ static void hub_start_disconnect(struct usb_device *hdev)
 	}
 
 	dev_err(&hdev->dev, "cannot disconnect hub!\n");
+}
+
+
+static void recursively_mark_NOTATTACHED(struct usb_device *udev)
+{
+	int i;
+
+	for (i = 0; i < udev->maxchild; ++i) {
+		if (udev->children[i])
+			recursively_mark_NOTATTACHED(udev->children[i]);
+	}
+	udev->state = USB_STATE_NOTATTACHED;
+}
+
+/**
+ * usb_set_device_state - change a device's current state (usbcore-internal)
+ * @udev: pointer to device whose state should be changed
+ * @new_state: new state value to be stored
+ *
+ * udev->state is _not_ protected by the udev->serialize semaphore.  This
+ * is so that devices can be marked as disconnected as soon as possible,
+ * without having to wait for the semaphore to be released.  Instead,
+ * changes to the state must be protected by the device_state_lock spinlock.
+ *
+ * Once a device has been added to the device tree, all changes to its state
+ * should be made using this routine.  The state should _not_ be set directly.
+ *
+ * If udev->state is already USB_STATE_NOTATTACHED then no change is made.
+ * Otherwise udev->state is set to new_state, and if new_state is
+ * USB_STATE_NOTATTACHED then all of udev's descendant's states are also set
+ * to USB_STATE_NOTATTACHED.
+ */
+void usb_set_device_state(struct usb_device *udev,
+		enum usb_device_state new_state)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&device_state_lock, flags);
+	if (udev->state == USB_STATE_NOTATTACHED)
+		;	/* do nothing */
+	else if (new_state != USB_STATE_NOTATTACHED)
+		udev->state = new_state;
+	else
+		recursively_mark_NOTATTACHED(udev);
+	spin_unlock_irqrestore(&device_state_lock, flags);
 }
 
 
@@ -890,7 +939,7 @@ void usb_disconnect(struct usb_device **pdev)
 	/* mark the device as inactive, so any further urb submissions for
 	 * this device will fail.
 	 */
-	udev->state = USB_STATE_NOTATTACHED;
+	usb_set_device_state(udev, USB_STATE_NOTATTACHED);
 
 	/* lock the bus list on behalf of HCDs unregistering their root hubs */
 	if (!udev->parent)
@@ -918,7 +967,11 @@ void usb_disconnect(struct usb_device **pdev)
 	release_address(udev);
 	usbfs_remove_device(udev);
 	usb_remove_sysfs_dev_files(udev);
+
+	/* Avoid races with recursively_mark_NOTATTACHED() */
+	spin_lock_irq(&device_state_lock);
 	*pdev = NULL;
+	spin_unlock_irq(&device_state_lock);
 
 	up(&udev->serialize);
 	if (!udev->parent)
@@ -1061,7 +1114,7 @@ int usb_new_device(struct usb_device *udev)
 	return 0;
 
 fail:
-	udev->state = USB_STATE_NOTATTACHED;
+	usb_set_device_state(udev, USB_STATE_NOTATTACHED);
 	return err;
 }
 
@@ -1166,9 +1219,9 @@ static int hub_port_reset(struct usb_device *hdev, int port,
 		if (status == -ENOTCONN || status == 0) {
 			clear_port_feature(hdev,
 				port + 1, USB_PORT_FEAT_C_RESET);
-			udev->state = status
+			usb_set_device_state(udev, status
 					? USB_STATE_NOTATTACHED
-					: USB_STATE_DEFAULT;
+					: USB_STATE_DEFAULT);
 			return status;
 		}
 
@@ -1189,6 +1242,9 @@ static int hub_port_disable(struct usb_device *hdev, int port)
 {
 	int ret;
 
+	if (hdev->children[port])
+		usb_set_device_state(hdev->children[port],
+				USB_STATE_NOTATTACHED);
 	ret = clear_port_feature(hdev, port + 1, USB_PORT_FEAT_ENABLE);
 	if (ret)
 		dev_err(hubdev(hdev), "cannot disable port %d (err = %d)\n",
@@ -1271,7 +1327,7 @@ static int hub_set_address(struct usb_device *udev)
 		USB_REQ_SET_ADDRESS, 0, udev->devnum, 0,
 		NULL, 0, HZ * USB_CTRL_SET_TIMEOUT);
 	if (retval == 0)
-		udev->state = USB_STATE_ADDRESS;
+		usb_set_device_state(udev, USB_STATE_ADDRESS);
 	return retval;
 }
 
@@ -1538,7 +1594,8 @@ static void hub_port_connect_change(struct usb_hub *hub, int port,
 				"couldn't allocate port %d usb_device\n", port+1);
 			goto done;
 		}
-		udev->state = USB_STATE_POWERED;
+
+		usb_set_device_state(udev, USB_STATE_POWERED);
 
 		/* hub can tell if it's lowspeed already:  D- pullup (not D+) */
 		if (portstatus & USB_PORT_STAT_LOW_SPEED)
@@ -1610,12 +1667,28 @@ static void hub_port_connect_change(struct usb_hub *hub, int port,
 		 * no one will look at it until hdev is unlocked.
 		 */
 		down (&udev->serialize);
-		hdev->children[port] = udev;
+		status = 0;
+
+		/* We mustn't add new devices if the parent hub has
+		 * been disconnected; we would race with the
+		 * recursively_mark_NOTATTACHED() routine.
+		 */
+		spin_lock_irq(&device_state_lock);
+		if (hdev->state == USB_STATE_NOTATTACHED)
+			status = -ENOTCONN;
+		else
+			hdev->children[port] = udev;
+		spin_unlock_irq(&device_state_lock);
 
 		/* Run it through the hoops (find a driver, etc) */
-		status = usb_new_device(udev);
-		if (status)
-			hdev->children[port] = NULL;
+		if (!status) {
+			status = usb_new_device(udev);
+			if (status) {
+				spin_lock_irq(&device_state_lock);
+				hdev->children[port] = NULL;
+				spin_unlock_irq(&device_state_lock);
+			}
+		}
 
 		up (&udev->serialize);
 		if (status)
@@ -1972,7 +2045,7 @@ int __usb_reset_device(struct usb_device *udev)
 			udev->actconfig->desc.bConfigurationValue, ret);
 		goto re_enumerate;
   	}
-	udev->state = USB_STATE_CONFIGURED;
+	usb_set_device_state(udev, USB_STATE_CONFIGURED);
 
 	for (i = 0; i < udev->actconfig->desc.bNumInterfaces; i++) {
 		struct usb_interface *intf = udev->actconfig->interface[i];
@@ -1998,7 +2071,7 @@ int __usb_reset_device(struct usb_device *udev)
  
 re_enumerate:
 	/* FIXME make some task re-enumerate; don't just mark unusable */
-	udev->state = USB_STATE_NOTATTACHED;
+	hub_port_disable(parent, port);
 	return -ENODEV;
 }
 EXPORT_SYMBOL(__usb_reset_device);

@@ -840,7 +840,7 @@ void usb_disable_device(struct usb_device *dev, int skip_ep0)
 		}
 		dev->actconfig = 0;
 		if (dev->state == USB_STATE_CONFIGURED)
-			dev->state = USB_STATE_ADDRESS;
+			usb_set_device_state(dev, USB_STATE_ADDRESS);
 	}
 }
 
@@ -1045,7 +1045,7 @@ int usb_reset_configuration(struct usb_device *dev)
 			config->desc.bConfigurationValue, 0,
 			NULL, 0, HZ * USB_CTRL_SET_TIMEOUT);
 	if (retval < 0) {
-		dev->state = USB_STATE_ADDRESS;
+		usb_set_device_state(dev, USB_STATE_ADDRESS);
 		return retval;
 	}
 
@@ -1183,9 +1183,9 @@ free_interfaces:
 
 	dev->actconfig = cp;
 	if (!cp)
-		dev->state = USB_STATE_ADDRESS;
+		usb_set_device_state(dev, USB_STATE_ADDRESS);
 	else {
-		dev->state = USB_STATE_CONFIGURED;
+		usb_set_device_state(dev, USB_STATE_CONFIGURED);
 
 		/* Initialize the new interface structures and the
 		 * hc/hcd/usbcore interface/endpoint state.

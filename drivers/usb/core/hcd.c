@@ -778,7 +778,7 @@ int usb_register_root_hub (struct usb_device *usb_dev, struct device *parent_dev
 	memset (&usb_dev->bus->devmap.devicemap, 0,
 			sizeof usb_dev->bus->devmap.devicemap);
 	set_bit (devnum, usb_dev->bus->devmap.devicemap);
-	usb_dev->state = USB_STATE_ADDRESS;
+	usb_set_device_state(usb_dev, USB_STATE_ADDRESS);
 
 	down (&usb_bus_list_lock);
 	usb_dev->bus->root_hub = usb_dev;
@@ -1580,7 +1580,7 @@ static void hcd_panic (void *_hcd)
 
 	/* hc's root hub is removed later removed in hcd->stop() */
 	down (&hub->serialize);
-	hub->state = USB_STATE_NOTATTACHED;
+	usb_set_device_state(hub, USB_STATE_NOTATTACHED);
 	for (i = 0; i < hub->maxchild; i++) {
 		if (hub->children [i])
 			usb_disconnect (&hub->children [i]);
