@@ -60,25 +60,25 @@ static int raw_open(struct inode *inode, struct file *filp)
 	bdev = raw_devices[minor].binding;
 	err = -ENODEV;
 	if (bdev) {
-		err = bd_claim(bdev, raw_open);
+		err = blkdev_get(bdev, filp->f_mode, 0, BDEV_RAW);
 		if (err)
 			goto out;
-		err = -ENODEV;
-		if (!igrab(bdev->bd_inode))
+		igrab(bdev->bd_inode);
+		err = bd_claim(bdev, raw_open);
+		if (err) {
+			blkdev_put(bdev, BDEV_RAW);
 			goto out;
-		err = blkdev_get(bdev, filp->f_mode, 0, BDEV_RAW);
+		}
+		err = set_blocksize(bdev, bdev_hardsect_size(bdev));
 		if (err) {
 			bd_release(bdev);
+			blkdev_put(bdev, BDEV_RAW);
 			goto out;
-		} else {
-			err = set_blocksize(bdev, bdev_hardsect_size(bdev));
-			if (err == 0) {
-				filp->f_flags |= O_DIRECT;
-				if (++raw_devices[minor].inuse == 1)
-					filp->f_dentry->d_inode->i_mapping =
-						bdev->bd_inode->i_mapping;
-			}
 		}
+		filp->f_flags |= O_DIRECT;
+		if (++raw_devices[minor].inuse == 1)
+			filp->f_dentry->d_inode->i_mapping =
+				bdev->bd_inode->i_mapping;
 	}
 	filp->private_data = bdev;
 out:
