@@ -1313,7 +1313,6 @@ static int isicom_tiocmset(struct tty_struct *tty, struct file *file,
 			   unsigned int set, unsigned int clear)
 {
 	struct isi_port * port = (struct isi_port *) tty->driver_data;
-	unsigned int arg;
 	unsigned long flags;
 	
 	if (isicom_paranoia_check(port, tty->name, "isicom_ioctl"))
