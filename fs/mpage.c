@@ -587,12 +587,19 @@ mpage_writepages(struct address_space *mapping,
 		page_cache_get(page);
 		write_unlock(&mapping->page_lock);
 
+		/*
+		 * At this point we hold neither mapping->page_lock nor
+		 * lock on the page itself: the page may be truncated or
+		 * invalidated (changing page->mapping to NULL), or even
+		 * swizzled back from swapper_space to tmpfs file mapping.
+		 */
+
 		lock_page(page);
 
 		if (sync)
 			wait_on_page_writeback(page);
 
-		if (page->mapping && !PageWriteback(page) &&
+		if (page->mapping == mapping && !PageWriteback(page) &&
 					test_clear_page_dirty(page)) {
 			if (writepage) {
 				ret = (*writepage)(page);

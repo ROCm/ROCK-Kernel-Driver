@@ -30,6 +30,7 @@ get_swap_bio(int gfp_flags, struct page *page, bio_end_io_t end_io)
 		struct swap_info_struct *sis;
 		swp_entry_t entry;
 
+		BUG_ON(!PageSwapCache(page));
 		entry.val = page->index;
 		sis = get_swap_info_struct(swp_type(entry));
 
