@@ -1538,137 +1538,185 @@ finish_node(struct device_node *np, unsigned long mem_start,
 	return mem_start;
 }
 
-/* This routine walks the interrupt tree for a given device node and gather 
- * all necessary informations according to the draft interrupt mapping
- * for CHRP. The current version was only tested on Apple "Core99" machines
- * and may not handle cascaded controllers correctly.
+/*
+ * Find the interrupt parent of a node.
  */
-__init
-static unsigned long
+static struct device_node * __init
+intr_parent(struct device_node *p)
+{
+	phandle *parp;
+
+	parp = (phandle *) get_property(p, "interrupt-parent", NULL);
+	if (parp == NULL)
+		return p->parent;
+	return find_phandle(*parp);
+}
+
+/*
+ * Find out the size of each entry of the interrupts property
+ * for a node.
+ */
+static int __init
+prom_n_intr_cells(struct device_node *np)
+{
+	struct device_node *p;
+	unsigned int *icp;
+
+	for (p = np; (p = intr_parent(p)) != NULL; ) {
+		icp = (unsigned int *)
+			get_property(p, "#interrupt-cells", NULL);
+		if (icp != NULL)
+			return *icp;
+		if (get_property(p, "interrupt-controller", NULL) != NULL
+		    || get_property(p, "interrupt-map", NULL) != NULL) {
+			printk("oops, node %s doesn't have #interrupt-cells\n",
+			       p->full_name);
+		return 1;
+		}
+	}
+#ifdef DEBUG_IRQ
+	printk("prom_n_intr_cells failed for %s\n", np->full_name);
+#endif
+	return 1;
+}
+
+/*
+ * Map an interrupt from a device up to the platform interrupt
+ * descriptor.
+ */
+static int __init
+map_interrupt(unsigned int **irq, struct device_node **ictrler,
+	      struct device_node *np, unsigned int *ints, int nintrc)
+{
+	struct device_node *p, *ipar;
+	unsigned int *imap, *imask, *ip;
+	int i, imaplen, match;
+	int newintrc, newaddrc;
+	unsigned int *reg;
+	int naddrc;
+
+	reg = (unsigned int *) get_property(np, "reg", NULL);
+	naddrc = prom_n_addr_cells(np);
+	p = intr_parent(np);
+	while (p != NULL) {
+		if (get_property(p, "interrupt-controller", NULL) != NULL)
+			/* this node is an interrupt controller, stop here */
+			break;
+		imap = (unsigned int *)
+			get_property(p, "interrupt-map", &imaplen);
+		if (imap == NULL) {
+			p = intr_parent(p);
+			continue;
+		}
+		imask = (unsigned int *)
+			get_property(p, "interrupt-map-mask", NULL);
+		if (imask == NULL) {
+			printk("oops, %s has interrupt-map but no mask\n",
+			       p->full_name);
+			return 0;
+		}
+		imaplen /= sizeof(unsigned int);
+		match = 0;
+		ipar = NULL;
+		while (imaplen > 0 && !match) {
+			/* check the child-interrupt field */
+			match = 1;
+			for (i = 0; i < naddrc && match; ++i)
+				match = ((reg[i] ^ imap[i]) & imask[i]) == 0;
+			for (; i < naddrc + nintrc && match; ++i)
+				match = ((ints[i-naddrc] ^ imap[i]) & imask[i]) == 0;
+			imap += naddrc + nintrc;
+			imaplen -= naddrc + nintrc;
+			/* grab the interrupt parent */
+			ipar = find_phandle((phandle) *imap++);
+			--imaplen;
+			if (ipar == NULL) {
+				printk("oops, no int parent %x in map of %s\n",
+				       imap[-1], p->full_name);
+				return 0;
+			}
+			/* find the parent's # addr and intr cells */
+			ip = (unsigned int *)
+				get_property(ipar, "#interrupt-cells", NULL);
+			if (ip == NULL) {
+				printk("oops, no #interrupt-cells on %s\n",
+				       ipar->full_name);
+				return 0;
+			}
+			newintrc = *ip;
+			ip = (unsigned int *)
+				get_property(ipar, "#address-cells", NULL);
+			newaddrc = (ip == NULL)? 0: *ip;
+			imap += newaddrc + newintrc;
+			imaplen -= newaddrc + newintrc;
+		}
+		if (imaplen < 0) {
+			printk("oops, error decoding int-map on %s, len=%d\n",
+			       p->full_name, imaplen);
+			return 0;
+		}
+		if (!match) {
+#ifdef DEBUG_IRQ
+			printk("oops, no match in %s int-map for %s\n",
+			       p->full_name, np->full_name);
+#endif
+			return 0;
+		}
+		p = ipar;
+		naddrc = newaddrc;
+		nintrc = newintrc;
+		ints = imap - nintrc;
+		reg = ints - naddrc;
+	}
+#ifdef DEBUG_IRQ
+	if (p == NULL)
+		printk("hmmm, int tree for %s doesn't have ctrler\n",
+		       np->full_name);
+#endif
+	*irq = ints;
+	*ictrler = p;
+	return nintrc;
+}
+
+/*
+ * New version of finish_node_interrupts.
+ */
+static unsigned long __init
 finish_node_interrupts(struct device_node *np, unsigned long mem_start)
 {
-	/* Finish this node */
-	unsigned int *isizep, *asizep, *interrupts, *map, *map_mask, *reg;
-	phandle *parent, map_parent;
-	struct device_node *node, *parent_node;
-	int l, isize, ipsize, asize, map_size, regpsize;
+	unsigned int *ints;
+	int intlen, intrcells;
+	int i, j, n;
+	unsigned int *irq;
+	struct device_node *ic;
 
-	/* Currently, we don't look at all nodes with no "interrupts" property */
-
-	interrupts = (unsigned int *)get_property(np, "interrupts", &l);
-	if (interrupts == NULL)
+	ints = (unsigned int *) get_property(np, "interrupts", &intlen);
+	if (ints == NULL)
 		return mem_start;
-	ipsize = l>>2;
+	intrcells = prom_n_intr_cells(np);
+	intlen /= intrcells * sizeof(unsigned int);
+	np->n_intrs = intlen;
+	np->intrs = (struct interrupt_info *) mem_start;
+	mem_start += intlen * sizeof(struct interrupt_info);
 
-	reg = (unsigned int *)get_property(np, "reg", &l);
-	regpsize = l>>2;
-
-	/* We assume default interrupt cell size is 1 (bugus ?) */
-	isize = 1;
-	node = np;
-	
-	do {
-	    /* We adjust the cell size if the current parent contains an #interrupt-cells
-	     * property */
-	    isizep = (unsigned int *)get_property(node, "#interrupt-cells", &l);
-	    if (isizep)
-	    	isize = *isizep;
-
-	    /* We don't do interrupt cascade (ISA) for now, we stop on the first 
-	     * controller found
-	     */
-	    if (get_property(node, "interrupt-controller", &l)) {
-	    	int i,j;
-
-	    	np->intrs = (struct interrupt_info *) mem_start;
-		np->n_intrs = ipsize / isize;
-		mem_start += np->n_intrs * sizeof(struct interrupt_info);
-		for (i = 0; i < np->n_intrs; ++i) {
-		    np->intrs[i].line = openpic_to_irq(virt_irq_create_mapping(*interrupts++));
-		    np->intrs[i].sense = 1;
-		    if (isize > 1)
-		        np->intrs[i].sense = *interrupts++;
-		    for (j=2; j<isize; j++)
-		    	interrupts++;
+	for (i = 0; i < intlen; ++i) {
+		np->intrs[i].line = 0;
+		np->intrs[i].sense = 1;
+		n = map_interrupt(&irq, &ic, np, ints, intrcells);
+		if (n <= 0)
+			continue;
+		np->intrs[i].line = openpic_to_irq(virt_irq_create_mapping(irq[0]));
+		if (n > 1)
+			np->intrs[i].sense = irq[1];
+		if (n > 2) {
+			printk("hmmm, got %d intr cells for %s:", n,
+			       np->full_name);
+			for (j = 0; j < n; ++j)
+				printk(" %d", irq[j]);
+			printk("\n");
 		}
-		return mem_start;
-	    }
-	    /* We lookup for an interrupt-map. This code can only handle one interrupt
-	     * per device in the map. We also don't handle #address-cells in the parent
-	     * I skip the pci node itself here, may not be necessary but I don't like it's
-	     * reg property.
-	     */
-	    if (np != node)
-	        map = (unsigned int *)get_property(node, "interrupt-map", &l);
-	     else
-	     	map = NULL;
-	    if (map && l) {
-	    	int i, found, temp_isize, temp_asize;
-	        map_size = l>>2;
-	        map_mask = (unsigned int *)get_property(node, "interrupt-map-mask", &l);
-	        asizep = (unsigned int *)get_property(node, "#address-cells", &l);
-	        if (asizep && l == sizeof(unsigned int))
-	            asize = *asizep;
-	        else
-	            asize = 0;
-	        found = 0;
-	        while (map_size>0 && !found) {
-	            found = 1;
-	            for (i=0; i<asize; i++) {
-	            	unsigned int mask = map_mask ? map_mask[i] : 0xffffffff;
-	            	if (!reg || (i>=regpsize) || ((mask & *map) != (mask & reg[i])))
-	           	    found = 0;
-	           	map++;
-	           	map_size--;
-	            }
-	            for (i=0; i<isize; i++) {
-	            	unsigned int mask = map_mask ? map_mask[i+asize] : 0xffffffff;
-	            	if ((mask & *map) != (mask & interrupts[i]))
-	            	    found = 0;
-	            	map++;
-	            	map_size--;
-	            }
-	            map_parent = *((phandle *)map);
-	            map+=1; map_size-=1;
-	            parent_node = find_phandle(map_parent);
-	            temp_isize = isize;
-		    temp_asize = 0;
-	            if (parent_node) {
-			isizep = (unsigned int *)get_property(parent_node, "#interrupt-cells", &l);
-	    		if (isizep)
-	    		    temp_isize = *isizep;
-			asizep = (unsigned int *)get_property(parent_node, "#address-cells", &l);
-			if (asizep && l == sizeof(unsigned int))
-				temp_asize = *asizep;
-	            }
-	            if (!found) {
-			map += temp_isize + temp_asize;
-			map_size -= temp_isize + temp_asize;
-	            }
-	        }
-	        if (found) {
-		    /* Mapped to a new parent.  Use the reg and interrupts specified in
-		     * the map as the new search parameters.  Then search from the parent.
-		     */
-	            node = parent_node;
-		    reg = map;
-		    regpsize = temp_asize;
-		    interrupts = map + temp_asize;
-		    ipsize = temp_isize;
-		    continue;
-	        }
-	    }
-	    /* We look for an explicit interrupt-parent.
-	     */
-	    parent = (phandle *)get_property(node, "interrupt-parent", &l);
-	    if (parent && (l == sizeof(phandle)) &&
-	    	(parent_node = find_phandle(*parent))) {
-	    	node = parent_node;
-	    	continue;
-	    }
-	    /* Default, get real parent */
-	    node = node->parent;
-	} while (node);
+		ints += intrcells;
+	}
 
 	return mem_start;
 }
