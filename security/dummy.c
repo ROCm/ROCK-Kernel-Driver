@@ -3,7 +3,7 @@
  * security model is loaded.
  *
  * Copyright (C) 2001 WireX Communications, Inc <chris@wirex.com>
- * Copyright (C) 2001 Greg Kroah-Hartman <greg@kroah.com>
+ * Copyright (C) 2001-2002  Greg Kroah-Hartman <greg@kroah.com>
  * Copyright (C) 2001 Networks Associates Technology, Inc <ssmalley@nai.com>
  *
  *	This program is free software; you can redistribute it and/or modify
