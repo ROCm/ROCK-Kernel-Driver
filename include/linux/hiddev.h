@@ -39,33 +39,33 @@ struct hiddev_event {
 };
 
 struct hiddev_devinfo {
-	unsigned int bustype;
-	unsigned int busnum;
-	unsigned int devnum;
-	unsigned int ifnum;
-	short vendor;
-	short product;
-	short version;
-	unsigned num_applications;
+	__u32 bustype;
+	__u32 busnum;
+	__u32 devnum;
+	__u32 ifnum;
+	__s16 vendor;
+	__s16 product;
+	__s16 version;
+	__u32 num_applications;
 };
 
 struct hiddev_collection_info {
-	unsigned index;
-	unsigned type;
-	unsigned usage;
-	unsigned level;
+	__u32 index;
+	__u32 type;
+	__u32 usage;
+	__u32 level;
 };
 
 #define HID_STRING_SIZE 256
 struct hiddev_string_descriptor {
-	int index;
+	__s32 index;
 	char value[HID_STRING_SIZE];
 };
 
 struct hiddev_report_info {
-	unsigned report_type;
-	unsigned report_id;
-	unsigned num_fields;
+	__u32 report_type;
+	__u32 report_id;
+	__u32 num_fields;
 };
 
 /* To do a GUSAGE/SUSAGE, fill in at least usage_code,  report_type and 
@@ -88,20 +88,20 @@ struct hiddev_report_info {
 #define HID_REPORT_TYPE_MAX     3
 
 struct hiddev_field_info {
-	unsigned report_type;
-	unsigned report_id;
-	unsigned field_index;
-	unsigned maxusage;
-	unsigned flags;
-	unsigned physical;		/* physical usage for this field */
-	unsigned logical;		/* logical usage for this field */
-	unsigned application;		/* application usage for this field */
+	__u32 report_type;
+	__u32 report_id;
+	__u32 field_index;
+	__u32 maxusage;
+	__u32 flags;
+	__u32 physical;		/* physical usage for this field */
+	__u32 logical;		/* logical usage for this field */
+	__u32 application;		/* application usage for this field */
 	__s32 logical_minimum;
 	__s32 logical_maximum;
 	__s32 physical_minimum;
 	__s32 physical_maximum;
-	unsigned unit_exponent;
-	unsigned unit;
+	__u32 unit_exponent;
+	__u32 unit;
 };
 
 /* Fill in report_type, report_id and field_index to get the information on a
@@ -118,12 +118,20 @@ struct hiddev_field_info {
 #define HID_FIELD_BUFFERED_BYTE		0x100
 
 struct hiddev_usage_ref {
-	unsigned report_type;
-	unsigned report_id;
-	unsigned field_index;
-	unsigned usage_index;
-	unsigned usage_code;
+	__u32 report_type;
+	__u32 report_id;
+	__u32 field_index;
+	__u32 usage_index;
+	__u32 usage_code;
 	__s32 value;
+};
+
+/* hiddev_usage_ref_multi is used for sending multiple bytes to a control.
+ * It really manifests itself as setting the value of consecutive usages */
+struct hiddev_usage_ref_multi {
+	struct hiddev_usage_ref uref;
+	__u32 num_values;
+	__s32 values[HID_MAX_USAGES];
 };
 
 /* FIELD_INDEX_NONE is returned in read() data from the kernel when flags
@@ -160,6 +168,10 @@ struct hiddev_usage_ref {
 #define HIDIOCGCOLLECTIONINDEX	_IOW('H', 0x10, struct hiddev_usage_ref)
 #define HIDIOCGCOLLECTIONINFO	_IOWR('H', 0x11, struct hiddev_collection_info)
 #define HIDIOCGPHYS(len)	_IOC(_IOC_READ, 'H', 0x12, len)
+
+/* For writing/reading to multiple/consecutive usages */
+#define HIDIOCGUSAGES		_IOWR('H', 0x13, struct hiddev_usage_ref_multi)
+#define HIDIOCSUSAGES		_IOW('H', 0x14, struct hiddev_usage_ref_multi)
 
 /* 
  * Flags to be used in HIDIOCSFLAG
