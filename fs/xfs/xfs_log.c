@@ -163,8 +163,11 @@ xfs_buftarg_t *xlog_target;
 void
 xlog_trace_loggrant(xlog_t *log, xlog_ticket_t *tic, xfs_caddr_t string)
 {
-	if (! log->l_grant_trace)
-		log->l_grant_trace = ktrace_alloc(1024, KM_SLEEP);
+	if (! log->l_grant_trace) {
+		log->l_grant_trace = ktrace_alloc(1024, KM_NOSLEEP);
+		if (! log->l_grant_trace)
+			return;
+	}
 
 	ktrace_enter(log->l_grant_trace,
 		     (void *)tic,
