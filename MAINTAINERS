@@ -931,8 +931,8 @@ W:	http://sourceforge.net/projects/e1000/
 S:	Supported
 
 INTERMEZZO FILE SYSTEM
-P:	Peter J. Braam
-M:	braam@clusterfs.com
+P:	Chen Yang
+M:	intermezzo-devel@lists.sf.net
 W:	http://www.inter-mezzo.org/
 L:	intermezzo-discuss@lists.sourceforge.net
 S:	Maintained

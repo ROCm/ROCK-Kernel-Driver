@@ -230,12 +230,12 @@ static void piix4_master_intr(int irq, void *dev_id, struct pt_regs * regs)
 	cached_irq_mask |= 1 << realirq;
 	if (unlikely(realirq > 7)) {
 		inb(0xa1);
-		outb(cached_A1, 0xa1);
+		outb(cached_slave_mask, 0xa1);
 		outb(0x60 + (realirq & 7), 0xa0);
 		outb(0x60 + 2, 0x20);
 	} else {
 		inb(0x21);
-		outb(cached_21, 0x21);
+		outb(cached_master_mask, 0x21);
 		outb(0x60 + realirq, 0x20);
 	}
 

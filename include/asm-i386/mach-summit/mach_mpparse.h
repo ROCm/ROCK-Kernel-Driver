@@ -19,6 +19,7 @@ static inline void mps_oem_check(struct mp_config_table *mpc, char *oem,
 {
 	if (!strncmp(oem, "IBM ENSW", 8) && 
 			(!strncmp(productid, "VIGIL SMP", 9) 
+			 || !strncmp(productid, "EXA", 3)
 			 || !strncmp(productid, "RUTHLESS SMP", 12))){
 		x86_summit = 1;
 		use_cyclone = 1; /*enable cyclone-timer*/
@@ -28,7 +29,9 @@ static inline void mps_oem_check(struct mp_config_table *mpc, char *oem,
 /* Hook from generic ACPI tables.c */
 static inline void acpi_madt_oem_check(char *oem_id, char *oem_table_id)
 {
-	if (!strncmp(oem_id, "IBM", 3) && !strncmp(oem_table_id, "SERVIGIL", 8)){
+	if (!strncmp(oem_id, "IBM", 3) &&
+	    (!strncmp(oem_table_id, "SERVIGIL", 8)
+	     || !strncmp(oem_table_id, "EXA", 3))){
 		x86_summit = 1;
 		use_cyclone = 1; /*enable cyclone-timer*/
 	}

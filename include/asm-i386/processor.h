@@ -93,7 +93,7 @@ extern struct cpuinfo_x86 cpu_data[];
 #define current_cpu_data boot_cpu_data
 #endif
 
-extern char ignore_irq13;
+extern char ignore_fpu_irq;
 
 extern void identify_cpu(struct cpuinfo_x86 *);
 extern void print_cpu_info(struct cpuinfo_x86 *);
@@ -257,6 +257,7 @@ static inline void clear_in_cr4 (unsigned long mask)
 
 /*
  * Bus types (default is ISA, but people can check others with these..)
+ * pc98 indicates PC98 systems (CBUS)
  */
 #ifdef CONFIG_EISA
 extern int EISA_bus;
@@ -264,6 +265,12 @@ extern int EISA_bus;
 #define EISA_bus (0)
 #endif
 extern int MCA_bus;
+#ifdef CONFIG_X86_PC9800
+#define pc98 1
+#else
+#define pc98 0
+#endif
+
 
 /* from system description table in BIOS.  Mostly for MCA use, but
 others may find it useful. */

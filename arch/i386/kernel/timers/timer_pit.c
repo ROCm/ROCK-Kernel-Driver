@@ -16,13 +16,17 @@
 extern spinlock_t i8259A_lock;
 extern spinlock_t i8253_lock;
 #include "do_timer.h"
+#include "io_ports.h"
+
+static int count_p; /* counter in get_offset_pit() */
 
 static int __init init_pit(char* override)
 {
-	/* check clock override */
-	if (override[0] && strncmp(override,"pit",3))
-		printk(KERN_ERR "Warning: clock= override failed. Defaulting to PIT\n");
-
+ 	/* check clock override */
+ 	if (override[0] && strncmp(override,"pit",3))
+ 		printk(KERN_ERR "Warning: clock= override failed. Defaulting to PIT\n");
+ 
+	count_p = LATCH;
 	return 0;
 }
 
@@ -86,7 +90,6 @@ static unsigned long get_offset_pit(void)
 {
 	int count;
 	unsigned long flags;
-	static int count_p = LATCH;    /* for the first call after boot */
 	static unsigned long jiffies_p = 0;
 
 	/*
@@ -96,9 +99,9 @@ static unsigned long get_offset_pit(void)
 
 	spin_lock_irqsave(&i8253_lock, flags);
 	/* timer count may underflow right here */
-	outb_p(0x00, 0x43);	/* latch the count ASAP */
+	outb_p(0x00, PIT_MODE);	/* latch the count ASAP */
 
-	count = inb_p(0x40);	/* read the latched count */
+	count = inb_p(PIT_CH0);	/* read the latched count */
 
 	/*
 	 * We do this guaranteed double memory access instead of a _p 
@@ -106,13 +109,13 @@ static unsigned long get_offset_pit(void)
 	 */
  	jiffies_t = jiffies;
 
-	count |= inb_p(0x40) << 8;
+	count |= inb_p(PIT_CH0) << 8;
 	
         /* VIA686a test code... reset the latch if count > max + 1 */
         if (count > LATCH) {
-                outb_p(0x34, 0x43);
-                outb_p(LATCH & 0xff, 0x40);
-                outb(LATCH >> 8, 0x40);
+                outb_p(0x34, PIT_MODE);
+                outb_p(LATCH & 0xff, PIT_CH0);
+                outb(LATCH >> 8, PIT_CH0);
                 count = LATCH - 1;
         }
 	

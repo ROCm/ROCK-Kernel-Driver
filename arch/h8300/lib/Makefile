@@ -1,0 +1,9 @@
+#
+# Makefile for H8/300-specific library files..
+#
+
+.S.o:
+	$(CC) $(AFLAGS) -D__ASSEMBLY__ -c $< -o $@
+
+L_TARGET = lib.a
+obj-y  = ashrdi3.o checksum.o memcpy.o memset.o abs.o
