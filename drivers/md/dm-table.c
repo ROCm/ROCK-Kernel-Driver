@@ -630,6 +630,16 @@ static int split_args(int *argc, char ***argvp, char *input)
 	return 0;
 }
 
+static void set_default_limits(struct io_restrictions *rs)
+{
+	rs->max_sectors = MAX_SECTORS;
+	rs->max_phys_segments = MAX_PHYS_SEGMENTS;
+	rs->max_hw_segments = MAX_HW_SEGMENTS;
+	rs->hardsect_size = 1 << SECTOR_SHIFT;
+	rs->max_segment_size = MAX_SEGMENT_SIZE;
+	rs->seg_boundary_mask = -1;
+}
+
 int dm_table_add_target(struct dm_table *t, const char *type,
 			sector_t start, sector_t len, char *params)
 {
@@ -642,6 +652,7 @@ int dm_table_add_target(struct dm_table *t, const char *type,
 
 	tgt = t->targets + t->num_targets;
 	memset(tgt, 0, sizeof(*tgt));
+	set_default_limits(&tgt->limits);
 
 	tgt->type = dm_get_target_type(type);
 	if (!tgt->type) {
