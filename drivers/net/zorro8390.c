@@ -59,9 +59,6 @@
 
 #define WORDSWAP(a)	((((a)>>8)&0xff) | ((a)<<8))
 
-#ifdef MODULE
-static struct net_device *root_zorro8390_dev;
-#endif
 
 static const struct card_info {
     zorro_id id;
@@ -72,9 +69,11 @@ static const struct card_info {
     { ZORRO_PROD_INDIVIDUAL_COMPUTERS_X_SURF, "X-Surf", 0x8600 },
 };
 
-static int __init zorro8390_probe(void);
-static int __init zorro8390_init(struct net_device *dev, unsigned long board,
-				 const char *name, unsigned long ioaddr);
+static int __devinit zorro8390_init_one(struct zorro_dev *z,
+					const struct zorro_device_id *ent);
+static int __devinit zorro8390_init(struct net_device *dev,
+				    unsigned long board, const char *name,
+				    unsigned long ioaddr);
 static int zorro8390_open(struct net_device *dev);
 static int zorro8390_close(struct net_device *dev);
 static void zorro8390_reset_8390(struct net_device *dev);
@@ -85,48 +84,54 @@ static void zorro8390_block_input(struct net_device *dev, int count,
 static void zorro8390_block_output(struct net_device *dev, const int count,
 				   const unsigned char *buf,
 				   const int start_page);
-static void __exit zorro8390_cleanup(void);
+static void __devexit zorro8390_remove_one(struct zorro_dev *z);
 
-static int __init zorro8390_probe(void)
+static struct zorro_device_id zorro8390_zorro_tbl[] __devinitdata = {
+    { ZORRO_PROD_VILLAGE_TRONIC_ARIADNE2, },
+    { ZORRO_PROD_INDIVIDUAL_COMPUTERS_X_SURF, },
+    { 0 }
+};
+
+static struct zorro_driver zorro8390_driver = {
+    .name	= "zorro8390",
+    .id_table	= zorro8390_zorro_tbl,
+    .probe	= zorro8390_init_one,
+    .remove	= __devexit_p(zorro8390_remove_one),
+};
+
+static int __devinit zorro8390_init_one(struct zorro_dev *z,
+					const struct zorro_device_id *ent)
 {
     struct net_device *dev;
-    struct zorro_dev *z = NULL;
     unsigned long board, ioaddr;
-    int err = -ENODEV;
-    int i;
+    int err, i;
 
-    while ((z = zorro_find_device(ZORRO_WILDCARD, z))) {
-	for (i = ARRAY_SIZE(cards)-1; i >= 0; i--)
-	    if (z->id == cards[i].id)
-		break;
-	if (i < 0)
-	    continue;
-	board = z->resource.start;
-	ioaddr = board+cards[i].offset;
-	dev = alloc_ei_netdev();
-	if (!dev)
-	    return -ENOMEM;
-	SET_MODULE_OWNER(dev);
-	if (!request_mem_region(ioaddr, NE_IO_EXTENT*2, dev->name)) {
-	    free_netdev(dev);
-	    continue;
-	}
-	if ((err = zorro8390_init(dev, board, cards[i].name,
-				  ZTWO_VADDR(ioaddr)))) {
-	    release_mem_region(ioaddr, NE_IO_EXTENT*2);
-	    free_netdev(dev);
-	    return err;
-	}
-	err = 0;
+    for (i = ARRAY_SIZE(cards)-1; i >= 0; i--)
+	if (z->id == cards[i].id)
+	    break;
+    board = z->resource.start;
+    ioaddr = board+cards[i].offset;
+    dev = alloc_ei_netdev();
+    if (!dev)
+	return -ENOMEM;
+    SET_MODULE_OWNER(dev);
+    if (!request_mem_region(ioaddr, NE_IO_EXTENT*2, dev->name)) {
+	free_netdev(dev);
+	return -EBUSY;
     }
-
-    if (err == -ENODEV)
-	printk("No Ariadne II or X-Surf ethernet card found.\n");
-    return err;
+    if ((err = zorro8390_init(dev, board, cards[i].name,
+			      ZTWO_VADDR(ioaddr)))) {
+	release_mem_region(ioaddr, NE_IO_EXTENT*2);
+	free_netdev(dev);
+	return err;
+    }
+    zorro_set_drvdata(z, dev);
+    return 0;
 }
 
-static int __init zorro8390_init(struct net_device *dev, unsigned long board,
-				 const char *name, unsigned long ioaddr)
+static int __devinit zorro8390_init(struct net_device *dev,
+				    unsigned long board, const char *name,
+				    unsigned long ioaddr)
 {
     int i;
     int err;
@@ -222,10 +227,6 @@ static int __init zorro8390_init(struct net_device *dev, unsigned long board,
     ei_status.reg_offset = zorro8390_offsets;
     dev->open = &zorro8390_open;
     dev->stop = &zorro8390_close;
-#ifdef MODULE
-    ei_status.priv = (unsigned long)root_zorro8390_dev;
-    root_zorro8390_dev = dev;
-#endif
     NS8390_init(dev, 0);
     err = register_netdev(dev);
     if (err)
@@ -401,23 +402,27 @@ static void zorro8390_block_output(struct net_device *dev, int count,
     return;
 }
 
-static void __exit zorro8390_cleanup(void)
+static void __devexit zorro8390_remove_one(struct zorro_dev *z)
 {
-#ifdef MODULE
-    struct net_device *dev, *next;
+    struct net_device *dev = zorro_get_drvdata(z);
 
-    while ((dev = root_zorro8390_dev)) {
-	next = (struct net_device *)(ei_status.priv);
-	unregister_netdev(dev);
-	free_irq(IRQ_AMIGA_PORTS, dev);
-	release_mem_region(ZTWO_PADDR(dev->base_addr), NE_IO_EXTENT*2);
-	free_netdev(dev);
-	root_zorro8390_dev = next;
-    }
-#endif
+    unregister_netdev(dev);
+    free_irq(IRQ_AMIGA_PORTS, dev);
+    release_mem_region(ZTWO_PADDR(dev->base_addr), NE_IO_EXTENT*2);
+    free_netdev(dev);
 }
 
-module_init(zorro8390_probe);
-module_exit(zorro8390_cleanup);
+static int __init zorro8390_init_module(void)
+{
+    return zorro_module_init(&zorro8390_driver);
+}
+
+static void __exit zorro8390_cleanup_module(void)
+{
+    zorro_unregister_driver(&zorro8390_driver);
+}
+
+module_init(zorro8390_init_module);
+module_exit(zorro8390_cleanup_module);
 
 MODULE_LICENSE("GPL");

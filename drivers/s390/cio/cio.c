@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/cio.c
  *   S/390 common I/O routines -- low level i/o calls
- *   $Revision: 1.114 $
+ *   $Revision: 1.117 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *			      IBM Corporation
@@ -173,7 +173,7 @@ cio_start_handle_notoper(struct subchannel *sch, __u8 lpm)
 	stsch (sch->irq, &sch->schib);
 
 	CIO_MSG_EVENT(0, "cio_start: 'not oper' status for "
-		      "subchannel %s!\n", sch->dev.bus_id);
+		      "subchannel %04x!\n", sch->irq);
 	sprintf(dbf_text, "no%s", sch->dev.bus_id);
 	CIO_TRACE_EVENT(0, dbf_text);
 	CIO_HEX_EVENT(0, &sch->schib, sizeof (struct schib));
@@ -572,9 +572,9 @@ cio_validate_subchannel (struct subchannel *sch, unsigned int irq)
 		sch->opm;
 
 	CIO_DEBUG(KERN_INFO, 0,
-		  "Detected device %04X on subchannel %s"
+		  "Detected device %04X on subchannel %04X"
 		  " - PIM = %02X, PAM = %02X, POM = %02X\n",
-		  sch->schib.pmcw.dev, sch->dev.bus_id, sch->schib.pmcw.pim,
+		  sch->schib.pmcw.dev, sch->irq, sch->schib.pmcw.pim,
 		  sch->schib.pmcw.pam, sch->schib.pmcw.pom);
 
 	/*
@@ -607,6 +607,7 @@ do_IRQ (struct pt_regs *regs)
 	struct irb *irb;
 
 	irq_enter ();
+	asm volatile ("mc 0,0");
 	if (S390_lowcore.int_clock >= S390_lowcore.jiffy_timer)
 		account_ticks(regs);
 	/*

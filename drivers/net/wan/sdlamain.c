@@ -1160,7 +1160,6 @@ STATIC irqreturn_t sdla_isr (int irq, void* dev_id, struct pt_regs *regs)
 void wanpipe_open (sdla_t* card)
 {
 	++card->open_cnt;
-	MOD_INC_USE_COUNT;
 }
 
 /*============================================================================
@@ -1172,7 +1171,6 @@ void wanpipe_open (sdla_t* card)
 void wanpipe_close (sdla_t* card)
 {
 	--card->open_cnt;
-	MOD_DEC_USE_COUNT;
 }
 
 /*============================================================================

@@ -76,6 +76,8 @@ CONFIG_BINFMT_MISC=m
 # CONFIG_PROCESS_DEBUG is not set
 CONFIG_PFAULT=y
 # CONFIG_SHARED_KERNEL is not set
+# CONFIG_CMM is not set
+# CONFIG_VIRT_TIMER is not set
 # CONFIG_PCMCIA is not set
 
 #
@@ -132,11 +134,13 @@ CONFIG_BLK_DEV_INITRD=y
 # S/390 block device drivers
 #
 CONFIG_BLK_DEV_XPRAM=m
+# CONFIG_DCSSBLK is not set
 CONFIG_DASD=y
 # CONFIG_DASD_PROFILE is not set
 CONFIG_DASD_ECKD=y
 CONFIG_DASD_FBA=y
 CONFIG_DASD_DIAG=y
+# CONFIG_DASD_CMB is not set
 
 #
 # Multi-device support (RAID and LVM)
@@ -311,6 +315,8 @@ CONFIG_NET_ETHERNET=y
 CONFIG_LCS=m
 CONFIG_CTC=m
 CONFIG_IUCV=m
+# CONFIG_NETIUCV is not set
+# CONFIG_SMSGIUCV is not set
 CONFIG_QETH=y
 
 #

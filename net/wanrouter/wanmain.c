@@ -191,8 +191,8 @@ static void __exit wanrouter_cleanup (void)
  * slap it first in directory and make it module_init().  The only reason
  * for subsys_initcall() here is that net goes after drivers (why, BTW?)
  */
-subsys_initcall(wanrouter_init)
-module_exit(wanrouter_cleanup)
+subsys_initcall(wanrouter_init);
+module_exit(wanrouter_cleanup);
 
 /*
  * 	Kernel APIs

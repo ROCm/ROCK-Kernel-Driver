@@ -43,8 +43,6 @@
  *   (C) 1999 Trond Myklebust <trond.myklebust@fys.uio.no>
  */
 
-#define __KERNEL_SYSCALLS__
-
 #include <linux/types.h>
 #include <linux/slab.h>
 #include <linux/capability.h>
@@ -56,7 +54,6 @@
 #include <linux/mm.h>
 #include <linux/udp.h>
 #include <linux/tcp.h>
-#include <linux/unistd.h>
 #include <linux/sunrpc/clnt.h>
 #include <linux/file.h>
 #include <linux/workqueue.h>

@@ -26,14 +26,7 @@
  * maybe other stuff do to.
  */
 
-/* Argh. Some architectures have kernel_thread in asm/processor.h
-   Some have it in unistd.h and you need to define __KERNEL_SYSCALLS__
-   Pass me a baseball bat and the person responsible.
-   dwmw2
-*/
-#define __KERNEL_SYSCALLS__
 #include <linux/time.h>
-#include <linux/unistd.h>
 
 #include <linux/module.h>
 #include <linux/init.h>

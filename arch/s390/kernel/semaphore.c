@@ -33,8 +33,9 @@ static inline int __sem_update_count(struct semaphore *sem, int incr)
                              "   cs    %0,%1,0(%3)\n"
                              "   jl    0b\n"
                              : "=&d" (old_val), "=&d" (new_val),
-			       "+m" (sem->count)
-			     : "a" (&sem->count), "d" (incr) : "cc" );
+			       "=m" (sem->count)
+			     : "a" (&sem->count), "d" (incr), "m" (sem->count)
+			     : "cc" );
 	return old_val;
 }
 

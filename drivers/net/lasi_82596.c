@@ -1016,8 +1016,6 @@ static int i596_open(struct net_device *dev)
 {
 	DEB(DEB_OPEN,printk("%s: i596_open() irq %d.\n", dev->name, dev->irq));
 
-	MOD_INC_USE_COUNT;
-
 	if (request_irq(dev->irq, &i596_interrupt, 0, "i82596", dev)) {
 		printk("%s: IRQ %d not free\n", dev->name, dev->irq);
 		goto out;
@@ -1038,8 +1036,6 @@ out_remove_rx_bufs:
 	remove_rx_bufs(dev);
 	free_irq(dev->irq, dev);
 out:
-	MOD_DEC_USE_COUNT;
-
 	return -EAGAIN;
 }
 

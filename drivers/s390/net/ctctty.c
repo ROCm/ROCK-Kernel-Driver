@@ -1,5 +1,5 @@
 /*
- * $Id: ctctty.c,v 1.15 2004/01/26 10:21:01 mschwide Exp $
+ * $Id: ctctty.c,v 1.16 2004/02/05 12:39:55 felfert Exp $
  *
  * CTC / ESCON network driver, tty interface.
  *
@@ -655,13 +655,18 @@ ctc_tty_get_lsr_info(ctc_tty_info * info, uint * value)
 }
 
 
-static int
-ctc_tty_get_ctc_tty_info(ctc_tty_info * info, uint * value)
+static int ctc_tty_tiocmget(struct tty_struct *tty, struct file *file)
 {
+	ctc_tty_info *info = (ctc_tty_info *) tty->driver_data;
 	u_char control,
 	 status;
 	uint result;
 	ulong flags;
+
+	if (ctc_tty_paranoia_check(info, tty->name, "ctc_tty_ioctl"))
+		return -ENODEV;
+	if (tty->flags & (1 << TTY_IO_ERROR))
+		return -EIO;
 
 	control = info->mcr;
 	spin_lock_irqsave(&ctc_tty_lock, flags);
@@ -673,51 +678,31 @@ ctc_tty_get_ctc_tty_info(ctc_tty_info * info, uint * value)
 	    | ((status & UART_MSR_RI) ? TIOCM_RNG : 0)
 	    | ((status & UART_MSR_DSR) ? TIOCM_DSR : 0)
 	    | ((status & UART_MSR_CTS) ? TIOCM_CTS : 0);
-	put_user(result, (uint *) value);
-	return 0;
+	return result;
 }
 
 static int
-ctc_tty_set_ctc_tty_info(ctc_tty_info * info, uint cmd, uint * value)
+ctc_tty_tiocmset(struct tty_struct *tty, struct file *file,
+		 unsigned int set, unsigned int clear)
 {
-	uint arg;
-	int old_mcr = info->mcr & (UART_MCR_RTS | UART_MCR_DTR);
+	ctc_tty_info *info = (ctc_tty_info *) tty->driver_data;
 
-	get_user(arg, (uint *) value);
-	switch (cmd) {
-		case TIOCMBIS:
-#ifdef CTC_DEBUG_MODEM_IOCTL
-			printk(KERN_DEBUG "%s%d ioctl TIOCMBIS\n", CTC_TTY_NAME,
-			       info->line);
-#endif
-			if (arg & TIOCM_RTS)
-				info->mcr |= UART_MCR_RTS;
-			if (arg & TIOCM_DTR)
-				info->mcr |= UART_MCR_DTR;
-			break;
-		case TIOCMBIC:
-#ifdef CTC_DEBUG_MODEM_IOCTL
-			printk(KERN_DEBUG "%s%d ioctl TIOCMBIC\n", CTC_TTY_NAME,
-			       info->line);
-#endif
-			if (arg & TIOCM_RTS)
-				info->mcr &= ~UART_MCR_RTS;
-			if (arg & TIOCM_DTR)
-				info->mcr &= ~UART_MCR_DTR;
-			break;
-		case TIOCMSET:
-#ifdef CTC_DEBUG_MODEM_IOCTL
-			printk(KERN_DEBUG "%s%d ioctl TIOCMSET\n", CTC_TTY_NAME,
-			       info->line);
-#endif
-			info->mcr = ((info->mcr & ~(UART_MCR_RTS | UART_MCR_DTR))
-				 | ((arg & TIOCM_RTS) ? UART_MCR_RTS : 0)
-			       | ((arg & TIOCM_DTR) ? UART_MCR_DTR : 0));
-			break;
-		default:
-			return -EINVAL;
-	}
-	if ((info->mcr  & (UART_MCR_RTS | UART_MCR_DTR)) != old_mcr)
+	if (ctc_tty_paranoia_check(info, tty->name, "ctc_tty_ioctl"))
+		return -ENODEV;
+	if (tty->flags & (1 << TTY_IO_ERROR))
+		return -EIO;
+
+	if (set & TIOCM_RTS)
+		info->mcr |= UART_MCR_RTS;
+	if (set & TIOCM_DTR)
+		info->mcr |= UART_MCR_DTR;
+
+	if (clear & TIOCM_RTS)
+		info->mcr &= ~UART_MCR_RTS;
+	if (clear & TIOCM_DTR)
+		info->mcr &= ~UART_MCR_DTR;
+
+	if ((set | clear) & (TIOCM_RTS|TIOCM_DTR))
 		ctc_tty_transmit_status(info);
 	return 0;
 }
@@ -772,22 +757,6 @@ ctc_tty_ioctl(struct tty_struct *tty, struct file *file,
 			    ((tty->termios->c_cflag & ~CLOCAL) |
 			     (arg ? CLOCAL : 0));
 			return 0;
-		case TIOCMGET:
-#ifdef CTC_DEBUG_MODEM_IOCTL
-			printk(KERN_DEBUG "%s%d ioctl TIOCMGET\n", CTC_TTY_NAME,
-			       info->line);
-#endif
-			error = verify_area(VERIFY_WRITE, (void *) arg, sizeof(uint));
-			if (error)
-				return error;
-			return ctc_tty_get_ctc_tty_info(info, (uint *) arg);
-		case TIOCMBIS:
-		case TIOCMBIC:
-		case TIOCMSET:
-			error = verify_area(VERIFY_READ, (void *) arg, sizeof(uint));
-			if (error)
-				return error;
-			return ctc_tty_set_ctc_tty_info(info, cmd, (uint *) arg);
 		case TIOCSERGETLSR:	/* Get line status register */
 #ifdef CTC_DEBUG_MODEM_IOCTL
 			printk(KERN_DEBUG "%s%d ioctl TIOCSERGETLSR\n", CTC_TTY_NAME,
@@ -1139,6 +1108,8 @@ static struct tty_operations ctc_ops = {
 	.unthrottle = ctc_tty_unthrottle,
 	.set_termios = ctc_tty_set_termios,
 	.hangup = ctc_tty_hangup,
+	.tiocmget = ctc_tty_tiocmget,
+	.tiocmset = ctc_tty_tiocmset,
 };
 
 int
@@ -1259,9 +1230,9 @@ ctc_tty_cleanup(void) {
 	
 	spin_lock_irqsave(&ctc_tty_lock, saveflags);
 	ctc_tty_shuttingdown = 1;
+	spin_unlock_irqrestore(&ctc_tty_lock, saveflags);
 	tty_unregister_driver(driver->ctc_tty_device);
 	kfree(driver);
 	put_tty_driver(driver->ctc_tty_device);
 	driver = NULL;
-	spin_unlock_irqrestore(&ctc_tty_lock, saveflags);
 }

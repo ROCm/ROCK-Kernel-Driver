@@ -23,8 +23,13 @@ strncpy_loop:
 	LA      3,1(3)
         STC     0,0(1)
 	LA      1,1(1)
-        JZ      strncpy_exit   # ICM inserted a 0x00
+        JZ      strncpy_pad    # ICM inserted a 0x00
         BRCT    4,strncpy_loop # R4 -= 1, jump to strncpy_loop if >  0
 strncpy_exit:
         BR      14
-
+strncpy_clear:
+	STC	0,0(1)
+	LA	1,1(1)
+strncpy_pad:
+	BRCT	4,strncpy_clear
+	BR	14
