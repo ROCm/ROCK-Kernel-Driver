@@ -39,13 +39,14 @@
 #define PRODOSI_AUXTYPE_DIR 0x0200
 
 /*================ Forward declarations ================*/
-
+static loff_t      hdr_llseek(struct file *, loff_t, int);
 static hfs_rwret_t hdr_read(struct file *, char *, hfs_rwarg_t, loff_t *);
 static hfs_rwret_t hdr_write(struct file *, const char *,
 			     hfs_rwarg_t, loff_t *);
 /*================ Global variables ================*/
 
 struct file_operations hfs_hdr_operations = {
+	llseek:		hdr_llseek,
 	read:		hdr_read,
 	write:		hdr_write,
 	fsync:		file_fsync,
@@ -340,6 +341,29 @@ static void set_dates(struct hfs_cat_entry *entry, struct inode *inode,
 		entry->backup_date = tmp;
 		hfs_cat_mark_dirty(entry);
 	}
+}
+
+loff_t hdr_llseek(struct file *file, loff_t offset, int origin)
+{
+	long long retval;
+
+	switch (origin) {
+		case 2:
+			offset += file->f_dentry->d_inode->i_size;
+			break;
+		case 1:
+			offset += file->f_pos;
+	}
+	retval = -EINVAL;
+	if (offset>=0 && offset<file->f_dentry->d_inode->i_size) {
+		if (offset != file->f_pos) {
+			file->f_pos = offset;
+			file->f_reada = 0;
+			file->f_version = ++event;
+		}
+		retval = offset;
+	}
+	return retval;
 }
 
 /*

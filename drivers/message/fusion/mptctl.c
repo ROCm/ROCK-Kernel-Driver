@@ -205,13 +205,6 @@ mptctl_reply(MPT_ADAPTER *ioc, MPT_FRAME_HDR *req, MPT_FRAME_HDR *reply)
 }
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
-static loff_t
-mptctl_llseek(struct file *file, loff_t offset, int origin)
-{
-	return -ESPIPE;
-}
-
-/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 static ssize_t
 mptctl_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 {
@@ -1092,7 +1085,7 @@ static struct file_operations mptctl_fops = {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,51)
 	owner:		THIS_MODULE,
 #endif
-	llseek:		mptctl_llseek,
+	llseek:		no_llseek,
 	read:		mptctl_read,
 	write:		mptctl_write,
 	ioctl:		mpt_ioctl,

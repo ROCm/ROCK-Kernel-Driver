@@ -86,9 +86,9 @@ typedef void (*dma_callback_t)( void *buf_id, int size );
 
 
 /* SA1100 DMA API */
-extern int sa1100_request_dma( dmach_t *channel, const char *device_id );
+extern int sa1100_request_dma( dmach_t *channel, const char *device_id,
+			       dma_device_t device );
 extern int sa1100_dma_set_callback( dmach_t channel, dma_callback_t cb );
-extern int sa1100_dma_set_device( dmach_t channel, dma_device_t device );
 extern int sa1100_dma_set_spin( dmach_t channel, dma_addr_t addr, int size );
 extern int sa1100_dma_queue_buffer( dmach_t channel, void *buf_id,
 				    dma_addr_t data, int size );
@@ -97,11 +97,23 @@ extern int sa1100_dma_stop( dmach_t channel );
 extern int sa1100_dma_resume( dmach_t channel );
 extern int sa1100_dma_flush_all( dmach_t channel );
 extern void sa1100_free_dma( dmach_t channel );
+extern int sa1100_dma_sleep( dmach_t channel );
+extern int sa1100_dma_wakeup( dmach_t channel );
 
 /* Sa1111 DMA interface (all but registration uses the above) */
 extern int sa1111_sac_request_dma( dmach_t *channel, const char *device_id,
 				   unsigned int direction );
 extern int sa1111_check_dma_bug( dma_addr_t addr );
 
+#ifdef CONFIG_SA1111
+static inline void
+__arch_adjust_zones(int node, unsigned long *size, unsigned long *holes)
+{
+	size[1] = size[0] - 256;
+	size[0] = 256;
+}
+
+#define arch_adjust_zones(node,size,holes) __arch_adjust_zones(node,size,holes)
+#endif
 
 #endif /* _ASM_ARCH_DMA_H */

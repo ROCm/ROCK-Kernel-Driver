@@ -4,7 +4,7 @@
  *  Internal header file PCI V3 chip
  *
  *  Copyright (C) ARM Limited
- *  Copyright (C) 2000 Deep Blue Solutions Ltd.
+ *  Copyright (C) 2000-2001 Deep Blue Solutions Ltd.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -124,25 +124,59 @@
 #define V3_PCI_MAP_M_REG_EN             (1 << 1)
 #define V3_PCI_MAP_M_ENABLE             (1 << 0)
 
-/*  9 => 512M window size
+/*
+ *  LB_BASE0,1 register bits (Local bus -> PCI)
  */
-#define V3_PCI_MAP_M_ADR_SIZE_512M      0x00000090
-/*  A => 1024M window size
- */
-#define V3_PCI_MAP_M_ADR_SIZE_1024M     0x000000A0      
+#define V3_LB_BASE_ADR_BASE		0xfff00000
+#define V3_LB_BASE_SWAP			(3 << 8)
+#define V3_LB_BASE_ADR_SIZE		(15 << 4)
+#define V3_LB_BASE_PREFETCH		(1 << 3)
+#define V3_LB_BASE_ENABLE		(1 << 0)
 
-/*  LB_BASE register bits (Local bus -> PCI)
- */
-#define V3_LB_BASE_M_MAP_ADR            0xFFF00000
-#define V3_LB_BASE_M_SWAP               (3 << 8)
-#define V3_LB_BASE_M_ADR_SIZE           0x000000F0
-#define V3_LB_BASE_M_PREFETCH           (1 << 3)
-#define V3_LB_BASE_M_ENABLE             (1 << 0)
+#define V3_LB_BASE_ADR_SIZE_1MB		(0 << 4)
+#define V3_LB_BASE_ADR_SIZE_2MB		(1 << 4)
+#define V3_LB_BASE_ADR_SIZE_4MB		(2 << 4)
+#define V3_LB_BASE_ADR_SIZE_8MB		(3 << 4)
+#define V3_LB_BASE_ADR_SIZE_16MB	(4 << 4)
+#define V3_LB_BASE_ADR_SIZE_32MB	(5 << 4)
+#define V3_LB_BASE_ADR_SIZE_64MB	(6 << 4)
+#define V3_LB_BASE_ADR_SIZE_128MB	(7 << 4)
+#define V3_LB_BASE_ADR_SIZE_256MB	(8 << 4)
+#define V3_LB_BASE_ADR_SIZE_512MB	(9 << 4)
+#define V3_LB_BASE_ADR_SIZE_1GB		(10 << 4)
+#define V3_LB_BASE_ADR_SIZE_2GB		(11 << 4)
 
-/*  LB_MAP register bits (Local bus -> PCI)
+#define v3_addr_to_lb_base(a)	((a) & V3_LB_BASE_ADR_BASE)
+
+/*
+ *  LB_MAP0,1 register bits (Local bus -> PCI)
  */
-#define V3_LB_MAP_M_MAP_ADR             0xFFF0
-#define V3_LB_MAP_M_TYPE                0x000E
-#define V3_LB_MAP_M_AD_LOW_EN           (1 << 0)
+#define V3_LB_MAP_MAP_ADR		0xfff0
+#define V3_LB_MAP_TYPE			(7 << 1)
+#define V3_LB_MAP_AD_LOW_EN		(1 << 0)
+
+#define V3_LB_MAP_TYPE_IACK		(0 << 1)
+#define V3_LB_MAP_TYPE_IO		(1 << 1)
+#define V3_LB_MAP_TYPE_MEM		(3 << 1)
+#define V3_LB_MAP_TYPE_CONFIG		(5 << 1)
+#define V3_LB_MAP_TYPE_MEM_MULTIPLE	(6 << 1)
+
+#define v3_addr_to_lb_map(a)	(((a) >> 16) & V3_LB_MAP_MAP_ADR)
+
+/*
+ *  LB_BASE2 register bits (Local bus -> PCI IO)
+ */
+#define V3_LB_BASE2_ADR_BASE		0xff00
+#define V3_LB_BASE2_SWAP		(3 << 6)
+#define V3_LB_BASE2_ENABLE		(1 << 0)
+
+#define v3_addr_to_lb_base2(a)	(((a) >> 16) & V3_LB_BASE2_ADR_BASE)
+
+/*
+ *  LB_MAP2 register bits (Local bus -> PCI IO)
+ */
+#define V3_LB_MAP2_MAP_ADR		0xff00
+
+#define v3_addr_to_lb_map2(a)	(((a) >> 16) & V3_LB_MAP2_MAP_ADR)
 
 #endif

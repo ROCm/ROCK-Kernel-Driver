@@ -171,7 +171,7 @@ Ldata_unknown:	@ Part of jumptable
 		mov	r1, r4
 		mov	r2, r3
 		bl	baddataabort
-		b	ret_from_sys_call
+		b	ret_from_exception
 
 Ldata_lateldrhpre:
 		tst	r4, #1 << 21			@ check writeback bit
@@ -377,11 +377,9 @@ __arm720_setup:	mov	r0, #0
 		mcr	p15, 0, r0, c3, c0		@ load domain access register
 
 		mrc	p15, 0, r0, c1, c0		@ get control register
-		bic	r0, r0, #0x2e00
-		bic	r0, r0, #0x000e
-		orr	r0, r0, #0x0031			@ ..V...RSBLDPWCAM
-		orr	r0, r0, #0x0100			@ .........111.... (old)
-		orr	r0, r0, #0x000c			@ ..0...01..111101 (new)
+		bic	r0, r0, #0x0e00			@ ..V. ..RS BLDP WCAM
+		orr	r0, r0, #0x2100			@ .... .... .111 .... (old)
+		orr	r0, r0, #0x003d			@ ..1. ..01 ..11 1101 (new)
 		mov	pc, lr				@ __ret (head-armv.S)
 
 /*

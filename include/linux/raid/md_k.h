@@ -323,7 +323,7 @@ typedef struct mdk_thread_s {
 	void			*data;
 	md_wait_queue_head_t	wqueue;
 	unsigned long           flags;
-	struct semaphore	*sem;
+	struct completion	*event;
 	struct task_struct	*tsk;
 	const char		*name;
 } mdk_thread_t;
@@ -364,6 +364,31 @@ do {									\
 	if (condition)	 						\
 		break;							\
 	__wait_event_lock_irq(wq, condition, lock);			\
+} while (0)
+
+
+#define __wait_disk_event(wq, condition) 				\
+do {									\
+	wait_queue_t __wait;						\
+	init_waitqueue_entry(&__wait, current);				\
+									\
+	add_wait_queue(&wq, &__wait);					\
+	for (;;) {							\
+		set_current_state(TASK_UNINTERRUPTIBLE);		\
+		if (condition)						\
+			break;						\
+		run_task_queue(&tq_disk);				\
+		schedule();						\
+	}								\
+	current->state = TASK_RUNNING;					\
+	remove_wait_queue(&wq, &__wait);				\
+} while (0)
+
+#define wait_disk_event(wq, condition) 					\
+do {									\
+	if (condition)	 						\
+		break;							\
+	__wait_disk_event(wq, condition);				\
 } while (0)
 
 #endif 

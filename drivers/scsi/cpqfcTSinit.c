@@ -41,7 +41,9 @@
 #include <linux/timer.h>
 #include <linux/ioport.h>  // request_region() prototype
 #include <linux/vmalloc.h> // ioremap()
+#if LINUX_VERSION_CODE >= LinuxVersionCode(2,4,7)
 #include <linux/completion.h>
+#endif
 #ifdef __alpha__
 #define __KERNEL_SYSCALLS__
 #endif
@@ -55,6 +57,7 @@
 #include "hosts.h"
 #include "cpqfcTSchip.h"
 #include "cpqfcTSstructs.h"
+#include "cpqfcTStrigger.h"
 
 #include "cpqfcTS.h"
 
@@ -88,7 +91,17 @@ static struct proc_dir_entry proc_scsi_cpqfcTS =
 
 #endif
 
-
+#if LINUX_VERSION_CODE >= LinuxVersionCode(2,4,7)
+#  define CPQFC_DECLARE_COMPLETION(x) DECLARE_COMPLETION(x)
+#  define CPQFC_WAITING waiting
+#  define CPQFC_COMPLETE(x) complete(x)
+#  define CPQFC_WAIT_FOR_COMPLETION(x) wait_for_completion(x);
+#else
+#  define CPQFC_DECLARE_COMPLETION(x) DECLARE_MUTEX_LOCKED(x)
+#  define CPQFC_WAITING sem
+#  define CPQFC_COMPLETE(x) up(x)
+#  define CPQFC_WAIT_FOR_COMPLETION(x) down(x)
+#endif
 
 /* local function to load our per-HBA (local) data for chip
    registers, FC link state, all FC exchanges, etc.
@@ -227,6 +240,8 @@ static void launch_FCworker_thread(struct Scsi_Host *HostAdapter)
              
   cpqfcHBAdata->notify_wt = &sem;
 
+  /* must unlock before kernel_thread(), for it may cause a reschedule. */
+  spin_unlock_irq(&io_request_lock);
   kernel_thread((int (*)(void *))cpqfcTSWorkerThread, 
                           (void *) HostAdapter, 0);
   /*
@@ -234,6 +249,7 @@ static void launch_FCworker_thread(struct Scsi_Host *HostAdapter)
 
    */
   down (&sem);
+  spin_lock_irq(&io_request_lock);
   cpqfcHBAdata->notify_wt = NULL;
 
   LEAVE("launch_FC_worker_thread");
@@ -417,13 +433,14 @@ int cpqfcTS_detect(Scsi_Host_Template *ScsiHostTemplate)
 	// 3.028     LILP received, link up, FLOGI starts
 	// slowest(worst) case, measured on 1Gb Finisar GT analyzer
 	
-	int wait_time;
-	unsigned long flags=0;
- 
-        spin_unlock_irqrestore(&io_request_lock, flags);
-        for( wait_time = jiffies + 4*HZ; wait_time > jiffies; )
-	  schedule();  // (our worker task needs to run)
-	spin_lock_irqsave(&io_request_lock, flags);
+	unsigned long stop_time;
+
+        spin_unlock_irq(&io_request_lock);
+	stop_time = jiffies + 4*HZ;
+        while ( time_before(jiffies, stop_time) ) 
+	  	schedule();  // (our worker task needs to run)
+
+	spin_lock_irq(&io_request_lock);
       }
       
       NumberOfAdapters++; 
@@ -435,7 +452,6 @@ int cpqfcTS_detect(Scsi_Host_Template *ScsiHostTemplate)
   return NumberOfAdapters;
 }
 
-
 static void my_ioctl_done (Scsi_Cmnd * SCpnt)
 {
     struct request * req;
@@ -443,9 +459,8 @@ static void my_ioctl_done (Scsi_Cmnd * SCpnt)
     req = &SCpnt->request;
     req->rq_status = RQ_SCSI_DONE; /* Busy, but indicate request done */
   
-    if (req->waiting != NULL) {
-	complete(req->waiting);
-    }
+    if (req->CPQFC_WAITING != NULL)
+	CPQFC_COMPLETE(req->CPQFC_WAITING);
 }   
 
 
@@ -463,7 +478,6 @@ int cpqfcTS_ioctl( Scsi_Device *ScsiDev, int Cmnd, void *arg)
   cpqfc_passthru_t *vendor_cmd;
   Scsi_Device *SDpnt;
   Scsi_Cmnd *ScsiPassThruCmnd;
-  unsigned long flags;
 
   ENTER("cpqfcTS_ioctl ");
   
@@ -560,30 +574,25 @@ int cpqfcTS_ioctl( Scsi_Device *ScsiDev, int Cmnd, void *arg)
         ScsiPassThruCmnd->SCp.phase = vendor_cmd->bus;
 	ScsiPassThruCmnd->SCp.have_data_in = vendor_cmd->pdrive;
 
-
-
         // We copy the scheme used by scsi.c to submit commands
 	// to our own HBA.  We do this in order to stall the
 	// thread calling the IOCTL until it completes, and use
 	// the same "_quecommand" function for synchronizing
 	// FC Link events with our "worker thread".
-	
-        spin_lock_irqsave(&io_request_lock, flags);
+
         {
-          DECLARE_COMPLETION(wait);
-          ScsiPassThruCmnd->request.waiting = &wait;
+          CPQFC_DECLARE_COMPLETION(wait);
+          ScsiPassThruCmnd->request.CPQFC_WAITING = &wait;
           // eventually gets us to our own _quecommand routine
           scsi_do_cmd( ScsiPassThruCmnd, &vendor_cmd->cdb[0], 
 	       buf, 
 	       vendor_cmd->len, 
 	       my_ioctl_done, 
 	       10*HZ, 1);// timeout,retries
-          spin_unlock_irqrestore(&io_request_lock, flags);
           // Other I/Os can now resume; we wait for our ioctl
 	  // command to complete
-	  wait_for_completion(&wait);
-          spin_lock_irqsave(&io_request_lock, flags);
-          ScsiPassThruCmnd->request.waiting = NULL;
+	  CPQFC_WAIT_FOR_COMPLETION(&wait);
+          ScsiPassThruCmnd->request.CPQFC_WAITING = NULL;
         }
 	
         result = ScsiPassThruCmnd->result;
@@ -603,7 +612,6 @@ int cpqfcTS_ioctl( Scsi_Device *ScsiDev, int Cmnd, void *arg)
         //  (*SDpnt->scsi_request_fn)();
 
         wake_up(&SDpnt->scpnt_wait);
-        spin_unlock_irqrestore(&io_request_lock, flags);
 
 	// need to pass data back to user (space)?
 	if( (vendor_cmd->rw_flag == VENDOR_READ_OPCODE) &&
@@ -613,7 +621,7 @@ int cpqfcTS_ioctl( Scsi_Device *ScsiDev, int Cmnd, void *arg)
 
         if( buf) 
 	  kfree( buf);
-	
+
         return result;
       }
       
@@ -1262,6 +1270,11 @@ int cpqfcTS_queuecommand(Scsi_Cmnd *Cmnd, void (* done)(Scsi_Cmnd *))
 //    printk(" @Q bad targ cmnd %p@ ", Cmnd);
       QueBadTargetCmnd( cpqfcHBAdata, Cmnd);
     }
+    else if (Cmnd->lun >= CPQFCTS_MAX_LUN)
+    {
+      printk(KERN_WARNING "cpqfc: Invalid LUN: %d\n", Cmnd->lun);
+      QueBadTargetCmnd( cpqfcHBAdata, Cmnd);
+    } 
 
     else  // we know what FC device to send to...
     {
@@ -1486,7 +1499,6 @@ int cpqfcTS_TargetDeviceReset( Scsi_Device *ScsiDev,
   int timeout = 10*HZ;
   int retries = 1;
   char scsi_cdb[12];
-  unsigned long flags;
   int result;
   Scsi_Cmnd * SCpnt;
   Scsi_Device * SDpnt;
@@ -1500,21 +1512,17 @@ int cpqfcTS_TargetDeviceReset( Scsi_Device *ScsiDev,
 
   scsi_cdb[0] = RELEASE;
 
-  spin_lock_irqsave(&io_request_lock, flags);
-
   // allocate with wait = true, interruptible = false 
   SCpnt = scsi_allocate_device(ScsiDev, 1, 0);
   {
-    DECLARE_COMPLETION(wait);
+    CPQFC_DECLARE_COMPLETION(wait);
         
     SCpnt->SCp.buffers_residual = FCP_TARGET_RESET;
 
-	SCpnt->request.waiting = &wait;
+	SCpnt->request.CPQFC_WAITING = &wait;
 	scsi_do_cmd(SCpnt,  scsi_cdb, NULL,  0, my_ioctl_done,  timeout, retries);
-	spin_unlock_irqrestore(&io_request_lock, flags);
-	wait_for_completion(&wait);
-    spin_lock_irqsave(&io_request_lock, flags);
-    SCpnt->request.waiting = NULL;
+	CPQFC_WAIT_FOR_COMPLETION(&wait);
+	SCpnt->request.CPQFC_WAITING = NULL;
   }
     
 /*
@@ -1560,7 +1568,6 @@ int cpqfcTS_TargetDeviceReset( Scsi_Device *ScsiDev,
   // 	(*SDpnt->scsi_request_fn)();
 
   wake_up(&SDpnt->scpnt_wait);
-  spin_unlock_irqrestore(&io_request_lock, flags);
   // printk("   LEAVING cpqfcTS_TargetDeviceReset() - return SUCCESS \n");
   return SUCCESS;
 }
@@ -1568,9 +1575,13 @@ int cpqfcTS_TargetDeviceReset( Scsi_Device *ScsiDev,
 
 int cpqfcTS_eh_device_reset(Scsi_Cmnd *Cmnd)
 {
+  int retval;
   Scsi_Device *SDpnt = Cmnd->device;
   // printk("   ENTERING cpqfcTS_eh_device_reset() \n");
-  return cpqfcTS_TargetDeviceReset( SDpnt, 0);
+  spin_unlock_irq(&io_request_lock);
+  retval = cpqfcTS_TargetDeviceReset( SDpnt, 0);
+  spin_lock_irq(&io_request_lock);
+  return retval;
 }
 
 	

@@ -19,9 +19,6 @@
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
-/* Address of user registers on the kernel stack. */
-extern unsigned int *userRegisters;
-
 extern __inline__
 unsigned int readRegister(const unsigned int nReg)
 {
@@ -32,6 +29,7 @@ unsigned int readRegister(const unsigned int nReg)
            for this in this routine.  LDF/STF instructions with Rn = PC
            depend on the PC being correct, as they use PC+8 in their 
            address calculations. */
+  unsigned int *userRegisters = GET_USERREG();
   unsigned int val = userRegisters[nReg];
   if (REG_PC == nReg) val -= 4;
   return val;
@@ -40,6 +38,7 @@ unsigned int readRegister(const unsigned int nReg)
 extern __inline__
 void writeRegister(const unsigned int nReg, const unsigned int val)
 {
+  unsigned int *userRegisters = GET_USERREG();
   userRegisters[nReg] = val;
 }
 
@@ -68,6 +67,7 @@ unsigned int readConditionCodes(void)
 extern __inline__
 void writeConditionCodes(const unsigned int val)
 {
+  unsigned int *userRegisters = GET_USERREG();
   unsigned int rval;
   /*
    * Operate directly on userRegisters since

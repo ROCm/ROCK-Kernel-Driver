@@ -14,7 +14,7 @@
 
 #define vectors_base()	(0)
 
-extern __inline__ unsigned long __xchg(unsigned long x, volatile void *ptr, int size)
+static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size)
 {
 	extern void __bad_xchg(volatile void *, int);
 

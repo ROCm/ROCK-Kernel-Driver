@@ -3,7 +3,7 @@
  *  Based on ataflop.c in the m68k Linux
  *  Copyright (C) 1993  Greg Harp
  *  Atari Support by Bjoern Brauel, Roman Hodek
- *  Archimedes Support by Dave Gilbert (gilbertd@cs.man.ac.uk)
+ *  Archimedes Support by Dave Gilbert (linux@treblig.org)
  *
  *  Big cleanup Sep 11..14 1994 Roman Hodek:
  *   - Driver now works interrupt driven
@@ -117,12 +117,17 @@
  *
  * DAG 30/01/99 - Started frobbing for 2.2.1
  * DAG 20/06/99 - A little more frobbing:
- *     Included include/asm/uaccess.h for get_user/put_user
+ *		  Included include/asm/uaccess.h for get_user/put_user
+ *
+ * DAG  1/09/00 - Dusted off for 2.4.0-test7
+ *                MAX_SECTORS was name clashing so it is now FD1772_...
+ *                Minor parameter, name layouts for 2.4.x differences
  */
 
 #include <linux/sched.h>
 #include <linux/fs.h>
 #include <linux/fcntl.h>
+#include <linux/slab.h>
 #include <linux/kernel.h>
 #include <linux/interrupt.h>
 #include <linux/timer.h>
@@ -135,16 +140,15 @@
 #include <linux/mm.h>
 
 #include <asm/arch/oldlatches.h>
-#include <asm/system.h>
 #include <asm/bitops.h>
 #include <asm/dma.h>
 #include <asm/hardware.h>
+#include <asm/hardware/ioc.h>
 #include <asm/io.h>
-#include <asm/ioc.h>
 #include <asm/irq.h>
 #include <asm/mach-types.h>
 #include <asm/pgtable.h>
-#include <asm/segment.h>
+#include <asm/system.h>
 #include <asm/uaccess.h>
 
 
@@ -242,7 +246,7 @@ void FDC1772_WRITE(int reg, unsigned char val)
 	outb(val, (reg / 2) + FDC1772BASE);
 };
 
-#define	MAX_SECTORS	22
+#define	FD1772_MAX_SECTORS	22
 
 unsigned char *DMABuffer;	/* buffer for writes */
 /*static unsigned long PhysDMABuffer; *//* physical address */
@@ -276,6 +280,7 @@ static int MotorOn = 0, MotorOffTrys;
 static volatile int fdc_busy = 0;
 static DECLARE_WAIT_QUEUE_HEAD(fdc_wait);
 
+
 /* long req'd for set_bit --RR */
 static unsigned long changed_floppies = 0xff, fake_change = 0;
 #define	CHECK_CHANGE_DELAY	HZ/2
@@ -287,31 +292,29 @@ static unsigned long changed_floppies = 0xff, fake_change = 0;
 #define FLOPPY_TIMEOUT		(6*HZ)
 #define RECALIBRATE_ERRORS	4	/* After this many errors the drive
 					 * will be recalibrated. */
-#define MAX_ERRORS			8	/* After this many errors the driver
-						 * will give up. */
+#define MAX_ERRORS		8	/* After this many errors the driver
+					 * will give up. */
 
-static struct timer_list fd_timer;
-
-#define	START_MOTOR_OFF_TIMER(delay)			\
-    do {						\
-        motor_off_timer.expires = jiffies + (delay);		\
-        add_timer( &motor_off_timer );			\
-        MotorOffTrys = 0;				\
+#define	START_MOTOR_OFF_TIMER(delay)				\
+	do {							\
+		motor_off_timer.expires = jiffies + (delay);	\
+		add_timer( &motor_off_timer );			\
+		MotorOffTrys = 0;				\
 	} while(0)
 
 #define	START_CHECK_CHANGE_TIMER(delay)				\
-    do {							\
-        mod_timer(&fd_timer, jiffies + (delay));		\
+	do {							\
+	        mod_timer(&fd_timer, jiffies + (delay));	\
 	} while(0)
 
-#define	START_TIMEOUT()					     \
-    do {						     \
-        mod_timer(&timeout_timer, jiffies+FLOPPY_TIMEOUT); \
+#define	START_TIMEOUT()						\
+	do {							\
+		mod_timer(&timeout_timer, jiffies+FLOPPY_TIMEOUT); \
 	} while(0)
 
-#define	STOP_TIMEOUT()					\
-    do {						\
-        del_timer( &timeout_timer );			\
+#define	STOP_TIMEOUT()						\
+	do {							\
+		del_timer( &timeout_timer );			\
 	} while(0)
 
 #define ENABLE_IRQ() enable_irq(FIQ_FD1772+64);
@@ -369,18 +372,27 @@ static void fd_probe(int drive);
 static int fd_test_drive_present(int drive);
 static void config_types(void);
 static int floppy_open(struct inode *inode, struct file *filp);
-static void floppy_release(struct inode *inode, struct file *filp);
+static int floppy_release(struct inode *inode, struct file *filp);
 
 /************************* End of Prototypes **************************/
 
-static struct timer_list motor_off_timer =
-{NULL, NULL, 0, 0, fd_motor_off_timer};
+static struct timer_list motor_off_timer = {
+	function:	fd_motor_off_timer,
+};
+
 #ifdef TRACKBUFFER
-static struct timer_list readtrack_timer =
-             { NULL, NULL, 0, 0, fd_readtrack_check };
+static struct timer_list readtrack_timer = {
+	function: 	fd_readtrack_check,
+};
 #endif
-static struct timer_list timeout_timer =
-{NULL, NULL, 0, 0, fd_times_out};
+
+static struct timer_list timeout_timer = {
+	function:	fd_times_out,
+};
+
+static struct timer_list fd_timer = {
+	function:	check_change,
+};
 
 /* DAG: Haven't got a clue what this is? */
 int stdma_islocked(void)
@@ -392,13 +404,7 @@ int stdma_islocked(void)
 
 static void fd_select_side(int side)
 {
-	unsigned long flags;
-
-	save_flags(flags);
-	cli();
-
 	oldlatch_aupdate(LATCHA_SIDESEL, side ? 0 : LATCHA_SIDESEL);
-	restore_flags(flags);
 }
 
 
@@ -407,8 +413,6 @@ static void fd_select_side(int side)
 
 static void fd_select_drive(int drive)
 {
-	unsigned long flags;
-
 #ifdef DEBUG
 	printk("fd_select_drive:%d\n", drive);
 #endif
@@ -418,10 +422,7 @@ static void fd_select_drive(int drive)
 	if (drive == SelectedDrive)
 		return;
 
-	save_flags(flags);
-	cli();
 	oldlatch_aupdate(LATCHA_FDSELALL, 0xf - (1 << drive));
-	restore_flags(flags);
 
 	/* restore track register to saved value */
 	FDC1772_WRITE(FDC1772REG_TRACK, unit[drive].track);
@@ -439,10 +440,7 @@ static void fd_deselect(void)
 
 	DPRINT(("fd_deselect\n"));
 
-	save_flags(flags);
-	cli();
 	oldlatch_aupdate(LATCHA_FDSELALL | LATCHA_MOTOR | LATCHA_INUSE, 0xf | LATCHA_MOTOR | LATCHA_INUSE);
-	restore_flags(flags);
 
 	SelectedDrive = -1;
 }
@@ -474,9 +472,12 @@ static void fd_motor_off_timer(unsigned long dummy)
 	status = FDC1772_READ(FDC1772REG_STATUS);
 
 	if (!(status & 0x80)) {
-		/* motor already turned off by FDC1772 -> deselect drives */
-     /* In actual fact its this deselection which turns the motor off on the
-        Arc, since the motor control is actually on Latch A */
+		/*
+		 * motor already turned off by FDC1772 -> deselect drives
+		 * In actual fact its this deselection which turns the motor
+		 * off on the Arc, since the motor control is actually on
+		 * Latch A
+		 */
 		DPRINT(("fdc1772: deselecting in fd_motor_off_timer\n"));
 		fd_deselect();
 		MotorOn = 0;
@@ -485,7 +486,7 @@ static void fd_motor_off_timer(unsigned long dummy)
 	}
 	/* not yet off, try again */
 
-      retry:
+retry:
 	restore_flags(flags);
 	/* Test again later; if tested too often, it seems there is no disk
 	 * in the drive and the FDC1772 will leave the motor on forever (or,
@@ -623,31 +624,29 @@ static void do_fd_action(int drive)
 	DPRINT(("do_fd_action unit[drive].track=%d\n", unit[drive].track));
 
 #ifdef TRACKBUFFER
-  repeat:
+repeat:
 
-  if (IS_BUFFERED( drive, ReqSide, ReqTrack )) {
-    if (ReqCmd == READ) {
-      copy_buffer( SECTOR_BUFFER(ReqSector), ReqData );
-      if (++ReqCnt < CURRENT->current_nr_sectors) {
-        /* read next sector */
-        setup_req_params( drive );
-        goto repeat;
-      }
-      else {
-        /* all sectors finished */
-        CURRENT->nr_sectors -= CURRENT->current_nr_sectors;
-        CURRENT->sector += CURRENT->current_nr_sectors;
-        end_request( 1 );
-        redo_fd_request();
-        return;
-      }
-    }
-    else {
-      /* cmd == WRITE, pay attention to track buffer
-       * consistency! */
-      copy_buffer( ReqData, SECTOR_BUFFER(ReqSector) );
-    }
-  }
+	if (IS_BUFFERED( drive, ReqSide, ReqTrack )) {
+		if (ReqCmd == READ) {
+			copy_buffer( SECTOR_BUFFER(ReqSector), ReqData );
+			if (++ReqCnt < CURRENT->current_nr_sectors) {
+				/* read next sector */
+				setup_req_params( drive );
+				goto repeat;
+			} else {
+				/* all sectors finished */
+				CURRENT->nr_sectors -= CURRENT->current_nr_sectors;
+				CURRENT->sector += CURRENT->current_nr_sectors;
+				end_request( 1 );
+				redo_fd_request();
+				return;
+			}
+		} else {
+			/* cmd == WRITE, pay attention to track buffer
+			 * consistency! */
+			copy_buffer( ReqData, SECTOR_BUFFER(ReqSector) );
+		}
+	}
 #endif
 
 	if (SelectedDrive != drive) {
@@ -708,7 +707,7 @@ static void fd_calibrate_done(int status)
 
 static void fd_seek(void)
 {
-  unsigned long flags;
+	unsigned long flags;
 	DPRINT(("fd_seek() to track %d (unit[SelectedDrive].track=%d)\n", ReqTrack,
 		unit[SelectedDrive].track));
 	if (unit[SelectedDrive].track == ReqTrack <<
@@ -719,14 +718,14 @@ static void fd_seek(void)
 	FDC1772_WRITE(FDC1772REG_DATA, ReqTrack <<
 		      unit[SelectedDrive].disktype->stretch);
 	udelay(25);
-  save_flags(flags);
-  cliIF();
+	save_flags(flags);
+	clf();
 	SET_IRQ_HANDLER(fd_seek_done);
 	FDC1772_WRITE(FDC1772REG_CMD, FDC1772CMD_SEEK | unit[SelectedDrive].steprate |
 		/* DAG */
 		(MotorOn?FDC1772CMDADD_H:0));
 
-  restore_flags(flags);
+	restore_flags(flags);
 	MotorOn = 1;
 	set_head_settle_flag();
 	START_TIMEOUT();
@@ -776,13 +775,10 @@ static void fd_rwsec(void)
 		paddr = (unsigned long) ReqData;
 		rwflag = 0x100;
 	} else {
+		paddr = (unsigned long) PhysDMABuffer;
 #ifdef TRACKBUFFER
-    if (read_track)
-      paddr = (unsigned long)PhysTrackBuffer;
-    else
-      paddr =(unsigned long)PhysDMABuffer;
-#else
-    paddr = (unsigned long)PhysDMABuffer;
+		if (read_track)
+			paddr = (unsigned long)PhysTrackBuffer;
 #endif
 		rwflag = 0;
 	}
@@ -794,9 +790,9 @@ static void fd_rwsec(void)
 	/*DPRINT(("fd_rwsec() before start sector \n")); */
 	/* Start sector of this operation */
 #ifdef TRACKBUFFER
-  FDC1772_WRITE( FDC1772REG_SECTOR, !read_track ? ReqSector : 1 );
+	FDC1772_WRITE( FDC1772REG_SECTOR, !read_track ? ReqSector : 1 );
 #else
-  FDC1772_WRITE( FDC1772REG_SECTOR, ReqSector );
+	FDC1772_WRITE( FDC1772REG_SECTOR, ReqSector );
 #endif
 
 	/* Cheat for track if stretch != 0 */
@@ -810,12 +806,12 @@ static void fd_rwsec(void)
 	DPRINT(("fd_rwsec() before setup DMA \n"));
 	/* Setup DMA - Heavily modified by DAG */
 	save_flags(flags);
-	cliIF();
+	clf();
 	disable_dma(FLOPPY_DMA);
 	set_dma_mode(FLOPPY_DMA, rwflag ? DMA_MODE_WRITE : DMA_MODE_READ);
 	set_dma_addr(FLOPPY_DMA, (long) paddr);		/* DAG - changed from Atari specific */
 #ifdef TRACKBUFFER
-  set_dma_count(FLOPPY_DMA,(!read_track ? 1 : unit[SelectedDrive].disktype->spt)*512);
+	set_dma_count(FLOPPY_DMA,(!read_track ? 1 : unit[SelectedDrive].disktype->spt)*512);
 #else
 	set_dma_count(FLOPPY_DMA, 512);		/* Block/sector size - going to have to change */
 #endif
@@ -825,14 +821,14 @@ static void fd_rwsec(void)
 	/* Now give it something to do */
 	FDC1772_WRITE(FDC1772REG_CMD, (rwflag ? (FDC1772CMD_WRSEC | FDC1772CMDADD_P) : 
 #ifdef TRACKBUFFER
-              (FDC1772CMD_RDSEC | (read_track ? FDC1772CMDADD_M : 0) |
+	      (FDC1772CMD_RDSEC | (read_track ? FDC1772CMDADD_M : 0) |
 	      /* Hmm - the idea here is to stop the FDC spinning the disc
 	      up when we know that we already still have it spinning */
 	      (MotorOn?FDC1772CMDADD_H:0))
 #else
-              FDC1772CMD_RDSEC
+	      FDC1772CMD_RDSEC
 #endif
-    ));
+		));
 
 	restore_flags(flags);
 	DPRINT(("fd_rwsec() after DMA setup flags=0x%08x\n", flags));
@@ -845,20 +841,19 @@ static void fd_rwsec(void)
 	/* wait for interrupt */
 
 #ifdef TRACKBUFFER
-  if (read_track) {
-    /* If reading a whole track, wait about one disk rotation and
-     * then check if all sectors are read. The FDC will even
-     * search for the first non-existant sector and need 1 sec to
-     * recognise that it isn't present :-(
-     */
-    del_timer( &readtrack_timer );
-    readtrack_timer.function = fd_readtrack_check;
-    readtrack_timer.expires = jiffies + HZ/5 + (old_motoron ? 0 : HZ);
-                              /* 1 rot. + 5 rot.s if motor was off  */
-    DPRINT(("Setting readtrack_timer to %d @ %d\n",readtrack_timer.expires,jiffies));
-    add_timer( &readtrack_timer );
-    MultReadInProgress = 1;
- }
+	if (read_track) {
+		/*
+		 * If reading a whole track, wait about one disk rotation and
+		 * then check if all sectors are read. The FDC will even
+		 * search for the first non-existant sector and need 1 sec to
+		 * recognise that it isn't present :-(
+		 */
+		/* 1 rot. + 5 rot.s if motor was off  */
+		mod_timer(&readtrack_timer, jiffies + HZ/5 + (old_motoron ? 0 : HZ));
+		DPRINT(("Setting readtrack_timer to %d @ %d\n",
+			readtrack_timer.expires,jiffies));
+		MultReadInProgress = 1;
+	}
 #endif
 
 	/*DPRINT(("fd_rwsec() before START_TIMEOUT \n")); */
@@ -869,55 +864,54 @@ static void fd_rwsec(void)
 
 #ifdef TRACKBUFFER
 
-static void fd_readtrack_check( unsigned long dummy )
+static void fd_readtrack_check(unsigned long dummy)
+{
+	unsigned long flags, addr;
+	extern unsigned char *fdc1772_dataaddr;
 
-{ unsigned long flags, addr;
-  extern unsigned char *fdc1772_dataaddr;
+	DPRINT(("fd_readtrack_check @ %d\n",jiffies));
 
-  DPRINT(("fd_readtrack_check @ %d\n",jiffies));
+	save_flags(flags);
+	clf();
 
-  save_flags(flags);
-  cliIF();
+	del_timer( &readtrack_timer );
 
-  del_timer( &readtrack_timer );
+	if (!MultReadInProgress) {
+		/* This prevents a race condition that could arise if the
+		 * interrupt is triggered while the calling of this timer
+		 * callback function takes place. The IRQ function then has
+		 * already cleared 'MultReadInProgress'  when control flow
+		 * gets here.
+		 */
+		restore_flags(flags);
+		return;
+	}
 
-  if (!MultReadInProgress) {
-    /* This prevents a race condition that could arise if the
-     * interrupt is triggered while the calling of this timer
-     * callback function takes place. The IRQ function then has
-     * already cleared 'MultReadInProgress'  when control flow
-     * gets here.
-     */
-        restore_flags(flags);
-    return;
-  }
+	/* get the current DMA address */
+	addr=(unsigned long)fdc1772_dataaddr; /* DAG - ? */
+	DPRINT(("fd_readtrack_check: addr=%x PhysTrackBuffer=%x\n",addr,PhysTrackBuffer));
 
-  /* get the current DMA address */
-  addr=fdc1772_dataaddr; /* DAG - ? */
-  DPRINT(("fd_readtrack_check: addr=%x PhysTrackBuffer=%x\n",addr,PhysTrackBuffer));
+	if (addr >= (unsigned int)PhysTrackBuffer + unit[SelectedDrive].disktype->spt*512) {
+		/* already read enough data, force an FDC interrupt to stop
+		 * the read operation
+		 */
+		SET_IRQ_HANDLER( NULL );
+		restore_flags(flags);
+		DPRINT(("fd_readtrack_check(): done\n"));
+		FDC1772_WRITE( FDC1772REG_CMD, FDC1772CMD_FORCI );
+		udelay(25);
 
-  if (addr >= PhysTrackBuffer + unit[SelectedDrive].disktype->spt*512) {
-    /* already read enough data, force an FDC interrupt to stop
-     * the read operation
-     */
-    SET_IRQ_HANDLER( NULL );
-    restore_flags(flags);
-    DPRINT(("fd_readtrack_check(): done\n"));
-    FDC1772_WRITE( FDC1772REG_CMD, FDC1772CMD_FORCI );
-    udelay(25);
-
-    /* No error until now -- the FDC would have interrupted
-     * otherwise!
-     */
-    fd_rwsec_done( 0 );
-  }
-  else {
-    /* not yet finished, wait another tenth rotation */
-    restore_flags(flags);
-    DPRINT(("fd_readtrack_check(): not yet finished\n"));
-    readtrack_timer.expires = jiffies + HZ/5/10;
-    add_timer( &readtrack_timer );
-  }
+		/* No error until now -- the FDC would have interrupted
+		 * otherwise!
+		 */
+		fd_rwsec_done( 0 );
+	} else {
+		/* not yet finished, wait another tenth rotation */
+		restore_flags(flags);
+		DPRINT(("fd_readtrack_check(): not yet finished\n"));
+		readtrack_timer.expires = jiffies + HZ/5/10;
+		add_timer( &readtrack_timer );
+	}
 }
 
 #endif
@@ -929,13 +923,15 @@ static void fd_rwsec_done(int status)
 	DPRINT(("fd_rwsec_done() status=%d @ %d\n", status,jiffies));
 
 #ifdef TRACKBUFFER
-  if (read_track && !MultReadInProgress) return;
-  MultReadInProgress = 0;
+	if (read_track && !MultReadInProgress)
+		return;
 
-  STOP_TIMEOUT();
+	MultReadInProgress = 0;
 
-  if (read_track)
-    del_timer( &readtrack_timer );
+	STOP_TIMEOUT();
+
+	if (read_track)
+		del_timer( &readtrack_timer );
 #endif
 
 
@@ -951,13 +947,13 @@ static void fd_rwsec_done(int status)
 	}
 	if ((status & FDC1772STAT_RECNF)
 #ifdef TRACKBUFFER
-    /* RECNF is no error after a multiple read when the FDC
-     * searched for a non-existant sector!
-     */
-    && !(read_track &&
-       FDC1772_READ(FDC1772REG_SECTOR) > unit[SelectedDrive].disktype->spt)
+	    /* RECNF is no error after a multiple read when the FDC
+	     * searched for a non-existant sector!
+	     */
+	    && !(read_track &&
+	       FDC1772_READ(FDC1772REG_SECTOR) > unit[SelectedDrive].disktype->spt)
 #endif
-    ) {
+	    ) {
 		if (Probing) {
 			if (unit[SelectedDrive].disktype > disk_type) {
 				/* try another disk type */
@@ -978,7 +974,7 @@ static void fd_rwsec_done(int status)
 		if (Probing) {
 			setup_req_params(SelectedDrive);
 #ifdef TRACKBUFFER
-      BufferDrive = -1;
+			BufferDrive = -1;
 #endif
 			do_fd_action(SelectedDrive);
 			return;
@@ -1001,19 +997,16 @@ static void fd_rwsec_done(int status)
 
 	if (ReqCmd == READ) {
 #ifdef TRACKBUFFER
-    if (!read_track)
-      {
-        /*cache_clear (PhysDMABuffer, 512);*/
-        copy_buffer (DMABuffer, ReqData);
-      }
-    else
-      {
-        /*cache_clear (PhysTrackBuffer, MAX_SECTORS * 512);*/
-        BufferDrive = SelectedDrive;
-        BufferSide  = ReqSide;
-        BufferTrack = ReqTrack;
-        copy_buffer (SECTOR_BUFFER (ReqSector), ReqData);
-      }
+		if (!read_track) {
+			/*cache_clear (PhysDMABuffer, 512);*/
+			copy_buffer (DMABuffer, ReqData);
+		} else {
+			/*cache_clear (PhysTrackBuffer, FD1772_MAX_SECTORS * 512);*/
+			BufferDrive = SelectedDrive;
+			BufferSide  = ReqSide;
+			BufferTrack = ReqTrack;
+			copy_buffer (SECTOR_BUFFER (ReqSector), ReqData);
+		}
 #else
 		/*cache_clear( PhysDMABuffer, 512 ); */
 		copy_buffer(DMABuffer, ReqData);
@@ -1032,9 +1025,9 @@ static void fd_rwsec_done(int status)
 	}
 	return;
 
-  err_end:
+err_end:
 #ifdef TRACKBUFFER
-  BufferDrive = -1;
+	BufferDrive = -1;
 #endif
 
 	fd_error();
@@ -1118,10 +1111,8 @@ static void finish_fdc_done(int dummy)
 
 
 /* Prevent "aliased" accesses. */
-static fd_ref[4] =
-{0, 0, 0, 0};
-static fd_device[4] =
-{0, 0, 0, 0};
+static int fd_ref[4];
+static int fd_device[4];
 
 /*
  * Current device number. Taken either from the block header or from the
@@ -1182,7 +1173,7 @@ static int floppy_revalidate(dev_t dev)
 	if (test_bit(drive, &changed_floppies) || test_bit(drive, &fake_change)
 	    || unit[drive].disktype == 0) {
 #ifdef TRACKBUFFER
-      BufferDrive = -1;
+		BufferDrive = -1;
 #endif
 		clear_bit(drive, &fake_change);
 		clear_bit(drive, &changed_floppies);
@@ -1214,7 +1205,7 @@ static void setup_req_params(int drive)
 	ReqData = ReqBuffer + 512 * ReqCnt;
 
 #ifdef TRACKBUFFER
-  read_track = (ReqCmd == READ && CURRENT_ERRORS == 0);
+	read_track = (ReqCmd == READ && CURRENT_ERRORS == 0);
 #endif
 
 	DPRINT(("Request params: Si=%d Tr=%d Se=%d Data=%08lx\n", ReqSide,
@@ -1234,7 +1225,7 @@ static void redo_fd_request(void)
 	if (!QUEUE_EMPTY && CURRENT->rq_status == RQ_INACTIVE)
 		goto the_end;
 
-      repeat:
+repeat:
 
 	if (QUEUE_EMPTY)
 		goto the_end;
@@ -1293,25 +1284,25 @@ static void redo_fd_request(void)
 
 	return;
 
-      the_end:
+the_end:
 	finish_fdc();
 }
 
 static void fd1772_checkint(void)
 {
-  extern int fdc1772_bytestogo;
+	extern int fdc1772_bytestogo;
 
-  /*printk("fd1772_checkint %d\n",fdc1772_fdc_int_done);*/
-  if (fdc1772_fdc_int_done)
-    floppy_irqconsequencehandler();
-  if ((MultReadInProgress) && (fdc1772_bytestogo==0)) fd_readtrack_check(0);
-  if (fdc_busy) {
-    queue_task(&fd1772_tq,&tq_immediate);
-    mark_bh(IMMEDIATE_BH);
-  };
-};
+	/*printk("fd1772_checkint %d\n",fdc1772_fdc_int_done);*/
+	if (fdc1772_fdc_int_done)
+		floppy_irqconsequencehandler();
+	if ((MultReadInProgress) && (fdc1772_bytestogo==0)) fd_readtrack_check(0);
+	if (fdc_busy) {
+		queue_task(&fd1772_tq,&tq_immediate);
+		mark_bh(IMMEDIATE_BH);
+	}
+}
 
-void do_fd_request(void)
+void do_fd_request(request_queue_t* q)
 {
 	unsigned long flags;
 
@@ -1329,8 +1320,8 @@ void do_fd_request(void)
 
 	redo_fd_request();
 
-  queue_task(&fd1772_tq,&tq_immediate);
-  mark_bh(IMMEDIATE_BH);
+	queue_task(&fd1772_tq,&tq_immediate);
+	mark_bh(IMMEDIATE_BH);
 }
 
 
@@ -1338,7 +1329,7 @@ static int invalidate_drive(int rdev)
 {
 	/* invalidate the buffer track to force a reread */
 #ifdef TRACKBUFFER
-  BufferDrive = -1;
+	BufferDrive = -1;
 #endif
 
 	set_bit(rdev & 3, &fake_change);
@@ -1352,9 +1343,6 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 	int drive, device;
 
 	device = inode->i_rdev;
-	switch (cmd) {
-		RO_IOCTLS(inode->i_rdev, param);
-	}
 	drive = MINOR(device);
 	switch (cmd) {
 	case FDFMTBEG:
@@ -1428,7 +1416,7 @@ static int fd_test_drive_present(int drive)
 		/*  if (!(mfp.par_dt_reg & 0x20))
 		   break; */
 		/* Well this is my nearest guess - quit when we get an FDC interrupt */
-		if (IOC_FIQSTAT & 2)
+		if (ioc_readb(IOC_FIQSTAT) & 2)
 			break;
 	}
 
@@ -1451,7 +1439,7 @@ static int fd_test_drive_present(int drive)
 		FDC1772_WRITE(FDC1772REG_CMD, FDC1772CMD_SEEK);
 		printk("fd_test_drive_present: just before wait for int\n");
 		/* DAG: Guess means wait for interrupt */
-		while (!(IOC_FIQSTAT & 2));
+		while (!(ioc_readb(IOC_FIQSTAT) & 2));
 		printk("fd_test_drive_present: just after wait for int\n");
 		status = FDC1772_READ(FDC1772REG_STATUS);
 	}
@@ -1553,7 +1541,7 @@ static int floppy_open(struct inode *inode, struct file *filp)
 }
 
 
-static void floppy_release(struct inode *inode, struct file *filp)
+static int floppy_release(struct inode *inode, struct file *filp)
 {
 	int drive = MINOR(inode->i_rdev) & 3;
 
@@ -1563,11 +1551,12 @@ static void floppy_release(struct inode *inode, struct file *filp)
 		printk("floppy_release with fd_ref == 0");
 		fd_ref[drive] = 0;
 	}
+
+	return 0;
 }
 
 static struct block_device_operations floppy_fops =
 {
-	owner:			THIS_MODULE,
 	open:			floppy_open,
 	release:		floppy_release,
 	ioctl:			fd_ioctl,
@@ -1580,7 +1569,7 @@ int fd1772_init(void)
 {
 	int i;
 
-	if (!machine_is_arc())
+	if (!machine_is_archimedes())
 		return 0;
 
 	if (register_blkdev(MAJOR_NR, "fd", &floppy_fops)) {
@@ -1603,24 +1592,14 @@ int fd1772_init(void)
 	/* initialize variables */
 	SelectedDrive = -1;
 #ifdef TRACKBUFFER
-  BufferDrive = -1;
-#endif
-
-	/* initialize check_change timer */
-	init_timer(&fd_timer);
-	fd_timer.function = check_change;
-}
-
-#ifdef TRACKBUFFER
-  DMABuffer = (char *)kmalloc((MAX_SECTORS+1)*512,GFP_KERNEL); /* Atari uses 512 - I want to eventually cope with 1K sectors */
-  TrackBuffer = DMABuffer + 512;
+	BufferDrive = BufferSide = BufferTrack = -1;
+	/* Atari uses 512 - I want to eventually cope with 1K sectors */
+	DMABuffer = (char *)kmalloc((FD1772_MAX_SECTORS+1)*512,GFP_KERNEL);
+	TrackBuffer = DMABuffer + 512;
 #else
 	/* Allocate memory for the DMAbuffer - on the Atari this takes it
 	   out of some special memory... */
 	DMABuffer = (char *) kmalloc(2048);	/* Copes with pretty large sectors */
-#endif
-#ifdef TRACKBUFFER  
-  BufferDrive = BufferSide = BufferTrack = -1;
 #endif
 
 	for (i = 0; i < FD_MAX_UNITS; i++) {
@@ -1635,17 +1614,13 @@ int fd1772_init(void)
 
 	blk_size[MAJOR_NR] = floppy_sizes;
 	blksize_size[MAJOR_NR] = floppy_blocksizes;
-	blk_dev[MAJOR_NR].request_fn = DEVICE_REQUEST;
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST);
 
 	config_types();
 
 	return 0;
 }
 
-/* Just a dummy at the moment */
-void floppy_setup(char *str, int *ints)
+void floppy_eject(void)
 {
-}
-
-void floppy_eject(void) {
 }

@@ -28,7 +28,9 @@
 		subs	r2, r2, #1
 		RETINSTR(moveq, pc, lr)
 
-ENTRY(__arch_readsw)
+ENTRY(__raw_readsw)
+		teq	r2, #0		@ do we have to check for the zero len?
+		moveq	pc, lr
 		tst	r1, #3
 		bne	.insw_align
 

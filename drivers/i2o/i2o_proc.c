@@ -40,6 +40,7 @@
 
 #include <linux/types.h>
 #include <linux/kernel.h>
+#include <linux/pci.h>
 #include <linux/i2o.h>
 #include <linux/proc_fs.h>
 #include <linux/init.h>
@@ -942,7 +943,7 @@ int i2o_proc_read_drivers_stored(char *buf, char **start, off_t offset,
 	int token;
 	int i;
 
-	struct
+	typedef struct
 	{
 		u16 result_count;
 		u16 pad;
@@ -952,30 +953,36 @@ int i2o_proc_read_drivers_stored(char *buf, char **start, off_t offset,
 		u16 row_count;
 		u16 more_flag;
 		i2o_driver_store_table dst[MAX_I2O_MODULES];
-	} result;
-
-	i2o_driver_store_table dst;
+	} i2o_driver_result_table;
+	
+	i2o_driver_result_table *result;
+	i2o_driver_store_table *dst;
 
 	spin_lock(&i2o_proc_lock);
 
 	len = 0;
+	
+	result = kmalloc(sizeof(i2o_driver_result_table), GFP_KERNEL);
+	if(result == NULL)
+		return -ENOMEM;
 
 	token = i2o_query_table(I2O_PARAMS_TABLE_GET,
 				c, ADAPTER_TID, 0x0005, -1, NULL, 0, 
-				&result, sizeof(result));
+				result, sizeof(*result));
 
 	if (token < 0) {
 		len += i2o_report_query_status(buf+len, token,"0x0005 DRIVER STORE TABLE");
 		spin_unlock(&i2o_proc_lock);
+		kfree(result);
 		return len;
 	}
 
 	len += sprintf(buf+len, "#  Module_type     Vendor Mod_id  Module_name             Vrs"  
 				"Date     Mod_size Par_size Flags\n");
-	for(i=0, dst=result.dst[0]; i < result.row_count; dst=result.dst[++i])
+	for(i=0, dst=&result->dst[0]; i < result->row_count; dst=&result->dst[++i])
 	{
-		len += sprintf(buf+len, "%-3d", dst.stored_ddm_index);
-		switch(dst.module_type)
+		len += sprintf(buf+len, "%-3d", dst->stored_ddm_index);
+		switch(dst->module_type)
 		{
 		case 0x01:
 			len += sprintf(buf+len, "Downloaded DDM  ");
@@ -989,26 +996,26 @@ int i2o_proc_read_drivers_stored(char *buf, char **start, off_t offset,
 
 #if 0
 		if(c->i2oversion == 0x02)
-			len += sprintf(buf+len, "%-d", dst.module_state);
+			len += sprintf(buf+len, "%-d", dst->module_state);
 #endif
 
-		len += sprintf(buf+len, "%-#7x", dst.i2o_vendor_id);
-		len += sprintf(buf+len, "%-#8x", dst.module_id);
-		len += sprintf(buf+len, "%-29s", chtostr(dst.module_name_version,28));
-		len += sprintf(buf+len, "%-9s", chtostr(dst.date,8));
-		len += sprintf(buf+len, "%8d ", dst.module_size);
-		len += sprintf(buf+len, "%8d ", dst.mpb_size);
-		len += sprintf(buf+len, "0x%04x", dst.module_flags);
+		len += sprintf(buf+len, "%-#7x", dst->i2o_vendor_id);
+		len += sprintf(buf+len, "%-#8x", dst->module_id);
+		len += sprintf(buf+len, "%-29s", chtostr(dst->module_name_version,28));
+		len += sprintf(buf+len, "%-9s", chtostr(dst->date,8));
+		len += sprintf(buf+len, "%8d ", dst->module_size);
+		len += sprintf(buf+len, "%8d ", dst->mpb_size);
+		len += sprintf(buf+len, "0x%04x", dst->module_flags);
 #if 0
 		if(c->i2oversion == 0x02)
 			len += sprintf(buf+len, "%d",
-				       dst.notification_level);
+				       dst->notification_level);
 #endif
 		len += sprintf(buf+len, "\n");
 	}
 
 	spin_unlock(&i2o_proc_lock);
-
+	kfree(result);
 	return len;
 }
 

@@ -16,7 +16,7 @@ if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
 fi
 
 if [ "$CONFIG_ISAPNP" = "y" -o "$CONFIG_ISAPNP" = "m" ]; then
-   tristate 'General Instruments Surfboard 1000' CONFIG_NET_SB1000 $CONFIG_ISAPNP
+   dep_tristate 'General Instruments Surfboard 1000' CONFIG_NET_SB1000 $CONFIG_ISAPNP
 fi
 
 #

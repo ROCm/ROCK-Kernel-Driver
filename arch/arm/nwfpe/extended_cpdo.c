@@ -37,6 +37,7 @@ floatx80 floatx80_pol(floatx80 rFn,floatx80 rFm);
 
 unsigned int ExtendedCPDO(const unsigned int opcode)
 {
+   FPA11 *fpa11 = GET_FPA11();
    floatx80 rFm, rFn;
    unsigned int Fd, Fm, Fn, nRc = 1;
 

@@ -2250,12 +2250,6 @@ static void vwsnd_audio_intr(int irq, void *dev_id, struct pt_regs *regs)
 	vwsnd_audio_write_intr(devc, status);
 }
 
-static loff_t vwsnd_audio_llseek(struct file *file, loff_t offset, int whence)
-{
-	DBGEV("(file=0x%p, offset=%Ld, whence=%d)\n", file, offset, whence);
-	return -ESPIPE;
-}
-
 static ssize_t vwsnd_audio_do_read(struct file *file,
 				   char *buffer,
 				   size_t count,
@@ -3037,7 +3031,7 @@ static int vwsnd_audio_release(struct inode *inode, struct file *file)
 
 static struct file_operations vwsnd_audio_fops = {
 	owner:		THIS_MODULE,
-	llseek:		vwsnd_audio_llseek,
+	llseek:		no_llseek,
 	read:		vwsnd_audio_read,
 	write:		vwsnd_audio_write,
 	poll:		vwsnd_audio_poll,
@@ -3078,13 +3072,6 @@ static int vwsnd_mixer_release(struct inode *inode, struct file *file)
 	DBGEV("(inode=0x%p, file=0x%p)\n", inode, file);
 	DEC_USE_COUNT;
 	return 0;
-}
-
-/* seek is illegal on mixer. */
-
-static loff_t vwsnd_mixer_llseek(struct file *file, loff_t offset, int whence)
-{
-	return -ESPIPE;
 }
 
 /* mixer_read_ioctl handles all read ioctls on the mixer device. */
@@ -3234,7 +3221,7 @@ static int vwsnd_mixer_ioctl(struct inode *ioctl,
 
 static struct file_operations vwsnd_mixer_fops = {
 	owner:		THIS_MODULE,
-	llseek:		vwsnd_mixer_llseek,
+	llseek:		no_llseek,
 	ioctl:		vwsnd_mixer_ioctl,
 	open:		vwsnd_mixer_open,
 	release:	vwsnd_mixer_release,

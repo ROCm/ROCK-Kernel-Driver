@@ -9,7 +9,22 @@
 #include <asm/byteorder.h>
 
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
+#include "linux22compat.h"
+#else
+#define V22_COMPAT_MOD_INC_USE_COUNT do {} while (0)
+#define V22_COMPAT_MOD_DEC_USE_COUNT do {} while (0)
+#define OWNER_THIS_MODULE owner: THIS_MODULE,
+
+#define INIT_TQ_LINK(tq) INIT_LIST_HEAD(&(tq).list)
+#define INIT_TQ_HEAD(tq) INIT_LIST_HEAD(&(tq))
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,18)
+#include <asm/spinlock.h>
+#else
 #include <linux/spinlock.h>
+#endif
 
 #ifndef MIN
 #define MIN(a,b) ((a) < (b) ? (a) : (b))

@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: //depot/src/linux/drivers/scsi/aic7xxx/cam.h#9 $
+ * $Id: //depot/src/linux/drivers/scsi/aic7xxx/cam.h#10 $
  */
 
 #ifndef _AIC7XXX_CAM_H
@@ -102,10 +102,6 @@ typedef enum {
 	 * back into the XPT queue.
 	 */
 	CAM_REQUEUE_REQ		= DID_BUS_BUSY,
-	/*
-	 * The transaction has made it through our queue routine.
-	 */
-	CAM_SIM_QUEUED		= 0x200,
 
 	CAM_STATUS_MASK		= 0x3F
 } cam_status;

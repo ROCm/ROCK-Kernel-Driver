@@ -26,6 +26,9 @@
 #include "fpsr.h"		/* FP control and status register definitions */
 #include "softfloat.h"
 
+/* Need task_struct */
+#include <linux/sched.h>
+
 #define		typeNone		0x00
 #define		typeSingle		0x01
 #define		typeDouble		0x02
@@ -39,6 +42,7 @@ typedef union tagFPREG {
 
 /* FPA11 device model */
 typedef struct tagFPA11 {
+  unsigned int *userRegisters;
   FPREG fpreg[8];		/* 8 floating point registers */
   FPSR fpsr;			/* floating point status register */
   FPCR fpcr;			/* floating point control register */
@@ -56,6 +60,7 @@ extern void resetFPA11(void);
 extern void SetRoundingMode(const unsigned int);
 extern void SetRoundingPrecision(const unsigned int);
 
-extern FPA11 *fpa11;
+#define GET_FPA11() ((FPA11 *)(&current->thread.fpstate))
+#define GET_USERREG() (GET_FPA11()->userRegisters)
 
 #endif

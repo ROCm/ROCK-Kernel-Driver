@@ -59,7 +59,7 @@ void	xlog_to_klog(byte *b, int size, int card_num)
 
 	x = (card_xlog_t *) b;
 
-	bzero(&klog, sizeof(klog));
+	memset(&klog, 0, sizeof(klog));
 
 	klog.time_stamp = (dword) x->time_hi;
 	klog.time_stamp = (klog.time_stamp << 16) | (dword) x->time_lo;
@@ -71,13 +71,13 @@ void	xlog_to_klog(byte *b, int size, int card_num)
 	{
 		klog.type = KLOG_XTXT_MSG;
 		klog.code = 0;
-		bcopy(&x->xcode, klog.buffer, klog.length);
+		memcpy(klog.buffer, &x->xcode, klog.length);
 	}
 	else if (x->code == 2)
 	{
 		klog.type = KLOG_XLOG_MSG;
 		klog.code = x->xcode;
-		bcopy(&x->data, klog.buffer, klog.length);
+		memcpy(klog.buffer, &x->data, klog.length);
 	}
 	else
 	{

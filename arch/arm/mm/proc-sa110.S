@@ -601,22 +601,27 @@ cpu_sa1110_name:
 
 __sa1100_setup:	@ Allow read-buffer operations from userland
 	mcr	p15, 0, r0, c9, c0, 5
+	mrc	p15, 0, r0, c1, c0		@ get control register v4
+	bic	r0, r0, #0x0e00			@ ..VI ZFRS BLDP WCAM
+	bic	r0, r0, #0x0002			@ .... 000. .... ..0.
+	orr	r0, r0, #0x003d
+	orr	r0, r0, #0x3100			@ ..11 ...1 ..11 11.1
+	b	__setup_common
 
 __sa110_setup:
-	mov	r0, #F_BIT | I_BIT | SVC_MODE
-	msr	cpsr_c, r0
-	mov	r0, #0
-	mcr	p15, 0, r0, c7, c7		@ invalidate I,D caches on v4
-	mcr	p15, 0, r0, c7, c10, 4		@ drain write buffer on v4
-	mcr	p15, 0, r0, c8, c7		@ invalidate I,D TLBs on v4
-	mcr	p15, 0, r4, c2, c0		@ load page table pointer
-	mov	r0, #0x1f			@ Domains 0, 1 = client
-	mcr	p15, 0, r0, c3, c0		@ load domain access register
 	mrc	p15, 0, r0, c1, c0		@ get control register v4
-	bic	r0, r0, #0x0e00			@ ....??r.........
-	bic	r0, r0, #0x0002			@ ..............a.
-	orr	r0, r0, #0x003d			@ ..........DPWC.M
-	orr	r0, r0, #0x1100			@ ...I...S........
+	bic	r0, r0, #0x2e00			@ ..VI ZFRS BLDP WCAM
+	bic	r0, r0, #0x0002			@ ..0. 000. .... ..0.
+	orr	r0, r0, #0x003d
+	orr	r0, r0, #0x1100			@ ...1 ...1 ..11 11.1
+__setup_common:
+	mov	r10, #0
+	mcr	p15, 0, r10, c7, c7		@ invalidate I,D caches on v4
+	mcr	p15, 0, r10, c7, c10, 4		@ drain write buffer on v4
+	mcr	p15, 0, r10, c8, c7		@ invalidate I,D TLBs on v4
+	mcr	p15, 0, r4, c2, c0		@ load page table pointer
+	mov	r10, #0x1f			@ Domains 0, 1 = client
+	mcr	p15, 0, r10, c3, c0		@ load domain access register
 	mov	pc, lr
 
 	.text

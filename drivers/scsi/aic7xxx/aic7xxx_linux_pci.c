@@ -1,7 +1,7 @@
 /*
  * Linux driver attachment glue for PCI based controllers.
  *
- * Copyright (c) 2000 Adaptec Inc.
+ * Copyright (c) 2000, 2001 Adaptec Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: //depot/src/linux/drivers/scsi/aic7xxx/aic7xxx_linux_pci.c#17 $
+ * $Id: //depot/src/linux/drivers/scsi/aic7xxx/aic7xxx_linux_pci.c#23 $
  */
 
 #include "aic7xxx_osm.h"
@@ -42,13 +42,9 @@ struct pci_device_id
 static int	ahc_linux_pci_dev_probe(struct pci_dev *pdev,
 					const struct pci_device_id *ent);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
-#include <linux/module.h>
-
 static void	ahc_linux_pci_dev_remove(struct pci_dev *pdev);
 
-/* We do our own ID filtering.  So we grab all Adaptec SCSI storage class
- * devices here.
- */
+/* We do our own ID filtering.  So, grab all SCSI storage class devices. */
 static struct pci_device_id ahc_linux_pci_id_table[] = {
 	{
 		0x9004, PCI_ANY_ID, PCI_ANY_ID, PCI_ANY_ID,
@@ -60,7 +56,6 @@ static struct pci_device_id ahc_linux_pci_id_table[] = {
 	},
 	{ 0 }
 };
-MODULE_DEVICE_TABLE(pci,ahc_linux_pci_id_table);
 
 struct pci_driver aic7xxx_pci_driver = {
 	name:		"aic7xxx",
@@ -127,6 +122,22 @@ ahc_linux_pci_dev_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		return (-ENODEV);
 	}
 	pci_set_master(pdev);
+
+	if (sizeof(bus_addr_t) > 4
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,3)
+	 && ahc_linux_get_memsize() > 0x80000000
+	 && pci_set_dma_mask(pdev, 0x7FFFFFFFFFULL) == 0) {
+#else
+	 && ahc_linux_get_memsize() > 0x80000000) {
+		ahc->dev_softc->dma_mask = 
+		    (bus_addr_t)(0x7FFFFFFFFFULL
+			       & ((1ULL << (sizeof(bus_addr_t) * 8))-1));
+#endif
+		ahc->flags |= AHC_39BIT_ADDRESSING;
+		ahc->platform_data->hw_dma_mask =
+		    (bus_addr_t)(0x7FFFFFFFFFULL
+			       & ((1ULL << (sizeof(bus_addr_t) * 8))-1));
+	}
 #endif
 	ahc->dev_softc = pci;
 	ahc->platform_data->irq = pdev->irq;
@@ -196,9 +207,11 @@ ahc_pci_map_registers(struct ahc_softc *ahc)
 {
 	uint32_t command;
 	u_long	 base;
+#ifdef MMAPIO
 	u_long	 start;
 	u_long	 base_page;
 	u_long	 base_offset;
+#endif
 	uint8_t *maddr;
 
 	command = ahc_pci_read_config(ahc->dev_softc, PCIR_COMMAND, 4);

@@ -92,6 +92,8 @@
  *                       Tjeerd Mulder <tjeerd.mulder@fujitsu-siemens.com>
  *    31.01.2001   0.29  Register/Unregister gameport
  *                       Fix SETTRIGGER non OSS API conformity
+ *    18.05.2001   0.30  PCI probing and error values cleaned up by Marcus
+ *                       Meissner <mm@caldera.de>
  *
  */
 
@@ -388,7 +390,7 @@ static unsigned long wavetable_mem = 0;
 
 /* --------------------------------------------------------------------- */
 
-extern __inline__ unsigned ld2(unsigned int x)
+static inline unsigned ld2(unsigned int x)
 {
 	unsigned r = 0;
 	
@@ -422,7 +424,7 @@ extern __inline__ unsigned ld2(unsigned int x)
 #undef hweight32
 #endif
 
-extern __inline__ unsigned int hweight32(unsigned int w)
+static inline unsigned int hweight32(unsigned int w)
 {
         unsigned int res = (w & 0x55555555) + ((w >> 1) & 0x55555555);
         res = (res & 0x33333333) + ((res >> 2) & 0x33333333);
@@ -477,7 +479,7 @@ static void set_dmac(struct sv_state *s, unsigned int addr, unsigned int count)
 	outb(0x14, s->iodmac + SV_DMA_MODE);
 }
 
-extern __inline__ unsigned get_dmaa(struct sv_state *s)
+static inline unsigned get_dmaa(struct sv_state *s)
 {
 #ifdef DMABYTEIO
 	unsigned io = s->iodmaa+6, v = 0, u;
@@ -492,7 +494,7 @@ extern __inline__ unsigned get_dmaa(struct sv_state *s)
 #endif /* DMABYTEIO */
 }
 
-extern __inline__ unsigned get_dmac(struct sv_state *s)
+static inline unsigned get_dmac(struct sv_state *s)
 {
 #ifdef DMABYTEIO
 	unsigned io = s->iodmac+6, v = 0, u;
@@ -663,7 +665,7 @@ static void set_adc_rate(struct sv_state *s, unsigned rate)
 
 /* --------------------------------------------------------------------- */
 
-extern inline void stop_adc(struct sv_state *s)
+static inline void stop_adc(struct sv_state *s)
 {
 	unsigned long flags;
 
@@ -673,7 +675,7 @@ extern inline void stop_adc(struct sv_state *s)
 	spin_unlock_irqrestore(&s->lock, flags);
 }	
 
-extern inline void stop_dac(struct sv_state *s)
+static inline void stop_dac(struct sv_state *s)
 {
 	unsigned long flags;
 
@@ -815,7 +817,7 @@ static int prog_dmabuf(struct sv_state *s, unsigned rec)
 	return 0;
 }
 
-extern __inline__ void clear_advance(struct sv_state *s)
+static inline void clear_advance(struct sv_state *s)
 {
 	unsigned char c = (s->fmt & (SV_CFMT_16BIT << SV_CFMT_ASHIFT)) ? 0 : 0x80;
 	unsigned char *buf = s->dma_dac.rawbuf;
@@ -1246,13 +1248,6 @@ static int mixer_ioctl(struct sv_state *s, unsigned int cmd, unsigned long arg)
 
 /* --------------------------------------------------------------------- */
 
-static loff_t sv_llseek(struct file *file, loff_t offset, int origin)
-{
-	return -ESPIPE;
-}
-
-/* --------------------------------------------------------------------- */
-
 static int sv_open_mixdev(struct inode *inode, struct file *file)
 {
 	int minor = MINOR(inode->i_rdev);
@@ -1286,7 +1281,7 @@ static int sv_ioctl_mixdev(struct inode *inode, struct file *file, unsigned int 
 
 static /*const*/ struct file_operations sv_mixer_fops = {
 	owner:		THIS_MODULE,
-	llseek:		sv_llseek,
+	llseek:		no_llseek,
 	ioctl:		sv_ioctl_mixdev,
 	open:		sv_open_mixdev,
 	release:	sv_release_mixdev,
@@ -1993,7 +1988,7 @@ static int sv_release(struct inode *inode, struct file *file)
 
 static /*const*/ struct file_operations sv_audio_fops = {
 	owner:		THIS_MODULE,
-	llseek:		sv_llseek,
+	llseek:		no_llseek,
 	read:		sv_read,
 	write:		sv_write,
 	poll:		sv_poll,
@@ -2275,7 +2270,7 @@ static int sv_midi_release(struct inode *inode, struct file *file)
 
 static /*const*/ struct file_operations sv_midi_fops = {
 	owner:		THIS_MODULE,
-	llseek:		sv_llseek,
+	llseek:		no_llseek,
 	read:		sv_midi_read,
 	write:		sv_midi_write,
 	poll:		sv_midi_poll,
@@ -2450,7 +2445,7 @@ static int sv_dmfm_release(struct inode *inode, struct file *file)
 
 static /*const*/ struct file_operations sv_dmfm_fops = {
 	owner:		THIS_MODULE,
-	llseek:		sv_llseek,
+	llseek:		no_llseek,
 	ioctl:		sv_dmfm_ioctl,
 	open:		sv_dmfm_open,
 	release:	sv_dmfm_release,
@@ -2504,21 +2499,24 @@ static int __devinit sv_probe(struct pci_dev *pcidev, const struct pci_device_id
 	static const char __initdata sv_ddma_name[] = "S3 Inc. SonicVibes DDMA Controller";
        	struct sv_state *s;
 	mm_segment_t fs;
-	int i, val;
+	int i, val, ret;
 	char *ddmaname;
 	unsigned ddmanamelen;
+
+	if ((ret=pci_enable_device(pcidev)))
+		return ret;
 
 	if (!RSRCISIOREGION(pcidev, RESOURCE_SB) ||
 	    !RSRCISIOREGION(pcidev, RESOURCE_ENH) ||
 	    !RSRCISIOREGION(pcidev, RESOURCE_SYNTH) ||
 	    !RSRCISIOREGION(pcidev, RESOURCE_MIDI) ||
 	    !RSRCISIOREGION(pcidev, RESOURCE_GAME))
-		return -1;
+		return -ENODEV;
 	if (pcidev->irq == 0)
-		return -1;
+		return -ENODEV;
 	if (pci_set_dma_mask(pcidev, 0x00ffffff)) {
 		printk(KERN_WARNING "sonicvibes: architecture does not support 24bit PCI busmaster DMA\n");
-		return -1;
+		return -ENODEV;
 	}
 	/* try to allocate a DDMA resource if not already available */
 	if (!RSRCISIOREGION(pcidev, RESOURCE_DDMA)) {
@@ -2534,12 +2532,12 @@ static int __devinit sv_probe(struct pci_dev *pcidev, const struct pci_device_id
 			pcidev->resource[RESOURCE_DDMA].name = NULL;
 			kfree(ddmaname);
 			printk(KERN_ERR "sv: cannot allocate DDMA controller io ports\n");
-			return -1;
+			return -EBUSY;
 		}
 	}
 	if (!(s = kmalloc(sizeof(struct sv_state), GFP_KERNEL))) {
 		printk(KERN_WARNING "sv: out of memory\n");
-		return -1;
+		return -ENOMEM;
 	}
 	memset(s, 0, sizeof(struct sv_state));
 	init_waitqueue_head(&s->dma_adc.wait);
@@ -2558,7 +2556,6 @@ static int __devinit sv_probe(struct pci_dev *pcidev, const struct pci_device_id
 	s->iodmaa = pci_resource_start(pcidev, RESOURCE_DDMA);
 	s->iodmac = pci_resource_start(pcidev, RESOURCE_DDMA) + SV_EXTENT_DMA;
 	s->gameport.io = pci_resource_start(pcidev, RESOURCE_GAME);
-	s->gameport.size = pci_resource_len(pcidev,RESOURCE_GAME);
 	pci_write_config_dword(pcidev, 0x40, s->iodmaa | 9);  /* enable and use extended mode */
 	pci_write_config_dword(pcidev, 0x48, s->iodmac | 9);  /* enable */
 	printk(KERN_DEBUG "sv: io ports: %#lx %#lx %#lx %#lx %#x %#x %#x\n",
@@ -2567,7 +2564,8 @@ static int __devinit sv_probe(struct pci_dev *pcidev, const struct pci_device_id
 	
 	/* hack */
 	pci_write_config_dword(pcidev, 0x60, wavetable_mem >> 12);  /* wavetable base address */
-	
+
+	ret = -EBUSY;
 	if (!request_region(s->ioenh, SV_EXTENT_ENH, "S3 SonicVibes PCM")) {
 		printk(KERN_ERR "sv: io ports %#lx-%#lx in use\n", s->ioenh, s->ioenh+SV_EXTENT_ENH-1);
 		goto err_region5;
@@ -2588,14 +2586,10 @@ static int __devinit sv_probe(struct pci_dev *pcidev, const struct pci_device_id
 		printk(KERN_ERR "sv: io ports %#lx-%#lx in use\n", s->iosynth, s->iosynth+SV_EXTENT_SYNTH-1);
 		goto err_region1;
 	}
-	if (!s->gameport.size)
-		s->gameport.io = 0;
-	if (s->gameport.io && !request_region(s->gameport.io, s->gameport.size, "ESS Solo1")) {
+	if (s->gameport.io && !request_region(s->gameport.io, SV_EXTENT_GAME, "ESS Solo1")) {
 		printk(KERN_ERR "sv: gameport io ports in use\n");
-		s->gameport.io = s->gameport.size = 0;
+		s->gameport.io = 0;
 	}
-	if (pci_enable_device(pcidev))
-		goto err_irq;
 	/* initialize codec registers */
 	outb(0x80, s->ioenh + SV_CODEC_CONTROL); /* assert reset */
 	udelay(50);
@@ -2619,21 +2613,29 @@ static int __devinit sv_probe(struct pci_dev *pcidev, const struct pci_device_id
 	wrindir(s, SV_CIPCMSR1, ((8000 * 65536 / FULLRATE) >> 8) & 0xff);
 	wrindir(s, SV_CIADCOUTPUT, 0);
 	/* request irq */
-	if (request_irq(s->irq, sv_interrupt, SA_SHIRQ, "S3 SonicVibes", s)) {
+	if ((ret=request_irq(s->irq,sv_interrupt,SA_SHIRQ,"S3 SonicVibes",s))) {
 		printk(KERN_ERR "sv: irq %u in use\n", s->irq);
 		goto err_irq;
 	}
 	printk(KERN_INFO "sv: found adapter at io %#lx irq %u dmaa %#06x dmac %#06x revision %u\n",
 	       s->ioenh, s->irq, s->iodmaa, s->iodmac, rdindir(s, SV_CIREVISION));
 	/* register devices */
-	if ((s->dev_audio = register_sound_dsp(&sv_audio_fops, -1)) < 0)
+	if ((s->dev_audio = register_sound_dsp(&sv_audio_fops, -1)) < 0) {
+		ret = s->dev_audio;
 		goto err_dev1;
-	if ((s->dev_mixer = register_sound_mixer(&sv_mixer_fops, -1)) < 0)
+	}
+	if ((s->dev_mixer = register_sound_mixer(&sv_mixer_fops, -1)) < 0) {
+		ret = s->dev_mixer;
 		goto err_dev2;
-	if ((s->dev_midi = register_sound_midi(&sv_midi_fops, -1)) < 0)
+	}
+	if ((s->dev_midi = register_sound_midi(&sv_midi_fops, -1)) < 0) {
+		ret = s->dev_midi;
 		goto err_dev3;
-	if ((s->dev_dmfm = register_sound_special(&sv_dmfm_fops, 15 /* ?? */)) < 0)
+	}
+	if ((s->dev_dmfm = register_sound_special(&sv_dmfm_fops, 15 /* ?? */)) < 0) {
+		ret = s->dev_dmfm;
 		goto err_dev4;
+	}
 	pci_set_master(pcidev);  /* enable bus mastering */
 	/* initialize the chips */
 	fs = get_fs();
@@ -2667,7 +2669,7 @@ static int __devinit sv_probe(struct pci_dev *pcidev, const struct pci_device_id
 	free_irq(s->irq, s);
  err_irq:
 	if (s->gameport.io)
-		release_region(s->gameport.io, s->gameport.size);
+		release_region(s->gameport.io, SV_EXTENT_GAME);
 	release_region(s->iosynth, SV_EXTENT_SYNTH);
  err_region1:
 	release_region(s->iomidi, SV_EXTENT_MIDI);
@@ -2679,7 +2681,7 @@ static int __devinit sv_probe(struct pci_dev *pcidev, const struct pci_device_id
 	release_region(s->ioenh, SV_EXTENT_ENH);
  err_region5:
 	kfree(s);
-	return -1;
+	return ret;
 }
 
 static void __devinit sv_remove(struct pci_dev *dev)
@@ -2698,7 +2700,7 @@ static void __devinit sv_remove(struct pci_dev *dev)
 	free_irq(s->irq, s);
 	if (s->gameport.io) {
 		gameport_unregister_port(&s->gameport);
-		release_region(s->gameport.io, s->gameport.size);
+		release_region(s->gameport.io, SV_EXTENT_GAME);
 	}
 	release_region(s->iodmac, SV_EXTENT_DMA);
 	release_region(s->iodmaa, SV_EXTENT_DMA);
@@ -2731,7 +2733,7 @@ static int __init init_sonicvibes(void)
 {
 	if (!pci_present())   /* No PCI bus in this machine! */
 		return -ENODEV;
-	printk(KERN_INFO "sv: version v0.29 time " __TIME__ " " __DATE__ "\n");
+	printk(KERN_INFO "sv: version v0.30 time " __TIME__ " " __DATE__ "\n");
 #if 0
 	if (!(wavetable_mem = __get_free_pages(GFP_KERNEL, 20-PAGE_SHIFT)))
 		printk(KERN_INFO "sv: cannot allocate 1MB of contiguous nonpageable memory for wavetable data\n");

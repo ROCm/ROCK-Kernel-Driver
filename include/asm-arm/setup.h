@@ -10,6 +10,13 @@
  *  Structure passed to kernel to tell it about the
  *  hardware it's running on.  See linux/Documentation/arm/Setup
  *  for more info.
+ *
+ * NOTE:
+ *  This file contains two ways to pass information from the boot
+ *  loader to the kernel. The old struct param_struct is deprecated,
+ *  but it will be kept in the kernel for 5 years from now
+ *  (2001). This will allow boot loaders to convert to the new struct
+ *  tag way.
  */
 #ifndef __ASMARM_SETUP_H
 #define __ASMARM_SETUP_H
@@ -25,6 +32,7 @@
  */
 #define COMMAND_LINE_SIZE 1024
 
+/* This is the old deprecated way to pass parameters to the kernel */
 struct param_struct {
     union {
 	struct {
@@ -53,7 +61,7 @@ struct param_struct {
 	    unsigned long system_rev;		/* 76 */
 	    unsigned long system_serial_low;	/* 80 */
 	    unsigned long system_serial_high;	/* 84 */
-	    unsigned long mem_fclk_21285;       /* 88 */ 
+	    unsigned long mem_fclk_21285;       /* 88 */
 	} s;
 	char unused[256];
     } u1;
@@ -67,9 +75,13 @@ struct param_struct {
     char commandline[COMMAND_LINE_SIZE];
 };
 
+
+
 /*
- * New idea - a list of tagged entries
+ * The new way of passing information: a list of tagged entries
  */
+
+/* The list ends with an ATAG_NONE node. */
 #define ATAG_NONE	0x00000000
 
 struct tag_header {
@@ -77,6 +89,7 @@ struct tag_header {
 	u32 tag;
 };
 
+/* The list must start with an ATAG_CORE node */
 #define ATAG_CORE	0x54410001
 
 struct tag_core {
@@ -85,13 +98,15 @@ struct tag_core {
 	u32 rootdev;
 };
 
+/* it is allowed to have multiple ATAG_MEM nodes */
 #define ATAG_MEM		0x54410002
 
 struct tag_mem32 {
 	u32	size;
-	u32	start;
+	u32	start;	/* physical start address */
 };
 
+/* VGA text type displays */
 #define ATAG_VIDEOTEXT	0x54410003
 
 struct tag_videotext {
@@ -106,21 +121,24 @@ struct tag_videotext {
 	u16		video_points;
 };
 
+/* describes how the ramdisk will be used in kernel */
 #define ATAG_RAMDISK	0x54410004
 
 struct tag_ramdisk {
-	u32 flags;		/* b0 = load, b1 = prompt */
-	u32 size;
-	u32 start;
+	u32 flags;	/* bit 0 = load, bit 1 = prompt */
+	u32 size;	/* decompressed ramdisk size */
+	u32 start;	/* starting block of floppy-based RAM disk image */
 };
 
+/* describes where the compressed ramdisk image lives */
 #define ATAG_INITRD	0x54410005
 
 struct tag_initrd {
-	u32 start;
-	u32 size;
+	u32 start;	/* physical start address */
+	u32 size;	/* size of compressed ramdisk image */
 };
 
+/* board serial number. "64 bits should be enough for everybody" */
 #define ATAG_SERIAL	0x54410006
 
 struct tag_serialnr {
@@ -128,12 +146,16 @@ struct tag_serialnr {
 	u32 high;
 };
 
+/* board revision */
 #define ATAG_REVISION	0x54410007
 
 struct tag_revision {
 	u32 rev;
 };
 
+/* initial values for vesafb-type framebuffers. see struct screen_info
+ * in include/linux/tty.h
+ */
 #define ATAG_VIDEOLFB	0x54410008
 
 struct tag_videolfb {
@@ -153,12 +175,14 @@ struct tag_videolfb {
 	u8		rsvd_pos;
 };
 
+/* command line: \0 terminated string */
 #define ATAG_CMDLINE	0x54410009
 
 struct tag_cmdline {
-	char	cmdline[1];
+	char	cmdline[1];	/* this is the minimum size */
 };
 
+/* acorn RiscPC specific information */
 #define ATAG_ACORN	0x41000101
 
 struct tag_acorn {
@@ -168,6 +192,7 @@ struct tag_acorn {
 	u8 adfsdrives;
 };
 
+/* footbridge memory clock, see arch/arm/mach-footbridge/arch.c */
 #define ATAG_MEMCLK	0x41000402
 
 struct tag_memclk {
@@ -203,6 +228,20 @@ struct tagtable {
 	u32 tag;
 	int (*parse)(const struct tag *);
 };
+
+#define __tag __attribute__((unused, __section__(".taglist")))
+#define __tagtable(tag, fn) \
+static struct tagtable __tagtable_##fn __tag = { tag, fn }
+
+#define tag_member_present(tag,member)				\
+	((unsigned long)(&((struct tag *)0L)->member + 1)	\
+		<= (tag)->hdr.size * 4)
+
+#define tag_next(t)	((struct tag *)((u32 *)(t) + (t)->hdr.size))
+#define tag_size(type)	((sizeof(struct tag_header) + sizeof(struct type)) >> 2)
+
+#define for_each_tag(t,base)		\
+	for (t = base; t->hdr.size; t = tag_next(t))
 
 /*
  * Memory map description

@@ -20,13 +20,8 @@ obj-n		:=
 obj-arc		:= ecard.o io-acorn.o floppydma.o
 obj-rpc		:= ecard.o io-acorn.o floppydma.o
 obj-clps7500	:= io-acorn.o
-obj-footbridge	:= io-pcio.o
 obj-l7200     	:= io-acorn.o
-obj-nexuspci	:= io-pcio.o
-obj-sa1100	:= io-pcio.o
 obj-shark	:= io-shark.o
-obj-integrator	:= io-pcio.o
-obj-clps711x	:= io-shark.o
 
 obj-y		+= $(obj-$(MACHINE))
 

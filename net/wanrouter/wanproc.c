@@ -25,7 +25,7 @@
 #include <linux/stddef.h>	/* offsetof(), etc. */
 #include <linux/errno.h>	/* return codes */
 #include <linux/kernel.h>
-#include <linux/malloc.h>	/* kmalloc(), kfree() */
+#include <linux/slab.h>	/* kmalloc(), kfree() */
 #include <linux/mm.h>		/* verify_area(), etc. */
 #include <linux/string.h>	/* inline mem*, str* functions */
 #include <asm/byteorder.h>	/* htons(), etc. */
@@ -1039,7 +1039,7 @@ typedef struct wan_stat_entry
  *	No /proc - output stubs
  */
 
-__initfunc(int wanrouter_proc_init(void))
+int __init wanrouter_proc_init(void)
 {
 	return 0;
 }

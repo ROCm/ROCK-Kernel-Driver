@@ -33,28 +33,46 @@ static char * __init dmi_string(struct dmi_header *dm, u8 s)
 	return bp;
 }
 
+/*
+ *	We have to be cautious here. We have seen BIOSes with DMI pointers
+ *	pointing to completely the wrong place for example
+ */
+ 
 static int __init dmi_table(u32 base, int len, int num, void (*decode)(struct dmi_header *))
 {
 	u8 *buf;
 	struct dmi_header *dm;
 	u8 *data;
 	int i=1;
-	int last = 0;	
 		
 	buf = ioremap(base, len);
 	if(buf==NULL)
 		return -1;
 
 	data = buf;
+
+	/*
+ 	 *	Stop when we see al the items the table claimed to have
+ 	 *	OR we run off the end of the table (also happens)
+ 	 */
+ 
 	while(i<num && (data - buf) < len)
 	{
 		dm=(struct dmi_header *)data;
-		if(dm->type < last)
+	
+		/*
+		 *	Avoid misparsing crud if the length of the last
+	 	 *	record is crap 
+		 */
+		if((data-buf+dm->length) >= len)
 			break;
-		last = dm->type;
 		decode(dm);		
 		data+=dm->length;
-		while(*data || data[1])
+		/*
+		 *	Don't go off the end of the data if there is
+	 	 *	stuff looking like string fill past the end
+	 	 */
+		while((data-buf) < len && (*data || data[1]))
 			data++;
 		data+=2;
 		i++;

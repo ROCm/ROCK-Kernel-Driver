@@ -260,8 +260,8 @@ struct ymf_unit {
 	int suspended;
 
 	u32 active_bank;
-	struct ymf_voice voices[64];
-	struct ymf_capture capture[5];
+	struct ymf_voice voices[YDSXG_PLAYBACK_VOICES];
+	struct ymf_capture capture[YDSXG_CAPTURE_VOICES];
 
 	struct ac97_codec *ac97_codec[NR_AC97];
 	u16 ac97_features;

@@ -533,6 +533,86 @@ void pckbd_leds(unsigned char leds)
 	}
 }
 
+#define DEFAULT_KEYB_REP_DELAY	250
+#define DEFAULT_KEYB_REP_RATE	30	/* cps */
+
+static struct kbd_repeat kbdrate={
+	DEFAULT_KEYB_REP_DELAY,
+	DEFAULT_KEYB_REP_RATE
+};
+
+static unsigned char parse_kbd_rate(struct kbd_repeat *r)
+{
+	static struct r2v{
+		int rate;
+		unsigned char val;
+	} kbd_rates[]={	{5,0x14},
+			{7,0x10},
+			{10,0x0c},
+			{15,0x08},
+			{20,0x04},
+			{25,0x02},
+			{30,0x00}
+	};
+	static struct d2v{
+		int delay;
+		unsigned char val;
+	} kbd_delays[]={{250,0},
+			{500,1},
+			{750,2},
+			{1000,3}
+	};
+	int rate=0,delay=0;
+	if (r != NULL){
+		int i,new_rate=30,new_delay=250;
+		if (r->rate <= 0)
+			r->rate=kbdrate.rate;
+		if (r->delay <= 0)
+			r->delay=kbdrate.delay;
+		for (i=0; i < sizeof(kbd_rates)/sizeof(struct r2v); i++)
+			if (kbd_rates[i].rate == r->rate){
+				new_rate=kbd_rates[i].rate;
+				rate=kbd_rates[i].val;
+				break;
+			}
+		for (i=0; i < sizeof(kbd_delays)/sizeof(struct d2v); i++)
+			if (kbd_delays[i].delay == r->delay){
+				new_delay=kbd_delays[i].delay;
+				delay=kbd_delays[i].val;
+				break;
+			}
+		r->rate=new_rate;
+		r->delay=new_delay;
+	}
+	return (delay << 5) | rate;
+}
+
+static int write_kbd_rate(unsigned char r)
+{
+	if (!send_data(KBD_CMD_SET_RATE) || !send_data(r)){
+		send_data(KBD_CMD_ENABLE); 	/* re-enable kbd if any errors */
+		return 0;
+	}else
+		return 1;
+}
+
+int pckbd_rate(struct kbd_repeat *rep)
+{
+	if (rep == NULL)
+		return -EINVAL;
+	else{
+		unsigned char r=parse_kbd_rate(rep);
+		struct kbd_repeat old_rep;
+		memcpy(&old_rep,&kbdrate,sizeof(struct kbd_repeat));
+		if (write_kbd_rate(r)){
+			memcpy(&kbdrate,rep,sizeof(struct kbd_repeat));
+			memcpy(rep,&old_rep,sizeof(struct kbd_repeat));
+			return 0;
+		}
+	}
+	return -EIO;
+}
+
 /*
  * In case we run on a non-x86 hardware we need to initialize both the
  * keyboard controller and the keyboard.  On a x86, the BIOS will

@@ -42,7 +42,7 @@ struct semaphore {
 #define DECLARE_MUTEX(name)		__DECLARE_SEMAPHORE_GENERIC(name,1)
 #define DECLARE_MUTEX_LOCKED(name)	__DECLARE_SEMAPHORE_GENERIC(name,0)
 
-extern inline void sema_init(struct semaphore *sem, int val)
+static inline void sema_init(struct semaphore *sem, int val)
 {
 	atomic_set(&sem->count, val);
 	sem->sleepers = 0;
@@ -79,7 +79,7 @@ extern void __up(struct semaphore * sem);
  * This is ugly, but we want the default case to fall through.
  * "__down" is the actual routine that waits...
  */
-extern inline void down(struct semaphore * sem)
+static inline void down(struct semaphore * sem)
 {
 #if WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
@@ -92,7 +92,7 @@ extern inline void down(struct semaphore * sem)
  * This is ugly, but we want the default case to fall through.
  * "__down_interruptible" is the actual routine that waits...
  */
-extern inline int down_interruptible (struct semaphore * sem)
+static inline int down_interruptible (struct semaphore * sem)
 {
 #if WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
@@ -101,7 +101,7 @@ extern inline int down_interruptible (struct semaphore * sem)
 	return __down_op_ret(sem, __down_interruptible_failed);
 }
 
-extern inline int down_trylock(struct semaphore *sem)
+static inline int down_trylock(struct semaphore *sem)
 {
 #if WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
@@ -116,7 +116,7 @@ extern inline int down_trylock(struct semaphore *sem)
  * The default case (no contention) will result in NO
  * jumps for both down() and up().
  */
-extern inline void up(struct semaphore * sem)
+static inline void up(struct semaphore * sem)
 {
 #if WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);

@@ -220,11 +220,6 @@ static ssize_t hci_emu_chr_read(struct file * file, char * buf, size_t count, lo
 	return ret;
 }
 
-static loff_t hci_emu_chr_lseek(struct file * file, loff_t offset, int origin)
-{
-	return -ESPIPE;
-}
-
 static int hci_emu_chr_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
 {
 	return -EINVAL;
@@ -295,7 +290,7 @@ static int hci_emu_chr_close(struct inode *inode, struct file *file)
 
 static struct file_operations hci_emu_fops = {
 	owner:	THIS_MODULE,	
-	llseek:	hci_emu_chr_lseek,
+	llseek:	no_llseek,
 	read:	hci_emu_chr_read,
 	write:	hci_emu_chr_write,
 	poll:	hci_emu_chr_poll,

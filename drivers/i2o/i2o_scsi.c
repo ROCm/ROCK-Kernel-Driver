@@ -826,7 +826,7 @@ int i2o_scsi_abort(Scsi_Cmnd * SCpnt)
 		m = I2O_POST_READ32(c);
 	}
 	while(m==0xFFFFFFFF);
-	msg = bus_to_virt(c->mem_offset + m);
+	msg = (u32 *)(c->mem_offset + m);
 	
 	__raw_writel(FIVE_WORD_MSG_SIZE, &msg[0]);
 	__raw_writel(I2O_CMD_SCSI_ABORT<<24|HOST_TID<<12|tid, &msg[1]);
@@ -874,13 +874,14 @@ int i2o_scsi_reset(Scsi_Cmnd * SCpnt, unsigned int reset_flags)
 	if(m == 0xFFFFFFFF)
 		return SCSI_RESET_PUNT;
 	
-	msg = bus_to_virt(c->mem_offset + m);
+	msg = (u32 *)(c->mem_offset + m);
 	__raw_writel(FOUR_WORD_MSG_SIZE|SGL_OFFSET_0, &msg[0]);
 	__raw_writel(I2O_CMD_SCSI_BUSRESET<<24|HOST_TID<<12|tid, &msg[1]);
 	__raw_writel(scsi_context|0x80000000, &msg[2]);
 	/* We use the top bit to split controller and unit transactions */
 	/* Now store unit,tid so we can tie the completion back to a specific device */
 	__raw_writel(c->unit << 16 | tid, &msg[3]);
+	wmb();
 	i2o_post_message(c,m);
 	return SCSI_RESET_PENDING;
 }

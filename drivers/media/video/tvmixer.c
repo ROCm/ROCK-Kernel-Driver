@@ -42,7 +42,6 @@ static int tvmixer_clients(struct i2c_client *client);
 static int tvmixer_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg);
 static int tvmixer_open(struct inode *inode, struct file *file);
 static int tvmixer_release(struct inode *inode, struct file *file);
-static loff_t tvmixer_llseek(struct file *file, loff_t offset, int origin);
 
 
 static struct i2c_driver driver = {
@@ -55,7 +54,7 @@ static struct i2c_driver driver = {
 
 static struct file_operations tvmixer_fops = {
 	owner:		THIS_MODULE,
-	llseek:         tvmixer_llseek,
+	llseek:         no_llseek,
 	ioctl:          tvmixer_ioctl,
 	open:           tvmixer_open,
 	release:        tvmixer_release,
@@ -231,11 +230,6 @@ static int tvmixer_release(struct inode *inode, struct file *file)
 	if (client->adapter->dec_use)
 		client->adapter->dec_use(client->adapter);
 	return 0;
-}
-
-static loff_t tvmixer_llseek(struct file *file, loff_t offset, int origin)
-{
-        return -ESPIPE;
 }
 
 /* ----------------------------------------------------------------------- */

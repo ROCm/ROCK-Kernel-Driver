@@ -76,6 +76,12 @@ extern void ret_from_exception(void);
 extern void fpundefinstr(void);
 extern void fp_enter(void);
 
+/*
+ * This has a special calling convention; it doesn't
+ * modify any of the usual registers, except for LR.
+ */
+extern void __do_softirq(void);
+
 #define EXPORT_SYMBOL_ALIAS(sym,orig)		\
  const char __kstrtab_##sym##[]			\
   __attribute__((section(".kstrtab"))) =	\
@@ -101,6 +107,8 @@ EXPORT_SYMBOL(ret_from_exception);
 EXPORT_SYMBOL(kd_mksound);
 #endif
 
+EXPORT_SYMBOL_NOVERS(__do_softirq);
+
 	/* platform dependent support */
 EXPORT_SYMBOL(dump_thread);
 EXPORT_SYMBOL(dump_fpu);
@@ -113,7 +121,6 @@ EXPORT_SYMBOL(kernel_thread);
 EXPORT_SYMBOL(system_rev);
 EXPORT_SYMBOL(system_serial_low);
 EXPORT_SYMBOL(system_serial_high);
-EXPORT_SYMBOL(mem_fclk_21285);
 EXPORT_SYMBOL(__bug);
 EXPORT_SYMBOL(__bad_xchg);
 EXPORT_SYMBOL(__readwrite_bug);
@@ -130,12 +137,24 @@ EXPORT_SYMBOL(csum_partial_copy_nocheck);
 EXPORT_SYMBOL(__csum_ipv6_magic);
 
 	/* io */
-EXPORT_SYMBOL(outsb);
-EXPORT_SYMBOL(outsw);
-EXPORT_SYMBOL(outsl);
-EXPORT_SYMBOL(insb);
-EXPORT_SYMBOL(insw);
-EXPORT_SYMBOL(insl);
+#ifndef __raw_readsb
+EXPORT_SYMBOL_NOVERS(__raw_readsb);
+#endif
+#ifndef __raw_readsw
+EXPORT_SYMBOL_NOVERS(__raw_readsw);
+#endif
+#ifndef __raw_readsl
+EXPORT_SYMBOL_NOVERS(__raw_readsl);
+#endif
+#ifndef __raw_writesb
+EXPORT_SYMBOL_NOVERS(__raw_writesb);
+#endif
+#ifndef __raw_writesw
+EXPORT_SYMBOL_NOVERS(__raw_writesw);
+#endif
+#ifndef __raw_writesl
+EXPORT_SYMBOL_NOVERS(__raw_writesl);
+#endif
 
 	/* address translation */
 #ifndef __virt_to_phys__is_a_macro
@@ -240,8 +259,5 @@ EXPORT_SYMBOL_NOVERS(__down_failed);
 EXPORT_SYMBOL_NOVERS(__down_interruptible_failed);
 EXPORT_SYMBOL_NOVERS(__down_trylock_failed);
 EXPORT_SYMBOL_NOVERS(__up_wakeup);
-EXPORT_SYMBOL_NOVERS(__down_read_failed);
-EXPORT_SYMBOL_NOVERS(__down_write_failed);
-EXPORT_SYMBOL_NOVERS(__rwsem_wake);
 
 EXPORT_SYMBOL(get_wchan);

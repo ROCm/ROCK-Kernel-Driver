@@ -448,7 +448,7 @@ try_again:
 		 * to give up than to deadlock the kernel looping here.
 		 */
 		if (gfp_mask & __GFP_WAIT) {
-			if (!order || total_free_shortage()) {
+			if (!order || free_shortage()) {
 				int progress = try_to_free_pages(gfp_mask);
 				if (progress || (gfp_mask & __GFP_FS))
 					goto try_again;

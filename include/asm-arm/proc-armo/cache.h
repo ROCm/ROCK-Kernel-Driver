@@ -45,7 +45,7 @@
 /*
  * The following handle the weird MEMC chip
  */
-extern __inline__ void memc_update_all(void)
+static inline void memc_update_all(void)
 {
 	struct task_struct *p;
 
@@ -66,7 +66,7 @@ static inline void memc_update_mm(struct mm_struct *mm)
 		processor._set_pgd(mm->pgd);
 }
 
-extern __inline__ void
+static inline void
 memc_clear(struct mm_struct *mm, struct page *page)
 {
 	cpu_memc_update_entry(mm->pgd, (unsigned long) page_address(page), 0);

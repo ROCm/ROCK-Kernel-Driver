@@ -2,7 +2,7 @@ Submitting Drivers For The Linux Kernel
 ---------------------------------------
 
 This document is intended to explain how to submit device drivers to the
-Linux 2.2 and 2.4test kernel trees. Note that if you are interested in video
+Linux 2.2 and 2.4 kernel trees. Note that if you are interested in video
 card drivers you should probably talk to XFree86 (http://wwww.xfree86.org) 
 instead.
 
@@ -34,7 +34,7 @@ Linux 2.2:
 	maintainer does not respond or you cannot find the appropriate
 	maintainer then please contact Alan Cox <alan@lxorguk.ukuu.org.uk>
 
-Linux 2.4test:
+Linux 2.4:
 	This kernel tree is under active development. The same rules apply
 	as 2.2 but you may wish to submit your driver via linux-kernel (see
 	resources) and follow that list to track changes in API's. These

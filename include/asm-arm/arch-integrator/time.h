@@ -113,7 +113,7 @@ static void integrator_timer_interrupt(int irq, void *dev_id, struct pt_regs *re
 /*
  * Set up timer interrupt, and return the current time in seconds.
  */
-extern __inline__ void setup_timer(void)
+static inline void setup_timer(void)
 {
 	volatile TimerStruct_t *timer0 = (volatile TimerStruct_t *)TIMER0_VA_BASE;
 	volatile TimerStruct_t *timer1 = (volatile TimerStruct_t *)TIMER1_VA_BASE;

@@ -156,7 +156,7 @@ static int debug;
 
 static void if_down(struct net_device *dev)
 {
-	struct sppp *sp = &((struct ppp_device *)dev)->sppp;
+	struct sppp *sp = (struct sppp *)sppp_of(dev);
 
 	sp->pp_link_state=SPPP_LINK_DOWN;
 }

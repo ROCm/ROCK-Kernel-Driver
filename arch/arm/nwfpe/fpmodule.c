@@ -39,9 +39,6 @@
 #include "fpa11.h"
 #include "fpa11.inl"
 
-/* external data */
-extern FPA11 *fpa11;
-
 /* kernel symbols required for signal handling */
 typedef struct task_struct*	PTASK;
 
@@ -70,9 +67,6 @@ static void (*orig_fp_enter)(void);
 
 /* forward declarations */
 extern void nwfpe_enter(void);
-
-/* Address of user registers on the kernel stack. */
-unsigned int *userRegisters;
 
 #ifdef MODULE
 /*
@@ -145,7 +139,7 @@ void float_raise(signed char flags)
 #ifdef CONFIG_DEBUG_USER
   printk(KERN_DEBUG "NWFPE: %s[%d] takes exception %08x at %p from %08x\n",
 	 current->comm, current->pid, flags,
-	 __builtin_return_address(0), userRegisters[15]);
+	 __builtin_return_address(0), GET_USERREG()[15]);
 #endif
 
   /* Keep SoftFloat exception flags up to date.  */

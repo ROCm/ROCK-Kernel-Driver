@@ -231,7 +231,7 @@
 #define SACR2_DREC	(1<<3)
 #define SACR2_DRPL	(1<<4)
 #define SACR2_ENLBF	(1<<5)
-#define SACR2_RESET	(1<<5)
+#define SACR2_RESET	(1<<6)
 
 #define SASR0_TNF	(1<<0)
 #define SASR0_RNE	(1<<1)
@@ -447,8 +447,8 @@
 #define _MSECR      _SA1111( 0x0C00 )
 #define _MSESTAT    _SA1111( 0x0C04 )
 #define _MSEDATA    _SA1111( 0x0C08 )
-#define _MSECLKDIV  _SA1111( 0x0C10 )
-#define _MSEPRECNT  _SA1111( 0x0C14 )
+#define _MSECLKDIV  _SA1111( 0x0C0C )
+#define _MSEPRECNT  _SA1111( 0x0C10 )
 
 #if ( LANGUAGE == C )
 

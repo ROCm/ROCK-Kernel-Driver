@@ -21,7 +21,7 @@ extern void __delay(int loops);
  */
 extern void udelay(unsigned long usecs);
 
-extern __inline__ unsigned long muldiv(unsigned long a, unsigned long b, unsigned long c)
+static inline unsigned long muldiv(unsigned long a, unsigned long b, unsigned long c)
 {
 	return a * b / c;
 }

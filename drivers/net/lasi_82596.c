@@ -96,7 +96,7 @@
 #include <asm/cache.h>
 
 static char version[] __initdata =
-	"82596.c $Revision: 1.14 $\n";
+	"82596.c $Revision: 1.20 $\n";
 
 /* DEBUG flags
  */
@@ -994,30 +994,35 @@ static int i596_test(struct net_device *dev)
 
 static int i596_open(struct net_device *dev)
 {
-	int res = 0;
-
 	DEB(DEB_OPEN,printk("%s: i596_open() irq %d.\n", dev->name, dev->irq));
-
-	if (request_irq(dev->irq, &i596_interrupt, 0, "i82596", dev)) {
-		printk("%s: IRQ %d not free\n", dev->name, dev->irq);
-		return -EAGAIN;
-	}
-
-	request_region(dev->base_addr, 12, dev->name);
-
-	init_rx_bufs(dev);
-
-	netif_start_queue(dev);
 
 	MOD_INC_USE_COUNT;
 
-	/* Initialize the 82596 memory */
-	if (init_i596_mem(dev)) {
-		res = -EAGAIN;
-		free_irq(dev->irq, dev);
+	if (request_irq(dev->irq, &i596_interrupt, 0, "i82596", dev)) {
+		printk("%s: IRQ %d not free\n", dev->name, dev->irq);
+		goto out;
 	}
 
-	return res;
+	init_rx_bufs(dev);
+
+	if (init_i596_mem(dev)) {
+		printk("%s: Failed to init memory\n", dev->name);
+		goto out_remove_rx_bufs;
+	}
+
+	request_mem_region(dev->base_addr, I596_TOTAL_SIZE, "i82596");
+
+	netif_start_queue(dev);
+
+	return 0;
+
+out_remove_rx_bufs:
+	remove_rx_bufs(dev);
+	free_irq(dev->irq, dev);
+out:
+	MOD_DEC_USE_COUNT;
+
+	return -EAGAIN;
 }
 
 static void i596_tx_timeout (struct net_device *dev)
@@ -1162,7 +1167,7 @@ static int __init i82596_probe(struct net_device *dev, int options)
 	if (!dev->base_addr || !dev->irq)
 	    return -ENODEV;
 
-	if (!pdc_lan_station_id( (char*)&eth_addr, (void*)dev->base_addr)) {
+	if (pdc_lan_station_id( (char*)&eth_addr, (void*)dev->base_addr)) {
 	    for(i=0;i<6;i++)
 		eth_addr[i] = gsc_readb(LAN_PROM_ADDR+i);
 	    printk("82596.c: MAC of HP700 LAN blindely read from the prom!\n");
@@ -1176,9 +1181,6 @@ static int __init i82596_probe(struct net_device *dev, int options)
 		dev->mem_start = (int)__get_free_pages(GFP_ATOMIC, 0);
 		if (!dev->mem_start) {
 			printk("%s: Couldn't get shared memory\n", dev->name);
-#ifdef ENABLE_APRICOT
-			release_region(dev->base_addr, I596_TOTAL_SIZE);
-#endif
 			return -ENOMEM;
 		}
 		dma_addr = virt_to_bus(dev->mem_start);
@@ -1211,9 +1213,6 @@ static int __init i82596_probe(struct net_device *dev, int options)
 			sizeof(struct i596_private), (unsigned long)&lp->scb));
 	memset((void *) lp, 0, sizeof(struct i596_private));
 
-#if 0
-	kernel_set_cachemode((void *)(dev->mem_start), 4096, IOMAP_NOCACHE_SER);
-#endif
 	lp->options = options;
 	lp->scb.command = 0;
 	lp->scb.cmd = I596_NULL;
@@ -1422,7 +1421,7 @@ static int i596_close(struct net_device *dev)
 	free_irq(dev->irq, dev);
 	remove_rx_bufs(dev);
 
-	release_region(dev->base_addr, 12);
+	release_mem_region(dev->base_addr, I596_TOTAL_SIZE);
 
 	MOD_DEC_USE_COUNT;
 
@@ -1548,4 +1547,3 @@ void cleanup_module(void)
 }
 
 #endif				/* MODULE */
-

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.prep_pci.c 1.18 05/17/01 18:14:22 cort
+ * BK Id: SCCS/s.prep_pci.c 1.22 08/05/01 16:18:54 trini
  */
 /*
  * PReP pci functions.
@@ -848,7 +848,7 @@ unsigned long __init prep_route_pci_interrupts(void)
 		switch(inb(0x0852))
 		{
 		case 0xff:
-			Motherboard_map_name = "IBM 850/860 Portable\n";
+			Motherboard_map_name = "IBM 850/860 Portable";
 			Motherboard_map = Nobis_pci_IRQ_map;
 			Motherboard_routes = Nobis_pci_IRQ_routes;
 			break;

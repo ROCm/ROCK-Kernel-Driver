@@ -107,30 +107,7 @@ static int piix_get_info (char *buffer, char **addr, off_t offset, int count)
 	c0 = inb_p((unsigned short)bibma + 0x02);
 	c1 = inb_p((unsigned short)bibma + 0x0a);
 
-	switch(bmide_dev->device) {
-		case PCI_DEVICE_ID_INTEL_82801BA_8:
-		case PCI_DEVICE_ID_INTEL_82801BA_9:
-			p += sprintf(p, "\n                                Intel PIIX4 Ultra 100 Chipset.\n");
-			break;
-		case PCI_DEVICE_ID_INTEL_82372FB_1:
-		case PCI_DEVICE_ID_INTEL_82801AA_1:
-			p += sprintf(p, "\n                                Intel PIIX4 Ultra 66 Chipset.\n");
-			break;
-		case PCI_DEVICE_ID_INTEL_82451NX:
-		case PCI_DEVICE_ID_INTEL_82801AB_1:
-		case PCI_DEVICE_ID_INTEL_82443MX_1:
-		case PCI_DEVICE_ID_INTEL_82371AB:
-			p += sprintf(p, "\n                                Intel PIIX4 Ultra 33 Chipset.\n");
-			break;
-		case PCI_DEVICE_ID_INTEL_82371SB_1:
-			p += sprintf(p, "\n                                Intel PIIX3 Chipset.\n");
-			break;
-		case PCI_DEVICE_ID_INTEL_82371FB_1:
-		case PCI_DEVICE_ID_INTEL_82371FB_0:
-		default:
-			p += sprintf(p, "\n                                Intel PIIX Chipset.\n");
-			break;
-	}
+	p += sprintf(p, "\n                    %s Chipset.\n", bmide_dev->name);
 	p += sprintf(p, "--------------- Primary Channel ---------------- Secondary Channel -------------\n");
 	p += sprintf(p, "                %sabled                         %sabled\n",
 			(c0&0x80) ? "dis" : " en",

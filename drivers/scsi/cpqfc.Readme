@@ -7,6 +7,19 @@ Tested in single and dual HBA configuration, 32 and 64bit busses,
 SEST size 512 Exchanges (simultaneous I/Os) limited by module kmalloc() 
 	max of 128k bytes contiguous.
 
+Ver 2.0.5  Aug 06, 2001
+   * Reject non-existent luns in the driver rather than letting the 
+     hardware do it.  (some HW behaves differently than others in this area.)
+   * Changed Makefile to rely on "make dep" instead of explicit dependencies
+   * ifdef'ed out fibre channel analyzer triggering debug code
+   * fixed a jiffies wrapping issue
+
+Ver 2.0.4  Aug 01, 2001
+   * Incorporated fix for target device reset from Steeleye
+   * Fixed passthrough ioctl so it doesn't hang.
+   * Fixed hang in launch_FCworker_thread() that occurred on some machines.
+   * Avoid problem when number of volumes in a single cabinet > 8
+
 Ver 2.0.2  July 23, 2001
    Changed the semiphore changes so the driver would compile in 2.4.7. 
    This version is for 2.4.7 and beyond. 

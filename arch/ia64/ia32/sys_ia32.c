@@ -746,7 +746,7 @@ struct readdir32_callback {
 };
 
 static int
-filldir32 (void *__buf, const char *name, int namlen, off_t offset, ino_t ino,
+filldir32 (void *__buf, const char *name, int namlen, loff_t offset, ino_t ino,
 	   unsigned int d_type)
 {
 	struct linux32_dirent * dirent;
@@ -811,7 +811,7 @@ out:
 }
 
 static int
-fillonedir32 (void * __buf, const char * name, int namlen, off_t offset, ino_t ino,
+fillonedir32 (void * __buf, const char * name, int namlen, loff_t offset, ino_t ino,
 	      unsigned int d_type)
 {
 	struct readdir32_callback * buf = (struct readdir32_callback *) __buf;

@@ -284,6 +284,7 @@ static int ncp_release(struct inode *inode, struct file *file) {
 
 struct file_operations ncp_file_operations =
 {
+	llseek:		generic_file_llseek,
 	read:		ncp_file_read,
 	write:		ncp_file_write,
 	ioctl:		ncp_ioctl,

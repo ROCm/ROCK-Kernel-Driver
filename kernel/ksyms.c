@@ -177,6 +177,7 @@ EXPORT_SYMBOL(invalidate_device);
 EXPORT_SYMBOL(invalidate_inode_pages);
 EXPORT_SYMBOL(truncate_inode_pages);
 EXPORT_SYMBOL(fsync_dev);
+EXPORT_SYMBOL(fsync_no_super);
 EXPORT_SYMBOL(permission);
 EXPORT_SYMBOL(vfs_permission);
 EXPORT_SYMBOL(inode_setattr);
@@ -429,7 +430,7 @@ EXPORT_SYMBOL(ioport_resource);
 EXPORT_SYMBOL(iomem_resource);
 
 /* process management */
-EXPORT_SYMBOL(up_and_exit);
+EXPORT_SYMBOL(complete_and_exit);
 EXPORT_SYMBOL(__wake_up);
 EXPORT_SYMBOL(wake_up_process);
 EXPORT_SYMBOL(sleep_on);

@@ -10,6 +10,7 @@
 #include <linux/nls.h>
 #include <linux/slab.h>
 #include <linux/iso_fs.h>
+#include <asm/unaligned.h>
 
 /*
  * Convert Unicode 16 to UTF8 or ASCII.
@@ -17,15 +18,15 @@
 static int
 uni16_to_x8(unsigned char *ascii, u16 *uni, int len, struct nls_table *nls)
 {
-	wchar_t *ip;
+	wchar_t *ip, ch;
 	unsigned char *op;
 
 	ip = uni;
 	op = ascii;
 
-	while (*ip && len) {
+	while ((ch = get_unaligned(ip)) && len) {
 		int llen;
-		wchar_t ch = be16_to_cpu(*ip);
+		ch = be16_to_cpu(ch);
 		if ((llen = nls->uni2char(ch, op, NLS_MAX_CHARSET_SIZE)) > 0)
 			op += llen;
 		else

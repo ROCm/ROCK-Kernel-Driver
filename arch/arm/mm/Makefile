@@ -17,7 +17,7 @@ obj-y		:= init.o
 obj-m		:=
 obj-n		:=
 obj-		:=
-export-objs	:= proc-syms.o
+export-objs	:= proc-syms.o discontig.o
 
 cpu32-y		:= consistent.o fault-armv.o ioremap.o mm-armv.o
 cpu32-$(CONFIG_MODULES) += proc-syms.o
@@ -34,7 +34,7 @@ p-$(CONFIG_CPU_ARM610)	+= proc-arm6,7.o
 p-$(CONFIG_CPU_ARM710)	+= proc-arm6,7.o
 p-$(CONFIG_CPU_ARM720T)	+= proc-arm720.o
 p-$(CONFIG_CPU_ARM920T)	+= proc-arm920.o
-p-$(CONFIG_CPU_ARM10)	+= proc-arm10.o
+p-$(CONFIG_CPU_ARM1020)	+= proc-arm1020.o
 p-$(CONFIG_CPU_SA110)	+= proc-sa110.o
 p-$(CONFIG_CPU_SA1100)	+= proc-sa110.o
 

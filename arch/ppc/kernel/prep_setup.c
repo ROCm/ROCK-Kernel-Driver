@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.prep_setup.c 1.23 07/18/01 22:56:39 paulus
+ * BK Id: SCCS/s.prep_setup.c 1.26 08/05/01 16:18:54 trini
  */
 /*
  *  linux/arch/ppc/kernel/setup.c
@@ -14,6 +14,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/delay.h>
 #include <linux/module.h>
 #include <linux/errno.h>
 #include <linux/sched.h>
@@ -147,7 +148,7 @@ prep_get_cpuinfo(char *buffer)
 		}
 		len += sprintf(buffer+len,"%sKb,",
 			       (((*(unsigned char *)0x8000080d)>>2)&1)?"512":"256");
-		len += sprintf(buffer+len,"%sync\n",
+		len += sprintf(buffer+len,"%ssync\n",
 			       ((*(unsigned char *)0x8000080d)>>7) ? "":"a");
 		break;
 	case _PREP_Motorola:
@@ -495,21 +496,20 @@ void __init mk48t59_calibrate_decr(void)
 void __prep
 prep_restart(char *cmd)
 {
-        unsigned long i = 10000;
-
+	unsigned long i = 10000;
 
 	__cli();
 
-        /* set exception prefix high - to the prom */
-        _nmask_and_or_msr(0, MSR_IP);
+	/* set exception prefix high - to the prom */
+	_nmask_and_or_msr(0, MSR_IP);
 
-        /* make sure bit 0 (reset) is a 0 */
-        outb( inb(0x92) & ~1L , 0x92 );
-        /* signal a reset to system control port A - soft reset */
-        outb( inb(0x92) | 1 , 0x92 );
+	/* make sure bit 0 (reset) is a 0 */
+	outb( inb(0x92) & ~1L , 0x92 );
+	/* signal a reset to system control port A - soft reset */
+	outb( inb(0x92) | 1 , 0x92 );
 
-        while ( i != 0 ) i++;
-        panic("restart failed\n");
+	while ( i != 0 ) i++;
+	panic("restart failed\n");
 }
 
 /*
@@ -541,27 +541,92 @@ prep_direct_restart(char *cmd)
 void __prep
 prep_halt(void)
 {
-        unsigned long flags;
+	unsigned long flags;
 	__cli();
 	/* set exception prefix high - to the prom */
 	save_flags( flags );
 	restore_flags( flags|MSR_IP );
-	
+
 	/* make sure bit 0 (reset) is a 0 */
 	outb( inb(0x92) & ~1L , 0x92 );
 	/* signal a reset to system control port A - soft reset */
 	outb( inb(0x92) | 1 , 0x92 );
-                
+
 	while ( 1 ) ;
 	/*
 	 * Not reached
 	 */
 }
 
+/*
+ * On IBM PReP's, power management is handled by a Signetics 87c750 behind the
+ * Utah component on the ISA bus. To access the 750 you must write a series of
+ * nibbles to port 0x82a (decoded by the Utah). This is described somewhat in
+ * the IBM Carolina Technical Specification.
+ * -Hollis
+ */
+static void __prep
+utah_sig87c750_setbit(unsigned int bytenum, unsigned int bitnum, int value)
+{
+	/*
+	 * byte1: 0 0 0 1 0  d  a5 a4
+	 * byte2: 0 0 0 1 a3 a2 a1 a0
+	 *
+	 * d = the bit's value, enabled or disabled
+	 * (a5 a4 a3) = the byte number, minus 20
+	 * (a2 a1 a0) = the bit number
+	 *
+	 * example: set the 5th bit of byte 21 (21.5)
+	 *     a5 a4 a3 = 001 (byte 1)
+	 *     a2 a1 a0 = 101 (bit 5)
+	 *
+	 *     byte1 = 0001 0100 (0x14)
+	 *     byte2 = 0001 1101 (0x1d)
+	 */
+	unsigned char byte1=0x10, byte2=0x10;
+	const unsigned int pm_reg_1=0x82a; /* ISA address */
+
+	/* the 750's '20.0' is accessed as '0.0' through Utah (which adds 20) */
+	bytenum -= 20;
+
+	byte1 |= (!!value) << 2;		/* set d */
+	byte1 |= (bytenum >> 1) & 0x3;	/* set a5, a4 */
+
+	byte2 |= (bytenum & 0x1) << 3;	/* set a3 */
+	byte2 |= bitnum & 0x7;			/* set a2, a1, a0 */
+
+	outb(byte1, pm_reg_1);		/* first nibble */
+	mb();
+	udelay(100);				/* important: let controller recover */
+
+	outb(byte2, pm_reg_1);		/* second nibble */
+	mb();
+	udelay(100);				/* important: let controller recover */
+}
+
 void __prep
 prep_power_off(void)
 {
-	prep_halt();
+	if ( _prep_type == _PREP_IBM) {
+		/* tested on:
+		 * 		Carolina's: 7248-43P, 6070 (PowerSeries 850)
+		 * should work on:
+		 * 		Carolina: 6050 (PowerSeries 830)
+		 * 		7043-140 (Tiger 1)
+		 */
+		unsigned long flags;
+		__cli();
+		/* set exception prefix high - to the prom */
+		save_flags( flags );
+		restore_flags( flags|MSR_IP );
+
+		utah_sig87c750_setbit(21, 5, 1); /* set bit 21.5, "PMEXEC_OFF" */
+
+		while ( 1 ) ;
+		/* not reached */
+	} else {
+		prep_halt();
+	}
 }
 
 int __prep

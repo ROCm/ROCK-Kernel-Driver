@@ -1846,7 +1846,7 @@ struct irix_dirent32_callback {
 #define ROUND_UP32(x) (((x)+sizeof(u32)-1) & ~(sizeof(u32)-1))
 
 static int irix_filldir32(void *__buf, const char *name, int namlen,
-                          off_t offset, ino_t ino, unsigned int d_type)
+                          loff_t offset, ino_t ino, unsigned int d_type)
 {
 	struct irix_dirent32 *dirent;
 	struct irix_dirent32_callback *buf =
@@ -1942,7 +1942,7 @@ struct irix_dirent64_callback {
 #define ROUND_UP64(x) (((x)+sizeof(u64)-1) & ~(sizeof(u64)-1))
 
 static int irix_filldir64(void * __buf, const char * name, int namlen,
-			  off_t offset, ino_t ino, unsigned int d_type)
+			  loff_t offset, ino_t ino, unsigned int d_type)
 {
 	struct irix_dirent64 *dirent;
 	struct irix_dirent64_callback * buf =

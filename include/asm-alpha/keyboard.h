@@ -22,6 +22,7 @@ extern int pckbd_translate(unsigned char scancode, unsigned char *keycode,
 			   char raw_mode);
 extern char pckbd_unexpected_up(unsigned char keycode);
 extern void pckbd_leds(unsigned char leds);
+extern int pckbd_rate(struct kbd_repeat *rep);
 extern void pckbd_init_hw(void);
 extern unsigned char pckbd_sysrq_xlate[128];
 
@@ -30,6 +31,7 @@ extern unsigned char pckbd_sysrq_xlate[128];
 #define kbd_translate		pckbd_translate
 #define kbd_unexpected_up	pckbd_unexpected_up
 #define kbd_leds		pckbd_leds
+#define kbd_rate               pckbd_rate
 #define kbd_init_hw		pckbd_init_hw
 #define kbd_sysrq_xlate		pckbd_sysrq_xlate
 

@@ -56,8 +56,6 @@
 
 static DECLARE_WAIT_QUEUE_HEAD(ds1286_wait);
 
-static long long ds1286_llseek(struct file *file, loff_t offset, int origin);
-
 static ssize_t ds1286_read(struct file *file, char *buf,
 			size_t count, loff_t *ppos);
 
@@ -100,11 +98,6 @@ unsigned char days_in_mo[] =
 /*
  *	Now all the various file operations that we export.
  */
-
-static long long ds1286_llseek(struct file *file, loff_t offset, int origin)
-{
-	return -ESPIPE;
-}
 
 static ssize_t ds1286_read(struct file *file, char *buf,
                            size_t count, loff_t *ppos)
@@ -374,7 +367,7 @@ static unsigned int ds1286_poll(struct file *file, poll_table *wait)
  */
 
 static struct file_operations ds1286_fops = {
-	llseek:		ds1286_llseek,
+	llseek:		no_llseek,
 	read:		ds1286_read,
 	poll:		ds1286_poll,
 	ioctl:		ds1286_ioctl,

@@ -749,11 +749,6 @@ err_out:
 }
 
 
-static long long agp_lseek(struct file *file, long long offset, int origin)
-{
-	return -ESPIPE;
-}
-
 static ssize_t agp_read(struct file *file, char *buf,
 			size_t count, loff_t * ppos)
 {
@@ -1083,7 +1078,7 @@ ioctl_out:
 static struct file_operations agp_fops =
 {
 	owner:		THIS_MODULE,
-	llseek:		agp_lseek,
+	llseek:		no_llseek,
 	read:		agp_read,
 	write:		agp_write,
 	ioctl:		agp_ioctl,

@@ -24,7 +24,9 @@
 		subs	r2, r2, ip
 		bne	.insb_aligned
 
-ENTRY(__arch_readsb)
+ENTRY(__raw_readsb)
+		teq	r2, #0		@ do we have to check for the zero len?
+		moveq	pc, lr
 		ands	ip, r1, #3
 		bne	.insb_align
 

@@ -45,6 +45,7 @@ static int affs_file_open(struct inode *inode, struct file *filp);
 static int affs_file_release(struct inode *inode, struct file *filp);
 
 struct file_operations affs_file_operations = {
+	llseek:		generic_file_llseek,
 	read:		generic_file_read,
 	write:		affs_file_write,
 	mmap:		generic_file_mmap,

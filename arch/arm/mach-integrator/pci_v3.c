@@ -4,7 +4,7 @@
  *  PCI functions for V3 host PCI bridge
  *
  *  Copyright (C) 1999 ARM Limited
- *  Copyright (C) 2000 Deep Blue Solutions Ltd
+ *  Copyright (C) 2000-2001 Deep Blue Solutions Ltd
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -109,11 +109,14 @@
  */
 
 // V3 access routines
-#define _V3Write16(o,v) __raw_writew(v, PCI_V3_VADDR + (unsigned int)(o))
-#define _V3Read16(o)    (__raw_readw(PCI_V3_VADDR + (unsigned int)(o)))
+#define v3_writeb(o,v) __raw_writeb(v, PCI_V3_VADDR + (unsigned int)(o))
+#define v3_readb(o)    (__raw_readb(PCI_V3_VADDR + (unsigned int)(o)))
 
-#define _V3Write32(o,v) __raw_writel(v, PCI_V3_VADDR + (unsigned int)(o))
-#define _V3Read32(o)    (__raw_readl(PCI_V3_VADDR + (unsigned int)(o)))
+#define v3_writew(o,v) __raw_writew(v, PCI_V3_VADDR + (unsigned int)(o))
+#define v3_readw(o)    (__raw_readw(PCI_V3_VADDR + (unsigned int)(o)))
+
+#define v3_writel(o,v) __raw_writel(v, PCI_V3_VADDR + (unsigned int)(o))
+#define v3_readl(o)    (__raw_readl(PCI_V3_VADDR + (unsigned int)(o)))
 
 /*============================================================================
  *
@@ -182,6 +185,9 @@ static spinlock_t v3_lock = SPIN_LOCK_UNLOCKED;
 #error PCI_BUS_PREMEM_START must be megabyte aligned
 #endif
 
+#undef V3_LB_BASE_PREFETCH
+#define V3_LB_BASE_PREFETCH 0
+
 static unsigned long v3_open_config_window(struct pci_dev *dev, int offset)
 {
 	unsigned int address, mapaddress, busnr;
@@ -212,13 +218,13 @@ static unsigned long v3_open_config_window(struct pci_dev *dev, int offset)
 		 *  0   = PCI A1 & A0 are 0 (0)
 		 */
 		address = PCI_FUNC(dev->devfn) << 8;
-		mapaddress = 0x0a;
+		mapaddress = V3_LB_MAP_TYPE_CONFIG;
 
 		if (slot > 12)
 			/*
 			 * high order bits are handled by the MAP register
 			 */
-			mapaddress |= 1 << (slot - 4);
+			mapaddress |= 1 << (slot - 5);
 		else
 			/*
 			 * low order bits handled directly in the address
@@ -237,21 +243,24 @@ static unsigned long v3_open_config_window(struct pci_dev *dev, int offset)
 		 *  3:1 = config cycle (101)
 		 *  0   = PCI A1 & A0 from host bus (1)
 		 */
-		mapaddress = 0x0b;
+		mapaddress = V3_LB_MAP_TYPE_CONFIG | V3_LB_MAP_AD_LOW_EN;
 		address = (busnr << 16) | (dev->devfn << 8);
 	}
 
 	/*
-	 * Set up base0 to see all 512Mbytes of memory space (not prefetchable), this
-	 * frees up base1 for re-use by configuration memory
+	 * Set up base0 to see all 512Mbytes of memory space (not
+	 * prefetchable), this frees up base1 for re-use by
+	 * configuration memory
 	 */
-	_V3Write32(V3_LB_BASE0, (PHYS_PCI_MEM_BASE & 0xFFF00000) | 0x90 | V3_LB_BASE_M_ENABLE);
+	v3_writel(V3_LB_BASE0, v3_addr_to_lb_base(PHYS_PCI_MEM_BASE) |
+			V3_LB_BASE_ADR_SIZE_512MB | V3_LB_BASE_ENABLE);
 
 	/*
 	 * Set up base1/map1 to point into configuration space.
 	 */
-	_V3Write32(V3_LB_BASE1, (PHYS_PCI_CONFIG_BASE & 0xFFF00000) | 0x40 | V3_LB_BASE_M_ENABLE);
-        _V3Write16(V3_LB_MAP1, mapaddress);
+	v3_writel(V3_LB_BASE1, v3_addr_to_lb_base(PHYS_PCI_CONFIG_BASE) |
+			V3_LB_BASE_ADR_SIZE_16MB | V3_LB_BASE_ENABLE);
+	v3_writew(V3_LB_MAP1, mapaddress);
 
 	return PCI_CONFIG_VADDR + address + offset;
 }
@@ -261,13 +270,17 @@ static void v3_close_config_window(void)
 	/*
 	 * Reassign base1 for use by prefetchable PCI memory
 	 */
-	_V3Write32(V3_LB_BASE1, ((PHYS_PCI_MEM_BASE + SZ_256M) & 0xFFF00000) | 0x84 | V3_LB_BASE_M_ENABLE);
-	_V3Write16(V3_LB_MAP1, ((PCI_BUS_PREMEM_START & 0xFFF00000) >> 16) | 0x0006);
+	v3_writel(V3_LB_BASE1, v3_addr_to_lb_base(PHYS_PCI_MEM_BASE + SZ_256M) |
+			V3_LB_BASE_ADR_SIZE_256MB | V3_LB_BASE_PREFETCH |
+			V3_LB_BASE_ENABLE);
+	v3_writew(V3_LB_MAP1, v3_addr_to_lb_map(PCI_BUS_PREMEM_START) |
+			V3_LB_MAP_TYPE_MEM_MULTIPLE);
 
 	/*
 	 * And shrink base0 back to a 256M window (NOTE: MAP0 already correct)
 	 */
-	_V3Write32(V3_LB_BASE0, (PHYS_PCI_MEM_BASE & 0xFFF00000) | 0x80 | V3_LB_BASE_M_ENABLE);
+	v3_writel(V3_LB_BASE0, v3_addr_to_lb_base(PHYS_PCI_MEM_BASE) |
+			V3_LB_BASE_ADR_SIZE_256MB | V3_LB_BASE_ENABLE);
 }
 
 static int v3_read_config_byte(struct pci_dev *dev, int where, u8 *val)
@@ -386,27 +399,126 @@ static struct pci_ops pci_v3_ops = {
 
 static struct resource non_mem = {
 	name:	"PCI non-prefetchable",
-	start:	PCI_BUS_NONMEM_START,
-	end:	PCI_BUS_NONMEM_START + PCI_BUS_NONMEM_SIZE - 1,
+	start:	0x40000000 + PCI_BUS_NONMEM_START,
+	end:	0x40000000 + PCI_BUS_NONMEM_START + PCI_BUS_NONMEM_SIZE - 1,
 	flags:	IORESOURCE_MEM,
 };
 
 static struct resource pre_mem = {
 	name:	"PCI prefetchable",
-	start:	PCI_BUS_PREMEM_START,
-	end:	PCI_BUS_PREMEM_START + PCI_BUS_PREMEM_SIZE - 1,
+	start:	0x40000000 + PCI_BUS_PREMEM_START,
+	end:	0x40000000 + PCI_BUS_PREMEM_START + PCI_BUS_PREMEM_SIZE - 1,
 	flags:	IORESOURCE_MEM | IORESOURCE_PREFETCH,
 };
+
+void __init pci_v3_setup_resources(struct resource **resource)
+{
+	if (request_resource(&iomem_resource, &non_mem))
+		printk("PCI: unable to allocate non-prefetchable memory region\n");
+	if (request_resource(&iomem_resource, &pre_mem))
+		printk("PCI: unable to allocate prefetchable memory region\n");
+
+	/*
+	 * bus->resource[0] is the IO resource for this bus
+	 * bus->resource[1] is the mem resource for this bus
+	 * bus->resource[2] is the prefetch mem resource for this bus
+	 */
+	resource[0] = &ioport_resource;
+	resource[1] = &non_mem;
+	resource[2] = &pre_mem;
+}
+
+/*
+ * These don't seem to be implemented on the Integrator I have, which
+ * means I can't get additional information on the reason for the pm2fb
+ * problems.  I suppose I'll just have to mind-meld with the machine. ;)
+ */
+#define SC_PCI     (IO_ADDRESS(INTEGRATOR_SC_PCIENABLE))
+#define SC_LBFADDR (IO_ADDRESS(INTEGRATOR_SC_BASE+0x20))
+#define SC_LBFCODE (IO_ADDRESS(INTEGRATOR_SC_BASE+0x24))
+
+static int v3_fault(unsigned long addr, struct pt_regs *regs)
+{
+	unsigned long pc = instruction_pointer(regs);
+	unsigned long instr = *(unsigned long *)pc;
+
+	printk("V3 fault: address=0x%08lx, pc=0x%08lx [%08lx] LBFADDR=%08x LBFCODE=%02x ISTAT=%02x\n",
+		addr, pc, instr, __raw_readl(SC_LBFADDR), __raw_readl(SC_LBFCODE) & 255,
+		v3_readb(V3_LB_ISTAT));
+
+	v3_writeb(V3_LB_ISTAT, 0);
+	__raw_writel(3, SC_PCI);
+
+	/*
+	 * If the instruction being executed was a read,
+	 * make it look like it read all-ones.
+	 */
+	if ((instr & 0x0c100000) == 0x04100000) {
+		int reg = (instr >> 12) & 15;
+		unsigned long val;
+
+		if (instr & 0x00400000)
+			val = 255;
+		else
+			val = -1;
+
+		regs->uregs[reg] = val;
+		regs->ARM_pc += 4;
+		return 0;
+	}
+
+	return 1;
+}
+
+static void v3_irq(int irq, void *devid, struct pt_regs *regs)
+{
+	unsigned long pc = instruction_pointer(regs);
+	unsigned long instr = *(unsigned long *)pc;
+	char buf[128];
+
+	sprintf(buf, "V3 int %d: pc=0x%08lx [%08lx] LBFADDR=%08x LBFCODE=%02x ISTAT=%02x\n", irq,
+		pc, instr, __raw_readl(SC_LBFADDR), __raw_readl(SC_LBFCODE) & 255,
+		v3_readb(V3_LB_ISTAT));
+	printascii(buf);
+
+	v3_writeb(V3_LB_ISTAT, 0);
+	__raw_writel(3, SC_PCI);
+
+	/*
+	 * If the instruction being executed was a read,
+	 * make it look like it read all-ones.
+	 */
+	if ((instr & 0x0c100000) == 0x04100000) {
+		int reg = (instr >> 16) & 15;
+		sprintf(buf, "   reg%d = %08lx\n", reg, regs->uregs[reg]);
+		printascii(buf);
+	}
+}
+
+static struct irqaction v3_int = {
+	name: "V3",
+	handler: v3_irq,
+};
+static struct irqaction v3_int2 = {
+	name: "V3TM",
+	handler: v3_irq,
+};
+
+extern int (*external_fault)(unsigned long addr, struct pt_regs *regs);
 
 /*
  * V3_LB_BASE? - local bus address
  * V3_LB_MAP?  - pci bus address
  */
-void __init pci_v3_init(struct arm_pci_sysdata *sysdata)
+void __init pci_v3_init(void *sysdata)
 {
-	struct pci_bus *bus;
 	unsigned int pci_cmd;
 	unsigned long flags;
+
+	/*
+	 * Hook in our fault handler for PCI errors
+	 */
+	external_fault = v3_fault;
 
 	spin_lock_irqsave(&v3_lock, flags);
 
@@ -414,47 +526,49 @@ void __init pci_v3_init(struct arm_pci_sysdata *sysdata)
 	 * Setup window 0 - PCI non-prefetchable memory
 	 *  Local: 0x40000000 Bus: 0x00000000 Size: 256MB
 	 */
-	_V3Write32(V3_LB_BASE0, (PHYS_PCI_MEM_BASE & 0xfff00000) | 0x80 | V3_LB_BASE_M_ENABLE);
-	_V3Write16(V3_LB_MAP0, (PCI_BUS_NONMEM_START >> 16) | 0x0006);
+	v3_writel(V3_LB_BASE0, v3_addr_to_lb_base(PHYS_PCI_MEM_BASE) |
+			V3_LB_BASE_ADR_SIZE_256MB | V3_LB_BASE_ENABLE);
+	v3_writew(V3_LB_MAP0, v3_addr_to_lb_map(PCI_BUS_NONMEM_START) |
+			V3_LB_MAP_TYPE_MEM);
 
 	/*
 	 * Setup window 1 - PCI prefetchable memory
 	 *  Local: 0x50000000 Bus: 0x10000000 Size: 256MB
 	 */
-	_V3Write32(V3_LB_BASE1, ((PHYS_PCI_MEM_BASE + SZ_256M) & 0xFFF00000) | 0x84 | V3_LB_BASE_M_ENABLE);
-	_V3Write16(V3_LB_MAP1, (PCI_BUS_PREMEM_START >> 16) | 0x0006);
+	v3_writel(V3_LB_BASE1, v3_addr_to_lb_base(PHYS_PCI_MEM_BASE + SZ_256M) |
+			V3_LB_BASE_ADR_SIZE_256MB | V3_LB_BASE_PREFETCH |
+			V3_LB_BASE_ENABLE);
+	v3_writew(V3_LB_MAP1, v3_addr_to_lb_map(PCI_BUS_PREMEM_START) |
+			V3_LB_MAP_TYPE_MEM_MULTIPLE);
 
 	/*
 	 * Setup window 2 - PCI IO
 	 */
-//	_V3Write32(V3_LB_BASE2, (PHYS_PCI_IO_BASE & 0xff000000) | V3_LB_BASE_M_ENABLE);
-//	_V3Write16(V3_LB_MAP2, 0);
+	v3_writel(V3_LB_BASE2, v3_addr_to_lb_base2(PHYS_PCI_IO_BASE) |
+			V3_LB_BASE_ENABLE);
+	v3_writew(V3_LB_MAP2, v3_addr_to_lb_map2(0));
 
 	spin_unlock_irqrestore(&v3_lock, flags);
 
-	bus = pci_scan_bus(0, &pci_v3_ops, sysdata);
+	pci_scan_bus(0, &pci_v3_ops, sysdata);
 
-	if (request_resource(&iomem_resource, &non_mem))
-		printk("PCI: unable to allocate non-prefetchable memory region");
-	if (request_resource(&iomem_resource, &pre_mem))
-		printk("PCI: unable to allocate prefetchable memory region");
-
-	/*
-	 * bus->resource[0] is the IO resource for this bus
-	 * bus->resource[1] is the mem resource for this bus
-	 * bus->resource[2] is the prefetch mem resource for this bus
-	 */
-	bus->resource[1] = &non_mem;
-	bus->resource[2] = &pre_mem;
-
-	pci_cmd = PCI_COMMAND_IO | PCI_COMMAND_MEMORY |
+	pci_cmd = PCI_COMMAND_MEMORY |
 		  PCI_COMMAND_MASTER | PCI_COMMAND_INVALIDATE;
 
-	pci_cmd |= sysdata->bus[0].features;
+	v3_writew(V3_PCI_CMD, pci_cmd);
 
-	_V3Write16(V3_PCI_CMD, pci_cmd);
+	/*
+	 * Clear any error conditions.
+	 */
+	__raw_writel(3, SC_PCI);
+	v3_writew(V3_LB_CFG, v3_readw(V3_LB_CFG) | (1 << 10));
+	v3_writeb(V3_LB_ISTAT, 0);
+	v3_writeb(V3_LB_IMASK, 0x68);
 
-	printk("PCI: Fast back to back transfers %sabled\n",
-	       (sysdata->bus[0].features & PCI_COMMAND_FAST_BACK) ?
-		"en" : "dis");
+	printk("LB_CFG: %04x LB_ISTAT: %02x LB_IMASK: %02x\n",
+		v3_readw(V3_LB_CFG),
+		v3_readb(V3_LB_ISTAT),
+		v3_readb(V3_LB_IMASK));
+	setup_arm_irq(IRQ_V3INT, &v3_int);
+//	setup_arm_irq(IRQ_LBUSTIMEOUT, &v3_int2);
 }

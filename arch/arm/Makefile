@@ -22,14 +22,18 @@ endif
 # Select CPU dependent flags.  Note that order of declaration is important;
 # the options further down the list override previous items.
 #
-apcs-y				:=
-apcs-$(CONFIG_CPU_26)		:=-mcpu=arm3 -Os
+# Note!  For APCS-26 YOU MUST HAVE AN APCS-26 LIBGCC.A
+#
+apcs-y				:=-mapcs-32
+apcs-$(CONFIG_CPU_26)		:=-mapcs-26 -mcpu=arm3 -Os
 
+# This selects which instruction set is used.
 arch-y				:=
 arch-$(CONFIG_CPU_32v3)		:=-march=armv3
 arch-$(CONFIG_CPU_32v4)		:=-march=armv4
 arch-$(CONFIG_CPU_32v5)		:=-march=armv5
 
+# This selects how we optimise for the processor.
 tune-y				:=
 tune-$(CONFIG_CPU_ARM610)	:=-mtune=arm610
 tune-$(CONFIG_CPU_ARM710)	:=-mtune=arm710
@@ -38,8 +42,8 @@ tune-$(CONFIG_CPU_ARM920T)	:=-mtune=arm9tdmi
 tune-$(CONFIG_CPU_SA110)	:=-mtune=strongarm110
 tune-$(CONFIG_CPU_SA1100)	:=-mtune=strongarm1100
 
-CFLAGS		+= -mapcs-32 $(apcs-y) $(arch-y) $(tune-y) -mshort-load-bytes -msoft-float
-AFLAGS		+= -mapcs-32 $(apcs-y) $(arch-y) -mno-fpu
+CFLAGS		+=$(apcs-y) $(arch-y) $(tune-y) -mshort-load-bytes -msoft-float
+AFLAGS		+=$(apcs-y) $(arch-y) -mno-fpu
 
 LIBGCC		:= $(shell $(CC) $(CFLAGS) --print-libgcc-file-name)
 

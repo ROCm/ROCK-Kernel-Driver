@@ -33,6 +33,7 @@ obj-$(CONFIG_COMX_PROTO_PPP)	+=		syncppp.o	comx-proto-ppp.o
 obj-$(CONFIG_COMX_PROTO_LAPB)	+=				comx-proto-lapb.o
 obj-$(CONFIG_COMX_PROTO_FR)	+=				comx-proto-fr.o
 obj-$(CONFIG_COSA)		+=		syncppp.o	cosa.o
+obj-$(CONFIG_FARSYNC)		+=		syncppp.o	farsync.o
 obj-$(CONFIG_DSCC4)             +=				dscc4.o
 obj-$(CONFIG_LANMEDIA)		+=		syncppp.o
 obj-$(CONFIG_SYNCLINK_SYNCPPP)	+=		syncppp.o

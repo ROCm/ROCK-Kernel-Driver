@@ -357,6 +357,7 @@ static int simple_config(dev_link_t *link)
 
 found_port:
     if (i != CS_SUCCESS) {
+	printk(KERN_NOTICE "serial_cs: no usable port range found, giving up\n");
 	cs_error(link->handle, RequestIO, i);
 	return -1;
     }
@@ -436,6 +437,7 @@ static int multi_config(dev_link_t *link)
     
     i = CardServices(RequestIRQ, link->handle, &link->irq);
     if (i != CS_SUCCESS) {
+	printk(KERN_NOTICE "serial_cs: no usable port range found, giving up\n");
 	cs_error(link->handle, RequestIRQ, i);
 	link->irq.AssignedIRQ = 0;
     }

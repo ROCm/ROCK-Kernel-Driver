@@ -202,11 +202,6 @@ static ssize_t sound_write(struct file *file, const char *buf, size_t count, lof
 	return ret;
 }
 
-static long long sound_lseek(struct file *file, long long offset, int orig)
-{
-	return -ESPIPE;
-}
-
 static int sound_open(struct inode *inode, struct file *file)
 {
 	int dev = MINOR(inode->i_rdev);
@@ -499,7 +494,7 @@ static int sound_mmap(struct file *file, struct vm_area_struct *vma)
 
 struct file_operations oss_sound_fops = {
 	owner:		THIS_MODULE,
-	llseek:		sound_lseek,
+	llseek:		no_llseek,
 	read:		sound_read,
 	write:		sound_write,
 	poll:		sound_poll,

@@ -7,7 +7,6 @@
  */
 
 #include "hardware.h"
-#include "serial_reg.h"
 
 #include <asm/mach-types.h>
 
@@ -22,36 +21,41 @@ extern void sa1100_setup( int arch_id );
  * The following code assumes the serial port has already been
  * initialized by the bootloader or such...
  */
+
+#define UART(x)		(*(volatile unsigned long *)(serial_port + (x)))
+
 static void puts( const char *s )
 {
-	volatile unsigned long *serial_port;
+	unsigned long serial_port;
 
 	if (machine_is_assabet()) {
 		if( machine_has_neponset() )
-			serial_port = (unsigned long *)_Ser3UTCR0;
+			serial_port = _Ser3UTCR0;
 		else
-			serial_port = (unsigned long *)_Ser1UTCR0;
+			serial_port = _Ser1UTCR0;
 	} else if (machine_is_brutus()||machine_is_nanoengine() ||
-		machine_is_pangolin())
-		serial_port = (unsigned long *)_Ser1UTCR0;
+		   machine_is_pangolin() || machine_is_freebird() ||
+		   machine_is_pfs168() || machine_is_flexanet())
+		serial_port = _Ser1UTCR0;
 	else if (machine_is_empeg() || machine_is_bitsy() ||
 		 machine_is_victor() || machine_is_lart() ||
-		 machine_is_sherman() )
-		serial_port = (unsigned long *)_Ser3UTCR0;
+		 machine_is_sherman() || machine_is_yopy() ||
+		 machine_is_huw_webpanel() || machine_is_itsy() )
+		serial_port = _Ser3UTCR0;
 	else
 		return;
 
 	for (; *s; s++) {
 		/* wait for space in the UART's transmiter */
-		while (!(serial_port[UTSR1] & UTSR1_TNF));
+		while (!(UART(UTSR1) & UTSR1_TNF));
 
 		/* send the character out. */
-		serial_port[UART_TX] = *s;
+		UART(UTDR) = *s;
 
 		/* if a LF, also do CR... */
 		if (*s == 10) {
-			while (!(serial_port[UTSR1] & UTSR1_TNF));
-			serial_port[UART_TX] = 13;
+			while (!(UART(UTSR1) & UTSR1_TNF));
+			UART(UTDR) = 13;
 		}
 	}
 }

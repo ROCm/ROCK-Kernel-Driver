@@ -471,7 +471,7 @@ S:	Maintained
 
 EMU10K1 SOUND DRIVER
 P:	Rui Sousa	
-M:	rsousa@grad.physics.sunysb.edu	
+M:	rui.p.m.sousa@clix.pt	
 L:	emu10k1-devel@opensource.creative.com
 W:	http://opensource.creative.com/
 S:	Maintained
@@ -821,6 +821,13 @@ P:	Benjamin Herrenschmidt
 M:	benh@kernel.crashing.org
 W:	http://www.linuxppc.org/
 L:	linuxppc-dev@lists.linuxppc.org
+S:	Maintained
+
+LOGICAL DISK MANAGER SUPPORT (LDM, Windows 2000/XP Dynamic Disks)
+P:	Richard Russon (FlatCap)
+M:	ldm@flatcap.org
+L:	ldm-devel@lists.sourceforge.net	
+W:	http://ldm.sourceforge.net
 S:	Maintained
 
 LOGICAL VOLUME MANAGER

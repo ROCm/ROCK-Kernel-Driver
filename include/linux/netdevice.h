@@ -344,7 +344,7 @@ struct net_device
 #define NETIF_F_HW_CSUM		8	/* Can checksum all the packets. */
 #define NETIF_F_DYNALLOC	16	/* Self-dectructable device. */
 #define NETIF_F_HIGHDMA		32	/* Can DMA to high memory. */
-#define NETIF_F_FRAGLIST	1	/* Scatter/gather IO. */
+#define NETIF_F_FRAGLIST	64	/* Scatter/gather IO. */
 
 	/* Called after device is detached from network. */
 	void			(*uninit)(struct net_device *dev);

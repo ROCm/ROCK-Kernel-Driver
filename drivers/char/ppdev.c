@@ -104,11 +104,6 @@ static inline void pp_enable_irq (struct pp_struct *pp)
 	port->ops->enable_irq (port);
 }
 
-static loff_t pp_lseek (struct file * file, long long offset, int origin)
-{
-	return -ESPIPE;
-}
-
 static ssize_t pp_read (struct file * file, char * buf, size_t count,
 			loff_t * ppos)
 {
@@ -726,7 +721,7 @@ static unsigned int pp_poll (struct file * file, poll_table * wait)
 
 static struct file_operations pp_fops = {
 	owner:		THIS_MODULE,
-	llseek:		pp_lseek,
+	llseek:		no_llseek,
 	read:		pp_read,
 	write:		pp_write,
 	poll:		pp_poll,

@@ -1,7 +1,7 @@
 /*	$Id: aurora.c,v 1.14 2001/06/29 23:07:37 davem Exp $
  *	linux/drivers/sbus/char/aurora.c -- Aurora multiport driver
  *
- *	Copyright (c) 1999 by Oliver Aldulea (oli@bv.ro)
+ *	Copyright (c) 1999 by Oliver Aldulea (oli at bv dot ro)
  *
  *	This code is based on the RISCom/8 multiport serial driver written
  *	by Dmitry Gorodchanin (pgmdsg@ibi.com), based on the Linux serial

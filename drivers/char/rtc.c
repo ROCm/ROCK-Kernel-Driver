@@ -94,8 +94,6 @@ static DECLARE_WAIT_QUEUE_HEAD(rtc_wait);
 
 static struct timer_list rtc_irq_timer;
 
-static loff_t rtc_llseek(struct file *file, loff_t offset, int origin);
-
 static ssize_t rtc_read(struct file *file, char *buf,
 			size_t count, loff_t *ppos);
 
@@ -188,11 +186,6 @@ static void rtc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 /*
  *	Now all the various file operations that we export.
  */
-
-static loff_t rtc_llseek(struct file *file, loff_t offset, int origin)
-{
-	return -ESPIPE;
-}
 
 static ssize_t rtc_read(struct file *file, char *buf,
 			size_t count, loff_t *ppos)
@@ -597,7 +590,7 @@ static unsigned int rtc_poll(struct file *file, poll_table *wait)
 
 static struct file_operations rtc_fops = {
 	owner:		THIS_MODULE,
-	llseek:		rtc_llseek,
+	llseek:		no_llseek,
 	read:		rtc_read,
 #if RTC_IRQ
 	poll:		rtc_poll,
@@ -710,15 +703,24 @@ found:
 	if (!(ctrl & RTC_DM_BINARY) || RTC_ALWAYS_BCD)
 		BCD_TO_BIN(year);       /* This should never happen... */
 	
-	if (year >= 20 && year < 48) {
+	if (year < 20) {
+		epoch = 2000;
+		guess = "SRM (post-2000)";
+	} else if (year >= 20 && year < 48) {
 		epoch = 1980;
 		guess = "ARC console";
 	} else if (year >= 48 && year < 70) {
 		epoch = 1952;
 		guess = "Digital UNIX";
+#if defined(__mips__)
 	} else if (year >= 70 && year < 100) {
 		epoch = 1928;
 		guess = "Digital DECstation";
+#else
+	} else if (year >= 70) {
+		epoch = 1900;
+		guess = "Standard PC (1900)";
+#endif
 	}
 	if (guess)
 		printk(KERN_INFO "rtc: %s epoch (%lu) detected\n", guess, epoch);

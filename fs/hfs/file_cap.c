@@ -26,7 +26,8 @@
 #include <linux/hfs_fs.h>
 
 /*================ Forward declarations ================*/
-
+static loff_t      cap_info_llseek(struct file *, loff_t,
+				   int);
 static hfs_rwret_t cap_info_read(struct file *, char *,
 				 hfs_rwarg_t, loff_t *);
 static hfs_rwret_t cap_info_write(struct file *, const char *,
@@ -45,6 +46,7 @@ static hfs_rwret_t cap_info_write(struct file *, const char *,
 /*================ Global variables ================*/
 
 struct file_operations hfs_cap_info_operations = {
+	llseek:		cap_info_llseek,
 	read:		cap_info_read,
 	write:		cap_info_write,
 	fsync:		file_fsync,
@@ -83,6 +85,29 @@ static void cap_build_meta(struct hfs_cap_info *meta,
 	hfs_put_nl(hfs_m_to_htime(entry->create_date), meta->fi_ctime);
 	hfs_put_nl(hfs_m_to_htime(entry->modify_date), meta->fi_mtime);
 	hfs_put_nl(CURRENT_TIME,                       meta->fi_utime);
+}
+
+static loff_t cap_info_llseek(struct file *file, loff_t offset, int origin)
+{
+	long long retval;
+
+	switch (origin) {
+		case 2:
+			offset += file->f_dentry->d_inode->i_size;
+			break;
+		case 1:
+			offset += file->f_pos;
+	}
+	retval = -EINVAL;
+	if (offset>=0 && offset<=HFS_FORK_MAX) {
+		if (offset != file->f_pos) {
+			file->f_pos = offset;
+			file->f_reada = 0;
+			file->f_version = ++event;
+		}
+		retval = offset;
+	}
+	return retval;
 }
 
 /*

@@ -55,11 +55,6 @@ static void calculate_ofrag(struct woinst *);
 static void calculate_ifrag(struct wiinst *);
 
 /* Audio file operations */
-static loff_t emu10k1_audio_llseek(struct file *file, loff_t offset, int origin)
-{
-	return -ESPIPE;
-}
-
 static ssize_t emu10k1_audio_read(struct file *file, char *buffer, size_t count, loff_t * ppos)
 {
 	struct emu10k1_wavedevice *wave_dev = (struct emu10k1_wavedevice *) file->private_data;
@@ -1549,7 +1544,7 @@ void emu10k1_waveout_bh(unsigned long refdata)
 
 struct file_operations emu10k1_audio_fops = {
 	owner:		THIS_MODULE,
-	llseek:		emu10k1_audio_llseek,
+	llseek:		no_llseek,
 	read:		emu10k1_audio_read,
 	write:		emu10k1_audio_write,
 	poll:		emu10k1_audio_poll,

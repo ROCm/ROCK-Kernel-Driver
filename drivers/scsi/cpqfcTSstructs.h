@@ -31,7 +31,7 @@
 #define CPQFCTS_DRIVER_VER(maj,min,submin) ((maj<<16)|(min<<8)|(submin))
 #define VER_MAJOR 2
 #define VER_MINOR 0
-#define VER_SUBMINOR 2
+#define VER_SUBMINOR 5
 
 // Macros for kernel (esp. SMP) tracing using a PCI analyzer
 // (e.g. x86).
@@ -77,7 +77,10 @@
 // PDA is Peripheral Device Address, VSA is Volume Set Addressing
 // Linux SCSI parameters
 #define CPQFCTS_MAX_TARGET_ID 64
-#define CPQFCTS_MAX_LUN 8    // The RA-4x00 supports 32 (Linux SCSI supports 8)
+
+// Note, changing CPQFCTS_MAX_LUN to less than 32 (e.g, 8) will result in
+// strange behavior if a box with more than, e.g. 8, is on the loop.
+#define CPQFCTS_MAX_LUN 32    // The RA-4x00 supports 32 (Linux SCSI supports 8)
 #define CPQFCTS_MAX_CHANNEL 0 // One FC port on cpqfcTS HBA
 
 #define CPQFCTS_CMD_PER_LUN 15 // power of 2 -1, must be >0 
@@ -972,12 +975,6 @@ PFC_LOGGEDIN_PORT  fcFindLoggedInPort(
   UCHAR wwn[8],    // search linked list for WWN, or...
   PFC_LOGGEDIN_PORT *pLastLoggedInPort
 );
-
-// don't do this unless you have the right hardware!
-#define TRIGGERABLE_HBA 1
-#ifdef TRIGGERABLE_HBA
-void TriggerHBA( void*, int);
-#endif
 
 void cpqfcTSPutLinkQue( 
   CPQFCHBA *cpqfcHBAdata, 

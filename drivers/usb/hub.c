@@ -9,6 +9,7 @@
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/completion.h>
 #include <linux/sched.h>
 #include <linux/list.h>
 #include <linux/slab.h>
@@ -36,7 +37,7 @@ static LIST_HEAD(hub_list);		/* List containing all of the hubs (for cleanup) */
 
 static DECLARE_WAIT_QUEUE_HEAD(khubd_wait);
 static int khubd_pid = 0;			/* PID of khubd */
-static DECLARE_MUTEX_LOCKED(khubd_exited);
+static DECLARE_COMPLETION(khubd_exited);
 
 static int usb_get_hub_descriptor(struct usb_device *dev, void *data, int size)
 {
@@ -781,7 +782,7 @@ static int usb_hub_thread(void *__hub)
 
 	dbg("usb_hub_thread exiting");
 
-	up_and_exit(&khubd_exited, 0);
+	complete_and_exit(&khubd_exited, 0);
 }
 
 static struct usb_device_id hub_id_table [] = {
@@ -834,7 +835,7 @@ void usb_hub_cleanup(void)
 	/* Kill the thread */
 	ret = kill_proc(khubd_pid, SIGTERM, 1);
 
-	down(&khubd_exited);
+	wait_for_completion(&khubd_exited);
 
 	/*
 	 * Hub resources are freed for us by usb_deregister. It calls

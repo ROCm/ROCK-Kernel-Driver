@@ -162,6 +162,7 @@ int imm_detect(Scsi_Host_Template * host)
 		    printk(KERN_ERR "imm%d: failed to claim parport because a "
 		      "pardevice is owning the port for too longtime!\n",
 			   i);
+		    parport_unregister_device (imm_hosts[i].dev);
 		    spin_lock_irq(&io_request_lock);
 		    return 0;
 		}

@@ -193,18 +193,8 @@ sysc_return:
         tm      SP_PSW+1(%r15),0x01 # returning to user ?
         jno     sysc_leave        # no-> skip bottom half, resched & signal
 #
-# check, if bottom-half has to be done
-#
-	lgf     %r1,processor(%r9)    # get cpu number from task struture
-	larl    %r2,irq_stat
-	sll     %r1,L1_CACHE_SHIFT
-	la      %r1,0(%r1,%r2)
-	icm     %r0,15,0(%r1)         # test irq_stat[#cpu].__softirq_pending
-        jnz     sysc_handle_bottom_half
-#
 # check, if reschedule is needed
 #
-sysc_return_bh:
 	lg      %r0,need_resched(%r9) # get need_resched from task_struct
 	ltgr    %r0,%r0
         jnz     sysc_reschedule
@@ -238,15 +228,6 @@ sysc_tracesys:
         stg     %r2,SP_R2(%r15)     # store return value
 	larl    %r14,sysc_return
         jg      syscall_trace       # return point is sysc_return
-
-
-#
-# call do_softirq and return from syscall, if interrupt-level
-# is zero
-#
-sysc_handle_bottom_half:        
-	larl    %r14,sysc_return_bh
-        jg      do_softirq          # return point is sysc_return_bh
 
 #
 # call schedule with sysc_return as return-address
@@ -698,9 +679,6 @@ io_int_handler:
 	brasl   %r14,do_IRQ            # call standard irq handler
 
 io_return:
-        tm      SP_PSW+1(%r15),0x01    # returning to user ?
-        jno     io_leave               # no-> skip resched & signal
-        stosm   48(%r15),0x03          # reenable interrupts
 #
 # check, if bottom-half has to be done
 #
@@ -711,6 +689,10 @@ io_return:
 	icm     %r0,15,0(%r1)         # test irq_stat[#cpu].__softirq_pending
         jnz     io_handle_bottom_half
 io_return_bh:	
+
+        tm      SP_PSW+1(%r15),0x01    # returning to user ?
+        jno     io_leave               # no-> skip resched & signal
+        stosm   48(%r15),0x03          # reenable interrupts
 #
 # check, if reschedule is needed
 #

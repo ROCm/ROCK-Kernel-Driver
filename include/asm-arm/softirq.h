@@ -11,7 +11,6 @@
 
 #define local_bh_disable()	cpu_bh_disable(smp_processor_id())
 #define __local_bh_enable()	__cpu_bh_enable(smp_processor_id())
-#define __cpu_raise_softirq(cpu,nr) set_bit((nr), &softirq_pending(cpu))
 
 #define in_softirq()		(local_bh_count(smp_processor_id()) != 0)
 
@@ -21,5 +20,7 @@ do {									\
 	if (!--*ptr && ptr[-2])						\
 		__asm__("bl%? __do_softirq": : : "lr");/* out of line */\
 } while (0)
+
+#define __cpu_raise_softirq(cpu, nr) __set_bit(nr, &softirq_pending(cpu))
 
 #endif	/* __ASM_SOFTIRQ_H */

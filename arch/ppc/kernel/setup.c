@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.setup.c 1.44 06/28/01 08:01:06 trini
+ * BK Id: SCCS/s.setup.c 1.46 07/26/01 14:18:18 trini
  */
 /*
  * Common prep/pmac/chrp boot and setup code.
@@ -574,7 +574,6 @@ identify_machine(unsigned long r3, unsigned long r4, unsigned long r5,
 				initrd_below_start_ok = 1;
 			}
 #endif
-			cmd_line[0] = 0;
 			chosen = find_devices("chosen");
 			if (chosen != NULL) {
 				p = get_property(chosen, "bootargs", NULL);

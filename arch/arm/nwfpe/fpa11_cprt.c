@@ -78,6 +78,8 @@ unsigned int EmulateCPRT(const unsigned int opcode)
 
 unsigned int PerformFLT(const unsigned int opcode)
 {
+   FPA11 *fpa11 = GET_FPA11();
+   
    unsigned int nRc = 1;
    SetRoundingMode(opcode);
    SetRoundingPrecision(opcode);
@@ -116,6 +118,7 @@ unsigned int PerformFLT(const unsigned int opcode)
 
 unsigned int PerformFIX(const unsigned int opcode)
 {
+   FPA11 *fpa11 = GET_FPA11();
    unsigned int nRc = 1;
    unsigned int Fn = getFm(opcode);
    
@@ -182,6 +185,7 @@ PerformComparisonOperation(floatx80 Fn, floatx80 Fm)
    
 static unsigned int PerformComparison(const unsigned int opcode)
 {
+   FPA11 *fpa11 = GET_FPA11();
    unsigned int Fn, Fm;
    floatx80 rFn, rFm;
    int e_flag = opcode & 0x400000;	/* 1 if CxFE */

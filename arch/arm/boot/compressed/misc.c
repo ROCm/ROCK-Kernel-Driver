@@ -73,7 +73,7 @@ void __memzero (__ptr_t s, size_t n)
 		*u.ucp++ = 0;
 }
 
-extern __inline__ __ptr_t memcpy(__ptr_t __dest, __const __ptr_t __src,
+static inline __ptr_t memcpy(__ptr_t __dest, __const __ptr_t __src,
 			    size_t __n)
 {
 	int i = 0;

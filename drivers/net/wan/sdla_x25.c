@@ -87,7 +87,7 @@
 #include <linux/errno.h>	/* return codes */
 #include <linux/string.h>	/* inline memset(), etc. */
 #include <linux/ctype.h>
-#include <linux/malloc.h>	/* kmalloc(), kfree() */
+#include <linux/slab.h>	/* kmalloc(), kfree() */
 #include <linux/wanrouter.h>	/* WAN router definitions */
 #include <linux/wanpipe.h>	/* WANPIPE common user API definitions */
 #include <asm/byteorder.h>	/* htons(), etc. */

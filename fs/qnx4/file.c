@@ -24,6 +24,7 @@
  */
 struct file_operations qnx4_file_operations =
 {
+	llseek:			generic_file_llseek,
 	read:			generic_file_read,
 #ifdef CONFIG_QNX4FS_RW
 	write:			generic_file_write,

@@ -172,7 +172,7 @@ static struct pci_device_id ohci1394_pci_tbl[] __devinitdata = {
 MODULE_DEVICE_TABLE(pci, ohci1394_pci_tbl);
 
 static char version[] __devinitdata =
-	"v0.50 15/Jul/01 Ben Collins <bcollins@debian.org>";
+	"v0.51 08/08/01 Ben Collins <bcollins@debian.org>";
 
 /* Module Parameters */
 MODULE_PARM(attempt_root,"i");
@@ -217,7 +217,7 @@ static u8 get_phy_reg(struct ti_ohci *ohci, u8 addr)
 	r = reg_read(ohci, OHCI1394_PhyControl);
 
 	if (i >= OHCI_LOOP_COUNT)
-		PRINT (KERN_ERR, ohci->id, "Get PHY Reg timeout [0x%08x/0x%08x/%d]\n",
+		PRINT (KERN_ERR, ohci->id, "Get PHY Reg timeout [0x%08x/0x%08x/%d]",
 		       r, r & 0x80000000, i);
   
 	spin_unlock_irqrestore (&ohci->phy_reg_lock, flags);
@@ -243,7 +243,7 @@ static void set_phy_reg(struct ti_ohci *ohci, u8 addr, u8 data)
 	}
 
 	if (i == OHCI_LOOP_COUNT)
-		PRINT (KERN_ERR, ohci->id, "Set PHY Reg timeout [0x%08x/0x%08x/%d]\n",
+		PRINT (KERN_ERR, ohci->id, "Set PHY Reg timeout [0x%08x/0x%08x/%d]",
 		       r, r & 0x00004000, i);
 
 	spin_unlock_irqrestore (&ohci->phy_reg_lock, flags);
@@ -263,7 +263,7 @@ static void set_phy_reg_mask(struct ti_ohci *ohci, u8 addr, u8 data)
 	return;
 }
 
-static int handle_selfid(struct ti_ohci *ohci, struct hpsb_host *host,
+static void handle_selfid(struct ti_ohci *ohci, struct hpsb_host *host,
 				int phyid, int isroot)
 {
 	quadlet_t *q = ohci->selfid_buf_cpu;
@@ -295,7 +295,7 @@ static int handle_selfid(struct ti_ohci *ohci, struct hpsb_host *host,
 			PRINT(KERN_ERR, ohci->id, 
 			      "Too many errors on SelfID error reception, giving up!");
 		}
-		return -1;
+		return;
 	}
 	
 	size = ((self_id_count & 0x00001FFC) >> 2) - 1;
@@ -326,7 +326,8 @@ static int handle_selfid(struct ti_ohci *ohci, struct hpsb_host *host,
 	DBGMSG(ohci->id, "SelfID complete");
 
 	hpsb_selfid_complete(host, phyid, isroot);
-	return 0;
+
+	return;
 }
 
 static int ohci_soft_reset(struct ti_ohci *ohci) {
@@ -427,7 +428,7 @@ static void initialize_dma_trm_ctx(struct dma_trm_ctx *d)
 	d->pending_first = NULL;
 	d->pending_last = NULL;
 
-	DBGMSG(ohci->id, "Transmit dma ctx=%d initialized", d->ctx);
+	DBGMSG(ohci->id, "Transmit DMA ctx=%d initialized", d->ctx);
 }
 
 /* Count the number of available iso contexts */
@@ -474,6 +475,16 @@ static int ohci_initialize(struct hpsb_host *host)
 
 	/* Set Link Power Status (LPS) */
 	reg_write(ohci, OHCI1394_HCControlSet, 0x00080000);
+
+	/* After enabling LPS, we need to wait for the connection
+	 * between phy and link to be established.  This should be
+	 * signaled by the LPS bit becoming 1, but this happens
+	 * immediately.  Instead we wait for reads from LinkControl to
+	 * give a valid result, i.e. not 0xffffffff. */
+	while (reg_read(ohci, OHCI1394_LinkControlSet) == 0xffffffff) {
+		DBGMSG(ohci->id, "waiting for phy-link connection");
+		mdelay(2);
+	}
 
 	/* Set the bus number */
 	reg_write(ohci, OHCI1394_NodeID, 0x0000ffc0);
@@ -640,11 +651,12 @@ static void insert_packet(struct ti_ohci *ohci,
 	u32 cycleTimer;
 	int idx = d->prg_ind;
 
-	DBGMSG(ohci->id, "Inserting packet for node %d, tlabel=%d, tcode=0x%x, speed=%d\n",
+	DBGMSG(ohci->id, "Inserting packet for node %d, tlabel=%d, tcode=0x%x, speed=%d",
 			packet->node_id, packet->tlabel, packet->tcode, packet->speed_code);
 
 	d->prg_cpu[idx]->begin.address = 0;
 	d->prg_cpu[idx]->begin.branchAddress = 0;
+
 	if (d->ctx==1) {
 		/* 
 		 * For response packets, we need to put a timeout value in
@@ -749,7 +761,7 @@ static void insert_packet(struct ti_ohci *ohci,
 
                 d->prg_cpu[idx]->end.branchAddress = 0;
                 d->prg_cpu[idx]->end.status = 0;
-                DBGMSG(ohci->id, "iso xmit context info: header[%08x %08x]\n"
+                DBGMSG(ohci->id, "Iso xmit context info: header[%08x %08x]\n"
                        "                       begin=%08x %08x %08x %08x\n"
                        "                             %08x %08x %08x %08x\n"
                        "                       end  =%08x %08x %08x %08x",
@@ -876,7 +888,7 @@ static int ohci_devctl(struct hpsb_host *host, enum devctl_cmd cmd, int arg)
 
 	switch (cmd) {
 	case RESET_BUS:
-		DBGMSG(ohci->id, "Bus reset requested%s",
+		DBGMSG(ohci->id, "devctl: Bus reset requested%s",
 		       ((host->attempt_root || attempt_root) ? 
 		       " and attempting to become root" : ""));
 		set_phy_reg_mask (ohci, 1, 0x40 | ((host->attempt_root || attempt_root) ?
@@ -1074,7 +1086,7 @@ static void ohci_irq_handler(int irq, void *dev_id,
 	spin_lock_irqsave(&ohci->event_lock, flags);
 	event = reg_read(ohci, OHCI1394_IntEventClear);
 	reg_write(ohci, OHCI1394_IntEventClear,
-		  event & ~(OHCI1394_selfIDComplete|OHCI1394_busReset));
+		  event & ~(OHCI1394_selfIDComplete | OHCI1394_busReset));
 	spin_unlock_irqrestore(&ohci->event_lock, flags);
 
 	if (!event) return;
@@ -1091,7 +1103,7 @@ static void ohci_irq_handler(int irq, void *dev_id,
 	/* Someone wants a bus reset. Better watch what you wish for... */
 	if (event & OHCI1394_busReset) {
 		if (!host->in_bus_reset) {
-			DBGMSG(ohci->id, "Bus reset requested%s",
+			DBGMSG(ohci->id, "irq_handler: Bus reset requested%s",
 			      ((host->attempt_root || attempt_root) ?
 			      " and attempting to become root" : ""));
 			
@@ -1263,7 +1275,7 @@ static void ohci_irq_handler(int irq, void *dev_id,
 	/* Make sure we handle everything, just in case we accidentally
 	 * enabled an interrupt that we didn't write a handler for.  */
 	if (event)
-		PRINT(KERN_ERR, ohci->id, "Unhandled interrupt(s) 0x%08x\n",
+		PRINT(KERN_ERR, ohci->id, "Unhandled interrupt(s) 0x%08x",
 		      event);
 }
 
@@ -1367,7 +1379,7 @@ static void dma_rcv_tasklet (unsigned long data)
 		 * over more than one descriptor. The next case is where
 		 * it's all in the first descriptor.  */
 		if ((offset + length) > d->buf_size) {
-			DBGMSG(ohci->id,"Split packet rcv'd\n");
+			DBGMSG(ohci->id,"Split packet rcv'd");
 			if (length > d->split_buf_size) {
 				ohci1394_stop_context(ohci, d->ctrlClear,
 					     "Split packet size exceeded");
@@ -1417,7 +1429,7 @@ static void dma_rcv_tasklet (unsigned long data)
 				buf_ptr += offset/4;
 			}
 		} else {
-			DBGMSG(ohci->id,"Single packet rcv'd\n");
+			DBGMSG(ohci->id,"Single packet rcv'd");
 			memcpy(d->spb, buf_ptr, length);
 			offset += length;
 			buf_ptr += length/4;
@@ -1837,7 +1849,7 @@ struct config_rom_ptr {
 #define cf_put_4bytes(cr, b1, b2, b3, b4) \
 	(((cr)->data++)[0] = cpu_to_be32(((b1) << 24) | ((b2) << 16) | ((b3) << 8) | (b4)))
 
-#define cf_put_keyval(cr, key, val) (((cr)->data++)[0] = cpu_to_be32((key) << 24) | (val))
+#define cf_put_keyval(cr, key, val) (((cr)->data++)[0] = cpu_to_be32(((key) << 24) | (val)))
 
 static inline void cf_put_crc16(struct config_rom_ptr *cr, int unit)
 {
@@ -1851,7 +1863,7 @@ static inline void cf_unit_begin(struct config_rom_ptr *cr, int unit)
 {
 	if (cr->unitdir[unit].refer != NULL) {
 		*cr->unitdir[unit].refer |=
-			cr->data - cr->unitdir[unit].refer;
+			cpu_to_be32 (cr->data - cr->unitdir[unit].refer);
 		cf_put_crc16(cr, cr->unitdir[unit].refunit);
 	}
 	cr->unitnum = unit;
@@ -1891,7 +1903,7 @@ static void ohci_init_config_rom(struct ti_ohci *ohci)
 	cf_put_1quad(&cr, reg_read(ohci, OHCI1394_GUIDLo));
 	cf_unit_end(&cr);
 
-	DBGMSG(ohci->id, "GUID: %08x:%08x\n", reg_read(ohci, OHCI1394_GUIDHi),
+	DBGMSG(ohci->id, "GUID: %08x:%08x", reg_read(ohci, OHCI1394_GUIDHi),
 		reg_read(ohci, OHCI1394_GUIDLo));
 
 	/* IEEE P1212 suggests the initial ROM header CRC should only
@@ -1962,10 +1974,10 @@ static void ohci_init_config_rom(struct ti_ohci *ohci)
 	cf_put_4bytes(&cr, 'I', 'P', 'v', '6');
 	cf_unit_end(&cr);
 
-	return;
+	ohci->csr_config_rom_length = cr.data - ohci->csr_config_rom_cpu;
 }
 
-static size_t get_ohci_rom(struct hpsb_host *host, const quadlet_t **ptr)
+static size_t ohci_get_rom(struct hpsb_host *host, const quadlet_t **ptr)
 {
 	struct ti_ohci *ohci=host->hostdata;
 
@@ -1974,7 +1986,7 @@ static size_t get_ohci_rom(struct hpsb_host *host, const quadlet_t **ptr)
 
 	*ptr = ohci->csr_config_rom_cpu;
 
-	return sizeof(ohci->csr_config_rom_cpu);
+	return ohci->csr_config_rom_length * 4;
 }
 
 int ohci_compare_swap(struct ti_ohci *ohci, quadlet_t *data,
@@ -2010,7 +2022,7 @@ static struct hpsb_host_template ohci_template = {
 	name:			OHCI1394_DRIVER_NAME,
 	initialize_host:	ohci_initialize,
 	release_host:		ohci_remove,
-	get_rom:		get_ohci_rom,
+	get_rom:		ohci_get_rom,
 	transmit_packet:	ohci_transmit,
 	devctl:			ohci_devctl,
 	hw_csr_reg:		ohci_hw_csr_reg,
@@ -2329,7 +2341,7 @@ static void packet_swab(quadlet_t *data, char tcode, int len, int payload_swap)
 			block_swab32(data, 1);
 			break;
                 default:
-			PRINT_G(KERN_ERR, "Invalid tcode in packet_swab (0x%x)\n", tcode);
+			PRINT_G(KERN_ERR, "Invalid tcode in packet_swab (0x%x)", tcode);
                         break;
         }
 	return;
@@ -2418,7 +2430,7 @@ static int __init ohci1394_init(void)
 		return -ENXIO;
 	}
 	if ((ret = pci_module_init(&ohci1394_driver))) {
-		PRINT_G(KERN_ERR, "PCI module init failed\n");
+		PRINT_G(KERN_ERR, "PCI module init failed");
 		hpsb_unregister_lowlevel(&ohci_template);
 		return ret;
 	}

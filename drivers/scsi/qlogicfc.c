@@ -98,7 +98,7 @@ typedef dma_addr_t dma64_addr_t;
    isp2200's firmware. 
 */
 
-#define RELOAD_FIRMWARE		1
+#define RELOAD_FIRMWARE		0
 
 #define USE_NVRAM_DEFAULTS      1
 
@@ -440,7 +440,7 @@ struct Status_Entry {
 #define MBOX_SEND_CHANGE_REQUEST        0x0070
 #define MBOX_PORT_LOGOUT                0x0071
 
-#include "qlogicfc_asm.c"
+//#include "qlogicfc_asm.c"
 
 /* Each element in mbox_param is an 8 bit bitmap where each bit indicates
    if that mbox should be copied as input.  For example 0x2 would mean
@@ -1847,13 +1847,13 @@ int isp2x00_biosparam(Disk * disk, kdev_t n, int ip[])
 	return 0;
 }
 
-
 static int isp2x00_reset_hardware(struct Scsi_Host *host)
 {
 	u_short param[8];
 	struct isp2x00_hostdata *hostdata;
 	int loop_count;
 	dma64_addr_t busaddr;
+	unsigned short risc_code_addr01 = 0x1000 ;
 
 	ENTER("isp2x00_reset_hardware");
 

@@ -43,10 +43,15 @@
 #define SPEED_S1600			0x4
 #define SPEED_S3200			0x5
 
-/* 2^(MAX_PAYLOAD+2) = Maximum data transfer length */
+/* 2^(MAX_PAYLOAD+1) = Maximum data transfer length */
 #define MAX_PAYLOAD_S100		0x7
 #define MAX_PAYLOAD_S200		0x8
 #define MAX_PAYLOAD_S400		0x9
+
+/* Max rec matches node_entry values */
+#define MAX_REC_S100			512
+#define MAX_REC_S200			1024
+#define MAX_REC_S400			2048
 
 #define ORB_SET_NOTIFY(value)                   ((value & 0x1) << 31)
 #define ORB_SET_RQ_FMT(value)                   ((value & 0x3) << 29)
@@ -238,10 +243,7 @@ struct sbp2_status_block {
 
 #define CONFIG_ROM_BASE_ADDRESS					0xfffff0000400ULL
 #define CONFIG_ROM_ROOT_DIR_BASE				0xfffff0000414ULL
-#define CONFIG_ROM_NODE_UNIQUE_ID_HI_ADDRESS			0xfffff000040cULL
-#define CONFIG_ROM_NODE_UNIQUE_ID_LO_ADDRESS			0xfffff0000410ULL
 #define CONFIG_ROM_SIGNATURE_ADDRESS				0xfffff0000404ULL
-#define CONFIG_ROM_NODE_OPTIONS					0xfffff0000408ULL
 #define CONFIG_ROM_UNIT_DIRECTORY_OFFSET			0xfffff0000424ULL
 
 #define IEEE1394_CONFIG_ROM_SIGNATURE				0x31333934
@@ -301,26 +303,6 @@ static unchar sbp2scsi_direction_table[0x100] = {
 	DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN
 };
 
-
-/*
- * Scsi_Host structure
- */
-#define SBP2SCSI { \
-	name:		"IEEE1394 SBP-2",		\
-	detect:		sbp2scsi_detect,		\
-	release:	sbp2scsi_release,		\
-	info:		sbp2scsi_info,			\
-	queuecommand:	sbp2scsi_queuecommand,		\
-	abort:		sbp2scsi_abort,			\
-	reset:		sbp2scsi_reset,			\
-	bios_param:	sbp2scsi_biosparam,		\
-	can_queue:	SBP2SCSI_MAX_OUTSTANDING_CMDS,	\
-	this_id:	-1,				\
-	sg_tablesize:	SBP2_MAX_SG_ELEMENTS,		\
-	cmd_per_lun:	SBP2SCSI_MAX_CMDS_PER_LUN,	\
-	use_clustering:	SBP2_CLUSTERING,		\
-	emulated:	1				\
-}
 
 /*
  * Number of request packets available for actual sbp2 I/O requests (these are used

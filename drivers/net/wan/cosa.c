@@ -303,7 +303,6 @@ static void chardev_channel_init(struct channel_data *chan);
 static char *chrdev_setup_rx(struct channel_data *channel, int size);
 static int chrdev_rx_done(struct channel_data *channel);
 static int chrdev_tx_done(struct channel_data *channel, int size);
-static loff_t cosa_lseek(struct file *file, loff_t offset, int origin);
 static ssize_t cosa_read(struct file *file,
 	char *buf, size_t count, loff_t *ppos);
 static ssize_t cosa_write(struct file *file,
@@ -319,7 +318,7 @@ static int cosa_fasync(struct inode *inode, struct file *file, int on);
 
 static struct file_operations cosa_fops = {
 	owner:		THIS_MODULE,
-	llseek:		cosa_lseek,
+	llseek:		no_llseek,
 	read:		cosa_read,
 	write:		cosa_write,
 	poll:		cosa_poll,
@@ -780,11 +779,6 @@ static void chardev_channel_init(struct channel_data *chan)
 {
 	init_MUTEX(&chan->rsem);
 	init_MUTEX(&chan->wsem);
-}
-
-static loff_t cosa_lseek(struct file * file, loff_t offset, int origin)
-{
-	return -ESPIPE;
 }
 
 static ssize_t cosa_read(struct file *file,

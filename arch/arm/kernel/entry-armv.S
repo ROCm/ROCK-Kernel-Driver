@@ -13,62 +13,8 @@
  *  Note:  there is a StrongARM bug in the STMIA rn, {regs}^ instruction that causes
  *  it to save wrong values...  Be aware!
  */
-#include <linux/config.h> /* for CONFIG_ARCH_xxxx */
-#include <linux/linkage.h>
-
-#include <asm/assembler.h>
-#include <asm/constants.h>
-#include <asm/errno.h>
-#include <asm/hardware.h>
-#include <asm/arch/irqs.h>
-#include <asm/proc-fns.h>
-
-
-#ifndef MODE_SVC
-#define MODE_SVC 0x13
-#endif
-
-		.macro	zero_fp
-#ifndef CONFIG_NO_FRAME_POINTER
-		mov	fp, #0
-#endif
-		.endm
-
-		.text
-
-@ Bad Abort numbers
-@ -----------------
-@
-#define BAD_PREFETCH	0
-#define BAD_DATA	1
-#define BAD_ADDREXCPTN	2
-#define BAD_IRQ		3
-#define BAD_UNDEFINSTR	4
-
-@
-@ Stack format (ensured by USER_* and SVC_*)
-@
-#define S_FRAME_SIZE	72
-#define S_OLD_R0	68
-#define S_PSR		64
-#define S_PC		60
-#define S_LR		56
-#define S_SP		52
-#define S_IP		48
-#define S_FP		44
-#define S_R10		40
-#define S_R9		36
-#define S_R8		32
-#define S_R7		28
-#define S_R6		24
-#define S_R5		20
-#define S_R4		16
-#define S_R3		12
-#define S_R2		8
-#define S_R1		4
-#define S_R0		0
-
-#define OFF_CR_ALIGNMENT(x)	cr_alignment - x
+#include <linux/config.h>
+#include "entry-header.S"
 
 #ifdef IOC_BASE
 /* IOC / IOMD based hardware */
@@ -552,75 +498,36 @@ ENTRY(soft_irq_mask)
 		.macro	irq_prio_table
 		.endm
 
+#elif defined(CONFIG_ARCH_ANAKIN)
+
+		.macro	disable_fiq
+		.endm
+
+		.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
+		mov	\base, #IO_BASE
+		mov	\irqstat, #INTERRUPT_CONTROLLER
+		ldr	\tmp, =anakin_irq_mask
+		ldr	\irqstat, [\base, \irqstat]
+		ldr	\tmp, [\tmp]
+		ands	\irqstat, \irqstat, \tmp
+		ldrne	\tmp, =anakin_active_irqs
+		strne	\irqstat, [\tmp]
+		movne	\irqnr, #IRQ_ANAKIN
+		.endm
+
+		.macro	irq_prio_table
+		.ltorg
+		.bss
+ENTRY(anakin_irq_mask)
+		.word	0
+ENTRY(anakin_active_irqs)
+		.space	4
+		.text
+		.endm
+
 #else
 #error Unknown architecture
 #endif
-
-/*============================================================================
- * For entry-common.S
- */
-
-		.macro	save_user_regs
-		sub	sp, sp, #S_FRAME_SIZE
-		stmia	sp, {r0 - r12}			@ Calling r0 - r12
-		add	r8, sp, #S_PC
-		stmdb	r8, {sp, lr}^			@ Calling sp, lr
-		str	lr, [r8, #0]			@ Save calling PC
-		mrs	r6, spsr
-		str	r6, [r8, #4]			@ Save CPSR
-		str	r0, [r8, #8]			@ Save OLD_R0
-		.endm
-
-		.macro	restore_user_regs
-		ldr	r0, [sp, #S_PSR]		@ Get calling cpsr
-		mov	ip, #I_BIT | MODE_SVC
-		msr	cpsr_c, ip			@ disable IRQs
-		msr	spsr, r0			@ save in spsr_svc
-		ldmia	sp, {r0 - lr}^			@ Get calling r0 - lr
-		mov	r0, r0
-		ldr	lr, [sp, #S_PC]			@ Get PC
-		add	sp, sp, #S_FRAME_SIZE
-		movs	pc, lr				@ return & move spsr_svc into cpsr
-		.endm
-
-		.macro	mask_pc, rd, rm
-		.endm
-
-		/* If we're optimising for StrongARM the resulting code won't 
-		   run on an ARM7 and we can save a couple of instructions.  
-									--pb */
-		.macro	arm700_bug_check, instr, temp
-#ifndef __ARM_ARCH_4__
-		and	\temp, \instr, #0x0f000000	@ check for SWI
-		teq	\temp, #0x0f000000
-		bne	.Larm700bug
-#endif
-		.endm
-
-		.macro	enable_irqs, temp
-		mrs	\temp, cpsr
-		bic	\temp, \temp, #I_BIT
-		msr	cpsr, \temp
-		.endm
-
-		.macro	get_current_task, rd
-		mov	\rd, sp, lsr #13
-		mov	\rd, \rd, lsl #13
-		.endm
-
-		/*
-		 * Like adr, but force SVC mode (if required)
-		 */
-		.macro	adrsvc, cond, reg, label
-		adr\cond	\reg, \label
-		.endm
-
-		.macro	alignment_trap, rbase, rtemp, sym
-#ifdef CONFIG_ALIGNMENT_TRAP
-		ldr	\rtemp, [\rbase, #OFF_CR_ALIGNMENT(\sym)]
-		mcr	p15, 0, \rtemp, c1, c0
-#endif
-		.endm
 
 /*
  * Invalid mode handlers
@@ -656,7 +563,7 @@ __und_invalid:	sub	sp, sp, #S_FRAME_SIZE
 		and	r2, r6, #31			@ int mode
 		b	SYMBOL_NAME(bad_mode)
 
-#ifdef CONFIG_NWFPE
+#if defined CONFIG_FPE_NWFPE || defined CONFIG_FPE_FASTFPE
 		/* The FPE is always present */
 		.equ	fpe_not_present, 0
 #else
@@ -806,9 +713,6 @@ __pabt_svc:	sub	sp, sp, #S_FRAME_SIZE
 .LCprocfns:	.word	SYMBOL_NAME(processor)
 #endif
 .LCfp:		.word	SYMBOL_NAME(fp_enter)
-#ifdef CONFIG_ALIGNMENT_TRAP
-.LCswi:		.word	SYMBOL_NAME(cr_alignment)
-#endif
 
 		irq_prio_table
 
@@ -835,7 +739,7 @@ __dabt_usr:	sub	sp, sp, #S_FRAME_SIZE		@ Allocate frame size in one go
 		mov	r2, #MODE_SVC
 		msr	cpsr_c, r2			@ Enable interrupts
 		mov	r2, sp
-		adrsvc	al, lr, ret_from_sys_call
+		adrsvc	al, lr, ret_from_exception
 		b	SYMBOL_NAME(do_DataAbort)
 
 		.align	5
@@ -855,9 +759,9 @@ __irq_usr:	sub	sp, sp, #S_FRAME_SIZE
 		@ routine called with r0 = irq number, r1 = struct pt_regs *
 		@
 		bne	do_IRQ
-		mov	r4, #0
-		get_current_task r5
-		b	ret_with_reschedule
+		mov	why, #0
+		get_current_task tsk
+		b	ret_to_user
 
 		.align	5
 __und_usr:	sub	sp, sp, #S_FRAME_SIZE		@ Allocate frame size in one go
@@ -869,7 +773,7 @@ __und_usr:	sub	sp, sp, #S_FRAME_SIZE		@ Allocate frame size in one go
 		stmdb	r8, {sp, lr}^			@ Save user sp, lr
 		alignment_trap r4, r7, __temp_und
 		zero_fp
-		adrsvc	al, r9, ret_from_sys_call	@ r9  = normal FP return
+		adrsvc	al, r9, ret_from_exception	@ r9  = normal FP return
 		adrsvc	al, lr, fpundefinstr		@ lr  = undefined instr return
 
 call_fpe:	get_current_task r10
@@ -883,7 +787,7 @@ fpundefinstr:	mov	r0, #MODE_SVC
 		msr	cpsr_c, r0			@ Enable interrupts
 		mov	r0, lr
 		mov	r1, sp
-		adrsvc	al, lr, ret_from_sys_call
+		adrsvc	al, lr, ret_from_exception
 		b	SYMBOL_NAME(do_undefinstr)
 
 		.align	5
@@ -901,40 +805,19 @@ __pabt_usr:	sub	sp, sp, #S_FRAME_SIZE		@ Allocate frame size in one go
 		mov	r0, r5				@ address (pc)
 		mov	r1, sp				@ regs
 		bl	SYMBOL_NAME(do_PrefetchAbort)	@ call abort handler
-		teq	r0, #0				@ Does this still apply???
-		bne	ret_from_sys_call		@ Return from exception
-#ifdef DEBUG_UNDEF
-		adr	r0, t
-		bl	SYMBOL_NAME(printk)
-#endif
-		mov	r0, r5
-		mov	r1, sp
-		and	r2, r6, #31
-		bl	SYMBOL_NAME(do_undefinstr)
-		ldr	lr, [sp, #S_PSR]		@ Get USR cpsr
-		msr	spsr, lr
-		ldmia	sp, {r0 - pc}^			@ Restore USR registers
+		/* fall through */
+/*
+ * This is the return code to user mode for abort handlers
+ */
+ENTRY(ret_from_exception)
+		get_current_task tsk
+		mov	why, #0
+		b	ret_to_user
 
-#ifdef DEBUG_UNDEF
-t:		.ascii "Prefetch -> undefined instruction\n\0"
-		.align
-#endif
-
-#include "entry-common.S"
-
+		.data
+ENTRY(fp_enter)
+		.word	fpe_not_present
 		.text
-
-#ifndef __ARM_ARCH_4__
-.Larm700bug:	ldr	r0, [sp, #S_PSR]		@ Get calling cpsr
-		str	lr, [r8]
-		msr	spsr, r0
-		ldmia	sp, {r0 - lr}^			@ Get calling r0 - lr
-		mov	r0, r0
-		ldr	lr, [sp, #S_PC]			@ Get PC
-		add	sp, sp, #S_FRAME_SIZE
-		movs	pc, lr
-#endif
-
 /*
  * Register switch for ARMv3 and ARMv4 processors
  * r0 = previous, r1 = next, return previous.

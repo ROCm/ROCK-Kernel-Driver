@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.pmac_setup.c 1.21 05/17/01 18:14:21 cort
+ * BK Id: SCCS/s.pmac_setup.c 1.24 07/06/01 14:49:51 trini
  */
 /*
  *  linux/arch/ppc/kernel/setup.c
@@ -134,7 +134,8 @@ sys_ctrler_t sys_ctrler = SYS_CTRLER_UNKNOWN;
 
 #ifdef CONFIG_SMP
 volatile static long int core99_l2_cache;
-void core99_init_l2(void)
+void __pmac
+core99_init_l2(void)
 {
 	int cpu = smp_processor_id();
 
@@ -153,9 +154,7 @@ void core99_init_l2(void)
 }
 #endif /* CONFIG_SMP */
 
-
-__pmac
-int
+int __pmac
 pmac_get_cpuinfo(char *buffer)
 {
 	int len;
@@ -265,8 +264,7 @@ pmac_get_cpuinfo(char *buffer)
  * Dummy mksound function that does nothing.
  * The real one is in the dmasound driver.
  */
-__pmac
-static void
+static void __pmac
 pmac_mksound(unsigned int hz, unsigned int ticks)
 {
 }
@@ -437,8 +435,8 @@ note_scsi_host(struct device_node *node, void *host)
 #endif
 
 #if defined(CONFIG_BLK_DEV_IDE) && defined(CONFIG_BLK_DEV_IDE_PMAC)
-
-kdev_t __init find_ide_boot(void)
+kdev_t __init
+find_ide_boot(void)
 {
 	char *p;
 	int n;
@@ -455,7 +453,8 @@ kdev_t __init find_ide_boot(void)
 }
 #endif /* CONFIG_BLK_DEV_IDE && CONFIG_BLK_DEV_IDE_PMAC */
 
-void __init find_boot_device(void)
+void __init
+find_boot_device(void)
 {
 #if defined(CONFIG_SCSI) && defined(CONFIG_BLK_DEV_SD)
 	if (boot_host != NULL) {
@@ -470,8 +469,8 @@ void __init find_boot_device(void)
 }
 
 /* can't be __init - can be called whenever a disk is first accessed */
-__pmac
-void note_bootable_part(kdev_t dev, int part, int goodness)
+void __pmac
+note_bootable_part(kdev_t dev, int part, int goodness)
 {
 	static int found_boot = 0;
 	char *p;
@@ -495,7 +494,7 @@ void note_bootable_part(kdev_t dev, int part, int goodness)
 	}
 }
 
-void
+void __pmac
 pmac_restart(char *cmd)
 {
 #ifdef CONFIG_ADB_CUDA
@@ -524,7 +523,7 @@ pmac_restart(char *cmd)
 	}
 }
 
-void
+void __pmac
 pmac_power_off(void)
 {
 #ifdef CONFIG_ADB_CUDA
@@ -553,7 +552,7 @@ pmac_power_off(void)
 	}
 }
 
-void
+void __pmac
 pmac_halt(void)
 {
    pmac_power_off();
@@ -564,19 +563,19 @@ pmac_halt(void)
 /*
  * IDE stuff.
  */
-void
+void __pmac
 pmac_ide_insw(ide_ioreg_t port, void *buf, int ns)
 {
 	_insw_ns((unsigned short *)(port+_IO_BASE), buf, ns);
 }
 
-void
+void __pmac
 pmac_ide_outsw(ide_ioreg_t port, void *buf, int ns)
 {
 	_outsw_ns((unsigned short *)(port+_IO_BASE), buf, ns);
 }
 
-int
+int __pmac
 pmac_ide_default_irq(ide_ioreg_t base)
 {
 #if defined(CONFIG_BLK_DEV_IDE) && defined(CONFIG_BLK_DEV_IDE_PMAC)
@@ -587,7 +586,7 @@ pmac_ide_default_irq(ide_ioreg_t base)
 #endif
 }
 
-ide_ioreg_t
+ide_ioreg_t __pmac
 pmac_ide_default_io_base(int index)
 {
 #if defined(CONFIG_BLK_DEV_IDE) && defined(CONFIG_BLK_DEV_IDE_PMAC)
@@ -598,7 +597,7 @@ pmac_ide_default_io_base(int index)
 #endif
 }
 
-int
+int __pmac
 pmac_ide_check_region(ide_ioreg_t from, unsigned int extent)
 {
 	/*
@@ -611,7 +610,7 @@ pmac_ide_check_region(ide_ioreg_t from, unsigned int extent)
 	return check_region(from, extent);
 }
 
-void
+void __pmac
 pmac_ide_request_region(ide_ioreg_t from,
 			unsigned int extent,
 			const char *name)
@@ -620,7 +619,7 @@ pmac_ide_request_region(ide_ioreg_t from,
 		request_region(from, extent, name);
 }
 
-void
+void __pmac
 pmac_ide_release_region(ide_ioreg_t from,
 			unsigned int extent)
 {
@@ -630,13 +629,15 @@ pmac_ide_release_region(ide_ioreg_t from,
 
 #if defined(CONFIG_BLK_DEV_IDE) && defined(CONFIG_BLK_DEV_IDE_PMAC)
 /* This is declared in drivers/block/ide-pmac.c */
-void pmac_ide_init_hwif_ports (hw_regs_t *hw, ide_ioreg_t data_port, ide_ioreg_t ctrl_port, int *irq);
+void __pmac
+pmac_ide_init_hwif_ports (hw_regs_t *hw, ide_ioreg_t data_port, ide_ioreg_t ctrl_port, int *irq);
 #else
 /*
  * This registers the standard ports for this architecture with the IDE
  * driver.
  */
-void pmac_ide_init_hwif_ports(hw_regs_t *hw, ide_ioreg_t data_port, ide_ioreg_t ctrl_port, int *irq)
+void __pmac
+pmac_ide_init_hwif_ports(hw_regs_t *hw, ide_ioreg_t data_port, ide_ioreg_t ctrl_port, int *irq)
 {
 }
 #endif
@@ -646,7 +647,8 @@ void pmac_ide_init_hwif_ports(hw_regs_t *hw, ide_ioreg_t data_port, ide_ioreg_t 
  * Read in a property describing some pieces of memory.
  */
 
-static void __init get_mem_prop(char *name, struct mem_pieces *mp)
+static void __init
+get_mem_prop(char *name, struct mem_pieces *mp)
 {
 	struct reg_property *rp;
 	int i, s;
@@ -686,7 +688,8 @@ static void __init get_mem_prop(char *name, struct mem_pieces *mp)
  * Our text, data, bss use something over 1MB, starting at 0.
  * Open Firmware may be using 1MB at the 4MB point.
  */
-unsigned long __init pmac_find_end_of_memory(void)
+unsigned long __init
+pmac_find_end_of_memory(void)
 {
 	unsigned long a, total;
 	struct mem_pieces phys_mem;
@@ -813,7 +816,7 @@ pmac_init(unsigned long r3, unsigned long r4, unsigned long r5,
 extern void drawchar(char c);
 extern void drawstring(const char *c);
 extern boot_infos_t *disp_bi;
-void
+void __init
 pmac_progress(char *s, unsigned short hex)
 {
 	if (disp_bi == 0)
@@ -822,4 +825,3 @@ pmac_progress(char *s, unsigned short hex)
 	prom_drawchar('\n');
 }
 #endif /* CONFIG_BOOTX_TEXT */
-

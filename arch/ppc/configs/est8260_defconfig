@@ -55,7 +55,8 @@ CONFIG_KERNEL_ELF=y
 # Parallel port support
 #
 # CONFIG_PARPORT is not set
-# CONFIG_PPC_RTC is not set
+CONFIG_PPC_RTC=y
+# CONFIG_CMDLINE_BOOL is not set
 
 #
 # Memory Technology Devices (MTD)
@@ -67,6 +68,7 @@ CONFIG_KERNEL_ELF=y
 #
 # CONFIG_PNP is not set
 # CONFIG_ISAPNP is not set
+# CONFIG_PNPBIOS is not set
 
 #
 # Block devices
@@ -197,6 +199,7 @@ CONFIG_NET_ETHERNET=y
 #
 # CONFIG_ACENIC is not set
 # CONFIG_ACENIC_OMIT_TIGON_I is not set
+# CONFIG_DL2K is not set
 # CONFIG_MYRI_SBUS is not set
 # CONFIG_HAMACHI is not set
 # CONFIG_YELLOWFIN is not set
@@ -395,6 +398,7 @@ CONFIG_PARTITION_ADVANCED=y
 # CONFIG_ATARI_PARTITION is not set
 # CONFIG_MAC_PARTITION is not set
 # CONFIG_MSDOS_PARTITION is not set
+# CONFIG_LDM_PARTITION is not set
 # CONFIG_SGI_PARTITION is not set
 # CONFIG_ULTRIX_PARTITION is not set
 # CONFIG_SUN_PARTITION is not set

@@ -744,7 +744,7 @@ root_found:
 		if (! s->u.isofs_sb.s_nls_iocharset) {
 			/* Fail only if explicit charset specified */
 			if (opt.iocharset)
-				goto out_freebh;
+				goto out_unlock;
 			s->u.isofs_sb.s_nls_iocharset = load_nls_default();
 		}
 	}
@@ -752,6 +752,7 @@ root_found:
 	s->s_op = &isofs_sops;
 	s->u.isofs_sb.s_mapping = opt.map;
 	s->u.isofs_sb.s_rock = (opt.rock == 'y' ? 2 : 0);
+	s->u.isofs_sb.s_rock_offset = -1; /* initial offset, will guess until SP is found*/
 	s->u.isofs_sb.s_cruft = opt.cruft;
 	s->u.isofs_sb.s_unhide = opt.unhide;
 	s->u.isofs_sb.s_uid = opt.uid;

@@ -9,6 +9,7 @@
 #include <linux/interrupt.h>
 #include <linux/smp_lock.h>
 #include <linux/module.h>
+#include <linux/completion.h>
 #include <linux/tty.h>
 #ifdef CONFIG_BSD_PROCESS_ACCT
 #include <linux/acct.h>
@@ -473,10 +474,10 @@ fake_volatile:
 	goto fake_volatile;
 }
 
-NORET_TYPE void up_and_exit(struct semaphore *sem, long code)
+NORET_TYPE void complete_and_exit(struct completion *comp, long code)
 {
-	if (sem)
-		up(sem);
+	if (comp)
+		complete(comp);
 	
 	do_exit(code);
 }

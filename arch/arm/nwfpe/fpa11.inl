@@ -24,11 +24,13 @@
 /* Read and write floating point status register */
 extern __inline__ unsigned int readFPSR(void)
 {
+  FPA11 *fpa11 = GET_FPA11();
   return(fpa11->fpsr);
 }
 
 extern __inline__ void writeFPSR(FPSR reg)
 {
+  FPA11 *fpa11 = GET_FPA11();
   /* the sysid byte in the status register is readonly */
   fpa11->fpsr = (fpa11->fpsr & MASK_SYSID) | (reg & ~MASK_SYSID);
 }
@@ -36,12 +38,14 @@ extern __inline__ void writeFPSR(FPSR reg)
 /* Read and write floating point control register */
 extern __inline__ FPCR readFPCR(void)
 {
+  FPA11 *fpa11 = GET_FPA11();
   /* clear SB, AB and DA bits before returning FPCR */
   return(fpa11->fpcr & ~MASK_RFC);
 }
 
 extern __inline__ void writeFPCR(FPCR reg)
 {
+  FPA11 *fpa11 = GET_FPA11();
   fpa11->fpcr &= ~MASK_WFC;		/* clear SB, AB and DA bits */
   fpa11->fpcr |= (reg & MASK_WFC);	/* write SB, AB and DA bits */
 }

@@ -88,7 +88,7 @@ options=N1,N2,N3,...
   The individual options are composed of a number of bitfields which
   have the following meanings:
 
-  ssible media type settings
+  Possible media type settings
 	0	10baseT
 	1	10Mbs AUI
 	2	undefined
@@ -104,8 +104,11 @@ options=N1,N2,N3,...
   When generating a value for the 'options' setting, the above media
   selection values may be OR'ed (or added to) the following:
 
-  512  (0x200)	Force full duplex mode.
-  16   (0x10)	Bus-master enable bit (Old Vortex cards only)
+  0x8000  Set driver debugging level to 7
+  0x4000  Set driver debugging level to 2
+  0x0400  Enable Wake-on-LAN
+  0x0200  Force full duplex mode.
+  0x0010  Bus-master enable bit (Old Vortex cards only)
 
   For example:
 
@@ -359,6 +362,11 @@ steps you should take:
      8K byte-wide RAM 5:3 Rx:Tx split, autoselect/Autonegotiate interface.
      MII transceiver found at address 24, status 782d.
      Enabling bus-master transmits and whole-frame receives.
+
+     NOTE: You must provide the `debug=2' modprobe option to generate
+     a full detection message.  Please do this:
+
+	modprobe 3c59x debug=2
 
    o If it is a PCI device, the relevant output from 'lspci -vx', eg:
 

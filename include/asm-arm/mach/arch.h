@@ -12,14 +12,12 @@
  * The size of struct machine_desc
  *   (for assembler code)
  */
-#define SIZEOF_MACHINE_DESC	56
+#define SIZEOF_MACHINE_DESC	48
 
 #ifndef __ASSEMBLY__
 
 extern void setup_initrd(unsigned int start, unsigned int size);
 extern void setup_ramdisk(int doload, int prompt, int start, unsigned int rd_sz);
-
-struct tagtable;
 
 struct machine_desc {
 	/*
@@ -41,8 +39,6 @@ struct machine_desc {
 	unsigned int		reserve_lp1 :1;	/* never has lp1	*/
 	unsigned int		reserve_lp2 :1;	/* never has lp2	*/
 	unsigned int		soft_reboot :1;	/* soft reboot		*/
-	const struct tagtable *	tagtable;	/* tag table		*/
-	int			tagsize;	/* tag table size	*/
 	void			(*fixup)(struct machine_desc *,
 					 struct param_struct *, char **,
 					 struct meminfo *);

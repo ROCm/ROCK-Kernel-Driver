@@ -540,6 +540,21 @@ do_sect_fault(unsigned long addr, int error_code, struct pt_regs *regs)
 	return 0;
 }
 
+/*
+ * Hook for things that need to trap external faults.  Note that
+ * we don't guarantee that this will be the final version of the
+ * interface.
+ */
+int (*external_fault)(unsigned long addr, struct pt_regs *regs);
+
+static int
+do_external_fault(unsigned long addr, int error_code, struct pt_regs *regs)
+{
+	if (external_fault)
+		return external_fault(addr, regs);
+	return 1;
+}
+
 static const struct fsr_info {
 	int	(*fn)(unsigned long addr, int error_code, struct pt_regs *regs);
 	int	sig;
@@ -549,13 +564,13 @@ static const struct fsr_info {
 	{ do_alignment,		SIGILL,	 "alignment exception"		   },
 	{ NULL,			SIGKILL, "terminal exception"		   },
 	{ do_alignment,		SIGILL,	 "alignment exception"		   },
-	{ NULL,			SIGBUS,	 "external abort on linefetch"	   },
+	{ do_external_fault,	SIGBUS,	 "external abort on linefetch"	   },
 	{ do_translation_fault,	SIGSEGV, "section translation fault"	   },
-	{ NULL,			SIGBUS,	 "external abort on linefetch"	   },
+	{ do_external_fault,	SIGBUS,	 "external abort on linefetch"	   },
 	{ do_page_fault,	SIGSEGV, "page translation fault"	   },
-	{ NULL,			SIGBUS,	 "external abort on non-linefetch" },
+	{ do_external_fault,	SIGBUS,	 "external abort on non-linefetch" },
 	{ NULL,			SIGSEGV, "section domain fault"		   },
-	{ NULL,			SIGBUS,	 "external abort on non-linefetch" },
+	{ do_external_fault,	SIGBUS,	 "external abort on non-linefetch" },
 	{ NULL,			SIGSEGV, "page domain fault"		   },
 	{ NULL,			SIGBUS,	 "external abort on translation"   },
 	{ do_sect_fault,	SIGSEGV, "section permission fault"	   },
@@ -571,13 +586,9 @@ do_DataAbort(unsigned long addr, int error_code, struct pt_regs *regs, int fsr)
 {
 	const struct fsr_info *inf = fsr_info + (fsr & 15);
 
-#if defined(CONFIG_CPU_SA110) || defined(CONFIG_CPU_SA1100)
+#if defined(CONFIG_CPU_SA110) || defined(CONFIG_CPU_SA1100) || defined(CONFIG_DEBUG_ERRORS)
 	if (addr == regs->ARM_pc)
 		goto sa1_weirdness;
-#endif
-#if defined(CONFIG_CPU_ARM720) && defined(CONFIG_ALIGNMENT_TRAP)
-	if (addr & 3 && (fsr & 13) != 1)
-		goto arm720_weirdness;
 #endif
 
 	if (!inf->fn)
@@ -593,12 +604,16 @@ bad:
 	die_if_kernel("Oops", regs, 0);
 	return;
 
-#if defined(CONFIG_CPU_SA110) || defined(CONFIG_CPU_SA1100)
+#if defined(CONFIG_CPU_SA110) || defined(CONFIG_CPU_SA1100) || defined(CONFIG_DEBUG_ERRORS)
 sa1_weirdness:
 	if (user_mode(regs)) {
 		static int first = 1;
-		if (first)
-			printk(KERN_DEBUG "Weird data abort detected\n");
+		if (first) {
+			printk(KERN_DEBUG "Fixing up bad data abort at %08lx\n", addr);
+#ifdef CONFIG_DEBUG_ERRORS
+			show_pte(current->mm, addr);
+#endif
+		}
 		first = 0;
 		return;
 	}
@@ -607,37 +622,24 @@ sa1_weirdness:
 		goto bad;
 	return;
 #endif
-#if defined(CONFIG_CPU_ARM720) && defined(CONFIG_ALIGNMENT_TRAP)
-arm720_weirdness:
-	if (!user_mode(regs)) {
-		unsigned long instr;
-
-		instr = *(unsigned long *)instruction_pointer(regs);
-
-		if ((instr & 0x04400000) != 0x04400000) {
-			static int first = 1;
-			if (first)
-				printk("Mis-reported alignment fault at "
-					"0x%08lx, fsr 0x%02x, code 0x%02x, "
-					"PC = 0x%08lx, instr = 0x%08lx\n",
-					addr, fsr, error_code, regs->ARM_pc,
-					instr);
-			first = 0;
-			cpu_tlb_invalidate_all();
-			cpu_cache_clean_invalidate_all();
-			return;
-		}
-	}
-
-	if (!inf->fn || inf->fn(addr, error_code, regs))
-		goto bad;
-	return;
-#endif
 }
 
-asmlinkage int
+asmlinkage void
 do_PrefetchAbort(unsigned long addr, struct pt_regs *regs)
 {
 	do_translation_fault(addr, 0, regs);
-	return 1;
+}
+
+/*
+ * if PG_dcache_dirty is set for the page, we need to ensure that any
+ * cache entries for the kernels virtual memory range are written
+ * back to the page.
+ */
+void check_pgcache_dirty(struct page *page)
+{
+	if (VALID_PAGE(page) && page->mapping &&
+	    test_and_clear_bit(PG_dcache_dirty, &page->flags)) {
+		unsigned long kvirt = (unsigned long)page_address(page);
+		cpu_cache_clean_invalidate_range(kvirt, kvirt + PAGE_SIZE, 0);
+	}
 }

@@ -20,8 +20,11 @@
 #include <linux/version.h>
 #include <linux/smp_lock.h>
 #include <asm/uaccess.h>
+#include <asm/atomic.h>
 
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2,3,0)
 #include <linux/devfs_fs_kernel.h>
+#endif
 
 #include "ieee1394.h"
 #include "ieee1394_types.h"
@@ -43,9 +46,10 @@
 
 static devfs_handle_t devfs_handle;
 
-LIST_HEAD(host_info_list);
+static LIST_HEAD(host_info_list);
 static int host_count;
-spinlock_t host_info_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t host_info_lock = SPIN_LOCK_UNLOCKED;
+static atomic_t internal_generation = ATOMIC_INIT(0);
 
 static struct hpsb_highlevel *hl_handle;
 
@@ -69,7 +73,7 @@ static struct pending_request *__alloc_pending_request(int flags)
         return req;
 }
 
-inline static struct pending_request *alloc_pending_request(void)
+static inline struct pending_request *alloc_pending_request(void)
 {
         return __alloc_pending_request(SLAB_KERNEL);
 }
@@ -148,6 +152,8 @@ static void add_host(struct hpsb_host *host)
                 host_count++;
                 spin_unlock_irq(&host_info_lock);
         }
+
+        atomic_inc(&internal_generation);
 }
 
 
@@ -156,13 +162,11 @@ static struct host_info *find_host_info(struct hpsb_host *host)
         struct list_head *lh;
         struct host_info *hi;
 
-        lh = host_info_list.next;
-        while (lh != &host_info_list) {
+        list_for_each(lh, &host_info_list) {
                 hi = list_entry(lh, struct host_info, list);
                 if (hi->host == host) {
                         return hi;
                 }
-                lh = lh->next;
         }
 
         return NULL;
@@ -202,16 +206,14 @@ static void host_reset(struct hpsb_host *host)
         hi = find_host_info(host);
 
         if (hi != NULL) {
-                lh = hi->file_info_list.next;
-
-                while (lh != &hi->file_info_list) {
+                list_for_each(lh, &hi->file_info_list) {
                         fi = list_entry(lh, struct file_info, list);
                         req = __alloc_pending_request(SLAB_ATOMIC);
 
                         if (req != NULL) {
                                 req->file_info = fi;
                                 req->req.type = RAW1394_REQ_BUS_RESET;
-                                req->req.generation = get_hpsb_generation();
+                                req->req.generation = get_hpsb_generation(host);
                                 req->req.misc = (host->node_id << 16)
                                         | host->node_count;
                                 if (fi->protocol_version > 3) {
@@ -221,11 +223,11 @@ static void host_reset(struct hpsb_host *host)
 
                                 queue_complete_req(req);
                         }
-                                
-                        lh = lh->next;
                 }
         }
         spin_unlock_irqrestore(&host_info_lock, flags);
+
+        atomic_inc(&internal_generation);
 }
 
 static void iso_receive(struct hpsb_host *host, int channel, quadlet_t *data,
@@ -248,8 +250,7 @@ static void iso_receive(struct hpsb_host *host, int channel, quadlet_t *data,
         hi = find_host_info(host);
 
         if (hi != NULL) {
-                for (lh = hi->file_info_list.next; lh != &hi->file_info_list;
-                     lh = lh->next) {
+		list_for_each(lh, &hi->file_info_list) {
                         fi = list_entry(lh, struct file_info, list);
 
                         if (!(fi->listen_channels & (1ULL << channel))) {
@@ -279,7 +280,7 @@ static void iso_receive(struct hpsb_host *host, int channel, quadlet_t *data,
                         req->ibs = ibs;
                         req->data = ibs->data;
                         req->req.type = RAW1394_REQ_ISO_RECEIVE;
-                        req->req.generation = get_hpsb_generation();
+                        req->req.generation = get_hpsb_generation(host);
                         req->req.misc = 0;
                         req->req.recvb = ptr2int(fi->iso_buffer);
                         req->req.length = MIN(length, fi->iso_buffer_length);
@@ -289,10 +290,8 @@ static void iso_receive(struct hpsb_host *host, int channel, quadlet_t *data,
         }
         spin_unlock_irqrestore(&host_info_lock, flags);
 
-        lh = reqs.next;
-        while (lh != &reqs) {
+        list_for_each(lh, &reqs) {
                 req = list_entry(lh, struct pending_request, list);
-                lh = lh->next;
                 queue_complete_req(req);
         }
 }
@@ -317,8 +316,7 @@ static void fcp_request(struct hpsb_host *host, int nodeid, int direction,
         hi = find_host_info(host);
 
         if (hi != NULL) {
-                for (lh = hi->file_info_list.next; lh != &hi->file_info_list;
-                     lh = lh->next) {
+		list_for_each(lh, &hi->file_info_list) {
                         fi = list_entry(lh, struct file_info, list);
 
                         if (!fi->fcp_buffer) {
@@ -348,7 +346,7 @@ static void fcp_request(struct hpsb_host *host, int nodeid, int direction,
                         req->ibs = ibs;
                         req->data = ibs->data;
                         req->req.type = RAW1394_REQ_FCP_REQUEST;
-                        req->req.generation = get_hpsb_generation();
+                        req->req.generation = get_hpsb_generation(host);
                         req->req.misc = nodeid | (direction << 16);
                         req->req.recvb = ptr2int(fi->fcp_buffer);
                         req->req.length = length;
@@ -358,16 +356,14 @@ static void fcp_request(struct hpsb_host *host, int nodeid, int direction,
         }
         spin_unlock_irqrestore(&host_info_lock, flags);
 
-        lh = reqs.next;
-        while (lh != &reqs) {
+        list_for_each(lh, &reqs) {
                 req = list_entry(lh, struct pending_request, list);
-                lh = lh->next;
                 queue_complete_req(req);
         }
 }
 
 
-static ssize_t dev_read(struct file *file, char *buffer, size_t count,
+static ssize_t raw1394_read(struct file *file, char *buffer, size_t count,
                     loff_t *offset_is_ignored)
 {
         struct file_info *fi = (struct file_info *)file->private_data;
@@ -421,7 +417,7 @@ static int state_opened(struct file_info *fi, struct pending_request *req)
                         fi->state = initialized;
                         fi->protocol_version = req->req.misc;
                         req->req.error = RAW1394_ERROR_NONE;
-                        req->req.generation = get_hpsb_generation();
+                        req->req.generation = atomic_read(&internal_generation);
                         break;
 
                 default:
@@ -443,9 +439,9 @@ static int state_initialized(struct file_info *fi, struct pending_request *req)
         struct host_info *hi;
         struct raw1394_khost_list *khl;
 
-        if (req->req.generation != get_hpsb_generation()) {
+        if (req->req.generation != atomic_read(&internal_generation)) {
                 req->req.error = RAW1394_ERROR_GENERATION;
-                req->req.generation = get_hpsb_generation();
+                req->req.generation = atomic_read(&internal_generation);
                 req->req.length = 0;
                 queue_complete_req(req);
                 return sizeof(struct raw1394_request);
@@ -461,15 +457,13 @@ static int state_initialized(struct file_info *fi, struct pending_request *req)
                         req->req.misc = host_count;
                         req->data = (quadlet_t *)khl;
                         
-                        lh = host_info_list.next;
-                        while (lh != &host_info_list) {
+                        list_for_each(lh, &host_info_list) {
                                 hi = list_entry(lh, struct host_info, list);
 
                                 khl->nodes = hi->host->node_count;
                                 strcpy(khl->name, hi->host->template->name);
 
                                 khl++;
-                                lh = lh->next;
                         }
                 }
                 spin_unlock_irq(&host_info_lock);
@@ -504,6 +498,7 @@ static int state_initialized(struct file_info *fi, struct pending_request *req)
 
                 if (lh != NULL) {
                         req->req.error = RAW1394_ERROR_NONE;
+                        req->req.generation = get_hpsb_generation(fi->host);
                         req->req.misc = (fi->host->node_id << 16) 
                                 | fi->host->node_count;
                         if (fi->protocol_version > 3) {
@@ -810,9 +805,9 @@ static int state_connected(struct file_info *fi, struct pending_request *req)
                 return handle_iso_send(fi, req, node);
         }
 
-        if (req->req.generation != get_hpsb_generation()) {
+        if (req->req.generation != get_hpsb_generation(fi->host)) {
                 req->req.error = RAW1394_ERROR_GENERATION;
-                req->req.generation = get_hpsb_generation();
+                req->req.generation = get_hpsb_generation(fi->host);
                 req->req.length = 0;
                 queue_complete_req(req);
                 return sizeof(struct raw1394_request);
@@ -846,7 +841,7 @@ static int state_connected(struct file_info *fi, struct pending_request *req)
 }
 
 
-static ssize_t dev_write(struct file *file, const char *buffer, size_t count,
+static ssize_t raw1394_write(struct file *file, const char *buffer, size_t count,
                      loff_t *offset_is_ignored)
 {
         struct file_info *fi = (struct file_info *)file->private_data;
@@ -889,7 +884,7 @@ static ssize_t dev_write(struct file *file, const char *buffer, size_t count,
         return retval;
 }
 
-static unsigned int dev_poll(struct file *file, poll_table *pt)
+static unsigned int raw1394_poll(struct file *file, poll_table *pt)
 {
         struct file_info *fi = file->private_data;
         unsigned int mask = POLLOUT | POLLWRNORM;
@@ -905,7 +900,7 @@ static unsigned int dev_poll(struct file *file, poll_table *pt)
         return mask;
 }
 
-static int dev_open(struct inode *inode, struct file *file)
+static int raw1394_open(struct inode *inode, struct file *file)
 {
         struct file_info *fi;
 
@@ -913,14 +908,14 @@ static int dev_open(struct inode *inode, struct file *file)
                 return -ENXIO;
         }
 
-	MOD_INC_USE_COUNT;
+        V22_COMPAT_MOD_INC_USE_COUNT;
 
         fi = kmalloc(sizeof(struct file_info), SLAB_KERNEL);
         if (fi == NULL) {
-		MOD_DEC_USE_COUNT;
+                V22_COMPAT_MOD_DEC_USE_COUNT;
                 return -ENOMEM;
         }
-
+        
         memset(fi, 0, sizeof(struct file_info));
 
         INIT_LIST_HEAD(&fi->list);
@@ -936,7 +931,7 @@ static int dev_open(struct inode *inode, struct file *file)
         return 0;
 }
 
-static int dev_release(struct inode *inode, struct file *file)
+static int raw1394_release(struct inode *inode, struct file *file)
 {
         struct file_info *fi = file->private_data;
         struct list_head *lh;
@@ -966,15 +961,11 @@ static int dev_release(struct inode *inode, struct file *file)
                         free_pending_request(req);
                 }
 
-                if (list_empty(&fi->req_pending)) {
-                        done = 1;
-                }
+                if (list_empty(&fi->req_pending)) done = 1;
 
                 spin_unlock_irq(&fi->reqlists_lock);
 
-                if (!done) {
-                        down_interruptible(&fi->complete_sem);
-                }
+                if (!done) down_interruptible(&fi->complete_sem);
         }
 
         if (fi->state == connected) {
@@ -987,7 +978,7 @@ static int dev_release(struct inode *inode, struct file *file)
 
         kfree(fi);
 
-        MOD_DEC_USE_COUNT;
+        V22_COMPAT_MOD_DEC_USE_COUNT;
         unlock_kernel();
         return 0;
 }
@@ -1001,12 +992,12 @@ static struct hpsb_highlevel_ops hl_ops = {
 };
 
 static struct file_operations file_ops = {
-	owner:    THIS_MODULE,
-        read:     dev_read, 
-        write:    dev_write, 
-        poll:     dev_poll, 
-        open:     dev_open, 
-        release:  dev_release, 
+        OWNER_THIS_MODULE
+        read:     raw1394_read, 
+        write:    raw1394_write, 
+        poll:     raw1394_poll, 
+        open:     raw1394_open, 
+        release:  raw1394_release, 
 };
 
 static int __init init_raw1394(void)

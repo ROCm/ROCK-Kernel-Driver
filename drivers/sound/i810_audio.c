@@ -109,6 +109,7 @@ static unsigned int clocking=48000;
 
 //#define DEBUG
 //#define DEBUG2
+//#define DEBUG_INTERRUPTS
 
 #define ADC_RUNNING	1
 #define DAC_RUNNING	2
@@ -190,7 +191,7 @@ enum {
 #define INT_MASK (INT_SEC|INT_PRI|INT_MC|INT_PO|INT_PI|INT_MO|INT_NI|INT_GPI)
 
 
-#define DRIVER_VERSION "0.02"
+#define DRIVER_VERSION "0.03"
 
 /* magic numbers to protect our data structures */
 #define I810_CARD_MAGIC		0x5072696E /* "Prin" */
@@ -281,9 +282,14 @@ struct i810_state {
 		wait_queue_head_t wait;	/* put process on wait queue when no more space in buffer */
 
 		/* redundant, but makes calculations easier */
-		unsigned fragsize;
+		/* what the hardware uses */
 		unsigned dmasize;
+		unsigned fragsize;
 		unsigned fragsamples;
+
+		/* what we tell the user to expect */
+		unsigned userfrags;
+		unsigned userfragsize;
 
 		/* OSS stuff */
 		unsigned mapped:1;
@@ -337,9 +343,8 @@ static struct i810_card *devs = NULL;
 static int i810_open_mixdev(struct inode *inode, struct file *file);
 static int i810_ioctl_mixdev(struct inode *inode, struct file *file, unsigned int cmd,
 				unsigned long arg);
-static loff_t i810_llseek(struct file *file, loff_t offset, int origin);
 
-extern __inline__ unsigned ld2(unsigned int x)
+static inline unsigned ld2(unsigned int x)
 {
 	unsigned r = 0;
 	
@@ -498,7 +503,7 @@ static unsigned int i810_set_adc_rate(struct i810_state * state, unsigned int ra
 /* get current playback/recording dma buffer pointer (byte offset from LBA),
    called with spinlock held! */
    
-extern __inline__ unsigned i810_get_dma_addr(struct i810_state *state, int rec)
+static inline unsigned i810_get_dma_addr(struct i810_state *state, int rec)
 {
 	struct dmabuf *dmabuf = &state->dmabuf;
 	unsigned int civ, offset;
@@ -543,13 +548,18 @@ extern __inline__ unsigned i810_get_dma_addr(struct i810_state *state, int rec)
 //}
 	
 /* Stop recording (lock held) */
-extern __inline__ void __stop_adc(struct i810_state *state)
+static inline void __stop_adc(struct i810_state *state)
 {
 	struct dmabuf *dmabuf = &state->dmabuf;
 	struct i810_card *card = state->card;
 
 	dmabuf->enable &= ~ADC_RUNNING;
 	outb(0, card->iobase + PI_CR);
+	// wait for the card to acknowledge shutdown
+	while( inb(card->iobase + PI_CR) != 0 ) ;
+	// now clear any latent interrupt bits (like the halt bit)
+	outb( inb(card->iobase + PI_SR), card->iobase + PI_SR );
+	outl( inl(card->iobase + GLOB_STA) & INT_PI, card->iobase + GLOB_STA);
 }
 
 static void stop_adc(struct i810_state *state)
@@ -578,13 +588,18 @@ static void start_adc(struct i810_state *state)
 }
 
 /* stop playback (lock held) */
-extern __inline__ void __stop_dac(struct i810_state *state)
+static inline void __stop_dac(struct i810_state *state)
 {
 	struct dmabuf *dmabuf = &state->dmabuf;
 	struct i810_card *card = state->card;
 
 	dmabuf->enable &= ~DAC_RUNNING;
 	outb(0, card->iobase + PO_CR);
+	// wait for the card to acknowledge shutdown
+	while( inb(card->iobase + PO_CR) != 0 ) ;
+	// now clear any latent interrupt bits (like the halt bit)
+	outb( inb(card->iobase + PO_SR), card->iobase + PO_SR );
+	outl( inl(card->iobase + GLOB_STA) & INT_PO, card->iobase + GLOB_STA);
 }
 
 static void stop_dac(struct i810_state *state)
@@ -710,24 +725,22 @@ static int prog_dmabuf(struct i810_state *state, unsigned rec)
 	dmabuf->numfrag = SG_LEN;
 	dmabuf->fragsize = dmabuf->dmasize/dmabuf->numfrag;
 	dmabuf->fragsamples = dmabuf->fragsize >> 1;
+	dmabuf->userfragsize = dmabuf->ossfragsize;
+	dmabuf->userfrags = dmabuf->dmasize/dmabuf->ossfragsize;
 
 	memset(dmabuf->rawbuf, 0, dmabuf->dmasize);
 
 	if(dmabuf->ossmaxfrags == 4) {
 		fragint = 8;
-		dmabuf->ossfragsize = dmabuf->dmasize>>2;
 		dmabuf->fragshift = 2;
 	} else if (dmabuf->ossmaxfrags == 8) {
 		fragint = 4;
-		dmabuf->ossfragsize = dmabuf->dmasize>>3;
 		dmabuf->fragshift = 3;
 	} else if (dmabuf->ossmaxfrags == 16) {
 		fragint = 2;
-		dmabuf->ossfragsize = dmabuf->dmasize>>4;
 		dmabuf->fragshift = 4;
 	} else {
 		fragint = 1;
-		dmabuf->ossfragsize = dmabuf->dmasize>>5;
 		dmabuf->fragshift = 5;
 	}
 	/*
@@ -862,7 +875,7 @@ static void i810_update_ptr(struct i810_state *state)
 				dmabuf->error++;
 			}
 		}
-		if (dmabuf->count > dmabuf->ossfragsize)
+		if (dmabuf->count > dmabuf->userfragsize)
 			wake_up(&dmabuf->wait);
 	}
 	/* error handling and process wake up for DAC */
@@ -890,7 +903,7 @@ static void i810_update_ptr(struct i810_state *state)
 				dmabuf->error++;
 			}
 		}
-		if (dmabuf->count < (dmabuf->dmasize-dmabuf->ossfragsize))
+		if (dmabuf->count < (dmabuf->dmasize-dmabuf->userfragsize))
 			wake_up(&dmabuf->wait);
 	}
 }
@@ -940,6 +953,8 @@ static int drain_dac(struct i810_state *state, int nonblock)
 			break;
 		}
 	}
+	stop_dac(state);
+	synchronize_irq();
 	remove_wait_queue(&dmabuf->wait, &wait);
 	current->state = TASK_RUNNING;
 	if (signal_pending(current))
@@ -977,13 +992,14 @@ static void i810_channel_interrupt(struct i810_card *card)
 		
 		status = inw(port + OFF_SR);
 #ifdef DEBUG_INTERRUPTS
-		printk("NUM %d PORT %lX IRQ ( ST%d ", c->num, c->port, status);
+		printk("NUM %d PORT %X IRQ ( ST%d ", c->num, c->port, status);
 #endif
 		if(status & DMA_INT_COMPLETE)
 		{
 			i810_update_ptr(state);
 #ifdef DEBUG_INTERRUPTS
-			printk("COMP%d ",x);
+			printk("COMP %d ", dmabuf->hwptr /
+					dmabuf->fragsize);
 #endif
 		}
 		if(status & DMA_INT_LVI)
@@ -1040,11 +1056,6 @@ static void i810_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	spin_unlock(&card->lock);
 }
 
-static loff_t i810_llseek(struct file *file, loff_t offset, int origin)
-{
-	return -ESPIPE;
-}
-
 /* in this loop, dmabuf.count signifies the amount of data that is waiting to be copied to
    the user's buffer.  it is filled by the dma machine and drained by this loop. */
 static ssize_t i810_read(struct file *file, char *buffer, size_t count, loff_t *ppos)
@@ -1084,9 +1095,10 @@ static ssize_t i810_read(struct file *file, char *buffer, size_t count, loff_t *
 		spin_lock_irqsave(&state->card->lock, flags);
 		swptr = dmabuf->swptr;
 		if (dmabuf->count > dmabuf->dmasize) {
-			dmabuf->count = 0;
+			dmabuf->count = dmabuf->dmasize;
 		}
-		cnt = dmabuf->count;
+		cnt = dmabuf->count - dmabuf->fragsize;
+		// this is to make the copy_to_user simpler below
 		if(cnt > (dmabuf->dmasize - swptr))
 			cnt = dmabuf->dmasize - swptr;
 		spin_unlock_irqrestore(&state->card->lock, flags);
@@ -1095,13 +1107,11 @@ static ssize_t i810_read(struct file *file, char *buffer, size_t count, loff_t *
 			cnt = count;
 		if (cnt <= 0) {
 			unsigned long tmo;
-			// are we already running?  only start us if we aren't running
-			// currently
-			i810_update_lvi(state,1);
 			if(!dmabuf->enable) {
 				dmabuf->trigger |= PCM_ENABLE_INPUT;
 				start_adc(state);
 			}
+			i810_update_lvi(state,1);
 			if (file->f_flags & O_NONBLOCK) {
 				if (!ret) ret = -EAGAIN;
 				return ret;
@@ -1150,7 +1160,8 @@ static ssize_t i810_read(struct file *file, char *buffer, size_t count, loff_t *
 		ret += cnt;
 	}
 	i810_update_lvi(state,1);
-	start_adc(state);
+	if(!(dmabuf->enable & ADC_RUNNING))
+		start_adc(state);
 	return ret;
 }
 
@@ -1194,23 +1205,30 @@ static ssize_t i810_write(struct file *file, const char *buffer, size_t count, l
 		if (dmabuf->count < 0) {
 			dmabuf->count = 0;
 		}
-		cnt = dmabuf->dmasize - swptr;
-		if(cnt > (dmabuf->dmasize - dmabuf->count))
-			cnt = dmabuf->dmasize - dmabuf->count;
+		cnt = dmabuf->dmasize - dmabuf->fragsize - dmabuf->count;
+		// this is to make the copy_from_user simpler below
+		if(cnt > (dmabuf->dmasize - swptr))
+			cnt = dmabuf->dmasize - swptr;
 		spin_unlock_irqrestore(&state->card->lock, flags);
 
+#ifdef DEBUG2
+		printk(KERN_INFO "i810_audio: i810_write: %d bytes available space\n", cnt);
+#endif
 		if (cnt > count)
 			cnt = count;
 		if (cnt <= 0) {
 			unsigned long tmo;
 			// There is data waiting to be played
-			i810_update_lvi(state,0);
 			if(!dmabuf->enable && dmabuf->count) {
 				/* force the starting incase SETTRIGGER has been used */
 				/* to stop it, otherwise this is a deadlock situation */
 				dmabuf->trigger |= PCM_ENABLE_OUTPUT;
 				start_dac(state);
 			}
+			// Update the LVI pointer in case we have already
+			// written data in this syscall and are just waiting
+			// on the tail bit of data
+			i810_update_lvi(state,0);
 			if (file->f_flags & O_NONBLOCK) {
 				if (!ret) ret = -EAGAIN;
 				return ret;
@@ -1259,11 +1277,10 @@ static ssize_t i810_write(struct file *file, const char *buffer, size_t count, l
 	}
 	if (swptr % dmabuf->fragsize) {
 		x = dmabuf->fragsize - (swptr % dmabuf->fragsize);
-		if((x + dmabuf->count) < dmabuf->dmasize)
-			memset(dmabuf->rawbuf + swptr, '\0', x);
+		memset(dmabuf->rawbuf + swptr, '\0', x);
 	}
 	i810_update_lvi(state,0);
-	if (!dmabuf->enable && dmabuf->count >= dmabuf->ossfragsize)
+	if (!dmabuf->enable && dmabuf->count >= dmabuf->userfragsize)
 		start_dac(state);
 
 	return ret;
@@ -1398,8 +1415,6 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 		if (dmabuf->enable != DAC_RUNNING || file->f_flags & O_NONBLOCK)
 			return 0;
 		drain_dac(state, 0);
-		stop_dac(state);
-		synchronize_irq();
 		dmabuf->ready = 0;
 		dmabuf->swptr = dmabuf->hwptr = 0;
 		dmabuf->count = dmabuf->total_bytes = 0;
@@ -1458,9 +1473,9 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 				return val;
 		}
 #ifdef DEBUG
-		printk("SNDCTL_DSP_GETBLKSIZE %d\n", dmabuf->ossfragsize);
+		printk("SNDCTL_DSP_GETBLKSIZE %d\n", dmabuf->userfragsize);
 #endif
-		return put_user(dmabuf->ossfragsize, (int *)arg);
+		return put_user(dmabuf->userfragsize, (int *)arg);
 
 	case SNDCTL_DSP_GETFMTS: /* Returns a mask of supported sample format*/
 #ifdef DEBUG
@@ -1545,13 +1560,13 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 			return val;
 		spin_lock_irqsave(&state->card->lock, flags);
 		i810_update_ptr(state);
-		abinfo.fragsize = dmabuf->ossfragsize;
-		abinfo.fragstotal = dmabuf->ossmaxfrags;
+		abinfo.fragsize = dmabuf->userfragsize;
+		abinfo.fragstotal = dmabuf->userfrags;
 		if(dmabuf->mapped)
 			abinfo.bytes = dmabuf->count;
 		else
 			abinfo.bytes = dmabuf->dmasize - dmabuf->count;
-		abinfo.fragments = abinfo.bytes / dmabuf->ossfragsize;
+		abinfo.fragments = abinfo.bytes / dmabuf->userfragsize;
 		spin_unlock_irqrestore(&state->card->lock, flags);
 #ifdef DEBUG
 		printk("SNDCTL_DSP_GETOSPACE %d, %d, %d, %d\n", abinfo.bytes,
@@ -1568,10 +1583,10 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 		i810_update_ptr(state);
 		cinfo.bytes = dmabuf->total_bytes;
 		cinfo.ptr = dmabuf->hwptr;
-		cinfo.blocks = (dmabuf->dmasize - dmabuf->count)/dmabuf->ossfragsize;
+		cinfo.blocks = (dmabuf->dmasize - dmabuf->count)/dmabuf->userfragsize;
 		if (dmabuf->mapped) {
 			dmabuf->count = (dmabuf->dmasize - 
-					 (dmabuf->count & (dmabuf->ossfragsize-1)));
+					 (dmabuf->count & (dmabuf->userfragsize-1)));
 			__i810_update_lvi(state, 0);
 		}
 		spin_unlock_irqrestore(&state->card->lock, flags);
@@ -1588,10 +1603,10 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 			return val;
 		spin_lock_irqsave(&state->card->lock, flags);
 		i810_update_ptr(state);
-		abinfo.fragsize = dmabuf->ossfragsize;
-		abinfo.fragstotal = dmabuf->ossmaxfrags;
+		abinfo.fragsize = dmabuf->userfragsize;
+		abinfo.fragstotal = dmabuf->userfrags;
 		abinfo.bytes = dmabuf->dmasize - dmabuf->count;
-		abinfo.fragments = abinfo.bytes / dmabuf->ossfragsize;
+		abinfo.fragments = abinfo.bytes / dmabuf->userfragsize;
 		spin_unlock_irqrestore(&state->card->lock, flags);
 #ifdef DEBUG
 		printk("SNDCTL_DSP_GETISPACE %d, %d, %d, %d\n", abinfo.bytes,
@@ -1607,10 +1622,10 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 		spin_lock_irqsave(&state->card->lock, flags);
 		i810_update_ptr(state);
 		cinfo.bytes = dmabuf->total_bytes;
-		cinfo.blocks = dmabuf->count/dmabuf->ossfragsize;
+		cinfo.blocks = dmabuf->count/dmabuf->userfragsize;
 		cinfo.ptr = dmabuf->hwptr;
 		if (dmabuf->mapped) {
-			dmabuf->count &= dmabuf->ossfragsize-1;
+			dmabuf->count &= (dmabuf->userfragsize-1);
 			__i810_update_lvi(state, 1);
 		}
 		spin_unlock_irqrestore(&state->card->lock, flags);
@@ -1667,7 +1682,7 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 				dmabuf->count = dmabuf->dmasize;
 				i810_update_lvi(state,0);
 			}
-			if (!dmabuf->enable && dmabuf->count > dmabuf->fragsize)
+			if (!dmabuf->enable && dmabuf->count > dmabuf->userfragsize)
 				start_dac(state);
 		}
 		if(val & PCM_ENABLE_INPUT) {
@@ -1684,7 +1699,7 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 				i810_update_lvi(state,1);
 			}
 			if (!dmabuf->enable && dmabuf->count <
-			    (dmabuf->dmasize - dmabuf->fragsize))
+			    (dmabuf->dmasize - dmabuf->userfragsize))
 				start_adc(state);
 		}
 		return 0;
@@ -1794,8 +1809,6 @@ found_virt:
 		dmabuf->trigger |= PCM_ENABLE_OUTPUT;
 	}
 		
-	down(&state->open_sem);
-
 	/* set default sample format. According to OSS Programmer's Guide  /dev/dsp
 	   should be default to unsigned 8-bits, mono, with sample rate 8kHz and
 	   /dev/dspW will accept 16-bits sample, but we don't support those so we
@@ -1806,7 +1819,6 @@ found_virt:
 	dmabuf->subdivision  = 0;
 
 	state->open_mode |= file->f_mode & (FMODE_READ | FMODE_WRITE);
-	up(&state->open_sem);
 
 	return 0;
 }
@@ -1814,21 +1826,21 @@ found_virt:
 static int i810_release(struct inode *inode, struct file *file)
 {
 	struct i810_state *state = (struct i810_state *)file->private_data;
+	struct i810_card *card = state->card;
 	struct dmabuf *dmabuf = &state->dmabuf;
+	unsigned long flags;
 
 	lock_kernel();
 
-	down(&state->open_sem);
-
 	/* stop DMA state machine and free DMA buffers/channels */
-	if(dmabuf->enable == DAC_RUNNING ||
+	if(dmabuf->enable & DAC_RUNNING ||
 	   (dmabuf->count && (dmabuf->trigger & PCM_ENABLE_OUTPUT))) {
 		drain_dac(state,0);
-		stop_dac(state);
 	}
 	if(dmabuf->enable & ADC_RUNNING) {
 		stop_adc(state);
 	}
+	spin_lock_irqsave(&card->lock, flags);
 	dealloc_dmabuf(state);
 	if (file->f_mode & FMODE_WRITE) {
 		state->card->free_pcm_channel(state->card, dmabuf->write_channel->num);
@@ -1837,11 +1849,9 @@ static int i810_release(struct inode *inode, struct file *file)
 		state->card->free_pcm_channel(state->card, dmabuf->read_channel->num);
 	}
 
-	/* we're covered by the open_sem */
-	up(&state->open_sem);
-	
 	state->card->states[state->virt] = NULL;
 	kfree(state);
+	spin_unlock_irqrestore(&card->lock, flags);
 	unlock_kernel();
 
 	return 0;
@@ -1849,7 +1859,7 @@ static int i810_release(struct inode *inode, struct file *file)
 
 static /*const*/ struct file_operations i810_audio_fops = {
 	owner:		THIS_MODULE,
-	llseek:		i810_llseek,
+	llseek:		no_llseek,
 	read:		i810_read,
 	write:		i810_write,
 	poll:		i810_poll,
@@ -1910,7 +1920,7 @@ static int i810_ioctl_mixdev(struct inode *inode, struct file *file, unsigned in
 
 static /*const*/ struct file_operations i810_mixer_fops = {
 	owner:		THIS_MODULE,
-	llseek:		i810_llseek,
+	llseek:		no_llseek,
 	ioctl:		i810_ioctl_mixdev,
 	open:		i810_open_mixdev,
 };

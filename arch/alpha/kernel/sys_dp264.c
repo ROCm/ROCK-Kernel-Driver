@@ -5,6 +5,10 @@
  *	Copyright (C) 1996, 1999 Jay A Estabrook
  *	Copyright (C) 1998, 1999 Richard Henderson
  *
+ *	Modified by Christopher C. Chimelis, 2001 to
+ *	add support for the addition of Shark to the
+ *	Tsunami family.
+ *
  * Code supporting the DP264 (EV6+TSUNAMI).
  */
 
@@ -632,6 +636,34 @@ struct alpha_machine_vector webbrick_mv __initmv = {
 
 struct alpha_machine_vector clipper_mv __initmv = {
 	vector_name:		"Clipper",
+	DO_EV6_MMU,
+	DO_DEFAULT_RTC,
+	DO_TSUNAMI_IO,
+	DO_TSUNAMI_BUS,
+	machine_check:		tsunami_machine_check,
+	max_dma_address:	ALPHA_MAX_DMA_ADDRESS,
+	min_io_address:		DEFAULT_IO_BASE,
+	min_mem_address:	DEFAULT_MEM_BASE,
+
+	nr_irqs:		64,
+	device_interrupt:	dp264_device_interrupt,
+
+	init_arch:		tsunami_init_arch,
+	init_irq:		clipper_init_irq,
+	init_rtc:		common_init_rtc,
+	init_pci:		common_init_pci,
+	kill_arch:		tsunami_kill_arch,
+	pci_map_irq:		clipper_map_irq,
+	pci_swizzle:		common_swizzle,
+};
+
+/* Sharks strongly resemble Clipper, at least as far
+ * as interrupt routing, etc, so we're using the
+ * same functions as Clipper does
+ */
+
+struct alpha_machine_vector shark_mv __initmv = {
+	vector_name:		"Shark",
 	DO_EV6_MMU,
 	DO_DEFAULT_RTC,
 	DO_TSUNAMI_IO,

@@ -15,7 +15,7 @@
 /*
  * Generic virtual read/write
  */
-extern __inline__ unsigned int __arch_getw(unsigned long a)
+static inline unsigned int __arch_getw(unsigned long a)
 {
 	unsigned int value;
 	__asm__ __volatile__("ldr%?h	%0, [%1, #0]	@ getw"
@@ -24,7 +24,7 @@ extern __inline__ unsigned int __arch_getw(unsigned long a)
 	return value;
 }
 
-extern __inline__ void __arch_putw(unsigned int value, unsigned long a)
+static inline void __arch_putw(unsigned int value, unsigned long a)
 {
 	__asm__ __volatile__("str%?h	%0, [%1, #0]	@ putw"
 		: : "r" (value), "r" (a));

@@ -10,27 +10,39 @@
 #include <linux/config.h>
 
 /*
+ * DMA buffer structure
+ */
+
+typedef struct dma_buf_s {
+	int size;		/* buffer size */
+	dma_addr_t dma_start;	/* starting DMA address */
+	dma_addr_t dma_ptr;	/* next DMA pointer to use */
+	int ref;		/* number of DMA references */
+	void *id;		/* to identify buffer from outside */
+	struct dma_buf_s *next;	/* next buffer to process */
+} dma_buf_t;
+
+
+/*
  * DMA channel structure.
  */
 
-typedef struct dma_buf_s dma_buf_t;
-
 typedef struct {
-	unsigned int lock;      /* Device is allocated */
-	const char *device_id;  /* Device name */
-	dma_buf_t *head;        /* where to insert buffers */
-	dma_buf_t *tail;        /* where to remove buffers */
-	dma_buf_t *curr;        /* buffer currently DMA'ed */
-	int ready;              /* 1 if DMA can occur */
-	int active;             /* 1 if DMA is actually processing data */
-	dma_regs_t *regs;       /* points to appropriate DMA registers */
-	int irq;                /* IRQ used by the channel */
-	dma_callback_t callback;        /* ... to call when buffers are done */
-	int spin_size;          /* > 0 when DMA should spin when no more buffer */
-	dma_addr_t spin_addr;   /* DMA address to spin onto */
-	int spin_ref;           /* number of spinning references */
+	unsigned int in_use;	/* Device is allocated */
+	const char *device_id;	/* Device name */
+	dma_device_t device;	/* ... to which this channel is attached */
+	dma_buf_t *head;	/* where to insert buffers */
+	dma_buf_t *tail;	/* where to remove buffers */
+	dma_buf_t *curr;	/* buffer currently DMA'ed */
+	int ready;		/* 1 if DMA can occur */
+	dma_regs_t *regs;	/* points to appropriate DMA registers */
+	int irq;		/* IRQ used by the channel */
+	dma_callback_t callback; /* ... to call when buffers are done */
+	int spin_size;		/* > 0 when DMA should spin when no more buffer */
+	dma_addr_t spin_addr;	/* DMA address to spin onto */
+	int spin_ref;		/* number of spinning references */
 #ifdef CONFIG_SA1111
-	int dma_a, dma_b, last_dma;	/* SA-1111 specific */
+	int dma_a, dma_b, last_dma; /* SA-1111 specific */
 #endif
 } sa1100_dma_t;
 

@@ -455,6 +455,17 @@ typedef PCMCIAPrtType	PCMCIAType [PCMCIASp/PCMCIAPrtSp] ;
 #define _Ser3UTSR0	_UTSR0 (3)	/* Ser. port 3 UART Status Reg. 0  */
 #define _Ser3UTSR1	_UTSR1 (3)	/* Ser. port 3 UART Status Reg. 1  */
 
+/*
+ * Register offsets
+ */
+#define UTCR0		0x00
+#define UTCR1		0x04
+#define UTCR2		0x08
+#define UTCR3		0x0c
+#define UTDR		0x14
+#define UTSR0		0x1c
+#define UTSR1		0x20
+
 #if LANGUAGE == C
 
 #define Ser1UTCR0	        	/* Ser. port 1 UART Control Reg. 0 */ \
@@ -1917,6 +1928,7 @@ typedef PCMCIAPrtType	PCMCIAType [PCMCIASp/PCMCIAPrtSp] ;
                 	(0xA0000010 + (Nb)*4)
 #define _MSC0   	_MSC (0)	/*  Static memory Control reg. 0   */
 #define _MSC1   	_MSC (1)	/*  Static memory Control reg. 1   */
+#define _MSC2		0xA000002C	/*  Static memory Control reg. 2, not contiguous   */
 
 #if LANGUAGE == C
                 	        	/* Memory system:                  */
@@ -1925,6 +1937,7 @@ typedef PCMCIAPrtType	PCMCIAType [PCMCIASp/PCMCIAPrtSp] ;
                 	((volatile Word *) io_p2v (_MSC (0)))
 #define MSC0    	(MSC [0])	/*  Static memory Control reg. 0   */
 #define MSC1    	(MSC [1])	/*  Static memory Control reg. 1   */
+#define MSC2    	(*(volatile Word *) io_p2v (_MSC2))	/*  Static memory Control reg. 2   */
 
 #elif LANGUAGE == Assembly
 
@@ -2748,10 +2761,10 @@ typedef PCMCIAPrtType	PCMCIAType [PCMCIASp/PCMCIAPrtSp] ;
 #define LCCR1_DisWdth(Pixel)    	/*  Display Width [16..1024 pix.]  */ \
                 	(((Pixel) - 16)/16 << FShft (LCCR1_PPL))
 #define LCCR1_HSW	Fld (6, 10)	/* Horizontal Synchronization      */
-                	        	/* pulse Width - 2 [Tpix] (L_LCLK) */
+					/* pulse Width - 1 [Tpix] (L_LCLK) */
 #define LCCR1_HorSnchWdth(Tpix) 	/*  Horizontal Synchronization     */ \
-                	        	/*  pulse Width [2..65 Tpix]       */ \
-                	(((Tpix) - 2) << FShft (LCCR1_HSW))
+					/*  pulse Width [1..64 Tpix]       */ \
+			(((Tpix) - 1) << FShft (LCCR1_HSW))
 #define LCCR1_ELW	Fld (8, 16)	/* End-of-Line pixel clock Wait    */
                 	        	/* count - 1 [Tpix]                */
 #define LCCR1_EndLnDel(Tpix)    	/*  End-of-Line Delay              */ \
@@ -2825,8 +2838,8 @@ typedef PCMCIAPrtType	PCMCIAType [PCMCIASp/PCMCIAPrtSp] ;
 #define LCCR3_HorSnchL	(LCCR3_HSP*1)	/*  Horizontal Synchronization     */
                 	        	/*  pulse active Low               */
 #define LCCR3_PCP	0x00400000	/* Pixel Clock Polarity (L_PCLK)   */
-#define LCCR3_PixFlEdg	(LCCR3_PCP*0)	/*  Pixel clock Falling-Edge       */
-#define LCCR3_PixRsEdg	(LCCR3_PCP*1)	/*  Pixel clock Rising-Edge        */
+#define LCCR3_PixRsEdg	(LCCR3_PCP*0)	/*  Pixel clock Rising-Edge        */
+#define LCCR3_PixFlEdg	(LCCR3_PCP*1)	/*  Pixel clock Falling-Edge       */
 #define LCCR3_OEP	0x00800000	/* Output Enable Polarity (L_BIAS, */
                 	        	/* active display mode)            */
 #define LCCR3_OutEnH	(LCCR3_OEP*0)	/*  Output Enable active High      */

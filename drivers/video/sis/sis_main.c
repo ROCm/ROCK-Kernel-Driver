@@ -8,7 +8,6 @@
  *
  */
 
-#define EXPORT_SYMTAB
 #undef  SISFBDEBUG
 
 #include <linux/config.h>

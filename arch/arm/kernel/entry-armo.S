@@ -25,52 +25,10 @@
  *  Ok, so this file may be a mess, but its as efficient as possible while
  *  adhering to the above criteria.
  */
-#include <linux/linkage.h>
 #include <linux/config.h>
-
-#include <asm/assembler.h>
-#include <asm/constants.h>
-#include <asm/errno.h>
-#include <asm/hardware.h>
-
-		.macro	zero_fp
-#ifndef CONFIG_NO_FRAME_POINTER
-		mov	fp, #0
-#endif
-		.endm
+#include "entry-header.S"
 
 		.text
-
-@ Bad Abort numbers
-@ -----------------
-@
-#define BAD_PREFETCH	0
-#define BAD_DATA	1
-#define BAD_ADDREXCPTN	2
-#define BAD_IRQ		3
-#define BAD_UNDEFINSTR	4
-
-@
-@ Stack format (ensured by USER_* and SVC_*)
-@
-#define S_OLD_R0	64
-#define S_PSR		60
-#define S_PC		60
-#define S_LR		56
-#define S_SP		52
-#define S_IP		48
-#define S_FP		44
-#define S_R10		40
-#define S_R9		36
-#define S_R8		32
-#define S_R7		28
-#define S_R6		24
-#define S_R5		20
-#define S_R4		16
-#define S_R3		12
-#define S_R2		8
-#define S_R1		4
-#define S_R0		0
 
 #ifdef IOC_BASE
 /* IOC / IOMD based hardware */
@@ -140,49 +98,6 @@ irq_prio_h:	.byte	 0, 8, 9, 8,10,10,10,10,11,11,11,11,10,10,10,10
 /*=============================================================================
  * For entry-common.S
  */
-
-		.macro	save_user_regs
-		str	r0, [sp, #-4]!
-		str	lr, [sp, #-4]!
-		sub	sp, sp, #15*4
-		stmia	sp, {r0 - lr}^
-		mov	r0, r0
-		.endm
-
-		.macro	restore_user_regs
-		ldmia	sp, {r0 - lr}^
-		mov	r0, r0
-		ldr	lr, [sp, #15*4]
-		add	sp, sp, #15*4+8
-		movs	pc, lr
-		.endm
-
-		.macro	mask_pc, rd, rm
-		bic	\rd, \rm, #PCMASK
-		.endm
-
-		.macro	arm700_bug_check, instr, temp
-		.endm
-
-		.macro	enable_irqs, temp
-		teqp	pc, #0x00000003
-		.endm
-
-		.macro	initialise_traps_extra
-		.endm
-
-		.macro	get_current_task, rd
-		mov	\rd, sp, lsr #13
-		mov	\rd, \rd, lsl #13
-		.endm
-
-		/*
-		 * Like adr, but force SVC mode (if required)
-		 */
-		.macro	adrsvc, cond, reg, label
-		adr\cond	\reg, \label
-		orr\cond	\reg, \reg, #0x08000003
-		.endm
 
 #if 0
 /*
@@ -275,7 +190,7 @@ __und_svc:	SVC_SAVE_ALL				@ Non-user mode
 		bl	SYMBOL_NAME(do_undefinstr)
 		SVC_RESTORE_ALL
 
-#ifdef CONFIG_NWFPE
+#if defined CONFIG_FPE_NWFPE || defined CONFIG_FPE_FASTFPE
 		/* The FPE is always present */
 		.equ	fpe_not_present, 0
 #else
@@ -334,7 +249,7 @@ vector_prefetch:
 		mov	r1, sp			@ Tasks registers
 		bl	SYMBOL_NAME(do_PrefetchAbort)
 		teq	r0, #0			@ If non-zero, we believe this abort..
-		bne	ret_from_sys_call
+		bne	ret_from_exception
 #ifdef DEBUG_UNDEF
 		adr	r0, t
 		bl	SYMBOL_NAME(printk)
@@ -440,9 +355,10 @@ vector_IRQ:	ldr	r13, .LCirq			@ I will leave this one in just in case...
 		adr	lr, 1b
 		orr	lr, lr, #0x08000003		@ Force SVC
 		bne	do_IRQ
-		mov	r4, #0
+
+		mov	why, #0
 		get_current_task r5
-		b	ret_with_reschedule
+		b	ret_to_user
 
 		irq_prio_table
 
@@ -645,6 +561,19 @@ Ldata_ldcstc_pre:
 #endif
 		b	SYMBOL_NAME(do_DataAbort)
 
+
+/*
+ * This is the return code to user mode for abort handlers
+ */
+ENTRY(ret_from_exception)
+		get_current_task tsk
+		mov	why, #0
+		b	ret_to_user
+
+		.data
+ENTRY(fp_enter)
+		.word	fpe_not_present
+		.text
 /*
  * Register switch for older 26-bit only ARMs
  */
@@ -697,10 +626,6 @@ ENTRY(__trap_init)
 		mov	r0, #0
 		stmia	r0, {r1 - r7, ip}
 		ldmfd	sp!, {r4 - r7, pc}^
-
-		.text
-
-#include "entry-common.S"
 
 		.bss
 __temp_irq:	.space	4				@ saved lr_irq

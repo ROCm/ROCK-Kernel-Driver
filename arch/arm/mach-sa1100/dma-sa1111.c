@@ -204,7 +204,7 @@ int sa1111_sac_request_dma(dmach_t *channel, const char *device_id,
 
 	dma = &dma_chan[ch];
 
-	if (xchg(&dma->lock, 1) == 1) {
+	if (xchg(&dma->in_use, 1) == 1) {
 	  	printk(KERN_ERR "%s: SA-1111 SAC DMA channel %d in use\n",
 		       device_id, ch);
 		return -EBUSY;
@@ -217,7 +217,7 @@ int sa1111_sac_request_dma(dmach_t *channel, const char *device_id,
 		printk(KERN_ERR
 		       "%s: unable to request IRQ %d for DMA channel %d (A)\n",
 		       device_id, irq, ch);
-		dma->lock = 0;
+		dma->in_use = 0;
 		return err;
 	}
 
@@ -228,7 +228,7 @@ int sa1111_sac_request_dma(dmach_t *channel, const char *device_id,
 		printk(KERN_ERR
 		       "%s: unable to request IRQ %d for DMA channel %d (B)\n",
 		       device_id, irq, ch);
-		dma->lock = 0;
+		dma->in_use = 0;
 		return err;
 	}
 
@@ -246,7 +246,25 @@ int sa1111_sac_request_dma(dmach_t *channel, const char *device_id,
 
 int sa1111_dma_get_current(dmach_t channel, void **buf_id, dma_addr_t *addr)
 {
-	return -ENOSYS;
+	sa1100_dma_t *dma = &dma_chan[channel];
+	int flags, ret;
+
+	local_irq_save(flags);
+	if (dma->curr && dma->spin_ref <= 0) {
+		dma_buf_t *buf = dma->curr;
+		if (buf_id)
+			*buf_id = buf->id;
+		/* not fully accurate but still... */
+		*addr = buf->dma_ptr;
+		ret = 0;
+	} else {
+		if (buf_id)
+			*buf_id = NULL;
+		*addr = 0;
+		ret = -ENXIO;
+	}
+	local_irq_restore(flags);
+	return ret;
 }
 
 int sa1111_dma_stop(dmach_t channel)
@@ -269,7 +287,7 @@ void sa1111_cleanup_sac_dma(dmach_t channel)
 
 
 /* According to the "Intel StrongARM SA-1111 Microprocessor Companion
- * Chip Specification Update" (June 2000), errata #7, there is a
+ * Chip Specification Update" (June 2000), erratum #7, there is a
  * significant bug in Serial Audio Controller DMA. If the SAC is
  * accessing a region of memory above 1MB relative to the bank base,
  * it is important that address bit 10 _NOT_ be asserted. Depending
@@ -288,7 +306,7 @@ int sa1111_check_dma_bug(dma_addr_t addr){
 	 * SDRAM bank 1 on Neponset). The default configuration selects
 	 * Assabet, so any address in bank 1 is necessarily invalid.
 	 */
-	if(machine_is_assabet() && addr >= _DRAMBnk1)
+	if((machine_is_assabet() || machine_is_pfs168()) && addr >= _DRAMBnk1)
 	  	return -1;
 
 	/* The bug only applies to buffers located more than one megabyte
@@ -336,11 +354,12 @@ EXPORT_SYMBOL(sa1111_sac_request_dma);
 EXPORT_SYMBOL(sa1111_check_dma_bug);
 
 
-static void __init sa1111_init_sac_dma(void)
+static int __init sa1111_init_sac_dma(void)
 {
 	int channel = SA1111_SAC_DMA_BASE;
 	dma_chan[channel++].regs = (dma_regs_t *) &SADTCS;
 	dma_chan[channel++].regs = (dma_regs_t *) &SADRCS;
+	return 0;
 }
 
 __initcall(sa1111_init_sac_dma);

@@ -300,7 +300,9 @@ time_init(void)
 
 	/* PC-like is standard; used for year < 20 || year >= 70 */
 	epoch = 1900;
-	if (year >= 20 && year < 48)
+	if (year < 20)
+		epoch = 2000;
+	else if (year >= 20 && year < 48)
 		/* NT epoch */
 		epoch = 1980;
 	else if (year >= 48 && year < 70)

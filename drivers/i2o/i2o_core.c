@@ -43,6 +43,7 @@
 #include <linux/interrupt.h>
 #include <linux/sched.h>
 #include <asm/semaphore.h>
+#include <linux/completion.h>
 
 #include <asm/io.h>
 #include <linux/reboot.h>
@@ -58,15 +59,15 @@
 #endif
 
 /* OSM table */
-static struct i2o_handler *i2o_handlers[MAX_I2O_MODULES] = {NULL};
+static struct i2o_handler *i2o_handlers[MAX_I2O_MODULES];
 
 /* Controller list */
-static struct i2o_controller *i2o_controllers[MAX_I2O_CONTROLLERS] = {NULL};
-struct i2o_controller *i2o_controller_chain = NULL;
-int i2o_num_controllers = 0;
+static struct i2o_controller *i2o_controllers[MAX_I2O_CONTROLLERS];
+struct i2o_controller *i2o_controller_chain;
+int i2o_num_controllers;
 
 /* Initiator Context for Core message */
-static int core_context = 0;
+static int core_context;
 
 /* Initialization && shutdown functions */
 static void i2o_sys_init(void);
@@ -107,9 +108,9 @@ void i2o_report_controller_unit(struct i2o_controller *, struct i2o_device *);
  * sys_tbl_ver is the CurrentChangeIndicator that is
  * used by IOPs to track changes.
  */
-static struct i2o_sys_tbl *sys_tbl = NULL;
-static int sys_tbl_ind = 0;
-static int sys_tbl_len = 0;
+static struct i2o_sys_tbl *sys_tbl;
+static int sys_tbl_ind;
+static int sys_tbl_len;
 
 /*
  * This spin lock is used to keep a device from being
@@ -154,8 +155,8 @@ struct i2o_post_wait_data
 	struct i2o_post_wait_data *next;	/* Chain */
 	void *mem[2];		/* Memory blocks to recover on failure path */
 };
-static struct i2o_post_wait_data *post_wait_queue = NULL;
-static u32 post_wait_id = 0;	// Unique ID for each post_wait
+static struct i2o_post_wait_data *post_wait_queue;
+static u32 post_wait_id;	// Unique ID for each post_wait
 static spinlock_t post_wait_lock = SPIN_LOCK_UNLOCKED;
 static void i2o_post_wait_complete(u32, int);
 
@@ -182,9 +183,9 @@ struct reply_info
 };
 static struct reply_info evt_reply;
 static struct reply_info events[I2O_EVT_Q_LEN];
-static int evt_in = 0;
-static int evt_out = 0;
-static int evt_q_len = 0;
+static int evt_in;
+static int evt_out;
+static int evt_q_len;
 #define MODINC(x,y) ((x) = ((x) + 1) % (y))
 
 /*
@@ -206,7 +207,7 @@ static spinlock_t i2o_evt_lock = SPIN_LOCK_UNLOCKED;
  */
  
 static DECLARE_MUTEX(evt_sem);
-static DECLARE_MUTEX_LOCKED(evt_dead);
+static DECLARE_COMPLETION(evt_dead);
 DECLARE_WAIT_QUEUE_HEAD(evt_wait);
 
 static struct notifier_block i2o_reboot_notifier =
@@ -220,7 +221,7 @@ static struct notifier_block i2o_reboot_notifier =
  *	Config options
  */
 
-static int verbose = 0;
+static int verbose;
 MODULE_PARM(verbose, "i");
 
 /*
@@ -905,7 +906,7 @@ static int i2o_core_evt(void *reply_data)
 			dprintk(KERN_INFO "I2O event thread dead\n");
 			printk("exiting...");
 			evt_running = 0;
-			up_and_exit(&evt_dead, 0);
+			complete_and_exit(&evt_dead, 0);
 		}
 
 		/* 
@@ -1915,11 +1916,71 @@ static int i2o_systab_send(struct i2o_controller *iop)
 	u32 *privbuf = kmalloc(16, GFP_KERNEL);
 	if(privbuf == NULL)
 		return -ENOMEM;
-
-	privbuf[0] = iop->status_block->current_mem_base;
-	privbuf[1] = iop->status_block->current_mem_size;
-	privbuf[2] = iop->status_block->current_io_base;
-	privbuf[3] = iop->status_block->current_io_size;
+	
+	if(iop->type == I2O_TYPE_PCI)
+	{
+		struct resource *root;
+		
+		if(iop->status_block->current_mem_size < iop->status_block->desired_mem_size)
+		{
+			struct resource *res = &iop->mem_resource;
+			res->name = iop->bus.pci.pdev->bus->name;
+			res->flags = IORESOURCE_MEM;
+			res->start = 0;
+			res->end = 0;
+			printk("%s: requires private memory resources.\n", iop->name);
+			root = pci_find_parent_resource(iop->bus.pci.pdev, res);
+			if(root==NULL)
+				printk("Can't find parent resource!\n");
+			if(root && allocate_resource(root, res, 
+					iop->status_block->desired_mem_size,
+					iop->status_block->desired_mem_size,
+					iop->status_block->desired_mem_size,
+					1<<20,	/* Unspecified, so use 1Mb and play safe */
+					NULL,
+					NULL)>=0)
+			{
+				iop->mem_alloc = 1;
+				iop->status_block->current_mem_size = 1 + res->end - res->start;
+				iop->status_block->current_mem_base = res->start;
+				printk(KERN_INFO "%s: allocated %ld bytes of PCI memory at 0x%08lX.\n", 
+					iop->name, 1+res->end-res->start, res->start);
+			}
+		}
+		if(iop->status_block->current_io_size < iop->status_block->desired_io_size)
+		{
+			struct resource *res = &iop->io_resource;
+			res->name = iop->bus.pci.pdev->bus->name;
+			res->flags = IORESOURCE_IO;
+			res->start = 0;
+			res->end = 0;
+			printk("%s: requires private memory resources.\n", iop->name);
+			root = pci_find_parent_resource(iop->bus.pci.pdev, res);
+			if(root==NULL)
+				printk("Can't find parent resource!\n");
+			if(root &&  allocate_resource(root, res, 
+					iop->status_block->desired_io_size,
+					iop->status_block->desired_io_size,
+					iop->status_block->desired_io_size,
+					1<<20,	/* Unspecified, so use 1Mb and play safe */
+					NULL,
+					NULL)>=0)
+			{
+				iop->io_alloc = 1;
+				iop->status_block->current_io_size = 1 + res->end - res->start;
+				iop->status_block->current_mem_base = res->start;
+				printk(KERN_INFO "%s: allocated %ld bytes of PCI I/O at 0x%08lX.\n", 
+					iop->name, 1+res->end-res->start, res->start);
+			}
+		}
+	}
+	else
+	{	
+		privbuf[0] = iop->status_block->current_mem_base;
+		privbuf[1] = iop->status_block->current_mem_size;
+		privbuf[2] = iop->status_block->current_io_base;
+		privbuf[3] = iop->status_block->current_io_size;
+	}
 
 	msg[0] = I2O_MESSAGE_SIZE(12) | SGL_OFFSET_6;
 	msg[1] = I2O_CMD_SYS_TAB_SET<<24 | HOST_TID<<12 | ADAPTER_TID;
@@ -1936,10 +1997,10 @@ static int i2o_systab_send(struct i2o_controller *iop)
  	 */
 	msg[6] = 0x54000000 | sys_tbl_len;
 	msg[7] = virt_to_bus(sys_tbl);
-	msg[8] = 0x54000000 | 0;
+	msg[8] = 0x54000000 | 8;
 	msg[9] = virt_to_bus(privbuf);
-	msg[10] = 0xD4000000 | 0;
-	msg[11] = virt_to_bus(privbuf+8);
+	msg[10] = 0xD4000000 | 8;
+	msg[11] = virt_to_bus(privbuf+2);
 
 	ret=i2o_post_wait_mem(iop, msg, sizeof(msg), 120, privbuf, NULL);
 	
@@ -3427,7 +3488,7 @@ void cleanup_module(void)
 		stat = kill_proc(evt_pid, SIGTERM, 1);
 		if(!stat) {
 			printk("waiting...");
-			down(&evt_dead);
+			wait_for_completion(&evt_dead);
 		}
 		printk("done.\n");
 	}

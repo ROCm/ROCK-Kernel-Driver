@@ -32,7 +32,7 @@ static void arch_idle(void)
 	cpu_do_idle(0);
 }
 
-extern __inline__ void arch_reset(char mode)
+static inline void arch_reset(char mode)
 {
 	unsigned int hdr_ctrl =	(IO_ADDRESS(INTEGRATOR_HDR_BASE) + INTEGRATOR_HDR_CTRL_OFFSET);
 	unsigned int val;

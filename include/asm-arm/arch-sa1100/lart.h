@@ -1,0 +1,7 @@
+#ifndef _INCLUDE_LART_H
+#define _INCLUDE_LART_H
+
+#define GPIO_UCB1200_IRQ        GPIO_GPIO (18)
+#define IRQ_GPIO_UCB1200_IRQ    IRQ_GPIO18
+
+#endif

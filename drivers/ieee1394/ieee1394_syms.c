@@ -9,8 +9,9 @@
  * directory of the kernel sources for details.
  */
 
-#include <linux/types.h>
+#include <linux/config.h>
 #include <linux/module.h>
+#include <linux/types.h>
 #include <linux/string.h>
 
 #include "ieee1394_types.h"
@@ -35,7 +36,6 @@ EXPORT_SYMBOL(hpsb_selfid_received);
 EXPORT_SYMBOL(hpsb_selfid_complete);
 EXPORT_SYMBOL(hpsb_packet_sent);
 EXPORT_SYMBOL(hpsb_packet_received);
-EXPORT_SYMBOL(hpsb_generation);
 
 EXPORT_SYMBOL(get_tlabel);
 EXPORT_SYMBOL(free_tlabel);
@@ -75,6 +75,7 @@ EXPORT_SYMBOL(highlevel_add_host);
 EXPORT_SYMBOL(highlevel_remove_host);
 EXPORT_SYMBOL(highlevel_host_reset);
 EXPORT_SYMBOL(highlevel_add_one_host);
-EXPORT_SYMBOL(hpsb_guid_get_handle);
+EXPORT_SYMBOL(hpsb_guid_get_entry);
+EXPORT_SYMBOL(hpsb_nodeid_get_entry);
 EXPORT_SYMBOL(hpsb_get_host_by_ne);
 EXPORT_SYMBOL(hpsb_guid_fill_packet);

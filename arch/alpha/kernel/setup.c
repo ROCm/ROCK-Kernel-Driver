@@ -154,6 +154,7 @@ WEAK(ruffian_mv);
 WEAK(rx164_mv);
 WEAK(sable_mv);
 WEAK(sable_gamma_mv);
+WEAK(shark_mv);
 WEAK(sx164_mv);
 WEAK(takara_mv);
 WEAK(webbrick_mv);
@@ -665,9 +666,10 @@ static int titan_indices[] = {0,1};
 
 static char tsunami_names[][16] = {
 	"0", "DP264", "Warhol", "Windjammer", "Monet", "Clipper",
-	"Goldrush", "Webbrick", "Catamaran"
+	"Goldrush", "Webbrick", "Catamaran", "Brisbane", "Melbourne",
+	"Flying Clipper", "Shark"
 };
-static int tsunami_indices[] = {0,1,2,3,4,5,6,7,8};
+static int tsunami_indices[] = {0,1,2,3,4,5,6,7,8,9,10,11,12};
 
 static struct alpha_machine_vector * __init
 get_sysvec(long type, long variation, long cpu)
@@ -767,6 +769,10 @@ get_sysvec(long type, long variation, long cpu)
 		&dp264_mv,		/* goldrush */
 		&webbrick_mv,		/* webbrick */
 		&dp264_mv,		/* catamaran */
+		NULL,			/* brisbane? */
+		NULL,			/* melbourne? */
+		NULL,			/* flying clipper? */
+		&shark_mv,		/* shark */
 	};
 
 	/* ??? Do we need to distinguish between Rawhides?  */
@@ -880,6 +886,7 @@ get_sysvec_byname(const char *name)
 		&rx164_mv,
 		&sable_mv,
 		&sable_gamma_mv,
+		&shark_mv,
 		&sx164_mv,
 		&takara_mv,
 		&webbrick_mv,

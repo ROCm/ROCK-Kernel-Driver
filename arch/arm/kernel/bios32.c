@@ -527,14 +527,6 @@ void pcibios_align_resource(void *data, struct resource *res, unsigned long size
 }
 
 /**
- * pcibios_set_master - Setup device for bus mastering.
- * @dev: PCI device to be setup
- */
-void pcibios_set_master(struct pci_dev *dev)
-{
-}
-
-/**
  * pcibios_enable_device - Enable I/O and memory.
  * @dev: PCI device to be enabled
  */

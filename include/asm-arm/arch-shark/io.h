@@ -11,7 +11,8 @@
 #ifndef __ASM_ARM_ARCH_IO_H
 #define __ASM_ARM_ARCH_IO_H
 
-#define __arch_ioremap(off,size,nocache) __ioremap(off,size,0)
+#define iomem_valid_addr(off,sz)	(1)
+#define iomem_to_phys(off)		(off)
 
 #define IO_SPACE_LIMIT 0xffffffff
 
@@ -28,7 +29,7 @@
  * optimize the expressions
  */
 #define DECLARE_DYN_OUT(fnsuffix,instr)						\
-extern __inline__ void __out##fnsuffix (unsigned int value, unsigned int port)	\
+static inline void __out##fnsuffix (unsigned int value, unsigned int port)	\
 {										\
 	unsigned long temp;							\
 	__asm__ __volatile__(							\
@@ -42,7 +43,7 @@ extern __inline__ void __out##fnsuffix (unsigned int value, unsigned int port)	\
 }
 
 #define DECLARE_DYN_IN(sz,fnsuffix,instr)					\
-extern __inline__ unsigned sz __in##fnsuffix (unsigned int port)		\
+static inline unsigned sz __in##fnsuffix (unsigned int port)		\
 {										\
 	unsigned long temp, value;						\
 	__asm__ __volatile__(							\
@@ -56,7 +57,7 @@ extern __inline__ unsigned sz __in##fnsuffix (unsigned int port)		\
 	return (unsigned sz)value;						\
 }
 
-extern __inline__ unsigned int __ioaddr (unsigned int port)			\
+static inline unsigned int __ioaddr (unsigned int port)			\
 {										\
 	if (__PORT_PCIO(port))							\
 		return (unsigned int)(PCIO_BASE + (port));			\

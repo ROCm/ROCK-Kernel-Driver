@@ -611,7 +611,7 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 						!(exp->ex_flags & NFSEXP_NOSUBTREECHECK));
 		}
 		if (IS_ERR(dentry)) {
-			if (PTR_ERR(dentry) != EINVAL)
+			if (PTR_ERR(dentry) != -EINVAL)
 				error = nfserrno(PTR_ERR(dentry));
 			goto out;
 		}

@@ -52,7 +52,18 @@ extern unsigned char gc_kbd_sysrq_xlate[128];
 #define kbd_disable_irq         gc_kbd_disable_irq
 #define kbd_sysrq_xlate         gc_kbd_sysrq_xlate
 
-#elif defined(CONFIG_SA1111)   /*@@@@@*/
+#elif CONFIG_SA1100_BITSY
+
+#define kbd_setkeycode(x...)    (-ENOSYS)
+#define kbd_getkeycode(x...)    (-ENOSYS)
+#define kbd_translate(sc_,kc_,rm_)	((*(kc_)=(sc_)),1)
+#define kbd_unexpected_up(x...) (1)
+#define kbd_leds(x...)		do { } while (0)
+#define kbd_init_hw(x...)	do { } while (0)
+#define kbd_enable_irq(x...)	do { } while (0)
+#define kbd_disable_irq(x...)	do { } while (0)
+
+#elif 0 //defined(CONFIG_SA1111)   /*@@@@@*/
 
 #define KEYBOARD_IRQ           TPRXINT
 #define DISABLE_KBD_DURING_INTERRUPTS  0
@@ -158,7 +169,7 @@ extern unsigned char sa1111_sysrq_xlate[128];
 
 /* needed if MAGIC_SYSRQ is enabled for serial console */
 #ifndef SYSRQ_KEY
-#define SYSRQ_KEY		-1
+#define SYSRQ_KEY		((unsigned char)(-1))
 #define kbd_sysrq_xlate         ((unsigned char *)NULL)
 #endif
 

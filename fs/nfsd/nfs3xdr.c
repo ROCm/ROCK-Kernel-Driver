@@ -160,11 +160,6 @@ encode_fattr3(struct svc_rqst *rqstp, u32 *p, struct dentry *dentry)
 {
 	struct inode	*inode = dentry->d_inode;
 
-	if (!inode) {
-		printk("nfsd: NULL inode in %s:%d", __FILE__, __LINE__);
-		return NULL;
-	}
-
 	*p++ = htonl(nfs3_ftypes[(inode->i_mode & S_IFMT) >> 12]);
 	*p++ = htonl((u32) inode->i_mode);
 	*p++ = htonl((u32) inode->i_nlink);
@@ -515,9 +510,8 @@ int
 nfs3svc_encode_attrstat(struct svc_rqst *rqstp, u32 *p,
 					struct nfsd3_attrstat *resp)
 {
-	if (resp->status == 0
-	 && !(p = encode_fattr3(rqstp, p, resp->fh.fh_dentry)))
-		return 0;
+	if (resp->status == 0)
+		p = encode_fattr3(rqstp, p, resp->fh.fh_dentry);
 	return xdr_ressize_check(rqstp, p);
 }
 
@@ -526,8 +520,7 @@ int
 nfs3svc_encode_wccstat(struct svc_rqst *rqstp, u32 *p,
 					struct nfsd3_attrstat *resp)
 {
-	if (!(p = encode_wcc_data(rqstp, p, &resp->fh)))
-		return 0;
+	p = encode_wcc_data(rqstp, p, &resp->fh);
 	return xdr_ressize_check(rqstp, p);
 }
 

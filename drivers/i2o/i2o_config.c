@@ -183,12 +183,6 @@ struct i2o_handler cfg_handler=
 	0xffffffff	// All classes
 };
 
-static long long cfg_llseek(struct file *file, long long offset, int origin)
-{
-	return -ESPIPE;
-}
-
-
 static ssize_t cfg_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 {
 	printk(KERN_INFO "i2o_config write not yet supported\n");
@@ -899,7 +893,7 @@ static int cfg_fasync(int fd, struct file *fp, int on)
 static struct file_operations config_fops =
 {
 	owner:		THIS_MODULE,
-	llseek:		cfg_llseek,
+	llseek:		no_llseek,
 	read:		cfg_read,
 	write:		cfg_write,
 	ioctl:		cfg_ioctl,

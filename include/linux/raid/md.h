@@ -36,6 +36,7 @@
 #include <linux/locks.h>
 #include <linux/kernel_stat.h>
 #include <asm/io.h>
+#include <linux/completion.h>
 
 #include <linux/raid/md_compatible.h>
 /*

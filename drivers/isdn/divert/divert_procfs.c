@@ -276,15 +276,9 @@ isdn_divert_ioctl(struct inode *inode, struct file *file,
 
 
 #ifdef CONFIG_PROC_FS
-static loff_t
-isdn_divert_lseek(struct file *file, loff_t offset, int orig)
-{
-	return -ESPIPE;
-}
-
 static struct file_operations isdn_fops =
 {
-	llseek:         isdn_divert_lseek,
+	llseek:         no_llseek,
 	read:           isdn_divert_read,
 	write:          isdn_divert_write,
 	poll:           isdn_divert_poll,

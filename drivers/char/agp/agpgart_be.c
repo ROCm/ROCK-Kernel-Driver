@@ -2338,6 +2338,7 @@ static int serverworks_create_gatt_table(void)
 	retval = serverworks_create_gatt_pages(value->num_entries / 1024);
 	if (retval != 0) {
 		serverworks_free_page_map(&page_dir);
+		serverworks_free_page_map(&serverworks_private.scratch_dir);
 		return retval;
 	}
 

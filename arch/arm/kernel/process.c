@@ -21,6 +21,7 @@
 #include <linux/user.h>
 #include <linux/delay.h>
 #include <linux/reboot.h>
+#include <linux/interrupt.h>
 #include <linux/init.h>
 
 #include <asm/system.h>
@@ -38,8 +39,6 @@
 
 extern const char *processor_modes[];
 extern void setup_mm_for_reboot(char mode);
-
-asmlinkage void ret_from_sys_call(void) __asm__("ret_from_sys_call");
 
 static volatile int hlt_counter;
 
@@ -296,6 +295,8 @@ void release_thread(struct task_struct *dead_task)
 {
 }
 
+asmlinkage void ret_from_fork(void) __asm__("ret_from_fork");
+
 int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 	unsigned long unused,
 	struct task_struct * p, struct pt_regs * regs)
@@ -311,7 +312,9 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 	childregs->ARM_sp = esp;
 
 	save = ((struct context_save_struct *)(childregs)) - 1;
-	init_thread_css(save);
+	*save = INIT_CSS;
+	save->pc |= (unsigned long)ret_from_fork;
+
 	p->thread.save = save;
 
 	return 0;

@@ -31,6 +31,17 @@
  *	Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
  *  History
+ *  v0.14.9b
+ *	Switch to static inline not extern inline (gcc 3)
+ *  v0.14.9a
+ *	Aug 6 2001 Alan Cox
+ *	0.14.9 crashed on rmmod due to a timer/bh left running. Simplified
+ *	the existing logic (the BH doesnt help as ac97 is lock_irqsave)
+ *	and used del_timer_sync to clean up
+ *	Fixed a problem where the ALi change broke my generic card
+ *  v0.14.9
+ *	Jul 10 2001 Matt Wu
+ *	Add H/W Volume Control
  *  v0.14.8a
  *	July 7 2001 Alan Cox
  *	Moved Matt Wu's ac97 register cache into the card structure
@@ -146,6 +157,7 @@
 #include <asm/hardirq.h>
 #include <linux/bitops.h>
 #include <linux/proc_fs.h>
+#include <linux/interrupt.h>
 
 #if defined CONFIG_ALPHA_NAUTILUS || CONFIG_ALPHA_GENERIC
 #include <asm/hwrpb.h>
@@ -155,7 +167,7 @@
 
 #include <linux/pm.h>
 
-#define DRIVER_VERSION "0.14.8"
+#define DRIVER_VERSION "0.14.9b"
 
 /* magic numbers to protect our data structures */
 #define TRIDENT_CARD_MAGIC	0x5072696E /* "Prin" */
@@ -348,6 +360,10 @@ struct trident_card {
 	int rec_channel_use_count;
 	u16 mixer_regs[64][NR_AC97];	/* Made card local by Alan */
 	int mixer_regs_ready;
+
+	/* Added for hardware volume control */
+	int hwvolctl;
+	struct timer_list timer;
 };
 
 /* table to map from CHANNELMASK to channel attribute for SiS 7018 */
@@ -379,7 +395,6 @@ static u16 trident_ac97_get(struct ac97_codec *codec, u8 reg);
 static int trident_open_mixdev(struct inode *inode, struct file *file);
 static int trident_ioctl_mixdev(struct inode *inode, struct file *file, unsigned int cmd,
 				unsigned long arg);
-static loff_t trident_llseek(struct file *file, loff_t offset, int origin);
 
 static void ali_ac97_set(struct trident_card *card, int secondary, u8 reg, u16 val);
 static u16 ali_ac97_get(struct trident_card *card, int secondary, u8 reg);
@@ -890,7 +905,7 @@ static void trident_rec_setup(struct trident_state *state)
 
 /* get current playback/recording dma buffer pointer (byte offset from LBA),
    called with spinlock held! */
-extern __inline__ unsigned trident_get_dma_addr(struct trident_state *state)
+static inline unsigned trident_get_dma_addr(struct trident_state *state)
 {
 	struct dmabuf *dmabuf = &state->dmabuf;
 	u32 cso;
@@ -928,7 +943,7 @@ extern __inline__ unsigned trident_get_dma_addr(struct trident_state *state)
 }
 
 /* Stop recording (lock held) */
-extern __inline__ void __stop_adc(struct trident_state *state)
+static inline void __stop_adc(struct trident_state *state)
 {
 	struct dmabuf *dmabuf = &state->dmabuf;
 	unsigned int chan_num = dmabuf->channel->num;
@@ -966,7 +981,7 @@ static void start_adc(struct trident_state *state)
 }
 
 /* stop playback (lock held) */
-extern __inline__ void __stop_dac(struct trident_state *state)
+static inline void __stop_dac(struct trident_state *state)
 {
 	struct dmabuf *dmabuf = &state->dmabuf;
 	unsigned int chan_num = dmabuf->channel->num;
@@ -1415,10 +1430,109 @@ static void trident_address_interrupt(struct trident_card *card)
 	}
 }
 
+static void ali_hwvol_control(struct trident_card *card, int opt)
+{
+	u16 dwTemp, volume[2], mute, diff, *pVol[2];
+
+	dwTemp = ali_ac97_read(card->ac97_codec[0], 0x02);
+	mute = dwTemp & 0x8000;
+	volume[0] = dwTemp & 0x001f;
+	volume[1] = (dwTemp & 0x1f00) >> 8;
+	if (volume[0] < volume [1]) {
+		pVol[0] = &volume[0];
+		pVol[1] = &volume[1];
+	} else {
+		pVol[1] = &volume[0];
+		pVol[0] = &volume[1];
+	}
+	diff = *(pVol[1]) - *(pVol[0]);
+
+	if (opt == 1) {                     // MUTE
+		dwTemp ^= 0x8000;
+		ali_ac97_write(card->ac97_codec[0], 0x02, dwTemp);
+	} else if (opt == 2) {   // Down
+		if (mute)
+			return;
+		if (*(pVol[1]) < 0x001f) {
+			(*pVol[1])++;
+			*(pVol[0]) = *(pVol[1]) - diff;
+		}
+		dwTemp &= 0xe0e0;
+		dwTemp |= (volume[0]) | (volume[1] << 8);
+		ali_ac97_write(card->ac97_codec[0], 0x02, dwTemp);
+		card->ac97_codec[0]->mixer_state[0] = ((32-volume[0])*25/8) | (((32-volume[1])*25/8) << 8);
+	} else if (opt == 4) {   // Up
+		if (mute)
+			return;
+		if (*(pVol[0]) >0) {
+			(*pVol[0])--;
+			*(pVol[1]) = *(pVol[0]) + diff;
+		}
+		dwTemp &= 0xe0e0;
+		dwTemp |= (volume[0]) | (volume[1] << 8);
+		ali_ac97_write(card->ac97_codec[0], 0x02, dwTemp);
+		card->ac97_codec[0]->mixer_state[0] = ((32-volume[0])*25/8) | (((32-volume[1])*25/8) << 8);
+	} 
+	else 
+	{
+		/* Nothing needs doing */
+	}
+}
+
+/*
+ *	Re-enable reporting of vol change after 0.1 seconds
+ */
+
+static void ali_timeout(unsigned long ptr)
+{
+	struct trident_card *card = (struct trident_card *)ptr;
+	u16 temp = 0;
+
+	/* Enable GPIO IRQ (MISCINT bit 18h)*/
+	temp = inw(TRID_REG(card, T4D_MISCINT + 2));
+	temp |= 0x0004;
+	outw(temp, TRID_REG(card, T4D_MISCINT + 2));
+}
+
+/*
+ *	Set up the timer to clear the vol change notification
+ */
+ 
+static void ali_set_timer(struct trident_card *card)
+{
+	/* Add Timer Routine to Enable GPIO IRQ */
+	del_timer(&card->timer);	/* Never queue twice */
+	card->timer.function = ali_timeout;
+	card->timer.data = (unsigned long) card;
+	card->timer.expires = jiffies + HZ/10;
+	add_timer(&card->timer);
+}
+
+/*
+ *	Process a GPIO event
+ */
+ 
+static void ali_queue_task(struct trident_card *card, int opt)
+{
+	u16 temp;
+
+	/* Disable GPIO IRQ (MISCINT bit 18h)*/
+	temp = inw(TRID_REG(card, T4D_MISCINT + 2));
+	temp &= (u16)(~0x0004);
+	outw(temp, TRID_REG(card, T4D_MISCINT + 2));
+
+	/* Adjust the volume */
+	ali_hwvol_control(card, opt);
+	
+	/* Set the timer for 1/10th sec */
+	ali_set_timer(card);
+}
+
 static void trident_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct trident_card *card = (struct trident_card *)dev_id;
 	u32 event;
+	u32 gpio;
 
 	spin_lock(&card->lock);
 	event = inl(TRID_REG(card, T4D_MISCINT));
@@ -1431,15 +1545,25 @@ static void trident_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		card->address_interrupt(card);
 	}
 
+	if(card->pci_id == PCI_DEVICE_ID_ALI_5451)
+	{
+		/* GPIO IRQ (H/W Volume Control) */
+		event = inl(TRID_REG(card, T4D_MISCINT));
+		if (event & (1<<25)) {
+			gpio = inl(TRID_REG(card, ALI_GPIO));
+			if (!timer_pending(&card->timer)) 
+				ali_queue_task(card, gpio&0x07);
+		}
+		event = inl(TRID_REG(card, T4D_MISCINT));
+		outl(event | (ST_TARGET_REACHED | MIXER_OVERFLOW | MIXER_UNDERFLOW), TRID_REG(card, T4D_MISCINT));
+		spin_unlock(&card->lock);
+		return;
+	}
+
 	/* manually clear interrupt status, bad hardware design, blame T^2 */
 	outl((ST_TARGET_REACHED | MIXER_OVERFLOW | MIXER_UNDERFLOW),
 	     TRID_REG(card, T4D_MISCINT));
 	spin_unlock(&card->lock);
-}
-
-static loff_t trident_llseek(struct file *file, loff_t offset, int origin)
-{
-	return -ESPIPE;
 }
 
 /* in this loop, dmabuf.count signifies the amount of data that is waiting to be copied to
@@ -2459,7 +2583,7 @@ static int trident_release(struct inode *inode, struct file *file)
 
 static /*const*/ struct file_operations trident_audio_fops = {
 	owner:		THIS_MODULE,
-	llseek:		trident_llseek,
+	llseek:		no_llseek,
 	read:		trident_read,
 	write:		trident_write,
 	poll:		trident_poll,
@@ -3486,7 +3610,7 @@ static int trident_ioctl_mixdev(struct inode *inode, struct file *file, unsigned
 
 static /*const*/ struct file_operations trident_mixer_fops = {
 	owner:		THIS_MODULE,
-	llseek:		trident_llseek,
+	llseek:		no_llseek,
 	ioctl:		trident_ioctl_mixdev,
 	open:		trident_open_mixdev,
 };
@@ -3638,9 +3762,11 @@ static int __init trident_probe(struct pci_dev *pci_dev, const struct pci_device
 	unsigned long iobase;
 	struct trident_card *card;
 	dma_addr_t mask;
-	int bits;
+	u8 bits;
 	u8 revision;
 	int i = 0;
+	u16 temp;
+	struct pci_dev *pci_dev_m1533 = NULL;
 
 	if (pci_enable_device(pci_dev))
 	    return -ENODEV;
@@ -3676,8 +3802,11 @@ static int __init trident_probe(struct pci_dev *pci_dev, const struct pci_device
 	card->banks[BANK_A].bitmap = 0UL;
 	card->banks[BANK_B].addresses = &bank_b_addrs;
 	card->banks[BANK_B].bitmap = 0UL;
+
 	init_MUTEX(&card->open_sem);
 	spin_lock_init(&card->lock);
+	init_timer(&card->timer);
+
 	devs = card;
 
 	pci_set_master(pci_dev);
@@ -3707,6 +3836,23 @@ static int __init trident_probe(struct pci_dev *pci_dev, const struct pci_device
 				res->data = card;
 			}
 #endif
+		}
+
+		/* Add H/W Volume Control By Matt Wu Jul. 06, 2001 */
+		card->hwvolctl = 0;
+		pci_dev_m1533 = pci_find_device(PCI_VENDOR_ID_AL,PCI_DEVICE_ID_AL_M1533, pci_dev_m1533);
+		if (pci_dev_m1533 == NULL)
+			return -ENODEV;
+		pci_read_config_byte(pci_dev_m1533, 0x63, &bits);
+		if (bits & (1<<5))
+			card->hwvolctl = 1;
+		if (card->hwvolctl) 
+		{
+			/* Clear m1533 pci cfg 78h bit 30 to zero, which makes
+			   GPIO11/12/13 work as ACGP_UP/DOWN/MUTE. */
+			pci_read_config_byte(pci_dev_m1533, 0x7b, &bits);
+			bits &= 0xbf; /*clear bit 6 */
+			pci_write_config_byte(pci_dev_m1533, 0x7b, bits);
 		}
 	}
 	else {
@@ -3753,17 +3899,33 @@ static int __init trident_probe(struct pci_dev *pci_dev, const struct pci_device
 	outl(0x00, TRID_REG(card, T4D_MUSICVOL_WAVEVOL));
 
 	if (card->pci_id == PCI_DEVICE_ID_ALI_5451) {
+		/* Add H/W Volume Control By Matt Wu Jul. 06, 2001 */
+		if(card->hwvolctl) 
+		{
+			/* Enable GPIO IRQ (MISCINT bit 18h)*/
+			temp = inw(TRID_REG(card, T4D_MISCINT + 2));
+			temp |= 0x0004;
+			outw(temp, TRID_REG(card, T4D_MISCINT + 2));
+
+			/* Enable H/W Volume Control GLOVAL CONTROL bit 0*/
+			temp = inw(TRID_REG(card, ALI_GLOBAL_CONTROL));
+			temp |= 0x0001;
+			outw(temp, TRID_REG(card, ALI_GLOBAL_CONTROL));
+
+		}
 		if(card->revision == ALI_5451_V02)
 			ali_close_multi_channels();
 		/* edited by HMSEO for GT sound */
 #if defined CONFIG_ALPHA_NAUTILUS || CONFIG_ALPHA_GENERIC
-		u16 ac97_data;
-		extern struct hwrpb_struct *hwrpb;
+		{
+			u16 ac97_data;
+			extern struct hwrpb_struct *hwrpb;
 		
-		if ((hwrpb->sys_type) == 201) {
-			printk(KERN_INFO "trident: Running on Alpha system type Nautilus\n");
-			ac97_data = ali_ac97_get(card, 0, AC97_POWER_CONTROL);
-			ali_ac97_set(card, 0, AC97_POWER_CONTROL, ac97_data |
+			if ((hwrpb->sys_type) == 201) {
+				printk(KERN_INFO "trident: Running on Alpha system type Nautilus\n");
+				ac97_data = ali_ac97_get(card, 0, AC97_POWER_CONTROL);
+				ali_ac97_set(card, 0, AC97_POWER_CONTROL, ac97_data |
+			}
 		}
 #endif
 		/* edited by HMSEO for GT sound*/
@@ -3782,6 +3944,13 @@ static void __exit trident_remove(struct pci_dev *pci_dev)
 	int i;
 	struct trident_card *card = pci_get_drvdata(pci_dev);
 
+	/*
+ 	 *	Kill running timers before unload. We can't have them
+ 	 *	going off after rmmod!
+ 	 */
+	if(card->hwvolctl)
+		del_timer_sync(&card->timer);
+		
 	/* ALi S/PDIF and Power Management */
 	if(card->pci_id == PCI_DEVICE_ID_ALI_5451) {
 		ali_setup_spdif_out(card, ALI_PCM_TO_SPDIF_OUT);

@@ -510,21 +510,22 @@ __arm920_setup:
 /*
  * Clear out 'unwanted' bits (then put them in if we need them)
  */
-	bic	r0, r0, #0x0e00			@ ....??r.........
-	bic	r0, r0, #0x0002			@ ..............a.
-	bic	r0, r0, #0x000c			@ W,D
-	bic	r0, r0, #0x1000			@ I
+						@   VI ZFRS BLDP WCAM
+	bic	r0, r0, #0x0e00
+	bic	r0, r0, #0x0002
+	bic	r0, r0, #0x000c
+	bic	r0, r0, #0x1000			@ ...0 000. .... 000.
 /*
  * Turn on what we want
  */
-	orr	r0, r0, #0x0031			@ ..........DP...M
-	orr	r0, r0, #0x0100			@ .......S........
+	orr	r0, r0, #0x0031
+	orr	r0, r0, #0x2100			@ ..1. ...1 ..11 ...1
 
 #ifdef CONFIG_CPU_ARM920_D_CACHE_ON
-	orr	r0, r0, #0x0004			@ Enable D cache
+	orr	r0, r0, #0x0004			@ .... .... .... .1..
 #endif
 #ifdef CONFIG_CPU_ARM920_I_CACHE_ON
-	orr	r0, r0, #0x1000                 @ I Cache on
+	orr	r0, r0, #0x1000			@ ...1 .... .... ....
 #endif
 	mov	pc, lr
 

@@ -152,11 +152,8 @@ static struct pci_ops dummy_ops = {
 };
 #endif
 
-void __init via82c505_init(struct arm_pci_sysdata *sysdata)
+void __init via82c505_init(void *sysdata)
 {
-	unsigned int pci_cmd = PCI_COMMAND_IO | PCI_COMMAND_MEMORY |
-				PCI_COMMAND_MASTER | PCI_COMMAND_INVALIDATE;
-	struct pci_dev *dev;
 	struct pci_bus *bus;
 
 	printk(KERN_DEBUG "PCI: VIA 82c505\n");
@@ -170,11 +167,6 @@ void __init via82c505_init(struct arm_pci_sysdata *sysdata)
 	outb(0xd0,0xA9);
 
 	pci_scan_bus(0, &via82c505_ops, sysdata);
-
-	pci_cmd |= sysdata->bus[0].features;
-
-	printk("PCI: Fast back to back transfers %sabled\n",
-	       (sysdata->bus[0].features & PCI_COMMAND_FAST_BACK) ? "en" : "dis");
 
 #ifdef CONFIG_ARCH_SHARK
 	/* 

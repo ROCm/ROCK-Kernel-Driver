@@ -103,6 +103,7 @@ struct dma_iso_ctx {
 	int ctxMatch;
 	wait_queue_head_t waitq;
         spinlock_t lock;
+    unsigned int syt_offset;
 	int flags;
 };
 
@@ -140,10 +141,10 @@ printk(level "video1394: " fmt "\n" , ## args)
 #define PRINT(level, card, fmt, args...) \
 printk(level "video1394_%d: " fmt "\n" , card , ## args)
 
-void irq_handler(int card, quadlet_t isoRecvIntEvent, 
+static void irq_handler(int card, quadlet_t isoRecvIntEvent, 
 		 quadlet_t isoXmitIntEvent);
 
-LIST_HEAD(video1394_cards);
+static LIST_HEAD(video1394_cards);
 static spinlock_t video1394_cards_lock = SPIN_LOCK_UNLOCKED;
 
 static devfs_handle_t devfs_handle;
@@ -607,7 +608,7 @@ int wakeup_dma_ir_ctx(struct ti_ohci *ohci, struct dma_iso_ctx *d)
 }
 
 static inline void put_timestamp(struct ti_ohci *ohci, struct dma_iso_ctx * d,
-				 int curr, int n)
+				 int n)
 {
 	unsigned char* buf = d->buf + n * d->buf_size;
 	u32 cycleTimer;
@@ -619,12 +620,38 @@ static inline void put_timestamp(struct ti_ohci *ohci, struct dma_iso_ctx * d,
 
 	cycleTimer = reg_read(ohci, OHCI1394_IsochronousCycleTimer);
 
-	timeStamp = ((cycleTimer & 0x0fff) + 11059);
+	timeStamp = ((cycleTimer & 0x0fff) + d->syt_offset); /* 11059 = 450 us */
 	timeStamp = (timeStamp % 3072 + ((timeStamp / 3072) << 12)
 		+ (cycleTimer & 0xf000)) & 0xffff;
 	
 	buf[6] = timeStamp >> 8; 
 	buf[7] = timeStamp & 0xff; 
+
+    /* if first packet is empty packet, then put timestamp into the next full one too */
+    if ( (d->it_prg[n][0].data[1] >>16) == 0x008) {
+   	    buf += d->packet_size;
+    	buf[6] = timeStamp >> 8;
+	    buf[7] = timeStamp & 0xff;
+	}
+
+    /* do the next buffer frame too in case of irq latency */
+	n = d->next_buffer[n];
+	if (n == -1) {
+	  return;
+	}
+	buf = d->buf + n * d->buf_size;
+
+	timeStamp += (d->last_used_cmd[n] << 12) & 0xffff;
+
+	buf[6] = timeStamp >> 8;
+	buf[7] = timeStamp & 0xff;
+
+    /* if first packet is empty packet, then put timestamp into the next full one too */
+    if ( (d->it_prg[n][0].data[1] >>16) == 0x008) {
+   	    buf += d->packet_size;
+    	buf[6] = timeStamp >> 8;
+	    buf[7] = timeStamp & 0xff;
+	}
 
 #if 0
 	printk("curr: %d, next: %d, cycleTimer: %08x timeStamp: %08x\n",
@@ -646,7 +673,7 @@ int wakeup_dma_it_ctx(struct ti_ohci *ohci, struct dma_iso_ctx *d)
 	for (i=0;i<d->num_desc;i++) {
 		if (d->it_prg[i][d->last_used_cmd[i]].end.status& 0xFFFF0000) {
 			int next = d->next_buffer[i];
-			put_timestamp(ohci, d, i, next);
+			put_timestamp(ohci, d, next);
 			d->it_prg[i][d->last_used_cmd[i]].end.status = 0;
 			d->buffer_status[i] = VIDEO1394_BUFFER_READY;
 		}
@@ -757,12 +784,13 @@ static void initialize_dma_it_prg_var_packet_queue(
 }
 
 static void initialize_dma_it_ctx(struct dma_iso_ctx *d, int sync_tag,
-				  int flags)
+				  unsigned int syt_offset, int flags)
 {
 	struct ti_ohci *ohci = (struct ti_ohci *)d->ohci;
 	int i;
 
 	d->flags = flags;
+	d->syt_offset = (syt_offset == 0 ? 11000 : syt_offset);
 
 	ohci1394_stop_context(ohci, d->ctrlClear, NULL);
 
@@ -807,7 +835,7 @@ static int video1394_ioctl(struct inode *inode, struct file *file,
 			   unsigned int cmd, unsigned long arg)
 {
 	struct video_card *video = NULL;
-	struct ti_ohci *ohci;
+	struct ti_ohci *ohci = NULL;
 	unsigned long flags;
 	struct list_head *lh;
 
@@ -931,7 +959,7 @@ static int video1394_ioctl(struct inode *inode, struct file *file,
 				return -EFAULT;
 			}
 			initialize_dma_it_ctx(video->it_context[i], 
-					      v.sync_tag, v.flags);
+					      v.sync_tag, v.syt_offset, v.flags);
 
 			video->current_ctx = video->it_context[i];
 
@@ -1200,6 +1228,7 @@ static int video1394_ioctl(struct inode *inode, struct file *file,
 		{
 			DBGMSG(ohci->id, "Starting iso transmit DMA ctx=%d",
 			       d->ctx);
+			put_timestamp(ohci, d, d->last_buffer);
 
 			/* Tell the controller where the first program is */
 			reg_write(ohci, d->cmdPtr, 
@@ -1214,6 +1243,7 @@ static int video1394_ioctl(struct inode *inode, struct file *file,
 				PRINT(KERN_INFO, ohci->id, 
 				      "Waking up iso transmit dma ctx=%d", 
 				      d->ctx);
+				put_timestamp(ohci, d, d->last_buffer);
 				reg_write(ohci, d->ctrlSet, 0x1000);
 			}
 		}
@@ -1340,7 +1370,7 @@ static int video1394_open(struct inode *inode, struct file *file)
         if (video == NULL)
                 return -EIO;
 
-	MOD_INC_USE_COUNT;
+	V22_COMPAT_MOD_INC_USE_COUNT;
 
 	return 0;
 }
@@ -1407,13 +1437,13 @@ static int video1394_release(struct inode *inode, struct file *file)
 			free_dma_iso_ctx(&video->it_context[i]);
 		}
 
-	MOD_DEC_USE_COUNT;
+	V22_COMPAT_MOD_DEC_USE_COUNT;
 
 	unlock_kernel();
 	return 0;
 }
 
-void irq_handler(int card, quadlet_t isoRecvIntEvent, 
+static void irq_handler(int card, quadlet_t isoRecvIntEvent, 
 		 quadlet_t isoXmitIntEvent)
 {
 	int i, flags;
@@ -1455,7 +1485,7 @@ void irq_handler(int card, quadlet_t isoRecvIntEvent,
 
 static struct file_operations video1394_fops=
 {
-	owner:		THIS_MODULE,
+        OWNER_THIS_MODULE
 	ioctl:		video1394_ioctl,
 	mmap:		video1394_mmap,
 	open:		video1394_open,
@@ -1623,7 +1653,12 @@ static int __init video1394_init_module (void)
 				VIDEO1394_MAJOR);
 		return -EIO;
 	}
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
+	devfs_handle = devfs_mk_dir(NULL, VIDEO1394_DRIVER_NAME,
+			strlen(VIDEO1394_DRIVER_NAME), NULL);
+#else
 	devfs_handle = devfs_mk_dir(NULL, VIDEO1394_DRIVER_NAME, NULL);
+#endif
 
 	hl_handle = hpsb_register_highlevel (VIDEO1394_DRIVER_NAME, &hl_ops);
 	if (hl_handle == NULL) {

@@ -17,30 +17,26 @@
 #include <asm/hardirq.h>
 #include <asm/lowcore.h>
 
-#define local_bh_disable()			\
-do {						\
-	local_bh_count(smp_processor_id())++;	\
-	barrier();				\
-} while (0)
+#define __cpu_bh_enable(cpu) \
+		do { barrier(); local_bh_count(cpu)--; } while (0)
+#define cpu_bh_disable(cpu) \
+		do { local_bh_count(cpu)++; barrier(); } while (0)
 
-#define __local_bh_enable()			\
-do {						\
-	barrier();				\
-	local_bh_count(smp_processor_id())--;	\
-} while (0)
+#define local_bh_disable()      cpu_bh_disable(smp_processor_id())
+#define __local_bh_enable()     __cpu_bh_enable(smp_processor_id())
 
-#define local_bh_enable()				\
-do {							\
-	if (!--local_bh_count(smp_processor_id())	\
-	    && softirq_pending(smp_processor_id())) {	\
-		do_softirq();				\
-		__sti();				\
-	}						\
+#define in_softirq() (local_bh_count(smp_processor_id()) != 0)
+
+#define local_bh_enable()			          	        \
+do {							                \
+	unsigned int *ptr = &local_bh_count(smp_processor_id());        \
+	barrier();                                                      \
+	if (!--*ptr)							\
+		if (softirq_pending(smp_processor_id()))		\
+			do_softirq();					\
 } while (0)
 
 #define __cpu_raise_softirq(cpu, nr) (softirq_pending(cpu) |= (1<<nr))
-
-#define in_softirq() (local_bh_count(smp_processor_id()) != 0)
 
 #endif	/* __ASM_SOFTIRQ_H */
 

@@ -60,6 +60,7 @@ CONFIG_PCI_NAMES=y
 #
 # CONFIG_PARPORT is not set
 # CONFIG_PPC_RTC is not set
+# CONFIG_CMDLINE_BOOL is not set
 
 #
 # Memory Technology Devices (MTD)
@@ -71,6 +72,7 @@ CONFIG_PCI_NAMES=y
 #
 # CONFIG_PNP is not set
 # CONFIG_ISAPNP is not set
+# CONFIG_PNPBIOS is not set
 
 #
 # Block devices
@@ -240,7 +242,7 @@ CONFIG_SCSI_NCR53C8XX_SYNC=20
 # CONFIG_SCSI_MAC53C94 is not set
 
 #
-# IEEE 1394 (FireWire) support
+# IEEE 1394 (FireWire) support (EXPERIMENTAL)
 #
 # CONFIG_IEEE1394 is not set
 
@@ -289,6 +291,7 @@ CONFIG_NCR885E=y
 #
 # CONFIG_ACENIC is not set
 # CONFIG_ACENIC_OMIT_TIGON_I is not set
+# CONFIG_DL2K is not set
 # CONFIG_MYRI_SBUS is not set
 # CONFIG_HAMACHI is not set
 # CONFIG_YELLOWFIN is not set
@@ -493,6 +496,7 @@ CONFIG_MSDOS_PARTITION=y
 # CONFIG_MINIX_SUBPARTITION is not set
 CONFIG_SOLARIS_X86_PARTITION=y
 # CONFIG_UNIXWARE_DISKLABEL is not set
+# CONFIG_LDM_PARTITION is not set
 # CONFIG_SGI_PARTITION is not set
 # CONFIG_ULTRIX_PARTITION is not set
 # CONFIG_SUN_PARTITION is not set

@@ -7,6 +7,7 @@
  * is pulled from the params struct.
  */
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/tty.h>
 #include <linux/delay.h>
 #include <linux/pm.h>
@@ -21,6 +22,18 @@
 
 extern void footbridge_map_io(void);
 extern void footbridge_init_irq(void);
+
+unsigned int mem_fclk_21285 = 50000000;
+
+EXPORT_SYMBOL(mem_fclk_21285);
+
+static int __init parse_tag_memclk(const struct tag *tag)
+{
+	mem_fclk_21285 = tag->u.memclk.fmemclk;
+	return 0;
+}
+
+__tagtable(ATAG_MEMCLK, parse_tag_memclk);
 
 #ifdef CONFIG_ARCH_EBSA285
 
@@ -73,7 +86,7 @@ fixup_netwinder(struct machine_desc *desc, struct param_struct *params,
 		printk(KERN_WARNING "Warning: bad NeTTrom parameters "
 		       "detected, using defaults\n");
 
-		params->u1.s.nr_pages = 0x2000;	/* 32MB */
+		params->u1.s.nr_pages = 0x1000;	/* 16MB */
 		params->u1.s.ramdisk_size = 0;
 		params->u1.s.flags = FLAG_READONLY;
 		params->u1.s.initrd_start = 0;
@@ -101,7 +114,7 @@ MACHINE_END
  * hard reboots fail on early boards.
  */
 static void __init
-fixup_cats(struct machine_desc *desc, struct param_struct *params,
+fixup_cats(struct machine_desc *desc, struct param_struct *unused,
 	   char **cmdline, struct meminfo *mi)
 {
 	ORIG_VIDEO_LINES  = 25;
@@ -123,7 +136,7 @@ MACHINE_END
 #ifdef CONFIG_ARCH_CO285
 
 static void __init
-fixup_coebsa285(struct machine_desc *desc, struct param_struct *params,
+fixup_coebsa285(struct machine_desc *desc, struct param_struct *unused,
 		char **cmdline, struct meminfo *mi)
 {
 	extern unsigned long boot_memory_end;

@@ -147,6 +147,10 @@ struct lp_struct lp_table[LP_NO];
 
 static unsigned int lp_count = 0;
 
+#ifdef CONFIG_LP_CONSOLE
+static struct parport *console_registered; // initially NULL
+#endif /* CONFIG_LP_CONSOLE */
+
 #undef LP_DEBUG
 
 /* --- low-level port access ----------------------------------- */
@@ -674,8 +678,8 @@ static int lp_register(int nr, struct parport *port)
 #ifdef CONFIG_LP_CONSOLE
 	if (!nr) {
 		if (port->modes & PARPORT_MODE_SAFEININT) {
-			MOD_INC_USE_COUNT;
 			register_console (&lpcons);
+			console_registered = port;
 			printk (KERN_INFO "lp%d: console ready\n", CONSOLE_LP);
 		} else
 			printk (KERN_ERR "lp%d: cannot run console on %s\n",
@@ -720,6 +724,12 @@ static void lp_attach (struct parport *port)
 static void lp_detach (struct parport *port)
 {
 	/* Write this some day. */
+#ifdef CONFIG_LP_CONSOLE
+	if (console_registered == port) {
+		unregister_console (&lpcons);
+		console_registered = NULL;
+	}
+#endif /* CONFIG_LP_CONSOLE */
 }
 
 static struct parport_driver lp_driver = {

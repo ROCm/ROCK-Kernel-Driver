@@ -197,11 +197,11 @@ do_entIF(unsigned long type, unsigned long a1,
 			regs.pc -= 4;	/* make pc point to former bpt */
 		}
 		send_sig(SIGTRAP, current, 1);
-		break;
+		return;
 
 	      case 1: /* bugcheck */
 		send_sig(SIGTRAP, current, 1);
-		break;
+		return;
 
 	      case 2: /* gentrap */
 		/*
@@ -216,7 +216,7 @@ do_entIF(unsigned long type, unsigned long a1,
 		      case GEN_FLTDIV: case GEN_FLTUND: case GEN_FLTINV:
 		      case GEN_FLTINE: case GEN_ROPRAND:
 			send_sig(SIGFPE, current, 1);
-			break;
+			return;
 
 		      case GEN_DECOVF:
 		      case GEN_DECDIV:
@@ -236,12 +236,8 @@ do_entIF(unsigned long type, unsigned long a1,
 		      case GEN_SUBRNG6:
 		      case GEN_SUBRNG7:
 			send_sig(SIGTRAP, current, 1);
-			break;
+			return;
 		}
-		break;
-
-	      case 3: /* FEN fault */
-		send_sig(SIGILL, current, 1);
 		break;
 
 	      case 4: /* opDEC */
@@ -252,12 +248,12 @@ do_entIF(unsigned long type, unsigned long a1,
 			if (alpha_fp_emul(regs.pc-4))
 				return;
 		}
-		send_sig(SIGILL, current, 1);
-		break;
-
-	      default:
-		panic("do_entIF: unexpected instruction-fault type");
+		/* fallthrough as illegal instruction .. */
+	      case 3: /* FEN fault */
+	      case 5: /* illoc */
+	      default: /* unexpected instruction-fault type */
 	}
+	send_sig(SIGILL, current, 1);
 }
 
 /* There is an ifdef in the PALcode in MILO that enables a 

@@ -2,7 +2,7 @@
 #define _SERIO_H
 
 /*
- * $Id: serio.h,v 1.8 2000/07/17 10:42:14 vojtech Exp $
+ * $Id: serio.h,v 1.11 2001/05/29 02:58:50 jsimmons Exp $
  *
  * Copyright (C) 1999 Vojtech Pavlik
  *
@@ -104,6 +104,10 @@ static __inline__ int serio_write(struct serio *serio, unsigned char data)
 #define SERIO_GUNZE	0x1c
 #define SERIO_IFORCE	0x1d
 #define SERIO_STINGER	0x1e
+#define SERIO_NEWTON	0x1f
+#define SERIO_STOWAWAY	0x20
+#define SERIO_H3600	0x21
+#define SERIO_PS2SER	0x22
 
 #define SERIO_ID	0xff00UL
 #define SERIO_EXTRA	0xff0000UL

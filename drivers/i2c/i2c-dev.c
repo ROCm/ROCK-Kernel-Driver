@@ -60,8 +60,6 @@ extern int cleanup_module(void);
 
 /* struct file_operations changed too often in the 2.1 series for nice code */
 
-static loff_t i2cdev_lseek (struct file *file, loff_t offset, int origin);
-
 static ssize_t i2cdev_read (struct file *file, char *buf, size_t count, 
                             loff_t *offset);
 static ssize_t i2cdev_write (struct file *file, const char *buf, size_t count, 
@@ -90,7 +88,7 @@ static struct file_operations i2cdev_fops = {
 #if LINUX_KERNEL_VERSION >= KERNEL_VERSION(2,4,0)
 	owner:		THIS_MODULE,
 #endif /* LINUX_KERNEL_VERSION >= KERNEL_VERSION(2,4,0) */
-	llseek:		i2cdev_lseek,
+	llseek:		no_llseek,
 	read:		i2cdev_read,
 	write:		i2cdev_write,
 	ioctl:		i2cdev_ioctl,
@@ -127,18 +125,6 @@ static struct i2c_client i2cdev_client_template = {
 };
 
 static int i2cdev_initialized;
-
-/* Note that the lseek function is called llseek in 2.1 kernels. But things
-   are complicated enough as is. */
-loff_t i2cdev_lseek (struct file *file, loff_t offset, int origin)
-{
-#ifdef DEBUG
-	struct inode *inode = file->f_dentry->d_inode;
-	printk("i2c-dev.o: i2c-%d lseek to %ld bytes relative to %d.\n",
-	       MINOR(inode->i_rdev),(long) offset,origin);
-#endif /* DEBUG */
-	return -ESPIPE;
-}
 
 static ssize_t i2cdev_read (struct file *file, char *buf, size_t count,
                             loff_t *offset)

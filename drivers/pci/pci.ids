@@ -1561,8 +1561,8 @@
 		10b7 1000  3C905C-TX Fast Etherlink for PC Management NIC
 	9800  3c980-TX [Fast Etherlink XL Server Adapter]
 		10b7 9800  3c980-TX Fast Etherlink XL Server Adapter
-	9805  3c980-TX 10/100baseTX NIC [Python-T]
-		10b7 9805  3c980 10/100baseTX NIC [Python-T]
+	9805  3c982 Dual Port Server Cyclone
+		10b7 9805  3c982 Dual Port Server Cyclone
 10b8  Standard Microsystems Corp [SMC]
 	0005  83C170QF
 		1055 e000  LANEPIC

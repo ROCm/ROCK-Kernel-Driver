@@ -145,7 +145,7 @@ static inline unsigned long pmd_page(pmd_t pmd)
 #define pte_young(pte)			(pte_val(pte) & L_PTE_YOUNG)
 
 #define PTE_BIT_FUNC(fn,op)			\
-extern inline pte_t pte_##fn(pte_t pte) { pte_val(pte) op; return pte; }
+static inline pte_t pte_##fn(pte_t pte) { pte_val(pte) op; return pte; }
 
 /*PTE_BIT_FUNC(rdprotect, &= ~L_PTE_USER);*/
 /*PTE_BIT_FUNC(mkread,    |= L_PTE_USER);*/

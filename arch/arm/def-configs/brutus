@@ -80,7 +80,7 @@ CONFIG_CMDLINE="keepinitrd"
 CONFIG_LEDS=y
 CONFIG_LEDS_TIMER=y
 CONFIG_LEDS_CPU=y
-# CONFIG_ALIGNMENT_TRAP is not set
+CONFIG_ALIGNMENT_TRAP=y
 
 #
 # Parallel port support

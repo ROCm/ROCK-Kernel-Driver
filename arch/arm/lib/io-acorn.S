@@ -62,13 +62,13 @@ ENTRY(outsl)
 ENTRY(insw)
 		addr	r0
 		teq	r2, #0
-		bne	__arch_readsw
+		bne	__raw_readsw
 		RETINSTR(mov, pc, lr)
 
 ENTRY(insb)
 		addr	r0
 		teq	r2, #0
-		bne	__arch_readsb
+		bne	__raw_readsb
 		RETINSTR(mov, pc, lr)
 
 @ Purpose: write a block of data from memory to a hardware register.
@@ -78,13 +78,13 @@ ENTRY(insb)
 ENTRY(outsw)
 		addr	r0
 		teq	r2, #0
-		bne	__arch_writesw
+		bne	__raw_writesw
 		RETINSTR(mov, pc, lr)
 
 ENTRY(outsb)
 		addr	r0
 		teq	r2, #0
-		bne	__arch_writesb
+		bne	__raw_writesb
 		RETINSTR(mov, pc, lr)
 
 @ Purpose: write a memc register

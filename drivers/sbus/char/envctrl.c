@@ -1,4 +1,4 @@
-/* $Id: envctrl.c,v 1.22 2001/03/25 09:12:15 davem Exp $
+/* $Id: envctrl.c,v 1.23 2001/08/09 23:42:09 davem Exp $
  * envctrl.c: Temperature and Fan monitoring on Machines providing it.
  *
  * Copyright (C) 1998  Eddie C. Dost  (ecd@skynet.be)
@@ -26,10 +26,15 @@
 #include <linux/miscdevice.h>
 #include <linux/mm.h>
 #include <linux/slab.h>
+#include <linux/kernel.h>
 
 #include <asm/ebus.h>
 #include <asm/uaccess.h>
 #include <asm/envctrl.h>
+
+#define __KERNEL_SYSCALLS__
+static int errno;
+#include <asm/unistd.h>
 
 #define ENVCTRL_MINOR	162
 
@@ -373,7 +378,7 @@ static int envctrl_i2c_data_translate(unsigned char data, int translate_type,
 /* Function Description: Read cpu-related data such as cpu temperature, voltage.
  * Return: Number of read bytes. Data is stored in bufdata in ascii format.
  */
-static int envctrl_read_cpu_info(struct i2c_child_t *pchild,
+static int envctrl_read_cpu_info(int cpu, struct i2c_child_t *pchild,
 				 char mon_type, unsigned char *bufdata)
 {
 	unsigned char data;
@@ -383,13 +388,13 @@ static int envctrl_read_cpu_info(struct i2c_child_t *pchild,
 	/* Find the right monitor type and channel. */
 	for (i = 0; i < PCF8584_MAX_CHANNELS; i++) {
 		if (pchild->mon_type[i] == mon_type) {
-			if (++j == read_cpu) {
+			if (++j == cpu) {
 				break;
 			}
 		}
 	}
 
-	if (j != read_cpu)
+	if (j != cpu)
 		return 0;
 
         /* Read data from address and port. */
@@ -588,7 +593,7 @@ envctrl_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 	case ENVCTRL_RD_CPU_TEMPERATURE:
 		if (!(pchild = envctrl_get_i2c_child(ENVCTRL_CPUTEMP_MON)))
 			return 0;
-		ret = envctrl_read_cpu_info(pchild, ENVCTRL_CPUTEMP_MON, data);
+		ret = envctrl_read_cpu_info(read_cpu, pchild, ENVCTRL_CPUTEMP_MON, data);
 
 		/* Reset cpu to the default cpu0. */
 		copy_to_user((unsigned char *)buf, data, ret);
@@ -597,7 +602,7 @@ envctrl_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 	case ENVCTRL_RD_CPU_VOLTAGE:
 		if (!(pchild = envctrl_get_i2c_child(ENVCTRL_CPUVOLTAGE_MON)))
 			return 0;
-		ret = envctrl_read_cpu_info(pchild, ENVCTRL_CPUVOLTAGE_MON, data);
+		ret = envctrl_read_cpu_info(read_cpu, pchild, ENVCTRL_CPUVOLTAGE_MON, data);
 
 		/* Reset cpu to the default cpu0. */
 		copy_to_user((unsigned char *)buf, data, ret);
@@ -976,6 +981,74 @@ static struct i2c_child_t *envctrl_get_i2c_child(unsigned char mon_type)
 	return NULL;
 }
 
+static void envctrl_do_shutdown(void)
+{
+	static int inprog = 0;
+	static char *envp[] = {	
+		"HOME=/", "TERM=linux", "PATH=/sbin:/usr/sbin:/bin:/usr/bin", NULL };
+	char *argv[] = { 
+		"/sbin/shutdown", "-h", "now", NULL };	
+
+	if (inprog != 0)
+		return;
+
+	inprog = 1;
+	printk(KERN_CRIT "kenvctrld: WARNING: Shutting down the system now.\n");
+	if (0 > execve("/sbin/shutdown", argv, envp)) {
+		printk(KERN_CRIT "kenvctrld: WARNING: system shutdown failed!\n"); 
+		inprog = 0;  /* unlikely to succeed, but we could try again */
+	}
+}
+
+static struct task_struct *kenvctrld_task;
+
+static int kenvctrld(void *__unused)
+{
+	int poll_interval;
+	int whichcpu;
+	char tempbuf[10];
+	struct i2c_child_t *cputemp;
+
+	if (NULL == (cputemp = envctrl_get_i2c_child(ENVCTRL_CPUTEMP_MON))) {
+		printk(KERN_ERR 
+		       "envctrl: kenvctrld unable to monitor CPU temp-- exiting\n");
+		return -ENODEV;
+	}
+
+	poll_interval = 5 * HZ; /* TODO env_mon_interval */
+
+	daemonize();
+	strcpy(current->comm, "kenvctrld");
+	kenvctrld_task = current;
+
+	printk(KERN_INFO "envctrl: %s starting...\n", current->comm);
+	for (;;) {
+		current->state = TASK_INTERRUPTIBLE;
+		schedule_timeout(poll_interval);
+		current->state = TASK_RUNNING;
+
+		if(signal_pending(current))
+			break;
+
+		for (whichcpu = 0; whichcpu < ENVCTRL_MAX_CPU; ++whichcpu) {
+			if (0 < envctrl_read_cpu_info(whichcpu, cputemp,
+						      ENVCTRL_CPUTEMP_MON,
+						      tempbuf)) {
+				if (tempbuf[0] >= shutdown_temperature) {
+					printk(KERN_CRIT 
+						"%s: WARNING: CPU%i temperature %i C meets or exceeds "\
+						"shutdown threshold %i C\n", 
+						current->comm, whichcpu, 
+						tempbuf[0], shutdown_temperature);
+					envctrl_do_shutdown();
+				}
+			}
+		}
+	}
+	printk(KERN_INFO "envctrl: %s exiting...\n", current->comm);
+	return 0;
+}
+
 static int __init envctrl_init(void)
 {
 #ifdef CONFIG_PCI
@@ -1054,6 +1127,8 @@ done:
 			i2c_childlist[i].addr, (0 == i) ? ("\n") : (" "));
 	}
 
+	kernel_thread(kenvctrld, NULL, CLONE_FS | CLONE_FILES);
+
 	return 0;
 #else
 	return -ENODEV;
@@ -1063,6 +1138,31 @@ done:
 static void __exit envctrl_cleanup(void)
 {
 	int i;
+
+	if (NULL != kenvctrld_task) {
+		force_sig(SIGKILL, kenvctrld_task);
+		for (;;) {
+			struct task_struct *p;
+			int found = 0;
+
+			read_lock(&tasklist_lock);
+			for_each_task(p) {
+				if (p == kenvctrld_task) {
+					found = 1;
+					break;
+				}
+			}
+			read_unlock(&tasklist_lock);
+
+			if (!found)
+				break;
+
+			current->state = TASK_INTERRUPTIBLE;
+			schedule_timeout(HZ);
+			current->state = TASK_RUNNING;
+		}
+		kenvctrld_task = NULL;
+	}
 
 	iounmap(i2c);
 	misc_deregister(&envctrl_dev);

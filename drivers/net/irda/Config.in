@@ -24,6 +24,7 @@ dep_tristate 'Toshiba Type-O IR Port' CONFIG_TOSHIBA_FIR $CONFIG_IRDA
 if [ "$CONFIG_EXPERIMENTAL" != "n" ]; then
 dep_tristate 'SMC IrCC (Experimental)' CONFIG_SMC_IRCC_FIR $CONFIG_IRDA
 dep_tristate 'ALi M5123 FIR (Experimental)' CONFIG_ALI_FIR $CONFIG_IRDA
+dep_tristate 'VLSI 82C147 SIR/MIR/FIR (Experimental)' CONFIG_VLSI_FIR $CONFIG_IRDA
 fi
 
 endmenu

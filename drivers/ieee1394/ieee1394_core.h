@@ -3,6 +3,7 @@
 #define _IEEE1394_CORE_H
 
 #include <linux/tqueue.h>
+#include <linux/slab.h>
 #include <asm/semaphore.h>
 #include "hosts.h"
 
@@ -24,11 +25,11 @@ struct hpsb_packet {
         /* Okay, this is core internal and a no care for hosts.
          * queued   = queued for sending
          * pending  = sent, waiting for response
-         * completed = processing completed, successful or not
+         * complete = processing completed, successful or not
          * incoming = incoming packet
          */
         enum { 
-                unused, queued, pending, completed, incoming 
+                unused, queued, pending, complete, incoming 
         } __attribute__((packed)) state;
 
         /* These are core internal. */
@@ -89,16 +90,10 @@ void free_hpsb_packet(struct hpsb_packet *packet);
  * Use the functions, not the variable.
  */
 #include <asm/atomic.h>
-extern atomic_t hpsb_generation;
 
-inline static unsigned int get_hpsb_generation(void)
+static inline unsigned int get_hpsb_generation(struct hpsb_host *host)
 {
-        return atomic_read(&hpsb_generation);
-}
-
-inline static void inc_hpsb_generation(void)
-{
-        atomic_inc(&hpsb_generation);
+        return atomic_read(&host->generation);
 }
 
 

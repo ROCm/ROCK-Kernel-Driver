@@ -65,54 +65,83 @@ static int tritech_maestro_init(struct ac97_codec * codec);
 static int sigmatel_9708_init(struct ac97_codec *codec);
 static int sigmatel_9721_init(struct ac97_codec *codec);
 static int sigmatel_9744_init(struct ac97_codec *codec);
-static int enable_eapd(struct ac97_codec *codec);
+static int eapd_control(struct ac97_codec *codec, int);
+static int crystal_digital_control(struct ac97_codec *codec, int mode);
+
+
+/*
+ *	AC97 operations.
+ *
+ *	If you are adding a codec then you should be able to use
+ *		eapd_ops - any codec that supports EAPD amp control (most)
+ *		null_ops - any ancient codec that supports nothing
+ *
+ *	The three functions are
+ *		init - used for non AC97 standard initialisation
+ *		amplifier - used to do amplifier control (1=on 0=off)
+ *		digital - switch to digital modes (0 = analog)
+ *
+ *	Not all codecs support all features, not all drivers use all the
+ *	operations yet
+ */
+ 
+static struct ac97_ops null_ops = { NULL, NULL, NULL };
+static struct ac97_ops default_ops = { NULL, eapd_control, NULL };
+static struct ac97_ops wolfson_ops = { wolfson_init, NULL, NULL };
+static struct ac97_ops tritech_ops = { tritech_init, NULL, NULL };
+static struct ac97_ops tritech_m_ops = { tritech_maestro_init, NULL, NULL };
+static struct ac97_ops sigmatel_9708_ops = { sigmatel_9708_init, NULL, NULL };
+static struct ac97_ops sigmatel_9721_ops = { sigmatel_9721_init, NULL, NULL };
+static struct ac97_ops sigmatel_9744_ops = { sigmatel_9744_init, NULL, NULL };
+static struct ac97_ops crystal_digital_ops = { NULL, eapd_control, crystal_digital_control };
 
 /* sorted by vendor/device id */
 static const struct {
 	u32 id;
 	char *name;
-	int  (*init)  (struct ac97_codec *codec);
+	struct ac97_ops *ops;
 } ac97_codec_ids[] = {
-	{0x41445303, "Analog Devices AD1819",	NULL},
-	{0x41445340, "Analog Devices AD1881",	NULL},
-	{0x41445348, "Analog Devices AD1881A",	NULL},
-	{0x41445460, "Analog Devices AD1885",	enable_eapd},
-	{0x414B4D00, "Asahi Kasei AK4540",	NULL},
-	{0x414B4D01, "Asahi Kasei AK4542",	NULL},
-	{0x414B4D02, "Asahi Kasei AK4543",	NULL},
-	{0x414C4710, "ALC200/200P",		NULL},
-	{0x43525900, "Cirrus Logic CS4297",	enable_eapd},
-	{0x43525903, "Cirrus Logic CS4297",	enable_eapd},
-	{0x43525913, "Cirrus Logic CS4297A rev A", enable_eapd},
-	{0x43525914, "Cirrus Logic CS4297A rev B", NULL},
-	{0x43525923, "Cirrus Logic CS4298",	NULL},
-	{0x4352592B, "Cirrus Logic CS4294",	NULL},
-	{0x4352592D, "Cirrus Logic CS4294",	NULL},
-	{0x43525931, "Cirrus Logic CS4299 rev A", NULL},
-	{0x43525933, "Cirrus Logic CS4299 rev C", NULL},
-	{0x43525934, "Cirrus Logic CS4299 rev D", NULL},
-	{0x45838308, "ESS Allegro ES1988",	NULL},
-	{0x49434511, "ICE1232",			NULL}, /* I hope --jk */
-	{0x4e534331, "National Semiconductor LM4549", NULL},
-	{0x53494c22, "Silicon Laboratory Si3036", NULL},
-	{0x53494c23, "Silicon Laboratory Si3038", NULL},
-	{0x545200FF, "TriTech TR?????",		tritech_maestro_init},
-	{0x54524102, "TriTech TR28022",		NULL},
-	{0x54524103, "TriTech TR28023",		NULL},
-	{0x54524106, "TriTech TR28026",		NULL},
-	{0x54524108, "TriTech TR28028",		tritech_init},
-	{0x54524123, "TriTech TR?????",		NULL},
-	{0x574D4C00, "Wolfson WM9704",		wolfson_init},
-	{0x574D4C03, "Wolfson WM9703/9704",	wolfson_init},
-	{0x574D4C04, "Wolfson WM9704 (quad)",	wolfson_init},
-	{0x83847600, "SigmaTel STAC????",	NULL},
-	{0x83847604, "SigmaTel STAC9701/3/4/5", NULL},
-	{0x83847605, "SigmaTel STAC9704",	NULL},
-	{0x83847608, "SigmaTel STAC9708",	sigmatel_9708_init},
-	{0x83847609, "SigmaTel STAC9721/23",	sigmatel_9721_init},
-	{0x83847644, "SigmaTel STAC9744/45",	sigmatel_9744_init},
-	{0x83847656, "SigmaTel STAC9756/57",	sigmatel_9744_init},
-	{0x83847684, "SigmaTel STAC9783/84?",	NULL},
+	{0x41445303, "Analog Devices AD1819",	&null_ops},
+	{0x41445340, "Analog Devices AD1881",	&null_ops},
+	{0x41445348, "Analog Devices AD1881A",	&null_ops},
+	{0x41445460, "Analog Devices AD1885",	&default_ops},
+	{0x414B4D00, "Asahi Kasei AK4540",	&null_ops},
+	{0x414B4D01, "Asahi Kasei AK4542",	&null_ops},
+	{0x414B4D02, "Asahi Kasei AK4543",	&null_ops},
+	{0x414C4710, "ALC200/200P",		&null_ops},
+	{0x43525900, "Cirrus Logic CS4297",	&default_ops},
+	{0x43525903, "Cirrus Logic CS4297",	&default_ops},
+	{0x43525913, "Cirrus Logic CS4297A rev A", &default_ops},
+	{0x43525914, "Cirrus Logic CS4297A rev B", &default_ops},
+	{0x43525923, "Cirrus Logic CS4298",	&null_ops},
+	{0x4352592B, "Cirrus Logic CS4294",	&null_ops},
+	{0x4352592D, "Cirrus Logic CS4294",	&null_ops},
+	{0x43525931, "Cirrus Logic CS4299 rev A", &crystal_digital_ops},
+	{0x43525933, "Cirrus Logic CS4299 rev C", &crystal_digital_ops},
+	{0x43525934, "Cirrus Logic CS4299 rev D", &crystal_digital_ops},
+	{0x45838308, "ESS Allegro ES1988",	&null_ops},
+	{0x49434511, "ICE1232",			&null_ops}, /* I hope --jk */
+	{0x4e534331, "National Semiconductor LM4549", &null_ops},
+	{0x53494c22, "Silicon Laboratory Si3036", &null_ops},
+	{0x53494c23, "Silicon Laboratory Si3038", &null_ops},
+	{0x545200FF, "TriTech TR?????",		&tritech_m_ops},
+	{0x54524102, "TriTech TR28022",		&null_ops},
+	{0x54524103, "TriTech TR28023",		&null_ops},
+	{0x54524106, "TriTech TR28026",		&null_ops},
+	{0x54524108, "TriTech TR28028",		&tritech_ops},
+	{0x54524123, "TriTech TR?????",		&null_ops},
+	{0x574D4C00, "Wolfson WM9704",		&wolfson_ops},
+	{0x574D4C03, "Wolfson WM9703/9704",	&wolfson_ops},
+	{0x574D4C04, "Wolfson WM9704 (quad)",	&wolfson_ops},
+	{0x83847600, "SigmaTel STAC????",	&null_ops},
+	{0x83847604, "SigmaTel STAC9701/3/4/5", &null_ops},
+	{0x83847605, "SigmaTel STAC9704",	&null_ops},
+	{0x83847608, "SigmaTel STAC9708",	&sigmatel_9708_ops},
+	{0x83847609, "SigmaTel STAC9721/23",	&sigmatel_9721_ops},
+	{0x83847644, "SigmaTel STAC9744/45",	&sigmatel_9744_ops},
+	{0x83847656, "SigmaTel STAC9756/57",	&sigmatel_9744_ops},
+	{0x83847684, "SigmaTel STAC9783/84?",	&null_ops},
+	{0x57454301, "Winbond 83971D",		&null_ops},
 	{0,}
 };
 
@@ -145,7 +174,7 @@ static const char *ac97_stereo_enhancements[] =
 	/*  24 */ "Wolfson Microelectronics 3D Enhancement",
 	/*  25 */ "Delta Integration 3D Enhancement",
 	/*  26 */ "SigmaTel 3D Enhancement",
-	/*  27 */ "Reserved 27",
+	/*  27 */ "Winbond 3D Stereo Enhancement",
 	/*  28 */ "Rockwell 3D Stereo Enhancement",
 	/*  29 */ "Reserved 29",
 	/*  30 */ "Reserved 30",
@@ -666,7 +695,7 @@ int ac97_probe_codec(struct ac97_codec *codec)
 	modem = codec->codec_read(codec, AC97_EXTENDED_MODEM_ID);
 
 	codec->name = NULL;
-	codec->codec_init = NULL;
+	codec->codec_ops = &null_ops;
 
 	id1 = codec->codec_read(codec, AC97_VENDOR_ID1);
 	id2 = codec->codec_read(codec, AC97_VENDOR_ID2);
@@ -674,7 +703,7 @@ int ac97_probe_codec(struct ac97_codec *codec)
 		if (ac97_codec_ids[i].id == ((id1 << 16) | id2)) {
 			codec->type = ac97_codec_ids[i].id;
 			codec->name = ac97_codec_ids[i].name;
-			codec->codec_init = ac97_codec_ids[i].init;
+			codec->codec_ops = ac97_codec_ids[i].ops;
 			break;
 		}
 	}
@@ -717,8 +746,8 @@ static int ac97_init_mixer(struct ac97_codec *codec)
 	codec->mixer_ioctl = ac97_mixer_ioctl;
 
 	/* codec specific initialization for 4-6 channel output or secondary codec stuff */
-	if (codec->codec_init != NULL) {
-		codec->codec_init(codec);
+	if (codec->codec_ops->init != NULL) {
+		codec->codec_ops->init(codec);
 	}
 
 	/* initialize mixer channel volumes */
@@ -843,17 +872,42 @@ static int tritech_maestro_init(struct ac97_codec * codec)
 
 
 /*
- *	External AMP management for EAPD using codecs
- *	(CS4279A, AD1885, ...)
+ *	This is basically standard AC97. It should work as a default for
+ *	almost all modern codecs. Note that some cards wire EAPD *backwards*
+ *	That side of it is up to the card driver not us to cope with.
+ *
  */
 
-static int enable_eapd(struct ac97_codec * codec)
+static int eapd_control(struct ac97_codec * codec, int on)
 {
-	codec->codec_write(codec, AC97_POWER_CONTROL,
-		codec->codec_read(codec, AC97_POWER_CONTROL)|0x8000);
+	if(on)
+		codec->codec_write(codec, AC97_POWER_CONTROL,
+			codec->codec_read(codec, AC97_POWER_CONTROL)|0x8000);
+	else
+		codec->codec_write(codec, AC97_POWER_CONTROL,
+			codec->codec_read(codec, AC97_POWER_CONTROL)&~0x8000);
 	return 0;
 }
 
+/*
+ *	Crystal digital audio control (CS4299
+ */
+ 
+static int crystal_digital_control(struct ac97_codec *codec, int mode)
+{
+	u16 cv;
+
+	switch(mode)
+	{
+		case 0: cv = 0x0; break;	/* SPEN off */
+		case 1: cv = 0x8004; break;	/* 48KHz digital */
+		case 2: cv = 0x8104; break;	/* 44.1KHz digital */
+		default:
+			return -1;		/* Not supported yet(eg AC3) */
+	}
+	codec->codec_write(codec, 0x68, cv);
+	return 0;
+}
 
 /* copied from drivers/sound/maestro.c */
 #if 0  /* there has been 1 person on the planet with a pt101 that we

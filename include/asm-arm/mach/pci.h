@@ -30,3 +30,5 @@ struct hw_pci {
 extern u8 no_swizzle(struct pci_dev *dev, u8 *pin);
 extern void __init dc21285_setup_resources(struct resource **resource);
 extern void __init dc21285_init(void *sysdata);
+extern void __init via82c505_init(void *sysdata);
+

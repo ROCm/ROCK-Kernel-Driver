@@ -1,4 +1,4 @@
-/* $Id: eicon_mod.c,v 1.37.6.4 2001/02/16 09:09:50 armin Exp $
+/* $Id: eicon_mod.c,v 1.37.6.5 2001/07/17 19:42:31 armin Exp $
  *
  * ISDN lowlevel-module for Eicon active cards.
  * 
@@ -55,7 +55,7 @@
 static eicon_card *cards = (eicon_card *) NULL;   /* glob. var , contains
                                                      start of card-list   */
 
-static char *eicon_revision = "$Revision: 1.37.6.4 $";
+static char *eicon_revision = "$Revision: 1.37.6.5 $";
 
 extern char *eicon_pci_revision;
 extern char *eicon_isa_revision;
@@ -1200,24 +1200,16 @@ unregister_card(eicon_card * card)
 static void
 eicon_freecard(eicon_card *card) {
 	int i;
-	struct sk_buff *skb;
 
 	for(i = 0; i < (card->nchannels + 1); i++) {
-		while((skb = skb_dequeue(&card->bch[i].e.X)))
-			dev_kfree_skb(skb);
-		while((skb = skb_dequeue(&card->bch[i].e.R)))
-			dev_kfree_skb(skb);
+		skb_queue_purge(&card->bch[i].e.X);
+		skb_queue_purge(&card->bch[i].e.R);
 	}
-	while((skb = skb_dequeue(&card->sndq)))
-		dev_kfree_skb(skb);
-	while((skb = skb_dequeue(&card->rcvq)))
-		dev_kfree_skb(skb);
-	while((skb = skb_dequeue(&card->rackq)))
-		dev_kfree_skb(skb);
-	while((skb = skb_dequeue(&card->sackq)))
-		dev_kfree_skb(skb);
-	while((skb = skb_dequeue(&card->statq)))
-		dev_kfree_skb(skb);
+	skb_queue_purge(&card->sndq);
+	skb_queue_purge(&card->rcvq);
+	skb_queue_purge(&card->rackq);
+	skb_queue_purge(&card->sackq);
+	skb_queue_purge(&card->statq);
 
 #ifdef CONFIG_ISDN_DRV_EICON_PCI
 	kfree(card->sbufp);

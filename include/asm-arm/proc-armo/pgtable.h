@@ -77,17 +77,17 @@ static inline unsigned long pmd_page(pmd_t pmd)
 #define pte_dirty(pte)			(!(pte_val(pte) & _PAGE_CLEAN))
 #define pte_young(pte)			(!(pte_val(pte) & _PAGE_OLD))
 
-extern inline pte_t pte_wrprotect(pte_t pte)    { pte_val(pte) |= _PAGE_READONLY;  return pte; }
-extern inline pte_t pte_rdprotect(pte_t pte)    { pte_val(pte) |= _PAGE_NOT_USER;  return pte; }
-extern inline pte_t pte_exprotect(pte_t pte)    { pte_val(pte) |= _PAGE_NOT_USER;  return pte; }
-extern inline pte_t pte_mkclean(pte_t pte)      { pte_val(pte) |= _PAGE_CLEAN;     return pte; }
-extern inline pte_t pte_mkold(pte_t pte)        { pte_val(pte) |= _PAGE_OLD;       return pte; }
+static inline pte_t pte_wrprotect(pte_t pte)    { pte_val(pte) |= _PAGE_READONLY;  return pte; }
+static inline pte_t pte_rdprotect(pte_t pte)    { pte_val(pte) |= _PAGE_NOT_USER;  return pte; }
+static inline pte_t pte_exprotect(pte_t pte)    { pte_val(pte) |= _PAGE_NOT_USER;  return pte; }
+static inline pte_t pte_mkclean(pte_t pte)      { pte_val(pte) |= _PAGE_CLEAN;     return pte; }
+static inline pte_t pte_mkold(pte_t pte)        { pte_val(pte) |= _PAGE_OLD;       return pte; }
 
-extern inline pte_t pte_mkwrite(pte_t pte)      { pte_val(pte) &= ~_PAGE_READONLY; return pte; }
-extern inline pte_t pte_mkread(pte_t pte)       { pte_val(pte) &= ~_PAGE_NOT_USER; return pte; }
-extern inline pte_t pte_mkexec(pte_t pte)       { pte_val(pte) &= ~_PAGE_NOT_USER; return pte; }
-extern inline pte_t pte_mkdirty(pte_t pte)      { pte_val(pte) &= ~_PAGE_CLEAN;    return pte; }
-extern inline pte_t pte_mkyoung(pte_t pte)      { pte_val(pte) &= ~_PAGE_OLD;      return pte; }
+static inline pte_t pte_mkwrite(pte_t pte)      { pte_val(pte) &= ~_PAGE_READONLY; return pte; }
+static inline pte_t pte_mkread(pte_t pte)       { pte_val(pte) &= ~_PAGE_NOT_USER; return pte; }
+static inline pte_t pte_mkexec(pte_t pte)       { pte_val(pte) &= ~_PAGE_NOT_USER; return pte; }
+static inline pte_t pte_mkdirty(pte_t pte)      { pte_val(pte) &= ~_PAGE_CLEAN;    return pte; }
+static inline pte_t pte_mkyoung(pte_t pte)      { pte_val(pte) &= ~_PAGE_OLD;      return pte; }
 
 #define pte_alloc_kernel        pte_alloc
 

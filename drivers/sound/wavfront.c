@@ -1947,12 +1947,6 @@ wavefront_synth_control (int cmd, wavefront_control *wc)
 /* WaveFront: Linux file system interface (for access via raw synth)    */
 /***********************************************************************/
 
-static loff_t
-wavefront_llseek(struct file *file, loff_t offset, int origin)
-{
-	return -ESPIPE;
-}
-
 static int 
 wavefront_open (struct inode *inode, struct file *file)
 {
@@ -2002,7 +1996,7 @@ wavefront_ioctl(struct inode *inode, struct file *file,
 
 static /*const*/ struct file_operations wavefront_fops = {
 	owner:		THIS_MODULE,
-	llseek:		wavefront_llseek,
+	llseek:		no_llseek,
 	ioctl:		wavefront_ioctl,
 	open:		wavefront_open,
 	release:	wavefront_release,

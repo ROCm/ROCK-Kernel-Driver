@@ -66,6 +66,7 @@ static __devinitdata struct usb_device_id pwc_device_table [] = {
 	{ USB_DEVICE(0x0471, 0x030C) },
 	{ USB_DEVICE(0x0471, 0x0310) },
 	{ USB_DEVICE(0x0471, 0x0311) },
+	{ USB_DEVICE(0x0471, 0x0312) },
 	{ USB_DEVICE(0x069A, 0x0001) },
 	{ }
 };
@@ -84,10 +85,10 @@ static struct usb_driver pwc_driver =
 
 static int default_size = PSZ_QCIF;
 static int default_fps = 10;
-static int default_palette = VIDEO_PALETTE_YUV420P; /* This format is understood by most tools */
+static int default_palette = VIDEO_PALETTE_YUV420P; /* This is normal for webcams */
 static int default_fbufs = 3;   /* Default number of frame buffers */
 static int default_mbufs = 2;	/* Default number of mmap() buffers */
-       int pwc_trace = TRACE_MODULE | TRACE_FLOW | TRACE_PWCX;
+       int pwc_trace = TRACE_MODULE | TRACE_FLOW;
 static int power_save = 0;
 int pwc_preferred_compression = 2; /* 0..3 = uncompressed..high */
 
@@ -977,7 +978,7 @@ static int pwc_video_open(struct video_device *vdev, int mode)
 
 	/* Set some defaults */
 	pdev->vsnapshot = 0;
-	if (pdev->type == 730 || pdev->type == 740)
+	if (pdev->type == 730 || pdev->type == 740 || pdev->type == 750)
 		pdev->vsize = PSZ_QSIF;
 	else
 		pdev->vsize = PSZ_QCIF;
@@ -990,7 +991,7 @@ static int pwc_video_open(struct video_device *vdev, int mode)
 	i = pwc_set_video_mode(pdev, pwc_image_sizes[default_size].x, pwc_image_sizes[default_size].y, default_fps, pdev->vcompression, 0);
 	if (i)	{
 		Trace(TRACE_OPEN, "First attempt at set_video_mode failed.\n");
-		if (pdev->type == 730 || pdev->type == 740) 
+		if (pdev->type == 730 || pdev->type == 740 || pdev->type == 750)
 			i = pwc_set_video_mode(pdev, pwc_image_sizes[PSZ_QSIF].x, pwc_image_sizes[PSZ_QSIF].y, 10, pdev->vcompression, 0);
 		else
 			i = pwc_set_video_mode(pdev, pwc_image_sizes[PSZ_QCIF].x, pwc_image_sizes[PSZ_QCIF].y, 10, pdev->vcompression, 0);
@@ -1490,7 +1491,49 @@ static int pwc_video_ioctl(struct video_device *vdev, unsigned int cmd, void *ar
 				return -EFAULT;
 			break;
 		}
-
+		
+		case VIDIOCGAUDIO:
+		{
+			struct video_audio v;
+			
+			strcpy(v.name, "Microphone");
+			v.audio = -1; /* unknown audio minor */
+			v.flags = 0;
+			v.mode = VIDEO_SOUND_MONO;
+			v.volume = 0;
+			v.bass = 0;
+			v.treble = 0;
+			v.balance = 0x8000;
+			v.step = 1;
+			
+			if (copy_to_user(arg, &v, sizeof(v)))
+				return -EFAULT;
+			break;	
+		}
+		
+		case VIDIOCSAUDIO:
+		{
+			struct video_audio v;
+			
+			if (copy_from_user(&v, arg, sizeof(v)))
+				return -EFAULT;
+			/* Dummy: nothing can be set */
+			break;
+		}
+		
+		case VIDIOCGUNIT:
+		{
+			struct video_unit vu;
+			
+			vu.video = pdev->vdev->minor & 0x3F;
+			vu.audio = -1; /* not known yet */
+			vu.vbi = -1;
+			vu.radio = -1;
+			vu.teletext = -1;
+			if (copy_to_user(arg, &vu, sizeof(vu)))
+				return -EFAULT;
+			break;
+		}
 		default:
 			return pwc_ioctl(pdev, cmd, arg);
 	} /* ..switch */
@@ -1536,8 +1579,6 @@ static void *usb_pwc_probe(struct usb_device *udev, unsigned int ifnum, const st
 {
 	struct pwc_device *pdev = NULL;
 	struct video_device *vdev;
-	struct usb_config_descriptor *config;
-	struct usb_interface *iface;
 	int vendor_id, product_id, type_id;
 	int i;
 
@@ -1579,7 +1620,7 @@ static void *usb_pwc_probe(struct usb_device *udev, unsigned int ifnum, const st
 			type_id = 680;
 			break;
 		case 0x030C:
-			Info("Philips PCVC690K (Vesta Scanner) USB webcam detected.\n");
+			Info("Philips PCVC690K (Vesta Pro Scan) USB webcam detected.\n");
 			type_id = 690;
 			break;
 		case 0x0310:
@@ -1589,6 +1630,10 @@ static void *usb_pwc_probe(struct usb_device *udev, unsigned int ifnum, const st
 		case 0x0311:
 			Info("Philips PCVC740K (ToUCam Pro) USB webcam detected.\n");
 			type_id = 740;
+			break;
+		case 0x0312:
+			Info("Philips PCVC750K (ToUCam Pro Scan) USB webcam detected.\n");
+			type_id = 750;
 			break;
 		default:
 			return NULL;
@@ -1610,9 +1655,6 @@ static void *usb_pwc_probe(struct usb_device *udev, unsigned int ifnum, const st
 
 	if (udev->descriptor.bNumConfigurations > 1)
 		Info("Warning: more than 1 configuration available.\n");
-
-	config = udev->actconfig;
-	iface = &config->interface[0];
 
 	/* Allocate structure, initialize pointers, mutexes, etc. and link it to the usb_device */
 	pdev = kmalloc(sizeof(struct pwc_device), GFP_KERNEL);
@@ -1771,7 +1813,7 @@ static int __init usb_pwc_init(void)
 	int s;
 	char *sizenames[PSZ_MAX] = { "sqcif", "qsif", "qcif", "sif", "cif", "vga" };
 
-	Info("Philips PCA645/646 + PCVC675/680/690 + PCVC730/740 webcam module version " PWC_VERSION " loaded.\n");
+	Info("Philips PCA645/646 + PCVC675/680/690 + PCVC730/740/750 webcam module version " PWC_VERSION " loaded.\n");
 	Info("Also supports Askey VC010 cam.\n");
 
 	if (fps) {
@@ -1801,10 +1843,12 @@ static int __init usb_pwc_init(void)
 		/* Determine default palette */
 		if (!strcmp(palette, "yuv420"))
 			default_palette = VIDEO_PALETTE_YUV420;
-		if (!strcmp(palette, "yuv420p"))
+		else if (!strcmp(palette, "yuv420p"))
 			default_palette = VIDEO_PALETTE_YUV420P;
 		else {
 			Err("Palette not recognized: try palette=yuv420 or yuv420p.\n");
+			Info("Download the driver from http://www.smcc.demon.nl/webcam/ for in kernel\n");
+			Info("format conversion support.\n");
 			return -EINVAL;
 		}
 		Info("Default palette set to %d.\n", default_palette);

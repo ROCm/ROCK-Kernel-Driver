@@ -85,7 +85,7 @@ static __inline__ int atomic_dec_and_test(volatile atomic_t *v)
 	return result;
 }
 
-extern __inline__ int atomic_add_negative(int i, volatile atomic_t *v)
+static inline int atomic_add_negative(int i, volatile atomic_t *v)
 {
 	unsigned long flags;
 	int result;
@@ -106,6 +106,12 @@ static __inline__ void atomic_clear_mask(unsigned long mask, unsigned long *addr
 	*addr &= ~mask;
 	__restore_flags(flags);
 }
+
+/* Atomic operations are already serializing on ARM */
+#define smp_mb__before_atomic_dec()	barrier()
+#define smp_mb__after_atomic_dec()	barrier()
+#define smp_mb__before_atomic_inc()	barrier()
+#define smp_mb__after_atomic_inc()	barrier()
 
 #endif
 #endif

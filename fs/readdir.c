@@ -122,7 +122,7 @@ struct readdir_callback {
 	int count;
 };
 
-static int fillonedir(void * __buf, const char * name, int namlen, off_t offset,
+static int fillonedir(void * __buf, const char * name, int namlen, loff_t offset,
 		      ino_t ino, unsigned int d_type)
 {
 	struct readdir_callback * buf = (struct readdir_callback *) __buf;
@@ -183,7 +183,7 @@ struct getdents_callback {
 	int error;
 };
 
-static int filldir(void * __buf, const char * name, int namlen, off_t offset,
+static int filldir(void * __buf, const char * name, int namlen, loff_t offset,
 		   ino_t ino, unsigned int d_type)
 {
 	struct linux_dirent * dirent;
@@ -261,7 +261,7 @@ struct getdents_callback64 {
 	int error;
 };
 
-static int filldir64(void * __buf, const char * name, int namlen, off_t offset,
+static int filldir64(void * __buf, const char * name, int namlen, loff_t offset,
 		     ino_t ino, unsigned int d_type)
 {
 	struct linux_dirent64 * dirent, d;

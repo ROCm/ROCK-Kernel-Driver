@@ -157,7 +157,7 @@ extern unsigned long cr_alignment;	/* defined in entry-armv.S */
 #define swp_is_buggy
 #endif
 
-extern __inline__ unsigned long __xchg(unsigned long x, volatile void *ptr, int size)
+static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size)
 {
 	extern void __bad_xchg(volatile void *, int);
 	unsigned long ret;

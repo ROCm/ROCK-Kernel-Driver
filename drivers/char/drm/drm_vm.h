@@ -86,12 +86,12 @@ struct page *DRM(vm_shm_nopage)(struct vm_area_struct *vma,
 #else
 	drm_map_t	 *map	 = (drm_map_t *)vma->vm_pte;
 #endif
-	unsigned long	 physical;
 	unsigned long	 offset;
 	unsigned long	 i;
 	pgd_t		 *pgd;
 	pmd_t		 *pmd;
 	pte_t		 *pte;
+	struct page	 *page;
 
 	if (address > vma->vm_end) return NOPAGE_SIGBUS; /* Disallow mremap */
 	if (!map)    		   return NOPAGE_OOM;  /* Nothing allocated */
@@ -107,14 +107,15 @@ struct page *DRM(vm_shm_nopage)(struct vm_area_struct *vma,
 	if( !pmd_present( *pmd ) ) return NOPAGE_OOM;
 	pte = pte_offset( pmd, i );
 	if( !pte_present( *pte ) ) return NOPAGE_OOM;
-	physical = (unsigned long)pte_page( *pte )->virtual;
-	atomic_inc(&virt_to_page(physical)->count); /* Dec. by kernel */
 
-	DRM_DEBUG("0x%08lx => 0x%08lx\n", address, physical);
+	page = pte_page(*pte);
+	get_page(page);
+
+	DRM_DEBUG("0x%08lx => 0x%08x\n", address, page_to_bus(page));
 #if LINUX_VERSION_CODE < 0x020317
-	return physical;
+	return page_address(page);
 #else
-	return virt_to_page(physical);
+	return page;
 #endif
 }
 

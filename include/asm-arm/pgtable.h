@@ -105,7 +105,7 @@ extern struct page *empty_zero_page;
  * Conversion functions: convert a page and protection to a page entry,
  * and a page entry and page directory to the page they refer to.
  */
-extern __inline__ pte_t mk_pte_phys(unsigned long physpage, pgprot_t pgprot)
+static inline pte_t mk_pte_phys(unsigned long physpage, pgprot_t pgprot)
 {
 	pte_t pte;
 	pte_val(pte) = physpage | pgprot_val(pgprot);
@@ -151,7 +151,7 @@ extern __inline__ pte_t mk_pte_phys(unsigned long physpage, pgprot_t pgprot)
 
 #include <asm/proc/pgtable.h>
 
-extern __inline__ pte_t pte_modify(pte_t pte, pgprot_t newprot)
+static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 {
 	pte_val(pte) = (pte_val(pte) & _PAGE_CHG_MASK) | pgprot_val(newprot);
 	return pte;

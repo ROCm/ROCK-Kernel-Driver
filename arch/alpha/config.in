@@ -54,12 +54,13 @@ choice 'Alpha system type' \
 	 RX164			CONFIG_ALPHA_RX164		\
 	 SX164			CONFIG_ALPHA_SX164		\
 	 Sable			CONFIG_ALPHA_SABLE		\
+	 Shark			CONFIG_ALPHA_SHARK		\
 	 Takara			CONFIG_ALPHA_TAKARA		\
 	 Titan			CONFIG_ALPHA_TITAN		\
 	 Wildfire		CONFIG_ALPHA_WILDFIRE" Generic
 
 # clear all implied options (don't want default values for those):
-unset CONFIG_ALPHA_EV4 CONFIG_ALPHA_EV5 CONFIG_ALPHA_EV6
+unset CONFIG_ALPHA_EV4 CONFIG_ALPHA_EV5 CONFIG_ALPHA_EV6 CONFIG_ALPHA_EV67
 unset CONFIG_ALPHA_EISA
 unset CONFIG_ALPHA_LCA CONFIG_ALPHA_APECS CONFIG_ALPHA_CIA
 unset CONFIG_ALPHA_T2 CONFIG_ALPHA_PYXIS CONFIG_ALPHA_POLARIS
@@ -142,6 +143,11 @@ then
 	define_bool CONFIG_ALPHA_EV6 y
 	define_bool CONFIG_ALPHA_TSUNAMI y
 fi
+if [ "$CONFIG_ALPHA_SHARK" = "y" ]
+then
+	define_bool CONFIG_ALPHA_EV67 y
+	define_bool CONFIG_ALPHA_TSUNAMI y
+fi
 if [ "$CONFIG_ALPHA_WILDFIRE" = "y" -o "$CONFIG_ALPHA_TITAN" = "y" ]
 then
         define_bool CONFIG_ALPHA_EV6 y
@@ -170,7 +176,7 @@ if [ "$CONFIG_ALPHA_JENSEN" = "y" -o "$CONFIG_ALPHA_MIKASA" = "y" \
 	-o "$CONFIG_ALPHA_SABLE" = "y" -o "$CONFIG_ALPHA_NORITAKE" = "y" \
 	-o "$CONFIG_ALPHA_DP264" = "y" -o "$CONFIG_ALPHA_RAWHIDE" = "y" \
 	-o "$CONFIG_ALPHA_EIGER" = "y" -o "$CONFIG_ALPHA_WILDFIRE" = "y" \
-	-o "$CONFIG_ALPHA_TITAN" = "y" ]
+	-o "$CONFIG_ALPHA_TITAN" = "y" -o "$CONFIG_ALPHA_SHARK" = "y" ]
 then
 	define_bool CONFIG_ALPHA_SRM y
 fi
@@ -179,7 +185,7 @@ if [ "$CONFIG_ALPHA_CABRIOLET" = "y" -o "$CONFIG_ALPHA_AVANTI" = "y" \
 	-o "$CONFIG_ALPHA_TAKARA" = "y" -o "$CONFIG_ALPHA_EB164" = "y" \
 	-o "$CONFIG_ALPHA_ALCOR" = "y"  -o "$CONFIG_ALPHA_MIATA" = "y" \
 	-o "$CONFIG_ALPHA_LX164" = "y"  -o "$CONFIG_ALPHA_SX164" = "y" \
-	-o "$CONFIG_ALPHA_NAUTILUS" = "y" ]
+	-o "$CONFIG_ALPHA_NAUTILUS" = "y" -o "$CONFIG_ALPHA_NONAME" = "y" ]
 then
   bool 'Use SRM as bootloader' CONFIG_ALPHA_SRM
 fi
@@ -201,7 +207,8 @@ fi
 
 if [ "$CONFIG_ALPHA_SABLE" = "y" -o "$CONFIG_ALPHA_RAWHIDE" = "y" \
 	-o "$CONFIG_ALPHA_DP264" = "y" -o "$CONFIG_ALPHA_WILDFIRE" = "y" \
-	-o "$CONFIG_ALPHA_TITAN" = "y" -o "$CONFIG_ALPHA_GENERIC" = "y" ]
+	-o "$CONFIG_ALPHA_TITAN" = "y" -o "$CONFIG_ALPHA_GENERIC" = "y" \
+	-o "$CONFIG_ALPHA_SHARK" = "y" ]
 then
 	bool 'Symmetric multi-processing support' CONFIG_SMP
 fi
@@ -235,6 +242,10 @@ if [ "$CONFIG_PROC_FS" = "y" ]; then
 	"ELF		CONFIG_KCORE_ELF	\
 	 A.OUT		CONFIG_KCORE_AOUT" ELF
 fi
+if [ "$CONFIG_PROC_FS" != "n" -a "$CONFIG_ALPHA_SRM" = "y" ]; then
+   tristate 'SRM environment through procfs' CONFIG_SRM_ENV
+fi
+ 
 tristate 'Kernel support for a.out (ECOFF) binaries' CONFIG_BINFMT_AOUT
 tristate 'Kernel support for ELF binaries' CONFIG_BINFMT_ELF
 tristate 'Kernel support for MISC binaries' CONFIG_BINFMT_MISC

@@ -447,7 +447,12 @@ int hpsb_read(struct hpsb_host *host, nodeid_t node, u64 addr,
                 return -ENOMEM;
         }
 
-        hpsb_send_packet(packet);
+	packet->generation = get_hpsb_generation(host);
+        if (!hpsb_send_packet(packet)) {
+		retval = -EINVAL;
+		goto hpsb_read_fail;
+	}
+
         down(&packet->state_change);
         down(&packet->state_change);
         retval = hpsb_packet_success(packet);
@@ -460,6 +465,7 @@ int hpsb_read(struct hpsb_host *host, nodeid_t node, u64 addr,
                 }
         }
 
+hpsb_read_fail:
         free_tlabel(host, node, packet->tlabel);
         free_hpsb_packet(packet);
 
@@ -514,11 +520,17 @@ int hpsb_write(struct hpsb_host *host, nodeid_t node, u64 addr,
 	if (!packet)
 		return -ENOMEM;
 
-        hpsb_send_packet(packet);
+	packet->generation = get_hpsb_generation(host);
+        if (!hpsb_send_packet(packet)) {
+		retval = -EINVAL;
+		goto hpsb_write_fail;
+	}
+
         down(&packet->state_change);
         down(&packet->state_change);
         retval = hpsb_packet_success(packet);
 
+hpsb_write_fail:
         free_tlabel(host, node, packet->tlabel);
         free_hpsb_packet(packet);
 
@@ -574,7 +586,11 @@ int hpsb_lock(struct hpsb_host *host, nodeid_t node, u64 addr, int extcode,
         }
         fill_async_lock(packet, addr, extcode, length);
 
-        hpsb_send_packet(packet);
+	packet->generation = get_hpsb_generation(host);
+        if (!hpsb_send_packet(packet)) {
+		retval = -EINVAL;
+		goto hpsb_lock_fail;
+	}
         down(&packet->state_change);
         down(&packet->state_change);
         retval = hpsb_packet_success(packet);
@@ -583,6 +599,7 @@ int hpsb_lock(struct hpsb_host *host, nodeid_t node, u64 addr, int extcode,
                 *data = packet->data[0];
         }
 
+hpsb_lock_fail:
         free_tlabel(host, node, packet->tlabel);
         free_hpsb_packet(packet);
 

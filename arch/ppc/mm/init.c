@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.init.c 1.27 06/28/01 15:50:17 paulus
+ * BK Id: SCCS/s.init.c 1.30 07/06/01 09:19:29 trini
  */
 /*
  *  PowerPC version 
@@ -98,7 +98,6 @@ extern char __init_begin, __init_end;
 extern char __prep_begin, __prep_end;
 extern char __chrp_begin, __chrp_end;
 extern char __pmac_begin, __pmac_end;
-extern char __apus_begin, __apus_end;
 extern char __openfirmware_begin, __openfirmware_end;
 unsigned long ioremap_base;
 unsigned long ioremap_bot;
@@ -719,14 +718,16 @@ static void free_sec(unsigned long start, unsigned long end, const char *name)
 	unsigned long cnt = 0;
 
 	while (start < end) {
-	  	clear_bit(PG_reserved, &virt_to_page(start)->flags);
+		ClearPageReserved(virt_to_page(start));
 		set_page_count(virt_to_page(start), 1);
 		free_page(start);
 		cnt++;
 		start += PAGE_SIZE;
  	}
-	if (cnt)
+	if (cnt) {
 		printk(" %ldk %s", PGTOKB(cnt), name);
+		totalram_pages += cnt;
+	}
 }
 
 void free_initmem(void)
@@ -744,8 +745,6 @@ void free_initmem(void)
 		FREESEC(chrp);
 	if (_machine != _MACH_prep)
 		FREESEC(prep);
-	if (_machine != _MACH_apus)
-		FREESEC(apus);
 	if (!have_of)
 		FREESEC(openfirmware);
  	printk("\n");

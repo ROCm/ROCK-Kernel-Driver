@@ -117,20 +117,6 @@ SECTIONS
   __chrp_end = .;
 
   . = ALIGN(4096);
-  __apus_begin = .;
-  .text.apus : { *(.text.apus) }
-  .data.apus : { *(.data.apus) }
-  . = ALIGN(4096);
-  __apus_end = .;
-
-  . = ALIGN(4096);
-  __apus_begin = .;
-  .text.apus : { *(.text.apus) }
-  .data.apus : { *(.data.apus) }
-  . = ALIGN(4096);
-  __apus_end = .;
-
-  . = ALIGN(4096);
   __openfirmware_begin = .;
   .text.openfirmware : { *(.text.openfirmware) }
   .data.openfirmware : { *(.data.openfirmware) }

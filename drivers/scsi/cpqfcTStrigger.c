@@ -3,12 +3,14 @@
 // since it writes directly to the Tachyon board.  This function
 // developed for Compaq HBA Tachyon TS v1.2 (Rev X5 PCB)
 
+#include "cpqfcTStrigger.h"
+#if TRIGGERABLE_HBA
+
 #include <linux/kernel.h>
 #include <linux/ioport.h>
 #include <linux/types.h>
 #include <linux/pci.h>
 #include <asm/io.h>
-
 
 void TriggerHBA( void* IOBaseUpper, int Print)
 {
@@ -28,3 +30,4 @@ void TriggerHBA( void* IOBaseUpper, int Print)
     printk( " -GPIO0 set- ");
 }
 
+#endif

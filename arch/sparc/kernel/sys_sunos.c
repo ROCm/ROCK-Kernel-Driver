@@ -322,7 +322,7 @@ struct sunos_dirent_callback {
 #define ROUND_UP(x) (((x)+sizeof(long)-1) & ~(sizeof(long)-1))
 
 static int sunos_filldir(void * __buf, const char * name, int namlen,
-			 off_t offset, ino_t ino, unsigned int d_type)
+			 loff_t offset, ino_t ino, unsigned int d_type)
 {
 	struct sunos_dirent * dirent;
 	struct sunos_dirent_callback * buf = (struct sunos_dirent_callback *) __buf;
@@ -403,7 +403,7 @@ struct sunos_direntry_callback {
 };
 
 static int sunos_filldirentry(void * __buf, const char * name, int namlen,
-			      off_t offset, ino_t ino, unsigned int d_type)
+			      loff_t offset, ino_t ino, unsigned int d_type)
 {
 	struct sunos_direntry * dirent;
 	struct sunos_direntry_callback * buf = (struct sunos_direntry_callback *) __buf;

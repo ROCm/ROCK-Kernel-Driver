@@ -34,7 +34,7 @@ CONFIG_CPU_SA110=y
 # Code maturity level options
 #
 CONFIG_EXPERIMENTAL=y
-# CONFIG_ALIGNMENT_TRAP is not set
+CONFIG_ALIGNMENT_TRAP=y
 # CONFIG_TEXT_SECTIONS is not set
 
 #

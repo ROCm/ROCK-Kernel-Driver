@@ -19,6 +19,7 @@
 #endif
 
 struct file_operations bfs_file_operations = {
+	llseek: generic_file_llseek,
 	read:	generic_file_read,
 	write:	generic_file_write,
 	mmap:	generic_file_mmap,

@@ -6,8 +6,6 @@
  *  regular file handling primitives for fat-based filesystems
  */
 
-#define ASC_LINUX_VERSION(V, P, S)	(((V) * 65536) + ((P) * 256) + (S))
-#include <linux/version.h>
 #include <linux/sched.h>
 #include <linux/locks.h>
 #include <linux/fs.h>
@@ -22,15 +20,11 @@
 #include <asm/uaccess.h>
 #include <asm/system.h>
 
-#include "msbuffer.h"
-
-#define MIN(a,b) (((a) < (b)) ? (a) : (b))
-#define MAX(a,b) (((a) > (b)) ? (a) : (b))
-
 #define PRINTK(x)
 #define Printk(x) printk x
 
 struct file_operations fat_file_operations = {
+	llseek:		generic_file_llseek,
 	read:		fat_file_read,
 	write:		fat_file_write,
 	mmap:		generic_file_mmap,
@@ -73,7 +67,7 @@ int fat_get_block(struct inode *inode, long iblock, struct buffer_head *bh_resul
 		return -EIO;
 	}
 	if (!(iblock % MSDOS_SB(inode->i_sb)->cluster_size)) {
-		if (fat_add_cluster(inode))
+		if (fat_add_cluster(inode) < 0)
 			return -ENOSPC;
 	}
 	MSDOS_I(inode)->mmu_private += sb->s_blocksize;

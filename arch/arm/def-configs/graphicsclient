@@ -2,7 +2,9 @@
 # Automatically generated make config: don't edit
 #
 CONFIG_ARM=y
+# CONFIG_EISA is not set
 # CONFIG_SBUS is not set
+# CONFIG_MCA is not set
 CONFIG_UID16=y
 
 #
@@ -25,35 +27,63 @@ CONFIG_MODULES=y
 # CONFIG_ARCH_CLPS7500 is not set
 # CONFIG_ARCH_CO285 is not set
 # CONFIG_ARCH_EBSA110 is not set
+# CONFIG_ARCH_L7200 is not set
 # CONFIG_ARCH_FOOTBRIDGE is not set
 # CONFIG_ARCH_INTEGRATOR is not set
 # CONFIG_ARCH_RPC is not set
 CONFIG_ARCH_SA1100=y
+# CONFIG_ARCH_CLPS711X is not set
 
 #
 # Archimedes/A5000 Implementations
 #
 
 #
+# Archimedes/A5000 Implementations (select only ONE)
+#
+# CONFIG_ARCH_ARC is not set
+# CONFIG_ARCH_A5K is not set
+
+#
 # Footbridge Implementations
 #
+# CONFIG_ARCH_CATS is not set
+# CONFIG_ARCH_PERSONAL_SERVER is not set
+# CONFIG_ARCH_EBSA285_ADDIN is not set
+# CONFIG_ARCH_EBSA285_HOST is not set
+# CONFIG_ARCH_NETWINDER is not set
 
 #
 # SA11x0 Implementations
 #
 # CONFIG_SA1100_ASSABET is not set
+# CONFIG_ASSABET_NEPONSET is not set
 # CONFIG_SA1100_BRUTUS is not set
 # CONFIG_SA1100_CERF is not set
 # CONFIG_SA1100_BITSY is not set
-# CONFIG_SA1100_LART is not set
+# CONFIG_SA1100_EXTENEX1 is not set
+# CONFIG_SA1100_FREEBIRD is not set
 CONFIG_SA1100_GRAPHICSCLIENT=y
+# CONFIG_SA1100_HUW_WEBPANEL is not set
+# CONFIG_SA1100_LART is not set
+# CONFIG_SA1100_PLEB is not set
 # CONFIG_SA1100_NANOENGINE is not set
-# CONFIG_SA1100_VICTOR is not set
+# CONFIG_SA1100_PANGOLIN is not set
 # CONFIG_SA1100_SHERMAN is not set
+# CONFIG_SA1100_VICTOR is not set
 # CONFIG_SA1100_XP860 is not set
-# CONFIG_ANGELBOOT is not set
+# CONFIG_SA1100_YOPY is not set
+# CONFIG_SA1100_PFS168 is not set
+CONFIG_SA1100_USB=m
+CONFIG_SA1100_USB_NETLINK=m
+CONFIG_SA1100_USB_CHAR=m
 # CONFIG_SA1100_FREQUENCY_SCALE is not set
 # CONFIG_SA1100_VOLTAGE_SCALE is not set
+
+#
+# CLPS711X/EP721X Implementations
+#
+# CONFIG_ARCH_P720T is not set
 # CONFIG_ARCH_ACORN is not set
 # CONFIG_FOOTBRIDGE is not set
 # CONFIG_FOOTBRIDGE_HOST is not set
@@ -64,31 +94,44 @@ CONFIG_CPU_32=y
 #
 # Processor Type
 #
+# CONFIG_CPU_32v3 is not set
 CONFIG_CPU_32v4=y
+# CONFIG_CPU_ARM610 is not set
+# CONFIG_CPU_ARM710 is not set
+# CONFIG_CPU_ARM720T is not set
+# CONFIG_CPU_ARM920T is not set
+# CONFIG_CPU_ARM1020 is not set
+# CONFIG_CPU_SA110 is not set
 CONFIG_CPU_SA1100=y
 CONFIG_DISCONTIGMEM=y
 
 #
 # General setup
 #
+
+#
+# Please ensure that you have read the help on the next option
+#
+# CONFIG_ANGELBOOT is not set
 # CONFIG_PCI is not set
 # CONFIG_ISA is not set
 # CONFIG_ISA_DMA is not set
-CONFIG_PC_KEYMAP=y
 CONFIG_HOTPLUG=y
 
 #
 # PCMCIA/CardBus support
 #
 CONFIG_PCMCIA=y
-# CONFIG_PCMCIA_DEBUG is not set
-CONFIG_SA1100_PCMCIA=y
-CONFIG_VIRTUAL_BUS=y
+# CONFIG_I82365 is not set
+# CONFIG_TCIC is not set
+# CONFIG_PCMCIA_CLPS6700 is not set
+CONFIG_PCMCIA_SA1100=m
 CONFIG_NET=y
 CONFIG_SYSVIPC=y
 # CONFIG_BSD_PROCESS_ACCT is not set
 CONFIG_SYSCTL=y
-CONFIG_NWFPE=y
+CONFIG_FPE_NWFPE=y
+# CONFIG_FPE_FASTFPE is not set
 CONFIG_KCORE_ELF=y
 # CONFIG_KCORE_AOUT is not set
 # CONFIG_BINFMT_AOUT is not set
@@ -97,8 +140,10 @@ CONFIG_BINFMT_ELF=y
 # CONFIG_PM is not set
 # CONFIG_ARTHUR is not set
 CONFIG_CMDLINE="root=nfs"
+# CONFIG_PFS168_CMDLINE is not set
 # CONFIG_LEDS is not set
 CONFIG_ALIGNMENT_TRAP=y
+# CONFIG_UCB1200 is not set
 
 #
 # Parallel port support
@@ -108,7 +153,65 @@ CONFIG_ALIGNMENT_TRAP=y
 #
 # Memory Technology Devices (MTD)
 #
-# CONFIG_MTD is not set
+CONFIG_MTD=m
+# CONFIG_MTD_DEBUG is not set
+
+#
+# Disk-On-Chip Device Drivers
+#
+# CONFIG_MTD_DOC1000 is not set
+# CONFIG_MTD_DOC2000 is not set
+# CONFIG_MTD_DOC2001 is not set
+# CONFIG_MTD_DOCPROBE is not set
+
+#
+# RAM/ROM Device Drivers
+#
+# CONFIG_MTD_PMC551 is not set
+# CONFIG_MTD_SLRAM is not set
+# CONFIG_MTD_RAM is not set
+# CONFIG_MTD_ROM is not set
+# CONFIG_MTD_MTDRAM is not set
+
+#
+# Linearly Mapped Flash Device Drivers
+#
+CONFIG_MTD_CFI=m
+# CONFIG_MTD_CFI_ADV_OPTIONS is not set
+CONFIG_MTD_CFI_INTELEXT=m
+# CONFIG_MTD_CFI_AMDSTD is not set
+# CONFIG_MTD_AMDSTD is not set
+# CONFIG_MTD_SHARP is not set
+# CONFIG_MTD_PHYSMAP is not set
+# CONFIG_MTD_NORA is not set
+# CONFIG_MTD_PNC2000 is not set
+# CONFIG_MTD_RPXLITE is not set
+# CONFIG_MTD_SC520CDP is not set
+# CONFIG_MTD_SBC_MEDIAGX is not set
+# CONFIG_MTD_ELAN_104NC is not set
+CONFIG_MTD_SA1100=m
+# CONFIG_MTD_DC21285 is not set
+# CONFIG_MTD_IQ80310 is not set
+# CONFIG_MTD_CSTM_CFI_JEDEC is not set
+# CONFIG_MTD_JEDEC is not set
+# CONFIG_MTD_MIXMEM is not set
+# CONFIG_MTD_OCTAGON is not set
+# CONFIG_MTD_VMAX is not set
+
+#
+# NAND Flash Device Drivers
+#
+# CONFIG_MTD_NAND is not set
+# CONFIG_MTD_NAND_SPIA is not set
+
+#
+# User Modules And Translation Layers
+#
+CONFIG_MTD_CHAR=m
+CONFIG_MTD_BLOCK=m
+# CONFIG_MTD_BLOCK_RO is not set
+# CONFIG_FTL is not set
+# CONFIG_NFTL is not set
 
 #
 # Plug and Play configuration
@@ -123,19 +226,24 @@ CONFIG_ALIGNMENT_TRAP=y
 # CONFIG_BLK_DEV_XD is not set
 # CONFIG_PARIDE is not set
 # CONFIG_BLK_CPQ_DA is not set
+# CONFIG_BLK_CPQ_CISS_DA is not set
 # CONFIG_BLK_DEV_DAC960 is not set
-# CONFIG_BLK_DEV_LOOP is not set
+CONFIG_BLK_DEV_LOOP=m
 # CONFIG_BLK_DEV_NBD is not set
-# CONFIG_BLK_DEV_LVM is not set
+CONFIG_BLK_DEV_RAM=y
+CONFIG_BLK_DEV_RAM_SIZE=8192
+CONFIG_BLK_DEV_INITRD=y
+
+#
+# Multi-device support (RAID and LVM)
+#
+# CONFIG_MD is not set
 # CONFIG_BLK_DEV_MD is not set
 # CONFIG_MD_LINEAR is not set
 # CONFIG_MD_RAID0 is not set
 # CONFIG_MD_RAID1 is not set
 # CONFIG_MD_RAID5 is not set
-CONFIG_BLK_DEV_RAM=y
-CONFIG_BLK_DEV_RAM_SIZE=8192
-CONFIG_BLK_DEV_INITRD=y
-# CONFIG_BLK_DEV_FLASH is not set
+# CONFIG_BLK_DEV_LVM is not set
 
 #
 # Networking options
@@ -170,6 +278,7 @@ CONFIG_IP_PNP_BOOTP=y
 # CONFIG_X25 is not set
 # CONFIG_LAPB is not set
 # CONFIG_LLC is not set
+# CONFIG_NET_DIVERT is not set
 # CONFIG_ECONET is not set
 # CONFIG_WAN_ROUTER is not set
 # CONFIG_NET_FASTROUTE is not set
@@ -199,7 +308,6 @@ CONFIG_NETDEVICES=y
 # Ethernet (10 or 100Mbit)
 #
 CONFIG_NET_ETHERNET=y
-# CONFIG_ARM_AM79C961A is not set
 # CONFIG_NET_VENDOR_3COM is not set
 # CONFIG_LANCE is not set
 CONFIG_NET_VENDOR_SMC=y
@@ -217,8 +325,9 @@ CONFIG_SMC9194=y
 #
 # Ethernet (1000 Mbit)
 #
-# CONFIG_YELLOWFIN is not set
 # CONFIG_ACENIC is not set
+# CONFIG_HAMACHI is not set
+# CONFIG_YELLOWFIN is not set
 # CONFIG_SK98LIN is not set
 # CONFIG_FDDI is not set
 # CONFIG_HIPPI is not set
@@ -331,6 +440,11 @@ CONFIG_BLK_DEV_IDECS=m
 # CONFIG_ISDN is not set
 
 #
+# Input core support
+#
+# CONFIG_INPUT is not set
+
+#
 # Character devices
 #
 CONFIG_VT=y
@@ -340,9 +454,15 @@ CONFIG_VT=y
 # CONFIG_SERIAL_NONSTANDARD is not set
 CONFIG_SERIAL_SA1100=y
 CONFIG_SERIAL_SA1100_CONSOLE=y
-CONFIG_SA1100_DEFAULT_BAUDRATE=38400
+CONFIG_SA1100_DEFAULT_BAUDRATE=9600
 # CONFIG_TOUCHSCREEN_UCB1200 is not set
 # CONFIG_TOUCHSCREEN_BITSY is not set
+# CONFIG_PROFILER is not set
+# CONFIG_PFS168_SPI is not set
+# CONFIG_PFS168_DTMF is not set
+# CONFIG_PFS168_MISC is not set
+CONFIG_SERIAL_CORE=y
+CONFIG_SERIAL_CORE_CONSOLE=y
 CONFIG_UNIX98_PTYS=y
 CONFIG_UNIX98_PTY_COUNT=32
 
@@ -374,6 +494,7 @@ CONFIG_UNIX98_PTY_COUNT=32
 # CONFIG_INTEL_RNG is not set
 # CONFIG_NVRAM is not set
 # CONFIG_RTC is not set
+# CONFIG_SA1100_RTC is not set
 # CONFIG_DTLK is not set
 # CONFIG_R3964 is not set
 # CONFIG_APPLICOM is not set
@@ -387,11 +508,18 @@ CONFIG_UNIX98_PTY_COUNT=32
 # CONFIG_PCMCIA_SERIAL is not set
 
 #
+# Multimedia devices
+#
+# CONFIG_VIDEO_DEV is not set
+
+#
 # File systems
 #
 # CONFIG_QUOTA is not set
 # CONFIG_AUTOFS_FS is not set
 # CONFIG_AUTOFS4_FS is not set
+# CONFIG_REISERFS_FS is not set
+# CONFIG_REISERFS_CHECK is not set
 # CONFIG_ADFS_FS is not set
 # CONFIG_ADFS_FS_RW is not set
 # CONFIG_AFFS_FS is not set
@@ -402,9 +530,12 @@ CONFIG_MSDOS_FS=m
 # CONFIG_UMSDOS_FS is not set
 CONFIG_VFAT_FS=m
 # CONFIG_EFS_FS is not set
-# CONFIG_JFFS_FS is not set
+CONFIG_JFFS_FS=m
+CONFIG_JFFS_FS_VERBOSE=0
+CONFIG_JFFS2_FS=m
+CONFIG_JFFS2_FS_DEBUG=0
 # CONFIG_CRAMFS is not set
-CONFIG_RAMFS=y
+CONFIG_RAMFS=m
 # CONFIG_ISO9660_FS is not set
 # CONFIG_JOLIET is not set
 # CONFIG_MINIX_FS is not set
@@ -446,8 +577,6 @@ CONFIG_LOCKD=y
 # CONFIG_NCPFS_NFS_NS is not set
 # CONFIG_NCPFS_OS2_NS is not set
 # CONFIG_NCPFS_SMALLDOS is not set
-# CONFIG_NCPFS_MOUNT_SUBDIR is not set
-# CONFIG_NCPFS_NDS_DOMAINS is not set
 # CONFIG_NCPFS_NLS is not set
 # CONFIG_NCPFS_EXTRAS is not set
 
@@ -456,6 +585,7 @@ CONFIG_LOCKD=y
 #
 # CONFIG_PARTITION_ADVANCED is not set
 CONFIG_MSDOS_PARTITION=y
+# CONFIG_SMB_NLS is not set
 CONFIG_NLS=y
 
 #
@@ -499,6 +629,7 @@ CONFIG_NLS_DEFAULT="iso8859-1"
 #
 # Console drivers
 #
+CONFIG_PC_KEYMAP=y
 # CONFIG_VGA_CONSOLE is not set
 CONFIG_FB=y
 
@@ -507,6 +638,8 @@ CONFIG_FB=y
 #
 CONFIG_FB=y
 CONFIG_DUMMY_CONSOLE=y
+# CONFIG_FB_ACORN is not set
+# CONFIG_FB_CLPS711X is not set
 # CONFIG_FB_CYBER2000 is not set
 CONFIG_FB_SA1100=y
 # CONFIG_FB_VIRTUAL is not set
@@ -536,9 +669,12 @@ CONFIG_FONT_8x16=y
 #
 # Kernel hacking
 #
-CONFIG_FRAME_POINTER=y
+# CONFIG_NO_FRAME_POINTER is not set
 CONFIG_DEBUG_ERRORS=y
 CONFIG_DEBUG_USER=y
 # CONFIG_DEBUG_INFO is not set
 # CONFIG_MAGIC_SYSRQ is not set
+# CONFIG_NO_PGT_CACHE is not set
 # CONFIG_DEBUG_LL is not set
+# CONFIG_DEBUG_DC21285_PORT is not set
+# CONFIG_DEBUG_CLPS711X_UART2 is not set

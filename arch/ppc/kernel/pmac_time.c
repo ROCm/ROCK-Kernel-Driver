@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.pmac_time.c 1.8 05/17/01 18:14:21 cort
+ * BK Id: SCCS/s.pmac_time.c 1.11 07/06/01 15:46:39 trini
  */
 /*
  * Support for periodic interrupts (100 per second) and for getting
@@ -60,8 +60,8 @@ extern rwlock_t xtime_lock;
 
 extern struct timezone sys_tz;
 
-__init
-long pmac_time_init(void)
+long __init
+pmac_time_init(void)
 {
 #ifdef CONFIG_NVRAM
 	s32 delta = 0;
@@ -81,8 +81,8 @@ long pmac_time_init(void)
 #endif
 }
 
-__pmac
-unsigned long pmac_get_rtc_time(void)
+unsigned long __pmac
+pmac_get_rtc_time(void)
 {
 #if defined(CONFIG_ADB_CUDA) || defined(CONFIG_ADB_PMU)
 	struct adb_request req;
@@ -122,7 +122,8 @@ unsigned long pmac_get_rtc_time(void)
 	return 0;
 }
 
-int pmac_set_rtc_time(unsigned long nowtime)
+int __pmac
+pmac_set_rtc_time(unsigned long nowtime)
 {
 #if defined(CONFIG_ADB_CUDA) || defined(CONFIG_ADB_PMU)
 	struct adb_request req;
@@ -164,7 +165,8 @@ int pmac_set_rtc_time(unsigned long nowtime)
  * Calibrate the decrementer register using VIA timer 1.
  * This is used both on powermacs and CHRP machines.
  */
-int __init via_calibrate_decr(void)
+int __init
+via_calibrate_decr(void)
 {
 	struct device_node *vias;
 	volatile unsigned char *via;
@@ -211,7 +213,8 @@ int __init via_calibrate_decr(void)
 /*
  * Reset the time after a sleep.
  */
-static int time_sleep_notify(struct pmu_sleep_notifier *self, int when)
+static int __pmac
+time_sleep_notify(struct pmu_sleep_notifier *self, int when)
 {
 	static unsigned long time_diff;
 	unsigned long flags;
@@ -237,7 +240,7 @@ static int time_sleep_notify(struct pmu_sleep_notifier *self, int when)
 	return PBOOK_SLEEP_OK;
 }
 
-static struct pmu_sleep_notifier time_sleep_notifier = {
+static struct pmu_sleep_notifier time_sleep_notifier __pmacdata = {
 	time_sleep_notify, SLEEP_LEVEL_MISC,
 };
 #endif /* CONFIG_PMAC_PBOOK */
@@ -247,7 +250,8 @@ static struct pmu_sleep_notifier time_sleep_notifier = {
  * This was taken from the pmac time_init() when merging the prep/pmac
  * time functions.
  */
-void __init pmac_calibrate_decr(void)
+void __init
+pmac_calibrate_decr(void)
 {
 	struct device_node *cpu;
 	unsigned int freq, *fp;
@@ -275,4 +279,3 @@ void __init pmac_calibrate_decr(void)
 	tb_ticks_per_jiffy = freq / HZ;
 	tb_to_us = mulhwu_scale_factor(freq, 1000000);
 }
-

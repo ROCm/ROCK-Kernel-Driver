@@ -108,7 +108,7 @@ __do_kernel_fault(struct mm_struct *mm, unsigned long addr, int error_code,
 	if ((fixup = search_exception_table(instruction_pointer(regs))) != 0) {
 #ifdef DEBUG
 		printk(KERN_DEBUG "%s: Exception at [<%lx>] addr=%lx (fixup: %lx)\n",
-			tsk->comm, regs->ARM_pc, addr, fixup);
+			current->comm, regs->ARM_pc, addr, fixup);
 #endif
 		regs->ARM_pc = fixup;
 		return;

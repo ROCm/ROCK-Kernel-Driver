@@ -24,6 +24,14 @@
 
 #include <asm/pgalloc.h>
 
+/*
+ * The "priority" of VM scanning is how much of the queues we
+ * will scan in one go. A value of 6 for DEF_PRIORITY implies
+ * that we'll scan 1/64th of the queues ("queue_length >> 6")
+ * during a normal aging round.
+ */
+#define DEF_PRIORITY (6)
+
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
 
 static inline void age_page_up(struct page *page)
@@ -65,23 +73,6 @@ static unsigned int zone_inactive_plenty(zone_t *zone)
 	return (inactive > (zone->size / 3));
 }
 
-static unsigned int zone_inactive_shortage(zone_t *zone) 
-{
-	unsigned int sum;
-
-	if (!zone->size)
-		return 0;
-
-	sum = zone->pages_high;
-	sum -= zone->inactive_dirty_pages;
-	sum -= zone->inactive_clean_pages;
-	sum -= zone->free_pages;
-	
-	if (sum > 0)
-		return sum;
-	return 0;
-}
-
 static unsigned int zone_free_plenty(zone_t *zone)
 {
 	unsigned int free;
@@ -91,17 +82,6 @@ static unsigned int zone_free_plenty(zone_t *zone)
 
 	return free > zone->pages_high*2;
 }
-
-static unsigned int zone_free_shortage(zone_t *zone)
-{
-	unsigned int free;
-
-	free = zone->free_pages;
-	free += zone->inactive_clean_pages;
-
-	return zone->size && free < zone->pages_low;
-}
-
 
 /* mm->page_table_lock is held. mmap_sem is not held */
 static void try_to_swap_out(struct mm_struct * mm, struct vm_area_struct* vma, unsigned long address, pte_t * page_table, struct page *page)
@@ -444,7 +424,7 @@ struct page * reclaim_page(zone_t * zone)
 		}
 
 		/* OK, remove the page from the caches. */
-                if (PageSwapCache(page)) {
+		if (PageSwapCache(page)) {
 			__delete_from_swap_cache(page);
 			goto found_page;
 		}
@@ -494,8 +474,8 @@ out:
  * have a page before it can continue with its allocation, we'll
  * do synchronous page flushing in that case.
  *
- * This code is heavily inspired by the FreeBSD source code. Thanks
- * go out to Matthew Dillon.
+ * This code used to be heavily inspired by the FreeBSD source code. 
+ * Thanks go out to Matthew Dillon.
  */
 #define MAX_LAUNDER 		(4 * (1 << page_cluster))
 #define CAN_DO_FS		(gfp_mask & __GFP_FS)
@@ -512,7 +492,7 @@ int page_launder(int gfp_mask, int sync)
 
 dirty_page_rescan:
 	spin_lock(&pagemap_lru_lock);
-	maxscan = nr_inactive_dirty_pages;
+	maxscan = nr_inactive_dirty_pages >> DEF_PRIORITY;
 	while ((page_lru = inactive_dirty_list.prev) != &inactive_dirty_list &&
 				maxscan-- > 0) {
 		page = list_entry(page_lru, struct page, lru);
@@ -654,13 +634,6 @@ dirty_page_rescan:
 			UnlockPage(page);
 			page_cache_release(page);
 
-			/* 
-			 * If we're freeing buffer cache pages, stop when
-			 * we've got enough free memory.
-			 */
-			if (freed_page && !total_free_shortage())
-				break;
-
 			continue;
 		} else if (page->mapping && !PageDirty(page)) {
 			/*
@@ -698,7 +671,7 @@ page_active:
 	 * loads, flush out the dirty pages before we have to wait on
 	 * IO.
 	 */
-	if (CAN_DO_IO && !launder_loop && total_free_shortage()) {
+	if (CAN_DO_IO && !launder_loop && free_shortage()) {
 		launder_loop = 1;
 		/* If we cleaned pages, never do synchronous IO. */
 		if (cleaned_pages)
@@ -717,25 +690,17 @@ page_active:
 /**
  * refill_inactive_scan - scan the active list and find pages to deactivate
  * @priority: the priority at which to scan
- * @target: number of pages to deactivate, zero for background aging
  *
  * This function will scan a portion of the active list to find
  * unused pages, those pages will then be moved to the inactive list.
  */
-int refill_inactive_scan(zone_t *zone, unsigned int priority, int target)
+static int refill_inactive_scan(unsigned int priority)
 {
 	struct list_head * page_lru;
 	struct page * page;
 	int maxscan = nr_active_pages >> priority;
 	int page_active = 0;
 	int nr_deactivated = 0;
-
-	/*
-	 * When we are background aging, we try to increase the page aging
-	 * information in the system.
-	 */
-	if (!target)
-		maxscan = nr_active_pages >> 4;
 
 	/* Take the lock while messing with the list... */
 	spin_lock(&pagemap_lru_lock);
@@ -794,10 +759,7 @@ skip_page:
 			list_del(page_lru);
 			list_add(page_lru, &active_list);
 		} else {
-			if (!zone || (zone && (zone == page->zone)))
-				nr_deactivated++;
-			if (target && nr_deactivated >= target)
-				break;
+			nr_deactivated++;
 		}
 	}
 	spin_unlock(&pagemap_lru_lock);
@@ -806,99 +768,73 @@ skip_page:
 }
 
 /*
- * Check if we have are low on free pages globally.
- */
-int free_shortage(void)
-{
-	int freeable = nr_free_pages() + nr_inactive_clean_pages();
-	int freetarget = freepages.high;
-
-	/* Are we low on free pages globally? */
-	if (freeable < freetarget)
-		return freetarget - freeable;
-	return 0;
-}
-
-/*
- *
  * Check if there are zones with a severe shortage of free pages,
  * or if all zones have a minor shortage.
  */
-int total_free_shortage(void)
+int free_shortage(void)
 {
-	int sum = 0;
-	pg_data_t *pgdat = pgdat_list;
+	pg_data_t *pgdat;
+	unsigned int global_free = 0;
+	unsigned int global_target = freepages.high;
 
-	/* Do we have a global free shortage? */
-	if((sum = free_shortage()))
-		return sum;
-
-	/* If not, are we very low on any particular zone? */
+	/* Are we low on free pages anywhere? */
+	pgdat = pgdat_list;
 	do {
 		int i;
 		for(i = 0; i < MAX_NR_ZONES; i++) {
 			zone_t *zone = pgdat->node_zones+ i;
-
-			sum += zone_free_shortage(zone);
-		}
-		pgdat = pgdat->node_next;
-	} while (pgdat);
-
-	return sum;
-
-}
-
-/*
- * How many inactive pages are we short globally?
- */
-int inactive_shortage(void)
-{
-	int shortage = 0;
-
-	/* Is the inactive dirty list too small? */
-
-	shortage += freepages.high;
-	shortage += inactive_target;
-	shortage -= nr_free_pages();
-	shortage -= nr_inactive_clean_pages();
-	shortage -= nr_inactive_dirty_pages;
-
-	if (shortage > 0)
-		return shortage;
-	return 0;
-}
-/*
- * Are we low on inactive pages globally or in any zone?
- */
-int total_inactive_shortage(void)
-{
-	int shortage = 0;
-	pg_data_t *pgdat = pgdat_list;
-
-	if((shortage = inactive_shortage()))
-		return shortage;
-
-	shortage = 0;	
-
-	do {
-		int i;
-		for(i = 0; i < MAX_NR_ZONES; i++) {
-			int zone_shortage;
-			zone_t *zone = pgdat->node_zones+ i;
+			unsigned int free;
 
 			if (!zone->size)
 				continue;
-			zone_shortage = zone->pages_high;
-			zone_shortage -= zone->inactive_dirty_pages;
-			zone_shortage -= zone->inactive_clean_pages;
-			zone_shortage -= zone->free_pages;
-			if (zone_shortage > 0)
-				shortage += zone_shortage;
+
+			free = zone->free_pages;
+			free += zone->inactive_clean_pages;
+
+			/* Local shortage? */
+			if (free < zone->pages_low)
+				return 1;
+
+			global_free += free;
 		}
 		pgdat = pgdat->node_next;
 	} while (pgdat);
 
-	return shortage;
+	/* Global shortage? */
+	return global_free < global_target;
+}
+
+/*
+ * Are we low on inactive pages globally or in any zone?
+ */
+int inactive_shortage(void)
+{
+	pg_data_t *pgdat;
+	unsigned int global_target = freepages.high + inactive_target;
+	unsigned int global_incative = 0;
+
+	pgdat = pgdat_list;
+	do {
+		int i;
+		for(i = 0; i < MAX_NR_ZONES; i++) {
+			zone_t *zone = pgdat->node_zones + i;
+			unsigned int inactive;
+
+			inactive  = zone->inactive_dirty_pages;
+			inactive += zone->inactive_clean_pages;
+			inactive += zone->free_pages;
+
+			/* Local shortage? */
+			if (inactive < zone->pages_high)
+				return 1;
+
+			global_incative += inactive;
+		}
+		pgdat = pgdat->node_next;
+	} while (pgdat);
+
+	/* Global shortage? */
+	return global_incative < global_target;
 }
 
 /*
@@ -917,23 +853,16 @@ int total_inactive_shortage(void)
  * deactivate too many pages. To achieve this we simply do less work
  * when called from a user process.
  */
-#define DEF_PRIORITY (6)
-static int refill_inactive_global(unsigned int gfp_mask, int user)
+
+static int refill_inactive(unsigned int gfp_mask)
 {
-	int count, start_count, maxtry;
+	int progress = 0, maxtry;
 
-	if (user) {
-		count = (1 << page_cluster);
-		maxtry = 6;
-	} else {
-		count = inactive_shortage();
-		maxtry = 1 << DEF_PRIORITY;
-	}
+	maxtry = 1 << DEF_PRIORITY;
 
-	start_count = count;
 	do {
 		if (current->need_resched) {
-			__set_current_state(TASK_RUNNING);
+			 __set_current_state(TASK_RUNNING);
 			schedule();
 			if (!inactive_shortage())
 				return 1;
@@ -942,71 +871,15 @@ static int refill_inactive_global(unsigned int gfp_mask, int user)
 		/* Walk the VM space for a bit.. */
 		swap_out(DEF_PRIORITY, gfp_mask);
 
-		count -= refill_inactive_scan(NULL, DEF_PRIORITY, count);
-		if (count <= 0)
-			goto done;
+		/* ..and refill the inactive list */
+		progress += refill_inactive_scan(DEF_PRIORITY);
 
 		if (--maxtry <= 0)
-				return 0;
-		
+			break;
 	} while (inactive_shortage());
 
-done:
-	return (count < start_count);
+	return progress;
 }
-
-static int refill_inactive_zone(zone_t *zone, unsigned int gfp_mask, int user) 
-{
-	int count, start_count, maxtry; 
-	
-	count = start_count = zone_inactive_shortage(zone);
-
-	maxtry = (1 << DEF_PRIORITY);
-
-	do {
-		swap_out(DEF_PRIORITY, gfp_mask);
-
-		count -= refill_inactive_scan(zone, DEF_PRIORITY, count);
-
-		if (count <= 0)
-			goto done;
-
-		if (--maxtry <= 0)
-			return 0;
-
-	} while(zone_inactive_shortage(zone));
-done:
-	return (count < start_count);
-}
-
-
-static int refill_inactive(unsigned int gfp_mask, int user) 
-{
-	int type = 0, ret = 0;
-	pg_data_t *pgdat = pgdat_list;
-	/*
-	 * First do a global scan if there is a 
-	 * global shortage.
-	 */
-	if (inactive_shortage())
-		ret += refill_inactive_global(gfp_mask, user);
-
-	/*
-	 * Then check if there is any specific zone 
-	 * with a shortage and try to refill it if
-	 * so.
-	 */
-	for (type = 0; type < MAX_NR_ZONES; type++) {
-		zone_t *zone = pgdat->node_zones + type;
-		
-		if (zone_inactive_shortage(zone)) 
-			ret += refill_inactive_zone(zone, gfp_mask, user);
-	} 
-
-	return ret;
-}
-
-#define DEF_PRIORITY (6)
 
 static int do_try_to_free_pages(unsigned int gfp_mask, int user)
 {
@@ -1030,7 +903,8 @@ static int do_try_to_free_pages(unsigned int gfp_mask, int user)
 	 * If needed, we move pages from the active list
 	 * to the inactive list.
 	 */
-	ret += refill_inactive(gfp_mask, user);
+	if (inactive_shortage()) 
+		ret += refill_inactive(gfp_mask);
 
 	/* 	
 	 * Reclaim unused slab cache if memory is low.
@@ -1085,7 +959,7 @@ int kswapd(void *unused)
 		static long recalc = 0;
 
 		/* If needed, try to free some memory. */
-		if (total_inactive_shortage() || total_free_shortage()) 
+		if (inactive_shortage() || free_shortage()) 
 			do_try_to_free_pages(GFP_KSWAPD, 0);
 
 		/* Once a second ... */
@@ -1096,7 +970,7 @@ int kswapd(void *unused)
 			recalculate_vm_stats();
 
 			/* Do background page aging. */
-			refill_inactive_scan(NULL, DEF_PRIORITY, 0);
+			refill_inactive_scan(DEF_PRIORITY);
 		}
 
 		run_task_queue(&tq_disk);
@@ -1112,7 +986,7 @@ int kswapd(void *unused)
 		 * We go to sleep for one second, but if it's needed
 		 * we'll be woken up earlier...
 		 */
-		if (!total_free_shortage() || !total_inactive_shortage()) {
+		if (!free_shortage() || !inactive_shortage()) {
 			interruptible_sleep_on_timeout(&kswapd_wait, HZ);
 		/*
 		 * If we couldn't free enough memory, we see if it was

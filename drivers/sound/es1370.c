@@ -401,6 +401,7 @@ struct es1370_state {
 	} midi;
 
 	struct gameport gameport;
+	struct semaphore sem;
 };
 
 /* --------------------------------------------------------------------- */
@@ -416,7 +417,7 @@ static unsigned char bugbuf[16] __attribute__ ((aligned (16)));
 
 /* --------------------------------------------------------------------- */
 
-extern inline unsigned ld2(unsigned int x)
+static inline unsigned ld2(unsigned int x)
 {
 	unsigned r = 0;
 	
@@ -460,7 +461,7 @@ static void wrcodec(struct es1370_state *s, unsigned char idx, unsigned char dat
 
 /* --------------------------------------------------------------------- */
 
-extern inline void stop_adc(struct es1370_state *s)
+static inline void stop_adc(struct es1370_state *s)
 {
 	unsigned long flags;
 
@@ -470,7 +471,7 @@ extern inline void stop_adc(struct es1370_state *s)
 	spin_unlock_irqrestore(&s->lock, flags);
 }	
 
-extern inline void stop_dac1(struct es1370_state *s)
+static inline void stop_dac1(struct es1370_state *s)
 {
 	unsigned long flags;
 
@@ -480,7 +481,7 @@ extern inline void stop_dac1(struct es1370_state *s)
 	spin_unlock_irqrestore(&s->lock, flags);
 }	
 
-extern inline void stop_dac2(struct es1370_state *s)
+static inline void stop_dac2(struct es1370_state *s)
 {
 	unsigned long flags;
 
@@ -564,7 +565,7 @@ static void start_adc(struct es1370_state *s)
 #define DMABUF_DEFAULTORDER (17-PAGE_SHIFT)
 #define DMABUF_MINORDER 1
 
-extern inline void dealloc_dmabuf(struct es1370_state *s, struct dmabuf *db)
+static inline void dealloc_dmabuf(struct es1370_state *s, struct dmabuf *db)
 {
 	struct page *page, *pend;
 
@@ -632,28 +633,28 @@ static int prog_dmabuf(struct es1370_state *s, struct dmabuf *db, unsigned rate,
 	return 0;
 }
 
-extern inline int prog_dmabuf_adc(struct es1370_state *s)
+static inline int prog_dmabuf_adc(struct es1370_state *s)
 {
 	stop_adc(s);
 	return prog_dmabuf(s, &s->dma_adc, DAC2_DIVTOSR((s->ctrl & CTRL_PCLKDIV) >> CTRL_SH_PCLKDIV),
 			   (s->sctrl >> SCTRL_SH_R1FMT) & ES1370_FMT_MASK, ES1370_REG_ADC_FRAMEADR);
 }
 
-extern inline int prog_dmabuf_dac2(struct es1370_state *s)
+static inline int prog_dmabuf_dac2(struct es1370_state *s)
 {
 	stop_dac2(s);
 	return prog_dmabuf(s, &s->dma_dac2, DAC2_DIVTOSR((s->ctrl & CTRL_PCLKDIV) >> CTRL_SH_PCLKDIV),
 			   (s->sctrl >> SCTRL_SH_P2FMT) & ES1370_FMT_MASK, ES1370_REG_DAC2_FRAMEADR);
 }
 
-extern inline int prog_dmabuf_dac1(struct es1370_state *s)
+static inline int prog_dmabuf_dac1(struct es1370_state *s)
 {
 	stop_dac1(s);
 	return prog_dmabuf(s, &s->dma_dac1, dac1_samplerate[(s->ctrl & CTRL_WTSRSEL) >> CTRL_SH_WTSRSEL],
 			   (s->sctrl >> SCTRL_SH_P1FMT) & ES1370_FMT_MASK, ES1370_REG_DAC1_FRAMEADR);
 }
 
-extern inline unsigned get_hwptr(struct es1370_state *s, struct dmabuf *db, unsigned reg)
+static inline unsigned get_hwptr(struct es1370_state *s, struct dmabuf *db, unsigned reg)
 {
 	unsigned hwptr, diff;
 
@@ -664,7 +665,7 @@ extern inline unsigned get_hwptr(struct es1370_state *s, struct dmabuf *db, unsi
 	return diff;
 }
 
-extern inline void clear_advance(void *buf, unsigned bsize, unsigned bptr, unsigned len, unsigned char c)
+static inline void clear_advance(void *buf, unsigned bsize, unsigned bptr, unsigned len, unsigned char c)
 {
 	if (bptr + len > bsize) {
 		unsigned x = bsize - bptr;
@@ -1042,13 +1043,6 @@ static int mixer_ioctl(struct es1370_state *s, unsigned int cmd, unsigned long a
 
 /* --------------------------------------------------------------------- */
 
-static loff_t es1370_llseek(struct file *file, loff_t offset, int origin)
-{
-	return -ESPIPE;
-}
-
-/* --------------------------------------------------------------------- */
-
 static int es1370_open_mixdev(struct inode *inode, struct file *file)
 {
 	int minor = MINOR(inode->i_rdev);
@@ -1082,7 +1076,7 @@ static int es1370_ioctl_mixdev(struct inode *inode, struct file *file, unsigned 
 
 static /*const*/ struct file_operations es1370_mixer_fops = {
 	owner:		THIS_MODULE,
-	llseek:		es1370_llseek,
+	llseek:		no_llseek,
 	ioctl:		es1370_ioctl_mixdev,
 	open:		es1370_open_mixdev,
 	release:	es1370_release_mixdev,
@@ -1168,7 +1162,7 @@ static ssize_t es1370_read(struct file *file, char *buffer, size_t count, loff_t
 {
 	struct es1370_state *s = (struct es1370_state *)file->private_data;
 	DECLARE_WAITQUEUE(wait, current);
-	ssize_t ret;
+	ssize_t ret = 0;
 	unsigned long flags;
 	unsigned swptr;
 	int cnt;
@@ -1178,12 +1172,13 @@ static ssize_t es1370_read(struct file *file, char *buffer, size_t count, loff_t
 		return -ESPIPE;
 	if (s->dma_adc.mapped)
 		return -ENXIO;
-	if (!s->dma_adc.ready && (ret = prog_dmabuf_adc(s)))
-		return ret;
 	if (!access_ok(VERIFY_WRITE, buffer, count))
 		return -EFAULT;
-	ret = 0;
-        add_wait_queue(&s->dma_adc.wait, &wait);
+	down(&s->sem);	
+	if (!s->dma_adc.ready && (ret = prog_dmabuf_adc(s)))
+		goto out;
+        
+	add_wait_queue(&s->dma_adc.wait, &wait);
 	while (count > 0) {
 		spin_lock_irqsave(&s->lock, flags);
 		swptr = s->dma_adc.swptr;
@@ -1201,20 +1196,27 @@ static ssize_t es1370_read(struct file *file, char *buffer, size_t count, loff_t
 			if (file->f_flags & O_NONBLOCK) {
 				if (!ret)
 					ret = -EAGAIN;
-				break;
+				goto out;
 			}
+			up(&s->sem);
 			schedule();
 			if (signal_pending(current)) {
 				if (!ret)
 					ret = -ERESTARTSYS;
-				break;
+				goto out;
+			}
+			down(&s->sem);
+			if (s->dma_adc.mapped)
+			{
+				ret = -ENXIO;
+				goto out;
 			}
 			continue;
 		}
 		if (copy_to_user(buffer, s->dma_adc.rawbuf + swptr, cnt)) {
 			if (!ret)
 				ret = -EFAULT;
-			break;
+			goto out;
 		}
 		swptr = (swptr + cnt) % s->dma_adc.dmasize;
 		spin_lock_irqsave(&s->lock, flags);
@@ -1227,6 +1229,8 @@ static ssize_t es1370_read(struct file *file, char *buffer, size_t count, loff_t
 		if (s->dma_adc.enabled)
 			start_adc(s);
 	}
+out:
+	up(&s->sem);
         remove_wait_queue(&s->dma_adc.wait, &wait);
 	set_current_state(TASK_RUNNING);
 	return ret;
@@ -1246,10 +1250,11 @@ static ssize_t es1370_write(struct file *file, const char *buffer, size_t count,
 		return -ESPIPE;
 	if (s->dma_dac2.mapped)
 		return -ENXIO;
-	if (!s->dma_dac2.ready && (ret = prog_dmabuf_dac2(s)))
-		return ret;
 	if (!access_ok(VERIFY_READ, buffer, count))
 		return -EFAULT;
+	down(&s->sem);	
+	if (!s->dma_dac2.ready && (ret = prog_dmabuf_dac2(s)))
+		goto out;
 	ret = 0;
         add_wait_queue(&s->dma_dac2.wait, &wait);
 	while (count > 0) {
@@ -1273,20 +1278,27 @@ static ssize_t es1370_write(struct file *file, const char *buffer, size_t count,
 			if (file->f_flags & O_NONBLOCK) {
 				if (!ret)
 					ret = -EAGAIN;
-				break;
+				goto out;
 			}
+			up(&s->sem);
 			schedule();
 			if (signal_pending(current)) {
 				if (!ret)
 					ret = -ERESTARTSYS;
-				break;
+				goto out;	
+			}
+			down(&s->sem);
+			if (s->dma_dac2.mapped)
+			{
+			ret = -ENXIO;
+			goto out;
 			}
 			continue;
 		}
 		if (copy_from_user(s->dma_dac2.rawbuf + swptr, buffer, cnt)) {
 			if (!ret)
 				ret = -EFAULT;
-			break;
+			goto out;
 		}
 		swptr = (swptr + cnt) % s->dma_dac2.dmasize;
 		spin_lock_irqsave(&s->lock, flags);
@@ -1300,6 +1312,8 @@ static ssize_t es1370_write(struct file *file, const char *buffer, size_t count,
 		if (s->dma_dac2.enabled)
 			start_dac2(s);
 	}
+out:
+	up(&s->sem);
         remove_wait_queue(&s->dma_dac2.wait, &wait);
 	set_current_state(TASK_RUNNING);
 	return ret;
@@ -1346,43 +1360,44 @@ static int es1370_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	struct es1370_state *s = (struct es1370_state *)file->private_data;
 	struct dmabuf *db;
-	int ret;
+	int ret = 0;
 	unsigned long size;
 
 	VALIDATE_STATE(s);
 	lock_kernel();
+	down(&s->sem);
 	if (vma->vm_flags & VM_WRITE) {
 		if ((ret = prog_dmabuf_dac2(s)) != 0) {
-			unlock_kernel();
-			return ret;
+			goto out;
 		}
 		db = &s->dma_dac2;
 	} else if (vma->vm_flags & VM_READ) {
 		if ((ret = prog_dmabuf_adc(s)) != 0) {
-			unlock_kernel();
-			return ret;
+			goto out;
 		}
 		db = &s->dma_adc;
 	} else  {
-		unlock_kernel();
-		return -EINVAL;
+		ret = -EINVAL;
+		goto out;
 	}
 	if (vma->vm_pgoff != 0) {
-		unlock_kernel();
-		return -EINVAL;
+		ret = -EINVAL;
+		goto out;
 	}
 	size = vma->vm_end - vma->vm_start;
 	if (size > (PAGE_SIZE << db->buforder)) {
-		unlock_kernel();
-		return -EINVAL;
+		ret = -EINVAL;
+		goto out;
 	}
 	if (remap_page_range(vma->vm_start, virt_to_phys(db->rawbuf), size, vma->vm_page_prot)) {
-		unlock_kernel();
-		return -EAGAIN;
+		ret = -EAGAIN;
+		goto out;
 	}
 	db->mapped = 1;
+out:
+	up(&s->sem);
 	unlock_kernel();
-	return 0;
+	return ret;
 }
 
 static int es1370_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
@@ -1788,6 +1803,7 @@ static int es1370_open(struct inode *inode, struct file *file)
 	spin_unlock_irqrestore(&s->lock, flags);
 	s->open_mode |= file->f_mode & (FMODE_READ | FMODE_WRITE);
 	up(&s->open_sem);
+	init_MUTEX(&s->sem);
 	return 0;
 }
 
@@ -1818,7 +1834,7 @@ static int es1370_release(struct inode *inode, struct file *file)
 
 static /*const*/ struct file_operations es1370_audio_fops = {
 	owner:		THIS_MODULE,
-	llseek:		es1370_llseek,
+	llseek:		no_llseek,
 	read:		es1370_read,
 	write:		es1370_write,
 	poll:		es1370_poll,
@@ -2240,7 +2256,7 @@ static int es1370_release_dac(struct inode *inode, struct file *file)
 
 static /*const*/ struct file_operations es1370_dac_fops = {
 	owner:		THIS_MODULE,
-	llseek:		es1370_llseek,
+	llseek:		no_llseek,
 	write:		es1370_write_dac,
 	poll:		es1370_poll_dac,
 	ioctl:		es1370_ioctl_dac,
@@ -2513,7 +2529,7 @@ static int es1370_midi_release(struct inode *inode, struct file *file)
 
 static /*const*/ struct file_operations es1370_midi_fops = {
 	owner:		THIS_MODULE,
-	llseek:		es1370_llseek,
+	llseek:		no_llseek,
 	read:		es1370_midi_read,
 	write:		es1370_midi_write,
 	poll:		es1370_midi_poll,
@@ -2612,14 +2628,12 @@ static int __devinit es1370_probe(struct pci_dev *pcidev, const struct pci_devic
 	 * mic bias setting (by Kim.Berts@fisub.mail.abb.com) */
 	s->ctrl = CTRL_CDC_EN | (DAC2_SRTODIV(8000) << CTRL_SH_PCLKDIV) | (1 << CTRL_SH_WTSRSEL);
 	s->gameport.io = 0;
-	s->gameport.size = 0;
 	if (joystick[devindex]) {
 		if (!request_region(0x200, JOY_EXTENT, "es1370"))
 			printk(KERN_ERR "es1370: joystick io port 0x200 in use\n");
 		else {
 			s->ctrl |= CTRL_JYSTK_EN;
 			s->gameport.io = 0x200;
-			s->gameport.size = JOY_EXTENT;
 		}
 	}
 	if (lineout[devindex])
@@ -2693,7 +2707,7 @@ static int __devinit es1370_probe(struct pci_dev *pcidev, const struct pci_devic
 	printk(KERN_ERR "es1370: cannot register misc device\n");
 	free_irq(s->irq, s);
 	if (s->gameport.io)
-		release_region(s->gameport.io, s->gameport.size);
+		release_region(s->gameport.io, JOY_EXTENT);
  err_irq:
 	release_region(s->io, ES1370_EXTENT);
  err_region:
@@ -2714,7 +2728,7 @@ static void __devinit es1370_remove(struct pci_dev *dev)
 	free_irq(s->irq, s);
 	if (s->gameport.io) {
 		gameport_unregister_port(&s->gameport);
-		release_region(s->gameport.io, s->gameport.size);
+		release_region(s->gameport.io, JOY_EXTENT);
 	}
 	release_region(s->io, ES1370_EXTENT);
 	unregister_sound_dsp(s->dev_audio);

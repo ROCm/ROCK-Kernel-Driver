@@ -55,9 +55,9 @@ iommu_arena_fixup(struct pci_iommu_arena * arena)
 	base = arena->dma_base;
 	size = arena->size;
 	if (base + size > 0xfff00000) {
-		int i = (0xfff00000 - base) >> PAGE_SHIFT;
-		for (; i < (0x100000 >> PAGE_SHIFT); i++)
-			arena->ptes[i] = IOMMU_INVALID_PTE;
+		int i, fixup_start = (0xfff00000 - base) >> PAGE_SHIFT;
+		for (i= 0; i < (0x100000 >> PAGE_SHIFT); i++)
+			arena->ptes[fixup_start+i] = IOMMU_INVALID_PTE;
 	}
 }
 
@@ -354,7 +354,7 @@ pci_free_consistent(struct pci_dev *pdev, long size, void *cpu_addr,
    Write dma_length of each leader with the combined lengths of
    the mergable followers.  */
 
-static inline void
+static void
 sg_classify(struct scatterlist *sg, struct scatterlist *end, int virt_ok)
 {
 	unsigned long next_vaddr;
@@ -436,10 +436,7 @@ sg_fill(struct scatterlist *leader, struct scatterlist *end,
 
 		/* Otherwise, break up the remaining virtually contiguous
 		   hunks into individual direct maps.  */
-		for (sg = leader; sg < end; ++sg)
-			if (sg->dma_address == 1 || sg->dma_address == -2)
-				sg->dma_address = 0;
-
+		sg_classify(leader, end, 0);
 		/* Retry.  */
 		return sg_fill(leader, end, out, arena, max_dma);
 	}

@@ -29,7 +29,7 @@ static void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 /*
  * Set up timer interrupt.
  */
-extern __inline__ void setup_timer(void)
+static inline void setup_timer(void)
 {
 	extern void ioctime_init(void);
 	ioctime_init();

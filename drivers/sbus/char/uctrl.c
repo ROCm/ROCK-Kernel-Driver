@@ -198,12 +198,6 @@ static struct uctrl_driver drv;
 void uctrl_get_event_status(void);
 void uctrl_get_external_status(void);
 
-static loff_t
-uctrl_llseek(struct file *file, loff_t offset, int type)
-{
-	return -ESPIPE;
-}
-
 static int
 uctrl_ioctl(struct inode *inode, struct file *file,
 	      unsigned int cmd, unsigned long arg)
@@ -231,7 +225,7 @@ void uctrl_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 static struct file_operations uctrl_fops = {
 	owner:		THIS_MODULE,
-	llseek:		uctrl_llseek,
+	llseek:		no_llseek,
 	ioctl:		uctrl_ioctl,
 	open:		uctrl_open,
 };

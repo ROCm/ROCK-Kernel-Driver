@@ -260,9 +260,9 @@ setup_memory(void *kernel_end)
 			       phys_to_virt(PFN_PHYS(max_low_pfn)));
 			initrd_start = initrd_end = 0;
 		} else {
-			/* Assume the initrd to be in the first node */
-			reserve_bootmem_node(NODE_DATA(nid), virt_to_phys((void *)initrd_start),
-					INITRD_SIZE);
+			reserve_bootmem_node(NODE_DATA(KVADDR_TO_NID(initrd_start)),
+					     virt_to_phys((void *)initrd_start),
+					     INITRD_SIZE);
 		}
 	}
 #endif /* CONFIG_BLK_DEV_INITRD */

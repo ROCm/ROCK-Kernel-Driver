@@ -29,7 +29,7 @@ static void timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 	do_timer(regs);
 }
 
-extern __inline__ void setup_timer (void)
+static inline void setup_timer (void)
 {
 	/*
 	 * Default the date to 1 Jan 1970 0:0:0

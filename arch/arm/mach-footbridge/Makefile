@@ -16,7 +16,7 @@ obj-m			:=
 obj-n			:=
 obj-			:=
 
-export-objs		:= netwinder-hw.o
+export-objs		:= arch.o netwinder-hw.o
 
 pci-$(CONFIG_ARCH_CATS) += cats-pci.o
 pci-$(CONFIG_ARCH_EBSA285) += ebsa285-pci.o

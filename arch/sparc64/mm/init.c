@@ -1,4 +1,4 @@
-/*  $Id: init.c,v 1.178 2001/08/06 13:09:00 davem Exp $
+/*  $Id: init.c,v 1.179 2001/08/08 07:52:00 davem Exp $
  *  arch/sparc64/mm/init.c
  *
  *  Copyright (C) 1996-1999 David S. Miller (davem@caip.rutgers.edu)
@@ -885,20 +885,20 @@ out:
 struct pgtable_cache_struct pgt_quicklists;
 #endif
 
-/* OK, we have to color these pages because during DTLB
- * protection faults we set the dirty bit via a non-Dcache
- * enabled mapping in the VPTE area.  The kernel can end
- * up missing the dirty bit resulting in processes crashing
- * _iff_ the VPTE mapping of the ptes have a virtual address
- * bit 13 which is different from bit 13 of the physical address.
- *
- * The sequence is:
- *	1) DTLB protection fault, write dirty bit into pte via VPTE
- *	   mappings.
- *	2) Swapper checks pte, does not see dirty bit, frees page.
- *	3) Process faults back in the page, the old pre-dirtied copy
- *	   is provided and here is the corruption.
+/* OK, we have to color these pages. The page tables are accessed
+ * by non-Dcache enabled mapping in the VPTE area by the dtlb_backend.S
+ * code, as well as by PAGE_OFFSET range direct-mapped addresses by 
+ * other parts of the kernel. By coloring, we make sure that the tlbmiss 
+ * fast handlers do not get data from old/garbage dcache lines that 
+ * correspond to an old/stale virtual address (user/kernel) that 
+ * previously mapped the pagetable page while accessing vpte range 
+ * addresses. The idea is that if the vpte color and PAGE_OFFSET range 
+ * color is the same, then when the kernel initializes the pagetable 
+ * using the later address range, accesses with the first address
+ * range will not see the newly initialized data rather than the
+ * garbage.
  */
+ 
 pte_t *pte_alloc_one(struct mm_struct *mm, unsigned long address)
 {
 	struct page *page = alloc_pages(GFP_KERNEL, 1);

@@ -86,7 +86,7 @@ extern int find_next_zero_bit(void * addr, int size, int offset);
 /*
  * This routine doesn't need to be atomic.
  */
-extern __inline__ int test_bit(int nr, const void * addr)
+static inline int test_bit(int nr, const void * addr)
 {
     return ((unsigned char *) addr)[nr >> 3] & (1U << (nr & 7));
 }	
@@ -95,7 +95,7 @@ extern __inline__ int test_bit(int nr, const void * addr)
  * ffz = Find First Zero in word. Undefined if no zero exists,
  * so code should check against ~0UL first..
  */
-extern __inline__ unsigned long ffz(unsigned long word)
+static inline unsigned long ffz(unsigned long word)
 {
 	int k;
 

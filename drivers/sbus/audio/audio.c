@@ -217,11 +217,6 @@ static unsigned int sparcaudio_poll(struct file *file, poll_table * wait)
         return mask;
 }
 
-static loff_t sparcaudio_llseek(struct file * file, loff_t offset, int origin)
-{
-	return -ESPIPE;
-}
-
 static ssize_t sparcaudio_read(struct file * file, char *buf, 
                                size_t count, loff_t *ppos)
 {
@@ -1892,7 +1887,7 @@ static int sparcaudio_release(struct inode * inode, struct file * file)
 
 static struct file_operations sparcaudio_fops = {
 	owner:		THIS_MODULE,
-	llseek:		sparcaudio_llseek,
+	llseek:		no_llseek,
 	read:		sparcaudio_read,
 	write:		sparcaudio_write,
 	poll:		sparcaudio_poll,

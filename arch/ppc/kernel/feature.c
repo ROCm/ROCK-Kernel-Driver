@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.feature.c 1.14 06/17/01 09:33:37 trini
+ * BK Id: SCCS/s.feature.c 1.16 07/06/01 14:42:47 trini
  */
 /*
  *  arch/ppc/kernel/feature.c
@@ -20,6 +20,7 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/spinlock.h>
+#include <asm/init.h>
 #include <asm/errno.h>
 #include <asm/ohare.h>
 #include <asm/heathrow.h>
@@ -58,7 +59,7 @@ typedef struct feature_bit {
 
 /* Those features concern for OHare-based PowerBooks (2400, 3400, 3500)
  */
-static fbit feature_bits_ohare_pbook[] = {
+static fbit feature_bits_ohare_pbook[] __pmacdata = {
 	{0x38,0,0},			/* FEATURE_null */
 	{0x38,0,OH_SCC_RESET},		/* FEATURE_Serial_reset */
 	{0x38,0,OH_SCC_ENABLE},		/* FEATURE_Serial_enable */
@@ -92,7 +93,7 @@ static fbit feature_bits_ohare_pbook[] = {
  * the SCC related bits and init them once. They have proven to occasionally cause
  * problems with the desktop units.
  */
-static fbit feature_bits_heathrow[] = {
+static fbit feature_bits_heathrow[] __pmacdata = {
 	{0x38,0,0},			/* FEATURE_null */
 	{0x38,0,0},			/* FEATURE_Serial_reset */
 	{0x38,0,0},			/* FEATURE_Serial_enable */
@@ -125,7 +126,7 @@ static fbit feature_bits_heathrow[] = {
 /* Those bits concern heathrow-based PowerBooks (wallstreet/mainstreet).
  * Heathrow-based desktop macs (Beige G3s) are _not_ handled here
  */
-static fbit feature_bits_wallstreet[] = {
+static fbit feature_bits_wallstreet[] __pmacdata = {
 	{0x38,0,0},			/* FEATURE_null */
 	{0x38,0,HRW_RESET_SCC},		/* FEATURE_Serial_reset */
 	{0x38,0,HRW_SCC_ENABLE},	/* FEATURE_Serial_enable */
@@ -160,7 +161,7 @@ static fbit feature_bits_wallstreet[] = {
  * Mostly the same as the heathrow. They are used on both PowerBooks
  * and desktop machines using the paddington chip
  */
-static fbit feature_bits_paddington[] = {
+static fbit feature_bits_paddington[] __pmacdata = {
 	{0x38,0,0},			/* FEATURE_null */
 	{0x38,0,PADD_RESET_SCC},	/* FEATURE_Serial_reset */
 	{0x38,0,HRW_SCC_ENABLE},	/* FEATURE_Serial_enable */
@@ -193,7 +194,7 @@ static fbit feature_bits_paddington[] = {
 /* Those bits are for Core99 machines (iBook,G4,iMacSL/DV,Pismo,...).
  * Note: Different sets may be needed for iBook, especially for sound
  */
-static fbit feature_bits_keylargo[] = {
+static fbit feature_bits_keylargo[] __pmacdata = {
 	{0x38,0,0},			/* FEATURE_null */
 	{0x38,0,KL0_SCC_RESET},		/* FEATURE_Serial_reset */
 	{0x38,0,KL0_SERIAL_ENABLE},	/* FEATURE_Serial_enable */
@@ -298,7 +299,7 @@ static struct board_features_t {
 
 extern unsigned long powersave_nap;
 
-void
+void __init
 feature_init(void)
 {
 	struct device_node *np;
@@ -403,7 +404,7 @@ feature_init(void)
 #endif
 }
 
-static struct feature_controller*
+static struct feature_controller __init *
 feature_add_controller(struct device_node *controller_device, fbit* bits)
 {
 	struct feature_controller*	controller;
@@ -443,7 +444,7 @@ feature_add_controller(struct device_node *controller_device, fbit* bits)
 	return controller;
 }
 
-static struct feature_controller*
+static struct feature_controller __pmac *
 feature_lookup_controller(struct device_node *device)
 {
 	int	i;
@@ -467,7 +468,7 @@ feature_lookup_controller(struct device_node *device)
 	return NULL;
 }
 
-int
+int __pmac
 feature_set(struct device_node* device, enum system_feature f)
 {
 	struct feature_controller*	controller;
@@ -500,7 +501,7 @@ feature_set(struct device_node* device, enum system_feature f)
 	return 0;
 }
 
-int
+int __pmac
 feature_clear(struct device_node* device, enum system_feature f)
 {
 	struct feature_controller*	controller;
@@ -533,7 +534,7 @@ feature_clear(struct device_node* device, enum system_feature f)
 	return 0;
 }
 
-int
+int __pmac
 feature_test(struct device_node* device, enum system_feature f)
 {
 	struct feature_controller*	controller;
@@ -562,7 +563,7 @@ feature_test(struct device_node* device, enum system_feature f)
 	return bit->polarity ? (value == 0) : (value == bit->mask);
 }
 
-int
+int __pmac
 feature_can_sleep(void)
 {
 	return ((board_features & FTR_CAN_SLEEP) != 0);	
@@ -576,7 +577,7 @@ feature_can_sleep(void)
  */
 
 /* Only one GMAC is assumed */
-void
+void __pmac
 feature_set_gmac_power(struct device_node* device, int power)
 {
 	unsigned long flags;
@@ -596,7 +597,7 @@ feature_set_gmac_power(struct device_node* device, int power)
 	udelay(20);
 }
 
-void
+void __pmac
 feature_gmac_phy_reset(struct device_node* device)
 {
 	unsigned long flags;
@@ -619,7 +620,7 @@ feature_gmac_phy_reset(struct device_node* device)
 }
 
 /* Pass the node of the correct controller, please */
-void
+void __pmac
 feature_set_usb_power(struct device_node* device, int power)
 {
 	char* prop;
@@ -691,7 +692,7 @@ feature_set_usb_power(struct device_node* device, int power)
 	spin_unlock_irqrestore(&keylargo->lock, flags);
 }
 
-void 
+void  __pmac
 feature_set_firewire_power(struct device_node* device, int power)
 {
 	unsigned long flags;
@@ -711,7 +712,7 @@ feature_set_firewire_power(struct device_node* device, int power)
 }
 
 /* Warning: will kill the PHY.. */
-void 
+void  __pmac
 feature_set_firewire_cable_power(struct device_node* device, int power)
 {
 	unsigned long flags;
@@ -726,7 +727,7 @@ feature_set_firewire_cable_power(struct device_node* device, int power)
 }
 
 #ifdef CONFIG_SMP
-void
+void __pmac
 feature_core99_kick_cpu(int cpu_nr)
 {
 #if 1 /* New way */
@@ -750,7 +751,7 @@ feature_core99_kick_cpu(int cpu_nr)
 }
 #endif /* CONFIG_SMP */
 
-void
+void __pmac
 feature_set_airport_power(struct device_node* device, int power)
 {
 	if (!keylargo_base || !airport_dev || airport_dev != device)
@@ -795,7 +796,7 @@ feature_set_airport_power(struct device_node* device, int power)
 
 /* Initialize the Core99 UniNorth host bridge and memory controller
  */
-static void
+static void __init
 uninorth_init(void)
 {
 	struct device_node* gmac, *fw;
@@ -831,7 +832,7 @@ uninorth_init(void)
 
 /* Initialize the Core99 KeyLargo ASIC. 
  */
-static void
+static void __init
 keylargo_init(void)
 {
 	struct device_node* np;
@@ -853,7 +854,7 @@ keylargo_init(void)
 }
 
 #ifdef CONFIG_PMAC_PBOOK
-void
+void __pmac
 feature_prepare_for_sleep(void)
 {
 	/* We assume gatwick is second */
@@ -874,8 +875,7 @@ feature_prepare_for_sleep(void)
 	}
 }
 
-
-void
+void __pmac
 feature_wake_up(void)
 {
 	struct feature_controller* ctrler = &controllers[0];
@@ -903,8 +903,7 @@ static u8 save_gpio_normal[KEYLARGO_GPIO_CNT];
 static u32 save_unin_clock_ctl;
 static struct dbdma_regs save_dbdma[13];
 
-
-static void
+static void __pmac
 heathrow_prepare_for_sleep(struct feature_controller* ctrler)
 {
 	save_mbcr = in_le32(FREG(ctrler, 0x34));
@@ -914,7 +913,7 @@ heathrow_prepare_for_sleep(struct feature_controller* ctrler)
 	out_le32(FREG(ctrler, 0x38), save_fcr[0] & ~HRW_IOBUS_ENABLE);
 }
 
-static void
+static void __pmac
 heathrow_wakeup(struct feature_controller* ctrler)
 {
 	out_le32(FREG(ctrler, 0x38), save_fcr[0]);
@@ -925,7 +924,7 @@ heathrow_wakeup(struct feature_controller* ctrler)
 	mdelay(1);
 }
 
-static void
+static void __pmac
 turn_off_keylargo(void)
 {
 	u32 temp;
@@ -977,7 +976,7 @@ turn_off_keylargo(void)
 	(void)KL_IN(KEYLARGO_FCR3); udelay(10);
 }
 
-static void
+static void __pmac
 turn_off_pangea(void)
 {
 	u32 temp;
@@ -1011,7 +1010,7 @@ turn_off_pangea(void)
 	(void)KL_IN(KEYLARGO_FCR3); udelay(10);
 }
 
-static void
+static void __pmac
 core99_prepare_for_sleep(struct feature_controller* ctrler)
 {
 	int i;
@@ -1086,7 +1085,7 @@ core99_prepare_for_sleep(struct feature_controller* ctrler)
 	}
 }
 
-static void
+static void __pmac
 core99_wake_up(struct feature_controller* ctrler)
 {
 	int i;

@@ -427,8 +427,6 @@ static struct busmouse a5kkbd_mouse = {
 
 void __init a5kkbd_init_hw (void)
 {
-	unsigned long flags;
-
 	if (request_irq (IRQ_KEYBOARDTX, a5kkbd_tx, 0, "keyboard", NULL) != 0)
 		panic("Could not allocate keyboard transmit IRQ!");
 	(void)ioc_readb(IOC_KARTRX);

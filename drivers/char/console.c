@@ -2658,12 +2658,15 @@ void unblank_screen(void)
 		printk("unblank_screen: tty %d not allocated ??\n", fg_console+1);
 		return;
 	}
+	currcons = fg_console;
+	if (vcmode != KD_TEXT)
+		return; /* but leave console_blanked != 0 */
+
 	console_timer.function = blank_screen;
 	if (blankinterval) {
 		mod_timer(&console_timer, jiffies + blankinterval);
 	}
 
-	currcons = fg_console;
 	console_blanked = 0;
 	if (console_blank_hook)
 		console_blank_hook(0);

@@ -28,21 +28,21 @@
  *	The Linux implications for SMP are handled as follows:
  *
  *	Pentium III / [Xeon]
- *		None of the E1AP-E3AP erratas are visible to the user.
+ *		None of the E1AP-E3AP errata are visible to the user.
  *
  *	E1AP.	see PII A1AP
  *	E2AP.	see PII A2AP
  *	E3AP.	see PII A3AP
  *
  *	Pentium II / [Xeon]
- *		None of the A1AP-A3AP erratas are visible to the user.
+ *		None of the A1AP-A3AP errata are visible to the user.
  *
  *	A1AP.	see PPro 1AP
  *	A2AP.	see PPro 2AP
  *	A3AP.	see PPro 7AP
  *
  *	Pentium Pro
- *		None of 1AP-9AP erratas are visible to the normal user,
+ *		None of 1AP-9AP errata are visible to the normal user,
  *	except occasional delivery of 'spurious interrupt' as trap #15.
  *	This is very rare and a non-problem.
  *

@@ -69,7 +69,7 @@ do {										\
 /*
  * Someday, we'll automatically detect which drives are present...
  */
-extern __inline__ void fd_scandrives (void)
+static inline void fd_scandrives (void)
 {
 #if 0
 	int floppy, drive_count;

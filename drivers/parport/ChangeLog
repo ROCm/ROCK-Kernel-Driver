@@ -1,3 +1,8 @@
+2001-08-08  Tim Waugh  <twaugh@redhat.com>
+
+	* share.c (parport_unregister_device): Remove device from wait list
+	too.
+
 2001-06-20  Tim Waugh  <twaugh@redhat.com>
 
 	* parport_pc.c: Make 'io_hi=0' work.

@@ -483,19 +483,6 @@ static void free_disk_sb (mdk_rdev_t * rdev)
 	}
 }
 
-static inline int mark_rdev_faulty (mdk_rdev_t * rdev)
-{
-	if (!rdev) {
-		MD_BUG();
-		return 0;
-	}
-	if (rdev->faulty)
-		return 0;
-	free_disk_sb(rdev);
-	rdev->faulty = 1;
-	return 1;
-}
-
 static int read_disk_sb (mdk_rdev_t * rdev)
 {
 	int ret = -EINVAL;
@@ -2088,7 +2075,7 @@ static int get_disk_info (mddev_t * mddev, void * arg)
 		return -EFAULT;
 
 	nr = info.number;
-	if (nr >= mddev->sb->nr_disks)
+	if (nr >= mddev->sb->raid_disks+mddev->sb->spare_disks)
 		return -EINVAL;
 
 	SET_FROM_SB(major);
@@ -2793,6 +2780,7 @@ static struct block_device_operations md_fops=
 int md_thread(void * arg)
 {
 	mdk_thread_t *thread = arg;
+	struct completion *event;
 
 	md_lock_kernel();
 
@@ -2822,9 +2810,9 @@ int md_thread(void * arg)
 	current->nice = -20;
 	md_unlock_kernel();
 
-	up(thread->sem);
-
-	for (;;) {
+	complete(thread->event);
+	while (thread->run) {
+		void (*run)(void *data);
 		DECLARE_WAITQUEUE(wait, current);
 
 		add_wait_queue(&thread->wqueue, &wait);
@@ -2838,18 +2826,17 @@ int md_thread(void * arg)
 		remove_wait_queue(&thread->wqueue, &wait);
 		clear_bit(THREAD_WAKEUP, &thread->flags);
 
-		if (thread->run) {
-			thread->run(thread->data);
+		if ((run=thread->run)) {
+			run(thread->data);
 			run_task_queue(&tq_disk);
-		} else
-			break;
+		}
 		if (md_signal_pending(current)) {
 			printk("md: %8s(%d) flushing signals.\n", current->comm,
 				current->pid);
 			md_flush_signals();
 		}
 	}
-	up(thread->sem);
+	complete(thread->event);
 	return 0;
 }
 
@@ -2865,7 +2852,7 @@ mdk_thread_t *md_register_thread (void (*run) (void *),
 {
 	mdk_thread_t *thread;
 	int ret;
-	DECLARE_MUTEX_LOCKED(sem);
+	struct completion event;
 	
 	thread = (mdk_thread_t *) kmalloc
 				(sizeof(mdk_thread_t), GFP_KERNEL);
@@ -2874,8 +2861,9 @@ mdk_thread_t *md_register_thread (void (*run) (void *),
 	
 	memset(thread, 0, sizeof(mdk_thread_t));
 	md_init_waitqueue_head(&thread->wqueue);
-	
-	thread->sem = &sem;
+
+	init_completion(&event);	
+	thread->event = &event;
 	thread->run = run;
 	thread->data = data;
 	thread->name = name;
@@ -2884,7 +2872,7 @@ mdk_thread_t *md_register_thread (void (*run) (void *),
 		kfree(thread);
 		return NULL;
 	}
-	down(&sem);
+	wait_for_completion(&event);
 	return thread;
 }
 
@@ -2900,17 +2888,16 @@ void md_interrupt_thread (mdk_thread_t *thread)
 
 void md_unregister_thread (mdk_thread_t *thread)
 {
-	DECLARE_MUTEX_LOCKED(sem);
+	struct completion event;
+
+	init_completion(&event);
 	
-	thread->sem = &sem;
+	thread->event = &event;
 	thread->run = NULL;
 	thread->name = NULL;
-	if (!thread->tsk) {
-		MD_BUG();
-		return;
-	}
 	md_interrupt_thread(thread);
-	down(&sem);
+	wait_for_completion(&event);
+	kfree(thread);
 }
 
 void md_recover_arrays (void)
@@ -2926,7 +2913,6 @@ void md_recover_arrays (void)
 int md_error (mddev_t *mddev, kdev_t rdev)
 {
 	mdk_rdev_t * rrdev;
-	int rc;
 
 /*	printk("md_error dev:(%d:%d), rdev:(%d:%d), (caller: %p,%p,%p,%p).\n",MAJOR(dev),MINOR(dev),MAJOR(rdev),MINOR(rdev), __builtin_return_address(0),__builtin_return_address(1),__builtin_return_address(2),__builtin_return_address(3));
  */
@@ -2935,8 +2921,14 @@ int md_error (mddev_t *mddev, kdev_t rdev)
 		return 0;
 	}
 	rrdev = find_rdev(mddev, rdev);
-	if (!mark_rdev_faulty(rrdev))
+	if (rrdev->faulty)
 		return 0;
+	if (mddev->pers->error_handler == NULL
+	    || mddev->pers->error_handler(mddev,rdev) <= 0) {
+		free_disk_sb(rrdev);
+		rrdev->faulty = 1;
+	} else
+		return 1;
 	/*
 	 * if recovery was running, stop it now.
 	 */
@@ -2944,11 +2936,8 @@ int md_error (mddev_t *mddev, kdev_t rdev)
 		mddev->pers->stop_resync(mddev);
 	if (mddev->recovery_running)
 		md_interrupt_thread(md_recovery_thread);
-	if (mddev->pers->error_handler) {
-		rc = mddev->pers->error_handler(mddev, rdev);
-		md_recover_arrays();
-		return rc;
-	}
+	md_recover_arrays();
+
 	return 0;
 }
 

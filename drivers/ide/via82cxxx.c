@@ -1,5 +1,5 @@
 /*
- * $Id: via82cxxx.c,v 3.20 2001/01/27 10:13:60 vojtech Exp $
+ * $Id: via82cxxx.c,v 3.23 2001/03/09 09:30:00 vojtech Exp $
  *
  *  Copyright (c) 2000-2001 Vojtech Pavlik
  *
@@ -32,14 +32,9 @@
  *   PIO 0-5, MWDMA 0-2, SWDMA 0-2 and UDMA 0-5
  *
  * (this includes UDMA33, 66 and 100) modes. UDMA66 and higher modes are
- * autodetected only in case the BIOS has detected a 80 wire cable. To ignore
- * the BIOS data, use 'ide0=ata66' or 'ide1=ata66' on the kernel command line.
- *
- * For correct operation it's needed to tell the driver the speed of the PCI
- * bus. The default, and most common value is 33 MHz. Most likely, your system
- * is using this value and you don't need to use any command line options. If
- * you run your PCI bus speed at 25, 30, 37, 40 or 42 MHz, use the 'idebus=xx'
- * option of the IDE driver. Note that this has nothing to do with UDMA66.
+ * autoenabled only in case the BIOS has detected a 80 wire cable. To ignore
+ * the BIOS data and assume the cable is present, use 'ide0=ata66' or
+ * 'ide1=ata66' on the kernel command line.
  */
 
 /*
@@ -84,15 +79,16 @@
 #define VIA_ADDRESS_SETUP	0x4c
 #define VIA_UDMA_TIMING		0x50
 
-#define VIA_UDMA		0x07
-#define VIA_UDMA_NONE		0x00
-#define VIA_UDMA_33		0x01
-#define VIA_UDMA_66		0x02
-#define VIA_UDMA_100		0x03
-#define VIA_BAD_PREQ		0x10
-#define VIA_BAD_CLK66		0x20
-#define VIA_SET_FIFO		0x40
-#define VIA_SET_THRESH		0x80
+#define VIA_UDMA		0x007
+#define VIA_UDMA_NONE		0x000
+#define VIA_UDMA_33		0x001
+#define VIA_UDMA_66		0x002
+#define VIA_UDMA_100		0x003
+#define VIA_BAD_PREQ		0x010	/* Crashes if PREQ# till DDACK# set */
+#define VIA_BAD_CLK66		0x020	/* 66 MHz clock doesn't work correctly */
+#define VIA_SET_FIFO		0x040	/* Needs to have FIFO split set */
+#define VIA_SET_THRESH		0x080	/* Needs to have FIFO thresholds set */
+#define VIA_BAD_PIO		0x100	/* Always uses 26 PCICLK/xfer regardles of PIO mode */
 
 /*
  * VIA SouthBridge chips.
@@ -103,13 +99,15 @@ static struct via_isa_bridge {
 	unsigned short id;
 	unsigned char rev_min;
 	unsigned char rev_max;
-	unsigned char flags;
+	unsigned short flags;
 } via_isa_bridges[] = {
+#ifdef VIA_NEW_BRIDGES_TESTED
 	{ "vt8233",	PCI_DEVICE_ID_VIA_8233_0,   0x00, 0x2f, VIA_UDMA_100 },
 	{ "vt8231",	PCI_DEVICE_ID_VIA_8231,     0x00, 0x2f, VIA_UDMA_66 },
-	{ "vt82c686b",	PCI_DEVICE_ID_VIA_82C686,   0x40, 0x4f, VIA_UDMA_100 },
+#endif
+	{ "vt82c686b",	PCI_DEVICE_ID_VIA_82C686,   0x40, 0x4f, VIA_UDMA_100 | VIA_BAD_PIO },
 	{ "vt82c686a",	PCI_DEVICE_ID_VIA_82C686,   0x10, 0x2f, VIA_UDMA_66 },
-	{ "vt82c686",	PCI_DEVICE_ID_VIA_82C686,   0x00, 0x0f, VIA_UDMA_66 },
+	{ "vt82c686",	PCI_DEVICE_ID_VIA_82C686,   0x00, 0x0f, VIA_UDMA_33 | VIA_BAD_CLK66 },
 	{ "vt82c596b",	PCI_DEVICE_ID_VIA_82C596,   0x10, 0x2f, VIA_UDMA_66 },
 	{ "vt82c596a",	PCI_DEVICE_ID_VIA_82C596,   0x00, 0x0f, VIA_UDMA_33 | VIA_BAD_CLK66 },
 	{ "vt82c586b",	PCI_DEVICE_ID_VIA_82C586_0, 0x40, 0x4f, VIA_UDMA_33 | VIA_SET_FIFO | VIA_BAD_PREQ },
@@ -123,6 +121,7 @@ static struct via_isa_bridge *via_config;
 static unsigned char via_enabled;
 static unsigned int via_80w;
 static unsigned int via_clock;
+static char *via_dma[] = { "MWDMA16", "UDMA33", "UDMA66", "UDMA100" };
 
 /*
  * VIA /proc entry.
@@ -145,8 +144,8 @@ static char *via_control3[] = { "No limit", "64", "128", "192" };
 
 static int via_get_info(char *buffer, char **addr, off_t offset, int count)
 {
-	short speed[4], cycle[4], setup[4], active[4],
-		recover[4], uen[4], udma[4], active8b[4], recover8b[4];
+	short speed[4], cycle[4], setup[4], active[4], recover[4], den[4],
+		 uen[4], udma[4], umul[4], active8b[4], recover8b[4];
 	struct pci_dev *dev = bmide_dev;
 	unsigned int v, u, i;
 	unsigned short c, w;
@@ -155,12 +154,13 @@ static int via_get_info(char *buffer, char **addr, off_t offset, int count)
 
 	via_print("----------VIA BusMastering IDE Configuration----------------");
 
-	via_print("Driver Version:                     3.20");
+	via_print("Driver Version:                     3.23");
 	via_print("South Bridge:                       VIA %s", via_config->name);
 
 	pci_read_config_byte(isa_dev, PCI_REVISION_ID, &t);
 	pci_read_config_byte(dev, PCI_REVISION_ID, &x);
 	via_print("Revision:                           ISA %#x IDE %#x", t, x);
+	via_print("Highest DMA rate:                   %s", via_dma[via_config->flags & VIA_UDMA]);
 
 	via_print("BM-DMA base:                        %#x", via_base);
 	via_print("PCI clock:                          %dMHz", via_clock);
@@ -200,28 +200,43 @@ static int via_get_info(char *buffer, char **addr, off_t offset, int count)
 	else u = 0;
 
 	for (i = 0; i < 4; i++) {
+
 		setup[i]     = ((t >> ((3 - i) << 1)) & 0x3) + 1;
 		recover8b[i] = ((w >> ((1 - (i >> 1)) << 3)) & 0xf) + 1;
 		active8b[i]  = ((w >> (((1 - (i >> 1)) << 3) + 4)) & 0xf) + 1;
 		active[i]    = ((v >> (((3 - i) << 3) + 4)) & 0xf) + 1;
 		recover[i]   = ((v >> ((3 - i) << 3)) & 0xf) + 1;
 		udma[i]      = ((u >> ((3 - i) << 3)) & 0x7) + 2;
+		umul[i]      = ((u >> (((3 - i) & 2) << 3)) & 0x8) ? 1 : 2;
+		uen[i]       = ((u >> ((3 - i) << 3)) & 0x20);
+		den[i]       = (c & ((i & 1) ? 0x40 : 0x20) << ((i & 2) << 2));
 
-		if ((via_config->flags & VIA_UDMA) == VIA_UDMA_100) {
-			speed[i] = 2000 / udma[i];
-			cycle[i] = 10 * udma[i];
+		speed[i] = 20 * via_clock / (active[i] + recover[i]);
+		cycle[i] = 1000 / via_clock * (active[i] + recover[i]);
+
+		if (!uen[i] || !den[i])
 			continue;
+
+		switch (via_config->flags & VIA_UDMA) {
+			
+			case VIA_UDMA_100:
+				speed[i] = 2000 / udma[i];
+				cycle[i] = 10 * udma[i];
+				break;
+
+			case VIA_UDMA_66:
+				speed[i] = 40 * via_clock / (udma[i] * umul[i]);
+				cycle[i] = 500 / via_clock * (udma[i] * umul[i]);
+				break;
+
+			case VIA_UDMA_33:
+				speed[i] = 20 * via_clock / udma[i];
+				cycle[i] = 1000 / via_clock * udma[i];
+				break;
 		}
-
-		uen[i]   = (u >> ((3 - i) << 3)) & 0x20;
-		udma[i] *= ((u >> (((3 - i) & 2) << 3)) & 0x8) ? 1 : 2;
-
-		speed[i] = 40 * via_clock / (uen[i] ? udma[i] : (active[i] + recover[i]) * 2);
-		cycle[i] = 1000 / via_clock * (uen[i] ? udma[i] : (active[i] + recover[i]) * 2) / 2;
 	}
 
-	via_print_drive("Transfer Mode: ", "%10s",
-			(c & ((i & 1) ? 0x40 : 0x20) << ((i & 2) << 2)) ? (uen[i] ? "UDMA" : "DMA") : "PIO");
+	via_print_drive("Transfer Mode: ", "%10s", den[i] ? (uen[i] ? "UDMA" : "DMA") : "PIO");
 
 	via_print_drive("Address Setup: ", "%8dns", (1000 / via_clock) * setup[i]);
 	via_print_drive("Cmd Active:    ", "%8dns", (1000 / via_clock) * active8b[i]);
@@ -342,12 +357,13 @@ int via82cxxx_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 		short speed = ide_find_best_mode(drive,
 			XFER_PIO | XFER_EPIO | XFER_SWDMA | XFER_MWDMA |
 			(via_config->flags & VIA_UDMA ? XFER_UDMA : 0) |
-			(w80 && (via_config->flags & VIA_UDMA) == VIA_UDMA_66 ? XFER_UDMA_66 : 0) |
-			(w80 && (via_config->flags & VIA_UDMA) == VIA_UDMA_100 ? XFER_UDMA_100 : 0));
-
-		func = ((speed & XFER_MODE) != XFER_PIO) ? ide_dma_on : ide_dma_off_quietly;
+			(w80 && (via_config->flags & VIA_UDMA) >= VIA_UDMA_66 ? XFER_UDMA_66 : 0) |
+			(w80 && (via_config->flags & VIA_UDMA) >= VIA_UDMA_100 ? XFER_UDMA_100 : 0));
 
 		via_set_drive(drive, speed);
+
+		func = (HWIF(drive)->autodma && (speed & XFER_MODE) != XFER_PIO)
+			? ide_dma_on : ide_dma_off_quietly;
 	}
 
 	return ide_dmaproc(func, drive);
@@ -459,11 +475,7 @@ unsigned int __init pci_init_via82cxxx(struct pci_dev *dev, const char *name)
 
 	pci_read_config_byte(isa, PCI_REVISION_ID, &t);
 	printk(KERN_INFO "VP_IDE: VIA %s (rev %02x) IDE %s controller on pci%s\n",
-			via_config->name, t,
-			(via_config->flags & VIA_UDMA) == VIA_UDMA_100 ? "UDMA100" :
-			(via_config->flags & VIA_UDMA) == VIA_UDMA_66 ? "UDMA66" :
-			(via_config->flags & VIA_UDMA) == VIA_UDMA_33 ? "UDMA33" : "MWDMA16",
-			dev->slot_name);
+		via_config->name, t, via_dma[via_config->flags & VIA_UDMA], dev->slot_name);
 
 /*
  * Setup /proc/ide/via entry.
@@ -471,11 +483,11 @@ unsigned int __init pci_init_via82cxxx(struct pci_dev *dev, const char *name)
 
 #ifdef CONFIG_PROC_FS
 	if (!via_proc) {
-		via_proc = 1;
 		via_base = pci_resource_start(dev, 4);
 		bmide_dev = dev;
 		isa_dev = isa;
 		via_display_info = &via_get_info;
+		via_proc = 1;
 	}
 #endif
 
@@ -506,7 +518,8 @@ void __init ide_init_via82cxxx(ide_hwif_t *hwif)
 	if (hwif->dma_base) {
 		hwif->dmaproc = &via82cxxx_dmaproc;
 #ifdef CONFIG_IDEDMA_AUTO
-		hwif->autodma = 1;
+		if (!noautodma)
+			hwif->autodma = 1;
 #endif
 	}
 #endif /* CONFIG_BLK_DEV_IDEDMA */

@@ -230,11 +230,13 @@ static void ecard_do_request(struct ecard_request *req)
 }
 
 #ifdef CONFIG_CPU_32
+#include <linux/completion.h>
+
 static pid_t ecard_pid;
 static wait_queue_head_t ecard_wait;
 static struct ecard_request *ecard_req;
 
-static DECLARE_MUTEX_LOCKED(ecard_done_sem);
+static DECLARE_COMPLETION(ecard_completion);
 
 /*
  * Set up the expansion card daemon's page tables.
@@ -328,7 +330,7 @@ ecard_task(void * unused)
 		} while (req == NULL);
 
 		ecard_do_request(req);
-		up(&ecard_done_sem);
+		complete(&ecard_completion);
 	}
 }
 
@@ -357,7 +359,7 @@ ecard_call(struct ecard_request *req)
 	/*
 	 * Now wait for kecardd to run.
 	 */
-	down(&ecard_done_sem);
+	wait_for_completion(&ecard_completion);
 }
 #else
 /*

@@ -22,6 +22,8 @@
 
 #define JFFS_VERSION_STRING "1.0"
 
+#include <linux/completion.h>
+
 /* This is a magic number that is used as an identification number for
    this file system.  It is written to the super_block structure.  */
 #define JFFS_MAGIC_SB_BITMASK 0x07c0  /* 1984 */
@@ -185,7 +187,7 @@ struct jffs_control
 	struct jffs_delete_list *delete_list; /* Track deleted files.  */
 	pid_t thread_pid;		/* GC thread's PID */
 	struct task_struct *gc_task;	/* GC task struct */
-	struct semaphore gc_thread_sem; /* GC thread exit mutex */
+	struct completion gc_thread_comp; /* GC thread exit mutex */
 	__u32 gc_minfree_threshold;	/* GC trigger thresholds */
 	__u32 gc_maxdirty_threshold;
 };

@@ -39,7 +39,7 @@ extern const struct exception_table_entry __stop___ex_table[];
 extern const char __start___kallsyms[] __attribute__ ((weak));
 extern const char __stop___kallsyms[] __attribute__ ((weak));
 
-static struct module kernel_module =
+struct module kernel_module =
 {
 	size_of_struct:		sizeof(struct module),
 	name: 			"",

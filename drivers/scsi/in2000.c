@@ -1909,10 +1909,10 @@ char *cp;
  * special macros declared in 'asm/io.h'. We use readb() and readl()
  * when reading from the card's BIOS area in in2000_detect().
  */
-static const unsigned int *bios_tab[] in2000__INITDATA = {
-   (unsigned int *)0xc8000,
-   (unsigned int *)0xd0000,
-   (unsigned int *)0xd8000,
+static u32 bios_tab[] in2000__INITDATA = {
+   0xc8000,
+   0xd0000,
+   0xd8000,
    0
    };
 
@@ -1973,13 +1973,13 @@ char buf[32];
  * for the obvious ID strings. We look for the 2 most common ones and
  * hope that they cover all the cases...
  */
-      else if (readl(bios_tab[bios]+0x04) == 0x41564f4e ||
-               readl(bios_tab[bios]+0x0c) == 0x61776c41) {
+      else if (isa_readl(bios_tab[bios]+0x10) == 0x41564f4e ||
+               isa_readl(bios_tab[bios]+0x30) == 0x61776c41) {
          printk("Found IN2000 BIOS at 0x%x ",(unsigned int)bios_tab[bios]);
 
 /* Read the switch image that's mapped into EPROM space */
 
-         switches = ~((readb(bios_tab[bios]+0x08) & 0xff));
+         switches = ~((isa_readb(bios_tab[bios]+0x20) & 0xff));
 
 /* Find out where the IO space is */
 
@@ -2073,7 +2073,7 @@ char buf[32];
 
 /* Older BIOS's had a 'sync on/off' switch - use its setting */
 
-      if (readl(bios_tab[bios]+0x04) == 0x41564f4e && (switches & SW_SYNC_DOS5))
+      if (isa_readl(bios_tab[bios]+0x10) == 0x41564f4e && (switches & SW_SYNC_DOS5))
          hostdata->sync_off = 0x00;    /* sync defaults to on */
       else
          hostdata->sync_off = 0xff;    /* sync defaults to off */

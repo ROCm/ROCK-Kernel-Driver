@@ -169,8 +169,8 @@
 		tst	\rx, #1			@ MMU enabled?
 		moveq	\rx, #0x80000000	@ physical base address
 		movne	\rx, #0xf8000000	@ virtual address
-		add	\rx, \rx, #0x00050000	@ Ser3
-		@add	\rx, \rx, #0x00010000	@ Ser1
+		@add	\rx, \rx, #0x00050000	@ Ser3
+		add	\rx, \rx, #0x00010000	@ Ser1
 		.endm
 
 		.macro	senduart,rd,rx
@@ -300,6 +300,37 @@
 		tst	\rd, #1 << 8		@ CTS
 		bne	1001b
 1002:
+		.endm
+
+#elif defined(CONFIG_ARCH_ANAKIN)
+
+//#//include <asm/arch/serial_reg.h>
+
+		.macro	addruart,rx
+		mrc	p15, 0, \rx, c1, c0
+		tst	\rx, #1			@ MMU enabled?
+		moveq	\rx, #IO_START
+		movne	\rx, #IO_BASE
+		add	\rx, \rx, #UART0
+		.endm
+
+		.macro	senduart,rd,rx
+		str	\rd, [\rx, #0x14]	@ tx
+		ldr	\rd, [\rx, #0x18]
+		orr	\rd, \rd, #SENDREQUEST
+		str	\rd, [\rx, #0x18]
+		.endm
+
+		.macro	waituart,rd,rx
+1001:		ldr	\rd, [\rx, #0x10]
+		tst	\rd, #TXEMPTY
+		beq	1001b
+		.endm
+
+		.macro	busyuart,rd,rx
+1001:		ldr	\rd, [\rx, #0x10]
+		tst	\rd, #CTS
+		bne	1001b
 		.endm
 
 #else

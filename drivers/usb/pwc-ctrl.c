@@ -137,7 +137,7 @@ static struct Timon_table_entry Timon_table[PSZ_MAX][6][4] =
 #include "pwc_timon.h"
 };
 
-/* Entries for the Kiara (730/740) camera */
+/* Entries for the Kiara (730/740/750) camera */
 
 struct Kiara_table_entry
 {
@@ -412,6 +412,7 @@ int pwc_set_video_mode(struct pwc_device *pdev, int width, int height, int frame
 		
 	case 730:
 	case 740:
+	case 750:
 		ret = set_video_mode_Kiara(pdev, size, frames, compression, snapshot);
 		break;
 	}
@@ -427,7 +428,6 @@ int pwc_set_video_mode(struct pwc_device *pdev, int width, int height, int frame
 	pdev->view.y = height;
 	pwc_set_image_buffer_size(pdev);
 	Trace(TRACE_SIZE, "Set viewport to %dx%d, image size is %dx%d, palette = %d.\n", width, height, pwc_image_sizes[size].x, pwc_image_sizes[size].y, pdev->vpalette);
-Debug("bandlength = %d\n", pdev->vbandlength);	
 	return 0;
 }
 
@@ -752,6 +752,7 @@ static inline int pwc_set_shutter_speed(struct pwc_device *pdev, int mode, int v
 			break;
 		case 730:
 		case 740:
+		case 750:
 			/* speed seems to range from 0x0 to 0xff */
 			buf[1] = 0;
 			buf[0] = value >> 8;

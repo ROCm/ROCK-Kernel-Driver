@@ -159,10 +159,10 @@ int __init i2o_pci_install(struct pci_dev *dev)
 	}
 
 	c->bus.pci.irq = -1;
-
 	c->bus.pci.queue_buggy = 0;
 	c->bus.pci.dpt = 0;
 	c->bus.pci.short_req = 0;
+	c->bus.pci.pdev = dev;
 
 	c->irq_mask = (volatile u32 *)(mem+0x34);
 	c->post_port = (volatile u32 *)(mem+0x40);
@@ -255,7 +255,6 @@ int __init i2o_pci_install(struct pci_dev *dev)
 #else
 			i2o_delete_controller(c);
 #endif /* MODULE */	
-			kfree(c);
 			iounmap(mem);
 			return -EBUSY;
 		}

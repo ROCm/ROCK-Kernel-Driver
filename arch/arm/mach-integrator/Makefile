@@ -11,7 +11,7 @@ O_TARGET		:= integrator.o
 
 # Object file lists.
 
-obj-y			:= arch.o irq.o mm.o time.o
+obj-y			:= arch.o cpu.o irq.o mm.o time.o
 obj-m			:=
 obj-n			:=
 obj-			:=

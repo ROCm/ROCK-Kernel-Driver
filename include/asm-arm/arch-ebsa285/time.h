@@ -199,7 +199,7 @@ static void timer1_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 /*
  * Set up timer interrupt.
  */
-extern __inline__ void setup_timer(void)
+static inline void setup_timer(void)
 {
 	int irq;
 

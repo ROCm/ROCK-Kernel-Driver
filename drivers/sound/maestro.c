@@ -1290,7 +1290,7 @@ static void set_adc_rate(struct ess_state *s, unsigned rate)
 }
 
 /* Stop our host of recording apus */
-extern inline void stop_adc(struct ess_state *s)
+static inline void stop_adc(struct ess_state *s)
 {
 	/* XXX lets hope we don't have to lock around this */
 	if (! (s->enable & ADC_RUNNING)) return;
@@ -1594,7 +1594,7 @@ static void set_dmac(struct ess_state *s, unsigned int addr, unsigned int count)
 }
 
 /* Playback pointer */
-extern __inline__ unsigned get_dmaa(struct ess_state *s)
+static inline unsigned get_dmaa(struct ess_state *s)
 {
 	int offset;
 
@@ -1608,7 +1608,7 @@ extern __inline__ unsigned get_dmaa(struct ess_state *s)
 }
 
 /* Record pointer */
-extern __inline__ unsigned get_dmac(struct ess_state *s)
+static inline unsigned get_dmac(struct ess_state *s)
 {
 	int offset;
 
@@ -2122,13 +2122,6 @@ static int mixer_ioctl(struct ess_card *card, unsigned int cmd, unsigned long ar
 }
 
 /* --------------------------------------------------------------------- */
-
-static loff_t ess_llseek(struct file *file, loff_t offset, int origin)
-{
-	return -ESPIPE;
-}
-
-/* --------------------------------------------------------------------- */
 static int ess_open_mixdev(struct inode *inode, struct file *file)
 {
 	int minor = MINOR(inode->i_rdev);
@@ -2172,7 +2165,7 @@ static int ess_ioctl_mixdev(struct inode *inode, struct file *file, unsigned int
 
 static /*const*/ struct file_operations ess_mixer_fops = {
 	owner:		THIS_MODULE,
-	llseek:         ess_llseek,
+	llseek:         no_llseek,
 	ioctl:          ess_ioctl_mixdev,
 	open:           ess_open_mixdev,
 	release:        ess_release_mixdev,
@@ -3104,7 +3097,7 @@ ess_release(struct inode *inode, struct file *file)
 
 static struct file_operations ess_audio_fops = {
 	owner:		THIS_MODULE,
-	llseek:         ess_llseek,
+	llseek:         no_llseek,
 	read:           ess_read,
 	write:          ess_write,
 	poll:           ess_poll,

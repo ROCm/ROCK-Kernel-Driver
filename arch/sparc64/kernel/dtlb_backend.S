@@ -1,4 +1,4 @@
-/* $Id: dtlb_backend.S,v 1.9 2000/01/31 04:59:12 davem Exp $
+/* $Id: dtlb_backend.S,v 1.11 2001/08/08 08:01:28 davem Exp $
  * dtlb_backend.S: Back end to DTLB miss replacement strategy.
  *                 This is included directly into the trap table.
  *
@@ -10,15 +10,13 @@
 #define VPTE_SHIFT		(PAGE_SHIFT - 3)
 #define PMD_SHIFT		(23 - PAGE_SHIFT + 3)
 #define PGD_SHIFT		(34 - PAGE_SHIFT + 3)
-#define VPTE_BITS		(_PAGE_CP | _PAGE_CV | _PAGE_P | _PAGE_W)
+#define VPTE_BITS		(_PAGE_CP | _PAGE_CV | _PAGE_P)
 
 /* Ways we can get here:
  *
  * 1) Nucleus loads and stores to/from PA-->VA direct mappings at tl>1.
  * 2) Nucleus loads and stores to/from user/kernel window save areas.
- * 3) VPTE misses from dtlb_base, dtlb_prot, and itlb_base.  But this only
- *    happens for non-nucleus contexts.  Nucleus VPTE's cannot work because
- *    of how OBP uses the same part of the address space in ctx 0.
+ * 3) VPTE misses from dtlb_base and itlb_base.
  */
 
 /* TLB1 ** ICACHE line 1: tl1 DTLB and quick VPTE miss	*/

@@ -27,6 +27,7 @@ struct kmi_info {
 	u_char			last_tx;
 	u_char			resend_count;
 	u_short			res;
+	u_char			present;
 	wait_queue_head_t	wait_q;
 	void			(*rx)(struct kmi_info *, u_int val,
 				      struct pt_regs *regs);

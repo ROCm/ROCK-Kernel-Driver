@@ -16,12 +16,12 @@
 
 #include <asm/arch/memory.h>
 
-extern __inline__ unsigned long virt_to_phys(volatile void *x)
+static inline unsigned long virt_to_phys(volatile void *x)
 {
 	return __virt_to_phys((unsigned long)(x));
 }
 
-extern __inline__ void *phys_to_virt(unsigned long x)
+static inline void *phys_to_virt(unsigned long x)
 {
 	return (void *)(__phys_to_virt((unsigned long)(x)));
 }

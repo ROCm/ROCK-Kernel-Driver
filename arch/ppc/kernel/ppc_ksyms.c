@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.ppc_ksyms.c 1.36 06/28/01 15:50:16 paulus
+ * BK Id: SCCS/s.ppc_ksyms.c 1.38 07/23/01 15:35:53 trini
  */
 #include <linux/config.h>
 #include <linux/module.h>
@@ -251,7 +251,6 @@ EXPORT_SYMBOL(find_devices);
 EXPORT_SYMBOL(find_type_devices);
 EXPORT_SYMBOL(find_compatible_devices);
 EXPORT_SYMBOL(find_path_device);
-EXPORT_SYMBOL(find_phandle);
 EXPORT_SYMBOL(device_is_compatible);
 EXPORT_SYMBOL(machine_is_compatible);
 EXPORT_SYMBOL(find_all_nodes);

@@ -2323,6 +2323,7 @@ CONFIG_ALPHA_GENERIC
   Ruffian             RPX164-2, AlphaPC164-UX, AlphaPC164-BX
   SX164               AlphaPC164-SX
   Sable               AS 2000, AS 2100
+  Shark		      DS 20L
   Takara              Takara
   Titan               Privateer
   Wildfire            AlphaServer GS 40/80/160/320
@@ -15585,8 +15586,30 @@ CONFIG_SOUND_CMPCI
 
 Creative EMU10K1 based PCI sound cards
 CONFIG_SOUND_EMU10K1
-  Say Y or M if you have a PCI sound card using the EMU10K1
-  chipset, such as the Creative SBLive!,  SB PCI512 or Emu-APS.
+  Say Y or M if you have a PCI sound card using the EMU10K1 chipset,
+  such as the Creative SBLive!, SB PCI512 or Emu-APS.
+
+  For more information about the degree of support for the different
+  card models please check:
+
+       http://opensource.creative.com
+
+  It is now possible to load dsp microcode patches into the EMU10K1
+  chip.  These patches are used to implement real time sound processing
+  effects which include for example: signal routing, bass/treble control,
+  AC3 passthrough, ...
+  Userspace tools to create new patches and load/unload them can be found
+  at the above link. You need to get the source snapshot and then type:
+
+	% make tools
+	% make install-tools
+
+  in the top directory.
+
+Creative EMU10K1 MIDI
+CONFIG_MIDI_EMU10K1
+  Say Y if you want to be able to use the OSS /dev/sequencer interface.
+  This code is still experimental.
 
 Crystal SoundFusion (CS4280/461x)
 CONFIG_SOUND_FUSION
@@ -17971,6 +17994,16 @@ CONFIG_NWFLASH
 
   If you're not sure, say N.
 
+SRM environment variables in procfs
+CONFIG_SRM_ENV
+  If you enable this option, a subdirectory called srm_environment
+  will give you access to the most important SRM environment
+  variables. If you've got an Alpha style system supporting
+  SRC, then it is a good idea to say Yes or Module to this driver.
+
+  This driver is also available as a module and will be called
+  srm_env.o if you build it as a module.
+  
 Footbridge internal watchdog
 CONFIG_21285_WATCHDOG
   The Intel Footbridge chip contains a builtin watchdog circuit. Say Y 

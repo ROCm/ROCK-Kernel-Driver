@@ -32,14 +32,12 @@ unsigned int EmulateCPDO(const unsigned int);
 unsigned int EmulateCPDT(const unsigned int);
 unsigned int EmulateCPRT(const unsigned int);
 
-/* Emulator registers */
-FPA11 *fpa11;
-
 /* Reset the FPA11 chip.  Called to initialize and reset the emulator. */
 void resetFPA11(void)
 {
   int i;
-
+  FPA11 *fpa11 = GET_FPA11();
+  
   /* initialize the register type array */
   for (i=0;i<=7;i++)
   {
@@ -130,8 +128,10 @@ unsigned int EmulateAll(unsigned int opcode)
 {
   unsigned int nRc = 0;
   unsigned long flags;
-
+  FPA11 *fpa11; 
   save_flags(flags); sti();
+
+  fpa11 = GET_FPA11();
 
   if (fpa11->initflag == 0)		/* good place for __builtin_expect */
   {

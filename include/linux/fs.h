@@ -763,7 +763,7 @@ extern int vfs_rename(struct inode *, struct dentry *, struct inode *, struct de
  * This allows the kernel to read directories into kernel space or
  * to have different dirent layouts depending on the binary type.
  */
-typedef int (*filldir_t)(void *, const char *, int, off_t, ino_t, unsigned);
+typedef int (*filldir_t)(void *, const char *, int, loff_t, ino_t, unsigned);
 
 struct block_device_operations {
 	int (*open) (struct inode *, struct file *);
@@ -1344,6 +1344,7 @@ extern int file_read_actor(read_descriptor_t * desc, struct page *page, unsigned
 extern ssize_t generic_file_read(struct file *, char *, size_t, loff_t *);
 extern ssize_t generic_file_write(struct file *, const char *, size_t, loff_t *);
 extern void do_generic_file_read(struct file *, loff_t *, read_descriptor_t *, read_actor_t);
+extern loff_t no_llseek(struct file *file, loff_t offset, int origin);
 extern loff_t generic_file_llseek(struct file *file, loff_t offset, int origin);
 extern ssize_t generic_read_dir(struct file *, char *, size_t, loff_t *);
 

@@ -726,6 +726,15 @@ void scsi_io_completion(Scsi_Cmnd * SCpnt, int good_sectors,
 			break;
 		}
 	}			/* driver byte != 0 */
+	if (host_byte(result) == DID_RESET) {
+		/*
+		 * Third party bus reset or reset for error
+		 * recovery reasons.  Just retry the request
+		 * and see what happens.  
+		 */
+		scsi_queue_next_request(q, SCpnt);
+		return;
+	}
 	if (result) {
 		struct Scsi_Device_Template *STpnt;
 

@@ -784,7 +784,7 @@ err_out:
 	return ret;
 }
 
-static int read_eeprom(long ioaddr, int location)
+static int __init read_eeprom(long ioaddr, int location)
 {
 	int bogus_cnt = 1000;
 

@@ -427,6 +427,12 @@
  * our current formula working to calculate logical drive number, return
  * failure for LUN > 7
  *
+ * Version 1.17a-ac
+ * Mon Aug 6 14:59:29 BST 2001 - "Michael Johnson" <johnsom@home.com>
+ *
+ * Make the HP print formatting and check for buggy firmware runtime not
+ * ifdef dependant.
+ *
  * BUGS:
  *     Some older 2.1 kernels (eg. 2.1.90) have a bug in pci.c that
  *     fails to detect the controller as a pci device on the system.
@@ -465,7 +471,7 @@
 
 #include <linux/sched.h>
 #include <linux/stat.h>
-#include <linux/malloc.h>	/* for kmalloc() */
+#include <linux/slab.h>	/* for kmalloc() */
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,1,0)	/* 0x20100 */
 #include <linux/bios32.h>
 #else
@@ -2662,7 +2668,8 @@ static int mega_i_query_adapter (mega_host_config * megaCfg)
 	}
 #endif
 
-#ifdef MEGA_HP_FIX		/* use HP firmware and bios version encoding */
+ /* use HP firmware and bios version encoding */
+if (megaCfg->productInfo.subSystemVendorID == HP_SUBSYS_ID) {
 	sprintf (megaCfg->fwVer, "%c%d%d.%d%d",
 		 megaCfg->productInfo.FwVer[2],
 		 megaCfg->productInfo.FwVer[1] >> 8,
@@ -2675,13 +2682,13 @@ static int mega_i_query_adapter (mega_host_config * megaCfg)
 		 megaCfg->productInfo.BiosVer[1] & 0x0f,
 		 megaCfg->productInfo.BiosVer[2] >> 8,
 		 megaCfg->productInfo.BiosVer[2] & 0x0f);
-#else
+} else {
 	memcpy (megaCfg->fwVer, (char *) megaCfg->productInfo.FwVer, 4);
 	megaCfg->fwVer[4] = 0;
 
 	memcpy (megaCfg->biosVer, (char *) megaCfg->productInfo.BiosVer, 4);
 	megaCfg->biosVer[4] = 0;
-#endif
+}
 	megaCfg->support_ext_cdb = mega_support_ext_cdb(megaCfg);
 
 	printk (KERN_NOTICE "megaraid: [%s:%s] detected %d logical drives" M_RD_CRLFSTR,
@@ -2957,7 +2964,6 @@ static int mega_findCard (Scsi_Host_Template * pHostTmpl,
 			}
 		}
 
-#ifdef MEGA_HP_FIX
 		/*
 		 * If we have a HP 1M(0x60E7)/2M(0x60E8) controller with
 		 * firmware H.01.07 or H.01.08, disable 64 bit support,
@@ -2980,7 +2986,6 @@ static int mega_findCard (Scsi_Host_Template * pHostTmpl,
 				megaCfg->flag &= ~BOARD_64BIT;
 			}
 		}
-#endif
 
 		if (mega_is_bios_enabled (megaCfg)) {
 			mega_hbas[numCtlrs].is_bios_enabled = 1;

@@ -543,11 +543,6 @@ static int adb_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static long long adb_lseek(struct file *file, loff_t offset, int origin)
-{
-	return -ESPIPE;
-}
-
 static ssize_t adb_read(struct file *file, char *buf,
 			size_t count, loff_t *ppos)
 {
@@ -665,7 +660,7 @@ out:
 }
 
 static struct file_operations adb_fops = {
-	llseek:		adb_lseek,
+	llseek:		no_llseek,
 	read:		adb_read,
 	write:		adb_write,
 	open:		adb_open,

@@ -1,4 +1,4 @@
-/* $Id: ffb_drv.c,v 1.14 2001/05/24 12:01:47 davem Exp $
+/* $Id: ffb_drv.c,v 1.15 2001/08/09 17:47:51 davem Exp $
  * ffb_drv.c: Creator/Creator3D direct rendering driver.
  *
  * Copyright (C) 2000 David S. Miller (davem@redhat.com)
@@ -73,7 +73,7 @@ static struct file_operations	DRM(fops) = {			\
 } while(0)
 
 /* For mmap customization */
-#define DRIVER_GET_MAP_OFS	(map->offset & 0xffffffff)
+#define DRIVER_GET_MAP_OFS()	(map->offset & 0xffffffff)
 #define DRIVER_GET_REG_OFS()	ffb_get_reg_offset(dev)
 
 typedef struct _ffb_position_t {
@@ -190,37 +190,6 @@ static int ffb_init_one(drm_device_t *dev, int prom_node, int parent_node,
 	return 0;
 }
 
-static int ffb_presetup(drm_device_t *dev)
-{
-	ffb_dev_priv_t	*ffb_priv;
-	drm_device_t *temp_dev;
-	int ret = 0;
-	int i;
-
-	/* Check for the case where no device was found. */
-	if(ffb_position == NULL) return -ENODEV;
-
-	/* Find our instance number by finding our device in dev structure */
-	for(i = 0; i < DRM(numdevs); i++) {
-		temp_dev = &(DRM(device)[i]);
-		if(temp_dev == dev) break;
-	}
-	if(i == DRM(numdevs)) {
-		return -ENODEV;
-	}
-
-	ffb_priv = kmalloc(sizeof(ffb_dev_priv_t), GFP_KERNEL);
-	if(!ffb_priv) return -ENOMEM;
-	memset(ffb_priv, 0, sizeof(*ffb_priv));
-	dev->dev_private = ffb_priv;
-
-	ret = ffb_init_one(dev,
-			   ffb_position[i].node,
-			   ffb_position[i].root,
-			   i);
-	return ret;
-}
-
 static int __init ffb_count_siblings(int root)
 {
 	int node, child, count = 0;
@@ -248,6 +217,8 @@ static int __init ffb_scan_siblings(int root, int instance)
 	return instance;
 }
 
+static int ffb_presetup(drm_device_t *);
+
 static int __init ffb_count_card_instances(void)
 {
 	int root, total, instance;
@@ -263,7 +234,8 @@ static int __init ffb_count_card_instances(void)
 	/* Actual failure will be caught during ffb_presetup b/c we can't catch
 	 * it easily here.
 	 */
-	if(!ffb_position) return -ENOMEM;
+	if (!ffb_position)
+		return -ENOMEM;
 
 	instance = ffb_scan_siblings(prom_root_node, 0);
 
@@ -291,9 +263,11 @@ static drm_map_t *ffb_find_map(struct file *filp, unsigned long off)
 
 		r_list = (drm_map_list_t *)list;
 		map = r_list->map;
-		if (!map) continue;
+		if (!map)
+			continue;
 		uoff = (map->offset & 0xffffffff);
-		if (uoff == off) return map;
+		if (uoff == off)
+			return map;
 	}
 
 	return NULL;
@@ -347,9 +321,9 @@ static unsigned long ffb_get_reg_offset(drm_device_t *dev)
 {
 	ffb_dev_priv_t *ffb_priv = (ffb_dev_priv_t *)dev->dev_private;
 
-	if(ffb_priv) {
+	if (ffb_priv)
 		return ffb_priv->card_phys_base;
-	}
+
 	return 0;
 }
 
@@ -358,6 +332,43 @@ static unsigned long ffb_get_reg_offset(drm_device_t *dev)
 #include "drm_dma.h"
 #include "drm_drawable.h"
 #include "drm_drv.h"
+
+/* This functions must be here since it references DRM(numdevs)
+ * which drm_drv.h declares.
+ */
+static int ffb_presetup(drm_device_t *dev)
+{
+	ffb_dev_priv_t	*ffb_priv;
+	drm_device_t *temp_dev;
+	int ret = 0;
+	int i;
+
+	/* Check for the case where no device was found. */
+	if (ffb_position == NULL)
+		return -ENODEV;
+
+	/* Find our instance number by finding our device in dev structure */
+	for (i = 0; i < DRM(numdevs); i++) {
+		temp_dev = &(DRM(device)[i]);
+		if(temp_dev == dev)
+			break;
+	}
+
+	if (i == DRM(numdevs))
+		return -ENODEV;
+
+	ffb_priv = kmalloc(sizeof(ffb_dev_priv_t), GFP_KERNEL);
+	if (!ffb_priv)
+		return -ENOMEM;
+	memset(ffb_priv, 0, sizeof(*ffb_priv));
+	dev->dev_private = ffb_priv;
+
+	ret = ffb_init_one(dev,
+			   ffb_position[i].node,
+			   ffb_position[i].root,
+			   i);
+	return ret;
+}
 
 #ifndef MODULE
 /* DRM(options) is called by the kernel to parse command-line options
@@ -369,13 +380,13 @@ static unsigned long ffb_get_reg_offset(drm_device_t *dev)
  * anyone can think of a way that we can fit into the __setup macro without
  * changing it, then please send the solution my way.
  */
-static int __init ffb_options( char *str )
+static int __init ffb_options(char *str)
 {
-	DRM(parse_options)( str );
+	DRM(parse_options)(str);
 	return 1;
 }
 
-__setup( DRIVER_NAME "=", ffb_options );
+__setup(DRIVER_NAME "=", ffb_options);
 #endif
 
 #include "drm_fops.h"

@@ -48,4 +48,6 @@
 #define __bus_to_virt__is_a_macro
 #define __bus_to_virt(x)	(x)
 
+#define PHYS_TO_NID(addr)	(0)
+
 #endif

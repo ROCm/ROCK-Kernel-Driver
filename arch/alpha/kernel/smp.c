@@ -211,13 +211,14 @@ smp_callin(void)
  * We are not told how much cache there is, so we have to guess.
  */
 static void __init
-smp_tune_scheduling (void)
+smp_tune_scheduling (int cpuid)
 {
 	struct percpu_struct *cpu;
 	unsigned long on_chip_cache;
 	unsigned long freq;
 
-	cpu = (struct percpu_struct*)((char*)hwrpb + hwrpb->processor_offset);
+	cpu = (struct percpu_struct*)((char*)hwrpb + hwrpb->processor_offset
+				      + cpuid * hwrpb->processor_size);
 	switch (cpu->type)
 	{
 	case EV45_CPU:
@@ -599,7 +600,7 @@ smp_boot_cpus(void)
 	current->processor = boot_cpuid;
 
 	smp_store_cpu_info(boot_cpuid);
-	smp_tune_scheduling();
+	smp_tune_scheduling(boot_cpuid);
 	smp_setup_percpu_timer(boot_cpuid);
 
 	init_idle();

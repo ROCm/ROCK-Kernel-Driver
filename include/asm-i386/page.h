@@ -117,7 +117,6 @@ static __inline__ int get_order(unsigned long size)
 #define virt_to_page(kaddr)	(mem_map + (__pa(kaddr) >> PAGE_SHIFT))
 #define VALID_PAGE(page)	((page - mem_map) < max_mapnr)
 
-
 #endif /* __KERNEL__ */
 
 #endif /* _I386_PAGE_H */

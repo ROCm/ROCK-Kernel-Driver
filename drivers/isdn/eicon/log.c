@@ -96,7 +96,7 @@ void	DivasLogFifoWrite(char *entry, int length)
 	}
 
 	m_count++;
-	bzero(new_klog,sizeof(KNODE));
+	memset(new_klog, 0, sizeof(KNODE));
 
 	/* Set head & tail to point to the new Msg Struct */
 	head=tail=new_klog;
@@ -112,7 +112,7 @@ void	DivasLogFifoWrite(char *entry, int length)
 	}
 
 	m_count++;
-	bzero(new_klog,sizeof(KNODE));
+	memset(new_klog, 0, sizeof(KNODE));
 
 	/* Let last Msg Struct point to new Msg Struct & inc tail */
 	tail->next=new_klog;
@@ -125,7 +125,7 @@ void	DivasLogFifoWrite(char *entry, int length)
         length = sizeof(klog_t);
     }
 
-    bcopy(entry,&tail->klog,length);
+    memcpy(&tail->klog, entry, length);
 
     return;
 }
@@ -155,7 +155,7 @@ void	DivasLogIdi(card_t *card, ENTITY *e, int request)
 {
 	klog_t		klog;
 
-	bzero(&klog, sizeof(klog));
+	memset(&klog, 0, sizeof(klog));
 
 	klog.time_stamp = UxTimeGet();
 
@@ -166,7 +166,7 @@ void	DivasLogIdi(card_t *card, ENTITY *e, int request)
 
 	klog.type = request ? KLOG_IDI_REQ : KLOG_IDI_CALLBACK;
 	klog.code = 0;
-	bcopy(e, klog.buffer, klog.length);
+	memcpy(klog.buffer, e, klog.length);
 
     /* send to the log driver and return */
 

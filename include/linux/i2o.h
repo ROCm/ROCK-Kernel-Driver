@@ -78,6 +78,7 @@ struct i2o_device
  */	 	
 struct i2o_pci
 {
+	struct pci_dev *pdev;	/* PCI device */
 	int irq;
 	int queue_buggy:1;	/* Don't send a lot of messages */
 	int short_req:1;	/* Use small block sizes	*/
@@ -126,6 +127,11 @@ struct i2o_controller
 	u32 mem_phys;				/* MFA physical */
 	
 	int battery:1;				/* Has a battery backup */
+	int io_alloc:1;				/* An I/O resource was allocated */
+	int mem_alloc:1;			/* A memory resource was allocated */
+	
+	struct resource io_resource;		/* I/O resource allocated to the IOP */
+	struct resource mem_resource;		/* Mem resource allocated to the IOP */
 
 	struct proc_dir_entry* proc_entry;	/* /proc dir */
 

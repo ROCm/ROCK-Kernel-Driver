@@ -59,6 +59,15 @@ void __init smp_setup(char *str, int *ints)
 	/* XXX implement me XXX */
 }
 
+static int max_cpus = NR_CPUS;
+static int __init maxcpus(char *str)
+{
+	get_option(&str, &max_cpus);
+	return 1;
+}
+
+__setup("maxcpus=", maxcpus);
+
 int smp_info(char *buf)
 {
 	int len = 7, i;
@@ -251,6 +260,8 @@ void __init smp_boot_cpus(void)
 		if (i == boot_cpu_id)
 			continue;
 
+		if ((cpucount + 1) == max_cpus)
+			break;
 		if (cpu_present_map & (1UL << i)) {
 			unsigned long entry = (unsigned long)(&sparc64_cpu_startup);
 			unsigned long cookie = (unsigned long)(&cpu_new_task);
@@ -502,11 +513,15 @@ retry:
 	}
 }
 
-void smp_cross_call(unsigned long *func, u32 ctx, u64 data1, u64 data2)
+/* Send cross call to all processors mentioned in MASK
+ * except self.
+ */
+static void smp_cross_call_masked(unsigned long *func, u32 ctx, u64 data1, u64 data2, unsigned long mask)
 {
 	if (smp_processors_ready) {
-		unsigned long mask = (cpu_present_map & ~(1UL<<smp_processor_id()));
 		u64 data0 = (((u64)ctx)<<32 | (((u64)func) & 0xffffffff));
+
+		mask &= ~(1UL<<smp_processor_id());
 
 		if (tlb_type == spitfire)
 			spitfire_xcall_deliver(data0, data1, data2, mask);
@@ -516,6 +531,10 @@ void smp_cross_call(unsigned long *func, u32 ctx, u64 data1, u64 data2)
 		/* NOTE: Caller runs local copy on master. */
 	}
 }
+
+/* Send cross call to all processors except self. */
+#define smp_cross_call(func, ctx, data1, data2) \
+	smp_cross_call_masked(func, ctx, data1, data2, cpu_present_map)
 
 struct call_data_struct {
 	void (*func) (void *info);
@@ -610,6 +629,9 @@ void smp_flush_tlb_all(void)
  *    space has (potentially) executed on, this is the heuristic
  *    we use to avoid doing cross calls.
  *
+ *    Also, for flushing from kswapd and also for clones, we
+ *    use cpu_vm_mask as the list of cpus to make run the TLB.
+ *
  * 2) TLB context numbers are shared globally across all processors
  *    in the system, this allows us to play several games to avoid
  *    cross calls.
@@ -627,42 +649,45 @@ void smp_flush_tlb_all(void)
  *    migrates to another cpu (again).
  *
  * 3) For shared address spaces (threads) and swapping we bite the
- *    bullet for most cases and perform the cross call.
+ *    bullet for most cases and perform the cross call (but only to
+ *    the cpus listed in cpu_vm_mask).
  *
  *    The performance gain from "optimizing" away the cross call for threads is
  *    questionable (in theory the big win for threads is the massive sharing of
  *    address space state across processors).
- *
- *    For the swapping case the locking is difficult to get right, we'd have to
- *    enforce strict ordered access to mm->cpu_vm_mask via a spinlock for example.
- *    Then again one could argue that when you are swapping, the cost of a cross
- *    call won't even show up on the performance radar.  But in any case we do get
- *    rid of the cross-call when the task has a dead context or the task has only
- *    ever run on the local cpu.
- *
- * 4) If the mm never had a valid context yet, there is nothing to
- *    flush.  CTX_NEVER_WAS_VALID checks this.
- *
- *    This check used to be done with CTX_VALID(), but Kanoj Sarcar has
- *    pointed out that this is an invalid optimization.  It can cause
- *    stale translations to be left in the TLB.
  */
 void smp_flush_tlb_mm(struct mm_struct *mm)
 {
-	if (CTX_NEVER_WAS_VALID(mm->context))
-		return;
+        /*
+         * This code is called from two places, dup_mmap and exit_mmap. In the
+         * former case, we really need a flush. In the later case, the callers
+         * are single threaded exec_mmap (really need a flush), multithreaded
+         * exec_mmap case (do not need to flush, since the caller gets a new
+         * context via activate_mm), and all other callers of mmput() whence
+         * the flush can be optimized since the associated threads are dead and
+         * the mm is being torn down (__exit_mm and other mmput callers) or the
+         * owning thread is dissociating itself from the mm. The
+         * (atomic_read(&mm->mm_users) == 0) check ensures real work is done
+         * for single thread exec and dup_mmap cases. An alternate check might
+         * have been (current->mm != mm).
+         *                                              Kanoj Sarcar
+         */
+        if (atomic_read(&mm->mm_users) == 0)
+                return;
 
 	{
 		u32 ctx = CTX_HWBITS(mm->context);
 		int cpu = smp_processor_id();
 
-		if (mm == current->active_mm && atomic_read(&mm->mm_users) == 1) {
+		if (atomic_read(&mm->mm_users) == 1) {
 			/* See smp_flush_tlb_page for info about this. */
 			mm->cpu_vm_mask = (1UL << cpu);
 			goto local_flush_and_out;
 		}
 
-		smp_cross_call(&xcall_flush_tlb_mm, ctx, 0, 0);
+		smp_cross_call_masked(&xcall_flush_tlb_mm,
+				      ctx, 0, 0,
+				      mm->cpu_vm_mask);
 
 	local_flush_and_out:
 		__flush_tlb_mm(ctx, SECONDARY_CONTEXT);
@@ -672,9 +697,6 @@ void smp_flush_tlb_mm(struct mm_struct *mm)
 void smp_flush_tlb_range(struct mm_struct *mm, unsigned long start,
 			 unsigned long end)
 {
-	if (CTX_NEVER_WAS_VALID(mm->context))
-		return;
-
 	{
 		u32 ctx = CTX_HWBITS(mm->context);
 		int cpu = smp_processor_id();
@@ -687,7 +709,9 @@ void smp_flush_tlb_range(struct mm_struct *mm, unsigned long start,
 			goto local_flush_and_out;
 		}
 
-		smp_cross_call(&xcall_flush_tlb_range, ctx, start, end);
+		smp_cross_call_masked(&xcall_flush_tlb_range,
+				      ctx, start, end,
+				      mm->cpu_vm_mask);
 
 	local_flush_and_out:
 		__flush_tlb_range(ctx, start, SECONDARY_CONTEXT, end, PAGE_SIZE, (end-start));
@@ -696,9 +720,6 @@ void smp_flush_tlb_range(struct mm_struct *mm, unsigned long start,
 
 void smp_flush_tlb_page(struct mm_struct *mm, unsigned long page)
 {
-	if (CTX_NEVER_WAS_VALID(mm->context))
-		return;
-
 	{
 		u32 ctx = CTX_HWBITS(mm->context);
 		int cpu = smp_processor_id();
@@ -730,7 +751,11 @@ void smp_flush_tlb_page(struct mm_struct *mm, unsigned long page)
 		 * this is a cloned mm or kswapd is kicking out pages for a task
 		 * which has run recently on another cpu.
 		 */
-		smp_cross_call(&xcall_flush_tlb_page, ctx, page, 0);
+		smp_cross_call_masked(&xcall_flush_tlb_page,
+				      ctx, page, 0,
+				      mm->cpu_vm_mask);
+		if (!(mm->cpu_vm_mask & (1UL << cpu)))
+			return;
 
 	local_flush_and_out:
 		__flush_tlb_page(ctx, page, SECONDARY_CONTEXT);

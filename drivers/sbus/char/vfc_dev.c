@@ -642,15 +642,9 @@ static int vfc_mmap(struct inode *inode, struct file *file,
 }
 
 
-static int vfc_lseek(struct inode *inode, struct file *file, 
-		     off_t offset, int origin) 
-{
-	return -ESPIPE;
-}
-
 static struct file_operations vfc_fops = {
 	owner:		THIS_MODULE,
-	llseek:		vfc_lseek,
+	llseek:		no_llseek,
 	ioctl:		vfc_ioctl,
 	mmap:		vfc_mmap,
 	open:		vfc_open,

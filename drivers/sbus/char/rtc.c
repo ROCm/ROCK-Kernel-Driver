@@ -81,11 +81,6 @@ void set_rtc_time(struct rtc_time *t)
 	spin_unlock_irq(&mostek_lock);
 }
 
-static long long rtc_lseek(struct file *file, long long offset, int origin)
-{
-	return -ESPIPE;
-}
-
 static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	unsigned long arg)
 {
@@ -143,7 +138,7 @@ static int rtc_release(struct inode *inode, struct file *file)
 
 static struct file_operations rtc_fops = {
 	owner:		THIS_MODULE,
-	llseek:		rtc_lseek,
+	llseek:		no_llseek,
 	ioctl:		rtc_ioctl,
 	open:		rtc_open,
 	release:	rtc_release,

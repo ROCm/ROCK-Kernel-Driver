@@ -48,7 +48,9 @@ static int __init fpe_setup(char *line)
 __setup("fpe=", fpe_setup);
 #endif
 
+extern unsigned int mem_fclk_21285;
 extern void paging_init(struct meminfo *, struct machine_desc *desc);
+extern void convert_to_tag_list(struct param_struct *params, int mem_init);
 extern void bootmem_init(struct meminfo *);
 extern void reboot_setup(char *str);
 extern int root_mountflags;
@@ -60,23 +62,11 @@ unsigned int __machine_arch_type;
 unsigned int system_rev;
 unsigned int system_serial_low;
 unsigned int system_serial_high;
-unsigned int mem_fclk_21285 = 50000000;
 unsigned int elf_hwcap;
 
 #ifdef MULTI_CPU
 struct processor processor;
 #endif
-
-struct drive_info_struct { char dummy[32]; } drive_info;
-
-struct screen_info screen_info = {
- orig_video_lines:	30,
- orig_video_cols:	80,
- orig_video_mode:	0,
- orig_video_ega_bx:	0,
- orig_video_isVGA:	1,
- orig_video_points:	8
-};
 
 unsigned char aux_device_present;
 char elf_platform[ELF_PLATFORM_SIZE];
@@ -222,7 +212,7 @@ parse_cmdline(struct meminfo *mi, char **cmdline_p, char *from)
 
 			mi->bank[mi->nr_banks].start = start;
 			mi->bank[mi->nr_banks].size  = size;
-			mi->bank[mi->nr_banks].node  = 0;
+			mi->bank[mi->nr_banks].node  = PHYS_TO_NID(start);
 			mi->nr_banks += 1;
 		}
 		c = *from++;
@@ -286,8 +276,8 @@ request_standard_resources(struct meminfo *mi, struct machine_desc *mdesc)
 
 		res = alloc_bootmem_low(sizeof(*res));
 		res->name  = "System RAM";
-		res->start = __virt_to_bus(virt_start);
-		res->end   = __virt_to_bus(virt_end);
+		res->start = __virt_to_phys(virt_start);
+		res->end   = __virt_to_phys(virt_end);
 		res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
 
 		request_resource(&iomem_resource, res);
@@ -330,11 +320,15 @@ request_standard_resources(struct meminfo *mi, struct machine_desc *mdesc)
  */
 static int __init parse_tag_core(const struct tag *tag)
 {
-	if ((tag->u.core.flags & 1) == 0)
-		root_mountflags &= ~MS_RDONLY;
-	ROOT_DEV = to_kdev_t(tag->u.core.rootdev);
+	if (tag->hdr.size > 2) {
+		if ((tag->u.core.flags & 1) == 0)
+			root_mountflags &= ~MS_RDONLY;
+		ROOT_DEV = to_kdev_t(tag->u.core.rootdev);
+	}
 	return 0;
 }
+
+__tagtable(ATAG_CORE, parse_tag_core);
 
 static int __init parse_tag_mem32(const struct tag *tag)
 {
@@ -346,11 +340,23 @@ static int __init parse_tag_mem32(const struct tag *tag)
 	}
 	meminfo.bank[meminfo.nr_banks].start = tag->u.mem.start;
 	meminfo.bank[meminfo.nr_banks].size  = tag->u.mem.size;
-	meminfo.bank[meminfo.nr_banks].node  = 0;
+	meminfo.bank[meminfo.nr_banks].node  = PHYS_TO_NID(tag->u.mem.start);
 	meminfo.nr_banks += 1;
 
 	return 0;
 }
+
+__tagtable(ATAG_MEM, parse_tag_mem32);
+
+#if defined(CONFIG_VGA_CONSOLE) || defined(CONFIG_DUMMY_CONSOLE)
+struct screen_info screen_info = {
+ orig_video_lines:	30,
+ orig_video_cols:	80,
+ orig_video_mode:	0,
+ orig_video_ega_bx:	0,
+ orig_video_isVGA:	1,
+ orig_video_points:	8
+};
 
 static int __init parse_tag_videotext(const struct tag *tag)
 {
@@ -366,6 +372,9 @@ static int __init parse_tag_videotext(const struct tag *tag)
 	return 0;
 }
 
+__tagtable(ATAG_VIDEOTEXT, parse_tag_videotext);
+#endif
+
 static int __init parse_tag_ramdisk(const struct tag *tag)
 {
 	setup_ramdisk((tag->u.ramdisk.flags & 1) == 0,
@@ -374,11 +383,15 @@ static int __init parse_tag_ramdisk(const struct tag *tag)
 	return 0;
 }
 
+__tagtable(ATAG_RAMDISK, parse_tag_ramdisk);
+
 static int __init parse_tag_initrd(const struct tag *tag)
 {
 	setup_initrd(tag->u.initrd.start, tag->u.initrd.size);
 	return 0;
 }
+
+__tagtable(ATAG_INITRD, parse_tag_initrd);
 
 static int __init parse_tag_serialnr(const struct tag *tag)
 {
@@ -387,11 +400,15 @@ static int __init parse_tag_serialnr(const struct tag *tag)
 	return 0;
 }
 
+__tagtable(ATAG_SERIAL, parse_tag_serialnr);
+
 static int __init parse_tag_revision(const struct tag *tag)
 {
 	system_rev = tag->u.revision.rev;
 	return 0;
 }
+
+__tagtable(ATAG_REVISION, parse_tag_revision);
 
 static int __init parse_tag_cmdline(const struct tag *tag)
 {
@@ -400,101 +417,43 @@ static int __init parse_tag_cmdline(const struct tag *tag)
 	return 0;
 }
 
-/*
- * This is the core tag table; these are the tags
- * that we recognise for any machine type.
- */
-static const struct tagtable core_tagtable[] __init = {
-	{ ATAG_CORE,      parse_tag_core      },
-	{ ATAG_MEM,       parse_tag_mem32     },
-	{ ATAG_VIDEOTEXT, parse_tag_videotext },
-	{ ATAG_RAMDISK,   parse_tag_ramdisk   },
-	{ ATAG_INITRD,    parse_tag_initrd    },
-	{ ATAG_SERIAL,    parse_tag_serialnr  },
-	{ ATAG_REVISION,  parse_tag_revision  },
-	{ ATAG_CMDLINE,   parse_tag_cmdline   }
-};
+__tagtable(ATAG_CMDLINE, parse_tag_cmdline);
 
 /*
- * Scan one tag table for this tag, and call its parse function.
+ * Scan the tag table for this tag, and call its parse function.
+ * The tag table is built by the linker from all the __tagtable
+ * declarations.
  */
-static int __init
-parse_tag(const struct tagtable *tbl, int size, const struct tag *t)
+static int __init parse_tag(const struct tag *tag)
 {
-	int i;
+	extern struct tagtable __tagtable_begin, __tagtable_end;
+	struct tagtable *t;
 
-	for (i = 0; i < size; i++, tbl++)
-		if (t->hdr.tag == tbl->tag) {
-			tbl->parse(t);
+	for (t = &__tagtable_begin; t < &__tagtable_end; t++)
+		if (tag->hdr.tag == t->tag) {
+			t->parse(tag);
 			break;
 		}
 
-	return i < size;
+	return t < &__tagtable_end;
 }
 
 /*
  * Parse all tags in the list, checking both the global and architecture
  * specific tag tables.
  */
-static void __init
-parse_tags(const struct tagtable *tbl, int size, const struct tag *t)
+static void __init parse_tags(const struct tag *t)
 {
-	/*
-	 * The tag list is terminated with a zero-sized tag.  Size is
-	 * defined to be in units of 32-bit quantities.
-	 */
-	for (; t->hdr.size; t = (struct tag *)((u32 *)t + t->hdr.size)) {
-		if (parse_tag(core_tagtable, ARRAY_SIZE(core_tagtable), t))
-			continue;
-
-		if (tbl && parse_tag(tbl, size, t))
-			continue;
-
-		printk(KERN_WARNING
-		       "Ignoring unrecognised tag 0x%08x\n", t->hdr.tag);
-	}
-}
-
-static void __init parse_params(struct param_struct *params)
-{
-	if (params->u1.s.page_size != PAGE_SIZE) {
-		printk(KERN_WARNING "Warning: bad configuration page, "
-		       "trying to continue\n");
-		return;
-	}
-
-	ROOT_DEV	   = to_kdev_t(params->u1.s.rootdev);
-	system_rev	   = params->u1.s.system_rev;
-	system_serial_low  = params->u1.s.system_serial_low;
-	system_serial_high = params->u1.s.system_serial_high;
-
-	if (params->u1.s.mem_fclk_21285 > 0)
-		mem_fclk_21285 = params->u1.s.mem_fclk_21285;  
-
-	setup_ramdisk((params->u1.s.flags & FLAG_RDLOAD) == 0,
-		      (params->u1.s.flags & FLAG_RDPROMPT) == 0,
-		      params->u1.s.rd_start,
-		      params->u1.s.ramdisk_size);
-
-	setup_initrd(params->u1.s.initrd_start,
-		     params->u1.s.initrd_size);
-
-	if (!(params->u1.s.flags & FLAG_READONLY))
-		root_mountflags &= ~MS_RDONLY;
-
-	strncpy(default_command_line, params->commandline, COMMAND_LINE_SIZE);
-	default_command_line[COMMAND_LINE_SIZE - 1] = '\0';
-
-	if (meminfo.nr_banks == 0) {
-		meminfo.nr_banks      = 1;
-		meminfo.bank[0].start = PHYS_OFFSET;
-		meminfo.bank[0].size  = params->u1.s.nr_pages << PAGE_SHIFT;
-	}
+	for (; t->hdr.size; t = tag_next(t))
+		if (!parse_tag(t))
+			printk(KERN_WARNING
+				"Ignoring unrecognised tag 0x%08x\n",
+				t->hdr.tag);
 }
 
 void __init setup_arch(char **cmdline_p)
 {
-	struct param_struct *params = NULL;
+	struct tag *tags = NULL;
 	struct machine_desc *mdesc;
 	char *from = default_command_line;
 
@@ -508,27 +467,26 @@ void __init setup_arch(char **cmdline_p)
 		reboot_setup("s");
 
 	if (mdesc->param_offset)
-		params = phys_to_virt(mdesc->param_offset);
+		tags = phys_to_virt(mdesc->param_offset);
 
 	/*
 	 * Do the machine-specific fixups before we parse the
 	 * parameters or tags.
 	 */
 	if (mdesc->fixup)
-		mdesc->fixup(mdesc, params, &from, &meminfo);
+		mdesc->fixup(mdesc, (struct param_struct *)tags,
+			     &from, &meminfo);
 
-	if (params) {
-		struct tag *tag = (struct tag *)params;
+	/*
+	 * If we have the old style parameters, convert them to
+	 * a tag list before.
+	 */
+	if (tags && tags->hdr.tag != ATAG_CORE)
+		convert_to_tag_list((struct param_struct *)tags,
+				    meminfo.nr_banks == 0);
 
-		/*
-		 * Is the first tag the CORE tag?  This differentiates
-		 * between the tag list and the parameter table.
-		 */
-		if (tag->hdr.tag == ATAG_CORE)
-			parse_tags(mdesc->tagtable, mdesc->tagsize, tag);
-		else
-			parse_params(params);
-	}
+	if (tags && tags->hdr.tag == ATAG_CORE)
+		parse_tags(tags);
 
 	if (meminfo.nr_banks == 0) {
 		meminfo.nr_banks      = 1;

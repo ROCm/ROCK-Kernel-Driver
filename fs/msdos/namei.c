@@ -17,8 +17,6 @@
 
 #include <asm/uaccess.h>
 
-#include "../fat/msbuffer.h"
-
 #define MSDOS_DEBUG 0
 #define PRINTK(x)
 

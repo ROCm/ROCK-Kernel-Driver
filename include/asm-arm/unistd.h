@@ -1,3 +1,15 @@
+/*
+ *  linux/include/asm-arm/unistd.h
+ *
+ *  Copyright (C) 2001 Russell King
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * Please forward _all_ changes to this file to rmk@arm.linux.org.uk,
+ * no matter what the change is.  Thanks!
+ */
 #ifndef __ASM_ARM_UNISTD_H
 #define __ASM_ARM_UNISTD_H
 
@@ -82,7 +94,7 @@
 #define __NR_sigpending			(__NR_SYSCALL_BASE+ 73)
 #define __NR_sethostname		(__NR_SYSCALL_BASE+ 74)
 #define __NR_setrlimit			(__NR_SYSCALL_BASE+ 75)
-#define __NR_old_getrlimit		(__NR_SYSCALL_BASE+ 76)	/* Back compat 2GB limited rlimit */
+#define __NR_getrlimit			(__NR_SYSCALL_BASE+ 76)	/* Back compat 2GB limited rlimit */
 #define __NR_getrusage			(__NR_SYSCALL_BASE+ 77)
 #define __NR_gettimeofday		(__NR_SYSCALL_BASE+ 78)
 #define __NR_settimeofday		(__NR_SYSCALL_BASE+ 79)
@@ -197,7 +209,7 @@
 					/* 188 reserved */
 					/* 189 reserved */
 #define __NR_vfork			(__NR_SYSCALL_BASE+190)
-#define __NR_getrlimit			(__NR_SYSCALL_BASE+191)	/* SuS compliant getrlimit */
+#define __NR_ugetrlimit			(__NR_SYSCALL_BASE+191)	/* SuS compliant getrlimit */
 #define __NR_mmap2			(__NR_SYSCALL_BASE+192)
 #define __NR_truncate64			(__NR_SYSCALL_BASE+193)
 #define __NR_ftruncate64		(__NR_SYSCALL_BASE+194)
@@ -228,6 +240,15 @@
 #define __NR_mincore			(__NR_SYSCALL_BASE+219)
 #define __NR_madvise			(__NR_SYSCALL_BASE+220)
 #define __NR_fcntl64			(__NR_SYSCALL_BASE+221)
+
+/*
+ * The following SWIs are ARM private.
+ */
+#define __ARM_NR_BASE			(__NR_SYSCALL_BASE+0x0f0000)
+#define __ARM_NR_breakpoint		(__ARM_NR_BASE+1)
+#define __ARM_NR_cacheflush		(__ARM_NR_BASE+2)
+#define __ARM_NR_usr26			(__ARM_NR_BASE+3)
+#define __ARM_NR_usr32			(__ARM_NR_BASE+4)
 
 #define __sys2(x) #x
 #define __sys1(x) __sys2(x)

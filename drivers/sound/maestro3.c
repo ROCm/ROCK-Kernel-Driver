@@ -130,7 +130,7 @@
 #include <linux/sched.h>
 #include <linux/delay.h>
 #include <linux/sound.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/soundcard.h>
 #include <linux/pci.h>
 #include <linux/vmalloc.h>
@@ -1280,13 +1280,6 @@ static const char invalid_magic[] = KERN_CRIT PFX "invalid magic value in %s\n";
 
 /* --------------------------------------------------------------------- */
 
-static loff_t m3_llseek(struct file *file, loff_t offset, int origin)
-{
-    return -ESPIPE;
-}
-
-/* --------------------------------------------------------------------- */
-
 static int drain_dac(struct m3_state *s, int nonblock)
 {
     DECLARE_WAITQUEUE(wait,current);
@@ -2180,7 +2173,7 @@ static int m3_ioctl_mixdev(struct inode *inode, struct file *file, unsigned int 
 }
 
 static struct file_operations m3_mixer_fops = {
-    llseek:         m3_llseek,
+    llseek:         no_llseek,
     ioctl:          m3_ioctl_mixdev,
     open:           m3_open_mixdev,
     release:        m3_release_mixdev,
@@ -2553,7 +2546,7 @@ static void m3_enable_ints(struct m3_card *card)
 }
 
 static struct file_operations m3_audio_fops = {
-    llseek:     &m3_llseek,
+    llseek:     &no_llseek,
     read:       &m3_read,
     write:      &m3_write,
     poll:       &m3_poll,

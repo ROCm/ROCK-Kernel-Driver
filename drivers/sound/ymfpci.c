@@ -38,6 +38,7 @@
  *  - 2001/01/07 Replace the OPL3 part of CONFIG_SOUND_YMFPCI_LEGACY code with
  *    native synthesizer through a playback slot.
  *  - Use new 2.3.x cache coherent PCI DMA routines instead of virt_to_bus.
+ *  - Make the thing big endian compatible. ALSA has it done.
  */
 
 #include <linux/config.h>
@@ -488,32 +489,34 @@ static void ymf_stop_adc(struct ymf_state *state)
  *  Hardware start management
  */
 
-static void ymfpci_hw_start(ymfpci_t *codec)
+static void ymfpci_hw_start(ymfpci_t *unit)
 {
 	unsigned long flags;
 
-	spin_lock_irqsave(&codec->reg_lock, flags);
-	if (codec->start_count++ == 0) {
-		ymfpci_writel(codec, YDSXGR_MODE, 3);
-		codec->active_bank = ymfpci_readl(codec, YDSXGR_CTRLSELECT) & 1;
+	spin_lock_irqsave(&unit->reg_lock, flags);
+	if (unit->start_count++ == 0) {
+		ymfpci_writel(unit, YDSXGR_MODE,
+		    ymfpci_readl(unit, YDSXGR_MODE) | 3);
+		unit->active_bank = ymfpci_readl(unit, YDSXGR_CTRLSELECT) & 1;
 	}
-      	spin_unlock_irqrestore(&codec->reg_lock, flags);
+	spin_unlock_irqrestore(&unit->reg_lock, flags);
 }
 
-static void ymfpci_hw_stop(ymfpci_t *codec)
+static void ymfpci_hw_stop(ymfpci_t *unit)
 {
 	unsigned long flags;
 	long timeout = 1000;
 
-	spin_lock_irqsave(&codec->reg_lock, flags);
-	if (--codec->start_count == 0) {
-		ymfpci_writel(codec, YDSXGR_MODE, 0);
+	spin_lock_irqsave(&unit->reg_lock, flags);
+	if (--unit->start_count == 0) {
+		ymfpci_writel(unit, YDSXGR_MODE,
+		    ymfpci_readl(unit, YDSXGR_MODE) & ~3);
 		while (timeout-- > 0) {
-			if ((ymfpci_readl(codec, YDSXGR_STATUS) & 2) == 0)
+			if ((ymfpci_readl(unit, YDSXGR_STATUS) & 2) == 0)
 				break;
 		}
 	}
-      	spin_unlock_irqrestore(&codec->reg_lock, flags);
+	spin_unlock_irqrestore(&unit->reg_lock, flags);
 }
 
 /*
@@ -525,7 +528,7 @@ static int voice_alloc(ymfpci_t *codec, ymfpci_voice_type_t type, int pair, ymfp
 	ymfpci_voice_t *voice, *voice2;
 	int idx;
 
-	for (idx = 0; idx < 64; idx += pair ? 2 : 1) {
+	for (idx = 0; idx < YDSXG_PLAYBACK_VOICES; idx += pair ? 2 : 1) {
 		voice = &codec->voices[idx];
 		voice2 = pair ? &codec->voices[idx+1] : NULL;
 		if (voice->use || (voice2 && voice2->use))
@@ -867,19 +870,19 @@ static void ymf_pcm_init_voice(ymfpci_voice_t *voice, int stereo,
 		} else {
 			if (!spdif) {
 				if ((voice->number & 1) == 0) {
-					bank->format |= 1;
 					bank->left_gain =
 					bank->left_gain_end = 0x40000000;
 				} else {
+					bank->format |= 1;
 					bank->right_gain =
 					bank->right_gain_end = 0x40000000;
 				}
 			} else {
 				if ((voice->number & 1) == 0) {
-					bank->format |= 1;
 					bank->eff2_gain =
 					bank->eff2_gain_end = 0x40000000;
 				} else {
+					bank->format |= 1;
 					bank->eff3_gain =
 					bank->eff3_gain_end = 0x40000000;
 				}
@@ -997,12 +1000,12 @@ void ymf_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	if (status & 0x80000000) {
 		codec->active_bank = ymfpci_readl(codec, YDSXGR_CTRLSELECT) & 1;
 		spin_lock(&codec->voice_lock);
-		for (nvoice = 0; nvoice < 64; nvoice++) {
+		for (nvoice = 0; nvoice < YDSXG_PLAYBACK_VOICES; nvoice++) {
 			voice = &codec->voices[nvoice];
 			if (voice->use)
 				ymf_pcm_interrupt(codec, voice);
 		}
-		for (nvoice = 0; nvoice < 5; nvoice++) {
+		for (nvoice = 0; nvoice < YDSXG_CAPTURE_VOICES; nvoice++) {
 			cap = &codec->capture[nvoice];
 			if (cap->use)
 				ymf_cap_interrupt(codec, cap);
@@ -1168,11 +1171,6 @@ out0:
 /*
  * User interface
  */
-
-static loff_t ymf_llseek(struct file *file, loff_t offset, int origin)
-{
-	return -ESPIPE;
-}
 
 /*
  * in this loop, dmabuf.count signifies the amount of data that is
@@ -1971,7 +1969,7 @@ static int ymf_release_mixdev(struct inode *inode, struct file *file)
 }
 
 static /*const*/ struct file_operations ymf_fops = {
-	llseek:		ymf_llseek,
+	llseek:		no_llseek,
 	read:		ymf_read,
 	write:		ymf_write,
 	poll:		ymf_poll,
@@ -1982,7 +1980,7 @@ static /*const*/ struct file_operations ymf_fops = {
 };
 
 static /*const*/ struct file_operations ymf_mixer_fops = {
-	llseek:		ymf_llseek,
+	llseek:		no_llseek,
 	ioctl:		ymf_ioctl_mixdev,
 	open:		ymf_open_mixdev,
 	release:	ymf_release_mixdev,

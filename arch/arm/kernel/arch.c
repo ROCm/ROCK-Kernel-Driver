@@ -1,10 +1,7 @@
 /*
  *  linux/arch/arm/kernel/arch.c
  *
- *  Architecture specific fixups.  This is where any
- *  parameters in the params struct are fixed up, or
- *  any additional architecture specific information
- *  is pulled from the params struct.
+ *  Architecture specific fixups.
  */
 #include <linux/config.h>
 #include <linux/tty.h>
@@ -28,46 +25,41 @@ unsigned int vram_size;
 unsigned int memc_ctrl_reg;
 unsigned int number_mfm_drives;
 
-static void __init
-fixup_acorn(struct machine_desc *desc, struct param_struct *params,
-	    char **cmdline, struct meminfo *mi)
+static int __init parse_tag_acorn(const struct tag *tag)
 {
-	if (machine_is_riscpc()) {
-		int i;
+	memc_ctrl_reg = tag->u.acorn.memc_control_reg;
+	number_mfm_drives = tag->u.acorn.adfsdrives;
 
-		/*
-		 * RiscPC can't handle half-word loads and stores
-		 */
-		elf_hwcap &= ~HWCAP_HALF;
-
-		switch (params->u1.s.pages_in_vram) {
-		case 512:
-			vram_size += PAGE_SIZE * 256;
-		case 256:
-			vram_size += PAGE_SIZE * 256;
-		default:
-			break;
-		}
-
-		if (vram_size) {
-			desc->video_start = 0x02000000;
-			desc->video_end   = 0x02000000 + vram_size;
-		}
-
-		for (i = 0; i < 4; i++) {
-			mi->bank[i].start = PHYS_OFFSET + (i << 26);
-			mi->bank[i].node  = 0;
-			mi->bank[i].size  =
-				params->u1.s.pages_in_bank[i] *
-				params->u1.s.page_size;
-		}
-		mi->nr_banks = 4;
+	switch (tag->u.acorn.vram_pages) {
+	case 512:
+		vram_size += PAGE_SIZE * 256;
+	case 256:
+		vram_size += PAGE_SIZE * 256;
+	default:
+		break;
 	}
-	memc_ctrl_reg	  = params->u1.s.memc_control_reg;
-	number_mfm_drives = (params->u1.s.adfsdrives >> 3) & 3;
+#if 0
+	if (vram_size) {
+		desc->video_start = 0x02000000;
+		desc->video_end   = 0x02000000 + vram_size;
+	}
+#endif
+	return 0;
 }
 
+__tagtable(ATAG_ACORN, parse_tag_acorn);
+
 #ifdef CONFIG_ARCH_RPC
+static void __init
+fixup_riscpc(struct machine_desc *desc, struct param_struct *unusd,
+	    char **cmdline, struct meminfo *mi)
+{
+	/*
+	 * RiscPC can't handle half-word loads and stores
+	 */
+	elf_hwcap &= ~HWCAP_HALF;
+}
+
 extern void __init rpc_map_io(void);
 
 MACHINE_START(RISCPC, "Acorn-RiscPC")
@@ -76,7 +68,7 @@ MACHINE_START(RISCPC, "Acorn-RiscPC")
 	BOOT_PARAMS(0x10000100)
 	DISABLE_PARPORT(0)
 	DISABLE_PARPORT(1)
-	FIXUP(fixup_acorn)
+	FIXUP(fixup_riscpc)
 	MAPIO(rpc_map_io)
 	INITIRQ(genarch_init_irq)
 MACHINE_END
@@ -85,7 +77,6 @@ MACHINE_END
 MACHINE_START(ARCHIMEDES, "Acorn-Archimedes")
 	MAINTAINER("Dave Gilbert")
 	BOOT_PARAMS(0x0207c000)
-	FIXUP(fixup_acorn)
 	INITIRQ(genarch_init_irq)
 MACHINE_END
 #endif
@@ -93,7 +84,6 @@ MACHINE_END
 MACHINE_START(A5K, "Acorn-A5000")
 	MAINTAINER("Russell King")
 	BOOT_PARAMS(0x0207c000)
-	FIXUP(fixup_acorn)
 	INITIRQ(genarch_init_irq)
 MACHINE_END
 #endif
@@ -103,7 +93,7 @@ MACHINE_END
 extern void __init l7200_map_io(void);
 
 static void __init
-fixup_l7200(struct machine_desc *desc, struct param_struct *params,
+fixup_l7200(struct machine_desc *desc, struct param_struct *unused,
              char **cmdline, struct meminfo *mi)
 {
         mi->nr_banks      = 1;

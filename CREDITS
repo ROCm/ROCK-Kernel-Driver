@@ -687,6 +687,17 @@ S: RR1 Box 67C
 S: Deering NH 03244
 S: USA
 
+N: Matt Domsch
+E: Matt_Domsch@dell.com
+W: http://www.dell.com/linux
+W: http://domsch.com/linux
+D: Linux/IA-64
+D: Dell PowerEdge server, SCSI layer, misc drivers, and other patches
+S: Dell Computer Corporation
+S: One Dell Way
+S: Round Rock, TX  78681
+S: USA
+
 N: Eddie C. Dost
 E: ecd@skynet.be
 D: Linux/Sparc kernel hacker
@@ -732,13 +743,26 @@ S: Blacksburg, Virginia 24061
 S: USA
 
 N: Randy Dunlap
-E: randy.dunlap@intel.com
+E: rddunlap@osdlab.org
 W: http://home.att.net/~randy.dunlap/
+W: http://home.att.net/~rddunlap/
 W: http://www.linux-usb.org
 D: Linux-USB subsystem, USB core/UHCI/printer/storage drivers
-S: 5200 NE Elam Young Pkwy., M/S HF3-77
-S: Hillsboro, Oregon 97124
+D: x86 SMP, ACPI, bootflag hacking
+S: 15275 SW Koll Parkway, Suite H
+S: Beaverton, Oregon 97006
 S: USA
+
+N: Bob Dunlop
+E: rjd@xyzzy.clara.co.uk
+E: bob.dunlop@farsite.co.uk
+W: www.farsite.co.uk
+D: FarSync card device driver
+S: FarSite Communications Ltd
+S: Tempus Business Centre
+S: 60 Kingsclere Road
+S: Basingstoke       RG21 6XG
+S: UK
 
 N: Cyrus Durgin
 E: cider@speakeasy.org
@@ -1114,7 +1138,7 @@ D: Selection mechanism
 
 N: Andre Hedrick
 E: andre@linux-ide.org
-E: ahedrick@atipa.com
+E: andre@aslab.com
 E: andre@suse.com
 W: http://www.linux-ide.org/
 D: Random SMP kernel hacker...
@@ -1125,8 +1149,8 @@ D: ATA-Disconnect
 D: ATA-Smart Kernel Daemon
 S: Linux ATA Development (LAD)
 S: Concord, CA
-S: Atipa Linux Solutions
-S: 6000 Connecticut  Kansas City, MO  64120
+S: ASL, Inc. 1-877-ASL-3535
+S: 1757 Houret Court, Milpitas, CA 95035
 S: SuSE Linux, Inc.
 S: 580 Second Street, Suite 210  Oakland, CA  94607
 S: USA
@@ -2483,6 +2507,15 @@ D: netfilter, ipchains with Michael Neuling.
 S: 52 Moore St
 S: Turner ACT 2612
 S: Australia
+
+N: Richard Russon (FlatCap)
+E: kernel@flatcap.org
+W: http://www.flatcap.org
+D: NTFS support
+D: LDM support (Win2000/XP Logical Disk Manager/Dynamic Disks)
+S: 50 Swansea Road
+S: Reading
+S: United Kingdom
 
 N: Bill Ryder
 E: bryder@sgi.com

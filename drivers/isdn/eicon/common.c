@@ -78,7 +78,7 @@ DESCRIPTOR DIDD_Table[32];
 
 void    DIVA_DIDD_Read( DESCRIPTOR *table, int tablelength )
 {
-        bzero(table, tablelength);
+        memset(table, 0, tablelength);
 
         if (tablelength > sizeof(DIDD_Table))
           tablelength = sizeof(DIDD_Table);
@@ -89,7 +89,7 @@ void    DIVA_DIDD_Read( DESCRIPTOR *table, int tablelength )
         }
 
         if (tablelength > 0)
-          bcopy((void *)DIDD_Table, (void *)table, tablelength);
+          memcpy((void *)table, (void *)DIDD_Table, tablelength);
 
 	return;
 }
@@ -99,7 +99,7 @@ void 	DIVA_DIDD_Write(DESCRIPTOR *table, int tablelength)
         if (tablelength > sizeof(DIDD_Table))
           tablelength = sizeof(DIDD_Table);
 
-	bcopy((void *)table, (void *)DIDD_Table, tablelength);
+	memcpy((void *)DIDD_Table, (void *)table, tablelength);
 
 	return;
 }
@@ -109,7 +109,7 @@ void    init_idi_tab(void)
 {
     DESCRIPTOR d[32];
 
-    bzero(d, sizeof(d));
+    memset(d, 0, sizeof(d));
 
     d[0].type = IDI_DIMAINT;  /* identify the DIMAINT entry */
     d[0].channels = 0; /* zero channels associated with dimaint*/

@@ -29,6 +29,7 @@
 #include "adfs.h"
 
 struct file_operations adfs_file_operations = {
+	llseek:		generic_file_llseek,
 	read:		generic_file_read,
 	mmap:		generic_file_mmap,
 	fsync:		file_fsync,

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.pmac_nvram.c 1.5 05/17/01 18:14:21 cort
+ * BK Id: SCCS/s.pmac_nvram.c 1.10 08/08/01 16:23:35 paulus
  */
 /*
  * Miscellaneous procedures for dealing with the PowerMac hardware.
@@ -68,13 +68,12 @@ static int nvram_partitions[3];
 #if 0
 static char* nvram_image;
 #else
-__pmac static char nvram_image[NVRAM_SIZE];
+static char nvram_image[NVRAM_SIZE] __pmacdata;
 #endif
 
 extern int pmac_newworld;
 
-
-static u8
+static u8 __openfirmware
 chrp_checksum(struct chrp_header* hdr)
 {
 	u8 *ptr;
@@ -86,7 +85,7 @@ chrp_checksum(struct chrp_header* hdr)
 	return sum;
 }
 
-static u32
+static u32 __pmac
 core99_calc_adler(u8 *buffer)
 {
 	int cnt;
@@ -109,7 +108,7 @@ core99_calc_adler(u8 *buffer)
 	return (high << 16) | low;
 }
 
-static u32
+static u32 __pmac
 core99_check(u8* datas)
 {
 	struct core99_header* hdr99 = (struct core99_header*)datas;
@@ -135,7 +134,7 @@ core99_check(u8* datas)
 	return hdr99->generation;
 }
 
-static int
+static int __pmac
 core99_erase_bank(int bank)
 {
 	int stat, i;
@@ -159,7 +158,7 @@ core99_erase_bank(int bank)
 	return 0;
 }
 
-static int
+static int __pmac
 core99_write_bank(int bank, u8* datas)
 {
 	int i, stat = 0;
@@ -187,7 +186,7 @@ core99_write_bank(int bank, u8* datas)
 	return 0;	
 }
 
-static void
+static void __init
 lookup_partitions(void)
 {
 	u8 buffer[17];
@@ -225,8 +224,8 @@ lookup_partitions(void)
 #endif	
 }
 
-__init
-void pmac_nvram_init(void)
+void __init
+pmac_nvram_init(void)
 {
 	struct device_node *dp;
 
@@ -268,7 +267,8 @@ void pmac_nvram_init(void)
 		for (i=0; i<NVRAM_SIZE; i++)
 			nvram_image[i] = nvram_data[i + core99_bank*NVRAM_SIZE];
 	} else if (_machine == _MACH_chrp && nvram_naddrs == 1) {
-		nvram_data = ioremap(dp->addrs[0].address, dp->addrs[0].size);
+		nvram_data = ioremap(dp->addrs[0].address + isa_mem_base,
+				     dp->addrs[0].size);
 		nvram_mult = 1;
 	} else if (nvram_naddrs == 1) {
 		nvram_data = ioremap(dp->addrs[0].address, dp->addrs[0].size);
@@ -285,7 +285,7 @@ void pmac_nvram_init(void)
 	lookup_partitions();
 }
 
-void
+void __pmac
 pmac_nvram_update(void)
 {
 	struct core99_header* hdr99;
@@ -312,8 +312,8 @@ pmac_nvram_update(void)
 		printk("nvram: Error writing bank %d\n", core99_bank);
 }
 
-__openfirmware
-unsigned char nvram_read_byte(int addr)
+unsigned char __openfirmware
+nvram_read_byte(int addr)
 {
 	switch (nvram_naddrs) {
 #ifdef CONFIG_ADB_PMU
@@ -340,8 +340,8 @@ unsigned char nvram_read_byte(int addr)
 	return 0;
 }
 
-__openfirmware
-void nvram_write_byte(unsigned char val, int addr)
+void __openfirmware
+nvram_write_byte(unsigned char val, int addr)
 {
 	switch (nvram_naddrs) {
 #ifdef CONFIG_ADB_PMU
@@ -372,13 +372,13 @@ void nvram_write_byte(unsigned char val, int addr)
 	eieio();
 }
 
-int
+int __pmac
 pmac_get_partition(int partition)
 {
 	return nvram_partitions[partition];
 }
 
-u8
+u8 __pmac
 pmac_xpram_read(int xpaddr)
 {
 	int offset = nvram_partitions[pmac_nvram_XPRAM];
@@ -389,7 +389,7 @@ pmac_xpram_read(int xpaddr)
 	return nvram_read_byte(xpaddr + offset);
 }
 
-void
+void __pmac
 pmac_xpram_write(int xpaddr, u8 data)
 {
 	int offset = nvram_partitions[pmac_nvram_XPRAM];
@@ -399,5 +399,3 @@ pmac_xpram_write(int xpaddr, u8 data)
 		
 	nvram_write_byte(xpaddr + offset, data);
 }
-
-

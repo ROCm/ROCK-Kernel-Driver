@@ -58,8 +58,8 @@
 
 /* Version block */
 #define PWC_MAJOR	8
-#define PWC_MINOR	0
-#define PWC_VERSION 	"8.0"
+#define PWC_MINOR	1
+#define PWC_VERSION 	"8.1"
 #define PWC_NAME 	"pwc"
 
 /* Turn certain features on/off */
@@ -138,7 +138,7 @@ struct pwc_device
    int vbandlength;		/* compressed band length; 0 is uncompressed */
    char vsnapshot;		/* snapshot mode */
    char vsync;			/* used by isoc handler */
-
+   
    /* The image acquisition requires 3 to 4 steps:
       1. data is gathered in short packets from the USB controller
       2. data is synchronized and packed into a frame buffer
@@ -157,7 +157,7 @@ struct pwc_device
    struct pwc_frame_buf *fbuf;	/* all frames */
    struct pwc_frame_buf *empty_frames, *empty_frames_tail;	/* all empty frames */
    struct pwc_frame_buf *full_frames, *full_frames_tail;	/* all filled frames */
-   struct pwc_frame_buf *fill_frame;	/* frame currently filled */
+   struct pwc_frame_buf *fill_frame;	/* frame currently being filled */
    struct pwc_frame_buf *read_frame;	/* frame currently read by user process */
    int frame_size;
    int frame_header_size, frame_trailer_size;

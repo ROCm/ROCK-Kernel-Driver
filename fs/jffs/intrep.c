@@ -3008,7 +3008,7 @@ jffs_garbage_collect_thread(void *ptr)
 
 	current->session = 1;
 	current->pgrp = 1;
-	init_MUTEX_LOCKED(&c->gc_thread_sem); /* barrier */ 
+	init_completion(&c->gc_thread_comp); /* barrier */ 
 	spin_lock_irq(&current->sigmask_lock);
 	siginitsetinv (&current->blocked, sigmask(SIGHUP) | sigmask(SIGKILL) | sigmask(SIGSTOP) | sigmask(SIGCONT));
 	recalc_sigpending(current);
@@ -3055,7 +3055,7 @@ jffs_garbage_collect_thread(void *ptr)
 				D1(printk("jffs_garbage_collect_thread(): SIGKILL received.\n"));
 				c->gc_task = NULL;
 				unlock_kernel();
-				up_and_exit(&c->gc_thread_sem, 0);
+				complete_and_exit(&c->gc_thread_comp, 0);
 			}
 		}
 

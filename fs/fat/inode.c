@@ -154,15 +154,19 @@ out:
 
 void fat_delete_inode(struct inode *inode)
 {
-	lock_kernel();
-	inode->i_size = 0;
-	fat_truncate(inode);
-	unlock_kernel();
+	if (!is_bad_inode(inode)) {
+		lock_kernel();
+		inode->i_size = 0;
+		fat_truncate(inode);
+		unlock_kernel();
+	}
 	clear_inode(inode);
 }
 
 void fat_clear_inode(struct inode *inode)
 {
+	if (is_bad_inode(inode))
+		return;
 	lock_kernel();
 	spin_lock(&fat_inode_lock);
 	fat_cache_inval_inode(inode);
@@ -372,6 +376,7 @@ static void fat_read_root(struct inode *inode)
 	inode->i_uid = sbi->options.fs_uid;
 	inode->i_gid = sbi->options.fs_gid;
 	inode->i_version = ++event;
+	inode->i_generation = 0;
 	inode->i_mode = (S_IRWXUGO & ~sbi->options.fs_umask) | S_IFDIR;
 	inode->i_op = sbi->dir_ops;
 	inode->i_fop = &fat_dir_operations;
@@ -403,12 +408,123 @@ static void fat_read_root(struct inode *inode)
 	inode->i_nlink = fat_subdirs(inode)+2;
 }
 
+/*
+ * a FAT file handle with fhtype 3 is
+ *  0/  i_ino - for fast, reliable lookup if still in the cache
+ *  1/  i_generation - to see if i_ino is still valid
+ *          bit 0 == 0 iff directory
+ *  2/  i_location - if ino has changed, but still in cache
+ *  3/  i_logstart - to semi-verify inode found at i_location
+ *  4/  parent->i_logstart - maybe used to hunt for the file on disc
+ *
+ */
+struct dentry *fat_fh_to_dentry(struct super_block *sb, __u32 *fh,
+				int len, int fhtype, int parent)
+{
+	struct inode *inode = NULL;
+	struct list_head *lp;
+	struct dentry *result;
+
+	if (fhtype != 3)
+		return NULL;
+	if (len < 5)
+		return NULL;
+	if (parent)
+		return NULL; /* We cannot find the parent,
+				It better just *be* there */
+
+	inode = iget(sb, fh[0]);
+	if (!inode || is_bad_inode(inode) ||
+	    inode->i_generation != fh[1]) {
+		if (inode) iput(inode);
+		inode = NULL;
+	}
+	if (!inode) {
+		/* try 2 - see if i_location is in F-d-c
+		 * require i_logstart to be the same
+		 * Will fail if you truncate and then re-write
+		 */
+
+		inode = fat_iget(sb, fh[2]);
+		if (inode && MSDOS_I(inode)->i_logstart != fh[3]) {
+			iput(inode);
+			inode = NULL;
+		}
+	}
+	if (!inode) {
+		/* For now, do nothing
+		 * What we could do is:
+		 * follow the file starting at fh[4], and record
+		 * the ".." entry, and the name of the fh[2] entry.
+		 * The follow the ".." file finding the next step up.
+		 * This way we build a path to the root of
+		 * the tree. If this works, we lookup the path and so
+		 * get this inode into the cache.
+		 * Finally try the fat_iget lookup again
+		 * If that fails, then weare totally out of luck
+		 * But all that is for another day
+		 */
+	}
+	if (!inode)
+		return ERR_PTR(-ESTALE);
+
+	
+	/* now to find a dentry.
+	 * If possible, get a well-connected one
+	 *
+	 * Given the way that we found the inode, it *MUST* be
+	 * well-connected, but it is easiest to just copy the
+	 * code.
+	 */
+	spin_lock(&dcache_lock);
+	for (lp = inode->i_dentry.next; lp != &inode->i_dentry ; lp=lp->next) {
+		result = list_entry(lp,struct dentry, d_alias);
+		if (! (result->d_flags & DCACHE_NFSD_DISCONNECTED)) {
+			dget_locked(result);
+			result->d_vfs_flags |= DCACHE_REFERENCED;
+			spin_unlock(&dcache_lock);
+			iput(inode);
+			return result;
+		}
+	}
+	spin_unlock(&dcache_lock);
+	result = d_alloc_root(inode);
+	if (result == NULL) {
+		iput(inode);
+		return ERR_PTR(-ENOMEM);
+	}
+	result->d_flags |= DCACHE_NFSD_DISCONNECTED;
+	return result;
+
+		
+}
+
+int fat_dentry_to_fh(struct dentry *de, __u32 *fh, int *lenp, int needparent)
+{
+	int len = *lenp;
+	struct inode *inode =  de->d_inode;
+	
+	if (len < 5)
+		return 255; /* no room */
+	*lenp = 5;
+	fh[0] = inode->i_ino;
+	fh[1] = inode->i_generation;
+	fh[2] = MSDOS_I(inode)->i_location;
+	fh[3] = MSDOS_I(inode)->i_logstart;
+	fh[4] = MSDOS_I(de->d_parent->d_inode)->i_logstart;
+	return 3;
+}
+
 static struct super_operations fat_sops = { 
 	write_inode:	fat_write_inode,
 	delete_inode:	fat_delete_inode,
 	put_super:	fat_put_super,
 	statfs:		fat_statfs,
 	clear_inode:	fat_clear_inode,
+
+	read_inode:	make_bad_inode,
+	fh_to_dentry:	fat_fh_to_dentry,
+	dentry_to_fh:	fat_dentry_to_fh,
 };
 
 /*
@@ -767,7 +883,10 @@ static void fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de)
 	inode->i_uid = sbi->options.fs_uid;
 	inode->i_gid = sbi->options.fs_gid;
 	inode->i_version = ++event;
+	inode->i_generation = CURRENT_TIME;
+	
 	if ((de->attr & ATTR_DIR) && !IS_FREE(de->name)) {
+		inode->i_generation &= ~1;
 		inode->i_mode = MSDOS_MKMODE(de->attr,S_IRWXUGO &
 		    ~sbi->options.fs_umask) | S_IFDIR;
 		inode->i_op = sbi->dir_ops;
@@ -798,6 +917,7 @@ static void fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de)
 			}
 		MSDOS_I(inode)->mmu_private = inode->i_size;
 	} else { /* not a directory */
+		inode->i_generation |= 1;
 		inode->i_mode = MSDOS_MKMODE(de->attr,
 		    ((IS_NOEXEC(inode) || 
 		      (sbi->options.showexec &&

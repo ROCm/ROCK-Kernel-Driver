@@ -43,7 +43,7 @@ static void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	do_timer(regs);	
 }
 
-extern __inline__ void setup_timer(void)
+static inline void setup_timer(void)
 {
 	int tick = 3686400 / 16 / 2 / 100;
 

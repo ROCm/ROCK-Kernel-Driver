@@ -95,11 +95,12 @@ struct hpsb_host *hpsb_get_host(struct hpsb_host_template *tmpl,
         struct hpsb_host *h;
 
         h = vmalloc(sizeof(struct hpsb_host) + hd_size);
-        if (h == NULL) {
-                return NULL;
-        }
+        if (!h) return NULL;
 
         memset(h, 0, sizeof(struct hpsb_host) + hd_size);
+
+        atomic_set(&h->generation, 0);
+
         INIT_LIST_HEAD(&h->pending_packets);
         spin_lock_init(&h->pending_pkt_lock);
 
@@ -239,7 +240,6 @@ static int remove_template(struct hpsb_host_template *tmpl)
         }
         spin_unlock(&templates_lock);
 
-        inc_hpsb_generation();
         return retval;
 }
 

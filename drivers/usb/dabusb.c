@@ -422,11 +422,6 @@ static int dabusb_fpga_download (pdabusb_t s, const char *fname)
 	return ret;
 }
 
-static loff_t dabusb_llseek (struct file *file, loff_t offset, int origin)
-{
-	return -ESPIPE;
-}
-
 static int dabusb_stop (pdabusb_t s)
 {
 	dbg("dabusb_stop");
@@ -705,7 +700,7 @@ static int dabusb_ioctl (struct inode *inode, struct file *file, unsigned int cm
 static struct file_operations dabusb_fops =
 {
 	owner:		THIS_MODULE,
-	llseek:		dabusb_llseek,
+	llseek:		no_llseek,
 	read:		dabusb_read,
 	ioctl:		dabusb_ioctl,
 	open:		dabusb_open,

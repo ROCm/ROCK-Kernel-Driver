@@ -10,7 +10,6 @@
  * directory of the kernel sources for details.
  */
 
-#include <linux/module.h>
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/list.h>
@@ -31,8 +30,7 @@
 #include "csr.h"
 #include "nodemgr.h"
 
-
-atomic_t hpsb_generation = ATOMIC_INIT(0);
+static kmem_cache_t *hpsb_packet_cache;
 
 
 static void dump_packet(const char *text, quadlet_t *data, int size)
@@ -76,16 +74,17 @@ struct hpsb_packet *alloc_hpsb_packet(size_t data_size)
         void *data = NULL;
         int kmflags = in_interrupt() ? GFP_ATOMIC : GFP_KERNEL;
 
-        packet = kmalloc(sizeof(struct hpsb_packet), kmflags);
-        if (!packet) return NULL;
+        packet = kmem_cache_alloc(hpsb_packet_cache, kmflags);
+        if (packet == NULL)
+                return NULL;
 
         memset(packet, 0, sizeof(struct hpsb_packet));
         packet->header = packet->embedded_header;
 
         if (data_size) {
                 data = kmalloc(data_size + 8, kmflags);
-                if (!data) {
-                        kfree(packet);
+                if (data == NULL) {
+			kmem_cache_free(hpsb_packet_cache, packet);
                         return NULL;
                 }
 
@@ -93,11 +92,11 @@ struct hpsb_packet *alloc_hpsb_packet(size_t data_size)
                 packet->data_size = data_size;
         }
 
-        INIT_LIST_HEAD(&packet->complete_tq);
+        INIT_TQ_HEAD(packet->complete_tq);
         INIT_LIST_HEAD(&packet->list);
         sema_init(&packet->state_change, 0);
         packet->state = unused;
-        packet->generation = get_hpsb_generation();
+        packet->generation = -1;
         packet->data_be = 1;
 
         return packet;
@@ -116,7 +115,7 @@ void free_hpsb_packet(struct hpsb_packet *packet)
         if (!packet) return;
 
         kfree(packet->data);
-        kfree(packet);
+        kmem_cache_free(hpsb_packet_cache, packet);
 }
 
 
@@ -126,7 +125,7 @@ int hpsb_reset_bus(struct hpsb_host *host, int type)
                 return 1;
         }
 
-        if (!hpsb_bus_reset(host)) {
+        if (!host->in_bus_reset) {
                 host->template->devctl(host, RESET_BUS, type);
                 return 0;
         } else {
@@ -333,7 +332,7 @@ void hpsb_selfid_complete(struct hpsb_host *host, int phyid, int isroot)
         }
 
         host->reset_retries = 0;
-        inc_hpsb_generation();
+        atomic_inc(&host->generation);
         if (isroot) host->template->devctl(host, ACT_CYCLE_MASTER, 1);
         highlevel_host_reset(host);
 }
@@ -353,7 +352,7 @@ void hpsb_packet_sent(struct hpsb_host *host, struct hpsb_packet *packet,
         }
 
         if (ackcode != ACK_PENDING || !packet->expect_response) {
-                packet->state = completed;
+                packet->state = complete;
                 up(&packet->state_change);
                 up(&packet->state_change);
                 run_task_queue(&packet->complete_tq);
@@ -390,7 +389,7 @@ int hpsb_send_packet(struct hpsb_packet *packet)
         struct hpsb_host *host = packet->host;
 
         if (!host->initialized || host->in_bus_reset 
-            || (packet->generation != get_hpsb_generation())) {
+            || (packet->generation != get_hpsb_generation(host))) {
                 return 0;
         }
 
@@ -442,14 +441,12 @@ void handle_packet_response(struct hpsb_host *host, int tcode, quadlet_t *data,
 
         spin_lock_irqsave(&host->pending_pkt_lock, flags);
 
-        lh = host->pending_packets.next;
-        while (lh != &host->pending_packets) {
+        list_for_each(lh, &host->pending_packets) {
                 packet = list_entry(lh, struct hpsb_packet, list);
                 if ((packet->tlabel == tlabel)
                     && (packet->node_id == (data[1] >> 16))){
                         break;
                 }
-                lh = lh->next;
         }
 
         if (lh == &host->pending_packets) {
@@ -506,7 +503,7 @@ void handle_packet_response(struct hpsb_host *host, int tcode, quadlet_t *data,
                 break;
         }
 
-        packet->state = completed;
+        packet->state = complete;
         up(&packet->state_change);
         run_task_queue(&packet->complete_tq);
 }
@@ -721,12 +718,9 @@ void abort_requests(struct hpsb_host *host)
         INIT_LIST_HEAD(&host->pending_packets);
         spin_unlock_irqrestore(&host->pending_pkt_lock, flags);
 
-        lh = llist.next;
-
-        while (lh != &llist) {
+        list_for_each(lh, &llist) {
                 packet = list_entry(lh, struct hpsb_packet, list);
-                lh = lh->next;
-                packet->state = completed;
+                packet->state = complete;
                 packet->ack_code = ACKX_ABORTED;
                 up(&packet->state_change);
                 run_task_queue(&packet->complete_tq);
@@ -751,11 +745,9 @@ void abort_timedouts(struct hpsb_host *host)
 
 
         spin_lock_irqsave(&host->pending_pkt_lock, flags);
-        lh = host->pending_packets.next;
 
-        while (lh != &host->pending_packets) {
+        list_for_each(lh, &host->pending_packets) {
                 packet = list_entry(lh, struct hpsb_packet, list);
-                lh = lh->next;
                 if (time_before(packet->sendtime + expire, jiffies)) {
                         list_del(&packet->list);
                         list_add(&packet->list, &expiredlist);
@@ -767,11 +759,9 @@ void abort_timedouts(struct hpsb_host *host)
         }
         spin_unlock_irqrestore(&host->pending_pkt_lock, flags);
 
-        lh = expiredlist.next;
-        while (lh != &expiredlist) {
+        list_for_each(lh, &expiredlist) {
                 packet = list_entry(lh, struct hpsb_packet, list);
-                lh = lh->next;
-                packet->state = completed;
+                packet->state = complete;
                 packet->ack_code = ACKX_TIMEOUT;
                 up(&packet->state_change);
                 run_task_queue(&packet->complete_tq);
@@ -781,16 +771,19 @@ void abort_timedouts(struct hpsb_host *host)
 
 static int __init ieee1394_init(void)
 {
-        init_hpsb_highlevel();
-        init_csr();
-        init_ieee1394_nodemgr();
+	hpsb_packet_cache = kmem_cache_create("hpsb_packet", sizeof(struct hpsb_packet),
+					      0, 0, NULL, NULL);
+	init_hpsb_highlevel();
+	init_csr();
+	init_ieee1394_nodemgr();
 	return 0;
 }
 
 static void __exit ieee1394_cleanup(void)
 {
-        cleanup_ieee1394_nodemgr();
-        cleanup_csr();
+	cleanup_ieee1394_nodemgr();
+	cleanup_csr();
+	kmem_cache_destroy(hpsb_packet_cache);
 }
 
 module_init(ieee1394_init);

@@ -1,4 +1,3 @@
-
 #ifndef _IEEE1394_HOSTS_H
 #define _IEEE1394_HOSTS_H
 
@@ -15,6 +14,8 @@ struct hpsb_packet;
 struct hpsb_host {
 /* private fields (hosts, do not use them) */
         struct hpsb_host *next;
+
+        atomic_t generation;
 
         struct list_head pending_packets;
         spinlock_t pending_pkt_lock;

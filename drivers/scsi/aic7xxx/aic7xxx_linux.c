@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC7xxx device driver for Linux.
  *
- * $Id: //depot/src/linux/drivers/scsi/aic7xxx/aic7xxx_linux.c#66 $
+ * $Id: //depot/src/linux/drivers/scsi/aic7xxx/aic7xxx_linux.c#72 $
  *
  * Copyright (c) 1994 John Aycock
  *   The University of Calgary Department of Computer Science.
@@ -113,8 +113,6 @@
  *
  */
 
-#include <linux/config.h>
-
 /*
  * The next three defines are user configurable.  These should be the only
  * defines a user might need to get in here and change.  There are other
@@ -122,12 +120,8 @@
  * under normal conditions.
  */
 
-#if defined(MODULE) || defined(PCMCIA)
+#if defined(MODULE)
 #include <linux/module.h>
-#endif
-
-#if defined(PCMCIA)
-#undef MODULE
 #endif
 
 #include "aic7xxx_osm.h"
@@ -138,6 +132,8 @@
 #endif
 
 #include "../sd.h"		/* For geometry detection */
+
+#include <linux/mm.h>		/* For fetching system memory size */
 
 /*
  * To generate the correct addresses for the controller to issue
@@ -483,7 +479,8 @@ static char dummy_buffer[60] = "Please don't trounce on me insmod!!\n";
 static void ahc_linux_handle_scsi_status(struct ahc_softc *,
 					 struct ahc_linux_device *,
 					 struct scb *);
-static void ahc_linux_filter_command(struct ahc_softc *ahc, Scsi_Cmnd *cmd);
+static void ahc_linux_filter_command(struct ahc_softc*, Scsi_Cmnd*,
+				     struct scb*);
 static void ahc_linux_sem_timeout(u_long arg);
 static void ahc_linux_freeze_sim_queue(struct ahc_softc *ahc);
 static void ahc_linux_release_sim_queue(u_long arg);
@@ -517,8 +514,13 @@ static __inline void ahc_linux_run_complete_queue(struct ahc_softc *ahc,
 						  struct ahc_cmd *acmd);
 static __inline void ahc_linux_check_device_queue(struct ahc_softc *ahc,
 						  struct ahc_linux_device *dev);
-static __inline void ahc_linux_sniff_command(struct ahc_softc*, Scsi_Cmnd*);
+static __inline void ahc_linux_sniff_command(struct ahc_softc*, Scsi_Cmnd*,
+					     struct scb*);
 static __inline void ahc_linux_unmap_scb(struct ahc_softc*, struct scb*);
+
+static __inline int ahc_linux_map_seg(struct ahc_softc *ahc, struct scb *scb,
+		 		      struct ahc_dma_seg *sg,
+				      bus_addr_t addr, bus_size_t len);
 
 static __inline struct ahc_linux_device*
 ahc_linux_get_device(struct ahc_softc *ahc, u_int channel, u_int target,
@@ -628,15 +630,15 @@ ahc_linux_run_device_queues(struct ahc_softc *ahc)
 
 	while ((ahc->flags & AHC_RESOURCE_SHORTAGE) == 0
 	    && ahc->platform_data->qfrozen == 0
-	    && (dev = LIST_FIRST(&ahc->platform_data->device_runq)) != NULL) {
-		LIST_REMOVE(dev, links);
+	    && (dev = TAILQ_FIRST(&ahc->platform_data->device_runq)) != NULL) {
+		TAILQ_REMOVE(&ahc->platform_data->device_runq, dev, links);
 		dev->flags &= ~AHC_DEV_ON_RUN_LIST;
 		ahc_linux_check_device_queue(ahc, dev);
 	}
 }
 
 static __inline void
-ahc_linux_sniff_command(struct ahc_softc *ahc, Scsi_Cmnd *cmd)
+ahc_linux_sniff_command(struct ahc_softc *ahc, Scsi_Cmnd *cmd, struct scb *scb)
 {
 	/*
 	 * Determine whether we care to filter
@@ -645,7 +647,7 @@ ahc_linux_sniff_command(struct ahc_softc *ahc, Scsi_Cmnd *cmd)
 	 * heavy weight processing.
 	 */
 	if (cmd->cmnd[0] == INQUIRY)
-		ahc_linux_filter_command(ahc, cmd);
+		ahc_linux_filter_command(ahc, cmd, scb);
 }
 
 static __inline void
@@ -654,6 +656,7 @@ ahc_linux_unmap_scb(struct ahc_softc *ahc, struct scb *scb)
 	Scsi_Cmnd *cmd;
 
 	cmd = scb->io_ctx;
+	ahc_sync_sglist(ahc, scb, BUS_DMASYNC_POSTWRITE);
 	if (cmd->use_sg != 0) {
 		struct scatterlist *sg;
 
@@ -665,6 +668,48 @@ ahc_linux_unmap_scb(struct ahc_softc *ahc, struct scb *scb)
 				 ahc_le32toh(scb->sg_list[0].addr),
 				 cmd->request_bufflen,
 				 scsi_to_pci_dma_dir(cmd->sc_data_direction));
+}
+
+static __inline int
+ahc_linux_map_seg(struct ahc_softc *ahc, struct scb *scb,
+		  struct ahc_dma_seg *sg, bus_addr_t addr, bus_size_t len)
+{
+	int	 consumed;
+
+	if ((scb->sg_count + 1) > AHC_NSEG)
+		panic("Too few segs for dma mapping.  "
+		      "Increase AHC_NSEG\n");
+
+	consumed = 1;
+	sg->addr = ahc_htole32(addr & 0xFFFFFFFF);
+	scb->platform_data->xfer_len += len;
+	if (sizeof(bus_addr_t) > 4
+	 && (ahc->flags & AHC_39BIT_ADDRESSING) != 0) {
+		/*
+		 * Due to DAC restrictions, we can't
+		 * cross a 4GB boundary.
+		 */
+		if ((addr ^ (addr + len - 1)) & ~0xFFFFFFFF) {
+			struct	 ahc_dma_seg *next_sg;
+			uint32_t next_len;
+
+			printf("Crossed Seg\n");
+			if ((scb->sg_count + 2) > AHC_NSEG)
+				panic("Too few segs for dma mapping.  "
+				      "Increase AHC_NSEG\n");
+
+			consumed++;
+			next_sg = sg + 1;
+			next_sg->addr = 0;
+			next_len = 0x100000000 - (addr & 0xFFFFFFFF);
+			len -= next_len;
+			next_len |= ((addr >> 8) + 0x1000000) & 0x7F000000;
+			next_sg->len = ahc_htole32(next_len);
+		}
+		len |= (addr >> 8) & 0x7F000000;
+	}
+	sg->len = ahc_htole32(len);
+	return (consumed);
 }
 
 /************************ Shutdown/halt/reboot hook ***************************/
@@ -736,9 +781,26 @@ ahc_dmamem_alloc(struct ahc_softc *ahc, bus_dma_tag_t dmat, void** vaddr,
 	map = malloc(sizeof(*map), M_DEVBUF, M_NOWAIT);
 	if (map == NULL)
 		return (ENOMEM);
+	/*
+	 * Although we can dma data above 4GB, our
+	 * "consistent" memory is below 4GB for
+	 * space efficiency reasons (only need a 4byte
+	 * address).  For this reason, we have to reset
+	 * our dma mask when doing allocations.
+	 */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,3)
+	pci_set_dma_mask(ahc->dev_softc, 0xFFFFFFFF);
+#else
+	ahc->dev_softc->dma_mask = 0xFFFFFFFF;
+#endif
 	*vaddr = pci_alloc_consistent(ahc->dev_softc,
 				      dmat->maxsize, &map->bus_addr);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,3)
+	pci_set_dma_mask(ahc->dev_softc, ahc->platform_data->hw_dma_mask);
 #else
+	ahc->dev_softc->dma_mask = ahc->platform_data->hw_dma_mask;
+#endif
+#else /* LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0) */
 	/*
 	 * At least in 2.2.14, malloc is a slab allocator so all
 	 * allocations are aligned.  We assume, for these kernel versions
@@ -1131,6 +1193,15 @@ ahc_linux_register_host(struct ahc_softc *ahc, Scsi_Host_Template *template)
 	return (0);
 }
 
+uint64_t
+ahc_linux_get_memsize()
+{
+	struct sysinfo si;
+
+	si_meminfo(&si);
+	return (si.totalram << PAGE_SHIFT);
+}
+
 /*
  * Find the smallest available unit number to use
  * for a new device.  We don't just use a static
@@ -1240,7 +1311,8 @@ ahc_platform_alloc(struct ahc_softc *ahc, void *platform_arg)
 		return (ENOMEM);
 	memset(ahc->platform_data, 0, sizeof(struct ahc_platform_data));
 	TAILQ_INIT(&ahc->platform_data->completeq);
-	LIST_INIT(&ahc->platform_data->device_runq);
+	TAILQ_INIT(&ahc->platform_data->device_runq);
+	ahc->platform_data->hw_dma_mask = 0xFFFFFFFF;
 	ahc_lockinit(ahc);
 	ahc_done_lockinit(ahc);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,0)
@@ -1305,6 +1377,8 @@ ahc_platform_set_tags(struct ahc_softc *ahc, struct ahc_devinfo *devinfo,
 	dev = ahc_linux_get_device(ahc, devinfo->channel - 'A',
 				   devinfo->target,
 				   devinfo->lun, /*alloc*/FALSE);
+	if (dev == NULL)
+		return;
 	was_queuing = dev->flags & (AHC_DEV_Q_BASIC|AHC_DEV_Q_TAGGED);
 	now_queuing = alg != AHC_QUEUE_NONE;
 	if ((dev->flags & AHC_DEV_FREEZE_TIL_EMPTY) == 0
@@ -1516,7 +1590,11 @@ ahc_linux_queue(Scsi_Cmnd * cmd, void (*scsi_done) (Scsi_Cmnd *))
 	}
 	cmd->result = CAM_REQ_INPROG << 16;
 	TAILQ_INSERT_TAIL(&dev->busyq, (struct ahc_cmd *)cmd, acmd_links.tqe);
-	ahc_linux_run_device_queue(ahc, dev);
+	if ((dev->flags & AHC_DEV_ON_RUN_LIST) == 0) {
+		TAILQ_INSERT_TAIL(&ahc->platform_data->device_runq, dev, links);
+		dev->flags |= AHC_DEV_ON_RUN_LIST;
+		ahc_linux_run_device_queues(ahc);
+	}
 	ahc_unlock(ahc, &flags);
 	return (0);
 }
@@ -1532,6 +1610,9 @@ ahc_linux_run_device_queue(struct ahc_softc *ahc, struct ahc_linux_device *dev)
 	struct	 ahc_tmode_tstate *tstate;
 	uint16_t mask;
 
+	if ((dev->flags & AHC_DEV_ON_RUN_LIST) != 0)
+		panic("running device on run list");
+
 	while ((acmd = TAILQ_FIRST(&dev->busyq)) != NULL
 	    && dev->openings > 0 && dev->qfrozen == 0) {
 
@@ -1540,11 +1621,9 @@ ahc_linux_run_device_queue(struct ahc_softc *ahc, struct ahc_linux_device *dev)
 		 * running is because the whole controller Q is frozen.
 		 */
 		if (ahc->platform_data->qfrozen != 0) {
-			if ((dev->flags & AHC_DEV_ON_RUN_LIST) != 0)
-				return;
 
-			LIST_INSERT_HEAD(&ahc->platform_data->device_runq,
-					 dev, links);
+			TAILQ_INSERT_TAIL(&ahc->platform_data->device_runq,
+					  dev, links);
 			dev->flags |= AHC_DEV_ON_RUN_LIST;
 			return;
 		}
@@ -1552,14 +1631,10 @@ ahc_linux_run_device_queue(struct ahc_softc *ahc, struct ahc_linux_device *dev)
 		 * Get an scb to use.
 		 */
 		if ((scb = ahc_get_scb(ahc)) == NULL) {
-			if ((dev->flags & AHC_DEV_ON_RUN_LIST) != 0)
-				panic("running device on run list");
-			LIST_INSERT_HEAD(&ahc->platform_data->device_runq,
+			TAILQ_INSERT_TAIL(&ahc->platform_data->device_runq,
 					 dev, links);
 			dev->flags |= AHC_DEV_ON_RUN_LIST;
 			ahc->flags |= AHC_RESOURCE_SHORTAGE;
-			printf("%s: Temporary Resource Shortage\n",
-			       ahc_name(ahc));
 			return;
 		}
 		TAILQ_REMOVE(&dev->busyq, acmd, acmd_links.tqe);
@@ -1611,6 +1686,8 @@ ahc_linux_run_device_queue(struct ahc_softc *ahc, struct ahc_linux_device *dev)
 		}
 
 		scb->platform_data->xfer_len = 0;
+		ahc_set_residual(scb, 0);
+		ahc_set_sense_residual(scb, 0);
 		if (cmd->use_sg != 0) {
 			struct	ahc_dma_seg *sg;
 			struct	scatterlist *cur_seg;
@@ -1623,13 +1700,22 @@ ahc_linux_run_device_queue(struct ahc_softc *ahc, struct ahc_linux_device *dev)
 			end_seg = cur_seg + nseg;
 			/* Copy the segments into the SG list. */
 			sg = scb->sg_list;
+			/*
+			 * The sg_count may be larger than nseg if
+			 * a transfer crosses a 32bit page.
+			 */ 
+			scb->sg_count = 0;
 			while(cur_seg < end_seg) {
-				sg->addr = ahc_htole32(sg_dma_address(cur_seg));
-/* XXX Add in the 5th byte of the address later.*/
-				sg->len = ahc_htole32(sg_dma_len(cur_seg));
-				scb->platform_data->xfer_len +=
-				    sg_dma_len(cur_seg);
-				sg++;
+				bus_addr_t addr;
+				bus_size_t len;
+				int consumed;
+
+				addr = sg_dma_address(cur_seg);
+				len = sg_dma_len(cur_seg);
+				consumed = ahc_linux_map_seg(ahc, scb,
+							     sg, addr, len);
+				sg += consumed;
+				scb->sg_count += consumed;
 				cur_seg++;
 			}
 			sg--;
@@ -1647,24 +1733,19 @@ ahc_linux_run_device_queue(struct ahc_softc *ahc, struct ahc_linux_device *dev)
 			 */
 			scb->hscb->dataptr = scb->sg_list->addr;
 			scb->hscb->datacnt = scb->sg_list->len;
-
-			/*
-			 * Remember the number of segments for later
-			 * residual calculations.
-			 */
-			scb->sg_count = nseg;
 		} else if (cmd->request_bufflen != 0) {
 			struct	 ahc_dma_seg *sg;
-			uint32_t baddr;
+			bus_addr_t addr;
 
 			sg = scb->sg_list;
-			baddr = pci_map_single(ahc->dev_softc,
+			addr = pci_map_single(ahc->dev_softc,
 			       cmd->request_buffer,
 			       cmd->request_bufflen,
 			       scsi_to_pci_dma_dir(cmd->sc_data_direction));
-			sg->addr = ahc_htole32(baddr);
-			sg->len = ahc_htole32(cmd->request_bufflen
-					      | AHC_DMA_LAST_SEG);
+			scb->sg_count = ahc_linux_map_seg(ahc, scb,
+							  sg, addr,
+							  cmd->request_bufflen);
+			sg->len |= ahc_htole32(AHC_DMA_LAST_SEG);
 
 			/*
 			 * Reset the sg list pointer.
@@ -1678,13 +1759,6 @@ ahc_linux_run_device_queue(struct ahc_softc *ahc, struct ahc_linux_device *dev)
 			 */
 			scb->hscb->dataptr = sg->addr;
 			scb->hscb->datacnt = sg->len;
-			scb->platform_data->xfer_len = cmd->request_bufflen;
-
-			/*
-			 * Remember the number of segments for later
-			 * residual calculations.
-			 */
-			scb->sg_count = 1;
 		} else {
 			scb->hscb->sgptr = ahc_htole32(SG_LIST_NULL);
 			scb->hscb->dataptr = 0;
@@ -1692,6 +1766,7 @@ ahc_linux_run_device_queue(struct ahc_softc *ahc, struct ahc_linux_device *dev)
 			scb->sg_count = 0;
 		}
 
+		ahc_sync_sglist(ahc, scb, BUS_DMASYNC_PREWRITE);
 		LIST_INSERT_HEAD(&ahc->pending_scbs, scb, pending_links);
 		dev->openings--;
 		dev->active++;
@@ -1936,7 +2011,10 @@ ahc_send_async(struct ahc_softc *ahc, char channel,
 		break;
         case AC_BUS_RESET:
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,0)
-		scsi_report_bus_reset(ahc->platform_data->host, channel - 'A');
+		if (ahc->platform_data->host != NULL) {
+			scsi_report_bus_reset(ahc->platform_data->host,
+					      channel - 'A');
+		}
 #endif
                 break;
         default:
@@ -1978,6 +2056,15 @@ ahc_done(struct ahc_softc *ahc, struct scb * scb)
 		memcpy(cmd->sense_buffer, ahc_get_sense_buf(ahc, scb),
 		       MIN(sizeof(struct scsi_sense_data),
 			   sizeof(cmd->sense_buffer)));
+		cmd->result |= (DRIVER_SENSE << 24);
+	} else {
+		/*
+		 * Guard against stale sense data.
+		 * The Linux mid-layer assumes that sense
+		 * was retrieved anytime the first byte of
+		 * the sense buffer looks "sane".
+		 */
+		cmd->sense_buffer[0] = 0;
 	}
 	if (ahc_get_transaction_status(scb) == CAM_REQ_INPROG) {
 		uint32_t amount_xferred;
@@ -1992,7 +2079,7 @@ ahc_done(struct ahc_softc *ahc, struct scb * scb)
 			ahc_set_transaction_status(scb, CAM_DATA_RUN_ERR);
 		} else {
 			ahc_set_transaction_status(scb, CAM_REQ_CMP);
-			ahc_linux_sniff_command(ahc, cmd);
+			ahc_linux_sniff_command(ahc, cmd, scb);
 		}
 	} else if (ahc_get_transaction_status(scb) == DID_OK) {
 		ahc_linux_handle_scsi_status(ahc, dev, scb);
@@ -2031,7 +2118,7 @@ ahc_done(struct ahc_softc *ahc, struct scb * scb)
 		 && dev->active == 0)
 			ahc_linux_free_device(ahc, dev);
 	} else if ((dev->flags & AHC_DEV_ON_RUN_LIST) == 0) {
-		LIST_INSERT_HEAD(&ahc->platform_data->device_runq, dev, links);
+		TAILQ_INSERT_TAIL(&ahc->platform_data->device_runq, dev, links);
 		dev->flags |= AHC_DEV_ON_RUN_LIST;
 	}
 
@@ -2127,12 +2214,13 @@ ahc_linux_handle_scsi_status(struct ahc_softc *ahc,
 }
 
 static void
-ahc_linux_filter_command(struct ahc_softc *ahc, Scsi_Cmnd *cmd)
+ahc_linux_filter_command(struct ahc_softc *ahc, Scsi_Cmnd *cmd, struct scb *scb)
 {
 	switch (cmd->cmnd[0]) {
 	case INQUIRY:
 	{
 		struct	ahc_devinfo devinfo;
+		struct	scsi_inquiry *inq;
 		struct	scsi_inquiry_data *sid;
 		struct	ahc_initiator_tinfo *targ_info;
 		struct	ahc_tmode_tstate *tstate;
@@ -2140,17 +2228,30 @@ ahc_linux_filter_command(struct ahc_softc *ahc, Scsi_Cmnd *cmd)
 		struct	ahc_linux_device *dev;
 		u_int	scsiid;
 		u_int	maxsync;
+		int	transferred_len;
 		int	minlen;
 		u_int	width;
 		u_int	period;
 		u_int	offset;
 		u_int	ppr_options;
 
+		 /*
+		  * Validate the command.  We only want to filter
+		  * standard inquiry commands, not those querying
+		  * Vital Product Data.
+		  */
+		inq = (struct scsi_inquiry *)cmd->cmnd;
+		if ((inq->byte2 & SI_EVPD) != 0
+		 || inq->page_code != 0)
+			break;
+
 		if (cmd->use_sg != 0) {
 			printf("%s: SG Inquiry response ignored\n",
 			       ahc_name(ahc));
 			break;
 		}
+		transferred_len = ahc_get_transfer_length(scb)
+				- ahc_get_residual(scb);
 		sid = (struct scsi_inquiry_data *)cmd->request_buffer;
 
 		/*
@@ -2163,7 +2264,7 @@ ahc_linux_filter_command(struct ahc_softc *ahc, Scsi_Cmnd *cmd)
 		dev = ahc_linux_get_device(ahc, cmd->channel,
 					   cmd->target, cmd->lun,
 					   /*alloc*/FALSE);
-		if (cmd->request_bufflen >= 1
+		if (transferred_len >= 1
 		 && SID_QUAL(sid) == SID_QUAL_LU_CONNECTED) {
 
 			dev->flags &= ~AHC_DEV_UNCONFIGURED;
@@ -2184,13 +2285,12 @@ ahc_linux_filter_command(struct ahc_softc *ahc, Scsi_Cmnd *cmd)
 		targ_info = ahc_fetch_transinfo(ahc, devinfo.channel,
 						devinfo.our_scsiid,
 						devinfo.target, &tstate);
-		/* Structure copy */
 		width = targ_info->user.width;
 		period = targ_info->user.period;
 		offset = targ_info->user.offset;
 		ppr_options = targ_info->user.ppr_options;
 		minlen = offsetof(struct scsi_inquiry_data, version) + 1;
-		if (cmd->request_bufflen >= minlen) {
+		if (transferred_len >= minlen) {
 			targ_info->curr.protocol_version = SID_ANSI_REV(sid);
 
 			/*
@@ -2206,7 +2306,7 @@ ahc_linux_filter_command(struct ahc_softc *ahc, Scsi_Cmnd *cmd)
 		}
 
 		minlen = offsetof(struct scsi_inquiry_data, flags) + 1;
-		if (cmd->request_bufflen >= minlen
+		if (transferred_len >= minlen
 		 && (sid->additional_length + 4) >= minlen) {
 			if ((sid->flags & SID_WBus16) == 0)
 				width = MSG_EXT_WDTR_BUS_8_BIT;
@@ -2231,7 +2331,7 @@ ahc_linux_filter_command(struct ahc_softc *ahc, Scsi_Cmnd *cmd)
 		 * available.
 		 */
 		if ((sid->additional_length + 4) >= minlen) {
-			if (cmd->request_bufflen >= minlen
+			if (transferred_len >= minlen
 			 && (sid->spi3data & SID_SPI_CLOCK_DT) == 0)
 				ppr_options = 0;
 

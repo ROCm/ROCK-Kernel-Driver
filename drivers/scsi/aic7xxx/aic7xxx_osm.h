@@ -18,7 +18,7 @@
  * along with this program; see the file COPYING.  If not, write to
  * the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
  * 
- * $Id: //depot/src/linux/drivers/scsi/aic7xxx/aic7xxx_linux.h#59 $
+ * $Id: //depot/src/linux/drivers/scsi/aic7xxx/aic7xxx_linux.h#65 $
  *
  * Copyright (c) 2000, 2001 Adaptec Inc.
  * All rights reserved.
@@ -47,7 +47,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: //depot/src/linux/drivers/scsi/aic7xxx/aic7xxx_linux.h#59 $
+ * $Id: //depot/src/linux/drivers/scsi/aic7xxx/aic7xxx_linux.h#65 $
  *
  */
 #ifndef _AIC7XXX_LINUX_H_
@@ -58,7 +58,7 @@
 #include <linux/blkdev.h>
 #include <linux/delay.h>
 #include <linux/ioport.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/pci.h>
 #include <linux/version.h>
 
@@ -159,6 +159,7 @@ typedef void bus_dmamap_callback_t(void *, bus_dma_segment_t *, int, int);
 					 */
 
 #define BUS_SPACE_MAXADDR	0xFFFFFFFF
+#define BUS_SPACE_MAXADDR_32BIT	0xFFFFFFFF
 #define BUS_SPACE_MAXSIZE_32BIT	0xFFFFFFFF
 
 int	ahc_dma_tag_create(struct ahc_softc *, bus_dma_tag_t /*parent*/,
@@ -188,8 +189,23 @@ int	ahc_dmamap_load(struct ahc_softc *ahc, bus_dma_tag_t /*dmat*/,
 
 int	ahc_dmamap_unload(struct ahc_softc *, bus_dma_tag_t, bus_dmamap_t);
 
-/* XXX May do selective memory barrier operations on certain platforms */
-#define ahc_dmamap_sync(ahc, dma_tag, dmamap, op)
+/*
+ * Operations performed by ahc_dmamap_sync().
+ */
+#define BUS_DMASYNC_PREREAD	0x01	/* pre-read synchronization */
+#define BUS_DMASYNC_POSTREAD	0x02	/* post-read synchronization */
+#define BUS_DMASYNC_PREWRITE	0x04	/* pre-write synchronization */
+#define BUS_DMASYNC_POSTWRITE	0x08	/* post-write synchronization */
+
+/*
+ * XXX
+ * ahc_dmamap_sync is only used on buffers allocated with
+ * the pci_alloc_consistent() API.  Although I'm not sure how
+ * this works on architectures with a write buffer, Linux does
+ * not have an API to sync "coherent" memory.  Perhaps we need
+ * to do an mb()?
+ */
+#define ahc_dmamap_sync(ahc, dma_tag, dmamap, offset, len, op)
 
 /************************** SCSI Constants/Structures *************************/
 #define SCSI_REV_2 2
@@ -228,6 +244,17 @@ struct scsi_sense_data
 	uint8_t	fru;
 	uint8_t	sense_key_spec[3];
 	uint8_t	extra_bytes[14];
+};
+
+struct scsi_inquiry
+{ 
+	u_int8_t opcode;
+	u_int8_t byte2;
+#define	SI_EVPD 0x01
+	u_int8_t page_code;
+	u_int8_t reserved;
+	u_int8_t length;
+	u_int8_t control;
 };
 
 struct scsi_inquiry_data
@@ -349,7 +376,7 @@ struct scsi_inquiry_data
 #include <linux/smp.h>
 #endif
 
-#define AIC7XXX_DRIVER_VERSION  "6.1.13"
+#define AIC7XXX_DRIVER_VERSION  "6.2.1"
 
 /**************************** Front End Queues ********************************/
 /*
@@ -400,7 +427,7 @@ typedef enum {
 
 struct ahc_linux_target;
 struct ahc_linux_device {
-	LIST_ENTRY(ahc_linux_device) links;
+	TAILQ_ENTRY(ahc_linux_device) links;
 	struct		ahc_busyq busyq;
 
 	/*
@@ -513,7 +540,7 @@ struct ahc_platform_data {
 	 * Fields accessed from interrupt context.
 	 */
 	struct ahc_linux_target *targets[AHC_NUM_TARGETS]; 
-	LIST_HEAD(, ahc_linux_device) device_runq;
+	TAILQ_HEAD(, ahc_linux_device) device_runq;
 	struct ahc_completeq	 completeq;
 
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,1,0)
@@ -526,6 +553,7 @@ struct ahc_platform_data {
 	uint32_t		 irq;		/* IRQ for this adapter */
 	uint32_t		 bios_address;
 	uint32_t		 mem_busaddr;	/* Mem Base Addr */
+	bus_addr_t		 hw_dma_mask;
 };
 
 /************************** OS Utility Wrappers *******************************/
@@ -552,26 +580,8 @@ ahc_delay(long usec)
 
 
 /***************************** Low Level I/O **********************************/
-#if defined(__powerpc__)
+#if defined(__powerpc__) || defined(__i386__) || defined(__ia64__)
 #define MMAPIO
-#ifdef mb
-#undef mb
-#endif
-#define mb() \
-	__asm__ __volatile__("eieio" ::: "memory")
-#elif defined(__i386__)
-#define MMAPIO
-#ifdef mb
-#undef mb
-#endif
-#define mb() \
-	do { ; } while(0)
-#elif defined(__alpha__)
-#ifdef mb
-#undef mb
-#endif
-#define mb() \
-	__asm__ __volatile__("mb": : :"memory")
 #endif
 
 static __inline uint8_t ahc_inb(struct ahc_softc * ahc, long port);
@@ -643,8 +653,10 @@ ahc_insb(struct ahc_softc * ahc, long port, uint8_t *array, int count)
 }
 
 /**************************** Initialization **********************************/
-int	ahc_linux_register_host(struct ahc_softc *,
-				Scsi_Host_Template *);
+int		ahc_linux_register_host(struct ahc_softc *,
+					Scsi_Host_Template *);
+
+uint64_t	ahc_linux_get_memsize(void);
 
 /*************************** Pretty Printing **********************************/
 struct info_str {
@@ -846,6 +858,7 @@ ahc_pci_read_config(ahc_dev_softc_t pci, int reg, int width)
 	default:
 		panic("ahc_pci_read_config: Read size too big");
 		/* NOTREACHED */
+		return (0);
 	}
 }
 

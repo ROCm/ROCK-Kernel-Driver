@@ -112,7 +112,7 @@ ptrace_getrn(struct task_struct *child, unsigned long insn)
 
 	val = get_stack_long(child, reg);
 	if (reg == 15)
-		val = pc_pointer(val);
+		val = pc_pointer(val + 8);
 
 	return val;
 }
@@ -319,17 +319,19 @@ add_breakpoint(struct task_struct *child, struct debug_info *dbg, unsigned long 
 			dbg->nsaved += 1;
 		}
 	} else
-		printk(KERN_DEBUG "add_breakpoint: too many breakpoints\n");
+		printk(KERN_ERR "ptrace: too many breakpoints\n");
 
 	return res;
 }
 
 int ptrace_set_bpt(struct task_struct *child)
 {
-	unsigned long insn, pc;
+	struct pt_regs *regs;
+	unsigned long pc, insn;
 	int res;
 
-	pc = pc_pointer(get_stack_long(child, REG_PC));
+	regs = get_user_regs(child);
+	pc = instruction_pointer(regs);
 
 	res = read_tsk_long(child, pc, &insn);
 	if (!res) {
@@ -342,7 +344,16 @@ int ptrace_set_bpt(struct task_struct *child)
 		if (alt)
 			res = add_breakpoint(child, dbg, alt);
 
-		if (!res && (!alt || predicate(insn) != PREDICATE_ALWAYS))
+		/*
+		 * Note that we ignore the result of setting the above
+		 * breakpoint since it may fail.  When it does, this is
+		 * not so much an error, but a forewarning that we may
+		 * be receiving a prefetch abort shortly.
+		 *
+		 * If we don't set this breakpoint here, then we can
+		 * loose control of the thread during single stepping.
+		 */
+		if (!alt || predicate(insn) != PREDICATE_ALWAYS)
 			res = add_breakpoint(child, dbg, pc + 4);
 	}
 
@@ -369,9 +380,9 @@ void __ptrace_cancel_bpt(struct task_struct *child)
 		unsigned long tmp;
 
 		read_tsk_long(child, dbg->bp[i].address, &tmp);
+		write_tsk_long(child, dbg->bp[i].address, dbg->bp[i].insn);
 		if (tmp != BREAKINST)
 			printk(KERN_ERR "ptrace_cancel_bpt: weirdness\n");
-		write_tsk_long(child, dbg->bp[i].address, dbg->bp[i].insn);
 	}
 }
 
@@ -614,12 +625,25 @@ out:
 	return ret;
 }
 
-asmlinkage void syscall_trace(void)
+asmlinkage void syscall_trace(int why, struct pt_regs *regs)
 {
+	unsigned long ip;
+
 	if ((current->ptrace & (PT_PTRACED|PT_TRACESYS))
 			!= (PT_PTRACED|PT_TRACESYS))
 		return;
-	current->exit_code = SIGTRAP;
+
+	/*
+	 * Save IP.  IP is used to denote syscall entry/exit:
+	 *  IP = 0 -> entry, = 1 -> exit
+	 */
+	ip = regs->ARM_ip;
+	regs->ARM_ip = why;
+
+	/* the 0x80 provides a way for the tracing parent to distinguish
+	   between a syscall stop and SIGTRAP delivery */
+	current->exit_code = SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD)
+					? 0x80 : 0);
 	current->state = TASK_STOPPED;
 	notify_parent(current, SIGCHLD);
 	schedule();
@@ -632,4 +656,5 @@ asmlinkage void syscall_trace(void)
 		send_sig(current->exit_code, current, 1);
 		current->exit_code = 0;
 	}
+	regs->ARM_ip = ip;
 }

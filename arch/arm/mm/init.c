@@ -376,7 +376,14 @@ static __init void reserve_node_zero(unsigned int bootmap_pfn, unsigned int boot
 	if (machine_is_archimedes() || machine_is_a5k())
 		reserve_bootmem_node(pgdat, 0x02000000, 0x00080000);
 	if (machine_is_p720t())
-		reserve_bootmem_node(pgdat, PAGE_OFFSET, 0x00014000);
+		reserve_bootmem_node(pgdat, PHYS_OFFSET, 0x00014000);
+#ifdef CONFIG_SA1111
+	/*
+	 * Because of the SA1111 DMA bug, we want to preserve
+	 * our precious DMA-able memory...
+	 */
+	reserve_bootmem_node(pgdat, PHYS_OFFSET, __pa(swapper_pg_dir)-PHYS_OFFSET);
+#endif
 }
 
 /*
@@ -532,6 +539,12 @@ void __init paging_init(struct meminfo *mi, struct machine_desc *mdesc)
 			zhole_size[0] -= mi->bank[i].size >> PAGE_SHIFT;
 		}
 
+		/*
+		 * Adjust the sizes according to any special
+		 * requirements for this machine type.
+		 */
+		arch_adjust_zones(node, zone_size, zhole_size);
+
 		free_area_init_node(node, pgdat, 0, zone_size,
 				bdata->node_boot_start, zhole_size);
 	}
@@ -542,6 +555,23 @@ void __init paging_init(struct meminfo *mi, struct machine_desc *mdesc)
 	 */
 	memzero(zero_page, PAGE_SIZE);
 	empty_zero_page = virt_to_page(zero_page);
+	flush_dcache_page(empty_zero_page);
+}
+
+static inline void free_area(unsigned long addr, unsigned long end, char *s)
+{
+	unsigned int size = (end - addr) >> 10;
+
+	for (; addr < end; addr += PAGE_SIZE) {
+		struct page *page = virt_to_page(addr);
+		ClearPageReserved(page);
+		set_page_count(page, 1);
+		free_page(addr);
+		totalram_pages++;
+	}
+
+	if (size && s)
+		printk("Freeing %s memory: %dK\n", s, size);
 }
 
 /*
@@ -571,6 +601,11 @@ void __init mem_init(void)
 	for (node = 0; node < numnodes; node++)
 		totalram_pages += free_all_bootmem_node(NODE_DATA(node));
 
+#ifdef CONFIG_SA1111
+	/* now that our DMA memory is actually so designated, we can free it */
+	free_area(PAGE_OFFSET, (unsigned long)swapper_pg_dir, NULL);
+#endif
+
 	/*
 	 * Since our memory may not be contiguous, calculate the
 	 * real number of pages we have in this system
@@ -598,22 +633,6 @@ void __init mem_init(void)
 		 */
 		sysctl_overcommit_memory = 1;
 	}
-}
-
-static inline void free_area(unsigned long addr, unsigned long end, char *s)
-{
-	unsigned int size = (end - addr) >> 10;
-
-	for (; addr < end; addr += PAGE_SIZE) {
-		struct page *page = virt_to_page(addr);
-		ClearPageReserved(page);
-		set_page_count(page, 1);
-		free_page(addr);
-		totalram_pages++;
-	}
-
-	if (size)
-		printk("Freeing %s memory: %dK\n", s, size);
 }
 
 void free_initmem(void)

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.init.h 1.5 05/17/01 18:14:24 cort
+ * BK Id: SCCS/s.init.h 1.8 07/06/01 09:19:30 trini
  */
 #ifdef __KERNEL__
 #ifndef _PPC_INIT_H
@@ -24,12 +24,6 @@
 #define __chrpfunc(__argchrp) \
 	__argchrp __chrp; \
 	__argchrp
-
-#define __apus __attribute__ ((__section__ (".text.apus")))
-#define __apusdata __attribute__ ((__section__ (".data.apus")))
-#define __apusfunc(__argapus) \
-	__argapus __apus; \
-	__argapus
 
 /* this is actually just common chrp/pmac code, not OF code -- Cort */
 #define __openfirmware __attribute__ ((__section__ (".text.openfirmware")))

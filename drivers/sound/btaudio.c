@@ -1,0 +1,979 @@
+/*
+    btaudio - bt878 audio dma driver for linux 2.4.x
+
+    (c) 2000 Gerd Knorr <kraxel@goldbach.in-berlin.de>
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program; if not, write to the Free Software
+    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+
+*/
+
+#include <linux/version.h>
+#include <linux/module.h>
+#include <linux/errno.h>
+#include <linux/pci.h>
+#include <linux/sched.h>
+#include <linux/signal.h>
+#include <linux/types.h>
+#include <linux/wrapper.h>
+#include <linux/interrupt.h>
+#include <linux/init.h>
+#include <linux/poll.h>
+#include <linux/sound.h>
+#include <linux/soundcard.h>
+#include <asm/uaccess.h>
+
+
+/* mmio access */
+#define btwrite(dat,adr)    writel((dat), (bta->mmio+(adr)))
+#define btread(adr)         readl(bta->mmio+(adr))
+
+#define btand(dat,adr)      btwrite((dat) & btread(adr), adr)
+#define btor(dat,adr)       btwrite((dat) | btread(adr), adr)
+#define btaor(dat,mask,adr) btwrite((dat) | ((mask) & btread(adr)), adr)
+
+/* registers (shifted because bta->mmio is long) */
+#define REG_INT_STAT      (0x100 >> 2)
+#define REG_INT_MASK      (0x104 >> 2)
+#define REG_GPIO_DMA_CTL  (0x10c >> 2)
+#define REG_PACKET_LEN    (0x110 >> 2)
+#define REG_RISC_STRT_ADD (0x114 >> 2)
+#define REG_RISC_COUNT    (0x120 >> 2)
+
+/* IRQ bits - REG_INT_(STAT|MASK) */
+#define IRQ_SCERR         (1 << 19)
+#define IRQ_OCERR         (1 << 18)
+#define IRQ_PABORT        (1 << 17)
+#define IRQ_RIPERR        (1 << 16)
+#define IRQ_PPERR         (1 << 15)
+#define IRQ_FDSR          (1 << 14)
+#define IRQ_FTRGT         (1 << 13)
+#define IRQ_FBUS          (1 << 12)
+#define IRQ_RISCI         (1 << 11)
+#define IRQ_OFLOW         (1 <<  3)
+
+#define IRQ_BTAUDIO       (IRQ_SCERR | IRQ_OCERR | IRQ_PABORT | IRQ_RIPERR |\
+			   IRQ_PPERR | IRQ_FDSR  | IRQ_FTRGT  | IRQ_FBUS   |\
+			   IRQ_RISCI)
+
+/* REG_GPIO_DMA_CTL bits */
+#define DMA_CTL_A_PWRDN   (1 << 26)
+#define DMA_CTL_DA_SBR    (1 << 14)
+#define DMA_CTL_DA_ES2    (1 << 13)
+#define DMA_CTL_ACAP_EN   (1 <<  4)
+#define DMA_CTL_RISC_EN   (1 <<  1)
+#define DMA_CTL_FIFO_EN   (1 <<  0)
+
+/* RISC instructions */
+#define RISC_WRITE        (0x01 << 28)
+#define RISC_JUMP         (0x07 << 28)
+#define RISC_SYNC         (0x08 << 28)
+
+/* RISC bits */
+#define RISC_WR_SOL       (1 << 27)
+#define RISC_WR_EOL       (1 << 26)
+#define RISC_IRQ          (1 << 24)
+#define RISC_SYNC_RESYNC  (1 << 15)
+#define RISC_SYNC_FM1     0x06
+#define RISC_SYNC_VRO     0x0c
+
+#define HWBASE_AD (448000)
+#define HWBASE_DA 31928 /* 48000 */
+
+/* -------------------------------------------------------------- */
+
+struct btaudio {
+	/* linked list */
+	struct btaudio *next;
+
+	/* device info */
+	int            dsp_dev;
+	int            mixer_dev;
+	struct pci_dev *pci;
+	unsigned int   irq;
+	unsigned long  mem;
+	unsigned long  *mmio;
+
+	/* locking */
+	int            users;
+	struct semaphore lock;
+
+	/* risc instructions */
+	unsigned int   risc_size;
+	unsigned long  *risc_cpu;
+	dma_addr_t     risc_dma;
+
+	/* audio data */
+	unsigned int   buf_size;
+	unsigned char  *buf_cpu;
+	dma_addr_t     buf_dma;
+
+	/* buffer setup */
+	int line_bytes;
+	int line_count;
+	int block_bytes;
+	int block_count;
+
+	/* read fifo management */
+	int recording;
+	int dma_block;
+	int read_offset;
+	int read_count;
+	wait_queue_head_t readq;
+
+	/* settings */
+	int gain[3];
+	int source;
+	int bits;
+	int decimation;
+	int mixcount;
+	int sampleshift;
+	int channels;
+};
+
+static struct btaudio *btaudios = NULL;
+static unsigned int dsp = -1;
+static unsigned int mixer = -1;
+static unsigned int debug = 0;
+static unsigned int irq_debug = 0;
+static int analog = 0;
+
+/* -------------------------------------------------------------- */
+
+#define BUF_DEFAULT 128*1024
+#define BUF_MIN         8192
+
+static int alloc_buffer(struct btaudio *bta)
+{
+	if (NULL == bta->buf_cpu) {
+		for (bta->buf_size = BUF_DEFAULT; bta->buf_size >= BUF_MIN;
+		     bta->buf_size = bta->buf_size >> 1) {
+			bta->buf_cpu = pci_alloc_consistent
+				(bta->pci, bta->buf_size, &bta->buf_dma);
+			if (NULL != bta->buf_cpu)
+				break;
+		}
+		if (NULL == bta->buf_cpu)
+			return -ENOMEM;
+		memset(bta->buf_cpu,0,bta->buf_size);
+	}
+	if (NULL == bta->risc_cpu) {
+		bta->risc_size = PAGE_SIZE;
+		bta->risc_cpu = pci_alloc_consistent
+			(bta->pci, bta->risc_size, &bta->risc_dma);
+		if (NULL == bta->risc_cpu)
+			return -ENOMEM;
+	}
+	return 0;
+}
+
+static void free_buffer(struct btaudio *bta)
+{
+	if (NULL != bta->buf_cpu) {
+		pci_free_consistent(bta->pci, bta->buf_size,
+				    bta->buf_cpu, bta->buf_dma);
+		bta->buf_cpu = NULL;
+	}
+	if (NULL != bta->risc_cpu) {
+		pci_free_consistent(bta->pci, bta->risc_size,
+				    bta->risc_cpu, bta->risc_dma);
+		bta->risc_cpu = NULL;
+	}
+}
+
+static int make_risc(struct btaudio *bta)
+{
+	int rp, bp, line, block;
+	unsigned long risc;
+
+	bta->block_bytes = bta->buf_size >> 4;
+	bta->block_count = 1 << 4;
+	bta->line_bytes  = bta->block_bytes;
+	bta->line_count  = bta->block_count;
+	while (bta->line_bytes > 4095) {
+		bta->line_bytes >>= 1;
+		bta->line_count <<= 1;
+	}
+	if (bta->line_count > 255)
+		return -EINVAL;
+	if (debug)
+		printk("btaudio: bufsize=%d - bs=%d bc=%d - ls=%d, lc=%d\n",
+		       bta->buf_size,bta->block_bytes,bta->block_count,
+		       bta->line_bytes,bta->line_count);
+        rp = 0; bp = 0;
+	block = 0;
+	bta->risc_cpu[rp++] = cpu_to_le32(RISC_SYNC|RISC_SYNC_FM1);
+	bta->risc_cpu[rp++] = cpu_to_le32(0);
+	for (line = 0; line < bta->line_count; line++) {
+		risc  = RISC_WRITE | RISC_WR_SOL | RISC_WR_EOL;
+		risc |= bta->line_bytes;
+		if (0 == (bp & (bta->block_bytes-1))) {
+			risc |= RISC_IRQ;
+			risc |= (block  & 0x0f) << 16;
+			risc |= (~block & 0x0f) << 20;
+			block++;
+		}
+		bta->risc_cpu[rp++] = cpu_to_le32(risc);
+		bta->risc_cpu[rp++] = cpu_to_le32(bta->buf_dma + bp);
+		bp += bta->line_bytes;
+	}
+	bta->risc_cpu[rp++] = cpu_to_le32(RISC_SYNC|RISC_SYNC_VRO);
+	bta->risc_cpu[rp++] = cpu_to_le32(0);
+	bta->risc_cpu[rp++] = cpu_to_le32(RISC_JUMP); 
+	bta->risc_cpu[rp++] = cpu_to_le32(bta->risc_dma);
+	return 0;
+}
+
+static int start_recording(struct btaudio *bta)
+{
+	int ret;
+
+	if (0 != (ret = alloc_buffer(bta)))
+		return ret;
+	if (0 != (ret = make_risc(bta)))
+		return ret;
+
+	btwrite(bta->risc_dma, REG_RISC_STRT_ADD);
+	btwrite((bta->line_count << 16) | bta->line_bytes,
+		REG_PACKET_LEN);
+	btwrite(IRQ_BTAUDIO, REG_INT_MASK);
+	if (analog) {
+		btwrite(DMA_CTL_ACAP_EN |
+			DMA_CTL_RISC_EN |
+			DMA_CTL_FIFO_EN |
+			DMA_CTL_DA_ES2  |
+			((bta->bits == 8) ? DMA_CTL_DA_SBR : 0) |
+			(bta->gain[bta->source] << 28) |
+			(bta->source            << 24) |
+			(bta->decimation        <<  8),
+			REG_GPIO_DMA_CTL);
+	} else {
+		btwrite(DMA_CTL_ACAP_EN |
+			DMA_CTL_RISC_EN |
+			DMA_CTL_FIFO_EN |
+			DMA_CTL_DA_ES2  |
+			DMA_CTL_A_PWRDN |
+			(1 << 6)   |
+			((bta->bits == 8) ? DMA_CTL_DA_SBR : 0) |
+			(bta->gain[bta->source] << 28) |
+			(bta->source            << 24) |
+			(bta->decimation        <<  8),
+			REG_GPIO_DMA_CTL);
+	}
+	bta->dma_block = 0;
+	bta->read_offset = 0;
+	bta->read_count = 0;
+	bta->recording = 1;
+	if (debug)
+		printk("btaudio: recording started\n");
+	return 0;
+}
+
+static void stop_recording(struct btaudio *bta)
+{
+        btand(~15, REG_GPIO_DMA_CTL);
+	bta->recording = 0;
+	if (debug)
+		printk("btaudio: recording stopped\n");
+}
+
+/* -------------------------------------------------------------- */
+
+static loff_t btaudio_llseek(struct file *file, loff_t offset, int origin)
+{
+        return -ESPIPE;
+}
+
+/* -------------------------------------------------------------- */
+
+static int btaudio_mixer_open(struct inode *inode, struct file *file)
+{
+	int minor = MINOR(inode->i_rdev);
+	struct btaudio *bta;
+
+	for (bta = btaudios; bta != NULL; bta = bta->next)
+		if (bta->mixer_dev == minor)
+			break;
+	if (NULL == bta)
+		return -ENODEV;
+
+	file->private_data = bta;
+	return 0;
+}
+
+static int btaudio_mixer_release(struct inode *inode, struct file *file)
+{
+	return 0;
+}
+
+static int btaudio_mixer_ioctl(struct inode *inode, struct file *file,
+			       unsigned int cmd, unsigned long arg)
+{
+	struct btaudio *bta = file->private_data;
+	int ret,val=0,i=0;
+
+	if (cmd == SOUND_MIXER_INFO) {
+		mixer_info info;
+                strncpy(info.id, "bt878", sizeof(info.id));
+                strncpy(info.name, "Brooktree Bt878 audio", sizeof(info.name));
+                info.modify_counter = bta->mixcount;
+                if (copy_to_user((void *)arg, &info, sizeof(info)))
+                        return -EFAULT;
+		return 0;
+	}
+	if (cmd == SOUND_OLD_MIXER_INFO) {
+		_old_mixer_info info;
+                strncpy(info.id, "bt878", sizeof(info.id));
+                strncpy(info.name, "Brooktree Bt878 audio", sizeof(info.name));
+                if (copy_to_user((void *)arg, &info, sizeof(info)))
+                        return -EFAULT;
+		return 0;
+	}
+	if (cmd == OSS_GETVERSION)
+		return put_user(SOUND_VERSION, (int *)arg);
+
+	/* read */
+	if (_SIOC_DIR(cmd) & _SIOC_WRITE)
+		if (get_user(val, (int *)arg))
+			return -EFAULT;
+
+	switch (cmd) {
+	case MIXER_READ(SOUND_MIXER_CAPS):
+		ret = SOUND_CAP_EXCL_INPUT;
+		break;
+	case MIXER_READ(SOUND_MIXER_STEREODEVS):
+		ret = 0;
+		break;
+	case MIXER_READ(SOUND_MIXER_RECMASK):
+	case MIXER_READ(SOUND_MIXER_DEVMASK):
+		ret = SOUND_MASK_LINE1|SOUND_MASK_LINE2|SOUND_MASK_LINE3;
+		break;
+
+	case MIXER_WRITE(SOUND_MIXER_RECSRC):
+		if (val & SOUND_MASK_LINE1 && bta->source != 0)
+			bta->source = 0;
+		else if (val & SOUND_MASK_LINE2 && bta->source != 1)
+			bta->source = 1;
+		else if (val & SOUND_MASK_LINE3 && bta->source != 2)
+			bta->source = 2;
+		btaor((bta->gain[bta->source] << 28) |
+		      (bta->source            << 24),
+		      0x0cffffff, REG_GPIO_DMA_CTL);
+	case MIXER_READ(SOUND_MIXER_RECSRC):
+		switch (bta->source) {
+		case 0:  ret = SOUND_MASK_LINE1; break;
+		case 1:  ret = SOUND_MASK_LINE2; break;
+		case 2:  ret = SOUND_MASK_LINE3; break;
+		default: ret = 0;
+		}
+		break;
+
+	case MIXER_WRITE(SOUND_MIXER_LINE1):
+	case MIXER_WRITE(SOUND_MIXER_LINE2):
+	case MIXER_WRITE(SOUND_MIXER_LINE3):
+		if (MIXER_WRITE(SOUND_MIXER_LINE1) == cmd)
+			i = 0;
+		if (MIXER_WRITE(SOUND_MIXER_LINE2) == cmd)
+			i = 1;
+		if (MIXER_WRITE(SOUND_MIXER_LINE3) == cmd)
+			i = 2;
+		bta->gain[i] = (val & 0xff) * 15 / 100;
+		if (bta->gain[i] > 15) bta->gain[i] = 15;
+		if (bta->gain[i] <  0) bta->gain[i] =  0;
+		if (i == bta->source)
+			btaor((bta->gain[bta->source]<<28),
+			      0x0fffffff, REG_GPIO_DMA_CTL);
+		ret  = bta->gain[i] * 100 / 15;
+		ret |= ret << 8;
+		break;
+
+	case MIXER_READ(SOUND_MIXER_LINE1):
+	case MIXER_READ(SOUND_MIXER_LINE2):
+	case MIXER_READ(SOUND_MIXER_LINE3):
+		if (MIXER_READ(SOUND_MIXER_LINE1) == cmd)
+			i = 0;
+		if (MIXER_READ(SOUND_MIXER_LINE2) == cmd)
+			i = 1;
+		if (MIXER_READ(SOUND_MIXER_LINE3) == cmd)
+			i = 2;
+		ret  = bta->gain[i] * 100 / 15;
+		ret |= ret << 8;
+		break;
+
+	default:
+		return -EINVAL;
+	}
+	if (put_user(ret, (int *)arg))
+		return -EFAULT;
+	return 0;
+}
+
+static struct file_operations btaudio_mixer_fops = {
+	owner:   THIS_MODULE,
+	llseek:  btaudio_llseek,
+	open:    btaudio_mixer_open,
+	release: btaudio_mixer_release,
+	ioctl:   btaudio_mixer_ioctl,
+};
+
+/* -------------------------------------------------------------- */
+
+static int btaudio_dsp_open(struct inode *inode, struct file *file)
+{
+	int minor = MINOR(inode->i_rdev);
+	struct btaudio *bta;
+
+	for (bta = btaudios; bta != NULL; bta = bta->next)
+		if (bta->dsp_dev == minor)
+			break;
+	if (NULL == bta)
+		return -ENODEV;
+
+	down(&bta->lock);
+	if (bta->users)
+		goto busy;
+	bta->users++;
+	file->private_data = bta;
+
+	bta->dma_block = 0;
+	bta->read_offset = 0;
+	bta->read_count = 0;
+	bta->sampleshift = 0;
+
+	up(&bta->lock);
+	return 0;
+
+ busy:
+	up(&bta->lock);
+	return -EBUSY;
+}
+
+static int btaudio_dsp_release(struct inode *inode, struct file *file)
+{
+	struct btaudio *bta = file->private_data;
+
+	down(&bta->lock);
+	if (bta->recording)
+		stop_recording(bta);
+	bta->users--;
+	up(&bta->lock);
+	return 0;
+}
+
+static ssize_t btaudio_dsp_read(struct file *file, char *buffer,
+				size_t swcount, loff_t *ppos)
+{
+	struct btaudio *bta = file->private_data;
+	int hwcount = swcount << bta->sampleshift;
+	int nsrc, ndst, err, ret = 0;
+	DECLARE_WAITQUEUE(wait, current);
+
+	add_wait_queue(&bta->readq, &wait);
+	down(&bta->lock);
+	while (swcount > 0) {
+		if (0 == bta->read_count) {
+			if (!bta->recording) {
+				if (0 != (err = start_recording(bta))) {
+					if (0 == ret)
+						ret = err;
+					break;
+				}
+			}
+			if (file->f_flags & O_NONBLOCK) {
+				if (0 == ret)
+					ret = -EAGAIN;
+				break;
+			}
+			up(&bta->lock);
+			current->state = TASK_INTERRUPTIBLE;
+			schedule();
+			down(&bta->lock);
+			if(signal_pending(current)) {
+				if (0 == ret)
+					ret = -EINTR;
+				break;
+			}
+		}
+		nsrc = (bta->read_count < hwcount) ? bta->read_count : hwcount;
+		if (nsrc > bta->buf_size - bta->read_offset)
+			nsrc = bta->buf_size - bta->read_offset;
+		ndst = nsrc >> bta->sampleshift;
+
+		if ((analog  && 0 == bta->sampleshift) ||
+		    (!analog && 2 == bta->channels)) {
+			/* just copy */
+			if (copy_to_user(buffer + ret, bta->buf_cpu + bta->read_offset, nsrc)) {
+				if (0 == ret)
+					ret = -EFAULT;
+				break;
+			}
+
+		} else if (!analog) {
+			/* stereo => mono (digital audio) */
+			__u16 *src = (__u16*)(bta->buf_cpu + bta->read_offset);
+			__u16 *dst = (__u16*)(buffer + ret);
+			__u16 avg;
+			int n = ndst>>1;
+			if (0 != verify_area(VERIFY_WRITE,dst,ndst)) {
+				if (0 == ret)
+					ret = -EFAULT;
+				break;
+			}
+			for (; n; n--, dst++) {
+				avg  = *(src++) >> 1;
+				avg += *(src++) >> 1;
+				__put_user(avg,(__u16*)(dst));
+			}
+
+		} else if (8 == bta->bits) {
+			/* copy + byte downsampling (audio A/D) */
+			__u8 *src = bta->buf_cpu + bta->read_offset;
+			__u8 *dst = buffer + ret;
+			int n = ndst;
+			if (0 != verify_area(VERIFY_WRITE,dst,ndst)) {
+				if (0 == ret)
+					ret = -EFAULT;
+				break;
+			}
+			for (; n; n--, src += (1 << bta->sampleshift), dst++)
+				__put_user(*src,(__u8*)(dst));
+
+		} else {
+			/* copy + word downsampling (audio A/D) */
+			__u16 *src = (__u16*)(bta->buf_cpu + bta->read_offset);
+			__u16 *dst = (__u16*)(buffer + ret);
+			int n = ndst>>1;
+			if (0 != verify_area(VERIFY_WRITE,dst,ndst)) {
+				if (0 == ret)
+					ret = -EFAULT;
+				break;
+			}
+			for (; n; n--, src += (1 << bta->sampleshift), dst++)
+				__put_user(*src,(__u16*)(dst));
+		}
+
+		ret     += ndst;
+		swcount -= ndst;
+		hwcount -= nsrc;
+		bta->read_count  -= nsrc;
+		bta->read_offset += nsrc;
+		if (bta->read_offset == bta->buf_size)
+			bta->read_offset = 0;
+	}
+	up(&bta->lock);
+	remove_wait_queue(&bta->readq, &wait);
+	current->state = TASK_RUNNING;
+	return ret;
+}
+
+static ssize_t btaudio_dsp_write(struct file *file, const char *buffer,
+				 size_t count, loff_t *ppos)
+{
+	return -EINVAL;
+}
+
+static int btaudio_dsp_ioctl(struct inode *inode, struct file *file,
+			     unsigned int cmd, unsigned long arg)
+{
+	struct btaudio *bta = file->private_data;
+	int s, i, ret, val = 0;
+	
+        switch (cmd) {
+        case OSS_GETVERSION:
+                return put_user(SOUND_VERSION, (int *)arg);
+        case SNDCTL_DSP_GETCAPS:
+		return 0;
+
+        case SNDCTL_DSP_SPEED:
+		if (get_user(val, (int*)arg))
+			return -EFAULT;
+		if (analog) {
+			for (s = 0; s < 16; s++)
+				if (val << s >= HWBASE_AD*4/15)
+					break;
+			for (i = 15; i >= 5; i--)
+				if (val << s <= HWBASE_AD*4/i)
+					break;
+			bta->sampleshift = s;
+			bta->decimation  = i;
+			if (debug)
+				printk("btaudio: rate: req=%d  dec=%d shift=%d hwrate=%d swrate=%d\n",
+				       val,i,s,(HWBASE_AD*4/i),(HWBASE_AD*4/i)>>s);
+		} else {
+			bta->sampleshift = (bta->channels == 2) ? 0 : 1;
+			bta->decimation  = 0;
+		}
+		if (bta->recording) {
+			down(&bta->lock);
+			stop_recording(bta);
+			start_recording(bta);
+			up(&bta->lock);
+		}
+		/* fall through */
+        case SOUND_PCM_READ_RATE:
+		if (analog) {
+			return put_user(HWBASE_AD*4/bta->decimation>>bta->sampleshift, (int*)arg);
+		} else {
+			return put_user(HWBASE_DA, (int*)arg);
+		}
+
+        case SNDCTL_DSP_STEREO:
+		if (!analog) {
+			if (get_user(val, (int*)arg))
+				return -EFAULT;
+			bta->channels    = (val > 0) ? 2 : 1;
+			bta->sampleshift = (bta->channels == 2) ? 0 : 1;
+			printk("btaudio: stereo=%d channels=%d\n",
+			       val,bta->channels);
+		} else {
+			if (val == 1)
+				return -EFAULT;
+			else {
+				bta->channels = 1;
+				printk("btaudio: stereo=0 channels=1\n");
+			}
+		}
+		return put_user((bta->channels)-1, (int *)arg);
+
+        case SNDCTL_DSP_CHANNELS:
+		if (!analog) {
+			if (get_user(val, (int*)arg))
+				return -EFAULT;
+			bta->channels    = (val > 1) ? 2 : 1;
+			bta->sampleshift = (bta->channels == 2) ? 0 : 1;
+			printk("btaudio: val=%d channels=%d\n",
+			       val,bta->channels);
+		}
+		/* fall through */
+        case SOUND_PCM_READ_CHANNELS:
+		return put_user(bta->channels, (int *)arg);
+		
+        case SNDCTL_DSP_GETFMTS: /* Returns a mask */
+		if (analog)
+			return put_user(AFMT_S16_LE|AFMT_S8, (int*)arg);
+		else
+			return put_user(AFMT_S16_LE, (int*)arg);
+
+        case SNDCTL_DSP_SETFMT: /* Selects ONE fmt*/
+		if (get_user(val, (int*)arg))
+			return -EFAULT;
+                if (val != AFMT_QUERY) {
+			if (analog)
+				bta->bits = (val == AFMT_S8) ? 8 : 16;
+			else
+				bta->bits = 16;
+			if (bta->recording) {
+				down(&bta->lock);
+				stop_recording(bta);
+				start_recording(bta);
+				up(&bta->lock);
+			}
+		}
+		if (debug)
+			printk("btaudio: fmt: bits=%d\n",bta->bits);
+                return put_user((bta->bits==16) ? AFMT_S16_LE : AFMT_S8,
+				(int*)arg);
+		break;
+        case SOUND_PCM_READ_BITS:
+		return put_user(bta->bits, (int*)arg);
+
+        case SNDCTL_DSP_NONBLOCK:
+                file->f_flags |= O_NONBLOCK;
+                return 0;
+
+        case SNDCTL_DSP_RESET:
+		if (bta->recording) {
+			down(&bta->lock);
+			stop_recording(bta);
+			up(&bta->lock);
+		}
+		return 0;
+        case SNDCTL_DSP_GETBLKSIZE:
+		if (!bta->recording) {
+			if (0 != (ret = alloc_buffer(bta)))
+				return ret;
+			if (0 != (ret = make_risc(bta)))
+				return ret;
+		}
+		return put_user(bta->block_bytes>>bta->sampleshift,(int*)arg);
+
+        case SNDCTL_DSP_SYNC:
+		/* NOP */
+		return 0;
+#if 0 /* TODO */
+        case SNDCTL_DSP_GETTRIGGER:
+        case SNDCTL_DSP_SETTRIGGER:
+        case SNDCTL_DSP_SETFRAGMENT:
+#endif
+	default:
+		return -EINVAL;
+	}
+}
+
+static unsigned int btaudio_dsp_poll(struct file *file, struct poll_table_struct *wait)
+{
+	struct btaudio *bta = file->private_data;
+	unsigned int mask = 0;
+
+	poll_wait(file, &bta->readq, wait);
+
+	if (0 == bta->read_count)
+		mask |= (POLLIN | POLLRDNORM);
+
+	return mask;
+}
+
+static struct file_operations btaudio_dsp_fops = {
+	owner:   THIS_MODULE,
+	llseek:  btaudio_llseek,
+	open:    btaudio_dsp_open,
+	release: btaudio_dsp_release,
+	read:    btaudio_dsp_read,
+	write:   btaudio_dsp_write,
+	ioctl:   btaudio_dsp_ioctl,
+	poll:    btaudio_dsp_poll,
+};
+
+/* -------------------------------------------------------------- */
+
+static char *irq_name[] = { "", "", "", "OFLOW", "", "", "", "", "", "", "",
+			    "RISCI", "FBUS", "FTRGT", "FDSR", "PPERR",
+			    "RIPERR", "PABORT", "OCERR", "SCERR" };
+
+static void btaudio_irq(int irq, void *dev_id, struct pt_regs * regs)
+{
+	int count = 0;
+	u32 stat,astat;
+	struct btaudio *bta = dev_id;
+
+	for (;;) {
+		count++;
+		stat  = btread(REG_INT_STAT);
+		astat = stat & btread(REG_INT_MASK);
+		if (!astat)
+			return;
+		btwrite(astat,REG_INT_STAT);
+
+		if (irq_debug) {
+			int i;
+			printk("btaudio: irq loop=%d risc=%x, bits:",
+			       count, stat>>28);
+			for (i = 0; i < (sizeof(irq_name)/sizeof(char*)); i++) {
+				if (stat & (1 << i))
+					printk(" %s",irq_name[i]);
+				if (astat & (1 << i))
+					printk("*");
+			}
+			printk("\n");
+		}
+		if (stat & IRQ_RISCI) {
+			int blocks;
+			blocks = (stat >> 28) - bta->dma_block;
+			if (blocks < 0)
+				blocks += bta->block_count;
+			bta->dma_block = stat >> 28;
+			if (bta->read_count + 2*bta->block_bytes > bta->buf_size) {
+				stop_recording(bta);
+				printk("btaudio: buffer overrun\n");
+			}
+			if (blocks > 0) {
+				bta->read_count += blocks * bta->block_bytes;
+				wake_up_interruptible(&bta->readq);
+			}
+		}
+		if (count > 10) {
+			printk("btaudio: Oops - irq mask cleared\n");
+			btwrite(0, REG_INT_MASK);
+		}
+	}
+	return;
+}
+
+/* -------------------------------------------------------------- */
+
+static int __devinit btaudio_probe(struct pci_dev *pci_dev,
+				   const struct pci_device_id *pci_id)
+{
+	struct btaudio *bta;
+	unsigned char revision,latency;
+	int rc = -EBUSY;
+
+	if (pci_enable_device(pci_dev))
+		return -EIO;
+	if (!request_mem_region(pci_resource_start(pci_dev,0),
+				pci_resource_len(pci_dev,0),
+				"btaudio")) {
+		return -EBUSY;
+	}
+
+	bta = kmalloc(sizeof(*bta),GFP_ATOMIC);
+	memset(bta,0,sizeof(*bta));
+
+	bta->pci  = pci_dev;
+	bta->irq  = pci_dev->irq;
+	bta->mem  = pci_resource_start(pci_dev,0);
+	bta->mmio = ioremap(pci_resource_start(pci_dev,0),
+			    pci_resource_len(pci_dev,0));
+
+	bta->source     = 1;
+	bta->bits       = 8;
+	bta->channels   = 1;
+	if (analog) {
+		bta->decimation  = 15;
+	} else {
+		bta->decimation  = 0;
+		bta->sampleshift = 1;
+	}
+
+	init_MUTEX(&bta->lock);
+        init_waitqueue_head(&bta->readq);
+
+        pci_read_config_byte(pci_dev, PCI_CLASS_REVISION, &revision);
+        pci_read_config_byte(pci_dev, PCI_LATENCY_TIMER, &latency);
+        printk("btaudio: Bt%x (rev %d) at %02x:%02x.%x, ",
+	       pci_dev->device,revision,pci_dev->bus->number,
+	       PCI_SLOT(pci_dev->devfn),PCI_FUNC(pci_dev->devfn));
+        printk("irq: %d, latency: %d, memory: 0x%lx\n",
+	       bta->irq, latency, bta->mem);
+
+	/* init hw */
+        btwrite(0, REG_GPIO_DMA_CTL);
+        btwrite(0, REG_INT_MASK);
+        btwrite(~0x0UL, REG_INT_STAT);
+	pci_set_master(pci_dev);
+
+	if ((rc = request_irq(bta->irq, btaudio_irq, SA_SHIRQ|SA_INTERRUPT,
+			       "btaudio",(void *)bta)) < 0) {
+		printk("btaudio: can't request irq (rc=%d)\n",rc);
+		goto fail1;
+	}
+
+	/* register devices */
+	rc = bta->dsp_dev = register_sound_dsp(&btaudio_dsp_fops,dsp);
+	if (rc < 0) {
+		printk("btaudio: can't register dsp (rc=%d)\n",rc);
+		goto fail2;
+	}
+	if (analog) {
+		rc = bta->mixer_dev = register_sound_mixer(&btaudio_mixer_fops,mixer);
+		if (rc < 0) {
+			printk("btaudio: can't register mixer (rc=%d)\n",rc);
+			goto fail3;
+		}
+	}
+	if (debug)
+		printk("btaudio: dsp: minor=%d, mixer: minor=%d\n",
+		       bta->dsp_dev,bta->mixer_dev);
+
+	/* hook into linked list */
+	bta->next = btaudios;
+	btaudios = bta;
+
+	pci_set_drvdata(pci_dev,bta);
+        return 0;
+
+ fail3:
+	unregister_sound_dsp(bta->dsp_dev);
+ fail2:
+        free_irq(bta->irq,bta);	
+ fail1:
+	release_mem_region(pci_resource_start(pci_dev,0),
+			   pci_resource_len(pci_dev,0));
+	kfree(bta);
+	return rc;
+}
+
+static void __devexit btaudio_remove(struct pci_dev *pci_dev)
+{
+	struct btaudio *bta = pci_get_drvdata(pci_dev);
+	struct btaudio *walk;
+
+	/* turn off all DMA / IRQs */
+        btand(~15, REG_GPIO_DMA_CTL);
+        btwrite(0, REG_INT_MASK);
+        btwrite(~0x0UL, REG_INT_STAT);
+
+	/* unregister devices */
+	unregister_sound_dsp(bta->dsp_dev);
+	if (analog)
+		unregister_sound_mixer(bta->mixer_dev);
+
+	/* free resources */
+	free_buffer(bta);
+        free_irq(bta->irq,bta);
+	release_mem_region(pci_resource_start(pci_dev,0),
+			   pci_resource_len(pci_dev,0));
+
+	/* remove from linked list */
+	if (bta == btaudios) {
+		btaudios = NULL;
+	} else {
+		for (walk = btaudios; walk->next != bta; walk = walk->next)
+			; /* if (NULL == walk->next) BUG(); */
+		walk->next = bta->next;
+	}
+
+	pci_set_drvdata(pci_dev, NULL);
+	kfree(bta);
+	return;
+}
+
+/* -------------------------------------------------------------- */
+
+static struct pci_device_id btaudio_pci_tbl[] __devinitdata = {
+        { PCI_VENDOR_ID_BROOKTREE, 0x0878,
+          PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+        { PCI_VENDOR_ID_BROOKTREE, 0x0879,
+          PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+        {0,}
+};
+
+static struct pci_driver btaudio_pci_driver = {
+        name:     "btaudio",
+        id_table: btaudio_pci_tbl,
+        probe:    btaudio_probe,
+        remove:   btaudio_remove,
+};
+
+int btaudio_init_module(void)
+{
+	printk("btaudio: driver version 0.5 loaded [%s mode]\n",
+	       analog ? "audio A/D" : "digital audio");
+	return pci_module_init(&btaudio_pci_driver);
+}
+
+void btaudio_cleanup_module(void)
+{
+	pci_unregister_driver(&btaudio_pci_driver);
+	return;
+}
+
+module_init(btaudio_init_module);
+module_exit(btaudio_cleanup_module);
+
+MODULE_PARM(dsp,"i");
+MODULE_PARM(mixer,"i");
+MODULE_PARM(debug,"i");
+MODULE_PARM(irq_debug,"i");
+MODULE_PARM(analog,"i");
+
+MODULE_DEVICE_TABLE(pci, btaudio_pci_tbl);
+MODULE_DESCRIPTION("btaudio - bt878 audio dma driver");
+MODULE_AUTHOR("Gerd Knorr");
+
+/*
+ * Local variables:
+ * c-basic-offset: 8
+ * End:
+ */

@@ -111,7 +111,7 @@ unsigned long DRM(ati_pcigart_init)( drm_device_t *dev )
 	memset( pci_gart, 0, ATI_MAX_PCIGART_PAGES * sizeof(u32) );
 
 	for ( i = 0 ; i < pages ; i++ ) {
-		page_base = virt_to_bus( entry->pagelist[i]->virtual );
+		page_base = page_to_bus( entry->pagelist[i] );
 		for (j = 0; j < (PAGE_SIZE / ATI_PCIGART_PAGE_SIZE); j++) {
 			*pci_gart++ = cpu_to_le32( page_base );
 			page_base += ATI_PCIGART_PAGE_SIZE;

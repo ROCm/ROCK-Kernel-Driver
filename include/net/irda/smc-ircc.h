@@ -154,22 +154,12 @@
 #define IRCC_1152                  0x80
 #define IRCC_CRC                   0x40
 
-struct smc_chip {
-	char *name;
-	unsigned char entr1;
-	unsigned char entr2;
-	unsigned char cid_index;
-	unsigned char cid_value;
-	int (*probe)(struct smc_chip *chip, chipio_t *info);
-};
-typedef struct smc_chip smc_chip_t;
-
 /* Private data for each instance */
 struct ircc_cb {
 	struct net_device *netdev;     /* Yes! we are some kind of netdevice */
 	struct irlap_cb    *irlap; /* The link layer we are binded to */
 	
-	chipio_t io;               /* IrDA controller information */
+	chipio_t *io;               /* IrDA controller information */
 	iobuff_t tx_buff;          /* Transmit buffer */
 	iobuff_t rx_buff;          /* Receive buffer */
 

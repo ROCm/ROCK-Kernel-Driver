@@ -25,7 +25,7 @@
 
 extern uaccess_t uaccess_user, uaccess_kernel;
 
-extern __inline__ void set_fs (mm_segment_t fs)
+static inline void set_fs (mm_segment_t fs)
 {
 	current->addr_limit = fs;
 	current->thread.uaccess = fs == USER_DS ? &uaccess_user : &uaccess_kernel;

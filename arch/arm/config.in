@@ -31,17 +31,19 @@ endmenu
 mainmenu_option next_comment
 comment 'System Type'
 
-choice 'ARM system type'	\
-	"Archimedes/A5000	CONFIG_ARCH_ARCA5K \
+choice 'ARM system type' \
+	"Anakin			CONFIG_ARCH_ANAKIN \
+	 Archimedes/A5000	CONFIG_ARCH_ARCA5K \
 	 Cirrus-CL-PS7500FE     CONFIG_ARCH_CLPS7500 \
+ 	 CLPS711x/EP721x-based	CONFIG_ARCH_CLPS711X \
 	 Co-EBSA285		CONFIG_ARCH_CO285 \
 	 EBSA-110		CONFIG_ARCH_EBSA110 \
-	 LinkUp-L7200		CONFIG_ARCH_L7200 \
 	 FootBridge		CONFIG_ARCH_FOOTBRIDGE \
 	 Integrator		CONFIG_ARCH_INTEGRATOR \
+	 LinkUp-L7200		CONFIG_ARCH_L7200 \
 	 RiscPC			CONFIG_ARCH_RPC \
  	 SA1100-based		CONFIG_ARCH_SA1100 \
- 	 CLPS711x/EP721x-based	CONFIG_ARCH_CLPS711X" RiscPC
+	 Shark			CONFIG_ARCH_SHARK" RiscPC
 
 mainmenu_option next_comment
 comment 'Archimedes/A5000 Implementations'
@@ -68,20 +70,37 @@ dep_bool '  Assabet' CONFIG_SA1100_ASSABET $CONFIG_ARCH_SA1100
 dep_bool '    Include support for Neponset' CONFIG_ASSABET_NEPONSET $CONFIG_SA1100_ASSABET
 dep_bool '  Brutus' CONFIG_SA1100_BRUTUS $CONFIG_ARCH_SA1100
 dep_bool '  CerfBoard' CONFIG_SA1100_CERF $CONFIG_ARCH_SA1100
+if [ "$CONFIG_SA1100_CERF" = "y" ]; then
+   bool '    32MB Cerf support' CONFIG_SA1100_CERF_32MB
+fi
 dep_bool '  Compaq iPAQ H3600 (Bitsy)' CONFIG_SA1100_BITSY $CONFIG_ARCH_SA1100
 #dep_bool '  Empeg' CONFIG_SA1100_EMPEG $CONFIG_ARCH_SA1100
-#dep_bool '  Itsy' CONFIG_SA1100_ITSY $CONFIG_ARCH_SA1100
+dep_bool '  Extenex HandHeld Theater (Squashtail)' CONFIG_SA1100_EXTENEX1 $CONFIG_ARCH_SA1100
+if [ "$CONFIG_SA1100_EXTENEX1" = "y" ]; then
+   bool '    Support 16 MB of DRAM (not just 8)' CONFIG_SA1100_EXTENEX1_16MB
+fi
+dep_bool '  FlexaNet' CONFIG_SA1100_FLEXANET $CONFIG_ARCH_SA1100
+dep_bool '  FreeBird-v1.1' CONFIG_SA1100_FREEBIRD $CONFIG_ARCH_SA1100
+dep_bool '  GraphicsClient Plus' CONFIG_SA1100_GRAPHICSCLIENT $CONFIG_ARCH_SA1100
+dep_bool '  HP Jornada 720' CONFIG_SA1100_JORNADA720 $CONFIG_ARCH_SA1100
+dep_bool '  HuW WebPanel' CONFIG_SA1100_HUW_WEBPANEL $CONFIG_ARCH_SA1100
+dep_bool '  Itsy' CONFIG_SA1100_ITSY $CONFIG_ARCH_SA1100
 dep_bool '  LART' CONFIG_SA1100_LART $CONFIG_ARCH_SA1100
-#dep_bool '  PLEB' CONFIG_SA1100_PLEB $CONFIG_ARCH_SA1100
-dep_bool '  GraphicsClient' CONFIG_SA1100_GRAPHICSCLIENT $CONFIG_ARCH_SA1100
 dep_bool '  nanoEngine' CONFIG_SA1100_NANOENGINE $CONFIG_ARCH_SA1100
-dep_bool '  Victor' CONFIG_SA1100_VICTOR $CONFIG_ARCH_SA1100
-dep_bool '  Sherman' CONFIG_SA1100_SHERMAN $CONFIG_ARCH_SA1100
-dep_bool '  XP860' CONFIG_SA1100_XP860 $CONFIG_ARCH_SA1100
+dep_bool '  OmniMeter' CONFIG_SA1100_OMNIMETER $CONFIG_ARCH_SA1100
 dep_bool '  Pangolin' CONFIG_SA1100_PANGOLIN $CONFIG_ARCH_SA1100
+dep_bool '  PLEB' CONFIG_SA1100_PLEB $CONFIG_ARCH_SA1100
+dep_bool '  Sherman' CONFIG_SA1100_SHERMAN $CONFIG_ARCH_SA1100
+dep_bool '  Simpad' CONFIG_SA1100_SIMPAD $CONFIG_ARCH_SA1100
+dep_bool '  Tulsa' CONFIG_SA1100_PFS168 $CONFIG_ARCH_SA1100
+dep_bool '  Victor' CONFIG_SA1100_VICTOR $CONFIG_ARCH_SA1100
+dep_bool '  XP860' CONFIG_SA1100_XP860 $CONFIG_ARCH_SA1100
+dep_bool '  Yopy' CONFIG_SA1100_YOPY $CONFIG_ARCH_SA1100
 
 # Determine if SA1111 support is required
 if [ "$CONFIG_ASSABET_NEPONSET" = "y" -o \
+     "$CONFIG_SA1100_JORNADA720" = "y" -o \
+     "$CONFIG_SA1100_PFS168" = "y" -o \
      "$CONFIG_SA1100_XP860" = "y" ]; then
    define_bool CONFIG_SA1111 y
 fi
@@ -148,7 +167,7 @@ if [ "$CONFIG_ARCH_EBSA110"    = "y" -o "$CONFIG_FOOTBRIDGE"    = "y" -o \
      "$CONFIG_ARCH_TBOX"       = "y" -o "$CONFIG_ARCH_SHARK"    = "y" -o \
      "$CONFIG_ARCH_NEXUSPCI"   = "y" -o "$CONFIG_ARCH_CLPS711X" = "y" -o \
      "$CONFIG_ARCH_INTEGRATOR" = "y" -o "$CONFIG_ARCH_SA1100"   = "y" -o \
-     "$CONFIG_ARCH_L7200"      = "y" ]; then
+     "$CONFIG_ARCH_L7200"      = "y" -o "$CONFIG_ARCH_ANAKIN"	= "y" ]; then
    define_bool CONFIG_CPU_32v4 y
 else
    define_bool CONFIG_CPU_32v4 n
@@ -219,7 +238,7 @@ fi
 # SA110
 if [ "$CONFIG_ARCH_EBSA110"  = "y" -o "$CONFIG_FOOTBRIDGE" = "y" -o \
      "$CONFIG_ARCH_TBOX"     = "y" -o "$CONFIG_ARCH_SHARK" = "y" -o \
-     "$CONFIG_ARCH_NEXUSPCI" = "y" ]; then
+     "$CONFIG_ARCH_NEXUSPCI" = "y" -o "$CONFIG_ARCH_ANAKIN" = "y" ]; then
    define_bool CONFIG_CPU_SA110 y
 else
    if [ "$CONFIG_ARCH_RPC" = "y" ]; then
@@ -252,9 +271,6 @@ endmenu
 mainmenu_option next_comment
 comment 'General setup'
 
-comment 'Please ensure that you have read the help on the next option'
-bool 'Load kernel using Angel Debug Monitor' CONFIG_ANGELBOOT
-
 # Now handle the bus types
 if [ "$CONFIG_ARCH_FTVPCI" = "y" -o \
      "$CONFIG_ARCH_SHARK" = "y" -o \
@@ -272,7 +288,8 @@ fi
 if [ "$CONFIG_FOOTBRIDGE_HOST" = "y" -o \
      "$CONFIG_ARCH_SHARK" = "y" -o \
      "$CONFIG_ARCH_CLPS7500" = "y" -o \
-     "$CONFIG_ARCH_EBSA110" = "y" ]; then
+     "$CONFIG_ARCH_EBSA110" = "y" -o \
+     "$CONFIG_ARCH_SA1100" = "y" ]; then
    define_bool CONFIG_ISA y
 else
    define_bool CONFIG_ISA n
@@ -283,6 +300,11 @@ if [ "$CONFIG_FOOTBRIDGE_HOST" = "y" -o \
    define_bool CONFIG_ISA_DMA y
 else
    define_bool CONFIG_ISA_DMA n
+fi
+
+if [ "$CONFIG_ARCH_SA1100" = "y" -o \
+     "$CONFIG_ARCH_INTEGRATOR" = "y" ]; then
+   dep_bool 'Support CPU clock change (EXPERIMENTAL)' CONFIG_CPU_FREQ $CONFIG_EXPERIMENTAL
 fi
 
 source drivers/pci/Config.in
@@ -312,8 +334,8 @@ if [ "$CONFIG_ARCH_EBSA110" = "y" -o         \
      "$CONFIG_ARCH_CLPS7500" = "y" -o        \
      "$CONFIG_ARCH_PERSONAL_SERVER" = "y" -o \
      "$CONFIG_ARCH_CATS" = "y" -o            \
-     "$CONFIG_ARCH_INTEGRATOR" = "y" -o      \
-     "$CONFIG_ARCH_P720T" = "y" ]; then
+     "$CONFIG_ARCH_P720T" = "y" -o	     \
+     "$CONFIG_ARCH_ANAKIN" = "y" ]; then
    string 'Default kernel command string' CONFIG_CMDLINE ""
 fi
 if [ "$CONFIG_ARCH_NETWINDER" = "y" -o  \
@@ -348,7 +370,11 @@ fi
 endmenu
 
 source drivers/parport/Config.in
-source drivers/mtd/Config.in
+
+if [ "$CONFIG_ALIGNMENT_TRAP" = "y" ]; then
+  source drivers/mtd/Config.in
+fi
+
 source drivers/pnp/Config.in
 source drivers/block/Config.in
 source drivers/md/Config.in
@@ -403,7 +429,7 @@ fi
 
 source drivers/ieee1394/Config.in
 
-source drivers/message/i2o/Config.in
+source drivers/i2o/Config.in
 
 mainmenu_option next_comment
 comment 'ISDN subsystem'
@@ -446,6 +472,9 @@ if [ "$CONFIG_VT" = "y" ]; then
       define_bool CONFIG_KMI_KEYB y
       define_bool CONFIG_KMI_MOUSE y
    fi
+   if [ "$CONFIG_ARCH_L7200" = "y" ]; then
+      define_bool CONFIG_L7200_KEYB y
+   fi
 
    # Do we use the PC-type keyboard map?
    if [ "$CONFIG_FOOTBRIDGE_HOST" = "y" -o \
@@ -454,13 +483,13 @@ if [ "$CONFIG_VT" = "y" ]; then
         "$CONFIG_ARCH_INTEGRATOR" = "y" -o \
         "$CONFIG_ARCH_TBOX" = "y" -o       \
         "$CONFIG_ARCH_CLPS7500" = "y" -o   \
-        "$CONFIG_ARCH_P720T" = "y" ]; then
+	"$CONFIG_ARCH_P720T" = "y" -o      \
+	"$CONFIG_ARCH_ANAKIN" = "y" ]; then
       define_bool CONFIG_PC_KEYMAP y
    fi
    if [ "$CONFIG_ARCH_ACORN" != "y" -a "$CONFIG_ARCH_EBSA110" != "y" ]; then
       bool 'VGA text console' CONFIG_VGA_CONSOLE
    fi
-   bool 'Support Frame buffer devices' CONFIG_FB
    source drivers/video/Config.in
    endmenu
 fi
@@ -469,6 +498,7 @@ if [ "$CONFIG_ARCH_ACORN" = "y" -o \
      "$CONFIG_ARCH_CLPS7500" = "y" -o \
      "$CONFIG_ARCH_TBOX" = "y" -o \
      "$CONFIG_ARCH_SHARK" = "y" -o \
+     "$CONFIG_ARCH_SA1100" = "y" -o \
      "$CONFIG_PCI" = "y" ]; then
    mainmenu_option next_comment
    comment 'Sound'

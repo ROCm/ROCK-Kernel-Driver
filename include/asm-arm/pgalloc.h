@@ -53,7 +53,7 @@ extern struct pgtable_cache_struct {
 #define __pgd_next(pgd) (((unsigned long *)pgd)[1])
 #define __pte_next(pte)	(((unsigned long *)pte)[0])
 
-extern __inline__ pgd_t *get_pgd_fast(void)
+static inline pgd_t *get_pgd_fast(void)
 {
 	unsigned long *ret;
 
@@ -66,7 +66,7 @@ extern __inline__ pgd_t *get_pgd_fast(void)
 	return (pgd_t *)ret;
 }
 
-extern __inline__ void free_pgd_fast(pgd_t *pgd)
+static inline void free_pgd_fast(pgd_t *pgd)
 {
 	__pgd_next(pgd) = (unsigned long) pgd_quicklist;
 	pgd_quicklist = (unsigned long *) pgd;
@@ -86,7 +86,7 @@ static inline pte_t *pte_alloc_one_fast(struct mm_struct *mm, unsigned long addr
 	return (pte_t *)ret;
 }
 
-extern __inline__ void free_pte_fast(pte_t *pte)
+static inline void free_pte_fast(pte_t *pte)
 {
 	__pte_next(pte) = (unsigned long) pte_quicklist;
 	pte_quicklist = (unsigned long *) pte;
@@ -123,7 +123,7 @@ extern __inline__ void free_pte_fast(pte_t *pte)
 extern pgd_t *get_pgd_slow(struct mm_struct *mm);
 extern void free_pgd_slow(pgd_t *pgd);
 
-extern __inline__ pgd_t *pgd_alloc(struct mm_struct *mm)
+static inline pgd_t *pgd_alloc(struct mm_struct *mm)
 {
 	pgd_t *pgd;
 

@@ -105,7 +105,7 @@ struct osf_dirent_callback {
 	int error;
 };
 
-static int osf_filldir(void *__buf, const char *name, int namlen, off_t offset,
+static int osf_filldir(void *__buf, const char *name, int namlen, loff_t offset,
 		       ino_t ino, unsigned int d_type)
 {
 	struct osf_dirent *dirent;

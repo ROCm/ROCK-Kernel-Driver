@@ -84,7 +84,6 @@
 
 /*****************************************************************************/
       
-#define EXPORT_SYMTAB
 #include <linux/version.h>
 #include <linux/config.h>
 #include <linux/module.h>
@@ -93,7 +92,7 @@
 #include <linux/sched.h>
 #include <linux/delay.h>
 #include <linux/sound.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/soundcard.h>
 #include <linux/pci.h>
 #include <linux/wrapper.h>
@@ -346,7 +345,7 @@ static unsigned long wavetable_mem;
 
 /* --------------------------------------------------------------------- */
 
-extern __inline__ unsigned ld2(unsigned int x)
+static inline unsigned ld2(unsigned int x)
 {
 	unsigned r = 0;
 	
@@ -380,7 +379,7 @@ extern __inline__ unsigned ld2(unsigned int x)
 #undef hweight32
 #endif
 
-extern __inline__ unsigned int hweight32(unsigned int w)
+static inline unsigned int hweight32(unsigned int w)
 {
         unsigned int res = (w & 0x55555555) + ((w >> 1) & 0x55555555);
         res = (res & 0x33333333) + ((res >> 2) & 0x33333333);
@@ -448,7 +447,7 @@ static void set_countdac(struct cm_state *s, unsigned count)
 	    set_countadc(s, count);
 }
 
-extern __inline__ unsigned get_dmadac(struct cm_state *s)
+static inline unsigned get_dmadac(struct cm_state *s)
 {
 	unsigned int curr_addr;
 
@@ -464,7 +463,7 @@ extern __inline__ unsigned get_dmadac(struct cm_state *s)
 	return curr_addr;
 }
 
-extern __inline__ unsigned get_dmaadc(struct cm_state *s)
+static inline unsigned get_dmaadc(struct cm_state *s)
 {
 	unsigned int curr_addr;
 
@@ -771,7 +770,7 @@ static inline void pause_dac(struct cm_state *s)
 		pause_adc(s);
 }
 
-extern inline void disable_adc(struct cm_state *s)
+static inline void disable_adc(struct cm_state *s)
 {
 	/* disable channel */
 	s->enable &= ~CM_ENABLE_CH0;
@@ -779,7 +778,7 @@ extern inline void disable_adc(struct cm_state *s)
 	reset_adc(s);
 }
 
-extern inline void disable_dac(struct cm_state *s)
+static inline void disable_dac(struct cm_state *s)
 {
 	/* disable channel */
 	s->enable &= ~CM_ENABLE_CH1;
@@ -789,7 +788,7 @@ extern inline void disable_dac(struct cm_state *s)
 		disable_adc(s);
 }
 
-extern inline void enable_adc(struct cm_state *s)
+static inline void enable_adc(struct cm_state *s)
 {
 	if (!(s->enable & CM_ENABLE_CH0)) {
 		/* enable channel */
@@ -799,7 +798,7 @@ extern inline void enable_adc(struct cm_state *s)
 	maskb(s->iobase + CODEC_CMI_FUNCTRL0, ~4, 0);
 }
 
-extern inline void enable_dac_unlocked(struct cm_state *s)
+static inline void enable_dac_unlocked(struct cm_state *s)
 {
 	if (!(s->enable & CM_ENABLE_CH1)) {
 		/* enable channel */
@@ -812,7 +811,7 @@ extern inline void enable_dac_unlocked(struct cm_state *s)
 		enable_adc(s);
 }
 
-extern inline void enable_dac(struct cm_state *s)
+static inline void enable_dac(struct cm_state *s)
 {
 	unsigned long flags;
 
@@ -821,7 +820,7 @@ extern inline void enable_dac(struct cm_state *s)
 	spin_unlock_irqrestore(&s->lock, flags);
 }
 
-extern inline void stop_adc_unlocked(struct cm_state *s)
+static inline void stop_adc_unlocked(struct cm_state *s)
 {
 	if (s->enable & CM_ENABLE_CH0) {
 		/* disable interrupt */
@@ -830,7 +829,7 @@ extern inline void stop_adc_unlocked(struct cm_state *s)
 	}
 }
 
-extern inline void stop_adc(struct cm_state *s)
+static inline void stop_adc(struct cm_state *s)
 {
 	unsigned long flags;
 
@@ -840,7 +839,7 @@ extern inline void stop_adc(struct cm_state *s)
 
 }
 
-extern inline void stop_dac_unlocked(struct cm_state *s)
+static inline void stop_dac_unlocked(struct cm_state *s)
 {
 	if (s->enable & CM_ENABLE_CH1) {
 		/* disable interrupt */
@@ -851,7 +850,7 @@ extern inline void stop_dac_unlocked(struct cm_state *s)
 		stop_adc_unlocked(s);
 }
 
-extern inline void stop_dac(struct cm_state *s)
+static inline void stop_dac(struct cm_state *s)
 {
 	unsigned long flags;
 
@@ -1095,7 +1094,7 @@ static int prog_dmabuf(struct cm_state *s, unsigned rec)
 	return 0;
 }
 
-extern __inline__ void clear_advance(struct cm_state *s)
+static inline void clear_advance(struct cm_state *s)
 {
 	unsigned char c = (s->fmt & (CM_CFMT_16BIT << CM_CFMT_DACSHIFT)) ? 0 : 0x80;
 	unsigned char *buf = s->dma_dac.rawbuf;
@@ -1568,13 +1567,6 @@ static int mixer_ioctl(struct cm_state *s, unsigned int cmd, unsigned long arg)
 
 /* --------------------------------------------------------------------- */
 
-static loff_t cm_llseek(struct file *file, loff_t offset, int origin)
-{
-	return -ESPIPE;
-}
-
-/* --------------------------------------------------------------------- */
-
 static int cm_open_mixdev(struct inode *inode, struct file *file)
 {
 	int minor = MINOR(inode->i_rdev);
@@ -1604,7 +1596,7 @@ static int cm_ioctl_mixdev(struct inode *inode, struct file *file, unsigned int 
 
 static /*const*/ struct file_operations cm_mixer_fops = {
 	owner:		THIS_MODULE,
-	llseek:		cm_llseek,
+	llseek:		no_llseek,
 	ioctl:		cm_ioctl_mixdev,
 	open:		cm_open_mixdev,
 	release:	cm_release_mixdev,
@@ -2422,7 +2414,7 @@ static int cm_release(struct inode *inode, struct file *file)
 
 static /*const*/ struct file_operations cm_audio_fops = {
 	owner:		THIS_MODULE,
-	llseek:		cm_llseek,
+	llseek:		no_llseek,
 	read:		cm_read,
 	write:		cm_write,
 	poll:		cm_poll,
@@ -2701,7 +2693,7 @@ static int cm_midi_release(struct inode *inode, struct file *file)
 
 static /*const*/ struct file_operations cm_midi_fops = {
 	owner:		THIS_MODULE,
-	llseek:		cm_llseek,
+	llseek:		no_llseek,
 	read:		cm_midi_read,
 	write:		cm_midi_write,
 	poll:		cm_midi_poll,
@@ -2868,7 +2860,7 @@ static int cm_dmfm_release(struct inode *inode, struct file *file)
 
 static /*const*/ struct file_operations cm_dmfm_fops = {
 	owner:		THIS_MODULE,
-	llseek:		cm_llseek,
+	llseek:		no_llseek,
 	ioctl:		cm_dmfm_ioctl,
 	open:		cm_dmfm_open,
 	release:	cm_dmfm_release,

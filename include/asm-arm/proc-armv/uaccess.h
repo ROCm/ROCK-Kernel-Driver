@@ -14,7 +14,7 @@
 #define KERNEL_DS	0x00000000
 #define USER_DS		PAGE_OFFSET
 
-extern __inline__ void set_fs (mm_segment_t fs)
+static inline void set_fs (mm_segment_t fs)
 {
 	current->addr_limit = fs;
 

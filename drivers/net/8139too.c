@@ -137,7 +137,7 @@ an MMIO register read.
 */
 
 #define DRV_NAME	"8139too"
-#define DRV_VERSION	"0.9.18"
+#define DRV_VERSION	"0.9.18a"
 
 
 #include <linux/config.h>
@@ -152,9 +152,9 @@ an MMIO register read.
 #include <linux/delay.h>
 #include <linux/ethtool.h>
 #include <linux/mii.h>
+#include <linux/completion.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
-
 
 #define RTL8139_DRIVER_NAME   DRV_NAME " Fast Ethernet driver " DRV_VERSION
 #define PFX DRV_NAME ": "
@@ -585,7 +585,7 @@ struct rtl8139_private {
 	chip_t chipset;
 	pid_t thr_pid;
 	wait_queue_head_t thr_wait;
-	struct semaphore thr_exited;
+	struct completion thr_exited;
 	u32 rx_config;
 	struct rtl_extra_stats xstats;
 };
@@ -970,7 +970,7 @@ static int __devinit rtl8139_init_one (struct pci_dev *pdev,
 	tp->mmio_addr = ioaddr;
 	spin_lock_init (&tp->lock);
 	init_waitqueue_head (&tp->thr_wait);
-	init_MUTEX_LOCKED (&tp->thr_exited);
+	init_completion (&tp->thr_exited);
 
 	/* dev is fully set up and ready to use now */
 	DPRINTK("about to register device named %s (%p)...\n", dev->name, dev);
@@ -1632,7 +1632,7 @@ static int rtl8139_thread (void *data)
 		rtnl_unlock ();
 	}
 
-	up_and_exit (&tp->thr_exited, 0);
+	complete_and_exit (&tp->thr_exited, 0);
 }
 
 
@@ -2138,7 +2138,7 @@ static int rtl8139_close (struct net_device *dev)
 			printk (KERN_ERR "%s: unable to signal thread\n", dev->name);
 			return ret;
 		}
-		down (&tp->thr_exited);
+		wait_for_completion (&tp->thr_exited);
 	}
 
 	DPRINTK ("%s: Shutting down ethercard, status was 0x%4.4x.\n",

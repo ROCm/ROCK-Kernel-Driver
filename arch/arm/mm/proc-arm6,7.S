@@ -162,7 +162,7 @@ Ldata_unknown:	@ Part of jumptable
 		mov	r1, r4
 		mov	r2, r3
 		bl	baddataabort
-		b	ret_from_sys_call
+		b	ret_from_exception
 
 Ldata_lateldrpreconst:
 		tst	r4, #1 << 21			@ check writeback bit
@@ -361,28 +361,24 @@ cpu_arm710_name:
 
 		.section ".text.init", #alloc, #execinstr
 
-__arm6_setup:	mov	r0, #F_BIT | I_BIT | SVC_MODE
-		msr	cpsr_c, r0
-		mov	r0, #0
+__arm6_setup:	mov	r0, #0
 		mcr	p15, 0, r0, c7, c0		@ flush caches on v3
 		mcr	p15, 0, r0, c5, c0		@ flush TLBs on v3
 		mcr	p15, 0, r4, c2, c0		@ load page table pointer
 		mov	r0, #0x1f			@ Domains 0, 1 = client
 		mcr	p15, 0, r0, c3, c0		@ load domain access register
-		mov	r0, #0x3d			@ ....S..DPWC.M
-		orr	r0, r0, #0x100
+		mov	r0, #0x3d			@ . ..RS BLDP WCAM
+		orr	r0, r0, #0x100			@ . ..01 0011 1101
 		mov	pc, lr
 
-__arm7_setup:	mov	r0, #F_BIT | I_BIT | SVC_MODE
-		msr	cpsr_c, r0
-		mov	r0, #0
+__arm7_setup:	mov	r0, #0
 		mcr	p15, 0, r0, c7, c0		@ flush caches on v3
 		mcr	p15, 0, r0, c5, c0		@ flush TLBs on v3
 		mcr	p15, 0, r4, c2, c0		@ load page table pointer
 		mov	r0, #0x1f			@ Domains 0, 1 = client
 		mcr	p15, 0, r0, c3, c0		@ load domain access register
-		mov	r0, #0x7d			@ ....S.LDPWC.M
-		orr	r0, r0, #0x100
+		mov	r0, #0x7d			@ . ..RS BLDP WCAM
+		orr	r0, r0, #0x100			@ . ..01 0111 1101
 		mov	pc, lr
 
 /*

@@ -208,8 +208,9 @@ sti_rom_copy(unsigned long base, unsigned long offset,
 		offset++;
 		dest++;
 	}
-	__flush_dcache_range((unsigned long) dest, count);
-	__flush_icache_range((unsigned long) dest, count);
+
+	flush_kernel_dcache_range((unsigned long)dest, count);
+	flush_icache_range((unsigned long)dest, dest + count);
 }
 
 static void dump_sti_rom(struct sti_rom *rom)

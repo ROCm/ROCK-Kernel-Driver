@@ -2730,7 +2730,7 @@ find_adp:
 		{
 		    printk(" %2x ",workrequ->cmnd[k]);
 		}
-		printk(" last_lenu= %x ",dev->id[j].last_lenu);
+		printk(" last_lenu= %lx ",dev->id[j].last_lenu);
 	   }
 	}
 	return (SCSI_ABORT_SNOOZE);

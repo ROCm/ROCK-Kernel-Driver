@@ -39,7 +39,7 @@ extern unsigned long search_exception_table(unsigned long);
 
 #define access_ok(type,addr,size)	(__range_ok(addr,size) == 0)
 
-extern __inline__ int verify_area(int type, const void * addr, unsigned long size)
+static inline int verify_area(int type, const void * addr, unsigned long size)
 {
 	return access_ok(type, addr, size) ? 0 : -EFAULT;
 }
@@ -129,7 +129,7 @@ static __inline__ long __strncpy_from_user (char *dst, const char *src, long cou
 
 #define strlen_user(s)	strnlen_user(s, ~0UL >> 1)
 
-extern __inline__ long strnlen_user(const char *s, long n)
+static inline long strnlen_user(const char *s, long n)
 {
 	unsigned long res = 0;
 

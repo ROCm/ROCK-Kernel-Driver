@@ -230,7 +230,7 @@ struct solo1_state {
 
 /* --------------------------------------------------------------------- */
 
-extern inline void write_seq(struct solo1_state *s, unsigned char data)
+static inline void write_seq(struct solo1_state *s, unsigned char data)
 {
         int i;
 	unsigned long flags;
@@ -250,7 +250,7 @@ extern inline void write_seq(struct solo1_state *s, unsigned char data)
 	outb(data, s->sbbase+0xc);
 }
 
-extern inline int read_seq(struct solo1_state *s, unsigned char *data)
+static inline int read_seq(struct solo1_state *s, unsigned char *data)
 {
         int i;
 
@@ -313,7 +313,7 @@ static unsigned char read_mixer(struct solo1_state *s, unsigned char reg)
 
 /* --------------------------------------------------------------------- */
 
-extern inline unsigned ld2(unsigned int x)
+static inline unsigned ld2(unsigned int x)
 {
 	unsigned r = 0;
 	
@@ -340,7 +340,7 @@ extern inline unsigned ld2(unsigned int x)
 
 /* --------------------------------------------------------------------- */
 
-extern inline void stop_dac(struct solo1_state *s)
+static inline void stop_dac(struct solo1_state *s)
 {
 	unsigned long flags;
 
@@ -364,7 +364,7 @@ static void start_dac(struct solo1_state *s)
 	spin_unlock_irqrestore(&s->lock, flags);
 }	
 
-extern inline void stop_adc(struct solo1_state *s)
+static inline void stop_adc(struct solo1_state *s)
 {
 	unsigned long flags;
 
@@ -414,7 +414,7 @@ static void start_adc(struct solo1_state *s)
 #define DMABUF_DEFAULTORDER (15-PAGE_SHIFT)
 #define DMABUF_MINORDER 1
 
-extern inline void dealloc_dmabuf(struct solo1_state *s, struct dmabuf *db)
+static inline void dealloc_dmabuf(struct solo1_state *s, struct dmabuf *db)
 {
 	struct page *page, *pend;
 
@@ -480,7 +480,7 @@ static int prog_dmabuf(struct solo1_state *s, struct dmabuf *db)
 	return 0;
 }
 
-extern inline int prog_dmabuf_adc(struct solo1_state *s)
+static inline int prog_dmabuf_adc(struct solo1_state *s)
 {
 	unsigned long va;
 	int c;
@@ -508,7 +508,7 @@ extern inline int prog_dmabuf_adc(struct solo1_state *s)
 	return 0;
 }
 
-extern inline int prog_dmabuf_dac(struct solo1_state *s)
+static inline int prog_dmabuf_dac(struct solo1_state *s)
 {
 	unsigned long va;
 	int c;
@@ -531,7 +531,7 @@ extern inline int prog_dmabuf_dac(struct solo1_state *s)
 	return 0;
 }
 
-extern inline void clear_advance(void *buf, unsigned bsize, unsigned bptr, unsigned len, unsigned char c)
+static inline void clear_advance(void *buf, unsigned bsize, unsigned bptr, unsigned len, unsigned char c)
 {
 	if (bptr + len > bsize) {
 		unsigned x = bsize - bptr;
@@ -911,13 +911,6 @@ static int mixer_ioctl(struct solo1_state *s, unsigned int cmd, unsigned long ar
 
 /* --------------------------------------------------------------------- */
 
-static loff_t solo1_llseek(struct file *file, loff_t offset, int origin)
-{
-        return -ESPIPE;
-}
-
-/* --------------------------------------------------------------------- */
-
 static int solo1_open_mixdev(struct inode *inode, struct file *file)
 {
 	int minor = MINOR(inode->i_rdev);
@@ -957,7 +950,7 @@ static int solo1_ioctl_mixdev(struct inode *inode, struct file *file, unsigned i
 
 static /*const*/ struct file_operations solo1_mixer_fops = {
 	owner:		THIS_MODULE,
-	llseek:		solo1_llseek,
+	llseek:		no_llseek,
 	ioctl:		solo1_ioctl_mixdev,
 	open:		solo1_open_mixdev,
 	release:	solo1_release_mixdev,
@@ -1652,7 +1645,7 @@ static int solo1_open(struct inode *inode, struct file *file)
 
 static /*const*/ struct file_operations solo1_audio_fops = {
 	owner:		THIS_MODULE,
-	llseek:		solo1_llseek,
+	llseek:		no_llseek,
 	read:		solo1_read,
 	write:		solo1_write,
 	poll:		solo1_poll,
@@ -2003,7 +1996,7 @@ static int solo1_midi_release(struct inode *inode, struct file *file)
 
 static /*const*/ struct file_operations solo1_midi_fops = {
 	owner:		THIS_MODULE,
-	llseek:		solo1_llseek,
+	llseek:		no_llseek,
 	read:		solo1_midi_read,
 	write:		solo1_midi_write,
 	poll:		solo1_midi_poll,
@@ -2191,7 +2184,7 @@ static int solo1_dmfm_release(struct inode *inode, struct file *file)
 
 static /*const*/ struct file_operations solo1_dmfm_fops = {
 	owner:		THIS_MODULE,
-	llseek:		solo1_llseek,
+	llseek:		no_llseek,
 	ioctl:		solo1_dmfm_ioctl,
 	open:		solo1_dmfm_open,
 	release:	solo1_dmfm_release,
@@ -2265,8 +2258,8 @@ static int setup_solo1(struct solo1_state *s)
 	return 0;
 }
 
-static void
-solo1_suspend(struct pci_dev *pci_dev) {
+static int
+solo1_suspend(struct pci_dev *pci_dev, u32 state) {
 	struct solo1_state *s = (struct solo1_state*)pci_get_drvdata(pci_dev);
 	if (!s)
 		return;
@@ -2277,14 +2270,16 @@ solo1_suspend(struct pci_dev *pci_dev) {
 	outb(3, s->sbbase+6); 
 	/* turn off DDMA controller address space */
 	pci_write_config_word(s->dev, 0x60, 0); 
+	return 0;
 }
 
-static void
+static int
 solo1_resume(struct pci_dev *pci_dev) {
 	struct solo1_state *s = (struct solo1_state*)pci_get_drvdata(pci_dev);
 	if (!s)
-		return;
+		return 1;
 	setup_solo1(s);
+	return 0;
 }
 
 static int __devinit solo1_probe(struct pci_dev *pcidev, const struct pci_device_id *pciid)

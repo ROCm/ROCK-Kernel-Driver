@@ -69,7 +69,7 @@ extern void __bug(const char *file, int line, void *data);
 #define PAGE_BUG(page)	__bug(__FILE__, __LINE__, page)
 
 /* Pure 2^n version of get_order */
-extern __inline__ int get_order(unsigned long size)
+static inline int get_order(unsigned long size)
 {
 	int order;
 

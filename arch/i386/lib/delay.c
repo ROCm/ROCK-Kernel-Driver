@@ -13,6 +13,7 @@
 #include <linux/config.h>
 #include <linux/sched.h>
 #include <linux/delay.h>
+#include <asm/processor.h>
 #include <asm/delay.h>
 
 #ifdef CONFIG_SMP
@@ -34,9 +35,9 @@ static void __rdtsc_delay(unsigned long loops)
 	rdtscl(bclock);
 	do
 	{
+		rep_nop();
 		rdtscl(now);
-	}
-	while((now-bclock) < loops);
+	} while ((now-bclock) < loops);
 }
 
 /*
@@ -58,7 +59,7 @@ static void __loop_delay(unsigned long loops)
 
 void __delay(unsigned long loops)
 {
-	if(x86_udelay_tsc)
+	if (x86_udelay_tsc)
 		__rdtsc_delay(loops);
 	else
 		__loop_delay(loops);

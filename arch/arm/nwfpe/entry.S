@@ -77,10 +77,7 @@ nwfpe_enter:
 	   emulation.  This would reduce load/store overhead at the expense
 	   of stealing two regs from the register allocator.  Not sure if
 	   it's worth it.  */
-	ldr r4, =userRegisters
-        str sp, [r4]			@ save pointer to user regs
-	ldr r4, =fpa11
-	str r10, [r4]			@ store pointer to our state
+	str sp, [r10]                   @ Store the user registers pointer in the fpa11 structure.
         mov r4, sp			@ use r4 for local pointer
         mov r10, lr			@ save the failure-return addresses
 

@@ -157,7 +157,7 @@ jffs_put_super(struct super_block *sb)
 		D1(printk (KERN_NOTICE "jffs_put_super(): Telling gc thread to die.\n"));
 		send_sig(SIGKILL, c->gc_task, 1);
 	}
-	down (&c->gc_thread_sem);
+	wait_for_completion(&c->gc_thread_comp);
 
 	D1(printk (KERN_NOTICE "jffs_put_super(): Successfully waited on thread.\n"));
 

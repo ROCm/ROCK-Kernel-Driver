@@ -159,6 +159,7 @@ struct ti_ohci {
 	/* buffer for csr config rom */
         quadlet_t *csr_config_rom_cpu; 
         dma_addr_t csr_config_rom_bus; 
+	int csr_config_rom_length;
 
 	unsigned int max_packet_size;
 

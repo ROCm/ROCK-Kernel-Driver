@@ -31,11 +31,40 @@
  * read/writes.  We define __arch_*[bl] here, and leave __arch_*w
  * to the architecture specific code.
  */
-#define __arch_getb(a)		(*(volatile unsigned char *)(a))
-#define __arch_getl(a)		(*(volatile unsigned int  *)(a))
+#define __arch_getb(a)			(*(volatile unsigned char *)(a))
+#define __arch_getl(a)			(*(volatile unsigned int  *)(a))
 
-#define __arch_putb(v,a)	(*(volatile unsigned char *)(a) = (v))
-#define __arch_putl(v,a)	(*(volatile unsigned int  *)(a) = (v))
+#define __arch_putb(v,a)		(*(volatile unsigned char *)(a) = (v))
+#define __arch_putl(v,a)		(*(volatile unsigned int  *)(a) = (v))
+
+extern void __raw_writesb(unsigned int addr, void *data, int bytelen);
+extern void __raw_writesw(unsigned int addr, void *data, int wordlen);
+extern void __raw_writesl(unsigned int addr, void *data, int longlen);
+
+extern void __raw_readsb(unsigned int addr, void *data, int bytelen);
+extern void __raw_readsw(unsigned int addr, void *data, int wordlen);
+extern void __raw_readsl(unsigned int addr, void *data, int longlen);
+
+#define __raw_writeb(v,a)		__arch_putb(v,a)
+#define __raw_writew(v,a)		__arch_putw(v,a)
+#define __raw_writel(v,a)		__arch_putl(v,a)
+
+#define __raw_readb(a)			__arch_getb(a)
+#define __raw_readw(a)			__arch_getw(a)
+#define __raw_readl(a)			__arch_getl(a)
+
+/*
+ * The compiler seems to be incapable of optimising constants
+ * properly.  Spell it out to the compiler in some cases.
+ * These are only valid for small values of "off" (< 1<<12)
+ */
+#define __raw_base_writeb(val,base,off)	__arch_base_putb(val,base,off)
+#define __raw_base_writew(val,base,off)	__arch_base_putw(val,base,off)
+#define __raw_base_writel(val,base,off)	__arch_base_putl(val,base,off)
+
+#define __raw_base_readb(base,off)	__arch_base_getb(base,off)
+#define __raw_base_readw(base,off)	__arch_base_getw(base,off)
+#define __raw_base_readl(base,off)	__arch_base_getl(base,off)
 
 /*
  * Now, pick up the machine-defined IO definitions
@@ -43,18 +72,26 @@
 #include <asm/arch/io.h>
 
 /*
- * IO definitions.  We define {out,in}[bwl] if __io is defined by
- * the machine.  Otherwise, these definitions are left for the
- * machine specific header files to pick up.
+ * IO definitions.  We define {out,in,outs,ins}[bwl] if __io is
+ * defined by the machine.  Otherwise, these definitions are left
+ * for the machine specific header files to pick up.
  */
 #ifdef __io
-#define outb(v,p)			__arch_putb(v,__io(p))
-#define outw(v,p)			__arch_putw(v,__io(p))
-#define outl(v,p)			__arch_putl(v,__io(p))
+#define outb(v,p)			__raw_writeb(v,__io(p))
+#define outw(v,p)			__raw_writew(v,__io(p))
+#define outl(v,p)			__raw_writel(v,__io(p))
 
-#define inb(p)				__arch_getb(__io(p))
-#define inw(p)				__arch_getw(__io(p))
-#define inl(p)				__arch_getl(__io(p))
+#define inb(p)				__raw_readb(__io(p))
+#define inw(p)				__raw_readw(__io(p))
+#define inl(p)				__raw_readl(__io(p))
+
+#define outsb(p,d,l)			__raw_writesb(__io(p),d,l)
+#define outsw(p,d,l)			__raw_writesw(__io(p),d,l)
+#define outsl(p,d,l)			__raw_writesl(__io(p),d,l)
+
+#define insb(p,d,l)			__raw_readsb(__io(p),d,l)
+#define insw(p,d,l)			__raw_readsw(__io(p),d,l)
+#define insl(p,d,l)			__raw_readsl(__io(p),d,l)
 #endif
 
 #define outb_p(val,port)		outb((val),(port))
@@ -63,13 +100,6 @@
 #define inb_p(port)			inb((port))
 #define inw_p(port)			inw((port))
 #define inl_p(port)			inl((port))
-
-extern void outsb(unsigned int port, const void *from, int len);
-extern void outsw(unsigned int port, const void *from, int len);
-extern void outsl(unsigned int port, const void *from, int len);
-extern void insb(unsigned int port, void *from, int len);
-extern void insw(unsigned int port, void *from, int len);
-extern void insl(unsigned int port, void *from, int len);
 
 #define outsb_p(port,from,len)		outsb(port,from,len)
 #define outsw_p(port,from,len)		outsw(port,from,len)
@@ -121,27 +151,6 @@ extern void __iounmap(void *addr);
 extern void *consistent_alloc(int gfp, size_t size, dma_addr_t *handle);
 extern void consistent_free(void *vaddr, size_t size, dma_addr_t handle);
 extern void consistent_sync(void *vaddr, size_t size, int rw);
-
-#define __raw_writeb(v,a)		__arch_putb(v,a)
-#define __raw_writew(v,a)		__arch_putw(v,a)
-#define __raw_writel(v,a)		__arch_putl(v,a)
-
-#define __raw_readb(a)			__arch_getb(a)
-#define __raw_readw(a)			__arch_getw(a)
-#define __raw_readl(a)			__arch_getl(a)
-
-/*
- * The compiler seems to be incapable of optimising constants
- * properly.  Spell it out to the compiler in some cases.
- * These are only valid for small values of "off" (< 1<<12)
- */
-#define __raw_base_writeb(val,base,off)	__arch_base_putb(val,base,off)
-#define __raw_base_writew(val,base,off)	__arch_base_putw(val,base,off)
-#define __raw_base_writel(val,base,off)	__arch_base_putl(val,base,off)
-
-#define __raw_base_readb(base,off)	__arch_base_getb(base,off)
-#define __raw_base_readw(base,off)	__arch_base_getw(base,off)
-#define __raw_base_readl(base,off)	__arch_base_getl(base,off)
 
 /*
  * String version of IO memory access ops:

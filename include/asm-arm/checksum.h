@@ -149,7 +149,7 @@ extern unsigned long
 __csum_ipv6_magic(struct in6_addr *saddr, struct in6_addr *daddr, __u32 len,
 		__u32 proto, unsigned int sum);
 
-extern __inline__ unsigned short int
+static inline unsigned short int
 csum_ipv6_magic(struct in6_addr *saddr, struct in6_addr *daddr, __u32 len,
 		unsigned short proto, unsigned int sum)
 {

@@ -43,7 +43,7 @@
 #include "midi.h"
 
 #ifdef EMU10K1_SEQUENCER
-#include "sound_config.h"
+#include "../sound_config.h"
 #endif
 
 static spinlock_t midi_spinlock __attribute((unused)) = SPIN_LOCK_UNLOCKED;

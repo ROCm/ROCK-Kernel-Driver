@@ -33,7 +33,7 @@ static void arch_idle(void)
 slow_out:
 }
 
-extern __inline__ void arch_reset(char mode)
+static inline void arch_reset(char mode)
 {
 	iomd_writeb(0, IOMD_ROMCR0);
 

@@ -18,7 +18,7 @@ static inline void arch_idle(void)
 
 #else
 
-extern inline void arch_reset(char mode)
+static inline void arch_reset(char mode)
 {
 	if (mode == 's') {
 		/* Jump into ROM at address 0 */

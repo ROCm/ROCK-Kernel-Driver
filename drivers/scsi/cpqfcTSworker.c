@@ -47,6 +47,7 @@
 #include "hosts.h"   // struct Scsi_Host definition for T handler
 #include "cpqfcTSchip.h"
 #include "cpqfcTSstructs.h"
+#include "cpqfcTStrigger.h"
 
 //#define LOGIN_DBG 1
 
@@ -3337,9 +3338,9 @@ PFC_LOGGEDIN_PORT  fcFindLoggedInPort(
 
   else
   {
-    for( i=0; i<8; i++)  // valid WWN passed?  NULL WWN invalid
+    if( wwn ) // non-null arg? (OK to pass NULL when not searching WWN)
     {
-      if( wwn ) // non-null arg? (OK to pass NULL when not searching WWN)
+      for( i=0; i<8; i++)  // valid WWN passed?  NULL WWN invalid
       {
         if( wwn[i] != 0 )
           wwn_valid = TRUE;  // any non-zero byte makes (presumably) valid
@@ -3392,6 +3393,10 @@ PFC_LOGGEDIN_PORT  fcFindLoggedInPort(
 	  {
             // we KNOW all the valid LUNs... 0xFF is invalid!
             Cmnd->SCp.have_data_in = pLoggedInPort->ScsiNexus.lun[Cmnd->lun];
+	    if (pLoggedInPort->ScsiNexus.lun[Cmnd->lun] == 0xFF)
+		return NULL;
+	    // printk("xlating lun %d to 0x%02x\n", Cmnd->lun, 
+            //	pLoggedInPort->ScsiNexus.lun[Cmnd->lun]);
 	  }
 	  else
 	    Cmnd->SCp.have_data_in = Cmnd->lun; // Linux & target luns match

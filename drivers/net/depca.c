@@ -2060,6 +2060,8 @@ void
 cleanup_module(void)
 {
   struct depca_private *lp = thisDepca.priv;
+
+  unregister_netdev(&thisDepca);
   if (lp) {
     iounmap(lp->sh_mem);
 #ifdef CONFIG_MCA      
@@ -2071,7 +2073,6 @@ cleanup_module(void)
   }
   thisDepca.irq=0;
 
-  unregister_netdev(&thisDepca);
   release_region(thisDepca.base_addr, DEPCA_TOTAL_SIZE);
 }
 #endif /* MODULE */

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.chrp_pci.c 1.17 06/28/01 16:11:56 paulus
+ * BK Id: SCCS/s.chrp_pci.c 1.20 08/08/01 16:35:43 paulus
  */
 /*
  * CHRP pci routines.
@@ -28,8 +28,10 @@
 #include "pci.h"
 
 /* LongTrail */
+unsigned long gg2_pci_config_base;
+
 #define pci_config_addr(dev, offset) \
-(GG2_PCI_CONFIG_BASE | ((dev->bus->number)<<16) | ((dev->devfn)<<8) | (offset))
+(gg2_pci_config_base | ((dev->bus->number)<<16) | ((dev->devfn)<<8) | (offset))
 
 volatile struct Hydra *Hydra = NULL;
 
@@ -111,7 +113,6 @@ static struct pci_ops python_pci_ops =
 	python_write_config_dword
 };
 
-#ifdef CONFIG_POWER4
 /*
  * Access functions for PCI config space using RTAS calls.
  */
@@ -158,7 +159,6 @@ static struct pci_ops rtas_pci_ops =
 	rtas_write_config_word,
 	rtas_write_config_dword
 };
-#endif /* CONFIG_POWER4 */
 
     /*
      *  Temporary fixes for PCI devices. These should be replaced by OF query
@@ -219,29 +219,20 @@ chrp_pcibios_fixup(void)
 		if ((np != 0) && (np->n_intrs > 0) && (np->intrs[0].line != 0))
 			dev->irq = np->intrs[0].line;
 		pci_write_config_byte(dev, PCI_INTERRUPT_LINE, dev->irq);
-
-		/* the F50 identifies the amd as a trident */
-		if ( (dev->vendor == PCI_VENDOR_ID_TRIDENT) &&
-		      (dev->class>>8 == PCI_CLASS_NETWORK_ETHERNET) )
-		{
-			dev->vendor = PCI_VENDOR_ID_AMD;
-			pci_write_config_word(dev, PCI_VENDOR_ID,
-					      PCI_VENDOR_ID_AMD);
-		}
 	}
 }
 
-/* this is largely modeled and stolen after the pmac_pci code -- tgall
- */
-
-static void __init
-ibm_add_bridges(struct device_node *dev)
+void __init
+chrp_find_bridges(void)
 {
+	struct device_node *dev;
 	int *bus_range;
-	int len, index = 0;
+	int len, index = -1;
 	struct pci_controller *hose;
 	volatile unsigned char *cfg;
 	unsigned int *dma;
+	char *model, *machine;
+	int is_longtrail = 0, is_mot = 0;
 	struct device_node *root = find_path_device("/");
 #ifdef CONFIG_POWER3
 	unsigned int *opprop = (unsigned int *)
@@ -249,10 +240,22 @@ ibm_add_bridges(struct device_node *dev)
 	int i;
 #endif
 
-	for(; dev != NULL; dev = dev->next, ++index) {
-		if (dev->parent != root)
+	/*
+	 * The PCI host bridge nodes on some machines don't have
+	 * properties to adequately identify them, so we have to
+	 * look at what sort of machine this is as well.
+	 */
+	machine = get_property(root, "model", NULL);
+	if (machine != NULL) {
+		is_longtrail = strncmp(machine, "IBM,LongTrail", 13) == 0;
+		is_mot = strncmp(machine, "MOT", 3) == 0;
+	}
+	for (dev = root->child; dev != NULL; dev = dev->sibling) {
+		if (dev->type == NULL || strcmp(dev->type, "pci") != 0)
 			continue;
-		if (dev->n_addrs < 1) {
+		++index;
+		/* The GG2 bridge on the LongTrail doesn't have an address */
+		if (dev->n_addrs < 1 && !is_longtrail) {
 			printk(KERN_WARNING "Can't use %s: no address\n",
 			       dev->full_name);
 			continue;
@@ -268,8 +271,10 @@ ibm_add_bridges(struct device_node *dev)
 		else
 			printk(KERN_INFO "PCI buses %d..%d",
 			       bus_range[0], bus_range[1]);
-		printk(" controlled by %s at %x\n", dev->type,
-		       dev->addrs[0].address);
+		printk(" controlled by %s", dev->type);
+		if (dev->n_addrs > 0)
+			printk(" at %x", dev->addrs[0].address);
+		printk("\n");
 
 		hose = pcibios_alloc_controller();
 		if (!hose) {
@@ -280,17 +285,35 @@ ibm_add_bridges(struct device_node *dev)
 		hose->arch_data = dev;
 		hose->first_busno = bus_range[0];
 		hose->last_busno = bus_range[1];
-		hose->ops = &python_pci_ops;
 
-		cfg = ioremap(dev->addrs[0].address + 0xf8000, 0x20);
-       		hose->cfg_addr = (volatile unsigned int *) cfg;
-       		hose->cfg_data = cfg + 0x10;
+		model = get_property(dev, "model", NULL);
+		if (model == NULL)
+			model = "<none>";
+		if (device_is_compatible(dev, "IBM,python")) {
+			hose->ops = &python_pci_ops;
+			cfg = ioremap(dev->addrs[0].address + 0xf8000, 0x20);
+			hose->cfg_addr = (volatile unsigned int *) cfg;
+			hose->cfg_data = cfg + 0x10;
+		} else if (is_mot
+			   || strncmp(model, "Motorola, Grackle", 17) == 0) {
+			setup_grackle(hose);
+		} else if (is_longtrail) {
+			hose->ops = &gg2_pci_ops;
+			gg2_pci_config_base = (unsigned long)
+				ioremap(GG2_PCI_CONFIG_BASE, 0x80000);
+		} else {
+			printk("No methods for %s (model %s), using RTAS\n",
+			       dev->full_name, model);
+			hose->ops = &rtas_pci_ops;
+		}
 
 		pci_process_bridge_OF_ranges(hose, dev, index == 0);
 
 #ifdef CONFIG_POWER3
-		i = prom_n_addr_cells(root) * (index + 2) - 1;
-                openpic_setup_ISU(index, opprop[i]);
+		if (opprop != NULL) {
+			i = prom_n_addr_cells(root) * (index + 2) - 1;
+			openpic_setup_ISU(index, opprop[i]);
+		}
 #endif /* CONFIG_POWER3 */
 
 		/* check the first bridge for a property that we can
@@ -302,64 +325,6 @@ ibm_add_bridges(struct device_node *dev)
 			printk("pci_dram_offset = %lx\n", pci_dram_offset);
 		}
 	}
-}
-
-void __init
-chrp_find_bridges(void)
-{
-	struct device_node *py, *dev;
-	char *model, *name;
-	struct pci_controller* hose;
 
 	ppc_md.pcibios_fixup = chrp_pcibios_fixup;
-
-	model = get_property(find_path_device("/"), "model", NULL);
-        if (!strncmp("MOT", model, 3)) {
-		struct pci_controller *hose;
-
-		hose = pcibios_alloc_controller();
-		if (!hose)
-			return;
-		hose->first_busno = 0;
-		hose->last_busno = 0xff;
-        	/* Check that please. This must be the root of the OF
-        	 * PCI tree (the root host bridge
-        	 */
-               	hose->arch_data = dev = find_devices("pci");
-                setup_grackle(hose, 0x20000);
-		pci_process_bridge_OF_ranges(hose, dev, 1);
-		return;
-        }
-
-	if ((py = find_compatible_devices("pci", "IBM,python")))
-	{
-		/* XXX xmon_init_scc needs this set and the BAT
-		   set up in MMU_init */
-		ibm_add_bridges(find_devices("pci"));
-		return;
-	}
-
-
-	hose = pcibios_alloc_controller();
-	if (!hose)
-		return;
-	hose->first_busno = 0;
-	hose->last_busno = 0xff;
-	/* Check that please. This must be the root of the OF
-	 * PCI tree (the root host bridge
-	 */
-	hose->arch_data = dev = find_devices("pci");
-	name = get_property(find_path_device("/"), "name", NULL);
-	if (!strncmp("IBM,7043-150", name, 12) ||
-	    !strncmp("IBM,7046-155", name, 12) ||
-	    !strncmp("IBM,7046-B50", name, 12) ) {
-		setup_grackle(hose, 0x01000000);
-		pci_process_bridge_OF_ranges(hose, dev, 1);
-		return;
-	}
-
-	/* LongTrail */
-	hose->ops = &gg2_pci_ops;
-	pci_dram_offset = 0;
-	pci_process_bridge_OF_ranges(hose, find_devices("pci"), 1);
 }

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.prom.c 1.26 06/28/01 15:50:16 paulus
+ * BK Id: SCCS/s.prom.c 1.35 07/25/01 14:11:37 trini
  */
 /*
  * Procedures for interfacing to the Open Firmware PROM on
@@ -170,6 +170,7 @@ static unsigned long finish_node_interrupts(struct device_node *, unsigned long)
 static unsigned long check_display(unsigned long);
 static int prom_next_node(phandle *);
 static void *early_get_property(unsigned long, unsigned long, char *);
+static struct device_node *find_phandle(phandle);
 
 #ifdef CONFIG_BOOTX_TEXT
 static void setup_disp_fake_bi(ihandle dp);
@@ -202,8 +203,7 @@ unsigned long dev_tree_size;
  * (Note that strings count as static variables.)
  */
 
-__init
-static void
+static void __init
 prom_exit()
 {
 	struct prom_args args;
@@ -217,8 +217,7 @@ prom_exit()
 		;
 }
 
-__init
-void
+void __init
 prom_enter(void)
 {
 	struct prom_args args;
@@ -230,8 +229,7 @@ prom_enter(void)
 	RELOC(prom)(&args);
 }
 
-__init
-static void *
+static void * __init
 call_prom(const char *service, int nargs, int nret, ...)
 {
 	va_list list;
@@ -252,8 +250,7 @@ call_prom(const char *service, int nargs, int nret, ...)
 	return prom_args.args[nargs];
 }
 
-__init
-void
+void __init
 prom_print(const char *msg)
 {
 	const char *p, *q;
@@ -282,7 +279,7 @@ prom_print(const char *msg)
 	}
 }
 
-void
+static void __init
 prom_print_hex(unsigned int v)
 {
 	char buf[16];
@@ -296,13 +293,6 @@ prom_print_hex(unsigned int v)
 	buf[i] = ' ';
 	buf[i+1] = 0;
 	prom_print(buf);
-}
-
-void
-prom_print_nl(void)
-{
-	unsigned long offset = reloc_offset();
-	prom_print(RELOC("\n"));
 }
 
 unsigned long smp_chrp_cpu_nr __initdata = 0;
@@ -328,7 +318,7 @@ unsigned long smp_chrp_cpu_nr __initdata = 0;
  *
  * -- Cort
  */
-static void
+static void __init
 prom_hold_cpus(unsigned long mem)
 {
 	extern void __secondary_hold(void);
@@ -389,13 +379,13 @@ prom_hold_cpus(unsigned long mem)
 		else {
 			prom_print(RELOC("failed: "));
 			prom_print_hex(*(ulong *)0x4);
-			prom_print_nl();
+			prom_print(RELOC("\n"));
 		}
 	}
 }
 #endif /* CONFIG_SMP */
 
-void
+void __init
 bootx_init(unsigned long r4, unsigned long phys)
 {
 	boot_infos_t *bi = (boot_infos_t *) r4;
@@ -508,7 +498,7 @@ extern unsigned long _SDR1;
 extern PTE *Hash;
 extern unsigned long Hash_size;
 
-void
+static void __init
 prom_alloc_htab(void)
 {
 	unsigned int hsize;
@@ -546,7 +536,7 @@ prom_alloc_htab(void)
 }
 #endif /* CONFIG_PPC64BRIDGE */
 
-static __init void
+static void __init
 prom_instantiate_rtas(void)
 {
 	ihandle prom_rtas;
@@ -598,8 +588,7 @@ prom_instantiate_rtas(void)
  * We enter here early on, when the Open Firmware prom is still
  * handling exceptions and the MMU hash table for us.
  */
-__init
-unsigned long
+unsigned long __init
 prom_init(int r3, int r4, prom_entry pp)
 {
 	int chrp = 0;
@@ -779,7 +768,7 @@ void phys_call_rtas(int service, int nargs, int nret, ...)
 }
 
 #ifdef CONFIG_BOOTX_TEXT
-__init static void
+static void __init
 prom_welcome(boot_infos_t* bi, unsigned long phys)
 {
 	unsigned long offset = reloc_offset();
@@ -831,8 +820,7 @@ prom_welcome(boot_infos_t* bi, unsigned long phys)
  * is really badly aligned, but I didn't encounter this case
  * yet.
  */
-__init
-static void
+static void __init
 prepare_disp_BAT(void)
 {
 	unsigned long offset = reloc_offset();
@@ -855,7 +843,8 @@ prepare_disp_BAT(void)
 
 #endif
 
-static int prom_set_color(ihandle ih, int i, int r, int g, int b)
+static int __init
+prom_set_color(ihandle ih, int i, int r, int g, int b)
 {
 	struct prom_args prom_args;
 	unsigned long offset = reloc_offset();
@@ -881,8 +870,7 @@ static int prom_set_color(ihandle ih, int i, int r, int g, int b)
  * So we check whether we will need to open the display,
  * and if so, open it now.
  */
-__init
-static unsigned long
+static unsigned long __init
 check_display(unsigned long mem)
 {
 	phandle node;
@@ -984,8 +972,7 @@ check_display(unsigned long mem)
  * way, xmon output should work too
  */
 #ifdef CONFIG_BOOTX_TEXT
-__init
-static void
+static void __init
 setup_disp_fake_bi(ihandle dp)
 {
 	int width = 640, height = 480, depth = 8, pitch;
@@ -1055,8 +1042,7 @@ setup_disp_fake_bi(ihandle dp)
 }
 #endif
 
-__init
-static int
+static int __init
 prom_next_node(phandle *nodep)
 {
 	phandle node;
@@ -1078,8 +1064,7 @@ prom_next_node(phandle *nodep)
 /*
  * Make a copy of the device tree from the PROM.
  */
-__init
-static unsigned long
+static unsigned long __init
 copy_device_tree(unsigned long mem_start, unsigned long mem_end)
 {
 	phandle root;
@@ -1099,8 +1084,7 @@ copy_device_tree(unsigned long mem_start, unsigned long mem_end)
 	return new_start;
 }
 
-__init
-static unsigned long
+static unsigned long __init
 inspect_node(phandle node, struct device_node *dad,
 	     unsigned long mem_start, unsigned long mem_end,
 	     struct device_node ***allnextpp)
@@ -1163,7 +1147,8 @@ inspect_node(phandle node, struct device_node *dad,
 		prev_propp = &pp->next;
 		namep = (char *) (pp + 1);
 		pp->name = PTRUNRELOC(namep);
-		strcpy(namep, RELOC("linux,phandle"));
+		/* Work around a GCC3 bug */
+		memcpy(namep, RELOC("linux,phandle"), sizeof("linux,phandle"));
 		mem_start = ALIGN((unsigned long)namep + strlen(namep) + 1);
 		pp->value = (unsigned char *) PTRUNRELOC(&np->node);
 		pp->length = sizeof(np->node);
@@ -1196,8 +1181,7 @@ inspect_node(phandle node, struct device_node *dad,
  * It traverses the device tree and fills in the name, type,
  * {n_}addrs and {n_}intrs fields of each node.
  */
-__init
-void
+void __init
 finish_device_tree(void)
 {
 	unsigned long mem = (unsigned long) klimit;
@@ -1251,7 +1235,7 @@ finish_device_tree(void)
  * early_get_property is used to access the device tree image prepared
  * by BootX very early on, before the pointers in it have been relocated.
  */
-__init void *
+static void * __init
 early_get_property(unsigned long base, unsigned long node, char *prop)
 {
 	struct device_node *np = (struct device_node *)(base + node);
@@ -1267,8 +1251,7 @@ early_get_property(unsigned long base, unsigned long node, char *prop)
 	return 0;
 }
 
-__init
-static unsigned long
+static unsigned long __init
 finish_node(struct device_node *np, unsigned long mem_start,
 	    interpret_func *ifunc, int naddrc, int nsizec)
 {
@@ -1342,7 +1325,8 @@ finish_node(struct device_node *np, unsigned long mem_start,
 /*
  * Find the interrupt parent of a node.
  */
-static struct device_node *intr_parent(struct device_node *p)
+static struct device_node * __init
+intr_parent(struct device_node *p)
 {
 	phandle *parp;
 
@@ -1367,7 +1351,7 @@ static struct device_node *intr_parent(struct device_node *p)
  * Find out the size of each entry of the interrupts property
  * for a node.
  */
-static int
+static int __init
 prom_n_intr_cells(struct device_node *np)
 {
 	struct device_node *p;
@@ -1393,7 +1377,7 @@ prom_n_intr_cells(struct device_node *np)
  * Map an interrupt from a device up to the platform interrupt
  * descriptor.
  */
-static int
+static int __init
 map_interrupt(unsigned int **irq, struct device_node **ictrler,
 	      struct device_node *np, unsigned int *ints, int nintrc)
 {
@@ -1489,7 +1473,7 @@ map_interrupt(unsigned int **irq, struct device_node **ictrler,
 /*
  * New version of finish_node_interrupts.
  */
-static unsigned long
+static unsigned long __init
 finish_node_interrupts(struct device_node *np, unsigned long mem_start)
 {
 	unsigned int *ints;
@@ -1549,8 +1533,8 @@ finish_node_interrupts(struct device_node *np, unsigned long mem_start)
  * are offsets from the start of the tree.
  * This procedure updates the pointers.
  */
-__init
-void relocate_nodes(void)
+void __init
+relocate_nodes(void)
 {
 	unsigned long base;
 	struct device_node *np;
@@ -1575,7 +1559,7 @@ void relocate_nodes(void)
 	}
 }
 
-int
+int __init
 prom_n_addr_cells(struct device_node* np)
 {
 	int* ip;
@@ -1590,7 +1574,7 @@ prom_n_addr_cells(struct device_node* np)
 	return 1;
 }
 
-int
+int __init
 prom_n_size_cells(struct device_node* np)
 {
 	int* ip;
@@ -1605,8 +1589,7 @@ prom_n_size_cells(struct device_node* np)
 	return 1;
 }
 
-__init
-static unsigned long
+static unsigned long __init
 interpret_pci_props(struct device_node *np, unsigned long mem_start,
 		    int naddrc, int nsizec)
 {
@@ -1652,8 +1635,7 @@ interpret_pci_props(struct device_node *np, unsigned long mem_start,
 	return mem_start;
 }
 
-__init
-static unsigned long
+static unsigned long __init
 interpret_dbdma_props(struct device_node *np, unsigned long mem_start,
 		      int naddrc, int nsizec)
 {
@@ -1705,8 +1687,7 @@ interpret_dbdma_props(struct device_node *np, unsigned long mem_start,
 	return mem_start;
 }
 
-__init
-static unsigned long
+static unsigned long __init
 interpret_macio_props(struct device_node *np, unsigned long mem_start,
 		      int naddrc, int nsizec)
 {
@@ -1759,8 +1740,7 @@ interpret_macio_props(struct device_node *np, unsigned long mem_start,
 	return mem_start;
 }
 
-__init
-static unsigned long
+static unsigned long __init
 interpret_isa_props(struct device_node *np, unsigned long mem_start,
 		    int naddrc, int nsizec)
 {
@@ -1801,8 +1781,7 @@ interpret_isa_props(struct device_node *np, unsigned long mem_start,
 	return mem_start;
 }
 
-__init
-static unsigned long
+static unsigned long __init
 interpret_root_props(struct device_node *np, unsigned long mem_start,
 		     int naddrc, int nsizec)
 {
@@ -1873,7 +1852,6 @@ prom_get_irq_senses(unsigned char *senses, int off, int max)
 /*
  * Construct and return a list of the device_nodes with a given name.
  */
-__openfirmware
 struct device_node *
 find_devices(const char *name)
 {
@@ -1893,7 +1871,6 @@ find_devices(const char *name)
 /*
  * Construct and return a list of the device_nodes with a given type.
  */
-__openfirmware
 struct device_node *
 find_type_devices(const char *type)
 {
@@ -1913,8 +1890,7 @@ find_type_devices(const char *type)
 /*
  * Returns all nodes linked together
  */
-__openfirmware
-struct device_node *
+struct device_node __openfirmware *
 find_all_nodes(void)
 {
 	struct device_node *head, **prevp, *np;
@@ -1931,7 +1907,6 @@ find_all_nodes(void)
 /* Checks if the given "compat" string matches one of the strings in
  * the device's "compatible" property
  */
-__openfirmware
 int
 device_is_compatible(struct device_node *device, const char *compat)
 {
@@ -1957,7 +1932,6 @@ device_is_compatible(struct device_node *device, const char *compat)
  * Indicates whether the root node has a given value in its
  * compatible property.
  */
-__openfirmware
 int
 machine_is_compatible(const char *compat)
 {
@@ -1973,7 +1947,6 @@ machine_is_compatible(const char *compat)
  * Construct and return a list of the device_nodes with a given type
  * and compatible property.
  */
-__openfirmware
 struct device_node *
 find_compatible_devices(const char *type, const char *compat)
 {
@@ -1996,7 +1969,6 @@ find_compatible_devices(const char *type, const char *compat)
 /*
  * Find the device_node with a given full_name.
  */
-__openfirmware
 struct device_node *
 find_path_device(const char *path)
 {
@@ -2011,8 +1983,7 @@ find_path_device(const char *path)
 /*
  * Find the device_node with a given phandle.
  */
-__openfirmware
-struct device_node *
+static struct device_node __init *
 find_phandle(phandle ph)
 {
 	struct device_node *np;
@@ -2027,7 +1998,6 @@ find_phandle(phandle ph)
  * Find a property with a given name for a given node
  * and return the value.
  */
-__openfirmware
 unsigned char *
 get_property(struct device_node *np, const char *name, int *lenp)
 {
@@ -2045,8 +2015,7 @@ get_property(struct device_node *np, const char *name, int *lenp)
 /*
  * Add a property to a node
  */
-__openfirmware
-void
+void __openfirmware
 prom_add_property(struct device_node* np, struct property* prop)
 {
 	struct property **next = &np->properties;
@@ -2058,8 +2027,7 @@ prom_add_property(struct device_node* np, struct property* prop)
 }
 
 #if 0
-__openfirmware
-void
+void __openfirmware
 print_properties(struct device_node *np)
 {
 	struct property *pp;
@@ -2113,8 +2081,7 @@ print_properties(struct device_node *np)
 spinlock_t rtas_lock = SPIN_LOCK_UNLOCKED;
 
 /* this can be called after setup -- Cort */
-__openfirmware
-int
+int __openfirmware
 call_rtas(const char *service, int nargs, int nret,
 	  unsigned long *outputs, ...)
 {
@@ -2154,8 +2121,7 @@ call_rtas(const char *service, int nargs, int nret,
 	return u.words[nargs+3];
 }
 
-__init
-void
+void __init
 abort()
 {
 #ifdef CONFIG_XMON
@@ -2195,8 +2161,7 @@ map_bootx_text(void)
 }
 
 /* Calc the base address of a given point (x,y) */
-__pmac
-static unsigned char *
+static unsigned char * __pmac
 calc_base(boot_infos_t *bi, int x, int y)
 {
 	unsigned char *base;
@@ -2210,7 +2175,7 @@ calc_base(boot_infos_t *bi, int x, int y)
 }
 
 /* Adjust the display to a new resolution */
-void
+void __openfirmware
 bootx_update_display(unsigned long phys, int width, int height,
 		     int depth, int pitch)
 {
@@ -2239,8 +2204,7 @@ bootx_update_display(unsigned long phys, int width, int height,
 	g_max_loc_Y = height / 16;
 }
 
-__pmac
-static void
+static void __pmac
 clearscreen(void)
 {
 	unsigned long offset	= reloc_offset();
@@ -2264,8 +2228,7 @@ __inline__ void dcbst(const void* addr)
 	__asm__ __volatile__ ("dcbst 0,%0" :: "r" (addr));
 }
 
-__pmac
-static void
+static void __pmac
 flushscreen(void)
 {
 	unsigned long offset	= reloc_offset();
@@ -2287,8 +2250,7 @@ flushscreen(void)
 }
 
 #ifndef NO_SCROLL
-__pmac
-static void
+static void __pmac
 scrollscreen(void)
 {
 	unsigned long offset		= reloc_offset();
@@ -2324,8 +2286,7 @@ scrollscreen(void)
 }
 #endif /* ndef NO_SCROLL */
 
-__pmac
-void
+void __pmac
 prom_drawchar(char c)
 {
 	unsigned long offset = reloc_offset();
@@ -2375,8 +2336,7 @@ prom_drawchar(char c)
 #endif
 }
 
-__pmac
-void
+void __pmac
 prom_drawstring(const char *c)
 {
 	unsigned long offset	= reloc_offset();
@@ -2387,8 +2347,7 @@ prom_drawstring(const char *c)
 		prom_drawchar(*c++);
 }
 
-__pmac
-void
+void __pmac
 prom_drawhex(unsigned long v)
 {
 	static char hex_table[] = "0123456789abcdef";
@@ -2406,9 +2365,7 @@ prom_drawhex(unsigned long v)
 	prom_drawchar(RELOC(hex_table)[(v >>  0) & 0x0000000FUL]);
 }
 
-
-__pmac
-static void
+static void __pmac
 draw_byte(unsigned char c, long locX, long locY)
 {
 	unsigned long offset	= reloc_offset();
@@ -2432,8 +2389,7 @@ draw_byte(unsigned char c, long locX, long locY)
 	}
 }
 
-__pmac
-static unsigned long expand_bits_8[16] = {
+static unsigned long expand_bits_8[16] __pmacdata  = {
 	0x00000000,
 	0x000000ff,
 	0x0000ff00,
@@ -2452,17 +2408,14 @@ static unsigned long expand_bits_8[16] = {
 	0xffffffff
 };
 
-__pmac
-static unsigned long expand_bits_16[4] = {
+static unsigned long expand_bits_16[4] __pmacdata = {
 	0x00000000,
 	0x0000ffff,
 	0xffff0000,
 	0xffffffff
 };
 
-
-__pmac
-static void
+static void __pmac
 draw_byte_32(unsigned char *font, unsigned long *base, int rb)
 {
 	int l, bits;	
@@ -2484,8 +2437,7 @@ draw_byte_32(unsigned char *font, unsigned long *base, int rb)
 	}
 }
 
-__pmac
-static void
+static void __pmac
 draw_byte_16(unsigned char *font, unsigned long *base, int rb)
 {
 	int l, bits;	
@@ -2505,8 +2457,7 @@ draw_byte_16(unsigned char *font, unsigned long *base, int rb)
 	}
 }
 
-__pmac
-static void
+static void __pmac
 draw_byte_8(unsigned char *font, unsigned long *base, int rb)
 {
 	int l, bits;	
@@ -2524,8 +2475,7 @@ draw_byte_8(unsigned char *font, unsigned long *base, int rb)
 	}
 }
 
-__pmac
-static unsigned char vga_font[cmapsz] = {
+static unsigned char vga_font[cmapsz] __pmacdata = {
 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7e, 0x81, 0xa5, 0x81, 0x81, 0xbd, 
 0x99, 0x81, 0x81, 0x7e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7e, 0xff, 
@@ -2871,4 +2821,3 @@ static unsigned char vga_font[cmapsz] = {
 };
 
 #endif /* CONFIG_BOOTX_TEXT */
-

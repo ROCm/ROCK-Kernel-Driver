@@ -580,6 +580,9 @@ get_irq_list(char *buf)
  * SMP cross-CPU interrupts have their own specific
  * handlers).
  */
+
+#define MAX_ILLEGAL_IRQS 16
+
 void
 handle_irq(int irq, struct pt_regs * regs)
 {	
@@ -597,9 +600,11 @@ handle_irq(int irq, struct pt_regs * regs)
 	irq_desc_t *desc = irq_desc + irq;
 	struct irqaction * action;
 	unsigned int status;
-
-	if ((unsigned) irq > ACTUAL_NR_IRQS) {
+	static unsigned int illegal_count=0;
+	
+	if ((unsigned) irq > ACTUAL_NR_IRQS && illegal_count < MAX_ILLEGAL_IRQS ) {
 		irq_err_count++;
+		illegal_count++;
 		printk(KERN_CRIT "device_interrupt: illegal interrupt %d\n",
 		       irq);
 		return;

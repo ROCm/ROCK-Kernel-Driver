@@ -83,6 +83,7 @@ void pwc_construct(struct pwc_device *pdev)
 		break;
 	case 730:
 	case 740:
+	case 750:
 		pdev->view_min.x = 160;
 		pdev->view_min.y = 120;
 		pdev->view_max.x = 640;

@@ -6,7 +6,7 @@
 # To add an entry into this database, please see Documentation/arm/README,
 # or contact rmk@arm.linux.org.uk
 #
-# Last update: Wed Jul 4 20:04:11 2001
+# Last update: Wed Jul 25 10:07:10 2001
 #
 # machine_is_xxx	CONFIG_xxxx		MACH_TYPE_xxx		number
 #
@@ -103,5 +103,14 @@ clep7212		ARCH_CLEP7212		CLEP7212		91
 cs89712			ARCH_CS89712		CS89712			92
 weararm			SA1100_WEARARM		WEARARM			93
 possio_px		SA1100_POSSIO_PX	POSSIO_PX		94
-
-# The following are unallocated
+sidearm			SA1100_SIDEARM		SIDEARM			95
+stork			SA1100_STORK		STORK			96
+shannon			SA1100_SHANNON		SHANNON			97
+ace			ARCH_ACE		ACE			98
+ballyarm		SA1100_BALLYARM		BALLYARM		99
+simputer		SA1100_SIMPUTER		SIMPUTER		100
+nexterm			SA1100_NEXTERM		NEXTERM			101
+sa1100_elf		SA1100_SA1100_ELF	SA1100_ELF		102
+gator			SA1100_GATOR		GATOR			103
+granite			ARCH_GRANITE		GRANITE			104
+consus			SA1100_CONSUS		CONSUS			105

@@ -42,7 +42,7 @@
 #include <linux/ptrace.h>
 #include <linux/poll.h>
 
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/tty.h>
 #include <linux/errno.h>
 #include <linux/string.h>

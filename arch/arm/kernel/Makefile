@@ -31,9 +31,9 @@ O_TARGET := kernel.o
 
 # Object file lists.
 
-obj-y		:= arch.o dma.o $(ENTRY_OBJ) irq.o process.o ptrace.o    \
-		   semaphore.o setup.o signal.o sys_arm.o time.o traps.o \
-		   $(O_OBJS_$(MACHINE))
+obj-y		:= arch.o compat.o dma.o $(ENTRY_OBJ) entry-common.o irq.o   \
+		   process.o ptrace.o semaphore.o setup.o signal.o sys_arm.o \
+		   time.o traps.o $(O_OBJS_$(MACHINE))
 obj-m		:=
 obj-n		:=
 obj-		:=
@@ -41,7 +41,8 @@ obj-		:=
 export-objs	:= armksyms.o dma.o ecard.o fiq.o io.o oldlatches.o time.o
 
 no-irq-arch	:= $(CONFIG_ARCH_INTEGRATOR) $(CONFIG_ARCH_CLPS711X) \
-		   $(CONFIG_ARCH_FOOTBRIDGE) $(CONFIG_ARCH_EBSA110)
+		   $(CONFIG_ARCH_FOOTBRIDGE) $(CONFIG_ARCH_EBSA110) \
+		   $(CONFIG_ARCH_SA1100)
 
 ifneq ($(findstring y,$(no-irq-arch)),y)
   obj-y		+= irq-arch.o
@@ -64,5 +65,6 @@ all: kernel.o $(HEAD_OBJ) init_task.o
 include $(TOPDIR)/Rules.make
 
 # Spell out some dependencies that `make dep' doesn't spot
-entry-armv.o: calls.S $(TOPDIR)/include/asm-arm/constants.h
-entry-armo.o: calls.S $(TOPDIR)/include/asm-arm/constants.h
+entry-armv.o: entry-header.S $(TOPDIR)/include/asm-arm/constants.h
+entry-armo.o: entry-header.S $(TOPDIR)/include/asm-arm/constants.h
+entry-common.o: entry-header.S calls.S $(TOPDIR)/include/asm-arm/constants.h

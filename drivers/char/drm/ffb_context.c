@@ -1,4 +1,4 @@
-/* $Id: ffb_context.c,v 1.4 2000/08/29 07:01:55 davem Exp $
+/* $Id: ffb_context.c,v 1.5 2001/08/09 17:47:51 davem Exp $
  * ffb_context.c: Creator/Creator3D DRI/DRM context switching.
  *
  * Copyright (C) 2000 David S. Miller (davem@redhat.com)
@@ -357,8 +357,6 @@ static void FFBWait(ffb_fbcPtr ffb)
 int DRM(context_switch)(drm_device_t *dev, int old, int new)
 {
 	ffb_dev_priv_t *fpriv = (ffb_dev_priv_t *) dev->dev_private;
-
-        atomic_inc(&dev->total_ctx);
 
 #if DRM_DMA_HISTOGRAM
         dev->ctx_start = get_cycles();

@@ -13,6 +13,7 @@ struct isofs_sb_info {
 	
 	unsigned char s_high_sierra; /* A simple flag */
 	unsigned char s_mapping;
+	int           s_rock_offset; /* offset of SUSP fields within SU area */
 	unsigned char s_rock;
 	unsigned char s_joliet_level;
 	unsigned char s_utf8;

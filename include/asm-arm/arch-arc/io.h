@@ -71,7 +71,7 @@
  * Dynamic IO functions - let the compiler
  * optimize the expressions
  */
-extern __inline__ void __outb (unsigned int value, unsigned int port)
+static inline void __outb (unsigned int value, unsigned int port)
 {
 	unsigned long temp;
 	__asm__ __volatile__(
@@ -84,7 +84,7 @@ extern __inline__ void __outb (unsigned int value, unsigned int port)
 	: "cc");
 }
 
-extern __inline__ void __outw (unsigned int value, unsigned int port)
+static inline void __outw (unsigned int value, unsigned int port)
 {
 	unsigned long temp;
 	__asm__ __volatile__(
@@ -97,7 +97,7 @@ extern __inline__ void __outw (unsigned int value, unsigned int port)
 	: "cc");
 }
 
-extern __inline__ void __outl (unsigned int value, unsigned int port)
+static inline void __outl (unsigned int value, unsigned int port)
 {
 	unsigned long temp;
 	__asm__ __volatile__(
@@ -111,7 +111,7 @@ extern __inline__ void __outl (unsigned int value, unsigned int port)
 }
 
 #define DECLARE_DYN_IN(sz,fnsuffix,instr)					\
-extern __inline__ unsigned sz __in##fnsuffix (unsigned int port)		\
+static inline unsigned sz __in##fnsuffix (unsigned int port)		\
 {										\
 	unsigned long temp, value;						\
 	__asm__ __volatile__(							\
@@ -125,7 +125,7 @@ extern __inline__ unsigned sz __in##fnsuffix (unsigned int port)		\
 	return (unsigned sz)value;						\
 }
 
-extern __inline__ unsigned int __ioaddr (unsigned int port)			\
+static inline unsigned int __ioaddr (unsigned int port)			\
 {										\
 	if (__PORT_PCIO(port))							\
 		return (unsigned int)(PCIO_BASE + (port << 2));			\

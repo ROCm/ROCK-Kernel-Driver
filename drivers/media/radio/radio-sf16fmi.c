@@ -5,6 +5,7 @@
  *
  * Fitted to new interface by Alan Cox <alan.cox@linux.org>
  * Made working and cleaned up functions <mikael.hedin@irf.se>
+ * Support for ISAPnP by Ladislav Michl <ladis@psi.cz>
  *
  * Notes on the hardware
  *
@@ -14,14 +15,15 @@
  *  
  */
 
+#include <linux/kernel.h>	/* __setup			*/
 #include <linux/module.h>	/* Modules 			*/
 #include <linux/init.h>		/* Initdata			*/
 #include <linux/ioport.h>	/* check_region, request_region	*/
 #include <linux/delay.h>	/* udelay			*/
+#include <linux/videodev.h>	/* kernel radio structs		*/
+#include <linux/isapnp.h>
 #include <asm/io.h>		/* outb, outb_p			*/
 #include <asm/uaccess.h>	/* copy to/from user		*/
-#include <linux/videodev.h>	/* kernel radio structs		*/
-#include <linux/config.h>	/* CONFIG_RADIO_SF16MI_PORT 	*/
 #include <asm/semaphore.h>
 
 struct fmi_device
@@ -32,13 +34,10 @@ struct fmi_device
         __u32 flags;
 };
 
-#ifndef CONFIG_RADIO_SF16FMI_PORT
-#define CONFIG_RADIO_SF16FMI_PORT -1
-#endif
-
-static int io = CONFIG_RADIO_SF16FMI_PORT; 
+static int io = -1; 
 static int radio_nr = -1;
 static int users = 0;
+static struct pci_dev *dev = NULL;
 static struct semaphore lock;
 
 /* freq is in 1/16 kHz to internal number, hw precision is 50 kHz */
@@ -284,16 +283,51 @@ static struct video_device fmi_radio=
 	ioctl:		fmi_ioctl,
 };
 
+/* ladis: this is my card. does any other types exist? */
+static struct isapnp_device_id id_table[] __devinitdata = {
+	{	ISAPNP_ANY_ID, ISAPNP_ANY_ID,
+		ISAPNP_VENDOR('M','F','R'), ISAPNP_FUNCTION(0xad10), 0},
+	{	ISAPNP_CARD_END, },
+};
+
+MODULE_DEVICE_TABLE(isapnp, id_table);
+
+static int isapnp_fmi_probe(void)
+{
+	int i = 0;
+
+	while (id_table[i].card_vendor != 0 && dev == NULL) {
+		dev = isapnp_find_dev(NULL, id_table[i].vendor,
+				      id_table[i].function, NULL);
+	}
+
+	if (!dev)
+		return -ENODEV;
+	if (dev->prepare(dev) < 0)
+		return -EAGAIN;
+	if (!(dev->resource[0].flags & IORESOURCE_IO))
+		return -ENODEV;
+	if (dev->activate(dev) < 0) {
+		printk ("radio-sf16fmi: ISAPnP configure failed (out of resources?)\n");
+		return -ENOMEM;
+	}
+
+	i = dev->resource[0].start;
+	printk ("radio-sf16fmi: ISAPnP reports card at %#x\n", i);
+
+	return i;
+}
+
 static int __init fmi_init(void)
 {
-	if(io==-1)
-	{
-		printk(KERN_ERR "You must set an I/O address with io=0x???\n");
-		return -EINVAL;
+	if (io < 0)
+		io = isapnp_fmi_probe();
+	if (io < 0) {
+		printk(KERN_ERR "radio-sf16fmi: No PnP card found.");
+		return io;
 	}
-	if (!request_region(io, 2, "fmi")) 
-	{
-		printk(KERN_ERR "fmi: port 0x%x already in use\n", io);
+	if (!request_region(io, 2, "radio-sf16fmi")) {
+		printk(KERN_ERR "radio-sf16fmi: port 0x%x already in use\n", io);
 		return -EBUSY;
 	}
 
@@ -305,14 +339,12 @@ static int __init fmi_init(void)
 	
 	init_MUTEX(&lock);
 	
-	if(video_register_device(&fmi_radio, VFL_TYPE_RADIO, radio_nr)==-1)
-	{
+	if (video_register_device(&fmi_radio, VFL_TYPE_RADIO, radio_nr) == -1) {
 		release_region(io, 2);
 		return -EINVAL;
 	}
 		
-	printk(KERN_INFO "SF16FMx radio card driver at 0x%x.\n", io);
-	printk(KERN_INFO "(c) 1998 Petr Vandrovec, vandrove@vc.cvut.cz.\n");
+	printk(KERN_INFO "SF16FMx radio card driver at 0x%x\n", io);
 	/* mute card - prevents noisy bootups */
 	fmi_mute(io);
 	return 0;
@@ -329,9 +361,20 @@ EXPORT_NO_SYMBOLS;
 static void __exit fmi_cleanup_module(void)
 {
 	video_unregister_device(&fmi_radio);
-	release_region(io,2);
+	release_region(io, 2);
+	if (dev)
+		dev->deactivate(dev);
 }
 
 module_init(fmi_init);
 module_exit(fmi_cleanup_module);
 
+#ifndef MODULE
+static int __init fmi_setup_io(char *str)
+{
+	get_option(&str, &io);
+	return 1;
+}
+
+__setup("sf16fm=", fmi_setup_io);
+#endif

@@ -92,15 +92,6 @@ process_line(struct conf_writedata *cnf)
 	return (0);
 }				/* process_line */
 
-/*************************/
-/* dummy file operations */
-/*************************/
-static loff_t
-hysdn_dummy_lseek(struct file *file, loff_t offset, int orig)
-{
-	return -ESPIPE;
-}				/* hysdn_dummy_lseek */
-
 /***********************************/
 /* conf file operations and tables */
 /***********************************/
@@ -396,7 +387,7 @@ hysdn_conf_close(struct inode *ino, struct file *filep)
 /******************************************************/
 static struct file_operations conf_fops =
 {
-	llseek:         hysdn_dummy_lseek,
+	llseek:         no_llseek,
 	read:           hysdn_conf_read,
 	write:          hysdn_conf_write,
 	open:           hysdn_conf_open,

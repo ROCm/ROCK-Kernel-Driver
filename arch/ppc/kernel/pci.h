@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.pci.h 1.7 05/17/01 18:14:21 cort
+ * BK Id: SCCS/s.pci.h 1.10 08/08/01 16:35:43 paulus
  */
 
 #ifndef __PPC_KERNEL_PCI_H__
@@ -22,6 +22,6 @@ extern struct pci_controller* pci_find_hose_for_OF_device(
 
 extern void setup_indirect_pci(struct pci_controller* hose,
 			u32 cfg_addr, u32 cfg_data);
-extern void setup_grackle(struct pci_controller *hose, unsigned io_space_size);
+extern void setup_grackle(struct pci_controller *hose);
 
 #endif /* __PPC_KERNEL_PCI_H__ */

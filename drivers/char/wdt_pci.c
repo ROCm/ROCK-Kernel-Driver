@@ -220,11 +220,6 @@ static void wdtpci_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 }
 
 
-static long long wdtpci_llseek(struct file *file, long long offset, int origin)
-{
-	return -ESPIPE;
-}
-
 /**
  *	wdtpci_ping:
  *
@@ -459,7 +454,7 @@ static int wdtpci_notify_sys(struct notifier_block *this, unsigned long code,
  
 static struct file_operations wdtpci_fops = {
 	owner:		THIS_MODULE,
-	llseek:		wdtpci_llseek,
+	llseek:		no_llseek,
 	read:		wdtpci_read,
 	write:		wdtpci_write,
 	ioctl:		wdtpci_ioctl,

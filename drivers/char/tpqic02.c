@@ -1734,12 +1734,6 @@ static void qic02_tape_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 } /* qic02_tape_interrupt */
 
 
-static long long qic02_tape_lseek(struct file * file, long long offset, int origin)
-{
-	return -EINVAL;	/* not supported */
-} /* qic02_tape_lseek */
-
-
 /* read/write routines:
  * This code copies between a kernel buffer and a user buffer. The 
  * actual data transfer is done using DMA and interrupts. Time-outs
@@ -2766,7 +2760,7 @@ static int qic02_tape_ioctl(struct inode * inode, struct file * filp,
 /* These are (most) of the interface functions: */
 static struct file_operations qic02_tape_fops = {
 	owner:		THIS_MODULE,
-	llseek:		qic02_tape_lseek,	/* not allowed */
+	llseek:		no_llseek,
 	read:		qic02_tape_read,
 	write:		qic02_tape_write,
 	ioctl:		qic02_tape_ioctl,

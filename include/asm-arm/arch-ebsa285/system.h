@@ -35,7 +35,7 @@ static void arch_idle(void)
 slow_out:
 }
 
-extern __inline__ void arch_reset(char mode)
+static inline void arch_reset(char mode)
 {
 	if (mode == 's') {
 		/*

@@ -24,14 +24,14 @@ typedef unsigned int dmamode_t;
 
 extern spinlock_t  dma_spin_lock;
 
-extern __inline__ unsigned long claim_dma_lock(void)
+static inline unsigned long claim_dma_lock(void)
 {
 	unsigned long flags;
 	spin_lock_irqsave(&dma_spin_lock, flags);
 	return flags;
 }
 
-extern __inline__ void release_dma_lock(unsigned long flags)
+static inline void release_dma_lock(unsigned long flags)
 {
 	spin_unlock_irqrestore(&dma_spin_lock, flags);
 }
@@ -127,6 +127,10 @@ extern int  get_dma_residue(dmach_t channel);
 extern int isa_dma_bridge_buggy;
 #else
 #define isa_dma_bridge_buggy    (0)
+#endif
+
+#ifndef arch_adjust_zones
+#define arch_adjust_zones(node,size,holes)
 #endif
 
 #endif /* _ARM_DMA_H */

@@ -135,6 +135,11 @@ static inline void * phys_to_virt(unsigned long address)
 	return __va(address);
 }
 
+/*
+ * Change "struct page" to physical address.
+ */
+#define page_to_phys(page)	((page - mem_map) << PAGE_SHIFT)
+
 extern void * __ioremap(unsigned long offset, unsigned long size, unsigned long flags);
 
 static inline void * ioremap (unsigned long offset, unsigned long size)
@@ -159,6 +164,7 @@ extern void iounmap(void *addr);
  */
 #define virt_to_bus virt_to_phys
 #define bus_to_virt phys_to_virt
+#define page_to_bus page_to_phys
 
 /*
  * readX/writeX() are used to access memory mapped devices. On some

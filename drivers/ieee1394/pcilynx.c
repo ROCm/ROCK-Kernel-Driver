@@ -58,20 +58,10 @@
 #define PRINTD(level, card, fmt, args...) do {} while (0)
 #endif
 
-static struct pci_device_id pcilynx_pci_tbl[] __devinitdata = {
-	{
-	  vendor: PCI_VENDOR_ID_TI,
-	  device: PCI_DEVICE_ID_TI_PCILYNX,
-	  subvendor: PCI_ANY_ID,
-	  subdevice: PCI_ANY_ID,
-	},
-	{ }			/* Terminating entry */
-};
-MODULE_DEVICE_TABLE(pci, pcilynx_pci_tbl);
 
 static struct ti_lynx cards[MAX_PCILYNX_CARDS];
 static int num_of_cards = 0;
-
+static struct hpsb_host_template lynx_template;
 
 /*
  * PCL handling functions.
@@ -152,10 +142,8 @@ static void print_pcl(const struct ti_lynx *lynx, pcl_t pclid)
 #endif
 
 
-static int add_card(struct pci_dev *dev);
-static void remove_card(struct ti_lynx *lynx);
-static int init_driver(void);
-
+static int add_card(struct pci_dev *dev, const struct pci_device_id *devid);
+static void remove_card(struct pci_dev *dev);
 
 
 
@@ -451,6 +439,7 @@ static void send_next(struct ti_lynx *lynx, int what)
 }
 
 
+#if 0
 static int lynx_detect(struct hpsb_host_template *tmpl)
 {
         struct hpsb_host *host;
@@ -470,6 +459,7 @@ static int lynx_detect(struct hpsb_host_template *tmpl)
 
         return num_of_cards;
 }
+#endif
 
 static int lynx_initialize(struct hpsb_host *host)
 {
@@ -595,7 +585,7 @@ static void lynx_release(struct hpsb_host *host)
         
         if (host != NULL) {
                 lynx = host->hostdata;
-                remove_card(lynx);
+                remove_card(lynx->dev);
         } else {
 #ifdef CONFIG_IEEE1394_PCILYNX_PORTS
                 unregister_chrdev(PCILYNX_MAJOR, PCILYNX_DRIVER_NAME);
@@ -782,7 +772,7 @@ static ssize_t mem_write(struct file*, const char*, size_t, loff_t*);
 
 
 static struct file_operations aux_ops = {
-	owner:		THIS_MODULE,
+        OWNER_THIS_MODULE
         read:           mem_read,
         write:          mem_write,
         poll:           aux_poll,
@@ -807,18 +797,23 @@ static int mem_open(struct inode *inode, struct file *file)
         enum { t_rom, t_aux, t_ram } type;
         struct memdata *md;
         
+        V22_COMPAT_MOD_INC_USE_COUNT;
+
         if (cid < PCILYNX_MINOR_AUX_START) {
                 /* just for completeness */
+                V22_COMPAT_MOD_DEC_USE_COUNT;
                 return -ENXIO;
         } else if (cid < PCILYNX_MINOR_ROM_START) {
                 cid -= PCILYNX_MINOR_AUX_START;
                 if (cid >= num_of_cards || !cards[cid].aux_port) {
+                        V22_COMPAT_MOD_DEC_USE_COUNT;
                         return -ENXIO;
                 }
                 type = t_aux;
         } else if (cid < PCILYNX_MINOR_RAM_START) {
                 cid -= PCILYNX_MINOR_ROM_START;
                 if (cid >= num_of_cards || !cards[cid].local_rom) {
+                        V22_COMPAT_MOD_DEC_USE_COUNT;
                         return -ENXIO;
                 }
                 type = t_rom;
@@ -827,16 +822,17 @@ static int mem_open(struct inode *inode, struct file *file)
                  * It is currently used inside the driver! */
                 cid -= PCILYNX_MINOR_RAM_START;
                 if (cid >= num_of_cards || !cards[cid].local_ram) {
+                        V22_COMPAT_MOD_DEC_USE_COUNT;
                         return -ENXIO;
                 }
                 type = t_ram;
         }
 
         md = (struct memdata *)kmalloc(sizeof(struct memdata), SLAB_KERNEL);
-        if (md == NULL)
+        if (md == NULL) {
+                V22_COMPAT_MOD_DEC_USE_COUNT;
                 return -ENOMEM;
-
-	MOD_INC_USE_COUNT;
+        }
 
         md->lynx = &cards[cid];
         md->cid = cid;
@@ -866,7 +862,7 @@ static int mem_release(struct inode *inode, struct file *file)
 
         kfree(md);
 
-	MOD_DEC_USE_COUNT;
+        V22_COMPAT_MOD_DEC_USE_COUNT;
         return 0;
 }
 
@@ -1210,8 +1206,7 @@ static void lynx_irq_handler(int irq, void *dev_id,
 
                 spin_unlock(&lynx->iso_rcv.lock);
 
-                queue_task(&lynx->iso_rcv.tq, &tq_immediate);
-                mark_bh(IMMEDIATE_BH);
+		tasklet_schedule(&lynx->iso_rcv.tq);
         }
 
         if (intmask & PCI_INT_DMA_HLT(CHANNEL_ASYNC_SEND)) {
@@ -1339,13 +1334,14 @@ static void iso_rcv_bh(struct ti_lynx *lynx)
 }
 
 
-static int add_card(struct pci_dev *dev)
+static int __devinit add_card(struct pci_dev *dev,
+                              const struct pci_device_id *devid)
 {
 #define FAIL(fmt, args...) do { \
         PRINT_G(KERN_ERR, fmt , ## args); \
         num_of_cards--; \
-        remove_card(lynx); \
-        return 1; \
+        remove_card(dev); \
+        return -1; \
         } while (0)
 
         struct ti_lynx *lynx; /* shortcut to currently handled device */
@@ -1355,26 +1351,30 @@ static int add_card(struct pci_dev *dev)
                 PRINT_G(KERN_WARNING, "cannot handle more than %d cards.  "
                         "Adjust MAX_PCILYNX_CARDS in pcilynx.h.",
                         MAX_PCILYNX_CARDS);
-                return 1;
+                return -1;
         }
 
         lynx = &cards[num_of_cards++];
+
+        if (pci_set_dma_mask(dev, 0xffffffff))
+                FAIL("DMA address limits not supported for PCILynx hardware %d",
+                     lynx->id);
+        if (pci_enable_device(dev))
+                FAIL("failed to enable PCILynx hardware %d", lynx->id);
+        pci_set_master(dev);
+
+        lynx->host = hpsb_get_host(&lynx_template, 0);
+        if (!lynx->host)
+                FAIL("failed to allocate host structure");
+
+        lynx->state = have_host_struct;
 
         lynx->id = num_of_cards-1;
         lynx->dev = dev;
 	lynx->host->pdev = dev;
 
-	lynx->lock = SPIN_LOCK_UNLOCKED;
-	lynx->phy_reg_lock = SPIN_LOCK_UNLOCKED;
-
-        if (pci_set_dma_mask(dev, 0xffffffff)) {
-                FAIL("DMA address limits not supported for PCILynx hardware %d",
-                     lynx->id);
-        }
-        if (pci_enable_device(dev)) {
-                FAIL("failed to enable PCILynx hardware %d", lynx->id);
-        }
-        pci_set_master(dev);
+        lynx->lock = SPIN_LOCK_UNLOCKED;
+        lynx->phy_reg_lock = SPIN_LOCK_UNLOCKED;
 
 #ifndef CONFIG_IEEE1394_PCILYNX_LOCALRAM
         lynx->pcl_mem = pci_alloc_consistent(dev, LOCALRAM_SIZE,
@@ -1475,7 +1475,8 @@ static int add_card(struct pci_dev *dev)
         init_waitqueue_head(&lynx->aux_intr_wait);
 #endif
 
-	INIT_TQUEUE(&lynx->iso_rcv.tq, (void (*)(void*))iso_rcv_bh, lynx);
+	tasklet_init(&lynx->iso_rcv.tq, (void (*)(unsigned long))iso_rcv_bh,
+		     (unsigned long)lynx);
 
         lynx->iso_rcv.lock = SPIN_LOCK_UNLOCKED;
 
@@ -1504,9 +1505,13 @@ static int add_card(struct pci_dev *dev)
 #undef FAIL
 }
 
-static void remove_card(struct ti_lynx *lynx)
+static void remove_card(struct pci_dev *dev)
 {
+        struct ti_lynx *lynx;
         int i;
+
+        lynx = cards;
+        while (lynx->dev != dev) lynx++;
 
         switch (lynx->state) {
         case have_intr:
@@ -1538,13 +1543,18 @@ static void remove_card(struct ti_lynx *lynx)
                 pci_free_consistent(lynx->dev, LOCALRAM_SIZE, lynx->pcl_mem,
                                     lynx->pcl_mem_dma);
 #endif
+        case have_host_struct:
+                /* FIXME - verify host freeing */
         case clear:;
                 /* do nothing - already freed */
         }
 
+	tasklet_kill(&lynx->iso_rcv.tq);
+
         lynx->state = clear;
 }
 
+#if 0
 static int init_driver()
 {
         struct pci_dev *dev = NULL;
@@ -1580,6 +1590,7 @@ static int init_driver()
 
         return 0;
 }
+#endif
 
 
 static size_t get_lynx_rom(struct hpsb_host *host, const quadlet_t **ptr)
@@ -1588,40 +1599,60 @@ static size_t get_lynx_rom(struct hpsb_host *host, const quadlet_t **ptr)
         return sizeof(lynx_csr_rom);
 }
 
-struct hpsb_host_template *get_lynx_template(void)
-{
-        static struct hpsb_host_template tmpl = {
-                name:             "pcilynx",
-                detect_hosts:     lynx_detect,
-                initialize_host:  lynx_initialize,
-                release_host:     lynx_release,
-                get_rom:          get_lynx_rom,
-                transmit_packet:  lynx_transmit,
-                devctl:           lynx_devctl
-        };
+static struct hpsb_host_template lynx_template = {
+	name:             PCILYNX_DRIVER_NAME,
+	initialize_host:  lynx_initialize,
+	release_host:     lynx_release,
+	get_rom:          get_lynx_rom,
+	transmit_packet:  lynx_transmit,
+	devctl:           lynx_devctl
+};
 
-        return &tmpl;
-}
+static struct pci_device_id pci_table[] __devinitdata = {
+	{
+                vendor:     PCI_VENDOR_ID_TI,
+                device:     PCI_DEVICE_ID_TI_PCILYNX,
+                subvendor:  PCI_ANY_ID,
+                subdevice:  PCI_ANY_ID,
+	},
+	{ }			/* Terminating entry */
+};
 
+static struct pci_driver lynx_pcidriver = {
+        name:      PCILYNX_DRIVER_NAME,
+        id_table:  pci_table,
+        probe:     add_card,
+        remove:    remove_card,
+};
 
 MODULE_AUTHOR("Andreas E. Bombe <andreas.bombe@munich.netsurf.de>");
 MODULE_DESCRIPTION("driver for Texas Instruments PCI Lynx IEEE-1394 controller");
 MODULE_SUPPORTED_DEVICE("pcilynx");
+MODULE_DEVICE_TABLE(pci, pci_table);
 
 static void __exit pcilynx_cleanup(void)
 {
-        hpsb_unregister_lowlevel(get_lynx_template());
+        pci_unregister_driver(&lynx_pcidriver);
+        hpsb_unregister_lowlevel(&lynx_template);
         PRINT_G(KERN_INFO, "removed " PCILYNX_DRIVER_NAME " module");
 }
 
 static int __init pcilynx_init(void)
 {
-        if (hpsb_register_lowlevel(get_lynx_template())) {
+        int ret;
+
+        if (hpsb_register_lowlevel(&lynx_template)) {
                 PRINT_G(KERN_ERR, "registering failed");
                 return -ENXIO;
-        } else {
-                return 0;
         }
+
+        ret = pci_module_init(&lynx_pcidriver);
+        if (ret < 0) {
+                PRINT_G(KERN_ERR, "PCI module init failed");
+                hpsb_unregister_lowlevel(&lynx_template);
+        }
+
+        return ret;
 }
 
 module_init(pcilynx_init);

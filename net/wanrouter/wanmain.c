@@ -48,7 +48,7 @@
 #include <linux/errno.h>	/* return codes */
 #include <linux/kernel.h>
 #include <linux/module.h>	/* support for loadable modules */
-#include <linux/malloc.h>	/* kmalloc(), kfree() */
+#include <linux/slab.h>	/* kmalloc(), kfree() */
 #include <linux/mm.h>		/* verify_area(), etc. */
 #include <linux/string.h>	/* inline mem*, str* functions */
 

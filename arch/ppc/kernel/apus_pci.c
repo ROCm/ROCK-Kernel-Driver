@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.apus_pci.c 1.3 05/17/01 18:14:21 cort
+ * BK Id: SCCS/s.apus_pci.c 1.4 07/06/01 09:19:28 trini
  */
 /*
  * Copyright (C) Michel Dänzer <michdaen@iiic.ethz.ch>
@@ -55,7 +55,6 @@ extern unsigned long powerup_PCI_present;
 static struct pci_controller *apus_hose;
 
 
-__apus
 void *pci_io_base(unsigned int bus)
 {
 	return 0;
@@ -70,7 +69,7 @@ void *pci_io_base(unsigned int bus)
 #define cfg_write_val(val)	val
 
 #define APUS_PCI_OP(rw, size, type, op, mask)					\
-__apus int									\
+int									\
 apus_pcibios_##rw##_config_##size(struct pci_dev *dev, int offset, type val)	\
 {										\
 	int fnno = FNNO(dev->devfn);						\

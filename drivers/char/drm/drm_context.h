@@ -160,7 +160,7 @@ int DRM(getsareactx)(struct inode *inode, struct file *filp,
 		return -EFAULT;
 
 	down(&dev->struct_sem);
-	if ((int)request.ctx_id >= dev->max_context) {
+	if (dev->max_context < 0 || request.ctx_id >= (unsigned) dev->max_context) {
 		up(&dev->struct_sem);
 		return -EINVAL;
 	}
@@ -193,22 +193,20 @@ int DRM(setsareactx)(struct inode *inode, struct file *filp,
 	list_for_each(list, &dev->maplist->head) {
 		r_list = (drm_map_list_t *)list;
 		if(r_list->map &&
-		   r_list->map->handle == request.handle) break;
+		   r_list->map->handle == request.handle)
+			goto found;
 	}
-	if (list == &(dev->maplist->head)) {
-		up(&dev->struct_sem);
-		return -EINVAL;
-	}
-	map = r_list->map;
+bad:
 	up(&dev->struct_sem);
+	return -EINVAL;
 
-	if (!map) return -EINVAL;
-
-	down(&dev->struct_sem);
-	if ((int)request.ctx_id >= dev->max_context) {
-		up(&dev->struct_sem);
-		return -EINVAL;
-	}
+found:
+	map = r_list->map;
+	if (!map) goto bad;
+	if (dev->max_context < 0)
+		goto bad;
+	if (request.ctx_id >= (unsigned) dev->max_context)
+		goto bad;
 	dev->context_sareas[request.ctx_id] = map;
 	up(&dev->struct_sem);
 	return 0;

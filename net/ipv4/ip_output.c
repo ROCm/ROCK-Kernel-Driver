@@ -5,7 +5,7 @@
  *
  *		The Internet Protocol (IP) output module.
  *
- * Version:	$Id: ip_output.c,v 1.96 2001/08/03 22:20:39 davem Exp $
+ * Version:	$Id: ip_output.c,v 1.97 2001/08/09 17:53:40 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -37,6 +37,7 @@
  *					and more readibility. 
  *		Marc Boucher	:	When call_out_firewall returns FW_QUEUE,
  *					silently drop skb instead of failing with -EPERM.
+ *		Detlev Wengorz	:	Copy protocol for fragments.
  */
 
 #include <asm/uaccess.h>
@@ -805,6 +806,8 @@ int ip_fragment(struct sk_buff *skb, int (*output)(struct sk_buff*))
 		skb_put(skb2, len + hlen);
 		skb2->nh.raw = skb2->data;
 		skb2->h.raw = skb2->data + hlen;
+		skb2->protocol = skb->protocol;
+		skb2->security = skb->security;
 
 		/*
 		 *	Charge the memory for the fragment to any owner

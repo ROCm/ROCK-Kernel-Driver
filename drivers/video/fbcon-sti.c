@@ -16,7 +16,7 @@
 #include <linux/console.h>
 #include <linux/string.h>
 #include <linux/fb.h>
-#include <asm/delay.h>
+#include <linux/delay.h>
 #include <asm/types.h>
 
 #include <video/fbcon.h>
@@ -323,8 +323,12 @@ fbcon_sti_clear_margins(struct vc_data *conp,
      */
 
 struct display_switch fbcon_sti = {
-	fbcon_sti_setup, fbcon_sti_bmove, fbcon_sti_clear,
-	fbcon_sti_putc, fbcon_sti_putcs, fbcon_sti_revc,
-	NULL, NULL, fbcon_sti_clear_margins,
-	FONTWIDTH(8)
+	setup:		fbcon_sti_setup, 
+	bmove:		fbcon_sti_bmove, 
+	clear:		fbcon_sti_clear,
+	putc:		fbcon_sti_putc, 
+	putcs:		fbcon_sti_putcs, 
+	revc:		fbcon_sti_revc,
+	clear_margins:	fbcon_sti_clear_margins,
+	fontwidthmask:	FONTWIDTH(8)
 };

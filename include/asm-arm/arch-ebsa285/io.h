@@ -25,14 +25,14 @@
 #define __mem_isa(a)		(PCIMEM_BASE + (unsigned long)(a))
 #else
 
-extern __inline__ unsigned long ___mem_pci(unsigned long a)
+static inline unsigned long ___mem_pci(unsigned long a)
 {
 	if (a <= 0xc0000000 || a >= 0xe0000000)
 		BUG();
 	return a;
 }
 
-extern __inline__ unsigned long ___mem_isa(unsigned long a)
+static inline unsigned long ___mem_isa(unsigned long a)
 {
 	if (a >= 16*1048576)
 		BUG();

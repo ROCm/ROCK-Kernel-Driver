@@ -48,6 +48,7 @@
 #endif
 
 #include <linux/irq.h>
+#include <linux/module.h>
 
 asmlinkage int system_call(void);
 asmlinkage void lcall7(void);
@@ -88,39 +89,65 @@ asmlinkage void machine_check(void);
 
 int kstack_depth_to_print = 24;
 
+
 /*
- * These constants are for searching for possible module text
- * segments.
+ * If the address is either in the .text section of the
+ * kernel, or in the vmalloc'ed module regions, it *may* 
+ * be the address of a calling routine
  */
+
+#ifdef CONFIG_MODULES
+
+extern struct module *module_list;
+extern struct module kernel_module;
+
+static inline int kernel_text_address(unsigned long addr)
+{
+	int retval = 0;
+	struct module *mod;
+
+	if (addr >= (unsigned long) &_stext &&
+	    addr <= (unsigned long) &_etext)
+		return 1;
+
+	for (mod = module_list; mod != &kernel_module; mod = mod->next) {
+		/* mod_bound tests for addr being inside the vmalloc'ed
+		 * module area. Of course it'd be better to test only
+		 * for the .text subset... */
+		if (mod_bound(addr, 0, mod)) {
+			retval = 1;
+			break;
+		}
+	}
+
+	return retval;
+}
+
+#else
+
+static inline int kernel_text_address(unsigned long addr)
+{
+	return (addr >= (unsigned long) &_stext &&
+		addr <= (unsigned long) &_etext);
+}
+
+#endif
 
 void show_trace(unsigned long * stack)
 {
 	int i;
-	unsigned long addr, module_start, module_end;
+	unsigned long addr;
 
 	if (!stack)
 		stack = (unsigned long*)&stack;
 
 	printk("Call Trace: ");
 	i = 1;
-	module_start = VMALLOC_START;
-	module_end = VMALLOC_END;
-	module_end = 0;
 	while (((long) stack & (THREAD_SIZE-1)) != 0) {
 		addr = *stack++;
-		/*
-		 * If the address is either in the text segment of the
-		 * kernel, or in the region which contains vmalloc'ed
-		 * memory, it *may* be the address of a calling
-		 * routine; if so, print it so that someone tracing
-		 * down the cause of the crash will be able to figure
-		 * out the call path that was taken.
-		 */
-		if (((addr >= (unsigned long) &_stext) &&
-		     (addr <= (unsigned long) &_etext)) ||
-		    ((addr >= module_start) && (addr <= module_end))) {
-			if (i && ((i % 8) == 0))
-				printk("\n       ");
+		if (kernel_text_address(addr)) {
+			if (i && ((i % 6) == 0))
+				printk("\n   ");
 			printk("[<%08lx>] ", addr);
 			i++;
 		}

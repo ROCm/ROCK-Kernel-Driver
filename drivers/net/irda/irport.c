@@ -293,9 +293,9 @@ void irport_start(struct irport_cb *self)
 
 	iobase = self->io.sir_base;
 
-	spin_lock_irqsave(&self->lock, flags);
-
 	irport_stop(self);
+	
+	spin_lock_irqsave(&self->lock, flags);
 
 	/* Initialize UART */
 	outb(UART_LCR_WLEN8, iobase+UART_LCR);  /* Reset DLAB */
@@ -353,7 +353,7 @@ void irport_change_speed(void *priv, __u32 speed)
 	int lcr;    /* Line control reg */
 	int divisor;
 
-	IRDA_DEBUG(2, __FUNCTION__ "(), Setting speed to: %d\n", speed);
+	IRDA_DEBUG(0, __FUNCTION__ "(), Setting speed to: %d\n", speed);
 
 	ASSERT(self != NULL, return;);
 
@@ -616,7 +616,9 @@ int irport_hard_xmit(struct sk_buff *skb, struct net_device *dev)
 	struct irport_cb *self;
 	unsigned long flags;
 	int iobase;
-	__s32 speed;
+	s32 speed;
+
+	IRDA_DEBUG(0, __FUNCTION__ "()\n");
 
 	ASSERT(dev != NULL, return 0;);
 	
@@ -773,14 +775,19 @@ int irport_net_open(struct net_device *dev)
 	struct irport_cb *self;
 	int iobase;
 
+	IRDA_DEBUG(0, __FUNCTION__ "()\n");
+	
 	ASSERT(dev != NULL, return -1;);
 	self = (struct irport_cb *) dev->priv;
 
 	iobase = self->io.sir_base;
 
 	if (request_irq(self->io.irq, self->interrupt, 0, dev->name, 
-			(void *) dev))
+			(void *) dev)) {
+		IRDA_DEBUG(0, __FUNCTION__ "(), unable to allocate irq=%d\n",
+			   self->io.irq);
 		return -EAGAIN;
+	}
 
 	irport_start(self);
 

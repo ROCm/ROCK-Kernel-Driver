@@ -236,6 +236,7 @@ int coda_fsync(struct file *file, struct dentry *dentry, int datasync)
 }
 
 struct file_operations coda_file_operations = {
+	llseek:		generic_file_llseek,
 	read:		generic_file_read,
 	write:		coda_file_write,
 	mmap:		generic_file_mmap,

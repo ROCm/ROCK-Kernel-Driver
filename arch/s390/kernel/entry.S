@@ -81,7 +81,7 @@ flags        =  4
 sigpending   =  8
 need_resched = 24
 tsk_ptrace   = 28
-processor    = 60
+processor    = 56
 
 /*
  * Base Address of this Module --- saved in __LC_ENTRY_BASE
@@ -197,19 +197,10 @@ pgm_system_call:
 
 sysc_return:
         tm      SP_PSW+1(%r15),0x01 # returning to user ?
-        bno     BASED(sysc_leave) # no-> skip bottom half, resched & signal
-#
-# check, if bottom-half has to be done
-#
-	l       %r1,processor(%r9)    # get cpu number from task struture
-	sll     %r1,L1_CACHE_SHIFT
-	al      %r1,BASED(.Lirq_stat) # get address of irq_stat
-	icm     %r0,15,0(%r1)         # test irq_stat[#cpu].__softirq_pending
-        bnz     BASED(sysc_handle_bottom_half)
+        bno     BASED(sysc_leave) # no-> skip resched & signal
 #
 # check, if reschedule is needed
 #
-sysc_return_bh:	
         icm     %r0,15,need_resched(%r9) # get need_resched from task_struct
         bnz     BASED(sysc_reschedule)
         icm     %r0,15,sigpending(%r9)   # get sigpending from task_struct
@@ -246,15 +237,6 @@ sysc_tracesys:
 	la      %r14,BASED(sysc_return)
         br      %r1               # return point is sysc_return
 
-
-#
-# call do_softirq and return from syscall, if interrupt-level
-# is zero
-#
-sysc_handle_bottom_half:        
-        l       %r1,BASED(.Ldo_softirq)
-	la      %r14,BASED(sysc_return_bh)
-        br      %r1               # call do_softirq
 
 #
 # call schedule with sysc_return as return-address
@@ -708,18 +690,19 @@ io_int_handler:
         basr    %r14,%r1          # branch to standard irq handler
 
 io_return:
-        tm      SP_PSW+1(%r15),0x01 # returning to user ?
-        bno     BASED(io_leave)   # no-> skip resched & signal
-        stosm   24(%r15),0x03     # reenable interrupts
 #
 # check, if bottom-half has to be done
 #
-	l       %r1,processor(%r9)    # get cpu number from task struture
-	sll     %r1,L1_CACHE_SHIFT
-	al      %r1,BASED(.Lirq_stat) # get address of irq_stat
-	icm     %r0,15,0(%r1)         # test irq_stat[#cpu].__softirq_pending
+        l       %r1,processor(%r9)    # get cpu number from task struture
+        sll     %r1,L1_CACHE_SHIFT
+        al      %r1,BASED(.Lirq_stat) # get address of irq_stat
+        icm     %r0,15,0(%r1)         # test irq_stat[#cpu].__softirq_pending
         bnz     BASED(io_handle_bottom_half)
-io_return_bh:	
+io_return_bh:
+
+        tm      SP_PSW+1(%r15),0x01 # returning to user ?
+        bno     BASED(io_leave)   # no-> skip resched & signal
+        stosm   24(%r15),0x03     # reenable interrupts
 #
 # check, if reschedule is needed
 #
@@ -732,12 +715,11 @@ io_leave:
         RESTORE_ALL
 
 #
-# call do_softirq and return from syscall, if interrupt-level
-# is zero
+# call do_softirq
 #
-io_handle_bottom_half:        
+io_handle_bottom_half:
         l       %r1,BASED(.Ldo_softirq)
-	la      %r14,BASED(io_return_bh)
+        la      %r14,BASED(io_return_bh)
         br      %r1               # call do_softirq
 
 #

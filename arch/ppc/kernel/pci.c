@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.pci.c 1.26 06/28/01 08:02:41 trini
+ * BK Id: SCCS/s.pci.c 1.28 08/08/01 16:35:43 paulus
  */
 /*
  * Common pmac/prep/chrp pci routines. -- Cort
@@ -41,6 +41,7 @@ unsigned long isa_mem_base    = 0;
 unsigned long pci_dram_offset = 0;
 
 static void pcibios_fixup_resources(struct pci_dev* dev);
+static void fixup_broken_pcnet32(struct pci_dev* dev);
 #ifdef CONFIG_ALL_PPC
 static void pcibios_fixup_cardbus(struct pci_dev* dev);
 static u8* pci_to_OF_bus_map;
@@ -57,6 +58,7 @@ struct pci_controller** hose_tail = &hose_head;
 static int pci_bus_count;
 
 struct pci_fixup pcibios_fixups[] = {
+	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_TRIDENT,	PCI_ANY_ID,		fixup_broken_pcnet32 },
 	{ PCI_FIXUP_HEADER,	PCI_ANY_ID,		PCI_ANY_ID,		pcibios_fixup_resources },
 #ifdef CONFIG_ALL_PPC
 	/* We should add per-machine fixup support in xxx_setup.c or xxx_pci.c */
@@ -64,6 +66,16 @@ struct pci_fixup pcibios_fixups[] = {
 #endif /* CONFIG_ALL_PPC */
  	{ 0 }
 };
+
+static void
+fixup_broken_pcnet32(struct pci_dev* dev)
+{
+	if ((dev->class>>8 == PCI_CLASS_NETWORK_ETHERNET)) {
+		dev->vendor = PCI_VENDOR_ID_AMD;
+		pci_write_config_word(dev, PCI_VENDOR_ID, PCI_VENDOR_ID_AMD);
+		pci_name_device(dev);
+	}
+}
 
 void
 pcibios_update_resource(struct pci_dev *dev, struct resource *root,

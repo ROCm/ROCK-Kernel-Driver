@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.pmac_pci.c 1.18 07/01/01 12:23:31 trini
+ * BK Id: SCCS/s.pmac_pci.c 1.22 08/08/01 16:35:43 paulus
  */
 /*
  * Support for PCI bridges found on Power Macintoshes.
@@ -407,7 +407,7 @@ setup_chaos(struct pci_controller* hose, struct reg_property* addr)
 }
 
 void __init
-setup_grackle(struct pci_controller *hose, unsigned io_space_size)
+setup_grackle(struct pci_controller *hose)
 {
 	setup_indirect_pci(hose, 0xfec00000, 0xfee00000);
 	if (machine_is_compatible("AAPL,PowerBook1998"))
@@ -459,7 +459,7 @@ add_bridges(struct device_node *dev)
 			disp_name = "UniNorth";
 		} else if (strcmp(dev->name, "pci") == 0) {
 			/* XXX assume this is a mpc106 (grackle) */
-			setup_grackle(hose, 0x20000);
+			setup_grackle(hose);
 			disp_name = "Grackle (MPC106)";
 		} else if (strcmp(dev->name, "bandit") == 0) {
 			setup_bandit(hose, addr);

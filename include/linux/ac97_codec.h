@@ -152,8 +152,7 @@ struct ac97_codec {
 	int dev_mixer; 
 	int type;
 
-	/* codec specific init/reset routines, used mainly for 4 or 6 channel support */
-	int  (*codec_init)  (struct ac97_codec *codec);
+	struct ac97_ops *codec_ops;
 
 	/* controller specific lower leverl ac97 accessing routines */
 	u16  (*codec_read)  (struct ac97_codec *codec, u8 reg);
@@ -182,6 +181,20 @@ struct ac97_codec {
 
 	/* Software Modem interface */
 	int  (*modem_ioctl)(struct ac97_codec *codec, unsigned int cmd, unsigned long arg);
+};
+
+/*
+ *	Operation structures for each known AC97 chip
+ */
+ 
+struct ac97_ops
+{
+	/* Initialise */
+	int (*init)(struct ac97_codec *c);
+	/* Amplifier control */
+	int (*amplifier)(struct ac97_codec *codec, int on);
+	/* Digital mode control */
+	int (*digital)(struct ac97_codec *codec, int format);
 };
 
 extern int ac97_read_proc (char *page_out, char **start, off_t off,

@@ -76,29 +76,6 @@
  * fdisk, mkfs, etc.).
  *
  *
- * Module Load Options:
- *
- * The SBP-2 driver now has a number of module load parameters available for use
- * in debugging/testing. Following are the valid parameters 
- *	
- * no_bus_scan - Skip the initial scsi bus scan during module load
- * (1 = skip bus scan, 0 = perform bus scan, default = 0)
- *
- * mode_sense_hack - Emulate mode sense for devices like 1394 memory stick readers
- * (1 = emulate/fake mode sense, 0 = do not emulate/fake mode sense, default = 0)  
- *
- * max_speed - Force max speed allowed
- * (0 = 100mb, 1 = 200mb, 2 = 400mb, default = auto configure)
- *
- * serialize_io - Force scsi stack to send down one command at a time, for debugging
- * (1 = serialize all I/O, 0 = do not serialize I/O, default = 1) 
- *
- * no_large_packets - Force scsi stack to limit max packet size sent down, for debugging
- * (1 = limit max transfer size, 0 = do not limit max packet size, default = 0)
- *
- * (e.g. insmod sbp2 no_bus_scan=1)
- *
- *
  * Current Support:
  *
  * The SBP-2 driver is still in an early state, but supports a variety of devices.
@@ -164,20 +141,6 @@
  *
  *	- Workaround for PPC pismo firewire chipset (enable SBP2_PPC_PISMO_WORKAROUND
  *	  define below).
- *
- *
- * Core IEEE-1394 Stack Changes:
- *
- *	- The IEEE-1394 core stack guid code attempts to read the node unique id from
- *	  each attached device after a bus reset. It currently uses a block read
- *	  request to do this, which "upsets" certain not-well-behaved devices, such as
- *	  some drives from QPS. If you have trouble with your IEEE-1394 storage 
- *	  device being detected after loading sbp2, try commenting out the 
- *	  init_ieee1394_guid() and cleanup_ieee1394_guid() lines at the bottom of 
- *	  ieee1394_core.c (and rebuild ieee1394.o). 
- *
- *	- In ohci1394.h, remove the IEEE1394_USE_BOTTOM_HALVES #define, and rebuild. 
- *	  This will give you around 30% to 40% performance increase.
  *
  *
  * History:
@@ -257,6 +220,8 @@
  *		   128KB max transfer limit.
  *	06/16/01 - Converted DMA interfaces to pci_dma - Ben Collins
  *							 <bcollins@debian.org
+ *	07/22/01 - Use NodeMngr to get info about the local host and
+ *		   attached devices. Ben Collins
  */
     
 /*
@@ -289,8 +254,10 @@
 #include "ieee1394_types.h"
 #include "ieee1394_core.h"
 #include "hosts.h"
+#include "nodemgr.h"
 #include "highlevel.h"
 #include "ieee1394_transactions.h"
+#include "ieee1394_hotplug.h"
 #include "../scsi/scsi.h"
 #include "../scsi/hosts.h"
 #include "../scsi/sd.h"
@@ -349,7 +316,7 @@ static int mode_sense_hack = 0;
  */
 MODULE_PARM(max_speed,"i");
 MODULE_PARM_DESC(max_speed, "Force down max speed (2 = 400mb default, 1 = 200mb, 0 = 100mb)");
-static int max_speed = SPEED_S400;
+static int max_speed = SPEED_400;
 
 /*
  * Set serialize_io to 1 if you'd like only one scsi command sent down to us at a time (debugging).
@@ -366,14 +333,24 @@ static int serialize_io = 1;	/* serialize I/O until stress issues are resolved *
 MODULE_PARM(no_large_packets,"i");
 MODULE_PARM_DESC(no_large_packets, "Do not allow large transfers from scsi drivers (debugging)");
 static int no_large_packets = 0;
- 
+
+/*
+ * Export information about protocols/devices supported by this driver
+ */
+static struct ieee1394_device_id sbp2_id_table[] = {
+	IEEE1394_PROTOCOL(SBP2_UNIT_SPEC_ID_ENTRY, SBP2_SW_VERSION_ENTRY),
+	{ }
+};
+
+MODULE_DEVICE_TABLE(ieee1394, sbp2_id_table); 
+
 /*
  * Debug levels, configured via kernel config.
  */
 
 #ifdef CONFIG_IEEE1394_SBP2_DEBUG_ORBS
 #define SBP2_ORB_DEBUG(fmt, args...)	HPSB_ERR("sbp2("__FUNCTION__"): "fmt, ## args)
-u32 global_outstanding_command_orbs = 0;
+static u32 global_outstanding_command_orbs = 0;
 #define outstanding_orb_incr global_outstanding_command_orbs++
 #define outstanding_orb_decr global_outstanding_command_orbs--
 #else
@@ -389,7 +366,7 @@ u32 global_outstanding_command_orbs = 0;
 #define SBP2_DMA_FREE(fmt, args...) \
 	HPSB_ERR("sbp2("__FUNCTION__")free(%d): "fmt, \
 		 --global_outstanding_dmas, ## args)
-u32 global_outstanding_dmas = 0;
+static u32 global_outstanding_dmas = 0;
 #else
 #define SBP2_DMA_ALLOC(fmt, args...)
 #define SBP2_DMA_FREE(fmt, args...)
@@ -432,9 +409,9 @@ u32 global_outstanding_dmas = 0;
 
 Scsi_Host_Template *global_scsi_tpnt = NULL;
 
-LIST_HEAD(sbp2_host_info_list);
+static LIST_HEAD(sbp2_host_info_list);
 static int sbp2_host_count = 0;
-spinlock_t sbp2_host_info_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t sbp2_host_info_lock = SPIN_LOCK_UNLOCKED;
 
 static struct hpsb_highlevel *sbp2_hl_handle = NULL;
 
@@ -681,7 +658,7 @@ static struct sbp2_request_packet *sbp2util_allocate_write_request_packet(struct
 		INIT_LIST_HEAD(&packet->list);
 		sema_init(&packet->state_change, 0);
 		packet->state = unused;
-		packet->generation = get_hpsb_generation();
+		packet->generation = get_hpsb_generation(hi->host);
 		packet->data_be = 1;
 
 		packet->host = hi->host;
@@ -1021,7 +998,7 @@ static void sbp2_add_host(struct hpsb_host *host)
 		sbp2_spin_lock(&sbp2_host_info_lock, flags);
 		list_add_tail(&hi->list, &sbp2_host_info_list);
 		sbp2_host_count++;
-		sbp2_spin_lock(&sbp2_host_info_lock, flags);
+		sbp2_spin_unlock(&sbp2_host_info_lock, flags);
 
 		/*
 		 * Initialize us to bus reset in progress
@@ -1046,19 +1023,19 @@ static void sbp2_add_host(struct hpsb_host *host)
 }
 
 /*
- * This fuction returns a host info structure from the host structure, in case we have multiple hosts
+ * This fuction returns a host info structure from the host structure,
+ * in case we have multiple hosts
  */
-static struct sbp2scsi_host_info *sbp2_find_host_info(struct hpsb_host *host) {
+static struct sbp2scsi_host_info *sbp2_find_host_info(struct hpsb_host *host)
+{
 	struct list_head *lh;
 	struct sbp2scsi_host_info *hi;
 
-	lh = sbp2_host_info_list.next;
-	while (lh != &sbp2_host_info_list) {
+	list_for_each (lh, &sbp2_host_info_list) {
 		hi = list_entry(lh, struct sbp2scsi_host_info, list);
 		if (hi->host == host) {
 			return hi;
 		}
-		lh = lh->next;
 	}
 
 	return(NULL);
@@ -1142,12 +1119,14 @@ static int sbp2_detection_thread(void *__hi)
 	 * This thread doesn't need any user-level access,
 	 * so get rid of all our resources
 	 */
+#if LINUX_VERSION_CODE > 0x20300
 	daemonize();
+#endif
 
 	/* 
 	 * Set-up a nice name
 	 */
-	strcpy(current->comm, "sbp2");
+	strcpy(current->comm, SBP2_DEVICE_NAME);
 
 	unlock_kernel();
         
@@ -1179,35 +1158,22 @@ static int sbp2_detection_thread(void *__hi)
  */
 static int sbp2_start_device(struct sbp2scsi_host_info *hi, int node_id)
 {
-	quadlet_t node_unique_id_lo, node_unique_id_hi;
 	u64 node_unique_id;
 	struct scsi_id_instance_data *scsi_id = NULL;
+	struct node_entry *ne;
 	int i;
 
 	SBP2_DEBUG("sbp2: sbp2_start_device");
 
-	/*
-	 * Let's read the node unique id off of the device (using two quadlet reads for hi and lo)
-	 */
-	if (sbp2util_read_quadlet(hi, LOCAL_BUS | node_id, CONFIG_ROM_NODE_UNIQUE_ID_HI_ADDRESS, 
-				  &node_unique_id_hi)) {
-		SBP2_DEBUG("sbp2: Error reading node unique id - bad status");
-		return(-EIO);
+	/* XXX: This will go away once we start using the nodemgr's
+	 * feature subscription API.  */
+	ne = hpsb_nodeid_get_entry(node_id|(hi->host->node_id & BUS_MASK));
+	if (!ne) {
+		HPSB_ERR("sbp2: Could not find device node");
+		return -ENXIO;
 	}
 
-	if (sbp2util_read_quadlet(hi, LOCAL_BUS | node_id, CONFIG_ROM_NODE_UNIQUE_ID_LO_ADDRESS, 
-				  &node_unique_id_lo)) {
-		SBP2_DEBUG("sbp2: Error reading node unique id - bad status");
-		return(-EIO);
-	}
-
-	/*
-	 * Spit out the node unique ids we got
-	 */
-	SBP2_DEBUG("sbp2: Node %x, node unique id hi = %x", (LOCAL_BUS | node_id), (unsigned int) node_unique_id_hi);
-	SBP2_DEBUG("sbp2: Node %x, node unique id lo = %x", (LOCAL_BUS | node_id), (unsigned int) node_unique_id_lo);
-
-	node_unique_id = (((u64)node_unique_id_hi) << 32) | ((u64)node_unique_id_lo);
+	node_unique_id = ne->guid;
 
 	/*
 	 * First, we need to find out whether this is a "new" SBP-2 device plugged in, or one that already
@@ -1355,7 +1321,7 @@ alloc_fail_first:
 	scsi_id->node_id = node_id;
 	scsi_id->node_unique_id = node_unique_id;
 	scsi_id->validated = 1;
-	scsi_id->speed_code = SPEED_S100;
+	scsi_id->speed_code = SPEED_100;
 	scsi_id->max_payload_size = MAX_PAYLOAD_S100;
 
 	init_waitqueue_head(&scsi_id->sbp2_login_wait);
@@ -1458,7 +1424,7 @@ alloc_fail_first:
 }
 
 /*
- * This function trys to determine if a device is a valid SBP-2 device
+ * This function tries to determine if a device is a valid SBP-2 device
  */
 static int sbp2_check_device(struct sbp2scsi_host_info *hi, int node_id)
 {
@@ -2249,65 +2215,43 @@ static int sbp2_parse_unit_directory(struct sbp2scsi_host_info *hi, struct scsi_
  */
 static int sbp2_max_speed_and_size(struct sbp2scsi_host_info *hi, struct scsi_id_instance_data *scsi_id)
 {
-	quadlet_t node_options, max_rec;
 	u8 speed_code;
+	struct node_entry *ne;
 
 	SBP2_DEBUG("sbp2: sbp2_max_speed_and_size");
 
-	/*
-	 * Get speed code from internal host structure. There should be a better way to obtain this.
-	 */
-	speed_code = hi->host->speed_map[(hi->host->node_id & NODE_MASK) * 64 + (scsi_id->node_id & NODE_MASK)];
+	/* Get this nodes information */
+	ne = hpsb_nodeid_get_entry(hi->host->node_id);
 
-	/*
-	 * Bump down our speed if there is a module parameter forcing us slower
-	 */
+	if (!ne) {
+		HPSB_ERR("sbp2: Unknown device, using S100, payload 512 bytes");
+		scsi_id->speed_code = SPEED_100;
+		scsi_id->max_payload_size = MAX_PAYLOAD_S100;
+		return(0);
+	}
+
+	speed_code = ne->busopt.lnkspd;
+
+	/* Bump down our speed if there is a module parameter forcing us slower */
 	if (speed_code > max_speed) {
 		speed_code = max_speed;
 		SBP2_ERR("sbp2: Reducing SBP-2 max speed allowed (%x)", max_speed); 
 	}
 
-	switch (speed_code) {
-		case SPEED_S100:
-			scsi_id->speed_code = SPEED_S100;
-			scsi_id->max_payload_size = MAX_PAYLOAD_S100;
-			SBP2_INFO("sbp2: SBP-2 device max speed S100 and payload 512 bytes"); 
-			break;
-		case SPEED_S200:
-			scsi_id->speed_code = SPEED_S200;
-			scsi_id->max_payload_size = MAX_PAYLOAD_S200;
-			SBP2_INFO("sbp2: SBP-2 device max speed S200 and payload 1KB"); 
-			break;
-		case SPEED_S400:
-			scsi_id->speed_code = SPEED_S400;
-			scsi_id->max_payload_size = MAX_PAYLOAD_S400;
-			SBP2_INFO("sbp2: SBP-2 device max speed S400 and payload 2KB"); 
-			break;
-		default:
-			scsi_id->speed_code = SPEED_S100;
-			scsi_id->max_payload_size = MAX_PAYLOAD_S100;
-			SBP2_ERR("sbp2: Undefined speed: Using SBP-2 device max speed S100 and payload 512 bytes"); 
-			break;
-	}
-
-	/*
-	 * Finally, check the adapter's capabilities to further bump down our max payload size
-	 * if necessary. For instance, TILynx may not support the default max payload at a 
-	 * particular speed.
-	 */
-	if (!hpsb_read(hi->host, hi->host->node_id | LOCAL_BUS, CONFIG_ROM_NODE_OPTIONS, &node_options, 4)) {
-
-		/* 
-		 * Grab max_rec (max payload = 2 ^ (max_rec+1)) from node options. Sbp2 max payload is 
-		 * defined as 2 ^ (max_pay+2)... so, have to subtract one from max rec for comparison...
-		 * confusing, eh?   ;-)
-		 */
-		max_rec = (be32_to_cpu(node_options) & 0x0000f000) >> 12;
-		if (scsi_id->max_payload_size > (max_rec - 1)) {
-			scsi_id->max_payload_size = (max_rec - 1);
-			SBP2_ERR("sbp2: Reducing SBP-2 max payload allowed (%x)", (max_rec - 1)); 
-		}
-
+	/* Support the devices max_rec and max speed. We choose a setting
+	 * that fits both values, since they may differ.  */
+	if (speed_code >= SPEED_400 && ne->busopt.max_rec >= MAX_REC_S400) {
+		HPSB_INFO("sbp2: SBP-2 device max speed S400 and payload 2KB");
+		scsi_id->speed_code = SPEED_400;
+		scsi_id->max_payload_size = MAX_PAYLOAD_S400;
+	} else if (speed_code >= SPEED_200 && ne->busopt.max_rec >= MAX_REC_S200) {
+		HPSB_INFO("sbp2: SBP-2 device max speed S200 and payload 1KB");
+		scsi_id->speed_code = SPEED_200;
+		scsi_id->max_payload_size = MAX_PAYLOAD_S200;
+	} else {
+		HPSB_INFO("sbp2: SBP-2 device max speed S100 and payload 512 bytes");
+		scsi_id->speed_code = SPEED_100;
+		scsi_id->max_payload_size = MAX_PAYLOAD_S100;
 	}
 
 	return(0);
@@ -3480,9 +3424,9 @@ static int sbp2scsi_detect (Scsi_Host_Template *tpnt)
 	SBP2_DEBUG("sbp2: sbp2scsi_detect");
 
 	global_scsi_tpnt = tpnt;
-
-	global_scsi_tpnt->proc_name = "sbp2";
-
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2,3,26)
+	global_scsi_tpnt->proc_name = SBP2_DEVICE_NAME;
+#endif
 	/*
 	 * Module load option for force one command at a time
 	 */
@@ -3554,9 +3498,7 @@ static void sbp2scsi_register_scsi_host(struct sbp2scsi_host_info *hi)
 	return;
 }
 
-/*
- * Called when our module is released
- */
+/* Called when our module is released */
 static int sbp2scsi_release(struct Scsi_Host *host)
 {
 	SBP2_DEBUG("sbp2: sbp2scsi_release");
@@ -3564,25 +3506,32 @@ static int sbp2scsi_release(struct Scsi_Host *host)
 	return(0);
 }
 
-/*
- * Called for contents of procfs
- */
+/* Called for contents of procfs */
 static const char *sbp2scsi_info (struct Scsi_Host *host)
 {
 	return "IEEE-1394 SBP-2 protocol driver";
 }
 
-/*
- * Module related section
- */
-
 MODULE_AUTHOR("James Goodwin <jamesg@filanet.com>");
 MODULE_DESCRIPTION("IEEE-1394 SBP-2 protocol driver");
-MODULE_SUPPORTED_DEVICE("sbp2");
+MODULE_SUPPORTED_DEVICE(SBP2_DEVICE_NAME);
 
-/*
- * SCSI host template
- */
-static Scsi_Host_Template driver_template = SBP2SCSI;
+/* SCSI host template */
+static Scsi_Host_Template driver_template = {
+	name:		"IEEE1394 SBP-2",
+	detect:		sbp2scsi_detect,
+	release:	sbp2scsi_release,
+	info:		sbp2scsi_info,
+	queuecommand:	sbp2scsi_queuecommand,
+	abort:		sbp2scsi_abort,
+	reset:		sbp2scsi_reset,
+	bios_param:	sbp2scsi_biosparam,
+	can_queue:	SBP2SCSI_MAX_OUTSTANDING_CMDS,
+	this_id:	-1,
+	sg_tablesize:	SBP2_MAX_SG_ELEMENTS,
+	cmd_per_lun:	SBP2SCSI_MAX_CMDS_PER_LUN,
+	use_clustering:	SBP2_CLUSTERING,
+	emulated:	1
+};
 
 #include "../scsi/scsi_module.c"

@@ -28,16 +28,18 @@
 
 #include <asm/uaccess.h>
 
-extern __inline__
+static inline
 void loadSingle(const unsigned int Fn,const unsigned int *pMem)
 {
+   FPA11 *fpa11 = GET_FPA11();
    fpa11->fType[Fn] = typeSingle;
    get_user(fpa11->fpreg[Fn].fSingle, pMem);
 }
 
-extern __inline__
+static inline
 void loadDouble(const unsigned int Fn,const unsigned int *pMem)
 {
+   FPA11 *fpa11 = GET_FPA11();
    unsigned int *p;
    p = (unsigned int*)&fpa11->fpreg[Fn].fDouble;
    fpa11->fType[Fn] = typeDouble;
@@ -45,9 +47,10 @@ void loadDouble(const unsigned int Fn,const unsigned int *pMem)
    get_user(p[1], &pMem[0]); /* sign & exponent */
 }   
 
-extern __inline__
+static inline
 void loadExtended(const unsigned int Fn,const unsigned int *pMem)
 {
+   FPA11 *fpa11 = GET_FPA11();
    unsigned int *p;
    p = (unsigned int*)&fpa11->fpreg[Fn].fExtended;
    fpa11->fType[Fn] = typeExtended;
@@ -56,9 +59,10 @@ void loadExtended(const unsigned int Fn,const unsigned int *pMem)
    get_user(p[2], &pMem[1]);  /* ms bits */
 }   
 
-extern __inline__
+static inline
 void loadMultiple(const unsigned int Fn,const unsigned int *pMem)
 {
+   FPA11 *fpa11 = GET_FPA11();
    register unsigned int *p;
    unsigned long x;
 
@@ -87,9 +91,10 @@ void loadMultiple(const unsigned int Fn,const unsigned int *pMem)
    }
 }
 
-extern __inline__
+static inline
 void storeSingle(const unsigned int Fn,unsigned int *pMem)
 {
+   FPA11 *fpa11 = GET_FPA11();
    float32 val;
    register unsigned int *p = (unsigned int*)&val;
    
@@ -109,9 +114,10 @@ void storeSingle(const unsigned int Fn,unsigned int *pMem)
    put_user(p[0], pMem);
 }   
 
-extern __inline__
+static inline
 void storeDouble(const unsigned int Fn,unsigned int *pMem)
 {
+   FPA11 *fpa11 = GET_FPA11();
    float64 val;
    register unsigned int *p = (unsigned int*)&val;
 
@@ -131,9 +137,10 @@ void storeDouble(const unsigned int Fn,unsigned int *pMem)
    put_user(p[0], &pMem[1]);	/* lsw */
 }   
 
-extern __inline__
+static inline
 void storeExtended(const unsigned int Fn,unsigned int *pMem)
 {
+   FPA11 *fpa11 = GET_FPA11();
    floatx80 val;
    register unsigned int *p = (unsigned int*)&val;
    
@@ -155,9 +162,10 @@ void storeExtended(const unsigned int Fn,unsigned int *pMem)
    put_user(p[2], &pMem[1]); /* msw */
 }   
 
-extern __inline__
+static inline
 void storeMultiple(const unsigned int Fn,unsigned int *pMem)
 {
+   FPA11 *fpa11 = GET_FPA11();
    register unsigned int nType, *p;
    
    p = (unsigned int*)&(fpa11->fpreg[Fn]);

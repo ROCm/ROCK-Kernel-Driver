@@ -72,9 +72,6 @@ extern int cpia_init(struct video_init *);
 #ifdef CONFIG_VIDEO_PLANB
 extern int init_planbs(struct video_init *);
 #endif
-#ifdef CONFIG_VIDEO_ZORAN
-extern int init_zoran_cards(struct video_init *);
-#endif
 
 static struct video_init video_init_list[]={
 #ifdef CONFIG_VIDEO_BWQCAM
@@ -86,9 +83,6 @@ static struct video_init video_init_list[]={
 #ifdef CONFIG_VIDEO_PLANB
 	{"planb", init_planbs},
 #endif
-#ifdef CONFIG_VIDEO_ZORAN
-	{"zoran", init_zoran_cards},
-#endif	
 	{"end", NULL}
 };
 
@@ -206,17 +200,6 @@ static int video_release(struct inode *inode, struct file *file)
 		__MOD_DEC_USE_COUNT(vfl->owner);
 	unlock_kernel();
 	return 0;
-}
-
-/*
- *	Question: Should we be able to capture and then seek around the
- *	image ?
- */
- 
-static long long video_lseek(struct file * file,
-			  long long offset, int origin)
-{
-	return -ESPIPE;
 }
 
 static int video_ioctl(struct inode *inode, struct file *file,
@@ -548,7 +531,7 @@ void video_unregister_device(struct video_device *vfd)
 static struct file_operations video_fops=
 {
 	owner:		THIS_MODULE,
-	llseek:		video_lseek,
+	llseek:		no_llseek,
 	read:		video_read,
 	write:		video_write,
 	ioctl:		video_ioctl,

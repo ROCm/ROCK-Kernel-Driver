@@ -42,7 +42,10 @@ struct raid1_private_data {
 	 */
 	struct buffer_head	*freebh;
 	int			freebh_cnt;	/* how many are on the list */
+	int			freebh_blocked;
 	struct raid1_bh		*freer1;
+	int			freer1_blocked;
+	int			freer1_cnt;
 	struct raid1_bh		*freebuf; 	/* each bh_req has a page allocated */
 	md_wait_queue_head_t	wait_buffer;
 

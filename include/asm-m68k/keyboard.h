@@ -14,6 +14,7 @@
 #ifdef __KERNEL__
 
 #include <linux/config.h>
+#include <linux/kd.h>
 #include <asm/machdep.h>
 
 #ifdef CONFIG_Q40
@@ -56,6 +57,7 @@ static __inline__ void kbd_leds(unsigned char leds)
 
 #define kbd_init_hw		mach_keyb_init
 #define kbd_translate		mach_kbd_translate
+#define kbd_rate		mach_kbdrate
 
 #define kbd_sysrq_xlate		mach_sysrq_xlate
 

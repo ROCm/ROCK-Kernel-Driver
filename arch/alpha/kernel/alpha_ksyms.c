@@ -19,6 +19,7 @@
 #include <linux/delay.h>
 
 #include <asm/io.h>
+#include <asm/console.h>
 #include <asm/hwrpb.h>
 #include <asm/uaccess.h>
 #include <asm/processor.h>
@@ -57,6 +58,11 @@ EXPORT_SYMBOL(disable_irq_nosync);
 EXPORT_SYMBOL(probe_irq_mask);
 EXPORT_SYMBOL(screen_info);
 EXPORT_SYMBOL(perf_irq);
+#ifdef CONFIG_ALPHA_SRM
+EXPORT_SYMBOL(callback_getenv);
+EXPORT_SYMBOL(callback_setenv);
+EXPORT_SYMBOL(callback_save_env);
+#endif /* CONFIG_ALPHA_SRM */
 
 /* platform dependent support */
 EXPORT_SYMBOL(_inb);

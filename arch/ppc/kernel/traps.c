@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.traps.c 1.14 06/15/01 13:00:20 paulus
+ * BK Id: SCCS/s.traps.c 1.16 07/31/01 10:53:34 trini
  */
 /*
  *  linux/arch/ppc/kernel/traps.c
@@ -40,7 +40,7 @@
 #include <asm/processor.h>
 
 extern int fix_alignment(struct pt_regs *);
-extern void bad_page_fault(struct pt_regs *, unsigned long);
+extern void bad_page_fault(struct pt_regs *, unsigned long, int sig);
 
 #ifdef CONFIG_XMON
 extern void xmon(struct pt_regs *regs);
@@ -317,7 +317,7 @@ AlignmentException(struct pt_regs *regs)
 		if (user_mode(regs))
 			force_sig(SIGSEGV, current);
 		else
-			bad_page_fault(regs, regs->dar);
+			bad_page_fault(regs, regs->dar, SIGSEGV);
 		return;
 	}
 	_exception(SIGBUS, regs);	

@@ -590,7 +590,7 @@ int tul_reset_scsi(HCS * pCurHcb, int seconds)
 int init_tulip(HCS * pCurHcb, SCB * scbp, int tul_num_scb, BYTE * pbBiosAdr, int seconds)
 {
 	int i;
-	WORD *pwFlags;
+	BYTE *pwFlags;
 	BYTE *pbHeads;
 	SCB *pTmpScb, *pPrevScb = NULL;
 
@@ -674,7 +674,7 @@ int init_tulip(HCS * pCurHcb, SCB * scbp, int tul_num_scb, BYTE * pbBiosAdr, int
 	       ((pCurHcb->HCS_Config & HCC_AUTO_TERM) >> 4) | (TUL_RD(pCurHcb->HCS_Base, TUL_GCTRL1) & 0xFE));
 
 	for (i = 0,
-	     pwFlags = (WORD *) & (i91unvramp->NVM_SCSIInfo[0].NVM_Targ0Config),
+	     pwFlags = & (i91unvramp->NVM_SCSIInfo[0].NVM_Targ0Config),
 	     pbHeads = pbBiosAdr + 0x180;
 	     i < pCurHcb->HCS_MaxTar;
 	     i++, pwFlags++) {

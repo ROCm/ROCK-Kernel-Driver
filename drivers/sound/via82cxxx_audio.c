@@ -1362,19 +1362,10 @@ out:
 }
 
 
-static loff_t via_llseek(struct file *file, loff_t offset, int origin)
-{
-	DPRINTK ("ENTER\n");
-
-	DPRINTK ("EXIT, returning -ESPIPE\n");
-	return -ESPIPE;
-}
-
-
 static struct file_operations via_mixer_fops = {
 	owner:		THIS_MODULE,
 	open:		via_mixer_open,
-	llseek:		via_llseek,
+	llseek:		no_llseek,
 	ioctl:		via_mixer_ioctl,
 };
 
@@ -1780,7 +1771,7 @@ static struct file_operations via_dsp_fops = {
 	read:		via_dsp_read,
 	write:		via_dsp_write,
 	poll:		via_dsp_poll,
-	llseek: 	via_llseek,
+	llseek: 	no_llseek,
 	ioctl:		via_dsp_ioctl,
 	mmap:		via_dsp_mmap,
 };

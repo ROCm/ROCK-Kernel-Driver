@@ -63,12 +63,6 @@ int cpu_idle(void *unused)
 	wait_psw.mask = _WAIT_PSW_MASK;
 	wait_psw.addr = (unsigned long) &&idle_wakeup | 0x80000000L;
 	while(1) {
-                if (softirq_pending(smp_processor_id())) {
-                        do_softirq();
-                        __sti();
-                        if (!current->need_resched)
-                                continue;
-                }
                 if (current->need_resched) {
                         schedule();
                         check_pgt_cache();

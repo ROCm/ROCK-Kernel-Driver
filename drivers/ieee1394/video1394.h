@@ -54,6 +54,7 @@ struct video1394_mmap {
 	unsigned int packet_size; /* For VARIABLE_PACKET_SIZE: 
 				     Maximum packet size */
 	unsigned int fps;
+	unsigned int syt_offset;
 	unsigned int flags;
 };
 

@@ -32,6 +32,7 @@ endif
 
 obj-$(CONFIG_SMP)    += smp.o irq_smp.o
 obj-$(CONFIG_PCI)    += pci.o pci_iommu.o
+obj-$(CONFIG_SRM_ENV)	+= srm_env.o
 
 ifdef CONFIG_ALPHA_GENERIC
 
@@ -67,6 +68,7 @@ obj-y    += sys_cabriolet.o
 endif
 
 obj-$(CONFIG_ALPHA_DP264) += sys_dp264.o
+obj-$(CONFIG_ALPHA_SHARK) += sys_dp264.o
 obj-$(CONFIG_ALPHA_TITAN) += sys_titan.o
 
 ifneq ($(CONFIG_ALPHA_EB64P)$(CONFIG_ALPHA_EB66),)

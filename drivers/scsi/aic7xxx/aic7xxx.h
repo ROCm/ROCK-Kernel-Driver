@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: //depot/src/aic7xxx/aic7xxx.h#27 $
+ * $Id: //depot/src/aic7xxx/aic7xxx.h#29 $
  *
  * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx.h,v 1.30 2000/11/10 20:13:40 gibbs Exp $
  */
@@ -142,7 +142,7 @@ struct scb_platform_data;
  *	   we must be sure that 4 slots are empty when we write to clear
  *	   the queue.  This reduces us to 253 SCBs: 1 that just completed
  *	   and the known three additional empty slots in the queue that
- *	   preceed it.
+ *	   precede it.
  */
 #define AHC_MAX_QUEUE	253
 
@@ -334,28 +334,10 @@ typedef enum {
 					   */
 	AHC_BIOS_ENABLED      = 0x80000,
 	AHC_ALL_INTERRUPTS    = 0x100000,
-	AHC_ULTRA_DISABLED    = 0x200000, /*
-					   * The precision resistor for
-					   * ultra transmission speeds is
-					   * missing, so we must limit
-					   * ourselves to fast SCSI.
-					   */
 	AHC_PAGESCBS	      = 0x400000, /* Enable SCB paging */
-	AHC_EDGE_INTERRUPT    = 0x800000  /* Device uses edge triggered ints */
+	AHC_EDGE_INTERRUPT    = 0x800000, /* Device uses edge triggered ints */
+	AHC_39BIT_ADDRESSING  = 0x1000000 /* Use 39 bit addressing scheme. */
 } ahc_flag;
-
-/*
- * Controller  Information composed at probe time.
- */
-struct ahc_probe_config {
-	const char	*description;
-	char		 channel;
-	char		 channel_b;
-	ahc_chip	 chip;
-	ahc_feature	 features;
-	ahc_bug		 bugs;
-	ahc_flag	 flags;
-};
 
 /************************* Hardware  SCB Definition ***************************/
 
@@ -505,6 +487,13 @@ struct ahc_dma_seg {
 #define	AHC_SG_LEN_MASK		0x00FFFFFF
 };
 
+struct sg_map_node {
+	bus_dmamap_t		 sg_dmamap;
+	bus_addr_t		 sg_physaddr;
+	struct ahc_dma_seg*	 sg_vaddr;
+	SLIST_ENTRY(sg_map_node) links;
+};
+
 /*
  * The current state of this SCB.
  */
@@ -544,16 +533,10 @@ struct scb {
 	bus_dmamap_t		  dmamap;
 #endif
 	struct scb_platform_data *platform_data;
-	struct	ahc_dma_seg 	 *sg_list;
+	struct sg_map_node	 *sg_map;
+	struct ahc_dma_seg 	 *sg_list;
 	bus_addr_t		  sg_list_phys;
 	u_int			  sg_count;/* How full ahc_dma_seg is */
-};
-
-struct sg_map_node {
-	bus_dmamap_t		 sg_dmamap;
-	bus_addr_t		 sg_physaddr;
-	struct ahc_dma_seg*	 sg_vaddr;
-	SLIST_ENTRY(sg_map_node) links;
 };
 
 struct scb_data {
@@ -871,7 +854,7 @@ struct ahc_softc {
 	/*
 	 * SCBs that have been sent to the controller
 	 */
-	LIST_HEAD(, scb)	 pending_scbs;
+	LIST_HEAD(, scb)	  pending_scbs;
 
 	/*
 	 * Counting lock for deferring the release of additional
@@ -1045,8 +1028,7 @@ struct ahc_devinfo {
 };
 
 /****************************** PCI Structures ********************************/
-typedef int (ahc_device_setup_t)(ahc_dev_softc_t,
-				 struct ahc_probe_config *);
+typedef int (ahc_device_setup_t)(struct ahc_softc *);
 
 struct ahc_pci_identity {
 	uint64_t		 full_id;
@@ -1099,10 +1081,8 @@ int		ahc_match_scb(struct ahc_softc *ahc, struct scb *scb,
 			      u_int tag, role_t role);
 
 /****************************** Initialization ********************************/
-void			 ahc_init_probe_config(struct ahc_probe_config *);
 struct ahc_softc	*ahc_alloc(void *platform_arg, char *name);
-int			 ahc_softc_init(struct ahc_softc *,
-					struct ahc_probe_config*);
+int			 ahc_softc_init(struct ahc_softc *);
 void			 ahc_controller_info(struct ahc_softc *ahc, char *buf);
 int			 ahc_init(struct ahc_softc *ahc);
 void			 ahc_intr_enable(struct ahc_softc *ahc, int enable);

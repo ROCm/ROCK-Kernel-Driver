@@ -261,7 +261,7 @@ void outsb(unsigned int port, const void *from, int len)
 			BUG();
 	}
 
-	__arch_writesb(ISAIO_BASE + off, from, len);
+	__raw_writesb(ISAIO_BASE + off, from, len);
 }
 
 void insb(unsigned int port, void *from, int len)
@@ -276,7 +276,7 @@ void insb(unsigned int port, void *from, int len)
 			BUG();
 	}
 
-	__arch_readsb(ISAIO_BASE + off, from, len);
+	__raw_readsb(ISAIO_BASE + off, from, len);
 }
 
 void outsw(unsigned int port, const void *from, int len)
@@ -291,7 +291,7 @@ void outsw(unsigned int port, const void *from, int len)
 			BUG();
 	}
 
-	__arch_writesw(ISAIO_BASE + off, from, len);
+	__raw_writesw(ISAIO_BASE + off, from, len);
 }
 
 void insw(unsigned int port, void *from, int len)
@@ -306,7 +306,7 @@ void insw(unsigned int port, void *from, int len)
 			BUG();
 	}
 
-	__arch_readsw(ISAIO_BASE + off, from, len);
+	__raw_readsw(ISAIO_BASE + off, from, len);
 }
 
 void outsl(unsigned int port, const void *from, int len)

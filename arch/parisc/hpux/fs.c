@@ -52,7 +52,7 @@ struct getdents_callback {
 #define NAME_OFFSET(de) ((int) ((de)->d_name - (char *) (de)))
 #define ROUND_UP(x) (((x)+sizeof(long)-1) & ~(sizeof(long)-1))
 
-static int filldir(void * __buf, const char * name, int namlen, off_t offset, ino_t ino)
+static int filldir(void * __buf, const char * name, int namlen, loff_t offset, ino_t ino)
 {
 	struct hpux_dirent * dirent;
 	struct getdents_callback * buf = (struct getdents_callback *) __buf;
