@@ -2002,8 +2002,8 @@ int __init blk_dev_init(void)
 	queue_nr_requests = (total_ram >> 8) & ~15;	/* One per quarter-megabyte */
 	if (queue_nr_requests < 32)
 		queue_nr_requests = 32;
-	if (queue_nr_requests > 512)
-		queue_nr_requests = 512;
+	if (queue_nr_requests > 256)
+		queue_nr_requests = 256;
 
 	/*
 	 * Batch frees according to queue length
