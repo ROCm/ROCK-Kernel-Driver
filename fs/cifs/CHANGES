@@ -1,3 +1,7 @@
+Version 0.85
+------------
+Fix oops in mkdir when server fails to return inode info.
+
 Version 0.84
 ------------
 Finish support for Linux 2.5 open/create changes, which removes the

@@ -404,7 +404,8 @@ cifs_mkdir(struct inode *inode, struct dentry *direntry, int mode)
 
 		direntry->d_op = &cifs_dentry_ops;
 		d_instantiate(direntry, newinode);
-		direntry->d_inode->i_nlink = 2;
+		if(direntry->d_inode)
+			direntry->d_inode->i_nlink = 2;
 		if (cifs_sb->tcon->ses->capabilities & CAP_UNIX)                
 			CIFSSMBUnixSetPerms(xid, pTcon, full_path, mode,
 				(__u64)-1,  
