@@ -440,9 +440,6 @@ svc_udp_sendto(struct svc_rqst *rqstp)
 	if (error == -ECONNREFUSED)
 		/* ICMP error on earlier request. */
 		error = svc_sendto(rqstp, bufp->iov, bufp->nriov);
-	else if (error == -EAGAIN)
-		/* Ignore and wait for re-xmit */
-		error = 0;
 
 	return error;
 }
@@ -651,13 +648,17 @@ svc_tcp_recvfrom(struct svc_rqst *rqstp)
 			 *  bit set in the fragment length header.
 			 *  But apparently no known nfs clients send fragmented
 			 *  records. */
-			/* FIXME: shutdown socket */
-			printk(KERN_NOTICE "RPC: bad TCP reclen %08lx",
+			printk(KERN_NOTICE "RPC: bad TCP reclen 0x%08lx (non-terminal)\n",
 			       (unsigned long) svsk->sk_reclen);
-			return -EIO;
+			goto err_delete;
 		}
 		svsk->sk_reclen &= 0x7fffffff;
 		dprintk("svc: TCP record, %d bytes\n", svsk->sk_reclen);
+		if (svsk->sk_reclen > (bufp->buflen<<2)) {
+			printk(KERN_NOTICE "RPC: bad TCP reclen 0x%08lx (large)\n",
+			       (unsigned long) svsk->sk_reclen);
+			goto err_delete;
+		}
 	}
 
 	/* Check whether enough data is available */
@@ -666,10 +667,6 @@ svc_tcp_recvfrom(struct svc_rqst *rqstp)
 		goto error;
 
 	if (len < svsk->sk_reclen) {
-		/* FIXME: if sk_reclen > window-size, then we will
-		 * never be able to receive the record, so should
-		 * shutdown the connection
-		 */
 		dprintk("svc: incomplete TCP record (%d of %d)\n",
 			len, svsk->sk_reclen);
 		svc_sock_received(svsk);
@@ -708,7 +705,11 @@ svc_tcp_recvfrom(struct svc_rqst *rqstp)
 
 	return len;
 
-error:
+ err_delete:
+	svc_delete_socket(svsk);
+	return -EAGAIN;
+
+ error:
 	if (len == -EAGAIN) {
 		dprintk("RPC: TCP recvfrom got EAGAIN\n");
 		svc_sock_received(svsk);
@@ -745,10 +746,8 @@ svc_tcp_sendto(struct svc_rqst *rqstp)
 		printk(KERN_NOTICE "rpc-srv/tcp: %s: sent only %d bytes of %d - should shutdown socket\n",
 		       rqstp->rq_sock->sk_server->sv_name,
 		       sent, bufp->len << 2);
-		/* FIXME: should shutdown the socket, or allocate more memort
-		 * or wait and try again or something.  Otherwise
-		 * client will get confused
-		 */
+		svc_delete_socket(rqstp->rq_sock);
+		sent = -EAGAIN;
 	}
 	return sent;
 }
