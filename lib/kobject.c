@@ -425,14 +425,11 @@ void kobject_unregister(struct kobject * kobj)
 
 struct kobject * kobject_get(struct kobject * kobj)
 {
-	struct kobject * ret = kobj;
-
 	if (kobj) {
 		WARN_ON(!atomic_read(&kobj->refcount));
 		atomic_inc(&kobj->refcount);
-	} else
-		ret = NULL;
-	return ret;
+	}
+	return kobj;
 }
 
 /**
