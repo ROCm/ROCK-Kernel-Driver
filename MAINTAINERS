@@ -654,8 +654,9 @@ W:	http://sources.redhat.com/dm
 S:	Maintained
 
 DEVICE NUMBER REGISTRY
-P:	John Cagle
+P:	Torben Mathiasen
 M:	device@lanana.org
+W:	http://lanana.org/docs/device-list/index.html
 L:	linux-kernel@vger.kernel.org
 S:	Maintained
 
