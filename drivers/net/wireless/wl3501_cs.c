@@ -1846,6 +1846,29 @@ static int wl3501_get_name(struct net_device *dev, struct iw_request_info *info,
 	return 0;
 }
 
+static int wl3501_set_freq(struct net_device *dev, struct iw_request_info *info,
+			   union iwreq_data *wrqu, char *extra)
+{
+	int channel = wrqu->freq.m;
+	int rc = 0;
+
+	if (channel > 1000 || wrqu->freq.e > 0)
+		rc = -EOPNOTSUPP;
+	else if (channel < 1 || channel > ARRAY_SIZE(wl3501_chan2freq))
+		rc = -EINVAL;
+	else {
+		struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+		unsigned long flags;
+
+		spin_lock_irqsave(&this->lock, flags);
+		this->chan = channel;
+		rc = wl3501_mgmt_start(this);
+		spin_unlock_irqrestore(&this->lock, flags);
+	}
+
+	return rc;
+}
+
 static int wl3501_get_freq(struct net_device *dev, struct iw_request_info *info,
 			   union iwreq_data *wrqu, char *extra)
 {
@@ -1859,19 +1882,19 @@ static int wl3501_get_freq(struct net_device *dev, struct iw_request_info *info,
 static int wl3501_set_mode(struct net_device *dev, struct iw_request_info *info,
 			   union iwreq_data *wrqu, char *extra)
 {
-	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
-	unsigned long flags;
-	int rc;
+	int rc = -EINVAL;
 
-	spin_lock_irqsave(&this->lock, flags);
 	if (wrqu->mode == IW_MODE_INFRA ||
 	    wrqu->mode == IW_MODE_ADHOC ||
 	    wrqu->mode == IW_MODE_AUTO) {
+		struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+		unsigned long flags;
+
+		spin_lock_irqsave(&this->lock, flags);
 		this->net_type = wrqu->mode;
 		rc = wl3501_mgmt_start(this);
-	} else
-		rc = -EINVAL;
-	spin_unlock_irqrestore(&this->lock, flags);
+		spin_unlock_irqrestore(&this->lock, flags);
+	}
 	return rc;
 }
 
@@ -2013,6 +2036,7 @@ static int wl3501_get_rate(struct net_device *dev, struct iw_request_info *info,
 
 static const iw_handler	wl3501_handler[] = {
 	[SIOCGIWNAME	- SIOCSIWCOMMIT] = wl3501_get_name,
+	[SIOCSIWFREQ	- SIOCSIWCOMMIT] = wl3501_set_freq,
 	[SIOCGIWFREQ	- SIOCSIWCOMMIT] = wl3501_get_freq,
 	[SIOCSIWMODE	- SIOCSIWCOMMIT] = wl3501_set_mode,
 	[SIOCGIWMODE	- SIOCSIWCOMMIT] = wl3501_get_mode,
