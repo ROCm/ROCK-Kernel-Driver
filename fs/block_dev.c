@@ -623,8 +623,7 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 		}
 	} else {
 		put_disk(disk);
-		if (owner)
-			__MOD_DEC_USE_COUNT(owner);
+		module_put(owner);
 		if (bdev->bd_contains == bdev) {
 			if (bdev->bd_disk->fops->open) {
 				ret = bdev->bd_disk->fops->open(inode, file);
@@ -651,8 +650,7 @@ out_first:
 		blkdev_put(bdev->bd_contains, BDEV_RAW);
 	bdev->bd_contains = NULL;
 	put_disk(disk);
-	if (owner)
-		__MOD_DEC_USE_COUNT(owner);
+	module_put(owner);
 out:
 	up(&bdev->bd_sem);
 	unlock_kernel();
@@ -723,9 +721,10 @@ int blkdev_put(struct block_device *bdev, int kind)
 	}
 	if (!bdev->bd_openers) {
 		struct module *owner = disk->fops->owner;
+
 		put_disk(disk);
-		if (owner)
-			__MOD_DEC_USE_COUNT(owner);
+		module_put(owner);
+
 		bdev->bd_disk = NULL;
 		bdev->bd_inode->i_data.backing_dev_info = &default_backing_dev_info;
 		if (bdev != bdev->bd_contains) {

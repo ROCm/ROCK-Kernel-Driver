@@ -111,8 +111,7 @@ static struct quota_format_type *find_quota_format(int id)
 
 static void put_quota_format(struct quota_format_type *fmt)
 {
-	if (fmt->qf_owner)
-		__MOD_DEC_USE_COUNT(fmt->qf_owner);
+	module_put(fmt->qf_owner);
 }
 
 /*
