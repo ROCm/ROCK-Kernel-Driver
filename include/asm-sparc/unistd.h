@@ -271,6 +271,7 @@
 #define __NR_fdatasync          253
 #define __NR_nfsservctl         254
 #define __NR_aplib              255
+#define __NR_tkill              257
 
 #define _syscall0(type,name) \
 type name(void) \

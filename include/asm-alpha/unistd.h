@@ -318,6 +318,7 @@
 #define __NR_gettid			378
 #define __NR_readahead			379
 #define __NR_security			380 /* syscall for security modules */
+#define __NR_tkill			381
 
 #if defined(__GNUC__)
 

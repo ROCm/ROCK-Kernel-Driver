@@ -1130,6 +1130,7 @@ sys_call_table:
 	data8 sys_getdents64
 	data8 sys_getunwind			// 1215
 	data8 sys_readahead
+	data8 sys_tkill
 	data8 ia64_ni_syscall
 	data8 ia64_ni_syscall
 	data8 ia64_ni_syscall

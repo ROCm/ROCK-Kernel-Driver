@@ -461,11 +461,13 @@
 #define __NR_mincore			(__NR_Linux + 211)
 #define __NR_madvise			(__NR_Linux + 212)
 #define __NR_getdents64			(__NR_Linux + 213)
+#define __NR_gettid			(__NR_Linux + 214)
+#define __NR_tkill			(__NR_Linux + 215)
 
 /*
  * Offset of the last Linux flavoured syscall
  */
-#define __NR_Linux_syscalls		213
+#define __NR_Linux_syscalls		215
 
 #ifndef _LANGUAGE_ASSEMBLY
 

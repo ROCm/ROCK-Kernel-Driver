@@ -230,6 +230,7 @@
 #define __NR_security           223     /* syscall for security modules */
 #define __NR_gettid             224
 #define __NR_readahead          225
+#define __NR_tkill              226
 
 /* XXX - _foo needs to be __foo, while __NR_bar could be _NR_bar. */
 #define _syscall0(type,name) \

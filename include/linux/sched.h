@@ -564,6 +564,7 @@ extern int in_egroup_p(gid_t);
 extern void proc_caches_init(void);
 extern void flush_signals(struct task_struct *);
 extern void flush_signal_handlers(struct task_struct *);
+extern void sig_exit(int, int, struct siginfo *);
 extern int dequeue_signal(sigset_t *, siginfo_t *);
 extern void block_all_signals(int (*notifier)(void *priv), void *priv,
 			      sigset_t *mask);
@@ -839,8 +840,13 @@ do {									\
 #define for_each_task(p) \
 	for (p = &init_task ; (p = p->next_task) != &init_task ; )
 
+#define for_each_thread(task) \
+	for (task = next_thread(current) ; task != current ; task = next_thread(task))
+
 #define next_thread(p) \
 	list_entry((p)->thread_group.next, struct task_struct, thread_group)
+
+#define thread_group_leader(p)	(p->pid == p->tgid)
 
 static inline void unhash_process(struct task_struct *p)
 {

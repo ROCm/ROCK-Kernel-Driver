@@ -222,6 +222,8 @@
 #define __NR_setfsuid32		215
 #define __NR_setfsgid32		216
 #define __NR_getdents64		220
+#define __NR_gettid		221
+#define __NR_tkill		222
 
 /* user-visible error numbers are in the range -1 - -122: see
    <asm-m68k/errno.h> */

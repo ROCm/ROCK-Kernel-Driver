@@ -552,6 +552,8 @@ sys_call_table:
 	ENTRY_UHOH(shmctl)		/* 195 */
 	ENTRY_SAME(ni_syscall)		/* streams1 */
 	ENTRY_SAME(ni_syscall)		/* streams2 */
+	ENTRY_SAME(gettid)
+	ENTRY_SAME(tkill)
 
 .end
 

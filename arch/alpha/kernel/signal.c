@@ -717,9 +717,7 @@ do_signal(sigset_t *oldset, struct pt_regs * regs, struct switch_stack * sw,
 
 			default:
 				lock_kernel();
-				sigaddset(&current->pending.signal, signr);
-				current->flags |= PF_SIGNALED;
-				do_exit(exit_code);
+				sig_exit(signr, exit_code, &info);
 				/* NOTREACHED */
 			}
 			continue;

@@ -233,6 +233,8 @@
 #define __NR_madvise			(__NR_Linux + 218)
 #define __NR_getdents64			(__NR_Linux + 219)
 #define __NR_fcntl64			(__NR_Linux + 220)
+#define __NR_gettid			(__NR_Linux + 221)
+#define __NR_tkill			(__NR_Linux + 222)
 
 /*
  * Offset of the last Linux flavoured syscall

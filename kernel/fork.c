@@ -724,10 +724,10 @@ int do_fork(unsigned long clone_flags, unsigned long stack_start,
 	/* Need tasklist lock for parent etc handling! */
 	write_lock_irq(&tasklist_lock);
 
-	/* CLONE_PARENT and CLONE_THREAD re-use the old parent */
+	/* CLONE_PARENT re-uses the old parent */
 	p->p_opptr = current->p_opptr;
 	p->p_pptr = current->p_pptr;
-	if (!(clone_flags & (CLONE_PARENT | CLONE_THREAD))) {
+	if (!(clone_flags & CLONE_PARENT)) {
 		p->p_opptr = current;
 		if (!(p->ptrace & PT_PTRACED))
 			p->p_pptr = current;

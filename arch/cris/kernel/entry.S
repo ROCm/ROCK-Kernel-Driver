@@ -1015,6 +1015,7 @@ sys_call_table:
         .long SYMBOL_NAME(sys_ni_syscall)       /* Reserved for Security */
         .long SYMBOL_NAME(sys_gettid)
         .long SYMBOL_NAME(sys_readahead)        /* 225 */
+        .long SYMBOL_NAME(sys_tkill)
 
         /*
          * NOTE!! This doesn't have to be exact - we just have
