@@ -443,17 +443,50 @@ static __inline__ void hlist_add_before(struct hlist_node *n, struct hlist_node 
 	*(n->pprev) = n;
 }
 
+static __inline__ void hlist_add_after(struct hlist_node *n,
+				       struct hlist_node *next)
+{
+	next->next	= n->next;
+	*(next->pprev)	= n;
+	n->next		= next;
+}
+
 #define hlist_entry(ptr, type, member) container_of(ptr,type,member)
 
 /* Cannot easily do prefetch unfortunately */
 #define hlist_for_each(pos, head) \
-	for (pos = (head)->first; pos; \
+	for (pos = (head)->first; pos && ({ prefetch(pos->next); 1; }); \
 	     pos = pos->next) 
 
 #define hlist_for_each_safe(pos, n, head) \
 	for (pos = (head)->first; n = pos ? pos->next : 0, pos; \
 	     pos = n)
 
+/**
+ * hlist_for_each_entry	- iterate over list of given type
+ * @tpos:	the type * to use as a loop counter.
+ * @pos:	the &struct hlist_node to use as a loop counter.
+ * @head:	the head for your list.
+ * @member:	the name of the hlist_node within the struct.
+ */
+#define hlist_for_each_entry(tpos, pos, head, member)			 \
+	for (pos = (head)->first;					 \
+	     pos && ({ prefetch(pos->next); 1;}) &&			 \
+		({ tpos = hlist_entry(pos, typeof(*tpos), member); 1;}); \
+	     pos = pos->next)
+/**
+ * hlist_for_each_entry_safe - iterate over list of given type safe against removal of list entry
+ * @tpos:	the type * to use as a loop counter.
+ * @pos:	the &struct hlist_node to use as a loop counter.
+ * @n:		another &struct hlist_node to use as temporary storage
+ * @head:	the head for your list.
+ * @member:	the name of the hlist_node within the struct.
+ */
+#define hlist_for_each_entry_safe(tpos, pos, n, head, member) 		 \
+	for (pos = (head)->first;					 \
+	     pos && ({ n = pos->next; 1; }) && 				 \
+		({ tpos = hlist_entry(pos, typeof(*tpos), member); 1;}); \
+	     pos = n)
 #else
 #warning "don't include kernel headers in userspace"
 #endif /* __KERNEL__ */
