@@ -24,7 +24,6 @@
 
 #ifdef __KERNEL__
 
-/* #include <asm/head.h> XXX */      /* for KERNBASE */
 #include <asm/btfixup.h>
 
 #ifndef __ASSEMBLY__
