@@ -240,7 +240,7 @@ static void serverworks_tlbflush(struct agp_memory *temp)
 	while(INREG8(serverworks_private.registers, 
 		     SVWRKS_POSTFLUSH) == 0x01) {
 		if((signed)(end - jiffies) <= 0) {
-			printk(KERN_ERR "Posted write buffer flush took more"
+			printk(KERN_ERR PFX "Posted write buffer flush took more"
 			       "then 3 seconds\n");
 		}
 	}
@@ -249,7 +249,7 @@ static void serverworks_tlbflush(struct agp_memory *temp)
 	while(INREG32(serverworks_private.registers, 
 		     SVWRKS_DIRFLUSH) == 0x00000001) {
 		if((signed)(end - jiffies) <= 0) {
-			printk(KERN_ERR "TLB flush took more"
+			printk(KERN_ERR PFX "TLB flush took more"
 			       "then 3 seconds\n");
 		}
 	}
@@ -447,8 +447,7 @@ static int __init agp_serverworks_probe(struct pci_dev *pdev,
 			PCI_DEVFN(0, 1));
 	if (!bridge_dev) {
 		printk(KERN_INFO PFX "agpgart: Detected a Serverworks "
-		       "Chipset, but could not find the secondary "
-		       "device.\n");
+		       "Chipset, but could not find the secondary device.\n");
 		return -ENODEV;
 	}
 
@@ -470,8 +469,8 @@ static int __init agp_serverworks_probe(struct pci_dev *pdev,
 	if (temp & PCI_BASE_ADDRESS_MEM_TYPE_64) {
 		pci_read_config_dword(pdev, SVWRKS_APSIZE + 4, &temp2);
 		if (temp2 != 0) {
-			printk("Detected 64 bit aperture address, but top "
-			       "bits are not zero.  Disabling agp\n");
+			printk(KERN_INFO PFX "Detected 64 bit aperture address, "
+			       "but top bits are not zero.  Disabling agp\n");
 			return -ENODEV;
 		}
 		serverworks_private.mm_addr_ofs = 0x18;
@@ -483,8 +482,8 @@ static int __init agp_serverworks_probe(struct pci_dev *pdev,
 		pci_read_config_dword(pdev,
 				serverworks_private.mm_addr_ofs + 4, &temp2);
 		if (temp2 != 0) {
-			printk("Detected 64 bit MMIO address, but top "
-			       "bits are not zero.  Disabling agp\n");
+			printk(KERN_INFO PFX "Detected 64 bit MMIO address, "
+			       "but top bits are not zero.  Disabling agp\n");
 			return -ENODEV;
 		}
 	}

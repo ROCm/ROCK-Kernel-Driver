@@ -447,7 +447,7 @@ static int intel_i830_insert_entries(struct agp_memory *mem,off_t pg_start,
 		printk (KERN_DEBUG "pg_start == 0x%.8lx,intel_i830_private.gtt_entries == 0x%.8x\n",
 				pg_start,intel_i830_private.gtt_entries);
 
-		printk ("Trying to insert into local/stolen memory\n");
+		printk (KERN_INFO PFX "Trying to insert into local/stolen memory\n");
 		return (-EINVAL);
 	}
 
@@ -483,7 +483,7 @@ static int intel_i830_remove_entries(struct agp_memory *mem,off_t pg_start,
 	global_cache_flush();
 
 	if (pg_start < intel_i830_private.gtt_entries) {
-		printk ("Trying to disable local/stolen memory\n");
+		printk (KERN_INFO PFX "Trying to disable local/stolen memory\n");
 		return (-EINVAL);
 	}
 
@@ -645,7 +645,7 @@ static int intel_815_configure(void)
 	/* the Intel 815 chipset spec. says that bits 29-31 in the
 	* ATTBASE register are reserved -> try not to write them */
 	if (agp_bridge->gatt_bus_addr & INTEL_815_ATTBASE_MASK) {
-		printk (KERN_EMERG "gatt bus addr too high");
+		printk (KERN_EMERG PFX "gatt bus addr too high");
 		return -EINVAL;
 	}
 
