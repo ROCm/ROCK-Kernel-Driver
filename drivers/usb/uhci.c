@@ -1594,7 +1594,9 @@ out:
 	spin_unlock(&urb->lock);
 	spin_unlock_irqrestore(&uhci->urb_list_lock, flags);
 
-	uhci_call_completion(urb);
+	/* Only call completion if it was successful */
+	if (!ret)
+		uhci_call_completion(urb);
 
 	return ret;
 }
