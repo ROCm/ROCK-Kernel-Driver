@@ -118,8 +118,8 @@ MODULE_PARM_DESC(xbox, "Set to 1 for Xbox, if you have problems with the AC'97 c
 #ifndef PCI_DEVICE_ID_INTEL_ESB_5
 #define PCI_DEVICE_ID_INTEL_ESB_5	0x25a6
 #endif
-#ifndef PCI_DEVICE_ID_INTEL_ICH6_3
-#define PCI_DEVICE_ID_INTEL_ICH6_3	0x266e
+#ifndef PCI_DEVICE_ID_INTEL_ICH6_18
+#define PCI_DEVICE_ID_INTEL_ICH6_18	0x266e
 #endif
 #ifndef PCI_DEVICE_ID_INTEL_ICH7_20
 #define PCI_DEVICE_ID_INTEL_ICH7_20	0x27de
@@ -1059,7 +1059,7 @@ static snd_pcm_uframes_t snd_intel8x0_pcm_pointer(snd_pcm_substream_t * substrea
 	intel8x0_t *chip = snd_pcm_substream_chip(substream);
 	ichdev_t *ichdev = get_ichdev(substream);
 	size_t ptr1, ptr;
-	int civ, timeout = 10;
+	int civ, timeout = 100;
 	unsigned int position;
 
 	spin_lock(&chip->reg_lock);
@@ -1067,8 +1067,10 @@ static snd_pcm_uframes_t snd_intel8x0_pcm_pointer(snd_pcm_substream_t * substrea
 		civ = igetbyte(chip, ichdev->reg_offset + ICH_REG_OFF_CIV);
 		ptr1 = igetword(chip, ichdev->reg_offset + ichdev->roff_picb);
 		position = ichdev->position;
-		if (ptr1 == 0)
-			udelay(1);
+		if (ptr1 == 0) {
+			udelay(10);
+			continue;
+		}
 		if (civ == igetbyte(chip, ichdev->reg_offset + ICH_REG_OFF_CIV) &&
 		    ptr1 == igetword(chip, ichdev->reg_offset + ichdev->roff_picb))
 			break;
@@ -2713,7 +2715,7 @@ static struct shortname_table {
 	{ PCI_DEVICE_ID_INTEL_ICH4, "Intel 82801DB-ICH4" },
 	{ PCI_DEVICE_ID_INTEL_ICH5, "Intel ICH5" },
 	{ PCI_DEVICE_ID_INTEL_ESB_5, "Intel 6300ESB" },
-	{ PCI_DEVICE_ID_INTEL_ICH6_3, "Intel ICH6" },
+	{ PCI_DEVICE_ID_INTEL_ICH6_18, "Intel ICH6" },
 	{ PCI_DEVICE_ID_INTEL_ICH7_20, "Intel ICH7" },
 	{ PCI_DEVICE_ID_SI_7012, "SiS SI7012" },
 	{ PCI_DEVICE_ID_NVIDIA_MCP_AUDIO, "NVidia nForce" },

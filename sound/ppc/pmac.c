@@ -1294,10 +1294,10 @@ static int snd_pmac_sleep_notify(struct pmu_sleep_notifier *self, int when)
 
 	switch (when) {
 	case PBOOK_SLEEP_NOW:
-		snd_pmac_suspend(chip->card, 0);
+		snd_pmac_suspend(chip->card, PMSG_SUSPEND);
 		break;
 	case PBOOK_WAKE:
-		snd_pmac_resume(chip->card, 0);
+		snd_pmac_resume(chip->card);
 		break;
 	}
 	return PBOOK_SLEEP_OK;
