@@ -31,7 +31,7 @@
 
 #define PFX "powernow-k8: "
 #define BFX PFX "BIOS error: "
-#define VERSION "version 1.00.08 - September 26, 2003"
+#define VERSION "version 1.00.08a"
 #include "powernow-k8.h"
 
 #ifdef CONFIG_PREEMPT
@@ -90,25 +90,27 @@ convert_fid_to_vco_fid(u32 fid)
 	}
 }
 
-/* Return 1 if the pending bit is set. Unless we are actually just told the */
-/* processor to transition a state, seeing this bit set is really bad news. */
+/*
+ * Return 1 if the pending bit is set. Unless we are actually just told the
+ * processor to transition a state, seeing this bit set is really bad news.
+ */
 static inline int
 pending_bit_stuck(void)
 {
-	u32 lo;
-	u32 hi;
+	u32 lo, hi;
 
 	rdmsr(MSR_FIDVID_STATUS, lo, hi);
 	return lo & MSR_S_LO_CHANGE_PENDING ? 1 : 0;
 }
 
-/* Update the global current fid / vid values from the status msr. Returns 1 */
-/* on error.                                                                 */
+/*
+ * Update the global current fid / vid values from the status msr. Returns 1
+ * on error.
+ */
 static int
 query_current_values_with_pending_wait(void)
 {
-	u32 lo;
-	u32 hi;
+	u32 lo, hi;
 	u32 i = 0;
 
 	lo = MSR_S_LO_CHANGE_PENDING;
@@ -223,9 +225,11 @@ write_new_vid(u32 vid)
 	return 0;
 }
 
-/* Reduce the vid by the max of step or reqvid.                   */
-/* Decreasing vid codes represent increasing voltages :           */
-/* vid of 0 is 1.550V, vid of 0x1e is 0.800V, vid of 0x1f is off. */
+/*
+ * Reduce the vid by the max of step or reqvid.
+ * Decreasing vid codes represent increasing voltages:
+ * vid of 0 is 1.550V, vid of 0x1e is 0.800V, vid of 0x1f is off.
+ */
 static int
 decrease_vid_code_by_step(u32 reqvid, u32 step)
 {
@@ -268,8 +272,10 @@ transition_fid_vid(u32 reqfid, u32 reqvid)
 	return 0;
 }
 
-/* Phase 1 - core voltage transition ... setup appropriate voltage for the */
-/* fid transition.                                                         */
+/*
+ * Phase 1 - core voltage transition ... setup appropriate voltage for the
+ * fid transition.
+ */
 static inline int
 core_voltage_pre_transition(u32 reqvid)
 {
@@ -452,7 +458,9 @@ check_supported_cpu(void)
 	}
 
 	if (c->x86_vendor != X86_VENDOR_AMD) {
+#ifdef MODULE
 		printk(KERN_INFO PFX "Not an AMD processor\n");
+#endif
 		return 0;
 	}
 
@@ -485,9 +493,7 @@ check_supported_cpu(void)
 		return 0;
 	}
 
-	printk(KERN_INFO PFX "Found AMD Athlon 64 / Opteron processor "
-	       "supporting p-state transitions\n");
-
+	printk(KERN_INFO PFX "Found AMD64 processor supporting PowerNow (" VERSION ")\n");
 	return 1;
 }
 
@@ -566,33 +572,19 @@ find_psb_table(void)
 		}
 
 		vstable = psb->voltagestabilizationtime;
-		printk(KERN_INFO PFX "voltage stable time: %d (units 20us)\n",
-		       vstable);
-
 		dprintk(KERN_DEBUG PFX "flags2: 0x%x\n", psb->flags2);
 		rvo = psb->flags2 & 3;
 		irt = ((psb->flags2) >> 2) & 3;
 		mvs = ((psb->flags2) >> 4) & 3;
 		vidmvs = 1 << mvs;
 		batps = ((psb->flags2) >> 6) & 3;
-		printk(KERN_INFO PFX "p states on battery: %d ", batps);
-		switch (batps) {
-		case 0:
-			printk("- all available\n");
-			break;
-		case 1:
-			printk("- only the minimum\n");
-			break;
-		case 2:
-			printk("- only the 2 lowest\n");
-			break;
-		case 3:
-			printk("- only the 3 lowest\n");
-			break;
-		}
-		printk(KERN_INFO PFX "ramp voltage offset: %d\n", rvo);
-		printk(KERN_INFO PFX "isochronous relief time: %d\n", irt);
-		printk(KERN_INFO PFX "maximum voltage step: %d\n", mvs);
+
+		printk(KERN_INFO PFX "voltage stable in %d usec", vstable * 20);
+		if (batps)
+			printk(", only %d lowest states on battery", batps);
+		printk(", ramp voltage offset: %d", rvo);
+		printk(", isochronous relief time: %d", irt);
+		printk(", maximum voltage step: %d\n", mvs);
 
 		dprintk(KERN_DEBUG PFX "numpst: 0x%x\n", psb->numpst);
 		if (psb->numpst != 1) {
@@ -603,14 +595,13 @@ find_psb_table(void)
 		dprintk(KERN_DEBUG PFX "cpuid: 0x%x\n", psb->cpuid);
 
 		plllock = psb->plllocktime;
-		printk(KERN_INFO PFX "pll lock time: 0x%x\n", plllock);
+		printk(KERN_INFO PFX "pll lock time: 0x%x, ", plllock);
 
 		maxvid = psb->maxvid;
-		printk(KERN_INFO PFX "maxfid: 0x%x\n", psb->maxfid);
-		printk(KERN_INFO PFX "maxvid: 0x%x\n", maxvid);
+		printk("maxfid 0x%x (%d MHz), maxvid 0x%x\n", 
+		       psb->maxfid, find_freq_from_fid(psb->maxfid), maxvid);
 
 		numps = psb->numpstates;
-		printk(KERN_INFO PFX "numpstates: 0x%x\n", numps);
 		if (numps < 2) {
 			printk(KERN_ERR BFX "no p states to transition\n");
 			return -ENODEV;
@@ -629,7 +620,7 @@ find_psb_table(void)
 			       "%d p-states\n", numps);
 		}
 
-		if ((numps <= 1) || (batps <= 1)) {
+		if (numps <= 1) {
 			printk(KERN_ERR PFX "only 1 p-state to transition\n");
 			return -ENODEV;
 		}
@@ -645,9 +636,8 @@ find_psb_table(void)
 		}
 
 		for (j = 0; j < numps; j++) {
-			printk(KERN_INFO PFX
-			       "   %d : fid 0x%x, vid 0x%x\n", j,
-			       pst[j].fid, pst[j].vid);
+			printk(KERN_INFO PFX "   %d : fid 0x%x (%d MHz), vid 0x%x\n", j,
+			       pst[j].fid, find_freq_from_fid(pst[j].fid), pst[j].vid);
 			powernow_table[j].index = pst[j].fid; /* lower 8 bits */
 			powernow_table[j].index |= (pst[j].vid << 8); /* upper 8 bits */
 			powernow_table[j].frequency = find_freq_from_fid(pst[j].fid);
@@ -660,8 +650,8 @@ find_psb_table(void)
 			return -EIO;
 		}
 
-		printk(KERN_INFO PFX "currfid 0x%x, currvid 0x%x\n",
-		       currfid, currvid);
+		printk(KERN_INFO PFX "currfid 0x%x (%d MHz), currvid 0x%x\n",
+		       currfid, find_freq_from_fid(currfid), currvid);
 
 		for (j = 0; j < numps; j++)
 			if ((pst[j].fid==currfid) && (pst[j].vid==currvid))
@@ -843,8 +833,6 @@ static int __init
 powernowk8_init(void)
 {
 	int rc;
-
-	printk(KERN_INFO PFX VERSION "\n");
 
 	if (check_supported_cpu() == 0)
 		return -ENODEV;
