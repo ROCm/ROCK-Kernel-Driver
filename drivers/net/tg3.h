@@ -118,12 +118,15 @@
 #define  CHIPREV_ID_5704_A2		 0x2002
 #define  CHIPREV_ID_5705_A0		 0x3000
 #define  CHIPREV_ID_5705_A1		 0x3001
+#define  CHIPREV_ID_5750_A0		 0x4000
+#define  CHIPREV_ID_5750_A1		 0x4001
 #define  GET_ASIC_REV(CHIP_REV_ID)	((CHIP_REV_ID) >> 12)
 #define   ASIC_REV_5700			 0x07
 #define   ASIC_REV_5701			 0x00
 #define   ASIC_REV_5703			 0x01
 #define   ASIC_REV_5704			 0x02
 #define   ASIC_REV_5705			 0x03
+#define   ASIC_REV_5750			 0x04
 #define  GET_CHIP_REV(CHIP_REV_ID)	((CHIP_REV_ID) >> 8)
 #define   CHIPREV_5700_AX		 0x70
 #define   CHIPREV_5700_BX		 0x71
@@ -2009,6 +2012,7 @@ struct tg3 {
 #define PHY_ID_BCM5703			0x60008160
 #define PHY_ID_BCM5704			0x60008190
 #define PHY_ID_BCM5705			0x600081a0
+#define PHY_ID_BCM5750			0x60008180
 #define PHY_ID_BCM8002			0x60010140
 #define PHY_ID_SERDES			0xfeedbee0
 #define PHY_ID_INVALID			0xffffffff
@@ -2032,7 +2036,7 @@ struct tg3 {
 	((X) == PHY_ID_BCM5400 || (X) == PHY_ID_BCM5401 || \
 	 (X) == PHY_ID_BCM5411 || (X) == PHY_ID_BCM5701 || \
 	 (X) == PHY_ID_BCM5703 || (X) == PHY_ID_BCM5704 || \
-	 (X) == PHY_ID_BCM5705 || \
+	 (X) == PHY_ID_BCM5705 || (X) == PHY_ID_BCM5750 || \
 	 (X) == PHY_ID_BCM8002 || (X) == PHY_ID_SERDES)
 
 	struct tg3_hw_stats		*hw_stats;
