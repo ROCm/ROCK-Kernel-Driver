@@ -132,6 +132,9 @@
 int leases_enable = 1;
 int lease_break_time = 45;
 
+#define for_each_lock(inode, lockp) \
+	for (lockp = &inode->i_flock; *lockp != NULL; lockp = &(*lockp)->fl_next)
+
 LIST_HEAD(file_lock_list);
 static LIST_HEAD(blocked_list);
 
@@ -220,25 +223,41 @@ void locks_copy_lock(struct file_lock *new, struct file_lock *fl)
 	new->fl_u = fl->fl_u;
 }
 
-/* Fill in a file_lock structure with an appropriate FLOCK lock. */
-static struct file_lock *flock_make_lock(struct file *filp, unsigned int type)
-{
-	struct file_lock *fl = locks_alloc_lock(1);
-	if (fl == NULL)
-		return NULL;
+static inline int flock_translate_cmd(int cmd) {
+	if (cmd & LOCK_MAND)
+		return cmd & (LOCK_MAND | LOCK_RW);
+	switch (cmd &~ LOCK_NB) {
+	case LOCK_SH:
+		return F_RDLCK;
+	case LOCK_EX:
+		return F_WRLCK;
+	case LOCK_UN:
+		return F_UNLCK;
+	}
+	return -EINVAL;
+}
 
-	fl->fl_owner = NULL;
+/* Fill in a file_lock structure with an appropriate FLOCK lock. */
+static int flock_make_lock(struct file *filp,
+		struct file_lock **lock, unsigned int cmd)
+{
+	struct file_lock *fl;
+	int type = flock_translate_cmd(cmd);
+	if (type < 0)
+		return type;
+	
+	fl = locks_alloc_lock(1);
+	if (fl == NULL)
+		return -ENOMEM;
+
 	fl->fl_file = filp;
 	fl->fl_pid = current->pid;
 	fl->fl_flags = FL_FLOCK;
 	fl->fl_type = type;
-	fl->fl_start = 0;
 	fl->fl_end = OFFSET_MAX;
-	fl->fl_notify = NULL;
-	fl->fl_insert = NULL;
-	fl->fl_remove = NULL;
 	
-	return fl;
+	*lock = fl;
+	return 0;
 }
 
 static int assign_type(struct file_lock *fl, int type)
@@ -756,59 +775,45 @@ repeat:
  * at the head of the list, but that's secret knowledge known only to
  * flock_lock_file and posix_lock_file.
  */
-static int flock_lock_file(struct file *filp, unsigned int lock_type,
+static int flock_lock_file(struct file *filp, struct file_lock *new_fl,
 			   unsigned int wait)
 {
-	struct file_lock *fl;
-	struct file_lock *new_fl = NULL;
 	struct file_lock **before;
 	struct inode * inode = filp->f_dentry->d_inode;
-	int error, change;
-	int unlock = (lock_type == F_UNLCK);
+	int error = 0;
+	int found = 0;
 
-	/*
-	 * If we need a new lock, get it in advance to avoid races.
-	 */
-	if (!unlock) {
-		error = -ENOLCK;
-		new_fl = flock_make_lock(filp, lock_type);
-		if (!new_fl)
-			return error;
-	}
-
-	error = 0;
-search:
-	change = 0;
-	before = &inode->i_flock;
-	while (((fl = *before) != NULL) && IS_FLOCK(fl)) {
-		if (filp == fl->fl_file) {
-			if (lock_type == fl->fl_type)
-				goto out;
-			change = 1;
+	lock_kernel();
+	for_each_lock(inode, before) {
+		struct file_lock *fl = *before;
+		if (IS_POSIX(fl))
 			break;
-		}
-		before = &fl->fl_next;
-	}
-	/* change means that we are changing the type of an existing lock,
-	 * or else unlocking it.
-	 */
-	if (change) {
-		/* N.B. What if the wait argument is false? */
+		if (IS_LEASE(fl))
+			continue;
+		if (filp != fl->fl_file)
+			continue;
+		if (new_fl->fl_type == fl->fl_type)
+			goto out;
+		found = 1;
 		locks_delete_lock(before);
-		if (!unlock) {
-			yield();
-			/*
-			 * If we waited, another lock may have been added ...
-			 */
-			goto search;
-		}
+		break;
 	}
-	if (unlock)
-		goto out;
+	unlock_kernel();
 
+	if (found)
+		yield();
+
+	if (new_fl->fl_type == F_UNLCK)
+		return 0;
+
+	lock_kernel();
 repeat:
-	for (fl = inode->i_flock; (fl != NULL) && IS_FLOCK(fl);
-	     fl = fl->fl_next) {
+	for_each_lock(inode, before) {
+		struct file_lock *fl = *before;
+		if (IS_POSIX(fl))
+			break;
+		if (IS_LEASE(fl))
+			continue;
 		if (!flock_locks_conflict(new_fl, fl))
 			continue;
 		error = -EAGAIN;
@@ -820,12 +825,10 @@ repeat:
 		goto repeat;
 	}
 	locks_insert_lock(&inode->i_flock, new_fl);
-	new_fl = NULL;
 	error = 0;
 
 out:
-	if (new_fl)
-		locks_free_lock(new_fl);
+	unlock_kernel();
 	return error;
 }
 
@@ -1023,20 +1026,6 @@ out_nolock:
 	if (new_fl2)
 		locks_free_lock(new_fl2);
 	return error;
-}
-
-static inline int flock_translate_cmd(int cmd) {
-	if (cmd & LOCK_MAND)
-		return cmd & (LOCK_MAND | LOCK_RW);
-	switch (cmd &~ LOCK_NB) {
-	case LOCK_SH:
-		return F_RDLCK;
-	case LOCK_EX:
-		return F_WRLCK;
-	case LOCK_UN:
-		return F_UNLCK;
-	}
-	return -EINVAL;
 }
 
 /**
@@ -1307,26 +1296,26 @@ out_unlock:
 asmlinkage long sys_flock(unsigned int fd, unsigned int cmd)
 {
 	struct file *filp;
-	int error, type;
+	struct file_lock *lock;
+	int error;
 
 	error = -EBADF;
 	filp = fget(fd);
 	if (!filp)
 		goto out;
 
-	error = flock_translate_cmd(cmd);
+	if ((cmd != LOCK_UN) && !(cmd & LOCK_MAND) && !(filp->f_mode & 3))
+		goto out_putf;
+
+	error = flock_make_lock(filp, &lock, cmd);
 	if (error < 0)
 		goto out_putf;
-	type = error;
 
-	error = -EBADF;
-	if ((type != F_UNLCK) && !(type & LOCK_MAND) && !(filp->f_mode & 3))
-		goto out_putf;
-
-	lock_kernel();
-	error = flock_lock_file(filp, type,
+	error = flock_lock_file(filp, lock,
 				(cmd & (LOCK_UN | LOCK_NB)) ? 0 : 1);
-	unlock_kernel();
+
+	if (error)
+		locks_free_lock(lock);
 
 out_putf:
 	fput(filp);
