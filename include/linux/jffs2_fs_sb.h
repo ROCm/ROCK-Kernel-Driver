@@ -1,4 +1,4 @@
-/* $Id: jffs2_fs_sb.h,v 1.25 2002/03/08 15:11:24 dwmw2 Exp $ */
+/* $Id: jffs2_fs_sb.h,v 1.26 2002/03/17 10:18:42 dwmw2 Exp $ */
 
 #ifndef _JFFS2_FS_SB
 #define _JFFS2_FS_SB
@@ -81,6 +81,9 @@ struct jffs2_sb_info {
 	uint32_t wbuf_ofs;
 	uint32_t wbuf_len;
 	uint32_t wbuf_pagesize;
+
+	/* OS-private pointer for getting back to master superblock info */
+	void *os_priv;
 };
 
 #endif /* _JFFS2_FB_SB */

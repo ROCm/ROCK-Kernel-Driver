@@ -658,7 +658,6 @@ struct quota_mount_options
 #include <linux/reiserfs_fs_sb.h>
 #include <linux/bfs_fs_sb.h>
 #include <linux/udf_fs_sb.h>
-#include <linux/jffs2_fs_sb.h>
 
 extern struct list_head super_blocks;
 extern spinlock_t sb_lock;
@@ -708,7 +707,6 @@ struct super_block {
 		struct reiserfs_sb_info	reiserfs_sb;
 		struct bfs_sb_info	bfs_sb;
 		struct udf_sb_info	udf_sb;
-		struct jffs2_sb_info	jffs2_sb;
 		void			*generic_sbp;
 	} u;
 	/*
