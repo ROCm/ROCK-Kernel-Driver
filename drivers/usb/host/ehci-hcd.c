@@ -626,10 +626,11 @@ static int ehci_urb_enqueue (
 
 	urb->transfer_flags &= ~EHCI_STATE_UNLINK;
 	INIT_LIST_HEAD (&qtd_list);
-	switch (usb_pipetype (urb->pipe)) {
 
-	case PIPE_CONTROL:
-	case PIPE_BULK:
+	switch (usb_pipetype (urb->pipe)) {
+	// case PIPE_CONTROL:
+	// case PIPE_BULK:
+	default:
 		if (!qh_urb_transaction (ehci, urb, &qtd_list, mem_flags))
 			return -ENOMEM;
 		return submit_async (ehci, urb, &qtd_list, mem_flags);
@@ -649,9 +650,6 @@ static int ehci_urb_enqueue (
 		dbg ("no split iso support yet");
 		return -ENOSYS;
 #endif /* have_split_iso */
-
-	default:	/* can't happen */
-		return -ENOSYS;
 	}
 }
 
@@ -665,15 +663,16 @@ static int ehci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
 	struct ehci_qh		*qh = (struct ehci_qh *) urb->hcpriv;
 	unsigned long		flags;
 
-	dbg ("%s urb_dequeue %p qh state %d",
-		hcd->self.bus_name, urb, qh->qh_state);
+	dbg ("%s urb_dequeue %p qh %p state %d",
+		hcd->self.bus_name, urb, qh, qh->qh_state);
 
 	switch (usb_pipetype (urb->pipe)) {
-	case PIPE_CONTROL:
-	case PIPE_BULK:
+	// case PIPE_CONTROL:
+	// case PIPE_BULK:
+	default:
 		spin_lock_irqsave (&ehci->lock, flags);
 		if (ehci->reclaim) {
-dbg ("dq: reclaim busy, %s", RUN_CONTEXT);
+			dbg ("dq: reclaim busy, %s", RUN_CONTEXT);
 			if (in_interrupt ()) {
 				spin_unlock_irqrestore (&ehci->lock, flags);
 				return -EAGAIN;
@@ -683,11 +682,8 @@ dbg ("dq: reclaim busy, %s", RUN_CONTEXT);
 					&& ehci->hcd.state != USB_STATE_HALT
 					) {
 				spin_unlock_irqrestore (&ehci->lock, flags);
-// yeech ... this could spin for up to two frames!
-dbg ("wait for dequeue: state %d, reclaim %p, hcd state %d",
-    qh->qh_state, ehci->reclaim, ehci->hcd.state
-);
-				udelay (100);
+				/* let pending unlinks complete */
+				wait_ms (1);
 				spin_lock_irqsave (&ehci->lock, flags);
 			}
 		}
@@ -712,9 +708,9 @@ dbg ("wait for dequeue: state %d, reclaim %p, hcd state %d",
 		// wait till next completion, do it then.
 		// completion irqs can wait up to 1024 msec,
 		urb->transfer_flags |= EHCI_STATE_UNLINK;
-		return 0;
+		break;
 	}
-	return -EINVAL;
+	return 0;
 }
 
 /*-------------------------------------------------------------------------*/
@@ -728,6 +724,7 @@ static void ehci_free_config (struct usb_hcd *hcd, struct usb_device *udev)
 	int			i;
 	unsigned long		flags;
 
+	/* ASSERT:  no requests/urbs are still linked (so no TDs) */
 	/* ASSERT:  nobody can be submitting urbs for this any more */
 
 	dbg ("%s: free_config devnum %d", hcd->self.bus_name, udev->devnum);
@@ -736,34 +733,57 @@ static void ehci_free_config (struct usb_hcd *hcd, struct usb_device *udev)
 	for (i = 0; i < 32; i++) {
 		if (dev->ep [i]) {
 			struct ehci_qh		*qh;
+			char			*why;
 
 			/* dev->ep never has ITDs or SITDs */
 			qh = (struct ehci_qh *) dev->ep [i];
-			vdbg ("free_config, ep 0x%02x qh %p", i, qh);
-			if (!list_empty (&qh->qtd_list)) {
-				dbg ("ep 0x%02x qh %p not empty!", i, qh);
+
+			/* detect/report non-recoverable errors */
+			if (in_interrupt ()) 
+				why = "disconnect() didn't";
+			else if ((qh->hw_info2 & cpu_to_le32 (0xffff)) != 0
+					&& qh->qh_state != QH_STATE_IDLE)
+				why = "(active periodic)";
+			else
+				why = 0;
+			if (why) {
+				err ("dev %s-%s ep %d-%s error: %s",
+					hcd->self.bus_name, udev->devpath,
+					i & 0xf, (i & 0x10) ? "IN" : "OUT",
+					why);
 				BUG ();
 			}
-			dev->ep [i] = 0;
 
-			/* wait_ms() won't spin here -- we're a thread */
+			dev->ep [i] = 0;
+			if (qh->qh_state == QH_STATE_IDLE)
+				goto idle;
+			dbg ("free_config, async ep 0x%02x qh %p", i, qh);
+
+			/* scan_async() empties the ring as it does its work,
+			 * using IAA, but doesn't (yet?) turn it off.  if it
+			 * doesn't empty this qh, likely it's the last entry.
+			 */
 			while (qh->qh_state == QH_STATE_LINKED
 					&& ehci->reclaim
 					&& ehci->hcd.state != USB_STATE_HALT
 					) {
 				spin_unlock_irqrestore (&ehci->lock, flags);
+				/* wait_ms() won't spin, we're a thread;
+				 * and we know IRQ+tasklet can progress
+				 */
 				wait_ms (1);
 				spin_lock_irqsave (&ehci->lock, flags);
 			}
-			if (qh->qh_state == QH_STATE_LINKED) {
+			if (qh->qh_state == QH_STATE_LINKED)
 				start_unlink_async (ehci, qh);
-				while (qh->qh_state != QH_STATE_IDLE) {
-					spin_unlock_irqrestore (&ehci->lock,
-						flags);
-					wait_ms (1);
-					spin_lock_irqsave (&ehci->lock, flags);
-				}
+			while (qh->qh_state != QH_STATE_IDLE
+					&& ehci->hcd.state != USB_STATE_HALT) {
+				spin_unlock_irqrestore (&ehci->lock,
+					flags);
+				wait_ms (1);
+				spin_lock_irqsave (&ehci->lock, flags);
 			}
+idle:
 			qh_put (ehci, qh);
 		}
 	}

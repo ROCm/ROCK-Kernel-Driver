@@ -241,10 +241,10 @@ static void intr_deschedule (
 
 	qh->qh_state = QH_STATE_UNLINK;
 	qh->qh_next.ptr = 0;
-	ehci->periodic_urbs--;
+	ehci->periodic_sched--;
 
 	/* maybe turn off periodic schedule */
-	if (!ehci->periodic_urbs)
+	if (!ehci->periodic_sched)
 		status = disable_periodic (ehci);
 	else {
 		status = 0;
@@ -266,13 +266,13 @@ static void intr_deschedule (
 
 	vdbg ("descheduled qh %p, per = %d frame = %d count = %d, urbs = %d",
 		qh, period, frame,
-		atomic_read (&qh->refcount), ehci->periodic_urbs);
+		atomic_read (&qh->refcount), ehci->periodic_sched);
 }
 
 static int check_period (
 	struct ehci_hcd *ehci, 
 	unsigned	frame,
-	int		uframe,
+	unsigned	uframe,
 	unsigned	period,
 	unsigned	usecs
 ) {
@@ -315,8 +315,7 @@ static int intr_submit (
 	struct list_head	*qtd_list,
 	int			mem_flags
 ) {
-	unsigned		epnum, period;
-	unsigned short		usecs, c_usecs, gap_uf;
+	unsigned		epnum;
 	unsigned long		flags;
 	struct ehci_qh		*qh;
 	struct hcd_dev		*dev;
@@ -328,43 +327,6 @@ static int intr_submit (
 	is_input = usb_pipein (urb->pipe);
 	if (is_input)
 		epnum |= 0x10;
-
-	/*
-	 * HS interrupt transfers are simple -- only one microframe.  FS/LS
-	 * interrupt transfers involve a SPLIT in one microframe and CSPLIT
-	 * sometime later.  We need to know how much time each will be
-	 * needed in each microframe and, for FS/LS, how many microframes
-	 * separate the two in the best case.
-	 */
-	usecs = usb_calc_bus_time (USB_SPEED_HIGH, is_input, 0,
-			urb->transfer_buffer_length);
-	if (urb->dev->speed == USB_SPEED_HIGH) {
-		gap_uf = 0;
-		c_usecs = 0;
-
-		/* FIXME handle HS periods of less than 1 frame. */
-		period = urb->interval >> 3;
-		if (period < 1) {
-			dbg ("intr period %d uframes, NYET!", urb->interval);
-			status = -EINVAL;
-			goto done;
-		}
-	} else {
-		/* gap is a function of full/low speed transfer times */
-		gap_uf = 1 + usb_calc_bus_time (urb->dev->speed, is_input, 0,
-				urb->transfer_buffer_length) / (125 * 1000);
-
-		/* FIXME this just approximates SPLIT/CSPLIT times */
-		if (is_input) {		// SPLIT, gap, CSPLIT+DATA
-			c_usecs = usecs + HS_USECS (0);
-			usecs = HS_USECS (1);
-		} else {		// SPLIT+DATA, gap, CSPLIT
-			usecs = usecs + HS_USECS (1);
-			c_usecs = HS_USECS (0);
-		}
-
-		period = urb->interval;
-	}
 
 	/*
 	 * NOTE: current completion/restart logic doesn't handle more than
@@ -423,19 +385,17 @@ static int intr_submit (
 
 	/* Schedule this periodic QH. */
 	if (likely (status == 0)) {
-		unsigned	frame = period;
+		unsigned	frame = qh->period;
 
 		qh->hw_next = EHCI_LIST_END;
-		qh->usecs = usecs;
-		qh->c_usecs = c_usecs;
 
 		urb->hcpriv = qh_get (qh);
 		status = -ENOSPC;
 
 		/* pick a set of schedule slots, link the QH into them */
 		do {
-			int	uframe;
-			u32	c_mask = 0;
+			unsigned	uframe;
+			u32		c_mask = 0;
 
 			/* pick a set of slots such that all uframes have
 			 * enough periodic bandwidth available.
@@ -443,7 +403,7 @@ static int intr_submit (
 			frame--;
 			for (uframe = 0; uframe < 8; uframe++) {
 				if (check_period (ehci, frame, uframe,
-						period, usecs) == 0)
+						qh->period, qh->usecs) == 0)
 					continue;
 
 				/* If this is a split transaction, check the
@@ -462,18 +422,18 @@ static int intr_submit (
 				 *
 				 * FIXME ehci 0.96 and above can use FSTNs
 				 */
-				if (!c_usecs)
+				if (!qh->c_usecs)
 				    	break;
 				if (check_period (ehci, frame,
-						uframe + gap_uf,
-						period, c_usecs) == 0)
+						uframe + qh->gap_uf,
+						qh->period, qh->c_usecs) == 0)
 					continue;
 				if (check_period (ehci, frame,
-						uframe + gap_uf + 1,
-						period, c_usecs) == 0)
+						uframe + qh->gap_uf + 1,
+						qh->period, qh->c_usecs) == 0)
 					continue;
 
-				c_mask = 0x03 << (8 + uframe + gap_uf);
+				c_mask = 0x03 << (8 + uframe + qh->gap_uf);
 				c_mask = cpu_to_le32 (c_mask);
 				break;
 			}
@@ -481,7 +441,7 @@ static int intr_submit (
 				continue;
 
 			/* QH will run once each period, starting there  */
-			urb->start_frame = frame;
+			urb->start_frame = qh->start = frame;
 			status = 0;
 
 			/* reset S-frame and (maybe) C-frame masks */
@@ -491,8 +451,10 @@ static int intr_submit (
 
 			/* stuff into the periodic schedule */
 			qh->qh_state = QH_STATE_LINKED;
-			vdbg ("qh %p usecs %d period %d.0 starting %d.%d",
-				qh, qh->usecs, period, frame, uframe);
+			dbg ("qh %p usecs %d/%d period %d.0 "
+					"starting %d.%d (gap %d)",
+				qh, qh->usecs, qh->c_usecs, qh->period,
+				frame, uframe, qh->gap_uf);
 			do {
 				if (unlikely (ehci->pshadow [frame].ptr != 0)) {
 // FIXME -- just link toward the end, before any qh with a shorter period,
@@ -505,15 +467,15 @@ static int intr_submit (
 						QH_NEXT (qh->qh_dma);
 				}
 				wmb ();
-				frame += period;
+				frame += qh->period;
 			} while (frame < ehci->periodic_size);
 
 			/* update bandwidth utilization records (for usbfs) */
 			usb_claim_bandwidth (urb->dev, urb,
-				(usecs + c_usecs) / period, 0);
+				(qh->usecs + qh->c_usecs) / qh->period, 0);
 
 			/* maybe enable periodic schedule processing */
-			if (!ehci->periodic_urbs++)
+			if (!ehci->periodic_sched++)
 				status = enable_periodic (ehci);
 			break;
 
@@ -806,7 +768,7 @@ static int get_iso_range (
 
 	/* calculate the legal range [start,max) */
 	now = readl (&ehci->regs->frame_index) + 1;	/* next uframe */
-	if (!ehci->periodic_urbs)
+	if (!ehci->periodic_sched)
 		now += 8;				/* startup delay */
 	now %= mod;
 	end = now + mod;
@@ -926,7 +888,7 @@ itd_schedule (struct ehci_hcd *ehci, struct urb *urb)
 		usb_claim_bandwidth (urb->dev, urb, usecs, 1);
 
 		/* maybe enable periodic schedule processing */
-		if (!ehci->periodic_urbs++) {
+		if (!ehci->periodic_sched++) {
 			if ((status =  enable_periodic (ehci)) != 0) {
 				// FIXME deschedule right away
 				err ("itd_schedule, enable = %d", status);
@@ -1009,8 +971,8 @@ itd_complete (
 	spin_lock_irqsave (&ehci->lock, flags);
 
 	/* defer stopping schedule; completion can submit */
-	ehci->periodic_urbs--;
-	if (!ehci->periodic_urbs)
+	ehci->periodic_sched--;
+	if (!ehci->periodic_sched)
 		(void) disable_periodic (ehci);
 
 	return flags;

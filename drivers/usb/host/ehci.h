@@ -50,7 +50,7 @@ struct ehci_hcd {			/* one per controller */
 
 	union ehci_shadow	*pshadow;	/* mirror hw periodic table */
 	int			next_uframe;	/* scan periodic, start here */
-	unsigned		periodic_urbs;	/* how many urbs scheduled? */
+	unsigned		periodic_sched;	/* periodic activity count */
 
 	/* deferred work from IRQ, etc */
 	struct tasklet_struct	tasklet;
@@ -72,7 +72,7 @@ struct ehci_hcd {			/* one per controller */
 };
 
 /* unwrap an HCD pointer to get an EHCI_HCD pointer */ 
-#define hcd_to_ehci(hcd_ptr) list_entry(hcd_ptr, struct ehci_hcd, hcd)
+#define hcd_to_ehci(hcd_ptr) container_of(hcd_ptr, struct ehci_hcd, hcd)
 
 /* NOTE:  urb->transfer_flags expected to not use this bit !!! */
 #define EHCI_STATE_UNLINK	0x8000		/* urb being unlinked */
@@ -287,12 +287,19 @@ struct ehci_qh {
 	struct list_head	qtd_list;	/* sw qtd list */
 
 	atomic_t		refcount;
-	unsigned short		usecs;		/* intr bandwidth */
-	unsigned short		c_usecs;	/* ... split completion bw */
-	short			qh_state;
+
+	u8			qh_state;
 #define	QH_STATE_LINKED		1		/* HC sees this */
 #define	QH_STATE_UNLINK		2		/* HC may still see this */
 #define	QH_STATE_IDLE		3		/* HC doesn't see this */
+
+	/* periodic schedule info */
+	u8			usecs;		/* intr bandwidth */
+	u8			gap_uf;		/* uframes split/csplit gap */
+	u8			c_usecs;	/* ... split completion bw */
+	unsigned short		period;		/* polling interval */
+	unsigned short		start;		/* where polling starts */
+
 } __attribute__ ((aligned (32)));
 
 /*-------------------------------------------------------------------------*/
