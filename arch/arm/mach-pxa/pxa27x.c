@@ -16,8 +16,10 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/pm.h>
+#include <linux/device.h>
 
 #include <asm/hardware.h>
+#include <asm/irq.h>
 
 #include "generic.h"
 
@@ -116,3 +118,45 @@ unsigned int get_lcdclk_frequency_10khz(void)
 EXPORT_SYMBOL(get_clk_frequency_khz);
 EXPORT_SYMBOL(get_memclk_frequency_10khz);
 EXPORT_SYMBOL(get_lcdclk_frequency_10khz);
+
+
+/*
+ * device registration specific to PXA27x.
+ */
+
+static u64 pxa27x_dmamask = 0xffffffffUL;
+
+static struct resource pxa27x_ohci_resources[] = {
+	[0] = {
+		.start  = 0x4C000000,
+		.end    = 0x4C00ff6f,
+		.flags  = IORESOURCE_MEM,
+	},
+	[1] = {
+		.start  = IRQ_USBH1,
+		.end    = IRQ_USBH1,
+		.flags  = IORESOURCE_IRQ,
+	},
+};
+
+static struct platform_device ohci_device = {
+	.name		= "pxa27x-ohci",
+	.id		= -1,
+	.dev		= {
+		.dma_mask = &pxa27x_dmamask,
+		.coherent_dma_mask = 0xffffffff,
+	},
+	.num_resources  = ARRAY_SIZE(pxa27x_ohci_resources),
+	.resource       = pxa27x_ohci_resources,
+};
+
+static struct platform_device *devices[] __initdata = {
+	&ohci_device,
+};
+
+static int __init pxa27x_init(void)
+{
+	return platform_add_devices(devices, ARRAY_SIZE(devices));
+}
+
+subsys_initcall(pxa27x_init);
