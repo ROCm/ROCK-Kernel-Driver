@@ -84,7 +84,7 @@
 #define	MCFUART_MR1_PARITYEVEN	0x00		/* Even parity */
 #define	MCFUART_MR1_PARITYODD	0x04		/* Odd parity */
 #define	MCFUART_MR1_PARITYSPACE	0x08		/* Space parity */
-#define	MCFUART_MR1_PARITYMARK	0x06		/* Mark parity */
+#define	MCFUART_MR1_PARITYMARK	0x0c		/* Mark parity */
 
 #define	MCFUART_MR1_CS5		0x00		/* 5 bits per char */
 #define	MCFUART_MR1_CS6		0x01		/* 6 bits per char */
