@@ -677,6 +677,10 @@ static int sbp2_update(struct unit_directory *ud)
 	 */
 	sbp2scsi_complete_all_commands(scsi_id, DID_BUS_BUSY);
 
+	/* Make sure we unblock requests (since this is likely after a bus
+	 * reset). */
+	scsi_unblock_requests(scsi_id->scsi_host);
+
 	return 0;
 }
 
@@ -2543,8 +2547,6 @@ static void sbp2scsi_complete_all_commands(struct scsi_id_instance_data *scsi_id
 			done (command->Current_SCpnt);
 		}
 	}
-
-	scsi_unblock_requests(scsi_id->scsi_host);
 
 	return;
 }
