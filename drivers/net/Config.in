@@ -135,7 +135,7 @@ if [ "$CONFIG_NET_ETHERNET" = "y" ]; then
 	 dep_tristate '    SEEQ8005 support (EXPERIMENTAL)' CONFIG_SEEQ8005 $CONFIG_EXPERIMENTAL
       fi
       if [ "$CONFIG_OBSOLETE" = "y" ]; then
-         tristate '    SK_G16 support' CONFIG_SK_G16
+         tristate '    SK_G16 support (OBSOLETE)' CONFIG_SK_G16
       fi
    fi
    if [ "$CONFIG_MCA" = "y" ]; then
