@@ -205,9 +205,6 @@ static inline unsigned long msecs_to_jiffies(unsigned int m)
 #endif
 }
 
-#define JIFFIES_TO_MSECS(j)	jiffies_to_msecs(j)
-#define MSECS_TO_JIFFIES(m)	msecs_to_jiffies(m)
-
 /*
  * The TICK_NSEC - 1 rounds up the value to the next resolution.  Note
  * that a remainder subtract here would not do the right thing as the

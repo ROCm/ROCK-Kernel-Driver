@@ -1873,7 +1873,7 @@ static void rebalance_tick(int this_cpu, runqueue_t *this_rq,
 			interval *= sd->busy_factor;
 
 		/* scale ms to jiffies */
-		interval = MSECS_TO_JIFFIES(interval);
+		interval = msecs_to_jiffies(interval);
 		if (unlikely(!interval))
 			interval = 1;
 
