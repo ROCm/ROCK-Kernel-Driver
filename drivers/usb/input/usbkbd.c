@@ -280,7 +280,7 @@ static int usb_kbd_probe(struct usb_interface *iface,
 
 	if (!(buf = kmalloc(63, GFP_KERNEL))) {
 		usb_free_urb(kbd->irq);
-		usb_kbd_free_buffers(dev, kbd);
+		usb_kbd_free_mem(dev, kbd);
 		kfree(kbd);
 		return -ENOMEM;
 	}
@@ -321,7 +321,7 @@ static void usb_kbd_disconnect(struct usb_interface *intf)
 	if (kbd) {
 		usb_unlink_urb(kbd->irq);
 		input_unregister_device(&kbd->dev);
-		usb_kbd_free_buffers(interface_to_usbdev(intf), kbd);
+		usb_kbd_free_mem(interface_to_usbdev(intf), kbd);
 		kfree(kbd);
 	}
 }
