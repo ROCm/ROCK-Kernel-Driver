@@ -826,7 +826,8 @@ xfs_setattr(
 			/* can't set PREALLOC this way, just preserve it */
 			ip->i_d.di_flags =
 				(ip->i_d.di_flags & XFS_DIFLAG_PREALLOC);
-			if (vap->va_xflags & XFS_XFLAG_REALTIME) {
+			if (vap->va_xflags & XFS_XFLAG_REALTIME &&
+			    (ip->i_d.di_mode & S_IFMT) == S_IFREG) {
 				ip->i_d.di_flags |= XFS_DIFLAG_REALTIME;
 				ip->i_iocore.io_flags |= XFS_IOCORE_RT;
 			} else {
@@ -842,6 +843,9 @@ xfs_setattr(
 				ip->i_d.di_flags |= XFS_DIFLAG_NOATIME;
 			if (vap->va_xflags & XFS_XFLAG_NODUMP)
 				ip->i_d.di_flags |= XFS_DIFLAG_NODUMP;
+			if ((vap->va_xflags & XFS_XFLAG_RTINHERIT) &&
+			    (ip->i_d.di_mode & S_IFMT) == S_IFDIR)
+				ip->i_d.di_flags |= XFS_DIFLAG_RTINHERIT;
 		}
 		xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 		timeflags |= XFS_ICHGTIME_CHG;
