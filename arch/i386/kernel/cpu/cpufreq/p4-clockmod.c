@@ -34,7 +34,7 @@
 
 #include "speedstep-lib.h"
 
-#define PFX	"cpufreq: "
+#define PFX	"p4-clockmod: "
 
 /*
  * Duty Cycle (3bits), note DC_DISABLE is not specified in
