@@ -285,7 +285,20 @@ int reiserfs_allocate_blocks_for_region(
 	// position, and how many blocks it is going to cover (we need to
 	//  populate pointers to file blocks representing the hole with zeros)
 
-	hole_size = (pos + 1 - (le_key_k_offset( get_inode_item_key_version(inode), &(ih->ih_key))+op_bytes_number(ih, inode->i_sb->s_blocksize))) >> inode->i_sb->s_blocksize_bits;
+	{
+	    int item_offset = 1;
+	    /*
+	     * if ih is stat data, its offset is 0 and we don't want to
+	     * add 1 to pos in the hole_size calculation
+	     */
+	    if (is_statdata_le_ih(ih))
+	        item_offset = 0;
+	    hole_size = (pos + item_offset -
+	            (le_key_k_offset( get_inode_item_key_version(inode),
+		    &(ih->ih_key)) +
+		    op_bytes_number(ih, inode->i_sb->s_blocksize))) >>
+		    inode->i_sb->s_blocksize_bits;
+	}
 
 	if ( hole_size > 0 ) {
 	    int to_paste = min_t(__u64, hole_size, MAX_ITEM_LEN(inode->i_sb->s_blocksize)/UNFM_P_SIZE ); // How much data to insert first time.
