@@ -615,6 +615,11 @@ acpi_bus_init (void)
 #ifdef CONFIG_X86
 	if (!acpi_ioapic) {
 		extern acpi_interrupt_flags acpi_sci_flags;
+
+		/* compatible (0) means level (3) */
+		if (acpi_sci_flags.trigger == 0)
+			acpi_sci_flags.trigger = 3;
+
 		/* Set PIC-mode SCI trigger type */
 		acpi_pic_sci_set_trigger(acpi_fadt.sci_int, acpi_sci_flags.trigger);
 	} else {
