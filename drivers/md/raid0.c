@@ -224,8 +224,9 @@ static int raid0_stop (mddev_t *mddev)
  * Of course, those facts may not be valid anymore (and surely won't...)
  * Hey guys, there's some work out there ;-)
  */
-static int raid0_make_request (mddev_t *mddev, int rw, struct bio *bio)
+static int raid0_make_request (request_queue_t *q, struct bio *bio)
 {
+	mddev_t *mddev = q->queuedata;
 	unsigned int sect_in_chunk, chunksize_bits,  chunk_size;
 	raid0_conf_t *conf = mddev_to_conf(mddev);
 	struct raid0_hash *hash;

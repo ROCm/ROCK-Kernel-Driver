@@ -433,8 +433,9 @@ static void resume_device(conf_t *conf)
 	spin_unlock_irq(&conf->resync_lock);
 }
 
-static int make_request(mddev_t *mddev, int rw, struct bio * bio)
+static int make_request(request_queue_t *q, struct bio * bio)
 {
+	mddev_t *mddev = q->queuedata;
 	conf_t *conf = mddev_to_conf(mddev);
 	mirror_info_t *mirror;
 	r1bio_t *r1_bio;
@@ -455,20 +456,16 @@ static int make_request(mddev_t *mddev, int rw, struct bio * bio)
 	 * make_request() can abort the operation when READA is being
 	 * used and no empty request is available.
 	 *
-	 * Currently, just replace the command with READ.
 	 */
-	if (rw == READA)
-		rw = READ;
-
 	r1_bio = mempool_alloc(conf->r1bio_pool, GFP_NOIO);
 
 	r1_bio->master_bio = bio;
 
 	r1_bio->mddev = mddev;
 	r1_bio->sector = bio->bi_sector;
-	r1_bio->cmd = rw;
+	r1_bio->cmd = bio_data_dir(bio);
 
-	if (rw == READ) {
+	if (r1_bio->cmd == READ) {
 		/*
 		 * read balancing logic:
 		 */
@@ -482,7 +479,7 @@ static int make_request(mddev_t *mddev, int rw, struct bio * bio)
 		read_bio->bi_sector = r1_bio->sector;
 		read_bio->bi_bdev = mirror->bdev;
 		read_bio->bi_end_io = end_request;
-		read_bio->bi_rw = rw;
+		read_bio->bi_rw = r1_bio->cmd;
 		read_bio->bi_private = r1_bio;
 
 		generic_make_request(read_bio);
@@ -506,7 +503,7 @@ static int make_request(mddev_t *mddev, int rw, struct bio * bio)
 		mbio->bi_sector	= r1_bio->sector;
 		mbio->bi_bdev = conf->mirrors[i].bdev;
 		mbio->bi_end_io	= end_request;
-		mbio->bi_rw = rw;
+		mbio->bi_rw = r1_bio->cmd;
 		mbio->bi_private = r1_bio;
 
 		sum_bios++;

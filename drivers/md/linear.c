@@ -1,6 +1,6 @@
 /*
    linear.c : Multiple Devices driver for Linux
-              Copyright (C) 1994-96 Marc ZYNGIER
+	      Copyright (C) 1994-96 Marc ZYNGIER
 	      <zyngier@ufr-info-p7.ibp.fr> or
 	      <maz@gloups.fdn.fr>
 
@@ -130,12 +130,13 @@ static int linear_stop (mddev_t *mddev)
 	return 0;
 }
 
-static int linear_make_request (mddev_t *mddev, int rw, struct bio *bio)
+static int linear_make_request (request_queue_t *q, struct bio *bio)
 {
-        linear_conf_t *conf = mddev_to_conf(mddev);
-        struct linear_hash *hash;
-        dev_info_t *tmp_dev;
-        long block;
+	mddev_t *mddev = q->queuedata;
+	linear_conf_t *conf = mddev_to_conf(mddev);
+	struct linear_hash *hash;
+	dev_info_t *tmp_dev;
+	long block;
 
 	block = bio->bi_sector >> 1;
 	hash = conf->hash_table + (block / conf->smallest->size);

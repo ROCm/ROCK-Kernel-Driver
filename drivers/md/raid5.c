@@ -1248,22 +1248,16 @@ static inline void raid5_plug_device(raid5_conf_t *conf)
 	spin_unlock_irq(&conf->device_lock);
 }
 
-static int make_request (mddev_t *mddev, int rw, struct bio * bi)
+static int make_request (request_queue_t *q, struct bio * bi)
 {
+	mddev_t *mddev = q->queuedata;
 	raid5_conf_t *conf = mddev_to_conf(mddev);
 	const unsigned int raid_disks = conf->raid_disks;
 	const unsigned int data_disks = raid_disks - 1;
 	unsigned int dd_idx, pd_idx;
 	sector_t new_sector;
 	sector_t logical_sector, last_sector;
-	int read_ahead = 0;
-
 	struct stripe_head *sh;
-
-	if (rw == READA) {
-		rw = READ;
-		read_ahead=1;
-	}
 
 	logical_sector = bi->bi_sector & ~(STRIPE_SECTORS-1);
 	last_sector = bi->bi_sector + (bi->bi_size>>9);
@@ -1279,10 +1273,10 @@ static int make_request (mddev_t *mddev, int rw, struct bio * bi)
 		PRINTK("raid5: make_request, sector %ul logical %ul\n", 
 		       new_sector, logical_sector);
 
-		sh = get_active_stripe(conf, new_sector, pd_idx, read_ahead);
+		sh = get_active_stripe(conf, new_sector, pd_idx, (bi->bi_rw&RWA_MASK));
 		if (sh) {
 
-			add_stripe_bio(sh, bi, dd_idx, rw);
+			add_stripe_bio(sh, bi, dd_idx, (bi->bi_rw&RW_MASK));
 
 			raid5_plug_device(conf);
 			handle_stripe(sh);

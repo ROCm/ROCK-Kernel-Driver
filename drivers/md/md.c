@@ -169,18 +169,6 @@ void del_mddev_mapping(mddev_t * mddev, kdev_t dev)
 	mddev_map[minor].data = NULL;
 }
 
-static int md_make_request (request_queue_t *q, struct bio *bio)
-{
-	mddev_t *mddev = q->queuedata;
-
-	if (mddev && mddev->pers)
-		return mddev->pers->make_request(mddev, bio_rw(bio), bio);
-	else {
-		bio_io_error(bio);
-		return 0;
-	}
-}
-
 static int md_fail_request (request_queue_t *q, struct bio *bio)
 {
 	bio_io_error(bio);
@@ -1705,7 +1693,7 @@ static int do_md_run(mddev_t * mddev)
 	}
 	mddev->pers = pers[pnum];
 
-	blk_queue_make_request(&mddev->queue, md_make_request);
+	blk_queue_make_request(&mddev->queue, mddev->pers->make_request);
 	mddev->queue.queuedata = mddev;
 
 	err = mddev->pers->run(mddev);
