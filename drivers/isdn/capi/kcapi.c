@@ -1,4 +1,4 @@
-/* $Id: kcapi.c,v 1.1.2.6 2004/03/16 08:00:08 armin Exp $
+/* $Id: kcapi.c,v 1.1.2.7 2004/03/16 08:01:47 armin Exp $
  * 
  * Kernel CAPI 2.0 Module
  * 
@@ -31,7 +31,7 @@
 #include <linux/b1lli.h>
 #endif
 
-static char *revision = "$Revision: 1.1.2.6 $";
+static char *revision = "$Revision: 1.1.2.7 $";
 
 /* ------------------------------------------------------------- */
 
@@ -246,7 +246,7 @@ static void recv_handler(void *dummy)
 		ap = get_capi_appl_by_nr(CAPIMSG_APPID(skb->data));
 		if (!ap) {
 			printk(KERN_ERR "kcapi: recv_handler: applid %d ? (%s)\n",
-			       ap->applid, capi_message2str(skb->data));
+				CAPIMSG_APPID(skb->data), capi_message2str(skb->data));
 			kfree_skb(skb);
 			continue;
 		}
