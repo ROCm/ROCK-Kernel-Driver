@@ -44,6 +44,9 @@
 #include <net/ip6_route.h>
 #include <net/addrconf.h>
 
+#include <net/mipglue.h>
+#include <net/mipv6.h>
+
 #include <asm/uaccess.h>
 
 /*
@@ -65,7 +68,7 @@ struct tlvtype_proc {
 
 /* An unknown option is detected, decide what to do */
 
-static int ip6_tlvopt_unknown(struct sk_buff *skb, int optoff)
+int ip6_tlvopt_unknown(struct sk_buff *skb, int optoff)
 {
 	switch ((skb->nh.raw[optoff] & 0xC0) >> 6) {
 	case 0: /* ignore */
@@ -148,7 +151,8 @@ bad:
  *****************************/
 
 static struct tlvtype_proc tlvprocdestopt_lst[] = {
-	/* No destination options are defined now */
+	/* Mobility Support destination options */
+	{MIPV6_TLV_HOMEADDR,	mipv6_handle_dstopt},
 	{-1,			NULL}
 };
 
@@ -224,6 +228,7 @@ static int ipv6_rthdr_rcv(struct sk_buff **skbp, unsigned int *nhoffp)
 
 	struct ipv6_rt_hdr *hdr;
 	struct rt0_hdr *rthdr;
+	struct rt2_hdr *rt2hdr;
 
 	if (!pskb_may_pull(skb, (skb->h.raw-skb->data)+8) ||
 	    !pskb_may_pull(skb, (skb->h.raw-skb->data)+((skb->h.raw[1]+1)<<3))) {
@@ -243,7 +248,10 @@ static int ipv6_rthdr_rcv(struct sk_buff **skbp, unsigned int *nhoffp)
 
 looped_back:
 	if (hdr->segments_left == 0) {
-		opt->srcrt = skb->h.raw - skb->nh.raw;
+		if (hdr->type == IPV6_SRCRT_TYPE_0)
+			opt->srcrt = skb->h.raw - skb->nh.raw;
+		else if (hdr->type == IPV6_SRCRT_TYPE_2)
+			opt->srcrt2 = skb->h.raw - skb->nh.raw;
 		skb->h.raw += (hdr->hdrlen + 1) << 3;
 		opt->dst0 = opt->dst1;
 		opt->dst1 = 0;
@@ -251,7 +259,7 @@ looped_back:
 		return 1;
 	}
 
-	if (hdr->type != IPV6_SRCRT_TYPE_0) {
+	if (hdr->type != IPV6_SRCRT_TYPE_0 && hdr->type != IPV6_SRCRT_TYPE_2) {
 		IP6_INC_STATS_BH(IPSTATS_MIB_INHDRERRORS);
 		icmpv6_param_prob(skb, ICMPV6_HDR_FIELD, (&hdr->type) - skb->nh.raw);
 		return -1;
@@ -297,9 +305,25 @@ looped_back:
 
 	i = n - --hdr->segments_left;
 
-	rthdr = (struct rt0_hdr *) hdr;
-	addr = rthdr->addr;
-	addr += i - 1;
+	if (hdr->type == IPV6_SRCRT_TYPE_0) {
+		rthdr = (struct rt0_hdr *) hdr;
+		addr = rthdr->addr;
+		addr += i - 1;
+	} else {
+		if (hdr->hdrlen != 2 || hdr->segments_left != 0) {
+			icmpv6_param_prob(skb, ICMPV6_HDR_FIELD,
+					  hdr->hdrlen != 2 ? 1 : 3);
+			return -1;
+		}
+		/* check that address is this node's home address */
+		rt2hdr = (struct rt2_hdr *) hdr;
+		addr = &rt2hdr->addr;
+		if (!ipv6_chk_addr(addr, NULL, 0) || 
+		    !ipv6_chk_mip_home_addr(addr)) {
+			kfree_skb(skb);
+			return -1;
+		}
+	}
 
 	if (ipv6_addr_is_multicast(addr)) {
 		IP6_INC_STATS_BH(IPSTATS_MIB_INADDRERRORS);
@@ -363,6 +387,10 @@ void __init ipv6_rthdr_init(void)
    temporary (or permanent) backdoor.
    If listening socket set IPV6_RTHDR to 2, then we invert header.
                                                    --ANK (980729)
+
+   By the Mobile IPv6 specification Type 2 routing header MUST NOT be
+   inverted.
+                                                   --AJT (20020917)
  */
 
 struct ipv6_txoptions *
@@ -384,6 +412,18 @@ ipv6_invert_rthdr(struct sock *sk, struct ipv6_rt_hdr *hdr)
 	struct rt0_hdr *irthdr;
 	struct ipv6_txoptions *opt;
 	int hdrlen = ipv6_optlen(hdr);
+
+	if (hdr->type == IPV6_SRCRT_TYPE_2) {
+		opt = sock_kmalloc(sk, sizeof(*opt) + hdrlen, GFP_ATOMIC);
+		if (opt == NULL)
+			return NULL;
+		memset(opt, 0, sizeof(*opt));
+		opt->tot_len = sizeof(*opt) + hdrlen;
+		opt->srcrt = (void*)(opt+1);
+		opt->opt_nflen = hdrlen;
+		memcpy(opt->srcrt, hdr, sizeof(struct rt2_hdr));
+		return opt;
+	}
 
 	if (hdr->segments_left ||
 	    hdr->type != IPV6_SRCRT_TYPE_0 ||
@@ -562,8 +602,15 @@ u8 *ipv6_build_nfrag_opts(struct sk_buff *skb, u8 *prev_hdr, struct ipv6_txoptio
 	if (opt) {
 		if (opt->dst0opt)
 			prev_hdr = ipv6_build_exthdr(skb, prev_hdr, NEXTHDR_DEST, opt->dst0opt);
-		if (opt->srcrt)
-			prev_hdr = ipv6_build_rthdr(skb, prev_hdr, opt->srcrt, daddr);
+		if (opt->srcrt) {
+			if (opt->srcrt2) {
+				struct in6_addr *rt2_hop = &((struct rt2_hdr *)opt->srcrt2)->addr;
+				prev_hdr = ipv6_build_rthdr(skb, prev_hdr, opt->srcrt, rt2_hop);
+			} else
+				prev_hdr = ipv6_build_rthdr(skb, prev_hdr, opt->srcrt, daddr);
+		}
+		if (opt->srcrt2)
+			prev_hdr = ipv6_build_rthdr(skb, prev_hdr, opt->srcrt2, daddr);
 	}
 	return prev_hdr;
 }
@@ -613,6 +660,8 @@ void ipv6_push_nfrag_opts(struct sk_buff *skb, struct ipv6_txoptions *opt,
 			  u8 *proto,
 			  struct in6_addr **daddr)
 {
+	if (opt->srcrt2)
+		ipv6_push_rthdr(skb, proto, opt->srcrt2, daddr);
 	if (opt->srcrt)
 		ipv6_push_rthdr(skb, proto, opt->srcrt, daddr);
 	if (opt->dst0opt)
@@ -644,6 +693,10 @@ ipv6_dup_options(struct sock *sk, struct ipv6_txoptions *opt)
 			*((char**)&opt2->dst1opt) += dif;
 		if (opt2->srcrt)
 			*((char**)&opt2->srcrt) += dif;
+		if (opt2->srcrt2)
+			*((char**)&opt2->srcrt2) += dif;
 	}
 	return opt2;
 }
+
+EXPORT_SYMBOL(ip6_tlvopt_unknown);

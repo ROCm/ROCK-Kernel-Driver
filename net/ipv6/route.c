@@ -51,6 +51,7 @@
 #include <net/addrconf.h>
 #include <net/tcp.h>
 #include <linux/rtnetlink.h>
+#include <net/mipglue.h>
 #include <net/dst.h>
 #include <net/xfrm.h>
 
@@ -384,12 +385,8 @@ static struct rt6_info *rt6_cow(struct rt6_info *ort, struct in6_addr *daddr,
 		rt->u.dst.flags |= DST_HOST;
 
 #ifdef CONFIG_IPV6_SUBTREES
-		if (rt->rt6i_src.plen && saddr) {
-			ipv6_addr_copy(&rt->rt6i_src.addr, saddr);
-			rt->rt6i_src.plen = 128;
-		}
+		rt->rt6i_src.plen = ort->rt6i_src.plen;
 #endif
-
 		rt->rt6i_nexthop = ndisc_get_neigh(rt->rt6i_dev, &rt->rt6i_gateway);
 
 		dst_hold(&rt->u.dst);
@@ -845,7 +842,7 @@ int ip6_route_add(struct in6_rtmsg *rtmsg, struct nlmsghdr *nlh, void *_rtattr)
 			if (!(gwa_type&IPV6_ADDR_UNICAST))
 				goto out;
 
-			grt = rt6_lookup(gw_addr, NULL, rtmsg->rtmsg_ifindex, 1);
+			grt = rt6_lookup(gw_addr, &rtmsg->rtmsg_src, rtmsg->rtmsg_ifindex, 1);
 
 			err = -EHOSTUNREACH;
 			if (grt == NULL)
@@ -885,6 +882,16 @@ int ip6_route_add(struct in6_rtmsg *rtmsg, struct nlmsghdr *nlh, void *_rtattr)
 	}
 
 	rt->rt6i_flags = rtmsg->rtmsg_flags;
+
+// KK : 2.4.22 uses USE_IPV6_MOBILITY, which is not defined.
+#ifdef USE_IPV6_MOBILITY
+	/* If destination is mobile node, add special skb->dst->input
+	 * function for proxy ND.
+	 */
+	if (rtmsg->rtmsg_flags & RTF_MOBILENODE) {
+		rt->u.dst.input = ip6_mipv6_forward;
+	}
+#endif /* CONFIG_IPV6_MOBILITY */
 
 install_route:
 	if (rta && rta[RTA_METRICS-1]) {
@@ -947,7 +954,7 @@ int ip6_del_rt(struct rt6_info *rt, struct nlmsghdr *nlh, void *_rtattr)
 	return err;
 }
 
-static int ip6_route_del(struct in6_rtmsg *rtmsg, struct nlmsghdr *nlh, void *_rtattr)
+int ip6_route_del(struct in6_rtmsg *rtmsg, struct nlmsghdr *nlh, void *_rtattr)
 {
 	struct fib6_node *fn;
 	struct rt6_info *rt;
@@ -992,7 +999,7 @@ int rt6_redirect(struct in6_addr *dest, struct in6_addr *saddr,
 	int notify;
 
 	/* Locate old route to this destination. */
-	rt = rt6_lookup(dest, NULL, neigh->dev->ifindex, 1);
+	rt = rt6_lookup(dest, saddr, neigh->dev->ifindex, 1);
 
 	if (rt == NULL)
 		return 0;
@@ -1074,6 +1081,9 @@ source_ok:
 	nrt = ip6_rt_copy(rt);
 	if (nrt == NULL)
 		goto out;
+#ifdef CONFIG_IPV6_SUBTREES
+	nrt->rt6i_src.plen = rt->rt6i_src.plen;
+#endif
 
 	nrt->rt6i_flags = RTF_GATEWAY|RTF_UP|RTF_DYNAMIC|RTF_CACHE|RTF_EXPIRES;
 	if (on_link)
@@ -1096,7 +1106,7 @@ source_ok:
 
 	if (rt->rt6i_flags&RTF_CACHE) {
 		ip6_del_rt(rt, NULL, NULL);
-		return;
+		return 1;
 	}
 
 out:
@@ -1178,6 +1188,9 @@ void rt6_pmtu_discovery(struct in6_addr *daddr, struct in6_addr *saddr,
 		nrt = ip6_rt_copy(rt);
 		if (nrt == NULL)
 			goto out;
+#ifdef CONFIG_IPV6_SUBTREES
+		nrt->rt6i_src.plen = rt->rt6i_src.plen;
+#endif
 		ipv6_addr_copy(&nrt->rt6i_dst.addr, daddr);
 		nrt->rt6i_dst.plen = 128;
 		nrt->u.dst.flags |= DST_HOST;
@@ -2099,3 +2112,8 @@ void __exit ip6_route_cleanup(void)
 	fib6_gc_cleanup();
 	kmem_cache_destroy(ip6_dst_ops.kmem_cachep);
 }
+
+EXPORT_SYMBOL(ip6_route_add);
+EXPORT_SYMBOL(ip6_route_del);
+EXPORT_SYMBOL(ip6_routing_table);
+EXPORT_SYMBOL(ip6_del_rt);

@@ -1,0 +1,21 @@
+#
+# Mobile IPv6 Configuration
+#
+menu "MOBILE IPv6 (EXPERIMENTAL)"
+        depends on IPV6 && NETFILTER && EXPERIMENTAL
+
+config IPV6_MOBILITY
+	tristate '    IPv6: Mobility Support (Correspondent Node)' 
+	#depends on CONFIG_IPV6
+	if IPV6_TUNNEL != "n"
+		config IPV6_MOBILITY_MN
+			tristate '      MIPv6: Mobile Node Support' 
+			depends on IPV6_MOBILITY
+		config IPV6_MOBILITY_HA
+			tristate '      MIPv6: Home Agent Support'
+			depends on IPV6_MOBILITY
+		config IPV6_MOBILITY_DEBUG
+			bool '      MIPv6: Debug messages' 
+			depends on IPV6_MOBILITY
+	endif
+endmenu

@@ -30,6 +30,7 @@ struct in6_ifreq {
 
 #define IPV6_SRCRT_STRICT	0x01	/* this hop must be a neighbor	*/
 #define IPV6_SRCRT_TYPE_0	0	/* IPv6 type 0 Routing Header	*/
+#define IPV6_SRCRT_TYPE_2	2	/*      type 2 for Mobile IPv6  */
 
 /*
  *	routing header
@@ -93,6 +94,18 @@ struct ipv6_comp_hdr {
 	__u8 nexthdr;
 	__u8 flags;
 	__u16 cpi;
+};
+
+/*
+ *	routing header type 2
+ */
+
+struct rt2_hdr {
+	struct ipv6_rt_hdr	rt_hdr;
+	__u32			reserved;
+	struct in6_addr		addr;
+
+#define rt2_type		rt_hdr.type;
 };
 
 /*
@@ -185,10 +198,13 @@ enum {
 struct inet6_skb_parm
 {
 	int			iif;
+	__u8			mipv6_flags;
 	__u16			ra;
 	__u16			hop;
 	__u16			dst0;
 	__u16			srcrt;
+	__u16			srcrt2;
+	__u16			hao;
 	__u16			dst1;
 };
 
@@ -199,7 +215,9 @@ struct ipv6_pinfo {
 	struct in6_addr 	rcv_saddr;
 	struct in6_addr		daddr;
 	struct in6_addr		*daddr_cache;
-
+#if defined(CONFIG_IPV6_SUBTREES)
+	struct in6_addr         *saddr_cache;
+#endif
 	__u32			flow_label;
 	__u32			frag_size;
 	int			hop_limit;

@@ -2,6 +2,7 @@
 #define _NET_IP6_ROUTE_H
 
 #define IP6_RT_PRIO_FW		16
+#define IP6_RT_PRIO_MIPV6      	64
 #define IP6_RT_PRIO_USER	1024
 #define IP6_RT_PRIO_ADDRCONF	256
 #define IP6_RT_PRIO_KERN	512
@@ -40,6 +41,8 @@ extern int			ipv6_route_ioctl(unsigned int cmd, void __user *arg);
 extern int			ip6_route_add(struct in6_rtmsg *rtmsg,
 					      struct nlmsghdr *,
 					      void *rtattr);
+extern int			ip6_route_del(struct in6_rtmsg *rtmsg,
+					      struct nlmsghdr *, void *_rtattr);
 extern int			ip6_del_rt(struct rt6_info *,
 					   struct nlmsghdr *,
 					   void *rtattr);
@@ -107,7 +110,8 @@ extern rwlock_t rt6_lock;
  *	Store a destination cache entry in a socket
  */
 static inline void ip6_dst_store(struct sock *sk, struct dst_entry *dst,
-				     struct in6_addr *daddr)
+				 struct in6_addr *daddr, 
+				 struct in6_addr *saddr)
 {
 	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct rt6_info *rt = (struct rt6_info *) dst;
@@ -115,6 +119,9 @@ static inline void ip6_dst_store(struct sock *sk, struct dst_entry *dst,
 	write_lock(&sk->sk_dst_lock);
 	__sk_dst_set(sk, dst);
 	np->daddr_cache = daddr;
+#ifdef CONFIG_IPV6_SUBTREES
+	np->saddr_cache = saddr;
+#endif
 	np->dst_cookie = rt->rt6i_node ? rt->rt6i_node->fn_sernum : 0;
 	write_unlock(&sk->sk_dst_lock);
 }

@@ -595,3 +595,6 @@ void ac6_proc_exit(void)
 }
 #endif
 
+EXPORT_SYMBOL(ipv6_dev_ac_inc);
+EXPORT_SYMBOL(ipv6_dev_ac_dec);
+EXPORT_SYMBOL(ipv6_chk_acast_addr);

@@ -64,6 +64,8 @@
 #include <net/addrconf.h>
 #include <net/icmp.h>
 
+#include <net/mipglue.h>
+
 #include <asm/uaccess.h>
 #include <asm/system.h>
 
@@ -392,6 +394,8 @@ void icmpv6_send(struct sk_buff *skb, int type, int code, __u32 info,
 
 	idev = in6_dev_get(skb->dev);
 
+	icmpv6_handle_mipv6_homeaddr(skb);
+
 	err = ip6_append_data(sk, icmpv6_getfrag, &msg,
 			      len + sizeof(struct icmp6hdr),
 			      sizeof(struct icmp6hdr),
@@ -619,13 +623,13 @@ static int icmpv6_rcv(struct sk_buff **pskb, unsigned int *nhoffp)
 		rt6_pmtu_discovery(&orig_hdr->daddr, &orig_hdr->saddr, dev,
 				   ntohl(hdr->icmp6_mtu));
 
-		/*
-		 *	Drop through to notify
-		 */
+		icmpv6_notify(skb, type, hdr->icmp6_code, hdr->icmp6_mtu);
+		break;
 
 	case ICMPV6_DEST_UNREACH:
-	case ICMPV6_TIME_EXCEED:
 	case ICMPV6_PARAMPROB:
+		mipv6_icmp_rcv(skb);
+	case ICMPV6_TIME_EXCEED:
 		icmpv6_notify(skb, type, hdr->icmp6_code, hdr->icmp6_mtu);
 		break;
 
@@ -649,10 +653,13 @@ static int icmpv6_rcv(struct sk_buff **pskb, unsigned int *nhoffp)
 	case ICMPV6_NI_QUERY:
 	case ICMPV6_NI_REPLY:
 	case ICMPV6_MLD2_REPORT:
+		break;
+
 	case ICMPV6_DHAAD_REQUEST:
 	case ICMPV6_DHAAD_REPLY:
 	case ICMPV6_MOBILE_PREFIX_SOL:
 	case ICMPV6_MOBILE_PREFIX_ADV:
+		mipv6_icmp_rcv(skb);
 		break;
 
 	default:
@@ -813,3 +820,4 @@ ctl_table ipv6_icmp_table[] = {
 };
 #endif
 
+EXPORT_SYMBOL(icmpv6_push_pending_frames);

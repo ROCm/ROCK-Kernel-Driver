@@ -25,9 +25,11 @@ struct prefix_info {
 #if defined(__BIG_ENDIAN_BITFIELD)
 	__u8			onlink : 1,
 			 	autoconf : 1,
-				reserved : 6;
+				router_address : 1,
+				reserved : 5;
 #elif defined(__LITTLE_ENDIAN_BITFIELD)
-	__u8			reserved : 6,
+	__u8			reserved : 5,
+				router_address : 1,
 				autoconf : 1,
 				onlink : 1;
 #else
@@ -95,6 +97,7 @@ extern void ipv6_mc_down(struct inet6_dev *idev);
 extern void ipv6_mc_init_dev(struct inet6_dev *idev);
 extern void ipv6_mc_destroy_dev(struct inet6_dev *idev);
 extern void addrconf_dad_failure(struct inet6_ifaddr *ifp);
+extern void addrconf_dad_completed(struct inet6_ifaddr *ifp);
 
 extern int ipv6_chk_mcast_addr(struct net_device *dev, struct in6_addr *group,
 		struct in6_addr *src_addr);

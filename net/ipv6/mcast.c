@@ -2486,3 +2486,7 @@ void igmp6_cleanup(void)
 	proc_net_remove("igmp6");
 #endif
 }
+
+EXPORT_SYMBOL(ipv6_dev_mc_inc);
+EXPORT_SYMBOL(ipv6_dev_mc_dec);
+
