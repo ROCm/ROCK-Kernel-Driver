@@ -466,7 +466,7 @@ static int shmem_writepage(struct page * page)
 		spin_unlock(&info->lock);
 		SetPageUptodate(page);
 		set_page_dirty(page);
-		UnlockPage(page);
+		unlock_page(page);
 		return 0;
 	}
 
@@ -512,7 +512,7 @@ repeat:
 
 	page = find_get_page(mapping, idx);
 	if (page) {
-		if (TryLockPage(page))
+		if (TestSetPageLocked(page))
 			goto wait_retry;
 		spin_unlock (&info->lock);
 		return page;
@@ -533,7 +533,7 @@ repeat:
 				return ERR_PTR(-ENOMEM);
 			}
 			wait_on_page(page);
-			if (!Page_Uptodate(page) && entry->val == swap.val) {
+			if (!PageUptodate(page) && entry->val == swap.val) {
 				page_cache_release(page);
 				return ERR_PTR(-EIO);
 			}
@@ -545,12 +545,12 @@ repeat:
 		}
 
 		/* We have to do this with page locked to prevent races */
-		if (TryLockPage(page)) 
+		if (TestSetPageLocked(page)) 
 			goto wait_retry;
 
 		error = move_from_swap_cache(page, idx, mapping);
 		if (error < 0) {
-			UnlockPage(page);
+			unlock_page(page);
 			return ERR_PTR(error);
 		}
 
@@ -614,7 +614,7 @@ static int shmem_getpage(struct inode * inode, unsigned long idx, struct page **
 	if (IS_ERR (*ptr))
 		goto failed;
 
-	UnlockPage(*ptr);
+	unlock_page(*ptr);
 	up (&info->sem);
 	return 0;
 failed:
@@ -864,7 +864,7 @@ shmem_file_write(struct file *file,const char *buf,size_t count,loff_t *ppos)
 		}
 unlock:
 		/* Mark it unlocked again and drop the page.. */
-		UnlockPage(page);
+		unlock_page(page);
 		page_cache_release(page);
 
 		if (status < 0)
@@ -1140,7 +1140,7 @@ static int shmem_symlink(struct inode * dir, struct dentry *dentry, const char *
 		memcpy(kaddr, symname, len);
 		kunmap(page);
 		SetPageDirty(page);
-		UnlockPage(page);
+		unlock_page(page);
 		page_cache_release(page);
 		up(&info->sem);
 		inode->i_op = &shmem_symlink_inode_operations;

@@ -618,7 +618,7 @@ affs_readpage_ofs(struct file *file, struct page *page)
 	err = affs_do_readpage_ofs(file, page, 0, to);
 	if (!err)
 		SetPageUptodate(page);
-	UnlockPage(page);
+	unlock_page(page);
 	return err;
 }
 
@@ -630,7 +630,7 @@ static int affs_prepare_write_ofs(struct file *file, struct page *page, unsigned
 	int err = 0;
 
 	pr_debug("AFFS: prepare_write(%u, %ld, %d, %d)\n", (u32)inode->i_ino, page->index, from, to);
-	if (Page_Uptodate(page))
+	if (PageUptodate(page))
 		return 0;
 
 	size = inode->i_size;
@@ -830,7 +830,7 @@ affs_truncate(struct inode *inode)
 		res = mapping->a_ops->prepare_write(NULL, page, size, size);
 		if (!res)
 			res = mapping->a_ops->commit_write(NULL, page, size, size);
-		UnlockPage(page);
+		unlock_page(page);
 		page_cache_release(page);
 		mark_inode_dirty(inode);
 		unlock_kernel();

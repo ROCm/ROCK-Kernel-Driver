@@ -94,7 +94,7 @@ smb_readpage_sync(struct dentry *dentry, struct page *page)
 
 io_error:
 	kunmap(page);
-	UnlockPage(page);
+	unlock_page(page);
 	return result;
 }
 
@@ -199,7 +199,7 @@ do_it:
 	get_page(page);
 	err = smb_writepage_sync(inode, page, 0, offset);
 	SetPageUptodate(page);
-	UnlockPage(page);
+	unlock_page(page);
 	put_page(page);
 	return err;
 }

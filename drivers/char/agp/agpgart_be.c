@@ -785,7 +785,7 @@ static void agp_generic_destroy_page(unsigned long addr)
 
 	page = virt_to_page(pt);
 	put_page(page);
-	UnlockPage(page);
+	unlock_page(page);
 	free_page((unsigned long) pt);
 	atomic_dec(&agp_bridge.current_memory_agp);
 }
@@ -2780,7 +2780,7 @@ static void ali_destroy_page(unsigned long addr)
 
 	page = virt_to_page(pt);
 	put_page(page);
-	UnlockPage(page);
+	unlock_page(page);
 	free_page((unsigned long) pt);
 	atomic_dec(&agp_bridge.current_memory_agp);
 }

@@ -739,7 +739,7 @@ jffs_do_readpage_nolock(struct file *file, struct page *page)
 		  (f->name ? f->name : ""), (long)page->index));
 
 	get_page(page);
-	/* Don't LockPage(page), should be locked already */
+	/* Don't SetPageLocked(page), should be locked already */
 	buf = page_address(page);
 	ClearPageUptodate(page);
 	ClearPageError(page);
@@ -789,7 +789,7 @@ jffs_do_readpage_nolock(struct file *file, struct page *page)
 static int jffs_readpage(struct file *file, struct page *page)
 {
 	int ret = jffs_do_readpage_nolock(file, page);
-	UnlockPage(page);
+	unlock_page(page);
 	return ret;
 }
 
@@ -1519,7 +1519,7 @@ jffs_prepare_write(struct file *filp, struct page *page,
 	/* FIXME: we should detect some error conditions here */
 
 	/* Bugger that. We should make sure the page is uptodate */
-	if (!Page_Uptodate(page) && (from || to < PAGE_CACHE_SIZE))
+	if (!PageUptodate(page) && (from || to < PAGE_CACHE_SIZE))
 		return jffs_do_readpage_nolock(filp, page);
 
 	return 0;

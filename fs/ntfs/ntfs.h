@@ -190,7 +190,7 @@ static inline struct page *ntfs_map_page(struct address_space *mapping,
 	if (!IS_ERR(page)) {
 		wait_on_page(page);
 		kmap(page);
-		if (Page_Uptodate(page) && !PageError(page))
+		if (PageUptodate(page) && !PageError(page))
 			return page;
 		ntfs_unmap_page(page);
 		return ERR_PTR(-EIO);

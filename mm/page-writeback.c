@@ -355,7 +355,7 @@ int generic_writeback_mapping(struct address_space *mapping, int *nr_to_write)
 					done = 1;
 			}
 		} else
-			UnlockPage(page);
+			unlock_page(page);
 
 		page_cache_release(page);
 		write_lock(&mapping->page_lock);

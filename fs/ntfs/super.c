@@ -1215,7 +1215,7 @@ handle_partial_page:
 			continue;
 		}
 		wait_on_page(page);
-		if (!Page_Uptodate(page)) {
+		if (!PageUptodate(page)) {
 			ntfs_debug("Async read_cache_page() error. Skipping "
 					"page (index 0x%lx).", index - 1);
 			/* Ignore pages which errored asynchronously. */
@@ -1298,7 +1298,7 @@ handle_partial_page:
 			continue;
 		}
 		wait_on_page(page);
-		if (!Page_Uptodate(page)) {
+		if (!PageUptodate(page)) {
 			ntfs_debug("Async read_cache_page() error. Skipping "
 					"page (index 0x%lx).", index - 1);
 			/* Ignore pages which errored asynchronously. */

@@ -552,7 +552,7 @@ static void end_buffer_io_async(struct buffer_head *bh, int uptodate)
 	 */
 	if (page_uptodate && !PageError(page))
 		SetPageUptodate(page);
-	UnlockPage(page);
+	unlock_page(page);
 	return;
 
 still_busy:
@@ -804,7 +804,7 @@ init_page_buffers(struct page *page, struct block_device *bdev,
 	unsigned int b_state;
 
 	b_state = 1 << BH_Mapped;
-	if (Page_Uptodate(page))
+	if (PageUptodate(page))
 		b_state |= 1 << BH_Uptodate;
 
 	do {
@@ -867,7 +867,7 @@ grow_dev_page(struct block_device *bdev, unsigned long block,
 
 failed:
 	buffer_error();
-	UnlockPage(page);
+	unlock_page(page);
 	page_cache_release(page);
 	return NULL;
 }
@@ -906,7 +906,7 @@ grow_buffers(struct block_device *bdev, unsigned long block, int size)
 	page = grow_dev_page(bdev, block, index, size);
 	if (!page)
 		return 0;
-	UnlockPage(page);
+	unlock_page(page);
 	page_cache_release(page);
 	return 1;
 }
@@ -1253,7 +1253,7 @@ static int __block_write_full_page(struct inode *inode,
 	if (!page_has_buffers(page)) {
 		if (S_ISBLK(inode->i_mode))
 			buffer_error();
-		if (!Page_Uptodate(page))
+		if (!PageUptodate(page))
 			buffer_error();
 		create_empty_buffers(page, 1 << inode->i_blkbits,
 					(1 << BH_Dirty)|(1 << BH_Uptodate));
@@ -1346,7 +1346,7 @@ done:
 		} while (bh != head);
 		if (uptodate)
 			SetPageUptodate(page);
-		UnlockPage(page);
+		unlock_page(page);
 	}
 	return err;
 recover:
@@ -1411,7 +1411,7 @@ static int __block_prepare_write(struct inode *inode, struct page *page,
 	    block++, block_start=block_end, bh = bh->b_this_page) {
 		block_end = block_start + blocksize;
 		if (block_end <= from || block_start >= to) {
-			if (Page_Uptodate(page))
+			if (PageUptodate(page))
 				mark_buffer_uptodate(bh, 1);
 			continue;
 		}
@@ -1423,7 +1423,7 @@ static int __block_prepare_write(struct inode *inode, struct page *page,
 			if (buffer_new(bh)) {
 				clear_bit(BH_New, &bh->b_state);
 				unmap_underlying_metadata(bh);
-				if (Page_Uptodate(page)) {
+				if (PageUptodate(page)) {
 					if (!buffer_mapped(bh))
 						buffer_error();
 					mark_buffer_uptodate(bh, 1);
@@ -1439,7 +1439,7 @@ static int __block_prepare_write(struct inode *inode, struct page *page,
 				continue;
 			}
 		}
-		if (Page_Uptodate(page)) {
+		if (PageUptodate(page)) {
 			mark_buffer_uptodate(bh, 1);
 			continue; 
 		}
@@ -1541,7 +1541,7 @@ int block_read_full_page(struct page *page, get_block_t *get_block)
 
 	if (!PageLocked(page))
 		PAGE_BUG(page);
-	if (Page_Uptodate(page))
+	if (PageUptodate(page))
 		buffer_error();
 	blocksize = 1 << inode->i_blkbits;
 	if (!page_has_buffers(page))
@@ -1588,7 +1588,7 @@ int block_read_full_page(struct page *page, get_block_t *get_block)
 		 */
 		if (!PageError(page))
 			SetPageUptodate(page);
-		UnlockPage(page);
+		unlock_page(page);
 		return 0;
 	}
 
@@ -1656,7 +1656,7 @@ int generic_cont_expand(struct inode *inode, loff_t size)
 	if (!err) {
 		err = mapping->a_ops->commit_write(NULL, page, offset, offset);
 	}
-	UnlockPage(page);
+	unlock_page(page);
 	page_cache_release(page);
 	if (err > 0)
 		err = 0;
@@ -1688,7 +1688,7 @@ int cont_prepare_write(struct page *page, unsigned offset,
 			goto out;
 		/* we might sleep */
 		if (*bytes>>PAGE_CACHE_SHIFT != pgpos) {
-			UnlockPage(new_page);
+			unlock_page(new_page);
 			page_cache_release(new_page);
 			continue;
 		}
@@ -1707,7 +1707,7 @@ int cont_prepare_write(struct page *page, unsigned offset,
 		__block_commit_write(inode, new_page,
 				zerofrom, PAGE_CACHE_SIZE);
 		kunmap(new_page);
-		UnlockPage(new_page);
+		unlock_page(new_page);
 		page_cache_release(new_page);
 	}
 
@@ -1746,7 +1746,7 @@ out1:
 out_unmap:
 	ClearPageUptodate(new_page);
 	kunmap(new_page);
-	UnlockPage(new_page);
+	unlock_page(new_page);
 	page_cache_release(new_page);
 out:
 	return status;
@@ -1836,7 +1836,7 @@ int block_truncate_page(struct address_space *mapping,
 	}
 
 	/* Ok, it's mapped. Make sure it's up-to-date */
-	if (Page_Uptodate(page))
+	if (PageUptodate(page))
 		mark_buffer_uptodate(bh, 1);
 
 	if (!buffer_uptodate(bh)) {
@@ -1856,7 +1856,7 @@ int block_truncate_page(struct address_space *mapping,
 	err = 0;
 
 unlock:
-	UnlockPage(page);
+	unlock_page(page);
 	page_cache_release(page);
 out:
 	return err;
@@ -1879,7 +1879,7 @@ int block_write_full_page(struct page *page, get_block_t *get_block)
 	/* Is the page fully outside i_size? (truncate in progress) */
 	offset = inode->i_size & (PAGE_CACHE_SIZE-1);
 	if (page->index >= end_index+1 || !offset) {
-		UnlockPage(page);
+		unlock_page(page);
 		return -EIO;
 	}
 
@@ -2119,7 +2119,7 @@ int block_symlink(struct inode *inode, const char *symname, int len)
 	mark_inode_dirty(inode);
 	return 0;
 fail_map:
-	UnlockPage(page);
+	unlock_page(page);
 	page_cache_release(page);
 fail:
 	return err;
@@ -2131,7 +2131,7 @@ fail:
 static void check_ttfb_buffer(struct page *page, struct buffer_head *bh)
 {
 	if (!buffer_uptodate(bh)) {
-		if (Page_Uptodate(page) && page->mapping
+		if (PageUptodate(page) && page->mapping
 			&& buffer_mapped(bh)	/* discard_buffer */
 			&& S_ISBLK(page->mapping->host->i_mode))
 		{
@@ -2190,7 +2190,7 @@ static /*inline*/ int drop_buffers(struct page *page)
 		bh = bh->b_this_page;
 	} while (bh != head);
 
-	if (!was_uptodate && Page_Uptodate(page))
+	if (!was_uptodate && PageUptodate(page))
 		buffer_error();
 
 	do {

@@ -489,7 +489,7 @@ static int read_disk_sb(mdk_rdev_t * rdev)
 	if (IS_ERR(page))
 		goto out;
 	wait_on_page(page);
-	if (!Page_Uptodate(page))
+	if (!PageUptodate(page))
 		goto fail;
 	if (PageError(page))
 		goto fail;
@@ -948,14 +948,14 @@ static int write_disk_sb(mdk_rdev_t * rdev)
 						offs + MD_SB_BYTES);
 	if (error)
 		goto unlock;
-	UnlockPage(page);
+	unlock_page(page);
 	wait_on_page(page);
 	page_cache_release(page);
 	fsync_bdev(bdev);
 skip:
 	return 0;
 unlock:
-	UnlockPage(page);
+	unlock_page(page);
 	page_cache_release(page);
 fail:
 	printk("md: write_disk_sb failed for device %s\n", partition_name(dev));

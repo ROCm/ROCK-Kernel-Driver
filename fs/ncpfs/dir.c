@@ -430,7 +430,7 @@ static int ncp_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	ctl.cache = cache = kmap(page);
 	ctl.head  = cache->head;
 
-	if (!Page_Uptodate(page) || !ctl.head.eof)
+	if (!PageUptodate(page) || !ctl.head.eof)
 		goto init_cache;
 
 	if (filp->f_pos == 2) {
@@ -456,7 +456,7 @@ static int ncp_readdir(struct file *filp, void *dirent, filldir_t filldir)
 			if (!ctl.page)
 				goto invalid_cache;
 			ctl.cache = kmap(ctl.page);
-			if (!Page_Uptodate(ctl.page))
+			if (!PageUptodate(ctl.page))
 				goto invalid_cache;
 		}
 		while (ctl.idx < NCP_DIRCACHE_SIZE) {
@@ -481,7 +481,7 @@ static int ncp_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		if (ctl.page) {
 			kunmap(ctl.page);
 			SetPageUptodate(ctl.page);
-			UnlockPage(ctl.page);
+			unlock_page(ctl.page);
 			page_cache_release(ctl.page);
 			ctl.page = NULL;
 		}
@@ -491,7 +491,7 @@ static int ncp_readdir(struct file *filp, void *dirent, filldir_t filldir)
 invalid_cache:
 	if (ctl.page) {
 		kunmap(ctl.page);
-		UnlockPage(ctl.page);
+		unlock_page(ctl.page);
 		page_cache_release(ctl.page);
 		ctl.page = NULL;
 	}
@@ -523,13 +523,13 @@ finished:
 		cache->head = ctl.head;
 		kunmap(page);
 		SetPageUptodate(page);
-		UnlockPage(page);
+		unlock_page(page);
 		page_cache_release(page);
 	}
 	if (ctl.page) {
 		kunmap(ctl.page);
 		SetPageUptodate(ctl.page);
-		UnlockPage(ctl.page);
+		unlock_page(ctl.page);
 		page_cache_release(ctl.page);
 	}
 out:
@@ -597,7 +597,7 @@ ncp_fill_cache(struct file *filp, void *dirent, filldir_t filldir,
 		if (ctl.page) {
 			kunmap(ctl.page);
 			SetPageUptodate(ctl.page);
-			UnlockPage(ctl.page);
+			unlock_page(ctl.page);
 			page_cache_release(ctl.page);
 		}
 		ctl.cache = NULL;

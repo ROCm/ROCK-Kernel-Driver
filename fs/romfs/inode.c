@@ -432,7 +432,7 @@ romfs_readpage(struct file *file, struct page * page)
 	}
 	flush_dcache_page(page);
 
-	UnlockPage(page);
+	unlock_page(page);
 
 	kunmap(page);
 err_out:

@@ -281,7 +281,7 @@ int jffs2_do_readpage_nolock (struct inode *inode, struct page *pg)
 int jffs2_do_readpage_unlock(struct inode *inode, struct page *pg)
 {
 	int ret = jffs2_do_readpage_nolock(inode, pg);
-	UnlockPage(pg);
+	unlock_page(pg);
 	return ret;
 }
 
@@ -371,7 +371,7 @@ int jffs2_prepare_write (struct file *filp, struct page *pg, unsigned start, uns
 	
 
 	/* Read in the page if it wasn't already present */
-	if (!Page_Uptodate(pg) && (start || end < PAGE_SIZE))
+	if (!PageUptodate(pg) && (start || end < PAGE_SIZE))
 		ret = jffs2_do_readpage_nolock(inode, pg);
 	D1(printk(KERN_DEBUG "end prepare_write()\n"));
 	up(&f->sem);

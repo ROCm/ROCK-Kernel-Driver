@@ -106,7 +106,7 @@ int direct2indirect (struct reiserfs_transaction_handle *th, struct inode * inod
 	** this avoids overwriting good data from writepage() with old data
 	** from the disk or buffer cache
 	*/
-	if (buffer_uptodate(unbh) || Page_Uptodate(unbh->b_page)) {
+	if (buffer_uptodate(unbh) || PageUptodate(unbh->b_page)) {
 	    up_to_date_bh = NULL ;
 	} else {
 	    up_to_date_bh = unbh ;

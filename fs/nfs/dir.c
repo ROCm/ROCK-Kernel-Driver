@@ -123,12 +123,12 @@ int nfs_readdir_filler(nfs_readdir_descriptor_t *desc, struct page *page)
 	 */
 	if (page->index == 0)
 		invalidate_inode_pages(inode);
-	UnlockPage(page);
+	unlock_page(page);
 	return 0;
  error:
 	SetPageError(page);
 	kunmap(page);
-	UnlockPage(page);
+	unlock_page(page);
 	invalidate_inode_pages(inode);
 	desc->error = error;
 	return -EIO;
@@ -202,7 +202,7 @@ int find_dirent_page(nfs_readdir_descriptor_t *desc)
 		status = PTR_ERR(page);
 		goto out;
 	}
-	if (!Page_Uptodate(page))
+	if (!PageUptodate(page))
 		goto read_error;
 
 	/* NOTE: Someone else may have changed the READDIRPLUS flag */

@@ -425,7 +425,7 @@ static int cramfs_readpage(struct file *file, struct page * page)
 	kunmap(page);
 	flush_dcache_page(page);
 	SetPageUptodate(page);
-	UnlockPage(page);
+	unlock_page(page);
 	return 0;
 }
 

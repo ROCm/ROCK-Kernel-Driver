@@ -66,7 +66,7 @@ static struct page * dir_get_page(struct inode *dir, unsigned long n)
 	if (!IS_ERR(page)) {
 		wait_on_page(page);
 		kmap(page);
-		if (!Page_Uptodate(page))
+		if (!PageUptodate(page))
 			goto fail;
 	}
 	return page;
@@ -269,7 +269,7 @@ int minix_delete_entry(struct minix_dir_entry *de, struct page *page)
 		de->inode = 0;
 		err = dir_commit_chunk(page, from, to);
 	}
-	UnlockPage(page);
+	unlock_page(page);
 	dir_put_page(page);
 	inode->i_ctime = inode->i_mtime = CURRENT_TIME;
 	mark_inode_dirty(inode);
@@ -303,7 +303,7 @@ int minix_make_empty(struct inode *inode, struct inode *dir)
 
 	err = dir_commit_chunk(page, 0, 2 * sbi->s_dirsize);
 fail:
-	UnlockPage(page);
+	unlock_page(page);
 	page_cache_release(page);
 	return err;
 }
@@ -369,7 +369,7 @@ void minix_set_link(struct minix_dir_entry *de, struct page *page,
 		de->inode = inode->i_ino;
 		err = dir_commit_chunk(page, from, to);
 	}
-	UnlockPage(page);
+	unlock_page(page);
 	dir_put_page(page);
 	dir->i_mtime = dir->i_ctime = CURRENT_TIME;
 	mark_inode_dirty(dir);

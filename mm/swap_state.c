@@ -24,7 +24,7 @@
 static int swap_writepage(struct page *page)
 {
 	if (remove_exclusive_swap_page(page)) {
-		UnlockPage(page);
+		unlock_page(page);
 		return 0;
 	}
 	rw_swap_page(WRITE, page);
@@ -244,9 +244,9 @@ void free_page_and_swap_cache(struct page *page)
 	 * exclusive_swap_page() _with_ the lock. 
 	 * 					- Marcelo
 	 */
-	if (PageSwapCache(page) && !TryLockPage(page)) {
+	if (PageSwapCache(page) && !TestSetPageLocked(page)) {
 		remove_exclusive_swap_page(page);
-		UnlockPage(page);
+		unlock_page(page);
 	}
 	page_cache_release(page);
 }

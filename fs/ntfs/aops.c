@@ -89,7 +89,7 @@ static void end_buffer_read_file_async(struct buffer_head *bh, int uptodate)
 	spin_unlock_irqrestore(&page_uptodate_lock, flags);
 	if (!PageError(page))
 		SetPageUptodate(page);
-	UnlockPage(page);
+	unlock_page(page);
 	return;
 still_busy:
 	spin_unlock_irqrestore(&page_uptodate_lock, flags);
@@ -227,7 +227,7 @@ handle_zblock:
 		SetPageUptodate(page);
 	else /* Signal synchronous i/o error. */
 		nr = -EIO;
-	UnlockPage(page);
+	unlock_page(page);
 	return nr;
 }
 
@@ -329,7 +329,7 @@ put_unm_unl_err_out:
 unm_unl_err_out:
 	unmap_mft_record(READ, ni);
 unl_err_out:
-	UnlockPage(page);
+	unlock_page(page);
 	return err;
 }
 
@@ -388,7 +388,7 @@ static void end_buffer_read_mftbmp_async(struct buffer_head *bh, int uptodate)
 	spin_unlock_irqrestore(&page_uptodate_lock, flags);
 	if (!PageError(page))
 		SetPageUptodate(page);
-	UnlockPage(page);
+	unlock_page(page);
 	return;
 still_busy:
 	spin_unlock_irqrestore(&page_uptodate_lock, flags);
@@ -507,7 +507,7 @@ handle_zblock:
 		SetPageUptodate(page);
 	else /* Signal synchronous i/o error. */
 		nr = -EIO;
-	UnlockPage(page);
+	unlock_page(page);
 	return nr;
 }
 
@@ -613,7 +613,7 @@ static void end_buffer_read_mst_async(struct buffer_head *bh, int uptodate)
 			SetPageError(page);
 		}
 	}
-	UnlockPage(page);
+	unlock_page(page);
 	return;
 still_busy:
 	spin_unlock_irqrestore(&page_uptodate_lock, flags);
@@ -761,7 +761,7 @@ handle_zblock:
 		SetPageUptodate(page);
 	else /* Signal synchronous i/o error. */
 		nr = -EIO;
-	UnlockPage(page);
+	unlock_page(page);
 	return nr;
 }
 

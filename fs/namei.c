@@ -2098,7 +2098,7 @@ static char *page_getlink(struct dentry * dentry, struct page **ppage)
 	if (IS_ERR(page))
 		goto sync_fail;
 	wait_on_page(page);
-	if (!Page_Uptodate(page))
+	if (!PageUptodate(page))
 		goto async_fail;
 	*ppage = page;
 	return kmap(page);

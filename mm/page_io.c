@@ -99,7 +99,7 @@ void rw_swap_page(int rw, struct page *page)
 	if (page->mapping != &swapper_space)
 		PAGE_BUG(page);
 	if (!rw_swap_page_base(rw, entry, page))
-		UnlockPage(page);
+		unlock_page(page);
 }
 
 /*
@@ -120,7 +120,7 @@ void rw_swap_page_nolock(int rw, swp_entry_t entry, char *buf)
 	/* needs sync_page to wait I/O completation */
 	page->mapping = &swapper_space;
 	if (!rw_swap_page_base(rw, entry, page))
-		UnlockPage(page);
+		unlock_page(page);
 	wait_on_page(page);
 	page->mapping = NULL;
 }

@@ -6,6 +6,70 @@
 #define PAGE_FLAGS_H
 
 /*
+ * Various page->flags bits:
+ *
+ * PG_reserved is set for special pages, which can never be swapped out. Some
+ * of them might not even exist (eg empty_bad_page)...
+ *
+ * The PG_private bitflag is set if page->private contains a valid value.
+ *
+ * During disk I/O, PG_locked_dontuse is used. This bit is set before I/O and
+ * reset when I/O completes. page_waitqueue(page) is a wait queue of all tasks
+ * waiting for the I/O on this page to complete.
+ *
+ * PG_uptodate tells whether the page's contents is valid.  When a read
+ * completes, the page becomes uptodate, unless a disk I/O error happened.
+ *
+ * For choosing which pages to swap out, inode pages carry a PG_referenced bit,
+ * which is set any time the system accesses that page through the (mapping,
+ * index) hash table.  This referenced bit, together with the referenced bit
+ * in the page tables, is used to manipulate page->age and move the page across
+ * the active, inactive_dirty and inactive_clean lists.
+ *
+ * Note that the referenced bit, the page->lru list_head and the active,
+ * inactive_dirty and inactive_clean lists are protected by the
+ * pagemap_lru_lock, and *NOT* by the usual PG_locked_dontuse bit!
+ *
+ * PG_skip is used on sparc/sparc64 architectures to "skip" certain parts of
+ * the address space.
+ *
+ * PG_error is set to indicate that an I/O error occurred on this page.
+ *
+ * PG_arch_1 is an architecture specific page state bit.  The generic code
+ * guarantees that this bit is cleared for a page when it first is entered into
+ * the page cache.
+ *
+ * PG_highmem pages are not permanently mapped into the kernel virtual address
+ * space, they need to be kmapped separately for doing IO on the pages.  The
+ * struct page (these bits with information) are always mapped into kernel
+ * address space...
+ */
+
+/*
+ * Don't use the *_dontuse flags.  Use the macros.  Otherwise you'll break
+ * locked- and dirty-page accounting.  The top eight bits of page->flags are
+ * used for page->zone, so putting flag bits there doesn't work.
+ */
+#define PG_locked_dontuse	 0	/* Page is locked. Don't touch. */
+#define PG_error		 1
+#define PG_referenced		 2
+#define PG_uptodate		 3
+
+#define PG_dirty_dontuse	 4
+#define PG_lru			 5
+#define PG_active		 6
+#define PG_slab			 7	/* slab debug (Suparna wants this) */
+
+#define PG_skip			 8	/* kill me now: obsolete */
+#define PG_highmem		 9
+#define PG_checked		10	/* kill me in 2.5.<early>. */
+#define PG_arch_1		11
+
+#define PG_reserved		12
+#define PG_launder		13	/* written out by VM pressure.. */
+#define PG_private		14	/* Has something at ->private */
+
+/*
  * Global page accounting.  One instance per CPU.
  */
 extern struct page_state {
@@ -30,7 +94,6 @@ extern void get_page_state(struct page_state *ret);
 /*
  * Manipulation of page state flags
  */
-#define UnlockPage(page)	unlock_page(page)
 #define PageLocked(page)	test_bit(PG_locked_dontuse, &(page)->flags)
 #define SetPageLocked(page)						\
 	do {								\
@@ -38,8 +101,7 @@ extern void get_page_state(struct page_state *ret);
 				&(page)->flags))			\
 			inc_page_state(nr_locked);			\
 	} while (0)
-#define LockPage(page)		SetPageLocked(page)	/* grr.  kill me */
-#define TryLockPage(page)						\
+#define TestSetPageLocked(page)						\
 	({								\
 		int ret;						\
 		ret = test_and_set_bit(PG_locked_dontuse,		\
@@ -71,9 +133,9 @@ extern void get_page_state(struct page_state *ret);
 #define PageReferenced(page)	test_bit(PG_referenced, &(page)->flags)
 #define SetPageReferenced(page)	set_bit(PG_referenced, &(page)->flags)
 #define ClearPageReferenced(page)	clear_bit(PG_referenced, &(page)->flags)
-#define PageTestandClearReferenced(page)	test_and_clear_bit(PG_referenced, &(page)->flags)
+#define TestClearPageReferenced(page) test_and_clear_bit(PG_referenced, &(page)->flags)
 
-#define Page_Uptodate(page)	test_bit(PG_uptodate, &(page)->flags)
+#define PageUptodate(page)	test_bit(PG_uptodate, &(page)->flags)
 #define SetPageUptodate(page)	set_bit(PG_uptodate, &(page)->flags)
 #define ClearPageUptodate(page)	clear_bit(PG_uptodate, &(page)->flags)
 
@@ -118,8 +180,8 @@ extern void get_page_state(struct page_state *ret);
 #define ClearPageActive(page)	clear_bit(PG_active, &(page)->flags)
 
 #define PageSlab(page)		test_bit(PG_slab, &(page)->flags)
-#define PageSetSlab(page)	set_bit(PG_slab, &(page)->flags)
-#define PageClearSlab(page)	clear_bit(PG_slab, &(page)->flags)
+#define SetPageSlab(page)	set_bit(PG_slab, &(page)->flags)
+#define ClearPageSlab(page)	clear_bit(PG_slab, &(page)->flags)
 
 #ifdef CONFIG_HIGHMEM
 #define PageHighMem(page)	test_bit(PG_highmem, &(page)->flags)
@@ -133,7 +195,6 @@ extern void get_page_state(struct page_state *ret);
 #define PageReserved(page)	test_bit(PG_reserved, &(page)->flags)
 #define SetPageReserved(page)	set_bit(PG_reserved, &(page)->flags)
 #define ClearPageReserved(page)	clear_bit(PG_reserved, &(page)->flags)
-#define __SetPageReserved(page)	__set_bit(PG_reserved, &(page)->flags)
 
 #define PageLaunder(page)	test_bit(PG_launder, &(page)->flags)
 #define SetPageLaunder(page)	set_bit(PG_launder, &(page)->flags)
@@ -141,5 +202,12 @@ extern void get_page_state(struct page_state *ret);
 #define SetPagePrivate(page)	set_bit(PG_private, &(page)->flags)
 #define ClearPagePrivate(page)	clear_bit(PG_private, &(page)->flags)
 #define PagePrivate(page)	test_bit(PG_private, &(page)->flags)
+
+/*
+ * The PageSwapCache predicate doesn't use a PG_flag at this time,
+ * but it may again do so one day.
+ */
+extern struct address_space swapper_space;
+#define PageSwapCache(page) ((page)->mapping == &swapper_space)
 
 #endif	/* PAGE_FLAGS_H */

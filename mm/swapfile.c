@@ -348,7 +348,7 @@ void free_swap_and_cache(swp_entry_t entry)
 			delete_from_swap_cache(page);
 			SetPageDirty(page);
 		}
-		UnlockPage(page);
+		unlock_page(page);
 		page_cache_release(page);
 	}
 }
@@ -689,7 +689,7 @@ static int try_to_unuse(unsigned int type)
 		 * mark page dirty so try_to_swap_out will preserve it.
 		 */
 		SetPageDirty(page);
-		UnlockPage(page);
+		unlock_page(page);
 		page_cache_release(page);
 
 		/*

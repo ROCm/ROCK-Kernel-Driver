@@ -73,7 +73,7 @@ vxfs_get_page(struct address_space *mapping, u_long n)
 	if (!IS_ERR(pp)) {
 		wait_on_page(pp);
 		kmap(pp);
-		if (!Page_Uptodate(pp))
+		if (!PageUptodate(pp))
 			goto fail;
 		/** if (!PageChecked(pp)) **/
 			/** vxfs_check_page(pp); **/

@@ -120,7 +120,7 @@ void invalidate_inode_pages(struct inode * inode)
 			continue;
 
 		/* ..or locked */
-		if (TryLockPage(page))
+		if (TestSetPageLocked(page))
 			continue;
 
 		if (PagePrivate(page) && !try_to_release_page(page, 0))
@@ -131,11 +131,11 @@ void invalidate_inode_pages(struct inode * inode)
 
 		__lru_cache_del(page);
 		__remove_inode_page(page);
-		UnlockPage(page);
+		unlock_page(page);
 		page_cache_release(page);
 		continue;
 unlock:
-		UnlockPage(page);
+		unlock_page(page);
 		continue;
 	}
 
@@ -201,7 +201,7 @@ static int truncate_list_pages(struct address_space *mapping,
 			int failed;
 
 			page_cache_get(page);
-			failed = TryLockPage(page);
+			failed = TestSetPageLocked(page);
 
 			list_del(head);
 			if (!failed)
@@ -221,7 +221,7 @@ static int truncate_list_pages(struct address_space *mapping,
 				} else 
 					truncate_complete_page(page);
 
-				UnlockPage(page);
+				unlock_page(page);
 			} else
  				wait_on_page(page);
 
@@ -321,11 +321,11 @@ static int invalidate_list_pages2(struct address_space * mapping,
 	while (curr != head) {
 		page = list_entry(curr, struct page, list);
 
-		if (!TryLockPage(page)) {
+		if (!TestSetPageLocked(page)) {
 			int __unlocked;
 
 			__unlocked = invalidate_this_page2(mapping, page, curr, head);
-			UnlockPage(page);
+			unlock_page(page);
 			unlocked |= __unlocked;
 			if (!__unlocked) {
 				curr = curr->prev;
@@ -405,7 +405,7 @@ static int do_buffer_fdatasync(struct address_space *mapping,
 		if (page_has_buffers(page))
 			retval |= fn(page);
 
-		UnlockPage(page);
+		unlock_page(page);
 		write_lock(&mapping->page_lock);
 		curr = page->list.next;
 		page_cache_release(page);
@@ -470,7 +470,7 @@ int fail_writepage(struct page *page)
 
 	/* Set the page dirty again, unlock */
 	SetPageDirty(page);
-	UnlockPage(page);
+	unlock_page(page);
 	return 0;
 }
 
@@ -659,6 +659,11 @@ void ___wait_on_page(struct page *page)
 
 /*
  * Unlock the page and wake up sleepers in ___wait_on_page.
+ *
+ * The first mb is necessary to safely close the critical section opened by the
+ * TryLockPage(), the second mb is necessary to enforce ordering between
+ * the clear_bit and the read of the waitqueue (to avoid SMP races with a
+ * parallel wait_on_page).
  */
 void unlock_page(struct page *page)
 {
@@ -689,7 +694,7 @@ static void __lock_page(struct page *page)
 			sync_page(page);
 			schedule();
 		}
-		if (!TryLockPage(page))
+		if (!TestSetPageLocked(page))
 			break;
 	}
 	__set_task_state(tsk, TASK_RUNNING);
@@ -708,7 +713,7 @@ EXPORT_SYMBOL(wake_up_page);
  */
 void lock_page(struct page *page)
 {
-	if (TryLockPage(page))
+	if (TestSetPageLocked(page))
 		__lock_page(page);
 }
 
@@ -741,7 +746,7 @@ struct page *find_trylock_page(struct address_space *mapping, unsigned long offs
 
 	read_lock(&mapping->page_lock);
 	page = radix_tree_lookup(&mapping->page_tree, offset);
-	if (page && TryLockPage(page))
+	if (page && TestSetPageLocked(page))
 		page = NULL;
 	read_unlock(&mapping->page_lock);
 	return page;
@@ -765,14 +770,14 @@ repeat:
 	page = radix_tree_lookup(&mapping->page_tree, offset);
 	if (page) {
 		page_cache_get(page);
-		if (TryLockPage(page)) {
+		if (TestSetPageLocked(page)) {
 			write_unlock(&mapping->page_lock);
 			lock_page(page);
 			write_lock(&mapping->page_lock);
 
 			/* Has the page been truncated while we slept? */
 			if (page->mapping != mapping || page->index != offset) {
-				UnlockPage(page);
+				unlock_page(page);
 				page_cache_release(page);
 				goto repeat;
 			}
@@ -881,12 +886,12 @@ struct page *grab_cache_page_nowait(struct address_space *mapping, unsigned long
 	page = find_get_page(mapping, index);
 
 	if ( page ) {
-		if ( !TryLockPage(page) ) {
+		if ( !TestSetPageLocked(page) ) {
 			/* Page found and locked */
 			/* This test is overly paranoid, but what the heck... */
 			if ( unlikely(page->mapping != mapping || page->index != index) ) {
 				/* Someone reallocated this page under us. */
-				UnlockPage(page);
+				unlock_page(page);
 				page_cache_release(page);
 				return NULL;
 			} else {
@@ -990,7 +995,7 @@ found_page:
 		page_cache_get(page);
 		write_unlock(&mapping->page_lock);
 
-		if (!Page_Uptodate(page))
+		if (!PageUptodate(page))
 			goto page_not_up_to_date;
 page_ok:
 		/* If users can be writing to this page using arbitrary
@@ -1027,7 +1032,7 @@ page_ok:
 		break;
 
 page_not_up_to_date:
-		if (Page_Uptodate(page))
+		if (PageUptodate(page))
 			goto page_ok;
 
 		/* Get exclusive access to the page ... */
@@ -1035,14 +1040,14 @@ page_not_up_to_date:
 
 		/* Did it get unhashed before we got the lock? */
 		if (!page->mapping) {
-			UnlockPage(page);
+			unlock_page(page);
 			page_cache_release(page);
 			continue;
 		}
 
 		/* Did somebody else fill it already? */
-		if (Page_Uptodate(page)) {
-			UnlockPage(page);
+		if (PageUptodate(page)) {
+			unlock_page(page);
 			goto page_ok;
 		}
 
@@ -1051,10 +1056,10 @@ readpage:
 		error = mapping->a_ops->readpage(filp, page);
 
 		if (!error) {
-			if (Page_Uptodate(page))
+			if (PageUptodate(page))
 				goto page_ok;
 			wait_on_page(page);
-			if (Page_Uptodate(page))
+			if (PageUptodate(page))
 				goto page_ok;
 			error = -EIO;
 		}
@@ -1518,7 +1523,7 @@ retry_find:
 	 * Ok, found a page in the page cache, now we need to check
 	 * that it's up-to-date.
 	 */
-	if (!Page_Uptodate(page))
+	if (!PageUptodate(page))
 		goto page_not_uptodate;
 
 success:
@@ -1559,20 +1564,20 @@ page_not_uptodate:
 
 	/* Did it get unhashed while we waited for it? */
 	if (!page->mapping) {
-		UnlockPage(page);
+		unlock_page(page);
 		page_cache_release(page);
 		goto retry_all;
 	}
 
 	/* Did somebody else get it up-to-date? */
-	if (Page_Uptodate(page)) {
-		UnlockPage(page);
+	if (PageUptodate(page)) {
+		unlock_page(page);
 		goto success;
 	}
 
 	if (!mapping->a_ops->readpage(file, page)) {
 		wait_on_page(page);
-		if (Page_Uptodate(page))
+		if (PageUptodate(page))
 			goto success;
 	}
 
@@ -1586,20 +1591,20 @@ page_not_uptodate:
 
 	/* Somebody truncated the page on us? */
 	if (!page->mapping) {
-		UnlockPage(page);
+		unlock_page(page);
 		page_cache_release(page);
 		goto retry_all;
 	}
 
 	/* Somebody else successfully read it in? */
-	if (Page_Uptodate(page)) {
-		UnlockPage(page);
+	if (PageUptodate(page)) {
+		unlock_page(page);
 		goto success;
 	}
 	ClearPageError(page);
 	if (!mapping->a_ops->readpage(file, page)) {
 		wait_on_page(page);
-		if (Page_Uptodate(page))
+		if (PageUptodate(page))
 			goto success;
 	}
 
@@ -2001,7 +2006,7 @@ repeat:
 
 /*
  * Read into the page cache. If a page already exists,
- * and Page_Uptodate() is not set, try to fill the page.
+ * and PageUptodate() is not set, try to fill the page.
  */
 struct page *read_cache_page(struct address_space *mapping,
 				unsigned long index,
@@ -2016,17 +2021,17 @@ retry:
 	if (IS_ERR(page))
 		goto out;
 	mark_page_accessed(page);
-	if (Page_Uptodate(page))
+	if (PageUptodate(page))
 		goto out;
 
 	lock_page(page);
 	if (!page->mapping) {
-		UnlockPage(page);
+		unlock_page(page);
 		page_cache_release(page);
 		goto retry;
 	}
-	if (Page_Uptodate(page)) {
-		UnlockPage(page);
+	if (PageUptodate(page)) {
+		unlock_page(page);
 		goto out;
 	}
 	err = filler(data, page);
@@ -2271,7 +2276,7 @@ unlock:
 		kunmap(page);
 		/* Mark it unlocked again and drop the page.. */
 		SetPageReferenced(page);
-		UnlockPage(page);
+		unlock_page(page);
 		page_cache_release(page);
 
 		if (status < 0)
@@ -2307,7 +2312,7 @@ sync_failure:
 	 * few blocks outside i_size.  Trim these off again.
 	 */
 	kunmap(page);
-	UnlockPage(page);
+	unlock_page(page);
 	page_cache_release(page);
 	if (pos + bytes > inode->i_size)
 		vmtruncate(inode, inode->i_size);

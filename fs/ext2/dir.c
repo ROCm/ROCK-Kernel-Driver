@@ -166,7 +166,7 @@ static struct page * ext2_get_page(struct inode *dir, unsigned long n)
 	if (!IS_ERR(page)) {
 		wait_on_page(page);
 		kmap(page);
-		if (!Page_Uptodate(page))
+		if (!PageUptodate(page))
 			goto fail;
 		if (!PageChecked(page))
 			ext2_check_page(page);
@@ -417,7 +417,7 @@ void ext2_set_link(struct inode *dir, struct ext2_dir_entry_2 *de,
 	de->inode = cpu_to_le32(inode->i_ino);
 	ext2_set_de_type (de, inode);
 	err = ext2_commit_chunk(page, from, to);
-	UnlockPage(page);
+	unlock_page(page);
 	ext2_put_page(page);
 	dir->i_mtime = dir->i_ctime = CURRENT_TIME;
 	mark_inode_dirty(dir);
@@ -512,7 +512,7 @@ got_it:
 	mark_inode_dirty(dir);
 	/* OFFSET_CACHE */
 out_unlock:
-	UnlockPage(page);
+	unlock_page(page);
 	ext2_put_page(page);
 out:
 	return err;
@@ -553,7 +553,7 @@ int ext2_delete_entry (struct ext2_dir_entry_2 * dir, struct page * page )
 		pde->rec_len = cpu_to_le16(to-from);
 	dir->inode = 0;
 	err = ext2_commit_chunk(page, from, to);
-	UnlockPage(page);
+	unlock_page(page);
 	inode->i_ctime = inode->i_mtime = CURRENT_TIME;
 	mark_inode_dirty(inode);
 out:
@@ -597,7 +597,7 @@ int ext2_make_empty(struct inode *inode, struct inode *parent)
 
 	err = ext2_commit_chunk(page, 0, chunk_size);
 fail:
-	UnlockPage(page);
+	unlock_page(page);
 	page_cache_release(page);
 	return err;
 }

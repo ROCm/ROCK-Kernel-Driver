@@ -433,7 +433,7 @@ unsigned char *read_dev_sector(struct block_device *bdev, unsigned long n, Secto
 			(filler_t *)mapping->a_ops->readpage, NULL);
 	if (!IS_ERR(page)) {
 		wait_on_page(page);
-		if (!Page_Uptodate(page))
+		if (!PageUptodate(page))
 			goto fail;
 		if (PageError(page))
 			goto fail;

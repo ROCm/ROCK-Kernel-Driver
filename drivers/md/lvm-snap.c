@@ -26,7 +26,7 @@
  *
  *    05/07/2000 - implemented persistent snapshot support
  *    23/11/2000 - used cpu_to_le64 rather than my own macro
- *    25/01/2001 - Put LockPage back in
+ *    25/01/2001 - Put SetPageLocked back in
  *    01/02/2001 - A dropped snapshot is now set as inactive
  *    12/03/2001 - lvm_pv_get_number changes:
  *                 o made it static

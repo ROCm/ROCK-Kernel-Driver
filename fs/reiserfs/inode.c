@@ -273,7 +273,7 @@ research:
             kunmap(bh_result->b_page) ;
 	// We do not return -ENOENT if there is a hole but page is uptodate, because it means
 	// That there is some MMAPED data associated with it that is yet to be written to disk.
-	if ((args & GET_BLOCK_NO_HOLE) && !Page_Uptodate(bh_result->b_page) ) {
+	if ((args & GET_BLOCK_NO_HOLE) && !PageUptodate(bh_result->b_page) ) {
 	    return -ENOENT ;
 	}
         return 0 ;
@@ -295,7 +295,7 @@ research:
 	} else 
 	    // We do not return -ENOENT if there is a hole but page is uptodate, because it means
 	    // That there is some MMAPED data associated with it that is yet to  be written to disk.
-	    if ((args & GET_BLOCK_NO_HOLE) && !Page_Uptodate(bh_result->b_page) ) {
+	    if ((args & GET_BLOCK_NO_HOLE) && !PageUptodate(bh_result->b_page) ) {
 	    ret = -ENOENT ;
 	    }
 
@@ -328,7 +328,7 @@ research:
 	** read old data off disk.  Set the up to date bit on the buffer instead
 	** and jump to the end
 	*/
-	    if (Page_Uptodate(bh_result->b_page)) {
+	    if (PageUptodate(bh_result->b_page)) {
 		mark_buffer_uptodate(bh_result, 1);
 		goto finished ;
     }
@@ -500,7 +500,7 @@ static int convert_tail_for_hole(struct inode *inode,
 
 unlock:
     if (tail_page != hole_page) {
-        UnlockPage(tail_page) ;
+        unlock_page(tail_page) ;
 	page_cache_release(tail_page) ;
     }
 out:
@@ -1722,7 +1722,7 @@ out:
     return error ;
 
 unlock:
-    UnlockPage(page) ;
+    unlock_page(page) ;
     page_cache_release(page) ;
     return error ;
 }
@@ -1794,7 +1794,7 @@ void reiserfs_truncate_file(struct inode *p_s_inode, int update_timestamps) {
 	        mark_buffer_dirty(bh) ;
 	    }
 	}
-	UnlockPage(page) ;
+	unlock_page(page) ;
 	page_cache_release(page) ;
     }
 
@@ -1996,7 +1996,7 @@ static int reiserfs_write_full_page(struct page *page) {
     if (nr) {
         submit_bh_for_writepage(arr, nr) ;
     } else {
-        UnlockPage(page) ;
+        unlock_page(page) ;
     }
     if (!partial)
         SetPageUptodate(page) ;
@@ -2007,7 +2007,7 @@ fail:
     if (nr) {
         submit_bh_for_writepage(arr, nr) ;
     } else {
-        UnlockPage(page) ;
+        unlock_page(page) ;
     }
     ClearPageUptodate(page) ;
     return error ;

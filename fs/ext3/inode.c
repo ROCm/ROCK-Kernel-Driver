@@ -1291,7 +1291,7 @@ static int ext3_writepage(struct page *page)
 	/* bget() all the buffers */
 	if (order_data) {
 		if (!page_has_buffers(page)) {
-			if (!Page_Uptodate(page))
+			if (!PageUptodate(page))
 				buffer_error();
 			create_empty_buffers(page,
 				inode->i_sb->s_blocksize,
@@ -1332,7 +1332,7 @@ out_fail:
 	
 	unlock_kernel();
 	SetPageDirty(page);
-	UnlockPage(page);
+	unlock_page(page);
 	return ret;
 }
 
@@ -1422,7 +1422,7 @@ static int ext3_block_truncate_page(handle_t *handle,
 	}
 
 	/* Ok, it's mapped. Make sure it's up-to-date */
-	if (Page_Uptodate(page))
+	if (PageUptodate(page))
 		set_bit(BH_Uptodate, &bh->b_state);
 
 	if (!buffer_uptodate(bh)) {
@@ -1457,7 +1457,7 @@ static int ext3_block_truncate_page(handle_t *handle,
 	}
 
 unlock:
-	UnlockPage(page);
+	unlock_page(page);
 	page_cache_release(page);
 out:
 	return err;

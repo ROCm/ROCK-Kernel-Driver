@@ -494,7 +494,7 @@ static inline void sync_metapage(metapage_t *mp)
 		waitfor_one_page(page);
 	}
 
-	UnlockPage(page);
+	unlock_page(page);
 	page_cache_release(page);
 }
 
@@ -527,7 +527,7 @@ void release_metapage(metapage_t * mp)
 			mp->data = 0;
 			if (test_bit(META_dirty, &mp->flag))
 				__write_metapage(mp);
-			UnlockPage(mp->page);
+			unlock_page(mp->page);
 			if (test_bit(META_sync, &mp->flag)) {
 				sync_metapage(mp);
 				clear_bit(META_sync, &mp->flag);
@@ -536,7 +536,7 @@ void release_metapage(metapage_t * mp)
 			if (test_bit(META_discard, &mp->flag)) {
 				lock_page(mp->page);
 				block_flushpage(mp->page, 0);
-				UnlockPage(mp->page);
+				unlock_page(mp->page);
 			}
 
 			page_cache_release(mp->page);
@@ -593,7 +593,7 @@ void invalidate_metapages(struct inode *ip, unsigned long addr,
 			page = find_lock_page(mapping, lblock>>l2BlocksPerPage);
 			if (page) {
 				block_flushpage(page, 0);
-				UnlockPage(page);
+				unlock_page(page);
 			}
 		}
 	}
@@ -610,7 +610,7 @@ void invalidate_inode_metapages(struct inode *inode)
 		clear_bit(META_dirty, &mp->flag);
 		set_bit(META_discard, &mp->flag);
 		kunmap(mp->page);
-		UnlockPage(mp->page);
+		unlock_page(mp->page);
 		page_cache_release(mp->page);
 		INCREMENT(mpStat.pagefree);
 		mp->data = 0;

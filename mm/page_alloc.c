@@ -879,7 +879,7 @@ void __init free_area_init_core(int nid, pg_data_t *pgdat, struct page **gmap,
 			struct page *page = mem_map + offset + i;
 			set_page_zone(page, nid * MAX_NR_ZONES + j);
 			set_page_count(page, 0);
-			__SetPageReserved(page);
+			SetPageReserved(page);
 			memlist_init(&page->list);
 			if (j != ZONE_HIGHMEM)
 				set_page_address(page, __va(zone_start_paddr));
