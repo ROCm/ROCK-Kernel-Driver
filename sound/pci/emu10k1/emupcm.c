@@ -32,7 +32,6 @@
 #include <linux/init.h>
 #include <sound/core.h>
 #include <sound/emu10k1.h>
-#include <sound/pcm_sgbuf.h>
 
 #define chip_t emu10k1_t
 

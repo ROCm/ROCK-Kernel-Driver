@@ -80,3 +80,5 @@ IEC958 (S/PDIF) interface:
   IEC958 [...] [Playback|Capture] Con Mask	/* consumer mask */
   IEC958 [...] [Playback|Capture] Pro Mask	/* professional mask */
   IEC958 [...] [Playback|Capture] PCM Stream	/* the settings assigned to a PCM stream */
+  IEC958 Q-subcode [Playback|Capture] Default	/* Q-subcode bits */
+  IEC958 Preamble [Playback|Capture] Default	/* burst preamble words (4*16bits) */

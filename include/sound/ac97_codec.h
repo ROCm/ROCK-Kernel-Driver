@@ -156,11 +156,29 @@
 /* extended modem ID bit defines */
 #define AC97_MEI_LINE1		0x0001	/* Line1 present */
 #define AC97_MEI_LINE2		0x0002	/* Line2 present */
-#define AC97_MEI_HEADSET	0x0004	/* Headset present */
+#define AC97_MEI_HANDSET	0x0004	/* Handset present */
 #define AC97_MEI_CID1		0x0008	/* caller ID decode for Line1 is supported */
 #define AC97_MEI_CID2		0x0010	/* caller ID decode for Line2 is supported */
 #define AC97_MEI_ADDR_MASK	0xc000	/* physical codec ID (address) */
 #define AC97_MEI_ADDR_SHIFT	14
+
+/* extended modem status and control bit defines */
+#define AC97_MEA_GPIO		0x0001	/* GPIO is ready (ro) */
+#define AC97_MEA_MREF		0x0002	/* Vref is up to nominal level (ro) */
+#define AC97_MEA_ADC1		0x0004	/* ADC1 operational (ro) */
+#define AC97_MEA_DAC1		0x0008	/* DAC1 operational (ro) */
+#define AC97_MEA_ADC2		0x0010	/* ADC2 operational (ro) */
+#define AC97_MEA_DAC2		0x0020	/* DAC2 operational (ro) */
+#define AC97_MEA_HADC		0x0040	/* HADC operational (ro) */
+#define AC97_MEA_HDAC		0x0080	/* HDAC operational (ro) */
+#define AC97_MEA_PRA		0x0100	/* GPIO power down (high) */
+#define AC97_MEA_PRB		0x0200	/* reserved */
+#define AC97_MEA_PRC		0x0400	/* ADC1 power down (high) */
+#define AC97_MEA_PRD		0x0800	/* DAC1 power down (high) */
+#define AC97_MEA_PRE		0x1000	/* ADC2 power down (high) */
+#define AC97_MEA_PRF		0x2000	/* DAC2 power down (high) */
+#define AC97_MEA_PRG		0x4000	/* HADC power down (high) */
+#define AC97_MEA_PRH		0x8000	/* HDAC power down (high) */
 
 /* specific - SigmaTel */
 #define AC97_SIGMATEL_ANALOG	0x6c	/* Analog Special */
@@ -268,6 +286,14 @@ struct _snd_ac97 {
 };
 
 /* conditions */
+static inline int ac97_is_audio(ac97_t * ac97)
+{
+	return (ac97->scaps & AC97_SCAP_AUDIO);
+}
+static inline int ac97_is_modem(ac97_t * ac97)
+{
+	return (ac97->scaps & AC97_SCAP_MODEM);
+}
 static inline int ac97_is_rev22(ac97_t * ac97)
 {
 	return (ac97->ext_id & AC97_EI_REV_MASK) == AC97_EI_REV_22;
@@ -278,7 +304,8 @@ static inline int ac97_can_amap(ac97_t * ac97)
 }
 
 /* functions */
-int snd_ac97_mixer(snd_card_t * card, ac97_t * _ac97, ac97_t ** rac97);
+int snd_ac97_mixer(snd_card_t * card, ac97_t * _ac97, ac97_t ** rac97);	/* create mixer controls */
+int snd_ac97_modem(snd_card_t * card, ac97_t * _ac97, ac97_t ** rac97);	/* create modem controls */
 
 void snd_ac97_write(ac97_t *ac97, unsigned short reg, unsigned short value);
 unsigned short snd_ac97_read(ac97_t *ac97, unsigned short reg);
@@ -296,6 +323,7 @@ enum { AC97_TUNE_HP_ONLY, AC97_TUNE_SWAP_HP };
 struct ac97_quirk {
 	unsigned short vendor;
 	unsigned short device;
+	const char *name;
 	int type;
 };
 

@@ -77,27 +77,6 @@ void snd_verbose_printd(const char *file, int line, const char *format, ...)
 	va_end(args);
 	tmpbuf[sizeof(tmpbuf)-1] = '\0';
 	printk(tmpbuf);
-}
-#endif
 
-#if defined(CONFIG_SND_DEBUG) && !defined(CONFIG_SND_VERBOSE_PRINTK)
-void snd_printd(const char *format, ...)
-{
-	va_list args;
-	char tmpbuf[512];
-	
-	if (format[0] == '<' && format[1] >= '0' && format[1] <= '9' && format[2] == '>') {
-		char tmp[] = "<0>";
-		tmp[1] = format[1];
-		printk("%sALSA: ", tmp);
-		format += 3;
-	} else {
-		printk(KERN_DEBUG "ALSA: ");
-	}
-	va_start(args, format);
-	vsnprintf(tmpbuf, sizeof(tmpbuf)-1, format, args);
-	va_end(args);
-	tmpbuf[sizeof(tmpbuf)-1] = '\0';
-	printk(tmpbuf);
 }
 #endif

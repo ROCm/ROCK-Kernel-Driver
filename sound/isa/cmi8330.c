@@ -30,7 +30,7 @@
  *
  *  To quickly load the module,
  *
- *  modprobe -a snd-card-cmi8330 sbport=0x220 sbirq=5 sbdma8=1
+ *  modprobe -a snd-cmi8330 sbport=0x220 sbirq=5 sbdma8=1
  *    sbdma16=5 wssport=0x530 wssirq=11 wssdma=0
  *
  *  This card has two mixers and two PCM devices.  I've cheesed it such
@@ -182,8 +182,8 @@ static const struct isapnp_card_id *snd_cmi8330_isapnp_id[SNDRV_CARDS] __devinit
 #define ISAPNP_CMI8330(_va, _vb, _vc, _device, _audio1, _audio2) \
 	{ \
 		ISAPNP_CARD_ID(_va, _vb, _vc, _device), \
-		devs : { ISAPNP_DEVICE_ID('@', '@', '@', _audio1), \
-			 ISAPNP_DEVICE_ID('@', 'X', '@', _audio2), } \
+		.devs = { ISAPNP_DEVICE_ID('@', '@', '@', _audio1), \
+			  ISAPNP_DEVICE_ID('@', 'X', '@', _audio2), } \
 	}
 
 static struct isapnp_card_id snd_cmi8330_pnpids[] __devinitdata =

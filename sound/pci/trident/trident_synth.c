@@ -600,7 +600,7 @@ static int snd_trident_simple_remove_sample(void *private_data, simple_instrumen
 		size <<= 1;
 
 	trident->synth.current_size -= size;
-	if (trident->synth.current_size < 0)	/* shouldnt need this check... */
+	if (trident->synth.current_size < 0)	/* shouldn't need this check... */
 		trident->synth.current_size = 0;
 
 	return 0;
@@ -909,7 +909,7 @@ static int snd_trident_synth_create_port(trident_t * trident, int idx)
 						   SNDRV_SEQ_PORT_TYPE_MIDI_GS |
 						   SNDRV_SEQ_PORT_TYPE_DIRECT_SAMPLE |
 						   SNDRV_SEQ_PORT_TYPE_SYNTH,
-						   16,
+						   16, 0,
 						   name);
 	if (p->chset->port < 0) {
 		result = p->chset->port;

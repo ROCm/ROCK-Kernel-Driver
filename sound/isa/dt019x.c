@@ -111,7 +111,7 @@ static struct isapnp_card_id snd_dt019x_pnpids[] __devinitdata = {
 	/* DT0196 / ALS-007 */
 	{
 		ISAPNP_CARD_ID('A','L','S',0x0007),
-		devs: { ISAPNP_DEVICE_ID('@','@','@',0x0001),
+		.devs = { ISAPNP_DEVICE_ID('@','@','@',0x0001),
 			ISAPNP_DEVICE_ID('@','X','@',0x0001),
 			ISAPNP_DEVICE_ID('@','H','@',0x0001) }
 	},
@@ -379,7 +379,7 @@ module_exit(alsa_card_dt019x_exit)
 
 #ifndef MODULE
 
-/* format is: snd-dt019x=enable,index,id,snd_isapnp,
+/* format is: snd-dt019x=enable,index,id,
 			  port,mpu_port,fm_port,
 			  irq,mpu_irq,dma8,dma8_size */
 

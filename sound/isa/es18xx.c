@@ -1950,8 +1950,8 @@ static const struct isapnp_card_id *snd_audiodrive_isapnp_id[SNDRV_CARDS] __devi
 #define ISAPNP_ES18XX(_va, _vb, _vc, _device, _audio, _control) \
         { \
                 ISAPNP_CARD_ID(_va, _vb, _vc, _device), \
-                devs : { ISAPNP_DEVICE_ID(_va, _vb, _vc, _audio), \
-                         ISAPNP_DEVICE_ID(_va, _vb, _vc, _control) } \
+                .devs = { ISAPNP_DEVICE_ID(_va, _vb, _vc, _audio), \
+                          ISAPNP_DEVICE_ID(_va, _vb, _vc, _control) } \
         }
 
 static struct isapnp_card_id snd_audiodrive_pnpids[] __devinitdata = {

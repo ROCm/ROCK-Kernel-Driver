@@ -495,6 +495,22 @@ void snd_card_info_read_oss(snd_info_buffer_t * buffer)
 
 #endif
 
+#ifdef MODULE
+static snd_info_entry_t *snd_card_module_info_entry;
+static void snd_card_module_info_read(snd_info_entry_t *entry, snd_info_buffer_t * buffer)
+{
+	int idx;
+	snd_card_t *card;
+
+	for (idx = 0; idx < SNDRV_CARDS; idx++) {
+		read_lock(&snd_card_rwlock);
+		if ((card = snd_cards[idx]) != NULL)
+			snd_iprintf(buffer, "%i %s\n", idx, card->module->name);
+		read_unlock(&snd_card_rwlock);
+	}
+}
+#endif
+
 int __init snd_card_info_init(void)
 {
 	snd_info_entry_t *entry;
@@ -509,6 +525,20 @@ int __init snd_card_info_init(void)
 		return -ENOMEM;
 	}
 	snd_card_info_entry = entry;
+
+#ifdef MODULE
+	entry = snd_info_create_module_entry(THIS_MODULE, "modules", NULL);
+	if (entry) {
+		entry->content = SNDRV_INFO_CONTENT_TEXT;
+		entry->c.text.read_size = PAGE_SIZE;
+		entry->c.text.read = snd_card_module_info_read;
+		if (snd_info_register(entry) < 0)
+			snd_info_free_entry(entry);
+		else
+			snd_card_module_info_entry = entry;
+	}
+#endif
+
 	return 0;
 }
 
@@ -516,6 +546,10 @@ int __exit snd_card_info_done(void)
 {
 	if (snd_card_info_entry)
 		snd_info_unregister(snd_card_info_entry);
+#ifdef MODULE
+	if (snd_card_module_info_entry)
+		snd_info_unregister(snd_card_module_info_entry);
+#endif
 	return 0;
 }
 

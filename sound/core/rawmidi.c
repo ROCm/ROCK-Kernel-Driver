@@ -79,7 +79,8 @@ static inline int snd_rawmidi_ready(snd_rawmidi_substream_t * substream)
 static inline int snd_rawmidi_ready_append(snd_rawmidi_substream_t * substream, size_t count)
 {
 	snd_rawmidi_runtime_t *runtime = substream->runtime;
-	return runtime->avail >= runtime->avail_min && runtime->avail >= count;
+	return runtime->avail >= runtime->avail_min &&
+	       (!substream->append || runtime->avail >= count);
 }
 
 static int snd_rawmidi_init(snd_rawmidi_substream_t *substream)

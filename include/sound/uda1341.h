@@ -15,9 +15,14 @@
  *                           features support
  */
 
-/* $Id: uda1341.h,v 1.2 2002/04/17 07:53:22 perex Exp $ */
+/* $Id: uda1341.h,v 1.4 2003/02/25 12:48:16 perex Exp $ */
 
 #define UDA1341_ALSA_NAME "snd-uda1341"
+
+/*
+ * Default rate set after inicialization
+ */
+#define AUDIO_RATE_DEFAULT	44100
 
 /*
  * UDA1341 L3 address and command types

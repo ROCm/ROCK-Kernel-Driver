@@ -222,12 +222,21 @@ static int __devinit snd_emu10k1_init(emu10k1_t * emu, int enable_ir)
 		outl(HCFG_LOCKTANKCACHE_MASK | HCFG_AUTOMUTE | HCFG_JOYENABLE, emu->port + HCFG);
 
 	if (enable_ir) {	/* enable IR for SB Live */
-		unsigned int reg = inl(emu->port + HCFG);
-		outl(reg | HCFG_GPOUT2, emu->port + HCFG);
-		udelay(500);
-		outl(reg | HCFG_GPOUT1 | HCFG_GPOUT2, emu->port + HCFG);
-		udelay(100);
-		outl(reg, emu->port + HCFG);
+		if (emu->audigy) {
+			unsigned int reg = inl(emu->port + A_IOCFG);
+			outl(reg | A_IOCFG_GPOUT2, emu->port + A_IOCFG);
+			udelay(500);
+			outl(reg | A_IOCFG_GPOUT1 | A_IOCFG_GPOUT2, emu->port + A_IOCFG);
+			udelay(100);
+			outl(reg, emu->port + A_IOCFG);
+		} else {
+			unsigned int reg = inl(emu->port + HCFG);
+			outl(reg | HCFG_GPOUT2, emu->port + HCFG);
+			udelay(500);
+			outl(reg | HCFG_GPOUT1 | HCFG_GPOUT2, emu->port + HCFG);
+			udelay(100);
+			outl(reg, emu->port + HCFG);
+ 		}
 	}
 	
 	if (!emu->APS) {	/* enable analog output */
@@ -581,22 +590,17 @@ int __devinit snd_emu10k1_create(snd_card_t * card,
 	/* enable PCI device */
 	if ((err = pci_enable_device(pci)) < 0)
 		return err;
-	/* set the DMA transfer mask */
-	if (is_audigy) {
-		if (pci_set_dma_mask(pci, 0xffffffff) < 0) {
-			snd_printk(KERN_ERR "architecture does not support 32bit PCI busmaster DMA\n");
-			return -ENXIO;
-		}
-	} else {
-		if (pci_set_dma_mask(pci, 0x1fffffff) < 0) {
-			snd_printk(KERN_ERR "architecture does not support 29bit PCI busmaster DMA\n");
-			return -ENXIO;
-		}
-	}
 
 	emu = snd_magic_kcalloc(emu10k1_t, 0, GFP_KERNEL);
 	if (emu == NULL)
 		return -ENOMEM;
+	/* set the DMA transfer mask */
+	emu->dma_mask = is_audigy ? AUDIGY_DMA_MASK : EMU10K1_DMA_MASK;
+	if (pci_set_dma_mask(pci, emu->dma_mask) < 0) {
+		snd_printk(KERN_ERR "architecture does not support PCI busmaster DMA with mask 0x%lx\n", emu->dma_mask);
+		snd_magic_kfree(emu);
+		return -ENXIO;
+	}
 	emu->card = card;
 	spin_lock_init(&emu->reg_lock);
 	spin_lock_init(&emu->emu_lock);

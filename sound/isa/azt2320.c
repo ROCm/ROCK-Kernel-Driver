@@ -125,8 +125,8 @@ static const struct isapnp_card_id *snd_azt2320_isapnp_id[SNDRV_CARDS] __devinit
 #define ISAPNP_AZT2320(_va, _vb, _vc, _device, _audio, _mpu401) \
 	{ \
 		ISAPNP_CARD_ID(_va, _vb, _vc, _device), \
-		devs : { ISAPNP_DEVICE_ID(_va, _vb, _vc, _audio), \
-			 ISAPNP_DEVICE_ID(_va, _vb, _vc, _mpu401), } \
+		.devs = { ISAPNP_DEVICE_ID(_va, _vb, _vc, _audio), \
+			  ISAPNP_DEVICE_ID(_va, _vb, _vc, _mpu401), } \
 	}
 
 static struct isapnp_card_id snd_azt2320_pnpids[] __devinitdata = {

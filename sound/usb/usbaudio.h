@@ -146,6 +146,7 @@ struct snd_usb_audio {
 /*
  * Information about devices with broken descriptors
  */
+
 #define QUIRK_ANY_INTERFACE -1
 
 #define QUIRK_MIDI_FIXED_ENDPOINT	0
@@ -153,6 +154,7 @@ struct snd_usb_audio {
 #define QUIRK_MIDI_MIDIMAN		2
 #define QUIRK_COMPOSITE			3
 #define QUIRK_AUDIO_FIXED_ENDPOINT	4
+#define QUIRK_STANDARD_INTERFACE	5
 
 #define QUIRK_BOOT_MASK			0x80
 #define QUIRK_BOOT_EXTIGY		(QUIRK_BOOT_MASK | 0)
@@ -185,6 +187,8 @@ struct snd_usb_midi_endpoint_info {
 
 /* for QUIRK_AUDIO_FIXED_ENDPOINT, data points to an audioformat structure */
 
+/* for QUIRK_STANDARD_INTERFACE, data is NULL */
+
 /*
  */
 
@@ -194,10 +198,10 @@ struct snd_usb_midi_endpoint_info {
 
 unsigned int snd_usb_combine_bytes(unsigned char *bytes, int size);
 
-void *snd_usb_find_desc(void *descstart, int desclen, void *after, u8 dtype, int iface, int altsetting);
-void *snd_usb_find_csint_desc(void *descstart, int desclen, void *after, u8 dsubtype, int iface, int altsetting);
+void *snd_usb_find_desc(void *descstart, int desclen, void *after, u8 dtype);
+void *snd_usb_find_csint_desc(void *descstart, int desclen, void *after, u8 dsubtype);
 
-int snd_usb_create_mixer(snd_usb_audio_t *chip, int ctrlif, unsigned char *buffer, int buflen);
+int snd_usb_create_mixer(snd_usb_audio_t *chip, int ctrlif);
 
 int snd_usb_create_midi_interface(snd_usb_audio_t *chip, struct usb_interface *iface, const snd_usb_audio_quirk_t *quirk);
 void snd_usbmidi_disconnect(struct list_head *p);

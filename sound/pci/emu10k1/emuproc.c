@@ -232,7 +232,7 @@ static long snd_emu10k1_fx8010_read(snd_info_entry_t *entry, void *file_private_
 }
 
 static struct snd_info_entry_ops snd_emu10k1_proc_ops_fx8010 = {
-	read: snd_emu10k1_fx8010_read,
+	.read = snd_emu10k1_fx8010_read,
 };
 
 int __devinit snd_emu10k1_proc_init(emu10k1_t * emu)

@@ -24,6 +24,7 @@
  */
 
 #include <sound/asound.h>
+#include <sound/memalloc.h>
 #include <linux/poll.h>
 #include <linux/bitops.h>
 
@@ -49,6 +50,7 @@ typedef struct sndrv_pcm_status snd_pcm_status_t;
 typedef struct sndrv_pcm_mmap_status snd_pcm_mmap_status_t;
 typedef struct sndrv_pcm_mmap_control snd_pcm_mmap_control_t;
 typedef struct sndrv_mask snd_mask_t;
+typedef struct snd_sg_buf snd_pcm_sgbuf_t;
 
 #define _snd_pcm_substream_chip(substream) ((substream)->private_data)
 #define snd_pcm_substream_chip(substream) snd_magic_cast1(chip_t, _snd_pcm_substream_chip(substream), return -ENXIO)
@@ -97,6 +99,7 @@ typedef struct _snd_pcm_ops {
 	int (*silence)(snd_pcm_substream_t *substream, int channel, 
 		       snd_pcm_uframes_t pos, snd_pcm_uframes_t count);
 	struct page *(*page)(snd_pcm_substream_t *substream, unsigned long offset);
+	int (*ack)(snd_pcm_substream_t *substream);
 } snd_pcm_ops_t;
 
 /*
@@ -119,13 +122,6 @@ typedef struct _snd_pcm_ops {
 #define SNDRV_PCM_TRIGGER_PAUSE_RELEASE	4
 #define SNDRV_PCM_TRIGGER_SUSPEND	5
 #define SNDRV_PCM_TRIGGER_RESUME	6
-
-#define SNDRV_PCM_DMA_TYPE_UNKNOWN	0	/* not defined */
-#define SNDRV_PCM_DMA_TYPE_CONTINUOUS	1	/* continuous no-DMA memory */
-#define SNDRV_PCM_DMA_TYPE_ISA		2	/* ISA continuous */
-#define SNDRV_PCM_DMA_TYPE_PCI		3	/* PCI continuous */
-#define SNDRV_PCM_DMA_TYPE_SBUS		4	/* SBUS continuous */
-#define SNDRV_PCM_DMA_TYPE_PCI_SG	5	/* PCI SG-buffer */
 
 /* If you change this don't forget to change rates[] table in pcm_native.c */
 #define SNDRV_PCM_RATE_5512		(1<<0)		/* 5512Hz */
@@ -281,13 +277,6 @@ typedef struct {
 	unsigned int mask;
 } snd_pcm_hw_constraint_list_t;
 
-struct snd_pcm_dma_buffer {
-	unsigned char *area;
-	dma_addr_t addr;
-	unsigned long bytes;
-	void *private_data; /* for allocator */
-};
-
 struct _snd_pcm_runtime {
 	/* -- Status -- */
 	snd_pcm_substream_t *trigger_master;
@@ -316,6 +305,7 @@ struct _snd_pcm_runtime {
 	unsigned int rate_den;
 
 	/* -- SW params -- */
+	int tstamp_timespec;		/* use timeval (0) or timespec (1) */
 	snd_pcm_tstamp_t tstamp_mode;	/* mmap timestamp is updated */
   	unsigned int period_step;
 	unsigned int sleep_min;		/* min ticks to sleep */
@@ -361,7 +351,7 @@ struct _snd_pcm_runtime {
 	/* -- DMA -- */           
 	unsigned char *dma_area;	/* DMA area */
 	dma_addr_t dma_addr;		/* physical bus address (not accessible from main CPU) */
-	unsigned long dma_bytes;	/* size of DMA area */
+	size_t dma_bytes;		/* size of DMA area */
 	void *dma_private;		/* private DMA data for the memory allocator */
 
 #if defined(CONFIG_SND_PCM_OSS) || defined(CONFIG_SND_PCM_OSS_MODULE)
@@ -378,17 +368,17 @@ struct _snd_pcm_substream {
 	char name[32];			/* substream name */
 	int stream;			/* stream (direction) */
 	size_t buffer_bytes_max;	/* limit ring buffer size */
-	int dma_type;			
-	struct snd_pcm_dma_buffer dma_buffer;
+	struct snd_dma_device dma_device;
+	struct snd_dma_buffer dma_buffer;
 	size_t dma_max;
-	void *dma_private;
 	/* -- hardware operations -- */
+	unsigned int open_flag: 1;	/* lowlevel device has been opened */
 	snd_pcm_ops_t *ops;
 	/* -- runtime information -- */
 	snd_pcm_runtime_t *runtime;
         /* -- timer section -- */
 	snd_timer_t *timer;		/* timer */
-	int timer_running;		/* time is running */
+	int timer_running: 1;		/* time is running */
 	spinlock_t timer_lock;
 	/* -- next substream -- */
 	snd_pcm_substream_t *next;
@@ -879,7 +869,18 @@ int snd_pcm_lib_preallocate_pci_pages_for_all(struct pci_dev *pci,
 					      snd_pcm_t *pcm,
 					      size_t size,
 					      size_t max);
+int snd_pcm_lib_preallocate_sg_pages(struct pci_dev *pci,
+				     snd_pcm_substream_t *substream,
+				     size_t size, size_t max);
+int snd_pcm_lib_preallocate_sg_pages_for_all(struct pci_dev *pci,
+					     snd_pcm_t *pcm,
+					     size_t size, size_t max);
+#define snd_pcm_substream_sgbuf(substream) ((substream)->runtime->dma_private)
+#define snd_pcm_sgbuf_pages(size) snd_sgbuf_aligned_pages(size)
+#define snd_pcm_sgbuf_get_addr(sgbuf,ofs) snd_sgbuf_get_addr(sgbuf,ofs)
+struct page *snd_pcm_sgbuf_ops_page(snd_pcm_substream_t *substream, unsigned long offset);
 #endif
+
 #ifdef CONFIG_SBUS
 int snd_pcm_lib_preallocate_sbus_pages(struct sbus_dev *sdev,
 				       snd_pcm_substream_t *substream,

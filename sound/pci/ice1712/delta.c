@@ -232,32 +232,33 @@ static int delta_spdif_stream_put(ice1712_t *ice, snd_ctl_elem_value_t * ucontro
 /*
  * AK4524 on Delta 44 and 66 to choose the chip mask
  */
-static int delta_ak4524_start(ice1712_t *ice, unsigned char *saved, int chip)
+static int delta_ak4524_start(akm4xxx_t *ak, int chip)
 {
-	snd_ice1712_save_gpio_status(ice, saved);
-	ice->ak4524.cs_mask =
-	ice->ak4524.cs_addr = chip == 0 ? ICE1712_DELTA_CODEC_CHIP_A :
-					  ICE1712_DELTA_CODEC_CHIP_B;
+	snd_ice1712_save_gpio_status(ak->chip);
+	ak->cs_mask =
+	ak->cs_addr = chip == 0 ? ICE1712_DELTA_CODEC_CHIP_A :
+				  ICE1712_DELTA_CODEC_CHIP_B;
 	return 0;
 }
 
 /*
  * AK4524 on Delta1010LT to choose the chip address
  */
-static int delta1010lt_ak4524_start(ice1712_t *ice, unsigned char *saved, int chip)
+static int delta1010lt_ak4524_start(akm4xxx_t *ak, int chip)
 {
-	snd_ice1712_save_gpio_status(ice, saved);
-	ice->ak4524.cs_mask = ICE1712_DELTA_1010LT_CS;
-	ice->ak4524.cs_addr = chip << 4;
+	snd_ice1712_save_gpio_status(ak->chip);
+	ak->cs_mask = ICE1712_DELTA_1010LT_CS;
+	ak->cs_addr = chip << 4;
 	return 0;
 }
 
 /*
  * change the rate of AK4524 on Delta 44/66, AP, 1010LT
  */
-static void delta_ak4524_set_rate_val(ice1712_t *ice, unsigned int rate)
+static void delta_ak4524_set_rate_val(akm4xxx_t *ak, unsigned int rate)
 {
 	unsigned char tmp, tmp2;
+	ice1712_t *ice = ak->chip;
 
 	if (rate == 0)	/* no hint - S/PDIF input is master, simply return */
 		return;
@@ -274,14 +275,14 @@ static void delta_ak4524_set_rate_val(ice1712_t *ice, unsigned int rate)
 		return;
 
 	/* do it again */
-	snd_ice1712_ak4524_reset(ice, 1);
+	snd_ice1712_akm4xxx_reset(ak, 1);
 	down(&ice->gpio_mutex);
 	tmp = snd_ice1712_read(ice, ICE1712_IREG_GPIO_DATA) & ~ICE1712_DELTA_DFS;
 	if (rate > 48000)
 		tmp |= ICE1712_DELTA_DFS;
 	snd_ice1712_write(ice, ICE1712_IREG_GPIO_DATA, tmp);
 	up(&ice->gpio_mutex);
-	snd_ice1712_ak4524_reset(ice, 0);
+	snd_ice1712_akm4xxx_reset(ak, 0);
 }
 
 
@@ -296,7 +297,7 @@ static void delta_open_spdif(ice1712_t *ice, snd_pcm_substream_t * substream)
 }
 
 /* set up */
-static void delta_setup_spdif(ice1712_t *ice, snd_pcm_substream_t * substream)
+static void delta_setup_spdif(ice1712_t *ice, int rate)
 {
 	unsigned long flags;
 	unsigned int tmp;
@@ -306,7 +307,7 @@ static void delta_setup_spdif(ice1712_t *ice, snd_pcm_substream_t * substream)
 	tmp = ice->spdif.cs8403_stream_bits;
 	if (tmp & 0x01)		/* consumer */
 		tmp &= (tmp & 0x01) ? ~0x06 : ~0x18;
-	switch (substream->runtime->rate) {
+	switch (rate) {
 	case 32000: tmp |= (tmp & 0x01) ? 0x04 : 0x00; break;
 	case 44100: tmp |= (tmp & 0x01) ? 0x00 : 0x10; break;
 	case 48000: tmp |= (tmp & 0x01) ? 0x02 : 0x08; break;
@@ -325,10 +326,84 @@ static void delta_setup_spdif(ice1712_t *ice, snd_pcm_substream_t * substream)
  * initialize the chips on M-Audio cards
  */
 
+static akm4xxx_t akm_audiophile __devinitdata = {
+	.type = SND_AK4528,
+	.num_adcs = 2,
+	.num_dacs = 2,
+	.caddr = 2,
+	.cif = 0,
+	.data_mask = ICE1712_DELTA_AP_DOUT,
+	.clk_mask = ICE1712_DELTA_AP_CCLK,
+	.cs_mask = ICE1712_DELTA_AP_CS_CODEC,
+	.cs_addr = ICE1712_DELTA_AP_CS_CODEC,
+	.cs_none = 0,
+	.add_flags = ICE1712_DELTA_AP_CS_DIGITAL,
+	.mask_flags = 0,
+	.ops = {
+		.set_rate_val = delta_ak4524_set_rate_val
+	}
+};
+
+static akm4xxx_t akm_delta410 __devinitdata = {
+	.type = SND_AK4529,
+	.num_adcs = 2,
+	.num_dacs = 8,
+	.caddr = 0,
+	.cif = 0,
+	.data_mask = ICE1712_DELTA_AP_DOUT,
+	.clk_mask = ICE1712_DELTA_AP_CCLK,
+	.cs_mask = ICE1712_DELTA_AP_CS_CODEC,
+	.cs_addr = ICE1712_DELTA_AP_CS_CODEC,
+	.cs_none = 0,
+	.add_flags = ICE1712_DELTA_AP_CS_DIGITAL,
+	.mask_flags = 0,
+	.ops = {
+		.set_rate_val = delta_ak4524_set_rate_val
+	}
+};
+
+static akm4xxx_t akm_delta1010lt __devinitdata = {
+	.type = SND_AK4524,
+	.num_adcs = 8,
+	.num_dacs = 8,
+	.caddr = 2,
+	.cif = 0, /* the default level of the CIF pin from AK4524 */
+	.data_mask = ICE1712_DELTA_1010LT_DOUT,
+	.clk_mask = ICE1712_DELTA_1010LT_CCLK,
+	.cs_mask = 0,
+	.cs_addr = 0, /* set later */
+	.cs_none = ICE1712_DELTA_1010LT_CS_NONE,
+	.add_flags = 0,
+	.mask_flags = 0,
+	.ops = {
+		.start = delta1010lt_ak4524_start,
+		.set_rate_val = delta_ak4524_set_rate_val
+	}
+};
+
+static akm4xxx_t akm_delta44 __devinitdata = {
+	.type = SND_AK4524,
+	.num_adcs = 4,
+	.num_dacs = 4,
+	.caddr = 2,
+	.cif = 0, /* the default level of the CIF pin from AK4524 */
+	.data_mask = ICE1712_DELTA_CODEC_SERIAL_DATA,
+	.clk_mask = ICE1712_DELTA_CODEC_SERIAL_CLOCK,
+	.cs_mask = 0,
+	.cs_addr = 0, /* set later */
+	.cs_none = 0,
+	.add_flags = 0,
+	.mask_flags = 0,
+	.ops = {
+		.start = delta_ak4524_start,
+		.set_rate_val = delta_ak4524_set_rate_val
+	}
+};
+
 static int __devinit snd_ice1712_delta_init(ice1712_t *ice)
 {
 	int err;
-	ak4524_t *ak;
+	akm4xxx_t *ak;
 
 	/* determine I2C, DACs and ADCs */
 	switch (ice->eeprom.subvendor) {
@@ -366,7 +441,7 @@ static int __devinit snd_ice1712_delta_init(ice1712_t *ice)
 	case ICE1712_SUBDEVICE_DELTADIO2496:
 	case ICE1712_SUBDEVICE_DELTA66:
 		ice->spdif.ops.open = delta_open_spdif;
-		ice->spdif.ops.setup = delta_setup_spdif;
+		ice->spdif.ops.setup_rate = delta_setup_spdif;
 		ice->spdif.ops.default_get = delta_spdif_default_get;
 		ice->spdif.ops.default_put = delta_spdif_default_put;
 		ice->spdif.ops.stream_get = delta_spdif_stream_get;
@@ -376,60 +451,36 @@ static int __devinit snd_ice1712_delta_init(ice1712_t *ice)
 		break;
 	}
 
+	/* no analog? */
+	switch (ice->eeprom.subvendor) {
+	case ICE1712_SUBDEVICE_DELTA1010:
+	case ICE1712_SUBDEVICE_DELTADIO2496:
+		return 0;
+	}
+
 	/* second stage of initialization, analog parts and others */
-	ak = &ice->ak4524;
+	ak = ice->akm = kmalloc(sizeof(akm4xxx_t), GFP_KERNEL);
+	if (! ak)
+		return -ENOMEM;
+	ice->akm_codecs = 1;
+
 	switch (ice->eeprom.subvendor) {
 	case ICE1712_SUBDEVICE_AUDIOPHILE:
+		snd_ice1712_akm4xxx_init(ak, &akm_audiophile, ice);
+		break;
 	case ICE1712_SUBDEVICE_DELTA410:
-		ak->num_adcs = ak->num_dacs = 2;
-		ak->type = SND_AK4528;
-		ak->caddr = 2;
-		if (ice->eeprom.subvendor == ICE1712_SUBDEVICE_DELTA410) {
-			ak->num_dacs = 8;
-			ak->type = SND_AK4529;
-			ak->caddr = 0;
-		}
-		ak->cif = 0; /* the default level of the CIF pin from AK4528/4529 */
-		ak->data_mask = ICE1712_DELTA_AP_DOUT;
-		ak->clk_mask = ICE1712_DELTA_AP_CCLK;
-		ak->cs_mask = ak->cs_addr = ICE1712_DELTA_AP_CS_CODEC; /* select AK4528/4529 codec */
-		ak->cs_none = 0;
-		ak->add_flags = ICE1712_DELTA_AP_CS_DIGITAL; /* assert digital high */
-		ak->mask_flags = 0;
-		ak->ops.set_rate_val = delta_ak4524_set_rate_val;
-		snd_ice1712_ak4524_init(ice);
+		snd_ice1712_akm4xxx_init(ak, &akm_delta410, ice);
 		break;
 	case ICE1712_SUBDEVICE_DELTA1010LT:
-		ak->num_adcs = ak->num_dacs = 8;
-		ak->type = SND_AK4524;
-		ak->caddr = 2;
-		ak->cif = 0; /* the default level of the CIF pin from AK4524 */
-		ak->data_mask = ICE1712_DELTA_1010LT_DOUT;
-		ak->clk_mask = ICE1712_DELTA_1010LT_CCLK;
-		ak->cs_mask = ak->cs_addr = 0; /* set later */
-		ak->cs_none = ICE1712_DELTA_1010LT_CS_NONE;
-		ak->add_flags = 0;
-		ak->mask_flags = 0;
-		ak->ops.start = delta1010lt_ak4524_start;
-		ak->ops.set_rate_val = delta_ak4524_set_rate_val;
-		snd_ice1712_ak4524_init(ice);
+		snd_ice1712_akm4xxx_init(ak, &akm_delta1010lt, ice);
 		break;
 	case ICE1712_SUBDEVICE_DELTA66:
 	case ICE1712_SUBDEVICE_DELTA44:
-		ak->num_adcs = ak->num_dacs = 4;
-		ak->type = SND_AK4524;
-		ak->caddr = 2;
-		ak->cif = 0; /* the default level of the CIF pin from AK4524 */
-		ak->data_mask = ICE1712_DELTA_CODEC_SERIAL_DATA;
-		ak->clk_mask = ICE1712_DELTA_CODEC_SERIAL_CLOCK;
-		ak->cs_mask = ak->cs_addr = 0; /* set later */
-		ak->cs_none = 0;
-		ak->add_flags = 0;
-		ak->mask_flags = 0;
-		ak->ops.start = delta_ak4524_start;
-		ak->ops.set_rate_val = delta_ak4524_set_rate_val;
-		snd_ice1712_ak4524_init(ice);
+		snd_ice1712_akm4xxx_init(ak, &akm_delta44, ice);
 		break;
+	default:
+		snd_BUG();
+		return -EINVAL;
 	}
 
 	return 0;
@@ -510,7 +561,7 @@ static int __devinit snd_ice1712_delta_add_controls(ice1712_t *ice)
 	case ICE1712_SUBDEVICE_DELTA410:
 	case ICE1712_SUBDEVICE_DELTA44:
 	case ICE1712_SUBDEVICE_DELTA66:
-		err = snd_ice1712_ak4524_build_controls(ice);
+		err = snd_ice1712_akm4xxx_build_controls(ice);
 		if (err < 0)
 			return err;
 		break;

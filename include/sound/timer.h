@@ -3,7 +3,8 @@
 
 /*
  *  Timer abstract layer
- *  Copyright (c) by Jaroslav Kysela <perex@suse.cz>
+ *  Copyright (c) by Jaroslav Kysela <perex@suse.cz>,
+ *		     Abramo Bagnara <abramo@alsa-project.org>
  *
  *
  *   This program is free software; you can redistribute it and/or modify
@@ -29,11 +30,15 @@ typedef enum sndrv_timer_class snd_timer_class_t;
 typedef enum sndrv_timer_slave_class snd_timer_slave_class_t;
 typedef enum sndrv_timer_global snd_timer_global_t;
 typedef struct sndrv_timer_id snd_timer_id_t;
+typedef struct sndrv_timer_ginfo snd_timer_ginfo_t;
+typedef struct sndrv_timer_gparams snd_timer_gparams_t;
+typedef struct sndrv_timer_gstatus snd_timer_gstatus_t;
 typedef struct sndrv_timer_select snd_timer_select_t;
 typedef struct sndrv_timer_info snd_timer_info_t;
 typedef struct sndrv_timer_params snd_timer_params_t;
 typedef struct sndrv_timer_status snd_timer_status_t;
 typedef struct sndrv_timer_read snd_timer_read_t;
+typedef struct sndrv_timer_tread snd_timer_tread_t;
 
 #define _snd_timer_chip(timer) ((timer)->private_data)
 #define snd_timer_chip(timer) snd_magic_cast1(chip_t, _snd_timer_chip(timer), return -ENXIO)
@@ -54,16 +59,21 @@ typedef struct sndrv_timer_read snd_timer_read_t;
 #define SNDRV_TIMER_IFLG_AUTO	  0x00000008	/* auto restart */
 #define SNDRV_TIMER_IFLG_FAST	  0x00000010	/* fast callback (do not use tasklet) */
 #define SNDRV_TIMER_IFLG_CALLBACK 0x00000020	/* timer callback is active */
+#define SNDRV_TIMER_IFLG_EXCLUSIVE 0x00000040	/* exclusive owner - no more instances */
 
 #define SNDRV_TIMER_FLG_CHANGE	0x00000001
 #define SNDRV_TIMER_FLG_RESCHED	0x00000002	/* need reschedule */
 
 typedef void (*snd_timer_callback_t) (snd_timer_instance_t * timeri, unsigned long ticks, unsigned long resolution);
+typedef void (*snd_timer_ccallback_t) (snd_timer_instance_t * timeri, enum sndrv_timer_event event,
+				       struct timespec * tstamp, unsigned long resolution);
 
 struct _snd_timer_hardware {
 	/* -- must be filled with low-level driver */
 	unsigned int flags;		/* various flags */
 	unsigned long resolution;	/* average timer resolution for one tick in nsec */
+	unsigned long resolution_min;	/* minimal resolution */
+	unsigned long resolution_max;	/* maximal resolution */
 	unsigned long ticks;		/* max timer ticks per interrupt */
 	/* -- low-level functions -- */
 	int (*open) (snd_timer_t * timer);
@@ -71,6 +81,8 @@ struct _snd_timer_hardware {
 	unsigned long (*c_resolution) (snd_timer_t * timer);
 	int (*start) (snd_timer_t * timer);
 	int (*stop) (snd_timer_t * timer);
+	int (*set_period) (snd_timer_t * timer, unsigned long period_num, unsigned long period_den);
+	int (*precise_resolution) (snd_timer_t * timer, unsigned long *num, unsigned long *den);
 };
 
 struct _snd_timer {
@@ -102,6 +114,7 @@ struct _snd_timer_instance {
 	void *private_data;
 	void (*private_free) (snd_timer_instance_t *ti);
 	snd_timer_callback_t callback;
+	snd_timer_ccallback_t ccallback;
 	void *callback_data;
 	unsigned long ticks;		/* auto-load ticks when expired */
 	unsigned long cticks;		/* current ticks */
@@ -123,20 +136,19 @@ struct _snd_timer_instance {
  */
 
 extern int snd_timer_new(snd_card_t *card, char *id, snd_timer_id_t *tid, snd_timer_t ** rtimer);
+extern void snd_timer_notify(snd_timer_t *timer, enum sndrv_timer_event event, struct timespec *tstamp);
 extern int snd_timer_global_new(char *id, int device, snd_timer_t **rtimer);
 extern int snd_timer_global_free(snd_timer_t *timer);
 extern int snd_timer_global_register(snd_timer_t *timer);
 extern int snd_timer_global_unregister(snd_timer_t *timer);
 
-extern snd_timer_instance_t *snd_timer_open(char *owner, snd_timer_id_t *tid, unsigned int slave_id);
+extern int snd_timer_open(snd_timer_instance_t ** ti, char *owner, snd_timer_id_t *tid, unsigned int slave_id);
 extern int snd_timer_close(snd_timer_instance_t * timeri);
-extern int snd_timer_set_owner(snd_timer_instance_t * timeri, pid_t pid, gid_t gid);
-extern int snd_timer_reset_owner(snd_timer_instance_t * timeri);
-extern int snd_timer_set_resolution(snd_timer_instance_t * timeri, unsigned long resolution);
 extern unsigned long snd_timer_resolution(snd_timer_instance_t * timeri);
 extern int snd_timer_start(snd_timer_instance_t * timeri, unsigned int ticks);
 extern int snd_timer_stop(snd_timer_instance_t * timeri);
 extern int snd_timer_continue(snd_timer_instance_t * timeri);
+extern int snd_timer_pause(snd_timer_instance_t * timeri);
 
 extern void snd_timer_interrupt(snd_timer_t * timer, unsigned long ticks_left);
 

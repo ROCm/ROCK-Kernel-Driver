@@ -182,7 +182,7 @@ static void *find_audio_control_unit(mixer_build_t *state, unsigned char unit)
 
 	p = NULL;
 	while ((p = snd_usb_find_desc(state->buffer, state->buflen, p,
-				      USB_DT_CS_INTERFACE, state->ctrlif, -1)) != NULL) {
+				      USB_DT_CS_INTERFACE)) != NULL) {
 		if (p[0] >= 4 && p[2] >= INPUT_TERMINAL && p[2] <= EXTENSION_UNIT && p[3] == unit)
 			return p;
 	}
@@ -1462,20 +1462,21 @@ static int parse_audio_unit(mixer_build_t *state, int unitid)
  *
  * walk through all OUTPUT_TERMINAL descriptors to search for mixers
  */
-int snd_usb_create_mixer(snd_usb_audio_t *chip, int ctrlif, unsigned char *buffer, int buflen)
+int snd_usb_create_mixer(snd_usb_audio_t *chip, int ctrlif)
 {
 	unsigned char *desc;
 	mixer_build_t state;
 	int err;
 	const struct usbmix_ctl_map *map;
 	struct usb_device_descriptor *dev = &chip->dev->descriptor;
+	struct usb_host_interface *hostif = &chip->dev->actconfig->interface[ctrlif].altsetting[0];
 
 	strcpy(chip->card->mixername, "USB Mixer");
 
 	memset(&state, 0, sizeof(state));
 	state.chip = chip;
-	state.buffer = buffer;
-	state.buflen = buflen;
+	state.buffer = hostif->extra;
+	state.buflen = hostif->extralen;
 	state.ctrlif = ctrlif;
 	state.vendor = dev->idVendor;
 	state.product = dev->idProduct;
@@ -1489,7 +1490,7 @@ int snd_usb_create_mixer(snd_usb_audio_t *chip, int ctrlif, unsigned char *buffe
 	}
 
 	desc = NULL;
-	while ((desc = snd_usb_find_csint_desc(buffer, buflen, desc, OUTPUT_TERMINAL, ctrlif, -1)) != NULL) {
+	while ((desc = snd_usb_find_csint_desc(hostif->extra, hostif->extralen, desc, OUTPUT_TERMINAL)) != NULL) {
 		if (desc[0] < 9)
 			continue; /* invalid descriptor? */
 		set_bit(desc[3], state.unitbitmap);  /* mark terminal ID as visited */

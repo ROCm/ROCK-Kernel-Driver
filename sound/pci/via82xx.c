@@ -52,7 +52,6 @@
 #include <linux/slab.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
-#include <sound/pcm_sgbuf.h>
 #include <sound/pcm_params.h>
 #include <sound/info.h>
 #include <sound/ac97_codec.h>
@@ -599,12 +598,12 @@ static void snd_via82xx_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		status &= (VIA_REG_STAT_EOL|VIA_REG_STAT_FLAG);
 		if (! status)
 			continue;
-		outb(status, VIADEV_REG(viadev, OFFSET_STATUS)); /* ack */
 		if (viadev->substream && viadev->running) {
 			spin_unlock(&chip->reg_lock);
 			snd_pcm_period_elapsed(viadev->substream);
 			spin_lock(&chip->reg_lock);
 		}
+		outb(status, VIADEV_REG(viadev, OFFSET_STATUS)); /* ack */
 	}
 	spin_unlock(&chip->reg_lock);
 }
@@ -820,6 +819,7 @@ static int snd_via686_playback_prepare(snd_pcm_substream_t *substream)
 	snd_pcm_runtime_t *runtime = substream->runtime;
 
 	snd_ac97_set_rate(chip->ac97, AC97_PCM_FRONT_DAC_RATE, runtime->rate);
+	snd_ac97_set_rate(chip->ac97, AC97_SPDIF, runtime->rate);
 	via686_setup_format(chip, viadev, runtime);
 	return 0;
 }
@@ -912,15 +912,15 @@ static int snd_via8233_multi_prepare(snd_pcm_substream_t *substream)
 	fmt = (runtime->format == SNDRV_PCM_FORMAT_S16_LE) ? VIA_REG_MULTPLAY_FMT_16BIT : VIA_REG_MULTPLAY_FMT_8BIT;
 	fmt |= runtime->channels << 4;
 	outb(fmt, VIADEV_REG(viadev, OFS_MULTPLAY_FORMAT));
-	/* set sample number to slot 3, 4, 7, 8, 6, 9 */
+	/* set sample number to slot 3, 4, 7, 8, 6, 9 (for VIA8233/C,8235) */
 	/* corresponding to FL, FR, RL, RR, C, LFE ?? */
 	switch (runtime->channels) {
 	case 1: slots = (1<<0) | (1<<4); break;
 	case 2: slots = (1<<0) | (2<<4); break;
 	case 3: slots = (1<<0) | (2<<4) | (5<<8); break;
 	case 4: slots = (1<<0) | (2<<4) | (3<<8) | (4<<12); break;
-	case 5: slots = (1<<0) | (2<<4) | (5<<8) | (3<<12) | (4<<16); break;
-	case 6: slots = (1<<0) | (2<<4) | (5<<8) | (6<<12) | (3<<16) | (4<<20); break;
+	case 5: slots = (1<<0) | (2<<4) | (3<<8) | (4<<12) | (5<<16); break;
+	case 6: slots = (1<<0) | (2<<4) | (3<<8) | (4<<12) | (5<<16) | (6<<20); break;
 	default: slots = 0; break;
 	}
 	/* STOP index is never reached */
@@ -1438,7 +1438,7 @@ static void snd_via82xx_mixer_free_ac97(ac97_t *ac97)
 }
 
 static struct ac97_quirk ac97_quirks[] = {
-	{ 0x1106, 0x4161, AC97_TUNE_HP_ONLY }, /* ASRock K7VT2 */
+	{ 0x1106, 0x4161, "ASRock K7VT2", AC97_TUNE_HP_ONLY },
 	{ } /* terminator */
 };
 
@@ -1457,7 +1457,7 @@ static int __devinit snd_via82xx_mixer_new(via82xx_t *chip)
 	if ((err = snd_ac97_mixer(chip->card, &ac97, &chip->ac97)) < 0)
 		return err;
 
-	snd_ac97_tune_hardware(&chip->ac97, chip->pci, ac97_quirks);
+	snd_ac97_tune_hardware(chip->ac97, chip->pci, ac97_quirks);
 
 	if (chip->chip_type != TYPE_VIA686) {
 		/* use slot 10/11 */

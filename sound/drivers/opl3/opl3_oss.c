@@ -101,7 +101,7 @@ static int snd_opl3_oss_create_port(opl3_t * opl3)
 							  SNDRV_SEQ_PORT_TYPE_MIDI_GENERIC |
 							  SNDRV_SEQ_PORT_TYPE_MIDI_GM |
 							  SNDRV_SEQ_PORT_TYPE_SYNTH,
-							  voices,
+							  voices, voices,
 							  name);
 	if (opl3->oss_chset->port < 0) {
 		snd_midi_channel_free_set(opl3->oss_chset);

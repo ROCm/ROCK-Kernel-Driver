@@ -351,6 +351,7 @@ int snd_seq_set_port_info(client_port_t * port, snd_seq_port_info_t * info)
 
 	/* information about supported channels/voices */
 	port->midi_channels = info->midi_channels;
+	port->midi_voices = info->midi_voices;
 	port->synth_voices = info->synth_voices;
 
 	return 0;
@@ -372,6 +373,7 @@ int snd_seq_get_port_info(client_port_t * port, snd_seq_port_info_t * info)
 
 	/* information about supported channels/voices */
 	info->midi_channels = port->midi_channels;
+	info->midi_voices = port->midi_voices;
 	info->synth_voices = port->synth_voices;
 
 	/* get subscriber counts */
@@ -611,7 +613,7 @@ subscribers_t *snd_seq_port_get_subscription(port_subs_info_t *src_grp,
 int snd_seq_event_port_attach(int client,
 			      snd_seq_port_callback_t *pcbp,
 			      int cap, int type, int midi_channels,
-			      char *portname)
+			      int midi_voices, char *portname)
 {
 	snd_seq_port_info_t portinfo;
 	int  ret;
@@ -628,6 +630,7 @@ int snd_seq_event_port_attach(int client,
 	portinfo.type = type;
 	portinfo.kernel = pcbp;
 	portinfo.midi_channels = midi_channels;
+	portinfo.midi_voices = midi_voices;
 
 	/* Create it */
 	ret = snd_seq_kernel_client_ctl(client,
