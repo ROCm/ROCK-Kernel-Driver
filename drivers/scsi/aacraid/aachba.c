@@ -131,47 +131,10 @@ struct inquiry_data {
 	u8 inqd_prl[4];	/* Product Revision Level */
 };
 
-struct sense_data {
-	u8 error_code;		/* 70h (current errors), 71h(deferred errors) */
-	u8 valid:1;		/* A valid bit of one indicates that the information  */
-				/* field contains valid information as defined in the
-				 * SCSI-2 Standard.
-				 */
-	u8 segment_number;	/* Only used for COPY, COMPARE, or COPY AND VERIFY Commands */
-	u8 sense_key:4;		/* Sense Key */
-	u8 reserved:1;
-	u8 ILI:1;		/* Incorrect Length Indicator */
-	u8 EOM:1;		/* End Of Medium - reserved for random access devices */
-	u8 filemark:1;		/* Filemark - reserved for random access devices */
-
-	u8 information[4];	/* for direct-access devices, contains the unsigned 
-				 * logical block address or residue associated with 
-				 * the sense key 
-				 */
-	u8 add_sense_len;	/* number of additional sense bytes to follow this field */
-	u8 cmnd_info[4];	/* not used */
-	u8 ASC;			/* Additional Sense Code */
-	u8 ASCQ;		/* Additional Sense Code Qualifier */
-	u8 FRUC;		/* Field Replaceable Unit Code - not used */
-	u8 bit_ptr:3;		/* indicates which byte of the CDB or parameter data
-				 * was in error
-				 */
-	u8 BPV:1;		/* bit pointer valid (BPV): 1- indicates that 
-				 * the bit_ptr field has valid value
-				 */
-	u8 reserved2:2;
-	u8 CD:1;		/* command data bit: 1- illegal parameter in CDB.
-				 * 0- illegal parameter in data.
-				 */
-	u8 SKSV:1;
-	u8 field_ptr[2];	/* byte of the CDB or parameter data in error */
-};
-
 /*
  *              M O D U L E   G L O B A L S
  */
  
-static struct sense_data sense_data[MAXIMUM_NUM_CONTAINERS];
 static unsigned long aac_build_sg(struct scsi_cmnd* scsicmd, struct sgmap* sgmap);
 static unsigned long aac_build_sg64(struct scsi_cmnd* scsicmd, struct sgmap64* psg);
 static int aac_send_srb_fib(struct scsi_cmnd* scsicmd);
@@ -275,21 +238,57 @@ int aac_get_config_status(struct aac_dev *dev)
  */
 int aac_get_containers(struct aac_dev *dev)
 {
-	struct fsa_scsi_hba *fsa_dev_ptr;
+	struct fsa_dev_info *fsa_dev_ptr;
 	u32 index; 
 	int status = 0;
-	struct aac_query_mount *dinfo;
-	struct aac_mount *dresp;
 	struct fib * fibptr;
 	unsigned instance;
+	struct aac_get_container_count *dinfo;
+	struct aac_get_container_count_resp *dresp;
+	int maximum_num_containers = MAXIMUM_NUM_CONTAINERS;
 
-	fsa_dev_ptr = &(dev->fsa_dev);
 	instance = dev->scsi_host_ptr->unique_id;
 
 	if (!(fibptr = fib_alloc(dev)))
 		return -ENOMEM;
 
-	for (index = 0; index < MAXIMUM_NUM_CONTAINERS; index++) {
+	fib_init(fibptr);
+	dinfo = (struct aac_get_container_count *) fib_data(fibptr);
+	dinfo->command = cpu_to_le32(VM_ContainerConfig);
+	dinfo->type = cpu_to_le32(CT_GET_CONTAINER_COUNT);
+
+	status = fib_send(ContainerCommand,
+		    fibptr,
+		    sizeof (struct aac_get_container_count),
+		    FsaNormal,
+		    1, 1,
+		    NULL, NULL);
+	if (status >= 0) {
+		dresp = (struct aac_get_container_count_resp *)fib_data(fibptr);
+		maximum_num_containers = dresp->ContainerSwitchEntries;
+		fib_complete(fibptr);
+	}
+
+	if (maximum_num_containers < MAXIMUM_NUM_CONTAINERS)
+		maximum_num_containers = MAXIMUM_NUM_CONTAINERS;
+
+	fsa_dev_ptr = (struct fsa_dev_info *) kmalloc(
+	  sizeof(*fsa_dev_ptr) * maximum_num_containers, GFP_KERNEL);
+	if (!fsa_dev_ptr) {
+		fib_free(fibptr);
+		return -ENOMEM;
+	}
+	memset(fsa_dev_ptr, 0, sizeof(*fsa_dev_ptr) * maximum_num_containers);
+
+	dev->fsa_dev = fsa_dev_ptr;
+	dev->maximum_num_containers = maximum_num_containers;
+
+	for (index = 0; index < dev->maximum_num_containers; index++) {
+		struct aac_query_mount *dinfo;
+		struct aac_mount *dresp;
+
+		fsa_dev_ptr[index].devname[0] = '\0';
+
 		fib_init(fibptr);
 		dinfo = (struct aac_query_mount *) fib_data(fibptr);
 
@@ -309,14 +308,20 @@ int aac_get_containers(struct aac_dev *dev)
 		}
 		dresp = (struct aac_mount *)fib_data(fibptr);
 
+		dprintk ((KERN_DEBUG
+		  "VM_NameServe cid=%d status=%d vol=%d state=%d cap=%u\n",
+		  (int)index, (int)le32_to_cpu(dresp->status),
+		  (int)le32_to_cpu(dresp->mnt[0].vol),
+		  (int)le32_to_cpu(dresp->mnt[0].state),
+		  (unsigned)le32_to_cpu(dresp->mnt[0].capacity)));
 		if ((le32_to_cpu(dresp->status) == ST_OK) &&
 		    (le32_to_cpu(dresp->mnt[0].vol) != CT_NONE) &&
 		    (le32_to_cpu(dresp->mnt[0].state) != FSCS_HIDDEN)) {
-			fsa_dev_ptr->valid[index] = 1;
-			fsa_dev_ptr->type[index] = le32_to_cpu(dresp->mnt[0].vol);
-			fsa_dev_ptr->size[index] = le32_to_cpu(dresp->mnt[0].capacity);
+			fsa_dev_ptr[index].valid = 1;
+			fsa_dev_ptr[index].type = le32_to_cpu(dresp->mnt[0].vol);
+			fsa_dev_ptr[index].size = le32_to_cpu(dresp->mnt[0].capacity);
 			if (le32_to_cpu(dresp->mnt[0].state) & FSCS_READONLY)
-				    fsa_dev_ptr->ro[index] = 1;
+				    fsa_dev_ptr[index].ro = 1;
 		}
 		fib_complete(fibptr);
 		/*
@@ -336,19 +341,19 @@ int aac_get_containers(struct aac_dev *dev)
  *	@cid: container identifier
  *
  *	Queries the controller about the given volume. The volume information
- *	is updated in the struct fsa_scsi_hba structure rather than returned.
+ *	is updated in the struct fsa_dev_info structure rather than returned.
  */
  
 static int probe_container(struct aac_dev *dev, int cid)
 {
-	struct fsa_scsi_hba *fsa_dev_ptr;
+	struct fsa_dev_info *fsa_dev_ptr;
 	int status;
 	struct aac_query_mount *dinfo;
 	struct aac_mount *dresp;
 	struct fib * fibptr;
 	unsigned instance;
 
-	fsa_dev_ptr = &(dev->fsa_dev);
+	fsa_dev_ptr = dev->fsa_dev;
 	instance = dev->scsi_host_ptr->unique_id;
 
 	if (!(fibptr = fib_alloc(dev)))
@@ -378,11 +383,11 @@ static int probe_container(struct aac_dev *dev, int cid)
 	if ((le32_to_cpu(dresp->status) == ST_OK) &&
 	    (le32_to_cpu(dresp->mnt[0].vol) != CT_NONE) &&
 	    (le32_to_cpu(dresp->mnt[0].state) != FSCS_HIDDEN)) {
-		fsa_dev_ptr->valid[cid] = 1;
-		fsa_dev_ptr->type[cid] = le32_to_cpu(dresp->mnt[0].vol);
-		fsa_dev_ptr->size[cid] = le32_to_cpu(dresp->mnt[0].capacity);
+		fsa_dev_ptr[cid].valid = 1;
+		fsa_dev_ptr[cid].type = le32_to_cpu(dresp->mnt[0].vol);
+		fsa_dev_ptr[cid].size = le32_to_cpu(dresp->mnt[0].capacity);
 		if (le32_to_cpu(dresp->mnt[0].state) & FSCS_READONLY)
-			fsa_dev_ptr->ro[cid] = 1;
+			fsa_dev_ptr[cid].ro = 1;
 	}
 
 error:
@@ -645,12 +650,15 @@ static void read_callback(void *context, struct fib * fibptr)
 	else {
 		printk(KERN_WARNING "read_callback: read failed, status = %d\n", readreply->status);
 		scsicmd->result = DID_OK << 16 | COMMAND_COMPLETE << 8 | SAM_STAT_CHECK_CONDITION;
-		set_sense((u8 *) &sense_data[cid],
+		set_sense((u8 *) &dev->fsa_dev[cid].sense_data,
 				    HARDWARE_ERROR,
 				    SENCODE_INTERNAL_TARGET_FAILURE,
 				    ASENCODE_INTERNAL_TARGET_FAILURE, 0, 0,
 				    0, 0);
-		memcpy(scsicmd->sense_buffer, &sense_data[cid], sizeof(struct sense_data));
+		memcpy(scsicmd->sense_buffer, &dev->fsa_dev[cid].sense_data,
+		  (sizeof(dev->fsa_dev[cid].sense_data) > sizeof(scsicmd->sense_buffer))
+		    ? sizeof(scsicmd->sense_buffer)
+		    : sizeof(dev->fsa_dev[cid].sense_data));
 	}
 	fib_complete(fibptr);
 	fib_free(fibptr);
@@ -691,12 +699,13 @@ static void write_callback(void *context, struct fib * fibptr)
 	else {
 		printk(KERN_WARNING "write_callback: write failed, status = %d\n", writereply->status);
 		scsicmd->result = DID_OK << 16 | COMMAND_COMPLETE << 8 | SAM_STAT_CHECK_CONDITION;
-		set_sense((u8 *) &sense_data[cid],
+		set_sense((u8 *) &dev->fsa_dev[cid].sense_data,
 				    HARDWARE_ERROR,
 				    SENCODE_INTERNAL_TARGET_FAILURE,
 				    ASENCODE_INTERNAL_TARGET_FAILURE, 0, 0,
 				    0, 0);
-		memcpy(scsicmd->sense_buffer, &sense_data[cid], sizeof(struct sense_data));
+		memcpy(scsicmd->sense_buffer, &dev->fsa_dev[cid].sense_data, 
+				sizeof(struct sense_data));
 	}
 
 	fib_complete(fibptr);
@@ -938,11 +947,11 @@ static int aac_write(struct scsi_cmnd * scsicmd, int cid)
 int aac_scsi_cmd(struct scsi_cmnd * scsicmd)
 {
 	u32 cid = 0;
-	int ret;
 	struct Scsi_Host *host = scsicmd->device->host;
 	struct aac_dev *dev = (struct aac_dev *)host->hostdata;
-	struct fsa_scsi_hba *fsa_dev_ptr = &dev->fsa_dev;
+	struct fsa_dev_info *fsa_dev_ptr = dev->fsa_dev;
 	int cardtype = dev->cardtype;
+	int ret;
 	
 	/*
 	 *	If the bus, id or lun is out of range, return fail
@@ -951,7 +960,7 @@ int aac_scsi_cmd(struct scsi_cmnd * scsicmd)
 	 */
 	if (scsicmd->device->id != host->this_id) {
 		if ((scsicmd->device->channel == 0) ){
-			if( (scsicmd->device->id >= MAXIMUM_NUM_CONTAINERS) || (scsicmd->device->lun != 0)){ 
+			if( (scsicmd->device->id >= dev->maximum_num_containers) || (scsicmd->device->lun != 0)){ 
 				scsicmd->result = DID_NO_CONNECT << 16;
 				__aac_io_done(scsicmd);
 				return 0;
@@ -962,7 +971,7 @@ int aac_scsi_cmd(struct scsi_cmnd * scsicmd)
 			 *	If the target container doesn't exist, it may have
 			 *	been newly created
 			 */
-			if (fsa_dev_ptr->valid[cid] == 0) {
+			if ((fsa_dev_ptr[cid].valid & 1) == 0) {
 				switch (scsicmd->cmnd[0]) {
 				case INQUIRY:
 				case READ_CAPACITY:
@@ -970,7 +979,7 @@ int aac_scsi_cmd(struct scsi_cmnd * scsicmd)
 					spin_unlock_irq(host->host_lock);
 					probe_container(dev, cid);
 					spin_lock_irq(host->host_lock);
-					if (fsa_dev_ptr->valid[cid] == 0) {
+					if (fsa_dev_ptr[cid].valid == 0) {
 						scsicmd->result = DID_NO_CONNECT << 16;
 						__aac_io_done(scsicmd);
 						return 0;
@@ -983,7 +992,7 @@ int aac_scsi_cmd(struct scsi_cmnd * scsicmd)
 			 *	If the target container still doesn't exist, 
 			 *	return failure
 			 */
-			if (fsa_dev_ptr->valid[cid] == 0) {
+			if (fsa_dev_ptr[cid].valid == 0) {
 				scsicmd->result = DID_BAD_TARGET << 16;
 				__aac_io_done(scsicmd);
 				return 0;
@@ -1006,12 +1015,15 @@ int aac_scsi_cmd(struct scsi_cmnd * scsicmd)
 	{
 		dprintk((KERN_WARNING "Only INQUIRY & TUR command supported for controller, rcvd = 0x%x.\n", scsicmd->cmnd[0]));
 		scsicmd->result = DID_OK << 16 | COMMAND_COMPLETE << 8 | SAM_STAT_CHECK_CONDITION;
-		set_sense((u8 *) &sense_data[cid],
+		set_sense((u8 *) &dev->fsa_dev[cid].sense_data,
 			    ILLEGAL_REQUEST,
 			    SENCODE_INVALID_COMMAND,
 			    ASENCODE_INVALID_COMMAND, 0, 0, 0, 0);
+		memcpy(scsicmd->sense_buffer, &dev->fsa_dev[cid].sense_data,
+		  (sizeof(dev->fsa_dev[cid].sense_data) > sizeof(scsicmd->sense_buffer))
+		    ? sizeof(scsicmd->sense_buffer)
+		    : sizeof(dev->fsa_dev[cid].sense_data));
 		__aac_io_done(scsicmd);
-		memcpy(scsicmd->sense_buffer, &sense_data[cid], sizeof(struct sense_data));
 		return 0;
 	}
 
@@ -1036,7 +1048,7 @@ int aac_scsi_cmd(struct scsi_cmnd * scsicmd)
 		 *	Set the Vendor, Product, and Revision Level
 		 *	see: <vendor>.c i.e. aac.c
 		 */
-		setinqstr(cardtype, (void *) (inq_data_ptr->inqd_vid), fsa_dev_ptr->type[cid]);
+		setinqstr(cardtype, (void *) (inq_data_ptr->inqd_vid), fsa_dev_ptr[cid].type);
 		if (scsicmd->device->id == host->this_id)
 			inq_data_ptr->inqd_pdt = INQD_PDT_PROC;	/* Processor device */
 		else
@@ -1047,11 +1059,14 @@ int aac_scsi_cmd(struct scsi_cmnd * scsicmd)
 	}
 	case READ_CAPACITY:
 	{
-		int capacity;
+		u32 capacity;
 		char *cp;
 
 		dprintk((KERN_DEBUG "READ CAPACITY command.\n"));
-		capacity = fsa_dev_ptr->size[cid] - 1;
+		if (fsa_dev_ptr[cid].size <= 0x100000000)
+			capacity = fsa_dev_ptr[cid].size - 1;
+		else
+			capacity = (u32)-1;
 		cp = scsicmd->request_buffer;
 		cp[0] = (capacity >> 24) & 0xff;
 		cp[1] = (capacity >> 16) & 0xff;
@@ -1106,8 +1121,8 @@ int aac_scsi_cmd(struct scsi_cmnd * scsicmd)
 	}
 	case REQUEST_SENSE:
 		dprintk((KERN_DEBUG "REQUEST SENSE command.\n"));
-		memcpy(scsicmd->sense_buffer, &sense_data[cid], sizeof (struct sense_data));
-		memset(&sense_data[cid], 0, sizeof (struct sense_data));
+		memcpy(scsicmd->sense_buffer, &dev->fsa_dev[cid].sense_data, sizeof (struct sense_data));
+		memset(&dev->fsa_dev[cid].sense_data, 0, sizeof (struct sense_data));
 		scsicmd->result = DID_OK << 16 | COMMAND_COMPLETE << 8 | SAM_STAT_GOOD;
 		__aac_io_done(scsicmd);
 		return 0;
@@ -1115,9 +1130,9 @@ int aac_scsi_cmd(struct scsi_cmnd * scsicmd)
 	case ALLOW_MEDIUM_REMOVAL:
 		dprintk((KERN_DEBUG "LOCK command.\n"));
 		if (scsicmd->cmnd[4])
-			fsa_dev_ptr->locked[cid] = 1;
+			fsa_dev_ptr[cid].locked = 1;
 		else
-			fsa_dev_ptr->locked[cid] = 0;
+			fsa_dev_ptr[cid].locked = 0;
 
 		scsicmd->result = DID_OK << 16 | COMMAND_COMPLETE << 8 | SAM_STAT_GOOD;
 		__aac_io_done(scsicmd);
@@ -1149,7 +1164,7 @@ int aac_scsi_cmd(struct scsi_cmnd * scsicmd)
 			 
 			spin_unlock_irq(host->host_lock);
 			if  (scsicmd->request->rq_disk)
-				memcpy(fsa_dev_ptr->devname[cid],
+				memcpy(fsa_dev_ptr[cid].devname,
 					scsicmd->request->rq_disk->disk_name,
 					8);
 
@@ -1169,11 +1184,13 @@ int aac_scsi_cmd(struct scsi_cmnd * scsicmd)
 			 */
 			printk(KERN_WARNING "Unhandled SCSI Command: 0x%x.\n", scsicmd->cmnd[0]);
 			scsicmd->result = DID_OK << 16 | COMMAND_COMPLETE << 8 | SAM_STAT_CHECK_CONDITION;
-			set_sense((u8 *) &sense_data[cid],
+			set_sense((u8 *) &dev->fsa_dev[cid].sense_data,
 				ILLEGAL_REQUEST, SENCODE_INVALID_COMMAND,
-			ASENCODE_INVALID_COMMAND, 0, 0, 0, 0);
-			memcpy(scsicmd->sense_buffer, &sense_data[cid],
-				sizeof(struct sense_data));
+				ASENCODE_INVALID_COMMAND, 0, 0, 0, 0);
+			memcpy(scsicmd->sense_buffer, &dev->fsa_dev[cid].sense_data,
+			  (sizeof(dev->fsa_dev[cid].sense_data) > sizeof(scsicmd->sense_buffer))
+			    ? sizeof(scsicmd->sense_buffer)
+			    : sizeof(dev->fsa_dev[cid].sense_data));
 			__aac_io_done(scsicmd);
 			return 0;
 	}
@@ -1182,16 +1199,16 @@ int aac_scsi_cmd(struct scsi_cmnd * scsicmd)
 static int query_disk(struct aac_dev *dev, void __user *arg)
 {
 	struct aac_query_disk qd;
-	struct fsa_scsi_hba *fsa_dev_ptr;
+	struct fsa_dev_info *fsa_dev_ptr;
 
-	fsa_dev_ptr = &(dev->fsa_dev);
+	fsa_dev_ptr = dev->fsa_dev;
 	if (copy_from_user(&qd, arg, sizeof (struct aac_query_disk)))
 		return -EFAULT;
 	if (qd.cnum == -1)
 		qd.cnum = ID_LUN_TO_CONTAINER(qd.id, qd.lun);
 	else if ((qd.bus == -1) && (qd.id == -1) && (qd.lun == -1)) 
 	{
-		if (qd.cnum < 0 || qd.cnum >= MAXIMUM_NUM_CONTAINERS)
+		if (qd.cnum < 0 || qd.cnum >= dev->maximum_num_containers)
 			return -EINVAL;
 		qd.instance = dev->scsi_host_ptr->host_no;
 		qd.bus = 0;
@@ -1200,16 +1217,17 @@ static int query_disk(struct aac_dev *dev, void __user *arg)
 	}
 	else return -EINVAL;
 
-	qd.valid = fsa_dev_ptr->valid[qd.cnum];
-	qd.locked = fsa_dev_ptr->locked[qd.cnum];
-	qd.deleted = fsa_dev_ptr->deleted[qd.cnum];
+	qd.valid = fsa_dev_ptr[qd.cnum].valid;
+	qd.locked = fsa_dev_ptr[qd.cnum].locked;
+	qd.deleted = fsa_dev_ptr[qd.cnum].deleted;
 
-	if (fsa_dev_ptr->devname[qd.cnum][0] == '\0')
+	if (fsa_dev_ptr[qd.cnum].devname[0] == '\0')
 		qd.unmapped = 1;
 	else
 		qd.unmapped = 0;
 
-	strlcpy(qd.name, fsa_dev_ptr->devname[qd.cnum], sizeof(qd.name));
+	strlcpy(qd.name, fsa_dev_ptr[qd.cnum].devname,
+	  min(sizeof(qd.name), sizeof(fsa_dev_ptr[qd.cnum].devname) + 1));
 
 	if (copy_to_user(arg, &qd, sizeof (struct aac_query_disk)))
 		return -EFAULT;
@@ -1219,49 +1237,49 @@ static int query_disk(struct aac_dev *dev, void __user *arg)
 static int force_delete_disk(struct aac_dev *dev, void __user *arg)
 {
 	struct aac_delete_disk dd;
-	struct fsa_scsi_hba *fsa_dev_ptr;
+	struct fsa_dev_info *fsa_dev_ptr;
 
-	fsa_dev_ptr = &(dev->fsa_dev);
+	fsa_dev_ptr = dev->fsa_dev;
 
 	if (copy_from_user(&dd, arg, sizeof (struct aac_delete_disk)))
 		return -EFAULT;
 
-	if (dd.cnum >= MAXIMUM_NUM_CONTAINERS)
+	if (dd.cnum >= dev->maximum_num_containers)
 		return -EINVAL;
 	/*
 	 *	Mark this container as being deleted.
 	 */
-	fsa_dev_ptr->deleted[dd.cnum] = 1;
+	fsa_dev_ptr[dd.cnum].deleted = 1;
 	/*
 	 *	Mark the container as no longer valid
 	 */
-	fsa_dev_ptr->valid[dd.cnum] = 0;
+	fsa_dev_ptr[dd.cnum].valid = 0;
 	return 0;
 }
 
 static int delete_disk(struct aac_dev *dev, void __user *arg)
 {
 	struct aac_delete_disk dd;
-	struct fsa_scsi_hba *fsa_dev_ptr;
+	struct fsa_dev_info *fsa_dev_ptr;
 
-	fsa_dev_ptr = &(dev->fsa_dev);
+	fsa_dev_ptr = dev->fsa_dev;
 
 	if (copy_from_user(&dd, arg, sizeof (struct aac_delete_disk)))
 		return -EFAULT;
 
-	if (dd.cnum >= MAXIMUM_NUM_CONTAINERS)
+	if (dd.cnum >= dev->maximum_num_containers)
 		return -EINVAL;
 	/*
 	 *	If the container is locked, it can not be deleted by the API.
 	 */
-	if (fsa_dev_ptr->locked[dd.cnum])
+	if (fsa_dev_ptr[dd.cnum].locked)
 		return -EBUSY;
 	else {
 		/*
 		 *	Mark the container as no longer being valid.
 		 */
-		fsa_dev_ptr->valid[dd.cnum] = 0;
-		fsa_dev_ptr->devname[dd.cnum][0] = '\0';
+		fsa_dev_ptr[dd.cnum].valid = 0;
+		fsa_dev_ptr[dd.cnum].devname[0] = '\0';
 		return 0;
 	}
 }

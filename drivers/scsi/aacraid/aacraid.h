@@ -662,14 +662,53 @@ struct aac_fib_context {
 	struct list_head	fib_list;	// this holds fibs and their attachd hw_fibs
 };
 
-struct fsa_scsi_hba {
-	u32		size[MAXIMUM_NUM_CONTAINERS];
-	u32		type[MAXIMUM_NUM_CONTAINERS];
-	u8		valid[MAXIMUM_NUM_CONTAINERS];
-	u8		ro[MAXIMUM_NUM_CONTAINERS];
-	u8		locked[MAXIMUM_NUM_CONTAINERS];
-	u8		deleted[MAXIMUM_NUM_CONTAINERS];
-	char		devname[MAXIMUM_NUM_CONTAINERS][8];
+struct sense_data {
+	u8 error_code;		/* 70h (current errors), 71h(deferred errors) */
+	u8 valid:1;		/* A valid bit of one indicates that the information  */
+				/* field contains valid information as defined in the
+				 * SCSI-2 Standard.
+				 */
+	u8 segment_number;	/* Only used for COPY, COMPARE, or COPY AND VERIFY Commands */
+	u8 sense_key:4;		/* Sense Key */
+	u8 reserved:1;
+	u8 ILI:1;		/* Incorrect Length Indicator */
+	u8 EOM:1;		/* End Of Medium - reserved for random access devices */
+	u8 filemark:1;		/* Filemark - reserved for random access devices */
+
+	u8 information[4];	/* for direct-access devices, contains the unsigned 
+				 * logical block address or residue associated with 
+				 * the sense key 
+				 */
+	u8 add_sense_len;	/* number of additional sense bytes to follow this field */
+	u8 cmnd_info[4];	/* not used */
+	u8 ASC;			/* Additional Sense Code */
+	u8 ASCQ;		/* Additional Sense Code Qualifier */
+	u8 FRUC;		/* Field Replaceable Unit Code - not used */
+	u8 bit_ptr:3;		/* indicates which byte of the CDB or parameter data
+				 * was in error
+				 */
+	u8 BPV:1;		/* bit pointer valid (BPV): 1- indicates that 
+				 * the bit_ptr field has valid value
+				 */
+	u8 reserved2:2;
+	u8 CD:1;		/* command data bit: 1- illegal parameter in CDB.
+				 * 0- illegal parameter in data.
+				 */
+	u8 SKSV:1;
+	u8 field_ptr[2];	/* byte of the CDB or parameter data in error */
+};
+
+struct fsa_dev_info {
+	u64		last;
+	u64		size;
+	u32		type;
+	u16		queue_depth;
+	u8		valid;
+	u8		ro;
+	u8		locked;
+	u8		deleted;
+	char		devname[8];
+	struct sense_data sense_data;
 };
 
 struct fib {
@@ -814,7 +853,8 @@ struct aac_dev
 	size_t			comm_size;
 
 	struct Scsi_Host	*scsi_host_ptr;
-	struct fsa_scsi_hba	fsa_dev;
+	int			maximum_num_containers;
+	struct fsa_dev_info	*fsa_dev;
 	pid_t			thread_pid;
 	int			cardtype;
 	
@@ -1213,6 +1253,25 @@ struct aac_commit_config {
 	u32		command;	/* VM_ContainerConfig */
 	u32		type;		/* CT_COMMIT_CONFIG */
 };
+
+/*
+ *	Query for Container Configuration Count
+ */
+
+#define CT_GET_CONTAINER_COUNT 4
+struct aac_get_container_count {
+	u32		command;	/* VM_ContainerConfig */
+	u32		type;		/* CT_GET_CONTAINER_COUNT */
+};
+
+struct aac_get_container_count_resp {
+	u32		response; /* ST_OK */
+	u32		dummy0;
+	u32		MaxContainers;
+	u32		ContainerSwitchEntries;
+	u32		MaxPartitions;
+};
+
 
 /*
  *	Query for "mountable" objects, ie, objects that are typically

@@ -521,12 +521,10 @@ static int __devinit aac_probe_one(struct pci_dev *pdev,
 {
 	unsigned index = id->driver_data;
 	struct Scsi_Host *shost;
-	struct fsa_scsi_hba *fsa_dev_ptr;
 	struct aac_dev *aac;
 	struct list_head *insert = &aac_devices;
 	int error = -ENODEV;
 	int unique_id = 0;
-	int container;
 
 	list_for_each_entry(aac, &aac_devices, entry) {
 		if (aac->id > unique_id) {
@@ -574,11 +572,6 @@ static int __devinit aac_probe_one(struct pci_dev *pdev,
 		goto out_free_host;
 	spin_lock_init(&aac->fib_lock);
 
-	/* Initialize the ordinal number of the device to -1 */
-	fsa_dev_ptr = &aac->fsa_dev;
-	for (container = 0; container < MAXIMUM_NUM_CONTAINERS; container++)
-		fsa_dev_ptr->devname[container][0] = '\0';
-
 	if ((*aac_drivers[index].init)(aac))
 		goto out_free_fibs;
 
@@ -607,11 +600,16 @@ static int __devinit aac_probe_one(struct pci_dev *pdev,
 	aac_get_containers(aac);
 	list_add(&aac->entry, insert);
 
+	shost->max_id = aac->maximum_num_containers;
+	if (shost->max_id < MAXIMUM_NUM_CONTAINERS)
+		shost->max_id = MAXIMUM_NUM_CONTAINERS;
+	else
+		shost->this_id = shost->max_id;
+
 	/*
 	 * dmb - we may need to move the setting of these parms somewhere else once
 	 * we get a fib that can report the actual numbers
 	 */
-	shost->max_id = MAXIMUM_NUM_CONTAINERS;
 	shost->max_lun = AAC_MAX_LUN;
 
 	pci_set_drvdata(pdev, shost);
@@ -635,6 +633,7 @@ out_deinit:
 	iounmap((void * )aac->regs.sa);
  out_free_fibs:
 	kfree(aac->fibs);
+	kfree(aac->fsa_dev);
  out_free_host:
 	scsi_host_put(shost);
  out_disable_pdev:
