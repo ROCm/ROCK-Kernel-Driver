@@ -16,10 +16,15 @@
 * General Public License for more details.
 *
 ******************************************************************************/
-#define QLA1280_VERSION      "3.23.36"
+#define QLA1280_VERSION      "3.23.37"
 /*****************************************************************************
     Revision History:
-    Rev  3.23.36 September 19, 2003, Christoph Hellwig
+    Rev  3.23.37 October 1, 2003, Jes Sorensen
+	- Make MMIO depend on CONFIG_X86_VISWS instead of yet another
+	  random CONFIG option
+	- Clean up locking in probe path
+    Rev  3.23.36 October 1, 2003, Christoph Hellwig
+	- queuecommand only ever receives new commands - clear flags
 	- Reintegrate lost fixes from Linux 2.5
     Rev  3.23.35 August 14, 2003, Jes Sorensen
 	- Build against 2.6
@@ -315,13 +320,13 @@
 
 #if LINUX_VERSION_CODE >= 0x020545
 #include <scsi/scsi_host.h>
+#include "scsi.h"
 #else
 #include <linux/blk.h>
+#include "scsi.h"
 #include "hosts.h"
 #include "sd.h"
 #endif
-
-#include "scsi.h"
 
 #if LINUX_VERSION_CODE < 0x020407
 #error "Kernels older than 2.4.7 are no longer supported"
@@ -339,7 +344,10 @@
 #define  DEBUG_PRINT_NVRAM	0
 #define  DEBUG_QLA1280		0
 
-#ifdef	CONFIG_SCSI_QLOGIC_1280_PIO
+/*
+ * The SGI VISWS is broken and doesn't support MMIO ;-(
+ */
+#ifdef CONFIG_X86_VISWS
 #define	MEMORY_MAPPED_IO	0
 #else
 #define	MEMORY_MAPPED_IO	1
@@ -413,6 +421,11 @@ scsi_adjust_queue_depth(Scsi_Device *device, int tag, int depth)
 }
 #else
 #define HOST_LOCK			ha->host->host_lock
+#endif
+#if LINUX_VERSION_CODE < 0x020600
+#define DEV_SIMPLE_TAGS(device)		device->tagged_queue
+#else
+#define DEV_SIMPLE_TAGS(device)		device->simple_tags
 #endif
 #if defined(__ia64__) && !defined(ia64_platform_is)
 #define ia64_platform_is(foo)		(!strcmp(x, platform_name))
@@ -647,11 +660,11 @@ static int ql_debug_level = 1;
 #define	PROC_BUF	&qla1280_buffer[len]
 
 #if LINUX_VERSION_CODE < 0x020600
-static int qla1280_proc_info(char *buffer, char **start, off_t offset, int length,
-		      int hostno, int inout)
+static int qla1280_proc_info(char *buffer, char **start, off_t offset,
+			     int length, int hostno, int inout)
 #else
-static int qla1280_proc_info(struct Scsi_Host *host, char *buffer, char **start,
-		      off_t offset, int length, int inout)
+static int qla1280_proc_info(struct Scsi_Host *host, char *buffer,
+			     char **start, off_t offset, int length, int inout)
 #endif
 {
 	struct scsi_qla_host *ha;
@@ -955,8 +968,8 @@ qla1280_do_device_init(struct pci_dev *pdev, Scsi_Host_Template * template,
 		       host->io_port, host->io_port + 0xff);
 		goto error_free_irq;
 	}
-
 #endif
+
 	/* load the F/W, read paramaters, and init the H/W */
 	if (qla1280_initialize_adapter(ha)) {
 		printk(KERN_INFO "qla1x160: Failed to initialize adapter\n");
@@ -1598,6 +1611,7 @@ qla1280_intr_handler(int irq, void *dev_id, struct pt_regs *regs)
 	return IRQ_RETVAL(handled);
 }
 
+
 static int
 qla12160_set_target_parameters(struct scsi_qla_host *ha, int bus, int target)
 {
@@ -1666,9 +1680,7 @@ qla1280_slave_configure(Scsi_Device *device)
 	int target = device->id;
 	int status = 0;
 	struct nvram *nv;
-#if LINUX_VERSION_CODE < 0x020500
 	unsigned long flags;
-#endif
 
 	ha = (struct scsi_qla_host *)device->host->hostdata;
 	nv = &ha->nvram;
@@ -1706,17 +1718,13 @@ qla1280_slave_configure(Scsi_Device *device)
 			nv->bus[bus].target[target].ppr_1x160.flags.enable_ppr = 0;
 	}
 
-#if LINUX_VERSION_CODE < 0x020500
 	spin_lock_irqsave(HOST_LOCK, flags);
-#endif
 	if (nv->bus[bus].target[target].parameter.f.enable_sync) {
 		status = qla12160_set_target_parameters(ha, bus, target);
 	}
 
 	qla12160_get_target_parameters(ha, device);
-#if LINUX_VERSION_CODE < 0x020500
 	spin_unlock_irqrestore(HOST_LOCK, flags);
-#endif
 	return status;
 }
 
@@ -1995,7 +2003,7 @@ qla1280_mem_alloc(struct scsi_qla_host *ha)
 	if (ha->request_ring)
 		pci_free_consistent(ha->pdev,
                                     ((REQUEST_ENTRY_CNT + 1) *
-                                     (sizeof(request_t))),
+				     (sizeof(request_t))),
                                     ha->request_ring, ha->request_dma);
  finish:
 	LEAVE("qla1280_mem_alloc");
@@ -2088,6 +2096,9 @@ qla1280_initialize_adapter(struct scsi_qla_host *ha)
 	struct device_reg *reg;
 	int status;
 	int bus;
+#if LINUX_VERSION_CODE > 0x020500
+	unsigned long flags;
+#endif
 
 	ENTER("qla1280_initialize_adapter");
 
@@ -2131,6 +2142,15 @@ qla1280_initialize_adapter(struct scsi_qla_host *ha)
 			"NVRAM\n");
 	}
 
+#if LINUX_VERSION_CODE >= 0x020500
+	/*
+	 * It's necessary to grab the spin here as qla1280_mailbox_command
+	 * needs to be able to drop the lock unconditionally to wait
+	 * for completion.
+	 * In 2.4 ->detect is called with the io_request_lock held.
+	 */
+	spin_lock_irqsave(HOST_LOCK, flags);
+#endif
 	/* If firmware needs to be loaded */
 	if (qla1280_isp_firmware(ha)) {
 		if (!(status = qla1280_chip_diag (ha))) {
@@ -2183,6 +2203,9 @@ qla1280_initialize_adapter(struct scsi_qla_host *ha)
 		status = 1;
 
  out:
+#if LINUX_VERSION_CODE >= 0x020500
+	spin_unlock_irqrestore(HOST_LOCK, flags);
+#endif
 	if (status)
 		dprintk(2, "qla1280_initialize_adapter: **** FAILED ****\n");
 
@@ -3208,18 +3231,14 @@ qla1280_mailbox_command(struct scsi_qla_host *ha, uint8_t mr, uint16_t *mb)
 	timer.function = qla1280_mailbox_timeout;
 	add_timer(&timer);
 
-#if LINUX_VERSION_CODE < 0x020500
 	spin_unlock_irq(HOST_LOCK);
-#endif
 	WRT_REG_WORD(&reg->host_cmd, HC_SET_HOST_INT);
 	data = qla1280_debounce_register(&reg->istatus);
 
 	wait_for_completion(&wait);
 	del_timer_sync(&timer);
 
-#if LINUX_VERSION_CODE < 0x020500
 	spin_lock_irq(HOST_LOCK);
-#endif
 
 	ha->mailbox_wait = NULL;
 
@@ -3636,7 +3655,7 @@ qla1280_64bit_start_scsi(struct scsi_qla_host *ha, struct srb * sp)
 		(SCSI_TCN_32(cmd) | BIT_7) : SCSI_TCN_32(cmd);
 
 	/* Enable simple tag queuing if device supports it. */
-	if (cmd->device->simple_tags)
+	if (DEV_SIMPLE_TAGS(cmd->device))
 		pkt->control_flags |= cpu_to_le16(BIT_3);
 
 	/* Load SCSI command packet. */
@@ -3936,7 +3955,7 @@ qla1280_32bit_start_scsi(struct scsi_qla_host *ha, struct srb * sp)
 		(SCSI_TCN_32(cmd) | BIT_7) : SCSI_TCN_32(cmd);
 
 	/* Enable simple tag queuing if device supports it. */
-	if (cmd->device->simple_tags)
+	if (DEV_SIMPLE_TAGS(cmd->device))
 		pkt->control_flags |= cpu_to_le16(BIT_3);
 
 	/* Load SCSI command packet. */
@@ -4823,6 +4842,7 @@ qla1280_debounce_register(volatile u16 * addr)
 	return ret;
 }
 
+
 /************************************************************************
  * qla1280_check_for_dead_scsi_bus                                      *
  *                                                                      *
@@ -4891,7 +4911,7 @@ qla12160_get_target_parameters(struct scsi_qla_host *ha, Scsi_Device *device)
 	} else
 		printk(" Async");
 
-	if (device->simple_tags)
+	if (DEV_SIMPLE_TAGS(device))
 		printk(", Tagged queuing: depth %d", device->queue_depth);
 	printk("\n");
 }
@@ -5105,6 +5125,7 @@ qla1280_get_token(char *str)
 	return ret;
 }
 
+
 static Scsi_Host_Template driver_template = {
 	.proc_info		= qla1280_proc_info,
 	.name			= "Qlogic ISP 1280/12160",
@@ -5131,6 +5152,7 @@ static Scsi_Host_Template driver_template = {
 };
 
 #include "scsi_module.c"
+
 
 /*
  * Overrides for Emacs so that we almost follow Linus's tabbing style.
