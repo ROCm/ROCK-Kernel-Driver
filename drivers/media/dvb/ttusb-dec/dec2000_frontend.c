@@ -30,12 +30,12 @@ static int debug = 0;
 #define dprintk	if (debug) printk
 
 static struct dvb_frontend_info dec2000_frontend_info = {
-	name:			"TechnoTrend/Hauppauge DEC-2000-t Frontend",
-	type:			FE_OFDM,
-	frequency_min:		51000000,
-	frequency_max:		858000000,
-	frequency_stepsize:	62500,
-	caps:	FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 | FE_CAN_FEC_3_4 |
+	.name			= "TechnoTrend/Hauppauge DEC-2000-t Frontend",
+	.type			= FE_OFDM,
+	.frequency_min		= 51000000,
+	.frequency_max		= 858000000,
+	.frequency_stepsize	= 62500,
+	.caps =	FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 | FE_CAN_FEC_3_4 |
 		FE_CAN_FEC_5_6 | FE_CAN_FEC_7_8 | FE_CAN_FEC_AUTO |
 		FE_CAN_QAM_16 | FE_CAN_QAM_64 | FE_CAN_QAM_AUTO |
 		FE_CAN_TRANSMISSION_MODE_AUTO | FE_CAN_GUARD_INTERVAL_AUTO |

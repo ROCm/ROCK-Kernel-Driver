@@ -91,12 +91,12 @@ static int __init gdb_console_setup(struct console *co, char *options)
 }
 
 static const struct console gdb_console = {
-	name:		"gdb_con",
-	write:		gdb_console_output,
-	device:		NULL,
-	setup:		gdb_console_setup,
-	flags:		CON_PRINTBUFFER,
-	index:		-1,
+	.name		= "gdb_con",
+	.write		= gdb_console_output,
+	.device		= NULL,
+	.setup		= gdb_console_setup,
+	.flags		= CON_PRINTBUFFER,
+	.index		= -1,
 };
 #endif
 
@@ -260,8 +260,8 @@ static void c_stop(struct seq_file *m, void *v)
 }
 
 struct seq_operations cpuinfo_op = {
-	start:	c_start,
-	next:	c_next,
-	stop:	c_stop,
-	show:	show_cpuinfo,
+	.start	= c_start,
+	.next	= c_next,
+	.stop	= c_stop,
+	.show	= show_cpuinfo,
 };

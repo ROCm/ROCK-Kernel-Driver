@@ -2198,10 +2198,10 @@ static struct pci_device_id id_table[] = {
 MODULE_DEVICE_TABLE(pci, id_table);
 
 static struct pci_driver it8172_driver = {
-	name: IT8172_MODULE_NAME,
-	id_table: id_table,
-	probe: it8172_probe,
-	remove: it8172_remove
+	.name = IT8172_MODULE_NAME,
+	.id_table = id_table,
+	.probe = it8172_probe,
+	.remove = it8172_remove
 };
 
 static int __init init_it8172(void)

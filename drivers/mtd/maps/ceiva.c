@@ -64,23 +64,23 @@
 
 static struct mtd_partition ceiva_partitions[] = {
 	{
-		name: "Ceiva BOOT partition",
-		size:   BOOT_PARTITION_SIZE_KiB*1024,
-		offset: 0,
+		.name = "Ceiva BOOT partition",
+		.size   = BOOT_PARTITION_SIZE_KiB*1024,
+		.offset = 0,
 
 	},{
-		name: "Ceiva parameters partition",
-		size:   PARAMS_PARTITION_SIZE_KiB*1024,
-		offset: (16 + 8) * 1024,
+		.name = "Ceiva parameters partition",
+		.size   = PARAMS_PARTITION_SIZE_KiB*1024,
+		.offset = (16 + 8) * 1024,
 	},{
-		name: "Ceiva kernel partition",
-		size: (KERNEL_PARTITION_SIZE_KiB)*1024,
-		offset: 0x20000,
+		.name = "Ceiva kernel partition",
+		.size = (KERNEL_PARTITION_SIZE_KiB)*1024,
+		.offset = 0x20000,
 
 	},{
-		name: "Ceiva root filesystem partition",
-		offset: MTDPART_OFS_APPEND,
-		size: (ROOT_PARTITION_SIZE_KiB)*1024,
+		.name = "Ceiva root filesystem partition",
+		.offset = MTDPART_OFS_APPEND,
+		.size = (ROOT_PARTITION_SIZE_KiB)*1024,
 	}
 };
 #endif

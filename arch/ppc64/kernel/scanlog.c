@@ -190,11 +190,11 @@ static int scanlog_release(struct inode * inode, struct file * file)
 }
 
 struct file_operations scanlog_fops = {
-	owner:		THIS_MODULE,
-	read:		scanlog_read,
-	write:		scanlog_write,
-	open:		scanlog_open,
-	release:	scanlog_release,
+	.owner		= THIS_MODULE,
+	.read		= scanlog_read,
+	.write		= scanlog_write,
+	.open		= scanlog_open,
+	.release	= scanlog_release,
 };
 
 int __init scanlog_init(void)

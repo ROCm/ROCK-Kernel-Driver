@@ -117,14 +117,14 @@ irqpda_t		*irqpdaindr;
  * VGA color display.
  */
 struct screen_info sn_screen_info = {
-	orig_x:			 0,
-	orig_y:			 0,
-	orig_video_mode:	 3,
-	orig_video_cols:	80,
-	orig_video_ega_bx:	 3,
-	orig_video_lines:	25,
-	orig_video_isVGA:	 1,
-	orig_video_points:	16
+	.orig_x			= 0,
+	.orig_y			= 0,
+	.orig_video_mode	= 3,
+	.orig_video_cols	= 80,
+	.orig_video_ega_bx	= 3,
+	.orig_video_lines	= 25,
+	.orig_video_isVGA	= 1,
+	.orig_video_points	= 16
 };
 
 /*

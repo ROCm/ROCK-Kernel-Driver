@@ -134,10 +134,10 @@ MODULE_DEVICE_TABLE(pci,via_pci_tbl);
 
 
 static struct pci_driver via_driver = {
-	name:		VIA_MODULE_NAME,
-	id_table:	via_pci_tbl,
-	probe:		via_init_one,
-	remove:		via_remove_one,
+	.name		= VIA_MODULE_NAME,
+	.id_table	= via_pci_tbl,
+	.probe		= via_init_one,
+	.remove		= via_remove_one,
 };
 
 

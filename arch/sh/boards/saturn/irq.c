@@ -102,13 +102,13 @@ static void shutdown_saturn_irq(unsigned int irq_nr)
 }
 
 static struct hw_interrupt_type saturn_int = {
-	typename:	"Saturn",
-	enable:		enable_saturn_irq,
-	disable:	disable_saturn_irq,
-	ack:		mask_and_ack_saturn_irq,
-	end:		end_saturn_irq,
-	startup:	startup_saturn_irq,
-	shutdown:	shutdown_saturn_irq,
+	.typename	= "Saturn",
+	.enable		= enable_saturn_irq,
+	.disable	= disable_saturn_irq,
+	.ack		= mask_and_ack_saturn_irq,
+	.end		= end_saturn_irq,
+	.startup	= startup_saturn_irq,
+	.shutdown	= shutdown_saturn_irq,
 };
 
 int saturn_irq_demux(int irq_nr)

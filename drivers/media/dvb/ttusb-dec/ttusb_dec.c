@@ -1003,10 +1003,10 @@ static struct usb_device_id ttusb_dec_table[] = {
 };
 
 static struct usb_driver ttusb_dec_driver = {
-      name:		DRIVER_NAME,
-      probe:		ttusb_dec_probe,
-      disconnect:	ttusb_dec_disconnect,
-      id_table:		ttusb_dec_table,
+      .name		= DRIVER_NAME,
+      .probe		= ttusb_dec_probe,
+      .disconnect	= ttusb_dec_disconnect,
+      .id_table		= ttusb_dec_table,
 };
 
 static int __init ttusb_dec_init(void)

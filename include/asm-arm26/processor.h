@@ -51,7 +51,7 @@ extern uaccess_t uaccess_user, uaccess_kernel;
         uaccess_t       *uaccess;         /* User access functions*/
 
 #define EXTRA_THREAD_STRUCT_INIT                \
-        uaccess:        &uaccess_kernel,
+        .uaccess        = &uaccess_kernel,
 
 // FIXME?!!
 

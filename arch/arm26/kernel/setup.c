@@ -304,12 +304,12 @@ __tagtable(ATAG_MEM, parse_tag_mem32);
 
 #if defined(CONFIG_DUMMY_CONSOLE)
 struct screen_info screen_info = {
- orig_video_lines:	30,
- orig_video_cols:	80,
- orig_video_mode:	0,
- orig_video_ega_bx:	0,
- orig_video_isVGA:	1,
- orig_video_points:	8
+ .orig_video_lines	= 30,
+ .orig_video_cols	= 80,
+ .orig_video_mode	= 0,
+ .orig_video_ega_bx	= 0,
+ .orig_video_isVGA	= 1,
+ .orig_video_points	= 8
 };
 
 static int __init parse_tag_videotext(const struct tag *tag)

@@ -12,21 +12,21 @@
 #include "lkc.h"
 
 struct symbol symbol_yes = {
-	name: "y",
-	curr: { "y", yes },
-	flags: SYMBOL_YES|SYMBOL_VALID,
+	.name = "y",
+	.curr = { "y", yes },
+	.flags = SYMBOL_YES|SYMBOL_VALID,
 }, symbol_mod = {
-	name: "m",
-	curr: { "m", mod },
-	flags: SYMBOL_MOD|SYMBOL_VALID,
+	.name = "m",
+	.curr = { "m", mod },
+	.flags = SYMBOL_MOD|SYMBOL_VALID,
 }, symbol_no = {
-	name: "n",
-	curr: { "n", no },
-	flags: SYMBOL_NO|SYMBOL_VALID,
+	.name = "n",
+	.curr = { "n", no },
+	.flags = SYMBOL_NO|SYMBOL_VALID,
 }, symbol_empty = {
-	name: "",
-	curr: { "", no },
-	flags: SYMBOL_VALID,
+	.name = "",
+	.curr = { "", no },
+	.flags = SYMBOL_VALID,
 };
 
 int sym_change_count;

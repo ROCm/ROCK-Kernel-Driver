@@ -81,9 +81,9 @@ static struct dvb_frontend_info ves1820_info = {
 	.symbol_rate_min = (XIN/2)/64,     /* SACLK/64 == (XIN/2)/64 */
 	.symbol_rate_max = (XIN/2)/4,      /* SACLK/4 */
 #if 0
-	frequency_tolerance: ???,
-	symbol_rate_tolerance: ???,  /* ppm */  /* == 8% (spec p. 5) */
-	notifier_delay: ?,
+	.frequency_tolerance = ???,
+	.symbol_rate_tolerance = ???,  /* ppm */  /* == 8% (spec p. 5) */
+	.notifier_delay = ?,
 #endif
 	.caps = FE_CAN_QAM_16 | FE_CAN_QAM_32 | FE_CAN_QAM_64 |
 		FE_CAN_QAM_128 | FE_CAN_QAM_256 | 

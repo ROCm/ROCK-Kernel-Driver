@@ -110,13 +110,13 @@ static void shutdown_systemasic_irq(unsigned int irq)
 }
 
 struct hw_interrupt_type systemasic_int = {
-        typename:       "System ASIC",
-        startup:        startup_systemasic_irq,
-        shutdown:       shutdown_systemasic_irq,
-        enable:         enable_systemasic_irq,
-        disable:        disable_systemasic_irq,
-        ack:            ack_systemasic_irq,
-        end:            end_systemasic_irq,
+        .typename       = "System ASIC",
+        .startup        = startup_systemasic_irq,
+        .shutdown       = shutdown_systemasic_irq,
+        .enable         = enable_systemasic_irq,
+        .disable        = disable_systemasic_irq,
+        .ack            = ack_systemasic_irq,
+        .end            = end_systemasic_irq,
 };
 
 /*

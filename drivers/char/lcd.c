@@ -551,9 +551,9 @@ static long lcd_read(struct inode *inode, struct file *file, char *buf, unsigned
  */
 
 static struct file_operations lcd_fops = {
-	read:		lcd_read,
-	ioctl:		lcd_ioctl,
-	open:		lcd_open,
+	.read		= lcd_read,
+	.ioctl		= lcd_ioctl,
+	.open		= lcd_open,
 };
 
 static struct miscdevice lcd_dev=

@@ -634,116 +634,116 @@ static int genmii_read_link(struct mii_phy *phy)
 
 /* Broadcom BCM 5201 */
 static struct mii_phy_ops bcm5201_phy_ops = {
-	init:		bcm5201_init,
-	suspend:	bcm5201_suspend,
-	setup_aneg:	genmii_setup_aneg,
-	setup_forced:	genmii_setup_forced,
-	poll_link:	genmii_poll_link,
-	read_link:	genmii_read_link,
+	.init		= bcm5201_init,
+	.suspend	= bcm5201_suspend,
+	.setup_aneg	= genmii_setup_aneg,
+	.setup_forced	= genmii_setup_forced,
+	.poll_link	= genmii_poll_link,
+	.read_link	= genmii_read_link,
 };
 
 static struct mii_phy_def bcm5201_phy_def = {
-	phy_id:		0x00406210,
-	phy_id_mask:	0xfffffff0,
-	name:		"BCM5201",
-	features:	MII_BASIC_FEATURES,
-	magic_aneg:	0,
-	ops:		&bcm5201_phy_ops
+	.phy_id		= 0x00406210,
+	.phy_id_mask	= 0xfffffff0,
+	.name		= "BCM5201",
+	.features	= MII_BASIC_FEATURES,
+	.magic_aneg	= 0,
+	.ops		= &bcm5201_phy_ops
 };
 
 /* Broadcom BCM 5221 */
 static struct mii_phy_ops bcm5221_phy_ops = {
-	suspend:	bcm5201_suspend,
-	init:		bcm5221_init,
-	setup_aneg:	genmii_setup_aneg,
-	setup_forced:	genmii_setup_forced,
-	poll_link:	genmii_poll_link,
-	read_link:	genmii_read_link,
+	.suspend	= bcm5201_suspend,
+	.init		= bcm5221_init,
+	.setup_aneg	= genmii_setup_aneg,
+	.setup_forced	= genmii_setup_forced,
+	.poll_link	= genmii_poll_link,
+	.read_link	= genmii_read_link,
 };
 
 static struct mii_phy_def bcm5221_phy_def = {
-	phy_id:		0x004061e0,
-	phy_id_mask:	0xfffffff0,
-	name:		"BCM5221",
-	features:	MII_BASIC_FEATURES,
-	magic_aneg:	0,
-	ops:		&bcm5221_phy_ops
+	.phy_id		= 0x004061e0,
+	.phy_id_mask	= 0xfffffff0,
+	.name		= "BCM5221",
+	.features	= MII_BASIC_FEATURES,
+	.magic_aneg	= 0,
+	.ops		= &bcm5221_phy_ops
 };
 
 /* Broadcom BCM 5400 */
 static struct mii_phy_ops bcm5400_phy_ops = {
-	init:		bcm5400_init,
-	suspend:	bcm5400_suspend,
-	setup_aneg:	bcm54xx_setup_aneg,
-	setup_forced:	bcm54xx_setup_forced,
-	poll_link:	genmii_poll_link,
-	read_link:	bcm54xx_read_link,
+	.init		= bcm5400_init,
+	.suspend	= bcm5400_suspend,
+	.setup_aneg	= bcm54xx_setup_aneg,
+	.setup_forced	= bcm54xx_setup_forced,
+	.poll_link	= genmii_poll_link,
+	.read_link	= bcm54xx_read_link,
 };
 
 static struct mii_phy_def bcm5400_phy_def = {
-	phy_id:		0x00206040,
-	phy_id_mask:	0xfffffff0,
-	name:		"BCM5400",
-	features:	MII_GBIT_FEATURES,
-	magic_aneg:	1,
-	ops:		&bcm5400_phy_ops
+	.phy_id		= 0x00206040,
+	.phy_id_mask	= 0xfffffff0,
+	.name		= "BCM5400",
+	.features	= MII_GBIT_FEATURES,
+	.magic_aneg	= 1,
+	.ops		= &bcm5400_phy_ops
 };
 
 /* Broadcom BCM 5401 */
 static struct mii_phy_ops bcm5401_phy_ops = {
-	init:		bcm5401_init,
-	suspend:	bcm5401_suspend,
-	setup_aneg:	bcm54xx_setup_aneg,
-	setup_forced:	bcm54xx_setup_forced,
-	poll_link:	genmii_poll_link,
-	read_link:	bcm54xx_read_link,
+	.init		= bcm5401_init,
+	.suspend	= bcm5401_suspend,
+	.setup_aneg	= bcm54xx_setup_aneg,
+	.setup_forced	= bcm54xx_setup_forced,
+	.poll_link	= genmii_poll_link,
+	.read_link	= bcm54xx_read_link,
 };
 
 static struct mii_phy_def bcm5401_phy_def = {
-	phy_id:		0x00206050,
-	phy_id_mask:	0xfffffff0,
-	name:		"BCM5401",
-	features:	MII_GBIT_FEATURES,
-	magic_aneg:	1,
-	ops:		&bcm5401_phy_ops
+	.phy_id		= 0x00206050,
+	.phy_id_mask	= 0xfffffff0,
+	.name		= "BCM5401",
+	.features	= MII_GBIT_FEATURES,
+	.magic_aneg	= 1,
+	.ops		= &bcm5401_phy_ops
 };
 
 /* Broadcom BCM 5411 */
 static struct mii_phy_ops bcm5411_phy_ops = {
-	init:		bcm5411_init,
-	suspend:	bcm5411_suspend,
-	setup_aneg:	bcm54xx_setup_aneg,
-	setup_forced:	bcm54xx_setup_forced,
-	poll_link:	genmii_poll_link,
-	read_link:	bcm54xx_read_link,
+	.init		= bcm5411_init,
+	.suspend	= bcm5411_suspend,
+	.setup_aneg	= bcm54xx_setup_aneg,
+	.setup_forced	= bcm54xx_setup_forced,
+	.poll_link	= genmii_poll_link,
+	.read_link	= bcm54xx_read_link,
 };
 
 static struct mii_phy_def bcm5411_phy_def = {
-	phy_id:		0x00206070,
-	phy_id_mask:	0xfffffff0,
-	name:		"BCM5411",
-	features:	MII_GBIT_FEATURES,
-	magic_aneg:	1,
-	ops:		&bcm5411_phy_ops
+	.phy_id		= 0x00206070,
+	.phy_id_mask	= 0xfffffff0,
+	.name		= "BCM5411",
+	.features	= MII_GBIT_FEATURES,
+	.magic_aneg	= 1,
+	.ops		= &bcm5411_phy_ops
 };
 
 /* Broadcom BCM 5421 */
 static struct mii_phy_ops bcm5421_phy_ops = {
-	init:		bcm5421_init,
-	suspend:	bcm5411_suspend,
-	setup_aneg:	bcm54xx_setup_aneg,
-	setup_forced:	bcm54xx_setup_forced,
-	poll_link:	genmii_poll_link,
-	read_link:	bcm54xx_read_link,
+	.init		= bcm5421_init,
+	.suspend	= bcm5411_suspend,
+	.setup_aneg	= bcm54xx_setup_aneg,
+	.setup_forced	= bcm54xx_setup_forced,
+	.poll_link	= genmii_poll_link,
+	.read_link	= bcm54xx_read_link,
 };
 
 static struct mii_phy_def bcm5421_phy_def = {
-	phy_id:		0x002060e0,
-	phy_id_mask:	0xfffffff0,
-	name:		"BCM5421",
-	features:	MII_GBIT_FEATURES,
-	magic_aneg:	1,
-	ops:		&bcm5421_phy_ops
+	.phy_id		= 0x002060e0,
+	.phy_id_mask	= 0xfffffff0,
+	.name		= "BCM5421",
+	.features	= MII_GBIT_FEATURES,
+	.magic_aneg	= 1,
+	.ops		= &bcm5421_phy_ops
 };
 
 /* Marvell 88E1101 (Apple seem to deal with 2 different revs,
@@ -751,36 +751,36 @@ static struct mii_phy_def bcm5421_phy_def = {
  * would be useful here) --BenH.
  */
 static struct mii_phy_ops marvell_phy_ops = {
-	setup_aneg:	marvell_setup_aneg,
-	setup_forced:	marvell_setup_forced,
-	poll_link:	genmii_poll_link,
-	read_link:	marvell_read_link
+	.setup_aneg	= marvell_setup_aneg,
+	.setup_forced	= marvell_setup_forced,
+	.poll_link	= genmii_poll_link,
+	.read_link	= marvell_read_link
 };
 
 static struct mii_phy_def marvell_phy_def = {
-	phy_id:		0x01410c00,
-	phy_id_mask:	0xffffff00,
-	name:		"Marvell 88E1101",
-	features:	MII_GBIT_FEATURES,
-	magic_aneg:	1,
-	ops:		&marvell_phy_ops
+	.phy_id		= 0x01410c00,
+	.phy_id_mask	= 0xffffff00,
+	.name		= "Marvell 88E1101",
+	.features	= MII_GBIT_FEATURES,
+	.magic_aneg	= 1,
+	.ops		= &marvell_phy_ops
 };
 
 /* Generic implementation for most 10/100 PHYs */
 static struct mii_phy_ops generic_phy_ops = {
-	setup_aneg:	genmii_setup_aneg,
-	setup_forced:	genmii_setup_forced,
-	poll_link:	genmii_poll_link,
-	read_link:	genmii_read_link
+	.setup_aneg	= genmii_setup_aneg,
+	.setup_forced	= genmii_setup_forced,
+	.poll_link	= genmii_poll_link,
+	.read_link	= genmii_read_link
 };
 
 static struct mii_phy_def genmii_phy_def = {
-	phy_id:		0x00000000,
-	phy_id_mask:	0x00000000,
-	name:		"Generic MII",
-	features:	MII_BASIC_FEATURES,
-	magic_aneg:	0,
-	ops:		&generic_phy_ops
+	.phy_id		= 0x00000000,
+	.phy_id_mask	= 0x00000000,
+	.name		= "Generic MII",
+	.features	= MII_BASIC_FEATURES,
+	.magic_aneg	= 0,
+	.ops		= &generic_phy_ops
 };
 
 static struct mii_phy_def* mii_phy_table[] = {

@@ -401,12 +401,12 @@ static struct fb_cmap *get_default_colormap(int bpp)
                                               ((1<<(width))-1)) : 0))
 
 static struct fb_ops mc68328_fb_ops = {
-	.owner:		THIS_MODULE,
-	.fb_setcolreg:	mc68328fb_setcolreg,
-	.fb_fillrect:	cfbfillrect,
-	.fb_copyarea:	cfbcopyarea,
-	.fb_imageblit:	cfbimgblt,
-	.fb_cursor:	softcursor,
+	.owner		= THIS_MODULE,
+	.fb_setcolreg	= mc68328fb_setcolreg,
+	.fb_fillrect	= cfbfillrect,
+	.fb_copyarea	= cfbcopyarea,
+	.fb_imageblit	= cfbimgblt,
+	.fb_cursor	= softcursor,
 };
 
 

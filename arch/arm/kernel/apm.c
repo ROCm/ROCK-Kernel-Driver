@@ -378,18 +378,18 @@ static int apm_open(struct inode * inode, struct file * filp)
 }
 
 static struct file_operations apm_bios_fops = {
-	owner:		THIS_MODULE,
-	read:		apm_read,
-	poll:		apm_poll,
-	ioctl:		apm_ioctl,
-	open:		apm_open,
-	release:	apm_release,
+	.owner		= THIS_MODULE,
+	.read		= apm_read,
+	.poll		= apm_poll,
+	.ioctl		= apm_ioctl,
+	.open		= apm_open,
+	.release	= apm_release,
 };
 
 static struct miscdevice apm_device = {
-	minor:		APM_MINOR_DEV,
-	name:		"apm_bios",
-	fops:		&apm_bios_fops
+	.minor		= APM_MINOR_DEV,
+	.name		= "apm_bios",
+	.fops		= &apm_bios_fops
 };
 
 

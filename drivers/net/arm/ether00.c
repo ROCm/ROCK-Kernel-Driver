@@ -991,9 +991,9 @@ static int ether00_remove_devices(void)
 }
 
 static struct pld_hotswap_ops ether00_pldhs_ops={
-	name: ETHER00_NAME,
-	add_device: ether00_add_device,
-	remove_devices: ether00_remove_devices,
+	.name = ETHER00_NAME,
+	.add_device = ether00_add_device,
+	.remove_devices = ether00_remove_devices,
 };
 
 

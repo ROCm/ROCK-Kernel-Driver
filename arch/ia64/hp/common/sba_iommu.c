@@ -1935,10 +1935,10 @@ acpi_sba_ioc_add(struct acpi_device *device)
 }
 
 static struct acpi_driver acpi_sba_ioc_driver = {
-	name:		"IOC IOMMU Driver",
-	ids:		"HWP0001,HWP0004",
-	ops: {
-		add:	acpi_sba_ioc_add,
+	.name		= "IOC IOMMU Driver",
+	.ids		= "HWP0001,HWP0004",
+	.ops		= {
+		.add	= acpi_sba_ioc_add,
 	},
 };
 
