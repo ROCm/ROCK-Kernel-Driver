@@ -62,6 +62,7 @@ struct psmouse {
 	unsigned char cmdcnt;
 	unsigned char pktcnt;
 	unsigned char type;
+	unsigned char model;
 	unsigned long last;
 	char acking;
 	char ack;
@@ -312,6 +313,7 @@ static int psmouse_extensions(struct psmouse *psmouse)
 	param[0] = 0;
 	psmouse->vendor = "Generic";
 	psmouse->name = "Mouse";
+	psmouse->model = 2;
 
 /*
  * Try Genius NetMouse magic init.
@@ -353,11 +355,9 @@ static int psmouse_extensions(struct psmouse *psmouse)
 		static int logitech_wheel[] = { 75, 76, 80, 81, 83, 88, -1 };
 		static int logitech_ps2pp[] = { 12, 13, 40, 41, 42, 43, 50, 51, 52, 53, 73, 75,
 							76, 80, 81, 83, 88, 96, 97, -1 };
-
-		int devicetype = ((param[0] >> 4) & 0x07) | ((param[0] << 3) & 0x78);
-
 		psmouse->vendor = "Logitech";
 		psmouse->name = "Mouse";
+		psmouse->model = ((param[0] >> 4) & 0x07) | ((param[0] << 3) & 0x78);
 
 		if (param[1] < 3)
 			clear_bit(BTN_MIDDLE, psmouse->dev.keybit);
@@ -367,21 +367,21 @@ static int psmouse_extensions(struct psmouse *psmouse)
 		psmouse->type = PSMOUSE_PS2;
 
 		for (i = 0; logitech_ps2pp[i] != -1; i++)
-			if (logitech_ps2pp[i] == devicetype) psmouse->type = PSMOUSE_PS2PP;
+			if (logitech_ps2pp[i] == psmouse->model) psmouse->type = PSMOUSE_PS2PP;
 
 		if (psmouse->type != PSMOUSE_PS2PP) return PSMOUSE_PS2;
 
 		for (i = 0; logitech_4btn[i] != -1; i++)
-			if (logitech_4btn[i] == devicetype) set_bit(BTN_SIDE, psmouse->dev.keybit);
+			if (logitech_4btn[i] == psmouse->model) set_bit(BTN_SIDE, psmouse->dev.keybit);
 
 		for (i = 0; logitech_wheel[i] != -1; i++)
-			if (logitech_wheel[i] == devicetype) set_bit(REL_WHEEL, psmouse->dev.relbit);
+			if (logitech_wheel[i] == psmouse->model) set_bit(REL_WHEEL, psmouse->dev.relbit);
 
 /*
  * Do Logitech PS2++ / PS2T++ magic init.
  */
 
-		if (devicetype == 97) { /* TouchPad 3 */
+		if (psmouse->model == 97) { /* TouchPad 3 */
 
 			set_bit(REL_WHEEL, psmouse->dev.relbit);
 			set_bit(REL_HWHEEL, psmouse->dev.relbit);
@@ -603,7 +603,7 @@ static void psmouse_connect(struct serio *serio, struct serio_dev *dev)
 	psmouse->dev.phys = psmouse->phys;
 	psmouse->dev.id.bustype = BUS_I8042;
 	psmouse->dev.id.vendor = psmouse->type;
-	psmouse->dev.id.product = 0x0002;
+	psmouse->dev.id.product = psmouse->model;
 	psmouse->dev.id.version = 0x0100;
 
 	input_register_device(&psmouse->dev);

@@ -1073,7 +1073,7 @@ static int hid_submit_ctrl(struct hid_device *hid)
 
 	hid->cr.bRequestType = USB_TYPE_CLASS | USB_RECIP_INTERFACE | dir;
 	hid->cr.bRequest = (dir == USB_DIR_OUT) ? HID_REQ_SET_REPORT : HID_REQ_GET_REPORT;
-	hid->cr.wValue = ((report->type + 1) << 8) | report->id;
+	hid->cr.wValue = cpu_to_le16(((report->type + 1) << 8) | report->id);
 	hid->cr.wIndex = cpu_to_le16(hid->ifnum);
 	hid->cr.wLength = cpu_to_le16(hid->urbctrl->transfer_buffer_length);
 
