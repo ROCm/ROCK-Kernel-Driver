@@ -78,13 +78,13 @@ SECTIONS
   . = ALIGN(32);
   .data.cacheline_aligned : { *(.data.cacheline_aligned) }
 
-  __bss_start = .;		/* BSS */
-  .bss : { *(.bss) }
-  __bss_stop = .; 
-
   __start___kallsyms = .;     /* All kernel symbols */
   __kallsyms : { *(__kallsyms) }
   __stop___kallsyms = .;
+
+  __bss_start = .;		/* BSS */
+  .bss : { *(.bss) }
+  __bss_stop = .; 
 
   _end = . ;
 

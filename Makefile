@@ -312,15 +312,28 @@ endef
 LDFLAGS_vmlinux += -T arch/$(ARCH)/vmlinux.lds.s
 
 #	Generate section listing all symbols and add it into vmlinux
+#	It's a three stage process:
+#	o .tmp_vmlinux has all symbols and sections, but __kallsyms is
+#	  empty
+#	  Running kallsyms on that gives as .tmp_kallsyms1.o with
+#	  the right size
+#	o .tmp_vmlinux1 now has a __kallsyms section of the right size,
+#	  but due to the added section, some addresses have shifted
+#	  From here, we generate a correct .tmp_kallsyms.o
+#	o The correct .tmp_kallsyms.o is linked into the final vmlinux
+#	  below.
 
 ifdef CONFIG_KALLSYMS
 
 final-objs += .tmp_kallsyms.o
 
 quiet_cmd_kallsyms = KSYM    $@
-define cmd_kallsyms
-	$(KALLSYMS) $< > $@
-endef
+cmd_kallsyms = \
+	$(KALLSYMS) $< > .tmp_kallsyms1.o; \
+	$(LD) $(LDFLAGS) $(LDFLAGS_vmlinux) .tmp_vmlinux .tmp_kallsyms1.o \
+		-o .tmp_vmlinux1; \
+	$(KALLSYMS) .tmp_vmlinux1 > $@; \
+	rm -f .tmp_kallsyms1.o .tmp_vmlinux1
 
 .tmp_kallsyms.o: .tmp_vmlinux
 	$(call cmd,kallsyms)
