@@ -171,7 +171,11 @@ static int debug = -1;
  * Receive ring size 
  * Warning: 64K ring has hardware issues and may lock up.
  */
+#if defined(CONFIG_SH_DREAMCAST) || defined(CONFIG_EMBEDDED)
+#define RX_BUF_IDX	1	/* 16K ring */
+#else
 #define RX_BUF_IDX	2	/* 32K ring */
+#endif
 #define RX_BUF_LEN	(8192 << RX_BUF_IDX)
 #define RX_BUF_PAD	16
 #define RX_BUF_WRAP_PAD 2048 /* spare padding to handle lack of packet wrap */
