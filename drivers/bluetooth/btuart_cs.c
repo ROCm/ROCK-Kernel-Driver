@@ -868,36 +868,29 @@ int btuart_event(event_t event, int priority, event_callback_args_t *args)
 	return 0;
 }
 
+static struct pcmcia_driver btuart_driver = {
+	.owner		= THIS_MODULE,
+	.drv		= {
+		.name	= "btuart_cs",
+	},
+	.attach		= btuart_attach,
+	.detach		= btuart_detach,
+};
 
-
-/* ======================== Module initialization ======================== */
-
-
-int __init init_btuart_cs(void)
+static int __init init_btuart_cs(void)
 {
-	servinfo_t serv;
-	int err;
-
-	CardServices(GetCardServicesInfo, &serv);
-	if (serv.Revision != CS_RELEASE_CODE) {
-		printk(KERN_NOTICE "btuart_cs: Card Services release does not match!\n");
-		return -1;
-	}
-
-	err = register_pccard_driver(&dev_info, &btuart_attach, &btuart_detach);
-
-	return err;
+	return pcmcia_register_driver(&btuart_driver);
 }
 
 
-void __exit exit_btuart_cs(void)
+static void __exit exit_btuart_cs(void)
 {
-	unregister_pccard_driver(&dev_info);
+	pcmcia_unregister_driver(&btuart_driver);
 
+	/* XXX: this really needs to move into generic code.. */
 	while (dev_list != NULL)
 		btuart_detach(dev_list);
 }
-
 
 module_init(init_btuart_cs);
 module_exit(exit_btuart_cs);
