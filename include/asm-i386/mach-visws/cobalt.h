@@ -60,7 +60,7 @@
 #define	CO_APIC_PCIA_BASE0	0 /* and 1 */	/* slot 0, line 0 */
 #define	CO_APIC_PCIA_BASE123	5 /* and 6 */	/* slot 0, line 1 */
 
-#define	CO_APIC_PIIX4_USB	7		/* this one is wierd */
+#define	CO_APIC_PIIX4_USB	7		/* this one is weird */
 
 /* Lithium PCI Bridge B -- "the one with PIIX4" */
 #define	CO_APIC_PCIB_BASE0	8 /* and 9-12 *//* slot 0, line 0 */

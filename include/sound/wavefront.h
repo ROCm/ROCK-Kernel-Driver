@@ -687,7 +687,7 @@ typedef struct wf_fx_info {
 
 /* Allow direct user-space control over FX memory/coefficient data.
    In theory this could be used to download the FX microprogram,
-   but it would be a little slower, and involve some wierd code.
+   but it would be a little slower, and involve some weird code.
  */
 
 #define WFFX_MEMSET              69
