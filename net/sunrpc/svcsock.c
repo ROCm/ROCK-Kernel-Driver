@@ -243,10 +243,25 @@ void svc_reserve(struct svc_rqst *rqstp, int space)
  * Release a socket after use.
  */
 static inline void
+svc_sock_put(struct svc_sock *svsk)
+{
+	struct svc_serv *serv = svsk->sk_server;
+
+	spin_lock_bh(&serv->sv_lock);
+	if (!--(svsk->sk_inuse) && test_bit(SK_DEAD, &svsk->sk_flags)) {
+		spin_unlock_bh(&serv->sv_lock);
+		dprintk("svc: releasing dead socket\n");
+		sock_release(svsk->sk_sock);
+		kfree(svsk);
+	}
+	else
+		spin_unlock_bh(&serv->sv_lock);
+}
+
+static void
 svc_sock_release(struct svc_rqst *rqstp)
 {
 	struct svc_sock	*svsk = rqstp->rq_sock;
-	struct svc_serv	*serv = svsk->sk_server;
 
 	svc_release_skb(rqstp);
 
@@ -265,15 +280,7 @@ svc_sock_release(struct svc_rqst *rqstp)
 	svc_reserve(rqstp, 0);
 	rqstp->rq_sock = NULL;
 
-	spin_lock_bh(&serv->sv_lock);
-	if (!--(svsk->sk_inuse) && test_bit(SK_DEAD, &svsk->sk_flags)) {
-		spin_unlock_bh(&serv->sv_lock);
-		dprintk("svc: releasing dead socket\n");
-		sock_release(svsk->sk_sock);
-		kfree(svsk);
-	}
-	else
-		spin_unlock_bh(&serv->sv_lock);
+	svc_sock_put(svsk);
 }
 
 /*
@@ -697,6 +704,35 @@ svc_tcp_accept(struct svc_sock *svsk)
 	 */
 	set_bit(SK_DATA, &newsvsk->sk_flags);
 	svc_sock_enqueue(newsvsk);
+
+	/* make sure that we don't have too many active connections.
+	 * If we have, something must be dropped.
+	 * We randomly choose between newest and oldest (in terms
+	 * of recent activity) and drop it.
+	 */
+	if (serv->sv_tmpcnt > serv->sv_nrthreads*5) {
+		struct svc_sock *svsk = NULL;
+		spin_lock_bh(&serv->sv_lock);
+		if (!list_empty(&serv->sv_tempsocks)) {
+			if (net_random()&1)
+				svsk = list_entry(serv->sv_tempsocks.prev,
+						  struct svc_sock,
+						  sk_list);
+			else
+				svsk = list_entry(serv->sv_tempsocks.next,
+						  struct svc_sock,
+						  sk_list);
+			set_bit(SK_CLOSE, &svsk->sk_flags);
+			svsk->sk_inuse ++;
+		}
+		spin_unlock_bh(&serv->sv_lock);
+
+		if (svsk) {
+			svc_sock_enqueue(svsk);
+			svc_sock_put(svsk);
+		}
+
+	}
 
 	if (serv->sv_stats)
 		serv->sv_stats->nettcpconn++;
@@ -1138,6 +1174,7 @@ if (svsk->sk_sk == NULL)
 	if (!pmap_register) {
 		set_bit(SK_TEMP, &svsk->sk_flags);
 		list_add(&svsk->sk_list, &serv->sv_tempsocks);
+		serv->sv_tmpcnt++;
 	} else {
 		clear_bit(SK_TEMP, &svsk->sk_flags);
 		list_add(&svsk->sk_list, &serv->sv_permsocks);
@@ -1217,6 +1254,8 @@ svc_delete_socket(struct svc_sock *svsk)
 	spin_lock_bh(&serv->sv_lock);
 
 	list_del(&svsk->sk_list);
+	if (test_bit(SK_TEMP, &svsk->sk_flags))
+		serv->sv_tmpcnt--;
 	if (test_bit(SK_QUED, &svsk->sk_flags))
 		list_del(&svsk->sk_ready);
 
