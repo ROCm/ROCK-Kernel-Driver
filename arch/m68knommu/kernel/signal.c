@@ -745,147 +745,44 @@ handle_signal(int sig, struct k_sigaction *ka, siginfo_t *info,
  * Note that 'init' is a special process: it doesn't get signals it doesn't
  * want to handle. Thus you cannot kill init even with a SIGKILL even by
  * mistake.
- *
- * Note that we go through the signals twice: once to check the signals
- * that the kernel can handle, and then we build all the user-level signal
- * handling stack-frames in one go after that.
  */
 asmlinkage int do_signal(sigset_t *oldset, struct pt_regs *regs)
 {
+	struct k_sigaction ka;
 	siginfo_t info;
-	struct k_sigaction *ka;
+	int signr;
 
-	current->thread.esp0 = (unsigned long) regs;
+	/*
+	 * We want the common case to go fast, which
+	 * is why we may in certain cases get here from
+	 * kernel mode. Just return without doing anything
+	 * if so.
+	 */
+	if (!user_mode(regs))
+		return 1;
 
 	if (!oldset)
 		oldset = &current->blocked;
 
-	for (;;) {
-		int signr;
-
-		signr = get_signal_to_deliver(&info, regs, NULL);
-
-		if (!signr)
-			break;
-
-		if ((current->ptrace & PT_PTRACED) && signr != SIGKILL) {
-			current->exit_code = signr;
-			current->state = TASK_STOPPED;
-			regs->sr &= ~PS_T;
-
-			/* Did we come from a system call? */
-			if (regs->orig_d0 >= 0) {
-				/* Restart the system call the same way as
-				   if the process were not traced.  */
-				struct k_sigaction *ka =
-					&current->sighand->action[signr-1];
-				int has_handler =
-					(ka->sa.sa_handler != SIG_IGN &&
-					 ka->sa.sa_handler != SIG_DFL);
-				handle_restart(regs, ka, has_handler);
-			}
-			notify_parent(current, SIGCHLD);
-			schedule();
-
-			/* We're back.  Did the debugger cancel the sig?  */
-			if (!(signr = current->exit_code)) {
-			discard_frame:
-			    continue;
-			}
-			current->exit_code = 0;
-
-			/* The debugger continued.  Ignore SIGSTOP.  */
-			if (signr == SIGSTOP)
-				goto discard_frame;
-
-			/* Update the siginfo structure.  Is this good?  */
-			if (signr != info.si_signo) {
-				info.si_signo = signr;
-				info.si_errno = 0;
-				info.si_code = SI_USER;
-				info.si_pid = current->parent->pid;
-				info.si_uid = current->parent->uid;
-			}
-
-			/* If the (new) signal is now blocked, requeue it.  */
-			if (sigismember(&current->blocked, signr)) {
-				send_sig_info(signr, &info, current);
-				continue;
-			}
-		}
-
-		ka = &current->sighand->action[signr-1];
-		if (ka->sa.sa_handler == SIG_IGN) {
-			if (signr != SIGCHLD)
-				continue;
-			/* Check for SIGCHLD: it's special.  */
-			while (sys_wait4(-1, NULL, WNOHANG, NULL) > 0)
-				/* nothing */;
-			continue;
-		}
-
-		if (ka->sa.sa_handler == SIG_DFL) {
-			int exit_code = signr;
-
-			if (current->pid == 1)
-				continue;
-
-			switch (signr) {
-			case SIGCONT: case SIGCHLD:
-			case SIGWINCH: case SIGURG:
-				continue;
-
-			case SIGTSTP: case SIGTTIN: case SIGTTOU:
-				if (is_orphaned_pgrp(process_group(current)))
-					continue;
-				/* FALLTHRU */
-
-			case SIGSTOP:
-				current->state = TASK_STOPPED;
-				current->exit_code = signr;
-				if (!(current->parent->sighand->action[SIGCHLD-1].sa.sa_flags & SA_NOCLDSTOP))
-					notify_parent(current, SIGCHLD);
-				schedule();
-				continue;
-
-			case SIGQUIT: case SIGILL: case SIGTRAP:
-			case SIGIOT: case SIGFPE: case SIGSEGV:
-			case SIGBUS: case SIGSYS: case SIGXCPU: case SIGXFSZ:
-				if (do_coredump(signr, exit_code, regs))
-					exit_code |= 0x80;
-				/* FALLTHRU */
-
-			default:
-				sigaddset(&current->pending.signal, signr);
-				recalc_sigpending();
-				current->flags |= PF_SIGNALED;
-				do_exit(exit_code);
-				/* NOTREACHED */
-			}
-		}
-
+	signr = get_signal_to_deliver(&info, &ka, regs, NULL);
+	if (signr > 0) {
 		/* Whee!  Actually deliver the signal.  */
-		handle_signal(signr, ka, &info, oldset, regs);
+		handle_signal(signr, &ka, &info, oldset, regs);
 		return 1;
 	}
 
 	/* Did we come from a system call? */
-	if (regs->orig_d0 >= 0)
+	if (regs->orig_d0 >= 0) {
 		/* Restart the system call - no handlers present */
-		handle_restart(regs, NULL, 0);
-
-	/* If we are about to discard some frame stuff we must copy
-	   over the remaining frame. */
-	if (regs->stkadj) {
-		struct pt_regs *tregs =
-		  (struct pt_regs *) ((ulong) regs + regs->stkadj);
-
-		/* This must be copied with decreasing addresses to
-		   handle overlaps.  */
-		tregs->vector = 0;
-		tregs->format = 0;
-		tregs->pc = regs->pc;
-		tregs->sr = regs->sr;
+		if (regs->d0 == -ERESTARTNOHAND
+		    || regs->d0 == -ERESTARTSYS
+		    || regs->d0 == -ERESTARTNOINTR) {
+			regs->d0 = regs->orig_d0;
+			regs->pc -= 2;
+		} else if (regs->d0 == -ERESTART_RESTARTBLOCK) {
+			regs->d0 = __NR_restart_syscall;
+			regs->pc -= 2;
+		}
 	}
 	return 0;
 }
