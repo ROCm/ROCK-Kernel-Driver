@@ -163,8 +163,7 @@ static int minix_remount (struct super_block * sb, int * flags, char * data)
 	return 0;
 }
 
-static struct super_block *minix_read_super(struct super_block *s, void *data,
-				     int silent)
+static int minix_fill_super(struct super_block *s, void *data, int silent)
 {
 	struct buffer_head *bh;
 	struct buffer_head **map;
@@ -273,7 +272,7 @@ static struct super_block *minix_read_super(struct super_block *s, void *data,
  	else if (sbi->s_mount_state & MINIX_ERROR_FS)
 		printk ("MINIX-fs: mounting file system with errors, "
 			"running fsck is recommended.\n");
-	return s;
+	return 0;
 
 out_iput:
 	iput(root_inode);
@@ -314,7 +313,7 @@ out_bad_hblock:
 out_bad_sb:
 	printk("MINIX-fs: unable to read superblock\n");
  out:
-	return NULL;
+	return -EINVAL;
 }
 
 static int minix_statfs(struct super_block *sb, struct statfs *buf)
@@ -558,7 +557,18 @@ void minix_truncate(struct inode * inode)
 		V2_minix_truncate(inode);
 }
 
-static DECLARE_FSTYPE_DEV(minix_fs_type,"minix",minix_read_super);
+static struct super_block *minix_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_bdev(fs_type, flags, dev_name, data, minix_fill_super);
+}
+
+static struct file_system_type minix_fs_type = {
+	owner:		THIS_MODULE,
+	name:		"minix",
+	get_sb:		minix_get_sb,
+	fs_flags:	FS_REQUIRES_DEV,
+};
 
 static int __init init_minix_fs(void)
 {
