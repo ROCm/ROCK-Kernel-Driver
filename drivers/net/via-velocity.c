@@ -592,6 +592,11 @@ static void velocity_init_registers(struct velocity_info *vptr,
 		BYTE_REG_BITS_SET(CFGB_OFSET, (CFGB_CRANDOM | CFGB_CAP | CFGB_MBA | CFGB_BAKOPT), &regs->CFGB);
 
 		/*
+		 *	Init CAM filter
+		 */
+		velocity_init_cam_filter(vptr);
+
+		/*
 		 *	Set packet filter: Receive directed and broadcast address
 		 */
 		velocity_set_multi(vptr->dev);
@@ -615,8 +620,6 @@ static void velocity_init_registers(struct velocity_info *vptr,
 			mac_tx_queue_run(regs, i);
 		}
 
-		velocity_init_cam_filter(vptr);
-
 		init_flow_control_register(vptr);
 
 		writel(CR0_STOP, &regs->CR0Clr);
@@ -624,7 +627,6 @@ static void velocity_init_registers(struct velocity_info *vptr,
 
 		mii_status = velocity_get_opt_media_mode(vptr);
 		netif_stop_queue(vptr->dev);
-		mac_clear_isr(regs);
 
 		mii_init(vptr, mii_status);
 
@@ -723,7 +725,6 @@ static int __devinit velocity_found1(struct pci_dev *pdev, const struct pci_devi
 
 	vptr->dev = dev;
 
-	dev->priv = vptr;
 	dev->irq = pdev->irq;
 
 	ret = pci_enable_device(pdev);
