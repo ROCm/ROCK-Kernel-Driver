@@ -659,7 +659,7 @@ static void aty_set_crtc(const struct atyfb_par *par, const struct crtc *crtc)
 	aty_st_le32(CRTC_GEN_CNTL, crtc->gen_cntl & ~CRTC_EN, par);
 
 	DPRINTK("setting up CRTC\n");
-	PRINTKI("set primary CRT to %ix%i %c%c composite %c\n",
+	DPRINTK("set primary CRT to %ix%i %c%c composite %c\n",
 	    ((((crtc->h_tot_disp>>16) & 0xff) + 1)<<3), (((crtc->v_tot_disp>>16) & 0x7ff) + 1),
 	    (crtc->h_sync_strt_wid & 0x200000)?'N':'P', (crtc->v_sync_strt_wid & 0x200000)?'N':'P',
 	    (crtc->gen_cntl & CRTC_CSYNC_EN)?'P':'N');
@@ -692,7 +692,7 @@ static void aty_set_crtc(const struct atyfb_par *par, const struct crtc *crtc)
 		aty_st_lcd(LCD_GEN_CNTL, (crtc->lcd_gen_cntl & ~CRTC_RW_SELECT) |
 			(SHADOW_EN | SHADOW_RW_EN), par);
 
-		PRINTKI("set secondary CRT to %ix%i %c%c\n",
+		DPRINTK("set secondary CRT to %ix%i %c%c\n",
 		    ((((crtc->shadow_h_tot_disp>>16) & 0xff) + 1)<<3), (((crtc->shadow_v_tot_disp>>16) & 0x7ff) + 1),
 		    (crtc->shadow_h_sync_strt_wid & 0x200000)?'N':'P', (crtc->shadow_v_sync_strt_wid & 0x200000)?'N':'P');
 
