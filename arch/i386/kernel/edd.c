@@ -26,14 +26,13 @@
 
 /*
  * Known issues:
- * - module unload leaves a directory around.  Seems related to
- *   creating symlinks in that directory.  Seen on kernel 2.5.41.
+ * - module unload leaves directories around if a symlink was
+ *   created in that directory.  Confirmed is a driverfs bug, not
+ *   ours.  Seen on kernel 2.5.41.
  * - refcounting of struct device objects could be improved.
  *
  * TODO:
  * - Add IDE and USB disk device support
- * - when driverfs model of discs and partitions changes,
- *   update symlink accordingly.
  * - Get symlink creator helper functions exported from
  *   drivers/base instead of duplicating them here.
  * - move edd.[ch] to better locations if/when one is decided
@@ -80,7 +79,6 @@ static struct driver_dir_entry bios_dir = {
 struct edd_device {
 	char name[EDD_DEVICE_NAME_SIZE];
 	struct edd_info *info;
-	struct list_head node;
 	struct driver_dir_entry dir;
 };
 
@@ -860,10 +858,7 @@ edd_create_file(struct edd_device *edev, struct edd_attribute *attr)
 static inline void
 edd_device_unregister(struct edd_device *edev)
 {
-	driverfs_remove_file(&edev->dir, "pci_dev");
-	driverfs_remove_file(&edev->dir, "disc");
 	driverfs_remove_dir(&edev->dir);
-	list_del_init(&edev->node);
 }
 
 static int
