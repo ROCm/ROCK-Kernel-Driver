@@ -36,6 +36,8 @@ static char *action_to_string(enum kobject_action action)
 		return "mount";
 	case KOBJ_UMOUNT:
 		return "umount";
+	case KOBJ_OFFLINE:
+		return "offline";
 	default:
 		return NULL;
 	}
