@@ -840,13 +840,16 @@ static int uhci_submit_control(struct uhci_hcd *uhci, struct urb *urb, struct ur
 		urb->setup_dma);
 
 	/*
-	 * If direction is "send", change the frame from SETUP (0x2D)
-	 * to OUT (0xE1). Else change it from SETUP to IN (0x69).
+	 * If direction is "send", change the packet ID from SETUP (0x2D)
+	 * to OUT (0xE1).  Else change it from SETUP to IN (0x69) and
+	 * set Short Packet Detect (SPD) for all data packets.
 	 */
-	destination ^= (USB_PID_SETUP ^ usb_packetid(urb->pipe));
-
-	if (!(urb->transfer_flags & URB_SHORT_NOT_OK))
+	if (usb_pipeout(urb->pipe))
+		destination ^= (USB_PID_SETUP ^ USB_PID_OUT);
+	else {
+		destination ^= (USB_PID_SETUP ^ USB_PID_IN);
 		status |= TD_CTRL_SPD;
+	}
 
 	/*
 	 * Build the DATA TD's
@@ -1101,17 +1104,20 @@ static int uhci_submit_common(struct uhci_hcd *uhci, struct urb *urb, struct urb
 	status = uhci_maxerr(3) | TD_CTRL_ACTIVE;
 	if (urb->dev->speed == USB_SPEED_LOW)
 		status |= TD_CTRL_LS;
-	if (!(urb->transfer_flags & URB_SHORT_NOT_OK))
+	if (usb_pipein(urb->pipe))
 		status |= TD_CTRL_SPD;
 
 	/*
 	 * Build the DATA TD's
 	 */
 	do {	/* Allow zero length packets */
-		int pktsze = len;
+		int pktsze = maxsze;
 
-		if (pktsze > maxsze)
-			pktsze = maxsze;
+		if (pktsze >= len) {
+			pktsze = len;
+			if (!(urb->transfer_flags & URB_SHORT_NOT_OK))
+				status &= ~TD_CTRL_SPD;
+		}
 
 		td = uhci_alloc_td(uhci, urb->dev);
 		if (!td)
@@ -1154,7 +1160,8 @@ static int uhci_submit_common(struct uhci_hcd *uhci, struct urb *urb, struct urb
 	}
 
 	/* Set the flag on the last packet */
-	td->status |= cpu_to_le32(TD_CTRL_IOC);
+	if (!(urb->transfer_flags & URB_NO_INTERRUPT))
+		td->status |= cpu_to_le32(TD_CTRL_IOC);
 
 	qh = uhci_alloc_qh(uhci, urb->dev);
 	if (!qh)
