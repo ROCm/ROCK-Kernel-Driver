@@ -124,6 +124,19 @@ int vm_enough_memory(long pages)
 }
 
 /*
+ * Requires inode->i_mapping->i_shared_sem
+ */
+static inline void
+__remove_shared_vm_struct(struct vm_area_struct *vma, struct inode *inode)
+{
+	if (inode) {
+		if (vma->vm_flags & VM_DENYWRITE)
+			atomic_inc(&inode->i_writecount);
+		list_del_init(&vma->shared);
+	}
+}
+
+/*
  * Remove one vm structure from the inode's i_mapping address space.
  */
 static void remove_shared_vm_struct(struct vm_area_struct *vma)
@@ -134,9 +147,7 @@ static void remove_shared_vm_struct(struct vm_area_struct *vma)
 		struct inode *inode = file->f_dentry->d_inode;
 
 		down(&inode->i_mapping->i_shared_sem);
-		if (vma->vm_flags & VM_DENYWRITE)
-			atomic_inc(&inode->i_writecount);
-		list_del_init(&vma->shared);
+		__remove_shared_vm_struct(vma, inode);
 		up(&inode->i_mapping->i_shared_sem);
 	}
 }
@@ -350,42 +361,119 @@ static void vma_link(struct mm_struct *mm, struct vm_area_struct *vma,
 	validate_mm(mm);
 }
 
-static int vma_merge(struct mm_struct * mm, struct vm_area_struct * prev,
-		     struct rb_node * rb_parent, unsigned long addr, 
-		     unsigned long end, unsigned long vm_flags)
+/*
+ * Return true if we can merge this (vm_flags,file,vm_pgoff,size)
+ * in front of (at a lower virtual address and file offset than) the vma.
+ *
+ * We don't check here for the merged mmap wrapping around the end of pagecache
+ * indices (16TB on ia32) because do_mmap_pgoff() does not permit mmap's which
+ * wrap, nor mmaps which cover the final page at index -1UL.
+ */
+static int
+can_vma_merge_before(struct vm_area_struct *vma, unsigned long vm_flags,
+	struct file *file, unsigned long vm_pgoff, unsigned long size)
+{
+	if (vma->vm_file == file && vma->vm_flags == vm_flags) {
+		if (!file)
+			return 1;	/* anon mapping */
+		if (vma->vm_pgoff == vm_pgoff + size)
+			return 1;
+	}
+	return 0;
+}
+
+/*
+ * Return true if we can merge this (vm_flags,file,vm_pgoff)
+ * beyond (at a higher virtual address and file offset than) the vma.
+ */
+static int
+can_vma_merge_after(struct vm_area_struct *vma, unsigned long vm_flags,
+	struct file *file, unsigned long vm_pgoff)
+{
+	if (vma->vm_file == file && vma->vm_flags == vm_flags) {
+		unsigned long vma_size;
+
+		if (!file)
+			return 1;	/* anon mapping */
+
+		vma_size = (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
+		if (vma->vm_pgoff + vma_size == vm_pgoff)
+			return 1;
+	}
+	return 0;
+}
+
+/*
+ * Given a new mapping request (addr,end,vm_flags,file,pgoff), figure out
+ * whether that can be merged with its predecessor or its successor.  Or
+ * both (it neatly fills a hole).
+ */
+static int vma_merge(struct mm_struct *mm, struct vm_area_struct *prev,
+			struct rb_node *rb_parent, unsigned long addr, 
+			unsigned long end, unsigned long vm_flags,
+			struct file *file, unsigned long pgoff)
 {
 	spinlock_t * lock = &mm->page_table_lock;
+
 	if (!prev) {
 		prev = rb_entry(rb_parent, struct vm_area_struct, vm_rb);
 		goto merge_next;
 	}
-	if (prev->vm_end == addr && can_vma_merge(prev, vm_flags)) {
-		struct vm_area_struct * next;
 
+	/*
+	 * Can it merge with the predecessor?
+	 */
+	if (prev->vm_end == addr &&
+			can_vma_merge_after(prev, vm_flags, file, pgoff)) {
+		struct vm_area_struct *next;
+		struct inode *inode = file ? file->f_dentry->d_inode : inode;
+		int need_up = 0;
+
+		if (unlikely(file && prev->vm_next &&
+				prev->vm_next->vm_file == file)) {
+			down(&inode->i_mapping->i_shared_sem);
+			need_up = 1;
+		}
 		spin_lock(lock);
 		prev->vm_end = end;
+
+		/*
+		 * OK, it did.  Can we now merge in the successor as well?
+		 */
 		next = prev->vm_next;
-		if (next && prev->vm_end == next->vm_start && can_vma_merge(next, vm_flags)) {
+		if (next && prev->vm_end == next->vm_start &&
+				can_vma_merge_before(next, vm_flags, file,
+					pgoff, (end - addr) >> PAGE_SHIFT)) {
 			prev->vm_end = next->vm_end;
 			__vma_unlink(mm, next, prev);
+			__remove_shared_vm_struct(next, inode);
 			spin_unlock(lock);
+			if (need_up)
+				up(&inode->i_mapping->i_shared_sem);
 
 			mm->map_count--;
 			kmem_cache_free(vm_area_cachep, next);
 			return 1;
 		}
 		spin_unlock(lock);
+		if (need_up)
+			up(&inode->i_mapping->i_shared_sem);
 		return 1;
 	}
 
+	/*
+	 * Can this new request be merged in front of prev->vm_next?
+	 */
 	prev = prev->vm_next;
 	if (prev) {
  merge_next:
-		if (!can_vma_merge(prev, vm_flags))
+		if (!can_vma_merge_before(prev, vm_flags, file,
+				pgoff, (end - addr) >> PAGE_SHIFT))
 			return 0;
 		if (end == prev->vm_start) {
 			spin_lock(lock);
 			prev->vm_start = addr;
+			prev->vm_pgoff -= (end - addr) >> PAGE_SHIFT;
 			spin_unlock(lock);
 			return 1;
 		}
@@ -404,7 +492,7 @@ unsigned long do_mmap_pgoff(struct file * file, unsigned long addr,
 {
 	struct mm_struct * mm = current->mm;
 	struct vm_area_struct * vma, * prev;
-	struct inode *inode = NULL;
+	struct inode *inode;
 	unsigned int vm_flags;
 	int correct_wcount = 0;
 	int error;
@@ -456,8 +544,9 @@ unsigned long do_mmap_pgoff(struct file * file, unsigned long addr,
 			return -EAGAIN;
 	}
 
+	inode = file ? file->f_dentry->d_inode : NULL;
+
 	if (file) {
-		inode = file->f_dentry->d_inode;
 		switch (flags & MAP_TYPE) {
 		case MAP_SHARED:
 			if ((prot & PROT_WRITE) && !(file->f_mode & FMODE_WRITE))
@@ -531,7 +620,7 @@ munmap_back:
 
 	/* Can we just expand an old anonymous mapping? */
 	if (!file && !(vm_flags & VM_SHARED) && rb_parent)
-		if (vma_merge(mm, prev, rb_parent, addr, addr + len, vm_flags))
+		if (vma_merge(mm, prev, rb_parent, addr, addr + len, vm_flags, NULL, 0))
 			goto out;
 
 	/* Determine the object being mapped and call the appropriate
@@ -590,10 +679,19 @@ munmap_back:
 	 */
 	addr = vma->vm_start;
 
-	vma_link(mm, vma, prev, rb_link, rb_parent);
-	if (correct_wcount)
-		atomic_inc(&inode->i_writecount);
-
+	if (!file || !rb_parent || !vma_merge(mm, prev, rb_parent, addr,
+				addr + len, vma->vm_flags, file, pgoff)) {
+		vma_link(mm, vma, prev, rb_link, rb_parent);
+		if (correct_wcount)
+			atomic_inc(&inode->i_writecount);
+	} else {
+		if (file) {
+			if (correct_wcount)
+				atomic_inc(&inode->i_writecount);
+			fput(file);
+		}
+		kmem_cache_free(vm_area_cachep, vma);
+	}
 out:	
 	mm->total_vm += len >> PAGE_SHIFT;
 	if (vm_flags & VM_LOCKED) {
@@ -1200,7 +1298,7 @@ unsigned long do_brk(unsigned long addr, unsigned long len)
 	flags = VM_DATA_DEFAULT_FLAGS | VM_ACCOUNT | mm->def_flags;
 
 	/* Can we just expand an old anonymous mapping? */
-	if (rb_parent && vma_merge(mm, prev, rb_parent, addr, addr + len, flags))
+	if (rb_parent && vma_merge(mm, prev, rb_parent, addr, addr + len, flags, NULL, 0))
 		goto out;
 
 	/*
