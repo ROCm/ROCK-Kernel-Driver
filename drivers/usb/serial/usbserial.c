@@ -15,6 +15,13 @@
  *
  * See Documentation/usb/usb-serial.txt for more information on using this driver
  *
+ * (03/21/2002) gkh
+ *	Moved all manipulation of port->open_count into the core.  Now the
+ *	individual driver's open and close functions are called only when the
+ *	first open() and last close() is called.  Making the drivers a bit
+ *	smaller and simpler.
+ *	Fixed a bug if a driver didn't have the owner field set.
+ *
  * (02/26/2002) gkh
  *	Moved all locking into the main serial_* functions, instead of having 
  *	the individual drivers have to grab the port semaphore.  This should
@@ -500,7 +507,7 @@ static int serial_open (struct tty_struct *tty, struct file * filp)
 	struct usb_serial *serial;
 	struct usb_serial_port *port;
 	unsigned int portNumber;
-	int retval;
+	int retval = 0;
 	
 	dbg(__FUNCTION__);
 
@@ -525,14 +532,21 @@ static int serial_open (struct tty_struct *tty, struct file * filp)
 	if (serial->type->owner)
 		__MOD_INC_USE_COUNT(serial->type->owner);
 
-	/* pass on to the driver specific version of this function if it is available */
-	if (serial->type->open)
-		retval = serial->type->open(port, filp);
-	else
-		retval = generic_open(port, filp);
+	++port->open_count;
+	if (port->open_count == 1) {
+		/* only call the device specific open if this 
+		 * is the first time the port is opened */
+		if (serial->type->open)
+			retval = serial->type->open(port, filp);
+		else
+			retval = generic_open(port, filp);
+	}
 
-	if (retval)
-		__MOD_DEC_USE_COUNT(serial->type->owner);
+	if (retval) {
+		port->open_count = 0;
+		if (serial->type->owner)
+			__MOD_DEC_USE_COUNT(serial->type->owner);
+	}
 
 	up (&port->sem);
 	return retval;
@@ -559,11 +573,16 @@ static void serial_close(struct tty_struct *tty, struct file * filp)
 		goto exit_no_mod_dec;
 	}
 
-	/* pass on to the driver specific version of this function if it is available */
-	if (serial->type->close)
-		serial->type->close(port, filp);
-	else
-		generic_close(port, filp);
+	--port->open_count;
+	if (port->open_count <= 0) {
+		/* only call the device specific close if this 
+		 * port is being closed by the last owner */
+		if (serial->type->close)
+			serial->type->close(port, filp);
+		else
+			generic_close(port, filp);
+		port->open_count = 0;
+	}
 
 exit:
 	if (serial->type->owner)
@@ -791,6 +810,8 @@ exit:
 
 static void serial_shutdown (struct usb_serial *serial)
 {
+	dbg(__FUNCTION__);
+
 	if (serial->type->shutdown)
 		serial->type->shutdown(serial);
 	else
@@ -810,52 +831,49 @@ static int generic_open (struct usb_serial_port *port, struct file *filp)
 
 	dbg(__FUNCTION__ " - port %d", port->number);
 
-	++port->open_count;
+	/* force low_latency on so that our tty_push actually forces the data through, 
+	   otherwise it is scheduled, and with high data rates (like with OHCI) data
+	   can get lost. */
+	port->tty->low_latency = 1;
 
-	if (port->open_count == 1) {
-		/* force low_latency on so that our tty_push actually forces the data through, 
-		   otherwise it is scheduled, and with high data rates (like with OHCI) data
-		   can get lost. */
-		port->tty->low_latency = 1;
-
-		/* if we have a bulk interrupt, start reading from it */
-		if (serial->num_bulk_in) {
-			/* Start reading from the device */
-			usb_fill_bulk_urb (port->read_urb, serial->dev,
-					   usb_rcvbulkpipe(serial->dev, port->bulk_in_endpointAddress),
-					   port->read_urb->transfer_buffer,
-					   port->read_urb->transfer_buffer_length,
-					   ((serial->type->read_bulk_callback) ?
-					     serial->type->read_bulk_callback :
-					     generic_read_bulk_callback),
-					   port);
-			result = usb_submit_urb(port->read_urb, GFP_KERNEL);
-			if (result)
-				err(__FUNCTION__ " - failed resubmitting read urb, error %d", result);
-		}
+	/* if we have a bulk interrupt, start reading from it */
+	if (serial->num_bulk_in) {
+		/* Start reading from the device */
+		usb_fill_bulk_urb (port->read_urb, serial->dev,
+				   usb_rcvbulkpipe(serial->dev, port->bulk_in_endpointAddress),
+				   port->read_urb->transfer_buffer,
+				   port->read_urb->transfer_buffer_length,
+				   ((serial->type->read_bulk_callback) ?
+				     serial->type->read_bulk_callback :
+				     generic_read_bulk_callback),
+				   port);
+		result = usb_submit_urb(port->read_urb, GFP_KERNEL);
+		if (result)
+			err(__FUNCTION__ " - failed resubmitting read urb, error %d", result);
 	}
 
 	return result;
 }
 
-static void generic_close (struct usb_serial_port *port, struct file * filp)
+static void generic_cleanup (struct usb_serial_port *port)
 {
 	struct usb_serial *serial = port->serial;
 
 	dbg(__FUNCTION__ " - port %d", port->number);
 
-	--port->open_count;
-
-	if (port->open_count <= 0) {
-		if (serial->dev) {
-			/* shutdown any bulk reads that might be going on */
-			if (serial->num_bulk_out)
-				usb_unlink_urb (port->write_urb);
-			if (serial->num_bulk_in)
-				usb_unlink_urb (port->read_urb);
-		}
-		port->open_count = 0;
+	if (serial->dev) {
+		/* shutdown any bulk reads that might be going on */
+		if (serial->num_bulk_out)
+			usb_unlink_urb (port->write_urb);
+		if (serial->num_bulk_in)
+			usb_unlink_urb (port->read_urb);
 	}
+}
+
+static void generic_close (struct usb_serial_port *port, struct file * filp)
+{
+	dbg(__FUNCTION__ " - port %d", port->number);
+	generic_cleanup (port);
 }
 
 static int generic_write (struct usb_serial_port *port, int from_user, const unsigned char *buf, int count)
@@ -1025,10 +1043,7 @@ static void generic_shutdown (struct usb_serial *serial)
 
 	/* stop reads and writes on all ports */
 	for (i=0; i < serial->num_ports; ++i) {
-		down (&serial->port[i].sem);
-		while (serial->port[i].open_count > 0)
-			generic_close (&serial->port[i], NULL);
-		up (&serial->port[i].sem);
+		generic_cleanup (&serial->port[i]);
 	}
 }
 
@@ -1040,11 +1055,13 @@ static void port_softint(void *private)
 
 	dbg(__FUNCTION__ " - port %d", port->number);
 	
-	if (!serial) {
+	if (!serial)
 		return;
-	}
 
 	tty = port->tty;
+	if (!tty)
+		return;
+
 	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) && tty->ldisc.write_wakeup) {
 		dbg(__FUNCTION__ " - write wakeup call.");
 		(tty->ldisc.write_wakeup)(tty);
@@ -1334,6 +1351,7 @@ static void usb_serial_disconnect(struct usb_device *dev, void *ptr)
 	struct usb_serial_port *port;
 	int i;
 
+	dbg(__FUNCTION__);
 	if (serial) {
 		/* fail all future close/read/write/ioctl/etc calls */
 		for (i = 0; i < serial->num_ports; ++i) {
