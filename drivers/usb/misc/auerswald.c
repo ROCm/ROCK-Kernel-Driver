@@ -269,7 +269,7 @@ typedef struct
 /* Forwards */
 static void auerswald_ctrlread_complete (struct urb * urb, struct pt_regs *regs);
 static void auerswald_removeservice (pauerswald_t cp, pauerscon_t scp);
-extern struct usb_driver auerswald_driver;
+static struct usb_driver auerswald_driver;
 
 
 /*-------------------------------------------------------------------*/
