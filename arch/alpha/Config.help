@@ -251,6 +251,10 @@ CONFIG_ALPHA_PRIMO
 CONFIG_ALPHA_GAMMA
   Say Y if you have an AS 2000 5/xxx or an AS 2100 5/xxx.
 
+CONFIG_ALPHA_EV67
+  Is this a machine based on the EV67 core?  If in doubt, select N here
+  and the machine will be treated as an EV6.
+
 CONFIG_ALPHA_SRM
   There are two different types of booting firmware on Alphas: SRM,
   which is command line driven, and ARC, which uses menus and arrow
@@ -609,4 +613,15 @@ CONFIG_DEBUG_SPINLOCK
   and certain other kinds of spinlock errors commonly made.  This is
   best used in conjunction with the NMI watchdog so that spinlock
   deadlocks are also debuggable.
+
+CONFIG_DEBUG_RWLOCK
+  If you say Y here then read-write lock processing will count how many
+  times it has tried to get the lock and issue an error message after
+  too many attempts.  If you suspect a rwlock problem or a kernel
+  hacker asks for this option then say Y.  Otherwise say N.
+
+CONFIG_DEBUG_SEMAPHORE
+  If you say Y here then semaphore processing will issue lots of
+  verbose debugging messages.  If you suspect a semaphore problem or a
+  kernel hacker asks for this option then say Y.  Otherwise say N.
 
