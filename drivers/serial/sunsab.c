@@ -53,9 +53,6 @@ static DECLARE_TASK_QUEUE(tq_serial);
 static struct tty_driver serial_driver, callout_driver;
 static int sab82532_refcount;
 
-/* number of characters left in xmit buffer before we ask for more */
-#define WAKEUP_CHARS 256
-
 #undef SERIAL_PARANOIA_CHECK
 #define SERIAL_DO_RESTART
 
@@ -2618,7 +2615,6 @@ static struct console sab82532_console = {
 
 int __init sab82532_console_init(void)
 {
-	extern int con_is_present(void);
 	extern int su_console_registered;
 
 	if (con_is_present() || su_console_registered)

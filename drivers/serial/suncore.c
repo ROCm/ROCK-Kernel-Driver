@@ -1,11 +1,11 @@
 /* suncore.c
  *
- * Generic SUN serial/kbd/ms layer.  Based entirely
+ * Common SUN serial routines.  Based entirely
  * upon drivers/sbus/char/sunserial.c which is:
  *
  * Copyright (C) 1997  Eddie C. Dost  (ecd@skynet.be)
  *
- * Port to new UART layer is:
+ * Adaptation to new UART layer is:
  *
  * Copyright (C) 2002 David S. Miller (davem@redhat.com)
  */
@@ -15,9 +15,7 @@
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/string.h>
-#include <linux/kbd_diacr.h>
 #include <linux/init.h>
-#include <linux/bootmem.h>
 
 #include <asm/oplib.h>
 
@@ -25,158 +23,11 @@
 
 int serial_console;
 int stop_a_enabled = 1;
+int sunserial_current_minor = 64;
 
-int __init con_is_present(void)
-{
-	return serial_console ? 0 : 1;
-}
-
-static void __init nop_rs_kgdb_hook(int channel)
-{ printk("Oops: nop_rs_kgdb_hook called\n"); }
-
-static void nop_rs_change_mouse_baud(int baud)
-{ printk("Oops: nop_rs_change_mouse_baud called\n"); }
-
-static int nop_rs_read_proc(char *page, char **start, off_t off, int count,
-			    int *eof, void *data)
-{ printk("Oops: nop_rs_read_proc called\n"); return 0; }
-
-struct sunserial_operations rs_ops = {
-	0,
-	nop_rs_kgdb_hook,
-	nop_rs_change_mouse_baud,
-	nop_rs_read_proc
-};
-
-static int __init serial_sun_init(void)
-{
-	struct sun_initfunc *init;
-
-	init = rs_ops.rs_init;
-	while (init) {
-		(void) init->init();
-		init = init->next;
-	}
-
-	return 0;
-}
-
-static void __exit serial_sun_exit(void)
-{
-}
-
-module_init(serial_sun_init);
-module_exit(serial_sun_exit);
-
-void __init rs_kgdb_hook(int channel)
-{ rs_ops.rs_kgdb_hook(channel); }
-
-void rs_change_mouse_baud(int baud)
-{ rs_ops.rs_change_mouse_baud(baud); }
-
-int rs_read_proc(char *page, char **start, off_t off, int count,
-		 int *eof, void *data)
-{ return rs_ops.rs_read_proc(page, start, off, count, eof, data); }
-
-static void nop_compute_shiftstate (void)
-{ printk("Oops: nop_compute_shiftstate called\n"); }
-
-static void nop_setledstate (struct kbd_struct *kbd, unsigned int ledstate)
-{ printk("Oops: nop_setledstate called\n"); }
-
-static unsigned char nop_getledstate (void)
-{ printk("Oops: nop_getledstate called\n"); return 0; }
-
-static int nop_setkeycode (unsigned int scancode, unsigned int keycode)
-{ printk("Oops: nop_setkeycode called\n"); return -EINVAL; }
-
-static int nop_getkeycode (unsigned int scancode)
-{ printk("Oops: nop_getkeycode called\n"); return -EINVAL; }
-
-struct sunkbd_operations kbd_ops = {
-	0,
-	nop_compute_shiftstate,
-	nop_setledstate,
-	nop_getledstate,
-	nop_setkeycode,
-	nop_getkeycode
-};
-
-#ifdef CONFIG_USB
-extern void pci_compute_shiftstate(void);
-extern int pci_setkeycode(unsigned int, unsigned int);
-extern int pci_getkeycode(unsigned int);
-extern void pci_setledstate(struct kbd_struct *, unsigned int);
-extern unsigned char pci_getledstate(void);
-extern int pcikbd_init(void);
-#endif
-
-int kbd_init(void)
-{
-	struct sun_initfunc *init;
-	int err = -ENODEV;
-
-	init = kbd_ops.kbd_init;
-	while (init) {
-		err = init->init();
-		init = init->next;
-	}
-#ifdef CONFIG_USB
-	if (!serial_console &&
-	    kbd_ops.compute_shiftstate == nop_compute_shiftstate) {
-		printk("kbd_init: Assuming USB keyboard.\n");
-		kbd_ops.compute_shiftstate = pci_compute_shiftstate;
-		kbd_ops.setledstate = pci_setledstate;
-		kbd_ops.getledstate = pci_getledstate;
-		kbd_ops.setkeycode = pci_setkeycode;
-		kbd_ops.getkeycode = pci_getkeycode;
-		pcikbd_init();
-	}
-#endif
-	return err;
-}
-
-void compute_shiftstate(void)
-{ kbd_ops.compute_shiftstate(); }
-
-void setledstate(struct kbd_struct *kbd, unsigned int ledstate)
-{ kbd_ops.setledstate(kbd, ledstate); }
-
-unsigned char getledstate(void)
-{ return kbd_ops.getledstate(); }
-
-int setkeycode(unsigned int scancode, unsigned int keycode)
-{ return kbd_ops.setkeycode(scancode, keycode); }
-
-int getkeycode(unsigned int scancode)
-{ return kbd_ops.getkeycode(scancode); }
-
-void * __init sunserial_alloc_bootmem(unsigned long size)
-{
-	void *ret;
-
-	ret = __alloc_bootmem(size, SMP_CACHE_BYTES, 0UL);
-	if (ret != NULL)
-		memset(ret, 0, size);
-
-	return ret;
-}
-
-void
-sunserial_setsun_initfunc(int (*init) (void))
-{
-	struct sun_initfunc *rs_initfunc;
-
-	rs_initfunc = sunserial_alloc_bootmem(sizeof(*rs_initfunc));
-	if (rs_initfunc == NULL) {
-		prom_printf("sunserial_setsun_initfunc: Cannot alloc sun_initfunc.\n");
-		prom_halt();
-	}
-
-	rs_initfunc->init = init;
-	rs_initfunc->next = rs_ops.rs_init;
-	rs_ops.rs_init = rs_initfunc;
-}
+EXPORT_SYMBOL(serial_console);
+EXPORT_SYMBOL(stop_a_enabled);
+EXPORT_SYMBOL(sunserial_current_minor);
 
 void
 sunserial_console_termios(struct console *con)
@@ -228,9 +79,9 @@ sunserial_console_termios(struct console *con)
 		/* XXX: this is unused below. */
 	}
 
-	if (prom_node_has_property(nd, cd_prop)) {
+	if (prom_node_has_property(nd, dtr_prop)) {
 		memset(buf, 0, sizeof(buf));
-		prom_getstring(nd, cd_prop, buf, sizeof(buf));
+		prom_getstring(nd, dtr_prop, buf, sizeof(buf));
 		if (!strcmp(buf, "false"))
 			rtsdtr = 0;
 
@@ -286,128 +137,104 @@ no_options:
 	con->cflag = cflag;
 }
 
+EXPORT_SYMBOL(sunserial_console_termios);
+
 void
-sunkbd_setsun_initfunc(int (*init)(void))
+sun_do_break(void)
 {
-	struct sun_initfunc *kbd_initfunc;
+	if (!stop_a_enabled)
+		return;
 
-	kbd_initfunc = sunserial_alloc_bootmem(sizeof(*kbd_initfunc));
-	if (kbd_initfunc == NULL) {
-		prom_printf("sunkbd_setsun_initfunc: Cannot alloc sun_initfunc.\n");
-		prom_halt();
-	}
+	printk("\n");
+	flush_user_windows();
 
-	kbd_initfunc->init = init;
-	kbd_initfunc->next = kbd_ops.kbd_init;
-	kbd_ops.kbd_init = kbd_initfunc;
+#ifndef CONFIG_SPARC64
+	if ((unsigned long)linux_dbvec >= DEBUG_FIRSTVADDR &&
+	    (unsigned long)linux_dbvec <= DEBUG_LASTVADDR)
+		sp_enter_debugger();
+	else
+#endif
+		prom_cmdline();
 }
 
-#ifdef CONFIG_PCI
-void
-sunkbd_install_keymaps(ushort **src_key_maps, unsigned int src_keymap_count,
-		       char *src_func_buf, char **src_func_table,
-		       int src_funcbufsize, int src_funcbufleft,
-		       struct kbdiacr *src_accent_table,
-		       unsigned int src_accent_table_size)
+EXPORT_SYMBOL(sun_do_break);
+
+/* Sun serial MOUSE auto baud rate detection.  */
+static struct mouse_baud_cflag {
+	int baud;
+	unsigned int cflag;
+} mouse_baud_table[] = {
+	{ 1200, B1200 },
+	{ 2400, B2400 },
+	{ 4800, B4800 },
+	{ 9600, B9600 },
+	{ -1, ~0 },
+	{ -1, ~0 },
+};
+
+unsigned int suncore_mouse_baud_cflag_next(unsigned int cflag, int *new_baud)
 {
-	extern unsigned int keymap_count;
-	int i, j;
+	int i;
 
-	for (i = 0; i < MAX_NR_KEYMAPS; i++) {
-		if (src_key_maps[i]) {
-			if (!key_maps[i]) {
-				key_maps[i] = (ushort *)
-					sunserial_alloc_bootmem(NR_KEYS * sizeof(ushort));
-				if (key_maps[i] == NULL) {
-					prom_printf("sunkbd_install_keymaps: "
-						    "Cannot alloc key_map(%d).\n", i);
-					prom_halt();
-				}
-			}
-			for (j = 0; j < NR_KEYS; j++)
-				key_maps[i][j] = src_key_maps[i][j];
-		}
-		key_maps[i] = src_key_maps[i];
-	}
-	keymap_count = src_keymap_count;
+	for (i = 0; mouse_baud_table[i].baud != -1; i++)
+		if (mouse_baud_table[i].cflag == (cflag & CBAUD))
+			break;
 
-	for (i = 0; i < MAX_NR_FUNC; i++)
-		func_table[i] = src_func_table[i];
-	funcbufptr = src_func_buf;
-	funcbufsize = src_funcbufsize;
-	funcbufleft = src_funcbufleft;
+	i += 1;
+	if (mouse_baud_table[i].baud == -1)
+		i = 0;
 
-	for (i = 0; i < MAX_DIACR; i++)
-		accent_table[i] = src_accent_table[i];
-	accent_table_size = src_accent_table_size;
+	*new_baud = mouse_baud_table[i].baud;
+	return mouse_baud_table[i].cflag;
 }
-#endif
 
-extern int sunsu_probe(void);
-extern int sunzilog_probe(void);
-#ifdef CONFIG_SAB82532
-extern int sab82532_probe(void);
-#endif
-#ifdef CONFIG_PCI
-extern int ps2kbd_probe(void);
-#endif
+EXPORT_SYMBOL(suncore_mouse_baud_cflag_next);
 
-/* This is called by the sparc32/sparc64 MM init layer right after
- * the bootmem allocator has been setup and is ready to use.
+/* Basically, when the baud rate is wrong the mouse spits out
+ * breaks to us.
  */
-void __init sun_serial_setup(void)
+int suncore_mouse_baud_detection(unsigned char ch, int is_break)
 {
-	int ret = 1;
-	
-#if defined(CONFIG_PCI) && !defined(CONFIG_SPARC64)
-	/*
-	 * Probing sequence on sparc differs from sparc64.
-	 * Keyboard is probed ahead of su because we want su function
-	 * when keyboard is active. su is probed ahead of zs in order to
-	 * get console on MrCoffee with fine but disconnected zs.
-	 */
-	if (!serial_console)
-		ps2kbd_probe();
-	if (sunsu_probe() == 0)
-		return;
-#endif
+	static int mouse_got_break = 0;
+	static int ctr = 0;
 
-	if (sunzilog_probe() == 0)
-		return;
-		
-#ifdef CONFIG_SAB82532
-	ret = sab82532_probe();
-#endif
+	if (is_break) {
+		/* Let a few normal bytes go by before we jump the gun
+		 * and say we need to try another baud rate.
+		 */
+		if (mouse_got_break && ctr < 8)
+			return 1;
 
-#if defined(CONFIG_PCI) && defined(CONFIG_SPARC64)
-	/*
-	 * Keyboard serial devices.
-	 *
-	 * Well done, Sun, prom_devopen("/pci@1f,4000/ebus@1/su@14,3083f8")
-	 * hangs the machine if no keyboard is connected to the device...
-	 * All PCI PROMs seem to do this, I have seen this on the Ultra 450
-	 * with version 3.5 PROM, and on the Ultra/AX with 3.1.5 PROM.
-	 *
-	 * So be very careful not to probe for keyboards if we are on a
-	 * serial console.
-	 */
-	if (!serial_console)
-		ps2kbd_probe();
-	if (sunsu_probe() == 0)
-		return;
-#endif
-
-	if (!ret)
-		return;
-		
-#ifdef CONFIG_SPARC64
-	{	extern int this_is_starfire;
-		/* Hello, Starfire. Pleased to meet you :) */
-		if (this_is_starfire != 0)
-			return;
+		/* Ok, we need to try another baud. */
+		ctr = 0;
+		mouse_got_break = 1;
+		return 2;
 	}
-#endif
-
-	prom_printf("No serial devices found, bailing out.\n");
-	prom_halt();
+	if (mouse_got_break) {
+		ctr++;
+		if (c == 0x87) {
+			/* Correct baud rate determined. */
+			mouse_got_break = 0;
+		}
+		return 1;
+	}
+	return 0;
 }
+
+EXPORT_SYMBOL(suncore_mouse_baud_detection);
+
+static int __init suncore_init(void)
+{
+	return 0;
+}
+
+static void __exit suncore_exit(void)
+{
+}
+
+module_init(suncore_init);
+module_exit(suncore_exit);
+
+MODULE_AUTHOR("Eddie C. Dost, David S. Miller");
+MODULE_DESCRIPTION("Sun serial common layer");
+MODULE_LICENSE("GPL");
