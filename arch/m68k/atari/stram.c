@@ -765,7 +765,7 @@ static int unswap_by_read(unsigned short *map, unsigned long max,
 				return -ENOMEM;
 			}
 			read_lock(&tasklist_lock);
-			for_each_task(p)
+			for_each_process(p)
 				unswap_process(p->mm, entry, page);
 			read_unlock(&tasklist_lock);
 			shmem_unuse(entry, page);
