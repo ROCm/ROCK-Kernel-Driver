@@ -87,10 +87,10 @@ static inline int is_user_addr_valid(struct task_struct *child,
 		return -EIO;
 	return 0;
 #else
-	struct mm_tblock_struct *tblock;
+	struct vm_list_struct *vml;
 
-	for (tblock = child->mm->context.tblock; tblock; tblock = tblock->next)
-		if (start >= tblock->vma->vm_start && start + len <= tblock->vma->vm_end)
+	for (vml = child->mm->context.vmlist; vml; vml = vml->next)
+		if (start >= vml->vma->vm_start && start + len <= vml->vma->vm_end)
 			return 0;
 
 	return -EIO;

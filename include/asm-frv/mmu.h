@@ -22,7 +22,7 @@ typedef struct {
 	unsigned long	dtlb_ptd_mapping;	/* [DAMR5] PTD mapping for dtlb cached PGE */
 
 #else
-	struct mm_tblock_struct	*tblock;
+	struct vm_list_struct	*vmlist;
 	unsigned long		end_brk;
 
 #endif
