@@ -134,6 +134,10 @@ config HD64465_PCMCIA
 	tristate "HD64465 host bridge support"
 	depends on HD64465 && PCMCIA
 
+config PCMCIA_AU1X00
+	tristate "Au1x00 pcmcia support"
+	depends on SOC_AU1X00 && PCMCIA
+
 config PCMCIA_SA1100
 	tristate "SA1100 support"
 	depends on ARM && ARCH_SA1100 && PCMCIA
@@ -182,6 +186,14 @@ config M32R_CFC_NUM
 	default "1" if PLAT_USRV || PLAT_M32700UT || PLAT_MAPPI2 || PLAT_OPSPUT
 	help
 	  Set the number of M32R CF slots.
+
+config PCMCIA_VRC4171
+	tristate "NEC VRC4171 Card Controllers support"
+	depends on VRC4171 && PCMCIA
+
+config PCMCIA_VRC4173
+	tristate "NEC VRC4173 CARDU support"
+	depends on CPU_VR41XX && PCI && PCMCIA
 
 config PCCARD_NONSTATIC
 	tristate

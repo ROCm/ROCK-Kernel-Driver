@@ -155,10 +155,10 @@ asmlinkage void math_emulate(long arg)
   RE_ENTRANT_CHECK_ON;
 #endif /* RE_ENTRANT_CHECKING */
 
-  if (!current->used_math)
+  if (!used_math())
     {
       finit();
-      current->used_math = 1;
+      set_used_math();
     }
 
   SETUP_DATA_AREA(arg);

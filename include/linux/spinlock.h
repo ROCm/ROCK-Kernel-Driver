@@ -38,6 +38,8 @@
  * If CONFIG_SMP is set, pull in the _raw_* definitions
  */
 #ifdef CONFIG_SMP
+
+#define assert_spin_locked(x)	BUG_ON(!spin_is_locked(x))
 #include <asm/spinlock.h>
 
 int __lockfunc _spin_trylock(spinlock_t *lock);
@@ -145,6 +147,14 @@ typedef struct {
 		0; \
 	})
 
+/* with debugging, assert_spin_locked() on UP does check
+ * the lock value properly */
+#define assert_spin_locked(x) \
+	({ \
+		CHECK_LOCK(x); \
+		BUG_ON(!(x)->lock); \
+	})
+
 /* without debugging, spin_trylock on UP always says
  * TRUE. --> printk if already locked. */
 #define _raw_spin_trylock(x) \
@@ -201,6 +211,7 @@ typedef struct {
 #define spin_lock_init(lock)	do { (void)(lock); } while(0)
 #define _raw_spin_lock(lock)	do { (void)(lock); } while(0)
 #define spin_is_locked(lock)	((void)(lock), 0)
+#define assert_spin_locked(lock)	do { (void)(lock); } while(0)
 #define _raw_spin_trylock(lock)	(((void)(lock), 1))
 #define spin_unlock_wait(lock)	(void)(lock)
 #define _raw_spin_unlock(lock) do { (void)(lock); } while(0)

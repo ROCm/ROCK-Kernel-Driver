@@ -4,7 +4,7 @@
  * Free Software Foundation;  either version 2 of the  License, or (at your
  * option) any later version.
  *
- * Copyright (C) 1997, 2001 Ralf Baechle
+ * Copyright (C) 1997, 01, 05 Ralf Baechle
  * Copyright 2001 MontaVista Software Inc.
  * Author: jsun@mvista.com or jsun@junsun.net
  *
@@ -20,7 +20,6 @@
  * Copyright (C) 2004 MontaVista Software Inc.
  * Author: Manish Lachwani, mlachwani@mvista.com
  */
-#include <linux/config.h>
 #include <linux/sched.h>
 #include <linux/mm.h>
 #include <linux/delay.h>

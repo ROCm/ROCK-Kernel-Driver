@@ -172,3 +172,16 @@ void __init ibm44x_platform_init(void)
 #endif
 }
 
+/* Called from MachineCheckException */
+void platform_machine_check(struct pt_regs *regs)
+{
+    	printk("PLB0: BEAR=0x%08x%08x ACR=  0x%08x BESR= 0x%08x\n",
+		mfdcr(DCRN_PLB0_BEARH), mfdcr(DCRN_PLB0_BEARL),
+		mfdcr(DCRN_PLB0_ACR),  mfdcr(DCRN_PLB0_BESR));
+	printk("POB0: BEAR=0x%08x%08x BESR0=0x%08x BESR1=0x%08x\n",
+		mfdcr(DCRN_POB0_BEARH), mfdcr(DCRN_POB0_BEARL),
+		mfdcr(DCRN_POB0_BESR0), mfdcr(DCRN_POB0_BESR1));
+	printk("OPB0: BEAR=0x%08x%08x BSTAT=0x%08x\n",
+		mfdcr(DCRN_OPB0_BEARH), mfdcr(DCRN_OPB0_BEARL),
+		mfdcr(DCRN_OPB0_BSTAT));
+}

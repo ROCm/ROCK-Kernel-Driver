@@ -1,3 +1,4 @@
+#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <asm/mips-boards/atlasint.h>

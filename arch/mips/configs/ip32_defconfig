@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.10-rc2
-# Sun Nov 21 14:12:00 2004
+# Linux kernel version: 2.6.11-rc2
+# Wed Jan 26 02:49:04 2005
 #
 CONFIG_MIPS=y
 CONFIG_MIPS64=y
@@ -78,14 +78,16 @@ CONFIG_SGI_IP32=y
 # CONFIG_SIBYTE_SB1xxx_SOC is not set
 # CONFIG_SNI_RM200_PCI is not set
 CONFIG_RWSEM_GENERIC_SPINLOCK=y
+CONFIG_GENERIC_CALIBRATE_DELAY=y
 CONFIG_HAVE_DEC_LOCK=y
 CONFIG_ARC=y
+CONFIG_DMA_IP32=y
+CONFIG_OWN_DMA=y
 CONFIG_DMA_NONCOHERENT=y
 # CONFIG_CPU_LITTLE_ENDIAN is not set
+CONFIG_ARC32=y
 CONFIG_BOOT_ELF32=y
 CONFIG_MIPS_L1_CACHE_SHIFT=5
-CONFIG_ARC32=y
-# CONFIG_FB is not set
 CONFIG_ARC_MEMORY=y
 CONFIG_ARC_PROMLIB=y
 
@@ -131,6 +133,20 @@ CONFIG_PCI_NAMES=y
 CONFIG_MMU=y
 
 #
+# PCCARD (PCMCIA/CardBus) support
+#
+# CONFIG_PCCARD is not set
+
+#
+# PC-card bridges
+#
+
+#
+# PCI Hotplug Support
+#
+# CONFIG_HOTPLUG_PCI is not set
+
+#
 # Executable file formats
 #
 CONFIG_BINFMT_ELF=y
@@ -151,6 +167,7 @@ CONFIG_BINFMT_ELF32=y
 #
 CONFIG_STANDALONE=y
 CONFIG_PREVENT_FIRMWARE_BUILD=y
+# CONFIG_FW_LOADER is not set
 
 #
 # Memory Technology Devices (MTD)
@@ -174,11 +191,13 @@ CONFIG_PREVENT_FIRMWARE_BUILD=y
 # CONFIG_BLK_CPQ_CISS_DA is not set
 # CONFIG_BLK_DEV_DAC960 is not set
 # CONFIG_BLK_DEV_UMEM is not set
+# CONFIG_BLK_DEV_COW_COMMON is not set
 CONFIG_BLK_DEV_LOOP=y
 # CONFIG_BLK_DEV_CRYPTOLOOP is not set
 # CONFIG_BLK_DEV_NBD is not set
 # CONFIG_BLK_DEV_SX8 is not set
 # CONFIG_BLK_DEV_RAM is not set
+CONFIG_BLK_DEV_RAM_COUNT=16
 CONFIG_INITRAMFS_SOURCE=""
 CONFIG_CDROM_PKTCDVD=y
 CONFIG_CDROM_PKTCDVD_BUFFERS=8
@@ -191,6 +210,7 @@ CONFIG_IOSCHED_NOOP=y
 CONFIG_IOSCHED_AS=y
 CONFIG_IOSCHED_DEADLINE=y
 CONFIG_IOSCHED_CFQ=y
+CONFIG_ATA_OVER_ETH=y
 
 #
 # ATA/ATAPI/MFM/RLL support
@@ -225,6 +245,7 @@ CONFIG_SCSI_LOGGING=y
 #
 # CONFIG_SCSI_SPI_ATTRS is not set
 # CONFIG_SCSI_FC_ATTRS is not set
+# CONFIG_SCSI_ISCSI_ATTRS is not set
 
 #
 # SCSI low-level drivers
@@ -258,14 +279,12 @@ CONFIG_AIC7XXX_REG_PRETTY_PRINT=y
 # CONFIG_SCSI_QLOGIC_ISP is not set
 # CONFIG_SCSI_QLOGIC_FC is not set
 # CONFIG_SCSI_QLOGIC_1280 is not set
-# CONFIG_SCSI_QLOGIC_1280_1040 is not set
 CONFIG_SCSI_QLA2XXX=y
 # CONFIG_SCSI_QLA21XX is not set
 # CONFIG_SCSI_QLA22XX is not set
 # CONFIG_SCSI_QLA2300 is not set
 # CONFIG_SCSI_QLA2322 is not set
 # CONFIG_SCSI_QLA6312 is not set
-# CONFIG_SCSI_QLA6322 is not set
 # CONFIG_SCSI_DC395x is not set
 # CONFIG_SCSI_DC390T is not set
 # CONFIG_SCSI_DEBUG is not set
@@ -465,6 +484,7 @@ CONFIG_SERIO_SERPORT=y
 # CONFIG_SERIO_CT82C710 is not set
 # CONFIG_SERIO_PCIPS2 is not set
 # CONFIG_SERIO_MACEPS2 is not set
+# CONFIG_SERIO_LIBPS2 is not set
 CONFIG_SERIO_RAW=y
 
 #
@@ -519,7 +539,6 @@ CONFIG_LEGACY_PTY_COUNT=256
 #
 # Ftape, the floppy tape device driver
 #
-# CONFIG_AGP is not set
 # CONFIG_DRM is not set
 # CONFIG_RAW_DRIVER is not set
 
@@ -550,12 +569,14 @@ CONFIG_LEGACY_PTY_COUNT=256
 #
 # Graphics support
 #
+# CONFIG_FB is not set
 
 #
 # Console display driver support
 #
 # CONFIG_VGA_CONSOLE is not set
 CONFIG_DUMMY_CONSOLE=y
+# CONFIG_BACKLIGHT_LCD_SUPPORT is not set
 
 #
 # Sound
@@ -570,9 +591,23 @@ CONFIG_USB_ARCH_HAS_HCD=y
 CONFIG_USB_ARCH_HAS_OHCI=y
 
 #
+# NOTE: USB_STORAGE enables SCSI, and 'SCSI disk support' may also be needed; see USB_STORAGE Help for more information
+#
+
+#
 # USB Gadget Support
 #
 # CONFIG_USB_GADGET is not set
+
+#
+# MMC/SD Card support
+#
+# CONFIG_MMC is not set
+
+#
+# InfiniBand support
+#
+# CONFIG_INFINIBAND is not set
 
 #
 # File systems
@@ -678,6 +713,11 @@ CONFIG_SGI_PARTITION=y
 # CONFIG_NLS is not set
 
 #
+# Profiling support
+#
+# CONFIG_PROFILING is not set
+
+#
 # Kernel hacking
 #
 # CONFIG_DEBUG_KERNEL is not set
@@ -695,6 +735,10 @@ CONFIG_KEYS_DEBUG_PROC_KEYS=y
 # Cryptographic options
 #
 # CONFIG_CRYPTO is not set
+
+#
+# Hardware crypto devices
+#
 
 #
 # Library routines

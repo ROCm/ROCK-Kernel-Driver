@@ -45,10 +45,17 @@ EXPORT_SYMBOL(_dma_cache_inv);
 
 #endif /* CONFIG_DMA_NONCOHERENT */
 
-asmlinkage int sys_cacheflush(void *addr, int bytes, int cache)
+/*
+ * We could optimize the case where the cache argument is not BCACHE but
+ * that seems very atypical use ...
+ */
+asmlinkage int sys_cacheflush(unsigned long addr, unsigned long int bytes,
+	unsigned int cache)
 {
-	/* This should flush more selectivly ...  */
-	__flush_cache_all();
+	if (verify_area(VERIFY_WRITE, (void *) addr, bytes))
+		return -EFAULT;
+
+	flush_icache_range(addr, addr + bytes);
 
 	return 0;
 }

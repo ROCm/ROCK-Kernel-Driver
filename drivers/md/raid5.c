@@ -56,7 +56,7 @@
 #define RAID5_DEBUG	0
 #define RAID5_PARANOIA	1
 #if RAID5_PARANOIA && defined(CONFIG_SMP)
-# define CHECK_DEVLOCK() if (!spin_is_locked(&conf->device_lock)) BUG()
+# define CHECK_DEVLOCK() assert_spin_locked(&conf->device_lock)
 #else
 # define CHECK_DEVLOCK()
 #endif

@@ -309,6 +309,7 @@ static void iommu_table_setparms_lpar(struct pci_controller *phb,
 static void iommu_bus_setup_pSeries(struct pci_bus *bus)
 {
 	struct device_node *dn, *pdn;
+	struct iommu_table *tbl;
 
 	DBG("iommu_bus_setup_pSeries, bus %p, bus->self %p\n", bus, bus->self);
 
@@ -326,7 +327,6 @@ static void iommu_bus_setup_pSeries(struct pci_bus *bus)
 	if (!bus->self) {
 		/* Root bus */
 		if (is_python(dn)) {
-			struct iommu_table *tbl;
 			unsigned int *iohole;
 
 			DBG("Python root bus %s\n", bus->name);
@@ -352,19 +352,35 @@ static void iommu_bus_setup_pSeries(struct pci_bus *bus)
 			iommu_table_setparms(dn->phb, dn, tbl);
 			dn->iommu_table = iommu_init_table(tbl);
 		} else {
-			/* 256 MB window by default */
-			dn->phb->dma_window_size = 1 << 28;
-			/* always skip the first 256MB */
-			dn->phb->dma_window_base_cur = 1 << 28;
+			/* Do a 128MB table at root. This is used for the IDE
+			 * controller on some SMP-mode POWER4 machines. It
+			 * doesn't hurt to allocate it on other machines
+			 * -- it'll just be unused since new tables are
+			 * allocated on the EADS level.
+			 *
+			 * Allocate at offset 128MB to avoid having to deal
+			 * with ISA holes; 128MB table for IDE is plenty.
+			 */
+			dn->phb->dma_window_size = 1 << 27;
+			dn->phb->dma_window_base_cur = 1 << 27;
 
-			/* No table at PHB level for non-python PHBs */
+			tbl = kmalloc(sizeof(struct iommu_table), GFP_KERNEL);
+
+			iommu_table_setparms(dn->phb, dn, tbl);
+			dn->iommu_table = iommu_init_table(tbl);
+
+			/* All child buses have 256MB tables */
+			dn->phb->dma_window_size = 1 << 28;
 		}
 	} else {
 		pdn = pci_bus_to_OF_node(bus->parent);
 
-		if (!pdn->iommu_table) {
+		if (!bus->parent->self && !is_python(pdn)) {
 			struct iommu_table *tbl;
-			/* First child, allocate new table (256MB window) */
+			/* First child and not python means this is the EADS
+			 * level. Allocate new table for this slot with 256MB
+			 * window.
+			 */
 
 			tbl = kmalloc(sizeof(struct iommu_table), GFP_KERNEL);
 
@@ -372,7 +388,7 @@ static void iommu_bus_setup_pSeries(struct pci_bus *bus)
 
 			dn->iommu_table = iommu_init_table(tbl);
 		} else {
-			/* Lower than first child or under python, copy parent table */
+			/* Lower than first child or under python, use parent table */
 			dn->iommu_table = pdn->iommu_table;
 		}
 	}

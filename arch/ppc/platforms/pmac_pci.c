@@ -913,8 +913,12 @@ pmac_pci_enable_device_hook(struct pci_dev *dev, int initial)
 	 * (iBook second controller)
 	 */
 	if (dev->vendor == PCI_VENDOR_ID_APPLE
-	    && dev->device == PCI_DEVICE_ID_APPLE_KL_USB && !node)
+	    && (dev->class == ((PCI_CLASS_SERIAL_USB << 8) | 0x10))
+	    && !node) {
+		printk(KERN_INFO "Apple USB OHCI %s disabled by firmware\n",
+		       pci_name(dev));
 		return -EINVAL;
+	}
 
 	if (!node)
 		return 0;

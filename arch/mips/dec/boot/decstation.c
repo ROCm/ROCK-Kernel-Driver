@@ -1,7 +1,6 @@
 /*
  * arch/mips/dec/decstation.c
  */
-#include <linux/config.h>
 
 #define RELOC
 #define INITRD

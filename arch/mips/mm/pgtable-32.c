@@ -71,8 +71,8 @@ void __init pagetable_init(void)
 
 	/* Initialize the entire pgd.  */
 	pgd_init((unsigned long)swapper_pg_dir);
-	pgd_init((unsigned long)swapper_pg_dir +
-	         sizeof(pgd_t ) * USER_PTRS_PER_PGD);
+	pgd_init((unsigned long)swapper_pg_dir
+		 + sizeof(pgd_t) * USER_PTRS_PER_PGD);
 
 #ifdef CONFIG_HIGHMEM
 	pgd_base = swapper_pg_dir;

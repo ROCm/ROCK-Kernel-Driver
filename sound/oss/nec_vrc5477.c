@@ -78,7 +78,6 @@
 #include <linux/spinlock.h>
 #include <linux/smp_lock.h>
 #include <linux/ac97_codec.h>
-#include <linux/interrupt.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <asm/uaccess.h>
@@ -396,10 +395,47 @@ static void set_dac_rate(struct vrc5477_ac97_state *s, unsigned rate)
 	}
 }
 
+static int ac97_codec_not_present(struct ac97_codec *codec)
+{
+	struct vrc5477_ac97_state *s =
+		(struct vrc5477_ac97_state *)codec->private_data;
+	unsigned long flags;
+	unsigned short count  = 0xffff;
+
+	spin_lock_irqsave(&s->lock, flags);
+
+	/* wait until we can access codec registers */
+	do {
+	       if (!(inl(s->io + VRC5477_CODEC_WR) & 0x80000000))
+		       break;
+	} while (--count);
+
+	if (count == 0) {
+		spin_unlock_irqrestore(&s->lock, flags);
+		return -1;
+	}
+
+	/* write 0 to reset */
+	outl((AC97_RESET << 16) | 0, s->io + VRC5477_CODEC_WR);
+
+	/* test whether we get a response from ac97 chip */
+	count  = 0xffff;
+	do {
+	       if (!(inl(s->io + VRC5477_CODEC_WR) & 0x80000000))
+		       break;
+	} while (--count);
+
+	if (count == 0) {
+		spin_unlock_irqrestore(&s->lock, flags);
+		return -1;
+	}
+	spin_unlock_irqrestore(&s->lock, flags);
+	return 0;
+}
 
 /* --------------------------------------------------------------------- */
 
-static inline void 
+extern inline void
 stop_dac(struct vrc5477_ac97_state *s)
 {
 	struct dmabuf* db = &s->dma_dac;
@@ -517,7 +553,7 @@ static void start_dac(struct vrc5477_ac97_state *s)
 	spin_unlock_irqrestore(&s->lock, flags);
 }	
 
-static inline void stop_adc(struct vrc5477_ac97_state *s)
+extern inline void stop_adc(struct vrc5477_ac97_state *s)
 {
 	struct dmabuf* db = &s->dma_adc;
 	unsigned long flags;
@@ -616,7 +652,7 @@ static void start_adc(struct vrc5477_ac97_state *s)
 #define DMABUF_DEFAULTORDER (16-PAGE_SHIFT)
 #define DMABUF_MINORDER 1
 
-static inline void dealloc_dmabuf(struct vrc5477_ac97_state *s, 
+extern inline void dealloc_dmabuf(struct vrc5477_ac97_state *s,
 				  struct dmabuf *db)
 {
 	if (db->lbuf) {
@@ -1858,6 +1894,13 @@ static int __devinit vrc5477_ac97_probe(struct pci_dev *pcidev,
 
         }
 
+	/* test if get response from ac97, if not return */
+        if (ac97_codec_not_present(&(s->codec))) {
+		printk(KERN_ERR PFX "no ac97 codec\n");
+		goto err_region;
+
+        }
+
 	if (!request_region(s->io, pci_resource_len(pcidev,0),
 			    VRC5477_AC97_MODULE_NAME)) {
 		printk(KERN_ERR PFX "io ports %#lx->%#lx in use\n",
@@ -1973,7 +2016,7 @@ static void __devexit vrc5477_ac97_remove(struct pci_dev *dev)
 		remove_proc_entry(VRC5477_AC97_MODULE_NAME, NULL);
 #endif /* VRC5477_AC97_DEBUG */
 
-	synchronize_irq(s->irq);
+	synchronize_irq();
 	free_irq(s->irq, s);
 	release_region(s->io, pci_resource_len(dev,0));
 	unregister_sound_dsp(s->dev_audio);
@@ -1996,7 +2039,7 @@ static struct pci_driver vrc5477_ac97_driver = {
 	.name		= VRC5477_AC97_MODULE_NAME,
 	.id_table	= id_table,
 	.probe		= vrc5477_ac97_probe,
-	.remove		= __devexit_p(vrc5477_ac97_remove),
+	.remove		= __devexit_p(vrc5477_ac97_remove)
 };
 
 static int __init init_vrc5477_ac97(void)

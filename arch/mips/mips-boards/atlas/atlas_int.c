@@ -23,7 +23,6 @@
  * Atlas board.
  *
  */
-#include <linux/config.h>
 #include <linux/compiler.h>
 #include <linux/init.h>
 #include <linux/sched.h>

@@ -29,7 +29,7 @@
  * There is no default value -- it has to be initialized.
  */
 u32 cached_kn02_csr;
-spinlock_t kn02_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(kn02_lock);
 
 
 static int kn02_irq_base;

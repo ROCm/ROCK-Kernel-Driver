@@ -1172,7 +1172,7 @@ int zft_compressor_init(void)
         if (TRACE_LEVEL >= ft_t_info) {
 		printk(
 KERN_INFO "(c) 1997 Claus-Justus Heine (claus@momo.math.rwth-aachen.de)\n"
-KERN_INFO "Compressor for zftape (lzrw3 algorithm)\n"
+KERN_INFO "Compressor for zftape (lzrw3 algorithm)\n");
         }
 #else /* !MODULE */
 	/* print a short no-nonsense boot message */

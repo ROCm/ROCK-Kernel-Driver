@@ -4,6 +4,7 @@
  * Copyright 2001 MontaVista Software Inc.
  * Author: MontaVista Software, Inc.
  *         	ppopov@mvista.com or source@mvista.com
+ * Copyright (C) 2005 Ralf Baechle (ralf@linux-mips.org)
  *
  * ########################################################################
  *
@@ -26,6 +27,8 @@
  */
 #ifndef __ASM_DB1X00_H
 #define __ASM_DB1X00_H
+
+#include <linux/config.h>
 
 #ifdef CONFIG_MIPS_DB1550
 #define BCSR_KSEG1_ADDR 0xAF000000

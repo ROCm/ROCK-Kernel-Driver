@@ -1,25 +1,27 @@
 /*
- * irix5sys.h: 32-bit IRIX5 ABI system call table.
+ * This file is subject to the terms and conditions of the GNU General Public
+ * License.  See the file "COPYING" in the main directory of this archive
+ * for more details.
  *
- * Copyright (C) 1996 David S. Miller (dm@engr.sgi.com)
+ * 32-bit IRIX5 ABI system call table derived from original file 'irix5sys.h'
+ * created by David S. Miller.
+ *
+ * Copyright (C) 1996 - 2004 David S. Miller <dm@engr.sgi.com>
+ * Copyright (C) 2004 Steven J. Hill <sjhill@realitydiluted.com>
  */
+#include <asm/asm.h>
 
-/* This file is being included twice - once to build a list of all
- * syscalls and once to build a table of how many arguments each syscall
- * accepts.  Syscalls that receive a pointer to the saved registers are
- * marked as having zero arguments.
- */
-#include <linux/config.h>
+	/*
+	 * Key:
+	 *         V == Valid and should work as expected for most cases.
+	 *        HV == Half Valid, some things will work, some likely will not
+	 *        IV == InValid, certainly will not work at all yet
+	 *        ?V == ?'ably Valid, I have not done enough looking into it
+	 *        DC == Don't Care, a rats ass we couldn't give
+	 */
 
-/* Keys:
- *         V == Valid and should work as expected for most cases.
- *        HV == Half Valid, some things will work, some likely will not
- *        IV == InValid, certainly will not work at all yet
- *        ?V == ?'ably Valid, I have not done enough looking into it
- *        DC == Don't Care, a rats ass we couldn't give
- */
+	.macro	irix5syscalltable
 
-#ifdef CONFIG_BINFMT_IRIX
 	sys	sys_syscall	0	/* 1000  sysindir()	       V*/
 	sys	sys_exit	1	/* 1001  exit()		       V*/
 	sys	sys_fork	0	/* 1002  fork()		       V*/
@@ -247,7 +249,7 @@
 	sys	irix_unimp	0	/* 1224  XXX psema_cntl()	*/
 	sys	irix_unimp	0	/* 1225  XXX restartreturn()	*/
 
-/* Just to pad things out nicely. */
+	/* Just to pad things out nicely. */
 	sys	irix_unimp	0
 	sys	irix_unimp	0
 	sys	irix_unimp	0
@@ -1022,8 +1024,18 @@
 	sys	irix_unimp	0
 	sys	irix_unimp	0
 	sys	irix_unimp	0
-#else
-	mille	sys_ni_syscall	0
-#endif
 
-/* YEEEEEEEEEEEEEEEEEE!!!! */
+	.endm
+
+	/*
+	 * Pre-compute the number of _instruction_ bytes needed to load
+	 * or store the arguments 6-8. Negative values are ignored.
+	 */
+	.macro  sys function, nargs
+	PTR	\function
+	LONG	(\nargs << 2) - (5 << 2)
+	.endm
+
+	.align	4
+EXPORT(sys_call_table_irix5)
+	irix5syscalltable

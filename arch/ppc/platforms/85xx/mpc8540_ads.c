@@ -147,10 +147,25 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 #ifdef CONFIG_SERIAL_TEXT_DEBUG
 	{
 		bd_t *binfo = (bd_t *) __res;
+		struct uart_port p;
 
 		/* Use the last TLB entry to map CCSRBAR to allow access to DUART regs */
 		settlbcam(NUM_TLBCAMS - 1, binfo->bi_immr_base,
 			  binfo->bi_immr_base, MPC85xx_CCSRBAR_SIZE, _PAGE_IO, 0);
+
+		memset(&p, 0, sizeof (p));
+		p.iotype = SERIAL_IO_MEM;
+		p.membase = (void *) binfo->bi_immr_base + MPC85xx_UART0_OFFSET;
+		p.uartclk = binfo->bi_busfreq;
+
+		gen550_init(0, &p);
+
+		memset(&p, 0, sizeof (p));
+		p.iotype = SERIAL_IO_MEM;
+		p.membase = (void *) binfo->bi_immr_base + MPC85xx_UART1_OFFSET;
+		p.uartclk = binfo->bi_busfreq;
+
+		gen550_init(1, &p);
 	}
 #endif
 

@@ -134,11 +134,9 @@ svc_preempt:	teq	r9, #0				@ was preempt count = 0
 		ldr	r1, [r6, #8]			@ local_bh_count
 		adds	r0, r0, r1
 		movne	pc, lr
-		mov	r7, #PREEMPT_ACTIVE
-		str	r7, [r8, #TI_PREEMPT]		@ set PREEMPT_ACTIVE
-1:		enable_irq r2				@ enable IRQs
-		bl	schedule
-		disable_irq r0				@ disable IRQs
+		mov	r7, #0				@ preempt_schedule_irq
+		str	r7, [r8, #TI_PREEMPT]		@ expects preempt_count == 0
+1:		bl	preempt_schedule_irq		@ irq en/disable is done inside
 		ldr	r0, [r8, #TI_FLAGS]		@ get new tasks TI_FLAGS
 		tst	r0, #_TIF_NEED_RESCHED
 		beq	preempt_return			@ go again

@@ -17,7 +17,7 @@
 
 extern asmlinkage void jazz_handle_int(void);
 
-static spinlock_t r4030_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(r4030_lock);
 
 static void enable_r4030_irq(unsigned int irq)
 {

@@ -183,7 +183,7 @@ static int edid_check_header(unsigned char *edid)
 			err = 0;
 	}
 
-	return 1;
+	return err;
 }
 
 static void parse_vendor_block(unsigned char *block, struct fb_monspecs *specs)

@@ -19,8 +19,6 @@ static struct proc_dir_entry *root_irq_dir, *irq_dir[NR_IRQS];
  */
 static struct proc_dir_entry *smp_affinity_entry[NR_IRQS];
 
-cpumask_t irq_affinity[NR_IRQS] = { [0 ... NR_IRQS-1] = CPU_MASK_ALL };
-
 static int irq_affinity_read_proc(char *page, char **start, off_t off,
 				  int count, int *eof, void *data)
 {

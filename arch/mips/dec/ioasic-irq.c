@@ -21,7 +21,7 @@
 #include <asm/dec/ioasic_ints.h>
 
 
-static spinlock_t ioasic_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(ioasic_lock);
 
 static int ioasic_irq_base;
 

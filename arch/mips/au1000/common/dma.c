@@ -7,6 +7,7 @@
  * Copyright 2000 MontaVista Software Inc.
  * Author: MontaVista Software, Inc.
  *         	stevel@mvista.com or source@mvista.com
+ * Copyright (C) 2005 Ralf Baechle (ralf@linux-mips.org)
  *
  *  This program is free software; you can redistribute  it and/or modify it
  *  under  the terms of  the GNU General  Public License as published by the
@@ -29,7 +30,7 @@
  *  675 Mass Ave, Cambridge, MA 02139, USA.
  *
  */
-
+#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
@@ -61,7 +62,7 @@
  */
 
 
-spinlock_t au1000_dma_spin_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(au1000_dma_spin_lock);
 
 struct dma_chan au1000_dma_table[NUM_AU1000_DMA_CHANNELS] = {
       {.dev_id = -1,},

@@ -98,6 +98,19 @@ static char irq_tab_alchemy[][5] __initdata = {
 };
 #endif
 
+#ifdef CONFIG_MIPS_MTX1
+static char irq_tab_alchemy[][5] __initdata = {
+ [0] = { -1, INTA, INTB, INTX, INTX},   /* IDSEL 00 - AdapterA-Slot0 (top)    */
+ [1] = { -1, INTB, INTA, INTX, INTX},   /* IDSEL 01 - AdapterA-Slot1 (bottom) */
+ [2] = { -1, INTC, INTD, INTX, INTX},   /* IDSEL 02 - AdapterB-Slot0 (top)    */
+ [3] = { -1, INTD, INTC, INTX, INTX},   /* IDSEL 03 - AdapterB-Slot1 (bottom) */
+ [4] = { -1, INTA, INTB, INTX, INTX},   /* IDSEL 04 - AdapterC-Slot0 (top)    */
+ [5] = { -1, INTB, INTA, INTX, INTX},   /* IDSEL 05 - AdapterC-Slot1 (bottom) */
+ [6] = { -1, INTC, INTD, INTX, INTX},   /* IDSEL 06 - AdapterD-Slot0 (top)    */
+ [7] = { -1, INTD, INTC, INTX, INTX},   /* IDSEL 07 - AdapterD-Slot1 (bottom) */
+};
+#endif
+
 int __init pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 {
 	return irq_tab_alchemy[slot][pin];

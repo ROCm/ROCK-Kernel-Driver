@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.10-rc2
-# Fri Nov 26 00:00:39 2004
+# Linux kernel version: 2.6.11-rc2
+# Wed Jan 26 02:49:13 2005
 #
 CONFIG_MIPS=y
 # CONFIG_MIPS64 is not set
@@ -80,14 +80,15 @@ CONFIG_PMC_YOSEMITE=y
 # CONFIG_SNI_RM200_PCI is not set
 # CONFIG_TOSHIBA_RBTX4927 is not set
 CONFIG_RWSEM_GENERIC_SPINLOCK=y
+CONFIG_GENERIC_CALIBRATE_DELAY=y
 CONFIG_HAVE_DEC_LOCK=y
 CONFIG_DMA_COHERENT=y
 # CONFIG_CPU_LITTLE_ENDIAN is not set
 CONFIG_IRQ_CPU=y
 CONFIG_IRQ_CPU_RM7K=y
+CONFIG_IRQ_CPU_RM9K=y
 CONFIG_SWAP_IO_SPACE=y
 CONFIG_MIPS_L1_CACHE_SHIFT=5
-# CONFIG_FB is not set
 
 #
 # CPU selection
@@ -134,6 +135,19 @@ CONFIG_PCI_NAMES=y
 CONFIG_MMU=y
 
 #
+# PCCARD (PCMCIA/CardBus) support
+#
+# CONFIG_PCCARD is not set
+
+#
+# PC-card bridges
+#
+
+#
+# PCI Hotplug Support
+#
+
+#
 # Executable file formats
 #
 CONFIG_BINFMT_ELF=y
@@ -149,6 +163,7 @@ CONFIG_TRAD_SIGNALS=y
 #
 CONFIG_STANDALONE=y
 CONFIG_PREVENT_FIRMWARE_BUILD=y
+# CONFIG_FW_LOADER is not set
 # CONFIG_DEBUG_DRIVER is not set
 
 #
@@ -172,10 +187,12 @@ CONFIG_PREVENT_FIRMWARE_BUILD=y
 # CONFIG_BLK_CPQ_DA is not set
 # CONFIG_BLK_CPQ_CISS_DA is not set
 # CONFIG_BLK_DEV_DAC960 is not set
+# CONFIG_BLK_DEV_COW_COMMON is not set
 # CONFIG_BLK_DEV_LOOP is not set
 # CONFIG_BLK_DEV_NBD is not set
 # CONFIG_BLK_DEV_SX8 is not set
 # CONFIG_BLK_DEV_RAM is not set
+CONFIG_BLK_DEV_RAM_COUNT=16
 CONFIG_INITRAMFS_SOURCE=""
 # CONFIG_LBD is not set
 CONFIG_CDROM_PKTCDVD=m
@@ -189,6 +206,7 @@ CONFIG_IOSCHED_NOOP=y
 CONFIG_IOSCHED_AS=y
 CONFIG_IOSCHED_DEADLINE=y
 CONFIG_IOSCHED_CFQ=y
+CONFIG_ATA_OVER_ETH=m
 
 #
 # ATA/ATAPI/MFM/RLL support
@@ -401,7 +419,8 @@ CONFIG_LEGACY_PTY_COUNT=256
 #
 # CONFIG_WATCHDOG is not set
 # CONFIG_RTC is not set
-# CONFIG_GEN_RTC is not set
+CONFIG_GEN_RTC=y
+CONFIG_GEN_RTC_X=y
 # CONFIG_DTLK is not set
 # CONFIG_R3964 is not set
 # CONFIG_APPLICOM is not set
@@ -409,7 +428,6 @@ CONFIG_LEGACY_PTY_COUNT=256
 #
 # Ftape, the floppy tape device driver
 #
-# CONFIG_AGP is not set
 # CONFIG_DRM is not set
 # CONFIG_RAW_DRIVER is not set
 
@@ -440,6 +458,8 @@ CONFIG_LEGACY_PTY_COUNT=256
 #
 # Graphics support
 #
+# CONFIG_FB is not set
+# CONFIG_BACKLIGHT_LCD_SUPPORT is not set
 
 #
 # Sound
@@ -454,9 +474,23 @@ CONFIG_USB_ARCH_HAS_HCD=y
 CONFIG_USB_ARCH_HAS_OHCI=y
 
 #
+# NOTE: USB_STORAGE enables SCSI, and 'SCSI disk support' may also be needed; see USB_STORAGE Help for more information
+#
+
+#
 # USB Gadget Support
 #
 # CONFIG_USB_GADGET is not set
+
+#
+# MMC/SD Card support
+#
+# CONFIG_MMC is not set
+
+#
+# InfiniBand support
+#
+# CONFIG_INFINIBAND is not set
 
 #
 # File systems
@@ -548,6 +582,7 @@ CONFIG_DEBUG_KERNEL=y
 # CONFIG_DEBUG_KOBJECT is not set
 # CONFIG_DEBUG_HIGHMEM is not set
 # CONFIG_DEBUG_INFO is not set
+# CONFIG_DEBUG_FS is not set
 CONFIG_CROSSCOMPILE=y
 CONFIG_CMDLINE=""
 # CONFIG_DEBUG_STACK_USAGE is not set
@@ -565,6 +600,10 @@ CONFIG_KEYS_DEBUG_PROC_KEYS=y
 # Cryptographic options
 #
 # CONFIG_CRYPTO is not set
+
+#
+# Hardware crypto devices
+#
 
 #
 # Library routines

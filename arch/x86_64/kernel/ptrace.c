@@ -480,7 +480,7 @@ asmlinkage long sys_ptrace(long request, long pid, unsigned long addr, long data
 			ret = -EIO;
 			break;
 		}
-		child->used_math = 1;
+		set_stopped_child_used_math(child);
 		ret = set_fpregs(child, (struct user_i387_struct __user *)data);
 		break;
 	}

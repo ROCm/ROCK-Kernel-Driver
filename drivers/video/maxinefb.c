@@ -43,30 +43,24 @@
 static struct fb_info fb_info;
 
 static struct fb_var_screeninfo maxinefb_defined = {
-	.xres 		= 1024,
-	.yres 		= 768,
-	.xres_virtual 	= 1024,
-	.yres_virtual 	= 768,
-	.bits_per_pixel = 8,
-	.red.length	= 8,
-	.green.length	= 8,
-	.blue.length	= 8,
-	.activate 	= FB_ACTIVATE_NOW,
-	.height 	= -1,
-	.width 		= -1,
-	.vmode 		= FB_VMODE_NONINTERLACED,
+	.xres =		1024,
+	.yres =		768,
+	.xres_virtual =	1024,
+	.yres_virtual =	768,
+	.bits_per_pixel =8,
+	.activate =	FB_ACTIVATE_NOW,
+	.height =	-1,
+	.width =	-1,
+	.vmode =	FB_VMODE_NONINTERLACED,
 };
 
 static struct fb_fix_screeninfo maxinefb_fix = {
-	.id 		= "Maxine onboard graphics 1024x768x8",
-	.smem_len 	= (1024*768),
-	.type 		= FB_TYPE_PACKED_PIXELS,
-	.visual 	= FB_VISUAL_PSEUDOCOLOR,
-	.line_length 	= 1024,
+	.id =		"Maxine onboard graphics 1024x768x8",
+	.smem_len =	(1024*768),
+	.type =		FB_TYPE_PACKED_PIXELS,
+	.visual =	FB_VISUAL_PSEUDOCOLOR,
+	.line_length =	1024,
 };
-
-/* Reference to machine type set in arch/mips/dec/prom/identify.c, KM */
-extern unsigned long mips_machtype;
 
 /* Handle the funny Inmos RamDAC/video controller ... */
 
@@ -100,12 +94,12 @@ static int maxinefb_setcolreg(unsigned regno, unsigned red, unsigned green,
 	/* value to be written into the palette reg. */
 	unsigned long hw_colorvalue = 0;
 
-	red   >>= 8;	/* The cmap fields are 16 bits    */
-	green >>= 8;	/* wide, but the harware colormap */
-	blue  >>= 8;	/* registers are only 8 bits wide */
+	red   >>= 8;    /* The cmap fields are 16 bits    */
+	green >>= 8;    /* wide, but the harware colormap */
+	blue  >>= 8;    /* registers are only 8 bits wide */
 
 	hw_colorvalue = (blue << 16) + (green << 8) + (red);
-	
+
 	maxinefb_ims332_write_register(IMS332_REG_COLOR_PALETTE + regno,
 				       hw_colorvalue);
 	return 0;
@@ -113,16 +107,18 @@ static int maxinefb_setcolreg(unsigned regno, unsigned red, unsigned green,
 
 static struct fb_ops maxinefb_ops = {
 	.owner		= THIS_MODULE,
-	.fb_setcolreg	= maxinefb_setcolreg,	
+	.fb_get_fix	= gen_get_fix,
+	.fb_get_var	= gen_get_var,
+	.fb_setcolreg	= maxinefb_setcolreg,
 	.fb_fillrect	= cfb_fillrect,
 	.fb_copyarea	= cfb_copyarea,
-	.fb_imageblit	= cfb_imageblit,		
+	.fb_imageblit	= cfb_imageblit,
 	.fb_cursor	= soft_cursor,
 };
 
 int __init maxinefb_init(void)
 {
-	volatile unsigned char *fboff;
+	unsigned long fboff;
 	unsigned long fb_start;
 	int i;
 
@@ -142,7 +138,7 @@ int __init maxinefb_init(void)
 
 	/* Clear screen */
 	for (fboff = fb_start; fboff < fb_start + 0x1ffff; fboff++)
-		*fboff = 0x0;
+		*(volatile unsigned char *)fboff = 0x0;
 
 	maxinefb_fix.smem_start = fb_start;
 	
@@ -159,7 +155,7 @@ int __init maxinefb_init(void)
 	}
 
 	fb_info.fbops = &maxinefb_ops;
-	fb_info.screen_base = (char *) maxinefb_fix.smem_start;
+	fb_info.screen_base = (char *)maxinefb_fix.smem_start;
 	fb_info.var = maxinefb_defined;
 	fb_info.fix = maxinefb_fix;
 	fb_info.flags = FBINFO_DEFAULT;

@@ -95,6 +95,7 @@ foreach $object (sort(keys(%object))) {
 		     $from !~ /\.text\.lock$/ &&
 		     $from !~ /\.pci_fixup_header$/ &&
 		     $from !~ /\.pci_fixup_final$/ &&
+		     $from !~ /\.pdr$/ &&
 		     $from !~ /\__param$/ &&
 		     $from !~ /\.altinstructions/ &&
 		     $from !~ /\.debug_/)) {

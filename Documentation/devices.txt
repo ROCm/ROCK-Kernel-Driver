@@ -1,9 +1,9 @@
 
-		       LINUX ALLOCATED DEVICES
+		    LINUX ALLOCATED DEVICES (2.6+ version)
 
 	     Maintained by Torben Mathiasen <device@lanana.org>
 
-		      Last revised: 04 August 2004
+		      Last revised: 25 January 2005
 
 This list is the Linux Device List, the official registry of allocated
 device numbers and /dev directory nodes for the Linux operating
@@ -24,7 +24,8 @@ platform only.	Allocations marked (68k/Atari) apply to Linux/68k on
 the Atari platform only.
 
 The symbol {2.6} means the allocation is obsolete and scheduled for
-removal once kernel version 2.6 (or equivalent) is released.
+removal once kernel version 2.6 (or equivalent) is released. Some of these
+allocations have already been removed.
 
 This document is in the public domain.	The author requests, however,
 that semantically altered versions are not distributed without
@@ -40,13 +41,6 @@ reply.
 
 
 	  **** DEVICE DRIVERS AUTHORS PLEASE READ THIS ****
-
-THE DEVICE REGISTRY IS OFFICIALLY FROZEN FOR LINUS TORVALDS' KERNEL
-TREE.  At Linus' request, no more allocations will be made official
-for Linus' kernel tree; the 3 June 2001 version of this list is the
-official final version of this registry.  At Alan Cox' request,
-however, the registry will continue to be maintained for the -ac
-series of kernels, and registrations will be accepted.
 
 To have a major number allocated, or a minor number in situations
 where that applies (e.g. busmice), please contact me with the
@@ -436,6 +430,8 @@ Your cooperation is appreciated.
 		226 = /dev/systrace	Systrace device
 		227 = /dev/mcelog	X86_64 Machine Check Exception driver
 		228 = /dev/hpet		HPET driver
+		229 = /dev/fuse		Fuse (virtual filesystem in user-space)
+		230 = /dev/midishare	MidiShare driver
 		240-254			Reserved for local use
 		255			Reserved for MISC_DYNAMIC_MINOR
 
@@ -1176,7 +1172,7 @@ Your cooperation is appreciated.
 
 		Requested by: andy@scramdisklinux.org
 
- 65 char	Sundance "plink" Transputer boards
+ 65 char	Sundance "plink" Transputer boards (obsolete, unused)
 		  0 = /dev/plink0	First plink device
 		  1 = /dev/plink1	Second plink device
 		  2 = /dev/plink2	Third plink device
@@ -1526,12 +1522,12 @@ Your cooperation is appreciated.
 		disks (see major number 3) except that the limit on
 		partitions is 15.
 
- 83 char	Teletext/videotext interfaces {2.6}
-		  0 = /dev/vtx		Teletext decoder
-		 16 = /dev/vttuner	TV tuner on teletext interface
-
-		Devices for the driver contained in the VideoteXt package.
-		More information on http://home.pages.de/~videotext/
+ 83 char	Matrox mga_vid video driver
+ 		 0 = /dev/mga_vid0	1st video card
+		 1 = /dev/mga_vid1	2nd video card
+		 2 = /dev/mga_vid2	3rd video card
+		  ...
+	        15 = /dev/mga_vid15	16th video card
 
  83 block	I2O hard disk
 		  0 = /dev/i2o/hdaw	49th I2O hard disk, whole disk
@@ -1701,11 +1697,6 @@ Your cooperation is appreciated.
 		  3 = /dev/ipauth	Authentication control device/log file
 		    ...		
 
- 95 block	IBM S/390 VM/ESA minidisk
-		  0 = /dev/msd0		First VM/ESA minidisk
-		  1 = /dev/msd1		Second VM/ESA minidisk
-		    ...
-
  96 char	Parallel port ATAPI tape devices
 		  0 = /dev/pt0		First parallel port ATAPI tape
 		  1 = /dev/pt1		Second parallel port ATAPI tape
@@ -1742,9 +1733,13 @@ Your cooperation is appreciated.
 		See http://stm.lbl.gov/comedi or http://www.llp.fu-berlin.de/.
 
  98 block	User-mode virtual block device
-		  0 = /dev/ubd0		First user-mode block device
-		  1 = /dev/ubd1		Second user-mode block device
+		  0 = /dev/ubda		First user-mode block device
+		 16 = /dev/udbb		Second user-mode block device
 		    ...
+
+		Partitions are handled in the same way as for IDE
+		disks (see major number 3) except that the limit on
+		partitions is 15.
 
 		This device is used by the user-mode virtual kernel port.
 
@@ -2109,6 +2104,7 @@ Your cooperation is appreciated.
 		disks (see major number 3) except that the limit on
 		partitions is 15.
 
+130 char 	(Misc devices)
 
 130 block       SCSI disk devices (160-175)
                   0 = /dev/sdfe         161st SCSI disk whole disk
@@ -2546,7 +2542,12 @@ Your cooperation is appreciated.
 		  0 = /dev/usb/lp0	First USB printer
 		    ...
 		 15 = /dev/usb/lp15	16th USB printer
-		 32 = /dev/usb/mdc800	MDC800 USB camera
+		 16 = /dev/usb/mouse0	First USB mouse
+		    ...
+		 31 = /dev/usb/mouse15	16th USB mouse
+		 32 = /dev/usb/ez0	First USB firmware loader
+		    ...
+		 47 = /dev/usb/ez15	16th USB firmware loader
 		 48 = /dev/usb/scanner0	First USB scanner
 		    ...
 		 63 = /dev/usb/scanner15 16th USB scanner
@@ -2554,23 +2555,11 @@ Your cooperation is appreciated.
 		 65 = /dev/usb/usblcd	USBLCD Interface (info@usblcd.de)
 		 66 = /dev/usb/cpad0	Synaptics cPad (mouse/LCD)
 
-		 96 = /dev/usb/hiddev0	1st USB HID device
-		    ...
-		111 = /dev/usb/hiddev15	16th USB HID device
-		112 = /dev/usb/auer0	1st auerswald ISDN device
-		    ...
-		127 = /dev/usb/auer15	16th auerswald ISDN device
-		128 = /dev/usb/brlvgr0	First Braille Voyager device
-		    ...
-		131 = /dev/usb/brlvgr3	Fourth Braille Voyager device
-		132 = /dev/usb/idmouse	ID Mouse (fingerprint scanner) device
-		144 = /dev/usb/lcd	USB LCD device
-		160 = /dev/usb/legousbtower0	1st USB Legotower device
-		    ...
-		175 = /dev/usb/legousbtower15	16th USB Legotower device
-		240 = /dev/usb/dabusb0	First daubusb device
-		    ...
-		243 = /dev/usb/dabusb3	Fourth dabusb device
+180 block	USB block devices
+		0 = /dev/uba		First USB block device
+		8 = /dev/ubb		Second USB block device
+		16 = /dev/ubc		Thrid USB block device
+		...
 
 181 char	Conrad Electronic parallel port radio clocks
 		  0 = /dev/pcfclock0	First Conrad radio clock
@@ -2761,8 +2750,10 @@ Your cooperation is appreciated.
 		 45 = /dev/ttyMM1		Marvell MPSC - port 1
 		 46 = /dev/ttyCPM0		PPC CPM (SCC or SMC) - port 0
 		    ...
-		 49 = /dev/ttyCPM5		PPC CPM (SCC or SMC) - port 5
-
+		 47 = /dev/ttyCPM5		PPC CPM (SCC or SMC) - port 5
+		 50 = /dev/ttyIOC40		Altix serial card
+		    ...
+		 81 = /dev/ttyIOC431		Altix serial card
 
 205 char	Low-density serial ports (alternate device)
 		  0 = /dev/culu0		Callout device for ttyLU0
@@ -2788,12 +2779,16 @@ Your cooperation is appreciated.
 		    ...
 		 39 = /dev/cudb7		Callout device for ttyDB7
 		 40 = /dev/cusg0		Callout device for ttySG0
-		 41 = /dev/ttySMX0		Callout device for ttySMX0
-		 42 = /dev/ttySMX1		Callout device for ttySMX1
-		 43 = /dev/ttySMX2		Callout device for ttySMX2
+		 41 = /dev/ttycusmx0		Callout device for ttySMX0
+		 42 = /dev/ttycusmx1		Callout device for ttySMX1
+		 43 = /dev/ttycusmx2		Callout device for ttySMX2
 		 46 = /dev/cucpm0		Callout device for ttyCPM0
 		    ...
 		 49 = /dev/cucpm5		Callout device for ttyCPM5
+		 50 = /dev/cuioc40		Callout device for ttyIOC40
+		    ...
+		 81 = /dev/cuioc431		Callout device for ttyIOC431
+
 
 206 char	OnStream SC-x0 tape devices
 		  0 = /dev/osst0		First OnStream SCSI tape, mode 0
@@ -3007,7 +3002,12 @@ Your cooperation is appreciated.
 		ioctl()'s can be used to rewind the tape regardless of
 		the device used to access it.
 
-231-239		UNASSIGNED
+231 char	InfiniBand MAD
+		0 = /dev/infiniband/umad0
+		1 = /dev/infiniband/umad1
+		 ...
+
+232-239		UNASSIGNED
 
 240-254 char	LOCAL/EXPERIMENTAL USE
 240-254 block	LOCAL/EXPERIMENTAL USE

@@ -518,7 +518,7 @@ static int sp887x_init(struct dvb_frontend* fe)
 
 	if (!state->initialised) {
 	/* request the firmware, this will block until someone uploads it */
-	printk("sp887x: waiting for firmware upload...\n");
+		printk("sp887x: waiting for firmware upload (%s)...\n", SP887X_DEFAULT_FIRMWARE);
 		ret = state->config->request_firmware(fe, &fw, SP887X_DEFAULT_FIRMWARE);
 	if (ret) {
 		printk("sp887x: no firmware upload (timeout or file not found?)\n");
@@ -531,6 +531,7 @@ static int sp887x_init(struct dvb_frontend* fe)
 			release_firmware(fw);
 			return ret;
 	}
+		printk("sp887x: firmware upload complete\n");
 		state->initialised = 1;
 	}
 

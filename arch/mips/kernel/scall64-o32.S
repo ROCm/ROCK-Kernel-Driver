@@ -6,6 +6,7 @@
  * Copyright (C) 1995 - 2000, 2001 by Ralf Baechle
  * Copyright (C) 1999, 2000 Silicon Graphics, Inc.
  * Copyright (C) 2001 MIPS Technologies, Inc.
+ * Copyright (C) 2004 Thiemo Seufer
  *
  * Hairy, the userspace application uses a different argument passing
  * convention than the kernel, so we have to translate things from o32
@@ -43,6 +44,8 @@ NESTED(handle_sys, PT_SIZE, sp)
  RESTORE_ALL
 #endif
 
+	/* We don't want to stumble over broken sign extensions from
+	   userland. O32 does never use the upper half. */
 	sll	a0, a0, 0
 	sll	a1, a1, 0
 	sll	a2, a2, 0
@@ -68,11 +71,13 @@ NESTED(handle_sys, PT_SIZE, sp)
 1:	lw	a4, 16(t0)		# argument #5 from usp
 2:	lw	a5, 20(t0)		# argument #6 from usp
 3:	lw	a6, 24(t0)		# argument #7 from usp
+4:	lw	a7, 28(t0)		# argument #8 from usp (for indirect syscalls)
 
 	.section __ex_table,"a"
 	PTR	1b, bad_stack
 	PTR	2b, bad_stack
 	PTR	3b, bad_stack
+	PTR	4b, bad_stack
 	.previous
 
 	li	t1, _TIF_SYSCALL_TRACE | _TIF_SYSCALL_AUDIT
@@ -91,7 +96,7 @@ NESTED(handle_sys, PT_SIZE, sp)
 	sd	v0, PT_R0(sp)		# flag for syscall restarting
 1:	sd	v0, PT_R2(sp)		# result
 
-FEXPORT(o32_syscall_exit)
+o32_syscall_exit:
 	local_irq_disable		# make need_resched and
 					# signals dont change between
 					# sampling and return
@@ -109,12 +114,12 @@ o32_syscall_exit_work:
 
 trace_a_syscall:
 	SAVE_STATIC
-	sd	a4, PT_R8(sp)
+	sd	a4, PT_R8(sp)		# Save argument registers
 	sd	a5, PT_R9(sp)
 	sd	a6, PT_R10(sp)
-	sd	a7, PT_R11(sp)
+	sd	a7, PT_R11(sp)		# For indirect syscalls
 
-	move	s0, t2
+	move	s0, t2			# Save syscall pointer
 	move	a0, sp
 	li	a1, 0
 	jal	do_syscall_trace
@@ -125,7 +130,8 @@ trace_a_syscall:
 	ld	a3, PT_R7(sp)
 	ld	a4, PT_R8(sp)
 	ld	a5, PT_R9(sp)
-	ld	a6, PT_R10(sp)		# For indirect syscalls
+	ld	a6, PT_R10(sp)
+	ld	a7, PT_R11(sp)		# For indirect syscalls
 	jalr	s0
 
 	li	t0, -EMAXERRNO - 1	# error?
@@ -162,40 +168,17 @@ not_o32_scall:
 #else
 	j	handle_sys64
 #endif
-
-illegal_syscall:
-	/* This also isn't a 64-bit syscall, throw an error.  */
-	li	v0, ENOSYS		# error
-	sd	v0, PT_R2(sp)
-	li	t0, 1			# set error flag
-	sd	t0, PT_R7(sp)
-	j	o32_syscall_exit
 	END(handle_sys)
 
 LEAF(sys32_syscall)
-	ld	t0, PT_R29(sp)		# user sp
-
 	sltu	v0, a0, __NR_O32_Linux + __NR_O32_Linux_syscalls + 1
-	beqz	v0, enosys
+	beqz	v0, einval
 
 	dsll	v0, a0, 3
-	dla	v1, sys32_syscall
 	ld	t2, (sys_call_table - (__NR_O32_Linux * 8))(v0)
 
-	li	v0, -EINVAL
-	beq	t2, v1, out		# do not recurse
-
-	beqz	t2, enosys		# null function pointer?
-
-	andi	v0, t0, 0x3		# unaligned stack pointer?
-	bnez	v0, sigsegv
-
-	daddiu	v0, t0, 16		# v0 = usp + 16
-	daddu	t1, v0, 12		# 3 32-bit arguments
-	ld	v1, TI_ADDR_LIMIT($28)
-	or	v0, v0, t1
-	and	v1, v1, v0
-	bnez	v1, efault
+	li	v1, 4000		# indirect syscall number
+	beq	a0, v1, einval		# do not recurse
 
 	move	a0, a1			# shift argument registers
 	move	a1, a2
@@ -203,25 +186,21 @@ LEAF(sys32_syscall)
 	move	a3, a4
 	move	a4, a5
 	move	a5, a6
+	move	a6, a7
+	sd	a0, PT_R4(sp)		# ... and push back a0 - a3, some
+	sd	a1, PT_R5(sp)		# syscalls expect them there
+	sd	a2, PT_R6(sp)
+	sd	a3, PT_R7(sp)
+	sd	a3, PT_R26(sp)		# update a3 for syscall restarting
 	jr	t2
 	/* Unreached */
 
-enosys:	li	v0, -ENOSYS
-	b	out
-
-sigsegv:
-	li	a0, _SIGSEGV
-	move	a1, $28
-	jal	force_sig
-	/* Fall through */
-
-efault:	li	v0, -EFAULT
-
-out:	jr	ra
+einval:	li	v0, -EINVAL
+	jr	ra
 	END(sys32_syscall)
 
 	.align	3
-	.type	sys_call_table,@object;
+	.type	sys_call_table,@object
 sys_call_table:
 	PTR	sys32_syscall			/* 4000 */
 	PTR	sys_exit

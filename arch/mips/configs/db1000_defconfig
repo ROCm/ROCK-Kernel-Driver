@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.10-rc2
-# Sun Nov 21 14:11:56 2004
+# Linux kernel version: 2.6.11-rc2
+# Wed Jan 26 02:49:01 2005
 #
 CONFIG_MIPS=y
 # CONFIG_MIPS64 is not set
@@ -101,11 +101,11 @@ CONFIG_MIPS_DB1000=y
 # CONFIG_SNI_RM200_PCI is not set
 # CONFIG_TOSHIBA_RBTX4927 is not set
 CONFIG_RWSEM_GENERIC_SPINLOCK=y
+CONFIG_GENERIC_CALIBRATE_DELAY=y
 CONFIG_HAVE_DEC_LOCK=y
 CONFIG_DMA_NONCOHERENT=y
 CONFIG_CPU_LITTLE_ENDIAN=y
 CONFIG_MIPS_L1_CACHE_SHIFT=5
-# CONFIG_FB is not set
 
 #
 # CPU selection
@@ -132,7 +132,6 @@ CONFIG_PAGE_SIZE_4KB=y
 # CONFIG_PAGE_SIZE_16KB is not set
 # CONFIG_PAGE_SIZE_64KB is not set
 CONFIG_CPU_HAS_PREFETCH=y
-# CONFIG_VTAG_ICACHE is not set
 CONFIG_64BIT_PHYS_ADDR=y
 # CONFIG_CPU_ADVANCED is not set
 CONFIG_CPU_HAS_LLSC=y
@@ -151,7 +150,6 @@ CONFIG_MMU=y
 #
 CONFIG_PCCARD=m
 # CONFIG_PCMCIA_DEBUG is not set
-# CONFIG_PCMCIA_OBSOLETE is not set
 CONFIG_PCMCIA=m
 
 #
@@ -200,10 +198,12 @@ CONFIG_PREVENT_FIRMWARE_BUILD=y
 # Block devices
 #
 # CONFIG_BLK_DEV_FD is not set
+# CONFIG_BLK_DEV_COW_COMMON is not set
 CONFIG_BLK_DEV_LOOP=y
 # CONFIG_BLK_DEV_CRYPTOLOOP is not set
 # CONFIG_BLK_DEV_NBD is not set
 # CONFIG_BLK_DEV_RAM is not set
+CONFIG_BLK_DEV_RAM_COUNT=16
 CONFIG_INITRAMFS_SOURCE=""
 # CONFIG_LBD is not set
 CONFIG_CDROM_PKTCDVD=m
@@ -217,6 +217,7 @@ CONFIG_IOSCHED_NOOP=y
 CONFIG_IOSCHED_AS=y
 CONFIG_IOSCHED_DEADLINE=y
 CONFIG_IOSCHED_CFQ=y
+CONFIG_ATA_OVER_ETH=m
 
 #
 # ATA/ATAPI/MFM/RLL support
@@ -293,8 +294,6 @@ CONFIG_IP_NF_CONNTRACK_MARK=y
 # CONFIG_IP_NF_QUEUE is not set
 # CONFIG_IP_NF_IPTABLES is not set
 # CONFIG_IP_NF_ARPTABLES is not set
-# CONFIG_IP_NF_COMPAT_IPCHAINS is not set
-# CONFIG_IP_NF_COMPAT_IPFWADM is not set
 CONFIG_XFRM=y
 CONFIG_XFRM_USER=m
 
@@ -426,6 +425,7 @@ CONFIG_SERIO=y
 # CONFIG_SERIO_I8042 is not set
 CONFIG_SERIO_SERPORT=y
 # CONFIG_SERIO_CT82C710 is not set
+# CONFIG_SERIO_LIBPS2 is not set
 CONFIG_SERIO_RAW=m
 
 #
@@ -479,7 +479,6 @@ CONFIG_RTC=y
 #
 # Ftape, the floppy tape device driver
 #
-# CONFIG_AGP is not set
 # CONFIG_DRM is not set
 
 #
@@ -515,12 +514,14 @@ CONFIG_SYNCLINK_CS=m
 #
 # Graphics support
 #
+# CONFIG_FB is not set
 
 #
 # Console display driver support
 #
 # CONFIG_VGA_CONSOLE is not set
 CONFIG_DUMMY_CONSOLE=y
+# CONFIG_BACKLIGHT_LCD_SUPPORT is not set
 
 #
 # Sound
@@ -534,9 +535,23 @@ CONFIG_DUMMY_CONSOLE=y
 # CONFIG_USB_ARCH_HAS_OHCI is not set
 
 #
+# NOTE: USB_STORAGE enables SCSI, and 'SCSI disk support' may also be needed; see USB_STORAGE Help for more information
+#
+
+#
 # USB Gadget Support
 #
 # CONFIG_USB_GADGET is not set
+
+#
+# MMC/SD Card support
+#
+# CONFIG_MMC is not set
+
+#
+# InfiniBand support
+#
+# CONFIG_INFINIBAND is not set
 
 #
 # File systems
@@ -686,6 +701,11 @@ CONFIG_NLS_DEFAULT="iso8859-1"
 # CONFIG_NLS_UTF8 is not set
 
 #
+# Profiling support
+#
+# CONFIG_PROFILING is not set
+
+#
 # Kernel hacking
 #
 # CONFIG_DEBUG_KERNEL is not set
@@ -726,6 +746,10 @@ CONFIG_CRYPTO_DEFLATE=y
 CONFIG_CRYPTO_MICHAEL_MIC=y
 CONFIG_CRYPTO_CRC32C=m
 # CONFIG_CRYPTO_TEST is not set
+
+#
+# Hardware crypto devices
+#
 
 #
 # Library routines
