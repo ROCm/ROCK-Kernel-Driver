@@ -31,6 +31,9 @@
 #include <linux/dump.h>
 #include <linux/sysdev.h>
 #include <linux/cpu.h>
+#include <linux/kthread.h>
+#include <linux/notifier.h>
+#include <linux/stop_machine.h>
 
 #include <asm/ptrace.h>
 #include <asm/atomic.h>
@@ -1063,33 +1066,54 @@ void __init smp_cpus_done(unsigned int max_cpus)
 }
 
 #ifdef CONFIG_SCHED_SMT
+
+/*
+ * Other architectures can use cpu_possible_map to initialize the
+ * scheduler domains topology.  In ppc64 we cannot do this because
+ * we do not necessarily have associativity information for all
+ * possible cpus (some "possible" cpus may not be present in the
+ * system on LPAR).  So we initialize the topology using cpu_online_map,
+ * using a parameterized version of arch_init_sched_domains.  With
+ * cpu hotplug, the important thing is to add a new cpu to the topology
+ * before it is up and taking interrupts.  We use a CPU_UP_PREPARE
+ * notifier for this.
+ *
+ * N.B. kernel/sched.c::sched_domain_debug() should not be used in
+ * conjunction with this implementation, as it uses cpu_possible_map.
+ */
+
 #ifdef CONFIG_NUMA
+
 static struct sched_group sched_group_cpus[NR_CPUS];
 static struct sched_group sched_group_phys[NR_CPUS];
 static struct sched_group sched_group_nodes[MAX_NUMNODES];
 static DEFINE_PER_CPU(struct sched_domain, cpu_domains);
 static DEFINE_PER_CPU(struct sched_domain, phys_domains);
 static DEFINE_PER_CPU(struct sched_domain, node_domains);
-__init void arch_init_sched_domains(void)
+
+static __devinit int __arch_init_sched_domains(void *new_mask)
 {
 	int i;
 	struct sched_group *first = NULL, *last = NULL;
+	cpumask_t new_cpu_map = *(cpumask_t *)new_mask;
 
 	/* Set up domains */
-	for_each_cpu(i) {
+	for_each_cpu_mask(i, new_cpu_map) {
 		struct sched_domain *cpu_domain = &per_cpu(cpu_domains, i);
 		struct sched_domain *phys_domain = &per_cpu(phys_domains, i);
 		struct sched_domain *node_domain = &per_cpu(node_domains, i);
 		int node = cpu_to_node(i);
+		int sibling = i ^ 0x1;
 		cpumask_t node_cpumask = node_to_cpumask(node);
 		cpumask_t nodemask;
 		cpumask_t my_cpumask = cpumask_of_cpu(i);
-		cpumask_t sibling_cpumask = cpumask_of_cpu(i ^ 0x1);
+		cpumask_t sibling_cpumask = cpumask_of_cpu(sibling);
 
-		cpus_and(nodemask, node_cpumask, cpu_possible_map);
+		cpus_and(nodemask, node_cpumask, new_cpu_map);
 
 		*cpu_domain = SD_SIBLING_INIT;
-		if (cur_cpu_spec->cpu_features & CPU_FTR_SMT)
+		if (cur_cpu_spec->cpu_features & CPU_FTR_SMT &&
+		    cpu_isset(sibling, new_cpu_map))
 			cpus_or(cpu_domain->span, my_cpumask, sibling_cpumask);
 		else
 			cpu_domain->span = my_cpumask;
@@ -1102,12 +1126,12 @@ __init void arch_init_sched_domains(void)
 		phys_domain->groups = &sched_group_phys[first_cpu(cpu_domain->span)];
 
 		*node_domain = SD_NODE_INIT;
-		node_domain->span = cpu_possible_map;
+		node_domain->span = new_cpu_map;
 		node_domain->groups = &sched_group_nodes[node];
 	}
 
 	/* Set up CPU (sibling) groups */
-	for_each_cpu(i) {
+	for_each_cpu_mask(i, new_cpu_map) {
 		struct sched_domain *cpu_domain = &per_cpu(cpu_domains, i);
 		int j;
 		first = last = NULL;
@@ -1136,7 +1160,7 @@ __init void arch_init_sched_domains(void)
 		cpumask_t nodemask;
 		struct sched_group *node = &sched_group_nodes[i];
 		cpumask_t node_cpumask = node_to_cpumask(i);
-		cpus_and(nodemask, node_cpumask, cpu_possible_map);
+		cpus_and(nodemask, node_cpumask, new_cpu_map);
 
 		if (cpus_empty(nodemask))
 			continue;
@@ -1173,7 +1197,7 @@ __init void arch_init_sched_domains(void)
 		struct sched_group *cpu = &sched_group_nodes[i];
 		cpumask_t nodemask;
 		cpumask_t node_cpumask = node_to_cpumask(i);
-		cpus_and(nodemask, node_cpumask, cpu_possible_map);
+		cpus_and(nodemask, node_cpumask, new_cpu_map);
 
 		if (cpus_empty(nodemask))
 			continue;
@@ -1190,30 +1214,38 @@ __init void arch_init_sched_domains(void)
 	last->next = first;
 
 	mb();
-	for_each_cpu(i) {
+	for_each_cpu_mask(i, new_cpu_map) {
 		struct sched_domain *cpu_domain = &per_cpu(cpu_domains, i);
 		cpu_attach_domain(cpu_domain, i);
 	}
+
+	return 0;
 }
+
 #else /* !CONFIG_NUMA */
+
 static struct sched_group sched_group_cpus[NR_CPUS];
 static struct sched_group sched_group_phys[NR_CPUS];
 static DEFINE_PER_CPU(struct sched_domain, cpu_domains);
 static DEFINE_PER_CPU(struct sched_domain, phys_domains);
-__init void arch_init_sched_domains(void)
+
+static __devinit void __arch_init_sched_domains(void *new_mask)
 {
 	int i;
 	struct sched_group *first = NULL, *last = NULL;
+	cpumask_t new_cpu_map = *(cpumask_t *)new_mask;
 
 	/* Set up domains */
-	for_each_cpu(i) {
+	for_each_cpu_mask(i, new_cpu_map) {
 		struct sched_domain *cpu_domain = &per_cpu(cpu_domains, i);
 		struct sched_domain *phys_domain = &per_cpu(phys_domains, i);
+		int sibling = i ^ 0x1;
 		cpumask_t my_cpumask = cpumask_of_cpu(i);
-		cpumask_t sibling_cpumask = cpumask_of_cpu(i ^ 0x1);
+		cpumask_t sibling_cpumask = cpumask_of_cpu(sibling);
 
 		*cpu_domain = SD_SIBLING_INIT;
-		if (cur_cpu_spec->cpu_features & CPU_FTR_SMT)
+		if (cur_cpu_spec->cpu_features & CPU_FTR_SMT &&
+		    cpu_isset(sibling, new_cpu_map))
 			cpus_or(cpu_domain->span, my_cpumask, sibling_cpumask);
 		else
 			cpu_domain->span = my_cpumask;
@@ -1221,12 +1253,12 @@ __init void arch_init_sched_domains(void)
 		cpu_domain->groups = &sched_group_cpus[i];
 
 		*phys_domain = SD_CPU_INIT;
-		phys_domain->span = cpu_possible_map;
+		phys_domain->span = new_cpu_map;
 		phys_domain->groups = &sched_group_phys[first_cpu(cpu_domain->span)];
 	}
 
 	/* Set up CPU (sibling) groups */
-	for_each_cpu(i) {
+	for_each_cpu_mask(i, new_cpu_map) {
 		struct sched_domain *cpu_domain = &per_cpu(cpu_domains, i);
 		int j;
 		first = last = NULL;
@@ -1252,7 +1284,7 @@ __init void arch_init_sched_domains(void)
 
 	first = last = NULL;
 	/* Set up physical groups */
-	for_each_cpu(i) {
+	for_each_cpu_mask(i, new_cpu_map) {
 		struct sched_domain *cpu_domain = &per_cpu(cpu_domains, i);
 		struct sched_group *cpu = &sched_group_phys[i];
 
@@ -1272,10 +1304,60 @@ __init void arch_init_sched_domains(void)
 	last->next = first;
 
 	mb();
-	for_each_cpu(i) {
+	for_each_cpu_mask(i, new_cpu_map) {
 		struct sched_domain *cpu_domain = &per_cpu(cpu_domains, i);
 		cpu_attach_domain(cpu_domain, i);
 	}
 }
 #endif /* CONFIG_NUMA */
+
+#ifdef CONFIG_HOTPLUG_CPU
+
+static int cpu_sched_domain_callback(struct notifier_block *nfb,
+			     unsigned long action,
+			     void *hcpu)
+{
+	struct task_struct *p;
+	unsigned long lcpu = (unsigned long)hcpu;
+	cpumask_t new_mask = cpu_online_map;
+
+	switch (action) {
+	case CPU_UP_PREPARE:
+		cpu_set(lcpu, new_mask);
+		break;
+	case CPU_DEAD:
+	case CPU_UP_CANCELED:
+		break;
+	default:
+		return NOTIFY_OK;
+	}
+
+	/* 
+	 * Cannot use stop_machine_run; the cpucontrol semaphore is
+	 * already held.
+	 */
+	p = __stop_machine_run(__arch_init_sched_domains, &new_mask, NR_CPUS);
+
+	if (IS_ERR(p))
+		return NOTIFY_BAD; /* perhaps a nasty message is ok */
+
+	kthread_stop(p);
+
+	return NOTIFY_OK;
+}
+#endif /* CONFIG_HOTPLUG_CPU */
+
+__init void arch_init_sched_domains(void)
+{
+	__arch_init_sched_domains(&cpu_online_map);
+}
+
+static int __init register_sched_domains_notifier(void)
+{
+	/* This must run after the NUMA notifier. */
+	hotcpu_notifier(cpu_sched_domain_callback, 0);
+	return 0;
+}
+__initcall(register_sched_domains_notifier);
 #endif /* CONFIG_SCHED_SMT */
+
