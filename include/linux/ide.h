@@ -1152,8 +1152,6 @@ enum {
 /*
  * Subdrivers support.
  */
-#define IDE_SUBDRIVER_VERSION	1
-
 typedef struct ide_driver_s {
 	struct module			*owner;
 	const char			*name;
@@ -1525,7 +1523,7 @@ extern void default_hwif_transport(ide_hwif_t *);
 
 int ide_register_driver(ide_driver_t *driver);
 void ide_unregister_driver(ide_driver_t *driver);
-int ide_register_subdriver (ide_drive_t *drive, ide_driver_t *driver, int version);
+int ide_register_subdriver(ide_drive_t *, ide_driver_t *);
 int ide_unregister_subdriver (ide_drive_t *drive);
 int ide_replace_subdriver(ide_drive_t *drive, const char *driver);
 

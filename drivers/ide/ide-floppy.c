@@ -2055,7 +2055,7 @@ static int idefloppy_attach (ide_drive_t *drive)
 		printk (KERN_ERR "ide-floppy: %s: Can't allocate a floppy structure\n", drive->name);
 		goto failed;
 	}
-	if (ide_register_subdriver (drive, &idefloppy_driver, IDE_SUBDRIVER_VERSION)) {
+	if (ide_register_subdriver(drive, &idefloppy_driver)) {
 		printk (KERN_ERR "ide-floppy: %s: Failed to register the driver with ide.c\n", drive->name);
 		kfree (floppy);
 		goto failed;

@@ -1829,7 +1829,7 @@ static int idedisk_attach(ide_drive_t *drive)
 	if (drive->media != ide_disk)
 		goto failed;
 
-	if (ide_register_subdriver (drive, &idedisk_driver, IDE_SUBDRIVER_VERSION)) {
+	if (ide_register_subdriver(drive, &idedisk_driver)) {
 		printk (KERN_ERR "ide-disk: %s: Failed to register the driver with ide.c\n", drive->name);
 		goto failed;
 	}

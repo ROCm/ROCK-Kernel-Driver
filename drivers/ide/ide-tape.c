@@ -4854,7 +4854,7 @@ static int idetape_attach (ide_drive_t *drive)
 		printk(KERN_ERR "ide-tape: %s: Can't allocate a tape structure\n", drive->name);
 		goto failed;
 	}
-	if (ide_register_subdriver (drive, &idetape_driver, IDE_SUBDRIVER_VERSION)) {
+	if (ide_register_subdriver(drive, &idetape_driver)) {
 		printk(KERN_ERR "ide-tape: %s: Failed to register the driver with ide.c\n", drive->name);
 		kfree(tape);
 		goto failed;

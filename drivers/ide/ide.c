@@ -2274,15 +2274,15 @@ static void setup_driver_defaults (ide_driver_t *d)
 		d->start_power_step = default_start_power_step;
 }
 
-int ide_register_subdriver (ide_drive_t *drive, ide_driver_t *driver, int version)
+int ide_register_subdriver(ide_drive_t *drive, ide_driver_t *driver)
 {
 	unsigned long flags;
-	
-	BUG_ON(drive->driver == NULL);
-	
+
+	BUG_ON(!drive->driver);
+
 	spin_lock_irqsave(&ide_lock, flags);
-	if (version != IDE_SUBDRIVER_VERSION || !drive->present ||
-	    drive->driver != &idedefault_driver || drive->usage || drive->dead) {
+	if (!drive->present || drive->driver != &idedefault_driver ||
+	    drive->usage || drive->dead) {
 		spin_unlock_irqrestore(&ide_lock, flags);
 		return 1;
 	}
