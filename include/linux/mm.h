@@ -167,6 +167,7 @@ typedef struct page {
 #define PG_skip			10
 #define PG_inactive_clean	11
 #define PG_highmem		12
+#define PG_checked		13	/* kill me in 2.5.<early>. */
 				/* bits 21-29 unused */
 #define PG_arch_1		30
 #define PG_reserved		31
@@ -181,6 +182,8 @@ typedef struct page {
 #define PageLocked(page)	test_bit(PG_locked, &(page)->flags)
 #define LockPage(page)		set_bit(PG_locked, &(page)->flags)
 #define TryLockPage(page)	test_and_set_bit(PG_locked, &(page)->flags)
+#define PageChecked(page)	test_bit(PG_checked, &(page)->flags)
+#define SetPageChecked(page)	set_bit(PG_checked, &(page)->flags)
 
 extern void __set_page_dirty(struct page *);
 
@@ -337,10 +340,10 @@ extern mem_map_t * mem_map;
  * can allocate highmem pages, the *get*page*() variants return
  * virtual kernel addresses to the allocated page(s).
  */
-extern struct page * FASTCALL(__alloc_pages(zonelist_t *zonelist, unsigned long order));
+extern struct page * FASTCALL(_alloc_pages(unsigned int gfp_mask, unsigned long order));
+extern struct page * FASTCALL(__alloc_pages(unsigned int gfp_mask, unsigned long order, zonelist_t *zonelist));
 extern struct page * alloc_pages_node(int nid, int gfp_mask, unsigned long order);
 
-#ifndef CONFIG_DISCONTIGMEM
 static inline struct page * alloc_pages(int gfp_mask, unsigned long order)
 {
 	/*
@@ -348,11 +351,8 @@ static inline struct page * alloc_pages(int gfp_mask, unsigned long order)
 	 */
 	if (order >= MAX_ORDER)
 		return NULL;
-	return __alloc_pages(contig_page_data.node_zonelists+(gfp_mask), order);
+	return _alloc_pages(gfp_mask, order);
 }
-#else /* !CONFIG_DISCONTIGMEM */
-extern struct page * alloc_pages(int gfp_mask, unsigned long order);
-#endif /* !CONFIG_DISCONTIGMEM */
 
 #define alloc_page(gfp_mask) alloc_pages(gfp_mask, 0)
 
@@ -471,18 +471,17 @@ extern struct page *filemap_nopage(struct vm_area_struct *, unsigned long, int);
 /*
  * GFP bitmasks..
  */
-#define __GFP_WAIT	0x01
-#define __GFP_HIGH	0x02
-#define __GFP_IO	0x04
-#define __GFP_DMA	0x08
-#ifdef CONFIG_HIGHMEM
-#define __GFP_HIGHMEM	0x10
-#else
-#define __GFP_HIGHMEM	0x0 /* noop */
-#endif
+/* Zone modifiers in GFP_ZONEMASK (see linux/mmzone.h - low four bits) */
+#define __GFP_DMA	0x01
+#define __GFP_HIGHMEM	0x02
 
+/* Action modifiers - doesn't change the zoning */
+#define __GFP_WAIT	0x10
+#define __GFP_HIGH	0x20
+#define __GFP_IO	0x40
+#define __GFP_BUFFER	0x80
 
-#define GFP_BUFFER	(__GFP_HIGH | __GFP_WAIT)
+#define GFP_BUFFER	(__GFP_HIGH | __GFP_WAIT | __GFP_BUFFER)
 #define GFP_ATOMIC	(__GFP_HIGH)
 #define GFP_USER	(             __GFP_WAIT | __GFP_IO)
 #define GFP_HIGHUSER	(             __GFP_WAIT | __GFP_IO | __GFP_HIGHMEM)

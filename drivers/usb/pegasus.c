@@ -127,8 +127,16 @@ static void ctrl_callback( urb_t *urb )
 static int get_registers(pegasus_t *pegasus, __u16 indx, __u16 size, void *data)
 {
 	int	ret;
+	unsigned char *buffer;
 	DECLARE_WAITQUEUE(wait, current);
 
+	buffer = kmalloc(size,GFP_KERNEL);
+	if (!buffer) {
+		err("unable to allocate memory for configuration descriptors");
+		return 0;
+	}
+	memcpy(buffer,data,size);
+	
 	while ( pegasus->flags & ETH_REGS_CHANGED ) {
 		pegasus->flags |= CTRL_URB_SLEEP;
 		interruptible_sleep_on( &pegasus->ctrl_wait );
@@ -143,7 +151,7 @@ static int get_registers(pegasus_t *pegasus, __u16 indx, __u16 size, void *data)
 	FILL_CONTROL_URB( &pegasus->ctrl_urb, pegasus->usb,
 			  usb_rcvctrlpipe(pegasus->usb,0),
 			  (char *)&pegasus->dr,
-			  data, size, ctrl_callback, pegasus );
+			  buffer, size, ctrl_callback, pegasus );
 
 	add_wait_queue( &pegasus->ctrl_wait, &wait );
 	set_current_state( TASK_INTERRUPTIBLE );
@@ -157,6 +165,8 @@ static int get_registers(pegasus_t *pegasus, __u16 indx, __u16 size, void *data)
 	schedule();
 	remove_wait_queue( &pegasus->ctrl_wait, &wait );
 out:
+	memcpy(data,buffer,size);
+	kfree(buffer);
 	return	ret;
 }
 
@@ -164,7 +174,15 @@ out:
 static int set_registers(pegasus_t *pegasus, __u16 indx, __u16 size, void *data)
 {
 	int	ret;
+	unsigned char *buffer;
 	DECLARE_WAITQUEUE(wait, current);
+
+	buffer = kmalloc(size, GFP_KERNEL);
+	if (!buffer) {
+		err("unable to allocate memory for configuration descriptors");
+		return 0;
+	}
+	memcpy(buffer, data, size);
 
 	while ( pegasus->flags & ETH_REGS_CHANGED ) {
 		pegasus->flags |= CTRL_URB_SLEEP ;
@@ -180,7 +198,7 @@ static int set_registers(pegasus_t *pegasus, __u16 indx, __u16 size, void *data)
 	FILL_CONTROL_URB( &pegasus->ctrl_urb, pegasus->usb,
 			  usb_sndctrlpipe(pegasus->usb,0),
 			  (char *)&pegasus->dr,
-			  data, size, ctrl_callback, pegasus );
+			  buffer, size, ctrl_callback, pegasus );
 			  
 	add_wait_queue( &pegasus->ctrl_wait, &wait );
 	set_current_state( TASK_INTERRUPTIBLE );
@@ -188,12 +206,14 @@ static int set_registers(pegasus_t *pegasus, __u16 indx, __u16 size, void *data)
 
 	if ( (ret = usb_submit_urb( &pegasus->ctrl_urb )) ) {
 		err( __FUNCTION__ " BAD CTRL %d", ret);
+		kfree(buffer);
 		return	ret;
 	}
 
 	schedule();
 	remove_wait_queue( &pegasus->ctrl_wait, &wait );
 
+	kfree(buffer);
 	return	ret;
 }
 
@@ -201,9 +221,17 @@ static int set_registers(pegasus_t *pegasus, __u16 indx, __u16 size, void *data)
 static int set_register( pegasus_t *pegasus, __u16 indx, __u8 data )
 {
 	int	ret;
+	unsigned char *buffer;
 	__u16 dat = data;
 	DECLARE_WAITQUEUE(wait, current);
 	
+	buffer = kmalloc(1, GFP_KERNEL);
+	if (!buffer) {
+		err("unable to allocate memory for configuration descriptors");
+		return 0;
+	}
+	memcpy(buffer, &data, 1);
+
 	while ( pegasus->flags & ETH_REGS_CHANGED ) {
 		pegasus->flags |= CTRL_URB_SLEEP;
 		interruptible_sleep_on( &pegasus->ctrl_wait );
@@ -218,7 +246,7 @@ static int set_register( pegasus_t *pegasus, __u16 indx, __u8 data )
 	FILL_CONTROL_URB( &pegasus->ctrl_urb, pegasus->usb,
 			  usb_sndctrlpipe(pegasus->usb,0),
 			  (char *)&pegasus->dr,
-			  &data, 1, ctrl_callback, pegasus );
+			  buffer, 1, ctrl_callback, pegasus );
 
 	add_wait_queue( &pegasus->ctrl_wait, &wait );
 	set_current_state( TASK_INTERRUPTIBLE );
@@ -226,12 +254,14 @@ static int set_register( pegasus_t *pegasus, __u16 indx, __u8 data )
 
 	if ( (ret = usb_submit_urb( &pegasus->ctrl_urb )) ) {
 		err( __FUNCTION__ " BAD CTRL %d", ret);
+		kfree(buffer);
 		return	ret;
 	}
 
 	schedule();
 	remove_wait_queue( &pegasus->ctrl_wait, &wait );
 
+	kfree(buffer);
 	return	ret;
 }
 

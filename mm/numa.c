@@ -34,7 +34,7 @@ void __init free_area_init_node(int nid, pg_data_t *pgdat, struct page *pmap,
 struct page * alloc_pages_node(int nid, int gfp_mask, unsigned long order)
 {
 #ifdef CONFIG_NUMA
-	return __alloc_pages(NODE_DATA(nid)->node_zonelists + gfp_mask, order);
+	return __alloc_pages(gfp_mask, order, NODE_DATA(nid)->node_zonelists + (gfp_mask & GFP_ZONEMASK));
 #else
 	return alloc_pages(gfp_mask, order);
 #endif
@@ -85,14 +85,14 @@ void __init free_area_init_node(int nid, pg_data_t *pgdat, struct page *pmap,
 static struct page * alloc_pages_pgdat(pg_data_t *pgdat, int gfp_mask,
 	unsigned long order)
 {
-	return __alloc_pages(pgdat->node_zonelists + gfp_mask, order);
+	return __alloc_pages(gfp_mask, order, pgdat->node_zonelists + (gfp_mask & GFP_ZONEMASK));
 }
 
 /*
  * This can be refined. Currently, tries to do round robin, instead
  * should do concentratic circle search, starting from current node.
  */
-struct page * alloc_pages(int gfp_mask, unsigned long order)
+struct page * _alloc_pages(int gfp_mask, unsigned long order)
 {
 	struct page *ret = 0;
 	pg_data_t *start, *temp;

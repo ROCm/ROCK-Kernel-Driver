@@ -544,7 +544,7 @@ need_resched_back:
 	release_kernel_lock(prev, this_cpu);
 
 	/* Do "administrative" work here while we don't hold any locks */
-	if (softirq_active(this_cpu) & softirq_mask(this_cpu))
+	if (softirq_pending(this_cpu))
 		goto handle_softirq;
 handle_softirq_back:
 

@@ -623,7 +623,7 @@ out:
 	desc->handler->end(irq);
 	spin_unlock(&desc->lock);
 
-	if (softirq_active(cpu) & softirq_mask(cpu))
+	if (softirq_pending(cpu))
 		do_softirq();
 	return 1;
 }

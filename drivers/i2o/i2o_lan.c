@@ -984,7 +984,7 @@ static int i2o_lan_packet_send(struct sk_buff *skb, struct net_device *dev)
 		__raw_writel(priv->unit << 16 | lan_send_context, msg+2); // InitiatorContext
 		__raw_writel(1 << 30 | 1 << 3, msg+3); 		 	  // TransmitControlWord
 			// bit 30: reply as soon as transmission attempt is complete
-			// bit 3: Supress CRC generation
+			// bit 3: Suppress CRC generation
 		__raw_writel(0xD5000000 | skb->len, msg+4);  	     // MAC hdr included
 		__raw_writel((u32)skb, msg+5);  		     // TransactionContext
 		__raw_writel(virt_to_bus(skb->data), msg+6);

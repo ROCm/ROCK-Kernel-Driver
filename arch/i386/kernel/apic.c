@@ -728,6 +728,9 @@ void smp_apic_timer_interrupt(struct pt_regs * regs)
 	irq_enter(cpu, 0);
 	smp_local_timer_interrupt(regs);
 	irq_exit(cpu, 0);
+
+	if (softirq_pending(cpu))
+		do_softirq();
 }
 
 /*

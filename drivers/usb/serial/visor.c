@@ -1,7 +1,7 @@
 /*
  * USB HandSpring Visor driver
  *
- *	Copyright (C) 1999, 2000
+ *	Copyright (C) 1999 - 2001
  *	    Greg Kroah-Hartman (greg@kroah.com)
  *
  *	This program is free software; you can redistribute it and/or modify
@@ -11,6 +11,9 @@
  *
  * See Documentation/usb/usb-serial.txt for more information on using this driver
  * 
+ * (05/28/2000) gkh
+ *	Added initial support for the Palm m500 and Palm m505 devices.
+ *
  * (04/08/2001) gb
  *	Identify version on module load.
  *
@@ -109,7 +112,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v1.0.0"
+#define DRIVER_VERSION "v1.1"
 #define DRIVER_AUTHOR "Greg Kroah-Hartman <greg@kroah.com>"
 #define DRIVER_DESC "USB HandSpring Visor driver"
 
@@ -131,8 +134,26 @@ static void visor_write_bulk_callback	(struct urb *urb);
 static void visor_read_bulk_callback	(struct urb *urb);
 
 
+static __devinitdata struct usb_device_id visor_id_table [] = {
+	{ USB_DEVICE(HANDSPRING_VENDOR_ID, HANDSPRING_VISOR_ID) },
+	{ }					/* Terminating entry */
+};
+
+static __devinitdata struct usb_device_id palm_m500_id_table [] = {
+	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M500_ID) },
+	{ }					/* Terminating entry */
+};
+
+static __devinitdata struct usb_device_id palm_m505_id_table [] = {
+	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M505_ID) },
+	{ }					/* Terminating entry */
+};
+
+
 static __devinitdata struct usb_device_id id_table [] = {
 	{ USB_DEVICE(HANDSPRING_VENDOR_ID, HANDSPRING_VISOR_ID) },
+	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M500_ID) },
+	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M505_ID) },
 	{ }					/* Terminating entry */
 };
 
@@ -143,7 +164,7 @@ MODULE_DEVICE_TABLE (usb, id_table);
 /* All of the device info needed for the Handspring Visor */
 struct usb_serial_device_type handspring_device = {
 	name:			"Handspring Visor",
-	id_table:		id_table,
+	id_table:		visor_id_table,
 	needs_interrupt_in:	MUST_HAVE_NOT,		/* this device must not have an interrupt in endpoint */
 	needs_bulk_in:		MUST_HAVE,		/* this device must have a bulk in endpoint */
 	needs_bulk_out:		MUST_HAVE,		/* this device must have a bulk out endpoint */
@@ -166,6 +187,57 @@ struct usb_serial_device_type handspring_device = {
 	read_bulk_callback:	visor_read_bulk_callback,
 };
 
+/* device info for the Palm M500 */
+struct usb_serial_device_type palm_m500_device = {
+	name:			"Palm M500",
+	id_table:		palm_m500_id_table,
+	needs_interrupt_in:	MUST_HAVE_NOT,		/* this device must not have an interrupt in endpoint */
+	needs_bulk_in:		MUST_HAVE,		/* this device must have a bulk in endpoint */
+	needs_bulk_out:		MUST_HAVE,		/* this device must have a bulk out endpoint */
+	num_interrupt_in:	0,
+	num_bulk_in:		2,
+	num_bulk_out:		2,
+	num_ports:		2,
+	open:			visor_open,
+	close:			visor_close,
+	throttle:		visor_throttle,
+	unthrottle:		visor_unthrottle,
+	startup:		visor_startup,
+	shutdown:		visor_shutdown,
+	ioctl:			visor_ioctl,
+	set_termios:		visor_set_termios,
+	write:			visor_write,
+	write_room:		visor_write_room,
+	chars_in_buffer:	visor_chars_in_buffer,
+	write_bulk_callback:	visor_write_bulk_callback,
+	read_bulk_callback:	visor_read_bulk_callback,
+};
+
+/* device info for the Palm M505 */
+struct usb_serial_device_type palm_m505_device = {
+	name:			"Palm M505",
+	id_table:		palm_m505_id_table,
+	needs_interrupt_in:	MUST_HAVE_NOT,		/* this device must not have an interrupt in endpoint */
+	needs_bulk_in:		MUST_HAVE,		/* this device must have a bulk in endpoint */
+	needs_bulk_out:		MUST_HAVE,		/* this device must have a bulk out endpoint */
+	num_interrupt_in:	0,
+	num_bulk_in:		2,
+	num_bulk_out:		2,
+	num_ports:		2,
+	open:			visor_open,
+	close:			visor_close,
+	throttle:		visor_throttle,
+	unthrottle:		visor_unthrottle,
+	startup:		visor_startup,
+	shutdown:		visor_shutdown,
+	ioctl:			visor_ioctl,
+	set_termios:		visor_set_termios,
+	write:			visor_write,
+	write_room:		visor_write_room,
+	chars_in_buffer:	visor_chars_in_buffer,
+	write_bulk_callback:	visor_write_bulk_callback,
+	read_bulk_callback:	visor_read_bulk_callback,
+};
 
 #define NUM_URBS			24
 #define URB_TRANSFER_BUFFER_SIZE	768
@@ -496,6 +568,10 @@ static int  visor_startup (struct usb_serial *serial)
 		return -ENOMEM;
 	}
 
+	/* force debugging on for the palm devices for now */
+	if (serial->dev->descriptor.idVendor == PALM_VENDOR_ID)
+		debug = 1;
+
 	dbg(__FUNCTION__);
 
 	dbg(__FUNCTION__ " - Set config to 1");
@@ -534,6 +610,28 @@ static int  visor_startup (struct usb_serial *serial)
 					break;	
 			}
 			info("%s: port %d, is for %s use and is bound to ttyUSB%d", serial->type->name, connection_info->connections[i].port, string, serial->minor + i);
+		}
+	}
+
+	if (serial->dev->descriptor.idVendor == PALM_VENDOR_ID) {
+		/* Palm USB Hack */
+		response = usb_control_msg (serial->dev, usb_rcvctrlpipe(serial->dev, 0), 
+					    PALM_GET_SOME_UNKNOWN_INFORMATION,
+					    0xc2, 0x0000, 0x0000, transfer_buffer, 
+					    0x14, 300);
+		if (response < 0) {
+			err(__FUNCTION__ " - error getting first unknown palm command");
+		} else {
+			usb_serial_debug_data (__FILE__, __FUNCTION__, 0x14, transfer_buffer);
+		}
+		response = usb_control_msg (serial->dev, usb_rcvctrlpipe(serial->dev, 0), 
+					    PALM_GET_SOME_UNKNOWN_INFORMATION,
+					    0xc2, 0x0000, 0x0000, transfer_buffer, 
+					    0x14, 300);
+		if (response < 0) {
+			err(__FUNCTION__ " - error getting second unknown palm command");
+		} else {
+			usb_serial_debug_data (__FILE__, __FUNCTION__, 0x14, transfer_buffer);
 		}
 	}
 
@@ -645,6 +743,8 @@ static int __init visor_init (void)
 	int i;
 
 	usb_serial_register (&handspring_device);
+	usb_serial_register (&palm_m500_device);
+	usb_serial_register (&palm_m505_device);
 	
 	/* create our write urb pool and transfer buffers */ 
 	spin_lock_init (&write_urb_pool_lock);
@@ -677,6 +777,8 @@ static void __exit visor_exit (void)
 	unsigned long flags;
 
 	usb_serial_deregister (&handspring_device);
+	usb_serial_deregister (&palm_m500_device);
+	usb_serial_deregister (&palm_m505_device);
 
 	spin_lock_irqsave (&write_urb_pool_lock, flags);
 

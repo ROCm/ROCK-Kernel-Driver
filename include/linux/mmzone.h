@@ -78,10 +78,9 @@ typedef struct zone_struct {
  */
 typedef struct zonelist_struct {
 	zone_t * zones [MAX_NR_ZONES+1]; // NULL delimited
-	int gfp_mask;
 } zonelist_t;
 
-#define NR_GFPINDEX		0x20
+#define GFP_ZONEMASK	0x0f
 
 /*
  * The pg_data_t structure is used in machines with CONFIG_DISCONTIGMEM
@@ -97,7 +96,7 @@ typedef struct zonelist_struct {
 struct bootmem_data;
 typedef struct pglist_data {
 	zone_t node_zones[MAX_NR_ZONES];
-	zonelist_t node_zonelists[NR_GFPINDEX];
+	zonelist_t node_zonelists[GFP_ZONEMASK+1];
 	struct page *node_mem_map;
 	unsigned long *valid_addr_bitmap;
 	struct bootmem_data *bdata;

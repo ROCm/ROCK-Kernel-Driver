@@ -1,7 +1,7 @@
 /*
  * USB HandSpring Visor driver
  *
- *	Copyright (C) 1999, 2000
+ *	Copyright (C) 1999 - 2001
  *	    Greg Kroah-Hartman (greg@kroah.com)
  *
  *	This program is free software; you can redistribute it and/or modify
@@ -19,6 +19,10 @@
 
 #define HANDSPRING_VENDOR_ID		0x082d
 #define HANDSPRING_VISOR_ID		0x0100
+
+#define PALM_VENDOR_ID			0x0830
+#define PALM_M500_ID			0x0001
+#define PALM_M505_ID			0x0002
 
 /****************************************************************************
  * Handspring Visor Vendor specific request codes (bRequest values)
@@ -69,6 +73,13 @@ struct visor_connection_info {
 #define VISOR_FUNCTION_HOTSYNC		0x02
 #define VISOR_FUNCTION_CONSOLE		0x03
 #define VISOR_FUNCTION_REMOTE_FILE_SYS	0x04
+
+
+/****************************************************************************
+ * PALM_GET_SOME_UNKNOWN_INFORMATION is sent by the host during enumeration to
+ * get some information from the M series devices, that is currently unknown.
+ ****************************************************************************/
+#define PALM_GET_SOME_UNKNOWN_INFORMATION	0x04
 
 #endif
 

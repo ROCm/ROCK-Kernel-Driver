@@ -428,18 +428,13 @@ out:
  * go out to Matthew Dillon.
  */
 #define MAX_LAUNDER 		(4 * (1 << page_cluster))
+#define CAN_DO_IO		(gfp_mask & __GFP_IO)
+#define CAN_DO_BUFFERS		(gfp_mask & __GFP_BUFFER)
 int page_launder(int gfp_mask, int sync)
 {
 	int launder_loop, maxscan, cleaned_pages, maxlaunder;
-	int can_get_io_locks;
 	struct list_head * page_lru;
 	struct page * page;
-
-	/*
-	 * We can only grab the IO locks (eg. for flushing dirty
-	 * buffers to disk) if __GFP_IO is set.
-	 */
-	can_get_io_locks = gfp_mask & __GFP_IO;
 
 	launder_loop = 0;
 	maxlaunder = 0;
@@ -463,6 +458,7 @@ dirty_page_rescan:
 
 		/* Page is or was in use?  Move it to the active list. */
 		if (PageReferenced(page) || page->age > 0 ||
+				page->zone->free_pages > page->zone->pages_high ||
 				(!page->buffers && page_count(page) > 1) ||
 				page_ramdisk(page)) {
 			del_page_from_inactive_dirty_list(page);
@@ -491,7 +487,7 @@ dirty_page_rescan:
 				goto page_active;
 
 			/* First time through? Move it to the back of the list */
-			if (!launder_loop) {
+			if (!launder_loop || !CAN_DO_IO) {
 				list_del(page_lru);
 				list_add(page_lru, &inactive_dirty_list);
 				UnlockPage(page);
@@ -621,7 +617,7 @@ page_active:
 	 * loads, flush out the dirty pages before we have to wait on
 	 * IO.
 	 */
-	if (can_get_io_locks && !launder_loop && free_shortage()) {
+	if ((CAN_DO_IO || CAN_DO_BUFFERS) && !launder_loop && free_shortage()) {
 		launder_loop = 1;
 		/* If we cleaned pages, never do synchronous IO. */
 		if (cleaned_pages)
@@ -655,24 +651,10 @@ int refill_inactive_scan(unsigned int priority, int target)
 
 	/*
 	 * When we are background aging, we try to increase the page aging
-	 * information in the system. When we have too many inactive pages
-	 * we don't do background aging since having all pages on the
-	 * inactive list decreases aging information.
-	 *
-	 * Since not all active pages have to be on the active list, we round
-	 * nr_active_pages up to num_physpages/2, if needed.
+	 * information in the system.
 	 */
-	if (!target) {
-		int inactive = nr_free_pages() + nr_inactive_clean_pages() +
-						nr_inactive_dirty_pages;
-		int active = MAX(nr_active_pages, num_physpages / 2);
-		if (active > 10 * inactive)
-			maxscan = nr_active_pages >> 4;
-		else if (active > 3 * inactive)
-			maxscan = nr_active_pages >> 8;
-		else
-			return 0;
-	}
+	if (!target)
+		maxscan = nr_active_pages >> 4;
 
 	/* Take the lock while messing with the list... */
 	spin_lock(&pagemap_lru_lock);

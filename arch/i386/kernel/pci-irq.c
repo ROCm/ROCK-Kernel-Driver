@@ -656,10 +656,12 @@ void __init pcibios_fixup_irqs(void)
 			if (pin) {
 				pin--;		/* interrupt pins are numbered starting from 1 */
 				irq = IO_APIC_get_PCI_irq_vector(dev->bus->number, PCI_SLOT(dev->devfn), pin);
-/*
- * Will be removed completely if things work out well with fuzzy parsing
- */
-#if 0
+	/*
+	 * Busses behind bridges are typically not listed in the MP-table.
+	 * In this case we have to look up the IRQ based on the parent bus,
+	 * parent slot, and pin number. The SMP code detects such bridged
+	 * busses itself so we should get into this branch reliably.
+	 */
 				if (irq < 0 && dev->bus->parent) { /* go back to the bridge */
 					struct pci_dev * bridge = dev->bus->self;
 
@@ -670,7 +672,6 @@ void __init pcibios_fixup_irqs(void)
 						printk(KERN_WARNING "PCI: using PPB(B%d,I%d,P%d) to get irq %d\n", 
 							bridge->bus->number, PCI_SLOT(bridge->devfn), pin, irq);
 				}
-#endif
 				if (irq >= 0) {
 					printk(KERN_INFO "PCI->APIC IRQ transform: (B%d,I%d,P%d) -> %d\n",
 						dev->bus->number, PCI_SLOT(dev->devfn), pin, irq);

@@ -873,6 +873,7 @@ static void kill_super(struct super_block *sb)
 	}
 	spin_unlock(&dcache_lock);
 	down_write(&sb->s_umount);
+	lock_kernel();
 	sb->s_root = NULL;
 	/* Need to clean after the sucker */
 	if (fs->fs_flags & FS_LITTER)
@@ -901,6 +902,7 @@ static void kill_super(struct super_block *sb)
 	put_filesystem(fs);
 	sb->s_type = NULL;
 	unlock_super(sb);
+	unlock_kernel();
 	up_write(&sb->s_umount);
 	if (bdev) {
 		blkdev_put(bdev, BDEV_FS);

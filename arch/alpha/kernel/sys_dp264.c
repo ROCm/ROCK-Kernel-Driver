@@ -16,18 +16,15 @@
 #include <linux/pci.h>
 #include <linux/init.h>
 
-#define __EXTERN_INLINE inline
-#include <asm/io.h>
-#include <asm/core_tsunami.h>
-#undef  __EXTERN_INLINE
-
 #include <asm/ptrace.h>
 #include <asm/system.h>
 #include <asm/dma.h>
 #include <asm/irq.h>
 #include <asm/bitops.h>
 #include <asm/mmu_context.h>
+#include <asm/io.h>
 #include <asm/pgtable.h>
+#include <asm/core_tsunami.h>
 #include <asm/hwrpb.h>
 
 #include "proto.h"

@@ -230,11 +230,11 @@ static int ext2_block_to_path(struct inode *inode, long i_block, int offsets[4])
  *	or when it reads all @depth-1 indirect blocks successfully and finds
  *	the whole chain, all way to the data (returns %NULL, *err == 0).
  */
-static inline Indirect *ext2_get_branch(struct inode *inode,
-					int depth,
-					int *offsets,
-					Indirect chain[4],
-					int *err)
+static Indirect *ext2_get_branch(struct inode *inode,
+				 int depth,
+				 int *offsets,
+				 Indirect chain[4],
+				 int *err)
 {
 	kdev_t dev = inode->i_dev;
 	int size = inode->i_sb->s_blocksize;
@@ -572,82 +572,6 @@ changed:
 		partial--;
 	}
 	goto reread;
-}
-
-struct buffer_head * ext2_getblk(struct inode * inode, long block, int create, int * err)
-{
-	struct buffer_head dummy;
-	int error;
-
-	dummy.b_state = 0;
-	dummy.b_blocknr = -1000;
-	error = ext2_get_block(inode, block, &dummy, create);
-	*err = error;
-	if (!error && buffer_mapped(&dummy)) {
-		struct buffer_head *bh;
-		bh = getblk(dummy.b_dev, dummy.b_blocknr, inode->i_sb->s_blocksize);
-		if (buffer_new(&dummy)) {
-			lock_buffer(bh);
-			memset(bh->b_data, 0, inode->i_sb->s_blocksize);
-			mark_buffer_uptodate(bh, 1);
-			unlock_buffer(bh);
-			mark_buffer_dirty_inode(bh, inode);
-		}
-		return bh;
-	}
-	return NULL;
-}
-
-struct buffer_head * ext2_bread (struct inode * inode, int block, 
-				 int create, int *err)
-{
-	struct buffer_head * bh;
-	int prev_blocks;
-	
-	prev_blocks = inode->i_blocks;
-	
-	bh = ext2_getblk (inode, block, create, err);
-	if (!bh)
-		return bh;
-	
-	/*
-	 * If the inode has grown, and this is a directory, then perform
-	 * preallocation of a few more blocks to try to keep directory
-	 * fragmentation down.
-	 */
-	if (create && 
-	    S_ISDIR(inode->i_mode) && 
-	    inode->i_blocks > prev_blocks &&
-	    EXT2_HAS_COMPAT_FEATURE(inode->i_sb,
-				    EXT2_FEATURE_COMPAT_DIR_PREALLOC)) {
-		int i;
-		struct buffer_head *tmp_bh;
-		
-		for (i = 1;
-		     i < EXT2_SB(inode->i_sb)->s_es->s_prealloc_dir_blocks;
-		     i++) {
-			/* 
-			 * ext2_getblk will zero out the contents of the
-			 * directory for us
-			 */
-			tmp_bh = ext2_getblk(inode, block+i, create, err);
-			if (!tmp_bh) {
-				brelse (bh);
-				return 0;
-			}
-			brelse (tmp_bh);
-		}
-	}
-	
-	if (buffer_uptodate(bh))
-		return bh;
-	ll_rw_block (READ, 1, &bh);
-	wait_on_buffer (bh);
-	if (buffer_uptodate(bh))
-		return bh;
-	brelse (bh);
-	*err = -EIO;
-	return NULL;
 }
 
 static int ext2_writepage(struct page *page)
@@ -1067,6 +991,7 @@ void ext2_read_inode (struct inode * inode)
 	} else if (S_ISDIR(inode->i_mode)) {
 		inode->i_op = &ext2_dir_inode_operations;
 		inode->i_fop = &ext2_dir_operations;
+		inode->i_mapping->a_ops = &ext2_aops;
 	} else if (S_ISLNK(inode->i_mode)) {
 		if (!inode->i_blocks)
 			inode->i_op = &ext2_fast_symlink_inode_operations;

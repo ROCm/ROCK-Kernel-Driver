@@ -2483,7 +2483,7 @@ int __init matroxfb_setup(char *options) {
 	return 0;
 }
 
-static int __init initialized = 0;
+static int initialized __initdata = 0;
 
 int __init matroxfb_init(void)
 {

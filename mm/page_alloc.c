@@ -268,15 +268,21 @@ static struct page * __alloc_pages_limit(zonelist_t *zonelist,
 	return NULL;
 }
 
+#ifndef CONFIG_DISCONTIGMEM
+struct page *_alloc_pages(unsigned int gfp_mask, unsigned long order)
+{
+	return __alloc_pages(gfp_mask, order,
+		contig_page_data.node_zonelists+(gfp_mask & GFP_ZONEMASK));
+}
+#endif
 
 /*
  * This is the 'heart' of the zoned buddy allocator:
  */
-struct page * __alloc_pages(zonelist_t *zonelist, unsigned long order)
+struct page * __alloc_pages(unsigned int gfp_mask, unsigned long order, zonelist_t *zonelist)
 {
 	zone_t **zone;
 	int direct_reclaim = 0;
-	unsigned int gfp_mask = zonelist->gfp_mask;
 	struct page * page;
 
 	/*
@@ -428,18 +434,26 @@ try_again:
 		}
 		/*
 		 * When we arrive here, we are really tight on memory.
+		 * Since kswapd didn't succeed in freeing pages for us,
+		 * we try to help it.
 		 *
-		 * We try to free pages ourselves by:
-		 * 	- shrinking the i/d caches.
-		 * 	- reclaiming unused memory from the slab caches.
-		 * 	- swapping/syncing pages to disk (done by page_launder)
-		 * 	- moving clean pages from the inactive dirty list to
-		 * 	  the inactive clean list. (done by page_launder)
+		 * Single page allocs loop until the allocation succeeds.
+		 * Multi-page allocs can fail due to memory fragmentation;
+		 * in that case we bail out to prevent infinite loops and
+		 * hanging device drivers ...
+		 *
+		 * Another issue are GFP_BUFFER allocations; because they
+		 * do not have __GFP_IO set it's possible we cannot make
+		 * any progress freeing pages, in that case it's better
+		 * to give up than to deadlock the kernel looping here.
 		 */
 		if (gfp_mask & __GFP_WAIT) {
 			memory_pressure++;
-			try_to_free_pages(gfp_mask);
-			goto try_again;
+			if (!order || free_shortage()) {
+				int progress = try_to_free_pages(gfp_mask);
+				if (progress || gfp_mask & __GFP_IO)
+					goto try_again;
+			}
 		}
 	}
 
@@ -671,14 +685,13 @@ static inline void build_zonelists(pg_data_t *pgdat)
 {
 	int i, j, k;
 
-	for (i = 0; i < NR_GFPINDEX; i++) {
+	for (i = 0; i <= GFP_ZONEMASK; i++) {
 		zonelist_t *zonelist;
 		zone_t *zone;
 
 		zonelist = pgdat->node_zonelists + i;
 		memset(zonelist, 0, sizeof(*zonelist));
 
-		zonelist->gfp_mask = i;
 		j = 0;
 		k = ZONE_NORMAL;
 		if (i & __GFP_HIGHMEM)

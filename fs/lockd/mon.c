@@ -146,7 +146,7 @@ xdr_encode_mon(struct rpc_rqst *rqstp, u32 *p, struct nsm_args *argp)
 	u32	addr = ntohl(argp->addr);
 
 	dprintk("nsm: xdr_encode_mon(%08x, %d, %d, %d)\n",
-			htonl(argp->addr), htonl(argp->proc),
+			htonl(argp->addr), htonl(argp->prog),
 			htonl(argp->vers), htonl(argp->proc));
 
 	/*

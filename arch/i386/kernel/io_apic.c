@@ -255,10 +255,16 @@ static int __init find_isa_irq_pin(int irq, int type)
  */
 static int pin_2_irq(int idx, int apic, int pin);
 
-int IO_APIC_get_PCI_irq_vector(int bus, int slot, int pci_pin)
+int IO_APIC_get_PCI_irq_vector(int bus, int slot, int pin)
 {
 	int apic, i, best_guess = -1;
 
+	Dprintk("querying PCI -> IRQ mapping bus:%d, slot:%d, pin:%d.\n",
+		bus, slot, pin);
+	if (mp_bus_id_to_pci_bus[bus] == -1) {
+		printk(KERN_WARNING "PCI BIOS passed nonexistent PCI bus %d!\n", bus);
+		return -1;
+	}
 	for (i = 0; i < mp_irq_entries; i++) {
 		int lbus = mp_irqs[i].mpc_srcbus;
 
@@ -269,14 +275,14 @@ int IO_APIC_get_PCI_irq_vector(int bus, int slot, int pci_pin)
 
 		if ((mp_bus_id_to_type[lbus] == MP_BUS_PCI) &&
 		    !mp_irqs[i].mpc_irqtype &&
-		    (bus == mp_bus_id_to_pci_bus[mp_irqs[i].mpc_srcbus]) &&
+		    (bus == lbus) &&
 		    (slot == ((mp_irqs[i].mpc_srcbusirq >> 2) & 0x1f))) {
 			int irq = pin_2_irq(i,apic,mp_irqs[i].mpc_dstirq);
 
 			if (!(apic || IO_APIC_IRQ(irq)))
 				continue;
 
-			if (pci_pin == (mp_irqs[i].mpc_srcbusirq & 3))
+			if (pin == (mp_irqs[i].mpc_srcbusirq & 3))
 				return irq;
 			/*
 			 * Use the first all-but-pin matching entry as a
@@ -728,9 +734,11 @@ void __init print_IO_APIC(void)
 	printk(KERN_DEBUG ".... register #01: %08X\n", *(int *)&reg_01);
 	printk(KERN_DEBUG ".......     : max redirection entries: %04X\n", reg_01.entries);
 	if (	(reg_01.entries != 0x0f) && /* older (Neptune) boards */
+		(reg_01.entries != 0x11) &&
 		(reg_01.entries != 0x17) && /* typical ISA+PCI boards */
 		(reg_01.entries != 0x1b) && /* Compaq Proliant boards */
 		(reg_01.entries != 0x1f) && /* dual Xeon boards */
+		(reg_01.entries != 0x20) &&
 		(reg_01.entries != 0x22) && /* bigger Xeon boards */
 		(reg_01.entries != 0x2E) &&
 		(reg_01.entries != 0x3F)

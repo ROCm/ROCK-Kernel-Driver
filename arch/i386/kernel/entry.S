@@ -133,6 +133,18 @@ ENOSYS = 38
 	movl $-8192, reg; \
 	andl %esp, reg
 
+#ifdef CONFIG_SMP
+#define CHECK_SOFTIRQ \
+	movl processor(%ebx),%eax; \
+	shll $CONFIG_X86_L1_CACHE_SHIFT,%eax; \
+	movl SYMBOL_NAME(irq_stat)(,%eax),%ecx; \
+	testl SYMBOL_NAME(irq_stat)+4(,%eax),%ecx
+#else
+#define CHECK_SOFTIRQ \
+	movl SYMBOL_NAME(irq_stat),%ecx; \
+	testl SYMBOL_NAME(irq_stat)+4,%ecx
+#endif
+
 ENTRY(lcall7)
 	pushfl			# We get a different stack layout with call gates,
 	pushl %eax		# which has to be cleaned up later..
@@ -203,18 +215,9 @@ ENTRY(system_call)
 	call *SYMBOL_NAME(sys_call_table)(,%eax,4)
 	movl %eax,EAX(%esp)		# save the return value
 ENTRY(ret_from_sys_call)
-#ifdef CONFIG_SMP
-	movl processor(%ebx),%eax
-	shll $CONFIG_X86_L1_CACHE_SHIFT,%eax
-	movl SYMBOL_NAME(irq_stat)(,%eax),%ecx		# softirq_active
-	testl SYMBOL_NAME(irq_stat)+4(,%eax),%ecx	# softirq_mask
-#else
-	movl SYMBOL_NAME(irq_stat),%ecx		# softirq_active
-	testl SYMBOL_NAME(irq_stat)+4,%ecx	# softirq_mask
-#endif
-	jne   handle_softirq
-	
-ret_with_reschedule:
+	cli
+	CHECK_SOFTIRQ
+	jne handle_softirq
 	cmpl $0,need_resched(%ebx)
 	jne reschedule
 	cmpl $0,sigpending(%ebx)
@@ -230,6 +233,13 @@ signal_return:
 	jne v86_signal_return
 	xorl %edx,%edx
 	call SYMBOL_NAME(do_signal)
+#ifdef CONFIG_SMP
+	GET_CURRENT(%ebx)
+#endif
+	cli
+	CHECK_SOFTIRQ
+	je restore_all
+	call SYMBOL_NAME(do_softirq)
 	jmp restore_all
 
 	ALIGN
@@ -238,6 +248,13 @@ v86_signal_return:
 	movl %eax,%esp
 	xorl %edx,%edx
 	call SYMBOL_NAME(do_signal)
+#ifdef CONFIG_SMP
+	GET_CURRENT(%ebx)
+#endif
+	cli
+	CHECK_SOFTIRQ
+	je restore_all
+	call SYMBOL_NAME(do_softirq)
 	jmp restore_all
 
 	ALIGN
@@ -258,24 +275,21 @@ badsys:
 
 	ALIGN
 ret_from_exception:
-#ifdef CONFIG_SMP
-	GET_CURRENT(%ebx)
-	movl processor(%ebx),%eax
-	shll $CONFIG_X86_L1_CACHE_SHIFT,%eax
-	movl SYMBOL_NAME(irq_stat)(,%eax),%ecx		# softirq_active
-	testl SYMBOL_NAME(irq_stat)+4(,%eax),%ecx	# softirq_mask
-#else
-	movl SYMBOL_NAME(irq_stat),%ecx		# softirq_active
-	testl SYMBOL_NAME(irq_stat)+4,%ecx	# softirq_mask
-#endif
-	jne   handle_softirq
+	cli
+	CHECK_SOFTIRQ
+	jne handle_softirq
+	cmpl $0,need_resched(%ebx)
+	jne reschedule
+	cmpl $0,sigpending(%ebx)
+	jne signal_return
+	jmp restore_all
 
 ENTRY(ret_from_intr)
 	GET_CURRENT(%ebx)
 	movl EFLAGS(%esp),%eax		# mix EFLAGS and CS
 	movb CS(%esp),%al
 	testl $(VM_MASK | 3),%eax	# return to VM86 mode or non-supervisor?
-	jne ret_with_reschedule
+	jne ret_from_sys_call
 	jmp restore_all
 
 	ALIGN

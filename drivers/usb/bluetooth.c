@@ -1,11 +1,20 @@
 /*
- * bluetooth.c   Version 0.8
+ * bluetooth.c   Version 0.10
  *
  * Copyright (c) 2000 Greg Kroah-Hartman	<greg@kroah.com>
  * Copyright (c) 2000 Mark Douglas Corner	<mcorner@umich.edu>
  *
  * USB Bluetooth driver, based on the Bluetooth Spec version 1.0B
  * 
+ * (2001/05/28) Version 0.10 gkh
+ *	- Fixed problem with using data from userspace in the bluetooth_write
+ *	  function as found by the CHECKER project.
+ *	- Added a buffer to the write_urb_pool which reduces the number of
+ *	  buffers being created and destroyed for ever write.  Also cleans
+ *	  up the logic a bit.
+ *	- Added a buffer to the control_urb_pool which fixes a memory leak
+ *	  when the device is removed from the system.
+ *
  * (08/04/2001) gb
  *	Identify version on module load.
  *
@@ -97,7 +106,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v0.8"
+#define DRIVER_VERSION "v0.10"
 #define DRIVER_AUTHOR "Greg Kroah-Hartman, Mark Douglas Corner"
 #define DRIVER_DESC "USB Bluetooth driver"
 
@@ -260,7 +269,7 @@ static inline struct usb_bluetooth *get_bluetooth_by_minor (int minor)
 }
 
 
-static int bluetooth_ctrl_msg (struct usb_bluetooth *bluetooth, int request, int value, void *buf, int len)
+static int bluetooth_ctrl_msg (struct usb_bluetooth *bluetooth, int request, int value, const unsigned char *buf, int len)
 {
 	struct urb *urb = NULL;
 	devrequest *dr = NULL;
@@ -282,11 +291,23 @@ static int bluetooth_ctrl_msg (struct usb_bluetooth *bluetooth, int request, int
 		return -ENOMEM;
 	}
 
-	/* free up the last buffer that this urb used */
-	if (urb->transfer_buffer != NULL) {
-		kfree(urb->transfer_buffer);
-		urb->transfer_buffer = NULL;
+	/* keep increasing the urb transfer buffer to fit the size of the message */
+	if (urb->transfer_buffer == NULL) {
+		urb->transfer_buffer = kmalloc (len, GFP_KERNEL);
+		if (urb->transfer_buffer == NULL) {
+			err (__FUNCTION__" - out of memory");
+			return -ENOMEM;
+		}
 	}
+	if (urb->transfer_buffer_length < len) {
+		kfree (urb->transfer_buffer);
+		urb->transfer_buffer = kmalloc (len, GFP_KERNEL);
+		if (urb->transfer_buffer == NULL) {
+			err (__FUNCTION__" - out of memory");
+			return -ENOMEM;
+		}
+	}
+	memcpy (urb->transfer_buffer, buf, len);
 
 	dr->requesttype = BLUETOOTH_CONTROL_REQUEST_TYPE;
 	dr->request = request;
@@ -295,14 +316,14 @@ static int bluetooth_ctrl_msg (struct usb_bluetooth *bluetooth, int request, int
 	dr->length = cpu_to_le16p(&len);
 	
 	FILL_CONTROL_URB (urb, bluetooth->dev, usb_sndctrlpipe(bluetooth->dev, 0),
-			  (unsigned char*)dr, buf, len, bluetooth_ctrl_callback, bluetooth);
+			  (unsigned char*)dr, urb->transfer_buffer, len, bluetooth_ctrl_callback, bluetooth);
 
 	/* send it down the pipe */
 	status = usb_submit_urb(urb);
 	if (status)
 		dbg(__FUNCTION__ " - usb_submit_urb(control) failed with status = %d", status);
 	
-	return 0;
+	return status;
 }
 
 
@@ -401,12 +422,13 @@ static int bluetooth_write (struct tty_struct * tty, int from_user, const unsign
 {
 	struct usb_bluetooth *bluetooth = get_usb_bluetooth ((struct usb_bluetooth *)tty->driver_data, __FUNCTION__);
 	struct urb *urb = NULL;
-	unsigned char *new_buffer;
+	unsigned char *temp_buffer = NULL;
+	const unsigned char *current_buffer;
 	const unsigned char *current_position;
-	int status;
 	int bytes_sent;
 	int buffer_size;
 	int i;
+	int retval = 0;
 
 	if (!bluetooth) {
 		return -ENODEV;
@@ -436,38 +458,39 @@ static int bluetooth_write (struct tty_struct * tty, int from_user, const unsign
 	printk ("\n");
 #endif
 
-	switch (*buf) {
+	if (from_user) {
+		temp_buffer = kmalloc (count, GFP_KERNEL);
+		if (temp_buffer == NULL) {
+			err (__FUNCTION__ "- out of memory.");
+			retval = -ENOMEM;
+			goto exit;
+		}
+		copy_from_user (temp_buffer, buf, count);
+		current_buffer = temp_buffer;
+	} else {
+		current_buffer = buf;
+	}
+
+	switch (*current_buffer) {
 		/* First byte indicates the type of packet */
 		case CMD_PKT:
 			/* dbg(__FUNCTION__ "- Send cmd_pkt len:%d", count);*/
 
 			if (in_interrupt()){
 				printk("cmd_pkt from interrupt!\n");
-				return count;
+				retval = count;
+				goto exit;
 			}
 
-			new_buffer = kmalloc (count-1, GFP_KERNEL);
-
-			if (!new_buffer) {
-				err (__FUNCTION__ "- out of memory.");
-				return -ENOMEM;
+			retval = bluetooth_ctrl_msg (bluetooth, 0x00, 0x00, &current_buffer[1], count-1);
+			if (retval) {
+				goto exit;
 			}
-
-			if (from_user)
-				copy_from_user (new_buffer, buf+1, count-1);
-			else
-				memcpy (new_buffer, buf+1, count-1);
-
-			if (bluetooth_ctrl_msg (bluetooth, 0x00, 0x00, new_buffer, count-1) != 0) {
-				kfree (new_buffer);
-				return 0;
-			}
-
-			/* need to free new_buffer somehow... FIXME */
-			return count;
+			retval = count;
+			break;
 
 		case ACL_PKT:
-			current_position = buf;
+			current_position = current_buffer;
 			++current_position;
 			--count;
 			bytes_sent = 0;
@@ -484,37 +507,25 @@ static int bluetooth_write (struct tty_struct * tty, int from_user, const unsign
 				}
 				if (urb == NULL) {
 					dbg (__FUNCTION__ " - no free urbs");
-					return bytes_sent;
+					retval = bytes_sent;
+					goto exit;
 				}
 				
-				/* free up the last buffer that this urb used */
-				if (urb->transfer_buffer != NULL) {
-					kfree(urb->transfer_buffer);
-					urb->transfer_buffer = NULL;
-				}
 
 				buffer_size = MIN (count, bluetooth->bulk_out_buffer_size);
-				
-				new_buffer = kmalloc (buffer_size, GFP_KERNEL);
-				if (new_buffer == NULL) {
-					err(__FUNCTION__" no more kernel memory...");
-					return bytes_sent;
-				}
-
-				if (from_user)
-					copy_from_user(new_buffer, current_position, buffer_size);
-				else
-					memcpy (new_buffer, current_position, buffer_size);
+				memcpy (urb->transfer_buffer, current_position, buffer_size);
 
 				/* build up our urb */
 				FILL_BULK_URB (urb, bluetooth->dev, usb_sndbulkpipe(bluetooth->dev, bluetooth->bulk_out_endpointAddress),
-						new_buffer, buffer_size, bluetooth_write_bulk_callback, bluetooth);
+						urb->transfer_buffer, buffer_size, bluetooth_write_bulk_callback, bluetooth);
 				urb->transfer_flags |= USB_QUEUE_BULK;
 
 				/* send it down the pipe */
-				status = usb_submit_urb(urb);
-				if (status)
-					dbg(__FUNCTION__ " - usb_submit_urb(write bulk) failed with status = %d", status);
+				retval = usb_submit_urb(urb);
+				if (retval) {
+					dbg(__FUNCTION__ " - usb_submit_urb(write bulk) failed with error = %d", retval);
+					goto exit;
+				}
 #ifdef BTBUGGYHARDWARE
 				/* A workaround for the stalled data bug */
 				/* May or may not be needed...*/
@@ -527,13 +538,20 @@ static int bluetooth_write (struct tty_struct * tty, int from_user, const unsign
 				count -= buffer_size;
 			}
 
-			return bytes_sent + 1;
+			retval = bytes_sent + 1;
+			break;
 		
 		default :
 			dbg(__FUNCTION__" - unsupported (at this time) write type");
+			retval = -EINVAL;
+			break;
 	}
 
-	return 0;
+exit:
+	if (temp_buffer != NULL)
+		kfree (temp_buffer);
+
+	return retval;
 } 
 
 
@@ -1114,7 +1132,11 @@ static void * usb_bluetooth_probe(struct usb_device *dev, unsigned int ifnum,
 			err("No free urbs available");
 			goto probe_error;
 		}
-		urb->transfer_buffer = NULL;
+		urb->transfer_buffer = kmalloc (bluetooth->bulk_out_buffer_size, GFP_KERNEL);
+		if (urb->transfer_buffer == NULL) {
+			err("out of memory");
+			goto probe_error;
+		}
 		bluetooth->write_urb_pool[i] = urb;
 	}
 	
@@ -1156,11 +1178,17 @@ probe_error:
 	if (bluetooth->interrupt_in_buffer)
 		kfree (bluetooth->interrupt_in_buffer);
 	for (i = 0; i < NUM_BULK_URBS; ++i)
-		if (bluetooth->write_urb_pool[i])
+		if (bluetooth->write_urb_pool[i]) {
+			if (bluetooth->write_urb_pool[i]->transfer_buffer)
+				kfree (bluetooth->write_urb_pool[i]->transfer_buffer);
 			usb_free_urb (bluetooth->write_urb_pool[i]);
+		}
 	for (i = 0; i < NUM_CONTROL_URBS; ++i) 
-		if (bluetooth->control_urb_pool[i])
+		if (bluetooth->control_urb_pool[i]) {
+			if (bluetooth->control_urb_pool[i]->transfer_buffer)
+				kfree (bluetooth->control_urb_pool[i]->transfer_buffer);
 			usb_free_urb (bluetooth->control_urb_pool[i]);
+		}
 
 	bluetooth_table[minor] = NULL;
 

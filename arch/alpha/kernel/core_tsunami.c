@@ -11,7 +11,6 @@
 #include <linux/pci.h>
 #include <linux/sched.h>
 #include <linux/init.h>
-#include <linux/bootmem.h>
 
 #include <asm/ptrace.h>
 #include <asm/system.h>
@@ -21,6 +20,8 @@
 #include <asm/io.h>
 #include <asm/core_tsunami.h>
 #undef __EXTERN_INLINE
+
+#include <linux/bootmem.h>
 
 #include "proto.h"
 #include "pci_impl.h"

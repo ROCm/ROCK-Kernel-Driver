@@ -10709,9 +10709,10 @@ CONFIG_USB_SERIAL_WHITEHEAT
 
 USB Handspring Visor Driver
 CONFIG_USB_SERIAL_VISOR
-  Say Y here if you want to connect to your HandSpring Visor through
-  its USB docking station. See http://usbvisor.sourceforge.net for
-  more information on using this driver.
+  Say Y here if you want to connect to your HandSpring Visor, Palm m500
+  or m505 through its USB docking station.
+  See http://usbvisor.sourceforge.net for more information on using this
+  driver.
 
   This code is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
@@ -11128,12 +11129,13 @@ CONFIG_USB_DSBR
 
 Microtek USB scanner support
 CONFIG_USB_MICROTEK
-  Say Y here if you want support for the Microtek X6USB and possibly
-  some other scanners by that vendor. The scanner will appear as a
-  scsi generic device to the rest of the system.
-  A patched version of SANE is necessary to use the
-  scanner. It's available at 
-  http://fachschaft.cup.uni-muenchen.de/~neukum/scanner.html
+  Say Y here if you want support for the Microtek X6USB and
+  possibly the Phantom 336CX, Phantom C6 and ScanMaker V6U(S)L.
+  Support for anything but the X6 is experimetal.
+  Please report failures and successes.
+  The scanner will appear as a scsi generic device to the rest
+  of the system. Scsi support is required for this driver to compile
+  and work. SANE 1.0.4 or newer is needed to make use of your scanner.
   This driver can be compiled as a module.
 
 USB Bluetooth support

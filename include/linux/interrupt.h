@@ -74,20 +74,15 @@ struct softirq_action
 asmlinkage void do_softirq(void);
 extern void open_softirq(int nr, void (*action)(struct softirq_action*), void *data);
 
+/* Locally cached atomic variables are cheaper than cli/sti */
 static inline void __cpu_raise_softirq(int cpu, int nr)
 {
-	softirq_active(cpu) |= (1<<nr);
+	set_bit(nr, &softirq_active(cpu));
 }
 
-
-/* I do not want to use atomic variables now, so that cli/sti */
 static inline void raise_softirq(int nr)
 {
-	unsigned long flags;
-
-	local_irq_save(flags);
 	__cpu_raise_softirq(smp_processor_id(), nr);
-	local_irq_restore(flags);
 }
 
 extern void softirq_init(void);
@@ -133,7 +128,7 @@ struct tasklet_struct name = { NULL, 0, ATOMIC_INIT(1), func, data }
 enum
 {
 	TASKLET_STATE_SCHED,	/* Tasklet is scheduled for execution */
-	TASKLET_STATE_RUN	/* Tasklet is running (SMP only) */
+	TASKLET_STATE_RUN	/* Tasklet is running */
 };
 
 struct tasklet_head
@@ -144,44 +139,12 @@ struct tasklet_head
 extern struct tasklet_head tasklet_vec[NR_CPUS];
 extern struct tasklet_head tasklet_hi_vec[NR_CPUS];
 
-#ifdef CONFIG_SMP
 #define tasklet_trylock(t) (!test_and_set_bit(TASKLET_STATE_RUN, &(t)->state))
-#define tasklet_unlock_wait(t) while (test_bit(TASKLET_STATE_RUN, &(t)->state)) { barrier(); }
 #define tasklet_unlock(t) clear_bit(TASKLET_STATE_RUN, &(t)->state)
-#else
-#define tasklet_trylock(t) 1
-#define tasklet_unlock_wait(t) do { } while (0)
-#define tasklet_unlock(t) do { } while (0)
-#endif
+#define tasklet_unlock_wait(t) while (test_bit(TASKLET_STATE_RUN, &(t)->state)) { barrier(); }
 
-static inline void tasklet_schedule(struct tasklet_struct *t)
-{
-	if (!test_and_set_bit(TASKLET_STATE_SCHED, &t->state)) {
-		int cpu = smp_processor_id();
-		unsigned long flags;
-
-		local_irq_save(flags);
-		t->next = tasklet_vec[cpu].list;
-		tasklet_vec[cpu].list = t;
-		__cpu_raise_softirq(cpu, TASKLET_SOFTIRQ);
-		local_irq_restore(flags);
-	}
-}
-
-static inline void tasklet_hi_schedule(struct tasklet_struct *t)
-{
-	if (!test_and_set_bit(TASKLET_STATE_SCHED, &t->state)) {
-		int cpu = smp_processor_id();
-		unsigned long flags;
-
-		local_irq_save(flags);
-		t->next = tasklet_hi_vec[cpu].list;
-		tasklet_hi_vec[cpu].list = t;
-		__cpu_raise_softirq(cpu, HI_SOFTIRQ);
-		local_irq_restore(flags);
-	}
-}
-
+extern void tasklet_schedule(struct tasklet_struct *t);
+extern void tasklet_hi_schedule(struct tasklet_struct *t);
 
 static inline void tasklet_disable_nosync(struct tasklet_struct *t)
 {
@@ -196,7 +159,14 @@ static inline void tasklet_disable(struct tasklet_struct *t)
 
 static inline void tasklet_enable(struct tasklet_struct *t)
 {
-	atomic_dec(&t->count);
+	if (atomic_dec_and_test(&t->count))
+		tasklet_schedule(t);
+}
+
+static inline void tasklet_hi_enable(struct tasklet_struct *t)
+{
+	if (atomic_dec_and_test(&t->count))
+		tasklet_hi_schedule(t);
 }
 
 extern void tasklet_kill(struct tasklet_struct *t);

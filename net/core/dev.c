@@ -1278,7 +1278,7 @@ static int deliver_to_old_ones(struct packet_type *pt, struct sk_buff *skb, int 
 
 	ret = pt->func(skb, skb->dev, pt);
 
-	tasklet_enable(bh_task_vec+TIMER_BH);
+	tasklet_hi_enable(bh_task_vec+TIMER_BH);
 	spin_unlock(&net_bh_lock);
 	return ret;
 }

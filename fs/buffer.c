@@ -61,7 +61,7 @@ static char buffersize_index[65] =
 
 #define BUFSIZE_INDEX(X) ((int) buffersize_index[(X)>>9])
 #define MAX_BUF_PER_PAGE (PAGE_CACHE_SIZE / 512)
-#define NR_RESERVED (2*MAX_BUF_PER_PAGE)
+#define NR_RESERVED (10*MAX_BUF_PER_PAGE)
 #define MAX_UNUSED_BUFFERS NR_RESERVED+20 /* don't ever have more than this 
 					     number of unused buffer heads */
 
@@ -1348,11 +1348,9 @@ no_grow:
 	 */
 	run_task_queue(&tq_disk);
 
-	/* 
-	 * Set our state for sleeping, then check again for buffer heads.
-	 * This ensures we won't miss a wake_up from an interrupt.
-	 */
-	wait_event(buffer_wait, nr_unused_buffer_heads >= MAX_BUF_PER_PAGE);
+	current->policy |= SCHED_YIELD;
+	__set_current_state(TASK_RUNNING);
+	schedule();
 	goto try_again;
 }
 

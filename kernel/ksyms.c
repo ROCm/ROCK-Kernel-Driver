@@ -90,17 +90,13 @@ EXPORT_SYMBOL(exit_fs);
 EXPORT_SYMBOL(exit_sighand);
 
 /* internal kernel memory management */
+EXPORT_SYMBOL(_alloc_pages);
 EXPORT_SYMBOL(__alloc_pages);
 EXPORT_SYMBOL(alloc_pages_node);
 EXPORT_SYMBOL(__get_free_pages);
 EXPORT_SYMBOL(get_zeroed_page);
 EXPORT_SYMBOL(__free_pages);
 EXPORT_SYMBOL(free_pages);
-#ifndef CONFIG_DISCONTIGMEM
-EXPORT_SYMBOL(contig_page_data);
-#else
-EXPORT_SYMBOL(alloc_pages);
-#endif
 EXPORT_SYMBOL(num_physpages);
 EXPORT_SYMBOL(kmem_find_general_cachep);
 EXPORT_SYMBOL(kmem_cache_create);

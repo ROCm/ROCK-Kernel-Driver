@@ -34,4 +34,7 @@ extern irq_cpustat_t irq_stat[];			/* defined in asm/hardirq.h */
   /* arch dependent irq_stat fields */
 #define nmi_count(cpu)		__IRQ_STAT((cpu), __nmi_count)		/* i386, ia64 */
 
+#define softirq_pending(cpu) \
+	((softirq_active(cpu) & softirq_mask(cpu)))
+
 #endif	/* __irq_cpustat_h */

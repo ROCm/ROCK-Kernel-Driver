@@ -529,7 +529,7 @@ static inline void __add_to_page_cache(struct page * page,
 	if (PageLocked(page))
 		BUG();
 
-	flags = page->flags & ~((1 << PG_uptodate) | (1 << PG_error) | (1 << PG_dirty) | (1 << PG_referenced) | (1 << PG_arch_1));
+	flags = page->flags & ~((1 << PG_uptodate) | (1 << PG_error) | (1 << PG_dirty) | (1 << PG_referenced) | (1 << PG_arch_1) | (1 << PG_checked));
 	page->flags = flags | (1 << PG_locked);
 	page_cache_get(page);
 	page->index = offset;

@@ -498,16 +498,17 @@ struct ext2_dir_entry_2 {
  * Ext2 directory file types.  Only the low 3 bits are used.  The
  * other bits are reserved for now.
  */
-#define EXT2_FT_UNKNOWN		0
-#define EXT2_FT_REG_FILE	1
-#define EXT2_FT_DIR		2
-#define EXT2_FT_CHRDEV		3
-#define EXT2_FT_BLKDEV 		4
-#define EXT2_FT_FIFO		5
-#define EXT2_FT_SOCK		6
-#define EXT2_FT_SYMLINK		7
-
-#define EXT2_FT_MAX		8
+enum {
+	EXT2_FT_UNKNOWN,
+	EXT2_FT_REG_FILE,
+	EXT2_FT_DIR,
+	EXT2_FT_CHRDEV,
+	EXT2_FT_BLKDEV,
+	EXT2_FT_FIFO,
+	EXT2_FT_SOCK,
+	EXT2_FT_SYMLINK,
+	EXT2_FT_MAX
+};
 
 /*
  * EXT2_DIR_PAD defines the directory entries boundaries
@@ -552,9 +553,6 @@ extern struct ext2_group_desc * ext2_get_group_desc(struct super_block * sb,
 extern unsigned long ext2_count_free (struct buffer_head *, unsigned);
 
 /* dir.c */
-extern int ext2_check_dir_entry (const char *, struct inode *,
-				 struct ext2_dir_entry_2 *, struct buffer_head *,
-				 unsigned long);
 
 /* file.c */
 extern int ext2_read (struct inode *, struct file *, char *, int);
@@ -613,6 +611,14 @@ extern void ext2_truncate (struct inode *);
 
 /* dir.c */
 extern struct file_operations ext2_dir_operations;
+extern int ext2_add_link (struct dentry *, struct inode *);
+extern ino_t ext2_inode_by_name(struct inode *, struct dentry *);
+extern int ext2_make_empty(struct inode *, struct inode *);
+extern struct ext2_dir_entry_2 * ext2_find_entry (struct inode *,struct dentry *, struct page **);
+extern int ext2_delete_entry (struct ext2_dir_entry_2 *, struct page *);
+extern int ext2_empty_dir (struct inode *);
+extern struct ext2_dir_entry_2 * ext2_dotdot (struct inode *, struct page **);
+extern void ext2_set_link(struct inode *, struct ext2_dir_entry_2 *, struct page *, struct inode *);
 
 /* file.c */
 extern struct inode_operations ext2_file_inode_operations;

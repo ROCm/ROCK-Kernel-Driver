@@ -312,17 +312,17 @@ int scsi_ioctl_send_command(Scsi_Device * dev, Scsi_Ioctl_Command * sic)
 	/* 
 	 * If there was an error condition, pass the info back to the user. 
 	 */
+	result = SRpnt->sr_result;
 	if (SRpnt->sr_result) {
 		int sb_len = sizeof(SRpnt->sr_sense_buffer);
 
 		sb_len = (sb_len > OMAX_SB_LEN) ? OMAX_SB_LEN : sb_len;
 		if (copy_to_user(cmd_in, SRpnt->sr_sense_buffer, sb_len))
-			return -EFAULT;
-	} else
+			result = -EFAULT;
+	} else {
 		if (copy_to_user(cmd_in, buf, outlen))
-			return -EFAULT;
-
-	result = SRpnt->sr_result;
+			result = -EFAULT;
+	}
 
 	SDpnt = SRpnt->sr_device;
 	scsi_release_request(SRpnt);

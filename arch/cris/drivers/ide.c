@@ -1,4 +1,4 @@
-/* $Id: ide.c,v 1.9 2001/03/01 13:11:18 bjornw Exp $
+/* $Id: ide.c,v 1.16 2001/04/05 08:30:07 matsfg Exp $
  *
  * Etrax specific IDE functions, like init and PIO-mode setting etc.
  * Almost the entire ide.c is used for the rest of the Etrax ATA driver.
@@ -8,6 +8,28 @@
  *             Mikael Starvik     (pio setup stuff)
  *
  * $Log: ide.c,v $
+ * Revision 1.16  2001/04/05 08:30:07  matsfg
+ * Corrected cse1 and csp0 reset.
+ *
+ * Revision 1.15  2001/04/04 14:34:06  bjornw
+ * Re-instated code that mysteriously disappeared during review updates.
+ *
+ * Revision 1.14  2001/04/04 13:45:12  matsfg
+ * Calls REG_SHADOW_SET for cse1 reset so only the resetbit is affected
+ *
+ * Revision 1.13  2001/04/04 13:26:40  matsfg
+ * memmapping is done in init.c
+ *
+ * Revision 1.12  2001/04/04 11:37:56  markusl
+ * Updated according to review remarks
+ *
+ * Revision 1.11  2001/03/29 12:49:14  matsfg
+ * Changed check for ata_tot_size from >= to >.
+ * Sets sw_len to 0 if size is exactly 65536.
+ *
+ * Revision 1.10  2001/03/16 09:39:30  matsfg
+ * Support for reset on port CSP0
+ *
  * Revision 1.9  2001/03/01 13:11:18  bjornw
  * 100 -> HZ
  *
@@ -158,6 +180,10 @@ unsigned char IN_BYTE(ide_ioreg_t reg) {
 #define ATA_PIO0_STROBE 19
 #define ATA_PIO0_HOLD    4
 
+static int e100_dmaproc (ide_dma_action_t func, ide_drive_t *drive);
+static void e100_ideproc (ide_ide_action_t func, ide_drive_t *drive,
+			  void *buffer, unsigned int length);
+
 /*
  * good_dma_drives() lists the model names (from "hdparm -i")
  * of drives which do not support mword2 DMA but which are
@@ -174,7 +200,7 @@ static void tune_e100_ide(ide_drive_t *drive, byte pio)
 	unsigned long flags;
 	
 	pio = 4;
-	//pio = ide_get_best_pio_mode(drive, pio, 4, NULL);
+	/* pio = ide_get_best_pio_mode(drive, pio, 4, NULL); */
 	
 	save_flags(flags);
 	cli();
@@ -226,10 +252,6 @@ static void tune_e100_ide(ide_drive_t *drive, byte pio)
 	restore_flags(flags);
 }
 
-static int e100_dmaproc (ide_dma_action_t func, ide_drive_t *drive); /* defined below */
-static void e100_ideproc (ide_ide_action_t func, ide_drive_t *drive,
-			  void *buffer, unsigned int length);        /* defined below */
-
 void __init 
 init_e100_ide (void)
 {
@@ -277,26 +299,23 @@ init_e100_ide (void)
 	*R_GEN_CONFIG = genconfig_shadow;
 
 #ifdef CONFIG_ETRAX_IDE_CSE1_16_RESET
-#ifndef CONFIG_CRIS_LOW_MAP
-	/* remap the I/O-mapped reset-bit from CSE1 to something inside our kernel space */
-	reset_addr = (unsigned long *)ioremap((unsigned long)(MEM_CSE1_START |
-							      MEM_NON_CACHEABLE), 16);
-	*reset_addr = 0;
-#else
-	/* LOW_MAP, can't do the ioremap, but it's already mapped straight over */
-	reset_addr = (unsigned long *)(MEM_CSE1_START | MEM_NON_CACHEABLE);
-	*reset_addr = 0;
+        init_ioremap();
+        REG_SHADOW_SET(port_cse1_addr, port_cse1_shadow, 16, 0);
 #endif
+
+#ifdef CONFIG_ETRAX_IDE_CSP0_8_RESET
+        init_ioremap();
+        REG_SHADOW_SET(port_csp0_addr, port_csp0_shadow, 8, 0);
 #endif
 
 	/* wait some */
-
-	dummy = 1;
-	dummy = 2;
-	dummy = 3;
+	udelay(25);
 
 #ifdef CONFIG_ETRAX_IDE_CSE1_16_RESET
-	*reset_addr = 1 << 16;
+	REG_SHADOW_SET(port_cse1_addr, port_cse1_shadow, 16, 1);
+#endif
+#ifdef CONFIG_ETRAX_IDE_CSP0_8_RESET
+	REG_SHADOW_SET(port_csp0_addr, port_csp0_shadow, 8, 1);
 #endif
 #ifdef CONFIG_ETRAX_IDE_G27_RESET
 	*R_PORT_G_DATA = 0; /* de-assert bus-reset */
@@ -349,7 +368,6 @@ static void
 e100_atapi_input_bytes (ide_drive_t *drive, void *buffer, unsigned int bytecount)
 {
 	ide_ioreg_t data_reg = IDE_DATA_REG;
-	unsigned long status;
 
 	D(printk("atapi_input_bytes, dreg 0x%x, buffer 0x%x, count %d\n",
 		 data_reg, buffer, bytecount));
@@ -376,7 +394,7 @@ e100_atapi_input_bytes (ide_drive_t *drive, void *buffer, unsigned int bytecount
 	
 	/* initiate a multi word dma read using PIO handshaking */
 	
-	*R_ATA_TRANSFER_CNT = bytecount >> 1;
+	*R_ATA_TRANSFER_CNT = IO_FIELD(R_ATA_TRANSFER_CNT, count, bytecount >> 1);
 	
 	*R_ATA_CTRL_DATA = data_reg |
 		IO_STATE(R_ATA_CTRL_DATA, rw,       read) |
@@ -390,35 +408,38 @@ e100_atapi_input_bytes (ide_drive_t *drive, void *buffer, unsigned int bytecount
 	LED_DISK_READ(1);
 	WAIT_DMA(3);
 	LED_DISK_READ(0);
-	
+
 #if 0
-	/* old polled transfer code */
-	
-	/* initiate a multi word read */
-	
-	*R_ATA_TRANSFER_CNT = wcount << 1;
-	
-	*R_ATA_CTRL_DATA = data_reg |
-		IO_STATE(R_ATA_CTRL_DATA, rw,       read) |
-		IO_STATE(R_ATA_CTRL_DATA, src_dst,  register) |
-		IO_STATE(R_ATA_CTRL_DATA, handsh,   pio) |
-		IO_STATE(R_ATA_CTRL_DATA, multi,    on) |
-		IO_STATE(R_ATA_CTRL_DATA, dma_size, word);
-	
-	/* svinto has a latency until the busy bit actually is set */
-	
-	nop(); nop();
-	nop(); nop();
-	nop(); nop();
-	nop(); nop();
-	nop(); nop();
-	
-	/* unit should be busy during multi transfer */
-	while((status = *R_ATA_STATUS_DATA) & IO_MASK(R_ATA_STATUS_DATA, busy)) {
-		while(!(status & IO_MASK(R_ATA_STATUS_DATA, dav)))
-			status = *R_ATA_STATUS_DATA;
-		*ptr++ = (unsigned short)(status & 0xffff);
-	}
+        /* old polled transfer code
+	 * this should be moved into a new function that can do polled
+	 * transfers if DMA is not available
+	 */
+        
+        /* initiate a multi word read */
+        
+        *R_ATA_TRANSFER_CNT = wcount << 1;
+        
+        *R_ATA_CTRL_DATA = data_reg |
+                IO_STATE(R_ATA_CTRL_DATA, rw,       read) |
+                IO_STATE(R_ATA_CTRL_DATA, src_dst,  register) |
+                IO_STATE(R_ATA_CTRL_DATA, handsh,   pio) |
+                IO_STATE(R_ATA_CTRL_DATA, multi,    on) |
+                IO_STATE(R_ATA_CTRL_DATA, dma_size, word);
+        
+        /* svinto has a latency until the busy bit actually is set */
+        
+        nop(); nop();
+        nop(); nop();
+        nop(); nop();
+        nop(); nop();
+        nop(); nop();
+        
+        /* unit should be busy during multi transfer */
+        while((status = *R_ATA_STATUS_DATA) & IO_MASK(R_ATA_STATUS_DATA, busy)) {
+                while(!(status & IO_MASK(R_ATA_STATUS_DATA, dav)))
+                        status = *R_ATA_STATUS_DATA;
+                *ptr++ = (unsigned short)(status & 0xffff);
+        }
 #endif
 }
 
@@ -426,8 +447,6 @@ static void
 e100_atapi_output_bytes (ide_drive_t *drive, void *buffer, unsigned int bytecount)
 {
 	ide_ioreg_t data_reg = IDE_DATA_REG;
-	unsigned short *ptr = (unsigned short *)buffer;
-	unsigned long ctrl;
 	
 	D(printk("atapi_output_bytes, dreg 0x%x, buffer 0x%x, count %d\n",
 		 data_reg, buffer, bytecount));
@@ -454,7 +473,7 @@ e100_atapi_output_bytes (ide_drive_t *drive, void *buffer, unsigned int bytecoun
 	
 	/* initiate a multi word dma write using PIO handshaking */
 	
-	*R_ATA_TRANSFER_CNT = bytecount >> 1;
+	*R_ATA_TRANSFER_CNT = IO_FIELD(R_ATA_TRANSFER_CNT, count, bytecount >> 1);
 	
 	*R_ATA_CTRL_DATA = data_reg |
 		IO_STATE(R_ATA_CTRL_DATA, rw,       write) |
@@ -470,40 +489,42 @@ e100_atapi_output_bytes (ide_drive_t *drive, void *buffer, unsigned int bytecoun
 	LED_DISK_WRITE(0);
 
 #if 0
-	/* old polled write code */
+        /* old polled write code - see comment in input_bytes */
 
-	while(*R_ATA_STATUS_DATA & IO_MASK(R_ATA_STATUS_DATA, busy)); /* wait for busy flag */
+	/* wait for busy flag */
+        while(*R_ATA_STATUS_DATA & IO_MASK(R_ATA_STATUS_DATA, busy)); 
 
-	/* initiate a multi word write */
+        /* initiate a multi word write */
 
-	*R_ATA_TRANSFER_CNT = bytecount >> 1;
+        *R_ATA_TRANSFER_CNT = bytecount >> 1;
 
-	ctrl = data_reg |
-		IO_STATE(R_ATA_CTRL_DATA, rw,       write) |
-		IO_STATE(R_ATA_CTRL_DATA, src_dst,  register) |
-		IO_STATE(R_ATA_CTRL_DATA, handsh,   pio) |
-		IO_STATE(R_ATA_CTRL_DATA, multi,    on) |
-		IO_STATE(R_ATA_CTRL_DATA, dma_size, word);
-	
-	LED_DISK_WRITE(1);
-	
-	/* Etrax will set busy = 1 until the multi pio transfer has finished
-	 * and tr_rdy = 1 after each succesful word transfer. 
-	 * When the last byte has been transferred Etrax will first set tr_tdy = 1 
-	 * and then busy = 0 (not in the same cycle). If we read busy before it
-	 * has been set to 0 we will think that we should transfer more bytes 
-	 * and then tr_rdy would be 0 forever. This is solved by checking busy
-	 * in the inner loop.
-	 */
-	
-	do {
-		*R_ATA_CTRL_DATA = ctrl | *ptr++;
-		while(!(*R_ATA_STATUS_DATA & IO_MASK(R_ATA_STATUS_DATA, tr_rdy)) &&
-		      (*R_ATA_STATUS_DATA & IO_MASK(R_ATA_STATUS_DATA, busy)));
-	} while(*R_ATA_STATUS_DATA & IO_MASK(R_ATA_STATUS_DATA, busy));
+        ctrl = data_reg |
+                IO_STATE(R_ATA_CTRL_DATA, rw,       write) |
+                IO_STATE(R_ATA_CTRL_DATA, src_dst,  register) |
+                IO_STATE(R_ATA_CTRL_DATA, handsh,   pio) |
+                IO_STATE(R_ATA_CTRL_DATA, multi,    on) |
+                IO_STATE(R_ATA_CTRL_DATA, dma_size, word);
+        
+        LED_DISK_WRITE(1);
+        
+        /* Etrax will set busy = 1 until the multi pio transfer has finished
+         * and tr_rdy = 1 after each succesful word transfer. 
+         * When the last byte has been transferred Etrax will first set tr_tdy = 1 
+         * and then busy = 0 (not in the same cycle). If we read busy before it
+         * has been set to 0 we will think that we should transfer more bytes 
+         * and then tr_rdy would be 0 forever. This is solved by checking busy
+         * in the inner loop.
+         */
+        
+        do {
+                *R_ATA_CTRL_DATA = ctrl | *ptr++;
+                while(!(*R_ATA_STATUS_DATA & IO_MASK(R_ATA_STATUS_DATA, tr_rdy)) &&
+                      (*R_ATA_STATUS_DATA & IO_MASK(R_ATA_STATUS_DATA, busy)));
+        } while(*R_ATA_STATUS_DATA & IO_MASK(R_ATA_STATUS_DATA, busy));
 
-	LED_DISK_WRITE(0);
-#endif	
+        LED_DISK_WRITE(0);
+#endif  
+
 }
 
 /*
@@ -604,7 +625,7 @@ static int e100_ide_build_dmatable (ide_drive_t *drive)
 		      those blocks that were actually set-up for transfer.
 		*/
 
-		if(ata_tot_size + size >= 131072) {
+		if(ata_tot_size + size > 131072) {
 			printk("too large total ATA DMA request, %d + %d!\n", ata_tot_size, size);
 			return 1;
 		}
@@ -625,7 +646,12 @@ static int e100_ide_build_dmatable (ide_drive_t *drive)
                         addr += 65536;
                 }
 		/* ok we want to do IO at addr, size bytes. set up a new descriptor entry */
-		ata_descrs[count].sw_len = size;
+                if(size == 65536) {
+                  ata_descrs[count].sw_len = 0;  /* 0 means 65536, this is a 16-bit field */
+                }
+                else {
+                  ata_descrs[count].sw_len = size;
+                }
 		ata_descrs[count].ctrl = 0;
 		ata_descrs[count].buf = addr;
 		ata_descrs[count].next = virt_to_phys(&ata_descrs[count + 1]);
@@ -793,9 +819,11 @@ static int e100_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 		
 		/* initiate a multi word dma read using DMA handshaking */
 		
-		*R_ATA_TRANSFER_CNT = ata_tot_size >> 1;
+		*R_ATA_TRANSFER_CNT =
+			IO_FIELD(R_ATA_TRANSFER_CNT, count, ata_tot_size >> 1);
 		
-		*R_ATA_CTRL_DATA = IDE_DATA_REG  |
+		*R_ATA_CTRL_DATA =
+			IO_FIELD(R_ATA_CTRL_DATA, data, IDE_DATA_REG) |
 			IO_STATE(R_ATA_CTRL_DATA, rw,       read) |
 			IO_STATE(R_ATA_CTRL_DATA, src_dst,  dma)  |
 			IO_STATE(R_ATA_CTRL_DATA, handsh,   dma)  |
@@ -834,9 +862,11 @@ static int e100_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 		
 		/* initiate a multi word dma write using DMA handshaking */
 		
-		*R_ATA_TRANSFER_CNT = ata_tot_size >> 1;
+		*R_ATA_TRANSFER_CNT =
+			IO_FIELD(R_ATA_TRANSFER_CNT, count, ata_tot_size >> 1);
 		
-		*R_ATA_CTRL_DATA = IDE_DATA_REG |
+		*R_ATA_CTRL_DATA =
+			IO_FIELD(R_ATA_CTRL_DATA, data,     IDE_DATA_REG) |
 			IO_STATE(R_ATA_CTRL_DATA, rw,       write) |
 			IO_STATE(R_ATA_CTRL_DATA, src_dst,  dma) |
 			IO_STATE(R_ATA_CTRL_DATA, handsh,   dma) |

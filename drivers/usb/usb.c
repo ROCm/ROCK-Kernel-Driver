@@ -449,7 +449,7 @@ void usb_deregister_bus(struct usb_bus *bus)
 	 */
 	list_del(&bus->bus_list);
 
-        usbdevfs_remove_bus(bus);
+	usbdevfs_remove_bus(bus);
 
 	clear_bit(bus->busnum, busmap.busmap);
 
@@ -1869,6 +1869,7 @@ int usb_clear_halt(struct usb_device *dev, int pipe)
 {
 	int result;
 	__u16 status;
+	unsigned char *buffer;
 	int endp=usb_pipeendpoint(pipe)|(usb_pipein(pipe)<<7);
 
 /*
@@ -1883,9 +1884,19 @@ int usb_clear_halt(struct usb_device *dev, int pipe)
 	if (result < 0)
 		return result;
 
+	buffer = kmalloc(sizeof(status), GFP_KERNEL);
+	if (!buffer) {
+		err("unable to allocate memory for configuration descriptors");
+		return -ENOMEM;
+	}
+
 	result = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
 		USB_REQ_GET_STATUS, USB_DIR_IN | USB_RECIP_ENDPOINT, 0, endp,
-		&status, sizeof(status), HZ * SET_TIMEOUT);
+		buffer, sizeof(status), HZ * SET_TIMEOUT);
+
+	memcpy(&status, buffer, sizeof(status));
+	kfree(buffer);
+
 	if (result < 0)
 		return result;
 
@@ -1970,10 +1981,9 @@ int usb_get_configuration(struct usb_device *dev)
 {
 	int result;
 	unsigned int cfgno, length;
-	unsigned char buffer[8];
+	unsigned char *buffer;
 	unsigned char *bigbuffer;
-	struct usb_config_descriptor *desc =
-		(struct usb_config_descriptor *)buffer;
+ 	struct usb_config_descriptor *desc;
 
 	if (dev->descriptor.bNumConfigurations > USB_MAXCONFIG) {
 		warn("too many configurations");
@@ -2001,6 +2011,13 @@ int usb_get_configuration(struct usb_device *dev)
 		err("out of memory");
 		return -ENOMEM;
 	}
+
+	buffer = kmalloc(8, GFP_KERNEL);
+	if (!buffer) {
+		err("unable to allocate memory for configuration descriptors");
+		return -ENOMEM;
+	}
+	desc = (struct usb_config_descriptor *)buffer;
 
 	for (cfgno = 0; cfgno < dev->descriptor.bNumConfigurations; cfgno++) {
 		/* We grab the first 8 bytes so we know how long the whole */
@@ -2052,8 +2069,10 @@ int usb_get_configuration(struct usb_device *dev)
 		}
 	}
 
+	kfree(buffer);
 	return 0;
 err:
+	kfree(buffer);
 	dev->descriptor.bNumConfigurations = cfgno;
 	return result;
 }
