@@ -429,6 +429,7 @@ EXPORT_SYMBOL(sysctl_tcp_wmem);
 EXPORT_SYMBOL(sysctl_tcp_ecn);
 EXPORT_SYMBOL(tcp_cwnd_application_limited);
 EXPORT_SYMBOL(tcp_sendpage);
+EXPORT_SYMBOL(sysctl_tcp_low_latency);
 
 EXPORT_SYMBOL(tcp_write_xmit);
 

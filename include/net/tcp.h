@@ -474,6 +474,7 @@ extern int sysctl_tcp_app_win;
 extern int sysctl_tcp_adv_win_scale;
 extern int sysctl_tcp_tw_reuse;
 extern int sysctl_tcp_frto;
+extern int sysctl_tcp_low_latency;
 
 extern atomic_t tcp_memory_allocated;
 extern atomic_t tcp_sockets_allocated;
@@ -1349,7 +1350,7 @@ static __inline__ int tcp_prequeue(struct sock *sk, struct sk_buff *skb)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
 
-	if (tp->ucopy.task) {
+	if (!sysctl_tcp_low_latency && tp->ucopy.task) {
 		__skb_queue_tail(&tp->ucopy.prequeue, skb);
 		tp->ucopy.memory += skb->truesize;
 		if (tp->ucopy.memory > sk->rcvbuf) {
