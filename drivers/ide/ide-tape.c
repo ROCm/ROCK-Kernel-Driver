@@ -6272,8 +6272,8 @@ static int idetape_cleanup (ide_drive_t *drive)
 	DRIVER(drive)->busy = 0;
 	(void) ide_unregister_subdriver(drive);
 	drive->driver_data = NULL;
-	devfs_remove("%s/mt");
-	devfs_remove("%s/mtn");
+	devfs_remove("%s/mt", drive->devfs_name);
+	devfs_remove("%s/mtn", drive->devfs_name);
 	devfs_unregister_tape(drive->disk->number);
 	kfree (tape);
 	drive->disk->fops = ide_fops;

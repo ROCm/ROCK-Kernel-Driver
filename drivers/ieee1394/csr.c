@@ -118,7 +118,7 @@ static inline void calculate_expire(struct csr_control *csr)
 	/* Just to keep from rounding low */
 	csr->expire++;
 
-	HPSB_VERBOSE("CSR: setting expire to %lu, HZ=%lu", csr->expire, HZ);
+	HPSB_VERBOSE("CSR: setting expire to %lu, HZ=%u", csr->expire, HZ);
 }
 
 

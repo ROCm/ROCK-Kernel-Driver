@@ -398,6 +398,23 @@ void mmput(struct mm_struct *mm)
 	}
 }
 
+/*
+ * Checks if the use count of an mm is non-zero and if so
+ * returns a reference to it after bumping up the use count.
+ * If the use count is zero, it means this mm is going away,
+ * so return NULL.
+ */
+struct mm_struct *mmgrab(struct mm_struct *mm)
+{
+	spin_lock(&mmlist_lock);
+	if (!atomic_read(&mm->mm_users))
+		mm = NULL;
+	else
+		atomic_inc(&mm->mm_users);
+	spin_unlock(&mmlist_lock);
+	return mm;
+}
+
 /* Please note the differences between mmput and mm_release.
  * mmput is called whenever we stop holding onto a mm_struct,
  * error success whatever.

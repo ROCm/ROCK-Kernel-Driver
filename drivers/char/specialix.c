@@ -171,8 +171,6 @@
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 #endif
 
-DECLARE_TASK_QUEUE(tq_specialix);
-
 #undef RS_EVENT_WRITE_WAKEUP
 #define RS_EVENT_WRITE_WAKEUP	0
 
@@ -988,7 +986,7 @@ static void sx_change_speed(struct specialix_board *bp, struct specialix_port *p
 	long tmp;
 	unsigned char cor1 = 0, cor3 = 0;
 	unsigned char mcor1 = 0, mcor2 = 0;
-	static int again;
+	static unsigned long again;
 	
 	if (!(tty = port->tty) || !tty->termios)
 		return;

@@ -1204,10 +1204,6 @@ source "drivers/pnp/Kconfig"
 
 source "drivers/block/Kconfig"
 
-config MOUNT_ROOT_FAILED_MSG
-	bool
-	default y
-
 source "drivers/ide/Kconfig"
 
 source "drivers/scsi/Kconfig"
