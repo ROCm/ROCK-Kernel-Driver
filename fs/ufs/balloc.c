@@ -434,7 +434,7 @@ unsigned ufs_add_fragments (struct inode * inode, unsigned fragment,
 	/*
 	 * Block can be extended
 	 */
-	ucg->cg_time = cpu_to_fs32(sb, CURRENT_TIME);
+	ucg->cg_time = cpu_to_fs32(sb, get_seconds());
 	for (i = newcount; i < (uspi->s_fpb - fragoff); i++)
 		if (ubh_isclr (UCPI_UBH, ucpi->c_freeoff, fragno + i))
 			break;
@@ -532,7 +532,7 @@ cg_found:
 	if (!ufs_cg_chkmagic(sb, ucg)) 
 		ufs_panic (sb, "ufs_alloc_fragments",
 			"internal error, bad magic number on cg %u", cgno);
-	ucg->cg_time = cpu_to_fs32(sb, CURRENT_TIME);
+	ucg->cg_time = cpu_to_fs32(sb, get_seconds());
 
 	if (count == uspi->s_fpb) {
 		result = ufs_alloccg_block (inode, ucpi, goal, err);

@@ -2605,7 +2605,7 @@ sys32_time (int *tloc)
 
 	/* SMP: This is fairly trivial. We grab CURRENT_TIME and
 	   stuff it to user space. No side effects */
-	i = CURRENT_TIME;
+	i = get_seconds();
 	if (tloc) {
 		if (put_user(i, tloc))
 			i = -EFAULT;

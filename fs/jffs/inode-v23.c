@@ -307,15 +307,15 @@ jffs_setattr(struct dentry *dentry, struct iattr *iattr)
 		inode->i_mtime = inode->i_ctime;
 	}
 	if (update_all || iattr->ia_valid & ATTR_ATIME) {
-		raw_inode.atime = iattr->ia_atime;
+		raw_inode.atime = iattr->ia_atime.tv_sec;
 		inode->i_atime = iattr->ia_atime;
 	}
 	if (update_all || iattr->ia_valid & ATTR_MTIME) {
-		raw_inode.mtime = iattr->ia_mtime;
+		raw_inode.mtime = iattr->ia_mtime.tv_sec;
 		inode->i_mtime = iattr->ia_mtime;
 	}
 	if (update_all || iattr->ia_valid & ATTR_CTIME) {
-		raw_inode.ctime = iattr->ia_ctime;
+		raw_inode.ctime = iattr->ia_ctime.tv_sec;
 		inode->i_ctime = iattr->ia_ctime;
 	}
 
@@ -364,9 +364,12 @@ jffs_new_inode(const struct inode * dir, struct jffs_raw_inode *raw_inode,
 	inode->i_gid = raw_inode->gid;
 	inode->i_rdev = NODEV;
 	inode->i_size = raw_inode->dsize;
-	inode->i_atime = raw_inode->atime;
-	inode->i_mtime = raw_inode->mtime;
-	inode->i_ctime = raw_inode->ctime;
+	inode->i_atime.tv_sec = raw_inode->atime;
+	inode->i_mtime.tv_sec = raw_inode->mtime;
+	inode->i_ctime.tv_sec = raw_inode->ctime;
+	inode->i_ctime.tv_nsec = 0;
+	inode->i_mtime.tv_nsec = 0;
+	inode->i_atime.tv_nsec = 0;
 	inode->i_blksize = PAGE_SIZE;
 	inode->i_blocks = (inode->i_size + 511) >> 9;
 
@@ -486,7 +489,7 @@ jffs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	raw_inode.uid = f->uid;
 	raw_inode.gid = f->gid;
 #endif
-	raw_inode.atime = CURRENT_TIME;
+	raw_inode.atime = get_seconds();
 	raw_inode.mtime = raw_inode.atime;
 	raw_inode.ctime = f->ctime;
 	raw_inode.offset = 0;
@@ -868,7 +871,7 @@ jffs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 	raw_inode.uid = current->fsuid;
 	raw_inode.gid = (dir->i_mode & S_ISGID) ? dir->i_gid : current->fsgid;
 	/*	raw_inode.gid = current->fsgid; */
-	raw_inode.atime = CURRENT_TIME;
+	raw_inode.atime = get_seconds();
 	raw_inode.mtime = raw_inode.atime;
 	raw_inode.ctime = raw_inode.atime;
 	raw_inode.offset = 0;
@@ -1031,7 +1034,7 @@ jffs_remove(struct inode *dir, struct dentry *dentry, int type)
 	raw_inode.mode = del_f->mode;
 	raw_inode.uid = current->fsuid;
 	raw_inode.gid = current->fsgid;
-	raw_inode.atime = CURRENT_TIME;
+	raw_inode.atime = get_seconds();
 	raw_inode.mtime = del_f->mtime;
 	raw_inode.ctime = raw_inode.atime;
 	raw_inode.offset = 0;
@@ -1107,7 +1110,7 @@ jffs_mknod(struct inode *dir, struct dentry *dentry, int mode, int rdev)
 	raw_inode.uid = current->fsuid;
 	raw_inode.gid = (dir->i_mode & S_ISGID) ? dir->i_gid : current->fsgid;
 	/*	raw_inode.gid = current->fsgid; */
-	raw_inode.atime = CURRENT_TIME;
+	raw_inode.atime = get_seconds();
 	raw_inode.mtime = raw_inode.atime;
 	raw_inode.ctime = raw_inode.atime;
 	raw_inode.offset = 0;
@@ -1217,7 +1220,7 @@ jffs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 	raw_inode.mode = S_IFLNK | S_IRWXUGO;
 	raw_inode.uid = current->fsuid;
 	raw_inode.gid = (dir->i_mode & S_ISGID) ? dir->i_gid : current->fsgid;
-	raw_inode.atime = CURRENT_TIME;
+	raw_inode.atime = get_seconds();
 	raw_inode.mtime = raw_inode.atime;
 	raw_inode.ctime = raw_inode.atime;
 	raw_inode.offset = 0;
@@ -1319,7 +1322,7 @@ jffs_create(struct inode *dir, struct dentry *dentry, int mode)
 	raw_inode.mode = mode;
 	raw_inode.uid = current->fsuid;
 	raw_inode.gid = (dir->i_mode & S_ISGID) ? dir->i_gid : current->fsgid;
-	raw_inode.atime = CURRENT_TIME;
+	raw_inode.atime = get_seconds();
 	raw_inode.mtime = raw_inode.atime;
 	raw_inode.ctime = raw_inode.atime;
 	raw_inode.offset = 0;
@@ -1452,7 +1455,7 @@ jffs_file_write(struct file *filp, const char *buf, size_t count,
 
 		raw_inode.uid = f->uid;
 		raw_inode.gid = f->gid;
-		raw_inode.atime = CURRENT_TIME;
+		raw_inode.atime = get_seconds();
 		raw_inode.mtime = raw_inode.atime;
 		raw_inode.ctime = f->ctime;
 		raw_inode.offset = pos;
@@ -1702,9 +1705,13 @@ jffs_read_inode(struct inode *inode)
 	inode->i_uid = f->uid;
 	inode->i_gid = f->gid;
 	inode->i_size = f->size;
-	inode->i_atime = f->atime;
-	inode->i_mtime = f->mtime;
-	inode->i_ctime = f->ctime;
+	inode->i_atime.tv_sec = f->atime;
+	inode->i_mtime.tv_sec = f->mtime;
+	inode->i_ctime.tv_sec = f->ctime;
+	inode->i_atime.tv_nsec = 
+	inode->i_mtime.tv_nsec = 
+	inode->i_ctime.tv_nsec = 0;
+
 	inode->i_blksize = PAGE_SIZE;
 	inode->i_blocks = (inode->i_size + 511) >> 9;
 	if (S_ISREG(inode->i_mode)) {

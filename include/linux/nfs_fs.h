@@ -422,6 +422,14 @@ nfs_time_to_secs(__u64 time)
 	return (time_t)(time >> 32);
 }
 
+
+static inline u32
+nfs_time_to_nsecs(__u64 time)
+{
+	return time & 0xffffffff;
+}
+
+
 /* NFS root */
 
 extern void * nfs_root_data(void);

@@ -1556,7 +1556,6 @@ generic_file_write_nolock(struct file *file, const struct iovec *iov,
 	ssize_t		written;
 	int		err;
 	size_t		bytes;
-	time_t		time_now;
 	struct pagevec	lru_pvec;
 	const struct iovec *cur_iov = iov; /* current iovec */
 	size_t		iov_base = 0;	   /* offset in the current iovec */
@@ -1676,12 +1675,7 @@ generic_file_write_nolock(struct file *file, const struct iovec *iov,
 		goto out;
 
 	remove_suid(file->f_dentry);
-	time_now = CURRENT_TIME;
-	if (inode->i_ctime != time_now || inode->i_mtime != time_now) {
-		inode->i_ctime = time_now;
-		inode->i_mtime = time_now;
-		mark_inode_dirty_sync(inode);
-	}
+	inode_update_time(inode, 1);
 
 	/* coalesce the iovecs and go direct-to-BIO for O_DIRECT */
 	if (unlikely(file->f_flags & O_DIRECT)) {

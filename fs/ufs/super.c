@@ -868,7 +868,7 @@ void ufs_write_super (struct super_block * sb) {
 	usb3 = ubh_get_usb_third(USPI_UBH);
 
 	if (!(sb->s_flags & MS_RDONLY)) {
-		usb1->fs_time = cpu_to_fs32(sb, CURRENT_TIME);
+		usb1->fs_time = cpu_to_fs32(sb, get_seconds());
 		if ((flags & UFS_ST_MASK) == UFS_ST_SUN 
 		  || (flags & UFS_ST_MASK) == UFS_ST_SUNx86)
 			ufs_set_fs_state(sb, usb1, usb3,
@@ -937,7 +937,7 @@ int ufs_remount (struct super_block * sb, int * mount_flags, char * data)
 	 */
 	if (*mount_flags & MS_RDONLY) {
 		ufs_put_cylinder_structures(sb);
-		usb1->fs_time = cpu_to_fs32(sb, CURRENT_TIME);
+		usb1->fs_time = cpu_to_fs32(sb, get_seconds());
 		if ((flags & UFS_ST_MASK) == UFS_ST_SUN
 		  || (flags & UFS_ST_MASK) == UFS_ST_SUNx86) 
 			ufs_set_fs_state(sb, usb1, usb3,

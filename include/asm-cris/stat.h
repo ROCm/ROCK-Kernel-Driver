@@ -18,6 +18,8 @@ struct __old_kernel_stat {
 	unsigned long  st_ctime;
 };
 
+#define STAT_HAVE_NSEC 1
+
 struct stat {
 	unsigned short st_dev;
 	unsigned short __pad1;
@@ -32,11 +34,11 @@ struct stat {
 	unsigned long  st_blksize;
 	unsigned long  st_blocks;
 	unsigned long  st_atime;
-	unsigned long  __unused1;
+	unsigned long  st_atime_nsec;
 	unsigned long  st_mtime;
-	unsigned long  __unused2;
+	unsigned long  st_mtime_nsec;
 	unsigned long  st_ctime;
-	unsigned long  __unused3;
+	unsigned long  st_ctime_nsec;
 	unsigned long  __unused4;
 	unsigned long  __unused5;
 };
@@ -67,13 +69,13 @@ struct stat64 {
 	unsigned long	__pad4;		/* future possible st_blocks high bits */
 
 	unsigned long	st_atime;
-	unsigned long	__pad5;
+	unsigned long	st_atime_nsec;
 
 	unsigned long	st_mtime;
-	unsigned long	__pad6;
+	unsigned long	st_mtime_nsec;
 
 	unsigned long	st_ctime;
-	unsigned long	__pad7;		/* will be high 32 bits of ctime someday */
+	unsigned long	st_ctime_nsec;	/* will be high 32 bits of ctime someday */
 
 	unsigned long long	st_ino;
 };

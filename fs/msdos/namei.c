@@ -251,7 +251,7 @@ static int msdos_add_entry(struct inode *dir, const char *name,
 		(*de)->attr |= ATTR_HIDDEN;
 	(*de)->start = 0;
 	(*de)->starthi = 0;
-	fat_date_unix2dos(dir->i_mtime,&(*de)->time,&(*de)->date);
+	fat_date_unix2dos(dir->i_mtime.tv_sec,&(*de)->time,&(*de)->date);
 	(*de)->size = 0;
 	mark_buffer_dirty(*bh);
 	return 0;

@@ -41,17 +41,18 @@ static u32	nfs3_ftypes[] = {
  * XDR functions for basic NFS types
  */
 static inline u32 *
-encode_time3(u32 *p, time_t secs)
+encode_time3(u32 *p, struct timespec *time)
 {
-	*p++ = htonl((u32) secs); *p++ = 0;
+	*p++ = htonl((u32) time->tv_sec); *p++ = htons(time->tv_nsec);
 	return p;
 }
 
 static inline u32 *
-decode_time3(u32 *p, time_t *secp)
+decode_time3(u32 *p, struct timespec *time)
 {
-	*secp = ntohl(*p++);
-	return p + 1;
+	time->tv_sec = ntohl(*p++);
+	time->tv_nsec = ntohl(*p++);
+	return p;
 }
 
 static inline u32 *
@@ -147,13 +148,15 @@ decode_sattr3(u32 *p, struct iattr *iap)
 		iap->ia_valid |= ATTR_ATIME;
 	} else if (tmp == 2) {		/* set to client time */
 		iap->ia_valid |= ATTR_ATIME | ATTR_ATIME_SET;
-		iap->ia_atime = ntohl(*p++), p++;
+		iap->ia_atime.tv_sec = ntohl(*p++);
+		iap->ia_atime.tv_nsec = ntohl(*p++);
 	}
 	if ((tmp = ntohl(*p++)) == 1) {	/* set to server time */
 		iap->ia_valid |= ATTR_MTIME;
 	} else if (tmp == 2) {		/* set to client time */
 		iap->ia_valid |= ATTR_MTIME | ATTR_MTIME_SET;
-		iap->ia_mtime = ntohl(*p++), p++;
+		iap->ia_mtime.tv_sec = ntohl(*p++);
+		iap->ia_mtime.tv_nsec = ntohl(*p++);
 	}
 	return p;
 }
@@ -164,6 +167,7 @@ encode_fattr3(struct svc_rqst *rqstp, u32 *p, struct svc_fh *fhp)
 	struct vfsmount *mnt = fhp->fh_export->ex_mnt;
 	struct dentry	*dentry = fhp->fh_dentry;
 	struct kstat stat;
+	struct timespec time;
 
 	vfs_getattr(mnt, dentry, &stat);
 
@@ -187,9 +191,10 @@ encode_fattr3(struct svc_rqst *rqstp, u32 *p, struct svc_fh *fhp)
 	else
 		p = xdr_encode_hyper(p, (u64) stat.dev);
 	p = xdr_encode_hyper(p, (u64) stat.ino);
-	p = encode_time3(p, stat.atime);
-	p = encode_time3(p, lease_get_mtime(dentry->d_inode));
-	p = encode_time3(p, stat.ctime);
+	p = encode_time3(p, &stat.atime);
+	lease_get_mtime(dentry->d_inode, &time); 
+	p = encode_time3(p, &time);
+	p = encode_time3(p, &stat.ctime);
 
 	return p;
 }
@@ -197,6 +202,7 @@ encode_fattr3(struct svc_rqst *rqstp, u32 *p, struct svc_fh *fhp)
 static inline u32 *
 encode_saved_post_attr(struct svc_rqst *rqstp, u32 *p, struct svc_fh *fhp)
 {
+	struct timespec  time;
 	struct inode	*inode = fhp->fh_dentry->d_inode;
 
 	/* Attributes to follow */
@@ -222,9 +228,13 @@ encode_saved_post_attr(struct svc_rqst *rqstp, u32 *p, struct svc_fh *fhp)
 	else
 		p = xdr_encode_hyper(p, (u64) inode->i_dev);
 	p = xdr_encode_hyper(p, (u64) inode->i_ino);
-	p = encode_time3(p, fhp->fh_post_atime);
-	p = encode_time3(p, fhp->fh_post_mtime);
-	p = encode_time3(p, fhp->fh_post_ctime);
+	time.tv_sec = fhp->fh_post_atime; 
+	time.tv_nsec = 0;
+	p = encode_time3(p, &time);
+	time.tv_sec = fhp->fh_post_mtime;
+	p = encode_time3(p, &time);
+	time.tv_sec = fhp->fh_post_ctime; 
+	p = encode_time3(p, &time);
 
 	return p;
 }
@@ -256,10 +266,14 @@ encode_wcc_data(struct svc_rqst *rqstp, u32 *p, struct svc_fh *fhp)
 
 	if (dentry && dentry->d_inode && fhp->fh_post_saved) {
 		if (fhp->fh_pre_saved) {
+			struct timespec time;
 			*p++ = xdr_one;
 			p = xdr_encode_hyper(p, (u64) fhp->fh_pre_size);
-			p = encode_time3(p, fhp->fh_pre_mtime);
-			p = encode_time3(p, fhp->fh_pre_ctime);
+			time.tv_nsec = 0;
+			time.tv_sec =  fhp->fh_pre_mtime;
+			p = encode_time3(p, &time);
+			time.tv_sec = fhp->fh_pre_ctime;
+			p = encode_time3(p, &time);
 		} else {
 			*p++ = xdr_zero;
 		}
@@ -290,8 +304,11 @@ nfs3svc_decode_sattrargs(struct svc_rqst *rqstp, u32 *p,
 	 || !(p = decode_sattr3(p, &args->attrs)))
 		return 0;
 
-	if ((args->check_guard = ntohl(*p++)) != 0)
-		p = decode_time3(p, &args->guardtime);
+	if ((args->check_guard = ntohl(*p++)) != 0) { 
+		struct timespec time; 
+		p = decode_time3(p, &time);
+		args->guardtime = time.tv_sec;
+	}
 
 	return xdr_argsize_check(rqstp, p);
 }

@@ -115,7 +115,7 @@ static int newque (key_t key, int msgflg)
 	}
 
 	msq->q_stime = msq->q_rtime = 0;
-	msq->q_ctime = CURRENT_TIME;
+	msq->q_ctime = get_seconds();
 	msq->q_cbytes = msq->q_qnum = 0;
 	msq->q_qbytes = msg_ctlmnb;
 	msq->q_lspid = msq->q_lrpid = 0;
@@ -532,7 +532,7 @@ asmlinkage long sys_msgctl (int msqid, int cmd, struct msqid_ds *buf)
 		ipcp->gid = setbuf.gid;
 		ipcp->mode = (ipcp->mode & ~S_IRWXUGO) | 
 			(S_IRWXUGO & setbuf.mode);
-		msq->q_ctime = CURRENT_TIME;
+		msq->q_ctime = get_seconds();
 		/* sleeping receivers might be excluded by
 		 * stricter permissions.
 		 */
@@ -599,7 +599,7 @@ static int inline pipelined_send(struct msg_queue* msq, struct msg_msg* msg)
 			} else {
 				msr->r_msg = msg;
 				msq->q_lrpid = msr->r_tsk->pid;
-				msq->q_rtime = CURRENT_TIME;
+				msq->q_rtime = get_seconds();
 				wake_up_process(msr->r_tsk);
 				return 1;
 			}
@@ -669,7 +669,7 @@ retry:
 	}
 
 	msq->q_lspid = current->pid;
-	msq->q_stime = CURRENT_TIME;
+	msq->q_stime = get_seconds();
 
 	if(!pipelined_send(msq,msg)) {
 		/* noone is waiting for this message, enqueue it */
@@ -760,7 +760,7 @@ retry:
 		}
 		list_del(&msg->m_list);
 		msq->q_qnum--;
-		msq->q_rtime = CURRENT_TIME;
+		msq->q_rtime = get_seconds();
 		msq->q_lrpid = current->pid;
 		msq->q_cbytes -= msg->m_ts;
 		atomic_sub(msg->m_ts,&msg_bytes);

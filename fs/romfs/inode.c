@@ -500,7 +500,8 @@ romfs_read_inode(struct inode *i)
 
 	i->i_nlink = 1;		/* Hard to decide.. */
 	i->i_size = ntohl(ri.size);
-	i->i_mtime = i->i_atime = i->i_ctime = 0;
+	i->i_mtime.tv_sec = i->i_atime.tv_sec = i->i_ctime.tv_sec = 0;
+	i->i_mtime.tv_nsec = i->i_atime.tv_nsec = i->i_ctime.tv_nsec = 0;
 	i->i_uid = i->i_gid = 0;
 
         /* Precalculate the data offset */

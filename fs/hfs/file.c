@@ -491,7 +491,7 @@ hfs_s32 hfs_do_write(struct inode *inode, struct hfs_fork * fork, hfs_u32 pos,
 		if (pos > fork->lsize) {
 			fork->lsize = pos;
 		}
-		entry->modify_date = hfs_u_to_mtime(CURRENT_TIME);
+		entry->modify_date = hfs_u_to_mtime(get_seconds());
 		hfs_cat_mark_dirty(entry);
 	}
 	return written;

@@ -90,9 +90,12 @@ void jffs2_read_inode (struct inode *inode)
 	inode->i_uid = latest_node.uid;
 	inode->i_gid = latest_node.gid;
 	inode->i_size = latest_node.isize;
-	inode->i_atime = latest_node.atime;
-	inode->i_mtime = latest_node.mtime;
-	inode->i_ctime = latest_node.ctime;
+	inode->i_atime.tv_sec = latest_node.atime;
+	inode->i_mtime.tv_sec = latest_node.mtime;
+	inode->i_ctime.tv_sec = latest_node.ctime;
+	inode->i_atime.tv_nsec = 
+	inode->i_mtime.tv_nsec = 
+	inode->i_ctime.tv_nsec = 0;
 
 	inode->i_nlink = f->inocache->nlink;
 
@@ -251,7 +254,7 @@ struct inode *jffs2_new_inode (struct inode *dir_i, int mode, struct jffs2_raw_i
 	inode->i_gid = ri->gid;
 	inode->i_uid = ri->uid;
 	inode->i_atime = inode->i_ctime = inode->i_mtime = 
-		ri->atime = ri->mtime = ri->ctime = CURRENT_TIME;
+		ri->atime = ri->mtime = ri->ctime = get_seconds();
 	inode->i_blksize = PAGE_SIZE;
 	inode->i_blocks = 0;
 	inode->i_size = 0;

@@ -820,7 +820,7 @@ static int vfat_add_entry(struct inode *dir,struct qstr* qname,
 	dir->i_ctime = dir->i_mtime = dir->i_atime = CURRENT_TIME;
 	mark_inode_dirty(dir);
 
-	fat_date_unix2dos(dir->i_mtime, &(*de)->time, &(*de)->date);
+	fat_date_unix2dos(dir->i_mtime.tv_sec, &(*de)->time, &(*de)->date);
 	(*de)->ctime = (*de)->time;
 	(*de)->adate = (*de)->cdate = (*de)->date;
 

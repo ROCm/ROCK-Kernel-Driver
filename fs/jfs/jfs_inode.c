@@ -68,7 +68,7 @@ struct inode *ialloc(struct inode *parent, umode_t mode)
 	inode->i_blksize = sb->s_blocksize;
 	inode->i_blocks = 0;
 	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
-	jfs_inode->otime = inode->i_ctime;
+	jfs_inode->otime = inode->i_ctime.tv_sec;
 	inode->i_generation = JFS_SBI(sb)->gengen++;
 
 	jfs_inode->cflag = 0;

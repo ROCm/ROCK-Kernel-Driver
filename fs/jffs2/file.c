@@ -156,9 +156,9 @@ int jffs2_setattr (struct dentry *dentry, struct iattr *iattr)
 		ri->mode &= ~S_ISGID;
 
 	ri->isize = (ivalid & ATTR_SIZE)?iattr->ia_size:inode->i_size;
-	ri->atime = (ivalid & ATTR_ATIME)?iattr->ia_atime:inode->i_atime;
-	ri->mtime = (ivalid & ATTR_MTIME)?iattr->ia_mtime:inode->i_mtime;
-	ri->ctime = (ivalid & ATTR_CTIME)?iattr->ia_ctime:inode->i_ctime;
+	ri->atime = (ivalid & ATTR_ATIME)?iattr->ia_atime.tv_sec:inode->i_atime.tv_sec;
+	ri->mtime = (ivalid & ATTR_MTIME)?iattr->ia_mtime.tv_sec:inode->i_mtime.tv_sec;
+	ri->ctime = (ivalid & ATTR_CTIME)?iattr->ia_ctime.tv_sec:inode->i_ctime.tv_sec;
 
 	ri->offset = 0;
 	ri->csize = ri->dsize = mdatalen;
@@ -186,9 +186,12 @@ int jffs2_setattr (struct dentry *dentry, struct iattr *iattr)
 		return PTR_ERR(new_metadata);
 	}
 	/* It worked. Update the inode */
-	inode->i_atime = ri->atime;
-	inode->i_ctime = ri->ctime;
-	inode->i_mtime = ri->mtime;
+	inode->i_atime.tv_sec = ri->atime;
+	inode->i_ctime.tv_sec = ri->ctime;
+	inode->i_mtime.tv_sec = ri->mtime;
+	inode->i_atime.tv_nsec =
+	inode->i_ctime.tv_nsec =
+	inode->i_mtime.tv_nsec = 0;
 	inode->i_mode = ri->mode;
 	inode->i_uid = ri->uid;
 	inode->i_gid = ri->gid;
@@ -309,7 +312,7 @@ int jffs2_prepare_write (struct file *filp, struct page *pg, unsigned start, uns
 		ri.uid = inode->i_uid;
 		ri.gid = inode->i_gid;
 		ri.isize = max((uint32_t)inode->i_size, pageofs);
-		ri.atime = ri.ctime = ri.mtime = CURRENT_TIME;
+		ri.atime = ri.ctime = ri.mtime = get_seconds();
 		ri.offset = inode->i_size;
 		ri.dsize = pageofs - inode->i_size;
 		ri.csize = 0;
@@ -380,7 +383,7 @@ int jffs2_commit_write (struct file *filp, struct page *pg, unsigned start, unsi
 	ri->uid = inode->i_uid;
 	ri->gid = inode->i_gid;
 	ri->isize = (uint32_t)inode->i_size;
-	ri->atime = ri->ctime = ri->mtime = CURRENT_TIME;
+	ri->atime = ri->ctime = ri->mtime = get_seconds();
 
 	kmap(pg);
 	ret = jffs2_write_inode_range(c, f, ri, page_address(pg) + start,
@@ -397,7 +400,8 @@ int jffs2_commit_write (struct file *filp, struct page *pg, unsigned start, unsi
 			inode->i_size = (pg->index << PAGE_CACHE_SHIFT) + start + writtenlen;
 			inode->i_blocks = (inode->i_size + 511) >> 9;
 			
-			inode->i_ctime = inode->i_mtime = ri->ctime;
+			inode->i_ctime.tv_sec = inode->i_mtime.tv_sec = ri->ctime;
+			inode->i_ctime.tv_nsec = inode->i_mtime.tv_nsec = 0;
 		}
 	}
 

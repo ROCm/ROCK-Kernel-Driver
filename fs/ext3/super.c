@@ -769,7 +769,7 @@ static int ext3_setup_super(struct super_block *sb, struct ext3_super_block *es,
 			"running e2fsck is recommended\n");
 	else if (le32_to_cpu(es->s_checkinterval) &&
 		(le32_to_cpu(es->s_lastcheck) +
-			le32_to_cpu(es->s_checkinterval) <= CURRENT_TIME))
+			le32_to_cpu(es->s_checkinterval) <= get_seconds()))
 		printk (KERN_WARNING
 			"EXT3-fs warning: checktime reached, "
 			"running e2fsck is recommended\n");
@@ -784,7 +784,7 @@ static int ext3_setup_super(struct super_block *sb, struct ext3_super_block *es,
 		es->s_max_mnt_count =
 			(__s16) cpu_to_le16(EXT3_DFL_MAX_MNT_COUNT);
 	es->s_mnt_count=cpu_to_le16(le16_to_cpu(es->s_mnt_count) + 1);
-	es->s_mtime = cpu_to_le32(CURRENT_TIME);
+	es->s_mtime = cpu_to_le32(get_seconds());
 	ext3_update_dynamic_rev(sb);
 	EXT3_SET_INCOMPAT_FEATURE(sb, EXT3_FEATURE_INCOMPAT_RECOVER);
 
@@ -1617,7 +1617,7 @@ static void ext3_commit_super (struct super_block * sb,
 			       struct ext3_super_block * es,
 			       int sync)
 {
-	es->s_wtime = cpu_to_le32(CURRENT_TIME);
+	es->s_wtime = cpu_to_le32(get_seconds());
 	BUFFER_TRACE(EXT3_SB(sb)->s_sbh, "marking dirty");
 	mark_buffer_dirty(EXT3_SB(sb)->s_sbh);
 	if (sync) {

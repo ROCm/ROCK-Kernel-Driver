@@ -546,10 +546,10 @@ static void exp_fsid_unhash(struct svc_export *exp)
 
 	ek = exp_get_fsid_key(exp->ex_client, exp->ex_fsid);
 	if (ek && !IS_ERR(ek)) {
-		ek->h.expiry_time = CURRENT_TIME-1;
+		ek->h.expiry_time = get_seconds()-1;
 		expkey_put(&ek->h, &svc_expkey_cache);
 	}
-	svc_expkey_cache.nextcheck = CURRENT_TIME;
+	svc_expkey_cache.nextcheck = get_seconds();
 }
 
 static int exp_fsid_hash(svc_client *clp, struct svc_export *exp)
@@ -580,10 +580,10 @@ static void exp_unhash(struct svc_export *exp)
 
 	ek = exp_get_key(exp->ex_client, inode->i_sb->s_dev, inode->i_ino);
 	if (ek && !IS_ERR(ek)) {
-		ek->h.expiry_time = CURRENT_TIME-1;
+		ek->h.expiry_time = get_seconds()-1;
 		expkey_put(&ek->h, &svc_expkey_cache);
 	}
-	svc_expkey_cache.nextcheck = CURRENT_TIME;
+	svc_expkey_cache.nextcheck = get_seconds();
 }
 	
 extern struct dentry *
@@ -733,8 +733,8 @@ out:
 static void
 exp_do_unexport(svc_export *unexp)
 {
-	unexp->h.expiry_time = CURRENT_TIME-1;
-	svc_export_cache.nextcheck = CURRENT_TIME;
+	unexp->h.expiry_time = get_seconds()-1;
+	svc_export_cache.nextcheck = get_seconds();
 	exp_unhash(unexp);
 	exp_fsid_unhash(unexp);
 }
@@ -1054,7 +1054,7 @@ exp_delclient(struct nfsctl_client *ncp)
 	 */
 	if (dom) {
 		err = auth_unix_forget_old(dom);
-		dom->h.expiry_time = CURRENT_TIME;
+		dom->h.expiry_time = get_seconds();
 		auth_domain_put(dom);
 	}
 

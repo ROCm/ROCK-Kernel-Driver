@@ -221,8 +221,8 @@ encode_attrs(struct nfs4_compound *cp, struct iattr *iap)
 		bmval1 |= FATTR4_WORD1_TIME_ACCESS_SET;
 		WRITE32(NFS4_SET_TO_CLIENT_TIME);
 		WRITE32(0);
-		WRITE32(iap->ia_mtime);
-		WRITE32(0);
+		WRITE32(iap->ia_mtime.tv_sec);
+		WRITE32(iap->ia_mtime.tv_nsec);
 	}
 	else if (iap->ia_valid & ATTR_ATIME) {
 		bmval1 |= FATTR4_WORD1_TIME_ACCESS_SET;
@@ -232,8 +232,8 @@ encode_attrs(struct nfs4_compound *cp, struct iattr *iap)
 		bmval1 |= FATTR4_WORD1_TIME_MODIFY_SET;
 		WRITE32(NFS4_SET_TO_CLIENT_TIME);
 		WRITE32(0);
-		WRITE32(iap->ia_mtime);
-		WRITE32(0);
+		WRITE32(iap->ia_mtime.tv_sec);
+		WRITE32(iap->ia_mtime.tv_nsec);
 	}
 	else if (iap->ia_valid & ATTR_MTIME) {
 		bmval1 |= FATTR4_WORD1_TIME_MODIFY_SET;

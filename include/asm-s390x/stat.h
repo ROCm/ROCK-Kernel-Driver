@@ -20,14 +20,16 @@ struct stat {
         unsigned long  st_rdev;
         unsigned long  st_size;
         unsigned long  st_atime;
-	unsigned long	__reserved0;	/* reserved for atime.nanoseconds */
+	unsigned long  st_atime_nsec;
         unsigned long  st_mtime;
-	unsigned long	__reserved1;	/* reserved for mtime.nanoseconds */
+	unsigned long  st_mtime_nsec;
         unsigned long  st_ctime;
-	unsigned long	__reserved2;	/* reserved for ctime.nanoseconds */
+	unsigned long  st_ctime_nsec;
         unsigned long  st_blksize;
         long           st_blocks;
         unsigned long  __unused[3];
 };
+
+#define STAT_HAVE_NSEC 1
 
 #endif

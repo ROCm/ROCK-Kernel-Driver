@@ -185,7 +185,7 @@ smb_set_inode_attr(struct inode *inode, struct smb_fattr *fattr)
 	 * A size change should have a different mtime, or same mtime
 	 * but different size.
 	 */
-	time_t last_time = inode->i_mtime;
+	time_t last_time = inode->i_mtime.tv_sec;
 	loff_t last_sz = inode->i_size;
 
 	inode->i_mode	= fattr->f_mode;
@@ -205,7 +205,7 @@ smb_set_inode_attr(struct inode *inode, struct smb_fattr *fattr)
 	 */
 	ei->oldmtime = jiffies;
 
-	if (inode->i_mtime != last_time || inode->i_size != last_sz) {
+	if (inode->i_mtime.tv_sec != last_time || inode->i_size != last_sz) {
 		VERBOSE("%ld changed, old=%ld, new=%ld, oz=%ld, nz=%ld\n",
 			inode->i_ino,
 			(long) last_time, (long) inode->i_mtime,

@@ -54,7 +54,8 @@ inline s64 utc2ntfs(const time_t time)
  */
 inline s64 get_current_ntfs_time(void)
 {
-	return utc2ntfs(CURRENT_TIME);
+	/* ignores leap second */
+	return utc2ntfs(get_seconds()) + xtime.tv_nsec/1000;
 }
 
 /**

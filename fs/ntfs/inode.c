@@ -590,18 +590,21 @@ static int ntfs_read_locked_inode(struct inode *vi)
 	 * mtime is the last change of the data within the file. Not changed
 	 * when only metadata is changed, e.g. a rename doesn't affect mtime.
 	 */
-	vi->i_mtime = ntfs2utc(si->last_data_change_time);
+	vi->i_mtime.tv_sec = ntfs2utc(si->last_data_change_time);
+	vi->i_mtime.tv_nsec = 0;
 	/*
 	 * ctime is the last change of the metadata of the file. This obviously
 	 * always changes, when mtime is changed. ctime can be changed on its
 	 * own, mtime is then not changed, e.g. when a file is renamed.
 	 */
-	vi->i_ctime = ntfs2utc(si->last_mft_change_time);
+	vi->i_ctime.tv_sec = ntfs2utc(si->last_mft_change_time);
+	vi->i_ctime.tv_nsec = 0;
 	/*
 	 * Last access to the data within the file. Not changed during a rename
 	 * for example but changed whenever the file is written to.
 	 */
-	vi->i_atime = ntfs2utc(si->last_access_time);
+	vi->i_atime.tv_sec = ntfs2utc(si->last_access_time);
+	vi->i_atime.tv_nsec = 0;
 
 	/* Find the attribute list attribute if present. */
 	reinit_attr_search_ctx(ctx);
