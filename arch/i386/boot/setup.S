@@ -162,7 +162,9 @@ ramdisk_max:	.long (-__PAGE_OFFSET-(512 << 20)-1) & 0x7fffffff
 					# the contents of an initrd
 
 trampoline:	call	start_of_setup
-		.space	1024
+		.align 16
+					# The offset at this point is 0x240
+		.space	(0x7ff-0x240+1) # E820 & EDD space (ending at 0x7ff)
 # End of setup header #####################################################
 
 start_of_setup:
