@@ -116,7 +116,6 @@ enum cflags {
 	COMMIT_Inlineea,	/* commit inode inline EA */
 	COMMIT_Freewmap,	/* free WMAP at iClose() */
 	COMMIT_Dirty,		/* Inode is really dirty */
-	COMMIT_Holdlock,	/* Hold the IWRITE_LOCK until commit is done */
 	COMMIT_Dirtable,	/* commit changes to di_dirtable */
 	COMMIT_Stale,		/* data extent is no longer valid */
 	COMMIT_Synclist,	/* metadata pages on group commit synclist */

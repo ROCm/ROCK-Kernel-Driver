@@ -1844,18 +1844,10 @@ void xtLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
 		} else {
 			/*
 			 * xdlist will point to into inode's xtree, ensure
-			 * that transaction is not committed lazily unless
-			 * we're deleting the inode (unlink).  In that case
-			 * we have special logic for the inode to be
-			 * unlocked by the lazy commit thread.
+			 * that transaction is not committed lazily.
 			 */
 			xadlock->xdlist = &p->xad[XTENTRYSTART];
-			if ((tblk->xflag & COMMIT_LAZY) &&
-			    (tblk->xflag & COMMIT_DELETE) &&
-			    (tblk->ip == ip))
-				set_cflag(COMMIT_Holdlock, ip);
-			else
-				tblk->xflag &= ~COMMIT_LAZY;
+			tblk->xflag &= ~COMMIT_LAZY;
 		}
 		jFYI(1,
 		     ("xtLog: free ip:0x%p mp:0x%p count:%d lwm:2\n",
@@ -2387,10 +2379,6 @@ static void txUpdateMap(struct tblock * tblk)
 		ip = tblk->ip;
 		diUpdatePMap(ipimap, ip->i_ino, TRUE, tblk);
 		ipimap->i_state |= I_DIRTY;
-		if (test_and_clear_cflag(COMMIT_Holdlock, ip)) {
-			if (tblk->flag & tblkGC_LAZY)
-				IWRITE_UNLOCK(ip);
-		}
 		iput(ip);
 	}
 }
