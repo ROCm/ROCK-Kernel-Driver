@@ -46,30 +46,16 @@
 #define __DQUOT_NUM_VERSION__	6*10000+5*100+1
 
 typedef __kernel_uid32_t qid_t; /* Type in which we store ids in memory */
+typedef __u64 qsize_t;          /* Type in which we store sizes */
 
-/*
- * Convert diskblocks to blocks and the other way around.
- */
-#define dbtob(num) (num << BLOCK_SIZE_BITS)
-#define btodb(num) (num >> BLOCK_SIZE_BITS)
+/* Size of blocks in which are counted size limits */
+#define QUOTABLOCK_BITS 10
+#define QUOTABLOCK_SIZE (1 << QUOTABLOCK_BITS)
 
-/*
- * Convert count of filesystem blocks to diskquota blocks, meant
- * for filesystems where i_blksize != BLOCK_SIZE
- */
-#define fs_to_dq_blocks(num, blksize) (((num) * (blksize)) / BLOCK_SIZE)
-
-/*
- * Definitions for disk quotas imposed on the average user
- * (big brother finally hits Linux).
- *
- * The following constants define the amount of time given a user
- * before the soft limits are treated as hard limits (usually resulting
- * in an allocation failure). The timer is started when the user crosses
- * their soft limit, it is reset when they go below their soft limit.
- */
-#define MAX_IQ_TIME  604800	/* (7*24*60*60) 1 week */
-#define MAX_DQ_TIME  604800	/* (7*24*60*60) 1 week */
+/* Conversion routines from and to quota blocks */
+#define qb2kb(x) ((x) << (QUOTABLOCK_BITS-10))
+#define kb2qb(x) ((x) >> (QUOTABLOCK_BITS-10))
+#define toqb(x) (((x) + QUOTABLOCK_SIZE - 1) >> QUOTABLOCK_BITS)
 
 #define MAXQUOTAS 2
 #define USRQUOTA  0		/* element used for user quotas */
@@ -105,7 +91,7 @@ typedef __kernel_uid32_t qid_t; /* Type in which we store ids in memory */
 struct mem_dqblk {
 	__u32 dqb_bhardlimit;	/* absolute limit on disk blks alloc */
 	__u32 dqb_bsoftlimit;	/* preferred limit on disk blks */
-	__u32 dqb_curblocks;	/* current block count */
+	qsize_t dqb_curspace;	/* current used space */
 	__u32 dqb_ihardlimit;	/* absolute limit on allocated inodes */
 	__u32 dqb_isoftlimit;	/* preferred inode limit */
 	__u32 dqb_curinodes;	/* current # allocated inodes */
@@ -119,7 +105,7 @@ struct mem_dqblk {
 struct quota_format_type;
 
 struct mem_dqinfo {
-	struct quota_format_type *dqi_format;
+	struct quota_format_type * dqi_format;
 	int dqi_flags;
 	unsigned int dqi_bgrace;
 	unsigned int dqi_igrace;
@@ -148,7 +134,7 @@ extern inline void mark_info_dirty(struct mem_dqinfo *info)
  */
 #define	dq_bhardlimit	dq_dqb.dqb_bhardlimit
 #define	dq_bsoftlimit	dq_dqb.dqb_bsoftlimit
-#define	dq_curblocks	dq_dqb.dqb_curblocks
+#define	dq_curspace	dq_dqb.dqb_curspace
 #define	dq_ihardlimit	dq_dqb.dqb_ihardlimit
 #define	dq_isoftlimit	dq_dqb.dqb_isoftlimit
 #define	dq_curinodes	dq_dqb.dqb_curinodes

@@ -703,9 +703,9 @@ static inline void dquot_incr_inodes(struct dquot *dquot, unsigned long number)
 	mark_dquot_dirty(dquot);
 }
 
-static inline void dquot_incr_blocks(struct dquot *dquot, unsigned long number)
+static inline void dquot_incr_space(struct dquot *dquot, qsize_t number)
 {
-	dquot->dq_curblocks += number;
+	dquot->dq_curspace += number;
 	mark_dquot_dirty(dquot);
 }
 
@@ -721,13 +721,13 @@ static inline void dquot_decr_inodes(struct dquot *dquot, unsigned long number)
 	mark_dquot_dirty(dquot);
 }
 
-static inline void dquot_decr_blocks(struct dquot *dquot, unsigned long number)
+static inline void dquot_decr_space(struct dquot *dquot, qsize_t number)
 {
-	if (dquot->dq_curblocks > number)
-		dquot->dq_curblocks -= number;
+	if (dquot->dq_curspace > number)
+		dquot->dq_curspace -= number;
 	else
-		dquot->dq_curblocks = 0;
-	if (dquot->dq_curblocks < dquot->dq_bsoftlimit)
+		dquot->dq_curspace = 0;
+	if (toqb(dquot->dq_curspace) < dquot->dq_bsoftlimit)
 		dquot->dq_btime = (time_t) 0;
 	dquot->dq_flags &= ~DQ_BLKS;
 	mark_dquot_dirty(dquot);
@@ -837,14 +837,14 @@ static int check_idq(struct dquot *dquot, ulong inodes, char *warntype)
 	return QUOTA_OK;
 }
 
-static int check_bdq(struct dquot *dquot, ulong blocks, char prealloc, char *warntype)
+static int check_bdq(struct dquot *dquot, qsize_t space, int prealloc, char *warntype)
 {
 	*warntype = 0;
-	if (blocks <= 0 || dquot->dq_flags & DQ_FAKE)
+	if (space <= 0 || dquot->dq_flags & DQ_FAKE)
 		return QUOTA_OK;
 
 	if (dquot->dq_bhardlimit &&
-	   (dquot->dq_curblocks + blocks) > dquot->dq_bhardlimit &&
+	   toqb(dquot->dq_curspace + space) > dquot->dq_bhardlimit &&
             !ignore_hardlimit(dquot)) {
 		if (!prealloc)
 			*warntype = BHARDWARN;
@@ -852,7 +852,7 @@ static int check_bdq(struct dquot *dquot, ulong blocks, char prealloc, char *war
 	}
 
 	if (dquot->dq_bsoftlimit &&
-	   (dquot->dq_curblocks + blocks) > dquot->dq_bsoftlimit &&
+	   toqb(dquot->dq_curspace + space) > dquot->dq_bsoftlimit &&
 	    dquot->dq_btime && CURRENT_TIME >= dquot->dq_btime &&
             !ignore_hardlimit(dquot)) {
 		if (!prealloc)
@@ -861,7 +861,7 @@ static int check_bdq(struct dquot *dquot, ulong blocks, char prealloc, char *war
 	}
 
 	if (dquot->dq_bsoftlimit &&
-	   (dquot->dq_curblocks + blocks) > dquot->dq_bsoftlimit &&
+	   toqb(dquot->dq_curspace + space) > dquot->dq_bsoftlimit &&
 	    dquot->dq_btime == 0) {
 		if (!prealloc) {
 			*warntype = BSOFTWARN;
@@ -948,7 +948,7 @@ void dquot_drop(struct inode *inode)
 /*
  * This operation can block, but only after everything is updated
  */
-int dquot_alloc_block(struct inode *inode, unsigned long number, char warn)
+int dquot_alloc_space(struct inode *inode, qsize_t number, int warn)
 {
 	int cnt, ret = NO_QUOTA;
 	struct dquot *dquot[MAXQUOTAS];
@@ -970,9 +970,9 @@ int dquot_alloc_block(struct inode *inode, unsigned long number, char warn)
 	for (cnt = 0; cnt < MAXQUOTAS; cnt++) {
 		if (dquot[cnt] == NODQUOT)
 			continue;
-		dquot_incr_blocks(dquot[cnt], number);
+		dquot_incr_space(dquot[cnt], number);
 	}
-	inode->i_blocks += number << (BLOCK_SIZE_BITS - 9);
+	inode->i_blocks += number >> 9;
 	/* NOBLOCK End */
 	ret = QUOTA_OK;
 warn_put_all:
@@ -1026,7 +1026,7 @@ warn_put_all:
 /*
  * This is a non-blocking operation.
  */
-void dquot_free_block(struct inode *inode, unsigned long number)
+void dquot_free_space(struct inode *inode, qsize_t number)
 {
 	unsigned short cnt;
 	struct dquot *dquot;
@@ -1037,10 +1037,10 @@ void dquot_free_block(struct inode *inode, unsigned long number)
 		dquot = dqduplicate(inode->i_dquot[cnt]);
 		if (dquot == NODQUOT)
 			continue;
-		dquot_decr_blocks(dquot, number);
+		dquot_decr_space(dquot, number);
 		dqputduplicate(dquot);
 	}
-	inode->i_blocks -= number << (BLOCK_SIZE_BITS - 9);
+	inode->i_blocks -= number >> 9;
 	unlock_kernel();
 	/* NOBLOCK End */
 }
@@ -1073,7 +1073,7 @@ void dquot_free_inode(const struct inode *inode, unsigned long number)
  */
 int dquot_transfer(struct inode *inode, struct iattr *iattr)
 {
-	unsigned long blocks;
+	qsize_t space;
 	struct dquot *transfer_from[MAXQUOTAS];
 	struct dquot *transfer_to[MAXQUOTAS];
 	int cnt, ret = NO_QUOTA, chuid = (iattr->ia_valid & ATTR_UID) && inode->i_uid != iattr->ia_uid,
@@ -1103,7 +1103,7 @@ int dquot_transfer(struct inode *inode, struct iattr *iattr)
 		}
 	}
 	/* NOBLOCK START: From now on we shouldn't block */
-	blocks = (inode->i_blocks >> 1);
+	space = ((qsize_t)inode->i_blocks) << 9;
 	/* Build the transfer_from list and check the limits */
 	for (cnt = 0; cnt < MAXQUOTAS; cnt++) {
 		/* The second test can fail when quotaoff is in progress... */
@@ -1113,7 +1113,7 @@ int dquot_transfer(struct inode *inode, struct iattr *iattr)
 		if (transfer_from[cnt] == NODQUOT)	/* Can happen on quotafiles (quota isn't initialized on them)... */
 			continue;
 		if (check_idq(transfer_to[cnt], 1, warntype+cnt) == NO_QUOTA ||
-		    check_bdq(transfer_to[cnt], blocks, 0, warntype+cnt) == NO_QUOTA)
+		    check_bdq(transfer_to[cnt], space, 0, warntype+cnt) == NO_QUOTA)
 			goto warn_put_all;
 	}
 
@@ -1128,10 +1128,10 @@ int dquot_transfer(struct inode *inode, struct iattr *iattr)
 			continue;
 
 		dquot_decr_inodes(transfer_from[cnt], 1);
-		dquot_decr_blocks(transfer_from[cnt], blocks);
+		dquot_decr_space(transfer_from[cnt], space);
 
 		dquot_incr_inodes(transfer_to[cnt], 1);
-		dquot_incr_blocks(transfer_to[cnt], blocks);
+		dquot_incr_space(transfer_to[cnt], space);
 
 		if (inode->i_dquot[cnt] == NODQUOT)
 			BUG();
@@ -1162,9 +1162,9 @@ warn_put_all:
 struct dquot_operations dquot_operations = {
 	initialize:	dquot_initialize,		/* mandatory */
 	drop:		dquot_drop,			/* mandatory */
-	alloc_block:	dquot_alloc_block,
+	alloc_block:	dquot_alloc_space,
 	alloc_inode:	dquot_alloc_inode,
-	free_block:	dquot_free_block,
+	free_block:	dquot_free_space,
 	free_inode:	dquot_free_inode,
 	transfer:	dquot_transfer
 };
