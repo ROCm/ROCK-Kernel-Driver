@@ -541,10 +541,13 @@ static int __init NCR53c406a_detect(Scsi_Host_Template * tpnt)
 	} else if (irq_level == 0) {
 		tpnt->can_queue = 0;
 		DEB(printk("NCR53c406a: No interrupts detected\n"));
+		printk("NCR53c406a driver no longer supports polling interface\n");
+		printk("Please email linux-scsi@vger.kernel.org\n");
+                        
 #if USE_DMA
 		printk("NCR53c406a: No interrupts found and DMA mode defined. Giving up.\n");
-		goto err_free_scsi;
 #endif				/* USE_DMA */
+		goto err_free_scsi;
 	} else {
 		DEB(printk("NCR53c406a: Shouldn't get here!\n"));
 		goto err_free_scsi;
