@@ -413,34 +413,37 @@ static int vicam_mmap_capture(struct usb_vicam *vicam, struct video_mmap *vm)
  * 
  *****************************************************************************/
 
-static int vicam_v4l_open(struct video_device *vdev, int flags)
+static int vicam_v4l_open(struct inode *inode, struct file *file)
 {
+	struct video_device *vdev = video_devdata(file);
 	struct usb_vicam *vicam = (struct usb_vicam *)vdev;
 	int err = 0;
 	
 	dbg("vicam_v4l_open");
- 
 	down(&vicam->sem);
 
 	vicam->fbuf = rvmalloc(vicam->maxframesize * VICAM_NUMFRAMES);
-	if (!vicam->fbuf)
-		err=-ENOMEM;
-	else {
-		vicam->open_count = 1;
-	}
+	if (vicam->open_count) {
+		err = -EBUSY;
+	} else if (!vicam->fbuf) {
+		err =- ENOMEM;
+	} else {
 #ifdef BLINKING
-	vicam_sndctrl(1, vicam, VICAM_REQ_CAMERA_POWER, 0x01, NULL, 0);
-	info ("led on");
-	vicam_sndctrl(1, vicam, VICAM_REQ_LED_CONTROL, 0x01, NULL, 0);
+		vicam_sndctrl(1, vicam, VICAM_REQ_CAMERA_POWER, 0x01, NULL, 0);
+		info ("led on");
+		vicam_sndctrl(1, vicam, VICAM_REQ_LED_CONTROL, 0x01, NULL, 0);
 #endif
+		vicam->open_count++;
+		file->private_data = vdev;
+	}
 
 	up(&vicam->sem);
-	
 	return err;
 }
 
-static void vicam_v4l_close(struct video_device *vdev)
+static int vicam_v4l_close(struct inode *inode, struct file *file)
 {
+	struct video_device *vdev = file->private_data;
 	struct usb_vicam *vicam = (struct usb_vicam *)vdev;
 
 	dbg("vicam_v4l_close");
@@ -456,17 +459,21 @@ static void vicam_v4l_close(struct video_device *vdev)
 	rvfree(vicam->fbuf, vicam->maxframesize * VICAM_NUMFRAMES);
 	vicam->fbuf = 0;
 	vicam->open_count=0;
+	file->private_data = NULL;
 
 	up(&vicam->sem);
 	/* Why does se401.c have a usbdevice check here? */
 	/* If device is unplugged while open, I guess we only may unregister now */
+	return 0;
 }
 
-static long vicam_v4l_read(struct video_device *vdev, char *user_buf, unsigned long buflen, int noblock)
+static int vicam_v4l_read(struct file *file, char *user_buf,
+			  size_t buflen, loff_t *ppos)
 {
+	struct video_device *vdev = file->private_data;
 	//struct usb_vicam *vicam = (struct usb_vicam *)vdev;
 
-	dbg("vicam_v4l_read(%ld)", buflen);
+	dbg("vicam_v4l_read(%d)", buflen);
 
 	if (!vdev || !buf)
 		return -EFAULT;
@@ -476,14 +483,10 @@ static long vicam_v4l_read(struct video_device *vdev, char *user_buf, unsigned l
 	return buflen;
 }
 
-static long vicam_v4l_write(struct video_device *dev, const char *buf, unsigned long count, int noblock)
+static int vicam_v4l_ioctl(struct inode *inode, struct file *file,
+			   unsigned int cmd, void *arg)
 {
-	info("vicam_v4l_write");
-	return -EINVAL;
-}
-
-static int vicam_v4l_ioctl(struct video_device *vdev, unsigned int cmd, void *arg)
-{
+	struct video_device *vdev = file->private_data;
 	struct usb_vicam *vicam = (struct usb_vicam *)vdev;
 	int ret = -EL3RST;
 
@@ -495,98 +498,74 @@ static int vicam_v4l_ioctl(struct video_device *vdev, unsigned int cmd, void *ar
 	switch (cmd) {
 	case VIDIOCGCAP:
 	{
-		struct video_capability b;
-		ret = vicam_get_capability(vicam,&b);
-		dbg("name %s",b.name);
-		if (copy_to_user(arg, &b, sizeof(b)))
-			ret = -EFAULT;
+		struct video_capability *b = arg;
+		ret = vicam_get_capability(vicam,b);
+		dbg("name %s",b->name);
+		break;
 	}
 	case VIDIOCGFBUF:
 	{
-		struct video_buffer vb;
+		struct video_buffer *vb = arg;
 		info("vicam_v4l_ioctl - VIDIOCGBUF - query frame buffer param");
 		/* frame buffer not supported, not used */
-		memset(&vb, 0, sizeof(vb));
-		vb.base = NULL;
-		
-		/* FIXME - VIDIOCGFBUF - why the void */
-		if (copy_to_user((void *)arg, (void *)&vb, sizeof(vb)))
-			ret = -EFAULT;
+		memset(vb, 0, sizeof(*vb));
 		ret = 0;
+		break;
 	}
 	case VIDIOCGWIN:
 	{
-		struct video_window vw;
-		ret = vicam_get_window(vicam, &vw);
-		if (copy_to_user(arg, &vw, sizeof(vw)))
-			ret = -EFAULT;
+		struct video_window *vw = arg;
+		ret = vicam_get_window(vicam, vw);
+		break;
 	}
 	case VIDIOCSWIN:
 	{
-		struct video_window vw;
-		if (copy_from_user(&vw, arg, sizeof(vw)))
-			ret = -EFAULT;
-		else
-			ret = vicam_set_window(vicam, &vw);
-		return ret;
+		struct video_window *vw = arg;
+		ret = vicam_set_window(vicam, vw);
+		break;
 	}
 	case VIDIOCGCHAN:
 	{
-		struct video_channel v;
+		struct video_channel *v = arg;
 
-		if (copy_from_user(&v, arg, sizeof(v)))
-			ret = -EFAULT;
-		else {
-			ret = vicam_get_channel(vicam,&v);
-			if (copy_to_user(arg, &v, sizeof(v)))
-				ret = -EFAULT;
-		}
+		ret = vicam_get_channel(vicam,v);
+		break;
 	}
 	case VIDIOCSCHAN:
 	{
-		struct video_channel v;
-		if (copy_from_user(&v, arg, sizeof(v)))
-			ret = -EFAULT;
-		else
-			ret = vicam_set_channel(vicam,&v);
+		struct video_channel *v = arg;
+		ret = vicam_set_channel(vicam,v);
+		break;
  	}
 	case VIDIOCGPICT:
 	{
-		struct video_picture p;
-		ret = vicam_get_picture(vicam, &p);
-		if (copy_to_user(arg, &p, sizeof(p)))
-			ret = -EFAULT;
+		struct video_picture *p = arg;
+		ret = vicam_get_picture(vicam,p);
+		break;
 	}
 	case VIDIOCSPICT:
 	{
-		struct video_picture p;
-		if (copy_from_user(&p, arg, sizeof(p)))
-			ret = -EFAULT;
-		else
-			ret = vicam_set_picture(vicam, &p);
+		struct video_picture *p = arg;
+		ret = vicam_set_picture(vicam,p);
+		break;
 	}
 	case VIDIOCGMBUF:
 	{
-		struct video_mbuf vm;
-		ret = vicam_get_mmapbuffer(vicam,&vm);
-		/* FIXME - VIDIOCGMBUF - why the void */
-		if (copy_to_user((void *)arg, (void *)&vm, sizeof(vm)))
-			ret = -EFAULT;
+		struct video_mbuf *vm = arg;
+		ret = vicam_get_mmapbuffer(vicam,vm);
+		break;
 	}
 	case VIDIOCMCAPTURE:
 	{
-		struct video_mmap vm;
-		ret = vicam_mmap_capture(vicam, &vm);
-		/* FIXME: This is probably not right */
+		struct video_mmap *vm = arg;
+		ret = vicam_mmap_capture(vicam,vm);
+		break;
 	}
 	case VIDIOCSYNC:
 	{
-		int frame;
-		/* FIXME - VIDIOCSYNC - why the void */
-		if (copy_from_user((void *)&frame, arg, sizeof(int)))
-			ret = -EFAULT;
-		else
-			ret = vicam_sync_frame(vicam,frame);
+		int *frame = arg;
+		ret = vicam_sync_frame(vicam,*frame);
+		break;
 	}
 
 	case VIDIOCKEY:
@@ -614,10 +593,12 @@ static int vicam_v4l_ioctl(struct video_device *vdev, unsigned int cmd, void *ar
         return ret;
 }
 
-static int vicam_v4l_mmap(struct vm_area_struct *vma, struct video_device *dev, const char *adr, unsigned long size)
+static int vicam_v4l_mmap(struct file *file, struct vm_area_struct *vma)
 {
-	struct usb_vicam *vicam = (struct usb_vicam *)dev;
-	unsigned long start = (unsigned long)adr;
+	struct video_device *vdev = file->private_data;
+	struct usb_vicam *vicam = (struct usb_vicam *)vdev;
+	unsigned long start = vma->vm_start;
+	unsigned long size  = vma->vm_end-vma->vm_start;
 	unsigned long page, pos;
 
 	down(&vicam->sem);
@@ -651,27 +632,23 @@ static int vicam_v4l_mmap(struct vm_area_struct *vma, struct video_device *dev, 
         return 0;
 }
 
-/* FIXME - vicam_v4l_init */
-static int vicam_v4l_init(struct video_device *dev)
-{
-	/* stick proc fs stuff in here if wanted */
-	dbg("vicam_v4l_init");
-	return 0;
-}
-
 /* FIXME - vicam_template - important */
+static struct file_operations vicam_fops = {
+	owner:		THIS_MODULE,
+	open:		vicam_v4l_open,
+	release:       	vicam_v4l_close,
+	read:		vicam_v4l_read,
+	mmap:		vicam_v4l_mmap,
+	ioctl:		video_generic_ioctl,
+	llseek:         no_llseek,
+};
 static struct video_device vicam_template = {
 	owner:		THIS_MODULE,
 	name:		"vicam USB camera",
 	type:		VID_TYPE_CAPTURE,
 	hardware:	VID_HARDWARE_SE401, /* need to ask for own id */
-	open:		vicam_v4l_open,
-	close:		vicam_v4l_close,
-	read:		vicam_v4l_read,
-	write:		vicam_v4l_write,
-	ioctl:		vicam_v4l_ioctl,
-	mmap:		vicam_v4l_mmap,
-	initialize:	vicam_v4l_init,
+	fops:           &vicam_fops,
+	kernel_ioctl:	vicam_v4l_ioctl,
 };
 
 /******************************************************************************
@@ -872,8 +849,7 @@ static void vicam_disconnect(struct usb_device *udev, void *ptr)
 
 	vicam = (struct usb_vicam *) ptr;
 
-	if (!vicam->open_count)
-		video_unregister_device(&vicam->vdev);
+	video_unregister_device(&vicam->vdev);
 	vicam->udev = NULL;
 /*
 	vicam->frame[0].grabstate = FRAME_ERROR;
