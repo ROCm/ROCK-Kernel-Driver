@@ -483,6 +483,9 @@ static int ipip_rcv(struct sk_buff *skb)
 			return 0;
 		}
 
+		secpath_put(skb->sp);
+		skb->sp = NULL;
+
 		skb->mac.raw = skb->nh.raw;
 		skb->nh.raw = skb->data;
 		memset(&(IPCB(skb)->opt), 0, sizeof(struct ip_options));

@@ -49,6 +49,7 @@
 #include <net/icmp.h>
 #include <net/ipip.h>
 #include <net/inet_ecn.h>
+#include <net/xfrm.h>
 
 /*
    This version of net/ipv6/sit.c is cloned of net/ipv4/ip_gre.c
@@ -376,6 +377,8 @@ static int ipip6_rcv(struct sk_buff *skb)
 
 	read_lock(&ipip6_lock);
 	if ((tunnel = ipip6_tunnel_lookup(iph->saddr, iph->daddr)) != NULL) {
+		secpath_put(skb->sp);
+		skb->sp = NULL;
 		skb->mac.raw = skb->nh.raw;
 		skb->nh.raw = skb->data;
 		memset(&(IPCB(skb)->opt), 0, sizeof(struct ip_options));

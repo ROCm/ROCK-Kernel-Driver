@@ -8,9 +8,11 @@
 #include <linux/delay.h>
 #include <linux/string.h>
 
+static __initdata char *message;
 static void __init error(char *x)
 {
-	panic("populate_root: %s\n", x);
+	if (!message)
+		message = x;
 }
 
 static void __init *malloc(int size)
@@ -63,7 +65,7 @@ static char __init *find_link(int major, int minor, int ino, char *name)
 	}
 	q = (struct hash *)malloc(sizeof(struct hash));
 	if (!q)
-		error("can't allocate link hash entry");
+		panic("can't allocate link hash entry");
 	q->ino = ino;
 	q->minor = minor;
 	q->major = major;
@@ -119,7 +121,7 @@ static void __init parse_header(char *s)
 
 /* FSM */
 
-enum state {
+static __initdata enum state {
 	Start,
 	Collect,
 	GotHeader,
@@ -130,9 +132,11 @@ enum state {
 	Reset
 } state, next_state;
 
-char *victim;
-unsigned count;
-loff_t this_header, next_header;
+static __initdata char *victim;
+static __initdata unsigned count;
+static __initdata loff_t this_header, next_header;
+
+static __initdata int dry_run;
 
 static inline void eat(unsigned n)
 {
@@ -185,23 +189,30 @@ static int __init do_collect(void)
 
 static int __init do_header(void)
 {
+	if (memcmp(collected, "070701", 6)) {
+		error("no cpio magic");
+		return 1;
+	}
 	parse_header(collected);
 	next_header = this_header + N_ALIGN(name_len) + body_len;
 	next_header = (next_header + 3) & ~3;
+	if (dry_run) {
+		read_into(name_buf, N_ALIGN(name_len), GotName);
+		return 0;
+	}
+	state = SkipIt;
 	if (name_len <= 0 || name_len > PATH_MAX)
-		state = SkipIt;
-	else if (S_ISLNK(mode)) {
+		return 0;
+	if (S_ISLNK(mode)) {
 		if (body_len > PATH_MAX)
-			state = SkipIt;
-		else {
-			collect = collected = symlink_buf;
-			remains = N_ALIGN(name_len) + body_len;
-			next_state = GotSymlink;
-			state = Collect;
-		}
-	} else if (body_len && !S_ISREG(mode))
-		state = SkipIt;
-	else
+			return 0;
+		collect = collected = symlink_buf;
+		remains = N_ALIGN(name_len) + body_len;
+		next_state = GotSymlink;
+		state = Collect;
+		return 0;
+	}
+	if (S_ISREG(mode) || !body_len)
 		read_into(name_buf, N_ALIGN(name_len), GotName);
 	return 0;
 }
@@ -248,6 +259,8 @@ static int __init do_name(void)
 		next_state = Reset;
 		return 0;
 	}
+	if (dry_run)
+		return 0;
 	if (S_ISREG(mode)) {
 		if (maybe_link() >= 0) {
 			wfd = sys_open(collected, O_WRONLY|O_CREAT, mode);
@@ -268,8 +281,7 @@ static int __init do_name(void)
 			sys_chown(collected, uid, gid);
 			sys_chmod(collected, mode);
 		}
-	} else
-		panic("populate_root: bogus mode: %o\n", mode);
+	}
 	return 0;
 }
 
@@ -323,13 +335,14 @@ static int __init write_buffer(char *buf, unsigned len)
 static void __init flush_buffer(char *buf, unsigned len)
 {
 	int written;
-	while ((written = write_buffer(buf, len)) < len) {
+	if (message)
+		return;
+	while ((written = write_buffer(buf, len)) < len && !message) {
 		char c = buf[written];
 		if (c == '0') {
 			buf += written;
 			len -= written;
 			state = Start;
-			continue;
 		} else
 			error("junk in compressed archive");
 	}
@@ -408,18 +421,20 @@ static void __init flush_window(void)
 	outcnt = 0;
 }
 
-static void __init unpack_to_rootfs(char *buf, unsigned len)
+char * __init unpack_to_rootfs(char *buf, unsigned len, int check_only)
 {
 	int written;
+	dry_run = check_only;
 	header_buf = malloc(110);
 	symlink_buf = malloc(PATH_MAX + N_ALIGN(PATH_MAX) + 1);
 	name_buf = malloc(N_ALIGN(PATH_MAX));
 	window = malloc(WSIZE);
 	if (!window || !header_buf || !symlink_buf || !name_buf)
-		error("can't allocate buffers");
+		panic("can't allocate buffers");
 	state = Start;
 	this_header = 0;
-	while (len) {
+	message = NULL;
+	while (!message && len) {
 		loff_t saved_offset = this_header;
 		if (*buf == '0' && !(this_header & 3)) {
 			state = Start;
@@ -427,7 +442,8 @@ static void __init unpack_to_rootfs(char *buf, unsigned len)
 			buf += written;
 			len -= written;
 			continue;
-		} else if (!*buf) {
+		}
+		if (!*buf) {
 			buf++;
 			len--;
 			this_header++;
@@ -442,7 +458,7 @@ static void __init unpack_to_rootfs(char *buf, unsigned len)
 		crc = (ulg)0xffffffffL; /* shift register contents */
 		makecrc();
 		if (gunzip())
-			error("ungzip failed");
+			message = "ungzip failed";
 		if (state != Reset)
 			error("junk in gzipped archive");
 		this_header = saved_offset + inptr;
@@ -453,12 +469,41 @@ static void __init unpack_to_rootfs(char *buf, unsigned len)
 	free(name_buf);
 	free(symlink_buf);
 	free(header_buf);
+	return message;
 }
 
 extern char __initramfs_start, __initramfs_end;
+#ifdef CONFIG_BLK_DEV_INITRD
+#include <linux/initrd.h>
+#endif
 
 void __init populate_rootfs(void)
 {
-	unpack_to_rootfs(&__initramfs_start,
-			 &__initramfs_end - &__initramfs_start);
+	char *err = unpack_to_rootfs(&__initramfs_start,
+			 &__initramfs_end - &__initramfs_start, 0);
+	if (err)
+		panic(err);
+#ifdef CONFIG_BLK_DEV_INITRD
+	if (initrd_start) {
+		int fd;
+		printk(KERN_INFO "checking if image is initramfs...");
+		err = unpack_to_rootfs((char *)initrd_start,
+			initrd_end - initrd_start, 1);
+		if (!err) {
+			printk(" it is\n");
+			unpack_to_rootfs((char *)initrd_start,
+				initrd_end - initrd_start, 0);
+			free_initrd_mem(initrd_start, initrd_end);
+			return;
+		}
+		printk("it isn't (%s); looks like an initrd\n", err);
+		fd = sys_open("/dev/initrd", O_WRONLY|O_CREAT, 700);
+		if (fd >= 0) {
+			sys_write(fd, (char *)initrd_start,
+					initrd_end - initrd_start);
+			sys_close(fd);
+			free_initrd_mem(initrd_start, initrd_end);
+		}
+	}
+#endif
 }

@@ -59,60 +59,64 @@
 #ifndef __ASSEMBLY__
 
 /* Bits [13:5] select one of 512 instruction cache tags */
-extern __inline__ void turbosparc_inv_insn_tag(unsigned long addr)
+static inline void turbosparc_inv_insn_tag(unsigned long addr)
 {
-        __asm__ __volatile__("sta %%g0, [%0] %1\n\t" : :
-                             "r" (addr), "i" (ASI_M_TXTC_TAG));
+        __asm__ __volatile__("sta %%g0, [%0] %1\n\t"
+			     : /* no outputs */
+			     : "r" (addr), "i" (ASI_M_TXTC_TAG)
+			     : "memory");
 }
 
 /* Bits [13:5] select one of 512 data cache tags */
-extern __inline__ void turbosparc_inv_data_tag(unsigned long addr)
+static inline void turbosparc_inv_data_tag(unsigned long addr)
 {
-        __asm__ __volatile__("sta %%g0, [%0] %1\n\t" : :
-                             "r" (addr), "i" (ASI_M_DATAC_TAG));
+        __asm__ __volatile__("sta %%g0, [%0] %1\n\t"
+			     : /* no outputs */
+			     : "r" (addr), "i" (ASI_M_DATAC_TAG)
+			     : "memory");
 }
 
-extern __inline__ void turbosparc_flush_icache(void)
+static inline void turbosparc_flush_icache(void)
 {
 	unsigned long addr;
 
-        for(addr = 0; addr < 0x4000; addr += 0x20)
+        for (addr = 0; addr < 0x4000; addr += 0x20)
                 turbosparc_inv_insn_tag(addr);
 }
 
-extern __inline__ void turbosparc_flush_dcache(void)
+static inline void turbosparc_flush_dcache(void)
 {
 	unsigned long addr;
 
-        for(addr = 0; addr < 0x4000; addr += 0x20)
+        for (addr = 0; addr < 0x4000; addr += 0x20)
                 turbosparc_inv_data_tag(addr);
 }
 
-extern __inline__ void turbosparc_idflash_clear(void)
+static inline void turbosparc_idflash_clear(void)
 {
 	unsigned long addr;
 
-        for(addr = 0; addr < 0x4000; addr += 0x20) {
+        for (addr = 0; addr < 0x4000; addr += 0x20) {
                 turbosparc_inv_insn_tag(addr);
                 turbosparc_inv_data_tag(addr);
 	}
 }
 
-extern __inline__ void turbosparc_set_ccreg(unsigned long regval)
+static inline void turbosparc_set_ccreg(unsigned long regval)
 {
-	__asm__ __volatile__("sta %0, [%1] %2\n\t" : :
-			     "r" (regval), "r" (0x600),
-			     "i" (ASI_M_MMUREGS));
+	__asm__ __volatile__("sta %0, [%1] %2\n\t"
+			     : /* no outputs */
+			     : "r" (regval), "r" (0x600), "i" (ASI_M_MMUREGS)
+			     : "memory");
 }
 
-extern __inline__ unsigned long turbosparc_get_ccreg(void)
+static inline unsigned long turbosparc_get_ccreg(void)
 {
 	unsigned long regval;
 
-	__asm__ __volatile__("lda [%1] %2, %0\n\t" :
-			     "=r" (regval) :
-			     "r" (0x600),
-			     "i" (ASI_M_MMUREGS));
+	__asm__ __volatile__("lda [%1] %2, %0\n\t"
+			     : "=r" (regval)
+			     : "r" (0x600), "i" (ASI_M_MMUREGS));
 	return regval;
 }
 
