@@ -98,7 +98,7 @@ $(call gz-sec, $(required)): $(obj)/kernel-%.gz: % FORCE
 $(obj)/kernel-initrd.gz: $(obj)/ramdisk.image.gz
 	cp -f $(obj)/ramdisk.image.gz $@
 
-$(call src-sec, $(required) $(initrd)): $(obj)/kernel-%.c: $(obj)/kernel-%.gz
+$(call src-sec, $(required) $(initrd)): $(obj)/kernel-%.c: $(obj)/kernel-%.gz FORCE
 	touch $@
 
 $(call obj-sec, $(required) $(initrd)): $(obj)/kernel-%.o: $(obj)/kernel-%.c FORCE
