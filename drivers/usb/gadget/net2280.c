@@ -1278,7 +1278,7 @@ static int net2280_wakeup (struct usb_gadget *_gadget)
 	if (!_gadget)
 		return 0;
 	dev = container_of (_gadget, struct net2280, gadget);
-	writel (1 << GENERATE_RESUME, dev->usb->usbstat);
+	writel (1 << GENERATE_RESUME, &dev->usb->usbstat);
 
 	/* pci writes may still be posted */
 	return 0;
