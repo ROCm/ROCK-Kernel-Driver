@@ -13,6 +13,14 @@ ToDo:
 	  with initialized_size < data_size. I don't think it can happen but
 	  it requires more careful consideration.
 	- Enable NFS exporting of NTFS.
+	- Apply block resolution optimization from aops.c::ntfs_read_block() to
+	  compress.c::ntfs_file_read_compressed_block() as well.
+
+2.0.18 - Fix race condition in reading of compressed files.
+
+	- There was a narrow window between checking a buffer head for being
+	  uptodate and locking it in ntfs_file_read_compressed_block(). We now
+	  lock the buffer and then check whether it is uptodate or not.
 
 2.0.17 - Cleanups and optimizations - shrinking the ToDo list.
 

@@ -157,7 +157,7 @@ static int ntfs_decompress(struct page *dest_pages[], int *dest_index,
 
 	/* Default error code. */
 	int err = -EOVERFLOW;
-	
+
 	ntfs_debug("Entering, cb_size = 0x%x.", cb_size);
 do_next_sb:
 	ntfs_debug("Beginning sub-block at offset = 0x%x in the cb.",
@@ -193,7 +193,7 @@ return_error:
 	/* Setup offsets for the current sub-block destination. */
 	do_sb_start = *dest_ofs;
 	do_sb_end = do_sb_start + NTFS_SB_SIZE;
-	
+
 	/* Check that we are still within allowed boundaries. */
 	if (*dest_index == dest_max_index && do_sb_end > dest_max_ofs)
 		goto return_overflow;
@@ -572,11 +572,13 @@ retry_remap:
 	for (i = 0; i < nr_bhs; i++) {
 		struct buffer_head *tbh = bhs[i];
 
-		if (buffer_uptodate(tbh))
+		if (unlikely(test_set_buffer_locked(tbh)))
 			continue;
-
-		lock_buffer(tbh);
-		get_bh(tbh);
+		if (unlikely(buffer_uptodate(tbh))) {
+			unlock_buffer(tbh);
+			continue;
+		}
+		atomic_inc(&tbh->b_count);
 		tbh->b_end_io = end_buffer_io_sync;
 		submit_bh(READ, tbh);
 	}
@@ -587,9 +589,8 @@ retry_remap:
 
 		if (buffer_uptodate(tbh))
 			continue;
-
 		wait_on_buffer(tbh);
-		if (!buffer_uptodate(tbh))
+		if (unlikely(!buffer_uptodate(tbh)))
 			goto read_err;
 	}
 

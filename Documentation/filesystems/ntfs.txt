@@ -247,6 +247,8 @@ ChangeLog
 
 Note, a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
 
+2.0.18:
+	- Fix race condition in reading of compressed files.
 2.0.17:
 	- Cleanups and optimizations.
 2.0.16:
