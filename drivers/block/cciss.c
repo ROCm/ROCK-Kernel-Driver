@@ -192,10 +192,10 @@ static inline CommandList_struct *removeQ(CommandList_struct **Qptr,
 /*
  * Report information about this controller.
  */
-#define ENG_GIG 1048576000
+#define ENG_GIG 1000000000
 #define ENG_GIG_FACTOR (ENG_GIG/512)
 #define RAID_UNKNOWN 6
-static const char *raid_label[] = {"0","4","1(0+1)","5","5+1","ADG",
+static const char *raid_label[] = {"0","4","1(1+0)","5","5+1","ADG",
 	                                   "UNKNOWN"};
 
 static struct proc_dir_entry *proc_cciss;
@@ -209,7 +209,7 @@ static int cciss_proc_get_info(char *buffer, char **start, off_t offset,
         ctlr_info_t *h = (ctlr_info_t*)data;
         drive_info_struct *drv;
 	unsigned long flags;
-	unsigned int vol_sz, vol_sz_frac;
+        sector_t vol_sz, vol_sz_frac;
 
         ctlr = h->ctlr;
 
@@ -246,32 +246,21 @@ static int cciss_proc_get_info(char *buffer, char **start, off_t offset,
         pos += size; len += size;
 	cciss_proc_tape_report(ctlr, buffer, &pos, &len);
 	for(i=0; i<=h->highest_lun; i++) {
-		sector_t tmp;
 
                 drv = &h->drv[i];
 		if (drv->block_size == 0)
 			continue;
+
 		vol_sz = drv->nr_blocks;
-		sector_div(vol_sz, ENG_GIG_FACTOR);
-
-		/*
-		 * Awkwardly do this:
-		 * vol_sz_frac =
-		 *     (drv->nr_blocks%ENG_GIG_FACTOR)*100/ENG_GIG_FACTOR;
-		 */
-		tmp = drv->nr_blocks;
-		vol_sz_frac = sector_div(tmp, ENG_GIG_FACTOR);
-
-		/* Now, vol_sz_frac = (drv->nr_blocks%ENG_GIG_FACTOR) */
-
+		vol_sz_frac = sector_div(vol_sz, ENG_GIG_FACTOR);
 		vol_sz_frac *= 100;
 		sector_div(vol_sz_frac, ENG_GIG_FACTOR);
 
 		if (drv->raid_level > 5)
 			drv->raid_level = RAID_UNKNOWN;
 		size = sprintf(buffer+len, "cciss/c%dd%d:"
-				"\t%4d.%02dGB\tRAID %s\n",
-				ctlr, i, vol_sz,vol_sz_frac,
+				"\t%4u.%02uGB\tRAID %s\n",
+				ctlr, i, (int)vol_sz, (int)vol_sz_frac,
 				raid_label[drv->raid_level]);
                 pos += size; len += size;
         }
@@ -1487,6 +1476,7 @@ static void cciss_geometry_inquiry(int ctlr, int logvol,
 			drv->sectors = inq_buff->data_byte[7];
 			drv->cylinders = (inq_buff->data_byte[4] & 0xff) << 8;
 			drv->cylinders += inq_buff->data_byte[5];
+			drv->raid_level = inq_buff->data_byte[8];
 		}
 	} else { /* Get geometry failed */
 		printk(KERN_WARNING "cciss: reading geometry failed, "
