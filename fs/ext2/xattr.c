@@ -617,9 +617,11 @@ bad_block:		ext2_error(sb, "ext2_xattr_set",
 				goto cleanup;
 			memcpy(header, HDR(bh), bh->b_size);
 			header->h_refcount = cpu_to_le32(1);
-			offset = (char *)header - bh->b_data;
-			here = ENTRY((char *)here + offset);
-			last = ENTRY((char *)last + offset);
+
+			offset = (char *)here - bh->b_data;
+			here = ENTRY((char *)header + offset);
+			offset = (char *)last - bh->b_data;
+			last = ENTRY((char *)header + offset);
 		}
 	} else {
 		/* Allocate a buffer where we construct the new block. */
