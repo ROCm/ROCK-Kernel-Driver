@@ -43,6 +43,14 @@ static unsigned int dcc_timeout = 300;
 static char irc_buffer[65536];
 static DECLARE_LOCK(irc_buffer_lock);
 
+unsigned int (*ip_nat_irc_hook)(struct sk_buff **pskb,
+				struct ip_conntrack *ct,
+				enum ip_conntrack_info ctinfo,
+				unsigned int matchoff,
+				unsigned int matchlen,
+				struct ip_conntrack_expect *exp);
+EXPORT_SYMBOL_GPL(ip_nat_irc_hook);
+
 MODULE_AUTHOR("Harald Welte <laforge@netfilter.org>");
 MODULE_DESCRIPTION("IRC (DCC) connection tracking helper");
 MODULE_LICENSE("GPL");
@@ -98,7 +106,7 @@ static int parse_dcc(char *data, char *data_end, u_int32_t *ip,
 	return 0;
 }
 
-static int help(struct sk_buff *skb,
+static int help(struct sk_buff **pskb,
 		struct ip_conntrack *ct, enum ip_conntrack_info ctinfo)
 {
 	unsigned int dataoff;
@@ -106,11 +114,10 @@ static int help(struct sk_buff *skb,
 	char *data, *data_limit, *ib_ptr;
 	int dir = CTINFO2DIR(ctinfo);
 	struct ip_conntrack_expect *exp;
-	struct ip_ct_irc_expect *exp_irc_info = NULL;
-
+	u32 seq;
 	u_int32_t dcc_ip;
 	u_int16_t dcc_port;
-	int i;
+	int i, ret = NF_ACCEPT;
 	char *addr_beg_p, *addr_end_p;
 
 	DEBUGP("entered\n");
@@ -127,23 +134,23 @@ static int help(struct sk_buff *skb,
 	}
 
 	/* Not a full tcp header? */
-	th = skb_header_pointer(skb, skb->nh.iph->ihl*4,
+	th = skb_header_pointer(*pskb, (*pskb)->nh.iph->ihl*4,
 				sizeof(_tcph), &_tcph);
 	if (th == NULL)
 		return NF_ACCEPT;
 
 	/* No data? */
-	dataoff = skb->nh.iph->ihl*4 + th->doff*4;
-	if (dataoff >= skb->len)
+	dataoff = (*pskb)->nh.iph->ihl*4 + th->doff*4;
+	if (dataoff >= (*pskb)->len)
 		return NF_ACCEPT;
 
 	LOCK_BH(&irc_buffer_lock);
-	ib_ptr = skb_header_pointer(skb, dataoff,
-				    skb->len - dataoff, irc_buffer);
+	ib_ptr = skb_header_pointer(*pskb, dataoff,
+				    (*pskb)->len - dataoff, irc_buffer);
 	BUG_ON(ib_ptr == NULL);
 
 	data = ib_ptr;
-	data_limit = ib_ptr + skb->len - dataoff;
+	data_limit = ib_ptr + (*pskb)->len - dataoff;
 
 	/* strlen("\1DCC SENT t AAAAAAAA P\1\n")=24
 	 * 5+MINMATCHLEN+strlen("t AAAAAAAA P\1\n")=14 */
@@ -195,19 +202,15 @@ static int help(struct sk_buff *skb,
 			}
 
 			exp = ip_conntrack_expect_alloc();
-			if (exp == NULL)
+			if (exp == NULL) {
+				ret = NF_DROP;
 				goto out;
-
-			exp_irc_info = &exp->help.exp_irc_info;
+			}
 
 			/* save position of address in dcc string,
 			 * necessary for NAT */
 			DEBUGP("tcph->seq = %u\n", th->seq);
-			exp->seq = ntohl(th->seq) + (addr_beg_p - ib_ptr);
-			exp_irc_info->len = (addr_end_p - addr_beg_p);
-			exp_irc_info->port = dcc_port;
-			DEBUGP("wrote info seq=%u (ofs=%u), len=%d\n",
-				exp->seq, (addr_end_p - _data), exp_irc_info->len);
+			seq = ntohl(th->seq) + (addr_beg_p - ib_ptr);
 
 			exp->tuple = ((struct ip_conntrack_tuple)
 				{ { 0, { 0 } },
@@ -216,24 +219,21 @@ static int help(struct sk_buff *skb,
 			exp->mask = ((struct ip_conntrack_tuple)
 				{ { 0, { 0 } },
 				  { 0xFFFFFFFF, { .tcp = { 0xFFFF } }, 0xFFFF }});
-
 			exp->expectfn = NULL;
-
-			DEBUGP("expect_related %u.%u.%u.%u:%u-%u.%u.%u.%u:%u\n",
-				NIPQUAD(exp->tuple.src.ip),
-				ntohs(exp->tuple.src.u.tcp.port),
-				NIPQUAD(exp->tuple.dst.ip),
-				ntohs(exp->tuple.dst.u.tcp.port));
-
-			ip_conntrack_expect_related(exp, ct);
-
+			if (ip_nat_irc_hook)
+				ret = ip_nat_irc_hook(pskb, ct, ctinfo, 
+						      addr_beg_p - ib_ptr,
+						      addr_end_p - addr_beg_p,
+						      exp);
+			else if (ip_conntrack_expect_related(exp, ct) != 0)
+				ret = NF_DROP;
 			goto out;
 		} /* for .. NUM_DCCPROTO */
 	} /* while data < ... */
 
  out:
 	UNLOCK_BH(&irc_buffer_lock);
-	return NF_ACCEPT;
+	return ret;
 }
 
 static struct ip_conntrack_helper irc_helpers[MAX_PORTS];
@@ -268,7 +268,6 @@ static int __init init(void)
 		hlpr->mask.dst.protonum = 0xFFFF;
 		hlpr->max_expected = max_dcc_channels;
 		hlpr->timeout = dcc_timeout;
-		hlpr->flags = IP_CT_HELPER_F_REUSE_EXPECT;
 		hlpr->me = ip_conntrack_irc;
 		hlpr->help = help;
 
@@ -304,8 +303,6 @@ static void fini(void)
 		ip_conntrack_helper_unregister(&irc_helpers[i]);
 	}
 }
-
-PROVIDES_CONNTRACK(irc);
 
 module_init(init);
 module_exit(fini);

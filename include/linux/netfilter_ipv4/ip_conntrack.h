@@ -79,11 +79,6 @@ union ip_conntrack_help {
 
 #ifdef CONFIG_IP_NF_NAT_NEEDED
 #include <linux/netfilter_ipv4/ip_nat.h>
-
-/* per conntrack: nat application helper private data */
-union ip_conntrack_nat_help {
-	/* insert nat helper private data here */
-};
 #endif
 
 #include <linux/types.h>
@@ -191,7 +186,6 @@ struct ip_conntrack
 #ifdef CONFIG_IP_NF_NAT_NEEDED
 	struct {
 		struct ip_nat_info info;
-		union ip_conntrack_nat_help help;
 #if defined(CONFIG_IP_NF_TARGET_MASQUERADE) || \
 	defined(CONFIG_IP_NF_TARGET_MASQUERADE_MODULE)
 		int masq_index;
@@ -302,16 +296,6 @@ struct ip_conntrack_stat
 };
 
 #define CONNTRACK_STAT_INC(count) (__get_cpu_var(ip_conntrack_stat).count++)
-
-/* eg. PROVIDES_CONNTRACK(ftp); */
-#define PROVIDES_CONNTRACK(name)                        \
-        int needs_ip_conntrack_##name;                  \
-        EXPORT_SYMBOL(needs_ip_conntrack_##name)
-
-/*. eg. NEEDS_CONNTRACK(ftp); */
-#define NEEDS_CONNTRACK(name)                                           \
-        extern int needs_ip_conntrack_##name;                           \
-        static int *need_ip_conntrack_##name __attribute_used__ = &needs_ip_conntrack_##name
 
 #endif /* __KERNEL__ */
 #endif /* _IP_CONNTRACK_H */

@@ -1,5 +1,6 @@
 /* IRC extension for TCP NAT alteration.
  * (C) 2000-2001 by Harald Welte <laforge@gnumonks.org>
+ * (C) 2004 Rusty Russell <rusty@rustcorp.com.au> IBM Corporation
  * based on a copy of RR's ip_nat_ftp.c
  *
  * ip_nat_irc.c,v 1.16 2001/12/06 07:42:10 laforge Exp
@@ -8,12 +9,6 @@
  *      modify it under the terms of the GNU General Public License
  *      as published by the Free Software Foundation; either version
  *      2 of the License, or (at your option) any later version.
- *
- *	Module load syntax:
- * 	insmod ip_nat_irc.o ports=port1,port2,...port<MAX_PORTS>
- *	
- * 	please give the ports of all IRC servers You wish to connect to.
- *	If You don't specify ports, the default will be port 6667
  */
 
 #include <linux/module.h>
@@ -35,66 +30,21 @@
 #define DEBUGP(format, args...)
 #endif
 
-#define MAX_PORTS 8
-static int ports[MAX_PORTS];
-static int ports_c;
-
 MODULE_AUTHOR("Harald Welte <laforge@gnumonks.org>");
 MODULE_DESCRIPTION("IRC (DCC) NAT helper");
 MODULE_LICENSE("GPL");
-module_param_array(ports, int, &ports_c, 0400);
-MODULE_PARM_DESC(ports, "port numbers of IRC servers");
 
 /* FIXME: Time out? --RR */
 
-static unsigned int
-irc_nat_expected(struct sk_buff **pskb,
-		 unsigned int hooknum,
-		 struct ip_conntrack *ct,
-		 struct ip_nat_info *info)
+static unsigned int help(struct sk_buff **pskb,
+			 struct ip_conntrack *ct,
+			 enum ip_conntrack_info ctinfo,
+			 unsigned int matchoff,
+			 unsigned int matchlen,
+			 struct ip_conntrack_expect *exp)
 {
-	struct ip_nat_range range;
-	u_int32_t newdstip, newsrcip, newip;
-
-	struct ip_conntrack *master = master_ct(ct);
-
-	IP_NF_ASSERT(info);
-	IP_NF_ASSERT(master);
-
-	IP_NF_ASSERT(!(info->initialized & (1 << HOOK2MANIP(hooknum))));
-
-	DEBUGP("nat_expected: We have a connection!\n");
-
-	newdstip = master->tuplehash[IP_CT_DIR_ORIGINAL].tuple.src.ip;
-	newsrcip = ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple.src.ip;
-	DEBUGP("nat_expected: DCC cmd. %u.%u.%u.%u->%u.%u.%u.%u\n",
-	       NIPQUAD(newsrcip), NIPQUAD(newdstip));
-
-	if (HOOK2MANIP(hooknum) == IP_NAT_MANIP_SRC)
-		newip = newsrcip;
-	else
-		newip = newdstip;
-
-	DEBUGP("nat_expected: IP to %u.%u.%u.%u\n", NIPQUAD(newip));
-
-	/* We don't want to manip the per-protocol, just the IPs. */
-	range.flags = IP_NAT_RANGE_MAP_IPS;
-	range.min_ip = range.max_ip = newip;
-
-	return ip_nat_setup_info(ct, &range, hooknum);
-}
-
-static int irc_data_fixup(const struct ip_ct_irc_expect *exp_irc_info,
-			  struct ip_conntrack *ct,
-			  struct sk_buff **pskb,
-			  enum ip_conntrack_info ctinfo,
-			  struct ip_conntrack_expect *expect)
-{
-	u_int32_t newip;
-	struct ip_conntrack_tuple t;
-	struct iphdr *iph = (*pskb)->nh.iph;
-	struct tcphdr *tcph = (void *) iph + iph->ihl * 4;
 	u_int16_t port;
+	unsigned int ret;
 
 	/* "4294967296 65635 " */
 	char buffer[18];
@@ -103,21 +53,30 @@ static int irc_data_fixup(const struct ip_ct_irc_expect *exp_irc_info,
 	       expect->seq, exp_irc_info->len,
 	       ntohl(tcph->seq));
 
-	newip = ct->tuplehash[IP_CT_DIR_REPLY].tuple.dst.ip;
+	/* Reply comes from server. */
+	exp->saved_proto.tcp.port = exp->tuple.dst.u.tcp.port;
+	exp->dir = IP_CT_DIR_REPLY;
 
-	/* Alter conntrack's expectations. */
-	t = expect->tuple;
-	t.dst.ip = newip;
-	for (port = exp_irc_info->port; port != 0; port++) {
-		t.dst.u.tcp.port = htons(port);
-		if (ip_conntrack_change_expect(expect, &t) == 0) {
-			DEBUGP("using port %d", port);
+	/* When you see the packet, we need to NAT it the same as the
+	 * this one. */
+	exp->expectfn = ip_nat_follow_master;
+
+	/* Try to get same port: if not, try to change it. */
+	for (port = ntohs(exp->saved_proto.tcp.port); port != 0; port++) {
+		int err;
+
+		exp->tuple.dst.u.tcp.port = htons(port);
+		atomic_inc(&exp->use);
+		err = ip_conntrack_expect_related(exp, ct);
+		/* Success, or retransmit. */
+		if (!err || err == -EEXIST)
 			break;
-		}
-
 	}
-	if (port == 0)
-		return 0;
+
+	if (port == 0) {
+		ip_conntrack_expect_put(exp);
+		return NF_DROP;
+	}
 
 	/*      strlen("\1DCC CHAT chat AAAAAAAA P\1\n")=27
 	 *      strlen("\1DCC SCHAT chat AAAAAAAA P\1\n")=28
@@ -132,131 +91,31 @@ static int irc_data_fixup(const struct ip_ct_irc_expect *exp_irc_info,
 	 *              0x01, \n:  terminators
 	 */
 
-	sprintf(buffer, "%u %u", ntohl(newip), port);
+	sprintf(buffer, "%u %u", ntohl(exp->tuple.src.ip), port);
 	DEBUGP("ip_nat_irc: Inserting '%s' == %u.%u.%u.%u, port %u\n",
-	       buffer, NIPQUAD(newip), port);
+	       buffer, NIPQUAD(exp->tuple.src.ip), port);
 
-	return ip_nat_mangle_tcp_packet(pskb, ct, ctinfo, 
-					expect->seq - ntohl(tcph->seq),
-					exp_irc_info->len, buffer, 
-					strlen(buffer));
+	ret = ip_nat_mangle_tcp_packet(pskb, ct, ctinfo, 
+				       matchoff, matchlen, buffer, 
+				       strlen(buffer));
+	if (ret != NF_ACCEPT)
+		ip_conntrack_unexpect_related(exp);
+	return ret;
 }
 
-static unsigned int help(struct ip_conntrack *ct,
-			 struct ip_conntrack_expect *exp,
-			 struct ip_nat_info *info,
-			 enum ip_conntrack_info ctinfo,
-			 unsigned int hooknum, 
-			 struct sk_buff **pskb)
+static void __exit fini(void)
 {
-	struct iphdr *iph = (*pskb)->nh.iph;
-	struct tcphdr *tcph = (void *) iph + iph->ihl * 4;
-	unsigned int datalen;
-	int dir;
-	struct ip_ct_irc_expect *exp_irc_info;
-
-	if (!exp)
-		DEBUGP("ip_nat_irc: no exp!!");
-		
-	exp_irc_info = &exp->help.exp_irc_info;
-
-	/* Only mangle things once: original direction in POST_ROUTING
-	   and reply direction on PRE_ROUTING. */
-	dir = CTINFO2DIR(ctinfo);
-	if (!((hooknum == NF_IP_POST_ROUTING && dir == IP_CT_DIR_ORIGINAL)
-	      || (hooknum == NF_IP_PRE_ROUTING && dir == IP_CT_DIR_REPLY))) {
-		DEBUGP("nat_irc: Not touching dir %s at hook %s\n",
-		       dir == IP_CT_DIR_ORIGINAL ? "ORIG" : "REPLY",
-		       hooknum == NF_IP_POST_ROUTING ? "POSTROUTING"
-		       : hooknum == NF_IP_PRE_ROUTING ? "PREROUTING"
-		       : hooknum == NF_IP_LOCAL_OUT ? "OUTPUT" : "???");
-		return NF_ACCEPT;
-	}
-	DEBUGP("got beyond not touching\n");
-
-	datalen = (*pskb)->len - iph->ihl * 4 - tcph->doff * 4;
-	/* Check whether the whole IP/address pattern is carried in the payload */
-	if (between(exp->seq + exp_irc_info->len,
-		    ntohl(tcph->seq),
-		    ntohl(tcph->seq) + datalen)) {
-		if (!irc_data_fixup(exp_irc_info, ct, pskb, ctinfo, exp))
-			return NF_DROP;
-	} else { 
-		/* Half a match?  This means a partial retransmisison.
-		   It's a cracker being funky. */
-		if (net_ratelimit()) {
-			printk
-			    ("IRC_NAT: partial packet %u/%u in %u/%u\n",
-			     exp->seq, exp_irc_info->len,
-			     ntohl(tcph->seq),
-			     ntohl(tcph->seq) + datalen);
-		}
-		return NF_DROP;
-	}
-	return NF_ACCEPT;
-}
-
-static struct ip_nat_helper ip_nat_irc_helpers[MAX_PORTS];
-static char irc_names[MAX_PORTS][10];
-
-/* This function is intentionally _NOT_ defined as  __exit, because
- * it is needed by init() */
-static void fini(void)
-{
-	int i;
-
-	for (i = 0; i < ports_c; i++) {
-		DEBUGP("ip_nat_irc: unregistering helper for port %d\n",
-		       ports[i]);
-		ip_nat_helper_unregister(&ip_nat_irc_helpers[i]);
-	} 
+	ip_nat_irc_hook = NULL;
+	/* Make sure noone calls it, meanwhile. */
+	synchronize_net();
 }
 
 static int __init init(void)
 {
-	int ret = 0;
-	int i;
-	struct ip_nat_helper *hlpr;
-	char *tmpname;
-
-	if (ports_c == 0)
-		ports[ports_c++] = IRC_PORT;
-
-	for (i = 0; i < ports_c; i++) {
-		hlpr = &ip_nat_irc_helpers[i];
-		hlpr->tuple.dst.protonum = IPPROTO_TCP;
-		hlpr->tuple.src.u.tcp.port = htons(ports[i]);
-		hlpr->mask.src.u.tcp.port = 0xFFFF;
-		hlpr->mask.dst.protonum = 0xFFFF;
-		hlpr->help = help;
-		hlpr->flags = 0;
-		hlpr->me = THIS_MODULE;
-		hlpr->expect = irc_nat_expected;
-
-		tmpname = &irc_names[i][0];
-		if (ports[i] == IRC_PORT)
-			sprintf(tmpname, "irc");
-		else
-			sprintf(tmpname, "irc-%d", i);
-		hlpr->name = tmpname;
-
-		DEBUGP
-		    ("ip_nat_irc: Trying to register helper for port %d: name %s\n",
-		     ports[i], hlpr->name);
-		ret = ip_nat_helper_register(hlpr);
-
-		if (ret) {
-			printk
-			    ("ip_nat_irc: error registering helper for port %d\n",
-			     ports[i]);
-			fini();
-			return 1;
-		}
-	}
-	return ret;
+	BUG_ON(ip_nat_irc_hook);
+	ip_nat_irc_hook = help;
+	return 0;
 }
-
-NEEDS_CONNTRACK(irc);
 
 module_init(init);
 module_exit(fini);

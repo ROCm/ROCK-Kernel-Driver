@@ -31,118 +31,63 @@ MODULE_AUTHOR("Brian J. Murrell <netfilter@interlinx.bc.ca>");
 MODULE_DESCRIPTION("Amanda NAT helper");
 MODULE_LICENSE("GPL");
 
-static unsigned int
-amanda_nat_expected(struct sk_buff **pskb,
-                    unsigned int hooknum,
-                    struct ip_conntrack *ct,
-                    struct ip_nat_info *info)
+static unsigned int help(struct sk_buff **pskb,
+			 struct ip_conntrack *ct,
+			 enum ip_conntrack_info ctinfo,
+			 unsigned int matchoff,
+			 unsigned int matchlen,
+			 struct ip_conntrack_expect *exp)
 {
-	struct ip_conntrack *master = master_ct(ct);
-	struct ip_ct_amanda_expect *exp_amanda_info;
-	struct ip_nat_range range;
-	u_int32_t newip;
-
-	IP_NF_ASSERT(info);
-	IP_NF_ASSERT(master);
-	IP_NF_ASSERT(!(info->initialized & (1 << HOOK2MANIP(hooknum))));
-
-	if (HOOK2MANIP(hooknum) == IP_NAT_MANIP_SRC)
-		newip = master->tuplehash[IP_CT_DIR_REPLY].tuple.dst.ip;
-	else
-		newip = master->tuplehash[IP_CT_DIR_REPLY].tuple.src.ip;
-
-	/* We don't want to manip the per-protocol, just the IPs. */
-	range.flags = IP_NAT_RANGE_MAP_IPS;
-	range.min_ip = range.max_ip = newip;
-
-	if (HOOK2MANIP(hooknum) == IP_NAT_MANIP_DST) {
-		exp_amanda_info = &ct->master->help.exp_amanda_info;
-		range.flags |= IP_NAT_RANGE_PROTO_SPECIFIED;
-		range.min = range.max
-			= ((union ip_conntrack_manip_proto)
-				{ .udp = { htons(exp_amanda_info->port) } });
-	}
-
-	return ip_nat_setup_info(ct, &range, hooknum);
-}
-
-static int amanda_data_fixup(struct ip_conntrack *ct,
-                             struct sk_buff **pskb,
-                             enum ip_conntrack_info ctinfo,
-                             struct ip_conntrack_expect *exp)
-{
-	struct ip_ct_amanda_expect *exp_amanda_info;
-	struct ip_conntrack_tuple t = exp->tuple;
 	char buffer[sizeof("65535")];
 	u_int16_t port;
+	unsigned int ret;
 
-	/* Alter conntrack's expectations. */
-	exp_amanda_info = &exp->help.exp_amanda_info;
-	t.dst.ip = ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.ip;
-	for (port = exp_amanda_info->port; port != 0; port++) {
-		t.dst.u.tcp.port = htons(port);
-		if (ip_conntrack_change_expect(exp, &t) == 0)
+	/* Connection comes from client. */
+	exp->saved_proto.tcp.port = exp->tuple.dst.u.tcp.port;
+	exp->dir = IP_CT_DIR_ORIGINAL;
+
+	/* When you see the packet, we need to NAT it the same as the
+	 * this one (ie. same IP: it will be TCP and master is UDP). */
+	exp->expectfn = ip_nat_follow_master;
+
+	/* Try to get same port: if not, try to change it. */
+	for (port = ntohs(exp->saved_proto.tcp.port); port != 0; port++) {
+		int err;
+		exp->tuple.dst.u.tcp.port = htons(port);
+		atomic_inc(&exp->use);
+		err = ip_conntrack_expect_related(exp, ct);
+		/* Success, or retransmit. */
+		if (!err || err == -EEXIST)
 			break;
 	}
-	if (port == 0)
-		return 0;
+
+	if (port == 0) {
+		ip_conntrack_expect_put(exp);
+		return NF_DROP;
+	}
 
 	sprintf(buffer, "%u", port);
-	return ip_nat_mangle_udp_packet(pskb, ct, ctinfo,
-	                                exp_amanda_info->offset,
-	                                exp_amanda_info->len,
-	                                buffer, strlen(buffer));
-}
-
-static unsigned int help(struct ip_conntrack *ct,
-                         struct ip_conntrack_expect *exp,
-                         struct ip_nat_info *info,
-                         enum ip_conntrack_info ctinfo,
-                         unsigned int hooknum,
-                         struct sk_buff **pskb)
-{
-	int dir = CTINFO2DIR(ctinfo);
-	int ret = NF_ACCEPT;
-
-	/* Only mangle things once: original direction in POST_ROUTING
-	   and reply direction on PRE_ROUTING. */
-	if (!((hooknum == NF_IP_POST_ROUTING && dir == IP_CT_DIR_ORIGINAL)
-	      || (hooknum == NF_IP_PRE_ROUTING && dir == IP_CT_DIR_REPLY)))
-		return NF_ACCEPT;
-
-	/* if this exectation has a "offset" the packet needs to be mangled */
-	if (exp->help.exp_amanda_info.offset != 0)
-		if (!amanda_data_fixup(ct, pskb, ctinfo, exp))
-			ret = NF_DROP;
-	exp->help.exp_amanda_info.offset = 0;
-
+	ret = ip_nat_mangle_udp_packet(pskb, ct, ctinfo,
+				       matchoff, matchlen,
+				       buffer, strlen(buffer));
+	if (ret != NF_ACCEPT)
+		ip_conntrack_unexpect_related(exp);
 	return ret;
 }
 
-static struct ip_nat_helper ip_nat_amanda_helper;
-
 static void __exit fini(void)
 {
-	ip_nat_helper_unregister(&ip_nat_amanda_helper);
+	ip_nat_amanda_hook = NULL;
+	/* Make sure noone calls it, meanwhile. */
+	synchronize_net();
 }
 
 static int __init init(void)
 {
-	struct ip_nat_helper *hlpr = &ip_nat_amanda_helper;
-
-	hlpr->tuple.dst.protonum = IPPROTO_UDP;
-	hlpr->tuple.src.u.udp.port = htons(10080);
-	hlpr->mask.src.u.udp.port = 0xFFFF;
-	hlpr->mask.dst.protonum = 0xFFFF;
-	hlpr->help = help;
-	hlpr->flags = 0;
-	hlpr->me = THIS_MODULE;
-	hlpr->expect = amanda_nat_expected;
-	hlpr->name = "amanda";
-
-	return ip_nat_helper_register(hlpr);
+	BUG_ON(ip_nat_amanda_hook);
+	ip_nat_amanda_hook = help;
+	return 0;
 }
 
-NEEDS_CONNTRACK(amanda);
 module_init(init);
 module_exit(fini);

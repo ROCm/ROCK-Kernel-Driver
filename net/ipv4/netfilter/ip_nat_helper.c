@@ -47,7 +47,6 @@
 #define DUMP_OFFSET(x)
 #endif
 
-static LIST_HEAD(helpers);
 DECLARE_LOCK(ip_nat_seqofs_lock);
 
 /* Setup TCP sequence correction given this change at this sequence */
@@ -447,77 +446,4 @@ void ip_nat_follow_master(struct ip_conntrack *ct)
 	BUG_ON(ct->nat.info.initialized);
 
 	ip_nat_copy_manip(master, ct->master, ct);
-}
-
-static inline int
-helper_cmp(const struct ip_nat_helper *helper,
-	   const struct ip_conntrack_tuple *tuple)
-{
-	return ip_ct_tuple_mask_cmp(tuple, &helper->tuple, &helper->mask);
-}
-
-int ip_nat_helper_register(struct ip_nat_helper *me)
-{
-	int ret = 0;
-
-	WRITE_LOCK(&ip_nat_lock);
-	if (LIST_FIND(&helpers, helper_cmp, struct ip_nat_helper *,&me->tuple))
-		ret = -EBUSY;
-	else
-		list_prepend(&helpers, me);
-	WRITE_UNLOCK(&ip_nat_lock);
-
-	return ret;
-}
-
-struct ip_nat_helper *
-__ip_nat_find_helper(const struct ip_conntrack_tuple *tuple)
-{
-	return LIST_FIND(&helpers, helper_cmp, struct ip_nat_helper *, tuple);
-}
-
-struct ip_nat_helper *
-ip_nat_find_helper(const struct ip_conntrack_tuple *tuple)
-{
-	struct ip_nat_helper *h;
-
-	READ_LOCK(&ip_nat_lock);
-	h = __ip_nat_find_helper(tuple);
-	READ_UNLOCK(&ip_nat_lock);
-
-	return h;
-}
-
-static int
-kill_helper(struct ip_conntrack *i, void *helper)
-{
-	int ret;
-
-	READ_LOCK(&ip_nat_lock);
-	ret = (i->nat.info.helper == helper);
-	READ_UNLOCK(&ip_nat_lock);
-
-	return ret;
-}
-
-void ip_nat_helper_unregister(struct ip_nat_helper *me)
-{
-	WRITE_LOCK(&ip_nat_lock);
-	/* Autoloading conntrack helper might have failed */
-	if (LIST_FIND(&helpers, helper_cmp, struct ip_nat_helper *,&me->tuple)) {
-		LIST_DELETE(&helpers, me);
-	}
-	WRITE_UNLOCK(&ip_nat_lock);
-
-	/* Someone could be still looking at the helper in a bh. */
-	synchronize_net();
-
-	/* Find anything using it, and umm, kill them.  We can't turn
-	   them into normal connections: if we've adjusted SYNs, then
-	   they'll ackstorm.  So we just drop it.  We used to just
-	   bump module count when a connection existed, but that
-	   forces admins to gen fake RSTs or bounce box, either of
-	   which is just a long-winded way of making things
-	   worse. --RR */
-	ip_ct_iterate_cleanup(kill_helper, me);
 }

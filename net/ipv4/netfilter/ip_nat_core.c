@@ -415,10 +415,6 @@ ip_nat_setup_info(struct ip_conntrack *conntrack,
 		IP_NF_ASSERT(info->num_manips <= IP_NAT_MAX_MANIPS);
 	}
 
-	/* If there's a helper, assign it; based on new tuple. */
-	if (!conntrack->master)
-		info->helper = __ip_nat_find_helper(&reply);
-
 	/* It's done. */
 	info->initialized |= (1 << HOOK2MANIP(hooknum));
 
@@ -522,16 +518,6 @@ do_bindings(struct ip_conntrack *ct,
 				return NF_DROP;
 			}
 		}
-	}
-
-	if (info->helper) {
-		DEBUGP("do_bindings: helper existing for (%p)\n", ct);
-
-		/* Always defragged for helpers */
-		IP_NF_ASSERT(!((*pskb)->nh.iph->frag_off
-			       & htons(IP_MF|IP_OFFSET)));
-
-		ret = info->helper->help(ct, NULL, info, ctinfo, hooknum,pskb);
 	}
 	READ_UNLOCK(&ip_nat_lock);
 
