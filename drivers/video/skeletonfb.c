@@ -295,7 +295,7 @@ static int xxxfb_setcolreg(unsigned regno, unsigned red, unsigned green,
  *      Returns negative errno on error, or zero on success.
  *
  */
-static int xxxfb_pan_display(struct fb_var_screeninfo *var, int con,
+static int xxxfb_pan_display(struct fb_var_screeninfo *var,
 			     const struct fb_info *info)
 {
     /* ... */
@@ -497,9 +497,6 @@ static struct fb_ops xxxfb_ops = {
 	.owner		= THIS_MODULE,
 	.fb_open	= xxxfb_open,    /* only if you need it to do something */
 	.fb_release	= xxxfb_release, /* only if you need it to do something */
-	/* Stuff to go away. Use generic functions for now */
-	.fb_set_var	= gen_set_var,	
-
 	.fb_check_var	= xxxfb_check_var,
 	.fb_set_par	= xxxfb_set_par,	/* optional */	
 	.fb_setcolreg	= xxxfb_setcolreg,

@@ -146,11 +146,11 @@ static int atyfb_check_var(struct fb_var_screeninfo *var,
 static int atyfb_set_par(struct fb_info *info); 
 static int atyfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 			   u_int transp, struct fb_info *info);
-static int atyfb_pan_display(struct fb_var_screeninfo *var, int con,
+static int atyfb_pan_display(struct fb_var_screeninfo *var,
 			     struct fb_info *info);
 static int atyfb_blank(int blank, struct fb_info *info);
 static int atyfb_ioctl(struct inode *inode, struct file *file, u_int cmd,
-		       u_long arg, int con, struct fb_info *info);
+		       u_long arg, struct fb_info *info);
 extern void atyfb_fillrect(struct fb_info *info, struct fb_fillrect *rect);
 extern void atyfb_copyarea(struct fb_info *info, struct fb_copyarea *area);
 extern void atyfb_imageblit(struct fb_info *info, struct fb_image *image);
@@ -195,17 +195,10 @@ int atyfb_init(void);
 int atyfb_setup(char *);
 #endif
 
-int gen_get_var(struct fb_var_screeninfo *var, int con, struct fb_info *info)
-{
-        *var = info->var;
-        return 0;
-}
-
 static struct fb_ops atyfb_ops = {
 	.owner		= THIS_MODULE,
 	.fb_open	= atyfb_open,
 	.fb_release	= atyfb_release,
-	.fb_set_var	= gen_set_var,
 	.fb_check_var	= atyfb_check_var,
 	.fb_set_par	= atyfb_set_par,
 	.fb_setcolreg	= atyfb_setcolreg,
@@ -1002,7 +995,7 @@ static int atyfb_release(struct fb_info *info, int user)
      *  This call looks only at xoffset, yoffset and the FB_VMODE_YWRAP flag
      */
 
-static int atyfb_pan_display(struct fb_var_screeninfo *var, int con,
+static int atyfb_pan_display(struct fb_var_screeninfo *var,
 			     struct fb_info *info)
 {
 	struct atyfb_par *par = (struct atyfb_par *) info->par;
@@ -1044,7 +1037,7 @@ struct atyclk {
 #endif
 
 static int atyfb_ioctl(struct inode *inode, struct file *file, u_int cmd,
-		       u_long arg, int con, struct fb_info *info)
+		       u_long arg, struct fb_info *info)
 {
 #if defined(__sparc__) || (defined(DEBUG) && defined(CONFIG_FB_ATY_CT))
 	struct atyfb_par *par = (struct atyfb_par *) info->par;
@@ -1829,9 +1822,7 @@ static int __init aty_init(struct fb_info *info, const char *name)
 	info->node = NODEV;
 	info->fbops = &atyfb_ops;
 	info->pseudo_palette = pseudo_palette;
-	info->currcon = -1;
 	strcpy(info->fontname, fontname);
-	info->updatevar = gen_update_var;
 	info->flags = FBINFO_FLAG_DEFAULT;
 
 #ifdef CONFIG_PMAC_BACKLIGHT
@@ -1955,9 +1946,6 @@ static int __init aty_init(struct fb_info *info, const char *name)
 	info->var = var;
 
 	fb_alloc_cmap(&info->cmap, 256, 0);
-
-	var.activate = FB_ACTIVATE_NOW;
-	gen_set_var(&var, -1, info);
 
 	if (register_framebuffer(info) < 0)
 		return 0;

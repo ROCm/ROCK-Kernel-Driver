@@ -62,7 +62,6 @@ anakinfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 
 static struct fb_ops anakinfb_ops = {
 	.owner		= THIS_MODULE,
-	.fb_set_var	= gen_set_var,
 	.fb_setcolreg	= anakinfb_setcolreg,
 	.fb_fillrect	= cfb_fillrect,
 	.fb_copyarea	= cfb_copyarea,

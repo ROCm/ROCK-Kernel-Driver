@@ -43,7 +43,7 @@ int gen_set_var(struct fb_var_screeninfo *var, int con, struct fb_info *info)
 					info->fbops->fb_set_par(info);
 
 				if (info->fbops->fb_pan_display)
-					info->fbops->fb_pan_display(&info->var, con, info);
+					info->fbops->fb_pan_display(&info->var, info);
 				fb_set_cmap(&info->cmap, 1, info);
 			}
 		}
@@ -51,8 +51,7 @@ int gen_set_var(struct fb_var_screeninfo *var, int con, struct fb_info *info)
 	return 0;
 }
 
-int fbgen_pan_display(struct fb_var_screeninfo *var, int con,
-		      struct fb_info *info)
+int fbgen_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
 {
     int xoffset = var->xoffset;
     int yoffset = var->yoffset;
@@ -62,12 +61,11 @@ int fbgen_pan_display(struct fb_var_screeninfo *var, int con,
 	xoffset + info->var.xres > info->var.xres_virtual ||
 	yoffset + info->var.yres > info->var.yres_virtual)
 	return -EINVAL;
-    if (con == info->currcon) {
-	if (info->fbops->fb_pan_display) {
-	    if ((err = info->fbops->fb_pan_display(var, con, info)))
+    if (info->fbops->fb_pan_display) {
+    	if ((err = info->fbops->fb_pan_display(var, info)))
 		return err;
-	} else
-	    return -EINVAL;
+	else
+	    	return -EINVAL;
     }
     info->var.xoffset = var->xoffset;
     info->var.yoffset = var->yoffset;
@@ -87,7 +85,7 @@ int gen_update_var(int con, struct fb_info *info)
     
 	if (con == info->currcon) {
 		if (info->fbops->fb_pan_display) {
-			if ((err = info->fbops->fb_pan_display(&info->var, con, info)))
+			if ((err = info->fbops->fb_pan_display(&info->var, info)))
 				return err;
 		}
 	}	

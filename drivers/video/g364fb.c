@@ -31,8 +31,6 @@
 #include <asm/io.h>
 #include <asm/jazz.h>
 
-#include <video/fbcon.h>
-
 /* 
  * Various defines for the G364
  */
@@ -108,7 +106,7 @@ static struct fb_var_screeninfo fb_var __initdata = {
  */
 int g364fb_init(void);
 
-static int g364fb_pan_display(struct fb_var_screeninfo *var, int con,
+static int g364fb_pan_display(struct fb_var_screeninfo *var,
 			      struct fb_info *info);
 static int g364fb_setcolreg(u_int regno, u_int red, u_int green,
 			    u_int blue, u_int transp,
@@ -117,7 +115,6 @@ static int g364fb_blank(int blank, struct fb_info *info);
 
 static struct fb_ops g364fb_ops = {
 	.owner		= THIS_MODULE,
-	.fb_set_var	= gen_set_var,
 	.fb_setcolreg	= g364fb_setcolreg,
 	.fb_pan_display	= g364fb_pan_display,
 	.fb_blank	= g364fb_blank,
@@ -148,7 +145,7 @@ void fbcon_g364fb_cursor(struct display *p, int mode, int x, int y)
  *
  *  This call looks only at xoffset, yoffset and the FB_VMODE_YWRAP flag
  */
-static int g364fb_pan_display(struct fb_var_screeninfo *var, int con,
+static int g364fb_pan_display(struct fb_var_screeninfo *var, 
 			      struct fb_info *info)
 {
 	if (var->xoffset || var->yoffset + var->yres > var->yres_virtual)

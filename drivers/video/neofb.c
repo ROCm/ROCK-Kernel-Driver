@@ -1164,10 +1164,9 @@ static void neofb_update_start(struct fb_info *info,
 /*
  *    Pan or Wrap the Display
  */
-static int neofb_pan_display(struct fb_var_screeninfo *var, int con,
-			     struct fb_info *fb)
+static int neofb_pan_display(struct fb_var_screeninfo *var,
+			     struct fb_info *info)
 {
-	struct fb_info *info = (struct fb_info *) fb;
 	u_int y_bottom;
 
 	y_bottom = var->yoffset;
@@ -1388,7 +1387,6 @@ static struct fb_ops neofb_ops = {
 	.owner		= THIS_MODULE,
 	.fb_check_var	= neofb_check_var,
 	.fb_set_par	= neofb_set_par,
-	.fb_set_var	= gen_set_var,
 	.fb_setcolreg	= neofb_setcolreg,
 	.fb_pan_display	= neofb_pan_display,
 	.fb_blank	= neofb_blank,
@@ -1758,7 +1756,6 @@ static struct fb_info *__devinit neo_alloc_fb_info(struct pci_dev *dev, const st
 	par = &default_par;
 	memset(par, 0, sizeof(struct neofb_par));
 
-	info->currcon = -1;
 	info->fix.accel = id->driver_data;
 
 	par->pci_burst = !nopciburst;

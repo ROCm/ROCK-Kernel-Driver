@@ -729,8 +729,7 @@ int __init sgivwfb_init(void)
 		goto fail_ioremap_fbmem;
 	}
 
-	/* turn on default video mode */
-	gen_set_var(&fb_info->var, -1, &fb_info);
+	fb_alloc_cmap(&fb_info.cmap, 256, 0);
 
 	if (register_framebuffer(&fb_info) < 0) {
 		printk(KERN_ERR

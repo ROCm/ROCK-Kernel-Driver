@@ -111,7 +111,6 @@ static int pmagbbfb_setcolreg(unsigned regno, unsigned red, unsigned green,
 
 static struct fb_ops pmagbbfb_ops = {
 	.owner		= THIS_MODULE,
-	.fb_set_var	= gen_set_var,
 	.fb_setcolreg	= pmagbbfb_setcolreg,
 	.fb_fillrect	= cfb_fillrect,
 	.fb_copyarea	= cfb_copyarea,
@@ -143,8 +142,6 @@ int __init pmagbbfb_init_one(int slot)
 	info->var = pmagbbfb_defined;
 	info->fix = pmagbbfb_fix;
 	info->screen_base = pmagbbfb_fix.smem_start; 
-	info->currcon = -1;
-	info->updatevar = gen_update_var;
 	info->flags = FBINFO_FLAG_DEFAULT;
 
 	fb_alloc_cmap(&fb_info.cmap, 256, 0);

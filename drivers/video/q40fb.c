@@ -66,7 +66,6 @@ static int q40fb_setcolreg(unsigned regno, unsigned red, unsigned green,
 
 static struct fb_ops q40fb_ops = {
 	.owner		= THIS_MODULE,
-	.fb_set_var	= gen_set_var,
 	.fb_setcolreg	= q40fb_setcolreg,
 	.fb_fillrect	= cfb_fillrect,
 	.fb_copyarea	= cfb_copyarea,

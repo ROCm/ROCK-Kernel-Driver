@@ -24,7 +24,6 @@
 #include <linux/delay.h>
 #include <linux/interrupt.h>
 #include <linux/fb.h>
-#include <linux/selection.h>
 #include <linux/init.h>
 #include <linux/ioport.h>
 #include <asm/io.h>
@@ -82,7 +81,6 @@ static void offb_init_fb(const char *name, const char *full_name,
 
 static struct fb_ops offb_ops = {
 	.owner		= THIS_MODULE,
-	.fb_set_var	= gen_set_var,
 	.fb_setcolreg	= offb_setcolreg,
 	.fb_blank	= offb_blank,
 	.fb_fillrect	= cfb_fillrect,

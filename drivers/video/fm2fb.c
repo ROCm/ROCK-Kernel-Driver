@@ -173,7 +173,6 @@ static int fm2fb_blank(int blank, struct fb_info *info);
 
 static struct fb_ops fm2fb_ops = {
 	.owner		= THIS_MODULE,
-	.fb_set_var	= gen_set_var,
 	.fb_setcolreg	= fm2fb_setcolreg,
 	.fb_blank	= fm2fb_blank,	
 	.fb_fillrect	= cfb_fillrect,

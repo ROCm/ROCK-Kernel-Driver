@@ -317,9 +317,6 @@ struct fb_ops {
     struct module *owner;
     int (*fb_open)(struct fb_info *info, int user);
     int (*fb_release)(struct fb_info *info, int user);
-    /* set settable parameters */
-    int (*fb_set_var)(struct fb_var_screeninfo *var, int con,
-		      struct fb_info *info);		
     /* checks var and creates a par based on it */
     int (*fb_check_var)(struct fb_var_screeninfo *var, struct fb_info *info);
     /* set the video mode according to par */
@@ -330,7 +327,7 @@ struct fb_ops {
     /* blank display */
     int (*fb_blank)(int blank, struct fb_info *info);
     /* pan display */
-    int (*fb_pan_display)(struct fb_var_screeninfo *var, int con, struct fb_info *info);
+    int (*fb_pan_display)(struct fb_var_screeninfo *var, struct fb_info *info);
     /* draws a rectangle */
     void (*fb_fillrect)(struct fb_info *info, struct fb_fillrect *rect); 
     /* Copy data from area to another */
@@ -341,7 +338,7 @@ struct fb_ops {
     int (*fb_poll)(struct fb_info *info, poll_table *wait);
     /* perform fb specific ioctl (optional) */
     int (*fb_ioctl)(struct inode *inode, struct file *file, unsigned int cmd,
-		    unsigned long arg, int con, struct fb_info *info);
+		    unsigned long arg, struct fb_info *info);
     /* perform fb specific mmap */
     int (*fb_mmap)(struct fb_info *info, struct file *file, struct vm_area_struct *vma);
     /* switch to/from raster image mode */

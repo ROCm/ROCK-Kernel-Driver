@@ -101,7 +101,6 @@ void hpfb_copyarea(struct fb_info *info, struct fb_copyarea *area)
 
 static struct fb_ops hpfb_ops = {
 	.owner		= THIS_MODULE,
-	.fb_set_var	= gen_set_var,
 	.fb_setcolreg	= hpfb_setcolreg,
 	.fb_fillrect	= cfb_fillrect,
 	.fb_copyarea	= hpfb_copyarea,

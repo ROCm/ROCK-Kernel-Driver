@@ -111,7 +111,6 @@ static int maxinefb_setcolreg(unsigned regno, unsigned red, unsigned green,
 
 static struct fb_ops maxinefb_ops = {
 	.owner		= THIS_MODULE,
-	.fb_set_var	= gen_set_var,
 	.fb_setcolreg	= maxinefb_setcolreg,	
 	.fb_fillrect	= cfb_fillrect,
 	.fb_copyarea	= cfb_copyarea,
@@ -158,8 +157,6 @@ int __init maxinefb_init(void)
 	fb_info.screen_base = (char *) maxinefb_fix.smem_start;
 	fb_info.var = maxinefb_defined;
 	fb_info.fix = maxinefb_fix;
-	fb_info.currcon = -1;
-	fb_info.updatevar = gen_update_var;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 
 	fb_alloc_cmap(&fb_info.cmap, 256, 0);

@@ -194,7 +194,6 @@ static struct fb_ops clps7111fb_ops = {
 	.owner		= THIS_MODULE,
 	.fb_check_var	= clps7111fb_check_var,
 	.fb_set_par	= clps7111fb_set_par,
-	.fb_set_var	= gen_set_var,
 	.fb_setcolreg	= clps7111fb_setcolreg,
 	.fb_blank	= clps7111fb_blank,
 	.fb_fillrect	= cfb_fillrect,
@@ -322,7 +321,6 @@ int __init clps711xfb_init(void)
 		clps_writeb(clps_readb(PDDR) | EDB_PD3_LCDBL, PDDR);
 	}
 
-	gen_set_var(&cfb->var, -1, cfb);
 	err = register_framebuffer(cfb);
 
 out:	return err;

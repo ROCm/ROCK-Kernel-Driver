@@ -94,7 +94,6 @@ static int tx3912fb_setcolreg(u_int regno, u_int red, u_int green,
  */
 static struct fb_ops tx3912fb_ops = {
 	.owner		= THIS_MODULE,
-	.fb_set_var	= gen_set_var,
 	.fb_setcolreg	= tx3912fb_setcolreg,
 	.fb_fillrect	= cfb_fillrect,
 	.fb_copyarea	= cfb_copyarea,
@@ -211,6 +210,7 @@ static int tx3912fb_setcolreg(u_int regno, u_int red, u_int green,
 int __init tx3912fb_init(void)
 {
 	u_long tx3912fb_paddr = 0;
+	int size = (info->var.bits_per_pixel == 8) ? 256 : 16;
 
 	/* Disable the video logic */
 	outl(inl(TX3912_VIDEO_CTRL1) &

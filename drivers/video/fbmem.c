@@ -377,7 +377,7 @@ static int fbmem_read_proc(char *buf, char **start, off_t offset,
 		if (*fi)
 			clen += sprintf(buf + clen, "%d %s\n",
 				        GET_FB_IDX((*fi)->node),
-				        (*fi)->modename);
+				        (*fi)->fix.id);
 	*start = buf + offset;
 	if (clen > offset)
 		clen -= offset;
@@ -485,7 +485,7 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			i = set_all_vcs(fbidx, fb, &var, info);
 			if (i) return i;
 		} else {
-			i = fb->fb_set_var(&var, PROC_CONSOLE(info), info);
+			i = gen_set_var(&var, PROC_CONSOLE(info), info);
 			if (i) return i;
 			gen_set_disp(PROC_CONSOLE(info), info);
 		}
@@ -507,7 +507,7 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			return -EFAULT;
 		if (fb->fb_pan_display == NULL)
 			return (var.xoffset || var.yoffset) ? -EINVAL : 0;
-		if ((i=fb->fb_pan_display(&var, PROC_CONSOLE(info), info)))
+		if ((i=fb->fb_pan_display(&var, info)))
 			return i;
 		if (copy_to_user((void *) arg, &var, sizeof(var)))
 			return -EFAULT;
@@ -547,8 +547,7 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	default:
 		if (fb->fb_ioctl == NULL)
 			return -EINVAL;
-		return fb->fb_ioctl(inode, file, cmd, arg, PROC_CONSOLE(info),
-				    info);
+		return fb->fb_ioctl(inode, file, cmd, arg, info);
 	}
 }
 

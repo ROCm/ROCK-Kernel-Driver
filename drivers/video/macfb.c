@@ -222,7 +222,7 @@ static int dafb_setpalette (unsigned int regno, unsigned int red,
 
 	local_irq_save(flags);
 	
-	/* fbcon will set an entire colourmap, but X won't.  Hopefully
+	/* fbdev will set an entire colourmap, but X won't.  Hopefully
 	   this should accomodate both of them */
 	if (regno != lastreg+1) {
 		int i;
@@ -585,7 +585,6 @@ static int macfb_setcolreg(unsigned regno, unsigned red, unsigned green,
 
 static struct fb_ops macfb_ops = {
 	.owner		= THIS_MODULE,
-	.fb_set_var	= gen_set_var,
 	.fb_setcolreg	= macfb_setcolreg,
 	.fb_fillrect	= cfb_fillrect,
 	.fb_copyarea	= cfb_copyarea,
@@ -951,8 +950,6 @@ void __init macfb_init(void)
 	fb_info.fbops		= &macfb_ops;
 	fb_info.var		= macfb_defined;
 	fb_info.fix		= macfb_fix;
-	fb_info.currcon		= -1;	
-	fb_info.updatevar	= gen_update_var;
 	fb_info.pseudo_palette	= pseudo_palette;
 	fb_info.flags		= FBINFO_FLAG_DEFAULT;
 

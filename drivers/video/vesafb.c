@@ -59,7 +59,7 @@ static void            (*pmi_pal)(void);
 
 /* --------------------------------------------------------------------- */
 
-static int vesafb_pan_display(struct fb_var_screeninfo *var, int con,
+static int vesafb_pan_display(struct fb_var_screeninfo *var,
                               struct fb_info *info)
 {
 	int offset;
@@ -170,7 +170,6 @@ static int vesafb_setcolreg(unsigned regno, unsigned red, unsigned green,
 
 static struct fb_ops vesafb_ops = {
 	.owner		= THIS_MODULE,
-	.fb_set_var	= gen_set_var,
 	.fb_setcolreg	= vesafb_setcolreg,
 	.fb_pan_display	= vesafb_pan_display,
 	.fb_fillrect	= cfb_fillrect,
@@ -348,7 +347,6 @@ int __init vesafb_init(void)
 	fb_info.fbops = &vesafb_ops;
 	fb_info.var = vesafb_defined;
 	fb_info.fix = vesafb_fix;
-	fb_info.updatevar = gen_update_var;
 	fb_info.pseudo_palette = pseudo_palette;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 

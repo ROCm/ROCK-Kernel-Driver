@@ -122,7 +122,6 @@ static int hitfb_setcolreg(unsigned regno, unsigned red, unsigned green,
 
 static struct fb_ops hitfb_ops = {
 	.owner		= THIS_MODULE,
-	.fb_set_var	= gen_set_var,
 	.fb_check_var	= hitfb_check_var,
 	.fb_set_par	= hitfb_set_par,
 	.fb_setcolreg	= hitfb_setcolreg,
@@ -167,8 +166,6 @@ int __init hitfb_init(void)
 	size = (fb_info.var.bits_per_pixel == 8) ? 256 : 16;
 	fb_alloc_cmap(&fb_info.cmap, size, 0); 	
 
-	gen_set_var(&fb_info.var, -1, &fb_info);
-    
 	if (register_framebuffer(&fb_info) < 0)
 		return -EINVAL;
     

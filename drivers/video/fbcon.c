@@ -335,14 +335,14 @@ int set_all_vcs(int fbidx, struct fb_ops *fb, struct fb_var_screeninfo *var,
     int unit, err;
 
     var->activate |= FB_ACTIVATE_TEST;
-    err = fb->fb_set_var(var, PROC_CONSOLE(info), info);
+    err = gen_set_var(var, PROC_CONSOLE(info), info);
     var->activate &= ~FB_ACTIVATE_TEST;
     gen_set_disp(PROC_CONSOLE(info), info);	
     if (err)
             return err;
     for (unit = 0; unit < MAX_NR_CONSOLES; unit++)
             if (fb_display[unit].conp && con2fb_map[unit] == fbidx) {
-                    fb->fb_set_var(var, unit, info);
+                    gen_set_var(var, unit, info);
 		    gen_set_disp(unit, info);
 	    }	
     return 0;
@@ -503,7 +503,6 @@ static const char *fbcon_startup(void)
     return display_desc;
 }
 
-
 static void fbcon_init(struct vc_data *conp, int init)
 {
     int unit = conp->vc_num;
@@ -512,6 +511,10 @@ static void fbcon_init(struct vc_data *conp, int init)
     /* on which frame buffer will we open this console? */
     info = registered_fb[(int)con2fb_map[unit]];
 
+    /* We trust the mode the driver supplies. */
+    if (info->fbops->fb_set_par)
+	info->fbops->fb_set_par(info);	
+    	
     gen_set_disp(unit, info);	
     DPRINTK("mode:   %s\n",info->modename);
     DPRINTK("visual: %d\n",info->fix.visual);
@@ -991,7 +994,7 @@ static __inline__ void ywrap_up(int unit, struct vc_data *conp,
     info->var.xoffset = 0;
     info->var.yoffset = p->yscroll*fontheight(p);
     info->var.vmode |= FB_VMODE_YWRAP;
-    info->updatevar(unit, info);
+    gen_update_var(unit, info);
     scrollback_max += count;
     if (scrollback_max > scrollback_phys_max)
 	scrollback_max = scrollback_phys_max;
@@ -1009,7 +1012,7 @@ static __inline__ void ywrap_down(int unit, struct vc_data *conp,
     info->var.xoffset = 0;
     info->var.yoffset = p->yscroll*fontheight(p);
     info->var.vmode |= FB_VMODE_YWRAP;
-    info->updatevar(unit, info);
+    gen_update_var(unit, info);
     scrollback_max -= count;
     if (scrollback_max < 0)
 	scrollback_max = 0;
@@ -1030,7 +1033,7 @@ static __inline__ void ypan_up(int unit, struct vc_data *conp,
     info->var.xoffset = 0;
     info->var.yoffset = p->yscroll*fontheight(p);
     info->var.vmode &= ~FB_VMODE_YWRAP;
-    info->updatevar(unit, info);
+    gen_update_var(unit, info);
     if (p->dispsw->clear_margins)
 	p->dispsw->clear_margins(conp, p, 1);
     scrollback_max += count;
@@ -1054,7 +1057,7 @@ static __inline__ void ypan_down(int unit, struct vc_data *conp,
     info->var.xoffset = 0;
     info->var.yoffset = p->yscroll*fontheight(p);
     info->var.vmode &= ~FB_VMODE_YWRAP;
-    info->updatevar(unit, info);
+    gen_update_var(unit, info);
     if (p->dispsw->clear_margins)
 	p->dispsw->clear_margins(conp, p, 1);
     scrollback_max -= count;
@@ -2145,7 +2148,7 @@ static int fbcon_scrolldelta(struct vc_data *conp, int lines)
 	offset -= limit;
     info->var.xoffset = 0;
     info->var.yoffset = offset*fontheight(p);
-    info->updatevar(unit, info);
+    gen_update_var(unit, info);
     if (!scrollback_current)
 	fbcon_cursor(conp, CM_DRAW);
     return 0;
@@ -2268,154 +2271,6 @@ static int __init fbcon_show_logo( void )
 	image.dx = x;
 	info->fbops->fb_imageblit(info, &image);
 	done = 1;
-#else    	 
-#if defined(CONFIG_FBCON_CFB16) || defined(CONFIG_FBCON_CFB24) || \
-    defined(CONFIG_FBCON_CFB32) || defined(CONFIG_FB_SBUS)
-        if (info->fix.visual == FB_VISUAL_DIRECTCOLOR) {
-	    unsigned int val;		/* max. depth 32! */
-	    int bdepth;
-	    int redshift, greenshift, blueshift;
-		
-	    /* Bug: Doesn't obey msb_right ... (who needs that?) */
-	    redshift   = info->var.red.offset;
-	    greenshift = info->var.green.offset;
-	    blueshift  = info->var.blue.offset;
-
-	    if (depth >= 24 && (depth % 8) == 0) {
-		/* have at least 8 bits per color */
-		src = logo;
-		bdepth = depth/8;
-		for( y1 = 0; y1 < LOGO_H; y1++ ) {
-		    dst = fb + y1*line + x*bdepth;
-		    for( x1 = 0; x1 < LOGO_W; x1++, src++ ) {
-			val = (*src << redshift) |
-			      (*src << greenshift) |
-			      (*src << blueshift);
-			if (bdepth == 4 && !((long)dst & 3)) {
-			    /* Some cards require 32bit access */
-			    fb_writel (val, dst);
-			    dst += 4;
-			} else if (bdepth == 2 && !((long)dst & 1)) {
-			    /* others require 16bit access */
-			    fb_writew (val,dst);
-			    dst +=2;
-			} else {
-#ifdef __LITTLE_ENDIAN
-			    for( i = 0; i < bdepth; ++i )
-#else
-			    for( i = bdepth-1; i >= 0; --i )
-#endif
-			        fb_writeb (val >> (i*8), dst++);
-			}
-		    }
-		}
-	    }
-	    else if (depth >= 12 && depth <= 23) {
-	        /* have 4..7 bits per color, using 16 color image */
-		unsigned int pix;
-		src = linux_logo16;
-		bdepth = (depth+7)/8;
-		for( y1 = 0; y1 < LOGO_H; y1++ ) {
-		    dst = fb + y1*line + x*bdepth;
-		    for( x1 = 0; x1 < LOGO_W/2; x1++, src++ ) {
-			pix = *src >> 4; /* upper nibble */
-			val = (pix << redshift) |
-			      (pix << greenshift) |
-			      (pix << blueshift);
-#ifdef __LITTLE_ENDIAN
-			for( i = 0; i < bdepth; ++i )
-#else
-			for( i = bdepth-1; i >= 0; --i )
-#endif
-			    fb_writeb (val >> (i*8), dst++);
-			pix = *src & 0x0f; /* lower nibble */
-			val = (pix << redshift) |
-			      (pix << greenshift) |
-			      (pix << blueshift);
-#ifdef __LITTLE_ENDIAN
-			for( i = 0; i < bdepth; ++i )
-#else
-			for( i = bdepth-1; i >= 0; --i )
-#endif
-			    fb_writeb (val >> (i*8), dst++);
-		    }
-		}
-	    }
-	    done = 1;
-        }
-#endif
-#if defined(CONFIG_FBCON_CFB16) || defined(CONFIG_FBCON_CFB24) || \
-    defined(CONFIG_FBCON_CFB32) || defined(CONFIG_FB_SBUS)
-	if ((depth % 8 == 0) && (info->fix.visual == FB_VISUAL_TRUECOLOR)) {
-	    /* Modes without color mapping, needs special data transformation... */
-	    unsigned int val;		/* max. depth 32! */
-	    int bdepth = depth/8;
-	    unsigned char mask[9] = { 0,0x80,0xc0,0xe0,0xf0,0xf8,0xfc,0xfe,0xff };
-	    unsigned char redmask, greenmask, bluemask;
-	    int redshift, greenshift, blueshift;
-		
-	    /* Bug: Doesn't obey msb_right ... (who needs that?) */
-	    redmask   = mask[info->var.red.length   < 8 ? info->var.red.length   : 8];
-	    greenmask = mask[info->var.green.length < 8 ? info->var.green.length : 8];
-	    bluemask  = mask[info->var.blue.length  < 8 ? info->var.blue.length  : 8];
-	    redshift   = info->var.red.offset   - (8 - info->var.red.length);
-	    greenshift = info->var.green.offset - (8 - info->var.green.length);
-	    blueshift  = info->var.blue.offset  - (8 - info->var.blue.length);
-
-	    src = logo;
-	    for( y1 = 0; y1 < LOGO_H; y1++ ) {
-		dst = fb + y1*line + x*bdepth;
-		for( x1 = 0; x1 < LOGO_W; x1++, src++ ) {
-		    val = safe_shift((linux_logo_red[*src-32]   & redmask), redshift) |
-		          safe_shift((linux_logo_green[*src-32] & greenmask), greenshift) |
-		          safe_shift((linux_logo_blue[*src-32]  & bluemask), blueshift);
-		    if (bdepth == 4 && !((long)dst & 3)) {
-			/* Some cards require 32bit access */
-			fb_writel (val, dst);
-			dst += 4;
-		    } else if (bdepth == 2 && !((long)dst & 1)) {
-			/* others require 16bit access */
-			fb_writew (val,dst);
-			dst +=2;
-		    } else {
-#ifdef __LITTLE_ENDIAN
-			for( i = 0; i < bdepth; ++i )
-#else
-			for( i = bdepth-1; i >= 0; --i )
-#endif
-			    fb_writeb (val >> (i*8), dst++);
-		    }
-		}
-	    }
-	    done = 1;
-	}
-#endif
-#if defined(CONFIG_FBCON_CFB4)
-	if (depth == 4 && info->fix.type == FB_TYPE_PACKED_PIXELS) {
-		src = logo;
-		for( y1 = 0; y1 < LOGO_H; y1++) {
-			dst = fb + y1*line + x/2;
-			for( x1 = 0; x1 < LOGO_W/2; x1++) {
-				u8 q = *src++;
-				q = (q << 4) | (q >> 4);
-				fb_writeb (q, dst++);
-			}
-		}
-		done = 1;
-	}
-#endif
-#if defined(CONFIG_FBCON_CFB8) || defined(CONFIG_FB_SBUS)
-	if (depth == 8 && info->fix.type == FB_TYPE_PACKED_PIXELS) {
-	    /* depth 8 or more, packed, with color registers */
-		
-	    src = logo;
-	    for( y1 = 0; y1 < LOGO_H; y1++ ) {
-		dst = fb + y1*line + x;
-		for( x1 = 0; x1 < LOGO_W; x1++ )
-		    fb_writeb (*src++, dst++);
-	    }
-	    done = 1;
-	}
 #endif
 #if defined(CONFIG_FBCON_AFB) || defined(CONFIG_FBCON_ILBM) || \
     defined(CONFIG_FBCON_IPLAN2P2) || defined(CONFIG_FBCON_IPLAN2P4) || \
@@ -2526,7 +2381,6 @@ static int __init fbcon_show_logo( void )
 		done = 1;
 	}
 #endif
-#endif	/* CONFIG_FBCON_ACCEL */		
     }
    
     if (info->fbops->fb_rasterimg)

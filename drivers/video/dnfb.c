@@ -117,7 +117,6 @@ static void dnfb_copyarea(struct fb_info *info, struct fb_copyarea *area);
 
 static struct fb_ops dn_fb_ops = {
 	.owner		= THIS_MODULE,
-	.fb_set_var	= gen_set_var,
 	.fb_blank	= dnfb_blank,
 	.fb_fillrect	= cfb_fillrect,
 	.fb_copyarea	= dnfb_copyarea,
