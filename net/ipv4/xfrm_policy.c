@@ -784,47 +784,6 @@ struct dst_ops xfrm4_dst_ops = {
 	.entry_size =		sizeof(struct xfrm_dst),
 };
 
-void create_debug_policy(void)
-{
-	extern struct xfrm_type ah_type;
-	struct xfrm_policy *pol = xfrm_policy_alloc();
-	struct xfrm_state *x;
-
-	if (!pol)
-		panic("panic\n");
-
-	pol->expires = ~0UL;
-	pol->action  = XFRM_POLICY_ALLOW;
-	pol->xfrm_nr = 1;
-	pol->xfrm_vec[0] = (struct xfrm_tmpl){
-		.id = { .proto = IPPROTO_AH },
-		.algos = ~0
-	};
-	pol->selector = (struct xfrm_selector){
-		.daddr = { .a4 = { .addr = __constant_htonl(0x7f000001),
-				   .mask = ~0 } },
-		.dport = __constant_htons(8888),
-		.dport_mask = ~0,
-		.prefixlen_d = 32,
-		.proto = IPPROTO_UDP
-	};
-	xfrm_policy_list[XFRM_POLICY_OUT] = pol;
-
-	x = xfrm_state_alloc();
-	x->sel = pol->selector;
-
-	/* Debug. */
-	x->id.proto = IPPROTO_AH;
-	x->id.spi = 1;
-	x->id.daddr = pol->selector.daddr;
-	x->km.state = XFRM_STATE_VALID;
-	x->km.warn_bytes = 0;
-	x->replay.oseq = 1;
-	x->type = &ah_type;
-	x->type->init_state(x, NULL);
-	xfrm_state_insert(x);
-}
-
 void __init xfrm_init(void)
 {
 	xfrm4_dst_ops.kmem_cachep = kmem_cache_create("xfrm4_dst_cache",
@@ -840,6 +799,4 @@ void __init xfrm_init(void)
 	xfrm_state_init();
 	xfrm_input_init();
 	ah4_init();
-
-	create_debug_policy();
 }

@@ -124,63 +124,6 @@ void skb_ah_walk(const struct sk_buff *skb, struct crypto_tfm *tfm)
 		BUG();
 }
 
-#if 0 /* obsolete? */
-static void
-ah_old_digest(struct xfrm_state *x, struct sk_buff *skb, u8 *auth_data)
-{
-	struct ah_data *ahp = (struct ah_data*)x->data;
-	struct crypto_tfm *tfm = ahp->tfm;
-	u8 pad[512/8 - ahp->key_len];
-
-	memset(auth_data, 0, ahp->digest_len);
-	memset(pad, 0, sizeof(pad));
-
-	crypto_digest_init(tfm);
-	tfm->__crt_alg->cra_digest.dia_update(tfm->crt_ctx, ahp->key, ahp->key_len);
-	tfm->__crt_alg->cra_digest.dia_update(tfm->crt_ctx, ahp->key, sizeof(pad)-ahp->key_len);
-	skb_ah_walk(skb, tfm);
-	tfm->__crt_alg->cra_digest.dia_update(tfm->crt_ctx, ahp->key, ahp->key_len);
-	crypto_digest_final(tfm, auth_data);
-}
-#endif
-
-/* I bring apologies for wrong use of crypto lib. Use of official
- * api to get hmac digest is too chumbersome.
- */
-
-static void
-ah_hmac_digest(struct xfrm_state *x, struct sk_buff *skb, u8 *auth_data)
-{
-	struct ah_data *ahp = (struct ah_data*)x->data;
-	struct crypto_tfm *tfm = ahp->tfm;
-	int i;
-	char tmp_digest[crypto_tfm_digestsize(tfm)];
-	char pad[crypto_tfm_blocksize(tfm)];
-
-	memset(auth_data, 0, ahp->digest_len);
-
-	memset(pad, 0, sizeof(pad));
-	memcpy(pad, ahp->key, ahp->key_len);
-	for (i = 0; i < crypto_tfm_blocksize(tfm); i++)
-		pad[i] ^= 0x36;
-
-	crypto_digest_init(tfm);
-	tfm->__crt_alg->cra_digest.dia_update(tfm->crt_ctx, pad, sizeof(pad));
-	skb_ah_walk(skb, tfm);
-	crypto_digest_final(tfm, tmp_digest);
-
-	memset(pad, 0, sizeof(pad));
-	memcpy(pad, ahp->key, ahp->key_len);
-
-	for (i = 0; i < crypto_tfm_blocksize(tfm); i++)
-		pad[i] ^= 0x5c;
-
-	crypto_digest_init(tfm);
-	tfm->__crt_alg->cra_digest.dia_update(tfm->crt_ctx, pad, sizeof(pad));
-	tfm->__crt_alg->cra_digest.dia_update(tfm->crt_ctx, tmp_digest, crypto_tfm_digestsize(tfm));
-	crypto_digest_final(tfm, auth_data);
-}
-
 int ah_output(struct sk_buff *skb)
 {
 	int err;
@@ -372,36 +315,3 @@ static void __exit ah4_fini(void)
 	if (inet_del_protocol(&ah4_protocol, IPPROTO_AH) < 0)
 		printk(KERN_INFO "ip ah close: can't remove protocol\n");
 }
-
-void ah_destroy(struct xfrm_state *x)
-{
-}
-
-struct ah_data debugging_ah_state =
-{
-	.key		= "PIZDETSPIZDETSPIZDETSPIZDETSPIZDETS",
-	.key_len	= 32,
-	.digest_len	= 16,
-	.digest		= ah_hmac_digest
-};
-
-int ah_init_state(struct xfrm_state *x, void *args)
-{
-	debugging_ah_state.tfm = crypto_alloc_tfm(CRYPTO_ALG_MD5);
-	x->data = &debugging_ah_state;
-	x->props.header_len = 16+16;
-	return 0;
-}
-
-
-struct xfrm_type ah_type =
-{
-	.description	= "AH4-HMAC",
-	.refcnt		= ATOMIC_INIT(1),
-	.proto	     	= IPPROTO_AH,
-	.algo		= 0,
-	.init_state	= ah_init_state,
-	.destructor	= ah_destroy,
-	.input		= ah_input,
-	.output		= ah_output
-};
