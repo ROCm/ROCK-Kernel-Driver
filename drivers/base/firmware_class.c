@@ -278,11 +278,12 @@ fw_setup_class_device_id(struct class_device *class_dev, struct device *dev)
 	/* XXX warning we should watch out for name collisions */
 	strlcpy(class_dev->class_id, dev->bus_id, BUS_ID_SIZE);
 }
+
 static int
-fw_setup_class_device(struct firmware *fw, struct class_device **class_dev_p,
-		      const char *fw_name, struct device *device)
+fw_register_class_device(struct class_device **class_dev_p,
+			 const char *fw_name, struct device *device)
 {
-	int retval = 0;
+	int retval;
 	struct firmware_priv *fw_priv = kmalloc(sizeof (struct firmware_priv),
 						GFP_KERNEL);
 	struct class_device *class_dev = kmalloc(sizeof (struct class_device),
@@ -301,13 +302,13 @@ fw_setup_class_device(struct firmware *fw, struct class_device **class_dev_p,
 	init_completion(&fw_priv->completion);
 	fw_priv->attr_data = firmware_attr_data_tmpl;
 	strlcpy(fw_priv->fw_id, fw_name, FIRMWARE_NAME_MAX);
-	fw_setup_class_device_id(class_dev, device);
-	class_dev->dev = device;
 
 	fw_priv->timeout.function = firmware_class_timeout;
 	fw_priv->timeout.data = (u_long) fw_priv;
 	init_timer(&fw_priv->timeout);
 
+	fw_setup_class_device_id(class_dev, device);
+	class_dev->dev = device;
 	class_dev->class = &firmware_class;
 	class_set_devdata(class_dev, fw_priv);
 	retval = class_device_register(class_dev);
@@ -316,7 +317,28 @@ fw_setup_class_device(struct firmware *fw, struct class_device **class_dev_p,
 		       __FUNCTION__);
 		goto error_kfree;
 	}
+	*class_dev_p = class_dev;
+	return 0;
 
+error_kfree:
+	kfree(fw_priv);
+	kfree(class_dev);
+	return retval;
+}
+static int
+fw_setup_class_device(struct firmware *fw, struct class_device **class_dev_p,
+		      const char *fw_name, struct device *device)
+{
+	struct class_device *class_dev;
+	struct firmware_priv *fw_priv;
+	int retval;
+
+	*class_dev_p = NULL;
+	retval = fw_register_class_device(&class_dev, fw_name, device);
+	if (retval)
+		goto out;
+
+	fw_priv = class_get_devdata(class_dev);
 	fw_priv->fw = fw;
 
 	retval = sysfs_create_bin_file(&class_dev->kobj, &fw_priv->attr_data);
@@ -341,11 +363,6 @@ error_remove_data:
 	sysfs_remove_bin_file(&class_dev->kobj, &fw_priv->attr_data);
 error_unreg_class_dev:
 	class_device_unregister(class_dev);
-	goto out;
-
-error_kfree:
-	kfree(fw_priv);
-	kfree(class_dev);
 out:
 	return retval;
 }
