@@ -81,75 +81,119 @@
  * FUNCTION:    acpi_ex_do_match
  *
  * PARAMETERS:  match_op        - The AML match operand
- *              package_value   - Value from the target package
- *              match_value     - Value to be matched
+ *              package_obj     - Object from the target package
+ *              match_obj       - Object to be matched
  *
  * RETURN:      TRUE if the match is successful, FALSE otherwise
  *
- * DESCRIPTION: Implements the low-level match for the ASL Match operator
+ * DESCRIPTION: Implements the low-level match for the ASL Match operator.
+ *              Package elements will be implicitly converted to the type of
+ *              the match object (Integer/Buffer/String).
  *
  ******************************************************************************/
 
 u8
 acpi_ex_do_match (
 	u32                             match_op,
-	acpi_integer                    package_value,
-	acpi_integer                    match_value)
+	union acpi_operand_object       *package_obj,
+	union acpi_operand_object       *match_obj)
 {
+	u8                              logical_result = TRUE;
+	acpi_status                     status;
 
+
+	/*
+	 * Note: Since the package_obj/match_obj ordering is opposite to that of
+	 * the standard logical operators, we have to reverse them when we call
+	 * do_logical_op in order to make the implicit conversion rules work
+	 * correctly. However, this means we have to flip the entire equation
+	 * also. A bit ugly perhaps, but overall, better than fussing the
+	 * parameters around at runtime, over and over again.
+	 *
+	 * Below, P[i] refers to the package element, M refers to the Match object.
+	 */
 	switch (match_op) {
-	case MATCH_MTR:   /* always true */
+	case MATCH_MTR:
+
+		/* Always true */
 
 		break;
 
+	case MATCH_MEQ:
 
-	case MATCH_MEQ:   /* true if equal   */
-
-		if (package_value != match_value) {
+		/*
+		 * True if equal: (P[i] == M)
+		 * Change to:     (M == P[i])
+		 */
+		status = acpi_ex_do_logical_op (AML_LEQUAL_OP, match_obj, package_obj,
+				 &logical_result);
+		if (ACPI_FAILURE (status)) {
 			return (FALSE);
 		}
 		break;
 
+	case MATCH_MLE:
 
-	case MATCH_MLE:   /* true if less than or equal  */
+		/*
+		 * True if less than or equal: (P[i] <= M) (P[i] not_greater than M)
+		 * Change to:                  (M >= P[i]) (M not_less than P[i])
+		 */
+		status = acpi_ex_do_logical_op (AML_LLESS_OP, match_obj, package_obj,
+				 &logical_result);
+		if (ACPI_FAILURE (status)) {
+			return (FALSE);
+		}
+		logical_result = (u8) !logical_result;
+		break;
 
-		if (package_value > match_value) {
+	case MATCH_MLT:
+
+		/*
+		 * True if less than: (P[i] < M)
+		 * Change to:         (M > P[i])
+		 */
+		status = acpi_ex_do_logical_op (AML_LGREATER_OP, match_obj, package_obj,
+				 &logical_result);
+		if (ACPI_FAILURE (status)) {
 			return (FALSE);
 		}
 		break;
 
+	case MATCH_MGE:
 
-	case MATCH_MLT:   /* true if less than   */
+		/*
+		 * True if greater than or equal: (P[i] >= M) (P[i] not_less than M)
+		 * Change to:                     (M <= P[i]) (M not_greater than P[i])
+		 */
+		status = acpi_ex_do_logical_op (AML_LGREATER_OP, match_obj, package_obj,
+				 &logical_result);
+		if (ACPI_FAILURE (status)) {
+			return (FALSE);
+		}
+		logical_result = (u8)!logical_result;
+		break;
 
-		if (package_value >= match_value) {
+	case MATCH_MGT:
+
+		/*
+		 * True if greater than: (P[i] > M)
+		 * Change to:            (M < P[i])
+		 */
+		status = acpi_ex_do_logical_op (AML_LLESS_OP, match_obj, package_obj,
+				 &logical_result);
+		if (ACPI_FAILURE (status)) {
 			return (FALSE);
 		}
 		break;
 
+	default:
 
-	case MATCH_MGE:   /* true if greater than or equal   */
-
-		if (package_value < match_value) {
-			return (FALSE);
-		}
-		break;
-
-
-	case MATCH_MGT:   /* true if greater than    */
-
-		if (package_value <= match_value) {
-			return (FALSE);
-		}
-		break;
-
-
-	default:    /* undefined   */
+		/* Undefined */
 
 		return (FALSE);
 	}
 
-
-	return TRUE;
+	return logical_result;
 }
 
 
@@ -182,18 +226,20 @@ acpi_ex_opcode_6A_0T_1R (
 	switch (walk_state->opcode) {
 	case AML_MATCH_OP:
 		/*
-		 * Match (search_package[0], match_op1[1], match_object1[2],
-		 *                          match_op2[3], match_object2[4], start_index[5])
+		 * Match (search_pkg[0], match_op1[1], match_obj1[2],
+		 *                      match_op2[3], match_obj2[4], start_index[5])
 		 */
 
-		/* Validate match comparison sub-opcodes */
+		/* Validate both Match Term Operators (MTR, MEQ, etc.) */
 
 		if ((operand[1]->integer.value > MAX_MATCH_OPERATOR) ||
 			(operand[3]->integer.value > MAX_MATCH_OPERATOR)) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "operation encoding out of range\n"));
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Match operator out of range\n"));
 			status = AE_AML_OPERAND_VALUE;
 			goto cleanup;
 		}
+
+		/* Get the package start_index, validate against the package length */
 
 		index = (u32) operand[5]->integer.value;
 		if (index >= (u32) operand[0]->package.count) {
@@ -201,6 +247,8 @@ acpi_ex_opcode_6A_0T_1R (
 			status = AE_AML_PACKAGE_LIMIT;
 			goto cleanup;
 		}
+
+		/* Create an integer for the return value */
 
 		return_desc = acpi_ut_create_internal_object (ACPI_TYPE_INTEGER);
 		if (!return_desc) {
@@ -214,37 +262,39 @@ acpi_ex_opcode_6A_0T_1R (
 		return_desc->integer.value = ACPI_INTEGER_MAX;
 
 		/*
-		 * Examine each element until a match is found.  Within the loop,
+		 * Examine each element until a match is found. Both match conditions
+		 * must be satisfied for a match to occur. Within the loop,
 		 * "continue" signifies that the current element does not match
 		 * and the next should be examined.
 		 *
 		 * Upon finding a match, the loop will terminate via "break" at
-		 * the bottom.  If it terminates "normally", match_value will be -1
-		 * (its initial value) indicating that no match was found.  When
-		 * returned as a Number, this will produce the Ones value as specified.
+		 * the bottom.  If it terminates "normally", match_value will be
+		 * ACPI_INTEGER_MAX (Ones) (its initial value) indicating that no
+		 * match was found.
 		 */
 		for ( ; index < operand[0]->package.count; index++) {
+			/* Get the current package element */
+
 			this_element = operand[0]->package.elements[index];
 
-			/*
-			 * Treat any NULL or non-numeric elements as non-matching.
-			 */
-			if (!this_element ||
-				ACPI_GET_OBJECT_TYPE (this_element) != ACPI_TYPE_INTEGER) {
+			/* Treat any uninitialized (NULL) elements as non-matching */
+
+			if (!this_element) {
 				continue;
 			}
 
 			/*
-			 * "continue" (proceed to next iteration of enclosing
-			 * "for" loop) signifies a non-match.
+			 * Both match conditions must be satisfied. Execution of a continue
+			 * (proceed to next iteration of enclosing for loop) signifies a
+			 * non-match.
 			 */
 			if (!acpi_ex_do_match ((u32) operand[1]->integer.value,
-					   this_element->integer.value, operand[2]->integer.value)) {
+					   this_element, operand[2])) {
 				continue;
 			}
 
 			if (!acpi_ex_do_match ((u32) operand[3]->integer.value,
-					   this_element->integer.value, operand[4]->integer.value)) {
+					   this_element, operand[4])) {
 				continue;
 			}
 
@@ -253,7 +303,6 @@ acpi_ex_opcode_6A_0T_1R (
 			return_desc->integer.value = index;
 			break;
 		}
-
 		break;
 
 

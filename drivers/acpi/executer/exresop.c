@@ -312,7 +312,7 @@ acpi_ex_resolve_operands (
 			goto next_operand;
 
 
-		case ARGI_ANYTYPE:
+		case ARGI_DATAREFOBJ:  /* Store operator only */
 
 			/*
 			 * We don't want to resolve index_op reference objects during

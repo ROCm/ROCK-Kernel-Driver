@@ -269,8 +269,8 @@ acpi_tb_convert_fadt1 (
 		 * that immediately follows.
 		 */
 		ACPI_MEMCPY (&local_fadt->reset_register,
-			&((struct fadt_descriptor_rev2_minus *) original_fadt)->reset_register,
-			sizeof (struct acpi_generic_address) + 1);
+			&(ACPI_CAST_PTR (struct fadt_descriptor_rev2_minus, original_fadt))->reset_register,
+  			sizeof (struct acpi_generic_address) + 1);
 	}
 	else {
 		/*
