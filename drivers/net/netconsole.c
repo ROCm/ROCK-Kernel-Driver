@@ -62,6 +62,7 @@ static struct netpoll np = {
 	.remote_port = 6666,
 	.remote_mac = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
 };
+static int configured = 0;
 
 #define MAX_PRINT_CHUNK 1000
 
@@ -90,19 +91,24 @@ static struct console netconsole = {
 	.write = write_msg
 };
 
-static int option_setup(char *opt)
+static void option_setup(char *opt)
 {
-	return netpoll_parse_options(&np, opt);
+	configured = !netpoll_parse_options(&np, opt);
 }
 
 __setup("netconsole=", option_setup);
 
 static int init_netconsole(void)
 {
-	if(strlen(config) && option_setup(config))
-		return 1;
+	if(strlen(config))
+		option_setup(config);
 
-	if(!np.remote_ip || netpoll_setup(&np))
+	if(!configured) {
+		printk("netconsole: not configured, aborting\n");
+		return 1;
+	}
+
+	if(netpoll_setup(&np))
 		return 1;
 
 	register_console(&netconsole);
