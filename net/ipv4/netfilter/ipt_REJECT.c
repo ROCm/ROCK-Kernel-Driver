@@ -84,45 +84,34 @@ static inline struct rtable *route_reverse(struct sk_buff *skb, int local)
 static void send_reset(struct sk_buff *oldskb, int local)
 {
 	struct sk_buff *nskb;
-	struct tcphdr *otcph, *tcph;
+	struct tcphdr otcph, *tcph;
 	struct rtable *rt;
-	unsigned int otcplen;
 	u_int16_t tmp_port;
 	u_int32_t tmp_addr;
 	int needs_ack;
 	int hh_len;
 
-	/* IP header checks: fragment, too short. */
-	if (oldskb->nh.iph->frag_off & htons(IP_OFFSET)
-	    || oldskb->len < (oldskb->nh.iph->ihl<<2) + sizeof(struct tcphdr))
+	/* IP header checks: fragment. */
+	if (oldskb->nh.iph->frag_off & htons(IP_OFFSET))
 		return;
-
-	otcph = (struct tcphdr *)((u_int32_t*)oldskb->nh.iph + oldskb->nh.iph->ihl);
-	otcplen = oldskb->len - oldskb->nh.iph->ihl*4;
 
 	if (skb_copy_bits(oldskb, oldskb->nh.iph->ihl*4,
-			  otcph, sizeof(*otcph)) < 0)
-		return;
+			  &otcph, sizeof(otcph)) < 0)
+ 		return;
 
 	/* No RST for RST. */
-	if (otcph->rst)
+	if (otcph.rst)
 		return;
 
-	/* Check checksum. */
-	if (tcp_v4_check(otcph, otcplen, oldskb->nh.iph->saddr,
-			 oldskb->nh.iph->daddr,
-			 csum_partial((char *)otcph, otcplen, 0)) != 0)
-		return;
-
+	/* FIXME: Check checksum --RR */
 	if ((rt = route_reverse(oldskb, local)) == NULL)
 		return;
 
 	hh_len = (rt->u.dst.dev->hard_header_len + 15)&~15;
 
-	/* Copy skb (even if skb is about to be dropped, we can't just
-           clone it because there may be other things, such as tcpdump,
-           interested in it). We also need to expand headroom in case
-	   hh_len of incoming interface < hh_len of outgoing interface */
+	/* We need a linear, writeable skb.  We also need to expand
+	   headroom in case hh_len of incoming interface < hh_len of
+	   outgoing interface */
 	nskb = skb_copy_expand(oldskb, hh_len, skb_tailroom(oldskb),
 			       GFP_ATOMIC);
 	if (!nskb) {
@@ -163,12 +152,13 @@ static void send_reset(struct sk_buff *oldskb, int local)
 
 	if (tcph->ack) {
 		needs_ack = 0;
-		tcph->seq = otcph->ack_seq;
+		tcph->seq = otcph.ack_seq;
 		tcph->ack_seq = 0;
 	} else {
 		needs_ack = 1;
-		tcph->ack_seq = htonl(ntohl(otcph->seq) + otcph->syn + otcph->fin
-				      + otcplen - (otcph->doff<<2));
+		tcph->ack_seq = htonl(ntohl(otcph.seq) + otcph.syn + otcph.fin
+				      + oldskb->len - oldskb->nh.iph->ihl*4
+				      - (otcph.doff<<2));
 		tcph->seq = 0;
 	}
 
