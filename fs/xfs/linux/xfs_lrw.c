@@ -71,6 +71,7 @@
 #include "xfs_inode_item.h"
 #include "xfs_buf_item.h"
 #include "xfs_utils.h"
+#include "xfs_iomap.h"
 
 #include <linux/capability.h>
 
@@ -967,8 +968,8 @@ xfs_bmap(bhv_desc_t	*bdp,
 	xfs_off_t	offset,
 	ssize_t		count,
 	int		flags,
-	page_buf_bmap_t	*pbmapp,
-	int		*npbmaps)
+	xfs_iomap_t	*iomapp,
+	int		*niomaps)
 {
 	xfs_inode_t	*ip = XFS_BHVTOI(bdp);
 	xfs_iocore_t	*io = &ip->i_iocore;
@@ -977,7 +978,7 @@ xfs_bmap(bhv_desc_t	*bdp,
 	ASSERT(((ip->i_d.di_flags & XFS_DIFLAG_REALTIME) != 0) ==
 	       ((ip->i_iocore.io_flags & XFS_IOCORE_RT) != 0));
 
-	return xfs_iomap(io, offset, count, flags, pbmapp, npbmaps);
+	return xfs_iomap(io, offset, count, flags, iomapp, niomaps);
 }
 
 /*

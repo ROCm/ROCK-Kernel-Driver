@@ -67,29 +67,6 @@ typedef enum page_buf_rw_e {
 	PBRW_ZERO = 3			/* Zero target memory */
 } page_buf_rw_t;
 
-typedef enum {				/* pbm_flags values */
-	PBMF_EOF =		0x01,	/* mapping contains EOF		*/
-	PBMF_HOLE =		0x02,	/* mapping covers a hole	*/
-	PBMF_DELAY =		0x04,	/* mapping covers delalloc region  */
-	PBMF_UNWRITTEN =	0x20,	/* mapping covers allocated	*/
-					/* but uninitialized file data	*/
-	PBMF_NEW =		0x40	/* just allocated		*/
-} bmap_flags_t;
-
-typedef enum {
-	/* base extent manipulation calls */
-	BMAP_READ = (1 << 0),		/* read extents */
-	BMAP_WRITE = (1 << 1),		/* create extents */
-	BMAP_ALLOCATE = (1 << 2),	/* delayed allocate to real extents */
-	BMAP_UNWRITTEN  = (1 << 3),	/* unwritten extents to real extents */
-	/* modifiers */
-	BMAP_IGNSTATE = (1 << 4),	/* ignore unwritten state on read */
-	BMAP_DIRECT = (1 << 5),		/* direct instead of buffered write */
-	BMAP_MMAP = (1 << 6),		/* allocate for mmap write */
-	BMAP_SYNC = (1 << 7),		/* sync write */
-	BMAP_TRYLOCK = (1 << 8),	/* non-blocking request */
-	BMAP_DEVICE = (1 << 9),		/* we only want to know the device */
-} bmapi_flags_t;
 
 typedef enum page_buf_flags_e {		/* pb_flags values */
 	PBF_READ = (1 << 0),	/* buffer intended for reading from device */
@@ -137,36 +114,6 @@ typedef struct pb_target {
 	unsigned int		pbr_sshift;
 	size_t			pbr_smask;
 } pb_target_t;
-
-/*
- *	page_buf_bmap_t:  File system I/O map
- *
- * The pbm_bn, pbm_offset and pbm_length fields are expressed in disk blocks.
- * The pbm_length field specifies the size of the underlying backing store
- * for the particular mapping.
- *
- * The pbm_bsize, pbm_size and pbm_delta fields are in bytes and indicate
- * the size of the mapping, the number of bytes that are valid to access
- * (read or write), and the offset into the mapping, given the offset
- * supplied to the file I/O map routine.  pbm_delta is the offset of the
- * desired data from the beginning of the mapping.
- *
- * When a request is made to read beyond the logical end of the object,
- * pbm_size may be set to 0, but pbm_offset and pbm_length should be set to
- * the actual amount of underlying storage that has been allocated, if any.
- */
-
-typedef struct page_buf_bmap_s {
-	page_buf_daddr_t pbm_bn;	/* block number in file system	    */
-	pb_target_t	*pbm_target;	/* device to do I/O to		    */
-	loff_t		pbm_offset;	/* byte offset of mapping in file   */
-	size_t		pbm_delta;	/* offset of request into bmap	    */
-	size_t		pbm_bsize;	/* size of this mapping in bytes    */
-	bmap_flags_t	pbm_flags;	/* options flags for mapping	    */
-} page_buf_bmap_t;
-
-typedef page_buf_bmap_t pb_bmap_t;
-
 
 /*
  *	page_buf_t:  Buffer structure for page cache-based buffers
