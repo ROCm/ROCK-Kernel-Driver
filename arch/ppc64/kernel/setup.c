@@ -623,6 +623,9 @@ void __init setup_arch(char **cmdline_p)
 	/* reboot on panic */
 	panic_timeout = 180;
 
+	/* default to panic on oops or EEH error */
+	panic_on_oops = 1;
+
 	if (ppc_md.panic)
 		notifier_chain_register(&panic_notifier_list, &ppc64_panic_block);
 

@@ -409,7 +409,6 @@ static void eeh_event_handler(void *dummy)
 {
 	unsigned long flags;
 	struct eeh_event	*event;
-	unsigned long		log_event;
 	int			rc;
 
 	while (1) {
@@ -422,19 +421,6 @@ static void eeh_event_handler(void *dummy)
 		spin_unlock_irqrestore(&eeh_eventlist_lock, flags);
 		if (event == NULL)
 			break;
-
-		spin_lock_irqsave(&slot_errbuf_lock, flags);
-		memset(slot_errbuf, 0, eeh_error_buf_size);
-
-		log_event = rtas_call(rtas_token("ibm,slot-error-detail"), 8, 1, NULL,
-				      event->dn->eeh_config_addr,
-				      BUID_HI(event->dn->phb->buid),
-				      BUID_LO(event->dn->phb->buid), NULL, 0,
-				      virt_to_phys(slot_errbuf), eeh_error_buf_size,
-				      2 /* Permanent Error */);
-		if (log_event == 0) 
-			log_error(slot_errbuf, ERR_TYPE_RTAS_LOG, 0);
-		spin_unlock_irqrestore(&slot_errbuf_lock, flags);
 
 		rc = 1;
 		if (strcmp(event->dn->name, "ethernet") == 0) {
@@ -511,27 +497,54 @@ unsigned long eeh_check_failure(void *token, unsigned long val)
 
 	if (ret == 0 && rets[1] == 1 && rets[0] >= 2) {
 		unsigned long flags;
+		unsigned long		log_event;
 		struct eeh_event 	*event;
+		unsigned long reset_state = rets[0];
+
+		/* Log the error with the rtas logger */
+		spin_lock_irqsave(&slot_errbuf_lock, flags);
+		memset(slot_errbuf, 0, eeh_error_buf_size);
+
+		log_event = rtas_call(rtas_token("ibm,slot-error-detail"), 8, 1, NULL,
+				      event->dn->eeh_config_addr,
+				      BUID_HI(event->dn->phb->buid),
+				      BUID_LO(event->dn->phb->buid), NULL, 0,
+				      virt_to_phys(slot_errbuf), eeh_error_buf_size,
+				      2 /* Permanent Error */);
+		if (log_event == 0) 
+			log_error(slot_errbuf, ERR_TYPE_RTAS_LOG, 0);
+		spin_unlock_irqrestore(&slot_errbuf_lock, flags);
 
 		/* prevent repeated reports of this failure */
 		dn->eeh_mode |= EEH_MODE_NOCHECK;
 
-		event = kmalloc(sizeof(*event), GFP_ATOMIC);
-		if (event == NULL) {
-			eeh_panic(dev, rets[0]);
-			goto ok_return;
+		/* Some errors are recoverable; we handle those
+		 * asynchronously. */
+		if (strcmp(dn->name, "ethernet") == 0) {
+			event = kmalloc(sizeof(*event), GFP_ATOMIC);
+			if (event == NULL) {
+				eeh_panic(dev, reset_state);
+				goto ok_return;
+			}
+	
+			event->dev = dev;
+			event->dn = dn;
+			event->reset_state = reset_state;
+	
+			/* We may or may not be called in an interrupt context */
+			spin_lock_irqsave(&eeh_eventlist_lock, flags);
+			list_add(&event->list, &eeh_eventlist);
+			spin_unlock_irqrestore(&eeh_eventlist_lock, flags);
+	
+			schedule_work(&eeh_event_wq);
 		}
-
-		event->dev = dev;
-		event->dn = dn;
-		event->reset_state = rets[0];
-
-		/* We may or may not be called in an interrupt context */
-		spin_lock_irqsave(&eeh_eventlist_lock, flags);
-		list_add(&event->list, &eeh_eventlist);
-		spin_unlock_irqrestore(&eeh_eventlist_lock, flags);
-
-		schedule_work(&eeh_event_wq);
+		else
+		{
+				/* For non-recoverable errors, we panic now.  This
+				 * prevents the device driver from getting tangled 
+				 * in its own shorts.  */
+				eeh_panic(dev, reset_state);
+		}
 
 		/* do not pci_dev_put */
 		return val;
