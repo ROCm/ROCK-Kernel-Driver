@@ -741,12 +741,9 @@ W:	http://www.developer.ibm.com/welcome/netfinity/serveraid.html
 S:	Supported 
 
 IDE DRIVER [GENERAL]
-P:	Martin Dalecki
-M:	martin@dalecki.de
-I:	pl_PL.ISO8859-2, de_DE.ISO8859-15, (en_US.ISO8859-1)
 L:	linux-kernel@vger.kernel.org
-W:	http://www.dalecki.de
-S:	Developement
+L:	linux-ide@vger.kernel.org
+S:	Maintained
 
 IDE/ATAPI CDROM DRIVER
 P:	Jens Axboe
