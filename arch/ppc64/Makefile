@@ -20,6 +20,7 @@ ifeq ($(HAS_BIARCH),y)
 AS              := $(AS) -64
 LD              := $(LD) -m elf64ppc
 CC		:= $(CC) -m64
+CHECK		:= $(CHECK) -m64
 endif
 
 LDFLAGS		:= -m elf64ppc
