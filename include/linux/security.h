@@ -1266,6 +1266,7 @@ static inline int security_init(void)
 
 # define security_enabled 0
 # define COND_SECURITY(seop, def) def
+# define COND_SECURITY_NOT_PRIVATE(inode, seop, def) def
 #endif
 
 #ifdef CONFIG_SECURITY_NETWORK
