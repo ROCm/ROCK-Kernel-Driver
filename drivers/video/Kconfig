@@ -809,12 +809,12 @@ config FB_SBUS
 	help
 	  Say Y if you want support for SBUS or UPA based frame buffer device.
 
-config FB_CREATOR
-	bool "Creator/Creator3D support"
+config FB_FFB
+	bool "Creator/Creator3D/Elite3D support"
 	depends on FB_SBUS && SPARC64
 	help
-	  This is the frame buffer device driver for the Creator and Creator3D
-	  graphics boards.
+	  This is the frame buffer device driver for the Creator, Creator3D,
+	  and Elite3D graphics boards.
 
 config FB_TCX
 	bool "TCX (SS4/SS5 only) support"

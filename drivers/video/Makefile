@@ -48,14 +48,6 @@ obj-$(CONFIG_FB_VGA16)            += vga16fb.o cfbfillrect.o cfbcopyarea.o \
 obj-$(CONFIG_FB_VIRGE)            += virgefb.o
 obj-$(CONFIG_FB_G364)             += g364fb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o
 obj-$(CONFIG_FB_FM2)              += fm2fb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o
-obj-$(CONFIG_FB_CREATOR)          += creatorfb.o sbusfb.o
-obj-$(CONFIG_FB_CGSIX)            += cgsixfb.o sbusfb.o
-obj-$(CONFIG_FB_BWTWO)            += bwtwofb.o sbusfb.o
-obj-$(CONFIG_FB_CGTHREE)          += cgthreefb.o sbusfb.o
-obj-$(CONFIG_FB_TCX)              += tcxfb.o sbusfb.o
-obj-$(CONFIG_FB_CGFOURTEEN)       += cgfourteenfb.o sbusfb.o
-obj-$(CONFIG_FB_P9100)            += p9100fb.o sbusfb.o
-obj-$(CONFIG_FB_LEO)              += leofb.o sbusfb.o
 obj-$(CONFIG_FB_STI)              += stifb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o
 obj-$(CONFIG_FB_PMAG_BA)          += pmag-ba-fb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o
 obj-$(CONFIG_FB_PMAGB_B)          += pmagb-b-fb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o
@@ -77,6 +69,18 @@ obj-$(CONFIG_FB_HIT)              += hitfb.o cfbfillrect.o cfbcopyarea.o cfbimgb
 obj-$(CONFIG_FB_E1355)            += epson1355fb.o
 obj-$(CONFIG_FB_PVR2)             += pvr2fb.o
 obj-$(CONFIG_FB_VOODOO1)          += sstfb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o
+
+# One by one these are being converted over to the new APIs
+#obj-$(CONFIG_FB_CREATOR)          += creatorfb.o sbusfb.o
+#obj-$(CONFIG_FB_CGSIX)            += cgsixfb.o sbusfb.o
+#obj-$(CONFIG_FB_BWTWO)            += bwtwofb.o sbusfb.o
+#obj-$(CONFIG_FB_CGTHREE)          += cgthreefb.o sbusfb.o
+#obj-$(CONFIG_FB_TCX)              += tcxfb.o sbusfb.o
+#obj-$(CONFIG_FB_CGFOURTEEN)       += cgfourteenfb.o sbusfb.o
+#obj-$(CONFIG_FB_P9100)            += p9100fb.o sbusfb.o
+#obj-$(CONFIG_FB_LEO)              += leofb.o sbusfb.o
+
+obj-$(CONFIG_FB_FFB)               += ffb.o sbuslib.o cfbimgblt.o cfbcopyarea.o
 
 # Files generated that shall be removed upon make clean
 clean-files := promcon_tbl.c

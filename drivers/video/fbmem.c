@@ -103,8 +103,6 @@ extern int hgafb_setup(char*);
 extern int matroxfb_init(void);
 extern int matroxfb_setup(char*);
 extern int hpfb_init(void);
-extern int sbusfb_init(void);
-extern int sbusfb_setup(char*);
 extern int control_init(void);
 extern int control_setup(char*);
 extern int platinum_init(void);
@@ -146,6 +144,8 @@ extern int sstfb_init(void);
 extern int sstfb_setup(char*);
 extern int i810fb_init(void);
 extern int i810fb_setup(char*);
+extern int ffb_init(void);
+extern int ffb_setup(char*);
 
 static struct {
 	const char *name;
@@ -153,13 +153,6 @@ static struct {
 	int (*setup)(char*);
 } fb_drivers[] __initdata = {
 
-#ifdef CONFIG_FB_SBUS
-	/*
-	 * Sbusfb must be initialized _before_ other frame buffer devices that
-	 * use PCI probing
-	 */
-	{ "sbus", sbusfb_init, sbusfb_setup },
-#endif
 	/*
 	 * Chipset specific drivers that use resource management
 	 */
@@ -243,6 +236,9 @@ static struct {
 #endif	
 #ifdef CONFIG_FB_STI
 	{ "stifb", stifb_init, stifb_setup },
+#endif
+#ifdef CONFIG_FB_FFB
+	{ "ffb", ffb_init, ffb_setup },
 #endif
 
 	/*
