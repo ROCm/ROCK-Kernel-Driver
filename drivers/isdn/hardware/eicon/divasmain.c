@@ -71,8 +71,6 @@ extern void diva_get_vserial_number(PISDN_ADAPTER IoAdapter, char *buf);
 extern int divasfunc_init(int dbgmask);
 extern void divasfunc_exit(void);
 
-static devfs_handle_t devfs_handle;
-
 typedef struct _diva_os_thread_dpc {
 	struct tasklet_struct divas_task;
 	struct work_struct trap_script_task;
