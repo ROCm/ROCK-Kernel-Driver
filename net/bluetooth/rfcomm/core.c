@@ -280,13 +280,13 @@ static struct rfcomm_dlc *rfcomm_dlc_get(struct rfcomm_session *s, u8 dlci)
 static int __rfcomm_dlc_open(struct rfcomm_dlc *d, bdaddr_t *src, bdaddr_t *dst, u8 channel)
 {
 	struct rfcomm_session *s;
-	u8 dlci = __dlci(0, channel);
 	int err = 0;
+	u8 dlci;
 
-	BT_DBG("dlc %p state %ld %s %s channel %d dlci %d", 
-			d, d->state, batostr(src), batostr(dst), channel, dlci);
+	BT_DBG("dlc %p state %ld %s %s channel %d", 
+			d, d->state, batostr(src), batostr(dst), channel);
 
-	if (dlci < 1 || dlci > 62)
+	if (channel < 1 || channel > 30)
 		return -EINVAL;
 
 	if (d->state != BT_OPEN && d->state != BT_CLOSED)
@@ -298,6 +298,8 @@ static int __rfcomm_dlc_open(struct rfcomm_dlc *d, bdaddr_t *src, bdaddr_t *dst,
 		if (!s)
 			return err;
 	}
+
+	dlci = __dlci(!s->initiator, channel);
 
 	/* Check if DLCI already exists */
 	if (rfcomm_dlc_get(s, dlci))
@@ -715,7 +717,7 @@ static int rfcomm_send_nsc(struct rfcomm_session *s, int cr, u8 type)
 	hdr->len  = __len8(sizeof(*mcc) + 1);
 
 	mcc = (void *) ptr; ptr += sizeof(*mcc);
-	mcc->type = __mcc_type(s->initiator, RFCOMM_NSC);
+	mcc->type = __mcc_type(cr, RFCOMM_NSC);
 	mcc->len  = __len8(1);
 
 	/* Type that we didn't like */
@@ -741,7 +743,7 @@ static int rfcomm_send_pn(struct rfcomm_session *s, int cr, struct rfcomm_dlc *d
 	hdr->len  = __len8(sizeof(*mcc) + sizeof(*pn));
 
 	mcc = (void *) ptr; ptr += sizeof(*mcc);
-	mcc->type = __mcc_type(s->initiator, RFCOMM_PN);
+	mcc->type = __mcc_type(cr, RFCOMM_PN);
 	mcc->len  = __len8(sizeof(*pn));
 
 	pn = (void *) ptr; ptr += sizeof(*pn);
@@ -850,7 +852,7 @@ static int rfcomm_send_msc(struct rfcomm_session *s, int cr, u8 dlci, u8 v24_sig
 
 	msc = (void *) ptr; ptr += sizeof(*msc);
 	msc->dlci    = __addr(1, dlci);
-	msc->v24_sig = v24_sig;
+	msc->v24_sig = v24_sig | 0x01;
 
 	*ptr = __fcs(buf); ptr++;
 
@@ -1085,6 +1087,8 @@ static int rfcomm_recv_sabm(struct rfcomm_session *s, u8 dlci)
 		d->state = BT_CONNECTED;
 		d->state_change(d, 0);
 		rfcomm_dlc_unlock(d);
+
+		rfcomm_send_msc(s, 1, dlci, d->v24_sig);
 	} else {
 		rfcomm_send_dm(s, dlci);
 	}
@@ -1207,6 +1211,14 @@ static int rfcomm_recv_rpn(struct rfcomm_session *s, int cr, int len, struct sk_
 	}
 	/* check for sane values: ignore/accept bit_rate, 8 bits, 1 stop bit, no parity,
 	                          no flow control lines, normal XON/XOFF chars */
+	if (rpn->param_mask & RFCOMM_RPN_PM_BITRATE) {
+		bit_rate = rpn->bit_rate;
+		if (bit_rate != RFCOMM_RPN_BR_115200) {
+			BT_DBG("RPN bit rate mismatch 0x%x", bit_rate);
+			bit_rate = RFCOMM_RPN_BR_115200;
+			rpn_mask ^= RFCOMM_RPN_PM_BITRATE;
+		}
+	}
 	if (rpn->param_mask & RFCOMM_RPN_PM_DATA) {
 		data_bits = __get_rpn_data_bits(rpn->line_settings);
 		if (data_bits != RFCOMM_RPN_DATA_8) {
@@ -1232,22 +1244,25 @@ static int rfcomm_recv_rpn(struct rfcomm_session *s, int cr, int len, struct sk_
 		}
 	}
 	if (rpn->param_mask & RFCOMM_RPN_PM_FLOW) {
-		if (rpn->flow_ctrl != RFCOMM_RPN_FLOW_NONE) {
-			BT_DBG("RPN flow ctrl mismatch 0x%x", rpn->flow_ctrl);
+		flow_ctrl = rpn->flow_ctrl;
+		if (flow_ctrl != RFCOMM_RPN_FLOW_NONE) {
+			BT_DBG("RPN flow ctrl mismatch 0x%x", flow_ctrl);
 			flow_ctrl = RFCOMM_RPN_FLOW_NONE;
 			rpn_mask ^= RFCOMM_RPN_PM_FLOW;
 		}
 	}
 	if (rpn->param_mask & RFCOMM_RPN_PM_XON) {
-		if (rpn->xon_char != RFCOMM_RPN_XON_CHAR) {
-			BT_DBG("RPN XON char mismatch 0x%x", rpn->xon_char);
+		xon_char = rpn->xon_char;
+		if (xon_char != RFCOMM_RPN_XON_CHAR) {
+			BT_DBG("RPN XON char mismatch 0x%x", xon_char);
 			xon_char = RFCOMM_RPN_XON_CHAR;
 			rpn_mask ^= RFCOMM_RPN_PM_XON;
 		}
 	}
 	if (rpn->param_mask & RFCOMM_RPN_PM_XOFF) {
-		if (rpn->xoff_char != RFCOMM_RPN_XOFF_CHAR) {
-			BT_DBG("RPN XOFF char mismatch 0x%x", rpn->xoff_char);
+		xoff_char = rpn->xoff_char;
+		if (xoff_char != RFCOMM_RPN_XOFF_CHAR) {
+			BT_DBG("RPN XOFF char mismatch 0x%x", xoff_char);
 			xoff_char = RFCOMM_RPN_XOFF_CHAR;
 			rpn_mask ^= RFCOMM_RPN_PM_XOFF;
 		}
