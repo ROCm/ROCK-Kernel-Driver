@@ -3,7 +3,7 @@
  *
  * Written By: Jyoti Shah, IBM Corporation
  *
- * Copyright (c) 2001-2002 IBM Corp.
+ * Copyright (c) 2001-2003 IBM Corp.
  *
  * All rights reserved.
  *
@@ -114,7 +114,6 @@ static u8 hpc_readcmdtoindex (u8, u8);
 static void get_hpc_access (void);
 static void free_hpc_access (void);
 static void poll_hpc (void);
-static int update_slot (struct slot *, u8);
 static int process_changeinstatus (struct slot *, struct slot *);
 static int process_changeinlatch (u8, u8, struct controller *);
 static int hpc_poll_thread (void *);
@@ -916,71 +915,6 @@ static void poll_hpc (void)
 	debug ("%s - Exit\n", __FUNCTION__);
 }
 
-
-/* ----------------------------------------------------------------------
- *  Name:    ibmphp_hpc_fillhpslotinfo(hotplug_slot * phpslot)
- *
- *  Action:  fill out the hotplug_slot info
- *
- *  Input:   pointer to hotplug_slot
- *
- *  Return
- *  Value:   0 or error codes
- *-----------------------------------------------------------------------*/
-int ibmphp_hpc_fillhpslotinfo (struct hotplug_slot *phpslot)
-{
-	int rc = 0;
-	struct slot *pslot;
-
-	if (phpslot && phpslot->private) {
-		pslot = (struct slot *) phpslot->private;
-		rc = update_slot (pslot, (u8) TRUE);
-		if (!rc) {
-
-			// power - enabled:1  not:0
-			phpslot->info->power_status = SLOT_POWER (pslot->status);
-
-			// attention - off:0, on:1, blinking:2
-			phpslot->info->attention_status = SLOT_ATTN (pslot->status, pslot->ext_status);
-
-			// latch - open:1 closed:0
-			phpslot->info->latch_status = SLOT_LATCH (pslot->status);
-
-			// pci board - present:1 not:0
-			if (SLOT_PRESENT (pslot->status))
-				phpslot->info->adapter_status = 1;
-			else
-				phpslot->info->adapter_status = 0;
-/*
-			if (pslot->bus_on->supported_bus_mode
-				&& (pslot->bus_on->supported_speed == BUS_SPEED_66))
-				phpslot->info->max_bus_speed_status = BUS_SPEED_66PCIX;
-			else
-				phpslot->info->max_bus_speed_status = pslot->bus_on->supported_speed;
-*/		} else
-			rc = -EINVAL;
-	} else
-		rc = -EINVAL;
-
-	return rc;
-}
-
-/*----------------------------------------------------------------------
-* Name:    update_slot
-*
-* Action:  fill out slot status and extended status, controller status
-*
-* Input:   pointer to slot struct
-*---------------------------------------------------------------------*/
-static int update_slot (struct slot *pslot, u8 update)
-{
-	int rc = 0;
-
-	debug ("%s - Entry pslot[%p]\n", __FUNCTION__, pslot);
-	rc = ibmphp_hpc_readslot (pslot, READ_ALLSTAT, NULL);
-	debug ("%s - Exit rc[%d]\n", __FUNCTION__, rc);
-	return rc;
-}
 
 /*----------------------------------------------------------------------
 * Name:    process_changeinstatus

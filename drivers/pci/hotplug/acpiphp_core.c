@@ -380,6 +380,25 @@ static void make_slot_name (struct slot *slot)
 }
 
 /**
+ * release_slot - free up the memory used by a slot
+ * @hotplug_slot: slot to free
+ */
+static void release_slot(struct hotplug_slot *hotplug_slot)
+{
+	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
+
+	if (slot == NULL)
+		return;
+
+	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
+
+	kfree(slot->hotplug_slot->info);
+	kfree(slot->hotplug_slot->name);
+	kfree(slot->hotplug_slot);
+	kfree(slot);
+}
+
+/**
  * init_slots - initialize 'struct slot' structures for each slot
  *
  */
@@ -422,6 +441,7 @@ static int init_slots (void)
 		slot->number = i;
 
 		slot->hotplug_slot->private = slot;
+		slot->hotplug_slot->release = &release_slot;
 		slot->hotplug_slot->ops = &acpi_hotplug_slot_ops;
 
 		slot->acpi_slot = get_slot_from_id(i);
@@ -435,10 +455,7 @@ static int init_slots (void)
 		retval = pci_hp_register(slot->hotplug_slot);
 		if (retval) {
 			err("pci_hp_register failed with error %d\n", retval);
-			kfree(slot->hotplug_slot->info);
-			kfree(slot->hotplug_slot->name);
-			kfree(slot->hotplug_slot);
-			kfree(slot);
+			release_slot(slot->hotplug_slot);
 			return retval;
 		}
 
@@ -457,13 +474,10 @@ static void cleanup_slots (void)
 	struct slot *slot;
 
 	list_for_each_safe (tmp, n, &slot_list) {
+		/* memory will be freed in release_slot callback */
 		slot = list_entry(tmp, struct slot, slot_list);
 		list_del(&slot->slot_list);
 		pci_hp_deregister(slot->hotplug_slot);
-		kfree(slot->hotplug_slot->info);
-		kfree(slot->hotplug_slot->name);
-		kfree(slot->hotplug_slot);
-		kfree(slot);
 	}
 
 	return;

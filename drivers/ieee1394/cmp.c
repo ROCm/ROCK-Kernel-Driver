@@ -138,7 +138,7 @@ static void cmp_add_host(struct hpsb_host *host)
 	}
 
 	ch->host = host;
-	ch->u.ompr.rate = SPEED_100;
+	ch->u.ompr.rate = IEEE1394_SPEED_100;
 	ch->u.ompr.bcast_channel_base = 63;
 	ch->u.ompr.nplugs = 2;
 

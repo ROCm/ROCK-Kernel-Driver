@@ -31,7 +31,7 @@ int  dma_prog_region_alloc(struct dma_prog_region *prog, unsigned long n_bytes, 
 	prog->n_pages = n_bytes / PAGE_SIZE;
 
 	prog->kvirt = pci_alloc_consistent(dev, prog->n_pages * PAGE_SIZE, &prog->bus_addr);
-	if(!prog->kvirt) {
+	if (!prog->kvirt) {
 		printk(KERN_ERR "dma_prog_region_alloc: pci_alloc_consistent() failed\n");
 		dma_prog_region_free(prog);
 		return -ENOMEM;
@@ -44,7 +44,7 @@ int  dma_prog_region_alloc(struct dma_prog_region *prog, unsigned long n_bytes, 
 
 void dma_prog_region_free(struct dma_prog_region *prog)
 {
-	if(prog->kvirt) {
+	if (prog->kvirt) {
 		pci_free_consistent(prog->dev, prog->n_pages * PAGE_SIZE, prog->kvirt, prog->bus_addr);
 	}
 
@@ -75,7 +75,7 @@ int dma_region_alloc(struct dma_region *dma, unsigned long n_bytes, struct pci_d
 	n_pages = n_bytes / PAGE_SIZE;
 
 	dma->kvirt = vmalloc_32(n_pages * PAGE_SIZE);
-	if(!dma->kvirt) {
+	if (!dma->kvirt) {
 		printk(KERN_ERR "dma_region_alloc: vmalloc_32() failed\n");
 		goto err;
 	}
@@ -87,7 +87,7 @@ int dma_region_alloc(struct dma_region *dma, unsigned long n_bytes, struct pci_d
 
 	/* allocate scatter/gather list */
 	dma->sglist = kmalloc(dma->n_pages * sizeof(struct scatterlist), GFP_KERNEL);
-	if(!dma->sglist) {
+	if (!dma->sglist) {
 		printk(KERN_ERR "dma_region_alloc: kmalloc(sglist) failed\n");
 		goto err;
 	}
@@ -96,7 +96,7 @@ int dma_region_alloc(struct dma_region *dma, unsigned long n_bytes, struct pci_d
 	memset(dma->sglist, 0, dma->n_pages * sizeof(struct scatterlist));
 
 	/* fill scatter/gather list with pages */
-	for(i = 0; i < dma->n_pages; i++) {
+	for (i = 0; i < dma->n_pages; i++) {
 		unsigned long va = (unsigned long) dma->kvirt + i * PAGE_SIZE;
 			
 		dma->sglist[i].page = vmalloc_to_page((void *)va);
@@ -106,7 +106,7 @@ int dma_region_alloc(struct dma_region *dma, unsigned long n_bytes, struct pci_d
 	/* map sglist to the IOMMU */
 	dma->n_dma_pages = pci_map_sg(dev, &dma->sglist[0], dma->n_pages, direction);
 
-	if(dma->n_dma_pages == 0) {
+	if (dma->n_dma_pages == 0) {
 		printk(KERN_ERR "dma_region_alloc: pci_map_sg() failed\n");
 		goto err;
 	}
@@ -123,18 +123,18 @@ err:
 
 void dma_region_free(struct dma_region *dma)
 {
-	if(dma->n_dma_pages) {
+	if (dma->n_dma_pages) {
 		pci_unmap_sg(dma->dev, dma->sglist, dma->n_pages, dma->direction);
 		dma->n_dma_pages = 0;
 		dma->dev = NULL;
 	}
 
-	if(dma->sglist) {
+	if (dma->sglist) {
 		kfree(dma->sglist);
 		dma->sglist = NULL;
 	}
 
-	if(dma->kvirt) {
+	if (dma->kvirt) {
 		vfree(dma->kvirt);
 		dma->kvirt = NULL;
 		dma->n_pages = 0;
@@ -148,8 +148,8 @@ static inline int dma_region_find(struct dma_region *dma, unsigned long offset, 
 	int i;
 	unsigned long off = offset;
 
-	for(i = 0; i < dma->n_dma_pages; i++) {
-		if(off < sg_dma_len(&dma->sglist[i])) {
+	for (i = 0; i < dma->n_dma_pages; i++) {
+		if (off < sg_dma_len(&dma->sglist[i])) {
 			*rem = off;
 			return i;
 		}
@@ -173,7 +173,7 @@ void dma_region_sync(struct dma_region *dma, unsigned long offset, unsigned long
 	int first, last;
 	unsigned long rem;
 
-	if(!len)
+	if (!len)
 		len = 1;
 
 	first = dma_region_find(dma, offset, &rem);
@@ -193,10 +193,10 @@ dma_region_pagefault(struct vm_area_struct *area, unsigned long address, int wri
 
 	struct dma_region *dma = (struct dma_region*) area->vm_private_data;
 
-	if(!dma->kvirt)
+	if (!dma->kvirt)
 		goto out;
 
-	if( (address < (unsigned long) area->vm_start) ||
+	if ( (address < (unsigned long) area->vm_start) ||
 	    (address > (unsigned long) area->vm_start + (PAGE_SIZE * dma->n_pages)) )
 		goto out;
 
@@ -216,16 +216,16 @@ int dma_region_mmap(struct dma_region *dma, struct file *file, struct vm_area_st
 {
 	unsigned long size;
 
-	if(!dma->kvirt)
+	if (!dma->kvirt)
 		return -EINVAL;
 
 	/* must be page-aligned */
-	if(vma->vm_pgoff != 0)
+	if (vma->vm_pgoff != 0)
 		return -EINVAL;
 
 	/* check the length */
 	size = vma->vm_end - vma->vm_start;
-	if(size > (PAGE_SIZE * dma->n_pages))
+	if (size > (PAGE_SIZE * dma->n_pages))
 		return -EINVAL;
 
 	vma->vm_ops = &dma_region_vm_ops;

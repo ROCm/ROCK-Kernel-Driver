@@ -3,8 +3,8 @@
  *
  * Written By: Chuck Cole, Jyoti Shah, Tong Yu, Irene Zubarev, IBM Corporation
  *
- * Copyright (c) 2001 Greg Kroah-Hartman (greg@kroah.com)
- * Copyright (c) 2001,2002 IBM Corp.
+ * Copyright (c) 2001,2003 Greg Kroah-Hartman (greg@kroah.com)
+ * Copyright (c) 2001-2003 IBM Corp.
  *
  * All rights reserved.
  *
@@ -739,26 +739,8 @@ static void free_slots (void)
 	debug ("%s -- enter\n", __FUNCTION__);
 
 	list_for_each_safe (tmp, next, &ibmphp_slot_head) {
-	
 		slot_cur = list_entry (tmp, struct slot, ibm_slot_list);
-
 		pci_hp_deregister (slot_cur->hotplug_slot);
-
-		if (slot_cur->hotplug_slot) {
-			kfree (slot_cur->hotplug_slot);
-			slot_cur->hotplug_slot = NULL;
-		}
-
-		if (slot_cur->ctrl) 
-			slot_cur->ctrl = NULL;
-		
-		if (slot_cur->bus_on) 
-			slot_cur->bus_on = NULL;
-
-		ibmphp_unconfigure_card (&slot_cur, -1);  /* we don't want to actually remove the resources, since free_resources will do just that */
-
-		kfree (slot_cur);
-		slot_cur = NULL;
 	}
 	debug ("%s -- exit\n", __FUNCTION__);
 }
@@ -1221,7 +1203,6 @@ int ibmphp_do_disable_slot (struct slot *slot_cur)
 {
 	int rc;
 	u8 flag;
-	int parm = 0;
 
 	debug ("DISABLING SLOT... \n"); 
 		
@@ -1270,7 +1251,7 @@ int ibmphp_do_disable_slot (struct slot *slot_cur)
 		return 0;
 	}
 
-	rc = ibmphp_unconfigure_card (&slot_cur, parm);
+	rc = ibmphp_unconfigure_card (&slot_cur, 0);
 	slot_cur->func = NULL;
 	debug ("in disable_slot. after unconfigure_card\n");
 	if (rc) {

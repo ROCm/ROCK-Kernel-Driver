@@ -1167,7 +1167,7 @@ do {								\
 		return -ENOMEM;					\
 	++length;						\
 	scratch = buffer + length;				\
-} while(0)
+} while (0)
 
 	PUT_ENVP("VENDOR_ID=%06x", ud->vendor_id);
 	PUT_ENVP("MODEL_ID=%06x", ud->model_id);
@@ -1547,12 +1547,12 @@ static void nodemgr_do_irm_duties(struct hpsb_host *host)
 	/* If there is no bus manager then we should set the root node's
 	 * force_root bit to promote bus stability per the 1394
 	 * spec. (8.4.2.6) */
-	if (host->busmgr_id == 0x3f && host->node_count > 1)
+	if (host->busmgr_id == 0xffff && host->node_count > 1)
 	{
 		u16 root_node = host->node_count - 1;
-		struct node_entry *ne = hpsb_nodeid_get_entry(host, root_node);
+		struct node_entry *ne = find_entry_by_nodeid(host, root_node | LOCAL_BUS);
 
-		if (ne->busopt.cmc)
+		if (ne && ne->busopt.cmc)
 			hpsb_send_phy_config(host, root_node, -1);
 		else {
 			HPSB_DEBUG("The root node is not cycle master capable; "
