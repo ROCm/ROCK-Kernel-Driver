@@ -35,7 +35,7 @@ inline void __const_udelay(unsigned long xloops)
 	__asm__("mull %0"
 		:"=d" (xloops), "=&a" (d0)
 		:"1" (xloops),"0" (current_cpu_data.loops_per_jiffy * (HZ/4)));
-        __delay(xloops);
+        __delay(++xloops);
 }
 
 void __udelay(unsigned long usecs)
