@@ -169,19 +169,22 @@ typedef enum {
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,4,21)
 /* i_alloc_sem was added in 2.4.22-pre1 */
-#define DM_FLAGS_IALLOCSEM	0x010	/* thread holds i_alloc_sem */
+#define DM_FLAGS_IALLOCSEM_RD	0x010	/* thread holds i_alloc_sem rd */
+#define DM_FLAGS_IALLOCSEM_WR	0x020	/* thread holds i_alloc_sem wr */
 #endif
 #endif
 
 /*
  *	Based on IO_ISDIRECT, decide which i_ flag is set.
  */
-#ifdef DM_FLAGS_IALLOCSEM
-#define DM_SEM_FLAG(ioflags) (((ioflags) & IO_ISDIRECT) ? \
-			      DM_FLAGS_IALLOCSEM : DM_FLAGS_ISEM)
+#ifdef DM_FLAGS_IALLOCSEM_RD
+#define DM_SEM_FLAG_RD(ioflags) (((ioflags) & IO_ISDIRECT) ? \
+			      DM_FLAGS_IALLOCSEM_RD : DM_FLAGS_ISEM)
+#define DM_SEM_FLAG_WR	(DM_FLAGS_IALLOCSEM_WR | DM_FLAGS_ISEM)
 #else
-#define DM_SEM_FLAG(ioflags) (((ioflags) & IO_ISDIRECT) ? \
+#define DM_SEM_FLAG_RD(ioflags) (((ioflags) & IO_ISDIRECT) ? \
 			      0 : DM_FLAGS_ISEM)
+#define DM_SEM_FLAG_WR	(DM_FLAGS_ISEM)
 #endif
 
 /*
