@@ -231,12 +231,9 @@ struct super_block *sget(struct file_system_type *type,
 			int (*set)(struct super_block *,void *),
 			void *data)
 {
-	struct super_block *s = alloc_super();
+	struct super_block *s = NULL;
 	struct list_head *p;
 	int err;
-
-	if (!s)
-		return ERR_PTR(-ENOMEM);
 
 retry:
 	spin_lock(&sb_lock);
@@ -247,9 +244,18 @@ retry:
 			continue;
 		if (!grab_super(old))
 			goto retry;
-		destroy_super(s);
+		if (s)
+			destroy_super(s);
 		return old;
 	}
+	if (!s) {
+		spin_unlock(&sb_lock);
+		s = alloc_super();
+		if (!s)
+			return ERR_PTR(-ENOMEM);
+		goto retry;
+	}
+		
 	err = set(s, data);
 	if (err) {
 		spin_unlock(&sb_lock);
