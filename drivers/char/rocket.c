@@ -2013,7 +2013,7 @@ int __init rp_init(void)
 	memset(&rocket_driver, 0, sizeof(struct tty_driver));
 	rocket_driver.magic = TTY_DRIVER_MAGIC;
 #ifdef CONFIG_DEVFS_FS
-	rocket_driver.name = "tts/R%d";
+	rocket_driver.name = "tts/R";
 #else
 	rocket_driver.name = "ttyR";
 #endif
@@ -2055,7 +2055,7 @@ int __init rp_init(void)
 	 */
 	callout_driver = rocket_driver;
 #ifdef CONFIG_DEVFS_FS
-	callout_driver.name = "cua/R%d";
+	callout_driver.name = "cua/R";
 #else
 	callout_driver.name = "cur";
 #endif

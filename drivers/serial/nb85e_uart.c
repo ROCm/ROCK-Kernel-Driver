@@ -528,7 +528,7 @@ static struct uart_driver nb85e_uart_driver = {
 	.owner			= THIS_MODULE,
 	.driver_name		= "nb85e_uart",
 #ifdef CONFIG_DEVFS_FS
-	.dev_name		= "tts/%d",
+	.dev_name		= "tts/",
 #else
 	.dev_name		= "ttyS",
 #endif

@@ -131,7 +131,7 @@ static int scc_init_drivers(void)
 	scc_driver.magic = TTY_DRIVER_MAGIC;
 	scc_driver.driver_name = "scc";
 #ifdef CONFIG_DEVFS_FS
-	scc_driver.name = "tts/%d";
+	scc_driver.name = "tts/";
 #else
 	scc_driver.name = "ttyS";
 #endif
@@ -168,7 +168,7 @@ static int scc_init_drivers(void)
 
 	scc_callout_driver = scc_driver;
 #ifdef CONFIG_DEVFS_FS
-	scc_callout_driver.name = "cua/%d";
+	scc_callout_driver.name = "cua/";
 #else
 	scc_callout_driver.name = "cua";
 #endif

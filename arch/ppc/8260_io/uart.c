@@ -2506,7 +2506,7 @@ int __init rs_8xx_init(void)
 	serial_driver.magic = TTY_DRIVER_MAGIC;
 	serial_driver.driver_name = "serial";
 #ifdef CONFIG_DEVFS_FS
-	serial_driver.name = "tts/%d";
+	serial_driver.name = "tts/";
 #else
 	serial_driver.name = "ttyS";
 #endif
@@ -2548,7 +2548,7 @@ int __init rs_8xx_init(void)
 	 */
 	callout_driver = serial_driver;
 #ifdef CONFIG_DEVFS_FS
-	callout_driver.name = "cua/%d";
+	callout_driver.name = "cua/";
 #else
 	callout_driver.name = "cua";
 #endif

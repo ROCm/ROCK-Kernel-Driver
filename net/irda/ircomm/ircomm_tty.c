@@ -99,11 +99,7 @@ int __init ircomm_tty_init(void)
 	memset(&driver, 0, sizeof(struct tty_driver));
 	driver.magic           = TTY_DRIVER_MAGIC;
 	driver.driver_name     = "ircomm";
-#ifdef CONFIG_DEVFS_FS
-	driver.name            = "ircomm%d";
-#else
 	driver.name            = "ircomm";
-#endif
 	driver.major           = IRCOMM_TTY_MAJOR;
 	driver.minor_start     = IRCOMM_TTY_MINOR;
 	driver.num             = IRCOMM_TTY_PORTS;

@@ -1021,7 +1021,7 @@ static int sci_init_drivers(void)
 	sci_driver.magic = TTY_DRIVER_MAGIC;
 	sci_driver.driver_name = "sci";
 #ifdef CONFIG_DEVFS_FS
-	sci_driver.name = "ttsc/%d";
+	sci_driver.name = "ttsc/";
 #else
 	sci_driver.name = "ttySC";
 #endif
@@ -1060,7 +1060,7 @@ static int sci_init_drivers(void)
 
 	sci_callout_driver = sci_driver;
 #ifdef CONFIG_DEVFS_FS
-	sci_callout_driver.name = "cusc/%d";
+	sci_callout_driver.name = "cusc/";
 #else
 	sci_callout_driver.name = "cusc";
 #endif

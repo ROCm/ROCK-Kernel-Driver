@@ -1031,9 +1031,9 @@ static struct uart_driver sunzilog_reg = {
 	.owner		=	THIS_MODULE,
 	.driver_name	=	"ttyS",
 #ifdef CONFIG_DEVFS_FS
-	.dev_name	=	"tts/%d",
+	.dev_name	=	"tts/",
 #else
-	.dev_name	=	"ttyS%d",
+	.dev_name	=	"ttyS",
 #endif
 	.major		=	TTY_MAJOR,
 };

@@ -444,7 +444,7 @@ void line_register_devfs(struct lines *set, struct line_driver *line_driver,
 
 	for(i = 0; i < nlines; i++){
 		if(!lines[i].valid) 
-			tty_unregister_devfs(driver, driver->minor_start + i);
+			tty_unregister_devfs(driver, i);
 	}
 
 	mconsole_register_dev(&line_driver->mc);

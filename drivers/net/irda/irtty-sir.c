@@ -502,7 +502,6 @@ static int irtty_open(struct tty_struct *tty)
 {
 	struct sir_dev *dev;
 	struct sirtty_cb *priv;
-	char hwname[16];
 	int ret = 0;
 
 	/* unfortunately, there's no tty_ldisc->owner field
@@ -535,23 +534,11 @@ static int irtty_open(struct tty_struct *tty)
  *		tty->ldisc.flush_buffer(tty);
  */
 
-
-	/* create device name - could we use tty_name() here? */
-
-	if (strchr(tty->driver->name, '%')) {
-		sprintf(hwname, tty->driver->name,
-			tty->index + tty->driver->name_base);
-	}
-	else {
-		sprintf(hwname, "%s%d", tty->driver->name,
-			tty->index + tty->driver->name_base);
-	}
-
 	/* apply mtt override */
 	sir_tty_drv.qos_mtt_bits = qos_mtt_bits;
 
 	/* get a sir device instance for this driver */
-	dev = sirdev_get_instance(&sir_tty_drv, hwname);
+	dev = sirdev_get_instance(&sir_tty_drv, tty->name);
 	if (!dev) {
 		ret = -ENODEV;
 		goto out;

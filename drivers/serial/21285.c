@@ -517,7 +517,7 @@ console_initcall(rs285_console_init);
 static struct uart_driver serial21285_reg = {
 	.owner			= THIS_MODULE,
 	.driver_name		= "ttyFB",
-	.dev_name		= "ttyFB%d",
+	.dev_name		= "ttyFB",
 	.major			= SERIAL_21285_MAJOR,
 	.minor			= SERIAL_21285_MINOR,
 	.nr			= 1,

@@ -253,7 +253,7 @@ int __init hvc_init(void)
 
 	hvc_driver.magic = TTY_DRIVER_MAGIC;
 	hvc_driver.driver_name = "hvc";
-	hvc_driver.name = "hvc/%d";
+	hvc_driver.name = "hvc/";
 	hvc_driver.major = HVC_MAJOR;
 	hvc_driver.minor_start = HVC_MINOR;
 	hvc_driver.num = hvc_count(&hvc_offset);
@@ -277,7 +277,7 @@ int __init hvc_init(void)
 	for (i = 0; i < hvc_driver.num; i++) {
 		hvc_struct[i].lock = SPIN_LOCK_UNLOCKED;
 		hvc_struct[i].index = i;
-		tty_register_device(&hvc_driver, hvc_driver.minor_start + i);
+		tty_register_device(&hvc_driver, i);
 	}
 
 	if (tty_register_driver(&hvc_driver))

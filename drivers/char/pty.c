@@ -354,7 +354,7 @@ int __init pty_init(void)
 	pty_driver.owner = THIS_MODULE;
 	pty_driver.driver_name = "pty_master";
 #ifdef CONFIG_DEVFS_FS
-	pty_driver.name = "pty/m%d";
+	pty_driver.name = "pty/m";
 #else
 	pty_driver.name = "pty";
 #endif
@@ -389,7 +389,7 @@ int __init pty_init(void)
 	pty_slave_driver.driver_name = "pty_slave";
 	pty_slave_driver.proc_entry = 0;
 #ifdef CONFIG_DEVFS_FS
-	pty_slave_driver.name = "pty/s%d";
+	pty_slave_driver.name = "pty/s";
 #else
 	pty_slave_driver.name = "ttyp";
 #endif
@@ -451,8 +451,8 @@ int __init pty_init(void)
 		pts_driver[i].minor_start = 0;
 		pts_driver[i].name_base = i*NR_PTYS;
 		pts_driver[i].num = ptm_driver[i].num;
-		pts_driver[i].other = &ptm_driver[i];
 		pts_driver[i].flags |= TTY_DRIVER_NO_DEVFS;
+		pts_driver[i].other = &ptm_driver[i];
 		pts_driver[i].table = pts_table[i];
 		pts_driver[i].termios = pts_termios[i];
 		pts_driver[i].termios_locked = pts_termios_locked[i];

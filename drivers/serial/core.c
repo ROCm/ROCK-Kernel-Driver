@@ -1960,7 +1960,7 @@ int uart_resume_port(struct uart_driver *drv, struct uart_port *port, u32 level)
 static inline void
 uart_report_port(struct uart_driver *drv, struct uart_port *port)
 {
-	printk(drv->dev_name, port->line);
+	printk("%s%d", drv->dev_name, port->line);
 	printk(" at ");
 	switch (port->iotype) {
 	case UPIO_PORT:
@@ -2234,7 +2234,7 @@ int uart_add_one_port(struct uart_driver *drv, struct uart_port *port)
 	 * Register the port whether it's detected or not.  This allows
 	 * setserial to be used to alter this ports parameters.
 	 */
-	tty_register_device(drv->tty_driver, drv->minor + port->line);
+	tty_register_device(drv->tty_driver, port->line);
 
  out:
 	up(&port_sem);
@@ -2266,7 +2266,7 @@ int uart_remove_one_port(struct uart_driver *drv, struct uart_port *port)
 	/*
 	 * Remove the devices from devfs
 	 */
-	tty_unregister_device(drv->tty_driver, drv->minor + port->line);
+	tty_unregister_device(drv->tty_driver, port->line);
 
 	uart_unconfigure_port(drv, state);
 	state->port = NULL;
@@ -2413,7 +2413,7 @@ void uart_unregister_port(struct uart_driver *drv, int line)
 
 	if (line < 0 || line >= drv->nr) {
 		printk(KERN_ERR "Attempt to unregister ");
-		printk(drv->dev_name, line);
+		printk("%s%d", drv->dev_name, line);
 		printk("\n");
 		return;
 	}

@@ -788,6 +788,11 @@ static void up_tty_sem(int index)
 
 static void release_mem(struct tty_struct *tty, int idx);
 
+static inline void tty_line_name(struct tty_driver *driver, int index, char *p)
+{
+	sprintf(p, "%s%d", driver->name, index + driver->name_base);
+}
+
 /*
  * WSH 06/09/97: Rewritten to remove races and properly clean up after a
  * failed open.  The new code protects the open with a semaphore, so it's
@@ -843,8 +848,7 @@ static int init_dev(kdev_t device, struct tty_struct **ret_tty)
 	tty->device = device;
 	tty->driver = driver;
 	tty->index = idx;
-	sprintf(tty->name, "%s%d",
-		driver->name, idx + driver->name_base);
+	tty_line_name(driver, idx, tty->name);
 
 	tp_loc = &driver->termios[idx];
 	if (!*tp_loc) {
@@ -873,8 +877,7 @@ static int init_dev(kdev_t device, struct tty_struct **ret_tty)
 					driver->other->minor_start + idx);
 		o_tty->driver = driver->other;
 		o_tty->index = idx;
-		sprintf(o_tty->name, "%s%d",
-			driver->other->name, idx + driver->other->name_base);
+		tty_line_name(driver->other, idx, o_tty->name);
 
 		o_tp_loc  = &driver->other->termios[idx];
 		if (!*o_tp_loc) {
@@ -2094,11 +2097,11 @@ static void tty_default_put_char(struct tty_struct *tty, unsigned char ch)
 }
 
 #ifdef CONFIG_DEVFS_FS
-static void tty_register_devfs(struct tty_driver *driver, unsigned minor)
+static void tty_register_devfs(struct tty_driver *driver, unsigned index)
 {
 	umode_t mode = S_IFCHR | S_IRUSR | S_IWUSR;
+	unsigned minor = driver->minor_start + index;
 	kdev_t dev = mk_kdev(driver->major, minor);
-	int idx = minor - driver->minor_start;
 	char buf[32];
 
 	if ((minor < driver->minor_start) || 
@@ -2108,32 +2111,33 @@ static void tty_register_devfs(struct tty_driver *driver, unsigned minor)
 		return;
 	}
 
-	sprintf(buf, driver->name, idx + driver->name_base);
+	tty_line_name(driver, index, buf);
 	devfs_register(NULL, buf, 0, driver->major, minor, mode,
 		       &tty_fops, NULL);
 }
 
-static void tty_unregister_devfs(struct tty_driver *driver, unsigned minor)
+static void tty_unregister_devfs(struct tty_driver *driver, int index)
 {
-	devfs_remove(driver->name,
-		     minor - driver->minor_start + driver->name_base);
+	char path[64];
+	tty_line_name(driver, index, path);
+	devfs_remove(path);
 }
 #else
-# define tty_register_devfs(driver, minor)	do { } while (0)
-# define tty_unregister_devfs(driver, minor)	do { } while (0)
+# define tty_register_devfs(driver, index)	do { } while (0)
+# define tty_unregister_devfs(driver, index)	do { } while (0)
 #endif /* CONFIG_DEVFS_FS */
 
 /*
  * Register a tty device described by <driver>, with minor number <minor>.
  */
-void tty_register_device(struct tty_driver *driver, unsigned minor)
+void tty_register_device(struct tty_driver *driver, unsigned index)
 {
-	tty_register_devfs(driver, minor);
+	tty_register_devfs(driver, index);
 }
 
-void tty_unregister_device(struct tty_driver *driver, unsigned minor)
+void tty_unregister_device(struct tty_driver *driver, unsigned index)
 {
-	tty_unregister_devfs(driver, minor);
+	tty_unregister_devfs(driver, index);
 }
 
 EXPORT_SYMBOL(tty_register_device);
@@ -2164,7 +2168,7 @@ int tty_register_driver(struct tty_driver *driver)
 	
 	if ( !(driver->flags & TTY_DRIVER_NO_DEVFS) ) {
 		for(i = 0; i < driver->num; i++)
-		    tty_register_device(driver, driver->minor_start + i);
+		    tty_register_device(driver, i);
 	}
 	proc_tty_register_driver(driver);
 	return error;
@@ -2205,7 +2209,7 @@ int tty_unregister_driver(struct tty_driver *driver)
 			kfree(tp);
 		}
 		if (!(driver->flags & TTY_DRIVER_NO_DEVFS))
-			tty_unregister_device(driver, driver->minor_start + i);
+			tty_unregister_device(driver, i);
 	}
 	proc_tty_unregister_driver(driver);
 	return 0;

@@ -1335,7 +1335,7 @@ int __init dz_init(void)
 #if (LINUX_VERSION_CODE > 0x2032D && defined(CONFIG_DEVFS_FS))
 	serial_driver.name = "ttyS";
 #else
-	serial_driver.name = "tts/%d";
+	serial_driver.name = "tts/";
 #endif
 	serial_driver.major = TTY_MAJOR;
 	serial_driver.minor_start = 64;
@@ -1376,7 +1376,7 @@ int __init dz_init(void)
 #if (LINUX_VERSION_CODE > 0x2032D && defined(CONFIG_DEVFS_FS))
 	callout_driver.name = "cua";
 #else
-	callout_driver.name = "cua/%d";
+	callout_driver.name = "cua/";
 #endif
 	callout_driver.major = TTYAUX_MAJOR;
 	callout_driver.subtype = SERIAL_TYPE_CALLOUT;
@@ -1425,10 +1425,8 @@ int __init dz_init(void)
 		printk("ttyS%02d at 0x%08x (irq = %d)\n", info->line,
 		       info->port, SERIAL);
 
-		tty_register_device(&serial_driver,
-		                   serial_driver.minor_start + info->line);
-		tty_register_device(&callout_driver,
-		                   callout_driver.minor_start + info->line);
+		tty_register_device(&serial_driver, info->line);
+		tty_register_device(&callout_driver, info->line);
 	}
 
 	/* Reset the chip */

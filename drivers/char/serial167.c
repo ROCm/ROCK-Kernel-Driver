@@ -2396,7 +2396,7 @@ scrn[1] = '\0';
     memset(&cy_serial_driver, 0, sizeof(struct tty_driver));
     cy_serial_driver.magic = TTY_DRIVER_MAGIC;
 #ifdef CONFIG_DEVFS_FS
-    cy_serial_driver.name = "tts/%d";
+    cy_serial_driver.name = "tts/";
 #else
     cy_serial_driver.name = "ttyS";
 #endif
@@ -2435,7 +2435,7 @@ scrn[1] = '\0';
      */
     cy_callout_driver = cy_serial_driver;
 #ifdef CONFIG_DEVFS_FS
-    cy_callout_driver.name = "cua/%d";
+    cy_callout_driver.name = "cua/";
 #else
     cy_callout_driver.name = "cua";
 #endif

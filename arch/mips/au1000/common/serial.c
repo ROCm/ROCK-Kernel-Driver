@@ -2588,7 +2588,7 @@ static int __init rs_init(void)
 	serial_driver.magic = TTY_DRIVER_MAGIC;
 	serial_driver.driver_name = "serial";
 #if (LINUX_VERSION_CODE > 0x2032D && defined(CONFIG_DEVFS_FS))
-	serial_driver.name = "tts/%d";
+	serial_driver.name = "tts/";
 #else
 	serial_driver.name = "ttyS";
 #endif
@@ -2632,7 +2632,7 @@ static int __init rs_init(void)
 	 */
 	callout_driver = serial_driver;
 #if (LINUX_VERSION_CODE > 0x2032D && defined(CONFIG_DEVFS_FS))
-	callout_driver.name = "cua/%d";
+	callout_driver.name = "cua/";
 #else
 	callout_driver.name = "cua";
 #endif
@@ -2681,10 +2681,8 @@ static int __init rs_init(void)
 		       (state->flags & ASYNC_FOURPORT) ? " FourPort" : "",
 		       state->port, state->irq,
 		       uart_config[state->type].name);
-		tty_register_device(&serial_driver,
-				   serial_driver.minor_start + state->line);
-		tty_register_device(&callout_driver,
-				   callout_driver.minor_start + state->line);
+		tty_register_device(&serial_driver, state->line);
+		tty_register_device(&callout_driver, state->line);
 	}
 	return 0;
 }
@@ -2771,10 +2769,8 @@ int register_serial(struct serial_struct *req)
 	      state->iomem_base ? "iomem" : "port",
 	      state->iomem_base ? (unsigned long)state->iomem_base :
 	      state->port, state->irq, uart_config[state->type].name);
-	tty_register_device(&serial_driver,
-			   serial_driver.minor_start + state->line); 
-	tty_register_device(&callout_driver,
-			   callout_driver.minor_start + state->line);
+	tty_register_device(&serial_driver, state->line); 
+	tty_register_device(&callout_driver, state->line);
 	return state->line + SERIAL_DEV_OFFSET;
 }
 
@@ -2800,10 +2796,8 @@ void unregister_serial(int line)
 	/* These will be hidden, because they are devices that will no longer
 	 * be available to the system. (ie, PCMCIA modems, once ejected)
 	 */
-	tty_unregister_device(&serial_driver,
-			     serial_driver.minor_start + state->line);
-	tty_unregister_device(&callout_driver,
-			     callout_driver.minor_start + state->line);
+	tty_unregister_device(&serial_driver, state->line);
+	tty_unregister_device(&callout_driver, state->line);
 	restore_flags(flags);
 }
 
