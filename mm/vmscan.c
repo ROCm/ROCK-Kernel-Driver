@@ -805,8 +805,7 @@ shrink_caches(struct zone *classzone, int priority, int *total_scanned,
  * excessive rotation of the inactive list, which is _supposed_ to be an LRU,
  * yes?
  */
-int
-try_to_free_pages(struct zone *classzone,
+int try_to_free_pages(struct zone *classzone,
 		unsigned int gfp_mask, unsigned int order)
 {
 	int priority;
@@ -838,7 +837,7 @@ try_to_free_pages(struct zone *classzone,
 		blk_congestion_wait(WRITE, HZ/10);
 		shrink_slab(total_scanned, gfp_mask);
 	}
-	if (gfp_mask & __GFP_FS)
+	if ((gfp_mask & __GFP_FS) && !(gfp_mask & __GFP_NORETRY))
 		out_of_memory();
 	return 0;
 }
