@@ -413,8 +413,6 @@ get_arg(void *b, void *val, int len)
 static int
 set_arg(void *b, void *val,int len)
 {
-	if(len <= 0)
-		len = sizeof(void *);
 	if (copy_to_user(b, (void *) val, len))
 		return -EFAULT;
 	return 0;
@@ -560,13 +558,18 @@ isdn_ppp_ioctl(struct inode *ino, struct file *file, unsigned int cmd, unsigned 
 			return isdn_ppp_set_compressor(is, &data);
 		case PPPIOCGCALLINFO:
 			{
+				struct isdn_net_phone *phone;
 				struct pppcallinfo pci;
+				int i;
 				memset((char *) &pci,0,sizeof(struct pppcallinfo));
-				if(lp)
-				{
+				if(lp) {
 					strncpy(pci.local_num,lp->msn,63);
-					if(lp->dial) {
-						strncpy(pci.remote_num,lp->dial->num,63);
+					i = 0;
+					list_for_each_entry(phone, &lp->phone[1], list) {
+						if (i++ == lp->dial) {
+							strncpy(pci.remote_num,phone->num,63);
+							break;
+						}
 					}
 					pci.charge_units = lp->charge;
 					if(lp->outgoing)

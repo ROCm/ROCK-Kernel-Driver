@@ -266,7 +266,7 @@ typedef struct {
 
 /* Phone-list-element */
 struct isdn_net_phone {
-	struct isdn_net_phone *next;
+	struct list_head list;
 	char num[ISDN_MSNLEN];
 };
 
@@ -334,10 +334,10 @@ typedef struct isdn_net_local_s {
   ulong                  sqfull_stamp; /* Start-Time of overload           */
   ulong                  slavedelay;   /* Dynamic bundling delaytime       */
   int                    triggercps;   /* BogoCPS needed for trigger slave */
-  struct isdn_net_phone  *phone[2];    /* List of remote-phonenumbers      */
+  struct list_head       phone[2];     /* List of remote-phonenumbers      */
 				       /* phone[0] = Incoming Numbers      */
 				       /* phone[1] = Outgoing Numbers      */
-  struct isdn_net_phone  *dial;        /* Pointer to dialed number         */
+  int                    dial;         /* # of phone number just dialed    */
   struct net_device      *master;      /* Ptr to Master device for slaves  */
   struct net_device      *slave;       /* Ptr to Slave device for masters  */
   struct isdn_net_local_s *next;       /* Ptr to next link in bundle       */
