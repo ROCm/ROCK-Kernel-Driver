@@ -5113,9 +5113,12 @@ static void __devexit skge_remove_one(struct pci_dev *pdev)
 	if ((pAC->GIni.GIMacsFound == 2) && pAC->RlmtNets == 2)
 		have_second_mac = 1;
 
+	remove_proc_entry(dev->name, pSkRootDir);
 	unregister_netdev(dev);
-	if (have_second_mac)
+	if (have_second_mac) {
+		remove_proc_entry(pAC->dev[1]->name, pSkRootDir);
 		unregister_netdev(pAC->dev[1]);
+	}
 
 	SkGeYellowLED(pAC, pAC->IoBase, 0);
 
