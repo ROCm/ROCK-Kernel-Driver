@@ -232,9 +232,8 @@ static int check_tty_count(struct tty_struct *tty, const char *routine)
 	int count = 0;
 	
 	file_list_lock();
-	for(p = tty->tty_files.next; p != &tty->tty_files; p = p->next) {
-		if(list_entry(p, struct file, f_list)->private_data == tty)
-			count++;
+	list_for_each(p, &tty->tty_files) {
+		count++;
 	}
 	file_list_unlock();
 	if (tty->driver.type == TTY_DRIVER_TYPE_PTY &&
@@ -441,8 +440,8 @@ void do_tty_hangup(void *data)
 {
 	struct tty_struct *tty = (struct tty_struct *) data;
 	struct file * cons_filp = NULL;
+	struct file *filp;
 	struct task_struct *p;
-	struct list_head *l;
 	struct pid *pid;
 	int    closecount = 0, n;
 
@@ -454,15 +453,7 @@ void do_tty_hangup(void *data)
 	
 	check_tty_count(tty, "do_tty_hangup");
 	file_list_lock();
-	for (l = tty->tty_files.next; l != &tty->tty_files; l = l->next) {
-		struct file * filp = list_entry(l, struct file, f_list);
-		/*
-		 * If this file descriptor has been closed, ignore it; it
-		 * will be going away shortly. (We don't test filp->f_count
-		 * for zero since that could open another race.) --rmk
-		 */
-		if (filp->private_data == NULL)
-			continue;
+	list_for_each_entry(filp, &tty->tty_files, f_list) {
 		if (IS_CONSOLE_DEV(filp->f_dentry->d_inode->i_rdev) ||
 		    IS_SYSCONS_DEV(filp->f_dentry->d_inode->i_rdev)) {
 			cons_filp = filp;
@@ -517,7 +508,8 @@ void do_tty_hangup(void *data)
 	}
 	
 	read_lock(&tasklist_lock);
-	if (tty->session > 0)
+	if (tty->session > 0) {
+		struct list_head *l;
 		for_each_task_pid(tty->session, PIDTYPE_SID, p, l, pid) {
 			if (p->tty == tty)
 				p->tty = NULL;
@@ -528,6 +520,7 @@ void do_tty_hangup(void *data)
 			if (tty->pgrp > 0)
 				p->tty_old_pgrp = tty->pgrp;
 		}
+	}
 	read_unlock(&tasklist_lock);
 
 	tty->flags = 0;
@@ -1227,14 +1220,16 @@ static void release_dev(struct file * filp)
 	}
 
 	/*
-	 * We've decremented tty->count, so we should zero out
-	 * filp->private_data, to break the link between the tty and
-	 * the file descriptor.  Otherwise if filp_close() blocks before
-	 * the file descriptor is removed from the inuse_filp
-	 * list, check_tty_count() could observe a discrepancy and
-	 * printk a warning message to the user.
+	 * We've decremented tty->count, so we need to remove this file
+	 * descriptor off the tty->tty_files list; this serves two
+	 * purposes:
+	 *  - check_tty_count sees the correct number of file descriptors
+	 *    associated with this tty.
+	 *  - do_tty_hangup no longer sees this file descriptor as
+	 *    something that needs to be handled for hangups.
 	 */
-	filp->private_data = 0;
+	file_kill(filp);
+	filp->private_data = NULL;
 
 	/*
 	 * Perform some housekeeping before deciding whether to return.
