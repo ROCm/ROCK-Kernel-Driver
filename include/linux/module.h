@@ -227,14 +227,14 @@ enum module_state
 #define MODULE_SECT_NAME_LEN 32
 struct module_sect_attr
 {
-	struct attribute attr;
+	struct module_attribute mattr;
 	char name[MODULE_SECT_NAME_LEN];
 	unsigned long address;
 };
 
-struct module_sections
+struct module_sect_attrs
 {
-	struct kobject kobj;
+	struct attribute_group grp;
 	struct module_sect_attr attrs[0];
 };
 
@@ -313,7 +313,7 @@ struct module
 	char *strtab;
 
 	/* Section attributes */
-	struct module_sections *sect_attrs;
+	struct module_sect_attrs *sect_attrs;
 #endif
 
 	/* Per-cpu data. */
