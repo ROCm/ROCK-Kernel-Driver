@@ -96,7 +96,7 @@ struct usb_hcd {	/* usb_bus.hcpriv points to this */
 #	define	USB_STATE_RUNNING	(__ACTIVE)
 #	define	USB_STATE_QUIESCING	(__SUSPEND|__TRANSIENT|__ACTIVE)
 #	define	USB_STATE_RESUMING	(__SUSPEND|__TRANSIENT)
-#	define	USB_STATE_SUSPENDED	(__SUSPEND)
+#	define	HCD_STATE_SUSPENDED	(__SUSPEND)
 
 #define	HCD_IS_RUNNING(state) ((state) & __ACTIVE)
 #define	HCD_IS_SUSPENDED(state) ((state) & __SUSPEND)

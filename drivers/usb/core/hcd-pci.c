@@ -293,7 +293,7 @@ int usb_hcd_pci_suspend (struct pci_dev *dev, u32 state)
 	case USB_STATE_HALT:
 		dev_dbg (hcd->self.controller, "halted; hcd not suspended\n");
 		break;
-	case USB_STATE_SUSPENDED:
+	case HCD_STATE_SUSPENDED:
 		dev_dbg (hcd->self.controller, "hcd already suspended\n");
 		break;
 	default:
@@ -310,7 +310,7 @@ int usb_hcd_pci_suspend (struct pci_dev *dev, u32 state)
 					"suspend fail, retval %d\n",
 					retval);
 		else
-			hcd->state = USB_STATE_SUSPENDED;
+			hcd->state = HCD_STATE_SUSPENDED;
 	}
 
  	pci_set_power_state (dev, state);
@@ -333,7 +333,7 @@ int usb_hcd_pci_resume (struct pci_dev *dev)
 	dev_dbg (hcd->self.controller, "resume from state D%d\n",
 			dev->current_state);
 
-	if (hcd->state != USB_STATE_SUSPENDED) {
+	if (hcd->state != HCD_STATE_SUSPENDED) {
 		dev_dbg (hcd->self.controller, 
 				"can't resume, not suspended!\n");
 		return -EL3HLT;
