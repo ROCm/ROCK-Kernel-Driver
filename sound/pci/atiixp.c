@@ -630,21 +630,20 @@ static snd_pcm_uframes_t snd_atiixp_pcm_pointer(snd_pcm_substream_t *substream)
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	atiixp_dma_t *dma = (atiixp_dma_t *)runtime->private_data;
 	unsigned int curptr;
+	int timeout = 1000;
 
-	spin_lock(&chip->reg_lock);
-	curptr = readl(chip->remap_addr + dma->ops->dt_cur);
-	if (curptr < dma->buf_addr) {
-		snd_printdd("curptr = %x, base = %x\n", curptr, dma->buf_addr);
-		curptr = 0;
-	} else {
+	while (timeout--) {
+		curptr = readl(chip->remap_addr + dma->ops->dt_cur);
+		if (curptr < dma->buf_addr)
+			continue;
 		curptr -= dma->buf_addr;
-		if (curptr >= dma->buf_bytes) {
-			snd_printdd("curptr = %x, size = %x\n", curptr, dma->buf_bytes);
-			curptr = 0;
-		}
+		if (curptr >= dma->buf_bytes)
+			continue;
+		return bytes_to_frames(runtime, curptr);
 	}
-	spin_unlock(&chip->reg_lock);
-	return bytes_to_frames(runtime, curptr);
+	snd_printd("atiixp: invalid DMA pointer read 0x%x (buf=%x)\n",
+		   readl(chip->remap_addr + dma->ops->dt_cur), dma->buf_addr);
+	return 0;
 }
 
 /*
