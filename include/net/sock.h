@@ -307,7 +307,6 @@ static __inline__ void sock_prot_dec_use(struct proto *prot)
  * Since ~2.3.5 it is also exclusive sleep lock serializing
  * accesses from user process context.
  */
-extern int __async_lock_sock(struct sock_iocb *, struct sock *, struct list_head *);
 extern void __lock_sock(struct sock *sk);
 extern void __release_sock(struct sock *sk);
 #define sock_owned_by_user(sk)	(NULL != (sk)->lock.owner)
