@@ -703,7 +703,8 @@ static void rtl8169_vlan_rx_register(struct net_device *dev,
 	unsigned long flags;
 
 	spin_lock_irqsave(&tp->lock, flags);
-	if ((tp->vlgrp = grp))
+	tp->vlgrp = grp;
+	if (tp->vlgrp)
 		tp->cp_cmd |= RxVlan;
 	else
 		tp->cp_cmd &= ~RxVlan;
