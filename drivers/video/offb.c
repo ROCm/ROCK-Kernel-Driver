@@ -49,7 +49,8 @@ enum {
 	cmap_r128,	/* ATI Rage128 */
 	cmap_M3A,	/* ATI Rage Mobility M3 Head A */
 	cmap_M3B,	/* ATI Rage Mobility M3 Head B */
-	cmap_radeon	/* ATI Radeon */
+	cmap_radeon,	/* ATI Radeon */
+	cmap_gxt2000,	/* IBM GXT2000 */
 };
 
 struct fb_info_offb {
@@ -61,6 +62,7 @@ struct fb_info_offb {
     volatile unsigned char *cmap_adr;
     volatile unsigned char *cmap_data;
     int cmap_type;
+    int blanked;
     union {
 #ifdef FBCON_HAS_CFB16
 	u16 cfb16[16];
@@ -207,9 +209,11 @@ static int offb_set_var(struct fb_var_screeninfo *var, int con,
 static int offb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			 struct fb_info *info)
 {
-    if (con == info->currcon) /* current console? */
+    struct fb_info_offb *info2 = (struct fb_info_offb *)info;
+
+    if (con == info->currcon && !info2->blanked) /* current console? */		
 	return fb_get_cmap(cmap, kspc, offb_getcolreg, info);
-    else if (fb_display[con].cmap.len) /* non default colormap? */
+    if (fb_display[con].cmap.len) /* non default colormap? */
 	fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0 : 2);
     else
     {
@@ -237,7 +241,7 @@ static int offb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 	if ((err = fb_alloc_cmap(&fb_display[con].cmap, size, 0)))
 	    return err;
     }
-    if (con == info->currcon)			/* current console? */
+    if (con == info->currcon && !info2->blanked)	/* current console? */
 	return fb_set_cmap(cmap, kspc, info);
     else
 	fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
@@ -254,7 +258,17 @@ static int offb_blank(int blank, struct fb_info *info)
     int i, j;
 
     if (!info2->cmap_adr)
-	return;
+	return 0;
+
+    if (!info2->blanked) {
+       if (!blank)
+	   return 0;
+       if (fb_display[info->currcon].cmap.len)
+   	   fb_get_cmap(&fb_display[info->currcon].cmap, 1, offb_getcolreg,info);
+    }
+
+    info2->blanked = blank;
+	
 
     if (blank)
 	for (i = 0; i < 256; i++) {
@@ -288,6 +302,9 @@ static int offb_blank(int blank, struct fb_info *info)
     	        out_8(info2->cmap_adr + 0xb0, i);
 	    	out_le32((unsigned *)(info2->cmap_adr + 0xb4), 0);
 	    	break;
+	    case cmap_gxt2000:
+		out_le32((unsigned *)info2->cmap_adr + i, 0);
+		break;
 	    }
 	}
     else
@@ -496,6 +513,10 @@ static void __init offb_init_fb(const char *name, const char *full_name,
 		info->cmap_adr = ioremap(base + 0x7ff000, 0x1000) + 0xcc0;
 		info->cmap_data = info->cmap_adr + 1;
 		info->cmap_type = cmap_m64;
+	} else if (device_is_compatible(dp, "pci1014,b7")) {
+		unsigned long regbase = dp->addrs[0].address;
+		info->cmap_adr = ioremap(regbase + 0x6000, 0x1000);
+		info->cmap_type = cmap_gxt2000;
 	}
         fix->visual = info->cmap_adr ? FB_VISUAL_PSEUDOCOLOR
 				     : FB_VISUAL_STATIC_PSEUDOCOLOR;
@@ -664,11 +685,12 @@ static void __init offb_init_fb(const char *name, const char *full_name,
 #endif /* CONFIG_FB_COMPAT_XPMAC) */
 }
 
-
 static int offbcon_switch(int con, struct fb_info *info)
 {
+    struct fb_info_offb *info2 = (struct fb_info_offb *)info;	
+
     /* Do we have to save the colormap? */
-    if (fb_display[info->currcon].cmap.len)
+    if (fb_display[info->currcon].cmap.len && !info2->blanked)
 	fb_get_cmap(&fb_display[info->currcon].cmap, 1, offb_getcolreg, info);
 
     info->currcon = con;
@@ -765,6 +787,10 @@ static int offb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 	out_8(info2->cmap_adr + 0xb0, regno);
   	out_le32((unsigned *)(info2->cmap_adr + 0xb4),
     		(red << 16 | green << 8 | blue));
+	break;
+    case cmap_gxt2000:
+	out_le32((unsigned *)info2->cmap_adr + regno,
+		(red << 16 | green << 8 | blue));
 	break;
     }
 

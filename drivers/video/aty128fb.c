@@ -70,6 +70,9 @@
 #ifdef CONFIG_FB_COMPAT_XPMAC
 #include <asm/vc_ioctl.h>
 #endif
+#ifdef CONFIG_BOOTX_TEXT
+#include <asm/btext.h>
+#endif /* CONFIG_BOOTX_TEXT */
 
 #include <video/fbcon.h>
 #include <video/fbcon-cfb8.h>
@@ -154,6 +157,7 @@ static struct aty128_chip_info aty128_pci_probe_list[] __initdata =
     {"Rage128 RL (AGP)", PCI_DEVICE_ID_ATI_RAGE128_RL, rage_128},
     {"Rage128 Pro PF (AGP)", PCI_DEVICE_ID_ATI_RAGE128_PF, rage_128_pro},
     {"Rage128 Pro PR (PCI)", PCI_DEVICE_ID_ATI_RAGE128_PR, rage_128_pro},
+    {"Rage128 Pro TR (AGP)", PCI_DEVICE_ID_ATI_RAGE128_U3, rage_128_pro},	
     {"Rage Mobility M3 (PCI)", PCI_DEVICE_ID_ATI_RAGE128_LE, rage_M3},
     {"Rage Mobility M3 (AGP)", PCI_DEVICE_ID_ATI_RAGE128_LF, rage_M3},
     {NULL, 0, rage_128}
@@ -216,9 +220,13 @@ static const char *aty128fb_name = "ATY Rage128";
 static char fontname[40] __initdata = { 0 };
 
 static int  noaccel __initdata = 0;
+#ifdef MODULE
 static char *font __initdata = NULL;
 static char *mode __initdata = NULL;
+#ifdef CONFIG_MTRR
 static int  nomtrr __initdata = 0;
+#endif
+#endif /* MODULE */
 
 static char *mode_option __initdata = NULL;
 
@@ -418,6 +426,7 @@ static struct fb_ops aty128fb_ops = {
 	fb_set_cmap:	gen_set_cmap,
 	fb_setcolreg:	aty128fb_setcolreg,
 	fb_pan_display:	aty128fb_pan_display,
+	fb_blank:	aty128fb_blank,
 	fb_rasterimg:	aty128fb_rasterimg,
 };
 
@@ -1243,6 +1252,13 @@ aty128_set_par(struct aty128fb_par *par,
 	display_info.disp_reg_address = info->regbase_phys;
     }
 #endif /* CONFIG_FB_COMPAT_XPMAC */
+#if defined(CONFIG_BOOTX_TEXT)
+	btext_update_display(info->frame_buffer_phys,
+			(((par->crtc.h_total>>16) & 0xff)+1)*8,
+			((par->crtc.v_total>>16) & 0x7ff)+1,
+			par->crtc.bpp,
+			par->crtc.vxres*par->crtc.bpp/8);
+#endif /* CONFIG_BOOTX_TEXT */
 }
 
     /*
@@ -1584,7 +1600,7 @@ aty128fb_setup(char *options)
     if (!options || !*options)
 	return 0;
 
-    while (this_opt = strsep(&options, ",")) {
+    while ((this_opt = strsep(&options, ",")) != NULL) {
 	if (!strncmp(this_opt, "font:", 5)) {
 	    char *p;
 	    int i;
@@ -1687,6 +1703,29 @@ aty128_init(struct fb_info_aty128 *info, const char *name)
             if (default_vmode <= 0 || default_vmode > VMODE_MAX)
                 default_vmode = VMODE_1024_768_60;
 
+	    /* iMacs need that resolution
+	     * PowerMac2,1 first r128 iMacs
+	     * PowerMac2,2 summer 2000 iMacs
+	     * PowerMac4,1 january 2001 iMacs "flower power"
+	     */
+	    if (machine_is_compatible("PowerMac2,1") ||
+		machine_is_compatible("PowerMac2,2") ||
+		machine_is_compatible("PowerMac4,1"))
+		default_vmode = VMODE_1024_768_75;
+
+	    /* iBook SE */
+	    if (machine_is_compatible("PowerBook2,2"))
+		default_vmode = VMODE_800_600_60;
+
+	    /* PowerBook Firewire (Pismo), iBook Dual USB */
+	    if (machine_is_compatible("PowerBook3,1") ||
+		machine_is_compatible("PowerBook4,1"))
+		default_vmode = VMODE_1024_768_60;
+
+	    /* PowerBook Titanium */
+	    if (machine_is_compatible("PowerBook3,2"))
+		default_vmode = VMODE_1152_768_60;
+	
             if (default_cmode < CMODE_8 || default_cmode > CMODE_32)
                 default_cmode = CMODE_8;
 

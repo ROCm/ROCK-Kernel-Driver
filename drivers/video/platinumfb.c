@@ -329,10 +329,10 @@ static int platinum_switch(int con, struct fb_info *fb)
 	struct fb_info_platinum *info = (struct fb_info_platinum *) fb;
 	struct fb_par_platinum par;
 
-	if (fb_display[info->currcon].cmap.len)
-		fb_get_cmap(&fb_display[info->currcon].cmap, 1, platinum_getcolreg,
+	if (fb_display[fb->currcon].cmap.len)
+		fb_get_cmap(&fb_display[fb->currcon].cmap, 1, platinum_getcolreg,
 			    fb);
-	info->currcon = con;
+	fb->currcon = con;
 
 	platinum_var_to_par(&fb_display[con].var, &par, info);
 	platinum_set_par(&par, info);
@@ -375,7 +375,7 @@ static int platinum_blank(int blank,  struct fb_info *fb)
 	out_le32(&info->platinum_regs->ctrl.r, ctrl);
 */
 /* TODO: Figure out how the heck to powerdown this thing! */
-    return 0;
+	return 0;
 }
 
 static int platinum_getcolreg(u_int regno, u_int *red, u_int *green,

@@ -604,6 +604,7 @@ static int cyberfb_blank(int blank, struct fb_info *info)
 	}
 #endif
 	DPRINTK("EXIT\n");
+	return 0;
 }
 
 
