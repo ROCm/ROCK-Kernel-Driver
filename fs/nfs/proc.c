@@ -186,8 +186,14 @@ nfs_proc_read(struct nfs_read_data *rdata, struct file *filp)
 	msg.rpc_cred = nfs_cred(inode, filp);
 	status = rpc_call_sync(NFS_CLIENT(inode), &msg, flags);
 
-	if (status >= 0)
+	if (status >= 0) {
 		nfs_refresh_inode(inode, fattr);
+		/* Emulate the eof flag, which isn't normally needed in NFSv2
+		 * as it is guaranteed to always return the file attributes
+		 */
+		if (rdata->args.offset + rdata->args.count >= fattr->size)
+			rdata->res.eof = 1;
+	}
 	dprintk("NFS reply read: %d\n", status);
 	return status;
 }
@@ -541,8 +547,14 @@ nfs_read_done(struct rpc_task *task)
 {
 	struct nfs_read_data *data = (struct nfs_read_data *) task->tk_calldata;
 
-	if (task->tk_status >= 0)
+	if (task->tk_status >= 0) {
 		nfs_refresh_inode(data->inode, data->res.fattr);
+		/* Emulate the eof flag, which isn't normally needed in NFSv2
+		 * as it is guaranteed to always return the file attributes
+		 */
+		if (data->args.offset + data->args.count >= data->res.fattr->size)
+			data->res.eof = 1;
+	}
 	nfs_readpage_result(task);
 }
 
