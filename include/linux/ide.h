@@ -23,6 +23,8 @@
 #include <asm/hdreg.h>
 #include <asm/io.h>
 
+#define DEBUG_PM
+
 /*
  * This is the multiple IDE interface driver, as evolved from hd.c.
  * It supports up to four IDE interfaces, on one or more IRQs (usually 14 & 15).
@@ -1169,6 +1171,39 @@ read_proc_t proc_ide_read_geometry;
 #endif
 
 /*
+ * Power Management step value (rq->pm->pm_step).
+ *
+ * The step value starts at 0 (ide_pm_state_start_suspend) for a
+ * suspend operation or 1000 (ide_pm_state_start_resume) for a
+ * resume operation.
+ *
+ * For each step, the core calls the subdriver start_power_step() first.
+ * This can return:
+ *	- ide_stopped :	In this case, the core calls us back again unless
+ *			step have been set to ide_power_state_completed.
+ *	- ide_started :	In this case, the channel is left busy until an
+ *			async event (interrupt) occurs.
+ * Typically, start_power_step() will issue a taskfile request with
+ * do_rw_taskfile().
+ *
+ * Upon reception of the interrupt, the core will call complete_power_step()
+ * with the error code if any. This routine should update the step value
+ * and return. It should not start a new request. The core will call
+ * start_power_step for the new step value, unless step have been set to
+ * ide_power_state_completed.
+ *
+ * Subdrivers are expected to define their own additional power
+ * steps from 1..999 for suspend and from 1001..1999 for resume,
+ * other values are reserved for future use.
+ */
+
+enum {
+	ide_pm_state_completed		= -1,
+	ide_pm_state_start_suspend	= 0,
+	ide_pm_state_start_resume	= 1000,
+};
+
+/*
  * Subdrivers support.
  */
 #define IDE_SUBDRIVER_VERSION	1
@@ -1197,6 +1232,8 @@ typedef struct ide_driver_s {
 	int		(*attach)(ide_drive_t *);
 	void		(*ata_prebuilder)(ide_drive_t *);
 	void		(*atapi_prebuilder)(ide_drive_t *);
+	ide_startstop_t	(*start_power_step)(ide_drive_t *, struct request *);
+	void		(*complete_power_step)(ide_drive_t *, struct request *, u8, u8);
 	struct device_driver	gen_driver;
 	struct list_head drives;
 	struct list_head drivers;
@@ -1205,6 +1242,8 @@ typedef struct ide_driver_s {
 #define DRIVER(drive)		((drive)->driver)
 
 extern int generic_ide_ioctl(struct block_device *, unsigned, unsigned long);
+extern int generic_ide_suspend(struct device *dev, u32 state, u32 level);
+extern int generic_ide_resume(struct device *dev, u32 level);
 
 /*
  * IDE modules.
@@ -1346,6 +1385,7 @@ typedef enum {
 	ide_wait,	/* insert rq at end of list, and wait for it */
 	ide_next,	/* insert rq immediately after current request */
 	ide_preempt,	/* insert rq in front of current request */
+	ide_head_wait,	/* insert rq in front of current request and wait for it */
 	ide_end		/* insert rq at end of list, but don't wait for it */
 } ide_action_t;
 
@@ -1585,6 +1625,7 @@ extern u8 eighty_ninty_three (ide_drive_t *);
 extern int set_transfer(ide_drive_t *, ide_task_t *);
 extern int taskfile_lib_get_identify(ide_drive_t *drive, u8 *);
 
+extern int ide_wait_not_busy(ide_hwif_t *hwif, unsigned long timeout);
 ide_startstop_t __ide_do_rw_disk(ide_drive_t *drive, struct request *rq, sector_t block);
 
 /*
