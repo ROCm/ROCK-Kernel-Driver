@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2004 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -153,8 +153,7 @@ xfs_set_inodeops(
 			inode->i_mapping->a_ops = &linvfs_aops;
 	} else {
 		inode->i_op = &linvfs_file_inode_operations;
-		init_special_inode(inode, inode->i_mode,
-					inode->i_rdev);
+		init_special_inode(inode, inode->i_mode, inode->i_rdev);
 	}
 }
 
@@ -287,7 +286,7 @@ void
 xfs_flush_buftarg(
 	xfs_buftarg_t		*btp)
 {
-	pagebuf_delwri_flush(btp, PBDF_WAIT, NULL);
+	pagebuf_delwri_flush(btp, 1, NULL);
 }
 
 void
@@ -448,7 +447,8 @@ linvfs_clear_inode(
 #define SYNCD_FLAGS	(SYNC_FSDATA|SYNC_BDFLUSH|SYNC_ATTR)
 
 STATIC int
-syncd(void *arg)
+xfssyncd(
+	void			*arg)
 {
 	vfs_t			*vfsp = (vfs_t *) arg;
 	int			error;
@@ -480,20 +480,22 @@ syncd(void *arg)
 }
 
 STATIC int
-linvfs_start_syncd(vfs_t *vfsp)
+linvfs_start_syncd(
+	vfs_t			*vfsp)
 {
-	int pid;
+	int			pid;
 
-	pid = kernel_thread(syncd, (void *) vfsp,
+	pid = kernel_thread(xfssyncd, (void *) vfsp,
 			CLONE_VM | CLONE_FS | CLONE_FILES);
 	if (pid < 0)
-		return pid;
+		return -pid;
 	wait_event(vfsp->vfs_wait_sync_task, vfsp->vfs_sync_task);
 	return 0;
 }
 
 STATIC void
-linvfs_stop_syncd(vfs_t *vfsp)
+linvfs_stop_syncd(
+	vfs_t			*vfsp)
 {
 	vfsp->vfs_flag |= VFS_UMOUNT;
 	wmb();
@@ -735,7 +737,7 @@ linvfs_fill_super(
 	struct vfs		*vfsp = vfs_allocate();
 	struct xfs_mount_args	*args = xfs_args_allocate(sb);
 	struct kstatfs		statvfs;
-	int			error;
+	int			error, error2;
 
 	vfsp->vfs_super = sb;
 	LINVFS_SET_VFS(sb, vfsp);
@@ -776,11 +778,15 @@ linvfs_fill_super(
 		goto fail_unmount;
 
 	sb->s_root = d_alloc_root(LINVFS_GET_IP(rootvp));
-	if (!sb->s_root)
+	if (!sb->s_root) {
+		error = ENOMEM;
 		goto fail_vnrele;
-	if (is_bad_inode(sb->s_root->d_inode))
+	}
+	if (is_bad_inode(sb->s_root->d_inode)) {
+		error = EINVAL;
 		goto fail_vnrele;
-	if (linvfs_start_syncd(vfsp))
+	}
+	if ((error = linvfs_start_syncd(vfsp)))
 		goto fail_vnrele;
 	vn_trace_exit(rootvp, __FUNCTION__, (inst_t *)__return_address);
 
@@ -796,7 +802,7 @@ fail_vnrele:
 	}
 
 fail_unmount:
-	VFS_UNMOUNT(vfsp, 0, NULL, error);
+	VFS_UNMOUNT(vfsp, 0, NULL, error2);
 
 fail_vfsop:
 	vfs_deallocate(vfsp);
