@@ -372,8 +372,6 @@ extern struct bus_type platform_bus_type;
 extern struct device legacy_bus;
 
 /* drivers/base/power.c */
-extern int device_suspend(u32 state, u32 level);
-extern void device_resume(u32 level);
 extern void device_shutdown(void);
 
 

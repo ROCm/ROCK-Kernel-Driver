@@ -31,10 +31,8 @@ struct sysdev_class {
 
 	/* Default operations for these types of devices */
 	int	(*shutdown)(struct sys_device *);
-	int	(*save)(struct sys_device *, u32 state);
 	int	(*suspend)(struct sys_device *, u32 state);
 	int	(*resume)(struct sys_device *);
-	int	(*restore)(struct sys_device *);
 	struct kset		kset;
 };
 
@@ -52,10 +50,8 @@ struct sysdev_driver {
 	int	(*add)(struct sys_device *);
 	int	(*remove)(struct sys_device *);
 	int	(*shutdown)(struct sys_device *);
-	int	(*save)(struct sys_device *, u32 state);
 	int	(*suspend)(struct sys_device *, u32 state);
 	int	(*resume)(struct sys_device *);
-	int	(*restore)(struct sys_device *);
 };
 
 

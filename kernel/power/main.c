@@ -65,9 +65,9 @@ static int pm_suspend_standby(void)
 	if (!pm_ops || !pm_ops->enter)
 		return -EPERM;
 
+	local_irq_save(flags);
 	if ((error = device_pm_power_down(PM_SUSPEND_STANDBY)))
 		goto Done;
-	local_irq_save(flags);
 	error = pm_ops->enter(PM_SUSPEND_STANDBY);
 	local_irq_restore(flags);
 	device_pm_power_up();
@@ -91,9 +91,9 @@ static int pm_suspend_mem(void)
 	if (!pm_ops || !pm_ops->enter)
 		return -EPERM;
 
+	local_irq_save(flags);
 	if ((error = device_pm_power_down(PM_SUSPEND_STANDBY)))
 		goto Done;
-	local_irq_save(flags);
 	error = pm_ops->enter(PM_SUSPEND_STANDBY);
 	local_irq_restore(flags);
 	device_pm_power_up();
@@ -114,9 +114,19 @@ static int pm_suspend_mem(void)
 
 static int power_down(u32 mode)
 {
+	unsigned long flags;
+	int error = 0;
+
+	local_irq_save(flags);
+	device_pm_power_down();
 	switch(mode) {
 	case PM_DISK_PLATFORM:
-		return pm_ops->enter(PM_SUSPEND_DISK);
+		error = pm_ops->enter(PM_SUSPEND_DISK);
+		if (error) {
+			device_pm_power_up();
+			local_irq_restore(flags);
+			return error;
+		}
 	case PM_DISK_SHUTDOWN:
 		machine_power_off();
 		break;

@@ -25,7 +25,6 @@
 #include "power.h"
 
 LIST_HEAD(dpm_active);
-LIST_HEAD(dpm_suspended);
 LIST_HEAD(dpm_off);
 LIST_HEAD(dpm_off_irq);
 
