@@ -29,6 +29,8 @@
  ********************************************************************/
 
 #include <linux/types.h>
+#include <linux/module.h>
+
 #include <asm/unaligned.h>
 #include <asm/byteorder.h>
 
@@ -393,6 +395,7 @@ int irda_param_pack(__u8 *buf, char *fmt, ...)
 
 	return 0;
 }
+EXPORT_SYMBOL(irda_param_pack);
 
 /*
  * Function irda_param_unpack (skb, fmt, ...)
@@ -437,6 +440,7 @@ int irda_param_unpack(__u8 *buf, char *fmt, ...)
 
 	return 0;
 }
+EXPORT_SYMBOL(irda_param_unpack);
 
 /*
  * Function irda_param_insert (self, pi, buf, len, info)
@@ -489,6 +493,7 @@ int irda_param_insert(void *self, __u8 pi, __u8 *buf, int len,
 						 pi_minor_info->func);
 	return ret;
 }
+EXPORT_SYMBOL(irda_param_insert);
 
 /*
  * Function irda_param_extract_all (self, buf, len, info)
@@ -544,6 +549,7 @@ int irda_param_extract(void *self, __u8 *buf, int len, pi_param_info_t *info)
 						  type, pi_minor_info->func);
 	return ret;
 }
+EXPORT_SYMBOL(irda_param_extract);
 
 /*
  * Function irda_param_extract_all (self, buf, len, info)
@@ -575,4 +581,4 @@ int irda_param_extract_all(void *self, __u8 *buf, int len,
 	}
 	return n;
 }
-
+EXPORT_SYMBOL(irda_param_extract_all);

@@ -73,11 +73,6 @@ extern int  irlap_driver_rcv(struct sk_buff *, struct net_device *,
 EXPORT_SYMBOL(irda_debug);
 #endif
 EXPORT_SYMBOL(irda_notify_init);
-EXPORT_SYMBOL(irda_param_insert);
-EXPORT_SYMBOL(irda_param_extract);
-EXPORT_SYMBOL(irda_param_extract_all);
-EXPORT_SYMBOL(irda_param_pack);
-EXPORT_SYMBOL(irda_param_unpack);
 
 /* IrLAP */
 
