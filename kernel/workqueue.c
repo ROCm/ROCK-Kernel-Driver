@@ -245,8 +245,9 @@ void fastcall flush_workqueue(struct workqueue_struct *wq)
 		long sequence_needed;
 
 		if (is_single_threaded(wq))
-			cpu = 0;
-		cwq = wq->cpu_wq + cpu;
+			cwq = wq->cpu_wq + 0; /* Always use cpu 0's area. */
+		else
+			cwq = wq->cpu_wq + cpu;
 
 		if (cwq->thread == current) {
 			/*
@@ -287,7 +288,10 @@ static struct task_struct *create_workqueue_thread(struct workqueue_struct *wq,
 	init_waitqueue_head(&cwq->more_work);
 	init_waitqueue_head(&cwq->work_done);
 
-	p = kthread_create(worker_thread, cwq, "%s/%d", wq->name, cpu);
+	if (is_single_threaded(wq))
+		p = kthread_create(worker_thread, cwq, "%s", wq->name);
+	else
+		p = kthread_create(worker_thread, cwq, "%s/%d", wq->name, cpu);
 	if (IS_ERR(p))
 		return NULL;
 	cwq->thread = p;
@@ -321,7 +325,7 @@ struct workqueue_struct *__create_workqueue(const char *name,
 	} else {
 		spin_lock(&workqueue_lock);
 		list_add(&wq->list, &workqueues);
-		spin_unlock_irq(&workqueue_lock);
+		spin_unlock(&workqueue_lock);
 		for_each_online_cpu(cpu) {
 			p = create_workqueue_thread(wq, cpu);
 			if (p) {
@@ -373,7 +377,7 @@ void destroy_workqueue(struct workqueue_struct *wq)
 			cleanup_workqueue_thread(wq, cpu);
 		spin_lock(&workqueue_lock);
 		list_del(&wq->list);
-		spin_unlock_irq(&workqueue_lock);
+		spin_unlock(&workqueue_lock);
 	}
 	unlock_cpu_hotplug();
 	kfree(wq);
