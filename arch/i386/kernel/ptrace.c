@@ -278,10 +278,10 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		if ((unsigned long) data > _NSIG)
 			break;
 		if (request == PTRACE_SYSCALL) {
-			set_thread_flag(TIF_SYSCALL_TRACE);
+			set_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 		}
 		else {
-			clear_thread_flag(TIF_SYSCALL_TRACE);
+			clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 		}
 		child->exit_code = data;
 	/* make sure the single step bit is not set. */
@@ -317,7 +317,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		ret = -EIO;
 		if ((unsigned long) data > _NSIG)
 			break;
-		clear_thread_flag(TIF_SYSCALL_TRACE);
+		clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 		if ((child->ptrace & PT_DTRACE) == 0) {
 			/* Spurious delayed TF traps may occur */
 			child->ptrace |= PT_DTRACE;
@@ -449,7 +449,7 @@ void do_syscall_trace(struct pt_regs *regs, int entryexit)
 {
 	if (!test_thread_flag(TIF_SYSCALL_TRACE))
 		return;
-	if (current->ptrace & PT_PTRACED)
+	if (!(current->ptrace & PT_PTRACED))
 		return;
 	/* the 0x80 provides a way for the tracing parent to distinguish
 	   between a syscall stop and SIGTRAP delivery */
