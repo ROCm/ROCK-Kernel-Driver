@@ -2867,8 +2867,12 @@ static int tg3_start_xmit_4gbug(struct sk_buff *skb, struct net_device *dev)
 				would_hit_hwbug = entry + 1;
 			}
 
-			tg3_set_txd(tp, entry, mapping, len,
-				    base_flags, (i == last));
+			if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5750)
+				tg3_set_txd(tp, entry, mapping, len,
+					    base_flags, (i == last)|(mss << 1));
+			else
+				tg3_set_txd(tp, entry, mapping, len,
+					    base_flags, (i == last));
 
 			entry = NEXT_TX(entry);
 		}
@@ -3054,8 +3058,12 @@ static int tg3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 			tp->tx_buffers[entry].skb = NULL;
 			pci_unmap_addr_set(&tp->tx_buffers[entry], mapping, mapping);
 
-			tg3_set_txd(tp, entry, mapping, len,
-				    base_flags, (i == last));
+			if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5750)
+				tg3_set_txd(tp, entry, mapping, len,
+					    base_flags, (i == last)|(mss << 1));
+			else
+				tg3_set_txd(tp, entry, mapping, len,
+					    base_flags, (i == last));
 
 			entry = NEXT_TX(entry);
 		}
