@@ -1783,6 +1783,8 @@ int __init rfcomm_init(void)
 {
 	kernel_thread(rfcomm_run, NULL, CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
 
+	BT_INFO("RFCOMM ver %s", VERSION);
+
 	rfcomm_init_sockets();
 
 #ifdef CONFIG_BT_RFCOMM_TTY
@@ -1791,9 +1793,6 @@ int __init rfcomm_init(void)
 
 	create_proc_read_entry("bluetooth/rfcomm", 0, 0, rfcomm_read_proc, NULL);
 
-	BT_INFO("Bluetooth RFCOMM ver %s", VERSION);
-	BT_INFO("Copyright (C) 2002 Maxim Krasnyansky <maxk@qualcomm.com>");
-	BT_INFO("Copyright (C) 2002 Marcel Holtmann <marcel@holtmann.org>");
 	return 0;
 }
 

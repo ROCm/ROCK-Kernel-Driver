@@ -781,9 +781,7 @@ int hci_usb_init(void)
 {
 	int err;
 
-	BT_INFO("Bluetooth HCI USB driver ver %s Copyright (C) 2000,2001 Qualcomm Inc",  
-		VERSION);
-	BT_INFO("Written 2000,2001 by Maxim Krasnyansky <maxk@qualcomm.com>");
+	BT_INFO("HCI USB driver ver %s", VERSION);
 
 	if ((err = usb_register(&hci_usb_driver)) < 0)
 		BT_ERR("Failed to register HCI USB driver");

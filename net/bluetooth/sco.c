@@ -969,19 +969,20 @@ int __init sco_init(void)
 	int err;
 
 	if ((err = bt_sock_register(BTPROTO_SCO, &sco_sock_family_ops))) {
-		BT_ERR("Can't register SCO socket layer");
+		BT_ERR("SCO socket registration failed");
 		return err;
 	}
 
 	if ((err = hci_register_proto(&sco_hci_proto))) {
-		BT_ERR("Can't register SCO protocol");
+		BT_ERR("SCO protocol registration failed");
 		return err;
 	}
 
 	create_proc_read_entry("bluetooth/sco", 0, 0, sco_read_proc, NULL);
 
-	BT_INFO("Bluetooth SCO ver %s Copyright (C) 2000,2001 Qualcomm Inc", VERSION);
-	BT_INFO("Written 2000,2001 by Maxim Krasnyansky <maxk@qualcomm.com>");
+	BT_INFO("SCO (Voice Link) ver %s", VERSION);
+	BT_INFO("SCO socket layer initialized");
+
 	return 0;
 }
 
@@ -993,10 +994,10 @@ void sco_cleanup(void)
 
 	/* Unregister socket, protocol and notifier */
 	if ((err = bt_sock_unregister(BTPROTO_SCO)))
-		BT_ERR("Can't unregister SCO socket layer %d", err);
+		BT_ERR("SCO socket unregistration failed. %d", err);
 
 	if ((err = hci_unregister_proto(&sco_hci_proto)))
-		BT_ERR("Can't unregister SCO protocol %d", err);
+		BT_ERR("SCO protocol unregistration failed. %d", err);
 }
 
 module_init(sco_init);

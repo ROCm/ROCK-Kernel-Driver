@@ -703,17 +703,22 @@ int bnep_get_coninfo(struct bnep_coninfo *ci)
 }
 
 static int __init bnep_init_module(void)
-{
-	BT_INFO("BNEP: BNEP2 ver %s\n"
-		"BNEP: Copyright (C) 2002 Inventel\n"
-		"BNEP: Written 2001,2002 by\n"
-		"BNEP: \tClement Moreau <clement.moreau@inventel.fr> "
-			"David Libault <david.libault@inventel.fr>\n"
-		"BNEP: Copyright (C) 2002 Maxim Krasnyanskiy <maxk@qualcomm.com>",
-			VERSION);
+{	
+	char flt[50] = "";	
+
+#ifdef CONFIG_BT_BNEP_PROTO_FILTER
+	strcat(flt, "protocol ");
+#endif
+
+#ifdef CONFIG_BT_BNEP_MC_FILTER
+	strcat(flt, "multicast");
+#endif
+
+	BT_INFO("BNEP (Ethernet Emulation) ver %s", VERSION);
+	if (flt[0])
+		BT_INFO("BNEP filters: %s", flt);
 
 	bnep_sock_init();
-
 	return 0;
 }
 
@@ -725,6 +730,6 @@ static void __exit bnep_cleanup_module(void)
 module_init(bnep_init_module);
 module_exit(bnep_cleanup_module);
 
-MODULE_DESCRIPTION("BNEP ver " VERSION);
-MODULE_AUTHOR("David Libault <david.libault@inventel.fr> Maxim Krasnyanskiy <maxk@qualcomm.com>");
+MODULE_DESCRIPTION("Bluetooth BNEP ver " VERSION);
+MODULE_AUTHOR("David Libault <david.libault@inventel.fr>, Maxim Krasnyanskiy <maxk@qualcomm.com>");
 MODULE_LICENSE("GPL");

@@ -331,9 +331,7 @@ static struct miscdevice hci_vhci_miscdev=
 
 int __init hci_vhci_init(void)
 {
-	BT_INFO("Bluetooth VHCI driver ver %s Copyright (C) 2000,2001 Qualcomm Inc",  
-		VERSION);
-	BT_INFO("Written 2000,2001 by Maxim Krasnyansky <maxk@qualcomm.com>");
+	BT_INFO("VHCI driver ver %s", VERSION);
 
 	if (misc_register(&hci_vhci_miscdev)) {
 		BT_ERR("Can't register misc device %d\n", VHCI_MINOR);
