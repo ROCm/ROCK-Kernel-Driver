@@ -754,7 +754,8 @@ static const struct {
 	ERRDOS, ERRnoaccess, 0xc000028e}, {
 	ERRDOS, ERRnoaccess, 0xc000028f}, {
 	ERRDOS, ERRnoaccess, 0xc0000290}, {
-ERRDOS, ERRbadfunc, 0xc000029c},};
+	ERRDOS, ERRbadfunc, 0xc000029c}, {
+	ERRDOS, ERRinvlevel, 0x007c0001}, };
 
 /*****************************************************************************
  Print an error message from the status code

@@ -64,7 +64,7 @@ cifs_open(struct inode *inode, struct file *file)
 		read_lock(&GlobalSMBSeslock);
 		list_for_each(tmp, &pCifsInode->openFileList) {            
 			pCifsFile = list_entry(tmp,struct cifsFileInfo, flist);           
-			if((pCifsFile->pfile == NULL)&& (pCifsFile->pid = current->pid)){
+			if((pCifsFile->pfile == NULL)&& (pCifsFile->pid == current->tgid)){
 			/* mode set in cifs_create */
 				pCifsFile->pfile = file; /* needed for writepage */
 				file->private_data = pCifsFile;
@@ -168,7 +168,7 @@ cifs_open(struct inode *inode, struct file *file)
 			memset(file->private_data, 0, sizeof(struct cifsFileInfo));
 			pCifsFile = (struct cifsFileInfo *) file->private_data;
 			pCifsFile->netfid = netfid;
-			pCifsFile->pid = current->pid;
+			pCifsFile->pid = current->tgid;
 			init_MUTEX(&pCifsFile->fh_sem);
 			pCifsFile->pfile = file; /* needed for writepage */
 			pCifsFile->pInode = inode;
@@ -598,7 +598,7 @@ cifs_lock(struct file *file, int cmd, struct file_lock *pfLock)
 			 pfLock->fl_start, numUnlock, numLock, lockType,
 			 wait_flag);
 	if (rc == 0 && (pfLock->fl_flags & FL_POSIX))
-		posix_lock_file(file, pfLock);
+		posix_lock_file_wait(file, pfLock);
 	FreeXid(xid);
 	return rc;
 }
