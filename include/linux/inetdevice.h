@@ -3,7 +3,10 @@
 
 #ifdef __KERNEL__
 
+#include <linux/if.h>
+#include <linux/netdevice.h>
 #include <linux/rcupdate.h>
+#include <linux/timer.h>
 
 struct ipv4_devconf
 {
