@@ -468,7 +468,8 @@ static inline void cp_rx_skb (struct cp_private *cp, struct sk_buff *skb,
 
 #if CP_VLAN_TAG_USED
 	if (cp->vlgrp && (desc->opts2 & RxVlanTagged)) {
-		vlan_hwaccel_rx(skb, cp->vlgrp, be16_to_cpu(desc->opts2 & 0xffff));
+		vlan_hwaccel_receive_skb(skb, cp->vlgrp,
+					 be16_to_cpu(desc->opts2 & 0xffff));
 	} else
 #endif
 		netif_receive_skb(skb);
