@@ -1158,18 +1158,6 @@ static int rx_pkt(struct atm_dev *dev)
         }
 		  
         if (!(skb = atm_alloc_charge(vcc, len, GFP_ATOMIC))) {
-	   /* lets allocate an skb for now */  
-	   skb = alloc_skb(len, GFP_ATOMIC);  
-	   if (!skb)  
-	   {  
-              IF_ERR(printk("can't allocate memory for recv, drop pkt!\n");)  
-              atomic_inc(&vcc->stats->rx_drop);
-              atm_return(vcc, atm_pdu2truesize(len));
-	      goto out_free_desc;
-	   }  
-        }
-        else {
-           IF_EVENT(printk("IA: Rx over the rx_quota %ld\n", vcc->rx_quota);)
            if (vcc->vci < 32)
               printk("Drop control packets\n");
 	      goto out_free_desc;
