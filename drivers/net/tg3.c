@@ -169,6 +169,8 @@ static void tg3_write_indirect_reg32(struct tg3 *tp, u32 off, u32 val)
 		spin_unlock_irqrestore(&tp->indirect_lock, flags);
 	} else {
 		writel(val, tp->regs + off);
+		if ((tp->tg3_flags & TG3_FLAG_5701_REG_WRITE_BUG) != 0)
+			readl(tp->regs + off);
 	}
 }
 
@@ -5993,6 +5995,14 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 			pci_write_config_word(tp->pdev, PCI_COMMAND, pci_cmd);
 		}
 	}
+
+	/* Back to back register writes can cause problems on this chip,
+	 * the workaround is to read back all reg writes except those to
+	 * mailbox regs.  See tg3_write_indirect_reg32().
+	 */
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5701)
+		tp->tg3_flags |= TG3_FLAG_5701_REG_WRITE_BUG;
+
 	if ((pci_state_reg & PCISTATE_BUS_SPEED_HIGH) != 0)
 		tp->tg3_flags |= TG3_FLAG_PCI_HIGH_SPEED;
 	if ((pci_state_reg & PCISTATE_BUS_32BIT) != 0)
