@@ -476,7 +476,7 @@ static int __init longhaul_cpu_init(struct cpufreq_policy *policy)
 		memcpy (eblcr_table, samuel1_eblcr, sizeof(samuel1_eblcr));
 		break;
 
-	case 7:		/* C5B / C5C */
+	case 7:
 		longhaul_version = TYPE_LONGHAUL_V1;
 		switch (c->x86_mask) {
 		case 0:
