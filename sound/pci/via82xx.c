@@ -1550,6 +1550,12 @@ static struct ac97_quirk ac97_quirks[] = {
 		.type = AC97_TUNE_HP_ONLY
 	},
 	{
+		.vendor = 0x1019,
+		.device = 0x0a81,
+		.name = "ECS K7VTA3",
+		.type = AC97_TUNE_HP_ONLY
+	},
+	{
 		.vendor = 0x1849,
 		.device = 0x3059,
 		.name = "ASRock K7VM2",
