@@ -2101,17 +2101,14 @@ static int gem_open(struct net_device *dev)
 		gp->hw_running = 1;
 	}
 
-	spin_lock_irq(&gp->lock);
-
 	/* We can now request the interrupt as we know it's masked
 	 * on the controller
 	 */
 	if (request_irq(gp->pdev->irq, gem_interrupt,
 			SA_SHIRQ, dev->name, (void *)dev)) {
-		spin_unlock_irq(&gp->lock);
-
 		printk(KERN_ERR "%s: failed to request irq !\n", gp->dev->name);
 
+		spin_lock_irq(&gp->lock);
 #ifdef CONFIG_PPC_PMAC
 		if (!hw_was_up && gp->pdev->vendor == PCI_VENDOR_ID_APPLE)
 			gem_apple_powerdown(gp);
@@ -2120,9 +2117,12 @@ static int gem_open(struct net_device *dev)
 		gp->pm_timer.expires = jiffies + 10*HZ;
 		add_timer(&gp->pm_timer);
 		up(&gp->pm_sem);
+		spin_unlock_irq(&gp->lock);
 
 		return -EAGAIN;
 	}
+
+       	spin_lock_irq(&gp->lock);
 
 	/* Allocate & setup ring buffers */
 	gem_init_rings(gp);
