@@ -1,5 +1,5 @@
 /* gdth_proc.c 
- * $Id: gdth_proc.c,v 1.35 2003/02/27 15:00:44 achim Exp $
+ * $Id: gdth_proc.c,v 1.37 2003/09/17 08:31:53 achim Exp $
  */
 
 #if LINUX_VERSION_CODE >= 0x020407

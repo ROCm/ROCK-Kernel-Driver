@@ -1869,9 +1869,9 @@ S: D53424 Remagen
 S: Germany
 
 N: Achim Leubner
-E: achim.leubner@intel.com
+E: achim_leubner@adaptec.com
 D: GDT Disk Array Controller/Storage RAID controller driver
-S: ICP vortex GmbH, an Intel company
+S: ICP vortex GmbH
 S: Neckarsulm
 S: Germany
 

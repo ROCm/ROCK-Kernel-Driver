@@ -556,7 +556,7 @@ config SCSI_GDTH
 	  Formerly called GDT SCSI Disk Array Controller Support.
 
 	  This is a driver for RAID/SCSI Disk Array Controllers (EISA/ISA/PCI) 
-	  manufactured by Intel/ICP vortex (an Intel Company). It is documented
+	  manufactured by Intel Corporation/ICP vortex GmbH. It is documented
 	  in the kernel source in <file:drivers/scsi/gdth.c> and
 	  <file:drivers/scsi/gdth.h.>
 
