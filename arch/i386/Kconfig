@@ -752,6 +752,13 @@ config HAVE_DEC_LOCK
 	depends on (SMP || PREEMPT) && X86_CMPXCHG
 	default y
 
+# turning this on wastes a bunch of space.
+# Summit needs it only when NUMA is on
+config BOOT_IOREMAP
+	bool
+	depends on (X86_SUMMIT && NUMA)
+	default y
+
 endmenu
 
 
