@@ -503,6 +503,17 @@ static unsigned int speedstep_detect_processor (void)
 			if (speedstep_coppermine)
 				return SPEEDSTEP_PROCESSOR_PIII_C;
 
+			/*
+			 * If the processor is a mobile version,
+			 * platform ID has bit 50 set
+			 * it has SpeedStep technology if either
+			 * bit 56 or 57 is set
+			 */
+			rdmsr(MSR_IA32_PLATFORM_ID, msr_lo, msr_hi);
+			dprintk(KERN_DEBUG "cpufreq: Coppermine: MSR_IA32_PLATFORM ID is 0x%x, 0x%x\n", msr_lo, msr_hi);
+			if ((msr_hi & (1<<18)) && (msr_hi & (3<<24)))
+				return SPEEDSTEP_PROCESSOR_PIII_C;
+
 			printk(KERN_INFO "cpufreq: in case this is a SpeedStep-capable Intel Pentium III Coppermine\n");
 			printk(KERN_INFO "cpufreq: processor, please pass the boot option or module parameter\n");
 			printk(KERN_INFO "cpufreq: `speedstep_coppermine=1` to the kernel. Thanks!\n");
