@@ -131,9 +131,7 @@ were returned when that routine allocated the memory being freed.
 
 The pool destroy() routines free the resources of the pool.  They must be
 called in a context which can sleep.  Make sure you've freed all allocated
-memory back to the pool before you destroy it.  While pci_pool_destroy()
-may not be called in interrupt context, it's perfectly safe to do that with
-dma_pool_destroy().
+memory back to the pool before you destroy it.
 
 
 Part Ic - DMA addressing limitations
