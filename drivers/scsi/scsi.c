@@ -55,7 +55,6 @@
 #include <linux/init.h>
 #include <linux/smp_lock.h>
 #include <linux/completion.h>
-#include <linux/mempool.h>
 
 #define __KERNEL_SYSCALLS__
 
@@ -74,24 +73,6 @@
 #include <linux/kmod.h>
 #endif
 
-#define SG_MEMPOOL_NR		5
-#define SG_MEMPOOL_SIZE		32
-
-struct scsi_host_sg_pool {
-	int size;
-	char *name; 
-	kmem_cache_t *slab;
-	mempool_t *pool;
-};
-
-#define SP(x) { x, "sgpool-" #x } 
-struct scsi_host_sg_pool scsi_sg_pools[SG_MEMPOOL_NR] = { 
-	SP(8), SP(16), SP(32), SP(64), SP(MAX_PHYS_SEGMENTS)
-}; 	
-#undef SP 	
-/*
-   static const char RCSid[] = "$Header: /vger/u4/cvs/linux/drivers/scsi/scsi.c,v 1.38 1997/01/19 23:07:18 davem Exp $";
- */
 
 /*
  * Definitions and constants.
@@ -668,10 +649,7 @@ int scsi_mlqueue_insert(Scsi_Cmnd * cmd, int reason)
  */
 void scsi_release_command(Scsi_Cmnd * SCpnt)
 {
-        request_queue_t *q;
-        Scsi_Device * SDpnt;
-
-        SDpnt = SCpnt->device;
+        request_queue_t *q = &SCpnt->device->request_queue;
 
         __scsi_release_command(SCpnt);
 
@@ -681,7 +659,6 @@ void scsi_release_command(Scsi_Cmnd * SCpnt)
          * This won't block - if the device cannot take any more, life
          * will go on.  
          */
-        q = &SDpnt->request_queue;
         scsi_queue_next_request(q, NULL);                
 }
 
@@ -2084,81 +2061,12 @@ static int __init setup_scsi_default_dev_flags(char *str)
 __setup("scsi_default_dev_flags=", setup_scsi_default_dev_flags);
 
 #endif
-static void *scsi_pool_alloc(int gfp_mask, void *data)
-{
-	return kmem_cache_alloc(data, gfp_mask);
-}
-
-static void scsi_pool_free(void *ptr, void *data)
-{
-	kmem_cache_free(data, ptr);
-}
-
-struct scatterlist *scsi_alloc_sgtable(Scsi_Cmnd *SCpnt, int gfp_mask)
-{
-	struct scsi_host_sg_pool *sgp;
-	struct scatterlist *sgl;
-	int pf_flags;
-
-	BUG_ON(!SCpnt->use_sg);
-
-	switch (SCpnt->use_sg) {
-		case 1 ... 8			: SCpnt->sglist_len = 0; break;
-		case 9 ... 16			: SCpnt->sglist_len = 1; break;
-		case 17 ... 32			: SCpnt->sglist_len = 2; break;
-		case 33 ... 64			: SCpnt->sglist_len = 3; break;
-		case 65 ... MAX_PHYS_SEGMENTS	: SCpnt->sglist_len = 4; break;
-		default: return NULL;
-	}
-
-	sgp = scsi_sg_pools + SCpnt->sglist_len;
-
-	pf_flags = current->flags;
-	current->flags |= PF_NOWARN;
-	sgl = mempool_alloc(sgp->pool, gfp_mask);
-	current->flags = pf_flags;
-	if (sgl) {
-		memset(sgl, 0, sgp->size);
-		return sgl;
-	}
-
-	return sgl;
-}
-
-void scsi_free_sgtable(struct scatterlist *sgl, int index)
-{
-	struct scsi_host_sg_pool *sgp = scsi_sg_pools + index;
-
-	if (unlikely(index > SG_MEMPOOL_NR)) {
-		printk("scsi_free_sgtable: mempool %d\n", index);
-		BUG();
-	}
-
-	mempool_free(sgl, sgp->pool);
-}
 
 static int __init init_scsi(void)
 {
-	int i;
-
 	printk(KERN_INFO "SCSI subsystem driver " REVISION "\n");
 
-	/*
-	 * setup sg memory pools
-	 */
-	for (i = 0; i < SG_MEMPOOL_NR; i++) {
-		struct scsi_host_sg_pool *sgp = scsi_sg_pools + i;
-		int size = sgp->size * sizeof(struct scatterlist);
-
-		sgp->slab = kmem_cache_create(sgp->name, size, 0, SLAB_HWCACHE_ALIGN, NULL, NULL);
-		if (!sgp->slab)
-			printk(KERN_ERR "SCSI: can't init sg slab %s\n", sgp->name);
-
-		sgp->pool = mempool_create(SG_MEMPOOL_SIZE, scsi_pool_alloc, scsi_pool_free, sgp->slab);
-		if (!sgp->pool)
-			printk(KERN_ERR "SCSI: can't init sg mempool %s\n", sgp->name);
-	}
-
+	scsi_init_queue();
 	scsi_init_procfs();
 	scsi_devfs_handle = devfs_mk_dir(NULL, "scsi", NULL);
 	scsi_host_init();
@@ -2170,20 +2078,11 @@ static int __init init_scsi(void)
 
 static void __exit exit_scsi(void)
 {
-	int i;
-
 	scsi_sysfs_unregister();
 	scsi_dev_info_list_delete();
 	devfs_unregister(scsi_devfs_handle);
 	scsi_exit_procfs();
-
-	for (i = 0; i < SG_MEMPOOL_NR; i++) {
-		struct scsi_host_sg_pool *sgp = scsi_sg_pools + i;
-		mempool_destroy(sgp->pool);
-		kmem_cache_destroy(sgp->slab);
-		sgp->pool = NULL;
-		sgp->slab = NULL;
-	}
+	scsi_exit_queue();
 }
 
 subsys_initcall(init_scsi);
