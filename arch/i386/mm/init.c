@@ -508,32 +508,36 @@ void __init mem_init(void)
 #endif
 }
 
-#if CONFIG_X86_PAE
 #include <linux/slab.h>
 
-kmem_cache_t *pae_pmd_cachep;
-kmem_cache_t *pae_pgd_cachep;
+kmem_cache_t *pmd_cache;
+kmem_cache_t *pgd_cache;
 
-void pae_pmd_ctor(void *, kmem_cache_t *, unsigned long);
-void pae_pgd_ctor(void *, kmem_cache_t *, unsigned long);
+void pmd_ctor(void *, kmem_cache_t *, unsigned long);
+void pgd_ctor(void *, kmem_cache_t *, unsigned long);
 
 void __init pgtable_cache_init(void)
 {
+	if (PTRS_PER_PMD > 1) {
+		pmd_cache = kmem_cache_create("pae_pmd",
+						PTRS_PER_PMD*sizeof(pmd_t),
+						0,
+						SLAB_HWCACHE_ALIGN | SLAB_MUST_HWCACHE_ALIGN,
+						pmd_ctor,
+						NULL);
+
+		if (!pmd_cache)
+			panic("pgtable_cache_init(): cannot create pmd cache");
+	}
+
         /*
          * PAE pgds must be 16-byte aligned:
          */
-	pae_pmd_cachep = kmem_cache_create("pae_pmd", 4096, 0,
-		SLAB_HWCACHE_ALIGN | SLAB_MUST_HWCACHE_ALIGN, pae_pmd_ctor, NULL);
-
-	if (!pae_pmd_cachep)
-		panic("init_pae(): cannot allocate pae_pmd SLAB cache");
-
-        pae_pgd_cachep = kmem_cache_create("pae_pgd", 32, 0,
-                SLAB_HWCACHE_ALIGN | SLAB_MUST_HWCACHE_ALIGN, pae_pgd_ctor, NULL);
-        if (!pae_pgd_cachep)
-                panic("init_pae(): Cannot alloc pae_pgd SLAB cache");
+        pgd_cache = kmem_cache_create("pgd", PTRS_PER_PGD*sizeof(pgd_t), 0,
+                SLAB_HWCACHE_ALIGN | SLAB_MUST_HWCACHE_ALIGN, pgd_ctor, NULL);
+        if (!pgd_cache)
+                panic("pgtable_cache_init(): Cannot create pgd cache");
 }
-#endif
 
 /* Put this after the callers, so that it cannot be inlined */
 static int do_test_wp_bit(void)
