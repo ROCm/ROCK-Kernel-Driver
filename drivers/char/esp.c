@@ -1780,7 +1780,6 @@ static int esp_tiocmset(struct tty_struct *tty, struct file *file,
 			unsigned int set, unsigned int clear)
 {
 	struct esp_struct * info = (struct esp_struct *)tty->driver_data;
-	unsigned int arg;
 
 	if (serial_paranoia_check(info, tty->name, __FUNCTION__))
 		return -ENODEV;
