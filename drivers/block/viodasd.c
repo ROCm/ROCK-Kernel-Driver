@@ -40,8 +40,12 @@
 #include <linux/string.h>
 #include <linux/dma-mapping.h>
 #include <linux/completion.h>
+#include <linux/device.h>
+#include <linux/kernel.h>
 
 #include <asm/uaccess.h>
+#include <asm/vio.h>
+#include <asm/page.h>		/* for PAGE_SIZE */
 #include <asm/iSeries/HvTypes.h>
 #include <asm/iSeries/HvLpEvent.h>
 #include <asm/iSeries/HvLpConfig.h>
@@ -456,7 +460,7 @@ static void do_viodasd_request(request_queue_t *q)
  * Probe a single disk and fill in the viodasd_device structure
  * for it.
  */
-static void probe_disk(struct viodasd_device *d)
+static int probe_disk(struct viodasd_device *d)
 {
 	HvLpEvent_Rc hvrc;
 	struct viodasd_waitevent we;
@@ -480,14 +484,14 @@ retry:
 			0, 0, 0);
 	if (hvrc != 0) {
 		printk(VIOD_KERN_WARNING "bad rc on HV open %d\n", (int)hvrc);
-		return;
+		return 0;
 	}
 
 	wait_for_completion(&we.com);
 
 	if (we.rc != 0) {
 		if (flags != 0)
-			return;
+			return 0;
 		/* try again with read only flag set */
 		flags = vioblockflags_ro;
 		goto retry;
@@ -517,22 +521,15 @@ retry:
 	if (hvrc != 0) {
 		printk(VIOD_KERN_WARNING
 		       "bad rc sending event to OS/400 %d\n", (int)hvrc);
-		return;
+		return 0;
 	}
-	printk(VIOD_KERN_INFO "disk %d: %lu sectors (%lu MB) "
-			"CHS=%d/%d/%d sector size %d%s\n",
-			dev_no, (unsigned long)(d->size >> 9),
-			(unsigned long)(d->size >> 20),
-			(int)d->cylinders, (int)d->tracks,
-			(int)d->sectors, (int)d->bytes_per_sector,
-			d->read_only ? " (RO)" : "");
 	/* create the request queue for the disk */
 	spin_lock_init(&d->q_lock);
 	q = blk_init_queue(do_viodasd_request, &d->q_lock);
 	if (q == NULL) {
 		printk(VIOD_KERN_WARNING "cannot allocate queue for disk %d\n",
 				dev_no);
-		return;
+		return 0;
 	}
 	g = alloc_disk(1 << PARTITION_SHIFT);
 	if (g == NULL) {
@@ -540,7 +537,7 @@ retry:
 				"cannot allocate disk structure for disk %d\n",
 				dev_no);
 		blk_cleanup_queue(q);
-		return;
+		return 0;
 	}
 
 	d->disk = g;
@@ -563,8 +560,17 @@ retry:
 	g->private_data = d;
 	set_capacity(g, d->size >> 9);
 
+	printk(VIOD_KERN_INFO "disk %d: %lu sectors (%lu MB) "
+			"CHS=%d/%d/%d sector size %d%s\n",
+			dev_no, (unsigned long)(d->size >> 9),
+			(unsigned long)(d->size >> 20),
+			(int)d->cylinders, (int)d->tracks,
+			(int)d->sectors, (int)d->bytes_per_sector,
+			d->read_only ? " (RO)" : "");
+
 	/* register us in the global list */
 	add_disk(g);
+	return 1;
 }
 
 /* returns the total number of scatterlist elements converted */
@@ -725,6 +731,29 @@ static void handle_block_event(struct HvLpEvent *event)
 }
 
 /*
+ * Get the driver to reprobe for more disks.
+ */
+static ssize_t probe_disks(struct device_driver *drv, char *buf)
+{
+	ssize_t count = 0;
+	struct viodasd_device *d;
+
+	for (d = viodasd_devices; d < &viodasd_devices[MAX_DISKNO]; d++) {
+		if ((d->disk == NULL) && probe_disk(d)) {
+			count += scnprintf(&buf[count], PAGE_SIZE - count,
+					"%s\n", d->disk->disk_name);
+		}
+	}
+	return count;
+}
+
+static DRIVER_ATTR(probe, S_IRUSR, probe_disks, NULL)
+
+static struct vio_driver viodasd_driver = {
+	.name = "viodasd"
+};
+
+/*
  * Initialize the whole device driver.  Handle module and non-module
  * versions
  */
@@ -767,6 +796,9 @@ static int __init viodasd_init(void)
 	for (i = 0; i < MAX_DISKNO; i++)
 		probe_disk(&viodasd_devices[i]);
 
+	vio_register_driver(&viodasd_driver);	/* FIX ME - error checking */
+	driver_create_file(&viodasd_driver.driver, &driver_attr_probe);
+
 	return 0;
 }
 module_init(viodasd_init);
@@ -775,6 +807,9 @@ void viodasd_exit(void)
 {
 	int i;
 	struct viodasd_device *d;
+
+	vio_unregister_driver(&viodasd_driver);
+	driver_remove_file(&viodasd_driver.driver, &driver_attr_probe);
 
         for (i = 0; i < MAX_DISKNO; i++) {
 		d = &viodasd_devices[i];
