@@ -28,7 +28,7 @@
 #include <asm/io.h>
 #include <asm/system.h>
 
-#ifdef CONFIG_ACPI_PROCESSOR
+#if defined(CONFIG_ACPI_PROCESSOR) || defined(CONFIG_ACPI_PROCESSOR_MODULE)
 #include <linux/acpi.h>
 #include <acpi/processor.h>
 #endif
@@ -63,7 +63,7 @@ struct pst_s {
 	u8 numpstates;
 };
 
-#ifdef CONFIG_ACPI_PROCESSOR
+#if defined(CONFIG_ACPI_PROCESSOR) || defined(CONFIG_ACPI_PROCESSOR_MODULE)
 union powernow_acpi_control_t {
 	struct {
 		unsigned long fid:5,
@@ -293,7 +293,7 @@ static void change_speed (unsigned int index)
 }
 
 
-#ifdef CONFIG_ACPI_PROCESSOR
+#if defined(CONFIG_ACPI_PROCESSOR) || defined(CONFIG_ACPI_PROCESSOR_MODULE)
 
 struct acpi_processor_performance *acpi_processor_perf;
 
@@ -642,7 +642,7 @@ static int __init powernow_init (void)
 
 static void __exit powernow_exit (void)
 {
-#ifdef CONFIG_ACPI_PROCESSOR
+#if defined(CONFIG_ACPI_PROCESSOR) || defined(CONFIG_ACPI_PROCESSOR_MODULE)
 	if (acpi_processor_perf) {
 		acpi_processor_unregister_performance(acpi_processor_perf, 0);
 		kfree(acpi_processor_perf);
