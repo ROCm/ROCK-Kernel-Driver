@@ -1,0 +1,10 @@
+menu "Generic Driver Options"
+
+config FW_LOADER
+	tristate "Hotplug firmware loading support"
+	---help---
+	  This option is provided for the case where no in-kernel-tree modules
+	  require hotplug firmware loading support, but a module built outside
+	  the kernel tree does.
+
+endmenu

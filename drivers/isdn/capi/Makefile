@@ -13,4 +13,3 @@ obj-$(CONFIG_ISDN_CAPI_CAPIFS)		+= capifs.o
 
 kernelcapi-y				:= kcapi.o capiutil.o capilib.o
 kernelcapi-$(CONFIG_PROC_FS)		+= kcapi_proc.o
-kernelcapi-objs				:= $(kernelcapi-y)
