@@ -1641,14 +1641,13 @@ static int rr_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 
 		spin_lock_irqsave(&rrpriv->lock, flags);
 		i = rr_read_eeprom(rrpriv, 0, image, EEPROM_BYTES);
+		spin_unlock_irqrestore(&rrpriv->lock, flags);
 		if (i != EEPROM_BYTES){
 			printk(KERN_ERR "%s: Error reading EEPROM\n",
 			       dev->name);
 			error = -EFAULT;
-			spin_unlock_irqrestore(&rrpriv->lock, flags);
 			goto gf_out;
 		}
-		spin_unlock_irqrestore(&rrpriv->lock, flags);
 		error = copy_to_user(rq->ifr_data, image, EEPROM_BYTES);
 		if (error)
 			error = -EFAULT;
