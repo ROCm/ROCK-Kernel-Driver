@@ -151,6 +151,7 @@ static int __devinit snd_card_als100_isapnp(int dev, struct snd_card_als100 *aca
 	err = pnp_activate_dev(pdev);
 	if (err < 0) {
 		printk(KERN_ERR PFX "AUDIO pnp configure failure\n");
+		kfree(cfg);
 		return err;
 	}
 	port[dev] = pnp_port_start(pdev, 0);
