@@ -683,7 +683,7 @@ int patch_ad1885(ac97_t * ac97)
 	snd_ac97_write_cache(ac97, AC97_AD_JACK_SPDIF, jack | 0x0300);
 
 	/* set default */
-	snd_ac97_write_cache(ac97, AC97_AD_MISC, 0);
+	snd_ac97_write_cache(ac97, AC97_AD_MISC, 0x0404);
 
 	ac97->build_ops = &patch_ad1885_build_ops;
 	return 0;
