@@ -305,9 +305,7 @@ static struct bin_attribute bridge_forward = {
  * This is a dummy kset so bridge objects don't cause
  * hotplug events 
  */
-struct subsystem bridge_subsys = { 
-	.kset = { .hotplug_ops = NULL },
-};
+decl_subsys_name(bridge, net_bridge, NULL, NULL);
 
 void br_sysfs_init(void)
 {
