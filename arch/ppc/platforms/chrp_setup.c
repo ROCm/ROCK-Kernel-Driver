@@ -371,6 +371,16 @@ static void __init chrp_find_openpic(void)
 	}
 }
 
+static int __init
+chrp_request_cascade(void)
+{
+	/* We have a cascade on OpenPIC IRQ 0, Linux IRQ 16 */
+	openpic_hookup_cascade(NUM_8259_INTERRUPTS, "82c59 cascade",
+			       i8259_irq);
+	return 0;
+}
+arch_initcall(chrp_request_cascade);
+
 void __init chrp_init_IRQ(void)
 {
 	struct device_node *np;
@@ -400,9 +410,6 @@ void __init chrp_init_IRQ(void)
 	OpenPIC_NumInitSenses = NR_IRQS - NUM_8259_INTERRUPTS;
 
 	openpic_init(NUM_8259_INTERRUPTS);
-	/* We have a cascade on OpenPIC IRQ 0, Linux IRQ 16 */
-	openpic_hookup_cascade(NUM_8259_INTERRUPTS, "82c59 cascade",
-			       i8259_irq);
 
 	for (i = 0; i < NUM_8259_INTERRUPTS; i++)
 		irq_desc[i].handler = &i8259_pic;
