@@ -136,7 +136,7 @@ typedef struct pglist_data {
 	unsigned long node_start_mapnr;
 	unsigned long node_size;
 	int node_id;
-	struct pglist_data *node_next;
+	struct pglist_data *pgdat_next;
 } pg_data_t;
 
 extern int numnodes;
@@ -162,6 +162,20 @@ extern void free_area_init_core(int nid, pg_data_t *pgdat, struct page **gmap,
   struct page *pmap);
 
 extern pg_data_t contig_page_data;
+
+/**
+ * for_each_pgdat - helper macro to iterate over all nodes
+ * @pgdat - pointer to a pg_data_t variable
+ *
+ * Meant to help with common loops of the form
+ * pgdat = pgdat_list;
+ * while(pgdat) {
+ * 	...
+ * 	pgdat = pgdat->pgdat_next;
+ * }
+ */
+#define for_each_pgdat(pgdat) \
+	for (pgdat = pgdat_list; pgdat; pgdat = pgdat->pgdat_next)
 
 #ifndef CONFIG_DISCONTIGMEM
 

@@ -471,7 +471,7 @@ static void kswapd_balance(void)
 		pgdat = pgdat_list;
 		do
 			need_more_balance |= kswapd_balance_pgdat(pgdat);
-		while ((pgdat = pgdat->node_next));
+		while ((pgdat = pgdat->pgdat_next));
 	} while (need_more_balance);
 }
 
@@ -499,7 +499,7 @@ static int kswapd_can_sleep(void)
 		if (kswapd_can_sleep_pgdat(pgdat))
 			continue;
 		return 0;
-	} while ((pgdat = pgdat->node_next));
+	} while ((pgdat = pgdat->pgdat_next));
 
 	return 1;
 }

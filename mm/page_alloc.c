@@ -480,7 +480,7 @@ unsigned int nr_free_pages(void)
 	unsigned int i, sum = 0;
 	pg_data_t *pgdat;
 
-	for (pgdat = pgdat_list; pgdat; pgdat = pgdat->node_next)
+	for (pgdat = pgdat_list; pgdat; pgdat = pgdat->pgdat_next)
 		for (i = 0; i < MAX_NR_ZONES; ++i)
 			sum += pgdat->node_zones[i].free_pages;
 
@@ -489,10 +489,10 @@ unsigned int nr_free_pages(void)
 
 static unsigned int nr_free_zone_pages(int offset)
 {
-	pg_data_t *pgdat = pgdat_list;
+	pg_data_t *pgdat;
 	unsigned int sum = 0;
 
-	do {
+	for_each_pgdat(pgdat) {
 		zonelist_t *zonelist = pgdat->node_zonelists + offset;
 		zone_t **zonep = zonelist->zones;
 		zone_t *zone;
@@ -503,9 +503,7 @@ static unsigned int nr_free_zone_pages(int offset)
 			if (size > high)
 				sum += size - high;
 		}
-
-		pgdat = pgdat->node_next;
-	} while (pgdat);
+	}
 
 	return sum;
 }
@@ -529,13 +527,12 @@ unsigned int nr_free_pagecache_pages(void)
 #if CONFIG_HIGHMEM
 unsigned int nr_free_highpages (void)
 {
-	pg_data_t *pgdat = pgdat_list;
+	pg_data_t *pgdat;
 	unsigned int pages = 0;
 
-	while (pgdat) {
+	for_each_pgdat(pgdat)
 		pages += pgdat->node_zones[ZONE_HIGHMEM].free_pages;
-		pgdat = pgdat->node_next;
-	}
+
 	return pages;
 }
 #endif
@@ -613,7 +610,7 @@ void show_free_areas(void)
 		K(nr_free_pages()),
 		K(nr_free_highpages()));
 
-	for (pgdat = pgdat_list; pgdat; pgdat = pgdat->node_next)
+	for (pgdat = pgdat_list; pgdat; pgdat = pgdat->pgdat_next)
 		for (type = 0; type < MAX_NR_ZONES; ++type) {
 			zone_t *zone = &pgdat->node_zones[type];
 			printk("Zone:%s "
@@ -635,7 +632,7 @@ void show_free_areas(void)
 		ps.nr_writeback,
 		nr_free_pages());
 
-	for (pgdat = pgdat_list; pgdat; pgdat = pgdat->node_next)
+	for (pgdat = pgdat_list; pgdat; pgdat = pgdat->pgdat_next)
 		for (type = 0; type < MAX_NR_ZONES; type++) {
 			list_t *elem;
 			zone_t *zone = &pgdat->node_zones[type];

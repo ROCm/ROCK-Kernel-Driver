@@ -98,19 +98,19 @@ struct page * _alloc_pages(unsigned int gfp_mask, unsigned int order)
 	if (!next)
 		next = pgdat_list;
 	temp = next;
-	next = next->node_next;
+	next = next->pgdat_next;
 #endif
 	start = temp;
 	while (temp) {
 		if ((ret = alloc_pages_pgdat(temp, gfp_mask, order)))
 			return(ret);
-		temp = temp->node_next;
+		temp = temp->pgdat_next;
 	}
 	temp = pgdat_list;
 	while (temp != start) {
 		if ((ret = alloc_pages_pgdat(temp, gfp_mask, order)))
 			return(ret);
-		temp = temp->node_next;
+		temp = temp->pgdat_next;
 	}
 	return(0);
 }
