@@ -137,9 +137,9 @@ extern unsigned int vced_count, vcei_count;
 #endif
 
 /*
- * Size of io_bitmap in longwords: 32 is ports 0-0x3ff.
+ * Size of io_bitmap in longwords.
  */
-#define IO_BITMAP_SIZE	32
+#define IO_BITMAP_SIZE	2048
 
 #define NUM_FPU_REGS	32
 
