@@ -37,7 +37,6 @@
 #ifndef __PAGE_BUF_H__
 #define __PAGE_BUF_H__
 
-#include <linux/version.h>
 #include <linux/config.h>
 #include <linux/list.h>
 #include <linux/types.h>
