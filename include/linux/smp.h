@@ -96,6 +96,7 @@ static inline void smp_send_reschedule_all(void) { }
 #define cpu_online_map				1
 #define cpu_online(cpu)				({ cpu; 1; })
 #define num_online_cpus()			1
+#define num_booting_cpus()			1
 
 struct notifier_block;
 

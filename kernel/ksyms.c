@@ -93,7 +93,7 @@ EXPORT_SYMBOL(__alloc_pages);
 EXPORT_SYMBOL(alloc_pages_node);
 EXPORT_SYMBOL(__get_free_pages);
 EXPORT_SYMBOL(get_zeroed_page);
-EXPORT_SYMBOL(page_cache_release);
+EXPORT_SYMBOL(__page_cache_release);
 EXPORT_SYMBOL(__free_pages);
 EXPORT_SYMBOL(free_pages);
 EXPORT_SYMBOL(num_physpages);
@@ -129,6 +129,7 @@ EXPORT_SYMBOL(highmem_start_page);
 EXPORT_SYMBOL(kmap_prot);
 EXPORT_SYMBOL(kmap_pte);
 #endif
+EXPORT_SYMBOL(get_user_pages);
 
 /* filesystem internal functions */
 EXPORT_SYMBOL(def_blk_fops);

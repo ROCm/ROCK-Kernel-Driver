@@ -46,6 +46,7 @@
 #include <asm/uaccess.h>
 #include <asm/byteorder.h>
 
+#include "hcd.h"	/* for usbcore internals */
 
 struct async {
         struct list_head asynclist;
@@ -724,7 +725,7 @@ static int proc_resetdevice(struct dev_state *ps)
 
 		lock_kernel();
 		if (intf->driver && ps->dev) {
-			usb_bind_driver(intf->driver,ps->dev, i);
+			usb_bind_driver (intf->driver, intf);
 		}
 		unlock_kernel();
 	}
@@ -1062,8 +1063,8 @@ static int proc_ioctl (struct dev_state *ps, void *arg)
 	int			size;
 	void			*buf = 0;
 	int			retval = 0;
-       struct usb_interface    *ifp = 0;
-       struct usb_driver       *driver = 0;
+	struct usb_interface    *ifp = 0;
+	struct usb_driver       *driver = 0;
 
 	/* get input parameters and alloc buffer */
 	if (copy_from_user(&ctrl, (void *) arg, sizeof (ctrl)))
@@ -1102,10 +1103,10 @@ static int proc_ioctl (struct dev_state *ps, void *arg)
 		unlock_kernel();
                break;
 
-       /* let kernel drivers try to (re)bind to the interface */
-       case USBDEVFS_CONNECT:
-               usb_find_interface_driver_for_ifnum (ps->dev, ctrl.ifno);
-               break;
+	/* let kernel drivers try to (re)bind to the interface */
+	case USBDEVFS_CONNECT:
+		usb_find_interface_driver (ps->dev, ifp);
+		break;
 
        /* talk directly to the interface's driver */
        default:
@@ -1144,6 +1145,11 @@ static int proc_ioctl (struct dev_state *ps, void *arg)
 	return retval;
 }
 
+/*
+ * NOTE:  All requests here that have interface numbers as parameters
+ * are assuming that somehow the configuration has been prevented from
+ * changing.  But there's no mechanism to ensure that...
+ */
 static int usbdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
 {
 	struct dev_state *ps = (struct dev_state *)file->private_data;

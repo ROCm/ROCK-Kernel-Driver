@@ -56,10 +56,10 @@ bus_attr_store(struct driver_dir_entry * dir, struct attribute * attr,
 }
 
 static struct driverfs_ops bus_attr_ops = {
-	open:	bus_attr_open,
-	close:	bus_attr_close,
-	show:	bus_attr_show,
-	store:	bus_attr_store,
+	.open	= bus_attr_open,
+	.close	= bus_attr_close,
+	.show	= bus_attr_show,
+	.store	= bus_attr_store,
 };
 
 int bus_create_file(struct bus_type * bus, struct bus_attribute * attr)
@@ -107,8 +107,8 @@ void bus_remove_dir(struct bus_type * bus)
 }
 
 static struct driver_dir_entry bus_dir = {
-	name:	"bus",
-	mode:	(S_IFDIR| S_IRWXU | S_IRUGO | S_IXUGO),
+	.name	= "bus",
+	.mode	= (S_IFDIR| S_IRWXU | S_IRUGO | S_IXUGO),
 };
 
 static int __init bus_init(void)

@@ -52,7 +52,6 @@ extern void usb_major_cleanup(void);
  * Prototypes for the device driver probing/loading functions
  */
 static void usb_find_drivers(struct usb_device *);
-static int  usb_find_interface_driver(struct usb_device *, unsigned int);
 static void usb_check_support(struct usb_device *);
 
 /*
@@ -119,7 +118,7 @@ void usb_scan_devices(void)
 }
 
 /**
- *	usb_unbind_driver - disconnects a driver from a device
+ *	usb_unbind_driver - disconnects a driver from a device (usbcore-internal)
  *	@device: usb device to be disconnected
  *	@intf: interface of the device to be disconnected
  *	Context: BKL held
@@ -164,21 +163,27 @@ void usb_unbind_driver(struct usb_device *device, struct usb_interface *intf)
 }
 
 /**
- *	usb_bind_driver - connect a driver to a device's interface
- *	@driver: device driver to be bound to a devices interface
- *	@dev: device to be bound
- *	@ifnum: index number of the interface to be used
+ *	usb_bind_driver - connect a driver to a device's interface (usbcore-internal)
+ *	@driver: device driver to be bound to interface
+ *	@interface: interface that the driver will be using
+ *	Context: BKL held
  *
- *	Does a save binding of a driver to a device's interface
- *	Returns a pointer to the drivers private description of the binding
+ *	Does a safe binding of a driver to one of a device's interfaces.
+ *	Returns the driver's data for the binding, or null indicating
+ *	that the driver did not bind to this interface.
+ *
+ *	This differs from usb_driver_claim_interface(), which is called from
+ *	drivers and neither calls the driver's probe() entry nor does any
+ *	locking to guard against removing driver modules.
  */
-
-void *usb_bind_driver(struct usb_driver *driver, struct usb_device *dev, unsigned int ifnum)
+void *
+usb_bind_driver (struct usb_driver *driver, struct usb_interface *interface)
 {
 	int i,m;
 	void *private = NULL;
 	const struct usb_device_id *id;
-	struct usb_interface *interface;
+	struct usb_device *dev = interface_to_usbdev (interface);
+	int ifnum;
 
 	if (driver->owner) {
 		m = try_inc_mod_count(driver->owner);
@@ -187,14 +192,21 @@ void *usb_bind_driver(struct usb_driver *driver, struct usb_device *dev, unsigne
 		unlock_kernel();
 	}
 
-	interface = &dev->actconfig->interface[ifnum];
+	// START TEMPORARY
+	// driver->probe() hasn't yet changed to take interface not dev+ifnum,
+	// so we still need ifnum here.
+	for (ifnum = 0; ifnum < dev->actconfig->bNumInterfaces; ifnum++)
+		if (&dev->actconfig->interface [ifnum] == interface)
+			break;
+	BUG_ON (ifnum == dev->actconfig->bNumInterfaces);
+	// END TEMPORARY
 
 	id = driver->id_table;
 	/* new style driver? */
 	if (id) {
 		for (i = 0; i < interface->num_altsetting; i++) {
 		  	interface->act_altsetting = i;
-			id = usb_match_id(dev, interface, id);
+			id = usb_match_id(interface, id);
 			if (id) {
 				down(&driver->serialize);
 				private = driver->probe(dev,ifnum,id);
@@ -252,7 +264,7 @@ static void usb_drivers_purge(struct usb_driver *driver,struct usb_device *dev)
 			 * This will go through the list looking for another
 			 * driver that can handle the device
 			 */
-			usb_find_interface_driver(dev, i);
+			usb_find_interface_driver(dev, interface);
 		}
 	}
 }
@@ -294,29 +306,7 @@ void usb_deregister(struct usb_driver *driver)
 }
 
 /**
- * usb_ifnum_to_ifpos - convert the interface number to the interface position
- * @dev: the device to use
- * @ifnum: the interface number (bInterfaceNumber); not interface position
- *
- * This is used to convert the interface _number_ (as in
- * interface.bInterfaceNumber) to the interface _position_ (as in
- * dev->actconfig->interface + position).  Note that the number is the same as
- * the position for all interfaces _except_ devices with interfaces not
- * sequentially numbered (e.g., 0, 2, 3, etc).
- */
-int usb_ifnum_to_ifpos(struct usb_device *dev, unsigned ifnum)
-{
-	int i;
-
-	for (i = 0; i < dev->actconfig->bNumInterfaces; i++)
-		if (dev->actconfig->interface[i].altsetting[0].bInterfaceNumber == ifnum)
-			return i;
-
-	return -EINVAL;
-}
-
-/**
- * usb_ifnum_to_if - get the interface object with a given interface number
+ * usb_ifnum_to_if - get the interface object with a given interface number (usbcore-internal)
  * @dev: the device whose current configuration is considered
  * @ifnum: the desired interface
  *
@@ -392,7 +382,8 @@ static void usb_check_support(struct usb_device *dev)
 	/* now we check this device */
 	if (dev->devnum > 0)
 		for (i = 0; i < dev->actconfig->bNumInterfaces; i++)
-			usb_find_interface_driver(dev, i);
+			usb_find_interface_driver (dev,
+				dev->actconfig->interface + i);
 }
 
 
@@ -475,7 +466,6 @@ void usb_driver_release_interface(struct usb_driver *driver, struct usb_interfac
 
 /**
  * usb_match_id - find first usb_device_id matching device or interface
- * @dev: the device whose descriptors are considered when matching
  * @interface: the interface of interest
  * @id: array of usb_device_id structures, terminated by zero entry
  *
@@ -537,14 +527,17 @@ void usb_driver_release_interface(struct usb_driver *driver, struct usb_interfac
  * its associated class and subclass.
  */   
 const struct usb_device_id *
-usb_match_id(struct usb_device *dev, struct usb_interface *interface,
-	     const struct usb_device_id *id)
+usb_match_id(struct usb_interface *interface, const struct usb_device_id *id)
 {
-	struct usb_interface_descriptor	*intf = 0;
+	struct usb_interface_descriptor *intf;
+	struct usb_device *dev;
 
 	/* proc_connectinfo in devio.c may call us with id == NULL. */
 	if (id == NULL)
 		return NULL;
+
+	intf = &interface->altsetting [interface->act_altsetting];
+	dev = interface_to_usbdev(interface);
 
 	/* It is important to check that id->driver_info is nonzero,
 	   since an entry that is all zeroes except for a nonzero
@@ -584,19 +577,17 @@ usb_match_id(struct usb_device *dev, struct usb_interface *interface,
 		    (id->bDeviceProtocol != dev->descriptor.bDeviceProtocol))
 			continue;
 
-		intf = &interface->altsetting [interface->act_altsetting];
-
 		if ((id->match_flags & USB_DEVICE_ID_MATCH_INT_CLASS) &&
 		    (id->bInterfaceClass != intf->bInterfaceClass))
 			continue;
 
 		if ((id->match_flags & USB_DEVICE_ID_MATCH_INT_SUBCLASS) &&
 		    (id->bInterfaceSubClass != intf->bInterfaceSubClass))
-		    continue;
+			continue;
 
 		if ((id->match_flags & USB_DEVICE_ID_MATCH_INT_PROTOCOL) &&
 		    (id->bInterfaceProtocol != intf->bInterfaceProtocol))
-		    continue;
+			continue;
 
 		return id;
 	}
@@ -605,7 +596,7 @@ usb_match_id(struct usb_device *dev, struct usb_interface *interface,
 }
 
 /*
- * This entrypoint gets called for each new device.
+ * This entrypoint gets called for unclaimed interfaces.
  *
  * We now walk the list of registered USB drivers,
  * looking for one that will accept this interface.
@@ -620,21 +611,27 @@ usb_match_id(struct usb_device *dev, struct usb_interface *interface,
  *
  * Returns: 0 if a driver accepted the interface, -1 otherwise
  */
-static int usb_find_interface_driver(struct usb_device *dev, unsigned ifnum)
+int usb_find_interface_driver (
+	struct usb_device *dev,
+	struct usb_interface *interface
+)
 {
 	struct list_head *tmp;
-	struct usb_interface *interface;
 	void *private;
 	struct usb_driver *driver;
+	int ifnum;
 	
-	if ((!dev) || (ifnum >= dev->actconfig->bNumInterfaces)) {
-		err("bad find_interface_driver params");
-		return -1;
-	}
-
 	down(&dev->serialize);
 
-	interface = dev->actconfig->interface + ifnum;
+	/* FIXME It's just luck that for some devices with drivers that set
+	 * configuration in probe(), the interface numbers still make sense.
+	 * That's one of several unsafe assumptions involved in configuring
+	 * devices, and in binding drivers to their interfaces.
+	 */
+	for (ifnum = 0; ifnum < dev->actconfig->bNumInterfaces; ifnum++)
+		if (&dev->actconfig->interface [ifnum] == interface)
+			break;
+	BUG_ON (ifnum == dev->actconfig->bNumInterfaces);
 
 	if (usb_interface_claimed(interface))
 		goto out_err;
@@ -645,7 +642,7 @@ static int usb_find_interface_driver(struct usb_device *dev, unsigned ifnum)
 		driver = list_entry(tmp, struct usb_driver, driver_list);
 		tmp = tmp->next;
 
-		private = usb_bind_driver(driver, dev, ifnum);
+		private = usb_bind_driver(driver, interface);
 
 		/* probe() may have changed the config on us */
 		interface = dev->actconfig->interface + ifnum;
@@ -662,25 +659,6 @@ static int usb_find_interface_driver(struct usb_device *dev, unsigned ifnum)
 out_err:
 	up(&dev->serialize);
 	return -1;
-}
-
-/**
- * usb_find_interface_driver_for_ifnum - finds a usb interface driver for the specified ifnum
- * @dev: the device to use
- * @ifnum: the interface number (bInterfaceNumber); not interface position!
- *
- * This converts a ifnum to ifpos via a call to usb_ifnum_to_ifpos and then
- * calls usb_find_interface_driver() with the found ifpos.  Note
- * usb_find_interface_driver's ifnum parameter is actually interface position.
- */
-int usb_find_interface_driver_for_ifnum(struct usb_device *dev, unsigned ifnum)
-{
-	int ifpos = usb_ifnum_to_ifpos(dev, ifnum);
-
-	if (0 > ifpos)
-		return -EINVAL;
-
-	return usb_find_interface_driver(dev, ifpos);
 }
 
 #ifdef	CONFIG_HOTPLUG
@@ -956,7 +934,7 @@ static void usb_find_drivers(struct usb_device *dev)
 
 		/* if this interface hasn't already been claimed */
 		if (!usb_interface_claimed(interface)) {
-			if (usb_find_interface_driver(dev, ifnum))
+			if (usb_find_interface_driver(dev, interface))
 				rejected++;
 			else
 				claimed++;
@@ -1655,8 +1633,6 @@ module_exit(usb_exit);
  * These symbols are exported for device (or host controller)
  * driver modules to use.
  */
-EXPORT_SYMBOL(usb_ifnum_to_ifpos);
-EXPORT_SYMBOL(usb_ifnum_to_if);
 EXPORT_SYMBOL(usb_epnum_to_ep_desc);
 
 EXPORT_SYMBOL(usb_register);
@@ -1668,7 +1644,6 @@ EXPORT_SYMBOL(usb_free_dev);
 EXPORT_SYMBOL(usb_get_dev);
 EXPORT_SYMBOL(usb_hub_tt_clear_buffer);
 
-EXPORT_SYMBOL(usb_find_interface_driver_for_ifnum);
 EXPORT_SYMBOL(usb_driver_claim_interface);
 EXPORT_SYMBOL(usb_interface_claimed);
 EXPORT_SYMBOL(usb_driver_release_interface);
@@ -1679,8 +1654,6 @@ EXPORT_SYMBOL(usb_new_device);
 EXPORT_SYMBOL(usb_reset_device);
 EXPORT_SYMBOL(usb_connect);
 EXPORT_SYMBOL(usb_disconnect);
-EXPORT_SYMBOL(usb_bind_driver);
-EXPORT_SYMBOL(usb_unbind_driver);
 
 EXPORT_SYMBOL(__usb_get_extra_descriptor);
 

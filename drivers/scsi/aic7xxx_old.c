@@ -5077,7 +5077,6 @@ aic7xxx_handle_seqint(struct aic7xxx_host *p, unsigned char intstat)
         }
         else 
         {
-          sti();
           panic("aic7xxx: AWAITING_MSG for an SCB that does "
                 "not have a waiting message.\n");
         }
@@ -6933,7 +6932,6 @@ aic7xxx_isr(int irq, void *dev_id, struct pt_regs *regs)
 #endif
     if (errno & (SQPARERR | ILLOPCODE | ILLSADDR))
     {
-      sti();
       panic("aic7xxx: unrecoverable BRKADRINT.\n");
     }
     if (errno & ILLHADDR)

@@ -6,7 +6,7 @@
 # define DBG(x...)
 #endif
 
-extern struct device device_root;
+extern struct list_head global_device_list;
 extern spinlock_t device_lock;
 
 extern struct device * get_device_locked(struct device *);

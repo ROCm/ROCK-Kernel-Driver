@@ -17,8 +17,8 @@
 #include <linux/errno.h>
 
 static struct device system_bus = {
-       name:           "System Bus",
-       bus_id:         "sys",
+       .name           = "System Bus",
+       .bus_id         = "sys",
 };
 
 int register_sys_device(struct device * dev)

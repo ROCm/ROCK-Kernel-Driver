@@ -1597,12 +1597,12 @@ static int es1371_ioctl(struct inode *inode, struct file *file, unsigned int cmd
         case SNDCTL_DSP_RESET:
 		if (file->f_mode & FMODE_WRITE) {
 			stop_dac2(s);
-			synchronize_irq();
+			synchronize_irq(s->irq);
 			s->dma_dac2.swptr = s->dma_dac2.hwptr = s->dma_dac2.count = s->dma_dac2.total_bytes = 0;
 		}
 		if (file->f_mode & FMODE_READ) {
 			stop_adc(s);
-			synchronize_irq();
+			synchronize_irq(s->irq);
 			s->dma_adc.swptr = s->dma_adc.hwptr = s->dma_adc.count = s->dma_adc.total_bytes = 0;
 		}
 		return 0;
@@ -2162,7 +2162,7 @@ static int es1371_ioctl_dac(struct inode *inode, struct file *file, unsigned int
 		
         case SNDCTL_DSP_RESET:
 		stop_dac1(s);
-		synchronize_irq();
+		synchronize_irq(s->irq);
 		s->dma_dac1.swptr = s->dma_dac1.hwptr = s->dma_dac1.count = s->dma_dac1.total_bytes = 0;
 		return 0;
 
@@ -3006,7 +3006,7 @@ static void __devinit es1371_remove(struct pci_dev *dev)
 #endif /* ES1371_DEBUG */
 	outl(0, s->io+ES1371_REG_CONTROL); /* switch everything off */
 	outl(0, s->io+ES1371_REG_SERIAL_CONTROL); /* clear serial interrupts */
-	synchronize_irq();
+	synchronize_irq(s->irq);
 	free_irq(s->irq, s);
 	if (s->gameport.io) {
 		gameport_unregister_port(&s->gameport);

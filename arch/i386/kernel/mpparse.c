@@ -213,7 +213,6 @@ static void __init MP_bus_info (struct mpc_config_bus *m)
 		quad = translation_table[mpc_record]->trans_quad;
 		mp_bus_id_to_node[m->mpc_busid] = quad;
 		mp_bus_id_to_local[m->mpc_busid] = translation_table[mpc_record]->trans_local;
-		quad_local_to_mp_bus_id[quad][translation_table[mpc_record]->trans_local] = m->mpc_busid;
 		printk("Bus #%d is %s (node %d)\n", m->mpc_busid, str, quad);
 	} else {
 		Dprintk("Bus #%d is %s\n", m->mpc_busid, str);
@@ -224,6 +223,9 @@ static void __init MP_bus_info (struct mpc_config_bus *m)
 	} else if (strncmp(str, BUSTYPE_EISA, sizeof(BUSTYPE_EISA)-1) == 0) {
 		mp_bus_id_to_type[m->mpc_busid] = MP_BUS_EISA;
 	} else if (strncmp(str, BUSTYPE_PCI, sizeof(BUSTYPE_PCI)-1) == 0) {
+		if (clustered_apic_mode){
+			quad_local_to_mp_bus_id[quad][translation_table[mpc_record]->trans_local] = m->mpc_busid;
+		}
 		mp_bus_id_to_type[m->mpc_busid] = MP_BUS_PCI;
 		mp_bus_id_to_pci_bus[m->mpc_busid] = mp_current_pci_id;
 		mp_current_pci_id++;
