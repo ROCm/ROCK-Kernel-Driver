@@ -2600,3 +2600,4 @@ int init_module(void)
 }
 #endif
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_NETPROTO(PF_WANPIPE);

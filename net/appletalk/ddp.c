@@ -1940,3 +1940,4 @@ module_exit(atalk_exit);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Alan Cox <Alan.Cox@linux.org>");
 MODULE_DESCRIPTION("AppleTalk 0.20 for Linux NET4.0\n");
+MODULE_ALIAS_NETPROTO(PF_APPLETALK);

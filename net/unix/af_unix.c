@@ -1965,3 +1965,4 @@ module_init(af_unix_init);
 module_exit(af_unix_exit);
 
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_NETPROTO(PF_UNIX);
