@@ -171,6 +171,7 @@ static struct usb_serial_device_type mct_u232_device = {
 
 
 struct mct_u232_private {
+	spinlock_t lock;
 	unsigned long	     control_state; /* Modem Line Setting (TIOCM) */
 	unsigned char        last_lcr;      /* Line Control Register */
 	unsigned char	     last_lsr;      /* Line Status Register */
@@ -306,8 +307,9 @@ static int mct_u232_startup (struct usb_serial *serial)
 	/* allocate the private data structure */
 	priv = kmalloc(sizeof(struct mct_u232_private), GFP_KERNEL);
 	if (!priv)
-		return (-1); /* error */
+		return -ENOMEM;
 	/* set initial values for control structures */
+	spin_lock_init(&priv->lock);
 	priv->control_state = 0;
 	priv->last_lsr = 0;
 	priv->last_msr = 0;
@@ -339,6 +341,10 @@ static int  mct_u232_open (struct usb_serial_port *port, struct file *filp)
 	struct usb_serial *serial = port->serial;
 	struct mct_u232_private *priv = usb_get_serial_port_data(port);
 	int retval = 0;
+	unsigned long control_state;
+	unsigned long flags;
+	unsigned char last_lcr;
+	unsigned char last_msr;
 
 	dbg("%s port %d", __FUNCTION__, port->number);
 
@@ -355,20 +361,27 @@ static int  mct_u232_open (struct usb_serial_port *port, struct file *filp)
 	 * sure if this is really necessary. But it should not harm
 	 * either.
 	 */
+	spin_lock_irqsave(&priv->lock, flags);
 	if (port->tty->termios->c_cflag & CBAUD)
 		priv->control_state = TIOCM_DTR | TIOCM_RTS;
 	else
 		priv->control_state = 0;
-	mct_u232_set_modem_ctrl(serial, priv->control_state);
 	
 	priv->last_lcr = (MCT_U232_DATA_BITS_8 | 
 			  MCT_U232_PARITY_NONE |
 			  MCT_U232_STOP_BITS_1);
-	mct_u232_set_line_ctrl(serial, priv->last_lcr);
+	control_state = priv->control_state;
+	last_lcr = priv->last_lcr;
+	spin_unlock_irqrestore(&priv->lock, flags);
+	mct_u232_set_modem_ctrl(serial, control_state);
+	mct_u232_set_line_ctrl(serial, last_lcr);
 
 	/* Read modem status and update control state */
-	mct_u232_get_modem_stat(serial, &priv->last_msr);
+	mct_u232_get_modem_stat(serial, &last_msr);
+	spin_lock_irqsave(&priv->lock, flags);
+	priv->last_msr = last_msr;
 	mct_u232_msr_to_state(&priv->control_state, priv->last_msr);
+	spin_unlock_irqrestore(&priv->lock, flags);
 
 	{
 		/* Puh, that's dirty */
@@ -523,6 +536,7 @@ static void mct_u232_read_int_callback (struct urb *urb, struct pt_regs *regs)
 	struct tty_struct *tty;
 	unsigned char *data = urb->transfer_buffer;
 	int status;
+	unsigned long flags;
 
         dbg("%s - port %d", __FUNCTION__, port->number);
 
@@ -567,6 +581,7 @@ static void mct_u232_read_int_callback (struct urb *urb, struct pt_regs *regs)
 	 * The interrupt-in pipe signals exceptional conditions (modem line
 	 * signal changes and errors). data[0] holds MSR, data[1] holds LSR.
 	 */
+	spin_lock_irqsave(&priv->lock, flags);
 	priv->last_msr = data[MCT_U232_MSR_INDEX];
 	
 	/* Record Control Line states */
@@ -597,6 +612,7 @@ static void mct_u232_read_int_callback (struct urb *urb, struct pt_regs *regs)
 		}
 	}
 #endif
+	spin_unlock_irqrestore(&priv->lock, flags);
 exit:
 	status = usb_submit_urb (urb, GFP_ATOMIC);
 	if (status)
@@ -614,7 +630,16 @@ static void mct_u232_set_termios (struct usb_serial_port *port,
 	unsigned int old_iflag = old_termios->c_iflag;
 	unsigned int cflag = port->tty->termios->c_cflag;
 	unsigned int old_cflag = old_termios->c_cflag;
+	unsigned long flags;
+	unsigned long control_state;
+	unsigned char last_lcr;
 	
+	/* get a local copy of the current port settings */
+	spin_lock_irqsave(&priv->lock, flags);
+	control_state = priv->control_state;
+	last_lcr = priv->last_lcr;
+	spin_unlock_irqrestore(&priv->lock, flags);
+
 	/*
 	 * Update baud rate
 	 */
@@ -622,12 +647,12 @@ static void mct_u232_set_termios (struct usb_serial_port *port,
 	        /* reassert DTR and (maybe) RTS on transition from B0 */
 		if( (old_cflag & CBAUD) == B0 ) {
 			dbg("%s: baud was B0", __FUNCTION__);
-			priv->control_state |= TIOCM_DTR;
+			control_state |= TIOCM_DTR;
 			/* don't set RTS if using hardware flow control */
 			if (!(old_cflag & CRTSCTS)) {
-				priv->control_state |= TIOCM_RTS;
+				control_state |= TIOCM_RTS;
 			}
-			mct_u232_set_modem_ctrl(serial, priv->control_state);
+			mct_u232_set_modem_ctrl(serial, control_state);
 		}
 		
 		switch(cflag & CBAUD) {
@@ -659,8 +684,8 @@ static void mct_u232_set_termios (struct usb_serial_port *port,
 		if ((cflag & CBAUD) == B0 ) {
 			dbg("%s: baud is B0", __FUNCTION__);
 			/* Drop RTS and DTR */
-			priv->control_state &= ~(TIOCM_DTR | TIOCM_RTS);
-        		mct_u232_set_modem_ctrl(serial, priv->control_state);
+			control_state &= ~(TIOCM_DTR | TIOCM_RTS);
+        		mct_u232_set_modem_ctrl(serial, control_state);
 		}
 	}
 
@@ -672,36 +697,36 @@ static void mct_u232_set_termios (struct usb_serial_port *port,
 	    || (cflag & CSTOPB) != (old_cflag & CSTOPB) ) {
 		
 
-		priv->last_lcr = 0;
+		last_lcr = 0;
 
 		/* set the parity */
 		if (cflag & PARENB)
-			priv->last_lcr |= (cflag & PARODD) ?
+			last_lcr |= (cflag & PARODD) ?
 				MCT_U232_PARITY_ODD : MCT_U232_PARITY_EVEN;
 		else
-			priv->last_lcr |= MCT_U232_PARITY_NONE;
+			last_lcr |= MCT_U232_PARITY_NONE;
 
 		/* set the number of data bits */
 		switch (cflag & CSIZE) {
 		case CS5:
-			priv->last_lcr |= MCT_U232_DATA_BITS_5; break;
+			last_lcr |= MCT_U232_DATA_BITS_5; break;
 		case CS6:
-			priv->last_lcr |= MCT_U232_DATA_BITS_6; break;
+			last_lcr |= MCT_U232_DATA_BITS_6; break;
 		case CS7:
-			priv->last_lcr |= MCT_U232_DATA_BITS_7; break;
+			last_lcr |= MCT_U232_DATA_BITS_7; break;
 		case CS8:
-			priv->last_lcr |= MCT_U232_DATA_BITS_8; break;
+			last_lcr |= MCT_U232_DATA_BITS_8; break;
 		default:
 			err("CSIZE was not CS5-CS8, using default of 8");
-			priv->last_lcr |= MCT_U232_DATA_BITS_8;
+			last_lcr |= MCT_U232_DATA_BITS_8;
 			break;
 		}
 
 		/* set the number of stop bits */
-		priv->last_lcr |= (cflag & CSTOPB) ?
+		last_lcr |= (cflag & CSTOPB) ?
 			MCT_U232_STOP_BITS_2 : MCT_U232_STOP_BITS_1;
 
-		mct_u232_set_line_ctrl(serial, priv->last_lcr);
+		mct_u232_set_line_ctrl(serial, last_lcr);
 	}
 	
 	/*
@@ -714,11 +739,17 @@ static void mct_u232_set_termios (struct usb_serial_port *port,
 		
 		/* Drop DTR/RTS if no flow control otherwise assert */
 		if ((iflag & IXOFF) || (iflag & IXON) || (cflag & CRTSCTS) )
-			priv->control_state |= TIOCM_DTR | TIOCM_RTS;
+			control_state |= TIOCM_DTR | TIOCM_RTS;
 		else
-			priv->control_state &= ~(TIOCM_DTR | TIOCM_RTS);
-		mct_u232_set_modem_ctrl(serial, priv->control_state);
+			control_state &= ~(TIOCM_DTR | TIOCM_RTS);
+		mct_u232_set_modem_ctrl(serial, control_state);
 	}
+
+	/* save off the modified port settings */
+	spin_lock_irqsave(&priv->lock, flags);
+	priv->control_state = control_state;
+	priv->last_lcr = last_lcr;
+	spin_unlock_irqrestore(&priv->lock, flags);
 } /* mct_u232_set_termios */
 
 
@@ -726,9 +757,14 @@ static void mct_u232_break_ctl( struct usb_serial_port *port, int break_state )
 {
 	struct usb_serial *serial = port->serial;
 	struct mct_u232_private *priv = usb_get_serial_port_data(port);
-	unsigned char lcr = priv->last_lcr;
+	unsigned char lcr;
+	unsigned long flags;
 
 	dbg("%sstate=%d", __FUNCTION__, break_state);
+
+	spin_lock_irqsave(&priv->lock, flags);
+	lcr = priv->last_lcr;
+	spin_unlock_irqrestore(&priv->lock, flags);
 
 	if (break_state)
 		lcr |= MCT_U232_SET_BREAK;
@@ -743,13 +779,19 @@ static int mct_u232_ioctl (struct usb_serial_port *port, struct file * file,
 	struct usb_serial *serial = port->serial;
 	struct mct_u232_private *priv = usb_get_serial_port_data(port);
 	int mask;
+	unsigned long control_state;
+	unsigned long flags;
 	
 	dbg("%scmd=0x%x", __FUNCTION__, cmd);
+
+	spin_lock_irqsave(&priv->lock, flags);
+	control_state = priv->control_state;
+	spin_unlock_irqrestore(&priv->lock, flags);
 
 	/* Based on code from acm.c and others */
 	switch (cmd) {
 	case TIOCMGET:
-		return put_user(priv->control_state, (unsigned long *) arg);
+		return put_user(control_state, (unsigned long *) arg);
 		break;
 
 	case TIOCMSET: /* Turns on and off the lines as specified by the mask */
@@ -762,20 +804,24 @@ static int mct_u232_ioctl (struct usb_serial_port *port, struct file * file,
 			/* RTS needs set */
 			if( ((cmd == TIOCMSET) && (mask & TIOCM_RTS)) ||
 			    (cmd == TIOCMBIS) )
-				priv->control_state |=  TIOCM_RTS;
+				control_state |=  TIOCM_RTS;
 			else
-				priv->control_state &= ~TIOCM_RTS;
+				control_state &= ~TIOCM_RTS;
 		}
 
 		if ((cmd == TIOCMSET) || (mask & TIOCM_DTR)) {
 			/* DTR needs set */
 			if( ((cmd == TIOCMSET) && (mask & TIOCM_DTR)) ||
 			    (cmd == TIOCMBIS) )
-				priv->control_state |=  TIOCM_DTR;
+				control_state |=  TIOCM_DTR;
 			else
-				priv->control_state &= ~TIOCM_DTR;
+				control_state &= ~TIOCM_DTR;
 		}
-		mct_u232_set_modem_ctrl(serial, priv->control_state);
+		mct_u232_set_modem_ctrl(serial, control_state);
+
+		spin_lock_irqsave(&priv->lock, flags);
+		priv->control_state = control_state;
+		spin_unlock_irqrestore(&priv->lock, flags);
 		break;
 					
 	case TIOCMIWAIT:

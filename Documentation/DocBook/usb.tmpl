@@ -1,0 +1,294 @@
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook V3.1//EN"[]>
+<book id="Linux-USB-API">
+ <bookinfo>
+  <title>The Linux-USB Host Side API</title>
+  
+  <legalnotice>
+   <para>
+     This documentation is free software; you can redistribute
+     it and/or modify it under the terms of the GNU General Public
+     License as published by the Free Software Foundation; either
+     version 2 of the License, or (at your option) any later
+     version.
+   </para>
+      
+   <para>
+     This program is distributed in the hope that it will be
+     useful, but WITHOUT ANY WARRANTY; without even the implied
+     warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+     See the GNU General Public License for more details.
+   </para>
+      
+   <para>
+     You should have received a copy of the GNU General Public
+     License along with this program; if not, write to the Free
+     Software Foundation, Inc., 59 Temple Place, Suite 330, Boston,
+     MA 02111-1307 USA
+   </para>
+      
+   <para>
+     For more details see the file COPYING in the source
+     distribution of Linux.
+   </para>
+  </legalnotice>
+ </bookinfo>
+
+<toc></toc>
+
+<chapter id="intro">
+    <title>Introduction to USB on Linux</title>
+
+    <para>A Universal Serial Bus (USB) is used to connect a host,
+    such as a PC or workstation, to a number of peripheral
+    devices.  USB uses a tree structure, with the host at the
+    root (the system's master), hubs as interior nodes, and
+    peripheral devices as leaves (and slaves).
+    Modern PCs support several such trees of USB devices, usually
+    one USB 2.0 tree (480 Mbit/sec each) with
+    a few USB 1.1 trees (12 Mbit/sec each) that are used when you
+    connect a USB 1.1 device directly to the machine's "root hub".
+    </para>
+
+    <para>That master/slave asymmetry was designed in part for
+    ease of use.  It is not physically possible to assemble
+    (legal) USB cables incorrectly:  all upstream "to-the-host"
+    connectors are the rectangular type, matching the sockets on
+    root hubs, and the downstream type are the squarish type
+    (or they are built in to the peripheral).
+    Software doesn't need to deal with distributed autoconfiguration
+    since the pre-designated master node manages all that.
+    At the electrical level, bus protocol overhead is reduced by
+    eliminating arbitration and moving scheduling into host software.
+    </para>
+
+    <para>USB 1.0 was announced in January 1996, and was revised
+    as USB 1.1 (with improvements in hub specification and
+    support for interrupt-out transfers) in September 1998.
+    USB 2.0 was released in April 2000, including high speed
+    transfers and transaction translating hubs (used for USB 1.1
+    and 1.0 backward compatibility).
+    </para>
+
+    <para>USB support was added to Linux early in the 2.2 kernel series
+    shortly before the 2.3 development forked off.  Updates
+    from 2.3 were regularly folded back into 2.2 releases, bringing
+    new features such as <filename>/sbin/hotplug</filename> support,
+    more drivers, and more robustness.
+    The 2.5 kernel series continued such improvements, and also
+    worked on USB 2.0 support,
+    higher performance,
+    better consistency between host controller drivers,
+    API simplification (to make bugs less likely),
+    and providing internal "kerneldoc" documentation.
+    </para>
+
+    <para>Linux can run inside USB devices as well as on
+    the hosts that control the devices.
+    Because the Linux 2.x USB support evolved to support mass market
+    platforms such as Apple Macintosh or PC-compatible systems,
+    it didn't address design concerns for those types of USB systems.
+    So it can't be used inside mass-market PDAs, or other peripherals.
+    USB device drivers running inside those Linux peripherals
+    don't do the same things as the ones running inside hosts,
+    and so they've been given a different name:
+    they're called <emphasis>gadget drivers</emphasis>.
+    This document does not present gadget drivers.
+    </para>
+
+    </chapter>
+
+<chapter id="host">
+    <title>USB Host-Side API Model</title>
+
+    <para>Host-side drivers for USB devices talk to the "usbcore" APIs.
+    There are two types of public "usbcore" APIs, targetted at two different
+    layers of USB driver.  Those are
+    <emphasis>general purpose</emphasis> drivers, exposed through
+    driver frameworks such as block, character, or network devices;
+    and drivers that are <emphasis>part of the core</emphasis>,
+    which are involved in managing a USB bus.
+    Such core drivers include the <emphasis>hub</emphasis> driver,
+    which manages trees of USB devices, and several different kinds
+    of <emphasis>host controller driver (HCD)</emphasis>,
+    which control individual busses.
+    </para>
+
+    <para>The device model seen by USB drivers is relatively complex.
+    </para>
+     
+    <itemizedlist>
+
+	<listitem><para>USB supports four kinds of data transfer
+	(control, bulk, interrupt, and isochronous).  Two transfer
+	types use bandwidth as it's available (control and bulk),
+	while the other two types of transfer (interrupt and isochronous)
+	are scheduled to provide guaranteed bandwidth.
+	</para></listitem>
+
+	<listitem><para>The device description model includes one or more
+	"configurations" per device, only one of which is active at a time.
+	Devices that are capable of high speed operation must also support
+	full speed configurations, along with a way to ask about the
+	"other speed" configurations that might be used.
+	</para></listitem>
+
+	<listitem><para>Configurations have one or more "interface", each
+	of which may have "alternate settings".  Interfaces may be
+	standardized by USB "Class" specifications, or may be specific to
+	a vendor or device.</para>
+
+	<para>USB device drivers actually bind to interfaces, not devices.
+	Think of them as "interface drivers", though you
+	may not see many devices where the distinction is important.
+	<emphasis>Most USB devices are simple, with only one configuration,
+	one interface, and one alternate setting.</emphasis>
+	</para></listitem>
+
+	<listitem><para>Interfaces have one or more "endpoints", each of
+	which supports one type and direction of data transfer such as
+	"bulk out" or "interrupt in".  The entire configuration may have
+	up to sixteen endpoints in each direction, allocated as needed
+	among all the interfaces.
+	</para></listitem>
+
+	<listitem><para>Data transfer on USB is packetized; each endpoint
+	has a maximum packet size.
+	Drivers must often be aware of conventions such as flagging the end
+	of bulk transfers using "short" (including zero length) packets.
+	</para></listitem>
+
+	<listitem><para>The Linux USB API supports synchronous calls for
+	control and bulk messaging.
+	It also supports asynchnous calls for all kinds of data transfer,
+	using request structures called "URBs" (USB Request Blocks).
+	</para></listitem>
+
+    </itemizedlist>
+
+    <para>Accordingly, the USB Core API exposed to device drivers
+    covers quite a lot of territory.  You'll probably need to consult
+    the USB 2.0 specification, available online from www.usb.org at
+    no cost, as well as class or device specifications.
+    </para>
+
+    <para>The only host-side drivers that actually touch hardware
+    (reading/writing registers, handling IRQs, and so on) are the HCDs.
+    In theory, all HCDs provide the same functionality through the same
+    API.  In practice, that's becoming more true on the 2.5 kernels,
+    but there are still differences that crop up especially with
+    fault handling.  Different controllers don't necessarily report
+    the same aspects of failures, and recovery from faults (including
+    software-induced ones like unlinking an URB) isn't yet fully
+    consistent.
+    Device driver authors should make a point of doing disconnect
+    testing (while the device is active) with each different host
+    controller driver, to make sure drivers don't have bugs of
+    their own as well as to make sure they aren't relying on some
+    HCD-specific behavior.
+    (You will need external USB 1.1 and/or
+    USB 2.0 hubs to perform all those tests.)
+    </para>
+
+    </chapter>
+
+<chapter><title>USB-Standard Types</title>
+
+    <para>In <filename>&lt;linux/usb_ch9.h&gt;</filename> you will find
+    the USB data types defined in chapter 9 of the USB specification.
+    These data types are used throughout USB, and in APIs including
+    this host side API, gadget APIs, and usbfs.
+    </para>
+
+!Iinclude/linux/usb_ch9.h
+
+    </chapter>
+
+<chapter><title>Host-Side Data Types and Macros</title>
+
+    <para>The host side API exposes several layers to drivers, some of
+    which are more necessary than others.
+    These support lifecycle models for host side drivers
+    and devices, and support passing buffers through usbcore to
+    some HCD that performs the I/O for the device driver.
+    </para>
+
+
+!Iinclude/linux/usb.h
+
+    </chapter>
+
+    <chapter><title>USB Core APIs</title>
+
+    <para>There are two basic I/O models in the USB API.
+    The most elemental one is asynchronous:  drivers submit requests
+    in the form of an URB, and the URB's completion callback
+    handle the next step.
+    All USB transfer types support that model, although there
+    are special cases for control URBs (which always have setup
+    and status stages, but may not have a data stage) and
+    isochronous URBs (which allow large packets and include
+    per-packet fault reports).
+    Built on top of that is synchronous API support, where a
+    driver calls a routine that allocates one or more URBs,
+    submits them, and waits until they complete.
+    There are synchronous wrappers for single-buffer control
+    and bulk transfers (which are awkward to use in some
+    driver disconnect scenarios), and for scatterlist based
+    streaming i/o (bulk or interrupt).
+    </para>
+
+    <para>USB drivers need to provide buffers that can be
+    used for DMA, although they don't necessarily need to
+    provide the DMA mapping themselves.
+    There are APIs to use used when allocating DMA buffers,
+    which can prevent use of bounce buffers on some systems.
+    In some cases, drivers may be able to rely on 64bit DMA
+    to eliminate another kind of bounce buffer.
+    </para>
+
+!Edrivers/usb/core/urb.c
+!Edrivers/usb/core/message.c
+!Edrivers/usb/core/file.c
+!Edrivers/usb/core/usb.c
+    </chapter>
+
+    <chapter><title>Host Controller APIs</title>
+
+    <para>These APIs are only for use by host controller drivers,
+    most of which implement standard register interfaces such as
+    EHCI, OHCI, or UHCI.
+    UHCI was one of the first interfaces, designed by Intel and
+    also used by VIA; it doesn't do much in hardware.
+    OHCI was designed later, to have the hardware do more work
+    (bigger transfers, tracking protocol state, and so on).
+    EHCI was designed with USB 2.0; its design has features that
+    resemble OHCI (hardware does much more work) as well as
+    UHCI (some parts of ISO support, TD list processing).
+    </para>
+
+    <para>There are host controllers other than the "big three",
+    although most PCI based controllers (and a few non-PCI based
+    ones) use one of those interfaces.
+    Not all host controllers use DMA; some use PIO, and there
+    is also a simulator.
+    </para>
+
+    <para>The same basic APIs are available to drivers for all
+    those controllers.  
+    For historical reasons they are in two layers:
+    <structname>struct usb_bus</structname> is a rather thin
+    layer that became available in the 2.2 kernels, while
+    <structname>struct usb_hcd</structname> is a more featureful
+    layer (available in later 2.4 kernels and in 2.5) that
+    lets HCDs share common code, to shrink driver size
+    and significantly reduce hcd-specific behaviors.
+    </para>
+
+!Edrivers/usb/core/hcd.c
+!Edrivers/usb/core/hcd-pci.c
+!Edrivers/usb/core/buffer.c
+    </chapter>
+
+</book>
+<!-- vim:syntax=sgml:sw=4
+-->

@@ -17,6 +17,8 @@
  *
  * History:
  * 
+ * 2003/02/24 show registers in sysfs (Kevin Brosius)
+ *
  * 2002/09/03 get rid of ed hashtables, rework periodic scheduling and
  * 	bandwidth accounting; if debugging, show schedules in driverfs
  * 2002/07/19 fixes to management of ED and schedule state.
@@ -105,11 +107,10 @@
  * TO DO:
  *
  *	- "disabled" and "sleeping" should be in hcd->state
- *	- bandwidth alloc to generic code
  *	- lots more testing!!
  */
 
-#define DRIVER_VERSION "2002-Sep-17"
+#define DRIVER_VERSION "2003 Feb 24"
 #define DRIVER_AUTHOR "Roman Weissgaerber, David Brownell"
 #define DRIVER_DESC "USB 1.1 'Open' Host Controller (OHCI) Driver"
 
@@ -124,6 +125,8 @@
 #define OHCI_UNLINK_TIMEOUT	 (HZ / 10)
 
 /*-------------------------------------------------------------------------*/
+
+static const char	hcd_name [] = "ohci-hcd";
 
 #include "ohci.h"
 
@@ -275,6 +278,7 @@ static int ohci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
 	urb_print (urb, "UNLINK", 1);
 #endif		  
 
+	spin_lock_irqsave (&ohci->lock, flags);
 	if (!ohci->disabled) {
 		urb_priv_t  *urb_priv;
 
@@ -282,21 +286,24 @@ static int ohci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
 		 * handed to us, flag it for unlink and giveback, and force
 		 * some upcoming INTR_SF to call finish_unlinks()
 		 */
-		spin_lock_irqsave (&ohci->lock, flags);
 		urb_priv = urb->hcpriv;
 		if (urb_priv) {
 			urb_priv->state = URB_DEL; 
 			if (urb_priv->ed->state == ED_OPER)
 				start_urb_unlink (ohci, urb_priv->ed);
 		}
-		spin_unlock_irqrestore (&ohci->lock, flags);
 	} else {
 		/*
 		 * with HC dead, we won't respect hc queue pointers
 		 * any more ... just clean up every urb's memory.
 		 */
-		finish_urb (ohci, urb, NULL);
+		if (urb->hcpriv) {
+			spin_unlock (&ohci->lock);
+			finish_urb (ohci, urb, NULL);
+			spin_lock (&ohci->lock);
+		}
 	}
+	spin_unlock_irqrestore (&ohci->lock, flags);
 	return 0;
 }
 
@@ -332,9 +339,11 @@ rescan:
 			td_free (ohci, ed->dummy);
 			break;
 		default:
-			err ("%s-%s ed %p (#%d) not unlinked; disconnect() bug? %d",
-				ohci->hcd.self.bus_name, udev->devpath, ed,
-				i, ed->state);
+			ohci_err (ohci,
+				"dev %s ep%d-%s linked; disconnect() bug?\n",
+				udev->devpath,
+				(i >> 1) & 0x0f, (i & 1) ? "out" : "in");
+
 			/* ED_OPER: some driver disconnect() is broken,
 			 * it didn't even start its unlinks much less wait
 			 * for their completions.
@@ -354,8 +363,10 @@ do_rescan:
 #ifdef DEBUG
 	/* a driver->disconnect() returned before its unlinks completed? */
 	if (in_interrupt ()) {
-		warn ("disconnect() bug for dev usb-%s-%s ep 0x%x", 
-			ohci->hcd.self.bus_name, udev->devpath, i);
+		ohci_warn (ohci,
+			"driver disconnect() bug %s ep%d-%s\n", 
+			udev->devpath,
+			(i >> 1) & 0x0f, (i & 1) ? "out" : "in");
 	}
 #endif
 
@@ -381,9 +392,12 @@ static int hc_reset (struct ohci_hcd *ohci)
 {
 	u32 temp;
 
-	/* SMM owns the HC?  not for long! */
+	/* SMM owns the HC?  not for long!
+	 * On PA-RISC, PDC can leave IR set incorrectly; ignore it there.
+	 */
+#ifndef __hppa__
 	if (readl (&ohci->regs->control) & OHCI_CTRL_IR) {
-		dev_dbg (ohci->hcd.controller, "USB HC TakeOver from BIOS/SMM\n");
+		ohci_dbg (ohci, "USB HC TakeOver from BIOS/SMM\n");
 
 		/* this timeout is arbitrary.  we make it long, so systems
 		 * depending on usb keyboards may be usable even if the
@@ -396,17 +410,18 @@ static int hc_reset (struct ohci_hcd *ohci)
 		while (readl (&ohci->regs->control) & OHCI_CTRL_IR) {
 			wait_ms (10);
 			if (--temp == 0) {
-				dev_err (ohci->hcd.controller, "USB HC TakeOver failed!\n");
+				ohci_err (ohci, "USB HC TakeOver failed!\n");
 				return -1;
 			}
 		}
 	}
+#endif
 
 	/* Disable HC interrupts */
 	writel (OHCI_INTR_MIE, &ohci->regs->intrdisable);
 
-	dev_dbg (ohci->hcd.controller, "USB HC reset_hc %s: ctrl = 0x%x ;\n",
-		ohci->hcd.self.bus_name,
+	ohci_dbg (ohci, "USB HC reset_hc %s: ctrl = 0x%x ;\n",
+		hcd_to_bus (&ohci->hcd)->bus_name,
 		readl (&ohci->regs->control));
 
   	/* Reset USB (needed by some controllers); RemoteWakeupConnected
@@ -422,7 +437,7 @@ static int hc_reset (struct ohci_hcd *ohci)
 	temp = 30;	/* ... allow extra time */
 	while ((readl (&ohci->regs->cmdstatus) & OHCI_HCR) != 0) {
 		if (--temp == 0) {
-			dev_err (ohci->hcd.controller, "USB HC reset timed out!");
+			ohci_err (ohci, "USB HC reset timed out!\n");
 			return -1;
 		}
 		udelay (1);
@@ -451,8 +466,9 @@ static int hc_reset (struct ohci_hcd *ohci)
  */
 static int hc_start (struct ohci_hcd *ohci)
 {
-  	u32			mask;
+  	u32			mask, tmp;
   	struct usb_device	*udev;
+  	struct usb_bus		*bus;
 
 	spin_lock_init (&ohci->lock);
 	ohci->disabled = 1;
@@ -478,7 +494,7 @@ static int hc_start (struct ohci_hcd *ohci)
 	 */
 	if ((readl (&ohci->regs->fminterval) & 0x3fff0000) == 0
 			|| !readl (&ohci->regs->periodicstart)) {
-		err ("%s init err", ohci->hcd.self.bus_name);
+		ohci_err (ohci, "init err\n");
 		return -EOVERFLOW;
 	}
 
@@ -493,9 +509,20 @@ static int hc_start (struct ohci_hcd *ohci)
 	writel (mask, &ohci->regs->intrstatus);
 	writel (mask, &ohci->regs->intrenable);
 
-	/* hub power always on: required for AMD-756 and some Mac platforms */
-	writel ((roothub_a (ohci) | RH_A_NPS) & ~(RH_A_PSM | RH_A_OCPM),
-		&ohci->regs->roothub.a);
+	/* handle root hub init quirks ... */
+	tmp = roothub_a (ohci);
+	tmp &= ~(RH_A_PSM | RH_A_OCPM);
+	if (ohci->flags & OHCI_QUIRK_SUPERIO) {
+		/* NSC 87560 and maybe others */
+		tmp |= RH_A_NOCP;
+		tmp &= ~(RH_A_POTPGT | RH_A_NPS);
+	} else {
+		/* hub power always on; required for AMD-756 and some
+		 * Mac platforms, use this mode everywhere by default
+		 */
+		tmp |= RH_A_NPS;
+	}
+	writel (tmp, &ohci->regs->roothub.a);
 	writel (RH_HS_LPSC, &ohci->regs->roothub.status);
 	writel (0, &ohci->regs->roothub.b);
 
@@ -503,7 +530,8 @@ static int hc_start (struct ohci_hcd *ohci)
 	mdelay ((roothub_a (ohci) >> 23) & 0x1fe);
  
 	/* connect the virtual root hub */
-	ohci->hcd.self.root_hub = udev = usb_alloc_dev (NULL, &ohci->hcd.self);
+	bus = hcd_to_bus (&ohci->hcd);
+	bus->root_hub = udev = usb_alloc_dev (NULL, bus);
 	ohci->hcd.state = USB_STATE_READY;
 	if (!udev) {
 		disable (ohci);
@@ -514,9 +542,9 @@ static int hc_start (struct ohci_hcd *ohci)
 
 	usb_connect (udev);
 	udev->speed = USB_SPEED_FULL;
-	if (usb_register_root_hub (udev, ohci->hcd.controller) != 0) {
+	if (hcd_register_root (&ohci->hcd) != 0) {
 		usb_put_dev (udev);
-		ohci->hcd.self.root_hub = NULL;
+		bus->root_hub = NULL;
 		disable (ohci);
 		ohci->hc_control &= ~OHCI_CTRL_HCFS;
 		writel (ohci->hc_control, &ohci->regs->control);
@@ -545,7 +573,7 @@ static void ohci_irq (struct usb_hcd *hcd, struct pt_regs *ptregs)
 	/* cardbus/... hardware gone before remove() */
 	} else if ((ints = readl (&regs->intrstatus)) == ~(u32)0) {
 		disable (ohci);
-		dbg ("%s device removed!", hcd->self.bus_name);
+		ohci_dbg (ohci, "device removed!\n");
 		return;
 
 	/* interrupt for some other device? */
@@ -553,13 +581,9 @@ static void ohci_irq (struct usb_hcd *hcd, struct pt_regs *ptregs)
 		return;
 	} 
 
-
-	// dbg ("Interrupt: %x frame: %x", ints, le16_to_cpu (ohci->hcca->frame_no));
-
 	if (ints & OHCI_INTR_UE) {
 		disable (ohci);
-		err ("OHCI Unrecoverable Error, %s disabled",
-				hcd->self.bus_name);
+		ohci_err (ohci, "OHCI Unrecoverable Error, disabled\n");
 		// e.g. due to PCI Master/Target Abort
 
 		ohci_dump (ohci, 1);
@@ -579,7 +603,8 @@ static void ohci_irq (struct usb_hcd *hcd, struct pt_regs *ptregs)
 	 */
 	spin_lock (&ohci->lock);
 	if (ohci->ed_rm_list)
-		finish_unlinks (ohci, le16_to_cpu (ohci->hcca->frame_no), ptregs);
+		finish_unlinks (ohci, le16_to_cpu (ohci->hcca->frame_no),
+				ptregs);
 	if ((ints & OHCI_INTR_SF) != 0 && !ohci->ed_rm_list)
 		writel (OHCI_INTR_SF, &regs->intrdisable);	
 	spin_unlock (&ohci->lock);
@@ -594,7 +619,7 @@ static void ohci_stop (struct usb_hcd *hcd)
 {	
 	struct ohci_hcd		*ohci = hcd_to_ohci (hcd);
 
-	dev_dbg (hcd->controller, "stop %s controller%s\n",
+	ohci_dbg (ohci, "stop %s controller%s\n",
 		hcfs2string (ohci->hc_control & OHCI_CTRL_HCFS),
 		ohci->disabled ? " (disabled)" : ""
 		);
@@ -629,8 +654,8 @@ static int hc_restart (struct ohci_hcd *ohci)
 
 	ohci->disabled = 1;
 	ohci->sleeping = 0;
-	if (ohci->hcd.self.root_hub)
-		usb_disconnect (&ohci->hcd.self.root_hub);
+	if (hcd_to_bus (&ohci->hcd)->root_hub)
+		usb_disconnect (&hcd_to_bus (&ohci->hcd)->root_hub);
 	
 	/* empty the interrupt branches */
 	for (i = 0; i < NUM_INTS; i++) ohci->load [i] = 0;
@@ -644,17 +669,15 @@ static int hc_restart (struct ohci_hcd *ohci)
 	ohci->ed_bulktail    = NULL;
 
 	if ((temp = hc_reset (ohci)) < 0 || (temp = hc_start (ohci)) < 0) {
-		err ("can't restart %s, %d", ohci->hcd.self.bus_name, temp);
+		ohci_err (ohci, "can't restart, %d\n", temp);
 		return temp;
 	} else
-		dbg ("restart %s completed", ohci->hcd.self.bus_name);
+		ohci_dbg (ohci, "restart complete\n");
 	return 0;
 }
 #endif
 
 /*-------------------------------------------------------------------------*/
-
-static const char	hcd_name [] = "ohci-hcd";
 
 #define DRIVER_INFO DRIVER_VERSION " " DRIVER_DESC
 
