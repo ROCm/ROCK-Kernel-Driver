@@ -57,7 +57,7 @@
 #include <linux/stat.h>
 #include <linux/string.h>
 #include <linux/smp_lock.h>
-#include <linux/suspend.h> 
+#include <linux/suspend.h>
 #include <linux/buffer_head.h>
 
 /* the number of mounted filesystems.  This is used to decide when to
