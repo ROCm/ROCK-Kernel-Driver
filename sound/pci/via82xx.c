@@ -2115,6 +2115,7 @@ static int __devinit check_dxs_list(struct pci_dev *pci)
 		{ .vendor = 0x1631, .device = 0xe004, .action = VIA_DXS_ENABLE }, /* Easy Note 3174, Packard Bell */
 		{ .vendor = 0x1695, .device = 0x3005, .action = VIA_DXS_ENABLE }, /* EPoX EP-8K9A */
 		{ .vendor = 0x1849, .device = 0x3059, .action = VIA_DXS_NO_VRA }, /* ASRock K7VM2 */
+		{ .vendor = 0x147b, .device = 0x1415, .action = VIA_DXS_NO_VRA }, /* Abit AV8 */
 		{ } /* terminator */
 	};
 	struct dxs_whitelist *w;
