@@ -828,7 +828,7 @@ qla2x00_init_response_q_entries(scsi_qla_host_t *ha)
 static void
 qla2x00_update_fw_options(scsi_qla_host_t *ha)
 {
-	uint16_t swing, emphasis;
+	uint16_t swing, emphasis, tx_sens, rx_sens;
 
 	memset(ha->fw_options, 0, sizeof(ha->fw_options));
 	qla2x00_get_fw_options(ha, ha->fw_options);
@@ -843,23 +843,53 @@ qla2x00_update_fw_options(scsi_qla_host_t *ha)
 	    sizeof(ha->fw_seriallink_options)));
 
 	ha->fw_options[1] &= ~FO1_SET_EMPHASIS_SWING;
-	if (ha->fw_seriallink_options[1] & BIT_2)
+	if (ha->fw_seriallink_options[3] & BIT_2) {
 		ha->fw_options[1] |= FO1_SET_EMPHASIS_SWING;
 
-	/*  1G settings */
-	swing = ha->fw_seriallink_options[0] & (BIT_2 | BIT_1 | BIT_0);
-	emphasis = ha->fw_seriallink_options[0] & (BIT_4 | BIT_3);
-	emphasis >>= 3;
-	ha->fw_options[10] = (emphasis << 14) | (swing << 8) | 0x3;
-	/*  2G settings */
-	swing = ha->fw_seriallink_options[0] & (BIT_7 | BIT_6 | BIT_5);
-	swing >>= 5;
-	emphasis = ha->fw_seriallink_options[1] & (BIT_1 | BIT_0);
-	ha->fw_options[11] = (emphasis << 14) | (swing << 8) | 0x3;
+		/*  1G settings */
+		swing = ha->fw_seriallink_options[2] & (BIT_2 | BIT_1 | BIT_0);
+		emphasis = (ha->fw_seriallink_options[2] &
+		    (BIT_4 | BIT_3)) >> 3;
+		tx_sens = ha->fw_seriallink_options[0] &
+		    (BIT_3 | BIT_2 | BIT_1 | BIT_0); 
+		rx_sens = (ha->fw_seriallink_options[0] &
+		    (BIT_7 | BIT_6 | BIT_5 | BIT_4)) >> 4;
+		ha->fw_options[10] = (emphasis << 14) | (swing << 8);
+		if (IS_QLA2300(ha) || IS_QLA2312(ha) || IS_QLA6312(ha)) {
+			if (rx_sens == 0x0)
+				rx_sens = 0x3;
+			ha->fw_options[10] |= (tx_sens << 4) | rx_sens;
+		} else if (IS_QLA2322(ha) || IS_QLA6322(ha))
+			ha->fw_options[10] |= BIT_5 |
+			    ((rx_sens & (BIT_1 | BIT_0)) << 2) |
+			    (tx_sens & (BIT_1 | BIT_0));
+
+		/*  2G settings */
+		swing = (ha->fw_seriallink_options[2] &
+		    (BIT_7 | BIT_6 | BIT_5)) >> 5;
+		emphasis = ha->fw_seriallink_options[3] & (BIT_1 | BIT_0);
+		tx_sens = ha->fw_seriallink_options[1] &
+		    (BIT_3 | BIT_2 | BIT_1 | BIT_0); 
+		rx_sens = (ha->fw_seriallink_options[1] &
+		    (BIT_7 | BIT_6 | BIT_5 | BIT_4)) >> 4;
+		ha->fw_options[11] = (emphasis << 14) | (swing << 8);
+		if (IS_QLA2300(ha) || IS_QLA2312(ha) || IS_QLA6312(ha)) {
+			if (rx_sens == 0x0)
+				rx_sens = 0x3;
+			ha->fw_options[11] |= (tx_sens << 4) | rx_sens;
+		} else if (IS_QLA2322(ha) || IS_QLA6322(ha))
+			ha->fw_options[11] |= BIT_5 |
+			    ((rx_sens & (BIT_1 | BIT_0)) << 2) |
+			    (tx_sens & (BIT_1 | BIT_0));
+	}
 
 	/* FCP2 options. */
 	/*  Return command IOCBs without waiting for an ABTS to complete. */
 	ha->fw_options[3] |= BIT_13;
+
+	/* LED scheme. */
+	if (ha->flags.enable_led_scheme)
+		ha->fw_options[2] |= BIT_12;
 
 	/* Update firmware options. */
 	qla2x00_set_fw_options(ha, ha->fw_options);
@@ -1369,12 +1399,13 @@ qla2x00_nvram_config(scsi_qla_host_t *ha)
 	ha->flags.enable_lip_reset = ((nv->host_p[1] & BIT_1) ? 1 : 0);
 	ha->flags.enable_lip_full_login = ((nv->host_p[1] & BIT_2) ? 1 : 0);
 	ha->flags.enable_target_reset = ((nv->host_p[1] & BIT_3) ? 1 : 0);
+	ha->flags.enable_led_scheme = ((nv->efi_parameters & BIT_3) ? 1 : 0);
 
 	ha->operating_mode =
 	    (icb->add_firmware_options[0] & (BIT_6 | BIT_5 | BIT_4)) >> 4;
 
-	ha->fw_seriallink_options[0] = nv->seriallink_options[0];
-	ha->fw_seriallink_options[1] = nv->seriallink_options[1];
+	memcpy(ha->fw_seriallink_options, nv->seriallink_options,
+	    sizeof(ha->fw_seriallink_options));
 
 	/* save HBA serial number */
 	ha->serial0 = icb->port_name[5];

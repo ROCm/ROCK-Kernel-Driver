@@ -1026,9 +1026,27 @@ typedef struct {
 	uint8_t	 special_options[2];
 
 	/* Reserved for expanded RISC parameter block */
-	uint8_t reserved_2[24];
+	uint8_t reserved_2[22];
 
 	/*
+	 * LSB BIT 0 = Tx Sensitivity 1G bit 0
+	 * LSB BIT 1 = Tx Sensitivity 1G bit 1
+	 * LSB BIT 2 = Tx Sensitivity 1G bit 2
+	 * LSB BIT 3 = Tx Sensitivity 1G bit 3
+	 * LSB BIT 4 = Rx Sensitivity 1G bit 0
+	 * LSB BIT 5 = Rx Sensitivity 1G bit 1
+	 * LSB BIT 6 = Rx Sensitivity 1G bit 2
+	 * LSB BIT 7 = Rx Sensitivity 1G bit 3
+	 *            
+	 * MSB BIT 0 = Tx Sensitivity 2G bit 0
+	 * MSB BIT 1 = Tx Sensitivity 2G bit 1
+	 * MSB BIT 2 = Tx Sensitivity 2G bit 2
+	 * MSB BIT 3 = Tx Sensitivity 2G bit 3
+	 * MSB BIT 4 = Rx Sensitivity 2G bit 0
+	 * MSB BIT 5 = Rx Sensitivity 2G bit 1
+	 * MSB BIT 6 = Rx Sensitivity 2G bit 2
+	 * MSB BIT 7 = Rx Sensitivity 2G bit 3
+	 *
 	 * LSB BIT 0 = Output Swing 1G bit 0
 	 * LSB BIT 1 = Output Swing 1G bit 1
 	 * LSB BIT 2 = Output Swing 1G bit 2
@@ -1047,7 +1065,7 @@ typedef struct {
 	 * MSB BIT 6 =
 	 * MSB BIT 7 =
 	 */
-	uint8_t seriallink_options[2];
+	uint8_t seriallink_options[4];
 
 	/*
 	 * NVRAM host parameter block
@@ -2070,6 +2088,7 @@ typedef struct scsi_qla_host {
 		uint32_t	enable_lip_reset	:1;
 		uint32_t	enable_lip_full_login	:1;
 		uint32_t	enable_target_reset	:1;
+		uint32_t	enable_led_scheme	:1;
 	} flags;
 
 	atomic_t	loop_state;
@@ -2347,7 +2366,7 @@ typedef struct scsi_qla_host {
 	uint32_t	fw_transfer_size;
 
 	uint16_t	fw_options[16];		/* slots: 1,2,3,10,11 */
-	uint8_t		fw_seriallink_options[2];
+	uint8_t		fw_seriallink_options[4];
 
 	/* Firmware dump information. */
 	void		*fw_dump;
