@@ -210,6 +210,41 @@ again:
 	return NULL;
 }
 
+/* Dirty hack. We did it in 2.2 (in __dst_free),
+ * we have _very_ good reasons not to repeat
+ * this mistake in 2.3, but we have no choice
+ * now. _It_ _is_ _explicit_ _deliberate_
+ * _race_ _condition_.
+ *
+ * Commented and originally written by Alexey.
+ */
+static void dst_ifdown(struct dst_entry *dst, int unregister)
+{
+	struct net_device *dev = dst->dev;
+
+	if (!unregister) {
+		dst->input = dst_discard_in;
+		dst->output = dst_discard_out;
+	}
+
+	do {
+		if (unregister) {
+			dst->dev = &loopback_dev;
+			dev_hold(&loopback_dev);
+			dev_put(dev);
+			if (dst->neighbour && dst->neighbour->dev == dev) {
+				dst->neighbour->dev = &loopback_dev;
+				dev_put(dev);
+				dev_hold(&loopback_dev);
+			}
+		}
+
+		if (dst->ops->ifdown)
+			dst->ops->ifdown(dst, unregister);
+	} while ((dst = dst->child) && dst->flags & DST_NOHASH &&
+		 dst->dev == dev);
+}
+
 static int dst_dev_event(struct notifier_block *this, unsigned long event, void *ptr)
 {
 	struct net_device *dev = ptr;
@@ -220,31 +255,8 @@ static int dst_dev_event(struct notifier_block *this, unsigned long event, void 
 	case NETDEV_DOWN:
 		spin_lock_bh(&dst_lock);
 		for (dst = dst_garbage_list; dst; dst = dst->next) {
-			if (dst->dev == dev) {
-				/* Dirty hack. We did it in 2.2 (in __dst_free),
-				   we have _very_ good reasons not to repeat
-				   this mistake in 2.3, but we have no choice
-				   now. _It_ _is_ _explicit_ _deliberate_
-				   _race_ _condition_.
-				 */
-				if (event!=NETDEV_DOWN &&
-				    dst->output == dst_discard_out) {
-					dst->dev = &loopback_dev;
-					dev_hold(&loopback_dev);
-					dev_put(dev);
-					dst->output = dst_discard_out;
-					if (dst->neighbour && dst->neighbour->dev == dev) {
-						dst->neighbour->dev = &loopback_dev;
-						dev_put(dev);
-						dev_hold(&loopback_dev);
-					}
-				} else {
-					dst->input = dst_discard_in;
-					dst->output = dst_discard_out;
-				}
-				if (dst->ops->ifdown)
-					dst->ops->ifdown(dst, event != NETDEV_DOWN);
-			}
+			if (dst->dev == dev)
+				dst_ifdown(dst, event != NETDEV_DOWN);
 		}
 		spin_unlock_bh(&dst_lock);
 		break;
