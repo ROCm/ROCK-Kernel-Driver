@@ -81,13 +81,13 @@ enum chipset_type {
 	HP_ZX1,
 };
 
-typedef struct _agp_version {
+struct agp_version {
 	u16 major;
 	u16 minor;
-} agp_version;
+};
 
 typedef struct _agp_kern_info {
-	agp_version version;
+	struct agp_version version;
 	struct pci_dev *device;
 	enum chipset_type chipset;
 	unsigned long mode;

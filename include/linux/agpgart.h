@@ -53,13 +53,13 @@
 #include <linux/types.h>
 #include <asm/types.h>
 
-typedef struct _agp_version {
+struct agp_version {
 	__u16 major;
 	__u16 minor;
-} agp_version;
+};
 
 typedef struct _agp_info {
-	agp_version version;	/* version of the driver        */
+	struct agp_version version;	/* version of the driver        */
 	__u32 bridge_id;	/* bridge vendor/device         */
 	__u32 agp_mode;		/* mode info of bridge          */
 	off_t aper_base;	/* base of aperture             */
@@ -117,7 +117,7 @@ typedef struct _agp_unbind {
 #define AGP_LOCK_INIT() 	sema_init(&(agp_fe.agp_mutex), 1)
 
 #ifndef _AGP_BACKEND_H
-typedef struct _agp_version {
+struct _agp_version {
 	u16 major;
 	u16 minor;
 } agp_version;
@@ -125,7 +125,7 @@ typedef struct _agp_version {
 #endif
 
 typedef struct _agp_info {
-	agp_version version;	/* version of the driver        */
+	struct agp_version version;	/* version of the driver        */
 	u32 bridge_id;		/* bridge vendor/device         */
 	u32 agp_mode;		/* mode info of bridge          */
 	off_t aper_base;	/* base of aperture             */
