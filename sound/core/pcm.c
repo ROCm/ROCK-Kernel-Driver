@@ -43,15 +43,6 @@ static int snd_pcm_dev_register(snd_device_t *device);
 static int snd_pcm_dev_disconnect(snd_device_t *device);
 static int snd_pcm_dev_unregister(snd_device_t *device);
 
-void snd_pcm_lock(int xup)
-{
-	if (!xup) {
-		down(&register_mutex);
-	} else {
-		up(&register_mutex);
-	}
-}
-
 static int snd_pcm_control_ioctl(snd_card_t * card,
 				 snd_ctl_file_t * control,
 				 unsigned int cmd, unsigned long arg)
@@ -836,10 +827,10 @@ static int snd_pcm_dev_register(snd_device_t *device)
 	snd_pcm_t *pcm = snd_magic_cast(snd_pcm_t, device->device_data, return -ENXIO);
 
 	snd_assert(pcm != NULL && device != NULL, return -ENXIO);
-	snd_pcm_lock(0);
+	down(&register_mutex);
 	idx = (pcm->card->number * SNDRV_PCM_DEVICES) + pcm->device;
 	if (snd_pcm_devices[idx]) {
-		snd_pcm_lock(1);
+		up(&register_mutex);
 		return -EBUSY;
 	}
 	snd_pcm_devices[idx] = pcm;
@@ -861,7 +852,7 @@ static int snd_pcm_dev_register(snd_device_t *device)
 		}
 		if ((err = snd_register_device(devtype, pcm->card, pcm->device, pcm->streams[cidx].reg, str)) < 0) {
 			snd_pcm_devices[idx] = NULL;
-			snd_pcm_lock(1);
+			up(&register_mutex);
 			return err;
 		}
 		for (substream = pcm->streams[cidx].substream; substream; substream = substream->next)
@@ -872,7 +863,7 @@ static int snd_pcm_dev_register(snd_device_t *device)
 		notify = list_entry(list, snd_pcm_notify_t, list);
 		notify->n_register(pcm);
 	}
-	snd_pcm_lock(1);
+	up(&register_mutex);
 	return 0;
 }
 
@@ -882,7 +873,7 @@ static int snd_pcm_dev_disconnect(snd_device_t *device)
 	struct list_head *list;
 	int idx;
 
-	snd_pcm_lock(0);
+	down(&register_mutex);
 	idx = (pcm->card->number * SNDRV_PCM_DEVICES) + pcm->device;
 	snd_pcm_devices[idx] = NULL;
 	list_for_each(list, &snd_pcm_notify_list) {
@@ -890,7 +881,7 @@ static int snd_pcm_dev_disconnect(snd_device_t *device)
 		notify = list_entry(list, snd_pcm_notify_t, list);
 		notify->n_disconnect(pcm);
 	}
-	snd_pcm_lock(1);
+	up(&register_mutex);
 	return 0;
 }
 
@@ -902,7 +893,7 @@ static int snd_pcm_dev_unregister(snd_device_t *device)
 	snd_pcm_t *pcm = snd_magic_cast(snd_pcm_t, device->device_data, return -ENXIO);
 
 	snd_assert(pcm != NULL, return -ENXIO);
-	snd_pcm_lock(0);
+	down(&register_mutex);
 	idx = (pcm->card->number * SNDRV_PCM_DEVICES) + pcm->device;
 	snd_pcm_devices[idx] = NULL;
 	for (cidx = 0; cidx < 2; cidx++) {
@@ -924,7 +915,7 @@ static int snd_pcm_dev_unregister(snd_device_t *device)
 		notify = list_entry(list, snd_pcm_notify_t, list);
 		notify->n_unregister(pcm);
 	}
-	snd_pcm_lock(1);
+	up(&register_mutex);
 	return snd_pcm_free(pcm);
 }
 
@@ -933,7 +924,7 @@ int snd_pcm_notify(snd_pcm_notify_t *notify, int nfree)
 	int idx;
 
 	snd_assert(notify != NULL && notify->n_register != NULL && notify->n_unregister != NULL, return -EINVAL);
-	snd_pcm_lock(0);
+	down(&register_mutex);
 	if (nfree) {
 		list_del(&notify->list);
 		for (idx = 0; idx < SNDRV_CARDS * SNDRV_PCM_DEVICES; idx++) {
@@ -949,7 +940,7 @@ int snd_pcm_notify(snd_pcm_notify_t *notify, int nfree)
 			notify->n_register(snd_pcm_devices[idx]);
 		}
 	}
-	snd_pcm_lock(1);
+	up(&register_mutex);
 	return 0;
 }
 
@@ -1014,7 +1005,6 @@ static void __exit alsa_pcm_exit(void)
 module_init(alsa_pcm_init)
 module_exit(alsa_pcm_exit)
 
-EXPORT_SYMBOL(snd_pcm_lock);
 EXPORT_SYMBOL(snd_pcm_devices);
 EXPORT_SYMBOL(snd_pcm_new);
 EXPORT_SYMBOL(snd_pcm_new_stream);
