@@ -255,7 +255,13 @@ static int nfs_stat_to_errno(int);
 				decode_putfh_maxsz + \
 				decode_getattr_maxsz + \
 				op_decode_hdr_maxsz + 4)
-
+#define NFS4_enc_access_sz	(compound_encode_hdr_maxsz + \
+				encode_putfh_maxsz + \
+				op_encode_hdr_maxsz + 1)
+#define NFS4_dec_access_sz	(compound_decode_hdr_maxsz + \
+				decode_putfh_maxsz + \
+				op_decode_hdr_maxsz + 2)
+  
 
 
 static struct {
@@ -450,14 +456,13 @@ encode_attrs(struct xdr_stream *xdr, struct iattr *iap,
 	return status;
 }
 
-static int
-encode_access(struct xdr_stream *xdr, struct nfs4_access *access)
+static int encode_access(struct xdr_stream *xdr, u32 access)
 {
 	uint32_t *p;
 
 	RESERVE_SPACE(8);
 	WRITE32(OP_ACCESS);
-	WRITE32(access->ac_req_access);
+	WRITE32(access);
 	
 	return 0;
 }
@@ -832,8 +837,7 @@ encode_open_downgrade(struct xdr_stream *xdr, struct nfs_closeargs *arg)
 	return 0;
 }
 
-static int
-encode_putfh(struct xdr_stream *xdr, struct nfs_fh *fh)
+static int encode_putfh(struct xdr_stream *xdr, const struct nfs_fh *fh)
 {
 	int len = fh->size;
 	uint32_t *p;
@@ -1094,9 +1098,6 @@ encode_compound(struct xdr_stream *xdr, struct nfs4_compound *cp, struct rpc_rqs
 
 	for (i = 0; i < cp->req_nops; i++) {
 		switch (cp->ops[i].opnum) {
-		case OP_ACCESS:
-			status = encode_access(xdr, &cp->ops[i].u.access);
-			break;
 		case OP_CREATE:
 			status = encode_create(xdr, &cp->ops[i].u.create, cp->server);
 			break;
@@ -1149,7 +1150,6 @@ encode_compound(struct xdr_stream *xdr, struct nfs4_compound *cp, struct rpc_rqs
  * END OF "GENERIC" ENCODE ROUTINES.
  */
 
-
 /*
  * Encode COMPOUND argument
  */
@@ -1164,6 +1164,26 @@ nfs4_xdr_enc_compound(struct rpc_rqst *req, uint32_t *p, struct nfs4_compound *c
 	cp->timestamp = jiffies;
 	return status;
 }
+
+/*
+ * Encode an ACCESS request
+ */
+static int nfs4_xdr_enc_access(struct rpc_rqst *req, uint32_t *p, const struct nfs4_accessargs *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 2,
+	};
+	int status;
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr);
+	if ((status = encode_putfh(&xdr, args->fh)) == 0)
+		status = encode_access(&xdr, args->access);
+	return status;
+}
+
+
 /*
  * Encode a CLOSE request
  */
@@ -1645,8 +1665,7 @@ decode_change_info(struct xdr_stream *xdr, struct nfs4_change_info *cinfo)
 	return 0;
 }
 
-static int
-decode_access(struct xdr_stream *xdr, struct nfs4_access *access)
+static int decode_access(struct xdr_stream *xdr, struct nfs4_accessres *access)
 {
 	uint32_t *p;
 	uint32_t supp, acc;
@@ -1658,12 +1677,8 @@ decode_access(struct xdr_stream *xdr, struct nfs4_access *access)
 	READ_BUF(8);
 	READ32(supp);
 	READ32(acc);
-	if ((supp & ~access->ac_req_access) || (acc & ~supp)) {
-		printk(KERN_NOTICE "NFS: server returned bad bits in access call!\n");
-		return -EIO;
-	}
-	*access->ac_resp_supported = supp;
-	*access->ac_resp_access = acc;
+	access->supported = supp;
+	access->access = acc;
 	return 0;
 }
 
@@ -2076,7 +2091,6 @@ out_bad_bitmap:
 			(unsigned int)bmval0, (unsigned int)bmval1);
 	return -EIO;
 }
-
 
 static int
 decode_fsinfo(struct xdr_stream *xdr, struct nfs_fsinfo *fsinfo)
@@ -2628,9 +2642,6 @@ decode_compound(struct xdr_stream *xdr, struct nfs4_compound *cp, struct rpc_rqs
 	op = &cp->ops[0];
 	for (cp->nops = 0; cp->nops < cp->resp_nops; cp->nops++, op++) {
 		switch (op->opnum) {
-		case OP_ACCESS:
-			status = decode_access(xdr, &op->u.access);
-			break;
 		case OP_CREATE:
 			status = decode_create(xdr, &op->u.create);
 			break;
@@ -2724,6 +2735,24 @@ nfs4_xdr_dec_compound(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_compound 
 	if (cp->toplevel_status)
 		status = -nfs_stat_to_errno(cp->toplevel_status);
 
+out:
+	return status;
+}
+
+/*
+ * Decode ACCESS response
+ */
+static int nfs4_xdr_dec_access(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_accessres *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+	
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	if ((status = decode_compound_hdr(&xdr, &hdr)) != 0)
+		goto out;
+	if ((status = decode_putfh(&xdr)) == 0)
+		status = decode_access(&xdr, res);
 out:
 	return status;
 }
@@ -3236,6 +3265,7 @@ struct rpc_procinfo	nfs4_procedures[] = {
   PROC(LOCK,            enc_lock,       dec_lock),
   PROC(LOCKT,           enc_lockt,      dec_lockt),
   PROC(LOCKU,           enc_locku,      dec_locku),
+  PROC(ACCESS,		enc_access,	dec_access),
 };
 
 struct rpc_version		nfs_version4 = {

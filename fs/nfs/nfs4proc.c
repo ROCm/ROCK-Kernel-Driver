@@ -82,19 +82,6 @@ nfs4_setup_compound(struct nfs4_compound *cp, struct nfs4_op *ops,
 }
 
 static void
-nfs4_setup_access(struct nfs4_compound *cp, u32 req_access, u32 *resp_supported, u32 *resp_access)
-{
-	struct nfs4_access *access = GET_OP(cp, access);
-	
-	access->ac_req_access = req_access;
-	access->ac_resp_supported = resp_supported;
-	access->ac_resp_access = resp_access;
-	
-	OPNUM(cp) = OP_ACCESS;
-	cp->req_nops++;
-}
-
-static void
 nfs4_setup_create_dir(struct nfs4_compound *cp, struct qstr *name,
 		      struct iattr *sattr, struct nfs4_change_info *info)
 {
@@ -989,48 +976,43 @@ nfs4_proc_lookup(struct inode *dir, struct qstr *name,
 	return nfs4_map_errors(status);
 }
 
-static int
-nfs4_proc_access(struct inode *inode, struct rpc_cred *cred, int mode)
+static int nfs4_proc_access(struct inode *inode, struct rpc_cred *cred, int mode)
 {
-	struct nfs4_compound	compound;
-	struct nfs4_op		ops[3];
-	struct nfs_fattr	fattr;
-	u32			req_access = 0, resp_supported, resp_access;
 	int			status;
-
-	fattr.valid = 0;
+	struct nfs4_accessargs args = {
+		.fh = NFS_FH(inode),
+	};
+	struct nfs4_accessres res = { 0 };
+	struct rpc_message msg = {
+		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_ACCESS],
+		.rpc_argp = &args,
+		.rpc_resp = &res,
+		.rpc_cred = cred,
+	};
 
 	/*
 	 * Determine which access bits we want to ask for...
 	 */
 	if (mode & MAY_READ)
-		req_access |= NFS4_ACCESS_READ;
+		args.access |= NFS4_ACCESS_READ;
 	if (S_ISDIR(inode->i_mode)) {
 		if (mode & MAY_WRITE)
-			req_access |= NFS4_ACCESS_MODIFY | NFS4_ACCESS_EXTEND | NFS4_ACCESS_DELETE;
+			args.access |= NFS4_ACCESS_MODIFY | NFS4_ACCESS_EXTEND | NFS4_ACCESS_DELETE;
 		if (mode & MAY_EXEC)
-			req_access |= NFS4_ACCESS_LOOKUP;
+			args.access |= NFS4_ACCESS_LOOKUP;
 	}
 	else {
 		if (mode & MAY_WRITE)
-			req_access |= NFS4_ACCESS_MODIFY | NFS4_ACCESS_EXTEND;
+			args.access |= NFS4_ACCESS_MODIFY | NFS4_ACCESS_EXTEND;
 		if (mode & MAY_EXEC)
-			req_access |= NFS4_ACCESS_EXECUTE;
+			args.access |= NFS4_ACCESS_EXECUTE;
 	}
-
-	nfs4_setup_compound(&compound, ops, NFS_SERVER(inode), "access");
-	nfs4_setup_putfh(&compound, NFS_FH(inode));
-	nfs4_setup_getattr(&compound, &fattr);
-	nfs4_setup_access(&compound, req_access, &resp_supported, &resp_access);
-	status = nfs4_call_compound(&compound, cred, 0);
-	nfs_refresh_inode(inode, &fattr);
-
+	status = rpc_call_sync(NFS_CLIENT(inode), &msg, 0);
 	if (!status) {
-		if (req_access != resp_supported) {
+		if (args.access != res.supported) {
 			printk(KERN_NOTICE "NFS: server didn't support all access bits!\n");
 			status = -ENOTSUPP;
-		}
-		else if (req_access != resp_access)
+		} else if ((args.access & res.access) != args.access)
 			status = -EACCES;
 	}
 	return nfs4_map_errors(status);

@@ -484,10 +484,14 @@ struct nfs4_change_info {
 	u64				after;
 };
 
-struct nfs4_access {
-	u32				ac_req_access;     /* request */
-	u32 *				ac_resp_supported; /* response */
-	u32 *				ac_resp_access;    /* response */
+struct nfs4_accessargs {
+	const struct nfs_fh *		fh;
+	u32				access;
+};
+
+struct nfs4_accessres {
+	u32				supported;
+	u32				access;
 };
 
 struct nfs4_close {
@@ -611,7 +615,6 @@ struct nfs4_setclientid {
 struct nfs4_op {
 	u32				opnum;
 	union {
-		struct nfs4_access	access;
 		struct nfs4_close	close;
 		struct nfs4_create	create;
 		struct nfs4_getattr	getattr;
