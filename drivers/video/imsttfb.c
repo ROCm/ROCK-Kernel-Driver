@@ -500,7 +500,7 @@ compute_imstt_regvals_ibm(struct imstt_par *par, int xres, int yres)
 			MHz = 200;
 			break;
 		default:
-			return 0;
+			return NULL;
 	}
 
 	setclkMHz(par, MHz);
@@ -547,7 +547,7 @@ compute_imstt_regvals_tvp(struct imstt_par *par, int xres, int yres)
 			init = yres == 960 ? &tvp_reg_init_19 : &tvp_reg_init_20;
 			break;
 		default:
-			return 0;
+			return NULL;
 	}
 	par->init = *init;
 	return init;

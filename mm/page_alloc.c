@@ -122,7 +122,7 @@ static void prep_compound_page(struct page *page, unsigned long order)
 	int i;
 	int nr_pages = 1 << order;
 
-	page[1].mapping = 0;
+	page[1].mapping = NULL;
 	page[1].index = order;
 	for (i = 0; i < nr_pages; i++) {
 		struct page *p = page + i;

@@ -328,7 +328,7 @@ static int hpet_release(struct inode *inode, struct file *file)
 	if (file->f_flags & FASYNC)
 		hpet_fasync(-1, file, 0);
 
-	file->private_data = 0;
+	file->private_data = NULL;
 	return 0;
 }
 
@@ -559,7 +559,7 @@ int hpet_register(struct hpet_task *tp, int periodic)
 	spin_lock_irq(&hpet_task_lock);
 	spin_lock(&hpet_lock);
 
-	for (devp = 0, hpetp = hpets; hpetp && !devp; hpetp = hpetp->hp_next)
+	for (devp = NULL, hpetp = hpets; hpetp && !devp; hpetp = hpetp->hp_next)
 		for (timer = hpetp->hp_hpet->hpet_timers, i = 0;
 		     i < hpetp->hp_ntimer; i++, timer++) {
 			if ((readq(&timer->hpet_config) & Tn_PER_INT_CAP_MASK)
@@ -569,7 +569,7 @@ int hpet_register(struct hpet_task *tp, int periodic)
 			devp = &hpetp->hp_dev[i];
 
 			if (devp->hd_flags & HPET_OPEN || devp->hd_task) {
-				devp = 0;
+				devp = NULL;
 				continue;
 			}
 
@@ -629,7 +629,7 @@ int hpet_unregister(struct hpet_task *tp)
 	writeq((readq(&timer->hpet_config) & ~Tn_INT_ENB_CNF_MASK),
 	       &timer->hpet_config);
 	devp->hd_flags &= ~(HPET_IE | HPET_PERIODIC);
-	devp->hd_task = 0;
+	devp->hd_task = NULL;
 	spin_unlock(&hpet_lock);
 	spin_unlock_irq(&hpet_task_lock);
 
@@ -739,14 +739,13 @@ static struct ctl_table_header *sysctl_header;
 
 static unsigned long __init hpet_calibrate(struct hpets *hpetp)
 {
-	struct hpet_timer *timer;
+	struct hpet_timer *timer = NULL;
 	unsigned long t, m, count, i, flags, start;
 	struct hpet_dev *devp;
 	int j;
 	struct hpet *hpet;
 
-	for (timer = 0, j = 0, devp = hpetp->hp_dev; j < hpetp->hp_ntimer;
-	     j++, devp++)
+	for (j = 0, devp = hpetp->hp_dev; j < hpetp->hp_ntimer; j++, devp++)
 		if ((devp->hd_flags & HPET_OPEN) == 0) {
 			timer = devp->hd_timer;
 			break;

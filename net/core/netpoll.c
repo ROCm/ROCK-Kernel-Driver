@@ -237,14 +237,14 @@ static void arp_reply(struct sk_buff *skb)
 	struct sk_buff *send_skb;
 	unsigned long flags;
 	struct list_head *p;
-	struct netpoll *np = 0;
+	struct netpoll *np = NULL;
 
 	spin_lock_irqsave(&rx_list_lock, flags);
 	list_for_each(p, &rx_list) {
 		np = list_entry(p, struct netpoll, rx_list);
 		if ( np->dev == skb->dev )
 			break;
-		np = 0;
+		np = NULL;
 	}
 	spin_unlock_irqrestore(&rx_list_lock, flags);
 
@@ -411,7 +411,7 @@ int netpoll_parse_options(struct netpoll *np, char *opt)
 		if ((delim = strchr(cur, '@')) == NULL)
 			goto parse_failed;
 		*delim=0;
-		np->local_port=simple_strtol(cur, 0, 10);
+		np->local_port=simple_strtol(cur, NULL, 10);
 		cur=delim;
 	}
 	cur++;
@@ -446,7 +446,7 @@ int netpoll_parse_options(struct netpoll *np, char *opt)
 		if ((delim = strchr(cur, '@')) == NULL)
 			goto parse_failed;
 		*delim=0;
-		np->remote_port=simple_strtol(cur, 0, 10);
+		np->remote_port=simple_strtol(cur, NULL, 10);
 		cur=delim;
 	}
 	cur++;
@@ -468,29 +468,29 @@ int netpoll_parse_options(struct netpoll *np, char *opt)
 		if ((delim = strchr(cur, ':')) == NULL)
 			goto parse_failed;
 		*delim=0;
-		np->remote_mac[0]=simple_strtol(cur, 0, 16);
+		np->remote_mac[0]=simple_strtol(cur, NULL, 16);
 		cur=delim+1;
 		if ((delim = strchr(cur, ':')) == NULL)
 			goto parse_failed;
 		*delim=0;
-		np->remote_mac[1]=simple_strtol(cur, 0, 16);
+		np->remote_mac[1]=simple_strtol(cur, NULL, 16);
 		cur=delim+1;
 		if ((delim = strchr(cur, ':')) == NULL)
 			goto parse_failed;
 		*delim=0;
-		np->remote_mac[2]=simple_strtol(cur, 0, 16);
+		np->remote_mac[2]=simple_strtol(cur, NULL, 16);
 		cur=delim+1;
 		if ((delim = strchr(cur, ':')) == NULL)
 			goto parse_failed;
 		*delim=0;
-		np->remote_mac[3]=simple_strtol(cur, 0, 16);
+		np->remote_mac[3]=simple_strtol(cur, NULL, 16);
 		cur=delim+1;
 		if ((delim = strchr(cur, ':')) == NULL)
 			goto parse_failed;
 		*delim=0;
-		np->remote_mac[4]=simple_strtol(cur, 0, 16);
+		np->remote_mac[4]=simple_strtol(cur, NULL, 16);
 		cur=delim+1;
-		np->remote_mac[5]=simple_strtol(cur, 0, 16);
+		np->remote_mac[5]=simple_strtol(cur, NULL, 16);
 	}
 
 	printk(KERN_INFO "%s: remote ethernet address "
@@ -620,7 +620,7 @@ void netpoll_cleanup(struct netpoll *np)
 	}
 
 	dev_put(np->dev);
-	np->dev = 0;
+	np->dev = NULL;
 }
 
 int netpoll_trap(void)

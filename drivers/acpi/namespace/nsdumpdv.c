@@ -128,7 +128,7 @@ acpi_ns_dump_root_devices (void)
 		return;
 	}
 
-	status = acpi_get_handle (0, ACPI_NS_SYSTEM_BUS, &sys_bus_handle);
+	status = acpi_get_handle(NULL, ACPI_NS_SYSTEM_BUS, &sys_bus_handle);
 	if (ACPI_FAILURE (status)) {
 		return;
 	}
