@@ -777,7 +777,7 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
 {
 	struct mm_struct *mm = current->mm;
 	struct vm_area_struct *vma;
-	int found_hole = 0;
+	unsigned long start_addr;
 
 	if (len > TASK_SIZE)
 		return -ENOMEM;
@@ -789,21 +789,29 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
 		    (!vma || addr + len <= vma->vm_start))
 			return addr;
 	}
-	addr = mm->free_area_cache;
+	start_addr = addr = mm->free_area_cache;
 
+full_search:
 	for (vma = find_vma(mm, addr); ; vma = vma->vm_next) {
 		/* At this point:  (!vma || addr < vma->vm_end). */
-		if (TASK_SIZE - len < addr)
+		if (TASK_SIZE - len < addr) {
+			/*
+			 * Start a new search - just in case we missed
+			 * some holes.
+			 */
+			if (start_addr != TASK_UNMAPPED_BASE) {
+				start_addr = addr = TASK_UNMAPPED_BASE;
+				goto full_search;
+			}
 			return -ENOMEM;
-		/*
-		 * Record the first available hole.
-		 */
-		if (!found_hole && (!vma || addr < vma->vm_start)) {
-			mm->free_area_cache = addr;
-			found_hole = 1;
 		}
-		if (!vma || addr + len <= vma->vm_start)
+		if (!vma || addr + len <= vma->vm_start) {
+			/*
+			 * Remember the place where we stopped the search:
+			 */
+			mm->free_area_cache = addr + len;
 			return addr;
+		}
 		addr = vma->vm_end;
 	}
 }
