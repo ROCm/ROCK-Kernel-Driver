@@ -227,7 +227,7 @@ static int proc_sel(struct task_struct *p, int which, int who)
 
 asmlinkage long sys_setpriority(int which, int who, int niceval)
 {
-	struct task_struct *p;
+	struct task_struct *g, *p;
 	int error;
 
 	if (which > 2 || which < 0)
@@ -241,7 +241,7 @@ asmlinkage long sys_setpriority(int which, int who, int niceval)
 		niceval = 19;
 
 	read_lock(&tasklist_lock);
-	for_each_task(p) {
+	do_each_thread(g, p) {
 		int no_nice;
 		if (!proc_sel(p, which, who))
 			continue;
@@ -262,8 +262,8 @@ asmlinkage long sys_setpriority(int which, int who, int niceval)
 			continue;
 		}
 		set_user_nice(p, niceval);
+	} while_each_thread(g, p);
 
-	}
 	read_unlock(&tasklist_lock);
 
 	return error;
@@ -277,21 +277,21 @@ asmlinkage long sys_setpriority(int which, int who, int niceval)
  */
 asmlinkage long sys_getpriority(int which, int who)
 {
-	struct task_struct *p;
+	struct task_struct *g, *p;
 	long retval = -ESRCH;
 
 	if (which > 2 || which < 0)
 		return -EINVAL;
 
 	read_lock(&tasklist_lock);
-	for_each_task (p) {
+	do_each_thread(g, p) {
 		long niceval;
 		if (!proc_sel(p, which, who))
 			continue;
 		niceval = 20 - task_nice(p);
 		if (niceval > retval)
 			retval = niceval;
-	}
+	} while_each_thread(g, p);
 	read_unlock(&tasklist_lock);
 
 	return retval;
@@ -882,12 +882,12 @@ asmlinkage long sys_setpgid(pid_t pid, pid_t pgid)
 	if (p->leader)
 		goto out;
 	if (pgid != pid) {
-		struct task_struct * tmp;
-		for_each_task (tmp) {
+		struct task_struct *g, *tmp;
+		do_each_thread(g, tmp) {
 			if (tmp->pgrp == pgid &&
 			    tmp->session == current->session)
 				goto ok_pgid;
-		}
+		} while_each_thread(g, tmp);
 		goto out;
 	}
 
@@ -956,14 +956,14 @@ asmlinkage long sys_getsid(pid_t pid)
 
 asmlinkage long sys_setsid(void)
 {
-	struct task_struct * p;
+	struct task_struct *g, *p;
 	int err = -EPERM;
 
 	read_lock(&tasklist_lock);
-	for_each_task(p) {
+	do_each_thread(g, p)
 		if (p->pgrp == current->pid)
 			goto out;
-	}
+	while_each_thread(g, p);
 
 	current->leader = 1;
 	current->session = current->pgrp = current->pid;

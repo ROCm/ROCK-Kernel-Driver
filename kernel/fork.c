@@ -161,7 +161,7 @@ static struct task_struct *dup_task_struct(struct task_struct *orig)
 
 static int get_pid(unsigned long flags)
 {
-	struct task_struct *p;
+	struct task_struct *g, *p;
 	int pid;
 
 	if (flags & CLONE_IDLETASK)
@@ -178,7 +178,7 @@ inside:
 		next_safe = pid_max;
 		read_lock(&tasklist_lock);
 	repeat:
-		for_each_task(p) {
+		do_each_thread(g, p) {
 			if (p->pid == last_pid	||
 			   p->pgrp == last_pid	||
 			   p->session == last_pid) {
@@ -195,7 +195,8 @@ inside:
 				next_safe = p->pgrp;
 			if (p->session > last_pid && next_safe > p->session)
 				next_safe = p->session;
-		}
+		} while_each_thread(g, p);
+
 		read_unlock(&tasklist_lock);
 	}
 	pid = last_pid;
@@ -632,6 +633,7 @@ static inline int copy_sighand(unsigned long clone_flags, struct task_struct * t
 	atomic_set(&sig->count, 1);
 	sig->group_exit = 0;
 	sig->group_exit_code = 0;
+	sig->group_exit_task = NULL;
 	memcpy(sig->action, current->sig->action, sizeof(sig->action));
 	sig->curr_target = NULL;
 	init_sigpending(&sig->shared_pending);
@@ -671,16 +673,13 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 		return ERR_PTR(-EINVAL);
 
 	/*
-	 * Thread groups must share signals as well:
+	 * Thread groups must share signals as well, and detached threads
+	 * can only be started up within the thread group.
 	 */
-	if (clone_flags & CLONE_THREAD)
-		clone_flags |= CLONE_SIGHAND;
-	/*
-	 * Detached threads can only be started up within the thread
-	 * group.
-	 */
-	if (clone_flags & CLONE_DETACHED)
-		clone_flags |= CLONE_THREAD;
+	if ((clone_flags & CLONE_THREAD) && !(clone_flags & CLONE_SIGHAND))
+		return ERR_PTR(-EINVAL);
+	if ((clone_flags & CLONE_DETACHED) && !(clone_flags & CLONE_THREAD))
+		return ERR_PTR(-EINVAL);
 
 	retval = security_ops->task_create(clone_flags);
 	if (retval)

@@ -78,9 +78,6 @@ void llc_sap_state_process(struct llc_sap *sap, struct sk_buff *skb)
 		sap->ind(ev->prim);
 	else if (ev->type == LLC_SAP_EV_TYPE_PDU)
 		kfree_skb(skb);
-	else
-		printk(KERN_INFO ":%s !kfree_skb & it is %s in a list\n",
-			__FUNCTION__, skb->list ? "" : "NOT");
 }
 
 /**

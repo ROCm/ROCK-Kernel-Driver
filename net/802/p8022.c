@@ -28,18 +28,8 @@
 static int p8022_request(struct datalink_proto *dl, struct sk_buff *skb,
 			 unsigned char *dest)
 {
-	union llc_u_prim_data prim_data;
-	struct llc_prim_if_block prim;
-
-	prim.data                 = &prim_data;
-	prim.sap                  = dl->sap;
-	prim.prim                 = LLC_DATAUNIT_PRIM;
-	prim_data.test.skb        = skb;
-	prim_data.test.saddr.lsap = dl->sap->laddr.lsap;
-	prim_data.test.daddr.lsap = dl->sap->laddr.lsap;
-	memcpy(prim_data.test.saddr.mac, skb->dev->dev_addr, IFHWADDRLEN);
-	memcpy(prim_data.test.daddr.mac, dest, IFHWADDRLEN);
-	return dl->sap->req(&prim);
+	llc_build_and_send_ui_pkt(dl->sap, skb, dest, dl->sap->laddr.lsap);
+	return 0;
 }
 
 struct datalink_proto *register_8022_client(unsigned char type,

@@ -52,20 +52,10 @@ struct llc_sap_ev_pdu_if {
 	u8 reason;
 };
 
-struct llc_sap_ev_tmr_if {
-	void *timer_specific;
-};
-
-struct llc_sap_ev_rpt_sts_if {
-	u8 status;
-};
-
 union llc_sap_ev_if {
 	struct llc_sap_ev_simple_if	a;	/* 'a' for simple, easy ... */
 	struct llc_sap_ev_prim_if	prim;
 	struct llc_sap_ev_pdu_if	pdu;
-	struct llc_sap_ev_tmr_if	tmr;
-	struct llc_sap_ev_rpt_sts_if	rsts;	/* report status */
 };
 
 struct llc_prim_if_block;

@@ -230,6 +230,7 @@ static unsigned long set_mtrr_state(u32 deftype_lo, u32 deftype_hi)
 
 static u32 cr4 = 0;
 static u32 deftype_lo, deftype_hi;
+static spinlock_t set_atomicity_lock = SPIN_LOCK_UNLOCKED;
 
 static void prepare_set(void)
 {
@@ -238,6 +239,7 @@ static void prepare_set(void)
 	/*  Note that this is not ideal, since the cache is only flushed/disabled
 	   for this CPU while the MTRRs are changed, but changing this requires
 	   more invasive changes to the way the kernel boots  */
+	spin_lock(&set_atomicity_lock);
 
 	/*  Save value of CR4 and clear Page Global Enable (bit 7)  */
 	if ( cpu_has_pge ) {
@@ -273,7 +275,7 @@ static void post_set(void)
 	/*  Restore value of CR4  */
 	if ( cpu_has_pge )
 		write_cr4(cr4);
-
+	spin_unlock(&set_atomicity_lock);
 }
 
 static void generic_set_all(void)

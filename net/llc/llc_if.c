@@ -86,7 +86,8 @@ void llc_sap_close(struct llc_sap *sap)
  *	llc_build_and_send_ui_pkt - unitdata request interface for upper layers
  *	@sap: sap to use
  *	@skb: packet to send
- *	@addr: destination address
+ *	@dmac: destination mac address
+ *	@dsap: destination sap
  *
  *	Upper layers calls this function when upper layer wants to send data
  *	using connection-less mode communication (UI pdu).
@@ -95,15 +96,12 @@ void llc_sap_close(struct llc_sap *sap)
  *	less mode communication; timeout/retries handled by network layer;
  *	package primitive as an event and send to SAP event handler
  */
-void llc_build_and_send_ui_pkt(struct llc_sap *sap,
-			       struct sk_buff *skb,
-			       struct sockaddr_llc *addr)
+void llc_build_and_send_ui_pkt(struct llc_sap *sap, struct sk_buff *skb,
+			       u8 *dmac, u8 dsap)
 {
 	union llc_u_prim_data prim_data;
 	struct llc_prim_if_block prim;
 	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
-
-	skb->protocol = llc_proto_type(addr->sllc_arphrd);
 
 	prim.data = &prim_data;
 	prim.sap  = sap;
@@ -111,9 +109,9 @@ void llc_build_and_send_ui_pkt(struct llc_sap *sap,
 
 	prim_data.udata.skb        = skb;
 	prim_data.udata.saddr.lsap = sap->laddr.lsap;
-	prim_data.udata.daddr.lsap = addr->sllc_dsap;
+	prim_data.udata.daddr.lsap = dsap;
 	memcpy(prim_data.udata.saddr.mac, skb->dev->dev_addr, IFHWADDRLEN);
-	memcpy(prim_data.udata.daddr.mac, addr->sllc_dmac, IFHWADDRLEN);
+	memcpy(prim_data.udata.daddr.mac, dmac, IFHWADDRLEN);
 
 	ev->type	   = LLC_SAP_EV_TYPE_PRIM;
 	ev->data.prim.prim = LLC_DATAUNIT_PRIM;
@@ -126,20 +124,18 @@ void llc_build_and_send_ui_pkt(struct llc_sap *sap,
  *	llc_build_and_send_test_pkt - TEST interface for upper layers.
  *	@sap: sap to use
  *	@skb: packet to send
- *	@addr: destination address
+ *	@dmac: destination mac address
+ *	@dsap: destination sap
  *
  *	This function is called when upper layer wants to send a TEST pdu.
  *	Returns 0 for success, 1 otherwise.
  */
-void llc_build_and_send_test_pkt(struct llc_sap *sap,
-				 struct sk_buff *skb,
-				 struct sockaddr_llc *addr)
+void llc_build_and_send_test_pkt(struct llc_sap *sap, struct sk_buff *skb,
+				 u8 *dmac, u8 dsap)
 {
 	union llc_u_prim_data prim_data;
 	struct llc_prim_if_block prim;
 	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
-
-	skb->protocol = llc_proto_type(addr->sllc_arphrd);
 
 	prim.data = &prim_data;
 	prim.sap  = sap;
@@ -147,9 +143,9 @@ void llc_build_and_send_test_pkt(struct llc_sap *sap,
 
 	prim_data.test.skb        = skb;
 	prim_data.test.saddr.lsap = sap->laddr.lsap;
-	prim_data.test.daddr.lsap = addr->sllc_dsap;
+	prim_data.test.daddr.lsap = dsap;
 	memcpy(prim_data.test.saddr.mac, skb->dev->dev_addr, IFHWADDRLEN);
-	memcpy(prim_data.test.daddr.mac, addr->sllc_dmac, IFHWADDRLEN);
+	memcpy(prim_data.test.daddr.mac, dmac, IFHWADDRLEN);
 	
 	ev->type	   = LLC_SAP_EV_TYPE_PRIM;
 	ev->data.prim.prim = LLC_TEST_PRIM;
@@ -162,20 +158,18 @@ void llc_build_and_send_test_pkt(struct llc_sap *sap,
  *	llc_build_and_send_xid_pkt - XID interface for upper layers
  *	@sap: sap to use
  *	@skb: packet to send
- *	@addr: destination address
+ *	@dmac: destination mac address
+ *	@dsap: destination sap
  *
  *	This function is called when upper layer wants to send a XID pdu.
  *	Returns 0 for success, 1 otherwise.
  */
-void llc_build_and_send_xid_pkt(struct llc_sap *sap,
-				struct sk_buff *skb,
-				struct sockaddr_llc *addr)
+void llc_build_and_send_xid_pkt(struct llc_sap *sap, struct sk_buff *skb,
+				u8 *dmac, u8 dsap)
 {
 	union llc_u_prim_data prim_data;
 	struct llc_prim_if_block prim;
 	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
-
-	skb->protocol = llc_proto_type(addr->sllc_arphrd);
 
 	prim.data = &prim_data;
 	prim.sap  = sap;
@@ -183,9 +177,9 @@ void llc_build_and_send_xid_pkt(struct llc_sap *sap,
 
 	prim_data.xid.skb        = skb;
 	prim_data.xid.saddr.lsap = sap->laddr.lsap;
-	prim_data.xid.daddr.lsap = addr->sllc_dsap;
+	prim_data.xid.daddr.lsap = dsap;
 	memcpy(prim_data.xid.saddr.mac, skb->dev->dev_addr, IFHWADDRLEN);
-	memcpy(prim_data.xid.daddr.mac, addr->sllc_dmac, IFHWADDRLEN);
+	memcpy(prim_data.xid.daddr.mac, dmac, IFHWADDRLEN);
 
 	ev->type	   = LLC_SAP_EV_TYPE_PRIM;
 	ev->data.prim.prim = LLC_XID_PRIM;
@@ -196,7 +190,8 @@ void llc_build_and_send_xid_pkt(struct llc_sap *sap,
 
 /**
  *	llc_build_and_send_pkt - Connection data sending for upper layers.
- *	@prim: pointer to structure that contains service parameters
+ *	@sk: connection
+ *	@skb: packet to send
  *
  *	This function is called when upper layer wants to send data using
  *	connection oriented communication mode. During sending data, connection
@@ -352,3 +347,4 @@ int llc_build_and_send_reset_pkt(struct sock *sk,
 
 EXPORT_SYMBOL(llc_sap_open);
 EXPORT_SYMBOL(llc_sap_close);
+EXPORT_SYMBOL(llc_build_and_send_ui_pkt);

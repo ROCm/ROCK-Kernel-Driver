@@ -51,7 +51,11 @@ struct exec_domain;
 #define CLONE_CLEARTID	0x00200000	/* clear the userspace TID */
 #define CLONE_DETACHED	0x00400000	/* parent wants no child-exit signal */
 
-#define CLONE_SIGNAL	(CLONE_SIGHAND | CLONE_THREAD)
+/*
+ * List of flags we want to share for kernel threads,
+ * if only because they are not used by them anyway.
+ */
+#define CLONE_KERNEL	(CLONE_FS | CLONE_FILES | CLONE_SIGHAND)
 
 /*
  * These are the constant used to fake the fixed-point load-average
@@ -222,6 +226,8 @@ struct signal_struct {
 	/* thread group exit support */
 	int			group_exit;
 	int			group_exit_code;
+
+	struct task_struct	*group_exit_task;
 };
 
 /*
@@ -552,6 +558,7 @@ extern int dequeue_signal(struct sigpending *pending, sigset_t *mask, siginfo_t 
 extern void block_all_signals(int (*notifier)(void *priv), void *priv,
 			      sigset_t *mask);
 extern void unblock_all_signals(void);
+extern void release_task(struct task_struct * p);
 extern int send_sig_info(int, struct siginfo *, struct task_struct *);
 extern int force_sig_info(int, struct siginfo *, struct task_struct *);
 extern int __kill_pg_info(int sig, struct siginfo *info, pid_t pgrp);
@@ -760,14 +767,16 @@ static inline void remove_wait_queue_locked(wait_queue_head_t *q,
 #define remove_parent(p)	list_del_init(&(p)->sibling)
 #define add_parent(p, parent)	list_add_tail(&(p)->sibling,&(parent)->children)
 
-#define REMOVE_LINKS(p) do {				\
-	list_del_init(&(p)->tasks);			\
-	remove_parent(p);				\
+#define REMOVE_LINKS(p) do {					\
+	if (thread_group_leader(p))				\
+		list_del_init(&(p)->tasks);			\
+	remove_parent(p);					\
 	} while (0)
 
-#define SET_LINKS(p) do {				\
-	list_add_tail(&(p)->tasks,&init_task.tasks);	\
-	add_parent(p, (p)->parent);			\
+#define SET_LINKS(p) do {					\
+	if (thread_group_leader(p))				\
+		list_add_tail(&(p)->tasks,&init_task.tasks);	\
+	add_parent(p, (p)->parent);				\
 	} while (0)
 
 static inline struct task_struct *eldest_child(struct task_struct *p)
@@ -797,11 +806,18 @@ static inline struct task_struct *younger_sibling(struct task_struct *p)
 #define next_task(p)	list_entry((p)->tasks.next, struct task_struct, tasks)
 #define prev_task(p)	list_entry((p)->tasks.prev, struct task_struct, tasks)
 
-#define for_each_task(p) \
+#define for_each_process(p) \
 	for (p = &init_task ; (p = next_task(p)) != &init_task ; )
 
-#define for_each_thread(task) \
-	for (task = next_thread(current) ; task != current ; task = next_thread(task))
+/*
+ * Careful: do_each_thread/while_each_thread is a double loop so
+ *          'break' will not work as expected - use goto instead.
+ */
+#define do_each_thread(g, t) \
+	for (g = t = &init_task ; (g = t = next_task(g)) != &init_task ; ) do
+
+#define while_each_thread(g, t) \
+	while ((t = next_thread(t)) != g)
 
 static inline task_t *next_thread(task_t *p)
 {
