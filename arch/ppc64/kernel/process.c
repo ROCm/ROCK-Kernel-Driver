@@ -44,8 +44,6 @@
 #include <asm/machdep.h>
 #include <asm/iSeries/HvCallHpt.h>
 
-int dump_fpu(struct pt_regs *regs, elf_fpregset_t *fpregs);
-
 struct task_struct *last_task_used_math = NULL;
 
 struct mm_struct ioremap_mm = { pgd             : ioremap_dir  

@@ -33,7 +33,6 @@ void* OpenPIC_Addr;
 static volatile struct OpenPIC *OpenPIC = NULL;
 u_int OpenPIC_NumInitSenses __initdata = 0;
 u_char *OpenPIC_InitSenses __initdata = NULL;
-extern int use_of_interrupt_tree;
 
 void find_ISUs(void);
 

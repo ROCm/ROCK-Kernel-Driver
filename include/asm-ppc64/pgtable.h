@@ -12,11 +12,6 @@
 #include <asm/page.h>
 #endif /* __ASSEMBLY__ */
 
-/* Certain architectures need to do special things when pte's
- * within a page table are directly modified.  Thus, the following
- * hook is made available.
- */
-
 /* PMD_SHIFT determines what a second-level page table entry can map */
 #define PMD_SHIFT	(PAGE_SHIFT + PAGE_SHIFT - 3)
 #define PMD_SIZE	(1UL << PMD_SHIFT)
@@ -107,9 +102,9 @@
 /* preserving _PAGE_SECONDARY | _PAGE_GROUP_IX */
 #define _PAGE_CHG_MASK	(PAGE_MASK | _PAGE_ACCESSED | _PAGE_DIRTY | _PAGE_HPTEFLAGS)
 
-#define _PAGE_BASE	_PAGE_PRESENT | _PAGE_ACCESSED | _PAGE_COHERENT
+#define _PAGE_BASE	(_PAGE_PRESENT | _PAGE_ACCESSED | _PAGE_COHERENT)
 
-#define _PAGE_WRENABLE	_PAGE_RW | _PAGE_DIRTY 
+#define _PAGE_WRENABLE	(_PAGE_RW | _PAGE_DIRTY)
 
 /* __pgprot defined in asm-ppc64/page.h */
 #define PAGE_NONE	__pgprot(_PAGE_PRESENT | _PAGE_ACCESSED)
@@ -330,8 +325,6 @@ static inline void pte_clear(pte_t * ptep)
 	pte_update(ptep, ~_PAGE_HPTEFLAGS, 0);
 }
 
-extern unsigned long va_to_phys(unsigned long address);
-extern pte_t *va_to_pte(unsigned long address);
 extern unsigned long ioremap_bot, ioremap_base;
 
 #define USER_PGD_PTRS (PAGE_OFFSET >> PGDIR_SHIFT)
@@ -356,6 +349,7 @@ extern void paging_init(void);
  * ahead of time, instead of waiting for the inevitable extra
  * hash-table miss exception.
  */
+struct vm_area_struct;
 extern void update_mmu_cache(struct vm_area_struct *, unsigned long, pte_t);
 
 /* Encode and de-code a swap entry */
@@ -380,12 +374,8 @@ extern void update_mmu_cache(struct vm_area_struct *, unsigned long, pte_t);
  */
 #define pgtable_cache_init()	do { } while (0)
 
-extern void updateBoltedHptePP(unsigned long newpp, unsigned long ea);
 extern void hpte_init_pSeries(void);
 extern void hpte_init_iSeries(void);
-
-extern void make_pte(HPTE * htab, unsigned long va, unsigned long pa,
-		int mode, unsigned long hash_mask, int large);
 
 #endif /* __ASSEMBLY__ */
 #endif /* _PPC64_PGTABLE_H */

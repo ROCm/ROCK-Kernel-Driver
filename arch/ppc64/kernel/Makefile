@@ -32,6 +32,8 @@ obj-$(CONFIG_PCI) += pSeries_pci.o pSeries_lpar.o pSeries_hvCall.o eeh.o
 obj-y += rtasd.o nvram.o
 endif
 
+obj-$(CONFIG_RTAS_FLASH) += rtas_flash.o
+
 obj-$(CONFIG_SMP) += smp.o
 
 obj-y += prom.o lmb.o rtas.o rtas-proc.o chrp_setup.o i8259.o
@@ -43,6 +45,11 @@ include $(TOPDIR)/Rules.make
 #
 
 head.o: head.S ppc_defs.h
+misc.o: misc.S ppc_defs.h
+entry.o: entry.S ppc_defs.h
+hvCall.o: hvCall.S ppc_defs.h
+pSeries_hvCall.o: pSeries_hvCall.S ppc_defs.h
+sys32.o: sys32.S ppc_defs.h
 
 ppc_defs.h: mk_defs.c ppc_defs.head \
 		$(TOPDIR)/include/asm/mmu.h \
