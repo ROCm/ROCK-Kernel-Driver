@@ -4,6 +4,7 @@
 #ifdef __KERNEL__
 #include <asm/div64.h>
 #include <asm/types.h>
+#include <asm/param.h>
 
 #if (HZ % USER_HZ)==0
 # define jiffies_to_clock_t(x) ((x) / (HZ / USER_HZ))
