@@ -191,7 +191,7 @@ cb_sockclass_listen_start(struct sock *sk)
 	int i = 0;
 
 	// XXX - TBD ipv6
-	if (sk->sk_family == IPPROTO_IPV6)
+	if (sk->sk_family == AF_INET6)
 		return;
 
 	// to store the socket address
@@ -205,7 +205,7 @@ cb_sockclass_listen_start(struct sock *sk)
 	ckrm_ns_hold(ns);
 
 	ns->ns_family = sk->sk_family;
-	if (ns->ns_family == IPPROTO_IPV6)	// IPv6 not supported yet.
+	if (ns->ns_family == AF_INET6)	// IPv6 not supported yet.
 		return;
 
 	ns->ns_daddrv4 = inet_sk(sk)->rcv_saddr;
@@ -256,7 +256,7 @@ cb_sockclass_listen_stop(struct sock *sk)
 	struct ckrm_sock_class *newcls = NULL;
 
 	// XXX - TBD ipv6
-	if (sk->sk_family == IPPROTO_IPV6)
+	if (sk->sk_family == AF_INET6)
 		return;
 
 	ns =  (struct ckrm_net_struct *)sk->sk_ns;
@@ -373,6 +373,9 @@ sock_forced_reclassify_ns(struct ckrm_net_struct *tns, struct ckrm_core_class *c
 	newcls = class_type(struct ckrm_sock_class, core);
 	// lookup the listening sockets
 	// returns with a reference count set on socket
+	if (tns->ns_family == AF_INET6) 
+		return -EOPNOTSUPP;
+
 	sk = tcp_v4_lookup_listener(tns->ns_daddrv4,tns->ns_dport,0);
 	if (!sk) {
 		printk(KERN_INFO "No such listener 0x%x:%d\n",
@@ -474,7 +477,7 @@ sock_forced_reclassify(struct ckrm_core_class *target,const char *options)
 			p2++;
 			p2 = v4toi(p2, '\\',&(v4addr));
 			ns.ns_daddrv4 = htonl(v4addr);
-			ns.ns_family = 4; //IPPROTO_IPV4
+			ns.ns_family = AF_INET; 
 			p2 = v4toi(++p2, ':',&tmp); 
 			ns.ns_dport = (__u16)tmp;
 			if (*p2) 
