@@ -1106,6 +1106,7 @@ void arch_unmap_area(struct vm_area_struct *area)
  * This mmap-allocator allocates new areas top-down from below the
  * stack's low limit (the base):
  */
+#ifndef HAVE_ARCH_UNMAPPED_AREA_TOPDOWN
 unsigned long
 arch_get_unmapped_area_topdown(struct file *filp, const unsigned long addr0,
 			  const unsigned long len, const unsigned long pgoff,
@@ -1190,6 +1191,7 @@ fail:
 
 	return addr;
 }
+#endif
 
 void arch_unmap_area_topdown(struct vm_area_struct *area)
 {
