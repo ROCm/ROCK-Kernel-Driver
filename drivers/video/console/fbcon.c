@@ -1012,7 +1012,10 @@ static void fbcon_putcs(struct vc_data *vc, const unsigned short *s,
 
 static void fbcon_putc(struct vc_data *vc, int c, int ypos, int xpos)
 {
-	fbcon_putcs(vc, (const unsigned short *) &c, 1, ypos, xpos);
+	unsigned short chr;
+
+	scr_writew(c, &chr);
+	fbcon_putcs(vc, &chr, 1, ypos, xpos);
 }
 
 static void fbcon_clear_margins(struct vc_data *vc, int bottom_only)
