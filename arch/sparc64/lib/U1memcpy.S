@@ -119,6 +119,9 @@
 	.globl		FUNC_NAME
 	.type		FUNC_NAME,#function
 FUNC_NAME:		/* %o0=dst, %o1=src, %o2=len */
+	srlx		%o2, 31, %g2
+	cmp		%g2, 0
+	tne		%xcc, 5
 	PREAMBLE
 	mov		%o0, %g5
 	cmp		%o2, 0
