@@ -1,9 +1,0 @@
-OUTPUT_FORMAT("ecoff-littlemips")
-OUTPUT_ARCH(mips)
-SECTIONS
-{
-  .initrd :
-  {
-        *(.data)
-  }
-}
