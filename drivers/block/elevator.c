@@ -194,6 +194,12 @@ int elevator_noop_merge(request_queue_t *q, struct list_head **insert,
 	return ELEVATOR_NO_MERGE;
 }
 
+void elevator_noop_merge_requests(request_queue_t *q, struct request *req,
+				  struct request *next)
+{
+	list_del_init(&next->queuelist);
+}
+
 void elevator_noop_add_request(request_queue_t *q, struct request *rq,
 			       struct list_head *insert_here)
 {
@@ -370,19 +376,70 @@ int elv_queue_empty(request_queue_t *q)
 	return list_empty(&q->queue_head);
 }
 
-inline struct list_head *elv_get_sort_head(request_queue_t *q,
-					   struct request *rq)
+struct request *elv_latter_request(request_queue_t *q, struct request *rq)
 {
+	struct list_head *next;
+
 	elevator_t *e = &q->elevator;
 
-	if (e->elevator_get_sort_head_fn)
-		return e->elevator_get_sort_head_fn(q, rq);
+	if (e->elevator_latter_req_fn)
+		return e->elevator_latter_req_fn(q, rq);
 
-	return &q->queue_head;
+	next = rq->queuelist.next;
+	if (next != &q->queue_head && next != &rq->queuelist)
+		return list_entry_rq(next);
+
+	return NULL;
+}
+
+struct request *elv_former_request(request_queue_t *q, struct request *rq)
+{
+	struct list_head *prev;
+
+	elevator_t *e = &q->elevator;
+
+	if (e->elevator_former_req_fn)
+		return e->elevator_latter_req_fn(q, rq);
+
+	prev = rq->queuelist.prev;
+	if (prev != &q->queue_head && prev != &rq->queuelist)
+		return list_entry_rq(prev);
+
+	return NULL;
+}
+
+int elv_register_queue(struct gendisk *disk)
+{
+	request_queue_t *q = disk->queue;
+	elevator_t *e;
+
+	if (!q)
+		return -ENXIO;
+
+	e = &q->elevator;
+
+	e->kobj.parent = kobject_get(&disk->kobj);
+	if (!e->kobj.parent)
+		return -EBUSY;
+
+	snprintf(e->kobj.name, KOBJ_NAME_LEN, "%s", "iosched");
+	e->kobj.ktype = e->elevator_ktype;
+
+	return kobject_register(&e->kobj);
+}
+
+void elv_unregister_queue(struct gendisk *disk)
+{
+	request_queue_t *q = disk->queue;
+	elevator_t *e = &q->elevator;
+
+	kobject_unregister(&e->kobj);
+	kobject_put(&disk->kobj);
 }
 
 elevator_t elevator_noop = {
 	.elevator_merge_fn		= elevator_noop_merge,
+	.elevator_merge_req_fn		= elevator_noop_merge_requests,
 	.elevator_next_req_fn		= elevator_noop_next_request,
 	.elevator_add_req_fn		= elevator_noop_add_request,
 };
