@@ -2829,7 +2829,7 @@ restart:
 		int i, len = 0;
 
 		mapping = ace_map_tx_skb(ap, skb, NULL, idx);
-		flagsize = ((skb->len - skb->data_len) << 16);
+		flagsize = (skb_headlen(skb) << 16);
 		if (skb->ip_summed == CHECKSUM_HW)
 			flagsize |= BD_FLG_TCP_UDP_SUM;
 #if ACENIC_DO_VLAN

@@ -826,7 +826,7 @@ static int cp_start_xmit (struct sk_buff *skb, struct net_device *dev)
 		 * Otherwise we could race with the device.
 		 */
 		first_eor = eor;
-		first_len = skb->len - skb->data_len;
+		first_len = skb_headlen(skb);
 		first_mapping = pci_map_single(cp->pdev, skb->data,
 					       first_len, PCI_DMA_TODEVICE);
 		cp->tx_skb[entry].skb = skb;

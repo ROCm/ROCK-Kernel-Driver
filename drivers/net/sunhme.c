@@ -2319,7 +2319,7 @@ static int happy_meal_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		/* We must give this initial chunk to the device last.
 		 * Otherwise we could race with the device.
 		 */
-		first_len = skb->len - skb->data_len;
+		first_len = skb_headlen(skb);
 		first_mapping = hme_dma_map(hp, skb->data, first_len, DMA_TODEVICE);
 		entry = NEXT_TX(entry);
 
