@@ -253,11 +253,6 @@ static int fop_close(struct inode * inode, struct file * file)
 	return 0;
 }
 
-static long long fop_llseek(struct file *file, long long offset, int origin)
-{
-	return -ESPIPE;
-}
-
 static int fop_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	unsigned long arg)
 {
@@ -282,7 +277,7 @@ static int fop_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 static struct file_operations wdt_fops = {
 	.owner		= THIS_MODULE,
-	.llseek		= fop_llseek,
+	.llseek		= no_llseek,
 	.write		= fop_write,
 	.open		= fop_open,
 	.release	= fop_close,
