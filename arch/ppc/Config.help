@@ -1,59 +1,54 @@
 CONFIG_SMP
   This enables support for systems with more than one CPU. If you have
-  a system with only one CPU, like most personal computers, say N. If
-  you have a system with more than one CPU, say Y.
+  a system with only one CPU, say N. If you have a system with more
+  than one CPU, say Y.  Note that the kernel does not currently
+  support SMP machines with 603/603e/603ev or PPC750 ("G3") processors
+  since they have inadequate hardware support for multiprocessor
+  operation.
 
   If you say N here, the kernel will run on single and multiprocessor
   machines, but will use only one CPU of a multiprocessor machine. If
-  you say Y here, the kernel will run on many, but not all,
-  singleprocessor machines. On a singleprocessor machine, the kernel
-  will run faster if you say N here.
-
-  Note that if you say Y here and choose architecture "586" or
-  "Pentium" under "Processor family", the kernel will not work on 486
-  architectures. Similarly, multiprocessor kernels for the "PPro"
-  architecture may not work on all Pentium based boards.
-
-  People using multiprocessor machines who say Y here should also say
-  Y to "Enhanced Real Time Clock Support", below. The "Advanced Power
-  Management" code will be disabled if you say Y here.
-
-  See also the <file:Documentation/smp.tex>,
-  <file:Documentation/smp.txt>, <file:Documentation/i386/IO-APIC.txt>,
-  <file:Documentation/nmi_watchdog.txt> and the SMP-HOWTO available at
-  <http://www.linuxdoc.org/docs.html#howto>.
+  you say Y here, the kernel will run on single-processor machines.
+  On a single-processor machine, the kernel will run faster if you say
+  N here.
 
   If you don't know what to do here, say N.
 
+CONFIG_PREEMPT
+  This option reduces the latency of the kernel when reacting to
+  real-time or interactive events by allowing a low priority process to
+  be preempted even if it is in kernel mode executing a system call.
+  Unfortunately the kernel code has some race conditions if both
+  CONFIG_SMP and CONFIG_PREEMPT are enabled, so this option is
+  currently disabled if you are building an SMP kernel.
+
+  Say Y here if you are building a kernel for a desktop, embedded
+  or real-time system.  Say N if you are unsure.
+
 CONFIG_PPC
-  The PowerPC is a very capable 32-bit RISC processor from Motorola,
-  the successor to their 68000 and 88000 series.  It powers recent
-  Macintoshes and also a widely-used series of single-board computers
-  from Motorola.  The Linux PowerPC port has a home page at
-  <http://penguinppc.org/>.
+  The PowerPC is a modern RISC architecture descended from the POWER
+  architecture designed by IBM.  The PowerPC architecture is designed
+  to allow high-speed implementations which can execute several
+  instructions in each clock cycle.  IBM and Motorola design and
+  manufacture PowerPC processors aimed at embedded, desktop and server
+  applications.  PowerPC chips are used in Apple Power Macintoshes
+  (including iMacs, iBooks and PowerBooks), in IBM pSeries (RS/6000)
+  and iSeries (AS/400) machines, and in a broad range of embedded
+  applications.  The Linux PowerPC port has a home page at
+  <http://penguinppc.org/intro.shtml>.
 
 CONFIG_MATH_EMULATION
-  Linux can emulate a math coprocessor (used for floating point
-  operations) if you don't have one. 486DX and Pentium processors have
-  a math coprocessor built in, 486SX and 386 do not, unless you added
-  a 487DX or 387, respectively. (The messages during boot time can
-  give you some hints here ["man dmesg"].) Everyone needs either a
-  coprocessor or this emulation.
+  Some PowerPC chips designed for embedded applications do not have 
+  a floating-point unit and therefore do not implement the
+  floating-point instructions in the PowerPC instruction set.  If you
+  say Y here, the kernel will include code to emulate a floating-point
+  unit, which will allow programs that use floating-point
+  instructions to run.
 
-  If you don't have a math coprocessor, you need to say Y here; if you
-  say Y here even though you have a coprocessor, the coprocessor will
-  be used nevertheless. (This behavior can be changed with the kernel
-  command line option "no387", which comes handy if your coprocessor
-  is broken. Try "man bootparam" or see the documentation of your boot
-  loader (lilo or loadlin) about how to pass options to the kernel at
-  boot time.) This means that it is a good idea to say Y here if you
-  intend to use this kernel on different machines.
-
-  More information about the internals of the Linux math coprocessor
-  emulation can be found in <file:arch/i386/math-emu/README>.
-
-  If you are not sure, say Y; apart from resulting in a 66 KB bigger
-  kernel, it won't hurt.
+  If you have an Apple machine or an IBM RS/6000 or pSeries machine,
+  or any machine with a 6xx, 7xx or 7xxx series processor, say N
+  here.  Saying Y here will not hurt performance (on any machine) but
+  will increase the size of the kernel.
 
 CONFIG_MAC_FLOPPY
   If you have a SWIM-3 (Super Woz Integrated Machine 3; from Apple)
@@ -69,11 +64,8 @@ CONFIG_IDE
 
   Integrated Disk Electronics (IDE aka ATA-1) is a connecting standard
   for mass storage units such as hard disks. It was designed by
-  Western Digital and Compaq Computer in 1984. It was then named
-  ST506. Quite a number of disks use the IDE interface.
-
-  AT Attachment (ATA) is the superset of the IDE specifications.
-  ST506 was also called ATA-1.
+  Western Digital and Compaq Computer in 1984.  Quite a number of
+  disks use the IDE interface.
 
   Fast-IDE is ATA-2 (also named Fast ATA), Enhanced IDE (EIDE) is
   ATA-3. It provides support for larger disks (up to 8.4GB by means of
@@ -111,50 +103,28 @@ CONFIG_HEARTBEAT
 CONFIG_ISA
   Find out whether you have ISA slots on your motherboard.  ISA is the
   name of a bus system, i.e. the way the CPU talks to the other stuff
-  inside your box.  Other bus systems are PCI, EISA, MicroChannel
-  (MCA) or VESA.  ISA is an older system, now being displaced by PCI;
-  newer boards don't support it.  If you have ISA, say Y, otherwise N.
+  inside your box.  If you have an Apple machine, say N here; if you
+  have an IBM RS/6000 or pSeries machine or a PReP machine, say Y.  If
+  you have an embedded board, consult your board documentation.
 
 CONFIG_PCI
-  Find out whether you have a PCI motherboard. PCI is the name of a
-  bus system, i.e. the way the CPU talks to the other stuff inside
-  your box. Other bus systems are ISA, EISA, MicroChannel (MCA) or
-  VESA. If you have PCI, say Y, otherwise N.
-
-  The PCI-HOWTO, available from
-  <http://www.linuxdoc.org/docs.html#howto>, contains valuable
-  information about which PCI hardware does work under Linux and which
-  doesn't.
+  Find out whether your system includes a PCI bus. PCI is the name of
+  a bus system, i.e. the way the CPU talks to the other stuff inside
+  your box.  If you say Y here, the kernel will include drivers and
+  infrastructure code to support PCI bus devices.
 
 CONFIG_PCI_QSPAN
-  Find out whether you have a PCI motherboard. PCI is the name of a
-  bus system, i.e. the way the CPU talks to the other stuff inside
-  your box. Other bus systems are ISA, EISA, MicroChannel (MCA) or
-  VESA. If you have PCI, say Y, otherwise N.
-
-  The PCI-HOWTO, available from
-  <http://www.linuxdoc.org/docs.html#howto>, contains valuable
-  information about which PCI hardware does work under Linux and which
-  doesn't.
+  Say Y here if you have a system based on a Motorola 8xx-series
+  embedded processor with a QSPAN PCI interface, otherwise say N.
 
 CONFIG_MCA
-  MicroChannel Architecture is found in some IBM PS/2 machines and
-  laptops.  It is a bus system similar to PCI or ISA. See
-  <file:Documentation/mca.txt> (and especially the web page given
-  there) before attempting to build an MCA bus kernel.
+  MicroChannel Architecture is found in some older IBM RS/6000
+  machines.  It is a bus system similar to PCI or ISA.  MCA-based
+  RS/6000 machines are currently not supported by Linux.
 
 CONFIG_EISA
-  The Extended Industry Standard Architecture (EISA) bus was
-  developed as an open alternative to the IBM MicroChannel bus.
-
-  The EISA bus provided some of the features of the IBM MicroChannel
-  bus while maintaining backward compatibility with cards made for
-  the older ISA bus.  The EISA bus saw limited use between 1988 and
-  1995 when it was made obsolete by the PCI bus.
-
-  Say Y here if you are building a kernel for an EISA-based machine.
-
-  Otherwise, say N.
+  The Extended Industry Standard Architecture (EISA) bus is a bus
+  architecture used on some older intel-based PCs.
 
 CONFIG_HOTPLUG
   Say Y here if you want to plug devices into your computer while
@@ -193,57 +163,27 @@ CONFIG_PCMCIA
 
 CONFIG_KCORE_ELF
   If you enabled support for /proc file system then the file
-  /proc/kcore will contain the kernel core image. This can be used
-  in gdb:
+  /proc/kcore will contain the kernel core image in ELF format. This
+  can be used in gdb:
 
   $ cd /usr/src/linux ; gdb vmlinux /proc/kcore
 
-  You have two choices here: ELF and A.OUT. Selecting ELF will make
-  /proc/kcore appear in ELF core format as defined by the Executable
-  and Linking Format specification. Selecting A.OUT will choose the
-  old "a.out" format which may be necessary for some old versions
-  of binutils or on some architectures.
-
   This is especially useful if you have compiled the kernel with the
   "-g" option to preserve debugging information. It is mainly used
-  for examining kernel data structures on the live kernel so if you
-  don't understand what this means or are not a kernel hacker, just
-  leave it at its default value ELF.
+  for examining kernel data structures on the live kernel.
 
 CONFIG_BINFMT_ELF
   ELF (Executable and Linkable Format) is a format for libraries and
   executables used across different architectures and operating
-  systems. Saying Y here will enable your kernel to run ELF binaries
-  and enlarge it by about 13 KB. ELF support under Linux has now all
-  but replaced the traditional Linux a.out formats (QMAGIC and ZMAGIC)
-  because it is portable (this does *not* mean that you will be able
-  to run executables from different architectures or operating systems
-  however) and makes building run-time libraries very easy. Many new
-  executables are distributed solely in ELF format. You definitely
-  want to say Y here.
-
-  Information about ELF is contained in the ELF HOWTO available from
-  <http://www.linuxdoc.org/docs.html#howto>.
-
-  If you find that after upgrading from Linux kernel 1.2 and saying Y
-  here, you still can't run any ELF binaries (they just crash), then
-  you'll have to install the newest ELF runtime libraries, including
-  ld.so (check the file <file:Documentation/Changes> for location and
-  latest version).
-
-  If you want to compile this as a module ( = code which can be
-  inserted in and removed from the running kernel whenever you want),
-  say M here and read <file:Documentation/modules.txt>.  The module
-  will be called binfmt_elf.o. Saying M or N here is dangerous because
-  some crucial programs on your system might be in ELF format.
+  systems.
 
 CONFIG_BINFMT_MISC
   If you say Y here, it will be possible to plug wrapper-driven binary
   formats into the kernel. You will like this especially when you use
   programs that need an interpreter to run like Java, Python or
-  Emacs-Lisp. It's also useful if you often run DOS executables under
+  Emacs-Lisp.  It's also useful if you often run DOS executables under
   the Linux DOS emulator DOSEMU (read the DOSEMU-HOWTO, available from
-  <http://www.linuxdoc.org/docs.html#howto>). Once you have
+  <http://www.linuxdoc.org/docs.html#howto>).  Once you have
   registered such a binary class with the kernel, you can start one of
   those programs simply by typing in its name at a shell prompt; Linux
   will automatically feed it to the correct interpreter.
@@ -262,20 +202,17 @@ CONFIG_BINFMT_MISC
 
 CONFIG_VGA_CONSOLE
   Saying Y here will allow you to use Linux in text mode through a
-  display that complies with the generic VGA standard. Virtually
-  everyone wants that.
+  display that complies with the generic VGA standard.  This can be
+  useful on PReP systems and IBM RS/6000 or pSeries machines but is of
+  limited usefulness on Apple machines.
 
-  The program SVGATextMode can be used to utilize SVGA video cards to
-  their full potential in text mode. Download it from
-  <ftp://ibiblio.org/pub/Linux/utils/console/>.
-
-  Say Y.
+  Say N here if you have an Apple machine.
 
 CONFIG_IRQ_ALL_CPUS
   This option gives the kernel permission to distribute IRQs across
   multiple CPUs.  Saying N here will route all IRQs to the first
-  CPU. Generally SMP PowerMacs can answer Y. SMP IBM CHRP boxes or
-  Power3 boxes should say N for now.
+  CPU.  Generally saying Y is safe, although some problems have been
+  reported with SMP Power Macintoshes with this option enabled.
 
 CONFIG_FB
   The frame buffer device provides an abstraction for the graphics
@@ -300,14 +237,9 @@ CONFIG_FB
   <http://www.tahallah.demon.co.uk/programming/prog.html> for more
   information.
 
-  Say Y here and to the driver for your graphics board below if you
-  are compiling a kernel for a non-x86 architecture.
-
-  If you are compiling for the x86 architecture, you can say Y if you
-  want to play with it, but it is not essential. Please note that
-  running graphical applications that directly touch the hardware
-  (e.g. an accelerated X server) and that are not frame buffer
-  device-aware may cause unexpected results. If unsure, say N.
+  Saying Y here is recommended if your machine has graphics hardware,
+  and strongly recommended if you are compiling a kernel for an Apple
+  machine.
 
 CONFIG_FB_COMPAT_XPMAC
   If you use the Xpmac X server (common with mklinux), you'll need to
@@ -414,26 +346,28 @@ CONFIG_PREP_RESIDUAL
 CONFIG_ADB
   Apple Desktop Bus (ADB) support is for support of devices which
   are connected to an ADB port.  ADB devices tend to have 4 pins.
-  If you have an Apple Macintosh prior to the iMac, or a
-  "Blue and White G3", you probably want to say Y here.  Otherwise
-  say N.
+  If you have an Apple Macintosh prior to the iMac, an iBook or
+  PowerBook, or a "Blue and White G3", you probably want to say Y
+  here.  Otherwise say N.
 
 CONFIG_ADB_CUDA
   This provides support for CUDA based Power Macintosh systems.  This
   includes most OldWorld PowerMacs, the first generation iMacs, the
-  Blue&White G3 and the Yikes G4 (PCI Graphics).  All later models
-  should use CONFIG_ADB_PMU instead.
+  Blue&White G3 and the "Yikes" G4 (PCI Graphics).  All later models
+  should use CONFIG_ADB_PMU instead.  It is safe to say Y here even if
+  your machine doesn't have a CUDA.
 
   If unsure say Y.
 
 CONFIG_ADB_PMU
-  On the PowerBook 3400 and 2400, the PMU is a 6805 microprocessor
-  core whose primary function is to control battery charging and
-  system power.  The PMU also controls the ADB (Apple Desktop Bus)
-  which connects to the keyboard and mouse, as well as the
-  non-volatile RAM and the RTC (real time clock) chip.  Say Y to
-  enable support for this device; you should do so if your machine
-  is one of these PowerBooks.
+  On PowerBooks, iBooks, and recent iMacs and Power Macintoshes, the
+  PMU is an embedded microprocessor whose primary function is to
+  control system power, and battery charging on the portable models.
+  The PMU also controls the ADB (Apple Desktop Bus) which connects to
+  the keyboard and mouse on some machines, as well as the non-volatile
+  RAM and the RTC (real time clock) chip.  Say Y to enable support for
+  this device; you should do so if your machine is one of those
+  mentioned above.
 
 CONFIG_ADB_MACIO
   Say Y here to include direct support for the ADB controller in the
@@ -464,7 +398,7 @@ CONFIG_SERIAL_CONSOLE
   your boot loader (lilo or loadlin) about how to pass options to the
   kernel at boot time.)
 
-  If you don't have a VGA card installed and you say Y here, the
+  If you don't have a graphics card installed and you say Y here, the
   kernel will automatically use the first serial line, /dev/ttyS0, as
   system console.
 
@@ -476,14 +410,11 @@ CONFIG_MAC_SERIAL
   for them, you can't currently use the serial console feature.
 
 CONFIG_BUSMOUSE
-  Say Y here if your machine has a bus mouse as opposed to a serial
-  mouse. Most people have a regular serial MouseSystem or
-  Microsoft mouse (made by Logitech) that plugs into a COM port
-  (rectangular with 9 or 25 pins). These people say N here. 
-
-  If you have a laptop, you either have to check the documentation or
-  experiment a bit to find out whether the trackball is a serial mouse
-  or not; it's best to say Y here for you.
+  Say Y here if your machine has a bus mouse as opposed to a serial,
+  PS/2 or USB mouse.  Say Y here if you have an Apple machine with an
+  ADB mouse and you are not using the input layer (that is,
+  CONFIG_INPUT_ADBHID is N), or if you have a PC-style mouse interface
+  card plugged into your PCI or ISA bus.  Otherwise say N.
 
   This is the generic bus mouse driver code. If you have a bus mouse,
   you will have to say Y here and also to the specific driver for your
@@ -496,17 +427,10 @@ CONFIG_BUSMOUSE
 
 CONFIG_MOUSE
   This is for machines with a mouse which is neither a serial nor a
-  bus mouse. Examples are PS/2 mice (such as the track balls on some
-  laptops) and some digitizer pads. Most people have a regular serial
-  MouseSystem or Microsoft mouse (made by Logitech) that plugs into a
-  COM port (rectangular with 9 or 25 pins). These people say N here.
-  If you have something else, read the Busmouse-HOWTO, available from
-  <http://www.linuxdoc.org/docs.html#howto>. This HOWTO contains
-  information about all non-serial mice, not just bus mice.
-
-  If you have a laptop, you either have to check the documentation or
-  experiment a bit to find out whether the trackball is a serial mouse
-  or not; it's best to say Y here for you.
+  USB nor a bus mouse.  Examples are PS/2 mice (including the track
+  balls on some laptops) and some digitizer pads.  Say Y here if you
+  have a CHRP machine (such as an IBM RS/6000 or pSeries machine) with
+  a PS/2-style mouse.
 
   Note that the answer to this question won't directly affect the
   kernel: saying N will just cause the configurator to skip all
@@ -523,16 +447,8 @@ CONFIG_MAGIC_SYSRQ
   keys are documented in <file:Documentation/sysrq.txt>. Don't say Y
   unless you really know what this hack does.
 
-CONFIG_PROC_HARDWARE
-  Say Y here to support the /proc/hardware file, which gives you
-  access to information about the machine you're running on,
-  including the model, CPU, MMU, clock speed, BogoMIPS rating,
-  and memory size.
-
 CONFIG_AMIGA
-  This option enables support for the Amiga series of computers. If
-  you plan to use this kernel on an Amiga, say Y here and browse the
-  material available in <file:Documentation/m68k>; otherwise say N.
+  This option enables support for the Amiga series of computers.
 
 CONFIG_A2232
   This option supports the 2232 7-port serial card shipped with the
@@ -581,10 +497,6 @@ CONFIG_AMIGAMOUSE
   The module is called amigamouse.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
 
-CONFIG_BOOTX_TEXT
-  Say Y here to see progress messages from the boot firmware in text
-  mode. Requires either BootX or Open Firmware.
-
 CONFIG_AMIGA_BUILTIN_SERIAL
   If you want to use your Amiga's built-in serial port in Linux,
   answer Y.
@@ -615,16 +527,20 @@ CONFIG_MULTIFACE_III_TTY
   If you want to compile it as a module, say M here and read
   <file:Documentation/modules.txt>.
 
+CONFIG_BOOTX_TEXT
+  Say Y here to see progress messages from the boot firmware in text
+  mode. Requires either BootX or Open Firmware.
+
 CONFIG_6xx
   There are four types of PowerPC chips supported.  The more common
   types (601, 603, 604, 740, 750, 7400), the Motorola embedded
   versions (821, 823, 850, 855, 860, 8260), the IBM embedded versions
-  (403 and 405) and the high end 64 bit Power processors (Power 3,
-  Power 4).  Unless you are building a kernel for one of the embedded
-  processor systems, or a 64 bit IBM RS/6000, choose 6xx.  Note that
-  the kernel runs in 32-bit mode even on 64-bit chips.  Also note that
-  because the 82xx family has a 603e core, specific support for that
-  chipset is asked later on.
+  (403 and 405) and the high end 64 bit Power processors (POWER 3)
+  Unless you are building a kernel for one of the embedded processor
+  systems, or a 64 bit IBM RS/6000, choose 6xx.  Note that the kernel
+  runs in 32-bit mode even on 64-bit chips.  Also note that because
+  the 82xx family has a 603e core, specific support for that chipset
+  is asked later on.
 
 CONFIG_8260
   The MPC8260 CPM (Communications Processor Module) is a typical
@@ -662,11 +578,14 @@ CONFIG_ALL_PPC
   Starmax series), PReP (PowerPC Reference Platform) machines (such
   as the Motorola PowerStacks, Motorola cPCI/VME embedded systems,
   and some IBM RS/6000 systems), CHRP (Common Hardware Reference
-  Platform), and several embedded PowerPC systems containing 4xx, 6xx,
-  7xx, 8xx, 74xx, and 82xx processors.  Currently, the default option
-  is to build a kernel which works on the first three.
+  Platform) machines (including all of the recent IBM RS/6000 and
+  pSeries machines), and several embedded PowerPC systems containing
+  4xx, 6xx, 7xx, 8xx, 74xx, and 82xx processors.  Currently, the
+  default option is to build a kernel which works on the first three.
 
-  Select PowerMac/PReP/MTX/CHRP if configuring for any of the above.
+  Select CHRP/PowerMac/PReP if configuring for an IBM RS/6000 or
+  pSeries machine, a Power Macintosh (including iMacs, iBooks and
+  Powerbooks), or a PReP machine.
 
   Select Gemini if configuring for a Synergy Microsystems' Gemini
   series Single Board Computer.  More information is available at:
@@ -722,22 +641,28 @@ CONFIG_TAU_INT
   debugging, leave this option off.
 
 CONFIG_TAU_AVERAGE
-  The TAU hardware can compare the temperature to an upper and lower bound.
-  The default behavior is to show both the upper and lower bound in
-  /proc/cpuinfo. If the range is large, the temperature is either changing
-  a lot, or the TAU hardware is broken (likely on some G4's). If the range
-  is small (around 4 degrees), the temperature is relatively stable.
+  The TAU hardware can compare the temperature to an upper and lower
+  bound.  The default behavior is to show both the upper and lower
+  bound in /proc/cpuinfo. If the range is large, the temperature is
+  either changing a lot, or the TAU hardware is broken (likely on some
+  G4's). If the range is small (around 4 degrees), the temperature is
+  relatively stable.  If you say Y here, a single temperature value,
+  halfway between the upper and lower bounds, will be reported in
+  /proc/cpuinfo.
+
+  If in doubt, say N here.
 
 CONFIG_PMAC_PBOOK
   This provides support for putting a PowerBook to sleep; it also
   enables media bay support.  Power management works on the
-  PB2400/3400/3500, Wallstreet, Lombard, and Bronze PowerBook G3. You
-  must get the power management daemon, pmud, to make it work and you
-  must have the /dev/pmu device (see the pmud README).
+  PB2400/3400/3500, Wallstreet, Lombard, and Bronze PowerBook G3 and
+  the Titanium Powerbook G4, as well as the iBooks.  You should get
+  the power management daemon, pmud, to make it work and you must have
+  the /dev/pmu device (see the pmud README).
 
   Get pmud from <ftp://ftp.samba.org/pub/ppclinux/pmud/>.
 
-  If you have a PowerBook, you should say Y.
+  If you have a PowerBook, you should say Y here.
 
   You may also want to compile the dma sound driver as a module and
   have it autoloaded. The act of removing the module shuts down the
@@ -955,11 +880,11 @@ CONFIG_EST8260
     URL: <http://www.microsys.de/html/cu824.html>
 
 CONFIG_MAC_ADBKEYCODES
-  This provides support for sending raw ADB keycodes to console
-  devices.  This is the default up to 2.4.0, but in future this may be
-  phased out in favor of generic Linux keycodes.  If you say Y here,
-  you can dynamically switch via the
-      /proc/sys/dev/mac_hid/keyboard_sends_linux_keycodes
+  This provides support for sending ADB keycodes to console devices in
+  raw mode, rather than generic "Linux" keycodes.  This is the default
+  up to 2.4.0, but in future this may be phased out in favor of
+  generic Linux keycodes.  If you say Y here, you can dynamically
+  switch via the /proc/sys/dev/mac_hid/keyboard_sends_linux_keycodes
   sysctl and with the "keyboard_sends_linux_keycodes=" kernel
   argument.
 
@@ -973,6 +898,8 @@ CONFIG_MAC_EMUMOUSEBTN
       /proc/sys/dev/mac_hid/mouse_button_emulation
       /proc/sys/dev/mac_hid/mouse_button2_keycode
       /proc/sys/dev/mac_hid/mouse_button3_keycode
+
+  If you have an Apple machine with a 1-button mouse, say Y here.
 
 CONFIG_PPC_RTC
   If you say Y here and create a character special file /dev/rtc with
@@ -1018,30 +945,31 @@ CONFIG_PPC_RTAS
   If unsure, say Y.
 
 CONFIG_CMDLINE
-  On some architectures (EBSA110 and CATS), there is currently no way
-  for the boot loader to pass arguments to the kernel. For these
-  architectures, you should supply some command-line options at build
-  time by entering them here. As a minimum, you should specify the
-  memory size and the root device (e.g., mem=64M root=/dev/nfs).
+  On some platforms, there is currently no way for the boot loader to
+  pass arguments to the kernel. For these platforms, you can supply
+  some command-line options at build time by entering them here.  In
+  most cases you will need to specify the root device here.
 
 CONFIG_KGDB
   Include in-kernel hooks for kgdb, the Linux kernel source level
-  debugger.  This project has a web page at
-  <http://kgdb.sourceforge.net/>.
+  debugger.  See <http://kgdb.sourceforge.net/> for more information.
+  Unless you are intending to debug the kernel, say N here.
 
 CONFIG_XMON
-  Include in-kernel hooks for the xmon kernel monitor/debugger
-  supported by the PPC port.
+  Include in-kernel hooks for the xmon kernel monitor/debugger.
+  Unless you are intending to debug the kernel, say N here.
 
 Include BDI2000 debugger support
 CONFIG_BDI_SWITCH
   Include in-kernel support for the Abatron BDI2000 debugger.
+  Unless you are intending to debug the kernel with one of these
+  machines, say N here.
 
 Add additional CFLAGS to the kernel build
 CONFIG_MORE_COMPILE_OPTIONS
-  If you want to add additional CFLAGS to the kernel build, such as
-  -g for KGDB, XMON or the BDI2000, enable this option and then
-  enter what you would like to add in the next question.
+  If you want to add additional CFLAGS to the kernel build, such as -g
+  for KGDB or the BDI2000, enable this option and then enter what you
+  would like to add in the next question.
 
 CONFIG_ADVANCED_OPTIONS
   This option will enable prompting for a variety of advanced kernel
@@ -1049,39 +977,42 @@ CONFIG_ADVANCED_OPTIONS
   work if they are set incorrectly, but can be used to optimize certain
   aspects of kernel memory management.
 
-  Unless you know what you are doing you *should not* enable this option.
+  Unless you know what you are doing, say N here.
 
 CONFIG_HIGHMEM_START_BOOL
-  Unless you know what you are doing you *should not* set this option.
+  This option allows you to set the base address of the kernel virtual
+  area used to map high memory pages.  This can be useful in
+  optimizing the layout of kernel virtual memory.
 
-  It can be used to override the default PKMAP_BASE address which
-  is the location of the high memory pool.  This can be useful in
-  optimizing virtual memory usage in a system.
+  Say N here unless you know what you are doing.
 
 CONFIG_LOWMEM_SIZE_BOOL
-  Unless you know what you are doing you *should not* set this option.
+  This option allows you to set the maximum amount of memory which
+  will be used as "low memory", that is, memory which the kernel can
+  access directly, without having to set up a kernel virtual mapping.
+  This can be useful in optimizing the layout of kernel virtual
+  memory.
 
-  It can be used to override the standard calculated value of
-  MAX_LOW_MEM. This can be useful in optimizing virtual memory usage
-  in a system.
+  Say N here unless you know what you are doing.
 
 CONFIG_KERNEL_START_BOOL
-  Unless you know what you are doing you *should not* set this option.
+  This option allows you to set the kernel virtual address at which
+  the kernel will map low memory (the kernel image will be linked at
+  this address).  This can be useful in optimizing the virtual memory
+  layout of the system.
 
-  It can be used to override the standard PAGE_OFFSET/KERNELBASE
-  value used by the kernel.  This can be useful in controlling
-  amount of virtual address space available to the kernel.
+  Say N here unless you know what you are doing.
 
 CONFIG_TASK_SIZE_BOOL
-  Unless you know what you are doing you *should not* set this option.
+  This option allows you to set the amount of virtual address space
+  allocated to user tasks.  This can be useful in optimizing the
+  virtual memory layout of the system.
 
-  It can be used to override the standard TASK_SIZE value used
-  by the kernel.  This can be useful in controlling amount of
-  virtual address space available to user tasks.
+  Say N here unless you know what you are doing.
 
 CONFIG_BOOT_LOAD_BOOL
-  Unless you know what you are doing you *should not* set this option.
+  This option allows you to set the initial load address of the zImage
+  or zImage.initrd file.  This can be useful if you are on a board
+  which has a small amount of memory.
 
-  It can be used to change the initial load address of the zImage or
-  zImage.initrd file.  This can be useful if you are on a board which has
-  a small ammount of memory.
+  Say N here unless you know what you are doing.
