@@ -260,7 +260,6 @@ else
    if [ "$CONFIG_SMP" = "y" ]; then
       define_bool CONFIG_X86_IO_APIC y
       define_bool CONFIG_X86_LOCAL_APIC y
-      define_bool CONFIG_X86_MPPARSE y
    fi
    bool 'PCI support' CONFIG_PCI
    if [ "$CONFIG_PCI" = "y" ]; then
@@ -441,6 +440,7 @@ fi
 if [ "$CONFIG_X86_LOCAL_APIC" = "y" ]; then
    define_bool CONFIG_X86_EXTRA_IRQS y
    define_bool CONFIG_X86_FIND_SMP_CONFIG y
+   define_bool CONFIG_X86_MPPARSE y
 fi
 
 endmenu
