@@ -807,7 +807,7 @@ static void s3c24xx_serial_set_termios(struct uart_port *port,
 		ulcon |= S3C2410_LCON_STOPB;
 
 	if (termios->c_cflag & PARENB) {
-		if (!(termios->c_cflag & PARODD))
+		if (termios->c_cflag & PARODD)
 			ulcon |= S3C2410_LCON_PODD;
 		else
 			ulcon |= S3C2410_LCON_PEVEN;
