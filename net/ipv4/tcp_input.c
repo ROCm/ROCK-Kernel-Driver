@@ -2410,7 +2410,7 @@ static int tcp_tso_acked(struct sock *sk, struct sk_buff *skb,
 							packets_acked);
 			if (sacked & TCPCB_URG) {
 				if (tp->urg_mode &&
-				    !before(orig_seq, tp->snd_up))
+				    !before(seq, tp->snd_up))
 					tp->urg_mode = 0;
 			}
 		} else if (*seq_rtt < 0)
