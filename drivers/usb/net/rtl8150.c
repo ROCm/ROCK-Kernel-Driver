@@ -398,6 +398,21 @@ static void unlink_all_urbs(rtl8150_t * dev)
 	usb_unlink_urb(dev->ctrl_urb);
 }
 
+static inline struct sk_buff *pull_skb(rtl8150_t *dev)
+{
+	struct sk_buff *skb;
+	int i;
+
+	for (i = 0; i < RX_SKB_POOL_SIZE; i++) {
+		if (dev->rx_skb_pool[i]) {
+			skb = dev->rx_skb_pool[i];
+			dev->rx_skb_pool[i] = NULL;
+			return skb;
+		}
+	}
+	return NULL;
+}
+
 static void read_bulk_callback(struct urb *urb, struct pt_regs *regs)
 {
 	rtl8150_t *dev;
@@ -601,21 +616,6 @@ static void free_skb_pool(rtl8150_t *dev)
 	for (i = 0; i < RX_SKB_POOL_SIZE; i++)
 		if (dev->rx_skb_pool[i])
 			dev_kfree_skb(dev->rx_skb_pool[i]);
-}
-
-static inline struct sk_buff *pull_skb(rtl8150_t *dev)
-{
-	struct sk_buff *skb;
-	int i;
-
-	for (i = 0; i < RX_SKB_POOL_SIZE; i++) {
-		if (dev->rx_skb_pool[i]) {
-			skb = dev->rx_skb_pool[i];
-			dev->rx_skb_pool[i] = NULL;
-			return skb;
-		}
-	}
-	return NULL;
 }
 
 static int enable_net_traffic(rtl8150_t * dev)

@@ -293,7 +293,7 @@ if ( ((specific_debug) && (debug == (level))) || \
 		warn(fmt, ## args); \
 	else if ((level) >= 5) \
 		info("[%s:%d] " fmt, \
-		     __PRETTY_FUNCTION__, __LINE__ , ## args); \
+		     __FUNCTION__, __LINE__ , ## args); \
 } \
 }
 #else

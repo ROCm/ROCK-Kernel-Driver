@@ -523,9 +523,9 @@ set_camera_power(struct vicam_camera *cam, int state)
 }
 
 static int
-vicam_ioctl(struct inode *inode, struct file *file, unsigned int ioctlnr, unsigned long ul_arg)
+vicam_ioctl(struct inode *inode, struct file *file, unsigned int ioctlnr, unsigned long arg)
 {
-	void *arg = (void *)ul_arg;
+	void __user *user_arg = (void __user *)arg;
 	struct vicam_camera *cam = file->private_data;
 	int retval = 0;
 
@@ -549,7 +549,7 @@ vicam_ioctl(struct inode *inode, struct file *file, unsigned int ioctlnr, unsign
 			b.minwidth = 320;	/* VIDEOSIZE_48_48 */
 			b.minheight = 240;
 
-			if (copy_to_user(arg, &b, sizeof (b)))
+			if (copy_to_user(user_arg, &b, sizeof(b)))
 				retval = -EFAULT;
 
 			break;
@@ -560,7 +560,7 @@ vicam_ioctl(struct inode *inode, struct file *file, unsigned int ioctlnr, unsign
 			struct video_channel v;
 
 			DBG("VIDIOCGCHAN\n");
-			if (copy_from_user(&v, arg, sizeof (v))) {
+			if (copy_from_user(&v, user_arg, sizeof(v))) {
 				retval = -EFAULT;
 				break;
 			}
@@ -576,7 +576,7 @@ vicam_ioctl(struct inode *inode, struct file *file, unsigned int ioctlnr, unsign
 			v.type = VIDEO_TYPE_CAMERA;
 			v.norm = 0;
 
-			if (copy_to_user(arg, &v, sizeof (v)))
+			if (copy_to_user(user_arg, &v, sizeof(v)))
 				retval = -EFAULT;
 			break;
 		}
@@ -585,7 +585,7 @@ vicam_ioctl(struct inode *inode, struct file *file, unsigned int ioctlnr, unsign
 		{
 			int v;
 
-			if (copy_from_user(&v, arg, sizeof (v)))
+			if (copy_from_user(&v, user_arg, sizeof(v)))
 				retval = -EFAULT;
 			DBG("VIDIOCSCHAN %d\n", v);
 
@@ -604,8 +604,7 @@ vicam_ioctl(struct inode *inode, struct file *file, unsigned int ioctlnr, unsign
 			vp.brightness = cam->gain << 8;
 			vp.depth = 24;
 			vp.palette = VIDEO_PALETTE_RGB24;
-			if (copy_to_user
-			    (arg, &vp, sizeof (struct video_picture)))
+			if (copy_to_user(user_arg, &vp, sizeof (struct video_picture)))
 				retval = -EFAULT;
 			break;
 		}
@@ -614,7 +613,7 @@ vicam_ioctl(struct inode *inode, struct file *file, unsigned int ioctlnr, unsign
 		{
 			struct video_picture vp;
 			
-			if (copy_from_user(&vp, arg, sizeof(vp))) {
+			if (copy_from_user(&vp, user_arg, sizeof(vp))) {
 				retval = -EFAULT;
 				break;
 			}
@@ -646,8 +645,7 @@ vicam_ioctl(struct inode *inode, struct file *file, unsigned int ioctlnr, unsign
 
 			DBG("VIDIOCGWIN\n");
 
-			if (copy_to_user
-			    ((void *) arg, (void *) &vw, sizeof (vw)))
+			if (copy_to_user(user_arg, (void *)&vw, sizeof(vw)))
 				retval = -EFAULT;
 
 			// I'm not sure what the deal with a capture window is, it is very poorly described
@@ -660,7 +658,7 @@ vicam_ioctl(struct inode *inode, struct file *file, unsigned int ioctlnr, unsign
 
 			struct video_window vw;
 
-			if (copy_from_user(&vw, arg, sizeof(vw))) {
+			if (copy_from_user(&vw, user_arg, sizeof(vw))) {
 				retval = -EFAULT;
 				break;
 			}
@@ -687,8 +685,7 @@ vicam_ioctl(struct inode *inode, struct file *file, unsigned int ioctlnr, unsign
 			for (i = 0; i < VICAM_FRAMES; i++)
 				vm.offsets[i] = VICAM_MAX_FRAME_SIZE * i;
 
-			if (copy_to_user
-			    ((void *) arg, (void *) &vm, sizeof (vm)))
+			if (copy_to_user(user_arg, (void *)&vm, sizeof(vm)))
 				retval = -EFAULT;
 
 			break;
@@ -699,8 +696,7 @@ vicam_ioctl(struct inode *inode, struct file *file, unsigned int ioctlnr, unsign
 			struct video_mmap vm;
 			// int video_size;
 
-			if (copy_from_user
-			    ((void *) &vm, (void *) arg, sizeof (vm))) {
+			if (copy_from_user((void *)&vm, user_arg, sizeof(vm))) {
 				retval = -EFAULT;
 				break;
 			}
@@ -723,7 +719,7 @@ vicam_ioctl(struct inode *inode, struct file *file, unsigned int ioctlnr, unsign
 		{
 			int frame;
 
-			if (copy_from_user((void *) &frame, arg, sizeof (int))) {
+			if (copy_from_user((void *)&frame, user_arg, sizeof(int))) {
 				retval = -EFAULT;
 				break;
 			}
@@ -1003,7 +999,7 @@ read_frame(struct vicam_camera *cam, int framenum)
 }
 
 static ssize_t
-vicam_read( struct file *file, char *buf, size_t count, loff_t *ppos )
+vicam_read( struct file *file, char __user *buf, size_t count, loff_t *ppos )
 {
 	struct vicam_camera *cam = file->private_data;
 

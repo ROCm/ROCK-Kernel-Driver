@@ -835,6 +835,7 @@ static int whiteheat_tiocmset (struct usb_serial_port *port, struct file *file,
 static int whiteheat_ioctl (struct usb_serial_port *port, struct file * file, unsigned int cmd, unsigned long arg)
 {
 	struct serial_struct serstruct;
+	void __user *user_arg = (void __user *)arg;
 
 	dbg("%s - port %d, cmd 0x%.4x", __FUNCTION__, port->number, cmd);
 
@@ -851,13 +852,13 @@ static int whiteheat_ioctl (struct usb_serial_port *port, struct file * file, un
 			serstruct.close_delay = CLOSING_DELAY;
 			serstruct.closing_wait = CLOSING_DELAY;
 
-			if (copy_to_user((void *)arg, &serstruct, sizeof(serstruct)))
+			if (copy_to_user(user_arg, &serstruct, sizeof(serstruct)))
 				return -EFAULT;
 
 			break;
 
 		case TIOCSSERIAL:
-			if (copy_from_user(&serstruct, (void *)arg, sizeof(serstruct)))
+			if (copy_from_user(&serstruct, user_arg, sizeof(serstruct)))
 				return -EFAULT;
 
 			/*

@@ -476,7 +476,7 @@ static int dabusb_startrek (pdabusb_t s)
 	return 0;
 }
 
-static ssize_t dabusb_read (struct file *file, char *buf, size_t count, loff_t * ppos)
+static ssize_t dabusb_read (struct file *file, char __user *buf, size_t count, loff_t * ppos)
 {
 	pdabusb_t s = (pdabusb_t) file->private_data;
 	unsigned long flags;
@@ -670,7 +670,7 @@ static int dabusb_ioctl (struct inode *inode, struct file *file, unsigned int cm
 			break;
 		}
 
-		if (copy_from_user (pbulk, (void *) arg, sizeof (bulk_transfer_t))) {
+		if (copy_from_user (pbulk, (void __user *) arg, sizeof (bulk_transfer_t))) {
 			ret = -EFAULT;
 			kfree (pbulk);
 			break;
@@ -678,18 +678,18 @@ static int dabusb_ioctl (struct inode *inode, struct file *file, unsigned int cm
 
 		ret=dabusb_bulk (s, pbulk);
 		if(ret==0)
-			if (copy_to_user((void *)arg, pbulk,
+			if (copy_to_user((void __user *)arg, pbulk,
 					 sizeof(bulk_transfer_t)))
 				ret = -EFAULT;
 		kfree (pbulk);
 		break;
 
 	case IOCTL_DAB_OVERRUNS:
-		ret = put_user (s->overruns, (unsigned int *) arg);
+		ret = put_user (s->overruns, (unsigned int __user *) arg);
 		break;
 
 	case IOCTL_DAB_VERSION:
-		ret = put_user (version, (unsigned int *) arg);
+		ret = put_user (version, (unsigned int __user *) arg);
 		break;
 
 	default:

@@ -1121,7 +1121,7 @@ static int se401_ioctl(struct inode *inode, struct file *file,
 	return video_usercopy(inode, file, cmd, arg, se401_do_ioctl);
 }
 
-static ssize_t se401_read(struct file *file, char *buf,
+static ssize_t se401_read(struct file *file, char __user *buf,
 		     size_t count, loff_t *ppos)
 {
 	int realcount=count, ret=0;

@@ -1705,7 +1705,7 @@ static void edge_set_termios (struct usb_serial_port *port, struct termios *old_
  * 	    transmit holding register is empty.  This functionality
  * 	    allows an RS485 driver to be written in user space. 
  *****************************************************************************/
-static int get_lsr_info(struct edgeport_port *edge_port, unsigned int *value)
+static int get_lsr_info(struct edgeport_port *edge_port, unsigned int __user *value)
 {
 	unsigned int result = 0;
 
@@ -1720,7 +1720,7 @@ static int get_lsr_info(struct edgeport_port *edge_port, unsigned int *value)
 	return 0;
 }
 
-static int get_number_bytes_avail(struct edgeport_port *edge_port, unsigned int *value)
+static int get_number_bytes_avail(struct edgeport_port *edge_port, unsigned int __user *value)
 {
 	unsigned int result = 0;
 	struct tty_struct *tty = edge_port->port->tty;
@@ -1790,7 +1790,7 @@ static int edge_tiocmget(struct usb_serial_port *port, struct file *file)
 	return result;
 }
 
-static int get_serial_info(struct edgeport_port *edge_port, struct serial_struct * retinfo)
+static int get_serial_info(struct edgeport_port *edge_port, struct serial_struct __user *retinfo)
 {
 	struct serial_struct tmp;
 
@@ -1811,7 +1811,6 @@ static int get_serial_info(struct edgeport_port *edge_port, struct serial_struct
 //	tmp.custom_divisor	= state->custom_divisor;
 //	tmp.hub6		= state->hub6;
 //	tmp.io_type		= state->io_type;
-
 
 	if (copy_to_user(retinfo, &tmp, sizeof(*retinfo)))
 		return -EFAULT;
@@ -1838,17 +1837,17 @@ static int edge_ioctl (struct usb_serial_port *port, struct file *file, unsigned
 		// return number of bytes available
 		case TIOCINQ:
 			dbg("%s (%d) TIOCINQ", __FUNCTION__,  port->number);
-			return get_number_bytes_avail(edge_port, (unsigned int *) arg);
+			return get_number_bytes_avail(edge_port, (unsigned int __user *) arg);
 			break;
 
 		case TIOCSERGETLSR:
 			dbg("%s (%d) TIOCSERGETLSR", __FUNCTION__,  port->number);
-			return get_lsr_info(edge_port, (unsigned int *) arg);
+			return get_lsr_info(edge_port, (unsigned int __user *) arg);
 			return 0;
 
 		case TIOCGSERIAL:
 			dbg("%s (%d) TIOCGSERIAL", __FUNCTION__,  port->number);
-			return get_serial_info(edge_port, (struct serial_struct *) arg);
+			return get_serial_info(edge_port, (struct serial_struct __user *) arg);
 
 		case TIOCSSERIAL:
 			dbg("%s (%d) TIOCSSERIAL", __FUNCTION__,  port->number);
@@ -1893,7 +1892,7 @@ static int edge_ioctl (struct usb_serial_port *port, struct file *file, unsigned
 			icount.buf_overrun = cnow.buf_overrun;
 
 			dbg("%s (%d) TIOCGICOUNT RX=%d, TX=%d", __FUNCTION__,  port->number, icount.rx, icount.tx );
-			if (copy_to_user((void *)arg, &icount, sizeof(icount)))
+			if (copy_to_user((void __user *)arg, &icount, sizeof(icount)))
 				return -EFAULT;
 			return 0;
 	}
