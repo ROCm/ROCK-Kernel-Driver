@@ -48,7 +48,7 @@
 static DECLARE_MUTEX(__ip_vs_mutex);
 
 /* lock for service table */
-rwlock_t __ip_vs_svc_lock = RW_LOCK_UNLOCKED;
+static rwlock_t __ip_vs_svc_lock = RW_LOCK_UNLOCKED;
 
 /* lock for table with the real services */
 static rwlock_t __ip_vs_rs_lock = RW_LOCK_UNLOCKED;
@@ -1926,7 +1926,7 @@ ip_vs_copy_service(struct ip_vs_service_entry *dst, struct ip_vs_service *src)
 
 static inline int
 __ip_vs_get_service_entries(const struct ip_vs_get_services *get,
-			    struct ip_vs_get_services *uptr)
+			    struct ip_vs_get_services __user *uptr)
 {
 	int idx, count=0;
 	struct ip_vs_service *svc;
@@ -1966,7 +1966,7 @@ __ip_vs_get_service_entries(const struct ip_vs_get_services *get,
 
 static inline int
 __ip_vs_get_dest_entries(const struct ip_vs_get_dests *get,
-			 struct ip_vs_get_dests *uptr)
+			 struct ip_vs_get_dests __user *uptr)
 {
 	struct ip_vs_service *svc;
 	int ret = 0;
@@ -2043,7 +2043,7 @@ static unsigned char get_arglen[GET_CMDID(IP_VS_SO_GET_MAX)+1] = {
 };
 
 static int
-do_ip_vs_get_ctl(struct sock *sk, int cmd, void *user, int *len)
+do_ip_vs_get_ctl(struct sock *sk, int cmd, void __user *user, int *len)
 {
 	unsigned char arg[128];
 	int ret = 0;
