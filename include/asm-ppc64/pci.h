@@ -135,6 +135,12 @@ extern void
 pcibios_resource_to_bus(struct pci_dev *dev, struct pci_bus_region *region,
 			struct resource *res);
 
+extern int
+unmap_bus_range(struct pci_bus *bus);
+
+extern int
+remap_bus_range(struct pci_bus *bus);
+
 #endif	/* __KERNEL__ */
 
 #endif /* __PPC64_PCI_H */
