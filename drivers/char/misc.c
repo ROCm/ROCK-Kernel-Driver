@@ -342,6 +342,7 @@ static int __init misc_init(void)
 	if (register_chrdev(MISC_MAJOR,"misc",&misc_fops)) {
 		printk("unable to get major %d for misc devices\n",
 		       MISC_MAJOR);
+		class_simple_destroy(misc_class);
 		return -EIO;
 	}
 	return 0;
