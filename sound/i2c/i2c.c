@@ -23,6 +23,7 @@
 #include <sound/driver.h>
 #include <linux/init.h>
 #include <linux/slab.h>
+#include <linux/string.h>
 #include <linux/errno.h>
 #include <sound/core.h>
 #include <sound/i2c.h>
