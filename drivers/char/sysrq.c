@@ -153,7 +153,7 @@ static void go_sync(struct super_block *sb, int remount_flag)
 
 	if (remount_flag) { /* Remount R/O */
 		int ret, flags;
-		struct list_head *p;
+		struct file *file;
 
 		if (sb->s_flags & MS_RDONLY) {
 			printk("R/O\n");
@@ -161,8 +161,7 @@ static void go_sync(struct super_block *sb, int remount_flag)
 		}
 
 		file_list_lock();
-		for (p = sb->s_files.next; p != &sb->s_files; p = p->next) {
-			struct file *file = list_entry(p, struct file, f_list);
+		list_for_each_entry(file, &sb->s_files, f_list) {
 			if (file->f_dentry && file_count(file)
 				&& S_ISREG(file->f_dentry->d_inode->i_mode))
 				file->f_mode &= ~2;
@@ -205,15 +204,11 @@ void do_emergency_sync(void) {
 	remount_flag = (emergency_sync_scheduled == EMERG_REMOUNT);
 	emergency_sync_scheduled = 0;
 
-	for (sb = sb_entry(super_blocks.next);
-	     sb != sb_entry(&super_blocks); 
-	     sb = sb_entry(sb->s_list.next))
+	list_for_each_entry(sb, &super_blocks, s_list)
 		if (sb->s_bdev && is_local_disk(sb->s_bdev))
 			go_sync(sb, remount_flag);
 
-	for (sb = sb_entry(super_blocks.next);
-	     sb != sb_entry(&super_blocks); 
-	     sb = sb_entry(sb->s_list.next))
+	list_for_each_entry(sb, &super_blocks, s_list)
 		if (sb->s_bdev && !is_local_disk(sb->s_bdev))
 			go_sync(sb, remount_flag);
 
