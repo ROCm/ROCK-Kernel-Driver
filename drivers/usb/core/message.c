@@ -36,7 +36,7 @@ static int usb_start_wait_urb(struct urb *urb, int timeout, int* actual_length)
 	add_wait_queue(&awd.wqh, &wait);
 
 	urb->context = &awd;
-	status = usb_submit_urb(urb, GFP_KERNEL);
+	status = usb_submit_urb(urb, GFP_ATOMIC);
 	if (status) {
 		// something went wrong
 		usb_free_urb(urb);
