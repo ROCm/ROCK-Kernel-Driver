@@ -108,8 +108,8 @@ struct _urb *_urb_alloc(int isoc, int gfp)
 struct _urb *_urb_dequeue(struct _urb_queue *q)
 {
 	struct _urb *_urb = NULL;
-        unsigned long flags;
-        spin_lock_irqsave(&q->lock, flags);
+	unsigned long flags;
+	spin_lock_irqsave(&q->lock, flags);
 	{
 		struct list_head *head = &q->head;
 		struct list_head *next = head->next;
@@ -167,7 +167,7 @@ static int hci_usb_intr_rx_submit(struct hci_usb *husb)
 
 	BT_DBG("%s", husb->hdev->name);
 
-        size = husb->intr_in_ep->desc.wMaxPacketSize;
+	size = husb->intr_in_ep->desc.wMaxPacketSize;
 
 	buf = kmalloc(size, GFP_ATOMIC);
 	if (!buf)
@@ -218,8 +218,8 @@ static int hci_usb_bulk_rx_submit(struct hci_usb *husb)
 
 	urb  = &_urb->urb;
 	pipe = usb_rcvbulkpipe(husb->udev, husb->bulk_in_ep->desc.bEndpointAddress);
-        usb_fill_bulk_urb(urb, husb->udev, pipe, buf, size, hci_usb_rx_complete, husb);
-        urb->transfer_flags = 0;
+	usb_fill_bulk_urb(urb, husb->udev, pipe, buf, size, hci_usb_rx_complete, husb);
+	urb->transfer_flags = 0;
 
 	BT_DBG("%s urb %p", husb->hdev->name, urb);
 
@@ -243,7 +243,7 @@ static int hci_usb_isoc_rx_submit(struct hci_usb *husb)
 	void *buf;
 
 	mtu  = husb->isoc_in_ep->desc.wMaxPacketSize;
-        size = mtu * HCI_MAX_ISOC_FRAMES;
+	size = mtu * HCI_MAX_ISOC_FRAMES;
 
 	buf = kmalloc(size, GFP_ATOMIC);
 	if (!buf)
@@ -263,6 +263,8 @@ static int hci_usb_isoc_rx_submit(struct hci_usb *husb)
 	urb->dev      = husb->udev;
 	urb->pipe     = usb_rcvisocpipe(husb->udev, husb->isoc_in_ep->desc.bEndpointAddress);
 	urb->complete = hci_usb_rx_complete;
+
+	urb->interval = husb->isoc_in_ep->desc.bInterval;
 
 	urb->transfer_buffer_length = size;
 	urb->transfer_buffer = buf;
@@ -415,8 +417,8 @@ static inline int hci_usb_send_ctrl(struct hci_usb *husb, struct sk_buff *skb)
 	struct urb *urb;
 
 	if (!_urb) {
-	       	_urb = _urb_alloc(0, GFP_ATOMIC);
-	       	if (!_urb)
+		_urb = _urb_alloc(0, GFP_ATOMIC);
+		if (!_urb)
 			return -ENOMEM;
 		_urb->type = skb->pkt_type;
 
@@ -451,8 +453,8 @@ static inline int hci_usb_send_bulk(struct hci_usb *husb, struct sk_buff *skb)
 	int pipe;
 
 	if (!_urb) {
-	       	_urb = _urb_alloc(0, GFP_ATOMIC);
-	       	if (!_urb)
+		_urb = _urb_alloc(0, GFP_ATOMIC);
+		if (!_urb)
 			return -ENOMEM;
 		_urb->type = skb->pkt_type;
 	}
@@ -474,10 +476,10 @@ static inline int hci_usb_send_isoc(struct hci_usb *husb, struct sk_buff *skb)
 {
 	struct _urb *_urb = __get_completed(husb, skb->pkt_type);
 	struct urb *urb;
-	
+
 	if (!_urb) {
-	       	_urb = _urb_alloc(HCI_MAX_ISOC_FRAMES, GFP_ATOMIC);
-	       	if (!_urb)
+		_urb = _urb_alloc(HCI_MAX_ISOC_FRAMES, GFP_ATOMIC);
+		if (!_urb)
 			return -ENOMEM;
 		_urb->type = skb->pkt_type;
 	}
@@ -485,16 +487,18 @@ static inline int hci_usb_send_isoc(struct hci_usb *husb, struct sk_buff *skb)
 	BT_DBG("%s skb %p len %d", husb->hdev->name, skb, skb->len);
 
 	urb = &_urb->urb;
-	
+
 	urb->context  = husb;
 	urb->dev      = husb->udev;
 	urb->pipe     = usb_sndisocpipe(husb->udev, husb->isoc_out_ep->desc.bEndpointAddress);
 	urb->complete = hci_usb_tx_complete;
 	urb->transfer_flags = URB_ISO_ASAP;
 
+	urb->interval = husb->isoc_out_ep->desc.bInterval;
+
 	urb->transfer_buffer = skb->data;
 	urb->transfer_buffer_length = skb->len;
-	
+
 	__fill_isoc_desc(urb, skb->len, husb->isoc_out_ep->desc.wMaxPacketSize);
 
 	_urb->priv = skb;
