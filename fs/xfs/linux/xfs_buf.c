@@ -1262,7 +1262,8 @@ bio_end_io_pagebuf(
 			SetPageError(page);
 		} else if (blocksize == PAGE_CACHE_SIZE) {
 			SetPageUptodate(page);
-		} else if (!PagePrivate(page)) {
+		} else if (!PagePrivate(page) &&
+				(pb->pb_flags & _PBF_PAGE_CACHE)) {
 			unsigned long	j, range;
 
 			ASSERT(blocksize < PAGE_CACHE_SIZE);
