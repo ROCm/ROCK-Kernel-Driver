@@ -42,9 +42,6 @@ extern unsigned long klimit;
 extern HTAB htab_data;
 extern unsigned long loops_per_jiffy;
 
-extern unsigned long embedded_sysmap_start;
-extern unsigned long embedded_sysmap_end;
-
 int have_of = 1;
 
 extern void  chrp_init(unsigned long r3,
@@ -53,7 +50,6 @@ extern void  chrp_init(unsigned long r3,
 		       unsigned long r6,
 		       unsigned long r7);
 
-extern void chrp_init_map_io_space( void );
 extern void iSeries_init( void );
 extern void iSeries_init_early( void );
 extern void pSeries_init_early( void );

@@ -28,7 +28,6 @@
 #define __KERNEL_SYSCALLS__
 #include <linux/unistd.h>
 #include <linux/init.h>
-/* #include <linux/openpic.h> */
 #include <linux/spinlock.h>
 #include <linux/cache.h>
 #include <linux/err.h>
@@ -64,10 +63,6 @@ static int max_cpus __initdata = NR_CPUS;
 unsigned long cpu_online_map;
 
 volatile unsigned long cpu_callin_map[NR_CPUS] = {0,};
-
-#define TB_SYNC_PASSES 4
-volatile unsigned long __initdata tb_sync_flag = 0;
-volatile unsigned long __initdata tb_offset = 0;
 
 extern unsigned char stab_array[];
 
@@ -724,7 +719,7 @@ void __init smp_setup(char *str, int *ints)
 {
 }
 
-int __init setup_profiling_timer(unsigned int multiplier)
+int setup_profiling_timer(unsigned int multiplier)
 {
 	return 0;
 }

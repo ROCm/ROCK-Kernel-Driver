@@ -97,17 +97,9 @@ int fwnmi_active;  /* TRUE if an FWNMI handler is present */
 kdev_t boot_dev;
 unsigned long  virtPython0Facilities = 0;  // python0 facility area (memory mapped io) (64-bit format) VIRTUAL address.
 
-extern HPTE *Hash, *Hash_end;
-extern unsigned long Hash_size, Hash_mask;
-extern int probingmem;
 extern unsigned long loops_per_jiffy;
 
-#ifdef CONFIG_BLK_DEV_RAM
-extern int rd_doload;		/* 1 = load ramdisk, 0 = don't load */
-extern int rd_prompt;		/* 1 = prompt for ramdisk, 0 = don't prompt */
-extern int rd_image_start;	/* starting block # of image */
-#endif
-
+extern unsigned long ppc_proc_freq;
 extern unsigned long ppc_tb_freq;
 
 void 
@@ -364,9 +356,6 @@ chrp_progress(char *s, unsigned short hex)
 }
 
 extern void setup_default_decr(void);
-
-extern unsigned long ppc_proc_freq;
-extern unsigned long ppc_tb_freq;
 
 void __init pSeries_calibrate_decr(void)
 {

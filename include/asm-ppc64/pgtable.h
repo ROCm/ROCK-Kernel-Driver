@@ -349,6 +349,7 @@ extern void paging_init(void);
  * ahead of time, instead of waiting for the inevitable extra
  * hash-table miss exception.
  */
+struct vm_area_struct;
 extern void update_mmu_cache(struct vm_area_struct *, unsigned long, pte_t);
 
 /* Encode and de-code a swap entry */

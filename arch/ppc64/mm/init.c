@@ -98,7 +98,7 @@ mmu_gather_t     mmu_gathers[NR_CPUS];
 
 void show_mem(void)
 {
-	int i,free = 0,total = 0,reserved = 0;
+	int i,total = 0,reserved = 0;
 	int shared = 0, cached = 0;
 
 	printk("Mem-info:\n");
