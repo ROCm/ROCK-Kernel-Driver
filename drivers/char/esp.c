@@ -2401,7 +2401,7 @@ static struct tty_operations esp_ops = {
 /*
  * The serial driver boot-time initialization code!
  */
-int __init espserial_init(void)
+static int __init espserial_init(void)
 {
 	int i, offset;
 	struct esp_struct * info;

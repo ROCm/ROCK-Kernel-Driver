@@ -923,7 +923,7 @@ static void tx_release(struct tty_struct *tty)
 /* Return next bottom half action to perform.
  * or 0 if nothing to do.
  */
-int bh_action(MGSLPC_INFO *info)
+static int bh_action(MGSLPC_INFO *info)
 {
 	unsigned long flags;
 	int rc = 0;
@@ -1017,7 +1017,7 @@ void bh_status(MGSLPC_INFO *info)
 }
 
 /* eom: non-zero = end of frame */ 
-void rx_ready_hdlc(MGSLPC_INFO *info, int eom) 
+static void rx_ready_hdlc(MGSLPC_INFO *info, int eom)
 {
 	unsigned char data[2];
 	unsigned char fifo_count, read_count, i;
@@ -1079,7 +1079,7 @@ void rx_ready_hdlc(MGSLPC_INFO *info, int eom)
 	issue_command(info, CHA, CMD_RXFIFO);
 }
 
-void rx_ready_async(MGSLPC_INFO *info, int tcd) 
+static void rx_ready_async(MGSLPC_INFO *info, int tcd)
 {
 	unsigned char data, status;
 	int fifo_count;
@@ -1153,7 +1153,7 @@ void rx_ready_async(MGSLPC_INFO *info, int tcd)
 }
 
 
-void tx_done(MGSLPC_INFO *info) 
+static void tx_done(MGSLPC_INFO *info)
 {
 	if (!info->tx_active)
 		return;
@@ -1190,7 +1190,7 @@ void tx_done(MGSLPC_INFO *info)
 	}
 }
 
-void tx_ready(MGSLPC_INFO *info) 
+static void tx_ready(MGSLPC_INFO *info)
 {
 	unsigned char fifo_count = 32;
 	int c;
@@ -1239,7 +1239,7 @@ void tx_ready(MGSLPC_INFO *info)
 	}
 }
 
-void cts_change(MGSLPC_INFO *info) 
+static void cts_change(MGSLPC_INFO *info)
 {
 	get_signals(info);
 	if ((info->cts_chkcount)++ >= IO_PIN_SHUTDOWN_LIMIT)
@@ -1276,7 +1276,7 @@ void cts_change(MGSLPC_INFO *info)
 	info->pending_bh |= BH_STATUS;
 }
 
-void dcd_change(MGSLPC_INFO *info) 
+static void dcd_change(MGSLPC_INFO *info)
 {
 	get_signals(info);
 	if ((info->dcd_chkcount)++ >= IO_PIN_SHUTDOWN_LIMIT)
@@ -1310,7 +1310,7 @@ void dcd_change(MGSLPC_INFO *info)
 	info->pending_bh |= BH_STATUS;
 }
 
-void dsr_change(MGSLPC_INFO *info) 
+static void dsr_change(MGSLPC_INFO *info)
 {
 	get_signals(info);
 	if ((info->dsr_chkcount)++ >= IO_PIN_SHUTDOWN_LIMIT)
@@ -1325,7 +1325,7 @@ void dsr_change(MGSLPC_INFO *info)
 	info->pending_bh |= BH_STATUS;
 }
 
-void ri_change(MGSLPC_INFO *info) 
+static void ri_change(MGSLPC_INFO *info)
 {
 	get_signals(info);
 	if ((info->ri_chkcount)++ >= IO_PIN_SHUTDOWN_LIMIT)
@@ -2955,7 +2955,7 @@ static inline int line_info(char *buf, MGSLPC_INFO *info)
 
 /* Called to print information about devices
  */
-int mgslpc_read_proc(char *page, char **start, off_t off, int count,
+static int mgslpc_read_proc(char *page, char **start, off_t off, int count,
 		 int *eof, void *data)
 {
 	int len = 0, l;
@@ -3218,7 +3218,7 @@ static void __exit synclink_cs_exit(void)
 module_init(synclink_cs_init);
 module_exit(synclink_cs_exit);
 
-void mgslpc_set_rate(MGSLPC_INFO *info, unsigned char channel, unsigned int rate) 
+static void mgslpc_set_rate(MGSLPC_INFO *info, unsigned char channel, unsigned int rate)
 {
 	unsigned int M, N;
 	unsigned char val;
@@ -3254,7 +3254,7 @@ void mgslpc_set_rate(MGSLPC_INFO *info, unsigned char channel, unsigned int rate
 
 /* Enabled the AUX clock output at the specified frequency.
  */
-void enable_auxclk(MGSLPC_INFO *info)
+static void enable_auxclk(MGSLPC_INFO *info)
 {
 	unsigned char val;
 	

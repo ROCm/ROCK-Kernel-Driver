@@ -142,7 +142,7 @@
 /* ROUND_UP macro from fs/select.c */
 #define ROUND_UP(x,y) (((x)+(y)-1)/(y))
 
-struct lp_struct lp_table[LP_NO];
+static struct lp_struct lp_table[LP_NO];
 
 static unsigned int lp_count = 0;
 static struct class_simple *lp_class;
@@ -867,7 +867,7 @@ static struct parport_driver lp_driver = {
 	.detach = lp_detach,
 };
 
-int __init lp_init (void)
+static int __init lp_init (void)
 {
 	int i, err = 0;
 
