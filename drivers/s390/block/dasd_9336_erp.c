@@ -5,14 +5,10 @@
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 2000
  */
 
-#include <asm/ccwcache.h>
-#include "dasd_int.h"
-#include "dasd_9336_erp.h"
-
-#ifdef PRINTK_HEADER
-#undef PRINTK_HEADER
 #define PRINTK_HEADER "dasd_erp(9336)"
-#endif				/* PRINTK_HEADER */
+
+#include "dasd_int.h"
+
 
 /*
  * DASD_9336_ERP_EXAMINE 
@@ -26,16 +22,17 @@
  *   'Chapter 7. 9336 Sense Data'.
  *
  * RETURN VALUES
- *   dasd_era_none      no error 
- *   dasd_era_fatal     for all fatal (unrecoverable errors)
- *   dasd_era_recover   for all others.
+ *   dasd_era_none	no error 
+ *   dasd_era_fatal	for all fatal (unrecoverable errors)
+ *   dasd_era_recover	for all others.
  */
-dasd_era_t dasd_9336_erp_examine (ccw_req_t * cqr, devstat_t * stat)
+dasd_era_t
+dasd_9336_erp_examine(dasd_ccw_req_t * cqr, devstat_t * stat)
 {
 	/* check for successful execution first */
 	if (stat->cstat == 0x00 &&
 	    stat->dstat == (DEV_STAT_CHN_END | DEV_STAT_DEV_END))
-		    return dasd_era_none;
+		return dasd_era_none;
 
 	/* examine the 24 byte sense data */
 	return dasd_era_recover;
@@ -56,7 +53,7 @@ dasd_era_t dasd_9336_erp_examine (ccw_req_t * cqr, devstat_t * stat)
  * c-label-offset: -4
  * c-continued-statement-offset: 4
  * c-continued-brace-offset: 0
- * indent-tabs-mode: nil
+ * indent-tabs-mode: 1
  * tab-width: 8
  * End:
  */

@@ -1,5 +1,5 @@
-/*
- * $Id$
+/* 
+ * $Id: iucv.c,v 1.32 2002/02/12 21:52:20 felfert Exp $
  *
  * IUCV network driver
  *
@@ -29,7 +29,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: IUCV lowlevel driver $Revision$
+ * RELEASE-TAG: IUCV lowlevel driver $Revision: 1.32 $
  *
  */
 
@@ -51,7 +51,7 @@
 #include <asm/s390_ext.h>
 #include <asm/ebcdic.h>
 
-#undef DEBUG
+#define DEBUG
 
 /* FLAGS:
  * All flags are defined in the field IPFLAGS1 of each function
@@ -96,10 +96,10 @@ typedef struct {
 	iucv_GeneralInterrupt data;
 } iucv_irqdata;
 
-struct list_head  iucv_irq_queue;
+static struct list_head  iucv_irq_queue;
 static spinlock_t iucv_irq_queue_lock = SPIN_LOCK_UNLOCKED;
 
-struct tq_struct  iucv_tq;
+static struct tq_struct  iucv_tq;
 
 static atomic_t   iucv_bh_scheduled = ATOMIC_INIT (0);
 
@@ -165,6 +165,10 @@ static unsigned long max_connections;
  * declare_flag: is 0 when iucv_declare_buffer has not been called
  */
 static int declare_flag;
+/**
+ * register_flag: is 0 when external interrupt has not been registered
+ */
+static int register_flag;
 
 /****************FIVE 40-BYTE PARAMETER STRUCTURES******************/
 /* Data struct 1: iparml_control
@@ -271,37 +275,56 @@ typedef struct {
 
 static iucv_param * iucv_param_pool;
 
+MODULE_AUTHOR("(C) 2001 IBM Corp. by Fritz Elfert (felfert@millenux.com)");
+MODULE_DESCRIPTION("Linux for S/390 IUCV lowlevel driver");
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,12))
+MODULE_LICENSE("GPL");
+#endif
+
 /*
  * Debugging stuff
  *******************************************************************************/
 
+
 #ifdef DEBUG
+static int debuglevel = 0;
+
+MODULE_PARM(debuglevel, "i");
+MODULE_PARM_DESC(debuglevel,
+ "Specifies the debug level (0=off ... 3=all)");
 
 static void
-iucv_dumpit(void *buf, int len)
+iucv_dumpit(char *title, void *buf, int len)
 {
 	int i;
 	__u8 *p = (__u8 *)buf;
 
-	printk(KERN_DEBUG "  ");
+	if (debuglevel < 3)
+		return;
+
+	printk(KERN_DEBUG __FUNCTION__ ": %s\n", title);
+	printk("  ");
 	for (i = 0; i < len; i++) {
 		if (!(i % 16) && i != 0)
 			printk ("\n  ");
 		else if (!(i % 4) && i != 0)
-			printk (" ");
-		printk ("%02X", *p++);
+			printk(" ");
+		printk("%02X", *p++);
 	}
 	if (len % 16)
 		printk ("\n");
 	return;
 }
-#define iucv_debug(fmt, args...) \
-printk(KERN_DEBUG __FUNCTION__ ": " fmt "\n" , ## args);
+#define iucv_debug(lvl, fmt, args...) \
+do { \
+	if (debuglevel >= lvl) \
+		printk(KERN_DEBUG __FUNCTION__ ": " fmt "\n" , ## args); \
+} while (0)
 
 #else
 
-#define iucv_debug(fmt, args...)
-#define iucv_dumpit(buf, len)
+#define iucv_debug(lvl, fmt, args...)
+#define iucv_dumpit(title, buf, len)
 
 #endif
 
@@ -309,6 +332,25 @@ printk(KERN_DEBUG __FUNCTION__ ": " fmt "\n" , ## args);
  * Internal functions
  *******************************************************************************/
 
+/**
+ * print start banner
+ */
+static void
+iucv_banner(void)
+{
+	char vbuf[] = "$Revision: 1.32 $";
+	char *version = vbuf;
+
+	if ((version = strchr(version, ':'))) {
+		char *p = strchr(version + 1, '$');
+		if (p)
+			*p = '\0';
+	} else
+		version = " ??? ";
+	printk(KERN_INFO
+	       "IUCV lowlevel driver Version%s initialized\n", version);
+}
+
 /**
  * iucv_init - Initialization
  *
@@ -354,7 +396,23 @@ iucv_init(void)
 	/* Initialize handler table */
 	INIT_LIST_HEAD(&iucv_handler_table);
 
+	iucv_banner();
 	return 0;
+}
+
+/**
+ * iucv_exit - De-Initialization
+ *
+ * Frees everything allocated from iucv_init.
+ */
+static void
+iucv_exit(void)
+{
+	if (iucv_external_int_buffer)
+		kfree(iucv_external_int_buffer);
+	if (iucv_param_pool)
+		kfree(iucv_param_pool);
+	printk(KERN_INFO "IUCV lowlevel driver unloaded\n");
 }
 
 /**
@@ -410,8 +468,8 @@ iucv_add_handler (handler *new)
 {
 	ulong flags;
 
-	iucv_debug("entering");
-	iucv_dumpit(new, sizeof(handler));
+	iucv_debug(1, "entering");
+	iucv_dumpit("handler:", new, sizeof(handler));
 
 	spin_lock_irqsave (&iucv_lock, flags);
 	if (!list_empty(&iucv_handler_table)) {
@@ -424,7 +482,7 @@ iucv_add_handler (handler *new)
 		list_for_each(lh, &iucv_handler_table) {
 			handler *h = list_entry(lh, handler, list);
 			if (memcmp(&new->id, &h->id, sizeof(h->id)) == 0) {
-				iucv_debug("ret 1");
+				iucv_debug(1, "ret 1");
 				spin_unlock_irqrestore (&iucv_lock, flags);
 				return 1;
 			}
@@ -437,32 +495,8 @@ iucv_add_handler (handler *new)
 	list_add(&new->list, &iucv_handler_table);
 	spin_unlock_irqrestore (&iucv_lock, flags);
 
-	iucv_debug("exiting");
+	iucv_debug(1, "exiting");
 	return 0;
-}
-
-/**
- * iucv_remove_handler:
- * @users_handler: handler to be removed
- *
- * Remove handler when application unregisters.
- */
-static void
-iucv_remove_handler(handler *handler)
-{
-	unsigned long flags;
-
-	if ((!iucv_pathid_table) || (!handler))
-		return;
-
-	iucv_debug("entering");
-
-	spin_lock_irqsave (&iucv_lock, flags);
-	list_del(&handler->list);
-	spin_unlock_irqrestore (&iucv_lock, flags);
-
-	iucv_debug("exiting");
-	return;
 }
 
 /**
@@ -477,8 +511,7 @@ iucv_remove_handler(handler *handler)
 static __inline__ ulong
 b2f0(__u32 code, void *parm)
 {
-	iucv_debug("iparml before b2f0 call:");
-	iucv_dumpit(parm, sizeof(iucv_param.param));
+	iucv_dumpit("iparml before b2f0 call:", parm, sizeof(iucv_param));
 
 	asm volatile (
 		"LRA   1,0(%1)\n\t"
@@ -489,8 +522,7 @@ b2f0(__u32 code, void *parm)
 		: "0", "1"
 		);
 
-	iucv_debug("iparml after b2f0 call:");
-	iucv_dumpit(parm, sizeof(iucv_param.param));
+	iucv_dumpit("iparml after b2f0 call:", parm, sizeof(iucv_param));
 
 	return (unsigned long)*((__u8 *)(parm + 3));
 }
@@ -511,9 +543,9 @@ iucv_add_pathid(__u16 pathid, handler *handler)
 {
 	ulong flags;
 
-	iucv_debug("entering");
+	iucv_debug(1, "entering");
 
-	iucv_debug("handler is pointing to %p", handler);
+	iucv_debug(1, "handler is pointing to %p", handler);
 
 	if (pathid > (max_connections - 1))
 		return -EINVAL;
@@ -521,7 +553,7 @@ iucv_add_pathid(__u16 pathid, handler *handler)
 	spin_lock_irqsave (&iucv_lock, flags);
 	if (iucv_pathid_table[pathid]) {
 		spin_unlock_irqrestore (&iucv_lock, flags);
-		iucv_debug("pathid entry is %p", iucv_pathid_table[pathid]);
+		iucv_debug(1, "pathid entry is %p", iucv_pathid_table[pathid]);
 		printk(KERN_WARNING
 		       "%s: Pathid being used, error.\n", __FUNCTION__);
 		return -EINVAL;
@@ -529,7 +561,7 @@ iucv_add_pathid(__u16 pathid, handler *handler)
 	iucv_pathid_table[pathid] = handler;
 	spin_unlock_irqrestore (&iucv_lock, flags);
 
-	iucv_debug("exiting");
+	iucv_debug(1, "exiting");
 	return 0;
 }				/* end of add_pathid function */
 
@@ -546,24 +578,63 @@ iucv_remove_pathid(__u16 pathid)
 	spin_unlock_irqrestore (&iucv_lock, flags);
 }
 
-/*
+/**
+ * iucv_declare_buffer_cpu0
+ * Register at VM for subsequent IUCV operations. This is always
+ * executed on CPU 0. Called from iucv_declare_buffer().
+ */
+static void
+iucv_declare_buffer_cpu0 (void *result)
+{
+	iparml_db *parm;
+
+	if (!(result && (smp_processor_id() == 0)))
+		return;
+	parm = (iparml_db *)grab_param();
+	parm->ipbfadr1 = virt_to_phys(iucv_external_int_buffer);
+	if ((*((ulong *)result) = b2f0(DECLARE_BUFFER, parm)) == 1)
+		*((ulong *)result) = parm->iprcode;
+	release_param(parm);
+}
+
+/**
+ * iucv_retrieve_buffer_cpu0:
+ * Unregister IUCV usage at VM. This is always executed on CPU 0.
+ * Called from iucv_retrieve_buffer().
+ */
+static void
+iucv_retrieve_buffer_cpu0 (void *result)
+{
+	iparml_control *parm;
+
+	if (smp_processor_id() != 0)
+		return;
+	parm = (iparml_control *)grab_param();
+	b2f0(RETRIEVE_BUFFER, parm);
+	release_param(parm);
+}
+
+/**
  * Name: iucv_declare_buffer
  * Purpose: Specifies the guests real address of an external
  *          interrupt.
  * Input: void
  * Output: iprcode - return code from b2f0 call
-*/
-int
+ */
+static int
 iucv_declare_buffer (void)
 {
-	ulong b2f0_result;
-	iparml_db *parm = (iparml_db *)grab_param();
+	ulong b2f0_result = 0x0deadbeef;
 
-	parm->ipbfadr1 = virt_to_phys(iucv_external_int_buffer);
-	b2f0_result = b2f0(DECLARE_BUFFER, parm);
-	release_param(parm);
-	iucv_debug("Address of EIB = %p", iucv_external_int_buffer);
-	iucv_debug("exiting");
+	iucv_debug(1, "entering");
+	if (smp_processor_id() == 0)
+		iucv_declare_buffer_cpu0(&b2f0_result);
+	else
+		smp_call_function(iucv_declare_buffer_cpu0, &b2f0_result, 0, 1);
+	iucv_debug(1, "Address of EIB = %p", iucv_external_int_buffer);
+	if (b2f0_result == 0x0deadbeef)
+	    b2f0_result = 0xaa;
+	iucv_debug(1, "exiting");
 	return b2f0_result;
 }
 
@@ -573,23 +644,50 @@ iucv_declare_buffer (void)
  * Terminates all use of IUCV.
  * Returns: return code from CP
  */
-int
+static int
 iucv_retrieve_buffer (void)
 {
-	ulong b2f0_result = 0;
-	iparml_control *parm = (iparml_control *)grab_param();
-
-	iucv_debug("entering");
-
-	b2f0_result = b2f0(RETRIEVE_BUFFER, parm);
-	release_param(parm);
-	if (b2f0_result == 0) {
-		kfree(iucv_pathid_table);
-		iucv_pathid_table = NULL;
+	iucv_debug(1, "entering");
+	if (declare_flag) {
+		if (smp_processor_id() == 0)
+			iucv_retrieve_buffer_cpu0(0);
+		else
+			smp_call_function(iucv_retrieve_buffer_cpu0, 0, 0, 1);
 		declare_flag = 0;
 	}
-	iucv_debug("exiting");
-	return b2f0_result;
+	iucv_debug(1, "exiting");
+	return 0;
+}
+
+/**
+ * iucv_remove_handler:
+ * @users_handler: handler to be removed
+ *
+ * Remove handler when application unregisters.
+ */
+static void
+iucv_remove_handler(handler *handler)
+{
+	unsigned long flags;
+
+	if ((!iucv_pathid_table) || (!handler))
+		return;
+
+	iucv_debug(1, "entering");
+
+	spin_lock_irqsave (&iucv_lock, flags);
+	list_del(&handler->list);
+	if (list_empty(&iucv_handler_table)) {
+		iucv_retrieve_buffer();
+		if (register_flag) {
+			unregister_external_interrupt(0x4000, iucv_irq_handler);
+			register_flag = 0;
+		}
+	}
+	spin_unlock_irqrestore (&iucv_lock, flags);
+
+	iucv_debug(1, "exiting");
+	return;
 }
 
 /**
@@ -623,7 +721,7 @@ iucv_register_program (__u8 pgmname[16],
 	ulong rc = 0;		/* return code from function calls */
 	handler *new_handler;
 
-	iucv_debug("entering");
+	iucv_debug(1, "entering");
 
 	if (ops == NULL) {
 		/* interrupt table is not defined */
@@ -711,17 +809,41 @@ iucv_register_program (__u8 pgmname[16],
 	if (declare_flag == 0) {
 		rc = iucv_declare_buffer();
 		if (rc) {
+			char *err = "Unknown";
 			iucv_remove_handler(new_handler);
 			kfree(new_handler);
+			switch(rc) {
+				case 0x03:
+					err = "Directory error";
+					break;
+				case 0x0a:
+					err = "Invalid length";
+					break;
+				case 0x13:
+					err = "Buffer already exists";
+					break;
+				case 0x3e:
+					err = "Buffer overlap";
+					break;
+				case 0x5c:
+					err = "Paging or storage error";
+					break;
+				case 0xaa:
+					err = "Function not called";
+					break;
+			}
 			printk(KERN_WARNING "%s: iucv_declare_buffer "
-			       "returned %ld\n", __FUNCTION__, rc);
+			       "returned error 0x%02lx (%s)\n", __FUNCTION__, rc,
+			       err);
 			return NULL;
 		}
+		declare_flag = 1;
+	}
+	if (register_flag == 0) {
 		/* request the 0x4000 external interrupt */
 		rc = register_external_interrupt (0x4000, iucv_irq_handler);
 		if (rc) {
 			iucv_remove_handler(new_handler);
-			iucv_retrieve_buffer();
 			kfree (new_handler);
 			printk(KERN_WARNING "%s: "
 			       "register_external_interrupt returned %ld\n",
@@ -729,9 +851,10 @@ iucv_register_program (__u8 pgmname[16],
 			return NULL;
 
 		}
-		declare_flag = 1;
+		register_flag = 1;
 	}
-	iucv_debug("exiting");
+	MOD_INC_USE_COUNT;
+	iucv_debug(1, "exiting");
 	return new_handler;
 }				/* end of register function */
 
@@ -741,24 +864,45 @@ iucv_register_program (__u8 pgmname[16],
  *
  * Unregister application with IUCV.
  * Returns:
- *   Always 0
+ *   0 on success, -EINVAL, if specified handle is invalid.
  */
 
 int
 iucv_unregister_program (iucv_handle_t handle)
 {
-	handler *h = (handler *)handle;
+	handler *h = NULL;
+	struct list_head *lh;
 	int i;
 	ulong flags;
 
-	iucv_debug("entering");
-	iucv_debug("address of handler is %p", h);
+	iucv_debug(1, "entering");
+	iucv_debug(1, "address of handler is %p", h);
+
+	/* Checking if handle is valid  */
+	spin_lock_irqsave (&iucv_lock, flags);
+	list_for_each(lh, &iucv_handler_table) {
+		if ((handler *)handle == list_entry(lh, handler, list)) {
+			h = (handler *)handle;
+			break;
+		}
+	}
+	if (!h) {
+		spin_unlock_irqrestore (&iucv_lock, flags);
+		if (handle)
+			printk(KERN_WARNING
+			       "%s: Handler not found in iucv_handler_table.\n",
+			       __FUNCTION__);
+		else
+			printk(KERN_WARNING
+			       "%s: NULL handle passed by application.\n",
+			       __FUNCTION__);
+		return -EINVAL;
+	}
 
 	/**
 	 * First, walk thru iucv_pathid_table and sever any pathid which is
 	 * still pointing to the handler to be removed.
 	 */
-	spin_lock_irqsave (&iucv_lock, flags);
 	for (i = 0; i < max_connections; i++)
 		if (iucv_pathid_table[i] == h) {
 			spin_unlock_irqrestore (&iucv_lock, flags);
@@ -770,7 +914,8 @@ iucv_unregister_program (iucv_handle_t handle)
 	iucv_remove_handler(h);
 	kfree(h);
 
-	iucv_debug("exiting");
+	MOD_DEC_USE_COUNT;
+	iucv_debug(1, "exiting");
 	return 0;
 }
 
@@ -811,8 +956,8 @@ iucv_accept(__u16 pathid, __u16 msglim_reqstd,
 	handler *h = NULL;
 	iparml_control *parm;
 
-	iucv_debug("entering");
-	iucv_debug("pathid = %d", pathid);
+	iucv_debug(1, "entering");
+	iucv_debug(1, "pathid = %d", pathid);
 
 	/* Checking if handle is valid  */
 	spin_lock_irqsave (&iucv_lock, flags);
@@ -825,9 +970,14 @@ iucv_accept(__u16 pathid, __u16 msglim_reqstd,
 	spin_unlock_irqrestore (&iucv_lock, flags);
 
 	if (!h) {
-		printk(KERN_WARNING "%s: NULL handle passed by application "
-		       "or handler not found in iucv_handler_table\n",
-		       __FUNCTION__);
+		if (handle)
+			printk(KERN_WARNING
+			       "%s: Handler not found in iucv_handler_table.\n",
+			       __FUNCTION__);
+		else
+			printk(KERN_WARNING
+			       "%s: NULL handle passed by application.\n",
+			       __FUNCTION__);
 		return -EINVAL;
 	}
 
@@ -849,7 +999,7 @@ iucv_accept(__u16 pathid, __u16 msglim_reqstd,
 	}
 	release_param(parm);
 
-	iucv_debug("exiting");
+	iucv_debug(1, "exiting");
 	return b2f0_result;
 }
 
@@ -904,7 +1054,7 @@ iucv_connect (__u16 *pathid, __u16 msglim_reqstd,
 	handler *h = NULL;
 	__u8 no_memory[16] = "NO MEMORY";
 
-	iucv_debug("entering");
+	iucv_debug(1, "entering");
 
 	/* Checking if handle is valid  */
 	spin_lock_irqsave (&iucv_lock, flags);
@@ -917,9 +1067,14 @@ iucv_connect (__u16 *pathid, __u16 msglim_reqstd,
 	spin_unlock_irqrestore (&iucv_lock, flags);
 
 	if (!h) {
-		printk(KERN_WARNING "%s: NULL handle passed by application "
-		       "or handler not found in iucv_handler_table\n",
-		       __FUNCTION__);
+		if (handle)
+			printk(KERN_WARNING
+			       "%s: Handler not found in iucv_handler_table.\n",
+			       __FUNCTION__);
+		else
+			printk(KERN_WARNING
+			       "%s: NULL handle passed by application.\n",
+			       __FUNCTION__);
 		return -EINVAL;
 	}
 
@@ -971,7 +1126,7 @@ iucv_connect (__u16 *pathid, __u16 msglim_reqstd,
 		return(add_pathid_result);
 	}
 
-	iucv_debug("exiting");
+	iucv_debug(1, "exiting");
 	return b2f0_result;
 }
 
@@ -993,8 +1148,8 @@ iucv_purge (__u16 pathid, __u32 msgid, __u32 srccls, __u32 *audit)
 	iparml_purge *parm;
 	ulong b2f0_result = 0;
 
-	iucv_debug("entering");
-	iucv_debug("pathid = %d", pathid);
+	iucv_debug(1, "entering");
+	iucv_debug(1, "pathid = %d", pathid);
 
 	parm = (iparml_purge *)grab_param();
 
@@ -1012,8 +1167,8 @@ iucv_purge (__u16 pathid, __u32 msgid, __u32 srccls, __u32 *audit)
 	
 	release_param(parm);
 
-	iucv_debug("b2f0_result = %ld", b2f0_result);
-	iucv_debug("exiting");
+	iucv_debug(1, "b2f0_result = %ld", b2f0_result);
+	iucv_debug(1, "exiting");
 	return b2f0_result;
 }
 
@@ -1099,8 +1254,8 @@ iucv_quiesce (__u16 pathid, __u8 user_data[16])
 	iparml_control *parm;
 	ulong b2f0_result = 0;
 
-	iucv_debug("entering");
-	iucv_debug("pathid = %d", pathid);
+	iucv_debug(1, "entering");
+	iucv_debug(1, "pathid = %d", pathid);
 
 	parm = (iparml_control *)grab_param();
 
@@ -1110,8 +1265,8 @@ iucv_quiesce (__u16 pathid, __u8 user_data[16])
 	b2f0_result = b2f0(QUIESCE, parm);
 	release_param(parm);
 
-	iucv_debug("b2f0_result = %ld", b2f0_result);
-	iucv_debug("exiting");
+	iucv_debug(1, "b2f0_result = %ld", b2f0_result);
+	iucv_debug(1, "exiting");
 
 	return b2f0_result;
 }
@@ -1152,7 +1307,7 @@ iucv_receive (__u16 pathid, __u32 msgid, __u32 trgcls,
 	ulong b2f0_result;
 	int moved = 0;	/* number of bytes moved from parmlist to buffer */
 
-	iucv_debug("entering");
+	iucv_debug(2, "entering");
 
 	if (!buffer)
 		return -EINVAL;
@@ -1170,9 +1325,9 @@ iucv_receive (__u16 pathid, __u32 msgid, __u32 trgcls,
 
 	if (b2f0_result == 0 || b2f0_result == 5) {
 		if (flags1_out) {
-			iucv_debug("*flags1_out = %d", *flags1_out);
+			iucv_debug(2, "*flags1_out = %d", *flags1_out);
 			*flags1_out = (parm->ipflags1 & (~0x07));
-			iucv_debug("*flags1_out = %d", *flags1_out);
+			iucv_debug(2, "*flags1_out = %d", *flags1_out);
 		}
 
 		if (!(parm->ipflags1 & IPRMDATA)) {	/*msg not in parmlist */
@@ -1199,7 +1354,7 @@ iucv_receive (__u16 pathid, __u32 msgid, __u32 trgcls,
 	}
 	release_param(parm);
 
-	iucv_debug("exiting");
+	iucv_debug(2, "exiting");
 	return b2f0_result;
 }
 
@@ -1242,7 +1397,7 @@ iucv_receive_array (__u16 pathid,
 	ulong b2f0_result;
 	int i = 0, moved = 0, need_to_move = 8, dyn_len;
 
-	iucv_debug("entering");
+	iucv_debug(2, "entering");
 
 	if (!buffer)
 		return -EINVAL;
@@ -1261,9 +1416,9 @@ iucv_receive_array (__u16 pathid,
 	if (b2f0_result == 0 || b2f0_result == 5) {
 
 		if (flags1_out) {
-			iucv_debug("*flags1_out = %d", *flags1_out);
+			iucv_debug(2, "*flags1_out = %d", *flags1_out);
 			*flags1_out = (parm->ipflags1 & (~0x07));
-			iucv_debug("*flags1_out = %d", *flags1_out);
+			iucv_debug(2, "*flags1_out = %d", *flags1_out);
 		}
 
 		if (!(parm->ipflags1 & IPRMDATA)) {	/*msg not in parmlist */
@@ -1316,7 +1471,7 @@ iucv_receive_array (__u16 pathid,
 	}
 	release_param(parm);
 
-	iucv_debug("exiting");
+	iucv_debug(2, "exiting");
 	return b2f0_result;
 }
 
@@ -1337,8 +1492,8 @@ iucv_reject (__u16 pathid, __u32 msgid, __u32 trgcls)
 	iparml_db *parm;
 	ulong b2f0_result = 0;
 
-	iucv_debug("entering");
-	iucv_debug("pathid = %d", pathid);
+	iucv_debug(1, "entering");
+	iucv_debug(1, "pathid = %d", pathid);
 
 	parm = (iparml_db *)grab_param();
 
@@ -1350,8 +1505,8 @@ iucv_reject (__u16 pathid, __u32 msgid, __u32 trgcls)
 	b2f0_result = b2f0(REJECT, parm);
 	release_param(parm);
 
-	iucv_debug("b2f0_result = %ld", b2f0_result);
-	iucv_debug("exiting");
+	iucv_debug(1, "b2f0_result = %ld", b2f0_result);
+	iucv_debug(1, "exiting");
 
 	return b2f0_result;
 }
@@ -1391,7 +1546,7 @@ iucv_reply (__u16 pathid,
 	iparml_db *parm;
 	ulong b2f0_result;
 
-	iucv_debug("entering");
+	iucv_debug(2, "entering");
 
 	if (!buffer)
 		return -EINVAL;
@@ -1415,7 +1570,7 @@ iucv_reply (__u16 pathid,
 	}
 	release_param(parm);
 
-	iucv_debug("exiting");
+	iucv_debug(2, "exiting");
 
 	return b2f0_result;
 }
@@ -1457,7 +1612,7 @@ iucv_reply_array (__u16 pathid,
 	iparml_db *parm;
 	ulong b2f0_result;
 
-	iucv_debug("entering");
+	iucv_debug(2, "entering");
 
 	if (!buffer)
 		return -EINVAL;
@@ -1482,7 +1637,7 @@ iucv_reply_array (__u16 pathid,
 	}
 	release_param(parm);
 
-	iucv_debug("exiting");
+	iucv_debug(2, "exiting");
 
 	return b2f0_result;
 }
@@ -1511,7 +1666,7 @@ iucv_reply_prmmsg (__u16 pathid,
 	iparml_dpl *parm;
 	ulong b2f0_result;
 
-	iucv_debug("entering");
+	iucv_debug(2, "entering");
 
 	parm = (iparml_dpl *)grab_param();
 
@@ -1524,7 +1679,7 @@ iucv_reply_prmmsg (__u16 pathid,
 	b2f0_result = b2f0(REPLY, parm);
 	release_param(parm);
 
-	iucv_debug("exiting");
+	iucv_debug(2, "exiting");
 
 	return b2f0_result;
 }
@@ -1543,8 +1698,8 @@ iucv_resume (__u16 pathid, __u8 user_data[16])
 	iparml_control *parm;
 	ulong b2f0_result = 0;
 
-	iucv_debug("entering");
-	iucv_debug("pathid = %d", pathid);
+	iucv_debug(1, "entering");
+	iucv_debug(1, "pathid = %d", pathid);
 
 	parm = (iparml_control *)grab_param();
 
@@ -1554,7 +1709,7 @@ iucv_resume (__u16 pathid, __u8 user_data[16])
 	b2f0_result = b2f0(RESUME, parm);
 	release_param(parm);
 
-	iucv_debug("exiting");
+	iucv_debug(1, "exiting");
 
 	return b2f0_result;
 }
@@ -1582,7 +1737,7 @@ iucv_send (__u16 pathid, __u32 * msgid,
 	iparml_db *parm;
 	ulong b2f0_result;
 
-	iucv_debug("entering");
+	iucv_debug(2, "entering");
 
 	if (!buffer)
 		return -EINVAL;
@@ -1603,7 +1758,7 @@ iucv_send (__u16 pathid, __u32 * msgid,
 		*msgid = parm->ipmsgid;
 	release_param(parm);
 
-	iucv_debug("exiting");
+	iucv_debug(2, "exiting");
 
 	return b2f0_result;
 }
@@ -1637,7 +1792,7 @@ iucv_send_array (__u16 pathid,
 	iparml_db *parm;
 	ulong b2f0_result;
 
-	iucv_debug("entering");
+	iucv_debug(2, "entering");
 
 	if (!buffer)
 		return -EINVAL;
@@ -1657,7 +1812,7 @@ iucv_send_array (__u16 pathid,
 		*msgid = parm->ipmsgid;
 	release_param(parm);
 
-	iucv_debug("exiting");
+	iucv_debug(2, "exiting");
 	return b2f0_result;
 }
 
@@ -1686,7 +1841,7 @@ iucv_send_prmmsg (__u16 pathid,
 	iparml_dpl *parm;
 	ulong b2f0_result;
 
-	iucv_debug("entering");
+	iucv_debug(2, "entering");
 
 	parm = (iparml_dpl *)grab_param();
 
@@ -1703,7 +1858,7 @@ iucv_send_prmmsg (__u16 pathid,
 		*msgid = parm->ipmsgid;
 	release_param(parm);
 
-	iucv_debug("exiting");
+	iucv_debug(2, "exiting");
 
 	return b2f0_result;
 }
@@ -1741,7 +1896,7 @@ iucv_send2way (__u16 pathid,
 	iparml_db *parm;
 	ulong b2f0_result;
 
-	iucv_debug("entering");
+	iucv_debug(2, "entering");
 
 	if (!buffer || !ansbuf)
 		return -EINVAL;
@@ -1764,7 +1919,7 @@ iucv_send2way (__u16 pathid,
 		*msgid = parm->ipmsgid;
 	release_param(parm);
 
-	iucv_debug("exiting");
+	iucv_debug(2, "exiting");
 
 	return b2f0_result;
 }
@@ -1804,7 +1959,7 @@ iucv_send2way_array (__u16 pathid,
 	iparml_db *parm;
 	ulong b2f0_result;
 
-	iucv_debug("entering");
+	iucv_debug(2, "entering");
 
 	if (!buffer || !ansbuf)
 		return -EINVAL;
@@ -1825,7 +1980,7 @@ iucv_send2way_array (__u16 pathid,
 		*msgid = parm->ipmsgid;
 	release_param(parm);
 
-	iucv_debug("exiting");
+	iucv_debug(2, "exiting");
 	return b2f0_result;
 }
 
@@ -1861,7 +2016,7 @@ iucv_send2way_prmmsg (__u16 pathid,
 	iparml_dpl *parm;
 	ulong b2f0_result;
 
-	iucv_debug("entering");
+	iucv_debug(2, "entering");
 
 	if (!ansbuf)
 		return -EINVAL;
@@ -1883,7 +2038,7 @@ iucv_send2way_prmmsg (__u16 pathid,
 		*msgid = parm->ipmsgid;
 	release_param(parm);
 
-	iucv_debug("exiting");
+	iucv_debug(2, "exiting");
 
 	return b2f0_result;
 }
@@ -1924,7 +2079,7 @@ iucv_send2way_prmmsg_array (__u16 pathid,
 	iparml_dpl *parm;
 	ulong b2f0_result;
 
-	iucv_debug("entering");
+	iucv_debug(2, "entering");
 
 	if (!ansbuf)
 		return -EINVAL;
@@ -1944,7 +2099,7 @@ iucv_send2way_prmmsg_array (__u16 pathid,
 		*msgid = parm->ipmsgid;
 	release_param(parm);
 
-	iucv_debug("exiting");
+	iucv_debug(2, "exiting");
 	return b2f0_result;
 }
 
@@ -1967,7 +2122,7 @@ iucv_setmask (int SetMaskFlag)
 	iparml_set_mask *parm;
 	ulong b2f0_result = 0;
 
-	iucv_debug("entering");
+	iucv_debug(1, "entering");
 
 	parm = (iparml_set_mask *)grab_param();
 
@@ -1976,8 +2131,8 @@ iucv_setmask (int SetMaskFlag)
 	b2f0_result = b2f0(SETMASK, parm);
 	release_param(parm);
 
-	iucv_debug("b2f0_result = %ld", b2f0_result);
-	iucv_debug("exiting");
+	iucv_debug(1, "b2f0_result = %ld", b2f0_result);
+	iucv_debug(1, "exiting");
 
 	return b2f0_result;
 }
@@ -1996,7 +2151,7 @@ iucv_sever(__u16 pathid, __u8 user_data[16])
 	iparml_control *parm;
 	ulong b2f0_result = 0;
 
-	iucv_debug("entering");
+	iucv_debug(1, "entering");
 	parm = (iparml_control *)grab_param();
 
 	memcpy(parm->ipuser, user_data, sizeof(parm->ipuser));
@@ -2008,7 +2163,7 @@ iucv_sever(__u16 pathid, __u8 user_data[16])
 		iucv_remove_pathid(pathid);
 	release_param(parm);
 
-	iucv_debug("exiting");
+	iucv_debug(1, "exiting");
 	return b2f0_result;
 }
 
@@ -2073,10 +2228,10 @@ iucv_do_int(iucv_GeneralInterrupt * int_buf)
 	int rc = 0, j = 0;
 	__u8 no_listener[16] = "NO LISTENER";
 
-	iucv_debug("entering, pathid %d, type %02X",
+	iucv_debug(2, "entering, pathid %d, type %02X",
 		 int_buf->ippathid, int_buf->iptype);
-	iucv_debug("External Interrupt Buffer:");
-	iucv_dumpit(int_buf, sizeof(iucv_GeneralInterrupt));
+	iucv_dumpit("External Interrupt Buffer:",
+		    int_buf, sizeof(iucv_GeneralInterrupt));
 
 	ASCEBC (no_listener, 16);
 
@@ -2088,9 +2243,7 @@ iucv_do_int(iucv_GeneralInterrupt * int_buf)
 		} else {
 			h = iucv_pathid_table[int_buf->ippathid];
 			interrupt = h->interrupt_table;
-
-			iucv_debug("Handler:");
-			iucv_dumpit(h, sizeof(handler));
+			iucv_dumpit("Handler:", h, sizeof(handler));
 		}
 	}
 
@@ -2107,14 +2260,15 @@ iucv_do_int(iucv_GeneralInterrupt * int_buf)
 					temp_buff2[j] &= (h->id.mask)[j];
 				}
 				
-				iucv_debug("temp_buff1:");
-				iucv_dumpit(temp_buff1, sizeof(temp_buff1));
-				iucv_debug("temp_buff2");
-				iucv_dumpit(temp_buff2, sizeof(temp_buff2));
+				iucv_dumpit("temp_buff1:",
+					    temp_buff1, sizeof(temp_buff1));
+				iucv_dumpit("temp_buff2",
+					    temp_buff2, sizeof(temp_buff2));
 				
 				if (memcmp (temp_buff1, temp_buff2, 24) == 0) {
 					
-					iucv_debug("found a matching handler");
+					iucv_debug(2,
+						   "found a matching handler");
 					break;
 				}
 			}
@@ -2125,8 +2279,9 @@ iucv_do_int(iucv_GeneralInterrupt * int_buf)
 				if (rc) {
 					iucv_sever (int_buf->ippathid,
 						    no_listener);
-					iucv_debug("add_pathid failed, rc = %d",
-						   (int)add_pathid_result);
+					iucv_debug(1,
+						   "add_pathid failed, rc = %d",
+						   rc);
 				} else {
 					interrupt = h->interrupt_table;
 					if (interrupt->ConnectionPending) {
@@ -2149,9 +2304,10 @@ iucv_do_int(iucv_GeneralInterrupt * int_buf)
 						(iucv_ConnectionComplete *)int_buf,
 						h->pgm_data);
 				else
-					iucv_debug("ConnectionComplete not called");
-			}
-			
+					iucv_debug(1,
+						   "ConnectionComplete not called");
+			} else
+				iucv_sever(int_buf->ippathid, no_listener);
 			break;
 			
 		case 0x03:		/* connection severed */
@@ -2174,7 +2330,8 @@ iucv_do_int(iucv_GeneralInterrupt * int_buf)
 						(iucv_ConnectionQuiesced *)int_buf,
 						h->pgm_data);
 				else
-					iucv_debug("ConnectionQuiesced not called");
+					iucv_debug(1,
+						   "ConnectionQuiesced not called");
 			}
 			break;
 			
@@ -2185,7 +2342,8 @@ iucv_do_int(iucv_GeneralInterrupt * int_buf)
 						(iucv_ConnectionResumed *)int_buf,
 						h->pgm_data);
 				else
-					iucv_debug("ConnectionResumed not called");
+					iucv_debug(1,
+						   "ConnectionResumed not called");
 			}
 			break;
 			
@@ -2197,7 +2355,8 @@ iucv_do_int(iucv_GeneralInterrupt * int_buf)
 						(iucv_MessageComplete *)int_buf,
 						h->pgm_data);
 				else
-					iucv_debug("MessageComplete not called");
+					iucv_debug(2,
+						   "MessageComplete not called");
 			}
 			break;
 			
@@ -2209,7 +2368,8 @@ iucv_do_int(iucv_GeneralInterrupt * int_buf)
 						(iucv_MessagePending *) int_buf,
 						h->pgm_data);
 				else
-					iucv_debug("MessagePending not called");
+					iucv_debug(2,
+						   "MessagePending not called");
 			}
 			break;
 		default:		/* unknown iucv type */
@@ -2218,7 +2378,7 @@ iucv_do_int(iucv_GeneralInterrupt * int_buf)
 			break;
 	}			/* end switch */
 	
-	iucv_debug("exiting pathid %d, type %02X",
+	iucv_debug(2, "exiting pathid %d, type %02X",
 		 int_buf->ippathid, int_buf->iptype);
 
 	return;
@@ -2256,23 +2416,35 @@ iucv_bh_handler(void)
 	return;
 }
 
+module_init(iucv_init);
+module_exit(iucv_exit);
+
 /**
  * Export all public stuff
+ * FIXME: I have commented out all the functions that
+ * 	  are not used in netiucv. Is anyone else
+ * 	  using them or should some of them be made
+ * 	  static / removed? pls review. Arnd
  */
 EXPORT_SYMBOL (iucv_accept);
 EXPORT_SYMBOL (iucv_connect);
+#if 0
 EXPORT_SYMBOL (iucv_purge);
 EXPORT_SYMBOL (iucv_query_maxconn);
 EXPORT_SYMBOL (iucv_query_bufsize);
 EXPORT_SYMBOL (iucv_quiesce);
+#endif
 EXPORT_SYMBOL (iucv_receive);
+#if 0
 EXPORT_SYMBOL (iucv_receive_array);
 EXPORT_SYMBOL (iucv_reject);
 EXPORT_SYMBOL (iucv_reply);
 EXPORT_SYMBOL (iucv_reply_array);
 EXPORT_SYMBOL (iucv_reply_prmmsg);
 EXPORT_SYMBOL (iucv_resume);
+#endif
 EXPORT_SYMBOL (iucv_send);
+#if 0
 EXPORT_SYMBOL (iucv_send2way);
 EXPORT_SYMBOL (iucv_send2way_array);
 EXPORT_SYMBOL (iucv_send_array);
@@ -2280,6 +2452,7 @@ EXPORT_SYMBOL (iucv_send2way_prmmsg);
 EXPORT_SYMBOL (iucv_send2way_prmmsg_array);
 EXPORT_SYMBOL (iucv_send_prmmsg);
 EXPORT_SYMBOL (iucv_setmask);
+#endif
 EXPORT_SYMBOL (iucv_sever);
 EXPORT_SYMBOL (iucv_register_program);
 EXPORT_SYMBOL (iucv_unregister_program);

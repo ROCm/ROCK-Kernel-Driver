@@ -34,17 +34,11 @@ void hwc_console_unblank (void);
 struct console hwc_console =
 {
 
-	hwc_console_name,
-	hwc_console_write,
-	NULL,
-	hwc_console_device,
-	NULL,
-	hwc_console_unblank,
-	NULL,
-	CON_PRINTBUFFER,
-	0,
-	0,
-	NULL
+	name:hwc_console_name,
+	write:hwc_console_write,
+	device:hwc_console_device,
+	unblank:hwc_console_unblank,
+	flags:CON_PRINTBUFFER,
 };
 
 void 
@@ -54,7 +48,8 @@ hwc_console_write (
 			  unsigned int count)
 {
 
-	if (console->device (console) != hwc_console.device (&hwc_console)) {
+	if (kdev_val (console->device (console)) !=
+	    kdev_val (hwc_console.device (&hwc_console))) {
 
 		hwc_printk (KERN_WARNING HWC_CON_PRINT_HEADER
 			    "hwc_console_write() called with wrong "
@@ -67,7 +62,7 @@ hwc_console_write (
 kdev_t 
 hwc_console_device (struct console * c)
 {
-	return MKDEV (hwc_console_major, hwc_console_minor);
+	return mk_kdev (hwc_console_major, hwc_console_minor);
 }
 
 void 

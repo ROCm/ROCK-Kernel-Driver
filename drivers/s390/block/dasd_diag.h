@@ -10,13 +10,12 @@
 #define MDSK_WRITE_REQ 0x01
 #define MDSK_READ_REQ  0x02
 
-#define INIT_BIO        0x00
-#define RW_BIO          0x01
-#define TERM_BIO        0x02
+#define INIT_BIO	0x00
+#define RW_BIO		0x01
+#define TERM_BIO	0x02
 
-#define DEV_CLASS_FBA   0x01
-#define DEV_CLASS_ECKD  0x04
-#define DEV_CLASS_CKD   0x04
+#define DEV_CLASS_FBA	0x01
+#define DEV_CLASS_ECKD	0x04
 
 typedef struct dasd_diag_characteristics_t {
 	u16 dev_nr;
@@ -29,7 +28,7 @@ typedef struct dasd_diag_characteristics_t {
 	u8 rdev_type;
 	u8 rdev_model;
 	u8 rdev_features;
-} __attribute__ ((packed, aligned (4)))
+} __attribute__ ((packed, aligned(4)))
 
     dasd_diag_characteristics_t;
 
@@ -40,7 +39,7 @@ typedef struct diag_bio_t {
 	u32 block_number;
 	u32 alet;
 	u32 buffer;
-} __attribute__ ((packed, aligned (8)))
+} __attribute__ ((packed, aligned(8)))
 
     diag_bio_t;
 
@@ -52,7 +51,7 @@ typedef struct diag_init_io_t {
 	u32 start_block;
 	u32 end_block;
 	u32 spare2[6];
-} __attribute__ ((packed, aligned (8)))
+} __attribute__ ((packed, aligned(8)))
 
     diag_init_io_t;
 
@@ -67,9 +66,9 @@ typedef struct diag_rw_io_t {
 	u32 bio_list;
 	u32 interrupt_params;
 	u32 spare3[5];
-} __attribute__ ((packed, aligned (8)))
+} __attribute__ ((packed, aligned(8)))
 
     diag_rw_io_t;
 
-int dasd_diag_init (void);
-void dasd_diag_cleanup (void);
+int dasd_diag_init(void);
+void dasd_diag_cleanup(void);

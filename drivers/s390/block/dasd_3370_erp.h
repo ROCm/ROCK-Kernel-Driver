@@ -10,6 +10,6 @@
 #ifndef DASD_3370_ERP_H
 #define DASD_3370_ERP_H
 
-dasd_era_t dasd_3370_erp_examine (ccw_req_t *, devstat_t *);
+dasd_era_t dasd_3370_erp_examine(dasd_ccw_req_t *, devstat_t *);
 
 #endif				/* DASD_3990_ERP_H */

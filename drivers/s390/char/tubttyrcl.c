@@ -11,13 +11,16 @@
  */
 #include "tubio.h"
 
+static void tty3270_rcl_sync(tub_t *);
+static int tty3270_rcl_resize(tub_t *, int);
+
 int
 tty3270_rcl_init(tub_t *tubp)
 {
 	return tty3270_rcl_resize(tubp, 20);
 }
 
-int
+static int
 tty3270_rcl_resize(tub_t *tubp, int newrclk)
 {
 	char *(*newrclb)[];
@@ -191,7 +194,7 @@ tty3270_rcl_put(tub_t *tubp, char *data, int len)
 	tty3270_rcl_sync(tubp);
 }
 
-void
+static void
 tty3270_rcl_sync(tub_t *tubp)
 {
 	tubp->tty_rclb = -1;

@@ -16,6 +16,7 @@
 #include <linux/blkdev.h>
 #include <linux/blk.h>
 #include <asm/irq.h>
+#include <linux/compatmac.h>
 
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2,2,17))
 #define TAPE_DEBUG               // use s390 debug feature
