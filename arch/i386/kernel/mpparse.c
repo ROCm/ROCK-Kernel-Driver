@@ -1165,6 +1165,10 @@ void __init mp_parse_prt (void)
 			mp_ioapic_routing[ioapic].apic_id, ioapic_pin, 
 			entry->irq);
 	}
+
+	print_IO_APIC();
+
+	return;
 }
 
 #endif /*CONFIG_ACPI_PCI*/
