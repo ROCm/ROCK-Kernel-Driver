@@ -737,11 +737,11 @@ static int deactivate_urbs(snd_usb_substream_t *subs, int force, int can_sleep)
 		if (test_bit(i, &subs->active_mask)) {
 			if (! test_and_set_bit(i, &subs->unlink_mask)) {
 				struct urb *u = subs->dataurb[i].urb;
-				if (async)
+				if (async) {
 					u->transfer_flags |= URB_ASYNC_UNLINK;
-				else
-					u->transfer_flags &= ~URB_ASYNC_UNLINK;
-				usb_unlink_urb(u);
+					usb_unlink_urb(u);
+				} else
+					usb_kill_urb(u);
 			}
 		}
 	}
@@ -750,11 +750,11 @@ static int deactivate_urbs(snd_usb_substream_t *subs, int force, int can_sleep)
 			if (test_bit(i+16, &subs->active_mask)) {
  				if (! test_and_set_bit(i+16, &subs->unlink_mask)) {
 					struct urb *u = subs->syncurb[i].urb;
-					if (async)
+					if (async) {
 						u->transfer_flags |= URB_ASYNC_UNLINK;
-					else
-						u->transfer_flags &= ~URB_ASYNC_UNLINK;
-					usb_unlink_urb(u);
+						usb_unlink_urb(u);
+					} else
+						usb_kill_urb(u);
 				}
 			}
 		}
