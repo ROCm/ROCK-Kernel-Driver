@@ -156,7 +156,6 @@ int device_bus_link(struct device * dev)
 
 int device_create_dir(struct driver_dir_entry * dir, struct driver_dir_entry * parent)
 {
-	INIT_LIST_HEAD(&dir->files);
 	dir->mode  = (S_IFDIR| S_IRWXU | S_IRUGO | S_IXUGO);
 	return driverfs_create_dir(dir,parent);
 }

@@ -735,8 +735,6 @@ void driverfs_remove_file(struct driver_dir_entry * dir, const char * name)
 	dentry = lookup_hash(&qstr,dir->dentry);
 
 	if (!IS_ERR(dentry)) {
-		struct driver_file_entry * entry = dentry->d_fsdata;
-
 		/* make sure dentry is really there */
 		if (dentry->d_inode && 
 		    (dentry->d_parent->d_inode == dir->dentry->d_inode)) {
@@ -770,10 +768,8 @@ void driverfs_remove_dir(struct driver_dir_entry * dir)
 	node = dentry->d_subdirs.next;
 	while (node != &dentry->d_subdirs) {
 		struct dentry * d = list_entry(node,struct dentry,d_child);
-		struct driver_file_entry * entry = d->d_fsdata;
 
 		node = node->next;
-
 		driverfs_unlink(dentry->d_inode,d);
 		dput(dentry);
 		put_mount();

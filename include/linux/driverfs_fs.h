@@ -30,7 +30,6 @@ struct driver_dir_entry {
 	char			* name;
 	struct dentry		* dentry;
 	mode_t			mode;
-	struct list_head	files;
 };
 
 struct device;
