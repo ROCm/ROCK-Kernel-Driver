@@ -75,9 +75,6 @@
  */
 #define NFS_RPC_SWAPFLAGS		(RPC_TASK_SWAPPER|RPC_TASK_ROOTCREDS)
 
-/* Flags in the RPC client structure */
-#define NFS_CLNTF_BUFSIZE	0x0001	/* readdir buffer in longwords */
-
 #define NFS_RW_SYNC		0x0001	/* O_SYNC handling */
 #define NFS_RW_SWAP		0x0002	/* This is a swap request */
 

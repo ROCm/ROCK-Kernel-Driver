@@ -50,7 +50,6 @@ struct rpc_clnt {
 				cl_droppriv : 1,/* enable NFS suid hack */
 				cl_oneshot  : 1,/* dispose after use */
 				cl_dead     : 1;/* abandoned */
-	unsigned int		cl_flags;	/* misc client flags */
 	unsigned long		cl_hardmax;	/* max hard timeout */
 
 	struct rpc_rtt		cl_rtt;		/* RTO estimator data */
