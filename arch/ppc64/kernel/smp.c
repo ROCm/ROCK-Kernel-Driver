@@ -480,13 +480,13 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 	while (atomic_read(&data.started) != cpus) {
 		HMT_low();
 		if (--timeout == 0) {
+			printk("smp_call_function on cpu %d: other cpus not "
+			       "responding (%d)\n", smp_processor_id(),
+			       atomic_read(&data.started));
 #ifdef CONFIG_DEBUG_KERNEL
 			if (debugger)
 				debugger(0);
 #endif
-			printk("smp_call_function on cpu %d: other cpus not "
-			       "responding (%d)\n", smp_processor_id(),
-			       atomic_read(&data.started));
 			goto out;
 		}
 	}
@@ -496,15 +496,15 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 		while (atomic_read(&data.finished) != cpus) {
 			HMT_low();
 			if (--timeout == 0) {
-#ifdef CONFIG_DEBUG_KERNEL
-				if (debugger)
-					debugger(0);
-#endif
 				printk("smp_call_function on cpu %d: other "
 				       "cpus not finishing (%d/%d)\n",
 				       smp_processor_id(),
 				       atomic_read(&data.finished),
 				       atomic_read(&data.started));
+#ifdef CONFIG_DEBUG_KERNEL
+				if (debugger)
+					debugger(0);
+#endif
 				goto out;
 			}
 		}
@@ -513,6 +513,7 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 	ret = 0;
 
 out:
+	call_data = NULL;
 	HMT_medium();
 	spin_unlock(&call_lock);
 	return ret;
@@ -520,9 +521,19 @@ out:
 
 void smp_call_function_interrupt(void)
 {
-	void (*func) (void *info) = call_data->func;
-	void *info = call_data->info;
-	int wait = call_data->wait;
+	void (*func) (void *info);
+	void *info;
+	int wait;
+
+	/* call_data will be NULL if the sender timed out while
+	 * waiting on us to receive the call.
+	 */
+	if (!call_data)
+		return;
+
+	func = call_data->func;
+	info = call_data->info;
+	wait = call_data->wait;
 
 	/*
 	 * Notify initiating CPU that I've grabbed the data and am
