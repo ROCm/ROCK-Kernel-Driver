@@ -876,10 +876,11 @@ static void usb_hub_port_connect_change(struct usb_hub *hubstate, int port,
 		 * (quite rare, since most hubs have 4-6 ports).
 		 */
 		pdev = dev->parent;
-		if (pdev->devpath [0] != '/')	/* parent not root */
+		if (pdev->devpath [0] != '0')	/* parent not root? */
 			len = snprintf (dev->devpath, sizeof dev->devpath,
 				"%s.%d", pdev->devpath, port + 1);
-		else	/* root == "/", root port 2 == "2", port 3 that hub "/2.3" */
+		/* root == "0", root port 2 == "2", port 3 that hub "2.3" */
+		else
 			len = snprintf (dev->devpath, sizeof dev->devpath,
 				"%d", port + 1);
 		if (len == sizeof dev->devpath)

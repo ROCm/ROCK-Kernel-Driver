@@ -1014,7 +1014,7 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent, struct usb_bus *bus)
 	usb_bus_get(bus);
 
 	if (!parent)
-		dev->devpath [0] = '/';
+		dev->devpath [0] = '0';
 	dev->bus = bus;
 	dev->parent = parent;
 	atomic_set(&dev->refcnt, 1);
