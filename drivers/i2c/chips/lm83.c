@@ -83,10 +83,10 @@ SENSORS_INSMOD_1(lm83);
  * The LM83 uses signed 8-bit values.
  */
 
-#define TEMP_FROM_REG(val)	(((val) > 127 ? (val)-0xFF : (val)) * 1000)
-#define TEMP_TO_REG(val)	((val) <= -50000 ? -50 + 0xFF : (val) >= 127000 ? 127 : \
+#define TEMP_FROM_REG(val)	(((val) > 127 ? (val) - 0x100 : (val)) * 1000)
+#define TEMP_TO_REG(val)	((val) <= -50000 ? -50 + 0x100 : (val) >= 127000 ? 127 : \
 				 (val) > -500 ? ((val)+500) / 1000 : \
-				 ((val)-500) / 1000 + 0xFF)
+				 ((val)-500) / 1000 + 0x100)
 
 static const u8 LM83_REG_R_TEMP[] = {
 	LM83_REG_R_LOCAL_TEMP,
