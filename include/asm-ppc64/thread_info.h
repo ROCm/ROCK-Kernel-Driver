@@ -23,6 +23,7 @@ struct thread_info {
 	unsigned long	flags;			/* low level flags */
 	int		cpu;			/* cpu we're on */
 	int		preempt_count;		/* not used at present */
+	struct restart_block restart_block;
 };
 
 /*
@@ -37,6 +38,9 @@ struct thread_info {
 	.flags =	0,			\
 	.cpu =		0,			\
 	.preempt_count = 1,			\
+	.restart_block = {			\
+		.fn = do_no_restart_syscall,	\
+	},					\
 }
 
 #define init_thread_info	(init_thread_union.thread_info)

@@ -10,6 +10,7 @@
  * 2 of the License, or (at your option) any later version.
  */
 
+#define __NR_restart_syscall	  0
 #define __NR_exit		  1
 #define __NR_fork		  2
 #define __NR_read		  3
