@@ -1021,6 +1021,11 @@ config PCI_QSPAN
 	  Say Y here if you have a system based on a Motorola 8xx-series
 	  embedded processor with a QSPAN PCI interface, otherwise say N.
 
+config PCI_8260
+	bool
+	depends on PCI && 8260 && !8272
+	default y
+	
 config PCI_PERMEDIA
 	bool "PCI for Permedia2"
 	depends on !4xx && !8xx && APUS
