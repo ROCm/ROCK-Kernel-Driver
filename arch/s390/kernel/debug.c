@@ -16,6 +16,7 @@
 #include <linux/errno.h>
 #include <linux/slab.h>
 #include <linux/ctype.h>
+#include <linux/sysctl.h>
 #include <asm/uaccess.h>
 #include <asm/semaphore.h>
 
@@ -708,6 +709,70 @@ extern inline void debug_finish_entry(debug_info_t * id, debug_entry_t* active,
 		proceed_active_area(id);
 }
 
+static int debug_stoppable=1;
+static int debug_active=1;
+
+#define CTL_S390DBF 5677
+#define CTL_S390DBF_STOPPABLE 5678
+#define CTL_S390DBF_ACTIVE 5679
+
+/*
+ * proc handler for the running debug_active sysctl
+ * always allow read, allow write only if debug_stoppable is set or
+ * if debug_active is already off
+ */
+static int s390dbf_procactive(ctl_table *table, int write, struct file *filp,
+                     void __user *buffer, size_t *lenp, loff_t *ppos)
+{
+	if (!write || debug_stoppable || !debug_active)
+		return proc_dointvec(table, write, filp, buffer, lenp, ppos);
+	else
+		return 0;
+}
+
+
+static struct ctl_table s390dbf_table[] = {
+	{
+		.ctl_name       = CTL_S390DBF_STOPPABLE,
+		.procname       = "debug_stoppable",
+		.data		= &debug_stoppable,
+		.maxlen		= sizeof(int),
+		.mode           = S_IRUGO | S_IWUSR,
+		.proc_handler   = &proc_dointvec,
+		.strategy	= &sysctl_intvec,
+	},
+	 {
+		.ctl_name       = CTL_S390DBF_ACTIVE,
+		.procname       = "debug_active",
+		.data		= &debug_active,
+		.maxlen		= sizeof(int),
+		.mode           = S_IRUGO | S_IWUSR,
+		.proc_handler   = &s390dbf_procactive,
+		.strategy	= &sysctl_intvec,
+	},
+	{ .ctl_name = 0 }
+};
+
+static struct ctl_table s390dbf_dir_table[] = {
+	{
+		.ctl_name       = CTL_S390DBF,
+		.procname       = "s390dbf",
+		.maxlen         = 0,
+		.mode           = S_IRUGO | S_IXUGO,
+		.child          = s390dbf_table,
+	},
+	{ .ctl_name = 0 }
+};
+
+struct ctl_table_header *s390dbf_sysctl_header;
+
+void debug_stop_all(void)
+{
+	if (debug_stoppable)
+		debug_active = 0;
+}
+
+
 /*
  * debug_event_common:
  * - write debug entry with given size
@@ -719,6 +784,8 @@ debug_entry_t *debug_event_common(debug_info_t * id, int level, const void *buf,
 	unsigned long flags;
 	debug_entry_t *active;
 
+	if (!debug_active)
+		return NULL;
 	spin_lock_irqsave(&id->lock, flags);
 	active = get_active_entry(id);
 	memset(DEBUG_DATA(active), 0, id->buf_size);
@@ -740,6 +807,8 @@ debug_entry_t *debug_exception_common(debug_info_t * id, int level,
 	unsigned long flags;
 	debug_entry_t *active;
 
+	if (!debug_active)
+		return NULL;
 	spin_lock_irqsave(&id->lock, flags);
 	active = get_active_entry(id);
 	memset(DEBUG_DATA(active), 0, id->buf_size);
@@ -780,7 +849,8 @@ debug_entry_t *debug_sprintf_event(debug_info_t* id,
 
 	if((!id) || (level > id->level))
 		return NULL;
-
+	if (!debug_active)
+		return NULL;
 	numargs=debug_count_numargs(string);
 
 	spin_lock_irqsave(&id->lock, flags);
@@ -812,6 +882,8 @@ debug_entry_t *debug_sprintf_exception(debug_info_t* id,
 
 	if((!id) || (level > id->level))
 		return NULL;
+	if (!debug_active)
+		return NULL;
 
 	numargs=debug_count_numargs(string);
 
@@ -838,6 +910,7 @@ static int __init debug_init(void)
 {
 	int rc = 0;
 
+	s390dbf_sysctl_header = register_sysctl_table(s390dbf_dir_table, 1);
 	down(&debug_lock);
 #ifdef CONFIG_PROC_FS
 	debug_proc_root_entry = proc_mkdir(DEBUG_DIR_ROOT, NULL);
@@ -1186,6 +1259,7 @@ void __exit debug_exit(void)
 #ifdef CONFIG_PROC_FS
 	remove_proc_entry(debug_proc_root_entry->name, NULL);
 #endif /* CONFIG_PROC_FS */
+	unregister_sysctl_table(s390dbf_sysctl_header);
 	return;
 }
 
@@ -1199,6 +1273,7 @@ MODULE_LICENSE("GPL");
 EXPORT_SYMBOL(debug_register);
 EXPORT_SYMBOL(debug_unregister); 
 EXPORT_SYMBOL(debug_set_level);
+EXPORT_SYMBOL(debug_stop_all);
 EXPORT_SYMBOL(debug_register_view);
 EXPORT_SYMBOL(debug_unregister_view);
 EXPORT_SYMBOL(debug_event_common);

@@ -104,6 +104,7 @@ struct symbol {
 	struct module *module;
 	unsigned int crc;
 	int crc_valid;
+	unsigned int weak:1;
 	char name[0];
 };
 
@@ -126,12 +127,13 @@ static inline unsigned int tdb_hash(const char *name)
  * the list of unresolved symbols per module */
 
 struct symbol *
-alloc_symbol(const char *name, struct symbol *next)
+alloc_symbol(const char *name, unsigned int weak, struct symbol *next)
 {
 	struct symbol *s = NOFAIL(malloc(sizeof(*s) + strlen(name) + 1));
 
 	memset(s, 0, sizeof(*s));
 	strcpy(s->name, name);
+	s->weak = weak;
 	s->next = next;
 	return s;
 }
@@ -145,7 +147,7 @@ new_symbol(const char *name, struct module *module, unsigned int *crc)
 	struct symbol *new;
 
 	hash = tdb_hash(name) % SYMBOL_HASH_SIZE;
-	new = symbolhash[hash] = alloc_symbol(name, symbolhash[hash]);
+	new = symbolhash[hash] = alloc_symbol(name, 0, symbolhash[hash]);
 	new->module = module;
 	if (crc) {
 		new->crc = *crc;
@@ -349,7 +351,8 @@ handle_modversions(struct module *mod, struct elf_info *info,
 		break;
 	case SHN_UNDEF:
 		/* undefined symbol */
-		if (ELF_ST_BIND(sym->st_info) != STB_GLOBAL)
+		if (ELF_ST_BIND(sym->st_info) != STB_GLOBAL &&
+		    ELF_ST_BIND(sym->st_info) != STB_WEAK)
 			break;
 		/* ignore global offset table */
 		if (strcmp(symname, "_GLOBAL_OFFSET_TABLE_") == 0)
@@ -370,6 +373,7 @@ handle_modversions(struct module *mod, struct elf_info *info,
 			   strlen(MODULE_SYMBOL_PREFIX)) == 0)
 			mod->unres = alloc_symbol(symname +
 						  strlen(MODULE_SYMBOL_PREFIX),
+						  ELF_ST_BIND(sym->st_info) == STB_WEAK,
 						  mod->unres);
 		break;
 	default:
@@ -476,7 +480,7 @@ read_symbols(char *modname)
 	 * the automatic versioning doesn't pick it up, but it's really
 	 * important anyhow */
 	if (modversions)
-		mod->unres = alloc_symbol("struct_module", mod->unres);
+		mod->unres = alloc_symbol("struct_module", 0, mod->unres);
 }
 
 #define SZ 500
@@ -548,7 +552,7 @@ add_versions(struct buffer *b, struct module *mod)
 	for (s = mod->unres; s; s = s->next) {
 		exp = find_symbol(s->name);
 		if (!exp || exp->module == mod) {
-			if (have_vmlinux)
+			if (have_vmlinux && !s->weak)
 				fprintf(stderr, "*** Warning: \"%s\" [%s.ko] "
 				"undefined!\n",	s->name, mod->name);
 			continue;

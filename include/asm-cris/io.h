@@ -56,6 +56,8 @@ extern void iounmap(void *addr);
 #define __raw_writew writew
 #define __raw_writel writel
 
+#define mmiowb()
+
 #define memset_io(a,b,c)	memset((void *)(a),(b),(c))
 #define memcpy_fromio(a,b,c)	memcpy((a),(void *)(b),(c))
 #define memcpy_toio(a,b,c)	memcpy((void *)(a),(b),(c))

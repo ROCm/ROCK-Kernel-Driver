@@ -41,61 +41,6 @@
 
 #define PDC202_DEBUG_CABLE	0
 
-#if defined(DISPLAY_PDC202XX_TIMINGS) && defined(CONFIG_PROC_FS)
-#include <linux/stat.h>
-#include <linux/proc_fs.h>
-
-static u8 pdcnew_proc = 0;
-#define PDC202_MAX_DEVS		5
-static struct pci_dev *pdc202_devs[PDC202_MAX_DEVS];
-static int n_pdc202_devs;
-
-static char * pdcnew_info(char *buf, struct pci_dev *dev)
-{
-	char *p = buf;
-
-	p += sprintf(p, "\n                                ");
-	switch(dev->device) {
-		case PCI_DEVICE_ID_PROMISE_20277:
-			p += sprintf(p, "SBFastTrak 133 Lite"); break;
-		case PCI_DEVICE_ID_PROMISE_20276:
-			p += sprintf(p, "MBFastTrak 133 Lite"); break;
-		case PCI_DEVICE_ID_PROMISE_20275:
-			p += sprintf(p, "MBUltra133"); break;
-		case PCI_DEVICE_ID_PROMISE_20271:
-			p += sprintf(p, "FastTrak TX2000"); break;
-		case PCI_DEVICE_ID_PROMISE_20270:
-			p += sprintf(p, "FastTrak LP/TX2/TX4"); break;
-		case PCI_DEVICE_ID_PROMISE_20269:
-			p += sprintf(p, "Ultra133 TX2"); break;
-		case PCI_DEVICE_ID_PROMISE_20268:
-			p += sprintf(p, "Ultra100 TX2"); break;
-		default:
-			p += sprintf(p, "Ultra series"); break;
-			break;
-	}
-	p += sprintf(p, " Chipset.\n");
-	return (char *)p;
-}
-
-static int pdcnew_get_info (char *buffer, char **addr, off_t offset, int count)
-{
-	char *p = buffer;
-	int i, len;
-
-	for (i = 0; i < n_pdc202_devs; i++) {
-		struct pci_dev *dev	= pdc202_devs[i];
-		p = pdcnew_info(buffer, dev);
-	}
-	/* p - buffer must be less than 4k! */
-	len = (p - buffer) - offset;
-	*addr = buffer + offset;
-	
-	return len > count ? count : len;
-}
-#endif  /* defined(DISPLAY_PDC202XX_TIMINGS) && defined(CONFIG_PROC_FS) */
-
-
 static u8 pdcnew_ratemask (ide_drive_t *drive)
 {
 	u8 mode;
@@ -416,15 +361,6 @@ static unsigned int __devinit init_chipset_pdcnew(struct pci_dev *dev, const cha
 #ifdef CONFIG_PPC_PMAC
 	apple_kiwi_init(dev);
 #endif
-
-#if defined(DISPLAY_PDC202XX_TIMINGS) && defined(CONFIG_PROC_FS)
-	pdc202_devs[n_pdc202_devs++] = dev;
-
-	if (!pdcnew_proc) {
-		pdcnew_proc = 1;
-		ide_pci_create_host_proc("pdcnew", pdcnew_get_info);
-	}
-#endif /* DISPLAY_PDC202XX_TIMINGS && CONFIG_PROC_FS */
 
 	return dev->irq;
 }

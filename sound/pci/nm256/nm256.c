@@ -61,6 +61,7 @@ static int force_ac97[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0}; /* disable
 static int buffer_top[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0}; /* not specified */
 static int use_cache[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0}; /* disabled */
 static int vaio_hack[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0}; /* disabled */
+static int reset_workaround[SNDRV_CARDS];
 
 module_param_array(index, int, NULL, 0444);
 MODULE_PARM_DESC(index, "Index value for " CARD_NAME " soundcard.");
@@ -80,6 +81,8 @@ module_param_array(use_cache, bool, NULL, 0444);
 MODULE_PARM_DESC(use_cache, "Enable the cache for coefficient table access.");
 module_param_array(vaio_hack, bool, NULL, 0444);
 MODULE_PARM_DESC(vaio_hack, "Enable workaround for Sony VAIO notebooks.");
+module_param_array(reset_workaround, bool, NULL, 0444);
+MODULE_PARM_DESC(reset_workaround, "Enable AC97 RESET workaround for some laptops.");
 
 /*
  * hw definitions
@@ -189,7 +192,7 @@ struct snd_nm256_stream {
 	
 	u32 buf;	/* offset from chip->buffer */
 	int bufsize;	/* buffer size in bytes */
-	unsigned long bufptr;		/* mapped pointer */
+	void __iomem *bufptr;		/* mapped pointer */
 	unsigned long bufptr_addr;	/* physical address of the mapped pointer */
 
 	int dma_size;		/* buffer size of the substream in bytes */
@@ -204,11 +207,11 @@ struct snd_nm256 {
 	
 	snd_card_t *card;
 
-	unsigned long cport;		/* control port */
+	void __iomem *cport;		/* control port */
 	struct resource *res_cport;	/* its resource */
 	unsigned long cport_addr;	/* physical address */
 
-	unsigned long buffer;		/* buffer */
+	void __iomem *buffer;		/* buffer */
 	struct resource *res_buffer;	/* its resource */
 	unsigned long buffer_addr;	/* buffer phyiscal address */
 
@@ -221,7 +224,7 @@ struct snd_nm256 {
 
 	unsigned int coeffs_current: 1;	/* coeff. table is loaded? */
 	unsigned int use_cache: 1;	/* use one big coef. table */
-	unsigned int latitude_workaround: 1; /* Dell Latitude LS workaround needed */
+	unsigned int reset_workaround: 1; /* Workaround for some laptops to avoid freeze */
 
 	int mixer_base;			/* register offset of ac97 mixer */
 	int mixer_status_offset;	/* offset of mixer status reg. */
@@ -328,7 +331,7 @@ snd_nm256_write_buffer(nm256_t *chip, void *src, int offset, int size)
 		return;
 	}
 #endif
-	memcpy_toio((void *)chip->buffer + offset, src, size);
+	memcpy_toio(chip->buffer + offset, src, size);
 }
 
 /*
@@ -886,8 +889,8 @@ snd_nm256_pcm(nm256_t *chip, int device)
 
 	for (i = 0; i < 2; i++) {
 		nm256_stream_t *s = &chip->streams[i];
-		s->bufptr = chip->buffer +  s->buf - chip->buffer_start;
-		s->bufptr_addr = chip->buffer_addr + s->buf - chip->buffer_start;
+		s->bufptr = chip->buffer + (s->buf - chip->buffer_start);
+		s->bufptr_addr = chip->buffer_addr + (s->buf - chip->buffer_start);
 	}
 
 	err = snd_pcm_new(chip->card, chip->card->driver, device,
@@ -1161,16 +1164,14 @@ snd_nm256_ac97_reset(ac97_t *ac97)
 {
 	nm256_t *chip = ac97->private_data;
 
-	spin_lock(&chip->reg_lock);
 	/* Reset the mixer.  'Tis magic!  */
 	snd_nm256_writeb(chip, 0x6c0, 1);
-	if (chip->latitude_workaround) {
+	if (! chip->reset_workaround) {
 		/* Dell latitude LS will lock up by this */
 		snd_nm256_writeb(chip, 0x6cc, 0x87);
 	}
 	snd_nm256_writeb(chip, 0x6cc, 0x80);
 	snd_nm256_writeb(chip, 0x6cc, 0x0);
-	spin_unlock(&chip->reg_lock);
 }
 
 /* create an ac97 mixer interface */
@@ -1225,13 +1226,13 @@ static int __devinit
 snd_nm256_peek_for_sig(nm256_t *chip)
 {
 	/* The signature is located 1K below the end of video RAM.  */
-	unsigned long temp;
+	void __iomem *temp;
 	/* Default buffer end is 5120 bytes below the top of RAM.  */
 	unsigned long pointer_found = chip->buffer_end - 0x1400;
 	u32 sig;
 
-	temp = (unsigned long) ioremap_nocache(chip->buffer_addr + chip->buffer_end - 0x400, 16);
-	if (temp == 0) {
+	temp = ioremap_nocache(chip->buffer_addr + chip->buffer_end - 0x400, 16);
+	if (temp == NULL) {
 		snd_printk("Unable to scan for card signature in video RAM\n");
 		return -EBUSY;
 	}
@@ -1247,7 +1248,7 @@ snd_nm256_peek_for_sig(nm256_t *chip)
 		    pointer < chip->buffer_size ||
 		    pointer > chip->buffer_end) {
 			snd_printk("invalid signature found: 0x%x\n", pointer);
-			iounmap((void *)temp);
+			iounmap(temp);
 			return -ENODEV;
 		} else {
 			pointer_found = pointer;
@@ -1255,7 +1256,7 @@ snd_nm256_peek_for_sig(nm256_t *chip)
 		}
 	}
 
-	iounmap((void *)temp);
+	iounmap(temp);
 	chip->buffer_end = pointer_found;
 
 	return 0;
@@ -1304,9 +1305,9 @@ static int snd_nm256_free(nm256_t *chip)
 		synchronize_irq(chip->irq);
 
 	if (chip->cport)
-		iounmap((void *) chip->cport);
+		iounmap(chip->cport);
 	if (chip->buffer)
-		iounmap((void *) chip->buffer);
+		iounmap(chip->buffer);
 	if (chip->res_cport) {
 		release_resource(chip->res_cport);
 		kfree_nocheck(chip->res_cport);
@@ -1342,7 +1343,6 @@ snd_nm256_create(snd_card_t *card, struct pci_dev *pci,
 		.dev_free =	snd_nm256_dev_free,
 	};
 	u32 addr;
-	u16 subsystem_vendor, subsystem_device;
 
 	*chip_ret = NULL;
 
@@ -1379,8 +1379,8 @@ snd_nm256_create(snd_card_t *card, struct pci_dev *pci,
 		err = -EBUSY;
 		goto __error;
 	}
-	chip->cport = (unsigned long) ioremap_nocache(chip->cport_addr, NM_PORT2_SIZE);
-	if (chip->cport == 0) {
+	chip->cport = ioremap_nocache(chip->cport_addr, NM_PORT2_SIZE);
+	if (chip->cport == NULL) {
 		snd_printk("unable to map control port %lx\n", chip->cport_addr);
 		err = -ENOMEM;
 		goto __error;
@@ -1444,8 +1444,8 @@ snd_nm256_create(snd_card_t *card, struct pci_dev *pci,
 		err = -EBUSY;
 		goto __error;
 	}
-	chip->buffer = (unsigned long) ioremap_nocache(chip->buffer_addr, chip->buffer_size);
-	if (chip->buffer == 0) {
+	chip->buffer = ioremap_nocache(chip->buffer_addr, chip->buffer_size);
+	if (chip->buffer == NULL) {
 		err = -ENOMEM;
 		snd_printk("unable to map ring buffer at %lx\n", chip->buffer_addr);
 		goto __error;
@@ -1479,19 +1479,6 @@ snd_nm256_create(snd_card_t *card, struct pci_dev *pci,
 
 	chip->coeffs_current = 0;
 
-	/* check workarounds */
-	chip->latitude_workaround = 1;
-	pci_read_config_word(pci, PCI_SUBSYSTEM_VENDOR_ID, &subsystem_vendor);
-	pci_read_config_word(pci, PCI_SUBSYSTEM_ID, &subsystem_device);
-	if (subsystem_vendor == 0x104d && subsystem_device == 0x8041) {
-		/* this workaround will cause lock-up after suspend/resume on Sony PCG-F305 */
-		chip->latitude_workaround = 0;
-	}
-	if (subsystem_vendor == 0x1028 && subsystem_device == 0x0080) {
-		/* this workaround will cause lock-up after suspend/resume on a Dell laptop */
-		chip->latitude_workaround = 0;
-	}
-
 	snd_nm256_init_chip(chip);
 
 	if ((err = snd_nm256_pcm(chip, 0)) < 0)
@@ -1524,11 +1511,15 @@ struct nm256_quirk {
 	int type;
 };
 
-#define NM_BLACKLISTED	1
+enum { NM_BLACKLISTED, NM_RESET_WORKAROUND };
 
 static struct nm256_quirk nm256_quirks[] __devinitdata = {
 	/* HP omnibook 4150 has cs4232 codec internally */
 	{ .vendor = 0x103c, .device = 0x0007, .type = NM_BLACKLISTED },
+	/* Sony PCG-F305 */
+	{ .vendor = 0x104d, .device = 0x8041, .type = NM_RESET_WORKAROUND },
+	/* Dell Latitude LS */
+	{ .vendor = 0x1028, .device = 0x0080, .type = NM_RESET_WORKAROUND },
 	{ } /* terminator */
 };
 
@@ -1559,9 +1550,13 @@ static int __devinit snd_nm256_probe(struct pci_dev *pci,
 
 	for (q = nm256_quirks; q->vendor; q++) {
 		if (q->vendor == subsystem_vendor && q->device == subsystem_device) {
-			if (q->type == NM_BLACKLISTED) {
+			switch (q->type) {
+			case NM_BLACKLISTED:
 				printk(KERN_INFO "nm256: The device is blacklisted.  Loading stopped\n");
 				return -ENODEV;
+			case NM_RESET_WORKAROUND:
+				reset_workaround[dev] = 1;
+				break;
 			}
 		}
 	}
@@ -1608,6 +1603,11 @@ static int __devinit snd_nm256_probe(struct pci_dev *pci,
 				    &chip)) < 0) {
 		snd_card_free(card);
 		return err;
+	}
+
+	if (reset_workaround[dev]) {
+		snd_printdd(KERN_INFO "nm256: reset_workaround activated\n");
+		chip->reset_workaround = 1;
 	}
 
 	sprintf(card->shortname, "NeoMagic %s", card->driver);

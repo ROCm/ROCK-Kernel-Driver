@@ -110,6 +110,11 @@ config PPC_SPLPAR
 	  processors, that is, which share physical processors between
 	  two or more partitions.
 
+config IBMVIO
+	depends on PPC_PSERIES || PPC_ISERIES
+	bool
+	default y
+
 config U3_DART
 	bool 
 	depends on PPC_MULTIPLATFORM

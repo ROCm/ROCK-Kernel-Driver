@@ -62,6 +62,7 @@ typedef unsigned int ia64_mv_inl_t (unsigned long);
 typedef void ia64_mv_outb_t (unsigned char, unsigned long);
 typedef void ia64_mv_outw_t (unsigned short, unsigned long);
 typedef void ia64_mv_outl_t (unsigned int, unsigned long);
+typedef void ia64_mv_mmiowb_t (void);
 typedef unsigned char ia64_mv_readb_t (const volatile void __iomem *);
 typedef unsigned short ia64_mv_readw_t (const volatile void __iomem *);
 typedef unsigned int ia64_mv_readl_t (const volatile void __iomem *);
@@ -130,6 +131,7 @@ extern void machvec_tlb_migrate_finish (struct mm_struct *);
 #  define platform_outb		ia64_mv.outb
 #  define platform_outw		ia64_mv.outw
 #  define platform_outl		ia64_mv.outl
+#  define platform_mmiowb	ia64_mv.mmiowb
 #  define platform_readb        ia64_mv.readb
 #  define platform_readw        ia64_mv.readw
 #  define platform_readl        ia64_mv.readl
@@ -176,6 +178,7 @@ struct ia64_machine_vector {
 	ia64_mv_outb_t *outb;
 	ia64_mv_outw_t *outw;
 	ia64_mv_outl_t *outl;
+	ia64_mv_mmiowb_t *mmiowb;
 	ia64_mv_readb_t *readb;
 	ia64_mv_readw_t *readw;
 	ia64_mv_readl_t *readl;
@@ -218,6 +221,7 @@ struct ia64_machine_vector {
 	platform_outb,				\
 	platform_outw,				\
 	platform_outl,				\
+	platform_mmiowb,			\
 	platform_readb,				\
 	platform_readw,				\
 	platform_readl,				\
@@ -343,6 +347,9 @@ extern ia64_mv_dma_supported		swiotlb_dma_supported;
 #endif
 #ifndef platform_outl
 # define platform_outl		__ia64_outl
+#endif
+#ifndef platform_mmiowb
+# define platform_mmiowb	__ia64_mmiowb
 #endif
 #ifndef platform_readb
 # define platform_readb		__ia64_readb

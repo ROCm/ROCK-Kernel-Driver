@@ -144,6 +144,7 @@ __switch_to_noper:
 	l	%r15,__THREAD_ksp(%r3)	# load kernel stack from next->tss.ksp
 	lm	%r6,%r15,__SF_GPRS(%r15)# load __switch_to registers of next task
 	st	%r3,__LC_CURRENT	# __LC_CURRENT = current task struct
+	lctl	%c4,%c4,__TASK_pid(%r3) # load pid to control reg. 4
 	l	%r3,__THREAD_info(%r3)  # load thread_info from task struct
 	st	%r3,__LC_THREAD_INFO
 	ahi	%r3,STACK_SIZE

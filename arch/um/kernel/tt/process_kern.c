@@ -305,7 +305,6 @@ int copy_thread_tt(int nr, unsigned long clone_flags, unsigned long sp,
 
 	change_sig(SIGUSR1, 0);
 	err = 0;
- out:
 	return(err);
 }
 

@@ -223,6 +223,8 @@ ufs_set_inode_gid(struct super_block *sb, struct ufs_inode *inode, u32 value)
 	inode->ui_u1.oldids.ui_sgid =  cpu_to_fs16(sb, value);
 }
 
+extern dev_t ufs_get_inode_dev(struct super_block *, struct ufs_inode_info *);
+extern void ufs_set_inode_dev(struct super_block *, struct ufs_inode_info *, dev_t);
 
 /*
  * These functions manipulate ufs buffers

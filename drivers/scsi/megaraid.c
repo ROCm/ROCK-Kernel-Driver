@@ -4006,7 +4006,7 @@ mega_enum_raid_scsi(adapter_t *adapter)
 	mbox->m_out.xferaddr = (u32)adapter->buf_dma_handle;
 
 	/*
-	 * Non-ROMB firware fail this command, so all channels
+	 * Non-ROMB firmware fail this command, so all channels
 	 * must be shown RAID
 	 */
 	adapter->mega_ch_class = 0xFF;

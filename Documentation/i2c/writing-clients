@@ -571,7 +571,7 @@ the driver module is usually enough.
      have to be cleaned up! */
   static int __initdata foo_initialized = 0;
 
-  int __init foo_init(void)
+  static int __init foo_init(void)
   {
     int res;
     printk("foo version %s (%s)\n",FOO_VERSION,FOO_DATE);
@@ -585,41 +585,27 @@ the driver module is usually enough.
     return 0;
   }
 
-  int __init foo_cleanup(void)
+  void foo_cleanup(void)
   {
-    int res;
     if (foo_initialized == 1) {
       if ((res = i2c_del_driver(&foo_driver))) {
         printk("foo: Driver registration failed, module not removed.\n");
-        return res;
+        return;
       }
       foo_initialized --;
     }
-    return 0;
   }
-
-  #ifdef MODULE
 
   /* Substitute your own name and email address */
   MODULE_AUTHOR("Frodo Looijaard <frodol@dds.nl>"
   MODULE_DESCRIPTION("Driver for Barf Inc. Foo I2C devices");
 
-  int init_module(void)
-  {
-    return foo_init();
-  }
-
-  int cleanup_module(void)
-  {
-    return foo_cleanup();
-  }
-
-  #endif /* def MODULE */
+  module_init(foo_init);
+  module_exit(foo_cleanup);
 
 Note that some functions are marked by `__init', and some data structures
-by `__init_data'. If this driver is compiled as part of the kernel (instead
-of as a module), those functions and structures can be removed after
-kernel booting is completed.
+by `__init_data'.  Hose functions and structures can be removed after
+kernel booting (or module loading) is completed.
 
 Command function
 ================

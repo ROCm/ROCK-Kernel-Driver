@@ -296,12 +296,12 @@ static int lockdoor = 1;
 static int check_media_type;
 /* automatically restart mrw format */
 static int mrw_format_restart = 1;
-MODULE_PARM(debug, "i");
-MODULE_PARM(autoclose, "i");
-MODULE_PARM(autoeject, "i");
-MODULE_PARM(lockdoor, "i");
-MODULE_PARM(check_media_type, "i");
-MODULE_PARM(mrw_format_restart, "i");
+module_param(debug, bool, 0);
+module_param(autoclose, bool, 0);
+module_param(autoeject, bool, 0);
+module_param(lockdoor, bool, 0);
+module_param(check_media_type, bool, 0);
+module_param(mrw_format_restart, bool, 0);
 
 static spinlock_t cdrom_lock = SPIN_LOCK_UNLOCKED;
 

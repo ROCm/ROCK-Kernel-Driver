@@ -75,12 +75,12 @@ MODULE_DESCRIPTION("PCMCIA Driver Services");
 MODULE_LICENSE("Dual MPL/GPL");
 
 #ifdef DEBUG
-int pc_debug;
+int ds_pc_debug;
 
-module_param(pc_debug, int, 0644);
+module_param_named(pc_debug, ds_pc_debug, int, 0644);
 
 #define ds_dbg(lvl, fmt, arg...) do {				\
-	if (pc_debug > (lvl))					\
+	if (ds_pc_debug > (lvl))					\
 		printk(KERN_DEBUG "ds: " fmt , ## arg);		\
 } while (0)
 #else
@@ -1060,7 +1060,11 @@ static int ds_ioctl(struct inode * inode, struct file * file,
 	}
     }
 
-    if (cmd & IOC_OUT) __copy_to_user(uarg, (char *)&buf, size);
+    if (cmd & IOC_OUT) {
+        if (__copy_to_user(uarg, (char *)&buf, size))
+            err = -EFAULT;
+    }
+
 
     return err;
 } /* ds_ioctl */

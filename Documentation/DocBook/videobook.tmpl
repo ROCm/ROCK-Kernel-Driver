@@ -731,13 +731,14 @@ static int io = 0x300;
 
 static int io = -1;
 
+#endif
 
 MODULE_AUTHOR("Alan Cox");
 MODULE_DESCRIPTION("A driver for an imaginary radio card.");
-MODULE_PARM(io, "i");
+module_param(io, int, 0444);
 MODULE_PARM_DESC(io, "I/O address of the card.");
 
-int init_module(void)
+static int __init init(void)
 {
         if(io==-1)
         {
@@ -748,25 +749,26 @@ int init_module(void)
         return myradio_init(NULL);
 }
 
-void cleanup_module(void)
+static void __exit cleanup(void)
 {
         video_unregister_device(&amp;my_radio);
         release_region(io, MY_IO_SIZE);
 }
 
-#endif
+module_init(init);
+module_exit(cleanup);
 
   </programlisting>
   <para>
         In this example we set the IO base by default if the driver is compiled into
-        the kernel where you cannot pass a parameter. For the module we require the
+        the kernel: you can still set it using "my_radio.irq" if this file is called <filename>my_radio.c</filename>. For the module we require the
         user sets the parameter. We set io to a nonsense port (-1) so that we can
         tell if the user supplied an io parameter or not.
   </para>
   <para>
         We use MODULE_ defines to give an author for the card driver and a
         description. We also use them to declare that io is an integer and it is the
-        address of the card.
+        address of the card, and can be read by anyone from sysfs.
   </para>
   <para>
         The clean-up routine unregisters the video_device we registered, and frees

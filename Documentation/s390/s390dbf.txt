@@ -78,6 +78,23 @@ Example:
 
 > echo "-" > /proc/s390dbf/dasd/level
 
+It is also possible to deactivate the debug feature globally for every
+debug log. You can change the behavior using  2 sysctl parameters in
+/proc/sys/s390dbf:
+There are currently 2 possible triggers, which stop the  debug feature
+globally. The first possbility is to use the "debug_active" sysctl. If
+set to 1 the debug feature is running. If "debug_active" is set to 0 the
+debug feature is turned off.
+The second trigger which stops the debug feature is an kernel oops.
+That prevents the debug feature from overwriting debug information that
+happened before the oops. After an oops you can reactivate the debug feature
+by piping 1 to /proc/sys/s390dbf/debug_active. Nevertheless, its not
+suggested to use an oopsed kernel in an production environment.
+If you want to disallow the deactivation of the debug feature, you can use
+the "debug_stoppable" sysctl. If you set "debug_stoppable" to 0 the debug
+feature cannot be stopped. If the debug feature is already stopped, it
+will stay deactivated.
+
 Kernel Interfaces:
 ------------------
 
@@ -115,6 +132,17 @@ Parameter:     id:        handle for debug log
 Return Value:  none 
 
 Description:   Sets new actual debug level if new_level is valid. 
+
+---------------------------------------------------------------------------
++void debug_stop_all(void);
+
+Parameter:     none
+
+Return Value:  none
+
+Description:   stops the debug feature if stopping is allowed. Currently
+               used in case of a kernel oops.
+
 ---------------------------------------------------------------------------
 debug_entry_t* debug_event (debug_info_t* id, int level, void* data, 
                             int length);
@@ -271,12 +299,12 @@ Examples
  * hex_ascii- + raw-view Example
  */
 
-#include <linux/module.h>
+#include <linux/init.h>
 #include <asm/debug.h>
 
 static debug_info_t* debug_info;
 
-int init_module(void)
+static int init(void)
 {
     /* register 4 debug areas with one page each and 4 byte data field */
 
@@ -291,10 +319,13 @@ int init_module(void)
     return 0;
 }
 
-void cleanup_module(void)
+static void cleanup(void)
 {
     debug_unregister (debug_info);
 }
+
+module_init(init);
+module_exit(cleanup);
 
 ---------------------------------------------------------------------------
 
@@ -302,12 +333,12 @@ void cleanup_module(void)
  * sprintf-view Example
  */
 
-#include <linux/module.h>
+#include <linux/init.h>
 #include <asm/debug.h>
 
 static debug_info_t* debug_info;
 
-int init_module(void)
+static int init(void)
 {
     /* register 4 debug areas with one page each and data field for */
     /* format string pointer + 2 varargs (= 3 * sizeof(long))       */
@@ -321,10 +352,13 @@ int init_module(void)
     return 0;
 }
 
-void cleanup_module(void)
+static void cleanup(void)
 {
     debug_unregister (debug_info);
 }
+
+module_init(init);
+module_exit(cleanup);
 
 
 
@@ -376,6 +410,15 @@ Examples:
 
 2. Flush all debug areas:
 > echo "-" > /proc/s390dbf/dasd/flush
+
+Stooping the debug feature
+--------------------------
+Example:
+
+1. Check if stopping is allowed
+> cat /proc/sys/s390dbf/debug_stoppable
+2. Stop debug feature
+> echo 0 > /proc/sys/s390dbf/debug_active
 
 lcrash Interface
 ----------------

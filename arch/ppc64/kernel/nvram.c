@@ -77,7 +77,7 @@ static loff_t dev_nvram_llseek(struct file *file, loff_t offset, int origin)
 }
 
 
-static ssize_t dev_nvram_read(struct file *file, char *buf,
+static ssize_t dev_nvram_read(struct file *file, char __user *buf,
 			  size_t count, loff_t *ppos)
 {
 	ssize_t len;
@@ -117,7 +117,7 @@ static ssize_t dev_nvram_read(struct file *file, char *buf,
 
 }
 
-static ssize_t dev_nvram_write(struct file *file, const char *buf,
+static ssize_t dev_nvram_write(struct file *file, const char __user *buf,
 			   size_t count, loff_t *ppos)
 {
 	ssize_t len;

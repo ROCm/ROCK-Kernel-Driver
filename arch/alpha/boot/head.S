@@ -100,3 +100,24 @@ halt:
 	.prologue 0
 	call_pal PAL_halt
 	.end halt
+
+/* $16 - new stack page */
+	.align 3
+	.globl	move_stack
+	.ent	move_stack
+move_stack:
+	.prologue 0
+	lda	$0, 0x1fff($31)
+	and	$0, $30, $1			/* Stack offset */
+	or	$1, $16, $16			/* New stack pointer */
+	mov	$30, $1
+	mov	$16, $2
+1:	ldq	$3, 0($1)			/* Move the stack */
+	addq	$1, 8, $1
+	stq	$3, 0($2)
+	and	$0, $1, $4
+	addq	$2, 8, $2
+	bne	$4, 1b
+	mov	$16, $30
+	ret	($26)
+	.end move_stack

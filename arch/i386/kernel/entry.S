@@ -187,8 +187,8 @@ need_resched:
 	movl $PREEMPT_ACTIVE,TI_preempt_count(%ebp)
 	sti
 	call schedule
-	movl $0,TI_preempt_count(%ebp)
 	cli
+	movl $0,TI_preempt_count(%ebp)
 	jmp need_resched
 #endif
 

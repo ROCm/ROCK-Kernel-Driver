@@ -210,7 +210,7 @@ typedef struct snd_rme32 {
 	spinlock_t lock;
 	int irq;
 	unsigned long port;
-	unsigned long iobase;
+	void __iomem *iobase;
 
 	u32 wcreg;		/* cached write control register value */
 	u32 wcreg_spdif;	/* S/PDIF setup */
@@ -725,9 +725,8 @@ snd_rme32_playback_hw_params(snd_pcm_substream_t * substream,
 	/* S/PDIF setup */
 	if ((rme32->wcreg & RME32_WCR_ADAT) == 0) {
 		rme32->wcreg &= ~(RME32_WCR_PRO | RME32_WCR_EMP);
-		writel(rme32->wcreg |=
-		       rme32->wcreg_spdif_stream,
-		       rme32->iobase + RME32_IO_CONTROL_REGISTER);
+		rme32->wcreg |= rme32->wcreg_spdif_stream;
+		writel(rme32->wcreg, rme32->iobase + RME32_IO_CONTROL_REGISTER);
 	}
 	spin_unlock_irq(&rme32->lock);
 
@@ -1123,7 +1122,7 @@ snd_rme32_pcm_trigger(snd_pcm_substream_t * substream, int cmd)
 	}
 	
 	/* prefill playback buffer */
-	if (cmd == SNDRV_PCM_TRIGGER_START) {
+	if (cmd == SNDRV_PCM_TRIGGER_START && rme32->fullduplex_mode) {
 		snd_pcm_group_for_each(pos, substream) {
 			s = snd_pcm_group_substream_entry(pos);
 			if (s == rme32->playback_substream) {
@@ -1344,8 +1343,8 @@ static void snd_rme32_free(void *private_data)
 		rme32->irq = -1;
 	}
 	if (rme32->iobase) {
-		iounmap((void *) rme32->iobase);
-		rme32->iobase = 0;
+		iounmap(rme32->iobase);
+		rme32->iobase = NULL;
 	}
 	if (rme32->port) {
 		pci_release_regions(rme32->pci);
@@ -1387,7 +1386,7 @@ static int __devinit snd_rme32_create(rme32_t * rme32)
 	}
 	rme32->irq = pci->irq;
 
-	if ((rme32->iobase = (unsigned long) ioremap_nocache(rme32->port, RME32_IO_SIZE)) == 0) {
+	if ((rme32->iobase = ioremap_nocache(rme32->port, RME32_IO_SIZE)) == 0) {
 		snd_printk("unable to remap memory region 0x%lx-0x%lx\n",
 			   rme32->port, rme32->port + RME32_IO_SIZE - 1);
 		return -ENOMEM;
@@ -1636,8 +1635,8 @@ snd_rme32_put_loopback_control(snd_kcontrol_t * kcontrol,
 		val &= ~RME32_WCR_MUTE;
 	else
 		val |= RME32_WCR_MUTE;
-	writel(rme32->wcreg =
-	       val, rme32->iobase + RME32_IO_CONTROL_REGISTER);
+	rme32->wcreg = val;
+	writel(val, rme32->iobase + RME32_IO_CONTROL_REGISTER);
 	spin_unlock_irq(&rme32->lock);
 	return change;
 }
@@ -1861,7 +1860,8 @@ static int snd_rme32_control_spdif_stream_put(snd_kcontrol_t * kcontrol,
 	change = val != rme32->wcreg_spdif_stream;
 	rme32->wcreg_spdif_stream = val;
 	rme32->wcreg &= ~(RME32_WCR_PRO | RME32_WCR_EMP);
-	writel(rme32->wcreg |= val, rme32->iobase + RME32_IO_CONTROL_REGISTER);
+	rme32->wcreg |= val;
+	writel(rme32->wcreg, rme32->iobase + RME32_IO_CONTROL_REGISTER);
 	spin_unlock_irq(&rme32->lock);
 	return change;
 }
@@ -1969,16 +1969,14 @@ snd_rme32_probe(struct pci_dev *pci, const struct pci_device_id *pci_id)
 	snd_card_t *card;
 	int err;
 
-	for (; dev < SNDRV_CARDS; dev++) {
-		if (!enable[dev]) {
-			dev++;
-			return -ENOENT;
-		}
-		break;
-	}
 	if (dev >= SNDRV_CARDS) {
 		return -ENODEV;
 	}
+	if (!enable[dev]) {
+		dev++;
+		return -ENOENT;
+	}
+
 	if ((card = snd_card_new(index[dev], id[dev], THIS_MODULE,
 				 sizeof(rme32_t))) == NULL)
 		return -ENOMEM;

@@ -203,12 +203,6 @@ static unsigned short snd_cs46xx_ac97_read(ac97_t * ac97,
 
 	val = snd_cs46xx_codec_read(chip, reg, codec_index);
 
-	/* HACK: voyetra uses EAPD bit in the reverse way.
-	 * we flip the bit to show the mixer status correctly
-	 */
-	if (reg == AC97_POWERDOWN && chip->amplifier_ctrl == amp_voyetra)
-		val ^= 0x8000;
-
 	return val;
 }
 
@@ -289,12 +283,6 @@ static void snd_cs46xx_ac97_write(ac97_t *ac97,
 		   codec_index == CS46XX_SECONDARY_CODEC_INDEX,
 		   return);
 
-	/* HACK: voyetra uses EAPD bit in the reverse way.
-	 * we flip the bit to show the mixer status correctly
-	 */
-	if (reg == AC97_POWERDOWN && chip->amplifier_ctrl == amp_voyetra)
-		val ^= 0x8000;
-
 	snd_cs46xx_codec_write(chip, reg, val, codec_index);
 }
 
@@ -308,7 +296,7 @@ int snd_cs46xx_download(cs46xx_t *chip,
                         unsigned long offset,
                         unsigned long len)
 {
-	unsigned long dst;
+	void __iomem *dst;
 	unsigned int bank = offset >> 16;
 	offset = offset & 0xffff;
 
@@ -336,7 +324,7 @@ int snd_cs46xx_clear_BA1(cs46xx_t *chip,
                          unsigned long offset,
                          unsigned long len) 
 {
-	unsigned long dst;
+	void __iomem *dst;
 	unsigned int bank = offset >> 16;
 	offset = offset & 0xffff;
 
@@ -2333,16 +2321,15 @@ static void snd_cs46xx_codec_reset (ac97_t * ac97)
 {
 	unsigned long end_time;
 	int err;
-	cs46xx_t * chip = ac97->private_data;
 
 	/* reset to defaults */
 	snd_ac97_write(ac97, AC97_RESET, 0);	
 
 	/* set the desired CODEC mode */
-	if (chip->nr_ac97_codecs == 0) {
+	if (ac97->num == CS46XX_PRIMARY_CODEC_INDEX) {
 		snd_printdd("cs46xx: CODOEC1 mode %04x\n",0x0);
 		snd_cs46xx_ac97_write(ac97,AC97_CSR_ACMODE,0x0);
-	} else if (chip->nr_ac97_codecs == 1) {
+	} else if (ac97->num == CS46XX_SECONDARY_CODEC_INDEX) {
 		snd_printdd("cs46xx: CODOEC2 mode %04x\n",0x3);
 		snd_cs46xx_ac97_write(ac97,AC97_CSR_ACMODE,0x3);
 	} else {
@@ -2380,10 +2367,43 @@ static void snd_cs46xx_codec_reset (ac97_t * ac97)
 }
 #endif
 
+static int __devinit cs46xx_detect_codec(cs46xx_t *chip, int codec)
+{
+	int idx, err;
+	ac97_template_t ac97;
+
+	memset(&ac97, 0, sizeof(ac97));
+	ac97.private_data = chip;
+	ac97.private_free = snd_cs46xx_mixer_free_ac97;
+	ac97.num = codec;
+	if (chip->amplifier_ctrl == amp_voyetra)
+		ac97.scaps = AC97_SCAP_INV_EAPD;
+
+	if (codec == CS46XX_SECONDARY_CODEC_INDEX) {
+		snd_cs46xx_codec_write(chip, AC97_RESET, 0, codec);
+		udelay(10);
+		if (snd_cs46xx_codec_read(chip, AC97_RESET, codec) & 0x8000) {
+			snd_printdd("snd_cs46xx: seconadry codec not present\n");
+			return -ENXIO;
+		}
+	}
+
+	snd_cs46xx_codec_write(chip, AC97_MASTER, 0x8000, codec);
+	for (idx = 0; idx < 100; ++idx) {
+		if (snd_cs46xx_codec_read(chip, AC97_MASTER, codec) == 0x8000) {
+			err = snd_ac97_mixer(chip->ac97_bus, &ac97, &chip->ac97[codec]);
+			return err;
+		}
+		set_current_state(TASK_INTERRUPTIBLE);
+		schedule_timeout(HZ/100);
+	}
+	snd_printdd("snd_cs46xx: codec %d detection timeout\n", codec);
+	return -ENXIO;
+}
+
 int __devinit snd_cs46xx_mixer(cs46xx_t *chip)
 {
 	snd_card_t *card = chip->card;
-	ac97_template_t ac97;
 	snd_ctl_elem_id_t id;
 	int err;
 	unsigned int idx;
@@ -2402,70 +2422,15 @@ int __devinit snd_cs46xx_mixer(cs46xx_t *chip)
 		return err;
 	chip->ac97_bus->private_free = snd_cs46xx_mixer_free_ac97_bus;
 
-	memset(&ac97, 0, sizeof(ac97));
-	ac97.private_data = chip;
-	ac97.private_free = snd_cs46xx_mixer_free_ac97;
-
-	snd_cs46xx_codec_write(chip, AC97_MASTER, 0x8000,
-			       CS46XX_PRIMARY_CODEC_INDEX);
-	for (idx = 0; idx < 100; ++idx) {
-		if (snd_cs46xx_codec_read(chip, AC97_MASTER,
-					  CS46XX_PRIMARY_CODEC_INDEX) == 0x8000)
-			goto _ok;
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(HZ/100);
-	}
-	return -ENXIO;
-
- _ok:
-	if ((err = snd_ac97_mixer(chip->ac97_bus, &ac97, &chip->ac97[CS46XX_PRIMARY_CODEC_INDEX])) < 0)
-		return err;
-	snd_printdd("snd_cs46xx: primary codec phase one\n");
+	if (cs46xx_detect_codec(chip, CS46XX_PRIMARY_CODEC_INDEX) < 0)
+		return -ENXIO;
 	chip->nr_ac97_codecs = 1;
 
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
 	snd_printdd("snd_cs46xx: detecting seconadry codec\n");
 	/* try detect a secondary codec */
-	memset(&ac97, 0, sizeof(ac97));    
-	ac97.private_data = chip;
-	ac97.private_free = snd_cs46xx_mixer_free_ac97;
-	ac97.num = CS46XX_SECONDARY_CODEC_INDEX;
-
-	snd_cs46xx_codec_write(chip, AC97_RESET, 0,
-			       CS46XX_SECONDARY_CODEC_INDEX);
-	udelay(10);
-
-	if (snd_cs46xx_codec_read(chip, AC97_RESET,
-				  CS46XX_SECONDARY_CODEC_INDEX) & 0x8000) {
-		snd_printdd("snd_cs46xx: seconadry codec not present\n");
-		goto _no_sec_codec;
-	}
-
-	snd_cs46xx_codec_write(chip, AC97_MASTER, 0x8000,
-			       CS46XX_SECONDARY_CODEC_INDEX);
-	for (idx = 0; idx < 100; ++idx) {
-		if (snd_cs46xx_codec_read(chip, AC97_MASTER,
-					  CS46XX_SECONDARY_CODEC_INDEX) == 0x8000) {
-			goto _ok2;
-		}
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(HZ/100);
-	}
-
- _no_sec_codec:
-	snd_printdd("snd_cs46xx: secondary codec did not respond ...\n");
-
-	chip->nr_ac97_codecs = 1;
-    
-	/* well, one codec only ... */
-	goto _end;
- _ok2:
-	if ((err = snd_ac97_mixer(chip->ac97_bus, &ac97, &chip->ac97[CS46XX_SECONDARY_CODEC_INDEX])) < 0)
-		return err;
-	chip->nr_ac97_codecs = 2;
-
- _end:
-
+	if (! cs46xx_detect_codec(chip, CS46XX_SECONDARY_CODEC_INDEX))
+		chip->nr_ac97_codecs = 2;
 #endif /* CONFIG_SND_CS46XX_NEW_DSP */
 
 	/* add cs4630 mixer controls */
@@ -2483,15 +2448,14 @@ int __devinit snd_cs46xx_mixer(cs46xx_t *chip)
 	chip->eapd_switch = snd_ctl_find_id(chip->card, &id);
     
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
-	if (chip->nr_ac97_codecs == 1 && 
-	    (snd_cs46xx_codec_read(chip, AC97_VENDOR_ID2,
-				  CS46XX_PRIMARY_CODEC_INDEX) == 0x592b ||
-	     snd_cs46xx_codec_read(chip, AC97_VENDOR_ID2,
-				   CS46XX_PRIMARY_CODEC_INDEX) == 0x592d)) {
-		/* set primary cs4294 codec into Extended Audio Mode */
-		snd_printdd("setting EAM bit on cs4294 CODEC\n");
-		snd_cs46xx_codec_write(chip, AC97_CSR_ACMODE, 0x200,
-				       CS46XX_PRIMARY_CODEC_INDEX);
+	if (chip->nr_ac97_codecs == 1) {
+		unsigned int id2 = chip->ac97[CS46XX_PRIMARY_CODEC_INDEX]->id & 0xffff;
+		if (id2 == 0x592b || id2 == 0x592d) {
+			/* set primary cs4294 codec into Extended Audio Mode */
+			snd_printdd("setting EAM bit on cs4294 CODEC\n");
+			snd_cs46xx_codec_write(chip, AC97_CSR_ACMODE, 0x200,
+					       CS46XX_PRIMARY_CODEC_INDEX);
+		}
 	}
 	/* do soundcard specific mixer setup */
 	if (chip->mixer_init) {
@@ -2902,7 +2866,7 @@ static int snd_cs46xx_free(cs46xx_t *chip)
 	for (idx = 0; idx < 5; idx++) {
 		snd_cs46xx_region_t *region = &chip->region.idx[idx];
 		if (region->remap_addr)
-			iounmap((void *) region->remap_addr);
+			iounmap(region->remap_addr);
 		if (region->resource) {
 			release_resource(region->resource);
 			kfree_nocheck(region->resource);
@@ -3868,8 +3832,8 @@ int __devinit snd_cs46xx_create(snd_card_t * card,
 			snd_cs46xx_free(chip);
 			return -EBUSY;
 		}
-		region->remap_addr = (unsigned long) ioremap_nocache(region->base, region->size);
-		if (region->remap_addr == 0) {
+		region->remap_addr = ioremap_nocache(region->base, region->size);
+		if (region->remap_addr == NULL) {
 			snd_printk("%s ioremap problem\n", region->name);
 			snd_cs46xx_free(chip);
 			return -ENOMEM;

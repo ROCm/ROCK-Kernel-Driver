@@ -275,24 +275,31 @@ int idr_get_new(struct idr *idp, void *ptr, int *id)
 }
 EXPORT_SYMBOL(idr_get_new);
 
+static void idr_remove_warning(int id)
+{
+	printk("idr_remove called for id=%d which is not allocated.\n", id);
+	dump_stack();
+}
+
 static void sub_remove(struct idr *idp, int shift, int id)
 {
 	struct idr_layer *p = idp->top;
 	struct idr_layer **pa[MAX_LEVEL];
 	struct idr_layer ***paa = &pa[0];
+	int n;
 
 	*paa = NULL;
 	*++paa = &idp->top;
 
 	while ((shift > 0) && p) {
-		int n = (id >> shift) & IDR_MASK;
+		n = (id >> shift) & IDR_MASK;
 		__clear_bit(n, &p->bitmap);
 		*++paa = &p->ary[n];
 		p = p->ary[n];
 		shift -= IDR_BITS;
 	}
-	if (likely(p != NULL)){
-		int n = id & IDR_MASK;
+	n = id & IDR_MASK;
+	if (likely(p != NULL && test_bit(n, &p->bitmap))){
 		__clear_bit(n, &p->bitmap);
 		p->ary[n] = NULL;
 		while(*paa && ! --((**paa)->count)){
@@ -301,6 +308,8 @@ static void sub_remove(struct idr *idp, int shift, int id)
 		}
 		if ( ! *paa )
 			idp->layers = 0;
+	} else {
+		idr_remove_warning(id);
 	}
 }
 

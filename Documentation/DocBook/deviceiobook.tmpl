@@ -147,8 +147,7 @@
 	compiler is not permitted to reorder the I/O sequence. When the 
 	ordering can be compiler optimised, you can use <function>
 	__readb</function> and friends to indicate the relaxed ordering. Use 
-	this with care. The <function>rmb</function> provides a read memory 
-	barrier. The <function>wmb</function> provides a write memory barrier.
+	this with care.
       </para>
 
       <para>
@@ -159,8 +158,70 @@
 	asynchronously. A driver author must issue a read from the same
 	device to ensure that writes have occurred in the specific cases the
 	author cares. This kind of property cannot be hidden from driver
-	writers in the API.
+	writers in the API.  In some cases, the read used to flush the device
+	may be expected to fail (if the card is resetting, for example).  In
+	that case, the read should be done from config space, which is
+	guaranteed to soft-fail if the card doesn't respond.
       </para>
+
+      <para>
+	The following is an example of flushing a write to a device when
+	the driver would like to ensure the write's effects are visible prior
+	to continuing execution.
+      </para>
+
+<programlisting>
+static inline void
+qla1280_disable_intrs(struct scsi_qla_host *ha)
+{
+	struct device_reg *reg;
+
+	reg = ha->iobase;
+	/* disable risc and host interrupts */
+	WRT_REG_WORD(&amp;reg->ictrl, 0);
+	/*
+	 * The following read will ensure that the above write
+	 * has been received by the device before we return from this
+	 * function.
+	 */
+	RD_REG_WORD(&amp;reg->ictrl);
+	ha->flags.ints_enabled = 0;
+}
+</programlisting>
+
+      <para>
+	In addition to write posting, on some large multiprocessing systems
+	(e.g. SGI Challenge, Origin and Altix machines) posted writes won't
+	be strongly ordered coming from different CPUs.  Thus it's important
+	to properly protect parts of your driver that do memory-mapped writes
+	with locks and use the <function>mmiowb</function> to make sure they
+	arrive in the order intended.
+      </para>
+
+      <para>
+	Generally, one should use <function>mmiowb</function> prior to
+	releasing a spinlock that protects regions using <function>writeb
+	</function> or similar functions that aren't surrounded by <function>
+	readb</function> calls, which will ensure ordering and flushing.  The
+	following example (again from qla1280.c) illustrates its use.
+      </para>
+
+<programlisting>
+       sp->flags |= SRB_SENT;
+       ha->actthreads++;
+       WRT_REG_WORD(&amp;reg->mailbox4, ha->req_ring_index);
+
+       /*
+        * A Memory Mapped I/O Write Barrier is needed to ensure that this write
+        * of the request queue in register is ordered ahead of writes issued
+        * after this one by other CPUs.  Access to the register is protected
+        * by the host_lock.  Without the mmiowb, however, it is possible for
+        * this CPU to release the host lock, another CPU acquire the host lock,
+        * and write to the request queue in, and have the second write make it
+        * to the chip first.
+        */
+       mmiowb(); /* posted write ordering */
+</programlisting>
 
       <para>
 	PCI ordering rules also guarantee that PIO read responses arrive
@@ -171,7 +232,9 @@
 	<function>readb</function> call has no relation to any previous DMA
 	writes performed by the device.  The driver can use
 	<function>readb_relaxed</function> for these cases, although only
-	some platforms will honor the relaxed semantics.
+	some platforms will honor the relaxed semantics.  Using the relaxed
+	read functions will provide significant performance benefits on
+	platforms that support it.
       </para>
     </sect1>
 

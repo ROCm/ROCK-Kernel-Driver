@@ -1903,22 +1903,16 @@ relock:
 		 * Anything else is fatal, maybe with a core dump.
 		 */
 		current->flags |= PF_SIGNALED;
-		if (sig_kernel_coredump(signr) &&
-		    do_coredump((long)signr, signr, regs)) {
+		if (sig_kernel_coredump(signr)) {
 			/*
-			 * That killed all other threads in the group and
-			 * synchronized with their demise, so there can't
-			 * be any more left to kill now.  The group_exit
-			 * flags are set by do_coredump.  Note that
-			 * thread_group_empty won't always be true yet,
-			 * because those threads were blocked in __exit_mm
-			 * and we just let them go to finish dying.
+			 * If it was able to dump core, this kills all
+			 * other threads in the group and synchronizes with
+			 * their demise.  If we lost the race with another
+			 * thread getting here, it set group_exit_code
+			 * first and our do_group_exit call below will use
+			 * that value and ignore the one we pass it.
 			 */
-			const int code = signr | 0x80;
-			BUG_ON(!current->signal->group_exit);
-			BUG_ON(current->signal->group_exit_code != code);
-			do_exit(code);
-			/* NOTREACHED */
+			do_coredump((long)signr, signr, regs);
 		}
 
 		/*

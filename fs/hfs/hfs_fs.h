@@ -60,6 +60,7 @@ struct hfs_inode_info {
 	struct semaphore extents_lock;
 
 	u16 alloc_blocks, clump_blocks;
+	sector_t fs_blocks;
 	/* Allocation extents from catlog record or volume header */
 	hfs_extent_rec first_extents;
 	u16 first_blocks;
@@ -205,6 +206,13 @@ extern void hfs_inode_read_fork(struct inode *inode, struct hfs_extent *ext,
 extern struct inode *hfs_iget(struct super_block *, struct hfs_cat_key *, hfs_cat_rec *);
 extern void hfs_clear_inode(struct inode *);
 extern void hfs_delete_inode(struct inode *);
+
+/* attr.c */
+extern int hfs_setxattr(struct dentry *dentry, const char *name,
+			const void *value, size_t size, int flags);
+extern ssize_t hfs_getxattr(struct dentry *dentry, const char *name,
+			    void *value, size_t size);
+extern ssize_t hfs_listxattr(struct dentry *dentry, char *buffer, size_t size);
 
 /* mdb.c */
 extern int hfs_mdb_get(struct super_block *);

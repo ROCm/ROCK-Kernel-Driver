@@ -102,7 +102,7 @@ struct sndrv_ctl_elem_list32 {
 	CPTR(pids);\
 }
 
-static int _snd_ioctl32_ctl_elem_list(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file, unsigned int native_ctl)
+static inline int _snd_ioctl32_ctl_elem_list(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file, unsigned int native_ctl)
 {
 	struct sndrv_ctl_elem_list32 data32;
 	struct sndrv_ctl_elem_list data;
@@ -168,7 +168,7 @@ struct sndrv_ctl_elem_info32 {
 	unsigned char reserved[64];
 } __attribute__((packed));
 
-static int _snd_ioctl32_ctl_elem_info(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file, unsigned int native_ctl)
+static inline int _snd_ioctl32_ctl_elem_info(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file, unsigned int native_ctl)
 {
 	struct sndrv_ctl_elem_info data;
 	struct sndrv_ctl_elem_info32 data32;
@@ -246,7 +246,7 @@ struct sndrv_ctl_elem_value32 {
 		struct sndrv_aes_iec958 iec958;
         } value;
         unsigned char reserved[128];
-} __attribute__((packed));
+};
 
 
 /* hmm, it's so hard to retrieve the value type from the control id.. */
@@ -274,7 +274,7 @@ static int get_ctl_type(struct file *file, snd_ctl_elem_id_t *id)
 }
 
 
-static int _snd_ioctl32_ctl_elem_value(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file, unsigned int native_ctl)
+static inline int _snd_ioctl32_ctl_elem_value(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file, unsigned int native_ctl)
 {
 	struct sndrv_ctl_elem_value *data;
 	struct sndrv_ctl_elem_value32 *data32;

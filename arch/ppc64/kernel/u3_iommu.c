@@ -267,6 +267,7 @@ static int dart_init(struct device_node *dart_node)
 
 void iommu_setup_u3(void)
 {
+	struct pci_controller *phb, *tmp;
 	struct pci_dev *dev = NULL;
 	struct device_node *dn;
 
@@ -298,6 +299,11 @@ void iommu_setup_u3(void)
 		struct device_node *dn = pci_device_to_OF_node(dev);
 		if (dn)
 			dn->iommu_table = &iommu_table_u3;
+	}
+	/* We also make sure we set all PHBs ... */
+	list_for_each_entry_safe(phb, tmp, &hose_list, list_node) {
+		dn = (struct device_node *)phb->arch_data;
+		dn->iommu_table = &iommu_table_u3;
 	}
 }
 

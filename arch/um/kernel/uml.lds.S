@@ -35,6 +35,8 @@ SECTIONS
   {
     *(.text)
     SCHED_TEXT
+    LOCK_TEXT
+    *(.fixup)
     /* .gnu.warning sections are handled specially by elf32.em.  */
     *(.gnu.warning)
     *(.gnu.linkonce.t*)

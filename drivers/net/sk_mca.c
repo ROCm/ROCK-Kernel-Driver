@@ -972,14 +972,6 @@ static struct net_device_stats *skmca_stats(struct net_device *dev)
 	return &(priv->stat);
 }
 
-/* we don't support runtime reconfiguration, since an MCA card can
-   be unambigously identified by its POS registers. */
-
-static int skmca_config(struct net_device *dev, struct ifmap *map)
-{
-	return 0;
-}
-
 /* switch receiver mode.  We use the LANCE's multicast filter to prefilter
    multicast addresses. */
 
@@ -1147,7 +1139,6 @@ struct net_device * __init skmca_probe(int unit)
 	/* set methods */
 	dev->open = skmca_open;
 	dev->stop = skmca_close;
-	dev->set_config = skmca_config;
 	dev->hard_start_xmit = skmca_tx;
 	dev->do_ioctl = NULL;
 	dev->get_stats = skmca_stats;

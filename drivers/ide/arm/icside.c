@@ -212,32 +212,17 @@ static void icside_build_sglist(ide_drive_t *drive, struct request *rq)
 	ide_hwif_t *hwif = drive->hwif;
 	struct icside_state *state = hwif->hwif_data;
 	struct scatterlist *sg = hwif->sg_table;
-	int nents;
 
-	if (rq->flags & REQ_DRIVE_TASKFILE) {
-		ide_task_t *args = rq->special;
+	ide_map_sg(drive, rq);
 
-		if (args->command_type == IDE_DRIVE_TASK_RAW_WRITE)
-			hwif->sg_dma_direction = DMA_TO_DEVICE;
-		else
-			hwif->sg_dma_direction = DMA_FROM_DEVICE;
+	if (rq_data_dir(rq) == READ)
+		hwif->sg_dma_direction = DMA_FROM_DEVICE;
+	else
+		hwif->sg_dma_direction = DMA_TO_DEVICE;
 
-		sg_init_one(sg, rq->buffer, rq->nr_sectors * SECTOR_SIZE);
-		nents = 1;
-	} else {
-		nents = blk_rq_map_sg(drive->queue, rq, sg);
-
-		if (rq_data_dir(rq) == READ)
-			hwif->sg_dma_direction = DMA_FROM_DEVICE;
-		else
-			hwif->sg_dma_direction = DMA_TO_DEVICE;
-	}
-
-	nents = dma_map_sg(state->dev, sg, nents, hwif->sg_dma_direction);
-
-	hwif->sg_nents = nents;
+	hwif->sg_nents = dma_map_sg(state->dev, sg, hwif->sg_nents,
+				    hwif->sg_dma_direction);
 }
-
 
 /*
  * Configure the IOMD to give the appropriate timings for the transfer
@@ -498,14 +483,6 @@ static int icside_dma_test_irq(ide_drive_t *drive)
 			ICS_ARCIN_V6_INTRSTAT_1)) & 1;
 }
 
-static int icside_dma_verbose(ide_drive_t *drive)
-{
-	printk(", %s (peak %dMB/s)",
-		ide_xfer_verbose(drive->current_speed),
-		2000 / drive->drive_data);
-	return 1;
-}
-
 static int icside_dma_timeout(ide_drive_t *drive)
 {
 	printk(KERN_ERR "%s: DMA timeout occurred: ", drive->name);
@@ -554,7 +531,6 @@ static void icside_dma_init(ide_hwif_t *hwif)
 	hwif->dma_start		= icside_dma_start;
 	hwif->ide_dma_end	= icside_dma_end;
 	hwif->ide_dma_test_irq	= icside_dma_test_irq;
-	hwif->ide_dma_verbose	= icside_dma_verbose;
 	hwif->ide_dma_timeout	= icside_dma_timeout;
 	hwif->ide_dma_lostirq	= icside_dma_lostirq;
 

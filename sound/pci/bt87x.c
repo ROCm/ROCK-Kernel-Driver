@@ -139,6 +139,14 @@ MODULE_PARM_DESC(digital_rate, "Digital input rate for Bt87x soundcard");
 #define RISC_SYNC_FM1	0x6
 #define RISC_SYNC_VRO	0xc
 
+#define ANALOG_CLOCK 1792000
+#ifdef CONFIG_SND_BT87X_OVERCLOCK
+#define CLOCK_DIV_MIN 1
+#else
+#define CLOCK_DIV_MIN 4
+#endif
+#define CLOCK_DIV_MAX 15
+
 #define ERROR_INTERRUPTS (INT_FBUS | INT_FTRGT | INT_PPERR | \
 			  INT_RIPERR | INT_PABORT | INT_OCERR)
 #define MY_INTERRUPTS (INT_RISCI | ERROR_INTERRUPTS)
@@ -264,7 +272,7 @@ static irqreturn_t snd_bt87x_interrupt(int irq, void *dev_id, struct pt_regs *re
 				   status, pci_status);
 		}
 	}
-	if (status & INT_RISCI) {
+	if ((status & INT_RISCI) && (chip->reg_control & CTL_ACAP_EN)) {
 		int current_block, irq_block;
 
 		/* assume that exactly one line has been recorded */
@@ -303,8 +311,8 @@ static snd_pcm_hardware_t snd_bt87x_analog_hw = {
 		SNDRV_PCM_INFO_MMAP_VALID,
 	.formats = SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S8,
 	.rates = SNDRV_PCM_RATE_KNOT,
-	.rate_min = 119466,
-	.rate_max = 448000,
+	.rate_min = ANALOG_CLOCK / CLOCK_DIV_MAX,
+	.rate_max = ANALOG_CLOCK / CLOCK_DIV_MIN,
 	.channels_min = 1,
 	.channels_max = 1,
 	.buffer_bytes_max = 255 * 4092,
@@ -346,9 +354,9 @@ static int snd_bt87x_set_digital_hw(bt87x_t *chip, snd_pcm_runtime_t *runtime)
 static int snd_bt87x_set_analog_hw(bt87x_t *chip, snd_pcm_runtime_t *runtime)
 {
 	static ratnum_t analog_clock = {
-		.num = 1792000,
-		.den_min = 4,
-		.den_max = 15,
+		.num = ANALOG_CLOCK,
+		.den_min = CLOCK_DIV_MIN,
+		.den_max = CLOCK_DIV_MAX,
 		.den_step = 1
 	};
 	static snd_pcm_hw_constraint_ratnums_t constraint_rates = {
@@ -433,7 +441,7 @@ static int snd_bt87x_prepare(snd_pcm_substream_t *substream)
 
 	spin_lock_irq(&chip->reg_lock);
 	chip->reg_control &= ~(CTL_DA_SDR_MASK | CTL_DA_SBR);
-	decimation = (1792000 + runtime->rate / 4) / runtime->rate;
+	decimation = (ANALOG_CLOCK + runtime->rate / 4) / runtime->rate;
 	chip->reg_control |= decimation << CTL_DA_SDR_SHIFT;
 	if (runtime->format == SNDRV_PCM_FORMAT_S8)
 		chip->reg_control |= CTL_DA_SBR;

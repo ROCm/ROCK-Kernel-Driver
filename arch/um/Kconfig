@@ -100,7 +100,8 @@ config HOSTFS
         say Y or M here; otherwise say N.
 
 config HPPFS
-	tristate "HoneyPot ProcFS"
+	tristate "HoneyPot ProcFS (EXPERIMENTAL)"
+	depends on BROKEN
 	help
 	hppfs (HoneyPot ProcFS) is a filesystem which allows UML /proc
 	entries to be overridden, removed, or fabricated from the host.
@@ -113,8 +114,12 @@ config HPPFS
 	You only need this if you are setting up a UML honeypot.  Otherwise,
 	it is safe to say 'N' here.
 
+	If you are actively using it, please ask for it to be fixed. In this
+	moment, it does not work on 2.6 (it works somehow on 2.4).
+
 config MCONSOLE
 	bool "Management console"
+	default y
 	help
         The user mode linux management console is a low-level interface to
         the kernel, somewhat like the i386 SysRq interface.  Since there is
@@ -131,19 +136,40 @@ config MCONSOLE
 
 config HOST_2G_2G
 	bool "2G/2G host address space split"
-
-config SMP
-	bool "Symmetric multi-processing support"
 	default n
 	help
-        This option enables UML SMP support.  UML implements virtual SMP by
-        allowing as many processes to run simultaneously on the host as
-        there are virtual processors configured.  Obviously, if the host is
-        a uniprocessor, those processes will timeshare, but, inside UML,
-        will appear to be running simultaneously.  If the host is a
-        multiprocessor, then UML processes may run simultaneously, depending
-        on the host scheduler.
-        It is safe to leave this unchanged.
+	This is needed when the host on which you run has a 2G/2G memory
+	split, instead of the customary 3G/1G.
+
+	Note that to enable such a host
+	configuration, which makes sense only in some cases, you need special
+	host patches.
+
+	So, if you do not know what to do here, say 'N'.
+
+config SMP
+	bool "Symmetric multi-processing support (EXPERIMENTAL)"
+	default n
+	depends on MODE_TT && EXPERIMENTAL
+	help
+	This option enables UML SMP support.
+	It is NOT related to having a real SMP box. Not directly, at least.
+
+	UML implements virtual SMP by allowing as many processes to run
+	simultaneously on the host as there are virtual processors configured.
+
+	Obviously, if the host is a uniprocessor, those processes will
+	timeshare, but, inside UML, will appear to be running simultaneously.
+	If the host is a multiprocessor, then UML processes may run
+	simultaneously, depending on the host scheduler.
+
+	This, however, is supported only in TT mode. So, if you use the SKAS
+	patch on your host, switching to TT mode and enabling SMP usually gives
+	you worse performances.
+	Also, since the support for SMP has been under-developed, there could
+	be some bugs being exposed by enabling SMP.
+
+	If you don't know what to do, say N.
 
 config NR_CPUS
 	int "Maximum number of CPUs (2-32)"
@@ -246,5 +272,9 @@ source "drivers/md/Kconfig"
 if BROKEN
 	source "drivers/mtd/Kconfig"
 endif
+
+config INPUT
+	bool
+	default n
 
 source "arch/um/Kconfig.debug"

@@ -42,7 +42,7 @@
 #include <asm/iommu.h>
 #include <asm/rtas.h>
 
-#include "open_pic.h"
+#include "mpic.h"
 #include "pci.h"
 
 /* RTAS tokens */
@@ -54,6 +54,7 @@ static int ibm_write_pci_config;
 static int s7a_workaround;
 
 extern unsigned long pci_probe_only;
+extern struct mpic *pSeries_mpic;
 
 static int rtas_read_config(struct device_node *dn, int where, int size, u32 *val)
 {
@@ -399,9 +400,9 @@ unsigned long __init find_and_init_phbs(void)
 		pci_process_bridge_OF_ranges(phb, node);
 		pci_setup_phb_io(phb, index == 0);
 
-		if (naca->interrupt_controller == IC_OPEN_PIC) {
+		if (naca->interrupt_controller == IC_OPEN_PIC && pSeries_mpic) {
 			int addr = root_size_cells * (index + 2) - 1;
-			openpic_setup_ISU(index, opprop[addr]); 
+			mpic_assign_isu(pSeries_mpic, index, opprop[addr]);
 		}
 
 		index++;
@@ -481,92 +482,6 @@ static void check_s7a(void)
 	}
 }
 
-static int get_bus_io_range(struct pci_bus *bus, unsigned long *start_phys,
-				unsigned long *start_virt, unsigned long *size)
-{
-	struct pci_controller *hose = PCI_GET_PHB_PTR(bus);
-	struct pci_bus_region region;
-	struct resource *res;
-
-	if (bus->self) {
-		res = bus->resource[0];
-		pcibios_resource_to_bus(bus->self, &region, res);
-		*start_phys = hose->io_base_phys + region.start;
-		*start_virt = (unsigned long) hose->io_base_virt + 
-				region.start;
-		if (region.end > region.start) 
-			*size = region.end - region.start + 1;
-		else {
-			printk("%s(): unexpected region 0x%lx->0x%lx\n", 
-					__FUNCTION__, region.start, region.end);
-			return 1;
-		}
-		
-	} else {
-		/* Root Bus */
-		res = &hose->io_resource;
-		*start_phys = hose->io_base_phys;
-		*start_virt = (unsigned long) hose->io_base_virt;
-		if (res->end > res->start)
-			*size = res->end - res->start + 1;
-		else {
-			printk("%s(): unexpected region 0x%lx->0x%lx\n", 
-					__FUNCTION__, res->start, res->end);
-			return 1;
-		}
-	}
-
-	return 0;
-}
-
-int unmap_bus_range(struct pci_bus *bus)
-{
-	unsigned long start_phys;
-	unsigned long start_virt;
-	unsigned long size;
-
-	if (!bus) {
-		printk(KERN_ERR "%s() expected bus\n", __FUNCTION__);
-		return 1;
-	}
-	
-	if (get_bus_io_range(bus, &start_phys, &start_virt, &size))
-		return 1;
-	if (iounmap_explicit((void *) start_virt, size))
-		return 1;
-
-	return 0;
-}
-EXPORT_SYMBOL(unmap_bus_range);
-
-int remap_bus_range(struct pci_bus *bus)
-{
-	unsigned long start_phys;
-	unsigned long start_virt;
-	unsigned long size;
-
-	if (!bus) {
-		printk(KERN_ERR "%s() expected bus\n", __FUNCTION__);
-		return 1;
-	}
-	
-	if (get_bus_io_range(bus, &start_phys, &start_virt, &size))
-		return 1;
-	if (__ioremap_explicit(start_phys, start_virt, size, _PAGE_NO_CACHE))
-		return 1;
-
-	return 0;
-}
-EXPORT_SYMBOL(remap_bus_range);
-
-static void phbs_remap_io(void)
-{
-	struct pci_controller *hose, *tmp;
-
-	list_for_each_entry_safe(hose, tmp, &hose_list, list_node)
-		remap_bus_range(hose->bus);
-}
-
 /* RPA-specific bits for removing PHBs */
 int pcibios_remove_root_bus(struct pci_controller *phb)
 {
@@ -619,25 +534,12 @@ EXPORT_SYMBOL(pcibios_remove_root_bus);
 
 static void __init pSeries_request_regions(void)
 {
-	struct device_node *i8042;
-
 	request_region(0x20,0x20,"pic1");
 	request_region(0xa0,0x20,"pic2");
 	request_region(0x00,0x20,"dma1");
 	request_region(0x40,0x20,"timer");
 	request_region(0x80,0x10,"dma page reg");
 	request_region(0xc0,0x20,"dma2");
-
-#define I8042_DATA_REG 0x60
-
-	/*
-	 * Some machines have an unterminated i8042 so check the device
-	 * tree and reserve the region if it does not appear. Later on
-	 * the i8042 code will try and reserve this region and fail.
-	 */
-	if (!(i8042 = of_find_node_by_type(NULL, "8042")))
-		request_region(I8042_DATA_REG, 16, "reserved (no i8042)");
-	of_node_put(i8042);
 }
 
 void __init pSeries_final_fixup(void)

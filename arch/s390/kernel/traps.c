@@ -38,6 +38,7 @@
 #include <asm/cpcmd.h>
 #include <asm/s390_ext.h>
 #include <asm/lowcore.h>
+#include <asm/debug.h>
 
 /* Called from entry.S only */
 extern void handle_per_exception(struct pt_regs *regs);
@@ -277,8 +278,10 @@ spinlock_t die_lock = SPIN_LOCK_UNLOCKED;
 void die(const char * str, struct pt_regs * regs, long err)
 {
 	static int die_counter;
-        console_verbose();
-        spin_lock_irq(&die_lock);
+
+	debug_stop_all();
+	console_verbose();
+	spin_lock_irq(&die_lock);
 	bust_spinlocks(1);
 	printk("%s: %04lx [#%d]\n", str, err & 0xffff, ++die_counter);
         show_regs(regs);
@@ -630,6 +633,21 @@ asmlinkage void data_exception(struct pt_regs * regs, long interruption_code)
 	}
 }
 
+asmlinkage void space_switch_exception(struct pt_regs * regs, long int_code)
+{
+        siginfo_t info;
+
+	/* Set user psw back to home space mode. */
+	if (regs->psw.mask & PSW_MASK_PSTATE)
+		regs->psw.mask |= PSW_ASC_HOME;
+	/* Send SIGILL. */
+        info.si_signo = SIGILL;
+        info.si_errno = 0;
+        info.si_code = ILL_PRVOPC;
+        info.si_addr = get_check_address(regs);
+        do_trap(int_code, SIGILL, "space switch event", regs, &info);
+}
+
 asmlinkage void kernel_stack_overflow(struct pt_regs * regs)
 {
 	die("Kernel stack overflow", regs, 0);
@@ -673,7 +691,7 @@ void __init trap_init(void)
         pgm_check_table[0x3B] = &do_dat_exception;
 #endif /* CONFIG_ARCH_S390X */
         pgm_check_table[0x15] = &operand_exception;
-        pgm_check_table[0x1C] = &privileged_op;
+        pgm_check_table[0x1C] = &space_switch_exception;
         pgm_check_table[0x1D] = &hfp_sqrt_exception;
 	pgm_check_table[0x40] = &do_monitor_call;
 

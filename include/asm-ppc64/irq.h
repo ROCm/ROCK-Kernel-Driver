@@ -20,6 +20,19 @@
 /* this number is used when no interrupt has been assigned */
 #define NO_IRQ			(-1)
 
+/*
+ * These constants are used for passing information about interrupt
+ * signal polarity and level/edge sensing to the low-level PIC chip
+ * drivers.
+ */
+#define IRQ_SENSE_MASK		0x1
+#define IRQ_SENSE_LEVEL		0x1	/* interrupt on active level */
+#define IRQ_SENSE_EDGE		0x0	/* interrupt triggered by edge */
+
+#define IRQ_POLARITY_MASK	0x2
+#define IRQ_POLARITY_POSITIVE	0x2	/* high level or low->high edge */
+#define IRQ_POLARITY_NEGATIVE	0x0	/* low level or high->low edge */
+
 #define get_irq_desc(irq) (&irq_desc[(irq)])
 
 /* Define a way to iterate across irqs. */

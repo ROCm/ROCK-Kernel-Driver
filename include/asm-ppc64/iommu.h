@@ -113,6 +113,9 @@ extern void iommu_setup_u3(void);
 /* Creates table for an individual device node */
 extern void iommu_devnode_init(struct device_node *dn);
 
+/* Frees table for an individual device node */
+extern void iommu_free_table(struct device_node *dn);
+
 #endif /* CONFIG_PPC_MULTIPLATFORM */
 
 #ifdef CONFIG_PPC_ISERIES

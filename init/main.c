@@ -287,8 +287,15 @@ static int __init unknown_bootoption(char *param, char *val)
 {
 	/* Change NUL term back to "=", to make "param" the whole string. */
 	if (val) {
-		if (val[-1] == '"') val[-2] = '=';
-		else val[-1] = '=';
+		/* param=val or param="val"? */
+		if (val == param+strlen(param)+1)
+			val[-1] = '=';
+		else if (val == param+strlen(param)+2) {
+			val[-2] = '=';
+			memmove(val-1, val, strlen(val)+1);
+			val--;
+		} else
+			BUG();
 	}
 
 	/* Handle obsolete-style parameters */

@@ -656,15 +656,9 @@ static int e100_ide_build_dmatable (ide_drive_t *drive)
 
 	ata_tot_size = 0;
 
-	if (HWGROUP(drive)->rq->flags & REQ_DRIVE_TASKFILE) {
-		sg_init_one(&sg[0], rq->buffer, rq->nr_sectors * SECTOR_SIZE);
-		hwif->sg_nents = i = 1;
-	}
-	else
-	{
-		hwif->sg_nents = i = blk_rq_map_sg(drive->queue, rq, hwif->sg_table);
-	}
+	ide_map_sg(drive, rq);
 
+	i = hwif->sg_nents;
 
 	while(i) {
 		/*

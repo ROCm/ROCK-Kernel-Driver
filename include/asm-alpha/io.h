@@ -282,6 +282,12 @@ static inline void __iomem *ioremap(unsigned long port, unsigned long size)
 	return IO_CONCAT(__IO_PREFIX,ioremap) (port, size);
 }
 
+static inline void __iomem *__ioremap(unsigned long port, unsigned long size,
+				      unsigned long flags)
+{
+	return ioremap(port, size);
+}
+
 static inline void __iomem * ioremap_nocache(unsigned long offset,
 					     unsigned long size)
 {
@@ -488,6 +494,8 @@ extern inline void writeq(u64 b, volatile void __iomem *addr)
 #define readw_relaxed(addr) __raw_readw(addr)
 #define readl_relaxed(addr) __raw_readl(addr)
 #define readq_relaxed(addr) __raw_readq(addr)
+
+#define mmiowb()
 
 /*
  * String version of IO memory access ops:

@@ -26,6 +26,8 @@ extern unsigned long switch_to_osf_pal(unsigned long nr,
 	struct pcb_struct * pcb_va, struct pcb_struct * pcb_pa,
 	unsigned long *vptb);
 
+extern void move_stack(unsigned long new_stack);
+
 struct hwrpb_struct *hwrpb = INIT_HWRPB;
 static struct pcb_struct pcb_va[1];
 
@@ -118,12 +120,10 @@ static inline void
 runkernel(void)
 {
 	__asm__ __volatile__(
-		"bis %1,%1,$30\n\t"
 		"bis %0,%0,$27\n\t"
 		"jmp ($27)"
 		: /* no outputs: it doesn't even return */
-		: "r" (START_ADDR),
-		  "r" (PAGE_SIZE + INIT_STACK));
+		: "r" (START_ADDR));
 }
 
 extern char _end;
@@ -147,9 +147,7 @@ start_kernel(void)
 	 */
 	static long nbytes;
 	static char envval[256] __attribute__((aligned(8)));
-#ifdef INITRD_IMAGE_SIZE
 	static unsigned long initrd_start;
-#endif
 
 	srm_printk("Linux/AXP bootp loader for Linux " UTS_RELEASE "\n");
 	if (INIT_HWRPB->pagesize != 8192) {
@@ -164,12 +162,19 @@ start_kernel(void)
 	}
 	pal_init();
 
-#ifdef INITRD_IMAGE_SIZE
 	/* The initrd must be page-aligned.  See below for the 
 	   cause of the magic number 5.  */
-	initrd_start = ((START_ADDR + 5*KERNEL_SIZE) | (PAGE_SIZE-1)) + 1;
+	initrd_start = ((START_ADDR + 5*KERNEL_SIZE + PAGE_SIZE) |
+			(PAGE_SIZE-1)) + 1;
+#ifdef INITRD_IMAGE_SIZE
 	srm_printk("Initrd positioned at %#lx\n", initrd_start);
 #endif
+
+	/*
+	 * Move the stack to a safe place to ensure it won't be
+	 * overwritten by kernel image.
+	 */
+	move_stack(initrd_start - PAGE_SIZE);
 
 	nbytes = callback_getenv(ENV_BOOTED_OSFLAGS, envval, sizeof(envval));
 	if (nbytes < 0 || nbytes >= sizeof(envval)) {

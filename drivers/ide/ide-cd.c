@@ -3039,10 +3039,9 @@ int ide_cdrom_probe_capabilities (ide_drive_t *drive)
 
 	printk(", %dkB Cache", be16_to_cpu(cap.buffer_size));
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	if (drive->using_dma)
-		(void) HWIF(drive)->ide_dma_verbose(drive);
-#endif /* CONFIG_BLK_DEV_IDEDMA */
+		ide_dma_verbose(drive);
+
 	printk("\n");
 
 	return nslots;
@@ -3433,7 +3432,7 @@ static struct block_device_operations idecd_ops = {
 /* options */
 char *ignore = NULL;
 
-MODULE_PARM(ignore, "s");
+module_param(ignore, charp, 0400);
 MODULE_DESCRIPTION("ATAPI CD-ROM Driver");
 
 static int ide_cdrom_attach (ide_drive_t *drive)

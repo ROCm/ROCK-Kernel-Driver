@@ -645,7 +645,7 @@ static struct bpt *at_breakpoint(unsigned long pc)
 	for (i = 0; i < NBPTS; ++i, ++bp)
 		if (bp->enabled && pc == bp->address)
 			return bp;
-	return 0;
+	return NULL;
 }
 
 static struct bpt *in_breakpoint_table(unsigned long nip, unsigned long *offp)
@@ -1582,7 +1582,7 @@ extern char exc_prolog;
 extern char dec_exc;
 
 void
-super_regs()
+super_regs(void)
 {
 	int cmd;
 	unsigned long val;
@@ -1816,7 +1816,7 @@ static char *memex_subcmd_help_string =
     "";
 
 void
-memex()
+memex(void)
 {
 	int cmd, inc, i, nslash;
 	unsigned long n;
@@ -1967,7 +1967,7 @@ memex()
 }
 
 int
-bsesc()
+bsesc(void)
 {
 	int c;
 
@@ -1985,7 +1985,7 @@ bsesc()
 			 || ('a' <= (c) && (c) <= 'f') \
 			 || ('A' <= (c) && (c) <= 'F'))
 void
-dump()
+dump(void)
 {
 	int c;
 
@@ -2150,7 +2150,7 @@ static unsigned mend;
 static unsigned mask;
 
 void
-memlocate()
+memlocate(void)
 {
 	unsigned a, n;
 	unsigned char val[4];
@@ -2183,7 +2183,7 @@ static unsigned long mskip = 0x1000;
 static unsigned long mlim = 0xffffffff;
 
 void
-memzcan()
+memzcan(void)
 {
 	unsigned char v;
 	unsigned a;
@@ -2212,7 +2212,7 @@ memzcan()
 
 /* Input scanning routines */
 int
-skipbl()
+skipbl(void)
 {
 	int c;
 
@@ -2237,8 +2237,7 @@ static char *regnames[N_PTREGS] = {
 };
 
 int
-scanhex(vp)
-unsigned long *vp;
+scanhex(unsigned long *vp)
 {
 	int c, d;
 	unsigned long v;
@@ -2322,7 +2321,7 @@ unsigned long *vp;
 }
 
 void
-scannl()
+scannl(void)
 {
 	int c;
 
@@ -2365,13 +2364,13 @@ static char line[256];
 static char *lineptr;
 
 void
-flush_input()
+flush_input(void)
 {
 	lineptr = NULL;
 }
 
 int
-inchar()
+inchar(void)
 {
 	if (lineptr == NULL || *lineptr == 0) {
 		if (fgets(line, sizeof(line), stdin) == NULL) {
@@ -2384,8 +2383,7 @@ inchar()
 }
 
 void
-take_input(str)
-char *str;
+take_input(char *str)
 {
 	lineptr = str;
 }

@@ -102,6 +102,8 @@ outsl (unsigned long port, const void *src, unsigned long count)
 #define ioremap_writethrough(physaddr, size)	(physaddr)
 #define ioremap_fullcache(physaddr, size)	(physaddr)
 
+#define mmiowb()
+
 #define page_to_phys(page)      ((page - mem_map) << PAGE_SHIFT)
 #if 0
 /* This is really stupid; don't define it.  */

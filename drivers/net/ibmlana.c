@@ -885,14 +885,6 @@ static struct net_device_stats *ibmlana_stats(struct net_device *dev)
 	return &priv->stat;
 }
 
-/* we don't support runtime reconfiguration, since am MCA card can
-   be unambigously identified by its POS registers. */
-
-static int ibmlana_config(struct net_device *dev, struct ifmap *map)
-{
-	return 0;
-}
-
 /* switch receiver mode. */
 
 static void ibmlana_set_multicast_list(struct net_device *dev)
@@ -984,7 +976,6 @@ static int ibmlana_probe(struct net_device *dev)
 
 	dev->open = ibmlana_open;
 	dev->stop = ibmlana_close;
-	dev->set_config = ibmlana_config;
 	dev->hard_start_xmit = ibmlana_tx;
 	dev->do_ioctl = NULL;
 	dev->get_stats = ibmlana_stats;
