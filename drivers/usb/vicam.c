@@ -40,6 +40,8 @@
 #include <linux/errno.h>
 #include <linux/poll.h>
 #include <linux/init.h>
+#include <linux/mm.h>
+#include <linux/pagemap.h>
 #include <linux/slab.h>
 #include <linux/fcntl.h>
 #include <linux/module.h>
