@@ -828,8 +828,8 @@ W: http://www.xenotime.net/linux/linux.html
 W: http://www.linux-usb.org
 D: Linux-USB subsystem, USB core/UHCI/printer/storage drivers
 D: x86 SMP, ACPI, bootflag hacking
-S: 15275 SW Koll Parkway, Suite H
-S: Beaverton, Oregon 97006
+S: 12725 SW Millikan Way, Suite 400
+S: Beaverton, Oregon 97005
 S: USA
 
 N: Bob Dunlop
@@ -2228,8 +2228,8 @@ N: Patrick Mochel
 E: mochel@osdl.org
 E: mochelp@infinity.powertie.org
 D: PCI Power Management, ACPI work
-S: 15275 SW Koll Parkway, Suite H
-S: Beaverton, OR 97006 
+S: 12725 SW Millikan Way, Suite 400
+S: Beaverton, Oregon 97005
 S: USA
 
 N: Eberhard Moenkeberg
