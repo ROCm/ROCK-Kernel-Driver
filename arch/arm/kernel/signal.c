@@ -325,7 +325,7 @@ setup_return(struct pt_regs *regs, struct k_sigaction *ka,
 	unsigned long retcode;
 	int thumb = 0;
 #ifdef CONFIG_CPU_32
-	unsigned long cpsr = regs->ARM_cpsr;
+	unsigned long cpsr = regs->ARM_cpsr & ~PSR_f;
 
 	/*
 	 * Maybe we need to deliver a 32-bit signal to a 26-bit task.
