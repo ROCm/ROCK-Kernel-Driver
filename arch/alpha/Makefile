@@ -92,9 +92,10 @@ CFLAGS += $(cflags-y) -Wa,-mev6
 
 HEAD := arch/alpha/kernel/head.o
 
-core-y			+= arch/alpha/kernel/ arch/alpha/mm/
-core-$(CONFIG_MATHEMU)  += arch/alpha/math-emu/
-libs-y			+= arch/alpha/lib/
+core-y				+= arch/alpha/kernel/ arch/alpha/mm/
+core-$(CONFIG_MATHEMU)		+= arch/alpha/math-emu/
+drivers-$(CONFIG_OPROFILE)	+= arch/alpha/oprofile/
+libs-y				+= arch/alpha/lib/
 
 boot := arch/alpha/boot
 

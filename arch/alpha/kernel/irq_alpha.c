@@ -74,7 +74,7 @@ do_entInt(unsigned long type, unsigned long vector,
 		alpha_mv.device_interrupt(vector, regs);
 		return;
 	case 4:
-		perf_irq(vector, regs);
+		perf_irq(la_ptr, regs);
 		return;
 	default:
 		printk(KERN_CRIT "Hardware intr %ld %lx? Huh?\n",
