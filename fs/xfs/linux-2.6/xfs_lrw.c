@@ -366,7 +366,7 @@ xfs_sendfile(
 	int			ioflags,
 	size_t			count,
 	read_actor_t		actor,
-	void			__user *target,
+	void			*target,
 	cred_t			*credp)
 {
 	ssize_t			ret;

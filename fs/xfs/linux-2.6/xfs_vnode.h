@@ -192,7 +192,7 @@ typedef ssize_t (*vop_write_t)(bhv_desc_t *, struct kiocb *,
 				loff_t *, int, struct cred *);
 typedef ssize_t (*vop_sendfile_t)(bhv_desc_t *, struct file *,
 				loff_t *, int, size_t, read_actor_t,
-				void __user *, struct cred *);
+				void *, struct cred *);
 typedef int	(*vop_ioctl_t)(bhv_desc_t *, struct inode *, struct file *,
 				int, unsigned int, void __user *);
 typedef int	(*vop_getattr_t)(bhv_desc_t *, struct vattr *, int,
