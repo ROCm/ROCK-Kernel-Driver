@@ -168,7 +168,7 @@ void saa7146_pgtable_free(struct pci_dev *pci, struct saa7146_pgtable *pt);
 int saa7146_pgtable_build_single(struct pci_dev *pci, struct saa7146_pgtable *pt, struct scatterlist *list, int length );
 char *saa7146_vmalloc_build_pgtable(struct pci_dev *pci, long length, struct saa7146_pgtable *pt);
 void saa7146_setgpio(struct saa7146_dev *dev, int port, u32 data);
-int saa7146_wait_for_debi_done(struct saa7146_dev *dev);
+int saa7146_wait_for_debi_done(struct saa7146_dev *dev, int nobusyloop);
 
 /* some memory sizes */
 #define SAA7146_I2C_MEM		( 1*PAGE_SIZE)

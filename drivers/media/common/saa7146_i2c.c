@@ -1,7 +1,7 @@
 #include <linux/version.h>
 #include <media/saa7146_vv.h>
 
-u32 saa7146_i2c_func(struct i2c_adapter *adapter)
+static u32 saa7146_i2c_func(struct i2c_adapter *adapter)
 {
 //fm	DEB_I2C(("'%s'.\n", adapter->name));
 
