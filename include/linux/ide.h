@@ -1477,7 +1477,6 @@ int ide_taskfile_ioctl(ide_drive_t *, unsigned int, unsigned long);
 int ide_cmd_ioctl(ide_drive_t *, unsigned int, unsigned long);
 int ide_task_ioctl(ide_drive_t *, unsigned int, unsigned long);
 
-extern void ide_delay_50ms(void);
 extern int system_bus_clock(void);
 
 extern u8 ide_auto_reduce_xfer(ide_drive_t *);

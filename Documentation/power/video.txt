@@ -30,6 +30,10 @@ There are three types of systems where video works after S3 resume:
   patched X, and plain text console (no vesafb or radeonfb), see
   http://www.doesi.gmxhome.de/linux/tm800s3/s3.html. (Acer TM 800)
 
+* radeon systems, where X can soft-boot your video card. You'll need
+  patched X, and plain text console (no vesafb or radeonfb), see
+  http://www.doesi.gmxhome.de/linux/tm800s3/s3.html. (Acer TM 800)
+
 Now, if you pass acpi_sleep=something, and it does not work with your
 bios, you'll get hard crash during resume. Be carefull.
 

@@ -846,7 +846,12 @@ struct dentry * d_alloc_anon(struct inode *inode)
 			res->d_sb = inode->i_sb;
 			res->d_parent = res;
 			res->d_inode = inode;
-			res->d_bucket = d_hash(res, res->d_name.hash);
+
+			/*
+			 * Set d_bucket to an "impossible" bucket address so
+			 * that d_move() doesn't get a false positive
+			 */
+			res->d_bucket = dentry_hashtable + D_HASHMASK + 1;
 			res->d_flags |= DCACHE_DISCONNECTED;
 			res->d_flags &= ~DCACHE_UNHASHED;
 			list_add(&res->d_alias, &inode->i_dentry);

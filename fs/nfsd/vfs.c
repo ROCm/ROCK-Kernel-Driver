@@ -1228,8 +1228,8 @@ nfsd_symlink(struct svc_rqst *rqstp, struct svc_fh *fhp,
 		err = nfserrno(err);
 	fh_unlock(fhp);
 
-	/* Compose the fh so the dentry will be freed ... */
 	cerr = fh_compose(resfhp, fhp->fh_export, dnew, fhp);
+	dput(dnew);
 	if (err==0) err = cerr;
 out:
 	return err;

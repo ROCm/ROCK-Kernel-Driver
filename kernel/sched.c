@@ -3566,7 +3566,8 @@ static int migration_call(struct notifier_block *nfb, unsigned long action,
 		/* Idle task back to normal (off runqueue, low prio) */
 		rq = task_rq_lock(rq->idle, &flags);
 		deactivate_task(rq->idle, rq);
-		__setscheduler(rq->idle, SCHED_NORMAL, MAX_PRIO);
+		rq->idle->static_prio = MAX_PRIO;
+		__setscheduler(rq->idle, SCHED_NORMAL, 0);
 		task_rq_unlock(rq, &flags);
  		BUG_ON(rq->nr_running != 0);
 

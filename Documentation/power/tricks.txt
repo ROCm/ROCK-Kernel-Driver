@@ -7,6 +7,8 @@ If you want to trick swsusp/S3 into working, you might want to try:
 * go with minimal config, turn off drivers like USB, AGP you don't
   really need
 
+* turn off APIC and preempt
+
 * use ext2. At least it has working fsck. [If something seemes to go
   wrong, force fsck when you have a chance]
 
