@@ -304,10 +304,11 @@ static int __rfcomm_dlc_open(struct rfcomm_dlc *d, bdaddr_t *src, bdaddr_t *dst,
 
 	rfcomm_dlc_clear_state(d);
 
-	d->dlci    = dlci;
-	d->addr    = __addr(s->initiator, dlci);
+	d->dlci     = dlci;
+	d->addr     = __addr(s->initiator, dlci);
+	d->priority = 7;
 
-	d->state   = BT_CONFIG;
+	d->state    = BT_CONFIG;
 	rfcomm_dlc_link(s, d);
 
 	d->mtu     = s->mtu;
@@ -744,7 +745,7 @@ static int rfcomm_send_pn(struct rfcomm_session *s, int cr, struct rfcomm_dlc *d
 
 	pn = (void *) ptr; ptr += sizeof(*pn);
 	pn->dlci        = d->dlci;
-	pn->priority    = 0;
+	pn->priority    = d->priority;
 	pn->ack_timer   = 0;
 	pn->max_retrans = 0;
 
@@ -1102,8 +1103,6 @@ static int rfcomm_apply_pn(struct rfcomm_dlc *d, int cr, struct rfcomm_pn *pn)
 			set_bit(RFCOMM_TX_THROTTLED, &d->flags);
 			d->credits = 0;
 		}
-
-		d->mtu = btohs(pn->mtu);
 	} else {
 		if (pn->flow_ctrl == 0xe0) {
 			d->tx_credits = pn->credits;
@@ -1111,9 +1110,11 @@ static int rfcomm_apply_pn(struct rfcomm_dlc *d, int cr, struct rfcomm_pn *pn)
 			set_bit(RFCOMM_TX_THROTTLED, &d->flags);
 			d->credits = 0;
 		}
-
-		d->mtu = btohs(pn->mtu);
 	}
+
+	d->priority = pn->priority;
+
+	d->mtu = btohs(pn->mtu);
 
 	return 0;
 }
@@ -1140,7 +1141,7 @@ static int rfcomm_recv_pn(struct rfcomm_session *s, int cr, struct sk_buff *skb)
 			switch (d->state) {
 			case BT_CONFIG:
 				rfcomm_apply_pn(d, cr, pn);
-				
+
 				d->state = BT_CONNECT;
 				rfcomm_send_sabm(s, d->dlci);
 				break;
@@ -1151,7 +1152,7 @@ static int rfcomm_recv_pn(struct rfcomm_session *s, int cr, struct sk_buff *skb)
 
 		if (!cr)
 			return 0;
-		
+
 		/* PN request for non existing DLC.
 		 * Assume incoming connection. */
 		if (rfcomm_connect_ind(s, channel, &d)) {
@@ -1160,7 +1161,7 @@ static int rfcomm_recv_pn(struct rfcomm_session *s, int cr, struct sk_buff *skb)
 			rfcomm_dlc_link(s, d);
 
 			rfcomm_apply_pn(d, cr, pn);
-			
+
 			d->state = BT_OPEN;
 			rfcomm_send_pn(s, 0, d);
 		} else {
@@ -1232,21 +1233,21 @@ static int rfcomm_recv_rpn(struct rfcomm_session *s, int cr, int len, struct sk_
 	if (rpn->param_mask & RFCOMM_RPN_PM_FLOW) {
 		if (rpn->flow_ctrl != RFCOMM_RPN_FLOW_NONE) {
 			BT_DBG("RPN flow ctrl mismatch 0x%x", rpn->flow_ctrl);
-			rpn->flow_ctrl = RFCOMM_RPN_FLOW_NONE;
+			flow_ctrl = RFCOMM_RPN_FLOW_NONE;
 			rpn_mask ^= RFCOMM_RPN_PM_FLOW;
 		}
 	}
 	if (rpn->param_mask & RFCOMM_RPN_PM_XON) {
 		if (rpn->xon_char != RFCOMM_RPN_XON_CHAR) {
 			BT_DBG("RPN XON char mismatch 0x%x", rpn->xon_char);
-			rpn->xon_char = RFCOMM_RPN_XON_CHAR;
+			xon_char = RFCOMM_RPN_XON_CHAR;
 			rpn_mask ^= RFCOMM_RPN_PM_XON;
 		}
 	}
 	if (rpn->param_mask & RFCOMM_RPN_PM_XOFF) {
 		if (rpn->xoff_char != RFCOMM_RPN_XOFF_CHAR) {
 			BT_DBG("RPN XOFF char mismatch 0x%x", rpn->xoff_char);
-			rpn->xoff_char = RFCOMM_RPN_XOFF_CHAR;
+			xoff_char = RFCOMM_RPN_XOFF_CHAR;
 			rpn_mask ^= RFCOMM_RPN_PM_XOFF;
 		}
 	}
