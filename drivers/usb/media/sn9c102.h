@@ -30,8 +30,7 @@
 #include <linux/wait.h>
 #include <linux/types.h>
 #include <linux/param.h>
-#include <asm/semaphore.h>
-#include <asm/rwsem.h>
+#include <linux/rwsem.h>
 
 #include "sn9c102_sensor.h"
 
