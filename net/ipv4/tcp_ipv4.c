@@ -2289,6 +2289,10 @@ static void *established_get_first(struct seq_file *seq)
 		struct hlist_node *node;
 		struct tcp_tw_bucket *tw;
 	       
+		if (hlist_empty(&tcp_ehash[st->bucket].chain) &&
+		    hlist_empty(&tcp_ehash[st->bucket+tcp_ehash_size].chain)
+		)
+			continue;
 		read_lock(&tcp_ehash[st->bucket].lock);
 		sk_for_each(sk, node, &tcp_ehash[st->bucket].chain) {
 			if (sk->sk_family != st->family) {
@@ -2335,13 +2339,18 @@ get_tw:
 		}
 		read_unlock(&tcp_ehash[st->bucket].lock);
 		st->state = TCP_SEQ_STATE_ESTABLISHED;
-		if (++st->bucket < tcp_ehash_size) {
-			read_lock(&tcp_ehash[st->bucket].lock);
-			sk = sk_head(&tcp_ehash[st->bucket].chain);
-		} else {
+
+		while ((++st->bucket < tcp_ehash_size) &&
+			hlist_empty(&tcp_ehash[st->bucket].chain) &&
+		        hlist_empty(&tcp_ehash[st->bucket+tcp_ehash_size].chain)
+		)	
+			/*empty*/;
+		if (st->bucket >= tcp_ehash_size) {
 			cur = NULL;
 			goto out;
 		}
+		read_lock(&tcp_ehash[st->bucket].lock);
+		sk = sk_head(&tcp_ehash[st->bucket].chain);
 	} else
 		sk = sk_next(sk);
 
