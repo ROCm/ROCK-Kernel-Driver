@@ -350,17 +350,15 @@ ENTRY(cpu_arm926_set_pgd)
 	mov	pc, lr
 
 /*
- * cpu_arm926_set_pmd(pmdp, pmd)
+ * cpu_arm926_flush_pmd(pmdp)
  *
  * Set a level 1 translation table entry, and clean it out of
  * any caches such that the MMUs can load it correctly.
  *
  * pmdp: pointer to PMD entry
- * pmd:  PMD value to store
  */
 	.align	5
-ENTRY(cpu_arm926_set_pmd)
-	str	r1, [r0]
+ENTRY(cpu_arm926_flush_pmd)
 #ifndef CONFIG_CPU_DCACHE_WRITETHROUGH
 	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
 #endif
@@ -500,7 +498,7 @@ arm926_processor_functions:
 
 	/* pgtable */
 	.word	cpu_arm926_set_pgd
-	.word	cpu_arm926_set_pmd
+	.word	cpu_arm926_flush_pmd
 	.word	cpu_arm926_set_pte
 
 	.size	arm926_processor_functions, . - arm926_processor_functions
