@@ -1498,10 +1498,6 @@ config E100
 	  <file:Documentation/networking/net-modules.txt>.  The module
 	  will be called e100.
 
-config E100_NAPI
-	bool "Use Rx Polling (NAPI)"
-	depends on E100
-
 config LNE390
 	tristate "Mylex EISA LNE390A/B support (EXPERIMENTAL)"
 	depends on NET_PCI && EISA && EXPERIMENTAL
