@@ -557,6 +557,7 @@ again:
 			if (page) {
 				block_invalidatepage(page, 0);
 				unlock_page(page);
+				page_cache_release(page);
 			}
 		}
 	}

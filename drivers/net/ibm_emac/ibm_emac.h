@@ -228,6 +228,21 @@ typedef struct emac_regs {
 	 (desc & EMAC_BAD_RX_PACKET)
 #endif
 
+/* SoC implementation specific EMAC register defaults */
+#if defined(CONFIG_440GP)
+#define EMAC_RWMR_DEFAULT		0x80009000
+#define EMAC_TMR0_DEFAULT		0x00000000
+#define EMAC_TMR1_DEFAULT		0xf8640000
+#elif defined(CONFIG_440GX)
+#define EMAC_RWMR_DEFAULT		0x1000a200
+#define EMAC_TMR0_DEFAULT		EMAC_TMR0_TFAE_2_32
+#define EMAC_TMR1_DEFAULT		0xa00f0000
+#else
+#define EMAC_RWMR_DEFAULT		0x0f002000
+#define EMAC_TMR0_DEFAULT		0x00000000
+#define EMAC_TMR1_DEFAULT		0x380f0000
+#endif				/* CONFIG_440GP */
+
 /* Revision specific EMAC register defaults */
 #ifdef CONFIG_IBM_EMAC4
 #define EMAC_M1_DEFAULT			(EMAC_M1_BASE | \
@@ -236,7 +251,7 @@ typedef struct emac_regs {
 #define EMAC_RMR_DEFAULT		(EMAC_RMR_BASE | \
 					EMAC_RMR_RFAF_128_2048)
 #define EMAC_TMR0_XMIT			(EMAC_TMR0_GNP0 | \
-					EMAC_TMR0_TFAE_128_2048)
+					EMAC_TMR0_DEFAULT)
 #define EMAC_TRTR_DEFAULT		EMAC_TRTR_1024
 #else				/* !CONFIG_IBM_EMAC4 */
 #define EMAC_M1_DEFAULT			EMAC_M1_BASE
@@ -244,20 +259,5 @@ typedef struct emac_regs {
 #define EMAC_TMR0_XMIT			EMAC_TMR0_GNP0
 #define EMAC_TRTR_DEFAULT		EMAC_TRTR_1600
 #endif				/* CONFIG_IBM_EMAC4 */
-
-/* SoC implementation specific EMAC register defaults */
-#if defined(CONFIG_440GP)
-#define EMAC_RWMR_DEFAULT		0x80009000
-#define EMAC_TMR0_DEFAULT		0x00000000
-#define EMAC_TMR1_DEFAULT		0xf8640000
-#elif defined(CONFIG_440GX)
-#define EMAC_RWMR_DEFAULT		0x1000a200
-#define EMAC_TMR0_DEFAULT		EMAC_TMR0_TFAE_128_2048
-#define EMAC_TMR1_DEFAULT		0x88810000
-#else
-#define EMAC_RWMR_DEFAULT		0x0f002000
-#define EMAC_TMR0_DEFAULT		0x00000000
-#define EMAC_TMR1_DEFAULT		0x380f0000
-#endif				/* CONFIG_440GP */
 
 #endif

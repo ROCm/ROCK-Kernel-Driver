@@ -2621,8 +2621,6 @@ void txAbort(tid_t tid, int dirty)
 	struct tblock *tblk = tid_to_tblock(tid);
 	struct tlock *tlck;
 
-	jfs_warn("txAbort: tid:%d dirty:0x%x", tid, dirty);
-
 	/*
 	 * free tlocks of the transaction
 	 */
