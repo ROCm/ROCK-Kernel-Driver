@@ -279,6 +279,112 @@ static CLASS_DEVICE_ATTR(host_##field, S_IRUGO | S_IWUSR,		\
 fc_host_rw_attr(link_down_tmo, "%d\n");
 
 
+/*
+ * Host Statistics Management
+ */
+
+/* Show a given an attribute in the statistics group */
+static ssize_t
+fc_stat_show(const struct class_device *cdev, char *buf, unsigned long offset)
+{
+	struct Scsi_Host *shost = transport_class_to_shost(cdev);
+	struct fc_internal *i = to_fc_internal(shost->transportt);
+	struct fc_host_statistics *stats;
+	ssize_t ret = -ENOENT;
+
+	if (offset > sizeof(struct fc_host_statistics) ||
+	    offset % sizeof(uint64_t) != 0)
+		WARN_ON(1);
+
+	if (i->f->get_fc_host_stats) {
+		stats = (i->f->get_fc_host_stats)(shost);
+		if (stats)
+			ret = snprintf(buf, 20, "0x%llx\n",
+			      *(uint64_t *)(((u8 *) stats) + offset));
+	}
+	return ret;
+}
+
+
+/* generate a read-only statistics attribute */
+#define fc_host_statistic(name)						\
+static ssize_t show_fcstat_##name(struct class_device *cd, char *buf) 	\
+{									\
+	return fc_stat_show(cd, buf, 					\
+			    offsetof(struct fc_host_statistics, name));	\
+}									\
+static CLASS_DEVICE_ATTR(name, S_IRUGO, show_fcstat_##name, NULL)
+
+fc_host_statistic(seconds_since_last_reset);
+fc_host_statistic(tx_frames);
+fc_host_statistic(tx_words);
+fc_host_statistic(rx_frames);
+fc_host_statistic(rx_words);
+fc_host_statistic(lip_count);
+fc_host_statistic(nos_count);
+fc_host_statistic(error_frames);
+fc_host_statistic(dumped_frames);
+fc_host_statistic(link_failure_count);
+fc_host_statistic(loss_of_sync_count);
+fc_host_statistic(loss_of_signal_count);
+fc_host_statistic(prim_seq_protocol_err_count);
+fc_host_statistic(invalid_tx_word_count);
+fc_host_statistic(invalid_crc_count);
+fc_host_statistic(fcp_input_requests);
+fc_host_statistic(fcp_output_requests);
+fc_host_statistic(fcp_control_requests);
+fc_host_statistic(fcp_input_megabytes);
+fc_host_statistic(fcp_output_megabytes);
+
+static ssize_t
+fc_reset_statistics(struct class_device *cdev, const char *buf,
+			   size_t count)
+{
+	struct Scsi_Host *shost = transport_class_to_shost(cdev);
+	struct fc_internal *i = to_fc_internal(shost->transportt);
+
+	/* ignore any data value written to the attribute */
+	if (i->f->reset_fc_host_stats) {
+		i->f->reset_fc_host_stats(shost);
+		return count;
+	}
+
+	return -ENOENT;
+}
+static CLASS_DEVICE_ATTR(reset_statistics, S_IWUSR, NULL, fc_reset_statistics);
+
+
+static struct attribute *fc_statistics_attrs[] = {
+	&class_device_attr_seconds_since_last_reset.attr,
+	&class_device_attr_tx_frames.attr,
+	&class_device_attr_tx_words.attr,
+	&class_device_attr_rx_frames.attr,
+	&class_device_attr_rx_words.attr,
+	&class_device_attr_lip_count.attr,
+	&class_device_attr_nos_count.attr,
+	&class_device_attr_error_frames.attr,
+	&class_device_attr_dumped_frames.attr,
+	&class_device_attr_link_failure_count.attr,
+	&class_device_attr_loss_of_sync_count.attr,
+	&class_device_attr_loss_of_signal_count.attr,
+	&class_device_attr_prim_seq_protocol_err_count.attr,
+	&class_device_attr_invalid_tx_word_count.attr,
+	&class_device_attr_invalid_crc_count.attr,
+	&class_device_attr_fcp_input_requests.attr,
+	&class_device_attr_fcp_output_requests.attr,
+	&class_device_attr_fcp_control_requests.attr,
+	&class_device_attr_fcp_input_megabytes.attr,
+	&class_device_attr_fcp_output_megabytes.attr,
+	&class_device_attr_reset_statistics.attr,
+	NULL
+};
+
+static struct attribute_group fc_statistics_group = {
+	.name = "statistics",
+	.attrs = fc_statistics_attrs,
+};
+
+
 
 struct scsi_transport_template *
 fc_attach_transport(struct fc_function_template *ft)
@@ -303,6 +409,10 @@ fc_attach_transport(struct fc_function_template *ft)
 	i->t.host_setup = &fc_setup_host_transport_attrs;
 	i->t.host_destroy = &fc_destroy_host;
 	i->t.host_size = sizeof(struct fc_host_attrs);
+
+	if (ft->get_fc_host_stats)
+		i->t.host_statistics = &fc_statistics_group;
+
 	i->f = ft;
 
 	

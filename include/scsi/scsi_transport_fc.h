@@ -43,6 +43,39 @@ struct fc_starget_attrs {	/* aka fc_target_attrs */
 #define fc_starget_dev_loss_work(x) \
 	(((struct fc_starget_attrs *)&(x)->starget_data)->dev_loss_work)
 
+
+/*
+ * FC Local Port (Host) Statistics
+ */
+
+/* FC Statistics - Following FC HBAAPI v2.0 guidelines */
+struct fc_host_statistics {
+	/* port statistics */
+	uint64_t seconds_since_last_reset;
+	uint64_t tx_frames;
+	uint64_t tx_words;
+	uint64_t rx_frames;
+	uint64_t rx_words;
+	uint64_t lip_count;
+	uint64_t nos_count;
+	uint64_t error_frames;
+	uint64_t dumped_frames;
+	uint64_t link_failure_count;
+	uint64_t loss_of_sync_count;
+	uint64_t loss_of_signal_count;
+	uint64_t prim_seq_protocol_err_count;
+	uint64_t invalid_tx_word_count;
+	uint64_t invalid_crc_count;
+	
+	/* fc4 statistics  (only FCP supported currently) */
+	uint64_t fcp_input_requests;
+	uint64_t fcp_output_requests;
+	uint64_t fcp_control_requests;
+	uint64_t fcp_input_megabytes;
+	uint64_t fcp_output_megabytes;
+};
+
+
 struct fc_host_attrs {
 	uint32_t link_down_tmo;	/* Link Down timeout in seconds. */
 	struct work_struct link_down_work;
@@ -64,6 +97,9 @@ struct fc_function_template {
 
 	void    (*get_host_link_down_tmo)(struct Scsi_Host *);
 	void	(*set_host_link_down_tmo)(struct Scsi_Host *, uint32_t);
+
+	struct fc_host_statistics * (*get_fc_host_stats)(struct Scsi_Host *);
+	void	(*reset_fc_host_stats)(struct Scsi_Host *);
 
 	/* 
 	 * The driver sets these to tell the transport class it
