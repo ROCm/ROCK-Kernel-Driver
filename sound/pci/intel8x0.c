@@ -444,6 +444,10 @@ struct _snd_intel8x0 {
 	struct snd_dma_buffer bdbars;
 	u32 int_sta_reg;		/* interrupt status register */
 	u32 int_sta_mask;		/* interrupt status mask */
+
+#ifdef CONFIG_PM
+	u32 pci_state[64 / sizeof(u32)];
+#endif
 };
 
 static struct pci_device_id snd_intel8x0_ids[] = {
@@ -2208,6 +2212,7 @@ static int intel8x0_suspend(snd_card_t *card, unsigned int state)
 	for (i = 0; i < 3; i++)
 		if (chip->ac97[i])
 			snd_ac97_suspend(chip->ac97[i]);
+	pci_save_state(chip->pci, chip->pci_state);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
@@ -2217,6 +2222,7 @@ static int intel8x0_resume(snd_card_t *card, unsigned int state)
 	intel8x0_t *chip = snd_magic_cast(intel8x0_t, card->pm_private_data, return -EINVAL);
 	int i;
 
+	pci_restore_state(chip->pci, chip->pci_state);
 	pci_enable_device(chip->pci);
 	pci_set_master(chip->pci);
 	snd_intel8x0_chip_init(chip, 0);
