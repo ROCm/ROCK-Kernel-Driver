@@ -927,6 +927,12 @@ static unsigned int atapi_xlat(struct ata_queued_cmd *qc, u8 *scsicmd)
 		qc->flags |= ATA_QCFLAG_SG; /* data is present; dma-map it */
 		qc->tf.protocol = ATA_PROT_ATAPI_DMA;
 		qc->tf.feature |= ATAPI_PKT_DMA;
+
+#ifdef ATAPI_ENABLE_DMADIR
+		/* some SATA bridges need us to indicate data xfer direction */
+		if (cmd->sc_data_direction != SCSI_DATA_WRITE)
+			qc->tf.feature |= ATAPI_DMADIR;
+#endif
 	}
 
 	return 0;
