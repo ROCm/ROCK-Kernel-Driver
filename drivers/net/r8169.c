@@ -279,15 +279,15 @@ struct rtl8169_private {
 	struct net_device_stats stats;	/* statistics of net device */
 	spinlock_t lock;	/* spin lock flag */
 	int chipset;
-	unsigned long cur_rx;	/* Index into the Rx descriptor buffer of next Rx pkt. */
-	unsigned long cur_tx;	/* Index into the Tx descriptor buffer of next Rx pkt. */
-	unsigned long dirty_tx;
+	u32 cur_rx; /* Index into the Rx descriptor buffer of next Rx pkt. */
+	u32 cur_tx; /* Index into the Tx descriptor buffer of next Rx pkt. */
+	u32 dirty_rx;
+	u32 dirty_tx;
 	struct TxDesc *TxDescArray;	/* Index of 256-alignment Tx Descriptor buffer */
 	struct RxDesc *RxDescArray;	/* Index of 256-alignment Rx Descriptor buffer */
 	dma_addr_t TxPhyAddr;
 	dma_addr_t RxPhyAddr;
-	unsigned char *RxBufferRings;	/* Index of Rx Buffer  */
-	unsigned char *RxBufferRing[NUM_RX_DESC];	/* Index of Rx Buffer array */
+	struct sk_buff *Rx_skbuff[NUM_RX_DESC];	/* Rx data buffers */
 	struct sk_buff *Tx_skbuff[NUM_TX_DESC];	/* Index of Transmit data buffer */
 };
 
@@ -753,37 +753,119 @@ rtl8169_hw_start(struct net_device *dev)
 
 }
 
+static inline void rtl8169_make_unusable_by_asic(struct RxDesc *desc)
+{
+	desc->buf_addr = 0xdeadbeef;
+	desc->status = EORbit; 
+}
+
+static void rtl8169_free_rx_skb(struct pci_dev *pdev, struct sk_buff **sk_buff,
+				struct RxDesc *desc)
+{
+	pci_unmap_single(pdev, desc->buf_addr, RX_BUF_SIZE, PCI_DMA_FROMDEVICE);
+	dev_kfree_skb(*sk_buff);
+	*sk_buff = NULL;
+	rtl8169_make_unusable_by_asic(desc);
+}
+
+static inline void rtl8169_give_to_asic(struct RxDesc *desc, dma_addr_t mapping)
+{
+	desc->buf_addr = mapping;
+	desc->status = OWNbit + RX_BUF_SIZE;
+}
+
+static int rtl8169_alloc_rx_skb(struct pci_dev *pdev, struct net_device *dev,
+				struct sk_buff **sk_buff, struct RxDesc *desc)
+{
+	struct sk_buff *skb;
+	dma_addr_t mapping;
+	int ret = 0;
+
+	skb = dev_alloc_skb(RX_BUF_SIZE);
+	if (!skb)
+		goto err_out;
+
+	skb->dev = dev;
+	skb_reserve(skb, 2);
+	*sk_buff = skb;
+
+	mapping = pci_map_single(pdev, skb->tail, RX_BUF_SIZE,
+				 PCI_DMA_FROMDEVICE);
+
+	rtl8169_give_to_asic(desc, mapping);
+
+out:
+	return ret;
+
+err_out:
+	ret = -ENOMEM;
+	rtl8169_make_unusable_by_asic(desc);
+	goto out;
+}
+
+static void rtl8169_rx_clear(struct rtl8169_private *tp)
+{
+	int i;
+
+	for (i = 0; i < NUM_RX_DESC; i++) {
+		if (tp->Rx_skbuff[i]) {
+			rtl8169_free_rx_skb(tp->pci_dev, tp->Rx_skbuff + i,
+					    tp->RxDescArray + i);
+		}
+	}
+}
+
+static u32 rtl8169_rx_fill(struct rtl8169_private *tp, struct net_device *dev,
+			   u32 start, u32 end)
+{
+	u32 cur;
+	
+	for (cur = start; end - start > 0; cur++) {
+		int ret, i = cur % NUM_RX_DESC;
+
+		if (tp->Rx_skbuff[i])
+			continue;
+			
+		ret = rtl8169_alloc_rx_skb(tp->pci_dev, dev, tp->Rx_skbuff + i,
+					   tp->RxDescArray + i);
+		if (ret < 0)
+			break;
+	}
+	return cur - start;
+}
+
+static inline void rtl8169_mark_as_last_descriptor(struct RxDesc *desc)
+{
+	desc->status |= EORbit;
+}
+
+static inline void rtl8169_unmark_as_last_descriptor(struct RxDesc *desc)
+{
+	desc->status &= ~EORbit;
+}
+
 static int rtl8169_init_ring(struct net_device *dev)
 {
 	struct rtl8169_private *tp = dev->priv;
-	int i;
 
-	tp->RxBufferRings = kmalloc(RX_BUF_SIZE * NUM_RX_DESC, GFP_KERNEL);
-	if (tp->RxBufferRings == NULL) {
-		printk(KERN_INFO "Allocate RxBufferRing failed\n");
-		return -ENOMEM;
-	}
-
-	tp->cur_rx = 0;
-	tp->cur_tx = 0;
-	tp->dirty_tx = 0;
+	tp->cur_rx = tp->dirty_rx = 0;
+	tp->cur_tx = tp->dirty_tx = 0;
 	memset(tp->TxDescArray, 0x0, NUM_TX_DESC * sizeof (struct TxDesc));
 	memset(tp->RxDescArray, 0x0, NUM_RX_DESC * sizeof (struct RxDesc));
 
-	for (i = 0; i < NUM_TX_DESC; i++) {
-		tp->Tx_skbuff[i] = NULL;
-	}
-	for (i = 0; i < NUM_RX_DESC; i++) {
-		if (i == (NUM_RX_DESC - 1))
-			tp->RxDescArray[i].status =
-			    (OWNbit | EORbit) + RX_BUF_SIZE;
-		else
-			tp->RxDescArray[i].status = OWNbit + RX_BUF_SIZE;
+	memset(tp->Tx_skbuff, 0x0, NUM_TX_DESC * sizeof(struct sk_buff *));
+	memset(tp->Rx_skbuff, 0x0, NUM_RX_DESC * sizeof(struct sk_buff *));
 
-		tp->RxBufferRing[i] = &(tp->RxBufferRings[i * RX_BUF_SIZE]);
-		tp->RxDescArray[i].buf_addr = virt_to_bus(tp->RxBufferRing[i]);
-	}
+	if (rtl8169_rx_fill(tp, dev, 0, NUM_RX_DESC) != NUM_RX_DESC)
+		goto err_out;
+
+	rtl8169_mark_as_last_descriptor(tp->RxDescArray + NUM_RX_DESC - 1);
+
 	return 0;
+
+err_out:
+	rtl8169_rx_clear(tp);
+	return -ENOMEM;
 }
 
 static void
@@ -903,70 +985,77 @@ rtl8169_tx_interrupt(struct net_device *dev, struct rtl8169_private *tp,
 	}
 }
 
+static inline void rtl8169_unmap_rx(struct pci_dev *pdev, struct RxDesc *desc)
+{
+	pci_dma_sync_single(pdev, le32_to_cpu(desc->buf_addr), RX_BUF_SIZE,
+			    PCI_DMA_FROMDEVICE);
+	pci_unmap_single(pdev, le32_to_cpu(desc->buf_addr), RX_BUF_SIZE,
+			 PCI_DMA_FROMDEVICE);
+}
+
 static void
 rtl8169_rx_interrupt(struct net_device *dev, struct rtl8169_private *tp,
 		     void *ioaddr)
 {
-	int cur_rx;
-	struct sk_buff *skb;
-	int pkt_size = 0;
+	int cur_rx, delta;
 
 	assert(dev != NULL);
 	assert(tp != NULL);
 	assert(ioaddr != NULL);
 
-	cur_rx = tp->cur_rx;
+	cur_rx = tp->cur_rx % RX_BUF_SIZE;
 
 	while ((tp->RxDescArray[cur_rx].status & OWNbit) == 0) {
+		u32 status = tp->RxDescArray[cur_rx].status;
 
-		if (tp->RxDescArray[cur_rx].status & RxRES) {
+		if (status & RxRES) {
 			printk(KERN_INFO "%s: Rx ERROR!!!\n", dev->name);
 			tp->stats.rx_errors++;
-			if (tp->RxDescArray[cur_rx].status & (RxRWT | RxRUNT))
+			if (status & (RxRWT | RxRUNT))
 				tp->stats.rx_length_errors++;
-			if (tp->RxDescArray[cur_rx].status & RxCRC)
+			if (status & RxCRC)
 				tp->stats.rx_crc_errors++;
 		} else {
-			pkt_size =
-			    (int) (tp->RxDescArray[cur_rx].
-				   status & 0x00001FFF) - 4;
-			skb = dev_alloc_skb(pkt_size + 2);
-			if (skb != NULL) {
-				skb->dev = dev;
-				skb_reserve(skb, 2);	// 16 byte align the IP fields. //
-				eth_copy_and_sum(skb, tp->RxBufferRing[cur_rx],
-						 pkt_size, 0);
-				skb_put(skb, pkt_size);
-				skb->protocol = eth_type_trans(skb, dev);
-				netif_rx(skb);
+			struct sk_buff *skb = tp->Rx_skbuff[cur_rx];
+			int pkt_size = (status & 0x00001FFF) - 4;
 
-				if (cur_rx == (NUM_RX_DESC - 1))
-					tp->RxDescArray[cur_rx].status =
-					    (OWNbit | EORbit) + RX_BUF_SIZE;
-				else
-					tp->RxDescArray[cur_rx].status =
-					    OWNbit + RX_BUF_SIZE;
+			rtl8169_unmap_rx(tp->pci_dev, tp->RxDescArray + cur_rx);
 
-				tp->RxDescArray[cur_rx].buf_addr =
-				    virt_to_bus(tp->RxBufferRing[cur_rx]);
-				dev->last_rx = jiffies;
-				tp->stats.rx_bytes += pkt_size;
-				tp->stats.rx_packets++;
-			} else {
-				printk(KERN_WARNING
-				       "%s: Memory squeeze, deferring packet.\n",
-				       dev->name);
-				/* We should check that some rx space is free.
-				   If not, free one and mark stats->rx_dropped++. */
-				tp->stats.rx_dropped++;
-			}
+			skb_put(skb, pkt_size);
+			skb->protocol = eth_type_trans(skb, dev);
+			netif_rx(skb);
+
+			tp->Rx_skbuff[cur_rx] = NULL;
+
+			dev->last_rx = jiffies;
+			tp->stats.rx_bytes += pkt_size;
+			tp->stats.rx_packets++;
 		}
-
-		cur_rx = (cur_rx + 1) % NUM_RX_DESC;
-
+		
+		tp->cur_rx++; 
+		cur_rx = tp->cur_rx % NUM_RX_DESC;
 	}
 
-	tp->cur_rx = cur_rx;
+	delta = rtl8169_rx_fill(tp, dev, tp->dirty_rx, tp->cur_rx);
+	if (delta > 0) {
+		u32 old_last = (tp->dirty_rx - 1) % NUM_RX_DESC;
+
+		tp->dirty_rx += delta;
+		rtl8169_mark_as_last_descriptor(tp->RxDescArray +
+						(tp->dirty_rx - 1)%NUM_RX_DESC);
+		rtl8169_unmark_as_last_descriptor(tp->RxDescArray + old_last);
+	} else if (delta < 0)
+		printk(KERN_INFO "%s: no Rx buffer allocated\n", dev->name);
+
+	/*
+	 * FIXME: until there is periodic timer to try and refill the ring,
+	 * a temporary shortage may definitely kill the Rx process.
+	 * - disable the asic to try and avoid an overflow and kick it again
+	 *   after refill ?
+	 * - how do others driver handle this condition (Uh oh...).
+	 */
+	if (tp->dirty_rx + NUM_RX_DESC == tp->cur_rx)
+		printk(KERN_EMERG "%s: Rx buffers exhausted\n", dev->name);
 }
 
 /* The interrupt handler does all of the Rx thread work and cleans up after the Tx thread. */
@@ -1029,7 +1118,6 @@ rtl8169_close(struct net_device *dev)
 	struct rtl8169_private *tp = dev->priv;
 	struct pci_dev *pdev = tp->pci_dev;
 	void *ioaddr = tp->mmio_addr;
-	int i;
 
 	netif_stop_queue(dev);
 
@@ -1051,16 +1139,15 @@ rtl8169_close(struct net_device *dev)
 	free_irq(dev->irq, dev);
 
 	rtl8169_tx_clear(tp);
+
+	rtl8169_rx_clear(tp);
+
 	pci_free_consistent(pdev, R8169_RX_RING_BYTES, tp->RxDescArray,
 			    tp->RxPhyAddr);
 	pci_free_consistent(pdev, R8169_TX_RING_BYTES, tp->TxDescArray,
 			    tp->TxPhyAddr);
 	tp->TxDescArray = NULL;
 	tp->RxDescArray = NULL;
-	kfree(tp->RxBufferRings);
-	for (i = 0; i < NUM_RX_DESC; i++) {
-		tp->RxBufferRing[i] = NULL;
-	}
 
 	return 0;
 }
