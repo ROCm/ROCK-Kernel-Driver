@@ -1048,7 +1048,7 @@ int isapnp_cfg_begin(int csn, int logdev)
 	isapnp_wait();
 	isapnp_key();
 	isapnp_wake(csn);
-#if 1
+#if 0
 	/* to avoid malfunction when the isapnptools package is used */
 	/* we must set RDP to our value again */
 	/* it is possible to set RDP only in the isolation phase */ 
