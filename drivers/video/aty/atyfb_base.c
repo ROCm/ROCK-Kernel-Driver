@@ -2191,6 +2191,14 @@ static int __init aty_init(struct fb_info *info, const char *name)
 	par->aty_cmap_regs =
 	    (struct aty_cmap_regs __iomem *) (par->ati_regbase + 0xc0);
 
+#ifdef CONFIG_PPC_PMAC
+	/* The Apple iBook1 uses non-standard memory frequencies. We detect it
+	 * and set the frequency manually. */
+	if (machine_is_compatible("PowerBook2,1")) {
+		par->pll_limits.mclk = 70;
+		par->pll_limits.xclk = 53;
+	}
+#endif
 	if (pll)
 		par->pll_limits.pll_max = pll;
 	if (mclk)
