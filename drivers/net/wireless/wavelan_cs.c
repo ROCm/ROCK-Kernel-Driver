@@ -282,9 +282,11 @@ mmc_out(u_long		base,
 	u_short		o,
 	u_char		d)
 {
+  int count = 0;
+
   /* Wait for MMC to go idle */
-  while(inb(HASR(base)) & HASR_MMI_BUSY)
-    ;
+  while((count++ < 100) && (inb(HASR(base)) & HASR_MMI_BUSY))
+    udelay(10);
 
   outb((u_char)((o << 1) | MMR_MMI_WR), MMR(base));
   outb(d, MMD(base));
@@ -317,14 +319,16 @@ static inline u_char
 mmc_in(u_long	base,
        u_short	o)
 {
-  while(inb(HASR(base)) & HASR_MMI_BUSY)
-    ;
+  int count = 0;
+
+  while((count++ < 100) && (inb(HASR(base)) & HASR_MMI_BUSY))
+    udelay(10);
   outb(o << 1, MMR(base));		/* Set the read address */
 
   outb(0, MMD(base));			/* Required dummy write */
 
-  while(inb(HASR(base)) & HASR_MMI_BUSY)
-    ;
+  while((count++ < 100) && (inb(HASR(base)) & HASR_MMI_BUSY))
+    udelay(10);
   return (u_char) (inb(MMD(base)));	/* Now do the actual read */
 }
 
@@ -3581,6 +3585,9 @@ wv_packet_write(device *	dev,
   /* Send the transmit command */
   wv_82593_cmd(dev, "wv_packet_write(): transmit",
 	       OP0_TRANSMIT, SR0_NO_RESULT);
+
+  /* Make sure the watchdog will keep quiet for a while */
+  dev->trans_start = jiffies;
 
   /* Keep stats up to date */
   lp->stats.tx_bytes += length;
