@@ -36,8 +36,8 @@
 #include <asm/irq.h>
 #include <asm/ecard.h>
 
-#include "../../scsi/scsi.h"
-#include "../../scsi/hosts.h"
+#include "../scsi.h"
+#include "../hosts.h"
 #include "fas216.h"
 
 struct arxescsi_info {
