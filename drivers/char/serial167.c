@@ -2379,7 +2379,7 @@ scrn[1] = '\0';
                                        | CyPARITY| CyFRAME| CyOVERRUN;
 		/* info->timeout */
 
-		printk("ttyS%1d ", info->line);
+		printk("ttyS%d ", info->line);
 		port_num++;info++;
 		if(!(port_num & 7)){
 		    printk("\n               ");

@@ -2592,7 +2592,7 @@ static int __init rs_8xx_init(void)
 		state->icount.rx = state->icount.tx = 0;
 		state->icount.frame = state->icount.parity = 0;
 		state->icount.overrun = state->icount.brk = 0;
-		printk(KERN_INFO "ttyS%02d at 0x%04x is a %s\n",
+		printk(KERN_INFO "ttyS%d at 0x%04x is a %s\n",
 		       i, (unsigned int)(state->port),
 		       (state->smc_scc_num & NUM_IS_SCC) ? "SCC" : "SMC");
 #ifdef CONFIG_SERIAL_CONSOLE
