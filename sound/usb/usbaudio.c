@@ -2002,7 +2002,7 @@ static int parse_audio_format_i_type(struct usb_device *dev, struct audioformat 
 		/* check the format byte size */
 		switch (fmt[5]) {
 		case 1:
-			pcm_format = SNDRV_PCM_FORMAT_U8;
+			pcm_format = SNDRV_PCM_FORMAT_S8;
 			break;
 		case 2:
 			pcm_format = SNDRV_PCM_FORMAT_S16_LE;
