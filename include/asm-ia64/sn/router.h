@@ -500,7 +500,7 @@ typedef struct router_info_s {
 
 	/*
 	 * Everything below here is for kernel use only and may change at	
-	 * at any time with or without a change in teh revision number
+	 * at any time with or without a change in the revision number
 	 *
 	 * Any pointers or things that come and go with DEBUG must go at
  	 * the bottom of the structure, below the user stuff.
