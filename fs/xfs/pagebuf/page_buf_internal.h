@@ -95,12 +95,6 @@ struct pagebuf_trace_buf {
 #define PB_TRACE_BUFSIZE	1024
 #define CIRC_INC(i)	(((i) + 1) & (PB_TRACE_BUFSIZE - 1))
 
-typedef struct pagebuf_daemon {
-	int			active;
-	spinlock_t		pb_delwrite_lock;
-	struct list_head	pb_delwrite_l;
-} pagebuf_daemon_t;
-
 /*
  * Tunable pagebuf parameters
  */
