@@ -13,7 +13,6 @@
 #include <linux/init.h>
 #include <linux/console.h>
 #include <linux/kdev_t.h>
-#include <linux/major.h>
 #include <linux/serial_reg.h>
 
 #include <asm/delay.h>
@@ -70,22 +69,19 @@ void putDebugChar(char kgdb_char)
 	ns16550_cons_put_char(kgdb_char, port);
 }
 
-static kdev_t
-ns16550_console_dev(struct console *c)
-{
-	return mk_kdev(TTY_MAJOR, 64 + c->index);
-}
-
 static struct console ns16550_console = {
     .name	= "prom",
     .setup	= NULL,
     .write	= ns16550_console_write,
-    .device	= ns16550_console_dev,
     .flags	= CON_PRINTBUFFER,
     .index	= -1,
 };
 
-void __init ns16550_setup_console(void)
+static int __init ns16550_setup_console(void)
 {
 	register_console(&ns16550_console);
+
+	return 0;
 }
+
+console_initcall(ns16550_setup_console);

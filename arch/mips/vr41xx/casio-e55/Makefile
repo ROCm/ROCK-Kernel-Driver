@@ -3,5 +3,3 @@
 #
 
 obj-y			+= init.o setup.o
-
-obj-$(CONFIG_IDE)	+= ide-e55.o

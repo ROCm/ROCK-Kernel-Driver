@@ -36,8 +36,6 @@ struct thread_info {
 	struct restart_block	restart_block;
 };
 
-#define PREEMPT_ACTIVE		0x4000000
-
 /*
  * macros/functions for gaining access to the thread information structure
  *
@@ -64,21 +62,43 @@ register struct thread_info *__current_thread_info __asm__("$28");
 #define current_thread_info()  __current_thread_info
 
 /* thread information allocation */
-#ifdef CONFIG_MIPS32
+#if defined(CONFIG_PAGE_SIZE_4KB) && defined(CONFIG_MIPS32)
 #define THREAD_SIZE_ORDER (1)
 #endif
-#ifdef CONFIG_MIPS64
-#define THREAD_SIZE_ORDER (1)
+#if defined(CONFIG_PAGE_SIZE_4KB) && defined(CONFIG_MIPS64)
+#define THREAD_SIZE_ORDER (2)
 #endif
+#ifdef CONFIG_PAGE_SIZE_16KB
+#define THREAD_SIZE_ORDER (0)
+#endif
+#ifdef CONFIG_PAGE_SIZE_64KB
+#define THREAD_SIZE_ORDER (0)
+#endif
+
 #define THREAD_SIZE (PAGE_SIZE << THREAD_SIZE_ORDER)
 #define THREAD_MASK (THREAD_SIZE - 1UL)
-#define alloc_thread_info(task) \
-	((struct thread_info *)kmalloc(THREAD_SIZE, GFP_KERNEL))
+
+#ifdef CONFIG_DEBUG_STACK_USAGE
+#define alloc_thread_info(tsk)					\
+({								\
+	struct thread_info *ret;				\
+								\
+	ret = kmalloc(THREAD_SIZE, GFP_KERNEL);			\
+	if (ret)						\
+		memset(ret, 0, THREAD_SIZE);			\
+	ret;							\
+})
+#else
+#define alloc_thread_info(tsk) kmalloc(THREAD_SIZE, GFP_KERNEL)
+#endif
+
 #define free_thread_info(info) kfree(info)
 #define get_thread_info(ti) get_task_struct((ti)->task)
 #define put_thread_info(ti) put_task_struct((ti)->task)
 
 #endif /* !__ASSEMBLY__ */
+
+#define PREEMPT_ACTIVE		0x4000000
 
 /*
  * thread information flags

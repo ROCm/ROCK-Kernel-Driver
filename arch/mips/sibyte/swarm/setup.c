@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2000, 2001 Broadcom Corporation
+ * Copyright (C) 2000, 2001, 2002, 2003 Broadcom Corporation
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -20,13 +20,12 @@
  * Setup code for the SWARM board
  */
 
+#include <linux/config.h>
 #include <linux/spinlock.h>
 #include <linux/mm.h>
 #include <linux/bootmem.h>
 #include <linux/blkdev.h>
 #include <linux/init.h>
-#include <linux/ide.h>
-#include <linux/console.h>
 
 #include <asm/irq.h>
 #include <asm/io.h>
@@ -39,13 +38,6 @@
 #include <asm/sibyte/sb1250_regs.h>
 #include <asm/sibyte/sb1250_genbus.h>
 #include <asm/sibyte/board.h>
-
-extern struct rtc_ops *rtc_ops;
-extern struct rtc_ops swarm_rtc_ops;
-
-#ifdef CONFIG_BLK_DEV_IDE
-extern struct ide_ops sibyte_ide_ops;
-#endif
 
 extern void sb1250_setup(void);
 
@@ -88,7 +80,7 @@ int swarm_be_handler(struct pt_regs *regs, int is_fixup)
 	return (is_fixup ? MIPS_BE_FIXUP : MIPS_BE_FATAL);
 }
 
-void __init swarm_setup(void)
+static void __init swarm_setup(void)
 {
 	extern int panic_timeout;
 
@@ -125,14 +117,7 @@ void __init swarm_setup(void)
 #endif
 	       " CFE\n");
 
-#ifdef CONFIG_BLK_DEV_IDE
-	ide_ops = &sibyte_ide_ops;
-#endif
-
 #ifdef CONFIG_VT
-#ifdef CONFIG_DUMMY_CONSOLE
-	conswitchp = &dummy_con;
-#endif
 	screen_info = (struct screen_info) {
 		0, 0,           /* orig-x, orig-y */
 		0,              /* unused */
@@ -148,6 +133,8 @@ void __init swarm_setup(void)
 #endif
 }
 
+early_initcall(swarm_setup);
+
 #ifdef LEDS_PHYS
 
 #ifdef CONFIG_SIBYTE_CARMEL
@@ -157,7 +144,7 @@ void __init swarm_setup(void)
 #endif
 
 #define setled(index, c) \
-  ((unsigned char *)(LEDS_PHYS|IO_SPACE_BASE|0x20))[(3-(index))<<3] = (c)
+  ((unsigned char *)(IOADDR(LEDS_PHYS)+0x20))[(3-(index))<<3] = (c)
 void setleds(char *str)
 {
 	int i;

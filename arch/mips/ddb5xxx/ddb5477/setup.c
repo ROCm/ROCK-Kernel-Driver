@@ -15,7 +15,6 @@
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
-#include <linux/console.h>
 #include <linux/sched.h>
 #include <linux/pci.h>
 #include <linux/ide.h>
@@ -36,9 +35,7 @@
 #include <asm/gdb-stub.h>
 #include <asm/traps.h>
 #include <asm/debug.h>
-#ifdef CONFIG_PC_KEYB
-#include <asm/keyboard.h> 
-#endif 
+#include <asm/pci_channel.h>
 
 #include <asm/ddb5xxx/ddb5xxx.h>
 
@@ -141,11 +138,11 @@ static void __init ddb_time_init(void)
 		bus_frequency = detect_bus_frequency(rtc_base);
 	}
 
-	/* mips_counter_frequency is 1/2 of the cpu core freq */
-	i =  (read_32bit_cp0_register(CP0_CONFIG) >> 28 ) & 7;
+	/* mips_hpt_frequency is 1/2 of the cpu core freq */
+	i =  (read_c0_config() >> 28 ) & 7;
 	if ((current_cpu_data.cputype == CPU_R5432) && (i == 3)) 
 		i = 4;
-	mips_counter_frequency = bus_frequency*(i+4)/4;
+	mips_hpt_frequency = bus_frequency*(i+4)/4;
 }
 
 extern int setup_irq(unsigned int irq, struct irqaction *irqaction);
@@ -153,7 +150,6 @@ extern int setup_irq(unsigned int irq, struct irqaction *irqaction);
 static void __init ddb_timer_setup(struct irqaction *irq)
 {
 #if defined(USE_CPU_COUNTER_TIMER)
-	unsigned int count;
 
         /* we are using the cpu counter for timer interrupts */
 	setup_irq(CPU_IRQ_BASE + 7, irq);
@@ -170,17 +166,14 @@ static void __init ddb_timer_setup(struct irqaction *irq)
 
 static void ddb5477_board_init(void);
 extern void ddb5477_irq_setup(void);
+extern void (*irq_setup)(void);
 
-#if defined(CONFIG_BLK_DEV_INITRD)
-extern unsigned long __rd_start, __rd_end, initrd_start, initrd_end;
-#endif
+extern struct pci_controller ddb5477_ext_controller;
+extern struct pci_controller ddb5477_io_controller;
 
-void __init ddb_setup(void)
+static int  ddb5477_setup(void)
 {
 	extern int panic_timeout;
-#ifdef CONFIG_BLK_DEV_IDE
-	extern struct ide_ops std_ide_ops;   
-#endif
 
 	/* initialize board - we don't trust the loader */
         ddb5477_board_init();
@@ -202,27 +195,16 @@ void __init ddb_setup(void)
 	/* Reboot on panic */
 	panic_timeout = 180;
 
-#ifdef CONFIG_BLK_DEV_IDE
-	ide_ops = &std_ide_ops;
-#endif
+	register_pci_controller (&ddb5477_ext_controller);
+	register_pci_controller (&ddb5477_io_controller);
 
-
-#ifdef CONFIG_FB
-	conswitchp = &dummy_con;
-#endif
-
-#if defined(CONFIG_BLK_DEV_INITRD)
-	ROOT_DEV = Root_RAM0;
-	initrd_start = (unsigned long)&__rd_start;
-	initrd_end = (unsigned long)&__rd_end;
-#endif
+	return 0;
 }
+
+early_initcall(ddb5477_setup);
 
 static void __init ddb5477_board_init(void)
 {
-#ifdef CONFIG_PC_KEYB
-	extern struct kbd_ops std_kbd_ops;   
-#endif
 	/* ----------- setup PDARs ------------ */
 
 	/* SDRAM should have been set */
@@ -351,13 +333,6 @@ static void __init ddb5477_board_init(void)
 	/* For dual-function pins, make them all non-GPIO */
 	ddb_out32(DDB_GIUFUNSEL, 0x0);
 	// ddb_out32(DDB_GIUFUNSEL, 0xfe0fcfff);  /* NEC recommanded value */
-	
-	if (mips_machtype == MACH_NEC_ROCKHOPPERII) {
-#ifdef CONFIG_PC_KEYB
-	printk("kdb_ops is std\n");
-	kbd_ops = &std_kbd_ops;
-#endif                     
-	}
 
 	if (mips_machtype == MACH_NEC_ROCKHOPPERII) {
 

@@ -32,13 +32,13 @@
 #include <linux/kernel_stat.h>
 
 #include <asm/irq.h>
+#include <asm/io.h>
 #include <asm/mips-boards/atlas.h>
 #include <asm/mips-boards/atlasint.h>
 #include <asm/gdb-stub.h>
 
 
-struct atlas_ictrl_regs *atlas_hw0_icregs
-	= (struct atlas_ictrl_regs *)ATLAS_ICTRL_REGS_BASE;
+static struct atlas_ictrl_regs *atlas_hw0_icregs;
 
 extern asmlinkage void mipsIRQ(void);
 
@@ -50,12 +50,14 @@ extern asmlinkage void mipsIRQ(void);
 
 void disable_atlas_irq(unsigned int irq_nr)
 {
-	atlas_hw0_icregs->intrsten = (1 << irq_nr);
+	atlas_hw0_icregs->intrsten = (1 << (irq_nr-ATLASINT_BASE));
+	iob();
 }
 
 void enable_atlas_irq(unsigned int irq_nr)
 {
-	atlas_hw0_icregs->intseten = (1 << irq_nr);
+	atlas_hw0_icregs->intseten = (1 << (irq_nr-ATLASINT_BASE));
+	iob();
 }
 
 static unsigned int startup_atlas_irq(unsigned int irq)
@@ -109,7 +111,7 @@ void atlas_hw0_irqdispatch(struct pt_regs *regs)
 	if (unlikely(int_status == 0))
 		return;
 
-	irq = ls1bit32(int_status);
+	irq = ATLASINT_BASE + ls1bit32(int_status);
 
 	DEBUG_INT("atlas_hw0_irqdispatch: irq=%d\n", irq);
 
@@ -125,6 +127,8 @@ void __init init_IRQ(void)
 {
 	int i;
 
+	atlas_hw0_icregs = (struct atlas_ictrl_regs *)ioremap (ATLAS_ICTRL_REGS_BASE, sizeof(struct atlas_ictrl_regs *));
+	
 	/*
 	 * Mask out all interrupt by writing "1" to all bit position in
 	 * the interrupt reset reg.
@@ -134,7 +138,7 @@ void __init init_IRQ(void)
 	/* Now safe to set the exception vector. */
 	set_except_vector(0, mipsIRQ);
 
-	for (i = 0; i <= ATLASINT_END; i++) {
+	for (i = ATLASINT_BASE; i <= ATLASINT_END; i++) {
 		irq_desc[i].status	= IRQ_DISABLED;
 		irq_desc[i].action	= 0;
 		irq_desc[i].depth	= 1;

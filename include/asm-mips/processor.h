@@ -12,21 +12,15 @@
 #define _ASM_PROCESSOR_H
 
 #include <linux/config.h>
-
-/*
- * Return current * instruction pointer ("program counter").
- */
-#define current_text_addr() ({ __label__ _l; _l: &&_l;})
-
-#ifndef __ASSEMBLY__
 #include <linux/cache.h>
 #include <linux/threads.h>
 
 #include <asm/cachectl.h>
+#include <asm/cpu.h>
 #include <asm/mipsregs.h>
 #include <asm/system.h>
 
-#if defined(CONFIG_SGI_IP27)
+#ifdef CONFIG_SGI_IP27
 #include <asm/sn/types.h>
 #include <asm/sn/intr_public.h>
 #endif
@@ -55,11 +49,11 @@ struct cpuinfo_mips {
 	unsigned long		udelay_val;
 	unsigned long		asid_cache;
 #if defined(CONFIG_SGI_IP27)
-	cpuid_t		p_cpuid;	/* PROM assigned cpuid */
+//	cpuid_t		p_cpuid;	/* PROM assigned cpuid */
 	cnodeid_t	p_nodeid;	/* my node ID in compact-id-space */
 	nasid_t		p_nasid;	/* my node ID in numa-as-id-space */
 	unsigned char	p_slice;	/* Physical position on node board */
-	hub_intmasks_t	p_intmasks;	/* SN0 per-CPU interrupt masks */
+	struct hub_intmasks_s p_intmasks; /* SN0 per-CPU interrupt masks */
 #endif
 #if 0
 	unsigned long		loops_per_sec;
@@ -85,45 +79,16 @@ struct cpuinfo_mips {
 	struct cache_desc	tcache;	/* Tertiary/split secondary cache */
 } __attribute__((aligned(SMP_CACHE_BYTES)));
 
-/*
- * Assumption: Options of CPU 0 are a superset of all processors.
- * This is true for all known MIPS systems.
- */
-#define cpu_has_tlb		(cpu_data[0].options & MIPS_CPU_TLB)
-#define cpu_has_4kex		(cpu_data[0].options & MIPS_CPU_4KEX)
-#define cpu_has_4ktlb		(cpu_data[0].options & MIPS_CPU_4KTLB)
-#define cpu_has_fpu		(cpu_data[0].options & MIPS_CPU_FPU)
-#define cpu_has_32fpr		(cpu_data[0].options & MIPS_CPU_32FPR)
-#define cpu_has_counter		(cpu_data[0].options & MIPS_CPU_COUNTER)
-#define cpu_has_watch		(cpu_data[0].options & MIPS_CPU_WATCH)
-#define cpu_has_mips16		(cpu_data[0].options & MIPS_CPU_MIPS16)
-#define cpu_has_divec		(cpu_data[0].options & MIPS_CPU_DIVEC)
-#define cpu_has_vce		(cpu_data[0].options & MIPS_CPU_VCE)
-#define cpu_has_cache_cdex	(cpu_data[0].options & MIPS_CPU_CACHE_CDEX)
-#define cpu_has_mcheck		(cpu_data[0].options & MIPS_CPU_MCHECK)
-#define cpu_has_ejtag		(cpu_data[0].options & MIPS_CPU_EJTAG)
-/* no FPU exception; never set on 64-bit */
-#ifdef CONFIG_MIPS64
-#define cpu_has_nofpuex		0
-#else
-#define cpu_has_nofpuex		(cpu_data[0].options & MIPS_CPU_NOFPUEX)
-#endif
-#define cpu_has_llsc		(cpu_data[0].options & MIPS_CPU_LLSC)
-#define cpu_has_vtag_icache	(cpu_data[0].icache.flags & MIPS_CACHE_VTAG)
-#define cpu_has_dc_aliases	(cpu_data[0].dcache.flags & MIPS_CACHE_ALIASES)
-#define cpu_has_ic_fills_f_dc	(cpu_data[0].dcache.flags & MIPS_CACHE_IC_F_DC)
-#ifdef CONFIG_MIPS64
-#define cpu_has_64bits		1
-#else
-#define cpu_has_64bits		(cpu_data[0].isa_level & MIPS_CPU_ISA_64BIT)
-#endif
-#define cpu_has_subset_pcaches	(cpu_data[0].options & MIPS_CPU_SUBSET_CACHES)
-
 extern struct cpuinfo_mips cpu_data[];
 #define current_cpu_data cpu_data[smp_processor_id()]
 
 extern void cpu_probe(void);
 extern void cpu_report(void);
+
+/*
+ * Return current * instruction pointer ("program counter").
+ */
+#define current_text_addr() ({ __label__ _l; _l: &&_l;})
 
 /*
  * System setup and hardware flags..
@@ -244,8 +209,6 @@ struct thread_struct {
 #define MF_N32		MF_32BIT_ADDR
 #define MF_N64		0
 
-#endif /* !__ASSEMBLY__ */
-
 #define INIT_THREAD  { \
         /* \
          * saved main processor registers \
@@ -271,7 +234,6 @@ struct thread_struct {
 }
 
 #ifdef __KERNEL__
-#ifndef __ASSEMBLY__
 
 struct task_struct;
 
@@ -300,7 +262,6 @@ unsigned long get_wchan(struct task_struct *p);
 
 #define cpu_relax()	barrier()
 
-#endif /* !__ASSEMBLY__ */
 #endif /* __KERNEL__ */
 
 /*
@@ -316,5 +277,14 @@ unsigned long get_wchan(struct task_struct *p);
  * address register on the stack.
  */
 #define return_address() ({__asm__ __volatile__("":::"$31");__builtin_return_address(0);})
+
+/*
+ * For now.  The 32-bit cycle counter is screwed up so solving this nicely takes a little
+ * brainwork ...
+ */
+static inline unsigned long long sched_clock(void)
+{
+	return 0ULL;
+}
 
 #endif /* _ASM_PROCESSOR_H */

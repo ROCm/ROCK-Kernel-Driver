@@ -11,18 +11,7 @@
 
 #ifdef __KERNEL__
 
-#include <linux/config.h>
-
-#ifdef CONFIG_DECSTATION
-   /*
-    * log2(HZ), change this here if you want another HZ value. This is also
-    * used in dec_time_init.  Minimum is 1, Maximum is 15.
-    */
-#  define LOG_2_HZ 7
-#  define HZ (1 << LOG_2_HZ)
-#else
-# define HZ		1000		/* Internal kernel timer frequency */
-#endif
+# include <param.h>			/* Internal kernel timer frequency */
 # define USER_HZ	100		/* .. some user interfaces are in "ticks" */
 # define CLOCKS_PER_SEC	(USER_HZ)	/* like times() */
 #endif
@@ -31,7 +20,7 @@
 #define HZ 100
 #endif
 
-#define EXEC_PAGESIZE	4096
+#define EXEC_PAGESIZE	65536
 
 #ifndef NOGROUP
 #define NOGROUP		(-1)

@@ -5,7 +5,7 @@
  *
  * Copyright 2001 MontaVista Software Inc.
  * Author: Jun Sun, jsun@mvista.com or jsun@junsun.net
- * Copyright (C) 2000, 2001 Ralf Baechle (ralf@gnu.org)
+ * Copyright (C) 2000, 2001, 2003 Ralf Baechle (ralf@gnu.org)
  *
  *  This program is free software; you can redistribute  it and/or modify it
  *  under  the terms of  the GNU General  Public License as published by the
@@ -45,103 +45,14 @@
 #include <asm/bootinfo.h>
 #include <asm/io.h>
 #include <asm/irq.h>
+#include <asm/irq_cpu.h>
 #include <asm/mipsregs.h>
 #include <asm/system.h>
 
-
-static spinlock_t rm7000_irq_lock = SPIN_LOCK_UNLOCKED;
-
-/* Function for careful CP0 interrupt mask access */
-static inline void modify_cp0_intmask(unsigned clr_mask_in, unsigned set_mask_in)
-{
-	unsigned long status;
-	unsigned clr_mask;
-	unsigned set_mask;
-
-	/* do the low 8 bits first */
-	clr_mask = 0xff & clr_mask_in;
-	set_mask = 0xff & set_mask_in;
-	status = read_c0_status();
-	status &= ~((clr_mask & 0xFF) << 8);
-	status |= (set_mask & 0xFF) << 8;
-	write_c0_status(status);
-
-	/* do the high 8 bits */
-	clr_mask = 0xff & (clr_mask_in >> 8);
-	set_mask = 0xff & (set_mask_in >> 8);
-	status = read_c0_intcontrol();
-	status &= ~((clr_mask & 0xFF) << 8);
-	status |= (set_mask & 0xFF) << 8;
-	write_c0_intcontrol(status);
-}
-
-static inline void mask_irq(unsigned int irq)
-{
-	modify_cp0_intmask(irq, 0);
-}
-
-static inline void unmask_irq(unsigned int irq)
-{
-	modify_cp0_intmask(0, irq);
-}
-
-static void enable_cp7000_irq(unsigned int irq)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&rm7000_irq_lock, flags);
-	unmask_irq(1 << irq);
-	spin_unlock_irqrestore(&rm7000_irq_lock, flags);
-}
-
-static unsigned int startup_cp7000_irq(unsigned int irq)
-{
-	enable_cp7000_irq(irq);
-
-	return 0;				/* never anything pending */
-}
-
-static void disable_cp7000_irq(unsigned int irq)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&rm7000_irq_lock, flags);
-	mask_irq(1 << irq);
-	spin_unlock_irqrestore(&rm7000_irq_lock, flags);
-}
-
-#define shutdown_cp7000_irq disable_cp7000_irq
-
-static void mask_and_ack_cp7000_irq(unsigned int irq)
-{
-	mask_irq(1 << irq);
-}
-
-static void end_cp7000_irq(unsigned int irq)
-{
-	if (!(irq_desc[irq].status & (IRQ_DISABLED|IRQ_INPROGRESS)))
-		unmask_irq(1 << irq);
-}
-
-static struct hw_interrupt_type cp7000_hpcdma_irq_type = {
-	"CP7000",
-	startup_cp7000_irq,
-	shutdown_cp7000_irq,
-	enable_cp7000_irq,
-	disable_cp7000_irq,
-	mask_and_ack_cp7000_irq,
-	end_cp7000_irq,
-	NULL
-};
-
-
 extern asmlinkage void ocelot_handle_int(void);
-extern void gt64120_irq_init(void);
 
 void __init init_IRQ(void)
 {
-	int i;
-
 	/*
 	 * Clear all of the interrupts while we change the able around a bit.
 	 * int-handler is not on bootstrap
@@ -151,23 +62,14 @@ void __init init_IRQ(void)
 
 	/* Sets the first-level interrupt dispatcher. */
 	set_except_vector(0, ocelot_handle_int);
+
 	init_generic_irq();
-
-	for (i = 0; i <= 15; i++) {
-		irq_desc[i].status	= IRQ_DISABLED;
-		irq_desc[i].action	= 0;
-		irq_desc[i].depth	= 1;
-		irq_desc[i].handler	= &cp7000_hpcdma_irq_type;
-	}
-
-	gt64120_irq_init();
+	mips_cpu_irq_init(0);
+	rm7k_cpu_irq_init(8);
 
 #ifdef CONFIG_KGDB
 	printk("start kgdb ...\n");
 	set_debug_traps();
 	breakpoint();	/* you may move this line to whereever you want :-) */
-#endif
-#ifdef CONFIG_GDB_CONSOLE
-	register_gdb_console();
 #endif
 }

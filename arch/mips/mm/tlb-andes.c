@@ -7,6 +7,7 @@
  * Copyright (C) 1999 Silicon Graphics, Inc.
  * Copyright (C) 2000 Kanoj Sarcar (kanoj@sgi.com)
  */
+#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -16,6 +17,9 @@
 #include <asm/system.h>
 #include <asm/mmu_context.h>
 
+extern void except_vec0_generic(void);
+extern void except_vec0_r4000(void);
+extern void except_vec1_generic(void);
 extern void except_vec1_r10k(void);
 
 #define NTLB_ENTRIES       64
@@ -235,7 +239,7 @@ void __update_tlb(struct vm_area_struct * vma, unsigned long address, pte_t pte)
 	local_irq_restore(flags);
 }
 
-void __init andes_tlb_init(void)
+void __init tlb_init(void)
 {
 	/*
 	 * You should never change this register:
@@ -253,5 +257,14 @@ void __init andes_tlb_init(void)
 
 	/* Did I tell you that ARC SUCKS?  */
 
-	memcpy((void *)KSEG1 + 0x080, except_vec1_r10k, 0x80);
+#ifdef CONFIG_MIPS32
+	memcpy((void *)KSEG0, &except_vec0_r4000, 0x80);
+	memcpy((void *)(KSEG0 + 0x080), &except_vec1_generic, 0x80);
+	flush_icache_range(KSEG0, KSEG0 + 0x100);
+#endif
+#ifdef CONFIG_MIPS64
+	memcpy((void *)(CKSEG0 + 0x000), &except_vec0_generic, 0x80);
+	memcpy((void *)(CKSEG0 + 0x080), except_vec1_r10k, 0x80);
+	flush_icache_range(CKSEG0 + 0x80, CKSEG0 + 0x100);
+#endif
 }

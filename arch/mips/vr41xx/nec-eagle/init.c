@@ -38,22 +38,21 @@
  *  MontaVista Software Inc. <yyuasa@mvista.com> or <source@mvista.com>
  *  - New creation, NEC Eagle is supported.
  */
-#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
 
 #include <asm/bootinfo.h>
 
-char arcs_cmdline[CL_SIZE];
-
 const char *get_system_type(void)
 {
 	return "NEC Eagle/Hawk";
 }
 
-void __init prom_init(int argc, char **argv, unsigned long magic, int *prom_vec)
+void __init prom_init(void)
 {
+	int argc = fw_arg0;
+	char **argv = (char **) fw_arg1;
 	int i;
 
 	/*
@@ -69,6 +68,7 @@ void __init prom_init(int argc, char **argv, unsigned long magic, int *prom_vec)
 	mips_machtype = MACH_NEC_EAGLE;
 }
 
-void __init prom_free_prom_memory (void)
+unsigned long __init prom_free_prom_memory(void)
 {
+	return 0;
 }

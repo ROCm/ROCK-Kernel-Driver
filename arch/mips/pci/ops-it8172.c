@@ -77,10 +77,10 @@ static struct resource pci_mem_resource_1 = {
 
 extern struct pci_ops it8172_pci_ops;
 
-struct pci_channel mips_pci_channels[] = {
-	{&it8172_pci_ops, &pci_io_resource, &pci_mem_resource_0, 0x10,
-	 0xff},
-	{NULL, NULL, NULL, NULL, NULL}
+struct pci_controller it8172_controller = {
+	.pci_ops	= &it8172_pci_ops,
+	.io_resource	= &pci_io_resource,
+	.mem_resource	= &pci_mem_resource_0,
 };
 
 static int it8172_pcibios_config_access(unsigned char access_type,
@@ -212,8 +212,3 @@ struct pci_ops it8172_pci_ops = {
 	.read = read_config,
 	.write = write_config,
 };
-
-unsigned __init int pcibios_assign_all_busses(void)
-{
-	return 1;
-}

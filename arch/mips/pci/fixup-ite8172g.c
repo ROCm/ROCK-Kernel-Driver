@@ -35,155 +35,40 @@
 #include <asm/it8172/it8172_pci.h>
 #include <asm/it8172/it8172_int.h>
 
-void __init pcibios_fixup_resources(struct pci_dev *dev)
+/*
+ * Shortcuts
+ */
+#define INTA	IT8172_PCI_INTA_IRQ
+#define INTB	IT8172_PCI_INTB_IRQ
+#define INTC	IT8172_PCI_INTC_IRQ
+#define INTD	IT8172_PCI_INTD_IRQ
+
+static const int internal_func_irqs[7] __initdata = {
+	IT8172_AC97_IRQ,
+	IT8172_DMA_IRQ,
+	IT8172_CDMA_IRQ,
+	IT8172_USB_IRQ,
+	IT8172_BRIDGE_MASTER_IRQ,
+	IT8172_IDE_IRQ,
+	IT8172_MC68K_IRQ
+};
+
+static char irq_tab_ite8172g[][5] __initdata = {
+ [0x10] = {	0, INTA, INTB, INTC, INTD },
+ [0x11] = {	0, INTA, INTB, INTC, INTD },
+ [0x12] = {	0, INTB, INTC, INTD, INTA },
+ [0x13] = {	0, INTC, INTD, INTA, INTB },
+ [0x14] = {	0, INTD, INTA, INTB, INTC },
+};
+
+int __init pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 {
-}
+	/*
+	 * Internal device 1 is actually 7 different internal devices on the
+	 * IT8172G (a multifunction device).
+	 */
+	if (slot == 1)
+		return internal_func_irqs[PCI_FUNC(dev->devfn)];
 
-void __init pcibios_fixup(void)
-{
-}
-
-void __init pcibios_fixup_irqs(void)
-{
-	unsigned int slot, func;
-	unsigned char pin;
-	struct pci_dev *dev = NULL;
-
-	const int internal_func_irqs[7] = {
-		IT8172_AC97_IRQ,
-		IT8172_DMA_IRQ,
-		IT8172_CDMA_IRQ,
-		IT8172_USB_IRQ,
-		IT8172_BRIDGE_MASTER_IRQ,
-		IT8172_IDE_IRQ,
-		IT8172_MC68K_IRQ
-	};
-
-	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
-		if (dev->bus->number != 0)
-			return;
-
-		pci_read_config_byte(dev, PCI_INTERRUPT_PIN, &pin);
-		slot = PCI_SLOT(dev->devfn);
-		func = PCI_FUNC(dev->devfn);
-
-		switch (slot) {
-		case 0x01:
-			/*
-			 * Internal device 1 is actually 7 different
-			 * internal devices on the IT8172G (a multi-
-			 * function device).
-			 */
-			if (func < 7)
-				dev->irq = internal_func_irqs[func];
-			break;
-		case 0x10:
-			switch (pin) {
-			case 1:	/* pin A */
-				dev->irq = IT8172_PCI_INTA_IRQ;
-				break;
-			case 2:	/* pin B */
-				dev->irq = IT8172_PCI_INTB_IRQ;
-				break;
-			case 3:	/* pin C */
-				dev->irq = IT8172_PCI_INTC_IRQ;
-				break;
-			case 4:	/* pin D */
-				dev->irq = IT8172_PCI_INTD_IRQ;
-				break;
-			default:
-				dev->irq = 0xff;
-				break;
-
-			}
-			break;
-		case 0x11:
-			switch (pin) {
-			case 1:	/* pin A */
-				dev->irq = IT8172_PCI_INTA_IRQ;
-				break;
-			case 2:	/* pin B */
-				dev->irq = IT8172_PCI_INTB_IRQ;
-				break;
-			case 3:	/* pin C */
-				dev->irq = IT8172_PCI_INTC_IRQ;
-				break;
-			case 4:	/* pin D */
-				dev->irq = IT8172_PCI_INTD_IRQ;
-				break;
-			default:
-				dev->irq = 0xff;
-				break;
-
-			}
-			break;
-		case 0x12:
-			switch (pin) {
-			case 1:	/* pin A */
-				dev->irq = IT8172_PCI_INTB_IRQ;
-				break;
-			case 2:	/* pin B */
-				dev->irq = IT8172_PCI_INTC_IRQ;
-				break;
-			case 3:	/* pin C */
-				dev->irq = IT8172_PCI_INTD_IRQ;
-				break;
-			case 4:	/* pin D */
-				dev->irq = IT8172_PCI_INTA_IRQ;
-				break;
-			default:
-				dev->irq = 0xff;
-				break;
-
-			}
-			break;
-		case 0x13:
-			switch (pin) {
-			case 1:	/* pin A */
-				dev->irq = IT8172_PCI_INTC_IRQ;
-				break;
-			case 2:	/* pin B */
-				dev->irq = IT8172_PCI_INTD_IRQ;
-				break;
-			case 3:	/* pin C */
-				dev->irq = IT8172_PCI_INTA_IRQ;
-				break;
-			case 4:	/* pin D */
-				dev->irq = IT8172_PCI_INTB_IRQ;
-				break;
-			default:
-				dev->irq = 0xff;
-				break;
-
-			}
-			break;
-		case 0x14:
-			switch (pin) {
-			case 1:	/* pin A */
-				dev->irq = IT8172_PCI_INTD_IRQ;
-				break;
-			case 2:	/* pin B */
-				dev->irq = IT8172_PCI_INTA_IRQ;
-				break;
-			case 3:	/* pin C */
-				dev->irq = IT8172_PCI_INTB_IRQ;
-				break;
-			case 4:	/* pin D */
-				dev->irq = IT8172_PCI_INTC_IRQ;
-				break;
-			default:
-				dev->irq = 0xff;
-				break;
-
-			}
-			break;
-		default:
-			continue;	/* do nothing */
-		}
-#ifdef DEBUG
-		printk("irq fixup: slot %d, int line %d, int number %d\n",
-		       slot, pin, dev->irq);
-#endif
-		pci_write_config_byte(dev, PCI_INTERRUPT_LINE, dev->irq);
-	}
+	return irq_tab_ite8172g[slot][pin];
 }

@@ -8,4 +8,3 @@
 #
 
 obj-y			+= init.o irq.o setup.o
-obj-$(CONFIG_IDE)	+= ide-eagle.o

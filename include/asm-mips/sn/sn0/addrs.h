@@ -40,20 +40,6 @@
  * use some new ANSI preprocessor stuff to paste these on where needed.
  */
 
-#define CAC_BASE		0xa800000000000000
-
-#define HSPEC_BASE		0x9000000000000000
-#define IO_BASE			0x9200000000000000
-#define MSPEC_BASE		0x9400000000000000
-#define UNCAC_BASE		0x9600000000000000
-
-#define TO_PHYS(x)		(	      ((x) & TO_PHYS_MASK))
-#define TO_CAC(x)		(CAC_BASE   | ((x) & TO_PHYS_MASK))
-#define TO_UNCAC(x)		(UNCAC_BASE | ((x) & TO_PHYS_MASK))
-#define TO_MSPEC(x)		(MSPEC_BASE | ((x) & TO_PHYS_MASK))
-#define TO_HSPEC(x)		(HSPEC_BASE | ((x) & TO_PHYS_MASK))
-
-
 /*
  * The following couple of definitions will eventually need to be variables,
  * since the amount of address space assigned to each node depends on
@@ -192,7 +178,7 @@
 #define IP27PROM_DECOMP_SIZE	0xfff00
 
 #define IP27PROM_BASE		PHYS_TO_K0(0x01a00000)
-#define IP27PROM_BASE_MAPPED	(K2BASE | 0x1fc00000)
+#define IP27PROM_BASE_MAPPED	(UNCAC_BASE | 0x1fc00000)
 #define IP27PROM_SIZE_MAX	0x100000
 
 #define IP27PROM_PCFG		PHYS_TO_K0(0x01b00000)
@@ -223,7 +209,7 @@
 
 #define IO6PROM_BASE		PHYS_TO_K0(0x01c00000)
 #define IO6PROM_SIZE		0x400000
-#define	IO6PROM_BASE_MAPPED	(K2BASE | 0x11c00000)
+#define	IO6PROM_BASE_MAPPED	(UNCAC_BASE | 0x11c00000)
 #define IO6DPROM_BASE		PHYS_TO_K0(0x01c00000)
 #define IO6DPROM_SIZE		0x200000
 

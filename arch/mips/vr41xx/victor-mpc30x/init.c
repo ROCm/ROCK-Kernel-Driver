@@ -13,7 +13,6 @@
  *  Free Software Foundation; either version 2 of the License, or (at your
  *  option) any later version.
  */
-#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
@@ -23,15 +22,15 @@
 #include <asm/mipsregs.h>
 #include <asm/vr41xx/vr41xx.h>
 
-char arcs_cmdline[CL_SIZE];
-
 const char *get_system_type(void)
 {
 	return "Victor MP-C303/304";
 }
 
-void __init prom_init(int argc, char **argv, unsigned long magic, int *prom_vec)
+void __init prom_init(void)
 {
+	int argc = fw_arg0;
+	char **argv = (char **) fw_arg1;
 	int i;
 
 	/*
@@ -49,6 +48,7 @@ void __init prom_init(int argc, char **argv, unsigned long magic, int *prom_vec)
 	add_memory_region(0, 32 << 20, BOOT_MEM_RAM);
 }
 
-void __init prom_free_prom_memory (void)
+unsigned long __init prom_free_prom_memory(void)
 {
+	return 0;
 }

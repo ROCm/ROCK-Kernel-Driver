@@ -31,6 +31,8 @@
 #include <linux/major.h>
 #include <linux/kdev_t.h>
 #include <linux/root_dev.h>
+#include <linux/highmem.h>
+#include <linux/console.h>
 
 #include <asm/addrspace.h>
 #include <asm/bootinfo.h>
@@ -40,24 +42,20 @@
 
 struct cpuinfo_mips cpu_data[NR_CPUS];
 
+EXPORT_SYMBOL(cpu_data);
+
 #ifdef CONFIG_VT
 struct screen_info screen_info;
 #endif
 
-#if defined(CONFIG_BLK_DEV_FD) || defined(CONFIG_BLK_DEV_FD_MODULE)
-extern struct fd_ops no_fd_ops;
-struct fd_ops *fd_ops;
-#endif
+/*
+ * Despite it's name this variable is even if we don't have PCI
+ */
+unsigned int PCI_DMA_BUS_IS_PHYS;
 
-#if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
-extern struct ide_ops no_ide_ops;
-struct ide_ops *ide_ops;
-#endif
+EXPORT_SYMBOL(PCI_DMA_BUS_IS_PHYS);
 
 extern void * __rd_start, * __rd_end;
-
-extern struct rtc_ops no_rtc_ops;
-struct rtc_ops *rtc_ops;
 
 /*
  * Setup information
@@ -67,11 +65,14 @@ struct rtc_ops *rtc_ops;
 unsigned long mips_machtype = MACH_UNKNOWN;
 unsigned long mips_machgroup = MACH_GROUP_UNKNOWN;
 
+EXPORT_SYMBOL(mips_machtype);
+EXPORT_SYMBOL(mips_machgroup);
+
 struct boot_mem_map boot_mem_map;
 
 static char command_line[CL_SIZE];
        char saved_command_line[CL_SIZE];
-extern char arcs_cmdline[CL_SIZE];
+       char arcs_cmdline[CL_SIZE]=CONFIG_CMDLINE;
 
 /*
  * mips_io_port_base is the begin of the address space to which x86 style
@@ -87,53 +88,22 @@ EXPORT_SYMBOL(mips_io_port_base);
 unsigned long isa_slot_offset;
 EXPORT_SYMBOL(isa_slot_offset);
 
-extern void SetUpBootInfo(void);
-extern void load_mmu(void);
-extern ATTRIB_NORET asmlinkage void start_kernel(void);
-extern void prom_init(int, char **, char **, int *);
-
 static struct resource code_resource = { "Kernel code" };
 static struct resource data_resource = { "Kernel data" };
 
-asmlinkage void __init init_arch(int argc, char **argv, char **envp,
-	int *prom_vec)
-{
-	/* Determine which MIPS variant we are running on. */
-	cpu_probe();
-
-	prom_init(argc, argv, envp, prom_vec);
-
-	cpu_report();
-
-	/*
-	 * Determine the mmu/cache attached to this machine, then flush the
-	 * tlb and caches.  On the r4xx0 variants this also sets CP0_WIRED to
-	 * zero.
-	 */
-	load_mmu();
-
-#ifdef CONFIG_MIPS32
-	/* Disable coprocessors and set FPU for 16/32 FPR register model */
-	clear_c0_status(ST0_CU1|ST0_CU2|ST0_CU3|ST0_KX|ST0_SX|ST0_FR);
-	set_c0_status(ST0_CU0);
-#endif
-#ifdef CONFIG_MIPS64
-	/*
-	 * On IP27, I am seeing the TS bit set when the kernel is loaded.
-	 * Maybe because the kernel is in ckseg0 and not xkphys? Clear it
-	 * anyway ...
-	 */
-	clear_c0_status(ST0_BEV|ST0_TS|ST0_CU1|ST0_CU2|ST0_CU3);
-	set_c0_status(ST0_CU0|ST0_KX|ST0_SX|ST0_FR);
-#endif
-
-	start_kernel();
-}
-
-void __init add_memory_region(phys_t start, phys_t size,
-			      long type)
+void __init add_memory_region(phys_t start, phys_t size, long type)
 {
 	int x = boot_mem_map.nr_map;
+	struct boot_mem_map_entry *prev = boot_mem_map.map + x - 1;
+
+	/*
+	 * Try to merge with previous entry if any.  This is far less than
+	 * perfect but is sufficient for most real world cases.
+	 */
+	if (x && prev->addr + prev->size == start && prev->type == type) {
+		prev->size += size;
+		return;
+	}
 
 	if (x == BOOT_MEM_MAP_MAX) {
 		printk("Ooops! Too many entries in the memory map!\n");
@@ -149,11 +119,12 @@ void __init add_memory_region(phys_t start, phys_t size,
 static void __init print_memory_map(void)
 {
 	int i;
+	const int field = 2 * sizeof(unsigned long);
 
 	for (i = 0; i < boot_mem_map.nr_map; i++) {
 		printk(" memory: %0*Lx @ %0*Lx ",
-		       sizeof(long) * 2, (u64) boot_mem_map.map[i].size,
-		       sizeof(long) * 2, (u64) boot_mem_map.map[i].addr);
+		       field, (unsigned long long) boot_mem_map.map[i].size,
+		       field, (unsigned long long) boot_mem_map.map[i].addr);
 
 		switch (boot_mem_map.map[i].type) {
 		case BOOT_MEM_RAM:
@@ -233,15 +204,15 @@ static inline void parse_cmdline_early(void)
 
 static inline void bootmem_init(void)
 {
+	unsigned long start_pfn;
+#ifndef CONFIG_SGI_IP27
+	unsigned long bootmap_size, max_low_pfn, first_usable_pfn;
+	int i;
+#endif
 #ifdef CONFIG_BLK_DEV_INITRD
 	unsigned long tmp;
 	unsigned long *initrd_header;
-#endif
-	unsigned long bootmap_size;
-	unsigned long start_pfn, max_low_pfn, first_usable_pfn;
-	int i;
 
-#ifdef CONFIG_BLK_DEV_INITRD
 	tmp = (((unsigned long)&_end + PAGE_SIZE-1) & PAGE_MASK) - 8;
 	if (tmp < (unsigned long)&_end)
 		tmp += PAGE_SIZE;
@@ -385,8 +356,7 @@ static inline void bootmem_init(void)
 		printk("Initial ramdisk at: 0x%p (%lu bytes)\n",
 		       (void *)initrd_start,
 		       initrd_size);
-/* FIXME: is this right? */
-#ifndef CONFIG_SGI_IP27
+
 		if (CPHYSADDR(initrd_end) > PFN_PHYS(max_low_pfn)) {
 			printk("initrd extends beyond end of memory "
 			       "(0x%0*Lx > 0x%0*Lx)\ndisabling initrd\n",
@@ -394,7 +364,6 @@ static inline void bootmem_init(void)
 			       sizeof(long) * 2, PFN_PHYS(max_low_pfn));
 			initrd_start = initrd_end = 0;
 		}
-#endif /* !CONFIG_SGI_IP27 */
 	}
 #endif /* CONFIG_BLK_DEV_INITRD  */
 }
@@ -456,229 +425,63 @@ static inline void resource_init(void)
 #undef MAXMEM
 #undef MAXMEM_PFN
 
+static int __initdata earlyinit_debug;
+
+static int __init earlyinit_debug_setup(char *str)
+{
+	earlyinit_debug = 1;
+	return 1;
+}
+__setup("earlyinit_debug", earlyinit_debug_setup);
+
+extern initcall_t __earlyinitcall_start, __earlyinitcall_end;
+
+static void __init do_earlyinitcalls(void)
+{
+	initcall_t *call, *start, *end;
+
+	start = &__earlyinitcall_start;
+	end = &__earlyinitcall_end;
+
+	for (call = start; call < end; call++) {
+		if (earlyinit_debug)
+			printk("calling earlyinitcall 0x%p\n", *call);
+
+		(*call)();
+	}
+}
+
 void __init setup_arch(char **cmdline_p)
 {
-	extern void atlas_setup(void);
-	extern void baget_setup(void);
-	extern void cobalt_setup(void);
-	extern void lasat_setup(void);
-	extern void ddb_setup(void);
-	extern void decstation_setup(void);
-	extern void deskstation_setup(void);
-	extern void jazz_setup(void);
-	extern void sni_rm200_pci_setup(void);
-	extern void ip22_setup(void);
-	extern void ip27_setup(void);
-	extern void ip32_setup(void);
-	extern void ev96100_setup(void);
-	extern void malta_setup(void);
-	extern void sead_setup(void);
-	extern void ikos_setup(void);
-	extern void momenco_ocelot_setup(void);
-	extern void momenco_ocelot_g_setup(void);
-	extern void momenco_ocelot_c_setup(void);
-	extern void nec_osprey_setup(void);
-	extern void nec_eagle_setup(void);
-	extern void zao_capcella_setup(void);
-	extern void victor_mpc30x_setup(void);
-	extern void ibm_workpad_setup(void);
-	extern void casio_e55_setup(void);
-	extern void jmr3927_setup(void);
-	extern void it8172_setup(void);
-	extern void swarm_setup(void);
-	extern void hp_setup(void);
-	extern void au1x00_setup(void);
-	extern void frame_info_init(void);
+	cpu_probe();
+	prom_init();
+	cpu_report();
 
-	frame_info_init();
-
-#ifdef CONFIG_BLK_DEV_FD
-	fd_ops = &no_fd_ops;
+#ifdef CONFIG_MIPS32
+	/* Disable coprocessors and set FPU for 16/32 FPR register model */
+	clear_c0_status(ST0_CU1|ST0_CU2|ST0_CU3|ST0_KX|ST0_SX|ST0_FR);
+	set_c0_status(ST0_CU0);
+#endif
+#ifdef CONFIG_MIPS64
+	/*
+	 * On IP27, I am seeing the TS bit set when the kernel is loaded.
+	 * Maybe because the kernel is in ckseg0 and not xkphys? Clear it
+	 * anyway ...
+	 */
+	clear_c0_status(ST0_BEV|ST0_TS|ST0_CU1|ST0_CU2|ST0_CU3);
+	set_c0_status(ST0_CU0|ST0_KX|ST0_SX|ST0_FR);
 #endif
 
-#ifdef CONFIG_BLK_DEV_IDE
-	ide_ops = &no_ide_ops;
+#if defined(CONFIG_VT)
+#if defined(CONFIG_VGA_CONSOLE)
+        conswitchp = &vga_con;
+#elif defined(CONFIG_DUMMY_CONSOLE)
+        conswitchp = &dummy_con;
+#endif
 #endif
 
-	rtc_ops = &no_rtc_ops;
-
-	switch (mips_machgroup) {
-#ifdef CONFIG_BAGET_MIPS
-	case MACH_GROUP_BAGET:
-		baget_setup();
-		break;
-#endif
-#ifdef CONFIG_MIPS_COBALT
-	case MACH_GROUP_COBALT:
-		cobalt_setup();
-		break;
-#endif
-#ifdef CONFIG_DECSTATION
-	case MACH_GROUP_DEC:
-		decstation_setup();
-		break;
-#endif
-#ifdef CONFIG_MIPS_ATLAS
-	case MACH_GROUP_UNKNOWN:
-		atlas_setup();
-		break;
-#endif
-#ifdef CONFIG_MIPS_JAZZ
-	case MACH_GROUP_JAZZ:
-		jazz_setup();
-		break;
-#endif
-#ifdef CONFIG_MIPS_MALTA
-	case MACH_GROUP_UNKNOWN:
-		malta_setup();
-		break;
-#endif
-#ifdef CONFIG_MOMENCO_OCELOT
-	case MACH_GROUP_MOMENCO:
-		momenco_ocelot_setup();
-		break;
-#endif
-#ifdef CONFIG_MOMENCO_OCELOT_G
-	case MACH_GROUP_MOMENCO:
-		momenco_ocelot_g_setup();
-		break;
-#endif
-#ifdef CONFIG_MOMENCO_OCELOT_C
-	case MACH_GROUP_MOMENCO:
-		momenco_ocelot_c_setup();
-		break;
-#endif
-#ifdef CONFIG_MIPS_SEAD
-	case MACH_GROUP_UNKNOWN:
-		sead_setup();
-		break;
-#endif
-#ifdef CONFIG_SGI_IP22
-	/* As of now this is only IP22.  */
-	case MACH_GROUP_SGI:
-		ip22_setup();
-		break;
-#endif
-#ifdef CONFIG_SGI_IP27
-	case MACH_GROUP_SGI:
-		ip27_setup();
-		break;
-#endif
-#ifdef CONFIG_SGI_IP32
-	case MACH_GROUP_SGI:
-		ip32_setup();
-		break;
-#endif
-#ifdef CONFIG_SNI_RM200_PCI
-	case MACH_GROUP_SNI_RM:
-		sni_rm200_pci_setup();
-		break;
-#endif
-#ifdef CONFIG_DDB5074
-	case MACH_GROUP_NEC_DDB:
-		ddb_setup();
-		break;
-#endif
-#ifdef CONFIG_DDB5476
-       case MACH_GROUP_NEC_DDB:
-               ddb_setup();
-               break;
-#endif
-#ifdef CONFIG_DDB5477
-       case MACH_GROUP_NEC_DDB:
-               ddb_setup();
-               break;
-#endif
-#ifdef CONFIG_CPU_VR41XX
-	case MACH_GROUP_NEC_VR41XX:
-		switch (mips_machtype) {
-#ifdef CONFIG_NEC_OSPREY
-		case MACH_NEC_OSPREY:
-			nec_osprey_setup();
-			break;
-#endif
-#ifdef CONFIG_NEC_EAGLE
-		case MACH_NEC_EAGLE:
-			nec_eagle_setup();
-			break;
-#endif
-#ifdef CONFIG_ZAO_CAPCELLA
-		case MACH_ZAO_CAPCELLA:
-			zao_capcella_setup();
-			break;
-#endif
-#ifdef CONFIG_VICTOR_MPC30X
-		case MACH_VICTOR_MPC30X:
-			victor_mpc30x_setup();
-			break;
-#endif
-#ifdef CONFIG_IBM_WORKPAD
-		case MACH_IBM_WORKPAD:
-			ibm_workpad_setup();
-			break;
-#endif
-#ifdef CONFIG_CASIO_E55
-		case MACH_CASIO_E55:
-			casio_e55_setup();
-			break;
-#endif
-#ifdef CONFIG_TANBAC_TB0229
-		case MACH_TANBAC_TB0229:
-			tanbac_tb0229_setup();
-			break;
-#endif
-		}
-		break;
-#endif
-#ifdef CONFIG_MIPS_EV96100
-	case MACH_GROUP_GALILEO:
-		ev96100_setup();
-		break;
-#endif
-#ifdef CONFIG_MIPS_EV64120
-	case MACH_GROUP_GALILEO:
-		ev64120_setup();
-		break;
-#endif
-#if defined(CONFIG_MIPS_IVR) || defined(CONFIG_MIPS_ITE8172)
-	case  MACH_GROUP_ITE:
-	case  MACH_GROUP_GLOBESPAN:
-		it8172_setup();
-		break;
-#endif
-#ifdef CONFIG_LASAT
-        case MACH_GROUP_LASAT:
-                lasat_setup();
-                break;
-#endif
-#ifdef CONFIG_SOC_AU1X00
-	case MACH_GROUP_ALCHEMY:
-		au1x00_setup();
-		break;
-#endif
-#ifdef CONFIG_TOSHIBA_JMR3927
-	case MACH_GROUP_TOSHIBA:
-		jmr3927_setup();
-		break;
-#endif
-#ifdef CONFIG_TOSHIBA_RBTX4927
-	case MACH_GROUP_TOSHIBA:
-		tx4927_setup();
-		break;
-#endif
-#ifdef CONFIG_SIBYTE_BOARD
-	case MACH_GROUP_SIBYTE:
-		swarm_setup();
-		break;
-#endif
-#ifdef CONFIG_HP_LASERJET
-        case MACH_GROUP_HP_LJ:
-                hp_setup();
-                break;
-#endif
-	default:
-		panic("Unsupported architecture");
-	}
+	/* call board setup routine */
+	do_earlyinitcalls();
 
 	strlcpy(command_line, arcs_cmdline, sizeof(command_line));
 	strlcpy(saved_command_line, command_line, sizeof(saved_command_line));
@@ -686,11 +489,8 @@ void __init setup_arch(char **cmdline_p)
 	*cmdline_p = command_line;
 
 	parse_cmdline_early();
-
 	bootmem_init();
-
 	paging_init();
-
 	resource_init();
 }
 

@@ -52,9 +52,10 @@ ENTRY(resume_kernel)
 need_resched:
 	LONG_L	t0, TI_FLAGS($28)
 	andi	t1, t0, _TIF_NEED_RESCHED
-	beqz	restore_all
-	if (in_exception_path)
-		goto restore_all;
+	beqz	t1, restore_all
+	LONG_L	t0, PT_STATUS(sp)		# Interrupts off?
+	andi	t0, 1
+	beqz	t0, restore_all
 	li	t0, PREEMPT_ACTIVE
 	sw	t0, TI_PRE_COUNT($28)
 	local_irq_enable t0
@@ -64,7 +65,7 @@ need_resched:
 #endif
 
 FEXPORT(ret_from_fork)
-	jal	schedule_tail
+	jal	schedule_tail		# a0 = task_t *prev
 
 FEXPORT(syscall_exit)
 	local_irq_disable		# make sure need_resched and
@@ -75,14 +76,19 @@ FEXPORT(syscall_exit)
 	and	t0, a2, t0
 	bnez	t0, syscall_exit_work
 
-FEXPORT(restore_all)
+FEXPORT(restore_all)			# restore full frame
 	.set	noat
-	RESTORE_ALL_AND_RET
+	RESTORE_TEMP
+	RESTORE_AT
+	RESTORE_STATIC
+FEXPORT(restore_partial)		# restore partial frame
+	RESTORE_SOME
+	RESTORE_SP_AND_RET
 	.set	at
 
 FEXPORT(work_pending)
 	andi	t0, a2, _TIF_NEED_RESCHED
-	bnez	t0, work_notifysig
+	beqz	t0, work_notifysig
 work_resched:
 	jal	schedule
 
@@ -103,11 +109,13 @@ work_notifysig:				# deal with pending signals and
 	jal	do_notify_resume	# a2 already loaded
 	j	restore_all
 
+FEXPORT(syscall_exit_work_partial)
+	SAVE_STATIC
 FEXPORT(syscall_exit_work)
 	LONG_L	t0, TI_FLAGS($28)
 	li	t1, _TIF_SYSCALL_TRACE
 	and	t0, t1
-	bnez	t0, work_pending	# trace bit is set
+	beqz	t0, work_pending	# trace bit is set
 	local_irq_enable		# could let do_syscall_trace()
 					# call schedule() instead
 	jal	do_syscall_trace

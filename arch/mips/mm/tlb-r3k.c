@@ -10,7 +10,6 @@
  * Copyright (C) 2002  Ralf Baechle
  * Copyright (C) 2002  Maciej W. Rozycki
  */
-#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -282,7 +281,7 @@ void __init add_wired_entry(unsigned long entrylo0, unsigned long entrylo1,
 	}
 }
 
-void __init r3k_tlb_init(void)
+void __init tlb_init(void)
 {
 	local_flush_tlb_all();
 	memcpy((void *)KSEG0, &except_vec0_r2300, 0x80);

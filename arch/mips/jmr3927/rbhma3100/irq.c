@@ -63,10 +63,7 @@
 
 struct tb_irq_space* tb_irq_spaces;
 
-unsigned int local_bh_count[NR_CPUS];
-unsigned int local_irq_count[NR_CPUS];
-
-static int jmr3927_irq_base=-1;
+static int jmr3927_irq_base = -1;
 
 #ifdef CONFIG_PCI
 static int jmr3927_gen_iack(void)
@@ -84,6 +81,7 @@ extern asmlinkage void jmr3927_IRQ(void);
 
 #define irc_dlevel	0
 #define irc_elevel	1
+
 static unsigned char irc_level[TX3927_NUM_IR] = {
 	5, 5, 5, 5, 5, 5,	/* INT[5:0] */
 	7, 7,			/* SIO */
@@ -122,9 +120,12 @@ static inline void unmask_irq(unsigned int irq_nr)
 static void jmr3927_irq_disable(unsigned int irq_nr);
 static void jmr3927_irq_enable(unsigned int irq_nr);
 
+static spinlock_t jmr3927_irq_lock = SPIN_LOCK_UNLOCKED;
+
 static unsigned int jmr3927_irq_startup(unsigned int irq)
 {
 	jmr3927_irq_enable(irq);
+
 	return 0;
 }
 
@@ -132,10 +133,6 @@ static unsigned int jmr3927_irq_startup(unsigned int irq)
 
 static void jmr3927_irq_ack(unsigned int irq)
 {
-	db_assert(jmr3927_irq_base != -1);
-	db_assert(irq >= jmr3927_irq_base);
-	db_assert(irq < jmr3927_irq_base + JMR3927_NR_IRQ_IRC + JMR3927_NR_IRQ_IOC);
-
 	if (irq == JMR3927_IRQ_IRC_TMR0) {
 		jmr3927_tmrptr->tisr = 0;       /* ack interrupt */
 	}
@@ -145,10 +142,6 @@ static void jmr3927_irq_ack(unsigned int irq)
 
 static void jmr3927_irq_end(unsigned int irq)
 {
-	db_assert(jmr3927_irq_base != -1);
-	db_assert(irq >= jmr3927_irq_base);
-	db_assert(irq < jmr3927_irq_base + JMR3927_NR_IRQ_IRC + JMR3927_NR_IRQ_IOC);
-
 	jmr3927_irq_enable(irq);
 }
 
@@ -156,26 +149,18 @@ static void jmr3927_irq_disable(unsigned int irq_nr)
 {
 	unsigned long flags;
 
-	db_assert(jmr3927_irq_base != -1);
-	db_assert(irq >= jmr3927_irq_base);
-	db_assert(irq < jmr3927_irq_base + JMR3927_NR_IRQ_IRC + JMR3927_NR_IRQ_IOC);
-
-	local_irq_save(flags);
+	spinlock_irqsave(&jmr3927_irq_lock, flags);
 	mask_irq(irq_nr);
-	local_irq_restore(flags);
+	spinlock_irqrestore(&jmr3927_irq_lock, flags);
 }
 
 static void jmr3927_irq_enable(unsigned int irq_nr)
 {
 	unsigned long flags;
 
-	db_assert(jmr3927_irq_base != -1);
-	db_assert(irq >= jmr3927_irq_base);
-	db_assert(irq < jmr3927_irq_base + JMR3927_NR_IRQ_IRC + JMR3927_NR_IRQ_IOC);
-
-	local_irq_save(flags);
+	spinlock_irqsave(&jmr3927_irq_lock, flags);
 	unmask_irq(irq_nr);
-	local_irq_restore(flags);
+	spinlock_irqrestore(&jmr3927_irq_lock, flags);
 }
 
 /*
@@ -195,8 +180,7 @@ static void mask_irq_isac(int irq_nr, int space_id)
 static void unmask_irq_isac(int irq_nr, int space_id)
 {
 	/* 0: mask */
-	unsigned char imask =
-		jmr3927_isac_reg_in(JMR3927_ISAC_INTM_ADDR);
+	unsigned char imask = jmr3927_isac_reg_in(JMR3927_ISAC_INTM_ADDR);
 	unsigned int bit  = 1 << irq_nr;
 	jmr3927_isac_reg_out(imask | bit, JMR3927_ISAC_INTM_ADDR);
 	/* flush write buffer */
@@ -206,8 +190,7 @@ static void unmask_irq_isac(int irq_nr, int space_id)
 static void mask_irq_ioc(int irq_nr, int space_id)
 {
 	/* 0: mask */
-	unsigned char imask =
-		jmr3927_ioc_reg_in(JMR3927_IOC_INTM_ADDR);
+	unsigned char imask = jmr3927_ioc_reg_in(JMR3927_IOC_INTM_ADDR);
 	unsigned int bit = 1 << irq_nr;
 	jmr3927_ioc_reg_out(imask & ~bit, JMR3927_IOC_INTM_ADDR);
 	/* flush write buffer */
@@ -216,8 +199,7 @@ static void mask_irq_ioc(int irq_nr, int space_id)
 static void unmask_irq_ioc(int irq_nr, int space_id)
 {
 	/* 0: mask */
-	unsigned char imask =
-		jmr3927_ioc_reg_in(JMR3927_IOC_INTM_ADDR);
+	unsigned char imask = jmr3927_ioc_reg_in(JMR3927_IOC_INTM_ADDR);
 	unsigned int bit = 1 << irq_nr;
 	jmr3927_ioc_reg_out(imask | bit, JMR3927_IOC_INTM_ADDR);
 	/* flush write buffer */
@@ -440,6 +422,7 @@ void jmr3927_irq_setup(void)
 }
 
 void (*irq_setup)(void);
+
 void __init init_IRQ(void)
 {
 
@@ -456,7 +439,7 @@ void __init init_IRQ(void)
         irq_setup();
 }
 
-hw_irq_controller jmr3927_irq_controller = {
+static hw_irq_controller jmr3927_irq_controller = {
 	"jmr3927_irq",
 	jmr3927_irq_startup,
 	jmr3927_irq_shutdown,
@@ -464,15 +447,13 @@ hw_irq_controller jmr3927_irq_controller = {
 	jmr3927_irq_disable,
 	jmr3927_irq_ack,
 	jmr3927_irq_end,
-	NULL			/* no affinity stuff for UP */
 };
 
-void
-jmr3927_irq_init(u32 irq_base)
+void jmr3927_irq_init(u32 irq_base)
 {
-	extern irq_desc_t irq_desc[];
 	u32 i;
 
+	init_generic_irq();
 	for (i= irq_base; i< irq_base + JMR3927_NR_IRQ_IRC + JMR3927_NR_IRQ_IOC; i++) {
 		irq_desc[i].status = IRQ_DISABLED;
 		irq_desc[i].action = NULL;

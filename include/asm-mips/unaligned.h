@@ -58,19 +58,19 @@ struct __una_u16 { __u16 x __attribute__((packed)); };
  * Elemental unaligned loads 
  */
 
-extern inline __u64 __uldq(const __u64 * r11)
+static inline __u64 __uldq(const __u64 * r11)
 {
 	const struct __una_u64 *ptr = (const struct __una_u64 *) r11;
 	return ptr->x;
 }
 
-extern inline __u32 __uldl(const __u32 * r11)
+static inline __u32 __uldl(const __u32 * r11)
 {
 	const struct __una_u32 *ptr = (const struct __una_u32 *) r11;
 	return ptr->x;
 }
 
-extern inline __u16 __uldw(const __u16 * r11)
+static inline __u16 __uldw(const __u16 * r11)
 {
 	const struct __una_u16 *ptr = (const struct __una_u16 *) r11;
 	return ptr->x;
@@ -80,25 +80,25 @@ extern inline __u16 __uldw(const __u16 * r11)
  * Elemental unaligned stores 
  */
 
-extern inline void __ustq(__u64 r5, __u64 * r11)
+static inline void __ustq(__u64 r5, __u64 * r11)
 {
 	struct __una_u64 *ptr = (struct __una_u64 *) r11;
 	ptr->x = r5;
 }
 
-extern inline void __ustl(__u32 r5, __u32 * r11)
+static inline void __ustl(__u32 r5, __u32 * r11)
 {
 	struct __una_u32 *ptr = (struct __una_u32 *) r11;
 	ptr->x = r5;
 }
 
-extern inline void __ustw(__u16 r5, __u16 * r11)
+static inline void __ustw(__u16 r5, __u16 * r11)
 {
 	struct __una_u16 *ptr = (struct __una_u16 *) r11;
 	ptr->x = r5;
 }
 
-extern inline __u64 __get_unaligned(const void *ptr, size_t size)
+static inline __u64 __get_unaligned(const void *ptr, size_t size)
 {
 	__u64 val;
 
@@ -121,7 +121,7 @@ extern inline __u64 __get_unaligned(const void *ptr, size_t size)
 	return val;
 }
 
-extern inline void __put_unaligned(__u64 val, void *ptr, size_t size)
+static inline void __put_unaligned(__u64 val, void *ptr, size_t size)
 {
 	switch (size) {
 	      case 1:

@@ -62,7 +62,7 @@
 1:
 		move	k0, sp
 		subu	sp, k1, GDB_FR_SIZE*2	# see comment above
-		LONG_S	$26, GDB_FR_REG29(sp)
+		LONG_S	k0, GDB_FR_REG29(sp)
 		LONG_S	$2, GDB_FR_REG2(sp)
 
 /*
@@ -90,7 +90,7 @@
 		LONG_S	$1, GDB_FR_REG1(sp)
 		/* v0 already saved */
 		LONG_S	$3, GDB_FR_REG3(sp)
-		LONG_S	$3, GDB_FR_REG4(sp)
+		LONG_S	$4, GDB_FR_REG4(sp)
 		LONG_S	$5, GDB_FR_REG5(sp)
 		LONG_S	$6, GDB_FR_REG6(sp)
 		LONG_S	$7, GDB_FR_REG7(sp)
@@ -296,7 +296,7 @@
 		LONG_L	v0, GDB_FR_HI(sp)
 		LONG_L	v1, GDB_FR_LO(sp)
 		mthi	v0
-		mtlo	v0
+		mtlo	v1
 		LONG_L	$31, GDB_FR_REG31(sp)
 		LONG_L	$30, GDB_FR_REG30(sp)
 		LONG_L	$28, GDB_FR_REG28(sp)

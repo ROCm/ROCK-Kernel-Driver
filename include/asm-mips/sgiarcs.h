@@ -236,6 +236,8 @@ struct linux_romvec {
 
 	/* Miscellaneous. */
 	LONG	cache_flush;
+	LONG	TestUnicodeCharacter;		/* ARC; not sure if ARCS too */
+	LONG	GetDisplayStatus;
 };
 
 /* The SGI ARCS parameter block is in a fixed location for standalone

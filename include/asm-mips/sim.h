@@ -13,13 +13,13 @@
 
 #include <asm/offset.h>
 
-#ifdef CONFIG_MIPS32
-
 /* Used in declaration of save_static functions.  */
 #define static_unused static __attribute__((unused))
 
 #define __str2(x) #x
 #define __str(x) __str2(x)
+
+#ifdef CONFIG_MIPS32
 
 #define save_static_function(symbol)					\
 __asm__ (								\
@@ -42,19 +42,11 @@ __asm__ (								\
 	".end\t" #symbol "\n\t"						\
 	".size\t" #symbol",. - " #symbol)
 
-#define save_static(frame)	do { } while (0)
-
 #define nabi_no_regargs
 
 #endif /* CONFIG_MIPS32 */
 
 #ifdef CONFIG_MIPS64
-
-/* Used in declaration of save_static functions.  */
-#define static_unused static __attribute__((unused))
-
-#define __str2(x) #x
-#define __str(x) __str2(x)
 
 #define save_static_function(symbol)					\
 __asm__ (								\
@@ -65,22 +57,17 @@ __asm__ (								\
 	".ent\t" #symbol ", 0\n"					\
 	#symbol":\n\t"							\
 	".frame\t$29, 0, $31\n\t"					\
+	"sd\t$16,"__str(PT_R16)"($29)\t\t\t# save_static_function\n\t"	\
+	"sd\t$17,"__str(PT_R17)"($29)\n\t"				\
+	"sd\t$18,"__str(PT_R18)"($29)\n\t"				\
+	"sd\t$19,"__str(PT_R19)"($29)\n\t"				\
+	"sd\t$20,"__str(PT_R20)"($29)\n\t"				\
+	"sd\t$21,"__str(PT_R21)"($29)\n\t"				\
+	"sd\t$22,"__str(PT_R22)"($29)\n\t"				\
+	"sd\t$23,"__str(PT_R23)"($29)\n\t"				\
+	"sd\t$30,"__str(PT_R30)"($29)\n\t"				\
 	".end\t" #symbol "\n\t"						\
 	".size\t" #symbol",. - " #symbol)
-
-#define save_static(frame)						\
-	__asm__ __volatile__(						\
-		"sd\t$16,"__str(PT_R16)"(%0)\n\t"			\
-		"sd\t$17,"__str(PT_R17)"(%0)\n\t"			\
-		"sd\t$18,"__str(PT_R18)"(%0)\n\t"			\
-		"sd\t$19,"__str(PT_R19)"(%0)\n\t"			\
-		"sd\t$20,"__str(PT_R20)"(%0)\n\t"			\
-		"sd\t$21,"__str(PT_R21)"(%0)\n\t"			\
-		"sd\t$22,"__str(PT_R22)"(%0)\n\t"			\
-		"sd\t$23,"__str(PT_R23)"(%0)\n\t"			\
-		"sd\t$30,"__str(PT_R30)"(%0)\n\t"			\
-		: /* No outputs */					\
-		: "r" (frame))
 
 #define nabi_no_regargs							\
 	unsigned long __dummy0,						\

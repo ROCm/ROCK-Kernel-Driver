@@ -16,8 +16,6 @@
 #ifndef __VICTOR_MPC30X_H
 #define __VICTOR_MPC30X_H
 
-#include <linux/config.h>
-
 #include <asm/addrspace.h>
 #include <asm/vr41xx/vr41xx.h>
 

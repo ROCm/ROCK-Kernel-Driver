@@ -25,25 +25,58 @@
 #ifndef _MIPS_ATLASINT_H
 #define _MIPS_ATLASINT_H
 
-/* Number of IRQ supported on hw interrupt 0. */
-#define ATLASINT_UART      0
-#define ATLASINT_END      32
+#define ATLASINT_BASE		1
+#define ATLASINT_UART		(ATLASINT_BASE+0)
+#define ATLASINT_TIM0		(ATLASINT_BASE+1)
+#define ATLASINT_RES2		(ATLASINT_BASE+2)
+#define ATLASINT_RES3		(ATLASINT_BASE+3)
+#define ATLASINT_RTC		(ATLASINT_BASE+4)
+#define ATLASINT_COREHI		(ATLASINT_BASE+5)
+#define ATLASINT_CORELO		(ATLASINT_BASE+6)
+#define ATLASINT_RES7		(ATLASINT_BASE+7)
+#define ATLASINT_PCIA		(ATLASINT_BASE+8)
+#define ATLASINT_PCIB		(ATLASINT_BASE+9)
+#define ATLASINT_PCIC		(ATLASINT_BASE+10)
+#define ATLASINT_PCID		(ATLASINT_BASE+11)
+#define ATLASINT_ENUM		(ATLASINT_BASE+12)
+#define ATLASINT_DEG		(ATLASINT_BASE+13)
+#define ATLASINT_ATXFAIL	(ATLASINT_BASE+14)
+#define ATLASINT_INTA		(ATLASINT_BASE+15)
+#define ATLASINT_INTB		(ATLASINT_BASE+16)
+#define ATLASINT_ETH		ATLASINT_INTB
+#define ATLASINT_INTC		(ATLASINT_BASE+17)
+#define ATLASINT_SCSI		ATLASINT_INTC
+#define ATLASINT_INTD		(ATLASINT_BASE+18)
+#define ATLASINT_SERR		(ATLASINT_BASE+19)
+#define ATLASINT_RES20		(ATLASINT_BASE+20)
+#define ATLASINT_RES21		(ATLASINT_BASE+21)
+#define ATLASINT_RES22		(ATLASINT_BASE+22)
+#define ATLASINT_RES23		(ATLASINT_BASE+23)
+#define ATLASINT_RES24		(ATLASINT_BASE+24)
+#define ATLASINT_RES25		(ATLASINT_BASE+25)
+#define ATLASINT_RES26		(ATLASINT_BASE+26)
+#define ATLASINT_RES27		(ATLASINT_BASE+27)
+#define ATLASINT_RES28		(ATLASINT_BASE+28)
+#define ATLASINT_RES29		(ATLASINT_BASE+29)
+#define ATLASINT_RES30		(ATLASINT_BASE+30)
+#define ATLASINT_RES31		(ATLASINT_BASE+31)
+#define ATLASINT_END		(ATLASINT_BASE+31)
 
 /*
  * Atlas registers are memory mapped on 64-bit aligned boundaries and
  * only word access are allowed.
  */
 struct atlas_ictrl_regs {
-        volatile unsigned long intraw;
-        long dummy1;
-        volatile unsigned long intseten;
-        long dummy2;
-        volatile unsigned long intrsten;
-        long dummy3;
-        volatile unsigned long intenable;
-        long dummy4;
-        volatile unsigned long intstatus;
-        long dummy5;
+        volatile unsigned int intraw;
+        int dummy1;
+        volatile unsigned int intseten;
+        int dummy2;
+        volatile unsigned int intrsten;
+        int dummy3;
+        volatile unsigned int intenable;
+        int dummy4;
+        volatile unsigned int intstatus;
+        int dummy5;
 };
 
 extern void atlasint_init(void);

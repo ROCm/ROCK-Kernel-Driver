@@ -19,8 +19,7 @@
 
 extern int r3k_have_wired_reg;	/* defined in tlb-r3k.c */
 
-void
-dump_tlb(int first, int last)
+void dump_tlb(int first, int last)
 {
 	int	i;
 	unsigned int asid;
@@ -28,8 +27,7 @@ dump_tlb(int first, int last)
 
 	asid = read_c0_entryhi() & 0xfc0;
 
-	for(i=first;i<=last;i++)
-	{
+	for (i = first; i <= last; i++) {
 		write_c0_index(i<<8);
 		__asm__ __volatile__(
 			".set\tnoreorder\n\t"
@@ -63,14 +61,12 @@ dump_tlb(int first, int last)
 	write_c0_entryhi(asid);
 }
 
-void
-dump_tlb_all(void)
+void dump_tlb_all(void)
 {
 	dump_tlb(0, current_cpu_data.tlbsize - 1);
 }
 
-void
-dump_tlb_wired(void)
+void dump_tlb_wired(void)
 {
 	int wired = r3k_have_wired_reg ? read_c0_wired() : 8;
 
@@ -78,10 +74,9 @@ dump_tlb_wired(void)
 	dump_tlb(0, wired - 1);
 }
 
-void
-dump_tlb_addr(unsigned long addr)
+void dump_tlb_addr(unsigned long addr)
 {
-	unsigned int flags, oldpid;
+	unsigned long flags, oldpid;
 	int index;
 
 	local_irq_save(flags);
@@ -101,15 +96,13 @@ dump_tlb_addr(unsigned long addr)
 	dump_tlb(index, index);
 }
 
-void
-dump_tlb_nonwired(void)
+void dump_tlb_nonwired(void)
 {
 	int wired = r3k_have_wired_reg ? read_c0_wired() : 8;
 	dump_tlb(wired, current_cpu_data.tlbsize - 1);
 }
 
-void
-dump_list_process(struct task_struct *t, void *address)
+void dump_list_process(struct task_struct *t, void *address)
 {
 	pgd_t	*page_dir, *pgd;
 	pmd_t	*pmd;
@@ -148,14 +141,12 @@ dump_list_process(struct task_struct *t, void *address)
 	printk("\n");
 }
 
-void
-dump_list_current(void *address)
+void dump_list_current(void *address)
 {
 	dump_list_process(current, address);
 }
 
-unsigned int
-vtop(void *address)
+unsigned int vtop(void *address)
 {
 	pgd_t	*pgd;
 	pmd_t	*pmd;
@@ -172,16 +163,14 @@ vtop(void *address)
 	return paddr;
 }
 
-void
-dump16(unsigned long *p)
+void dump16(unsigned long *p)
 {
 	int i;
 
-	for(i=0;i<8;i++)
-	{
-		printk("*%08lx == %08lx, ",
-		       (unsigned long)p, (unsigned long)*p++);
-		printk("*%08lx == %08lx\n",
-		       (unsigned long)p, (unsigned long)*p++);
+	for (i = 0; i < 8; i++) {
+		printk("*%08lx == %08lx, ", (unsigned long)p, *p);
+		p++;
+		printk("*%08lx == %08lx\n", (unsigned long)p, *p);
+		p++;
 	}
 }

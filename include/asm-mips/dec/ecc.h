@@ -42,10 +42,14 @@
 
 
 #ifndef __ASSEMBLY__
+
+#include <linux/interrupt.h>
+
 struct pt_regs;
+
 extern void dec_ecc_be_init(void);
 extern int dec_ecc_be_handler(struct pt_regs *regs, int is_fixup);
-extern void dec_ecc_be_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+extern irqreturn_t dec_ecc_be_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 #endif
 
 #endif /* __ASM_MIPS_DEC_ECC_H */

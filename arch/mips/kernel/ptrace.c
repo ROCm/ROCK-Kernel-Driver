@@ -108,7 +108,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 	/* Read the word at location addr in the USER area. */
 	case PTRACE_PEEKUSR: {
 		struct pt_regs *regs;
-		unsigned long tmp;
+		unsigned long tmp = 0;
 
 		regs = (struct pt_regs *) ((unsigned long) child->thread_info +
 		       THREAD_SIZE - 32 - sizeof(struct pt_regs));
@@ -312,13 +312,9 @@ asmlinkage void do_syscall_trace(void)
 
 	/* The 0x80 provides a way for the tracing parent to distinguish
 	   between a syscall stop and SIGTRAP delivery */
-	current->exit_code = SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD)
-	                                ? 0x80 : 0);
-	preempt_disable();
-	current->state = TASK_STOPPED;
-	notify_parent(current, SIGCHLD);
-	schedule();
-	preempt_enable();
+	ptrace_notify(SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD) ?
+	                         0x80 : 0));
+
 	/*
 	 * this isn't the same as continuing with a signal, but it will do
 	 * for normal use.  strace only continues with a signal if the

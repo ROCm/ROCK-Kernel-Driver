@@ -1,17 +1,11 @@
-/***********************************************************************
- *
+/*
  * Copyright 2001 MontaVista Software Inc.
  * Author: jsun@mvista.com or jsun@junsun.net
- *
- * arch/mips/ddb5xxx/common/prom.c
- *     prom.c file.
  *
  * This program is free software; you can redistribute  it and/or modify it
  * under  the terms of  the GNU General  Public License as published by the
  * Free Software Foundation;  either version 2 of the  License, or (at your
  * option) any later version.
- *
- ***********************************************************************
  */
 #include <linux/config.h>
 #include <linux/init.h>
@@ -23,8 +17,6 @@
 #include <asm/bootinfo.h>
 #include <asm/ddb5xxx/ddb5xxx.h>
 #include <asm/debug.h>
-
-char arcs_cmdline[CL_SIZE];
 
 const char *get_system_type(void)
 {
@@ -38,13 +30,22 @@ const char *get_system_type(void)
 	}
 }
 
+#if defined(CONFIG_DDB5477)
+void ddb5477_runtime_detection(void);
+#endif
+
 /* [jsun@junsun.net] PMON passes arguments in C main() style */
-void __init prom_init(int argc, const char **arg)
+void __init prom_init(void)
 {
+	int argc = fw_arg0;
+	char **arg = (char**) fw_arg1;
 	int i;
 
+	/* if user passes kernel args, ignore the default one */
+	if (argc > 1)
+		arcs_cmdline[0] = '\0';
+
 	/* arg[0] is "g", the rest is boot parameters */
-	arcs_cmdline[0] = '\0';
 	for (i = 1; i < argc; i++) {
 		if (strlen(arcs_cmdline) + strlen(arg[i] + 1)
 		    >= sizeof(arcs_cmdline))
@@ -52,9 +53,6 @@ void __init prom_init(int argc, const char **arg)
 		strcat(arcs_cmdline, arg[i]);
 		strcat(arcs_cmdline, " ");
 	}
-
-	/* by default all these boards use dhcp/nfs root fs */
-	strcat(arcs_cmdline, "ip=bootp");
 
 	mips_machgroup = MACH_GROUP_NEC_DDB;
 
@@ -70,8 +68,9 @@ void __init prom_init(int argc, const char **arg)
 #endif
 }
 
-void __init prom_free_prom_memory(void)
+unsigned long __init prom_free_prom_memory(void)
 {
+	return 0;
 }
 
 #if defined(CONFIG_DDB5477)

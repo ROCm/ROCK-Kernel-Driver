@@ -22,11 +22,21 @@
  *  You should have received a copy of the  GNU General Public License along
  *  with this program; if not, write  to the Free Software Foundation, Inc.,
  *  675 Mass Ave, Cambridge, MA 02139, USA.
+ *
+ *  Louis Hamilton, Red Hat, Inc.
+ *    hamilton@redhat.com  [MIPS64 modifications]
  */
+
 #ifndef __OCELOT_C_FPGA_H__
 #define __OCELOT_C_FPGA_H__
 
-#define OCELOT_C_CS0_ADDR (0xfc000000)
+#include <linux/config.h>
+
+#ifdef CONFIG_MIPS64
+#define OCELOT_C_CS0_ADDR       (0xfffffffffc000000)
+#else
+#define OCELOT_C_CS0_ADDR               (0xfc000000)
+#endif
 
 #define OCELOT_C_REG_BOARDREV		0x0
 #define OCELOT_C_REG_FPGA_REV		0x1
