@@ -154,11 +154,11 @@ hydra_init(void)
 void __init
 chrp_pcibios_fixup(void)
 {
-	struct pci_dev *dev;
+	struct pci_dev *dev = NULL;
 	struct device_node *np;
 
 	/* PCI interrupts are controlled by the OpenPIC */
-	pci_for_each_dev(dev) {
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		np = pci_device_to_OF_node(dev);
 		if ((np != 0) && (np->n_intrs > 0) && (np->intrs[0].line != 0))
 			dev->irq = np->intrs[0].line;
