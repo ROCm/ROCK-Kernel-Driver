@@ -49,6 +49,10 @@ config FORCE_MAX_ZONEORDER
 
 source "init/Kconfig"
 
+config SYSVIPC_COMPAT
+	bool
+	depends on COMPAT && SYSVIPC
+	default y
 
 menu "Platform support"
 

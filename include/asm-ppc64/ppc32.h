@@ -141,9 +141,4 @@ struct ucontext32 {
 	struct mcontext32	uc_mcontext;
 };
 
-struct ipc_kludge_32 {
-	unsigned int msgp;
-	int msgtyp;
-};
-
 #endif  /* _PPC64_PPC32_H */
