@@ -407,12 +407,6 @@ void __init paging_init(void)
 
 void __init test_wp_bit(void)
 {
-	if (cpu_has_pse) {
-		/* Ok, all PSE-capable CPUs are definitely handling the WP bit right. */
-		boot_cpu_data.wp_works_ok = 1;
-		return;
-	}
-
 	printk("Checking if this processor honours the WP bit even in supervisor mode... ");
 
 	/* Any page-aligned address will do, the test is non-destructive */
