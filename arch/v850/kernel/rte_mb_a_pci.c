@@ -239,7 +239,7 @@ static void __devinit pcibios_assign_resources (void)
 	struct resource *r;
 
 	pci_for_each_dev (dev) {
-		int di_num;
+		unsigned di_num;
 		unsigned class = dev->class >> 8;
 
 		if (class && class != PCI_CLASS_BRIDGE_HOST) {

@@ -2,8 +2,8 @@
  * include/asm-v850/nb85e_utils.h -- Utility functions associated with
  *	the NB85E cpu core
  *
- *  Copyright (C) 2001  NEC Corporation
- *  Copyright (C) 2001  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2001,02  NEC Corporation
+ *  Copyright (C) 2001,02  Miles Bader <miles@gnu.org>
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
@@ -40,7 +40,7 @@ int calc_counter_params (unsigned long base_freq,
 	/* Find the lowest clock divider setting that can represent RATE.  */
 	for (_divlog2 = min_divlog2; _divlog2 <= max_divlog2; _divlog2++) {
 		/* Minimum interrupt rate possible using this divider.  */
-		int min_int_rate
+		unsigned min_int_rate
 			= (base_freq >> _divlog2) >> counter_size;
 
 		if (min_int_rate <= rate) {

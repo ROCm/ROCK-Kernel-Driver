@@ -512,9 +512,10 @@ int do_signal(struct pt_regs *regs, sigset_t *oldset)
 	/* Did we come from a system call? */
 	if (PT_REGS_SYSCALL (regs)) {
 		/* Restart the system call - no handlers present */
-		if (regs->gpr[GPR_RVAL] == -ERESTARTNOHAND ||
-		    regs->gpr[GPR_RVAL] == -ERESTARTSYS ||
-		    regs->gpr[GPR_RVAL] == -ERESTARTNOINTR) {
+		if (regs->gpr[GPR_RVAL] == (v850_reg_t)-ERESTARTNOHAND ||
+		    regs->gpr[GPR_RVAL] == (v850_reg_t)-ERESTARTSYS ||
+		    regs->gpr[GPR_RVAL] == (v850_reg_t)-ERESTARTNOINTR)
+		{
 			regs->gpr[12] = PT_REGS_SYSCALL (regs);
 			regs->pc -= 4; /* Size of `trap 0' insn.  */
 		}

@@ -61,10 +61,10 @@ void __init mach_early_init (void)
 void __init mach_setup (char **cmdline)
 {
 	/* Probe for Mother-A, and print a message if we find it.  */
-	*(volatile long *)MB_A_SRAM_ADDR = 0xDEADBEEF;
-	if (*(volatile long *)MB_A_SRAM_ADDR == 0xDEADBEEF) {
-		*(volatile long *)MB_A_SRAM_ADDR = 0x12345678;
-		if (*(volatile long *)MB_A_SRAM_ADDR == 0x12345678)
+	*(volatile unsigned long *)MB_A_SRAM_ADDR = 0xDEADBEEF;
+	if (*(volatile unsigned long *)MB_A_SRAM_ADDR == 0xDEADBEEF) {
+		*(volatile unsigned long *)MB_A_SRAM_ADDR = 0x12345678;
+		if (*(volatile unsigned long *)MB_A_SRAM_ADDR == 0x12345678)
 			printk (KERN_INFO
 				"          NEC SolutionGear/Midas lab"
 				" RTE-MOTHER-A motherboard\n");

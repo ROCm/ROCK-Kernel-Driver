@@ -183,7 +183,7 @@ void __init gbus_int_init_irq_types (struct gbus_int_irq_init *inits,
 {
 	struct gbus_int_irq_init *init;
 	for (init = inits; init->name; init++) {
-		int i;
+		unsigned i;
 		struct hw_interrupt_type *hwit = hw_irq_types++;
 
 		hwit->typename = init->name;
@@ -200,7 +200,7 @@ void __init gbus_int_init_irq_types (struct gbus_int_irq_init *inits,
 
 		/* Set the interrupt priorities.  */
 		for (i = 0; i < init->num; i++) {
-			int j;
+			unsigned j;
 			for (j = 0; j < NUM_USED_GINTS; j++)
 				if (used_gint[j].priority > init->priority)
 					break;
@@ -222,7 +222,7 @@ static struct hw_interrupt_type gint_hw_itypes[NUM_USED_GINTS];
 
 /* GBUS interrupts themselves.  */
 
-__init struct gbus_int_irq_init gbus_irq_inits[] = {
+struct gbus_int_irq_init gbus_irq_inits[] __initdata = {
 	/* First set defaults.  */
 	{ "GBUS_INT", IRQ_GBUS_INT(0), IRQ_GBUS_INT_NUM, 1, 6},
 	{ 0 }
@@ -236,7 +236,7 @@ static struct hw_interrupt_type gbus_hw_itypes[NUM_GBUS_IRQ_INITS];
 /* Initialize GBUS interrupts.  */
 void __init gbus_int_init_irqs (void)
 {
-	int i;
+	unsigned i;
 
 	/* First initialize the shared gint interrupts.  */
 	for (i = 0; i < NUM_USED_GINTS; i++) {
