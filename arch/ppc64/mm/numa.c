@@ -84,15 +84,133 @@ static struct device_node * __init find_cpu_node(unsigned int cpu)
 	return NULL;
 }
 
+/* must hold reference to node during call */
+static int *of_get_associativity(struct device_node *dev)
+ {
+	int *result;
+	int len;
+	
+	result = (int *)get_property(dev, "ibm,associativity", &len);
+
+	if (len <= 0)
+		return NULL;
+
+	return result;
+}
+
+static int of_node_numa_domain(struct device_node *device, int depth)
+{
+	int numa_domain;
+	unsigned int *tmp;
+	
+	tmp = of_get_associativity(device);
+	if (tmp && (tmp[0] >= depth)) {
+		numa_domain = tmp[depth];
+	} else {
+		printk(KERN_ERR "WARNING: no NUMA information for "
+		       "%s\n", device->full_name);
+		numa_domain = 0;
+	}
+	return numa_domain;
+}
+
+/*
+ * In theory, the "ibm,associativity" property may contain multiple 
+ * associativity lists because a resource may be multiply connected 
+ * into the machine.  This resource then has different associativity
+ * characteristics relative to its multiple connections.  We ignore
+ * this for now.  We also assume that all cpu and memory sets have
+ * their distances represented at a common level.  This won't be 
+ * true for heirarchical NUMA.
+ *
+ * This function answers the question:
+ * At which associativity level does a particular kind of device
+ * begin to differ.
+ *
+ * More common levels mean that things are closer together.
+ *
+ * - Dave Hansen <haveblue@us.ibm.com>
+ */
+static int find_assoc_diff_depth(char *node_type)
+{
+	struct device_node *device;
+	struct device_node *base_device;
+	int smallest_depth = -1;
+	int *base_assoc;
+
+	device = of_find_node_by_type(NULL, node_type);
+	if (!device)
+		goto err;
+
+	base_device = device;
+
+	/* 
+	 * keep a reference on the first device node so that it can
+	 * be compared against in the loop below 
+	 */
+	of_node_get(base_device);
+	base_assoc = of_get_associativity(base_device);
+
+	for (; device; device = of_find_node_by_type(device, node_type)) {
+		int depth;
+		int length;
+		int *assoc = of_get_associativity(device);
+
+		if (!assoc)
+			goto err;
+
+		/*
+		 * The associativity arrays are pascal-string-style with t
+		 * the length as the first (0th) field. (self-inclusive)
+		 */
+		length = assoc[0];
+
+		if (length > base_assoc[0]) {
+			printk(KERN_ERR "OpenFirmware associativity depth "
+			       "changed for %s: approximating depth\n",
+			       node_type);
+			goto err;
+		}
+
+		for (depth = 1; depth <= length; depth++) {
+			if (base_assoc[depth] != assoc[depth]) {
+				smallest_depth = depth;
+				break;
+			}
+		}
+	}
+
+err:
+	of_node_put(device);
+	of_node_put(base_device);
+	return smallest_depth;
+}
+
+static int find_min_common_depth(void)
+{
+	return min(find_assoc_diff_depth("memory"),
+		   find_assoc_diff_depth("cpu"));
+}
+
+static unsigned long read_cell_ul(struct device_node *device, unsigned int **buf)
+{
+	int i;
+	unsigned long result = 0;
+
+	i = prom_n_size_cells(device);
+	/* bug on i>2 ?? */
+	while (i--) {
+		result = (result << 32) | **buf;
+		(*buf)++;
+	}
+	return result;
+}
+
 static int __init parse_numa_properties(void)
 {
 	struct device_node *cpu = NULL;
 	struct device_node *memory = NULL;
-	unsigned int *tmp;
-	int cpu_associativity;
-	int memory_associativity;
 	int depth;
-	int len;
 	int max_domain = 0;
 	long entries = lmb_end_of_DRAM() >> MEMORY_INCREMENT_SHIFT;
 	unsigned long i;
@@ -108,53 +226,20 @@ static int __init parse_numa_properties(void)
 	for (i = 0; i < entries ; i++)
 		numa_memory_lookup_table[i] = ARRAY_INITIALISER;
 
-	/* Check that both memory and cpu have associativity information */
-	cpu = of_find_node_by_type(NULL, "cpu");
-	if (!cpu)
-		return -1;
+	depth = find_min_common_depth();
 
-	tmp = (int *)get_property(cpu, "ibm,associativity", &len);
-	if (!tmp || len <= 0) {
-		of_node_put(cpu);
-		return -1;
-	}
-	cpu_associativity = tmp[0];
-	of_node_put(cpu);
-
-	memory = of_find_node_by_type(NULL, "memory");
-	if (!memory)
-		return -1;
-
-	tmp = (int *)get_property(memory, "ibm,associativity", &len);
-	if (!tmp || len <= 0) {
-		of_node_put(memory);
-		return -1;
-	}
-	memory_associativity = tmp[0];
-	of_node_put(memory);
-
-	/* find common depth */
-	if (cpu_associativity < memory_associativity)
-		depth = cpu_associativity;
-	else
-		depth = memory_associativity;
-
+	printk(KERN_INFO "NUMA associativity depth for CPU/Memory: %d\n", depth);
+	if (depth < 0)
+		return depth;
+	
 	for_each_cpu(i) {
 		int numa_domain;
 
 		cpu = find_cpu_node(i);
 
 		if (cpu) {
-			tmp = (int *)get_property(cpu, "ibm,associativity",
-						  &len);
-			if (tmp && (len >= depth)) {
-				numa_domain = tmp[depth];
-				of_node_put(cpu);
-			} else {
-				printk(KERN_ERR "WARNING: no NUMA "
-				       "information for cpu %ld\n", i);
-				numa_domain = 0;
-			}
+			numa_domain = of_node_numa_domain(cpu, depth);
+			of_node_put(cpu);
 
 			if (numa_domain >= MAX_NUMNODES) {
 				/*
@@ -183,42 +268,27 @@ static int __init parse_numa_properties(void)
 
 	memory = NULL;
 	while ((memory = of_find_node_by_type(memory, "memory")) != NULL) {
-		unsigned long start = 0;
-		unsigned long size = 0;
+		unsigned long start;
+		unsigned long size;
 		int numa_domain;
 		int ranges;
+		unsigned int *memcell_buf;
+		int len;
 
-		tmp = (unsigned int *)get_property(memory, "reg", &len);
-		if (!tmp || len <= 0)
+		memcell_buf = (unsigned int *)get_property(memory, "reg", &len);
+		if (!memcell_buf || len <= 0)
 			continue;
 
 		ranges = memory->n_addrs;
 new_range:
-
-		i = prom_n_size_cells(memory);
-		while (i--) {
-			start = (start << 32) | *tmp;
-			tmp++;
-		}
-
-		i = prom_n_size_cells(memory);
-		while (i--) {
-			size = (size << 32) | *tmp;
-			tmp++;
-		}
+		/* these are order-sensitive, and modify the buffer pointer */
+		start = read_cell_ul(memory, &memcell_buf);
+		 size = read_cell_ul(memory, &memcell_buf);
 
 		start = _ALIGN_DOWN(start, MEMORY_INCREMENT);
 		size = _ALIGN_UP(size, MEMORY_INCREMENT);
 
-		tmp = (unsigned int *)get_property(memory, "ibm,associativity",
-					   &len);
-		if (tmp && len >= depth) {
-			numa_domain = tmp[depth];
-		} else {
-			printk(KERN_ERR "WARNING: no NUMA information for "
-			       "memory at %lx\n", start);
-			numa_domain = 0;
-		}
+		numa_domain = of_node_numa_domain(memory, depth);
 
 		if (numa_domain >= MAX_NUMNODES) {
 			if (numa_domain != 0xffff)
