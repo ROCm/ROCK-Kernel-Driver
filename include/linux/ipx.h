@@ -24,15 +24,13 @@ struct sockaddr_ipx
 #define IPX_DLTITF	0
 #define IPX_CRTITF	1
 
-typedef struct ipx_route_definition
-{
+struct ipx_route_definition {
 	__u32         ipx_network;
 	__u32         ipx_router_network;
 	unsigned char ipx_router_node[IPX_NODE_LEN];
-}	ipx_route_definition;
+};
 
-typedef struct ipx_interface_definition
-{
+struct ipx_interface_definition {
 	__u32         ipx_network;
 	unsigned char ipx_device[16];
 	unsigned char ipx_dlink_type;
@@ -47,13 +45,12 @@ typedef struct ipx_interface_definition
 #define IPX_PRIMARY		1
 #define IPX_INTERNAL		2
 	unsigned char ipx_node[IPX_NODE_LEN];
-}	ipx_interface_definition;
+};
 	
-typedef struct ipx_config_data
-{
+struct ipx_config_data {
 	unsigned char	ipxcfg_auto_select_primary;
 	unsigned char	ipxcfg_auto_create_interfaces;
-}	ipx_config_data;
+};
 
 /*
  * OLD Route Definition for backward compatibility.
@@ -77,13 +74,4 @@ struct ipx_route_def
 #define SIOCAIPXPRISLT		(SIOCPROTOPRIVATE+1)
 #define SIOCIPXCFGDATA		(SIOCPROTOPRIVATE+2)
 #define SIOCIPXNCPCONN		(SIOCPROTOPRIVATE+3)
-
-#ifdef __KERNEL__
-#include <linux/skbuff.h>
-
-extern int ipxrtr_route_skb(struct sk_buff *);
-extern int ipx_if_offset(unsigned long ipx_net_number);
-extern void ipx_remove_socket(struct sock *sk);
-#endif /* def __KERNEL__ */
-
 #endif /* def _IPX_H_ */

@@ -523,8 +523,18 @@ static int ip_build_xmit_slow(struct sock *sk,
 		/*
 		 *	Get the memory we require with some space left for alignment.
 		 */
-
-		skb = sock_alloc_send_skb(sk, fraglen+hh_len+15, flags&MSG_DONTWAIT, &err);
+		if (!(flags & MSG_DONTWAIT) || nfrags == 0) {
+			skb = sock_alloc_send_skb(sk, fraglen + hh_len + 15,
+						  (flags & MSG_DONTWAIT), &err);
+		} else {
+			/* On a non-blocking write, we check for send buffer
+			 * usage on the first fragment only.
+			 */
+			skb = sock_wmalloc(sk, fraglen + hh_len + 15, 1,
+					   sk->allocation);
+			if (!skb)
+				err = -ENOBUFS;
+		}
 		if (skb == NULL)
 			goto error;
 

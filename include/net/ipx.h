@@ -14,12 +14,11 @@
 #include <net/datalink.h>
 #include <linux/ipx.h>
 
-typedef struct
-{
+struct ipx_address {
 	__u32   net;
 	__u8    node[IPX_NODE_LEN]; 
 	__u16   sock;
-} ipx_address;
+};
 
 #define ipx_broadcast_node	"\377\377\377\377\377\377"
 #define ipx_this_node           "\0\0\0\0\0\0"
@@ -39,11 +38,16 @@ struct ipxhdr
 #define IPX_TYPE_SPX		0x05	/* SPX protocol */
 #define IPX_TYPE_NCP		0x11	/* $lots for docs on this (SPIT) */
 #define IPX_TYPE_PPROP		0x14	/* complicated flood fill brdcast */
-	ipx_address	ipx_dest __attribute__ ((packed));
-	ipx_address	ipx_source __attribute__ ((packed));
+	struct ipx_address	ipx_dest __attribute__ ((packed));
+	struct ipx_address	ipx_source __attribute__ ((packed));
 };
 
-typedef struct ipx_interface {
+static __inline__ struct ipxhdr *ipx_hdr(struct sk_buff *skb)
+{
+	return (struct ipxhdr *)skb->h.raw;
+}
+
+struct ipx_interface {
 	/* IPX address */
 	__u32           if_netnum;
 	unsigned char	if_node[IPX_NODE_LEN];
@@ -65,16 +69,16 @@ typedef struct ipx_interface {
 	unsigned char	if_primary;
 	
 	struct ipx_interface	*if_next;
-}	ipx_interface;
+};
 
-typedef struct ipx_route {
+struct ipx_route {
 	__u32         ir_net;
-	ipx_interface *ir_intrfc;
+	struct ipx_interface	*ir_intrfc;
 	unsigned char ir_routed;
 	unsigned char ir_router_node[IPX_NODE_LEN];
-	struct ipx_route *ir_next;
+	struct ipx_route	*ir_next;
 	atomic_t      refcnt;
-}	ipx_route;
+};
 
 #ifdef __KERNEL__
 struct ipx_cb {
@@ -88,8 +92,8 @@ struct ipx_cb {
 };
 
 struct ipx_opt {
-	ipx_address	dest_addr;
-	ipx_interface	*intrfc;
+	struct ipx_address	dest_addr;
+	struct ipx_interface	*intrfc;
 	unsigned short	port;
 #ifdef CONFIG_IPX_INTERN
 	unsigned char	node[IPX_NODE_LEN];
@@ -105,8 +109,5 @@ struct ipx_opt {
 #endif
 #define IPX_MIN_EPHEMERAL_SOCKET	0x4000
 #define IPX_MAX_EPHEMERAL_SOCKET	0x7fff
-
-extern int ipx_register_spx(struct proto_ops **, struct net_proto_family *);
-extern int ipx_unregister_spx(void);
 
 #endif /* def _NET_INET_IPX_H_ */

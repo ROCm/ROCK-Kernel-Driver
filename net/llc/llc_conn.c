@@ -162,7 +162,7 @@ void llc_conn_rtn_pdu(struct sock *sk, struct sk_buff *skb,
 void llc_conn_resend_i_pdu_as_cmd(struct sock *sk, u8 nr, u8 first_p_bit)
 {
 	struct sk_buff *skb;
-	llc_pdu_sn_t *pdu;
+	struct llc_pdu_sn *pdu;
 	u16 nbr_unack_pdus;
 	u8 howmany_resend = 0;
 
@@ -173,7 +173,7 @@ void llc_conn_resend_i_pdu_as_cmd(struct sock *sk, u8 nr, u8 first_p_bit)
 	 * appropriate PDUs, fix them up, and put them on mac_pdu_q.
 	 */
 	while ((skb = skb_dequeue(&llc_sk(sk)->pdu_unack_q)) != NULL) {
-		pdu = (llc_pdu_sn_t *)skb->nh.raw;
+		pdu = (struct llc_pdu_sn *)skb->nh.raw;
 		llc_pdu_set_cmd_rsp(skb, LLC_PDU_CMD);
 		llc_pdu_set_pf_bit(skb, first_p_bit);
 		skb_queue_tail(&sk->write_queue, skb);
@@ -201,7 +201,7 @@ out:;
 void llc_conn_resend_i_pdu_as_rsp(struct sock *sk, u8 nr, u8 first_f_bit)
 {
 	struct sk_buff *skb;
-	llc_pdu_sn_t *pdu;
+	struct llc_pdu_sn *pdu;
 	u16 nbr_unack_pdus;
 	u8 howmany_resend = 0;
 
@@ -212,7 +212,7 @@ void llc_conn_resend_i_pdu_as_rsp(struct sock *sk, u8 nr, u8 first_f_bit)
 	 * appropriate PDUs, fix them up, and put them on mac_pdu_q
 	 */
 	while ((skb = skb_dequeue(&llc_sk(sk)->pdu_unack_q)) != NULL) {
-		pdu = (llc_pdu_sn_t *)skb->nh.raw;
+		pdu = (struct llc_pdu_sn *)skb->nh.raw;
 		llc_pdu_set_cmd_rsp(skb, LLC_PDU_RSP);
 		llc_pdu_set_pf_bit(skb, first_f_bit);
 		skb_queue_tail(&sk->write_queue, skb);
@@ -240,14 +240,14 @@ int llc_conn_remove_acked_pdus(struct sock *sk, u8 nr, u16 *how_many_unacked)
 {
 	int pdu_pos, i;
 	struct sk_buff *skb;
-	llc_pdu_sn_t *pdu;
+	struct llc_pdu_sn *pdu;
 	int nbr_acked = 0;
 	int q_len = skb_queue_len(&llc_sk(sk)->pdu_unack_q);
 
 	if (!q_len)
 		goto out;
 	skb = skb_peek(&llc_sk(sk)->pdu_unack_q);
-	pdu = (llc_pdu_sn_t *)skb->nh.raw;
+	pdu = (struct llc_pdu_sn *)skb->nh.raw;
 
 	/* finding position of last acked pdu in queue */
 	pdu_pos = ((int)LLC_2_SEQ_NBR_MODULO + (int)nr -
@@ -275,7 +275,7 @@ static void llc_conn_send_pdus(struct sock *sk)
 	struct sk_buff *skb;
 
 	while ((skb = skb_dequeue(&sk->write_queue)) != NULL) {
-		llc_pdu_sn_t *pdu = (llc_pdu_sn_t *)skb->nh.raw;
+		struct llc_pdu_sn *pdu = (struct llc_pdu_sn *)skb->nh.raw;
 
 		if (!LLC_PDU_TYPE_IS_I(pdu) &&
 		    !(skb->dev->flags & IFF_LOOPBACK))
@@ -297,7 +297,8 @@ void llc_conn_free_ev(struct llc_conn_state_ev *ev)
 {
 	if (ev->type == LLC_CONN_EV_TYPE_PDU) {
 		/* free the frame that binded to this event */
-		llc_pdu_sn_t *pdu = (llc_pdu_sn_t *)ev->data.pdu.skb->nh.raw;
+		struct llc_pdu_sn *pdu =
+				(struct llc_pdu_sn *)ev->data.pdu.skb->nh.raw;
 
 		if (LLC_PDU_TYPE_IS_I(pdu) || !ev->flag || !ev->ind_prim)
 			kfree_skb(ev->data.pdu.skb);
@@ -488,7 +489,6 @@ void __init llc_build_offset_table(void)
 	struct llc_conn_state *curr_state;
 	int state, ev_type, next_offset;
 
-	memset(llc_offset_table, 0, sizeof(llc_offset_table));
 	for (state = 0; state < NBR_CONN_STATES; state++) {
 		curr_state = &llc_conn_state_table[state];
 		next_offset = 0;

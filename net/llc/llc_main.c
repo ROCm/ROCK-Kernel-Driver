@@ -600,23 +600,23 @@ static int __init llc_init(void)
 	ev = kmalloc(sizeof(*ev), GFP_ATOMIC);
 	if (!ev)
 		goto err;
+	llc_build_offset_table();
 	memset(ev, 0, sizeof(*ev));
 	if(dev_base->next)
 		memcpy(llc_main_station.mac_sa, dev_base->next->dev_addr, ETH_ALEN);
 	else
 		memset(llc_main_station.mac_sa, 0, ETH_ALEN);
 	llc_main_station.ack_timer.expires = jiffies + 3 * HZ;
-	/* initialize the station component */
-	llc_register_sap(0, mac_indicate);
 	llc_main_station.maximum_retry	= 1;
 	llc_main_station.state		= LLC_STATION_STATE_DOWN;
 	ev->type	= LLC_STATION_EV_TYPE_SIMPLE;
 	ev->data.a.ev	= LLC_STATION_EV_ENABLE_WITHOUT_DUP_ADDR_CHECK;
 	rc = llc_station_next_state(&llc_main_station, ev);
-	llc_build_offset_table();
 	llc_ind_prim.data = &llc_ind_data_prim;
 	llc_cfm_prim.data = &llc_cfm_data_prim;
 	proc_net_create("802.2", 0, llc_proc_get_info);
+	/* initialize the station component */
+	llc_register_sap(0, mac_indicate);
 	llc_ui_init();
 out:
 	return rc;

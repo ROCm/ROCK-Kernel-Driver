@@ -49,7 +49,6 @@
  */
 
 #include <linux/config.h>
-#if defined(CONFIG_ATALK) || defined(CONFIG_ATALK_MODULE)
 #include <linux/module.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
@@ -96,8 +95,8 @@ extern void aarp_cleanup_module(void);
 
 extern void aarp_probe_network(struct atalk_iface *atif);
 extern int  aarp_proxy_probe_network(struct atalk_iface *atif,
-					struct at_addr *sa);
-extern void aarp_proxy_remove(struct net_device *dev, struct at_addr *sa);
+				     struct atalk_addr *sa);
+extern void aarp_proxy_remove(struct net_device *dev, struct atalk_addr *sa);
 
 #ifdef CONFIG_SYSCTL
 extern inline void atalk_register_sysctl(void);
@@ -332,7 +331,7 @@ static void atif_drop_device(struct net_device *dev)
 }
 
 static struct atalk_iface *atif_add_device(struct net_device *dev,
-					   struct at_addr *sa)
+					   struct atalk_addr *sa)
 {
 	struct atalk_iface *iface;
 
@@ -407,7 +406,7 @@ static int atif_probe_device(struct atalk_iface *atif)
 
 /* Perform AARP probing for a proxy address */
 static int atif_proxy_probe_device(struct atalk_iface *atif,
-				   struct at_addr* proxy_addr)
+				   struct atalk_addr* proxy_addr)
 {
 	int netrange = ntohs(atif->nets.nr_lastnet) -
 			ntohs(atif->nets.nr_firstnet) + 1;
@@ -451,16 +450,16 @@ static int atif_proxy_probe_device(struct atalk_iface *atif,
 }
 
 
-struct at_addr *atalk_find_dev_addr(struct net_device *dev)
+struct atalk_addr *atalk_find_dev_addr(struct net_device *dev)
 {
 	struct atalk_iface *iface = dev->atalk_ptr;
 	return iface ? &iface->address : NULL;
 }
 
-static struct at_addr *atalk_find_primary(void)
+static struct atalk_addr *atalk_find_primary(void)
 {
 	struct atalk_iface *fiface = NULL;
-	struct at_addr *retval;
+	struct atalk_addr *retval;
 	struct atalk_iface *iface;
 
 	/*
@@ -497,14 +496,17 @@ static struct atalk_iface *atalk_find_anynet(int node, struct net_device *dev)
 	struct atalk_iface *iface = dev->atalk_ptr;
 
 	if (!iface || iface->status & ATIF_PROBE)
-		return NULL;
+		goto out_err;
 
-	if (node == ATADDR_BCAST ||
-	    iface->address.s_node == node ||
-	    node == ATADDR_ANYNODE)
-		return iface;
-
-	return NULL;
+	if (node != ATADDR_BCAST &&
+	    iface->address.s_node != node &&
+	    node != ATADDR_ANYNODE)
+		goto out_err;
+out:
+	return iface;
+out_err:
+	iface = NULL;
+	goto out;
 }
 
 /* Find a match for a specific network:node pair */
@@ -537,7 +539,7 @@ static struct atalk_iface *atalk_find_interface(int net, int node)
  * the socket (later on...). We know about host routes and the fact
  * that a route must be direct to broadcast.
  */
-static struct atalk_route *atrtr_find(struct at_addr *target)
+static struct atalk_route *atrtr_find(struct atalk_addr *target)
 {
 	/*
 	 * we must search through all routes unless we find a 
@@ -589,7 +591,7 @@ out:
  * Given an AppleTalk network, find the device to use. This can be
  * a simple lookup.
  */
-struct net_device *atrtr_get_dev(struct at_addr *sa)
+struct net_device *atrtr_get_dev(struct atalk_addr *sa)
 {
 	struct atalk_route *atr = atrtr_find(sa);
 	return atr ? atr->dev : NULL;
@@ -598,9 +600,9 @@ struct net_device *atrtr_get_dev(struct at_addr *sa)
 /* Set up a default router */
 static void atrtr_set_default(struct net_device *dev)
 {
-	atrtr_default.dev = dev;
-	atrtr_default.flags = RTF_UP;
-	atrtr_default.gateway.s_net = htons(0);
+	atrtr_default.dev	     = dev;
+	atrtr_default.flags	     = RTF_UP;
+	atrtr_default.gateway.s_net  = htons(0);
 	atrtr_default.gateway.s_node = 0;
 }
 
@@ -691,7 +693,7 @@ out:
 }
 
 /* Delete a route. Find it and discard it */
-static int atrtr_delete(struct at_addr * addr)
+static int atrtr_delete(struct atalk_addr * addr)
 {
 	struct atalk_route **r = &atalk_router_list;
 	int retval = 0;
@@ -750,7 +752,7 @@ static inline void atalk_dev_down(struct net_device *dev)
  * delete our use of them (iface and route).
  */
 static int ddp_device_event(struct notifier_block *this, unsigned long event,
-				void *ptr)
+			    void *ptr)
 {
 	if (event == NETDEV_DOWN)
 		/* Discard any use of this */
@@ -765,7 +767,7 @@ static int atif_ioctl(int cmd, void *arg)
 {
 	static char aarp_mcast[6] = { 0x09, 0x00, 0x00, 0xFF, 0xFF, 0xFF };
 	struct ifreq atreq;
-	struct netrange *nr;
+	struct atalk_netrange *nr;
 	struct sockaddr_at *sa;
 	struct net_device *dev;
 	struct atalk_iface *atif;
@@ -796,7 +798,7 @@ static int atif_ioctl(int cmd, void *arg)
 			    dev->type != ARPHRD_PPP)
 				return -EPROTONOSUPPORT;
 
-			nr = (struct netrange *)&sa->sat_zero[0];
+			nr = (struct atalk_netrange *)&sa->sat_zero[0];
 			add_route = 1;
 
 			/*
@@ -936,7 +938,7 @@ static int atif_ioctl(int cmd, void *arg)
                         if (!atif)
                                 return -EADDRNOTAVAIL;
 
-                        nr = (struct netrange *)&(atif->nets);
+                        nr = (struct atalk_netrange *)&(atif->nets);
                         /*
                          * Phase 1 is fine on Localtalk but we don't do
                          * Ethertalk phase 1. Anyone wanting to add it go ahead.
@@ -982,7 +984,6 @@ static int atif_ioctl(int cmd, void *arg)
 /* Routing ioctl() calls */
 static int atrtr_ioctl(unsigned int cmd, void *arg)
 {
-	struct net_device *dev = NULL;
 	struct rtentry rt;
 
 	if (copy_from_user(&rt, arg, sizeof(rt)))
@@ -995,15 +996,19 @@ static int atrtr_ioctl(unsigned int cmd, void *arg)
 			return atrtr_delete(&((struct sockaddr_at *)
 						&rt.rt_dst)->sat_addr);
 
-		case SIOCADDRT:
-			/* FIXME: the name of the device is still in user
-			 * space, isn't it? */
+		case SIOCADDRT: {
+			struct net_device *dev = NULL;
+			/*
+			 * FIXME: the name of the device is still in user
+			 * space, isn't it?
+			 */
 			if (rt.rt_dev) {
 				dev = __dev_get_by_name(rt.rt_dev);
 				if (!dev)
 					return -ENODEV;
 			}			
 			return atrtr_create(&rt, dev);
+		}
 	}
 	return -EINVAL;
 }
@@ -1159,14 +1164,13 @@ static int atalk_release(struct socket *sock)
 {
 	struct sock *sk = sock->sk;
 
-	if (!sk)
-		goto out;
-	if (!sk->dead)
-		sk->state_change(sk);
-	sk->dead = 1;
-	sock->sk = NULL;
-	atalk_destroy_socket(sk);
-out:
+	if (sk) {
+		if (!sk->dead)
+			sk->state_change(sk);
+		sk->dead = 1;
+		sock->sk = NULL;
+		atalk_destroy_socket(sk);
+	}
 	return 0;
 }
 
@@ -1222,7 +1226,7 @@ static int atalk_autobind(struct sock *sk)
 {
 	struct atalk_sock *at = at_sk(sk);
 	struct sockaddr_at sat;
-	struct at_addr *ap = atalk_find_primary();
+	struct atalk_addr *ap = atalk_find_primary();
 	int n = -EADDRNOTAVAIL;
 
 	if (!ap || ap->s_net == htons(ATADDR_ANYNET))
@@ -1252,7 +1256,7 @@ static int atalk_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 		return -EAFNOSUPPORT;
 
 	if (addr->sat_addr.s_net == htons(ATADDR_ANYNET)) {
-		struct at_addr *ap = atalk_find_primary();
+		struct atalk_addr *ap = atalk_find_primary();
 
 		if (!ap)
 			return -EADDRNOTAVAIL;
@@ -1330,7 +1334,6 @@ static int atalk_connect(struct socket *sock, struct sockaddr *uaddr,
 	return 0;
 }
 
-
 /*
  * Find the name of an AppleTalk socket. Just copy the right
  * fields into the sockaddr.
@@ -1366,22 +1369,140 @@ static int atalk_getname(struct socket *sock, struct sockaddr *uaddr,
 	return 0;
 }
 
+#if defined(CONFIG_IPDDP) || defined(CONFIG_IPDDP_MODULE)
+static __inline__ int is_ip_over_ddp(struct sk_buff *skb)
+{
+        return skb->data[12] == 22;
+}
+
+static int handle_ip_over_ddp(struct sk_buff *skb)
+{
+        struct net_device *dev = __dev_get_by_name("ipddp0");
+	struct net_device_stats *stats;
+
+	/* This needs to be able to handle ipddp"N" devices */
+        if (!dev)
+                return -ENODEV;
+
+        skb->protocol = htons(ETH_P_IP);
+        skb_pull(skb, 13);
+        skb->dev   = dev;
+        skb->h.raw = skb->data;
+
+	stats = dev->priv;
+        stats->rx_packets++;
+        stats->rx_bytes += skb->len + 13;
+        netif_rx(skb);  /* Send the SKB up to a higher place. */
+	return 0;
+}
+#else
+/* make it easy for gcc to optimize this test out, i.e. kill the code */
+#define is_ip_over_ddp(skb) 0
+#define handle_ip_over_ddp(skb) 0
+#endif
+
+static void atalk_route_packet(struct sk_buff *skb, struct net_device *dev,
+			       struct ddpehdr *ddp, struct ddpebits *ddphv,
+			       int origlen)
+{
+	struct atalk_route *rt;
+	struct atalk_addr ta;
+
+	/*
+	 * Don't route multicast, etc., packets, or packets sent to "this
+	 * network" 
+	 */
+	if (skb->pkt_type != PACKET_HOST || !ddp->deh_dnet) {
+		/*
+		 * FIXME:
+		 *
+		 * Can it ever happen that a packet is from a PPP iface and
+		 * needs to be broadcast onto the default network?
+		 */
+		if (dev->type == ARPHRD_PPP)
+			printk(KERN_DEBUG "AppleTalk: didn't forward broadcast "
+					  "packet received from PPP iface\n");
+		goto free_it;
+	}
+
+	ta.s_net  = ddp->deh_dnet;
+	ta.s_node = ddp->deh_dnode;
+
+	/* Route the packet */
+	rt = atrtr_find(&ta);
+	if (!rt || ddphv->deh_hops == DDP_MAXHOPS)
+		goto free_it;
+	/* FIXME: use skb->cb to be able to use shared skbs */
+	ddphv->deh_hops++;
+
+	/*
+	 * Route goes through another gateway, so set the target to the
+	 * gateway instead.
+	 */
+
+	if (rt->flags & RTF_GATEWAY) {
+		ta.s_net  = rt->gateway.s_net;
+		ta.s_node = rt->gateway.s_node;
+	}
+
+        /* Fix up skb->len field */
+        skb_trim(skb, min_t(unsigned int, origlen,
+			    (rt->dev->hard_header_len +
+			     ddp_dl->header_length + ddphv->deh_len)));
+
+	/* Mend the byte order */
+	/* FIXME: use skb->cb to be able to use shared skbs */
+	*((__u16 *)ddp) = ntohs(*((__u16 *)ddphv));
+
+	/*
+	 * Send the buffer onwards
+	 *
+	 * Now we must always be careful. If it's come from LocalTalk to
+	 * EtherTalk it might not fit
+	 *
+	 * Order matters here: If a packet has to be copied to make a new
+	 * headroom (rare hopefully) then it won't need unsharing.
+	 *
+	 * Note. ddp-> becomes invalid at the realloc.
+	 */
+	if (skb_headroom(skb) < 22) {
+		/* 22 bytes - 12 ether, 2 len, 3 802.2 5 snap */
+		struct sk_buff *nskb = skb_realloc_headroom(skb, 32);
+		kfree_skb(skb);
+		if (!nskb) 
+			goto out;
+		skb = nskb;
+	} else
+		skb = skb_unshare(skb, GFP_ATOMIC);
+	
+	/*
+	 * If the buffer didn't vanish into the lack of space bitbucket we can
+	 * send it.
+	 */
+	if (skb && aarp_send_ddp(rt->dev, skb, &ta, NULL) == -1)
+		goto free_it;
+out:
+	return;
+free_it:
+	kfree_skb(skb);
+}
+
 /**
- * atalk_rcv - Receive a packet (in skb) from device dev
- * @skb - packet received
- * @dev - network device where the packet comes from
- * @pt - packet type
+ *	atalk_rcv - Receive a packet (in skb) from device dev
+ *	@skb - packet received
+ *	@dev - network device where the packet comes from
+ *	@pt - packet type
  *
- * Receive a packet (in skb) from device dev. This has come from the SNAP
- * decoder, and on entry skb->h.raw is the DDP header, skb->len is the DDP
- * header, skb->len is the DDP length. The physical headers have been
- * extracted. PPP should probably pass frames marked as for this layer.
- * [ie ARPHRD_ETHERTALK]
+ *	Receive a packet (in skb) from device dev. This has come from the SNAP
+ *	decoder, and on entry skb->h.raw is the DDP header, skb->len is the DDP
+ *	header, skb->len is the DDP length. The physical headers have been
+ *	extracted. PPP should probably pass frames marked as for this layer.
+ *	[ie ARPHRD_ETHERTALK]
  */
 static int atalk_rcv(struct sk_buff *skb, struct net_device *dev,
 		     struct packet_type *pt)
 {
-	struct ddpehdr *ddp = (void *)skb->h.raw;
+	struct ddpehdr *ddp = ddp_hdr(skb);
 	struct sock *sock;
 	struct atalk_iface *atif;
 	struct sockaddr_at tosat;
@@ -1432,106 +1553,13 @@ static int atalk_rcv(struct sk_buff *skb, struct net_device *dev,
 
 	/* Not ours, so we route the packet via the correct AppleTalk iface */
 	if (!atif) {
-		struct atalk_route *rt;
-		struct at_addr ta;
-
-		/*
-		 * Don't route multicast, etc., packets, or packets
-		 * sent to "this network" 
-		 */
-		if (skb->pkt_type != PACKET_HOST || !ddp->deh_dnet) {
-			/* FIXME:
-			 * Can it ever happen that a packet is from a PPP
-			 * iface and needs to be broadcast onto the default
-			 * network? */
-			if (dev->type == ARPHRD_PPP)
-				printk(KERN_DEBUG "AppleTalk: didn't forward "
-						  "broadcast packet received "
-						  "from PPP iface\n");
-			goto freeit;
-		}
-
-		ta.s_net  = ddp->deh_dnet;
-		ta.s_node = ddp->deh_dnode;
-
-		/* Route the packet */
-		rt = atrtr_find(&ta);
-		if (!rt || ddphv.deh_hops == DDP_MAXHOPS)
-			goto freeit;
-		/* FIXME: use skb->cb to be able to use shared skbs */
-		ddphv.deh_hops++;
-
-		/*
-		 * Route goes through another gateway, so
-		 * set the target to the gateway instead.
-		 */
-		if (rt->flags & RTF_GATEWAY) {
-			ta.s_net  = rt->gateway.s_net;
-			ta.s_node = rt->gateway.s_node;
-		}
-
-                /* Fix up skb->len field */
-                skb_trim(skb, min_t(unsigned int, origlen,
-				    (rt->dev->hard_header_len +
-				     ddp_dl->header_length + ddphv.deh_len)));
-
-		/* Mend the byte order */
-		/* FIXME: use skb->cb to be able to use shared skbs */
-		*((__u16 *)ddp) = ntohs(*((__u16 *)&ddphv));
-
-		/*
-		 * Send the buffer onwards
-		 *
-		 * Now we must always be careful. If it's come from 
-		 * LocalTalk to EtherTalk it might not fit
-		 *
-		 * Order matters here: If a packet has to be copied
-		 * to make a new headroom (rare hopefully) then it
-		 * won't need unsharing.
-		 *
-		 * Note. ddp-> becomes invalid at the realloc.
-		 */
-		if (skb_headroom(skb) < 22) {
-			/* 22 bytes - 12 ether, 2 len, 3 802.2 5 snap */
-			struct sk_buff *nskb = skb_realloc_headroom(skb, 32);
-			kfree_skb(skb);
-			if (!nskb) 
-				goto out;
-			skb = nskb;
-		} else
-			skb = skb_unshare(skb, GFP_ATOMIC);
-		
-		/*
-		 * If the buffer didn't vanish into the lack of
-		 * space bitbucket we can send it.
-		 */
-		if (skb && aarp_send_ddp(rt->dev, skb, &ta, NULL) == -1)
-			goto freeit;
+		atalk_route_packet(skb, dev, ddp, &ddphv, origlen);
 		goto out;
 	}
 
-#if defined(CONFIG_IPDDP) || defined(CONFIG_IPDDP_MODULE)
-        /* Check if IP-over-DDP */
-        if (skb->data[12] == 22) {
-                struct net_device *dev = __dev_get_by_name("ipddp0");
-		struct net_device_stats *stats;
-
-		/* This needs to be able to handle ipddp"N" devices */
-                if (!dev)
-                        return -ENODEV;
-
-                skb->protocol = htons(ETH_P_IP);
-                skb_pull(skb, 13);
-                skb->dev = dev;
-                skb->h.raw = skb->data;
-
-		stats = dev->priv;
-                stats->rx_packets++;
-                stats->rx_bytes += skb->len + 13;
-                netif_rx(skb);  /* Send the SKB up to a higher place. */
-		goto out;
-        }
-#endif
+	/* if IP over DDP is not selected this code will be optimized out */
+	if (is_ip_over_ddp(skb))
+		return handle_ip_over_ddp(skb);
 	/*
 	 * Which socket - atalk_search_socket() looks for a *full match*
 	 * of the <net, node, port> tuple.
@@ -1568,7 +1596,7 @@ static int ltalk_rcv(struct sk_buff *skb, struct net_device *dev,
 	if (skb->mac.raw[2] == 1) {
 		struct ddpehdr *ddp;
 		/* Find our address */
-		struct at_addr *ap = atalk_find_dev_addr(dev);
+		struct atalk_addr *ap = atalk_find_dev_addr(dev);
 
 		if (!ap || skb->len < sizeof(struct ddpshdr))
 			goto freeit;
@@ -1674,7 +1702,7 @@ static int atalk_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 
 		dev = rt->dev;
 	} else {
-		struct at_addr at_hint;
+		struct atalk_addr at_hint;
 
 		at_hint.s_node = 0;
 		at_hint.s_net  = at->src_net;
@@ -1792,7 +1820,7 @@ static int atalk_recvmsg(struct socket *sock, struct msghdr *msg, int size,
 		return err;
 
 	/* FIXME: use skb->cb to be able to use shared skbs */
-	ddp = (struct ddpehdr *)(skb->h.raw);
+	ddp = ddp_hdr(skb);
 	*((__u16 *)&ddphv) = ntohs(*((__u16 *)ddp));
 
 	if (sk->type == SOCK_RAW) {
@@ -1833,40 +1861,48 @@ static int atalk_recvmsg(struct socket *sock, struct msghdr *msg, int size,
  */
 static int atalk_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 {
-	long amount = 0;
+	int rc = -EINVAL;
 	struct sock *sk = sock->sk;
 
 	switch (cmd) {
 		/* Protocol layer */
-		case TIOCOUTQ:
-			amount = sk->sndbuf - atomic_read(&sk->wmem_alloc);
+		case TIOCOUTQ: {
+			long amount = sk->sndbuf - atomic_read(&sk->wmem_alloc);
+
 			if (amount < 0)
 				amount = 0;
+			rc = put_user(amount, (int *)arg);
 			break;
+		}
 		case TIOCINQ: {
 			/*
 			 * These two are safe on a single CPU system as only
 			 * user tasks fiddle here
 			 */
 			struct sk_buff *skb = skb_peek(&sk->receive_queue);
+			long amount = 0;
 
 			if (skb)
 				amount = skb->len - sizeof(struct ddpehdr);
+			rc = put_user(amount, (int *)arg);
 			break;
 		}
 		case SIOCGSTAMP:
 			if (!sk)
-				return -EINVAL;
+				break;
+			rc = -ENOENT;
 			if (!sk->stamp.tv_sec)
-				return -ENOENT;
-			return copy_to_user((void *)arg, &sk->stamp,
-					sizeof(struct timeval)) ? -EFAULT : 0;
+				break;
+			rc = copy_to_user((void *)arg, &sk->stamp,
+					  sizeof(struct timeval)) ? -EFAULT : 0;
+			break;
 		/* Routing */
 		case SIOCADDRT:
 		case SIOCDELRT:
-			if (!capable(CAP_NET_ADMIN))
-				return -EPERM;
-			return atrtr_ioctl(cmd, (void *)arg);
+			rc = -EPERM;
+			if (capable(CAP_NET_ADMIN))
+				rc = atrtr_ioctl(cmd, (void *)arg);
+			break;
 		/* Interface */
 		case SIOCGIFADDR:
 		case SIOCSIFADDR:
@@ -1874,15 +1910,11 @@ static int atalk_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		case SIOCATALKDIFADDR:
 		case SIOCDIFADDR:
 		case SIOCSARP:		/* proxy AARP */
-		case SIOCDARP:	{	/* proxy AARP */
-			int ret;
-
+		case SIOCDARP:		/* proxy AARP */
 			rtnl_lock();
-			ret = atif_ioctl(cmd, (void *)arg);
+			rc = atif_ioctl(cmd, (void *)arg);
 			rtnl_unlock();
-
-			return ret;
-		}
+			break;
 		/* Physical layer ioctl calls */
 		case SIOCSIFLINK:
 		case SIOCGIFHWADDR:
@@ -1896,21 +1928,11 @@ static int atalk_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		case SIOCGIFCOUNT:
 		case SIOCGIFINDEX:
 		case SIOCGIFNAME:
-			return dev_ioctl(cmd, (void *)arg);
-		case SIOCSIFMETRIC:
-		case SIOCSIFBRDADDR:
-		case SIOCGIFNETMASK:
-		case SIOCSIFNETMASK:
-		case SIOCGIFMEM:
-		case SIOCSIFMEM:
-		case SIOCGIFDSTADDR:
-		case SIOCSIFDSTADDR:
-			return -EINVAL;
-		default:
-			return -EINVAL;
+			rc = dev_ioctl(cmd, (void *)arg);
+			break;
 	}
 
-	return put_user(amount, (int *)arg);
+	return rc;
 }
 
 static struct net_proto_family atalk_family_ops = {
@@ -1955,7 +1977,7 @@ struct packet_type ppptalk_packet_type = {
 	.func		= atalk_rcv,
 };
 
-static char ddp_snap_id[] = { 0x08, 0x00, 0x07, 0x80, 0x9B };
+static unsigned char ddp_snap_id[] = { 0x08, 0x00, 0x07, 0x80, 0x9B };
 
 /* Export symbols for use by drivers when AppleTalk is a module */
 EXPORT_SYMBOL(aarp_send_ddp);
@@ -2023,4 +2045,3 @@ static void __exit atalk_exit(void)
 }
 module_exit(atalk_exit);
 #endif  /* MODULE */
-#endif  /* CONFIG_ATALK || CONFIG_ATALK_MODULE */

@@ -77,8 +77,8 @@ static llc_prim_call_t llc_resp_prim[LLC_NBR_PRIMITIVES] = {
  *	@sap: pointer to allocated SAP (output argument).
  *
  *	Interface function to upper layer. each one who wants to get a SAP
- *	(for example NetBEUI) should call this function. Returns 0 for
- *	success, 1 for failure.
+ *	(for example NetBEUI) should call this function. Returns the opened
+ *	SAP for success, NULL for failure.
  */
 struct llc_sap *llc_sap_open(llc_prim_call_t nw_indicate,
 			     llc_prim_call_t nw_confirm, u8 lsap)
