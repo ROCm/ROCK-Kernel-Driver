@@ -910,18 +910,18 @@ L:	linux-hippi@sunsite.dk
 S:	Maintained
 
 HEWLETT-PACKARD FIBRE CHANNEL 64-bit/66MHz PCI non-intelligent HBA
-P:	Chase Maupin
-M:	chase.maupin@hp.com
+P:	Chirag Kantharia
+M:	chirag.kantharia@hp.com
 L:	iss_storagedev@hp.com
 S:	Maintained
  
 HEWLETT-PACKARD SMART2 RAID DRIVER
-P:	Francis Wiran
-M:	francis.wiran@hp.com
+P:	Chirag Kantharia
+M:	chirag.kantharia@hp.com
 L:	iss_storagedev@hp.com
 S:	Maintained
  
-HEWLETT-PACKARD SMART CISS RAID DRIVER 
+HEWLETT-PACKARD SMART CISS RAID DRIVER (cciss)
 P:	Mike Miller
 M:	mike.miller@hp.com
 L:	iss_storagedev@hp.com
