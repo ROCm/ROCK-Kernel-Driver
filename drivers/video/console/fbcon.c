@@ -93,6 +93,9 @@
 #endif
 
 #include "fbcon.h"
+#ifdef CONFIG_BOOTSPLASH
+#include "../bootsplash/bootsplash.h"
+#endif
 
 #ifdef FBCONDEBUG
 #  define DPRINTK(fmt, args...) printk(KERN_DEBUG "%s: " fmt, __FUNCTION__ , ## args)
@@ -394,6 +397,10 @@ static int fbcon_takeover(int show_logo)
 
 	for (i = first_fb_vc; i <= last_fb_vc; i++)
 		con2fb_map[i] = info_idx;
+
+#ifdef CONFIG_BOOTSPLASH
+	splash_init();
+#endif
 
 	err = take_over_console(&fb_con, first_fb_vc, last_fb_vc,
 				fbcon_is_default);
@@ -937,6 +944,16 @@ static void fbcon_init(struct vc_data *vc, int init)
 	rows = vc->vc_rows;
 	new_cols = info->var.xres / vc->vc_font.width;
 	new_rows = info->var.yres / vc->vc_font.height;
+
+#ifdef CONFIG_BOOTSPLASH
+	if (vc->vc_splash_data && vc->vc_splash_data->splash_state) {
+		new_cols = vc->vc_splash_data->splash_text_wi / vc->vc_font.width;
+		new_rows = vc->vc_splash_data->splash_text_he / vc->vc_font.height;
+		logo = 0;
+		con_remap_def_color(vc->vc_num, vc->vc_splash_data->splash_color << 4 | vc->vc_splash_data->splash_fg_color);
+	}
+#endif
+
 	vc_resize(vc->vc_num, new_cols, new_rows);
 	/*
 	 * We must always set the mode. The mode of the previous console
@@ -1562,6 +1579,10 @@ static int fbcon_scroll(struct vc_data *vc, int t, int b, int dir,
 			fbcon_softback_note(vc, t, count);
 		if (logo_shown >= 0)
 			goto redraw_up;
+#ifdef CONFIG_BOOTSPLASH
+		if (info->splash_data)
+			goto redraw_up;
+#endif
 		switch (p->scrollmode) {
 		case SCROLL_MOVE:
 			ops->bmove(vc, info, t + count, 0, t, 0,
@@ -1646,6 +1667,10 @@ static int fbcon_scroll(struct vc_data *vc, int t, int b, int dir,
 	case SM_DOWN:
 		if (count > vc->vc_rows)	/* Maximum realistic size */
 			count = vc->vc_rows;
+#ifdef CONFIG_BOOTSPLASH
+		if (info->splash_data)
+			goto redraw_down;
+#endif
 		switch (p->scrollmode) {
 		case SCROLL_MOVE:
 			ops->bmove(vc, info, t, 0, t + count, 0,
@@ -1788,6 +1813,14 @@ static void fbcon_bmove_rec(struct vc_data *vc, struct display *p, int sy, int s
 		}
 		return;
 	}
+
+#ifdef CONFIG_BOOTSPLASH
+	if (info->splash_data && sy == dy && height == 1) {
+		/* must use slower redraw bmove to keep background pic intact */
+		splash_bmove_redraw(info->splash_data, vc, info, sy, sx, dx, width);
+		return;
+	}
+#endif
 	ops->bmove(vc, info, real_y(p, sy), sx, real_y(p, dy), dx,
 		   height, width);
 }
@@ -1889,6 +1922,10 @@ static int fbcon_switch(struct vc_data *vc)
 	int i, prev_console, do_set_par = 0;
 
 	info = registered_fb[con2fb_map[vc->vc_num]];
+
+#ifdef CONFIG_BOOTSPLASH
+	splash_prepare(vc, info);
+#endif
 
 	if (softback_top) {
 		int l = fbcon_softback_size / vc->vc_size_row;
@@ -1999,6 +2036,12 @@ static int fbcon_switch(struct vc_data *vc)
 static void fbcon_generic_blank(struct vc_data *vc, struct fb_info *info,
 				int blank)
 {
+#ifdef CONFIG_BOOTSPLASH
+	if (info->splash_data) {
+		splash_blank(info->splash_data, vc, info, blank);
+		return;
+	}
+#endif
 	if (blank) {
 		unsigned short charmask = vc->vc_hi_font_mask ?
 			0x1ff : 0xff;
@@ -2196,8 +2239,15 @@ static int fbcon_do_set_font(struct vc_data *vc, int w, int h,
 	}
 
 	if (resize) {
+		u32 xres = info->var.xres, yres = info->var.yres;
 		/* reset wrap/pan */
 		info->var.xoffset = info->var.yoffset = p->yscroll = 0;
+#ifdef CONFIG_BOOTSPLASH
+		if (info->splash_data) {
+			xres = info->splash_data->splash_text_wi;
+			yres = info->splash_data->splash_text_he;
+		}
+#endif
 		vc_resize(vc->vc_num, info->var.xres / w, info->var.yres / h);
 		if (CON_IS_VISIBLE(vc) && softback_buf) {
 			int l = fbcon_softback_size / vc->vc_size_row;
