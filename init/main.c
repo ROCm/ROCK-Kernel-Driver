@@ -141,6 +141,7 @@ __setup("maxcpus=", maxcpus);
 
 static char * argv_init[MAX_INIT_ARGS+2] = { "init", NULL, };
 char * envp_init[MAX_INIT_ENVS+2] = { "HOME=/", "TERM=linux", NULL, };
+static const char *panic_later, *panic_param;
 
 __setup("profile=", profile_setup);
 
@@ -253,20 +254,27 @@ static int __init unknown_bootoption(char *param, char *val)
 		return 0;
 	}
 
+	if (panic_later)
+		return 0;
+
 	if (val) {
 		/* Environment option */
 		unsigned int i;
 		for (i = 0; envp_init[i]; i++) {
-			if (i == MAX_INIT_ENVS)
-				panic("Too many boot env vars at `%s'", param);
+			if (i == MAX_INIT_ENVS) {
+				panic_later = "Too many boot env vars at `%s'";
+				panic_param = param;
+			}
 		}
 		envp_init[i] = param;
 	} else {
 		/* Command line option */
 		unsigned int i;
 		for (i = 0; argv_init[i]; i++) {
-			if (i == MAX_INIT_ARGS)
-				panic("Too many boot init vars at `%s'",param);
+			if (i == MAX_INIT_ARGS) {
+				panic_later = "Too many boot init vars at `%s'";
+				panic_param = param;
+			}
 		}
 		argv_init[i] = param;
 	}
@@ -424,6 +432,8 @@ asmlinkage void __init start_kernel(void)
 	 * this. But we do want output early, in case something goes wrong.
 	 */
 	console_init();
+	if (panic_later)
+		panic(panic_later, panic_param);
 	profile_init();
 	local_irq_enable();
 #ifdef CONFIG_BLK_DEV_INITRD
