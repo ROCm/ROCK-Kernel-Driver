@@ -457,62 +457,54 @@ static int keyspan_pda_set_modem_info(struct usb_serial *serial,
 	return rc;
 }
 
+static int keyspan_pda_tiocmget(struct usb_serial_port *port, struct file *file)
+{
+	struct usb_serial *serial = port->serial;
+	int rc;
+	unsigned char status;
+	int value;
+
+	rc = keyspan_pda_get_modem_info(serial, &status);
+	if (rc < 0)
+		return rc;
+	value =
+		((status & (1<<7)) ? TIOCM_DTR : 0) |
+		((status & (1<<6)) ? TIOCM_CAR : 0) |
+		((status & (1<<5)) ? TIOCM_RNG : 0) |
+		((status & (1<<4)) ? TIOCM_DSR : 0) |
+		((status & (1<<3)) ? TIOCM_CTS : 0) |
+		((status & (1<<2)) ? TIOCM_RTS : 0);
+	return value;
+}
+
+static int keyspan_pda_tiocmset(struct usb_serial_port *port, struct file *file,
+				unsigned int set, unsigned int clear)
+{
+	struct usb_serial *serial = port->serial;
+	int rc;
+	unsigned char status;
+
+	rc = keyspan_pda_get_modem_info(serial, &status);
+	if (rc < 0)
+		return rc;
+
+	if (set & TIOCM_RTS)
+		status |= (1<<2);
+	if (set & TIOCM_DTR)
+		status |= (1<<7);
+
+	if (clear & TIOCM_RTS)
+		status &= ~(1<<2);
+	if (clear & TIOCM_DTR)
+		status &= ~(1<<7);
+	rc = keyspan_pda_set_modem_info(serial, status);
+	return rc;
+}
 
 static int keyspan_pda_ioctl(struct usb_serial_port *port, struct file *file,
 			     unsigned int cmd, unsigned long arg)
 {
-	struct usb_serial *serial = port->serial;
-	int rc;
-	unsigned int value;
-	unsigned char status, mask;
-
 	switch (cmd) {
-	case TIOCMGET: /* get modem pins state */
-		rc = keyspan_pda_get_modem_info(serial, &status);
-		if (rc < 0)
-			return rc;
-		value =
-			((status & (1<<7)) ? TIOCM_DTR : 0) |
-			((status & (1<<6)) ? TIOCM_CAR : 0) |
-			((status & (1<<5)) ? TIOCM_RNG : 0) |
-			((status & (1<<4)) ? TIOCM_DSR : 0) |
-			((status & (1<<3)) ? TIOCM_CTS : 0) |
-			((status & (1<<2)) ? TIOCM_RTS : 0);
-		if (copy_to_user((unsigned int *)arg, &value, sizeof(int)))
-			return -EFAULT;
-		return 0;
-	case TIOCMSET: /* set a state as returned by MGET */
-		if (copy_from_user(&value, (unsigned int *)arg, sizeof(int)))
-			return -EFAULT;
-		status =
-			((value & TIOCM_DTR) ? (1<<7) : 0) |
-			((value & TIOCM_CAR) ? (1<<6) : 0) |
-			((value & TIOCM_RNG) ? (1<<5) : 0) |
-			((value & TIOCM_DSR) ? (1<<4) : 0) |
-			((value & TIOCM_CTS) ? (1<<3) : 0) |
-			((value & TIOCM_RTS) ? (1<<2) : 0);
-		rc = keyspan_pda_set_modem_info(serial, status);
-		if (rc < 0)
-			return rc;
-		return 0;
-	case TIOCMBIS: /* set bits in bitmask <arg> */
-	case TIOCMBIC: /* clear bits from bitmask <arg> */
-		if (copy_from_user(&value, (unsigned int *)arg, sizeof(int)))
-			return -EFAULT;
-		rc = keyspan_pda_get_modem_info(serial, &status);
-		if (rc < 0)
-			return rc;
-		mask =
-			((value & TIOCM_RTS) ? (1<<2) : 0) |
-			((value & TIOCM_DTR) ? (1<<7) : 0);
-		if (cmd == TIOCMBIS)
-			status |= mask;
-		else
-			status &= ~mask;
-		rc = keyspan_pda_set_modem_info(serial, status);
-		if (rc < 0)
-			return rc;
-		return 0;
 	case TIOCMIWAIT:
 		/* wait for any of the 4 modem inputs (DCD,RI,DSR,CTS)*/
 		/* TODO */
@@ -874,6 +866,8 @@ static struct usb_serial_device_type keyspan_pda_device = {
 	.ioctl =		keyspan_pda_ioctl,
 	.set_termios =		keyspan_pda_set_termios,
 	.break_ctl =		keyspan_pda_break_ctl,
+	.tiocmget =		keyspan_pda_tiocmget,
+	.tiocmset =		keyspan_pda_tiocmset,
 	.attach =		keyspan_pda_startup,
 	.shutdown =		keyspan_pda_shutdown,
 };
