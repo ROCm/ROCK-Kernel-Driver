@@ -478,13 +478,9 @@ static int bnep_session(void *arg)
 
 	BT_DBG("");
 
-        daemonize();
+        daemonize("kbnepd %s", dev->name);
 	set_user_nice(current, -15);
 	current->flags |= PF_IOTHREAD;
-        sigfillset(&current->blocked);
-	flush_signals(current);
-
-        sprintf(current->comm, "kbnepd %s", dev->name);
 
         set_fs(KERNEL_DS);
 

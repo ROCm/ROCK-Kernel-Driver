@@ -580,7 +580,7 @@ typedef struct av7110_s {
 #define TRICK_FREEZE 3
         struct audio_status      audiostate;
 
-        struct dvb_demux_filter     *handle2filter[32];
+        struct dvb_demux_filter     *handle2filter[MAXFILT];
         p2t_t                   p2t_filter[MAXFILT];
         dvb_filter_pes2ts_t     p2t[2];
         struct ipack_s          ipack[2];

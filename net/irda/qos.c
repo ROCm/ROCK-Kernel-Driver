@@ -722,8 +722,8 @@ __u32 irlap_max_line_capacity(__u32 speed, __u32 max_turn_time)
 	i = value_index(speed, baud_rates, 10);
 	j = value_index(max_turn_time, max_turn_times, 4);
 
-	ASSERT(((i >=0) && (i <=10)), return 0;);
-	ASSERT(((j >=0) && (j <=4)), return 0;);
+	ASSERT(((i >=0) && (i <10)), return 0;);
+	ASSERT(((j >=0) && (j <4)), return 0;);
 
 	line_capacity = max_line_capacities[i][j];
 

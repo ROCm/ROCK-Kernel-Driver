@@ -7,4 +7,4 @@ DRIVER_OBJS = $(addprefix ../../../drivers/oprofile/, \
 
 oprofile-y				:= $(DRIVER_OBJS) init.o timer_int.o
 oprofile-$(CONFIG_X86_LOCAL_APIC) 	+= nmi_int.o op_model_athlon.o \
-					   op_model_ppro.o
+					   op_model_ppro.o op_model_p4.o

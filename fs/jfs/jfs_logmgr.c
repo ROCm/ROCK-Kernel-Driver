@@ -2132,17 +2132,7 @@ int jfsIOWait(void *arg)
 {
 	struct lbuf *bp;
 
-	lock_kernel();
-
-	daemonize();
-	strcpy(current->comm, "jfsIO");
-
-	unlock_kernel();
-
-	spin_lock_irq(&current->sighand->siglock);
-	sigfillset(&current->blocked);
-	recalc_sigpending();
-	spin_unlock_irq(&current->sighand->siglock);
+	daemonize("jfsIO");
 
 	complete(&jfsIOwait);
 

@@ -1216,10 +1216,9 @@ static int nodemgr_host_thread(void *__hi)
 	struct host_info *hi = (struct host_info *)__hi;
 
 	/* No userlevel access needed */
-	daemonize();
+	daemonize("knodemgrd");
+	allow_signal(SIGTERM);
 
-	strcpy(current->comm, "knodemgrd");
-	
 	/* Sit and wait for a signal to probe the nodes on the bus. This
 	 * happens when we get a bus reset. */
 	while (!down_interruptible(&hi->reset_sem) &&
