@@ -269,8 +269,6 @@ prepare: .hdepend include/config/MARKER
 include/asm:
 	@echo 'Making asm->asm-$(ARCH) symlink'
 	@ln -s asm-$(ARCH) $@
-	@echo 'Making directory include/linux/modules'
-	@mkdir include/linux/modules
 
 # 	Split autoconf.h into include/linux/config/*
 
@@ -346,9 +344,9 @@ include/linux/modversions.h: FORCE
 	@(echo "#ifndef _LINUX_MODVERSIONS_H";\
 	  echo "#define _LINUX_MODVERSIONS_H"; \
 	  echo "#include <linux/modsetver.h>"; \
-	  cd $(TOPDIR)/include/linux/modules; \
-	  for f in *.ver; do \
-	    if [ -f $$f ]; then echo "#include <linux/modules/$${f}>"; fi; \
+	  cd $(TOPDIR)/include/linux; \
+	  for f in `find modules -name \*.ver`; do \
+	    echo "#include <linux/$${f}>"; \
 	  done; \
 	  echo "#endif"; \
 	) > $@.tmp

@@ -303,8 +303,7 @@ script:
 ifdef CONFIG_MODVERSIONS
 ifneq "$(strip $(export-objs))" ""
 
-MODINCL := $(TOPDIR)/include/linux/modules
-MODPREFIX := $(subst /,-,$(RELDIR))__
+MODVERDIR := $(TOPDIR)/include/linux/modules/$(RELDIR)
 
 #
 # Added the SMP separator to stop module accidents between uniprocessor
@@ -320,21 +319,21 @@ endif
 # We don't track dependencies for .ver files, so we FORCE to check
 # them always (i.e. always at "make dep" time).
 
-quiet_cmd_create_ver = Creating $@
+quiet_cmd_create_ver = Creating include/linux/modules/$(RELDIR)/$*.ver
 cmd_create_ver = $(CC) $(CFLAGS) $(EXTRA_CFLAGS) -E -D__GENKSYMS__ $< | \
 		 $(GENKSYMS) $(genksyms_smp_prefix) -k $(VERSION).$(PATCHLEVEL).$(SUBLEVEL) > $@.tmp
 
-$(MODINCL)/$(MODPREFIX)%.ver: %.c FORCE
-	@echo $(cmd_create_ver)
+$(MODVERDIR)/%.ver: %.c FORCE
+	@mkdir -p $(dir $@)
 	@$(call cmd,cmd_create_ver)
 	@if [ -r $@ ] && cmp -s $@ $@.tmp; then \
-	  echo $@ is unchanged; rm -f $@.tmp; \
+	  rm -f $@.tmp; \
 	else \
 	  mv -f $@.tmp $@; \
 	fi
 
 # updates .ver files but not modversions.h
-fastdep: $(addprefix $(MODINCL)/$(MODPREFIX),$(export-objs:.o=.ver))
+fastdep: $(addprefix $(MODVERDIR)/,$(export-objs:.o=.ver))
 
 endif # export-objs 
 
