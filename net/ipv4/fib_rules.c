@@ -438,7 +438,7 @@ static __inline__ int inet_fill_rule(struct sk_buff *skb,
 
 nlmsg_failure:
 rtattr_failure:
-	skb_put(skb, b - skb->tail);
+	skb_trim(skb, b - skb->data);
 	return -1;
 }
 

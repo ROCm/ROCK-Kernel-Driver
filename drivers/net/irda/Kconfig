@@ -269,7 +269,7 @@ config MA600_DONGLE_OLD
 	  information, download the following tar gzip file.
 
 	  There is a pre-compiled module on
-	  <http://engsvr.ust.hk/~eetwl95/download/ma600-2.4.x.tar.gz>
+	  <http://engsvr.ust.hk/~eetwl95/ma600.html>
 
 config EP7211_IR
 	tristate "EP7211 I/R support"
@@ -291,6 +291,22 @@ config USB_IRDA
 
 	  Please note that the driver is still experimental.  And of course,
 	  you will need both USB and IrDA support in your kernel...
+
+config SIGMATEL_FIR
+	tristate "SigmaTel STIr4200 bridge (EXPERIMENTAL)"
+	depends on IRDA && USB && EXPERIMENTAL
+	select CRC32
+	---help---
+	  Say Y here if you want to build support for the SigmaTel STIr4200
+	  USB IrDA FIR bridge device driver.  
+
+	  USB bridge based on the SigmaTel STIr4200 don't conform to the
+	  IrDA-USB device class specification, and therefore need their
+	  own specific driver. Those dongles support SIR and FIR (4Mbps)
+	  speeds. 
+
+	  To compile it as a module, choose M here: the module will be called
+	  stir4200.
 
 config NSC_FIR
 	tristate "NSC PC87108/PC87338"

@@ -136,6 +136,7 @@ struct ipv6_devconf {
 	__s32		rtr_solicits;
 	__s32		rtr_solicit_interval;
 	__s32		rtr_solicit_delay;
+	__s32		force_mld_version;
 #ifdef CONFIG_IPV6_PRIVACY
 	__s32		use_tempaddr;
 	__s32		temp_valid_lft;
@@ -165,6 +166,7 @@ enum {
 	DEVCONF_REGEN_MAX_RETRY,
 	DEVCONF_MAX_DESYNC_FACTOR,
 	DEVCONF_MAX_ADDRESSES,
+	DEVCONF_FORCE_MLD_VERSION,
 	DEVCONF_MAX
 };
 
