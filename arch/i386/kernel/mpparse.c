@@ -1026,8 +1026,14 @@ void __init mp_config_ioapic_for_sci(int irq)
 
 		while ((void *) entry < madt_end) {
                 	if (entry->header.type == ACPI_MADT_INT_SRC_OVR &&
-			    acpi_fadt.sci_int == entry->global_irq)
+			    acpi_fadt.sci_int == entry->bus_irq) {
+				/*
+				 * ACPI should use the settings in the
+				 * ISO for its SCI. Do not continue.
+				 */
+				acpi_fadt.sci_int = entry->global_irq;
                 		return;
+			}
 
                 	entry = (struct acpi_table_int_src_ovr *)
                 	        ((unsigned long) entry + entry->header.length);
