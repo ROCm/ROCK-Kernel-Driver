@@ -9,8 +9,6 @@
 #include <linux/agp_backend.h>
 #include "agp.h"
 
-static int agp_try_unsupported __initdata = 0;
-
 static int ali_fetch_size(void)
 {
 	int i;
@@ -292,16 +290,10 @@ static int __init agp_ali_probe(struct pci_dev *pdev,
 			goto found;
 	}
 
-	if (!agp_try_unsupported) {
-		printk(KERN_ERR PFX
-		     "Unsupported ALi chipset (device id: %04x),"
-		     " you might want to try agp_try_unsupported=1.\n",
-		     pdev->device);
-		return -ENODEV;
-	}
+	printk(KERN_ERR PFX "Unsupported ALi chipset (device id: %04x)\n",
+	     pdev->device);
+	return -ENODEV;
 
-	printk(KERN_WARNING PFX "Trying generic ALi routines"
-	       " for device id: %04x\n", pdev->device);
 
 found:
 	bridge = agp_alloc_bridge();
@@ -328,6 +320,7 @@ found:
 			devs[j].chipset_name = "M1641";
 			break;
 		case 0x43:
+			devs[j].chipset_name = "M????";
 			break;
 		case 0x47:
 			devs[j].chipset_name = "M1647";
@@ -397,7 +390,6 @@ static void __exit agp_ali_cleanup(void)
 module_init(agp_ali_init);
 module_exit(agp_ali_cleanup);
 
-MODULE_PARM(agp_try_unsupported, "1i");
 MODULE_AUTHOR("Dave Jones <davej@codemonkey.org.uk>");
 MODULE_LICENSE("GPL and additional rights");
 
