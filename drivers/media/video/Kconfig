@@ -177,10 +177,16 @@ config VIDEO_ZORAN_BUZ
 config VIDEO_ZORAN_DC10
 	tristate "Miro DC10(+) support"
 	depends on VIDEO_ZORAN
+	help
+	  Say Y to support the Pinnacle Systems Studio DC10 plus TV/Video
+	  card.  Vendor page at <http://www.pinnaclesys.com/>.
 
 config VIDEO_ZORAN_LML33
 	tristate "Linux Media Labs LML33 support"
 	depends on VIDEO_ZORAN
+	help
+	  Say Y here to support the Linux Media Labs LML33 TV/Video card.
+	  Resources page is at <http://www.linuxmedialabs.com/lml33doc.html>.
 
 config VIDEO_ZR36120
 	tristate "Zoran ZR36120/36125 Video For Linux"
