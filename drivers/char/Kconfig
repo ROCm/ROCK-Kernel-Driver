@@ -349,7 +349,7 @@ config ISTALLION
 	  module will be called istallion.
 
 config SERIAL_TX3912
-	bool "TMPTX3912/PR31700 serial port support"
+	bool "TX3912/PR31700 serial port support"
 	depends on SERIAL_NONSTANDARD && MIPS && BROKEN_ON_SMP
 	help
 	  The TX3912 is a Toshiba RISC processor based o the MIPS 3900 core;
@@ -357,7 +357,7 @@ config SERIAL_TX3912
 	  Say Y here to enable kernel support for the on-board serial port.
 
 config SERIAL_TX3912_CONSOLE
-	bool "Console on TMPTX3912/PR31700 serial port"
+	bool "Console on TX3912/PR31700 serial port"
 	depends on SERIAL_TX3912
 	help
 	  The TX3912 is a Toshiba RISC processor based o the MIPS 3900 core;
