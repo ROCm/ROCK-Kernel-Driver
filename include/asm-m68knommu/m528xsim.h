@@ -1,20 +1,20 @@
 /****************************************************************************/
 
 /*
- *	m5282sim.h -- ColdFire 5282 System Integration Module support.
+ *	m528xsim.h -- ColdFire 5280/5282 System Integration Module support.
  *
  *	(C) Copyright 2003, Greg Ungerer (gerg@snapgear.com)
  */
 
 /****************************************************************************/
-#ifndef	m5282sim_h
-#define	m5282sim_h
+#ifndef	m528xsim_h
+#define	m528xsim_h
 /****************************************************************************/
 
 #include <linux/config.h>
 
 /*
- *	Define the 5282 SIM register set addresses.
+ *	Define the 5280/5282 SIM register set addresses.
  */
 #define	MCFICM_INTC0		0x0c00		/* Base for Interrupt Ctrl 0 */
 #define	MCFICM_INTC1		0x0d00		/* Base for Interrupt Ctrl 0 */
@@ -28,8 +28,9 @@
 #define	MCFINTC_IACKL		0x19		/* */
 #define	MCFINTC_ICR0		0x40		/* Base ICR register */
 
+#define	MCFINT_VECBASE		64		/* Vector base number */
 #define	MCFINT_UART0		13		/* Interrupt number for UART0 */
 #define	MCFINT_PIT1		55		/* Interrupt number for PIT1 */
 
 /****************************************************************************/
-#endif	/* m5282sim_h */
+#endif	/* m528xsim_h */

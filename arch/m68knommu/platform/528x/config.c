@@ -1,10 +1,10 @@
 /***************************************************************************/
 
 /*
- *	linux/arch/m68knommu/platform/5282/config.c
+ *	linux/arch/m68knommu/platform/528x/config.c
  *
  *	Sub-architcture dependant initialization code for the Motorola
- *	5282 CPU.
+ *	5280 and 5282 CPUs.
  *
  *	Copyright (C) 1999-2003, Greg Ungerer (gerg@snapgear.com)
  *	Copyright (C) 2001-2003, SnapGear Inc. (www.snapgear.com)

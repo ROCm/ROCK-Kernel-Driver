@@ -1,9 +1,10 @@
 /*****************************************************************************/
 
 /*
- *	crt0_ram.S -- startup code for MCF5282 ColdFire based MOTOROLA boards.
+ *	crt0_ram.S -- startup code for Feith CANCan board.
  *
- *	(C) Copyright 2003, Greg Ungerer (gerg@snapgear.com).
+ *	(C) Copyright 1999-2002, Greg Ungerer (gerg@snapgear.com).
+ *	(C) Copyright 2000, Lineo (www.lineo.com).
  */
 
 /*****************************************************************************/
@@ -18,19 +19,13 @@
 /*****************************************************************************/
 
 /*
- *	Motorola M5282C3 ColdFire eval board, chip select and memory setup.
+ *	Feith ColdFire CANCam, chip select and memory setup.
  */
 
 #define	MEM_BASE	0x00000000	/* Memory base at address 0 */
 #define	VBR_BASE	MEM_BASE	/* Vector address */
+#define MEM_SIZE  0x04000000      /* Memory size 64Mb */
 
-#if defined(CONFIG_RAM16MB)
-#define	MEM_SIZE	0x01000000	/* Memory size 16Mb */
-#elif defined(CONFIG_RAM8MB)
-#define	MEM_SIZE	0x00800000	/* Memory size 8Mb */
-#else
-#define	MEM_SIZE	0x00400000	/* Memory size 4Mb */
-#endif
 
 /*****************************************************************************/
 
@@ -96,25 +91,12 @@ _start:
 
 	/*
 	 *	Enable CPU internal cache.
-	 *
-	 *	Cache is totally broken in first 5282 silicon.
-	 *	No point enabling it for now.
 	 */
-#if 0
-	move.l	#0x01000000, %d0
+	move.l	#0x01000000, %d0		/* Invalidate cache cmd */
 	movec	%d0, %CACR			/* Invalidate cache */
-	nop
-
-	move.l	#0x0000c000, %d0		/* Set SDRAM cached only */
-	movec	%d0, %ACR0
-	move.l	#0x00000000, %d0		/* No other regions cached */
-	movec	%d0, %ACR1
-
-	move.l	#0x00000000, %d0		/* Setup cache mask */
+	move.l	#0x80000100, %d0		/* Setup cache mask */
 	movec	%d0, %CACR			/* Enable cache */
 	nop
-#endif
-
 
 #ifdef CONFIG_ROMFS_FS
 	/*
@@ -137,6 +119,7 @@ _copy_romfs:
 	move.l	%d0, -(%a1)
 	cmp.l	%a0, %a2			/* Check if at end */
 	bne	_copy_romfs
+
 #else /* CONFIG_ROMFS_FS */
 	lea.l	_ebss, %a1
 	move.l	%a1, _ramstart

@@ -181,7 +181,7 @@ __command_line:
 	.long	__start
 	.long	__start
 vector	=	2
-	.rept	126-1
+	.rept	126
 	.long	_interrupt_redirect_table+vector*4
 vector	=	vector + 1
 	.endr
