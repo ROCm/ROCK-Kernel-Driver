@@ -489,14 +489,15 @@ out:
 			memcpy(x1->encap, x->encap, sizeof(*x1->encap));
 		memcpy(&x1->lft, &x->lft, sizeof(x1->lft));
 		x1->km.dying = 0;
+
+		if (!mod_timer(&x1->timer, jiffies + HZ))
+			xfrm_state_hold(x1);
+		if (x1->curlft.use_time)
+			xfrm_state_check_expire(x1);
+
 		err = 0;
 	}
 	spin_unlock_bh(&x1->lock);
-
-	if (!mod_timer(&x1->timer, jiffies + HZ))
-		xfrm_state_hold(x1);
-	if (x1->curlft.use_time)
-		xfrm_state_check_expire(x1);
 
 	xfrm_state_put(x1);
 

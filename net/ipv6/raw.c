@@ -283,7 +283,8 @@ void rawv6_err(struct sock *sk, struct sk_buff *skb,
 
 static inline int rawv6_rcv_skb(struct sock * sk, struct sk_buff * skb)
 {
-	if (sk->sk_filter && skb->ip_summed != CHECKSUM_UNNECESSARY) {
+	if ((raw6_sk(sk)->checksum || sk->sk_filter) && 
+	    skb->ip_summed != CHECKSUM_UNNECESSARY) {
 		if ((unsigned short)csum_fold(skb_checksum(skb, 0, skb->len, skb->csum))) {
 			/* FIXME: increment a raw6 drops counter here */
 			kfree_skb(skb);
@@ -452,6 +453,10 @@ static int rawv6_push_pending_frames(struct sock *sk, struct flowi *fl, struct r
 	struct sk_buff *skb;
 	int err = 0;
 	u16 *csum;
+	u32 tmp_csum;
+
+	if (!opt->checksum)
+		goto send;
 
 	if ((skb = skb_peek(&sk->sk_write_queue)) == NULL)
 		goto out;
@@ -463,29 +468,32 @@ static int rawv6_push_pending_frames(struct sock *sk, struct flowi *fl, struct r
 		goto out;
 	}
 
+	/* should be check HW csum miyazawa */
 	if (skb_queue_len(&sk->sk_write_queue) == 1) {
 		/*
 		 * Only one fragment on the socket.
 		 */
-		/* should be check HW csum miyazawa */
-		*csum = csum_ipv6_magic(&fl->fl6_src,
-					&fl->fl6_dst,
-					len, fl->proto, skb->csum);
+		tmp_csum = skb->csum;
 	} else {
-		u32 tmp_csum = 0;
+		tmp_csum = 0;
 
 		skb_queue_walk(&sk->sk_write_queue, skb) {
 			tmp_csum = csum_add(tmp_csum, skb->csum);
 		}
-
-		tmp_csum = csum_ipv6_magic(&fl->fl6_src,
-					   &fl->fl6_dst,
-					   len, fl->proto, tmp_csum);
-		*csum = tmp_csum;
 	}
+
+	/* in case cksum was not initialized */
+	if (unlikely(*csum))
+		tmp_csum = csum_sub(tmp_csum, *csum);
+
+	*csum = csum_ipv6_magic(&fl->fl6_src,
+				&fl->fl6_dst,
+				len, fl->proto, tmp_csum);
+
 	if (*csum == 0)
 		*csum = -1;
-	ip6_push_pending_frames(sk);
+send:
+	err = ip6_push_pending_frames(sk);
 out:
 	return err;
 }
@@ -702,13 +710,8 @@ back_from_confirm:
 
 		if (err)
 			ip6_flush_pending_frames(sk);
-		else if (!(msg->msg_flags & MSG_MORE)) {
-			if (raw_opt->checksum) {
-				err = rawv6_push_pending_frames(sk, &fl, raw_opt, len);
-			} else {
-				err = ip6_push_pending_frames(sk);
-			}
-		}
+		else if (!(msg->msg_flags & MSG_MORE))
+			err = rawv6_push_pending_frames(sk, &fl, raw_opt, len);
 	}
 done:
 	ip6_dst_store(sk, dst,
