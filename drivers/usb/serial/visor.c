@@ -177,24 +177,40 @@ static void visor_write_bulk_callback	(struct urb *urb, struct pt_regs *regs);
 static void visor_read_bulk_callback	(struct urb *urb, struct pt_regs *regs);
 static void visor_read_int_callback	(struct urb *urb, struct pt_regs *regs);
 static int  clie_3_5_startup	(struct usb_serial *serial);
+static int palm_os_3_probe (struct usb_serial *serial, const struct usb_device_id *id);
+static int palm_os_4_probe (struct usb_serial *serial, const struct usb_device_id *id);
 
 
 static struct usb_device_id id_table [] = {
-	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M500_ID) },
-	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M505_ID) },
-	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M515_ID) },
-	{ USB_DEVICE(PALM_VENDOR_ID, PALM_I705_ID) },
-	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M125_ID) },
-	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M130_ID) },
-	{ USB_DEVICE(PALM_VENDOR_ID, PALM_TUNGSTEN_T_ID) },
-	{ USB_DEVICE(PALM_VENDOR_ID, PALM_TUNGSTEN_Z_ID) },
-	{ USB_DEVICE(PALM_VENDOR_ID, PALM_ZIRE_ID) },
-	{ USB_DEVICE(HANDSPRING_VENDOR_ID, HANDSPRING_VISOR_ID) },
-	{ USB_DEVICE(HANDSPRING_VENDOR_ID, HANDSPRING_TREO_ID) },
-	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_4_0_ID) },
-	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_S360_ID) },
+	{ USB_DEVICE(HANDSPRING_VENDOR_ID, HANDSPRING_VISOR_ID),
+		.driver_info = (unsigned int)&palm_os_3_probe },
+	{ USB_DEVICE(HANDSPRING_VENDOR_ID, HANDSPRING_TREO_ID),
+		.driver_info = (unsigned int)&palm_os_4_probe },
+	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M500_ID),
+		.driver_info = (unsigned int)&palm_os_4_probe },
+	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M505_ID),
+		.driver_info = (unsigned int)&palm_os_4_probe },
+	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M515_ID),
+		.driver_info = (unsigned int)&palm_os_4_probe },
+	{ USB_DEVICE(PALM_VENDOR_ID, PALM_I705_ID),
+		.driver_info = (unsigned int)&palm_os_4_probe },
+	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M125_ID),
+		.driver_info = (unsigned int)&palm_os_4_probe },
+	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M130_ID),
+		.driver_info = (unsigned int)&palm_os_4_probe },
+	{ USB_DEVICE(PALM_VENDOR_ID, PALM_TUNGSTEN_T_ID),
+		.driver_info = (unsigned int)&palm_os_4_probe },
+	{ USB_DEVICE(PALM_VENDOR_ID, PALM_TUNGSTEN_Z_ID),
+		.driver_info = (unsigned int)&palm_os_4_probe },
+	{ USB_DEVICE(PALM_VENDOR_ID, PALM_ZIRE_ID),
+		.driver_info = (unsigned int)&palm_os_4_probe },
+	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_4_0_ID),
+		.driver_info = (unsigned int)&palm_os_4_probe },
+	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_S360_ID),
+		.driver_info = (unsigned int)&palm_os_4_probe },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_4_1_ID) },
-	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_NX60_ID) },
+	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_NX60_ID),
+		.driver_info = (unsigned int)&palm_os_4_probe },
 	{ }					/* Terminating entry */
 };
 
@@ -600,99 +616,143 @@ static void visor_unthrottle (struct usb_serial_port *port)
 		dev_err(&port->dev, "%s - failed submitting read urb, error %d\n", __FUNCTION__, result);
 }
 
-static int visor_probe (struct usb_serial *serial, const struct usb_device_id *id)
+static int palm_os_3_probe (struct usb_serial *serial, const struct usb_device_id *id)
 {
 	struct device *dev = &serial->dev->dev;
-	int response;
+	struct visor_connection_info *connection_info;
+	unsigned char *transfer_buffer;
+	char *string;
+	int retval = 0;
 	int i;
 	int num_ports;
-	unsigned char *transfer_buffer =  kmalloc (256, GFP_KERNEL);
 
+	dbg("%s", __FUNCTION__);
+
+	transfer_buffer = kmalloc (sizeof (*connection_info), GFP_KERNEL);
 	if (!transfer_buffer) {
-		dev_err(dev, "%s - kmalloc(%d) failed.\n", __FUNCTION__, 256);
+		dev_err(dev, "%s - kmalloc(%d) failed.\n", __FUNCTION__,
+			sizeof(*connection_info));
 		return -ENOMEM;
 	}
+
+	/* send a get connection info request */
+	retval = usb_control_msg (serial->dev,
+				  usb_rcvctrlpipe(serial->dev, 0),
+				  VISOR_GET_CONNECTION_INFORMATION,
+				  0xc2, 0x0000, 0x0000, transfer_buffer,
+				  sizeof(*connection_info), 300);
+	if (retval < 0) {
+		dev_err(dev, "%s - error %d getting connection information\n",
+			__FUNCTION__, retval);
+		goto exit;
+	}
+		
+	connection_info = (struct visor_connection_info *)transfer_buffer;
+
+	le16_to_cpus(&connection_info->num_ports);
+	num_ports = connection_info->num_ports;
+	/* handle devices that report invalid stuff here */
+	if (num_ports > 2)
+		num_ports = 2;
+	dev_info(dev, "%s: Number of ports: %d\n", serial->type->name,
+		connection_info->num_ports);
+
+	for (i = 0; i < num_ports; ++i) {
+		switch (connection_info->connections[i].port_function_id) {
+			case VISOR_FUNCTION_GENERIC:
+				string = "Generic";
+				break;
+			case VISOR_FUNCTION_DEBUGGER:
+				string = "Debugger";
+				break;
+			case VISOR_FUNCTION_HOTSYNC:
+				string = "HotSync";
+				break;
+			case VISOR_FUNCTION_CONSOLE:
+				string = "Console";
+				break;
+			case VISOR_FUNCTION_REMOTE_FILE_SYS:
+				string = "Remote File System";
+				break;
+			default:
+				string = "unknown";
+				break;	
+		}
+		dev_info(dev, "%s: port %d, is for %s use\n", serial->type->name,
+			 connection_info->connections[i].port, string);
+	}
+
+	/*
+	 * save off our num_ports info so that we can use it in the
+	 * calc_num_ports callback
+	 */
+	usb_set_serial_data(serial, (void *)(long)num_ports);
+
+	/* ask for the number of bytes available, but ignore the response as it is broken */
+	retval = usb_control_msg (serial->dev,
+				  usb_rcvctrlpipe(serial->dev, 0),
+				  VISOR_REQUEST_BYTES_AVAILABLE,
+				  0xc2, 0x0000, 0x0005, transfer_buffer,
+				  0x02, 300);
+	if (retval < 0)
+		dev_err(dev, "%s - error %d getting bytes available request\n",
+			__FUNCTION__, retval);
+	retval = 0;
+
+exit:
+	kfree (transfer_buffer);
+
+	return retval;
+}
+
+static int palm_os_4_probe (struct usb_serial *serial, const struct usb_device_id *id)
+{
+	struct device *dev = &serial->dev->dev;
+	struct palm_ext_connection_info *connection_info;
+	unsigned char *transfer_buffer;
+	int retval;
+
+	dbg("%s", __FUNCTION__);
+
+	transfer_buffer =  kmalloc (sizeof (*connection_info), GFP_KERNEL);
+	if (!transfer_buffer) {
+		dev_err(dev, "%s - kmalloc(%d) failed.\n", __FUNCTION__,
+			sizeof(*connection_info));
+		return -ENOMEM;
+	}
+
+	retval = usb_control_msg (serial->dev,
+				  usb_rcvctrlpipe(serial->dev, 0), 
+				  PALM_GET_EXT_CONNECTION_INFORMATION,
+				  0xc2, 0x0000, 0x0000, transfer_buffer,
+				  sizeof (*connection_info), 300);
+	if (retval < 0)
+		dev_err(dev, "%s - error %d getting connection info\n",
+			__FUNCTION__, retval);
+	else
+		usb_serial_debug_data (__FILE__, __FUNCTION__, 0x14, transfer_buffer);
+
+	kfree (transfer_buffer);
+	return 0;
+}
+
+
+static int visor_probe (struct usb_serial *serial, const struct usb_device_id *id)
+{
+	int retval = 0;
+	int (*startup) (struct usb_serial *serial, const struct usb_device_id *id);
 
 	dbg("%s", __FUNCTION__);
 
 	dbg("%s - Set config to 1", __FUNCTION__);
 	usb_set_configuration (serial->dev, 1);
 
-	/* send a get connection info request */
-	response = usb_control_msg (serial->dev, usb_rcvctrlpipe(serial->dev, 0), VISOR_GET_CONNECTION_INFORMATION,
-					0xc2, 0x0000, 0x0000, transfer_buffer, 0x12, 300);
-	if (response < 0) {
-		dev_err(dev, "%s - error getting connection information\n", __FUNCTION__);
-	} else {
-		struct visor_connection_info *connection_info = (struct visor_connection_info *)transfer_buffer;
-		char *string;
-
-		le16_to_cpus(&connection_info->num_ports);
-		num_ports = connection_info->num_ports;
-		dev_info(dev, "%s: Number of ports: %d\n", serial->type->name, connection_info->num_ports);
-		for (i = 0; i < num_ports; ++i) {
-			switch (connection_info->connections[i].port_function_id) {
-				case VISOR_FUNCTION_GENERIC:
-					string = "Generic";
-					break;
-				case VISOR_FUNCTION_DEBUGGER:
-					string = "Debugger";
-					break;
-				case VISOR_FUNCTION_HOTSYNC:
-					string = "HotSync";
-					break;
-				case VISOR_FUNCTION_CONSOLE:
-					string = "Console";
-					break;
-				case VISOR_FUNCTION_REMOTE_FILE_SYS:
-					string = "Remote File System";
-					break;
-				default:
-					string = "unknown";
-					break;	
-			}
-			dev_info(dev, "%s: port %d, is for %s use\n", serial->type->name,
-				 connection_info->connections[i].port, string);
-		/* save off our num_ports info so that we can use it in the calc_num_ports call */
-		usb_set_serial_data(serial, (void *)(long)num_ports);
-		}
+	if (id->driver_info) {
+		startup = (void *)id->driver_info;
+		retval = startup(serial, id);
 	}
 
-	if ((serial->dev->descriptor.idVendor == PALM_VENDOR_ID) ||
-	    ((serial->dev->descriptor.idVendor == SONY_VENDOR_ID) &&
-	     (serial->dev->descriptor.idProduct != SONY_CLIE_4_1_ID))) {
-		/* Palm OS 4.0 Hack */
-		response = usb_control_msg (serial->dev, usb_rcvctrlpipe(serial->dev, 0), 
-					    PALM_GET_SOME_UNKNOWN_INFORMATION,
-					    0xc2, 0x0000, 0x0000, transfer_buffer, 
-					    0x14, 300);
-		if (response < 0) {
-			dev_err(dev, "%s - error getting first unknown palm command\n", __FUNCTION__);
-		} else {
-			usb_serial_debug_data (__FILE__, __FUNCTION__, 0x14, transfer_buffer);
-		}
-		response = usb_control_msg (serial->dev, usb_rcvctrlpipe(serial->dev, 0), 
-					    PALM_GET_SOME_UNKNOWN_INFORMATION,
-					    0xc2, 0x0000, 0x0000, transfer_buffer, 
-					    0x14, 300);
-		if (response < 0) {
-			dev_err(dev, "%s - error getting second unknown palm command\n", __FUNCTION__);
-		} else {
-			usb_serial_debug_data (__FILE__, __FUNCTION__, 0x14, transfer_buffer);
-		}
-	}
-
-	/* ask for the number of bytes available, but ignore the response as it is broken */
-	response = usb_control_msg (serial->dev, usb_rcvctrlpipe(serial->dev, 0), VISOR_REQUEST_BYTES_AVAILABLE,
-					0xc2, 0x0000, 0x0005, transfer_buffer, 0x02, 300);
-	if (response < 0) {
-		dev_err(dev, "%s - error getting bytes available request\n", __FUNCTION__);
-	}
-
-	kfree (transfer_buffer);
-
-	/* continue on with initialization */
-	return 0;
+	return retval;
 }
 
 static int visor_calc_num_ports (struct usb_serial *serial)
