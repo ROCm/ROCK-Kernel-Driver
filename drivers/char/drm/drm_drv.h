@@ -58,8 +58,8 @@
 #ifndef __HAVE_CTX_BITMAP
 #define __HAVE_CTX_BITMAP		0
 #endif
-#ifndef __HAVE_DMA_IRQ
-#define __HAVE_DMA_IRQ			0
+#ifndef __HAVE_IRQ
+#define __HAVE_IRQ			0
 #endif
 #ifndef __HAVE_DMA_QUEUE
 #define __HAVE_DMA_QUEUE		0
@@ -215,9 +215,9 @@ static drm_ioctl_desc_t		  DRM(ioctls)[] = {
 	[DRM_IOCTL_NR(DRM_IOCTL_INFO_BUFS)]     = { DRM(infobufs),    1, 0 },
 	[DRM_IOCTL_NR(DRM_IOCTL_MAP_BUFS)]      = { DRM(mapbufs),     1, 0 },
 	[DRM_IOCTL_NR(DRM_IOCTL_FREE_BUFS)]     = { DRM(freebufs),    1, 0 },
-
-	/* The DRM_IOCTL_DMA ioctl should be defined by the driver.
-	 */
+	/* The DRM_IOCTL_DMA ioctl should be defined by the driver. */
+#endif
+#if __HAVE_IRQ || __HAVE_DMA
 	[DRM_IOCTL_NR(DRM_IOCTL_CONTROL)]       = { DRM(control),     1, 1 },
 #endif
 
@@ -384,7 +384,7 @@ static int DRM(takedown)( drm_device_t *dev )
 	DRM_DEBUG( "\n" );
 
 	DRIVER_PRETAKEDOWN();
-#if __HAVE_DMA_IRQ
+#if __HAVE_IRQ
 	if ( dev->irq ) DRM(irq_uninstall)( dev );
 #endif
 

@@ -119,7 +119,7 @@
  * a noop stub is generated for compatibility.
  */
 /* XXX: Add vblank support? */
-#define __HAVE_DMA_IRQ		0
+#define __HAVE_IRQ		0
 
 /* Buffer customization:
  */

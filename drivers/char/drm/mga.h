@@ -84,7 +84,7 @@
 /* DMA customization:
  */
 #define __HAVE_DMA		1
-#define __HAVE_DMA_IRQ		1
+#define __HAVE_IRQ		1
 #define __HAVE_VBL_IRQ		1
 #define __HAVE_SHARED_IRQ       1
 

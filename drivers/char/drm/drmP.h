@@ -92,8 +92,8 @@
 #ifndef __HAVE_DMA
 #define __HAVE_DMA		0
 #endif
-#ifndef __HAVE_DMA_IRQ
-#define __HAVE_DMA_IRQ		0
+#ifndef __HAVE_IRQ
+#define __HAVE_IRQ		0
 #endif
 #ifndef __HAVE_DMA_WAITLIST
 #define __HAVE_DMA_WAITLIST	0
@@ -903,12 +903,17 @@ extern int	     DRM(dma_setup)(drm_device_t *dev);
 extern void	     DRM(dma_takedown)(drm_device_t *dev);
 extern void	     DRM(free_buffer)(drm_device_t *dev, drm_buf_t *buf);
 extern void	     DRM(reclaim_buffers)( struct file *filp );
-#if __HAVE_DMA_IRQ
+#endif /* __HAVE_DMA */
+
+				/* IRQ support (drm_irq.h) */
+#if __HAVE_IRQ || __HAVE_DMA
 extern int           DRM(control)( struct inode *inode, struct file *filp,
 				   unsigned int cmd, unsigned long arg );
+#endif
+#if __HAVE_IRQ
 extern int           DRM(irq_install)( drm_device_t *dev, int irq );
 extern int           DRM(irq_uninstall)( drm_device_t *dev );
-extern irqreturn_t   DRM(dma_service)( DRM_IRQ_ARGS );
+extern irqreturn_t   DRM(irq_handler)( DRM_IRQ_ARGS );
 extern void          DRM(driver_irq_preinstall)( drm_device_t *dev );
 extern void          DRM(driver_irq_postinstall)( drm_device_t *dev );
 extern void          DRM(driver_irq_uninstall)( drm_device_t *dev );
@@ -918,12 +923,11 @@ extern int           DRM(wait_vblank)(struct inode *inode, struct file *filp,
 extern int           DRM(vblank_wait)(drm_device_t *dev, unsigned int *vbl_seq);
 extern void          DRM(vbl_send_signals)( drm_device_t *dev );
 #endif
-#if __HAVE_DMA_IRQ_BH
-extern void          DRM(dma_immediate_bh)( void *dev );
+#if __HAVE_IRQ_BH
+extern void          DRM(irq_immediate_bh)( void *dev );
 #endif
 #endif
 
-#endif /* __HAVE_DMA */
 
 #if __REALLY_HAVE_AGP
 				/* AGP/GART support (drm_agpsupport.h) */
