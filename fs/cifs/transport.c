@@ -45,6 +45,11 @@ AllocMidQEntry(struct smb_hdr *smb_buffer, struct cifsSesInfo *ses)
 		cERROR(1, ("Null session passed in to AllocMidQEntry "));
 		return NULL;
 	}
+	if (ses->server == NULL) {
+		cERROR(1, ("Null TCP session in AllocMidQEntry"));
+		return NULL;
+	}
+	
 	temp = (struct mid_q_entry *) kmem_cache_alloc(cifs_mid_cachep,
 						       SLAB_KERNEL);
 	if (temp == NULL)
@@ -65,7 +70,6 @@ AllocMidQEntry(struct smb_hdr *smb_buffer, struct cifsSesInfo *ses)
 		/* Should we wake up tcp thread first? BB  */
 		timeout = wait_event_interruptible_timeout(ses->server->response_q,
 			(ses->server->tcpStatus == CifsGood), timeout);
-        cFYI(1,("timeout (after reconnection wait) %d",timeout));
 	}
 
 	if (ses->server->tcpStatus == CifsGood) {
