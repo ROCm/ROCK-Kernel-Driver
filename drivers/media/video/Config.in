@@ -5,7 +5,6 @@ mainmenu_option next_comment
 comment 'Video For Linux'
 
 bool '  V4L information in proc filesystem' CONFIG_VIDEO_PROC_FS
-dep_tristate '  I2C on parallel port' CONFIG_I2C_PARPORT $CONFIG_PARPORT $CONFIG_I2C
 
 comment 'Video Adapters'
 if [ "$CONFIG_I2C_ALGOBIT" = "y" -o "$CONFIG_I2C_ALGOBIT" = "m" ]; then

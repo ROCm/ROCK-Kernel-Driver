@@ -1674,7 +1674,7 @@ static int w840_suspend (struct pci_dev *pdev, u32 state)
 		spin_unlock_irq(&np->lock);
 
 		spin_unlock_wait(&dev->xmit_lock);
-		synchronize_irq();
+		synchronize_irq(dev->irq);
 	
 		np->stats.rx_missed_errors += readl(ioaddr + RxMissed) & 0xffff;
 

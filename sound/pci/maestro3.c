@@ -2310,7 +2310,8 @@ static int snd_m3_free(m3_t *chip)
 		vfree(chip->suspend_mem);
 #endif
 
-	synchronize_irq();
+	if(chip->irq >= 0)
+		synchronize_irq(chip->irq);
 
 	if (chip->iobase_res) {
 		release_resource(chip->iobase_res);

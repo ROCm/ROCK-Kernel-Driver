@@ -17,14 +17,12 @@
 #define MAX_CDB 12
 #define MAX_SENSE 14
 
-int atp870u_detect(Scsi_Host_Template *);
-int atp870u_command(Scsi_Cmnd *);
-int atp870u_queuecommand(Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
-int atp870u_abort(Scsi_Cmnd *);
-int atp870u_reset(Scsi_Cmnd *, unsigned int);
-int atp870u_biosparam(Disk *, struct block_device *, int *);
-int atp870u_release(struct Scsi_Host *);
-void send_s870(unsigned char);
+static int atp870u_detect(Scsi_Host_Template *);
+static int atp870u_command(Scsi_Cmnd *);
+static int atp870u_queuecommand(Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
+static int atp870u_abort(Scsi_Cmnd *);
+static int atp870u_biosparam(Disk *, struct block_device *, int *);
+static int atp870u_release(struct Scsi_Host *);
 
 #define qcnt		32
 #define ATP870U_SCATTER 128
@@ -49,12 +47,7 @@ extern int atp870u_proc_info(char *, char **, off_t, int, int, int);
 	command: atp870u_command,				\
 	queuecommand: atp870u_queuecommand,			\
 	eh_strategy_handler: NULL,				\
-	eh_abort_handler: NULL, 				\
-	eh_device_reset_handler: NULL,				\
-	eh_bus_reset_handler: NULL,				\
-	eh_host_reset_handler: NULL,				\
-	abort: atp870u_abort,					\
-	reset: atp870u_reset,					\
+	eh_abort_handler: atp870u_abort, 			\
 	slave_attach: NULL,					\
 	bios_param: atp870u_biosparam,				\
 	can_queue: qcnt,	 /* max simultaneous cmds      */\
