@@ -430,22 +430,20 @@ static void dev_forward_change(struct inet6_dev *idev)
 }
 
 
-static void addrconf_forward_change(struct inet6_dev *idev)
+static void addrconf_forward_change(void)
 {
 	struct net_device *dev;
-
-	if (idev) {
-		dev_forward_change(idev);
-		return;
-	}
+	struct inet6_dev *idev;
 
 	read_lock(&dev_base_lock);
 	for (dev=dev_base; dev; dev=dev->next) {
 		read_lock(&addrconf_lock);
 		idev = __in6_dev_get(dev);
 		if (idev) {
+			int changed = (!idev->cnf.forwarding) ^ (!ipv6_devconf.forwarding);
 			idev->cnf.forwarding = ipv6_devconf.forwarding;
-			dev_forward_change(idev);
+			if (changed)
+				dev_forward_change(idev);
 		}
 		read_unlock(&addrconf_lock);
 	}
@@ -3025,18 +3023,18 @@ int addrconf_sysctl_forward(ctl_table *ctl, int write, struct file * filp,
 
 	ret = proc_dointvec(ctl, write, filp, buffer, lenp, ppos);
 
-	if (write && *valp != val && valp != &ipv6_devconf_dflt.forwarding) {
-		struct inet6_dev *idev = NULL;
-
+	if (write && valp != &ipv6_devconf_dflt.forwarding) {
 		if (valp != &ipv6_devconf.forwarding) {
-			idev = (struct inet6_dev *)ctl->extra1;
-			if (idev == NULL)
-				return ret;
-		} else
+			if ((!*valp) ^ (!val)) {
+				struct inet6_dev *idev = (struct inet6_dev *)ctl->extra1;
+				if (idev == NULL)
+					return ret;
+				dev_forward_change(idev);
+			}
+		} else {
 			ipv6_devconf_dflt.forwarding = ipv6_devconf.forwarding;
-
-		addrconf_forward_change(idev);
-
+			addrconf_forward_change();
+		}
 		if (*valp)
 			rt6_purge_dflt_routers(0);
 	}
@@ -3077,15 +3075,19 @@ static int addrconf_sysctl_forward_strategy(ctl_table *table,
 	}
 
 	if (valp != &ipv6_devconf_dflt.forwarding) {
-		struct inet6_dev *idev;
 		if (valp != &ipv6_devconf.forwarding) {
-			idev = (struct inet6_dev *)table->extra1;
+			struct inet6_dev *idev = (struct inet6_dev *)table->extra1;
+			int changed;
 			if (unlikely(idev == NULL))
 				return -ENODEV;
-		} else
-			idev = NULL;
-		*valp = new;
-		addrconf_forward_change(idev);
+			changed = (!*valp) ^ (!new);
+			*valp = new;
+			if (changed)
+				dev_forward_change(idev);
+		} else {
+			*valp = new;
+			addrconf_forward_change();
+		}
 
 		if (*valp)
 			rt6_purge_dflt_routers(0);
