@@ -560,137 +560,114 @@ GLOBAL_ENTRY(__ia64_load_fpu)
 END(__ia64_load_fpu)
 
 GLOBAL_ENTRY(__ia64_init_fpu)
-	alloc r2=ar.pfs,0,0,0,0
-	stf.spill [sp]=f0
-	mov      f32=f0
+	stf.spill [sp]=f0		// M3
+	mov	 f32=f0			// F
+	nop.b	 0
+
+	ldfps	 f33,f34=[sp]		// M0
+	ldfps	 f35,f36=[sp]		// M1
+	mov      f37=f0			// F
 	;;
-	ldf.fill f33=[sp]
-	ldf.fill f34=[sp]
-	mov      f35=f0
-	;;
-	ldf.fill f36=[sp]
-	ldf.fill f37=[sp]
-	mov      f38=f0
-	;;
-	ldf.fill f39=[sp]
-	ldf.fill f40=[sp]
-	mov      f41=f0
-	;;
-	ldf.fill f42=[sp]
-	ldf.fill f43=[sp]
-	mov      f44=f0
-	;;
-	ldf.fill f45=[sp]
-	ldf.fill f46=[sp]
-	mov      f47=f0
-	;;
-	ldf.fill f48=[sp]
-	ldf.fill f49=[sp]
-	mov      f50=f0
-	;;
-	ldf.fill f51=[sp]
-	ldf.fill f52=[sp]
-	mov      f53=f0
-	;;
-	ldf.fill f54=[sp]
-	ldf.fill f55=[sp]
-	mov      f56=f0
-	;;
-	ldf.fill f57=[sp]
-	ldf.fill f58=[sp]
-	mov      f59=f0
-	;;
-	ldf.fill f60=[sp]
-	ldf.fill f61=[sp]
-	mov      f62=f0
-	;;
-	ldf.fill f63=[sp]
-	ldf.fill f64=[sp]
-	mov      f65=f0
-	;;
-	ldf.fill f66=[sp]
-	ldf.fill f67=[sp]
-	mov      f68=f0
-	;;
-	ldf.fill f69=[sp]
-	ldf.fill f70=[sp]
-	mov      f71=f0
-	;;
-	ldf.fill f72=[sp]
-	ldf.fill f73=[sp]
-	mov      f74=f0
-	;;
-	ldf.fill f75=[sp]
-	ldf.fill f76=[sp]
-	mov      f77=f0
-	;;
-	ldf.fill f78=[sp]
-	ldf.fill f79=[sp]
-	mov      f80=f0
-	;;
-	ldf.fill f81=[sp]
-	ldf.fill f82=[sp]
-	mov      f83=f0
-	;;
-	ldf.fill f84=[sp]
-	ldf.fill f85=[sp]
-	mov      f86=f0
-	;;
-	ldf.fill f87=[sp]
-	ldf.fill f88=[sp]
-	mov      f89=f0
-	;;
-	ldf.fill f90=[sp]
-	ldf.fill f91=[sp]
-	mov      f92=f0
-	;;
-	ldf.fill f93=[sp]
-	ldf.fill f94=[sp]
-	mov      f95=f0
-	;;
-	ldf.fill f96=[sp]
-	ldf.fill f97=[sp]
-	mov      f98=f0
-	;;
-	ldf.fill f99=[sp]
-	ldf.fill f100=[sp]
-	mov      f101=f0
-	;;
-	ldf.fill f102=[sp]
-	ldf.fill f103=[sp]
-	mov      f104=f0
-	;;
-	ldf.fill f105=[sp]
-	ldf.fill f106=[sp]
-	mov      f107=f0
-	;;
-	ldf.fill f108=[sp]
-	ldf.fill f109=[sp]
-	mov      f110=f0
-	;;
-	ldf.fill f111=[sp]
-	ldf.fill f112=[sp]
-	mov      f113=f0
-	;;
-	ldf.fill f114=[sp]
-	ldf.fill f115=[sp]
-	mov      f116=f0
-	;;
-	ldf.fill f117=[sp]
-	ldf.fill f118=[sp]
-	mov      f119=f0
-	;;
-	ldf.fill f120=[sp]
-	ldf.fill f121=[sp]
-	mov      f122=f0
-	;;
-	ldf.fill f123=[sp]
-	ldf.fill f124=[sp]
-	mov      f125=f0
-	;;
-	ldf.fill f126=[sp]
-	mov      f127=f0
-	br.ret.sptk.many rp
+
+	setf.s	 f38=r0			// M2
+	setf.s	 f39=r0			// M3
+	mov      f40=f0			// F
+
+	ldfps	 f41,f42=[sp]		// M0
+	ldfps	 f43,f44=[sp]		// M1
+	mov      f45=f0			// F
+
+	setf.s	 f46=r0			// M2
+	setf.s	 f47=r0			// M3
+	mov      f48=f0			// F
+
+	ldfps	 f49,f50=[sp]		// M0
+	ldfps	 f51,f52=[sp]		// M1
+	mov      f53=f0			// F
+
+	setf.s	 f54=r0			// M2
+	setf.s	 f55=r0			// M3
+	mov      f56=f0			// F
+
+	ldfps	 f57,f58=[sp]		// M0
+	ldfps	 f59,f60=[sp]		// M1
+	mov      f61=f0			// F
+
+	setf.s	 f62=r0			// M2
+	setf.s	 f63=r0			// M3
+	mov      f64=f0			// F
+
+	ldfps	 f65,f66=[sp]		// M0
+	ldfps	 f67,f68=[sp]		// M1
+	mov      f69=f0			// F
+
+	setf.s	 f70=r0			// M2
+	setf.s	 f71=r0			// M3
+	mov      f72=f0			// F
+
+	ldfps	 f73,f74=[sp]		// M0
+	ldfps	 f75,f76=[sp]		// M1
+	mov      f77=f0			// F
+
+	setf.s	 f78=r0			// M2
+	setf.s	 f79=r0			// M3
+	mov      f80=f0			// F
+
+	ldfps	 f81,f82=[sp]		// M0
+	ldfps	 f83,f84=[sp]		// M1
+	mov      f85=f0			// F
+
+	setf.s	 f86=r0			// M2
+	setf.s	 f87=r0			// M3
+	mov      f88=f0			// F
+
+	/*
+	 * When the instructions are cached, it would be faster to initialize
+	 * the remaining registers with simply mov instructions (F-unit).
+	 * This gets the time down to ~29 cycles.  However, this would use up
+	 * 33 bundles, whereas continuing with the above pattern yields
+	 * 10 bundles and ~30 cycles.
+	 */
+
+	ldfps	 f89,f90=[sp]		// M0
+	ldfps	 f91,f92=[sp]		// M1
+	mov      f93=f0			// F
+
+	setf.s	 f94=r0			// M2
+	setf.s	 f95=r0			// M3
+	mov      f96=f0			// F
+
+	ldfps	 f97,f98=[sp]		// M0
+	ldfps	 f99,f100=[sp]		// M1
+	mov      f101=f0		// F
+
+	setf.s	 f102=r0		// M2
+	setf.s	 f103=r0		// M3
+	mov      f104=f0		// F
+
+	ldfps	 f105,f106=[sp]		// M0
+	ldfps	 f107,f108=[sp]		// M1
+	mov      f109=f0		// F
+
+	setf.s	 f110=r0		// M2
+	setf.s	 f111=r0		// M3
+	mov      f112=f0		// F
+
+	ldfps	 f113,f114=[sp]		// M0
+	ldfps	 f115,f116=[sp]		// M1
+	mov      f117=f0		// F
+
+	setf.s	 f118=r0		// M2
+	setf.s	 f119=r0		// M3
+	mov      f120=f0		// F
+
+	ldfps	 f121,f122=[sp]		// M0
+	ldfps	 f123,f124=[sp]		// M1
+	mov      f125=f0		// F
+
+	setf.s	 f126=r0		// M2
+	setf.s	 f127=r0		// M3
+	br.ret.sptk.many rp		// F
 END(__ia64_init_fpu)
 
 /*

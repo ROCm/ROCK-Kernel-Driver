@@ -38,7 +38,7 @@ enum {Enabled, Magic};
 
 typedef struct {
 	struct list_head list;
-	int flags;			/* type, status, etc. */
+	unsigned long flags;		/* type, status, etc. */
 	int offset;			/* offset of magic */
 	int size;			/* size of magic/mask */
 	char *magic;			/* magic or filename extension */

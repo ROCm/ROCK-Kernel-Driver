@@ -15,7 +15,7 @@
 
 #include <linux/spinlock.h>
 #include <linux/list.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <asm/system.h>
 
 /*

@@ -40,10 +40,10 @@ static unsigned long totalram_pages;
 
 static int pgt_cache_water[2] = { 25, 50 };
 
-int
+void
 check_pgt_cache (void)
 {
-	int low, high, freed = 0;
+	int low, high;
 
 	low = pgt_cache_water[0];
 	high = pgt_cache_water[1];
@@ -51,12 +51,11 @@ check_pgt_cache (void)
 	if (pgtable_cache_size > high) {
 		do {
 			if (pgd_quicklist)
-				free_page((unsigned long)pgd_alloc_one_fast(0)), ++freed;
+				free_page((unsigned long)pgd_alloc_one_fast(0));
 			if (pmd_quicklist)
-				free_page((unsigned long)pmd_alloc_one_fast(0, 0)), ++freed;
+				free_page((unsigned long)pmd_alloc_one_fast(0, 0));
 		} while (pgtable_cache_size > low);
 	}
-	return freed;
 }
 
 /*
@@ -347,8 +346,6 @@ void
 paging_init (void)
 {
 	unsigned long max_dma, zones_size[MAX_NR_ZONES];
-
-	clear_page((void *) ZERO_PAGE_ADDR);
 
 	/* initialize mem_map[] */
 

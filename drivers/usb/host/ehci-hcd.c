@@ -248,7 +248,7 @@ static int ehci_start (struct usb_hcd *hcd)
 	ehci->tasklet.data = (unsigned long) ehci;
 
 	/* wire up the root hub */
-	hcd->bus->root_hub = udev = usb_alloc_dev (NULL, hcd->bus);
+	hcd->self.root_hub = udev = usb_alloc_dev (NULL, &hcd->self);
 	if (!udev) {
 done2:
 		ehci_mem_cleanup (ehci);
@@ -288,8 +288,7 @@ done2:
 		while (readl (&ehci->regs->status) & (STS_ASS | STS_PSS))
 			udelay (100);
 		ehci_reset (ehci);
-		// usb_disconnect (udev); 
-		hcd->bus->root_hub = 0;
+		hcd->self.root_hub = 0;
 		usb_free_dev (udev); 
 		retval = -ENODEV;
 		goto done2;
@@ -304,7 +303,7 @@ static void ehci_stop (struct usb_hcd *hcd)
 {
 	struct ehci_hcd		*ehci = hcd_to_ehci (hcd);
 
-	dbg ("%s: stop", hcd->bus_name);
+	dbg ("%s: stop", hcd->self.bus_name);
 
 	if (hcd->state == USB_STATE_RUNNING)
 		ehci_ready (ehci);
@@ -339,7 +338,7 @@ static int ehci_suspend (struct usb_hcd *hcd, u32 state)
 	int			ports;
 	int			i;
 
-	dbg ("%s: suspend to %d", hcd->bus_name, state);
+	dbg ("%s: suspend to %d", hcd->self.bus_name, state);
 
 	ports = HCS_N_PORTS (ehci->hcs_params);
 
@@ -356,7 +355,7 @@ static int ehci_suspend (struct usb_hcd *hcd, u32 state)
 		if ((temp & PORT_PE) == 0
 				|| (temp & PORT_OWNER) != 0)
 			continue;
-dbg ("%s: suspend port %d", hcd->bus_name, i);
+dbg ("%s: suspend port %d", hcd->self.bus_name, i);
 		temp |= PORT_SUSPEND;
 		writel (temp, &ehci->regs->port_status [i]);
 	}
@@ -380,7 +379,7 @@ static int ehci_resume (struct usb_hcd *hcd)
 	int			ports;
 	int			i;
 
-	dbg ("%s: resume", hcd->bus_name);
+	dbg ("%s: resume", hcd->self.bus_name);
 
 	ports = HCS_N_PORTS (ehci->hcs_params);
 
@@ -400,7 +399,7 @@ static int ehci_resume (struct usb_hcd *hcd)
 		if ((temp & PORT_PE) == 0
 				|| (temp & PORT_SUSPEND) != 0)
 			continue;
-dbg ("%s: resume port %d", hcd->bus_name, i);
+dbg ("%s: resume port %d", hcd->self.bus_name, i);
 		temp |= PORT_RESUME;
 		writel (temp, &ehci->regs->port_status [i]);
 		readl (&ehci->regs->command);	/* unblock posted writes */
@@ -472,7 +471,7 @@ static void ehci_irq (struct usb_hcd *hcd)
 
 	/* PCI errors [4.15.2.4] */
 	if (unlikely ((status & STS_FATAL) != 0)) {
-		err ("%s: fatal error, state %x", hcd->bus_name, hcd->state);
+		err ("%s: fatal error, state %x", hcd->self.bus_name, hcd->state);
 		ehci_reset (ehci);
 		// generic layer kills/unlinks all urbs
 		// then tasklet cleans up the rest
@@ -547,7 +546,7 @@ static int ehci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
 	unsigned long		flags;
 
 	dbg ("%s urb_dequeue %p qh state %d",
-		hcd->bus_name, urb, qh->qh_state);
+		hcd->self.bus_name, urb, qh->qh_state);
 
 	switch (usb_pipetype (urb->pipe)) {
 	case PIPE_CONTROL:
@@ -608,7 +607,7 @@ static void ehci_free_config (struct usb_hcd *hcd, struct usb_device *udev)
 
 	/* ASSERT:  nobody can be submitting urbs for this any more */
 
-	dbg ("%s: free_config devnum %d", hcd->bus_name, udev->devnum);
+	dbg ("%s: free_config devnum %d", hcd->self.bus_name, udev->devnum);
 
 	spin_lock_irqsave (&ehci->lock, flags);
 	for (i = 0; i < 32; i++) {
@@ -645,7 +644,7 @@ static void ehci_free_config (struct usb_hcd *hcd, struct usb_device *udev)
 					spin_lock_irqsave (&ehci->lock, flags);
 				}
 			}
-			qh_unput (ehci, qh);
+			qh_put (ehci, qh);
 		}
 	}
 

@@ -30,6 +30,7 @@
 #ifdef __KERNEL__
 
 #include <linux/types.h>
+#include <linux/time.h>
 #include <asm/byteorder.h>
 
 #if  __LITTLE_ENDIAN == 1234

@@ -899,10 +899,10 @@ static struct request *get_request_wait(request_queue_t *q, int rw)
 	spin_lock_prefetch(q->queue_lock);
 
 	generic_unplug_device(q);
-	add_wait_queue(&rl->wait, &wait);
+	add_wait_queue_exclusive(&rl->wait, &wait);
 	do {
 		set_current_state(TASK_UNINTERRUPTIBLE);
-		if (rl->count < batch_requests)
+		if (!rl->count)
 			schedule();
 		spin_lock_irq(q->queue_lock);
 		rq = get_request(q, rw);

@@ -1,13 +1,6 @@
 #
 # Makefile for the kernel character device drivers.
 #
-# Note! Dependencies are done automagically by 'make dep', which also
-# removes any old dependencies. DON'T put your own dependencies here
-# unless it's something special (ie not a .c file).
-#
-# Note 2! The CFLAGS definitions are now inherited from the
-# parent makes..
-#
 
 # Object file lists.
 
@@ -16,10 +9,6 @@ obj-m		:=
 obj-n		:=
 obj-		:=
 
-SUB_DIRS     := 
-MOD_SUB_DIRS := $(SUB_DIRS)
-ALL_SUB_DIRS := $(SUB_DIRS)
-
 O_TARGET := video.o
 
 # All of the (potential) objects that export symbols.
@@ -27,7 +16,6 @@ O_TARGET := video.o
 
 export-objs     :=	i2c-old.o videodev.o bttv-if.o cpia.o video-buf.o
 
-list-multi	:=	bttv.o zoran.o
 bttv-objs	:=	bttv-driver.o bttv-cards.o bttv-if.o \
 			bttv-risc.o bttv-vbi.o
 zoran-objs      :=	zr36120.o zr36120_i2c.o zr36120_mem.o
@@ -59,29 +47,4 @@ obj-$(CONFIG_VIDEO_CPIA_USB) += cpia_usb.o
 obj-$(CONFIG_VIDEO_MEYE) += meye.o
 obj-$(CONFIG_TUNER_3036) += tuner-3036.o
 
-# Extract lists of the multi-part drivers.
-# The 'int-*' lists are the intermediate files used to build the multi's.
-
-multi-y         := $(filter $(list-multi), $(obj-y))
-multi-m         := $(filter $(list-multi), $(obj-m))
-int-y           := $(sort $(foreach m, $(multi-y), $($(basename $(m))-objs)))
-int-m           := $(sort $(foreach m, $(multi-m), $($(basename $(m))-objs)))
-
-# Files that are both resident and modular: remove from modular.
-
-obj-m           := $(filter-out $(obj-y), $(obj-m))
-int-m           := $(filter-out $(int-y), $(int-m))
-
-# Take multi-part drivers out of obj-y and put components in.
-
-obj-y           := $(filter-out $(list-multi), $(obj-y)) $(int-y)
-
 include $(TOPDIR)/Rules.make
-
-fastdep:
-
-zoran.o: zr36120.o zr36120_i2c.o zr36120_mem.o
-	$(LD) $(LD_RFLAG) -r -o $@ zr36120.o zr36120_i2c.o zr36120_mem.o
-
-bttv.o: $(bttv-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(bttv-objs)

@@ -1,14 +1,7 @@
 #
 # Makefile for the LSI Logic Fusion MPT (Message Passing Technology) drivers.
 #
-# Note! Dependencies are done automagically by 'make dep', which also
-# removes any old dependencies. DON'T put your own dependencies here
-# unless it's something special (ie not a .c file).
-#
-# Note 2! The CFLAGS definition is now inherited from the
-# parent makefile.
-#
-# Note 3! If you want to turn on various debug defines for an extended period of
+# Note! If you want to turn on various debug defines for an extended period of
 # time but don't want them lingering around in the Makefile when you pass it on 
 # to someone else, use the MPT_CFLAGS env variable (thanks Steve). -nromer
 
@@ -54,18 +47,10 @@ O_TARGET := fusion.o
 
 export-objs	:= mptbase.o mptscsih.o mptlan.o mptctl.o isense.o
 
-# ? what's list-multi for?
-#list-multi	:= fusion.o mptscsih.o
-
 obj-$(CONFIG_FUSION)		+= mptbase.o mptscsih.o
 obj-$(CONFIG_FUSION_ISENSE)	+= isense.o
 obj-$(CONFIG_FUSION_CTL)	+= mptctl.o
 obj-$(CONFIG_FUSION_LAN)	+= mptlan.o
-
-O_OBJS		:= $(filter-out		$(export-objs), $(obj-y))
-OX_OBJS		:= $(filter		$(export-objs), $(obj-y))
-M_OBJS		:= $(sort $(filter-out	$(export-objs), $(obj-m)))
-MX_OBJS		:= $(sort $(filter	$(export-objs), $(obj-m)))
 
 include $(TOPDIR)/Rules.make
 

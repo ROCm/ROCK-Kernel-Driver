@@ -530,8 +530,8 @@ ia64_do_signal (sigset_t *oldset, struct sigscratch *scr, long in_syscall)
 				info.si_signo = signr;
 				info.si_errno = 0;
 				info.si_code = SI_USER;
-				info.si_pid = current->p_pptr->pid;
-				info.si_uid = current->p_pptr->uid;
+				info.si_pid = current->parent->pid;
+				info.si_uid = current->parent->uid;
 			}
 
 			/* If the (new) signal is now blocked, requeue it.  */
@@ -570,7 +570,7 @@ ia64_do_signal (sigset_t *oldset, struct sigscratch *scr, long in_syscall)
 			      case SIGSTOP:
 				current->state = TASK_STOPPED;
 				current->exit_code = signr;
-				sig = current->p_pptr->sig;
+				sig = current->parent->sig;
 				if (sig && !(sig->action[SIGCHLD-1].sa.sa_flags & SA_NOCLDSTOP))
 					notify_parent(current, SIGCHLD);
 				schedule();

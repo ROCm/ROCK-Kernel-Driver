@@ -130,8 +130,8 @@ int ide_driveid_update (ide_drive_t *drive)
 		__restore_flags(flags);	/* local CPU only */
 		return 0;
 	}
-	ata_input_data(drive, id, SECTOR_WORDS);
-	(void) GET_STAT();	/* clear drive IRQ */
+	ata_read(drive, id, SECTOR_WORDS);
+	GET_STAT();		/* clear drive IRQ */
 	ide__sti();		/* local CPU only */
 	__restore_flags(flags);	/* local CPU only */
 	ide_fix_driveid(id);
@@ -285,7 +285,7 @@ int ide_config_drive_speed (ide_drive_t *drive, byte speed)
 	enable_irq(hwif->irq);
 
 	if (error) {
-		(void) ide_dump_status(drive, "set_drive_speed_status", stat);
+		ide_dump_status(drive, "set_drive_speed_status", stat);
 		return error;
 	}
 

@@ -1270,9 +1270,10 @@ void __init ide_init_pdc202xx(struct ata_channel *hwif)
 #ifdef CONFIG_PDC202XX_32_UNMASK
 	hwif->drives[0].io_32bit = 1;
 	hwif->drives[1].io_32bit = 1;
+
 	hwif->drives[0].unmask = 1;
 	hwif->drives[1].unmask = 1;
-#endif /* CONFIG_PDC202XX_32_UNMASK */
+#endif
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (hwif->dma_base) {
@@ -1285,9 +1286,9 @@ void __init ide_init_pdc202xx(struct ata_channel *hwif)
 		hwif->drives[1].autotune = 1;
 		hwif->autodma = 0;
 	}
-#else /* !CONFIG_BLK_DEV_IDEDMA */
+#else
 	hwif->drives[0].autotune = 1;
 	hwif->drives[1].autotune = 1;
 	hwif->autodma = 0;
-#endif /* CONFIG_BLK_DEV_IDEDMA */
+#endif
 }

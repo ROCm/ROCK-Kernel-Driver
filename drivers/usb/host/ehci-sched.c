@@ -224,7 +224,7 @@ static void intr_deschedule (
 
 	do {
 		periodic_unlink (ehci, frame, qh);
-		qh_unput (ehci, qh);
+		qh_put (ehci, qh);
 		frame += period;
 	} while (frame < ehci->periodic_size);
 
@@ -345,7 +345,7 @@ static int intr_submit (
 		qh->hw_next = EHCI_LIST_END;
 		qh->usecs = usecs;
 
-		urb->hcpriv = qh_put (qh);
+		urb->hcpriv = qh_get (qh);
 		status = -ENOSPC;
 
 		/* pick a set of schedule slots, link the QH into them */
@@ -393,7 +393,7 @@ static int intr_submit (
 // AND handle it already being (implicitly) linked into this frame
 					BUG ();
 				} else {
-					ehci->pshadow [frame].qh = qh_put (qh);
+					ehci->pshadow [frame].qh = qh_get (qh);
 					ehci->periodic [frame] =
 						QH_NEXT (qh->qh_dma);
 				}
@@ -1113,8 +1113,8 @@ restart:
 				temp = q.qh->qh_next;
 				type = Q_NEXT_TYPE (q.qh->hw_next);
 				flags = intr_complete (ehci, frame,
-						qh_put (q.qh), flags);
-				qh_unput (ehci, q.qh);
+						qh_get (q.qh), flags);
+				qh_put (ehci, q.qh);
 				q = temp;
 				break;
 			case Q_TYPE_FSTN:

@@ -24,9 +24,9 @@ struct sigpending {
  */
 
 #ifndef __HAVE_ARCH_SIG_BITOPS
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 
-/* We don't use <asm/bitops.h> for these because there is no need to
+/* We don't use <linux/bitops.h> for these because there is no need to
    be atomic.  */
 static inline void sigaddset(sigset_t *set, int _sig)
 {

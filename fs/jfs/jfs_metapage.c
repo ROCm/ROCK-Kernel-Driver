@@ -515,7 +515,7 @@ static inline void sync_metapage(metapage_t *mp)
 	lock_page(page);
 
 	/* we're done with this page - no need to check for errors */
-	if (page->buffers) {
+	if (page_has_buffers(page)) {
 		writeout_one_page(page);
 		waitfor_one_page(page);
 	}

@@ -1503,9 +1503,9 @@ static void idetape_input_buffers (ide_drive_t *drive, idetape_pc_t *pc, unsigne
 			idetape_discard_data (drive, bcount);
 			return;
 		}
-#endif /* IDETAPE_DEBUG_BUGS */
+#endif
 		count = min(bio->bi_size - pc->b_count, bcount);
-		atapi_input_bytes (drive, bio_data(bio) + pc->b_count, count);
+		atapi_read(drive, bio_data(bio) + pc->b_count, count);
 		bcount -= count;
 		pc->b_count += bio->bi_size;
 		if (pc->b_count == bio->bi_size) {
@@ -1530,7 +1530,7 @@ static void idetape_output_buffers (ide_drive_t *drive, idetape_pc_t *pc, unsign
 		}
 #endif /* IDETAPE_DEBUG_BUGS */
 		count = min(pc->b_count, bcount);
-		atapi_output_bytes (drive, bio_data(bio), count);
+		atapi_write(drive, bio_data(bio), count);
 		bcount -= count;
 		pc->b_data += count;
 		pc->b_count -= count;
@@ -2169,12 +2169,12 @@ static ide_startstop_t idetape_pc_intr (ide_drive_t *drive)
 		if (pc->bio != NULL)
 			idetape_output_buffers (drive, pc, bcount.all);
 		else
-			atapi_output_bytes (drive,pc->current_position,bcount.all);	/* Write the current buffer */
+			atapi_write(drive,pc->current_position,bcount.all);	/* Write the current buffer */
 	} else {
 		if (pc->bio != NULL)
 			idetape_input_buffers (drive, pc, bcount.all);
 		else
-			atapi_input_bytes (drive,pc->current_position,bcount.all);	/* Read the current buffer */
+			atapi_read(drive,pc->current_position,bcount.all);	/* Read the current buffer */
 	}
 	pc->actually_transferred += bcount.all;					/* Update the current position */
 	pc->current_position+=bcount.all;
@@ -2259,7 +2259,7 @@ static ide_startstop_t idetape_transfer_pc(ide_drive_t *drive)
 	tape->cmd_start_time = jiffies;
 	BUG_ON(HWGROUP(drive)->handler);
 	ide_set_handler(drive, &idetape_pc_intr, IDETAPE_WAIT_CMD, NULL);	/* Set the interrupt routine */
-	atapi_output_bytes (drive,pc->c,12);			/* Send the actual packet */
+	atapi_write(drive,pc->c,12);	/* Send the actual packet */
 	return ide_started;
 }
 

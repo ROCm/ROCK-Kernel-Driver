@@ -1,8 +1,14 @@
 /*
- *
- *
  *  linux/drivers/ide/ide-m8xx.c
  *
+ *  Copyright (C) 2000, 2001 Wolfgang Denk, wd@denx.de
+ *  Modified for direct IDE interface
+ *	by Thomas Lange, thomas@corelatus.com
+ *  Modified for direct IDE interface on 8xx without using the PCMCIA
+ *  controller
+ *	by Steven.Scholz@imc-berlin.de
+ *  Moved out of arch/ppc/kernel/m8xx_setup.c, other minor cleanups
+ *	by Mathew Locke <mattl@mvista.com>
  */
 
 #include <linux/config.h>

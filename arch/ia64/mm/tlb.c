@@ -16,10 +16,11 @@
 #include <linux/smp.h>
 #include <linux/mm.h>
 
+#include <asm/delay.h>
 #include <asm/mmu_context.h>
 #include <asm/pgalloc.h>
 #include <asm/pal.h>
-#include <asm/delay.h>
+#include <asm/tlbflush.h>
 
 #define SUPPORTED_PGBITS (			\
 		1 << _PAGE_SIZE_256M |		\
@@ -79,7 +80,7 @@ wrap_mmu_context (struct mm_struct *mm)
 	flush_tlb_all();
 }
 
-static inline void
+void
 ia64_global_tlb_purge (unsigned long start, unsigned long end, unsigned long nbits)
 {
 	static spinlock_t ptcg_lock = SPIN_LOCK_UNLOCKED;

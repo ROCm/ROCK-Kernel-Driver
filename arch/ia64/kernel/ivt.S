@@ -127,7 +127,7 @@ ENTRY(vhpt_miss)
 	;;
 (p7)	dep r17=r17,r19,(PAGE_SHIFT-3),3	// put region number bits in place
 	srlz.d					// ensure "rsm psr.dt" has taken effect
-(p6)	movl r19=__pa(SWAPPER_PGD_ADDR)		// region 5 is rooted at swapper_pg_dir
+(p6)	movl r19=__pa(swapper_pg_dir)		// region 5 is rooted at swapper_pg_dir
 (p6)	shr.u r21=r21,PGDIR_SHIFT+PAGE_SHIFT
 (p7)	shr.u r21=r21,PGDIR_SHIFT+PAGE_SHIFT-3
 	;;
@@ -413,7 +413,7 @@ ENTRY(nested_dtlb_miss)
 	;;
 (p7)	dep r17=r17,r19,(PAGE_SHIFT-3),3	// put region number bits in place
 	srlz.d
-(p6)	movl r19=__pa(SWAPPER_PGD_ADDR)		// region 5 is rooted at swapper_pg_dir
+(p6)	movl r19=__pa(swapper_pg_dir)		// region 5 is rooted at swapper_pg_dir
 (p6)	shr.u r21=r21,PGDIR_SHIFT+PAGE_SHIFT
 (p7)	shr.u r21=r21,PGDIR_SHIFT+PAGE_SHIFT-3
 	;;

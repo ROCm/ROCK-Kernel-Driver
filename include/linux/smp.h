@@ -12,6 +12,7 @@
 
 #include <linux/kernel.h>
 #include <linux/compiler.h>
+#include <linux/threads.h>
 #include <asm/smp.h>
 
 /*

@@ -22,7 +22,7 @@ CFLAGS := $(CFLAGS) -pipe $(EXTRA) -ffixed-r13 -mfixed-range=f10-f15,f32-f127 \
 # -ffunction-sections
 CFLAGS_KERNEL := -mconstant-gp
 
-GCC_VERSION=$(shell $(CROSS_COMPILE)$(HOSTCC) -v 2>&1 | fgrep 'gcc version' | cut -f3 -d' ' | cut -f1 -d'.')
+GCC_VERSION=$(shell $(CC) -v 2>&1 | fgrep 'gcc version' | cut -f3 -d' ' | cut -f1 -d'.')
 
 ifneq ($(GCC_VERSION),2)
 	CFLAGS += -frename-registers --param max-inline-insns=2000
@@ -33,16 +33,11 @@ ifeq ($(CONFIG_ITANIUM_BSTEP_SPECIFIC),y)
 endif
 
 ifdef CONFIG_IA64_GENERIC
-	CORE_FILES      :=      arch/$(ARCH)/hp/hp.a	\
-				arch/$(ARCH)/sn/sn.o	\
-				arch/$(ARCH)/dig/dig.a	\
-				arch/$(ARCH)/sn/io/sgiio.o \
+	CORE_FILES      :=      arch/$(ARCH)/hp/hp.o			\
+				arch/$(ARCH)/dig/dig.a			\
 				$(CORE_FILES)
 	SUBDIRS		:=	arch/$(ARCH)/hp		\
-				arch/$(ARCH)/sn/sn1	\
-				arch/$(ARCH)/sn		\
 				arch/$(ARCH)/dig	\
-				arch/$(ARCH)/sn/io	\
 				$(SUBDIRS)
 
 else # !GENERIC
@@ -50,7 +45,16 @@ else # !GENERIC
 ifdef CONFIG_IA64_HP_SIM
         SUBDIRS         :=      arch/$(ARCH)/hp		\
                                 $(SUBDIRS)
-        CORE_FILES      :=      arch/$(ARCH)/hp/hp.a	\
+        CORE_FILES      :=      arch/$(ARCH)/hp/hp.o	\
+                                $(CORE_FILES)
+endif
+
+ifdef CONFIG_IA64_HP_ZX1
+        SUBDIRS         :=      arch/$(ARCH)/hp				\
+				arch/$(ARCH)/dig			\
+                                $(SUBDIRS)
+        CORE_FILES      :=      arch/$(ARCH)/hp/hp.o			\
+				arch/$(ARCH)/dig/dig.a			\
                                 $(CORE_FILES)
 endif
 

@@ -6,7 +6,11 @@
 #include <linux/module.h>
 
 #include <linux/string.h>
-EXPORT_SYMBOL_NOVERS(memset);
+#undef memset
+extern void *memset (void *, int, size_t);
+EXPORT_SYMBOL_NOVERS(memset);			/* gcc generates direct calls to memset()... */
+EXPORT_SYMBOL_NOVERS(__memset_generic);
+EXPORT_SYMBOL_NOVERS(__bzero);
 EXPORT_SYMBOL(memchr);
 EXPORT_SYMBOL(memcmp);
 EXPORT_SYMBOL_NOVERS(memcpy);
@@ -67,7 +71,7 @@ EXPORT_SYMBOL(kernel_thread);
 EXPORT_SYMBOL(last_cli_ip);
 #endif
 
-#include <asm/pgalloc.h>
+#include <asm/tlbflush.h>
 
 EXPORT_SYMBOL(flush_tlb_range);
 
@@ -147,3 +151,10 @@ EXPORT_SYMBOL(efi);
 #include <linux/proc_fs.h>
 extern struct proc_dir_entry *efi_dir;
 EXPORT_SYMBOL(efi_dir);
+
+#include <asm/machvec.h>
+#ifdef CONFIG_IA64_GENERIC
+EXPORT_SYMBOL(ia64_mv);
+#endif
+EXPORT_SYMBOL(machvec_noop);
+

@@ -372,10 +372,10 @@ int ide_build_dmatable(ide_drive_t *drive, struct request *rq,
 }
 
 /* Teardown mappings after DMA has completed.  */
-void ide_destroy_dmatable (ide_drive_t *drive)
+void ide_destroy_dmatable(struct ata_device *d)
 {
-	struct pci_dev *dev = drive->channel->pci_dev;
-	struct ata_request *ar = IDE_CUR_AR(drive);
+	struct pci_dev *dev = d->channel->pci_dev;
+	struct ata_request *ar = IDE_CUR_AR(d);
 
 	pci_unmap_sg(dev, ar->ar_sg_table, ar->ar_sg_nents, ar->ar_sg_ddir);
 }

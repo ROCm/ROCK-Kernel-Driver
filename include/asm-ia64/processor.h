@@ -15,7 +15,7 @@
 
 #include <linux/config.h>
 
-#include <linux/compiler.h>
+#include <linux/percpu.h>
 
 #include <asm/ptrace.h>
 #include <asm/kregs.h>
@@ -186,10 +186,6 @@
  */
 #define IA64_USEC_PER_CYC_SHIFT	41
 
-#define __HAVE_ARCH_PER_CPU
-
-#define THIS_CPU(var)	(var)
-
 #ifndef __ASSEMBLY__
 
 #include <linux/threads.h>
@@ -201,11 +197,6 @@
 #include <asm/rse.h>
 #include <asm/unwind.h>
 #include <asm/atomic.h>
-
-extern unsigned long __per_cpu_offset[NR_CPUS];
-
-#define per_cpu(var, cpu)	(*(__typeof__(&(var))) ((void *) &(var) + __per_cpu_offset[cpu]))
-#define this_cpu(var)		(var)
 
 /* like above but expressed as bitfields for more efficient access: */
 struct ia64_psr {

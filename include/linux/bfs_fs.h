@@ -7,6 +7,7 @@
 #define _LINUX_BFS_FS_H
 
 #include <linux/bfs_fs_i.h>
+#include <linux/bfs_fs_sb.h>
 
 #define BFS_BSIZE_BITS		9
 #define BFS_BSIZE		(1<<BFS_BSIZE_BITS)
@@ -88,6 +89,11 @@ extern struct address_space_operations bfs_aops;
 /* dir.c */
 extern struct inode_operations bfs_dir_inops;
 extern struct file_operations bfs_dir_operations;
+
+static inline struct bfs_sb_info *BFS_SB(struct super_block *sb)
+{
+	return sb->u.generic_sbp;
+}
 
 static inline struct bfs_inode_info *BFS_I(struct inode *inode)
 {

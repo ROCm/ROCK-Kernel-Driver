@@ -443,7 +443,8 @@
     present : 0,                          \
     unchecked_isa_dma : 0,                \
     use_clustering : ENABLE_CLUSTERING,   \
-    use_new_eh_code : 1                   \
+    use_new_eh_code : 1,                  \
+    highmem_io : 1                        \
 }
 #else
  #define IPS {                            \

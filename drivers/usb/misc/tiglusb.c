@@ -33,7 +33,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "1.02"
+#define DRIVER_VERSION "1.03"
 #define DRIVER_AUTHOR  "Romain Lievin <roms@lpg.ticalc.org> & Julien Blache <jb@jblache.org>"
 #define DRIVER_DESC    "TI-GRAPH LINK USB (aka SilverLink) driver"
 #define DRIVER_LICENSE "GPL"
@@ -383,6 +383,7 @@ static void tiglusb_disconnect (struct usb_device *dev, void *drv_context)
 	wake_up (&s->wait);
 	if (s->state == _started)
 		sleep_on (&s->remove_ok);
+	down (&s->mutex);
 	s->dev = NULL;
 	s->opened = 0;
 
@@ -479,7 +480,7 @@ static void __exit tiglusb_cleanup (void)
 
 /* --------------------------------------------------------------------- */
 
-__setup ("tipar=", tiglusb_setup);
+__setup ("tiusb=", tiglusb_setup);
 module_init (tiglusb_init);
 module_exit (tiglusb_cleanup);
 

@@ -22,9 +22,9 @@
 #include <linux/stddef.h>
 #include <linux/string.h>
 #include <linux/radix-tree.h>
+#include <linux/bitops.h>
 
 #include <asm/atomic.h>
-#include <asm/bitops.h>
 
 struct poll_table_struct;
 
@@ -684,7 +684,6 @@ struct quota_mount_options
 #include <linux/ufs_fs_sb.h>
 #include <linux/romfs_fs_sb.h>
 #include <linux/adfs_fs_sb.h>
-#include <linux/bfs_fs_sb.h>
 
 extern struct list_head super_blocks;
 extern spinlock_t sb_lock;
@@ -702,6 +701,7 @@ struct super_block {
 	struct file_system_type	*s_type;
 	struct super_operations	*s_op;
 	struct dquot_operations	*dq_op;
+	struct export_operations *s_export_op;
 	unsigned long		s_flags;
 	unsigned long		s_magic;
 	struct dentry		*s_root;
@@ -712,6 +712,7 @@ struct super_block {
 
 	struct list_head	s_dirty;	/* dirty inodes */
 	struct list_head	s_locked_inodes;/* inodes being synced */
+	struct list_head	s_anon;		/* anonymous dentries for (nfs) exporting */
 	struct list_head	s_files;
 
 	struct block_device	*s_bdev;
@@ -728,7 +729,6 @@ struct super_block {
 		struct ufs_sb_info	ufs_sb;
 		struct romfs_sb_info	romfs_sb;
 		struct adfs_sb_info	adfs_sb;
-		struct bfs_sb_info	bfs_sb;
 		void			*generic_sbp;
 	} u;
 	/*
@@ -881,7 +881,7 @@ struct super_operations {
 	 *   and must return a dentry for the referenced object or, if "parent" is
 	 *   set, a dentry for the parent of the object.
 	 *   If a dentry cannot be found, a "root" dentry should be created and
-	 *   flaged as DCACHE_NFSD_DISCONNECTED. nfsd_iget is an example implementation.
+	 *   flaged as DCACHE_DISCONNECTED. nfsd_iget is an example implementation.
 	 *
 	 * dentry_to_fh is given a dentry and must generate the filesys specific
 	 *   part of the file handle.  Available length is passed in *lenp and used
@@ -936,6 +936,110 @@ struct dquot_operations {
 	void (*free_inode) (const struct inode *, unsigned long);
 	int (*transfer) (struct inode *, struct iattr *);
 };
+
+
+/**
+ * &export_operations - for nfsd to communicate with file systems
+ * decode_fh:      decode a file handle fragment and return a &struct dentry
+ * encode_fh:      encode a file handle fragment from a dentry
+ * get_name:       find the name for a given inode in a given directory
+ * get_parent:     find the parent of a given directory
+ * get_dentry:     find a dentry for the inode given a file handle sub-fragment
+ *
+ * Description:
+ *    The export_operations structure provides a means for nfsd to communicate
+ *    with a particular exported file system  - particularly enabling nfsd and
+ *    the filesystem to co-operate when dealing with file handles.
+ *
+ *    export_operations contains two basic operation for dealing with file handles,
+ *    decode_fh() and encode_fh(), and allows for some other operations to be defined
+ *    which standard helper routines use to get specific information from the
+ *    filesystem.
+ *
+ *    nfsd encodes information use to determine which filesystem a filehandle
+ *    applies to in the initial part of the file handle.  The remainder, termed a
+ *    file handle fragment, is controlled completely by the filesystem.
+ *    The standard helper routines assume that this fragment will contain one or two
+ *    sub-fragments, one which identifies the file, and one which may be used to
+ *    identify the (a) directory containing the file.
+ *
+ *    In some situations, nfsd needs to get a dentry which is connected into a
+ *    specific part of the file tree.  To allow for this, it passes the function
+ *    acceptable() together with a @context which can be used to see if the dentry
+ *    is acceptable.  As there can be multiple dentrys for a given file, the filesystem
+ *    should check each one for acceptability before looking for the next.  As soon
+ *    as an acceptable one is found, it should be returned.
+ *
+ * decode_fh:
+ *    @decode_fh is given a &struct super_block (@sb), a file handle fragment (@fh, @fh_len)
+ *    and an acceptability testing function (@acceptable, @context).  It should return
+ *    a &struct dentry which refers to the same file that the file handle fragment refers
+ *    to,  and which passes the acceptability test.  If it cannot, it should return
+ *    a %NULL pointer if the file was found but no acceptable &dentries were available, or
+ *    a %ERR_PTR error code indicating why it couldn't be found (e.g. %ENOENT or %ENOMEM).
+ *
+ * encode_fh:
+ *    @encode_fh should store in the file handle fragment @fh (using at most @max_len bytes)
+ *    information that can be used by @decode_fh to recover the file refered to by the
+ *    &struct dentry @de.  If the @connectable flag is set, the encode_fh() should store
+ *    sufficient information so that a good attempt can be made to find not only
+ *    the file but also it's place in the filesystem.   This typically means storing
+ *    a reference to de->d_parent in the filehandle fragment.
+ *    encode_fh() should return the number of bytes stored or a negative error code
+ *    such as %-ENOSPC
+ *
+ * get_name:
+ *    @get_name should find a name for the given @child in the given @parent directory.
+ *    The name should be stored in the @name (with the understanding that it is already
+ *    pointing to a a %NAME_MAX+1 sized buffer.   get_name() should return %0 on success,
+ *    a negative error code or error.
+ *    @get_name will be called without @parent->i_sem held.
+ *
+ * get_parent:
+ *    @get_parent should find the parent directory for the given @child which is also
+ *    a directory.  In the event that it cannot be found, or storage space cannot be
+ *    allocated, a %ERR_PTR should be returned.
+ *
+ * get_dentry:
+ *    Given a &super_block (@sb) and a pointer to a file-system specific inode identifier,
+ *    possibly an inode number, (@inump) get_dentry() should find the identified inode and
+ *    return a dentry for that inode.
+ *    Any suitable dentry can be returned including, if necessary, a new dentry created
+ *    with d_alloc_root.  The caller can then find any other extant dentrys by following the
+ *    d_alias links.  If a new dentry was created using d_alloc_root, DCACHE_NFSD_DISCONNECTED
+ *    should be set, and the dentry should be d_rehash()ed.
+ *
+ *    If the inode cannot be found, either a %NULL pointer or an %ERR_PTR code can be returned.
+ *    The @inump will be whatever was passed to nfsd_find_fh_dentry() in either the
+ *    @obj or @parent parameters.
+ *
+ * Locking rules:
+ *  get_parent is called with child->d_inode->i_sem down
+ *  get_name is not (which is possibly inconsistent)
+ */
+
+struct export_operations {
+	struct dentry *(*decode_fh)(struct super_block *sb, __u32 *fh, int fh_len, int fh_type,
+			 int (*acceptable)(void *context, struct dentry *de),
+			 void *context);
+	int (*encode_fh)(struct dentry *de, __u32 *fh, int *max_len,
+			 int connectable);
+
+	/* the following are only called from the filesystem itself */
+	int (*get_name)(struct dentry *parent, char *name,
+			struct dentry *child);
+	struct dentry * (*get_parent)(struct dentry *child);
+	struct dentry * (*get_dentry)(struct super_block *sb, void *inump);
+
+	/* This is set by the exporting module to a standard helper */
+	struct dentry * (*find_exported_dentry)(
+		struct super_block *sb, void *obj, void *parent,
+		int (*acceptable)(void *context, struct dentry *de),
+		void *context);
+
+
+};
+
 
 struct file_system_type {
 	const char *name;

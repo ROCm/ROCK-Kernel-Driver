@@ -35,6 +35,29 @@
 #define DEF_PRIORITY (6)
 
 /*
+ * On the swap_out path, the radix-tree node allocations are performing
+ * GFP_ATOMIC allocations under PF_MEMALLOC.  They can completely
+ * exhaust the page allocator.  This is bad; some pages should be left
+ * available for the I/O system to start sending the swapcache contents
+ * to disk.
+ *
+ * So PF_MEMALLOC is dropped here.  This causes the slab allocations to fail
+ * earlier, so radix-tree nodes will then be allocated from the mempool
+ * reserves.
+ */
+static inline int
+swap_out_add_to_swap_cache(struct page *page, swp_entry_t entry)
+{
+	int flags = current->flags;
+	int ret;
+
+	current->flags &= ~PF_MEMALLOC;
+	ret = add_to_swap_cache(page, entry);
+	current->flags = flags;
+	return ret;
+}
+
+/*
  * The swap-out function returns 1 if it successfully
  * scanned all the pages it was asked to (`count').
  * It returns zero if it couldn't do anything,
@@ -139,7 +162,7 @@ drop_pte:
 		 * (adding to the page cache will clear the dirty
 		 * and uptodate bits, so we need to do it again)
 		 */
-		switch (add_to_swap_cache(page, entry)) {
+		switch (swap_out_add_to_swap_cache(page, entry)) {
 		case 0:				/* Success */
 			SetPageUptodate(page);
 			set_page_dirty(page);

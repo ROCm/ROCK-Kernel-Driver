@@ -272,13 +272,17 @@ init_e100_ide (void)
 	printk("ide: ETRAX 100LX built-in ATA DMA controller\n");
 
 	/* first initialize the channel interface data */
-	
+
 	for(h = 0; h < MAX_HWIFS; h++) {
 		struct ata_channel *hwif = &ide_hwifs[h];
+
 		hwif->chipset = ide_etrax100;
 		hwif->tuneproc = &tune_e100_ide;
 		hwif->dmaproc = &e100_dmaproc;
-		hwif->ideproc = &e100_ideproc;
+		hwif->ata_read = e100_ide_input_data;
+		hwif->ata_write = e100_ide_input_data;
+		hwif->atapi_read = e100_atapi_read;
+		hwif->atapi_write = e100_atapi_write;
 	}
 	/* actually reset and configure the etrax100 ide/ata interface */
 
@@ -375,12 +379,12 @@ static etrax_dma_descr mydescr;
  * so if an odd bytecount is specified, be sure that there's at least one
  * extra byte allocated for the buffer.
  */
-static void 
-e100_atapi_input_bytes (ide_drive_t *drive, void *buffer, unsigned int bytecount)
+static void
+e100_atapi_read(ide_drive_t *drive, void *buffer, unsigned int bytecount)
 {
 	ide_ioreg_t data_reg = IDE_DATA_REG;
 
-	D(printk("atapi_input_bytes, dreg 0x%x, buffer 0x%x, count %d\n",
+	D(printk("atapi_read, dreg 0x%x, buffer 0x%x, count %d\n",
 		 data_reg, buffer, bytecount));
 	
 	if(bytecount & 1) {
@@ -454,12 +458,12 @@ e100_atapi_input_bytes (ide_drive_t *drive, void *buffer, unsigned int bytecount
 #endif
 }
 
-static void 
-e100_atapi_output_bytes (ide_drive_t *drive, void *buffer, unsigned int bytecount)
+static void
+e100_atapi_write(ide_drive_t *drive, void *buffer, unsigned int bytecount)
 {
 	ide_ioreg_t data_reg = IDE_DATA_REG;
 	
-	D(printk("atapi_output_bytes, dreg 0x%x, buffer 0x%x, count %d\n",
+	D(printk("atapi_write, dreg 0x%x, buffer 0x%x, count %d\n",
 		 data_reg, buffer, bytecount));
 
 	if(bytecount & 1) {
@@ -544,7 +548,7 @@ e100_atapi_output_bytes (ide_drive_t *drive, void *buffer, unsigned int bytecoun
 static void 
 e100_ide_input_data (ide_drive_t *drive, void *buffer, unsigned int wcount)
 {
-	e100_atapi_input_bytes(drive, buffer, wcount << 2);
+	e100_atapi_read(drive, buffer, wcount << 2);
 }
 
 /*
@@ -553,7 +557,7 @@ e100_ide_input_data (ide_drive_t *drive, void *buffer, unsigned int wcount)
 static void
 e100_ide_output_data (ide_drive_t *drive, void *buffer, unsigned int wcount)
 {
-	e100_atapi_output_bytes(drive, buffer, wcount << 2);
+	e100_atapi_write(drive, buffer, wcount << 2);
 }
 
 /*
@@ -570,11 +574,11 @@ e100_ideproc (ide_ide_action_t func, ide_drive_t *drive,
 		case ideproc_ide_output_data:
 			e100_ide_input_data(drive, buffer, length);
 			break;
-		case ideproc_atapi_input_bytes:
-			e100_atapi_input_bytes(drive, buffer, length);
+		case ideproc_atapi_read:
+			e100_atapi_read(drive, buffer, length);
 			break;
-		case ideproc_atapi_output_bytes:
-			e100_atapi_output_bytes(drive, buffer, length);
+		case ideproc_atapi_write:
+			e100_atapi_write(drive, buffer, length);
 			break;
 		default:
 			printk("e100_ideproc: unsupported func %d!\n", func);

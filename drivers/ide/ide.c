@@ -383,7 +383,7 @@ void ide_end_queued_request(ide_drive_t *drive, int uptodate, struct request *rq
 		spin_lock_irqsave(&ide_lock, flags);
 
 		if ((jiffies - ar->ar_time > ATA_AR_MAX_TURNAROUND) && drive->queue_depth > 1) {
-			printk("%s: exceeded max command turn-around time (%d seconds)\n", drive->name, ATA_AR_MAX_TURNAROUND / HZ);
+			printk(KERN_INFO "%s: exceeded max command turn-around time (%d seconds)\n", drive->name, ATA_AR_MAX_TURNAROUND / HZ);
 			drive->queue_depth >>= 1;
 		}
 
@@ -474,7 +474,7 @@ void ide_set_handler (ide_drive_t *drive, ide_handler_t *handler,
 	spin_unlock_irqrestore(&ide_lock, flags);
 }
 
-static void ata_pre_reset (ide_drive_t *drive)
+static void ata_pre_reset(ide_drive_t *drive)
 {
 	if (ata_ops(drive) && ata_ops(drive)->pre_reset)
 		ata_ops(drive)->pre_reset(drive);
@@ -528,10 +528,9 @@ static ide_startstop_t ata_special (ide_drive_t *drive)
 	printk("%s: ata_special: 0x%02x\n", drive->name, s->all);
 #endif
 	if (s->b.set_tune) {
-		ide_tuneproc_t *tuneproc = drive->channel->tuneproc;
 		s->b.set_tune = 0;
-		if (tuneproc != NULL)
-			tuneproc(drive, drive->tune_req);
+		if (drive->channel->tuneproc != NULL)
+			drive->channel->tuneproc(drive, drive->tune_req);
 	} else if (drive->driver != NULL) {
 		if (ata_ops(drive)->special)
 			return ata_ops(drive)->special(drive);
@@ -899,23 +898,24 @@ byte ide_dump_status (ide_drive_t *drive, const char *msg, byte stat)
 }
 
 /*
- * try_to_flush_leftover_data() is invoked in response to a drive
- * unexpectedly having its DRQ_STAT bit set.  As an alternative to
- * resetting the drive, this routine tries to clear the condition
- * by read a sector's worth of data from the drive.  Of course,
+ * This gets invoked in response to a drive unexpectedly having its DRQ_STAT
+ * bit set.  As an alternative to resetting the drive, it tries to clear the
+ * condition by reading a sector's worth of data from the drive.  Of course,
  * this may not help if the drive is *waiting* for data from *us*.
  */
 static void try_to_flush_leftover_data (ide_drive_t *drive)
 {
-	int i = (drive->mult_count ? drive->mult_count : 1) * SECTOR_WORDS;
+	int i = (drive->mult_count ? drive->mult_count : 1);
 
 	if (drive->type != ATA_DISK)
 		return;
+
 	while (i > 0) {
-		u32 buffer[16];
-		unsigned int wcount = (i > 16) ? 16 : i;
-		i -= wcount;
-		ata_input_data (drive, buffer, wcount);
+		u32 buffer[SECTOR_WORDS];
+		unsigned int count = (i > 1) ? 1 : i;
+
+		ata_read(drive, buffer, count * SECTOR_WORDS);
+		i -= count;
 	}
 }
 
@@ -1002,16 +1002,18 @@ void ide_cmd(ide_drive_t *drive, byte cmd, byte nsect, ide_handler_t *handler)
 static ide_startstop_t drive_cmd_intr (ide_drive_t *drive)
 {
 	struct request *rq = HWGROUP(drive)->rq;
-	byte *args = (byte *) rq->buffer;
-	byte stat = GET_STAT();
+	u8 *args = rq->buffer;
+	u8 stat = GET_STAT();
 	int retries = 10;
 
 	ide__sti();	/* local CPU only */
 	if ((stat & DRQ_STAT) && args && args[3]) {
-		byte io_32bit = drive->io_32bit;
+		int io_32bit = drive->io_32bit;
+
 		drive->io_32bit = 0;
-		ata_input_data(drive, &args[4], args[3] * SECTOR_WORDS);
+		ata_read(drive, &args[4], args[3] * SECTOR_WORDS);
 		drive->io_32bit = io_32bit;
+
 		while (((stat = GET_STAT()) & BUSY_STAT) && retries--)
 			udelay(100);
 	}
@@ -1019,6 +1021,7 @@ static ide_startstop_t drive_cmd_intr (ide_drive_t *drive)
 	if (!OK_STAT(stat, READY_STAT, BAD_STAT))
 		return ide_error(drive, "drive_cmd", stat); /* calls ide_end_drive_cmd */
 	ide_end_drive_cmd (drive, stat, GET_ERR());
+
 	return ide_stopped;
 }
 
@@ -1266,31 +1269,26 @@ void ide_stall_queue(ide_drive_t *drive, unsigned long timeout)
 /*
  * Select the next drive which will be serviced.
  */
-static inline ide_drive_t *choose_drive(ide_hwgroup_t *hwgroup)
+static ide_drive_t *choose_drive(ide_hwgroup_t *hwgroup)
 {
-	ide_drive_t *drive, *best;
+	ide_drive_t *tmp;
+	ide_drive_t *drive = NULL;
+	unsigned long sleep = 0;
 
-	best = NULL;
-	drive = hwgroup->drive;
+	tmp = hwgroup->drive;
 	do {
-		if (!list_empty(&drive->queue.queue_head)
-		&& (!drive->PADAM_sleep	|| time_after_eq(drive->PADAM_sleep, jiffies))) {
-			if (!best
-			 || (drive->PADAM_sleep && (!best->PADAM_sleep || time_after(best->PADAM_sleep, drive->PADAM_sleep)))
-			 || (!best->PADAM_sleep && time_after(best->PADAM_service_start + 2 * best->PADAM_service_time, drive->PADAM_service_start + 2 * drive->PADAM_service_time)))
+		if (!list_empty(&tmp->queue.queue_head)
+		&& (!tmp->PADAM_sleep || time_after_eq(tmp->PADAM_sleep, jiffies))) {
+			if (!drive
+			 || (tmp->PADAM_sleep && (!drive->PADAM_sleep || time_after(drive->PADAM_sleep, tmp->PADAM_sleep)))
+			 || (!drive->PADAM_sleep && time_after(drive->PADAM_service_start + 2 * drive->PADAM_service_time, tmp->PADAM_service_start + 2 * tmp->PADAM_service_time)))
 			{
-				if (!blk_queue_plugged(&drive->queue))
-					best = drive;
+				if (!blk_queue_plugged(&tmp->queue))
+					drive = tmp;
 			}
 		}
-	} while ((drive = drive->next) != hwgroup->drive);
-	return best;
-}
-
-static ide_drive_t *ide_choose_drive(ide_hwgroup_t *hwgroup)
-{
-	ide_drive_t *drive = choose_drive(hwgroup);
-	unsigned long sleep = 0;
+		tmp = tmp->next;
+	} while (tmp != hwgroup->drive);
 
 	if (drive)
 		return drive;
@@ -1495,7 +1493,7 @@ static void ide_do_request(ide_hwgroup_t *hwgroup, int masked_irq)
 		/*
 		 * will clear IDE_BUSY, if appropriate
 		 */
-		if ((drive = ide_choose_drive(hwgroup)) == NULL)
+		if ((drive = choose_drive(hwgroup)) == NULL)
 			break;
 
 		hwif = drive->channel;
@@ -1731,20 +1729,23 @@ static void unexpected_intr(int irq, ide_hwgroup_t *hwgroup)
 	 * handle the unexpected interrupt
 	 */
 	do {
-		if (hwif->irq == irq) {
-			stat = IN_BYTE(hwif->io_ports[IDE_STATUS_OFFSET]);
-			if (!OK_STAT(stat, READY_STAT, BAD_STAT)) {
-				/* Try to not flood the console with msgs */
-				static unsigned long last_msgtime, count;
-				++count;
-				if (0 < (signed long)(jiffies - (last_msgtime + HZ))) {
-					last_msgtime = jiffies;
-					printk("%s%s: unexpected interrupt, status=0x%02x, count=%ld\n",
-					 hwif->name, (hwif->next == hwgroup->hwif) ? "" : "(?)", stat, count);
-				}
+		if (hwif->irq != irq)
+			continue;
+
+		stat = IN_BYTE(hwif->io_ports[IDE_STATUS_OFFSET]);
+		if (!OK_STAT(stat, READY_STAT, BAD_STAT)) {
+			/* Try to not flood the console with msgs */
+			static unsigned long last_msgtime;
+			static int count;
+			++count;
+			if (time_after(jiffies, last_msgtime + HZ)) {
+				last_msgtime = jiffies;
+				printk("%s%s: unexpected interrupt, status=0x%02x, count=%d\n",
+						hwif->name, (hwif->next == hwgroup->hwif) ? "" : "(?)", stat, count);
 			}
 		}
-	} while ((hwif = hwif->next) != hwgroup->hwif);
+		hwif = hwif->next;
+	} while (hwif != hwgroup->hwif);
 }
 
 /*
@@ -1766,7 +1767,8 @@ void ide_intr(int irq, void *dev_id, struct pt_regs *regs)
 		goto out_lock;
 
 	if ((handler = hwgroup->handler) == NULL || hwgroup->poll_timeout != 0) {
-		printk("ide: unexpected interrupt\n");
+		printk(KERN_INFO "ide: unexpected interrupt %d %d\n", hwif->unit, irq);
+
 		/*
 		 * Not expecting an interrupt from this drive.
 		 * That means this could be:
@@ -2298,7 +2300,10 @@ void ide_unregister(struct ata_channel *channel)
 	channel->maskproc = old_hwif.maskproc;
 	channel->quirkproc = old_hwif.quirkproc;
 	channel->rwproc	= old_hwif.rwproc;
-	channel->ideproc = old_hwif.ideproc;
+	channel->ata_read = old_hwif.ata_read;
+	channel->ata_write = old_hwif.ata_write;
+	channel->atapi_read = old_hwif.atapi_read;
+	channel->atapi_write = old_hwif.atapi_write;
 	channel->dmaproc = old_hwif.dmaproc;
 	channel->busproc = old_hwif.busproc;
 	channel->bus_state = old_hwif.bus_state;
@@ -2565,13 +2570,17 @@ int ide_write_setting (ide_drive_t *drive, ide_settings_t *setting, int val)
 	return 0;
 }
 
-static int set_io_32bit(ide_drive_t *drive, int arg)
+static int set_io_32bit(struct ata_device *drive, int arg)
 {
+	if (drive->no_io_32bit)
+		return -EIO;
+
 	drive->io_32bit = arg;
 #ifdef CONFIG_BLK_DEV_DTC2278
 	if (drive->channel->chipset == ide_dtc2278)
 		drive->channel->drives[!drive->select.b.unit].io_32bit = arg;
-#endif /* CONFIG_BLK_DEV_DTC2278 */
+#endif
+
 	return 0;
 }
 
@@ -3018,8 +3027,6 @@ static int __init match_parm (char *s, const char *keywords[], int vals[], int m
  * "hdx=slow"		: insert a huge pause after each access to the data
  *				port. Should be used only as a last resort.
  *
- * "hdx=swapdata"	: when the drive is a disk, byte swap all data
- * "hdx=bswap"		: same as above..........
  * "hdxlun=xx"          : set the drive last logical unit.
  * "hdx=flash"		: allows for more than one ata_flash disk to be
  *				registered. In most cases, only one device
@@ -3127,8 +3134,7 @@ int __init ide_setup (char *s)
 	if (!strncmp(s, "hd", 2) && s[2] >= 'a' && s[2] <= max_drive) {
 		const char *hd_words[] = {"none", "noprobe", "nowerr", "cdrom",
 				"serialize", "autotune", "noautotune",
-				"slow", "swapdata", "bswap", "flash",
-				"remap", "noremap", "scsi", NULL};
+				"slow", "flash", "remap", "noremap", "scsi", NULL};
 		unit = s[2] - 'a';
 		hw   = unit / MAX_DRIVES;
 		unit = unit % MAX_DRIVES;
@@ -3178,20 +3184,16 @@ int __init ide_setup (char *s)
 			case -8: /* "slow" */
 				drive->slow = 1;
 				goto done;
-			case -9: /* "swapdata" or "bswap" */
-			case -10:
-				drive->bswap = 1;
-				goto done;
-			case -11: /* "flash" */
+			case -9: /* "flash" */
 				drive->ata_flash = 1;
 				goto done;
-			case -12: /* "remap" */
+			case -10: /* "remap" */
 				drive->remap_0_to_1 = 1;
 				goto done;
-			case -13: /* "noremap" */
+			case -11: /* "noremap" */
 				drive->remap_0_to_1 = 2;
 				goto done;
-			case -14: /* "scsi" */
+			case -12: /* "scsi" */
 #if defined(CONFIG_BLK_DEV_IDESCSI) && defined(CONFIG_SCSI)
 				drive->scsi = 1;
 				goto done;

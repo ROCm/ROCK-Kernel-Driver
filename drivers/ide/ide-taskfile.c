@@ -1,4 +1,5 @@
 /*
+ *  Copyright (C) 2002		Marcin Dalecki <martin@dalecki.de>
  *  Copyright (C) 2000		Michael Cornwell <cornwell@acm.org>
  *  Copyright (C) 2000		Andre Hedrick <andre@linux-ide.org>
  *
@@ -33,7 +34,7 @@
 #define DEBUG_TASKFILE	0	/* unset when fixed */
 
 #if DEBUG_TASKFILE
-#define DTF(x...) printk(x)
+#define DTF(x...) printk(##x)
 #else
 #define DTF(x...)
 #endif
@@ -58,15 +59,9 @@ static inline void ide_unmap_rq(struct request *rq, char *to,
 		bio_kunmap_irq(to, flags);
 }
 
-static void bswap_data (void *buffer, int wcount)
-{
-	u16 *p = buffer;
-
-	while (wcount--) {
-		*p = *p << 8 | *p >> 8; p++;
-		*p = *p << 8 | *p >> 8; p++;
-	}
-}
+/*
+ * Data transfer functions for polled IO.
+ */
 
 #if SUPPORT_VLB_SYNC
 /*
@@ -76,30 +71,88 @@ static void bswap_data (void *buffer, int wcount)
  * of the sector count register location, with interrupts disabled
  * to ensure that the reads all happen together.
  */
-static inline void task_vlb_sync(ide_drive_t *drive)
+static void ata_read_vlb(struct ata_device *drive, void *buffer, unsigned int wcount)
 {
-	ide_ioreg_t port = IDE_NSECTOR_REG;
+	unsigned long flags;
 
-	IN_BYTE(port);
-	IN_BYTE(port);
-	IN_BYTE(port);
+	__save_flags(flags);	/* local CPU only */
+	__cli();		/* local CPU only */
+	IN_BYTE(IDE_NSECTOR_REG);
+	IN_BYTE(IDE_NSECTOR_REG);
+	IN_BYTE(IDE_NSECTOR_REG);
+	insl(IDE_DATA_REG, buffer, wcount);
+	__restore_flags(flags);	/* local CPU only */
+}
+
+static void ata_write_vlb(struct ata_device *drive, void *buffer, unsigned int wcount)
+{
+	unsigned long flags;
+
+	__save_flags(flags);	/* local CPU only */
+	__cli();		/* local CPU only */
+	IN_BYTE(IDE_NSECTOR_REG);
+	IN_BYTE(IDE_NSECTOR_REG);
+	IN_BYTE(IDE_NSECTOR_REG);
+	outsl(IDE_DATA_REG, buffer, wcount);
+	__restore_flags(flags);	/* local CPU only */
 }
 #endif
 
-/*
- * This is used for most PIO data transfers *from* the IDE interface
- */
-void ata_input_data(ide_drive_t *drive, void *buffer, unsigned int wcount)
+static void ata_read_32(struct ata_device *drive, void *buffer, unsigned int wcount)
 {
-	byte io_32bit;
+	insl(IDE_DATA_REG, buffer, wcount);
+}
+
+static void ata_write_32(struct ata_device *drive, void *buffer, unsigned int wcount)
+{
+	outsl(IDE_DATA_REG, buffer, wcount);
+}
+
+#if SUPPORT_SLOW_DATA_PORTS
+static void ata_read_slow(struct ata_device *drive, void *buffer, unsigned int wcount)
+{
+	unsigned short *ptr = (unsigned short *) buffer;
+
+	while (wcount--) {
+		*ptr++ = inw_p(IDE_DATA_REG);
+		*ptr++ = inw_p(IDE_DATA_REG);
+	}
+}
+
+static void ata_write_slow(struct ata_device *drive, void *buffer, unsigned int wcount)
+{
+	unsigned short *ptr = (unsigned short *) buffer;
+
+	while (wcount--) {
+		outw_p(*ptr++, IDE_DATA_REG);
+		outw_p(*ptr++, IDE_DATA_REG);
+	}
+}
+#endif
+
+static void ata_read_16(ide_drive_t *drive, void *buffer, unsigned int wcount)
+{
+	insw(IDE_DATA_REG, buffer, wcount<<1);
+}
+
+static void ata_write_16(ide_drive_t *drive, void *buffer, unsigned int wcount)
+{
+	outsw(IDE_DATA_REG, buffer, wcount<<1);
+}
+
+/*
+ * This is used for most PIO data transfers *from* the device.
+ */
+void ata_read(ide_drive_t *drive, void *buffer, unsigned int wcount)
+{
+	int io_32bit;
 
 	/*
-	 * first check if this controller has defined a special function
-	 * for handling polled ide transfers
+	 * First check if this controller has defined a special function
+	 * for handling polled ide transfers.
 	 */
-
-	if (drive->channel->ideproc) {
-		drive->channel->ideproc(ideproc_ide_input_data, drive, buffer, wcount);
+	if (drive->channel->ata_read) {
+		drive->channel->ata_read(drive, buffer, wcount);
 		return;
 	}
 
@@ -107,39 +160,30 @@ void ata_input_data(ide_drive_t *drive, void *buffer, unsigned int wcount)
 
 	if (io_32bit) {
 #if SUPPORT_VLB_SYNC
-		if (io_32bit & 2) {
-			unsigned long flags;
-			__save_flags(flags);	/* local CPU only */
-			__cli();		/* local CPU only */
-			task_vlb_sync(drive);
-			insl(IDE_DATA_REG, buffer, wcount);
-			__restore_flags(flags);	/* local CPU only */
-		} else
+		if (io_32bit & 2)
+			ata_read_vlb(drive, buffer, wcount);
+		else
 #endif
-			insl(IDE_DATA_REG, buffer, wcount);
+			ata_read_32(drive, buffer, wcount);
 	} else {
 #if SUPPORT_SLOW_DATA_PORTS
-		if (drive->slow) {
-			unsigned short *ptr = (unsigned short *) buffer;
-			while (wcount--) {
-				*ptr++ = inw_p(IDE_DATA_REG);
-				*ptr++ = inw_p(IDE_DATA_REG);
-			}
-		} else
+		if (drive->slow)
+			ata_read_slow(drive, buffer, wcount);
+		else
 #endif
-			insw(IDE_DATA_REG, buffer, wcount<<1);
+			ata_read_16(drive, buffer, wcount);
 	}
 }
 
 /*
- * This is used for most PIO data transfers *to* the IDE interface
+ * This is used for most PIO data transfers *to* the device interface.
  */
-void ata_output_data(ide_drive_t *drive, void *buffer, unsigned int wcount)
+void ata_write(ide_drive_t *drive, void *buffer, unsigned int wcount)
 {
-	byte io_32bit;
+	int io_32bit;
 
-	if (drive->channel->ideproc) {
-		drive->channel->ideproc(ideproc_ide_output_data, drive, buffer, wcount);
+	if (drive->channel->ata_write) {
+		drive->channel->ata_write(drive, buffer, wcount);
 		return;
 	}
 
@@ -147,27 +191,18 @@ void ata_output_data(ide_drive_t *drive, void *buffer, unsigned int wcount)
 
 	if (io_32bit) {
 #if SUPPORT_VLB_SYNC
-		if (io_32bit & 2) {
-			unsigned long flags;
-			__save_flags(flags);	/* local CPU only */
-			__cli();		/* local CPU only */
-			task_vlb_sync(drive);
-			outsl(IDE_DATA_REG, buffer, wcount);
-			__restore_flags(flags);	/* local CPU only */
-		} else
+		if (io_32bit & 2)
+			ata_write_vlb(drive, buffer, wcount);
+		else
 #endif
-			outsl(IDE_DATA_REG, buffer, wcount);
+			ata_write_32(drive, buffer, wcount);
 	} else {
 #if SUPPORT_SLOW_DATA_PORTS
-		if (drive->slow) {
-			unsigned short *ptr = (unsigned short *) buffer;
-			while (wcount--) {
-				outw_p(*ptr++, IDE_DATA_REG);
-				outw_p(*ptr++, IDE_DATA_REG);
-			}
-		} else
+		if (drive->slow)
+			ata_write_slow(drive, buffer, wcount);
+		else
 #endif
-			outsw(IDE_DATA_REG, buffer, wcount<<1);
+			ata_write_16(drive, buffer, wcount<<1);
 	}
 }
 
@@ -178,10 +213,10 @@ void ata_output_data(ide_drive_t *drive, void *buffer, unsigned int wcount)
  * so if an odd bytecount is specified, be sure that there's at least one
  * extra byte allocated for the buffer.
  */
-void atapi_input_bytes (ide_drive_t *drive, void *buffer, unsigned int bytecount)
+void atapi_read(ide_drive_t *drive, void *buffer, unsigned int bytecount)
 {
-	if (drive->channel->ideproc) {
-		drive->channel->ideproc(ideproc_atapi_input_bytes, drive, buffer, bytecount);
+	if (drive->channel->atapi_read) {
+		drive->channel->atapi_read(drive, buffer, bytecount);
 		return;
 	}
 
@@ -193,15 +228,15 @@ void atapi_input_bytes (ide_drive_t *drive, void *buffer, unsigned int bytecount
 		return;
 	}
 #endif
-	ata_input_data (drive, buffer, bytecount / 4);
+	ata_read(drive, buffer, bytecount / 4);
 	if ((bytecount & 0x03) >= 2)
-		insw (IDE_DATA_REG, ((byte *)buffer) + (bytecount & ~0x03), 1);
+		insw(IDE_DATA_REG, ((byte *)buffer) + (bytecount & ~0x03), 1);
 }
 
-void atapi_output_bytes (ide_drive_t *drive, void *buffer, unsigned int bytecount)
+void atapi_write(ide_drive_t *drive, void *buffer, unsigned int bytecount)
 {
-	if (drive->channel->ideproc) {
-		drive->channel->ideproc(ideproc_atapi_output_bytes, drive, buffer, bytecount);
+	if (drive->channel->atapi_write) {
+		drive->channel->atapi_write(drive, buffer, bytecount);
 		return;
 	}
 
@@ -213,27 +248,9 @@ void atapi_output_bytes (ide_drive_t *drive, void *buffer, unsigned int bytecoun
 		return;
 	}
 #endif
-	ata_output_data (drive, buffer, bytecount / 4);
+	ata_write(drive, buffer, bytecount / 4);
 	if ((bytecount & 0x03) >= 2)
 		outsw(IDE_DATA_REG, ((byte *)buffer) + (bytecount & ~0x03), 1);
-}
-
-void taskfile_input_data(ide_drive_t *drive, void *buffer, unsigned int wcount)
-{
-	ata_input_data(drive, buffer, wcount);
-	if (drive->bswap)
-		bswap_data(buffer, wcount);
-}
-
-void taskfile_output_data(ide_drive_t *drive, void *buffer, unsigned int wcount)
-{
-	if (drive->bswap) {
-		bswap_data(buffer, wcount);
-		ata_output_data(drive, buffer, wcount);
-		bswap_data(buffer, wcount);
-	} else {
-		ata_output_data(drive, buffer, wcount);
-	}
 }
 
 /*
@@ -311,8 +328,6 @@ static ide_startstop_t pre_task_mulout_intr(ide_drive_t *drive, struct request *
 static ide_startstop_t task_mulout_intr (ide_drive_t *drive)
 {
 	byte stat		= GET_STAT();
-	/* FIXME: this should go possible as well */
-	byte io_32bit		= drive->io_32bit;
 	struct request *rq	= &HWGROUP(drive)->wrq;
 	ide_hwgroup_t *hwgroup	= HWGROUP(drive);
 	int mcount		= drive->mult_count;
@@ -378,14 +393,13 @@ static ide_startstop_t task_mulout_intr (ide_drive_t *drive)
 		}
 
 		/*
-		 * Ok, we're all setup for the interrupt
-		 * re-entering us on the last transfer.
+		 * Ok, we're all setup for the interrupt re-entering us on the
+		 * last transfer.
 		 */
-		taskfile_output_data(drive, buffer, nsect * SECTOR_WORDS);
+		ata_write(drive, buffer, nsect * SECTOR_WORDS);
 		bio_kunmap_irq(buffer, &flags);
 	} while (mcount);
 
-	drive->io_32bit = io_32bit;
 	rq->errors = 0;
 	if (hwgroup->handler == NULL)
 		ide_set_handler(drive, task_mulout_intr, WAIT_CMD, NULL);
@@ -542,7 +556,6 @@ ide_startstop_t task_no_data_intr (ide_drive_t *drive)
 static ide_startstop_t task_in_intr (ide_drive_t *drive)
 {
 	byte stat		= GET_STAT();
-	byte io_32bit		= drive->io_32bit;
 	struct request *rq	= HWGROUP(drive)->rq;
 	char *pBuf		= NULL;
 	unsigned long flags;
@@ -561,10 +574,8 @@ static ide_startstop_t task_in_intr (ide_drive_t *drive)
 	pBuf = ide_map_rq(rq, &flags);
 	DTF("Read: %p, rq->current_nr_sectors: %d\n", pBuf, (int) rq->current_nr_sectors);
 
-	drive->io_32bit = 0;
-	taskfile_input_data(drive, pBuf, SECTOR_WORDS);
+	ata_read(drive, pBuf, SECTOR_WORDS);
 	ide_unmap_rq(rq, pBuf, &flags);
-	drive->io_32bit = io_32bit;
 
 	if (--rq->current_nr_sectors <= 0) {
 		/* (hs): swapped next 2 lines */
@@ -597,7 +608,7 @@ static ide_startstop_t pre_task_out_intr(ide_drive_t *drive, struct request *rq)
 		unsigned long flags;
 		char *buf = ide_map_rq(rq, &flags);
 		/* For Write_sectors we need to stuff the first sector */
-		taskfile_output_data(drive, buf, SECTOR_WORDS);
+		ata_write(drive, buf, SECTOR_WORDS);
 		rq->current_nr_sectors--;
 		ide_unmap_rq(rq, buf, &flags);
 	} else {
@@ -613,8 +624,6 @@ static ide_startstop_t pre_task_out_intr(ide_drive_t *drive, struct request *rq)
 static ide_startstop_t task_out_intr(ide_drive_t *drive)
 {
 	byte stat		= GET_STAT();
-	/* FIXME: this should go possible as well */
-	byte io_32bit		= drive->io_32bit;
 	struct request *rq	= HWGROUP(drive)->rq;
 	char *pBuf		= NULL;
 	unsigned long flags;
@@ -631,9 +640,8 @@ static ide_startstop_t task_out_intr(ide_drive_t *drive)
 		pBuf = ide_map_rq(rq, &flags);
 		DTF("write: %p, rq->current_nr_sectors: %d\n", pBuf, (int) rq->current_nr_sectors);
 
-		taskfile_output_data(drive, pBuf, SECTOR_WORDS);
+		ata_write(drive, pBuf, SECTOR_WORDS);
 		ide_unmap_rq(rq, pBuf, &flags);
-		drive->io_32bit = io_32bit;
 		rq->errors = 0;
 		rq->current_nr_sectors--;
 	}
@@ -649,8 +657,6 @@ static ide_startstop_t task_mulin_intr(ide_drive_t *drive)
 {
 	unsigned int		msect, nsect;
 	byte stat		= GET_STAT();
-	/* FIXME: this should go possible as well */
-	byte io_32bit		= drive->io_32bit;
 	struct request *rq	= HWGROUP(drive)->rq;
 	char *pBuf		= NULL;
 	unsigned long flags;
@@ -676,10 +682,8 @@ static ide_startstop_t task_mulin_intr(ide_drive_t *drive)
 
 		DTF("Multiread: %p, nsect: %d , rq->current_nr_sectors: %d\n",
 			pBuf, nsect, rq->current_nr_sectors);
-		drive->io_32bit = 0;
-		taskfile_input_data(drive, pBuf, nsect * SECTOR_WORDS);
+		ata_read(drive, pBuf, nsect * SECTOR_WORDS);
 		ide_unmap_rq(rq, pBuf, &flags);
-		drive->io_32bit = io_32bit;
 		rq->errors = 0;
 		rq->current_nr_sectors -= nsect;
 		msect -= nsect;
@@ -897,20 +901,25 @@ void init_taskfile_request(struct request *rq)
 int ide_raw_taskfile(ide_drive_t *drive, struct ata_taskfile *args, byte *buf)
 {
 	struct request rq;
-	struct ata_request ar;
+	struct ata_request star;
 
-	ata_ar_init(drive, &ar);
+	ata_ar_init(drive, &star);
+
+	/* Don't put this request on free_req list after usage.
+	 */
+	star.ar_flags |= ATA_AR_STATIC;
+
 	init_taskfile_request(&rq);
 	rq.buffer = buf;
 
-	memcpy(&ar.ar_task, args, sizeof(*args));
+	memcpy(&star.ar_task, args, sizeof(*args));
 
 	if (args->command_type != IDE_DRIVE_TASK_NO_DATA)
 		rq.current_nr_sectors = rq.nr_sectors
 			= (args->hobfile.sector_count << 8)
 			| args->taskfile.sector_count;
 
-	rq.special = &ar;
+	rq.special = &star;
 
 	return ide_do_drive_cmd(drive, &rq, ide_wait);
 }
@@ -1025,12 +1034,11 @@ int ide_task_ioctl(ide_drive_t *drive, unsigned long arg)
 }
 
 EXPORT_SYMBOL(drive_is_ready);
-EXPORT_SYMBOL(ata_input_data);
-EXPORT_SYMBOL(ata_output_data);
-EXPORT_SYMBOL(atapi_input_bytes);
-EXPORT_SYMBOL(atapi_output_bytes);
-EXPORT_SYMBOL(taskfile_input_data);
-EXPORT_SYMBOL(taskfile_output_data);
+
+EXPORT_SYMBOL(ata_read);
+EXPORT_SYMBOL(ata_write);
+EXPORT_SYMBOL(atapi_read);
+EXPORT_SYMBOL(atapi_write);
 
 EXPORT_SYMBOL(ata_taskfile);
 EXPORT_SYMBOL(recal_intr);

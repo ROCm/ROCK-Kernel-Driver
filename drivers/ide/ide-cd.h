@@ -104,6 +104,15 @@ struct packet_command {
 	int quiet;
 	int timeout;
 	struct request_sense *sense;
+
+	/* This is currently used to pass failed commands through the request
+	 * queue.  Is this for asynchronos error reporting?
+	 *
+	 * Can we always be sure that this didn't valish from stack beneath us
+	 * - we can't!
+	 */
+
+	struct packet_command *failed_command;
 };
 
 /* Structure of a MSF cdrom address. */

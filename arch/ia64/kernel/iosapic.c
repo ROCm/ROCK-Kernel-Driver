@@ -22,6 +22,7 @@
  * 02/01/07     E. Focht        <efocht@ess.nec.de> Redirectable interrupt vectors in
  *                              iosapic_set_affinity(), initializations for
  *                              /proc/irq/#/smp_affinity
+ * 02/04/02	P. Diefenbaugh	Cleaned up ACPI PCI IRQ routing.
  */
 /*
  * Here is what the interrupt logic between a PCI device and the CPU looks like:
@@ -56,9 +57,8 @@
 #include <linux/smp_lock.h>
 #include <linux/string.h>
 #include <linux/irq.h>
+#include <linux/acpi.h>
 
-#include <asm/acpi-ext.h>
-#include <asm/acpikcfg.h>
 #include <asm/delay.h>
 #include <asm/hw_irq.h>
 #include <asm/io.h>
@@ -92,11 +92,37 @@ static struct iosapic_irq {
 	unsigned char trigger	: 1;	/* trigger mode (see iosapic.h) */
 } iosapic_irq[IA64_NUM_VECTORS];
 
+static struct iosapic {
+	char *addr;			/* base address of IOSAPIC */
+	unsigned char	pcat_compat;	/* 8259 compatibility flag */
+	unsigned char 	base_irq;	/* first irq assigned to this IOSAPIC */
+	unsigned short 	max_pin;	/* max input pin supported in this IOSAPIC */
+} iosapic_lists[256] __initdata;
+
+static int num_iosapic = 0;
+
+
+/*
+ * Find an IOSAPIC associated with an IRQ
+ */
+static inline int __init
+find_iosapic (unsigned int irq)
+{
+	int i;
+
+	for (i = 0; i < num_iosapic; i++) {
+		if ((irq - iosapic_lists[i].base_irq) < iosapic_lists[i].max_pin)
+			return i;
+	}
+
+	return -1;
+}
+
 /*
  * Translate IOSAPIC irq number to the corresponding IA-64 interrupt vector.  If no
  * entry exists, return -1.
  */
-int
+static int
 iosapic_irq_to_vector (int irq)
 {
 	int vector;
@@ -479,7 +505,7 @@ iosapic_register_platform_irq (u32 int_type, u32 global_vector,
 	int vector;
 
 	switch (int_type) {
-	case ACPI20_ENTRY_PIS_PMI:
+	      case ACPI_INTERRUPT_PMI:
 		vector = iosapic_vector;
 		/*
 		 * since PMI vector is alloc'd by FW(ACPI) not by kernel,
@@ -488,15 +514,15 @@ iosapic_register_platform_irq (u32 int_type, u32 global_vector,
 		iosapic_reassign_vector(vector);
 		delivery = IOSAPIC_PMI;
 		break;
-	case ACPI20_ENTRY_PIS_CPEI:
-		vector = IA64_PCE_VECTOR;
-		delivery = IOSAPIC_LOWEST_PRIORITY;
-		break;
-	case ACPI20_ENTRY_PIS_INIT:
+	      case ACPI_INTERRUPT_INIT:
 		vector = ia64_alloc_irq();
 		delivery = IOSAPIC_INIT;
 		break;
-	default:
+	      case ACPI_INTERRUPT_CPEI:
+		vector = IA64_PCE_VECTOR;
+		delivery = IOSAPIC_LOWEST_PRIORITY;
+		break;
+	      default:
 		printk("iosapic_register_platform_irq(): invalid int type\n");
 		return -1;
 	}
@@ -542,31 +568,41 @@ iosapic_register_legacy_irq (unsigned long irq,
 void __init
 iosapic_init (unsigned long phys_addr, unsigned int base_irq, int pcat_compat)
 {
-	int i, irq, max_pin, vector, pin;
+	int irq, max_pin, vector, pin;
 	unsigned int ver;
 	char *addr;
 	static int first_time = 1;
 
 	if (first_time) {
 		first_time = 0;
-
 		for (vector = 0; vector < IA64_NUM_VECTORS; ++vector)
 			iosapic_irq[vector].pin = -1;	/* mark as unused */
+	}
 
+	if (pcat_compat) {
 		/*
-		 * Fetch the PCI interrupt routing table:
+		 * Disable the compatibility mode interrupts (8259 style), needs IN/OUT support
+		 * enabled.
 		 */
-		acpi_cf_get_pci_vectors(&pci_irq.route, &pci_irq.num_routes);
+		printk("%s: Disabling PC-AT compatible 8259 interrupts\n", __FUNCTION__);
+		outb(0xff, 0xA1);
+		outb(0xff, 0x21);
 	}
 
 	addr = ioremap(phys_addr, 0);
 	ver = iosapic_version(addr);
 	max_pin = (ver >> 16) & 0xff;
 
+	iosapic_lists[num_iosapic].addr = addr;
+	iosapic_lists[num_iosapic].pcat_compat = pcat_compat;
+	iosapic_lists[num_iosapic].base_irq = base_irq;
+	iosapic_lists[num_iosapic].max_pin = max_pin;
+	num_iosapic++;
+
 	printk("IOSAPIC: version %x.%x, address 0x%lx, IRQs 0x%02x-0x%02x\n",
 	       (ver & 0xf0) >> 4, (ver & 0x0f), phys_addr, base_irq, base_irq + max_pin);
 
-	if ((base_irq == 0) && pcat_compat)
+	if ((base_irq == 0) && pcat_compat) {
 		/*
 		 * Map the legacy ISA devices into the IOSAPIC data.  Some of these may
 		 * get reprogrammed later on with data from the ACPI Interrupt Source
@@ -590,11 +626,37 @@ iosapic_init (unsigned long phys_addr, unsigned int base_irq, int pcat_compat)
 			/* program the IOSAPIC routing table: */
 			set_rte(vector, (ia64_get_lid() >> 16) & 0xffff);
 		}
+	}
+}
+
+void __init
+iosapic_init_pci_irq (void)
+{
+	int i, index, vector, pin;
+	int base_irq, max_pin, pcat_compat;
+	unsigned int irq;
+	char *addr;
+
+	if (0 != acpi_get_prt(&pci_irq.route, &pci_irq.num_routes))
+		return;
 
 	for (i = 0; i < pci_irq.num_routes; i++) {
+
 		irq = pci_irq.route[i].irq;
 
-		if ((irq < (int)base_irq) || (irq > (int)(base_irq + max_pin)))
+		index = find_iosapic(irq);
+		if (index < 0) {
+			printk("PCI: IRQ %u has no IOSAPIC mapping\n", irq);
+			continue;
+		}
+
+		addr = iosapic_lists[index].addr;
+		base_irq = iosapic_lists[index].base_irq;
+		max_pin = iosapic_lists[index].max_pin;
+		pcat_compat = iosapic_lists[index].pcat_compat;
+		pin = irq - base_irq;
+
+		if ((unsigned) pin > max_pin)
 			/* the interrupt route is for another controller... */
 			continue;
 
@@ -607,18 +669,13 @@ iosapic_init (unsigned long phys_addr, unsigned int base_irq, int pcat_compat)
 				vector = ia64_alloc_irq();
 		}
 
-		register_irq(irq, vector, irq - base_irq,
-			     /* IOSAPIC_POL_LOW, IOSAPIC_LEVEL */
-			     IOSAPIC_LOWEST_PRIORITY, 0, 0, base_irq, addr);
+		register_irq(irq, vector, pin, IOSAPIC_LOWEST_PRIORITY, 0, 0, base_irq, addr);
 
-# ifdef DEBUG_IRQ_ROUTING
+#ifdef DEBUG_IRQ_ROUTING
 		printk("PCI: (B%d,I%d,P%d) -> IOSAPIC irq 0x%02x -> vector 0x%02x\n",
 		       pci_irq.route[i].bus, pci_irq.route[i].pci_id>>16, pci_irq.route[i].pin,
 		       iosapic_irq[vector].base_irq + iosapic_irq[vector].pin, vector);
-# endif
-
-			/* program the IOSAPIC routing table: */
-			set_rte(vector, (ia64_get_lid() >> 16) & 0xffff);
+#endif
 	}
 }
 
@@ -630,6 +687,11 @@ iosapic_pci_fixup (int phase)
 	int vector;
 	struct hw_interrupt_type *irq_type;
 	irq_desc_t *idesc;
+
+	if (phase == 0) {
+		iosapic_init_pci_irq();
+		return;
+	}
 
 	if (phase != 1)
 		return;
@@ -670,10 +732,10 @@ iosapic_pci_fixup (int phase)
 
 				irq_type = &irq_type_iosapic_level;
 				idesc = irq_desc(vector);
-				if (idesc->handler != irq_type){
+				if (idesc->handler != irq_type) {
 					if (idesc->handler != &no_irq_type)
-						printk("iosapic_pci_fixup: changing vector 0x%02x from "
-						       "%s to %s\n", vector,
+						printk("iosapic_pci_fixup: changing vector 0x%02x "
+						       "from %s to %s\n", vector,
 						       idesc->handler->typename,
 						       irq_type->typename);
 					idesc->handler = irq_type;

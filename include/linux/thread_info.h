@@ -7,8 +7,8 @@
 #ifndef _LINUX_THREAD_INFO_H
 #define _LINUX_THREAD_INFO_H
 
+#include <linux/bitops.h>
 #include <asm/thread_info.h>
-#include <asm/bitops.h>
 
 #ifdef __KERNEL__
 

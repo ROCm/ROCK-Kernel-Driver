@@ -140,7 +140,7 @@ static void idescsi_input_buffers (ide_drive_t *drive, idescsi_pc_t *pc, unsigne
 		}
 		count = min(pc->sg->length - pc->b_count, bcount);
 		buf = page_address(pc->sg->page) + pc->sg->offset;
-		atapi_input_bytes (drive, buf + pc->b_count, count);
+		atapi_read(drive, buf + pc->b_count, count);
 		bcount -= count; pc->b_count += count;
 		if (pc->b_count == pc->sg->length) {
 			pc->sg++;
@@ -162,7 +162,7 @@ static void idescsi_output_buffers (ide_drive_t *drive, idescsi_pc_t *pc, unsign
 		}
 		count = min(pc->sg->length - pc->b_count, bcount);
 		buf = page_address(pc->sg->page) + pc->sg->offset;
-		atapi_output_bytes (drive, buf + pc->b_count, count);
+		atapi_write(drive, buf + pc->b_count, count);
 		bcount -= count; pc->b_count += count;
 		if (pc->b_count == pc->sg->length) {
 			pc->sg++;
@@ -363,7 +363,7 @@ static ide_startstop_t idescsi_pc_intr (ide_drive_t *drive)
 					if (pc->sg)
 						idescsi_input_buffers(drive, pc, temp);
 					else
-						atapi_input_bytes(drive, pc->current_position, temp);
+						atapi_read(drive, pc->current_position, temp);
 					printk(KERN_ERR "ide-scsi: transferred %d of %d bytes\n", temp, bcount);
 				}
 				pc->actually_transferred += temp;
@@ -382,13 +382,13 @@ static ide_startstop_t idescsi_pc_intr (ide_drive_t *drive)
 		if (pc->sg)
 			idescsi_input_buffers (drive, pc, bcount);
 		else
-			atapi_input_bytes (drive,pc->current_position,bcount);
+			atapi_read(drive,pc->current_position,bcount);
 	} else {
 		set_bit(PC_WRITING, &pc->flags);
 		if (pc->sg)
 			idescsi_output_buffers (drive, pc, bcount);
 		else
-			atapi_output_bytes (drive,pc->current_position,bcount);
+			atapi_write(drive,pc->current_position,bcount);
 	}
 	pc->actually_transferred+=bcount;				/* Update the current position */
 	pc->current_position+=bcount;
@@ -414,7 +414,7 @@ static ide_startstop_t idescsi_transfer_pc (ide_drive_t *drive)
 		return ide_stopped;
 	}
 	ide_set_handler(drive, &idescsi_pc_intr, get_timeout(pc), NULL);	/* Set the interrupt routine */
-	atapi_output_bytes (drive, scsi->pc->c, 12);			/* Send the actual packet */
+	atapi_write(drive, scsi->pc->c, 12);			/* Send the actual packet */
 	return ide_started;
 }
 

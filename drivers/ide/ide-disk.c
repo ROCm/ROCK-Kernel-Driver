@@ -1051,7 +1051,6 @@ static void idedisk_add_settings(ide_drive_t *drive)
 	ide_add_setting(drive,	"bios_head",		SETTING_RW,					-1,			-1,			TYPE_BYTE,	0,	255,				1,	1,	&drive->bios_head,		NULL);
 	ide_add_setting(drive,	"bios_sect",		SETTING_RW,					-1,			-1,			TYPE_BYTE,	0,	63,				1,	1,	&drive->bios_sect,		NULL);
 	ide_add_setting(drive,	"address",		SETTING_RW,					HDIO_GET_ADDRESS,	HDIO_SET_ADDRESS,	TYPE_INTA,	0,	2,				1,	1,	&drive->addressing,	set_lba_addressing);
-	ide_add_setting(drive,	"bswap",		SETTING_READ,					-1,			-1,			TYPE_BYTE,	0,	1,				1,	1,	&drive->bswap,			NULL);
 	ide_add_setting(drive,	"multcount",		id ? SETTING_RW : SETTING_READ,			HDIO_GET_MULTCOUNT,	HDIO_SET_MULTCOUNT,	TYPE_BYTE,	0,	id ? id->max_multsect : 0,	1,	1,	&drive->mult_count,		set_multcount);
 	ide_add_setting(drive,	"nowerr",		SETTING_RW,					HDIO_GET_NOWERR,	HDIO_SET_NOWERR,	TYPE_BYTE,	0,	1,				1,	1,	&drive->nowerr,			set_nowerr);
 	ide_add_setting(drive,	"lun",			SETTING_RW,					-1,			-1,			TYPE_INT,	0,	7,				1,	1,	&drive->lun,			NULL);
@@ -1198,11 +1197,11 @@ static void idedisk_setup(ide_drive_t *drive)
 	if ((capacity >= (drive->bios_cyl * drive->bios_sect * drive->bios_head)) &&
 	    (!drive->forced_geom) && drive->bios_sect && drive->bios_head)
 		drive->bios_cyl = (capacity / drive->bios_sect) / drive->bios_head;
-	printk (KERN_INFO "%s: %ld sectors", drive->name, capacity);
+	printk(KERN_INFO "%s: %ld sectors", drive->name, capacity);
 
 	/* Give size in megabytes (MB), not mebibytes (MiB). */
 	/* We compute the exact rounded value, avoiding overflow. */
-	printk (" (%ld MB)", (capacity - capacity/625 + 974)/1950);
+	printk(" (%ld MB)", (capacity - capacity/625 + 974)/1950);
 
 	/* Only print cache size when it was specified */
 	if (id->buf_size)
@@ -1213,7 +1212,7 @@ static void idedisk_setup(ide_drive_t *drive)
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (drive->using_dma)
 		(void) drive->channel->dmaproc(ide_dma_verbose, drive);
-#endif /* CONFIG_BLK_DEV_IDEDMA */
+#endif
 	printk("\n");
 
 	drive->mult_count = 0;
@@ -1223,15 +1222,17 @@ static void idedisk_setup(ide_drive_t *drive)
 		id->multsect_valid = id->multsect ? 1 : 0;
 		drive->mult_req = id->multsect_valid ? id->max_multsect : INITIAL_MULT_COUNT;
 		drive->special.b.set_multmode = drive->mult_req ? 1 : 0;
-#else	/* original, pre IDE-NFG, per request of AC */
+#else
+		/* original, pre IDE-NFG, per request of AC */
 		drive->mult_req = INITIAL_MULT_COUNT;
 		if (drive->mult_req > id->max_multsect)
 			drive->mult_req = id->max_multsect;
 		if (drive->mult_req || ((id->multsect_valid & 1) && id->multsect))
 			drive->special.b.set_multmode = 1;
-#endif	/* CONFIG_IDEDISK_MULTI_MODE */
+#endif
 	}
 	drive->no_io_32bit = id->dword_io ? 1 : 0;
+
 	if (drive->id->cfs_enable_2 & 0x3000)
 		write_cache(drive, (id->cfs_enable_2 & 0x3000));
 	probe_lba_addressing(drive, 1);

@@ -1249,7 +1249,6 @@ struct dentry *reiserfs_fh_to_dentry(struct super_block *sb, __u32 *data,
 				     int len, int fhtype, int parent) {
     struct cpu_key key ;
     struct inode *inode = NULL ;
-    struct list_head *lp;
     struct dentry *result;
 
     /* fhtype happens to reflect the number of u32s encoded.
@@ -1304,24 +1303,12 @@ out:
     /* now to find a dentry.
      * If possible, get a well-connected one
      */
-    spin_lock(&dcache_lock);
-    list_for_each(lp, &inode->i_dentry) {
-	    result = list_entry(lp,struct dentry, d_alias);
-	    if (! (result->d_flags & DCACHE_NFSD_DISCONNECTED)) {
-		    dget_locked(result);
-		    result->d_vfs_flags |= DCACHE_REFERENCED;
-		    spin_unlock(&dcache_lock);
-		    iput(inode);
-		    return result;
-	    }
-    }
-    spin_unlock(&dcache_lock);
-    result = d_alloc_root(inode);
+    result = d_alloc_anon(inode);
     if (result == NULL) {
 	    iput(inode);
 	    return ERR_PTR(-ENOMEM);
     }
-    result->d_flags |= DCACHE_NFSD_DISCONNECTED;
+    result->d_vfs_flags |= DCACHE_REFERENCED;
     return result;
 
 }

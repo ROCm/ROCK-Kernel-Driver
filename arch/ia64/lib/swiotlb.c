@@ -10,6 +10,7 @@
  *			unnecessary i-cache flushing.
  */
 
+#include <linux/cache.h>
 #include <linux/mm.h>
 #include <linux/module.h>
 #include <linux/pci.h>
@@ -23,9 +24,6 @@
 
 #include <linux/init.h>
 #include <linux/bootmem.h>
-
-#define ALIGN(val, align) ((unsigned long)	\
-	(((unsigned long) (val) + ((align) - 1)) & ~((align) - 1)))
 
 #define OFFSET(val,align) ((unsigned long)	\
 	                   ( (val) & ( (align) - 1)))
@@ -276,8 +274,11 @@ swiotlb_alloc_consistent (struct pci_dev *hwdev, size_t size, dma_addr_t *dma_ha
 	int gfp = GFP_ATOMIC;
 	void *ret;
 
-	if (!hwdev || hwdev->dma_mask <= 0xffffffff)
-		gfp |= GFP_DMA; /* XXX fix me: should change this to GFP_32BIT or ZONE_32BIT */
+	/*
+	 * Alloc_consistent() is defined to return memory < 4GB, no matter what the DMA
+	 * mask says.
+	 */
+	gfp |= GFP_DMA; /* XXX fix me: should change this to GFP_32BIT or ZONE_32BIT */
 	ret = (void *)__get_free_pages(gfp, get_order(size));
 	if (!ret)
 		return NULL;

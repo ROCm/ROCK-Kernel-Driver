@@ -30,7 +30,7 @@
  * These used to be if'd out here because using : "cc" as a constraint
  * resulted in errors from egcs.  Things appear to be OK with gcc-2.95.
  */
-static __inline__ void set_bit(int nr, volatile void * addr)
+static __inline__ void set_bit(int nr, volatile unsigned long * addr)
 {
 	unsigned long old;
 	unsigned long mask = 1 << (nr & 0x1f);
@@ -50,7 +50,7 @@ static __inline__ void set_bit(int nr, volatile void * addr)
 /*
  * non-atomic version
  */
-static __inline__ void __set_bit(int nr, volatile void *addr)
+static __inline__ void __set_bit(int nr, volatile unsigned long *addr)
 {
 	unsigned long mask = 1 << (nr & 0x1f);
 	unsigned long *p = ((unsigned long *)addr) + (nr >> 5);
@@ -64,7 +64,7 @@ static __inline__ void __set_bit(int nr, volatile void *addr)
 #define smp_mb__before_clear_bit()	smp_mb()
 #define smp_mb__after_clear_bit()	smp_mb()
 
-static __inline__ void clear_bit(int nr, volatile void *addr)
+static __inline__ void clear_bit(int nr, volatile unsigned long *addr)
 {
 	unsigned long old;
 	unsigned long mask = 1 << (nr & 0x1f);
@@ -84,7 +84,7 @@ static __inline__ void clear_bit(int nr, volatile void *addr)
 /*
  * non-atomic version
  */
-static __inline__ void __clear_bit(int nr, volatile void *addr)
+static __inline__ void __clear_bit(int nr, volatile unsigned long *addr)
 {
 	unsigned long mask = 1 << (nr & 0x1f);
 	unsigned long *p = ((unsigned long *)addr) + (nr >> 5);
@@ -92,7 +92,7 @@ static __inline__ void __clear_bit(int nr, volatile void *addr)
 	*p &= ~mask;
 }
 
-static __inline__ void change_bit(int nr, volatile void *addr)
+static __inline__ void change_bit(int nr, volatile unsigned long *addr)
 {
 	unsigned long old;
 	unsigned long mask = 1 << (nr & 0x1f);
@@ -112,7 +112,7 @@ static __inline__ void change_bit(int nr, volatile void *addr)
 /*
  * non-atomic version
  */
-static __inline__ void __change_bit(int nr, volatile void *addr)
+static __inline__ void __change_bit(int nr, volatile unsigned long *addr)
 {
 	unsigned long mask = 1 << (nr & 0x1f);
 	unsigned long *p = ((unsigned long *)addr) + (nr >> 5);
@@ -123,7 +123,7 @@ static __inline__ void __change_bit(int nr, volatile void *addr)
 /*
  * test_and_*_bit do imply a memory barrier (?)
  */
-static __inline__ int test_and_set_bit(int nr, volatile void *addr)
+static __inline__ int test_and_set_bit(int nr, volatile unsigned long *addr)
 {
 	unsigned int old, t;
 	unsigned int mask = 1 << (nr & 0x1f);
@@ -146,7 +146,7 @@ static __inline__ int test_and_set_bit(int nr, volatile void *addr)
 /*
  * non-atomic version
  */
-static __inline__ int __test_and_set_bit(int nr, volatile void *addr)
+static __inline__ int __test_and_set_bit(int nr, volatile unsigned long *addr)
 {
 	unsigned long mask = 1 << (nr & 0x1f);
 	unsigned long *p = ((unsigned long *)addr) + (nr >> 5);
@@ -156,7 +156,7 @@ static __inline__ int __test_and_set_bit(int nr, volatile void *addr)
 	return (old & mask) != 0;
 }
 
-static __inline__ int test_and_clear_bit(int nr, volatile void *addr)
+static __inline__ int test_and_clear_bit(int nr, volatile unsigned long *addr)
 {
 	unsigned int old, t;
 	unsigned int mask = 1 << (nr & 0x1f);
@@ -179,7 +179,7 @@ static __inline__ int test_and_clear_bit(int nr, volatile void *addr)
 /*
  * non-atomic version
  */
-static __inline__ int __test_and_clear_bit(int nr, volatile void *addr)
+static __inline__ int __test_and_clear_bit(int nr, volatile unsigned long *addr)
 {
 	unsigned long mask = 1 << (nr & 0x1f);
 	unsigned long *p = ((unsigned long *)addr) + (nr >> 5);
@@ -189,7 +189,7 @@ static __inline__ int __test_and_clear_bit(int nr, volatile void *addr)
 	return (old & mask) != 0;
 }
 
-static __inline__ int test_and_change_bit(int nr, volatile void *addr)
+static __inline__ int test_and_change_bit(int nr, volatile unsigned long *addr)
 {
 	unsigned int old, t;
 	unsigned int mask = 1 << (nr & 0x1f);
@@ -212,7 +212,7 @@ static __inline__ int test_and_change_bit(int nr, volatile void *addr)
 /*
  * non-atomic version
  */
-static __inline__ int __test_and_change_bit(int nr, volatile void *addr)
+static __inline__ int __test_and_change_bit(int nr, volatile unsigned long *addr)
 {
 	unsigned long mask = 1 << (nr & 0x1f);
 	unsigned long *p = ((unsigned long *)addr) + (nr >> 5);
@@ -222,7 +222,7 @@ static __inline__ int __test_and_change_bit(int nr, volatile void *addr)
 	return (old & mask) != 0;
 }
 
-static __inline__ int test_bit(int nr, __const__ volatile void *addr)
+static __inline__ int test_bit(int nr, __const__ volatile unsigned long *addr)
 {
 	__const__ unsigned int *p = (__const__ unsigned int *) addr;
 
@@ -230,7 +230,7 @@ static __inline__ int test_bit(int nr, __const__ volatile void *addr)
 }
 
 /* Return the bit position of the most significant 1 bit in a word */
-static __inline__ int __ilog2(unsigned int x)
+static __inline__ int __ilog2(unsigned long x)
 {
 	int lz;
 
@@ -238,7 +238,7 @@ static __inline__ int __ilog2(unsigned int x)
 	return 31 - lz;
 }
 
-static __inline__ int ffz(unsigned int x)
+static __inline__ int ffz(unsigned long x)
 {
 	if ((x = ~x) == 0)
 		return 32;
@@ -296,7 +296,7 @@ static inline int sched_find_first_bit(unsigned long *b)
  * @offset: The bitnumber to start searching at
  * @size: The maximum size to search
  */
-static __inline__ unsigned long find_next_bit(void *addr,
+static __inline__ unsigned long find_next_bit(unsigned long *addr,
 	unsigned long size, unsigned long offset)
 {
 	unsigned int *p = ((unsigned int *) addr) + (offset >> 5);
@@ -353,7 +353,7 @@ found_middle:
 #define find_first_zero_bit(addr, size) \
 	find_next_zero_bit((addr), (size), 0)
 
-static __inline__ unsigned long find_next_zero_bit(void * addr,
+static __inline__ unsigned long find_next_zero_bit(unsigned long * addr,
 	unsigned long size, unsigned long offset)
 {
 	unsigned int * p = ((unsigned int *) addr) + (offset >> 5);

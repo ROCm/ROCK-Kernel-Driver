@@ -54,6 +54,8 @@
     20020326   Richard Gooch <rgooch@atnf.csiro.au>
                Fixed bitfield data type for <devfs_*alloc_devnum>.
                Made major bitfield type and initialiser 64 bit safe.
+    20020413   Richard Gooch <rgooch@atnf.csiro.au>
+               Fixed shift warning on 64 bit machines.
 */
 #include <linux/module.h>
 #include <linux/init.h>
@@ -136,7 +138,7 @@ struct major_list
 #if BITS_PER_LONG == 32
 #  define INITIALISER64(low,high) (low), (high)
 #else
-#  define INITIALISER64(low,high) ( (high) << 32 | (low) )
+#  define INITIALISER64(low,high) ( (unsigned long) (high) << 32 | (low) )
 #endif
 
 /*  Block majors already assigned:

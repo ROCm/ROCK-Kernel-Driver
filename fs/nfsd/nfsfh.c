@@ -6,6 +6,7 @@
  * Copyright (C) 1995, 1996 Olaf Kirch <okir@monad.swb.de>
  * Portions Copyright (C) 1999 G. Allen Morris III <gam3@acm.org>
  * Extensive rewrite by Neil Brown <neilb@cse.unsw.edu.au> Southern-Spring 1999
+ * ... and again Southern-Winter 2001 to support export_operations
  */
 
 #include <linux/sched.h>
@@ -28,6 +29,11 @@
 
 static int nfsd_nr_verified;
 static int nfsd_nr_put;
+
+extern struct export_operations export_op_default;
+
+#define	CALL(ops,fun) ((ops->fun)?(ops->fun):export_op_default.fun)
+
 
 
 struct nfsd_getdents_callback {
@@ -60,15 +66,6 @@ dprintk("filldir_one: seq=%d, ino=%ld, name=%s\n", buf->sequence, ino, name);
 	return result;
 }
 
-/**
- * nfsd_get_name - default nfsd_operations->get_name function
- * @dentry: the directory in which to find a name
- * @name:   a pointer to a %NAME_MAX+1 char buffer to store the name
- * @child:  the dentry for the child directory.
- *
- * calls readdir on the parent until it finds an entry with
- * the same inode number as the child, and returns that.
- */
 static int nfsd_get_name(struct dentry *dentry, char *name,
 			struct dentry *child)
 {
@@ -120,9 +117,6 @@ out:
 	return error;
 }
 
-/* this should be provided by each filesystem in an nfsd_operations interface as
- * iget isn't really the right interface
- */
 static struct dentry *nfsd_iget(struct super_block *sb, unsigned long ino, __u32 generation)
 {
 
@@ -136,7 +130,6 @@ static struct dentry *nfsd_iget(struct super_block *sb, unsigned long ino, __u32
 	 * of 0 means "accept any"
 	 */
 	struct inode *inode;
-	struct list_head *lp;
 	struct dentry *result;
 	if (ino == 0)
 		return ERR_PTR(-ESTALE);
@@ -159,24 +152,12 @@ static struct dentry *nfsd_iget(struct super_block *sb, unsigned long ino, __u32
 	/* now to find a dentry.
 	 * If possible, get a well-connected one
 	 */
-	spin_lock(&dcache_lock);
-	list_for_each(lp, &inode->i_dentry) {
-		result = list_entry(lp,struct dentry, d_alias);
-		if (! (result->d_flags & DCACHE_NFSD_DISCONNECTED)) {
-			dget_locked(result);
-			result->d_vfs_flags |= DCACHE_REFERENCED;
-			spin_unlock(&dcache_lock);
-			iput(inode);
-			return result;
-		}
-	}
-	spin_unlock(&dcache_lock);
-	result = d_alloc_root(inode);
-	if (result == NULL) {
+	result = d_alloc_anon(inode);
+	if (!result) {
 		iput(inode);
 		return ERR_PTR(-ENOMEM);
 	}
-	result->d_flags |= DCACHE_NFSD_DISCONNECTED;
+	result->d_vfs_flags |= DCACHE_REFERENCED;
 	return result;
 }
 
@@ -215,7 +196,7 @@ int d_splice(struct dentry *target, struct dentry *parent, struct qstr *name)
 #ifdef NFSD_PARANOIA
 	if (!IS_ROOT(target))
 		printk("nfsd: d_splice with no-root target: %s/%s\n", parent->d_name.name, name->name);
-	if (!(target->d_flags & DCACHE_NFSD_DISCONNECTED))
+	if (!(target->d_flags & DCACHE_DISCONNECTED))
 		printk("nfsd: d_splice with non-DISCONNECTED target: %s/%s\n", parent->d_name.name, name->name);
 #endif
 	tdentry = d_alloc(parent, name);
@@ -223,13 +204,6 @@ int d_splice(struct dentry *target, struct dentry *parent, struct qstr *name)
 		return -ENOMEM;
 	d_move(target, tdentry);
 
-	/* tdentry will have been made a "child" of target (the parent of target)
-	 * make it an IS_ROOT instead
-	 */
-	spin_lock(&dcache_lock);
-	list_del_init(&tdentry->d_child);
-	tdentry->d_parent = tdentry;
-	spin_unlock(&dcache_lock);
 	d_rehash(target);
 	dput(tdentry);
 
@@ -237,9 +211,9 @@ int d_splice(struct dentry *target, struct dentry *parent, struct qstr *name)
 	 * the children are connected, but it must be a singluar (non-forking)
 	 * branch
 	 */
-	if (!(parent->d_flags & DCACHE_NFSD_DISCONNECTED)) {
+	if (!(parent->d_flags & DCACHE_DISCONNECTED)) {
 		while (target) {
-			target->d_flags &= ~DCACHE_NFSD_DISCONNECTED;
+			target->d_flags &= ~DCACHE_DISCONNECTED;
 			parent = target;
 			spin_lock(&dcache_lock);
 			if (list_empty(&parent->d_subdirs))
@@ -249,9 +223,12 @@ int d_splice(struct dentry *target, struct dentry *parent, struct qstr *name)
 #ifdef NFSD_PARANOIA
 				/* must be only child */
 				if (target->d_child.next != &parent->d_subdirs
-				    || target->d_child.prev != &parent->d_subdirs)
+				    || target->d_child.prev != &parent->d_subdirs) {
 					printk("nfsd: d_splice found non-singular disconnected branch: %s/%s\n",
 					       parent->d_name.name, target->d_name.name);
+					spin_unlock(&dcache_lock);
+					return 0;
+				}
 #endif
 			}
 			spin_unlock(&dcache_lock);
@@ -261,7 +238,6 @@ int d_splice(struct dentry *target, struct dentry *parent, struct qstr *name)
 }
 
 /* this routine finds the dentry of the parent of a given directory
- * it should be in the filesystem accessed by nfsd_operations
  * it assumes lookup("..") works.
  */
 struct dentry *nfsd_findparent(struct dentry *child)
@@ -305,7 +281,7 @@ struct dentry *nfsd_findparent(struct dentry *child)
 			pdentry = d_alloc_root(tdentry->d_inode);
 			if (pdentry) {
 				igrab(tdentry->d_inode);
-				pdentry->d_flags |= DCACHE_NFSD_DISCONNECTED;
+				pdentry->d_flags |= DCACHE_DISCONNECTED;
 			}
 		}
 		if (pdentry == NULL)
@@ -412,14 +388,14 @@ find_fh_dentry(struct super_block *sb, __u32 *datap, int len, int fhtype, int ne
 	down(&sb->s_nfsd_free_path_sem);
 	result = nfsd_get_dentry(sb, datap, len, fhtype, 0);
 	if (IS_ERR(result)
-	    || !(result->d_flags & DCACHE_NFSD_DISCONNECTED)
+	    || !(result->d_flags & DCACHE_DISCONNECTED)
 	    || (!S_ISDIR(result->d_inode->i_mode) && ! needpath)) {
 		up(&sb->s_nfsd_free_path_sem);
 	    
 		err = PTR_ERR(result);
 		if (IS_ERR(result))
 			goto err_out;
-		if ((result->d_flags & DCACHE_NFSD_DISCONNECTED))
+		if ((result->d_flags & DCACHE_DISCONNECTED))
 			nfsdstats.fh_anon++;
 		return result;
 	}
@@ -457,7 +433,7 @@ find_fh_dentry(struct super_block *sb, __u32 *datap, int len, int fhtype, int ne
 		dentry = dget(result);
 	}
 
-	while(dentry->d_flags & DCACHE_NFSD_DISCONNECTED) {
+	while(dentry->d_flags & DCACHE_DISCONNECTED) {
 		/* LOOP INVARIANT */
 		/* haven't found a place in the tree yet, but we do have a free path
 		 * from dentry down to result, and dentry is a directory.
@@ -527,6 +503,46 @@ err_out:
 }
 
 /*
+ * our acceptability function.
+ * if NOSUBTREECHECK, accept anything
+ * if not, require that we can walk up to exp->ex_dentry
+ * doing some checks on the 'x' bits
+ */
+int nfsd_acceptable(void *expv, struct dentry *dentry)
+{
+	struct svc_export *exp = expv;
+	int rv;
+	struct dentry *tdentry;
+
+	if (exp->ex_flags & NFSEXP_NOSUBTREECHECK)
+		return 1;
+
+	dget(dentry);
+	read_lock(&dparent_lock);
+	for (tdentry = dentry;
+	     tdentry != exp->ex_dentry && ! IS_ROOT(tdentry);
+	     (dget(tdentry->d_parent),
+	      dput(tdentry),
+	      tdentry = tdentry->d_parent)
+		) {
+		/* make sure parents give x permission to user */
+		int err;
+		read_unlock(&dparent_lock);
+		err = permission(tdentry->d_parent->d_inode, S_IXOTH);
+		read_lock(&dparent_lock);
+		if (err < 0)
+			break;
+	}
+	read_unlock(&dparent_lock);
+	if (tdentry != exp->ex_dentry)
+		dprintk("nfsd_acceptable failed at %p %s\n", tdentry, tdentry->d_name.name);
+	rv = (tdentry == exp->ex_dentry);
+	dput(tdentry);
+	return rv;
+}
+
+
+/*
  * Perform sanity checks on the dentry in a client's file handle.
  *
  * Note that the file handle dentry may need to be freed even after
@@ -553,6 +569,8 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 		kdev_t xdev = NODEV;
 		ino_t xino = 0;
 		__u32 *datap=NULL;
+		__u32 tfh[3];		/* filehandle fragment for oldstyle filehandles */
+		int fileid_type;
 		int data_left = fh->fh_size/4;
 		int nfsdev;
 		int fsid = 0;
@@ -560,8 +578,8 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 		error = nfserr_stale;
 		if (rqstp->rq_vers == 3)
 			error = nfserr_badhandle;
+
 		if (fh->fh_version == 1) {
-			
 			datap = fh->fh_auth;
 			if (--data_left<0) goto out;
 			switch (fh->fh_auth_type) {
@@ -602,7 +620,6 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 
 		if (!exp) {
 			/* export entry revoked */
-			nfsdstats.fh_stale++;
 			goto out;
 		}
 
@@ -626,27 +643,35 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 		if (rqstp->rq_vers == 3)
 			error = nfserr_badhandle;
 
-		if (fh->fh_version == 1) {
-			/* if fileid_type != 0, and super_operations provide fh_to_dentry lookup,
-			 *  then should use that */
-			switch (fh->fh_fileid_type) {
-			case 0:
-				dentry = dget(exp->ex_dentry);
-				break;
-			default:
-				dentry = find_fh_dentry(exp->ex_dentry->d_sb,
-							datap, data_left, fh->fh_fileid_type,
-							!(exp->ex_flags & NFSEXP_NOSUBTREECHECK));
-			}
-		} else {
-			__u32 tfh[3];
+		if (fh->fh_version != 1) {
 			tfh[0] = fh->ofh_ino;
 			tfh[1] = fh->ofh_generation;
 			tfh[2] = fh->ofh_dirino;
-			dentry = find_fh_dentry(exp->ex_dentry->d_sb,
-						tfh, 3, fh->ofh_dirino?2:1,
-						!(exp->ex_flags & NFSEXP_NOSUBTREECHECK));
+			datap = tfh;
+			data_left = 3;
+			if (fh->ofh_dirino == 0)
+				fileid_type = 1;
+			else
+				fileid_type = 2;
+		} else
+			fileid_type = fh->fh_fileid_type;
+		
+		if (fileid_type == 0)
+			dentry = dget(exp->ex_dentry);
+		else {
+			struct export_operations *nop = exp->ex_mnt->mnt_sb->s_export_op;
+			if (nop)
+				dentry = CALL(nop,decode_fh)(exp->ex_mnt->mnt_sb,
+							     datap, data_left,
+							     fileid_type,
+							     nfsd_acceptable, exp);
+			else
+				dentry = find_fh_dentry(exp->ex_dentry->d_sb,
+							datap, data_left, fileid_type,
+							!(exp->ex_flags & NFSEXP_NOSUBTREECHECK));
 		}
+		if (dentry == NULL)
+			goto out;
 		if (IS_ERR(dentry)) {
 			if (PTR_ERR(dentry) != -EINVAL)
 				error = nfserrno(PTR_ERR(dentry));
@@ -654,7 +679,7 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 		}
 #ifdef NFSD_PARANOIA
 		if (S_ISDIR(dentry->d_inode->i_mode) &&
-		    (dentry->d_flags & DCACHE_NFSD_DISCONNECTED)) {
+		    (dentry->d_flags & DCACHE_DISCONNECTED)) {
 			printk("nfsd: find_fh_dentry returned a DISCONNECTED directory: %s/%s\n",
 			       dentry->d_parent->d_name.name, dentry->d_name.name);
 		}
@@ -681,7 +706,7 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 	 * write call).
 	 */
 
-	/* When is type ever negative? */
+	/* Type can be negative when creating hardlinks - not to a dir */
 	if (type > 0 && (inode->i_mode & S_IFMT) != type) {
 		error = (type == S_IFDIR)? nfserr_notdir : nfserr_isdir;
 		goto out;
@@ -693,10 +718,14 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 
 	/*
 	 * Security: Check that the export is valid for dentry <gam3@acm.org>
+	 *  This is only needed with subtree_check, and if export_operations is
+	 *  not being used -  export_operations does the check via  the "acceptable"
+	 *  callback
 	 */
 	error = 0;
 
-	if (!(exp->ex_flags & NFSEXP_NOSUBTREECHECK)) {
+	if (exp->ex_mnt->mnt_sb->s_export_op == NULL &&
+	    !(exp->ex_flags & NFSEXP_NOSUBTREECHECK)) {
 		if (exp->ex_dentry != dentry) {
 			struct dentry *tdentry = dentry;
 
@@ -718,13 +747,11 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 				    && !(tdentry->d_inode->i_mode & S_IXOTH)
 					) {
 					error = nfserr_stale;
-					nfsdstats.fh_stale++;
 					dprintk("fh_verify: no root_squashed access.\n");
 				}
 			} while ((tdentry != tdentry->d_parent));
 			if (exp->ex_dentry != tdentry) {
 				error = nfserr_stale;
-				nfsdstats.fh_stale++;
 				printk("nfsd Security: %s/%s bad export.\n",
 				       dentry->d_parent->d_name.name,
 				       dentry->d_name.name);
@@ -746,8 +773,11 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 	}
 #endif
 out:
+	if (error == nfserr_stale)
+		nfsdstats.fh_stale++;
 	return error;
 }
+
 
 /*
  * Compose a file handle for an NFS reply.
@@ -759,12 +789,17 @@ out:
 inline int _fh_update(struct dentry *dentry, struct svc_export *exp,
 		      __u32 *datap, int *maxsize)
 {
+	struct export_operations *nop = exp->ex_mnt->mnt_sb->s_export_op;
 	struct super_block *sb = dentry->d_sb;
 	
 	if (dentry == exp->ex_dentry) {
 		*maxsize = 0;
 		return 0;
 	}
+
+	if (nop)
+		return CALL(nop,encode_fh)(dentry, datap, maxsize,
+			  !(exp->ex_flags&NFSEXP_NOSUBTREECHECK));
 
 	if (sb->s_op->dentry_to_fh) {
 		int need_parent = !S_ISDIR(dentry->d_inode->i_mode) &&
@@ -870,11 +905,11 @@ fh_compose(struct svc_fh *fhp, struct svc_export *exp, struct dentry *dentry, st
 				_fh_update(dentry, exp, datap, &size);
 			fhp->fh_handle.fh_size += size*4;
 		}
+		if (fhp->fh_handle.fh_fileid_type == 255)
+			return nfserr_opnotsupp;
 	}
 
 	nfsd_nr_verified++;
-	if (fhp->fh_handle.fh_fileid_type == 255)
-		return nfserr_opnotsupp;
 	return 0;
 }
 
@@ -906,6 +941,8 @@ fh_update(struct svc_fh *fhp)
 		fhp->fh_handle.fh_fileid_type =
 			_fh_update(dentry, fhp->fh_export, datap, &size);
 		fhp->fh_handle.fh_size += size*4;
+		if (fhp->fh_handle.fh_fileid_type == 255)
+			return nfserr_opnotsupp;
 	}
 out:
 	return 0;
@@ -938,3 +975,4 @@ fh_put(struct svc_fh *fhp)
 	}
 	return;
 }
+

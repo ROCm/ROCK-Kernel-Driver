@@ -3,7 +3,7 @@ Devfs (Device File System) FAQ
 
 Linux Devfs (Device File System) FAQ
 Richard Gooch
-4-APR-2002
+7-APR-2002
 
 
 Document languages:
@@ -1589,6 +1589,20 @@ pass devfs=mount to your boot loader
 mount devfs manually in your boot scripts with:
 mount -t none devfs /dev
 
+
+
+Mount by volume LABEL=<label> doesn't work with
+devfs
+
+Most probably you are not mounting devfs onto /dev. What
+happens is that if your kernel config has CONFIG_DEVFS_FS=y
+then the contents of /proc/partitions will have the devfs
+names (such as scsi/host0/bus0/target0/lun0/part1). The
+contents of /proc/partitions are used by mount(8) when
+mounting by volume label. If devfs is not mounted on /dev,
+then mount(8) will fail to find devices. The solution is to
+make sure that devfs is mounted on /dev. See above for how to
+do that.
 
 
 

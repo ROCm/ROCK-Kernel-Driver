@@ -1237,11 +1237,11 @@ out_unlock:
 /**
  * sys_sched_setaffinity - set the cpu affinity of a process
  * @pid: pid of the process
- * @len: length of new_mask
- * @new_mask: user-space pointer to the new cpu mask
+ * @len: length of the bitmask pointed to by user_mask_ptr
+ * @user_mask_ptr: user-space pointer to the new cpu mask
  */
 asmlinkage int sys_sched_setaffinity(pid_t pid, unsigned int len,
-				      unsigned long *new_mask_ptr)
+				      unsigned long *user_mask_ptr)
 {
 	unsigned long new_mask;
 	task_t *p;
@@ -1250,7 +1250,7 @@ asmlinkage int sys_sched_setaffinity(pid_t pid, unsigned int len,
 	if (len < sizeof(new_mask))
 		return -EINVAL;
 
-	if (copy_from_user(&new_mask, new_mask_ptr, sizeof(new_mask)))
+	if (copy_from_user(&new_mask, user_mask_ptr, sizeof(new_mask)))
 		return -EFAULT;
 
 	new_mask &= cpu_online_map;
@@ -1289,8 +1289,8 @@ out_unlock:
 /**
  * sys_sched_getaffinity - get the cpu affinity of a process
  * @pid: pid of the process
- * @len: length of the new mask
- * @user_mask_ptr: userspace pointer to the mask
+ * @len: length of the bitmask pointed to by user_mask_ptr
+ * @user_mask_ptr: user-space pointer to hold the current cpu mask
  */
 asmlinkage int sys_sched_getaffinity(pid_t pid, unsigned int len,
 				      unsigned long *user_mask_ptr)
@@ -1649,6 +1649,7 @@ void set_cpus_allowed(task_t *p, unsigned long new_mask)
 	if (!new_mask)
 		BUG();
 
+	preempt_disable();
 	rq = task_rq_lock(p, &flags);
 	p->cpus_allowed = new_mask;
 	/*
@@ -1657,7 +1658,7 @@ void set_cpus_allowed(task_t *p, unsigned long new_mask)
 	 */
 	if (new_mask & (1UL << p->thread_info->cpu)) {
 		task_rq_unlock(rq, &flags);
-		return;
+		goto out;
 	}
 
 	init_MUTEX_LOCKED(&req.sem);
@@ -1667,6 +1668,8 @@ void set_cpus_allowed(task_t *p, unsigned long new_mask)
 	wake_up_process(rq->migration_thread);
 
 	down(&req.sem);
+out:
+	preempt_enable();
 }
 
 static volatile unsigned long migration_mask;

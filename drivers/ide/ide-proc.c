@@ -422,7 +422,6 @@ void ide_remove_proc_entries(struct proc_dir_entry *dir, ide_proc_entry_t *p)
 static void create_proc_ide_drives(struct ata_channel *hwif)
 {
 	int	d;
-	struct proc_dir_entry *ent;
 	struct proc_dir_entry *parent = hwif->proc;
 	char name[64];
 

@@ -12,7 +12,10 @@
 #define TI_EXEC_DOMAIN	0x00
 #define TI_FLAGS	0x08
 #define TI_CPU		0x0c
-#define TI_ADDR_LIMI	0x10
+#define TI_ADDR_LIMIT	0x10
+#define TI_PRE_COUNT	0x18
+
+#define PREEMPT_ACTIVE	0x4000000
 
 #ifndef __ASSEMBLY__
 
@@ -26,6 +29,7 @@ struct thread_info {
 	__u32 flags;			/* thread_info flags (see TIF_*) */
 	__u32 cpu;			/* current CPU */
 	mm_segment_t addr_limit;	/* user-level address space limit */
+	__s32 preempt_count;		/* 0=premptable, <0=BUG; will also serve as bh-counter */
 };
 
 #define INIT_THREAD_SIZE		/* tell sched.h not to declare the thread_union */
@@ -37,6 +41,7 @@ struct thread_info {
 	flags:		0,			\
 	cpu:		0,			\
 	addr_limit:	KERNEL_DS,		\
+	preempt_count:	0,			\
 }
 
 /* how to get the thread information struct from C */

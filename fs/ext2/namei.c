@@ -79,9 +79,36 @@ static struct dentry *ext2_lookup(struct inode * dir, struct dentry *dentry)
 		if (!inode)
 			return ERR_PTR(-EACCES);
 	}
+	if (inode)
+		return d_splice_alias(inode, dentry);
 	d_add(dentry, inode);
 	return NULL;
 }
+
+struct dentry *ext2_get_parent(struct dentry *child)
+{
+	unsigned long ino;
+	struct dentry *parent;
+	struct inode *inode;
+	struct dentry dotdot;
+
+	dotdot.d_name.name = "..";
+	dotdot.d_name.len = 2;
+
+	ino = ext2_inode_by_name(child->d_inode, &dotdot);
+	if (!ino)
+		return ERR_PTR(-ENOENT);
+	inode = iget(child->d_inode->i_sb, ino);
+
+	if (!inode)
+		return ERR_PTR(-EACCES);
+	parent = d_alloc_anon(inode);
+	if (!parent) {
+		iput(inode);
+		parent = ERR_PTR(-ENOMEM);
+	}
+	return parent;
+} 
 
 /*
  * By the time this is called, we already have created
