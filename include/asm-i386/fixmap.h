@@ -42,6 +42,8 @@
  * task switches.
  */
 enum fixed_addresses {
+	FIX_VSYSCALL,
+	FIX_HOLE,
 #ifdef CONFIG_X86_LOCAL_APIC
 	FIX_APIC_BASE,	/* local (CPU) APIC) -- required for SMP or not */
 #endif
@@ -96,10 +98,9 @@ extern void __set_fixmap (enum fixed_addresses idx,
  * used by vmalloc.c.
  *
  * Leave one empty page between vmalloc'ed areas and
- * the start of the fixmap, and leave one page empty
- * at the top of mem..
+ * the start of the fixmap.
  */
-#define FIXADDR_TOP	(0xffffe000UL)
+#define FIXADDR_TOP	(0xfffff000UL)
 #define __FIXADDR_SIZE	(__end_of_permanent_fixed_addresses << PAGE_SHIFT)
 #define FIXADDR_START	(FIXADDR_TOP - __FIXADDR_SIZE)
 
