@@ -25,9 +25,9 @@
 #include <net/p8022.h>
 
 extern void llc_register_sap(unsigned char sap,
-			       int (*rcvfunc)(struct sk_buff *,
-					      struct net_device *,
-					       struct packet_type *));
+			     int (*rcvfunc)(struct sk_buff *,
+					    struct net_device *,
+					    struct packet_type *));
 extern void llc_unregister_sap(unsigned char sap);
 
 static struct datalink_proto *p8022_list;
@@ -124,3 +124,5 @@ void unregister_8022_client(unsigned char type)
 
 EXPORT_SYMBOL(register_8022_client);
 EXPORT_SYMBOL(unregister_8022_client);
+
+MODULE_LICENSE("GPL");
