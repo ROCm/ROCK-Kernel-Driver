@@ -15,8 +15,6 @@
 #include <net/sock.h>
 #include <linux/atalk.h>
 
-#ifdef CONFIG_PROC_FS
-extern struct file_operations atalk_seq_arp_fops;
 
 static __inline__ struct atalk_iface *atalk_get_interface_idx(loff_t pos)
 {
@@ -321,14 +319,3 @@ void __exit atalk_proc_exit(void)
 	remove_proc_entry("arp", atalk_proc_dir);
 	remove_proc_entry("atalk", proc_net);
 }
-
-#else /* CONFIG_PROC_FS */
-int __init atalk_proc_init(void)
-{
-	return 0;
-}
-
-void __exit atalk_proc_exit(void)
-{
-}
-#endif /* CONFIG_PROC_FS */
