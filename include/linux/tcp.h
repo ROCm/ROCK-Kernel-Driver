@@ -186,6 +186,8 @@ struct tcp_info
 
 	__u32	tcpi_rcv_rtt;
 	__u32	tcpi_rcv_space;
+
+	__u32	tcpi_total_retrans;
 };
 
 #ifdef __KERNEL__
@@ -363,6 +365,8 @@ struct tcp_opt {
 	__u8	pending;	/* Scheduled timer event	*/
 	__u8	urg_mode;	/* In urgent mode		*/
 	__u32	snd_up;		/* Urgent pointer		*/
+
+	__u32	total_retrans;	/* Total retransmits for entire connection */
 
 	/* The syn_wait_lock is necessary only to avoid proc interface having
 	 * to grab the main lock sock while browsing the listening hash

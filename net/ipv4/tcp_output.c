@@ -1106,6 +1106,8 @@ int tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb)
 		/* Update global TCP statistics. */
 		TCP_INC_STATS(TCP_MIB_RETRANSSEGS);
 
+		tp->total_retrans++;
+
 #if FASTRETRANS_DEBUG > 0
 		if (TCP_SKB_CB(skb)->sacked&TCPCB_SACKED_RETRANS) {
 			if (net_ratelimit())
