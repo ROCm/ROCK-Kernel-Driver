@@ -734,6 +734,13 @@ typedef enum {
 	idetape_direction_write
 } idetape_chrdev_direction_t;
 
+struct idetape_bh {
+	unsigned short b_size;
+	atomic_t b_count;
+	struct idetape_bh *b_reqnext;
+	char *b_data;
+};
+
 /*
  *	Our view of a packet command.
  */
@@ -744,7 +751,7 @@ typedef struct idetape_packet_command_s {
 	int request_transfer;			/* Bytes to transfer */
 	int actually_transferred;		/* Bytes actually transferred */
 	int buffer_size;			/* Size of our data buffer */
-	struct bio *bio;
+	struct idetape_bh *bh;
 	char *b_data;
 	int b_count;
 	u8 *buffer;				/* Data buffer */
@@ -828,7 +835,7 @@ typedef struct {
  */
 typedef struct idetape_stage_s {
 	struct request rq;			/* The corresponding request */
-	struct bio *bio;			/* The data buffers */
+	struct idetape_bh *bh;			/* The data buffers */
 	struct idetape_stage_s *next;		/* Pointer to the next stage */
 	os_aux_t *aux;				/* OnStream aux ptr */
 } idetape_stage_t;
@@ -950,7 +957,7 @@ typedef struct {
 	int stage_size;				/* Data buffer size (chosen based on the tape's recommendation */
 	idetape_stage_t *merge_stage;
 	int merge_stage_size;
-	struct bio *bio;
+	struct idetape_bh *bh;
 	char *b_data;
 	int b_count;
 	
@@ -1034,7 +1041,7 @@ typedef struct {
 	 * Measures number of frames:
 	 *
 	 * 1. written/read to/from the driver pipeline (pipeline_head).
-	 * 2. written/read to/from the tape buffers (bio).
+	 * 2. written/read to/from the tape buffers (idetape_bh).
 	 * 3. written/read by the tape to/from the media (tape_head).
 	 */
 	int pipeline_head;
@@ -1418,54 +1425,54 @@ static void idetape_discard_data (ide_drive_t *drive, unsigned int bcount)
 
 static void idetape_input_buffers (ide_drive_t *drive, idetape_pc_t *pc, unsigned int bcount)
 {
-	struct bio *bio = pc->bio;
+	struct idetape_bh *bh = pc->bh;
 	int count;
 
 	while (bcount) {
 #if IDETAPE_DEBUG_BUGS
-		if (bio == NULL) {
-			printk(KERN_ERR "ide-tape: bio == NULL in "
+		if (bh == NULL) {
+			printk(KERN_ERR "ide-tape: bh == NULL in "
 				"idetape_input_buffers\n");
 			idetape_discard_data(drive, bcount);
 			return;
 		}
 #endif /* IDETAPE_DEBUG_BUGS */
-		count = min(bio->bi_size - pc->b_count, bcount);
-		HWIF(drive)->atapi_input_bytes(drive, bio_data(bio) + pc->b_count, count);
+		count = min((unsigned int)(bh->b_size - atomic_read(&bh->b_count)), bcount);
+		HWIF(drive)->atapi_input_bytes(drive, bh->b_data + atomic_read(&bh->b_count), count);
 		bcount -= count;
-		pc->b_count += bio->bi_size;
-		if (pc->b_count == bio->bi_size) {
-			bio = bio->bi_next;
-			if (bio)
-				pc->b_count = 0;
+		atomic_add(count, &bh->b_count);
+		if (atomic_read(&bh->b_count) == bh->b_size) {
+			bh = bh->b_reqnext;
+			if (bh)
+				atomic_set(&bh->b_count, 0);
 		}
 	}
-	pc->bio = bio;
+	pc->bh = bh;
 }
 
 static void idetape_output_buffers (ide_drive_t *drive, idetape_pc_t *pc, unsigned int bcount)
 {
-	struct bio *bio = pc->bio;
+	struct idetape_bh *bh = pc->bh;
 	int count;
 
 	while (bcount) {
 #if IDETAPE_DEBUG_BUGS
-		if (bio == NULL) {
-			printk(KERN_ERR "ide-tape: bio == NULL in "
+		if (bh == NULL) {
+			printk(KERN_ERR "ide-tape: bh == NULL in "
 				"idetape_output_buffers\n");
 			return;
 		}
 #endif /* IDETAPE_DEBUG_BUGS */
-		count = min((unsigned long) pc->b_count, (unsigned long) bcount);
-		HWIF(drive)->atapi_output_bytes(drive, bio_data(bio), count);
+		count = min((unsigned int)pc->b_count, (unsigned int)bcount);
+		HWIF(drive)->atapi_output_bytes(drive, pc->b_data, count);
 		bcount -= count;
 		pc->b_data += count;
 		pc->b_count -= count;
 		if (!pc->b_count) {
-			pc->bio = bio = bio->bi_next;
-			if (bio) {
-				pc->b_data = bio_data(bio);
-				pc->b_count = bio->bi_size;
+			pc->bh = bh = bh->b_reqnext;
+			if (bh) {
+				pc->b_data = bh->b_data;
+				pc->b_count = atomic_read(&bh->b_count);
 			}
 		}
 	}
@@ -1473,7 +1480,7 @@ static void idetape_output_buffers (ide_drive_t *drive, idetape_pc_t *pc, unsign
 
 static void idetape_update_buffers (idetape_pc_t *pc)
 {
-	struct bio *bio = pc->bio;
+	struct idetape_bh *bh = pc->bh;
 	int count;
 	unsigned int bcount = pc->actually_transferred;
 
@@ -1481,19 +1488,19 @@ static void idetape_update_buffers (idetape_pc_t *pc)
 		return;
 	while (bcount) {
 #if IDETAPE_DEBUG_BUGS
-		if (bio == NULL) {
-			printk(KERN_ERR "ide-tape: bio == NULL in "
+		if (bh == NULL) {
+			printk(KERN_ERR "ide-tape: bh == NULL in "
 				"idetape_update_buffers\n");
 			return;
 		}
 #endif /* IDETAPE_DEBUG_BUGS */
-		count = min((unsigned long) bio->bi_size, (unsigned long) bcount);
-		pc->b_count = count;
-		if (pc->b_count == bio->bi_size)
-			bio = bio->bi_next;
+		count = min((unsigned int)bh->b_size, (unsigned int)bcount);
+		atomic_set(&bh->b_count, count);
+		if (atomic_read(&bh->b_count) == bh->b_size)
+			bh = bh->b_reqnext;
 		bcount -= count;
 	}
-	pc->bio = bio;
+	pc->bh = bh;
 }
 
 /*
@@ -1554,7 +1561,7 @@ static void idetape_init_pc (idetape_pc_t *pc)
 	pc->request_transfer = 0;
 	pc->buffer = pc->pc_buffer;
 	pc->buffer_size = IDETAPE_PC_BUFFER_SIZE;
-	pc->bio = NULL;
+	pc->bh = NULL;
 	pc->b_data = NULL;
 }
 
@@ -1652,7 +1659,7 @@ static void idetape_active_next_stage (ide_drive_t *drive)
 #endif /* IDETAPE_DEBUG_BUGS */	
 
 	rq->buffer = NULL;
-	rq->bio = stage->bio;
+	rq->special = (void *)stage->bh;
 	tape->active_data_request = rq;
 	tape->active_stage = stage;
 	tape->next_stage = stage->next;
@@ -1686,21 +1693,21 @@ static void idetape_increase_max_pipeline_stages (ide_drive_t *drive)
  */
 static void __idetape_kfree_stage (idetape_stage_t *stage)
 {
-	struct bio *prev_bio, *bio = stage->bio;
+	struct idetape_bh *prev_bh, *bh = stage->bh;
 	int size;
 
-	while (bio != NULL) {
-		if (bio_data(bio) != NULL) {
-			size = (int) bio->bi_size;
+	while (bh != NULL) {
+		if (bh->b_data != NULL) {
+			size = (int) bh->b_size;
 			while (size > 0) {
-				free_page((unsigned long) bio_data(bio));
+				free_page((unsigned long) bh->b_data);
 				size -= PAGE_SIZE;
-				bio->bi_size += PAGE_SIZE;
+				bh->b_data += PAGE_SIZE;
 			}
 		}
-		prev_bio = bio;
-		bio = bio->bi_next;
-		kfree(prev_bio);
+		prev_bh = bh;
+		bh = bh->b_reqnext;
+		kfree(prev_bh);
 	}
 	kfree(stage);
 }
@@ -1817,7 +1824,7 @@ static int idetape_end_request(ide_drive_t *drive, int uptodate, int nr_sects)
 				if (tape->onstream) {
 					stage = tape->first_stage;
 					aux = stage->aux;
-					p = bio_data(stage->bio);
+					p = stage->bh->b_data;
 					if (ntohl(aux->logical_blk_num) < 11300 && ntohl(aux->logical_blk_num) > 11100)
 						printk(KERN_INFO "ide-tape: finished writing logical blk %u (data %x %x %x %x)\n", ntohl(aux->logical_blk_num), *p++, *p++, *p++, *p++);
 				}
@@ -2139,12 +2146,12 @@ static ide_startstop_t idetape_pc_intr (ide_drive_t *drive)
 		}
 	}
 	if (test_bit(PC_WRITING, &pc->flags)) {
-		if (pc->bio != NULL)
+		if (pc->bh != NULL)
 			idetape_output_buffers(drive, pc, bcount.all);
 		else
 			HWIF(drive)->atapi_output_bytes(drive, pc->current_position, bcount.all);	/* Write the current buffer */
 	} else {
-		if (pc->bio != NULL)
+		if (pc->bh != NULL)
 			idetape_input_buffers(drive, pc, bcount.all);
 		else
 			HWIF(drive)->atapi_input_bytes(drive, pc->current_position, bcount.all);	/* Read the current buffer */
@@ -2520,22 +2527,21 @@ static ide_startstop_t idetape_rw_callback (ide_drive_t *drive)
 	return ide_stopped;
 }
 
-static void idetape_create_read_cmd (idetape_tape_t *tape, idetape_pc_t *pc, unsigned int length, struct bio *bio)
+static void idetape_create_read_cmd(idetape_tape_t *tape, idetape_pc_t *pc, unsigned int length, struct idetape_bh *bh)
 {
-	struct bio *p = bio;
-	struct bio_vec *bv = bio_iovec(p);	/* effective page bh */
+	struct idetape_bh *p = bh;
 	idetape_init_pc(pc);
 	pc->c[0] = IDETAPE_READ_CMD;
 	put_unaligned(htonl(length), (unsigned int *) &pc->c[1]);
 	pc->c[1] = 1;
 	pc->callback = &idetape_rw_callback;
-	pc->bio = bio;
-	bv->bv_len = 0;
+	pc->bh = bh;
+	atomic_set(&bh->b_count, 0);
 	pc->buffer = NULL;
 	if (tape->onstream) {
 		while (p) {
-			bv->bv_len = 0;
-			p = p->bi_next;
+			atomic_set(&p->b_count, 0);
+			p = p->b_reqnext;
 		}
 	}
 	if (!tape->onstream) {
@@ -2551,10 +2557,10 @@ static void idetape_create_read_cmd (idetape_tape_t *tape, idetape_pc_t *pc, uns
 	}
 }
 
-static void idetape_create_read_buffer_cmd(idetape_tape_t *tape, idetape_pc_t *pc, unsigned int length, struct bio *bio)
+static void idetape_create_read_buffer_cmd(idetape_tape_t *tape, idetape_pc_t *pc, unsigned int length, struct idetape_bh *bh)
 {
 	int size = 32768;
-	struct bio *p = bio;
+	struct idetape_bh *p = bh;
 
 	idetape_init_pc(pc);
 	pc->c[0] = IDETAPE_READ_BUFFER_CMD;
@@ -2562,20 +2568,19 @@ static void idetape_create_read_buffer_cmd(idetape_tape_t *tape, idetape_pc_t *p
 	pc->c[7] = size >> 8;
 	pc->c[8] = size & 0xff;
 	pc->callback = &idetape_pc_callback;
-	pc->bio = bio;
-	atomic_set(&bio->bi_cnt, 0);
+	pc->bh = bh;
+	atomic_set(&bh->b_count, 0);
 	pc->buffer = NULL;
 	while (p) {
-		p->bi_size = 0;
-		p = p->bi_next;
+		atomic_set(&p->b_count, 0);
+		p = p->b_reqnext;
 	}
 	pc->request_transfer = pc->buffer_size = size;
 }
 
-static void idetape_create_write_cmd (idetape_tape_t *tape, idetape_pc_t *pc, unsigned int length, struct bio *bio)
+static void idetape_create_write_cmd(idetape_tape_t *tape, idetape_pc_t *pc, unsigned int length, struct idetape_bh *bh)
 {
-	struct bio *p = bio;
-	struct bio_vec *bv= bio_iovec(p);
+	struct idetape_bh *p = bh;
 
 	idetape_init_pc(pc);
 	pc->c[0] = IDETAPE_WRITE_CMD;
@@ -2585,13 +2590,13 @@ static void idetape_create_write_cmd (idetape_tape_t *tape, idetape_pc_t *pc, un
 	set_bit(PC_WRITING, &pc->flags);
 	if (tape->onstream) {
 		while (p) {
-			bv->bv_len = p->bi_size;
-			p = p->bi_next;
+			atomic_set(&p->b_count, p->b_size);
+			p = p->b_reqnext;
 		}
 	}
-	pc->bio = bio;
-	pc->b_data = bio_data(bio);
-	pc->b_count = bio->bi_size;
+	pc->bh = bh;
+	pc->b_data = bh->b_data;
+	pc->b_count = atomic_read(&bh->b_count);
 	pc->buffer = NULL;
 	if (!tape->onstream) {
 		pc->request_transfer = pc->buffer_size = length * tape->tape_block_size;
@@ -2758,7 +2763,7 @@ static ide_startstop_t idetape_do_request(ide_drive_t *drive,
 					tape->req_buffer_fill = 1;
 			}
 			pc = idetape_next_pc_storage(drive);
-			idetape_create_read_cmd(tape, pc, rq->current_nr_sectors, rq->bio);
+			idetape_create_read_cmd(tape, pc, rq->current_nr_sectors, (struct idetape_bh *)rq->special);
 			break;
 		case IDETAPE_WRITE_RQ:
 			tape->buffer_head++;
@@ -2775,12 +2780,12 @@ static ide_startstop_t idetape_do_request(ide_drive_t *drive,
 				calculate_speeds(drive);
 			}
 			pc = idetape_next_pc_storage(drive);
-			idetape_create_write_cmd(tape, pc, rq->current_nr_sectors, rq->bio);
+			idetape_create_write_cmd(tape, pc, rq->current_nr_sectors, (struct idetape_bh *)rq->special);
 			break;
 		case IDETAPE_READ_BUFFER_RQ:
 			tape->postpone_cnt = 0;
 			pc = idetape_next_pc_storage(drive);
-			idetape_create_read_buffer_cmd(tape, pc, rq->current_nr_sectors, rq->bio);
+			idetape_create_read_buffer_cmd(tape, pc, rq->current_nr_sectors, (struct idetape_bh *)rq->special);
 			break;
 		case IDETAPE_ABORTED_WRITE_RQ:
 			rq->flags = IDETAPE_WRITE_RQ;
@@ -2836,67 +2841,59 @@ static inline int idetape_pipeline_active (idetape_tape_t *tape)
 static idetape_stage_t *__idetape_kmalloc_stage (idetape_tape_t *tape, int full, int clear)
 {
 	idetape_stage_t *stage;
-	struct bio *prev_bio, *bio;
+	struct idetape_bh *prev_bh, *bh;
 	int pages = tape->pages_per_stage;
 	char *b_data = NULL;
-	struct bio_vec *bv;
 
 	if ((stage = (idetape_stage_t *) kmalloc (sizeof (idetape_stage_t),GFP_KERNEL)) == NULL)
 		return NULL;
 	stage->next = NULL;
 
-	bio = stage->bio = bio_alloc(GFP_KERNEL,1);
-	bv = bio_iovec(bio);
-	bv->bv_len = 0;
-	if (bio == NULL)
+	bh = stage->bh = (struct idetape_bh *)kmalloc(sizeof(struct idetape_bh), GFP_KERNEL);
+	if (bh == NULL)
 		goto abort;
-	bio->bi_next = NULL;
-	if ((bio->bi_io_vec[0].bv_page = alloc_page(GFP_KERNEL)) == NULL)
+	bh->b_reqnext = NULL;
+	if ((bh->b_data = (char *) __get_free_page (GFP_KERNEL)) == NULL)
 		goto abort;
 	if (clear)
-		memset(bio_data(bio), 0, PAGE_SIZE);
-	bio->bi_size = PAGE_SIZE;
-	if (bv->bv_len == full)
-		bv->bv_len = bio->bi_size;
-
-//	set_bit(BH_Lock, &bio->bi_flags);
+		memset(bh->b_data, 0, PAGE_SIZE);
+	bh->b_size = PAGE_SIZE;
+	atomic_set(&bh->b_count, full ? bh->b_size : 0);
 
 	while (--pages) {
-		if ((bio->bi_io_vec[pages].bv_page = alloc_page(GFP_KERNEL)) == NULL)
+		if ((b_data = (char *) __get_free_page (GFP_KERNEL)) == NULL)
 			goto abort;
 		if (clear)
-			memset(bio_data(bio), 0, PAGE_SIZE);
-		if (bio->bi_size == bv->bv_len + PAGE_SIZE) {
-			bio->bi_size += PAGE_SIZE;
-			bv->bv_len += PAGE_SIZE;
-			bv->bv_offset -= PAGE_SIZE;
+			memset(b_data, 0, PAGE_SIZE);
+		if (bh->b_data == b_data + PAGE_SIZE) {
+			bh->b_size += PAGE_SIZE;
+			bh->b_data -= PAGE_SIZE;
 			if (full)
-				bio->bi_size += PAGE_SIZE;
+				atomic_add(PAGE_SIZE, &bh->b_count);
 			continue;
 		}
-		if (b_data == bio_data(bio) + bio->bi_size) {
-			bio->bi_size += PAGE_SIZE;
+		if (b_data == bh->b_data + bh->b_size) {
+			bh->b_size += PAGE_SIZE;
 			if (full)
-				bio->bi_size += PAGE_SIZE;
+				atomic_add(PAGE_SIZE, &bh->b_count);
 			continue;
 		}
-		prev_bio = bio;
-		if ((bio = bio_alloc(GFP_KERNEL,1)) == NULL) {
-			free_page((unsigned long) bio_data(bio));
+		prev_bh = bh;
+		if ((bh = (struct idetape_bh *)kmalloc(sizeof(struct idetape_bh), GFP_KERNEL)) == NULL) {
+			free_page((unsigned long) b_data);
 			goto abort;
 		}
-		bio->bi_next = NULL;
-		//bio->bi_io_vec[0].bv_offset = b_data;
-		bio->bi_size = PAGE_SIZE;
-		atomic_set(&bio->bi_cnt, full ? bio->bi_size : 0);
-//		set_bit(BH_Lock, &bio->bi_flags);
-		prev_bio->bi_next = bio;
+		bh->b_reqnext = NULL;
+		bh->b_data = b_data;
+		bh->b_size = PAGE_SIZE;
+		atomic_set(&bh->b_count, full ? bh->b_size : 0);
+		prev_bh->b_reqnext = bh;
 	}
-	bio->bi_size -= tape->excess_bh_size;
+	bh->b_size -= tape->excess_bh_size;
 	if (full)
-		atomic_sub(tape->excess_bh_size, &bio->bi_cnt);
+		atomic_sub(tape->excess_bh_size, &bh->b_count);
 	if (tape->onstream)
-		stage->aux = (os_aux_t *) (bio_data(bio) + bio->bi_size - OS_AUX_SIZE);
+		stage->aux = (os_aux_t *) (bh->b_data + bh->b_size - OS_AUX_SIZE);
 	return stage;
 abort:
 	__idetape_kfree_stage(stage);
@@ -2923,40 +2920,40 @@ static idetape_stage_t *idetape_kmalloc_stage (idetape_tape_t *tape)
 
 static void idetape_copy_stage_from_user (idetape_tape_t *tape, idetape_stage_t *stage, const char *buf, int n)
 {
-	struct bio *bio = tape->bio;
+	struct idetape_bh *bh = tape->bh;
 	int count;
 
 	while (n) {
 #if IDETAPE_DEBUG_BUGS
-		if (bio == NULL) {
-			printk(KERN_ERR "ide-tape: bio == NULL in "
+		if (bh == NULL) {
+			printk(KERN_ERR "ide-tape: bh == NULL in "
 				"idetape_copy_stage_from_user\n");
 			return;
 		}
 #endif /* IDETAPE_DEBUG_BUGS */
-		count = min((unsigned long) (bio->bi_size - tape->b_count), (unsigned long) n);
-		copy_from_user(bio_data(bio) + tape->b_count, buf, count);
+		count = min((unsigned int)(bh->b_size - atomic_read(&bh->b_count)), (unsigned int)n);
+		copy_from_user(bh->b_data + atomic_read(&bh->b_count), buf, count);
 		n -= count;
-		bio->bi_size += count;
+		atomic_add(count, &bh->b_count);
 		buf += count;
-		if (tape->b_count == bio->bi_size) {
-			bio = bio->bi_next;
-			if (bio)
-				tape->b_count = 0;
+		if (atomic_read(&bh->b_count) == bh->b_size) {
+			bh = bh->b_reqnext;
+			if (bh)
+				atomic_set(&bh->b_count, 0);
 		}
 	}
-	tape->bio = bio;
+	tape->bh = bh;
 }
 
 static void idetape_copy_stage_to_user (idetape_tape_t *tape, char *buf, idetape_stage_t *stage, int n)
 {
-	struct bio *bio = tape->bio;
+	struct idetape_bh *bh = tape->bh;
 	int count;
 
 	while (n) {
 #if IDETAPE_DEBUG_BUGS
-		if (bio == NULL) {
-			printk(KERN_ERR "ide-tape: bio == NULL in "
+		if (bh == NULL) {
+			printk(KERN_ERR "ide-tape: bh == NULL in "
 				"idetape_copy_stage_to_user\n");
 			return;
 		}
@@ -2968,10 +2965,10 @@ static void idetape_copy_stage_to_user (idetape_tape_t *tape, char *buf, idetape
 		tape->b_count -= count;
 		buf += count;
 		if (!tape->b_count) {
-			tape->bio = bio = bio->bi_next;
-			if (bio) {
-				tape->b_data = bio_data(bio);
-				tape->b_count = bio->bi_size;
+			tape->bh = bh = bh->b_reqnext;
+			if (bh) {
+				tape->b_data = bh->b_data;
+				tape->b_count = atomic_read(&bh->b_count);
 			}
 		}
 	}
@@ -2979,26 +2976,26 @@ static void idetape_copy_stage_to_user (idetape_tape_t *tape, char *buf, idetape
 
 static void idetape_init_merge_stage (idetape_tape_t *tape)
 {
-	struct bio *bio = tape->merge_stage->bio;
+	struct idetape_bh *bh = tape->merge_stage->bh;
 	
-	tape->bio = bio;
+	tape->bh = bh;
 	if (tape->chrdev_direction == idetape_direction_write)
-		atomic_set(&bio->bi_cnt, 0);
+		atomic_set(&bh->b_count, 0);
 	else {
-		tape->b_data = bio_data(bio);
-		tape->b_count = atomic_read(&bio->bi_cnt);
+		tape->b_data = bh->b_data;
+		tape->b_count = atomic_read(&bh->b_count);
 	}
 }
 
 static void idetape_switch_buffers (idetape_tape_t *tape, idetape_stage_t *stage)
 {
-	struct bio *tmp;
+	struct idetape_bh *tmp;
 	os_aux_t *tmp_aux;
 
-	tmp = stage->bio; tmp_aux = stage->aux;
-	stage->bio = tape->merge_stage->bio;
+	tmp = stage->bh; tmp_aux = stage->aux;
+	stage->bh = tape->merge_stage->bh;
 	stage->aux = tape->merge_stage->aux;
-	tape->merge_stage->bio = tmp;
+	tape->merge_stage->bh = tmp;
 	tape->merge_stage->aux = tmp_aux;
 	idetape_init_merge_stage(tape);
 }
@@ -3468,7 +3465,7 @@ static void idetape_update_stats (ide_drive_t *drive)
  * idetape_queue_rw_tail generates a read/write request for the block
  * device interface and wait for it to be serviced.
  */
-static int idetape_queue_rw_tail (ide_drive_t *drive, int cmd, int blocks, struct bio *bio)
+static int idetape_queue_rw_tail(ide_drive_t *drive, int cmd, int blocks, struct idetape_bh *bh)
 {
 	idetape_tape_t *tape = drive->driver_data;
 	struct request rq;
@@ -3485,7 +3482,7 @@ static int idetape_queue_rw_tail (ide_drive_t *drive, int cmd, int blocks, struc
 #endif /* IDETAPE_DEBUG_BUGS */	
 
 	ide_init_drive_cmd(&rq);
-	rq.bio = bio;
+	rq.special = (void *)bh;
 	rq.flags = cmd;
 	rq.sector = tape->first_frame_position;
 	rq.nr_sectors = rq.current_nr_sectors = blocks;
@@ -3527,8 +3524,8 @@ static void idetape_onstream_read_back_buffer (ide_drive_t *drive)
 		if (!first)
 			first = stage;
 		aux = stage->aux;
-		p = bio_data(stage->bio);
-		idetape_queue_rw_tail(drive, IDETAPE_READ_BUFFER_RQ, tape->capabilities.ctl, stage->bio);
+		p = stage->bh->b_data;
+		idetape_queue_rw_tail(drive, IDETAPE_READ_BUFFER_RQ, tape->capabilities.ctl, stage->bh);
 #if ONSTREAM_DEBUG
 		if (tape->debug_level >= 2)
 			printk(KERN_INFO "ide-tape: %s: read back logical block %d, data %x %x %x %x\n", tape->name, logical_blk_num, *p++, *p++, *p++, *p++);
@@ -3684,18 +3681,18 @@ static int idetape_verify_stage (ide_drive_t *drive, idetape_stage_t *stage, int
 	os_aux_t *aux = stage->aux;
 	os_partition_t *par = &aux->partition;
 	struct request *rq = &stage->rq;
-	struct bio *bio;
+	struct idetape_bh *bh;
 
 	if (!tape->onstream)
 		return 1;
 	if (tape->raw) {
 		if (rq->errors) {
-			bio = stage->bio;
-			while (bio) {
-				memset(bio_data(bio), 0, bio->bi_size);
-				bio = bio->bi_next;
+			bh = stage->bh;
+			while (bh) {
+				memset(bh->b_data, 0, bh->b_size);
+				bh = bh->b_reqnext;
 			}
-			strcpy(bio_data(stage->bio), "READ ERROR ON FRAME");
+			strcpy(stage->bh->b_data, "READ ERROR ON FRAME");
 		}
 		return 1;
 	}
@@ -3805,7 +3802,7 @@ static int idetape_add_chrdev_write_request (ide_drive_t *drive, int blocks)
 			 *	Linux is short on memory. Fallback to
 			 *	non-pipelined operation mode for this request.
 			 */
-			return idetape_queue_rw_tail(drive, IDETAPE_WRITE_RQ, blocks, tape->merge_stage->bio);
+			return idetape_queue_rw_tail(drive, IDETAPE_WRITE_RQ, blocks, tape->merge_stage->bh);
 		}
 	}
 	rq = &new_stage->rq;
@@ -3881,7 +3878,7 @@ static void idetape_empty_write_pipeline (ide_drive_t *drive)
 {
 	idetape_tape_t *tape = drive->driver_data;
 	int blocks, min;
-	struct bio *bio;
+	struct idetape_bh *bh;
 	
 #if IDETAPE_DEBUG_BUGS
 	if (tape->chrdev_direction != idetape_direction_write) {
@@ -3900,22 +3897,23 @@ static void idetape_empty_write_pipeline (ide_drive_t *drive)
 
 			blocks++;
 			i = tape->tape_block_size - tape->merge_stage_size % tape->tape_block_size;
-			bio = tape->bio->bi_next;
-			while (bio) {
-				atomic_set(&bio->bi_cnt, 0);
-				bio = bio->bi_next;
+			bh = tape->bh->b_reqnext;
+			while (bh) {
+				atomic_set(&bh->b_count, 0);
+				bh = bh->b_reqnext;
 			}
-			bio = tape->bio;
+			bh = tape->bh;
 			while (i) {
-				if (bio == NULL) {
-					printk(KERN_INFO "ide-tape: bug, bio NULL\n");
+				if (bh == NULL) {
+
+					printk(KERN_INFO "ide-tape: bug, bh NULL\n");
 					break;
 				}
-				min = min(i, bio->bi_size - atomic_read(&bio->bi_cnt));
-				memset(bio_data(bio) + bio->bi_size, 0, min);
-				atomic_add(min, &bio->bi_cnt);
+				min = min(i, (unsigned int)(bh->b_size - atomic_read(&bh->b_count)));
+				memset(bh->b_data + atomic_read(&bh->b_count), 0, min);
+				atomic_add(min, &bh->b_count);
 				i -= min;
-				bio = bio->bi_next;
+				bh = bh->b_reqnext;
 			}
 		}
 		(void) idetape_add_chrdev_write_request(drive, blocks);
@@ -3994,7 +3992,7 @@ static int idetape_initiate_read (ide_drive_t *drive, int max_stages)
 		 *	is switched from completion mode to buffer available
 		 *	mode.
 		 */
-		bytes_read = idetape_queue_rw_tail(drive, IDETAPE_READ_RQ, 0, tape->merge_stage->bio);
+		bytes_read = idetape_queue_rw_tail(drive, IDETAPE_READ_RQ, 0, tape->merge_stage->bh);
 		if (bytes_read < 0) {
 			__idetape_kfree_stage(tape->merge_stage);
 			tape->merge_stage = NULL;
@@ -4135,7 +4133,7 @@ static int idetape_add_chrdev_read_request (ide_drive_t *drive,int blocks)
 		}
 		if (test_bit(IDETAPE_PIPELINE_ERROR, &tape->flags))
 		 	return 0;
-		return idetape_queue_rw_tail(drive, IDETAPE_READ_RQ, blocks, tape->merge_stage->bio);
+		return idetape_queue_rw_tail(drive, IDETAPE_READ_RQ, blocks, tape->merge_stage->bh);
 	}
 	rq_ptr = &tape->first_stage->rq;
 	bytes_read = tape->tape_block_size * (rq_ptr->nr_sectors - rq_ptr->current_nr_sectors);
@@ -4185,23 +4183,23 @@ static int idetape_add_chrdev_read_request (ide_drive_t *drive,int blocks)
 static void idetape_pad_zeros (ide_drive_t *drive, int bcount)
 {
 	idetape_tape_t *tape = drive->driver_data;
-	struct bio *bio;
+	struct idetape_bh *bh;
 	int blocks;
 	
 	while (bcount) {
 		unsigned int count;
 
-		bio = tape->merge_stage->bio;
+		bh = tape->merge_stage->bh;
 		count = min(tape->stage_size, bcount);
 		bcount -= count;
 		blocks = count / tape->tape_block_size;
 		while (count) {
-			atomic_set(&bio->bi_cnt, min(count, bio->bi_size));
-			memset(bio_data(bio), 0, bio->bi_size);
-			count -= atomic_read(&bio->bi_cnt);
-			bio = bio->bi_next;
+			atomic_set(&bh->b_count, min(count, (unsigned int)bh->b_size));
+			memset(bh->b_data, 0, atomic_read(&bh->b_count));
+			count -= atomic_read(&bh->b_count);
+			bh = bh->b_reqnext;
 		}
-		idetape_queue_rw_tail(drive, IDETAPE_WRITE_RQ, blocks, tape->merge_stage->bio);
+		idetape_queue_rw_tail(drive, IDETAPE_WRITE_RQ, blocks, tape->merge_stage->bh);
 	}
 }
 
@@ -4611,7 +4609,7 @@ static ssize_t idetape_chrdev_read (struct file *file, char *buf,
 	if (count == 0)
 		return (0);
 	if (tape->merge_stage_size) {
-		actually_read = min((unsigned long) (tape->merge_stage_size), (unsigned long) count);
+		actually_read = min((unsigned int)(tape->merge_stage_size), (unsigned int)count);
 		idetape_copy_stage_to_user(tape, buf, tape->merge_stage, actually_read);
 		buf += actually_read;
 		tape->merge_stage_size -= actually_read;
@@ -4630,7 +4628,7 @@ static ssize_t idetape_chrdev_read (struct file *file, char *buf,
 		bytes_read = idetape_add_chrdev_read_request(drive, tape->capabilities.ctl);
 		if (bytes_read <= 0)
 			goto finish;
-		temp = min((unsigned long) count, (unsigned long) bytes_read);
+		temp = min((unsigned long)count, (unsigned long)bytes_read);
 		idetape_copy_stage_to_user(tape, buf, tape->merge_stage, temp);
 		actually_read += temp;
 		tape->merge_stage_size = bytes_read-temp;
@@ -4680,7 +4678,7 @@ static void idetape_update_last_marker (ide_drive_t *drive, int last_mark_addr, 
 			"tape block %d\n", tape->last_frame_position);
 #endif
 	idetape_position_tape(drive, last_mark_addr, 0, 0);
-	if (!idetape_queue_rw_tail(drive, IDETAPE_READ_RQ, 1, stage->bio)) {
+	if (!idetape_queue_rw_tail(drive, IDETAPE_READ_RQ, 1, stage->bh)) {
 		printk(KERN_INFO "ide-tape: %s: couldn't read last marker\n",
 			tape->name);
 		__idetape_kfree_stage(stage);
@@ -4701,7 +4699,7 @@ static void idetape_update_last_marker (ide_drive_t *drive, int last_mark_addr, 
 #endif
 	aux->next_mark_addr = htonl(next_mark_addr);
 	idetape_position_tape(drive, last_mark_addr, 0, 0);
-	if (!idetape_queue_rw_tail(drive, IDETAPE_WRITE_RQ, 1, stage->bio)) {
+	if (!idetape_queue_rw_tail(drive, IDETAPE_WRITE_RQ, 1, stage->bh)) {
 		printk(KERN_INFO "ide-tape: %s: couldn't write back marker "
 			"frame at %d\n", tape->name, last_mark_addr);
 		__idetape_kfree_stage(stage);
@@ -4735,9 +4733,9 @@ static void idetape_write_filler (ide_drive_t *drive, int block, int cnt)
 		/* don't write fillers if we cannot position the tape. */
 		return;
 
-	strcpy(bio_data(stage->bio), "Filler");
+	strcpy(stage->bh->b_data, "Filler");
 	while (cnt--) {
-		if (!idetape_queue_rw_tail(drive, IDETAPE_WRITE_RQ, 1, stage->bio)) {
+		if (!idetape_queue_rw_tail(drive, IDETAPE_WRITE_RQ, 1, stage->bh)) {
 			printk(KERN_INFO "ide-tape: %s: write_filler: "
 				"couldn't write header frame\n", tape->name);
 			__idetape_kfree_stage(stage);
@@ -4770,9 +4768,9 @@ static void __idetape_write_header (ide_drive_t *drive, int block, int cnt)
 	header.partition.last_frame_addr = htonl(tape->capacity);
 	header.partition.wrt_pass_cntr = htons(tape->wrt_pass_cntr);
 	header.partition.eod_frame_addr = htonl(tape->eod_frame_addr);
-	memcpy(bio_data(stage->bio), &header, sizeof(header));
+	memcpy(stage->bh->b_data, &header, sizeof(header));
 	while (cnt--) {
-		if (!idetape_queue_rw_tail(drive, IDETAPE_WRITE_RQ, 1, stage->bio)) {
+		if (!idetape_queue_rw_tail(drive, IDETAPE_WRITE_RQ, 1, stage->bh)) {
 			printk(KERN_INFO "ide-tape: %s: couldn't write "
 				"header frame\n", tape->name);
 			__idetape_kfree_stage(stage);
@@ -4905,7 +4903,7 @@ static ssize_t idetape_chrdev_write (struct file *file, const char *buf,
 		 *	is switched from completion mode to buffer available
 		 *	mode.
 		 */
-		retval = idetape_queue_rw_tail(drive, IDETAPE_WRITE_RQ, 0, tape->merge_stage->bio);
+		retval = idetape_queue_rw_tail(drive, IDETAPE_WRITE_RQ, 0, tape->merge_stage->bh);
 		if (retval < 0) {
 			__idetape_kfree_stage(tape->merge_stage);
 			tape->merge_stage = NULL;
@@ -4929,7 +4927,7 @@ static ssize_t idetape_chrdev_write (struct file *file, const char *buf,
 			tape->merge_stage_size = 0;
 		}
 #endif /* IDETAPE_DEBUG_BUGS */
-		actually_written = min((unsigned long) (tape->stage_size - tape->merge_stage_size), (unsigned long) count);
+		actually_written = min((unsigned int)(tape->stage_size - tape->merge_stage_size), (unsigned int)count);
 		idetape_copy_stage_from_user(tape, tape->merge_stage, buf, actually_written);
 		buf += actually_written;
 		tape->merge_stage_size += actually_written;
@@ -5378,13 +5376,13 @@ static int __idetape_analyze_headers (ide_drive_t *drive, int block)
 		printk(KERN_INFO "ide-tape: %s: reading header\n", tape->name);
 #endif
 	idetape_position_tape(drive, block, 0, 0);
-	if (!idetape_queue_rw_tail(drive, IDETAPE_READ_RQ, 1, stage->bio)) {
+	if (!idetape_queue_rw_tail(drive, IDETAPE_READ_RQ, 1, stage->bh)) {
 		printk(KERN_INFO "ide-tape: %s: couldn't read header frame\n",
 			tape->name);
 		__idetape_kfree_stage(stage);
 		return 0;
 	}
-	header = (os_header_t *) bio_data(stage->bio);
+	header = (os_header_t *) stage->bh->b_data;
 	aux = stage->aux;
 	if (strncmp(header->ident_str, "ADR_SEQ", 7) != 0) {
 		printk(KERN_INFO "ide-tape: %s: invalid header identification string\n", tape->name);
