@@ -318,11 +318,6 @@ unw_access_gr (struct unw_frame_info *info, int regnum, unsigned long *val, char
 			}
 		} else {
 			/* access a scratch register */
-			if (!info->pt) {
-				UNW_DPRINT(0, "unwind.%s: no pt-regs; cannot access r%d\n",
-					   __FUNCTION__, regnum);
-				return -1;
-			}
 			pt = get_scratch_regs(info);
 			addr = (unsigned long *) (pt + pt_regs_off(regnum));
 			if (info->pri_unat_loc)
