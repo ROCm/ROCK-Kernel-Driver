@@ -163,7 +163,7 @@ static struct proc_dir_entry * proc_ide_root = NULL;
 static int proc_ide_write_config
 	(struct file *file, const char *buffer, unsigned long count, void *data)
 {
-	ide_hwif_t	*hwif = (ide_hwif_t *)data;
+	ide_hwif_t	*hwif = data;
 	int		for_real = 0;
 	unsigned long	startn = 0, n, flags;
 	const char	*start = NULL, *msg = NULL;
@@ -338,7 +338,7 @@ static int proc_ide_read_config
 	int		len;
 
 #ifdef CONFIG_BLK_DEV_IDEPCI
-	ide_hwif_t	*hwif = (ide_hwif_t *)data;
+	ide_hwif_t	*hwif = data;
 	struct pci_dev	*dev = hwif->pci_dev;
 	if (!IDE_PCI_DEVID_EQ(hwif->pci_devid, IDE_PCI_DEVID_NULL) && dev && dev->bus) {
 		int reg = 0;
@@ -384,7 +384,7 @@ static int proc_ide_read_drivers
 	while (p) {
 		driver = (ide_driver_t *) p->info;
 		if (driver)
-			out += sprintf(out, "%s version %s\n", driver->name, driver->version);
+			out += sprintf(out, "%s\n",driver->name);
 		p = p->next;
 	}
 	len = out - page;
@@ -394,7 +394,7 @@ static int proc_ide_read_drivers
 static int proc_ide_read_imodel
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
-	ide_hwif_t	*hwif = (ide_hwif_t *) data;
+	ide_hwif_t	*hwif = data;
 	int		len;
 	const char	*name;
 
@@ -424,7 +424,7 @@ static int proc_ide_read_imodel
 static int proc_ide_read_mate
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
-	ide_hwif_t	*hwif = (ide_hwif_t *) data;
+	ide_hwif_t	*hwif = data;
 	int		len;
 
 	if (hwif && hwif->mate && hwif->mate->present)
@@ -437,7 +437,7 @@ static int proc_ide_read_mate
 static int proc_ide_read_channel
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
-	ide_hwif_t	*hwif = (ide_hwif_t *) data;
+	ide_hwif_t	*hwif = data;
 	int		len;
 
 	page[0] = hwif->channel ? '1' : '0';
@@ -462,7 +462,7 @@ static int proc_ide_get_identify(ide_drive_t *drive, byte *buf)
 static int proc_ide_read_identify
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
-	ide_drive_t	*drive = (ide_drive_t *)data;
+	ide_drive_t	*drive = data;
 	int		len = 0, i = 0;
 
 	if (drive && !proc_ide_get_identify(drive, page)) {
@@ -483,8 +483,8 @@ static int proc_ide_read_identify
 static int proc_ide_read_settings
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
-	ide_drive_t	*drive = (ide_drive_t *) data;
-	ide_settings_t	*setting = (ide_settings_t *) drive->settings;
+	ide_drive_t	*drive = data;
+	ide_settings_t	*setting = drive->settings;
 	char		*out = page;
 	int		len, rc, mul_factor, div_factor;
 
@@ -515,7 +515,7 @@ static int proc_ide_read_settings
 static int proc_ide_write_settings
 	(struct file *file, const char *buffer, unsigned long count, void *data)
 {
-	ide_drive_t	*drive = (ide_drive_t *) data;
+	ide_drive_t	*drive = data;
 	char		name[MAX_LEN + 1];
 	int		for_real = 0, len;
 	unsigned long	n;
@@ -573,7 +573,15 @@ static int proc_ide_write_settings
 				--n;
 				++p;
 			}
-			setting = ide_find_setting_by_name(drive, name);
+
+			/* Find setting by name */
+			setting = drive->settings;
+
+			while (setting) {
+			    if (strcmp(setting->name, name) == 0)
+				break;
+			    setting = setting->next;
+			}
 			if (!setting)
 				goto parse_error;
 
@@ -590,21 +598,21 @@ parse_error:
 int proc_ide_read_capacity
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
-	ide_drive_t	*drive = (ide_drive_t *) data;
-	ide_driver_t    *driver = (ide_driver_t *) drive->driver;
+	ide_drive_t	*drive = data;
+	ide_driver_t    *driver = drive->driver;
 	int		len;
 
 	if (!driver)
 		len = sprintf(page, "(none)\n");
         else
-		len = sprintf(page,"%llu\n", (unsigned long long) ((ide_driver_t *)drive->driver)->capacity(drive));
+		len = sprintf(page,"%llu\n", (unsigned long long) drive->driver->capacity(drive));
 	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
 }
 
 int proc_ide_read_geometry
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
-	ide_drive_t	*drive = (ide_drive_t *) data;
+	ide_drive_t	*drive = data;
 	char		*out = page;
 	int		len;
 
@@ -617,7 +625,7 @@ int proc_ide_read_geometry
 static int proc_ide_read_dmodel
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
-	ide_drive_t	*drive = (ide_drive_t *) data;
+	ide_drive_t	*drive = data;
 	struct hd_driveid *id = drive->id;
 	int		len;
 
@@ -635,14 +643,14 @@ static int proc_ide_read_driver
 	if (!driver)
 		len = sprintf(page, "(none)\n");
 	else
-		len = sprintf(page, "%s version %s\n", driver->name, driver->version);
+		len = sprintf(page, "%s\n", driver->name);
 	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
 }
 
 static int proc_ide_write_driver
 	(struct file *file, const char *buffer, unsigned long count, void *data)
 {
-	ide_drive_t	*drive = (ide_drive_t *) data;
+	ide_drive_t	*drive = data;
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
@@ -654,7 +662,7 @@ static int proc_ide_write_driver
 static int proc_ide_read_media
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
-	ide_drive_t	*drive = (ide_drive_t *) data;
+	ide_drive_t	*drive = data;
 	const char	*media;
 	int		len;
 
@@ -787,7 +795,6 @@ void destroy_proc_ide_drives(ide_hwif_t *hwif)
 
 	for (d = 0; d < MAX_DRIVES; d++) {
 		ide_drive_t *drive = &hwif->drives[d];
-//		ide_driver_t *driver = drive->driver;
 
 		if (drive->proc)
 			destroy_proc_ide_device(hwif, drive);

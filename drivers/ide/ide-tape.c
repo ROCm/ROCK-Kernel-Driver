@@ -1835,10 +1835,9 @@ static void idetape_remove_stage_head (ide_drive_t *drive)
  *	idetape_end_request is used to finish servicing a request, and to
  *	insert a pending pipeline request into the main device queue.
  */
-static void idetape_end_request (byte uptodate, ide_hwgroup_t *hwgroup)
+static int idetape_end_request(ide_drive_t *drive, int uptodate)
 {
-	ide_drive_t *drive = hwgroup->drive;
-	struct request *rq = hwgroup->rq;
+	struct request *rq = HWGROUP(drive)->rq;
 	idetape_tape_t *tape = drive->driver_data;
 	unsigned long flags;
 	int error;
@@ -1932,6 +1931,8 @@ static void idetape_end_request (byte uptodate, ide_hwgroup_t *hwgroup)
 	if (tape->active_data_request == NULL)
 		clear_bit(IDETAPE_PIPELINE_ACTIVE, &tape->flags);
 	spin_unlock_irqrestore(&tape->spinlock, flags);
+
+	return 0;
 }
 
 static ide_startstop_t idetape_request_sense_callback (ide_drive_t *drive)
@@ -1944,10 +1945,10 @@ static ide_startstop_t idetape_request_sense_callback (ide_drive_t *drive)
 #endif /* IDETAPE_DEBUG_LOG */
 	if (!tape->pc->error) {
 		idetape_analyze_error (drive, (idetape_request_sense_result_t *) tape->pc->buffer);
-		idetape_end_request (1, HWGROUP (drive));
+		idetape_end_request(drive, 1);
 	} else {
 		printk (KERN_ERR "ide-tape: Error in REQUEST SENSE itself - Aborting request!\n");
-		idetape_end_request (0, HWGROUP (drive));
+		idetape_end_request(drive, 0);
 	}
 	return ide_stopped;
 }
@@ -2012,7 +2013,7 @@ static ide_startstop_t idetape_retry_pc (ide_drive_t *drive)
 /*
  *	idetape_postpone_request postpones the current request so that
  *	ide.c will be able to service requests from another device on
- *	the same hwgroup while we are polling for DSC.
+ *	the same interface while we are polling for DSC.
  */
 static void idetape_postpone_request (ide_drive_t *drive)
 {
@@ -2348,7 +2349,7 @@ static ide_startstop_t idetape_pc_callback (ide_drive_t *drive)
 		printk (KERN_INFO "ide-tape: Reached idetape_pc_callback\n");
 #endif /* IDETAPE_DEBUG_LOG */
 
-	idetape_end_request (tape->pc->error ? 0 : 1, HWGROUP(drive));
+	idetape_end_request(drive, tape->pc->error ? 0 : 1);
 	return ide_stopped;
 }
 
@@ -2397,7 +2398,7 @@ static ide_startstop_t idetape_onstream_buffer_fill_callback (ide_drive_t *drive
 	if (tape->debug_level >= 1)
 		printk(KERN_INFO "ide-tape: buffer fill callback, %d/%d\n", tape->cur_frames, tape->max_frames);
 #endif
-	idetape_end_request (tape->pc->error ? 0 : 1, HWGROUP(drive));
+	idetape_end_request(drive, tape->pc->error ? 0 : 1);
 	return ide_stopped;
 }
 
@@ -2508,7 +2509,7 @@ static ide_startstop_t idetape_rw_callback (ide_drive_t *drive)
 		tape->avg_time = jiffies;
 	}
 
-#if IDETAPE_DEBUG_LOG	
+#if IDETAPE_DEBUG_LOG
 	if (tape->debug_level >= 4)
 		printk (KERN_INFO "ide-tape: Reached idetape_rw_callback\n");
 #endif /* IDETAPE_DEBUG_LOG */
@@ -2517,9 +2518,9 @@ static ide_startstop_t idetape_rw_callback (ide_drive_t *drive)
 	rq->current_nr_sectors -= blocks;
 
 	if (!tape->pc->error)
-		idetape_end_request (1, HWGROUP (drive));
+		idetape_end_request(drive, 1);
 	else
-		idetape_end_request (tape->pc->error, HWGROUP (drive));
+		idetape_end_request(drive, tape->pc->error);
 	return ide_stopped;
 }
 
@@ -2630,7 +2631,7 @@ static ide_startstop_t idetape_do_request (ide_drive_t *drive, struct request *r
 		 *	We do not support buffer cache originated requests.
 		 */
 		printk (KERN_NOTICE "ide-tape: %s: Unsupported command in request queue (%ld)\n", drive->name, rq->flags);
-		ide_end_request (0, HWGROUP (drive));			/* Let the common code handle it */
+		ide_end_request(drive, 0);			/* Let the common code handle it */
 		return ide_stopped;
 	}
 
@@ -2644,7 +2645,7 @@ static ide_startstop_t idetape_do_request (ide_drive_t *drive, struct request *r
 	if (postponed_rq != NULL)
 		if (rq != postponed_rq) {
 			printk (KERN_ERR "ide-tape: ide-tape.c bug - Two DSC requests were queued\n");
-			idetape_end_request (0, HWGROUP (drive));
+			idetape_end_request(drive, 0);
 			return ide_stopped;
 		}
 #endif /* IDETAPE_DEBUG_BUGS */
@@ -2772,7 +2773,7 @@ static ide_startstop_t idetape_do_request (ide_drive_t *drive, struct request *r
 			break;
 		case IDETAPE_ABORTED_WRITE_RQ:
 			rq->flags = IDETAPE_WRITE_RQ;
-			idetape_end_request (IDETAPE_ERROR_EOD, HWGROUP(drive));
+			idetape_end_request(drive, IDETAPE_ERROR_EOD);
 			return ide_stopped;
 		case IDETAPE_ABORTED_READ_RQ:
 #if IDETAPE_DEBUG_LOG
@@ -2780,7 +2781,7 @@ static ide_startstop_t idetape_do_request (ide_drive_t *drive, struct request *r
 				printk(KERN_INFO "ide-tape: %s: detected aborted read rq\n", tape->name);
 #endif
 			rq->flags = IDETAPE_READ_RQ;
-			idetape_end_request (IDETAPE_ERROR_EOD, HWGROUP(drive));
+			idetape_end_request(drive, IDETAPE_ERROR_EOD);
 			return ide_stopped;
 		case IDETAPE_PC_RQ1:
 			pc = (idetape_pc_t *) rq->buffer;
@@ -2791,7 +2792,7 @@ static ide_startstop_t idetape_do_request (ide_drive_t *drive, struct request *r
 			return ide_stopped;
 		default:
 			printk (KERN_ERR "ide-tape: bug in IDETAPE_RQ_CMD macro\n");
-			idetape_end_request (0, HWGROUP (drive));
+			idetape_end_request(drive, 0);
 			return ide_stopped;
 	}
 	return idetape_issue_packet_command (drive, pc);
@@ -3118,7 +3119,7 @@ static ide_startstop_t idetape_read_position_callback (ide_drive_t *drive)
 		if (result->bpu) {
 			printk (KERN_INFO "ide-tape: Block location is unknown to the tape\n");
 			clear_bit (IDETAPE_ADDRESS_VALID, &tape->flags);
-			idetape_end_request (0, HWGROUP (drive));
+			idetape_end_request(drive, 0);
 		} else {
 #if IDETAPE_DEBUG_LOG
 			if (tape->debug_level >= 2)
@@ -3129,10 +3130,10 @@ static ide_startstop_t idetape_read_position_callback (ide_drive_t *drive)
 			tape->last_frame_position = ntohl (result->last_block);
 			tape->blocks_in_buffer = result->blocks_in_buffer[2];
 			set_bit (IDETAPE_ADDRESS_VALID, &tape->flags);
-			idetape_end_request (1, HWGROUP (drive));
+			idetape_end_request(drive, 1);
 		}
 	} else {
-		idetape_end_request (0, HWGROUP (drive));
+		idetape_end_request(drive, 0);
 	}
 	return ide_stopped;
 }
@@ -6143,7 +6144,6 @@ int idetape_reinit(ide_drive_t *drive);
  */
 static ide_driver_t idetape_driver = {
 	name:			"ide-tape",
-	version:		IDETAPE_VERSION,
 	media:			ide_tape,
 	busy:			1,
 	supports_dma:		1,

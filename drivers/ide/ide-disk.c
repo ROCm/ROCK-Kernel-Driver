@@ -125,7 +125,7 @@ static ide_startstop_t do_rw_disk (ide_drive_t *drive, struct request *rq, unsig
 {
 	if (!(rq->flags & REQ_CMD)) {
 		blk_dump_rq_flags(rq, "do_rw_disk, bad command");
-		ide_end_request(0, HWGROUP(drive));
+		ide_end_request(drive, 0);
 		return ide_stopped;
 	}
 
@@ -324,7 +324,6 @@ static ide_startstop_t lba_48_rw_disk (ide_drive_t *drive, struct request *rq, u
 	args.posthandler	= NULL;
 	args.rq			= (struct request *) rq;
 	args.block		= block;
-	rq->special		= NULL;
 	rq->special		= (ide_task_t *)&args;
 
 	return do_rw_taskfile(drive, &args);
@@ -1042,7 +1041,6 @@ int idedisk_reinit(ide_drive_t *drive);
  */
 static ide_driver_t idedisk_driver = {
 	name:			"ide-disk",
-	version:		IDEDISK_VERSION,
 	media:			ide_disk,
 	busy:			0,
 	supports_dma:		1,

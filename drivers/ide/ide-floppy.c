@@ -667,11 +667,10 @@ static void idefloppy_write_zeros (ide_drive_t *drive, unsigned int bcount)
  *	For read/write requests, we will call ide_end_request to pass to the
  *	next buffer.
  */
-static void idefloppy_end_request (byte uptodate, ide_hwgroup_t *hwgroup)
+static int idefloppy_end_request(ide_drive_t *drive, int uptodate)
 {
-	ide_drive_t *drive = hwgroup->drive;
 	idefloppy_floppy_t *floppy = drive->driver_data;
-	struct request *rq = hwgroup->rq;
+	struct request *rq = HWGROUP(drive)->rq;
 	int error;
 
 #if IDEFLOPPY_DEBUG_LOG
@@ -687,13 +686,15 @@ static void idefloppy_end_request (byte uptodate, ide_hwgroup_t *hwgroup)
 		floppy->failed_pc = NULL;
 	/* Why does this happen? */
 	if (!rq)
-		return;
+		return 0;
 	if (!(rq->flags & IDEFLOPPY_RQ)) {
-		ide_end_request (uptodate, hwgroup);
-		return;
+		ide_end_request(drive, uptodate);
+		return 0;
 	}
 	rq->errors = error;
 	ide_end_drive_cmd (drive, 0, 0);
+
+	return 0;
 }
 
 static void idefloppy_input_buffers (ide_drive_t *drive, idefloppy_pc_t *pc, unsigned int bcount)
@@ -706,7 +707,7 @@ static void idefloppy_input_buffers (ide_drive_t *drive, idefloppy_pc_t *pc, uns
 		if (pc->b_count == bio->bi_size) {
 			rq->sector += rq->current_nr_sectors;
 			rq->nr_sectors -= rq->current_nr_sectors;
-			idefloppy_end_request (1, HWGROUP(drive));
+			idefloppy_end_request(drive, 1);
 			if ((bio = rq->bio) != NULL)
 				pc->b_count = 0;
 		}
@@ -731,7 +732,7 @@ static void idefloppy_output_buffers (ide_drive_t *drive, idefloppy_pc_t *pc, un
 		if (!pc->b_count) {
 			rq->sector += rq->current_nr_sectors;
 			rq->nr_sectors -= rq->current_nr_sectors;
-			idefloppy_end_request (1, HWGROUP(drive));
+			idefloppy_end_request(drive, 1);
 			if ((bio = rq->bio) != NULL) {
 				pc->b_data = bio_data(bio);
 				pc->b_count = bio->bi_size;
@@ -755,7 +756,7 @@ static void idefloppy_update_buffers (ide_drive_t *drive, idefloppy_pc_t *pc)
 	struct bio *bio = rq->bio;
 
 	while ((bio = rq->bio) != NULL)
-		idefloppy_end_request (1, HWGROUP(drive));
+		idefloppy_end_request(drive, 1);
 }
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 
@@ -818,10 +819,10 @@ static void idefloppy_request_sense_callback (ide_drive_t *drive)
 #endif /* IDEFLOPPY_DEBUG_LOG */
 	if (!floppy->pc->error) {
 		idefloppy_analyze_error (drive,(idefloppy_request_sense_result_t *) floppy->pc->buffer);
-		idefloppy_end_request (1,HWGROUP (drive));
+		idefloppy_end_request(drive, 1);
 	} else {
 		printk (KERN_ERR "Error in REQUEST SENSE itself - Aborting request!\n");
-		idefloppy_end_request (0,HWGROUP (drive));
+		idefloppy_end_request(drive, 0);
 	}
 }
 
@@ -836,7 +837,7 @@ static void idefloppy_pc_callback (ide_drive_t *drive)
 	printk (KERN_INFO "ide-floppy: Reached idefloppy_pc_callback\n");
 #endif /* IDEFLOPPY_DEBUG_LOG */
 
-	idefloppy_end_request (floppy->pc->error ? 0:1, HWGROUP(drive));
+	idefloppy_end_request(drive, floppy->pc->error ? 0:1);
 }
 
 /*
@@ -1159,7 +1160,7 @@ static void idefloppy_rw_callback (ide_drive_t *drive)
 	printk (KERN_INFO "ide-floppy: Reached idefloppy_rw_callback\n");
 #endif /* IDEFLOPPY_DEBUG_LOG */
 
-	idefloppy_end_request(1, HWGROUP(drive));
+	idefloppy_end_request(drive, 1);
 	return;
 }
 
@@ -1293,13 +1294,13 @@ static ide_startstop_t idefloppy_do_request (ide_drive_t *drive, struct request 
 				drive->name, floppy->failed_pc->c[0], floppy->sense_key, floppy->asc, floppy->ascq);
 		else
 			printk (KERN_ERR "ide-floppy: %s: I/O error\n", drive->name);
-		idefloppy_end_request (0, HWGROUP(drive));
+		idefloppy_end_request(drive, 0);
 		return ide_stopped;
 	}
 	if (rq->flags & REQ_CMD) {
 		if (rq->sector % floppy->bs_factor || rq->nr_sectors % floppy->bs_factor) {
 			printk ("%s: unsupported r/w request size\n", drive->name);
-			idefloppy_end_request (0, HWGROUP(drive));
+			idefloppy_end_request(drive, 0);
 			return ide_stopped;
 		}
 		pc = idefloppy_next_pc_storage (drive);
@@ -1308,7 +1309,7 @@ static ide_startstop_t idefloppy_do_request (ide_drive_t *drive, struct request 
 		pc = (idefloppy_pc_t *) rq->buffer;
 	} else {
 		blk_dump_rq_flags(rq, "ide-floppy: unsupported command in queue");
-		idefloppy_end_request (0,HWGROUP (drive));
+		idefloppy_end_request(drive, 0);
 		return ide_stopped;
 	}
 	pc->rq = rq;
@@ -2057,7 +2058,6 @@ int idefloppy_reinit(ide_drive_t *drive);
  */
 static ide_driver_t idefloppy_driver = {
 	name:			"ide-floppy",
-	version:		IDEFLOPPY_VERSION,
 	media:			ide_floppy,
 	busy:			0,
 	supports_dma:		1,

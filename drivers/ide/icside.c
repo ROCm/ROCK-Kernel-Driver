@@ -341,7 +341,7 @@ static ide_startstop_t icside_dmaintr(ide_drive_t *drive)
 			rq = HWGROUP(drive)->rq;
 			for (i = rq->nr_sectors; i > 0;) {
 				i -= rq->current_nr_sectors;
-				ide_end_request(1, HWGROUP(drive));
+				ide_end_request(drive, 1);
 			}
 			return ide_stopped;
 		}

@@ -215,7 +215,7 @@ ide_startstop_t ide_dma_intr (ide_drive_t *drive)
 		if (!dma_stat) {
 			struct request *rq = HWGROUP(drive)->rq;
 
-			__ide_end_request(HWGROUP(drive), 1, rq->nr_sectors);
+			__ide_end_request(drive, 1, rq->nr_sectors);
 			return ide_stopped;
 		}
 		printk("%s: dma_intr: bad DMA status (dma_stat=%x)\n", 

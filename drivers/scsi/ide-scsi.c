@@ -259,11 +259,10 @@ static void hexdump(u8 *x, int len)
 	printk("]\n");
 }
 
-static void idescsi_end_request (byte uptodate, ide_hwgroup_t *hwgroup)
+static int idescsi_end_request(ide_drive_t *drive, int uptodate)
 {
-	ide_drive_t *drive = hwgroup->drive;
 	idescsi_scsi_t *scsi = drive->driver_data;
-	struct request *rq = hwgroup->rq;
+	struct request *rq = HWGROUP(drive)->rq;
 	idescsi_pc_t *pc = (idescsi_pc_t *) rq->special;
 	int log = test_bit(IDESCSI_LOG_CMD, &scsi->log);
 	struct Scsi_Host *host;
@@ -271,8 +270,8 @@ static void idescsi_end_request (byte uptodate, ide_hwgroup_t *hwgroup)
 	unsigned long flags;
 
 	if (!(rq->flags & REQ_SPECIAL)) {
-		ide_end_request (uptodate, hwgroup);
-		return;
+		ide_end_request(drive, uptodate);
+		return 0;
 	}
 	ide_end_drive_cmd (drive, 0, 0);
 	if (rq->errors >= ERROR_MAX) {
@@ -302,6 +301,8 @@ static void idescsi_end_request (byte uptodate, ide_hwgroup_t *hwgroup)
 	idescsi_free_bio (rq->bio);
 	kfree(pc); kfree(rq);
 	scsi->pc = NULL;
+
+	return 0;
 }
 
 static inline unsigned long get_timeout(idescsi_pc_t *pc)
@@ -341,7 +342,7 @@ static ide_startstop_t idescsi_pc_intr (ide_drive_t *drive)
 		ide__sti();
 		if (status & ERR_STAT)
 			rq->errors++;
-		idescsi_end_request (1, HWGROUP(drive));
+		idescsi_end_request(drive, 1);
 		return ide_stopped;
 	}
 	bcount = IN_BYTE (IDE_BCOUNTH_REG) << 8 | IN_BYTE (IDE_BCOUNTL_REG);
@@ -470,7 +471,7 @@ static ide_startstop_t idescsi_do_request (ide_drive_t *drive, struct request *r
 		return idescsi_issue_pc (drive, (idescsi_pc_t *) rq->special);
 	}
 	blk_dump_rq_flags(rq, "ide-scsi: unsup command");
-	idescsi_end_request (0,HWGROUP (drive));
+	idescsi_end_request(drive, 0);
 	return ide_stopped;
 }
 
@@ -541,7 +542,6 @@ int idescsi_reinit(ide_drive_t *drive);
  */
 static ide_driver_t idescsi_driver = {
 	name:			"ide-scsi",
-	version:		IDESCSI_VERSION,
 	media:			ide_scsi,
 	busy:			0,
 	supports_dma:		1,

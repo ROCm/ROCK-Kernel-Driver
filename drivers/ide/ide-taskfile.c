@@ -632,7 +632,7 @@ ide_startstop_t taskfile_error (ide_drive_t *drive, const char *msg, byte stat)
 		if (drive->driver != NULL)
 			DRIVER(drive)->end_request(0, HWGROUP(drive));
 		else
-			ide_end_request(0, HWGROUP(drive));
+			ide_end_request(drive, 0);
 	} else {
 		if ((rq->errors & ERROR_RESET) == ERROR_RESET) {
 			++rq->errors;
@@ -748,7 +748,7 @@ ide_startstop_t task_in_intr (ide_drive_t *drive)
 	if (--rq->current_nr_sectors <= 0) {
 		/* (hs): swapped next 2 lines */
 		DTF("Request Ended stat: %02x\n", GET_STAT());
-		if (ide_end_request(1, HWGROUP(drive))) {
+		if (ide_end_request(drive, 1)) {
 			ide_set_handler(drive, &task_in_intr,  WAIT_CMD, NULL);
 			return ide_started;
 		}
@@ -851,7 +851,7 @@ ide_startstop_t task_mulin_intr (ide_drive_t *drive)
 			rq->current_nr_sectors -= nsect;
 			stat = altstat_multi_poll(drive, GET_ALTSTAT(), "read");
 		}
-		ide_end_request(1, HWGROUP(drive));
+		ide_end_request(drive, 1);
 		return ide_stopped;
 	}
 #endif /* ALTSTAT_SCREW_UP */
@@ -873,7 +873,7 @@ ide_startstop_t task_mulin_intr (ide_drive_t *drive)
 		rq->current_nr_sectors -= nsect;
 		msect -= nsect;
 		if (!rq->current_nr_sectors) {
-			if (!ide_end_request(1, HWGROUP(drive)))
+			if (!ide_end_request(drive, 1))
 				return ide_stopped;
 		}
 	} while (msect);
@@ -941,7 +941,7 @@ ide_startstop_t task_out_intr (ide_drive_t *drive)
 		return ide_error(drive, "task_out_intr", stat);
 
 	if (!rq->current_nr_sectors)
-		if (!ide_end_request(1, HWGROUP(drive)))
+		if (!ide_end_request(drive, 1))
 			return ide_stopped;
 
 	if ((rq->current_nr_sectors==1) ^ (stat & DRQ_STAT)) {
@@ -993,7 +993,7 @@ ide_startstop_t task_mulout_intr (ide_drive_t *drive)
 		 * there may be more, ide_do_request will restart it if
 		 * necessary
 		 */
-		ide_end_request(1, HWGROUP(drive));
+		ide_end_request(drive, 1);
 		return ide_stopped;
 	}
 
@@ -1028,7 +1028,7 @@ ide_startstop_t task_mulout_intr (ide_drive_t *drive)
 			rq->current_nr_sectors -= nsect;
 			stat = altstat_multi_poll(drive, GET_ALTSTAT(), "write");
 		}
-		ide_end_request(1, HWGROUP(drive));
+		ide_end_request(drive, 1);
 		return ide_stopped;
 	}
 #endif /* ALTSTAT_SCREW_UP */
@@ -1109,7 +1109,7 @@ ide_startstop_t bio_mulout_intr (ide_drive_t *drive)
 			return startstop;
 		}
 
-		__ide_end_request(HWGROUP(drive), 1, rq->hard_nr_sectors);
+		__ide_end_request(drive, 1, rq->hard_nr_sectors);
 		HWGROUP(drive)->wrq.bio = NULL;
 		return ide_stopped;
 	}

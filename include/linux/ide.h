@@ -367,6 +367,8 @@ typedef union {
 	} b;
 } special_t;
 
+struct ide_settings_s;
+
 typedef struct ide_drive_s {
 	request_queue_t		 queue;	/* request queue */
 	struct ide_drive_s 	*next;	/* circular list of hwgroup drives */
@@ -415,7 +417,7 @@ typedef struct ide_drive_s {
 	byte		nowerr;		/* used for ignoring WRERR_STAT */
 	byte		sect0;		/* offset of first sector for DM6:DDO */
 	unsigned int	usage;		/* current "open()" count for drive */
-	byte 		head;		/* "real" number of heads */
+	byte		head;		/* "real" number of heads */
 	byte		sect;		/* "real" sectors per track */
 	byte		bios_head;	/* BIOS/fdisk/LILO number of heads */
 	byte		bios_sect;	/* BIOS/fdisk/LILO sectors per track */
@@ -433,7 +435,7 @@ typedef struct ide_drive_s {
 	void		*driver_data;	/* extra driver data */
 	devfs_handle_t	de;		/* directory for device */
 	struct proc_dir_entry *proc;	/* /proc/ide/ directory entry */
-	void		*settings;	/* /proc/ide/ drive settings */
+	struct ide_settings_s *settings;    /* /proc/ide/ drive settings */
 	char		driver_req[10];	/* requests specific driver */
 	int		last_lun;	/* last logical unit */
 	int		forced_lun;	/* if hdxlun was given at boot */
@@ -652,7 +654,6 @@ typedef struct ide_settings_s {
 
 void ide_add_setting(ide_drive_t *drive, const char *name, int rw, int read_ioctl, int write_ioctl, int data_type, int min, int max, int mul_factor, int div_factor, void *data, ide_procset_t *set);
 void ide_remove_setting(ide_drive_t *drive, char *name);
-ide_settings_t *ide_find_setting_by_name(ide_drive_t *drive, char *name);
 int ide_read_setting(ide_drive_t *t, ide_settings_t *setting);
 int ide_write_setting(ide_drive_t *drive, ide_settings_t *setting, int val);
 void ide_add_generic_settings(ide_drive_t *drive);
@@ -703,44 +704,29 @@ read_proc_t proc_ide_read_geometry;
  */
 #define IDE_SUBDRIVER_VERSION	1
 
-typedef int		(ide_cleanup_proc)(ide_drive_t *);
-typedef int		(ide_standby_proc)(ide_drive_t *);
-typedef int		(ide_flushcache_proc)(ide_drive_t *);
-typedef ide_startstop_t	(ide_do_request_proc)(ide_drive_t *, struct request *, unsigned long);
-typedef void		(ide_end_request_proc)(byte, ide_hwgroup_t *);
-typedef int		(ide_ioctl_proc)(ide_drive_t *, struct inode *, struct file *, unsigned int, unsigned long);
-typedef int		(ide_open_proc)(struct inode *, struct file *, ide_drive_t *);
-typedef void		(ide_release_proc)(struct inode *, struct file *, ide_drive_t *);
-typedef int		(ide_check_media_change_proc)(ide_drive_t *);
-typedef void		(ide_revalidate_proc)(ide_drive_t *);
-typedef void		(ide_pre_reset_proc)(ide_drive_t *);
-typedef unsigned long	(ide_capacity_proc)(ide_drive_t *);
-typedef ide_startstop_t	(ide_special_proc)(ide_drive_t *);
 typedef void		(ide_setting_proc)(ide_drive_t *);
-typedef int		(ide_driver_reinit_proc)(ide_drive_t *);
 
 typedef struct ide_driver_s {
 	const char			*name;
-	const char			*version;
 	byte				media;
 	unsigned busy			: 1;
 	unsigned supports_dma		: 1;
 	unsigned supports_dsc_overlap	: 1;
-	ide_cleanup_proc		*cleanup;
-	ide_standby_proc		*standby;
-	ide_flushcache_proc		*flushcache;
-	ide_do_request_proc		*do_request;
-	ide_end_request_proc		*end_request;
-	ide_ioctl_proc			*ioctl;
-	ide_open_proc			*open;
-	ide_release_proc		*release;
-	ide_check_media_change_proc	*media_change;
-	ide_revalidate_proc		*revalidate;
-	ide_pre_reset_proc		*pre_reset;
-	ide_capacity_proc		*capacity;
-	ide_special_proc		*special;
+	int (*cleanup)(ide_drive_t *);
+	int (*standby)(ide_drive_t *);
+	int (*flushcache)(ide_drive_t *);
+	ide_startstop_t	(*do_request)(ide_drive_t *, struct request *, unsigned long);
+	int (*end_request)(ide_drive_t *drive, int uptodate);
+	int (*ioctl)(ide_drive_t *, struct inode *, struct file *, unsigned int, unsigned long);
+	int (*open)(struct inode *, struct file *, ide_drive_t *);
+	void (*release)(struct inode *, struct file *, ide_drive_t *);
+	int (*media_change)(ide_drive_t *);
+	void (*revalidate)(ide_drive_t *);
+	void (*pre_reset)(ide_drive_t *);
+	unsigned long (*capacity)(ide_drive_t *);
+	ide_startstop_t	(*special)(ide_drive_t *);
 	ide_proc_entry_t		*proc;
-	ide_driver_reinit_proc		*driver_reinit;
+	int (*driver_reinit)(ide_drive_t *);
 } ide_driver_t;
 
 #define DRIVER(drive)		((ide_driver_t *)((drive)->driver))
@@ -752,13 +738,12 @@ typedef struct ide_driver_s {
 #define IDE_PROBE_MODULE		1
 #define IDE_DRIVER_MODULE		2
 
-typedef int	(ide_module_init_proc)(void);
 
 typedef struct ide_module_s {
-	int				type;
-	ide_module_init_proc		*init;
-	void				*info;
-	struct ide_module_s		*next;
+	int type;
+	int (*init)(void);
+	void *info;
+	struct ide_module_s *next;
 } ide_module_t;
 
 /*
@@ -783,10 +768,8 @@ extern int noautodma;
 #define LOCAL_END_REQUEST	/* Don't generate end_request in blk.h */
 #include <linux/blk.h>
 
-inline int __ide_end_request(ide_hwgroup_t *, int, int);
-int ide_end_request(byte uptodate, ide_hwgroup_t *hwgroup);
-
-int drive_is_ready (ide_drive_t *drive);
+extern int __ide_end_request(ide_drive_t *drive, int uptodate, int nr_secs);
+extern int ide_end_request(ide_drive_t *drive, int uptodate);
 
 /*
  * This is used on exit from the driver, to designate the next irq handler
@@ -1141,5 +1124,7 @@ void export_ide_init_queue (ide_drive_t *drive);
 byte export_probe_for_drive (ide_drive_t *drive);
 
 extern spinlock_t ide_lock;
+
+extern int drive_is_ready(ide_drive_t *drive);
 
 #endif /* _IDE_H */

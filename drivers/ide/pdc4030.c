@@ -345,7 +345,7 @@ read_next:
 	rq->nr_sectors -= nsect;
 	total_remaining = rq->nr_sectors;
 	if ((rq->current_nr_sectors -= nsect) <= 0) {
-		ide_end_request(1, HWGROUP(drive));
+		ide_end_request(drive, 1);
 	}
 /*
  * Now the data has been read in, do the following:
@@ -407,7 +407,8 @@ static ide_startstop_t promise_complete_pollfunc(ide_drive_t *drive)
 #ifdef DEBUG_WRITE
 	printk(KERN_DEBUG "%s: Write complete - end_request\n", drive->name);
 #endif
-	__ide_end_request(hwgroup, 1, rq->nr_sectors);
+	__ide_end_request(drive, 1, rq->nr_sectors);
+
 	return ide_stopped;
 }
 
@@ -571,7 +572,7 @@ ide_startstop_t do_pdc4030_io (ide_drive_t *drive, ide_task_t *task)
 /* Check that it's a regular command. If not, bomb out early. */
 	if (!(rq->flags & REQ_CMD)) {
 		blk_dump_rq_flags(rq, "pdc4030 bad flags");
-		ide_end_request(0, HWGROUP(drive));
+		ide_end_request(drive, 0);
 		return ide_stopped;
 	}
 
@@ -633,7 +634,7 @@ ide_startstop_t do_pdc4030_io (ide_drive_t *drive, ide_task_t *task)
 
 	default:
 		printk(KERN_ERR "pdc4030: command not READ or WRITE! Huh?\n");
-		ide_end_request(0, HWGROUP(drive));
+		ide_end_request(drive, 0);
 		return ide_stopped;
 	}
 }

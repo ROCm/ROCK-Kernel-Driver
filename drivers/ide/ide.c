@@ -372,15 +372,14 @@ int ide_system_bus_speed (void)
 	return system_bus_speed;
 }
 
-inline int __ide_end_request(ide_hwgroup_t *hwgroup, int uptodate, int nr_secs)
+int __ide_end_request(ide_drive_t *drive, int uptodate, int nr_secs)
 {
-	ide_drive_t *drive = hwgroup->drive;
 	struct request *rq;
 	unsigned long flags;
 	int ret = 1;
 
 	spin_lock_irqsave(&ide_lock, flags);
-	rq = hwgroup->rq;
+	rq = HWGROUP(drive)->rq;
 
 	BUG_ON(!(rq->flags & REQ_STARTED));
 
@@ -397,27 +396,19 @@ inline int __ide_end_request(ide_hwgroup_t *hwgroup, int uptodate, int nr_secs)
 	 */
 	if (drive->state == DMA_PIO_RETRY && drive->retry_pio <= 3) {
 		drive->state = 0;
-		hwgroup->hwif->dmaproc(ide_dma_on, drive);
+		HWGROUP(drive)->hwif->dmaproc(ide_dma_on, drive);
 	}
 
 	if (!end_that_request_first(rq, uptodate, nr_secs)) {
 		add_blkdev_randomness(major(rq->rq_dev));
 		blkdev_dequeue_request(rq);
-        	hwgroup->rq = NULL;
+		HWGROUP(drive)->rq = NULL;
 		end_that_request_last(rq);
 		ret = 0;
 	}
 
 	spin_unlock_irqrestore(&ide_lock, flags);
 	return ret;
-}
-
-/*
- * This is our end_request replacement function.
- */
-int ide_end_request (byte uptodate, ide_hwgroup_t *hwgroup)
-{
-	return __ide_end_request(hwgroup, uptodate, 0);
 }
 
 /*
@@ -909,9 +900,9 @@ ide_startstop_t ide_error (ide_drive_t *drive, const char *msg, byte stat)
 
 	if (rq->errors >= ERROR_MAX) {
 		if (drive->driver != NULL)
-			DRIVER(drive)->end_request(0, HWGROUP(drive));
+			DRIVER(drive)->end_request(drive, 0);
 		else
-	 		ide_end_request(0, HWGROUP(drive));
+			ide_end_request(drive, 0);
 	} else {
 		if ((rq->errors & ERROR_RESET) == ERROR_RESET) {
 			++rq->errors;
@@ -1212,9 +1203,9 @@ static ide_startstop_t start_request (ide_drive_t *drive, struct request *rq)
 	return do_special(drive);
 kill_rq:
 	if (drive->driver != NULL)
-		DRIVER(drive)->end_request(0, HWGROUP(drive));
+		DRIVER(drive)->end_request(drive, 0);
 	else
-		ide_end_request(0, HWGROUP(drive));
+		ide_end_request(drive, 0);
 	return ide_stopped;
 }
 
@@ -2126,7 +2117,6 @@ void ide_unregister (unsigned int index)
 	 */
 	unregister_blkdev(hwif->major, hwif->name);
 	kfree(blksize_size[hwif->major]);
-	kfree(max_readahead[hwif->major]);
 	blk_dev[hwif->major].data = NULL;
 	blk_dev[hwif->major].queue = NULL;
 	blk_clear(hwif->major);
@@ -2279,7 +2269,8 @@ int ide_register (int arg1, int arg2, int irq)
 
 void ide_add_setting (ide_drive_t *drive, const char *name, int rw, int read_ioctl, int write_ioctl, int data_type, int min, int max, int mul_factor, int div_factor, void *data, ide_procset_t *set)
 {
-	ide_settings_t **p = (ide_settings_t **) &drive->settings, *setting = NULL;
+	ide_settings_t **p = &drive->settings;
+	ide_settings_t *setting = NULL;
 
 	while ((*p) && strcmp((*p)->name, name) < 0)
 		p = &((*p)->next);
@@ -2305,7 +2296,7 @@ abort:
 
 void ide_remove_setting (ide_drive_t *drive, char *name)
 {
-	ide_settings_t **p = (ide_settings_t **) &drive->settings, *setting;
+	ide_settings_t **p = &drive->settings, *setting;
 
 	while ((*p) && strcmp((*p)->name, name))
 		p = &((*p)->next);
@@ -2314,30 +2305,6 @@ void ide_remove_setting (ide_drive_t *drive, char *name)
 	(*p) = setting->next;
 	kfree(setting->name);
 	kfree(setting);
-}
-
-static ide_settings_t *ide_find_setting_by_ioctl (ide_drive_t *drive, int cmd)
-{
-	ide_settings_t *setting = drive->settings;
-
-	while (setting) {
-		if (setting->read_ioctl == cmd || setting->write_ioctl == cmd)
-			break;
-		setting = setting->next;
-	}
-	return setting;
-}
-
-ide_settings_t *ide_find_setting_by_name (ide_drive_t *drive, char *name)
-{
-	ide_settings_t *setting = drive->settings;
-
-	while (setting) {
-		if (strcmp(setting->name, name) == 0)
-			break;
-		setting = setting->next;
-	}
-	return setting;
 }
 
 static void auto_remove_settings (ide_drive_t *drive)
@@ -2614,7 +2581,17 @@ static int ide_ioctl (struct inode *inode, struct file *file,
 	if ((drive = get_info_ptr(inode->i_rdev)) == NULL)
 		return -ENODEV;
 
-	if ((setting = ide_find_setting_by_ioctl(drive, cmd)) != NULL) {
+	/* Find setting by ioctl */
+
+	setting = drive->settings;
+
+	while (setting) {
+		if (setting->read_ioctl == cmd || setting->write_ioctl == cmd)
+			break;
+		setting = setting->next;
+	}
+
+	if (setting != NULL) {
 		if (cmd == setting->read_ioctl) {
 			err = ide_read_setting(drive, setting);
 			return err >= 0 ? put_user(err, (long *) arg) : err;
@@ -3481,15 +3458,16 @@ static int default_flushcache (ide_drive_t *drive)
 
 static ide_startstop_t default_do_request(ide_drive_t *drive, struct request *rq, unsigned long block)
 {
-	ide_end_request(0, HWGROUP(drive));
+	ide_end_request(drive, 0);
 	return ide_stopped;
 }
- 
-static void default_end_request (byte uptodate, ide_hwgroup_t *hwgroup)
+
+/* This is the default end request function as well */
+int ide_end_request(ide_drive_t *drive, int uptodate)
 {
-	ide_end_request(uptodate, hwgroup);
+	return __ide_end_request(drive, uptodate, 0);
 }
-  
+
 static int default_ioctl (ide_drive_t *drive, struct inode *inode, struct file *file,
 			  unsigned int cmd, unsigned long arg)
 {
@@ -3536,25 +3514,6 @@ static int default_driver_reinit (ide_drive_t *drive)
 	return 0;
 }
 
-static void setup_driver_defaults (ide_drive_t *drive)
-{
-	ide_driver_t *d = drive->driver;
-
-	if (d->cleanup == NULL)		d->cleanup = default_cleanup;
-	if (d->standby == NULL)		d->standby = default_standby;
-	if (d->flushcache == NULL)	d->flushcache = default_flushcache;
-	if (d->do_request == NULL)	d->do_request = default_do_request;
-	if (d->end_request == NULL)	d->end_request = default_end_request;
-	if (d->ioctl == NULL)		d->ioctl = default_ioctl;
-	if (d->open == NULL)		d->open = default_open;
-	if (d->release == NULL)		d->release = default_release;
-	if (d->media_change == NULL)	d->media_change = default_check_media_change;
-	if (d->pre_reset == NULL)	d->pre_reset = default_pre_reset;
-	if (d->capacity == NULL)	d->capacity = default_capacity;
-	if (d->special == NULL)		d->special = default_special;
-	if (d->driver_reinit == NULL)	d->driver_reinit = default_driver_reinit;
-}
-
 ide_drive_t *ide_scan_devices (byte media, const char *name, ide_driver_t *driver, int n)
 {
 	unsigned int unit, index, i;
@@ -3578,15 +3537,46 @@ ide_drive_t *ide_scan_devices (byte media, const char *name, ide_driver_t *drive
 int ide_register_subdriver (ide_drive_t *drive, ide_driver_t *driver, int version)
 {
 	unsigned long flags;
-	
+
 	save_flags(flags);		/* all CPUs */
 	cli();				/* all CPUs */
 	if (version != IDE_SUBDRIVER_VERSION || !drive->present || drive->driver != NULL || drive->busy || drive->usage) {
 		restore_flags(flags);	/* all CPUs */
 		return 1;
 	}
+
 	drive->driver = driver;
-	setup_driver_defaults(drive);
+
+	/* Fill in the default handlers
+	 */
+
+	if (driver->cleanup == NULL)
+	    driver->cleanup = default_cleanup;
+	if (driver->standby == NULL)
+	    driver->standby = default_standby;
+	if (driver->flushcache == NULL)
+	    driver->flushcache = default_flushcache;
+	if (driver->do_request == NULL)
+	    driver->do_request = default_do_request;
+	if (driver->end_request == NULL)
+	    driver->end_request = ide_end_request;
+	if (driver->ioctl == NULL)
+	    driver->ioctl = default_ioctl;
+	if (driver->open == NULL)
+	    driver->open = default_open;
+	if (driver->release == NULL)
+	    driver->release = default_release;
+	if (driver->media_change == NULL)
+	    driver->media_change = default_check_media_change;
+	if (driver->pre_reset == NULL)
+	    driver->pre_reset = default_pre_reset;
+	if (driver->capacity == NULL)
+	    driver->capacity = default_capacity;
+	if (driver->special == NULL)
+	    driver->special = default_special;
+	if (driver->driver_reinit == NULL)
+	    driver->driver_reinit = default_driver_reinit;
+
 	restore_flags(flags);		/* all CPUs */
 	if (drive->autotune != 2) {
 		if (driver->supports_dma && HWIF(drive)->dmaproc != NULL) {
@@ -3614,7 +3604,7 @@ int ide_register_subdriver (ide_drive_t *drive, ide_driver_t *driver, int versio
 int ide_unregister_subdriver (ide_drive_t *drive)
 {
 	unsigned long flags;
-	
+
 	save_flags(flags);		/* all CPUs */
 	cli();				/* all CPUs */
 	if (drive->usage || drive->busy || drive->driver == NULL || DRIVER(drive)->busy) {
@@ -3704,8 +3694,8 @@ EXPORT_SYMBOL(restart_request);
 EXPORT_SYMBOL(ide_init_drive_cmd);
 EXPORT_SYMBOL(ide_do_drive_cmd);
 EXPORT_SYMBOL(ide_end_drive_cmd);
-EXPORT_SYMBOL(ide_end_request);
 EXPORT_SYMBOL(__ide_end_request);
+EXPORT_SYMBOL(ide_end_request);
 EXPORT_SYMBOL(ide_revalidate_drive);
 EXPORT_SYMBOL(ide_revalidate_disk);
 EXPORT_SYMBOL(ide_cmd);
