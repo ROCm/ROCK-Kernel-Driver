@@ -170,6 +170,22 @@ static ctl_table sctp_table[] = {
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec
 	},
+	{
+		.ctl_name	= NET_SCTP_RMEM,
+		.procname	= "rmem",
+		.data		= &sctp_rmem,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec
+	},
+	{
+		.ctl_name	= NET_SCTP_WMEM,
+		.procname	= "wmem",
+		.data		= &sctp_wmem,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec
+	},
 	{ .ctl_name = 0 }
 };
 
