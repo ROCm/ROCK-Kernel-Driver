@@ -1723,8 +1723,6 @@ static int vlsi_irda_init(struct net_device *ndev)
 
 	irda_qos_bits_to_value(&idev->qos);
 
-	irda_device_setup(ndev);
-
 	/* currently no public media definitions for IrDA */
 
 	ndev->flags |= IFF_PORTSEL | IFF_AUTOMEDIA;
@@ -1748,8 +1746,6 @@ vlsi_irda_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
 	struct net_device	*ndev;
 	vlsi_irda_dev_t		*idev;
-	int			alloc_size;
-
 
 	if (pci_enable_device(pdev))
 		goto out;
@@ -1765,38 +1761,33 @@ vlsi_irda_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto out_disable;
 	}
 
-	alloc_size = sizeof(*ndev) + sizeof(*idev);
-
-	ndev = (struct net_device *) kmalloc (alloc_size, GFP_KERNEL);
+	ndev = alloc_irdadev(sizeof(*idev));
 	if (ndev==NULL) {
 		ERROR("%s: Unable to allocate device memory.\n", __FUNCTION__);
 		goto out_disable;
 	}
 
-	memset(ndev, 0, alloc_size);
-
-	idev = (vlsi_irda_dev_t *) (ndev + 1);
-	ndev->priv = (void *) idev;
+	idev = ndev->priv;
 
 	spin_lock_init(&idev->lock);
 	init_MUTEX(&idev->sem);
 	down(&idev->sem);
 	idev->pdev = pdev;
-	ndev->init = vlsi_irda_init;
-	strcpy(ndev->name,"irda%d");
-	if (register_netdev(ndev)) {
+
+	if (vlsi_irda_init(ndev) < 0)
+		goto out_freedev;
+
+	if (register_netdev(ndev) < 0) {
 		ERROR("%s: register_netdev failed\n", __FUNCTION__);
 		goto out_freedev;
 	}
 
-	idev->proc_entry = NULL;
 	if (vlsi_proc_root != NULL) {
 		struct proc_dir_entry *ent;
 
 		ent = create_proc_entry(ndev->name, S_IFREG|S_IRUGO, vlsi_proc_root);
 		if (!ent) {
 			WARNING("%s: failed to create proc entry\n", __FUNCTION__);
-			idev->proc_entry = NULL;
 		}
 		else {
 			ent->data = ndev;
@@ -1814,7 +1805,7 @@ vlsi_irda_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 out_freedev:
 	up(&idev->sem);
-	kfree(ndev);
+	free_netdev(ndev);
 out_disable:
 	pci_disable_device(pdev);
 out:
@@ -1832,6 +1823,8 @@ static void __devexit vlsi_irda_remove(struct pci_dev *pdev)
 		return;
 	}
 
+	unregister_netdev(ndev);
+
 	idev = ndev->priv;
 	down(&idev->sem);
 	if (idev->proc_entry) {
@@ -1840,10 +1833,7 @@ static void __devexit vlsi_irda_remove(struct pci_dev *pdev)
 	}
 	up(&idev->sem);
 
-	unregister_netdev(ndev);
-	/* do not free - async completed by unregister_netdev()
-	 * ndev->destructor called (if present) when going to free
-	 */
+	free_netdev(ndev);
 
 	pci_set_drvdata(pdev, NULL);
 
