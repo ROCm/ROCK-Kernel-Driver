@@ -405,6 +405,9 @@ svcauth_null_release(struct svc_rqst *rqstp)
 	if (rqstp->rq_client)
 		auth_domain_put(rqstp->rq_client);
 	rqstp->rq_client = NULL;
+	if (rqstp->rq_cred.cr_group_info)
+		put_group_info(rqstp->rq_cred.cr_group_info);
+	rqstp->rq_cred.cr_group_info = NULL;
 
 	return 0; /* don't drop */
 }
