@@ -1037,7 +1037,8 @@ static void auerswald_int_complete (struct urb * urb, struct pt_regs *regs)
 
         /* now extract the information */
         channelid = cp->intbufp[2];
-        bytecount = le16_to_cpup (&cp->intbufp[3]);
+        bytecount = (unsigned char)cp->intbufp[3];
+        bytecount |= (unsigned char)cp->intbufp[4] << 8;
 
         /* check the channel id */
         if (channelid >= AUH_TYPESIZE) {
@@ -1930,7 +1931,7 @@ static int auerswald_probe (struct usb_interface *intf,
 	struct usb_device *usbdev = interface_to_usbdev(intf);
 	pauerswald_t cp = NULL;
 	unsigned int u = 0;
-	char *pbuf;
+	u16 *pbuf;
 	int ret;
 
 	dbg ("probe: vendor id 0x%x, device id 0x%x",
@@ -2002,7 +2003,7 @@ static int auerswald_probe (struct usb_interface *intf,
 	info("device is a %s", cp->dev_desc);
 
         /* get the maximum allowed control transfer length */
-        pbuf = (char *) kmalloc (2, GFP_KERNEL);    /* use an allocated buffer because of urb target */
+        pbuf = (u16 *) kmalloc (2, GFP_KERNEL);    /* use an allocated buffer because of urb target */
         if (!pbuf) {
 		err( "out of memory");
 		goto pfail;
