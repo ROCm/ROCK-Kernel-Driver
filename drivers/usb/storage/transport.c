@@ -473,7 +473,15 @@ int usb_stor_bulk_msg(struct us_data *us, void *data, int pipe,
 
 /* This is a version of usb_clear_halt() that doesn't read the status from
  * the device -- this is because some devices crash their internal firmware
- * when the status is requested after a halt
+ * when the status is requested after a halt.
+ *
+ * A definitive list of these 'bad' devices is too difficult to maintain or
+ * make complete enough to be useful.  This problem was first observed on the
+ * Hagiwara FlashGate DUAL unit.  However, bus traces reveal that neither
+ * MacOS nor Windows checks the status after clearing a halt.
+ *
+ * Since many vendors in this space limit their testing to interoperability
+ * with these two OSes, specification violations like this one are common.
  */
 int usb_stor_clear_halt(struct us_data *us, int pipe)
 {
