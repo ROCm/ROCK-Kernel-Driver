@@ -408,8 +408,9 @@ xfs_itobp(
 		if (unlikely(XFS_TEST_ERROR(!di_ok, mp, XFS_ERRTAG_ITOBP_INOTOBP,
 				 XFS_RANDOM_ITOBP_INOTOBP))) {
 #ifdef DEBUG
-			prdev("bad inode magic/vsn daddr 0x%llx #%d (magic=%x)",
-				mp->m_dev, (unsigned long long)imap.im_blkno, i,
+			prdev("bad inode magic/vsn daddr %lld #%d (magic=%x)",
+				mp->m_ddev_targp,
+				(unsigned long long)imap.im_blkno, i,
 				INT_GET(dip->di_core.di_magic, ARCH_CONVERT));
 #endif
 			XFS_CORRUPTION_ERROR("xfs_itobp", XFS_ERRLEVEL_HIGH,

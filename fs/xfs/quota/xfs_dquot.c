@@ -87,9 +87,9 @@
 STATIC void		xfs_qm_dqflush_done(xfs_buf_t *, xfs_dq_logitem_t *);
 
 #ifdef DEBUG
-dev_t xfs_dqerror_dev = 0;
-int xfs_do_dqerror = 0;
-int xfs_dqreq_num = 0;
+xfs_buftarg_t *xfs_dqerror_target;
+int xfs_do_dqerror;
+int xfs_dqreq_num;
 int xfs_dqerror_mod = 33;
 #endif
 
@@ -911,7 +911,7 @@ xfs_qm_dqget(
 
 #ifdef DEBUG
 	if (xfs_do_dqerror) {
-		if ((xfs_dqerror_dev == mp->m_dev) &&
+		if ((xfs_dqerror_target == mp->m_ddev_targp) &&
 		    (xfs_dqreq_num++ % xfs_dqerror_mod) == 0) {
 			cmn_err(CE_DEBUG, "Returning error in dqget");
 			return (EIO);

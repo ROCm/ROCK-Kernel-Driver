@@ -329,6 +329,7 @@ xfs_corruption_error(
 	int		linenum,
 	inst_t		*ra)
 {
-	xfs_hex_dump(p, 16);
+	if (level <= xfs_error_level)
+		xfs_hex_dump(p, 16);
 	xfs_error_report(tag, level, mp, fname, linenum, ra);
 }
