@@ -332,7 +332,7 @@ struct TxParam
 /* Information that need to be kept for each board. */
 struct arlan_private {
       struct net_device_stats stats;
-      struct arlan_shmem * card;
+      struct arlan_shmem __iomem * card;
       struct arlan_shmem * conf;
 
       struct arlan_conf_stru * Conf;	     
@@ -407,10 +407,8 @@ struct arlan_private {
 #define TXHEAD(dev) (((struct arlan_private *)netdev_priv(dev))->txRing[0])
 #define TXTAIL(dev) (((struct arlan_private *)netdev_priv(dev))->txRing[1])
 
-#define TXBuffStart(dev) \
- ((int)(((struct arlan_private *)netdev_priv(dev))->card)->txBuffer) - ((int)(((struct arlan_private *)netdev_priv(dev))->card) )
-#define TXBuffEnd(dev) \
- ((int)(((struct arlan_private *)netdev_priv(dev))->card)->rxBuffer) - ((int)(((struct arlan_private *)netdev_priv(dev))->card)
+#define TXBuffStart(dev) offsetof(struct arlan_shmem, txBuffer)
+#define TXBuffEnd(dev) offsetof(struct arlan_shmem, xxBuffer)
  
 #define READSHM(to,from,atype) {\
 	atype tmp;\
