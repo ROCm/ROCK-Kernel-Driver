@@ -769,13 +769,15 @@ out:
  * Assumes it is operating within the aio issuer's mm
  * context. Expects to be called with ctx->ctx_lock held
  */
-static void __aio_run_iocbs(struct kioctx *ctx)
+static int __aio_run_iocbs(struct kioctx *ctx)
 {
 	struct kiocb *iocb;
 	int count = 0;
+	LIST_HEAD(run_list);
 
-	while (!list_empty(&ctx->run_list)) {
-		iocb = list_entry(ctx->run_list.next, struct kiocb,
+	list_splice_init(&ctx->run_list, &run_list);
+	while (!list_empty(&run_list)) {
+		iocb = list_entry(run_list.next, struct kiocb,
 			ki_run_list);
 		list_del(&iocb->ki_run_list);
 		/*
@@ -788,6 +790,9 @@ static void __aio_run_iocbs(struct kioctx *ctx)
 		count++;
  	}
 	aio_run++;
+	if (!list_empty(&ctx->run_list))
+		return 1;
+	return 0;
 }
 
 /*
@@ -799,9 +804,15 @@ static void __aio_run_iocbs(struct kioctx *ctx)
  */
 static inline void aio_run_iocbs(struct kioctx *ctx)
 {
+	int requeue;
+
 	spin_lock_irq(&ctx->ctx_lock);
-	__aio_run_iocbs(ctx);
- 	spin_unlock_irq(&ctx->ctx_lock);
+
+	requeue = __aio_run_iocbs(ctx);
+	spin_unlock_irq(&ctx->ctx_lock);
+	if (requeue)
+		queue_work(aio_wq, &ctx->wq);
+
 }
 
 /*
@@ -817,14 +828,17 @@ static void aio_kick_handler(void *data)
 {
 	struct kioctx *ctx = data;
 	mm_segment_t oldfs = get_fs();
+	int requeue;
 
 	set_fs(USER_DS);
 	use_mm(ctx->mm);
 	spin_lock_irq(&ctx->ctx_lock);
-	__aio_run_iocbs(ctx);
+	requeue =__aio_run_iocbs(ctx);
  	unuse_mm(ctx->mm);
 	spin_unlock_irq(&ctx->ctx_lock);
 	set_fs(oldfs);
+	if (requeue)
+		queue_work(aio_wq, &ctx->wq);
 }
 
 
