@@ -2732,7 +2732,7 @@ void end_that_request_last(struct request *req)
 	struct gendisk *disk = req->rq_disk;
 	struct completion *waiting = req->waiting;
 
-	if (unlikely(laptop_mode))
+	if (unlikely(laptop_mode) && blk_fs_request(req))
 		laptop_io_completion();
 
 	if (disk && blk_fs_request(req)) {
