@@ -125,8 +125,7 @@ static ssize_t set_out0_output(struct device *dev, const char *buf, size_t count
 	unsigned int value;
 	struct i2c_client *client = to_i2c_client(dev);
 	struct pcf8591_data *data = i2c_get_clientdata(client);
-	if ((value = (simple_strtoul(buf, NULL, 10) + 5) / 10) <= 255);
-	{
+	if ((value = (simple_strtoul(buf, NULL, 10) + 5) / 10) <= 255) {
 		data->aout = value;
 		i2c_smbus_write_byte_data(client, data->control, data->aout);
 	}
@@ -235,9 +234,9 @@ int pcf8591_detect(struct i2c_adapter *adapter, int address, int kind)
 	/* OK, this is not exactly good programming practice, usually. But it is
 	   very code-efficient in this case. */
 
-      exit_kfree:
+exit_kfree:
 	kfree(new_client);
-      exit:
+exit:
 	return err;
 }
 
@@ -277,8 +276,7 @@ static int pcf8591_read_channel(struct device *dev, int channel)
 
 	down(&data->update_lock);
 
-	if ((data->control & PCF8591_CONTROL_AICH_MASK) != channel)
-	{
+	if ((data->control & PCF8591_CONTROL_AICH_MASK) != channel) {
 		data->control = (data->control & ~PCF8591_CONTROL_AICH_MASK)
 			      | channel;
 		i2c_smbus_write_byte(client, data->control);
