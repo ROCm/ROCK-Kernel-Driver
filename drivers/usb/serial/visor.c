@@ -497,7 +497,6 @@ static int visor_write (struct usb_serial_port *port, const unsigned char *buf, 
 		dev_dbg(&port->dev, "write limit hit\n");
 		return 0;
 	}
-	++priv->outstanding_urbs;
 	spin_unlock_irqrestore(&priv->lock, flags);
 
 	buffer = kmalloc (count, GFP_ATOMIC);
