@@ -573,7 +573,7 @@ static int mm_make_request(request_queue_t *q, struct bio *bio)
 --                              mm_interrupt
 -----------------------------------------------------------------------------------
 */
-static void mm_interrupt(int irq, void *__card, struct pt_regs *regs)
+static irqreturn_t mm_interrupt(int irq, void *__card, struct pt_regs *regs)
 {
 	struct cardinfo *card = (struct cardinfo *) __card;
 	unsigned int dma_status;
@@ -585,7 +585,7 @@ HW_TRACE(0x30);
 
 	if (!(dma_status & (DMASCR_ERROR_MASK | DMASCR_CHAIN_COMPLETE))) {
 		/* interrupt wasn't for me ... */
-		return;
+		return IRQ_NONE;
         }
 
 	/* clear COMPLETION interrupts */
@@ -663,6 +663,7 @@ HW_TRACE(0x30);
 
 HW_TRACE(0x36);
 
+	return IRQ_HANDLED; 
 }
 /*
 -----------------------------------------------------------------------------------
