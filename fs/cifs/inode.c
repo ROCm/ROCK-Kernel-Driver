@@ -273,10 +273,10 @@ cifs_get_inode_info(struct inode **pinode, const unsigned char *search_path,
 			/* new inode, can safely set these fields */
 			inode->i_mode = cifs_sb->mnt_file_mode;
 
-		if (attr & ATTR_REPARSE) {
-	/* Can IFLNK be set as it basically is on windows with IFREG or IFDIR? */
-			inode->i_mode |= S_IFLNK;
-		} else if (attr & ATTR_DIRECTORY) {
+/*		if (attr & ATTR_REPARSE)  */
+/* 		We no longer handle these as symlinks because we could not */
+/* 		follow them due to the absolute path with drive letter */
+		if (attr & ATTR_DIRECTORY) {
 	/* override default perms since we do not do byte range locking on dirs */
 			inode->i_mode = cifs_sb->mnt_dir_mode;
 			inode->i_mode |= S_IFDIR;

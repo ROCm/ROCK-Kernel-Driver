@@ -1351,6 +1351,8 @@ typedef struct smb_com_transaction2_fnext_rsp_parms {
 #define SMB_QUERY_CIFS_UNIX_INFO    0x200
 #define SMB_QUERY_LABEL_INFO        0x3ea
 #define SMB_QUERY_FS_QUOTA_INFO     0x3ee
+#define SMB_QUERY_FS_FULL_SIZE_INFO 0x3ef
+#define SMB_QUERY_OBJECTID_INFO     0x3f0
 
 typedef struct smb_com_transaction2_qfsi_req {
 	struct smb_hdr hdr;	/* wct = 14+ */
