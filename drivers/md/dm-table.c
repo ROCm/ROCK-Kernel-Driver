@@ -655,6 +655,11 @@ int dm_table_add_target(struct dm_table *t, const char *type,
 	memset(tgt, 0, sizeof(*tgt));
 	set_default_limits(&tgt->limits);
 
+	if (!len) {
+		tgt->error = "zero-length target";
+		return -EINVAL;
+	}
+
 	tgt->type = dm_get_target_type(type);
 	if (!tgt->type) {
 		tgt->error = "unknown target type";
