@@ -1958,8 +1958,7 @@ static int journal_init_dev( struct super_block *super,
       		SB_ONDISK_JOURNAL_DEVICE( super ) ?
 		to_kdev_t(SB_ONDISK_JOURNAL_DEVICE( super )) : super -> s_dev;	
 	/* there is no "jdev" option and journal is on separate device */
-	if( ( !jdev_name || !jdev_name[ 0 ] ) && 
-	    SB_ONDISK_JOURNAL_DEVICE( super ) ) {
+	if( ( !jdev_name || !jdev_name[ 0 ] ) ) {
 		journal -> j_dev_bd = bdget( kdev_t_to_nr( jdev ) );
 		if( journal -> j_dev_bd )
 			result = blkdev_get( journal -> j_dev_bd, 
@@ -1974,9 +1973,6 @@ static int journal_init_dev( struct super_block *super,
 		return result;
 	}
 
-	/* no "jdev" option and journal is on the host device */
-	if( !jdev_name || !jdev_name[ 0 ] )
-		return 0;
 	journal -> j_dev_file = filp_open( jdev_name, 0, 0 );
 	if( !IS_ERR( journal -> j_dev_file ) ) {
 		struct inode *jdev_inode;
