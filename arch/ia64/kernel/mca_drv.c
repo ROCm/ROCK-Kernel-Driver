@@ -39,8 +39,6 @@
 static int sal_rec_max = 10000;
 
 /* from mca.c */
-extern int  ia64_reg_MCA_extension(void*);
-extern void ia64_unreg_MCA_extension(void);
 static ia64_mca_sal_to_os_state_t *sal_to_os_handoff_state;
 static ia64_mca_os_to_sal_state_t *os_to_sal_handoff_state;
 

@@ -119,7 +119,8 @@ extern void ia64_mca_ucmc_handler(void);
 extern void ia64_monarch_init_handler(void);
 extern void ia64_slave_init_handler(void);
 extern void ia64_mca_cmc_vector_setup(void);
-extern int  (*ia64_mca_ucmc_other_recover_fp)(void *,ia64_mca_sal_to_os_state_t *,ia64_mca_os_to_sal_state_t *);
+extern int  ia64_reg_MCA_extension(void*);
+extern void ia64_unreg_MCA_extension(void);
 
 #endif /* !__ASSEMBLY__ */
 #endif /* _ASM_IA64_MCA_H */
