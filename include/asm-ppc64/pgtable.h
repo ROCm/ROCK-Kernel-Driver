@@ -267,8 +267,8 @@ static inline unsigned long pte_update( pte_t *p, unsigned long clr,
 {
 	unsigned long old, tmp;
 
-	__asm__ __volatile__("\n\
-1:	ldarx	%0,0,%3	\n\
+	__asm__ __volatile__(
+	"1:	ldarx	%0,0,%3		# pte_update\n\
 	andc	%1,%0,%4 \n\
 	or	%1,%1,%5 \n\
 	stdcx.	%1,0,%3 \n\
