@@ -60,6 +60,7 @@
 		* default to PIO, to fix chip bugs
 	- Add missing unregister_netdev (Jason Lunz)
 	- Add CONFIG_SUNDANCE_MMIO config option (jgarzik)
+	- Better rx buf size calculation (Donald Becker)
 
 */
 
@@ -973,7 +974,7 @@ static void init_ring(struct net_device *dev)
 	np->cur_rx = np->cur_tx = 0;
 	np->dirty_rx = np->dirty_tx = 0;
 
-	np->rx_buf_sz = (dev->mtu <= 1500 ? PKT_BUF_SZ : dev->mtu + 36);
+	np->rx_buf_sz = (dev->mtu <= 1520 ? PKT_BUF_SZ : dev->mtu + 16);
 
 	/* Initialize all Rx descriptors. */
 	for (i = 0; i < RX_RING_SIZE; i++) {
