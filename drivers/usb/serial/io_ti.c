@@ -1626,7 +1626,7 @@ static void edge_interrupt_callback (struct urb *urb)
 	}
 
 	if (urb->status) {
-		dbg(__FUNCTION__" - nonzero control read status received: %d", urb->status);
+		dbg("%s - nonzero control read status received: %d", __FUNCTION__, urb->status);
 		return;
 	}
 
@@ -1959,7 +1959,7 @@ static void edge_close (struct usb_serial_port *port, struct file * filp)
 	if (port_paranoia_check (port, __FUNCTION__))
 		return;
 	
-	dbg(__FUNCTION__ " - port %d", port->number);
+	dbg("%s - port %d", __FUNCTION__, port->number);
 			 
 	serial = get_usb_serial (port, __FUNCTION__);
 	if (!serial)
@@ -1999,7 +1999,7 @@ static void edge_close (struct usb_serial_port *port, struct file * filp)
 	edge_port->close_pending = 0;
 	}
 
-	dbg(__FUNCTION__" exited");
+	dbg("%s - exited", __FUNCTION__);
 }
 
 static int edge_write (struct usb_serial_port *port, int from_user, const unsigned char *data, int count)
@@ -2047,7 +2047,7 @@ static int edge_write (struct usb_serial_port *port, int from_user, const unsign
 	/* send the data out the bulk port */
 	result = usb_submit_urb(port->write_urb, GFP_ATOMIC);
 	if (result)
-		err(__FUNCTION__ " - failed submitting write urb, error %d", result);
+		err("%s - failed submitting write urb, error %d", __FUNCTION__, result);
 	else
 		result = count;
 
@@ -2062,19 +2062,19 @@ static int edge_write_room (struct usb_serial_port *port)
 	struct edgeport_port *edge_port = (struct edgeport_port *)(port->private);
 	int room = 0;
 
-	dbg(__FUNCTION__);
+	dbg("%s", __FUNCTION__);
 
 	if (edge_port == NULL)
 		return -ENODEV;
 	if (edge_port->close_pending == 1)
 		return -ENODEV;
 	
-	dbg(__FUNCTION__" - port %d", port->number);
+	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	if (port->write_urb->status != -EINPROGRESS)
 		room = port->bulk_out_size;
 
-	dbg(__FUNCTION__ " - returns %d", room);
+	dbg("%s - returns %d", __FUNCTION__, room);
 	return room;
 }
 
@@ -2083,7 +2083,7 @@ static int edge_chars_in_buffer (struct usb_serial_port *port)
 	struct edgeport_port *edge_port = (struct edgeport_port *)(port->private);
 	int chars = 0;
 
-	dbg(__FUNCTION__);
+	dbg("%s", __FUNCTION__);
 
 	if (edge_port == NULL)
 		return -ENODEV;
@@ -2138,7 +2138,7 @@ static void edge_unthrottle (struct usb_serial_port *port)
 	struct tty_struct *tty;
 	int status;
 
-	dbg(__FUNCTION__" - port %d", port->number);
+	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	if (edge_port == NULL)
 		return;
@@ -2229,32 +2229,32 @@ static void change_port_settings (struct edgeport_port *edge_port, struct termio
 		if (cflag & PARODD) {
 			config->wFlags |= UMP_MASK_UART_FLAGS_PARITY;
 			config->bParity = UMP_UART_ODDPARITY;
-			dbg(__FUNCTION__" - parity = odd");
+			dbg("%s - parity = odd", __FUNCTION__);
 		} else {
 			config->wFlags |= UMP_MASK_UART_FLAGS_PARITY;
 			config->bParity = UMP_UART_EVENPARITY;
-			dbg(__FUNCTION__" - parity = even");
+			dbg("%s - parity = even", __FUNCTION__);
 		}
 	} else {
 		config->bParity = UMP_UART_NOPARITY; 	
-		dbg(__FUNCTION__" - parity = none");
+		dbg("%s - parity = none", __FUNCTION__);
 	}
 
 	if (cflag & CSTOPB) {
 		config->bStopBits = UMP_UART_STOPBIT2;
-		dbg(__FUNCTION__" - stop bits = 2");
+		dbg("%s - stop bits = 2", __FUNCTION__);
 	} else {
 		config->bStopBits = UMP_UART_STOPBIT1;
-		dbg(__FUNCTION__" - stop bits = 1");
+		dbg("%s - stop bits = 1", __FUNCTION__);
 	}
 
 	/* figure out the flow control settings */
 	if (cflag & CRTSCTS) {
 		config->wFlags |= UMP_MASK_UART_FLAGS_OUT_X_CTS_FLOW;
 		config->wFlags |= UMP_MASK_UART_FLAGS_RTS_FLOW;
-		dbg(__FUNCTION__" - RTS/CTS is enabled");
+		dbg("%s - RTS/CTS is enabled", __FUNCTION__);
 	} else {
-		dbg(__FUNCTION__" - RTS/CTS is disabled");
+		dbg("%s - RTS/CTS is disabled", __FUNCTION__);
 	}
 
 	/* if we are implementing XON/XOFF, set the start and stop character in the device */
@@ -2422,7 +2422,7 @@ static int get_modem_info (struct edgeport_port *edge_port, unsigned int *value)
 		  | ((msr & MSR_DSR)	? TIOCM_DSR: 0);  /* 0x100 */
 
 
-	dbg(__FUNCTION__" -- %x", result);
+	dbg("%s -- %x", __FUNCTION__, result);
 
 	if (copy_to_user(value, &result, sizeof(int)))
 		return -EFAULT;
@@ -2463,42 +2463,42 @@ static int edge_ioctl (struct usb_serial_port *port, struct file *file, unsigned
 	struct async_icount cnow;
 	struct async_icount cprev;
 
-	dbg(__FUNCTION__" - port %d, cmd = 0x%x", port->number, cmd);
+	dbg("%s - port %d, cmd = 0x%x", __FUNCTION__, port->number, cmd);
 
 	switch (cmd) {
 		case TIOCINQ:
-			dbg(__FUNCTION__" (%d) TIOCINQ",  port->number);
+			dbg("%s - (%d) TIOCINQ", __FUNCTION__, port->number);
 //			return get_number_bytes_avail(edge_port, (unsigned int *) arg);
 			break;
 
 		case TIOCSERGETLSR:
-			dbg(__FUNCTION__" (%d) TIOCSERGETLSR",  port->number);
+			dbg("%s - (%d) TIOCSERGETLSR", __FUNCTION__, port->number);
 //			return get_lsr_info(edge_port, (unsigned int *) arg);
 			break;
 
 		case TIOCMBIS:
 		case TIOCMBIC:
 		case TIOCMSET:
-			dbg(__FUNCTION__" (%d) TIOCMSET/TIOCMBIC/TIOCMSET",  port->number);
+			dbg("%s - (%d) TIOCMSET/TIOCMBIC/TIOCMSET", __FUNCTION__, port->number);
 			return set_modem_info(edge_port, cmd, (unsigned int *) arg);
 			break;
 
 		case TIOCMGET:  
-			dbg(__FUNCTION__" (%d) TIOCMGET",  port->number);
+			dbg("%s - (%d) TIOCMGET", __FUNCTION__, port->number);
 			return get_modem_info(edge_port, (unsigned int *) arg);
 			break;
 
 		case TIOCGSERIAL:
-			dbg(__FUNCTION__" (%d) TIOCGSERIAL",  port->number);
+			dbg("%s - (%d) TIOCGSERIAL", __FUNCTION__, port->number);
 			return get_serial_info(edge_port, (struct serial_struct *) arg);
 			break;
 
 		case TIOCSSERIAL:
-			dbg(__FUNCTION__" (%d) TIOCSSERIAL",  port->number);
+			dbg("%s - (%d) TIOCSSERIAL", __FUNCTION__, port->number);
 			break;
 
 		case TIOCMIWAIT:
-			dbg(__FUNCTION__" (%d) TIOCMIWAIT",  port->number);
+			dbg("%s - (%d) TIOCMIWAIT", __FUNCTION__, port->number);
 			cprev = edge_port->icount;
 			while (1) {
 				interruptible_sleep_on(&edge_port->delta_msr_wait);
@@ -2565,7 +2565,7 @@ static int edge_startup (struct usb_serial *serial)
 	/* create our private serial structure */
 	edge_serial = kmalloc (sizeof(struct edgeport_serial), GFP_KERNEL);
 	if (edge_serial == NULL) {
-		err(__FUNCTION__" - Out of memory");
+		err("%s - Out of memory", __FUNCTION__);
 		return -ENOMEM;
 	}
 	memset (edge_serial, 0, sizeof(struct edgeport_serial));
@@ -2582,7 +2582,7 @@ static int edge_startup (struct usb_serial *serial)
 	for (i = 0; i < serial->num_ports; ++i) {
 		edge_port = kmalloc (sizeof(struct edgeport_port), GFP_KERNEL);
 		if (edge_port == NULL) {
-			err(__FUNCTION__" - Out of memory");
+			err("%s - Out of memory", __FUNCTION__);
 			return -ENOMEM;
 		}
 		memset (edge_port, 0, sizeof(struct edgeport_port));
@@ -2598,7 +2598,7 @@ static void edge_shutdown (struct usb_serial *serial)
 {
 	int i;
 
-	dbg (__FUNCTION__);
+	dbg ("%s", __FUNCTION__);
 
 	for (i=0; i < serial->num_ports; ++i) {
 		kfree (serial->port[i].private);

@@ -521,6 +521,7 @@ static struct usb_serial_device_type keyspan_2port_device = {
 	unthrottle:		keyspan_rx_unthrottle,
 	ioctl:			keyspan_ioctl,
 	set_termios:		keyspan_set_termios,
+	break_ctl:		keyspan_break_ctl,
 	attach:			keyspan_startup,
 	shutdown:		keyspan_shutdown,
 };

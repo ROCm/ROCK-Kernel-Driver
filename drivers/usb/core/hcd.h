@@ -155,7 +155,15 @@ struct usb_operations {
 		dma_addr_t dma,
 		size_t size, int direction);
 
-	// FIXME  also: buffer_sg_map (), buffer_sg_unmap ()
+	int (*buffer_map_sg) (struct usb_bus *bus,
+		struct scatterlist *sg, int *n_hw_ents,
+		int nents, int direction);
+	void (*buffer_dmasync_sg) (struct usb_bus *bus,
+		struct scatterlist *sg,
+		int n_hw_ents, int direction);
+	void (*buffer_unmap_sg) (struct usb_bus *bus,
+		struct scatterlist *sg,
+		int n_hw_ents, int direction);
 };
 
 /* each driver provides one of these, and hardware init support */
@@ -246,6 +254,13 @@ void hcd_buffer_dmasync (struct usb_bus *bus,
 void hcd_buffer_unmap (struct usb_bus *bus,
 	dma_addr_t dma,
 	size_t size, int direction);
+int hcd_buffer_map_sg (struct usb_bus *bus, struct scatterlist *sg,
+		       int *n_hw_ents, int nents, int direction);
+void hcd_buffer_sync_sg (struct usb_bus *bus, struct scatterlist *sg,
+			 int n_hw_ents, int direction);
+
+void hcd_buffer_unmap_sg (struct usb_bus *bus, struct scatterlist *sg,
+			  int n_hw_ents, int direction);
 
 /* generic bus glue, needed for host controllers that don't use PCI */
 extern struct usb_operations usb_hcd_operations;

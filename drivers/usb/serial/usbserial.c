@@ -5,10 +5,9 @@
  * Copyright (c) 2000 Peter Berger (pberger@brimson.com)
  * Copyright (c) 2000 Al Borchers (borchers@steinerpoint.com)
  *
- *	This program is free software; you can redistribute it and/or modify
- *	it under the terms of the GNU General Public License as published by
- *	the Free Software Foundation; either version 2 of the License, or
- *	(at your option) any later version.
+ *	This program is free software; you can redistribute it and/or
+ *	modify it under the terms of the GNU General Public License version
+ *	2 as published by the Free Software Foundation.
  *
  * This driver was originally based on the ACM driver by Armin Fuerst (which was 
  * based on a driver by Brad Keryan)
@@ -443,7 +442,7 @@ static struct usb_serial *get_free_serial (struct usb_serial *serial, int num_po
 	unsigned int i, j;
 	int good_spot;
 
-	dbg(__FUNCTION__ " %d", num_ports);
+	dbg("%s %d", __FUNCTION__, num_ports);
 
 	*minor = 0;
 	for (i = 0; i < SERIAL_TTY_MINORS; ++i) {
@@ -462,7 +461,7 @@ static struct usb_serial *get_free_serial (struct usb_serial *serial, int num_po
 			
 		serial->magic = USB_SERIAL_MAGIC;
 		*minor = i;
-		dbg(__FUNCTION__ " - minor base = %d", *minor);
+		dbg("%s - minor base = %d", __FUNCTION__, *minor);
 		for (i = *minor; (i < (*minor + num_ports)) && (i < SERIAL_TTY_MINORS); ++i)
 			serial_table[i] = serial;
 		return serial;
@@ -474,7 +473,7 @@ static void return_serial (struct usb_serial *serial)
 {
 	int i;
 
-	dbg(__FUNCTION__);
+	dbg("%s", __FUNCTION__);
 
 	if (serial == NULL)
 		return;
@@ -497,13 +496,13 @@ int ezusb_writememory (struct usb_serial *serial, int address, unsigned char *da
 
 	/* dbg("ezusb_writememory %x, %d", address, length); */
 	if (!serial->dev) {
-		dbg(__FUNCTION__ " - no physical device present, failing.");
+		dbg("%s - no physical device present, failing.", __FUNCTION__);
 		return -ENODEV;
 	}
 
 	transfer_buffer =  kmalloc (length, GFP_KERNEL);
 	if (!transfer_buffer) {
-		err(__FUNCTION__ " - kmalloc(%d) failed.", length);
+		err("%s - kmalloc(%d) failed.", __FUNCTION__, length);
 		return -ENOMEM;
 	}
 	memcpy (transfer_buffer, data, length);
@@ -515,10 +514,10 @@ int ezusb_writememory (struct usb_serial *serial, int address, unsigned char *da
 int ezusb_set_reset (struct usb_serial *serial, unsigned char reset_bit)
 {
 	int	response;
-	dbg(__FUNCTION__ " - %d", reset_bit);
+	dbg("%s - %d", __FUNCTION__, reset_bit);
 	response = ezusb_writememory (serial, CPUCS_REG, &reset_bit, 1, 0xa0);
 	if (response < 0) {
-		err(__FUNCTION__ "- %d failed", reset_bit);
+		err("%s- %d failed", __FUNCTION__, reset_bit);
 	}
 	return response;
 }
@@ -535,7 +534,7 @@ static int serial_open (struct tty_struct *tty, struct file * filp)
 	unsigned int portNumber;
 	int retval = 0;
 	
-	dbg(__FUNCTION__);
+	dbg("%s", __FUNCTION__);
 
 	/* initialize the pointer incase something fails */
 	tty->driver_data = NULL;
@@ -581,7 +580,7 @@ static int serial_open (struct tty_struct *tty, struct file * filp)
 static void __serial_close(struct usb_serial_port *port, struct file *filp)
 {
 	if (!port->open_count) {
-		dbg (__FUNCTION__ " - port not opened");
+		dbg ("%s - port not opened", __FUNCTION__);
 		return;
 	}
 
@@ -610,7 +609,7 @@ static void serial_close(struct tty_struct *tty, struct file * filp)
 
 	down (&port->sem);
 
-	dbg(__FUNCTION__ " - port %d", port->number);
+	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	/* if disconnect beat us to the punch here, there's nothing to do */
 	if (tty->driver_data) {
@@ -631,10 +630,10 @@ static int serial_write (struct tty_struct * tty, int from_user, const unsigned 
 
 	down (&port->sem);
 
-	dbg(__FUNCTION__ " - port %d, %d byte(s)", port->number, count);
+	dbg("%s - port %d, %d byte(s)", __FUNCTION__, port->number, count);
 
 	if (!port->open_count) {
-		dbg (__FUNCTION__ " - port not opened");
+		dbg("%s - port not opened", __FUNCTION__);
 		goto exit;
 	}
 
@@ -660,10 +659,10 @@ static int serial_write_room (struct tty_struct *tty)
 
 	down (&port->sem);
 
-	dbg(__FUNCTION__ " - port %d", port->number);
+	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	if (!port->open_count) {
-		dbg (__FUNCTION__ " - port not open");
+		dbg("%s - port not open", __FUNCTION__);
 		goto exit;
 	}
 
@@ -689,10 +688,10 @@ static int serial_chars_in_buffer (struct tty_struct *tty)
 
 	down (&port->sem);
 
-	dbg(__FUNCTION__ " - port %d", port->number);
+	dbg("%s = port %d", __FUNCTION__, port->number);
 
 	if (!port->open_count) {
-		dbg (__FUNCTION__ " - port not open");
+		dbg("%s - port not open", __FUNCTION__);
 		goto exit;
 	}
 
@@ -717,10 +716,10 @@ static void serial_throttle (struct tty_struct * tty)
 
 	down (&port->sem);
 
-	dbg(__FUNCTION__ " - port %d", port->number);
+	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	if (!port->open_count) {
-		dbg (__FUNCTION__ " - port not open");
+		dbg ("%s - port not open", __FUNCTION__);
 		goto exit;
 	}
 
@@ -742,10 +741,10 @@ static void serial_unthrottle (struct tty_struct * tty)
 
 	down (&port->sem);
 
-	dbg(__FUNCTION__ " - port %d", port->number);
+	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	if (!port->open_count) {
-		dbg (__FUNCTION__ " - port not open");
+		dbg("%s - port not open", __FUNCTION__);
 		goto exit;
 	}
 
@@ -768,10 +767,10 @@ static int serial_ioctl (struct tty_struct *tty, struct file * file, unsigned in
 
 	down (&port->sem);
 
-	dbg(__FUNCTION__ " - port %d, cmd 0x%.4x", port->number, cmd);
+	dbg("%s - port %d, cmd 0x%.4x", __FUNCTION__, port->number, cmd);
 
 	if (!port->open_count) {
-		dbg (__FUNCTION__ " - port not open");
+		dbg ("%s - port not open", __FUNCTION__);
 		goto exit;
 	}
 
@@ -796,10 +795,10 @@ static void serial_set_termios (struct tty_struct *tty, struct termios * old)
 
 	down (&port->sem);
 
-	dbg(__FUNCTION__ " - port %d", port->number);
+	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	if (!port->open_count) {
-		dbg (__FUNCTION__ " - port not open");
+		dbg("%s - port not open", __FUNCTION__);
 		goto exit;
 	}
 
@@ -821,10 +820,10 @@ static void serial_break (struct tty_struct *tty, int break_state)
 
 	down (&port->sem);
 
-	dbg(__FUNCTION__ " - port %d", port->number);
+	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	if (!port->open_count) {
-		dbg (__FUNCTION__ " - port not open");
+		dbg("%s - port not open", __FUNCTION__);
 		goto exit;
 	}
 
@@ -838,7 +837,7 @@ exit:
 
 static void serial_shutdown (struct usb_serial *serial)
 {
-	dbg(__FUNCTION__);
+	dbg ("%s", __FUNCTION__);
 
 	if (serial->type->shutdown)
 		serial->type->shutdown(serial);
@@ -854,7 +853,7 @@ static int serial_read_proc (char *page, char **start, off_t off, int count, int
 	off_t begin = 0;
 	char tmp[40];
 
-	dbg(__FUNCTION__);
+	dbg("%s", __FUNCTION__);
 	length += sprintf (page, "usbserinfo:1.0 driver:%s\n", DRIVER_VERSION);
 	for (i = 0; i < SERIAL_TTY_MINORS && length < PAGE_SIZE; ++i) {
 		serial = get_serial_by_minor(i);
@@ -899,7 +898,7 @@ static int generic_open (struct usb_serial_port *port, struct file *filp)
 	if (port_paranoia_check (port, __FUNCTION__))
 		return -ENODEV;
 
-	dbg(__FUNCTION__ " - port %d", port->number);
+	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	/* force low_latency on so that our tty_push actually forces the data through, 
 	   otherwise it is scheduled, and with high data rates (like with OHCI) data
@@ -920,7 +919,7 @@ static int generic_open (struct usb_serial_port *port, struct file *filp)
 				   port);
 		result = usb_submit_urb(port->read_urb, GFP_KERNEL);
 		if (result)
-			err(__FUNCTION__ " - failed resubmitting read urb, error %d", result);
+			err("%s - failed resubmitting read urb, error %d", __FUNCTION__, result);
 	}
 
 	return result;
@@ -930,7 +929,7 @@ static void generic_cleanup (struct usb_serial_port *port)
 {
 	struct usb_serial *serial = port->serial;
 
-	dbg(__FUNCTION__ " - port %d", port->number);
+	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	if (serial->dev) {
 		/* shutdown any bulk reads that might be going on */
@@ -943,7 +942,7 @@ static void generic_cleanup (struct usb_serial_port *port)
 
 static void generic_close (struct usb_serial_port *port, struct file * filp)
 {
-	dbg(__FUNCTION__ " - port %d", port->number);
+	dbg("%s - port %d", __FUNCTION__, port->number);
 	generic_cleanup (port);
 }
 
@@ -952,17 +951,17 @@ static int generic_write (struct usb_serial_port *port, int from_user, const uns
 	struct usb_serial *serial = port->serial;
 	int result;
 
-	dbg(__FUNCTION__ " - port %d", port->number);
+	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	if (count == 0) {
-		dbg(__FUNCTION__ " - write request of 0 bytes");
+		dbg("%s - write request of 0 bytes", __FUNCTION__);
 		return (0);
 	}
 
 	/* only do something if we have a bulk out endpoint */
 	if (serial->num_bulk_out) {
 		if (port->write_urb->status == -EINPROGRESS) {
-			dbg (__FUNCTION__ " - already writing");
+			dbg("%s - already writing", __FUNCTION__);
 			return (0);
 		}
 
@@ -990,7 +989,7 @@ static int generic_write (struct usb_serial_port *port, int from_user, const uns
 		/* send the data out the bulk port */
 		result = usb_submit_urb(port->write_urb, GFP_ATOMIC);
 		if (result)
-			err(__FUNCTION__ " - failed submitting write urb, error %d", result);
+			err("%s - failed submitting write urb, error %d", __FUNCTION__, result);
 		else
 			result = count;
 
@@ -1006,14 +1005,14 @@ static int generic_write_room (struct usb_serial_port *port)
 	struct usb_serial *serial = port->serial;
 	int room = 0;
 
-	dbg(__FUNCTION__ " - port %d", port->number);
+	dbg("%s - port %d", __FUNCTION__, port->number);
 	
 	if (serial->num_bulk_out) {
 		if (port->write_urb->status != -EINPROGRESS)
 			room = port->bulk_out_size;
 	}
 
-	dbg(__FUNCTION__ " - returns %d", room);
+	dbg("%s - returns %d", __FUNCTION__, room);
 	return (room);
 }
 
@@ -1022,14 +1021,14 @@ static int generic_chars_in_buffer (struct usb_serial_port *port)
 	struct usb_serial *serial = port->serial;
 	int chars = 0;
 
-	dbg(__FUNCTION__ " - port %d", port->number);
+	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	if (serial->num_bulk_out) {
 		if (port->write_urb->status == -EINPROGRESS)
 			chars = port->write_urb->transfer_buffer_length;
 	}
 
-	dbg (__FUNCTION__ " - returns %d", chars);
+	dbg("%s - returns %d", __FUNCTION__, chars);
 	return (chars);
 }
 
@@ -1042,15 +1041,15 @@ static void generic_read_bulk_callback (struct urb *urb)
 	int i;
 	int result;
 
-	dbg(__FUNCTION__ " - port %d", port->number);
+	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	if (!serial) {
-		dbg(__FUNCTION__ " - bad serial pointer, exiting");
+		dbg("%s - bad serial pointer, exiting", __FUNCTION__);
 		return;
 	}
 
 	if (urb->status) {
-		dbg(__FUNCTION__ " - nonzero read bulk status received: %d", urb->status);
+		dbg("%s - nonzero read bulk status received: %d", __FUNCTION__, urb->status);
 		return;
 	}
 
@@ -1080,7 +1079,7 @@ static void generic_read_bulk_callback (struct urb *urb)
 			     generic_read_bulk_callback), port);
 	result = usb_submit_urb(port->read_urb, GFP_ATOMIC);
 	if (result)
-		err(__FUNCTION__ " - failed resubmitting read urb, error %d", result);
+		err("%s - failed resubmitting read urb, error %d", __FUNCTION__, result);
 }
 
 static void generic_write_bulk_callback (struct urb *urb)
@@ -1088,15 +1087,15 @@ static void generic_write_bulk_callback (struct urb *urb)
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
 	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
 
-	dbg(__FUNCTION__ " - port %d", port->number);
+	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	if (!serial) {
-		dbg(__FUNCTION__ " - bad serial pointer, exiting");
+		dbg("%s - bad serial pointer, exiting", __FUNCTION__);
 		return;
 	}
 
 	if (urb->status) {
-		dbg(__FUNCTION__ " - nonzero write bulk status received: %d", urb->status);
+		dbg("%s - nonzero write bulk status received: %d", __FUNCTION__, urb->status);
 		return;
 	}
 
@@ -1110,7 +1109,7 @@ static void generic_shutdown (struct usb_serial *serial)
 {
 	int i;
 
-	dbg (__FUNCTION__);
+	dbg("%s", __FUNCTION__);
 
 	/* stop reads and writes on all ports */
 	for (i=0; i < serial->num_ports; ++i) {
@@ -1124,7 +1123,7 @@ static void port_softint(void *private)
 	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
 	struct tty_struct *tty;
 
-	dbg(__FUNCTION__ " - port %d", port->number);
+	dbg("%s - port %d", __FUNCTION__, port->number);
 	
 	if (!serial)
 		return;
@@ -1134,7 +1133,7 @@ static void port_softint(void *private)
 		return;
 
 	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) && tty->ldisc.write_wakeup) {
-		dbg(__FUNCTION__ " - write wakeup call.");
+		dbg("%s - write wakeup call.", __FUNCTION__);
 		(tty->ldisc.write_wakeup)(tty);
 	}
 
@@ -1402,7 +1401,7 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 	max_endpoints = max(num_bulk_in, num_bulk_out);
 	max_endpoints = max(max_endpoints, num_interrupt_in);
 	max_endpoints = max(max_endpoints, (int)serial->num_ports);
-	dbg (__FUNCTION__ " - setting up %d port structures for this device", max_endpoints);
+	dbg("%s - setting up %d port structures for this device", __FUNCTION__, max_endpoints);
 	for (i = 0; i < max_endpoints; ++i) {
 		port = &serial->port[i];
 		port->number = i + serial->minor;
@@ -1496,7 +1495,7 @@ static void usb_serial_disconnect(struct usb_device *dev, void *ptr)
 	struct usb_serial_port *port;
 	int i;
 
-	dbg(__FUNCTION__);
+	dbg ("%s", __FUNCTION__);
 	if (serial) {
 		/* fail all future close/read/write/ioctl/etc calls */
 		for (i = 0; i < serial->num_ports; ++i) {
@@ -1566,7 +1565,11 @@ static void usb_serial_disconnect(struct usb_device *dev, void *ptr)
 static struct tty_driver serial_tty_driver = {
 	.magic =		TTY_DRIVER_MAGIC,
 	.driver_name =		"usb-serial",
+#ifndef CONFIG_DEVFS_FS
+	.name =			"ttyUSB",
+#else
 	.name =			"usb/tts/%d",
+#endif
 	.major =		SERIAL_TTY_MAJOR,
 	.minor_start =		0,
 	.num =			SERIAL_TTY_MINORS,
@@ -1607,7 +1610,7 @@ static int __init usb_serial_init(void)
 	serial_tty_driver.init_termios          = tty_std_termios;
 	serial_tty_driver.init_termios.c_cflag  = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
 	if (tty_register_driver (&serial_tty_driver)) {
-		err(__FUNCTION__ " - failed to register tty driver");
+		err("%s - failed to register tty driver", __FUNCTION__);
 		return -1;
 	}
 
