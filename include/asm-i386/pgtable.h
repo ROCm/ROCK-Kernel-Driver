@@ -342,10 +342,10 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 	((pte_t *) pmd_page_kernel(*(dir)) +  __pte_offset(address))
 #define pte_offset_map(dir, address) \
 	((pte_t *)kmap_atomic(pmd_page(*(dir)),KM_PTE0) + __pte_offset(address))
-#define pte_offset_map2(dir, address) \
+#define pte_offset_map_nested(dir, address) \
 	((pte_t *)kmap_atomic(pmd_page(*(dir)),KM_PTE1) + __pte_offset(address))
 #define pte_unmap(pte) kunmap_atomic(pte, KM_PTE0)
-#define pte_unmap2(pte) kunmap_atomic(pte, KM_PTE1)
+#define pte_unmap_nested(pte) kunmap_atomic(pte, KM_PTE1)
 
 /*
  * The i386 doesn't have any external MMU info: the kernel page

@@ -17,7 +17,7 @@
 
 extern int vm_enough_memory(long pages);
 
-static inline pte_t *get_one_pte_map2(struct mm_struct *mm, unsigned long addr)
+static inline pte_t *get_one_pte_map_nested(struct mm_struct *mm, unsigned long addr)
 {
 	pgd_t * pgd;
 	pmd_t * pmd;
@@ -41,9 +41,9 @@ static inline pte_t *get_one_pte_map2(struct mm_struct *mm, unsigned long addr)
 		goto end;
 	}
 
-	pte = pte_offset_map2(pmd, addr);
+	pte = pte_offset_map_nested(pmd, addr);
 	if (pte_none(*pte)) {
-		pte_unmap2(pte);
+		pte_unmap_nested(pte);
 		pte = NULL;
 	}
 end:
@@ -84,11 +84,11 @@ static int move_one_page(struct mm_struct *mm, unsigned long old_addr, unsigned 
 	pte_t *src, *dst;
 
 	spin_lock(&mm->page_table_lock);
-	src = get_one_pte_map2(mm, old_addr);
+	src = get_one_pte_map_nested(mm, old_addr);
 	if (src) {
 		dst = alloc_one_pte_map(mm, new_addr);
 		error = copy_one_pte(mm, src, dst);
-		pte_unmap2(src);
+		pte_unmap_nested(src);
 		pte_unmap(dst);
 	}
 	spin_unlock(&mm->page_table_lock);

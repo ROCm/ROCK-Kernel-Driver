@@ -154,7 +154,7 @@ struct page *DRM(vm_shm_nopage)(struct vm_area_struct *vma,
 	unsigned long	 i;
 	pgd_t		 *pgd;
 	pmd_t		 *pmd;
-	pte_t		 *pte;
+	pte_t		 *pte, entry;
 	struct page	 *page;
 
 	if (address > vma->vm_end) return NOPAGE_SIGBUS; /* Disallow mremap */
@@ -166,20 +166,22 @@ struct page *DRM(vm_shm_nopage)(struct vm_area_struct *vma,
 	 * they need to be virtually contiguous in kernel space.
 	 */
 	pgd = pgd_offset_k( i );
-	if( !pgd_present( *pgd ) ) return NOPAGE_OOM;
+	if (!pgd_present(*pgd))
+		goto oom;
 	pmd = pmd_offset( pgd, i );
-	if( !pmd_present( *pmd ) ) return NOPAGE_OOM;
+	if (!pmd_present(*pmd))
+		goto oom;
+
 	preempt_disable();
-	pte = pte_offset_map( pmd, i );
-	if( !pte_present( *pte ) ) {
-		pte_unmap(pte);
-		preempt_enable();
-		return NOPAGE_OOM;
-	}
+	pte = pte_offset_map(pmd, i);
+	entry = *pte;
 	pte_unmap(pte);
 	preempt_enable();
 
-	page = pte_page(*pte);
+	if (!pte_present(entry))
+		goto oom;
+
+	page = pte_page(entry);
 	get_page(page);
 
 	DRM_DEBUG("shm_nopage 0x%lx\n", address);
@@ -188,6 +190,8 @@ struct page *DRM(vm_shm_nopage)(struct vm_area_struct *vma,
 #else
 	return page;
 #endif
+oom:
+	return NOPAGE_OOM;
 }
 
 /* Special close routine which deletes map information if we are the last
