@@ -150,6 +150,23 @@ static int spi_setup_host_attrs(struct Scsi_Host *shost)
 	return 0;
 }
 
+static int spi_configure_device(struct scsi_device *sdev)
+{
+	struct scsi_target *starget = sdev->sdev_target;
+
+	/* Populate the target capability fields with the values
+	 * gleaned from the device inquiry */
+
+	spi_support_sync(starget) = scsi_device_sync(sdev);
+	spi_support_wide(starget) = scsi_device_wide(sdev);
+	spi_support_dt(starget) = scsi_device_dt(sdev);
+	spi_support_dt_only(starget) = scsi_device_dt_only(sdev);
+	spi_support_ius(starget) = scsi_device_ius(sdev);
+	spi_support_qas(starget) = scsi_device_qas(sdev);
+
+	return 0;
+}
+
 static int spi_setup_transport_attrs(struct scsi_target *starget)
 {
 	spi_period(starget) = -1;	/* illegal value */
@@ -783,6 +800,7 @@ spi_attach_transport(struct spi_function_template *ft)
 	i->t.target_attrs = &i->attrs[0];
 	i->t.target_class = &spi_transport_class;
 	i->t.target_setup = &spi_setup_transport_attrs;
+	i->t.device_configure = &spi_configure_device;
 	i->t.target_size = sizeof(struct spi_transport_attrs);
 	i->t.host_attrs = &i->host_attrs[0];
 	i->t.host_class = &spi_host_class;

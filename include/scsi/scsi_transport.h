@@ -36,6 +36,7 @@ struct scsi_transport_template {
 
 	/* Constructor functions */
 	int (*device_setup)(struct scsi_device *);
+	int (*device_configure)(struct scsi_device *);
 	int (*target_setup)(struct scsi_target *);
 	int (*host_setup)(struct Scsi_Host *);
 

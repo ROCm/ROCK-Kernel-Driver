@@ -613,7 +613,10 @@ static int scsi_add_lun(struct scsi_device *sdev, char *inq_result, int *bflags)
 	if (*bflags & BLIST_NOT_LOCKABLE)
 		sdev->lockable = 0;
 
-	if(sdev->host->hostt->slave_configure)
+	if (sdev->host->transportt->device_configure)
+		sdev->host->transportt->device_configure(sdev);
+
+	if (sdev->host->hostt->slave_configure)
 		sdev->host->hostt->slave_configure(sdev);
 
 	/*

@@ -37,6 +37,13 @@ struct spi_transport_attrs {
 	unsigned int pcomp_en:1;/* Precompensation enabled */
 	unsigned int initial_dv:1; /* DV done to this target yet  */
 	unsigned long flags;	/* flags field for drivers to use */
+	/* Device Properties fields */
+	unsigned int support_sync:1; /* synchronous support */
+	unsigned int support_wide:1; /* wide support */
+	unsigned int support_dt:1; /* allows DT phases */
+	unsigned int support_dt_only; /* disallows ST phases */
+	unsigned int support_ius; /* support Information Units */
+	unsigned int support_qas; /* supports quick arbitration and selection */
 	/* Private Fields */
 	unsigned int dv_pending:1; /* Internal flag */
 	struct semaphore dv_sem; /* semaphore to serialise dv */
@@ -65,8 +72,18 @@ struct spi_host_attrs {
 #define spi_rti(x)	(((struct spi_transport_attrs *)&(x)->starget_data)->rti)
 #define spi_pcomp_en(x)	(((struct spi_transport_attrs *)&(x)->starget_data)->pcomp_en)
 #define spi_initial_dv(x)	(((struct spi_transport_attrs *)&(x)->starget_data)->initial_dv)
+
+#define spi_support_sync(x)	(((struct spi_transport_attrs *)&(x)->starget_data)->support_sync)
+#define spi_support_wide(x)	(((struct spi_transport_attrs *)&(x)->starget_data)->support_wide)
+#define spi_support_dt(x)	(((struct spi_transport_attrs *)&(x)->starget_data)->support_dt)
+#define spi_support_dt_only(x)	(((struct spi_transport_attrs *)&(x)->starget_data)->support_dt_only)
+#define spi_support_ius(x)	(((struct spi_transport_attrs *)&(x)->starget_data)->support_ius)
+#define spi_support_qas(x)	(((struct spi_transport_attrs *)&(x)->starget_data)->support_qas)
+
 #define spi_flags(x)	(((struct spi_transport_attrs *)&(x)->starget_data)->flags)
 #define spi_signalling(h)	(((struct spi_host_attrs *)&(h)->shost_data)->signalling)
+
+
 
 /* The functions by which the transport class and the driver communicate */
 struct spi_function_template {
