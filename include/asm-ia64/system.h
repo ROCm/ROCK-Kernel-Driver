@@ -149,7 +149,7 @@ do {										\
 			      "(p6) ssm psr.i;"					\
 			      "(p7) rsm psr.i;;"				\
 			      "(p6) srlz.d"					\
-			      : "=&r" (old_psr) : "r"((psr) & IA64_PSR_I)	\
+			      : "=r" (old_psr) : "r"((psr) & IA64_PSR_I)	\
 			      : "p6", "p7", "memory");				\
 	if ((old_psr & IA64_PSR_I) && !(psr & IA64_PSR_I)) {			\
 		__asm__ ("mov %0=ip" : "=r"(ip));				\

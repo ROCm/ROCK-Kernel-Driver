@@ -25,21 +25,24 @@ extern acpi_status acpi_evaluate_integer (acpi_handle, acpi_string, acpi_object_
 static int hpzx1_devices;
 
 struct fake_pci_dev {
+	struct fake_pci_dev *next;
+	struct pci_dev *pci_dev;
 	unsigned long csr_base;
 	unsigned long csr_size;
 	unsigned long mapped_csrs;	// ioremapped
 	int sizing;			// in middle of BAR sizing operation?
-};
+} *fake_pci_dev_list;
 
 static struct pci_ops *orig_pci_ops;
 
 struct fake_pci_dev *
 lookup_fake_dev (struct pci_bus *bus, unsigned int devfn)
 {
-	struct pci_dev *dev;
-	list_for_each_entry(dev, &bus->devices, bus_list)
-		if (dev->devfn == devfn)
-			return (struct fake_pci_dev *) dev->sysdata;
+	struct fake_pci_dev *fake_dev;
+
+	for (fake_dev = fake_pci_dev_list; fake_dev; fake_dev = fake_dev->next)
+		if (fake_dev->pci_dev->bus == bus && fake_dev->pci_dev->devfn == devfn)
+			return fake_dev;
 	return NULL;
 }
 
@@ -155,6 +158,10 @@ hpzx1_fake_pci_dev(char *name, unsigned int busnum, unsigned long addr, unsigned
 	}
 
 	bus->ops = &hp_pci_conf;	// replace pci ops for this bus
+
+	fake->pci_dev = dev;
+	fake->next = fake_pci_dev_list;
+	fake_pci_dev_list = fake;
 
 	memset(dev, 0, sizeof(*dev));
 	dev->bus = bus;
