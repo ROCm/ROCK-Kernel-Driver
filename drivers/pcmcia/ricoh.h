@@ -109,7 +109,7 @@
 
 /* 16-bit IO and memory timing registers */
 #define RL5C4XX_16BIT_IO_0		0x0088	/* 16 bit */
-#define RL5C4XX_16BIT_MEM_0		0x0088	/* 16 bit */
+#define RL5C4XX_16BIT_MEM_0		0x008a	/* 16 bit */
 #define  RL5C4XX_SETUP_MASK		0x0007
 #define  RL5C4XX_SETUP_SHIFT		0
 #define  RL5C4XX_CMD_MASK		0x01f0

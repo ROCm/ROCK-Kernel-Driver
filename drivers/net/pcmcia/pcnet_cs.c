@@ -239,24 +239,6 @@ typedef struct pcnet_dev_t {
 
 /*======================================================================
 
-    This bit of code is used to avoid unregistering network devices
-    at inappropriate times.  2.2 and later kernels are fairly picky
-    about when this can happen.
-    
-======================================================================*/
-
-static void flush_stale_links(void)
-{
-    dev_link_t *link, *next;
-    for (link = dev_list; link; link = next) {
-	next = link->next;
-	if (link->state & DEV_STALE_LINK)
-	    pcnet_detach(link);
-    }
-}
-
-/*======================================================================
-
     We never need to do anything when a pcnet device is "initialized"
     by the net software, because we only register already-found cards.
 
@@ -284,7 +266,6 @@ static dev_link_t *pcnet_attach(void)
     int i, ret;
 
     DEBUG(0, "pcnet_attach()\n");
-    flush_stale_links();
 
     /* Create new ethernet device */
     info = kmalloc(sizeof(*info), GFP_KERNEL);
@@ -356,10 +337,8 @@ static void pcnet_detach(dev_link_t *link)
 
     if (link->state & DEV_CONFIG) {
 	pcnet_release(link);
-	if (link->state & DEV_STALE_CONFIG) {
-	    link->state |= DEV_STALE_LINK;
+	if (link->state & DEV_STALE_CONFIG)
 	    return;
-	}
     }
 
     if (link->handle)
@@ -821,7 +800,9 @@ static void pcnet_release(dev_link_t *link)
 
     link->state &= ~DEV_CONFIG;
 
-} /* pcnet_release */
+    if (link->state & DEV_STALE_CONFIG)
+	    pcnet_detach(link);
+}
 
 /*======================================================================
 
