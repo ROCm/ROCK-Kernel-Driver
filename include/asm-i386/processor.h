@@ -564,7 +564,7 @@ static inline void rep_nop(void)
 #define ARCH_HAS_PREFETCH
 extern inline void prefetch(const void *x)
 {
-	alternative_input(ASM_NOP3,
+	alternative_input(ASM_NOP4,
 			  "prefetchnta (%1)",
 			  X86_FEATURE_XMM,
 			  "r" (x));
@@ -578,7 +578,7 @@ extern inline void prefetch(const void *x)
    spinlocks to avoid one state transition in the cache coherency protocol. */
 extern inline void prefetchw(const void *x)
 {
-	alternative_input(ASM_NOP3,
+	alternative_input(ASM_NOP4,
 			  "prefetchw (%1)",
 			  X86_FEATURE_3DNOW,
 			  "r" (x));

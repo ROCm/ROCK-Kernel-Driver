@@ -242,9 +242,6 @@ static struct usb_driver usb_mouse_driver = {
 	.probe		= usb_mouse_probe,
 	.disconnect	= usb_mouse_disconnect,
 	.id_table	= usb_mouse_id_table,
-	.driver	= {
-		.devclass = &input_devclass,
-	},
 };
 
 static int __init usb_mouse_init(void)

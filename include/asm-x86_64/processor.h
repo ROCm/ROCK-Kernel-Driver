@@ -304,11 +304,16 @@ extern inline void sync_core(void)
 
 #define cpu_has_fpu 1
 
+#if 0
+/* disabled for now to work around opteron errata #91. Also gcc 3.2
+   doesn't like this in some cases. */
 #define ARCH_HAS_PREFETCH
+#define prefetch(x) __builtin_prefetch((x),0,1)
+#endif
+
 #define ARCH_HAS_PREFETCHW
 #define ARCH_HAS_SPINLOCK_PREFETCH
 
-#define prefetch(x) __builtin_prefetch((x),0,1)
 #define prefetchw(x) __builtin_prefetch((x),1,1)
 #define spin_lock_prefetch(x)  prefetchw(x)
 #define cpu_relax()   rep_nop()

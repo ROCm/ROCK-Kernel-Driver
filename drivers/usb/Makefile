@@ -36,7 +36,6 @@ obj-$(CONFIG_USB_STV680)	+= media/
 obj-$(CONFIG_USB_VICAM)		+= media/
 
 obj-$(CONFIG_USB_CATC)		+= net/
-obj-$(CONFIG_USB_CDCETHER)	+= net/
 obj-$(CONFIG_USB_KAWETH)	+= net/
 obj-$(CONFIG_USB_PEGASUS)	+= net/
 obj-$(CONFIG_USB_RTL8150)	+= net/

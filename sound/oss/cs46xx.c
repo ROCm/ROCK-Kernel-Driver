@@ -1247,7 +1247,7 @@ static void dealloc_dmabuf(struct cs_state *state)
 		mapend = virt_to_page(dmabuf->rawbuf + 
 				(PAGE_SIZE << dmabuf->buforder) - 1);
 		for (map = virt_to_page(dmabuf->rawbuf); map <= mapend; map++)
-			cs4x_ClearPageReserved(map);
+			ClearPageReserved(map);
 		free_dmabuf(state->card, dmabuf);
 	}
 
@@ -1256,7 +1256,7 @@ static void dealloc_dmabuf(struct cs_state *state)
 		mapend = virt_to_page(dmabuf->tmpbuff +
 				(PAGE_SIZE << dmabuf->buforder_tmpbuff) - 1);
 		for (map = virt_to_page(dmabuf->tmpbuff); map <= mapend; map++)
-			cs4x_ClearPageReserved(map);
+			ClearPageReserved(map);
 		free_dmabuf2(state->card, dmabuf);
 	}
 

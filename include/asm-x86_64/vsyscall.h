@@ -1,7 +1,6 @@
 #ifndef _ASM_X86_64_VSYSCALL_H_
 #define _ASM_X86_64_VSYSCALL_H_
 
-#include <linux/time.h>
 #include <linux/seqlock.h>
 
 enum vsyscall_num {
