@@ -99,6 +99,7 @@ static void ymfpci_disable_dsp(ymfpci_t *unit);
 static void ymfpci_download_image(ymfpci_t *codec);
 static void ymf_memload(ymfpci_t *unit);
 
+static spinlock_t ymf_devs_lock = SPIN_LOCK_UNLOCKED;
 static LIST_HEAD(ymf_devs);
 
 /*
@@ -1912,12 +1913,14 @@ static int ymf_open(struct inode *inode, struct file *file)
 	}
 
 	unit = NULL;	/* gcc warns */
+	spin_lock(&ymf_devs_lock);
 	list_for_each(list, &ymf_devs) {
 		unit = list_entry(list, ymfpci_t, ymf_devs);
 		if (((unit->dev_audio ^ minor) & ~0x0F) == 0)
 			break;
 	}
-	if (list == &ymf_devs)
+	spin_unlock(&ymf_devs_lock);
+	if (unit == NULL)
 		return -ENODEV;
 
 	down(&unit->open_sem);
@@ -2021,15 +2024,18 @@ static int ymf_open_mixdev(struct inode *inode, struct file *file)
 	ymfpci_t *unit;
 	int i;
 
+	spin_lock(&ymf_devs_lock);
 	list_for_each(list, &ymf_devs) {
 		unit = list_entry(list, ymfpci_t, ymf_devs);
 		for (i = 0; i < NR_AC97; i++) {
 			if (unit->ac97_codec[i] != NULL &&
 			    unit->ac97_codec[i]->dev_mixer == minor) {
+				spin_unlock(&ymf_devs_lock);
 				goto match;
 			}
 		}
 	}
+	spin_unlock(&ymf_devs_lock);
 	return -ENODEV;
 
  match:
@@ -2607,7 +2613,9 @@ static int __devinit ymf_probe_one(struct pci_dev *pcidev, const struct pci_devi
 #endif /* CONFIG_SOUND_YMFPCI_LEGACY */
 
 	/* put it into driver list */
+	spin_lock(&ymf_devs_lock);
 	list_add_tail(&codec->ymf_devs, &ymf_devs);
+	spin_unlock(&ymf_devs_lock);
 	pci_set_drvdata(pcidev, codec);
 
 	return 0;
@@ -2639,7 +2647,9 @@ static void __devexit ymf_remove_one(struct pci_dev *pcidev)
 	ymfpci_t *codec = pci_get_drvdata(pcidev);
 
 	/* remove from list of devices */
+	spin_lock(&ymf_devs_lock);
 	list_del(&codec->ymf_devs);
+	spin_unlock(&ymf_devs_lock);
 
 	unregister_sound_mixer(codec->ac97_codec[0]->dev_mixer);
 	ac97_release_codec(codec->ac97_codec[0]);
