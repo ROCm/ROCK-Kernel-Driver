@@ -394,7 +394,9 @@ Dirty:             968 kB
 Writeback:           0 kB
 Mapped:         280372 kB
 Slab:           684068 kB
-Committed_AS:  1576424 kB
+CommitLimit:   7669796 kB
+Committed_AS:   100056 kB
+CommitAvail:   7569740 kB
 PageTables:      24448 kB
 ReverseMaps:   1080904
 VmallocTotal:   112216 kB
@@ -434,19 +436,43 @@ VmallocChunk:   111088 kB
    Writeback: Memory which is actively being written back to the disk
       Mapped: files which have been mmaped, such as libraries
               Slab: in-kernel data structures cache
-Committed_AS: An estimate of how much RAM you would need to make a
-              99.99% guarantee that there never is OOM (out of memory)
-              for this workload. Normally the kernel will overcommit
-              memory. That means, say you do a 1GB malloc, nothing
-              happens, really. Only when you start USING that malloc
-              memory you will get real memory on demand, and just as
-              much as you use. So you sort of take a mortgage and hope
-              the bank doesn't go bust. Other cases might include when
-              you mmap a file that's shared only when you write to it
-              and you get a private copy of that data. While it normally
-              is shared between processes. The Committed_AS is a
-              guesstimate of how much RAM/swap you would need
-              worst-case.
+ CommitLimit: Based on the overcommit ratio ('vm.overcommit_ratio'),
+              this is the total amount of  memory currently available to
+              be allocated on the system. This limit is only adhered to
+              if strict overcommit accounting is enabled (mode 2 in
+              'vm.overcommit_memory').
+              The CommitLimit is calculated with the following formula:
+              CommitLimit = ('vm.overcommit_ratio' * Physical RAM) + Swap
+              For example, on a system with 1G of physical RAM and 7G
+              of swap with a `vm.overcommit_ratio` of 30 it would
+              yield a CommitLimit of 7.3G.
+              For more details, see the memory overcommit documentation
+              in vm/overcommit-accounting.
+Committed_AS: The amount of memory presently allocated on the system.
+              The committed memory is a sum of all of the memory which
+              has been allocated by processes, even if it has not been
+              "used" by them as of yet. A process which malloc()'s 1G
+              of memory, but only touches 300M of it will only show up
+              as using 300M of memory even if it has the address space
+              allocated for the entire 1G. This 1G is memory which has
+              been "committed" to by the VM and can be used at any time
+              by the allocating application. With strict overcommit
+              enabled on the system (mode 2 in 'vm.overcommit_memory'),
+              allocations which would exceed the CommitLimit (detailed
+              above) will not be permitted. This is useful if one needs
+              to guarantee that processes will not fail due to lack of
+              memory once that memory has been successfully allocated.
+ CommitAvail: Based on the current overcommit ratio
+              ('vm.overcommit_ratio'), this is the amount of memory
+              currently available to be allocated under the overcommit
+              limit (the CommitLimit above). This is calculated as:
+              CommitAvail = CommitLimit - Committed_AS
+              This limit is only enforced if strict overcommit accounting
+              is enabled (mode 2 in 'vm.overcommit_memory'). CommitAvail
+              may be a negative number if strict accounting is not enabled
+              and the system's memory is currently overcommitted.
+              For more details, see the memory overcommit documentation
+              in vm/overcommit-accounting.
   PageTables: amount of memory dedicated to the lowest level of page
               tables.
  ReverseMaps: number of reverse mappings performed
