@@ -26,7 +26,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#define ZFCP_SYSFS_ADAPTER_C_REVISION "$Revision: 1.30 $"
+#define ZFCP_SYSFS_ADAPTER_C_REVISION "$Revision: 1.32 $"
 
 #include <asm/ccwdev.h>
 #include "zfcp_ext.h"
@@ -75,6 +75,7 @@ ZFCP_DEFINE_ADAPTER_ATTR(fc_topology, "%s\n",
 ZFCP_DEFINE_ADAPTER_ATTR(hardware_version, "0x%08x\n",
 			 adapter->hardware_version);
 ZFCP_DEFINE_ADAPTER_ATTR(serial_number, "%17s\n", adapter->serial_number);
+ZFCP_DEFINE_ADAPTER_ATTR(scsi_host_no, "0x%x\n", adapter->scsi_host_no);
 
 /**
  * zfcp_sysfs_adapter_in_recovery_show - recovery state of adapter
@@ -98,30 +99,6 @@ zfcp_sysfs_adapter_in_recovery_show(struct device *dev, char *buf)
 
 static DEVICE_ATTR(in_recovery, S_IRUGO,
 		   zfcp_sysfs_adapter_in_recovery_show, NULL);
-
-/**
- * zfcp_sysfs_adapter_scsi_host_no_show - display scsi_host_no of adapter
- * @dev: pointer to belonging device
- * @buf: pointer to input buffer
- *
- * "scsi_host_no" attribute of adapter. Displays the SCSI host number.
- */
-static ssize_t
-zfcp_sysfs_adapter_scsi_host_no_show(struct device *dev, char *buf)
-{
-	struct zfcp_adapter *adapter;
-	unsigned short host_no = 0;
-
-	down(&zfcp_data.config_sema);
-	adapter = dev_get_drvdata(dev);
-	if (adapter->scsi_host)
-		host_no = adapter->scsi_host->host_no;
-	up(&zfcp_data.config_sema);
-	return sprintf(buf, "0x%x\n", host_no);
-}
-
-static DEVICE_ATTR(scsi_host_no, S_IRUGO, zfcp_sysfs_adapter_scsi_host_no_show,
-		   NULL);
 
 /**
  * zfcp_sysfs_port_add_store - add a port to sysfs tree
@@ -219,9 +196,7 @@ zfcp_sysfs_port_remove_store(struct device *dev, const char *buf, size_t count)
 	zfcp_erp_port_shutdown(port, 0);
 	zfcp_erp_wait(adapter);
 	zfcp_port_put(port);
-	zfcp_sysfs_port_remove_files(&port->sysfs_device,
-				     atomic_read(&port->status));
-	device_unregister(&port->sysfs_device);
+	zfcp_port_dequeue(port);
  out:
 	up(&zfcp_data.config_sema);
 	return retval ? retval : count;

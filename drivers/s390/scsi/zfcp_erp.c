@@ -31,7 +31,7 @@
 #define ZFCP_LOG_AREA			ZFCP_LOG_AREA_ERP
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_ERP_REVISION "$Revision: 1.44 $"
+#define ZFCP_ERP_REVISION "$Revision: 1.49 $"
 
 #include "zfcp_ext.h"
 
@@ -1202,7 +1202,7 @@ zfcp_erp_async_handler_nolock(struct zfcp_erp_action *erp_action,
  * returns:	0 - there was an action to handle
  *		!0 - otherwise
  */
-static int
+int
 zfcp_erp_async_handler(struct zfcp_erp_action *erp_action,
 		       unsigned long set_mask)
 {
@@ -1215,28 +1215,6 @@ zfcp_erp_async_handler(struct zfcp_erp_action *erp_action,
 	write_unlock_irqrestore(&adapter->erp_lock, flags);
 
 	return retval;
-}
-
-/*
- * purpose:	is called for finished FSF requests related to erp,
- *		moves concerned erp action to 'ready' queue and
- *		signals erp thread to process it,
- *		besides it cancels a timeout
- */
-void
-zfcp_erp_fsf_req_handler(struct zfcp_fsf_req *fsf_req)
-{
-	struct zfcp_erp_action *erp_action = fsf_req->erp_action;
-	struct zfcp_adapter *adapter = fsf_req->adapter;
-
-	debug_text_event(adapter->erp_dbf, 3, "a_frh");
-	debug_event(adapter->erp_dbf, 3, &erp_action->action, sizeof (int));
-
-	if (erp_action) {
-		debug_event(adapter->erp_dbf, 3, &erp_action->action,
-			    sizeof (int));
-		zfcp_erp_async_handler(erp_action, 0);
-	}
 }
 
 /*
@@ -1892,7 +1870,7 @@ zfcp_erp_schedule_work(struct zfcp_unit *unit)
 			      unit->fcp_lun,
 			      unit->port->wwpn,
 			      zfcp_get_busid_by_unit(unit));
-		atomic_set(&p->unit->scsi_add_work, 0);
+		atomic_set(&unit->scsi_add_work, 0);
 		return -ENOMEM;
 	}
 
@@ -2500,10 +2478,8 @@ zfcp_erp_adapter_strategy_open_qdio(struct zfcp_erp_action *erp_action)
 		    ("bug: Could not clean QDIO (data transfer mechanism) "
 		     "queues. (debug info %i).\n", retval_cleanup);
 	}
-#ifdef ZFCP_DEBUG_REQUESTS
 	else
 		debug_text_event(adapter->req_dbf, 1, "q_clean");
-#endif				/* ZFCP_DEBUG_REQUESTS */
 
  failed_qdio_establish:
 	atomic_clear_mask(ZFCP_STATUS_ADAPTER_QDIOUP, &adapter->status);
@@ -2577,9 +2553,7 @@ zfcp_erp_adapter_strategy_close_qdio(struct zfcp_erp_action *erp_action)
 		     zfcp_get_busid_by_adapter(adapter));
 	} else {
 		ZFCP_LOG_DEBUG("queues cleaned up\n");
-#ifdef ZFCP_DEBUG_REQUESTS
 		debug_text_event(adapter->req_dbf, 1, "q_clean");
-#endif				/* ZFCP_DEBUG_REQUESTS */
 	}
 
 	/*

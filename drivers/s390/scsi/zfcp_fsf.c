@@ -29,7 +29,7 @@
  */
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_FSF_C_REVISION "$Revision: 1.29 $"
+#define ZFCP_FSF_C_REVISION "$Revision: 1.43 $"
 
 #include "zfcp_ext.h"
 
@@ -77,6 +77,11 @@ static u32 fsf_qtcb_type[] = {
 	[FSF_QTCB_DOWNLOAD_CONTROL_FILE] = FSF_SUPPORT_COMMAND,
 	[FSF_QTCB_UPLOAD_CONTROL_FILE] =  FSF_SUPPORT_COMMAND
 };
+
+static const char zfcp_act_subtable_type[5][8] = {
+	{"unknown"}, {"OS"}, {"WWPN"}, {"DID"}, {"LUN"}
+};
+
 
 /****************************************************************/
 /*************** FSF related Functions  *************************/
@@ -320,7 +325,7 @@ zfcp_fsf_protstatus_eval(struct zfcp_fsf_req *fsf_req)
 			     sizeof(struct fsf_qtcb));
 			goto forget_log;
 		}
-		if ((fsf_req->qtcb->header.log_start +
+		if ((size_t) (fsf_req->qtcb->header.log_start +
 		     fsf_req->qtcb->header.log_length)
 		    > sizeof(struct fsf_qtcb)) {
 			ZFCP_LOG_NORMAL("bug: ULP (FSF logging) log data ends "
@@ -388,7 +393,6 @@ zfcp_fsf_protstatus_eval(struct zfcp_fsf_req *fsf_req)
 				zfcp_get_busid_by_adapter(adapter),
 				fsf_req->qtcb->prefix.prot_status_qual.
 				sequence_error.exp_req_seq_no);
-#ifdef ZFCP_DEBUG_REQUESTS
 		debug_text_event(adapter->req_dbf, 1, "exp_seq!");
 		debug_event(adapter->req_dbf, 1,
 			    &fsf_req->qtcb->prefix.prot_status_qual.
@@ -396,7 +400,6 @@ zfcp_fsf_protstatus_eval(struct zfcp_fsf_req *fsf_req)
 		debug_text_event(adapter->req_dbf, 1, "qtcb_seq!");
 		debug_exception(adapter->req_dbf, 1,
 				&fsf_req->qtcb->prefix.req_seq_no, 4);
-#endif				/* ZFCP_DEBUG_REQUESTS */
 		debug_text_exception(adapter->erp_dbf, 0, "prot_seq_err");
 		/* restart operation on this adapter */
 		zfcp_erp_adapter_reopen(adapter, 0);
@@ -771,6 +774,8 @@ zfcp_fsf_fsfstatus_qual_eval(struct zfcp_fsf_req *fsf_req)
 static int
 zfcp_fsf_req_dispatch(struct zfcp_fsf_req *fsf_req)
 {
+	struct zfcp_erp_action *erp_action = fsf_req->erp_action;
+	struct zfcp_adapter *adapter = fsf_req->adapter;
 	int retval = 0;
 
 	if (unlikely(fsf_req->status & ZFCP_STATUS_FSFREQ_ERROR)) {
@@ -861,7 +866,13 @@ zfcp_fsf_req_dispatch(struct zfcp_fsf_req *fsf_req)
 			     fsf_req->qtcb->header.fsf_command);
 	}
 
-        zfcp_erp_fsf_req_handler(fsf_req);
+	if (!erp_action)
+		return retval;
+
+	debug_text_event(adapter->erp_dbf, 3, "a_frh");
+	debug_event(adapter->erp_dbf, 3, &erp_action->action, sizeof (int));
+	zfcp_erp_async_handler(erp_action, 0);
+
 	return retval;
 }
 
@@ -924,9 +935,7 @@ zfcp_fsf_status_read(struct zfcp_adapter *adapter, int req_flags)
 	ZFCP_LOG_TRACE("Status Read request initiated "
 		       "(adapter busid=%s)\n",
 		       zfcp_get_busid_by_adapter(adapter));
-#ifdef ZFCP_DEBUG_REQUESTS
 	debug_text_event(adapter->req_dbf, 1, "unso");
-#endif
 	goto out;
 
  failed_req_send:
@@ -1044,8 +1053,12 @@ zfcp_fsf_status_read_handler(struct zfcp_fsf_req *fsf_req)
 
 	case FSF_STATUS_READ_LINK_DOWN:
 		ZFCP_LOG_FLAGS(1, "FSF_STATUS_READ_LINK_DOWN\n");
-
-		/* Unneccessary, ignoring.... */
+		debug_text_event(adapter->erp_dbf, 0, "unsol_link_down:");
+		ZFCP_LOG_INFO("Local link to adapter %s is down\n",
+			      zfcp_get_busid_by_adapter(adapter));
+		atomic_set_mask(ZFCP_STATUS_ADAPTER_LINK_UNPLUGGED,
+				&adapter->status);
+		zfcp_erp_adapter_failed(adapter);
 		break;
 
 	case FSF_STATUS_READ_LINK_UP:
@@ -1063,27 +1076,6 @@ zfcp_fsf_status_read_handler(struct zfcp_fsf_req *fsf_req)
 					ZFCP_STATUS_ADAPTER_LINK_UNPLUGGED
 					| ZFCP_STATUS_COMMON_ERP_FAILED);
 
-		break;
-
-	case FSF_STATUS_READ_NOTIFICATION_LOST:
-		ZFCP_LOG_FLAGS(1, "FSF_STATUS_READ_NOTIFICATION_LOST\n");
-		debug_text_event(adapter->erp_dbf, 2, "unsol_not_lost:");
-		switch (status_buffer->status_subtype) {
-		case FSF_STATUS_READ_SUB_LOST_CFDC_UPDATED:
-			ZFCP_LOG_NORMAL(
-				"The unsolicited status information about "
-				"CFDC update on the adapter %s is lost "
-				"due to the lack of internal resources\n",
-				zfcp_get_busid_by_adapter(adapter));
-			break;
-		case FSF_STATUS_READ_SUB_LOST_CFDC_HARDENED:
-			ZFCP_LOG_NORMAL(
-				"The unsolicited status information about "
-				"CFDC harden on the adapter %s is lost "
-				"due to the lack of internal resources\n",
-				zfcp_get_busid_by_adapter(adapter));
-			break;
-		}
 		break;
 
 	case FSF_STATUS_READ_CFDC_UPDATED:
@@ -1344,16 +1336,10 @@ zfcp_fsf_abort_fcp_command_handler(struct zfcp_fsf_req *new_fsf_req)
 	case FSF_FCP_COMMAND_DOES_NOT_EXIST:
 		ZFCP_LOG_FLAGS(2, "FSF_FCP_COMMAND_DOES_NOT_EXIST\n");
 		retval = 0;
-#ifdef ZFCP_DEBUG_REQUESTS
-		/*
-		 * debug feature area which records
-		 * fsf request sequence numbers
-		 */
 		debug_text_event(new_fsf_req->adapter->req_dbf, 3, "no_exist");
 		debug_event(new_fsf_req->adapter->req_dbf, 3,
 			    &new_fsf_req->qtcb->bottom.support.req_handle,
 			    sizeof (unsigned long));
-#endif				/* ZFCP_DEBUG_REQUESTS */
 		debug_text_event(new_fsf_req->adapter->erp_dbf, 3,
 				 "fsf_s_no_exist");
 		new_fsf_req->status |= ZFCP_STATUS_FSFREQ_ABORTNOTNEEDED;
@@ -1670,20 +1656,19 @@ zfcp_fsf_send_ct_handler(struct zfcp_fsf_req *fsf_req)
 				"to a port with WWPN 0x%Lx connected "
 				"to the adapter %s\n", port->wwpn,
 				zfcp_get_busid_by_port(port));
-		counter = 0;
-		do {
-			subtable = header->fsf_status_qual.halfword[counter++];
-			rule = header->fsf_status_qual.halfword[counter++];
+		for (counter = 0; counter < 2; counter++) {
+			subtable = header->fsf_status_qual.halfword[counter * 2];
+			rule = header->fsf_status_qual.halfword[counter * 2 + 1];
 			switch (subtable) {
 			case FSF_SQ_CFDC_SUBTABLE_OS:
 			case FSF_SQ_CFDC_SUBTABLE_PORT_WWPN:
 			case FSF_SQ_CFDC_SUBTABLE_PORT_DID:
 			case FSF_SQ_CFDC_SUBTABLE_LUN:
-       				ZFCP_LOG_NORMAL("Access denied (%s rule %d)\n",
+       				ZFCP_LOG_INFO("Access denied (%s rule %d)\n",
 					zfcp_act_subtable_type[subtable], rule);
 				break;
 			}
-		} while (counter < 4);
+		}
 		debug_text_event(fsf_req->adapter->erp_dbf, 1, "fsf_s_access");
 		fsf_req->status |= ZFCP_STATUS_FSFREQ_ERROR;
 		break;
@@ -2036,20 +2021,19 @@ static int zfcp_fsf_send_els_handler(struct zfcp_fsf_req *fsf_req)
 		ZFCP_LOG_NORMAL("Access denied, cannot send ELS "
 				"(adapter: %s, wwpn=0x%016Lx)\n",
 				zfcp_get_busid_by_port(port), port->wwpn);
-		counter = 0;
-		do {
-			subtable = header->fsf_status_qual.halfword[counter++];
-			rule = header->fsf_status_qual.halfword[counter++];
+		for (counter = 0; counter < 2; counter++) {
+			subtable = header->fsf_status_qual.halfword[counter * 2];
+			rule = header->fsf_status_qual.halfword[counter * 2 + 1];
 			switch (subtable) {
 			case FSF_SQ_CFDC_SUBTABLE_OS:
 			case FSF_SQ_CFDC_SUBTABLE_PORT_WWPN:
 			case FSF_SQ_CFDC_SUBTABLE_PORT_DID:
 			case FSF_SQ_CFDC_SUBTABLE_LUN:
-				ZFCP_LOG_NORMAL("Access denied (%s rule %d)\n",
+				ZFCP_LOG_INFO("Access denied (%s rule %d)\n",
 					zfcp_act_subtable_type[subtable], rule);
 				break;
 			}
-		} while (counter < 4);
+		}
 		debug_text_event(adapter->erp_dbf, 1, "fsf_s_access");
 		fsf_req->status |= ZFCP_STATUS_FSFREQ_ERROR;
 		break;
@@ -2114,7 +2098,8 @@ zfcp_fsf_exchange_config_data(struct zfcp_erp_action *erp_action)
 
 	erp_action->fsf_req->erp_action = erp_action;
 	erp_action->fsf_req->qtcb->bottom.config.feature_selection =
-		FSF_FEATURE_CFDC;
+		FSF_FEATURE_CFDC |
+		FSF_FEATURE_LOST_SAN_NOTIFICATION;
 
 	/* start QDIO request for this FSF request */
 	retval = zfcp_fsf_req_send(erp_action->fsf_req, &erp_action->timer);
@@ -2138,6 +2123,84 @@ zfcp_fsf_exchange_config_data(struct zfcp_erp_action *erp_action)
 	return retval;
 }
 
+/**
+ * zfcp_fsf_exchange_config_evaluate
+ * @fsf_req: fsf_req which belongs to xchg config data request
+ * @xchg_ok: specifies if xchg config data was incomplete or complete (0/1)
+ *
+ * returns: -EIO on error, 0 otherwise
+ */
+static int
+zfcp_fsf_exchange_config_evaluate(struct zfcp_fsf_req *fsf_req, int xchg_ok)
+{
+	struct fsf_qtcb_bottom_config *bottom;
+	struct zfcp_adapter *adapter = fsf_req->adapter;
+
+	bottom = &fsf_req->qtcb->bottom.config;
+	ZFCP_LOG_DEBUG("low/high QTCB version 0x%x/0x%x of FSF\n",
+		       bottom->low_qtcb_version, bottom->high_qtcb_version);
+	adapter->fsf_lic_version = bottom->lic_version;
+	adapter->supported_features = bottom->supported_features;
+
+	if (xchg_ok) {
+		adapter->wwnn = bottom->nport_serv_param.wwnn;
+		adapter->wwpn = bottom->nport_serv_param.wwpn;
+		adapter->s_id = bottom->s_id & ZFCP_DID_MASK;
+		adapter->fc_topology = bottom->fc_topology;
+		adapter->fc_link_speed = bottom->fc_link_speed;
+		adapter->hydra_version = bottom->adapter_type;
+	} else {
+		adapter->wwnn = 0;
+		adapter->wwpn = 0;
+		adapter->s_id = 0;
+		adapter->fc_topology = 0;
+		adapter->fc_link_speed = 0;
+		adapter->hydra_version = 0;
+	}
+
+	if(adapter->supported_features & FSF_FEATURE_HBAAPI_MANAGEMENT){
+		adapter->hardware_version = bottom->hardware_version;
+		memcpy(adapter->serial_number, bottom->serial_number, 17);
+		EBCASC(adapter->serial_number, sizeof(adapter->serial_number));
+	}
+
+	ZFCP_LOG_INFO("The adapter %s reported the following characteristics:\n"
+		      "WWNN 0x%016Lx, "
+		      "WWPN 0x%016Lx, "
+		      "S_ID 0x%08x,\n"
+		      "adapter version 0x%x, "
+		      "LIC version 0x%x, "
+		      "FC link speed %d Gb/s\n",
+		      zfcp_get_busid_by_adapter(adapter),
+		      adapter->wwnn,
+		      adapter->wwpn,
+		      (unsigned int) adapter->s_id,
+		      adapter->hydra_version,
+		      adapter->fsf_lic_version,
+		      adapter->fc_link_speed);
+	if (ZFCP_QTCB_VERSION < bottom->low_qtcb_version) {
+		ZFCP_LOG_NORMAL("error: the adapter %s "
+				"only supports newer control block "
+				"versions in comparison to this device "
+				"driver (try updated device driver)\n",
+				zfcp_get_busid_by_adapter(adapter));
+		debug_text_event(adapter->erp_dbf, 0, "low_qtcb_ver");
+		zfcp_erp_adapter_shutdown(adapter, 0);
+		return -EIO;
+	}
+	if (ZFCP_QTCB_VERSION > bottom->high_qtcb_version) {
+		ZFCP_LOG_NORMAL("error: the adapter %s "
+				"only supports older control block "
+				"versions than this device driver uses"
+				"(consider a microcode upgrade)\n",
+				zfcp_get_busid_by_adapter(adapter));
+		debug_text_event(adapter->erp_dbf, 0, "high_qtcb_ver");
+		zfcp_erp_adapter_shutdown(adapter, 0);
+		return -EIO;
+	}
+	return 0;
+}
+
 /*
  * function:    zfcp_fsf_exchange_config_data_handler
  *
@@ -2148,81 +2211,20 @@ zfcp_fsf_exchange_config_data(struct zfcp_erp_action *erp_action)
 static int
 zfcp_fsf_exchange_config_data_handler(struct zfcp_fsf_req *fsf_req)
 {
-	int retval = -EIO;
 	struct fsf_qtcb_bottom_config *bottom;
 	struct zfcp_adapter *adapter = fsf_req->adapter;
 
-	if (fsf_req->status & ZFCP_STATUS_FSFREQ_ERROR) {
-		/* don't set any value, stay with the old (unitialized) ones */
-		goto skip_fsfstatus;
-	}
+	if (fsf_req->status & ZFCP_STATUS_FSFREQ_ERROR)
+		return -EIO;
 
-	/* evaluate FSF status in QTCB */
 	switch (fsf_req->qtcb->header.fsf_status) {
 
 	case FSF_GOOD:
 		ZFCP_LOG_FLAGS(2, "FSF_GOOD\n");
-		bottom = &fsf_req->qtcb->bottom.config;
-		/* only log QTCB versions for now */
-		ZFCP_LOG_DEBUG("low QTCB version 0x%x of FSF, "
-			       "high QTCB version 0x%x of FSF, \n",
-			       bottom->low_qtcb_version,
-			       bottom->high_qtcb_version);
-		adapter->wwnn = bottom->nport_serv_param.wwnn;
-		adapter->wwpn = bottom->nport_serv_param.wwpn;
-		adapter->s_id = bottom->s_id & ZFCP_DID_MASK;
-		adapter->hydra_version = bottom->adapter_type;
-		adapter->fsf_lic_version = bottom->lic_version;
-		adapter->fc_topology = bottom->fc_topology;
-		adapter->fc_link_speed = bottom->fc_link_speed;
-                adapter->supported_features = bottom->supported_features;
 
-		if(adapter->supported_features & FSF_FEATURE_HBAAPI_MANAGEMENT){
-			adapter->hardware_version = bottom->hardware_version;
-                        /* copy just first 17 bytes */
-                        memcpy(adapter->serial_number,
-                               bottom->serial_number, 17);
-                        EBCASC(adapter->serial_number,
-                               sizeof(adapter->serial_number));
-		}
+		if (zfcp_fsf_exchange_config_evaluate(fsf_req, 1))
+			return -EIO;
 
-		ZFCP_LOG_INFO("The adapter %s reported "
-			      "the following characteristics:\n"
-			      "WWNN 0x%16.16Lx, "
-			      "WWPN 0x%16.16Lx, "
-			      "S_ID 0x%6.6x,\n"
-			      "adapter version 0x%x, "
-			      "LIC version 0x%x, "
-			      "FC link speed %d Gb/s\n",
-			      zfcp_get_busid_by_adapter(adapter),
-			      adapter->wwnn,
-			      adapter->wwpn,
-			      (unsigned int) adapter->s_id,
-			      adapter->hydra_version,
-			      adapter->fsf_lic_version,
-			      adapter->fc_link_speed);
-		if (ZFCP_QTCB_VERSION < bottom->low_qtcb_version) {
-			ZFCP_LOG_NORMAL("error: the adapter %s "
-					"only supports newer control block "
-					"versions in comparison to this device "
-					"driver (try updated device driver)\n",
-					zfcp_get_busid_by_adapter(adapter));
-			debug_text_event(fsf_req->adapter->erp_dbf, 0,
-					 "low_qtcb_ver");
-			zfcp_erp_adapter_shutdown(adapter, 0);
-			goto skip_fsfstatus;
-		}
-		if (ZFCP_QTCB_VERSION > bottom->high_qtcb_version) {
-			ZFCP_LOG_NORMAL("error: the adapter %s "
-					"only supports older control block "
-					"versions than this device driver uses"
-					"(consider a microcode upgrade)\n",
-					zfcp_get_busid_by_adapter(adapter));
-			debug_text_event(fsf_req->adapter->erp_dbf, 0,
-					 "high_qtcb_ver");
-			zfcp_erp_adapter_shutdown(adapter, 0);
-			goto skip_fsfstatus;
-		}
 		switch (adapter->fc_topology) {
 		case FSF_TOPO_P2P:
 			ZFCP_LOG_FLAGS(1, "FSF_TOPO_P2P\n");
@@ -2234,7 +2236,7 @@ zfcp_fsf_exchange_config_data_handler(struct zfcp_fsf_req *fsf_req)
 			debug_text_event(fsf_req->adapter->erp_dbf, 0,
 					 "top-p-to-p");
 			zfcp_erp_adapter_shutdown(adapter, 0);
-			goto skip_fsfstatus;
+			return -EIO;
 		case FSF_TOPO_AL:
 			ZFCP_LOG_FLAGS(1, "FSF_TOPO_AL\n");
 			ZFCP_LOG_NORMAL("error: Arbitrated loop fibre-channel "
@@ -2245,7 +2247,7 @@ zfcp_fsf_exchange_config_data_handler(struct zfcp_fsf_req *fsf_req)
 			debug_text_event(fsf_req->adapter->erp_dbf, 0,
 					 "top-al");
 			zfcp_erp_adapter_shutdown(adapter, 0);
-			goto skip_fsfstatus;
+			return -EIO;
 		case FSF_TOPO_FABRIC:
 			ZFCP_LOG_FLAGS(1, "FSF_TOPO_FABRIC\n");
 			ZFCP_LOG_INFO("Switched fabric fibre-channel "
@@ -2264,8 +2266,9 @@ zfcp_fsf_exchange_config_data_handler(struct zfcp_fsf_req *fsf_req)
 			debug_text_exception(fsf_req->adapter->erp_dbf, 0,
 					     "unknown-topo");
 			zfcp_erp_adapter_shutdown(adapter, 0);
-			goto skip_fsfstatus;
+			return -EIO;
 		}
+		bottom = &fsf_req->qtcb->bottom.config;
 		if (bottom->max_qtcb_size < sizeof(struct fsf_qtcb)) {
 			ZFCP_LOG_NORMAL("bug: Maximum QTCB size (%d bytes) "
 					"allowed by the adapter %s "
@@ -2279,22 +2282,32 @@ zfcp_fsf_exchange_config_data_handler(struct zfcp_fsf_req *fsf_req)
 			debug_event(fsf_req->adapter->erp_dbf, 0,
 				    &bottom->max_qtcb_size, sizeof (u32));
 			zfcp_erp_adapter_shutdown(adapter, 0);
-			goto skip_fsfstatus;
+			return -EIO;
 		}
 		atomic_set_mask(ZFCP_STATUS_ADAPTER_XCONFIG_OK,
 				&adapter->status);
-		retval = 0;
-
 		break;
+	case FSF_EXCHANGE_CONFIG_DATA_INCOMPLETE:
+		debug_text_event(adapter->erp_dbf, 0, "xchg-inco");
 
+		if (zfcp_fsf_exchange_config_evaluate(fsf_req, 0))
+			return -EIO;
+
+		ZFCP_LOG_INFO("Local link to adapter %s is down\n",
+			      zfcp_get_busid_by_adapter(adapter));
+		atomic_set_mask(ZFCP_STATUS_ADAPTER_XCONFIG_OK |
+				ZFCP_STATUS_ADAPTER_LINK_UNPLUGGED,
+				&adapter->status);
+		zfcp_erp_adapter_failed(adapter);
+		break;
 	default:
-		/* retval is -EIO by default */
 		debug_text_event(fsf_req->adapter->erp_dbf, 0, "fsf-stat-ng");
 		debug_event(fsf_req->adapter->erp_dbf, 0,
 			    &fsf_req->qtcb->header.fsf_status, sizeof (u32));
+		zfcp_erp_adapter_shutdown(adapter, 0);
+		return -EIO;
 	}
- skip_fsfstatus:
-	return retval;
+	return 0;
 }
 
 /*
@@ -2408,20 +2421,19 @@ zfcp_fsf_open_port_handler(struct zfcp_fsf_req *fsf_req)
 		ZFCP_LOG_NORMAL("Access denied, cannot open port "
 			"with WWPN 0x%Lx connected to the adapter %s\n",
 			port->wwpn, zfcp_get_busid_by_port(port));
-		counter = 0;
-		do {
-			subtable = header->fsf_status_qual.halfword[counter++];
-			rule = header->fsf_status_qual.halfword[counter++];
+		for (counter = 0; counter < 2; counter++) {
+			subtable = header->fsf_status_qual.halfword[counter * 2];
+			rule = header->fsf_status_qual.halfword[counter * 2 + 1];
 			switch (subtable) {
 			case FSF_SQ_CFDC_SUBTABLE_OS:
 			case FSF_SQ_CFDC_SUBTABLE_PORT_WWPN:
 			case FSF_SQ_CFDC_SUBTABLE_PORT_DID:
 			case FSF_SQ_CFDC_SUBTABLE_LUN:
-				ZFCP_LOG_NORMAL("Access denied (%s rule %d)\n",
+				ZFCP_LOG_INFO("Access denied (%s rule %d)\n",
 					zfcp_act_subtable_type[subtable], rule);
 				break;
 			}
-		} while (counter < 4);
+		}
 		debug_text_event(fsf_req->adapter->erp_dbf, 1, "fsf_s_access");
 		zfcp_erp_port_failed(port);
 		fsf_req->status |= ZFCP_STATUS_FSFREQ_ERROR;
@@ -2814,20 +2826,19 @@ zfcp_fsf_close_physical_port_handler(struct zfcp_fsf_req *fsf_req)
 				"physical port with WWPN 0x%Lx connected to "
 				"the adapter %s\n", port->wwpn,
 				zfcp_get_busid_by_port(port));
-		counter = 0;
-		do {
-			subtable = header->fsf_status_qual.halfword[counter++];
-			rule = header->fsf_status_qual.halfword[counter++];
+		for (counter = 0; counter < 2; counter++) {
+			subtable = header->fsf_status_qual.halfword[counter * 2];
+			rule = header->fsf_status_qual.halfword[counter * 2 + 1];
 			switch (subtable) {
 			case FSF_SQ_CFDC_SUBTABLE_OS:
 			case FSF_SQ_CFDC_SUBTABLE_PORT_WWPN:
 			case FSF_SQ_CFDC_SUBTABLE_PORT_DID:
 			case FSF_SQ_CFDC_SUBTABLE_LUN:
-	       			ZFCP_LOG_NORMAL("Access denied (%s rule %d)\n",
+	       			ZFCP_LOG_INFO("Access denied (%s rule %d)\n",
 					zfcp_act_subtable_type[subtable], rule);
 				break;
 			}
-		} while (counter < 4);
+		}
 		debug_text_event(fsf_req->adapter->erp_dbf, 1, "fsf_s_access");
 		fsf_req->status |= ZFCP_STATUS_FSFREQ_ERROR;
 		break;
@@ -2956,8 +2967,8 @@ zfcp_fsf_open_unit(struct zfcp_erp_action *erp_action)
 	atomic_set_mask(ZFCP_STATUS_COMMON_OPENING, &erp_action->unit->status);
 	erp_action->fsf_req->data.open_unit.unit = erp_action->unit;
 	erp_action->fsf_req->erp_action = erp_action;
-	erp_action->fsf_req->qtcb->bottom.support.option =
-		FSF_OPEN_LUN_SUPPRESS_BOXING;
+//	erp_action->fsf_req->qtcb->bottom.support.option =
+//		FSF_OPEN_LUN_UNSOLICITED_SENSE_DATA;
 
 	/* start QDIO request for this FSF request */
 	retval = zfcp_fsf_req_send(erp_action->fsf_req, &erp_action->timer);
@@ -2994,12 +3005,16 @@ static int
 zfcp_fsf_open_unit_handler(struct zfcp_fsf_req *fsf_req)
 {
 	int retval = -EINVAL;
+	struct zfcp_adapter *adapter;
 	struct zfcp_unit *unit;
 	struct fsf_qtcb_header *header;
+	struct fsf_qtcb_bottom_support *bottom;
 	u16 subtable, rule, counter;
 
+	adapter = fsf_req->adapter;
 	unit = fsf_req->data.open_unit.unit;
 	header = &fsf_req->qtcb->header;
+	bottom = &fsf_req->qtcb->bottom.support;
 
 	if (fsf_req->status & ZFCP_STATUS_FSFREQ_ERROR) {
 		/* don't change unit status in our bookkeeping */
@@ -3021,7 +3036,7 @@ zfcp_fsf_open_unit_handler(struct zfcp_fsf_req *fsf_req)
 		ZFCP_HEX_DUMP(ZFCP_LOG_LEVEL_DEBUG,
 			      (char *) &header->fsf_status_qual,
 			      sizeof (union fsf_status_qual));
-		debug_text_event(fsf_req->adapter->erp_dbf, 1, "fsf_s_ph_nv");
+		debug_text_event(adapter->erp_dbf, 1, "fsf_s_ph_nv");
 		zfcp_erp_adapter_reopen(unit->port->adapter, 0);
 		fsf_req->status |= ZFCP_STATUS_FSFREQ_ERROR;
 		break;
@@ -3034,7 +3049,7 @@ zfcp_fsf_open_unit_handler(struct zfcp_fsf_req *fsf_req)
 				"to the adapter %s twice.\n",
 				unit->fcp_lun,
 				unit->port->wwpn, zfcp_get_busid_by_unit(unit));
-		debug_text_exception(fsf_req->adapter->erp_dbf, 0,
+		debug_text_exception(adapter->erp_dbf, 0,
 				     "fsf_s_uopen");
 		fsf_req->status |= ZFCP_STATUS_FSFREQ_ERROR;
 		break;
@@ -3046,21 +3061,20 @@ zfcp_fsf_open_unit_handler(struct zfcp_fsf_req *fsf_req)
 				"WWPN 0x%Lx connected to the adapter %s\n",
 			unit->fcp_lun, unit->port->wwpn,
 			zfcp_get_busid_by_unit(unit));
-		counter = 0;
-		do {
-			subtable = header->fsf_status_qual.halfword[counter++];
-			rule = header->fsf_status_qual.halfword[counter++];
+		for (counter = 0; counter < 2; counter++) {
+			subtable = header->fsf_status_qual.halfword[counter * 2];
+			rule = header->fsf_status_qual.halfword[counter * 2 + 1];
 			switch (subtable) {
 			case FSF_SQ_CFDC_SUBTABLE_OS:
 			case FSF_SQ_CFDC_SUBTABLE_PORT_WWPN:
 			case FSF_SQ_CFDC_SUBTABLE_PORT_DID:
 			case FSF_SQ_CFDC_SUBTABLE_LUN:
-				ZFCP_LOG_NORMAL("Access denied (%s rule %d)\n",
+				ZFCP_LOG_INFO("Access denied (%s rule %d)\n",
 					zfcp_act_subtable_type[subtable], rule);
 				break;
 			}
-		} while (counter < 4);
-		debug_text_event(fsf_req->adapter->erp_dbf, 1, "fsf_s_access");
+		}
+		debug_text_event(adapter->erp_dbf, 1, "fsf_s_access");
 		zfcp_erp_unit_failed(unit);
 		fsf_req->status |= ZFCP_STATUS_FSFREQ_ERROR;
 		break;
@@ -3071,7 +3085,7 @@ zfcp_fsf_open_unit_handler(struct zfcp_fsf_req *fsf_req)
 			       "with WWPN 0x%Lx on the adapter %s "
 			       "needs to be reopened\n",
 			       unit->port->wwpn, zfcp_get_busid_by_unit(unit));
-		debug_text_event(fsf_req->adapter->erp_dbf, 2, "fsf_s_pboxed");
+		debug_text_event(adapter->erp_dbf, 2, "fsf_s_pboxed");
 		zfcp_erp_port_reopen(unit->port, 0);
 		fsf_req->status |= ZFCP_STATUS_FSFREQ_ERROR |
 			ZFCP_STATUS_FSFREQ_RETRY;
@@ -3079,30 +3093,38 @@ zfcp_fsf_open_unit_handler(struct zfcp_fsf_req *fsf_req)
 
 	case FSF_LUN_SHARING_VIOLATION :
 		ZFCP_LOG_FLAGS(2, "FSF_LUN_SHARING_VIOLATION\n");
-		ZFCP_LOG_NORMAL("error: FCP-LUN 0x%Lx at "
-				"the remote port with WWPN 0x%Lx connected "
-				"to the adapter %s "
-				"is already owned by another operating system "
-				"instance (LPAR or VM guest)\n",
-				unit->fcp_lun,
-				unit->port->wwpn,
-				zfcp_get_busid_by_unit(unit));
 		subtable = header->fsf_status_qual.halfword[4];
 		rule = header->fsf_status_qual.halfword[5];
-		switch (subtable) {
-		case FSF_SQ_CFDC_SUBTABLE_OS:
-		case FSF_SQ_CFDC_SUBTABLE_PORT_WWPN:
-		case FSF_SQ_CFDC_SUBTABLE_PORT_DID:
-		case FSF_SQ_CFDC_SUBTABLE_LUN:
-			ZFCP_LOG_NORMAL("Access denied (%s rule %d)\n",
-				zfcp_act_subtable_type[subtable], rule);
-			break;
+		if (rule == 0xFFFF) {
+			ZFCP_LOG_NORMAL("FCP-LUN 0x%Lx at the remote port "
+					"with WWPN 0x%Lx connected to the "
+					"adapter %s is already in use\n",
+					unit->fcp_lun,
+					unit->port->wwpn,
+					zfcp_get_busid_by_unit(unit));
+		} else {
+			switch (subtable) {
+			case FSF_SQ_CFDC_SUBTABLE_OS:
+			case FSF_SQ_CFDC_SUBTABLE_PORT_WWPN:
+			case FSF_SQ_CFDC_SUBTABLE_PORT_DID:
+			case FSF_SQ_CFDC_SUBTABLE_LUN:
+				ZFCP_LOG_NORMAL("Access to FCP-LUN 0x%Lx at the "
+						"remote port with WWPN 0x%Lx "
+						"connected to the adapter %s "
+						"is denied (%s rule %d)\n",
+						unit->fcp_lun,
+						unit->port->wwpn,
+						zfcp_get_busid_by_unit(unit),
+						zfcp_act_subtable_type[subtable],
+						rule);
+				break;
+			}
 		}
-		ZFCP_LOG_NORMAL("Additional sense data is presented:\n");
-		ZFCP_HEX_DUMP(ZFCP_LOG_LEVEL_NORMAL,
+		ZFCP_LOG_DEBUG("status qualifier:\n");
+		ZFCP_HEX_DUMP(ZFCP_LOG_LEVEL_DEBUG,
 			      (char *) &header->fsf_status_qual,
 			      sizeof (union fsf_status_qual));
-		debug_text_event(fsf_req->adapter->erp_dbf, 2,
+		debug_text_event(adapter->erp_dbf, 2,
 				 "fsf_s_l_sh_vio");
 		zfcp_erp_unit_failed(unit);
 		fsf_req->status |= ZFCP_STATUS_FSFREQ_ERROR;
@@ -3118,7 +3140,7 @@ zfcp_fsf_open_unit_handler(struct zfcp_fsf_req *fsf_req)
 			      unit->fcp_lun,
 			      unit->port->wwpn,
 			      zfcp_get_busid_by_unit(unit));
-		debug_text_event(fsf_req->adapter->erp_dbf, 1,
+		debug_text_event(adapter->erp_dbf, 1,
 				 "fsf_s_max_units");
 		zfcp_erp_unit_failed(unit);
 		fsf_req->status |= ZFCP_STATUS_FSFREQ_ERROR;
@@ -3131,7 +3153,7 @@ zfcp_fsf_open_unit_handler(struct zfcp_fsf_req *fsf_req)
 			ZFCP_LOG_FLAGS(2,
 				       "FSF_SQ_INVOKE_LINK_TEST_PROCEDURE\n");
 			/* Re-establish link to port */
-			debug_text_event(fsf_req->adapter->erp_dbf, 1,
+			debug_text_event(adapter->erp_dbf, 1,
 					 "fsf_sq_ltest");
 			zfcp_erp_port_reopen(unit->port, 0);
 			fsf_req->status |= ZFCP_STATUS_FSFREQ_ERROR;
@@ -3140,7 +3162,7 @@ zfcp_fsf_open_unit_handler(struct zfcp_fsf_req *fsf_req)
 			ZFCP_LOG_FLAGS(2,
 				       "FSF_SQ_ULP_DEPENDENT_ERP_REQUIRED\n");
 			/* ERP strategy will escalate */
-			debug_text_event(fsf_req->adapter->erp_dbf, 1,
+			debug_text_event(adapter->erp_dbf, 1,
 					 "fsf_sq_ulp");
 			fsf_req->status |= ZFCP_STATUS_FSFREQ_ERROR;
 			break;
@@ -3148,12 +3170,23 @@ zfcp_fsf_open_unit_handler(struct zfcp_fsf_req *fsf_req)
 			ZFCP_LOG_NORMAL
 			    ("bug: Wrong status qualifier 0x%x arrived.\n",
 			     header->fsf_status_qual.word[0]);
-			debug_text_event(fsf_req->adapter->erp_dbf, 0,
+			debug_text_event(adapter->erp_dbf, 0,
 					 "fsf_sq_inval:");
-			debug_exception(fsf_req->adapter->erp_dbf, 0,
+			debug_exception(adapter->erp_dbf, 0,
 					&header->fsf_status_qual.word[0],
 				sizeof (u32));
 		}
+		break;
+
+	case FSF_INVALID_COMMAND_OPTION:
+		ZFCP_LOG_FLAGS(2, "FSF_INVALID_COMMAND_OPTION\n");
+		ZFCP_LOG_NORMAL(
+			"Invalid option 0x%x has been specified "
+			"in QTCB bottom sent to the adapter %s\n",
+			bottom->option,
+			zfcp_get_busid_by_adapter(adapter));
+		fsf_req->status |= ZFCP_STATUS_FSFREQ_ERROR;
+		retval = -EINVAL;
 		break;
 
 	case FSF_GOOD:
@@ -3162,13 +3195,16 @@ zfcp_fsf_open_unit_handler(struct zfcp_fsf_req *fsf_req)
 		unit->handle = header->lun_handle;
 		ZFCP_LOG_TRACE("unit (FCP_LUN=0x%Lx) of remote port "
 			       "(WWPN=0x%Lx) via adapter (busid=%s) opened, "
-			       "port handle 0x%x \n",
+			       "port handle 0x%x, access flag 0x%02x\n",
 			       unit->fcp_lun,
 			       unit->port->wwpn,
 			       zfcp_get_busid_by_unit(unit),
-			       unit->handle);
+			       unit->handle,
+			       bottom->lun_access);
 		/* mark unit as open */
 		atomic_set_mask(ZFCP_STATUS_COMMON_OPEN, &unit->status);
+		if (adapter->supported_features & FSF_FEATURE_CFDC)
+			unit->lun_access = bottom->lun_access;
 		retval = 0;
 		break;
 
@@ -3176,8 +3212,8 @@ zfcp_fsf_open_unit_handler(struct zfcp_fsf_req *fsf_req)
 		ZFCP_LOG_NORMAL("bug: An unknown FSF Status was presented "
 				"(debug info 0x%x)\n",
 				header->fsf_status);
-		debug_text_event(fsf_req->adapter->erp_dbf, 0, "fsf_s_inval:");
-		debug_exception(fsf_req->adapter->erp_dbf, 0,
+		debug_text_event(adapter->erp_dbf, 0, "fsf_s_inval:");
+		debug_exception(adapter->erp_dbf, 0,
 				&header->fsf_status, sizeof (u32));
 		break;
 	}
@@ -3454,15 +3490,11 @@ zfcp_fsf_send_fcp_command_task(struct zfcp_adapter *adapter,
 	 * (need this for look up on normal command completion)
 	 */
 	fsf_req->data.send_fcp_command_task.scsi_cmnd = scsi_cmnd;
-#ifdef ZFCP_DEBUG_REQUESTS
 	debug_text_event(adapter->req_dbf, 3, "fsf/sc");
 	debug_event(adapter->req_dbf, 3, &fsf_req, sizeof (unsigned long));
 	debug_event(adapter->req_dbf, 3, &scsi_cmnd, sizeof (unsigned long));
-#endif				/* ZFCP_DEBUG_REQUESTS */
-#ifdef ZFCP_DEBUG_ABORTS
-	fsf_req->data.send_fcp_command_task.start_jiffies = jiffies;
-#endif
 
+	fsf_req->data.send_fcp_command_task.start_jiffies = jiffies;
 	fsf_req->data.send_fcp_command_task.unit = unit;
 	ZFCP_LOG_DEBUG("unit=0x%lx, unit_fcp_lun=0x%Lx\n",
 		       (unsigned long) unit, unit->fcp_lun);
@@ -3605,10 +3637,8 @@ zfcp_fsf_send_fcp_command_task(struct zfcp_adapter *adapter,
  no_fit:
  failed_scsi_cmnd:
 	/* dequeue new FSF request previously enqueued */
-#ifdef ZFCP_DEBUG_REQUESTS
 	debug_text_event(adapter->req_dbf, 3, "fail_sc");
 	debug_event(adapter->req_dbf, 3, &scsi_cmnd, sizeof (unsigned long));
-#endif				/* ZFCP_DEBUG_REQUESTS */
 
 	zfcp_fsf_req_free(fsf_req);
 	fsf_req = NULL;
@@ -3863,20 +3893,19 @@ zfcp_fsf_send_fcp_command_handler(struct zfcp_fsf_req *fsf_req)
 				"remote port with WWPN 0x%Lx connected to the "
 				"adapter %s\n",	unit->fcp_lun, unit->port->wwpn,
 			zfcp_get_busid_by_unit(unit));
-		counter = 0;
-		do {
-			subtable = header->fsf_status_qual.halfword[counter++];
-			rule = header->fsf_status_qual.halfword[counter++];
+		for (counter = 0; counter < 2; counter++) {
+			subtable = header->fsf_status_qual.halfword[counter * 2];
+			rule = header->fsf_status_qual.halfword[counter * 2 + 1];
 			switch (subtable) {
 			case FSF_SQ_CFDC_SUBTABLE_OS:
 			case FSF_SQ_CFDC_SUBTABLE_PORT_WWPN:
 			case FSF_SQ_CFDC_SUBTABLE_PORT_DID:
 			case FSF_SQ_CFDC_SUBTABLE_LUN:
-				ZFCP_LOG_NORMAL("Access denied (%s rule %d)\n",
+				ZFCP_LOG_INFO("Access denied (%s rule %d)\n",
 					zfcp_act_subtable_type[subtable], rule);
 				break;
 			}
-		} while (counter < 4);
+		}
 		debug_text_event(fsf_req->adapter->erp_dbf, 1, "fsf_s_access");
 		fsf_req->status |= ZFCP_STATUS_FSFREQ_ERROR;
 		break;
@@ -4384,7 +4413,6 @@ zfcp_fsf_send_fcp_command_task_handler(struct zfcp_fsf_req *fsf_req)
 	 * the new eh
 	 */
 	/* always call back */
-#ifdef ZFCP_DEBUG_REQUESTS
 	debug_text_event(fsf_req->adapter->req_dbf, 2, "ok_done:");
 	debug_event(fsf_req->adapter->req_dbf, 2, &scpnt,
 		    sizeof (unsigned long));
@@ -4392,7 +4420,6 @@ zfcp_fsf_send_fcp_command_task_handler(struct zfcp_fsf_req *fsf_req)
 		    sizeof (unsigned long));
 	debug_event(fsf_req->adapter->req_dbf, 2, &fsf_req,
 		    sizeof (unsigned long));
-#endif /* ZFCP_DEBUG_REQUESTS */
 	(scpnt->scsi_done) (scpnt);
 	/*
 	 * We must hold this lock until scsi_done has been called.
@@ -4505,15 +4532,13 @@ zfcp_fsf_control_file(struct zfcp_adapter *adapter,
 	int direction;
 	int retval = 0;
 
-#if 0
-	if (!(adapter->features & FSF_FEATURE_CFDC)) {
+	if (!(adapter->supported_features & FSF_FEATURE_CFDC)) {
 		ZFCP_LOG_INFO(
 			"Adapter %s does not support control file\n",
 			zfcp_get_busid_by_adapter(adapter));
 		retval = -EOPNOTSUPP;
-		goto no_act_support;
+		goto no_cfdc_support;
 	}
-#endif
 
 	switch (fsf_command) {
 
@@ -4595,6 +4620,7 @@ out:
 	write_unlock_irqrestore(&adapter->request_queue.queue_lock, lock_flags);
 
 invalid_command:
+no_cfdc_support:
 	return retval;
 }
 
@@ -4932,11 +4958,6 @@ zfcp_fsf_req_create(struct zfcp_adapter *adapter, u32 fsf_cmd, int req_flags,
                 goto failed_sbals;
 	}
 
-
-	/* set magics */
-	fsf_req->common_magic = ZFCP_MAGIC;
-	fsf_req->specific_magic = ZFCP_MAGIC_FSFREQ;
-
 	fsf_req->adapter = adapter;	/* pointer to "parent" adapter */
 	fsf_req->fsf_command = fsf_cmd;
 	fsf_req->sbal_number = 1;
@@ -5085,7 +5106,6 @@ zfcp_fsf_req_send(struct zfcp_fsf_req *fsf_req, struct timer_list *timer)
 			 "to request queue.\n");
 	} else {
 		req_queue->distance_from_int = new_distance_from_int;
-#ifdef ZFCP_DEBUG_REQUESTS
 		debug_text_event(adapter->req_dbf, 1, "o:a/seq");
 		debug_event(adapter->req_dbf, 1, &fsf_req,
 			    sizeof (unsigned long));
@@ -5095,7 +5115,6 @@ zfcp_fsf_req_send(struct zfcp_fsf_req *fsf_req, struct timer_list *timer)
 		} else {
 			debug_text_event(adapter->req_dbf, 1, "nocb");
 		}
-#endif				/* ZFCP_DEBUG_REQUESTS */
 		/*
 		 * increase FSF sequence counter -
 		 * this must only be done for request successfully enqueued to
