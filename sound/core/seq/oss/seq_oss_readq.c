@@ -74,7 +74,6 @@ void
 snd_seq_oss_readq_delete(seq_oss_readq_t *q)
 {
 	if (q) {
-		snd_seq_oss_readq_clear(q);	/* to be sure */
 		if (q->q)
 			kfree(q->q);
 		kfree(q);
