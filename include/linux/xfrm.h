@@ -117,8 +117,9 @@ enum
 #define XFRM_MSG_EXPIRE		(XFRM_MSG_BASE + 8)
 
 #define XFRM_MSG_UPDPOLICY	(XFRM_MSG_BASE + 9)
+#define XFRM_MSG_UPDSA		(XFRM_MSG_BASE + 10)
 
-#define XFRM_MSG_MAX		(XFRM_MSG_UPDPOLICY+1)
+#define XFRM_MSG_MAX		(XFRM_MSG_UPDSA+1)
 
 struct xfrm_user_tmpl {
 	struct xfrm_id		id;
@@ -136,6 +137,7 @@ struct xfrm_encap_tmpl {
 	__u16		encap_type;
 	__u16		encap_sport;
 	__u16		encap_dport;
+	xfrm_address_t	encap_oa;
 };
 
 /* Netlink message attributes.  */

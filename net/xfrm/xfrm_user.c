@@ -249,7 +249,7 @@ error_no_put:
 static int xfrm_add_sa(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfrma)
 {
 	struct xfrm_usersa_info *p = NLMSG_DATA(nlh);
-	struct xfrm_state *x, *x1;
+	struct xfrm_state *x;
 	int err;
 
 	err = verify_newsa_info(p, (struct rtattr **) xfrma);
@@ -260,16 +260,13 @@ static int xfrm_add_sa(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfrma)
 	if (!x)
 		return err;
 
-	x1 = xfrm_state_lookup(&x->id.daddr, x->id.spi, x->id.proto, x->props.family);
-	if (x1) {
+	err = xfrm_state_replace(x, nlh->nlmsg_type == XFRM_MSG_NEWSA);
+	if (err < 0) {
+		x->km.state = XFRM_STATE_DEAD;
 		xfrm_state_put(x);
-		xfrm_state_put(x1);
-		return -EEXIST;
 	}
 
-	xfrm_state_insert(x);
-
-	return 0;
+	return err;
 }
 
 static int xfrm_del_sa(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfrma)
@@ -801,6 +798,7 @@ static const int xfrm_msg_min[(XFRM_MSG_MAX + 1 - XFRM_MSG_BASE)] = {
 	NLMSG_LENGTH(sizeof(struct xfrm_user_acquire)),	/* ACQUIRE */
 	NLMSG_LENGTH(sizeof(struct xfrm_user_expire)),	/* EXPIRE */
 	NLMSG_LENGTH(sizeof(struct xfrm_userpolicy_info)),/* UPD POLICY */
+	NLMSG_LENGTH(sizeof(struct xfrm_usersa_info)),	/* UPD SA */
 };
 
 static struct xfrm_link {
@@ -823,6 +821,7 @@ static struct xfrm_link {
 	{},
 	{},
 	{	.doit	=	xfrm_add_policy 	},
+	{	.doit	=	xfrm_add_sa, 		},
 };
 
 static int xfrm_done(struct netlink_callback *cb)

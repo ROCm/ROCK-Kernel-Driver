@@ -370,11 +370,10 @@ xfrm_state_find(xfrm_address_t *daddr, xfrm_address_t *saddr,
 	return x;
 }
 
-void xfrm_state_insert(struct xfrm_state *x)
+static void __xfrm_state_insert(struct xfrm_state *x)
 {
 	unsigned h = xfrm_dst_hash(&x->id.daddr, x->props.family);
 
-	spin_lock_bh(&xfrm_state_lock);
 	list_add(&x->bydst, xfrm_state_bydst+h);
 	xfrm_state_hold(x);
 
@@ -386,8 +385,60 @@ void xfrm_state_insert(struct xfrm_state *x)
 	if (!mod_timer(&x->timer, jiffies + HZ))
 		xfrm_state_hold(x);
 
-	spin_unlock_bh(&xfrm_state_lock);
 	wake_up(&km_waitq);
+}
+
+void xfrm_state_insert(struct xfrm_state *x)
+{
+	spin_lock_bh(&xfrm_state_lock);
+	__xfrm_state_insert(x);
+	spin_unlock_bh(&xfrm_state_lock);
+}
+
+int xfrm_state_replace(struct xfrm_state *x, int excl)
+{
+	struct xfrm_state_afinfo *afinfo;
+	struct xfrm_state *x1;
+	int err;
+
+	afinfo = xfrm_state_get_afinfo(x->props.family);
+	x1 = NULL;
+
+	spin_lock_bh(&xfrm_state_lock);
+
+	if (afinfo) {
+		x1 = afinfo->state_lookup(&x->id.daddr, x->id.spi, x->id.proto);
+		if (!x1) {
+			x1 = afinfo->find_acq(
+				x->props.mode, x->props.reqid, x->id.proto,
+				&x->id.daddr, &x->props.saddr, 0);
+			if (x1 && x1->id.spi != x->id.spi && x1->id.spi) {
+				xfrm_state_put(x1);
+				x1 = NULL;
+			}
+		}
+
+		if (x1 && (excl ? x1->id.spi : xfrm_state_kern(x1))) {
+			xfrm_state_put(x1);
+			x1 = NULL;
+			err = -EEXIST;
+			goto out;
+		}
+	}
+
+	__xfrm_state_insert(x);
+	err = 0;
+
+out:
+	spin_unlock_bh(&xfrm_state_lock);
+
+	if (x1) {
+		xfrm_state_delete(x1);
+		xfrm_state_put(x1);
+	}
+
+	xfrm_state_put_afinfo(afinfo);
+	return err;
 }
 
 int xfrm_state_check_expire(struct xfrm_state *x)
