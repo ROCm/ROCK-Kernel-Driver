@@ -104,6 +104,8 @@ rpc_create_client(struct rpc_xprt *xprt, char *servname,
 	if (!clnt->cl_port)
 		clnt->cl_autobind = 1;
 
+	rpc_init_rtt(&clnt->cl_rtt, xprt->timeout.to_initval);
+
 	if (!rpcauth_create(flavor, clnt))
 		goto out_no_auth;
 

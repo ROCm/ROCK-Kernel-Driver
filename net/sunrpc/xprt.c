@@ -480,13 +480,20 @@ xprt_lookup_rqst(struct rpc_xprt *xprt, u32 xid)
  * Complete reply received.
  * The TCP code relies on us to remove the request from xprt->pending.
  */
-static inline void
+static void
 xprt_complete_rqst(struct rpc_xprt *xprt, struct rpc_rqst *req, int copied)
 {
 	struct rpc_task	*task = req->rq_task;
+	struct rpc_clnt *clnt = task->tk_client;
 
 	/* Adjust congestion window */
-	xprt_adjust_cwnd(xprt, copied);
+	if (!xprt->nocong) {
+		xprt_adjust_cwnd(xprt, copied);
+	       	if (!req->rq_nresend) {
+			int timer = rpcproc_timer(clnt, task->tk_msg.rpc_proc);
+			if (timer)
+				rpc_update_rtt(&clnt->cl_rtt, timer, (long)jiffies - req->rq_xtime);
+	}
 
 #ifdef RPC_PROFILE
 	/* Profile only reads for now */
@@ -934,6 +941,7 @@ xprt_timer(struct rpc_task *task)
 	spin_lock(&xprt->sock_lock);
 	if (req->rq_received)
 		goto out;
+	req->rq_nresend++;
 	xprt_adjust_cwnd(xprt, -ETIMEDOUT);
 
 	dprintk("RPC: %4d xprt_timer (%s request)\n",
@@ -982,15 +990,13 @@ xprt_transmit(struct rpc_task *task)
 	if (!xprt_lock_write(xprt, task))
 		return;
 
-#ifdef RPC_PROFILE
-	req->rq_xtime = jiffies;
-#endif
 	do_xprt_transmit(task);
 }
 
 static void
 do_xprt_transmit(struct rpc_task *task)
 {
+	struct rpc_clnt *clnt = task->tk_client;
 	struct rpc_rqst	*req = task->tk_rqstp;
 	struct rpc_xprt	*xprt = req->rq_xprt;
 	int status, retry = 0;
@@ -1002,6 +1008,7 @@ do_xprt_transmit(struct rpc_task *task)
 	 */
 	while (1) {
 		xprt_clear_wspace(xprt);
+		req->rq_xtime = jiffies;
 		status = xprt_sendmsg(xprt, req);
 
 		if (status < 0)
@@ -1065,7 +1072,21 @@ do_xprt_transmit(struct rpc_task *task)
  out_receive:
 	dprintk("RPC: %4d xmit complete\n", task->tk_pid);
 	/* Set the task's receive timeout value */
-	task->tk_timeout = req->rq_timeout.to_current;
+	if (!xprt->nocong) {
+		int backoff;
+		task->tk_timeout = rpc_calc_rto(&clnt->cl_rtt,
+				rpcproc_timer(clnt, task->tk_msg.rpc_proc));
+		/* If we are retransmitting, increment the timeout counter */
+		backoff = req->rq_nresend;
+		if (backoff) {
+			if (backoff > 7)
+				backoff = 7;
+			task->tk_timeout <<= backoff;
+		}
+		if (task->tk_timeout > req->rq_timeout.to_maxval)
+			task->tk_timeout = req->rq_timeout.to_maxval;
+	} else
+		task->tk_timeout = req->rq_timeout.to_current;
 	spin_lock_bh(&xprt->sock_lock);
 	if (!req->rq_received)
 		rpc_sleep_on(&xprt->pending, task, NULL, xprt_timer);

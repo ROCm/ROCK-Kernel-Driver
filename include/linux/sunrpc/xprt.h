@@ -98,9 +98,8 @@ struct rpc_rqst {
 	
 	u32			rq_bytes_sent;	/* Bytes we have sent */
 
-#ifdef RPC_PROFILE
-	unsigned long		rq_xtime;	/* when transmitted */
-#endif
+	long			rq_xtime;	/* when transmitted */
+	int			rq_nresend;
 };
 #define rq_svec			rq_snd_buf.head
 #define rq_slen			rq_snd_buf.len

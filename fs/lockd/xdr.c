@@ -561,11 +561,10 @@ nlmclt_decode_res(struct rpc_rqst *req, u32 *p, struct nlm_res *resp)
 #define nlmclt_decode_norep	NULL
 
 #define PROC(proc, argtype, restype)	\
-    { "nlm_" #proc,						\
-      (kxdrproc_t) nlmclt_encode_##argtype,			\
-      (kxdrproc_t) nlmclt_decode_##restype,			\
-      MAX(NLM_##argtype##_sz, NLM_##restype##_sz) << 2,		\
-      0								\
+    { .p_procname  = "nlm_" #proc,					\
+      .p_encode    = (kxdrproc_t) nlmclt_encode_##argtype,		\
+      .p_decode    = (kxdrproc_t) nlmclt_decode_##restype,		\
+      .p_bufsiz    = MAX(NLM_##argtype##_sz, NLM_##restype##_sz) << 2	\
     }
 
 static struct rpc_procinfo	nlm_procedures[] = {

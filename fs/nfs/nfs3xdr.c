@@ -988,37 +988,37 @@ nfs3_xdr_commitres(struct rpc_rqst *req, u32 *p, struct nfs_writeres *res)
 # define MAX(a, b)	(((a) > (b))? (a) : (b))
 #endif
 
-#define PROC(proc, argtype, restype)				\
-    { "nfs3_" #proc,						\
-      (kxdrproc_t) nfs3_xdr_##argtype,				\
-      (kxdrproc_t) nfs3_xdr_##restype,				\
-      MAX(NFS3_##argtype##_sz,NFS3_##restype##_sz) << 2,	\
-      0							\
+#define PROC(proc, argtype, restype, timer)				\
+    { .p_procname  = "nfs3_" #proc,					\
+      .p_encode    = (kxdrproc_t) nfs3_xdr_##argtype,			\
+      .p_decode    = (kxdrproc_t) nfs3_xdr_##restype,			\
+      .p_bufsiz    = MAX(NFS3_##argtype##_sz,NFS3_##restype##_sz) << 2,	\
+      .p_timer     = timer						\
     }
 
 static struct rpc_procinfo	nfs3_procedures[22] = {
-  PROC(null,		enc_void,	dec_void),
-  PROC(getattr,		fhandle,	attrstat),
-  PROC(setattr, 	sattrargs,	wccstat),
-  PROC(lookup,		diropargs,	lookupres),
-  PROC(access,		accessargs,	accessres),
-  PROC(readlink,	readlinkargs,	readlinkres),
-  PROC(read,		readargs,	readres),
-  PROC(write,		writeargs,	writeres),
-  PROC(create,		createargs,	createres),
-  PROC(mkdir,		mkdirargs,	createres),
-  PROC(symlink,		symlinkargs,	createres),
-  PROC(mknod,		mknodargs,	createres),
-  PROC(remove,		diropargs,	wccstat),
-  PROC(rmdir,		diropargs,	wccstat),
-  PROC(rename,		renameargs,	renameres),
-  PROC(link,		linkargs,	linkres),
-  PROC(readdir,		readdirargs,	readdirres),
-  PROC(readdirplus,	readdirargs,	readdirres),
-  PROC(fsstat,		fhandle,	fsstatres),
-  PROC(fsinfo,  	fhandle,	fsinfores),
-  PROC(pathconf,	fhandle,	pathconfres),
-  PROC(commit,		commitargs,	commitres),
+  PROC(null,		enc_void,	dec_void, 0),
+  PROC(getattr,		fhandle,	attrstat, 1),
+  PROC(setattr, 	sattrargs,	wccstat, 0),
+  PROC(lookup,		diropargs,	lookupres, 2),
+  PROC(access,		accessargs,	accessres, 1),
+  PROC(readlink,	readlinkargs,	readlinkres, 3),
+  PROC(read,		readargs,	readres, 3),
+  PROC(write,		writeargs,	writeres, 4),
+  PROC(create,		createargs,	createres, 0),
+  PROC(mkdir,		mkdirargs,	createres, 0),
+  PROC(symlink,		symlinkargs,	createres, 0),
+  PROC(mknod,		mknodargs,	createres, 0),
+  PROC(remove,		diropargs,	wccstat, 0),
+  PROC(rmdir,		diropargs,	wccstat, 0),
+  PROC(rename,		renameargs,	renameres, 0),
+  PROC(link,		linkargs,	linkres, 0),
+  PROC(readdir,		readdirargs,	readdirres, 3),
+  PROC(readdirplus,	readdirargs,	readdirres, 3),
+  PROC(fsstat,		fhandle,	fsstatres, 0),
+  PROC(fsinfo,  	fhandle,	fsinfores, 0),
+  PROC(pathconf,	fhandle,	pathconfres, 0),
+  PROC(commit,		commitargs,	commitres, 5),
 };
 
 struct rpc_version		nfs_version3 = {
