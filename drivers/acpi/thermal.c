@@ -54,9 +54,6 @@ static int tzp = 0;
 MODULE_PARM(tzp, "i");
 MODULE_PARM_DESC(tzp, "Thermal zone polling frequency, in 1/10 seconds.\n");
 
-#define PREFIX			"ACPI: "
-
-
 #define ACPI_THERMAL_MAX_ACTIVE	10
 
 #define KELVIN_TO_CELSIUS(t)	((t-2732+5)/10)

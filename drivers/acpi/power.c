@@ -36,9 +36,6 @@
 #define _COMPONENT		ACPI_POWER_COMPONENT
 ACPI_MODULE_NAME		("acpi_power")
 
-#define PREFIX			"ACPI: "
-
-
 int acpi_power_add (struct acpi_device *device);
 int acpi_power_remove (struct acpi_device *device, int type);
 

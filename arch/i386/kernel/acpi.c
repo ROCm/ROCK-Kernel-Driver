@@ -47,6 +47,7 @@
 
 #define PREFIX			"ACPI: "
 
+extern int acpi_disabled;
 
 /* --------------------------------------------------------------------------
                               Boot-time Configuration
@@ -56,42 +57,40 @@ enum acpi_irq_model_id		acpi_irq_model;
 
 #ifdef CONFIG_ACPI_BOOT
 /*
- * Use reserved fixmap pages for physical-to-virtual mappings of ACPI tables.
- * Note that the same range is used for each table, so tables that need to
- * persist should be memcpy'd.
+ * Temporarily use the virtual area starting from FIX_IO_APIC_BASE_END,
+ * to map the target physical address. The problem is that set_fixmap()
+ * provides a single page, and it is possible that the page is not
+ * sufficient.
+ * By using this area, we can map up to MAX_IO_APICS pages temporarily,
+ * i.e. until the next __va_range() call.
+ *
+ * Important Safety Note:  The fixed I/O APIC page numbers are *subtracted*
+ * from the fixed base.  That's why we start at FIX_IO_APIC_BASE_END and
+ * count idx down while incrementing the phys address.
  */
-char *
-__acpi_map_table (
-	unsigned long	phys_addr,
-	unsigned long	size)
+char *__acpi_map_table(unsigned long phys, unsigned long size)
 {
-	unsigned long	base = 0;
-	unsigned long	mapped_phys = phys_addr;
-	unsigned long	offset = phys_addr & (PAGE_SIZE - 1);
-	unsigned long	mapped_size = PAGE_SIZE - offset;
-	unsigned long	avail_size = mapped_size + (PAGE_SIZE * FIX_ACPI_PAGES);
-	int		idx = FIX_ACPI_BEGIN;
+	unsigned long base, offset, mapped_size;
+	int idx;
 
-	if (!phys_addr || !size)
-		return NULL;
+	if (phys + size < 8*1024*1024) 
+		return __va(phys); 
 
-	base = fix_to_virt(FIX_ACPI_BEGIN);
+	offset = phys & (PAGE_SIZE - 1);
+	mapped_size = PAGE_SIZE - offset;
+	set_fixmap(FIX_IO_APIC_BASE_END, phys);
+	base = fix_to_virt(FIX_IO_APIC_BASE_END);
 
-	set_fixmap(idx, mapped_phys);
-
-	if (size > avail_size)
-		return NULL;
-
-	/* If the table doesn't map completely into the fist page... */
-	if (size > mapped_size) {
-		do {
-			/* Make sure we don't go past our range */
-			if (idx++ == FIX_ACPI_END)
-				return NULL;
-			mapped_phys = mapped_phys + PAGE_SIZE;
-			set_fixmap(idx, mapped_phys);
-			mapped_size = mapped_size + PAGE_SIZE;
-		} while (mapped_size < size);
+	/*
+	 * Most cases can be covered by the below.
+	 */
+	idx = FIX_IO_APIC_BASE_END;
+	while (mapped_size < size) {
+		if (--idx < FIX_IO_APIC_BASE_0)
+			return 0;	/* cannot handle this */
+		phys += PAGE_SIZE;
+		set_fixmap(idx, phys);
+		mapped_size += PAGE_SIZE;
 	}
 
 	return ((unsigned char *) base + offset);
@@ -317,6 +316,14 @@ acpi_boot_init (
 	result = acpi_table_init(cmdline);
 	if (result)
 		return result;
+
+	result = acpi_blacklisted();
+	if (result) {
+		acpi_disabled = 1;
+		return result;
+	}
+	else
+		printk(KERN_NOTICE PREFIX "BIOS passes blacklist\n");
 
 #ifdef CONFIG_X86_LOCAL_APIC
 

@@ -257,14 +257,6 @@ int acpi_processor_set_thermal_limit(acpi_handle handle, int type);
 #define ACPI_SYSTEM_FILE_DEBUG_LAYER	"debug_layer"
 #define ACPI_SYSTEM_FILE_DEBUG_LEVEL	"debug_level"
 
-#ifdef CONFIG_ACPI_SYSTEM
-
-int acpi_system_init (void);
-void acpi_system_exit (void);
-
-#endif
-
-
 /* --------------------------------------------------------------------------
                                  Thermal Zone
    -------------------------------------------------------------------------- */

@@ -39,9 +39,6 @@
 #define _COMPONENT		ACPI_PCI_COMPONENT
 ACPI_MODULE_NAME		("pci_bind")
 
-#define PREFIX			"ACPI: "
-
-
 struct acpi_pci_data {
 	acpi_pci_id		id;
 	struct pci_bus		*bus;

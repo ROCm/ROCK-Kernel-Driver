@@ -15,6 +15,7 @@ if [ "$CONFIG_X86" = "y" ]; then
       define_bool CONFIG_ACPI_BOOT y
 
       if [ "$CONFIG_ACPI_HT_ONLY" != "y" ]; then
+	 bool     '  Sleep States' CONFIG_ACPI_SLEEP
          tristate '  AC Adapter' CONFIG_ACPI_AC
          tristate '  Battery' CONFIG_ACPI_BATTERY
          tristate '  Button' CONFIG_ACPI_BUTTON
@@ -33,7 +34,6 @@ if [ "$CONFIG_X86" = "y" ]; then
          define_bool CONFIG_ACPI_EC y
          define_bool CONFIG_ACPI_POWER y
          define_bool CONFIG_ACPI_PCI $CONFIG_PCI
-         define_bool CONFIG_ACPI_SLEEP $CONFIG_SOFTWARE_SUSPEND
          define_bool CONFIG_ACPI_SYSTEM	y
       fi
    fi
@@ -49,6 +49,7 @@ if [ "$CONFIG_IA64" = "y" ]; then
       define_bool CONFIG_ACPI_PCI n
       define_bool CONFIG_ACPI_POWER n
       define_bool CONFIG_ACPI_SYSTEM n
+      define_bool CONFIG_ACPI_SLEEP n
       define_bool CONFIG_ACPI_BUTTON n
       define_bool CONFIG_ACPI_FAN n
       define_bool CONFIG_ACPI_PROCESSOR n

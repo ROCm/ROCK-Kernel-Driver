@@ -19,7 +19,7 @@ obj-y		:= acpi_ksyms.o
 #
 # ACPI Boot-Time Table Parsing
 #
-obj-$(CONFIG_ACPI_BOOT)		+= tables.o
+obj-$(CONFIG_ACPI_BOOT)		+= tables.o blacklist.o
 
 #
 # ACPI Core Subsystem (Interpreter)
@@ -42,7 +42,9 @@ obj-$(CONFIG_ACPI_PCI)		+= pci_root.o pci_link.o pci_irq.o pci_bind.o
 obj-$(CONFIG_ACPI_POWER)	+= power.o
 obj-$(CONFIG_ACPI_PROCESSOR)	+= processor.o
 obj-$(CONFIG_ACPI_THERMAL)	+= thermal.o
-obj-$(CONFIG_ACPI_SYSTEM)	+= system.o
+obj-$(CONFIG_ACPI_SYSTEM)	+= system.o event.o
+obj-$(CONFIG_ACPI_DEBUG)	+= debug.o
+obj-$(CONFIG_ACPI_SLEEP)	+= sleep.o
 obj-$(CONFIG_ACPI_NUMA)		+= numa.o
 obj-$(CONFIG_ACPI_TOSHIBA)	+= toshiba_acpi.o
 

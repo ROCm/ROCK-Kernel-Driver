@@ -45,9 +45,6 @@
 #define _COMPONENT		ACPI_PCI_COMPONENT
 ACPI_MODULE_NAME		("pci_link")
 
-#define PREFIX			"ACPI: "
-
-
 #define ACPI_PCI_LINK_MAX_POSSIBLE 16
 
 static int acpi_pci_link_add (struct acpi_device *device);

@@ -40,9 +40,6 @@ MODULE_AUTHOR("Paul Diefenbaugh");
 MODULE_DESCRIPTION(ACPI_AC_DRIVER_NAME);
 MODULE_LICENSE("GPL");
 
-#define PREFIX			"ACPI: "
-
-
 int acpi_ac_add (struct acpi_device *device);
 int acpi_ac_remove (struct acpi_device *device, int type);
 
