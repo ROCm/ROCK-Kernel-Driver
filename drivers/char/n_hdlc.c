@@ -6,7 +6,8 @@
  * Microgate and SyncLink are registered trademarks of Microgate Corporation
  *
  * Adapted from ppp.c, written by Michael Callahan <callahan@maths.ox.ac.uk>,
- *	Al Longyear <longyear@netcom.com>, Paul Mackerras <Paul.Mackerras@cs.anu.edu.au>
+ *	Al Longyear <longyear@netcom.com>,
+ *	Paul Mackerras <Paul.Mackerras@cs.anu.edu.au>
  *
  * Original release 01/11/99
  * $Id: n_hdlc.c,v 4.8 2003/05/06 21:18:51 paulkf Exp $
@@ -96,31 +97,18 @@
 
 #include <linux/poll.h>
 #include <linux/in.h>
+#include <linux/ioctl.h>
 #include <linux/slab.h>
 #include <linux/tty.h>
 #include <linux/errno.h>
 #include <linux/string.h>	/* used in new tty drivers */
 #include <linux/signal.h>	/* used in new tty drivers */
+#include <linux/if.h>
+
 #include <asm/system.h>
 #include <asm/bitops.h>
 #include <asm/termios.h>
-#include <linux/if.h>
-
-#include <linux/ioctl.h>
-
-#ifdef CONFIG_KERNELD
-#include <linux/kerneld.h>
-#endif
-
-#define GET_USER(error,value,addr) error = get_user(value,addr)
-#define COPY_FROM_USER(error,dest,src,size) error = copy_from_user(dest,src,size) ? -EFAULT : 0
-#define PUT_USER(error,value,addr) error = put_user(value,addr)
-#define COPY_TO_USER(error,dest,src,size) error = copy_to_user(dest,src,size) ? -EFAULT : 0
-
 #include <asm/uaccess.h>
-
-typedef ssize_t		rw_ret_t;
-typedef size_t		rw_count_t;
 
 /*
  * Buffers for individual HDLC frames
@@ -130,90 +118,89 @@ typedef size_t		rw_count_t;
 #define MAX_RX_BUF_COUNT 60
 #define DEFAULT_TX_BUF_COUNT 1
 
+struct n_hdlc_buf {
+	struct n_hdlc_buf *link;
+	int		  count;
+	char		  buf[1];
+};
 
-typedef struct _n_hdlc_buf
-{
-	struct _n_hdlc_buf *link;
-	int count;
-	char buf[1];
-} N_HDLC_BUF;
+#define	N_HDLC_BUF_SIZE	(sizeof(struct n_hdlc_buf) + maxframe)
 
-#define	N_HDLC_BUF_SIZE	(sizeof(N_HDLC_BUF)+maxframe)
+struct n_hdlc_buf_list {
+	struct n_hdlc_buf *head;
+	struct n_hdlc_buf *tail;
+	int		  count;
+	spinlock_t	  spinlock;
+};
 
-typedef struct _n_hdlc_buf_list
-{
-	N_HDLC_BUF *head;
-	N_HDLC_BUF *tail;
-	int count;
-	spinlock_t spinlock;
-	
-} N_HDLC_BUF_LIST;
-
-/*
- * Per device instance data structure
+/**
+ * struct n_hdlc - per device instance data structure
+ * @magic - magic value for structure
+ * @flags - miscellaneous control flags
+ * @tty - ptr to TTY structure
+ * @backup_tty - TTY to use if tty gets closed
+ * @tbusy - reentrancy flag for tx wakeup code
+ * @woke_up - FIXME: describe this field
+ * @tbuf - currently transmitting tx buffer
+ * @tx_buf_list - list of pending transmit frame buffers
+ * @rx_buf_list - list of received frame buffers
+ * @tx_free_buf_list - list unused transmit frame buffers
+ * @rx_free_buf_list - list unused received frame buffers
  */
 struct n_hdlc {
-	int		magic;		/* magic value for structure	*/
-	__u32		flags;		/* miscellaneous control flags	*/
-	
-	struct tty_struct *tty;		/* ptr to TTY structure	*/
-	struct tty_struct *backup_tty;	/* TTY to use if tty gets closed */
-	
-	int		tbusy;		/* reentrancy flag for tx wakeup code */
-	int		woke_up;
-	N_HDLC_BUF	*tbuf;		/* currently transmitting tx buffer */
-	N_HDLC_BUF_LIST tx_buf_list;	/* list of pending transmit frame buffers */	
-	N_HDLC_BUF_LIST	rx_buf_list;	/* list of received frame buffers */
-	N_HDLC_BUF_LIST tx_free_buf_list;	/* list unused transmit frame buffers */	
-	N_HDLC_BUF_LIST	rx_free_buf_list;	/* list unused received frame buffers */
+	int			magic;
+	__u32			flags;
+	struct tty_struct	*tty;
+	struct tty_struct	*backup_tty;
+	int			tbusy;
+	int			woke_up;
+	struct n_hdlc_buf	*tbuf;
+	struct n_hdlc_buf_list	tx_buf_list;
+	struct n_hdlc_buf_list	rx_buf_list;
+	struct n_hdlc_buf_list	tx_free_buf_list;
+	struct n_hdlc_buf_list	rx_free_buf_list;
 };
 
 /*
  * HDLC buffer list manipulation functions
  */
-static void n_hdlc_buf_list_init(N_HDLC_BUF_LIST *list);
-static void n_hdlc_buf_put(N_HDLC_BUF_LIST *list,N_HDLC_BUF *buf);
-static N_HDLC_BUF* n_hdlc_buf_get(N_HDLC_BUF_LIST *list);
+static void n_hdlc_buf_list_init(struct n_hdlc_buf_list *list);
+static void n_hdlc_buf_put(struct n_hdlc_buf_list *list,
+			   struct n_hdlc_buf *buf);
+static struct n_hdlc_buf *n_hdlc_buf_get(struct n_hdlc_buf_list *list);
 
 /* Local functions */
 
 static struct n_hdlc *n_hdlc_alloc (void);
-
-MODULE_PARM(debuglevel, "i");
-MODULE_PARM(maxframe, "i");
-
 
 /* debug level can be set by insmod for debugging purposes */
 #define DEBUG_LEVEL_INFO	1
 static int debuglevel;
 
 /* max frame size for memory allocations */
-static ssize_t	maxframe=4096;
+static ssize_t maxframe = 4096;
 
 /* TTY callbacks */
 
-static rw_ret_t n_hdlc_tty_read(struct tty_struct *,
-	struct file *, __u8 *, rw_count_t);
-static rw_ret_t n_hdlc_tty_write(struct tty_struct *,
-	struct file *, const __u8 *, rw_count_t);
-static int n_hdlc_tty_ioctl(struct tty_struct *,
-	struct file *, unsigned int, unsigned long);
-static unsigned int n_hdlc_tty_poll (struct tty_struct *tty, struct file *filp,
-				  poll_table * wait);
-static int n_hdlc_tty_open (struct tty_struct *);
-static void n_hdlc_tty_close (struct tty_struct *);
-static int n_hdlc_tty_room (struct tty_struct *tty);
-static void n_hdlc_tty_receive (struct tty_struct *tty,
-	const __u8 * cp, char *fp, int count);
-static void n_hdlc_tty_wakeup (struct tty_struct *tty);
+static int n_hdlc_tty_read(struct tty_struct *tty, struct file *file,
+			   __u8 *buf, size_t nr);
+static int n_hdlc_tty_write(struct tty_struct *tty, struct file *file,
+			    const __u8 *buf, size_t nr);
+static int n_hdlc_tty_ioctl(struct tty_struct *tty, struct file *file,
+			    unsigned int cmd, unsigned long arg);
+static unsigned int n_hdlc_tty_poll(struct tty_struct *tty, struct file *filp,
+				    poll_table *wait);
+static int n_hdlc_tty_open(struct tty_struct *tty);
+static void n_hdlc_tty_close(struct tty_struct *tty);
+static int n_hdlc_tty_room(struct tty_struct *tty);
+static void n_hdlc_tty_receive(struct tty_struct *tty, const __u8 *cp,
+			       char *fp, int count);
+static void n_hdlc_tty_wakeup(struct tty_struct *tty);
 
 #define bset(p,b)	((p)[(b) >> 5] |= (1 << ((b) & 0x1f)))
 
 #define tty2n_hdlc(tty)	((struct n_hdlc *) ((tty)->disc_data))
 #define n_hdlc2tty(n_hdlc)	((n_hdlc)->tty)
-
-/* Define this string only once for all macro invocations */
-static char szVersion[] = HDLC_VERSION;
 
 static struct tty_ldisc n_hdlc_ldisc = {
 	.owner		= THIS_MODULE,
@@ -230,15 +217,14 @@ static struct tty_ldisc n_hdlc_ldisc = {
 	.write_wakeup	= n_hdlc_tty_wakeup,
 };
 
-/* n_hdlc_release()
- *
- *	release an n_hdlc per device line discipline info structure
- *
+/**
+ * n_hdlc_release - release an n_hdlc per device line discipline info structure
+ * @n_hdlc - per device line discipline info structure
  */
-static void n_hdlc_release (struct n_hdlc *n_hdlc)
+static void n_hdlc_release(struct n_hdlc *n_hdlc)
 {
 	struct tty_struct *tty = n_hdlc2tty (n_hdlc);
-	N_HDLC_BUF *buf;
+	struct n_hdlc_buf *buf;
 	
 	if (debuglevel >= DEBUG_LEVEL_INFO)	
 		printk("%s(%d)n_hdlc_release() called\n",__FILE__,__LINE__);
@@ -285,10 +271,12 @@ static void n_hdlc_release (struct n_hdlc *n_hdlc)
 	
 }	/* end of n_hdlc_release() */
 
-/* n_hdlc_tty_close()
+/**
+ * n_hdlc_tty_close - line discipline close
+ * @tty - pointer to tty info structure
  *
- *	Called when the line discipline is changed to something
- *	else, the tty is closed, or the tty detects a hangup.
+ * Called when the line discipline is changed to something
+ * else, the tty is closed, or the tty detects a hangup.
  */
 static void n_hdlc_tty_close(struct tty_struct *tty)
 {
@@ -322,12 +310,11 @@ static void n_hdlc_tty_close(struct tty_struct *tty)
 		
 }	/* end of n_hdlc_tty_close() */
 
-/* n_hdlc_tty_open
- * 
- * 	called when line discipline changed to n_hdlc
- * 	
- * Arguments:	tty	pointer to tty info structure
- * Return Value:	0 if success, otherwise error code
+/**
+ * n_hdlc_tty_open - called when line discipline changed to n_hdlc
+ * @tty - pointer to tty info structure
+ *
+ * Returns 0 if success, otherwise error code
  */
 static int n_hdlc_tty_open (struct tty_struct *tty)
 {
@@ -373,22 +360,20 @@ static int n_hdlc_tty_open (struct tty_struct *tty)
 	
 }	/* end of n_tty_hdlc_open() */
 
-/* n_hdlc_send_frames()
- * 
- * 	send frames on pending send buffer list until the
- * 	driver does not accept a frame (busy)
- * 	this function is called after adding a frame to the
- * 	send buffer list and by the tty wakeup callback
- * 	
- * Arguments:		n_hdlc		pointer to ldisc instance data
- * 			tty		pointer to tty instance data
- * Return Value:	None
+/**
+ * n_hdlc_send_frames - send frames on pending send buffer list
+ * @n_hdlc - pointer to ldisc instance data
+ * @tty - pointer to tty instance data
+ *
+ * Send frames on pending send buffer list until the driver does not accept a
+ * frame (busy) this function is called after adding a frame to the send buffer
+ * list and by the tty wakeup callback.
  */
-static void n_hdlc_send_frames (struct n_hdlc *n_hdlc, struct tty_struct *tty)
+static void n_hdlc_send_frames(struct n_hdlc *n_hdlc, struct tty_struct *tty)
 {
 	register int actual;
 	unsigned long flags;
-	N_HDLC_BUF *tbuf;
+	struct n_hdlc_buf *tbuf;
 
 	if (debuglevel >= DEBUG_LEVEL_INFO)	
 		printk("%s(%d)n_hdlc_send_frames() called\n",__FILE__,__LINE__);
@@ -431,7 +416,7 @@ static void n_hdlc_send_frames (struct n_hdlc *n_hdlc, struct tty_struct *tty)
 					__FILE__,__LINE__,tbuf);
 					
 			/* free current transmit buffer */
-			n_hdlc_buf_put(&n_hdlc->tx_free_buf_list,tbuf);
+			n_hdlc_buf_put(&n_hdlc->tx_free_buf_list, tbuf);
 			
 			/* this tx buffer is done */
 			n_hdlc->tbuf = NULL;
@@ -469,17 +454,15 @@ static void n_hdlc_send_frames (struct n_hdlc *n_hdlc, struct tty_struct *tty)
 		
 }	/* end of n_hdlc_send_frames() */
 
-/* n_hdlc_tty_wakeup()
+/**
+ * n_hdlc_tty_wakeup - Callback for transmit wakeup
+ * @tty	- pointer to associated tty instance data
  *
- *	Callback for transmit wakeup. Called when low level
- *	device driver can accept more send data.
- *
- * Arguments:		tty	pointer to associated tty instance data
- * Return Value:	None
+ * Called when low level device driver can accept more send data.
  */
-static void n_hdlc_tty_wakeup (struct tty_struct *tty)
+static void n_hdlc_tty_wakeup(struct tty_struct *tty)
 {
-	struct n_hdlc *n_hdlc = tty2n_hdlc (tty);
+	struct n_hdlc *n_hdlc = tty2n_hdlc(tty);
 
 	if (debuglevel >= DEBUG_LEVEL_INFO)	
 		printk("%s(%d)n_hdlc_tty_wakeup() called\n",__FILE__,__LINE__);
@@ -496,16 +479,14 @@ static void n_hdlc_tty_wakeup (struct tty_struct *tty)
 		
 }	/* end of n_hdlc_tty_wakeup() */
 
-/* n_hdlc_tty_room()
- * 
- *	Callback function from tty driver. Return the amount of 
- *	space left in the receiver's buffer to decide if remote
- *	transmitter is to be throttled.
+/**
+ * n_hdlc_tty_room - Return the amount of space left in the receiver's buffer
+ * @tty	- pointer to associated tty instance data
  *
- * Arguments:		tty	pointer to associated tty instance data
- * Return Value:	number of bytes left in receive buffer
+ * Callback function from tty driver. Return the amount of space left in the
+ * receiver's buffer to decide if remote transmitter is to be throttled.
  */
-static int n_hdlc_tty_room (struct tty_struct *tty)
+static int n_hdlc_tty_room(struct tty_struct *tty)
 {
 	if (debuglevel >= DEBUG_LEVEL_INFO)	
 		printk("%s(%d)n_hdlc_tty_room() called\n",__FILE__,__LINE__);
@@ -514,23 +495,21 @@ static int n_hdlc_tty_room (struct tty_struct *tty)
 	return 65536;
 }	/* end of n_hdlc_tty_root() */
 
-/* n_hdlc_tty_receive()
- * 
- * 	Called by tty low level driver when receive data is
- * 	available. Data is interpreted as one HDLC frame.
- * 	
- * Arguments:	 	tty		pointer to tty isntance data
- * 			data		pointer to received data
- * 			flags		pointer to flags for data
- * 			count		count of received data in bytes
- * 	
- * Return Value:	None
+/**
+ * n_hdlc_tty_receive - Called by tty driver when receive data is available
+ * @tty	- pointer to tty instance data
+ * @data - pointer to received data
+ * @flags - pointer to flags for data
+ * @count - count of received data in bytes
+ *
+ * Called by tty low level driver when receive data is available. Data is
+ * interpreted as one HDLC frame.
  */
-static void n_hdlc_tty_receive(struct tty_struct *tty,
-	const __u8 * data, char *flags, int count)
+static void n_hdlc_tty_receive(struct tty_struct *tty, const __u8 *data,
+			       char *flags, int count)
 {
 	register struct n_hdlc *n_hdlc = tty2n_hdlc (tty);
-	register N_HDLC_BUF *buf;
+	register struct n_hdlc_buf *buf;
 
 	if (debuglevel >= DEBUG_LEVEL_INFO)	
 		printk("%s(%d)n_hdlc_tty_receive() called count=%d\n",
@@ -560,7 +539,7 @@ static void n_hdlc_tty_receive(struct tty_struct *tty,
 		/* no buffers in free list, attempt to allocate another rx buffer */
 		/* unless the maximum count has been reached */
 		if (n_hdlc->rx_buf_list.count < MAX_RX_BUF_COUNT)
-			buf = (N_HDLC_BUF*)kmalloc(N_HDLC_BUF_SIZE,GFP_ATOMIC);
+			buf = kmalloc(N_HDLC_BUF_SIZE, GFP_ATOMIC);
 	}
 	
 	if (!buf) {
@@ -575,7 +554,7 @@ static void n_hdlc_tty_receive(struct tty_struct *tty,
 	buf->count=count;
 
 	/* add HDLC buffer to list of received frames */
-	n_hdlc_buf_put(&n_hdlc->rx_buf_list,buf);
+	n_hdlc_buf_put(&n_hdlc->rx_buf_list, buf);
 	
 	/* wake up any blocked reads and perform async signalling */
 	wake_up_interruptible (&tty->read_wait);
@@ -584,28 +563,22 @@ static void n_hdlc_tty_receive(struct tty_struct *tty,
 
 }	/* end of n_hdlc_tty_receive() */
 
-/* n_hdlc_tty_read()
- * 
- * 	Called to retreive one frame of data (if available)
+/**
+ * n_hdlc_tty_read - Called to retreive one frame of data (if available)
+ * @tty - pointer to tty instance data
+ * @file - pointer to open file object
+ * @buf - pointer to returned data buffer
+ * @nr - size of returned data buffer
  * 	
- * Arguments:
- * 
- * 	tty		pointer to tty instance data
- * 	file		pointer to open file object
- * 	buf		pointer to returned data buffer
- * 	nr		size of returned data buffer
- * 	
- * Return Value:
- * 
- * 	Number of bytes returned or error code
+ * Returns the number of bytes returned or error code.
  */
-static rw_ret_t n_hdlc_tty_read (struct tty_struct *tty,
-	struct file *file, __u8 * buf, rw_count_t nr)
+static int n_hdlc_tty_read(struct tty_struct *tty, struct file *file,
+			   __u8 *buf, size_t nr)
 {
 	struct n_hdlc *n_hdlc = tty2n_hdlc(tty);
 	int error;
-	rw_ret_t ret;
-	N_HDLC_BUF *rbuf;
+	int ret;
+	struct n_hdlc_buf *rbuf;
 
 	if (debuglevel >= DEBUG_LEVEL_INFO)	
 		printk("%s(%d)n_hdlc_tty_read() called\n",__FILE__,__LINE__);
@@ -644,16 +617,15 @@ static rw_ret_t n_hdlc_tty_read (struct tty_struct *tty,
 			return -EINTR;
 	}
 		
-	if (rbuf->count > nr) {
+	if (rbuf->count > nr)
 		/* frame too large for caller's buffer (discard frame) */
-		ret = (rw_ret_t)-EOVERFLOW;
-	} else {
+		ret = -EOVERFLOW;
+	else {
 		/* Copy the data to the caller's buffer */
-		COPY_TO_USER(error,buf,rbuf->buf,rbuf->count);
-		if (error)
-			ret = (rw_ret_t)error;
+		if (copy_to_user(buf, rbuf->buf, rbuf->count))
+			ret = -EFAULT;
 		else
-			ret = (rw_ret_t)rbuf->count;
+			ret = rbuf->count;
 	}
 	
 	/* return HDLC buffer to free list unless the free list */
@@ -668,24 +640,22 @@ static rw_ret_t n_hdlc_tty_read (struct tty_struct *tty,
 	
 }	/* end of n_hdlc_tty_read() */
 
-/* n_hdlc_tty_write()
- * 
- * 	write a single frame of data to device
- * 	
- * Arguments:	tty	pointer to associated tty device instance data
- * 		file	pointer to file object data
- * 		data	pointer to transmit data (one frame)
- * 		count	size of transmit frame in bytes
+/**
+ * n_hdlc_tty_write - write a single frame of data to device
+ * @tty	- pointer to associated tty device instance data
+ * @file - pointer to file object data
+ * @data - pointer to transmit data (one frame)
+ * @count - size of transmit frame in bytes
  * 		
- * Return Value:	number of bytes written (or error code)
+ * Returns the number of bytes written (or error code).
  */
-static rw_ret_t n_hdlc_tty_write (struct tty_struct *tty, struct file *file,
-	const __u8 * data, rw_count_t count)
+static int n_hdlc_tty_write(struct tty_struct *tty, struct file *file,
+			    const __u8 *data, size_t count)
 {
 	struct n_hdlc *n_hdlc = tty2n_hdlc (tty);
 	int error = 0;
 	DECLARE_WAITQUEUE(wait, current);
-	N_HDLC_BUF *tbuf;
+	struct n_hdlc_buf *tbuf;
 
 	if (debuglevel >= DEBUG_LEVEL_INFO)	
 		printk("%s(%d)n_hdlc_tty_write() called count=%d\n",
@@ -735,10 +705,10 @@ static rw_ret_t n_hdlc_tty_write (struct tty_struct *tty, struct file *file,
 
 	if (!error) {		
 		/* Retrieve the user's buffer */
-		COPY_FROM_USER (error, tbuf->buf, data, count);
-		if (error) {
+		if (copy_from_user(tbuf->buf, data, count)) {
 			/* return tx buffer to free list */
 			n_hdlc_buf_put(&n_hdlc->tx_free_buf_list,tbuf);
+			error = -EFAULT;
 		} else {
 			/* Send the data */
 			tbuf->count = error = count;
@@ -751,21 +721,17 @@ static rw_ret_t n_hdlc_tty_write (struct tty_struct *tty, struct file *file,
 	
 }	/* end of n_hdlc_tty_write() */
 
-/* n_hdlc_tty_ioctl()
+/**
+ * n_hdlc_tty_ioctl - process IOCTL system call for the tty device.
+ * @tty - pointer to tty instance data
+ * @file - pointer to open file object for device
+ * @cmd - IOCTL command code
+ * @arg - argument for IOCTL call (cmd dependent)
  *
- *	Process IOCTL system call for the tty device.
- *
- * Arguments:
- *
- *	tty		pointer to tty instance data
- *	file		pointer to open file object for device
- *	cmd		IOCTL command code
- *	arg		argument for IOCTL call (cmd dependent)
- *
- * Return Value:	Command dependent
+ * Returns command dependent result.
  */
-static int n_hdlc_tty_ioctl (struct tty_struct *tty, struct file * file,
-               unsigned int cmd, unsigned long arg)
+static int n_hdlc_tty_ioctl(struct tty_struct *tty, struct file *file,
+			    unsigned int cmd, unsigned long arg)
 {
 	struct n_hdlc *n_hdlc = tty2n_hdlc (tty);
 	int error = 0;
@@ -790,7 +756,7 @@ static int n_hdlc_tty_ioctl (struct tty_struct *tty, struct file * file,
 		else
 			count = 0;
 		spin_unlock_irqrestore(&n_hdlc->rx_buf_list.spinlock,flags);
-		PUT_USER (error, count, (int *) arg);
+		error = put_user(count, (int *)arg);
 		break;
 
 	case TIOCOUTQ:
@@ -802,7 +768,7 @@ static int n_hdlc_tty_ioctl (struct tty_struct *tty, struct file * file,
 		if (n_hdlc->tx_buf_list.head)
 			count += n_hdlc->tx_buf_list.head->count;
 		spin_unlock_irqrestore(&n_hdlc->tx_buf_list.spinlock,flags);
-		PUT_USER (error, count, (int*)arg);
+		error = put_user(count, (int*)arg);
 		break;
 
 	default:
@@ -813,24 +779,18 @@ static int n_hdlc_tty_ioctl (struct tty_struct *tty, struct file * file,
 	
 }	/* end of n_hdlc_tty_ioctl() */
 
-/* n_hdlc_tty_poll()
+/**
+ * n_hdlc_tty_poll - TTY callback for poll system call
+ * @tty - pointer to tty instance data
+ * @filp - pointer to open file object for device
+ * @poll_table - wait queue for operations
  * 
- * 	TTY callback for poll system call. Determine which 
- * 	operations (read/write) will not block and return
- * 	info to caller.
- * 	
- * Arguments:
- * 
- * 	tty		pointer to tty instance data
- * 	filp		pointer to open file object for device
- * 	poll_table	wait queue for operations
- * 
- * Return Value:
- * 
- * 	bit mask containing info on which ops will not block
+ * Determine which operations (read/write) will not block and return info
+ * to caller.
+ * Returns a bit mask containing info on which ops will not block.
  */
-static unsigned int n_hdlc_tty_poll (struct tty_struct *tty,
-	 struct file *filp, poll_table * wait)
+static unsigned int n_hdlc_tty_poll(struct tty_struct *tty, struct file *filp,
+				    poll_table *wait)
 {
 	struct n_hdlc *n_hdlc = tty2n_hdlc (tty);
 	unsigned int mask = 0;
@@ -858,20 +818,17 @@ static unsigned int n_hdlc_tty_poll (struct tty_struct *tty,
 	return mask;
 }	/* end of n_hdlc_tty_poll() */
 
-/* n_hdlc_alloc()
- * 
- * 	Allocate an n_hdlc instance data structure
+/**
+ * n_hdlc_alloc - allocate an n_hdlc instance data structure
  *
- * Arguments:		None
- * Return Value:	pointer to structure if success, otherwise 0	
+ * Returns a pointer to newly created structure if success, otherwise %NULL
  */
-static struct n_hdlc *n_hdlc_alloc (void)
+static struct n_hdlc *n_hdlc_alloc(void)
 {
-	struct n_hdlc	*n_hdlc;
-	N_HDLC_BUF	*buf;
-	int		i;
-	
-	n_hdlc = (struct n_hdlc *)kmalloc(sizeof(struct n_hdlc), GFP_KERNEL);
+	struct n_hdlc_buf *buf;
+	int i;
+	struct n_hdlc *n_hdlc = kmalloc(sizeof(*n_hdlc), GFP_KERNEL);
+
 	if (!n_hdlc)
 		return 0;
 
@@ -884,7 +841,7 @@ static struct n_hdlc *n_hdlc_alloc (void)
 	
 	/* allocate free rx buffer list */
 	for(i=0;i<DEFAULT_RX_BUF_COUNT;i++) {
-		buf = (N_HDLC_BUF*)kmalloc(N_HDLC_BUF_SIZE,GFP_KERNEL);
+		buf = kmalloc(N_HDLC_BUF_SIZE, GFP_KERNEL);
 		if (buf)
 			n_hdlc_buf_put(&n_hdlc->rx_free_buf_list,buf);
 		else if (debuglevel >= DEBUG_LEVEL_INFO)	
@@ -893,7 +850,7 @@ static struct n_hdlc *n_hdlc_alloc (void)
 	
 	/* allocate free tx buffer list */
 	for(i=0;i<DEFAULT_TX_BUF_COUNT;i++) {
-		buf = (N_HDLC_BUF*)kmalloc(N_HDLC_BUF_SIZE,GFP_KERNEL);
+		buf = kmalloc(N_HDLC_BUF_SIZE, GFP_KERNEL);
 		if (buf)
 			n_hdlc_buf_put(&n_hdlc->tx_free_buf_list,buf);
 		else if (debuglevel >= DEBUG_LEVEL_INFO)	
@@ -908,31 +865,23 @@ static struct n_hdlc *n_hdlc_alloc (void)
 	
 }	/* end of n_hdlc_alloc() */
 
-/* n_hdlc_buf_list_init()
- * 
- * 	initialize specified HDLC buffer list
- * 	
- * Arguments:	 	list	pointer to buffer list
- * Return Value:	None	
+/**
+ * n_hdlc_buf_list_init - initialize specified HDLC buffer list
+ * @list - pointer to buffer list
  */
-static void n_hdlc_buf_list_init(N_HDLC_BUF_LIST *list)
+static void n_hdlc_buf_list_init(struct n_hdlc_buf_list *list)
 {
-	memset(list,0,sizeof(N_HDLC_BUF_LIST));
+	memset(list, 0, sizeof(*list));
 	spin_lock_init(&list->spinlock);
 }	/* end of n_hdlc_buf_list_init() */
 
-/* n_hdlc_buf_put()
- * 
- * 	add specified HDLC buffer to tail of specified list
- * 	
- * Arguments:
- * 
- * 	list	pointer to buffer list
- * 	buf	pointer to buffer
- * 
- * Return Value:	None	
+/**
+ * n_hdlc_buf_put - add specified HDLC buffer to tail of specified list
+ * @list - pointer to buffer list
+ * @buf	- pointer to buffer
  */
-static void n_hdlc_buf_put(N_HDLC_BUF_LIST *list,N_HDLC_BUF *buf)
+static void n_hdlc_buf_put(struct n_hdlc_buf_list *list,
+			   struct n_hdlc_buf *buf)
 {
 	unsigned long flags;
 	spin_lock_irqsave(&list->spinlock,flags);
@@ -949,23 +898,18 @@ static void n_hdlc_buf_put(N_HDLC_BUF_LIST *list,N_HDLC_BUF *buf)
 	
 }	/* end of n_hdlc_buf_put() */
 
-/* n_hdlc_buf_get()
+/**
+ * n_hdlc_buf_get - remove and return an HDLC buffer from list
+ * @list - pointer to HDLC buffer list
  * 
- * 	remove and return an HDLC buffer from the
- * 	head of the specified HDLC buffer list
- * 	
- * Arguments:
- * 
- * 	list	pointer to HDLC buffer list
- * 	
- * Return Value:
- * 
- * 	pointer to HDLC buffer if available, otherwise NULL
+ * Remove and return an HDLC buffer from the head of the specified HDLC buffer
+ * list.
+ * Returns a pointer to HDLC buffer if available, otherwise %NULL.
  */
-static N_HDLC_BUF* n_hdlc_buf_get(N_HDLC_BUF_LIST *list)
+static struct n_hdlc_buf* n_hdlc_buf_get(struct n_hdlc_buf_list *list)
 {
 	unsigned long flags;
-	N_HDLC_BUF *buf;
+	struct n_hdlc_buf *buf;
 	spin_lock_irqsave(&list->spinlock,flags);
 	
 	buf = list->head;
@@ -981,42 +925,60 @@ static N_HDLC_BUF* n_hdlc_buf_get(N_HDLC_BUF_LIST *list)
 	
 }	/* end of n_hdlc_buf_get() */
 
+static char hdlc_banner[] __initdata =
+	KERN_INFO "HDLC line discipline: version " HDLC_VERSION
+	", maxframe=%u\n";
+static char hdlc_register_ok[] __initdata =
+	KERN_INFO "N_HDLC line discipline registered.\n";
+static char hdlc_register_fail[] __initdata =
+	KERN_ERR "error registering line discipline: %d\n";
+static char hdlc_init_fail[] __initdata =
+	KERN_INFO "N_HDLC: init failure %d\n";
+
 static int __init n_hdlc_init(void)
 {
-	int    status;
+	int status;
 
 	/* range check maxframe arg */
-	if ( maxframe<4096)
-		maxframe=4096;
-	else if ( maxframe>65535)
-		maxframe=65535;
+	if (maxframe < 4096)
+		maxframe = 4096;
+	else if (maxframe > 65535)
+		maxframe = 65535;
 
-	printk("HDLC line discipline: version %s, maxframe=%u\n", 
-		szVersion, maxframe);
+	printk(hdlc_banner, maxframe);
 
 	status = tty_register_ldisc(N_HDLC, &n_hdlc_ldisc);
 	if (!status)
-		printk (KERN_INFO"N_HDLC line discipline registered.\n");
+		printk(hdlc_register_ok);
 	else
-		printk (KERN_ERR"error registering line discipline: %d\n",status);
+		printk(hdlc_register_fail, status);
 
 	if (status)
-		printk(KERN_INFO"N_HDLC: init failure %d\n", status);
-	return (status);
+		printk(hdlc_init_fail, status);
+	return status;
 	
 }	/* end of init_module() */
 
+static char hdlc_unregister_ok[] __exitdata =
+	KERN_INFO "N_HDLC: line discipline unregistered\n";
+static char hdlc_unregister_fail[] __exitdata =
+	KERN_ERR "N_HDLC: can't unregister line discipline (err = %d)\n";
+
 static void __exit n_hdlc_exit(void)
 {
-	int status;
 	/* Release tty registration of line discipline */
-	if ((status = tty_register_ldisc(N_HDLC, NULL)))
-		printk("N_HDLC: can't unregister line discipline (err = %d)\n", status);
+	int status = tty_register_ldisc(N_HDLC, NULL);
+
+	if (status)
+		printk(hdlc_unregister_fail, status);
 	else
-		printk("N_HDLC: line discipline unregistered\n");
+		printk(hdlc_unregister_ok);
 }
 
 module_init(n_hdlc_init);
 module_exit(n_hdlc_exit);
 
 MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Paul Fulghum paulkf@microgate.com");
+MODULE_PARM(debuglevel, "i");
+MODULE_PARM(maxframe, "i");

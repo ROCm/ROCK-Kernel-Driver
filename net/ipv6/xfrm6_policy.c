@@ -146,7 +146,7 @@ __xfrm6_bundle_create(struct xfrm_policy *policy, struct xfrm_state **xfrm, int 
 		memcpy(&dst_prev->metrics, &rt->u.dst.metrics, sizeof(dst_prev->metrics));
 		dst_prev->path		= &rt->u.dst;
 
-		/* Copy neighbout for reachability confirmation */
+		/* Copy neighbour for reachability confirmation */
 		dst_prev->neighbour	= neigh_clone(rt->u.dst.neighbour);
 		dst_prev->input		= rt->u.dst.input;
 		dst_prev->output	= dst_prev->xfrm->type->output;

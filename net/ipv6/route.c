@@ -336,7 +336,7 @@ static int rt6_ins(struct rt6_info *rt, struct nlmsghdr *nlh, void *_rtattr)
 	return err;
 }
 
-/* No rt6_lock! If COW faild, the function returns dead route entry
+/* No rt6_lock! If COW failed, the function returns dead route entry
    with dst->error set to errno value.
  */
 
@@ -1786,11 +1786,12 @@ extern struct rt6_statistics rt6_stats;
 
 static int rt6_stats_seq_show(struct seq_file *seq, void *v)
 {
-	seq_printf(seq, "%04x %04x %04x %04x %04x %04x\n",
+	seq_printf(seq, "%04x %04x %04x %04x %04x %04x %04x\n",
 		      rt6_stats.fib_nodes, rt6_stats.fib_route_nodes,
 		      rt6_stats.fib_rt_alloc, rt6_stats.fib_rt_entries,
 		      rt6_stats.fib_rt_cache,
-		      atomic_read(&ip6_dst_ops.entries));
+		      atomic_read(&ip6_dst_ops.entries),
+		      rt6_stats.fib_discarded_routes);
 
 	return 0;
 }

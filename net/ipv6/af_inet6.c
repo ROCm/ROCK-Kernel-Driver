@@ -310,7 +310,7 @@ int inet6_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 	} else {
 		if (addr_type != IPV6_ADDR_ANY) {
 			/* ipv4 addr of the socket is invalid.  Only the
-			 * unpecified and mapped address have a v4 equivalent.
+			 * unspecified and mapped address have a v4 equivalent.
 			 */
 			v4addr = LOOPBACK4_IPV6;
 			if (!(addr_type & IPV6_ADDR_MULTICAST))	{
