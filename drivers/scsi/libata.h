@@ -29,9 +29,8 @@
 #define DRV_VERSION	"1.02"	/* must be exactly four chars */
 
 struct ata_scsi_args {
-	struct ata_port		*ap;
-	struct ata_device	*dev;
-	struct scsi_cmnd		*cmd;
+	u16			*id;
+	struct scsi_cmnd	*cmd;
 	void			(*done)(struct scsi_cmnd *);
 };
 
