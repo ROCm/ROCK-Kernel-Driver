@@ -872,8 +872,9 @@ static void check_match(
  *    performed for at least two bytes (required for the zip translate_eol
  *    option -- not supported here).
  */
-static void fill_window(s)
-    deflate_state *s;
+static void fill_window(
+	deflate_state *s
+)
 {
     register unsigned n, m;
     register Pos *p;
@@ -1261,7 +1262,7 @@ static block_state deflate_slow(
     return flush == Z_FINISH ? finish_done : block_done;
 }
 
-extern int zlib_deflate_workspacesize ()
+extern int zlib_deflate_workspacesize(void)
 {
     return sizeof(deflate_workspace);
 }
