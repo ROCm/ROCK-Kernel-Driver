@@ -15,8 +15,8 @@
 */
 
 #define DRV_NAME	"tulip"
-#define DRV_VERSION	"1.1.0"
-#define DRV_RELDATE	"Dec 11, 2001"
+#define DRV_VERSION	"1.1.11"
+#define DRV_RELDATE	"Feb 08, 2002"
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -185,6 +185,10 @@ struct tulip_chip_table tulip_tbl[] = {
   { "Davicom DM9102/DM9102A", 128, 0x0001ebef,
 	HAS_MII | HAS_MEDIA_TABLE | CSR12_IN_SROM | HAS_ACPI,
 	tulip_timer },
+
+  /* RS7112 */
+  { "Conexant LANfinity", 256, 0x0001ebef,
+	HAS_MII | HAS_ACPI, tulip_timer },
 };
 
 
@@ -212,6 +216,7 @@ static struct pci_device_id tulip_pci_tbl[] __devinitdata = {
 	{ 0x1113, 0x1216, PCI_ANY_ID, PCI_ANY_ID, 0, 0, COMET },
 	{ 0x1113, 0x1217, PCI_ANY_ID, PCI_ANY_ID, 0, 0, MX98715 },
 	{ 0x1113, 0x9511, PCI_ANY_ID, PCI_ANY_ID, 0, 0, COMET },
+	{ 0x14f1, 0x1803, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CONEXANT },
 	{ } /* terminate list */
 };
 MODULE_DEVICE_TABLE(pci, tulip_pci_tbl);
@@ -418,7 +423,7 @@ media_picked:
 		tp->csr6 = 0x01a80200;
 		outl(0x0f370000 | inw(ioaddr + 0x80), ioaddr + 0x80);
 		outl(0x11000 | inw(ioaddr + 0xa0), ioaddr + 0xa0);
-	} else if (tp->chip_id == COMET) {
+	} else if (tp->chip_id == COMET || tp->chip_id == CONEXANT) {
 		/* Enable automatic Tx underrun recovery. */
 		outl(inl(ioaddr + 0x88) | 1, ioaddr + 0x88);
 		dev->if_port = tp->mii_cnt ? 11 : 0;
@@ -1254,7 +1259,7 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 	u8 chip_rev;
 	int i, irq;
 	unsigned short sum;
-	u8 ee_data[EEPROM_SIZE];
+	unsigned char *ee_data;
 	struct net_device *dev;
 	long ioaddr;
 	static int board_idx = -1;
@@ -1431,6 +1436,7 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 	   be polled, waiting for the value to be read bit serially from the
 	   EEPROM.
 	   */
+	ee_data = tp->eeprom;
 	sum = 0;
 	if (chip_idx == LC82C168) {
 		for (i = 0; i < 3; i++) {
@@ -1453,17 +1459,22 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 		int sa_offset = 0;
 		int ee_addr_size = tulip_read_eeprom(ioaddr, 0xff, 8) & 0x40000 ? 8 : 6;
 
-		for (i = 0; i < sizeof(ee_data)/2; i++)
+		for (i = 0; i < sizeof(tp->eeprom)/2; i++)
 			((u16 *)ee_data)[i] =
 				le16_to_cpu(tulip_read_eeprom(ioaddr, i, ee_addr_size));
 
 		/* DEC now has a specification (see Notes) but early board makers
 		   just put the address in the first EEPROM locations. */
-		/* This does  memcmp(eedata, eedata+16, 8) */
+		/* This does  memcmp(ee_data, ee_data+16, 8) */
 		for (i = 0; i < 8; i ++)
 			if (ee_data[i] != ee_data[16+i])
 				sa_offset = 20;
-		if (ee_data[0] == 0xff  &&  ee_data[1] == 0xff &&  ee_data[2] == 0) {
+		if (chip_idx == CONEXANT) {
+			/* Check that the tuple type and length is correct. */
+			if (ee_data[0x198] == 0x04  &&  ee_data[0x199] == 6)
+				sa_offset = 0x19A;
+		} else if (ee_data[0] == 0xff  &&  ee_data[1] == 0xff &&
+				   ee_data[2] == 0) {
 			sa_offset = 2;		/* Grrr, damn Matrox boards. */
 			multiport_cnt = 4;
 		}
@@ -1556,8 +1567,6 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 	}
 
 	if (tp->flags & HAS_MEDIA_TABLE) {
-		memcpy(tp->eeprom, ee_data, sizeof(tp->eeprom));
-
 		sprintf(dev->name, "tulip%d", board_idx);	/* hack */
 		tulip_parse_eeprom(dev);
 		strcpy(dev->name, "eth%d");			/* un-hack */

@@ -84,6 +84,7 @@ enum chips {
 	COMPEX9881,
 	I21145,
 	DM910X,
+	CONEXANT,
 };
 
 
@@ -290,7 +291,7 @@ enum t21143_csr6_bits {
 #define DESC_RING_WRAP 0x02000000
 
 
-#define EEPROM_SIZE 128 	/* 2 << EEPROM_ADDRLEN */
+#define EEPROM_SIZE 512 	/* 2 << EEPROM_ADDRLEN */
 
 
 #define RUN_AT(x) (jiffies + (x))
