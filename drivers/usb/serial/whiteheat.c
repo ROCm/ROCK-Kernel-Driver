@@ -91,6 +91,10 @@
 #include "whiteheat_fw.h"		/* firmware for the ConnectTech WhiteHEAT device */
 #include "whiteheat.h"			/* WhiteHEAT specific commands */
 
+#ifndef CMSPAR
+#define CMSPAR 0
+#endif
+
 /*
  * Version Information
  */
