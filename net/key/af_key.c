@@ -683,6 +683,8 @@ static struct sk_buff * pfkey_xfrm_state2msg(struct xfrm_state *x, int add_keys,
 	sa->sadb_sa_flags = 0;
 	if (x->props.flags & XFRM_STATE_NOECN)
 		sa->sadb_sa_flags |= SADB_SAFLAGS_NOECN;
+	if (x->props.flags & XFRM_STATE_DECAP_DSCP)
+		sa->sadb_sa_flags |= SADB_SAFLAGS_DECAP_DSCP;
 
 	/* hard time */
 	if (hsc & 2) {
@@ -965,6 +967,8 @@ static struct xfrm_state * pfkey_msg2xfrm_state(struct sadb_msg *hdr,
 	x->props.replay_window = sa->sadb_sa_replay;
 	if (sa->sadb_sa_flags & SADB_SAFLAGS_NOECN)
 		x->props.flags |= XFRM_STATE_NOECN;
+	if (sa->sadb_sa_flags & SADB_SAFLAGS_DECAP_DSCP)
+		x->props.flags |= XFRM_STATE_DECAP_DSCP;
 
 	lifetime = (struct sadb_lifetime*) ext_hdrs[SADB_EXT_LIFETIME_HARD-1];
 	if (lifetime != NULL) {

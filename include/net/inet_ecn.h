@@ -78,6 +78,12 @@ static inline void IP_ECN_clear(struct iphdr *iph)
 	iph->tos &= ~INET_ECN_MASK;
 }
 
+static inline void ipv4_copy_dscp(struct iphdr *outer, struct iphdr *inner)
+{
+	u32 dscp = ipv4_get_dsfield(outer) & ~INET_ECN_MASK;
+	ipv4_change_dsfield(inner, INET_ECN_MASK, dscp);
+}
+
 struct ipv6hdr;
 
 static inline void IP6_ECN_set_ce(struct ipv6hdr *iph)
