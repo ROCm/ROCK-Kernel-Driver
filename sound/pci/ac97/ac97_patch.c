@@ -367,17 +367,14 @@ int patch_ad1980(ac97_t * ac97)
 
 int patch_alc650(ac97_t * ac97)
 {
-	unsigned short val, nval;
+	unsigned short val;
 	int spdif = 0;
 
-	val = snd_ac97_read(ac97, AC97_ALC650_MULTICH);
-	snd_ac97_write(ac97, AC97_ALC650_MULTICH, val ^ 0x80);
-	nval = snd_ac97_read(ac97, AC97_ALC650_MULTICH);
+	/* FIXME: set the above 1 if we can detect the chip rev.E correctly.
+	 *        this is used for switching mic and center/lfe, which needs
+	 *        resetting GPIO0 level on the older revision.
+	 */
 	ac97->spec.dev_flags = 0;
-	if (val != nval) {
-		ac97->spec.dev_flags = 1; /* rev.E or later */
-		snd_ac97_write(ac97, AC97_ALC650_MULTICH, val); /* push back */
-	}
 
 	/* check spdif */
 	if (ac97->spec.dev_flags) {

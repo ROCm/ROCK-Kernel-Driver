@@ -115,8 +115,7 @@ or
 
 	% aplay -Dspdif foo.wav
 
-So far, only S16LE format is supported.  Still no 24bit.  Sorry, not
-enough info for this.
+24bit format is also supported experimentally.
 
 The playback and capture over SPDIF use normal DAC and ADC,
 respectively, so you cannot playback both analog and digital streams

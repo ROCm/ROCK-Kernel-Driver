@@ -1210,6 +1210,7 @@ snd_nm256_mixer(nm256_t *chip)
 	ac97.reset = snd_nm256_ac97_reset;
 	ac97.write = snd_nm256_ac97_write;
 	ac97.read = snd_nm256_ac97_read;
+	ac97.scaps = AC97_SCAP_AUDIO; /* we support audio! */
 	ac97.limited_regs = 1;
 	for (i = 0; mixer_regs[i] >= 0; i++)
 		set_bit(mixer_regs[i], ac97.reg_accessed);

@@ -1143,16 +1143,10 @@ static void snd_pcm_change_state(snd_pcm_substream_t *substream, int state)
 		snd_pcm_group_for_each(pos, substream) {
 			s = snd_pcm_group_substream_entry(pos);
 			if (s != substream)
-				spin_lock(&substream->self_group.lock);
-		}
-		snd_pcm_group_for_each(pos, substream) {
-			s = snd_pcm_group_substream_entry(pos);
+				spin_lock(&s->self_group.lock);
 			s->runtime->status->state = state;
-		}
-		snd_pcm_group_for_each(pos, substream) {
-			s = snd_pcm_group_substream_entry(pos);
 			if (s != substream)
-				spin_unlock(&substream->self_group.lock);
+				spin_unlock(&s->self_group.lock);
 		}
 		spin_unlock(&substream->group->lock);
 	} else {
@@ -1517,7 +1511,7 @@ static int snd_pcm_unlink(snd_pcm_substream_t *substream)
 	relink_to_local(substream);
        _end:
 	write_unlock_irq(&snd_pcm_link_rwlock);
-	return 0;
+	return res;
 }
 
 static int snd_pcm_hw_rule_mul(snd_pcm_hw_params_t *params,
