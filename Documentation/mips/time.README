@@ -103,9 +103,9 @@ Step 1: decide how you like to implement the time services.
      Do you plan to use the CPU counter register as the timer interrupt
      or use an exnternal timer?
 
-     In order to CPU counter register as the timer interrupt source, you must
-     know the counter speed (mips_counter_frequency).  It is usually the
-     same as the CPU speed (Or it is ALWAYS the same?)
+     In order to use CPU counter register as the timer interrupt source, you
+     must know the counter speed (mips_counter_frequency).  It is usually the
+     same as the CPU speed or an integral divisor of it.
 
   d) decide on whether you want to use high-level or low-level timer
      interrupt routines.  The low-level one is presumably faster, but should
@@ -154,8 +154,45 @@ For some tricky cases, you may need to add your own wrapper functions
 for some of the functions in time.c.  
 
 For example, you may define your own timer interrupt routine, which does
-its own processing and in turn calls timer_interrupt().
+some of its own processing and then calls timer_interrupt().
 
 You can also over-ride any of the built-in functions (gettimeoffset,
 RTC routines and/or timer interrupt routine).
 
+
+PORTING NOTES FOR SMP
+----------------------
+
+If you have a SMP box, things are slightly more complicated.
+
+The time service running every jiffy is logically divided into two parts:
+
+  1) the one for the whole system  (defined in timer_interrupt())
+  2) the one that should run for each CPU (defined in local_timer_interrupt())
+
+You need to decide on your timer interrupt sources.
+
+  case 1) - whole system has only one timer interrupt delivered to one CPU
+
+	In this case, you set up timer interrupt as in UP systems.  In addtion,
+	you need to set emulate_local_timer_interrupt to 1 so that other
+	CPUs get to call local_timer_interrupt().
+
+	THIS IS CURRENTLY NOT IMPLEMNETED.  However, it is rather easy to write
+	one should such a need arise.  You simply make a IPI call.
+
+  case 2) - each CPU has a separate timer interrupt
+
+	In this case, you need to set up IRQ such that each of them will
+	call local_timer_interrupt().  In addition, you need to arrange
+	one and only one of them to call timer_interrupt().
+
+	You can also do the low-level version of those interrupt routines,
+	following similar dispatching routes described above.
+
+Note about do_gettimeoffset():
+
+  It is very likely the CPU counter registers are not sync'ed up in a SMP box.
+  Therefore you cannot really use the many of the existing routines that
+  are based on CPU counter.  You should wirte your own gettimeoffset rouinte
+  if you want intra-jiffy resolution.
