@@ -1295,6 +1295,14 @@ block_dump
 block_dump enables block I/O debugging when set to a nonzero value. More
 information on block I/O debugging is in Documentation/laptop-mode.txt.
 
+swap_token_timeout
+------------------
+
+This file contains valid hold time of swap out protection token. The Linux
+VM has token based thrashing control mechanism and uses the token to prevent
+unnecessary page faults in thrashing situation. The unit of the value is
+second. The value would be useful to tune thrashing behavior.
+
 2.5 /proc/sys/dev - Device specific parameters
 ----------------------------------------------
 
