@@ -688,7 +688,7 @@ static void snd_pmac_dbdma_reset(pmac_t *chip)
 static irqreturn_t
 snd_pmac_tx_intr(int irq, void *devid, struct pt_regs *regs)
 {
-	pmac_t *chip = snd_magic_cast(pmac_t, devid, return);
+	pmac_t *chip = snd_magic_cast(pmac_t, devid, return IRQ_NONE);
 	snd_pmac_pcm_update(chip, &chip->playback);
 	return IRQ_HANDLED;
 }
@@ -697,7 +697,7 @@ snd_pmac_tx_intr(int irq, void *devid, struct pt_regs *regs)
 static irqreturn_t
 snd_pmac_rx_intr(int irq, void *devid, struct pt_regs *regs)
 {
-	pmac_t *chip = snd_magic_cast(pmac_t, devid, return);
+	pmac_t *chip = snd_magic_cast(pmac_t, devid, return IRQ_NONE);
 	snd_pmac_pcm_update(chip, &chip->capture);
 	return IRQ_HANDLED;
 }
@@ -706,7 +706,7 @@ snd_pmac_rx_intr(int irq, void *devid, struct pt_regs *regs)
 static irqreturn_t
 snd_pmac_ctrl_intr(int irq, void *devid, struct pt_regs *regs)
 {
-	pmac_t *chip = snd_magic_cast(pmac_t, devid, return);
+	pmac_t *chip = snd_magic_cast(pmac_t, devid, return IRQ_NONE);
 	int ctrl = in_le32(&chip->awacs->control);
 
 	/*printk("pmac: control interrupt.. 0x%x\n", ctrl);*/
