@@ -45,6 +45,20 @@ int reiserfs_xattr_init (struct super_block *sb, int mount_flags);
 int reiserfs_permission (struct inode *inode, int mask, struct nameidata *nd);
 int reiserfs_permission_locked (struct inode *inode, int mask, struct nameidata *nd);
 
+int reiserfs_xattr_del (struct inode *, const char *);
+int reiserfs_xattr_get (const struct inode *, const char *, void *, size_t);
+int reiserfs_xattr_set (struct inode *, const char *, const void *,
+                               size_t, int);
+
+extern struct reiserfs_xattr_handler user_handler;
+extern struct reiserfs_xattr_handler trusted_handler;
+#ifdef CONFIG_REISERFS_FS_SECURITY
+extern struct reiserfs_xattr_handler security_handler;
+#endif
+
+int reiserfs_xattr_register_handlers (void) __init;
+void reiserfs_xattr_unregister_handlers (void);
+
 static inline void
 reiserfs_write_lock_xattrs(struct super_block *sb)
 {
@@ -66,7 +80,6 @@ reiserfs_read_unlock_xattrs(struct super_block *sb)
 {
     up_read (&REISERFS_XATTR_DIR_SEM(sb));
 }
-
 
 static inline void
 reiserfs_write_lock_xattr_i(struct inode *inode)
@@ -90,7 +103,6 @@ reiserfs_read_unlock_xattr_i(struct inode *inode)
     up_read (&REISERFS_I(inode)->xattr_sem);
 }
 
-
 #else
 
 #define is_reiserfs_priv_object(inode) 0
@@ -105,6 +117,9 @@ reiserfs_read_unlock_xattr_i(struct inode *inode)
 
 #define reiserfs_permission NULL
 
+#define reiserfs_xattr_register_handlers() 0
+#define reiserfs_xattr_unregister_handlers()
+
 static inline int reiserfs_delete_xattrs (struct inode *inode) { return 0; };
 static inline int reiserfs_chown_xattrs (struct inode *inode, struct iattr *attrs) { return 0; };
 static inline int reiserfs_xattr_init (struct super_block *sb, int mount_flags)
@@ -114,17 +129,4 @@ static inline int reiserfs_xattr_init (struct super_block *sb, int mount_flags)
 };
 #endif
 
-extern struct reiserfs_xattr_handler user_handler;
-extern struct reiserfs_xattr_handler trusted_handler;
-#ifdef CONFIG_REISERFS_FS_SECURITY
-extern struct reiserfs_xattr_handler security_handler;
-#endif
-
-extern int reiserfs_xattr_register_handlers (void) __init;
-extern void reiserfs_xattr_unregister_handlers (void);
-
-extern int reiserfs_xattr_del (struct inode *, const char *);
-extern int reiserfs_xattr_get (const struct inode *, const char *, void *, size_t);
-extern int reiserfs_xattr_set (struct inode *, const char *, const void *,
-                               size_t, int);
 #endif  /* __KERNEL__ */
