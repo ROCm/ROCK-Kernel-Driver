@@ -97,11 +97,10 @@ do {								\
 	_FP_ROUND(wc, X);					\
 	if (_FP_FRAC_OVERP_##wc(fs, X))				\
 	  {							\
-	    _FP_FRAC_SRL_##wc(X, (_FP_WORKBITS+1));		\
+	    _FP_FRAC_CLEAR_OVERP_##wc(fs, X);			\
 	    X##_e++;						\
 	  }							\
-	else							\
-	  _FP_FRAC_SRL_##wc(X, _FP_WORKBITS);			\
+	_FP_FRAC_SRL_##wc(X, _FP_WORKBITS);			\
 	if (X##_e >= _FP_EXPMAX_##fs)				\
 	  {							\
 	    /* overflow */					\
@@ -780,9 +779,8 @@ do {									\
 		X##_e -= (_FP_W_TYPE_SIZE - rsize);			\
 	X##_e = rsize - X##_e - 1;					\
 									\
-	r &= ~((rtype)1 << X##_e);					\
 	if (_FP_FRACBITS_##fs < rsize && _FP_WFRACBITS_##fs < X##_e)	\
-	  __FP_FRAC_SRS_1(r, (X##_e - _FP_WFRACBITS_##fs), rsize);	\
+	  __FP_FRAC_SRS_1(r, (X##_e - _FP_WFRACBITS_##fs + 1), rsize);	\
 	_FP_FRAC_DISASSEMBLE_##wc(X, ((unsigned rtype)r), rsize);	\
 	if ((_FP_WFRACBITS_##fs - X##_e - 1) > 0)			\
 	  _FP_FRAC_SLL_##wc(X, (_FP_WFRACBITS_##fs - X##_e - 1));	\
