@@ -165,6 +165,12 @@ int reiserfs_super_in_proc( char *buffer, char **start, off_t offset,
 			"search_by_key_fs_changed: \t%lu\n"
 			"search_by_key_restarted: \t%lu\n"
 			
+			"insert_item_restarted: \t%lu\n"
+			"paste_into_item_restarted: \t%lu\n"
+			"cut_from_item_restarted: \t%lu\n"
+			"delete_solid_item_restarted: \t%lu\n"
+			"delete_item_restarted: \t%lu\n"
+
 			"leaked_oid: \t%lu\n"
 			"leaves_removable: \t%lu\n",
 
@@ -201,6 +207,13 @@ int reiserfs_super_in_proc( char *buffer, char **start, off_t offset,
 			SFP( search_by_key ),
 			SFP( search_by_key_fs_changed ),
 			SFP( search_by_key_restarted ),
+
+			SFP( insert_item_restarted ),
+			SFP( paste_into_item_restarted ),
+			SFP( cut_from_item_restarted ),
+			SFP( delete_solid_item_restarted ),
+			SFP( delete_item_restarted ),
+
 			SFP( leaked_oid ),
 			SFP( leaves_removable ) );
 

@@ -270,6 +270,12 @@ typedef struct reiserfs_proc_info_data
   stat_cnt_t search_by_key_fs_changed;
   stat_cnt_t search_by_key_restarted;
 
+  stat_cnt_t insert_item_restarted;
+  stat_cnt_t paste_into_item_restarted;
+  stat_cnt_t cut_from_item_restarted;
+  stat_cnt_t delete_solid_item_restarted;
+  stat_cnt_t delete_item_restarted;
+
   stat_cnt_t leaked_oid;
   stat_cnt_t leaves_removable;
 

@@ -1245,6 +1245,8 @@ int reiserfs_delete_item (struct reiserfs_transaction_handle *th,
 	if ( n_ret_value != REPEAT_SEARCH )
 	    break;
 
+	PROC_INFO_INC( p_s_sb, delete_item_restarted );
+
 	// file system changed, repeat search
 	n_ret_value = search_for_position_by_key(p_s_sb, p_s_item_key, p_s_path);
 	if (n_ret_value == IO_ERROR)
@@ -1355,8 +1357,10 @@ void reiserfs_delete_solid_item (struct reiserfs_transaction_handle *th,
 	}
 
 	retval = fix_nodes (M_DELETE, &tb, NULL, 0);
-	if (retval == REPEAT_SEARCH)
+	if (retval == REPEAT_SEARCH) {
+	    PROC_INFO_INC( th -> t_super, delete_solid_item_restarted );
 	    continue;
+	}
 
 	if (retval == CARRY_ON) {
 	    do_balance (&tb, 0, 0, M_DELETE);
@@ -1543,6 +1547,8 @@ int reiserfs_cut_from_item (struct reiserfs_transaction_handle *th,
       	if ( n_ret_value != REPEAT_SEARCH )
 	    break;
 	
+	PROC_INFO_INC( p_s_sb, cut_from_item_restarted );
+
 	n_ret_value = search_for_position_by_key(p_s_sb, p_s_item_key, p_s_path);
 	if (n_ret_value == POSITION_FOUND)
 	    continue;
@@ -1810,6 +1816,7 @@ int reiserfs_paste_into_item (struct reiserfs_transaction_handle *th,
     
     while ( (retval = fix_nodes(M_PASTE, &s_paste_balance, NULL, p_c_body)) == REPEAT_SEARCH ) {
 	/* file system changed while we were in the fix_nodes */
+	PROC_INFO_INC( th -> t_super, paste_into_item_restarted );
 	retval = search_for_position_by_key (th->t_super, p_s_key, p_s_search_path);
 	if (retval == IO_ERROR) {
 	    retval = -EIO ;
@@ -1860,6 +1867,7 @@ int reiserfs_insert_item(struct reiserfs_transaction_handle *th,
 
     while ( (retval = fix_nodes(M_INSERT, &s_ins_balance, p_s_ih, p_c_body)) == REPEAT_SEARCH) {
 	/* file system changed while we were in the fix_nodes */
+	PROC_INFO_INC( th -> t_super, insert_item_restarted );
 	retval = search_item (th->t_super, key, p_s_path);
 	if (retval == IO_ERROR) {
 	    retval = -EIO;
