@@ -163,6 +163,12 @@ static void console_callback(void *ignored);
 
 static int printable;		/* Is console ready for printing? */
 
+/*
+ * ignore_poke: don't unblank the screen when things are typed.  This is
+ * mainly for the privacy of braille terminal users.
+ */
+static int ignore_poke;
+
 int do_poke_blanked_console;
 int console_blanked;
 
@@ -1314,7 +1320,7 @@ static void setterm_command(int currcons)
 		case 14: /* set vesa powerdown interval */
 			vesa_off_interval = ((par[1] < 60) ? par[1] : 60) * 60 * HZ;
 			break;
-		case 15:	/* Activate the previous console */
+		case 15: /* activate the previous console */
 			set_console(last_console);
 			break;
 	}
@@ -2282,6 +2288,13 @@ int tioclinux(struct tty_struct *tty, unsigned long arg)
 				ret = 0;
 			}
 			break;
+		case 14:	/* blank screen until explicitly unblanked, not only poked */
+			ignore_poke = 1;
+			do_blank_screen(0);
+			break;
+		case 15:	/* which console is blanked ? */
+			ret = console_blanked;
+			break;
 		default:
 			ret = -EINVAL;
 			break;
@@ -2753,6 +2766,7 @@ void unblank_screen(void)
 {
 	int currcons;
 
+	ignore_poke = 0;
 	if (!console_blanked)
 		return;
 	if (!vc_cons_allocated(fg_console)) {
@@ -2790,7 +2804,7 @@ static void blank_screen(unsigned long dummy)
 void poke_blanked_console(void)
 {
 	del_timer(&console_timer);
-	if (!vt_cons[fg_console] || vt_cons[fg_console]->vc_mode == KD_GRAPHICS)
+	if (ignore_poke || !vt_cons[fg_console] || vt_cons[fg_console]->vc_mode == KD_GRAPHICS)
 		return;
 	if (console_blanked) {
 		console_timer.function = unblank_screen_t;
