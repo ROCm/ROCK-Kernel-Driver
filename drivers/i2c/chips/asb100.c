@@ -124,7 +124,7 @@ static const u16 asb100_reg_temp_hyst[]	= {0, 0x3a, 0x153, 0x253, 0x19};
 static u8 IN_TO_REG(unsigned val)
 {
 	unsigned nval = SENSORS_LIMIT(val, ASB100_IN_MIN, ASB100_IN_MAX);
-	return nval / 16;
+	return (nval + 8) / 16;
 }
 
 static unsigned IN_FROM_REG(u8 reg)
