@@ -129,7 +129,7 @@ int usb_register_dev(struct usb_interface *intf,
 	int retval = -EINVAL;
 	int minor_base = class_driver->minor_base;
 	int minor = 0;
-	char name[DEVICE_ID_SIZE];
+	char name[BUS_ID_SIZE];
 	struct class_device *class_dev;
 	char *temp;
 
@@ -166,7 +166,7 @@ int usb_register_dev(struct usb_interface *intf,
 	intf->minor = minor;
 
 	/* handle the devfs registration */
-	snprintf(name, DEVICE_ID_SIZE, class_driver->name, minor - minor_base);
+	snprintf(name, BUS_ID_SIZE, class_driver->name, minor - minor_base);
 	devfs_mk_cdev(MKDEV(USB_MAJOR, minor), class_driver->mode, name);
 
 	/* create a usb class device for this usb interface */
@@ -211,7 +211,7 @@ void usb_deregister_dev(struct usb_interface *intf,
 			struct usb_class_driver *class_driver)
 {
 	int minor_base = class_driver->minor_base;
-	char name[DEVICE_ID_SIZE];
+	char name[BUS_ID_SIZE];
 
 #ifdef CONFIG_USB_DYNAMIC_MINORS
 	minor_base = 0;
@@ -226,7 +226,7 @@ void usb_deregister_dev(struct usb_interface *intf,
 	usb_minors[intf->minor] = NULL;
 	spin_unlock (&minor_lock);
 
-	snprintf(name, DEVICE_ID_SIZE, class_driver->name, intf->minor - minor_base);
+	snprintf(name, BUS_ID_SIZE, class_driver->name, intf->minor - minor_base);
 	devfs_remove (name);
 
 	if (intf->class_dev) {
