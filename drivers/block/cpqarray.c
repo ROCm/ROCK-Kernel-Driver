@@ -102,7 +102,7 @@ static struct board_type products[] = {
 	{ 0x40580E11, "Smart Array 431",	&smart4_access },
 };
 
-static struct gendisk ida_gendisk[MAX_CTLR * NWD];
+static struct gendisk *ida_gendisk[MAX_CTLR][NWD];
 
 static struct proc_dir_entry *proc_array;
 
@@ -115,7 +115,6 @@ static struct proc_dir_entry *proc_array;
 /* Debug Extra Paranoid... */
 #define DBGPX(s) do { } while(0)
 
-int cpqarray_init(void);
 static int cpqarray_pci_detect(void);
 static int cpqarray_pci_init(ctlr_info_t *c, struct pci_dev *pdev);
 static void *remap_pci_mem(ulong base, ulong size);
@@ -273,19 +272,9 @@ static int ida_proc_get_info(char *buffer, char **start, off_t offset, int lengt
 }
 #endif /* CONFIG_PROC_FS */
 
-#ifdef MODULE
-
 MODULE_PARM(eisa, "1-8i");
 
-/* This is a bit of a hack... */
-int __init init_module(void)
-{
-	if (cpqarray_init() == 0) /* all the block dev numbers already used */
-		return -EIO;	  /* or no controllers were found */
-	return 0;
-}
-
-void cleanup_module(void)
+static void __exit cpqarray_exit(void)
 {
 	int i, j;
 	char buff[4]; 
@@ -312,21 +301,21 @@ void cleanup_module(void)
 		kfree(hba[i]->cmd_pool_bits);
 
 		for (j = 0; j < NWD; j++) {
-			if (ida_gendisk[i*NWD+j].part)
-				del_gendisk(&ida_gendisk[i*NWD+j]);
+			if (ida_gendisk[i][j]->part)
+				del_gendisk(ida_gendisk[i][j]);
+			put_disk(ida_gendisk[i][j]);
 		}
 	}
 	devfs_find_and_unregister(NULL, "ida", 0, 0, 0, 0);
 	remove_proc_entry("cpqarray", proc_root_driver);
 }
-#endif /* MODULE */
 
 /*
  *  This is it.  Find all the controllers and register them.  I really hate
  *  stealing all these major device numbers.
  *  returns the number of block devices registered.
  */
-int __init cpqarray_init(void)
+static int __init cpqarray_init(void)
 {
 	request_queue_t *q;
 	int i,j;
@@ -336,7 +325,7 @@ int __init cpqarray_init(void)
 	cpqarray_eisa_detect();
 	
 	if (nr_ctlr == 0)
-		return(num_cntlrs_reg);
+		return -ENODEV;
 
 	printk(DRIVER_NAME "\n");
 	printk("Found %d controller(s)\n", nr_ctlr);
@@ -347,7 +336,7 @@ int __init cpqarray_init(void)
 	 * Find disks and fill in structs
 	 * Get an interrupt, set the Q depth and get into /proc
 	 */
-	for(i=0; i< nr_ctlr; i++) {
+	for(i=0; i < nr_ctlr; i++) {
 	  	/* If this successful it should insure that we are the only */
 		/* instance of the driver */	
 		if (register_blkdev(MAJOR_NR+i, hba[i]->devname, &ida_fops)) {
@@ -355,8 +344,6 @@ int __init cpqarray_init(void)
                                 MAJOR_NR+i);
                         continue;
                 }
-
-	
 		hba[i]->access.set_intr_mask(hba[i], 0);
 		if (request_irq(hba[i]->intr, do_ida_intr,
 			SA_INTERRUPT|SA_SHIRQ, hba[i]->devname, hba[i])) {
@@ -367,33 +354,18 @@ int __init cpqarray_init(void)
 			continue;
 		}
 		num_cntlrs_reg++;
+		for (j=0; j<NWD; j++) {
+			ida_gendisk[i][j] = disk_alloc();
+			if (!ida_gendisk[i][j])
+				goto Enomem2;
+		}
 		hba[i]->cmd_pool = (cmdlist_t *)pci_alloc_consistent(
 				hba[i]->pci_dev, NR_CMDS * sizeof(cmdlist_t), 
 				&(hba[i]->cmd_pool_dhandle));
 		hba[i]->cmd_pool_bits = kmalloc(((NR_CMDS+BITS_PER_LONG-1)/BITS_PER_LONG)*sizeof(unsigned long), GFP_KERNEL);
 		
-	if(hba[i]->cmd_pool_bits == NULL || hba[i]->cmd_pool == NULL)
-		{
-			nr_ctlr = i; 
-			if(hba[i]->cmd_pool_bits)
-				kfree(hba[i]->cmd_pool_bits);
-			if(hba[i]->cmd_pool)
-				pci_free_consistent(hba[i]->pci_dev, 
-					NR_CMDS * sizeof(cmdlist_t), 
-					hba[i]->cmd_pool, 
-					hba[i]->cmd_pool_dhandle);
-			free_irq(hba[i]->intr, hba[i]);
-			unregister_blkdev(MAJOR_NR+i, hba[i]->devname);
-			num_cntlrs_reg--;
-                	printk( KERN_ERR "cpqarray: out of memory");
-
-			/* If num_cntlrs_reg == 0, no controllers worked. 
-			 *	init_module will fail, so clean up global 
-			 *	memory that clean_module would do.
-			*/	
-                	return(num_cntlrs_reg);
-	
-		}
+		if (!hba[i]->cmd_pool_bits || !hba[i]->cmd_pool)
+			goto Enomem1;
 		memset(hba[i]->cmd_pool, 0, NR_CMDS * sizeof(cmdlist_t));
 		memset(hba[i]->cmd_pool_bits, 0, ((NR_CMDS+BITS_PER_LONG-1)/BITS_PER_LONG)*sizeof(unsigned long));
 		printk(KERN_INFO "cpqarray: Finding drives on %s", 
@@ -424,7 +396,7 @@ int __init cpqarray_init(void)
 		add_timer(&hba[i]->timer);
 
 		for(j=0; j<NWD; j++) {
-			struct gendisk *disk = ida_gendisk + i*NWD + j;
+			struct gendisk *disk = ida_gendisk[i][j];
 			drv_info_t *drv = &hba[i]->drv[j];
 			sprintf(disk->disk_name, "ida/c%dd%d", i, j);
 			disk->major = MAJOR_NR + i;
@@ -440,7 +412,31 @@ int __init cpqarray_init(void)
 		}
 	}
 	/* done ! */
-	return(num_cntlrs_reg);
+	return num_cntlrs_reg ? 0 : -ENODEV;
+
+Enomem1:
+	nr_ctlr = i; 
+	kfree(hba[i]->cmd_pool_bits);
+	if (hba[i]->cmd_pool)
+		pci_free_consistent(hba[i]->pci_dev, NR_CMDS*sizeof(cmdlist_t), 
+				    hba[i]->cmd_pool, hba[i]->cmd_pool_dhandle);
+Enomem2:
+	while (j--) {
+		put_disk(ida_gendisk[i][j]);
+		ida_gendisk[i][j] = NULL;
+	}
+	free_irq(hba[i]->intr, hba[i]);
+	unregister_blkdev(MAJOR_NR+i, hba[i]->devname);
+	num_cntlrs_reg--;
+	printk( KERN_ERR "cpqarray: out of memory");
+
+	if (!num_cntlrs_reg) {
+		devfs_find_and_unregister(NULL,"ida",0,0,0,0);
+		remove_proc_entry("cpqarray", proc_root_driver);
+		return -ENODEV;
+	}
+	return 0;
+}
 }
 
 /*
@@ -1434,7 +1430,7 @@ static int revalidate_allvol(kdev_t dev)
 	 * on this controller to zero.  We will reread all of this data
 	 */
 	for (i = 0; i < NWD; i++) {
-		struct gendisk *disk = ida_gendisk + ctlr*NWD + i;
+		struct gendisk *disk = ida_gendisk[ctlr][i];
 		if (disk->part)
 			del_gendisk(disk);
 	}
@@ -1450,7 +1446,7 @@ static int revalidate_allvol(kdev_t dev)
 	hba[ctlr]->access.set_intr_mask(hba[ctlr], FIFO_NOT_EMPTY);
 
 	for(i=0; i<NWD; i++) {
-		struct gendisk *disk = ida_gendisk + ctlr*NWD + i;
+		struct gendisk *disk = ida_gendisk[ctlr][i];
 		drv_info_t *drv = &hba[ctlr]->drv[i];
 		if (!drv->nr_blks)
 			continue;
@@ -1467,7 +1463,7 @@ static int ida_revalidate(kdev_t dev)
 {
         int ctlr = major(dev) - MAJOR_NR;
 	int target = DEVICE_NR(dev);
-        struct gendisk *gdev = &ida_gendisk[ctlr*NWD+target];
+        struct gendisk *gdev = ida_gendisk[ctlr][target];
 	set_capacity(gdev, hba[ctlr]->drv[target].nr_blks);
 	return 0;
 }
@@ -1635,7 +1631,7 @@ static void getgeometry(int ctlr)
 	     (log_index < id_ctlr_buf->nr_drvs)
 	     && (log_unit < NWD);
 	     log_unit++) {
-		struct gendisk *disk = ida_gendisk + ctlr * NWD + log_unit;
+		struct gendisk *disk = ida_gendisk[ctlr][log_unit];
 
 		size = sizeof(sense_log_drv_stat_t);
 
@@ -1724,3 +1720,6 @@ static void getgeometry(int ctlr)
 	return;
 
 }
+
+module_init(cpqarray_init)
+module_exit(cpqarray_exit)
