@@ -475,7 +475,7 @@ static void __split_bio(struct mapped_device *md, struct bio *bio)
 	ci.io->md = md;
 	ci.sector = bio->bi_sector;
 	ci.sector_count = bio_sectors(bio);
-	ci.idx = 0;
+	ci.idx = bio->bi_idx;
 
 	atomic_inc(&md->pending);
 	while (ci.sector_count)
