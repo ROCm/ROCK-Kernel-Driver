@@ -230,7 +230,14 @@ static int full_duplex[MAX_UNITS];
 #define NATSEMI_REGS_SIZE	(NATSEMI_NREGS * sizeof(u32))
 #define NATSEMI_EEPROM_SIZE	24 /* 12 16-bit values */
 
-#define PKT_BUF_SZ		1536 /* Size of each temporary Rx buffer. */
+/* Buffer sizes:
+ * The nic writes 32-bit values, even if the upper bytes of
+ * a 32-bit value are beyond the end of the buffer.
+ */
+#define NATSEMI_HEADERS		22	/* 2*mac,type,vlan,crc */
+#define NATSEMI_PADDING		16	/* 2 bytes should be sufficient */
+#define NATSEMI_LONGPKT		1518	/* limit for normal packets */
+#define NATSEMI_RX_LIMIT	2046	/* maximum supported by hardware */
 
 /* These identify the driver base version and may not be removed. */
 static char version[] __devinitdata =
@@ -533,6 +540,22 @@ enum TxConfig_bits {
 	TxCarrierIgn		= 0x80000000
 };
 
+/* 
+ * Tx Configuration:
+ * - 256 byte DMA burst length
+ * - fill threshold 512 bytes (i.e. restart DMA when 512 bytes are free)
+ * - 64 bytes initial drain threshold (i.e. begin actual transmission
+ *   when 64 byte are in the fifo)
+ * - on tx underruns, increase drain threshold by 64.
+ * - at most use a drain threshold of 1472 bytes: The sum of the fill
+ *   threshold and the drain threshold must be less than 2016 bytes.
+ *
+ */
+#define TX_FLTH_VAL		((512/32) << 8)
+#define TX_DRTH_VAL_START	(64/32)
+#define TX_DRTH_VAL_INC		2
+#define TX_DRTH_VAL_LIMIT	(1472/32)
+
 enum RxConfig_bits {
 	RxDrthMask		= 0x3e,
 	RxMxdmaMask		= 0x700000,
@@ -549,6 +572,7 @@ enum RxConfig_bits {
 	RxAcceptRunt		= 0x40000000,
 	RxAcceptErr		= 0x80000000
 };
+#define RX_DRTH_VAL		(128/8)
 
 enum ClkRun_bits {
 	PMEEnable		= 0x100,
@@ -725,6 +749,7 @@ static irqreturn_t intr_handler(int irq, void *dev_instance, struct pt_regs *reg
 static void netdev_error(struct net_device *dev, int intr_status);
 static void netdev_rx(struct net_device *dev);
 static void netdev_tx_done(struct net_device *dev);
+static int natsemi_change_mtu(struct net_device *dev, int new_mtu);
 static void __set_rx_mode(struct net_device *dev);
 static void set_rx_mode(struct net_device *dev);
 static void __get_stats(struct net_device *dev);
@@ -891,6 +916,7 @@ static int __devinit natsemi_probe1 (struct pci_dev *pdev,
 	dev->stop = &netdev_close;
 	dev->get_stats = &get_stats;
 	dev->set_multicast_list = &set_rx_mode;
+	dev->change_mtu = &natsemi_change_mtu;
 	dev->do_ioctl = &netdev_ioctl;
 	dev->tx_timeout = &tx_timeout;
 	dev->watchdog_timeo = TX_TIMEOUT;
@@ -1674,15 +1700,16 @@ static void init_registers(struct net_device *dev)
 	 * ECRETRY=1
 	 * ATP=1
 	 */
-	np->tx_config = TxAutoPad | TxCollRetry | TxMxdma_256 | (0x1002);
+	np->tx_config = TxAutoPad | TxCollRetry | TxMxdma_256 |
+				TX_FLTH_VAL | TX_DRTH_VAL_START;
 	writel(np->tx_config, ioaddr + TxConfig);
 
 	/* DRTH 0x10: start copying to memory if 128 bytes are in the fifo
 	 * MXDMA 0: up to 256 byte bursts
 	 */
-	np->rx_config = RxMxdma_256 | 0x20;
+	np->rx_config = RxMxdma_256 | RX_DRTH_VAL;
 	/* if receive ring now has bigger buffers than normal, enable jumbo */
-	if (np->rx_buf_sz > PKT_BUF_SZ)
+	if (np->rx_buf_sz > NATSEMI_LONGPKT)
 		np->rx_config |= RxAcceptLong;
 
 	writel(np->rx_config, ioaddr + RxConfig);
@@ -1864,7 +1891,7 @@ static void refill_rx(struct net_device *dev)
 		struct sk_buff *skb;
 		int entry = np->dirty_rx % RX_RING_SIZE;
 		if (np->rx_skbuff[entry] == NULL) {
-			unsigned int buflen = np->rx_buf_sz + RX_OFFSET;
+			unsigned int buflen = np->rx_buf_sz+NATSEMI_PADDING;
 			skb = dev_alloc_skb(buflen);
 			np->rx_skbuff[entry] = skb;
 			if (skb == NULL)
@@ -1881,6 +1908,15 @@ static void refill_rx(struct net_device *dev)
 			printk(KERN_WARNING "%s: going OOM.\n", dev->name);
 		np->oom = 1;
 	}
+}
+
+static void set_bufsize(struct net_device *dev)
+{
+	struct netdev_private *np = netdev_priv(dev);
+	if (dev->mtu <= ETH_DATA_LEN)
+		np->rx_buf_sz = ETH_DATA_LEN + NATSEMI_HEADERS;
+	else
+		np->rx_buf_sz = dev->mtu + NATSEMI_HEADERS;
 }
 
 /* Initialize the Rx and Tx rings, along with various 'dev' bits. */
@@ -1903,9 +1939,8 @@ static void init_ring(struct net_device *dev)
 	np->dirty_rx = 0;
 	np->cur_rx = RX_RING_SIZE;
 	np->oom = 0;
-	np->rx_buf_sz = PKT_BUF_SZ;
-	if (dev->mtu > ETH_DATA_LEN)
-		np->rx_buf_sz += dev->mtu - ETH_DATA_LEN;
+	set_bufsize(dev);
+
 	np->rx_head_desc = &np->rx_ring[0];
 
 	/* Please be carefull before changing this loop - at least gcc-2.95.1
@@ -1940,10 +1975,10 @@ static void drain_tx(struct net_device *dev)
 	}
 }
 
-static void drain_ring(struct net_device *dev)
+static void drain_rx(struct net_device *dev)
 {
- 	struct netdev_private *np = netdev_priv(dev);
-	unsigned int buflen = np->rx_buf_sz + RX_OFFSET;
+	struct netdev_private *np = netdev_priv(dev);
+	unsigned int buflen = np->rx_buf_sz;
 	int i;
 
 	/* Free all the skbuffs in the Rx queue. */
@@ -1958,6 +1993,11 @@ static void drain_ring(struct net_device *dev)
 		}
 		np->rx_skbuff[i] = NULL;
 	}
+}
+
+static void drain_ring(struct net_device *dev)
+{
+	drain_rx(dev);
 	drain_tx(dev);
 }
 
@@ -1967,6 +2007,22 @@ static void free_ring(struct net_device *dev)
 	pci_free_consistent(np->pci_dev,
 		sizeof(struct netdev_desc) * (RX_RING_SIZE+TX_RING_SIZE),
 		np->rx_ring, np->ring_dma);
+}
+
+static void reinit_rx(struct net_device *dev)
+{
+	struct netdev_private *np = netdev_priv(dev);
+	int i;
+
+	/* RX Ring */
+	np->dirty_rx = 0;
+	np->cur_rx = RX_RING_SIZE;
+	np->rx_head_desc = &np->rx_ring[0];
+	/* Initialize all Rx descriptors. */
+	for (i = 0; i < RX_RING_SIZE; i++)
+		np->rx_ring[i].cmd_status = cpu_to_le32(DescOwn);
+
+	refill_rx(dev);
 }
 
 static void reinit_ring(struct net_device *dev)
@@ -1980,15 +2036,7 @@ static void reinit_ring(struct net_device *dev)
 	for (i=0;i<TX_RING_SIZE;i++)
 		np->tx_ring[i].cmd_status = 0;
 
-	/* RX Ring */
-	np->dirty_rx = 0;
-	np->cur_rx = RX_RING_SIZE;
-	np->rx_head_desc = &np->rx_ring[0];
-	/* Initialize all Rx descriptors. */
-	for (i = 0; i < RX_RING_SIZE; i++)
-		np->rx_ring[i].cmd_status = cpu_to_le32(DescOwn);
-
-	refill_rx(dev);
+	reinit_rx(dev);
 }
 
 static int start_tx(struct sk_buff *skb, struct net_device *dev)
@@ -2148,7 +2196,7 @@ static void netdev_rx(struct net_device *dev)
 	int entry = np->cur_rx % RX_RING_SIZE;
 	int boguscnt = np->dirty_rx + RX_RING_SIZE - np->cur_rx;
 	s32 desc_status = le32_to_cpu(np->rx_head_desc->cmd_status);
-	unsigned int buflen = np->rx_buf_sz + RX_OFFSET;
+	unsigned int buflen = np->rx_buf_sz;
 
 	/* If the driver owns the next entry it's a new packet. Send it up. */
 	while (desc_status < 0) { /* e.g. & DescOwn */
@@ -2257,12 +2305,18 @@ static void netdev_error(struct net_device *dev, int intr_status)
 		__get_stats(dev);
 	}
 	if (intr_status & IntrTxUnderrun) {
-		if ((np->tx_config & TxDrthMask) < 62)
-			np->tx_config += 2;
-		if (netif_msg_tx_err(np))
-			printk(KERN_NOTICE
-				"%s: increased Tx threshold, txcfg %#08x.\n",
-				dev->name, np->tx_config);
+		if ((np->tx_config & TxDrthMask) < TX_DRTH_VAL_LIMIT) {
+			np->tx_config += TX_DRTH_VAL_INC;
+			if (netif_msg_tx_err(np))
+				printk(KERN_NOTICE
+					"%s: increased tx threshold, txcfg %#08x.\n",
+					dev->name, np->tx_config);
+		} else {
+			if (netif_msg_tx_err(np))
+				printk(KERN_NOTICE
+					"%s: tx underrun with maximum tx threshold, txcfg %#08x.\n",
+					dev->name, np->tx_config);
+		}
 		writel(np->tx_config, ioaddr + TxConfig);
 	}
 	if (intr_status & WOLPkt && netif_msg_wol(np)) {
@@ -2347,6 +2401,36 @@ static void __set_rx_mode(struct net_device *dev)
 	}
 	writel(rx_mode, ioaddr + RxFilterAddr);
 	np->cur_rx_mode = rx_mode;
+}
+
+static int natsemi_change_mtu(struct net_device *dev, int new_mtu)
+{
+	if (new_mtu < 64 || new_mtu > NATSEMI_RX_LIMIT-NATSEMI_HEADERS)
+		return -EINVAL;
+
+	dev->mtu = new_mtu;
+
+	/* synchronized against open : rtnl_lock() held by caller */
+	if (netif_running(dev)) {
+		struct netdev_private *np = netdev_priv(dev);
+		long ioaddr = dev->base_addr;
+
+		disable_irq(dev->irq);
+		spin_lock(&np->lock);
+		/* stop engines */
+		natsemi_stop_rxtx(dev);
+		/* drain rx queue */
+		drain_rx(dev);
+		/* change buffers */
+		set_bufsize(dev);
+		reinit_rx(dev);
+		writel(np->ring_dma, ioaddr + RxRingPtr);
+		/* restart engines */
+		writel(RxOn | TxOn, ioaddr + ChipCmd);
+		spin_unlock(&np->lock);
+		enable_irq(dev->irq);
+	}
+	return 0;
 }
 
 static void set_rx_mode(struct net_device *dev)
@@ -2870,6 +2954,7 @@ static int netdev_get_eeprom(struct net_device *dev, u8 *buf)
 	}
 	return 0;
 }
+
 static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct mii_ioctl_data *data = if_mii(rq);
