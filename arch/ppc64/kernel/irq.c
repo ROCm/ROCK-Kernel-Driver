@@ -41,6 +41,7 @@
 #include <linux/proc_fs.h>
 #include <linux/random.h>
 #include <linux/kallsyms.h>
+#include <linux/profile.h>
 
 #include <asm/uaccess.h>
 #include <asm/bitops.h>
