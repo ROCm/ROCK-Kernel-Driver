@@ -26,6 +26,10 @@ config RWSEM_XCHGADD_ALGORITHM
 	bool
 	default y
 
+config TIME_INTERPOLATION
+	bool
+	default y
+
 choice
 	prompt "IA-64 processor type"
 	default ITANIUM
