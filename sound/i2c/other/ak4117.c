@@ -26,7 +26,7 @@
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/pcm.h>
-#include "ak4117.h"
+#include <sound/ak4117.h>
 #include <sound/asoundef.h>
 
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");

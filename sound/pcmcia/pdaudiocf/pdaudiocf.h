@@ -22,12 +22,13 @@
 #define __PDAUDIOCF_H
 
 #include <sound/pcm.h>
+#include <linux/interrupt.h>
 #include <pcmcia/cs_types.h>
 #include <pcmcia/cs.h>
 #include <pcmcia/cistpl.h>
 #include <pcmcia/ds.h>
 
-#include "ak4117.h"
+#include <sound/ak4117.h>
 
 /* PDAUDIOCF registers */
 #define PDAUDIOCF_REG_MD	0x00	/* music data, R/O */

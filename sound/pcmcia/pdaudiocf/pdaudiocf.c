@@ -78,9 +78,9 @@ static void pdacf_release(dev_link_t *link)
 {
 	if (link->state & DEV_CONFIG) {
 		/* release cs resources */
-		CardServices(ReleaseConfiguration, link->handle);
-		CardServices(ReleaseIO, link->handle, &link->io);
-		CardServices(ReleaseIRQ, link->handle, &link->irq);
+		pcmcia_release_configuration(link->handle);
+		pcmcia_release_io(link->handle, &link->io);
+		pcmcia_release_irq(link->handle, &link->irq);
 		link->state &= ~DEV_CONFIG;
 	}
 }
@@ -96,7 +96,7 @@ static int snd_pdacf_free(pdacf_t *pdacf)
 
 	/* Break the link with Card Services */
 	if (link->handle)
-		CardServices(DeregisterClient, link->handle);
+		pcmcia_deregister_client(link->handle);
 
 	card_list[pdacf->index] = NULL;
 	pdacf->card = NULL;
@@ -198,7 +198,7 @@ static dev_link_t *snd_pdacf_attach(void)
 	client_reg.Version = 0x0210;
 	client_reg.event_callback_args.client_data = link;
 
-	ret = CardServices(RegisterClient, &link->handle, &client_reg);
+	ret = pcmcia_register_client(&link->handle, &client_reg);
 	if (ret != CS_SUCCESS) {
 		cs_error(link->handle, RegisterClient, ret);
 		snd_pdacf_detach(link);
@@ -292,8 +292,8 @@ static void snd_pdacf_detach_all(void)
  * configuration callback
  */
 
-#define CS_CHECK(fn, args...) \
-while ((last_ret=CardServices(last_fn=(fn), args))!=0) goto cs_failed
+#define CS_CHECK(fn, ret) \
+do { last_fn = (fn); if ((last_ret = (ret)) != 0) goto cs_failed; } while (0)
 
 static void pdacf_config(dev_link_t *link)
 {
@@ -312,21 +312,21 @@ static void pdacf_config(dev_link_t *link)
 	tuple.TupleDataMax = sizeof(buf);
 	tuple.TupleOffset = 0;
 	tuple.DesiredTuple = CISTPL_CONFIG;
-	CS_CHECK(GetFirstTuple, handle, &tuple);
-	CS_CHECK(GetTupleData, handle, &tuple);
-	CS_CHECK(ParseTuple, handle, &tuple, &parse);
+	CS_CHECK(GetFirstTuple, pcmcia_get_first_tuple(handle, &tuple));
+	CS_CHECK(GetTupleData, pcmcia_get_tuple_data(handle, &tuple));
+	CS_CHECK(ParseTuple, pcmcia_parse_tuple(handle, &tuple, &parse));
 	link->conf.ConfigBase = parse.config.base;
 	link->conf.ConfigIndex = 0x5;
 
-	CS_CHECK(GetConfigurationInfo, handle, &conf);
+	CS_CHECK(GetConfigurationInfo, pcmcia_get_configuration_info(handle, &conf));
 	link->conf.Vcc = conf.Vcc;
 
 	/* Configure card */
 	link->state |= DEV_CONFIG;
 
-	CS_CHECK(RequestIO, handle, &link->io);
-	CS_CHECK(RequestIRQ, link->handle, &link->irq);
-	CS_CHECK(RequestConfiguration, link->handle, &link->conf);
+	CS_CHECK(RequestIO, pcmcia_request_io(handle, &link->io));
+	CS_CHECK(RequestIRQ, pcmcia_request_irq(link->handle, &link->irq));
+	CS_CHECK(RequestConfiguration, pcmcia_request_configuration(link->handle, &link->conf));
 
 	if (snd_pdacf_assign_resources(pdacf, link->io.BasePort1, link->irq.AssignedIRQ) < 0)
 		goto failed;
@@ -338,9 +338,9 @@ static void pdacf_config(dev_link_t *link)
 cs_failed:
 	cs_error(link->handle, last_fn, last_ret);
 failed:
-	CardServices(ReleaseConfiguration, link->handle);
-	CardServices(ReleaseIO, link->handle, &link->io);
-	CardServices(ReleaseIRQ, link->handle, &link->irq);
+	pcmcia_release_configuration(link->handle);
+	pcmcia_release_io(link->handle, &link->io);
+	pcmcia_release_irq(link->handle, &link->irq);
 }
 
 /*
@@ -376,7 +376,7 @@ static int pdacf_event(event_t event, int priority, event_callback_args_t *args)
 	case CS_EVENT_RESET_PHYSICAL:
 		snd_printdd(KERN_DEBUG "RESET_PHYSICAL\n");
 		if (link->state & DEV_CONFIG)
-			CardServices(ReleaseConfiguration, link->handle);
+			pcmcia_release_configuration(link->handle);
 		break;
 	case CS_EVENT_PM_RESUME:
 		snd_printdd(KERN_DEBUG "RESUME\n");
@@ -386,7 +386,7 @@ static int pdacf_event(event_t event, int priority, event_callback_args_t *args)
 		snd_printdd(KERN_DEBUG "CARD_RESET\n");
 		if (DEV_OK(link)) {
 			snd_printdd(KERN_DEBUG "requestconfig...\n");
-			CardServices(RequestConfiguration, link->handle, &link->conf);
+			pcmcia_request_configuration(link->handle, &link->conf);
 			if (chip) {
 				snd_printdd(KERN_DEBUG "calling snd_pdacf_resume\n");
 				snd_pdacf_resume(chip);
