@@ -83,7 +83,7 @@ struct m68k_serial *m68k_consinfo = 0;
 extern wait_queue_head_t keypress_wait; 
 #endif
 
-struct tty_driver serial_driver;
+struct tty_driver *serial_driver;
 
 /* serial subtype definitions */
 #define SERIAL_TYPE_NORMAL	1
@@ -1415,49 +1415,56 @@ void startup_console(void)
 #endif
 
 
+static struct tty_operations rs_ops = {
+	.open = rs_open,
+	.close = rs_close,
+	.write = rs_write,
+	.flush_chars = rs_flush_chars,
+	.write_room = rs_write_room,
+	.chars_in_buffer = rs_chars_in_buffer,
+	.flush_buffer = rs_flush_buffer,
+	.ioctl = rs_ioctl,
+	.throttle = rs_throttle,
+	.unthrottle = rs_unthrottle,
+	.set_termios = rs_set_termios,
+	.stop = rs_stop,
+	.start = rs_start,
+	.hangup = rs_hangup,
+	.set_ldisc = rs_set_ldisc,
+};
+
 /* rs_init inits the driver */
 static int __init
 rs68328_init(void)
 {
 	int flags, i;
 	struct m68k_serial *info;
-	
+
+	serial_driver = alloc_tty_driver(NR_PORTS);
+	if (!serial_driver)
+		return -ENOMEM;
+
 	show_serial_version();
 
 	/* Initialize the tty_driver structure */
 	/* SPARC: Not all of this is exactly right for us. */
 	
-	memset(&serial_driver, 0, sizeof(struct tty_driver));
-	serial_driver.magic = TTY_DRIVER_MAGIC;
-	serial_driver.name = "ttyS";
-	serial_driver.major = TTY_MAJOR;
-	serial_driver.minor_start = 64;
-	serial_driver.num = NR_PORTS;
-	serial_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	serial_driver.subtype = SERIAL_TYPE_NORMAL;
-	serial_driver.init_termios = tty_std_termios;
-	serial_driver.init_termios.c_cflag = 
+	serial_driver->name = "ttyS";
+	serial_driver->major = TTY_MAJOR;
+	serial_driver->minor_start = 64;
+	serial_driver->type = TTY_DRIVER_TYPE_SERIAL;
+	serial_driver->subtype = SERIAL_TYPE_NORMAL;
+	serial_driver->init_termios = tty_std_termios;
+	serial_driver->init_termios.c_cflag = 
 			m68328_console_cbaud | CS8 | CREAD | HUPCL | CLOCAL;
-	serial_driver.flags = TTY_DRIVER_REAL_RAW;
+	serial_driver->flags = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(serial_driver, &rs_ops);
 
-	serial_driver.open = rs_open;
-	serial_driver.close = rs_close;
-	serial_driver.write = rs_write;
-	serial_driver.flush_chars = rs_flush_chars;
-	serial_driver.write_room = rs_write_room;
-	serial_driver.chars_in_buffer = rs_chars_in_buffer;
-	serial_driver.flush_buffer = rs_flush_buffer;
-	serial_driver.ioctl = rs_ioctl;
-	serial_driver.throttle = rs_throttle;
-	serial_driver.unthrottle = rs_unthrottle;
-	serial_driver.set_termios = rs_set_termios;
-	serial_driver.stop = rs_stop;
-	serial_driver.start = rs_start;
-	serial_driver.hangup = rs_hangup;
-	serial_driver.set_ldisc = rs_set_ldisc;
-
-	if (tty_register_driver(&serial_driver))
-		panic("Couldn't register serial driver\n");
+	if (tty_register_driver(serial_driver)) {
+		put_tty_driver(serial_driver);
+		printk(KERN_ERR "Couldn't register serial driver\n");
+		return -ENOMEM;
+	}
 
 	save_flags(flags); cli();
 
@@ -1482,7 +1489,7 @@ rs68328_init(void)
 	    info->line = i;
 	    info->is_cons = 1; /* Means shortcuts work */
 	    
-	    printk("%s%d at 0x%08x (irq = %d)", serial_driver.name, info->line, 
+	    printk("%s%d at 0x%08x (irq = %d)", serial_driver->name, info->line, 
 		   info->port, info->irq);
 	    printk(" is a builtin MC68328 UART\n");
 	    
@@ -1589,7 +1596,7 @@ int m68328_console_setup(struct console *cp, char *arg)
 static struct tty_driver *m68328_console_device(struct console *c, int *index)
 {
 	*index = c->index;
-	return &serial_driver;
+	return serial_driver;
 }
 
 
