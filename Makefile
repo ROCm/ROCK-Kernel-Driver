@@ -107,6 +107,11 @@ export KBUILD_MODULES KBUILD_BUILTIN KBUILD_VERBOSE
 
 #	For now, leave verbose as default
 
+ifdef V
+  ifeq ("$(origin V)", "command line")
+    KBUILD_VERBOSE = $(V)
+  endif
+endif
 ifndef KBUILD_VERBOSE
   KBUILD_VERBOSE = 1
 endif
