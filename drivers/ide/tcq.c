@@ -406,7 +406,8 @@ static int check_autopoll(struct ata_device *drive)
 
 	args.taskfile.feature = 0x01;
 	args.cmd = WIN_NOP;
-	ide_cmd_type_parser(&args);
+	args.handler = task_no_data_intr;
+	args.command_type = IDE_DRIVE_TASK_NO_DATA;
 
 	/*
 	 * do taskfile and check ABRT bit -- intelligent adapters will not
@@ -441,7 +442,8 @@ static int configure_tcq(struct ata_device *drive)
 	memset(&args, 0, sizeof(args));
 	args.taskfile.feature = SETFEATURES_EN_WCACHE;
 	args.cmd = WIN_SETFEATURES;
-	ide_cmd_type_parser(&args);
+	args.handler = task_no_data_intr;
+	args.command_type = IDE_DRIVE_TASK_NO_DATA;
 
 	if (ide_raw_taskfile(drive, &args)) {
 		printk("%s: failed to enable write cache\n", drive->name);
@@ -455,7 +457,8 @@ static int configure_tcq(struct ata_device *drive)
 	memset(&args, 0, sizeof(args));
 	args.taskfile.feature = SETFEATURES_DIS_RI;
 	args.cmd = WIN_SETFEATURES;
-	ide_cmd_type_parser(&args);
+	args.handler = task_no_data_intr;
+	args.command_type = IDE_DRIVE_TASK_NO_DATA;
 
 	if (ide_raw_taskfile(drive, &args)) {
 		printk("%s: disabling release interrupt fail\n", drive->name);
@@ -469,7 +472,8 @@ static int configure_tcq(struct ata_device *drive)
 	memset(&args, 0, sizeof(args));
 	args.taskfile.feature = SETFEATURES_EN_SI;
 	args.cmd = WIN_SETFEATURES;
-	ide_cmd_type_parser(&args);
+	args.handler = task_no_data_intr;
+	args.command_type = IDE_DRIVE_TASK_NO_DATA;
 
 	if (ide_raw_taskfile(drive, &args)) {
 		printk("%s: enabling service interrupt fail\n", drive->name);

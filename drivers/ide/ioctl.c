@@ -150,12 +150,12 @@ int ata_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned
 	 * configuration.
 	 */
 
-	if (!capable(CAP_SYS_ADMIN))
-		return -EACCES;
-
 	switch (cmd) {
 		case HDIO_GET_32BIT: {
 			unsigned long val = drive->channel->io_32bit;
+
+			if (!capable(CAP_SYS_ADMIN))
+				return -EACCES;
 
 			if (put_user(val, (unsigned long *) arg))
 				return -EFAULT;
@@ -163,6 +163,9 @@ int ata_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned
 		}
 
 		case HDIO_SET_32BIT:
+		        if (!capable(CAP_SYS_ADMIN))
+				return -EACCES;
+
 			if (arg < 0 || arg > 1)
 				return -EINVAL;
 
@@ -178,6 +181,9 @@ int ata_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned
 			return 0;
 
 		case HDIO_SET_PIO_MODE:
+			if (!capable(CAP_SYS_ADMIN))
+				return -EACCES;
+
 			if (arg < 0 || arg > 255)
 				return -EINVAL;
 
@@ -198,6 +204,9 @@ int ata_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned
 		case HDIO_GET_UNMASKINTR: {
 			unsigned long val = drive->channel->unmask;
 
+			if (!capable(CAP_SYS_ADMIN))
+				return -EACCES;
+
 			if (put_user(val, (unsigned long *) arg))
 				return -EFAULT;
 
@@ -205,6 +214,9 @@ int ata_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned
 		}
 
 		case HDIO_SET_UNMASKINTR:
+			if (!capable(CAP_SYS_ADMIN))
+				return -EACCES;
+
 			if (arg < 0 || arg > 1)
 				return -EINVAL;
 
@@ -222,6 +234,9 @@ int ata_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned
 		case HDIO_GET_DMA: {
 			unsigned long val = drive->using_dma;
 
+			if (!capable(CAP_SYS_ADMIN))
+				return -EACCES;
+
 			if (put_user(val, (unsigned long *) arg))
 				return -EFAULT;
 
@@ -229,6 +244,9 @@ int ata_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned
 		}
 
 		case HDIO_SET_DMA:
+			if (!capable(CAP_SYS_ADMIN))
+				return -EACCES;
+
 			if (arg < 0 || arg > 1)
 				return -EINVAL;
 
@@ -249,6 +267,9 @@ int ata_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned
 		case HDIO_GETGEO: {
 			struct hd_geometry *loc = (struct hd_geometry *) arg;
 			unsigned short bios_cyl = drive->bios_cyl; /* truncate */
+
+			if (!capable(CAP_SYS_ADMIN))
+				return -EACCES;
 
 			if (!loc || (drive->type != ATA_DISK && drive->type != ATA_FLOPPY))
 				return -EINVAL;
@@ -272,6 +293,9 @@ int ata_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned
 		case HDIO_GETGEO_BIG_RAW: {
 			struct hd_big_geometry *loc = (struct hd_big_geometry *) arg;
 
+			if (!capable(CAP_SYS_ADMIN))
+				return -EACCES;
+
 			if (!loc || (drive->type != ATA_DISK && drive->type != ATA_FLOPPY))
 				return -EINVAL;
 
@@ -292,6 +316,9 @@ int ata_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned
 		}
 
 		case HDIO_GET_IDENTITY:
+			if (!capable(CAP_SYS_ADMIN))
+				return -EACCES;
+
 			if (minor(inode->i_rdev) & PARTN_MASK)
 				return -EINVAL;
 
@@ -304,11 +331,17 @@ int ata_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned
 			return 0;
 
 		case HDIO_GET_NICE:
+			if (!capable(CAP_SYS_ADMIN))
+				return -EACCES;
+
 			return put_user(drive->dsc_overlap << IDE_NICE_DSC_OVERLAP |
 					drive->atapi_overlap << IDE_NICE_ATAPI_OVERLAP,
 					(long *) arg);
 
 		case HDIO_SET_NICE:
+			if (!capable(CAP_SYS_ADMIN))
+				return -EACCES;
+
 			if (arg != (arg & ((1 << IDE_NICE_DSC_OVERLAP))))
 				return -EPERM;
 
@@ -322,18 +355,27 @@ int ata_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned
 			return 0;
 
 		case HDIO_GET_BUSSTATE:
+			if (!capable(CAP_SYS_ADMIN))
+				return -EACCES;
+
 			if (put_user(drive->channel->bus_state, (long *)arg))
 				return -EFAULT;
 
 			return 0;
 
 		case HDIO_SET_BUSSTATE:
+			if (!capable(CAP_SYS_ADMIN))
+				return -EACCES;
+
 			if (drive->channel->busproc)
 				drive->channel->busproc(drive, (int)arg);
 
 			return 0;
 
 		case HDIO_DRIVE_CMD:
+			if (!capable(CAP_SYS_ADMIN))
+				return -EACCES;
+
 			if (!arg) {
 				if (ide_spin_wait_hwgroup(drive))
 					return -EBUSY;

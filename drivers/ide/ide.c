@@ -67,9 +67,6 @@
 #include "pcihost.h"
 #include "ioctl.h"
 
-/* default maximum number of failures */
-#define IDE_DEFAULT_MAX_FAILURES	1
-
 /*
  * CompactFlash cards and their relatives pretend to be removable hard disks, except:
  *	(1) they never have a slave unit, and
@@ -555,6 +552,19 @@ static void try_to_flush_leftover_data(struct ata_device *drive)
 #endif
 
 /*
+ * This is invoked on completion of a WIN_RESTORE (recalibrate) cmd.
+ *
+ * FIXME: Why can't be just use task_no_data_intr here?
+ */
+static ide_startstop_t recal_intr(struct ata_device *drive, struct request *rq)
+{
+	if (!ata_status(drive, READY_STAT, BAD_STAT))
+		return ata_error(drive, rq, __FUNCTION__);
+
+	return ide_stopped;
+}
+
+/*
  * We are still on the old request path here so issuing the recalibrate command
  * directly should just work.
  */
@@ -572,6 +582,7 @@ static int do_recalibrate(struct ata_device *drive)
 		args.taskfile.sector_count = drive->sect;
 		args.cmd = WIN_RESTORE;
 		args.handler = recal_intr;
+		args.command_type = IDE_DRIVE_TASK_NO_DATA;
 		ata_taskfile(drive, &args, NULL);
 	}
 

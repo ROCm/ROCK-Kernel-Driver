@@ -664,7 +664,6 @@ struct ata_taskfile {
 	struct hd_drive_task_hdr  hobfile;
 	u8 cmd;					/* actual ATA command */
 	int command_type;
-	ide_startstop_t (*prehandler)(struct ata_device *, struct request *);
 	ide_startstop_t (*handler)(struct ata_device *, struct request *);
 };
 
@@ -678,16 +677,30 @@ extern ide_startstop_t ata_taskfile(struct ata_device *,
  * Special Flagged Register Validation Caller
  */
 
-extern ide_startstop_t recal_intr(struct ata_device *, struct request *);
-extern ide_startstop_t task_no_data_intr(struct ata_device *, struct request *);
+/*
+ * for now, taskfile requests are special :/
+ */
+static inline char *ide_map_rq(struct request *rq, unsigned long *flags)
+{
+	if (rq->bio)
+		return bio_kmap_irq(rq->bio, flags) + ide_rq_offset(rq);
+	else
+		return rq->buffer + ((rq)->nr_sectors - (rq)->current_nr_sectors) * SECTOR_SIZE;
+}
 
-extern void ide_cmd_type_parser(struct ata_taskfile *args);
+static inline void ide_unmap_rq(struct request *rq, char *to,
+				unsigned long *flags)
+{
+	if (rq->bio)
+		bio_kunmap_irq(to, flags);
+}
+
+extern ide_startstop_t task_no_data_intr(struct ata_device *, struct request *);
 extern int ide_raw_taskfile(struct ata_device *, struct ata_taskfile *);
 
 extern void ide_fix_driveid(struct hd_driveid *id);
 extern int ide_config_drive_speed(struct ata_device *, byte);
 extern byte eighty_ninty_three(struct ata_device *);
-
 
 extern void ide_stall_queue(struct ata_device *, unsigned long);
 
