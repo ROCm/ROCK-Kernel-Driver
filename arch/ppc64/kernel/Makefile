@@ -9,7 +9,7 @@ obj-y               :=	setup.o entry.o traps.o irq.o idle.o \
 			align.o semaphore.o bitops.o stab.o htab.o pacaData.o \
 			udbg.o binfmt_elf32.o sys_ppc32.o ioctl32.o \
 			ptrace32.o signal32.o pmc.o rtc.o init_task.o \
-			lmb.o pci.o pci_dn.o pci_dma.o
+			lmb.o pci.o pci_dn.o pci_dma.o cputable.o
 
 obj-$(CONFIG_PPC_ISERIES) += iSeries_pci.o       iSeries_pci_reset.o \
 			     iSeries_IoMmTable.o iSeries_irq.o \

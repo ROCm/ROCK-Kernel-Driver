@@ -65,6 +65,10 @@ SECTIONS
   __ex_table : { *(__ex_table) }
   __stop___ex_table = .;
 
+  __start___ftr_fixup = .;
+  __ftr_fixup : { *(__ftr_fixup) }
+  __stop___ftr_fixup = .;
+
   . = ALIGN(16384);		/* init_task */
   .data.init_task : { *(.data.init_task) }
 
