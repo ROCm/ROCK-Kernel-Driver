@@ -333,6 +333,8 @@
  *
  * 0.4.10  01/07/2003
  *    - Added vendor/product ids for Visioneer scanners.
+ *    - Print information about user-supplied ids only once at startup instead
+ *      of everytime any USB device is plugged in.
  *
  * TODO
  *    - Remove the 2/3 endpoint limitation
@@ -874,10 +876,6 @@ probe_scanner(struct usb_interface *intf,
 	char have_bulk_in, have_bulk_out, have_intr;
 	char name[10];
 
-	if (vendor != -1 && product != -1) {
-		info("probe_scanner: User specified USB scanner -- Vendor:Product - %x:%x", vendor, product);
-	}
-
 	dbg("probe_scanner: USB dev address:%p", dev);
 
 /*
@@ -1189,6 +1187,8 @@ usb_scanner_init (void)
                 return -1;
 
 	info(DRIVER_VERSION ":" DRIVER_DESC);
+	if (vendor != -1 && product != -1)
+		info("probe_scanner: User specified USB scanner -- Vendor:Product - %x:%x", vendor, product);
 	return 0;
 }
 
