@@ -1374,7 +1374,7 @@ ptrace_disable (struct task_struct *child)
 {
 	struct ia64_psr *child_psr = ia64_psr(ia64_task_regs(child));
 
-	/* make sure the single step/take-branch tra bits are not set: */
+	/* make sure the single step/taken-branch trap bits are not set: */
 	child_psr->ss = 0;
 	child_psr->tb = 0;
 }
