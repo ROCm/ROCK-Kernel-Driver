@@ -222,8 +222,6 @@ static int proc_write_options(struct file *file, const char __user *buffer,
 			unsigned long count, void *data);
 
 #ifdef CONFIG_ADB
-static void pmu_poll_adb(void);
-
 struct adb_driver via_pmu_driver = {
 	"PMU",
 	pmu_probe,
@@ -1187,7 +1185,6 @@ pmu_poll(void)
 	via_pmu_interrupt(0, 0, 0);
 }
 
-#ifdef CONFIG_ADB
 void __openfirmware
 pmu_poll_adb(void)
 {
@@ -1202,7 +1199,6 @@ pmu_poll_adb(void)
 	} while (pmu_suspended && (adb_int_pending || pmu_state != idle
 		|| req_awaiting_reply));
 }
-#endif /* CONFIG_ADB */
 
 void __openfirmware
 pmu_wait_complete(struct adb_request *req)
@@ -2777,6 +2773,7 @@ pmu_polled_request(struct adb_request *req)
 
 EXPORT_SYMBOL(pmu_request);
 EXPORT_SYMBOL(pmu_poll);
+EXPORT_SYMBOL(pmu_poll_adb);
 EXPORT_SYMBOL(pmu_wait_complete);
 EXPORT_SYMBOL(pmu_suspend);
 EXPORT_SYMBOL(pmu_resume);

@@ -127,6 +127,7 @@ extern int pmu_request(struct adb_request *req,
 		void (*done)(struct adb_request *), int nbytes, ...);
 
 extern void pmu_poll(void);
+extern void pmu_poll_adb(void); /* For use by xmon */
 extern void pmu_wait_complete(struct adb_request *req);
 
 /* For use before switching interrupts off for a long time;
