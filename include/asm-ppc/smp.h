@@ -28,10 +28,10 @@ struct cpuinfo_PPC {
 	unsigned long pgtable_cache_sz;
 };
 
-extern struct cpuinfo_PPC cpu_data[NR_CPUS];
+extern struct cpuinfo_PPC cpu_data[];
 extern unsigned long cpu_online_map;
-extern unsigned long smp_proc_in_lock[NR_CPUS];
-extern volatile unsigned long cpu_callin_map[NR_CPUS];
+extern unsigned long smp_proc_in_lock[];
+extern volatile unsigned long cpu_callin_map[];
 extern int smp_tb_synchronized;
 
 extern void smp_store_cpu_info(int id);
@@ -50,7 +50,7 @@ extern void smp_local_timer_interrupt(struct pt_regs *);
 
 #define smp_processor_id() (current_thread_info()->cpu)
 
-extern int smp_hw_index[NR_CPUS];
+extern int smp_hw_index[];
 #define hard_smp_processor_id() (smp_hw_index[smp_processor_id()])
 
 struct klock_info_struct {

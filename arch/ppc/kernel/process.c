@@ -59,6 +59,12 @@ static struct files_struct init_files = INIT_FILES;
 static struct signal_struct init_signals = INIT_SIGNALS;
 struct mm_struct init_mm = INIT_MM(init_mm);
 
+/* this is 8kB-aligned so we can get to the thread_info struct
+   at the base of it from the stack pointer with 1 integer instruction. */
+union thread_union init_thread_union
+	__attribute__((__section__(".data.init_task"))) =
+{ INIT_THREAD_INFO(init_task) };
+
 /* initial task structure */
 struct task_struct init_task = INIT_TASK(init_task);
 
@@ -191,9 +197,7 @@ dump_fpu(struct pt_regs *regs, elf_fpregset_t *fpregs)
 	return 1;
 }
 
-void
-_switch_to(struct task_struct *prev, struct task_struct *new,
-	  struct task_struct **last)
+void switch_to(struct task_struct *prev, struct task_struct *new)
 {
 	struct thread_struct *new_thread, *old_thread;
 	unsigned long s;
@@ -215,7 +219,7 @@ _switch_to(struct task_struct *prev, struct task_struct *new,
 	 * every switch, just a save.
 	 *  -- Cort
 	 */
-	if ( prev->thread.regs && (prev->thread.regs->msr & MSR_FP) )
+	if (prev->thread.regs && (prev->thread.regs->msr & MSR_FP))
 		giveup_fpu(prev);
 #ifdef CONFIG_ALTIVEC	
 	/*
@@ -234,8 +238,6 @@ _switch_to(struct task_struct *prev, struct task_struct *new,
 #endif /* CONFIG_ALTIVEC */	
 #endif /* CONFIG_SMP */
 
-	current_set[smp_processor_id()] = new;
-
 	/* Avoid the trap.  On smp this this never happens since
 	 * we don't set last_task_used_altivec -- Cort
 	 */
@@ -243,7 +245,7 @@ _switch_to(struct task_struct *prev, struct task_struct *new,
 		new->thread.regs->msr |= MSR_VEC;
 	new_thread = &new->thread;
 	old_thread = &current->thread;
-	*last = _switch(old_thread, new_thread);
+	_switch(old_thread, new_thread);
 	__restore_flags(s);
 }
 
@@ -276,7 +278,7 @@ void show_regs(struct pt_regs * regs)
 #endif
 	
 #ifdef CONFIG_SMP
-	printk(" CPU: %d", current->processor);
+	printk(" CPU: %d", smp_processor_id());
 #endif /* CONFIG_SMP */
 	
 	printk("\n");

@@ -135,7 +135,6 @@ void show_mem(void)
 {
 	int i,free = 0,total = 0,reserved = 0;
 	int shared = 0, cached = 0;
-	struct task_struct *p;
 	int highmem = 0;
 
 	printk("Mem-info:\n");
@@ -153,7 +152,7 @@ void show_mem(void)
 		else if (!page_count(mem_map+i))
 			free++;
 		else
-			shared += atomic_read(&mem_map[i].count) - 1;
+			shared += page_count(mem_map+i) - 1;
 	}
 	printk("%d pages of RAM\n",total);
 	printk("%d pages of HIGHMEM\n", highmem);
@@ -163,49 +162,6 @@ void show_mem(void)
 	printk("%d pages swap cached\n",cached);
 	printk("%d pages in page table cache\n",(int)pgtable_cache_size);
 	show_buffers();
-	printk("%-8s %3s %8s %8s %8s %9s %8s", "Process", "Pid",
-	       "Ctx", "Ctx<<4", "Last Sys", "pc", "task");
-#ifdef CONFIG_SMP
-	printk(" %3s", "CPU");
-#endif /* CONFIG_SMP */
-	printk("\n");
-	for_each_task(p)
-	{
-		printk("%-8.8s %3d %8ld %8ld %8ld %c%08lx %08lx ",
-		       p->comm,p->pid,
-		       (p->mm)?p->mm->context:0,
-		       (p->mm)?(p->mm->context<<4):0,
-		       p->thread.last_syscall,
-		       (p->thread.regs)?user_mode(p->thread.regs) ? 'u' : 'k' : '?',
-		       (p->thread.regs)?p->thread.regs->nip:0,
-		       (ulong)p);
-		{
-			int iscur = 0;
-#ifdef CONFIG_SMP
-			printk("%3d ", p->processor);
-			if ( (p->processor != NO_PROC_ID) &&
-			     (p == current_set[p->processor]) )
-			{
-				iscur = 1;
-				printk("current");
-			}
-#else
-			if ( p == current )
-			{
-				iscur = 1;
-				printk("current");
-			}
-
-			if ( p == last_task_used_math )
-			{
-				if ( iscur )
-					printk(",");
-				printk("last math");
-			}
-#endif /* CONFIG_SMP */
-			printk("\n");
-		}
-	}
 }
 
 void si_meminfo(struct sysinfo *val)

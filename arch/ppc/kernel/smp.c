@@ -37,6 +37,7 @@
 #include <asm/smp.h>
 #include <asm/residual.h>
 #include <asm/time.h>
+#include <asm/thread_info.h>
 
 int smp_threads_ready;
 volatile int smp_commenced;
@@ -49,11 +50,12 @@ atomic_t ipi_sent;
 spinlock_t kernel_flag __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 unsigned int prof_multiplier[NR_CPUS];
 unsigned int prof_counter[NR_CPUS];
-cycles_t cacheflush_time;
+unsigned long cache_decay_ticks;
 static int max_cpus __initdata = NR_CPUS;
 unsigned long cpu_online_map;
 int smp_hw_index[NR_CPUS];
 static struct smp_ops_t *smp_ops;
+struct thread_info *secondary_ti;
 
 /* all cpu mappings are 1-1 -- Cort */
 volatile unsigned long cpu_callin_map[NR_CPUS];
@@ -66,6 +68,8 @@ int start_secondary(void *);
 extern int cpu_idle(void *unused);
 void smp_call_function_interrupt(void);
 void smp_message_pass(int target, int msg, unsigned long data, int wait);
+static int __smp_call_function(void (*func) (void *info), void *info,
+			       int wait, int target);
 
 #ifdef CONFIG_PPC_ISERIES
 extern void smp_iSeries_space_timers( unsigned nr );
@@ -108,7 +112,7 @@ void smp_message_recv(int msg, struct pt_regs *regs)
 		smp_call_function_interrupt();
 		break;
 	case PPC_MSG_RESCHEDULE: 
-		current->work.need_resched = 1;
+		set_need_resched();
 		break;
 	case PPC_MSG_INVALIDATE_TLB:
 		_tlbia();
@@ -192,8 +196,8 @@ static struct call_data_struct {
  * in the system.
  */
 
-int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
-			int wait)
+int smp_call_function(void (*func) (void *info), void *info, int nonatomic,
+		      int wait)
 /*
  * [SUMMARY] Run a function on all other CPUs.
  * <func> The function to run. This must be fast and non-blocking.
@@ -207,12 +211,23 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
  * hardware interrupt handler, you may call it from a bottom half handler.
  */
 {
-	struct call_data_struct data;
-	int ret = -1, cpus = smp_num_cpus-1;
-	int timeout;
-
-	if (!cpus)
+	if (smp_num_cpus <= 1)
 		return 0;
+	return __smp_call_function(func, info, wait, MSG_ALL_BUT_SELF);
+}
+
+static int __smp_call_function(void (*func) (void *info), void *info,
+			       int wait, int target)
+{
+	struct call_data_struct data;
+	int ret = -1;
+	int timeout;
+	int ncpus = 1;
+
+	if (target == MSG_ALL_BUT_SELF)
+		ncpus = smp_num_cpus - 1;
+	else if (target == MSG_ALL)
+		ncpus = smp_num_cpus;
 
 	data.func = func;
 	data.info = info;
@@ -224,11 +239,11 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 	spin_lock_bh(&call_lock);
 	call_data = &data;
 	/* Send a message to all other CPUs and wait for them to respond */
-	smp_message_pass(MSG_ALL_BUT_SELF, PPC_MSG_CALL_FUNCTION, 0, 0);
+	smp_message_pass(target, PPC_MSG_CALL_FUNCTION, 0, 0);
 
 	/* Wait for response */
 	timeout = 1000000;
-	while (atomic_read(&data.started) != cpus) {
+	while (atomic_read(&data.started) != ncpus) {
 		if (--timeout == 0) {
 			printk("smp_call_function on cpu %d: other cpus not responding (%d)\n",
 			       smp_processor_id(), atomic_read(&data.started));
@@ -240,7 +255,7 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 
 	if (wait) {
 		timeout = 1000000;
-		while (atomic_read(&data.finished) != cpus) {
+		while (atomic_read(&data.finished) != ncpus) {
 			if (--timeout == 0) {
 				printk("smp_call_function on cpu %d: other cpus not finishing (%d/%d)\n",
 				       smp_processor_id(), atomic_read(&data.finished), atomic_read(&data.started));
@@ -276,9 +291,28 @@ void smp_call_function_interrupt(void)
 		atomic_inc(&call_data->finished);
 }
 
+/*
+ * Task migration callback.
+ */
+void smp_task_migration_interrupt(void *new_task)
+{
+	task_t *p;
+
+	p = new_task;
+	sched_task_migrated(p);
+}
+
+/*
+ * This function sends a 'task migration' IPI to another CPU.
+ * Must be called from syscall contexts, with interrupts *enabled*.
+ */
+void smp_migrate_task(int cpu, task_t *p)
+{
+	__smp_call_function(smp_task_migration_interrupt, p, 0, cpu);
+}
+
 void __init smp_boot_cpus(void)
 {
-	extern struct task_struct *current_set[NR_CPUS];
 	int i, cpu_nr;
 	struct task_struct *p;
 
@@ -292,7 +326,6 @@ void __init smp_boot_cpus(void)
 	 * cpu 0, the master -- Cort
 	 */
 	cpu_callin_map[0] = 1;
-	current->cpu = 0;
 
 	for (i = 0; i < NR_CPUS; i++) {
 		prof_counter[i] = 1;
@@ -300,10 +333,9 @@ void __init smp_boot_cpus(void)
 	}
 
 	/*
-	 * XXX very rough, assumes 20 bus cycles to read a cache line,
-	 * timebase increments every 4 bus cycles, 32kB L1 data cache.
+	 * XXX very rough.
 	 */
-	cacheflush_time = 5 * 1024;
+	cache_decay_ticks = HZ/100;
 
 	smp_ops = ppc_md.smp_ops;
 	if (smp_ops == NULL) {
@@ -311,7 +343,7 @@ void __init smp_boot_cpus(void)
 		return;
 	}
 
-	/* Probe arch for CPUs */
+	/* Probe platform for CPUs */
 	cpu_nr = smp_ops->probe();
 
 	/*
@@ -338,9 +370,8 @@ void __init smp_boot_cpus(void)
 		init_idle(p, i);
 		unhash_process(p);
 
-		p->cpu = i;
-		p->cpus_allowed = 1 << i; /* we schedule the first task manually */
-		current_set[i] = p;
+		secondary_ti = p->thread_info;
+		p->thread_info->cpu = i;
 
 		/*
 		 * There was a cache flush loop here to flush the cache
@@ -357,11 +388,10 @@ void __init smp_boot_cpus(void)
 		 * use this value that I found through experimentation.
 		 * -- Cort
 		 */
-		for ( c = 1000; c && !cpu_callin_map[i] ; c-- )
+		for (c = 1000; c && !cpu_callin_map[i]; c--)
 			udelay(100);
 		
-		if ( cpu_callin_map[i] )
-		{
+		if (cpu_callin_map[i]) {
 			char buf[32];
 			sprintf(buf, "found cpu %d", i);
 			if (ppc_md.progress) ppc_md.progress(buf, 0x350+i);
@@ -488,7 +518,7 @@ void __init smp_commence(void)
 
 void __init smp_callin(void)
 {
-	int cpu = current->processor;
+	int cpu = smp_processor_id();
 	
         smp_store_cpu_info(cpu);
 	set_dec(tb_ticks_per_jiffy);
@@ -505,7 +535,7 @@ void __init smp_callin(void)
 	 */
 	cpu_online_map |= 1UL << smp_processor_id();
 	
-	while(!smp_commenced)
+	while (!smp_commenced)
 		barrier();
 
 	/* see smp_commence for more info */

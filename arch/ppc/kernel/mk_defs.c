@@ -42,19 +42,13 @@
 int
 main(void)
 {
-	DEFINE(THREAD_SIZE, THREAD_SIZE);
-	DEFINE(TI_CPU, offsetof(struct thread_info, cpu));
-	DEFINE(TI_FLAGS, offsetof(struct thread_info, flags));
-	DEFINE(STATE, offsetof(struct task_struct, state));
 	DEFINE(THREAD, offsetof(struct task_struct, thread));
+	DEFINE(THREAD_INFO, offsetof(struct task_struct, thread_info));
 	DEFINE(MM, offsetof(struct task_struct, mm));
-	DEFINE(ACTIVE_MM, offsetof(struct task_struct, active_mm));
-	DEFINE(TASK_STRUCT_SIZE, sizeof(struct task_struct));
 	DEFINE(KSP, offsetof(struct thread_struct, ksp));
 	DEFINE(PGDIR, offsetof(struct thread_struct, pgdir));
 	DEFINE(LAST_SYSCALL, offsetof(struct thread_struct, last_syscall));
 	DEFINE(PT_REGS, offsetof(struct thread_struct, regs));
-	DEFINE(TASK_FLAGS, offsetof(struct task_struct, flags));
 	DEFINE(THREAD_FPEXC_MODE, offsetof(struct thread_struct, fpexc_mode));
 	DEFINE(THREAD_FPR0, offsetof(struct thread_struct, fpr[0]));
 	DEFINE(THREAD_FPSCR, offsetof(struct thread_struct, fpscr));

@@ -25,6 +25,7 @@
 #include <asm/cputable.h>
 #include <asm/mmu.h>
 #include <asm/ppc_asm.h>
+#include <asm/thread_info.h>
 #include "ppc_defs.h"
 
 	.text
@@ -375,7 +376,8 @@ _GLOBAL(_tlbia)
 	SYNC
 	lis	r9,hash_table_lock@h
 	ori	r9,r9,hash_table_lock@l
-	lwz	r8,CPU(r2)
+	rlwinm	r8,r1,0,0,18
+	lwz	r8,TI_CPU(r8)
 	oris	r8,r8,10
 10:	lwarx	r7,0,r9
 	cmpi	0,r7,0
@@ -420,7 +422,8 @@ _GLOBAL(_tlbie)
 	SYNC
 	lis	r9,hash_table_lock@h
 	ori	r9,r9,hash_table_lock@l
-	lwz	r8,CPU(r2)
+	rlwinm	r8,r1,0,0,18
+	lwz	r8,TI_CPU(r8)
 	oris	r8,r8,11
 10:	lwarx	r7,0,r9
 	cmpi	0,r7,0

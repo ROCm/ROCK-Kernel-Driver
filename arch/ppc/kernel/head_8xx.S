@@ -637,63 +637,6 @@ DataTLBError:
 
 	. = 0x2000
 
-/*
- * This code finishes saving the registers to the exception frame
- * and jumps to the appropriate handler for the exception, turning
- * on address translation.
- */
-	.globl	transfer_to_handler
-transfer_to_handler:
-	stw	r22,_NIP(r21)
-	lis	r22,MSR_POW@h
-	andc	r23,r23,r22
-	stw	r23,_MSR(r21)
-	SAVE_4GPRS(8, r21)
-	SAVE_8GPRS(12, r21)
-	SAVE_8GPRS(24, r21)
-	andi.	r23,r23,MSR_PR
-	mfspr	r23,SPRG3		/* if from user, fix up THREAD.regs */
-	beq	2f
-	addi	r24,r1,STACK_FRAME_OVERHEAD
-	stw	r24,PT_REGS(r23)
-2:	addi	r2,r23,-THREAD		/* set r2 to current */
-	tovirt(r2,r2)
-	mflr	r23
-	andi.	r24,r23,0x3f00		/* get vector offset */
-	stw	r24,TRAP(r21)
-	li	r22,0
-	stw	r22,RESULT(r21)
-	mtspr	SPRG2,r22		/* r1 is now kernel sp */
-	addi	r24,r2,TASK_STRUCT_SIZE	/* check for kernel stack overflow */
-	cmplw	0,r1,r2
-	cmplw	1,r1,r24
-	crand	1,1,4
-	bgt-	stack_ovf		/* if r2 < r1 < r2+TASK_STRUCT_SIZE */
-	lwz	r24,0(r23)		/* virtual address of handler */
-	lwz	r23,4(r23)		/* where to go when done */
-	mtspr	SRR0,r24
-	mtspr	SRR1,r20
-	mtlr	r23
-	SYNC
-	rfi				/* jump to handler, enable MMU */
-
-/*
- * On kernel stack overflow, load up an initial stack pointer
- * and call StackOverflow(regs), which should not return.
- */
-stack_ovf:
-	addi	r3,r1,STACK_FRAME_OVERHEAD
-	lis	r1,init_thread_union@ha
-	addi	r1,r1,init_thread_union@l
-	addi	r1,r1,THREAD_SIZE-STACK_FRAME_OVERHEAD
-	lis	r24,StackOverflow@ha
-	addi	r24,r24,StackOverflow@l
-	li	r20,MSR_KERNEL
-	mtspr	SRR0,r24
-	mtspr	SRR1,r20
-	SYNC
-	rfi
-
 	.globl	giveup_fpu
 giveup_fpu:
 	blr
@@ -707,7 +650,6 @@ _GLOBAL(__setup_cpu_8xx)
  * This is where the main kernel code starts.
  */
 start_here:
-
 	/* ptr to current */
 	lis	r2,init_task@h
 	ori	r2,r2,init_task@l
@@ -971,10 +913,6 @@ set_dec_cpu6:
 	.data
 	.globl	sdata
 sdata:
-	.globl	init_thread_union
-init_thread_union:
-	.space	8192
-
 	.globl	empty_zero_page
 empty_zero_page:
 	.space	4096
