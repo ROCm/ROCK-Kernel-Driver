@@ -228,6 +228,7 @@ EXPORT_SYMBOL(file_ra_state_init);
 EXPORT_SYMBOL(generic_file_write);
 EXPORT_SYMBOL(generic_file_write_nolock);
 EXPORT_SYMBOL(generic_file_mmap);
+EXPORT_SYMBOL(generic_file_readonly_mmap);
 EXPORT_SYMBOL(generic_ro_fops);
 EXPORT_SYMBOL(file_lock_list);
 EXPORT_SYMBOL(locks_init_lock);

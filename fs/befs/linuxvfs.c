@@ -74,7 +74,7 @@ struct inode_operations befs_dir_inode_operations = {
 struct file_operations befs_file_operations = {
 	.llseek		= default_llseek,
 	.read		= generic_file_read,
-	.mmap		= generic_file_mmap,
+	.mmap		= generic_file_readonly_mmap,
 };
 
 struct address_space_operations befs_aops = {
