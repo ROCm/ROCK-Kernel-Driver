@@ -803,11 +803,13 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 				nbyte = ELF_MIN_ALIGN - nbyte;
 				if (nbyte > elf_brk - elf_bss)
 					nbyte = elf_brk - elf_bss;
-				if (clear_user((void __user *) elf_bss + load_bias, nbyte)) {
-					retval = -EFAULT;
-					send_sig(SIGKILL, current, 0);
-					goto out_free_dentry;
-				}
+				/*
+				 * This bss-zeroing can fail if the ELF file
+				 * specifies odd protections.  So we don't check
+				 * the return value
+				 */
+				(void)clear_user((void __user *)elf_bss +
+							load_bias, nbyte);
 			}
 		}
 
