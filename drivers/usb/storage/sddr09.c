@@ -65,6 +65,7 @@ struct nand_flash_dev {
  * NAND Flash Manufacturer ID Codes
  */
 #define NAND_MFR_AMD		0x01
+#define NAND_MFR_NS		0x8f
 #define NAND_MFR_TOSHIBA	0x98
 #define NAND_MFR_SAMSUNG	0xec
 
@@ -72,6 +73,8 @@ static inline char *nand_flash_manufacturer(int manuf_id) {
 	switch(manuf_id) {
 	case NAND_MFR_AMD:
 		return "AMD";
+	case NAND_MFR_NS:
+		return "NS";
 	case NAND_MFR_TOSHIBA:
 		return "Toshiba";
 	case NAND_MFR_SAMSUNG:
@@ -84,10 +87,12 @@ static inline char *nand_flash_manufacturer(int manuf_id) {
 /*
  * It looks like it is unnecessary to attach manufacturer to the
  * remaining data: SSFDC prescribes manufacturer-independent id codes.
+ *
+ * 256 MB NAND flash has a 5-byte ID with 2nd byte 0xaa, 0xba, 0xca or 0xda.
  */
 
 static struct nand_flash_dev nand_flash_ids[] = {
-	/* NAND flash - these I verified */
+	/* NAND flash */
 	{ 0x6e, 20, 8, 4, 8, 2},	/* 1 MB */
 	{ 0xe8, 20, 8, 4, 8, 2},	/* 1 MB */
 	{ 0xec, 20, 8, 4, 8, 2},	/* 1 MB */
@@ -101,12 +106,13 @@ static struct nand_flash_dev nand_flash_ids[] = {
 	{ 0x75, 25, 9, 5, 10, 2},	/* 32 MB */
 	{ 0x76, 26, 9, 5, 10, 3},	/* 64 MB */
 	{ 0x79, 27, 9, 5, 10, 3},	/* 128 MB */
-	/* There do also exist 96 MB (from Datafab) and 256 MB cards */
 
-	/* MASK ROM - from unknown source */
+	/* MASK ROM */
 	{ 0x5d, 21, 9, 4, 8, 2},	/* 2 MB */
 	{ 0xd5, 22, 9, 4, 9, 2},	/* 4 MB */
 	{ 0xd6, 23, 9, 4, 10, 2},	/* 8 MB */
+	{ 0x57, 24, 9, 4, 11, 2},	/* 16 MB */
+	{ 0x58, 25, 9, 4, 12, 2},	/* 32 MB */
 	{ 0,}
 };
 
