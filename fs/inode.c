@@ -453,7 +453,7 @@ static void prune_icache(int nr_to_scan)
 	dispose_list(&freeable);
 	up(&iprune_sem);
 
-	if (current_is_kswapd)
+	if (current_is_kswapd())
 		mod_page_state(kswapd_inodesteal, reap);
 	else
 		mod_page_state(pginodesteal, reap);
