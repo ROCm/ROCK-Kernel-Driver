@@ -1344,6 +1344,7 @@ static int rtl8139_open (struct net_device *dev)
 
 	rtl8139_init_ring (dev);
 	rtl8139_hw_start (dev);
+	netif_start_queue (dev);
 
 	if (netif_msg_ifup(tp))
 		printk(KERN_DEBUG "%s: rtl8139_open() ioaddr %#lx IRQ %d"
@@ -1433,8 +1434,6 @@ static void rtl8139_hw_start (struct net_device *dev)
 
 	/* Enable all known interrupts by setting the interrupt mask. */
 	RTL_W16 (IntrMask, rtl8139_intr_mask);
-
-	netif_start_queue (dev);
 }
 
 
