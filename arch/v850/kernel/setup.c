@@ -78,6 +78,9 @@ void __init setup_arch (char **cmdline)
 	/* ... and tell the kernel about it.  */
 	init_mem_alloc (ram_start, ram_len);
 
+	printk (KERN_INFO "CPU: %s\nPlatform: %s\n",
+		CPU_MODEL_LONG, PLATFORM_LONG);
+
 	/* do machine-specific setups.  */
 	mach_setup (cmdline);
 

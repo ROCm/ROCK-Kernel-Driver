@@ -73,8 +73,6 @@ void __init mach_early_init (void)
 
 void __init mach_setup (char **cmdline)
 {
-	printk (KERN_INFO "CPU: NEC V850E2 (NA85E2C FPGA implementation)\n");
-
 	memcons_setup ();
 
 	/* Setup up NMI0 to copy the registers to a known memory location.

@@ -60,12 +60,6 @@ void __init mach_early_init (void)
 
 void __init mach_setup (char **cmdline)
 {
-	printk (KERN_INFO
-		"CPU: %s\n"
-		"Platform: %s\n",
-		CPU_MODEL_LONG,
-		PLATFORM_LONG);
-
 #ifdef CONFIG_V850E_NB85E_UART_CONSOLE
 	nb85e_uart_cons_init (1);
 #endif

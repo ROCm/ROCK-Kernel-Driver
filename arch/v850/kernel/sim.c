@@ -42,8 +42,6 @@ void __init mach_setup (char **cmdline)
 	const char *err;
 	unsigned long root_dev_addr, root_dev_len;
 
-	printk (KERN_INFO "CPU: NEC V850E (GDB simulator)\n");
-
 	simcons_setup ();
 
 	printk (KERN_INFO "Reading root filesystem: %s", ROOT_FS);
