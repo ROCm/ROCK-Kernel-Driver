@@ -956,11 +956,11 @@ crmodverdir:
 
 .PHONY: $(objtree)/Module.symvers
 $(objtree)/Module.symvers:
-	@[ -e $(objtree)/Module.symvers ] || \
+	@test -e $(objtree)/Module.symvers || ( \
 	echo; \
 	echo "WARNING: Symbol version dump $(objtree)/Module.symvers is " \
 	     "missing, modules will have CONFIG_MODVERSIONS disabled."; \
-	echo
+	echo )
 
 module-dirs := $(addprefix _module_,$(KBUILD_EXTMOD))
 .PHONY: $(module-dirs) modules
