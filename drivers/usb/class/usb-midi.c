@@ -642,7 +642,7 @@ static loff_t usb_midi_llseek(struct file *file, loff_t offset, int origin)
  *
  **/
 
-static ssize_t usb_midi_read(struct file *file, char *buffer, size_t count, loff_t *ppos)
+static ssize_t usb_midi_read(struct file *file, char __user *buffer, size_t count, loff_t *ppos)
 {
 	struct usb_mididev *m = (struct usb_mididev *)file->private_data;
 	struct midi_in_endpoint *ep = m->min.ep;
@@ -725,7 +725,7 @@ static ssize_t usb_midi_read(struct file *file, char *buffer, size_t count, loff
  *
  **/
 
-static ssize_t usb_midi_write(struct file *file, const char *buffer, size_t count, loff_t *ppos)
+static ssize_t usb_midi_write(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
 {
 	struct usb_mididev *m = (struct usb_mididev *)file->private_data;
 	ssize_t ret;

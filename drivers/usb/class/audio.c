@@ -541,7 +541,7 @@ static void dmabuf_copyin(struct dmabuf *db, const void *buffer, unsigned int si
 			pgrem = rem;
 		memcpy((db->sgbuf[db->wrptr >> PAGE_SHIFT]) + (db->wrptr & (PAGE_SIZE-1)), buffer, pgrem);
 		size -= pgrem;
-		(char *)buffer += pgrem;
+		buffer += pgrem;
 		db->wrptr += pgrem;
 		if (db->wrptr >= db->dmasize)
 			db->wrptr = 0;
@@ -564,14 +564,14 @@ static void dmabuf_copyout(struct dmabuf *db, void *buffer, unsigned int size)
 			pgrem = rem;
 		memcpy(buffer, (db->sgbuf[db->rdptr >> PAGE_SHIFT]) + (db->rdptr & (PAGE_SIZE-1)), pgrem);
 		size -= pgrem;
-		(char *)buffer += pgrem;
+		buffer += pgrem;
 		db->rdptr += pgrem;
 		if (db->rdptr >= db->dmasize)
 			db->rdptr = 0;
 	}
 }
 
-static int dmabuf_copyin_user(struct dmabuf *db, unsigned int ptr, const void *buffer, unsigned int size)
+static int dmabuf_copyin_user(struct dmabuf *db, unsigned int ptr, const void __user *buffer, unsigned int size)
 {
 	unsigned int pgrem, rem;
 
@@ -589,14 +589,14 @@ static int dmabuf_copyin_user(struct dmabuf *db, unsigned int ptr, const void *b
 		if (copy_from_user((db->sgbuf[ptr >> PAGE_SHIFT]) + (ptr & (PAGE_SIZE-1)), buffer, pgrem))
 			return -EFAULT;
 		size -= pgrem;
-		(char *)buffer += pgrem;
+		buffer += pgrem;
 		ptr += pgrem;
 		if (ptr >= db->dmasize)
 			ptr = 0;
 	}
 }
 
-static int dmabuf_copyout_user(struct dmabuf *db, unsigned int ptr, void *buffer, unsigned int size)
+static int dmabuf_copyout_user(struct dmabuf *db, unsigned int ptr, void __user *buffer, unsigned int size)
 {
 	unsigned int pgrem, rem;
 
@@ -614,7 +614,7 @@ static int dmabuf_copyout_user(struct dmabuf *db, unsigned int ptr, void *buffer
 		if (copy_to_user(buffer, (db->sgbuf[ptr >> PAGE_SHIFT]) + (ptr & (PAGE_SIZE-1)), pgrem))
 			return -EFAULT;
 		size -= pgrem;
-		(char *)buffer += pgrem;
+		buffer += pgrem;
 		ptr += pgrem;
 		if (ptr >= db->dmasize)
 			ptr = 0;
@@ -2010,7 +2010,7 @@ static int usb_audio_ioctl_mixdev(struct inode *inode, struct file *file, unsign
 		strncpy(info.id, "USB_AUDIO", sizeof(info.id));
 		strncpy(info.name, "USB Audio Class Driver", sizeof(info.name));
 		info.modify_counter = ms->modcnt;
-		if (copy_to_user((void *)arg, &info, sizeof(info)))
+		if (copy_to_user((void __user *)arg, &info, sizeof(info)))
 			return -EFAULT;
 		return 0;
 	}
@@ -2018,7 +2018,7 @@ static int usb_audio_ioctl_mixdev(struct inode *inode, struct file *file, unsign
 		_old_mixer_info info;
 		strncpy(info.id, "USB_AUDIO", sizeof(info.id));
 		strncpy(info.name, "USB Audio Class Driver", sizeof(info.name));
-		if (copy_to_user((void *)arg, &info, sizeof(info)))
+		if (copy_to_user((void __user *)arg, &info, sizeof(info)))
 			return -EFAULT;
 		return 0;
 	}
@@ -2140,7 +2140,7 @@ static int drain_out(struct usb_audiodev *as, int nonblock)
 
 /* --------------------------------------------------------------------- */
 
-static ssize_t usb_audio_read(struct file *file, char *buffer, size_t count, loff_t *ppos)
+static ssize_t usb_audio_read(struct file *file, char __user *buffer, size_t count, loff_t *ppos)
 {
 	struct usb_audiodev *as = (struct usb_audiodev *)file->private_data;
 	DECLARE_WAITQUEUE(wait, current);
@@ -2208,7 +2208,7 @@ static ssize_t usb_audio_read(struct file *file, char *buffer, size_t count, lof
 	return ret;
 }
 
-static ssize_t usb_audio_write(struct file *file, const char *buffer, size_t count, loff_t *ppos)
+static ssize_t usb_audio_write(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
 {
 	struct usb_audiodev *as = (struct usb_audiodev *)file->private_data;
 	DECLARE_WAITQUEUE(wait, current);
@@ -2507,7 +2507,7 @@ static int usb_audio_ioctl(struct inode *inode, struct file *file, unsigned int 
 		abinfo.fragstotal = as->usbout.dma.numfrag;
 		abinfo.fragments = abinfo.bytes >> as->usbout.dma.fragshift;      
 		spin_unlock_irqrestore(&as->lock, flags);
-		return copy_to_user((void *)arg, &abinfo, sizeof(abinfo)) ? -EFAULT : 0;
+		return copy_to_user((void __user *)arg, &abinfo, sizeof(abinfo)) ? -EFAULT : 0;
 
 	case SNDCTL_DSP_GETISPACE:
 		if (!(file->f_mode & FMODE_READ))
@@ -2520,7 +2520,7 @@ static int usb_audio_ioctl(struct inode *inode, struct file *file, unsigned int 
 		abinfo.fragstotal = as->usbin.dma.numfrag;
 		abinfo.fragments = abinfo.bytes >> as->usbin.dma.fragshift;      
 		spin_unlock_irqrestore(&as->lock, flags);
-		return copy_to_user((void *)arg, &abinfo, sizeof(abinfo)) ? -EFAULT : 0;
+		return copy_to_user((void __user *)arg, &abinfo, sizeof(abinfo)) ? -EFAULT : 0;
 		
 	case SNDCTL_DSP_NONBLOCK:
 		file->f_flags |= O_NONBLOCK;
@@ -2544,7 +2544,7 @@ static int usb_audio_ioctl(struct inode *inode, struct file *file, unsigned int 
 		if (as->usbin.dma.mapped)
 			as->usbin.dma.count &= as->usbin.dma.fragsize-1;
 		spin_unlock_irqrestore(&as->lock, flags);
-		if (copy_to_user((void *)arg, &cinfo, sizeof(cinfo)))
+		if (copy_to_user((void __user *)arg, &cinfo, sizeof(cinfo)))
 			return -EFAULT;
 		return 0;
 
@@ -2558,7 +2558,7 @@ static int usb_audio_ioctl(struct inode *inode, struct file *file, unsigned int 
 		if (as->usbout.dma.mapped)
 			as->usbout.dma.count &= as->usbout.dma.fragsize-1;
 		spin_unlock_irqrestore(&as->lock, flags);
-		if (copy_to_user((void *)arg, &cinfo, sizeof(cinfo)))
+		if (copy_to_user((void __user *)arg, &cinfo, sizeof(cinfo)))
 			return -EFAULT;
 		return 0;
 

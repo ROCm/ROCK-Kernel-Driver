@@ -455,7 +455,7 @@ static int usblp_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 				if (length > _IOC_SIZE(cmd))
 					length = _IOC_SIZE(cmd); /* truncate */
 
-				if (copy_to_user((unsigned char *) arg,
+				if (copy_to_user((void __user *) arg,
 						usblp->device_id_string,
 						(unsigned long) length)) {
 					retval = -EFAULT;
@@ -479,7 +479,7 @@ static int usblp_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 						twoints[1] |= (1<<i);
 				}
 
-				if (copy_to_user((unsigned char *)arg,
+				if (copy_to_user((void __user *)arg,
 						(unsigned char *)twoints,
 						sizeof(twoints))) {
 					retval = -EFAULT;
@@ -540,7 +540,7 @@ static int usblp_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 				twoints[0] = usblp->dev->bus->busnum;
 				twoints[1] = usblp->dev->devnum;
-				if (copy_to_user((unsigned char *)arg,
+				if (copy_to_user((void __user *)arg,
 						(unsigned char *)twoints,
 						sizeof(twoints))) {
 					retval = -EFAULT;
@@ -560,7 +560,7 @@ static int usblp_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 				twoints[0] = usblp->dev->descriptor.idVendor;
 				twoints[1] = usblp->dev->descriptor.idProduct;
-				if (copy_to_user((unsigned char *)arg,
+				if (copy_to_user((void __user *)arg,
 						(unsigned char *)twoints,
 						sizeof(twoints))) {
 					retval = -EFAULT;
@@ -584,7 +584,7 @@ static int usblp_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 					goto done;
 				}
 				status = *usblp->statusbuf;
-				if (copy_to_user ((int *)arg, &status, sizeof(int)))
+				if (copy_to_user ((void __user *)arg, &status, sizeof(int)))
 					retval = -EFAULT;
 				break;
 
@@ -597,7 +597,7 @@ done:
 	return retval;
 }
 
-static ssize_t usblp_write(struct file *file, const char *buffer, size_t count, loff_t *ppos)
+static ssize_t usblp_write(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
 {
 	DECLARE_WAITQUEUE(wait, current);
 	struct usblp *usblp = file->private_data;
@@ -682,7 +682,7 @@ static ssize_t usblp_write(struct file *file, const char *buffer, size_t count, 
 	return count;
 }
 
-static ssize_t usblp_read(struct file *file, char *buffer, size_t count, loff_t *ppos)
+static ssize_t usblp_read(struct file *file, char __user *buffer, size_t count, loff_t *ppos)
 {
 	struct usblp *usblp = file->private_data;
 	DECLARE_WAITQUEUE(wait, current);
