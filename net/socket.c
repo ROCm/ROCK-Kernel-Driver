@@ -506,8 +506,13 @@ struct file_operations bad_sock_fops = {
  
 void sock_release(struct socket *sock)
 {
-	if (sock->ops) 
+	if (sock->ops) {
+		const int family = sock->ops->family;
+
 		sock->ops->release(sock);
+		sock->ops = NULL;
+		module_put(net_families[family]->owner);
+	}
 
 	if (sock->fasync_list)
 		printk(KERN_ERR "sock_release: fasync list not empty!\n");
@@ -1058,11 +1063,12 @@ int sock_create(int family, int type, int protocol, struct socket **res)
 
 	sock->type  = type;
 
+	i = -EBUSY;
+	if (!try_module_get(net_families[family]->owner))
+		goto out_release;
+
 	if ((i = net_families[family]->create(sock, protocol)) < 0) 
-	{
-		sock_release(sock);
-		goto out;
-	}
+		goto out_release;
 
 	*res = sock;
 	security_socket_post_create(sock, family, type, protocol);
@@ -1070,6 +1076,9 @@ int sock_create(int family, int type, int protocol, struct socket **res)
 out:
 	net_family_read_unlock();
 	return i;
+out_release:
+	sock_release(sock);
+	goto out;
 }
 
 asmlinkage long sys_socket(int family, int type, int protocol)
