@@ -164,7 +164,7 @@ struct _snd_fm801 {
 };
 
 static struct pci_device_id snd_fm801_ids[] __devinitdata = {
-	{ 0x1319, 0x0801, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },   /* FM801 */
+	{ 0x1319, 0x0801, PCI_ANY_ID, PCI_ANY_ID, PCI_CLASS_MULTIMEDIA_AUDIO << 8, 0xffff00, 0, },   /* FM801 */
 	{ 0, }
 };
 
