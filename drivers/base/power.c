@@ -22,6 +22,21 @@
 extern struct subsystem devices_subsys;
 
 /**
+ * We handle system devices differently - we suspend and shut them 
+ * down first and resume them first. That way, we do anything stupid like
+ * shutting down the interrupt controller before any devices..
+ *
+ * Note that there are not different stages for power management calls - 
+ * they only get one called once when interrupts are disabled. 
+ */
+
+extern int sysdev_shutdown(void);
+extern int sysdev_save(u32 state);
+extern int sysdev_suspend(u32 state);
+extern int sysdev_resume(void);
+extern int sysdev_restore(void);
+
+/**
  * device_suspend - suspend/remove all devices on the device ree
  * @state:	state we're entering
  * @level:	what stage of the suspend process we're at
@@ -50,6 +65,21 @@ int device_suspend(u32 state, u32 level)
 		}
 	}
 	up_write(&devices_subsys.rwsem);
+
+	/*
+	 * Make sure system devices are suspended.
+	 */
+	switch(level) {
+	case SUSPEND_SAVE_STATE:
+		sysdev_save(state);
+		break;
+	case SUSPEND_POWER_DOWN:
+		sysdev_suspend(state);
+		break;
+	default:
+		break;
+	}
+
 	return error;
 }
 
@@ -64,6 +94,17 @@ int device_suspend(u32 state, u32 level)
 void device_resume(u32 level)
 {
 	struct list_head * node;
+
+	switch (level) {
+	case RESUME_POWER_ON:
+		sysdev_resume();
+		break;
+	case RESUME_RESTORE_STATE:
+		sysdev_restore();
+		break;
+	default:
+		break;
+	}
 
 	down_write(&devices_subsys.rwsem);
 	list_for_each_prev(node,&devices_subsys.kset.list) {
@@ -98,6 +139,8 @@ void device_shutdown(void)
 			pr_debug("Ignored.\n");
 	}
 	up_write(&devices_subsys.rwsem);
+
+	sysdev_shutdown();
 }
 
 EXPORT_SYMBOL(device_suspend);

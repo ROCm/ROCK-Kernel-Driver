@@ -351,30 +351,6 @@ extern int (*platform_notify_remove)(struct device * dev);
 extern struct device * get_device(struct device * dev);
 extern void put_device(struct device * dev);
 
-/* drivers/base/sys.c */
-
-struct sys_root {
-	u32		id;
-	struct device 	dev;
-	struct device	sysdev;
-};
-
-extern int sys_register_root(struct sys_root *);
-extern void sys_unregister_root(struct sys_root *);
-
-
-struct sys_device {
-	char		* name;
-	u32		id;
-	struct sys_root	* root;
-	struct device	dev;
-	struct class_device class_dev;
-};
-
-extern int sys_device_register(struct sys_device *);
-extern void sys_device_unregister(struct sys_device *);
-
-extern struct bus_type system_bus_type;
 
 /* drivers/base/platform.c */
 
