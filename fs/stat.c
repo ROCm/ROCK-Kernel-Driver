@@ -320,7 +320,7 @@ static long cp_new_stat64(struct kstat *stat, struct stat64 __user *statbuf)
 	return copy_to_user(statbuf,&tmp,sizeof(tmp)) ? -EFAULT : 0;
 }
 
-asmlinkage long sys_stat64(char __user * filename, struct stat64 __user * statbuf, long flags)
+asmlinkage long sys_stat64(char __user * filename, struct stat64 __user * statbuf)
 {
 	struct kstat stat;
 	int error = vfs_stat(filename, &stat);
@@ -330,7 +330,7 @@ asmlinkage long sys_stat64(char __user * filename, struct stat64 __user * statbu
 
 	return error;
 }
-asmlinkage long sys_lstat64(char __user * filename, struct stat64 __user * statbuf, long flags)
+asmlinkage long sys_lstat64(char __user * filename, struct stat64 __user * statbuf)
 {
 	struct kstat stat;
 	int error = vfs_lstat(filename, &stat);
@@ -340,7 +340,7 @@ asmlinkage long sys_lstat64(char __user * filename, struct stat64 __user * statb
 
 	return error;
 }
-asmlinkage long sys_fstat64(unsigned long fd, struct stat64 __user * statbuf, long flags)
+asmlinkage long sys_fstat64(unsigned long fd, struct stat64 __user * statbuf)
 {
 	struct kstat stat;
 	int error = vfs_fstat(fd, &stat);
