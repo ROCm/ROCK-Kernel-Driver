@@ -136,7 +136,7 @@ void scsi_initialize_merge_fn(Scsi_Device * SDpnt)
  			 * hardware have no practical limit.
 			 */
 			bounce_limit = BLK_BOUNCE_ANY;
-		else
+		else if (SHpnt->pci_dev)
 			bounce_limit = SHpnt->pci_dev->dma_mask;
 	} else if (SHpnt->unchecked_isa_dma)
 		bounce_limit = BLK_BOUNCE_ISA;
