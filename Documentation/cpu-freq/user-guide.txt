@@ -119,7 +119,7 @@ the processor shall run at.
 The preferred interface is located in the sysfs filesystem. If you
 mounted it at /sys, the cpufreq interface is located in a subdirectory
 "cpufreq" within the cpu-device directory
-(e.g. /sys/devices/sys/cpu0/cpufreq/ for the first CPU).
+(e.g. /sys/class/cpu/cpu0/cpufreq/ for the first CPU).
 
 cpuinfo_min_freq :		this file shows the minimum operating
 				frequency the processor can run at(in kHz) 
