@@ -58,6 +58,6 @@ $(obj)/split-include $(obj)/docproc $(addprefix $(obj)/,$(tkparse-objs)) \
 $(obj)/conmakehash lxdialog: $(obj)/fixdep
 
 mrproper:
-	@rm -f $(addprefix $(obj)/,$(tkparse-objs) $(obj)/kconfig.tk core $(host-progs))
+	@rm -f $(host-progs) $(addprefix $(obj)/,$(tkparse-objs) kconfig.tk core)
 	@$(call descend,scripts/lxdialog,mrproper)
 
