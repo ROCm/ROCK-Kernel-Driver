@@ -37,7 +37,7 @@
 #undef DIRECT_HDMA
 
 #define DRV_NAME	"sata_promise"
-#define DRV_VERSION	"0.85"
+#define DRV_VERSION	"0.86"
 
 
 enum {
@@ -626,6 +626,7 @@ static void pdc20621_fill_sg(struct ata_queued_cmd *qc)
 	memcpy_toio(dimm_mmio + (portno * PDC_DIMM_WINDOW_STEP) +
 		    PDC_DIMM_HOST_PRD,
 		    &pp->dimm_buf[PDC_DIMM_HEADER_SZ], sgt_len);
+	readl(dimm_mmio);	/* flush */
 	VPRINTK("ata pkt buf ofs %u, prd size %u, mmio copied\n", i, sgt_len);
 }
 
@@ -711,6 +712,7 @@ static void pdc20621_dma_start(struct ata_queued_cmd *qc)
 	wmb();			/* flush PRD, pkt writes */
 
 	writel(0x00000001, mmio + PDC_20621_SEQCTL + (seq * 4));
+	readl(mmio + PDC_20621_SEQCTL + (seq * 4));	/* flush */
 
 	if (doing_hdma) {
 		pdc20621_dump_hdma(qc);
@@ -719,6 +721,7 @@ static void pdc20621_dma_start(struct ata_queued_cmd *qc)
 #else
 		writel(port_ofs + PDC_DIMM_HOST_PKT,
 		       mmio + PDC_HDMA_PKT_SUBMIT);
+		readl(mmio + PDC_HDMA_PKT_SUBMIT);	/* flush */
 #endif
 		VPRINTK("submitted ofs 0x%x (%u), seq %u\n",
 		port_ofs + PDC_DIMM_HOST_PKT,
@@ -727,6 +730,7 @@ static void pdc20621_dma_start(struct ata_queued_cmd *qc)
 	} else {
 		writel(port_ofs + PDC_DIMM_ATA_PKT,
 		       (void *) ap->ioaddr.cmd_addr + PDC_PKT_SUBMIT);
+		readl((void *) ap->ioaddr.cmd_addr + PDC_PKT_SUBMIT);
 		VPRINTK("submitted ofs 0x%x (%u), seq %u\n", 
 			port_ofs + PDC_DIMM_ATA_PKT,
 			port_ofs + PDC_DIMM_ATA_PKT,
@@ -765,11 +769,13 @@ static inline unsigned int pdc20621_host_intr( struct ata_port *ap,
 			/* submit hdma pkt */
 			pdc20621_dump_hdma(qc);
 			writel(0x00000001, mmio + PDC_20621_SEQCTL + (seq * 4));
+			readl(mmio + PDC_20621_SEQCTL + (seq * 4));
 #ifdef DIRECT_HDMA
 			pdc20621_push_hdma(qc);
 #else
 			writel(port_ofs + PDC_DIMM_HOST_PKT,
 			       mmio + PDC_HDMA_PKT_SUBMIT);
+			readl(mmio + PDC_HDMA_PKT_SUBMIT);
 #endif
 		}
 		handled = 1;
@@ -784,8 +790,10 @@ static inline unsigned int pdc20621_host_intr( struct ata_port *ap,
 
 			/* submit ata pkt */
 			writel(0x00000001, mmio + PDC_20621_SEQCTL + (seq * 4));
+			readl(mmio + PDC_20621_SEQCTL + (seq * 4));
 			writel(port_ofs + PDC_DIMM_ATA_PKT,
 			       (void *) ap->ioaddr.cmd_addr + PDC_PKT_SUBMIT);
+			readl((void *) ap->ioaddr.cmd_addr + PDC_PKT_SUBMIT);
 		}
 		
 		/* step two - execute ATA command */
@@ -1039,10 +1047,12 @@ static void pdc_dma_start(struct ata_queued_cmd *qc)
 	VPRINTK("ENTER, ap %p\n", ap);
 
 	writel(0x00000001, ap->host_set->mmio_base + (seq * 4));
+	readl(ap->host_set->mmio_base + (seq * 4));	/* flush */
 
 	pp->pkt[2] = seq;
 	wmb();			/* flush PRD, pkt writes */
 	writel(pp->pkt_dma, (void *) ap->ioaddr.cmd_addr + PDC_PKT_SUBMIT);
+	readl((void *) ap->ioaddr.cmd_addr + PDC_PKT_SUBMIT); /* flush */
 }
 
 static void pdc_tf_load_mmio(struct ata_port *ap, struct ata_taskfile *tf)
