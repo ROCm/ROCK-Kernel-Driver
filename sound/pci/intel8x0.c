@@ -1024,8 +1024,10 @@ static void snd_intel8x0_setup_pcm_out(intel8x0_t *chip,
 			/* reset to 2ch once to keep the 6 channel data in alignment,
 			 * to start from Front Left always
 			 */
-			iputdword(chip, ICHREG(GLOB_CNT), (cnt & 0xcfffff));
-			mdelay(50); /* grrr... */
+			if (cnt & ICH_PCM_246_MASK) {
+				iputdword(chip, ICHREG(GLOB_CNT), cnt & ~ICH_PCM_246_MASK);
+				msleep(50); /* grrr... */
+			}
 		} else if (chip->device_type == DEVICE_INTEL_ICH4) {
 			if (sample_bits > 16)
 				cnt |= ICH_PCM_20BIT;
