@@ -33,8 +33,8 @@ int llc_sap_ev_rx_ui(struct llc_sap *sap, struct sk_buff *skb)
 	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
 	struct llc_pdu_un *pdu = llc_pdu_un_hdr(skb);
 
-	return ev->type == LLC_SAP_EV_TYPE_PDU && !LLC_PDU_IS_CMD(pdu) &&
-	       !LLC_PDU_TYPE_IS_U(pdu) &&
+	return ev->type == LLC_SAP_EV_TYPE_PDU && LLC_PDU_IS_CMD(pdu) &&
+	       LLC_PDU_TYPE_IS_U(pdu) &&
 	       LLC_U_PDU_CMD(pdu) == LLC_1_PDU_CMD_UI ? 0 : 1;
 }
 
@@ -62,8 +62,8 @@ int llc_sap_ev_rx_xid_c(struct llc_sap *sap, struct sk_buff *skb)
 	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
 	struct llc_pdu_un *pdu = llc_pdu_un_hdr(skb);
 
-	return ev->type == LLC_SAP_EV_TYPE_PDU && !LLC_PDU_IS_CMD(pdu) &&
-	       !LLC_PDU_TYPE_IS_U(pdu) &&
+	return ev->type == LLC_SAP_EV_TYPE_PDU && LLC_PDU_IS_CMD(pdu) &&
+	       LLC_PDU_TYPE_IS_U(pdu) &&
 	       LLC_U_PDU_CMD(pdu) == LLC_1_PDU_CMD_XID ? 0 : 1;
 }
 
@@ -72,8 +72,8 @@ int llc_sap_ev_rx_xid_r(struct llc_sap *sap, struct sk_buff *skb)
 	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
 	struct llc_pdu_un *pdu = llc_pdu_un_hdr(skb);
 
-	return ev->type == LLC_SAP_EV_TYPE_PDU && !LLC_PDU_IS_RSP(pdu) &&
-	       !LLC_PDU_TYPE_IS_U(pdu) &&
+	return ev->type == LLC_SAP_EV_TYPE_PDU && LLC_PDU_IS_RSP(pdu) &&
+	       LLC_PDU_TYPE_IS_U(pdu) &&
 	       LLC_U_PDU_RSP(pdu) == LLC_1_PDU_CMD_XID ? 0 : 1;
 }
 
@@ -91,8 +91,8 @@ int llc_sap_ev_rx_test_c(struct llc_sap *sap, struct sk_buff *skb)
 	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
 	struct llc_pdu_un *pdu = llc_pdu_un_hdr(skb);
 
-	return ev->type == LLC_SAP_EV_TYPE_PDU && !LLC_PDU_IS_CMD(pdu) &&
-	       !LLC_PDU_TYPE_IS_U(pdu) &&
+	return ev->type == LLC_SAP_EV_TYPE_PDU && LLC_PDU_IS_CMD(pdu) &&
+	       LLC_PDU_TYPE_IS_U(pdu) &&
 	       LLC_U_PDU_CMD(pdu) == LLC_1_PDU_CMD_TEST ? 0 : 1;
 }
 
@@ -101,8 +101,8 @@ int llc_sap_ev_rx_test_r(struct llc_sap *sap, struct sk_buff *skb)
 	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
 	struct llc_pdu_un *pdu = llc_pdu_un_hdr(skb);
 
-	return ev->type == LLC_SAP_EV_TYPE_PDU && !LLC_PDU_IS_RSP(pdu) &&
-	       !LLC_PDU_TYPE_IS_U(pdu) &&
+	return ev->type == LLC_SAP_EV_TYPE_PDU && LLC_PDU_IS_RSP(pdu) &&
+	       LLC_PDU_TYPE_IS_U(pdu) &&
 	       LLC_U_PDU_RSP(pdu) == LLC_1_PDU_CMD_TEST ? 0 : 1;
 }
 
