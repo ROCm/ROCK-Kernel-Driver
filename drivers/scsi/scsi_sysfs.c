@@ -246,7 +246,6 @@ sdev_rd_attr (device_blocked, "%d\n");
 sdev_rd_attr (queue_depth, "%d\n");
 sdev_rd_attr (type, "%d\n");
 sdev_rd_attr (scsi_level, "%d\n");
-sdev_rd_attr (access_count, "%d\n");
 sdev_rd_attr (vendor, "%.8s\n");
 sdev_rd_attr (model, "%.16s\n");
 sdev_rd_attr (rev, "%.4s\n");
@@ -265,17 +264,14 @@ static ssize_t sdev_store_delete(struct device *dev, const char *buf,
 				 size_t count)
 {
 	struct scsi_device *sdev = to_scsi_device(dev);
-	int res = count;
 
-	if (sdev->access_count)
-		/*
-		 * FIXME and scsi_proc.c: racey use of access_count,
-		 * possibly add a new arg to scsi_remove_device.
-		 */
-		res = -EBUSY;
-	else
-		scsi_remove_device(sdev);
-	return res;
+	/*
+	 * FIXME and scsi_proc.c: racey use of access_count,
+	 */
+	if (atomic_read(&sdev->access_count))
+		return -EBUSY;
+	scsi_remove_device(sdev);
+	return count;
 };
 static DEVICE_ATTR(delete, S_IWUSR, NULL, sdev_store_delete);
 
@@ -285,7 +281,6 @@ static struct device_attribute *scsi_sysfs_sdev_attrs[] = {
 	&dev_attr_queue_depth,
 	&dev_attr_type,
 	&dev_attr_scsi_level,
-	&dev_attr_access_count,
 	&dev_attr_vendor,
 	&dev_attr_model,
 	&dev_attr_rev,
@@ -415,7 +410,7 @@ void scsi_remove_device(struct scsi_device *sdev)
 	if (class) {
 		down_write(&class->subsys.rwsem);
 		set_bit(SDEV_DEL, &sdev->sdev_state);
-		if (sdev->access_count == 0)
+		if (atomic_read(&sdev->access_count))
 			device_del(&sdev->sdev_gendev);
 		up_write(&class->subsys.rwsem);
 	}

@@ -196,6 +196,7 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 		goto out;
 
 	memset(sdev, 0, sizeof(*sdev));
+	atomic_set(&sdev->access_count, 0);
 	sdev->vendor = scsi_null_device_strs;
 	sdev->model = scsi_null_device_strs;
 	sdev->rev = scsi_null_device_strs;

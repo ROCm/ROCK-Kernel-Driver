@@ -4,6 +4,7 @@
 #include <linux/device.h>
 #include <linux/list.h>
 #include <linux/spinlock.h>
+#include <asm/atomic.h>
 
 struct request_queue;
 struct scsi_cmnd;
@@ -44,7 +45,7 @@ struct scsi_device {
 					 * vendor-specific cmd's */
 	unsigned sector_size;	/* size in bytes */
 
-	int access_count;	/* Count of open channels/mounts */
+	atomic_t access_count;	/* Count of open channels/mounts */
 
 	void *hostdata;		/* available to low-level driver */
 	char devfs_name[256];	/* devfs junk */

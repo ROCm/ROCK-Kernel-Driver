@@ -215,7 +215,7 @@ static int scsi_remove_single_device(uint host, uint channel, uint id, uint lun)
 	sdev = scsi_find_device(shost, channel, id, lun);
 	if (!sdev)
 		goto out;
-	if (sdev->access_count)
+	if (atomic_read(&sdev->access_count))
 		goto out;
 
 	scsi_remove_device(sdev);

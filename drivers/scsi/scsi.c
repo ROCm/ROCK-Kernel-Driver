@@ -889,21 +889,24 @@ int scsi_track_queue_full(struct scsi_device *sdev, int depth)
 int scsi_device_get(struct scsi_device *sdev)
 {
 	struct class *class = class_get(&sdev_class);
-	int error = -ENXIO;
 
-	if (class) {
-		down_write(&class->subsys.rwsem);
-		if (!test_bit(SDEV_DEL, &sdev->sdev_state))
-			if (try_module_get(sdev->host->hostt->module)) 
-				if (get_device(&sdev->sdev_gendev)) {
-					sdev->access_count++;
-					error = 0;
-				}
-		up_write(&class->subsys.rwsem);
-		class_put(&sdev_class);
-	}
+	if (!class)
+		goto out;
+	if (test_bit(SDEV_DEL, &sdev->sdev_state))
+		goto out;
+	if (!try_module_get(sdev->host->hostt->module))
+		goto out;
+	if (!get_device(&sdev->sdev_gendev))
+		goto out_put_module;
+	atomic_inc(&sdev->access_count);
+	class_put(&sdev_class);
+	return 0;
 
-	return error;
+ out_put_module:
+	module_put(sdev->host->hostt->module);
+ out:
+	class_put(&sdev_class);
+	return -ENXIO;
 }
 
 void scsi_device_put(struct scsi_device *sdev)
@@ -913,15 +916,11 @@ void scsi_device_put(struct scsi_device *sdev)
 	if (!class)
 		return;
 
-	down_write(&class->subsys.rwsem);
 	module_put(sdev->host->hostt->module);
-	if (--sdev->access_count == 0) {
+	if (atomic_dec_and_test(&sdev->access_count))
 		if (test_bit(SDEV_DEL, &sdev->sdev_state))
 			device_del(&sdev->sdev_gendev);
-	}
 	put_device(&sdev->sdev_gendev);
-	up_write(&class->subsys.rwsem);
-
 	class_put(&sdev_class);
 }
 
