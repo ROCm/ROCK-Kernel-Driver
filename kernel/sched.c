@@ -40,6 +40,7 @@
 #include <linux/cpu.h>
 #include <linux/percpu.h>
 #include <linux/kthread.h>
+#include <linux/stop_machine.h>
 
 #ifdef CONFIG_NUMA_SCHED
 #define cpu_to_node_mask(cpu) node_to_cpumask(cpu_to_node(cpu))
@@ -484,22 +485,10 @@ inline int task_curr(task_t *p)
 }
 
 #ifdef CONFIG_SMP
-enum request_type {
-	REQ_MOVE_TASK,
-	REQ_SET_DOMAIN,
-};
-
 typedef struct {
 	struct list_head list;
-	enum request_type type;
-
-	/* For REQ_MOVE_TASK */
 	task_t *task;
 	int dest_cpu;
-
-	/* For REQ_SET_DOMAIN */
-	struct sched_domain *sd;
-
 	struct completion done;
 } migration_req_t;
 
@@ -521,7 +510,6 @@ static int migrate_task(task_t *p, int dest_cpu, migration_req_t *req)
 	}
 
 	init_completion(&req->done);
-	req->type = REQ_MOVE_TASK;
 	req->task = p;
 	req->dest_cpu = dest_cpu;
 	list_add(&req->list, &rq->migration_queue);
@@ -3382,14 +3370,7 @@ static int migration_thread(void * data)
 
 		spin_unlock(&rq->lock);
 
-		if (req->type == REQ_MOVE_TASK) {
-			__migrate_task(req->task, req->dest_cpu);
-		} else if (req->type == REQ_SET_DOMAIN) {
-			rq->sd = req->sd;
-		} else {
-			WARN_ON(1);
-		}
-
+		__migrate_task(req->task, req->dest_cpu);
 		local_irq_enable();
 
 		complete(&req->done);
@@ -3530,33 +3511,7 @@ EXPORT_SYMBOL(kernel_flag);
 /* Attach the domain 'sd' to 'cpu' as its base domain */
 void cpu_attach_domain(struct sched_domain *sd, int cpu)
 {
-	migration_req_t req;
-	unsigned long flags;
-	runqueue_t *rq = cpu_rq(cpu);
-	int local = 1;
-
-	lock_cpu_hotplug();
-
-	spin_lock_irqsave(&rq->lock, flags);
-
-	if (cpu == smp_processor_id() || cpu_is_offline(cpu)) {
-		rq->sd = sd;
-	} else {
-		init_completion(&req.done);
-		req.type = REQ_SET_DOMAIN;
-		req.sd = sd;
-		list_add(&req.list, &rq->migration_queue);
-		local = 0;
-	}
-
-	spin_unlock_irqrestore(&rq->lock, flags);
-
-	if (!local) {
-		wake_up_process(rq->migration_thread);
-		wait_for_completion(&req.done);
-	}
-
-	unlock_cpu_hotplug();
+	cpu_rq(cpu)->sd = sd;
 }
 
 #ifdef ARCH_HAS_SCHED_DOMAIN
@@ -3758,15 +3713,18 @@ void sched_domain_debug(void)
 #define sched_domain_debug() {}
 #endif
 
-void __init sched_init_smp(void)
+static int __init init_sched_domains(void *unused)
 {
+	/* Interrupts disabled, CPUs stopped.  We can safely switch over. */
 	arch_init_sched_domains();
 	sched_domain_debug();
+	return 0;
 }
-#else
-void __init sched_init_smp(void)
+static int __init sched_init_smp(void)
 {
+	return stop_machine_run(init_sched_domains, NULL, NR_CPUS);
 }
+__initcall(sched_init_smp);
 #endif /* CONFIG_SMP */
 
 void __init sched_init(void)

@@ -657,7 +657,6 @@ static int init(void * unused)
 	do_pre_smp_initcalls();
 
 	smp_init();
-	sched_init_smp();
 	do_basic_setup();
 
        /*

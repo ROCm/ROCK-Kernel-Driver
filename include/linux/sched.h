@@ -154,7 +154,6 @@ extern spinlock_t mmlist_lock;
 typedef struct task_struct task_t;
 
 extern void sched_init(void);
-extern void sched_init_smp(void);
 extern void init_idle(task_t *idle, int cpu);
 
 extern void show_state(void);
