@@ -1,3 +1,6 @@
+Version 0.86
+------------
+Fix oops on empty file readahead.  Fix for file size handling for locally cached files.
 Version 0.85
 ------------
 Fix oops in mkdir when server fails to return inode info. Fix oops in reopen_files

@@ -43,6 +43,9 @@ cifs_get_inode_info_unix(struct inode **pinode,
 	struct cifs_sb_info *cifs_sb = CIFS_SB(sb);
 	char *tmp_path;
 
+/* BB add caching check so we do not go to server to overwrite inode info to cached file
+	where the local file sizes are correct and the server info is stale  BB */
+
 	xid = GetXid();
 
 	pTcon = cifs_sb->tcon;
@@ -169,7 +172,15 @@ cifs_get_inode_info(struct inode **pinode, const unsigned char *search_path,
 	xid = GetXid();
 
 	pTcon = cifs_sb->tcon;
-	cFYI(1, (" Getting info on %s ", search_path));
+	cFYI(1,("Getting info on %s ", search_path));
+
+	if((pfindData == NULL) && (*pinode != NULL)) {
+		if(CIFS_I(*pinode)->clientCanCacheRead) {
+			cFYI(1,("No need to revalidate inode sizes on cached file "));
+			FreeXid(xid);
+			return rc;
+		}
+	}
 
 	/* if file info not passed in then get it from server */
 	if(pfindData == NULL) {

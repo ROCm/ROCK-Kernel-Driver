@@ -50,6 +50,7 @@ cifs_open(struct inode *inode, struct file *file)
 	int desiredAccess = 0x20197;
 	int disposition = FILE_OPEN;
 	__u16 netfid;
+	FILE_ALL_INFO * buf = NULL;
 
 	xid = GetXid();
 
@@ -117,11 +118,12 @@ cifs_open(struct inode *inode, struct file *file)
 
 	/* BB pass O_SYNC flag through on file attributes .. BB */
 
-	/* BB add code to refresh inode by passing in file_info buf on open 
+	/* Also refresh inode by passing in file_info buf returned by SMBOpen 
 	   and calling get_inode_info with returned buf (at least 
 	   helps non-Unix server case */
+        buf = kmalloc(sizeof(FILE_ALL_INFO),GFP_KERNEL);
 	rc = CIFSSMBOpen(xid, pTcon, full_path, disposition, desiredAccess,
-			CREATE_NOT_DIR, &netfid, &oplock, NULL, cifs_sb->local_nls);
+			CREATE_NOT_DIR, &netfid, &oplock, buf, cifs_sb->local_nls);
 	if (rc) {
 		cFYI(1, ("cifs_open returned 0x%x ", rc));
 		cFYI(1, ("oplock: %d ", oplock));	
@@ -140,8 +142,22 @@ cifs_open(struct inode *inode, struct file *file)
 			write_lock(&GlobalSMBSeslock);
 			list_add(&pCifsFile->tlist,&pTcon->openFileList);
 			pCifsInode = CIFS_I(file->f_dentry->d_inode);
-			if(pCifsInode->openFileList.next)
+			if(pCifsInode) {
+		                if (pTcon->ses->capabilities & CAP_UNIX)
+					rc = cifs_get_inode_info_unix(&file->f_dentry->d_inode,
+						full_path, inode->i_sb);
+				else
+					rc = cifs_get_inode_info(&file->f_dentry->d_inode,
+						full_path, buf, inode->i_sb);
+
 				list_add(&pCifsFile->flist,&pCifsInode->openFileList);
+				if(oplock == OPLOCK_EXCLUSIVE) {
+					pCifsInode->clientCanCacheAll = TRUE;
+					pCifsInode->clientCanCacheRead = TRUE;
+					cFYI(1,("Exclusive Oplock granted on inode %p",file->f_dentry->d_inode));
+				} else if(oplock == OPLOCK_READ)
+					pCifsInode->clientCanCacheRead = TRUE;
+			}
 			write_unlock(&GlobalSMBSeslock);
 			write_unlock(&file->f_owner.lock);
 			if(file->f_flags & O_CREAT) {           
@@ -162,6 +178,8 @@ cifs_open(struct inode *inode, struct file *file)
 		}
 	}
 
+	if (buf)
+		kfree(buf);
 	if (full_path)
 		kfree(full_path);
 	FreeXid(xid);
@@ -245,6 +263,13 @@ cifs_close(struct inode *inode, struct file *file)
 	} else
 		rc = -EBADF;
 
+	if(list_empty(&(CIFS_I(inode)->openFileList))) {
+		cFYI(1,("closing last open instance for inode %p",inode));
+		/* if the file is not open we do not know if we can cache
+		info on this inode, much less write behind and read ahead */
+		CIFS_I(inode)->clientCanCacheRead = FALSE;
+		CIFS_I(inode)->clientCanCacheAll  = FALSE;
+	}
 	if((rc ==0) && CIFS_I(inode)->write_behind_rc)
 		rc = CIFS_I(inode)->write_behind_rc;
 	FreeXid(xid);
@@ -837,7 +862,13 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 				break;
 			}
 		} else {
-			cFYI(1,("No bytes read"));
+			cFYI(1,("No bytes read cleaning remaining pages off readahead list"));
+			/* BB turn off caching and do new lookup on file size at server? */
+			while (!list_empty(page_list) && (i < num_pages)) {
+				page = list_entry(page_list->prev, struct page, list);
+				list_del(&page->list);
+			}
+
 			break;
 		}
 		if(smb_read_data) {

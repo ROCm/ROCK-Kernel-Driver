@@ -201,10 +201,11 @@ cifs_alloc_inode(struct super_block *sb)
 	cifs_inode->cifsAttrs = 0x20;	/* default */
 	atomic_set(&cifs_inode->inUse, 0);
 	cifs_inode->time = 0;
-	if(oplockEnabled) {
-		cifs_inode->clientCanCacheRead = 1;
-		cifs_inode->clientCanCacheAll = 1;
-	}
+	/* Until the file is open and we have gotten oplock
+	info back from the server, can not assume caching of
+	file data or metadata */
+	cifs_inode->clientCanCacheRead = FALSE;
+	cifs_inode->clientCanCacheAll = FALSE;
 	INIT_LIST_HEAD(&cifs_inode->openFileList);
 	return &cifs_inode->vfs_inode;
 }

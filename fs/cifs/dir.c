@@ -144,7 +144,7 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode,
 	full_path = build_path_from_dentry(direntry);
 
 	if(nd) { 
-		cFYI(1,("In create nd flags = 0x%x for %s",nd->flags,full_path));
+		cFYI(1,("In create for inode %p dentry->inode %p nd flags = 0x%x for %s",inode, direntry->d_inode, nd->flags,full_path));
 
 		if ((nd->intent.open.flags & O_ACCMODE) == O_RDONLY)
                 	desiredAccess = GENERIC_READ;
@@ -165,6 +165,8 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode,
 	if (rc) {
 		cFYI(1, ("cifs_create returned 0x%x ", rc));
 	} else {
+	/* BB for case of overwriting existing file can we use the inode that was
+		 passed in rather than creating new one?? */
 		if (pTcon->ses->capabilities & CAP_UNIX)
 			rc = cifs_get_inode_info_unix(&newinode, full_path,
 						      inode->i_sb);
@@ -195,8 +197,15 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode,
 				write_lock(&GlobalSMBSeslock);
 				list_add(&pCifsFile->tlist,&pTcon->openFileList);
 				pCifsInode = CIFS_I(newinode);
-				if(pCifsInode)
+				if(pCifsInode) {
 					list_add(&pCifsFile->flist,&pCifsInode->openFileList);
+					if(oplock == OPLOCK_EXCLUSIVE) {
+						pCifsInode->clientCanCacheAll = TRUE;
+						pCifsInode->clientCanCacheRead = TRUE;
+						cFYI(1,("Exclusive Oplock granted on inode %p",newinode));
+					} else if(oplock == OPLOCK_READ)
+						pCifsInode->clientCanCacheRead = TRUE;
+				}
 				write_unlock(&GlobalSMBSeslock);
 				if (cifs_sb->tcon->ses->capabilities & CAP_UNIX)                
 					CIFSSMBUnixSetPerms(xid, pTcon, full_path, inode->i_mode,
