@@ -1341,11 +1341,11 @@ mptscsih_remove(struct pci_dev *pdev)
 
 	hd = (MPT_SCSI_HOST *)host->hostdata;
 	if (hd != NULL) {
-		int sz1, sz3, sztarget=0;
+		int sz1;
 
 		mptscsih_shutdown(&pdev->dev);
 
-		sz1 = sz3 = 0;
+		sz1=0;
 
 		if (hd->ScsiLookup != NULL) {
 			sz1 = hd->ioc->req_depth * sizeof(void *);
@@ -1354,36 +1354,16 @@ mptscsih_remove(struct pci_dev *pdev)
 		}
 
 		if (hd->Targets != NULL) {
-			int max, ii;
-
-			/*
-			 * Free any target structures that were allocated.
-			 */
-			if (hd->is_spi) {
-				max = MPT_MAX_SCSI_DEVICES;
-			} else {
-				max = MPT_MAX_FC_DEVICES<256 ? MPT_MAX_FC_DEVICES : 255;
-			}
-			for (ii=0; ii < max; ii++) {
-				if (hd->Targets[ii]) {
-					kfree(hd->Targets[ii]);
-					hd->Targets[ii] = NULL;
-					sztarget += sizeof(VirtDevice);
-				}
-			}
-
 			/*
 			 * Free pointer array.
 			 */
-			sz3 = max * sizeof(void *);
 			kfree(hd->Targets);
 			hd->Targets = NULL;
 		}
 
 		dprintk((MYIOC_s_INFO_FMT 
-		    "Free'd ScsiLookup (%d) Target (%d+%d) memory\n",
-		    hd->ioc->name, sz1, sz3, sztarget));
-		dprintk(("Free'd done and free Q (%d) memory\n", szQ));
+		    "Free'd ScsiLookup (%d) memory\n",
+		    hd->ioc->name, sz1));
 
 		/* NULL the Scsi_Host pointer
 		 */
@@ -2595,39 +2575,56 @@ static int
 mptscsih_slave_alloc(struct scsi_device *device)
 {
 	struct Scsi_Host	*host = device->host;
-	MPT_SCSI_HOST		*hd;
+	MPT_SCSI_HOST		*hd = (MPT_SCSI_HOST *)host->hostdata;
 	VirtDevice		*vdev;
-
-	hd = (MPT_SCSI_HOST *)host->hostdata;
+	uint			target = device->id;
 
 	if (hd == NULL)
 		return -ENODEV;
 
-	if ((vdev = hd->Targets[device->id]) == NULL) {
-		if ((vdev = kmalloc(sizeof(VirtDevice), GFP_ATOMIC)) == NULL) {
-			printk(MYIOC_s_ERR_FMT "slave_alloc kmalloc(%d) FAILED!\n",
-			hd->ioc->name, (int)sizeof(VirtDevice));
-			return -ENOMEM;
-		} else {
-			memset(vdev, 0, sizeof(VirtDevice));
-			vdev->tflags = MPT_TARGET_FLAGS_Q_YES;
-			vdev->ioc_id = hd->ioc->id;
-			vdev->target_id = device->id;
-			vdev->bus_id = device->channel;
-			vdev->raidVolume = 0;
-			hd->Targets[device->id] = vdev;
-			if (hd->is_spi) {
-				if (hd->ioc->spi_data.isRaid & (1 << device->id)) {
-					vdev->raidVolume = 1;
-					ddvtprintk((KERN_INFO
-					    "RAID Volume @ id %d\n", device->id));
-				}
-			} else {
-				vdev->tflags |= MPT_TARGET_FLAGS_VALID_INQUIRY;
-			}
-		}
+	if ((vdev = hd->Targets[target]) != NULL)
+		goto out;
+
+	vdev = kmalloc(sizeof(VirtDevice), GFP_KERNEL);
+	if (!vdev) {
+		printk(MYIOC_s_ERR_FMT "slave_alloc kmalloc(%zd) FAILED!\n",
+				hd->ioc->name, sizeof(VirtDevice));
+		return -ENOMEM;
 	}
+
+	memset(vdev, 0, sizeof(VirtDevice));
+	vdev->tflags = MPT_TARGET_FLAGS_Q_YES;
+	vdev->ioc_id = hd->ioc->id;
+	vdev->target_id = device->id;
+	vdev->bus_id = device->channel;
+	vdev->raidVolume = 0;
+	hd->Targets[device->id] = vdev;
+	if (hd->is_spi) {
+		if (hd->ioc->spi_data.isRaid & (1 << device->id)) {
+			vdev->raidVolume = 1;
+			ddvtprintk((KERN_INFO
+			    "RAID Volume @ id %d\n", device->id));
+		}
+	} else {
+		vdev->tflags |= MPT_TARGET_FLAGS_VALID_INQUIRY;
+	}
+
+ out:
 	vdev->num_luns++;
+	return 0;
+}
+
+static int mptscsih_is_raid_volume(MPT_SCSI_HOST *hd, uint id)
+{
+	int i;
+
+	if (!hd->ioc->spi_data.isRaid || !hd->ioc->spi_data.pIocPg3)
+		return 0;
+
+	for (i = 0; i < hd->ioc->spi_data.pIocPg3->NumPhysDisks; i++) {
+		if (id == hd->ioc->spi_data.pIocPg3->PhysDisk[i].PhysDiskID)
+			return 1;
+	}
 
 	return 0;
 }
@@ -2640,59 +2637,37 @@ static void
 mptscsih_slave_destroy(struct scsi_device *device)
 {
 	struct Scsi_Host	*host = device->host;
-	MPT_SCSI_HOST		*hd;
+	MPT_SCSI_HOST		*hd = (MPT_SCSI_HOST *)host->hostdata;
 	VirtDevice		*vdev;
-	int 			raid_volume=0;
-
-	hd = (MPT_SCSI_HOST *)host->hostdata;
+	uint			target = device->id;
+	uint			lun = device->lun;
 
 	if (hd == NULL)
 		return;
 
-	mptscsih_search_running_cmds(hd, device->id, device->lun);
+	mptscsih_search_running_cmds(hd, target, lun);
 
-	/* Free memory and reset all flags for this target
-	 */
-	if ((vdev = hd->Targets[device->id]) != NULL) {
-		vdev->num_luns--;
+	vdev = hd->Targets[target];
+	vdev->luns[0] &= ~(1 << lun);
+	if (--vdev->num_luns)
+		return;
 
-		if (vdev->luns[0] & (1 << device->lun))
-			vdev->luns[0] &= ~(1 << device->lun);
-
-		/* Free device structure only if number of luns is 0.
-		 */
-		if (vdev->num_luns == 0) {
-			kfree(hd->Targets[device->id]);
-			hd->Targets[device->id] = NULL;
-
-			if (!hd->is_spi)
-				return;
-
-			if((hd->ioc->spi_data.isRaid) && (hd->ioc->spi_data.pIocPg3)) {
-			int i;
-				for(i=0;i<hd->ioc->spi_data.pIocPg3->NumPhysDisks &&
-					raid_volume==0;i++)
-
-					if(device->id ==
-					  hd->ioc->spi_data.pIocPg3->PhysDisk[i].PhysDiskID) {
-						raid_volume=1;
-						hd->ioc->spi_data.forceDv |=
-						  MPT_SCSICFG_RELOAD_IOC_PG3;
-					}
-			}
-
-			if(!raid_volume){
-				hd->ioc->spi_data.dvStatus[device->id] =
+	kfree(hd->Targets[target]);
+	hd->Targets[target] = NULL;
+	
+	if (hd->is_spi) {
+		if (mptscsih_is_raid_volume(hd, target)) {
+			hd->ioc->spi_data.forceDv |= MPT_SCSICFG_RELOAD_IOC_PG3;
+		} else {
+			hd->ioc->spi_data.dvStatus[target] =
 				MPT_SCSICFG_NEGOTIATE;
 
-				if (hd->negoNvram == 0)
-					hd->ioc->spi_data.dvStatus[device->id]
-					|= MPT_SCSICFG_DV_NOT_DONE;
+			if (!hd->negoNvram) {
+				hd->ioc->spi_data.dvStatus[target] |=
+					MPT_SCSICFG_DV_NOT_DONE;
 			}
 		}
 	}
-
-	return;
 }
 
 static void
@@ -2702,7 +2677,7 @@ mptscsih_set_queue_depth(struct scsi_device *device, MPT_SCSI_HOST *hd,
 	int	max_depth;
 	int	tagged;
 
-	if ( hd->is_spi ) {
+	if (hd->is_spi) {
 		if (pTarget->tflags & MPT_TARGET_FLAGS_VALID_INQUIRY) {
 			if (!(pTarget->tflags & MPT_TARGET_FLAGS_Q_YES))
 				max_depth = 1;
@@ -2816,7 +2791,6 @@ mptscsih_store_queue_depth(struct device *dev, const char *buf, size_t count)
 		pTarget, depth);
 	return count;
 }
-
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
