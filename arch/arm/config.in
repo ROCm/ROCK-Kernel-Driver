@@ -63,11 +63,6 @@ dep_bool '  ADS Bitsy' CONFIG_SA1100_ADSBITSY $CONFIG_ARCH_SA1100
 dep_bool '  Brutus' CONFIG_SA1100_BRUTUS $CONFIG_ARCH_SA1100
 dep_bool '  CerfBoard' CONFIG_SA1100_CERF $CONFIG_ARCH_SA1100
 if [ "$CONFIG_SA1100_CERF" = "y" ]; then
-   choice 'Cerf RAM available' \
-        "8MB   CONFIG_SA1100_CERF_8MB \
-         16MB   CONFIG_SA1100_CERF_16MB \
-         32MB   CONFIG_SA1100_CERF_32MB \
-         64MB   CONFIG_SA1100_CERF_64MB" CerfRam
    choice 'Cerf Flash available'  \
         "8MB    CONFIG_SA1100_CERF_FLASH_8MB \
          16MB   CONFIG_SA1100_CERF_FLASH_16MB \
@@ -453,7 +448,9 @@ else
 fi
 comment 'At least one math emulation must be selected'
 tristate 'NWFPE math emulation' CONFIG_FPE_NWFPE
-dep_tristate 'FastFPE math emulation (experimental)' CONFIG_FPE_FASTFPE $CONFIG_EXPERIMENTAL
+if [ "$CONFIG_CPU_26" = "n" -a "$CONFIG_CPU_32v3" = "n" ]; then
+   dep_tristate 'FastFPE math emulation (experimental)' CONFIG_FPE_FASTFPE $CONFIG_EXPERIMENTAL
+fi
 choice 'Kernel core (/proc/kcore) format' \
 	"ELF		CONFIG_KCORE_ELF	\
 	 A.OUT		CONFIG_KCORE_AOUT" ELF
@@ -494,15 +491,10 @@ if [ "$CONFIG_ARCH_NETWINDER" = "y" -o  \
    fi
 fi
 
-if [ "$CONFIG_ARCH_SA1100" = "y" ]; then
+if [ "$CONFIG_CPU_32" = "y" ]; then
    define_bool CONFIG_ALIGNMENT_TRAP y
 else
-   if [ "$CONFIG_CPU_32" = "y" -a \
-        "$CONFIG_ARCH_EBSA110" != "y" ]; then
-      bool 'Mis-alignment trap handler' CONFIG_ALIGNMENT_TRAP
-   else
-      define_bool CONFIG_ALIGNMENT_TRAP n
-   fi
+   define_bool CONFIG_ALIGNMENT_TRAP n
 fi
 endmenu
 
@@ -510,6 +502,8 @@ source drivers/parport/Config.in
 
 if [ "$CONFIG_ALIGNMENT_TRAP" = "y" ]; then
   source drivers/mtd/Config.in
+else
+  define_bool CONFIG_MTD n
 fi
 
 source drivers/pnp/Config.in

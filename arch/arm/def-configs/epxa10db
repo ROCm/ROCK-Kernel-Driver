@@ -156,7 +156,7 @@ CONFIG_BINFMT_ELF=y
 # CONFIG_PM is not set
 # CONFIG_APM is not set
 # CONFIG_ARTHUR is not set
-CONFIG_CMDLINE="console=ttyUA0,38400 root=/dev/mtdblock0 rw"
+CONFIG_CMDLINE="mem=32M console=ttyUA0,38400 root=/dev/mtdblock0 rw"
 CONFIG_ALIGNMENT_TRAP=y
 
 #

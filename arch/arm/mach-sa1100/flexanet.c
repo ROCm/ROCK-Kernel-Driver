@@ -151,21 +151,6 @@ static int __init flexanet_init(void)
 __initcall(flexanet_init);
 
 
-static void __init
-fixup_flexanet(struct machine_desc *desc, struct tag *tags,
-	      char **cmdline, struct meminfo *mi)
-{
-	/* fixed RAM size, by now (64MB) */
-	SET_BANK( 0, 0xc0000000, 64*1024*1024 );
-	mi->nr_banks = 1;
-
-	/* setup ramdisk */
-	ROOT_DEV = mk_kdev(RAMDISK_MAJOR,0);
-	setup_ramdisk( 1, 0, 0, 8192 );
-	setup_initrd( 0xc0800000, 3*1024*1024 );
-}
-
-
 static struct map_desc flexanet_io_desc[] __initdata = {
  /* virtual     physical    length      domain     r  w  c  b */
   { 0xf0000000, 0x10000000, 0x00001000, DOMAIN_IO, 0, 1, 0, 0 }, /* Board Control Register */
@@ -206,7 +191,6 @@ static void __init flexanet_map_io(void)
 MACHINE_START(FLEXANET, "FlexaNet")
 	BOOT_MEM(0xc0000000, 0x80000000, 0xf8000000)
 	BOOT_PARAMS(0xc0000100)
-	FIXUP(fixup_flexanet)
 	MAPIO(flexanet_map_io)
 	INITIRQ(sa1100_init_irq)
 MACHINE_END

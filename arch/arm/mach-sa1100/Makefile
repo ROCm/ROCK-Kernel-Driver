@@ -99,8 +99,6 @@ led-$(CONFIG_SA1100_SIMPAD)		+= leds-simpad.o
 obj-$(CONFIG_SA1100_STORK)		+= stork.o
 export-objs				+= stork.o
 
-obj-$(CONFIG_SA1100_VICTOR)		+= victor.o
-
 obj-$(CONFIG_SA1100_XP860)		+= xp860.o
 
 obj-$(CONFIG_SA1100_YOPY)		+= yopy.o

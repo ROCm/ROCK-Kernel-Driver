@@ -60,16 +60,6 @@ __tagtable(ATAG_ACORN, parse_tag_acorn);
 
 #endif
 
-static void __init
-fixup_riscpc(struct machine_desc *desc, struct tag *tags,
-	    char **cmdline, struct meminfo *mi)
-{
-	/*
-	 * RiscPC can't handle half-word loads and stores
-	 */
-	elf_hwcap &= ~HWCAP_HALF;
-}
-
 static struct map_desc rpc_io_desc[] __initdata = {
  { SCREEN_BASE,	SCREEN_START,	2*1048576, DOMAIN_IO, 0, 1, 0, 0 }, /* VRAM		*/
  { IO_BASE,	IO_START,	IO_SIZE	 , DOMAIN_IO, 0, 1, 0, 0 }, /* IO space		*/
@@ -80,6 +70,11 @@ static struct map_desc rpc_io_desc[] __initdata = {
 void __init rpc_map_io(void)
 {
 	iotable_init(rpc_io_desc);
+
+	/*
+	 * RiscPC can't handle half-word loads and stores
+	 */
+	elf_hwcap &= ~HWCAP_HALF;
 }
 
 MACHINE_START(RISCPC, "Acorn-RiscPC")
@@ -88,7 +83,6 @@ MACHINE_START(RISCPC, "Acorn-RiscPC")
 	BOOT_PARAMS(0x10000100)
 	DISABLE_PARPORT(0)
 	DISABLE_PARPORT(1)
-	FIXUP(fixup_riscpc)
 	MAPIO(rpc_map_io)
 	INITIRQ(rpc_init_irq)
 MACHINE_END

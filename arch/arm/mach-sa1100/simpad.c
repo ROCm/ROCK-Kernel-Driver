@@ -40,22 +40,6 @@ void clear_cs3_bit(int value)
 	*(CS3BUSTYPE *)(CS3_BASE) = cs3_shadow;
 }
 
-static void __init
-fixup_simpad(struct machine_desc *desc, struct tag *tags,
-		   char **cmdline, struct meminfo *mi)
-{
-#ifdef CONFIG_SA1100_SIMPAD_DRAM_64MB /* DRAM */
-	SET_BANK( 0, 0xc0000000, 64*1024*1024 );
-#else
-	SET_BANK( 0, 0xc0000000, 32*1024*1024 );
-#endif
-	mi->nr_banks = 1;
-	ROOT_DEV = mk_kdev(RAMDISK_MAJOR,0);
-	setup_ramdisk( 1, 0, 0, 8192 );
-	setup_initrd( __phys_to_virt(0xc0800000), 4*1024*1024 );
-}
-
-
 static struct map_desc simpad_io_desc[] __initdata = {
   /* virtual	physical    length	domain	   r  w  c  b */
   { 0xf2800000, 0x4b800000, 0x00800000, DOMAIN_IO, 0, 1, 0, 0 }, /* MQ200 */  
@@ -141,22 +125,14 @@ static int proc_cs3_read(char *page, char **start, off_t off,
 }
  
  
-static struct proc_dir_entry *proc_cs3;
- 
 static int __init cs3_init(void)
 {
-	proc_cs3 = create_proc_entry("cs3", 0, 0);
+	struct proc_dir_entry *proc_cs3 = create_proc_entry("cs3", 0, 0);
 	if (proc_cs3)
 		proc_cs3->read_proc = proc_cs3_read;
 	return 0;
 }
  
-static int __exit cs3_exit(void)
-{
-	if (proc_cs3)
-		remove_proc_entry( "cs3", 0);
-	return 0;
-}		   
 __initcall(cs3_init);
 
 #endif // CONFIG_PROC_FS
@@ -164,7 +140,6 @@ __initcall(cs3_init);
 MACHINE_START(SIMPAD, "Simpad")
 	MAINTAINER("Juergen Messerer")
 	BOOT_MEM(0xc0000000, 0x80000000, 0xf8000000)
-	FIXUP(fixup_simpad)
 	MAPIO(simpad_map_io)
 	INITIRQ(sa1100_init_irq)
 MACHINE_END
