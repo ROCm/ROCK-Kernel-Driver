@@ -1664,14 +1664,6 @@ static int idedisk_resume(struct device *dev, u32 level)
 /* This is just a hook for the overall driver tree.
  */
 
-static struct device_driver idedisk_devdrv = {
-	.bus = &ide_bus_type,
-	.name = "IDE disk driver",
-
-	.suspend = idedisk_suspend,
-	.resume = idedisk_resume,
-};
-
 static int idedisk_ioctl (ide_drive_t *drive, struct inode *inode,
 	struct file *file, unsigned int cmd, unsigned long arg)
 {
@@ -1717,12 +1709,6 @@ static void idedisk_setup (ide_drive_t *drive)
 			drive->doorlocking = 1;
 		}
 	}
-	{
-		sprintf(drive->disk->disk_dev.name, "ide-disk");
-		drive->disk->disk_dev.driver = &idedisk_devdrv;
-		drive->disk->disk_dev.driver_data = drive;
-	}
-
 #if 1
 	(void) probe_lba_addressing(drive, 1);
 #else
@@ -1806,7 +1792,6 @@ static int idedisk_cleanup (ide_drive_t *drive)
 {
 	struct gendisk *g = drive->disk;
 
-	device_unregister(&drive->disk->disk_dev);
 	if ((drive->id->cfs_enable_2 & 0x3000) && drive->wcache)
 		if (do_idedisk_flushcache(drive))
 			printk (KERN_INFO "%s: Write Cache FAILED Flushing!\n",
@@ -1905,7 +1890,6 @@ static void __exit idedisk_exit (void)
 static int idedisk_init (void)
 {
 	ide_register_driver(&idedisk_driver);
-	driver_register(&idedisk_devdrv);
 	return 0;
 }
 
