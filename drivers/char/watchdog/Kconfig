@@ -346,6 +346,18 @@ config ALIM7101_WDT
 	  module, say M here and read <file:Documentation/modules.txt>.  Most
 	  people will say N.
 
+config ALIM1535_WDT
+	tristate "ALi M1535 PMU Watchdog Timer"
+	depends on WATCHDOG
+	---help---
+	  This is the driver for the hardware watchdog on the ALi M1535 PMU.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module is called alim1535_wdt.  If you want to compile it as a
+	  module, say M here and read <file:Documentation/modules.txt>.  Most
+	  people will say N.
+
 config SC1200_WDT
 	tristate "National Semiconductor PC87307/PC97307 (ala SC1200) Watchdog"
 	depends on WATCHDOG
