@@ -264,45 +264,6 @@ pcibios_fixup_bus(struct pci_bus *bus)
 	}
 }
 
-void
-pcibios_update_resource(struct pci_dev *dev, struct resource *res,
-			int resource)
-{
-	struct pci_controller *hose = dev->sysdata;
-	struct resource *root;
-	int where;
-	u32 reg;
-
-	if (resource < PCI_ROM_RESOURCE) 
-		where = PCI_BASE_ADDRESS_0 + (resource * 4);
-	else if (resource == PCI_ROM_RESOURCE)
-		where = dev->rom_base_reg;
-	else {
-		return; /* Don't update non-standard resources here. */
-	}
-
-	/* Point root at the hose root. */
-	if (res->flags & IORESOURCE_IO)
-		root = hose->io_space;
-	else if (res->flags & IORESOURCE_MEM)
-		root = hose->mem_space;
-	else {
-		return; /* Don't update non-standard resources here. */
-	}
-
-	reg = (res->start - root->start) | (res->flags & 0xf);
-	pci_write_config_dword(dev, where, reg);
-	if ((res->flags & (PCI_BASE_ADDRESS_SPACE
-			   | PCI_BASE_ADDRESS_MEM_TYPE_MASK))
-	    == (PCI_BASE_ADDRESS_SPACE_MEMORY
-		| PCI_BASE_ADDRESS_MEM_TYPE_64)) {
-		pci_write_config_dword(dev, where+4, 0);
-		printk(KERN_WARNING "PCI: dev %s type 64-bit\n", dev->dev.name);
-	}
-
-	/* ??? FIXME -- record old value for shutdown.  */
-}
-
 void __init
 pcibios_update_irq(struct pci_dev *dev, int irq)
 {

@@ -93,46 +93,6 @@ fixup_broken_pcnet32(struct pci_dev* dev)
 	}
 }
 
-void
-pcibios_update_resource(struct pci_dev *dev, struct resource *res,
-			int resource)
-{
-	u32 new, check;
-	int reg;
-	struct pci_controller* hose = dev->sysdata;
-	unsigned long io_offset;
-	
-	new = res->start;
-	res->flags &= ~IORESOURCE_UNSET;
-	if (hose && res->flags & IORESOURCE_IO) {
-		io_offset = (unsigned long)hose->io_base_virt - isa_io_base;
-		new -= io_offset;
-	}
-	if (hose && res->flags & IORESOURCE_MEM)
-		new -= hose->pci_mem_offset;
-	new |= (res->flags & PCI_REGION_FLAG_MASK);
-	if (resource < 6) {
-		reg = PCI_BASE_ADDRESS_0 + 4*resource;
-	} else if (resource == PCI_ROM_RESOURCE) {
-		res->flags |= PCI_ROM_ADDRESS_ENABLE;
-		reg = dev->rom_base_reg;
-	} else {
-		/* Somebody might have asked allocation of a non-standard resource */
-		return;
-	}
-
-	pci_write_config_dword(dev, reg, new);
-	pci_read_config_dword(dev, reg, &check);
-	if ((new ^ check) & ((new & PCI_BASE_ADDRESS_SPACE_IO) ? PCI_BASE_ADDRESS_IO_MASK : PCI_BASE_ADDRESS_MEM_MASK)) {
-		printk(KERN_ERR "PCI: Error while updating region "
-		       "%s/%d (%08x != %08x)\n", dev->slot_name, resource,
-		       new, check);
-	}
-	printk(KERN_INFO "PCI: moved device %s resource %d (%lx) to %x\n",
-	       dev->slot_name, resource, res->flags,
-	       new & ~PCI_REGION_FLAG_MASK);
-}
-
 static void
 pcibios_fixup_resources(struct pci_dev *dev)
 {

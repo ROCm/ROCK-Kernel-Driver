@@ -400,37 +400,6 @@ int pcibios_enable_device(struct pci_dev *dev)
 	return pcibios_enable_resources(dev);
 }
 
-void pcibios_update_resource(struct pci_dev *dev, struct resource *res,
-			     int resource)
-{
-	u32 new, check;
-	int reg;
-
-	new = res->start | (res->flags & PCI_REGION_FLAG_MASK);
-	if (resource < 6) {
-		reg = PCI_BASE_ADDRESS_0 + 4 * resource;
-	} else if (resource == PCI_ROM_RESOURCE) {
-		res->flags |= PCI_ROM_ADDRESS_ENABLE;
-		reg = dev->rom_base_reg;
-	} else {
-		/*
-		 * Somebody might have asked allocation of a non-standard
-		 * resource
-		 */
-		return;
-	}
-
-	pci_write_config_dword(dev, reg, new);
-	pci_read_config_dword(dev, reg, &check);
-	if ((new ^ check) &
-	    ((new & PCI_BASE_ADDRESS_SPACE_IO) ? PCI_BASE_ADDRESS_IO_MASK :
-	     PCI_BASE_ADDRESS_MEM_MASK)) {
-		printk(KERN_ERR "PCI: Error while updating region "
-		       "%s/%d (%08x != %08x)\n", dev->slot_name, resource,
-		       new, check);
-	}
-}
-
 void pcibios_align_resource(void *data, struct resource *res,
 			    unsigned long size, unsigned long align)
 {
