@@ -856,6 +856,13 @@ befs_fill_super(struct super_block *sb, void *data, int silent)
 	if (befs_check_sb(sb) != BEFS_OK)
 		goto unaquire_priv_sbp;
 
+	if( befs_sb->num_blocks > ~((sector_t)0) ) {
+		befs_error(sb, "blocks count: %Lu "
+			"is larger than the host can use",
+			befs_sb->num_blocks);
+		goto unaquire_priv_sbp;
+	}
+
 	/*
 	 * set up enough so that it can read an inode
 	 * Fill in kernel superblock fields from private sb
