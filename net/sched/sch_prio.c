@@ -47,7 +47,8 @@ struct prio_sched_data
 };
 
 
-struct Qdisc *prio_classify(struct sk_buff *skb, struct Qdisc *sch,int *r)
+static struct Qdisc *prio_classify(struct sk_buff *skb,
+				   struct Qdisc *sch, int *r)
 {
 	struct prio_sched_data *q = qdisc_priv(sch);
 	u32 band = skb->priority;

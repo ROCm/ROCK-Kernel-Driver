@@ -320,7 +320,7 @@ static unsigned int dsmark_drop(struct Qdisc *sch)
 }
 
 
-int dsmark_init(struct Qdisc *sch,struct rtattr *opt)
+static int dsmark_init(struct Qdisc *sch,struct rtattr *opt)
 {
 	struct dsmark_qdisc_data *p = PRIV(sch);
 	struct rtattr *tb[TCA_DSMARK_MAX];

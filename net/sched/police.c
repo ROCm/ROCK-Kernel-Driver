@@ -163,7 +163,7 @@ void tcf_police_destroy(struct tcf_police *p)
 }
 
 #ifdef CONFIG_NET_CLS_ACT
-int tcf_act_police_locate(struct rtattr *rta, struct rtattr *est,struct tc_action *a, int ovr, int bind)
+static int tcf_act_police_locate(struct rtattr *rta, struct rtattr *est,struct tc_action *a, int ovr, int bind)
 {
 	unsigned h;
 	int ret = 0;
@@ -272,7 +272,7 @@ failure:
 	return -1;
 }
 
-int tcf_act_police_cleanup(struct tc_action *a, int bind)
+static int tcf_act_police_cleanup(struct tc_action *a, int bind)
 {
 	struct tcf_police *p;
 	p = PRIV(a);
@@ -282,7 +282,7 @@ int tcf_act_police_cleanup(struct tc_action *a, int bind)
 	return 0;
 }
 
-int tcf_act_police(struct sk_buff **pskb, struct tc_action *a)
+static int tcf_act_police(struct sk_buff **pskb, struct tc_action *a)
 {
 	psched_time_t now;
 	struct sk_buff *skb = *pskb;
@@ -345,7 +345,7 @@ int tcf_act_police(struct sk_buff **pskb, struct tc_action *a)
 	return p->action;
 }
 
-int tcf_act_police_dump(struct sk_buff *skb, struct tc_action *a, int bind, int ref)
+static int tcf_act_police_dump(struct sk_buff *skb, struct tc_action *a, int bind, int ref)
 {
 	unsigned char	 *b = skb->tail;
 	struct tc_police opt;
