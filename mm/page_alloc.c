@@ -464,7 +464,7 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 		struct zone *z = zones[i];
 
 		min += z->pages_low;
-		if (z->free_pages > min ||
+		if (z->free_pages >= min ||
 				(!wait && z->free_pages >= z->pages_high)) {
 			page = buffered_rmqueue(z, order, cold);
 			if (page)
@@ -487,7 +487,7 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 		if (gfp_mask & __GFP_HIGH)
 			local_min >>= 2;
 		min += local_min;
-		if (z->free_pages > min ||
+		if (z->free_pages >= min ||
 				(!wait && z->free_pages >= z->pages_high)) {
 			page = buffered_rmqueue(z, order, cold);
 			if (page)
@@ -525,7 +525,7 @@ rebalance:
 		struct zone *z = zones[i];
 
 		min += z->pages_min;
-		if (z->free_pages > min ||
+		if (z->free_pages >= min ||
 				(!wait && z->free_pages >= z->pages_high)) {
 			page = buffered_rmqueue(z, order, cold);
 			if (page)
