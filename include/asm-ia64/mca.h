@@ -103,6 +103,8 @@ enum {
 	IA64_MCA_NEW_CONTEXT	=	-1	/* SAL to return to new context */
 };
 
+#define MIN_STATE_AREA_SIZE     57
+
 typedef struct ia64_mca_os_to_sal_state_s {
 	u64		imots_os_status;	/*   OS status to SAL as to what happened
 						 *   with the MCA handling.
@@ -133,7 +135,7 @@ extern void ia64_mca_cmc_int_handler(int,void *,struct pt_regs *);
 extern void ia64_mca_cpe_int_handler(int,void *,struct pt_regs *);
 extern int  ia64_log_print(int,prfunc_t);
 extern void ia64_mca_cmc_vector_setup(void);
-extern void ia64_mca_check_errors( void );
+extern int  ia64_mca_check_errors(void);
 extern u64  ia64_log_get(int, prfunc_t);
 
 #define PLATFORM_CALL(fn, args)	printk("Platform call TBD\n")

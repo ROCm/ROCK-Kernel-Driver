@@ -306,7 +306,7 @@ efi_memmap_walk (efi_freemem_callback_t callback, void *arg)
 		u64 start;
 		u64 end;
 	} prev, curr;
-	void *efi_map_start, *efi_map_end, *p, *q;
+	void *efi_map_start, *efi_map_end, *p, *q, *r;
 	efi_memory_desc_t *md, *check_md;
 	u64 efi_desc_size, start, end, granule_addr, first_non_wb_addr = 0;
 
@@ -351,11 +351,10 @@ efi_memmap_walk (efi_freemem_callback_t callback, void *arg)
 
 			if (!(first_non_wb_addr > granule_addr))
 				continue;	/* couldn't find enough contiguous memory */
+
+			for (r = p; r < q; r += efi_desc_size)
+				trim_top(r, first_non_wb_addr);
 		}
-
-		/* BUG_ON((md->phys_addr >> IA64_GRANULE_SHIFT) < first_non_wb_addr); */
-
-		trim_top(md, first_non_wb_addr);
 
 		if (is_available_memory(md)) {
 			if (md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT) > mem_limit) {

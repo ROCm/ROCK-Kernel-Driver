@@ -13,6 +13,7 @@
  * pciio.h -- platform-independent PCI interface
  */
 
+#include <linux/config.h>
 #include <asm/sn/ioerror.h>
 #include <asm/sn/driver.h>
 #include <asm/sn/hcl.h>
@@ -207,6 +208,9 @@ typedef struct pciio_dmamap_s *pciio_dmamap_t;
 typedef struct pciio_intr_s *pciio_intr_t;
 typedef struct pciio_info_s *pciio_info_t;
 typedef struct pciio_piospace_s *pciio_piospace_t;
+typedef struct pciio_win_info_s *pciio_win_info_t;
+typedef struct pciio_win_map_s *pciio_win_map_t;
+typedef struct pciio_win_alloc_s *pciio_win_alloc_t;
 
 /* PIO MANAGEMENT */
 
@@ -382,8 +386,13 @@ pciio_intr_alloc_f      (devfs_handle_t dev,	/* which PCI device */
 typedef void
 pciio_intr_free_f       (pciio_intr_t intr_hdl);
 
+#ifdef CONFIG_IA64_SGI_SN1
 typedef int
 pciio_intr_connect_f    (pciio_intr_t intr_hdl);	/* pciio intr resource handle */
+#else
+typedef int
+pciio_intr_connect_f    (pciio_intr_t intr_hdl, intr_func_t intr_func, intr_arg_t intr_arg);	/* pciio intr resource handle */
+#endif
 
 typedef void
 pciio_intr_disconnect_f (pciio_intr_t intr_hdl);
@@ -627,6 +636,44 @@ pciio_device_detach(
 			devfs_handle_t pcicard,   /* vertex created by pciio_device_register */
                         int drv_flags);
 
+
+/* create and initialize empty window mapping resource */
+extern pciio_win_map_t
+pciio_device_win_map_new(pciio_win_map_t win_map,	/* preallocated win map structure */
+			 size_t region_size,		/* size of region to be tracked */
+			 size_t page_size);		/* allocation page size */
+
+/* destroy window mapping resource freeing up ancillary resources */
+extern void
+pciio_device_win_map_free(pciio_win_map_t win_map);	/* preallocated win map structure */
+
+/* populate window mapping with free range of addresses */
+extern void
+pciio_device_win_populate(pciio_win_map_t win_map,	/* win map */
+			  iopaddr_t ioaddr,		/* base address of free range */
+			  size_t size);			/* size of free range */
+
+/* allocate window from mapping resource */
+#ifdef CONFIG_IA64_SGI_SN1
+extern iopaddr_t
+pciio_device_win_alloc(pciio_win_map_t win_map,		/* win map */
+		       pciio_win_alloc_t win_alloc,	/* opaque allocation cookie */
+		       size_t size,			/* size of allocation */
+		       size_t align);			/* alignment of allocation */
+#else
+extern iopaddr_t
+pciio_device_win_alloc(pciio_win_map_t win_map,		/* win map */
+		       pciio_win_alloc_t win_alloc,	/* opaque allocation cookie */
+		       size_t start,			/* start unit, or 0 */
+		       size_t size,			/* size of allocation */
+		       size_t align);			/* alignment of allocation */
+#endif
+
+/* free previously allocated window */
+extern void
+pciio_device_win_free(pciio_win_alloc_t win_alloc);	/* opaque allocation cookie */
+
+
 /*
  * Generic PCI interface, for use with all PCI providers
  * and all PCI devices.
@@ -644,52 +691,6 @@ extern iopaddr_t        pciio_pio_pciaddr_get(pciio_piomap_t pciio_piomap);
 extern ulong            pciio_pio_mapsz_get(pciio_piomap_t pciio_piomap);
 extern caddr_t          pciio_pio_kvaddr_get(pciio_piomap_t pciio_piomap);
 
-#ifdef LATER
-#ifdef USE_PCI_PIO
-extern uint8_t 		pciio_pio_read8(volatile uint8_t *addr);
-extern uint16_t 	pciio_pio_read16(volatile uint16_t *addr);
-extern uint32_t 	pciio_pio_read32(volatile uint32_t *addr);
-extern uint64_t 	pciio_pio_read64(volatile uint64_t *addr);
-extern void 		pciio_pio_write8(uint8_t val, volatile uint8_t *addr);
-extern void 		pciio_pio_write16(uint16_t val, volatile uint16_t *addr);
-extern void 		pciio_pio_write32(uint32_t val, volatile uint32_t *addr);
-extern void 		pciio_pio_write64(uint64_t val, volatile uint64_t *addr);
-#else /* !USE_PCI_PIO */
-__inline uint8_t pciio_pio_read8(volatile uint8_t *addr)
-{ 
-	return *addr; 
-}
-__inline uint16_t pciio_pio_read16(volatile uint16_t *addr)
-{
-	return *addr; 
-}
-__inline uint32_t pciio_pio_read32(volatile uint32_t *addr)
-{
-	return *addr; 
-}
-__inline uint64_t pciio_pio_read64(volatile uint64_t *addr)
-{
-	return *addr;
-}
-__inline void pciio_pio_write8(uint8_t val, volatile uint8_t *addr)
-{
-	*addr = val;
-}
-__inline void pciio_pio_write16(uint16_t val, volatile uint16_t *addr)
-{
-	*addr = val;
-}
-__inline void pciio_pio_write32(uint32_t val, volatile uint32_t *addr)
-{
-	*addr = val;
-}
-__inline void pciio_pio_write64(uint64_t val, volatile uint64_t *addr)
-{
-	*addr = val;
-}
-#endif /* USE_PCI_PIO */
-#endif	/* LATER */
-
 /* Generic PCI dma interfaces */
 extern devfs_handle_t     pciio_dma_dev_get(pciio_dmamap_t pciio_dmamap);
 
@@ -701,8 +702,10 @@ extern pciio_provider_t *pciio_provider_fns_get(devfs_handle_t provider);
 /* Generic pci slot information access interface */
 extern pciio_info_t     pciio_info_chk(devfs_handle_t vhdl);
 extern pciio_info_t     pciio_info_get(devfs_handle_t vhdl);
+extern pciio_info_t     pciio_hostinfo_get(devfs_handle_t vhdl);
 extern void             pciio_info_set(devfs_handle_t vhdl, pciio_info_t widget_info);
 extern devfs_handle_t     pciio_info_dev_get(pciio_info_t pciio_info);
+extern devfs_handle_t     pciio_info_hostdev_get(pciio_info_t pciio_info);
 extern pciio_bus_t	pciio_info_bus_get(pciio_info_t pciio_info);
 extern pciio_slot_t     pciio_info_slot_get(pciio_info_t pciio_info);
 extern pciio_function_t	pciio_info_function_get(pciio_info_t pciio_info);
@@ -718,7 +721,7 @@ extern iopaddr_t	pciio_info_bar_base_get(pciio_info_t, int);
 extern size_t		pciio_info_bar_size_get(pciio_info_t, int);
 extern iopaddr_t	pciio_info_rom_base_get(pciio_info_t);
 extern size_t		pciio_info_rom_size_get(pciio_info_t);
-
+extern int		pciio_info_type1_get(pciio_info_t);
 extern int              pciio_error_handler(devfs_handle_t, int, ioerror_mode_t, ioerror_t *);
 extern int		pciio_dma_enabled(devfs_handle_t);
 

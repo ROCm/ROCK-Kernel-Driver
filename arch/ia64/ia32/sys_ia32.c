@@ -20,7 +20,6 @@
 #include <linux/fs.h>
 #include <linux/file.h>
 #include <linux/signal.h>
-#include <linux/utime.h>
 #include <linux/resource.h>
 #include <linux/times.h>
 #include <linux/utsname.h>
@@ -38,7 +37,6 @@
 #include <linux/smb_mount.h>
 #include <linux/ncp_fs.h>
 #include <linux/quota.h>
-#include <linux/module.h>
 #include <linux/sunrpc/svc.h>
 #include <linux/nfsd/nfsd.h>
 #include <linux/nfsd/cache.h>
@@ -49,6 +47,7 @@
 #include <linux/ptrace.h>
 #include <linux/stat.h>
 #include <linux/ipc.h>
+#include <linux/compat.h>
 
 #include <asm/types.h>
 #include <asm/uaccess.h>
@@ -194,9 +193,12 @@ putstat (struct stat32 *ubuf, struct kstat *stat)
 	err |= __put_user(high2lowgid(stat->gid), &ubuf->st_gid);
 	err |= __put_user(stat->rdev, &ubuf->st_rdev);
 	err |= __put_user(stat->size, &ubuf->st_size);
-	err |= __put_user(stat->atime, &ubuf->st_atime);
-	err |= __put_user(stat->mtime, &ubuf->st_mtime);
-	err |= __put_user(stat->ctime, &ubuf->st_ctime);
+	err |= __put_user(stat->atime.tv_sec, &ubuf->st_atime);
+	err |= __put_user(stat->atime.tv_nsec, &ubuf->st_atime_nsec);
+	err |= __put_user(stat->mtime.tv_sec, &ubuf->st_mtime);
+	err |= __put_user(stat->mtime.tv_nsec, &ubuf->st_mtime_nsec);
+	err |= __put_user(stat->ctime.tv_sec, &ubuf->st_ctime);
+	err |= __put_user(stat->ctime.tv_nsec, &ubuf->st_ctime_nsec);
 	err |= __put_user(stat->blksize, &ubuf->st_blksize);
 	err |= __put_user(stat->blocks, &ubuf->st_blocks);
 	return err;
@@ -616,7 +618,8 @@ sys32_mprotect (unsigned int start, unsigned int len, int prot)
 			/* end address is 4KB aligned but not page aligned. */
 			retval = mprotect_subpage(PAGE_START(end), prot);
 			if (retval < 0)
-				return retval;
+				goto out;
+
 			end = PAGE_START(end);
 		}
 		retval = sys_mprotect(start, end - start, prot);
@@ -697,88 +700,18 @@ sys32_fstatfs (unsigned int fd, struct statfs32 *buf)
 	return ret;
 }
 
-struct timeval32
-{
-    int tv_sec, tv_usec;
-};
-
-struct itimerval32
-{
-    struct timeval32 it_interval;
-    struct timeval32 it_value;
-};
-
 static inline long
-get_tv32 (struct timeval *o, struct timeval32 *i)
+get_tv32 (struct timeval *o, struct compat_timeval *i)
 {
 	return (!access_ok(VERIFY_READ, i, sizeof(*i)) ||
 		(__get_user(o->tv_sec, &i->tv_sec) | __get_user(o->tv_usec, &i->tv_usec)));
 }
 
 static inline long
-put_tv32 (struct timeval32 *o, struct timeval *i)
+put_tv32 (struct compat_timeval *o, struct timeval *i)
 {
 	return (!access_ok(VERIFY_WRITE, o, sizeof(*o)) ||
 		(__put_user(i->tv_sec, &o->tv_sec) | __put_user(i->tv_usec, &o->tv_usec)));
-}
-
-static inline long
-get_it32 (struct itimerval *o, struct itimerval32 *i)
-{
-	return (!access_ok(VERIFY_READ, i, sizeof(*i)) ||
-		(__get_user(o->it_interval.tv_sec, &i->it_interval.tv_sec) |
-		 __get_user(o->it_interval.tv_usec, &i->it_interval.tv_usec) |
-		 __get_user(o->it_value.tv_sec, &i->it_value.tv_sec) |
-		 __get_user(o->it_value.tv_usec, &i->it_value.tv_usec)));
-}
-
-static inline long
-put_it32 (struct itimerval32 *o, struct itimerval *i)
-{
-	return (!access_ok(VERIFY_WRITE, o, sizeof(*o)) ||
-		(__put_user(i->it_interval.tv_sec, &o->it_interval.tv_sec) |
-		 __put_user(i->it_interval.tv_usec, &o->it_interval.tv_usec) |
-		 __put_user(i->it_value.tv_sec, &o->it_value.tv_sec) |
-		 __put_user(i->it_value.tv_usec, &o->it_value.tv_usec)));
-}
-
-extern int do_getitimer (int which, struct itimerval *value);
-
-asmlinkage long
-sys32_getitimer (int which, struct itimerval32 *it)
-{
-	struct itimerval kit;
-	int error;
-
-	error = do_getitimer(which, &kit);
-	if (!error && put_it32(it, &kit))
-		error = -EFAULT;
-
-	return error;
-}
-
-extern int do_setitimer (int which, struct itimerval *, struct itimerval *);
-
-asmlinkage long
-sys32_setitimer (int which, struct itimerval32 *in, struct itimerval32 *out)
-{
-	struct itimerval kin, kout;
-	int error;
-
-	if (in) {
-		if (get_it32(&kin, in))
-			return -EFAULT;
-	} else
-		memset(&kin, 0, sizeof(kin));
-
-	error = do_setitimer(which, &kin, out ? &kout : NULL);
-	if (error || !out)
-		return error;
-	if (put_it32(out, &kout))
-		return -EFAULT;
-
-	return 0;
-
 }
 
 asmlinkage unsigned long
@@ -802,42 +735,11 @@ sys32_alarm (unsigned int seconds)
 /* Translations due to time_t size differences.  Which affects all
    sorts of things, like timeval and itimerval.  */
 
-struct utimbuf_32 {
-	int	atime;
-	int	mtime;
-};
-
-extern asmlinkage long sys_utimes(char * filename, struct timeval * utimes);
-extern asmlinkage long sys_gettimeofday (struct timeval *tv, struct timezone *tz);
-
-asmlinkage long
-sys32_utime (char *filename, struct utimbuf_32 *times32)
-{
-	mm_segment_t old_fs = get_fs();
-	struct timeval tv[2], *tvp;
-	long ret;
-
-	if (times32) {
-		if (get_user(tv[0].tv_sec, &times32->atime))
-			return -EFAULT;
-		tv[0].tv_usec = 0;
-		if (get_user(tv[1].tv_sec, &times32->mtime))
-			return -EFAULT;
-		tv[1].tv_usec = 0;
-		set_fs(KERNEL_DS);
-		tvp = tv;
-	} else
-		tvp = NULL;
-	ret = sys_utimes(filename, tvp);
-	set_fs(old_fs);
-	return ret;
-}
-
 extern struct timezone sys_tz;
 extern int do_sys_settimeofday (struct timeval *tv, struct timezone *tz);
 
 asmlinkage long
-sys32_gettimeofday (struct timeval32 *tv, struct timezone *tz)
+sys32_gettimeofday (struct compat_timeval *tv, struct timezone *tz)
 {
 	if (tv) {
 		struct timeval ktv;
@@ -853,7 +755,7 @@ sys32_gettimeofday (struct timeval32 *tv, struct timezone *tz)
 }
 
 asmlinkage long
-sys32_settimeofday (struct timeval32 *tv, struct timezone *tz)
+sys32_settimeofday (struct compat_timeval *tv, struct timezone *tz)
 {
 	struct timeval ktv;
 	struct timezone ktz;
@@ -1003,7 +905,7 @@ out:
 #define ROUND_UP_TIME(x,y) (((x)+(y)-1)/(y))
 
 asmlinkage long
-sys32_select (int n, fd_set *inp, fd_set *outp, fd_set *exp, struct timeval32 *tvp32)
+sys32_select (int n, fd_set *inp, fd_set *outp, fd_set *exp, struct compat_timeval *tvp32)
 {
 	fd_set_bits fds;
 	char *bits;
@@ -1110,28 +1012,7 @@ sys32_old_select (struct sel_arg_struct *arg)
 	if (copy_from_user(&a, arg, sizeof(a)))
 		return -EFAULT;
 	return sys32_select(a.n, (fd_set *) A(a.inp), (fd_set *) A(a.outp), (fd_set *) A(a.exp),
-			    (struct timeval32 *) A(a.tvp));
-}
-
-extern asmlinkage long sys_nanosleep (struct timespec *rqtp, struct timespec *rmtp);
-
-asmlinkage long
-sys32_nanosleep (struct timespec32 *rqtp, struct timespec32 *rmtp)
-{
-	struct timespec t;
-	int ret;
-	mm_segment_t old_fs = get_fs();
-
-	if (get_user (t.tv_sec, &rqtp->tv_sec) || get_user (t.tv_nsec, &rqtp->tv_nsec))
-		return -EFAULT;
-	set_fs(KERNEL_DS);
-	ret = sys_nanosleep(&t, rmtp ? &t : NULL);
-	set_fs(old_fs);
-	if (rmtp && ret == -EINTR) {
-		if (put_user(t.tv_sec, &rmtp->tv_sec) || put_user(t.tv_nsec, &rmtp->tv_nsec))
-			return -EFAULT;
-	}
-	return ret;
+			    (struct compat_timeval *) A(a.tvp));
 }
 
 struct iovec32 { unsigned int iov_base; int iov_len; };
@@ -1304,7 +1185,7 @@ struct msghdr32 {
 };
 
 struct cmsghdr32 {
-	__kernel_size_t32 cmsg_len;
+	compat_size_t cmsg_len;
 	int               cmsg_level;
 	int               cmsg_type;
 };
@@ -1369,7 +1250,7 @@ get_cmsghdr32 (struct msghdr *kmsg, unsigned char *stackbuf, struct sock *sk, si
 {
 	struct cmsghdr *kcmsg, *kcmsg_base;
 	__kernel_size_t kcmlen, tmp;
-	__kernel_size_t32 ucmlen;
+	compat_size_t ucmlen;
 	struct cmsghdr32 *ucmsg;
 	long err;
 
@@ -1893,10 +1774,10 @@ extern asmlinkage long sys_getsockname(int fd, struct sockaddr *usockaddr,
 extern asmlinkage long sys_getpeername(int fd, struct sockaddr *usockaddr,
 				      int *usockaddr_len);
 extern asmlinkage long sys_send(int fd, void *buff, size_t len, unsigned flags);
-extern asmlinkage long sys_sendto(int fd, u32 buff, __kernel_size_t32 len,
+extern asmlinkage long sys_sendto(int fd, u32 buff, compat_size_t len,
 				   unsigned flags, u32 addr, int addr_len);
 extern asmlinkage long sys_recv(int fd, void *ubuf, size_t size, unsigned flags);
-extern asmlinkage long sys_recvfrom(int fd, u32 ubuf, __kernel_size_t32 size,
+extern asmlinkage long sys_recvfrom(int fd, u32 ubuf, compat_size_t size,
 				     unsigned flags, u32 addr, u32 addr_len);
 extern asmlinkage long sys_setsockopt(int fd, int level, int optname,
 				     char *optval, int optlen);
@@ -2018,8 +1899,8 @@ struct ipc64_perm32 {
 
 struct semid_ds32 {
 	struct ipc_perm32 sem_perm;               /* permissions .. see ipc.h */
-	__kernel_time_t32 sem_otime;              /* last semop time */
-	__kernel_time_t32 sem_ctime;              /* last change time */
+	compat_time_t   sem_otime;              /* last semop time */
+	compat_time_t   sem_ctime;              /* last change time */
 	u32 sem_base;              /* ptr to first semaphore in array */
 	u32 sem_pending;          /* pending operations to be processed */
 	u32 sem_pending_last;    /* last pending operation */
@@ -2029,9 +1910,9 @@ struct semid_ds32 {
 
 struct semid64_ds32 {
 	struct ipc64_perm32 sem_perm;
-	__kernel_time_t32 sem_otime;
+	compat_time_t   sem_otime;
 	unsigned int __unused1;
-	__kernel_time_t32 sem_ctime;
+	compat_time_t   sem_ctime;
 	unsigned int __unused2;
 	unsigned int sem_nsems;
 	unsigned int __unused3;
@@ -2042,9 +1923,9 @@ struct msqid_ds32 {
 	struct ipc_perm32 msg_perm;
 	u32 msg_first;
 	u32 msg_last;
-	__kernel_time_t32 msg_stime;
-	__kernel_time_t32 msg_rtime;
-	__kernel_time_t32 msg_ctime;
+	compat_time_t   msg_stime;
+	compat_time_t   msg_rtime;
+	compat_time_t   msg_ctime;
 	u32 wwait;
 	u32 rwait;
 	unsigned short msg_cbytes;
@@ -2056,11 +1937,11 @@ struct msqid_ds32 {
 
 struct msqid64_ds32 {
 	struct ipc64_perm32 msg_perm;
-	__kernel_time_t32 msg_stime;
+	compat_time_t   msg_stime;
 	unsigned int __unused1;
-	__kernel_time_t32 msg_rtime;
+	compat_time_t   msg_rtime;
 	unsigned int __unused2;
-	__kernel_time_t32 msg_ctime;
+	compat_time_t   msg_ctime;
 	unsigned int __unused3;
 	unsigned int msg_cbytes;
 	unsigned int msg_qnum;
@@ -2074,9 +1955,9 @@ struct msqid64_ds32 {
 struct shmid_ds32 {
 	struct ipc_perm32 shm_perm;
 	int shm_segsz;
-	__kernel_time_t32 shm_atime;
-	__kernel_time_t32 shm_dtime;
-	__kernel_time_t32 shm_ctime;
+	compat_time_t   shm_atime;
+	compat_time_t   shm_dtime;
+	compat_time_t   shm_ctime;
 	__kernel_ipc_pid_t32 shm_cpid;
 	__kernel_ipc_pid_t32 shm_lpid;
 	unsigned short shm_nattch;
@@ -2084,12 +1965,12 @@ struct shmid_ds32 {
 
 struct shmid64_ds32 {
 	struct ipc64_perm shm_perm;
-	__kernel_size_t32 shm_segsz;
-	__kernel_time_t32 shm_atime;
+	compat_size_t shm_segsz;
+	compat_time_t   shm_atime;
 	unsigned int __unused1;
-	__kernel_time_t32 shm_dtime;
+	compat_time_t   shm_dtime;
 	unsigned int __unused2;
-	__kernel_time_t32 shm_ctime;
+	compat_time_t   shm_ctime;
 	unsigned int __unused3;
 	__kernel_pid_t32 shm_cpid;
 	__kernel_pid_t32 shm_lpid;
@@ -2615,8 +2496,8 @@ sys32_time (int *tloc)
 }
 
 struct rusage32 {
-	struct timeval32 ru_utime;
-	struct timeval32 ru_stime;
+	struct compat_timeval ru_utime;
+	struct compat_timeval ru_stime;
 	int    ru_maxrss;
 	int    ru_ixrss;
 	int    ru_idrss;
@@ -2899,57 +2780,152 @@ get_fpreg (int regno, struct _fpreg_ia32 *reg, struct pt_regs *ptp, struct switc
 }
 
 static int
-save_ia32_fpstate (struct task_struct *tsk, struct _fpstate_ia32 *save)
+save_ia32_fpstate (struct task_struct *tsk, struct ia32_user_i387_struct *save)
 {
 	struct switch_stack *swp;
 	struct pt_regs *ptp;
 	int i, tos;
 
 	if (!access_ok(VERIFY_WRITE, save, sizeof(*save)))
-		return -EIO;
-	__put_user(tsk->thread.fcr, &save->cw);
-	__put_user(tsk->thread.fsr, &save->sw);
-	__put_user(tsk->thread.fsr >> 32, &save->tag);
-	__put_user(tsk->thread.fir, &save->ipoff);
-	__put_user(__USER_CS, &save->cssel);
-	__put_user(tsk->thread.fdr, &save->dataoff);
-	__put_user(__USER_DS, &save->datasel);
+		return -EFAULT;
+
+	__put_user(tsk->thread.fcr & 0xffff, &save->cwd);
+	__put_user(tsk->thread.fsr & 0xffff, &save->swd);
+	__put_user((tsk->thread.fsr>>16) & 0xffff, &save->twd);
+	__put_user(tsk->thread.fir, &save->fip);
+	__put_user((tsk->thread.fir>>32) & 0xffff, &save->fcs);
+	__put_user(tsk->thread.fdr, &save->foo);
+	__put_user((tsk->thread.fdr>>32) & 0xffff, &save->fos);
+
 	/*
 	 *  Stack frames start with 16-bytes of temp space
 	 */
 	swp = (struct switch_stack *)(tsk->thread.ksp + 16);
 	ptp = ia64_task_regs(tsk);
-	tos = (tsk->thread.fsr >> 11) & 3;
+	tos = (tsk->thread.fsr >> 11) & 7;
 	for (i = 0; i < 8; i++)
-		put_fpreg(i, &save->_st[i], ptp, swp, tos);
+		put_fpreg(i, (struct _fpreg_ia32 *)&save->st_space[4*i], ptp, swp, tos);
 	return 0;
 }
 
 static int
-restore_ia32_fpstate (struct task_struct *tsk, struct _fpstate_ia32 *save)
+restore_ia32_fpstate (struct task_struct *tsk, struct ia32_user_i387_struct *save)
 {
 	struct switch_stack *swp;
 	struct pt_regs *ptp;
-	int i, tos, ret;
-	int fsrlo, fsrhi;
+	int i, tos;
+	unsigned int fsrlo, fsrhi, num32;
 
 	if (!access_ok(VERIFY_READ, save, sizeof(*save)))
-		return(-EIO);
-	ret = __get_user(tsk->thread.fcr, (unsigned int *)&save->cw);
-	ret |= __get_user(fsrlo, (unsigned int *)&save->sw);
-	ret |= __get_user(fsrhi, (unsigned int *)&save->tag);
-	tsk->thread.fsr = ((long)fsrhi << 32) | (long)fsrlo;
-	ret |= __get_user(tsk->thread.fir, (unsigned int *)&save->ipoff);
-	ret |= __get_user(tsk->thread.fdr, (unsigned int *)&save->dataoff);
+		return(-EFAULT);
+
+	__get_user(num32, (unsigned int *)&save->cwd);
+	tsk->thread.fcr = (tsk->thread.fcr & (~0x1f3f)) | (num32 & 0x1f3f);
+	__get_user(fsrlo, (unsigned int *)&save->swd);
+	__get_user(fsrhi, (unsigned int *)&save->twd);
+	num32 = (fsrhi << 16) | fsrlo;
+	tsk->thread.fsr = (tsk->thread.fsr & (~0xffffffff)) | num32;
+	__get_user(num32, (unsigned int *)&save->fip);
+	tsk->thread.fir = (tsk->thread.fir & (~0xffffffff)) | num32;
+	__get_user(num32, (unsigned int *)&save->foo);
+	tsk->thread.fdr = (tsk->thread.fdr & (~0xffffffff)) | num32;
+
 	/*
 	 *  Stack frames start with 16-bytes of temp space
 	 */
 	swp = (struct switch_stack *)(tsk->thread.ksp + 16);
 	ptp = ia64_task_regs(tsk);
-	tos = (tsk->thread.fsr >> 11) & 3;
+	tos = (tsk->thread.fsr >> 11) & 7;
 	for (i = 0; i < 8; i++)
-		get_fpreg(i, &save->_st[i], ptp, swp, tos);
-	return ret ? -EFAULT : 0;
+		get_fpreg(i, (struct _fpreg_ia32 *)&save->st_space[4*i], ptp, swp, tos);
+	return 0;
+}
+
+static int
+save_ia32_fpxstate (struct task_struct *tsk, struct ia32_user_fxsr_struct *save)
+{
+	struct switch_stack *swp;
+	struct pt_regs *ptp;
+	int i, tos;
+	unsigned long mxcsr=0;
+	unsigned long num128[2];
+
+	if (!access_ok(VERIFY_WRITE, save, sizeof(*save)))
+		return -EFAULT;
+
+	__put_user(tsk->thread.fcr & 0xffff, &save->cwd);
+	__put_user(tsk->thread.fsr & 0xffff, &save->swd);
+	__put_user((tsk->thread.fsr>>16) & 0xffff, &save->twd);
+	__put_user(tsk->thread.fir, &save->fip);
+	__put_user((tsk->thread.fir>>32) & 0xffff, &save->fcs);
+	__put_user(tsk->thread.fdr, &save->foo);
+	__put_user((tsk->thread.fdr>>32) & 0xffff, &save->fos);
+
+        /*
+         *  Stack frames start with 16-bytes of temp space
+         */
+        swp = (struct switch_stack *)(tsk->thread.ksp + 16);
+        ptp = ia64_task_regs(tsk);
+	tos = (tsk->thread.fsr >> 11) & 7;
+        for (i = 0; i < 8; i++)
+		put_fpreg(i, (struct _fpreg_ia32 *)&save->st_space[4*i], ptp, swp, tos);
+
+	mxcsr = ((tsk->thread.fcr>>32) & 0xff80) | ((tsk->thread.fsr>>32) & 0x3f);
+	__put_user(mxcsr & 0xffff, &save->mxcsr);
+	for (i = 0; i < 8; i++) {
+		memcpy(&(num128[0]), &(swp->f16) + i*2, sizeof(unsigned long));
+		memcpy(&(num128[1]), &(swp->f17) + i*2, sizeof(unsigned long));
+		copy_to_user(&save->xmm_space[0] + 4*i, num128, sizeof(struct _xmmreg_ia32));
+	}
+	return 0;
+}
+
+static int
+restore_ia32_fpxstate (struct task_struct *tsk, struct ia32_user_fxsr_struct *save)
+{
+	struct switch_stack *swp;
+	struct pt_regs *ptp;
+	int i, tos;
+	unsigned int fsrlo, fsrhi, num32;
+	int mxcsr;
+	unsigned long num64;
+	unsigned long num128[2];
+
+	if (!access_ok(VERIFY_READ, save, sizeof(*save)))
+		return(-EFAULT);
+
+	__get_user(num32, (unsigned int *)&save->cwd);
+	tsk->thread.fcr = (tsk->thread.fcr & (~0x1f3f)) | (num32 & 0x1f3f);
+	__get_user(fsrlo, (unsigned int *)&save->swd);
+	__get_user(fsrhi, (unsigned int *)&save->twd);
+	num32 = (fsrhi << 16) | fsrlo;
+	tsk->thread.fsr = (tsk->thread.fsr & (~0xffffffff)) | num32;
+	__get_user(num32, (unsigned int *)&save->fip);
+	tsk->thread.fir = (tsk->thread.fir & (~0xffffffff)) | num32;
+	__get_user(num32, (unsigned int *)&save->foo);
+	tsk->thread.fdr = (tsk->thread.fdr & (~0xffffffff)) | num32;
+
+	/*
+	 *  Stack frames start with 16-bytes of temp space
+	 */
+	swp = (struct switch_stack *)(tsk->thread.ksp + 16);
+	ptp = ia64_task_regs(tsk);
+	tos = (tsk->thread.fsr >> 11) & 7;
+	for (i = 0; i < 8; i++)
+	get_fpreg(i, (struct _fpreg_ia32 *)&save->st_space[4*i], ptp, swp, tos);
+
+	__get_user(mxcsr, (unsigned int *)&save->mxcsr);
+	num64 = mxcsr & 0xff10;
+	tsk->thread.fcr = (tsk->thread.fcr & (~0xff1000000000)) | (num64<<32);
+	num64 = mxcsr & 0x3f;
+	tsk->thread.fsr = (tsk->thread.fsr & (~0x3f00000000)) | (num64<<32);
+
+	for (i = 0; i < 8; i++) {
+		copy_from_user(num128, &save->xmm_space[0] + 4*i, sizeof(struct _xmmreg_ia32));
+		memcpy(&(swp->f16) + i*2, &(num128[0]), sizeof(unsigned long));
+		memcpy(&(swp->f17) + i*2, &(num128[1]), sizeof(unsigned long));
+	}
+	return 0;
 }
 
 extern asmlinkage long sys_ptrace (long, pid_t, unsigned long, unsigned long, long, long, long,
@@ -3061,11 +3037,19 @@ sys32_ptrace (int request, pid_t pid, unsigned int addr, unsigned int data,
 		break;
 
 	      case IA32_PTRACE_GETFPREGS:
-		ret = save_ia32_fpstate(child, (struct _fpstate_ia32 *) A(data));
+		ret = save_ia32_fpstate(child, (struct ia32_user_i387_struct *) A(data));
+		break;
+
+	      case IA32_PTRACE_GETFPXREGS:
+		ret = save_ia32_fpxstate(child, (struct ia32_user_fxsr_struct *) A(data));
 		break;
 
 	      case IA32_PTRACE_SETFPREGS:
-		ret = restore_ia32_fpstate(child, (struct _fpstate_ia32 *) A(data));
+		ret = restore_ia32_fpstate(child, (struct ia32_user_i387_struct *) A(data));
+		break;
+
+	      case IA32_PTRACE_SETFPXREGS:
+		ret = restore_ia32_fpxstate(child, (struct ia32_user_fxsr_struct *) A(data));
 		break;
 
 	      case PTRACE_SYSCALL:	/* continue, stop after next syscall */
@@ -3535,9 +3519,12 @@ putstat64 (struct stat64 *ubuf, struct kstat *kbuf)
 	err |= __put_user(kbuf->rdev, &ubuf->st_rdev);
 	err |= __put_user(kbuf->size, &ubuf->st_size_lo);
 	err |= __put_user((kbuf->size >> 32), &ubuf->st_size_hi);
-	err |= __put_user(kbuf->atime, &ubuf->st_atime);
-	err |= __put_user(kbuf->mtime, &ubuf->st_mtime);
-	err |= __put_user(kbuf->ctime, &ubuf->st_ctime);
+	err |= __put_user(kbuf->atime.tv_sec, &ubuf->st_atime);
+	err |= __put_user(kbuf->atime.tv_nsec, &ubuf->st_atime_nsec);
+	err |= __put_user(kbuf->mtime.tv_sec, &ubuf->st_mtime);
+	err |= __put_user(kbuf->mtime.tv_nsec, &ubuf->st_mtime_nsec);
+	err |= __put_user(kbuf->ctime.tv_sec, &ubuf->st_ctime);
+	err |= __put_user(kbuf->ctime.tv_nsec, &ubuf->st_ctime_nsec);
 	err |= __put_user(kbuf->blksize, &ubuf->st_blksize);
 	err |= __put_user(kbuf->blocks, &ubuf->st_blocks);
 	return err;
@@ -3624,7 +3611,7 @@ sys32_sysinfo (struct sysinfo32 *info)
 }
 
 asmlinkage long
-sys32_sched_rr_get_interval (pid_t pid, struct timespec32 *interval)
+sys32_sched_rr_get_interval (pid_t pid, struct compat_timespec *interval)
 {
 	extern asmlinkage long sys_sched_rr_get_interval (pid_t, struct timespec *);
 	mm_segment_t old_fs = get_fs();
@@ -3699,6 +3686,37 @@ sys32_brk (unsigned int brk)
 	if (ret < obrk)
 		clear_user((void *) ret, PAGE_ALIGN(ret) - ret);
 	return ret;
+}
+
+/*
+ * Exactly like fs/open.c:sys_open(), except that it doesn't set the O_LARGEFILE flag.
+ */
+asmlinkage long
+sys32_open (const char * filename, int flags, int mode)
+{
+	char * tmp;
+	int fd, error;
+
+	tmp = getname(filename);
+	fd = PTR_ERR(tmp);
+	if (!IS_ERR(tmp)) {
+		fd = get_unused_fd();
+		if (fd >= 0) {
+			struct file *f = filp_open(tmp, flags, mode);
+			error = PTR_ERR(f);
+			if (IS_ERR(f))
+				goto out_error;
+			fd_install(fd, f);
+		}
+out:
+		putname(tmp);
+	}
+	return fd;
+
+out_error:
+	put_unused_fd(fd);
+	fd = error;
+	goto out;
 }
 
 #ifdef	NOTYET  /* UNTESTED FOR IA64 FROM HERE DOWN */
@@ -4193,7 +4211,7 @@ struct timex32 {
 	u32 modes;
 	s32 offset, freq, maxerror, esterror;
 	s32 status, constant, precision, tolerance;
-	struct timeval32 time;
+	struct compat_timeval time;
 	s32 tick;
 	s32 ppsfreq, jitter, shift, stabil;
 	s32 jitcnt, calcnt, errcnt, stbcnt;

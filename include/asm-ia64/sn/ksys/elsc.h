@@ -9,7 +9,10 @@
 #ifndef _ASM_SN_KSYS_ELSC_H
 #define _ASM_SN_KSYS_ELSC_H
 
+#include <linux/config.h>
 #include <asm/sn/ksys/l1.h>
+
+#ifdef CONFIG_IA64_SGI_SN1
 
 #define ELSC_ACP_MAX		86		/* 84+cr+lf */
 #define ELSC_LINE_MAX		(ELSC_ACP_MAX - 2)
@@ -73,7 +76,6 @@ int	elsc_power_down(elsc_t *e, int sec);
 int	elsc_power_cycle(elsc_t *e);
 int	elsc_system_reset(elsc_t *e);
 int	elsc_dip_switches(elsc_t *e);
-int	elsc_nic_get(elsc_t *e, uint64_t *nic, int verbose);
 
 int	_elsc_hbt(elsc_t *e, int ival, int rdly);
 
@@ -82,6 +84,9 @@ int	_elsc_hbt(elsc_t *e, int ival, int rdly);
 #define	elsc_hbt_send(e)		_elsc_hbt(e, 0, 1)
 
 elsc_t	       *get_elsc(void);
+
+#endif	/* CONFIG_IA64_SGI_SN1 */
+
 
 /*
  * Error codes

@@ -3,17 +3,25 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 2000-2001 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 2000-2002 Silicon Graphics, Inc. All rights reserved.
  */
 
-#include <asm/io.h>
 #include <linux/pci.h>
+#include <asm/io.h>
 #include <asm/sn/simulator.h>
-#include <asm/pio_flush.h>
 #include <asm/delay.h>
+#include <asm/sn/pda.h>
 
-static inline void *
-sn1_io_addr(unsigned long port)
+/**
+ * sn_io_addr - convert an in/out port to an i/o address
+ * @port: port to convert
+ *
+ * Legacy in/out instructions are converted to ld/st instructions
+ * on IA64.  This routine will convert a port number into a valid 
+ * SN i/o address.  Used by sn_in*() and sn_out*().
+ */
+void *
+sn_io_addr(unsigned long port)
 {
 	if (!IS_RUNNING_ON_SIMULATOR()) {
 		return( (void *)  (port | __IA64_UNCACHED_OFFSET));
@@ -38,182 +46,20 @@ sn1_io_addr(unsigned long port)
 }
 
 /**
- * sn1_inb - read a byte from a port
- * @port: port to read from
+ * sn1_mmiob - I/O space memory barrier
  *
- * Reads a byte from @port and returns it to the caller.
- */
-unsigned int
-sn1_inb (unsigned long port)
-{
-return __ia64_inb ( port );
-}
-
-/**
- * sn1_inw - read a word from a port
- * @port: port to read from
+ * Acts as a memory mapped I/O barrier for platforms that queue writes to 
+ * I/O space.  This ensures that subsequent writes to I/O space arrive after
+ * all previous writes.  For most ia64 platforms, this is a simple
+ * 'mf.a' instruction.  For other platforms, mmiob() may have to read
+ * a chipset register to ensure ordering.
  *
- * Reads a word from @port and returns it to the caller.
- */
-unsigned int
-sn1_inw (unsigned long port)
-{
-return __ia64_inw ( port );
-}
-
-/**
- * sn1_inl - read a word from a port
- * @port: port to read from
- *
- * Reads a word from @port and returns it to the caller.
- */
-unsigned int
-sn1_inl (unsigned long port)
-{
-return __ia64_inl ( port );
-}
-
-/**
- * sn1_outb - write a byte to a port
- * @port: port to write to
- * @val: value to write
- *
- * Writes @val to @port.
+ * On SN1, we wait for the PIO_WRITE_STATUS Bedrock register to clear.
  */
 void
-sn1_outb (unsigned char val, unsigned long port)
+sn1_mmiob (void)
 {
-return __ia64_outb ( val, port );
-}
-
-/**
- * sn1_outw - write a word to a port
- * @port: port to write to
- * @val: value to write
- *
- * Writes @val to @port.
- */
-void
-sn1_outw (unsigned short val, unsigned long port)
-{
-return __ia64_outw ( val, port );
-}
-
-/**
- * sn1_outl - write a word to a port
- * @port: port to write to
- * @val: value to write
- *
- * Writes @val to @port.
- */
-void
-sn1_outl (unsigned int val, unsigned long port)
-{
-return __ia64_outl ( val, port );
-}
-
-/**
- * sn1_inb - read a byte from a port
- * @port: port to read from
- *
- * Reads a byte from @port and returns it to the caller.
- */
-unsigned int
-sn1_inb (unsigned long port)
-{
-	volatile unsigned char *addr = sn1_io_addr(port);
-	unsigned char ret;
-
-	ret = *addr;
-	__ia64_mf_a();
-	return ret;
-}
-
-/**
- * sn1_inw - read a word from a port
- * 2port: port to read from
- *
- * Reads a word from @port and returns it to the caller.
- */
-unsigned int
-sn1_inw (unsigned long port)
-{
-	volatile unsigned short *addr = sn1_io_addr(port);
-	unsigned short ret;
-
-	ret = *addr;
-	__ia64_mf_a();
-	return ret;
-}
-
-/**
- * sn1_inl - read a word from a port
- * @port: port to read from
- *
- * Reads a word from @port and returns it to the caller.
- */
-unsigned int
-sn1_inl (unsigned long port)
-{
-	volatile unsigned int *addr = sn1_io_addr(port);
-	unsigned int ret;
-
-	ret = *addr;
-	__ia64_mf_a();
-	return ret;
-}
-
-/**
- * sn1_outb - write a byte to a port
- * @port: port to write to
- * @val: value to write
- *
- * Writes @val to @port.
- */
-void
-sn1_outb (unsigned char val, unsigned long port)
-{
-	volatile unsigned char *addr = sn1_io_addr(port);
-
-	*addr = val;
-	__ia64_mf_a();
-}
-
-/**
- * sn1_outw - write a word to a port
- * @port: port to write to
- * @val: value to write
- *
- * Writes @val to @port.
- */
-void
-sn1_outw (unsigned short val, unsigned long port)
-{
-	volatile unsigned short *addr = sn1_io_addr(port);
-
-	*addr = val;
-	__ia64_mf_a();
-}
-
-/**
- * sn1_outl - write a word to a port
- * @port: port to write to
- * @val: value to write
- *
- * Writes @val to @port.
- */
-void
-sn1_outl (unsigned int val, unsigned long port)
-{
-	volatile unsigned int *addr = sn1_io_addr(port);
-
-	*addr = val;
-	__ia64_mf_a();
-}
-#endif /* SN1_IOPORTS */
-
-void
-sn_mmiob ()
-{
-	PIO_FLUSH();
+	(volatile unsigned long) (*pda.bedrock_rev_id);
+	while (!(volatile unsigned long) (*pda.pio_write_status_addr))
+		udelay(5);
 }

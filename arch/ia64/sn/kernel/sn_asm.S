@@ -1,6 +1,33 @@
-
 /*
- * Copyright (c) 2000-2001 Silicon Graphics, Inc.  All rights reserved.
+ * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * 
+ * This program is free software; you can redistribute it and/or modify it 
+ * under the terms of version 2 of the GNU General Public License 
+ * as published by the Free Software Foundation.
+ * 
+ * This program is distributed in the hope that it would be useful, but 
+ * WITHOUT ANY WARRANTY; without even the implied warranty of 
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+ * 
+ * Further, this software is distributed without any warranty that it is 
+ * free of the rightful claim of any third person regarding infringement 
+ * or the like.  Any license provided herein, whether implied or 
+ * otherwise, applies only to this software file.  Patent licenses, if 
+ * any, provided herein do not apply to combinations of this program with 
+ * other software, or any other product whatsoever.
+ * 
+ * You should have received a copy of the GNU General Public 
+ * License along with this program; if not, write the Free Software 
+ * Foundation, Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
+ * 
+ * Contact information:  Silicon Graphics, Inc., 1600 Amphitheatre Pkwy, 
+ * Mountain View, CA  94043, or:
+ * 
+ * http://www.sgi.com 
+ * 
+ * For further information regarding this notice, see: 
+ * 
+ * http://oss.sgi.com/projects/GenInfo/NoticeExplan
  */
 
 #include <linux/config.h>
@@ -8,9 +35,10 @@
 
 // Testing only.
 // Routine will cause MCAs
-//   zzzmsa(n)
+//   zzzmca(n)
 //      n=0 MCA via duplicate TLB dropin
-//      n=0 MCA via read of garbage address
+//      n=1 MCA via read of garbage address
+//      n=2 MCA via lfetch read of garbage address
 //
 
 #define ITIR(key, ps)           ((key<<8) | (ps<<2))
@@ -45,20 +73,30 @@ zzzmca:
 
                         rsm      0x2000;;
                         srlz.d;
-                        mov      r11      = 1
+                        mov      r11      = 5
                         mov      r3       = ITIR(0,TLB_PAGESIZE);;
                         mov      cr.itir  = r3
                         mov      r10      = 0;;
                         itr.d    dtr[r11] = r10;;
-                        mov      r11      = 2
+                        mov      r11      = 6
 
                         itr.d    dtr[r11] = r10;;
                         br      9f
 
-1:                      movl    r8=0xfe00000048;;
-                        ld8     r9=[r8];;
+1:
+			cmp.eq	p6,p7=1,r32
+#ifdef CONFIG_IA64_SGI_SN1
+                        movl    r8=0xe00000fe00000048;;
+#else
+                        movl    r8=0xe0007fb000000048;;
+#endif
+                 (p6)   ld8     r9=[r8]
+                 (p7)   lfetch.fault.nt2  [r8]
+			;;
                         mf
+			;;
                         mf.a
+			;;
                         srlz.d
 
 9:                      mov     ar.pfs=loc4
@@ -66,83 +104,4 @@ zzzmca:
 
                         .endp   zzzmca
 
-                        .global zzzspec
-                        .proc   zzzspec
-zzzspec:
-			mov	r8=r32
-			movl	r9=0xe000000000000000
-			movl	r10=0x4000;;
-			ld8.s	r16=[r8];;
-			ld8.s	r17=[r9];;
-			add	r8=r8,r10;;
-			ld8.s	r18=[r8];;
-			add	r8=r8,r10;;
-			ld8.s	r19=[r8];;
-			add	r8=r8,r10;;
-			ld8.s	r20=[r8];;
-			mov	r8=r0
-			tnat.nz	p6,p0=r16
-			tnat.nz	p7,p0=r17
-			tnat.nz	p8,p0=r18
-			tnat.nz	p9,p0=r19
-			tnat.nz	p10,p0=r20;;
-		(p6)	dep	r8=-1,r8,0,1;;
-		(p7)	dep	r8=-1,r8,1,1;;
-		(p8)	dep	r8=-1,r8,2,1;;
-		(p9)	dep	r8=-1,r8,3,1;;
-		(p10)	dep	r8=-1,r8,4,1;;
-                        br.ret.sptk     rp
-                        .endp   zzzspec
-
-                        .global zzzspec2
-                        .proc   zzzspec2
-zzzspec2:
-			cmp.eq	p6,p7=r2,r2
-			movl	r16=0xc0000a0001000020
-			;;
-			mf
-			;;
-			ld8	r9=[r16]
-		(p6)	br.spnt	1f
-			ld8	r10=[r32]
-			;;
-		1:	mf.a
-			mf
-
-			ld8	r9=[r16];;
-			cmp.ne	p6,p7=r9,r16
-		(p6)	br.spnt	1f
-			ld8	r10=[r32]
-			;;
-		1:	mf.a
-			mf
-
-			ld8	r9=[r33];;
-			cmp.ne	p6,p7=r9,r33
-		(p6)	br.spnt	1f
-			ld8	r10=[r32]
-			;;
-		1:	mf.a
-			mf
-
-			tpa	r23=r32
-			add	r20=512,r33
-			add	r21=1024,r33;;
-			ld8	r9=[r20]
-			ld8	r10=[r21];;
-			nop.i	0
-			{ .mib
-			nop.m 0
-			cmp.ne	p6,p7=r10,r33
-		(p6)	br.spnt	1f
-			}
-			ld8	r10=[r32]
-			;;
-		1:	mf.a
-			mf
-			br.ret.sptk     rp
-
-                        .endp   zzzspec
-
 #endif
-

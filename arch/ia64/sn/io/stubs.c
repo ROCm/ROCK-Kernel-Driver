@@ -9,8 +9,9 @@
 
 #include <linux/types.h>
 #include <linux/ctype.h>
-#include <linux/mm.h>
+#include <linux/mmzone.h>
 #include <linux/slab.h>
+#include <asm/sn/arch.h>
 #include <asm/sn/sgi.h>
 #include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
@@ -28,8 +29,8 @@
 
 int pcibr_prefetch_enable_rev, pcibr_wg_enable_rev;
 int default_intr_pri;
-int force_fire_and_forget;
-int ignore_conveyor_override;
+int force_fire_and_forget = 1;
+int ignore_conveyor_override = 0;
 
 devfs_handle_t dummy_vrtx;	/* Needed for cpuid_to_vertex() in hack.h */
 
@@ -53,54 +54,24 @@ is_sys_critical_vertex(devfs_handle_t x)
 	return(0);
 }
 
-char *
-nic_bridge_vertex_info(devfs_handle_t v, nic_data_t mcr)
-{
-	FIXME("nic_bridge_vertex_info : returns NULL");
-	return((char *)0);
-}
-
 void *
-snia_kmem_alloc_node(register size_t size, register int flags, cnodeid_t node)
-{
-        /* Allocates on node 'node' */
-	FIXME("snia_kmem_alloc_node : use kmalloc");
-	return(kmalloc(size, GFP_KERNEL));
-}
-
-void *
-snia_kmem_zalloc_node(register size_t size, register int flags, cnodeid_t node)
-{
-	FIXME("snia_kmem_zalloc_node : use kmalloc");
-	return(kmalloc(size, GFP_KERNEL));
-}
-
-void
-snia_kmem_free(void *where, int size)
-{
-	FIXME("snia_kmem_free : use kfree");
-	return(kfree(where));
-}
-
-
-void *
-snia_kmem_zone_alloc(register zone_t *zone, int flags)
+snia_kmem_zone_alloc(register struct zone *zone, int flags)
 {
 	FIXME("snia_kmem_zone_alloc : return null");
 	return((void *)0);
 }
 
 void
-snia_kmem_zone_free(register zone_t *zone, void *ptr)
+snia_kmem_zone_free(register struct zone *zone, void *ptr)
 {
 	FIXME("snia_kmem_zone_free : no-op");
 }
 
-zone_t *
+struct zone *
 snia_kmem_zone_init(register int size, char *zone_name)
 {
 	FIXME("snia_kmem_zone_free : returns NULL");
-	return((zone_t *)0);
+	return((struct zone *)0);
 }
 
 int
@@ -113,13 +84,6 @@ compare_and_swap_ptr(void **location, void *old_ptr, void *new_ptr)
 	}
 	else
 		return(0);
-}
-
-void *
-swap_ptr(void **loc, void *new)
-{
-	FIXME("swap_ptr : returns null");
-	return((void *)0);
 }
 
 /* For ml/SN/SN1/slots.c */
@@ -153,10 +117,8 @@ nic_vmc_check(devfs_handle_t vhdl, char *nicinfo)
 char *
 nic_vertex_info_get(devfs_handle_t v)
 {
-
 	FIXME("nic_vertex_info_get\n");
 	return(NULL);
-
 }
 
 int

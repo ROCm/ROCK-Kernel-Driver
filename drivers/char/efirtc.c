@@ -40,7 +40,7 @@
 #include <asm/uaccess.h>
 #include <asm/system.h>
 
-#define EFI_RTC_VERSION		"0.3"
+#define EFI_RTC_VERSION		"0.4"
 
 #define EFI_ISDST (EFI_TIME_ADJUST_DAYLIGHT|EFI_TIME_IN_DAYLIGHT)
 /*
@@ -315,14 +315,14 @@ efi_rtc_get_status(char *buf)
 	spin_unlock_irqrestore(&efi_rtc_lock,flags);
 
 	p += sprintf(p,
-		     "Time          : %u:%u:%u.%09u\n"
-		     "Date          : %u-%u-%u\n"
-		     "Daylight      : %u\n",
+		     "Time           : %u:%u:%u.%09u\n"
+		     "Date           : %u-%u-%u\n"
+		     "Daylight       : %u\n",
 		     eft.hour, eft.minute, eft.second, eft.nanosecond, 
 		     eft.year, eft.month, eft.day,
 		     eft.daylight);
 
-	if ( eft.timezone == EFI_UNSPECIFIED_TIMEZONE)
+	if (eft.timezone == EFI_UNSPECIFIED_TIMEZONE)
 		p += sprintf(p, "Timezone       : unspecified\n");
 	else
 		/* XXX fixme: convert to string? */
@@ -341,7 +341,7 @@ efi_rtc_get_status(char *buf)
 		     enabled == 1 ? "yes" : "no",
 		     pending == 1 ? "yes" : "no");
 
-	if ( eft.timezone == EFI_UNSPECIFIED_TIMEZONE)
+	if (eft.timezone == EFI_UNSPECIFIED_TIMEZONE)
 		p += sprintf(p, "Timezone       : unspecified\n");
 	else
 		/* XXX fixme: convert to string? */
@@ -375,17 +375,25 @@ efi_rtc_read_proc(char *page, char **start, off_t off,
 static int __init 
 efi_rtc_init(void)
 {
-	int ret =0;
+	int ret;
+	struct proc_dir_entry *dir;
+
 	printk(KERN_INFO "EFI Time Services Driver v%s\n", EFI_RTC_VERSION);
 
 	ret = misc_register(&efi_rtc_dev);
 	if (ret) {
-		printk(KERN_ERR "driver/efirtc: can't misc_register on minor=%d\n", EFI_RTC_MINOR);
+		printk(KERN_ERR "efirtc: can't misc_register on minor=%d\n",
+				EFI_RTC_MINOR);
 		return ret;
 	}
 
-	create_proc_read_entry ("driver/efirtc", 0, NULL, efi_rtc_read_proc, NULL);
-
+	dir = create_proc_read_entry ("driver/efirtc", 0, NULL,
+			              efi_rtc_read_proc, NULL);
+	if (dir == NULL) {
+		printk(KERN_ERR "efirtc: can't create /proc/driver/efirtc.\n");
+		misc_deregister(&efi_rtc_dev);
+		return -1;
+	}
 	return 0;
 }
 

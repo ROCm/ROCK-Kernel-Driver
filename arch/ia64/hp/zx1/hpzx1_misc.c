@@ -180,7 +180,6 @@ hpzx1_fake_pci_dev(char *name, unsigned int busnum, unsigned long addr, unsigned
 	list_add_tail(&dev->bus_list, &bus->devices);
 	list_add_tail(&dev->global_list, &pci_devices);
 
-	strcpy(dev->dev.name, dev->name);
 	strcpy(dev->dev.bus_id, dev->slot_name);
 	ret = device_register(&dev->dev);
 	if (ret < 0)
@@ -335,7 +334,7 @@ hpzx1_acpi_dev_init(void)
 
 extern void sba_init(void);
 
-static void
+static int
 hpzx1_init (void)
 {
 	/* zx1 has a hardware I/O TLB which lets us DMA from any device to any address */
@@ -343,6 +342,7 @@ hpzx1_init (void)
 
 	hpzx1_acpi_dev_init();
 	sba_init();
+	return 0;
 }
 
 subsys_initcall(hpzx1_init);

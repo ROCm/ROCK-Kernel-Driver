@@ -1,4 +1,4 @@
-# arch/ia64/sn/Makefile
+# arch/ia64/sn/kernel/Makefile
 #
 # Copyright (C) 1999,2001-2002 Silicon Graphics, Inc.  All Rights Reserved.
 #
@@ -33,11 +33,17 @@
 
 EXTRA_CFLAGS    := -DLITTLE_ENDIAN
 
-export-objs 	:= sn_ksyms.o
+.S.s:
+	$(CPP) $(AFLAGS) $(AFLAGS_KERNEL) -o $*.s $<
+.S.o:
+	$(CC) $(AFLAGS) $(AFLAGS_KERNEL) -c -o $*.o $<
 
-obj-y		= probe.o setup.o sn_asm.o sv.o bte.o
-obj-$(CONFIG_IA64_SGI_SN1)      += irq.o mca.o sn1/
-obj-$(CONFIG_IA64_SGI_SN2)      += irq.o mca.o sn2/
+export-objs = sn_ksyms.o iomv.o
+
+obj-y		= probe.o setup.o sn_asm.o sv.o bte.o iomv.o
+obj-$(CONFIG_IA64_SGI_SN1)      += irq.o mca.o
+obj-$(CONFIG_IA64_SGI_SN2)      += irq.o mca.o
 obj-$(CONFIG_IA64_SGI_AUTOTEST) += llsc4.o misctest.o
 obj-$(CONFIG_IA64_GENERIC)      += machvec.o
 obj-$(CONFIG_MODULES)           += sn_ksyms.o
+obj-$(CONFIG_IA64_SGI_SN_BRT)	+= bte_regr_test.o

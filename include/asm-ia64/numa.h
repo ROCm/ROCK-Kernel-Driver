@@ -62,6 +62,8 @@ extern u8 numa_slit[NR_NODES * NR_NODES];
 
 extern int paddr_to_nid(unsigned long paddr);
 
+#define local_nodeid (cpu_to_node_map[smp_processor_id()])
+
 #endif /* CONFIG_NUMA */
 
 #endif /* _ASM_IA64_NUMA_H */

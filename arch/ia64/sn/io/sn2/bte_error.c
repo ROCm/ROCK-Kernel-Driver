@@ -1,4 +1,4 @@
-/* $Id$
+/* $Id: bte_error.c,v 1.1 2002/02/28 17:31:25 marcelo Exp $
  *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -54,96 +54,14 @@
  *									*
  ************************************************************************/
 
-#ifdef BTE_ERROR
-// This routine is not called.  Yet.  It may be someday.  It probably
-// *should* be someday.  Until then, ifdef it out.
-bte_result_t
-bte_error_handler(bte_handle_t *bh)
-/*
- * Function: 	bte_error_handler
- * Purpose:	Process a BTE error after a transfer has failed.
- * Parameters:	bh - bte handle of bte that failed.
- * Returns:	The BTE error type.
- * Notes:
+/* 
+ * >>> bte_crb_error_handler needs to be broken into two parts.  The
+ * first should cleanup the CRB.  The second should wait until all bte
+ * related CRB's are complete and then do the error reset.
  */
-{
-    devfs_handle_t	hub_v;
-    hubinfo_t		hinfo;
-    int			il;
-    hubreg_t		iidsr, imem, ieclr;
-    hubreg_t		bte_status;
-
-    bh->bh_bte->bte_error_count++;
-
-    /* 
-     * Process any CRB logs - we know that the bte_context contains
-     * the BTE completion status, but to avoid a race with error
-     * processing, we force a call to pick up any CRB errors pending. 
-     * After this call, we know that we have any CRB errors related to 
-     * this BTE transfer in the context.
-     */
-    hub_v = cnodeid_to_vertex(bh->bh_bte->bte_cnode);
-    hubinfo_get(hub_v, &hinfo);
-    (void)hubiio_crb_error_handler(hub_v, hinfo);
-
-    /* Be sure BTE is stopped */
-
-    (void)BTE_LOAD(bh->bh_bte->bte_base, BTEOFF_CTRL);
-
-    /*	
-     * Now clear up the rest of the error - be sure to hold crblock 
-     * to avoid race with other cpu on this node.
-     */
-    imem = REMOTE_HUB_L(hinfo->h_nasid, IIO_IMEM);
-    ieclr = REMOTE_HUB_L(hinfo->h_nasid, IIO_IECLR);
-    if (bh->bh_bte->bte_num == 0) {
-	imem |= IIO_IMEM_W0ESD | IIO_IMEM_B0ESD;
-	ieclr|= IECLR_BTE0;
-    } else {
-	imem |= IIO_IMEM_W0ESD | IIO_IMEM_B1ESD;
-	ieclr|= IECLR_BTE1;
-    }
-
-    REMOTE_HUB_S(hinfo->h_nasid, IIO_IMEM, imem);
-    REMOTE_HUB_S(hinfo->h_nasid, IIO_IECLR, ieclr);
-
-    iidsr  = REMOTE_HUB_L(hinfo->h_nasid, IIO_IIDSR);
-    iidsr &= ~IIO_IIDSR_SENT_MASK;
-    iidsr |= IIO_IIDSR_ENB_MASK;
-    REMOTE_HUB_S(hinfo->h_nasid, IIO_IIDSR, iidsr);
-    mutex_spinunlock(&hinfo->h_crblock, il);
-
-    bte_status = BTE_LOAD(bh->bh_bte->bte_base, BTEOFF_STAT);
-    BTE_STORE(bh->bh_bte->bte_base, BTEOFF_STAT, bte_status & ~IBLS_BUSY);
-    ASSERT(!BTE_IS_BUSY(BTE_LOAD(bh->bh_bte->bte_base, BTEOFF_STAT)));
-
-    switch(bh->bh_error) {
-    case IIO_ICRB_ECODE_PERR:
-	return(BTEFAIL_POISON);
-    case IIO_ICRB_ECODE_WERR:
-	return(BTEFAIL_PROT);
-    case IIO_ICRB_ECODE_AERR:
-	return(BTEFAIL_ACCESS);
-    case IIO_ICRB_ECODE_TOUT:
-	return(BTEFAIL_TOUT);
-    case IIO_ICRB_ECODE_XTERR:
-	return(BTEFAIL_ERROR);
-    case IIO_ICRB_ECODE_DERR:
-	return(BTEFAIL_DIR);
-    case IIO_ICRB_ECODE_PWERR:
-    case IIO_ICRB_ECODE_PRERR:
-	/* NO BREAK */
-    default:
-	printk("BTE failure (%d) unexpected\n", 
-		bh->bh_error);
-	return(BTEFAIL_ERROR);
-    }
-}
-#endif // BTE_ERROR
-
 void
 bte_crb_error_handler(devfs_handle_t hub_v, int btenum, 
-		      int crbnum, ioerror_t *ioe)
+		      int crbnum, ioerror_t *ioe, int bteop)
 /*
  * Function: 	bte_crb_error_handler
  * Purpose:	Process a CRB for a specific HUB/BTE
@@ -162,29 +80,70 @@ bte_crb_error_handler(devfs_handle_t hub_v, int btenum,
 	icrba_t		crba; 
 	icrbb_t		crbb; 
 	nasid_t		n;
+	hubreg_t	iidsr, imem, ieclr;
 
 	hubinfo_get(hub_v, &hinfo);
 
 
 	n = hinfo->h_nasid;
 	
-	/* Step 1 */
-	crba.ii_icrb0_a_regval = REMOTE_HUB_L(n, IIO_ICRB_A(crbnum));
-	crbb.ii_icrb0_b_regval = REMOTE_HUB_L(n, IIO_ICRB_B(crbnum));
 
-
-	/* Zero error and error code to prevent error_dump complaining
-	 * about these CRBs. 
+	/*
+	 * The following 10 lines (or so) are adapted from IRIXs
+	 * bte_crb_error function.  No clear documentation tells
+	 * why the crb needs to complete normally in order for
+	 * the BTE to resume normal operations.  This first step
+	 * appears vital!
 	 */
+
+	/*
+	 * Zero error and error code to prevent error_dump complaining
+	 * about these CRBs. Copy the CRB to the notification line.
+	 * The crb address is in shub format (physical address shifted
+	 * right by cacheline size).
+	 */
+	crbb.ii_icrb0_b_regval = REMOTE_HUB_L(n, IIO_ICRB_B(crbnum));
 	crbb.b_error=0;
 	crbb.b_ecode=0;
+	REMOTE_HUB_S(n, IIO_ICRB_B(crbnum), crbb.ii_icrb0_b_regval);
 
-	/* Step 2 */
+	crba.ii_icrb0_a_regval = REMOTE_HUB_L(n, IIO_ICRB_A(crbnum));
+	crba.a_addr = TO_PHYS((u64)&nodepda->bte_if[btenum].notify) >> 3;
+	crba.a_valid = 1;
 	REMOTE_HUB_S(n, IIO_ICRB_A(crbnum), crba.ii_icrb0_a_regval);
-	/* Step 3 */
+
 	REMOTE_HUB_S(n, IIO_ICCR, 
 		     IIO_ICCR_PENDING | IIO_ICCR_CMD_FLUSH | crbnum);
+
 	while (REMOTE_HUB_L(n, IIO_ICCR) & IIO_ICCR_PENDING)
 	    ;
+
+
+	/* Terminate the BTE. */
+	/* >>> The other bte transfer will need to be restarted. */
+	HUB_L((shubreg_t *)((nodepda->bte_if[btenum].bte_base_addr +
+		       IIO_IBCT0 - IIO_IBLS0)));
+
+	imem = REMOTE_HUB_L(n, IIO_IMEM);
+	ieclr = REMOTE_HUB_L(n, IIO_IECLR);
+	if (btenum == 0) {
+		imem |= IIO_IMEM_W0ESD | IIO_IMEM_B0ESD;
+		ieclr|= IECLR_BTE0;
+	} else {
+		imem |= IIO_IMEM_W0ESD | IIO_IMEM_B1ESD;
+		ieclr|= IECLR_BTE1;
+	}
+	REMOTE_HUB_S(n, IIO_IMEM, imem);
+	REMOTE_HUB_S(n, IIO_IECLR, ieclr);
+		
+	iidsr  = REMOTE_HUB_L(n, IIO_IIDSR);
+	iidsr &= ~IIO_IIDSR_SENT_MASK;
+	iidsr |= IIO_IIDSR_ENB_MASK;
+	REMOTE_HUB_S(n, IIO_IIDSR, iidsr);
+
+
+ 	bte_reset_nasid(n);
+
+	*nodepda->bte_if[btenum].most_rcnt_na = IBLS_ERROR;
 }
 

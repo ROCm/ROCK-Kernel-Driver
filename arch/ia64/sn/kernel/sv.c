@@ -3,7 +3,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 2000-2001 Silicon Graphics, Inc.  All rights reserved
+ * Copyright (C) 2000-2002 Silicon Graphics, Inc.  All rights reserved
  *
  * This implemenation of synchronization variables is heavily based on
  * one done by Steve Lord <lord@sgi.com>
@@ -210,7 +210,7 @@ signed long sv_wait(sv_t *sv, int sv_wait_flags, unsigned long timeout)
 	 */
 
 	/* don't need the _irqsave part, but there is no wq_write_lock() */
-	wq_write_lock_irqsave(&sv->sv_waiters.lock, flags);
+	write_lock_irqsave(&sv->sv_waiters.lock, flags);
 
 #ifdef EXCLUSIVE_IN_QUEUE
 	wait.flags |= WQ_FLAG_EXCLUSIVE;
@@ -228,7 +228,7 @@ signed long sv_wait(sv_t *sv, int sv_wait_flags, unsigned long timeout)
 					(void *)sv, sv->sv_flags);
 		BUG();
 	}
-	wq_write_unlock_irqrestore(&sv->sv_waiters.lock, flags);
+	write_unlock_irqrestore(&sv->sv_waiters.lock, flags);
 
 	if(sv_wait_flags & SV_WAIT_SIG)
 		set_current_state(TASK_EXCLUSIVE | TASK_INTERRUPTIBLE  );

@@ -1,3 +1,8 @@
+#
+# For a description of the syntax of this configuration file,
+# see Documentation/kbuild/kconfig-language.txt.
+#
+
 mainmenu "IA-64 Linux Kernel Configuration"
 
 source "init/Kconfig"
@@ -215,6 +220,22 @@ config NUMA
 	  Access).  This option is for configuring high-end multiprocessor
 	  server systems.  If in doubt, say N.
 
+choice
+	prompt "Maximum Memory per NUMA Node" if NUMA && IA64_DIG
+	depends on NUMA && IA64_DIG
+	default IA64_NODESIZE_16GB
+
+config IA64_NODESIZE_16GB
+	bool "16GB"
+
+config IA64_NODESIZE_64GB
+	bool "64GB"
+
+config IA64_NODESIZE_256GB
+	bool "256GB"
+
+endchoice
+
 config DISCONTIGMEM
 	bool
 	depends on IA64_SGI_SN1 || IA64_SGI_SN2 || (IA64_GENERIC || IA64_DIG || IA64_HP_ZX1) && NUMA
@@ -396,6 +417,11 @@ config IA32_SUPPORT
 	  emulation support which makes it possible to transparently
 	  run IA-32 Linux binaries on an IA-64 Linux system.
 	  If in doubt, say Y.
+
+config COMPAT
+	bool
+	depends on IA32_SUPPORT
+	default y
 
 config PERFMON
 	bool "Performance monitor support"

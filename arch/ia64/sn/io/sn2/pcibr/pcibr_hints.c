@@ -85,11 +85,9 @@ pcibr_hints_fix_some_rrbs(devfs_handle_t xconn_vhdl, unsigned mask)
 
     if (hint)
 	hint->ph_rrb_fixed = mask;
-#if DEBUG
     else
-	printk("pcibr_hints_fix_rrbs: pcibr_hints_get failed at\n"
-		"\t%p\n", xconn_vhdl);
-#endif
+        PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_HINTS, xconn_vhdl,
+		    "pcibr_hints_fix_rrbs: pcibr_hints_get failed\n"));
 }
 
 void
@@ -107,11 +105,9 @@ pcibr_hints_dualslot(devfs_handle_t xconn_vhdl,
 
     if (hint)
 	hint->ph_host_slot[guest] = host + 1;
-#if DEBUG
     else
-	printk("pcibr_hints_dualslot: pcibr_hints_get failed at\n"
-		"\t%p\n", xconn_vhdl);
-#endif
+	PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_HINTS, xconn_vhdl,
+		    "pcibr_hints_dualslot: pcibr_hints_get failed\n"));
 }
 
 void
@@ -122,11 +118,9 @@ pcibr_hints_intr_bits(devfs_handle_t xconn_vhdl,
 
     if (hint)
 	hint->ph_intr_bits = xxx_intr_bits;
-#if DEBUG
     else
-	printk("pcibr_hints_intr_bits: pcibr_hints_get failed at\n"
-	       "\t%p\n", xconn_vhdl);
-#endif
+	PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_HINTS, xconn_vhdl,
+		    "pcibr_hints_intr_bits: pcibr_hints_get failed\n"));
 }
 
 void
@@ -145,11 +139,9 @@ pcibr_hints_handsoff(devfs_handle_t xconn_vhdl)
 
     if (hint)
 	hint->ph_hands_off = 1;
-#if DEBUG
     else
-	printk("pcibr_hints_handsoff: pcibr_hints_get failed at\n"
-		"\t%p\n", xconn_vhdl);
-#endif
+	PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_HINTS, xconn_vhdl,
+		    "pcibr_hints_handsoff: pcibr_hints_get failed\n"));
 }
 
 void
@@ -161,13 +153,11 @@ pcibr_hints_subdevs(devfs_handle_t xconn_vhdl,
     char                    sdname[16];
     devfs_handle_t            pconn_vhdl = GRAPH_VERTEX_NONE;
 
-    sprintf(sdname, "pci/%d", slot);
+    sprintf(sdname, "%s/%d", EDGE_LBL_PCI, slot);
     (void) hwgraph_path_add(xconn_vhdl, sdname, &pconn_vhdl);
     if (pconn_vhdl == GRAPH_VERTEX_NONE) {
-#if DEBUG
-	printk("pcibr_hints_subdevs: hwgraph_path_create failed at\n"
-		"\t%p (seeking %s)\n", xconn_vhdl, sdname);
-#endif
+	PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_HINTS, xconn_vhdl,
+		    "pcibr_hints_subdevs: hwgraph_path_create failed\n"));
 	return;
     }
     hwgraph_info_get_LBL(pconn_vhdl, INFO_LBL_SUBDEVS, &ainfo);
@@ -176,10 +166,8 @@ pcibr_hints_subdevs(devfs_handle_t xconn_vhdl,
 
 	NEW(subdevp);
 	if (!subdevp) {
-#if DEBUG
-	    printk("pcibr_hints_subdevs: subdev ptr alloc failed at\n"
-		    "\t%p\n", pconn_vhdl);
-#endif
+	    PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_HINTS, xconn_vhdl,
+			"pcibr_hints_subdevs: subdev ptr alloc failed\n"));
 	    return;
 	}
 	*subdevp = subdevs;
@@ -189,16 +177,12 @@ pcibr_hints_subdevs(devfs_handle_t xconn_vhdl,
 	    return;
 	DEL(subdevp);
 	if (ainfo == (arbitrary_info_t) NULL) {
-#if DEBUG
-	    printk("pcibr_hints_subdevs: null subdevs ptr at\n"
-		    "\t%p\n", pconn_vhdl);
-#endif
+	    PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_HINTS, xconn_vhdl,
+			"pcibr_hints_subdevs: null subdevs ptr\n"));
 	    return;
 	}
-#if DEBUG
-	printk("pcibr_subdevs_get: dup subdev add_LBL at\n"
-		"\t%p\n", pconn_vhdl);
-#endif
+	PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_HINTS, xconn_vhdl,
+		    "pcibr_subdevs_get: dup subdev add_LBL\n"));
     }
     *(uint64_t *) ainfo = subdevs;
 }

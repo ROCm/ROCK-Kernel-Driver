@@ -9,14 +9,21 @@
 #ifndef _ASM_IA64_SN_TYPES_H
 #define _ASM_IA64_SN_TYPES_H
 
+#include <linux/config.h>
 #include <linux/types.h>
 
 typedef unsigned long 	cpuid_t;
 typedef unsigned long 	cpumask_t;
 typedef signed short	nasid_t;	/* node id in numa-as-id space */
 typedef signed char	partid_t;	/* partition ID type */
+#ifdef CONFIG_IA64_SGI_SN2
+typedef unsigned int    moduleid_t;     /* user-visible module number type */
+typedef unsigned int    cmoduleid_t;    /* kernel compact module id type */
+#else
 typedef signed short	moduleid_t;	/* user-visible module number type */
 typedef signed short	cmoduleid_t;	/* kernel compact module id type */
+#endif
+typedef signed char slabid_t;
 typedef unsigned char	clusterid_t;	/* Clusterid of the cell */
 
 typedef uint64_t __psunsigned_t;

@@ -86,7 +86,7 @@ EXPORT_SYMBOL(cpu_online_map);
 EXPORT_SYMBOL(ia64_cpu_to_sapicid);
 #else /* !CONFIG_SMP */
 
-EXPORT_SYMBOL(__flush_tlb_all);
+EXPORT_SYMBOL(local_flush_tlb_all);
 
 #endif /* !CONFIG_SMP */
 
