@@ -1186,7 +1186,7 @@ struct cipher_testvec tf_cbc_dec_tv_template[] = {
 
 /*
  * Serpent test vectors.  These are backwards because Serpent writes
- * octect sequences in right-to-left mode.
+ * octet sequences in right-to-left mode.
  */
 #define SERPENT_ENC_TEST_VECTORS	4
 #define SERPENT_DEC_TEST_VECTORS	4
