@@ -280,6 +280,8 @@ static irqreturn_t atkbd_interrupt(struct serio *serio, unsigned char data,
 	if (!test_bit(ATKBD_FLAG_ENABLED, &atkbd->flags))
 		goto out;
 
+	input_event(&atkbd->dev, EV_MSC, MSC_RAW, code);
+
 	if (atkbd->translated) {
 
 		if (atkbd->emul ||
@@ -753,9 +755,10 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 	}
 
 	if (atkbd->write) {
-		atkbd->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_LED) | BIT(EV_REP);
+		atkbd->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_LED) | BIT(EV_REP) | BIT(EV_MSC);
 		atkbd->dev.ledbit[0] = BIT(LED_NUML) | BIT(LED_CAPSL) | BIT(LED_SCROLLL);
-	} else  atkbd->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_REP);
+	} else  atkbd->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_REP) | BIT(EV_MSC);
+	atkbd->dev.mscbit[0] = BIT(MSC_RAW);
 
 	if (!atkbd_softrepeat) {
 		atkbd->dev.rep[REP_DELAY] = 250;
@@ -795,7 +798,6 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 		atkbd->set = 2;
 		atkbd->id = 0xab00;
 	}
-
 
 	if (atkbd->extra) {
 		atkbd->dev.ledbit[0] |= BIT(LED_COMPOSE) | BIT(LED_SUSPEND) | BIT(LED_SLEEP) | BIT(LED_MUTE) | BIT(LED_MISC);
