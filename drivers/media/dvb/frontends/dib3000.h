@@ -2,7 +2,7 @@
  * public header file of the frontend drivers for mobile DVB-T demodulators
  * DiBcom 3000-MB and DiBcom 3000-MC/P (http://www.dibcom.fr/)
  *
- * Copyright (C) 2004 Patrick Boettcher (patrick.boettcher@desy.de)
+ * Copyright (C) 2004-5 Patrick Boettcher (patrick.boettcher@desy.de)
  *
  * based on GPL code from DibCom, which has
  *
@@ -31,25 +31,24 @@ struct dib3000_config
 	/* the demodulator's i2c address */
 	u8 demod_address;
 
-	/* The i2c address of the PLL */
-	u8 pll_addr;
-
-	/* PLL maintenance */
-	int (*pll_init)(struct dvb_frontend *fe);
-	int (*pll_set)(struct dvb_frontend *fe, struct dvb_frontend_parameters* params);
+	/* PLL maintenance and the i2c address of the PLL */
+	u8 (*pll_addr)(struct dvb_frontend *fe);
+	int (*pll_init)(struct dvb_frontend *fe, u8 pll_buf[5]);
+	int (*pll_set)(struct dvb_frontend *fe, struct dvb_frontend_parameters* params, u8 pll_buf[5]);
 };
 
-struct dib3000_xfer_ops
+struct dib_fe_xfer_ops
 {
 	/* pid and transfer handling is done in the demodulator */
 	int (*pid_parse)(struct dvb_frontend *fe, int onoff);
 	int (*fifo_ctrl)(struct dvb_frontend *fe, int onoff);
-	int (*pid_ctrl)(struct dvb_frontend *fe, int pid, int onoff);
+	int (*pid_ctrl)(struct dvb_frontend *fe, int index, int pid, int onoff);
+	int (*tuner_pass_ctrl)(struct dvb_frontend *fe, int onoff, u8 pll_ctrl);
 };
 
 extern struct dvb_frontend* dib3000mb_attach(const struct dib3000_config* config,
-					     struct i2c_adapter* i2c, struct dib3000_xfer_ops *xfer_ops);
+					     struct i2c_adapter* i2c, struct dib_fe_xfer_ops *xfer_ops);
 
 extern struct dvb_frontend* dib3000mc_attach(const struct dib3000_config* config,
-					     struct i2c_adapter* i2c, struct dib3000_xfer_ops *xfer_ops);
+					     struct i2c_adapter* i2c, struct dib_fe_xfer_ops *xfer_ops);
 #endif // DIB3000_H

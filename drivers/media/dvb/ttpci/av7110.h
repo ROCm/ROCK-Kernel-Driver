@@ -115,7 +115,7 @@ struct av7110 {
 
         int                     bmpp;
         int                     bmplen;
-        int                     bmp_state;
+	volatile int		bmp_state;
 #define BMP_NONE     0
 #define BMP_LOADING  1
 #define BMP_LOADINGS 2
@@ -157,6 +157,18 @@ struct av7110 {
 
         struct dmx_frontend	hw_frontend;
         struct dmx_frontend	mem_frontend;
+
+	/* for budget mode demux1 */
+	struct dmxdev		dmxdev1;
+	struct dvb_demux	demux1;
+	struct dvb_net		dvb_net1;
+	spinlock_t		feedlock1;
+	int			feeding1;
+	u8			tsf;
+	u32			ttbp;
+	unsigned char           *grabbing;
+	struct saa7146_pgtable  pt;
+	struct tasklet_struct   vpe_tasklet;
 
         int                     fe_synced; 
         struct semaphore        pid_mutex;

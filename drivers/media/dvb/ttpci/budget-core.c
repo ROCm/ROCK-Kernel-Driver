@@ -89,11 +89,18 @@ static int start_ts_capture (struct budget *budget)
 	 *	Pitch: 188, NumBytes3: 188, NumLines3: 1024
 	 */
 
-	if (budget->card->type == BUDGET_FS_ACTIVY) {
+        switch(budget->card->type) {
+	case BUDGET_FS_ACTIVY:
 		saa7146_write(dev, DD1_INIT, 0x04000000);
 		saa7146_write(dev, MC2, (MASK_09 | MASK_25));
 		saa7146_write(dev, BRS_CTRL, 0x00000000);
-	} else {
+		break;
+	case BUDGET_PATCH:
+		saa7146_write(dev, DD1_INIT, 0x00000200);
+		saa7146_write(dev, MC2, (MASK_10 | MASK_26));
+		saa7146_write(dev, BRS_CTRL, 0x60000000);
+		break;
+	default:
 		if (budget->video_port == BUDGET_VIDEO_PORTA) {
 			saa7146_write(dev, DD1_INIT, 0x06000200);
 			saa7146_write(dev, MC2, (MASK_09 | MASK_25 | MASK_10 | MASK_26));
@@ -122,9 +129,10 @@ static int start_ts_capture (struct budget *budget)
 	}
 
       	saa7146_write(dev, MC2, (MASK_04 | MASK_20));
-     	saa7146_write(dev, MC1, (MASK_04 | MASK_20)); // DMA3 on
 
-	SAA7146_IER_ENABLE(budget->dev, MASK_10);	// VPE
+	SAA7146_ISR_CLEAR(budget->dev, MASK_10);	/* VPE */
+	SAA7146_IER_ENABLE(budget->dev, MASK_10);	/* VPE */
+	saa7146_write(dev, MC1, (MASK_04 | MASK_20));	/* DMA3 on */
 
         return ++budget->feeding;
 }
@@ -249,6 +257,7 @@ static int budget_start_feed(struct dvb_demux_feed *feed)
                 return -EINVAL;
 
    	spin_lock(&budget->feedlock);   
+	feed->pusi_seen = 0; /* have a clean section start */
 	status = start_ts_capture (budget);
    	spin_unlock(&budget->feedlock);
 	return status;
