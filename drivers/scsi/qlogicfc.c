@@ -738,7 +738,6 @@ int isp2x00_detect(Scsi_Host_Template * tmpt)
 
 			if (!hostdata->res){
 			        printk("qlogicfc%d : could not allocate memory for request and response queue.\n", hosts);
-				pci_free_consistent(pdev, RES_SIZE + REQ_SIZE, hostdata->res, busaddr);
 			        scsi_unregister(host);
 				continue;
 			}
