@@ -245,6 +245,8 @@
 #define __NR_tkill		238
 #define __NR_sendfile64		239
 #define __NR_futex		240
+#define __NR_sched_setaffinity	241
+#define __NR_sched_getaffinity	242
 
 /* user-visible error numbers are in the range -1 - -124: see <asm-i386/errno.h> */
 
