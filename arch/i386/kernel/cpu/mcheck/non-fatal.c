@@ -88,3 +88,5 @@ static int __init init_nonfatal_mce_checker(void)
 	return 0;
 }
 module_init(init_nonfatal_mce_checker);
+
+MODULE_LICENSE("GPL");
