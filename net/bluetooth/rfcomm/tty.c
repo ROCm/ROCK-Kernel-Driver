@@ -266,6 +266,9 @@ static struct sk_buff *rfcomm_wmalloc(struct rfcomm_dev *dev, unsigned long size
 }
 
 /* ---- Device IOCTLs ---- */
+
+#define NOCAP_FLAGS ((1 << RFCOMM_REUSE_DLC) | (1 << RFCOMM_RELEASE_ONHUP))
+
 static int rfcomm_create_dev(struct sock *sk, unsigned long arg)
 {
 	struct rfcomm_dev_req req;
@@ -277,7 +280,14 @@ static int rfcomm_create_dev(struct sock *sk, unsigned long arg)
 
 	BT_DBG("sk %p dev_id %id flags 0x%x", sk, req.dev_id, req.flags);
 
+	if (req.flags != NOCAP_FLAGS && !capable(CAP_NET_ADMIN))
+		return -EPERM;
+	
 	if (req.flags & (1 << RFCOMM_REUSE_DLC)) {
+		/* Socket must be connected */
+		if (sk->state != BT_CONNECTED)
+			return -EBADFD;
+
 		dlc = rfcomm_pi(sk)->dlc;
 		rfcomm_dlc_hold(dlc);
 	} else {
@@ -311,6 +321,9 @@ static int rfcomm_release_dev(unsigned long arg)
 
 	BT_DBG("dev_id %id flags 0x%x", req.dev_id, req.flags);
 
+	if (!capable(CAP_NET_ADMIN))
+		return -EPERM;
+	
 	if (!(dev = rfcomm_dev_get(req.dev_id)))
 		return -ENODEV;
 
