@@ -263,6 +263,8 @@ static ctl_table kern_table[] = {
 #endif
 	{KERN_PIDMAX, "pid_max", &pid_max, sizeof (int),
 	 0600, NULL, &proc_dointvec},
+	{KERN_PANIC_ON_OOPS,"panic_on_oops",
+	 &panic_on_oops,sizeof(int),0644,NULL,&proc_dointvec},
 	{0}
 };
 
