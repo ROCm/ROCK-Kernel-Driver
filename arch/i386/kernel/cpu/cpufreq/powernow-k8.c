@@ -32,7 +32,7 @@
 #include <asm/io.h>
 #include <asm/delay.h>
 
-#ifdef CONFIG_X86_POWERNOW_K8_ACPI
+#ifdef CONFIG_ACPI_PROCESSOR
 #include <linux/acpi.h>
 #include <acpi/processor.h>
 #endif
@@ -666,7 +666,7 @@ static int find_psb_table(struct powernow_k8_data *data)
 	return -ENODEV;
 }
 
-#ifdef CONFIG_X86_POWERNOW_K8_ACPI
+#ifdef CONFIG_ACPI_PROCESSOR
 static void powernow_k8_acpi_pst_values(struct powernow_k8_data *data, unsigned int index)
 {
 	if (!data->acpi_data.state_count)
