@@ -1,10 +1,11 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.10
-# Mon Dec 27 11:03:23 2004
+# Linux kernel version: 2.6.11-rc1
+# Fri Jan 14 14:56:51 2005
 #
 CONFIG_MMU=y
 CONFIG_RWSEM_XCHGADD_ALGORITHM=y
+CONFIG_GENERIC_CALIBRATE_DELAY=y
 CONFIG_ARCH_S390=y
 CONFIG_UID16=y
 
@@ -142,6 +143,7 @@ CONFIG_SCSI_LOGGING=y
 #
 # CONFIG_SCSI_SPI_ATTRS is not set
 CONFIG_SCSI_FC_ATTRS=y
+# CONFIG_SCSI_ISCSI_ATTRS is not set
 
 #
 # SCSI low-level drivers
@@ -184,6 +186,7 @@ CONFIG_IOSCHED_NOOP=y
 CONFIG_IOSCHED_AS=y
 CONFIG_IOSCHED_DEADLINE=y
 CONFIG_IOSCHED_CFQ=y
+# CONFIG_ATA_OVER_ETH is not set
 
 #
 # Multi-device support (RAID and LVM)
@@ -530,6 +533,7 @@ CONFIG_MAGIC_SYSRQ=y
 # CONFIG_DEBUG_SPINLOCK_SLEEP is not set
 # CONFIG_DEBUG_KOBJECT is not set
 # CONFIG_DEBUG_INFO is not set
+# CONFIG_DEBUG_FS is not set
 
 #
 # Security options

@@ -119,8 +119,6 @@ extern void account_system_vtime(struct task_struct *);
 
 #else
 
-#define account_system_vtime(prev)
-
 #define finish_arch_switch(rq, prev) do {				     \
 	set_fs(current->thread.mm_segment);				     \
 	spin_unlock_irq(&(rq)->lock);					     \
