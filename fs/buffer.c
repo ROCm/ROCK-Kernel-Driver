@@ -2779,6 +2779,7 @@ static int end_bio_bh_io_sync(struct bio *bio, unsigned int bytes_done, int err)
 int submit_bh(int rw, struct buffer_head * bh)
 {
 	struct bio *bio;
+	int ret = 0;
 
 	BUG_ON(!buffer_locked(bh));
 	BUG_ON(!buffer_mapped(bh));
@@ -2817,7 +2818,14 @@ int submit_bh(int rw, struct buffer_head * bh)
 	bio->bi_end_io = end_bio_bh_io_sync;
 	bio->bi_private = bh;
 
-	return submit_bio(rw, bio);
+	bio_get(bio);
+	submit_bio(rw, bio);
+
+	if (bio_flagged(bio, BIO_EOPNOTSUPP))
+		ret = -EOPNOTSUPP;
+
+	bio_put(bio);
+	return ret;
 }
 
 /**

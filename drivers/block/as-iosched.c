@@ -1512,8 +1512,13 @@ as_insert_request(request_queue_t *q, struct request *rq, int where)
 	struct as_data *ad = q->elevator.elevator_data;
 	struct as_rq *arq = RQ_DATA(rq);
 
-	if (arq)
+	if (arq) {
+		if (arq->state != AS_RQ_PRESCHED) {
+			printk("arq->state: %d\n", arq->state);
+			WARN_ON(1);
+		}
 		arq->state = AS_RQ_NEW;
+	}
 
 	/* barriers must flush the reorder queue */
 	if (unlikely(rq->flags & (REQ_SOFTBARRIER | REQ_HARDBARRIER)

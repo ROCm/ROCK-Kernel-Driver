@@ -1339,37 +1339,35 @@ static ide_proc_entry_t idedisk_proc[] = {
 static int idedisk_issue_flush(request_queue_t *q, struct gendisk *disk,
 			       sector_t *error_sector)
 {
-	struct request *rq;
 	ide_drive_t *drive = q->queuedata;
-	char *buf;
+	struct request *rq;
 	int ret;
 
 	if (!drive->wcache || !(drive->id->cfs_enable_2 & 0x3000))
 		return 0;
 
 	rq = blk_get_request(q, WRITE, __GFP_WAIT);
-	buf = rq->cmd;
-	memset(buf, 0, sizeof(rq->cmd));
+
+	memset(rq->cmd, 0, sizeof(rq->cmd));
 
 	if (drive->id->cfs_enable_2 & 0x2400)
-		buf[0] = WIN_FLUSH_CACHE_EXT;
+		rq->cmd[0] = WIN_FLUSH_CACHE_EXT;
 	else
-		buf[0] = WIN_FLUSH_CACHE;
+		rq->cmd[0] = WIN_FLUSH_CACHE;
 
 	
 	rq->flags |= REQ_DRIVE_TASK | REQ_SOFTBARRIER;
-	rq->buffer = buf;
+	rq->buffer = rq->cmd;
 
 	ret = blk_execute_rq(q, disk, rq);
-
-	blk_put_request(rq);
 
 	/*
 	 * if we failed and caller wants error offset, get it
 	 */
 	if (ret && error_sector)
-		*error_sector = ide_get_error_location(drive, buf);
+		*error_sector = ide_get_error_location(drive, rq->cmd);
 
+	blk_put_request(rq);
 	return ret;
 }
 
