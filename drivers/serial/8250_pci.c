@@ -311,7 +311,7 @@ static int
 sbs_setup(struct pci_dev *dev, struct pci_board *board,
 		struct serial_struct *req, int idx)
 {
-	unsigned int bar, offset = board->first_offset, maxnr;
+	unsigned int bar, offset = board->first_offset;
 
 	bar = 0;
 
