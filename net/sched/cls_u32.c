@@ -112,11 +112,6 @@ static int u32_classify(struct sk_buff *skb, struct tcf_proto *tp, struct tcf_re
 	int sel = 0;
 	int i;
 
-#if !defined(__i386__) && !defined(__mc68000__)
-	if ((unsigned long)ptr & 3)
-		return -1;
-#endif
-
 next_ht:
 	n = ht->ht[sel];
 
