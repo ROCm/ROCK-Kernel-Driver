@@ -2417,8 +2417,10 @@ acpi_processor_remove (
 	pr = (struct acpi_processor *) acpi_driver_data(device);
 
 	/* Unregister the idle handler when processor #0 is removed. */
-	if (pr->id == 0)
+	if (pr->id == 0) {
 		pm_idle = pm_idle_save;
+		synchronize_kernel();
+	}
 
 	status = acpi_remove_notify_handler(pr->handle, ACPI_DEVICE_NOTIFY, 
 		acpi_processor_notify);
