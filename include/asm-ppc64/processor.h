@@ -53,36 +53,36 @@
 #define MSR_LE_LG	0 		/* Little Endian */
 
 #ifdef __ASSEMBLY__
-#define MASK(X)		(1<<(X))
+#define __MASK(X)	(1<<(X))
 #else
-#define MASK(X)		(1UL<<(X))
+#define __MASK(X)	(1UL<<(X))
 #endif
 
-#define MSR_SF		MASK(MSR_SF_LG)  /* Enable 64 bit mode */
-#define MSR_ISF		MASK(MSR_ISF_LG) /* Interrupt 64b mode valid on 630 */
-#define MSR_HV 		MASK(MSR_HV_LG)	 /* Hypervisor state */
-#define MSR_VEC		MASK(MSR_VEC_LG) /* Enable AltiVec */
-#define MSR_POW		MASK(MSR_POW_LG) /* Enable Power Management */
-#define MSR_WE		MASK(MSR_WE_LG)	 /* Wait State Enable */
-#define MSR_TGPR	MASK(MSR_TGPR_LG)/* TLB Update registers in use */
-#define MSR_CE		MASK(MSR_CE_LG)	 /* Critical Interrupt Enable */
-#define MSR_ILE		MASK(MSR_ILE_LG) /* Interrupt Little Endian */
-#define MSR_EE		MASK(MSR_EE_LG)	 /* External Interrupt Enable */
-#define MSR_PR		MASK(MSR_PR_LG)	 /* Problem State / Privilege Level */
-#define MSR_FP		MASK(MSR_FP_LG)	 /* Floating Point enable */
-#define MSR_ME		MASK(MSR_ME_LG)	 /* Machine Check Enable */
-#define MSR_FE0		MASK(MSR_FE0_LG) /* Floating Exception mode 0 */
-#define MSR_SE		MASK(MSR_SE_LG)	 /* Single Step */
-#define MSR_BE		MASK(MSR_BE_LG)	 /* Branch Trace */
-#define MSR_DE		MASK(MSR_DE_LG)	 /* Debug Exception Enable */
-#define MSR_FE1		MASK(MSR_FE1_LG) /* Floating Exception mode 1 */
-#define MSR_IP		MASK(MSR_IP_LG)	 /* Exception prefix 0x000/0xFFF */
-#define MSR_IR		MASK(MSR_IR_LG)	 /* Instruction Relocate */
-#define MSR_DR		MASK(MSR_DR_LG)	 /* Data Relocate */
-#define MSR_PE		MASK(MSR_PE_LG)	 /* Protection Enable */
-#define MSR_PX		MASK(MSR_PX_LG)	 /* Protection Exclusive Mode */
-#define MSR_RI		MASK(MSR_RI_LG)	 /* Recoverable Exception */
-#define MSR_LE		MASK(MSR_LE_LG)	 /* Little Endian */
+#define MSR_SF		__MASK(MSR_SF_LG)	/* Enable 64 bit mode */
+#define MSR_ISF		__MASK(MSR_ISF_LG)	/* Interrupt 64b mode valid on 630 */
+#define MSR_HV 		__MASK(MSR_HV_LG)	/* Hypervisor state */
+#define MSR_VEC		__MASK(MSR_VEC_LG)	/* Enable AltiVec */
+#define MSR_POW		__MASK(MSR_POW_LG)	/* Enable Power Management */
+#define MSR_WE		__MASK(MSR_WE_LG)	/* Wait State Enable */
+#define MSR_TGPR	__MASK(MSR_TGPR_LG)	/* TLB Update registers in use */
+#define MSR_CE		__MASK(MSR_CE_LG)	/* Critical Interrupt Enable */
+#define MSR_ILE		__MASK(MSR_ILE_LG)	/* Interrupt Little Endian */
+#define MSR_EE		__MASK(MSR_EE_LG)	/* External Interrupt Enable */
+#define MSR_PR		__MASK(MSR_PR_LG)	/* Problem State / Privilege Level */
+#define MSR_FP		__MASK(MSR_FP_LG)	/* Floating Point enable */
+#define MSR_ME		__MASK(MSR_ME_LG)	/* Machine Check Enable */
+#define MSR_FE0		__MASK(MSR_FE0_LG)	/* Floating Exception mode 0 */
+#define MSR_SE		__MASK(MSR_SE_LG)	/* Single Step */
+#define MSR_BE		__MASK(MSR_BE_LG)	/* Branch Trace */
+#define MSR_DE		__MASK(MSR_DE_LG)	/* Debug Exception Enable */
+#define MSR_FE1		__MASK(MSR_FE1_LG)	/* Floating Exception mode 1 */
+#define MSR_IP		__MASK(MSR_IP_LG)	/* Exception prefix 0x000/0xFFF */
+#define MSR_IR		__MASK(MSR_IR_LG)	/* Instruction Relocate */
+#define MSR_DR		__MASK(MSR_DR_LG)	/* Data Relocate */
+#define MSR_PE		__MASK(MSR_PE_LG)	/* Protection Enable */
+#define MSR_PX		__MASK(MSR_PX_LG)	/* Protection Exclusive Mode */
+#define MSR_RI		__MASK(MSR_RI_LG)	/* Recoverable Exception */
+#define MSR_LE		__MASK(MSR_LE_LG)	/* Little Endian */
 
 #define MSR_		MSR_ME | MSR_RI | MSR_IR | MSR_DR | MSR_ISF
 #define MSR_KERNEL      MSR_ | MSR_SF | MSR_HV
@@ -694,10 +694,8 @@ extern struct mm_struct ioremap_mm;
 /*
  * Return saved PC of a blocked thread. For now, this is the "user" PC
  */
-static inline unsigned long thread_saved_pc(struct thread_struct *t)
-{
-	return (t->regs) ? t->regs->nip : 0;
-}
+#define thread_saved_pc(tsk)    \
+        ((tsk)->thread.regs? (tsk)->thread.regs->nip: 0)
 
 #define copy_segments(tsk, mm)		do { } while (0)
 #define release_segments(mm)		do { } while (0)
