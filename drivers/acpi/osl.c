@@ -36,6 +36,7 @@
 #include <linux/delay.h>
 #include <linux/workqueue.h>
 #include <asm/io.h>
+#include "acpi_bus.h"
 #include "acpi.h"
 
 #ifdef CONFIG_ACPI_EFI
@@ -481,6 +482,44 @@ acpi_os_write_pci_configuration (
 						     pci_id->function),
 				     reg, size, value);
 	return (result ? AE_ERROR : AE_OK);
+}
+
+/* TODO: Rewrite this code!!! */
+void
+acpi_os_derive_pci_id (
+	acpi_handle     rhandle,        /* upper bound  */
+	acpi_handle     chandle,        /* current node */
+	acpi_pci_id     **id)
+{
+	acpi_handle     handle;
+	acpi_pci_id     *pci_id = *id;
+	acpi_status     status;
+	unsigned long   temp;
+	acpi_object_type type;
+	u8              tu8;
+
+	acpi_get_parent(chandle, &handle);
+	if (handle != rhandle) {
+		acpi_os_derive_pci_id(rhandle, handle, &pci_id);
+
+		status = acpi_get_type(handle, &type);
+		if ( (ACPI_FAILURE(status)) || (type != ACPI_TYPE_DEVICE) )
+			return;
+
+		status = acpi_evaluate_integer(handle, METHOD_NAME__ADR, NULL, &temp);
+		if (ACPI_SUCCESS(status)) {
+			pci_id->device  = ACPI_HIWORD (ACPI_LODWORD (temp));
+			pci_id->function = ACPI_LOWORD (ACPI_LODWORD (temp));
+
+			/* any nicer way to get bus number of bridge ? */
+			status = acpi_os_read_pci_configuration(pci_id, 0x0e, &tu8, 8);
+			if (ACPI_SUCCESS(status) && (tu8 & 0x7f) == 1) {
+				status = acpi_os_read_pci_configuration(pci_id, 0x19, &tu8, 8);
+				if (ACPI_SUCCESS(status))
+					pci_id->bus = tu8;
+			}
+		}
+	}
 }
 
 #else /*!CONFIG_ACPI_PCI*/
