@@ -391,6 +391,7 @@ acpi_pci_irq_enable (
 	u8			pin = 0;
 	int			edge_level = ACPI_LEVEL_SENSITIVE;
 	int			active_high_low = ACPI_ACTIVE_LOW;
+	extern int		via_interrupt_line_quirk;
 
 	ACPI_FUNCTION_TRACE("acpi_pci_irq_enable");
 
@@ -439,6 +440,9 @@ acpi_pci_irq_enable (
 			return_VALUE(0);
 		}
  	}
+
+	if (via_interrupt_line_quirk)
+		pci_write_config_byte(dev, PCI_INTERRUPT_LINE, irq & 15);
 
 	dev->irq = acpi_register_gsi(irq, edge_level, active_high_low);
 
