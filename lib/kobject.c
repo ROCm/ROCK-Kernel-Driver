@@ -58,14 +58,11 @@ static int create_dir(struct kobject * kobj)
 	return error;
 }
 
-
 static inline struct kobject * to_kobj(struct list_head * entry)
 {
 	return container_of(entry,struct kobject,entry);
 }
 
-
-#ifdef CONFIG_HOTPLUG
 static int get_kobj_path_length(struct kset *kset, struct kobject *kobj)
 {
 	int length = 1;
@@ -98,6 +95,31 @@ static void fill_kobj_path(struct kset *kset, struct kobject *kobj, char *path, 
 	pr_debug("%s: path = '%s'\n",__FUNCTION__,path);
 }
 
+/**
+ * kobject_get_path - generate and return the path associated with a given kobj
+ * and kset pair.  The result must be freed by the caller with kfree().
+ *
+ * @kset:	kset in question, with which to build the path
+ * @kobj:	kobject in question, with which to build the path
+ * @gfp_mask:	the allocation type used to allocate the path
+ */
+char * kobject_get_path(struct kset *kset, struct kobject *kobj, int gfp_mask)
+{
+	char *path;
+	int len;
+
+	len = get_kobj_path_length(kset, kobj);
+	path = kmalloc(len, gfp_mask);
+	if (!path)
+		return NULL;
+	memset(path, 0x00, len);
+	fill_kobj_path(kset, kobj, path, len);
+
+	return path;
+}
+
+#ifdef CONFIG_HOTPLUG
+
 #define BUFFER_SIZE	1024	/* should be enough memory for the env */
 #define NUM_ENVP	32	/* number of env pointers */
 static unsigned long sequence_num;
@@ -112,7 +134,6 @@ static void kset_hotplug(const char *action, struct kset *kset,
 	char *scratch;
 	int i = 0;
 	int retval;
-	int kobj_path_length;
 	char *kobj_path = NULL;
 	char *name = NULL;
 	unsigned long seq;
@@ -163,12 +184,9 @@ static void kset_hotplug(const char *action, struct kset *kset,
 	envp [i++] = scratch;
 	scratch += sprintf(scratch, "SEQNUM=%ld", seq) + 1;
 
-	kobj_path_length = get_kobj_path_length (kset, kobj);
-	kobj_path = kmalloc (kobj_path_length, GFP_KERNEL);
+	kobj_path = kobject_get_path(kset, kobj, GFP_KERNEL);
 	if (!kobj_path)
 		goto exit;
-	memset (kobj_path, 0x00, kobj_path_length);
-	fill_kobj_path (kset, kobj, kobj_path, kobj_path_length);
 
 	envp [i++] = scratch;
 	scratch += sprintf (scratch, "DEVPATH=%s", kobj_path) + 1;
@@ -626,7 +644,7 @@ void subsys_remove_file(struct subsystem * s, struct subsys_attribute * a)
 	}
 }
 
-
+EXPORT_SYMBOL(kobject_get_path);
 EXPORT_SYMBOL(kobject_init);
 EXPORT_SYMBOL(kobject_register);
 EXPORT_SYMBOL(kobject_unregister);

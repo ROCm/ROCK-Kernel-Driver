@@ -58,6 +58,8 @@ extern void kobject_put(struct kobject *);
 
 extern void kobject_hotplug(const char *action, struct kobject *);
 
+extern char * kobject_get_path(struct kset *, struct kobject *, int);
+
 struct kobj_type {
 	void (*release)(struct kobject *);
 	struct sysfs_ops	* sysfs_ops;
