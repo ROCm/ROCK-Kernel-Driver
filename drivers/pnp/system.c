@@ -93,8 +93,8 @@ static int system_pnp_probe(struct pnp_dev * dev, const struct pnp_device_id *de
 
 static struct pnp_driver system_pnp_driver = {
 	.name		= "system",
-	.flags		= PNP_DRIVER_DO_NOT_ACTIVATE, 
 	.id_table	= pnp_dev_table,
+	.flags		= PNP_DRIVER_RES_DO_NOT_CHANGE,
 	.probe		= system_pnp_probe,
 	.remove		= NULL,
 };

@@ -626,7 +626,7 @@ isapnp_parse_name(char *name, unsigned int name_max, unsigned short *size)
 		isapnp_peek(name, size1);
 		name[size1] = '\0';
 		*size -= size1;
-		
+
 		/* clean whitespace from end of string */
 		while (size1 > 0  &&  name[--size1] == ' ')
 			name[size1] = '\0';
@@ -647,7 +647,7 @@ static int __init isapnp_create_device(struct pnp_card *card,
 		return 1;
 	if (pnp_build_resource(dev, 0) == NULL)
 		return 1;
-	pnpc_add_device(card,dev);
+	pnp_add_card_device(card,dev);
 	while (1) {
 		if (isapnp_read_tag(&type, &size)<0)
 			return 1;
@@ -659,7 +659,7 @@ static int __init isapnp_create_device(struct pnp_card *card,
 				if ((dev = isapnp_parse_device(card, size, number++)) == NULL)
 					return 1;
 				pnp_build_resource(dev,0);
-				pnpc_add_device(card,dev);
+				pnp_add_card_device(card,dev);
 				size = 0;
 				skip = 0;
 			} else {
@@ -852,7 +852,7 @@ static void isapnp_parse_card_id(struct pnp_card * card, unsigned short vendor, 
 			device & 0x0f,
 			(device >> 12) & 0x0f,
 			(device >> 8) & 0x0f);
-	pnpc_add_id(id,card);
+	pnp_add_card_id(id,card);
 }
 
 
@@ -962,7 +962,7 @@ static int __init isapnp_build_device_list(void)
 			isapnp_parse_current_resources(dev, &dev->res);
 		}
 
-		pnpc_add_card(card);
+		pnp_add_card(card);
 	}
 	isapnp_wait();
 	return 0;
