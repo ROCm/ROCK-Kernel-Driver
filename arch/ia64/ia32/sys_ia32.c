@@ -618,7 +618,8 @@ sys32_mprotect (unsigned int start, unsigned int len, int prot)
 			/* end address is 4KB aligned but not page aligned. */
 			retval = mprotect_subpage(PAGE_START(end), prot);
 			if (retval < 0)
-				return retval;
+				goto out;
+
 			end = PAGE_START(end);
 		}
 		retval = sys_mprotect(start, end - start, prot);
