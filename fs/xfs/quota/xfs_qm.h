@@ -187,7 +187,6 @@ extern int		xfs_qm_write_sb_changes(xfs_mount_t *, __int64_t);
 extern int		xfs_qm_sync(xfs_mount_t *, short);
 
 /* dquot stuff */
-extern void		xfs_qm_dqunlink(xfs_dquot_t *);
 extern boolean_t	xfs_qm_dqalloc_incore(xfs_dquot_t **);
 extern int		xfs_qm_dqattach(xfs_inode_t *, uint);
 extern void		xfs_qm_dqdetach(xfs_inode_t *);

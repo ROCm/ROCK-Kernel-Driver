@@ -52,7 +52,6 @@ struct mtrr_ops {
 };
 
 extern int generic_get_free_region(unsigned long base, unsigned long size);
-extern void generic_init_secondary(void);
 extern int generic_validate_add_page(unsigned long base, unsigned long size,
 				     unsigned int type);
 

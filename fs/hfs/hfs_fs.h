@@ -223,9 +223,6 @@ extern int hfs_strcmp(const unsigned char *, unsigned int,
 		      const unsigned char *, unsigned int);
 extern int hfs_compare_dentry(struct dentry *, struct qstr *, struct qstr *);
 
-/* super.c */
-extern struct super_block *hfs_read_super(struct super_block *,void *,int);
-
 /* trans.c */
 extern void hfs_triv2mac(struct hfs_name *, struct qstr *);
 extern int hfs_mac2triv(char *, const struct hfs_name *);

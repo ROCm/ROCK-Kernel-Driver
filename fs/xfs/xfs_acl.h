@@ -74,8 +74,6 @@ extern struct kmem_zone *xfs_acl_zone;
 
 extern int xfs_acl_inherit(struct vnode *, struct vattr *, xfs_acl_t *);
 extern int xfs_acl_iaccess(struct xfs_inode *, mode_t, cred_t *);
-extern int xfs_acl_get(struct vnode *, xfs_acl_t *, xfs_acl_t *);
-extern int xfs_acl_set(struct vnode *, xfs_acl_t *, xfs_acl_t *);
 extern int xfs_acl_vtoacl(struct vnode *, xfs_acl_t *, xfs_acl_t *);
 extern int xfs_acl_vhasacl_access(struct vnode *);
 extern int xfs_acl_vhasacl_default(struct vnode *);
