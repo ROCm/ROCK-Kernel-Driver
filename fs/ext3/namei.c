@@ -557,6 +557,8 @@ static int htree_dirblock_to_tree(struct file *dir_file,
 		    ((hinfo->hash == start_hash) &&
 		     (hinfo->minor_hash < start_minor_hash)))
 			continue;
+		if (de->inode == 0)
+			continue;
 		if ((err = ext3_htree_store_dirent(dir_file,
 				   hinfo->hash, hinfo->minor_hash, de)) != 0) {
 			brelse(bh);
