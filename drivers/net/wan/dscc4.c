@@ -1163,7 +1163,6 @@ static int dscc4_close(struct net_device *dev)
 	hdlc_close(hdlc);
 	dscc4_release_ring(dpriv);
 
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
