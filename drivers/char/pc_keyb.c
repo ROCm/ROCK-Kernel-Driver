@@ -808,6 +808,17 @@ static char * __init initialize_kbd(void)
 {
 	int status;
 
+#ifdef CONFIG_IA64
+	/*
+	 * This is not really IA-64 specific.  Probably ought to be done on all platforms
+	 * that are (potentially) legacy-free.
+	 */
+	if (kbd_read_status() == 0xff && kbd_read_input() == 0xff) {
+		kbd_exists = 0;
+		return "No keyboard controller preset";
+	}
+#endif
+
 	/*
 	 * Test the keyboard interface.
 	 * This seems to be the only way to get it going.
@@ -910,6 +921,10 @@ void __init pckbd_init_hw(void)
 		char *msg = initialize_kbd();
 		if (msg)
 			printk(KERN_WARNING "initialize_kbd: %s\n", msg);
+#ifdef CONFIG_IA64
+		if (!kbd_exists)
+			return;
+#endif
 	}
 
 #if defined CONFIG_PSMOUSE
