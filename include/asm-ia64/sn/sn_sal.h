@@ -8,7 +8,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All rights reserved.
+ * Copyright (c) 2000-2004 Silicon Graphics, Inc.  All rights reserved.
  */
 
 
@@ -60,6 +60,7 @@
 #define  SN_SAL_SYSCTL_FRU_CAPTURE		   0x0200003f
 
 #define  SN_SAL_SYSCTL_IOBRICK_PCI_OP		   0x02000042	// reentrant
+#define	 SN_SAL_IROUTER_OP			   0x02000043
 
 /*
  * Service-specific constants
@@ -84,6 +85,25 @@
 #define SAL_SYSCTL_IO_XTALK	0       /* connected via a compute node */
 
 #endif	/* CONFIG_HOTPLUG_PCI_SGI */
+
+/*
+ * IRouter (i.e. generalized system controller) operations
+ */
+#define SAL_IROUTER_OPEN	0	/* open a subchannel */
+#define SAL_IROUTER_CLOSE	1	/* close a subchannel */
+#define SAL_IROUTER_SEND	2	/* send part of an IRouter packet */
+#define SAL_IROUTER_RECV	3	/* receive part of an IRouter packet */
+#define SAL_IROUTER_INTR_STATUS	4	/* check the interrupt status for
+					 * an open subchannel
+					 */
+#define SAL_IROUTER_INTR_ON	5	/* enable an interrupt */
+#define SAL_IROUTER_INTR_OFF	6	/* disable an interrupt */
+#define SAL_IROUTER_INIT	7	/* initialize IRouter driver */
+
+/* IRouter interrupt mask bits */
+#define SAL_IROUTER_INTR_XMIT	SAL_CONSOLE_INTR_XMIT
+#define SAL_IROUTER_INTR_RECV	SAL_CONSOLE_INTR_RECV
+
 
 /*
  * SN_SAL_GET_PARTITION_ADDR return constants
@@ -702,6 +722,126 @@ ia64_sn_set_error_handling_features(const u64 *feature_bits)
 			feature_bits[5],
 			feature_bits[6]);
 	return rv.status;
+}
+
+
+/*
+ * Open a subchannel for sending arbitrary data to the system
+ * controller network via the system controller device associated with
+ * 'nasid'.  Return the subchannel number or a negative error code.
+ */
+static inline int
+ia64_sn_irtr_open(nasid_t nasid)
+{
+	struct ia64_sal_retval rv;
+	SAL_CALL_REENTRANT(rv, SN_SAL_IROUTER_OP, SAL_IROUTER_OPEN, nasid,
+			   0, 0, 0, 0, 0);
+	return (int) rv.v0;
+}
+
+/*
+ * Close system controller subchannel 'subch' previously opened on 'nasid'.
+ */
+static inline int
+ia64_sn_irtr_close(nasid_t nasid, int subch)
+{
+	struct ia64_sal_retval rv;
+	SAL_CALL_REENTRANT(rv, SN_SAL_IROUTER_OP, SAL_IROUTER_CLOSE,
+			   (u64) nasid, (u64) subch, 0, 0, 0, 0);
+	return (int) rv.status;
+}
+
+/*
+ * Read data from system controller associated with 'nasid' on
+ * subchannel 'subch'.  The buffer to be filled is pointed to by
+ * 'buf', and its capacity is in the integer pointed to by 'len'.  The
+ * referent of 'len' is set to the number of bytes read by the SAL
+ * call.  The return value is either SALRET_OK (for bytes read) or
+ * SALRET_ERROR (for error or "no data available").
+ */
+static inline int
+ia64_sn_irtr_recv(nasid_t nasid, int subch, char *buf, int *len)
+{
+	struct ia64_sal_retval rv;
+	SAL_CALL_REENTRANT(rv, SN_SAL_IROUTER_OP, SAL_IROUTER_RECV,
+			   (u64) nasid, (u64) subch, (u64) buf, (u64) len,
+			   0, 0);
+	return (int) rv.status;
+}
+
+/*
+ * Write data to the system controller network via the system
+ * controller associated with 'nasid' on suchannel 'subch'.  The
+ * buffer to be written out is pointed to by 'buf', and 'len' is the
+ * number of bytes to be written.  The return value is either the
+ * number of bytes written (which could be zero) or a negative error
+ * code.
+ */
+static inline int
+ia64_sn_irtr_send(nasid_t nasid, int subch, char *buf, int len)
+{
+	struct ia64_sal_retval rv;
+	SAL_CALL_REENTRANT(rv, SN_SAL_IROUTER_OP, SAL_IROUTER_SEND,
+			   (u64) nasid, (u64) subch, (u64) buf, (u64) len,
+			   0, 0);
+	return (int) rv.v0;
+}
+
+/*
+ * Check whether any interrupts are pending for the system controller
+ * associated with 'nasid' and its subchannel 'subch'.  The return
+ * value is a mask of pending interrupts (SAL_IROUTER_INTR_XMIT and/or
+ * SAL_IROUTER_INTR_RECV).
+ */
+static inline int
+ia64_sn_irtr_intr(nasid_t nasid, int subch)
+{
+	struct ia64_sal_retval rv;
+	SAL_CALL_REENTRANT(rv, SN_SAL_IROUTER_OP, SAL_IROUTER_INTR_STATUS,
+			   (u64) nasid, (u64) subch, 0, 0, 0, 0);
+	return (int) rv.v0;
+}
+
+/*
+ * Enable the interrupt indicated by the intr parameter (either
+ * SAL_IROUTER_INTR_XMIT or SAL_IROUTER_INTR_RECV).
+ */
+static inline int
+ia64_sn_irtr_intr_enable(nasid_t nasid, int subch, u64 intr)
+{
+	struct ia64_sal_retval rv;
+	SAL_CALL_REENTRANT(rv, SN_SAL_IROUTER_OP, SAL_IROUTER_INTR_ON,
+			   (u64) nasid, (u64) subch, intr, 0, 0, 0);
+	return (int) rv.v0;
+}
+
+/*
+ * Disable the interrupt indicated by the intr parameter (either
+ * SAL_IROUTER_INTR_XMIT or SAL_IROUTER_INTR_RECV).
+ */
+static inline int
+ia64_sn_irtr_intr_disable(nasid_t nasid, int subch, u64 intr)
+{
+	struct ia64_sal_retval rv;
+	SAL_CALL_REENTRANT(rv, SN_SAL_IROUTER_OP, SAL_IROUTER_INTR_OFF,
+			   (u64) nasid, (u64) subch, intr, 0, 0, 0);
+	return (int) rv.v0;
+}
+
+/*
+ * Initialize the SAL components of the system controller
+ * communication driver; specifically pass in a sizable buffer that
+ * can be used for allocation of subchannel queues as new subchannels
+ * are opened.  "buf" points to the buffer, and "len" specifies its
+ * length.
+ */
+static inline int
+ia64_sn_irtr_init(nasid_t nasid, void *buf, int len)
+{
+	struct ia64_sal_retval rv;
+	SAL_CALL_REENTRANT(rv, SN_SAL_IROUTER_OP, SAL_IROUTER_INIT,
+			   (u64) nasid, (u64) buf, (u64) len, 0, 0, 0);
+	return (int) rv.status;
 }
 
 #endif /* _ASM_IA64_SN_SN_SAL_H */
