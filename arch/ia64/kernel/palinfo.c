@@ -333,10 +333,11 @@ vm_info(char *page)
 	sep = "";
 	for (i = 0; i < 8; i++) {
 		if (attrib & (1 << i)) {
-			p += sprintf(p, "%s%s\n", sep, mem_attrib[i]);
+			p += sprintf(p, "%s%s", sep, mem_attrib[i]);
 			sep = ", ";
 		}
 	}
+	p += sprintf(p, "\n");
 
 	if ((status=ia64_pal_vm_page_size(&tr_pages, &vw_pages)) !=0) {
 		printk("ia64_pal_vm_page_size=%ld\n", status);
