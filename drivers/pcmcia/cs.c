@@ -338,13 +338,13 @@ static int pcmcia_add_socket(struct class_device *class_dev)
 	socket->erase_busy.next = socket->erase_busy.prev = &socket->erase_busy;
 	INIT_LIST_HEAD(&socket->cis_cache);
 	spin_lock_init(&socket->lock);
-
-	init_socket(socket);
-
 	init_completion(&socket->thread_done);
 	init_waitqueue_head(&socket->thread_wait);
 	init_MUTEX(&socket->skt_sem);
 	spin_lock_init(&socket->thread_lock);
+
+	init_socket(socket);
+
 	ret = kernel_thread(pccardd, socket, CLONE_KERNEL);
 	if (ret < 0)
 		return ret;
