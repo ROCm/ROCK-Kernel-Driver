@@ -12,6 +12,7 @@
  *
  *	Fixes:
  *	Vitaly E. Lavrov	releasing NULL neighbor in neigh_add.
+ *	Harald Welte		Add neighbour cache statistics like rtstat
  */
 
 #include <linux/config.h>
@@ -21,6 +22,7 @@
 #include <linux/socket.h>
 #include <linux/sched.h>
 #include <linux/netdevice.h>
+#include <linux/proc_fs.h>
 #ifdef CONFIG_SYSCTL
 #include <linux/sysctl.h>
 #endif
@@ -59,6 +61,7 @@ void neigh_changeaddr(struct neigh_table *tbl, struct net_device *dev);
 
 static int neigh_glbl_allocs;
 static struct neigh_table *neigh_tables;
+static struct file_operations neigh_stat_seq_fops;
 
 /*
    Neighbour hash table buckets are protected with rwlock tbl->lock.
@@ -115,6 +118,8 @@ static int neigh_forced_gc(struct neigh_table *tbl)
 {
 	int shrunk = 0;
 	int i;
+
+	NEIGH_CACHE_STAT_INC(tbl, forced_gc_runs);
 
 	write_lock_bh(&tbl->lock);
 	for (i = 0; i <= tbl->hash_mask; i++) {
@@ -273,7 +278,8 @@ static struct neighbour *neigh_alloc(struct neigh_table *tbl)
 	init_timer(&n->timer);
 	n->timer.function = neigh_timer_handler;
 	n->timer.data	  = (unsigned long)n;
-	tbl->stats.allocs++;
+
+	NEIGH_CACHE_STAT_INC(tbl, allocs);
 	neigh_glbl_allocs++;
 	tbl->entries++;
 	n->tbl		  = tbl;
@@ -315,6 +321,8 @@ static void neigh_hash_grow(struct neigh_table *tbl, unsigned long new_entries)
 	struct neighbour **new_hash, **old_hash;
 	unsigned int i, new_hash_mask, old_entries;
 
+	NEIGH_CACHE_STAT_INC(tbl, hash_grows);
+
 	BUG_ON(new_entries & (new_entries - 1));
 	new_hash = neigh_hash_alloc(new_entries);
 	if (!new_hash)
@@ -350,11 +358,14 @@ struct neighbour *neigh_lookup(struct neigh_table *tbl, const void *pkey,
 	struct neighbour *n;
 	int key_len = tbl->key_len;
 	u32 hash_val = tbl->hash(pkey, dev) & tbl->hash_mask;
+	
+	NEIGH_CACHE_STAT_INC(tbl, lookups);
 
 	read_lock_bh(&tbl->lock);
 	for (n = tbl->hash_buckets[hash_val]; n; n = n->next) {
 		if (dev == n->dev && !memcmp(n->primary_key, pkey, key_len)) {
 			neigh_hold(n);
+			NEIGH_CACHE_STAT_INC(tbl, hits);
 			break;
 		}
 	}
@@ -368,10 +379,13 @@ struct neighbour *neigh_lookup_nodev(struct neigh_table *tbl, const void *pkey)
 	int key_len = tbl->key_len;
 	u32 hash_val = tbl->hash(pkey, NULL) & tbl->hash_mask;
 
+	NEIGH_CACHE_STAT_INC(tbl, lookups);
+
 	read_lock_bh(&tbl->lock);
 	for (n = tbl->hash_buckets[hash_val]; n; n = n->next) {
 		if (!memcmp(n->primary_key, pkey, key_len)) {
 			neigh_hold(n);
+			NEIGH_CACHE_STAT_INC(tbl, hits);
 			break;
 		}
 	}
@@ -556,6 +570,8 @@ void neigh_destroy(struct neighbour *neigh)
 {
 	struct hh_cache *hh;
 
+	NEIGH_CACHE_STAT_INC(neigh->tbl, destroys);
+
 	if (!neigh->dead) {
 		printk(KERN_WARNING
 		       "Destroying alive neighbour %p\n", neigh);
@@ -630,6 +646,8 @@ static void neigh_periodic_timer(unsigned long arg)
 	struct neigh_table *tbl = (struct neigh_table *)arg;
 	struct neighbour *n, **np;
 	unsigned long expire, now = jiffies;
+
+	NEIGH_CACHE_STAT_INC(tbl, periodic_gc_runs);
 
 	write_lock(&tbl->lock);
 
@@ -762,7 +780,7 @@ static void neigh_timer_handler(unsigned long arg)
 
 		neigh->nud_state = NUD_FAILED;
 		notify = 1;
-		neigh->tbl->stats.res_failed++;
+		NEIGH_CACHE_STAT_INC(neigh->tbl, res_failed);
 		NEIGH_PRINTK2("neigh %p is failed.\n", neigh);
 
 		/* It is very thin place. report_unreachable is very complicated
@@ -1311,6 +1329,29 @@ void neigh_table_init(struct neigh_table *tbl)
 	if (!tbl->kmem_cachep)
 		panic("cannot create neighbour cache");
 
+	tbl->stats = alloc_percpu(struct neigh_statistics);
+	if (!tbl->stats)
+		panic("cannot create neighbour cache statistics");
+	
+#ifdef CONFIG_PROC_FS
+#define NC_STAT_SUFFIX "_stat"
+	{
+	char *proc_stat_name;
+	proc_stat_name = kmalloc(strlen(tbl->id) + 
+				 strlen(NC_STAT_SUFFIX) + 1, GFP_KERNEL);
+	if (!proc_stat_name)
+		panic("cannot allocate neighbour cache proc name buffer");
+	strcpy(proc_stat_name, tbl->id);
+	strcat(proc_stat_name, NC_STAT_SUFFIX);
+
+	tbl->pde = create_proc_entry(proc_stat_name, 0, proc_net);
+	if (!tbl->pde) 
+		panic("cannot create neighbour proc dir entry");
+	tbl->pde->proc_fops = &neigh_stat_seq_fops;
+	tbl->pde->data = tbl;
+	}
+#endif
+
 	tbl->hash_mask = 1;
 	tbl->hash_buckets = neigh_hash_alloc(tbl->hash_mask + 1);
 
@@ -1856,6 +1897,106 @@ void neigh_seq_stop(struct seq_file *seq, void *v)
 	read_unlock_bh(&tbl->lock);
 }
 EXPORT_SYMBOL(neigh_seq_stop);
+
+/* statistics via seq_file */
+
+static void *neigh_stat_seq_start(struct seq_file *seq, loff_t *pos)
+{
+	struct proc_dir_entry *pde = seq->private;
+	struct neigh_table *tbl = pde->data;
+	int cpu;
+
+	if (*pos == 0)
+		return SEQ_START_TOKEN;
+	
+	for (cpu = *pos-1; cpu < NR_CPUS; ++cpu) {
+		if (!cpu_possible(cpu))
+			continue;
+		*pos = cpu+1;
+		return per_cpu_ptr(tbl->stats, cpu);
+	}
+	return NULL;
+}
+
+static void *neigh_stat_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	struct proc_dir_entry *pde = seq->private;
+	struct neigh_table *tbl = pde->data;
+	int cpu;
+
+	for (cpu = *pos; cpu < NR_CPUS; ++cpu) {
+		if (!cpu_possible(cpu))
+			continue;
+		*pos = cpu+1;
+		return per_cpu_ptr(tbl->stats, cpu);
+	}
+	return NULL;
+}
+
+static void neigh_stat_seq_stop(struct seq_file *seq, void *v)
+{
+
+}
+
+static int neigh_stat_seq_show(struct seq_file *seq, void *v)
+{
+	struct proc_dir_entry *pde = seq->private;
+	struct neigh_table *tbl = pde->data;
+	struct neigh_statistics *st = v;
+
+	if (v == SEQ_START_TOKEN) {
+		seq_printf(seq, "entries  allocs destroys hash_grows  lookups hits  res_failed  rcv_probes_mcast rcv_probes_ucast  periodic_gc_runs forced_gc_runs forced_gc_goal_miss\n");
+		return 0;
+	}
+
+	seq_printf(seq, "%08x  %08lx %08lx %08lx  %08lx %08lx  %08lx  "
+			"%08lx %08lx  %08lx %08lx\n",
+		   tbl->entries,
+
+		   st->allocs,
+		   st->destroys,
+		   st->hash_grows,
+
+		   st->lookups,
+		   st->hits,
+
+		   st->res_failed,
+
+		   st->rcv_probes_mcast,
+		   st->rcv_probes_ucast,
+
+		   st->periodic_gc_runs,
+		   st->forced_gc_runs
+		   );
+
+	return 0;
+}
+
+static struct seq_operations neigh_stat_seq_ops = {
+	.start	= neigh_stat_seq_start,
+	.next	= neigh_stat_seq_next,
+	.stop	= neigh_stat_seq_stop,
+	.show	= neigh_stat_seq_show,
+};
+
+static int neigh_stat_seq_open(struct inode *inode, struct file *file)
+{
+	int ret = seq_open(file, &neigh_stat_seq_ops);
+
+	if (!ret) {
+		struct seq_file *sf = file->private_data;
+		sf->private = PDE(inode);
+	}
+	return ret;
+};
+
+static struct file_operations neigh_stat_seq_fops = {
+	.owner	 = THIS_MODULE,
+	.open 	 = neigh_stat_seq_open,
+	.read	 = seq_read,
+	.llseek	 = seq_lseek,
+	.release = seq_release,
+};
 
 #endif /* CONFIG_PROC_FS */
 
