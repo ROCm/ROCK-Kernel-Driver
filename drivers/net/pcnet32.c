@@ -244,6 +244,7 @@ static int full_duplex[MAX_UNITS];
  * v1.30a  22 May 2004 Don Fry limit frames received during interrupt.
  * v1.30b  24 May 2004 Don Fry fix bogus tx carrier errors with 79c973,
  *	   assisted by Bruce Penrod <bmpenrod@endruntechnologies.com>.
+ * v1.30c  25 May 2004 Don Fry added netif_wake_queue after pcnet32_restart.
  */
 
 
