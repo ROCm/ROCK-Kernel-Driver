@@ -238,17 +238,8 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 		may_enter_fs = (gfp_mask & __GFP_FS) ||
 				(PageSwapCache(page) && (gfp_mask & __GFP_IO));
 
-		/*
-		 * If the page is mapped into pagetables then wait on it, to
-		 * throttle this allocator to the rate at which we can clear
-		 * MAP_SHARED data.  This will also throttle against swapcache
-		 * writes.
-		 */
-		if (PageWriteback(page)) {
-			if (may_enter_fs && page_mapped(page))
-				wait_on_page_writeback(page);
+		if (PageWriteback(page))
 			goto keep_locked;
-		}
 
 		pte_chain_lock(page);
 		if (page_referenced(page) && page_mapping_inuse(page)) {
