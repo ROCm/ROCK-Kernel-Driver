@@ -236,7 +236,7 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr * exec,
 			return;
 		p += len;
 	}
-	__put_user(NULL, argv);
+	__put_user(0, argv);
 	current->mm->arg_end = current->mm->env_start = p;
 	while (envc-- > 0) {
 		size_t len;
@@ -246,7 +246,7 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr * exec,
 			return;
 		p += len;
 	}
-	__put_user(NULL, envp);
+	__put_user(0, envp);
 	current->mm->env_end = p;
 
 	/* Put the elf_info on the stack in the right place.  */
