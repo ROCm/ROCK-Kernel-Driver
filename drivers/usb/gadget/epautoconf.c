@@ -171,9 +171,14 @@ ep_matches (
 	}
 
 	/* report (variable) full speed bulk maxpacket */
-	if (USB_ENDPOINT_XFER_BULK == type)
-		desc->wMaxPacketSize = cpu_to_le16 (
-				min ((unsigned)64, ep->maxpacket));
+	if (USB_ENDPOINT_XFER_BULK == type) {
+		int size = ep->maxpacket;
+
+		/* min() doesn't work on bitfields with gcc-3.5 */
+		if (size > 64)
+			size = 64;
+		desc->wMaxPacketSize = cpu_to_le16(size);
+	}
 	return 1;
 }
 
