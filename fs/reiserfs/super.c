@@ -734,14 +734,14 @@ static int reiserfs_remount (struct super_block * s, int * mount_flags, char * a
 
 static int read_bitmaps (struct super_block * s)
 {
-    int i, bmp;
+    int i, bmap_nr;
 
     SB_AP_BITMAP (s) = reiserfs_kmalloc (sizeof (struct buffer_head *) * SB_BMAP_NR(s), GFP_NOFS, s);
     if (SB_AP_BITMAP (s) == 0)
 	return 1;
-    for (i = 0, bmp = REISERFS_DISK_OFFSET_IN_BYTES / s->s_blocksize + 1;
-	 i < SB_BMAP_NR(s); i++, bmp = s->s_blocksize * 8 * i) {
-	SB_AP_BITMAP (s)[i] = sb_getblk(s, bmp);
+    for (i = 0, bmap_nr = REISERFS_DISK_OFFSET_IN_BYTES / s->s_blocksize + 1;
+	 i < SB_BMAP_NR(s); i++, bmap_nr = s->s_blocksize * 8 * i) {
+	SB_AP_BITMAP (s)[i] = sb_getblk(s, bmap_nr);
 	if (!buffer_uptodate(SB_AP_BITMAP(s)[i]))
 	    ll_rw_block(READ, 1, SB_AP_BITMAP(s) + i);
     }
