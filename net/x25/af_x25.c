@@ -188,7 +188,7 @@ static void x25_kill_by_device(struct net_device *dev)
 static int x25_device_event(struct notifier_block *this, unsigned long event, void *ptr)
 {
 	struct net_device *dev = ptr;
-	struct x25_neigh *neigh;
+	struct x25_neigh *nb;
 
 	if (dev->type == ARPHRD_X25
 #if defined(CONFIG_LLC) || defined(CONFIG_LLC_MODULE)
@@ -200,8 +200,11 @@ static int x25_device_event(struct notifier_block *this, unsigned long event, vo
 				x25_link_device_up(dev);
 				break;
 			case NETDEV_GOING_DOWN:
-				if ((neigh = x25_get_neigh(dev)))
-					x25_terminate_link(neigh);
+				nb = x25_get_neigh(dev);
+				if (nb) {
+					x25_terminate_link(nb);
+					x25_neigh_put(nb);
+				}
 				break;
 			case NETDEV_DOWN:
 				x25_kill_by_device(dev);
@@ -255,7 +258,7 @@ static struct sock *x25_find_listener(struct x25_address *addr)
 /*
  *	Find a connected X.25 socket given my LCI and neighbour.
  */
-struct sock *x25_find_socket(unsigned int lci, struct x25_neigh *neigh)
+struct sock *x25_find_socket(unsigned int lci, struct x25_neigh *nb)
 {
 	struct sock *s;
 	unsigned long flags;
@@ -264,7 +267,7 @@ struct sock *x25_find_socket(unsigned int lci, struct x25_neigh *neigh)
 	cli();
 
 	for (s = x25_list; s; s = s->next)
-		if (x25_sk(s)->lci == lci && x25_sk(s)->neighbour == neigh)
+		if (x25_sk(s)->lci == lci && x25_sk(s)->neighbour == nb)
 			break;
 
 	restore_flags(flags);
@@ -274,11 +277,11 @@ struct sock *x25_find_socket(unsigned int lci, struct x25_neigh *neigh)
 /*
  *	Find a unique LCI for a given device.
  */
-unsigned int x25_new_lci(struct x25_neigh *neigh)
+unsigned int x25_new_lci(struct x25_neigh *nb)
 {
 	unsigned int lci = 1;
 
-	while (x25_find_socket(lci, neigh))
+	while (x25_find_socket(lci, nb))
 		if (++lci == 4096) {
 			lci = 0;
 			break;
@@ -631,11 +634,11 @@ static int x25_connect(struct socket *sock, struct sockaddr *uaddr, int addr_len
 
 	x25->lci = x25_new_lci(x25->neighbour);
 	if (!x25->lci)
-		goto out_put_route;
+		goto out_put_neigh;
 
 	rc = -EINVAL;
 	if (sk->zapped)		/* Must bind first - autobinding does not work */
-		goto out_put_route;
+		goto out_put_neigh;
 
 	if (!strcmp(x25->source_addr.x25_addr, null_x25_address.x25_addr))
 		memset(&x25->source_addr, '\0', X25_ADDR_LEN);
@@ -656,7 +659,7 @@ static int x25_connect(struct socket *sock, struct sockaddr *uaddr, int addr_len
 	/* Now the loop */
 	rc = -EINPROGRESS;
 	if (sk->state != TCP_ESTABLISHED && (flags & O_NONBLOCK))
-		goto out_put_route;
+		goto out_put_neigh;
 
 	cli();	/* To avoid races on the sleep */
 
@@ -681,6 +684,9 @@ static int x25_connect(struct socket *sock, struct sockaddr *uaddr, int addr_len
 	rc = 0;
 out_unlock:
 	sti();
+out_put_neigh:
+	if (rc)
+		x25_neigh_put(x25->neighbour);
 out_put_route:
 	x25_route_put(rt);
 out:
@@ -758,7 +764,7 @@ static int x25_getname(struct socket *sock, struct sockaddr *uaddr, int *uaddr_l
 	return 0;
 }
  
-int x25_rx_call_request(struct sk_buff *skb, struct x25_neigh *neigh, unsigned int lci)
+int x25_rx_call_request(struct sk_buff *skb, struct x25_neigh *nb, unsigned int lci)
 {
 	struct sock *sk;
 	struct sock *make;
@@ -800,7 +806,7 @@ int x25_rx_call_request(struct sk_buff *skb, struct x25_neigh *neigh, unsigned i
 	 * on certain facilties
 	 */
 
-	x25_limit_facilities(&facilities,neigh);
+	x25_limit_facilities(&facilities, nb);
 
 	/*
 	 *	Try to create a new socket.
@@ -821,7 +827,7 @@ int x25_rx_call_request(struct sk_buff *skb, struct x25_neigh *neigh, unsigned i
 	makex25->lci           = lci;
 	makex25->dest_addr     = dest_addr;
 	makex25->source_addr   = source_addr;
-	makex25->neighbour     = neigh;
+	makex25->neighbour     = nb;
 	makex25->facilities    = facilities;
 	makex25->vc_facil_mask = x25_sk(sk)->vc_facil_mask;
 
@@ -853,7 +859,7 @@ out:
 	return rc;
 out_clear_request:
 	rc = 0;
-	x25_transmit_clear_request(neigh, lci, 0x01);
+	x25_transmit_clear_request(nb, lci, 0x01);
 	goto out;
 }
 
@@ -1358,12 +1364,12 @@ struct notifier_block x25_dev_notifier = {
 	.notifier_call = x25_device_event,
 };
 
-void x25_kill_by_neigh(struct x25_neigh *neigh)
+void x25_kill_by_neigh(struct x25_neigh *nb)
 {
 	struct sock *s;
 
 	for (s = x25_list; s; s = s->next)
-		if (x25_sk(s)->neighbour == neigh)
+		if (x25_sk(s)->neighbour == nb)
 			x25_disconnect(s, ENETUNREACH, 0, 0);
 }
 

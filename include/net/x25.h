@@ -118,7 +118,7 @@ struct x25_route {
 };
 
 struct x25_neigh {
-	struct x25_neigh	*next;
+	struct list_head	node;
 	struct net_device	*dev;
 	unsigned int		state;
 	unsigned int		extended;
@@ -126,6 +126,7 @@ struct x25_neigh {
 	unsigned long		t20;
 	struct timer_list	t20timer;
 	unsigned long		global_facil_mask;
+	atomic_t		refcnt;
 };
 
 struct x25_opt {
@@ -198,6 +199,18 @@ extern void x25_transmit_link(struct sk_buff *, struct x25_neigh *);
 extern int  x25_subscr_ioctl(unsigned int, void *);
 extern struct x25_neigh *x25_get_neigh(struct net_device *);
 extern void x25_link_free(void);
+
+/* x25_neigh.c */
+static __inline__ void x25_neigh_hold(struct x25_neigh *nb)
+{
+	atomic_inc(&nb->refcnt);
+}
+
+static __inline__ void x25_neigh_put(struct x25_neigh *nb)
+{
+	if (atomic_dec_and_test(&nb->refcnt))
+		kfree(nb);
+}
 
 /* x25_out.c */
 extern  int x25_output(struct sock *, struct sk_buff *);
