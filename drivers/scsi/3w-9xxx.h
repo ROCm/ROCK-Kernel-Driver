@@ -329,6 +329,11 @@ static twa_message_type twa_error_table[] = {
 #define TW_CURRENT_FW_BUILD 5
 #define TW_CURRENT_FW_BRANCH 1
 
+/* Phase defines */
+#define TW_PHASE_INITIAL 0
+#define TW_PHASE_SINGLE  1
+#define TW_PHASE_SGLIST  2
+
 /* Misc defines */
 #define TW_SECTOR_SIZE                        512
 #define TW_ALIGNMENT_9000                     4  /* 4 bytes */
@@ -361,7 +366,6 @@ static twa_message_type twa_error_table[] = {
 #define TW_MAX_CMDS_PER_LUN		      254
 #define TW_MAX_RESPONSE_DRAIN		      256
 #define TW_MAX_AEN_DRAIN		      40
-#define TW_IN_INTR                            1
 #define TW_IN_IOCTL                           2
 #define TW_IN_CHRDEV_IOCTL                    3
 #define TW_IN_ATTENTION_LOOP		      4
@@ -427,6 +431,25 @@ static twa_message_type twa_error_table[] = {
 #define TW_COMMAND_SIZE			      4
 #define TW_DMA_MASK			      DMA_32BIT_MASK
 #endif
+#ifndef PCI_DEVICE_ID_3WARE_9000
+#define PCI_DEVICE_ID_3WARE_9000 0x1002
+#endif
+
+/* Bitmask macros to eliminate bitfields */
+
+/* opcode: 5, reserved: 3 */
+#define TW_OPRES_IN(x,y) ((x << 5) | (y & 0x1f))
+#define TW_OP_OUT(x) (x & 0x1f)
+
+/* opcode: 5, sgloffset: 3 */
+#define TW_OPSGL_IN(x,y) ((x << 5) | (y & 0x1f))
+#define TW_SGL_OUT(x) ((x >> 5) & 0x7)
+
+/* severity: 3, reserved: 5 */
+#define TW_SEV_OUT(x) (x & 0x7)
+
+/* reserved_1: 4, response_id: 8, reserved_2: 20 */
+#define TW_RESID_OUT(x) ((x >> 4) & 0xff)
 
 /* Macros */
 #define TW_CONTROL_REG_ADDR(x) (x->base_addr)
@@ -468,17 +491,10 @@ typedef struct TAG_TW_SG_Entry {
 
 /* Command Packet */
 typedef struct TW_Command {
-	/* First DWORD */
-	struct {
-		unsigned char opcode:5;
-		unsigned char sgl_offset:3;
-	} byte0_offset;
+	unsigned char opcode__sgloffset;
 	unsigned char size;
 	unsigned char request_id;
-	struct {
-		unsigned char unit:4;
-		unsigned char host_id:4;
-	} byte3_offset;
+	unsigned char unit__hostid;
 	/* Second DWORD */
 	unsigned char status;
 	unsigned char flags;
@@ -515,10 +531,7 @@ typedef struct TAG_TW_SG_Apache {
 
 /* Command Packet for 9000+ controllers */
 typedef struct TAG_TW_Command_Apache {
-	struct {
-		unsigned char opcode:5;
-		unsigned char reserved:3;
-	} command;
+	unsigned char opcode__reserved;
 	unsigned char unit;
 	unsigned short request_id;
 	unsigned char status;
@@ -538,10 +551,7 @@ typedef struct TAG_TW_Command_Apache_Header {
 		char reserved[4];
 		unsigned short error;
 		unsigned char padding;
-		struct {
-			unsigned char severity:3;
-			unsigned char reserved:5;
-		} substatus_block;
+		unsigned char severity__reserved;
 	} status_block;
 	unsigned char err_specific_desc[98];
 	struct {
@@ -562,8 +572,7 @@ typedef struct TAG_TW_Command_Full {
 
 /* Initconnection structure */
 typedef struct TAG_TW_Initconnect {
-	unsigned char opcode:5;
-	unsigned char res1:3;
+	unsigned char opcode__reserved;
 	unsigned char size;
 	unsigned char request_id;
 	unsigned char res2;
@@ -625,11 +634,7 @@ typedef struct {
 
 /* Response queue */
 typedef union TAG_TW_Response_Queue {
-	struct {
-		u32 undefined_1: 4;
-		u32 response_id: 8;
-		u32 undefined_2: 20;
-	} u;
+	u32 response_id;
 	u32 value;
 } TW_Response_Queue;
 
@@ -649,38 +654,11 @@ typedef struct TAG_TW_Compatibility_Info
 	unsigned short working_build;
 } TW_Compatibility_Info;
 
-/* Command header for ATA pass-thru */
-typedef struct TAG_TW_Passthru
-{
-	struct {
-		unsigned char opcode:5;
-		unsigned char sgloff:3;
-	} byte0;
-	unsigned char size;
-	unsigned char request_id;
-	struct {
-		unsigned char aport:4;
-		unsigned char host_id:4;
-	} byte3;
-	unsigned char status;
-	unsigned char flags;
-	unsigned short param;
-	unsigned short features;
-	unsigned short sector_count;
-	unsigned short sector_num;
-	unsigned short cylinder_lo;
-	unsigned short cylinder_hi;
-	unsigned char drive_head;
-	unsigned char command;
-	TW_SG_Entry sg_list[TW_ATA_PASS_SGL_MAX];
-	unsigned char padding[12];
-} TW_Passthru;
-
 typedef struct TAG_TW_Device_Extension {
 	u32                     *base_addr;
 	unsigned long	       	*generic_buffer_virt[TW_Q_LENGTH];
 	unsigned long	       	generic_buffer_phys[TW_Q_LENGTH];
-	unsigned long	       	*command_packet_virt[TW_Q_LENGTH];
+	TW_Command_Full	       	*command_packet_virt[TW_Q_LENGTH];
 	unsigned long		command_packet_phys[TW_Q_LENGTH];
 	struct pci_dev		*tw_pci_dev;
 	struct scsi_cmnd	*srb[TW_Q_LENGTH];
