@@ -17,6 +17,10 @@
 #include <linux/interrupt.h>
 
 #include <asm/uaccess.h>
+#include <asm/traps.h>
+
+#define PRINT_USER_FAULTS /* (turn this on if you want user faults to be */
+			 /*  dumped to the console via printk)          */
 
 
 /* Defines for parisc_acctyp()	*/
@@ -114,59 +118,31 @@ parisc_acctyp(unsigned long code, unsigned int inst)
 #undef isGraphicsFlushRead
 #undef BITSSET
 
-/* This is similar to expand_stack(), except that it is for stacks
- * that grow upwards.
+
+#if 0
+/* This is the treewalk to find a vma which is the highest that has
+ * a start < addr.  We're using find_vma_prev instead right now, but
+ * we might want to use this at some point in the future.  Probably
+ * not, but I want it committed to CVS so I don't lose it :-)
  */
-
-static inline int expand_stackup(struct vm_area_struct * vma, unsigned long address)
-{
-	unsigned long grow;
-
-	address += 4 + PAGE_SIZE - 1;
-	address &= PAGE_MASK;
-	grow = (address - vma->vm_end) >> PAGE_SHIFT;
-	if (address - vma->vm_start > current->rlim[RLIMIT_STACK].rlim_cur ||
-	    ((vma->vm_mm->total_vm + grow) << PAGE_SHIFT) > current->rlim[RLIMIT_AS].rlim_cur)
-		return -ENOMEM;
-	vma->vm_end = address;
-	vma->vm_mm->total_vm += grow;
-	if (vma->vm_flags & VM_LOCKED)
-		vma->vm_mm->locked_vm += grow;
-	return 0;
-}
-
-
-/* This is similar to find_vma(), except that it understands that stacks
- * grow up rather than down.
- * XXX Optimise by making use of cache and avl tree as per find_vma().
- */
-
-struct vm_area_struct * pa_find_vma(struct mm_struct * mm, unsigned long addr)
-{
-	struct vm_area_struct *vma = NULL;
-
-	if (mm) {
-		vma = mm->mmap;
-		if (!vma || addr < vma->vm_start)
-			return NULL;
-		while (vma->vm_next && addr >= vma->vm_next->vm_start)
-			vma = vma->vm_next;
-	}
-	return vma;
-}
-
-
-/*
- * This routine handles page faults.  It determines the address,
- * and the problem, and then passes it off to one of the appropriate
- * routines.
- */
-extern void parisc_terminate(char *, struct pt_regs *, int, unsigned long);
+			while (tree != vm_avl_empty) {
+				if (tree->vm_start > addr) {
+					tree = tree->vm_avl_left;
+				} else {
+					prev = tree;
+					if (prev->vm_next == NULL)
+						break;
+					if (prev->vm_next->vm_start > addr)
+						break;
+					tree = tree->vm_avl_right;
+				}
+			}
+#endif
 
 void do_page_fault(struct pt_regs *regs, unsigned long code,
 			      unsigned long address)
 {
-	struct vm_area_struct * vma;
+	struct vm_area_struct *vma, *prev_vma;
 	struct task_struct *tsk = current;
 	struct mm_struct *mm = tsk->mm;
 	const struct exception_table_entry *fix;
@@ -176,13 +152,9 @@ void do_page_fault(struct pt_regs *regs, unsigned long code,
 		goto no_context;
 
 	down_read(&mm->mmap_sem);
-	vma = pa_find_vma(mm, address);
-	if (!vma)
-		goto bad_area;
-	if (address < vma->vm_end)
-		goto good_area;
-	if (!(vma->vm_flags & VM_GROWSUP) || expand_stackup(vma, address))
-		goto bad_area;
+	vma = find_vma_prev(mm, address, &prev_vma);
+	if (!vma || address < vma->vm_start)
+		goto check_expansion;
 /*
  * Ok, we have a good vm_area for this memory access. We still need to
  * check the access permissions.
@@ -221,6 +193,11 @@ good_area:
 	up_read(&mm->mmap_sem);
 	return;
 
+check_expansion:
+	vma = prev_vma;
+	if (vma && (expand_stack(vma, address) == 0))
+		goto good_area;
+
 /*
  * Something tried to access memory that isn't in our memory map..
  */
@@ -230,9 +207,16 @@ bad_area:
 	if (user_mode(regs)) {
 		struct siginfo si;
 
-		printk("\ndo_page_fault() pid=%d command='%s'\n",
-		    tsk->pid, tsk->comm);
+#ifdef PRINT_USER_FAULTS
+		printk(KERN_DEBUG "\n");
+		printk(KERN_DEBUG "do_page_fault() pid=%d command='%s' type=%lu address=0x%08lx\n",
+		    tsk->pid, tsk->comm, code, address);
+		if (vma) {
+			printk(KERN_DEBUG "vm_start = 0x%08lx, vm_end = 0x%08lx\n",
+					vma->vm_start, vma->vm_end);
+		}
 		show_regs(regs);
+#endif
 		/* FIXME: actually we need to get the signo and code correct */
 		si.si_signo = SIGSEGV;
 		si.si_errno = 0;
@@ -272,11 +256,11 @@ no_context:
 		}
 	}
 
-	parisc_terminate("Bad Address (null pointer deref?)",regs,code,address);
+	parisc_terminate("Bad Address (null pointer deref?)", regs, code, address);
 
   out_of_memory:
 	up_read(&mm->mmap_sem);
-	printk("VM: killing process %s\n", current->comm);
+	printk(KERN_CRIT "VM: killing process %s\n", current->comm);
 	if (user_mode(regs))
 		do_exit(SIGKILL);
 	goto no_context;

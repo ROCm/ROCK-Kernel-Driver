@@ -7,7 +7,7 @@
  *	(c) 1999 Matthew Wilcox
  */
 
-extern unsigned long hil_base;	/* declared in drivers/gsc/hil.c */
+extern unsigned long hil_base;	/* declared in drivers/parisc/hil.c */
 extern unsigned int hil_irq;
 
 #define HILBASE			hil_base /* 0xf0821000 (old) or 0xf0201000 (new) */

@@ -30,11 +30,11 @@ typedef struct svc_buf	svc_buf;
 #define NFSDDBG_FACILITY		NFSDDBG_PROC
 
 
-static void
-svcbuf_reserve(struct svc_buf *buf, u32 **ptr, int *len, int nr)
+static inline void
+svcbuf_reserve(struct xdr_buf *buf, u32 **ptr, int *len, int nr)
 {
-	*ptr = buf->buf + nr;
-	*len = buf->buflen - buf->len - nr;
+	*ptr = (u32*)(buf->head[0].iov_base+buf->head[0].iov_len) + nr;
+	*len = ((PAGE_SIZE-buf->head[0].iov_len)>>2) - nr;
 }
 
 static int
@@ -109,7 +109,7 @@ nfsd_proc_readlink(struct svc_rqst *rqstp, struct nfsd_fhandle     *argp,
 	dprintk("nfsd: READLINK %s\n", SVCFH_fmt(&argp->fh));
 
 	/* Reserve room for status and path length */
-	svcbuf_reserve(&rqstp->rq_resbuf, &path, &dummy, 2);
+	svcbuf_reserve(&rqstp->rq_res, &path, &dummy, 2);
 
 	/* Read the symlink. */
 	resp->len = NFS_MAXPATHLEN;
@@ -127,8 +127,7 @@ static int
 nfsd_proc_read(struct svc_rqst *rqstp, struct nfsd_readargs *argp,
 				       struct nfsd_readres  *resp)
 {
-	u32 *	buffer;
-	int	nfserr, avail;
+	int	nfserr;
 
 	dprintk("nfsd: READ    %s %d bytes at %d\n",
 		SVCFH_fmt(&argp->fh),
@@ -137,22 +136,21 @@ nfsd_proc_read(struct svc_rqst *rqstp, struct nfsd_readargs *argp,
 	/* Obtain buffer pointer for payload. 19 is 1 word for
 	 * status, 17 words for fattr, and 1 word for the byte count.
 	 */
-	svcbuf_reserve(&rqstp->rq_resbuf, &buffer, &avail, 19);
 
-	if ((avail << 2) < argp->count) {
+	if (NFSSVC_MAXBLKSIZE < argp->count) {
 		printk(KERN_NOTICE
 			"oversized read request from %08x:%d (%d bytes)\n",
 				ntohl(rqstp->rq_addr.sin_addr.s_addr),
 				ntohs(rqstp->rq_addr.sin_port),
 				argp->count);
-		argp->count = avail << 2;
+		argp->count = NFSSVC_MAXBLKSIZE;
 	}
 	svc_reserve(rqstp, (19<<2) + argp->count + 4);
 
 	resp->count = argp->count;
 	nfserr = nfsd_read(rqstp, fh_copy(&resp->fh, &argp->fh),
 				  argp->offset,
-				  (char *) buffer,
+			   	  argp->vec, argp->vlen,
 				  &resp->count);
 
 	return nfserr;
@@ -175,7 +173,7 @@ nfsd_proc_write(struct svc_rqst *rqstp, struct nfsd_writeargs *argp,
 
 	nfserr = nfsd_write(rqstp, fh_copy(&resp->fh, &argp->fh),
 				   argp->offset,
-				   argp->data,
+				   argp->vec, argp->vlen,
 				   argp->len,
 				   &stable);
 	return nfserr;
@@ -471,13 +469,14 @@ nfsd_proc_readdir(struct svc_rqst *rqstp, struct nfsd_readdirargs *argp,
 {
 	u32 *		buffer;
 	int		nfserr, count;
+	loff_t		offset;
 
 	dprintk("nfsd: READDIR  %s %d bytes at %d\n",
 		SVCFH_fmt(&argp->fh),		
 		argp->count, argp->cookie);
 
 	/* Reserve buffer space for status */
-	svcbuf_reserve(&rqstp->rq_resbuf, &buffer, &count, 1);
+	svcbuf_reserve(&rqstp->rq_res, &buffer, &count, 1);
 
 	/* Shrink to the client read size */
 	if (count > (argp->count >> 2))
@@ -488,11 +487,18 @@ nfsd_proc_readdir(struct svc_rqst *rqstp, struct nfsd_readdirargs *argp,
 	if (count < 0)
 		count = 0;
 
+	resp->buffer = buffer;
+	resp->offset = NULL;
+	resp->buflen = count;
+	resp->common.err = nfs_ok;
 	/* Read directory and encode entries on the fly */
-	nfserr = nfsd_readdir(rqstp, &argp->fh, (loff_t) argp->cookie, 
-			      nfssvc_encode_entry,
-			      buffer, &count, NULL, NULL);
-	resp->count = count;
+	offset = argp->cookie;
+	nfserr = nfsd_readdir(rqstp, &argp->fh, &offset, 
+			      &resp->common, nfssvc_encode_entry);
+
+	resp->count = resp->buffer - buffer;
+	if (resp->offset)
+		*resp->offset = (u32)offset;
 
 	fh_put(&argp->fh);
 	return nfserr;

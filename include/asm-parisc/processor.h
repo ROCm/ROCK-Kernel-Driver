@@ -2,12 +2,14 @@
  * include/asm-parisc/processor.h
  *
  * Copyright (C) 1994 Linus Torvalds
+ * Copyright (C) 2001 Grant Grundler
  */
 
 #ifndef __ASM_PARISC_PROCESSOR_H
 #define __ASM_PARISC_PROCESSOR_H
 
 #ifndef __ASSEMBLY__
+#include <linux/config.h>
 #include <linux/threads.h>
 
 #include <asm/hardware.h>
@@ -15,7 +17,10 @@
 #include <asm/pdc.h>
 #include <asm/ptrace.h>
 #include <asm/types.h>
+#include <asm/system.h>
 #endif /* __ASSEMBLY__ */
+
+#define KERNEL_STACK_SIZE 	(4*PAGE_SIZE)
 
 /*
  * Default implementation of macro that returns current
@@ -30,8 +35,11 @@
 
 #define current_text_addr() ({ void *pc; __asm__("\n\tblr 0,%0\n\tnop":"=r" (pc)); pc; })
 
-#define TASK_SIZE	    (PAGE_OFFSET)
-#define TASK_UNMAPPED_BASE  (TASK_SIZE / 3)
+#define TASK_SIZE               (current->thread.task_size)
+#define DEFAULT_TASK_SIZE       (0xFFF00000UL)
+
+#define TASK_UNMAPPED_BASE      (current->thread.map_base)
+#define DEFAULT_MAP_BASE        (0x40000000UL)
 
 #ifndef __ASSEMBLY__
 
@@ -50,17 +58,14 @@ struct system_cpuinfo_parisc {
 
 	struct {
 		struct pdc_model model;
-		struct pdc_model_cpuid /* ARGH */ versions;
-		struct pdc_model_cpuid cpuid;
-#if 0
-		struct pdc_model_caps caps;
-#endif
+		unsigned long versions;
+		unsigned long cpuid;
+		unsigned long capabilities;
 		char   sys_model_name[81]; /* PDC-ROM returnes this model name */
 	} pdc;
 
-	char	 	*model_name;
-	char		*cpu_name;
-	char		*family_name;
+	char		*cpu_name;	/* e.g. "PA7300LC (PCX-L2)" */
+	char		*family_name;	/* e.g. "1.1e" */
 };
 
 
@@ -68,29 +73,41 @@ struct system_cpuinfo_parisc {
 ** Per CPU data structure - ie varies per CPU.
 */
 struct cpuinfo_parisc {
-	unsigned cpuid;
 
 	struct irq_region *region;
-
-	unsigned long it_value; /* Interval Timer value at last timer interrupt */
-	unsigned long it_delta; /* Interval Timer delta (tic_10ms / HZ * 100) */
-
-	unsigned long hpa;	/* Host Physical address */
-	unsigned long txn_addr;	/* External Interrupt Register or id_eid */
-
-	unsigned long bh_count;		/* number of times bh was invoked */
-	unsigned long irq_count;	/* number of IRQ's since boot */
-	unsigned long irq_max_cr16;	/* longest time to handle a single IRQ */
+	unsigned long it_value;     /* Interval Timer value at last timer Intr */
+	unsigned long it_delta;     /* Interval Timer delta (tic_10ms / HZ * 100) */
+	unsigned long irq_count;    /* number of IRQ's since boot */
+	unsigned long irq_max_cr16; /* longest time to handle a single IRQ */
+	unsigned long cpuid;        /* aka slot_number or set to NO_PROC_ID */
+	unsigned long hpa;          /* Host Physical address */
+	unsigned long txn_addr;     /* MMIO addr of EIR or id_eid */
+#ifdef CONFIG_SMP
+	spinlock_t lock;            /* synchronization for ipi's */
+	unsigned long pending_ipi;  /* bitmap of type ipi_message_type */
+	unsigned long ipi_count;    /* number ipi Interrupts */
+#endif
+	unsigned long bh_count;     /* number of times bh was invoked */
+	unsigned long prof_counter; /* per CPU profiling support */
+	unsigned long prof_multiplier;	/* per CPU profiling support */
+	unsigned long fp_rev;
+	unsigned long fp_model;
+	unsigned int state;
+	struct parisc_device *dev;
 };
 
 extern struct system_cpuinfo_parisc boot_cpu_data;
 extern struct cpuinfo_parisc cpu_data[NR_CPUS];
 #define current_cpu_data cpu_data[smp_processor_id()]
 
-extern void identify_cpu(struct cpuinfo_parisc *);
+#define CPU_HVERSION ((boot_cpu_data.hversion >> 4) & 0x0FFF)
 
-#define EISA_bus 0 /* we don't have ISA support yet */
-#define EISA_bus__is_a_macro /* for versions in ksyms.c */
+#ifdef CONFIG_EISA
+extern int EISA_bus;
+#else
+#define EISA_bus 0
+#endif
+
 #define MCA_bus 0
 #define MCA_bus__is_a_macro /* for versions in ksyms.c */
 
@@ -100,31 +117,32 @@ typedef struct {
 
 struct thread_struct {
 	struct pt_regs regs;
-	unsigned long  pg_tables;
+	unsigned long  task_size;
+	unsigned long  map_base;
 	unsigned long  flags;
 }; 
 
 /* Thread struct flags. */
 #define PARISC_KERNEL_DEATH	(1UL << 31)	/* see die_if_kernel()... */
 
-#define INIT_THREAD { {			\
-	{ 0, 0, 0, 0, 0, 0, 0, 0,	\
-	  0, 0, 0, 0, 0, 0, 0, 0,	\
-	  0, 0, 0, 0, 0, 0, 0, 0,	\
-	  0, 0, 0, 0, 0, 0, 0, 0 },	\
-	{ 0, 0, 0, 0, 0, 0, 0, 0,	\
-	  0, 0, 0, 0, 0, 0, 0, 0,	\
-	  0, 0, 0, 0, 0, 0, 0, 0,	\
-	  0, 0, 0, 0, 0, 0, 0, 0 },	\
-	{ 0, 0, 0, 0, 0, 0, 0, 0 },	\
-	{ 0, 0}, { 0, 0}, 0, 0, 0, 0	\
-	}, __pa((unsigned long) swapper_pg_dir) }
+#define INIT_THREAD { \
+	regs:	{	gr: { 0, }, \
+			fr: { 0, }, \
+			sr: { 0, }, \
+			iasq: { 0, }, \
+			iaoq: { 0, }, \
+			cr27: 0, \
+		}, \
+	task_size:      DEFAULT_TASK_SIZE, \
+	map_base:       DEFAULT_MAP_BASE, \
+	flags:          0 \
+	}
 
 /*
  * Return saved PC of a blocked thread.  This is used by ps mostly.
  */
 
-extern inline unsigned long thread_saved_pc(struct thread_struct *t)
+static inline unsigned long thread_saved_pc(struct task_struct *t)
 {
 	return 0xabcdef;
 }
@@ -144,6 +162,35 @@ extern inline unsigned long thread_saved_pc(struct thread_struct *t)
  * We also initialize sr3 to an illegal value (illegal for our
  * implementation, not for the architecture).
  */
+typedef unsigned int elf_caddr_t;
+
+#define start_thread_som(regs, new_pc, new_sp) do {	\
+	unsigned long *sp = (unsigned long *)new_sp;	\
+	__u32 spaceid = (__u32)current->mm->context;	\
+	unsigned long pc = (unsigned long)new_pc;	\
+	/* offset pc for priv. level */			\
+	pc |= 3;					\
+							\
+	set_fs(USER_DS);				\
+	regs->iasq[0] = spaceid;			\
+	regs->iasq[1] = spaceid;			\
+	regs->iaoq[0] = pc;				\
+	regs->iaoq[1] = pc + 4;                         \
+	regs->sr[2] = LINUX_GATEWAY_SPACE;              \
+	regs->sr[3] = 0xffff;				\
+	regs->sr[4] = spaceid;				\
+	regs->sr[5] = spaceid;				\
+	regs->sr[6] = spaceid;				\
+	regs->sr[7] = spaceid;				\
+	regs->gr[ 0] = USER_PSW;                        \
+	regs->gr[30] = ((new_sp)+63)&~63;		\
+	regs->gr[31] = pc;				\
+							\
+	get_user(regs->gr[26],&sp[0]);			\
+	get_user(regs->gr[25],&sp[-1]); 		\
+	get_user(regs->gr[24],&sp[-2]); 		\
+	get_user(regs->gr[23],&sp[-3]); 		\
+} while(0)
 
 /* The ELF abi wants things done a "wee bit" differently than
  * som does.  Supporting this behavior here avoids
@@ -163,22 +210,44 @@ extern inline unsigned long thread_saved_pc(struct thread_struct *t)
    |         32 bytes of magic       |
    |---------------------------------|
    | 32 bytes argument/sp save area  |
-   |---------------------------------|  ((current->mm->env_end) + 63 & ~63)
-   |         N bytes of slack        |
-   |---------------------------------|
-   |      envvar and arg strings     |
-   |---------------------------------|
+   |---------------------------------| (bprm->p)
    |	    ELF auxiliary info	     |
    |         (up to 28 words)        |
    |---------------------------------|
-   |  Environment variable pointers  |
-   |         upwards to NULL	     |
+   |		   NULL		     |
+   |---------------------------------|
+   |	   Environment pointers	     |
+   |---------------------------------|
+   |		   NULL		     |
    |---------------------------------|
    |        Argument pointers        |
-   |         upwards to NULL	     |
-   |---------------------------------|
+   |---------------------------------| <- argv
    |          argc (1 word)          |
-   -----------------------------------
+   |---------------------------------| <- bprm->exec (HACK!)
+   |         N bytes of slack        |
+   |---------------------------------|
+   |	filename passed to execve    |
+   |---------------------------------| (mm->env_end)
+   |           env strings           |
+   |---------------------------------| (mm->env_start, mm->arg_end)
+   |           arg strings           |
+   |---------------------------------|
+   | additional faked arg strings if |
+   | we're invoked via binfmt_script |
+   |---------------------------------| (mm->arg_start)
+   stack base is at TASK_SIZE - rlim_max.
+
+on downward growing arches, it looks like this:
+   stack base at TASK_SIZE
+   | filename passed to execve
+   | env strings
+   | arg strings
+   | faked arg strings
+   | slack
+   | ELF
+   | envps
+   | argvs
+   | argc
 
  *  The pleasant part of this is that if we need to skip arguments we
  *  can just decrement argc and move argv, because the stack pointer
@@ -186,154 +255,78 @@ extern inline unsigned long thread_saved_pc(struct thread_struct *t)
  *  argument vectors.
  *
  * Note that the S/390 people took the easy way out and hacked their
- * GCC to make the stack grow downwards.  */
-
-#define start_thread_som(regs, new_pc, new_sp) do {		\
-	unsigned long *sp = (unsigned long *)new_sp;	\
-	__u32 spaceid = (__u32)current->mm->context;	\
-	unsigned long pc = (unsigned long)new_pc;	\
-	/* offset pc for priv. level */			\
-	pc |= 3;					\
-							\
-	set_fs(USER_DS);				\
-	regs->iasq[0] = spaceid;			\
-	regs->iasq[1] = spaceid;			\
-	regs->iaoq[0] = pc;				\
-	regs->iaoq[1] = pc;				\
-	regs->sr[2] = LINUX_GATEWAY_SPACE;              \
-	regs->sr[3] = 0xffff;				\
-	regs->sr[4] = spaceid;				\
-	regs->sr[5] = spaceid;				\
-	regs->sr[6] = spaceid;				\
-	regs->sr[7] = spaceid;				\
-	regs->gr[ 0] = USER_INIT_PSW;			\
-	regs->gr[30] = ((new_sp)+63)&~63;		\
-	regs->gr[31] = pc;				\
-							\
-	get_user(regs->gr[26],&sp[0]);			\
-	get_user(regs->gr[25],&sp[-1]); 		\
-	get_user(regs->gr[24],&sp[-2]); 		\
-	get_user(regs->gr[23],&sp[-3]); 		\
-							\
-	regs->cr30 = (u32) current;			\
-} while(0)
-
-
-#define start_thread(regs, new_pc, new_sp) do {		\
-	unsigned long *sp = (unsigned long *)new_sp;	\
-	__u32 spaceid = (__u32)current->mm->context;	\
-        unsigned long pc = (unsigned long)new_pc;       \
-        /* offset pc for priv. level */                 \
-        pc |= 3;                                        \
-							\
-							\
-	set_fs(USER_DS);				\
-	regs->iasq[0] = spaceid;			\
-	regs->iasq[1] = spaceid;			\
-	regs->iaoq[0] = pc;				\
-	regs->iaoq[1] = pc; 	               		\
-	regs->sr[2] = LINUX_GATEWAY_SPACE;              \
-	regs->sr[3] = 0xffff;				\
-	regs->sr[4] = spaceid;				\
-	regs->sr[5] = spaceid;				\
-	regs->sr[6] = spaceid;				\
-	regs->sr[7] = spaceid;				\
-	regs->gr[ 0] = USER_INIT_PSW;			\
-	regs->fr[ 0] = 0LL;                            	\
-	regs->fr[ 1] = 0LL;                            	\
-	regs->fr[ 2] = 0LL;                            	\
-	regs->fr[ 3] = 0LL;                            	\
-	regs->gr[30] = ((current->mm->env_end)+63)&~63;	\
-	regs->gr[31] = pc;				\
-							\
-	get_user(regs->gr[25],&sp[0]);			\
-	regs->gr[24] = (unsigned long) &sp[1];		\
-	regs->gr[23] = 0;                            	\
-							\
-	regs->cr30 = (u32) current;			\
-} while(0)
-
-#ifdef __LP64__
-
-/*
- * For 64 bit kernels we need a version of start thread for 32 bit
- * elf files.
- *
- * FIXME: It should be possible to not duplicate the above code
- *        by playing games with concatenation to form both
- *        macros at compile time. The only difference between
- *        this macro and the above is the name and the types
- *        for sp and pc.
+ * GCC to make the stack grow downwards.
  */
 
-#define start_thread32(regs, new_pc, new_sp) do {         \
-	__u32 *sp = (__u32 *)new_sp;                    \
+#define start_thread(regs, new_pc, new_sp) do {		\
+	elf_addr_t *sp = (elf_addr_t *)new_sp;		\
 	__u32 spaceid = (__u32)current->mm->context;	\
-	__u32 pc = (__u32)new_pc;                       \
-        /* offset pc for priv. level */                 \
-        pc |= 3;                                        \
+	elf_addr_t pc = (elf_addr_t)new_pc | 3;		\
+	elf_caddr_t *argv = (elf_caddr_t *)bprm->exec + 1;	\
 							\
 	set_fs(USER_DS);				\
 	regs->iasq[0] = spaceid;			\
 	regs->iasq[1] = spaceid;			\
 	regs->iaoq[0] = pc;				\
-	regs->iaoq[1] = pc; 	               		\
+	regs->iaoq[1] = pc + 4;                         \
 	regs->sr[2] = LINUX_GATEWAY_SPACE;              \
 	regs->sr[3] = 0xffff;				\
 	regs->sr[4] = spaceid;				\
 	regs->sr[5] = spaceid;				\
 	regs->sr[6] = spaceid;				\
 	regs->sr[7] = spaceid;				\
-	regs->gr[ 0] = USER_INIT_PSW;			\
+	regs->gr[ 0] = USER_PSW;                        \
 	regs->fr[ 0] = 0LL;                            	\
 	regs->fr[ 1] = 0LL;                            	\
 	regs->fr[ 2] = 0LL;                            	\
 	regs->fr[ 3] = 0LL;                            	\
-	regs->gr[30] = ((current->mm->env_end)+63)&~63;	\
+	regs->gr[30] = ((unsigned long)sp + 63) &~ 63;	\
 	regs->gr[31] = pc;				\
 							\
-	get_user(regs->gr[25],&sp[0]);			\
-	regs->gr[24] = (unsigned long) &sp[1];		\
-	regs->gr[23] = 0;                            	\
-							\
-	regs->cr30 = (u32) current;			\
+	get_user(regs->gr[25], (argv - 1));		\
+	regs->gr[24] = (long) argv;			\
+	regs->gr[23] = 0;				\
 } while(0)
 
-#endif
-
 struct task_struct;
+struct mm_struct;
 
 /* Free all resources held by a thread. */
 extern void release_thread(struct task_struct *);
 extern int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags);
 
-#define copy_segments(tsk, mm)	do { } while (0)
+extern void map_hpux_gateway_page(struct task_struct *tsk, struct mm_struct *mm);
+
+#define copy_segments(tsk, mm)  do { \
+					if (tsk->personality == PER_HPUX)  \
+					    map_hpux_gateway_page(tsk,mm); \
+				} while (0)
 #define release_segments(mm)	do { } while (0)
 
-extern inline unsigned long get_wchan(struct task_struct *p)
+static inline unsigned long get_wchan(struct task_struct *p)
 {
 	return 0xdeadbeef; /* XXX */
 }
 
-#define KSTK_EIP(tsk)	(0xdeadbeef)
-#define KSTK_ESP(tsk)	(0xdeadbeef)
-
-/* Be sure to hunt all references to this down when you change the size of
- * the kernel stack */
+#define KSTK_EIP(tsk)	((tsk)->thread.regs.iaoq[0])
+#define KSTK_ESP(tsk)	((tsk)->thread.regs.gr[30])
 
 #endif /* __ASSEMBLY__ */
 
-#define THREAD_SIZE	(4*PAGE_SIZE)
+#ifdef  CONFIG_PA20
+#define ARCH_HAS_PREFETCH
+extern inline void prefetch(const void *addr)
+{
+	__asm__("ldw 0(%0), %%r0" : : "r" (addr));
+}
 
-#define alloc_task_struct() \
-	((struct task_struct *) __get_free_pages(GFP_KERNEL,2))
-#define free_task_struct(p)     free_pages((unsigned long)(p),2)
-#define get_task_struct(tsk)      atomic_inc(&virt_to_page(tsk)->count)
-
-#define init_task (init_task_union.task) 
-#define init_stack (init_task_union.stack)
+#define ARCH_HAS_PREFETCHW
+extern inline void prefetchw(const void *addr)
+{
+	__asm__("ldd 0(%0), %%r0" : : "r" (addr));
+}
+#endif
 
 #define cpu_relax()	barrier()
-
 
 #endif /* __ASM_PARISC_PROCESSOR_H */

@@ -1,0 +1,125 @@
+config AGP
+	tristate "/dev/agpgart (AGP Support)" if !GART_IOMMU
+	default AGP_GART if GART_IOMMU
+	---help---
+	  AGP (Accelerated Graphics Port) is a bus system mainly used to
+	  connect graphics cards to the rest of the system.
+
+	  If you have an AGP system and you say Y here, it will be possible to
+	  use the AGP features of your 3D rendering video card. This code acts
+	  as a sort of "AGP driver" for the motherboard's chipset.
+
+	  If you need more texture memory than you can get with the AGP GART
+	  (theoretically up to 256 MB, but in practice usually 64 or 128 MB
+	  due to kernel allocation issues), you could use PCI accesses
+	  and have up to a couple gigs of texture space.
+
+	  Note that this is the only means to have XFree4/GLX use
+	  write-combining with MTRR support on the AGP bus. Without it, OpenGL
+	  direct rendering will be a lot slower but still faster than PIO.
+
+	  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
+	  use GLX or DRI.  If unsure, say N.
+
+	  This driver is available as a module.  If you want to compile it as
+	  a module, say M here and read <file:Documentation/modules.txt>.  The
+	  module will be called agpgart.o.
+
+config AGP_GART
+	bool "/dev/agpgart (AGP Support)"
+	depends on GART_IOMMU
+
+config AGP_INTEL
+	bool "Intel 440LX/BX/GX and I815/I820/I830M/I830MP/I840/I845/I850/I860 support"
+	depends on AGP
+	help
+	  This option gives you AGP support for the GLX component of the
+	  XFree86 4.x on Intel 440LX/BX/GX, 815, 820, 830, 840, 845, 850 and 860 chipsets.
+
+	  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
+	  use GLX or DRI.  If unsure, say N.
+
+config AGP_I810
+	bool "Intel I810/I815/I830M (on-board) support"
+	depends on AGP
+	help
+	  This option gives you AGP support for the Xserver on the Intel 810
+	  815 and 830m chipset boards for their on-board integrated graphics. This
+	  is required to do any useful video modes with these boards.
+
+config AGP_VIA
+	bool "VIA chipset support"
+	depends on AGP
+	help
+	  This option gives you AGP support for the GLX component of the
+	  XFree86 4.x on VIA MPV3/Apollo Pro chipsets.
+
+	  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
+	  use GLX or DRI.  If unsure, say N.
+
+config AGP_AMD
+	bool "AMD Irongate, 761, and 762 support"
+	depends on AGP
+	help
+	  This option gives you AGP support for the GLX component of the
+	  XFree86 4.x on AMD Irongate, 761, and 762 chipsets.
+
+	  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
+	  use GLX or DRI.  If unsure, say N.
+
+config AGP_SIS
+	bool "Generic SiS support"
+	depends on AGP
+	help
+	  This option gives you AGP support for the GLX component of the "soon
+	  to be released" XFree86 4.x on Silicon Integrated Systems [SiS]
+	  chipsets.
+
+	  Note that 5591/5592 AGP chipsets are NOT supported.
+
+	  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
+	  use GLX or DRI.  If unsure, say N.
+
+config AGP_ALI
+	bool "ALI chipset support"
+	depends on AGP
+	---help---
+	  This option gives you AGP support for the GLX component of the
+	  XFree86 4.x on the following ALi chipsets.  The supported chipsets
+	  include M1541, M1621, M1631, M1632, M1641,M1647,and M1651.
+	  For the ALi-chipset question, ALi suggests you refer to
+	  <http://www.ali.com.tw/eng/support/index.shtml>.
+
+	  The M1541 chipset can do AGP 1x and 2x, but note that there is an
+	  acknowledged incompatibility with Matrox G200 cards. Due to
+	  timing issues, this chipset cannot do AGP 2x with the G200.
+	  This is a hardware limitation. AGP 1x seems to be fine, though.
+
+	  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
+	  use GLX or DRI.  If unsure, say N.
+
+config AGP_SWORKS
+	bool "Serverworks LE/HE support"
+	depends on AGP
+	help
+	  Say Y here to support the Serverworks AGP card.  See 
+	  <http://www.serverworks.com/> for product descriptions and images.
+
+config AGP_AMD_8151
+	bool "AMD 8151 support"
+	depends on AGP && !GART_IOMMU
+
+config AGP_I460
+	bool "Intel 460GX support"
+	depends on AGP && IA64
+	help
+	  This option gives you AGP GART support for the Intel 460GX chipset
+	  for IA64 processors.
+
+config AGP_HP_ZX1
+	bool "HP ZX1 AGP support"
+	depends on AGP && IA64
+	help
+	  This option gives you AGP GART support for the HP ZX1 chipset
+	  for IA64 processors.
+

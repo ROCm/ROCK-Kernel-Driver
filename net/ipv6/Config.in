@@ -1,7 +1,0 @@
-#
-# IPv6 configuration
-# 
-
-if [ "$CONFIG_NETFILTER" != "n" ]; then
-   source net/ipv6/netfilter/Config.in
-fi

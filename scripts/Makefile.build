@@ -7,7 +7,9 @@ src := $(obj)
 .PHONY: __build
 __build:
 
+ifdef include-config
 include .config
+endif
 
 include $(obj)/Makefile
 
@@ -171,30 +173,96 @@ targets += $(multi-used-y) $(multi-used-m)
 
 # Compile programs on the host
 # ===========================================================================
+# host-progs := bin2hex
+# Will compile bin2hex.c and create an executable named bin2hex
+#
+# host-progs    := lxdialog
+# lxdialog-objs := checklist.o lxdialog.o
+# Will compile lxdialog.c and checklist.c, and then link the executable
+# lxdialog, based on checklist.o and lxdialog.o
+#
+# host-progs      := qconf
+# qconf-cxxobjs   := qconf.o
+# qconf-objs      := menu.o
+# Will compile qconf as a C++ program, and menu as a C program.
+# They are linked as C++ code to the executable qconf
 
-quiet_cmd_host_cc__c  = HOSTCC  $@
-cmd_host_cc__c        = $(HOSTCC) -Wp,-MD,$(depfile) \
-			$(HOSTCFLAGS) $(HOST_EXTRACFLAGS) \
-			$(HOST_LOADLIBES) -o $@ $<
+# host-progs := conf
+# conf-objs  := conf.o libkconfig.so
+# libkconfig-objs := expr.o type.o
+# Will create a shared library named libkconfig.so that consist of
+# expr.o and type.o (they are both compiled as C code and the object file
+# are made as position independent code).
+# conf.c is compiled as a c program, and conf.o is linked together with
+# libkconfig.so as the executable conf.
+# Note: Shared libraries consisting of C++ files are not supported  
+#
 
-$(host-progs-single): %: %.c FORCE
-	$(call if_changed_dep,host_cc__c)
+# Create executable from a single .c file
+# host-csingle -> Executable
+quiet_cmd_host-csingle 	= HOSTCC  $@
+      cmd_host-csingle	= $(HOSTCC) -Wp,-MD,$(depfile) \
+			  $(HOSTCFLAGS) $(HOST_EXTRACFLAGS) \
+			  $(HOST_LOADLIBES) -o $@ $<
+$(host-csingle): %: %.c FORCE
+	$(call if_changed_dep,host-csingle)
 
-quiet_cmd_host_cc_o_c = HOSTCC  $@
-cmd_host_cc_o_c       = $(HOSTCC) -Wp,-MD,$(depfile) \
-			$(HOSTCFLAGS) $(HOST_EXTRACFLAGS) -c -o $@ $<
+# Link an executable based on list of .o files, all plain c
+# host-cmulti -> executable
+quiet_cmd_host-cmulti	= HOSTLD  $@
+      cmd_host-cmulti	= $(HOSTCC) $(HOSTLDFLAGS) -o $@ \
+			  $(addprefix $(obj)/,$($(@F)-objs)) \
+			  $(HOST_LOADLIBES) $(HOSTLOADLIBES_$(@F))
+$(host-cmulti): %: $(host-cobjs) $(host-cshlib) FORCE
+	$(call if_changed,host-cmulti)
 
-$(host-progs-multi-objs): %.o: %.c FORCE
-	$(call if_changed_dep,host_cc_o_c)
+# Create .o file from a single .c file
+# host-cobjs -> .o
+quiet_cmd_host-cobjs	= HOSTCC  $@
+      cmd_host-cobjs	= $(HOSTCC) -Wp,-MD,$(depfile) \
+			  $(HOSTCFLAGS) $(HOST_EXTRACFLAGS) \
+			  $(HOSTCFLAGS_$(@F)) -c -o $@ $<
+$(host-cobjs): %.o: %.c FORCE
+	$(call if_changed_dep,host-cobjs)
 
-quiet_cmd_host_cc__o  = HOSTLD  $@
-cmd_host_cc__o        = $(HOSTCC) $(HOSTLDFLAGS) -o $@ $(addprefix $(obj)/,$($(subst $(obj)/,,$@)-objs)) \
-			$(HOST_LOADLIBES)
+# Link an executable based on list of .o files, a mixture of .c and .cc
+# host-cxxmulti -> executable
+quiet_cmd_host-cxxmulti	= HOSTLD  $@
+      cmd_host-cxxmulti	= $(HOSTCXX) $(HOSTLDFLAGS) -o $@ \
+			  $(foreach o,objs cxxobjs,\
+			  $(addprefix $(obj)/,$($(@F)-$(o)))) \
+			  $(HOST_LOADLIBES) $(HOSTLOADLIBES_$(@F))
+$(host-cxxmulti): %: $(host-cobjs) $(host-cxxobjs) $(host-cshlib) FORCE
+	$(call if_changed,host-cxxmulti)
 
-$(host-progs-multi): %: $(host-progs-multi-objs) FORCE
-	$(call if_changed,host_cc__o)
+# Create .o file from a single .cc (C++) file
+quiet_cmd_host-cxxobjs	= HOSTCXX $@
+      cmd_host-cxxobjs	= $(HOSTCXX) -Wp,-MD,$(depfile) \
+			  $(HOSTCXXFLAGS) $(HOST_EXTRACXXFLAGS) \
+			  $(HOSTCXXFLAGS_$(@F)) -c -o $@ $<
+$(host-cxxobjs): %.o: %.cc FORCE
+	$(call if_changed_dep,host-cxxobjs)
 
-targets += $(host-progs-single) $(host-progs-multi-objs) $(host-progs-multi) 
+# Compile .c file, create position independent .o file
+# host-cshobjs -> .o
+quiet_cmd_host-cshobjs	= HOSTCC  -fPIC $@
+      cmd_host-cshobjs	= $(HOSTCC) -Wp,-MD,$(depfile) -fPIC\
+			  $(HOSTCFLAGS) $(HOST_EXTRACFLAGS) \
+			  $(HOSTCFLAGS_$(@F)) -c -o $@ $<
+$(host-cshobjs): %.o: %.c FORCE
+	$(call if_changed_dep,host-cshobjs)
+
+# Link a shared library, based on position independent .o files
+# *.o -> .so shared library (host-cshlib)
+quiet_cmd_host-cshlib	= HOSTLLD -shared $@
+      cmd_host-cshlib	= $(HOSTCC) $(HOSTLDFLAGS) -shared -o $@ \
+			  $(addprefix $(obj)/,$($(@F:.so=-objs))) \
+			  $(HOST_LOADLIBES) $(HOSTLOADLIBES_$(@F))
+$(host-cshlib): %: $(host-cshobjs) FORCE
+	$(call if_changed,host-cshlib)
+
+targets += $(host-csingle)  $(host-cmulti) $(host-cobjs)\
+	   $(host-cxxmulti) $(host-cxxobjs) $(host-cshlib) $(host-cshobjs) 
 
 # Descending
 # ---------------------------------------------------------------------------

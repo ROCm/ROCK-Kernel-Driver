@@ -100,6 +100,10 @@ invalidate_complete_page(struct address_space *mapping, struct page *page)
  * When looking at page->index outside the page lock we need to be careful to
  * copy it into a local to avoid races (it could change at any time).
  *
+ * We pass down the cache-hot hint to the page freeing code.  Even if the
+ * mapping is large, it is probably the case that the final pages are the most
+ * recently touched, and freeing happens in ascending file offset order.
+ *
  * Called under (and serialised by) inode->i_sem.
  */
 void truncate_inode_pages(struct address_space *mapping, loff_t lstart)
@@ -110,7 +114,7 @@ void truncate_inode_pages(struct address_space *mapping, loff_t lstart)
 	pgoff_t next;
 	int i;
 
-	pagevec_init(&pvec);
+	pagevec_init(&pvec, 0);
 	next = start;
 	while (pagevec_lookup(&pvec, mapping, next, PAGEVEC_SIZE)) {
 		for (i = 0; i < pagevec_count(&pvec); i++) {
@@ -185,7 +189,7 @@ void invalidate_inode_pages(struct address_space *mapping)
 	pgoff_t next = 0;
 	int i;
 
-	pagevec_init(&pvec);
+	pagevec_init(&pvec, 0);
 	while (pagevec_lookup(&pvec, mapping, next, PAGEVEC_SIZE)) {
 		for (i = 0; i < pagevec_count(&pvec); i++) {
 			struct page *page = pvec.pages[i];
@@ -226,7 +230,7 @@ void invalidate_inode_pages2(struct address_space *mapping)
 	pgoff_t next = 0;
 	int i;
 
-	pagevec_init(&pvec);
+	pagevec_init(&pvec, 0);
 	while (pagevec_lookup(&pvec, mapping, next, PAGEVEC_SIZE)) {
 		for (i = 0; i < pagevec_count(&pvec); i++) {
 			struct page *page = pvec.pages[i];

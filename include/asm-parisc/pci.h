@@ -3,9 +3,6 @@
 
 #include <asm/scatterlist.h>
 
-#define MIN_PCI_PORT 0x000000
-#define MAX_PCI_PORT 0xffffff
-
 /*
 ** HP PCI platforms generally support multiple bus adapters.
 **    (workstations 1-~4, servers 2-~32)
@@ -19,7 +16,7 @@
 #define PCI_MAX_BUSSES	256
 
 /* [soapbox on]
-** Who the hell can develope stuff without ASSERT or VASSERT?
+** Who the hell can develop stuff without ASSERT or VASSERT?
 ** No one understands all the modules across all platforms.
 ** For linux add another dimension - processor architectures.
 **
@@ -49,18 +46,40 @@
 ** Data needed by pcibios layer belongs here.
 */
 struct pci_hba_data {
-	struct pci_hba_data *next;	/* global chain of HBAs */
-	char           *base_addr;	/* aka Host Physical Address */
-	struct hp_device *iodc_info;	/* Info from PA bus walk */
+	unsigned long	base_addr;	/* aka Host Physical Address */
+	const struct parisc_device *dev; /* device from PA bus walk */
 	struct pci_bus *hba_bus;	/* primary PCI bus below HBA */
 	int		hba_num;	/* I/O port space access "key" */
 	struct resource bus_num;	/* PCI bus numbers */
 	struct resource io_space;	/* PIOP */
-	struct resource mem_space;	/* LMMIO */
-	unsigned long   mem_space_offset;  /* VCLASS support */
+	struct resource lmmio_space;	/* bus addresses < 4Gb */
+	struct resource elmmio_space;	/* additional bus addresses < 4Gb */
+	unsigned long   lmmio_space_offset;  /* CPU view - PCI view */
+	void *          iommu;          /* IOMMU this device is under */
 	/* REVISIT - spinlock to protect resources? */
 };
 
+#define HBA_DATA(d)		((struct pci_hba_data *) (d))
+
+/* 
+** We support 2^16 I/O ports per HBA.  These are set up in the form
+** 0xbbxxxx, where bb is the bus number and xxxx is the I/O port
+** space address.
+*/
+#define HBA_PORT_SPACE_BITS	16
+
+#define HBA_PORT_BASE(h)	((h) << HBA_PORT_SPACE_BITS)
+#define HBA_PORT_SPACE_SIZE	(1UL << HBA_PORT_SPACE_BITS)
+
+#define PCI_PORT_HBA(a)		((a) >> HBA_PORT_SPACE_BITS)
+#define PCI_PORT_ADDR(a)	((a) & (HBA_PORT_SPACE_SIZE - 1))
+
+/*
+** Convert between PCI (IO_VIEW) addresses and processor (PA_VIEW) addresses.
+** Note that we currently support only LMMIO.
+*/
+#define PCI_BUS_ADDR(hba,a)	((a) - hba->lmmio_space_offset)
+#define PCI_HOST_ADDR(hba,a)	((a) + hba->lmmio_space_offset)
 
 /*
 ** KLUGE: linux/pci.h include asm/pci.h BEFORE declaring struct pci_bus
@@ -68,6 +87,12 @@ struct pci_hba_data {
 */
 struct pci_bus;
 struct pci_dev;
+
+/* The PCI address space does equal the physical memory
+ * address space.  The networking and block device layers use
+ * this boolean for bounce buffer decisions.
+ */
+#define PCI_DMA_BUS_IS_PHYS     (1)
 
 /*
 ** Most PCI devices (eg Tulip, NCR720) also export the same registers
@@ -106,9 +131,6 @@ struct pci_bios_ops {
 	void (*fixup_bus)(struct pci_bus *bus);
 };
 
-extern void pcibios_size_bridge(struct pci_bus *, struct pbus_set_ranges_data *);
-
-
 /*
 ** See Documentation/DMA-mapping.txt
 */
@@ -127,8 +149,8 @@ struct pci_dma_ops {
 
 /*
 ** We could live without the hppa_dma_ops indirection if we didn't want
-** to support 4 different dma models with one binary or they were
-** all loadable modules:
+** to support 4 different coherent dma models with one binary (they will
+** someday be loadable modules):
 **     I/O MMU        consistent method           dma_sync behavior
 **  =============   ======================       =======================
 **  a) PA-7x00LC    uncachable host memory          flush/purge
@@ -144,8 +166,11 @@ struct pci_dma_ops {
 */
 
 extern struct pci_dma_ops *hppa_dma_ops;
+
+#ifdef CONFIG_PA11
 extern struct pci_dma_ops pcxl_dma_ops;
 extern struct pci_dma_ops pcx_dma_ops;
+#endif
 
 /*
 ** Oops hard if we haven't setup hppa_dma_ops by the time the first driver
@@ -155,7 +180,9 @@ extern struct pci_dma_ops pcx_dma_ops;
 */
 static inline int pci_dma_panic(char *msg)
 {
+	extern void panic(const char *, ...);	/* linux/kernel.h */
 	panic(msg);
+	/* NOTREACHED */
 	return -1;
 }
 
@@ -196,16 +223,32 @@ static inline int pci_dma_panic(char *msg)
 	hppa_dma_ops->dma_sync_sg(p, sg, n, d); \
 	}
 
+/* No highmem on parisc, plus we have an IOMMU, so mapping pages is easy. */
+#define pci_map_page(dev, page, off, size, dir) \
+	pci_map_single(dev, (page_address(page) + (off)), size, dir)
+#define pci_unmap_page(dev,addr,sz,dir) pci_unmap_single(dev,addr,sz,dir)
+
+/* Don't support DAC yet. */
+#define pci_dac_dma_supported(pci_dev, mask)	(0)
+
 /*
 ** Stuff declared in arch/parisc/kernel/pci.c
 */
 extern struct pci_port_ops *pci_port;
 extern struct pci_bios_ops *pci_bios;
 extern int pci_post_reset_delay;	/* delay after de-asserting #RESET */
+extern int pci_hba_count;
+extern struct pci_hba_data *parisc_pci_hba[];
 
+#ifdef CONFIG_PCI
 extern void pcibios_register_hba(struct pci_hba_data *);
+extern void pcibios_set_master(struct pci_dev *);
 extern void pcibios_assign_unassigned_resources(struct pci_bus *);
-
+#else
+extern inline void pcibios_register_hba(struct pci_hba_data *x)
+{
+}
+#endif
 
 /*
 ** used by drivers/pci/pci.c:pci_do_scan_bus()
@@ -216,17 +259,40 @@ extern void pcibios_assign_unassigned_resources(struct pci_bus *);
 **   To date, only alpha sets this to one. We'll need to set this
 **   to zero for legacy platforms and one for PAT platforms.
 */
-#ifdef __LP64__
-extern int pdc_pat;  /* arch/parisc/kernel/inventory.c */
-#define pcibios_assign_all_busses()	pdc_pat
-#else
-#define pcibios_assign_all_busses()	0
-#endif
+#define pcibios_assign_all_busses()     (pdc_type == PDC_TYPE_PAT)
 
 #define PCIBIOS_MIN_IO          0x10
 #define PCIBIOS_MIN_MEM         0x1000 /* NBPG - but pci/setup-res.c dies */
 
 /* Return the index of the PCI controller for device PDEV. */
 #define pci_controller_num(PDEV)	(0)
+
+#define GET_IOC(dev) ((struct ioc *)(HBA_DATA(dev->sysdata)->iommu))
+
+#ifdef CONFIG_IOMMU_CCIO
+struct parisc_device;
+struct ioc;
+void * ccio_get_iommu(const struct parisc_device *dev);
+struct pci_dev * ccio_get_fake(const struct parisc_device *dev);
+int ccio_request_resource(const struct parisc_device *dev,
+		struct resource *res);
+int ccio_allocate_resource(const struct parisc_device *dev,
+		struct resource *res, unsigned long size,
+		unsigned long min, unsigned long max, unsigned long align,
+		void (*alignf)(void *, struct resource *, unsigned long, unsigned long),
+		void *alignf_data);
+#else /* !CONFIG_IOMMU_CCIO */
+#define ccio_get_iommu(dev) NULL
+#define ccio_get_fake(dev) NULL
+#define ccio_request_resource(dev, res) request_resource(&iomem_resource, res)
+#define ccio_allocate_resource(dev, res, size, min, max, align, alignf, data) \
+		allocate_resource(&iomem_resource, res, size, min, max, \
+				align, alignf, data)
+#endif /* !CONFIG_IOMMU_CCIO */
+
+#ifdef CONFIG_IOMMU_SBA
+struct parisc_device;
+void * sba_get_iommu(struct parisc_device *dev);
+#endif
 
 #endif /* __ASM_PARISC_PCI_H */

@@ -1,2 +1,0 @@
-CONFIG_SND_USB_AUDIO
-  Say 'Y' or 'M' to include support for USB audio and USB MIDI devices.

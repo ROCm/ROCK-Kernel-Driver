@@ -12,6 +12,8 @@ struct pipe_inode_info {
 	unsigned int waiting_writers;
 	unsigned int r_counter;
 	unsigned int w_counter;
+	struct file *rdfile;
+	struct file *wrfile;
 	struct fasync_struct *fasync_readers;
 	struct fasync_struct *fasync_writers;
 };
@@ -30,6 +32,8 @@ struct pipe_inode_info {
 #define PIPE_WAITING_WRITERS(inode)	((inode).i_pipe->waiting_writers)
 #define PIPE_RCOUNTER(inode)	((inode).i_pipe->r_counter)
 #define PIPE_WCOUNTER(inode)	((inode).i_pipe->w_counter)
+#define PIPE_READFILE(inode)	((inode).i_pipe->rdfile)
+#define PIPE_WRITEFILE(inode)	((inode).i_pipe->wrfile)
 #define PIPE_FASYNC_READERS(inode)     (&((inode).i_pipe->fasync_readers))
 #define PIPE_FASYNC_WRITERS(inode)     (&((inode).i_pipe->fasync_writers))
 

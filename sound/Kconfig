@@ -1,0 +1,44 @@
+# sound/Config.in
+#
+
+menu "Open Sound System"
+	depends on SOUND!=n
+
+config SOUND_PRIME
+	tristate "Open Sound System"
+	depends on SOUND
+	help
+	  Say 'Y' or 'M' to enable Open Sound System drivers.
+
+source "sound/oss/Kconfig"
+
+endmenu
+
+
+menu "Advanced Linux Sound Architecture"
+	depends on SOUND!=n
+
+config SND
+	tristate "Advanced Linux Sound Architecture"
+	depends on SOUND
+
+source "sound/core/Kconfig"
+
+source "sound/drivers/Kconfig"
+
+source "sound/isa/Kconfig"
+
+source "sound/pci/Kconfig"
+
+source "sound/ppc/Kconfig"
+
+source "sound/arm/Kconfig"
+
+# the following will depenend on the order of config.
+# here assuming USB is defined before ALSA
+source "sound/usb/Kconfig"
+
+source "sound/sparc/Kconfig"
+
+endmenu
+

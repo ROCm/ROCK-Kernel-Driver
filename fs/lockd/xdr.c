@@ -216,25 +216,6 @@ nlm_encode_testres(u32 *p, struct nlm_res *resp)
 	return p;
 }
 
-/*
- * Check buffer bounds after decoding arguments
- */
-static inline int
-xdr_argsize_check(struct svc_rqst *rqstp, u32 *p)
-{
-	struct svc_buf	*buf = &rqstp->rq_argbuf;
-
-	return p - buf->base <= buf->buflen;
-}
-
-static inline int
-xdr_ressize_check(struct svc_rqst *rqstp, u32 *p)
-{
-	struct svc_buf	*buf = &rqstp->rq_resbuf;
-
-	buf->len = p - buf->base;
-	return (buf->len <= buf->buflen);
-}
 
 /*
  * First, the server side XDR functions

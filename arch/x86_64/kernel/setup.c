@@ -37,6 +37,7 @@
 #include <linux/console.h>
 #include <linux/seq_file.h>
 #include <linux/root_dev.h>
+#include <linux/pci.h>
 #include <asm/mtrr.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
@@ -196,11 +197,11 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 			acpi_disabled = 1;
 
 		if (!memcmp(from, "mem=", 4))
-			parse_memopt(from+4); 
+			parse_memopt(from+4, &from); 
 
 #ifdef CONFIG_GART_IOMMU 
 		if (!memcmp(from,"iommu=",6)) { 
-			iommu_setup(from+6); 
+			iommu_setup(from+6, &from); 
 		}
 #endif
 
@@ -214,7 +215,6 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 	}
 	*to = '\0';
 	*cmdline_p = command_line;
-	print_user_map(); 
 }
 
 #ifndef CONFIG_DISCONTIGMEM

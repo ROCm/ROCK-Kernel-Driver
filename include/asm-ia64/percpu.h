@@ -29,8 +29,11 @@ extern unsigned long __per_cpu_offset[NR_CPUS];
 #ifdef CONFIG_SMP
 # define per_cpu(var, cpu)	(*RELOC_HIDE(&var##__per_cpu, __per_cpu_offset[cpu]))
 #else
-# define per_cpu(var, cpu)	__get_cpu_var(var)
+# define per_cpu(var, cpu)	((void)cpu, __get_cpu_var(var))
 #endif
+
+#define EXPORT_PER_CPU_SYMBOL(var) EXPORT_SYMBOL(var##__per_cpu)
+#define EXPORT_PER_CPU_SYMBOL_GPL(var) EXPORT_SYMBOL_GPL(var##__per_cpu)
 
 #endif /* !__ASSEMBLY__ */
 

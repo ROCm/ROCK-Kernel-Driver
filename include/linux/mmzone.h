@@ -9,6 +9,7 @@
 #include <linux/list.h>
 #include <linux/wait.h>
 #include <linux/cache.h>
+#include <linux/threads.h>
 #include <asm/atomic.h>
 #ifdef CONFIG_DISCONTIGMEM
 #include <asm/numnodes.h>
@@ -45,6 +46,18 @@ struct zone_padding {
 #else
 #define ZONE_PADDING(name)
 #endif
+
+struct per_cpu_pages {
+	int count;		/* number of pages in the list */
+	int low;		/* low watermark, refill needed */
+	int high;		/* high watermark, emptying needed */
+	int batch;		/* chunk size for buddy add/remove */
+	struct list_head list;	/* the list of pages */
+};
+
+struct per_cpu_pageset {
+	struct per_cpu_pages pcp[2];	/* 0: hot.  1: cold */
+} ____cacheline_aligned_in_smp;
 
 /*
  * On machines where it is needed (eg PCs) we divide physical memory
@@ -106,6 +119,10 @@ struct zone {
 	wait_queue_head_t	* wait_table;
 	unsigned long		wait_table_size;
 	unsigned long		wait_table_bits;
+
+	ZONE_PADDING(_pad3_)
+
+	struct per_cpu_pageset	pageset[NR_CPUS];
 
 	/*
 	 * Discontig memory support fields.

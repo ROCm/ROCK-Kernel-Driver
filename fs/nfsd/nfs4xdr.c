@@ -1313,9 +1313,10 @@ out_serverfault:
 }
 
 static int
-nfsd4_encode_dirent(struct readdir_cd *cd, const char *name, int namlen,
+nfsd4_encode_dirent(struct readdir_cd *ccd, const char *name, int namlen,
 		    loff_t offset, ino_t ino, unsigned int d_type)
 {
+	struct nfsd4_readdir *cd = container_of(ccd, struct nfsd4_readdir, common);
 	int buflen;
 	u32 *p = cd->buffer;
 	u32 *attrlenp;
@@ -1324,16 +1325,13 @@ nfsd4_encode_dirent(struct readdir_cd *cd, const char *name, int namlen,
 	int nfserr = 0;
 
 	/* In nfsv4, "." and ".." never make it onto the wire.. */
-	if (name && isdotent(name, namlen))
+	if (name && isdotent(name, namlen)) {
+		cd->common.err = nfs_ok;
 		return 0;
+	}
 
 	if (cd->offset)
 		xdr_encode_hyper(cd->offset, (u64) offset);
-
-	/* nfsd_readdir calls us with name == 0 when it wants us to
-	 * set the last offset entry. */
-	if (name == 0)
-		return 0;
 
 	buflen = cd->buflen - 4 - XDR_QUADLEN(namlen);
 	if (buflen < 0)
@@ -1347,8 +1345,8 @@ nfsd4_encode_dirent(struct readdir_cd *cd, const char *name, int namlen,
 	/*
 	 * Now we come to the ugly part: writing the fattr for this entry.
 	 */
-	bmval0 = cd->bmval[0];
-	bmval1 = cd->bmval[1];
+	bmval0 = cd->rd_bmval[0];
+	bmval1 = cd->rd_bmval[1];
 	if ((bmval0 & ~(FATTR4_WORD0_RDATTR_ERROR | FATTR4_WORD0_FILEID)) || bmval1)  {
 		/*
 		 * "Heavyweight" case: we have no choice except to
@@ -1356,14 +1354,14 @@ nfsd4_encode_dirent(struct readdir_cd *cd, const char *name, int namlen,
 		 * only Windows clients will trigger this code
 		 * path.
 		 */
-		dentry = lookup_one_len(name, cd->dirfh->fh_dentry, namlen);
+		dentry = lookup_one_len(name, cd->rd_fhp->fh_dentry, namlen);
 		if (IS_ERR(dentry)) {
 			nfserr = nfserrno(PTR_ERR(dentry));
 			goto error;
 		}
 
-		nfserr = nfsd4_encode_fattr(NULL, cd->dirfh->fh_export,
-					    dentry, p, &buflen, cd->bmval);
+		nfserr = nfsd4_encode_fattr(NULL, cd->rd_fhp->fh_export,
+					    dentry, p, &buflen, cd->rd_bmval);
 		dput(dentry);
 
 		if (!nfserr) {
@@ -1384,7 +1382,7 @@ error:
 		 * entire READDIR operation(!)
 		 */
 		if (!(bmval0 & FATTR4_WORD0_RDATTR_ERROR)) {
-			cd->nfserr = nfserr;
+			cd->common.err = nfserr;
 			return -EINVAL;
 		}
 
@@ -1414,10 +1412,11 @@ error:
 out:
 	cd->buflen -= (p - cd->buffer);
 	cd->buffer = p;
+	cd->common.err = nfs_ok;
 	return 0;
 
 nospc:
-	cd->eob = 1;
+	cd->common.err = nfserr_readdir_nospc;
 	return -EINVAL;
 }
 
@@ -1643,6 +1642,7 @@ static int
 nfsd4_encode_readdir(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_readdir *readdir)
 {
 	int maxcount;
+	loff_t offset;
 	ENCODE_HEAD;
 
 	if (nfserr)
@@ -1667,17 +1667,26 @@ nfsd4_encode_readdir(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_re
 	WRITE32(0);
 	WRITE32(0);
 
+	readdir->common.err = 0;
+	readdir->buflen = maxcount;
+	readdir->buffer = p;
+	readdir->offset = NULL;
+
+	offset = readdir->rd_cookie;
 	nfserr = nfsd_readdir(readdir->rd_rqstp, readdir->rd_fhp,
-			      readdir->rd_cookie, nfsd4_encode_dirent,
-			      p, &maxcount, NULL, readdir->rd_bmval);
+			      &offset,
+			      &readdir->common, nfsd4_encode_dirent);
+	if (nfserr == nfs_ok &&
+	    readdir->common.err == nfserr_readdir_nospc &&
+	    readdir->buffer == p)
+		nfserr = nfserr_readdir_nospc;
 	if (!nfserr) {
-		/*
-		 * nfsd_readdir() expects 'maxcount' to be a count of
-		 * words, but fills it in with a count of bytes at the
-		 * end!
-		 */
-		BUG_ON(maxcount & 3);
-		p += (maxcount >> 2);
+		if (readdir->offset)
+			xdr_encode_hyper(readdir->offset, offset);
+
+		p = readdir->buffer;
+		*p++ = 0;	/* no more entries */
+		*p++ = htonl(readdir->common.err == nfserr_eof);
 		ADJUST_ARGS();
 	}
 	return nfserr;

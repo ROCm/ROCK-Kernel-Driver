@@ -1,43 +1,19 @@
 #ifndef _PARISC_PGTABLE_H
 #define _PARISC_PGTABLE_H
 
+#include <asm/fixmap.h>
+
 #ifndef __ASSEMBLY__
 /*
  * we simulate an x86-style page table for the linux mm code
  */
 
+#include <linux/spinlock.h>
 #include <asm/processor.h>
-#include <asm/fixmap.h>
 #include <asm/cache.h>
+#include <asm/bitops.h>
 
-/* To make 53c7xx.c happy */
-
-#define IOMAP_FULL_CACHING	2		/* used for 'what' below */
-#define IOMAP_NOCACHE_SER	3
-
-extern void kernel_set_cachemode(unsigned long addr,
-				    unsigned long size, int what);
-
-/*
- * cache_clear() semantics: Clear any cache entries for the area in question,
- * without writing back dirty entries first. This is useful if the data will
- * be overwritten anyway, e.g. by DMA to memory. The range is defined by a
- * _physical_ address.
- */
-#define cache_clear(paddr, len)			do { } while (0)
-/*
- * cache_push() semantics: Write back any dirty cache data in the given area,
- * and invalidate the range in the instruction cache. It needs not (but may)
- * invalidate those entries also in the data cache. The range is defined by a
- * _physical_ address.
- */
-#define cache_push(paddr, len) \
-	do { \
-		unsigned long vaddr = phys_to_virt(paddr); \
-		flush_cache_range(0, vaddr, vaddr + len); \
-	} while(0)
-#define cache_push_v(vaddr, len) \
-			flush_cache_range(0, vaddr, vaddr + len)
+#define ARCH_STACK_GROWSUP
 
 /*
  * kern_addr_valid(ADDR) tests if ADDR is pointing to valid kernel
@@ -63,8 +39,6 @@ extern void kernel_set_cachemode(unsigned long addr,
                 *(pteptr) = (pteval);                           \
         } while(0)
 
-
-
 #endif /* !__ASSEMBLY__ */
 
 #define pte_ERROR(e) \
@@ -74,11 +48,62 @@ extern void kernel_set_cachemode(unsigned long addr,
 #define pgd_ERROR(e) \
 	printk("%s:%d: bad pgd %08lx.\n", __FILE__, __LINE__, pgd_val(e))
 
+ /* Note: If you change ISTACK_SIZE, you need to change the corresponding
+  * values in vmlinux.lds and vmlinux64.lds (init_istack section). Also,
+  * the "order" and size need to agree.
+  */
+
+#define  ISTACK_SIZE  32768 /* Interrupt Stack Size */
+#define  ISTACK_ORDER 3
+
+/*
+ * NOTE: Many of the below macros use PT_NLEVELS because
+ *       it is convenient that PT_NLEVELS == LOG2(pte size in bytes),
+ *       i.e. we use 3 level page tables when we use 8 byte pte's
+ *       (for 64 bit) and 2 level page tables when we use 4 byte pte's
+ */
+
+#ifdef __LP64__
+#define PT_NLEVELS 3
+#define PT_INITIAL 4 /* Number of initial page tables */
+#else
+#define PT_NLEVELS 2
+#define PT_INITIAL 2 /* Number of initial page tables */
+#endif
+
+#define MAX_ADDRBITS (PAGE_SHIFT + (PT_NLEVELS)*(PAGE_SHIFT - PT_NLEVELS))
+#define MAX_ADDRESS (1UL << MAX_ADDRBITS)
+
+#define SPACEID_SHIFT (MAX_ADDRBITS - 32)
+
+/* Definitions for 1st level */
+
+#define PGDIR_SHIFT  (PAGE_SHIFT + (PT_NLEVELS - 1)*(PAGE_SHIFT - PT_NLEVELS))
+#define PGDIR_SIZE	(1UL << PGDIR_SHIFT)
+#define PGDIR_MASK	(~(PGDIR_SIZE-1))
+#define PTRS_PER_PGD    (1UL << (PAGE_SHIFT - PT_NLEVELS))
+#define USER_PTRS_PER_PGD       PTRS_PER_PGD
+
+/* Definitions for 2nd level */
+#define pgtable_cache_init()	do { } while (0)
+
+#define PMD_SHIFT       (PAGE_SHIFT + (PAGE_SHIFT - PT_NLEVELS))
+#define PMD_SIZE	(1UL << PMD_SHIFT)
+#define PMD_MASK	(~(PMD_SIZE-1))
+#if PT_NLEVELS == 3
+#define PTRS_PER_PMD    (1UL << (PAGE_SHIFT - PT_NLEVELS))
+#else
+#define PTRS_PER_PMD    1
+#endif
+
+/* Definitions for 3rd level */
+
+#define PTRS_PER_PTE    (1UL << (PAGE_SHIFT - PT_NLEVELS))
+
 /*
  * pgd entries used up by user/kernel:
  */
 
-#define USER_PGD_PTRS (PAGE_OFFSET >> PGDIR_SHIFT)
 #define FIRST_USER_PGD_NR	0
 
 #ifndef __ASSEMBLY__
@@ -89,35 +114,43 @@ extern  void *vmalloc_start;
 #define VMALLOC_END	(FIXADDR_START)
 #endif
 
-#define _PAGE_READ	0x001	/* read access allowed */
-#define _PAGE_WRITE	0x002	/* write access allowed */
-#define _PAGE_EXEC	0x004	/* execute access allowed */
-#define _PAGE_GATEWAY	0x008	/* privilege promotion allowed */
-#define _PAGE_GATEWAY_BIT 28	/* _PAGE_GATEWAY & _PAGE_GATEWAY_BIT need */
-				/* to agree. One could be defined in relation */
-				/* to the other, but that's kind of ugly. */
+/* NB: The tlb miss handlers make certain assumptions about the order */
+/*     of the following bits, so be careful (One example, bits 25-31  */
+/*     are moved together in one instruction).                        */
 
-				/* 0x010 reserved (B bit) */
-#define _PAGE_DIRTY	0x020	/* D: dirty */
-				/* 0x040 reserved (T bit) */
-#define _PAGE_NO_CACHE  0x080   /* Software: Uncacheable */
-#define _PAGE_NO_CACHE_BIT 24   /* Needs to agree with _PAGE_NO_CACHE above */
-#define _PAGE_ACCESSED	0x100	/* R: page cache referenced */
-#define _PAGE_PRESENT   0x200   /* Software: pte contains a translation */
-#define _PAGE_PRESENT_BIT  22   /* Needs to agree with _PAGE_PRESENT above */
-#define _PAGE_USER      0x400   /* Software: User accessable page */
-#define _PAGE_USER_BIT     21   /* Needs to agree with _PAGE_USER above */
-				/* 0x800 still available */
+#define _PAGE_READ_BIT     31   /* (0x001) read access allowed */
+#define _PAGE_WRITE_BIT    30   /* (0x002) write access allowed */
+#define _PAGE_EXEC_BIT     29   /* (0x004) execute access allowed */
+#define _PAGE_GATEWAY_BIT  28   /* (0x008) privilege promotion allowed */
+#define _PAGE_DMB_BIT      27   /* (0x010) Data Memory Break enable (B bit) */
+#define _PAGE_DIRTY_BIT    26   /* (0x020) Page Dirty (D bit) */
+#define _PAGE_REFTRAP_BIT  25   /* (0x040) Page Ref. Trap enable (T bit) */
+#define _PAGE_NO_CACHE_BIT 24   /* (0x080) Uncached Page (U bit) */
+#define _PAGE_ACCESSED_BIT 23   /* (0x100) Software: Page Accessed */
+#define _PAGE_PRESENT_BIT  22   /* (0x200) Software: translation valid */
+#define _PAGE_FLUSH_BIT    21   /* (0x400) Software: translation valid */
+				/*             for cache flushing only */
+#define _PAGE_USER_BIT     20   /* (0x800) Software: User accessable page */
 
-#ifdef __ASSEMBLY__
-#define _PGB_(x)	(1 << (63 - (x)))
-#define __PAGE_O	_PGB_(13)
-#define __PAGE_U	_PGB_(12)
-#define __PAGE_T	_PGB_(2)
-#define __PAGE_D	_PGB_(3)
-#define __PAGE_B	_PGB_(4)
-#define __PAGE_P	_PGB_(14)
-#endif
+/* N.B. The bits are defined in terms of a 32 bit word above, so the */
+/*      following macro is ok for both 32 and 64 bit.                */
+
+#define xlate_pabit(x) (31 - x)
+
+#define _PAGE_READ     (1 << xlate_pabit(_PAGE_READ_BIT))
+#define _PAGE_WRITE    (1 << xlate_pabit(_PAGE_WRITE_BIT))
+#define _PAGE_RW       (_PAGE_READ | _PAGE_WRITE)
+#define _PAGE_EXEC     (1 << xlate_pabit(_PAGE_EXEC_BIT))
+#define _PAGE_GATEWAY  (1 << xlate_pabit(_PAGE_GATEWAY_BIT))
+#define _PAGE_DMB      (1 << xlate_pabit(_PAGE_DMB_BIT))
+#define _PAGE_DIRTY    (1 << xlate_pabit(_PAGE_DIRTY_BIT))
+#define _PAGE_REFTRAP  (1 << xlate_pabit(_PAGE_REFTRAP_BIT))
+#define _PAGE_NO_CACHE (1 << xlate_pabit(_PAGE_NO_CACHE_BIT))
+#define _PAGE_ACCESSED (1 << xlate_pabit(_PAGE_ACCESSED_BIT))
+#define _PAGE_PRESENT  (1 << xlate_pabit(_PAGE_PRESENT_BIT))
+#define _PAGE_FLUSH    (1 << xlate_pabit(_PAGE_FLUSH_BIT))
+#define _PAGE_USER     (1 << xlate_pabit(_PAGE_USER_BIT))
+
 #define _PAGE_TABLE	(_PAGE_PRESENT | _PAGE_READ | _PAGE_WRITE |  _PAGE_DIRTY | _PAGE_ACCESSED)
 #define _PAGE_CHG_MASK	(PAGE_MASK | _PAGE_ACCESSED | _PAGE_DIRTY)
 #define _PAGE_KERNEL	(_PAGE_PRESENT | _PAGE_EXEC | _PAGE_READ | _PAGE_WRITE | _PAGE_DIRTY | _PAGE_ACCESSED)
@@ -138,6 +171,7 @@ extern  void *vmalloc_start;
 #define PAGE_KERNEL_RO	__pgprot(_PAGE_PRESENT | _PAGE_EXEC | _PAGE_READ | _PAGE_DIRTY | _PAGE_ACCESSED)
 #define PAGE_KERNEL_UNC	__pgprot(_PAGE_KERNEL | _PAGE_NO_CACHE)
 #define PAGE_GATEWAY    __pgprot(_PAGE_PRESENT | _PAGE_USER | _PAGE_ACCESSED | _PAGE_GATEWAY| _PAGE_READ)
+#define PAGE_FLUSH      __pgprot(_PAGE_FLUSH)
 
 
 /*
@@ -167,7 +201,7 @@ extern  void *vmalloc_start;
 #define __S110  PAGE_RWX
 #define __S111  PAGE_RWX
 
-extern unsigned long swapper_pg_dir[]; /* declared in init_task.c */
+extern pgd_t swapper_pg_dir[]; /* declared in init_task.c */
 
 /* initial page tables for 0-8MB for kernel */
 
@@ -178,23 +212,15 @@ extern unsigned long pg0[];
 extern unsigned long *empty_zero_page;
 
 /*
- * BAD_PAGETABLE is used when we need a bogus page-table, while
- * BAD_PAGE is used for a bogus page.
- *
  * ZERO_PAGE is a global shared page that is always zero: used
  * for zero-mapped memory areas etc..
  */
-extern pte_t __bad_page(void);
-extern pte_t * __bad_pagetable(void);
 
-#define BAD_PAGETABLE __bad_pagetable()
-#define BAD_PAGE __bad_page()
 #define ZERO_PAGE(vaddr) (virt_to_page(empty_zero_page))
 
-#define pte_none(x)	(!pte_val(x))
+#define pte_none(x)     ((pte_val(x) == 0) || (pte_val(x) & _PAGE_FLUSH))
 #define pte_present(x)	(pte_val(x) & _PAGE_PRESENT)
 #define pte_clear(xp)	do { pte_val(*(xp)) = 0; } while (0)
-#define pte_pagenr(x)	((unsigned long)((pte_val(x) >> PAGE_SHIFT)))
 
 #define pmd_none(x)	(!pmd_val(x))
 #define pmd_bad(x)	((pmd_val(x) & ~PAGE_MASK) != _PAGE_TABLE)
@@ -255,14 +281,14 @@ extern inline pte_t pte_mkwrite(pte_t pte)	{ pte_val(pte) |= _PAGE_WRITE; return
 	__pte;								\
 })
 
-#define mk_pte(page,pgprot) \
-({									\
-	pte_t __pte;							\
-									\
-	pte_val(__pte) = ((page)-mem_map)*PAGE_SIZE +			\
-				pgprot_val(pgprot);			\
-	__pte;								\
-})
+#define mk_pte(page, pgprot)	pfn_pte(page_to_pfn(page), (pgprot))
+
+static inline pte_t pfn_pte(unsigned long pfn, pgprot_t pgprot)
+{
+	pte_t pte;
+	pte_val(pte) = (pfn << PAGE_SHIFT) | pgprot_val(pgprot);
+	return pte;
+}
 
 /* This takes a physical page address that is used by the remapping functions */
 #define mk_pte_phys(physpage, pgprot) \
@@ -271,15 +297,20 @@ extern inline pte_t pte_mkwrite(pte_t pte)	{ pte_val(pte) |= _PAGE_WRITE; return
 extern inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 { pte_val(pte) = (pte_val(pte) & _PAGE_CHG_MASK) | pgprot_val(newprot); return pte; }
 
-/*
- * Permanent address of a page. Obviously must never be
- * called on a highmem page.
- */
-#define __page_address(page) ({ if (PageHighMem(page)) BUG(); PAGE_OFFSET + (((page) - mem_map) << PAGE_SHIFT); })
-#define pages_to_mb(x) ((x) >> (20-PAGE_SHIFT))
-#define pte_page(x) (mem_map+pte_pagenr(x))
+/* Permanent address of a page.  On parisc we don't have highmem. */
 
-#define pmd_page(pmd) ((unsigned long) __va(pmd_val(pmd) & PAGE_MASK))
+#define pte_pfn(x) (pte_val(x) >> PAGE_SHIFT)
+
+#ifdef CONFIG_DISCONTIGMEM
+#define pte_page(x) (phys_to_page(pte_val(x)))
+#else
+#define pte_page(x) (mem_map+(pte_val(x) >> PAGE_SHIFT))
+#endif
+
+#define pmd_page_kernel(pmd)	((unsigned long) __va(pmd_val(pmd) & PAGE_MASK))
+
+#define __pmd_page(pmd) ((unsigned long) __va(pmd_val(pmd) & PAGE_MASK))
+#define pmd_page(pmd)	virt_to_page((void *)__pmd_page(pmd))
 
 #define pgd_index(address) ((address) >> PGDIR_SHIFT)
 
@@ -300,31 +331,110 @@ extern inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 #endif
 
 /* Find an entry in the third-level page table.. */ 
-#define pte_offset(pmd, address) \
-((pte_t *) pmd_page(*(pmd)) + (((address)>>PAGE_SHIFT) & (PTRS_PER_PTE-1)))
+#define __pte_offset(address) (((address) >> PAGE_SHIFT) & (PTRS_PER_PTE-1))
+#define pte_offset_kernel(pmd, address) \
+	((pte_t *) pmd_page_kernel(*(pmd)) + __pte_offset(address))
+#define pte_offset_map(pmd, address) pte_offset_kernel(pmd, address)
+#define pte_offset_map_nested(pmd, address) pte_offset_kernel(pmd, address)
+#define pte_unmap(pte) do { } while (0)
+#define pte_unmap_nested(pte) do { } while (0)
+
+#define pte_unmap(pte)			do { } while (0)
+#define pte_unmap_nested(pte)		do { } while (0)
 
 extern void paging_init (void);
 
-extern inline void update_mmu_cache(struct vm_area_struct * vma,
-	unsigned long address, pte_t pte)
-{
-}
+/* Used for deferring calls to flush_dcache_page() */
+
+#define PG_dcache_dirty         PG_arch_1
+
+struct vm_area_struct; /* forward declaration (include/linux/mm.h) */
+extern void update_mmu_cache(struct vm_area_struct *, unsigned long, pte_t);
 
 /* Encode and de-code a swap entry */
 
-#define __swp_type(x)                     ((x).val & 0x3f)
-#define __swp_offset(x)                   ( (((x).val >> 6) &  0x7) | \
-					  (((x).val >> 7) & ~0x7) )
+#define __swp_type(x)                     ((x).val & 0x1f)
+#define __swp_offset(x)                   ( (((x).val >> 5) &  0xf) | \
+					  (((x).val >> 7) & ~0xf) )
 #define __swp_entry(type, offset)         ((swp_entry_t) { (type) | \
-					    ((offset &  0x7) << 6) | \
-					    ((offset & ~0x7) << 7) })
+					    ((offset &  0xf) << 5) | \
+					    ((offset & ~0xf) << 7) })
 #define __pte_to_swp_entry(pte)		((swp_entry_t) { pte_val(pte) })
 #define __swp_entry_to_pte(x)		((pte_t) { (x).val })
 
-#define module_map	vmalloc
-#define module_unmap	vfree
+static inline int ptep_test_and_clear_young(pte_t *ptep)
+{
+#ifdef CONFIG_SMP
+	return test_and_clear_bit(xlate_pabit(_PAGE_ACCESSED_BIT), ptep);
+#else
+	pte_t pte = *ptep;
+	if (!pte_young(pte))
+		return 0;
+	set_pte(ptep, pte_mkold(pte));
+	return 1;
+#endif
+}
 
-#include <asm-generic/pgtable.h>
+static inline int ptep_test_and_clear_dirty(pte_t *ptep)
+{
+#ifdef CONFIG_SMP
+	return test_and_clear_bit(xlate_pabit(_PAGE_DIRTY_BIT), ptep);
+#else
+	pte_t pte = *ptep;
+	if (!pte_dirty(pte))
+		return 0;
+	set_pte(ptep, pte_mkclean(pte));
+	return 1;
+#endif
+}
+
+#ifdef CONFIG_SMP
+extern spinlock_t pa_dbit_lock;
+#else
+static int pa_dbit_lock; /* dummy to keep the compilers happy */
+#endif
+
+static inline pte_t ptep_get_and_clear(pte_t *ptep)
+{
+	pte_t old_pte;
+	pte_t pte;
+
+	spin_lock(&pa_dbit_lock);
+	pte = old_pte = *ptep;
+	pte_val(pte) &= ~_PAGE_PRESENT;
+	pte_val(pte) |= _PAGE_FLUSH;
+	set_pte(ptep,pte);
+	spin_unlock(&pa_dbit_lock);
+
+	return old_pte;
+}
+
+static inline void ptep_set_wrprotect(pte_t *ptep)
+{
+#ifdef CONFIG_SMP
+	unsigned long new, old;
+
+	do {
+		old = pte_val(*ptep);
+		new = pte_val(pte_wrprotect(__pte (old)));
+	} while (cmpxchg((unsigned long *) ptep, old, new) != old);
+#else
+	pte_t old_pte = *ptep;
+	set_pte(ptep, pte_wrprotect(old_pte));
+#endif
+}
+
+static inline void ptep_mkdirty(pte_t *ptep)
+{
+#ifdef CONFIG_SMP
+	set_bit(xlate_pabit(_PAGE_DIRTY_BIT), ptep);
+#else
+	pte_t old_pte = *ptep;
+	set_pte(ptep, pte_mkdirty(old_pte));
+#endif
+}
+
+#define pte_same(A,B)	(pte_val(A) == pte_val(B))
 
 typedef pte_t *pte_addr_t;
 
@@ -332,9 +442,8 @@ typedef pte_t *pte_addr_t;
 
 #define io_remap_page_range remap_page_range
 
-/*
- * No page table caches to initialise
- */
-#define pgtable_cache_init()	do { } while (0)
+/* We provide our own get_unmapped_area to provide cache coherency */
 
-#endif /* _PARISC_PAGE_H */
+#define HAVE_ARCH_UNMAPPED_AREA
+
+#endif /* _PARISC_PGTABLE_H */

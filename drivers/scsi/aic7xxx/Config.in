@@ -1,8 +1,0 @@
-if [ "$CONFIG_SCSI_AIC7XXX_OLD" != "y" ]; then
-   dep_tristate 'Adaptec AIC7xxx support' CONFIG_SCSI_AIC7XXX $CONFIG_SCSI
-   if [ "$CONFIG_SCSI_AIC7XXX" != "n" ]; then
-      int  '  Maximum number of TCQ commands per device' CONFIG_AIC7XXX_CMDS_PER_DEVICE 253
-      int  '  Initial bus reset delay in milli-seconds' CONFIG_AIC7XXX_RESET_DELAY_MS 15000
-      bool  '  Build Adapter Firmware with Kernel Build' CONFIG_AIC7XXX_BUILD_FIRMWARE
-   fi
-fi

@@ -263,7 +263,7 @@ mpage_readpages(struct address_space *mapping, struct list_head *pages,
 	sector_t last_block_in_bio = 0;
 	struct pagevec lru_pvec;
 
-	pagevec_init(&lru_pvec);
+	pagevec_init(&lru_pvec, 0);
 	for (page_idx = 0; page_idx < nr_pages; page_idx++) {
 		struct page *page = list_entry(pages->prev, struct page, list);
 
@@ -560,7 +560,7 @@ mpage_writepages(struct address_space *mapping,
 	if (get_block == NULL)
 		writepage = mapping->a_ops->writepage;
 
-	pagevec_init(&pvec);
+	pagevec_init(&pvec, 0);
 	write_lock(&mapping->page_lock);
 
 	list_splice_init(&mapping->dirty_pages, &mapping->io_pages);

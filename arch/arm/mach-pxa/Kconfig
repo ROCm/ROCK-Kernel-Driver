@@ -1,0 +1,13 @@
+
+menu "Intel PXA250/210 Implementations"
+
+config ARCH_LUBBOCK
+	bool "Intel DBPXA250 Development Platform"
+	depends on ARCH_PXA
+
+config ARCH_PXA_IDP
+	bool "Accelent Xscale IDP"
+	depends on ARCH_PXA
+
+endmenu
+

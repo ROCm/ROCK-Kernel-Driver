@@ -577,7 +577,7 @@ found:
  */
 int
 nfsd_read(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
-          char *buf, unsigned long *count)
+          struct iovec *vec, int vlen, unsigned long *count)
 {
 	struct raparms	*ra;
 	mm_segment_t	oldfs;
@@ -603,7 +603,7 @@ nfsd_read(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 
 	oldfs = get_fs();
 	set_fs(KERNEL_DS);
-	err = vfs_read(&file, buf, *count, &offset);
+	err = vfs_readv(&file, vec, vlen, *count, &offset);
 	set_fs(oldfs);
 
 	/* Write back readahead params */
@@ -629,7 +629,8 @@ out:
  */
 int
 nfsd_write(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
-				char *buf, unsigned long cnt, int *stablep)
+				struct iovec *vec, int vlen,
+	   			unsigned long cnt, int *stablep)
 {
 	struct svc_export	*exp;
 	struct file		file;
@@ -677,7 +678,7 @@ nfsd_write(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 
 	/* Write the data. */
 	oldfs = get_fs(); set_fs(KERNEL_DS);
-	err = vfs_write(&file, buf, cnt, &offset);
+	err = vfs_writev(&file, vec, vlen, cnt, &offset);
 	if (err >= 0)
 		nfsdstats.io_write += cnt;
 	set_fs(oldfs);
@@ -1386,16 +1387,15 @@ out_nfserr:
 
 /*
  * Read entries from a directory.
- * The verifier is an NFSv3 thing we ignore for now.
+ * The  NFSv3/4 verifier we ignore for now.
  */
 int
-nfsd_readdir(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset, 
-             encode_dent_fn func, u32 *buffer, int *countp, u32 *verf, u32 *bmval)
+nfsd_readdir(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t *offsetp, 
+	     struct readdir_cd *cdp, encode_dent_fn func)
 {
-	u32		*p;
-	int		oldlen, eof, err;
+	int		err;
 	struct file	file;
-	struct readdir_cd cd;
+	loff_t		offset = *offsetp;
 
 	err = nfsd_open(rqstp, fhp, S_IFDIR, MAY_READ, &file);
 	if (err)
@@ -1405,17 +1405,6 @@ nfsd_readdir(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 
 	file.f_pos = offset;
 
-	/* Set up the readdir context */
-	memset(&cd, 0, sizeof(cd));
-	cd.rqstp  = rqstp;
-	cd.buffer = buffer;
-	cd.buflen = *countp; /* count of words */
-	cd.dirfh  = fhp;
-	if (bmval) {
-		cd.bmval[0] = bmval[0];
-		cd.bmval[1] = bmval[1];
-	}
-
 	/*
 	 * Read the directory entries. This silly loop is necessary because
 	 * readdir() is not guaranteed to fill up the entire buffer, but
@@ -1423,49 +1412,21 @@ nfsd_readdir(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 	 */
 
 	do {
-		oldlen = cd.buflen;
+		cdp->err = nfserr_eof; /* will be cleared on successful read */
+		err = vfs_readdir(&file, (filldir_t) func, cdp);
+	} while (err >=0 && cdp->err == nfs_ok);
+	if (err)
+		err = nfserrno(err);
+	else
+		err = cdp->err;
+	*offsetp = file.f_pos;
 
-		err = vfs_readdir(&file, (filldir_t) func, &cd);
-
-		if (err < 0)
-			goto out_nfserr;
-
-		err = cd.nfserr;
-		if (err)
-			goto out_close;
-	} while (oldlen != cd.buflen && !cd.eob);
-
-	err = nfserr_readdir_nospc;
-	if (rqstp->rq_vers == 4 && cd.eob && cd.buffer == buffer)
-		goto out_close;
-
-	/* If we didn't fill the buffer completely, we're at EOF */
-	eof = !cd.eob;
-
-	if (cd.offset) {
-		if (rqstp->rq_vers > 2)
-			(void)xdr_encode_hyper(cd.offset, file.f_pos);
-		else
-			*cd.offset = htonl(file.f_pos);
-	}
-
-	p = cd.buffer;
-	*p++ = 0;			/* no more entries */
-	*p++ = htonl(eof);		/* end of directory */
-	*countp = (caddr_t) p - (caddr_t) buffer;
-
-	dprintk("nfsd: readdir result %d bytes, eof %d offset %d\n",
-				*countp, eof,
-				cd.offset? ntohl(*cd.offset) : -1);
-	err = 0;
+	if (err == nfserr_eof || err == nfserr_readdir_nospc)
+		err = nfs_ok; /* can still be found in ->err */
 out_close:
 	nfsd_close(&file);
 out:
 	return err;
-
-out_nfserr:
-	err = nfserrno(err);
-	goto out_close;
 }
 
 /*

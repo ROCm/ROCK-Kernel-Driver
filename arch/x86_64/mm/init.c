@@ -36,6 +36,7 @@
 #include <asm/apic.h>
 #include <asm/tlb.h>
 #include <asm/mmu_context.h>
+#include <asm/proto.h>
 
 unsigned long start_pfn, end_pfn;
 
@@ -171,7 +172,7 @@ static __init void *alloc_low_page(int *index, unsigned long *phys)
 	unsigned long pfn = start_pfn++, paddr; 
 	void *adr;
 
-	if (pfn >= end_pfn) 
+	if (pfn >= end_pfn_map) 
 		panic("alloc_low_page: ran out of memory"); 
 	for (i = 0; temp_mappings[i].allocated; i++) {
 		if (!temp_mappings[i].pmd) 
@@ -239,7 +240,7 @@ void __init init_memory_mapping(void)
 	unsigned long end;
 	unsigned long next; 
 
-	end = PAGE_OFFSET + (end_pfn * PAGE_SIZE); 
+	end = PAGE_OFFSET + (end_pfn_map * PAGE_SIZE); 
 	for (adr = PAGE_OFFSET; adr < end; adr = next) { 
 		int map;
 		unsigned long pgd_phys; 

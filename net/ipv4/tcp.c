@@ -476,8 +476,8 @@ void tcp_write_space(struct sock *sk)
 		if (sk->sleep && waitqueue_active(sk->sleep))
 			wake_up_interruptible(sk->sleep);
 
-		if (sock->fasync_list && !(sk->shutdown & SEND_SHUTDOWN))
-			sock_wake_async(sock, 2, POLL_OUT);
+		if (!(sk->shutdown & SEND_SHUTDOWN))
+			sk_wake_async(sk, 2, POLL_OUT);
 	}
 }
 

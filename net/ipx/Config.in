@@ -1,5 +1,0 @@
-#
-# IPX configuration
-#
-
-bool '  IPX: Full internal IPX network' CONFIG_IPX_INTERN

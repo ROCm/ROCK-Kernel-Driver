@@ -19,10 +19,17 @@ typedef int			__kernel_suseconds_t;
 typedef int			__kernel_clock_t;
 typedef int			__kernel_daddr_t;
 /* Note these change from narrow to wide kernels */
+#ifdef __LP64__
 typedef unsigned long		__kernel_size_t;
 typedef long			__kernel_ssize_t;
 typedef long			__kernel_ptrdiff_t;
 typedef long			__kernel_time_t;
+#else
+typedef unsigned int		__kernel_size_t;
+typedef int			__kernel_ssize_t;
+typedef int			__kernel_ptrdiff_t;
+typedef int			__kernel_time_t;
+#endif
 typedef char *			__kernel_caddr_t;
 
 typedef unsigned short		__kernel_uid16_t;
@@ -43,6 +50,10 @@ typedef struct {
 	int	__val[2];
 #endif /* !defined(__KERNEL__) && !defined(__USE_ALL) */
 } __kernel_fsid_t;
+
+/* compatibility stuff */
+typedef __kernel_uid_t __kernel_old_uid_t;
+typedef __kernel_gid_t __kernel_old_gid_t;
 
 #if defined(__KERNEL__) && defined(__LP64__)
 /* Now 32bit compatibility types */

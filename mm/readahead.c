@@ -49,7 +49,7 @@ read_pages(struct address_space *mapping, struct file *filp,
 	unsigned page_idx;
 	struct pagevec lru_pvec;
 
-	pagevec_init(&lru_pvec);
+	pagevec_init(&lru_pvec, 0);
 
 	if (mapping->a_ops->readpages)
 		return mapping->a_ops->readpages(mapping, pages, nr_pages);
@@ -176,7 +176,7 @@ int do_page_cache_readahead(struct address_space *mapping,
 			continue;
 
 		read_unlock(&mapping->page_lock);
-		page = page_cache_alloc(mapping);
+		page = page_cache_alloc_cold(mapping);
 		read_lock(&mapping->page_lock);
 		if (!page)
 			break;

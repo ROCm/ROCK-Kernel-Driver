@@ -1,0 +1,36 @@
+
+menu "Archimedes/A5000 Implementations"
+
+# These architectures will be combined.  However, until this
+# is complete...  Note that the ARC will take precedence over
+# A5K
+comment "Archimedes/A5000 Implementations (select only ONE)"
+
+config ARCH_ARC
+	bool "Archimedes"
+	depends on ARCH_ARCA5K
+	help
+	  The Acorn Archimedes was an personal computer based on an 8K ARM2
+	  processor, released in 1987.  It supported 512K of RAM and 2 800K
+	  floppy disks.  Picture and more detailed specifications at
+	  <http://www.computingmuseum.com/museum/archi.htm>.
+
+config ARCH_A5K
+	bool "A5000"
+	depends on ARCH_ARCA5K
+	help
+	  Say Y here to to support the Acorn A5000.  Linux can support the
+	  internal IDE disk and CD-ROM interface, serial and parallel port,
+	  and the floppy drive.  Note that on some A5000s the floppy is
+	  plugged into the wrong socket on the motherboard.
+
+config PAGESIZE_16
+	bool "2MB physical memory"
+	depends on ARCH_ARCA5K
+	help
+	  Say Y here if your Archimedes or A5000 system has only 2MB of
+	  memory, otherwise say N.  The resulting kernel will not run on a
+	  machine with 4MB of memory.
+
+endmenu
+

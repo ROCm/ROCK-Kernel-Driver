@@ -1,0 +1,1237 @@
+#
+# For a description of the syntax of this configuration file,
+# see Documentation/kbuild/config-language.txt.
+#
+
+mainmenu "Linux Kernel Configuration"
+
+config ARM
+	bool
+	default y
+	help
+	  The ARM series is a line of low-power-consumption RISC chip designs
+	  licensed by ARM ltd and targeted at embedded applications and
+	  handhelds such as the Compaq IPAQ.  ARM-based PCs are no longer
+	  manufactured, but  legacy ARM-based PC hardware remains popular in
+	  Europe.  There is an ARM Linux project with a web page at
+	  <http://www.arm.linux.org.uk/>.
+
+config EISA
+	bool
+	---help---
+	  The Extended Industry Standard Architecture (EISA) bus was
+	  developed as an open alternative to the IBM MicroChannel bus.
+
+	  The EISA bus provided some of the features of the IBM MicroChannel
+	  bus while maintaining backward compatibility with cards made for
+	  the older ISA bus.  The EISA bus saw limited use between 1988 and
+	  1995 when it was made obsolete by the PCI bus.
+
+	  Say Y here if you are building a kernel for an EISA-based machine.
+
+	  Otherwise, say N.
+
+config SBUS
+	bool
+
+config MCA
+	bool
+	help
+	  MicroChannel Architecture is found in some IBM PS/2 machines and
+	  laptops.  It is a bus system similar to PCI or ISA. See
+	  <file:Documentation/mca.txt> (and especially the web page given
+	  there) before attempting to build an MCA bus kernel.
+
+config UID16
+	bool
+	default y
+
+config RWSEM_GENERIC_SPINLOCK
+	bool
+	default y
+
+config RWSEM_XCHGADD_ALGORITHM
+	bool
+
+config GENERIC_BUST_SPINLOCK
+	bool
+
+config GENERIC_ISA_DMA
+	bool
+
+source "init/Kconfig"
+
+
+menu "System Type"
+
+choice
+	prompt "ARM system type"
+	default ARCH_RPC
+
+config ARCH_ADIFCC
+	bool "ADIFCC-based"
+
+config ARCH_ANAKIN
+	bool "Anakin"
+	---help---
+	  The Anakin is a StrongArm based SA110 - 2 DIN Vehicle Telematics Platform.
+	  64MB SDRAM - 4 Mb Flash - Compact Flash Interface - 1 MB VRAM
+
+	  On board peripherals:
+	  * Front display: 400x234 16 bit TFT touchscreen
+	  * External independent second screen interface
+	  * CAN controller SJA1000
+	  * USB host controller
+	  * 6 channel video codec with hardware overlay
+	  * Smartcard reader
+	  * IrDa
+
+	  Modules interfaced over the Multi Media Extension slots:
+	  * A communication card
+	  Wavecom GPRS modem
+	  uBlock GPS
+	  Bosch DAB module
+	  * An audio card ( 4 * 40W, AC97 Codec, I2S)
+
+config ARCH_ARCA5K
+	bool "Archimedes/A5000"
+	help
+	  This selects what ARM system you wish to build the kernel for. It
+	  also selects to some extent the CPU type. If you are unsure what
+	  to set this option to, please consult any information supplied with
+	  your system.
+
+config ARCH_CLPS7500
+	bool "Cirrus-CL-PS7500FE"
+
+config ARCH_CLPS711X
+	bool "CLPS711x/EP721x-based"
+
+config ARCH_CO285
+	bool "Co-EBSA285"
+
+config ARCH_PXA
+	bool "PXA250/210-based"
+
+config ARCH_EBSA110
+	bool "EBSA-110"
+	help
+	  This is an evaluation board for the StrongARM processor available
+	  from Digital. It has limited hardware on-board, including an onboard
+	  Ethernet interface, two PCMCIA sockets, two serial ports and a
+	  parallel port.
+
+config ARCH_CAMELOT
+	bool "Epxa10db"
+	help
+	  This enables support for Altera's Excalibur XA10 development board.
+	  If you would like to build your kernel to run on one of these boards
+	  then you must say 'Y' here. Otherwise say 'N'
+
+config ARCH_FOOTBRIDGE
+	bool "FootBridge"
+
+config ARCH_INTEGRATOR
+	bool "Integrator"
+
+config ARCH_IOP310
+	bool "IOP310-based"
+
+config ARCH_L7200
+	bool "LinkUp-L7200"
+	help
+	  Say Y here if you intend to run this kernel on a LinkUp Systems
+	  L7200 Software Development Board which uses an ARM720T processor.
+	  Information on this board can be obtained at:
+
+	  <http://www.linkupsys.com/>
+
+	  If you have any questions or comments about the Linux kernel port
+	  to this board, send e-mail to sjhill@cotw.com.
+
+config ARCH_RPC
+	bool "RiscPC"
+	help
+	  On the Acorn Risc-PC, Linux can support the internal IDE disk and
+	  CD-ROM interface, serial and parallel port, and the floppy drive.
+
+config ARCH_SA1100
+	bool "SA1100-based"
+
+config ARCH_SHARK
+	bool "Shark"
+
+endchoice
+
+source "arch/arm/mach-arc/Kconfig"
+
+source "arch/arm/mach-clps711x/Kconfig"
+
+source "arch/arm/mach-epxa10db/Kconfig"
+
+source "arch/arm/mach-footbridge/Kconfig"
+
+source "arch/arm/mach-iop310/Kconfig"
+
+source "arch/arm/mach-pxa/Kconfig"
+
+source "arch/arm/mach-sa1100/Kconfig"
+
+# Definitions to make life easier
+config ARCH_ACORN
+	bool
+	depends on ARCH_ARCA5K || ARCH_RPC
+	default y
+
+#####################################################################
+# Footbridge support
+config FOOTBRIDGE
+	bool
+	depends on ARCH_CO285 || ARCH_FOOTBRIDGE
+	default y
+
+config FOOTBRIDGE_HOST
+	bool
+	depends on ARCH_CATS || ARCH_EBSA285_HOST || ARCH_NETWINDER || ARCH_PERSONAL_SERVER
+	default y
+
+config FOOTBRIDGE_ADDIN
+	bool
+	depends on ARCH_CO285 || ARCH_EBSA285_ADDIN
+	default y
+
+config ARCH_EBSA285
+	bool
+	depends on ARCH_EBSA285_HOST || ARCH_EBSA285_ADDIN
+	default y
+
+#####################################################################
+# SA1111 support
+config SA1111
+	bool
+	depends on ASSABET_NEPONSET || SA1100_ADSBITSY || SA1100_BADGE4 || SA1100_CONSUS || SA1100_GRAPHICSMASTER || SA1100_JORNADA720 || ARCH_LUBBOCK || SA1100_PFS168 || SA1100_PT_SYSTEM3 || SA1100_XP860
+	default y
+
+config FORCE_MAX_ZONEORDER
+	int
+	depends on ASSABET_NEPONSET || SA1100_ADSBITSY || SA1100_BADGE4 || SA1100_CONSUS || SA1100_GRAPHICSMASTER || SA1100_JORNADA720 || ARCH_LUBBOCK || SA1100_PFS168 || SA1100_PT_SYSTEM3 || SA1100_XP860
+	default "9"
+
+comment "Processor Type"
+
+# Figure out whether this system uses 26-bit or 32-bit CPUs.
+config CPU_32
+	bool
+	depends on !ARCH_ARCA5K
+	default y
+
+config CPU_26
+	bool
+	depends on ARCH_ARCA5K
+	default y
+
+# Select CPU types depending on the architecture selected.  This selects
+# which CPUs we support in the kernel image, and the compiler instruction
+# optimiser behaviour.
+# ARM610
+config CPU_ARM610
+	bool "Support ARM610 processor"
+	depends on ARCH_RPC
+	help
+	  The ARM610 is the successor to the ARM3 processor
+	  and was produced by VLSI Technology Inc.
+
+	  Say Y if you want support for the ARM610 processor.
+	  Otherwise, say N.
+
+# ARM710
+config CPU_ARM710
+	bool "Support ARM710 processor" if !ARCH_CLPS7500 && ARCH_RPC
+	default y if ARCH_CLPS7500
+	help
+	  A 32-bit RISC microprocessor based on the ARM7 processor core
+	  designed by Advanced RISC Machines Ltd. The ARM710 is the
+	  successor to the ARM610 processor. It was released in
+	  July 1994 by VLSI Technology Inc.
+
+	  Say Y if you want support for the ARM710 processor.
+	  Otherwise, say N.
+
+# ARM720T
+config CPU_ARM720T
+	bool "Support ARM720T processor" if !ARCH_CLPS711X && !ARCH_L7200 && !ARCH_CDB89712 && ARCH_INTEGRATOR
+	default y if ARCH_CLPS711X || ARCH_L7200 || ARCH_CDB89712
+	help
+	  A 32-bit RISC processor with 8kByte Cache, Write Buffer and
+	  MMU built around an ARM7TDMI core.
+
+	  Say Y if you want support for the ARM720T processor.
+	  Otherwise, say N.
+
+# ARM920T
+config CPU_ARM920T
+	bool "Support ARM920T processor"
+	depends on ARCH_INTEGRATOR
+	help
+	  The ARM920T is licensed to be produced by numerous vendors,
+	  and is used in the Maverick EP9312.  More information at
+	  <http://linuxdevices.com/products/PD2382866068.html>.
+
+	  Say Y if you want support for the ARM920T processor.
+	  Otherwise, say N.
+
+# ARM922T
+config CPU_ARM922T
+	bool
+	depends on ARCH_CAMELOT
+	default y
+	help
+	  The ARM922T is a version of the ARM920T, but with smaller
+	  instruction and data caches. It is used in Altera's
+	  Excalibur XA device family.
+
+	  Say Y if you want support for the ARM922T processor.
+	  Otherwise, say N.
+
+# ARM926T
+config CPU_ARM926T
+	bool "Support ARM926T processor"
+	depends on ARCH_INTEGRATOR
+	help
+	  This is a variant of the ARM920.  It has slightly different
+	  instruction sequences for cache and TLB operations.  Curiously,
+	  there is no documentation on it at the ARM corporate website.
+
+	  Say Y if you want support for the ARM926T processor.
+	  Otherwise, say N.
+
+# ARM1020
+config CPU_ARM1020
+	bool "Support ARM1020 processor"
+	depends on ARCH_INTEGRATOR
+	help
+	  The ARM1020 is the cached version of the ARM10 processor,
+	  with an addition of a floating-point unit.
+
+	  Say Y if you want support for the ARM1020 processor.
+	  Otherwise, say N.
+
+# SA110
+config CPU_SA110
+	bool "Support StrongARM(R) SA-110 processor" if !ARCH_EBSA110 && !FOOTBRIDGE && !ARCH_TBOX && !ARCH_SHARK && !ARCH_NEXUSPCI && !ARCH_ANAKIN && ARCH_RPC
+	default y if ARCH_EBSA110 || FOOTBRIDGE || ARCH_TBOX || ARCH_SHARK || ARCH_NEXUSPCI || ARCH_ANAKIN
+	help
+	  The Intel StrongARM(R) SA-110 is a 32-bit microprocessor and
+	  is available at five speeds ranging from 100 MHz to 233 MHz.
+	  More information is available at
+	  <http://developer.intel.com/design/strong/sa110.htm>.
+
+	  Say Y if you want support for the SA-110 processor.
+	  Otherwise, say N.
+
+# SA1100
+config CPU_SA1100
+	bool
+	depends on ARCH_SA1100
+	default y
+
+# XScale
+config CPU_XSCALE
+	bool
+	depends on ARCH_IOP310 || ARCH_ADIFCC || ARCH_PXA
+	default y
+
+# Figure out what processor architecture version we should be using.
+# This defines the compiler instruction set which depends on the machine type.
+config CPU_32v3
+	bool
+	depends on ARCH_RPC || ARCH_CLPS7500
+	default y
+
+config CPU_32v4
+	bool
+	depends on ARCH_EBSA110 || FOOTBRIDGE || ARCH_TBOX || ARCH_SHARK || ARCH_NEXUSPCI || ARCH_CLPS711X || ARCH_INTEGRATOR || ARCH_SA1100 || ARCH_L7200 || ARCH_ANAKIN || ARCH_CAMELOT
+	default y
+
+config CPU_32v5
+	bool
+	depends on ARCH_IOP310 || ARCH_ADIFCC || ARCH_PXA
+	default y
+
+comment "Processor Features"
+
+config ARM_THUMB
+	bool "Support Thumb instructions (EXPERIMENTAL)"
+	depends on (CPU_ARM720T || CPU_ARM920T || CPU_ARM922T || CPU_ARM926T || CPU_ARM1020 || CPU_XSCALE) && EXPERIMENTAL
+	help
+	  Say Y if you want to have kernel support for ARM Thumb instructions,
+	  fault handlers, and system calls.
+
+	  The Thumb instruction set is a compressed form of the standard ARM
+	  instruction set resulting in smaller binaries at the expense of
+	  slightly less efficient code.
+
+	  If you don't know what this all is, saying Y is a safe choice.
+
+config CPU_ICACHE_DISABLE
+	bool "Disable I-Cache"
+	depends on CPU_ARM920T || CPU_ARM922T || CPU_ARM926T || CPU_ARM1020
+	help
+	  Say Y here to disable the processor instruction cache. Unless
+	  you have a reason not to or are unsure, say N.
+
+config CPU_DCACHE_DISABLE
+	bool "Disable D-Cache"
+	depends on CPU_ARM920T || CPU_ARM922T || CPU_ARM926T || CPU_ARM1020
+	help
+	  Say Y here to disable the processor data cache. Unless
+	  you have a reason not to or are unsure, say N.
+
+config CPU_DCACHE_WRITETHROUGH
+	bool "Force write through D-cache"
+	depends on (CPU_ARM920T || CPU_ARM922T || CPU_ARM926T || CPU_ARM1020) && !CPU_DISABLE_DCACHE
+	help
+	  Say Y here to use the data cache in writethough mode. Unless you
+	  specifically require this or are unsure, say N.
+
+config CPU_CACHE_ROUND_ROBIN
+	bool "Round robin I and D cache replacement algorithm"
+	depends on (CPU_ARM926T || CPU_ARM1020) && (!CPU_ICACHE_DISABLE || !CPU_DCACHE_DISABLE)
+	help
+	  Say Y here to use the predictable round-robin cache replacement
+	  policy.  Unless you specifically require this or are unsure, say N.
+
+config CPU_BPREDICT_DISABLE
+	bool "Disable branch prediction"
+	depends on CPU_ARM1020
+	help
+	  Say Y here to disable branch prediction.  If unsure, say N.
+
+#  bool 'Use XScale PMU as timer source' CONFIG_XSCALE_PMU_TIMER
+config XSCALE_PMU
+	bool
+	depends on CPU_XSCALE && !XSCALE_PMU_TIMER
+	default y
+
+endmenu
+
+
+menu "General setup"
+
+# Select various configuration options depending on the machine type
+config DISCONTIGMEM
+	bool
+	depends on ARCH_EDB7211 || ARCH_SA1100
+	default y
+	help
+	  Say Y to upport efficient handling of discontiguous physical memory,
+	  for architectures which are either NUMA (Non-Uniform Memory Access)
+	  or have huge holes in the physical address space for other reasons.
+	  See <file:Documentation/vm/numa> for more.
+
+# Now handle the bus types
+config PCI
+	bool
+	default PCI_INTEGRATOR if !ARCH_FTVPCI && !ARCH_SHARK && !FOOTBRIDGE_HOST && !ARCH_IOP310 && ARCH_INTEGRATOR
+	default y if ARCH_FTVPCI || ARCH_SHARK || FOOTBRIDGE_HOST || ARCH_IOP310
+	help
+	  Find out whether you have a PCI motherboard. PCI is the name of a
+	  bus system, i.e. the way the CPU talks to the other stuff inside
+	  your box. Other bus systems are ISA, EISA, MicroChannel (MCA) or
+	  VESA. If you have PCI, say Y, otherwise N.
+
+	  The PCI-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>, contains valuable
+	  information about which PCI hardware does work under Linux and which
+	  doesn't.
+
+config PCI_INTEGRATOR
+	bool "PCI support"
+	depends on !ARCH_FTVPCI && !ARCH_SHARK && !FOOTBRIDGE_HOST && !ARCH_IOP310 && ARCH_INTEGRATOR
+	help
+	  Find out whether you have a PCI motherboard. PCI is the name of a
+	  bus system, i.e. the way the CPU talks to the other stuff inside
+	  your box. Other bus systems are ISA, EISA, MicroChannel (MCA) or
+	  VESA. If you have PCI, say Y, otherwise N.
+
+	  The PCI-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>, contains valuable
+	  information about which PCI hardware does work under Linux and which
+	  doesn't.
+
+# Select the host bridge type
+config PCI_HOST_PLX90X0
+	bool
+	depends on PCI && ARCH_FTVPCI
+	default y
+
+config PCI_HOST_VIA82C505
+	bool
+	depends on PCI && ARCH_SHARK
+	default y
+
+config ISA
+	bool
+	depends on FOOTBRIDGE_HOST || ARCH_SHARK || ARCH_CLPS7500 || ARCH_EBSA110 || ARCH_CDB89712 || ARCH_EDB7211 || ARCH_SA1100
+	default y
+	help
+	  Find out whether you have ISA slots on your motherboard.  ISA is the
+	  name of a bus system, i.e. the way the CPU talks to the other stuff
+	  inside your box.  Other bus systems are PCI, EISA, MicroChannel
+	  (MCA) or VESA.  ISA is an older system, now being displaced by PCI;
+	  newer boards don't support it.  If you have ISA, say Y, otherwise N.
+
+config ISA_DMA
+	bool
+	depends on FOOTBRIDGE_HOST || ARCH_SHARK
+	default y
+
+config FIQ
+	bool
+	depends on ARCH_ACORN || ARCH_L7200
+	default y
+
+# Compressed boot loader in ROM.  Yes, we really want to ask about
+# TEXT and BSS so we preserve their values in the config files.
+config ZBOOT_ROM
+	bool "Compressed boot loader in ROM/flash"
+	help
+	  Say Y here if you intend to execute your compressed kernel image (zImage)
+	  directly from ROM or flash.  If unsure, say N.
+
+config ZBOOT_ROM_TEXT
+	hex "Compressed ROM boot loader base address"
+	default "0"
+	help
+	  The base address for zImage.  Unless you have special requirements, you
+	  should not change this value.
+
+config ZBOOT_ROM_BSS
+	hex "Compressed ROM boot loader BSS address"
+	default "0"
+	help
+	  The base address of 64KiB of read/write memory, which must be available
+	  while the decompressor is running.  Unless you have special requirements,
+	  you should not change this value.
+
+config CPU_FREQ
+	bool "Support CPU clock change (EXPERIMENTAL)"
+	depends on (ARCH_SA1100 || ARCH_INTEGRATOR) && EXPERIMENTAL
+	help
+	  CPU clock scaling allows you to change the clock speed of the
+	  running CPU on the fly. This is a nice method to save battery power,
+	  because the lower the clock speed, the less power the CPU
+	  consumes. Note that this driver doesn't automatically change the CPU
+	  clock speed, you need some userland tools (which still have to be
+	  written) to implement the policy. If you don't understand what this
+	  is all about, it's safe to say 'N'.
+
+config CPU_FREQ_24_API
+	bool
+	depends on CPU_FREQ
+	default y
+
+config CPU_FREQ_26_API
+	bool
+	depends on CPU_FREQ
+	default y
+
+source "drivers/pci/Kconfig"
+
+config HOTPLUG
+	bool "Support for hot-pluggable devices"
+	---help---
+	  Say Y here if you want to plug devices into your computer while
+	  the system is running, and be able to use them quickly.  In many
+	  cases, the devices can likewise be unplugged at any time too.
+
+	  One well known example of this is PCMCIA- or PC-cards, credit-card
+	  size devices such as network cards, modems or hard drives which are
+	  plugged into slots found on all modern laptop computers.  Another
+	  example, used on modern desktops as well as laptops, is USB.
+
+	  Enable HOTPLUG and KMOD, and build a modular kernel.  Get agent
+	  software (at <http://linux-hotplug.sourceforge.net/>) and install it.
+	  Then your kernel will automatically call out to a user mode "policy
+	  agent" (/sbin/hotplug) to load modules and set up software needed
+	  to use devices as you hotplug them.
+
+source "drivers/pcmcia/Kconfig"
+
+comment "At least one math emulation must be selected"
+
+config FPE_NWFPE
+	tristate "NWFPE math emulation"
+	---help---
+	  Say Y to include the NWFPE floating point emulator in the kernel.
+	  This is necessary to run most binaries. Linux does not currently
+	  support floating point hardware so you need to say Y here even if
+	  your machine has an FPA or floating point co-processor podule.
+
+	  It is also possible to say M to build the emulator as a module
+	  (nwfpe.o) or indeed to leave it out altogether. However, unless you
+	  know what you are doing this can easily render your machine
+	  unbootable. Saying Y is the safe option.
+
+	  You may say N here if you are going to load the Acorn FPEmulator
+	  early in the bootup.
+
+config FPE_FASTFPE
+	tristate "FastFPE math emulation (EXPERIMENTAL)"
+	depends on !CPU_26 && !CPU_32v3 && EXPERIMENTAL
+	---help---
+	  Say Y here to include the FAST floating point emulator in the kernel.
+	  This is an experimental much faster emulator which now also has full
+	  precision for the mantissa.  It does not support any exceptions.
+	  It is very simple, and approximately 3-6 times faster than NWFPE.
+
+	  It should be sufficient for most programs.  It may be not suitable
+	  for scientific calculations, but you have to check this for yourself.
+	  If you do not feel you need a faster FP emulation you should better
+	  choose NWFPE.
+
+	  It is also possible to say M to build the emulator as a module
+	  (fastfpe.o).  But keep in mind that you should only load the FP
+	  emulator early in the bootup.  You should never change from NWFPE to
+	  FASTFPE or vice versa in an active system!
+
+choice
+	prompt "Kernel core (/proc/kcore) format"
+	default KCORE_ELF
+
+config KCORE_ELF
+	bool "ELF"
+	---help---
+	  If you enabled support for /proc file system then the file
+	  /proc/kcore will contain the kernel core image. This can be used
+	  in gdb:
+
+	  $ cd /usr/src/linux ; gdb vmlinux /proc/kcore
+
+	  You have two choices here: ELF and A.OUT. Selecting ELF will make
+	  /proc/kcore appear in ELF core format as defined by the Executable
+	  and Linking Format specification. Selecting A.OUT will choose the
+	  old "a.out" format which may be necessary for some old versions
+	  of binutils or on some architectures.
+
+	  This is especially useful if you have compiled the kernel with the
+	  "-g" option to preserve debugging information. It is mainly used
+	  for examining kernel data structures on the live kernel so if you
+	  don't understand what this means or are not a kernel hacker, just
+	  leave it at its default value ELF.
+
+config KCORE_AOUT
+	bool "A.OUT"
+	help
+	  Not necessary unless you're using a very out-of-date binutils
+	  version.  You probably want KCORE_ELF.
+
+endchoice
+
+config BINFMT_AOUT
+	tristate "Kernel support for a.out binaries"
+	---help---
+	  A.out (Assembler.OUTput) is a set of formats for libraries and
+	  executables used in the earliest versions of UNIX. Linux used the
+	  a.out formats QMAGIC and ZMAGIC until they were replaced with the
+	  ELF format.
+
+	  As more and more programs are converted to ELF, the use for a.out
+	  will gradually diminish. If you disable this option it will reduce
+	  your kernel by one page. This is not much and by itself does not
+	  warrant removing support. However its removal is a good idea if you
+	  wish to ensure that absolutely none of your programs will use this
+	  older executable format. If you don't know what to answer at this
+	  point then answer Y. If someone told you "You need a kernel with
+	  QMAGIC support" then you'll have to say Y here. You may answer M to
+	  compile a.out support as a module and later load the module when you
+	  want to use a program or library in a.out format. The module will be
+	  called binfmt_aout.o. Saying M or N here is dangerous though,
+	  because some crucial programs on your system might still be in A.OUT
+	  format.
+
+config BINFMT_ELF
+	tristate "Kernel support for ELF binaries"
+	---help---
+	  ELF (Executable and Linkable Format) is a format for libraries and
+	  executables used across different architectures and operating
+	  systems. Saying Y here will enable your kernel to run ELF binaries
+	  and enlarge it by about 13 KB. ELF support under Linux has now all
+	  but replaced the traditional Linux a.out formats (QMAGIC and ZMAGIC)
+	  because it is portable (this does *not* mean that you will be able
+	  to run executables from different architectures or operating systems
+	  however) and makes building run-time libraries very easy. Many new
+	  executables are distributed solely in ELF format. You definitely
+	  want to say Y here.
+
+	  Information about ELF is contained in the ELF HOWTO available from
+	  <http://www.linuxdoc.org/docs.html#howto>.
+
+	  If you find that after upgrading from Linux kernel 1.2 and saying Y
+	  here, you still can't run any ELF binaries (they just crash), then
+	  you'll have to install the newest ELF runtime libraries, including
+	  ld.so (check the file <file:Documentation/Changes> for location and
+	  latest version).
+
+	  If you want to compile this as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want),
+	  say M here and read <file:Documentation/modules.txt>.  The module
+	  will be called binfmt_elf.o. Saying M or N here is dangerous because
+	  some crucial programs on your system might be in ELF format.
+
+config BINFMT_MISC
+	tristate "Kernel support for MISC binaries"
+	---help---
+	  If you say Y here, it will be possible to plug wrapper-driven binary
+	  formats into the kernel. You will like this especially when you use
+	  programs that need an interpreter to run like Java, Python or
+	  Emacs-Lisp. It's also useful if you often run DOS executables under
+	  the Linux DOS emulator DOSEMU (read the DOSEMU-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>). Once you have
+	  registered such a binary class with the kernel, you can start one of
+	  those programs simply by typing in its name at a shell prompt; Linux
+	  will automatically feed it to the correct interpreter.
+
+	  You can do other nice things, too. Read the file
+	  <file:Documentation/binfmt_misc.txt> to learn how to use this
+	  feature, and <file:Documentation/java.txt> for information about how
+	  to include Java support.
+
+	  You must say Y to "/proc file system support" (CONFIG_PROC_FS) to
+	  use this part of the kernel.
+
+	  You may say M here for module support and later load the module when
+	  you have use for it; the module is called binfmt_misc.o. If you
+	  don't know what to answer at this point, say Y.
+
+config PM
+	bool "Power Management support"
+	---help---
+	  "Power Management" means that parts of your computer are shut
+	  off or put into a power conserving "sleep" mode if they are not
+	  being used.  There are two competing standards for doing this: APM
+	  and ACPI.  If you want to use either one, say Y here and then also
+	  to the requisite support below.
+
+	  Power Management is most important for battery powered laptop
+	  computers; if you have a laptop, check out the Linux Laptop home
+	  page on the WWW at
+	  <http://www.cs.utexas.edu/users/kharker/linux-laptop/> and the
+	  Battery Powered Linux mini-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>.
+
+	  Note that, even if you say N here, Linux on the x86 architecture
+	  will issue the hlt instruction if nothing is to be done, thereby
+	  sending the processor to sleep and saving power.
+
+config PREEMPT
+	bool "Preemptible Kernel (EXPERIMENTAL)"
+	depends on CPU_32 && EXPERIMENTAL
+	help
+	  This option reduces the latency of the kernel when reacting to
+	  real-time or interactive events by allowing a low priority process to
+	  be preempted even if it is in kernel mode executing a system call.
+	  This allows applications to run more reliably even when the system is
+	  under load.
+
+	  Say Y here if you are building a kernel for a desktop, embedded
+	  or real-time system.  Say N if you are unsure.
+
+config APM
+	tristate "Advanced Power Management Emulation"
+	depends on PM
+	---help---
+	  APM is a BIOS specification for saving power using several different
+	  techniques. This is mostly useful for battery powered laptops with
+	  APM compliant BIOSes. If you say Y here, the system time will be
+	  reset after a RESUME operation, the /proc/apm device will provide
+	  battery status information, and user-space programs will receive
+	  notification of APM "events" (e.g. battery status change).
+
+	  If you select "Y" here, you can disable actual use of the APM
+	  BIOS by passing the "apm=off" option to the kernel at boot time.
+
+	  Note that the APM support is almost completely disabled for
+	  machines with more than one CPU.
+
+	  In order to use APM, you will need supporting software. For location
+	  and more information, read <file:Documentation/pm.txt> and the
+	  Battery Powered Linux mini-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>.
+
+	  This driver does not spin down disk drives (see the hdparm(8)
+	  manpage ("man 8 hdparm") for that), and it doesn't turn off
+	  VESA-compliant "green" monitors.
+
+	  This driver does not support the TI 4000M TravelMate and the ACER
+	  486/DX4/75 because they don't have compliant BIOSes. Many "green"
+	  desktop machines also don't have compliant BIOSes, and this driver
+	  may cause those machines to panic during the boot phase.
+
+	  Generally, if you don't have a battery in your machine, there isn't
+	  much point in using this driver and you should say N. If you get
+	  random kernel OOPSes or reboots that don't seem to be related to
+	  anything, try disabling/enabling this option (or disabling/enabling
+	  APM in your BIOS).
+
+	  Some other things you should try when experiencing seemingly random,
+	  "weird" problems:
+
+	  1) make sure that you have enough swap space and that it is
+	  enabled.
+	  2) pass the "no-hlt" option to the kernel
+	  3) switch on floating point emulation in the kernel and pass
+	  the "no387" option to the kernel
+	  4) pass the "floppy=nodma" option to the kernel
+	  5) pass the "mem=4M" option to the kernel (thereby disabling
+	  all but the first 4 MB of RAM)
+	  6) make sure that the CPU is not over clocked.
+	  7) read the sig11 FAQ at <http://www.bitwizard.nl/sig11/>
+	  8) disable the cache from your BIOS settings
+	  9) install a fan for the video card or exchange video RAM
+	  10) install a better fan for the CPU
+	  11) exchange RAM chips
+	  12) exchange the motherboard.
+
+	  To compile this driver as a module ( = code which can be inserted in
+	  and removed from the running kernel whenever you want), say M here
+	  and read <file:Documentation/modules.txt>. The module will be called
+	  apm.o.
+
+config ARTHUR
+	tristate "RISC OS personality"
+	depends on CPU_32
+	help
+	  Say Y here to include the kernel code necessary if you want to run
+	  Acorn RISC OS/Arthur binaries under Linux. This code is still very
+	  experimental; if this sounds frightening, say N and sleep in peace.
+	  You can also say M here to compile this support as a module (which
+	  will be called arthur.o).
+
+config CMDLINE
+	string "Default kernel command string"
+	default ""
+	help
+	  On some architectures (EBSA110 and CATS), there is currently no way
+	  for the boot loader to pass arguments to the kernel. For these
+	  architectures, you should supply some command-line options at build
+	  time by entering them here. As a minimum, you should specify the
+	  memory size and the root device (e.g., mem=64M root=/dev/nfs).
+
+config LEDS
+	bool "Timer and CPU usage LEDs"
+	depends on ARCH_NETWINDER || ARCH_EBSA110 || ARCH_EBSA285 || ARCH_FTVPCI || ARCH_SHARK || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_CDB89712 || ARCH_P720T
+	help
+	  If you say Y here, the LEDs on your machine will be used
+	  to provide useful information about your current system status.
+
+	  If you are compiling a kernel for a NetWinder or EBSA-285, you will
+	  be able to select which LEDs are active using the options below. If
+	  you are compiling a kernel for the EBSA-110 or the LART however, the
+	  red LED will simply flash regularly to indicate that the system is
+	  still functional. It is safe to say Y here if you have a CATS
+	  system, but the driver will do nothing.
+
+config LEDS_TIMER
+	bool "Timer LED" if LEDS && (ARCH_NETWINDER || ARCH_EBSA285 || ARCH_SHARK || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_P720T)
+	depends on ARCH_NETWINDER || ARCH_EBSA110 || ARCH_EBSA285 || ARCH_FTVPCI || ARCH_SHARK || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_CDB89712 || ARCH_P720T
+	default y if ARCH_EBSA110
+	help
+	  If you say Y here, one of the system LEDs (the green one on the
+	  NetWinder, the amber one on the EBSA285, or the red one on the LART)
+	  will flash regularly to indicate that the system is still
+	  operational. This is mainly useful to kernel hackers who are
+	  debugging unstable kernels.
+
+	  The LART uses the same LED for both Timer LED and CPU usage LED
+	  functions. You may choose to use both, but the Timer LED function
+	  will overrule the CPU usage LED.
+
+config LEDS_CPU
+	bool "CPU usage LED"
+	depends on LEDS && (ARCH_NETWINDER || ARCH_EBSA285 || ARCH_SHARK || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_P720T)
+	help
+	  If you say Y here, the red LED will be used to give a good real
+	  time indication of CPU usage, by lighting whenever the idle task
+	  is not currently executing.
+
+	  The LART uses the same LED for both Timer LED and CPU usage LED
+	  functions. You may choose to use both, but the Timer LED function
+	  will overrule the CPU usage LED.
+
+config ALIGNMENT_TRAP
+	bool
+	depends on CPU_32
+	default y
+	help
+	  ARM processors can not fetch/store information which is not
+	  naturally aligned on the bus, i.e., a 4 byte fetch must start at an
+	  address divisible by 4. On 32-bit ARM processors, these non-aligned
+	  fetch/store instructions will be emulated in software if you say
+	  here, which has a severe performance impact. This is necessary for
+	  correct operation of some network protocols. With an IP-only
+	  configuration it is safe to say N, otherwise say Y.
+
+endmenu
+
+source "drivers/parport/Kconfig"
+
+if ALIGNMENT_TRAP
+source "drivers/mtd/Kconfig"
+endif
+
+source "drivers/pnp/Kconfig"
+
+source "drivers/block/Kconfig"
+
+source "drivers/md/Kconfig"
+
+source "drivers/acorn/block/Kconfig"
+
+source "net/Kconfig"
+
+
+menu "Network device support"
+	depends on NET
+
+config NETDEVICES
+	bool "Network device support"
+	---help---
+	  You can say N here if you don't intend to connect your Linux box to
+	  any other computer at all or if all your connections will be over a
+	  telephone line with a modem either via UUCP (UUCP is a protocol to
+	  forward mail and news between unix hosts over telephone lines; read
+	  the UUCP-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>) or dialing up a shell
+	  account or a BBS, even using term (term is a program which gives you
+	  almost full Internet connectivity if you have a regular dial up
+	  shell account on some Internet connected Unix computer. Read
+	  <http://www.bart.nl/~patrickr/term-howto/Term-HOWTO.html>).
+
+	  You'll have to say Y if your computer contains a network card that
+	  you want to use under Linux (make sure you know its name because you
+	  will be asked for it and read the Ethernet-HOWTO (especially if you
+	  plan to use more than one network card under Linux)) or if you want
+	  to use SLIP (Serial Line Internet Protocol is the protocol used to
+	  send Internet traffic over telephone lines or null modem cables) or
+	  CSLIP (compressed SLIP) or PPP (Point to Point Protocol, a better
+	  and newer replacement for SLIP) or PLIP (Parallel Line Internet
+	  Protocol is mainly used to create a mini network by connecting the
+	  parallel ports of two local machines) or AX.25/KISS (protocol for
+	  sending Internet traffic over amateur radio links).
+
+	  Make sure to read the NET-3-HOWTO. Eventually, you will have to read
+	  Olaf Kirch's excellent and free book "Network Administrator's
+	  Guide", to be found in <http://www.linuxdoc.org/docs.html#guide>. If
+	  unsure, say Y.
+
+source "drivers/net/Kconfig"
+
+endmenu
+
+#   source net/ax25/Config.in
+source "net/irda/Kconfig"
+
+source "net/ax25/Kconfig"
+
+
+menu "ATA/ATAPI/MFM/RLL support"
+
+config IDE
+	tristate "ATA/ATAPI/MFM/RLL support"
+	---help---
+	  If you say Y here, your kernel will be able to manage low cost mass
+	  storage units such as ATA/(E)IDE and ATAPI units. The most common
+	  cases are IDE hard drives and ATAPI CD-ROM drives.
+
+	  If your system is pure SCSI and doesn't use these interfaces, you
+	  can say N here.
+
+	  Integrated Disk Electronics (IDE aka ATA-1) is a connecting standard
+	  for mass storage units such as hard disks. It was designed by
+	  Western Digital and Compaq Computer in 1984. It was then named
+	  ST506. Quite a number of disks use the IDE interface.
+
+	  AT Attachment (ATA) is the superset of the IDE specifications.
+	  ST506 was also called ATA-1.
+
+	  Fast-IDE is ATA-2 (also named Fast ATA), Enhanced IDE (EIDE) is
+	  ATA-3. It provides support for larger disks (up to 8.4GB by means of
+	  the LBA standard), more disks (4 instead of 2) and for other mass
+	  storage units such as tapes and cdrom. UDMA/33 (aka UltraDMA/33) is
+	  ATA-4 and provides faster (and more CPU friendly) transfer modes
+	  than previous PIO (Programmed processor Input/Output) from previous
+	  ATA/IDE standards by means of fast DMA controllers.
+
+	  ATA Packet Interface (ATAPI) is a protocol used by EIDE tape and
+	  CD-ROM drives, similar in many respects to the SCSI protocol.
+
+	  SMART IDE (Self Monitoring, Analysis and Reporting Technology) was
+	  designed in order to prevent data corruption and disk crash by
+	  detecting pre hardware failure conditions (heat, access time, and
+	  the like...). Disks built since June 1995 may follow this standard.
+	  The kernel itself don't manage this; however there are quite a
+	  number of user programs such as smart that can query the status of
+	  SMART parameters disk.
+
+	  If you want to compile this driver as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want),
+	  say M here and read <file:Documentation/modules.txt>. The module
+	  will be called ide.o.
+
+	  For further information, please read <file:Documentation/ide.txt>.
+
+	  If unsure, say Y.
+
+source "drivers/ide/Kconfig"
+
+endmenu
+
+
+menu "SCSI support"
+
+config SCSI
+	tristate "SCSI support"
+	---help---
+	  If you want to use a SCSI hard disk, SCSI tape drive, SCSI CD-ROM or
+	  any other SCSI device under Linux, say Y and make sure that you know
+	  the name of your SCSI host adapter (the card inside your computer
+	  that "speaks" the SCSI protocol, also called SCSI controller),
+	  because you will be asked for it.
+
+	  You also need to say Y here if you want support for the parallel
+	  port version of the 100 MB IOMEGA ZIP drive.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called scsi_mod.o.  If you want to compile it as
+	  a module, say M here and read <file:Documentation/modules.txt> and
+	  <file:Documentation/scsi.txt>.  However, do not compile this as a
+	  module if your root file system (the one containing the directory /)
+	  is located on a SCSI device.
+
+source "drivers/scsi/Kconfig"
+
+endmenu
+
+#if [ "$CONFIG_ARCH_CLPS711X" = "y" ]; then
+#   source drivers/ssi/Config.in
+#fi
+source "drivers/ieee1394/Kconfig"
+
+source "drivers/message/i2o/Kconfig"
+
+source "drivers/isdn/Kconfig"
+
+#
+# input before char - char/joystick depends on it. As does USB.
+#
+source "drivers/input/Kconfig"
+
+source "drivers/char/Kconfig"
+
+config KBDMOUSE
+	bool
+	depends on ARCH_ACORN && BUSMOUSE=y && !ARCH_RPC
+	default y
+
+config RPCMOUSE
+	bool
+	depends on ARCH_ACORN && BUSMOUSE=y && ARCH_RPC
+	default y
+
+source "drivers/media/Kconfig"
+
+source "fs/Kconfig"
+
+
+menu "Console drivers"
+	depends on VT
+
+config VGA_CONSOLE
+	bool "VGA text console"
+	depends on !ARCH_ACORN && !ARCH_EBSA110
+	help
+	  Saying Y here will allow you to use Linux in text mode through a
+	  display that complies with the generic VGA standard. Virtually
+	  everyone wants that.
+
+	  The program SVGATextMode can be used to utilize SVGA video cards to
+	  their full potential in text mode. Download it from
+	  <ftp://ibiblio.org/pub/Linux/utils/console/>.
+
+	  Say Y.
+
+source "drivers/video/Kconfig"
+
+endmenu
+
+
+menu "Sound"
+	depends on ARCH_ACORN || ARCH_CLPS7500 || ARCH_TBOX || ARCH_SHARK || ARCH_SA1100 || PCI
+
+config SOUND
+	tristate "Sound card support"
+	---help---
+	  If you have a sound card in your computer, i.e. if it can say more
+	  than an occasional beep, say Y.  Be sure to have all the information
+	  about your sound card and its configuration down (I/O port,
+	  interrupt and DMA channel), because you will be asked for it.
+
+	  You want to read the Sound-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>. General information about
+	  the modular sound system is contained in the files
+	  <file:Documentation/sound/Introduction>.  The file
+	  <file:Documentation/sound/README.OSS> contains some slightly
+	  outdated but still useful information as well.
+
+	  If you have a PnP sound card and you want to configure it at boot
+	  time using the ISA PnP tools (read
+	  <http://www.roestock.demon.co.uk/isapnptools/>), then you need to
+	  compile the sound card support as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want)
+	  and load that module after the PnP configuration is finished.  To do
+	  this, say M here and read <file:Documentation/modules.txt> as well
+	  as <file:Documentation/sound/README.modules>; the module will be
+	  called soundcore.o.
+
+	  I'm told that even without a sound card, you can make your computer
+	  say more than an occasional beep, by programming the PC speaker.
+	  Kernel patches and supporting utilities to do that are in the pcsp
+	  package, available at <ftp://ftp.infradead.org/pub/pcsp/>.
+
+source "sound/Kconfig"
+
+endmenu
+
+source "drivers/misc/Kconfig"
+
+source "drivers/usb/Kconfig"
+
+source "net/bluetooth/Kconfig"
+
+
+menu "Kernel hacking"
+
+# Always compile kernel with framepointer (until 2.4 real comes out)
+# Bug reports aren't much use without this.
+config NO_FRAME_POINTER
+	bool "Compile kernel without frame pointer"
+	help
+	  If you say Y here, the resulting kernel will be slightly smaller and
+	  faster. However, when a problem occurs with the kernel, the
+	  information that is reported is severely limited. Most people
+	  should say N here.
+
+config DEBUG_USER
+	bool "Verbose user fault messages"
+	help
+	  When a user program crashes due to an exception, the kernel can
+	  print a brief message explaining what the problem was. This is
+	  sometimes helpful for debugging but serves no purpose on a
+	  production system. Most people should say N here.
+
+config DEBUG_INFO
+	bool "Include debugging information in kernel binary"
+	help
+	  Say Y here to include source-level debugging information in the
+	  `vmlinux' binary image. This is handy if you want to use gdb or
+	  addr2line to debug the kernel. It has no impact on the in-memory
+	  footprint of the running kernel but it can increase the amount of
+	  time and disk space needed for compilation of the kernel. If in
+	  doubt say N.
+
+config DEBUG_KERNEL
+	bool "Kernel debugging"
+	help
+	  Say Y here if you are developing drivers or trying to debug and
+	  identify kernel problems.
+
+config DEBUG_SLAB
+	bool "Debug memory allocations"
+	depends on DEBUG_KERNEL
+	help
+	  Say Y here to have the kernel do limited verification on memory
+	  allocation as well as poisoning memory on free to catch use of freed
+	  memory.
+
+config MAGIC_SYSRQ
+	bool "Magic SysRq key"
+	depends on DEBUG_KERNEL
+	help
+	  If you say Y here, you will have some control over the system even
+	  if the system crashes for example during kernel debugging (e.g., you
+	  will be able to flush the buffer cache to disk, reboot the system
+	  immediately or dump some status information). This is accomplished
+	  by pressing various keys while holding SysRq (Alt+PrintScreen). It
+	  also works on a serial console (on PC hardware at least), if you
+	  send a BREAK and then within 5 seconds a command keypress. The
+	  keys are documented in <file:Documentation/sysrq.txt>. Don't say Y
+	  unless you really know what this hack does.
+
+config DEBUG_SPINLOCK
+	bool "Spinlock debugging"
+	depends on DEBUG_KERNEL
+	help
+	  Say Y here and build SMP to catch missing spinlock initialization
+	  and certain other kinds of spinlock errors commonly made.  This is
+	  best used in conjunction with the NMI watchdog so that spinlock
+	  deadlocks are also debuggable.
+
+config DEBUG_WAITQ
+	bool "Wait queue debugging"
+	depends on DEBUG_KERNEL
+
+config DEBUG_BUGVERBOSE
+	bool "Verbose BUG() reporting (adds 70K)"
+	depends on DEBUG_KERNEL
+	help
+	  Say Y here to make BUG() panics output the file name and line number
+	  of the BUG call as well as the EIP and oops trace.  This aids
+	  debugging but costs about 70-100K of memory.
+
+config DEBUG_ERRORS
+	bool "Verbose kernel error messages"
+	depends on DEBUG_KERNEL
+	help
+	  This option controls verbose debugging information which can be
+	  printed when the kernel detects an internal error. This debugging
+	  information is useful to kernel hackers when tracking down problems,
+	  but mostly meaningless to other people. It's safe to say Y unless
+	  you are concerned with the code size or don't want to see these
+	  messages.
+
+# These options are only for real kernel hackers who want to get their hands dirty. 
+config DEBUG_LL
+	bool "Kernel low-level debugging functions"
+	depends on DEBUG_KERNEL
+	help
+	  Say Y here to include definitions of printascii, printchar, printhex
+	  in the kernel.  This is helpful if you are debugging code that
+	  executes before the console is initialized.
+
+config DEBUG_DC21285_PORT
+	bool "Kernel low-level debugging messages via footbridge serial port"
+	depends on DEBUG_LL && FOOTBRIDGE
+	help
+	  Say Y here if you want the debug print routines to direct their
+	  output to the serial port in the DC21285 (Footbridge). Saying N
+	  will cause the debug messages to appear on the first 16550
+	  serial port.
+
+config DEBUG_CLPS711X_UART2
+	bool "Kernel low-level debugging messages via UART2"
+	depends on DEBUG_LL && ARCH_CLPS711X
+	help
+	  Say Y here if you want the debug print routines to direct their
+	  output to the second serial port on these devices.  Saying N will
+	  cause the debug messages to appear on the first serial port.
+
+endmenu
+
+source "security/Kconfig"
+
+source "crypto/Kconfig"
+
+source "lib/Kconfig"
+

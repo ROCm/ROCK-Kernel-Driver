@@ -1,5 +1,7 @@
 /*
-** Dynamic DMA mapping support.
+** PARISC 1.1 Dynamic DMA mapping support.
+** This implementation is for PA-RISC platforms that do not support
+** I/O TLBs (aka DMA address translation hardware).
 ** See Documentation/DMA-mapping.txt for interface definitions.
 **
 **      (c) Copyright 1999,2000 Hewlett-Packard Company
@@ -7,36 +9,28 @@
 **	(c) Copyright 2000 Philipp Rumpf <prumpf@tux.org>
 **      (c) Copyright 2000 John Marvin
 **
-** This implementation is for PA-RISC platforms that do not support
-** I/O TLBs (aka DMA address translation hardware).
-**
 ** "leveraged" from 2.3.47: arch/ia64/kernel/pci-dma.c.
 ** (I assume it's from David Mosberger-Tang but there was no Copyright)
 **
 ** AFAIK, all PA7100LC and PA7300LC platforms can use this code.
-** All PA2.0 machines but V-class can alias xxx_alloc_consistent()
-** to use regular cacheable memory.
 **
 ** - ggg
 */
 
-#include <linux/types.h>
-#include <linux/mm.h>
-#include <linux/string.h>
-#include <linux/pci.h>
 #include <linux/init.h>
-
+#include <linux/mm.h>
+#include <linux/pci.h>
+#include <linux/proc_fs.h>
 #include <linux/slab.h>
-#include <linux/vmalloc.h>
+#include <linux/string.h>
+#include <linux/types.h>
 
-#include <asm/uaccess.h>
-#include <asm/pgalloc.h>
-
+#include <asm/cacheflush.h>
+#include <asm/dma.h>    /* for DMA_CHUNK_SIZE */
 #include <asm/io.h>
 #include <asm/page.h>	/* get_order */
-#include <asm/dma.h>    /* for DMA_CHUNK_SIZE */
-
-#include <linux/proc_fs.h>
+#include <asm/pgalloc.h>
+#include <asm/uaccess.h>
 
 static struct proc_dir_entry * proc_gsc_root = NULL;
 static int pcxl_proc_info(char *buffer, char **start, off_t offset, int length);
@@ -117,7 +111,7 @@ static inline int map_pmd_uncached(pmd_t * pmd, unsigned long vaddr,
 	if (end > PGDIR_SIZE)
 		end = PGDIR_SIZE;
 	do {
-		pte_t * pte = pte_alloc_kernel(pmd, vaddr);
+		pte_t * pte = pte_alloc_kernel(&init_mm, pmd, vaddr);
 		if (!pte)
 			return -ENOMEM;
 		if (map_pte_uncached(pte, orig_vaddr, end - vaddr, paddr_ptr))
@@ -139,7 +133,7 @@ static inline int map_uncached_pages(unsigned long vaddr, unsigned long size,
 	do {
 		pmd_t *pmd;
 		
-		pmd = pmd_alloc_kernel(dir, vaddr);
+		pmd = pmd_alloc(NULL, dir, vaddr);
 		if (!pmd)
 			return -ENOMEM;
 		if (map_pmd_uncached(pmd, vaddr, end - vaddr, &paddr))
@@ -164,7 +158,7 @@ static inline void unmap_uncached_pte(pmd_t * pmd, unsigned long vaddr,
 		pmd_clear(pmd);
 		return;
 	}
-	pte = pte_offset(pmd, vaddr);
+	pte = pte_offset_map(pmd, vaddr);
 	vaddr &= ~PMD_MASK;
 	end = vaddr + size;
 	if (end > PMD_SIZE)
@@ -347,7 +341,7 @@ pcxl_dma_init(void)
     pcxl_res_hint = 0;
     pcxl_res_map = (char *)__get_free_pages(GFP_KERNEL,
 					    get_order(pcxl_res_size));
-
+    memset(pcxl_res_map, 0, pcxl_res_size);
     proc_gsc_root = proc_mkdir("gsc", 0);
     create_proc_info_entry("dino", 0, proc_gsc_root, pcxl_proc_info);
     return 0;
@@ -431,10 +425,10 @@ static int pa11_dma_map_sg(struct pci_dev *dev, struct scatterlist *sglist, int 
 	    BUG();
 
 	for (i = 0; i < nents; i++, sglist++ ) {
-		sg_dma_address(sglist) = (dma_addr_t) virt_to_phys(sglist->address);
+		unsigned long vaddr = sg_virt_addr(sglist);
+		sg_dma_address(sglist) = (dma_addr_t) virt_to_phys(vaddr);
 		sg_dma_len(sglist) = sglist->length;
-		flush_kernel_dcache_range((unsigned long)sglist->address,
-				sglist->length);
+		flush_kernel_dcache_range(vaddr, sglist->length);
 	}
 	return nents;
 }
@@ -452,7 +446,7 @@ static void pa11_dma_unmap_sg(struct pci_dev *dev, struct scatterlist *sglist, i
 	/* once we do combining we'll need to use phys_to_virt(sg_dma_address(sglist)) */
 
 	for (i = 0; i < nents; i++, sglist++ )
-		flush_kernel_dcache_range((unsigned long) sglist->address, sglist->length);
+		flush_kernel_dcache_range(sg_virt_addr(sglist), sglist->length);
 	return;
 }
 
@@ -471,7 +465,7 @@ static void pa11_dma_sync_sg(struct pci_dev *dev, struct scatterlist *sglist, in
 	/* once we do combining we'll need to use phys_to_virt(sg_dma_address(sglist)) */
 
 	for (i = 0; i < nents; i++, sglist++ )
-		flush_kernel_dcache_range((unsigned long) sglist->address, sglist->length);
+		flush_kernel_dcache_range(sg_virt_addr(sglist), sglist->length);
 }
 
 struct pci_dma_ops pcxl_dma_ops = {
@@ -510,7 +504,6 @@ struct pci_dma_ops pcx_dma_ops = {
 	pa11_dma_sync_sg			/* dma_sync_sg */
 };
 
-struct pci_dma_ops *hppa_dma_ops;
 
 static int pcxl_proc_info(char *buf, char **start, off_t offset, int len)
 {

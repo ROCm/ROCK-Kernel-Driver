@@ -22,7 +22,7 @@
 
 unsigned int pci_probe = PCI_PROBE_CONF1 | PCI_PROBE_CONF2;
 
-int pcibios_last_bus = 0xfe; /* XXX */
+int pcibios_last_bus = 0xff; /* XXX */
 struct pci_bus *pci_root_bus = NULL;
 struct pci_ops *pci_root_ops = NULL;
 

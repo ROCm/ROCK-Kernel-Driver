@@ -1,0 +1,218 @@
+#
+# ACPI Configuration
+#
+
+menu "ACPI Support"
+
+config ACPI
+	bool "ACPI Support" if X86
+	default y if IA64 && (!IA64_HP_SIM || IA64_SGI_SN)
+	---help---
+	  Advanced Configuration and Power Interface (ACPI) support for 
+	  Linux requires an ACPI compliant platform (hardware/firmware),
+	  and assumes the presence of OS-directed configuration and power
+	  management (OSPM) software.  This option will enlarge your 
+	  kernel by about 70K.
+
+	  Linux ACPI provides a robust functional replacement for several 
+	  legacy configuration and power management intefaces, including 
+	  the Plug-and-Play BIOS specification (PnP BIOS), the 
+	  MultiProcessor Specification (MPS), and the Advanced Power 
+	  Management (APM) specification.  If both ACPI and APM support 
+	  are configured, whichever is loaded first shall be used.
+
+	  The ACPI SourceForge project contains the latest source code, 
+	  documentation, tools, mailing list subscription, and other 
+	  information.  This project is available at:
+	  <http://sourceforge.net/projects/acpi>
+
+	  Linux support for ACPI is based on Intel Corporation's ACPI
+	  Component Architecture (ACPI CA).  For more information see:
+	  <http://developer.intel.com/technology/iapc/acpi>
+
+	  ACPI is an open industry specification co-developed by Compaq, 
+	  Intel, Microsoft, Phoenix, and Toshiba.  The specification is 
+	  available at:
+	  <http://www.acpi.info>
+
+config ACPI_HT_ONLY
+	bool "CPU Enumeration Only"
+	depends on X86 && ACPI && X86_LOCAL_APIC
+	---help---
+	  This option enables limited ACPI support -- just enough to 
+	  enumerate processors from the ACPI Multiple APIC Description 
+	  Table (MADT).  Note that ACPI supports both logical (e.g. Hyper-
+	  Threading) and physical processors, where the MultiProcessor 
+	  Specification (MPS) table only supports physical processors.
+
+	  Full ACPI support (CONFIG_ACPI) is preferred.  Use this option 
+	  only if you wish to limit ACPI's role to processor enumeration.
+
+	  There is no command-line option to disable this, but the kernel
+	  will fall back to the MPS table if the MADT is not present.
+
+config ACPI_BOOT
+	bool
+	depends on IA64 && (!IA64_HP_SIM || IA64_SGI_SN) || X86 && ACPI && !ACPI_HT_ONLY || X86 && ACPI
+	default y
+
+config ACPI_SLEEP
+	bool "Sleep States"
+	depends on X86 && ACPI && !ACPI_HT_ONLY
+	default SOFTWARE_SUSPEND
+	---help---
+	  This option adds support for ACPI suspend states. 
+
+	  With this option, you will be able to put the system "to sleep". 
+	  Sleep states are low power states for the system and devices. All
+	  of the system operating state is saved to either memory or disk
+	  (depending on the state), to allow the system to resume operation
+	  quickly at your request.
+
+	  Although this option sounds really nifty, barely any of the device
+	  drivers have been converted to the new driver model and hence few
+	  have proper power management support. 
+
+	  This option is not recommended for anyone except those doing driver
+	  power management development.
+
+config ACPI_AC
+	tristate "AC Adapter"
+	depends on X86 && ACPI && !ACPI_HT_ONLY
+	help
+	  This driver adds support for the AC Adapter object, which indicates
+	  whether a system is on AC, or not.  Typically, only mobile systems 
+	  have this object, since desktops are always on AC.
+
+config ACPI_BATTERY
+	tristate "Battery"
+	depends on X86 && ACPI && !ACPI_HT_ONLY
+	help
+	  This driver adds support for battery information through
+	  /proc/acpi/battery. If you have a mobile system with a battery, 
+	  say Y.
+
+config ACPI_BUTTON
+	tristate "Button"
+	depends on IA64 && !IA64_HP_SIM || X86 && ACPI && !ACPI_HT_ONLY
+	help
+	  This driver registers for events based on buttons, such as the
+	  power, sleep, and lid switch.  In the future, a daemon will read
+	  /proc/acpi/event and perform user-defined actions such as shutting
+	  down the system.  Until then, you can cat it, and see output when
+	  a button is pressed.
+
+config ACPI_FAN
+	tristate "Fan"
+	depends on IA64 && !IA64_HP_SIM || X86 && ACPI && !ACPI_HT_ONLY
+	help
+	  This driver adds support for ACPI fan devices, allowing user-mode 
+	  applications to perform basic fan control (on, off, status).
+
+config ACPI_PROCESSOR
+	tristate "Processor"
+	depends on IA64 && !IA64_HP_SIM || X86 && ACPI && !ACPI_HT_ONLY
+	help
+	  This driver installs ACPI as the idle handler for Linux, and uses
+	  ACPI C2 and C3 processor states to save power, on systems that
+	  support it.
+
+config ACPI_PROCESSOR_PERF
+	bool "Processor Performance States"
+	depends on X86 && ACPI && !ACPI_HT_ONLY && ACPI_PROCESSOR && CPU_FREQ
+	help
+	  This driver adds support for CPU frequency scaling, if this is supported
+	  by the hardware and the BIOS. If you are compiling for a mobile system,
+	  say Y.
+
+config ACPI_THERMAL
+	tristate "Thermal Zone"
+	depends on ACPI_PROCESSOR
+	help
+	  This driver adds support for ACPI thermal zones.  Most mobile and
+	  some desktop systems support ACPI thermal zones.  It is HIGHLY
+	  recommended that this option be enabled, as your processor(s)
+	  may be damaged without it.
+
+config ACPI_NUMA
+	bool "NUMA support" if NUMA && (IA64 && !IA64_HP_SIM || X86 && ACPI && !ACPI_HT_ONLY)
+	default y if IA64 && IA64_SGI_SN
+
+config ACPI_TOSHIBA
+	tristate "Toshiba Laptop Extras"
+	depends on X86 && ACPI && !ACPI_HT_ONLY
+	---help---
+	  This driver adds support for access to certain system settings
+	  on "legacy free" Toshiba laptops.  These laptops can be recognized by
+	  their lack of a BIOS setup menu and APM support.
+
+	  On these machines, all system configuration is handled through the
+	  ACPI.  This driver is required for access to controls not covered
+	  by the general ACPI drivers, such as LCD brightness, video output,
+	  etc.
+
+	  This driver differs from the non-ACPI Toshiba laptop driver (located
+	  under "Processor type and features") in several aspects.
+	  Configuration is accessed by reading and writing text files in the
+	  /proc tree instead of by program interface to /dev.  Furthermore, no
+	  power management functions are exposed, as those are handled by the
+	  general ACPI drivers.
+
+	  More information about this driver is available at
+	  <http://memebeam.org/toys/ToshibaAcpiDriver>.
+
+	  If you have a legacy free Toshiba laptop (such as the Libretto L1
+	  series), say Y.
+
+config ACPI_DEBUG
+	bool "Debug Statements"
+	depends on IA64 && !IA64_HP_SIM || X86 && ACPI && !ACPI_HT_ONLY
+	help
+	  The ACPI driver can optionally report errors with a great deal
+	  of verbosity. Saying Y enables these statements. This will increase
+	  your kernel size by around 50K.
+
+config ACPI_BUS
+	bool
+	depends on IA64 && !IA64_HP_SIM || X86 && ACPI && !ACPI_HT_ONLY
+	default y
+
+config ACPI_INTERPRETER
+	bool
+	depends on IA64 && !IA64_HP_SIM || X86 && ACPI && !ACPI_HT_ONLY
+	default y
+
+config ACPI_EC
+	bool
+	depends on X86 && ACPI && !ACPI_HT_ONLY
+	default y
+	help
+	  This driver is required on some systems for the proper operation of
+	  the battery and thermal drivers.  If you are compiling for a 
+	  mobile system, say Y.
+
+config ACPI_POWER
+	bool
+	depends on IA64 && !IA64_HP_SIM || X86 && ACPI && !ACPI_HT_ONLY
+	default y
+
+config ACPI_PCI
+	bool
+	depends on IA64 && !IA64_HP_SIM || X86 && ACPI && !ACPI_HT_ONLY
+	default PCI
+
+config ACPI_SYSTEM
+	bool
+	depends on IA64 && !IA64_HP_SIM || X86 && ACPI && !ACPI_HT_ONLY
+	default y
+	help
+	  This driver will enable your system to shut down using ACPI, and
+	  dump your ACPI DSDT table using /proc/acpi/dsdt.
+
+config ACPI_EFI
+	bool
+	depends on IA64 && (!IA64_HP_SIM || IA64_SGI_SN)
+	default y
+
+endmenu
+

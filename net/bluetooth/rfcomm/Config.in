@@ -1,7 +1,0 @@
-
-dep_tristate 'RFCOMM protocol support' CONFIG_BT_RFCOMM $CONFIG_BT_L2CAP
-
-if [ "$CONFIG_BT_RFCOMM" != "n" ]; then
-   bool '  RFCOMM TTY support' CONFIG_BT_RFCOMM_TTY
-fi
-

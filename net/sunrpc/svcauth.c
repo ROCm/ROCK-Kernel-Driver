@@ -40,8 +40,7 @@ svc_authenticate(struct svc_rqst *rqstp, u32 *statp, u32 *authp, int proc)
 	*statp = rpc_success;
 	*authp = rpc_auth_ok;
 
-	svc_getu32(&rqstp->rq_argbuf, flavor);
-	flavor = ntohl(flavor);
+	flavor = ntohl(svc_getu32(&rqstp->rq_arg.head[0]));
 
 	dprintk("svc: svc_authenticate (%d)\n", flavor);
 	if (flavor >= RPC_AUTH_MAXFLAVOR || !(aops = authtab[flavor])) {

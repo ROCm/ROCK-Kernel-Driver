@@ -1,0 +1,11 @@
+# ALSA PowerMac drivers
+
+menu "ALSA PowerMac devices"
+	depends on SND!=n && PPC
+
+config SND_POWERMAC
+	tristate "PowerMac (AWACS, DACA, Burgundy, Tumbler, Keywest)"
+	depends on SND
+
+endmenu
+

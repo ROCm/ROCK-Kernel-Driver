@@ -48,16 +48,7 @@
  * Callback function for readdir
  */
 struct readdir_cd {
-	struct svc_rqst *	rqstp;
-	struct svc_fh *		dirfh;
-	u32 *			buffer;
-	int			buflen;
-	u32 *			offset;		/* previous dirent->d_next */
-	char			plus;		/* readdirplus */
-	char			eob;		/* end of buffer */
-	char			dotonly;
-	int			nfserr;		/* v4 only */
-	u32			bmval[2];	/* v4 only */
+	int			err;	/* 0, nfserr, or nfserr_eof */
 };
 typedef int		(*encode_dent_fn)(struct readdir_cd *, const char *,
 						int, loff_t, ino_t, unsigned int);
@@ -97,9 +88,9 @@ int		nfsd_open(struct svc_rqst *, struct svc_fh *, int,
 				int, struct file *);
 void		nfsd_close(struct file *);
 int		nfsd_read(struct svc_rqst *, struct svc_fh *,
-				loff_t, char *, unsigned long *);
+				loff_t, struct iovec *,int, unsigned long *);
 int		nfsd_write(struct svc_rqst *, struct svc_fh *,
-				loff_t, char *, unsigned long, int *);
+				loff_t, struct iovec *,int, unsigned long, int *);
 int		nfsd_readlink(struct svc_rqst *, struct svc_fh *,
 				char *, int *);
 int		nfsd_symlink(struct svc_rqst *, struct svc_fh *,
@@ -117,9 +108,7 @@ int		nfsd_unlink(struct svc_rqst *, struct svc_fh *, int type,
 int		nfsd_truncate(struct svc_rqst *, struct svc_fh *,
 				unsigned long size);
 int		nfsd_readdir(struct svc_rqst *, struct svc_fh *,
-				loff_t, encode_dent_fn,
-				u32 *buffer, int *countp, u32 *verf,
-				u32 *bmval);
+			     loff_t *, struct readdir_cd *, encode_dent_fn);
 int		nfsd_statfs(struct svc_rqst *, struct svc_fh *,
 				struct statfs *);
 
@@ -180,10 +169,13 @@ void		nfsd_lockd_shutdown(void);
 #define	nfserr_readdir_nospc	__constant_htonl(NFSERR_READDIR_NOSPC)
 #define	nfserr_bad_xdr		__constant_htonl(NFSERR_BAD_XDR)
 
-/* error code for internal use - if a request fails due to
- * kmalloc failure, it gets dropped.  Client should resend eventually
+/* error codes for internal use */
+/* if a request fails due to kmalloc failure, it gets dropped.
+ *  Client should resend eventually
  */
 #define	nfserr_dropit		__constant_htonl(30000)
+/* end-of-file indicator in readdir */
+#define	nfserr_eof		__constant_htonl(30001)
 
 /* Check for dir entries '.' and '..' */
 #define isdotent(n, l)	(l < 3 && n[0] == '.' && (l == 1 || n[1] == '.'))

@@ -1,0 +1,41 @@
+# drivers/mtd/nand/Config.in
+# $Id: Config.in,v 1.4 2001/09/19 09:35:23 dwmw2 Exp $
+
+menu "NAND Flash Device Drivers"
+	depends on MTD!=n
+
+config MTD_NAND
+	tristate "NAND Device Support"
+	depends on MTD
+	help
+	  This enables support for accessing all type of NAND flash
+	  devices.
+
+config MTD_NAND_ECC
+	bool "Enable ECC correction algorithm"
+	depends on MTD_NAND
+	help
+	  This enables software-based ECC for use with NAND flash chips. It
+	  can detect and correct 1 bit errors per 256 byte blocks. This
+	  should be used to increase the reliability of the data stored and
+	  read on the device.
+
+config MTD_NAND_VERIFY_WRITE
+	bool "Verify NAND page writes"
+	depends on MTD_NAND
+	help
+	  This adds an extra check when data is written to the flash. The
+	  NAND flash device internally checks only bits transitioning
+	  from 1 to 0. There is a rare possibility that even though the
+	  device thinks the write was successful, a bit could have been
+	  flipped accidentaly due to device wear, gamma rays, whatever.
+	  Enable this if you are really paranoid.
+
+config MTD_NAND_SPIA
+	tristate "NAND Flash device on SPIA board"
+	depends on ARM && ARCH_P720T && MTD_NAND
+	help
+	  If you had to ask, you don't have one. Say 'N'.
+
+endmenu
+

@@ -25,6 +25,8 @@
 #include <asm/mpspec.h>
 #include <asm/nmi.h>
 
+extern void default_do_nmi(struct pt_regs *);
+
 unsigned int nmi_watchdog = NMI_LOCAL_APIC;
 static unsigned int nmi_hz = HZ;
 unsigned int nmi_perfctr_msr;	/* the MSR to reset in NMI handler */

@@ -1,0 +1,8 @@
+#
+# Misc strange devices
+#
+
+menu "Misc devices"
+
+endmenu
+

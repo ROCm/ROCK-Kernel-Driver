@@ -1,7 +1,0 @@
-
-dep_tristate '  DVB Core Support' CONFIG_DVB_CORE $CONFIG_DVB
-
-if [ "$CONFIG_DVB_CORE" != "n" ]; then
-  dep_bool       '  devfs only' CONFIG_DVB_DEVFS_ONLY $CONFIG_DVB_CORE $CONFIG_DEVFS_FS
-fi
-

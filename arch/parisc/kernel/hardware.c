@@ -5,7 +5,7 @@
  * 
  *    Based on the document "PA-RISC 1.1 I/O Firmware Architecture 
  *    Reference Specification", March 7, 1999, version 0.96.  This
- *    is available at ?.
+ *    is available at http://parisc-linux.org/documentation/
  *
  *    Copyright 1999 by Alex deVries <adevries@thepuffingroup.com>
  *    and copyright 1999 The Puffin Group Inc.
@@ -30,32 +30,15 @@
 #include <asm/hardware.h>
 #include <linux/stddef.h>
 #include <linux/kernel.h>
-
-#define HPHW_NUM_TYPES 3431
-
-static char * hw_type_name[16] = {
-	"Processor",
-	"Memory",
-	"B DMA",
-	"Obsolete",
-	"A DMA",
-	"A Direct",
-	"Obsolete",
-	"Bus Converter Port",
-	"HP CIO Adapter",
-	"Console",
-	"Foreign I/O Module",
-	"Bus Adapter",
-	"IOA (?)",
-	"Bus Bridge to Foreign Bus",
-	"HP Clothing: Fabric Component"
-};
+#include <linux/init.h>
 
 /*
- *	XXX	Could this be __init ??
+ *	HP PARISC Hardware Database
+ *	Access to this database is only possible during bootup
+ *	so don't reference this table after starting the init process
  */
  
-static struct hp_hardware hp_hardware_list[] = {
+static struct hp_hardware hp_hardware_list[] __initdata = {
 	{HPHW_NPROC,0x01,0x4,0x0,"Indigo (840, 930)"},
 	{HPHW_NPROC,0x8,0x4,0x01,"Firefox(825,925)"},
 	{HPHW_NPROC,0xA,0x4,0x01,"Top Gun (835,834,935,635)"},
@@ -169,9 +152,10 @@ static struct hp_hardware hp_hardware_list[] = {
 	{HPHW_NPROC,0x59A,0x4,0x91,"Unlisted but reserved"},
 	{HPHW_NPROC,0x59A,0x4,0x81,"Unlisted but reserved"},
 	{HPHW_NPROC,0x59B,0x4,0x81,"Raven U 160 (9000/780/C160)"},
+	{HPHW_NPROC,0x59C,0x4,0x81,"Raven U 180 (9000/780/C180)"},
 	{HPHW_NPROC,0x59D,0x4,0x81,"Raven U 200 (9000/780/C200)"},
 	{HPHW_NPROC,0x59E,0x4,0x91,"ThunderHawk T' 120"},
-	{HPHW_NPROC,0x59F,0x4,0x91,"Raven U 180+ (9000/780/\?\?\?\?)"},
+	{HPHW_NPROC,0x59F,0x4,0x91,"Raven U 180+ (9000/780)"},
 	{HPHW_NPROC,0x5A0,0x4,0x81,"UL 1w T120 1MB/1MB (841/D260,D360)"},
 	{HPHW_NPROC,0x5A1,0x4,0x91,"UL 2w T120 1MB/1MB (851/D260,D360)"},
 	{HPHW_NPROC,0x5A2,0x4,0x81,"UL 1w U160 512K/512K (861/D270,D370)"},
@@ -201,7 +185,7 @@ static struct hp_hardware hp_hardware_list[] = {
 	{HPHW_NPROC,0x5B8,0x4,0x91,"SPP2250 240 MHz"},
 	{HPHW_NPROC,0x5B9,0x4,0x81,"UL 1w U+/240 (350/550)"},
 	{HPHW_NPROC,0x5BA,0x4,0x91,"UL 2w U+/240 (350/550)"},
-	{HPHW_NPROC,0x5BB,0x4,0x81,"AllegroHigh W "},
+	{HPHW_NPROC,0x5BB,0x4,0x81,"AllegroHigh W"},
 	{HPHW_NPROC,0x5BC,0x4,0x91,"AllegroLow W"},
 	{HPHW_NPROC,0x5BD,0x4,0x91,"Forte W 2-way"},
 	{HPHW_NPROC,0x5BE,0x4,0x91,"Prelude W"},
@@ -212,12 +196,41 @@ static struct hp_hardware hp_hardware_list[] = {
 	{HPHW_NPROC,0x5C3,0x4,0x91,"Sonata 360"},
 	{HPHW_NPROC,0x5C4,0x4,0x91,"Rhapsody 440"},
 	{HPHW_NPROC,0x5C5,0x4,0x91,"Rhapsody 360"},
-	{HPHW_NPROC,0x5C6,0x4,0x91,"Raven W 360 (9000/780/\?\?\?\?)"},
+	{HPHW_NPROC,0x5C6,0x4,0x91,"Raven W 360 (9000/780)"},
 	{HPHW_NPROC,0x5C7,0x4,0x91,"Halfdome W 440"},
 	{HPHW_NPROC,0x5C8,0x4,0x81,"Lego 360 processor"},
 	{HPHW_NPROC,0x5C9,0x4,0x91,"Rhapsody DC- 440"},
 	{HPHW_NPROC,0x5CA,0x4,0x91,"Rhapsody DC- 360"},
 	{HPHW_NPROC,0x5CB,0x4,0x91,"Crescendo 440"},
+	{HPHW_NPROC,0x5CC,0x4,0x91,"Prelude W 440"},
+	{HPHW_NPROC,0x5CD,0x4,0x91,"SPP2600"},
+	{HPHW_NPROC,0x5CE,0x4,0x91,"M2600"},
+	{HPHW_NPROC,0x5CF,0x4,0x81,"Allegro W+"},
+	{HPHW_NPROC,0x5D0,0x4,0x81,"Kazoo W+"},
+	{HPHW_NPROC,0x5D1,0x4,0x91,"Forte W+ 2w"},
+	{HPHW_NPROC,0x5D2,0x4,0x91,"Forte W+ 4w"},
+	{HPHW_NPROC,0x5D3,0x4,0x91,"Prelude W+ 540"},
+	{HPHW_NPROC,0x5D4,0x4,0x91,"Duet W+"},
+	{HPHW_NPROC,0x5D5,0x4,0x91,"Crescendo 550"},
+	{HPHW_NPROC,0x5D6,0x4,0x81,"Crescendo DC- 440"},
+	{HPHW_NPROC,0x5D7,0x4,0x91,"Keystone W+"},
+	{HPHW_NPROC,0x5D8,0x4,0x91,"Rhapsody wave 2 W+ DC-"},
+	{HPHW_NPROC,0x5D9,0x4,0x91,"Rhapsody wave 2 W+"},
+	{HPHW_NPROC,0x5DA,0x4,0x91,"Marcato W+ DC-"},
+	{HPHW_NPROC,0x5DB,0x4,0x91,"Marcato W+"},
+	{HPHW_NPROC,0x5DC,0x4,0x91,"Allegro W2"},
+	{HPHW_NPROC,0x5DD,0x4,0x81,"Duet W2"},
+	{HPHW_NPROC,0x5DE,0x4,0x81,"Piccolo W+"},
+	{HPHW_NPROC,0x5DF,0x4,0x81,"Cantata W2"},
+	{HPHW_NPROC,0x5E0,0x4,0x91,"Cantata DC- W2"},
+	{HPHW_NPROC,0x5E1,0x4,0x91,"Crescendo DC- W2"},
+	{HPHW_NPROC,0x5E2,0x4,0x91,"Crescendo 650 W2"},
+	{HPHW_NPROC,0x5E3,0x4,0x91,"Crescendo 750 W2"},
+	{HPHW_NPROC,0x5E4,0x4,0x91,"Keystone/Matterhorn W2 750"},
+	{HPHW_NPROC,0x5E5,0x4,0x91,"PowerBar W+"},
+	{HPHW_NPROC,0x5E6,0x4,0x91,"Keystone/Matterhorn W2 650"},
+	{HPHW_NPROC,0x5E7,0x4,0x91,"Caribe W2 800"},
+	{HPHW_NPROC,0x5E8,0x4,0x91,"Pikes Peak W2"},
 	{HPHW_NPROC,0x5FF,0x4,0x91,"Hitachi W"},
 	{HPHW_NPROC,0x600,0x4,0x81,"Gecko (712/60)"},
 	{HPHW_NPROC,0x601,0x4,0x81,"Gecko 80 (712/80)"},
@@ -243,7 +256,7 @@ static struct hp_hardware hp_hardware_list[] = {
 	{HPHW_NPROC,0x616,0x4,0x81,"Piranha 120"},
 	{HPHW_NPROC,0x617,0x4,0x81,"Jason 50"},
 	{HPHW_NPROC,0x618,0x4,0x81,"Jason 100"},
-	{HPHW_NPROC,0x619,0x4,0x81,"Mirage 80 "},
+	{HPHW_NPROC,0x619,0x4,0x81,"Mirage 80"},
 	{HPHW_NPROC,0x61A,0x4,0x81,"SAIC L-80"},
 	{HPHW_NPROC,0x61B,0x4,0x81,"Rocky1 L-60"},
 	{HPHW_NPROC,0x61C,0x4,0x81,"Anole T (743/T)"},
@@ -311,6 +324,7 @@ static struct hp_hardware hp_hardware_list[] = {
 	{HPHW_A_DMA, 0x004, 0x00050, 0x80, "Lanbrusca 802.3 (36967A)"}, 
 	{HPHW_A_DMA, 0x004, 0x00056, 0x80, "HP-PB LoQuix FDDI"}, 
 	{HPHW_A_DMA, 0x004, 0x00057, 0x80, "HP-PB LoQuix FDDI (28670A)"}, 
+	{HPHW_A_DMA, 0x004, 0x0005E, 0x00, "Gecko Add-on Token Ring"}, 
 	{HPHW_A_DMA, 0x012, 0x00089, 0x80, "Barracuda Add-on FW-SCSI"}, 
 	{HPHW_A_DMA, 0x013, 0x00089, 0x80, "Bluefish Add-on FW-SCSI"}, 
 	{HPHW_A_DMA, 0x014, 0x00089, 0x80, "Shrike Add-on FW-SCSI"}, 
@@ -319,6 +333,7 @@ static struct hp_hardware hp_hardware_list[] = {
 	{HPHW_A_DMA, 0x01F, 0x00089, 0x80, "SkyHawk 100/120 FW-SCSI"}, 
 	{HPHW_A_DMA, 0x027, 0x00089, 0x80, "Piranha 100 FW-SCSI"}, 
 	{HPHW_A_DMA, 0x032, 0x00089, 0x80, "Raven T' Core FW-SCSI"}, 
+	{HPHW_A_DMA, 0x03b, 0x00089, 0x80, "Raven U/L2 Core FW-SCSI"}, 
 	{HPHW_A_DMA, 0x03d, 0x00089, 0x80, "Merlin 160 Core FW-SCSI"},
 	{HPHW_A_DMA, 0x044, 0x00089, 0x80, "Mohawk Core FW-SCSI"}, 
 	{HPHW_A_DMA, 0x051, 0x00089, 0x80, "Firehawk FW-SCSI"}, 
@@ -440,6 +455,8 @@ static struct hp_hardware hp_hardware_list[] = {
 	{HPHW_BA, 0x801, 0x00081, 0x0, "Hitachi Tiny 80 Core BA"}, 
 	{HPHW_BA, 0x004, 0x0008B, 0x0, "Anole Optional PCMCIA BA"}, 
 	{HPHW_BA, 0x004, 0x0008E, 0x0, "GSC ITR Wax BA"}, 
+	{HPHW_BA, 0x00C, 0x0008E, 0x0, "Gecko Optional Wax BA"}, 
+	{HPHW_BA, 0x010, 0x0008E, 0x0, "Pace Wax BA"}, 
 	{HPHW_BA, 0x011, 0x0008E, 0x0, "SuperPace Wax BA"}, 
 	{HPHW_BA, 0x012, 0x0008E, 0x0, "Mirage Jr Wax BA"}, 
 	{HPHW_BA, 0x013, 0x0008E, 0x0, "Mirage Wax BA"}, 
@@ -489,7 +506,7 @@ static struct hp_hardware hp_hardware_list[] = {
 	{HPHW_BA, 0x800, 0x00090, 0x0, "Hitachi Tiny 64 Wax EISA BA"}, 
 	{HPHW_BA, 0x801, 0x00090, 0x0, "Hitachi Tiny 80 Wax EISA BA"}, 
 	{HPHW_BA, 0x01A, 0x00093, 0x0, "Anole 64 TIMI BA"}, 
-	{HPHW_BA, 0x01B, 0x00093, 0x0, "Anole 64 TIMI BA"}, 
+	{HPHW_BA, 0x01B, 0x00093, 0x0, "Anole 100 TIMI BA"}, 
 	{HPHW_BA, 0x034, 0x00093, 0x0, "Anole T TIMI BA"}, 
 	{HPHW_BA, 0x04A, 0x00093, 0x0, "Anole L2 132 TIMI BA"}, 
 	{HPHW_BA, 0x04C, 0x00093, 0x0, "Anole L2 165 TIMI BA"}, 
@@ -551,6 +568,7 @@ static struct hp_hardware hp_hardware_list[] = {
 	{HPHW_CONSOLE, 0x01A, 0x0001F, 0x00, "Jason/Anole 64 Null Console"}, 
 	{HPHW_CONSOLE, 0x01B, 0x0001F, 0x00, "Jason/Anole 100 Null Console"}, 
 	{HPHW_FABRIC, 0x004, 0x000AA, 0x80, "Halfdome DNA Central Agent"}, 
+	{HPHW_FABRIC, 0x007, 0x000AA, 0x80, "Caribe DNA Central Agent"}, 
 	{HPHW_FABRIC, 0x004, 0x000AB, 0x00, "Halfdome TOGO Fabric Crossbar"}, 
 	{HPHW_FABRIC, 0x004, 0x000AC, 0x00, "Halfdome Sakura Fabric Router"}, 
 	{HPHW_FIO, 0x025, 0x0002E, 0x80, "Armyknife Optional X.25"}, 
@@ -588,14 +606,14 @@ static struct hp_hardware hp_hardware_list[] = {
 	{HPHW_FIO, 0x00D, 0x00072, 0x0, "Strider-33 Core LAN (802.3)"}, 
 	{HPHW_FIO, 0x00E, 0x00072, 0x0, "Trailways-50 Core LAN (802.3)"}, 
 	{HPHW_FIO, 0x00F, 0x00072, 0x0, "Trailways-33 Core LAN (802.3)"}, 
-	{HPHW_FIO, 0x010, 0x00072, 0x0, "Pace Core Lan (802.3)"}, 
-	{HPHW_FIO, 0x011, 0x00072, 0x0, "Sidewinder Core Lan (802.3)"}, 
+	{HPHW_FIO, 0x010, 0x00072, 0x0, "Pace Core LAN (802.3)"}, 
+	{HPHW_FIO, 0x011, 0x00072, 0x0, "Sidewinder Core LAN (802.3)"}, 
 	{HPHW_FIO, 0x019, 0x00072, 0x0, "Scorpio Sr. Core LAN (802.3)"}, 
 	{HPHW_FIO, 0x020, 0x00072, 0x0, "Scorpio 100 Core LAN (802.3)"}, 
 	{HPHW_FIO, 0x021, 0x00072, 0x0, "Spectra 50 Core LAN (802.3)"}, 
 	{HPHW_FIO, 0x022, 0x00072, 0x0, "Spectra 75 Core LAN (802.3)"}, 
 	{HPHW_FIO, 0x023, 0x00072, 0x0, "Spectra 100 Core LAN (802.3)"}, 
-	{HPHW_FIO, 0x024, 0x00072, 0x0, "Fast Pace Core Lan (802.3)"}, 
+	{HPHW_FIO, 0x024, 0x00072, 0x0, "Fast Pace Core LAN (802.3)"}, 
 	{HPHW_FIO, 0x026, 0x00072, 0x0, "CoralII Jaguar Core LAN (802.3)"}, 
 	{HPHW_FIO, 0x004, 0x00073, 0x0, "Cobra Core HIL"}, 
 	{HPHW_FIO, 0x005, 0x00073, 0x0, "Coral Core HIL"}, 
@@ -694,8 +712,8 @@ static struct hp_hardware hp_hardware_list[] = {
 	{HPHW_FIO, 0x04D, 0x00074, 0x0, "Anole L2 165 Core Centronics"}, 
 	{HPHW_FIO, 0x050, 0x00074, 0x0, "Merlin Jr 132 Core Centronics"}, 
 	{HPHW_FIO, 0x051, 0x00074, 0x0, "Firehawk Core Centronics"}, 
-	{HPHW_FIO, 0x056, 0x00074, 0x0, "Raven+ wSE FWSCSI Core Centronics"}, 
-	{HPHW_FIO, 0x057, 0x00074, 0x0, "Raven+ wDiff FWSCSI Core Centronics"}, 
+	{HPHW_FIO, 0x056, 0x00074, 0x0, "Raven+ w SE FWSCSI Core Centronics"}, 
+	{HPHW_FIO, 0x057, 0x00074, 0x0, "Raven+ w Diff FWSCSI Core Centronics"}, 
 	{HPHW_FIO, 0x058, 0x00074, 0x0, "FireHawk 200 Core Centronics"}, 
 	{HPHW_FIO, 0x05C, 0x00074, 0x0, "SummitHawk 230 Core Centronics"}, 
 	{HPHW_FIO, 0x800, 0x00074, 0x0, "Hitachi Tiny 64 Core Centronics"}, 
@@ -861,66 +879,66 @@ static struct hp_hardware hp_hardware_list[] = {
 	{HPHW_FIO, 0x02E, 0x00083, 0x0, "UL 350 Core PC Floppy"}, 
 	{HPHW_FIO, 0x02F, 0x00083, 0x0, "UL 550 Core PC Floppy"}, 
 	{HPHW_FIO, 0x032, 0x00083, 0x0, "Raven T' Core PC Floppy"}, 
-	{HPHW_FIO, 0x034, 0x00083, 0x0, "SAIC L-80 Core PC Floopy"}, 
-	{HPHW_FIO, 0x035, 0x00083, 0x0, "PCX-L2 712/132 Core Floopy"}, 
-	{HPHW_FIO, 0x036, 0x00083, 0x0, "PCX-L2 712/160 Core Floopy"}, 
-	{HPHW_FIO, 0x03B, 0x00083, 0x0, "Raven U/L2 Core PC Floopy"}, 
-	{HPHW_FIO, 0x03C, 0x00083, 0x0, "Merlin 132 Core PC Floopy"}, 
-	{HPHW_FIO, 0x03D, 0x00083, 0x0, "Merlin 160 Core PC Floopy"}, 
-	{HPHW_FIO, 0x03E, 0x00083, 0x0, "Merlin+ 132 Core PC Floopy"}, 
-	{HPHW_FIO, 0x03F, 0x00083, 0x0, "Merlin+ 180 Core PC Floopy"}, 
-	{HPHW_FIO, 0x045, 0x00083, 0x0, "Rocky1 Core PC Floopy"}, 
-	{HPHW_FIO, 0x046, 0x00083, 0x0, "Rocky2 120 Core PC Floopy"}, 
-	{HPHW_FIO, 0x047, 0x00083, 0x0, "Rocky2 150 Core PC Floopy"}, 
-	{HPHW_FIO, 0x04E, 0x00083, 0x0, "Kiji L2 132 Core PC Floopy"}, 
-	{HPHW_FIO, 0x050, 0x00083, 0x0, "Merlin Jr 132 Core PC Floopy"}, 
-	{HPHW_FIO, 0x056, 0x00083, 0x0, "Raven+ w SE FWSCSI Core PC Floopy"}, 
-	{HPHW_FIO, 0x057, 0x00083, 0x0, "Raven+ w Diff FWSCSI Core PC Floopy"}, 
-	{HPHW_FIO, 0x800, 0x00083, 0x0, "Hitachi Tiny 64 Core PC Floopy"}, 
-	{HPHW_FIO, 0x801, 0x00083, 0x0, "Hitachi Tiny 80 Core PC Floopy"}, 
-	{HPHW_FIO, 0x015, 0x00084, 0x0, "KittyHawk GSY Core PC Keyboard"}, 
-	{HPHW_FIO, 0x016, 0x00084, 0x0, "Gecko Core PC Keyboard"}, 
-	{HPHW_FIO, 0x018, 0x00084, 0x0, "Gecko Optional PC Keyboard"}, 
-	{HPHW_FIO, 0x01A, 0x00084, 0x0, "Anole 64 Core PC Keyboard"}, 
-	{HPHW_FIO, 0x01B, 0x00084, 0x0, "Anole 100 Core PC Keyboard"}, 
-	{HPHW_FIO, 0x01C, 0x00084, 0x0, "Gecko 80 Core PC Keyboard"}, 
-	{HPHW_FIO, 0x01D, 0x00084, 0x0, "Gecko 100 Core PC Keyboard"}, 
-	{HPHW_FIO, 0x01F, 0x00084, 0x0, "SkyHawk 100/120 Core PC Keyboard"}, 
-	{HPHW_FIO, 0x027, 0x00084, 0x0, "Piranha 100 Core PC Keyboard"}, 
-	{HPHW_FIO, 0x028, 0x00084, 0x0, "Mirage Jr Core PC Keyboard"}, 
-	{HPHW_FIO, 0x029, 0x00084, 0x0, "Mirage Core PC Keyboard"}, 
-	{HPHW_FIO, 0x02A, 0x00084, 0x0, "Electra Core PC Keyboard"}, 
-	{HPHW_FIO, 0x02B, 0x00084, 0x0, "Mirage 80 Core PC Keyboard"}, 
-	{HPHW_FIO, 0x02C, 0x00084, 0x0, "Mirage 100+ Core PC Keyboard"}, 
-	{HPHW_FIO, 0x02E, 0x00084, 0x0, "UL 350 Core PC Keyboard"}, 
-	{HPHW_FIO, 0x02F, 0x00084, 0x0, "UL 550 Core PC Keyboard"}, 
-	{HPHW_FIO, 0x032, 0x00084, 0x0, "Raven T' Core PC Keyboard"}, 
-	{HPHW_FIO, 0x033, 0x00084, 0x0, "Anole T Core PC Keyboard"}, 
-	{HPHW_FIO, 0x034, 0x00084, 0x0, "SAIC L-80 Core PC Keyboard"}, 
-	{HPHW_FIO, 0x035, 0x00084, 0x0, "PCX-L2 712/132 Core Keyboard"}, 
-	{HPHW_FIO, 0x036, 0x00084, 0x0, "PCX-L2 712/160 Core Keyboard"}, 
-	{HPHW_FIO, 0x03B, 0x00084, 0x0, "Raven U/L2 Core PC Keyboard"}, 
-	{HPHW_FIO, 0x03C, 0x00084, 0x0, "Merlin 132 Core PC Keyboard"}, 
-	{HPHW_FIO, 0x03D, 0x00084, 0x0, "Merlin 160 Core PC Keyboard"}, 
-	{HPHW_FIO, 0x03E, 0x00084, 0x0, "Merlin+ 132 Core PC Keyboard"}, 
-	{HPHW_FIO, 0x03F, 0x00084, 0x0, "Merlin+ 180 Core PC Keyboard"}, 
-	{HPHW_FIO, 0x044, 0x00084, 0x0, "Mohawk Core PC Keyboard"}, 
-	{HPHW_FIO, 0x045, 0x00084, 0x0, "Rocky1 Core PC Keyboard"}, 
-	{HPHW_FIO, 0x046, 0x00084, 0x0, "Rocky2 120 Core PC Keyboard"}, 
-	{HPHW_FIO, 0x047, 0x00084, 0x0, "Rocky2 150 Core PC Keyboard"}, 
-	{HPHW_FIO, 0x048, 0x00084, 0x0, "Rocky2 120 Dino PC Keyboard"}, 
-	{HPHW_FIO, 0x049, 0x00084, 0x0, "Rocky2 150 Dino PC Keyboard"}, 
-	{HPHW_FIO, 0x04B, 0x00084, 0x0, "Anole L2 132 Core PC Keyboard"}, 
-	{HPHW_FIO, 0x04D, 0x00084, 0x0, "Anole L2 165 Core PC Keyboard"}, 
-	{HPHW_FIO, 0x04E, 0x00084, 0x0, "Kiji L2 132 Core PC Keyboard"}, 
-	{HPHW_FIO, 0x050, 0x00084, 0x0, "Merlin Jr 132 Core PC Keyboard"}, 
-	{HPHW_FIO, 0x051, 0x00084, 0x0, "Firehawk Core PC Keyboard"}, 
-	{HPHW_FIO, 0x056, 0x00084, 0x0, "Raven+ w SE FWSCSI Core PC Keyboard"}, 
-	{HPHW_FIO, 0x057, 0x00084, 0x0, "Raven+ w Diff FWSCSI Core PC Keyboard"}, 
-	{HPHW_FIO, 0x058, 0x00084, 0x0, "FireHawk 200 Core PC Keyboard"}, 
-	{HPHW_FIO, 0x05C, 0x00084, 0x0, "SummitHawk 230 Core PC Keyboard"}, 
-	{HPHW_FIO, 0x800, 0x00084, 0x0, "Hitachi Tiny 64 Core PC Keyboard"}, 
-	{HPHW_FIO, 0x801, 0x00084, 0x0, "Hitachi Tiny 80 Core PC Keyboard"}, 
+	{HPHW_FIO, 0x034, 0x00083, 0x0, "SAIC L-80 Core PC Floppy"}, 
+	{HPHW_FIO, 0x035, 0x00083, 0x0, "PCX-L2 712/132 Core Floppy"}, 
+	{HPHW_FIO, 0x036, 0x00083, 0x0, "PCX-L2 712/160 Core Floppy"}, 
+	{HPHW_FIO, 0x03B, 0x00083, 0x0, "Raven U/L2 Core PC Floppy"}, 
+	{HPHW_FIO, 0x03C, 0x00083, 0x0, "Merlin 132 Core PC Floppy"}, 
+	{HPHW_FIO, 0x03D, 0x00083, 0x0, "Merlin 160 Core PC Floppy"}, 
+	{HPHW_FIO, 0x03E, 0x00083, 0x0, "Merlin+ 132 Core PC Floppy"}, 
+	{HPHW_FIO, 0x03F, 0x00083, 0x0, "Merlin+ 180 Core PC Floppy"}, 
+	{HPHW_FIO, 0x045, 0x00083, 0x0, "Rocky1 Core PC Floppy"}, 
+	{HPHW_FIO, 0x046, 0x00083, 0x0, "Rocky2 120 Core PC Floppy"}, 
+	{HPHW_FIO, 0x047, 0x00083, 0x0, "Rocky2 150 Core PC Floppy"}, 
+	{HPHW_FIO, 0x04E, 0x00083, 0x0, "Kiji L2 132 Core PC Floppy"}, 
+	{HPHW_FIO, 0x050, 0x00083, 0x0, "Merlin Jr 132 Core PC Floppy"}, 
+	{HPHW_FIO, 0x056, 0x00083, 0x0, "Raven+ w SE FWSCSI Core PC Floppy"}, 
+	{HPHW_FIO, 0x057, 0x00083, 0x0, "Raven+ w Diff FWSCSI Core PC Floppy"}, 
+	{HPHW_FIO, 0x800, 0x00083, 0x0, "Hitachi Tiny 64 Core PC Floppy"}, 
+	{HPHW_FIO, 0x801, 0x00083, 0x0, "Hitachi Tiny 80 Core PC Floppy"},
+	{HPHW_FIO, 0x015, 0x00084, 0x0, "KittyHawk GSY Core PS/2 Port"}, 
+	{HPHW_FIO, 0x016, 0x00084, 0x0, "Gecko Core PS/2 Port"}, 
+	{HPHW_FIO, 0x018, 0x00084, 0x0, "Gecko Optional PS/2 Port"}, 
+	{HPHW_FIO, 0x01A, 0x00084, 0x0, "Anole 64 Core PS/2 Port"}, 
+	{HPHW_FIO, 0x01B, 0x00084, 0x0, "Anole 100 Core PS/2 Port"}, 
+	{HPHW_FIO, 0x01C, 0x00084, 0x0, "Gecko 80 Core PS/2 Port"}, 
+	{HPHW_FIO, 0x01D, 0x00084, 0x0, "Gecko 100 Core PS/2 Port"}, 
+	{HPHW_FIO, 0x01F, 0x00084, 0x0, "SkyHawk 100/120 Core PS/2 Port"}, 
+	{HPHW_FIO, 0x027, 0x00084, 0x0, "Piranha 100 Core PS/2 Port"}, 
+	{HPHW_FIO, 0x028, 0x00084, 0x0, "Mirage Jr Core PS/2 Port"}, 
+	{HPHW_FIO, 0x029, 0x00084, 0x0, "Mirage Core PS/2 Port"}, 
+	{HPHW_FIO, 0x02A, 0x00084, 0x0, "Electra Core PS/2 Port"}, 
+	{HPHW_FIO, 0x02B, 0x00084, 0x0, "Mirage 80 Core PS/2 Port"}, 
+	{HPHW_FIO, 0x02C, 0x00084, 0x0, "Mirage 100+ Core PS/2 Port"}, 
+	{HPHW_FIO, 0x02E, 0x00084, 0x0, "UL 350 Core PS/2 Port"}, 
+	{HPHW_FIO, 0x02F, 0x00084, 0x0, "UL 550 Core PS/2 Port"}, 
+	{HPHW_FIO, 0x032, 0x00084, 0x0, "Raven T' Core PS/2 Port"}, 
+	{HPHW_FIO, 0x033, 0x00084, 0x0, "Anole T Core PS/2 Port"}, 
+	{HPHW_FIO, 0x034, 0x00084, 0x0, "SAIC L-80 Core PS/2 Port"}, 
+	{HPHW_FIO, 0x035, 0x00084, 0x0, "PCX-L2 712/132 Core PS/2 Port"}, 
+	{HPHW_FIO, 0x036, 0x00084, 0x0, "PCX-L2 712/160 Core PS/2 Port"}, 
+	{HPHW_FIO, 0x03B, 0x00084, 0x0, "Raven U/L2 Core PS/2 Port"}, 
+	{HPHW_FIO, 0x03C, 0x00084, 0x0, "Merlin 132 Core PS/2 Port"}, 
+	{HPHW_FIO, 0x03D, 0x00084, 0x0, "Merlin 160 Core PS/2 Port"}, 
+	{HPHW_FIO, 0x03E, 0x00084, 0x0, "Merlin+ 132 Core PS/2 Port"}, 
+	{HPHW_FIO, 0x03F, 0x00084, 0x0, "Merlin+ 180 Core PS/2 Port"}, 
+	{HPHW_FIO, 0x044, 0x00084, 0x0, "Mohawk Core PS/2 Port"}, 
+	{HPHW_FIO, 0x045, 0x00084, 0x0, "Rocky1 Core PS/2 Port"}, 
+	{HPHW_FIO, 0x046, 0x00084, 0x0, "Rocky2 120 Core PS/2 Port"}, 
+	{HPHW_FIO, 0x047, 0x00084, 0x0, "Rocky2 150 Core PS/2 Port"}, 
+	{HPHW_FIO, 0x048, 0x00084, 0x0, "Rocky2 120 Dino PS/2 Port"}, 
+	{HPHW_FIO, 0x049, 0x00084, 0x0, "Rocky2 150 Dino PS/2 Port"}, 
+	{HPHW_FIO, 0x04B, 0x00084, 0x0, "Anole L2 132 Core PS/2 Port"}, 
+	{HPHW_FIO, 0x04D, 0x00084, 0x0, "Anole L2 165 Core PS/2 Port"}, 
+	{HPHW_FIO, 0x04E, 0x00084, 0x0, "Kiji L2 132 Core PS/2 Port"}, 
+	{HPHW_FIO, 0x050, 0x00084, 0x0, "Merlin Jr 132 Core PS/2 Port"}, 
+	{HPHW_FIO, 0x051, 0x00084, 0x0, "Firehawk Core PS/2 Port"}, 
+	{HPHW_FIO, 0x056, 0x00084, 0x0, "Raven+ w SE FWSCSI Core PS/2 Port"}, 
+	{HPHW_FIO, 0x057, 0x00084, 0x0, "Raven+ w Diff FWSCSI Core PS/2 Port"}, 
+	{HPHW_FIO, 0x058, 0x00084, 0x0, "FireHawk 200 Core PS/2 Port"}, 
+	{HPHW_FIO, 0x05C, 0x00084, 0x0, "SummitHawk 230 Core PS/2 Port"}, 
+	{HPHW_FIO, 0x800, 0x00084, 0x0, "Hitachi Tiny 64 Core PS/2 Port"}, 
+	{HPHW_FIO, 0x801, 0x00084, 0x0, "Hitachi Tiny 80 Core PS/2 Port"}, 
 	{HPHW_FIO, 0x004, 0x00085, 0x0, "Solo GSC Optional Graphics"}, 
 	{HPHW_FIO, 0x005, 0x00085, 0x0, "Duet GSC Optional Graphics"}, 
 	{HPHW_FIO, 0x008, 0x00085, 0x0, "Anole Artist Optional Graphics"}, 
@@ -969,18 +987,17 @@ static struct hp_hardware hp_hardware_list[] = {
 	{HPHW_FIO, 0x034, 0x00088, 0x0, "Anole T VME Networking"}, 
 	{HPHW_FIO, 0x04A, 0x00088, 0x0, "Anole L2 132 VME Networking"}, 
 	{HPHW_FIO, 0x04C, 0x00088, 0x0, "Anole L2 165 VME Networking"}, 
-	{HPHW_FIO, 0x03B, 0x00089, 0x0, "Raven U/L2 Core FW-SCSI"}, 
-	{HPHW_FIO, 0x011, 0x0008A, 0x0, "WB-96 Core Lan (802.3)"}, 
-	{HPHW_FIO, 0x012, 0x0008A, 0x0, "Orville Core Lan (802.3)"}, 
-	{HPHW_FIO, 0x013, 0x0008A, 0x0, "Wilbur Core Lan (802.3)"}, 
-	{HPHW_FIO, 0x014, 0x0008A, 0x0, "WB-80 Core Lan (802.3)"}, 
-	{HPHW_FIO, 0x015, 0x0008A, 0x0, "KittyHawk GSY Core Lan (802.3)"}, 
-	{HPHW_FIO, 0x016, 0x0008A, 0x0, "Gecko Core Lan (802.3)"}, 
-	{HPHW_FIO, 0x018, 0x0008A, 0x0, "Gecko Optional Lan (802.3)"}, 
-	{HPHW_FIO, 0x01A, 0x0008A, 0x0, "Anole 64 Core Lan (802.3)"}, 
-	{HPHW_FIO, 0x01B, 0x0008A, 0x0, "Anole 100 Core Lan (802.3)"}, 
-	{HPHW_FIO, 0x01C, 0x0008A, 0x0, "Gecko 80 Core Lan (802.3)"}, 
-	{HPHW_FIO, 0x01D, 0x0008A, 0x0, "Gecko 100 Core Lan (802.3)"}, 
+	{HPHW_FIO, 0x011, 0x0008A, 0x0, "WB-96 Core LAN (802.3)"}, 
+	{HPHW_FIO, 0x012, 0x0008A, 0x0, "Orville Core LAN (802.3)"}, 
+	{HPHW_FIO, 0x013, 0x0008A, 0x0, "Wilbur Core LAN (802.3)"}, 
+	{HPHW_FIO, 0x014, 0x0008A, 0x0, "WB-80 Core LAN (802.3)"}, 
+	{HPHW_FIO, 0x015, 0x0008A, 0x0, "KittyHawk GSY Core LAN (802.3)"}, 
+	{HPHW_FIO, 0x016, 0x0008A, 0x0, "Gecko Core LAN (802.3)"}, 
+	{HPHW_FIO, 0x018, 0x0008A, 0x0, "Gecko Optional LAN (802.3)"}, 
+	{HPHW_FIO, 0x01A, 0x0008A, 0x0, "Anole 64 Core LAN (802.3)"}, 
+	{HPHW_FIO, 0x01B, 0x0008A, 0x0, "Anole 100 Core LAN (802.3)"}, 
+	{HPHW_FIO, 0x01C, 0x0008A, 0x0, "Gecko 80 Core LAN (802.3)"}, 
+	{HPHW_FIO, 0x01D, 0x0008A, 0x0, "Gecko 100 Core LAN (802.3)"}, 
 	{HPHW_FIO, 0x01F, 0x0008A, 0x0, "SkyHawk 100/120 Core LAN (802.3)"}, 
 	{HPHW_FIO, 0x027, 0x0008A, 0x0, "Piranha 100 Core LAN (802.3)"}, 
 	{HPHW_FIO, 0x028, 0x0008A, 0x0, "Mirage Jr Core LAN (802.3)"}, 
@@ -991,24 +1008,24 @@ static struct hp_hardware hp_hardware_list[] = {
 	{HPHW_FIO, 0x02E, 0x0008A, 0x0, "UL 350 Core LAN (802.3)"}, 
 	{HPHW_FIO, 0x02F, 0x0008A, 0x0, "UL 350 Core LAN (802.3)"}, 
 	{HPHW_FIO, 0x032, 0x0008A, 0x0, "Raven T' Core LAN (802.3)"}, 
-	{HPHW_FIO, 0x033, 0x0008A, 0x0, "Anole T Core Lan (802.3)"}, 
-	{HPHW_FIO, 0x034, 0x0008A, 0x0, "SAIC L-80 Core Lan (802.3)"}, 
-	{HPHW_FIO, 0x035, 0x0008A, 0x0, "PCX-L2 712/132 Core Lan (802.3)"}, 
-	{HPHW_FIO, 0x036, 0x0008A, 0x0, "PCX-L2 712/160 Core Lan (802.3)"}, 
-	{HPHW_FIO, 0x03B, 0x0008A, 0x0, "Raven U/L2 Core Lan (802.3)"}, 
-	{HPHW_FIO, 0x03C, 0x0008A, 0x0, "Merlin 132 Core Lan (802.3)"}, 
-	{HPHW_FIO, 0x03D, 0x0008A, 0x0, "Merlin 160 Core Lan (802.3)"}, 
-	{HPHW_FIO, 0x044, 0x0008A, 0x0, "Mohawk Core Lan (802.3)"}, 
+	{HPHW_FIO, 0x033, 0x0008A, 0x0, "Anole T Core LAN (802.3)"}, 
+	{HPHW_FIO, 0x034, 0x0008A, 0x0, "SAIC L-80 Core LAN (802.3)"}, 
+	{HPHW_FIO, 0x035, 0x0008A, 0x0, "PCX-L2 712/132 Core LAN (802.3)"}, 
+	{HPHW_FIO, 0x036, 0x0008A, 0x0, "PCX-L2 712/160 Core LAN (802.3)"}, 
+	{HPHW_FIO, 0x03B, 0x0008A, 0x0, "Raven U/L2 Core LAN (802.3)"}, 
+	{HPHW_FIO, 0x03C, 0x0008A, 0x0, "Merlin 132 Core LAN (802.3)"}, 
+	{HPHW_FIO, 0x03D, 0x0008A, 0x0, "Merlin 160 Core LAN (802.3)"}, 
+	{HPHW_FIO, 0x044, 0x0008A, 0x0, "Mohawk Core LAN (802.3)"}, 
 	{HPHW_FIO, 0x045, 0x0008A, 0x0, "Rocky1 Core LAN (802.3)"}, 
 	{HPHW_FIO, 0x046, 0x0008A, 0x0, "Rocky2 120 Core LAN (802.3)"}, 
 	{HPHW_FIO, 0x047, 0x0008A, 0x0, "Rocky2 150 Core LAN (802.3)"}, 
 	{HPHW_FIO, 0x04B, 0x0008A, 0x0, "Anole L2 132 Core LAN (802.3)"}, 
 	{HPHW_FIO, 0x04D, 0x0008A, 0x0, "Anole L2 165 Core LAN (802.3)"}, 
 	{HPHW_FIO, 0x04E, 0x0008A, 0x0, "Kiji L2 132 Core LAN (802.3)"}, 
-	{HPHW_FIO, 0x050, 0x0008A, 0x0, "Merlin Jr 132 Core Lan (802.3)"}, 
+	{HPHW_FIO, 0x050, 0x0008A, 0x0, "Merlin Jr 132 Core LAN (802.3)"}, 
 	{HPHW_FIO, 0x058, 0x0008A, 0x0, "FireHawk 200 Core LAN (802.3)"}, 
-	{HPHW_FIO, 0x800, 0x0008A, 0x0, "Hitachi Tiny 64 Core Lan (802.3)"}, 
-	{HPHW_FIO, 0x801, 0x0008A, 0x0, "Hitachi Tiny 80 Core Lan (802.3)"}, 
+	{HPHW_FIO, 0x800, 0x0008A, 0x0, "Hitachi Tiny 64 Core LAN (802.3)"}, 
+	{HPHW_FIO, 0x801, 0x0008A, 0x0, "Hitachi Tiny 80 Core LAN (802.3)"}, 
 	{HPHW_FIO, 0x004, 0x0008C, 0x0, "SkyHawk 100/120 Wax RS-232"}, 
 	{HPHW_FIO, 0x005, 0x0008C, 0x0, "SAIC L-80 Wax RS-232"}, 
 	{HPHW_FIO, 0x006, 0x0008C, 0x0, "Raven U/L2 Dino RS-232"}, 
@@ -1099,14 +1116,15 @@ static struct hp_hardware hp_hardware_list[] = {
 	{HPHW_FIO, 0x005, 0x0008F, 0x0, "Rocky1 Boot Rom"}, 
 	{HPHW_FIO, 0x006, 0x0008F, 0x0, "Rocky2 120 Boot Rom"}, 
 	{HPHW_FIO, 0x007, 0x0008F, 0x0, "Rocky2 150 Boot Rom"}, 
-	{HPHW_FIO, 0x006, 0x00096, 0x0, "Raven U/L2 Dino PS2 Keyboard"}, 
-	{HPHW_FIO, 0x007, 0x00096, 0x0, "Dino PS2 Keyboard"}, 
-	{HPHW_FIO, 0x008, 0x00096, 0x0, "Merlin 132 Dino PS2 Keyboard"}, 
-	{HPHW_FIO, 0x009, 0x00096, 0x0, "Merlin 160 Dino PS2 Keyboard"}, 
-	{HPHW_FIO, 0x00A, 0x00096, 0x0, "Merlin Jr 132 Dino PS2 Keyboard"}, 
-	{HPHW_FIO, 0x019, 0x00096, 0x0, "Merlin+ 180 Dino PS2 Keyboard"}, 
-	{HPHW_FIO, 0x022, 0x00096, 0x0, "Merlin+ 132 Dino PS2 Keyboard"}, 
-	{HPHW_FIO, 0x004, 0x00097, 0x0, "Cascade EISA 100VG lan"}, 
+	{HPHW_FIO, 0x01B, 0x0008F, 0x0, "Anole 100 Boot Rom"}, 
+	{HPHW_FIO, 0x006, 0x00096, 0x0, "Raven U/L2 Dino PS/2 Port"}, 
+	{HPHW_FIO, 0x007, 0x00096, 0x0, "Dino PS/2 Port"}, 
+	{HPHW_FIO, 0x008, 0x00096, 0x0, "Merlin 132 Dino PS/2 Port"}, 
+	{HPHW_FIO, 0x009, 0x00096, 0x0, "Merlin 160 Dino PS/2 Port"}, 
+	{HPHW_FIO, 0x00A, 0x00096, 0x0, "Merlin Jr 132 Dino PS/2 Port"}, 
+	{HPHW_FIO, 0x019, 0x00096, 0x0, "Merlin+ 180 Dino PS/2 Port"}, 
+	{HPHW_FIO, 0x022, 0x00096, 0x0, "Merlin+ 132 Dino PS/2 Port"}, 
+	{HPHW_FIO, 0x004, 0x00097, 0x0, "Cascade EISA 100VG LAN"}, 
 	{HPHW_FIO, 0x023, 0x00099, 0x0, "Rocky1 Wax HPIB"}, 
 	{HPHW_FIO, 0x048, 0x00099, 0x0, "Rocky2 120 Clark/Dino HPIB"}, 
 	{HPHW_FIO, 0x049, 0x00099, 0x0, "Rocky2 150 Clark/Dino HPIB"}, 
@@ -1114,14 +1132,14 @@ static struct hp_hardware hp_hardware_list[] = {
 	{HPHW_FIO, 0x004, 0x000A2, 0x0, "Forte Core PCI 10/100BT LAN"}, 
 	{HPHW_FIO, 0x005, 0x000A2, 0x0, "AllegroLow PCI 10/100BT LAN"}, 
 	{HPHW_FIO, 0x006, 0x000A2, 0x0, "AllegroHIgh Core PCI 10/100BT LAN"}, 
-	{HPHW_FIO, 0x007, 0x000A2, 0x0, "PCI Plug-in Lan"}, 
-	{HPHW_FIO, 0x00A, 0x000A2, 0x0, "Lego 360 Core PCI 10/100BT Lan"}, 
-	{HPHW_FIO, 0x03E, 0x000A2, 0x0, "Merlin+ 132 Core PCI Lan"}, 
-	{HPHW_FIO, 0x03F, 0x000A2, 0x0, "Merlin+ 180 Core PCI Lan"}, 
-	{HPHW_FIO, 0x056, 0x000A2, 0x0, "Raven+ w SE FWSCSI Core PCI Lan"}, 
-	{HPHW_FIO, 0x057, 0x000A2, 0x0, "Raven+ w Diff FWSCSI Core PCI Lan"}, 
-	{HPHW_FIO, 0x05E, 0x000A2, 0x0, "Staccato 132 PCI Lan"}, 
-	{HPHW_FIO, 0x05F, 0x000A2, 0x0, "Staccato 180 PCI Lan"}, 
+	{HPHW_FIO, 0x007, 0x000A2, 0x0, "PCI Plug-in LAN"}, 
+	{HPHW_FIO, 0x00A, 0x000A2, 0x0, "Lego 360 Core PCI 10/100BT LAN"}, 
+	{HPHW_FIO, 0x03E, 0x000A2, 0x0, "Merlin+ 132 Core PCI LAN"}, 
+	{HPHW_FIO, 0x03F, 0x000A2, 0x0, "Merlin+ 180 Core PCI LAN"}, 
+	{HPHW_FIO, 0x056, 0x000A2, 0x0, "Raven+ w SE FWSCSI Core PCI LAN"}, 
+	{HPHW_FIO, 0x057, 0x000A2, 0x0, "Raven+ w Diff FWSCSI Core PCI LAN"}, 
+	{HPHW_FIO, 0x05E, 0x000A2, 0x0, "Staccato 132 PCI LAN"}, 
+	{HPHW_FIO, 0x05F, 0x000A2, 0x0, "Staccato 180 PCI LAN"}, 
 	{HPHW_FIO, 0x004, 0x000A3, 0x0, "Forte Core PCI LVD Ultra2 SCSI"}, 
 	{HPHW_FIO, 0x004, 0x000A3, 0x0, "Forte Core PCI SE UltraSCSI"}, 
 	{HPHW_FIO, 0x004, 0x000A3, 0x0, "Forte Core PCI IDE/ATAPI CD-ROM"}, 
@@ -1157,160 +1175,19 @@ static struct hp_hardware hp_hardware_list[] = {
 	{HPHW_IOA, 0x185, 0x0000B, 0x00, "Java BC Summit Port"}, 
 	{HPHW_IOA, 0x1FF, 0x0000B, 0x00, "Hitachi Ghostview Summit Port"}, 
 	{HPHW_IOA, 0x580, 0x0000B, 0x10, "U2-IOA BC Runway Port"}, 
-	{HPHW_IOA, 0x581, 0x0000B, 0x10, "Uturn-IOA BC Runway Port"}, 
-	{HPHW_IOA, 0x582, 0x0000B, 0x10, "Astro BC Runway Port"}, 
-	{HPHW_IOA, 0x700, 0x0000B, 0x00, "NEC-IOS BC System Bus Port"}, 
+	{HPHW_IOA, 0x581, 0x0000B, 0x10, "Uturn-IOA BC Runway Port"},
+	{HPHW_IOA, 0x582, 0x0000B, 0x10, "Astro BC Runway Port"},
+	{HPHW_IOA, 0x700, 0x0000B, 0x00, "NEC-IOS BC System Bus Port"},
 	{HPHW_MEMORY, 0x002, 0x00008, 0x00, "MID_BUS"}, 
-	{HPHW_MEMORY, 0x00C, 0x00008, 0x08, "Kahlua 8MB"}, 
-	{HPHW_MEMORY, 0x00D, 0x00008, 0x08, "Kahlua 4MB"}, 
-	{HPHW_MEMORY, 0x00E, 0x00008, 0x08, "Tequila 16MB"}, 
-	{HPHW_MEMORY, 0x00F, 0x00008, 0x08, "Tequila 32MB"}, 
-	{HPHW_MEMORY, 0x040, 0x00008, 0x00, "Hitachi"}, 
-	{HPHW_MEMORY, 0x004, 0x00009, 0x00, "Cheetah"}, 
-	{HPHW_MEMORY, 0x005, 0x00009, 0x00, "Emerald"}, 
-	{HPHW_MEMORY, 0x008, 0x00009, 0x00, "Indigo 3MB/5MB"}, 
-	{HPHW_MEMORY, 0x00C, 0x00009, 0x00, "Indigo 8MB"}, 
-	{HPHW_MEMORY, 0x00D, 0x00009, 0x00, "Paradise 4MB"}, 
-	{HPHW_MEMORY, 0x00E, 0x00009, 0x00, "Burgundy Onboard"}, 
-	{HPHW_MEMORY, 0x012, 0x00009, 0x00, "Indigo 12MB/20MB"}, 
-	{HPHW_MEMORY, 0x013, 0x00009, 0x00, "Cobra"}, 
-	{HPHW_MEMORY, 0x014, 0x00009, 0x00, "Nova"}, 
-	{HPHW_MEMORY, 0x015, 0x00009, 0x00, "Coral"}, 
-	{HPHW_MEMORY, 0x016, 0x00009, 0x00, "Bushmaster"}, 
-	{HPHW_MEMORY, 0x017, 0x00009, 0x00, "Scorpio"}, 
-	{HPHW_MEMORY, 0x018, 0x00009, 0x00, "Flounder"}, 
-	{HPHW_MEMORY, 0x019, 0x00009, 0x00, "Hardball"}, 
-	{HPHW_MEMORY, 0x01A, 0x00009, 0x00, "CoralII 99"}, 
-	{HPHW_MEMORY, 0x01B, 0x00009, 0x00, "Scorpio Jr."}, 
-	{HPHW_MEMORY, 0x01C, 0x00009, 0x00, "Strider-50 (715T)"}, 
-	{HPHW_MEMORY, 0x01D, 0x00009, 0x00, "Strider-33 (707T)"}, 
-	{HPHW_MEMORY, 0x01E, 0x00009, 0x00, "Trailways-50 (715S)"}, 
-	{HPHW_MEMORY, 0x01F, 0x00009, 0x00, "Trailways-33 (707S)"}, 
-	{HPHW_MEMORY, 0x020, 0x00009, 0x00, "Pace"}, 
-	{HPHW_MEMORY, 0x021, 0x00009, 0x00, "Sidewinder"}, 
-	{HPHW_MEMORY, 0x022, 0x00009, 0x00, "Orville"}, 
-	{HPHW_MEMORY, 0x023, 0x00009, 0x00, "Wilbur"}, 
-	{HPHW_MEMORY, 0x026, 0x00009, 0x00, "Gecko"}, 
-	{HPHW_MEMORY, 0x027, 0x00009, 0x00, "Scorpio Sr."}, 
-	{HPHW_MEMORY, 0x028, 0x00009, 0x00, "Scorpio 100"}, 
-	{HPHW_MEMORY, 0x029, 0x00009, 0x00, "Spectra 50"}, 
-	{HPHW_MEMORY, 0x02A, 0x00009, 0x00, "CoralII 132"}, 
-	{HPHW_MEMORY, 0x02F, 0x00009, 0x00, "KittyHawk DC2-"}, 
-	{HPHW_MEMORY, 0x030, 0x00009, 0x00, "Spectra 75"}, 
-	{HPHW_MEMORY, 0x031, 0x00009, 0x00, "Spectra 100"}, 
-	{HPHW_MEMORY, 0x032, 0x00009, 0x00, "KittyHawk DC3"}, 
-	{HPHW_MEMORY, 0x033, 0x00009, 0x00, "Fast Pace"}, 
-	{HPHW_MEMORY, 0x034, 0x00009, 0x00, "Snake Eagle"}, 
-	{HPHW_MEMORY, 0x035, 0x00009, 0x00, "Anole 64"}, 
-	{HPHW_MEMORY, 0x036, 0x00009, 0x00, "Anole 100"}, 
-	{HPHW_MEMORY, 0x037, 0x00009, 0x00, "Snake Cheetah"}, 
-	{HPHW_MEMORY, 0x038, 0x00009, 0x00, "Gecko 80"}, 
-	{HPHW_MEMORY, 0x039, 0x00009, 0x00, "Gecko 100"}, 
-	{HPHW_MEMORY, 0x03A, 0x00009, 0x00, "Gecko 120"}, 
-	{HPHW_MEMORY, 0x03B, 0x00009, 0x00, "Gila 80"}, 
-	{HPHW_MEMORY, 0x03C, 0x00009, 0x00, "Gila 100"}, 
-	{HPHW_MEMORY, 0x03D, 0x00009, 0x00, "Gila 120"}, 
-	{HPHW_MEMORY, 0x03E, 0x00009, 0x00, "Scorpio-L 80"}, 
-	{HPHW_MEMORY, 0x03F, 0x00009, 0x00, "Scorpio-L 100"}, 
-	{HPHW_MEMORY, 0x040, 0x00009, 0x00, "Scorpio-L 120"}, 
-	{HPHW_MEMORY, 0x041, 0x00009, 0x00, "Spectra-L 80"}, 
-	{HPHW_MEMORY, 0x042, 0x00009, 0x00, "Spectra-L 100"}, 
-	{HPHW_MEMORY, 0x043, 0x00009, 0x00, "Spectra-L 120"}, 
-	{HPHW_MEMORY, 0x044, 0x00009, 0x00, "Piranha 100"}, 
-	{HPHW_MEMORY, 0x045, 0x00009, 0x00, "Piranha 120"}, 
-	{HPHW_MEMORY, 0x046, 0x00009, 0x00, "Jason 50"}, 
-	{HPHW_MEMORY, 0x047, 0x00009, 0x00, "Jason 100"}, 
-	{HPHW_MEMORY, 0x049, 0x00009, 0x00, "SkyHawk 100/120"}, 
-	{HPHW_MEMORY, 0x04A, 0x00009, 0x00, "Mirage Jr"}, 
-	{HPHW_MEMORY, 0x04B, 0x00009, 0x00, "Mirage 100"}, 
-	{HPHW_MEMORY, 0x04C, 0x00009, 0x00, "Mirage 100+"}, 
-	{HPHW_MEMORY, 0x04D, 0x00009, 0x00, "Electra 100"}, 
-	{HPHW_MEMORY, 0x04E, 0x00009, 0x00, "Electra 120"}, 
-	{HPHW_MEMORY, 0x04F, 0x00009, 0x00, "Mirage 80"}, 
-	{HPHW_MEMORY, 0x050, 0x00009, 0x00, "UL Proc 1 way T'100"}, 
-	{HPHW_MEMORY, 0x051, 0x00009, 0x00, "UL Proc 1 way T'120"}, 
-	{HPHW_MEMORY, 0x052, 0x00009, 0x00, "UL Proc 2 way T'100"}, 
-	{HPHW_MEMORY, 0x053, 0x00009, 0x00, "KittyHawk DC3-"}, 
-	{HPHW_MEMORY, 0x054, 0x00009, 0x00, "UL Proc 2 way T'120"}, 
-	{HPHW_MEMORY, 0x055, 0x00009, 0x00, "Raven 120 mem"}, 
-	{HPHW_MEMORY, 0x056, 0x00009, 0x00, "UL Proc L 75"}, 
-	{HPHW_MEMORY, 0x057, 0x00009, 0x00, "UL Proc L 100"}, 
-	{HPHW_MEMORY, 0x058, 0x00009, 0x00, "Anole T"}, 
-	{HPHW_MEMORY, 0x059, 0x00009, 0x00, "SAIC L-80"}, 
-	{HPHW_MEMORY, 0x05A, 0x00009, 0x00, "Merlin+ L2 180"}, 
-	{HPHW_MEMORY, 0x05B, 0x00009, 0x00, "Raven U 200 2-way"}, 
-	{HPHW_MEMORY, 0x05C, 0x00009, 0x00, "Raven U 180+"}, 
-	{HPHW_MEMORY, 0x05D, 0x00009, 0x00, "Raven U 200"}, 
-	{HPHW_MEMORY, 0x05E, 0x00009, 0x00, "Rocky2 150 Memory"}, 
-	{HPHW_MEMORY, 0x08A, 0x00009, 0x00, "Staccato L2 132 Memory"}, 
-	{HPHW_MEMORY, 0x08B, 0x00009, 0x00, "Staccato L2 180 Memory"}, 
-	{HPHW_MEMORY, 0x05F, 0x00009, 0x00, "SPP2000 Memory"}, 
-	{HPHW_MEMORY, 0x060, 0x00009, 0x00, "Merlin L2 132"}, 
-	{HPHW_MEMORY, 0x061, 0x00009, 0x00, "Merlin+ L2 132"}, 
 	{HPHW_MEMORY, 0x063, 0x00009, 0x00, "712/132 L2 Upgrade"}, 
 	{HPHW_MEMORY, 0x064, 0x00009, 0x00, "712/160 L2 Upgrade"}, 
 	{HPHW_MEMORY, 0x065, 0x00009, 0x00, "715/132 L2 Upgrade"}, 
-	{HPHW_MEMORY, 0x066, 0x00009, 0x00, "715/160 L2 Upgrade"}, 
-	{HPHW_MEMORY, 0x067, 0x00009, 0x00, "Merlin 160/ThunderHawk Memory"}, 
-	{HPHW_MEMORY, 0x068, 0x00009, 0x00, "LightningHawk Memory"}, 
-	{HPHW_MEMORY, 0x069, 0x00009, 0x00, "Rocky1 Memory"}, 
-	{HPHW_MEMORY, 0x06A, 0x00009, 0x00, "Raven L2 132"}, 
-	{HPHW_MEMORY, 0x06B, 0x00009, 0x00, "Raven L2 160"}, 
-	{HPHW_MEMORY, 0x06C, 0x00009, 0x00, "Raven L2 187"}, 
-	{HPHW_MEMORY, 0x06D, 0x00009, 0x00, "Raven L2 200"}, 
-	{HPHW_MEMORY, 0x06E, 0x00009, 0x00, "Raven U 230"}, 
-	{HPHW_MEMORY, 0x06F, 0x00009, 0x00, "Raven U 240"}, 
-	{HPHW_MEMORY, 0x070, 0x00009, 0x00, "Rocky2 120 Memory"}, 
-	{HPHW_MEMORY, 0x071, 0x00009, 0x00, "Raven U 160"}, 
-	{HPHW_MEMORY, 0x072, 0x00009, 0x00, "Raven U 180"}, 
-	{HPHW_MEMORY, 0x072, 0x00009, 0x00, "UL Proc 1 way T'120 1MB/1MB"}, 
-	{HPHW_MEMORY, 0x073, 0x00009, 0x00, "UL Proc 2 way T'120 1MB/1MB"}, 
-	{HPHW_MEMORY, 0x074, 0x00009, 0x00, "Anole L2 132 memory"}, 
-	{HPHW_MEMORY, 0x075, 0x00009, 0x00, "Anole L2 165 memory"}, 
-	{HPHW_MEMORY, 0x076, 0x00009, 0x00, "UL 1 way U160 512K/512K memory"}, 
-	{HPHW_MEMORY, 0x077, 0x00009, 0x00, "UL 2 way U160 512K/512K memory"}, 
-	{HPHW_MEMORY, 0x078, 0x00009, 0x00, "Kiji L2 132 memory"}, 
-	{HPHW_MEMORY, 0x079, 0x00009, 0x00, "UL 1 way U160 1M/1M memory"}, 
-	{HPHW_MEMORY, 0x07A, 0x00009, 0x00, "UL 2 way U160 1M/1M memory"}, 
-	{HPHW_MEMORY, 0x07B, 0x00009, 0x00, "UL 1 way U180 1M/1M memory"}, 
-	{HPHW_MEMORY, 0x07C, 0x00009, 0x00, "UL 2 way U180 1M/1M memory"}, 
-	{HPHW_MEMORY, 0x07D, 0x00009, 0x00, "UL 1 way U240 U+ 2M/2M memory"}, 
-	{HPHW_MEMORY, 0x07E, 0x00009, 0x00, "UL 2 way U240 U+ 2M/2M memory"}, 
-	{HPHW_MEMORY, 0x07F, 0x00009, 0x00, "UL L2 132 memory"}, 
-	{HPHW_MEMORY, 0x080, 0x00009, 0x00, "UL L2 160 memory"}, 
-	{HPHW_MEMORY, 0x081, 0x00009, 0x00, "Merlin Jr 132 memory"}, 
-	{HPHW_MEMORY, 0x082, 0x00009, 0x00, "FireHawk 200 Memory"}, 
-	{HPHW_MEMORY, 0x083, 0x00009, 0x00, "SummitHawk Memory"}, 
-	{HPHW_MEMORY, 0x084, 0x00009, 0x00, "Jade Upgrade Memory"}, 
-	{HPHW_MEMORY, 0x085, 0x00009, 0x00, "SPP2500 Memory"}, 
-	{HPHW_MEMORY, 0x086, 0x00009, 0x00, "AllegroHigh Memory"}, 
-	{HPHW_MEMORY, 0x087, 0x00009, 0x00, "AllegroLow Memory"}, 
-	{HPHW_MEMORY, 0x088, 0x00009, 0x00, "Forte 2w Memory"}, 
-	{HPHW_MEMORY, 0x089, 0x00009, 0x00, "Forte 4w Memory"}, 
-	{HPHW_MEMORY, 0x08A, 0x00009, 0x00, "Staccato L2 132 Memory"}, 
-	{HPHW_MEMORY, 0x08B, 0x00009, 0x00, "Staccato L2 180 Memory"}, 
-	{HPHW_MEMORY, 0x090, 0x00009, 0x00, "Prelude SMC Memory"}, 
-	{HPHW_MEMORY, 0x091, 0x00009, 0x00, "Lego 360 Memory"}, 
-	{HPHW_MEMORY, 0x7FF, 0x00009, 0x00, "NEC Aska memory"}, 
-	{HPHW_MEMORY, 0x800, 0x00009, 0x00, "Hitachi Tiny 64"}, 
-	{HPHW_MEMORY, 0x801, 0x00009, 0x00, "Hitachi Tiny 80"}, 
-	{HPHW_MEMORY, 0x8FF, 0x00009, 0x00, "Hitachi X memory"}, 
-	{HPHW_MEMORY, 0x091, 0x00009, 0x00, "M2250 Memory"}, 
-	{HPHW_MEMORY, 0x092, 0x00009, 0x00, "M2500 Memory"}, 
-	{HPHW_MEMORY, 0x093, 0x00009, 0x00, "Sonata 440 Memory"}, 
-	{HPHW_MEMORY, 0x094, 0x00009, 0x00, "Sonata 360 Memory"}, 
-	{HPHW_MEMORY, 0x095, 0x00009, 0x00, "Rhapsody 440 Memory"}, 
-	{HPHW_MEMORY, 0x096, 0x00009, 0x00, "Rhapsody 360 Memory"}, 
-	{HPHW_MEMORY, 0x097, 0x00009, 0x00, "Raven W 360 Memory"}, 
-	{HPHW_MEMORY, 0x098, 0x00009, 0x00, "Halfdome W 440 Memory"}, 
-	{HPHW_MEMORY, 0x099, 0x00009, 0x00, "Rhapsody DC- 440 Memory"}, 
-	{HPHW_MEMORY, 0x09A, 0x00009, 0x00, "Rhapsody DC- 360 Memory"}, 
-	{HPHW_MEMORY, 0x09B, 0x00009, 0x00, "Crescendo Memory"}, 
+	{HPHW_MEMORY, 0x066, 0x00009, 0x00, "715/160 L2 Upgrade"},
 	{HPHW_OTHER, 0x004, 0x00030, 0x00, "Master"}, 
 	{HPHW_OTHER, 0x004, 0x00034, 0x00, "Slave"}, 
 	{HPHW_OTHER, 0x004, 0x00038, 0x00, "EDU"}, 
 	{HPHW_OTHER, 0x004, 0x00049, 0x00, "LGB Control"}, 
-        {0, }			/* leave the last entry empty ! */
+	{HPHW_FAULTY, 0, }  /* Special Marker for last entry */
 };
 
 
@@ -1318,7 +1195,7 @@ static struct hp_cpu_type_mask {
 	unsigned short model;
 	unsigned short mask;
 	enum cpu_type cpu;
-} hp_cpu_type_mask_list[] = {
+} hp_cpu_type_mask_list[] __initdata = {
 
 	{ 0x0000, 0x0ff0, pcx    },  /* 0x0000 - 0x000f */
 	{ 0x0048, 0x0ff0, pcxl   },  /* 0x0040 - 0x004f */
@@ -1350,8 +1227,10 @@ static struct hp_cpu_type_mask {
 	{ 0x0592, 0x0fff, pcxt_  },  /* 0x0592 - 0x0592 */
 	{ 0x0593, 0x0fff, pcxu   },  /* 0x0593 - 0x0593 */
 	{ 0x0594, 0x0ffc, pcxu   },  /* 0x0594 - 0x0597 */
-	{ 0x0598, 0x0ffc, pcxu   },  /* 0x0598 - 0x059b */
-	{ 0x059c, 0x0ffe, pcxu_  },  /* 0x059c - 0x059d */
+	{ 0x0598, 0x0ffe, pcxu_  },  /* 0x0598 - 0x0599 */
+	{ 0x059a, 0x0ffe, pcxu   },  /* 0x059a - 0x059b */
+	{ 0x059c, 0x0fff, pcxu   },  /* 0x059c - 0x059c */
+	{ 0x059d, 0x0fff, pcxu_  },  /* 0x059d - 0x059d */
 	{ 0x059e, 0x0fff, pcxt_  },  /* 0x059e - 0x059e */
 	{ 0x059f, 0x0fff, pcxu   },  /* 0x059f - 0x059f */
 	{ 0x05a0, 0x0ffe, pcxt_  },  /* 0x05a0 - 0x05a1 */
@@ -1370,7 +1249,27 @@ static struct hp_cpu_type_mask {
 	{ 0x05ba, 0x0fff, pcxu_  },  /* 0x05ba - 0x05ba */
 	{ 0x05bb, 0x0fff, pcxw   },  /* 0x05bb - 0x05bb */
 	{ 0x05bc, 0x0ffc, pcxw   },  /* 0x05bc - 0x05bf */
-	{ 0x05c0, 0x0fc0, pcxw   },  /* 0x05c0 - 0x05ff */
+	{ 0x05c0, 0x0ffc, pcxw 	 },  /* 0x05c0 - 0x05c3 */
+	{ 0x05c4, 0x0ffe, pcxw 	 },  /* 0x05c4 - 0x05c5 */
+	{ 0x05c6, 0x0fff, pcxw 	 },  /* 0x05c6 - 0x05c6 */
+	{ 0x05c7, 0x0fff, pcxw_  },  /* 0x05c7 - 0x05c7 */
+	{ 0x05c8, 0x0ffc, pcxw 	 },  /* 0x05c8 - 0x05cb */
+	{ 0x05cc, 0x0ffe, pcxw 	 },  /* 0x05cc - 0x05cd */
+	{ 0x05ce, 0x0ffe, pcxw_  },  /* 0x05ce - 0x05cf */
+	{ 0x05d0, 0x0ffc, pcxw_  },  /* 0x05d0 - 0x05d3 */
+	{ 0x05d4, 0x0ffe, pcxw_  },  /* 0x05d4 - 0x05d5 */
+	{ 0x05d6, 0x0fff, pcxw 	 },  /* 0x05d6 - 0x05d6 */
+	{ 0x05d7, 0x0fff, pcxw_  },  /* 0x05d7 - 0x05d7 */
+	{ 0x05d8, 0x0ffc, pcxw_  },  /* 0x05d8 - 0x05db */
+	{ 0x05dc, 0x0ffe, pcxw2  },  /* 0x05dc - 0x05dd */
+	{ 0x05de, 0x0fff, pcxw_  },  /* 0x05de - 0x05de */
+	{ 0x05df, 0x0fff, pcxw2  },  /* 0x05df - 0x05df */
+	{ 0x05e0, 0x0ffc, pcxw2  },  /* 0x05e0 - 0x05e3 */
+	{ 0x05e4, 0x0fff, pcxw2  },  /* 0x05e4 - 0x05e4 */
+	{ 0x05e5, 0x0fff, pcxw_  },  /* 0x05e5 - 0x05e5 */
+	{ 0x05e6, 0x0ffe, pcxw2  },  /* 0x05e6 - 0x05e7 */
+	{ 0x05e8, 0x0ff8, pcxw2  },  /* 0x05e8 - 0x05ef */
+	{ 0x05f0, 0x0ff0, pcxw2  },  /* 0x05f0 - 0x05ff */
 	{ 0x0600, 0x0ff0, pcxl   },  /* 0x0600 - 0x060f */
 	{ 0x0610, 0x0ff0, pcxl   },  /* 0x0610 - 0x061f */
 	{ 0x0000, 0x0000, pcx    }	/* terminate table */
@@ -1386,36 +1285,51 @@ char *cpu_name_version[][2] = {
 	[pcxu]	{ "PA8000 (PCX-U)",	"2.0" },
 	[pcxu_]	{ "PA8200 (PCX-U+)",	"2.0" },
 	[pcxw]	{ "PA8500 (PCX-W)",	"2.0" },
-	[pcxw_]	{ "PA8600 (PCX-W+)",	"2.0" }
+	[pcxw_]	{ "PA8600 (PCX-W+)",	"2.0" },
+	[pcxw2]	{ "PA8700 (PCX-W2)",	"2.0" }
 };
 
-char *parisc_getHWtype(unsigned short hw_type)
-{
-	if (hw_type <= HPHW_CIO) {
-		return hw_type_name[hw_type];
-	} else {
-		return "Unknown Type";
-	}
-}
-
-char *parisc_getHWdescription(unsigned short hw_type, unsigned long hversion,
-		unsigned long sversion)
+const char * __init
+parisc_hardware_description(struct parisc_device_id *id)
 {
 	struct hp_hardware *listptr;
 	
-	for (listptr = hp_hardware_list; listptr->name; listptr++) {
-		if ((listptr->hw_type==hw_type) &&
-				(listptr->hversion==hversion) &&
-				(listptr->sversion==sversion)){
+	for (listptr = hp_hardware_list; listptr->hw_type != HPHW_FAULTY; listptr++) {
+		if ((listptr->hw_type == id->hw_type) &&
+				(listptr->hversion == id->hversion) &&
+				(listptr->sversion == id->sversion)){
 			return listptr->name;
 		}
 	}
+
+	/*
+	 * ok, the above hardware table isn't complete, and we haven't found
+	 * our device in this table. So let's now try to find a generic name
+	 * to describe the given hardware...
+	 */
+	switch (id->hw_type) {
+		case HPHW_NPROC:
+			return "Unknown machine";
+
+		case HPHW_A_DIRECT:
+			switch (id->sversion) {
+				case 0x0D: return "MUX port";
+				case 0x0E: return "RS-232 port";
+			}
+			break;
+			
+		case HPHW_MEMORY:
+			return "Memory";
+			
+	}
+	
 	return "unknown device";
 }
 
 
 /* Interpret hversion (ret[0]) from PDC_MODEL(4)/PDC_MODEL_INFO(0) */
-enum cpu_type parisc_get_cpu_type(unsigned long hversion)
+enum cpu_type __init
+parisc_get_cpu_type(unsigned long hversion)
 {
 	struct hp_cpu_type_mask *ptr;
 	unsigned short model = ((unsigned short) (hversion)) >> 4;
@@ -1424,23 +1338,8 @@ enum cpu_type parisc_get_cpu_type(unsigned long hversion)
 		if (ptr->model == (model & ptr->mask))
 			return ptr->cpu;
 	}
-	panic("parisc_get_cpu_type() could not identify CPU type\n");
+	panic("could not identify CPU type\n");
 
 	return pcx;	/* not reached: */
 }
 
-
-struct hp_hardware *parisc_get_reference(unsigned short hw_type,
-		unsigned long hversion, unsigned long sversion)
-{
-	struct hp_hardware *listptr = hp_hardware_list;
-
-	for (listptr = hp_hardware_list; listptr->name; listptr++) {
-		if ((listptr->hw_type == hw_type) &&
-				(listptr->hversion == hversion) &&
-				(listptr->sversion == sversion)) {
-			return listptr;
-		}
-	}
-	return NULL;
-}

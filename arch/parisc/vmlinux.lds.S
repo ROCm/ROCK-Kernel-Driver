@@ -1,17 +1,24 @@
+#include <linux/config.h>
+
 /* ld script to make hppa Linux kernel */
-OUTPUT_FORMAT("elf32-hppa")
+#ifndef CONFIG_PARISC64
+OUTPUT_FORMAT("elf32-hppa-linux")
 OUTPUT_ARCH(hppa)
+#else
+OUTPUT_FORMAT("elf64-hppa-linux")
+OUTPUT_ARCH(hppa:hppa2.0w)
+#endif
+
 ENTRY(_stext)
+#ifndef CONFIG_PARISC64
 jiffies = jiffies_64 + 4;
+#else
+jiffies = jiffies_64;
+#endif
 SECTIONS
 {
 
-/* right now use 0x10000/0x11000, later when we don't use Console and
- * Boot-Device IODC, we will change this to 0x8000 !!!
- */
-
-  . = 0xc0100000;   
-/*	. = 0x10000;  */
+  . = 0x10100000;
 
   _text = .;			/* Text and read-only data */
   .text BLOCK(16) : {
@@ -22,12 +29,12 @@ SECTIONS
 	*(.gnu.warning)
 	} = 0
 
+  _etext = .;			/* End of text section */
+
   . = ALIGN(16);
   .rodata : { *(.rodata) *(.rodata.*) }
   .kstrtab : { *(.kstrtab) }
 
-  _etext = .;			/* End of text section */
-  
   .data BLOCK(8192) : {			/* Data without special */
 	data_start = .;
 	*(.data)
@@ -42,6 +49,16 @@ SECTIONS
   __ksymtab : { *(__ksymtab) }
   __stop___ksymtab = .;
 
+  __start___kallsyms = .;       /* All kernel symbols */
+  __kallsyms : { *(__kallsyms) }
+  __stop___kallsyms = .;
+
+#ifdef CONFIG_PARISC64
+  . = ALIGN(16);               /* Linkage tables */
+  .opd : { *(.opd) } PROVIDE (__gp = .); 
+  .plt : { *(.plt) } 
+  .dlt : { *(.dlt) }
+#endif
 
   . = ALIGN(16384);
   __init_begin = .;
@@ -49,7 +66,7 @@ SECTIONS
   .init.data : { *(.init.data) }
   . = ALIGN(16);
   __setup_start = .;
-  .setup.init : { *(.setup.init) }
+  .init.setup : { *(.init.setup) }
   __setup_end = .;
   __initcall_start = .;
   .initcall.init : {
@@ -62,8 +79,12 @@ SECTIONS
 	*(.initcall7.init)
   }
   __initcall_end = .;
+  . = ALIGN(32);
+  __per_cpu_start = .;
+  .data.percpu  : { *(.data.percpu) }
+  __per_cpu_end = .;
+  . = ALIGN(4096);
   __init_end = .;
-
 
   init_task BLOCK(16384) : { *(init_task) }  /* The initial task and kernel stack */
 
@@ -84,5 +105,15 @@ SECTIONS
   .stab.indexstr 0 : { *(.stab.indexstr) }
   .comment 0 : { *(.comment) }
   .note 0 : { *(.note) }	
-	
+
+#ifdef CONFIG_PARISC64
+  /* temporary hack until binutils is fixed to not emit these
+     for static binaries */
+  /DISCARD/ : {
+    *(.dynsym)
+    *(.dynstr)
+    *(.dynamic)
+    *(.hash)
+  }
+#endif
 }

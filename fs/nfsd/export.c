@@ -738,23 +738,6 @@ exp_do_unexport(svc_export *unexp)
 	exp_fsid_unhash(unexp);
 }
 
-/*
- * Revoke all exports for a given client.
- */
-static void
-exp_unexport_all(svc_client *clp)
-{
-	struct svc_export *exp;
-	int index;
-
-	dprintk("unexporting all fs's for clnt %p\n", clp);
-
-	cache_for_each(exp, &svc_export_cache, index, h)
-		if (exp->ex_client == clp)
-			exp_do_unexport(exp);
-	cache_flush();
-
-}
 
 /*
  * unexport syscall.
@@ -1109,6 +1092,18 @@ nfsd_export_init(void)
 }
 
 /*
+ * Flush exports table - called when last nfsd thread is killed
+ */
+void
+nfsd_export_flush(void)
+{
+	exp_writelock();
+	cache_purge(&svc_expkey_cache);
+	cache_purge(&svc_export_cache);
+	exp_writeunlock();
+}
+
+/*
  * Shutdown the exports module.
  */
 void
@@ -1118,8 +1113,6 @@ nfsd_export_shutdown(void)
 	dprintk("nfsd: shutting down export module.\n");
 
 	exp_writelock();
-
-	exp_unexport_all(NULL);
 
 	if (cache_unregister(&svc_expkey_cache))
 		printk(KERN_ERR "nfsd: failed to unregister expkey cache\n");

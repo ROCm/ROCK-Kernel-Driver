@@ -1,4 +1,12 @@
 /*
+ *  WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
+ *  ---------------------------------------------------------------
+ *  This source file will be removed as soon as we have converted
+ *  hp_psaux.c and hp_keyb.c to the input layer !
+ *  
+ */
+
+/*
  *  linux/arch/parisc/kernel/keyboard.c
  *
  *  Alex deVries <adevries@thepuffingroup.com>
@@ -7,8 +15,10 @@
  *  Copyright 2000 Philipp Rumpf
  */
 
+#include <linux/errno.h>
 #include <linux/keyboard.h>
 #include <asm/keyboard.h>
+#include <linux/module.h>
 
 static int def_setkeycode(unsigned int x, unsigned int y)
 {
@@ -43,19 +53,28 @@ static void def_init_hw(void)
 
 static char def_sysrq_xlate[NR_KEYS];
 
-static struct kbd_ops def_kbd_ops = {
-	setkeycode:	def_setkeycode,
-	getkeycode:	def_getkeycode,
-	translate:	def_translate,
-	unexpected_up:	def_unexpected_up,
-	leds:		def_leds,
-	init_hw:	def_init_hw,
-
-	sysrq_key:	0xff,
+#define DEFAULT_KEYB_OPS \
+	setkeycode:	def_setkeycode,	\
+	getkeycode:	def_getkeycode, \
+	translate:	def_translate, \
+	unexpected_up:	def_unexpected_up, \
+	leds:		def_leds, \
+	init_hw:	def_init_hw, \
+	sysrq_key:	0xff, \
 	sysrq_xlate:	def_sysrq_xlate,
+
+static struct kbd_ops def_kbd_ops = {
+	DEFAULT_KEYB_OPS
 };
 
 struct kbd_ops *kbd_ops = &def_kbd_ops;
+
+void unregister_kbd_ops(void)
+{
+	struct kbd_ops new_kbd_ops = { DEFAULT_KEYB_OPS };
+	register_kbd_ops(&new_kbd_ops);
+}
+EXPORT_SYMBOL(unregister_kbd_ops);
 
 void register_kbd_ops(struct kbd_ops *ops)
 {

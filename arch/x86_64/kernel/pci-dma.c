@@ -6,6 +6,7 @@
 #include <linux/mm.h>
 #include <linux/string.h>
 #include <linux/pci.h>
+#include <linux/module.h>
 #include <asm/io.h>
 
 dma_addr_t bad_dma_address = -1UL; 
@@ -32,26 +33,23 @@ int pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
 
 	BUG_ON(direction == PCI_DMA_NONE);
  
- 	/*
- 	 *
- 	 */
  	for (i = 0; i < nents; i++ ) {
 		struct scatterlist *s = &sg[i];
- 		if (s->page) { 
+
+		BUG_ON(!s->page); 
+
 			s->dma_address = pci_map_page(hwdev, s->page, s->offset, 
 						      s->length, direction); 
-		} else
-			BUG(); 
 
-		if (unlikely(s->dma_address == bad_dma_address))
-			goto error; 
-	}
-	return nents;
-
- error: 
+		if (unlikely(s->dma_address == bad_dma_address)) {
 	pci_unmap_sg(hwdev, sg, i, direction); 
 	return 0; 
+		}
+	}
+	return nents;
 }
+
+EXPORT_SYMBOL(pci_map_sg);
 
 /* Unmap a set of streaming mode DMA translations.
  * Again, cpu read rules concerning calls here are the same as for
@@ -68,3 +66,5 @@ void pci_unmap_sg(struct pci_dev *dev, struct scatterlist *sg,
 		pci_unmap_single(dev, s->dma_address, s->length, dir); 
 	} 
 }
+
+EXPORT_SYMBOL(pci_unmap_sg);

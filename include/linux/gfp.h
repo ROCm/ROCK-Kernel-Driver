@@ -17,6 +17,7 @@
 #define __GFP_IO	0x40	/* Can start low memory physical IO? */
 #define __GFP_HIGHIO	0x80	/* Can start high mem physical IO? */
 #define __GFP_FS	0x100	/* Can call down to low-level FS? */
+#define __GFP_COLD	0x200	/* Cache-cold page required */
 
 #define GFP_NOHIGHIO	(             __GFP_WAIT | __GFP_IO)
 #define GFP_NOIO	(             __GFP_WAIT)
@@ -31,6 +32,7 @@
    platforms, used as appropriate on others */
 
 #define GFP_DMA		__GFP_DMA
+
 
 /*
  * There is only one page-allocator function, and two main namespaces to
@@ -77,13 +79,14 @@ extern unsigned long FASTCALL(get_zeroed_page(unsigned int gfp_mask));
 #define __get_dma_pages(gfp_mask, order) \
 		__get_free_pages((gfp_mask) | GFP_DMA,(order))
 
-/*
- * There is only one 'core' page-freeing function.
- */
 extern void FASTCALL(__free_pages(struct page *page, unsigned int order));
 extern void FASTCALL(free_pages(unsigned long addr, unsigned int order));
+extern void FASTCALL(free_hot_page(struct page *page));
+extern void FASTCALL(free_cold_page(struct page *page));
 
 #define __free_page(page) __free_pages((page), 0)
 #define free_page(addr) free_pages((addr),0)
+
+void page_alloc_init(void);
 
 #endif /* __LINUX_GFP_H */

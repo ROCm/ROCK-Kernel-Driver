@@ -1,0 +1,35 @@
+#
+# ISDN hardware drivers
+#
+comment "CAPI hardware drivers"
+	depends on NET && ISDN_BOOL && ISDN_CAPI
+
+source "drivers/isdn/hardware/avm/Kconfig"
+
+source "drivers/isdn/hardware/eicon/Kconfig"
+
+comment "ISDN4Linux hardware drivers"
+	depends on NET && ISDN_BOOL && ISDN
+
+source "drivers/isdn/hisax/Kconfig"
+
+
+menu "Active cards"
+	depends on NET && ISDN_BOOL && ISDN!=n
+
+source "drivers/isdn/icn/Kconfig"
+
+source "drivers/isdn/pcbit/Kconfig"
+
+source "drivers/isdn/sc/Kconfig"
+
+source "drivers/isdn/act2000/Kconfig"
+
+source "drivers/isdn/eicon/Kconfig"
+
+source "drivers/isdn/tpam/Kconfig"
+
+source "drivers/isdn/hysdn/Kconfig"
+
+endmenu
+

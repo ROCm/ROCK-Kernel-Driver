@@ -59,7 +59,7 @@ static void mp_pool_free(void *mpb, void *data)
 static int multipath_map (mddev_t *mddev, mdk_rdev_t **rdevp)
 {
 	multipath_conf_t *conf = mddev_to_conf(mddev);
-	int i, disks = MD_SB_DISKS;
+	int i, disks = mddev->max_disks;
 
 	/*
 	 * Later we do read balancing on the read side 
@@ -147,7 +147,7 @@ static int multipath_read_balance (multipath_conf_t *conf)
 {
 	int disk;
 
-	for (disk = 0; disk < MD_SB_DISKS; disk++) {
+	for (disk = 0; disk < conf->mddev->max_disks; disk++) {
 		mdk_rdev_t *rdev = conf->multipaths[disk].rdev;
 		if (rdev && rdev->in_sync)
 			return disk;
@@ -259,7 +259,7 @@ static void print_multipath_conf (multipath_conf_t *conf)
 	printk(" --- wd:%d rd:%d\n", conf->working_disks,
 			 conf->raid_disks);
 
-	for (i = 0; i < MD_SB_DISKS; i++) {
+	for (i = 0; i < conf->mddev->max_disks; i++) {
 		tmp = conf->multipaths + i;
 		if (tmp->rdev)
 			printk(" disk%d, o:%d, dev:%s\n",

@@ -34,15 +34,13 @@ extern unsigned long numa_free_all_bootmem(void);
 extern void reserve_bootmem_generic(unsigned long phys, unsigned len);
 extern void free_bootmem_generic(unsigned long phys, unsigned len);
 
-extern unsigned long start_pfn, end_pfn; 
+extern unsigned long start_pfn, end_pfn, end_pfn_map; 
 
 extern void show_stack(unsigned long * rsp);
 
 extern void exception_table_check(void);
 
-extern void acpi_boot_init(char *);
-
-int iommu_setup(char *opt);
+extern int acpi_boot_init(char *);
 
 #define round_up(x,y) (((x) + (y) - 1) & ~((y)-1))
 #define round_down(x,y) ((x) & ~((y)-1))

@@ -655,7 +655,7 @@ skb_read_and_csum_bits(skb_reader_t *desc, void *to, size_t len)
  * We have set things up such that we perform the checksum of the UDP
  * packet in parallel with the copies into the RPC client iovec.  -DaveM
  */
-static int
+int
 csum_partial_copy_to_xdr(struct xdr_buf *xdr, struct sk_buff *skb)
 {
 	skb_reader_t desc;

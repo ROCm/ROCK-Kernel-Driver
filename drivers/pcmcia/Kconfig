@@ -1,0 +1,91 @@
+#
+# PCMCIA bus subsystem configuration
+#
+# Right now the non-CardBus choices are not supported
+# by the integrated kernel driver.
+#
+
+menu "PCMCIA/CardBus support"
+	depends on HOTPLUG
+
+config PCMCIA
+	tristate "PCMCIA/CardBus support"
+	---help---
+	  Say Y here if you want to attach PCMCIA- or PC-cards to your Linux
+	  computer.  These are credit-card size devices such as network cards,
+	  modems or hard drives often used with laptops computers.  There are
+	  actually two varieties of these cards: the older 16 bit PCMCIA cards
+	  and the newer 32 bit CardBus cards.  If you want to use CardBus
+	  cards, you need to say Y here and also to "CardBus support" below.
+
+	  To use your PC-cards, you will need supporting software from David
+	  Hinds' pcmcia-cs package (see the file <file:Documentation/Changes>
+	  for location).  Please also read the PCMCIA-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  When compiled this way, there will be modules called pcmcia_core.o
+	  and ds.o.  If you want to compile it as a module, say M here and
+	  read <file:Documentation/modules.txt>.
+
+config CARDBUS
+	bool "CardBus support"
+	depends on PCMCIA && PCI
+	---help---
+	  CardBus is a bus mastering architecture for PC-cards, which allows
+	  for 32 bit PC-cards (the original PCMCIA standard specifies only
+	  a 16 bit wide bus). Many newer PC-cards are actually CardBus cards.
+
+	  This option enables support for CardBus PC Cards, as well as support
+	  for CardBus host bridges.  Virtually all modern PCMCIA bridges are
+	  CardBus compatible.  A "bridge" is the hardware inside your computer
+	  that PCMCIA cards are plugged into.
+
+	  To use your PC-cards, you will need supporting software from David
+	  Hinds' pcmcia-cs package (see the file <file:Documentation/Changes>
+	  for location).
+
+	  If unsure, say Y.
+
+config I82092
+	tristate "i82092 compatible bridge support"
+	depends on PCMCIA && PCI
+	help
+	  This provides support for the Intel I82092AA PCI-to-PCMCIA bridge device,
+	  found in some older laptops and more commonly in evaluation boards for the
+	  chip.
+
+config I82365
+	tristate "i82365 compatible bridge support"
+	depends on PCMCIA
+	help
+	  Say Y here to include support for ISA-bus PCMCIA host bridges that
+	  are register compatible with the Intel i82365.  These are found on
+	  older laptops and ISA-bus card readers for desktop systems.  A
+	  "bridge" is the hardware inside your computer that PCMCIA cards are
+	  plugged into. If unsure, say N.
+
+config TCIC
+	tristate "Databook TCIC host bridge support"
+	depends on PCMCIA
+	help
+	  Say Y here to include support for the Databook TCIC family of PCMCIA
+	  host bridges. These are only found on a handful of old systems.
+	  "Bridge" is the name used for the hardware inside your computer that
+	  PCMCIA cards are plugged into. If unsure, say N.
+
+config HD64465_PCMCIA
+	tristate "HD64465 host bridge support"
+	depends on HD64465 && PCMCIA
+
+config PCMCIA_SA1100
+	tristate "SA1100 support"
+	depends on ARM && ARCH_SA1100 && PCMCIA
+
+config PCMCIA_SA1111
+	tristate "SA1111 support"
+	depends on PCMCIA_SA1100 && SA1111
+
+endmenu
+

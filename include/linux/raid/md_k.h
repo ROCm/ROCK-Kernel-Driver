@@ -151,8 +151,9 @@ struct mdk_rdev_s
 	struct block_device *bdev;	/* block device handle */
 
 	struct page	*sb_page;
-	mdp_super_t	*sb;
+	int		sb_loaded;
 	sector_t	sb_offset;
+	int		preferred_minor;	/* autorun support */
 
 	/* A device can be in one of three states based on two flags:
 	 * Not working:   faulty==1 in_sync==0
@@ -196,6 +197,7 @@ struct mddev_s
 	time_t				ctime, utime;
 	int				level, layout;
 	int				raid_disks;
+	int				max_disks;
 	unsigned long			state;
 	sector_t			size; /* used size of component devices */
 	__u64				events;

@@ -5,6 +5,8 @@
 #ifndef PAGE_FLAGS_H
 #define PAGE_FLAGS_H
 
+#include <linux/percpu.h>
+
 /*
  * Various page->flags bits:
  *
@@ -73,7 +75,7 @@
  * Global page accounting.  One instance per CPU.  Only unsigned longs are
  * allowed.
  */
-extern struct page_state {
+struct page_state {
 	unsigned long nr_dirty;
 	unsigned long nr_writeback;
 	unsigned long nr_pagecache;
@@ -103,7 +105,9 @@ extern struct page_state {
 	unsigned long kswapd_steal;
 	unsigned long pageoutrun;
 	unsigned long allocstall;
-} ____cacheline_aligned_in_smp page_states[NR_CPUS];
+};
+
+DECLARE_PER_CPU(struct page_state, page_states);
 
 extern void get_page_state(struct page_state *ret);
 extern void get_full_page_state(struct page_state *ret);
@@ -111,7 +115,7 @@ extern void get_full_page_state(struct page_state *ret);
 #define mod_page_state(member, delta)					\
 	do {								\
 		int cpu = get_cpu();					\
-		page_states[cpu].member += (delta);			\
+		per_cpu(page_states, cpu).member += (delta);		\
 		put_cpu();						\
 	} while (0)
 

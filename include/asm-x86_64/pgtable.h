@@ -274,24 +274,40 @@ static inline int pmd_large(pmd_t pte) {
 #define level3_offset_k(dir, address) ((pgd_t *) pml4_page(*(dir)) + pgd_index(address))
 
 /* PGD - Level3 access */
-
-#define __pgd_offset_k(pgd, address) ((pgd) + pgd_index(address))
 /* to find an entry in a page-table-directory. */
 #define pgd_index(address) ((address >> PGDIR_SHIFT) & (PTRS_PER_PGD-1))
-#define current_pgd_offset_k(address) \
-       __pgd_offset_k((pgd_t *)read_pda(level4_pgt), address)
+static inline pgd_t *__pgd_offset_k(pgd_t *pgd, unsigned long address)
+{ 
+	return pgd + pgd_index(address);
+} 
+
+/* Find correct pgd via the hidden fourth level page level: */
 
 /* This accesses the reference page table of the boot cpu. 
    Other CPUs get synced lazily via the page fault handler. */
 static inline pgd_t *pgd_offset_k(unsigned long address)
 {
-	pml4_t pml4;
+	unsigned long addr;
 
-	pml4 = init_level4_pgt[pml4_index(address)];
-	return __pgd_offset_k(__va(pml4_val(pml4) & PTE_MASK), address);
+	addr = pml4_val(init_level4_pgt[pml4_index(address)]);
+	addr &= PHYSICAL_PAGE_MASK;
+	return __pgd_offset_k((pgd_t *)__va(addr), address);
 }
 
+/* Access the pgd of the page table as seen by the current CPU. */ 
+static inline pgd_t *current_pgd_offset_k(unsigned long address)
+{
+	unsigned long addr;
+
+	addr = read_pda(level4_pgt)[pml4_index(address)];
+	addr &= PHYSICAL_PAGE_MASK;
+	return __pgd_offset_k((pgd_t *)__va(addr), address);
+}
+
+#if 0 /* disabled because of confusing/wrong naming. */
 #define __pgd_offset(address) pgd_index(address)
+#endif
+
 #define pgd_offset(mm, address) ((mm)->pgd+pgd_index(address))
 
 /* PMD  - Level 2 access */

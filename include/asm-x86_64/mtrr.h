@@ -107,12 +107,7 @@ static __inline__ int mtrr_del_page (int reg, __u64 base, __u32 size)
 }
 #endif
 
-/*  The following functions are for initialisation: don't use them!  */
-extern int mtrr_init (void);
-#if defined(CONFIG_SMP) && defined(CONFIG_MTRR)
-extern void mtrr_init_boot_cpu (void);
-extern void mtrr_init_secondary_cpu (void);
-#endif
+extern void mtrr_init_cpu(int cpu);
 
 #endif
 
