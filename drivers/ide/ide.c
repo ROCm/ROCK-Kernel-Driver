@@ -848,13 +848,6 @@ void ide_unregister (unsigned int index)
 	hwif->ide_dma_verbose		= old_hwif.ide_dma_verbose;
 	hwif->ide_dma_lostirq		= old_hwif.ide_dma_lostirq;
 	hwif->ide_dma_timeout		= old_hwif.ide_dma_timeout;
-	hwif->ide_dma_queued_on		= old_hwif.ide_dma_queued_on;
-	hwif->ide_dma_queued_off	= old_hwif.ide_dma_queued_off;
-#ifdef CONFIG_BLK_DEV_IDE_TCQ
-	hwif->ide_dma_queued_read	= old_hwif.ide_dma_queued_read;
-	hwif->ide_dma_queued_write	= old_hwif.ide_dma_queued_write;
-	hwif->ide_dma_queued_start	= old_hwif.ide_dma_queued_start;
-#endif
 #endif
 
 #if 0

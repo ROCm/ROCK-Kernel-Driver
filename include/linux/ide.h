@@ -801,12 +801,6 @@ typedef struct ide_dma_ops_s {
 	int (*ide_dma_verbose)(ide_drive_t *drive);
 	int (*ide_dma_lostirq)(ide_drive_t *drive);
 	int (*ide_dma_timeout)(ide_drive_t *drive);
-	/* dma queued operations */
-	int (*ide_dma_queued_on)(ide_drive_t *drive);
-	int (*ide_dma_queued_off)(ide_drive_t *drive);
-	ide_startstop_t (*ide_dma_queued_read)(ide_drive_t *drive);
-	ide_startstop_t (*ide_dma_queued_write)(ide_drive_t *drive);
-	ide_startstop_t (*ide_dma_queued_start)(ide_drive_t *drive);
 } ide_dma_ops_t;
 
 /*
@@ -946,13 +940,6 @@ typedef struct hwif_s {
 	int (*ide_dma_verbose)(ide_drive_t *drive);
 	int (*ide_dma_lostirq)(ide_drive_t *drive);
 	int (*ide_dma_timeout)(ide_drive_t *drive);
-
-	/* dma queued operations */
-	int (*ide_dma_queued_on)(ide_drive_t *drive);
-	int (*ide_dma_queued_off)(ide_drive_t *drive);
-	ide_startstop_t (*ide_dma_queued_read)(ide_drive_t *drive);
-	ide_startstop_t (*ide_dma_queued_write)(ide_drive_t *drive);
-	ide_startstop_t (*ide_dma_queued_start)(ide_drive_t *drive);
 
 	void (*OUTB)(u8 addr, unsigned long port);
 	void (*OUTBSYNC)(ide_drive_t *drive, u8 addr, unsigned long port);
@@ -1644,16 +1631,6 @@ extern int __ide_dma_queued_off(ide_drive_t *drive);
 extern ide_startstop_t __ide_dma_queued_read(ide_drive_t *drive);
 extern ide_startstop_t __ide_dma_queued_write(ide_drive_t *drive);
 extern ide_startstop_t __ide_dma_queued_start(ide_drive_t *drive);
-#else
-static inline int __ide_dma_queued_on(ide_drive_t *drive)
-{
-	return 1;
-}
-
-static inline int __ide_dma_queued_off(ide_drive_t *drive)
-{
-	return 1;
-}
 #endif
 
 #else

@@ -2030,13 +2030,6 @@ pmac_ide_setup_dma(pmac_ide_hwif_t *pmif, ide_hwif_t *hwif)
 	hwif->ide_dma_verbose = &__ide_dma_verbose;
 	hwif->ide_dma_timeout = &__ide_dma_timeout;
 	hwif->ide_dma_lostirq = &pmac_ide_dma_lostirq;
-	hwif->ide_dma_queued_on = &__ide_dma_queued_on;
-	hwif->ide_dma_queued_off = &__ide_dma_queued_off;
-#ifdef CONFIG_BLK_DEV_IDE_TCQ
-	hwif->ide_dma_queued_read = __ide_dma_queued_read;
-	hwif->ide_dma_queued_write = __ide_dma_queued_write;
-	hwif->ide_dma_queued_start = __ide_dma_queued_start;
-#endif
 
 #ifdef CONFIG_BLK_DEV_IDEDMA_PMAC_AUTO
 	if (!noautodma)

@@ -512,9 +512,9 @@ int __ide_dma_off_quietly (ide_drive_t *drive)
 
 	if (HWIF(drive)->ide_dma_host_off(drive))
 		return 1;
-
-	HWIF(drive)->ide_dma_queued_off(drive);
-
+#ifdef CONFIG_BLK_DEV_IDE_TCQ
+	__ide_dma_queued_off(drive);
+#endif
 	return 0;
 }
 
@@ -1090,23 +1090,6 @@ void ide_setup_dma (ide_hwif_t *hwif, unsigned long dma_base, unsigned int num_p
 		hwif->ide_dma_timeout = &__ide_dma_timeout;
 	if (!hwif->ide_dma_lostirq)
 		hwif->ide_dma_lostirq = &__ide_dma_lostirq;
-
-	/*
-	 * dma queued ops. if tcq isn't set, queued on and off are just
-	 * dummy functions. cuts down on ifdef hell
-	 */
-	if (!hwif->ide_dma_queued_on)
-		hwif->ide_dma_queued_on = __ide_dma_queued_on;
-	if (!hwif->ide_dma_queued_off)
-		hwif->ide_dma_queued_off = __ide_dma_queued_off;
-#ifdef CONFIG_BLK_DEV_IDE_TCQ
-	if (!hwif->ide_dma_queued_read)
-		hwif->ide_dma_queued_read = __ide_dma_queued_read;
-	if (!hwif->ide_dma_queued_write)
-		hwif->ide_dma_queued_write = __ide_dma_queued_write;
-	if (!hwif->ide_dma_queued_start)
-		hwif->ide_dma_queued_start = __ide_dma_queued_start;
-#endif
 
 	if (hwif->chipset != ide_trm290) {
 		u8 dma_stat = hwif->INB(hwif->dma_status);

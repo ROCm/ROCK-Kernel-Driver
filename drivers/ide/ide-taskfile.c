@@ -200,12 +200,14 @@ ide_startstop_t do_rw_taskfile (ide_drive_t *drive, ide_task_t *task)
 			if (!hwif->ide_dma_read(drive))
 				return ide_started;
 			break;
+#ifdef CONFIG_BLK_DEV_IDE_TCQ
 		case WIN_READDMA_QUEUED:
 		case WIN_READDMA_QUEUED_EXT:
-			return hwif->ide_dma_queued_read(drive);
+			return __ide_dma_queued_read(drive);
 		case WIN_WRITEDMA_QUEUED:
 		case WIN_WRITEDMA_QUEUED_EXT:
-			return hwif->ide_dma_queued_write(drive);
+			return __ide_dma_queued_write(drive);
+#endif
 		default:
 			if (task->handler == NULL)
 				return ide_stopped;

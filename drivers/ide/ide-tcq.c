@@ -353,7 +353,7 @@ ide_startstop_t ide_service(ide_drive_t *drive)
 		 */
 		TCQ_PRINTK("ide_service: starting command, stat=%x\n", stat);
 		spin_unlock_irqrestore(&ide_lock, flags);
-		return HWIF(drive)->ide_dma_queued_start(drive);
+		return __ide_dma_queued_start(drive);
 	}
 
 	printk(KERN_ERR "ide_service: missing request for tag %d\n", tag);
@@ -729,7 +729,7 @@ static ide_startstop_t ide_dma_queued_rw(ide_drive_t *drive, u8 command)
 	feat = hwif->INB(IDE_NSECTOR_REG);
 	if (!(feat & REL)) {
 		TCQ_PRINTK("IMMED in queued_start, feat=%x\n", feat);
-		return hwif->ide_dma_queued_start(drive);
+		return __ide_dma_queued_start(drive);
 	}
 
 	/*
