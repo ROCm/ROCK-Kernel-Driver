@@ -2290,6 +2290,52 @@ out_stop:
 	ext3_journal_stop(handle);
 }
 
+static unsigned long ext3_get_inode_block(struct super_block *sb,
+		unsigned long ino, struct ext3_iloc *iloc)
+{
+	unsigned long desc, group_desc, block_group;
+	unsigned long offset, block;
+	struct buffer_head *bh;
+	struct ext3_group_desc * gdp;
+
+	if ((ino != EXT3_ROOT_INO &&
+		ino != EXT3_JOURNAL_INO &&
+		ino < EXT3_FIRST_INO(sb)) ||
+		ino > le32_to_cpu(
+			EXT3_SB(sb)->s_es->s_inodes_count)) {
+		ext3_error (sb, "ext3_get_inode_block",
+			    "bad inode number: %lu", ino);
+		return 0;
+	}
+	block_group = (ino - 1) / EXT3_INODES_PER_GROUP(sb);
+	if (block_group >= EXT3_SB(sb)->s_groups_count) {
+		ext3_error (sb, "ext3_get_inode_block",
+			    "group >= groups count");
+		return 0;
+	}
+	group_desc = block_group >> EXT3_DESC_PER_BLOCK_BITS(sb);
+	desc = block_group & (EXT3_DESC_PER_BLOCK(sb) - 1);
+	bh = EXT3_SB(sb)->s_group_desc[group_desc];
+	if (!bh) {
+		ext3_error (sb, "ext3_get_inode_block",
+			    "Descriptor not loaded");
+		return 0;
+	}
+
+	gdp = (struct ext3_group_desc *) bh->b_data;
+	/*
+	 * Figure out the offset within the block group inode table
+	 */
+	offset = ((ino - 1) % EXT3_INODES_PER_GROUP(sb)) *
+		EXT3_INODE_SIZE(sb);
+	block = le32_to_cpu(gdp[desc].bg_inode_table) +
+		(offset >> EXT3_BLOCK_SIZE_BITS(sb));
+
+	iloc->block_group = block_group;
+	iloc->offset = offset & (EXT3_BLOCK_SIZE(sb) - 1);
+	return block;
+}
+
 /* 
  * ext3_get_inode_loc returns with an extra refcount against the
  * inode's underlying buffer_head on success. 
@@ -2297,61 +2343,19 @@ out_stop:
 
 int ext3_get_inode_loc (struct inode *inode, struct ext3_iloc *iloc)
 {
-	struct buffer_head *bh = 0;
 	unsigned long block;
-	unsigned long block_group;
-	unsigned long group_desc;
-	unsigned long desc;
-	unsigned long offset;
-	struct ext3_group_desc * gdp;
 
-	if ((inode->i_ino != EXT3_ROOT_INO &&
-		inode->i_ino != EXT3_JOURNAL_INO &&
-		inode->i_ino < EXT3_FIRST_INO(inode->i_sb)) ||
-		inode->i_ino > le32_to_cpu(
-			EXT3_SB(inode->i_sb)->s_es->s_inodes_count)) {
-		ext3_error (inode->i_sb, "ext3_get_inode_loc",
-			    "bad inode number: %lu", inode->i_ino);
-		goto bad_inode;
-	}
-	block_group = (inode->i_ino - 1) / EXT3_INODES_PER_GROUP(inode->i_sb);
-	if (block_group >= EXT3_SB(inode->i_sb)->s_groups_count) {
-		ext3_error (inode->i_sb, "ext3_get_inode_loc",
-			    "group >= groups count");
-		goto bad_inode;
-	}
-	group_desc = block_group >> EXT3_DESC_PER_BLOCK_BITS(inode->i_sb);
-	desc = block_group & (EXT3_DESC_PER_BLOCK(inode->i_sb) - 1);
-	bh = EXT3_SB(inode->i_sb)->s_group_desc[group_desc];
-	if (!bh) {
-		ext3_error (inode->i_sb, "ext3_get_inode_loc",
-			    "Descriptor not loaded");
-		goto bad_inode;
-	}
-
-	gdp = (struct ext3_group_desc *) bh->b_data;
-	/*
-	 * Figure out the offset within the block group inode table
-	 */
-	offset = ((inode->i_ino - 1) % EXT3_INODES_PER_GROUP(inode->i_sb)) *
-		EXT3_INODE_SIZE(inode->i_sb);
-	block = le32_to_cpu(gdp[desc].bg_inode_table) +
-		(offset >> EXT3_BLOCK_SIZE_BITS(inode->i_sb));
-	if (!(bh = sb_bread(inode->i_sb, block))) {
+	block = ext3_get_inode_block(inode->i_sb, inode->i_ino, iloc);
+	if (block) {
+		struct buffer_head *bh = sb_bread(inode->i_sb, block);
+		if (bh) {
+			iloc->bh = bh;
+			return 0;
+		}
 		ext3_error (inode->i_sb, "ext3_get_inode_loc",
 			    "unable to read inode block - "
 			    "inode=%lu, block=%lu", inode->i_ino, block);
-		goto bad_inode;
 	}
-	offset &= (EXT3_BLOCK_SIZE(inode->i_sb) - 1);
-
-	iloc->bh = bh;
-	iloc->raw_inode = (struct ext3_inode *) (bh->b_data + offset);
-	iloc->block_group = block_group;
-
-	return 0;
-
- bad_inode:
 	return -EIO;
 }
 
@@ -2388,7 +2392,7 @@ void ext3_read_inode(struct inode * inode)
 	if (ext3_get_inode_loc(inode, &iloc))
 		goto bad_inode;
 	bh = iloc.bh;
-	raw_inode = iloc.raw_inode;
+	raw_inode = ext3_raw_inode(&iloc);
 	inode->i_mode = le16_to_cpu(raw_inode->i_mode);
 	inode->i_uid = (uid_t)le16_to_cpu(raw_inode->i_uid_low);
 	inode->i_gid = (gid_t)le16_to_cpu(raw_inode->i_gid_low);
@@ -2454,10 +2458,8 @@ void ext3_read_inode(struct inode * inode)
 	 * even on big-endian machines: we do NOT byteswap the block numbers!
 	 */
 	for (block = 0; block < EXT3_N_BLOCKS; block++)
-		ei->i_data[block] = iloc.raw_inode->i_block[block];
+		ei->i_data[block] = raw_inode->i_block[block];
 	INIT_LIST_HEAD(&ei->i_orphan);
-
-	brelse (iloc.bh);
 
 	if (S_ISREG(inode->i_mode)) {
 		inode->i_op = &ext3_file_inode_operations;
@@ -2476,8 +2478,9 @@ void ext3_read_inode(struct inode * inode)
 	} else {
 		inode->i_op = &ext3_special_inode_operations;
 		init_special_inode(inode, inode->i_mode,
-				   le32_to_cpu(iloc.raw_inode->i_block[0]));
+				   le32_to_cpu(raw_inode->i_block[0]));
 	}
+	brelse (iloc.bh);
 	ext3_set_inode_flags(inode);
 	return;
 
@@ -2497,7 +2500,7 @@ static int ext3_do_update_inode(handle_t *handle,
 				struct inode *inode, 
 				struct ext3_iloc *iloc)
 {
-	struct ext3_inode *raw_inode = iloc->raw_inode;
+	struct ext3_inode *raw_inode = ext3_raw_inode(iloc);
 	struct ext3_inode_info *ei = EXT3_I(inode);
 	struct buffer_head *bh = iloc->bh;
 	int err = 0, rc, block;
