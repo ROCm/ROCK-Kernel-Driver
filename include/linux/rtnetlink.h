@@ -78,7 +78,7 @@ struct rtattr
 
 
 /******************************************************************************
- *		Definitions used in routing table administation.
+ *		Definitions used in routing table administration.
  ****/
 
 struct rtmsg
@@ -129,14 +129,14 @@ enum
 #define RTPROT_STATIC	4	/* Route installed by administrator	*/
 
 /* Values of protocol >= RTPROT_STATIC are not interpreted by kernel;
-   they just passed from user and back as is.
+   they are just passed from user and back as is.
    It will be used by hypothetical multiple routing daemons.
    Note that protocol values should be standardized in order to
    avoid conflicts.
  */
 
 #define RTPROT_GATED	8	/* Apparently, GateD */
-#define RTPROT_RA	9	/* RDISC/ND router advertisments */
+#define RTPROT_RA	9	/* RDISC/ND router advertisements */
 #define RTPROT_MRT	10	/* Merit MRT */
 #define RTPROT_ZEBRA	11	/* Zebra */
 #define RTPROT_BIRD	12	/* BIRD */
@@ -210,8 +210,8 @@ enum rtattr_type_t
 
 /* RTM_MULTIPATH --- array of struct rtnexthop.
  *
- * "struct rtnexthop" describres all necessary nexthop information,
- * i.e. parameters of path to a destination via this nextop.
+ * "struct rtnexthop" describes all necessary nexthop information,
+ * i.e. parameters of path to a destination via this nexthop.
  *
  * At the moment it is impossible to set different prefsrc, mtu, window
  * and rtt for different paths from multipath.
@@ -485,7 +485,7 @@ enum
 
    Comments:
    - Combination IFF_BROADCAST|IFF_POINTOPOINT is invalid
-   - If neiher of these three flags are set;
+   - If neither of these three flags are set;
      the interface is NBMA.
 
    - IFF_MULTICAST does not mean anything special:
