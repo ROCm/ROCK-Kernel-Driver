@@ -268,7 +268,8 @@ struct dentry_operations adfs_dentry_operations = {
 	.d_compare	= adfs_compare,
 };
 
-struct dentry *adfs_lookup(struct inode *dir, struct dentry *dentry, struct nameidata *nd)
+static struct dentry *
+adfs_lookup(struct inode *dir, struct dentry *dentry, struct nameidata *nd)
 {
 	struct inode *inode = NULL;
 	struct object_info obj;

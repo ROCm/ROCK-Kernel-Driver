@@ -165,7 +165,7 @@ adfs_dir_checkbyte(const struct adfs_dir *dir)
 /*
  * Read and check that a directory is valid
  */
-int
+static int
 adfs_dir_read(struct super_block *sb, unsigned long object_id,
 	      unsigned int size, struct adfs_dir *dir)
 {
@@ -260,7 +260,7 @@ adfs_obj2dir(struct adfs_direntry *de, struct object_info *obj)
  * get a directory entry.  Note that the caller is responsible
  * for holding the relevant locks.
  */
-int
+static int
 __adfs_dir_get(struct adfs_dir *dir, int pos, struct object_info *obj)
 {
 	struct super_block *sb = dir->sb;
@@ -290,7 +290,7 @@ __adfs_dir_get(struct adfs_dir *dir, int pos, struct object_info *obj)
 	return 0;
 }
 
-int
+static int
 __adfs_dir_put(struct adfs_dir *dir, int pos, struct object_info *obj)
 {
 	struct super_block *sb = dir->sb;
