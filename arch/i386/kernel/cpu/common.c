@@ -506,7 +506,7 @@ void __init early_cpu_init(void)
 void __init cpu_init (void)
 {
 	int cpu = smp_processor_id();
-	struct tss_struct * t = init_tss + cpu;
+	struct tss_struct * t = &per_cpu(init_tss, cpu);
 	struct thread_struct *thread = &current->thread;
 
 	if (test_and_set_bit(cpu, &cpu_initialized)) {

@@ -299,7 +299,7 @@ void exit_thread(void)
 	/* The process may have allocated an io port bitmap... nuke it. */
 	if (unlikely(NULL != t->io_bitmap_ptr)) {
 		int cpu = get_cpu();
-		struct tss_struct *tss = init_tss + cpu;
+		struct tss_struct *tss = &per_cpu(init_tss, cpu);
 
 		kfree(t->io_bitmap_ptr);
 		t->io_bitmap_ptr = NULL;
@@ -517,7 +517,7 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 	struct thread_struct *prev = &prev_p->thread,
 				 *next = &next_p->thread;
 	int cpu = smp_processor_id();
-	struct tss_struct *tss = init_tss + cpu;
+	struct tss_struct *tss = &per_cpu(init_tss, cpu);
 
 	/* never put a printk in __switch_to... printk() calls wake_up*() indirectly */
 
