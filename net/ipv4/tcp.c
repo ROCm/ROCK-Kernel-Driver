@@ -447,7 +447,7 @@ unsigned int tcp_poll(struct file *file, struct socket *sock, poll_table *wait)
 			mask |= POLLIN | POLLRDNORM;
 
 		if (!(sk->sk_shutdown & SEND_SHUTDOWN)) {
-			if (tcp_wspace(sk) >= tcp_min_write_space(sk)) {
+			if (sk_stream_wspace(sk) >= sk_stream_min_wspace(sk)) {
 				mask |= POLLOUT | POLLWRNORM;
 			} else {  /* send SIGIO later */
 				set_bit(SOCK_ASYNC_NOSPACE,
@@ -458,7 +458,7 @@ unsigned int tcp_poll(struct file *file, struct socket *sock, poll_table *wait)
 				 * wspace test but before the flags are set,
 				 * IO signal will be lost.
 				 */
-				if (tcp_wspace(sk) >= tcp_min_write_space(sk))
+				if (sk_stream_wspace(sk) >= sk_stream_min_wspace(sk))
 					mask |= POLLOUT | POLLWRNORM;
 			}
 		}
@@ -467,24 +467,6 @@ unsigned int tcp_poll(struct file *file, struct socket *sock, poll_table *wait)
 			mask |= POLLPRI;
 	}
 	return mask;
-}
-
-/*
- *	TCP socket write_space callback.
- */
-void tcp_write_space(struct sock *sk)
-{
-	struct socket *sock = sk->sk_socket;
-
-	if (tcp_wspace(sk) >= tcp_min_write_space(sk) && sock) {
-		clear_bit(SOCK_NOSPACE, &sock->flags);
-
-		if (sk->sk_sleep && waitqueue_active(sk->sk_sleep))
-			wake_up_interruptible(sk->sk_sleep);
-
-		if (sock->fasync_list && !(sk->sk_shutdown & SEND_SHUTDOWN))
-			sock_wake_async(sock, 2, POLL_OUT);
-	}
 }
 
 int tcp_ioctl(struct sock *sk, int cmd, unsigned long arg)
@@ -796,7 +778,7 @@ static inline void skb_entail(struct sock *sk, struct tcp_opt *tp,
 	TCP_SKB_CB(skb)->flags = TCPCB_FLAG_ACK;
 	TCP_SKB_CB(skb)->sacked = 0;
 	__skb_queue_tail(&sk->sk_write_queue, skb);
-	tcp_charge_skb(sk, skb);
+	sk_charge_skb(sk, skb);
 	if (!tp->send_head)
 		tp->send_head = skb;
 	else if (tp->nonagle&TCP_NAGLE_PUSH)
@@ -2635,4 +2617,3 @@ EXPORT_SYMBOL(tcp_shutdown);
 EXPORT_SYMBOL(tcp_sockets_allocated);
 EXPORT_SYMBOL(tcp_statistics);
 EXPORT_SYMBOL(tcp_timewait_cachep);
-EXPORT_SYMBOL(tcp_write_space);

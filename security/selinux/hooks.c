@@ -71,6 +71,9 @@
 #define XATTR_SELINUX_SUFFIX "selinux"
 #define XATTR_NAME_SELINUX XATTR_SECURITY_PREFIX XATTR_SELINUX_SUFFIX
 
+extern int policydb_loaded_version;
+extern int selinux_nlmsg_lookup(u16 sclass, u16 nlmsg_type, u32 *perm);
+
 #ifdef CONFIG_SECURITY_SELINUX_DEVELOP
 int selinux_enforcing = 0;
 
@@ -627,7 +630,7 @@ static inline u16 inode_mode_to_security_class(umode_t mode)
 	return SECCLASS_FILE;
 }
 
-static inline u16 socket_type_to_security_class(int family, int type)
+static inline u16 socket_type_to_security_class(int family, int type, int protocol)
 {
 	switch (family) {
 	case PF_UNIX:
@@ -648,7 +651,28 @@ static inline u16 socket_type_to_security_class(int family, int type)
 			return SECCLASS_RAWIP_SOCKET;
 		}
 	case PF_NETLINK:
-		return SECCLASS_NETLINK_SOCKET;
+		switch (protocol) {
+		case NETLINK_ROUTE:
+			return SECCLASS_NETLINK_ROUTE_SOCKET;
+		case NETLINK_FIREWALL:
+			return SECCLASS_NETLINK_FIREWALL_SOCKET;
+		case NETLINK_TCPDIAG:
+			return SECCLASS_NETLINK_TCPDIAG_SOCKET;
+		case NETLINK_NFLOG:
+			return SECCLASS_NETLINK_NFLOG_SOCKET;
+		case NETLINK_XFRM:
+			return SECCLASS_NETLINK_XFRM_SOCKET;
+		case NETLINK_SELINUX:
+			return SECCLASS_NETLINK_SELINUX_SOCKET;
+		case NETLINK_AUDIT:
+			return SECCLASS_NETLINK_AUDIT_SOCKET;
+		case NETLINK_IP6_FW:
+			return SECCLASS_NETLINK_IP6FW_SOCKET;
+		case NETLINK_DNRTMSG:
+			return SECCLASS_NETLINK_DNRT_SOCKET;
+		default:
+			return SECCLASS_NETLINK_SOCKET;
+		}
 	case PF_PACKET:
 		return SECCLASS_PACKET_SOCKET;
 	case PF_KEY:
@@ -853,7 +877,8 @@ out:
 		struct socket *sock = SOCKET_I(inode);
 		if (sock->sk) {
 			isec->sclass = socket_type_to_security_class(sock->sk->sk_family,
-			                                             sock->sk->sk_type);
+			                                             sock->sk->sk_type,
+			                                             sock->sk->sk_protocol);
 		} else {
 			isec->sclass = SECCLASS_SOCKET;
 		}
@@ -1565,22 +1590,6 @@ static int selinux_vm_enough_memory(long pages)
 	vm_unacct_memory(pages);
 
 	return -ENOMEM;
-}
-
-static int selinux_netlink_send(struct sk_buff *skb)
-{
-	if (capable(CAP_NET_ADMIN))
-		cap_raise (NETLINK_CB (skb).eff_cap, CAP_NET_ADMIN);
-	else
-		NETLINK_CB(skb).eff_cap = 0;
-	return 0;
-}
-
-static int selinux_netlink_recv(struct sk_buff *skb)
-{
-	if (!cap_raised(NETLINK_CB(skb).eff_cap, CAP_NET_ADMIN))
-		return -EPERM;
-	return 0;
 }
 
 /* binprm security operations */
@@ -2918,8 +2927,8 @@ static int selinux_socket_create(int family, int type,
 
 	tsec = current->security;
 	err = avc_has_perm(tsec->sid, tsec->sid,
-			   socket_type_to_security_class(family, type),
-			   SOCKET__CREATE, NULL, NULL);
+			   socket_type_to_security_class(family, type,
+			   protocol), SOCKET__CREATE, NULL, NULL);
 
 out:
 	return err;
@@ -2938,7 +2947,7 @@ static void selinux_socket_post_create(struct socket *sock, int family,
 	isec = SOCK_INODE(sock)->i_security;
 
 	tsec = current->security;
-	isec->sclass = socket_type_to_security_class(family, type);
+	isec->sclass = socket_type_to_security_class(family, type, protocol);
 	isec->sid = kern ? SECINITSID_KERNEL : tsec->sid;
 
 	return;
@@ -3174,12 +3183,12 @@ static int selinux_socket_sock_rcv_skb(struct sock *sk, struct sk_buff *skb)
 	char *addrp;
 	int len, err = 0;
 	u32 netif_perm, node_perm, node_sid, recv_perm = 0;
+	u32 sock_sid = 0;
+	u16 sock_class = 0;
 	struct socket *sock;
-	struct inode *inode;
 	struct net_device *dev;
 	struct sel_netif *netif;
 	struct netif_security_struct *nsec;
-	struct inode_security_struct *isec;
 	struct avc_audit_data ad;
 
 	family = sk->sk_family;
@@ -3190,15 +3199,21 @@ static int selinux_socket_sock_rcv_skb(struct sock *sk, struct sk_buff *skb)
 	if (family == PF_INET6 && skb->protocol == ntohs(ETH_P_IP))
 		family = PF_INET;
 
-	sock = sk->sk_socket;
-	
-	/* TCP control messages don't always have a socket. */
-	if (!sock)
-		goto out;
-
-	inode = SOCK_INODE(sock);
-	if (!inode)
-		goto out;
+ 	read_lock_bh(&sk->sk_callback_lock);
+ 	sock = sk->sk_socket;
+ 	if (sock) {
+ 		struct inode *inode;
+ 		inode = SOCK_INODE(sock);
+ 		if (inode) {
+ 			struct inode_security_struct *isec;
+ 			isec = inode->i_security;
+ 			sock_sid = isec->sid;
+ 			sock_class = isec->sclass;
+ 		}
+ 	}
+ 	read_unlock_bh(&sk->sk_callback_lock);
+ 	if (!sock_sid)
+  		goto out;
 
 	dev = skb->dev;
 	if (!dev)
@@ -3211,9 +3226,8 @@ static int selinux_socket_sock_rcv_skb(struct sock *sk, struct sk_buff *skb)
 	}
 	
 	nsec = &netif->nsec;
-	isec = inode->i_security;
 
-	switch (isec->sclass) {
+	switch (sock_class) {
 	case SECCLASS_UDP_SOCKET:
 		netif_perm = NETIF__UDP_RECV;
 		node_perm = NODE__UDP_RECV;
@@ -3242,7 +3256,7 @@ static int selinux_socket_sock_rcv_skb(struct sock *sk, struct sk_buff *skb)
 		goto out;
 	}
 
-	err = avc_has_perm(isec->sid, nsec->if_sid, SECCLASS_NETIF,
+	err = avc_has_perm(sock_sid, nsec->if_sid, SECCLASS_NETIF,
 	                   netif_perm, &nsec->avcr, &ad);
 	sel_netif_put(netif);
 	if (err)
@@ -3253,7 +3267,7 @@ static int selinux_socket_sock_rcv_skb(struct sock *sk, struct sk_buff *skb)
 	if (err)
 		goto out;
 	
-	err = avc_has_perm(isec->sid, node_sid, SECCLASS_NODE, node_perm, NULL, &ad);
+	err = avc_has_perm(sock_sid, node_sid, SECCLASS_NODE, node_perm, NULL, &ad);
 	if (err)
 		goto out;
 
@@ -3267,7 +3281,7 @@ static int selinux_socket_sock_rcv_skb(struct sock *sk, struct sk_buff *skb)
 		if (err)
 			goto out;
 
-		err = avc_has_perm(isec->sid, port_sid, isec->sclass,
+		err = avc_has_perm(sock_sid, port_sid, sock_class,
 		                   recv_perm, NULL, &ad);
 	}
 out:	
@@ -3320,6 +3334,55 @@ static int selinux_sk_alloc_security(struct sock *sk, int family, int priority)
 static void selinux_sk_free_security(struct sock *sk)
 {
 	sk_free_security(sk);
+}
+
+static int selinux_nlmsg_perm(struct sock *sk, struct sk_buff *skb)
+{
+	int err = 0;
+	u32 perm;
+	struct nlmsghdr *nlh;
+	struct socket *sock = sk->sk_socket;
+	struct inode_security_struct *isec = SOCK_INODE(sock)->i_security;
+	
+	if (skb->len < NLMSG_SPACE(0)) {
+		err = -EINVAL;
+		goto out;
+	}
+	nlh = (struct nlmsghdr *)skb->data;
+	
+	err = selinux_nlmsg_lookup(isec->sclass, nlh->nlmsg_type, &perm);
+	if (err) {
+		/* Ignore */
+		if (err == -ENOENT)
+			err = 0;
+		goto out;
+	}
+
+	err = socket_has_perm(current, sock, perm);
+out:
+	return err;
+}
+
+static int selinux_netlink_send(struct sock *sk, struct sk_buff *skb)
+{
+	int err = 0;
+	
+	if (capable(CAP_NET_ADMIN))
+		cap_raise (NETLINK_CB (skb).eff_cap, CAP_NET_ADMIN);
+	else
+		NETLINK_CB(skb).eff_cap = 0;
+	
+	if (policydb_loaded_version >= POLICYDB_VERSION_NLCLASS)
+		err = selinux_nlmsg_perm(sk, skb);
+	
+	return err;
+}
+
+static int selinux_netlink_recv(struct sk_buff *skb)
+{
+	if (!cap_raised(NETLINK_CB(skb).eff_cap, CAP_NET_ADMIN))
+		return -EPERM;
+	return 0;
 }
 
 #ifdef CONFIG_NETFILTER

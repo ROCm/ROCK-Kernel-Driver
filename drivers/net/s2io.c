@@ -1425,13 +1425,13 @@ int fill_rx_buffers(struct s2io_nic *nic, int ring_no)
 			goto end;
 		}
 
-		skb = dev_alloc_skb(size + HEADER_ALIGN_LAYER_3);
+		skb = dev_alloc_skb(size + NET_IP_ALIGN);
 		if (!skb) {
 			DBG_PRINT(ERR_DBG, "%s: Out of ", dev->name);
 			DBG_PRINT(ERR_DBG, "memory to allocate SKBs\n");
 			return -ENOMEM;
 		}
-		skb_reserve(skb, HEADER_ALIGN_LAYER_3);
+		skb_reserve(skb, NET_IP_ALIGN);
 		memset(rxdp, 0, sizeof(RxD_t));
 		rxdp->Buffer0_ptr = pci_map_single
 		    (nic->pdev, skb->data, size, PCI_DMA_FROMDEVICE);

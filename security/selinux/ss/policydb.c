@@ -38,6 +38,8 @@ static char *symtab_name[SYM_NUM] = {
 };
 #endif
 
+int policydb_loaded_version;
+
 static unsigned int symtab_sizes[SYM_NUM] = {
 	2,
 	32,
@@ -68,6 +70,11 @@ static struct policydb_compat_info policydb_compat[] = {
 	},
 	{
 		.version        = POLICYDB_VERSION_IPV6,
+		.sym_num        = SYM_NUM,
+		.ocon_num       = OCON_NUM,
+	},
+	{
+		.version        = POLICYDB_VERSION_NLCLASS,
 		.sym_num        = SYM_NUM,
 		.ocon_num       = OCON_NUM,
 	},
@@ -1125,7 +1132,7 @@ int policydb_read(struct policydb *p, void *fp)
 	struct role_trans *tr, *ltr;
 	struct ocontext *l, *c, *newc;
 	struct genfs *genfs_p, *genfs, *newgenfs;
-	int i, j, rc, r_policyvers;
+	int i, j, rc, r_policyvers = 0;
 	u32 *buf, len, len2, config, nprim, nel, nel2;
 	char *policydb_str;
 	struct policydb_compat_info *info;
@@ -1546,6 +1553,7 @@ int policydb_read(struct policydb *p, void *fp)
 	if (rc)
 		goto bad;
 out:
+	policydb_loaded_version = r_policyvers;
 	return rc;
 bad_newc:
 	ocontext_destroy(newc,OCON_FSUSE);

@@ -816,6 +816,30 @@ static inline void skb_reserve(struct sk_buff *skb, unsigned int len)
 	skb->tail += len;
 }
 
+/*
+ * CPUs often take a performance hit when accessing unaligned memory
+ * locations. The actual performance hit varies, it can be small if the
+ * hardware handles it or large if we have to take an exception and fix it
+ * in software.
+ *
+ * Since an ethernet header is 14 bytes network drivers often end up with
+ * the IP header at an unaligned offset. The IP header can be aligned by
+ * shifting the start of the packet by 2 bytes. Drivers should do this
+ * with:
+ *
+ * skb_reserve(NET_IP_ALIGN);
+ *
+ * The downside to this alignment of the IP header is that the DMA is now
+ * unaligned. On some architectures the cost of an unaligned DMA is high
+ * and this cost outweighs the gains made by aligning the IP header.
+ * 
+ * Since this trade off varies between architectures, we allow NET_IP_ALIGN
+ * to be overridden.
+ */
+#ifndef NET_IP_ALIGN
+#define NET_IP_ALIGN	2
+#endif
+
 extern int ___pskb_trim(struct sk_buff *skb, unsigned int len, int realloc);
 
 static inline void __skb_trim(struct sk_buff *skb, unsigned int len)
