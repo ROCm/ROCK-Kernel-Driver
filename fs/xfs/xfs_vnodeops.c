@@ -82,7 +82,7 @@ xfs_open(
 /*
  * xfs_getattr
  */
-int
+STATIC int
 xfs_getattr(
 	bhv_desc_t	*bdp,
 	vattr_t		*vap,

@@ -481,7 +481,7 @@ void		xfs_iunlock_map_shared(xfs_inode_t *, uint);
 void		xfs_ifunlock(xfs_inode_t *);
 void		xfs_ireclaim(xfs_inode_t *);
 int		xfs_finish_reclaim(xfs_inode_t *, int, int);
-int		xfs_reclaim_all(struct xfs_mount *);
+int		xfs_finish_reclaim_all(struct xfs_mount *);
 
 /*
  * xfs_inode.c prototypes.
