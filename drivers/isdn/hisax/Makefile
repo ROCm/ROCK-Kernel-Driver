@@ -6,7 +6,7 @@ EXTRA_CFLAGS      += -DHISAX_MAX_CARDS=$(CONFIG_HISAX_MAX_CARDS)
 
 # Objects that export symbols.
 
-export-objs	  := config.o fsm.o hisax_isac.o hisax_hscx.o
+export-objs	  := config.o hisax_isac.o hisax_hscx.o
 
 # Each configuration option enables a list of files.
 

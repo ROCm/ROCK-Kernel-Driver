@@ -2152,3 +2152,11 @@ MODULE_DEVICE_TABLE(pci, hisax_pci_tbl);
 
 module_init(HiSax_init);
 module_exit(HiSax_exit);
+
+EXPORT_SYMBOL(FsmNew);
+EXPORT_SYMBOL(FsmFree);
+EXPORT_SYMBOL(FsmEvent);
+EXPORT_SYMBOL(FsmChangeState);
+EXPORT_SYMBOL(FsmInitTimer);
+EXPORT_SYMBOL(FsmDelTimer);
+EXPORT_SYMBOL(FsmRestartTimer);
