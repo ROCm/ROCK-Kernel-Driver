@@ -23,10 +23,10 @@
  */
 
 
-#include "acpi.h"
-#include "acnamesp.h"
-#include "acdispat.h"
-#include "acinterp.h"
+#include <acpi/acpi.h>
+#include <acpi/acnamesp.h>
+#include <acpi/acdispat.h>
+#include <acpi/acinterp.h>
 
 #define _COMPONENT          ACPI_NAMESPACE
 	 ACPI_MODULE_NAME    ("nsinit")

@@ -24,8 +24,8 @@
  */
 
 
-#include "acpi.h"
-#include "acinterp.h"
+#include <acpi/acpi.h>
+#include <acpi/acinterp.h>
 
 #define _COMPONENT          ACPI_EXECUTER
 	 ACPI_MODULE_NAME    ("exmutex")

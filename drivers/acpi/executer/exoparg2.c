@@ -23,11 +23,11 @@
  */
 
 
-#include "acpi.h"
-#include "acparser.h"
-#include "acinterp.h"
-#include "acevents.h"
-#include "amlcode.h"
+#include <acpi/acpi.h>
+#include <acpi/acparser.h>
+#include <acpi/acinterp.h>
+#include <acpi/acevents.h>
+#include <acpi/amlcode.h>
 
 
 #define _COMPONENT          ACPI_EXECUTER

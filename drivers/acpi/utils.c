@@ -27,8 +27,8 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/types.h>
-#include "acpi_bus.h"
-#include "acpi_drivers.h"
+#include <acpi/acpi_bus.h>
+#include <acpi/acpi_drivers.h>
 
 
 #define _COMPONENT		ACPI_BUS_COMPONENT
