@@ -324,7 +324,7 @@ static inline void mts_urb_abort(struct mts_desc* desc) {
 	MTS_DEBUG_GOT_HERE();
 	mts_debug_dump(desc);
 
-	usb_unlink_urb( desc->urb );
+	usb_kill_urb( desc->urb );
 }
 
 static int mts_scsi_abort (Scsi_Cmnd *srb)
@@ -822,9 +822,8 @@ static void mts_usb_disconnect (struct usb_interface *intf)
 
 	usb_set_intfdata(intf, NULL);
 
+	usb_kill_urb(desc->urb);
 	scsi_remove_host(desc->host);
-	usb_unlink_urb(desc->urb);
-	scsi_host_put(desc->host);
 
 	usb_free_urb(desc->urb);
 	kfree(desc);
