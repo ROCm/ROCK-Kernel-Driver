@@ -312,6 +312,11 @@ static char *mode;
 #ifdef CONFIG_PPC
 static int default_vmode __initdata = VMODE_CHOOSE;
 static int default_cmode __initdata = CMODE_CHOOSE;
+
+module_param_named(vmode, default_vmode, int, 0);
+MODULE_PARM_DESC(vmode, "int: video mode for mac");
+module_param_named(cmode, default_cmode, int, 0);
+MODULE_PARM_DESC(cmode, "int: color mode for mac");
 #endif
 
 #ifdef CONFIG_ATARI
@@ -3678,12 +3683,6 @@ module_param(mclk, int, 0);
 MODULE_PARM_DESC(mclk, "int: override memory clock");
 module_param(xclk, int, 0);
 MODULE_PARM_DESC(xclk, "int: override accelerated engine clock");
-#ifdef CONFIG_PPC
-module_param(vmode, int, 0);
-MODULE_PARM_DESC(vmode, "int: video mode for mac");
-module_param(cmode, int, 0);
-MODULE_PARM_DESC(cmode, "int: color mode for mac");
-#endif
 module_param(mode, charp, 0);
 MODULE_PARM_DESC(mode, "Specify resolution as \"<xres>x<yres>[-<bpp>][@<refresh>]\" ");
 #ifdef CONFIG_MTRR
