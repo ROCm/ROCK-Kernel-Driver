@@ -10,6 +10,7 @@ dep_tristate '  Logitech ADI digital joysticks and gamepads' CONFIG_JOYSTICK_ADI
 dep_tristate '  Creative Labs Blaster Cobra gamepad' CONFIG_JOYSTICK_COBRA $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_GAMEPORT
 dep_tristate '  Genius Flight2000 Digital joysticks and gamepads' CONFIG_JOYSTICK_GF2K $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_GAMEPORT
 dep_tristate '  Gravis GrIP joysticks and gamepads' CONFIG_JOYSTICK_GRIP $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_GAMEPORT
+dep_tristate '  Guillemot joysticks and gamepads' CONFIG_JOYSTICK_GUILLEMOT $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_GAMEPORT
 dep_tristate '  InterAct digital joysticks and gamepads' CONFIG_JOYSTICK_INTERACT $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_GAMEPORT
 dep_tristate '  Microsoft SideWinder digital joysticks and gamepads' CONFIG_JOYSTICK_SIDEWINDER $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_GAMEPORT
 dep_tristate '  ThrustMaster DirectConnect joysticks and gamepads' CONFIG_JOYSTICK_TMDC $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_GAMEPORT
@@ -21,6 +22,7 @@ dep_tristate '  LogiCad3d Magellan/SpaceMouse 6dof controllers' CONFIG_JOYSTICK_
 dep_tristate '  SpaceTec SpaceOrb/Avenger 6dof controllers' CONFIG_JOYSTICK_SPACEORB $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_SERIO
 dep_tristate '  SpaceTec SpaceBall 6dof controllers' CONFIG_JOYSTICK_SPACEBALL $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_SERIO
 dep_tristate '  Gravis Stinger gamepad' CONFIG_JOYSTICK_STINGER $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_SERIO
+dep_tristate '  Twiddler as as joystick' CONFIG_JOYSTICK_TWIDDLER $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_SERIO
 
 dep_tristate '  Multisystem, Sega Genesis, Saturn joysticks and gamepads' CONFIG_JOYSTICK_DB9 $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_PARPORT
 dep_tristate '  Multisystem, NES, SNES, N64, PSX joysticks and gamepads' CONFIG_JOYSTICK_GAMECON $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_PARPORT

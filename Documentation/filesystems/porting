@@ -3,10 +3,12 @@ Changes since 2.5.0:
 --- 
 [recommended]
 
-New helpers: sb_bread(), sb_getblk(), sb_get_hash_table(), set_bh(),
+New helpers: sb_bread(), sb_getblk(), sb_find_get_block(), set_bh(),
 	sb_set_blocksize() and sb_min_blocksize().
 
 Use them.
+
+(sb_find_get_block() replaces 2.4's get_hash_table())
 
 --- 
 [recommended]
@@ -81,7 +83,7 @@ can relax your locking.
 [mandatory]
 
 ->lookup(), ->truncate(), ->create(), ->unlink(), ->mknod(), ->mkdir(),
-->rmdir(), ->link(), ->lseek(), ->symlink(), ->rename(), ->permission()
+->rmdir(), ->link(), ->lseek(), ->symlink(), ->rename()
 and ->readdir() are called without BKL now.  Grab it on entry, drop upon return
 - that will guarantee the same locking you used to have.  If your method or its
 parts do not need BKL - better yet, now you can shift lock_kernel() and
@@ -228,3 +230,37 @@ anything from oops to silent memory corruption.
 	Use bdev_read_only(bdev) instead of is_read_only(kdev).  The latter
 is still alive, but only because of the mess in drivers/s390/block/dasd.c.
 As soon as it gets fixed is_read_only() will die.
+
+---
+[mandatory]
+
+->permission() is called without BKL now. Grab it on entry, drop upon
+return - that will guarantee the same locking you used to have.  If
+your method or its parts do not need BKL - better yet, now you can
+shift lock_kernel() and unlock_kernel() so that they would protect
+exactly what needs to be protected.
+
+---
+[mandatory]
+
+->statfs() is now called without BKL held.  BKL should have been
+shifted into individual fs sb_op functions where it's not clear that
+it's safe to remove it.  If you don't need it, remove it.
+
+---
+[mandatory]
+
+	is_read_only() is gone; use bdev_read_only() instead.
+
+---
+[mandatory]
+
+	destroy_buffers() is gone; use invalidate_bdev().
+
+---
+[mandatory]
+
+	fsync_dev() is gone; use fsync_bdev().  NOTE: lvm breakage is
+deliberate; as soon as struct block_device * is propagated in a reasonable
+way by that code fixing will become trivial; until then nothing can be
+done.

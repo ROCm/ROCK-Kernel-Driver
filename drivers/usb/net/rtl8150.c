@@ -1,15 +1,14 @@
 /*
- * Copyright (c) 2002 Petko Manolov (petkan@users.sourceforge.net)
+ *  Copyright (c) 2002 Petko Manolov (petkan@users.sourceforge.net)
  *
- *	This program is free software; you can redistribute it and/or
- *	modify it under the terms of the GNU General Public License as
- *	published by the Free Software Foundation; either version 2 of
- *	the License, or (at your option) any later version.
- *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation.
  */
 
 #include <linux/config.h>
 #include <linux/sched.h>
+#include <linux/init.h>
 #include <linux/signal.h>
 #include <linux/slab.h>
 #include <linux/module.h>
@@ -19,7 +18,6 @@
 #include <linux/ethtool.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/usb.h>
-#include <linux/init.h>
 #include <asm/uaccess.h>
 
 /* Version Information */
@@ -106,7 +104,7 @@ unsigned long multicast_filter_limit = 32;
 
 static void fill_skb_pool(rtl8150_t *);
 static void free_skb_pool(rtl8150_t *);
-static struct sk_buff *pull_skb(rtl8150_t *);
+static inline struct sk_buff *pull_skb(rtl8150_t *);
 static void rtl8150_disconnect(struct usb_device *dev, void *ptr);
 static void *rtl8150_probe(struct usb_device *dev, unsigned int ifnum,
 			   const struct usb_device_id *id);
@@ -312,7 +310,7 @@ static void read_bulk_callback(struct urb *urb)
 	case -ENOENT:
 		return;	/* the urb is in unlink state */
 	case -ETIMEDOUT:
-		warn("reset needed may be?..");
+		warn("may be reset is needed?..");
 		goto goon;
 	default:
 		warn("Rx status %d", urb->status);
@@ -331,13 +329,13 @@ static void read_bulk_callback(struct urb *urb)
 	netif_rx(dev->rx_skb);
 	dev->stats.rx_packets++;
 	dev->stats.rx_bytes += pkt_len;
-	
+
+	spin_lock(&dev->rx_pool_lock);
 	skb = pull_skb(dev);
+	spin_unlock(&dev->rx_pool_lock);
 	if (!skb)
 		goto resched;
 
-	skb->dev = netdev;
-	skb_reserve(skb, 2);
 	dev->rx_skb = skb;
 goon:
 	FILL_BULK_URB(dev->rx_urb, dev->udev, usb_rcvbulkpipe(dev->udev, 1),
@@ -361,11 +359,16 @@ static void rx_fixup(unsigned long data)
 
 	dev = (rtl8150_t *)data;
 
+	spin_lock_irq(&dev->rx_pool_lock);
 	fill_skb_pool(dev);
+	spin_unlock_irq(&dev->rx_pool_lock);
 	if (test_bit(RX_URB_FAIL, &dev->flags))
 		if (dev->rx_skb)
 			goto try_again;
-	if (!(skb = pull_skb(dev)))
+	spin_lock_irq(&dev->rx_pool_lock);
+	skb = pull_skb(dev);
+	spin_unlock_irq(&dev->rx_pool_lock);
+	if (skb == NULL)
 		goto tlsched;
 	dev->rx_skb = skb;
 	FILL_BULK_URB(dev->rx_urb, dev->udev, usb_rcvbulkpipe(dev->udev, 1),
@@ -426,51 +429,41 @@ static void fill_skb_pool(rtl8150_t *dev)
 {
 	struct sk_buff *skb;
 	int i;
-	unsigned long flags;
 
-	spin_lock_irqsave(&dev->rx_pool_lock, flags);
 	for (i = 0; i < RX_SKB_POOL_SIZE; i++) {
 		if (dev->rx_skb_pool[i])
 			continue;
 		skb = dev_alloc_skb(RTL8150_MTU + 2);
 		if (!skb) {
-			spin_unlock_irqrestore(&dev->rx_pool_lock, flags);
 			return;
 		}
 		skb->dev = dev->netdev;
 		skb_reserve(skb, 2);
 		dev->rx_skb_pool[i] = skb;
 	}
-	spin_unlock_irqrestore(&dev->rx_pool_lock, flags);
 }
 
 static void free_skb_pool(rtl8150_t *dev)
 {
 	int i;
 
-	spin_lock_irq(&dev->rx_pool_lock);
 	for (i = 0; i < RX_SKB_POOL_SIZE; i++)
 		if (dev->rx_skb_pool[i])
 			dev_kfree_skb(dev->rx_skb_pool[i]);
-	spin_unlock_irq(&dev->rx_pool_lock);
 }
 
-static struct sk_buff *pull_skb(rtl8150_t *dev)
+static inline struct sk_buff *pull_skb(rtl8150_t *dev)
 {
 	struct sk_buff *skb;
 	int i;
-	unsigned long flags;
 
-	spin_lock_irqsave(&dev->rx_pool_lock, flags);
 	for (i = 0; i < RX_SKB_POOL_SIZE; i++) {
 		if (dev->rx_skb_pool[i]) {
 			skb = dev->rx_skb_pool[i];
 			dev->rx_skb_pool[i] = NULL;
-			spin_unlock_irqrestore(&dev->rx_pool_lock, flags);
 			return skb;
 		}
 	}
-	spin_unlock_irqrestore(&dev->rx_pool_lock, flags);
 	return NULL;
 }
 
@@ -578,8 +571,8 @@ static int rtl8150_open(struct net_device *netdev)
 	if (dev == NULL) {
 		return -ENODEV;
 	}
-
-	dev->rx_skb = pull_skb(dev);
+	if (dev->rx_skb == NULL)
+		dev->rx_skb = pull_skb(dev);
 	if (!dev->rx_skb)
 		return -ENOMEM;
 
@@ -816,13 +809,13 @@ static void rtl8150_disconnect(struct usb_device *udev, void *ptr)
 	dev = NULL;
 }
 
-static int __init usb_rtl8150_init(void)
+int __init usb_rtl8150_init(void)
 {
 	info(DRIVER_DESC " " DRIVER_VERSION);
 	return usb_register(&rtl8150_driver);
 }
 
-static void __exit usb_rtl8150_exit(void)
+void __exit usb_rtl8150_exit(void)
 {
 	usb_deregister(&rtl8150_driver);
 }

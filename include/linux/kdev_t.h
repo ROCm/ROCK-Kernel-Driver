@@ -36,8 +36,7 @@ typedef struct { unsigned short major, minor; } kdev_t;
 Admissible operations on an object of type kdev_t:
 - passing it along
 - comparing it for equality with another such object
-- storing it in inode->i_dev, inode->i_rdev, req->rq_dev, de->dc_dev,
-- tty->device
+- storing it in inode->i_rdev, req->rq_dev, de->dc_dev, tty->device
 - using its bit pattern as argument in a hash function
 - finding its major and minor
 - complaining about it

@@ -2,18 +2,8 @@
  * Copyright (c) 1999-2002 Petko Manolov - Petkan (petkan@users.sourceforge.net)
  *
  * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ * it under the terms of the GNU General Public License version 2 as published
+ * by the Free Software Foundation.
  */
 
 
@@ -23,6 +13,7 @@
 #define	HAS_HOME_PNA		0x40000000
 
 #define	PEGASUS_MTU		1536
+#define	RX_SKBS			4
 
 #define	EPROM_WRITE		0x01
 #define	EPROM_READ		0x02
@@ -100,10 +91,12 @@ typedef struct pegasus {
 	int			intr_interval;
 	struct tasklet_struct	rx_tl;
 	struct urb		*ctrl_urb, *rx_urb, *tx_urb, *intr_urb;
+	struct sk_buff		*rx_pool[RX_SKBS];
 	struct sk_buff		*rx_skb;
 	struct usb_ctrlrequest	dr;
 	wait_queue_head_t	ctrl_wait;
 	struct semaphore	sem;
+	spinlock_t		rx_pool_lock;
 	unsigned char		intr_buff[8];
 	__u8			tx_buff[PEGASUS_MTU];
 	__u8			eth_regs[4];

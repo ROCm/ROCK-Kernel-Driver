@@ -49,7 +49,11 @@
 #define DRIVER_AUTHOR "Cesar Miquel <miquel@df.uba.ar>"
 #define DRIVER_DESC "USB Rio 500 driver"
 
-#define RIO_MINOR   64
+#ifdef CONFIG_USB_DYNAMIC_MINORS
+	#define RIO_MINOR	0
+#else
+	#define RIO_MINOR	64
+#endif
 
 /* stall/wait timeout for rio */
 #define NAK_TIMEOUT (HZ)
@@ -65,6 +69,7 @@ struct rio_usb_data {
         unsigned int ifnum;             /* Interface number of the USB device */
         int isopen;                     /* nz if open */
         int present;                    /* Device is present on the bus */
+	int minor;			/* minor number assigned to us */
         char *obuf, *ibuf;              /* transfer buffers */
         char bulk_in_ep, bulk_out_ep;   /* Endpoint assignments */
         wait_queue_head_t wait_q;       /* for timeouts */
@@ -449,8 +454,15 @@ static void *probe_rio(struct usb_device *dev, unsigned int ifnum,
 		       const struct usb_device_id *id)
 {
 	struct rio_usb_data *rio = &rio_instance;
+	int retval;
 
 	info("USB Rio found at address %d", dev->devnum);
+
+	retval = usb_register_dev(&usb_rio_fops, RIO_MINOR, 1, &rio->minor);
+	if (retval) {
+		err("Not able to get a minor for this device.");
+		return NULL;
+	}
 
 	rio->present = 1;
 	rio->rio_dev = dev;
@@ -486,6 +498,7 @@ static void disconnect_rio(struct usb_device *dev, void *ptr)
 	struct rio_usb_data *rio = (struct rio_usb_data *) ptr;
 
 	devfs_unregister(rio->devfs);
+	usb_deregister_dev(1, rio->minor);
 
 	down(&(rio->lock));
 	if (rio->isopen) {
@@ -515,9 +528,6 @@ static struct usb_driver rio_driver = {
 	name:		"rio500",
 	probe:		probe_rio,
 	disconnect:	disconnect_rio,
-	fops:		&usb_rio_fops,
-	minor:		RIO_MINOR,
-	num_minors:	1,
 	id_table:	rio_table,
 };
 

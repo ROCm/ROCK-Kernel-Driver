@@ -417,10 +417,6 @@ void ext3_put_super (struct super_block * sb)
 	for (i = 0; i < sbi->s_gdb_count; i++)
 		brelse(sbi->s_group_desc[i]);
 	kfree(sbi->s_group_desc);
-	for (i = 0; i < EXT3_MAX_GROUP_LOADED; i++)
-		brelse(sbi->s_inode_bitmap[i]);
-	for (i = 0; i < EXT3_MAX_GROUP_LOADED; i++)
-		brelse(sbi->s_block_bitmap[i]);
 	brelse(sbi->s_sbh);
 
 	/* Debugging code just in case the in-memory inode orphan list
@@ -504,7 +500,7 @@ static struct super_operations ext3_sops = {
 	write_super:	ext3_write_super,	/* BKL not held. We take it. Needed? */
 	write_super_lockfs: ext3_write_super_lockfs, /* BKL not held. Take it */
 	unlockfs:	ext3_unlockfs,		/* BKL not held.  We take it */
-	statfs:		ext3_statfs,		/* BKL held */
+	statfs:		ext3_statfs,		/* BKL not held. */
 	remount_fs:	ext3_remount,		/* BKL held */
 };
 
@@ -1150,14 +1146,6 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 		printk (KERN_ERR "EXT3-fs: group descriptors corrupted !\n");
 		goto failed_mount2;
 	}
-	for (i = 0; i < EXT3_MAX_GROUP_LOADED; i++) {
-		sbi->s_inode_bitmap_number[i] = 0;
-		sbi->s_inode_bitmap[i] = NULL;
-		sbi->s_block_bitmap_number[i] = 0;
-		sbi->s_block_bitmap[i] = NULL;
-	}
-	sbi->s_loaded_inode_bitmaps = 0;
-	sbi->s_loaded_block_bitmaps = 0;
 	sbi->s_gdb_count = db_count;
 	/*
 	 * set up enough so that it can read an inode

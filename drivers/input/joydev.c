@@ -1,5 +1,5 @@
 /*
- * $Id: joydev.c,v 1.38 2001/12/27 10:37:41 vojtech Exp $
+ * $Id: joydev.c,v 1.43 2002/04/09 23:59:01 jsimmons Exp $
  *
  *  Copyright (c) 1999-2001 Vojtech Pavlik 
  *  Copyright (c) 1999 Colin Van Dyke 
@@ -49,7 +49,7 @@ MODULE_SUPPORTED_DEVICE("input/js");
 MODULE_LICENSE("GPL");
 
 #define JOYDEV_MINOR_BASE	0
-#define JOYDEV_MINORS		32
+#define JOYDEV_MINORS		16	
 #define JOYDEV_BUFFER_SIZE	64
 
 #define MSECS(t)	(1000 * ((t) / HZ) + 1000 * ((t) % HZ) / HZ)
@@ -254,6 +254,10 @@ static ssize_t joydev_read(struct file *file, char *buf, size_t count, loff_t *p
 
 		while (list->head == list->tail) {
 
+			if (!joydev->exist) {
+				retval = -ENODEV;
+				break;
+			}
 			if (file->f_flags & O_NONBLOCK) {
 				retval = -EAGAIN;
 				break;
@@ -324,6 +328,8 @@ static int joydev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 	struct joydev *joydev = list->joydev;
 	struct input_dev *dev = joydev->handle.dev;
 	int i;
+
+	if (!joydev->exist) return -ENODEV;
 
 	switch (cmd) {
 

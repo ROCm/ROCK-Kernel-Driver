@@ -142,12 +142,6 @@ static void ext2_put_super (struct super_block * sb)
 		if (sbi->s_group_desc[i])
 			brelse (sbi->s_group_desc[i]);
 	kfree(sbi->s_group_desc);
-	for (i = 0; i < EXT2_MAX_GROUP_LOADED; i++)
-		if (sbi->s_inode_bitmap[i])
-			brelse (sbi->s_inode_bitmap[i]);
-	for (i = 0; i < EXT2_MAX_GROUP_LOADED; i++)
-		if (sbi->s_block_bitmap[i])
-			brelse (sbi->s_block_bitmap[i]);
 	brelse (sbi->s_sbh);
 	sb->u.generic_sbp = NULL;
 	kfree(sbi);
@@ -686,14 +680,6 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 		db_count = i;
 		goto failed_mount2;
 	}
-	for (i = 0; i < EXT2_MAX_GROUP_LOADED; i++) {
-		sbi->s_inode_bitmap_number[i] = 0;
-		sbi->s_inode_bitmap[i] = NULL;
-		sbi->s_block_bitmap_number[i] = 0;
-		sbi->s_block_bitmap[i] = NULL;
-	}
-	sbi->s_loaded_inode_bitmaps = 0;
-	sbi->s_loaded_block_bitmaps = 0;
 	sbi->s_gdb_count = db_count;
 	get_random_bytes(&sbi->s_next_generation, sizeof(u32));
 	/*
