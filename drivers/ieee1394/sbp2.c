@@ -2881,7 +2881,6 @@ static Scsi_Host_Template scsi_driver_template = {
 	.cmd_per_lun =			SBP2_MAX_CMDS_PER_LUN,
 	.can_queue = 			SBP2_MAX_SCSI_QUEUE,
 	.emulated =			1,
-	.highmem_io =			1,
 };
 
 static int sbp2_module_init(void)
