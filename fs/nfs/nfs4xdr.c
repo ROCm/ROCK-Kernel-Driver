@@ -2323,6 +2323,8 @@ nfs4_xdr_dec_read(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_readres *res)
 	status = decode_read_getattr(&xdr, res->fattr);
 	if (!status)
 		status = -nfs_stat_to_errno(hdr.status);
+	if (!status)
+		status = res->count;
 out:
 	return status;
 }

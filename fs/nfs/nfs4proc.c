@@ -1038,7 +1038,6 @@ nfs4_proc_read(struct nfs_read_data *rdata, struct file *filp)
 		.rpc_proc	= &nfs4_procedures[NFSPROC4_CLNT_READ],
 		.rpc_argp	= &rdata->args,
 		.rpc_resp	= &rdata->res,
-		.rpc_cred	= rdata->cred,
 	};
 	unsigned long timestamp = jiffies;
 	int status;
@@ -1053,8 +1052,11 @@ nfs4_proc_read(struct nfs_read_data *rdata, struct file *filp)
 		struct nfs4_state *state;
 		state = (struct nfs4_state *)filp->private_data;
 		memcpy(&rdata->args.stateid, &state->stateid, sizeof(rdata->args.stateid));
-	} else
+		msg.rpc_cred = state->owner->so_cred;
+	} else {
 		memcpy(&rdata->args.stateid, &zero_stateid, sizeof(rdata->args.stateid));
+		msg.rpc_cred = NFS_I(inode)->mm_cred;
+	}
 
 	fattr->valid = 0;
 	status = rpc_call_sync(server->client, &msg, flags);
@@ -1079,7 +1081,6 @@ nfs4_proc_write(struct nfs_write_data *wdata, struct file *filp)
 		.rpc_proc	= &nfs4_procedures[NFSPROC4_CLNT_WRITE],
 		.rpc_argp	= &wdata->args,
 		.rpc_resp	= &wdata->res,
-		.rpc_cred	= wdata->cred,
 	};
 	int status;
 
@@ -1093,11 +1094,15 @@ nfs4_proc_write(struct nfs_write_data *wdata, struct file *filp)
 		struct nfs4_state *state;
 		state = (struct nfs4_state *)filp->private_data;
 		memcpy(&wdata->args.stateid, &state->stateid, sizeof(wdata->args.stateid));
-	} else
+		msg.rpc_cred = state->owner->so_cred;
+	} else {
 		memcpy(&wdata->args.stateid, &zero_stateid, sizeof(wdata->args.stateid));
+		msg.rpc_cred = NFS_I(inode)->mm_cred;
+	}
 
 	fattr->valid = 0;
 	status = rpc_call_sync(server->client, &msg, rpcflags);
+	NFS_CACHEINV(inode);
 	dprintk("NFS reply write: %d\n", status);
 	return status;
 }
