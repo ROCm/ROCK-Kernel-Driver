@@ -164,6 +164,10 @@ void
 acpi_db_set_scope (
 	char                            *name);
 
+acpi_status
+acpi_db_sleep (
+	char                            *object_arg);
+
 void
 acpi_db_find_references (
 	char                            *object_arg);

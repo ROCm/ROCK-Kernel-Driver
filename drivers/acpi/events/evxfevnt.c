@@ -241,14 +241,7 @@ acpi_set_gpe_type (
 		return_ACPI_STATUS (AE_OK);
 	}
 
-	/* Disable the GPE if enabled */
-
-	status = acpi_ev_disable_gpe (gpe_event_info);
-	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
-	}
-
-	/* Set the new type */
+	/* Set the new type (will disable GPE if currently enabled) */
 
 	status = acpi_ev_set_gpe_type (gpe_event_info, type);
 

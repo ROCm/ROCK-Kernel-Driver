@@ -188,6 +188,7 @@ acpi_remove_fixed_event_handler (
  *              handler_type    - The type of handler:
  *                                  ACPI_SYSTEM_NOTIFY: system_handler (00-7f)
  *                                  ACPI_DEVICE_NOTIFY: driver_handler (80-ff)
+ *                                  ACPI_ALL_NOTIFY:  both system and device
  *              Handler         - Address of the handler
  *              Context         - Value passed to the handler on each GPE
  *
@@ -243,20 +244,21 @@ acpi_install_notify_handler (
 	if (device == ACPI_ROOT_OBJECT) {
 		/* Make sure the handler is not already installed */
 
-		if (((handler_type == ACPI_SYSTEM_NOTIFY) &&
-				acpi_gbl_system_notify.handler)        ||
-			((handler_type == ACPI_DEVICE_NOTIFY) &&
+		if (((handler_type & ACPI_SYSTEM_NOTIFY) &&
+				acpi_gbl_system_notify.handler)     ||
+			((handler_type & ACPI_DEVICE_NOTIFY) &&
 				acpi_gbl_device_notify.handler)) {
 			status = AE_ALREADY_EXISTS;
 			goto unlock_and_exit;
 		}
 
-		if (handler_type == ACPI_SYSTEM_NOTIFY) {
+		if (handler_type & ACPI_SYSTEM_NOTIFY) {
 			acpi_gbl_system_notify.node  = node;
 			acpi_gbl_system_notify.handler = handler;
 			acpi_gbl_system_notify.context = context;
 		}
-		else /* ACPI_DEVICE_NOTIFY */ {
+
+		if (handler_type & ACPI_DEVICE_NOTIFY) {
 			acpi_gbl_device_notify.node  = node;
 			acpi_gbl_device_notify.handler = handler;
 			acpi_gbl_device_notify.context = context;
@@ -284,9 +286,9 @@ acpi_install_notify_handler (
 		if (obj_desc) {
 			/* Object exists - make sure there's no handler */
 
-			if (((handler_type == ACPI_SYSTEM_NOTIFY) &&
+			if (((handler_type & ACPI_SYSTEM_NOTIFY) &&
 					obj_desc->common_notify.system_notify) ||
-				((handler_type == ACPI_DEVICE_NOTIFY) &&
+				((handler_type & ACPI_DEVICE_NOTIFY) &&
 					obj_desc->common_notify.device_notify)) {
 				status = AE_ALREADY_EXISTS;
 				goto unlock_and_exit;
@@ -308,7 +310,6 @@ acpi_install_notify_handler (
 			/* Remove local reference to the object */
 
 			acpi_ut_remove_reference (obj_desc);
-
 			if (ACPI_FAILURE (status)) {
 				goto unlock_and_exit;
 			}
@@ -326,11 +327,18 @@ acpi_install_notify_handler (
 		notify_obj->notify.handler = handler;
 		notify_obj->notify.context = context;
 
-		if (handler_type == ACPI_SYSTEM_NOTIFY) {
+		if (handler_type & ACPI_SYSTEM_NOTIFY) {
 			obj_desc->common_notify.system_notify = notify_obj;
 		}
-		else /* ACPI_DEVICE_NOTIFY */ {
+
+		if (handler_type & ACPI_DEVICE_NOTIFY) {
 			obj_desc->common_notify.device_notify = notify_obj;
+		}
+
+		if (handler_type == ACPI_ALL_NOTIFY) {
+			/* Extra ref if installed in both */
+
+			acpi_ut_add_reference (notify_obj);
 		}
 	}
 
@@ -349,6 +357,7 @@ unlock_and_exit:
  *              handler_type    - The type of handler:
  *                                  ACPI_SYSTEM_NOTIFY: system_handler (00-7f)
  *                                  ACPI_DEVICE_NOTIFY: driver_handler (80-ff)
+ *                                  ACPI_ALL_NOTIFY:  both system and device
  *              Handler         - Address of the handler
  * RETURN:      Status
  *
@@ -398,20 +407,21 @@ acpi_remove_notify_handler (
 	if (device == ACPI_ROOT_OBJECT) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Removing notify handler for ROOT object.\n"));
 
-		if (((handler_type == ACPI_SYSTEM_NOTIFY) &&
-			  !acpi_gbl_system_notify.handler) ||
-			((handler_type == ACPI_DEVICE_NOTIFY) &&
+		if (((handler_type & ACPI_SYSTEM_NOTIFY) &&
+			  !acpi_gbl_system_notify.handler)      ||
+			((handler_type & ACPI_DEVICE_NOTIFY) &&
 			  !acpi_gbl_device_notify.handler)) {
 			status = AE_NOT_EXIST;
 			goto unlock_and_exit;
 		}
 
-		if (handler_type == ACPI_SYSTEM_NOTIFY) {
+		if (handler_type & ACPI_SYSTEM_NOTIFY) {
 			acpi_gbl_system_notify.node  = NULL;
 			acpi_gbl_system_notify.handler = NULL;
 			acpi_gbl_system_notify.context = NULL;
 		}
-		else {
+
+		if (handler_type & ACPI_DEVICE_NOTIFY) {
 			acpi_gbl_device_notify.node  = NULL;
 			acpi_gbl_device_notify.handler = NULL;
 			acpi_gbl_device_notify.context = NULL;
@@ -439,29 +449,33 @@ acpi_remove_notify_handler (
 
 		/* Object exists - make sure there's an existing handler */
 
-		if (handler_type == ACPI_SYSTEM_NOTIFY) {
+		if (handler_type & ACPI_SYSTEM_NOTIFY) {
 			notify_obj = obj_desc->common_notify.system_notify;
-		}
-		else {
-			notify_obj = obj_desc->common_notify.device_notify;
-		}
+			if ((!notify_obj) ||
+				 (notify_obj->notify.handler != handler)) {
+				status = AE_BAD_PARAMETER;
+				goto unlock_and_exit;
+			}
 
-		if ((!notify_obj) ||
-			(notify_obj->notify.handler != handler)) {
-			status = AE_BAD_PARAMETER;
-			goto unlock_and_exit;
-		}
+			/* Remove the handler */
 
-		/* Remove the handler */
-
-		if (handler_type == ACPI_SYSTEM_NOTIFY) {
 			obj_desc->common_notify.system_notify = NULL;
-		}
-		else {
-			obj_desc->common_notify.device_notify = NULL;
+			acpi_ut_remove_reference (notify_obj);
 		}
 
-		acpi_ut_remove_reference (notify_obj);
+		if (handler_type & ACPI_DEVICE_NOTIFY) {
+			notify_obj = obj_desc->common_notify.device_notify;
+			if ((!notify_obj) ||
+				 (notify_obj->notify.handler != handler)) {
+				status = AE_BAD_PARAMETER;
+				goto unlock_and_exit;
+			}
+
+			/* Remove the handler */
+
+			obj_desc->common_notify.device_notify = NULL;
+			acpi_ut_remove_reference (notify_obj);
+		}
 	}
 
 

@@ -386,7 +386,7 @@ acpi_ds_call_control_method (
 	/* On error, we must delete the new walk state */
 
 cleanup:
-	if (next_walk_state->method_desc) {
+	if (next_walk_state && (next_walk_state->method_desc)) {
 		/* Decrement the thread count on the method parse tree */
 
 	   next_walk_state->method_desc->method.thread_count--;

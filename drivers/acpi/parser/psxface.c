@@ -103,9 +103,8 @@ acpi_psx_execute (
 		return_ACPI_STATUS (status);
 	}
 
-	if (info &&
-	   (info->parameter_type == ACPI_PARAM_ARGS) &&
-	   (info->parameters)) {
+	if ((info->parameter_type == ACPI_PARAM_ARGS) &&
+		(info->parameters)) {
 		/*
 		 * The caller "owns" the parameters, so give each one an extra
 		 * reference

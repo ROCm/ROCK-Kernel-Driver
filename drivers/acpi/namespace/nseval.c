@@ -494,7 +494,7 @@ acpi_ns_get_object_value (
 			status = AE_CTRL_RETURN_VALUE;
 			info->return_object = ACPI_CAST_PTR (union acpi_operand_object, resolved_node);
 			ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "Returning object %p [%s]\n",
-				*info->return_object, acpi_ut_get_object_type_name (info->return_object)));
+				info->return_object, acpi_ut_get_object_type_name (info->return_object)));
 		}
 	}
 

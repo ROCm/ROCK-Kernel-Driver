@@ -174,8 +174,11 @@ acpi_ev_delete_gpe_handlers (
 	struct acpi_gpe_block_info      *gpe_block)
 {
 	struct acpi_gpe_event_info      *gpe_event_info;
-	u32                             i;
-	u32                             j;
+	acpi_native_uint                i;
+	acpi_native_uint                j;
+
+
+	ACPI_FUNCTION_TRACE ("ev_delete_gpe_handlers");
 
 
 	/* Examine each GPE Register within the block */
@@ -194,7 +197,7 @@ acpi_ev_delete_gpe_handlers (
 		}
 	}
 
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -232,6 +235,7 @@ acpi_ev_save_method_info (
 	u32                             gpe_number;
 	char                            name[ACPI_NAME_SIZE + 1];
 	u8                              type;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("ev_save_method_info");
@@ -309,12 +313,12 @@ acpi_ev_save_method_info (
 
 	/* Update enable mask, but don't enable the HW GPE as of yet */
 
-	acpi_ev_enable_gpe (gpe_event_info, FALSE);
+	status = acpi_ev_enable_gpe (gpe_event_info, FALSE);
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_LOAD,
 		"Registered GPE method %s as GPE number 0x%.2X\n",
 		name, gpe_number));
-	return_ACPI_STATUS (AE_OK);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -425,8 +429,11 @@ acpi_ev_match_prw_and_gpe (
 		/* Mark GPE for WAKE-ONLY but WAKE_DISABLED */
 
 		gpe_event_info->flags &= ~(ACPI_GPE_WAKE_ENABLED | ACPI_GPE_RUN_ENABLED);
-		acpi_ev_set_gpe_type (gpe_event_info, ACPI_GPE_TYPE_WAKE);
-		acpi_ev_update_gpe_enable_masks (gpe_event_info, ACPI_GPE_DISABLE);
+		status = acpi_ev_set_gpe_type (gpe_event_info, ACPI_GPE_TYPE_WAKE);
+		if (ACPI_FAILURE (status)) {
+			goto cleanup;
+		}
+		status = acpi_ev_update_gpe_enable_masks (gpe_event_info, ACPI_GPE_DISABLE);
 	}
 
 cleanup:

@@ -196,8 +196,8 @@ acpi_ev_queue_notify_request (
 		/* There is no per-device notify handler for this device */
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
-			"No notify handler for [%4.4s] node %p\n",
-			acpi_ut_get_node_name (node), node));
+			"No notify handler for Notify(%4.4s, %X) node %p\n",
+			acpi_ut_get_node_name (node), notify_value, node));
 	}
 
 	return (status);

@@ -614,9 +614,10 @@ typedef u32                                     acpi_event_status;
 
 /* Notify types */
 
-#define ACPI_SYSTEM_NOTIFY              0
-#define ACPI_DEVICE_NOTIFY              1
-#define ACPI_MAX_NOTIFY_HANDLER_TYPE    1
+#define ACPI_SYSTEM_NOTIFY              0x1
+#define ACPI_DEVICE_NOTIFY              0x2
+#define ACPI_ALL_NOTIFY                 0x3
+#define ACPI_MAX_NOTIFY_HANDLER_TYPE    0x3
 
 #define ACPI_MAX_SYS_NOTIFY             0x7f
 

@@ -149,7 +149,7 @@ acpi_ns_initialize_devices (
 		return_ACPI_STATUS (status);
 	}
 
-	/* Walk namespace for all objects of type Device or Processor */
+	/* Walk namespace for all objects */
 
 	status = acpi_ns_walk_namespace (ACPI_TYPE_ANY, ACPI_ROOT_OBJECT,
 			  ACPI_UINT32_MAX, TRUE, acpi_ns_init_one_device, &info, NULL);
@@ -355,10 +355,11 @@ acpi_ns_init_one_device (
 	}
 
 	/*
-	 * We will run _STA/_INI on Devices and Processors only
+	 * We will run _STA/_INI on Devices, Processors and thermal_zones only
 	 */
-	if ((pinfo.node->type != ACPI_TYPE_DEVICE) &&
-		(pinfo.node->type != ACPI_TYPE_PROCESSOR)) {
+	if ((pinfo.node->type != ACPI_TYPE_DEVICE)      &&
+		(pinfo.node->type != ACPI_TYPE_PROCESSOR)   &&
+		(pinfo.node->type != ACPI_TYPE_THERMAL)) {
 		return_ACPI_STATUS (AE_OK);
 	}
 
@@ -381,7 +382,7 @@ acpi_ns_init_one_device (
 			return_ACPI_STATUS (AE_OK);
 		}
 
-		/* _STA is not required for Processor objects */
+		/* _STA is not required for Processor or thermal_zone objects */
 	}
 	else {
 		info->num_STA++;
@@ -404,14 +405,14 @@ acpi_ns_init_one_device (
 		if (status != AE_NOT_FOUND) {
 			/* Ignore error and move on to next device */
 
-	#ifdef ACPI_DEBUG_OUTPUT
+#ifdef ACPI_DEBUG_OUTPUT
 			char                *scope_name = acpi_ns_get_external_pathname (pinfo.node);
 
 			ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "%s._INI failed: %s\n",
 					scope_name, acpi_format_exception (status)));
 
 			ACPI_MEM_FREE (scope_name);
-	#endif
+#endif
 		}
 
 		status = AE_OK;

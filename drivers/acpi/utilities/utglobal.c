@@ -226,7 +226,7 @@ const struct acpi_predefined_names      acpi_gbl_pre_defined_names[] =
 	{"_PR_",    ACPI_TYPE_LOCAL_SCOPE,      NULL},
 	{"_SB_",    ACPI_TYPE_DEVICE,           NULL},
 	{"_SI_",    ACPI_TYPE_LOCAL_SCOPE,      NULL},
-	{"_TZ_",    ACPI_TYPE_LOCAL_SCOPE,      NULL},
+	{"_TZ_",    ACPI_TYPE_THERMAL,          NULL},
 	{"_REV",    ACPI_TYPE_INTEGER,          "2"},
 	{"_OS_",    ACPI_TYPE_STRING,           ACPI_OS_NAME},
 	{"_GL_",    ACPI_TYPE_MUTEX,            "0"},

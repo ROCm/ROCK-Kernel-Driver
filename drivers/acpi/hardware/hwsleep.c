@@ -570,9 +570,9 @@ acpi_leave_sleep_state (
 
 	/* Enable power button */
 
-	acpi_set_register(acpi_gbl_fixed_event_info[ACPI_EVENT_POWER_BUTTON].enable_register_id,
+	(void) acpi_set_register(acpi_gbl_fixed_event_info[ACPI_EVENT_POWER_BUTTON].enable_register_id,
 			1, ACPI_MTX_DO_NOT_LOCK);
-	acpi_set_register(acpi_gbl_fixed_event_info[ACPI_EVENT_POWER_BUTTON].status_register_id,
+	(void) acpi_set_register(acpi_gbl_fixed_event_info[ACPI_EVENT_POWER_BUTTON].status_register_id,
 			1, ACPI_MTX_DO_NOT_LOCK);
 
 	/* Enable BM arbitration */

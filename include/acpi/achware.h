@@ -114,11 +114,7 @@ acpi_hw_clear_acpi_status (
 /* GPE support */
 
 acpi_status
-acpi_hw_enable_gpe (
-	struct acpi_gpe_event_info      *gpe_event_info);
-
-acpi_status
-acpi_hw_disable_gpe (
+acpi_hw_write_gpe_enable_reg (
 	struct acpi_gpe_event_info      *gpe_event_info);
 
 acpi_status
@@ -154,6 +150,11 @@ acpi_hw_enable_all_wakeup_gpes (
 
 acpi_status
 acpi_hw_enable_runtime_gpe_block (
+	struct acpi_gpe_xrupt_info      *gpe_xrupt_info,
+	struct acpi_gpe_block_info      *gpe_block);
+
+acpi_status
+acpi_hw_enable_wakeup_gpe_block (
 	struct acpi_gpe_xrupt_info      *gpe_xrupt_info,
 	struct acpi_gpe_block_info      *gpe_block);
 
