@@ -938,15 +938,15 @@ struct buffer_head *ext3_getblk(handle_t *handle, struct inode * inode,
 			lock_buffer(bh);
 			BUFFER_TRACE(bh, "call get_create_access");
 			fatal = ext3_journal_get_create_access(handle, bh);
-			if (!fatal) {
-				memset(bh->b_data, 0,
-				       inode->i_sb->s_blocksize);
+			if (!fatal && !buffer_uptodate(bh)) {
+				memset(bh->b_data, 0, inode->i_sb->s_blocksize);
 				set_buffer_uptodate(bh);
 			}
 			unlock_buffer(bh);
 			BUFFER_TRACE(bh, "call ext3_journal_dirty_metadata");
 			err = ext3_journal_dirty_metadata(handle, bh);
-			if (!fatal) fatal = err;
+			if (!fatal)
+				fatal = err;
 		} else {
 			BUFFER_TRACE(bh, "not a new buffer");
 		}
