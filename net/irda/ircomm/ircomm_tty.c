@@ -38,6 +38,7 @@
 #include <linux/termios.h>
 #include <linux/tty.h>
 #include <linux/interrupt.h>
+#include <linux/device.h>		/* for MODULE_ALIAS_CHARDEV_MAJOR */
 
 #include <asm/uaccess.h>
 
@@ -1411,6 +1412,7 @@ done:
 MODULE_AUTHOR("Dag Brattli <dagb@cs.uit.no>");
 MODULE_DESCRIPTION("IrCOMM serial TTY driver");
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_CHARDEV_MAJOR(IRCOMM_TTY_MAJOR);
 
 module_init(ircomm_tty_init);
 module_exit(ircomm_tty_cleanup);

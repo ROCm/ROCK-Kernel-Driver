@@ -1176,7 +1176,7 @@ static void unix_attach_fds(struct scm_cookie *scm, struct sk_buff *skb)
  */
 
 static int unix_dgram_sendmsg(struct kiocb *kiocb, struct socket *sock,
-			      struct msghdr *msg, int len)
+			      struct msghdr *msg, size_t len)
 {
 	struct sock_iocb *siocb = kiocb_to_siocb(kiocb);
 	struct sock *sk = sock->sk;
@@ -1217,7 +1217,7 @@ static int unix_dgram_sendmsg(struct kiocb *kiocb, struct socket *sock,
 		goto out;
 
 	err = -EMSGSIZE;
-	if ((unsigned)len > sk->sk_sndbuf - 32)
+	if (len > sk->sk_sndbuf - 32)
 		goto out;
 
 	skb = sock_alloc_send_skb(sk, len, msg->msg_flags&MSG_DONTWAIT, &err);
@@ -1324,7 +1324,7 @@ out:
 
 		
 static int unix_stream_sendmsg(struct kiocb *kiocb, struct socket *sock,
-			       struct msghdr *msg, int len)
+			       struct msghdr *msg, size_t len)
 {
 	struct sock_iocb *siocb = kiocb_to_siocb(kiocb);
 	struct sock *sk = sock->sk;
@@ -1447,7 +1447,7 @@ static void unix_copy_addr(struct msghdr *msg, struct sock *sk)
 }
 
 static int unix_dgram_recvmsg(struct kiocb *iocb, struct socket *sock,
-			      struct msghdr *msg, int size,
+			      struct msghdr *msg, size_t size,
 			      int flags)
 {
 	struct sock_iocb *siocb = kiocb_to_siocb(iocb);
@@ -1555,7 +1555,7 @@ static long unix_stream_data_wait(struct sock * sk, long timeo)
 
 
 static int unix_stream_recvmsg(struct kiocb *iocb, struct socket *sock,
-			       struct msghdr *msg, int size,
+			       struct msghdr *msg, size_t size,
 			       int flags)
 {
 	struct sock_iocb *siocb = kiocb_to_siocb(iocb);

@@ -23,8 +23,8 @@
  *
  */
 
-#ifndef _HD64572_H
-#define _HD64572_H
+#ifndef __HD64572_H
+#define __HD64572_H
 
 /* Illegal Access Register */
 #define	ILAR	0x00
@@ -59,6 +59,9 @@
 #define IR0_M(val, chan)	((val)<<(8*(chan)))		/* Int MSCI */
 
 /* MSCI Channel Registers */
+#define MSCI0_OFFSET 0x00
+#define MSCI1_OFFSET 0x80
+
 #define MD0	0x138	/* Mode reg 0 */
 #define MD1	0x139	/* Mode reg 1 */
 #define MD2	0x13a	/* Mode reg 2 */
@@ -107,6 +110,11 @@
 #define RCR	0x156	/* Rx DMA Critical Request Reg */
 
 /* Timer Registers */
+#define TIMER0RX_OFFSET 0x00
+#define TIMER0TX_OFFSET 0x10
+#define TIMER1RX_OFFSET 0x20
+#define TIMER1TX_OFFSET 0x30
+
 #define TCNTL	0x200	/* Timer Upcounter L */
 #define TCNTH	0x201	/* Timer Upcounter H */
 #define TCONRL	0x204	/* Timer Constant Register L */
@@ -132,6 +140,11 @@
 #define DCR_TX(chan)	(0x59 + 2*chan)	/* DMA Command Reg (Tx) */
 
 /* DMA Channel Registers */
+#define DMAC0RX_OFFSET 0x00
+#define DMAC0TX_OFFSET 0x20
+#define DMAC1RX_OFFSET 0x40
+#define DMAC1TX_OFFSET 0x60
+
 #define DARL	0x80	/* Dest Addr Register L (single-block, RX only) */
 #define DARH	0x81	/* Dest Addr Register H (single-block, RX only) */
 #define DARB	0x82	/* Dest Addr Register B (single-block, RX only) */
@@ -166,7 +179,17 @@ typedef struct {
 	unsigned char	filler[5];	/* alignment filler (16 bytes) */ 
 } pcsca_bd_t;
 
-/* 
+/* Block Descriptor Structure */
+typedef struct {
+	u32 cp;			/* pointer to next block descriptor */
+	u32 bp;			/* buffer pointer */
+	u16 len;		/* data length */
+	u8 stat;		/* status */
+	u8 unused;		/* pads to 4-byte boundary */
+}pkt_desc;
+
+
+/*
 	Descriptor Status definitions:
 
 	Bit	Transmission	Reception
@@ -189,6 +212,23 @@ typedef struct {
 #define DST_ABT		0x20	/* Abort */
 #define DST_SHRT	0x40	/* Short Frame  */
 #define DST_EOM		0x80	/* End of Message  */
+
+/* Packet Descriptor Status bits */
+
+#define ST_TX_EOM     0x80	/* End of frame */
+#define ST_TX_UNDRRUN 0x08
+#define ST_TX_OWNRSHP 0x02
+#define ST_TX_EOT     0x01	/* End of transmition */
+
+#define ST_RX_EOM     0x80	/* End of frame */
+#define ST_RX_SHORT   0x40	/* Short frame */
+#define ST_RX_ABORT   0x20	/* Abort */
+#define ST_RX_RESBIT  0x10	/* Residual bit */
+#define ST_RX_OVERRUN 0x08	/* Overrun */
+#define ST_RX_CRC     0x04	/* CRC */
+#define ST_RX_OWNRSHP 0x02
+
+#define ST_ERROR_MASK 0x7C
 
 /* Status Counter Registers */
 #define CMCR	0x158	/* Counter Master Ctl Reg */
@@ -246,10 +286,24 @@ typedef struct {
 #define MD0_BIT_SYNC	0x80
 #define MD0_TRANSP	0xc0
 
+#define MD0_HDLC        0x80	/* Bit-sync HDLC mode */
+
+#define MD0_CRC_NONE	0x00
+#define MD0_CRC_16_0	0x04
+#define MD0_CRC_16	0x05
+#define MD0_CRC_ITU32	0x06
+#define MD0_CRC_ITU	0x07
+
 #define MD1_NOADDR	0x00
 #define MD1_SADDR1	0x40
 #define MD1_SADDR2	0x80
 #define MD1_DADDR	0xc0
+
+#define MD2_NRZI_IEEE	0x40
+#define MD2_MANCHESTER	0x80
+#define MD2_FM_MARK	0xA0
+#define MD2_FM_SPACE	0xC0
+#define MD2_LOOPBACK	0x03	/* Local data Loopback */
 
 #define MD2_F_DUPLEX	0x00
 #define MD2_AUTO_ECHO	0x01
@@ -273,6 +327,10 @@ typedef struct {
 #define CTL_UDRNC	0x20
 #define CTL_URSKP	0x40
 #define CTL_URCT	0x80
+
+#define CTL_NORTS	0x01
+#define CTL_NODTR	0x02
+#define CTL_IDLE	0x10
 
 #define	RXS_BR0		0x01
 #define	RXS_BR1		0x02
@@ -302,6 +360,12 @@ typedef struct {
 #define	EXS_TES1	0x20
 #define	EXS_TES2	0x40
 
+#define CLK_BRG_MASK	0x0F
+#define CLK_PIN_OUT	0x80
+#define CLK_LINE    	0x00	/* clock line input */
+#define CLK_BRG     	0x40	/* internal baud rate generator */
+#define CLK_TX_RXCLK	0x60	/* TX clock from RX clock */
+
 #define CMD_RX_RST	0x11
 #define CMD_RX_ENA	0x12
 #define CMD_RX_DIS	0x13
@@ -323,6 +387,10 @@ typedef struct {
 #define CMD_CH_RST	0x21
 #define CMD_SRCH_MODE	0x31
 #define CMD_NOP		0x00
+
+#define CMD_RESET	0x21
+#define CMD_TX_ENABLE	0x02
+#define CMD_RX_ENABLE	0x12
 
 #define ST0_RXRDY	0x01
 #define ST0_TXRDY	0x02
@@ -374,6 +442,8 @@ typedef struct {
 #define IE0_RXINTB	0x20
 #define IE0_RXINTA	0x40
 #define IE0_TXINT	0x80
+#define IE0_UDRN	0x00008000 /* TX underrun MSCI interrupt enable */
+#define IE0_CDCD	0x00000400 /* CD level change interrupt enable */
 
 #define IE1_IDLD	0x01
 #define IE1_ABTD	0x02
@@ -424,14 +494,28 @@ typedef struct {
 #define DIR_EOM		0x40
 #define DIR_EOT		0x80
 
+#define DIR_REFE	0x04
+#define DIR_UDRFE	0x04
+#define DIR_COAE	0x08
+#define DIR_COFE	0x10
+#define DIR_BOFE	0x20
+#define DIR_EOME	0x40
+#define DIR_EOTE	0x80
+
 #define DMR_CNTE	0x02
 #define DMR_NF		0x04
 #define DMR_SEOME	0x08
 #define DMR_TMOD	0x10
 
+#define DMER_DME        0x80	/* DMA Master Enable */
+
 #define DCR_SW_ABT	0x01
 #define DCR_FCT_CLR	0x02
 
+#define DCR_ABORT	0x01
+#define DCR_CLEAR_EOF	0x02
+
+#define PCR_COTE	0x80
 #define PCR_PR0		0x01
 #define PCR_PR1		0x02
 #define PCR_PR2		0x04
@@ -440,4 +524,4 @@ typedef struct {
 #define PCR_OSB		0x40
 #define PCR_BURST	0x80
 
-#endif /* (_HD64572_H) */
+#endif /* (__HD64572_H) */

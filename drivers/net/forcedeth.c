@@ -1438,7 +1438,7 @@ static void __devexit remove_nic(struct pci_dev *pci_dev)
 	iounmap(get_hwbase(dev));
 	pci_release_regions(pci_dev);
 	pci_disable_device(pci_dev);
-	kfree(dev);
+	free_netdev(dev);
 	pci_set_drvdata(pci_dev, NULL);
 }
 

@@ -10,6 +10,8 @@ struct hpsb_address_serve {
 
         struct hpsb_address_ops *op;
 
+	struct hpsb_host *host;
+
         /* first address handled and first address behind, quadlet aligned */
         u64 start, end;
 };
@@ -36,9 +38,9 @@ struct hpsb_highlevel {
          * hpsb_unregister_highlevel once for each host. */
         void (*remove_host) (struct hpsb_host *host);
 
-        /* Host experienced bus reset with possible configuration changes.  Note
-         * that this one may occur during interrupt/bottom half handling.  You
-         * can not expect to be able to do stock hpsb_reads. */
+        /* Host experienced bus reset with possible configuration changes.
+	 * Note that this one may occur during interrupt/bottom half handling.
+	 * You can not expect to be able to do stock hpsb_reads. */
         void (*host_reset) (struct hpsb_host *host);
 
         /* An isochronous packet was received.  Channel contains the channel
@@ -50,13 +52,14 @@ struct hpsb_highlevel {
 
         /* A write request was received on either the FCP_COMMAND (direction =
          * 0) or the FCP_RESPONSE (direction = 1) register.  The cts arg
-         * contains the cts field (first byte of data).
-         */
+         * contains the cts field (first byte of data). */
         void (*fcp_request) (struct hpsb_host *host, int nodeid, int direction,
                              int cts, u8 *data, size_t length);
 
-
+	/* These are initialized by the subsystem when the
+	 * hpsb_higlevel is registered. */
 	struct list_head hl_list;
+	struct list_head irq_list;
 	struct list_head addr_list;
 
 	struct list_head host_info_list;
@@ -137,10 +140,11 @@ void hpsb_unregister_highlevel(struct hpsb_highlevel *hl);
  * It returns true for successful allocation.  There is no unregister function,
  * all address spaces are deallocated together with the hpsb_highlevel.
  */
-int hpsb_register_addrspace(struct hpsb_highlevel *hl,
+int hpsb_register_addrspace(struct hpsb_highlevel *hl, struct hpsb_host *host,
                             struct hpsb_address_ops *ops, u64 start, u64 end);
 
-int hpsb_unregister_addrspace(struct hpsb_highlevel *hl, u64 start);
+int hpsb_unregister_addrspace(struct hpsb_highlevel *hl, struct hpsb_host *host,
+                              u64 start);
 
 /*
  * Enable or disable receving a certain isochronous channel through the
@@ -179,6 +183,6 @@ int hpsb_set_hostinfo(struct hpsb_highlevel *hl, struct hpsb_host *host, void *d
 struct hpsb_host *hpsb_get_host_bykey(struct hpsb_highlevel *hl, unsigned long key);
 
 /* Initialize the highlevel system */
-void init_hpsb_highlevel(void);
+void init_hpsb_highlevel(struct hpsb_host *host);
 
 #endif /* IEEE1394_HIGHLEVEL_H */

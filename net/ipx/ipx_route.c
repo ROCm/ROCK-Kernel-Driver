@@ -169,13 +169,13 @@ int ipxrtr_route_skb(struct sk_buff *skb)
  * Route an outgoing frame from a socket.
  */
 int ipxrtr_route_packet(struct sock *sk, struct sockaddr_ipx *usipx,
-			struct iovec *iov, int len, int noblock)
+			struct iovec *iov, size_t len, int noblock)
 {
 	struct sk_buff *skb;
 	struct ipx_opt *ipxs = ipx_sk(sk);
 	struct ipx_interface *intrfc;
 	struct ipxhdr *ipx;
-	int size;
+	size_t size;
 	int ipx_offset;
 	struct ipx_route *rt = NULL;
 	int rc;
