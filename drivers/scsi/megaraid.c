@@ -4065,7 +4065,7 @@ int megaraid_biosparam (struct scsi_device *sdev, struct block_device *bdev,
 			/* Default heads (64) & sectors (32) */
 			heads = 64;
 			sectors = 32;
-			cylinders = (unsigned long)capacity / (heads * sectors);
+			cylinders = (unsigned long)capacity >> 11;
 
 			/* Handle extended translation size for logical drives > 1Gb */
 			if (capacity >= 0x200000) {
@@ -4153,7 +4153,7 @@ mega_partsize(struct block_device *bdev, sector_t capacity, int *geom)
 			return -1;
 		}
 
-		cyls = capacity/(heads * sectors);
+		cyls = (unsigned long)capacity/(heads * sectors);
 
 		geom[0] = heads;
 		geom[1] = sectors;
