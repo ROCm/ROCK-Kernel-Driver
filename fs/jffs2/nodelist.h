@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: nodelist.h,v 1.123 2004/11/16 20:36:11 dwmw2 Exp $
+ * $Id: nodelist.h,v 1.124 2004/11/17 09:30:02 dedekind Exp $
  *
  */
 
@@ -148,13 +148,6 @@ struct jffs2_inode_cache {
 
 #define INOCACHE_HASHSIZE 128
 
-struct jffs2_scan_info {
-	struct jffs2_full_dirent *dents;
-	struct jffs2_tmp_dnode_info *tmpnodes;
-	/* Latest i_size info */
-	uint32_t version;
-	uint32_t isize;
-};
 /*
   Larger representation of a raw node, kept in-core only when the 
   struct inode for this particular ino is instantiated.
