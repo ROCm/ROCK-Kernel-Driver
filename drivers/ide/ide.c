@@ -1965,11 +1965,10 @@ ide_proc_entry_t generic_subdriver_entries[] = {
 #endif
 
 /*
- * Note that we only release the standard ports,
- * and do not even try to handle any extra ports
- * allocated for weird IDE interface chipsets.
+ * Note that we only release the standard ports, and do not even try to handle
+ * any extra ports allocated for weird IDE interface chipsets.
  */
-void hwif_unregister (ide_hwif_t *hwif)
+static void hwif_unregister(ide_hwif_t *hwif)
 {
 	if (hwif->straight8) {
 		ide_release_region(hwif->io_ports[IDE_DATA_OFFSET], 8);
@@ -2063,11 +2062,6 @@ void ide_unregister (unsigned int index)
 	if (irq_count == 1)
 		free_irq(hwif->irq, hwgroup);
 
-	/*
-	 * Note that we only release the standard ports,
-	 * and do not even try to handle any extra ports
-	 * allocated for weird IDE interface chipsets.
-	 */
 	hwif_unregister(hwif);
 
 	/*
@@ -3718,7 +3712,6 @@ EXPORT_SYMBOL(ide_register_hw);
 EXPORT_SYMBOL(ide_register);
 EXPORT_SYMBOL(ide_unregister);
 EXPORT_SYMBOL(ide_setup_ports);
-EXPORT_SYMBOL(hwif_unregister);
 EXPORT_SYMBOL(get_info_ptr);
 EXPORT_SYMBOL(current_capacity);
 

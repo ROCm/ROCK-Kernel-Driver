@@ -1101,7 +1101,6 @@ int ide_replace_subdriver(ide_drive_t *drive, const char *driver);
 #  define OFF_BOARD		NEVER_BOARD
 #endif /* CONFIG_BLK_DEV_OFFBOARD */
 
-unsigned long ide_find_free_region (unsigned short size) __init;
 void ide_scan_pcibus (int scan_direction) __init;
 #endif
 #ifdef CONFIG_BLK_DEV_IDEDMA
@@ -1115,13 +1114,9 @@ int report_drive_dmaing (ide_drive_t *drive);
 int ide_dmaproc (ide_dma_action_t func, ide_drive_t *drive);
 int ide_release_dma (ide_hwif_t *hwif);
 void ide_setup_dma (ide_hwif_t *hwif, unsigned long dmabase, unsigned int num_ports) __init;
-unsigned long ide_get_or_set_dma_base (ide_hwif_t *hwif, int extra, const char *name) __init;
+/* FIXME spilt this up into a get and set function */
+extern unsigned long ide_get_or_set_dma_base (ide_hwif_t *hwif, int extra, const char *name) __init;
 #endif
-
-void hwif_unregister (ide_hwif_t *hwif);
-
-void export_ide_init_queue (ide_drive_t *drive);
-byte export_probe_for_drive (ide_drive_t *drive);
 
 extern spinlock_t ide_lock;
 

@@ -406,22 +406,19 @@ static void enable_nest (ide_drive_t *drive)
 }
 
 /*
- * probe_for_drive() tests for existence of a given drive using do_probe().
- *
- * Returns:	0  no device was found
- *		1  device was found (note: drive->present might still be 0)
+ * Tests for existence of a given drive using do_probe().
  */
-static inline byte probe_for_drive (ide_drive_t *drive)
+static inline void probe_for_drive (ide_drive_t *drive)
 {
 	if (drive->noprobe)			/* skip probing? */
-		return drive->present;
+		return;
 	if (do_probe(drive, WIN_IDENTIFY) >= 2) { /* if !(success||timed-out) */
-		(void) do_probe(drive, WIN_PIDENTIFY); /* look for ATAPI device */
+		do_probe(drive, WIN_PIDENTIFY); /* look for ATAPI device */
 	}
 	if (drive->id && strstr(drive->id->model, "E X A B Y T E N E S T"))
 		enable_nest(drive);
 	if (!drive->present)
-		return 0;			/* drive not found */
+		return;			/* drive not found */
 	if (drive->id == NULL) {		/* identification failed? */
 		if (drive->media == ide_disk) {
 			printk ("%s: non-IDE drive, CHS=%d/%d/%d\n",
@@ -432,7 +429,6 @@ static inline byte probe_for_drive (ide_drive_t *drive)
 			drive->present = 0;	/* nuke it */
 		}
 	}
-	return 1;	/* drive was found */
 }
 
 /*
@@ -548,7 +544,7 @@ static void probe_hwif (ide_hwif_t *hwif)
 	 */
 	for (unit = 0; unit < MAX_DRIVES; ++unit) {
 		ide_drive_t *drive = &hwif->drives[unit];
-		(void) probe_for_drive (drive);
+		probe_for_drive (drive);
 		if (drive->present && !hwif->present) {
 			hwif->present = 1;
 			if (hwif->chipset != ide_4drives || !hwif->mate->present) {
@@ -930,19 +926,6 @@ static int hwif_init (ide_hwif_t *hwif)
 
 	return hwif->present;
 }
-
-void export_ide_init_queue (ide_drive_t *drive)
-{
-	ide_init_queue(drive);
-}
-
-byte export_probe_for_drive (ide_drive_t *drive)
-{
-	return probe_for_drive(drive);
-}
-
-EXPORT_SYMBOL(export_ide_init_queue);
-EXPORT_SYMBOL(export_probe_for_drive);
 
 int ideprobe_init (void);
 static ide_module_t ideprobe_module = {
