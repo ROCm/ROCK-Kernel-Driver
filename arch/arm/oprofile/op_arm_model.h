@@ -24,6 +24,6 @@ struct op_arm_model_spec {
 extern struct op_arm_model_spec op_xscale_spec;
 #endif
 
-extern int pmu_init(struct oprofile_operations **ops, struct op_arm_model_spec *spec);
+extern int __init pmu_init(struct oprofile_operations *ops, struct op_arm_model_spec *spec);
 extern void pmu_exit(void);
 #endif /* OP_ARM_MODEL_H */

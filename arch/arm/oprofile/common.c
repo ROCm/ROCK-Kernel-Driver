@@ -11,6 +11,7 @@
 #include <linux/oprofile.h>
 #include <linux/errno.h>
 #include <asm/semaphore.h>
+#include <linux/sysdev.h>
 
 #include "op_counter.h"
 #include "op_arm_model.h"
@@ -25,6 +26,26 @@ static void pmu_stop(void);
 static int pmu_create_files(struct super_block *, struct dentry *);
 
 #ifdef CONFIG_PM
+static int pmu_suspend(struct sys_device *dev, u32 state)
+{
+	if (pmu_enabled)
+		pmu_stop();
+	return 0;
+}
+
+static int pmu_resume(struct sys_device *dev)
+{
+	if (pmu_enabled)
+		pmu_start();
+	return 0;
+}
+
+static struct sysdev_class oprofile_sysclass = {
+	set_kset_name("oprofile"),
+	.resume		= pmu_resume,
+	.suspend	= pmu_suspend,
+};
+
 static struct sys_device device_oprofile = {
 	.id		= 0,
 	.cls		= &oprofile_sysclass,
@@ -35,14 +56,14 @@ static int __init init_driverfs(void)
 	int ret;
 
 	if (!(ret = sysdev_class_register(&oprofile_sysclass)))
-		ret = sys_device_register(&device_oprofile);
+		ret = sysdev_register(&device_oprofile);
 
 	return ret;
 }
 
-static void __exit exit_driverfs(void)
+static void  exit_driverfs(void)
 {
-	sys_device_unregister(&device_oprofile);
+	sysdev_unregister(&device_oprofile);
 	sysdev_class_unregister(&oprofile_sysclass);
 }
 #else
@@ -105,8 +126,7 @@ static void pmu_stop(void)
 	up(&pmu_sem);
 }
 
-int __init
-pmu_init(struct oprofile_operations *ops, struct op_arm_model_spec *spec)
+int __init pmu_init(struct oprofile_operations *ops, struct op_arm_model_spec *spec)
 {
 	init_MUTEX(&pmu_sem);
 
