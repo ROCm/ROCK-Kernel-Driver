@@ -335,6 +335,7 @@ controller (compatible with DirectPadPro):
  * Analog PSX Pad (red mode)
  * Analog PSX Pad (green mode)
  * PSX Rumble Pad
+ * PSX DDR Pad
 
 2.4 Sega
 ~~~~~~~~
@@ -452,13 +453,21 @@ uses the following kernel/module command line:
 	  5  | Multisystem 2-button joystick
 	  6  | N64 pad
 	  7  | Sony PSX controller
+	  8  | Sony PSX DDR controller
 
-  The exact type of the PSX controller type is autoprobed, so you must have
-your controller plugged in before initializing.
+  The exact type of the PSX controller type is autoprobed when used so
+hot swapping should work (but is not recomended).
 
   Should you want to use more than one of parallel ports at once, you can use
 gamecon.map2 and gamecon.map3 as additional command line parameters for two
 more parallel ports.
+
+  There are two options specific to PSX driver portion.  gamecon.psx_delay sets
+the command delay when talking to the controllers. The default of 25 should
+work but you can try lowering it for better performace. If your pads don't
+respond try raising it untill they work. Setting the type to 8 allows the
+driver to be used with Dance Dance Revolution or similar games. Arrow keys are
+registered as key presses instead of X and Y axes.
 
 3.2 db9.c
 ~~~~~~~~~

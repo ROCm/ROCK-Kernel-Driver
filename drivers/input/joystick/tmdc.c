@@ -322,7 +322,7 @@ static void tmdc_connect(struct gameport *gameport, struct gameport_dev *dev)
 			tmdc->dev[j].evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);
 
 			for (i = 0; i < models[m].abs && i < TMDC_ABS; i++) {
-				if (tmdc->abs[i] < 0) continue;
+				if (tmdc->abs[j][i] < 0) continue;
 				set_bit(tmdc->abs[j][i], tmdc->dev[j].absbit);
 				tmdc->dev[j].absmin[tmdc->abs[j][i]] = 8;
 				tmdc->dev[j].absmax[tmdc->abs[j][i]] = 248;

@@ -53,9 +53,7 @@ static int parkbd_writing;
 static unsigned long parkbd_start;
 
 static struct pardevice *parkbd_dev;
-
-static char parkbd_name[] = "PARKBD AT/XT keyboard adapter";
-static char parkbd_phys[32];
+static struct serio *parkbd_port;
 
 static int parkbd_readlines(void)
 {
@@ -85,13 +83,6 @@ static int parkbd_write(struct serio *port, unsigned char c)
 
 	return 0;
 }
-
-static struct serio parkbd_port =
-{
-	.write	= parkbd_write,
-	.name	= parkbd_name,
-	.phys	= parkbd_phys,
-};
 
 static void parkbd_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
@@ -125,7 +116,7 @@ static void parkbd_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		parkbd_buffer |= (parkbd_readlines() >> 1) << parkbd_counter++;
 
 		if (parkbd_counter == parkbd_mode + 10)
-			serio_interrupt(&parkbd_port, (parkbd_buffer >> (2 - parkbd_mode)) & 0xff, 0, regs);
+			serio_interrupt(parkbd_port, (parkbd_buffer >> (2 - parkbd_mode)) & 0xff, 0, regs);
 	}
 
 	parkbd_last = jiffies;
@@ -163,16 +154,38 @@ static int parkbd_getport(void)
 	return 0;
 }
 
+static struct serio * __init parkbd_allocate_serio(void)
+{
+	struct serio *serio;
+
+	serio = kmalloc(sizeof(struct serio), GFP_KERNEL);
+	if (serio) {
+		serio->type = parkbd_mode;
+		serio->write = parkbd_write,
+		strlcpy(serio->name, "PARKBD AT/XT keyboard adapter", sizeof(serio->name));
+		snprintf(serio->phys, sizeof(serio->phys), "%s/serio0", parkbd_dev->port->name);
+	}
+
+	return serio;
+}
 
 int __init parkbd_init(void)
 {
-	if (parkbd_getport()) return -1;
+	int err;
+
+	err = parkbd_getport();
+	if (err)
+		return err;
+
+	parkbd_port = parkbd_allocate_serio();
+	if (!parkbd_port) {
+		parport_release(parkbd_dev);
+		return -ENOMEM;
+	}
+
 	parkbd_writelines(3);
-	parkbd_port.type = parkbd_mode;
 
-	sprintf(parkbd_phys, "%s/serio0", parkbd_dev->port->name);
-
-	serio_register_port(&parkbd_port);
+	serio_register_port(parkbd_port);
 
 	printk(KERN_INFO "serio: PARKBD %s adapter on %s\n",
                         parkbd_mode ? "AT" : "XT", parkbd_dev->port->name);
@@ -183,7 +196,7 @@ int __init parkbd_init(void)
 void __exit parkbd_exit(void)
 {
 	parport_release(parkbd_dev);
-	serio_unregister_port(&parkbd_port);
+	serio_unregister_port(parkbd_port);
 	parport_unregister_device(parkbd_dev);
 }
 

@@ -223,16 +223,6 @@ static int hiddev_fasync(int fd, struct file *file, int on)
 	return retval < 0 ? retval : 0;
 }
 
-/*
- * De-allocate a hiddev structure
- */
-static struct usb_class_driver hiddev_class;
-static void hiddev_cleanup(struct hiddev *hiddev)
-{
-	hiddev_table[hiddev->hid->minor - HIDDEV_MINOR_BASE] = NULL;
-	usb_deregister_dev(hiddev->hid->intf, &hiddev_class);
-	kfree(hiddev);
-}
 
 /*
  * release file op
@@ -253,7 +243,7 @@ static int hiddev_release(struct inode * inode, struct file * file)
 		if (list->hiddev->exist) 
 			hid_close(list->hiddev->hid);
 		else
-			hiddev_cleanup(list->hiddev);
+			kfree(list->hiddev);
 	}
 
 	kfree(list);
@@ -636,16 +626,19 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 				goto inval;
 
 			field = report->field[uref->field_index];
-			if (uref->usage_index >= field->maxusage)
+
+			if (cmd == HIDIOCGCOLLECTIONINDEX) {
+				if (uref->usage_index >= field->maxusage)
+					goto inval;
+			} else if (uref->usage_index >= field->report_count)
 				goto inval;
 
-			if (cmd == HIDIOCGUSAGES || cmd == HIDIOCSUSAGES) {
-				if (uref_multi->num_values >= HID_MAX_USAGES || 
-				    uref->usage_index >= field->maxusage || 
-				   (uref->usage_index + uref_multi->num_values) >= field->maxusage)
-					goto inval;
+			else if ((cmd == HIDIOCGUSAGES || cmd == HIDIOCSUSAGES) &&
+				 (uref_multi->num_values >= HID_MAX_MULTI_USAGES ||
+				  uref->usage_index + uref_multi->num_values >= field->report_count ||
+				  uref->usage_index + uref_multi->num_values < uref->usage_index))
+				goto inval;
 			}
-		}
 
 		switch (cmd) {
 			case HIDIOCGUSAGE:
@@ -795,17 +788,21 @@ int hiddev_connect(struct hid_device *hid)
  * This is where hid.c calls us to disconnect a hiddev device from the
  * corresponding hid device (usually because the usb device has disconnected)
  */
+static struct usb_class_driver hiddev_class;
 void hiddev_disconnect(struct hid_device *hid)
 {
 	struct hiddev *hiddev = hid->hiddev;
 
 	hiddev->exist = 0;
 
+	hiddev_table[hiddev->hid->minor - HIDDEV_MINOR_BASE] = NULL;
+	usb_deregister_dev(hiddev->hid->intf, &hiddev_class);
+
 	if (hiddev->open) {
 		hid_close(hiddev->hid);
 		wake_up_interruptible(&hiddev->wait);
 	} else {
-		hiddev_cleanup(hiddev);
+		kfree(hiddev);
 	}
 }
 
