@@ -562,7 +562,7 @@ fast_exception_return:
 	mfmsr	r20
 	li	r21, MSR_RI
 	andc	r20,r20,r21
-	mtmsrd	r20
+	mtmsrd	r20,1
 
 	mtspr   SRR1,r23
 	mtspr   SRR0,r22
@@ -989,7 +989,7 @@ _GLOBAL(do_stab_bolted)
 	mfmsr	r22
 	li	r23, MSR_RI
 	andc	r22,r22,r23
-	mtmsrd	r22
+	mtmsrd	r22,1
 
 	ld	r22,EX_SRR0(r21)	/* Get SRR0 from exc. frame */
 	ld	r23,EX_SRR1(r21)	/* Get SRR1 from exc. frame */
@@ -1094,7 +1094,7 @@ SLB_NUM_ENTRIES = 64
 	mfmsr	r22
 	li	r23, MSR_RI
 	andc	r22,r22,r23
-	mtmsrd	r22
+	mtmsrd	r22,1
 
 	ld	r22,EX_SRR0(r21)	/* Get SRR0 from exc. frame */
 	ld	r23,EX_SRR1(r21)	/* Get SRR1 from exc. frame */

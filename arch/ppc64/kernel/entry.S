@@ -396,7 +396,7 @@ restore:
 	mfmsr	r0
 	li	r2, MSR_RI
 	andc	r0,r0,r2
-	mtmsrd	r0
+	mtmsrd	r0,1
 
 	ld	r0,_MSR(r1)
 	mtspr	SRR1,r0
