@@ -7,7 +7,7 @@ extra-y		:= head.o vmlinux.lds
 
 obj-y               :=	setup.o entry.o traps.o irq.o idle.o dma.o \
 			time.o process.o signal.o syscalls.o misc.o ptrace.o \
-			align.o semaphore.o bitops.o stab.o pacaData.o \
+			align.o semaphore.o bitops.o pacaData.o \
 			udbg.o binfmt_elf32.o sys_ppc32.o ioctl32.o \
 			ptrace32.o signal32.o rtc.o init_task.o \
 			lmb.o cputable.o cpu_setup_power4.o idle_power4.o \
