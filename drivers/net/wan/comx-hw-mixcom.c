@@ -566,8 +566,6 @@ static int MIXCOM_open(struct net_device *dev)
 
 	return 0;
 	
-err_restore_flags:
-	restore_flags(flags);
 err_release_region:
 	release_region(dev->base_addr, MIXCOM_IO_EXTENT);
 err_ret:

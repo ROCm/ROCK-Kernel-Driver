@@ -597,6 +597,7 @@ static void sa1100_irda_fir_error(struct sa1100_irda *si, struct net_device *dev
 		sa1100_irda_rx_alloc(si);
 
 		netif_rx(skb);
+		dev->last_rx = jiffies;
 	} else {
 		/*
 		 * Remap the buffer.
