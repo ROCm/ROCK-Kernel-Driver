@@ -67,6 +67,7 @@ int fs_overflowgid = DEFAULT_FS_OVERFLOWUID;
 int C_A_D = 1;
 int cad_pid = 1;
 
+extern int system_running;
 
 /*
  *	Notifier list for kernel code which wants to be called
