@@ -132,8 +132,8 @@ static void ip_map_request(struct cache_detail *cd,
 		 ntohl(addr) >>  8 & 0xff,
 		 ntohl(addr) >>  0 & 0xff);
 
-	add_word(bpp, blen, im->m_class);
-	add_word(bpp, blen, text_addr);
+	qword_add(bpp, blen, im->m_class);
+	qword_add(bpp, blen, text_addr);
 	(*bpp)[-1] = '\n';
 }
 
@@ -155,11 +155,11 @@ static int ip_map_parse(struct cache_detail *cd,
 	mesg[mlen-1] = 0;
 
 	/* class */
-	len = get_word(&mesg, class, 50);
+	len = qword_get(&mesg, class, 50);
 	if (len <= 0) return -EINVAL;
 
 	/* ip address */
-	len = get_word(&mesg, buf, 50);
+	len = qword_get(&mesg, buf, 50);
 	if (len <= 0) return -EINVAL;
 
 	if (sscanf(buf, "%u.%u.%u.%u%c", &b1, &b2, &b3, &b4, &c) != 4)
@@ -170,7 +170,7 @@ static int ip_map_parse(struct cache_detail *cd,
 		return -EINVAL;
 
 	/* domainname, or empty for NEGATIVE */
-	len = get_word(&mesg, buf, 50);
+	len = qword_get(&mesg, buf, 50);
 	if (len < 0) return -EINVAL;
 
 	if (len) {

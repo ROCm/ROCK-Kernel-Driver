@@ -86,10 +86,10 @@ void expkey_request(struct cache_detail *cd,
 	struct svc_expkey *ek = container_of(h, struct svc_expkey, h);
 	char type[5];
 
-	add_word(bpp, blen, ek->ek_client->name);
+	qword_add(bpp, blen, ek->ek_client->name);
 	snprintf(type, 5, "%d", ek->ek_fsidtype);
-	add_word(bpp, blen, type);
-	add_hex(bpp, blen, (char*)ek->ek_fsid, ek->ek_fsidtype==0?8:4);
+	qword_add(bpp, blen, type);
+	qword_addhex(bpp, blen, (char*)ek->ek_fsid, ek->ek_fsidtype==0?8:4);
 	(*bpp)[-1] = '\n';
 }
 
@@ -114,7 +114,7 @@ int expkey_parse(struct cache_detail *cd, char *mesg, int mlen)
 	if (!buf) goto out;
 
 	err = -EINVAL;
-	if ((len=get_word(&mesg, buf, PAGE_SIZE)) <= 0)
+	if ((len=qword_get(&mesg, buf, PAGE_SIZE)) <= 0)
 		goto out;
 
 	err = -ENOENT;
@@ -124,7 +124,7 @@ int expkey_parse(struct cache_detail *cd, char *mesg, int mlen)
 	dprintk("found domain %s\n", buf);
 
 	err = -EINVAL;
-	if ((len=get_word(&mesg, buf, PAGE_SIZE)) <= 0)
+	if ((len=qword_get(&mesg, buf, PAGE_SIZE)) <= 0)
 		goto out;
 	fsidtype = simple_strtoul(buf, &ep, 10);
 	if (*ep)
@@ -132,7 +132,7 @@ int expkey_parse(struct cache_detail *cd, char *mesg, int mlen)
 	dprintk("found fsidtype %d\n", fsidtype);
 	if (fsidtype > 1)
 		goto out;
-	if ((len=get_word(&mesg, buf, PAGE_SIZE)) <= 0)
+	if ((len=qword_get(&mesg, buf, PAGE_SIZE)) <= 0)
 		goto out;
 	dprintk("found fsid length %d\n", len);
 	if (len != ((fsidtype==0)?8:4))
@@ -149,7 +149,7 @@ int expkey_parse(struct cache_detail *cd, char *mesg, int mlen)
 	memcpy(key.ek_fsid, buf, len);
 
 	/* now we want a pathname, or empty meaning NEGATIVE  */
-	if ((len=get_word(&mesg, buf, PAGE_SIZE)) < 0)
+	if ((len=qword_get(&mesg, buf, PAGE_SIZE)) < 0)
 		goto out;
 	dprintk("Path seems to be <%s>\n", buf);
 	err = 0;
@@ -269,9 +269,9 @@ void svc_export_request(struct cache_detail *cd,
 	struct svc_export *exp = container_of(h, struct svc_export, h);
 	char *pth;
 
-	add_word(bpp, blen, exp->ex_client->name);
+	qword_add(bpp, blen, exp->ex_client->name);
 	pth = d_path(exp->ex_dentry, exp->ex_mnt, *bpp, *blen);
-	add_word(bpp, blen, pth);
+	qword_add(bpp, blen, pth);
 	(*bpp)[-1] = '\n';
 }
 
@@ -298,7 +298,7 @@ int svc_export_parse(struct cache_detail *cd, char *mesg, int mlen)
 	if (!buf) goto out;
 
 	/* client */
-	len = get_word(&mesg, buf, PAGE_SIZE);
+	len = qword_get(&mesg, buf, PAGE_SIZE);
 	if (len <= 0) return -EINVAL;
 	err = -ENOENT;
 	dom = auth_domain_find(buf);
@@ -307,7 +307,7 @@ int svc_export_parse(struct cache_detail *cd, char *mesg, int mlen)
 
 	/* path */
 	err = -EINVAL;
-	if ((len=get_word(&mesg, buf, PAGE_SIZE)) <= 0)
+	if ((len=qword_get(&mesg, buf, PAGE_SIZE)) <= 0)
 		goto out;
 	err = path_lookup(buf, 0, &nd);
 	if (err) goto out;

@@ -271,16 +271,16 @@ extern int cache_unregister(struct cache_detail *cd);
 extern struct cache_detail *cache_find(char *name);
 extern void cache_drop(struct cache_detail *detail);
 
-extern void add_word(char **bpp, int *lp, char *str);
-extern void add_hex(char **bpp, int *lp, char *buf, int blen);
-extern int get_word(char **bpp, char *dest, int bufsize);
+extern void qword_add(char **bpp, int *lp, char *str);
+extern void qword_addhex(char **bpp, int *lp, char *buf, int blen);
+extern int qword_get(char **bpp, char *dest, int bufsize);
 
 static inline int get_int(char **bpp, int *anint)
 {
 	char buf[50];
 	char *ep;
 	int rv;
-	int len = get_word(bpp, buf, 50);
+	int len = qword_get(bpp, buf, 50);
 	if (len < 0) return -EINVAL;
 	if (len ==0) return -ENOENT;
 	rv = simple_strtol(buf, &ep, 0);
