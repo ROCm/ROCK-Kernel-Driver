@@ -124,7 +124,7 @@ static inline void _raw_write_lock(rwlock_t * lock)
 	"	br	1b\n"
 	".previous"
 	: "=m" (*lock), "=&r" (regx)
-	: "0" (*lock) : "memory");
+	: "m" (*lock) : "memory");
 }
 
 static inline void _raw_read_lock(rwlock_t * lock)

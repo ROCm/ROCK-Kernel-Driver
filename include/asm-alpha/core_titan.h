@@ -377,58 +377,14 @@ struct el_PRIVATEER_envdata_mcheck {
  * can only use linear accesses to get at PCI/AGP memory and I/O spaces.
  */
 
-#define vucp	volatile unsigned char *
-#define vusp	volatile unsigned short *
-#define vuip	volatile unsigned int *
-#define vulp	volatile unsigned long *
-
-__EXTERN_INLINE u8 titan_inb(unsigned long addr)
-{
-	/* ??? I wish I could get rid of this.  But there's no ioremap
-	   equivalent for I/O space.  PCI I/O can be forced into the
-	   correct hose's I/O region, but that doesn't take care of
-	   legacy ISA crap.  */
-
-	addr += TITAN_IO_BIAS;
-	return __kernel_ldbu(*(vucp)addr);
-}
-
-__EXTERN_INLINE void titan_outb(u8 b, unsigned long addr)
-{
-	addr += TITAN_IO_BIAS;
-	__kernel_stb(b, *(vucp)addr);
-	mb();
-}
-
-__EXTERN_INLINE u16 titan_inw(unsigned long addr)
-{
-	addr += TITAN_IO_BIAS;
-	return __kernel_ldwu(*(vusp)addr);
-}
-
-__EXTERN_INLINE void titan_outw(u16 b, unsigned long addr)
-{
-	addr += TITAN_IO_BIAS;
-	__kernel_stw(b, *(vusp)addr);
-	mb();
-}
-
-__EXTERN_INLINE u32 titan_inl(unsigned long addr)
-{
-	addr += TITAN_IO_BIAS;
-	return *(vuip)addr;
-}
-
-__EXTERN_INLINE void titan_outl(u32 b, unsigned long addr)
-{
-	addr += TITAN_IO_BIAS;
-	*(vuip)addr = b;
-	mb();
-}
-
 /*
  * Memory functions.  all accesses are done through linear space.
  */
+
+__EXTERN_INLINE void __iomem *titan_ioportmap(unsigned long addr)
+{
+	return (void __iomem *)(addr + TITAN_IO_BIAS);
+}
 
 extern void __iomem *titan_ioremap(unsigned long addr, unsigned long size);
 extern void titan_iounmap(volatile void __iomem *addr);
@@ -438,88 +394,16 @@ __EXTERN_INLINE int titan_is_ioaddr(unsigned long addr)
 	return addr >= TITAN_BASE;
 }
 
-__EXTERN_INLINE u8 titan_readb(const volatile void __iomem *addr)
-{
-	return __kernel_ldbu(*(vucp)addr);
-}
+extern int titan_is_mmio(const volatile void __iomem *addr);
 
-__EXTERN_INLINE u16 titan_readw(const volatile void __iomem *addr)
-{
-	return __kernel_ldwu(*(vusp)addr);
-}
-
-__EXTERN_INLINE u32 titan_readl(const volatile void __iomem *addr)
-{
-	return (*(vuip)addr) & 0xffffffff;
-}
-
-__EXTERN_INLINE u64 titan_readq(const volatile void __iomem *addr)
-{
-	return *(vulp)addr;
-}
-
-__EXTERN_INLINE void titan_writeb(u8 b, volatile void __iomem *addr)
-{
-	__kernel_stb(b, *(vucp)addr);
-}
-
-__EXTERN_INLINE void titan_writew(u16 b, volatile void __iomem *addr)
-{
-	__kernel_stw(b, *(vusp)addr);
-}
-
-__EXTERN_INLINE void titan_writel(u32 b, volatile void __iomem *addr)
-{
-	*(vuip)addr = b;
-}
-
-__EXTERN_INLINE void titan_writeq(u64 b, volatile void __iomem *addr)
-{
-	*(vulp)addr = b;
-}
-
-#undef vucp
-#undef vusp
-#undef vuip
-#undef vulp
-
-#ifdef __WANT_IO_DEF
-
-#define __inb(p)		titan_inb((unsigned long)(p))
-#define __inw(p)		titan_inw((unsigned long)(p))
-#define __inl(p)		titan_inl((unsigned long)(p))
-#define __outb(x,p)		titan_outb(x,(unsigned long)(p))
-#define __outw(x,p)		titan_outw(x,(unsigned long)(p))
-#define __outl(x,p)		titan_outl(x,(unsigned long)(p))
-#define __readb(a)		titan_readb(a)
-#define __readw(a)		titan_readw(a)
-#define __readl(a)		titan_readl(a)
-#define __readq(a)		titan_readq(a)
-#define __writeb(x,a)		titan_writeb(x,a)
-#define __writew(x,a)		titan_writew(x,a)
-#define __writel(x,a)		titan_writel(x,a)
-#define __writeq(x,a)		titan_writeq(x,a)
-#define __ioremap(a,s)		titan_ioremap(a,s)
-#define __iounmap(a)		titan_iounmap(a)
-#define __is_ioaddr(a)		titan_is_ioaddr((unsigned long)(a))
-
-#define inb(p)	 		__inb(p)
-#define inw(p) 			__inw(p)
-#define inl(p) 			__inl(p)
-#define outb(v,p) 		__outb(v,p)
-#define outw(v,p) 		__outw(v,p)
-#define outl(v,p) 		__outl(v,p)
-
-#define __raw_readb(a)		__readb(a)
-#define __raw_readw(a)		__readw(a)
-#define __raw_readl(a)		__readl(a)
-#define __raw_readq(a)		__readq(a)
-#define __raw_writeb(v,a)	__writeb(v,a)
-#define __raw_writew(v,a)	__writew(v,a)
-#define __raw_writel(v,a)	__writel(v,a)
-#define __raw_writeq(v,a)	__writeq(v,a)
-
-#endif /* __WANT_IO_DEF */
+#undef __IO_PREFIX
+#define __IO_PREFIX		titan
+#define titan_trivial_rw_bw	1
+#define titan_trivial_rw_lq	1
+#define titan_trivial_io_bw	1
+#define titan_trivial_io_lq	1
+#define titan_trivial_iounmap	0
+#include <asm/io_trivial.h>
 
 #ifdef __IO_EXTERN_INLINE
 #undef __EXTERN_INLINE

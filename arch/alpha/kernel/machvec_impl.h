@@ -44,56 +44,60 @@
 #define DO_DEFAULT_RTC rtc_port: 0x70
 
 #define DO_EV4_MMU							\
-	max_asn:			EV4_MAX_ASN,			\
-	mv_switch_mm:			ev4_switch_mm,			\
-	mv_activate_mm:			ev4_activate_mm,		\
-	mv_flush_tlb_current:		ev4_flush_tlb_current,		\
-	mv_flush_tlb_current_page:	ev4_flush_tlb_current_page
+	.max_asn =			EV4_MAX_ASN,			\
+	.mv_switch_mm =			ev4_switch_mm,			\
+	.mv_activate_mm =		ev4_activate_mm,		\
+	.mv_flush_tlb_current =		ev4_flush_tlb_current,		\
+	.mv_flush_tlb_current_page =	ev4_flush_tlb_current_page
 
 #define DO_EV5_MMU							\
-	max_asn:			EV5_MAX_ASN,			\
-	mv_switch_mm:			ev5_switch_mm,			\
-	mv_activate_mm:			ev5_activate_mm,		\
-	mv_flush_tlb_current:		ev5_flush_tlb_current,		\
-	mv_flush_tlb_current_page:	ev5_flush_tlb_current_page
+	.max_asn =			EV5_MAX_ASN,			\
+	.mv_switch_mm =			ev5_switch_mm,			\
+	.mv_activate_mm =		ev5_activate_mm,		\
+	.mv_flush_tlb_current =		ev5_flush_tlb_current,		\
+	.mv_flush_tlb_current_page =	ev5_flush_tlb_current_page
 
 #define DO_EV6_MMU							\
-	max_asn:			EV6_MAX_ASN,			\
-	mv_switch_mm:			ev5_switch_mm,			\
-	mv_activate_mm:			ev5_activate_mm,		\
-	mv_flush_tlb_current:		ev5_flush_tlb_current,		\
-	mv_flush_tlb_current_page:	ev5_flush_tlb_current_page
+	.max_asn =			EV6_MAX_ASN,			\
+	.mv_switch_mm =			ev5_switch_mm,			\
+	.mv_activate_mm =		ev5_activate_mm,		\
+	.mv_flush_tlb_current =		ev5_flush_tlb_current,		\
+	.mv_flush_tlb_current_page =	ev5_flush_tlb_current_page
 
 #define DO_EV7_MMU							\
-	max_asn:			EV6_MAX_ASN,			\
-	mv_switch_mm:			ev5_switch_mm,			\
-	mv_activate_mm:			ev5_activate_mm,		\
-	mv_flush_tlb_current:		ev5_flush_tlb_current,		\
-	mv_flush_tlb_current_page:	ev5_flush_tlb_current_page
+	.max_asn =			EV6_MAX_ASN,			\
+	.mv_switch_mm =			ev5_switch_mm,			\
+	.mv_activate_mm =		ev5_activate_mm,		\
+	.mv_flush_tlb_current =		ev5_flush_tlb_current,		\
+	.mv_flush_tlb_current_page =	ev5_flush_tlb_current_page
 
 #define IO_LITE(UP,low)							\
-	hae_register:		(unsigned long *) CAT(UP,_HAE_ADDRESS),	\
-	iack_sc:		CAT(UP,_IACK_SC),			\
-	mv_inb:			CAT(low,_inb),				\
-	mv_inw:			CAT(low,_inw),				\
-	mv_inl:			CAT(low,_inl),				\
-	mv_outb:		CAT(low,_outb),				\
-	mv_outw:		CAT(low,_outw),				\
-	mv_outl:		CAT(low,_outl),				\
-	mv_readb:		CAT(low,_readb),			\
-	mv_readw:		CAT(low,_readw),			\
-	mv_readl:		CAT(low,_readl),			\
-	mv_readq:		CAT(low,_readq),			\
-	mv_writeb:		CAT(low,_writeb),			\
-	mv_writew:		CAT(low,_writew),			\
-	mv_writel:		CAT(low,_writel),			\
-	mv_writeq:		CAT(low,_writeq),			\
-	mv_ioremap:		CAT(low,_ioremap),			\
-	mv_iounmap:		CAT(low,_iounmap)			\
+	.hae_register =		(unsigned long *) CAT(UP,_HAE_ADDRESS),	\
+	.iack_sc =		CAT(UP,_IACK_SC),			\
+	.mv_ioread8 =		CAT(low,_ioread8),			\
+	.mv_ioread16 =		CAT(low,_ioread16),			\
+	.mv_ioread32 =		CAT(low,_ioread32),			\
+	.mv_iowrite8 =		CAT(low,_iowrite8),			\
+	.mv_iowrite16 =		CAT(low,_iowrite16),			\
+	.mv_iowrite32 =		CAT(low,_iowrite32),			\
+	.mv_readb =		CAT(low,_readb),			\
+	.mv_readw =		CAT(low,_readw),			\
+	.mv_readl =		CAT(low,_readl),			\
+	.mv_readq =		CAT(low,_readq),			\
+	.mv_writeb =		CAT(low,_writeb),			\
+	.mv_writew =		CAT(low,_writew),			\
+	.mv_writel =		CAT(low,_writel),			\
+	.mv_writeq =		CAT(low,_writeq),			\
+	.mv_ioportmap =		CAT(low,_ioportmap),			\
+	.mv_ioremap =		CAT(low,_ioremap),			\
+	.mv_iounmap =		CAT(low,_iounmap),			\
+	.mv_is_ioaddr =		CAT(low,_is_ioaddr),			\
+	.mv_is_mmio =		CAT(low,_is_mmio)			\
 
 #define IO(UP,low)							\
 	IO_LITE(UP,low),						\
-	pci_ops:		&CAT(low,_pci_ops)
+	.pci_ops =		&CAT(low,_pci_ops),			\
+	.mv_pci_tbi =		CAT(low,_pci_tbi)
 
 #define DO_APECS_IO	IO(APECS,apecs)
 #define DO_CIA_IO	IO(CIA,cia)
@@ -108,23 +112,8 @@
 #define DO_WILDFIRE_IO	IO(WILDFIRE,wildfire)
 
 #define DO_PYXIS_IO	IO_LITE(CIA,cia_bwx), \
-			pci_ops: &CAT(cia,_pci_ops)
-
-#define BUS(which)					\
-	mv_is_ioaddr:	CAT(which,_is_ioaddr),		\
-	mv_pci_tbi:	CAT(which,_pci_tbi)
-
-#define DO_APECS_BUS	BUS(apecs)
-#define DO_CIA_BUS	BUS(cia)
-#define DO_IRONGATE_BUS	BUS(irongate)
-#define DO_LCA_BUS	BUS(lca)
-#define DO_MARVEL_BUS	BUS(marvel)
-#define DO_MCPCIA_BUS	BUS(mcpcia)
-#define DO_POLARIS_BUS	BUS(polaris)
-#define DO_T2_BUS	BUS(t2)
-#define DO_TSUNAMI_BUS	BUS(tsunami)
-#define DO_TITAN_BUS	BUS(titan)
-#define DO_WILDFIRE_BUS	BUS(wildfire)
+			.pci_ops = &cia_pci_ops, \
+			.mv_pci_tbi = cia_pci_tbi
 
 /*
  * In a GENERIC kernel, we have lots of these vectors floating about,

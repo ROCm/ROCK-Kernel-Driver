@@ -190,86 +190,13 @@ struct el_IRONGATE_sysdata_mcheck {
  * K7 can only use linear accesses to get at PCI memory and I/O spaces.
  */
 
-#define vucp	volatile unsigned char __force *
-#define vusp	volatile unsigned short __force *
-#define vuip	volatile unsigned int __force *
-#define vulp	volatile unsigned long __force *
-
-__EXTERN_INLINE u8 irongate_inb(unsigned long addr)
-{
-	return __kernel_ldbu(*(vucp)(addr + IRONGATE_IO));
-}
-
-__EXTERN_INLINE void irongate_outb(u8 b, unsigned long addr)
-{
-        __kernel_stb(b, *(vucp)(addr + IRONGATE_IO));
-	mb();
-}
-
-__EXTERN_INLINE u16 irongate_inw(unsigned long addr)
-{
-	return __kernel_ldwu(*(vusp)(addr + IRONGATE_IO));
-}
-
-__EXTERN_INLINE void irongate_outw(u16 b, unsigned long addr)
-{
-        __kernel_stw(b, *(vusp)(addr + IRONGATE_IO));
-	mb();
-}
-
-__EXTERN_INLINE u32 irongate_inl(unsigned long addr)
-{
-	return *(vuip)(addr + IRONGATE_IO);
-}
-
-__EXTERN_INLINE void irongate_outl(u32 b, unsigned long addr)
-{
-        *(vuip)(addr + IRONGATE_IO) = b;
-	mb();
-}
-
 /*
  * Memory functions.  All accesses are done through linear space.
  */
 
-__EXTERN_INLINE u8 irongate_readb(const volatile void __iomem *addr)
+__EXTERN_INLINE void __iomem *irongate_ioportmap(unsigned long addr)
 {
-	return __kernel_ldbu(*(vucp)addr);
-}
-
-__EXTERN_INLINE u16 irongate_readw(const volatile void __iomem *addr)
-{
-	return __kernel_ldwu(*(vusp)addr);
-}
-
-__EXTERN_INLINE u32 irongate_readl(const volatile void __iomem *addr)
-{
-	return *(vuip)addr;
-}
-
-__EXTERN_INLINE u64 irongate_readq(const volatile void __iomem *addr)
-{
-	return *(vulp)addr;
-}
-
-__EXTERN_INLINE void irongate_writeb(u8 b, volatile void __iomem *addr)
-{
-	__kernel_stb(b, *(vucp)addr);
-}
-
-__EXTERN_INLINE void irongate_writew(u16 b, volatile void __iomem *addr)
-{
-	__kernel_stw(b, *(vusp)addr);
-}
-
-__EXTERN_INLINE void irongate_writel(u32 b, volatile void __iomem *addr)
-{
-	*(vuip)addr = b;
-}
-
-__EXTERN_INLINE void irongate_writeq(u64 b, volatile void __iomem *addr)
-{
-	*(vulp)addr = b;
+	return (void __iomem *)(addr + IRONGATE_IO);
 }
 
 extern void __iomem *irongate_ioremap(unsigned long addr, unsigned long size);
@@ -280,47 +207,20 @@ __EXTERN_INLINE int irongate_is_ioaddr(unsigned long addr)
 	return addr >= IRONGATE_MEM;
 }
 
-#undef vucp
-#undef vusp
-#undef vuip
-#undef vulp
+__EXTERN_INLINE int irongate_is_mmio(const volatile void __iomem *xaddr)
+{
+	unsigned long addr = (unsigned long)xaddr;
+	return addr < IRONGATE_IO || addr >= IRONGATE_CONF;
+}
 
-#ifdef __WANT_IO_DEF
-
-#define __inb(p)		irongate_inb((unsigned long)(p))
-#define __inw(p)		irongate_inw((unsigned long)(p))
-#define __inl(p)		irongate_inl((unsigned long)(p))
-#define __outb(x,p)		irongate_outb(x,(unsigned long)(p))
-#define __outw(x,p)		irongate_outw(x,(unsigned long)(p))
-#define __outl(x,p)		irongate_outl(x,(unsigned long)(p))
-#define __readb(a)		irongate_readb(a)
-#define __readw(a)		irongate_readw(a)
-#define __readl(a)		irongate_readl(a)
-#define __readq(a)		irongate_readq(a)
-#define __writeb(x,a)		irongate_writeb(x,a)
-#define __writew(x,a)		irongate_writew(x,a)
-#define __writel(x,a)		irongate_writel(x,a)
-#define __writeq(x,a)		irongate_writeq(x,a)
-#define __ioremap(a,s)		irongate_ioremap(a,s)
-#define __iounmap(a)		irongate_iounmap(a)
-#define __is_ioaddr(a)		irongate_is_ioaddr((unsigned long)(a))
-
-#define inb(p)			__inb(p)
-#define inw(p)			__inw(p)
-#define inl(p)			__inl(p)
-#define outb(x,p)		__outb(x,p)
-#define outw(x,p)		__outw(x,p)
-#define outl(x,p)		__outl(x,p)
-#define __raw_readb(a)		__readb(a)
-#define __raw_readw(a)		__readw(a)
-#define __raw_readl(a)		__readl(a)
-#define __raw_readq(a)		__readq(a)
-#define __raw_writeb(v,a)	__writeb(v,a)
-#define __raw_writew(v,a)	__writew(v,a)
-#define __raw_writel(v,a)	__writel(v,a)
-#define __raw_writeq(v,a)	__writeq(v,a)
-
-#endif /* __WANT_IO_DEF */
+#undef __IO_PREFIX
+#define __IO_PREFIX			irongate
+#define irongate_trivial_rw_bw		1
+#define irongate_trivial_rw_lq		1
+#define irongate_trivial_io_bw		1
+#define irongate_trivial_io_lq		1
+#define irongate_trivial_iounmap	0
+#include <asm/io_trivial.h>
 
 #ifdef __IO_EXTERN_INLINE
 #undef __EXTERN_INLINE

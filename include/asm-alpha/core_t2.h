@@ -357,13 +357,13 @@ struct el_t2_frame_corrected {
 #define vip	volatile int *
 #define vuip	volatile unsigned int *
 
-__EXTERN_INLINE u8 t2_inb(unsigned long addr)
+static inline u8 t2_inb(unsigned long addr)
 {
 	long result = *(vip) ((addr << 5) + T2_IO + 0x00);
 	return __kernel_extbl(result, addr & 3);
 }
 
-__EXTERN_INLINE void t2_outb(u8 b, unsigned long addr)
+static inline void t2_outb(u8 b, unsigned long addr)
 {
 	unsigned long w;
 
@@ -372,13 +372,13 @@ __EXTERN_INLINE void t2_outb(u8 b, unsigned long addr)
 	mb();
 }
 
-__EXTERN_INLINE u16 t2_inw(unsigned long addr)
+static inline u16 t2_inw(unsigned long addr)
 {
 	long result = *(vip) ((addr << 5) + T2_IO + 0x08);
 	return __kernel_extwl(result, addr & 3);
 }
 
-__EXTERN_INLINE void t2_outw(u16 b, unsigned long addr)
+static inline void t2_outw(u16 b, unsigned long addr)
 {
 	unsigned long w;
 
@@ -387,12 +387,12 @@ __EXTERN_INLINE void t2_outw(u16 b, unsigned long addr)
 	mb();
 }
 
-__EXTERN_INLINE u32 t2_inl(unsigned long addr)
+static inline u32 t2_inl(unsigned long addr)
 {
 	return *(vuip) ((addr << 5) + T2_IO + 0x18);
 }
 
-__EXTERN_INLINE void t2_outl(u32 b, unsigned long addr)
+static inline void t2_outl(u32 b, unsigned long addr)
 {
 	*(vuip) ((addr << 5) + T2_IO + 0x18) = b;
 	mb();
@@ -560,16 +560,15 @@ __EXTERN_INLINE void t2_writeq(u64 b, volatile void __iomem *xaddr)
 	spin_unlock_irqrestore(&t2_hae_lock, flags);
 }
 
-__EXTERN_INLINE void __iomem *t2_ioremap(unsigned long addr, 
-					 unsigned long size
-					 __attribute__((unused)))
+__EXTERN_INLINE void __iomem *t2_ioportmap(unsigned long addr)
 {
-	return (void __iomem *)addr;
+	return (void __iomem *)(addr + T2_IO);
 }
 
-__EXTERN_INLINE void t2_iounmap(volatile void __iomem *addr)
+__EXTERN_INLINE void __iomem *t2_ioremap(unsigned long addr, 
+					 unsigned long size)
 {
-	return;
+	return (void __iomem *)(addr + T2_DENSE_MEM);
 }
 
 __EXTERN_INLINE int t2_is_ioaddr(unsigned long addr)
@@ -577,30 +576,47 @@ __EXTERN_INLINE int t2_is_ioaddr(unsigned long addr)
 	return (long)addr >= 0;
 }
 
+__EXTERN_INLINE int t2_is_mmio(const volatile void __iomem *addr)
+{
+	return (unsigned long)addr >= T2_DENSE_MEM;
+}
+
+/* New-style ioread interface.  The mmio routines are so ugly for T2 that
+   it doesn't make sense to merge the pio and mmio routines.  */
+
+#define IOPORT(OS, NS)							\
+__EXTERN_INLINE unsigned int t2_ioread##NS(void __iomem *xaddr)		\
+{									\
+	if (t2_is_mmio(xaddr))						\
+		return t2_read##OS(xaddr - T2_DENSE_MEM);		\
+	else								\
+		return t2_in##OS((unsigned long)xaddr - T2_IO);		\
+}									\
+__EXTERN_INLINE void t2_iowrite##NS(u##NS b, void __iomem *xaddr)	\
+{									\
+	if (t2_is_mmio(xaddr))						\
+		t2_write##OS(b, xaddr - T2_DENSE_MEM);			\
+	else								\
+		t2_out##OS(b, (unsigned long)xaddr - T2_IO);		\
+}
+
+IOPORT(b, 8)
+IOPORT(w, 16)
+IOPORT(l, 32)
+
+#undef IOPORT
+
 #undef vip
 #undef vuip
 
-#ifdef __WANT_IO_DEF
-
-#define __inb(p)		t2_inb((unsigned long)(p))
-#define __inw(p)		t2_inw((unsigned long)(p))
-#define __inl(p)		t2_inl((unsigned long)(p))
-#define __outb(x,p)		t2_outb(x,(unsigned long)(p))
-#define __outw(x,p)		t2_outw(x,(unsigned long)(p))
-#define __outl(x,p)		t2_outl(x,(unsigned long)(p))
-#define __readb(a)		t2_readb(a)
-#define __readw(a)		t2_readw(a)
-#define __readl(a)		t2_readl(a)
-#define __readq(a)		t2_readq(a)
-#define __writeb(x,a)		t2_writeb(x,a)
-#define __writew(x,a)		t2_writew(x,a)
-#define __writel(x,a)		t2_writel(x,a)
-#define __writeq(x,a)		t2_writeq(x,a)
-#define __ioremap(a,s)		t2_ioremap(a,s)
-#define __iounmap(a)		t2_iounmap(a)
-#define __is_ioaddr(a)		t2_is_ioaddr((unsigned long)(a))
-
-#endif /* __WANT_IO_DEF */
+#undef __IO_PREFIX
+#define __IO_PREFIX		t2
+#define t2_trivial_rw_bw	0
+#define t2_trivial_rw_lq	0
+#define t2_trivial_io_bw	0
+#define t2_trivial_io_lq	0
+#define t2_trivial_iounmap	1
+#include <asm/io_trivial.h>
 
 #ifdef __IO_EXTERN_INLINE
 #undef __EXTERN_INLINE

@@ -211,91 +211,6 @@ struct el_MCPCIA_uncorrected_frame_mcheck {
  * Unfortunately, we can't use BWIO with EV5, so for now, we always use SPARSE.
  */
 
-#define vucp	volatile unsigned char __force *
-#define vusp	volatile unsigned short __force *
-#define vip	volatile int __force *
-#define vuip	volatile unsigned int __force *
-#define vulp	volatile unsigned long __force *
-
-__EXTERN_INLINE u8 mcpcia_inb(unsigned long in_addr)
-{
-	unsigned long addr, hose, result;
-
-	addr = in_addr & 0xffffUL;
-	hose = in_addr & ~0xffffUL;
-
-	/* ??? I wish I could get rid of this.  But there's no ioremap
-	   equivalent for I/O space.  PCI I/O can be forced into the
-	   correct hose's I/O region, but that doesn't take care of
-	   legacy ISA crap.  */
-	hose += MCPCIA_IO_BIAS;
-
-	result = *(vip) ((addr << 5) + hose + 0x00);
-	return __kernel_extbl(result, addr & 3);
-}
-
-__EXTERN_INLINE void mcpcia_outb(u8 b, unsigned long in_addr)
-{
-	unsigned long addr, hose, w;
-
-	addr = in_addr & 0xffffUL;
-	hose = in_addr & ~0xffffUL;
-	hose += MCPCIA_IO_BIAS;
-
-	w = __kernel_insbl(b, addr & 3);
-	*(vuip) ((addr << 5) + hose + 0x00) = w;
-	mb();
-}
-
-__EXTERN_INLINE u16 mcpcia_inw(unsigned long in_addr)
-{
-	unsigned long addr, hose, result;
-
-	addr = in_addr & 0xffffUL;
-	hose = in_addr & ~0xffffUL;
-	hose += MCPCIA_IO_BIAS;
-
-	result = *(vip) ((addr << 5) + hose + 0x08);
-	return __kernel_extwl(result, addr & 3);
-}
-
-__EXTERN_INLINE void mcpcia_outw(u16 b, unsigned long in_addr)
-{
-	unsigned long addr, hose, w;
-
-	addr = in_addr & 0xffffUL;
-	hose = in_addr & ~0xffffUL;
-	hose += MCPCIA_IO_BIAS;
-
-	w = __kernel_inswl(b, addr & 3);
-	*(vuip) ((addr << 5) + hose + 0x08) = w;
-	mb();
-}
-
-__EXTERN_INLINE u32 mcpcia_inl(unsigned long in_addr)
-{
-	unsigned long addr, hose;
-
-	addr = in_addr & 0xffffUL;
-	hose = in_addr & ~0xffffUL;
-	hose += MCPCIA_IO_BIAS;
-
-	return *(vuip) ((addr << 5) + hose + 0x18);
-}
-
-__EXTERN_INLINE void mcpcia_outl(u32 b, unsigned long in_addr)
-{
-	unsigned long addr, hose;
-
-	addr = in_addr & 0xffffUL;
-	hose = in_addr & ~0xffffUL;
-	hose += MCPCIA_IO_BIAS;
-
-	*(vuip) ((addr << 5) + hose + 0x18) = b;
-	mb();
-}
-
-
 /*
  * Memory functions.  64-bit and 32-bit accesses are done through
  * dense memory space, everything else through sparse space.
@@ -328,16 +243,105 @@ __EXTERN_INLINE void mcpcia_outl(u32 b, unsigned long in_addr)
  *
  */
 
-__EXTERN_INLINE void __iomem *mcpcia_ioremap(unsigned long addr,
-					     unsigned long size
-					     __attribute__((unused)))
+#define vip	volatile int __force *
+#define vuip	volatile unsigned int __force *
+
+#ifdef MCPCIA_ONE_HAE_WINDOW
+#define MCPCIA_FROB_MMIO						\
+	if (__mcpcia_is_mmio(hose)) {					\
+		set_hae(hose & 0xffffffff);				\
+		hose = hose - MCPCIA_DENSE(4) + MCPCIA_SPARSE(4);	\
+	}
+#else
+#define MCPCIA_FROB_MMIO						\
+	if (__mcpcia_is_mmio(hose)) {					\
+		hose = hose - MCPCIA_DENSE(4) + MCPCIA_SPARSE(4);	\
+	}
+#endif
+
+static inline int __mcpcia_is_mmio(unsigned long addr)
 {
-	return (void __iomem *)(addr + MCPCIA_MEM_BIAS);
+	return (addr & 0x80000000UL) == 0;
 }
 
-__EXTERN_INLINE void mcpcia_iounmap(volatile void __iomem *addr)
+__EXTERN_INLINE unsigned int mcpcia_ioread8(void __iomem *xaddr)
 {
-	return;
+	unsigned long addr = (unsigned long)xaddr & MCPCIA_MEM_MASK;
+	unsigned long hose = (unsigned long)xaddr & ~MCPCIA_MEM_MASK;
+	unsigned long result;
+
+	MCPCIA_FROB_MMIO;
+
+	result = *(vip) ((addr << 5) + hose + 0x00);
+	return __kernel_extbl(result, addr & 3);
+}
+
+__EXTERN_INLINE void mcpcia_iowrite8(u8 b, void __iomem *xaddr)
+{
+	unsigned long addr = (unsigned long)xaddr & MCPCIA_MEM_MASK;
+	unsigned long hose = (unsigned long)xaddr & ~MCPCIA_MEM_MASK;
+	unsigned long w;
+
+	MCPCIA_FROB_MMIO;
+
+	w = __kernel_insbl(b, addr & 3);
+	*(vuip) ((addr << 5) + hose + 0x00) = w;
+}
+
+__EXTERN_INLINE unsigned int mcpcia_ioread16(void __iomem *xaddr)
+{
+	unsigned long addr = (unsigned long)xaddr & MCPCIA_MEM_MASK;
+	unsigned long hose = (unsigned long)xaddr & ~MCPCIA_MEM_MASK;
+	unsigned long result;
+
+	MCPCIA_FROB_MMIO;
+
+	result = *(vip) ((addr << 5) + hose + 0x08);
+	return __kernel_extwl(result, addr & 3);
+}
+
+__EXTERN_INLINE void mcpcia_iowrite16(u16 b, void __iomem *xaddr)
+{
+	unsigned long addr = (unsigned long)xaddr & MCPCIA_MEM_MASK;
+	unsigned long hose = (unsigned long)xaddr & ~MCPCIA_MEM_MASK;
+	unsigned long w;
+
+	MCPCIA_FROB_MMIO;
+
+	w = __kernel_inswl(b, addr & 3);
+	*(vuip) ((addr << 5) + hose + 0x08) = w;
+}
+
+__EXTERN_INLINE unsigned int mcpcia_ioread32(void __iomem *xaddr)
+{
+	unsigned long addr = (unsigned long)xaddr;
+
+	if (!__mcpcia_is_mmio(addr))
+		addr = ((addr & 0xffff) << 5) + (addr & ~0xfffful) + 0x18;
+
+	return *(vuip)addr;
+}
+
+__EXTERN_INLINE void mcpcia_iowrite32(u32 b, void __iomem *xaddr)
+{
+	unsigned long addr = (unsigned long)xaddr;
+
+	if (!__mcpcia_is_mmio(addr))
+		addr = ((addr & 0xffff) << 5) + (addr & ~0xfffful) + 0x18;
+
+	*(vuip)addr = b;
+}
+
+
+__EXTERN_INLINE void __iomem *mcpcia_ioportmap(unsigned long addr)
+{
+	return (void __iomem *)(addr + MCPCIA_IO_BIAS);
+}
+
+__EXTERN_INLINE void __iomem *mcpcia_ioremap(unsigned long addr,
+					     unsigned long size)
+{
+	return (void __iomem *)(addr + MCPCIA_MEM_BIAS);
 }
 
 __EXTERN_INLINE int mcpcia_is_ioaddr(unsigned long addr)
@@ -345,132 +349,25 @@ __EXTERN_INLINE int mcpcia_is_ioaddr(unsigned long addr)
 	return addr >= MCPCIA_SPARSE(0);
 }
 
-__EXTERN_INLINE u8 mcpcia_readb(const volatile void __iomem *xaddr)
+__EXTERN_INLINE int mcpcia_is_mmio(const volatile void __iomem *xaddr)
 {
-	unsigned long addr = (unsigned long)xaddr & 0xffffffffUL;
-	unsigned long hose = (unsigned long)xaddr & ~0xffffffffUL;
-	unsigned long result, work;
-
-#ifndef MCPCIA_ONE_HAE_WINDOW
-	unsigned long msb;
-	msb = addr & ~MCPCIA_MEM_MASK;
-	set_hae(msb);
-#endif
-	addr = addr & MCPCIA_MEM_MASK;
-
-	hose = hose - MCPCIA_DENSE(4) + MCPCIA_SPARSE(4);
-	work = ((addr << 5) + hose + 0x00);
-	result = *(vip) work;
-	return __kernel_extbl(result, addr & 3);
+	unsigned long addr = (unsigned long) xaddr;
+	return __mcpcia_is_mmio(addr);
 }
 
-__EXTERN_INLINE u16 mcpcia_readw(const volatile void __iomem *xaddr)
-{
-	unsigned long addr = (unsigned long)xaddr & 0xffffffffUL;
-	unsigned long hose = (unsigned long)xaddr & ~0xffffffffUL;
-	unsigned long result, work;
+#undef MCPCIA_FROB_MMIO
 
-#ifndef MCPCIA_ONE_HAE_WINDOW
-	unsigned long msb;
-	msb = addr & ~MCPCIA_MEM_MASK;
-	set_hae(msb);
-#endif
-	addr = addr & MCPCIA_MEM_MASK;
-
-	hose = hose - MCPCIA_DENSE(4) + MCPCIA_SPARSE(4);
-	work = ((addr << 5) + hose + 0x08);
-	result = *(vip) work;
-	return __kernel_extwl(result, addr & 3);
-}
-
-__EXTERN_INLINE void mcpcia_writeb(u8 b, volatile void __iomem *xaddr)
-{
-	unsigned long addr = (unsigned long)xaddr & 0xffffffffUL;
-	unsigned long hose = (unsigned long)xaddr & ~0xffffffffUL;
-	unsigned long w;
-
-#ifndef MCPCIA_ONE_HAE_WINDOW
-	unsigned long msb;
-	msb = addr & ~MCPCIA_MEM_MASK;
-	set_hae(msb);
-#endif
-	addr = addr & MCPCIA_MEM_MASK;
-
-	w = __kernel_insbl(b, addr & 3);
-	hose = hose - MCPCIA_DENSE(4) + MCPCIA_SPARSE(4);
-	*(vuip) ((addr << 5) + hose + 0x00) = w;
-}
-
-__EXTERN_INLINE void mcpcia_writew(u16 b, volatile void __iomem *xaddr)
-{
-	unsigned long addr = (unsigned long)xaddr & 0xffffffffUL;
-	unsigned long hose = (unsigned long)xaddr & ~0xffffffffUL;
-	unsigned long w;
-
-#ifndef MCPCIA_ONE_HAE_WINDOW
-	unsigned long msb;
-	msb = addr & ~MCPCIA_MEM_MASK;
-	set_hae(msb);
-#endif
-	addr = addr & MCPCIA_MEM_MASK;
-
-	w = __kernel_inswl(b, addr & 3);
-	hose = hose - MCPCIA_DENSE(4) + MCPCIA_SPARSE(4);
-	*(vuip) ((addr << 5) + hose + 0x08) = w;
-}
-
-__EXTERN_INLINE u32 mcpcia_readl(const volatile void __iomem *addr)
-{
-	return *(vuip)addr;
-}
-
-__EXTERN_INLINE u64 mcpcia_readq(const volatile void __iomem *addr)
-{
-	return *(vulp)addr;
-}
-
-__EXTERN_INLINE void mcpcia_writel(u32 b, volatile void __iomem *addr)
-{
-	*(vuip)addr = b;
-}
-
-__EXTERN_INLINE void mcpcia_writeq(u64 b, volatile void __iomem *addr)
-{
-	*(vulp)addr = b;
-}
-
-#undef vucp
-#undef vusp
 #undef vip
 #undef vuip
-#undef vulp
 
-#ifdef __WANT_IO_DEF
-
-#define __inb(p)		mcpcia_inb((unsigned long)(p))
-#define __inw(p)		mcpcia_inw((unsigned long)(p))
-#define __inl(p)		mcpcia_inl((unsigned long)(p))
-#define __outb(x,p)		mcpcia_outb(x,(unsigned long)(p))
-#define __outw(x,p)		mcpcia_outw(x,(unsigned long)(p))
-#define __outl(x,p)		mcpcia_outl(x,(unsigned long)(p))
-#define __readb(a)		mcpcia_readb(a)
-#define __readw(a)		mcpcia_readw(a)
-#define __readl(a)		mcpcia_readl(a)
-#define __readq(a)		mcpcia_readq(a)
-#define __writeb(x,a)		mcpcia_writeb(x,a)
-#define __writew(x,a)		mcpcia_writew(x,a)
-#define __writel(x,a)		mcpcia_writel(x,a)
-#define __writeq(x,a)		mcpcia_writeq(x,a)
-#define __ioremap(a,s)		mcpcia_ioremap(a,s)
-#define __iounmap(a)		mcpcia_iounmap(a)
-#define __is_ioaddr(a)		mcpcia_is_ioaddr((unsigned long)(a))
-
-#define __raw_readl(a)		__readl(a)
-#define __raw_readq(a)		__readq(a)
-#define __raw_writel(v,a)	__writel(v,a)
-#define __raw_writeq(v,a)	__writeq(v,a)
-
-#endif /* __WANT_IO_DEF */
+#undef __IO_PREFIX
+#define __IO_PREFIX		mcpcia
+#define mcpcia_trivial_rw_bw	2
+#define mcpcia_trivial_rw_lq	1
+#define mcpcia_trivial_io_bw	0
+#define mcpcia_trivial_io_lq	0
+#define mcpcia_trivial_iounmap	1
+#include <asm/io_trivial.h>
 
 #ifdef __IO_EXTERN_INLINE
 #undef __EXTERN_INLINE
