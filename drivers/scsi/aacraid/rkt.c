@@ -38,6 +38,7 @@
 #include <linux/blkdev.h>
 #include <linux/delay.h>
 #include <linux/completion.h>
+#include <linux/time.h>
 #include <linux/interrupt.h>
 #include <asm/semaphore.h>
 
@@ -67,8 +68,8 @@ static irqreturn_t aac_rkt_intr(int irq, void *dev_id, struct pt_regs *regs)
 			rkt_writel(dev, InboundDoorbellReg,DoorBellPrintfDone);
 		}
 		else if (bellbits & DoorBellAdapterNormCmdReady) {
-			aac_command_normal(&dev->queues->queue[HostNormCmdQueue]);
 			rkt_writel(dev, MUnit.ODR, DoorBellAdapterNormCmdReady);
+			aac_command_normal(&dev->queues->queue[HostNormCmdQueue]);
 		}
 		else if (bellbits & DoorBellAdapterNormRespReady) {
 			aac_response_normal(&dev->queues->queue[HostNormRespQueue]);
@@ -305,7 +306,7 @@ static void aac_rkt_start_adapter(struct aac_dev *dev)
 	struct aac_init *init;
 
 	init = dev->init;
-	init->HostElapsedSeconds = cpu_to_le32(jiffies/HZ);
+	init->HostElapsedSeconds = cpu_to_le32(get_seconds());
 	/*
 	 *	Tell the adapter we are back and up and running so it will scan
 	 *	its command queues and enable our interrupts
@@ -341,12 +342,38 @@ static int aac_rkt_check_health(struct aac_dev *dev)
 	if (status & SELF_TEST_FAILED)
 		return -1;
 	/*
-	 *	Check to see if the board panic'd while booting.
+	 *	Check to see if the board panic'd.
 	 */
 	if (status & KERNEL_PANIC)
-		return -2;
+	{
+		char * buffer = kmalloc(512, GFP_KERNEL|__GFP_DMA);
+		struct POSTSTATUS {
+			u32 Post_Command;
+			u32 Post_Address;
+		} * post = kmalloc(sizeof(struct POSTSTATUS), GFP_KERNEL);
+		dma_addr_t paddr = pci_map_single(dev->pdev, post, sizeof(struct POSTSTATUS), 2);
+		dma_addr_t baddr = pci_map_single(dev->pdev, buffer, 512, 1);
+		u32 status = -1;
+		int ret = -2;
+		
+		memset(buffer, 0, 512);
+		post->Post_Command = cpu_to_le32(COMMAND_POST_RESULTS);
+		post->Post_Address = cpu_to_le32(baddr);
+		rkt_writel(dev, MUnit.IMRx[0], cpu_to_le32(paddr));
+		rkt_sync_cmd(dev, COMMAND_POST_RESULTS, baddr, &status);
+		pci_unmap_single(dev->pdev, paddr, sizeof(struct POSTSTATUS),2);
+		kfree(post);
+		if ((buffer[0] == '0') && (buffer[1] == 'x')) {
+			ret = (buffer[2] <= '9') ? (buffer[2] - '0') : (buffer[2] - 'A' + 10);
+			ret <<= 4;
+			ret += (buffer[3] <= '9') ? (buffer[3] - '0') : (buffer[3] - 'A' + 10);
+		}
+		pci_unmap_single(dev->pdev, baddr, 512, 1);
+		kfree(buffer);
+		return ret;
+	}
 	/*
-	 *	Wait for the adapter to be up and running. Wait up to 3 minutes
+	 *	Wait for the adapter to be up and running.
 	 */
 	if (!(status & KERNEL_UP_AND_RUNNING))
 		return -3;
@@ -354,26 +381,24 @@ static int aac_rkt_check_health(struct aac_dev *dev)
 	 *	Everything is OK
 	 */
 	return 0;
-} /* aac_rkt_check_health */
+}
 
 /**
  *	aac_rkt_init	-	initialize an i960 based AAC card
  *	@dev: device to configure
- *	@devnum: adapter number
  *
  *	Allocate and set up resources for the i960 based AAC variants. The 
  *	device_interface in the commregion will be allocated and linked 
  *	to the comm region.
  */
 
-int aac_rkt_init(struct aac_dev *dev, unsigned long num)
+int aac_rkt_init(struct aac_dev *dev)
 {
 	unsigned long start;
 	unsigned long status;
 	int instance;
 	const char * name;
 
-	dev->devnum = num;
 	instance = dev->id;
 	name     = dev->name;
 
@@ -388,14 +413,21 @@ int aac_rkt_init(struct aac_dev *dev, unsigned long num)
 	/*
 	 *	Check to see if the board failed any self tests.
 	 */
-	if (rkt_readl(dev, IndexRegs.Mailbox[7]) & SELF_TEST_FAILED) {
+	if (rkt_readl(dev, MUnit.OMRx[0]) & SELF_TEST_FAILED) {
 		printk(KERN_ERR "%s%d: adapter self-test failed.\n", dev->name, instance);
+		return -1;
+	}
+	/*
+	 *	Check to see if the monitor panic'd while booting.
+	 */
+	if (rkt_readl(dev, MUnit.OMRx[0]) & MONITOR_PANIC) {
+		printk(KERN_ERR "%s%d: adapter monitor panic.\n", dev->name, instance);
 		return -1;
 	}
 	/*
 	 *	Check to see if the board panic'd while booting.
 	 */
-	if (rkt_readl(dev, IndexRegs.Mailbox[7]) & KERNEL_PANIC) {
+	if (rkt_readl(dev, MUnit.OMRx[0]) & KERNEL_PANIC) {
 		printk(KERN_ERR "%s%d: adapter kernel panic'd.\n", dev->name, instance);
 		return -1;
 	}
@@ -403,7 +435,7 @@ int aac_rkt_init(struct aac_dev *dev, unsigned long num)
 	/*
 	 *	Wait for the adapter to be up and running. Wait up to 3 minutes
 	 */
-	while (!(rkt_readl(dev, IndexRegs.Mailbox[7]) & KERNEL_UP_AND_RUNNING)) 
+	while (!(rkt_readl(dev, MUnit.OMRx[0]) & KERNEL_UP_AND_RUNNING))
 	{
 		if(time_after(jiffies, start+180*HZ))
 		{

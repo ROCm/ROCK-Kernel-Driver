@@ -6,14 +6,12 @@
  *              D E F I N E S
  *----------------------------------------------------------------------------*/
 
-#define MAXIMUM_NUM_CONTAINERS	31
+#define MAXIMUM_NUM_CONTAINERS	32
 #define MAXIMUM_NUM_ADAPTERS	8
 
-#define AAC_NUM_FIB		578
-//#define AAC_NUM_IO_FIB	512
+#define AAC_NUM_FIB		(256 + 64)
 #define AAC_NUM_IO_FIB		100
 
-#define AAC_MAX_TARGET 		(MAXIMUM_NUM_CONTAINERS+1)
 #define AAC_MAX_LUN		(8)
 
 #define AAC_MAX_HOSTPHYSMEMPAGES (0xfffff)
@@ -21,7 +19,12 @@
 /*
  * These macros convert from physical channels to virtual channels
  */
-#define CONTAINER_CHANNEL	(0)
+#define CONTAINER_CHANNEL		(0)
+#define ID_LUN_TO_CONTAINER(id, lun)	(id)
+#define CONTAINER_TO_CHANNEL(cont)	(CONTAINER_CHANNEL)
+#define CONTAINER_TO_ID(cont)		(cont)
+#define CONTAINER_TO_LUN(cont)		(0)
+
 #define aac_phys_to_logical(x)  (x+1)
 #define aac_logical_to_phys(x)  (x?x-1:0)
 
@@ -73,7 +76,7 @@ struct diskparm
 #define		FT_SOCK		6	/* socket */
 #define		FT_FIFO		7	/* fifo */
 #define		FT_FILESYS	8	/* ADAPTEC's "FSA"(tm) filesystem */
-#define		FT_DRIVE	9	/* physical disk - addressable in scsi by bus/target/lun */
+#define		FT_DRIVE	9	/* physical disk - addressable in scsi by bus/id/lun */
 #define		FT_SLICE	10	/* virtual disk - raw volume - slice */
 #define		FT_PARTITION	11	/* FSA partition - carved out of a slice - building block for containers */
 #define		FT_VOLUME	12	/* Container - Volume Set */
@@ -433,7 +436,7 @@ struct adapter_ops
 
 struct aac_driver_ident
 {
-	int 	(*init)(struct aac_dev *dev, unsigned long num);
+	int 	(*init)(struct aac_dev *dev);
 	char *	name;
 	char *	vname;
 	char *	model;
@@ -596,6 +599,9 @@ struct rx_inbound {
 #define	InboundMailbox2		IndexRegs.Mailbox[2]
 #define	InboundMailbox3		IndexRegs.Mailbox[3]
 #define	InboundMailbox4		IndexRegs.Mailbox[4]
+#define	InboundMailbox5		IndexRegs.Mailbox[5]
+#define	InboundMailbox6		IndexRegs.Mailbox[6]
+#define	InboundMailbox7		IndexRegs.Mailbox[7]
 
 #define	INBOUNDDOORBELL_0	cpu_to_le32(0x00000001)
 #define INBOUNDDOORBELL_1	cpu_to_le32(0x00000002)
@@ -825,9 +831,8 @@ struct aac_dev
 	} regs;
 	u32			OIMR; /* Mask Register Cache */
 	/*
-	 *	The following is the number of the individual adapter
+	 *	AIF thread states
 	 */
-	u32			devnum;
 	u32			aif_thread;
 	struct completion	aif_completion;
 	struct aac_adapter_info adapter_info;
@@ -839,19 +844,19 @@ struct aac_dev
 };
 
 #define AllocateAndMapFibSpace(dev, MapFibContext) \
-	dev->a_ops.AllocateAndMapFibSpace(dev, MapFibContext)
+	(dev)->a_ops.AllocateAndMapFibSpace(dev, MapFibContext)
 
 #define UnmapAndFreeFibSpace(dev, MapFibContext) \
-	dev->a_ops.UnmapAndFreeFibSpace(dev, MapFibContext)
+	(dev)->a_ops.UnmapAndFreeFibSpace(dev, MapFibContext)
 
 #define aac_adapter_interrupt(dev) \
-	dev->a_ops.adapter_interrupt(dev)
+	(dev)->a_ops.adapter_interrupt(dev)
 
 #define aac_adapter_notify(dev, event) \
-	dev->a_ops.adapter_notify(dev, event)
+	(dev)->a_ops.adapter_notify(dev, event)
 
 #define aac_adapter_enable_int(dev, event) \
-	dev->a_ops.adapter_enable_int(dev, event)
+	(dev)->a_ops.adapter_enable_int(dev, event)
 
 #define aac_adapter_disable_int(dev, event) \
 	dev->a_ops.adapter_disable_int(dev, event)
@@ -1023,7 +1028,7 @@ struct aac_srb
 {
 	u32		function;
 	u32		channel;
-	u32		target;
+	u32		id;
 	u32		lun;
 	u32		timeout;
 	u32		flags;
@@ -1212,7 +1217,7 @@ struct aac_query_disk
 {
 	s32	cnum;
 	s32	bus;
-	s32	target;
+	s32	id;
 	s32	lun;
 	u32	valid;
 	u32	locked;
@@ -1323,6 +1328,7 @@ extern struct aac_common aac_config;
 #define WRITE_PERMANENT_PARAMETERS	cpu_to_le32(0x0000000b)
 #define HOST_CRASHING			cpu_to_le32(0x0000000d)
 #define	SEND_SYNCHRONOUS_FIB		cpu_to_le32(0x0000000c)
+#define	COMMAND_POST_RESULTS		cpu_to_le32(0x00000014)
 #define GET_ADAPTER_PROPERTIES		cpu_to_le32(0x00000019)
 #define RE_INIT_ADAPTER			cpu_to_le32(0x000000ee)
 
@@ -1347,14 +1353,16 @@ extern struct aac_common aac_config;
  *	Phases are bit oriented.  It is NOT valid  to have multiple bits set						
  */					
 
-#define	SELF_TEST_FAILED		cpu_to_le32(0x00000004)
-#define	KERNEL_UP_AND_RUNNING		cpu_to_le32(0x00000080)
-#define	KERNEL_PANIC			cpu_to_le32(0x00000100)
+#define	SELF_TEST_FAILED		(cpu_to_le32(0x00000004))
+#define MONITOR_PANIC			(cpu_to_le32(0x00000020))
+#define	KERNEL_UP_AND_RUNNING		(cpu_to_le32(0x00000080))
+#define	KERNEL_PANIC			(cpu_to_le32(0x00000100))
 
 /*
  *	Doorbell bit defines
  */
 
+#define DoorBellSyncCmdAvailable	cpu_to_le32(1<<0)	// Host -> Adapter
 #define DoorBellPrintfDone		cpu_to_le32(1<<5)	// Host -> Adapter
 #define DoorBellAdapterNormCmdReady	cpu_to_le32(1<<1)	// Adapter -> Host
 #define DoorBellAdapterNormRespReady	cpu_to_le32(1<<2)	// Adapter -> Host
@@ -1368,9 +1376,22 @@ extern struct aac_common aac_config;
  */
  
 #define 	AifCmdEventNotify	1	/* Notify of event */
+#define			AifEnConfigChange	3	/* Adapter configuration change */
+#define			AifEnContainerChange	4	/* Container configuration change */
+#define			AifEnDeviceFailure	5	/* SCSI device failed */
+#define			AifEnAddContainer	15	/* A new array was created */
+#define			AifEnDeleteContainer	16	/* A container was deleted */
+#define			AifEnExpEvent		23	/* Firmware Event Log */
+#define			AifExeFirmwarePanic	3	/* Firmware Event Panic */
+#define			AifHighPriority		3	/* Highest Priority Event */
+
 #define		AifCmdJobProgress	2	/* Progress report */
+#define			AifJobCtrZero	101	/* Array Zero progress */
+#define			AifJobStsSuccess 1	/* Job completes */
 #define		AifCmdAPIReport		3	/* Report from other user of API */
 #define		AifCmdDriverNotify	4	/* Notify host driver of event */
+#define			AifDenMorphComplete 200	/* A morph operation completed */
+#define			AifDenVolumeExtendComplete 201 /* A volume extend completed */
 #define		AifReqJobList		100	/* Gets back complete job list */
 #define		AifReqJobsForCtr	101	/* Gets back jobs for specific container */
 #define		AifReqJobsForScsi	102	/* Gets back jobs for specific SCSI device */ 
@@ -1427,9 +1448,9 @@ int aac_get_containers(struct aac_dev *dev);
 int aac_scsi_cmd(struct scsi_cmnd *cmd);
 int aac_dev_ioctl(struct aac_dev *dev, int cmd, void *arg);
 int aac_do_ioctl(struct aac_dev * dev, int cmd, void *arg);
-int aac_rx_init(struct aac_dev *dev, unsigned long devNumber);
-int aac_rkt_init(struct aac_dev *dev, unsigned long devNumber);
-int aac_sa_init(struct aac_dev *dev, unsigned long devNumber);
+int aac_rx_init(struct aac_dev *dev);
+int aac_rkt_init(struct aac_dev *dev);
+int aac_sa_init(struct aac_dev *dev);
 unsigned int aac_response_normal(struct aac_queue * q);
 unsigned int aac_command_normal(struct aac_queue * q);
 int aac_command_thread(struct aac_dev * dev);

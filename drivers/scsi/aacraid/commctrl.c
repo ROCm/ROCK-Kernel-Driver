@@ -431,7 +431,7 @@ int aac_send_raw_srb(struct aac_dev* dev, void* arg)
 	// Fix up srb for endian and force some values
 	srbcmd->function = cpu_to_le32(SRBF_ExecuteScsi);	// Force this
 	srbcmd->channel  = cpu_to_le32(srbcmd->channel);
-	srbcmd->target   = cpu_to_le32(srbcmd->target);
+	srbcmd->id	 = cpu_to_le32(srbcmd->id);
 	srbcmd->lun      = cpu_to_le32(srbcmd->lun);
 	srbcmd->flags    = cpu_to_le32(srbcmd->flags);
 	srbcmd->timeout  = cpu_to_le32(srbcmd->timeout);

@@ -27,7 +27,7 @@
  * Abstract: Linux Driver entry module for Adaptec RAID Array Controller
  */
 
-#define AAC_DRIVER_VERSION		"1.1.2-lk1"
+#define AAC_DRIVER_VERSION		"1.1.2-lk2"
 #define AAC_DRIVER_BUILD_DATE		__DATE__
 #define AAC_DRIVERNAME			"aacraid"
 
@@ -355,13 +355,15 @@ static int aac_eh_reset(struct scsi_cmnd* cmd)
 	struct Scsi_Host * host = dev->host;
 	struct scsi_cmnd * command;
 	int count;
+	struct aac_dev * aac;
 	unsigned long flags;
 
 	printk(KERN_ERR "%s: Host adapter reset request. SCSI hang ?\n", 
 					AAC_DRIVERNAME);
 
 
-	if (aac_adapter_check_health((struct aac_dev *)host->hostdata)) {
+	aac = (struct aac_dev *)host->hostdata;
+	if (aac_adapter_check_health(aac)) {
 		printk(KERN_ERR "%s: Host adapter appears dead\n", 
 				AAC_DRIVERNAME);
 		return -ENODEV;
@@ -381,15 +383,13 @@ static int aac_eh_reset(struct scsi_cmnd* cmd)
 				}
 			}
 			spin_unlock_irqrestore(&dev->list_lock, flags);
-			if (active)
-				break;
 
+			/*
+			 * We can exit If all the commands are complete
+			 */
+			if (active == 0)
+				return SUCCESS;
 		}
-		/*
-		 * We can exit If all the commands are complete
-		 */
-		if (active == 0)
-			return SUCCESS;
 		spin_unlock_irq(host->host_lock);
 		scsi_sleep(HZ);
 		spin_lock_irq(host->host_lock);
@@ -461,7 +461,11 @@ static struct scsi_host_template aac_driver_template = {
 	.this_id        		= 16,
 	.sg_tablesize   		= 16,
 	.max_sectors    		= 128,
+#if (AAC_NUM_IO_FIB > 256)
+	.cmd_per_lun			= 256,
+#else		
 	.cmd_per_lun    		= AAC_NUM_IO_FIB, 
+#endif	
 	.use_clustering			= ENABLE_CLUSTERING,
 };
 
@@ -521,7 +525,7 @@ static int __devinit aac_probe_one(struct pci_dev *pdev,
 	for (container = 0; container < MAXIMUM_NUM_CONTAINERS; container++)
 		fsa_dev_ptr->devname[container][0] = '\0';
 
-	if ((*aac_drivers[index].init)(aac , shost->unique_id))
+	if ((*aac_drivers[index].init)(aac))
 		goto out_free_fibs;
 
 	/*
@@ -552,7 +556,7 @@ static int __devinit aac_probe_one(struct pci_dev *pdev,
 	 * dmb - we may need to move the setting of these parms somewhere else once
 	 * we get a fib that can report the actual numbers
 	 */
-	shost->max_id = AAC_MAX_TARGET;
+	shost->max_id = MAXIMUM_NUM_CONTAINERS;
 	shost->max_lun = AAC_MAX_LUN;
 
 	error = scsi_add_host(shost, &pdev->dev);
