@@ -5,6 +5,9 @@
  *	2.3.99 updates
  *  Copyright (c) 2002 Allen Curtis, Ones and Zeros, Inc. (acurtis@onz.com)
  *	2.5.50 updates
+ *  Fix the console driver to be registered with initcalls and some minor fixup
+ *  for 2.6.2, by Petter Larsen, moreCom as (petter.larsen@morecom.no) and
+ *  Miguel Valero, AxxessIT ASA (miguel.valero@axxessit.no)
  *
  * I used the 8xx uart.c driver as the framework for this driver.
  * The original code was written for the EST8260 board.  I tried to make
@@ -75,11 +78,11 @@ static char *serial_name = "CPM UART driver";
 static char *serial_version = "0.02";
 
 static struct tty_driver *serial_driver;
-static int serial_console_setup(struct console *co, char *options);
-
+static int __init serial_console_setup( struct console *co, char *options);
 static void serial_console_write(struct console *c, const char *s,
 		                                unsigned count);
-static kdev_t serial_console_device(struct console *c);
+
+static struct tty_driver *serial_console_device(struct console *c, int *index);
 
 #if defined(CONFIG_SERIAL_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
 static unsigned long break_pressed; /* break, really ... */
@@ -533,8 +536,6 @@ static _INLINE_ void receive_break(ser_info_t *info, struct pt_regs *regs)
 	*(tty->flip.flag_buf_ptr++) = TTY_BREAK;
 	*(tty->flip.char_buf_ptr++) = 0;
 	tty->flip.count++;
-
-	queue_task(&tty->flip.tqueue, &tq_timer);
 }
 
 
@@ -1864,8 +1865,8 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 {
 #ifdef DO_THIS_LATER
 	DECLARE_WAITQUEUE(wait, current);
-#endif
 	struct serial_state *state = info->state;
+#endif
 	int		retval;
 	int		do_clocal = 0;
 
@@ -2467,11 +2468,13 @@ static struct tty_driver *serial_console_device(struct console *c, int *index)
 /*
  *	Register console.
  */
-long __init console_8xx_init(long kmem_start, long kmem_end)
+static int __init console_8xx_init(void)
 {
 	register_console(&sercons);
-	return kmem_start;
+	return 0;
 }
+
+console_initcall(console_8xx_init);
 
 #endif
 
@@ -2879,8 +2882,10 @@ static int __init serial_console_setup(struct console *co, char *options)
 	volatile	smc_t		*sp;
 	volatile	smc_uart_t	*up;
 #endif
+#ifdef SCC_CONSOLE
 	volatile	scc_t		*scp;
 	volatile	scc_uart_t	*sup;
+#endif
 	volatile	iop8260_t	*io;
 	bd_t				*bd;
 

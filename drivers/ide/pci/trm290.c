@@ -225,7 +225,7 @@ static int trm290_ide_dma_write (ide_drive_t *drive /*, struct request *rq */)
 #endif
 	/* issue cmd to drive */
 	hwif->OUTB(command, IDE_COMMAND_REG);
-	return HWIF(drive)->ide_dma_count(drive);
+	return hwif->ide_dma_begin(drive);
 }
 
 static int trm290_ide_dma_read (ide_drive_t *drive  /*, struct request *rq */)
@@ -269,7 +269,7 @@ static int trm290_ide_dma_read (ide_drive_t *drive  /*, struct request *rq */)
 #endif
 	/* issue cmd to drive */
 	hwif->OUTB(command, IDE_COMMAND_REG);
-	return HWIF(drive)->ide_dma_count(drive);
+	return hwif->ide_dma_begin(drive);
 }
 
 static int trm290_ide_dma_begin (ide_drive_t *drive)

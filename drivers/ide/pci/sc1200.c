@@ -164,7 +164,7 @@ static int sc1200_autoselect_dma_mode (ide_drive_t *drive)
 	 */
 	if (mate->present) {
 		struct hd_driveid *mateid = mate->id;
-		if (mateid && (mateid->capability & 1) && !hwif->ide_dma_bad_drive(mate)) {
+		if (mateid && (mateid->capability & 1) && !__ide_dma_bad_drive(mate)) {
 			if ((mateid->field_valid & 4) && (mateid->dma_ultra & 7))
 				udma_ok = 1;
 			else if ((mateid->field_valid & 2) && (mateid->dma_mword & 7))
@@ -177,7 +177,7 @@ static int sc1200_autoselect_dma_mode (ide_drive_t *drive)
 	 * Now see what the current drive is capable of,
 	 * selecting UDMA only if the mate said it was ok.
 	 */
-	if (id && (id->capability & 1) && hwif->autodma && !hwif->ide_dma_bad_drive(drive)) {
+	if (id && (id->capability & 1) && hwif->autodma && !__ide_dma_bad_drive(drive)) {
 		if (udma_ok && (id->field_valid & 4) && (id->dma_ultra & 7)) {
 			if      (id->dma_ultra & 4)
 				mode = XFER_UDMA_2;
@@ -493,7 +493,7 @@ printk("%s: SC1200: resume\n", hwif->name);
 		//
 		for (d = 0; d < MAX_DRIVES; ++d) {
 			ide_drive_t *drive = &(hwif->drives[d]);
-			if (drive->present && !hwif->ide_dma_bad_drive(drive)) {
+			if (drive->present && !__ide_dma_bad_drive(drive)) {
 				int was_using_dma = drive->using_dma;
 				hwif->ide_dma_off_quietly(drive);
 				sc1200_config_dma(drive);

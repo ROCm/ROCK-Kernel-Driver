@@ -1988,12 +1988,6 @@ pmac_ide_dma_write (ide_drive_t *drive)
 	return pmac_ide_dma_begin(drive);
 }
 
-static int __pmac
-pmac_ide_dma_count (ide_drive_t *drive)
-{
-	return HWIF(drive)->ide_dma_begin(drive);
-}
-
 /*
  * Kick the DMA controller into life after the DMA command has been issued
  * to the drive.
@@ -2159,20 +2153,16 @@ pmac_ide_setup_dma(pmac_ide_hwif_t *pmif, ide_hwif_t *hwif)
 				    	pmif->dma_table_cpu, pmif->dma_table_dma);
 		return;
 	}
-	hwif->ide_dma_off = &__ide_dma_off;
 	hwif->ide_dma_off_quietly = &__ide_dma_off_quietly;
 	hwif->ide_dma_on = &__ide_dma_on;
 	hwif->ide_dma_check = &pmac_ide_dma_check;
 	hwif->ide_dma_read = &pmac_ide_dma_read;
 	hwif->ide_dma_write = &pmac_ide_dma_write;
-	hwif->ide_dma_count = &pmac_ide_dma_count;
 	hwif->ide_dma_begin = &pmac_ide_dma_begin;
 	hwif->ide_dma_end = &pmac_ide_dma_end;
 	hwif->ide_dma_test_irq = &pmac_ide_dma_test_irq;
 	hwif->ide_dma_host_off = &pmac_ide_dma_host_off;
 	hwif->ide_dma_host_on = &pmac_ide_dma_host_on;
-	hwif->ide_dma_good_drive = &__ide_dma_good_drive;
-	hwif->ide_dma_bad_drive = &__ide_dma_bad_drive;
 	hwif->ide_dma_verbose = &__ide_dma_verbose;
 	hwif->ide_dma_timeout = &__ide_dma_timeout;
 	hwif->ide_dma_lostirq = &pmac_ide_dma_lostirq;

@@ -347,6 +347,8 @@ static int rtasd(void *unused)
 	int event_scan = rtas_token("event-scan");
 	int rc;
 
+	daemonize("rtasd");
+
 	if (event_scan == RTAS_UNKNOWN_SERVICE || get_eventscan_parms() == -1)
 		goto error;
 
@@ -359,15 +361,9 @@ static int rtasd(void *unused)
 	/* We can use rtas_log_buf now */
 	no_more_logging = 0;
 
+	printk(KERN_ERR "RTAS daemon started\n");
+
 	DEBUG("will sleep for %d jiffies\n", (HZ*60/rtas_event_scan_rate) / 2);
-
-	daemonize("rtasd");
-
-#if 0
-	/* Rusty unreal time task */
-	current->policy = SCHED_FIFO;
-	current->nice = sys_sched_get_priority_max(SCHED_FIFO) + 1;
-#endif
 
 	/* See if we have any error stored in NVRAM */
 	memset(logdata, 0, rtas_error_log_max);
@@ -423,7 +419,9 @@ repeat:
 	goto repeat;
 
 error_vfree:
-	vfree(rtas_log_buf);
+	if (rtas_log_buf)
+		vfree(rtas_log_buf);
+	rtas_log_buf = NULL;
 error:
 	/* Should delete proc entries */
 	return -EINVAL;
@@ -450,8 +448,6 @@ static int __init rtas_init(void)
 
 	if (kernel_thread(rtasd, 0, CLONE_FS) < 0)
 		printk(KERN_ERR "Failed to start RTAS daemon\n");
-
-	printk(KERN_ERR "RTAS daemon started\n");
 
 	/* Make room for the sequence number */
 	rtas_error_log_buffer_max = rtas_error_log_max + sizeof(int);
