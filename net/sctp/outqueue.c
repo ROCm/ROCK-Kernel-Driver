@@ -125,8 +125,19 @@ void sctp_outq_teardown(struct sctp_outq *q)
 		sctp_free_chunk(chunk);
 	}
 
-	/* Throw away any leftover chunks. */
+	/* Throw away any chunks in the retransmit queue. */ 
+	list_for_each_safe(lchunk, temp, &q->retransmit) {
+		list_del(lchunk);
+		chunk = list_entry(lchunk, sctp_chunk_t, transmitted_list);
+		sctp_free_chunk(chunk);
+	}
+
+	/* Throw away any leftover data chunks. */
 	while ((chunk = (sctp_chunk_t *) skb_dequeue(&q->out)))
+		sctp_free_chunk(chunk);
+
+	/* Throw away any leftover control chunks. */
+	while ((chunk = (sctp_chunk_t *) skb_dequeue(&q->control)))
 		sctp_free_chunk(chunk);
 }
 
