@@ -21,6 +21,7 @@
 
 #include <sound/driver.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 #include <linux/slab.h>
 #ifndef LINUX_ISAPNP_H
 #include <linux/isapnp.h>

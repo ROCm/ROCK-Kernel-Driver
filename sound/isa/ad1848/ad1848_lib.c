@@ -21,15 +21,17 @@
 
 #define SNDRV_MAIN_OBJECT_FILE
 #include <sound/driver.h>
-#include <asm/io.h>
-#include <asm/dma.h>
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 #include <linux/slab.h>
 #include <linux/ioport.h>
 #include <sound/core.h>
 #include <sound/ad1848.h>
 #include <sound/pcm_params.h>
+
+#include <asm/io.h>
+#include <asm/dma.h>
 
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("Routines for control of AD1848/AD1847/CS4248");

@@ -90,6 +90,7 @@
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/string.h>
+#include <linux/interrupt.h>
 #include <linux/ioport.h>
 #include <linux/sched.h>
 #include <linux/delay.h>
@@ -98,15 +99,16 @@
 #include <linux/soundcard.h>
 #include <linux/pci.h>
 #include <linux/wrapper.h>
-#include <asm/io.h>
-#include <asm/dma.h>
 #include <linux/init.h>
 #include <linux/poll.h>
 #include <linux/spinlock.h>
 #include <linux/smp_lock.h>
-#include <asm/uaccess.h>
-#include <asm/hardirq.h>
 #include <linux/bitops.h>
+#include <linux/wait.h>
+
+#include <asm/io.h>
+#include <asm/page.h>
+#include <asm/uaccess.h>
 
 #include "dm.h"
 
@@ -1466,11 +1468,11 @@ static int cm_ioctl_mixdev(struct inode *inode, struct file *file, unsigned int 
 }
 
 static /*const*/ struct file_operations cm_mixer_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	ioctl:		cm_ioctl_mixdev,
-	open:		cm_open_mixdev,
-	release:	cm_release_mixdev,
+	.owner	 = THIS_MODULE,
+	.llseek	 = no_llseek,
+	.ioctl	 = cm_ioctl_mixdev,
+	.open	 = cm_open_mixdev,
+	.release = cm_release_mixdev,
 };
 
 
@@ -2278,15 +2280,15 @@ static int cm_release(struct inode *inode, struct file *file)
 }
 
 static /*const*/ struct file_operations cm_audio_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	read:		cm_read,
-	write:		cm_write,
-	poll:		cm_poll,
-	ioctl:		cm_ioctl,
-	mmap:		cm_mmap,
-	open:		cm_open,
-	release:	cm_release,
+	.owner	 = THIS_MODULE,
+	.llseek	 = no_llseek,
+	.read	 = cm_read,
+	.write	 = cm_write,
+	.poll	 = cm_poll,
+	.ioctl	 = cm_ioctl,
+	.mmap	 = cm_mmap,
+	.open	 = cm_open,
+	.release = cm_release,
 };
 
 #ifdef CONFIG_SOUND_CMPCI_MIDI
@@ -2556,13 +2558,13 @@ static int cm_midi_release(struct inode *inode, struct file *file)
 }
 
 static /*const*/ struct file_operations cm_midi_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	read:		cm_midi_read,
-	write:		cm_midi_write,
-	poll:		cm_midi_poll,
-	open:		cm_midi_open,
-	release:	cm_midi_release,
+	.owner	 = THIS_MODULE,
+	.llseek	 = no_llseek,
+	.read	 = cm_midi_read,
+	.write	 = cm_midi_write,
+	.poll	 = cm_midi_poll,
+	.open	 = cm_midi_open,
+	.release = cm_midi_release,
 };
 #endif
 
@@ -2722,11 +2724,11 @@ static int cm_dmfm_release(struct inode *inode, struct file *file)
 }
 
 static /*const*/ struct file_operations cm_dmfm_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	ioctl:		cm_dmfm_ioctl,
-	open:		cm_dmfm_open,
-	release:	cm_dmfm_release,
+	.owner	 = THIS_MODULE,
+	.llseek	 = no_llseek,
+	.ioctl	 = cm_dmfm_ioctl,
+	.open	 = cm_dmfm_open,
+	.release = cm_dmfm_release,
 };
 #endif /* CONFIG_SOUND_CMPCI_FM */
 

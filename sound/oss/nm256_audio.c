@@ -22,6 +22,7 @@
 #define __NO_VERSION__
 #include <linux/pci.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/pm.h>
 #include <linux/delay.h>
