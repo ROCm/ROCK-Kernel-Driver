@@ -1745,8 +1745,10 @@ cache_alloc_debugcheck_after(kmem_cache_t *cachep,
 
 	if (!objp)	
 		return objp;
-	if (cachep->flags & SLAB_POISON)
+	if (cachep->flags & SLAB_POISON) {
 		check_poison_obj(cachep, objp);
+ 		poison_obj(cachep, objp, POISON_BEFORE);
+	}
 	if (cachep->flags & SLAB_STORE_USER) {
 		objlen -= BYTES_PER_WORD;
 		*((void **)(objp+objlen)) = caller;
