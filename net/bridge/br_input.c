@@ -45,26 +45,15 @@ static void br_pass_frame_up(struct net_bridge *br, struct sk_buff *skb)
 			br_pass_frame_up_finish);
 }
 
+/* note: already called with rcu_read_lock (preempt_disabled) */
 int br_handle_frame_finish(struct sk_buff *skb)
 {
-	struct net_bridge *br;
-	unsigned char *dest;
+	const unsigned char *dest = skb->mac.ethernet->h_dest;
+	struct net_bridge_port *p = skb->dev->br_port;
+	struct net_bridge *br = p->br;
 	struct net_bridge_fdb_entry *dst;
-	struct net_bridge_port *p;
-	int passedup;
+	int passedup = 0;
 
-	dest = skb->mac.ethernet->h_dest;
-
-	rcu_read_lock();
-	p = rcu_dereference(skb->dev->br_port);
-
-	if (p == NULL || p->state == BR_STATE_DISABLED) {
-		kfree_skb(skb);
-		goto out;
-	}
-
-	br = p->br;
-	passedup = 0;
 	if (br->dev->flags & IFF_PROMISC) {
 		struct sk_buff *skb2;
 
@@ -99,20 +88,21 @@ int br_handle_frame_finish(struct sk_buff *skb)
 	br_flood_forward(br, skb, 0);
 
 out:
-	rcu_read_unlock();
 	return 0;
 }
 
-int br_handle_frame(struct sk_buff *skb)
+/*
+ * Called via br_handle_frame_hook.
+ * Return 0 if *pskb should be processed furthur
+ *	  1 if *pskb is handled
+ * note: already called with rcu_read_lock (preempt_disabled) 
+ */
+int br_handle_frame(struct net_bridge_port *p, struct sk_buff **pskb)
 {
-	unsigned char *dest;
-	struct net_bridge_port *p;
+	struct sk_buff *skb = *pskb;
+	const unsigned char *dest = skb->mac.ethernet->h_dest;
 
-	dest = skb->mac.ethernet->h_dest;
-
-	rcu_read_lock();
-	p = skb->dev->br_port;
-	if (p == NULL || p->state == BR_STATE_DISABLED)
+	if (p->state == BR_STATE_DISABLED)
 		goto err;
 
 	if (skb->mac.ethernet->h_source[0] & 1)
@@ -128,15 +118,16 @@ int br_handle_frame(struct sk_buff *skb)
 		if (!dest[5]) {
 			NF_HOOK(PF_BRIDGE, NF_BR_LOCAL_IN, skb, skb->dev, 
 				NULL, br_stp_handle_bpdu);
-			rcu_read_unlock();
-			return 0;
+			return 1;
 		}
 	}
 
 	else if (p->state == BR_STATE_FORWARDING) {
-		if (br_should_route_hook && br_should_route_hook(&skb)) {
-			rcu_read_unlock();
-			return -1;
+		if (br_should_route_hook) {
+			if (br_should_route_hook(pskb)) 
+				return 0;
+			skb = *pskb;
+			dest = skb->mac.ethernet->h_dest;
 		}
 
 		if (!memcmp(p->br->dev->dev_addr, dest, ETH_ALEN))
@@ -144,12 +135,10 @@ int br_handle_frame(struct sk_buff *skb)
 
 		NF_HOOK(PF_BRIDGE, NF_BR_PRE_ROUTING, skb, skb->dev, NULL,
 			br_handle_frame_finish);
-		rcu_read_unlock();
-		return 0;
+		return 1;
 	}
 
 err:
-	rcu_read_unlock();
 	kfree_skb(skb);
-	return 0;
+	return 1;
 }

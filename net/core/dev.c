@@ -1144,16 +1144,10 @@ int skb_checksum_help(struct sk_buff **pskb, int inward)
 		goto out;
 	}
 
-	if (skb_shared(*pskb)  || skb_cloned(*pskb)) {
-		struct sk_buff *newskb = skb_copy(*pskb, GFP_ATOMIC);
-		if (!newskb) {
-			ret = -ENOMEM;
+	if (skb_cloned(*pskb)) {
+		ret = pskb_expand_head(*pskb, 0, 0, GFP_ATOMIC);
+		if (ret)
 			goto out;
-		}
-		if ((*pskb)->sk)
-			skb_set_owner_w(newskb, (*pskb)->sk);
-		kfree_skb(*pskb);
-		*pskb = newskb;
 	}
 
 	if (offset > (int)(*pskb)->len)
@@ -1676,43 +1670,34 @@ static void net_tx_action(struct softirq_action *h)
 }
 
 static __inline__ int deliver_skb(struct sk_buff *skb,
-				  struct packet_type *pt_prev, int last)
+				  struct packet_type *pt_prev)
 {
 	atomic_inc(&skb->users);
 	return pt_prev->func(skb, skb->dev, pt_prev);
 }
 
-
 #if defined(CONFIG_BRIDGE) || defined (CONFIG_BRIDGE_MODULE)
-int (*br_handle_frame_hook)(struct sk_buff *skb);
+int (*br_handle_frame_hook)(struct net_bridge_port *p, struct sk_buff **pskb);
 
-static __inline__ int handle_bridge(struct sk_buff *skb,
-				     struct packet_type *pt_prev)
+static __inline__ int handle_bridge(struct sk_buff **pskb,
+				    struct packet_type **pt_prev, int *ret)
 {
-	int ret = NET_RX_DROP;
-	if (pt_prev)
-		ret = deliver_skb(skb, pt_prev, 0);
+	struct net_bridge_port *port;
 
-	return ret;
-}
+	if ((*pskb)->pkt_type == PACKET_LOOPBACK ||
+	    (port = rcu_dereference((*pskb)->dev->br_port)) == NULL)
+		return 0;
 
-#endif
-
-static inline int __handle_bridge(struct sk_buff *skb,
-			struct packet_type **pt_prev, int *ret)
-{
-#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
-	if (skb->dev->br_port && skb->pkt_type != PACKET_LOOPBACK) {
-		*ret = handle_bridge(skb, *pt_prev);
-		if (br_handle_frame_hook(skb) == 0)
-			return 1;
-
+	if (*pt_prev) {
+		*ret = deliver_skb(*pskb, *pt_prev);
 		*pt_prev = NULL;
-	}
-#endif
-	return 0;
+	} 
+	
+	return br_handle_frame_hook(port, pskb);
 }
-
+#else
+#define handle_bridge(skb, pt_prev, ret)	(0)
+#endif
 
 #ifdef CONFIG_NET_CLS_ACT
 /* TODO: Maybe we should just force sch_ingress to be compiled in
@@ -1779,27 +1764,27 @@ int netif_receive_skb(struct sk_buff *skb)
 	skb->mac_len = skb->nh.raw - skb->mac.raw;
 
 	pt_prev = NULL;
+
+	rcu_read_lock();
+
 #ifdef CONFIG_NET_CLS_ACT
 	if (skb->tc_verd & TC_NCLS) {
 		skb->tc_verd = CLR_TC_NCLS(skb->tc_verd);
-		rcu_read_lock();
 		goto ncls;
 	}
- #endif
+#endif
 
-	rcu_read_lock();
 	list_for_each_entry_rcu(ptype, &ptype_all, list) {
 		if (!ptype->dev || ptype->dev == skb->dev) {
 			if (pt_prev) 
-				ret = deliver_skb(skb, pt_prev, 0);
+				ret = deliver_skb(skb, pt_prev);
 			pt_prev = ptype;
 		}
 	}
 
 #ifdef CONFIG_NET_CLS_ACT
 	if (pt_prev) {
-		atomic_inc(&skb->users);
-		ret = pt_prev->func(skb, skb->dev, pt_prev);
+		ret = deliver_skb(skb, pt_prev);
 		pt_prev = NULL; /* noone else should process this after*/
 	} else {
 		skb->tc_verd = SET_TC_OK2MUNGE(skb->tc_verd);
@@ -1818,7 +1803,7 @@ ncls:
 
 	handle_diverter(skb);
 
-	if (__handle_bridge(skb, &pt_prev, &ret))
+	if (handle_bridge(&skb, &pt_prev, &ret))
 		goto out;
 
 	type = skb->protocol;
@@ -1826,7 +1811,7 @@ ncls:
 		if (ptype->type == type &&
 		    (!ptype->dev || ptype->dev == skb->dev)) {
 			if (pt_prev) 
-				ret = deliver_skb(skb, pt_prev, 0);
+				ret = deliver_skb(skb, pt_prev);
 			pt_prev = ptype;
 		}
 	}

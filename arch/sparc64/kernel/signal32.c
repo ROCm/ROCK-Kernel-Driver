@@ -1227,8 +1227,6 @@ static inline void handle_signal32(unsigned long signr, struct k_sigaction *ka,
 		else
 			setup_frame32(&ka->sa, regs, signr, oldset, info);
 	}
-	if (ka->sa.sa_flags & SA_ONESHOT)
-		ka->sa.sa_handler = SIG_DFL;
 	if (!(ka->sa.sa_flags & SA_NOMASK)) {
 		spin_lock_irq(&current->sighand->siglock);
 		sigorsets(&current->blocked,&current->blocked,&ka->sa.sa_mask);
@@ -1268,21 +1266,19 @@ int do_signal32(sigset_t *oldset, struct pt_regs * regs,
 {
 	siginfo_t info;
 	struct signal_deliver_cookie cookie;
+	struct k_sigaction ka;
 	int signr;
 	int svr4_signal = current->personality == PER_SVR4;
 	
 	cookie.restart_syscall = restart_syscall;
 	cookie.orig_i0 = orig_i0;
 
-	signr = get_signal_to_deliver(&info, regs, &cookie);
+	signr = get_signal_to_deliver(&info, &ka, regs, &cookie);
 	if (signr > 0) {
-		struct k_sigaction *ka;
-
-		ka = &current->sighand->action[signr-1];
-
 		if (cookie.restart_syscall)
-			syscall_restart32(orig_i0, regs, &ka->sa);
-		handle_signal32(signr, ka, &info, oldset, regs, svr4_signal);
+			syscall_restart32(orig_i0, regs, &ka.sa);
+		handle_signal32(signr, &ka, &info, oldset,
+				regs, svr4_signal);
 		return 1;
 	}
 	if (cookie.restart_syscall &&

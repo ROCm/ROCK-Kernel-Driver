@@ -166,31 +166,53 @@ static int rtnetlink_fill_ifinfo(struct sk_buff *skb, struct net_device *dev,
 	r->ifi_family = AF_UNSPEC;
 	r->ifi_type = dev->type;
 	r->ifi_index = dev->ifindex;
-	r->ifi_flags = dev->flags;
+	r->ifi_flags = dev_get_flags(dev);
 	r->ifi_change = change;
 
-	if (!netif_running(dev) || !netif_carrier_ok(dev))
-		r->ifi_flags &= ~IFF_RUNNING;
-	else
-		r->ifi_flags |= IFF_RUNNING;
-
 	RTA_PUT(skb, IFLA_IFNAME, strlen(dev->name)+1, dev->name);
+
+	if (1) {
+		u32 txqlen = dev->tx_queue_len;
+		RTA_PUT(skb, IFLA_TXQLEN, sizeof(txqlen), &txqlen);
+	}
+
+	if (1) {
+		struct ifmap map = {
+			.mem_start   = dev->mem_start,
+			.mem_end     = dev->mem_end,
+			.base_addr   = dev->base_addr,
+			.irq         = dev->irq,
+			.dma         = dev->dma,
+			.port        = dev->if_port,
+		};
+		RTA_PUT(skb, IFLA_MAP, sizeof(map), &map);
+	}
+
 	if (dev->addr_len) {
 		RTA_PUT(skb, IFLA_ADDRESS, dev->addr_len, dev->dev_addr);
 		RTA_PUT(skb, IFLA_BROADCAST, dev->addr_len, dev->broadcast);
 	}
+
 	if (1) {
-		unsigned mtu = dev->mtu;
+		u32 mtu = dev->mtu;
 		RTA_PUT(skb, IFLA_MTU, sizeof(mtu), &mtu);
 	}
-	if (dev->ifindex != dev->iflink)
-		RTA_PUT(skb, IFLA_LINK, sizeof(int), &dev->iflink);
+
+	if (dev->ifindex != dev->iflink) {
+		u32 iflink = dev->iflink;
+		RTA_PUT(skb, IFLA_LINK, sizeof(iflink), &iflink);
+	}
+
 	if (dev->qdisc_sleeping)
 		RTA_PUT(skb, IFLA_QDISC,
 			strlen(dev->qdisc_sleeping->ops->id) + 1,
 			dev->qdisc_sleeping->ops->id);
-	if (dev->master)
-		RTA_PUT(skb, IFLA_MASTER, sizeof(int), &dev->master->ifindex);
+	
+	if (dev->master) {
+		u32 master = dev->master->ifindex;
+		RTA_PUT(skb, IFLA_MASTER, sizeof(master), &master);
+	}
+
 	if (dev->get_stats) {
 		unsigned long *stats = (unsigned long*)dev->get_stats(dev);
 		if (stats) {
@@ -246,6 +268,30 @@ static int do_setlink(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 
 	err = -EINVAL;
 
+	if (ifm->ifi_flags)
+		dev_change_flags(dev, ifm->ifi_flags);
+
+	if (ida[IFLA_MAP - 1]) {
+		if (!dev->set_config) {
+			err = -EOPNOTSUPP;
+			goto out;
+		}
+
+		if (!netif_device_present(dev)) {
+			err = -ENODEV;
+			goto out;
+		}
+		
+		if (ida[IFLA_MAP - 1]->rta_len != RTA_LENGTH(sizeof(struct ifmap)))
+			goto out;
+		
+		err = dev->set_config(dev, (struct ifmap *)
+				RTA_DATA(ida[IFLA_MAP - 1]));
+
+		if (err)
+			goto out;
+	}
+
 	if (ida[IFLA_ADDRESS - 1]) {
 		if (!dev->set_mac_address) {
 			err = -EOPNOTSUPP;
@@ -268,6 +314,23 @@ static int do_setlink(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 			goto out;
 		memcpy(dev->broadcast, RTA_DATA(ida[IFLA_BROADCAST - 1]),
 		       dev->addr_len);
+	}
+
+	if (ida[IFLA_MTU - 1]) {
+		if (ida[IFLA_MTU - 1]->rta_len != RTA_LENGTH(sizeof(u32)))
+			goto out;
+		err = dev_set_mtu(dev, *((u32 *) RTA_DATA(ida[IFLA_MTU - 1])));
+
+		if (err)
+			goto out;
+
+	}
+
+	if (ida[IFLA_TXQLEN - 1]) {
+		if (ida[IFLA_TXQLEN - 1]->rta_len != RTA_LENGTH(sizeof(u32)))
+			goto out;
+
+		dev->tx_queue_len = *((u32 *) RTA_DATA(ida[IFLA_TXQLEN - 1]));
 	}
 
 	err = 0;
