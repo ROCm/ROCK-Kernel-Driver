@@ -872,22 +872,10 @@ static int find_idlest_cpu(struct task_struct *p, int this_cpu,
 
 /*
  * Perform scheduler related setup for a newly forked process p.
- * p is forked by current. The cpu hotplug lock is held.
+ * p is forked by current.
  */
 void fastcall sched_fork(task_t *p)
 {
-	int cpu = smp_processor_id();
-
-	/*
-	 * The task hasn't been attached yet, so cpus_allowed mask cannot
-	 * change. The cpus_allowed mask of the parent may have changed
-	 * after it is copied, and it may then move to a CPU that is not
-	 * allowed for the child.
-	 */
-	if (unlikely(!cpu_isset(cpu, p->cpus_allowed)))
-		cpu = any_online_cpu(p->cpus_allowed);
-	set_task_cpu(p, cpu);
-
 	/*
 	 * We mark the process as running here, but have not actually
 	 * inserted it onto the runqueue yet. This guarantees that

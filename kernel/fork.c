@@ -893,16 +893,6 @@ struct task_struct *copy_process(unsigned long clone_flags,
 	if ((clone_flags & CLONE_SIGHAND) && !(clone_flags & CLONE_VM))
 		return ERR_PTR(-EINVAL);
 
-	/*
-	 * The newly dup'ed task shares the same cpus_allowed mask as its
-	 * parent (ie. current), and it is not attached to the tasklist.
-	 * The end result is that this CPU might go down and the parent
-	 * be migrated away, leaving the task on a dead CPU. So take the
-	 * hotplug lock here and release it after the child has been attached
-	 * to the tasklist.
-	 */
-	lock_cpu_hotplug();
-
 	retval = security_task_create(clone_flags);
 	if (retval)
 		goto fork_out;
@@ -1043,6 +1033,17 @@ struct task_struct *copy_process(unsigned long clone_flags,
 
 	/* Need tasklist lock for parent etc handling! */
 	write_lock_irq(&tasklist_lock);
+
+	/*
+	 * The task hasn't been attached yet, so cpus_allowed mask cannot
+	 * have changed. The cpus_allowed mask of the parent may have
+	 * changed after it was copied first time, and it may then move to
+	 * another CPU - so we re-copy it here and set the child's CPU to
+	 * the parent's CPU. This avoids alot of nasty races.
+	 */
+	p->cpus_allowed = current->cpus_allowed;
+	set_task_cpu(p, smp_processor_id());
+
 	/*
 	 * Check for pending SIGKILL! The new thread should not be allowed
 	 * to slip out of an OOM kill. (or normal SIGKILL.)
@@ -1108,7 +1109,6 @@ struct task_struct *copy_process(unsigned long clone_flags,
 	retval = 0;
 
 fork_out:
-	unlock_cpu_hotplug();
 	if (retval)
 		return ERR_PTR(retval);
 	return p;
