@@ -28,7 +28,7 @@ static struct dma_channel {
 	char *name;
 	void (*irq_handler)(int, void *, struct pt_regs *);
 	void *data;
-} dma_channels[16];
+} dma_channels[PXA_DMA_CHANNELS];
 
 
 int pxa_request_dma (char *name, pxa_dma_prio prio,
@@ -45,7 +45,7 @@ int pxa_request_dma (char *name, pxa_dma_prio prio,
 	local_irq_save(flags);
 
 	/* try grabbing a DMA channel with the requested priority */
-	for (i = prio; i < prio + (prio == DMA_PRIO_LOW) ? 8 : 4; i++) {
+	for (i = prio; i < prio + PXA_DMA_NBCH(prio); i++) {
 		if (!dma_channels[i].name) {
 			found = 1;
 			break;
@@ -97,7 +97,7 @@ static irqreturn_t dma_irq_handler(int irq, void *dev_id, struct pt_regs *regs)
 {
 	int i, dint = DINT;
 
-	for (i = 0; i < 16; i++) {
+	for (i = 0; i < PXA_DMA_CHANNELS; i++) {
 		if (dint & (1 << i)) {
 			struct dma_channel *channel = &dma_channels[i];
 			if (channel->name && channel->irq_handler) {
