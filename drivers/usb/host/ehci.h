@@ -71,8 +71,8 @@ struct ehci_hcd {			/* one per controller */
 
 	/* glue to PCI and HCD framework */
 	struct usb_hcd		hcd;
-	struct ehci_caps	*caps;
-	struct ehci_regs	*regs;
+	struct ehci_caps __iomem *caps;
+	struct ehci_regs __iomem *regs;
 	u32			hcs_params;	/* cached register copy */
 
 	/* per-HC memory pools (could be per-bus, but ...) */
