@@ -103,7 +103,7 @@ static struct serial_uart_config uart_config[] = {
 	{ 0, 0}
 };
 
-struct tty_driver hp_simserial_driver;
+struct tty_driver *hp_simserial_driver;
 
 static struct async_struct *IRQ_ports[NR_IRQS];
 
@@ -1000,6 +1000,28 @@ static inline void show_serial_version(void)
 	printk(KERN_INFO " no serial options enabled\n");
 }
 
+static struct tty_operations hp_ops = {
+	.open = rs_open,
+	.close = rs_close,
+	.write = rs_write,
+	.put_char = rs_put_char,
+	.flush_chars = rs_flush_chars,
+	.write_room = rs_write_room,
+	.chars_in_buffer = rs_chars_in_buffer,
+	.flush_buffer = rs_flush_buffer,
+	.ioctl = rs_ioctl,
+	.throttle = rs_throttle,
+	.unthrottle = rs_unthrottle,
+	.send_xchar = rs_send_xchar,
+	.set_termios = rs_set_termios,
+	.stop = rs_stop,
+	.start = rs_start,
+	.hangup = rs_hangup,
+	.break_ctl = rs_break,
+	.wait_until_sent = rs_wait_until_sent,
+	.read_proc = rs_read_proc,
+};
+
 /*
  * The serial driver boot-time initialization code!
  */
@@ -1009,43 +1031,25 @@ simrs_init (void)
 	int			i;
 	struct serial_state	*state;
 
+	hp_simserial_driver = alloc_tty_driver(1);
+	if (!hp_simserial_driver)
+		return -ENOMEM;
+
 	show_serial_version();
 
 	/* Initialize the tty_driver structure */
 
-	memset(&hp_simserial_driver, 0, sizeof(struct tty_driver));
-	hp_simserial_driver.magic = TTY_DRIVER_MAGIC;
-	hp_simserial_driver.driver_name = "simserial";
-	hp_simserial_driver.name = "ttyS";
-	hp_simserial_driver.major = TTY_MAJOR;
-	hp_simserial_driver.minor_start = 64;
-	hp_simserial_driver.num = 1;
-	hp_simserial_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	hp_simserial_driver.subtype = SERIAL_TYPE_NORMAL;
-	hp_simserial_driver.init_termios = tty_std_termios;
-	hp_simserial_driver.init_termios.c_cflag =
+	hp_simserial_driver->driver_name = "simserial";
+	hp_simserial_driver->name = "ttyS";
+	hp_simserial_driver->major = TTY_MAJOR;
+	hp_simserial_driver->minor_start = 64;
+	hp_simserial_driver->type = TTY_DRIVER_TYPE_SERIAL;
+	hp_simserial_driver->subtype = SERIAL_TYPE_NORMAL;
+	hp_simserial_driver->init_termios = tty_std_termios;
+	hp_simserial_driver->init_termios.c_cflag =
 		B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-	hp_simserial_driver.flags = TTY_DRIVER_REAL_RAW;
-
-	hp_simserial_driver.open = rs_open;
-	hp_simserial_driver.close = rs_close;
-	hp_simserial_driver.write = rs_write;
-	hp_simserial_driver.put_char = rs_put_char;
-	hp_simserial_driver.flush_chars = rs_flush_chars;
-	hp_simserial_driver.write_room = rs_write_room;
-	hp_simserial_driver.chars_in_buffer = rs_chars_in_buffer;
-	hp_simserial_driver.flush_buffer = rs_flush_buffer;
-	hp_simserial_driver.ioctl = rs_ioctl;
-	hp_simserial_driver.throttle = rs_throttle;
-	hp_simserial_driver.unthrottle = rs_unthrottle;
-	hp_simserial_driver.send_xchar = rs_send_xchar;
-	hp_simserial_driver.set_termios = rs_set_termios;
-	hp_simserial_driver.stop = rs_stop;
-	hp_simserial_driver.start = rs_start;
-	hp_simserial_driver.hangup = rs_hangup;
-	hp_simserial_driver.break_ctl = rs_break;
-	hp_simserial_driver.wait_until_sent = rs_wait_until_sent;
-	hp_simserial_driver.read_proc = rs_read_proc;
+	hp_simserial_driver->flags = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(hp_simserial_driver, &hp_ops);
 
 	/*
 	 * Let's have a little bit of fun !
@@ -1065,7 +1069,7 @@ simrs_init (void)
 		       uart_config[state->type].name);
 	}
 
-	if (tty_register_driver(&hp_simserial_driver))
+	if (tty_register_driver(hp_simserial_driver))
 		panic("Couldn't register simserial driver\n");
 
 	return 0;
