@@ -17,11 +17,11 @@
 
 static size_t
 ext3_xattr_trusted_list(char *list, struct inode *inode,
-			const char *name, int name_len, int flags)
+			const char *name, int name_len)
 {
 	const int prefix_len = sizeof(XATTR_TRUSTED_PREFIX)-1;
 
-	if (!((flags & XATTR_KERNEL_CONTEXT) || capable(CAP_SYS_ADMIN)))
+	if (!capable(CAP_SYS_ADMIN))
 		return 0;
 
 	if (list) {
@@ -34,11 +34,11 @@ ext3_xattr_trusted_list(char *list, struct inode *inode,
 
 static int
 ext3_xattr_trusted_get(struct inode *inode, const char *name,
-		       void *buffer, size_t size, int flags)
+		       void *buffer, size_t size)
 {
 	if (strcmp(name, "") == 0)
 		return -EINVAL;
-	if (!((flags & XATTR_KERNEL_CONTEXT) || capable(CAP_SYS_ADMIN)))
+	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM;
 	return ext3_xattr_get(inode, EXT3_XATTR_INDEX_TRUSTED, name,
 			      buffer, size);
@@ -50,7 +50,7 @@ ext3_xattr_trusted_set(struct inode *inode, const char *name,
 {
 	if (strcmp(name, "") == 0)
 		return -EINVAL;
-	if (!((flags & XATTR_KERNEL_CONTEXT) || capable(CAP_SYS_ADMIN)))
+	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM;
 	return ext3_xattr_set(inode, EXT3_XATTR_INDEX_TRUSTED, name,
 			      value, size, flags);
