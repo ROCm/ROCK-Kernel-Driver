@@ -28,17 +28,14 @@ void cx8800_vbi_fmt(struct cx8800_dev *dev, struct v4l2_format *f)
 	f->fmt.vbi.count[0] = VBI_LINE_COUNT;
 	f->fmt.vbi.count[1] = VBI_LINE_COUNT;
 
-	switch (dev->tvnorm->id) {
-	case V4L2_STD_NTSC_M:
-	case V4L2_STD_NTSC_M_JP:
+	if (dev->tvnorm->id & V4L2_STD_525_60) {
+		/* ntsc */
 		f->fmt.vbi.sampling_rate = 28636363;
 		f->fmt.vbi.start[0] = 10 -1;
 		f->fmt.vbi.start[1] = 273 -1;
-		break;
-	case V4L2_STD_PAL_BG:
-	case V4L2_STD_PAL_DK:
-	case V4L2_STD_PAL_I:
-	case V4L2_STD_SECAM:
+
+	} else if (V4L2_STD_625_50) {
+		/* pal */
 		f->fmt.vbi.sampling_rate = 35468950;
 		f->fmt.vbi.start[0] = 7 -1;
 		f->fmt.vbi.start[1] = 319 -1;

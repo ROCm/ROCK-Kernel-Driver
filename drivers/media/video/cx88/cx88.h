@@ -32,7 +32,7 @@
 #include "cx88-reg.h"
 
 #include <linux/version.h>
-#define CX88_VERSION_CODE KERNEL_VERSION(0,0,3)
+#define CX88_VERSION_CODE KERNEL_VERSION(0,0,4)
 
 #ifndef TRUE
 # define TRUE (1==1)
@@ -114,17 +114,20 @@ extern struct sram_channel cx88_sram_channels[];
 /* card configuration                                          */
 
 #define CX88_BOARD_NOAUTO        UNSET
-#define CX88_BOARD_UNKNOWN           0
-#define CX88_BOARD_HAUPPAUGE         1
-#define CX88_BOARD_GDI               2
-#define CX88_BOARD_PIXELVIEW         3
-#define CX88_BOARD_ATI_WONDER_PRO    4
-#define CX88_BOARD_WINFAST2000XP     5
-#define CX88_BOARD_AVERTV_303        6
-#define CX88_BOARD_MSI_TVANYWHERE    7
-#define CX88_BOARD_WINFAST_DV2000    8
-#define CX88_BOARD_LEADTEK_PVR2000   9
-
+#define CX88_BOARD_UNKNOWN               0
+#define CX88_BOARD_HAUPPAUGE             1
+#define CX88_BOARD_GDI                   2
+#define CX88_BOARD_PIXELVIEW             3
+#define CX88_BOARD_ATI_WONDER_PRO        4
+#define CX88_BOARD_WINFAST2000XP         5
+#define CX88_BOARD_AVERTV_303            6
+#define CX88_BOARD_MSI_TVANYWHERE_MASTER 7
+#define CX88_BOARD_WINFAST_DV2000        8
+#define CX88_BOARD_LEADTEK_PVR2000       9
+#define CX88_BOARD_IODATA_GVVCP3PCI      10
+#define CX88_BOARD_PROLINK_PLAYTVPVR     11
+#define CX88_BOARD_ASUS_PVR_416          12
+#define CX88_BOARD_MSI_TVANYWHERE        13
 
 enum cx88_itype {
 	CX88_VMUX_COMPOSITE1 = 1,
@@ -263,6 +266,9 @@ struct cx8800_dev {
 
 	/* other global state info */
 	u32                         shadow[SHADOW_MAX];
+	int                         shutdown;
+	pid_t                       tpid;
+	struct completion           texit;
 	struct cx8800_suspend_state state;
 };
 
@@ -351,7 +357,8 @@ extern const unsigned int cx88_bcount;
 extern struct cx88_subid cx88_subids[];
 extern const unsigned int cx88_idcount;
 
-extern void __devinit cx88_card_setup(struct cx8800_dev *dev);
+extern void cx88_card_list(struct cx8800_dev *dev);
+extern void cx88_card_setup(struct cx8800_dev *dev);
 
 /* ----------------------------------------------------------- */
 /* cx88-tvaudio.c                                              */
@@ -372,6 +379,7 @@ extern void __devinit cx88_card_setup(struct cx8800_dev *dev);
 void cx88_set_tvaudio(struct cx8800_dev *dev);
 void cx88_get_stereo(struct cx8800_dev *dev, struct v4l2_tuner *t);
 void cx88_set_stereo(struct cx8800_dev *dev, u32 mode);
+int cx88_audio_thread(void *data);
 
 /*
  * Local variables:
