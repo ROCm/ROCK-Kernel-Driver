@@ -20,6 +20,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/module.h>
 #include <asm/hvcall.h>
 #include <asm/prom.h>
 #include <asm/hvconsole.h>
@@ -50,6 +51,8 @@ int hvc_get_chars(int index, char *buf, int count)
 	return 0;
 }
 
+EXPORT_SYMBOL(hvc_get_chars);
+
 int hvc_put_chars(int index, const char *buf, int count)
 {
 	unsigned long *lbuf = (unsigned long *) buf;
@@ -63,6 +66,8 @@ int hvc_put_chars(int index, const char *buf, int count)
 		return 0;
 	return -1;
 }
+
+EXPORT_SYMBOL(hvc_put_chars);
 
 /* return the number of client vterms present */
 /* XXX this requires an interface change to handle multiple discontiguous
