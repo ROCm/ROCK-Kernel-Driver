@@ -27,16 +27,13 @@
 #include "jfs_txnmgr.h"
 #include "jfs_debug.h"
 
-extern struct task_struct *jfsCommitTask;
 static spinlock_t meta_lock = SPIN_LOCK_UNLOCKED;
-static wait_queue_head_t meta_wait;
 
 #ifdef CONFIG_JFS_STATISTICS
 struct {
 	uint	pagealloc;	/* # of page allocations */
 	uint	pagefree;	/* # of page frees */
 	uint	lockwait;	/* # of sleeping lock_metapage() calls */
-	uint	allocwait;	/* # of sleeping alloc_metapage() calls */
 } mpStat;
 #endif
 
@@ -134,11 +131,6 @@ static void mp_mempool_free(void *element, void *pool_data)
 
 int __init metapage_init(void)
 {
-	/*
-	 * Initialize wait queue
-	 */
-	init_waitqueue_head(&meta_wait);
-
 	/*
 	 * Allocate the metapage structures
 	 */
@@ -624,12 +616,10 @@ int jfs_mpstat_read(char *buffer, char **start, off_t offset, int length,
 		       "=======================\n"
 		       "page allocations = %d\n"
 		       "page frees = %d\n"
-		       "lock waits = %d\n"
-		       "allocation waits = %d\n",
+		       "lock waits = %d\n",
 		       mpStat.pagealloc,
 		       mpStat.pagefree,
-		       mpStat.lockwait,
-		       mpStat.allocwait);
+		       mpStat.lockwait);
 
 	begin = offset;
 	*start = buffer + begin;
