@@ -74,12 +74,6 @@
 #define SUN4C_PAGE_KERNEL	__pgprot(_SUN4C_READABLE|_SUN4C_WRITEABLE|\
 					 _SUN4C_PAGE_DIRTY|_SUN4C_PAGE_PRIV)
 
-/*
- * We have a couple of free bits left, but it's probably not a big
- * deal, considering sizes of RAM and swap on sun4c.
- */
-#define SUN4C_PTE_FILE_MAX_BITS	20
-
 #ifndef __ASSEMBLY__
 
 extern __inline__ unsigned long sun4c_get_synchronous_error(void)

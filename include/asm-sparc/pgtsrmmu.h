@@ -64,8 +64,7 @@
 
 #define SRMMU_FILE         0x40	/* Implemented in software */
 
-#define SRMMU_PTE_FILE_MAX_BITS	24
-#define SRMMU_PTE_FILE_SHIFT     8
+#define SRMMU_PTE_FILE_SHIFT     8	/* == 32-PTE_FILE_MAX_BITS */
 
 #define SRMMU_CHG_MASK    (0xffffff00 | SRMMU_REF | SRMMU_DIRTY)
 

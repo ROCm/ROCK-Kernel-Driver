@@ -108,7 +108,7 @@ ctxd_t *srmmu_ctx_table_phys;
 ctxd_t *srmmu_context_table;
 
 int viking_mxcc_present;
-spinlock_t srmmu_context_spinlock = SPIN_LOCK_UNLOCKED;
+static spinlock_t srmmu_context_spinlock = SPIN_LOCK_UNLOCKED;
 
 int is_hypersparc;
 
@@ -152,7 +152,7 @@ void *srmmu_nocache_pool;
 void *srmmu_nocache_bitmap;
 int srmmu_nocache_low;
 int srmmu_nocache_used;
-spinlock_t srmmu_nocache_spinlock;
+static spinlock_t srmmu_nocache_spinlock = SPIN_LOCK_UNLOCKED;
 
 /* This makes sense. Honest it does - Anton */
 #define __nocache_pa(VADDR) (((unsigned long)VADDR) - SRMMU_NOCACHE_VADDR + __pa((unsigned long)srmmu_nocache_pool))
@@ -2198,8 +2198,6 @@ void __init ld_mmu_srmmu(void)
 	BTFIXUPSET_INT(page_kernel, pgprot_val(SRMMU_PAGE_KERNEL));
 	page_kernel = pgprot_val(SRMMU_PAGE_KERNEL);
 	pg_iobits = SRMMU_VALID | SRMMU_WRITE | SRMMU_REF;
-
-	BTFIXUPSET_SIMM13(pte_file_max_bits, SRMMU_PTE_FILE_MAX_BITS);
 
 	/* Functions */
 #ifndef CONFIG_SMP	
