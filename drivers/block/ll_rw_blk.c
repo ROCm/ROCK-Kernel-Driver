@@ -1651,7 +1651,7 @@ static struct request *get_request(request_queue_t *q, int rw, int gfp_mask)
 	struct io_context *ioc = get_io_context(gfp_mask);
 
 	if (unlikely(test_bit(QUEUE_FLAG_DRAIN, &q->queue_flags)))
-		return NULL;
+		goto out;
 
 	spin_lock_irq(q->queue_lock);
 	if (rl->count[rw]+1 >= q->nr_requests) {
