@@ -824,30 +824,26 @@ void smp_flush_tlb_mm(struct mm_struct *mm)
 	}
 }
 
-void smp_flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
+void smp_flush_tlb_range(struct mm_struct *mm, unsigned long start,
 			 unsigned long end)
 {
-	struct mm_struct *mm = vma->vm_mm;
+	u32 ctx = CTX_HWBITS(mm->context);
+	int cpu = smp_processor_id();
 
-	{
-		u32 ctx = CTX_HWBITS(mm->context);
-		int cpu = smp_processor_id();
+	start &= PAGE_MASK;
+	end    = PAGE_ALIGN(end);
 
-		start &= PAGE_MASK;
-		end    = PAGE_ALIGN(end);
-
-		if (mm == current->active_mm && atomic_read(&mm->mm_users) == 1) {
-			mm->cpu_vm_mask = (1UL << cpu);
-			goto local_flush_and_out;
-		}
-
-		smp_cross_call_masked(&xcall_flush_tlb_range,
-				      ctx, start, end,
-				      mm->cpu_vm_mask);
-
-	local_flush_and_out:
-		__flush_tlb_range(ctx, start, SECONDARY_CONTEXT, end, PAGE_SIZE, (end-start));
+	if (mm == current->active_mm && atomic_read(&mm->mm_users) == 1) {
+		mm->cpu_vm_mask = (1UL << cpu);
+		goto local_flush_and_out;
 	}
+
+	smp_cross_call_masked(&xcall_flush_tlb_range,
+			      ctx, start, end,
+			      mm->cpu_vm_mask);
+
+ local_flush_and_out:
+	__flush_tlb_range(ctx, start, SECONDARY_CONTEXT, end, PAGE_SIZE, (end-start));
 }
 
 void smp_flush_tlb_kernel_range(unsigned long start, unsigned long end)
