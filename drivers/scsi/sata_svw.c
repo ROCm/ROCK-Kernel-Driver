@@ -284,7 +284,7 @@ static int k2_sata_init_one (struct pci_dev *pdev, const struct pci_device_id *e
 	/* Request PCI regions */
 	rc = pci_request_regions(pdev, DRV_NAME);
 	if (rc)
-		goto err_out;
+		return rc;
 
 	rc = pci_set_dma_mask(pdev, ATA_DMA_MASK);
 	if (rc)
@@ -355,8 +355,6 @@ err_out_free_ent:
 	kfree(probe_ent);
 err_out_regions:
 	pci_release_regions(pdev);
-err_out:
-	pci_disable_device(pdev);
 	return rc;
 }
 

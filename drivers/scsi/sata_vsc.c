@@ -267,7 +267,7 @@ static int __devinit vsc_sata_init_one (struct pci_dev *pdev, const struct pci_d
 
 	rc = pci_request_regions(pdev, DRV_NAME);
 	if (rc)
-		goto err_out;
+		return rc;
 
 	/*
 	 * Use 32 bit DMA mask, because 64 bit address support is poor.
@@ -334,8 +334,6 @@ err_out_free_ent:
 	kfree(probe_ent);
 err_out_regions:
 	pci_release_regions(pdev);
-err_out:
-	pci_disable_device(pdev);
 	return rc;
 }
 

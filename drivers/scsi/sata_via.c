@@ -171,7 +171,7 @@ static int svia_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	rc = pci_request_regions(pdev, DRV_NAME);
 	if (rc)
-		goto err_out;
+		return rc;
 
 	pci_read_config_byte(pdev, SATA_PATA_SHARING, &tmp8);
 	if (tmp8 & SATA_2DEV) {
@@ -279,8 +279,6 @@ static int svia_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 
 err_out_regions:
 	pci_release_regions(pdev);
-err_out:
-	pci_disable_device(pdev);
 	return rc;
 }
 
