@@ -84,10 +84,9 @@ xfs_bulkstat_one(
 	xfs_arch_t      arch;           /* these are set according to      */
 	__uint16_t      di_flags;       /* temp */
 
-	buf = (xfs_bstat_t *)buffer;
 	dip = (xfs_dinode_t *)dibuff;
 
-	if (! buf || ino == mp->m_sb.sb_rbmino || ino == mp->m_sb.sb_rsumino ||
+	if (!buffer || ino == mp->m_sb.sb_rbmino || ino == mp->m_sb.sb_rsumino ||
 	    (XFS_SB_VERSION_HASQUOTA(&mp->m_sb) &&
 	     (ino == mp->m_sb.sb_uquotino || ino == mp->m_sb.sb_gquotino))) {
 		*stat = BULKSTAT_RV_NOTHING;
@@ -97,6 +96,8 @@ xfs_bulkstat_one(
 		*stat = BULKSTAT_RV_NOTHING;
 		return XFS_ERROR(ENOMEM);
 	}
+
+	buf = kmem_alloc(sizeof(*buf), KM_SLEEP);
 
 	if (dip == NULL) {
 		/* We're not being passed a pointer to a dinode.  This happens
@@ -112,6 +113,7 @@ xfs_bulkstat_one(
 		if (ip->i_d.di_mode == 0) {
 			xfs_iput_new(ip, XFS_ILOCK_SHARED);
 			*stat = BULKSTAT_RV_NOTHING;
+			kmem_free(buf, sizeof(*buf));
 			return XFS_ERROR(ENOENT);
 		}
 		dic = &ip->i_d;
@@ -228,6 +230,13 @@ xfs_bulkstat_one(
 		xfs_iput(ip, XFS_ILOCK_SHARED);
 	}
 
+	if (copy_to_user(buffer, buf, sizeof(*buf)))  {
+		kmem_free(buf, sizeof(*buf));
+		*stat = BULKSTAT_RV_NOTHING;
+		return EFAULT;
+	}
+
+	kmem_free(buf, sizeof(*buf));
 	*stat = BULKSTAT_RV_DIDONE;
 	if (ubused)
 		*ubused = sizeof(*buf);
@@ -650,7 +659,6 @@ xfs_bulkstat_single(
 	xfs_caddr_t		buffer,	/* buffer with inode stats */
 	int			*done)	/* 1 if there're more stats to get */
 {
-	xfs_bstat_t		bstat;	/* one bulkstat result structure */
 	int			count;	/* count value for bulkstat call */
 	int			error;	/* return value */
 	xfs_ino_t		ino;	/* filesystem inode number */
@@ -666,7 +674,7 @@ xfs_bulkstat_single(
 	 */
 
 	ino = (xfs_ino_t)*lastinop;
-	error = xfs_bulkstat_one(mp, ino, &bstat, sizeof(bstat),
+	error = xfs_bulkstat_one(mp, ino, buffer, sizeof(xfs_bstat_t),
 				 NULL, 0, NULL, NULL, &res);
 	if (error) {
 		/*
@@ -676,8 +684,8 @@ xfs_bulkstat_single(
 		(*lastinop)--;
 		count = 1;
 		if (xfs_bulkstat(mp, lastinop, &count, xfs_bulkstat_one,
-				NULL,
-				sizeof(bstat), buffer, BULKSTAT_FG_IGET, done))
+				NULL, sizeof(xfs_bstat_t), buffer,
+				BULKSTAT_FG_IGET, done))
 			return error;
 		if (count == 0 || (xfs_ino_t)*lastinop != ino)
 			return error == EFSCORRUPTED ?
@@ -686,8 +694,6 @@ xfs_bulkstat_single(
 			return 0;
 	}
 	*done = 0;
-	if (copy_to_user(buffer, &bstat, sizeof(bstat)))
-		return XFS_ERROR(EFAULT);
 	return 0;
 }
 
