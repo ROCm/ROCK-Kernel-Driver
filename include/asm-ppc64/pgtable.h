@@ -204,8 +204,8 @@ extern unsigned long empty_zero_page[PAGE_SIZE/sizeof(unsigned long)];
 #define	pmd_bad(pmd)		((pmd_val(pmd)) == 0)
 #define	pmd_present(pmd)	((pmd_val(pmd)) != 0)
 #define	pmd_clear(pmdp)		(pmd_val(*(pmdp)) = 0)
-#define pmd_page(pmd)		(__bpn_to_ba(pmd_val(pmd)))
-#define pmd_page_kernel(pmd)	pmd_page(pmd)
+#define pmd_page_kernel(pmd)	(__bpn_to_ba(pmd_val(pmd)))
+#define pmd_page(pmd)		virt_to_page(pmd_page_kernel(pmd))
 #define pgd_set(pgdp, pmdp)	(pgd_val(*(pgdp)) = (__ba_to_bpn(pmdp)))
 #define pgd_none(pgd)		(!pgd_val(pgd))
 #define pgd_bad(pgd)		((pgd_val(pgd)) == 0)
@@ -227,7 +227,7 @@ extern unsigned long empty_zero_page[PAGE_SIZE/sizeof(unsigned long)];
 
 /* Find an entry in the third-level page table.. */
 #define pte_offset_kernel(dir,addr) \
-  ((pte_t *) pmd_page(*(dir)) + (((addr) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1)))
+  ((pte_t *) pmd_page_kernel(*(dir)) + (((addr) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1)))
 
 #define pte_offset_map(dir,addr)	pte_offset_kernel((dir), (addr))
 #define pte_offset_map_nested(dir,addr)	pte_offset_kernel((dir), (addr))
