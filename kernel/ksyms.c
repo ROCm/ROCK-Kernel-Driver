@@ -485,6 +485,8 @@ EXPORT_SYMBOL(task_nice);
 EXPORT_SYMBOL_GPL(idle_cpu);
 #if CONFIG_SMP
 EXPORT_SYMBOL_GPL(set_cpus_allowed);
+#endif
+#if CONFIG_SMP || CONFIG_PREEMPT
 EXPORT_SYMBOL(kernel_flag);
 #endif
 EXPORT_SYMBOL(jiffies);

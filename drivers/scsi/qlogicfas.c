@@ -127,11 +127,6 @@
 #endif
 
 #include <linux/module.h>
-
-#ifdef PCMCIA
-#undef MODULE
-#endif
-
 #include <linux/blk.h>		/* to get disk capacity */
 #include <linux/kernel.h>
 #include <linux/string.h>
@@ -148,7 +143,6 @@
 
 #include "scsi.h"
 #include "hosts.h"
-#include "qlogicfas.h"
 
 /*----------------------------------------------------------------*/
 /* driver state info, local to driver */
@@ -165,6 +159,8 @@ static int qlcfg7 = SYNCOFFST;
 static int qlcfg8 = (SLOWCABLE << 7) | (QL_ENABLE_PARITY << 4);
 static int qlcfg9 = ((XTALFREQ + 4) / 5);
 static int qlcfgc = (FASTCLK << 3) | (FASTSCSI << 4);
+
+int qlogicfas_queuecommand(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *));
 
 /*----------------------------------------------------------------*/
 /* The qlogic card uses two register maps - These macros select which one */
@@ -631,13 +627,11 @@ void qlogicfas_preset(int port, int irq)
  *	Look for qlogic card and init if found 
  */
  
-int __devinit qlogicfas_detect(Scsi_Host_Template * host)
+struct Scsi_Host *__qlogicfas_detect(Scsi_Host_Template *host)
 {
 	int i, j;		/* these are only used by IRQ detect */
 	int qltyp;		/* type of chip */
 	struct Scsi_Host *hreg;	/* registered host structure */
-
-	host->proc_name = "qlogicfas";
 
 	/*	Qlogic Cards only exist at 0x230 or 0x330 (the chip itself
 	 *	decodes the address - I check 230 first since MIDI cards are
@@ -659,7 +653,7 @@ int __devinit qlogicfas_detect(Scsi_Host_Template * host)
 			release_region(qbase, 0x10);
 		}
 		if (qbase == 0x430)
-			return 0;
+			return NULL;;
 	} else
 		printk(KERN_INFO "Ql: Using preset base address of %03x\n", qbase);
 
@@ -726,14 +720,19 @@ int __devinit qlogicfas_detect(Scsi_Host_Template * host)
 		qltyp, qbase, qlirq, QL_TURBO_PDMA);
 	host->name = qinfo;
 
-	return 1;
+	return hreg;
 
 err_release_mem:
 	release_region(qbase, 0x10);
 	if (host->can_queue)
 		free_irq(qlirq, do_ql_ihandl);
-	return 0;
+	return NULL;;
 
+}
+
+int __devinit qlogicfas_detect(Scsi_Host_Template *sht)
+{
+	return (__qlogicfas_detect(sht) != NULL);
 }
 
 /* 
@@ -777,7 +776,7 @@ static int qlogicfas_abort(Scsi_Cmnd * cmd)
  *	the PCMCIA qlogic_stub code. This wants fixing
  */
 
-static int qlogicfas_bus_reset(Scsi_Cmnd * cmd)
+int qlogicfas_bus_reset(Scsi_Cmnd * cmd)
 {
 	qabort = 2;
 	ql_zap();
@@ -818,9 +817,27 @@ MODULE_LICENSE("GPL");
 /*
  *	The driver template is also needed for PCMCIA
  */
- 
-Scsi_Host_Template qlogicfas_driver_template = QLOGICFAS;
+Scsi_Host_Template qlogicfas_driver_template = {
+	.module			= THIS_MODULE,
+	.name			= "qlogicfas",
+	.proc_name		= "qlogicfas",
+	.detect			= qlogicfas_detect,
+	.info			= qlogicfas_info,
+	.command		= qlogicfas_command,
+	.queuecommand		= qlogicfas_queuecommand,
+	.eh_abort_handler	= qlogicfas_abort,
+	.eh_bus_reset_handler	= qlogicfas_bus_reset,
+	.eh_device_reset_handler= qlogicfas_device_reset,
+	.eh_host_reset_handler	= qlogicfas_host_reset,
+	.bios_param		= qlogicfas_biosparam,
+	.can_queue		= 0,
+	.this_id		= -1,
+	.sg_tablesize		= SG_ALL,
+	.cmd_per_lun		= 1,
+	.use_clustering		= DISABLE_CLUSTERING,
+};
+
+#ifndef PCMCIA
 #define driver_template qlogicfas_driver_template
-
 #include "scsi_module.c"
-
+#endif

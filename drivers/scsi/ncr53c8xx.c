@@ -5024,7 +5024,6 @@ static int ncr_abort_command (ncb_p np, Scsi_Cmnd *cmd)
 **==========================================================
 */
 
-#ifdef MODULE
 static int ncr_detach(ncb_p np)
 {
 	ccb_p cp;
@@ -5160,7 +5159,6 @@ static int ncr_detach(ncb_p np)
 
 	return 1;
 }
-#endif
 
 /*==========================================================
 **
@@ -8935,7 +8933,6 @@ out:
 }
 
 
-#ifdef MODULE
 int ncr53c8xx_release(struct Scsi_Host *host)
 {
 #ifdef DEBUG_NCR53C8XX
@@ -8945,7 +8942,6 @@ printk("ncr53c8xx : release\n");
 
      return 1;
 }
-#endif
 
 
 /*

@@ -946,16 +946,6 @@ config SCSI_SYM53C8XX_2
 	  Please read <file:drivers/scsi/sym53c8xx_2/Documentation.txt> for more
 	  information.
 
-config SCSI_ZALON
-	tristate "Zalon SCSI support"
-	depends on GSC && SCSI
-	help
-	  The Zalon is a GSC/HSC bus interface chip that sits between the
-	  PA-RISC processor and the NCR 53c720 SCSI controller on C100,
-	  C110, J200, J210 and some D, K & R-class machines.  It's also
-	  used on the add-in Bluefish, Barracuda & Shrike SCSI cards.
-	  Say Y here if you have one of these machines or cards.
-
 config SCSI_SYM53C8XX_DMA_ADDRESSING_MODE
 	int "DMA addressing mode"
 	depends on SCSI_SYM53C8XX_2
@@ -1010,9 +1000,19 @@ config SCSI_SYM53C8XX_IOMAPPED
 	  If you say Y here, the driver will preferently use normal IO rather than 
 	  memory mapped IO.
 
+config SCSI_ZALON
+	tristate "Zalon SCSI support"
+	depends on GSC && SCSI
+	help
+	  The Zalon is a GSC/HSC bus interface chip that sits between the
+	  PA-RISC processor and the NCR 53c720 SCSI controller on C100,
+	  C110, J200, J210 and some D, K & R-class machines.  It's also
+	  used on the add-in Bluefish, Barracuda & Shrike SCSI cards.
+	  Say Y here if you have one of these machines or cards.
+
 config SCSI_NCR53C8XX
 	tristate "NCR53C8XX SCSI support"
-	depends on PCI && SCSI_SYM53C8XX_2!=y && SCSI
+	depends on PCI && SCSI_SYM53C8XX_2!=y && SCSI_ZALON!=y && SCSI
 	---help---
 	  This is the BSD ncr driver adapted to Linux for the NCR53C8XX family
 	  of PCI-SCSI controllers.  This driver supports parity checking,

@@ -61,15 +61,15 @@ MODULE_AUTHOR("David Hinds <dahinds@users.sourceforge.net>");
 MODULE_DESCRIPTION("Future Domain PCMCIA SCSI driver");
 MODULE_LICENSE("Dual MPL/GPL");
 
-#define INT_MODULE_PARM(n, v) static int n = v; MODULE_PARM(n, "i")
-
 /* Bit map of interrupts to choose from */
-INT_MODULE_PARM(irq_mask, 0xdeb8);
+static int irq_mask = 0xdeb8;
+MODULE_PARM(irq_mask, "i");
 static int irq_list[4] = { -1 };
 MODULE_PARM(irq_list, "1-4i");
 
 #ifdef PCMCIA_DEBUG
-INT_MODULE_PARM(pc_debug, PCMCIA_DEBUG);
+static int pc_debug = PCMCIA_DEBUG;
+MODULE_PARM(pc_debug, "i");
 #define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args)
 static char *version =
 "fdomain_cs.c 1.47 2001/10/13 00:08:52 (David Hinds)";
@@ -81,11 +81,15 @@ static char *version =
 
 typedef struct scsi_info_t {
     dev_link_t		link;
+    struct Scsi_Host	*host;
     int			ndev;
     dev_node_t		node[8];
 } scsi_info_t;
 
+extern Scsi_Host_Template fdomain_driver_template;
 extern void fdomain_setup(char *str, int *ints);
+extern struct Scsi_Host *__fdomain_16x0_detect( Scsi_Host_Template *tpnt );
+extern int fdomain_16x0_bus_reset(Scsi_Cmnd *SCpnt);
 
 static void fdomain_release(u_long arg);
 static int fdomain_event(event_t event, int priority,
@@ -94,8 +98,6 @@ static int fdomain_event(event_t event, int priority,
 static dev_link_t *fdomain_attach(void);
 static void fdomain_detach(dev_link_t *);
 
-#define driver_template fdomain_driver_template
-extern Scsi_Host_Template fdomain_driver_template;
 
 static dev_link_t *dev_list = NULL;
 
@@ -231,7 +233,6 @@ static void fdomain_config(dev_link_t *link)
     link->conf.ConfigBase = parse.config.base;
 
     /* Configure card */
-    driver_template.module = &__this_module;
     link->state |= DEV_CONFIG;
     
     tuple.DesiredTuple = CISTPL_CFTABLE_ENTRY;
@@ -260,14 +261,18 @@ static void fdomain_config(dev_link_t *link)
     sprintf(str, "%d,%d", link->io.BasePort1, link->irq.AssignedIRQ);
     fdomain_setup(str, ints);
     
-    scsi_register_host(&driver_template);
+    host = __fdomain_16x0_detect(&fdomain_driver_template);
+    if (!host) {
+        printk(KERN_INFO "fdomain_cs: no SCSI devices found\n");
+	goto cs_failed;
+    }
+ 
+    scsi_add_host(host, NULL);
 
     tail = &link->dev;
     info->ndev = 0;
-    for (host = scsi_host_get_next(NULL); host;
-	 host = scsi_host_get_next(host))
-	if (host->hostt == &driver_template)
-	    list_for_each_entry (dev, &host->my_devices, siblings) {
+   
+    list_for_each_entry (dev, &host->my_devices, siblings) {
 	    u_long arg[2], id;
 	    kernel_scsi_ioctl(dev, SCSI_IOCTL_GET_IDLUN, arg);
 	    id = (arg[0]&0x0f) + ((arg[0]>>4)&0xf0) +
@@ -296,10 +301,11 @@ static void fdomain_config(dev_link_t *link)
 	    }
 	    *tail = node; tail = &node->next;
 	    info->ndev++;
-	}
+
+    }
+
     *tail = NULL;
-    if (info->ndev == 0)
-	printk(KERN_INFO "fdomain_cs: no SCSI devices found\n");
+    info->host = host;
     
     link->state &= ~DEV_CONFIG_PENDING;
     return;
@@ -316,30 +322,22 @@ cs_failed:
 static void fdomain_release(u_long arg)
 {
     dev_link_t *link = (dev_link_t *)arg;
+    scsi_info_t *info = link->priv;
 
     DEBUG(0, "fdomain_release(0x%p)\n", link);
 
-#warning This does not protect you.  You need some real fix for your races.
-#if 0
-    if (GET_USE_COUNT(&__this_module) != 0) {
-	DEBUG(1, "fdomain_cs: release postponed, "
-	      "device still open\n");
-	link->state |= DEV_STALE_CONFIG;
-	return;
-    }
-#endif
-
-    scsi_unregister_host(&driver_template);
+    scsi_remove_host(info->host);
     link->dev = NULL;
     
     CardServices(ReleaseConfiguration, link->handle);
     CardServices(ReleaseIO, link->handle, &link->io);
     CardServices(ReleaseIRQ, link->handle, &link->irq);
-    
+
+    scsi_unregister(info->host);
+
     link->state &= ~DEV_CONFIG;
     if (link->state & DEV_STALE_LINK)
 	fdomain_detach(link);
-    
 } /* fdomain_release */
 
 /*====================================================================*/
@@ -374,7 +372,7 @@ static int fdomain_event(event_t event, int priority,
     case CS_EVENT_CARD_RESET:
 	if (link->state & DEV_CONFIG) {
 	    CardServices(RequestConfiguration, link->handle, &link->conf);
-	    fdomain_16x0_reset(NULL, 0);
+	    fdomain_16x0_bus_reset(NULL);
 	}
 	break;
     }

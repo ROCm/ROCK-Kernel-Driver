@@ -75,17 +75,11 @@ const char *sym53c8xx_info(struct Scsi_Host *host);
 int sym53c8xx_queue_command(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
 int sym53c8xx_reset(Scsi_Cmnd *, unsigned int);
 int sym53c8xx_slave_configure(Scsi_Device *);
-
-#ifdef MODULE
 int sym53c8xx_release(struct Scsi_Host *);
-#else
-#define sym53c8xx_release NULL
-#endif
-
 
 #if	LINUX_VERSION_CODE >= LinuxVersionCode(2,1,75)
 
-#define SYM53C8XX {     .name           = "",			\
+#define SYM53C8XX {     .name           = "sym53c8xx",		\
 			.detect         = sym53c8xx_detect,	\
 			.release        = sym53c8xx_release,	\
 			.info           = sym53c8xx_info, 	\
