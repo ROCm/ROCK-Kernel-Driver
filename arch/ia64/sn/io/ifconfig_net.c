@@ -265,9 +265,9 @@ static int ifconfig_net_ioctl(struct inode * inode, struct file * file,
 }
 
 struct file_operations ifconfig_net_fops = {
-	ioctl:ifconfig_net_ioctl,	/* ioctl */
-	open:ifconfig_net_open,		/* open */
-	release:ifconfig_net_close	/* release */
+	.ioctl =ifconfig_net_ioctl,	/* ioctl */
+	.open =ifconfig_net_open,		/* open */
+	.release =ifconfig_net_close	/* release */
 };
 
 

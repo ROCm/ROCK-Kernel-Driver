@@ -64,22 +64,22 @@ int                     pcibr_devflag = D_MP;
  * appropriate function name below.
  */
 struct file_operations pcibr_fops = {
-	owner:  THIS_MODULE,
-	llseek: NULL,
-	read: NULL,
-	write: NULL,
-	readdir: NULL,
-	poll: NULL,
-	ioctl: NULL,
-	mmap: NULL,
-	open: NULL,
-	flush: NULL,
-	release: NULL,
-	fsync: NULL,
-	fasync: NULL,
-	lock: NULL,
-	readv: NULL,
-	writev: NULL
+	.owner =THIS_MODULE,
+	.llseek = NULL,
+	.read = NULL,
+	.write = NULL,
+	.readdir = NULL,
+	.poll = NULL,
+	.ioctl = NULL,
+	.mmap = NULL,
+	.open = NULL,
+	.flush = NULL,
+	.release = NULL,
+	.fsync = NULL,
+	.fasync = NULL,
+	.lock = NULL,
+	.readv = NULL,
+	.writev = NULL
 };
 
 #ifdef LATER

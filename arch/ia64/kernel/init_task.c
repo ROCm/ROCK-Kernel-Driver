@@ -34,8 +34,8 @@ union init_thread {
 	} s;
 	unsigned long stack[KERNEL_STACK_SIZE/sizeof (unsigned long)];
 } init_thread_union __attribute__((section(".data.init_task"))) = {{
-	task: INIT_TASK(init_thread_union.s.task),
-	thread_info: INIT_THREAD_INFO(init_thread_union.s.thread_info)
+	.task = INIT_TASK(init_thread_union.s.task),
+	.thread_info = INIT_THREAD_INFO(init_thread_union.s.thread_info)
 }};
 
 asm (".global init_task; init_task = init_thread_union");

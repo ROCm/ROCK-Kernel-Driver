@@ -283,9 +283,9 @@ ia64_init_itm (void)
 }
 
 static struct irqaction timer_irqaction = {
-	handler:	timer_interrupt,
-	flags:		SA_INTERRUPT,
-	name:		"timer"
+	.handler =	timer_interrupt,
+	.flags =	SA_INTERRUPT,
+	.name =		"timer"
 };
 
 void __init

@@ -24,7 +24,7 @@ extern void hubni_error_handler(char *, int); /* huberror.c */
 
 static int hubstats_ioctl(struct inode *, struct file *, unsigned int, unsigned long);
 struct file_operations hub_mon_fops = {
-        ioctl:          hubstats_ioctl,
+        .ioctl =        hubstats_ioctl,
 };
 
 #define HUB_CAPTURE_TICKS	(2 * HZ)

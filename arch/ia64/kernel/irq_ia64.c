@@ -148,9 +148,9 @@ ia64_handle_irq (ia64_vector vector, struct pt_regs *regs)
 extern void handle_IPI (int irq, void *dev_id, struct pt_regs *regs);
 
 static struct irqaction ipi_irqaction = {
-	handler:	handle_IPI,
-	flags:		SA_INTERRUPT,
-	name:		"IPI"
+	.handler =	handle_IPI,
+	.flags =	SA_INTERRUPT,
+	.name =		"IPI"
 };
 #endif
 

@@ -108,14 +108,14 @@ irqpda_t		*irqpdaindr[NR_CPUS];
  * VGA color display.
  */
 struct screen_info sn1_screen_info = {
-	orig_x:			 0,
-	orig_y:			 0,
-	orig_video_mode:	 3,
-	orig_video_cols:	80,
-	orig_video_ega_bx:	 3,
-	orig_video_lines:	25,
-	orig_video_isVGA:	 1,
-	orig_video_points:	16
+	.orig_x =		 0,
+	.orig_y =		 0,
+	.orig_video_mode =	 3,
+	.orig_video_cols =	80,
+	.orig_video_ega_bx =	 3,
+	.orig_video_lines =	25,
+	.orig_video_isVGA =	 1,
+	.orig_video_points =	16
 };
 
 /*
@@ -169,9 +169,9 @@ early_sn1_setup(void)
 #ifdef NOT_YET_CONFIG_IA64_MCA
 extern void ia64_mca_cpe_int_handler (int cpe_irq, void *arg, struct pt_regs *ptregs);
 static struct irqaction mca_cpe_irqaction = { 
-	handler:    ia64_mca_cpe_int_handler,
-	flags:      SA_INTERRUPT,
-	name:       "cpe_hndlr"
+	.handler =  ia64_mca_cpe_int_handler,
+	.flags =    SA_INTERRUPT,
+	.name =     "cpe_hndlr"
 };
 #endif
 #ifdef CONFIG_IA64_MCA

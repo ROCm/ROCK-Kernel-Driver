@@ -140,13 +140,13 @@ static struct {
 	} stat;
 # endif
 } unw = {
-	tables: &unw.kernel_table,
-	lock: SPIN_LOCK_UNLOCKED,
-	save_order: {
+	.tables = &unw.kernel_table,
+	.lock = SPIN_LOCK_UNLOCKED,
+	.save_order = {
 		UNW_REG_RP, UNW_REG_PFS, UNW_REG_PSP, UNW_REG_PR,
 		UNW_REG_UNAT, UNW_REG_LC, UNW_REG_FPSR, UNW_REG_PRI_UNAT_GR
 	},
-	preg_index: {
+	.preg_index = {
 		struct_offset(struct unw_frame_info, pri_unat_loc)/8,	/* PRI_UNAT_GR */
 		struct_offset(struct unw_frame_info, pri_unat_loc)/8,	/* PRI_UNAT_MEM */
 		struct_offset(struct unw_frame_info, bsp_loc)/8,
@@ -189,9 +189,9 @@ static struct {
 		struct_offset(struct unw_frame_info, fr_loc[30 - 16])/8,
 		struct_offset(struct unw_frame_info, fr_loc[31 - 16])/8,
 	},
-	hash : { [0 ... UNW_HASH_SIZE - 1] = -1 },
+	.hash = { [0 ... UNW_HASH_SIZE - 1] = -1 },
 #if UNW_DEBUG
-	preg_name: {
+	.preg_name = {
 		"pri_unat_gr", "pri_unat_mem", "bsp", "bspstore", "ar.pfs", "ar.rnat", "psp", "rp",
 		"r4", "r5", "r6", "r7",
 		"ar.unat", "pr", "ar.lc", "ar.fpsr",

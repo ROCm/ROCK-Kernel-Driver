@@ -402,7 +402,7 @@ static unsigned long reset_pmcs[IA64_NUM_PMC_REGS];	/* contains PAL reset values
 static void pfm_vm_close(struct vm_area_struct * area);
 
 static struct vm_operations_struct pfm_vm_ops={
-	close: pfm_vm_close
+	.close = pfm_vm_close
 };
 
 /*
@@ -4125,9 +4125,9 @@ pfm_cleanup_notifiers(struct task_struct *task)
 }
 
 static struct irqaction perfmon_irqaction = {
-	handler:	perfmon_interrupt,
-	flags:		SA_INTERRUPT,
-	name:		"perfmon"
+	.handler =	perfmon_interrupt,
+	.flags =	SA_INTERRUPT,
+	.name =		"perfmon"
 };
 
 
