@@ -65,79 +65,90 @@ MODULE_PARM_DESC(read_timeout, "User specified read timeout in seconds");
 
 static struct usb_device_id scanner_device_ids [] = {
 	/* Acer (now Benq) */
-	{ USB_DEVICE(0x04a5, 0x2060) },	/* 620U & 640U (!)*/
-	{ USB_DEVICE(0x04a5, 0x2040) },	/* 620U (!) */
-	{ USB_DEVICE(0x04a5, 0x20c0) }, /* 1240UT, 1240U */
-	{ USB_DEVICE(0x04a5, 0x2022) },	/* 340U */
 	{ USB_DEVICE(0x04a5, 0x1a20) },	/* Unknown - Oliver Schwartz */
 	{ USB_DEVICE(0x04a5, 0x1a2a) },	/* Another 620U */
+	{ USB_DEVICE(0x04a5, 0x2022) },	/* 340U */
+	{ USB_DEVICE(0x04a5, 0x2040) },	/* 620U (!) */
+	{ USB_DEVICE(0x04a5, 0x2060) },	/* 620U & 640U (!)*/
 	{ USB_DEVICE(0x04a5, 0x207e) },	/* 640BU */
-	{ USB_DEVICE(0x04a5, 0x20be) },	/* Unknown - Oliver Schwartz */
-	{ USB_DEVICE(0x04a5, 0x20de) },	/* S2W 3300U */
 	{ USB_DEVICE(0x04a5, 0x20b0) },	/* Benq 4300 */
-	{ USB_DEVICE(0x04a5, 0x20fe) },	/* Benq 5300 */
+	{ USB_DEVICE(0x04a5, 0x20be) },	/* Unknown - Oliver Schwartz */
+	{ USB_DEVICE(0x04a5, 0x20c0) }, /* 1240UT, 1240U */
+	{ USB_DEVICE(0x04a5, 0x20de) },	/* S2W 3300U */
 	{ USB_DEVICE(0x04a5, 0x20fc) }, /* Benq 5000 */
+	{ USB_DEVICE(0x04a5, 0x20fe) },	/* Benq 5300 */
 	/* Agfa */
 	{ USB_DEVICE(0x06bd, 0x0001) },	/* SnapScan 1212U */
 	{ USB_DEVICE(0x06bd, 0x0002) },	/* SnapScan 1236U */
-	{ USB_DEVICE(0x06bd, 0x2061) },	/* Another SnapScan 1212U (?)*/
 	{ USB_DEVICE(0x06bd, 0x0100) },	/* SnapScan Touch */
+	{ USB_DEVICE(0x06bd, 0x2061) },	/* Another SnapScan 1212U (?)*/
+	{ USB_DEVICE(0x06bd, 0x208d) }, /* Snapscan e40 */
+	{ USB_DEVICE(0x06bd, 0x208f) }, /* SnapScan e50*/
 	{ USB_DEVICE(0x06bd, 0x2091) }, /* SnapScan e20 */
+	{ USB_DEVICE(0x06bd, 0x2093) }, /* SnapScan e10*/
 	{ USB_DEVICE(0x06bd, 0x2095) }, /* SnapScan e25 */
 	{ USB_DEVICE(0x06bd, 0x2097) }, /* SnapScan e26 */
-	{ USB_DEVICE(0x06bd, 0x208d) }, /* Snapscan e40 */
-	{ USB_DEVICE(0x06bd, 0x2093) }, /* SnapScan e10*/
-	{ USB_DEVICE(0x06bd, 0x20ff) }, /* SnapScan e42*/
-	{ USB_DEVICE(0x06bd, 0x208f) }, /* SnapScan e50*/
 	{ USB_DEVICE(0x06bd, 0x20fd) }, /* SnapScan e52*/
+	{ USB_DEVICE(0x06bd, 0x20ff) }, /* SnapScan e42*/
+	/* Artec */
+	{ USB_DEVICE(0x05d8, 0x4001) },	/* Ultima 2000 */
+	{ USB_DEVICE(0x05d8, 0x4002) }, /* Ultima 2000 (GT6801 based) */
 	/* Benq: see Acer */
 	/* Canon */
-	{ USB_DEVICE(0x04a9, 0x2201) }, /* FB320U */
-	{ USB_DEVICE(0x04a9, 0x2205) }, /* FB1210U */
+	{ USB_DEVICE(0x04a9, 0x2201) }, /* CanoScan FB320U */
 	{ USB_DEVICE(0x04a9, 0x2202) }, /* CanoScan FB620U */
 	{ USB_DEVICE(0x04a9, 0x2204) }, /* CanoScan FB630U/FB636U */
+	{ USB_DEVICE(0x04a9, 0x2205) }, /* CanoScan FB1210U */
 	{ USB_DEVICE(0x04a9, 0x2206) }, /* CanoScan N650U/N656U */
 	{ USB_DEVICE(0x04a9, 0x2207) }, /* CanoScan N1220U */
 	{ USB_DEVICE(0x04a9, 0x2208) }, /* CanoScan D660U */ 
-	{ USB_DEVICE(0x04a9, 0x220b) }, /* D646U */
+	{ USB_DEVICE(0x04a9, 0x220b) }, /* CanoScan D646U */
+	{ USB_DEVICE(0x04a9, 0x220c) },	/* CanoScan D1250U2 */
 	{ USB_DEVICE(0x04a9, 0x220d) }, /* CanoScan N670U/N676U/LIDE 20 */
 	{ USB_DEVICE(0x04a9, 0x220e) }, /* CanoScan N1240U/LIDE 30 */
 	{ USB_DEVICE(0x04a9, 0x3042) }, /* FS4000US */
 	/* Colorado -- See Primax/Colorado below */
+	/* Compaq */
+	{ USB_DEVICE(0x049f, 0x0021) },	/* S200 */
 	/* Epson -- See Seiko/Epson below */
 	/* Genius */
-	{ USB_DEVICE(0x0458, 0x2001) },	/* ColorPage-Vivid Pro */
+	{ USB_DEVICE(0x0458, 0x2001) },	/* ColorPage Vivid Pro */
 	{ USB_DEVICE(0x0458, 0x2007) },	/* ColorPage HR6 V2 */
-	{ USB_DEVICE(0x0458, 0x2008) }, /* ColorPage-HR6 V2 */
-	{ USB_DEVICE(0x0458, 0x2009) }, /* ColorPage-HR6A */
-	{ USB_DEVICE(0x0458, 0x2011) }, /* ColorPage-Vivid3x */
-	{ USB_DEVICE(0x0458, 0x2013) }, /* ColorPage-HR7 */
-	{ USB_DEVICE(0x0458, 0x2015) }, /* ColorPage-HR7LE */
-	{ USB_DEVICE(0x0458, 0x2016) }, /* ColorPage-HR6X */
+	{ USB_DEVICE(0x0458, 0x2008) }, /* ColorPage HR6 V2 */
+	{ USB_DEVICE(0x0458, 0x2009) }, /* ColorPage HR6A */
+	{ USB_DEVICE(0x0458, 0x2011) }, /* ColorPage Vivid3x */
+	{ USB_DEVICE(0x0458, 0x2013) }, /* ColorPage HR7 */
+	{ USB_DEVICE(0x0458, 0x2015) }, /* ColorPage HR7LE */
+	{ USB_DEVICE(0x0458, 0x2016) }, /* ColorPage HR6X */
 	/* Hewlett Packard */
-	{ USB_DEVICE(0x03f0, 0x0505) }, /* ScanJet 2100C */
-	{ USB_DEVICE(0x03f0, 0x0605) },	/* 2200C */
-	{ USB_DEVICE(0x03f0, 0x0901) }, /* 2300C */
-	{ USB_DEVICE(0x03f0, 0x0205) },	/* 3300C */
-	{ USB_DEVICE(0x03f0, 0x0405) }, /* 3400C */
-	{ USB_DEVICE(0x03f0, 0x0101) },	/* 4100C */
-	{ USB_DEVICE(0x03f0, 0x0105) },	/* 4200C */
-	{ USB_DEVICE(0x03f0, 0x0305) }, /* 4300C */
-	{ USB_DEVICE(0x03f0, 0x0705) }, /* 4400C */
+	{ USB_DEVICE(0x03f0, 0x0101) },	/* ScanJet 4100C */
 	{ USB_DEVICE(0x03f0, 0x0102) },	/* PhotoSmart S20 */
-	{ USB_DEVICE(0x03f0, 0x0401) },	/* 5200C */
-	//	{ USB_DEVICE(0x03f0, 0x0701) },	/* 5300C - NOT SUPPORTED - see http://www.neatech.nl/oss/HP5300C/ */
-	{ USB_DEVICE(0x03f0, 0x0201) },	/* 6200C */
-	{ USB_DEVICE(0x03f0, 0x0601) },	/* 6300C */
+	{ USB_DEVICE(0x03f0, 0x0105) },	/* ScanJet 4200C */
+	{ USB_DEVICE(0x03f0, 0x0201) },	/* ScanJet 6200C */
+	{ USB_DEVICE(0x03f0, 0x0205) },	/* ScanJet 3300C */
+	{ USB_DEVICE(0x03f0, 0x0305) }, /* ScanJet 4300C */
+	{ USB_DEVICE(0x03f0, 0x0401) },	/* ScanJet 5200C */
+	{ USB_DEVICE(0x03f0, 0x0405) }, /* ScanJet 3400C */
+	{ USB_DEVICE(0x03f0, 0x0505) }, /* ScanJet 2100C */
+	{ USB_DEVICE(0x03f0, 0x0601) },	/* ScanJet 6300C */
+	{ USB_DEVICE(0x03f0, 0x0605) },	/* ScanJet 2200C */
+	//	{ USB_DEVICE(0x03f0, 0x0701) },	/* ScanJet 5300C - NOT SUPPORTED - use hpusbscsi driver */
+	{ USB_DEVICE(0x03f0, 0x0705) }, /* ScanJet 4400C */
+	//	{ USB_DEVICE(0x03f0, 0x0801) },	/* ScanJet 7400C - NOT SUPPORTED - use hpusbscsi driver */
+	{ USB_DEVICE(0x03f0, 0x0901) }, /* ScanJet 2300C */
+	{ USB_DEVICE(0x03f0, 0x1305) },	/* Scanjet 4570c */
+	{ USB_DEVICE(0x03f0, 0x2005) },	/* ScanJet 3570c */
+	{ USB_DEVICE(0x03f0, 0x2205) },	/* ScanJet 3500c */
 	/* iVina */
 	{ USB_DEVICE(0x0638, 0x0268) }, /* 1200U */
 	/* Lexmark */
 	{ USB_DEVICE(0x043d, 0x002d) }, /* X70/X73 */
-	/* Lifetec */
-	{ USB_DEVICE(0x05d8, 0x4002) }, /* Lifetec LT9385 */
 	/* Memorex */
 	{ USB_DEVICE(0x0461, 0x0346) }, /* 6136u - repackaged Primax ? */
-	/* Microtek -- No longer supported - Enable SCSI and USB Microtek in kernel config */
+	/* Microtek */
+	{ USB_DEVICE(0x05da, 0x30ce) },	/* ScanMaker 3800 */
+	/* The following SCSI-over-USB Microtek devices are supported by the
+	   microtek driver: Enable SCSI and USB Microtek in kernel config */
 	//	{ USB_DEVICE(0x05da, 0x0099) },	/* ScanMaker X6 - X6U */
 	//	{ USB_DEVICE(0x05da, 0x0094) },	/* Phantom 336CX - C3 */
 	//	{ USB_DEVICE(0x05da, 0x00a0) },	/* Phantom 336CX - C3 #2 */
@@ -146,58 +157,59 @@ static struct usb_device_id scanner_device_ids [] = {
 	//	{ USB_DEVICE(0x05da, 0x80a3) },	/* ScanMaker V6USL #2 */
 	//	{ USB_DEVICE(0x05da, 0x80ac) },	/* ScanMaker V6UL - SpicyU */
 	/* Minolta */
-	//	{ USB_DEVICE(0x0638,0x026a) }, /* Minolta Dimage Scan Dual II */
-	//	{ USB_DEVICE(0x0686, 0x4004) }, /* Scan Elite II (need interrupt ep) */
 	{ USB_DEVICE(0x0686, 0x400d) }, /* Scan Dual III */
+	/* The following SCSI-over-USB Minolta devices are supported by the
+	   hpusbscsi driver: Enable SCSI and USB hpusbscsi in kernel config */
+	//	{ USB_DEVICE(0x0638, 0x026a) }, /* Minolta Dimage Scan Dual II */
+	//	{ USB_DEVICE(0x0686, 0x4004) }, /* Scan Elite II (need interrupt ep) */
 	/* Mustek */
+	{ USB_DEVICE(0x0400, 0x1000) },	/* BearPaw 1200 (National Semiconductor LM9831) */
+	{ USB_DEVICE(0x0400, 0x1001) }, /* BearPaw 2400 (National Semiconductor LM9832) */
 	{ USB_DEVICE(0x055f, 0x0001) },	/* ScanExpress 1200 CU */
-	{ USB_DEVICE(0x0400, 0x1000) },	/* BearPaw 1200 */
 	{ USB_DEVICE(0x055f, 0x0002) },	/* ScanExpress 600 CU */
-	{ USB_DEVICE(0x055f, 0x0873) }, /* ScanExpress 600 USB */
 	{ USB_DEVICE(0x055f, 0x0003) },	/* ScanExpress 1200 USB */
 	{ USB_DEVICE(0x055f, 0x0006) },	/* ScanExpress 1200 UB */
 	{ USB_DEVICE(0x055f, 0x0007) },	/* ScanExpress 1200 USB Plus */
-	{ USB_DEVICE(0x055f, 0x0210) },	/* ScanExpress A3 USB */
-	{ USB_DEVICE(0x0400, 0x1001) }, /* BearPaw 2400 */
 	{ USB_DEVICE(0x055f, 0x0008) }, /* ScanExpress 1200 CU Plus */
 	{ USB_DEVICE(0x055f, 0x0010) }, /* BearPaw 1200F */
+	{ USB_DEVICE(0x055f, 0x0210) },	/* ScanExpress A3 USB */
 	{ USB_DEVICE(0x055f, 0x0218) }, /* BearPaw 2400 TA */
-	{ USB_DEVICE(0x05d8, 0x4002) }, /* BearPaw 1200 CU and ScanExpress 1200 UB Plus */
 	{ USB_DEVICE(0x055f, 0x0219) }, /* BearPaw 2400 TA Plus */
 	{ USB_DEVICE(0x055f, 0x021c) }, /* BearPaw 1200 CU Plus */
 	{ USB_DEVICE(0x055f, 0x021d) }, /* Bearpaw 2400 CU Plus */
 	{ USB_DEVICE(0x055f, 0x021e) }, /* BearPaw 1200 TA/CS */
 	{ USB_DEVICE(0x055f, 0x0400) }, /* BearPaw 2400 TA PRO */
+	{ USB_DEVICE(0x055f, 0x0873) }, /* ScanExpress 600 USB */
 	{ USB_DEVICE(0x055f, 0x1000) }, /* BearPaw 4800 TA PRO */
+	//	{ USB_DEVICE(0x05d8, 0x4002) }, /* BearPaw 1200 CU and ScanExpress 1200 UB Plus (see Artec) */
 	/* Nikon */
 	{ USB_DEVICE(0x04b0, 0x4000) }, /* Coolscan LS 40 ED */
 	/* Plustek */
-	{ USB_DEVICE(0x07b3, 0x0017) }, /* OpticPro UT12/UT16/UT24 */
-	{ USB_DEVICE(0x07b3, 0x0011) }, /* OpticPro U24 */
-	{ USB_DEVICE(0x07b3, 0x0010) }, /* OpticPro U12 */
-	{ USB_DEVICE(0x07b3, 0x0015) }, /* OpticPro U24 */
 	{ USB_DEVICE(0x07b3, 0x0005) }, /* Unknown */
 	{ USB_DEVICE(0x07b3, 0x0007) }, /* Unknown */
 	{ USB_DEVICE(0x07b3, 0x000F) }, /* Unknown */
+	{ USB_DEVICE(0x07b3, 0x0010) }, /* OpticPro U12 */
+	{ USB_DEVICE(0x07b3, 0x0011) }, /* OpticPro U24 */
 	{ USB_DEVICE(0x07b3, 0x0012) }, /* Unknown */
 	{ USB_DEVICE(0x07b3, 0x0013) }, /* Unknown */
 	{ USB_DEVICE(0x07b3, 0x0014) }, /* Unknown */
+	{ USB_DEVICE(0x07b3, 0x0015) }, /* OpticPro U24 */
 	{ USB_DEVICE(0x07b3, 0x0016) }, /* Unknown */
-	{ USB_DEVICE(0x07b3, 0x0012) }, /* Unknown */
+	{ USB_DEVICE(0x07b3, 0x0017) }, /* OpticPro UT12/UT16/UT24 */
 	{ USB_DEVICE(0x07b3, 0x0401) }, /* OpticPro 1248U */
 	/* Primax/Colorado */
 	{ USB_DEVICE(0x0461, 0x0300) },	/* G2-300 #1 */
-	{ USB_DEVICE(0x0461, 0x0380) },	/* G2-600 #1 */
 	{ USB_DEVICE(0x0461, 0x0301) },	/* G2E-300 #1 */
-	{ USB_DEVICE(0x0461, 0x0381) },	/* ReadyScan 636i */
 	{ USB_DEVICE(0x0461, 0x0302) },	/* G2-300 #2 */
-	{ USB_DEVICE(0x0461, 0x0382) },	/* G2-600 #2 */
 	{ USB_DEVICE(0x0461, 0x0303) },	/* G2E-300 #2 */
-	{ USB_DEVICE(0x0461, 0x0383) },	/* G2E-600 */
 	{ USB_DEVICE(0x0461, 0x0340) },	/* Colorado USB 9600 */
-	// { USB_DEVICE(0x0461, 0x0360) },	/* Colorado USB 19200 - undetected endpoint */
 	{ USB_DEVICE(0x0461, 0x0341) },	/* Colorado 600u */
+	{ USB_DEVICE(0x0461, 0x0360) },	/* Colorado USB 19200 */
 	{ USB_DEVICE(0x0461, 0x0361) },	/* Colorado 1200u */
+	{ USB_DEVICE(0x0461, 0x0380) },	/* G2-600 #1 */
+	{ USB_DEVICE(0x0461, 0x0381) },	/* ReadyScan 636i */
+	{ USB_DEVICE(0x0461, 0x0382) },	/* G2-600 #2 */
+	{ USB_DEVICE(0x0461, 0x0383) },	/* G2E-600 */
 	/* Relisis */
 	// { USB_DEVICE(0x0475, 0x0103) },	/* Episode - undetected endpoint */
 	/* Seiko/Epson Corp. */
@@ -221,17 +233,18 @@ static struct usb_device_id scanner_device_ids [] = {
 	{ USB_DEVICE(0x04b8, 0x011c) }, /* Perfection 3200 */
 	{ USB_DEVICE(0x04b8, 0x011d) }, /* Perfection 1260 */
 	{ USB_DEVICE(0x04b8, 0x011e) }, /* Perfection 1660 Photo */
+	{ USB_DEVICE(0x04b8, 0x0801) }, /* Stylus CX5200 */
 	{ USB_DEVICE(0x04b8, 0x0802) }, /* Stylus CX3200 */
 	/* Umax */
 	{ USB_DEVICE(0x1606, 0x0010) },	/* Astra 1220U */
 	{ USB_DEVICE(0x1606, 0x0030) },	/* Astra 2000U */
 	{ USB_DEVICE(0x1606, 0x0060) }, /* Astra 3400U/3450U */
 	{ USB_DEVICE(0x1606, 0x0130) }, /* Astra 2100U */
-	{ USB_DEVICE(0x1606, 0x0160) }, /* Astra 5400U */
+	{ USB_DEVICE(0x1606, 0x0160) }, /* Astra 5400U */  
 	{ USB_DEVICE(0x1606, 0x0230) },	/* Astra 2200U */
 	/* Visioneer */
-	{ USB_DEVICE(0x04a7, 0x0221) },	/* OneTouch 5300 USB */
 	{ USB_DEVICE(0x04a7, 0x0211) },	/* OneTouch 7600 USB */
+	{ USB_DEVICE(0x04a7, 0x0221) },	/* OneTouch 5300 USB */
 	{ USB_DEVICE(0x04a7, 0x0231) },	/* 6100 USB */
 	{ USB_DEVICE(0x04a7, 0x0311) },	/* 6200 EPP/USB */
 	{ USB_DEVICE(0x04a7, 0x0321) },	/* OneTouch 8100 EPP/USB */
