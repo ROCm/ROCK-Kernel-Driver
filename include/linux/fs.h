@@ -250,6 +250,8 @@ typedef void (dio_iodone_t)(struct inode *inode, loff_t offset,
 #define ATTR_ATTR_FLAG	1024
 #define ATTR_KILL_SUID	2048
 #define ATTR_KILL_SGID	4096
+#define ATTR_RAW       	8192    /* file system, not vfs will massage attrs */
+#define ATTR_FROM_OPEN 	16384    /* called from open path, ie O_TRUNC */
 
 /*
  * This is the Inode Attributes structure, used for notify_change().  It
@@ -320,6 +322,7 @@ struct address_space_operations {
 	int (*releasepage) (struct page *, int);
 	ssize_t (*direct_IO)(int, struct kiocb *, const struct iovec *iov,
 			loff_t offset, unsigned long nr_segs);
+	void (*removepage)(struct page *); /* called when page gets removed from the inode */
 };
 
 struct backing_dev_info;
@@ -423,6 +426,7 @@ struct inode {
 	struct block_device	*i_bdev;
 	struct cdev		*i_cdev;
 	int			i_cindex;
+	void			*i_filterdata;
 
 	unsigned long		i_dnotify_mask; /* Directory notify events */
 	struct dnotify_struct	*i_dnotify; /* for directory notifications */
@@ -556,6 +560,7 @@ struct file {
 	spinlock_t		f_ep_lock;
 #endif /* #ifdef CONFIG_EPOLL */
 	struct address_space	*f_mapping;
+ 	struct lookup_intent    *f_it;
 };
 extern spinlock_t files_lock;
 #define file_list_lock() spin_lock(&files_lock);
@@ -874,19 +879,28 @@ struct inode_operations {
 	int (*create) (struct inode *,struct dentry *,int, struct nameidata *);
 	struct dentry * (*lookup) (struct inode *,struct dentry *, struct nameidata *);
 	int (*link) (struct dentry *,struct inode *,struct dentry *);
+	int (*link_raw) (struct nameidata *,struct nameidata *);
 	int (*unlink) (struct inode *,struct dentry *);
+	int (*unlink_raw) (struct nameidata *);
 	int (*symlink) (struct inode *,struct dentry *,const char *);
+	int (*symlink_raw) (struct nameidata *,const char *);
 	int (*mkdir) (struct inode *,struct dentry *,int);
+	int (*mkdir_raw) (struct nameidata *,int);
 	int (*rmdir) (struct inode *,struct dentry *);
+	int (*rmdir_raw) (struct nameidata *);
 	int (*mknod) (struct inode *,struct dentry *,int,dev_t);
+	int (*mknod_raw) (struct nameidata *,int,dev_t);
 	int (*rename) (struct inode *, struct dentry *,
 			struct inode *, struct dentry *);
+	int (*rename_raw) (struct nameidata *, struct nameidata *);
 	int (*readlink) (struct dentry *, char __user *,int);
 	int (*follow_link) (struct dentry *, struct nameidata *);
 	void (*truncate) (struct inode *);
 	int (*permission) (struct inode *, int, struct nameidata *);
 	int (*setattr) (struct dentry *, struct iattr *);
+	int (*setattr_raw) (struct inode *, struct iattr *);
 	int (*getattr) (struct vfsmount *mnt, struct dentry *, struct kstat *);
+	int (*getattr_it) (struct vfsmount *, struct dentry *, struct lookup_intent *, struct kstat *);
 	int (*setxattr) (struct dentry *, const char *,const void *,size_t,int);
 	ssize_t (*getxattr) (struct dentry *, const char *, void *, size_t);
 	ssize_t (*listxattr) (struct dentry *, char *, size_t);
@@ -1115,6 +1129,7 @@ extern int __register_filesystem(struct file_system_type *, int);
 extern int unregister_filesystem(struct file_system_type *);
 extern struct vfsmount *kern_mount(struct file_system_type *);
 extern int may_umount(struct vfsmount *);
+struct vfsmount *do_kern_mount(const char *type, int flags, const char *name, void *data);
 extern long do_mount(char *, char *, char *, unsigned long, void *);
 
 extern int vfs_statfs(struct super_block *, struct kstatfs *);
@@ -1176,9 +1191,10 @@ static inline int break_lease(struct inode *inode, unsigned int mode)
 
 /* fs/open.c */
 
-extern int do_truncate(struct dentry *, loff_t start);
+extern int do_truncate(struct dentry *, loff_t start, int called_from_open);
 extern struct file *filp_open(const char *, int, int);
 extern struct file * dentry_open(struct dentry *, struct vfsmount *, int);
+extern struct file * dentry_open_it(struct dentry *, struct vfsmount *, int, struct lookup_intent *);
 extern int filp_close(struct file *, fl_owner_t id);
 extern char * getname(const char __user *);
 
@@ -1431,6 +1447,7 @@ static inline ssize_t blockdev_direct_IO_no_locking(int rw, struct kiocb *iocb,
 
 extern struct file_operations generic_ro_fops;
 
+extern rwlock_t file_systems_lock;
 #define special_file(m) (S_ISCHR(m)||S_ISBLK(m)||S_ISFIFO(m)||S_ISSOCK(m))
 
 extern int vfs_readlink(struct dentry *, char __user *, int, const char *);

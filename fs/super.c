@@ -804,6 +804,8 @@ out:
 	return (struct vfsmount *)sb;
 }
 
+EXPORT_SYMBOL(do_kern_mount);
+
 struct vfsmount *kern_mount(struct file_system_type *type)
 {
 	return do_kern_mount(type->name, 0, type->name, NULL);

@@ -108,6 +108,7 @@ static int check_mnt(struct vfsmount *mnt)
 
 static void detach_mnt(struct vfsmount *mnt, struct nameidata *old_nd)
 {
+	memset(old_nd, 0, sizeof(*old_nd));
 	old_nd->dentry = mnt->mnt_mountpoint;
 	old_nd->mnt = mnt->mnt_parent;
 	mnt->mnt_parent = mnt;
@@ -750,6 +751,7 @@ long do_mount(char * dev_name, char * dir_name, char *type_page,
 	int retval = 0;
 	int mnt_flags = 0;
 
+	intent_init(&nd.intent, IT_LOOKUP);
 	/* Discard magic */
 	if ((flags & MS_MGC_MSK) == MS_MGC_VAL)
 		flags &= ~MS_MGC_MSK;

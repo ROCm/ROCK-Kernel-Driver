@@ -676,6 +676,7 @@ static struct sock *unix_find_other(struct sockaddr_un *sunname, int len,
 	int err = 0;
 	
 	if (sunname->sun_path[0]) {
+		intent_init(&nd.intent, IT_LOOKUP);
 		err = path_lookup(sunname->sun_path, LOOKUP_FOLLOW, &nd);
 		if (err)
 			goto fail;

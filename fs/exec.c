@@ -125,9 +125,9 @@ asmlinkage long sys_uselib(const char __user * library)
 	struct file * file;
 	struct nameidata nd;
 	int error;
+	intent_init(&nd.intent, IT_OPEN);
 
-	nd.intent.open.flags = FMODE_READ;
-
+	nd.intent.it_flags = O_RDONLY;
 	FSHOOK_BEGIN_USER_WALK(open,
 		error,
 		library,
@@ -145,7 +145,7 @@ asmlinkage long sys_uselib(const char __user * library)
 		goto out;
 	}
 
-	file = dentry_open(nd.dentry, nd.mnt, O_RDONLY);
+	file = dentry_open_it(nd.dentry, nd.mnt, O_RDONLY, &nd.intent);
 	error = PTR_ERR(file);
 	if (IS_ERR(file))
 		goto out;
@@ -496,8 +496,9 @@ struct file *open_exec(const char *name)
 
 	FSHOOK_BEGIN(open, err, .filename = name, .flags = O_RDONLY)
 
-	nd.intent.open.flags = FMODE_READ;
-	err = path_lookup(name, LOOKUP_FOLLOW|LOOKUP_OPEN, &nd);
+	intent_init(&nd.intent, IT_OPEN);
+	nd.intent.it_flags = O_RDONLY;
+	err = path_lookup(name, LOOKUP_FOLLOW, &nd);
 	file = ERR_PTR(err);
 
 	if (!err) {
@@ -510,7 +511,7 @@ struct file *open_exec(const char *name)
 				err = -EACCES;
 			file = ERR_PTR(err);
 			if (!err) {
-				file = dentry_open(nd.dentry, nd.mnt, O_RDONLY);
+				file = dentry_open_it(nd.dentry, nd.mnt, O_RDONLY, &nd.intent);
 				if (!IS_ERR(file)) {
 					err = deny_write_access(file);
 					if (err) {
@@ -1440,7 +1441,7 @@ int do_coredump(long signr, int exit_code, struct pt_regs * regs)
 		goto close_fail;
 	if (!file->f_op->write)
 		goto close_fail;
-	if (do_truncate(file->f_dentry, 0) != 0)
+	if (do_truncate(file->f_dentry, 0, 0) != 0)
 		goto close_fail;
 
 	retval = binfmt->core_dump(signr, regs, file);

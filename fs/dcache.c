@@ -217,7 +217,14 @@ int d_invalidate(struct dentry * dentry)
 		spin_unlock(&dcache_lock);
 		return 0;
 	}
-	/*
+
+        /* network invalidation by Lustre */
+	if (dentry->d_flags & DCACHE_LUSTRE_INVALID) {
+		spin_unlock(&dcache_lock);
+		return 0;
+	}
+
+        /*
 	 * Check whether to do a partial shrink_dcache
 	 * to get rid of unused child entries.
 	 */
@@ -1110,14 +1117,23 @@ void d_delete(struct dentry * dentry)
  * Adds a dentry to the hash according to its name.
  */
  
-void d_rehash(struct dentry * entry)
+void __d_rehash(struct dentry * entry, int lock)
 {
 	struct hlist_head *list = d_hash(entry->d_parent, entry->d_name.hash);
-	spin_lock(&dcache_lock);
+	if (lock)
+		spin_lock(&dcache_lock);
  	entry->d_vfs_flags &= ~DCACHE_UNHASHED;
 	entry->d_bucket = list;
  	hlist_add_head_rcu(&entry->d_hash, list);
-	spin_unlock(&dcache_lock);
+	if (lock)
+		spin_unlock(&dcache_lock);
+}
+
+EXPORT_SYMBOL(__d_rehash);
+
+void d_rehash(struct dentry * entry)
+{
+	__d_rehash(entry, 1);
 }
 
 #define do_switch(x,y) do { \
