@@ -28,7 +28,6 @@ extern int comx_init(void);
 extern int lmc_setup(void);
 
 extern int madgemc_probe(void);
-extern int uml_net_probe(void);
 
 /* Pad device name to IFNAMSIZ=16. F.e. __PAD6 is string of 9 zeros. */
 #define __PAD6 "\0\0\0\0\0\0\0\0\0"
@@ -102,9 +101,6 @@ static struct net_probe pci_probes[] __initdata = {
  */  
 #ifdef CONFIG_MADGEMC
 	{madgemc_probe, 0},
-#endif
-#ifdef CONFIG_UML_NET
-	{uml_net_probe, 0},
 #endif
  
 	{NULL, 0},
