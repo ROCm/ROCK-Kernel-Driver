@@ -65,24 +65,6 @@ typedef struct mdk_rdev_s mdk_rdev_t;
 #define MAX_MD_DEVS  (1<<MINORBITS)	/* Max number of md dev */
 
 /*
- * Maps a kdev to an mddev/subdev. How 'data' is handled is up to
- * the personality. (eg. HSM uses this to identify individual LVs)
- */
-typedef struct dev_mapping_s {
-	mddev_t *mddev;
-	void *data;
-} dev_mapping_t;
-
-extern dev_mapping_t mddev_map [MAX_MD_DEVS];
-
-static inline mddev_t * kdev_to_mddev (kdev_t dev)
-{
-	if (major(dev) != MD_MAJOR)
-		BUG();
-        return mddev_map[minor(dev)].mddev;
-}
-
-/*
  * options passed in raidrun:
  */
 
@@ -196,23 +178,30 @@ struct mddev_s
 	mdk_personality_t		*pers;
 	int				__minor;
 	mdp_super_t			*sb;
-	int				nb_dev;
 	struct list_head 		disks;
 	int				sb_dirty;
-	mdu_param_t			param;
 	int				ro;
+
+	struct mdk_thread_s		*sync_thread;	/* doing resync or reconstruct */
 	unsigned long			curr_resync;	/* blocks scheduled */
 	unsigned long			resync_mark;	/* a recent timestamp */
 	unsigned long			resync_mark_cnt;/* blocks written at resync_mark */
-	char				*name;
+	/* recovery_running is 0 for no recovery/resync,
+	 * 1 for active recovery
+	 * 2 for active resync
+	 * -error for an error (e.g. -EINTR)
+	 * it can only be set > 0 under reconfig_sem
+	 */
 	int				recovery_running;
+	int				in_sync;	/* know to not need resync */
 	struct semaphore		reconfig_sem;
-	struct semaphore		recovery_sem;
-	struct semaphore		resync_sem;
 	atomic_t			active;
+	mdp_disk_t			*spare;
 
 	atomic_t			recovery_active; /* blocks scheduled, but not written */
 	wait_queue_head_t		recovery_wait;
+
+	request_queue_t			queue;	/* for plugging ... */
 
 	struct list_head		all_mddevs;
 };
@@ -220,7 +209,7 @@ struct mddev_s
 struct mdk_personality_s
 {
 	char *name;
-	int (*make_request)(mddev_t *mddev, int rw, struct bio *bio);
+	int (*make_request)(request_queue_t *q, struct bio *bio);
 	int (*run)(mddev_t *mddev);
 	int (*stop)(mddev_t *mddev);
 	int (*status)(char *page, mddev_t *mddev);
@@ -237,9 +226,6 @@ struct mdk_personality_s
  * SPARE_ACTIVE expects such a change)
  */
 	int (*diskop) (mddev_t *mddev, mdp_disk_t **descriptor, int state);
-
-	int (*stop_resync)(mddev_t *mddev);
-	int (*restart_resync)(mddev_t *mddev);
 	int (*sync_request)(mddev_t *mddev, sector_t sector_nr, int go_faster);
 };
 
@@ -279,13 +265,6 @@ extern mdp_disk_t *get_spare(mddev_t *mddev);
 #define ITERATE_RDEV(mddev,rdev,tmp)					\
 	ITERATE_RDEV_GENERIC((mddev)->disks,same_set,rdev,tmp)
 
-/*
- * Same as above, but assumes that the device has rdev->desc_nr numbered
- * from 0 to mddev->nb_dev, and iterates through rdevs in ascending order.
- */
-#define ITERATE_RDEV_ORDERED(mddev,rdev,i)				\
-	for (i = 0; rdev = find_rdev_nr(mddev, i), i < mddev->nb_dev; i++)
-
 
 /*
  * Iterates through all 'RAID managed disks'
@@ -298,26 +277,6 @@ extern mdp_disk_t *get_spare(mddev_t *mddev);
  */
 #define ITERATE_RDEV_PENDING(rdev,tmp)					\
 	ITERATE_RDEV_GENERIC(pending_raid_disks,pending,rdev,tmp)
-
-/*
- * iterates through all used mddevs in the system.
- */
-#define ITERATE_MDDEV(mddev,tmp)					\
-									\
-	for (tmp = all_mddevs.next;					\
-		mddev = list_entry(tmp, mddev_t, all_mddevs),	\
-			tmp = tmp->next, tmp->prev != &all_mddevs	\
-		; )
-
-static inline int lock_mddev (mddev_t * mddev)
-{
-	return down_interruptible(&mddev->reconfig_sem);
-}
-
-static inline void unlock_mddev (mddev_t * mddev)
-{
-	up(&mddev->reconfig_sem);
-}
 
 #define xchg_values(x,y) do { __typeof__(x) __tmp = x; \
 				x = y; y = __tmp; } while (0)
