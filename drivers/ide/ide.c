@@ -778,6 +778,17 @@ void ide_unregister (unsigned int index)
 	/* More messed up locking ... */
 	spin_unlock_irq(&ide_lock);
 	device_unregister(&hwif->gendev);
+
+	/*
+	 * Remove us from the kernel's knowledge
+	 */
+	blk_unregister_region(MKDEV(hwif->major, 0), MAX_DRIVES<<PARTN_BITS);
+	for (i = 0; i < MAX_DRIVES; i++) {
+		struct gendisk *disk = hwif->drives[i].disk;
+		hwif->drives[i].disk = NULL;
+		put_disk(disk);
+	}
+	unregister_blkdev(hwif->major, hwif->name);
 	spin_lock_irq(&ide_lock);
 
 #if !defined(CONFIG_DMA_NONPCI)
@@ -793,21 +804,11 @@ void ide_unregister (unsigned int index)
 		hwif->dma_prdtable = 0;
 	}
 #endif /* !(CONFIG_DMA_NONPCI) */
-
-	/*
-	 * Remove us from the kernel's knowledge
-	 */
-	blk_unregister_region(MKDEV(hwif->major, 0), MAX_DRIVES<<PARTN_BITS);
-	for (i = 0; i < MAX_DRIVES; i++) {
-		struct gendisk *disk = hwif->drives[i].disk;
-		hwif->drives[i].disk = NULL;
-		put_disk(disk);
-	}
-	unregister_blkdev(hwif->major, hwif->name);
-
 	old_hwif			= *hwif;
 	init_hwif_data(index);	/* restore hwif data to pristine status */
 	hwif->hwgroup			= old_hwif.hwgroup;
+
+	hwif->gendev.parent		= old_hwif.gendev.parent;
 
 	hwif->proc			= old_hwif.proc;
 
