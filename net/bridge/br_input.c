@@ -48,7 +48,7 @@ static void br_pass_frame_up(struct net_bridge *br, struct sk_buff *skb)
 /* note: already called with rcu_read_lock (preempt_disabled) */
 int br_handle_frame_finish(struct sk_buff *skb)
 {
-	const unsigned char *dest = skb->mac.ethernet->h_dest;
+	const unsigned char *dest = eth_hdr(skb)->h_dest;
 	struct net_bridge_port *p = skb->dev->br_port;
 	struct net_bridge *br = p->br;
 	struct net_bridge_fdb_entry *dst;
@@ -100,17 +100,17 @@ out:
 int br_handle_frame(struct net_bridge_port *p, struct sk_buff **pskb)
 {
 	struct sk_buff *skb = *pskb;
-	const unsigned char *dest = skb->mac.ethernet->h_dest;
+	const unsigned char *dest = eth_hdr(skb)->h_dest;
 
 	if (p->state == BR_STATE_DISABLED)
 		goto err;
 
-	if (skb->mac.ethernet->h_source[0] & 1)
+	if (eth_hdr(skb)->h_source[0] & 1)
 		goto err;
 
 	if (p->state == BR_STATE_LEARNING ||
 	    p->state == BR_STATE_FORWARDING)
-		br_fdb_insert(p->br, p, skb->mac.ethernet->h_source, 0);
+		br_fdb_insert(p->br, p, eth_hdr(skb)->h_source, 0);
 
 	if (p->br->stp_enabled &&
 	    !memcmp(dest, bridge_ula, 5) &&
@@ -127,7 +127,7 @@ int br_handle_frame(struct net_bridge_port *p, struct sk_buff **pskb)
 			if (br_should_route_hook(pskb)) 
 				return 0;
 			skb = *pskb;
-			dest = skb->mac.ethernet->h_dest;
+			dest = eth_hdr(skb)->h_dest;
 		}
 
 		if (!memcmp(p->br->dev->dev_addr, dest, ETH_ALEN))
