@@ -59,9 +59,10 @@ aoe_exit(void)
 	discover_timer(TKILL);
 
 	aoenet_exit();
-	aoeblk_exit();
+	unregister_blkdev(AOE_MAJOR, DEVICE_NAME);
 	aoechr_exit();
 	aoedev_exit();
+	aoeblk_exit();		/* free cache after de-allocating bufs */
 }
 
 static int __init

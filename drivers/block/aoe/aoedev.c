@@ -11,7 +11,6 @@
 
 static struct aoedev *devlist;
 static spinlock_t devlist_lock;
-static kmem_cache_t *buf_pool_cache;
 
 struct aoedev *
 aoedev_bymac(unsigned char *macaddr)
@@ -53,9 +52,7 @@ aoedev_newdev(ulong nframes)
 
 	spin_lock_init(&d->lock);
 	init_timer(&d->timer);
-	d->bufpool = mempool_create(MIN_BUFS,
-				    mempool_alloc_slab, mempool_free_slab,
-				    buf_pool_cache);
+	d->bufpool = NULL;	/* defer to aoeblk_gdalloc */
 	INIT_LIST_HEAD(&d->bufq);
 	d->next = devlist;
 	devlist = d;
@@ -95,15 +92,10 @@ aoedev_downdev(struct aoedev *d)
 		bio_endio(bio, bio->bi_size, -EIO);
 	}
 
-	if (d->gd) {
-		struct block_device *bdev = bdget_disk(d->gd, 0);
-		if (bdev) {
-			if (bdev->bd_openers)
-				d->flags |= DEVFL_CLOSEWAIT;
-			bdput(bdev);
-		}
+	if (d->nopen)
+		d->flags |= DEVFL_CLOSEWAIT;
+	if (d->gd)
 		d->gd->capacity = 0;
-	}
 
 	d->flags &= ~DEVFL_UP;
 }
@@ -177,17 +169,11 @@ aoedev_exit(void)
 		del_timer_sync(&d->timer);
 		aoedev_freedev(d);
 	}
-	kmem_cache_destroy(buf_pool_cache);
 }
 
 int __init
 aoedev_init(void)
 {
-	buf_pool_cache = kmem_cache_create("aoe_bufs", 
-					   sizeof(struct buf),
-					   0, 0, NULL, NULL);
-	if (buf_pool_cache == NULL)
-		return -ENOMEM;
 	spin_lock_init(&devlist_lock);
 	return 0;
 }

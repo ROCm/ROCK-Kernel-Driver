@@ -102,10 +102,7 @@ aoenet_xmit(struct sk_buff *sl)
 }
 
 /* 
- * (1) i have no idea if this is redundant, but i can't figure why
- * the ifp is passed in if it is.
- *
- * (2) len doesn't include the header by default.  I want this. 
+ * (1) len doesn't include the header by default.  I want this. 
  */
 static int
 aoenet_rcv(struct sk_buff *skb, struct net_device *ifp, struct packet_type *pt)
@@ -117,12 +114,11 @@ aoenet_rcv(struct sk_buff *skb, struct net_device *ifp, struct packet_type *pt)
 	if (!skb)
 		return 0;
 
-	skb->dev = ifp;	/* (1) */
-
 	if (!is_aoe_netif(ifp))
 		goto exit;
 
-	skb->len += ETH_HLEN;	/* (2) */
+	//skb->len += ETH_HLEN;	/* (1) */
+	skb_push(skb, ETH_HLEN);	/* (1) */
 
 	h = (struct aoe_hdr *) skb->mac.raw;
 	n = __be32_to_cpu(*((u32 *) h->tag));
@@ -133,10 +129,11 @@ aoenet_rcv(struct sk_buff *skb, struct net_device *ifp, struct packet_type *pt)
 		n = h->err;
 		if (n > NECODES)
 			n = 0;
-		printk(KERN_CRIT "aoe: aoenet_rcv: error packet from %d.%d; "
-			"ecode=%d '%s'\n",
-		       __be16_to_cpu(*((u16 *) h->major)), h->minor, 
-			h->err, aoe_errlist[n]);
+		if (net_ratelimit())
+			printk(KERN_ERR "aoe: aoenet_rcv: error packet from %d.%d; "
+			       "ecode=%d '%s'\n",
+			       __be16_to_cpu(*((u16 *) h->major)), h->minor, 
+			       h->err, aoe_errlist[n]);
 		goto exit;
 	}
 
