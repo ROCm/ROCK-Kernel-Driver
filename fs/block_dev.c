@@ -804,6 +804,9 @@ struct file_operations def_blk_fops = {
 	.mmap		= generic_file_mmap,
 	.fsync		= block_fsync,
 	.ioctl		= block_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl	= compat_blkdev_ioctl,
+#endif
 	.readv		= generic_file_readv,
 	.writev		= generic_file_write_nolock,
 	.sendfile	= generic_file_sendfile,
