@@ -9,7 +9,7 @@ char *task_mem(struct mm_struct *mm, char *buffer)
 	unsigned long data, text, lib;
 
 	data = mm->total_vm - mm->shared_vm - mm->stack_vm;
-	text = (mm->end_code - mm->start_code) >> 10;
+	text = (PAGE_ALIGN(mm->end_code) - (mm->start_code & PAGE_MASK)) >> 10;
 	lib = (mm->exec_vm << (PAGE_SHIFT-10)) - text;
 	buffer += sprintf(buffer,
 		"VmSize:\t%8lu kB\n"
@@ -36,7 +36,8 @@ int task_statm(struct mm_struct *mm, int *shared, int *text,
 	       int *data, int *resident)
 {
 	*shared = mm->shared_vm;
-	*text = (mm->end_code - mm->start_code) >> PAGE_SHIFT;
+	*text = (PAGE_ALIGN(mm->end_code) - (mm->start_code & PAGE_MASK))
+								>> PAGE_SHIFT;
 	*data = mm->total_vm - mm->shared_vm - *text;
 	*resident = mm->rss;
 	return mm->total_vm;
