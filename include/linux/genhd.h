@@ -62,7 +62,7 @@ struct hd_struct {
 	sector_t start_sect;
 	sector_t nr_sects;
 	devfs_handle_t de;              /* primary (master) devfs entry  */
-	struct device *hd_driverfs_dev;  /* support driverfs hiearchy     */
+	struct kobject kobj;
 	unsigned reads, read_sectors, writes, write_sectors;
 	int policy;
 };
@@ -93,7 +93,7 @@ struct gendisk {
 	devfs_handle_t de;		/* more of the same */
 	devfs_handle_t disk_de;		/* piled higher and deeper */
 	struct device *driverfs_dev;
-	struct device disk_dev;
+	struct kobject kobj;
 
 	struct timer_rand_state *random;
 	int policy;
@@ -129,8 +129,6 @@ static inline void set_capacity(struct gendisk *disk, sector_t size)
 {
 	disk->capacity = size;
 }
-
-extern struct device_class disk_devclass;
 
 #endif  /*  __KERNEL__  */
 
