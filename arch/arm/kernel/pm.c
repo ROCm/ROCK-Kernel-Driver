@@ -16,9 +16,17 @@
 #include <asm/leds.h>
 #include <asm/system.h>
 
+/*
+ * Tell the linker that pm_do_suspend may not be present.
+ */
+extern int pm_do_suspend(void) __attribute__((weak));
+
 int suspend(void)
 {
 	int ret;
+
+	if (!pm_do_suspend)
+		return -ENOSYS;
 
 	/*
 	 * Suspend "legacy" devices.
@@ -82,8 +90,25 @@ int suspend(void)
 }
 
 #ifdef CONFIG_SYSCTL
+/*
+ * We really want this to die.  It's a disgusting hack using unallocated
+ * sysctl numbers.  We should be using a real interface.
+ */
+
 #include <linux/init.h>
 #include <linux/sysctl.h>
+
+static int
+pm_sysctl_proc_handler(ctl_table *ctl, int write, struct file *filp,
+		       void *buffer, size_t *lenp)
+{
+	int ret = -EIO;
+	printk("PM: task %s (pid %d) uses deprecated sysctl PM interface\n",
+		current->comm, current->pid);
+	if (write)
+		ret = suspend();
+	return ret;
+}
 
 /*
  * This came from arch/arm/mach-sa1100/pm.c:
@@ -102,13 +127,23 @@ int suspend(void)
 
 static struct ctl_table pm_table[] =
 {
-	{ACPI_S1_SLP_TYP, "suspend", NULL, 0, 0600, NULL, (proc_handler *)&suspend},
+	{
+		.ctl_name	= ACPI_S1_SLP_TYP,
+		.procname	= "suspend",
+		.mode		= 0200,
+		.proc_handler	= pm_sysctl_proc_handler,
+	},
 	{0}
 };
 
 static struct ctl_table pm_dir_table[] =
 {
-	{CTL_ACPI, "pm", NULL, 0, 0555, pm_table},
+	{
+		.ctl_name	= CTL_ACPI,
+		.procname	= "pm",
+		.mode		= 0555,
+		.child		= pm_table,
+	},
 	{0}
 };
 

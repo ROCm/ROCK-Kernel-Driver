@@ -133,7 +133,6 @@ typedef struct socket_info_t {
     u_short			lock_count;
     client_handle_t		clients;
     u_int			real_clients;
-    client_handle_t		reset_handle;
     pccard_mem_map		cis_mem;
     u_char			*cis_virt;
     config_t			*config;
@@ -155,6 +154,14 @@ typedef struct socket_info_t {
 #ifdef CONFIG_PROC_FS
     struct proc_dir_entry	*proc;
 #endif
+
+    struct semaphore		skt_sem;	/* protects socket h/w state */
+
+    struct task_struct		*thread;
+    struct completion		thread_done;
+    wait_queue_head_t		thread_wait;
+    spinlock_t			thread_lock;	/* protects thread_events */
+    unsigned int		thread_events;
 } socket_info_t;
 
 /* Flags in config state */

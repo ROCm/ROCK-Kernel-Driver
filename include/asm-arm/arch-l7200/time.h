@@ -42,11 +42,14 @@
 /*
  * Handler for RTC timer interrupt
  */
-static void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t
+timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	do_timer(regs);
 	do_profile(regs);
 	RTC_RTCC = 0;				/* Clear interrupt */
+
+	return IRQ_HANDLED;
 }
 
 /*

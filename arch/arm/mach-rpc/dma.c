@@ -83,7 +83,7 @@ static void iomd_get_next_sg(struct scatterlist *sg, dma_t *dma)
 	sg->length |= flags;
 }
 
-static void iomd_dma_handle(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t iomd_dma_handle(int irq, void *dev_id, struct pt_regs *regs)
 {
 	dma_t *dma = (dma_t *)dev_id;
 	unsigned long base = dma->dma_base;
@@ -93,7 +93,7 @@ static void iomd_dma_handle(int irq, void *dev_id, struct pt_regs *regs)
 
 		status = iomd_readb(base + ST);
 		if (!(status & DMA_ST_INT))
-			return;
+			return IRQ_HANDLED;
 
 		if (status & DMA_ST_OFL && !dma->sg)
 			break;
@@ -117,6 +117,8 @@ static void iomd_dma_handle(int irq, void *dev_id, struct pt_regs *regs)
 
 	iomd_writeb(0, dma->dma_base + CR);
 	disable_irq(irq);
+
+	return IRQ_HANDLED;
 }
 
 static int iomd_request_dma(dmach_t channel, dma_t *dma)
