@@ -364,7 +364,7 @@ static ssize_t show_##reg (struct device *dev, char *buf, int nr) \
 	 \
 	w83781d_update_client(client); \
 	 \
-	return sprintf(buf,"%ld\n", (long)IN_FROM_REG(data->reg[nr])); \
+	return sprintf(buf,"%ld\n", (long)IN_FROM_REG(data->reg[nr] * 10)); \
 }
 show_in_reg(in);
 show_in_reg(in_min);
@@ -378,7 +378,7 @@ static ssize_t store_in_##reg (struct device *dev, const char *buf, size_t count
 	u32 val; \
 	 \
 	val = simple_strtoul(buf, NULL, 10); \
-	data->in_##reg[nr] = IN_TO_REG(val); \
+	data->in_##reg[nr] = (IN_TO_REG(val) / 10); \
 	w83781d_write_value(client, W83781D_REG_IN_##REG(nr), data->in_##reg[nr]); \
 	 \
 	return count; \
