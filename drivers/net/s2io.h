@@ -668,6 +668,8 @@ typedef struct s2io_nic {
 	u16 last_link_state;
 #define	LINK_DOWN	1
 #define	LINK_UP		2
+
+	int task_flag;
 } nic_t;
 
 #define RESET_ERROR 1;
