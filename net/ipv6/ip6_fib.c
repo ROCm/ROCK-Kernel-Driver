@@ -493,6 +493,10 @@ out:
 
 static __inline__ void fib6_start_gc(struct rt6_info *rt)
 {
+	if ((rt->rt6i_flags & RTF_EXPIRES) && rt->rt6i_expires &&
+	     rt->rt6i_expires < ip6_fib_timer.expires) {
+		mod_timer(&ip6_fib_timer, rt->rt6i_expires);
+	} else
 	if (ip6_fib_timer.expires == 0 &&
 	    (rt->rt6i_flags & (RTF_EXPIRES|RTF_CACHE)))
 		mod_timer(&ip6_fib_timer, jiffies + ip6_rt_gc_interval);
@@ -502,6 +506,14 @@ void fib6_force_start_gc(void)
 {
 	if (ip6_fib_timer.expires == 0)
 		mod_timer(&ip6_fib_timer, jiffies + ip6_rt_gc_interval);
+}
+
+void fib6_update_expiry(struct rt6_info *rt, unsigned int lifetime)
+{
+	rt->rt6i_expires = jiffies + (HZ * lifetime);
+	rt->rt6i_flags |= RTF_EXPIRES;
+	/* Make sure we do a GC when this router expires */
+	fib6_start_gc(rt);
 }
 
 /*
@@ -1128,6 +1140,7 @@ static int fib6_clean_node(struct fib6_walker_t *w)
 	for (rt = w->leaf; rt; rt = rt->u.next) {
 		res = c->func(rt, c->arg);
 		if (res < 0) {
+			rt->u.dst.error = -ENETUNREACH;
 			w->leaf = rt;
 			res = fib6_del(rt, NULL, NULL);
 			if (res) {
@@ -1208,7 +1221,7 @@ static int fib6_age(struct rt6_info *rt, void *arg)
 	 */
 
 	if (rt->rt6i_flags&RTF_EXPIRES && rt->rt6i_expires) {
-		if (time_after(now, rt->rt6i_expires)) {
+		if (time_after_eq(now, rt->rt6i_expires)) {
 			RT6_TRACE("expiring %p\n", rt);
 			return -1;
 		}
