@@ -494,8 +494,8 @@ static void ehci_stop (struct usb_hcd *hcd)
 #ifdef	EHCI_STATS
 	dbg ("irq normal %ld err %ld reclaim %ld",
 		ehci->stats.normal, ehci->stats.error, ehci->stats.reclaim);
-	dbg ("complete %ld unlink %ld qpatch %ld",
-		ehci->stats.complete, ehci->stats.unlink, ehci->stats.qpatch);
+	dbg ("complete %ld unlink %ld",
+		ehci->stats.complete, ehci->stats.unlink);
 #endif
 
 	dbg_status (ehci, "ehci_stop completed", readl (&ehci->regs->status));
