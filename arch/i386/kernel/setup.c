@@ -36,6 +36,10 @@
 #include <linux/highmem.h>
 #include <asm/e820.h>
 #include <asm/mpspec.h>
+#include <asm/arch_hooks.h>
+#include "setup_arch_pre.h"
+
+static inline char * __init machine_specific_memory_setup(void);
 
 /*
  * Machine setup..
@@ -494,31 +498,8 @@ static int __init copy_e820_map(struct e820entry * biosmap, int nr_map)
 
 static void __init setup_memory_region(void)
 {
-	char *who = "BIOS-e820";
+	char *who = machine_specific_memory_setup();
 
-	/*
-	 * Try to copy the BIOS-supplied E820-map.
-	 *
-	 * Otherwise fake a memory map; one section from 0k->640k,
-	 * the next section from 1mb->appropriate_mem_k
-	 */
-	sanitize_e820_map(E820_MAP, &E820_MAP_NR);
-	if (copy_e820_map(E820_MAP, E820_MAP_NR) < 0) {
-		unsigned long mem_size;
-
-		/* compare results from other methods and take the greater */
-		if (ALT_MEM_K < EXT_MEM_K) {
-			mem_size = EXT_MEM_K;
-			who = "BIOS-88";
-		} else {
-			mem_size = ALT_MEM_K;
-			who = "BIOS-e801";
-		}
-
-		e820.nr_map = 0;
-		add_memory_region(0, LOWMEMSIZE(), E820_RAM);
-		add_memory_region(HIGH_MEMORY, mem_size << 10, E820_RAM);
-  	}
 	printk(KERN_INFO "BIOS-provided physical RAM map:\n");
 	print_memory_map(who);
 } /* setup_memory_region */
@@ -605,16 +586,16 @@ void __init setup_arch(char **cmdline_p)
 	unsigned long start_pfn, max_low_pfn;
 	int i;
 
+	pre_setup_arch_hook();
 	early_cpu_init();
 
-#ifdef CONFIG_VISWS
-	visws_get_board_type_and_rev();
-#endif
 
  	ROOT_DEV = ORIG_ROOT_DEV;
  	drive_info = DRIVE_INFO;
  	screen_info = SCREEN_INFO;
+#ifdef CONFIG_APM
 	apm_info.bios = APM_BIOS_INFO;
+#endif
 	saved_videomode = VIDEO_MODE;
 	printk("Video mode to be used for restore is %lx\n", saved_videomode);
 	if( SYS_DESC_TABLE.length != 0 ) {
@@ -630,6 +611,7 @@ void __init setup_arch(char **cmdline_p)
 	rd_prompt = ((RAMDISK_FLAGS & RAMDISK_PROMPT_FLAG) != 0);
 	rd_doload = ((RAMDISK_FLAGS & RAMDISK_LOAD_FLAG) != 0);
 #endif
+	ARCH_SETUP
 	setup_memory_region();
 
 	if (!MOUNT_ROOT_RDONLY)
@@ -810,7 +792,7 @@ void __init setup_arch(char **cmdline_p)
 	 */
 	acpi_reserve_bootmem();
 #endif
-#ifdef CONFIG_X86_LOCAL_APIC
+#ifdef CONFIG_X86_FIND_SMP_CONFIG
 	/*
 	 * Find and reserve possible boot-time SMP configuration:
 	 */
@@ -915,6 +897,8 @@ static int __init highio_setup(char *str)
 }
 __setup("nohighio", highio_setup);
  
+
+#include "setup_arch_post.h"
 /*
  * Local Variables:
  * mode:c
