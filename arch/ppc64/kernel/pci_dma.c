@@ -710,12 +710,6 @@ void create_tce_tables_for_busesLP(struct list_head *bus_list)
 	for (ln=bus_list->next; ln != bus_list; ln=ln->next) {
 		bus = pci_bus_b(ln);
 		busdn = PCI_GET_DN(bus);
-		/* NOTE: there should never be a window declared on a bus when
-		 * child devices also have a window.  If this should ever be
-		 * architected, we probably want children to have priority.
-		 * In reality, the PHB containing ISA has the property, but otherwise
-		 * it is the pci-bridges that have the property.
-		 */
 		dma_window = (u32 *)get_property(busdn, "ibm,dma-window", 0);
 		if (dma_window) {
 			/* Bussubno hasn't been copied yet.
@@ -724,6 +718,7 @@ void create_tce_tables_for_busesLP(struct list_head *bus_list)
 			busdn->bussubno = bus->number;
 			create_pci_bus_tce_table((unsigned long)busdn);
 		}
+		/* look for a window on a bridge even if the PHB had one */
 		create_tce_tables_for_busesLP(&bus->children);
 	}
 }

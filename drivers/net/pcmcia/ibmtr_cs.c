@@ -208,10 +208,13 @@ static dev_link_t *ibmtr_attach(void)
     flush_stale_links();
 
     /* Create new token-ring device */
-    info = kmalloc(sizeof(*info), GFP_KERNEL);
-    if (!info) return NULL;
-    memset(info, 0, sizeof(*info));
-    link = &info->link; link->priv = info;
+    dev = alloc_trdev(sizeof(*info));
+    if (!dev)
+	    return NULL;
+    info = dev->priv;
+
+    link = &info->link;
+    link->priv = info;
 
     init_timer(&link->release);
     link->release.function = &ibmtr_release;
@@ -232,12 +235,6 @@ static dev_link_t *ibmtr_attach(void)
     link->conf.IntType = INT_MEMORY_AND_IO;
     link->conf.Present = PRESENT_OPTION;
 
-    dev = init_trdev(NULL,0);
-    if (dev == NULL) {
-	ibmtr_detach(link);
-        return NULL;
-    }
-    dev->priv = &info->ti;
     link->irq.Instance = info->dev = dev;
     
     dev->init = &ibmtr_probe;
@@ -258,11 +255,16 @@ static dev_link_t *ibmtr_attach(void)
     ret = CardServices(RegisterClient, &link->handle, &client_reg);
     if (ret != 0) {
         cs_error(link->handle, RegisterClient, ret);
-        ibmtr_detach(link);
-        return NULL;
+	goto out_detach;
     }
 
+out:
     return link;
+
+out_detach:
+    ibmtr_detach(link);
+    link = NULL;
+    goto out;
 } /* ibmtr_attach */
 
 /*======================================================================
@@ -307,12 +309,8 @@ static void ibmtr_detach(dev_link_t *link)
 
     /* Unlink device structure, free bits */
     *linkp = link->next;
-    if (info->dev) {
-	unregister_trdev(info->dev);
-	kfree(info->dev);
-    }
-    kfree(info);
-
+    unregister_netdev(dev);
+    kfree(dev);
 } /* ibmtr_detach */
 
 /*======================================================================
@@ -413,10 +411,10 @@ static void ibmtr_config(dev_link_t *link)
         Adapters Technical Reference"  SC30-3585 for this info.  */
     ibmtr_hw_setup(dev, mmiobase);
 
-    i = register_trdev(dev);
+    i = register_netdev(dev);
     
     if (i != 0) {
-	printk(KERN_NOTICE "ibmtr_cs: register_trdev() failed\n");
+	printk(KERN_NOTICE "ibmtr_cs: register_netdev() failed\n");
 	goto failed;
     }
 

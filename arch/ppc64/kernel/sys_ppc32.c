@@ -2318,6 +2318,14 @@ long sys32_nice(u32 increment)
 	return sys_nice((int)increment);
 }
 
+extern off_t sys_lseek(unsigned int fd, off_t offset, unsigned int origin);
+
+off_t ppc32_lseek(unsigned int fd, u32 offset, unsigned int origin)
+{
+	/* sign extend n */
+	return sys_lseek(fd, (int)offset, origin);
+}
+
 /*
  * This is just a version for 32-bit applications which does
  * not force O_LARGEFILE on.

@@ -13,6 +13,7 @@
 #include <asm/io.h>
 
 #include <linux/mtd/map.h>
+#include <linux/mtd/cfi.h>
 
 static u8 simple_map_read8(struct map_info *map, unsigned long ofs)
 {

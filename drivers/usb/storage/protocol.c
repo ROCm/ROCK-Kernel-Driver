@@ -137,8 +137,7 @@ void usb_stor_qic157_command(Scsi_Cmnd *srb, struct us_data *us)
 
 	/* send the command to the transport layer */
 	usb_stor_invoke_transport(srb, us);
-	if (srb->result == GOOD << 1) {
-
+	if (srb->result == SAM_STAT_GOOD) {
 		/* fix the INQUIRY data if necessary */
 		fix_inquiry_data(srb);
 	}
@@ -210,7 +209,7 @@ void usb_stor_ATAPI_command(Scsi_Cmnd *srb, struct us_data *us)
 
 	/* send the command to the transport layer */
 	usb_stor_invoke_transport(srb, us);
-	if (srb->result == GOOD << 1) {
+	if (srb->result == SAM_STAT_GOOD) {
 
 		/* Fix the MODE_SENSE data if we translated the command */
 		if (old_cmnd == MODE_SENSE)
@@ -307,7 +306,7 @@ void usb_stor_ufi_command(Scsi_Cmnd *srb, struct us_data *us)
 
 	/* send the command to the transport layer */
 	usb_stor_invoke_transport(srb, us);
-	if (srb->result == GOOD << 1) {
+	if (srb->result == SAM_STAT_GOOD) {
 
 		/* Fix the MODE_SENSE data if we translated the command */
 		if (old_cmnd == MODE_SENSE)
@@ -376,7 +375,7 @@ void usb_stor_transparent_scsi_command(Scsi_Cmnd *srb, struct us_data *us)
 
 	/* send the command to the transport layer */
 	usb_stor_invoke_transport(srb, us);
-	if (srb->result == GOOD << 1) {
+	if (srb->result == SAM_STAT_GOOD) {
 
 		/* Fix the MODE_SENSE data if we translated the command */
 		if ((us->flags & US_FL_MODE_XLATE) && (old_cmnd == MODE_SENSE))

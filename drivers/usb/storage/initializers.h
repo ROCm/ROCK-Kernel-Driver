@@ -39,6 +39,7 @@
 
 #include <linux/config.h>
 #include "usb.h"
+#include "transport.h"
 
 /* This places the Shuttle/SCM USB<->SCSI bridge devices in multi-target
  * mode */

@@ -108,7 +108,7 @@ public:
 
 	QPixmap symbolYesPix, symbolModPix, symbolNoPix;
 	QPixmap choiceYesPix, choiceNoPix;
-	QPixmap menuPix, menuInvPix, menuBackPix;
+	QPixmap menuPix, menuInvPix, menuBackPix, voidPix;
 
 	bool showAll, showName, showRange, showData;
 	enum listMode mode;

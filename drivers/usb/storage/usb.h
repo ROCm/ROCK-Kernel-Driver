@@ -82,7 +82,7 @@ struct us_unusual_dev {
 #define US_FLIDX_SG_ACTIVE	19  /* 0x00080000  current_sg is in use   */
 #define US_FLIDX_ABORTING	20  /* 0x00100000  abort is in progress   */
 #define US_FLIDX_DISCONNECTING	21  /* 0x00200000  disconnect in progress */
-#define DONT_SUBMIT	((1UL << US_FLIDX_ABORTING) || \
+#define DONT_SUBMIT	((1UL << US_FLIDX_ABORTING) | \
 			 (1UL << US_FLIDX_DISCONNECTING))
 
 

@@ -271,7 +271,6 @@ static ctl_table kern_table[] = {
 /* Constants for minimum and maximum testing in vm_table.
    We use these as one-element integer vectors. */
 static int zero = 0;
-static int one = 1;
 static int one_hundred = 100;
 
 
@@ -292,20 +291,7 @@ static ctl_table vm_table[] = {
 	 &sysctl_intvec, NULL, &zero, &one_hundred },
 	{VM_DIRTY_WB_CS, "dirty_writeback_centisecs",
 	 &dirty_writeback_centisecs, sizeof(dirty_writeback_centisecs), 0644,
-	 NULL, &proc_dointvec_minmax, &sysctl_intvec, NULL,
-	 /* Here, we define the range of possible values for
-	    dirty_writeback_centisecs.
-
-	    The default value is 5 seconds (500 centisec).  We will use 1
-	    centisec, the smallest possible value that could make any sort of
-	    sense.  If we allowed the user to set the interval to 0 seconds
-	    (which would presumably mean to chew up all of the CPU looking for
-	    dirty pages and writing them out, without taking a break), the
-	    interval would effectively become 1 second (100 centisecs), due to
-	    some nicely documented throttling code in wb_kupdate().
-
-	    There is no maximum legal value for dirty_writeback. */
-	 &one , NULL},
+	 NULL, dirty_writeback_centisecs_handler },
 	{VM_DIRTY_EXPIRE_CS, "dirty_expire_centisecs",
 	 &dirty_expire_centisecs, sizeof(dirty_expire_centisecs), 0644,
 	 NULL, &proc_dointvec},
