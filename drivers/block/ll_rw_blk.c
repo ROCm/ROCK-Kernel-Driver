@@ -1142,7 +1142,7 @@ static inline void __generic_unplug_device(request_queue_t *q)
 
 /**
  * generic_unplug_device - fire a request queue
- * @data:    The &request_queue_t in question
+ * @q:    The &request_queue_t in question
  *
  * Description:
  *   Linux uses plugging to build bigger requests queues before letting
