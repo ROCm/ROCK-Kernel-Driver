@@ -315,7 +315,13 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 
 	/* Set a new TLS for the child thread?  Peek back into the
 	   syscall arguments that we saved on syscall entry.  */
-	childti->pcb.unique = (clone_flags & CLONE_SETTLS ? regs->r19 : 0);
+	/* Note: if CLONE_SETTLS is not set, then we must inherit the
+	   value from the parent, which will have been set by the block
+	   copy in dup_task_struct.  This is non-intuitive, but is
+	   required for proper operation in the case of a threaded
+	   application calling fork.  */
+	if (clone_flags & CLONE_SETTLS)
+		childti->pcb.unique = regs->r19;
 
 	return 0;
 }
