@@ -272,6 +272,8 @@ static void init_hwif_default(ide_hwif_t *hwif, unsigned int index)
 #endif
 }
 
+extern void ide_arm_init(void);
+
 /*
  * init_ide_data() sets reasonable default values into all fields
  * of all instances of the hwifs and drives, but only on the first call.
@@ -319,6 +321,9 @@ static void __init init_ide_data (void)
 	initializing = 1;
 	ide_init_default_hwifs();
 	initializing = 0;
+#endif
+#ifdef CONFIG_IDE_ARM
+	ide_arm_init();
 #endif
 }
 

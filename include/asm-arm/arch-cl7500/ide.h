@@ -6,8 +6,6 @@
  * Modifications:
  *  29-07-1998	RMK	Major re-work of IDE architecture specific code
  */
-#include <asm/irq.h>
-#include <asm/arch/hardware.h>
 
 /*
  * Set up a hw structure for a specified data port, control port and IRQ.
@@ -35,16 +33,4 @@ static inline void ide_init_hwif_ports(hw_regs_t *hw, unsigned long data_port,
 	hw->io_ports[IDE_IRQ_OFFSET] = 0;
 }
 
-/*
- * This registers the standard ports for this architecture with the IDE
- * driver.
- */
-static __inline__ void
-ide_init_default_hwifs(void)
-{
-	hw_regs_t hw;
-
-	ide_init_hwif_ports(&hw, ISASLOT_IO + 0x1f0, ISASLOT_IO + 0x3f6, NULL);
-	hw.irq = IRQ_ISA_14;
-	ide_register_hw(&hw);
-}
+static inline void ide_init_default_hwifs(void) { ; }

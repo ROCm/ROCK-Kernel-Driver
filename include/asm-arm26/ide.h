@@ -47,23 +47,7 @@ static inline void ide_init_hwif_ports(hw_regs_t *hw, unsigned long data_port,
 
 #define ide_init_default_irq(base)	(0)
 
-/*
- * This registers the standard ports for this architecture with the IDE
- * driver.
- */
-static __inline__ void ide_init_default_hwifs(void)
-{
-        if (machine_is_a5k()) {
-                hw_regs_t hw;
-
-                memset(&hw, 0, sizeof(hw));
-
-                ide_init_hwif_ports(&hw, 0x1f0, 0x3f6, NULL);
-                hw.irq = IRQ_HARDDISK;
-                ide_register_hw(&hw,NULL);
-        }
-}
-
+static inline void ide_init_default_hwifs(void) { ; }
 
 /*
  * We always use the new IDE port registering,
