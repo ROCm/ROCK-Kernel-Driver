@@ -114,7 +114,9 @@ long sys_sigsuspend(old_sigset_t mask, int p2, int p3, int p4, int p6, int p7,
 	recalc_sigpending();
 	spin_unlock_irq(&current->sig->siglock);
 
-	regs->gpr[3] = -EINTR;
+	regs->result = -EINTR;
+	regs->gpr[3] = EINTR;
+	regs->ccr |= 0x10000000;
 	while (1) {
 		current->state = TASK_INTERRUPTIBLE;
 		schedule();
@@ -150,7 +152,9 @@ long sys_rt_sigsuspend(sigset_t *unewset, size_t sigsetsize, int p3, int p4, int
 	recalc_sigpending();
 	spin_unlock_irq(&current->sig->siglock);
 
-	regs->gpr[3] = -EINTR;
+	regs->result = -EINTR;
+	regs->gpr[3] = EINTR;
+	regs->ccr |= 0x10000000;
 	while (1) {
 		current->state = TASK_INTERRUPTIBLE;
 		schedule();

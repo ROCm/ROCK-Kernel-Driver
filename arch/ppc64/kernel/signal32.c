@@ -847,11 +847,21 @@ int sys32_rt_sigsuspend(sigset32_t* unewset, size_t sigsetsize, int p3,
 	recalc_sigpending();
 	spin_unlock_irq(&current->sig->siglock);
 
-	regs->gpr[3] = -EINTR;
+	regs->result = -EINTR;
+	regs->gpr[3] = EINTR;
+	regs->ccr |= 0x10000000;
 	while (1) {
 		current->state = TASK_INTERRUPTIBLE;
 		schedule();
 		if (do_signal(&saveset, regs))
+			/*
+			 * If a signal handler needs to be called,
+			 * do_signal() has set R3 to the signal number (the
+			 * first argument of the signal handler), so don't
+			 * overwrite that with EINTR !
+			 * In the other cases, do_signal() doesn't touch 
+			 * R3, so it's still set to -EINTR (see above).
+			 */
 			return regs->gpr[3];
 	}
 }
