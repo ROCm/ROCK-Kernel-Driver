@@ -227,7 +227,7 @@ finish:
 }
 
 /* All packets are sent to the network through this function from
- * sctp_push_outqueue().
+ * sctp_outq_tail().
  *
  * The return value is a normal kernel error return value.
  */

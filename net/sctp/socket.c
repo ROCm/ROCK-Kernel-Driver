@@ -869,13 +869,6 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 					goto out_unlock;
 				}
 			} else {
-				/* Check against the defaults.  */
-				if (sinfo->sinfo_stream >=
-				    sp->initmsg.sinit_num_ostreams) {
-					err = -EINVAL;
-					goto out_unlock;
-				}
-
 				/* Check against the requested.  */
 				if (sinfo->sinfo_stream >=
 				    sinit->sinit_num_ostreams) {
@@ -916,14 +909,8 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 					sinit->sinit_num_ostreams;
 			}
 			if (sinit->sinit_max_instreams) {
-				if (sinit->sinit_max_instreams <=
-				    SCTP_MAX_STREAM) {
-					asoc->c.sinit_max_instreams =
-						sinit->sinit_max_instreams;
-				} else {
-					asoc->c.sinit_max_instreams =
-						SCTP_MAX_STREAM;
-				}
+				asoc->c.sinit_max_instreams =
+					sinit->sinit_max_instreams;
 			}
 			if (sinit->sinit_max_attempts) {
 				asoc->max_init_attempts

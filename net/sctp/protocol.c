@@ -82,7 +82,7 @@ struct sock *sctp_get_ctl_sock(void)
 }
 
 /* Set up the proc fs entry for the SCTP protocol. */
-void sctp_proc_init(void)
+__init void sctp_proc_init(void)
 {
 	if (!proc_net_sctp) {
 		struct proc_dir_entry *ent;
@@ -95,7 +95,7 @@ void sctp_proc_init(void)
 }
 
 /* Clean up the proc fs entry for the SCTP protocol. */
-void sctp_proc_exit(void)
+__exit void sctp_proc_exit(void)
 {
 	if (proc_net_sctp) {
 		proc_net_sctp = NULL;
@@ -688,7 +688,7 @@ static void cleanup_sctp_mibs(void)
 }
 
 /* Initialize the universe into something sensible.  */
-int sctp_init(void)
+__init int sctp_init(void)
 {
 	int i;
 	int status = 0;
@@ -750,13 +750,9 @@ int sctp_init(void)
 
 	/* Implementation specific variables. */
 
-	/* Initialize default stream count setup information.
-	 * Note: today the stream accounting data structures are very
-	 * fixed size, so one really does need to make sure that these have
-	 * upper/lower limits when changing.
-	 */
-	sctp_proto.max_instreams    = SCTP_MAX_STREAM;
-	sctp_proto.max_outstreams   = SCTP_MAX_STREAM;
+	/* Initialize default stream count setup information. */
+	sctp_proto.max_instreams    = SCTP_DEFAULT_INSTREAMS;
+	sctp_proto.max_outstreams   = SCTP_DEFAULT_OUTSTREAMS;
 
 	/* Allocate and initialize the association hash table.  */
 	sctp_proto.assoc_hashsize = 4096;
@@ -852,7 +848,7 @@ err_init_mibs:
 }
 
 /* Exit handler for the SCTP protocol.  */
-void sctp_exit(void)
+__exit void sctp_exit(void)
 {
 	/* BUG.  This should probably do something useful like clean
 	 * up all the remaining associations and all that memory.
@@ -889,4 +885,3 @@ module_exit(sctp_exit);
 MODULE_AUTHOR("Linux Kernel SCTP developers <lksctp-developers@lists.sourceforge.net>");
 MODULE_DESCRIPTION("Support for the SCTP protocol (RFC2960)");
 MODULE_LICENSE("GPL");
-

@@ -800,8 +800,8 @@ static void sctp_rcvmsg_rfree(struct sk_buff *skb)
 
 	/* Send a window update SACK if the rwnd has increased by at least the
 	 * minimum of the association's PMTU and half of the receive buffer.
-	 * The algorithm used is similar to the one described in Section 4.2.3.3
-	 * of RFC 1122.
+	 * The algorithm used is similar to the one described in 
+	 * Section 4.2.3.3 of RFC 1122.
 	 */
 	if ((asoc->state == SCTP_STATE_ESTABLISHED) &&
 	    (asoc->rwnd > asoc->a_rwnd) &&
@@ -819,7 +819,7 @@ static void sctp_rcvmsg_rfree(struct sk_buff *skb)
 		asoc->peer.sack_needed = 0;
 		asoc->peer.next_dup_tsn = 0;
 
-		sctp_push_outqueue(&asoc->outqueue, sack);
+		sctp_outq_tail(&asoc->outqueue, sack);
 
 		/* Stop the SACK timer.  */
 		timer = &asoc->timers[SCTP_EVENT_TIMEOUT_SACK];

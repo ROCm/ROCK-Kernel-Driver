@@ -82,12 +82,12 @@ static const sctp_supported_addrs_param_t sat_param = {
 
 /* gcc 3.2 doesn't allow initialization of zero-length arrays. So the above
  * structure is split and the address types array is initialized using a
- * fixed length array. 
+ * fixed length array.
  */
 static const __u16 sat_addr_types[2] = {
 	SCTP_PARAM_IPV4_ADDRESS,
 	SCTP_V6(SCTP_PARAM_IPV6_ADDRESS,)
-};			
+};
 
 /* RFC 2960 3.3.2 Initiation (INIT) (1)
  *
@@ -540,7 +540,7 @@ sctp_chunk_t *sctp_make_datafrag_empty(sctp_association_t *asoc,
 	dp.stream = htons(sinfo->sinfo_stream);
 	dp.ppid   = htonl(sinfo->sinfo_ppid);
 	dp.ssn    = htons(ssn);
-
+	
 	/* Set the flags for an unordered send.  */
 	if (sinfo->sinfo_flags & MSG_UNORDERED)
 		flags |= SCTP_DATA_UNORDERED;
@@ -552,7 +552,7 @@ sctp_chunk_t *sctp_make_datafrag_empty(sctp_association_t *asoc,
 
 	retval->subh.data_hdr = sctp_addto_chunk(retval, sizeof(dp), &dp);
 	memcpy(&retval->sinfo, sinfo, sizeof(struct sctp_sndrcvinfo));
-
+       
 nodata:
 	return retval;
 }
@@ -607,12 +607,12 @@ sctp_chunk_t *sctp_make_data_empty(sctp_association_t *asoc,
 	 *  ordered send and a new ssn is generated.  The flags field is set
 	 *  in the inner routine - sctp_make_datafrag_empty().
 	 */
-	if (sinfo->sinfo_flags & MSG_UNORDERED) {
-		ssn = 0;
-	} else {
-		ssn = __sctp_association_get_next_ssn(asoc,
-						      sinfo->sinfo_stream);
-	}
+//	if (sinfo->sinfo_flags & MSG_UNORDERED) {
+	ssn = 0;
+//	} else {
+//		ssn = __sctp_association_get_next_ssn(asoc,
+//						      sinfo->sinfo_stream);
+//	}
 
 	return sctp_make_datafrag_empty(asoc, sinfo, data_len, flags, ssn);
 }
@@ -1013,6 +1013,7 @@ sctp_chunk_t *sctp_chunkify(struct sk_buff *skb, const sctp_association_t *asoc,
 	retval->asoc		= (sctp_association_t *) asoc;
 	retval->num_times_sent	= 0;
 	retval->has_tsn		= 0;
+	retval->has_ssn         = 0;
 	retval->rtt_in_progress	= 0;
 	retval->sent_at	= jiffies;
 	retval->singleton	= 1;
@@ -1212,6 +1213,29 @@ int sctp_user_addto_chunk(sctp_chunk_t *chunk, int len, struct iovec *data)
 
 out:
 	return err;
+}
+
+/* Helper function to assign a TSN if needed.  This assumes that both
+ * the data_hdr and association have already been assigned.
+ */
+void sctp_chunk_assign_ssn(sctp_chunk_t *chunk)
+{
+	__u16 ssn;
+	__u16 sid;
+
+	if (chunk->has_ssn)
+		return;
+
+	/* This is the last possible instant to assign a SSN. */
+	if (chunk->chunk_hdr->flags & SCTP_DATA_UNORDERED) {
+		ssn = 0;
+	} else {
+		sid = htons(chunk->subh.data_hdr->stream);
+		ssn = htons(__sctp_association_get_next_ssn(chunk->asoc, sid));
+	}
+
+	chunk->subh.data_hdr->ssn = ssn;
+	chunk->has_ssn = 1;
 }
 
 /* Helper function to assign a TSN if needed.  This assumes that both
@@ -1654,6 +1678,7 @@ int sctp_verify_init(const sctp_association_t *asoc,
 
 /* Unpack the parameters in an INIT packet into an association.
  * Returns 0 on failure, else success.
+ * FIXME:  This is an association method. 
  */
 int sctp_process_init(sctp_association_t *asoc, sctp_cid_t cid,
 		      const union sctp_addr *peer_addr,
@@ -1710,6 +1735,12 @@ int sctp_process_init(sctp_association_t *asoc, sctp_cid_t cid,
 			ntohs(peer_init->init_hdr.num_inbound_streams);
 	}
 
+	if (asoc->c.sinit_max_instreams >
+	    ntohs(peer_init->init_hdr.num_outbound_streams)) {
+		asoc->c.sinit_max_instreams =
+			ntohs(peer_init->init_hdr.num_outbound_streams);
+	}
+
 	/* Copy Initiation tag from INIT to VT_peer in cookie.   */
 	asoc->c.peer_vtag = asoc->peer.i.init_tag;
 
@@ -1738,6 +1769,21 @@ int sctp_process_init(sctp_association_t *asoc, sctp_cid_t cid,
 	sctp_tsnmap_init(&asoc->peer.tsn_map, SCTP_TSN_MAP_SIZE,
 			 asoc->peer.i.initial_tsn);
 
+	/* RFC 2960 6.5 Stream Identifier and Stream Sequence Number
+	 *
+	 * The stream sequence number in all the streams shall start
+	 * from 0 when the association is established.  Also, when the
+	 * stream sequence number reaches the value 65535 the next
+	 * stream sequence number shall be set to 0.
+	 */
+
+	/* Allocate storage for the negotiated streams. */
+	asoc->ssnmap = sctp_ssnmap_new(asoc->peer.i.num_outbound_streams,
+				       asoc->c.sinit_num_ostreams,
+				       priority);
+	if (!asoc->ssnmap)
+		goto nomem_ssnmap;
+
 	/* ADDIP Section 4.1 ASCONF Chunk Procedures
 	 *
 	 * When an endpoint has an ASCONF signaled change to be sent to the
@@ -1751,6 +1797,7 @@ int sctp_process_init(sctp_association_t *asoc, sctp_cid_t cid,
 	asoc->peer.addip_serial = asoc->peer.i.initial_tsn - 1;
 	return 1;
 
+nomem_ssnmap:
 clean_up:
 	/* Release the transport structures. */
 	list_for_each_safe(pos, temp, &asoc->peer.transport_addr_list) {

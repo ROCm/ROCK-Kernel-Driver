@@ -49,51 +49,39 @@
 #include <net/sctp/sm.h>
 
 /* Forward declarations for internal helpers.  */
-static inline sctp_ulpevent_t * sctp_ulpqueue_reasm(sctp_ulpqueue_t *ulpq,
-						    sctp_ulpevent_t *event);
-static inline sctp_ulpevent_t *sctp_ulpqueue_order(sctp_ulpqueue_t *ulpq,
-						   sctp_ulpevent_t *event);
+static inline struct sctp_ulpevent * sctp_ulpq_reasm(struct sctp_ulpq *ulpq,
+						     struct sctp_ulpevent *);
+static inline struct sctp_ulpevent *sctp_ulpq_order(struct sctp_ulpq *,
+						    struct sctp_ulpevent *);
 
 /* 1st Level Abstractions */
 
 /* Create a new ULP queue.  */
-sctp_ulpqueue_t *sctp_ulpqueue_new(sctp_association_t *asoc,
-				   __u16 inbound, int priority)
+struct sctp_ulpq *sctp_ulpq_new(sctp_association_t *asoc, int priority)
 {
-	sctp_ulpqueue_t *ulpq;
-	size_t size;
+	struct sctp_ulpq *ulpq;
 
-	/* Today, there is only a fixed size of storage needed for
-	 * stream support, but make the interfaces acceptable for
-	 * the future.
-	 */
-	size = sizeof(sctp_ulpqueue_t)+sctp_ulpqueue_storage_size(inbound);
-	ulpq = kmalloc(size, priority);
+	ulpq = kmalloc(sizeof(struct sctp_ulpq), priority);
 	if (!ulpq)
 		goto fail;
-	if (!sctp_ulpqueue_init(ulpq, asoc, inbound))
+	if (!sctp_ulpq_init(ulpq, asoc))
 		goto fail_init;
 	ulpq->malloced = 1;
 	return ulpq;
 
 fail_init:
 	kfree(ulpq);
-
 fail:
 	return NULL;
 }
 
 /* Initialize a ULP queue from a block of memory.  */
-sctp_ulpqueue_t *sctp_ulpqueue_init(sctp_ulpqueue_t *ulpq,
-				    sctp_association_t *asoc,
-				    __u16 inbound)
+struct sctp_ulpq *sctp_ulpq_init(struct sctp_ulpq *ulpq,
+				 sctp_association_t *asoc)
 {
-	memset(ulpq,
-	       sizeof(sctp_ulpqueue_t) + sctp_ulpqueue_storage_size(inbound),
-	       0x00);
+	memset(ulpq, sizeof(struct sctp_ulpq), 0x00);
 
 	ulpq->asoc = asoc;
-	spin_lock_init(&ulpq->lock);
 	skb_queue_head_init(&ulpq->reasm);
 	skb_queue_head_init(&ulpq->lobby);
 	ulpq->malloced = 0;
@@ -101,38 +89,39 @@ sctp_ulpqueue_t *sctp_ulpqueue_init(sctp_ulpqueue_t *ulpq,
 	return ulpq;
 }
 
+
 /* Flush the reassembly and ordering queues.  */
-void sctp_ulpqueue_flush(sctp_ulpqueue_t *ulpq)
+void sctp_ulpq_flush(struct sctp_ulpq *ulpq)
 {
 	struct sk_buff *skb;
-	sctp_ulpevent_t *event;
+	struct sctp_ulpevent *event;
 
 	while ((skb = skb_dequeue(&ulpq->lobby))) {
-		event = (sctp_ulpevent_t *) skb->cb;
+		event = (struct sctp_ulpevent *) skb->cb;
 		sctp_ulpevent_free(event);
 	}
 
 	while ((skb = skb_dequeue(&ulpq->reasm))) {
-		event = (sctp_ulpevent_t *) skb->cb;
+		event = (struct sctp_ulpevent *) skb->cb;
 		sctp_ulpevent_free(event);
 	}
 }
 
 /* Dispose of a ulpqueue.  */
-void sctp_ulpqueue_free(sctp_ulpqueue_t *ulpq)
+void sctp_ulpq_free(struct sctp_ulpq *ulpq)
 {
-	sctp_ulpqueue_flush(ulpq);
+	sctp_ulpq_flush(ulpq);
 	if (ulpq->malloced)
 		kfree(ulpq);
 }
 
 /* Process an incoming DATA chunk.  */
-int sctp_ulpqueue_tail_data(sctp_ulpqueue_t *ulpq, sctp_chunk_t *chunk,
+int sctp_ulpq_tail_data(struct sctp_ulpq *ulpq, sctp_chunk_t *chunk,
 			    int priority)
 {
 	struct sk_buff_head temp;
 	sctp_data_chunk_t *hdr;
-	sctp_ulpevent_t *event;
+	struct sctp_ulpevent *event;
 
 	hdr = (sctp_data_chunk_t *) chunk->chunk_hdr;
 
@@ -147,7 +136,7 @@ int sctp_ulpqueue_tail_data(sctp_ulpqueue_t *ulpq, sctp_chunk_t *chunk,
 		return -ENOMEM;
 
 	/* Do reassembly if needed.  */
-	event = sctp_ulpqueue_reasm(ulpq, event);
+	event = sctp_ulpq_reasm(ulpq, event);
 
 	/* Do ordering if needed.  */
 	if (event) {
@@ -155,18 +144,18 @@ int sctp_ulpqueue_tail_data(sctp_ulpqueue_t *ulpq, sctp_chunk_t *chunk,
 		skb_queue_head_init(&temp);
 		skb_queue_tail(&temp, event->parent);
 
-		event = sctp_ulpqueue_order(ulpq, event);
+		event = sctp_ulpq_order(ulpq, event);
 	}
 
 	/* Send event to the ULP.  */
 	if (event)
-		sctp_ulpqueue_tail_event(ulpq, event);
+		sctp_ulpq_tail_event(ulpq, event);
 
 	return 0;
 }
 
 /* Add a new event for propogation to the ULP.  */
-int sctp_ulpqueue_tail_event(sctp_ulpqueue_t *ulpq, sctp_ulpevent_t *event)
+int sctp_ulpq_tail_event(struct sctp_ulpq *ulpq, struct sctp_ulpevent *event)
 {
 	struct sock *sk = ulpq->asoc->base.sk;
 
@@ -202,20 +191,18 @@ out_free:
 /* 2nd Level Abstractions */
 
 /* Helper function to store chunks that need to be reassembled.  */
-static inline void sctp_ulpqueue_store_reasm(sctp_ulpqueue_t *ulpq, sctp_ulpevent_t *event)
+static inline void sctp_ulpq_store_reasm(struct sctp_ulpq *ulpq, 
+					 struct sctp_ulpevent *event)
 {
 	struct sk_buff *pos, *tmp;
-	sctp_ulpevent_t *cevent;
+	struct sctp_ulpevent *cevent;
 	__u32 tsn, ctsn;
-	unsigned long flags __attribute ((unused));
 
 	tsn = event->sndrcvinfo.sinfo_tsn;
 
-	sctp_spin_lock_irqsave(&ulpq->reasm.lock, flags);
-
 	/* Find the right place in this list. We store them by TSN.  */
 	sctp_skb_for_each(pos, &ulpq->reasm, tmp) {
-		cevent = (sctp_ulpevent_t *)pos->cb;
+		cevent = (struct sctp_ulpevent *)pos->cb;
 		ctsn = cevent->sndrcvinfo.sinfo_tsn;
 
 		if (TSN_lt(tsn, ctsn))
@@ -227,8 +214,6 @@ static inline void sctp_ulpqueue_store_reasm(sctp_ulpqueue_t *ulpq, sctp_ulpeven
 		__skb_insert(event->parent, pos->prev, pos, &ulpq->reasm);
 	else
 		__skb_queue_tail(&ulpq->reasm, event->parent);
-
-	sctp_spin_unlock_irqrestore(&ulpq->reasm.lock, flags);
 }
 
 /* Helper function to return an event corresponding to the reassembled
@@ -238,10 +223,10 @@ static inline void sctp_ulpqueue_store_reasm(sctp_ulpqueue_t *ulpq, sctp_ulpeven
  * payload was fragmented on the way and ip had to reassemble them.
  * We add the rest of skb's to the first skb's fraglist.
  */
-static inline sctp_ulpevent_t *sctp_make_reassembled_event(struct sk_buff *f_frag, struct sk_buff *l_frag)
+static inline struct sctp_ulpevent *sctp_make_reassembled_event(struct sk_buff *f_frag, struct sk_buff *l_frag)
 {
 	struct sk_buff *pos;
-	sctp_ulpevent_t *event;
+	struct sctp_ulpevent *event;
 	struct sk_buff *pnext, *last;
 	struct sk_buff *list = skb_shinfo(f_frag)->frag_list;
 
@@ -249,7 +234,7 @@ static inline sctp_ulpevent_t *sctp_make_reassembled_event(struct sk_buff *f_fra
 	pos = f_frag->next;
 
 	/* Get the last skb in the f_frag's frag_list if present. */
-	for (last = list; list; last = list,list = list->next);
+	for (last = list; list; last = list, list = list->next);
 
 	/* Add the list of remaining fragments to the first fragments
 	 * frag_list.
@@ -287,13 +272,12 @@ static inline sctp_ulpevent_t *sctp_make_reassembled_event(struct sk_buff *f_fra
 /* Helper function to check if an incoming chunk has filled up the last
  * missing fragment in a SCTP datagram and return the corresponding event.
  */
-static inline sctp_ulpevent_t *sctp_ulpqueue_retrieve_reassembled(sctp_ulpqueue_t *ulpq)
+static inline sctp_ulpevent_t *sctp_ulpq_retrieve_reassembled(struct sctp_ulpq *ulpq)
 {
 	struct sk_buff *pos, *tmp;
 	sctp_ulpevent_t *cevent;
 	struct sk_buff *first_frag = NULL;
 	__u32 ctsn, next_tsn;
-	unsigned long flags __attribute ((unused));
 	sctp_ulpevent_t *retval = NULL;
 
 	/* Initialized to 0 just to avoid compiler warning message. Will
@@ -301,8 +285,6 @@ static inline sctp_ulpevent_t *sctp_ulpqueue_retrieve_reassembled(sctp_ulpqueue_
 	 * is set when we find the first fragment of a message.
 	 */
 	next_tsn = 0;
-
-	sctp_spin_lock_irqsave(&ulpq->reasm.lock, flags);
 
 	/* The chunks are held in the reasm queue sorted by TSN.
 	 * Walk through the queue sequentially and look for a sequence of
@@ -345,7 +327,6 @@ static inline sctp_ulpevent_t *sctp_ulpqueue_retrieve_reassembled(sctp_ulpqueue_
 		if (retval)
 			break;
 	}
-	sctp_spin_unlock_irqrestore(&ulpq->reasm.lock, flags);
 
 	return retval;
 }
@@ -353,7 +334,7 @@ static inline sctp_ulpevent_t *sctp_ulpqueue_retrieve_reassembled(sctp_ulpqueue_
 /* Helper function to reassemble chunks. Hold chunks on the reasm queue that
  * need reassembling.
  */
-static inline sctp_ulpevent_t *sctp_ulpqueue_reasm(sctp_ulpqueue_t *ulpq,
+static inline sctp_ulpevent_t *sctp_ulpq_reasm(struct sctp_ulpq *ulpq,
 						   sctp_ulpevent_t *event)
 {
 	sctp_ulpevent_t *retval = NULL;
@@ -368,8 +349,8 @@ static inline sctp_ulpevent_t *sctp_ulpqueue_reasm(sctp_ulpqueue_t *ulpq,
 	if (SCTP_DATA_NOT_FRAG == (event->chunk_flags & SCTP_DATA_FRAG_MASK))
 		return event;
 
-	sctp_ulpqueue_store_reasm(ulpq, event);
-	retval = sctp_ulpqueue_retrieve_reassembled(ulpq);
+	sctp_ulpq_store_reasm(ulpq, event);
+	retval = sctp_ulpq_retrieve_reassembled(ulpq);
 
 	return retval;
 }
@@ -377,20 +358,20 @@ static inline sctp_ulpevent_t *sctp_ulpqueue_reasm(sctp_ulpqueue_t *ulpq,
 /* Helper function to gather skbs that have possibly become
  * ordered by an an incoming chunk.
  */
-static inline void sctp_ulpqueue_retrieve_ordered(sctp_ulpqueue_t *ulpq,
-						  sctp_ulpevent_t *event)
+static inline void sctp_ulpq_retrieve_ordered(struct sctp_ulpq *ulpq,
+					      sctp_ulpevent_t *event)
 {
 	struct sk_buff *pos, *tmp;
-	sctp_ulpevent_t *cevent;
+	struct sctp_ulpevent *cevent;
+	struct sctp_stream *in;
 	__u16 sid, csid;
 	__u16 ssn, cssn;
-	unsigned long flags __attribute ((unused));
 
 	sid = event->sndrcvinfo.sinfo_stream;
 	ssn = event->sndrcvinfo.sinfo_ssn;
+	in  = &ulpq->asoc->ssnmap->in;
 
 	/* We are holding the chunks by stream, by SSN.  */
-	sctp_spin_lock_irqsave(&ulpq->lobby.lock, flags);
 	sctp_skb_for_each(pos, &ulpq->lobby, tmp) {
 		cevent = (sctp_ulpevent_t *) pos->cb;
 		csid = cevent->sndrcvinfo.sinfo_stream;
@@ -404,32 +385,31 @@ static inline void sctp_ulpqueue_retrieve_ordered(sctp_ulpqueue_t *ulpq,
 		if (csid < sid)
 			continue;
 
-		if (cssn != ulpq->ssn[sid])
+		if (cssn != sctp_ssn_peek(in, sid))
 			break;
 
-		ulpq->ssn[sid]++;
+		/* Found it, so mark in the ssnmap. */
+		sctp_ssn_next(in, sid);
+	       
 		__skb_unlink(pos, pos->list);
 
 		/* Attach all gathered skbs to the event.  */
 		__skb_queue_tail(event->parent->list, pos);
 	}
-	sctp_spin_unlock_irqrestore(&ulpq->lobby.lock, flags);
 }
 
 /* Helper function to store chunks needing ordering.  */
-static inline void sctp_ulpqueue_store_ordered(sctp_ulpqueue_t *ulpq,
-					       sctp_ulpevent_t *event)
+static inline void sctp_ulpq_store_ordered(struct sctp_ulpq *ulpq,
+					   sctp_ulpevent_t *event)
 {
 	struct sk_buff *pos, *tmp;
 	sctp_ulpevent_t *cevent;
 	__u16 sid, csid;
 	__u16 ssn, cssn;
-	unsigned long flags __attribute ((unused));
 
 	sid = event->sndrcvinfo.sinfo_stream;
 	ssn = event->sndrcvinfo.sinfo_ssn;
 
-	sctp_spin_lock_irqsave(&ulpq->lobby.lock, flags);
 
 	/* Find the right place in this list.  We store them by
 	 * stream ID and then by SSN.
@@ -450,14 +430,13 @@ static inline void sctp_ulpqueue_store_ordered(sctp_ulpqueue_t *ulpq,
 		__skb_insert(event->parent, pos->prev, pos, &ulpq->lobby);
 	else
 		__skb_queue_tail(&ulpq->lobby, event->parent);
-
-	sctp_spin_unlock_irqrestore(&ulpq->lobby.lock, flags);
 }
 
-static inline sctp_ulpevent_t *sctp_ulpqueue_order(sctp_ulpqueue_t *ulpq,
-						   sctp_ulpevent_t *event)
+static inline sctp_ulpevent_t *sctp_ulpq_order(struct sctp_ulpq *ulpq,
+					       sctp_ulpevent_t *event)
 {
 	__u16 sid, ssn;
+	struct sctp_stream *in;
 
 	/* FIXME: We should be using some new chunk structure here
 	 * instead of carrying chunk fields in the event structure.
@@ -472,23 +451,24 @@ static inline sctp_ulpevent_t *sctp_ulpqueue_order(sctp_ulpqueue_t *ulpq,
 	/* Note: The stream ID must be verified before this routine.  */
 	sid = event->sndrcvinfo.sinfo_stream;
 	ssn = event->sndrcvinfo.sinfo_ssn;
+	in  = &ulpq->asoc->ssnmap->in;
 
 	/* Is this the expected SSN for this stream ID?  */
-	if (ssn != ulpq->ssn[sid]) {
+	if (ssn != sctp_ssn_peek(in, sid)) {
 		/* We've received something out of order, so find where it
 		 * needs to be placed.  We order by stream and then by SSN.
 		 */
-		sctp_ulpqueue_store_ordered(ulpq, event);
+		sctp_ulpq_store_ordered(ulpq, event);
 		return NULL;
 	}
 
 	/* Mark that the next chunk has been found.  */
-	ulpq->ssn[sid]++;
+	sctp_ssn_next(in, sid);
 
 	/* Go find any other chunks that were waiting for
 	 * ordering.
 	 */
-	sctp_ulpqueue_retrieve_ordered(ulpq, event);
+	sctp_ulpq_retrieve_ordered(ulpq, event);
 
 	return event;
 }

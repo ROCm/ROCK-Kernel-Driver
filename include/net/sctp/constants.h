@@ -56,8 +56,10 @@
 #include <linux/ipv6.h> /* For ipv6hdr. */
 #include <net/sctp/user.h>
 
-/* What a hack!  Jiminy Cricket!  */
-enum { SCTP_MAX_STREAM = 10 };
+/* Value used for stream negotiation. */
+enum { SCTP_MAX_STREAM = 0xffff };
+enum { SCTP_DEFAULT_OUTSTREAMS = 10 };
+enum { SCTP_DEFAULT_INSTREAMS = SCTP_MAX_STREAM };
 
 /* Define the amount of space to reserve for SCTP, IP, LL.
  * There is a little bit of waste that we are always allocating

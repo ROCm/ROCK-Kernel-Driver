@@ -6,7 +6,7 @@
  *
  * This file is part of the SCTP kernel reference Implementation
  *
- * These functions implement the outqueue class.   The outqueue handles
+ * These functions implement the sctp_outq class.   The outqueue handles
  * bundling and queueing of outgoing SCTP chunks.
  *
  * The SCTP reference implementation is free software;
@@ -47,39 +47,39 @@
  */
 
 #include <linux/types.h>
-#include <linux/list.h> /* For struct list_head */
+#include <linux/list.h>   /* For struct list_head */
 #include <linux/socket.h>
 #include <linux/ip.h>
-#include <net/sock.h>		/* For skb_set_owner_w */
+#include <net/sock.h>	  /* For skb_set_owner_w */
 
 #include <net/sctp/sctp.h>
 
 /* Declare internal functions here.  */
 static int sctp_acked(sctp_sackhdr_t *sack, __u32 tsn);
-static void sctp_check_transmitted(sctp_outqueue_t *q,
+static void sctp_check_transmitted(struct sctp_outq *q,
 				   struct list_head *transmitted_queue,
 				   sctp_transport_t *transport,
 				   sctp_sackhdr_t *sack,
 				   __u32 highest_new_tsn);
 
 /* Generate a new outqueue.  */
-sctp_outqueue_t *sctp_outqueue_new(sctp_association_t *asoc)
+struct sctp_outq *sctp_outq_new(sctp_association_t *asoc)
 {
-	sctp_outqueue_t *q;
+	struct sctp_outq *q;
 
-	q = t_new(sctp_outqueue_t, GFP_KERNEL);
+	q = t_new(struct sctp_outq, GFP_KERNEL);
 	if (q) {
-		sctp_outqueue_init(asoc, q);
+		sctp_outq_init(asoc, q);
 		q->malloced = 1;
 	}
 	return q;
 }
 
-/* Initialize an existing SCTP_outqueue.  This does the boring stuff.
+/* Initialize an existing sctp_outq.  This does the boring stuff.
  * You still need to define handlers if you really want to DO
  * something with this structure...
  */
-void sctp_outqueue_init(sctp_association_t *asoc, sctp_outqueue_t *q)
+void sctp_outq_init(sctp_association_t *asoc, struct sctp_outq *q)
 {
 	q->asoc = asoc;
 	skb_queue_head_init(&q->out);
@@ -102,7 +102,7 @@ void sctp_outqueue_init(sctp_association_t *asoc, sctp_outqueue_t *q)
 /* Free the outqueue structure and any related pending chunks.
  * FIXME: Add SEND_FAILED support.
  */
-void sctp_outqueue_teardown(sctp_outqueue_t *q)
+void sctp_outq_teardown(struct sctp_outq *q)
 {
 	sctp_transport_t *transport;
 	struct list_head *lchunk, *pos, *temp;
@@ -131,29 +131,22 @@ void sctp_outqueue_teardown(sctp_outqueue_t *q)
 }
 
 /* Free the outqueue structure and any related pending chunks.  */
-void sctp_outqueue_free(sctp_outqueue_t *q)
+void sctp_outq_free(struct sctp_outq *q)
 {
 	/* Throw away leftover chunks. */
-	sctp_outqueue_teardown(q);
+	sctp_outq_teardown(q);
 
 	/* If we were kmalloc()'d, free the memory.  */
 	if (q->malloced)
 		kfree(q);
 }
 
-/* Transmit any pending partial chunks.  */
-void sctp_force_outqueue(sctp_outqueue_t *q)
-{
-	/* Do we really need this? */
-	/* BUG */
-}
-
-/* Put a new chunk in an SCTP_outqueue.  */
-int sctp_push_outqueue(sctp_outqueue_t *q, sctp_chunk_t *chunk)
+/* Put a new chunk in an sctp_outq.  */
+int sctp_outq_tail(struct sctp_outq *q, sctp_chunk_t *chunk)
 {
 	int error = 0;
 
-	SCTP_DEBUG_PRINTK("sctp_push_outqueue(%p, %p[%s])\n",
+	SCTP_DEBUG_PRINTK("sctp_outq_tail(%p, %p[%s])\n",
 			  q, chunk, chunk && chunk->chunk_hdr ?
 			  sctp_cname(SCTP_ST_CHUNK(chunk->chunk_hdr->type))
 			  : "Illegal Chunk");
@@ -184,8 +177,7 @@ int sctp_push_outqueue(sctp_outqueue_t *q, sctp_chunk_t *chunk)
 
 		default:
 			SCTP_DEBUG_PRINTK("outqueueing (%p, %p[%s])\n",
-			  q, chunk,
-			  chunk && chunk->chunk_hdr ?
+			  q, chunk, chunk && chunk->chunk_hdr ?
 			  sctp_cname(SCTP_ST_CHUNK(chunk->chunk_hdr->type))
 			  : "Illegal Chunk");
 
@@ -193,13 +185,13 @@ int sctp_push_outqueue(sctp_outqueue_t *q, sctp_chunk_t *chunk)
 			q->empty = 0;
 			break;
 		};
-	} else {
+	} else
 		skb_queue_tail(&q->control, (struct sk_buff *) chunk);
-	}
+
 	if (error < 0)
 		return error;
 
-	error = sctp_flush_outqueue(q, 0);
+	error = sctp_outq_flush(q, 0);
 
 	return error;
 }
@@ -207,7 +199,7 @@ int sctp_push_outqueue(sctp_outqueue_t *q, sctp_chunk_t *chunk)
 /* Insert a chunk into the retransmit queue.  Chunks on the retransmit
  * queue are kept in order, based on the TSNs.
  */
-void sctp_retransmit_insert(struct list_head *tlchunk, sctp_outqueue_t *q)
+void sctp_retransmit_insert(struct list_head *tlchunk, struct sctp_outq *q)
 {
 	struct list_head *rlchunk;
 	sctp_chunk_t *tchunk, *rchunk;
@@ -232,7 +224,7 @@ void sctp_retransmit_insert(struct list_head *tlchunk, sctp_outqueue_t *q)
 }
 
 /* Mark all the eligible packets on a transport for retransmission.  */
-void sctp_retransmit_mark(sctp_outqueue_t *q, sctp_transport_t *transport,
+void sctp_retransmit_mark(struct sctp_outq *q, sctp_transport_t *transport,
 			  __u8 fast_retransmit)
 {
 	struct list_head *lchunk, *ltemp;
@@ -302,7 +294,7 @@ void sctp_retransmit_mark(sctp_outqueue_t *q, sctp_transport_t *transport,
 /* Mark all the eligible packets on a transport for retransmission and force
  * one packet out.
  */
-void sctp_retransmit(sctp_outqueue_t *q, sctp_transport_t *transport,
+void sctp_retransmit(struct sctp_outq *q, sctp_transport_t *transport,
 		     __u8 fast_retransmit)
 {
 	int error = 0;
@@ -315,7 +307,7 @@ void sctp_retransmit(sctp_outqueue_t *q, sctp_transport_t *transport,
 
 	sctp_retransmit_mark(q, transport, fast_retransmit);
 
-	error = sctp_flush_outqueue(q, /* rtx_timeout */ 1);
+	error = sctp_outq_flush(q, /* rtx_timeout */ 1);
 
 	if (error)
 		q->asoc->base.sk->err = -error;
@@ -323,14 +315,14 @@ void sctp_retransmit(sctp_outqueue_t *q, sctp_transport_t *transport,
 
 /*
  * Transmit DATA chunks on the retransmit queue.  Upon return from
- * sctp_flush_retran_queue() the packet 'pkt' may contain chunks which
+ * sctp_outq_flush_rtx() the packet 'pkt' may contain chunks which
  * need to be transmitted by the caller.
  * We assume that pkt->transport has already been set.
  *
  * The return value is a normal kernel error return value.
  */
-static int sctp_flush_retran_queue(sctp_outqueue_t *q, sctp_packet_t *pkt,
-				   int rtx_timeout, int *start_timer)
+static int sctp_outq_flush_rtx(struct sctp_outq *q, sctp_packet_t *pkt,
+			       int rtx_timeout, int *start_timer)
 {
 	struct list_head *lqueue;
 	struct list_head *lchunk;
@@ -439,7 +431,7 @@ static int sctp_flush_retran_queue(sctp_outqueue_t *q, sctp_packet_t *pkt,
  * queue.  'pos' points to the next chunk in the output queue after the
  * chunk that is currently in the process of fragmentation.
  */
-void sctp_xmit_frag(sctp_outqueue_t *q, struct sk_buff *pos,
+void sctp_xmit_frag(struct sctp_outq *q, struct sk_buff *pos,
 		    sctp_packet_t *packet, sctp_chunk_t *frag, __u32 tsn)
 {
 	sctp_transport_t *transport = packet->transport;
@@ -515,7 +507,7 @@ void sctp_xmit_frag(sctp_outqueue_t *q, struct sk_buff *pos,
  * The argument 'frag' point to the first fragment and it holds the list
  * of all the other fragments in the 'frag_list' field.
  */
-void sctp_xmit_fragmented_chunks(sctp_outqueue_t *q, sctp_packet_t *packet,
+void sctp_xmit_fragmented_chunks(struct sctp_outq *q, sctp_packet_t *packet,
 				 sctp_chunk_t *frag)
 {
 	sctp_association_t *asoc = frag->asoc;
@@ -574,7 +566,7 @@ sctp_chunk_t *sctp_fragment_chunk(sctp_chunk_t *chunk,
 
 	if (!first_frag)
 		goto err;
-
+	first_frag->has_ssn = 1;
 	/* All the fragments are added to the frag_list of the first chunk. */
 	frag_list = &first_frag->frag_list;
 
@@ -588,7 +580,7 @@ sctp_chunk_t *sctp_fragment_chunk(sctp_chunk_t *chunk,
 					  ssn);
 		if (!frag)
 			goto err;
-
+		frag->has_ssn = 1;
 		/* Add the middle fragment to the first fragment's
 		 * frag_list.
 		 */
@@ -603,6 +595,7 @@ sctp_chunk_t *sctp_fragment_chunk(sctp_chunk_t *chunk,
 				  SCTP_DATA_LAST_FRAG, ssn);
 	if (!frag)
 		goto err;
+	frag->has_ssn = 1;
 
 	/* Add the last fragment to the first fragment's frag_list. */
 	list_add_tail(&frag->frag_list, frag_list);
@@ -632,7 +625,7 @@ err:
 }
 
 /*
- * sctp_flush_outqueue - Try to flush an outqueue.
+ * sctp_outq_flush - Try to flush an outqueue.
  *
  * Description: Send everything in q which we legally can, subject to
  * congestion limitations.
@@ -641,7 +634,7 @@ err:
  * locking concerns must be made.  Today we use the sock lock to protect
  * this function.
  */
-int sctp_flush_outqueue(sctp_outqueue_t *q, int rtx_timeout)
+int sctp_outq_flush(struct sctp_outq *q, int rtx_timeout)
 {
 	sctp_packet_t *packet;
 	sctp_packet_t singleton;
@@ -660,7 +653,6 @@ int sctp_flush_outqueue(sctp_outqueue_t *q, int rtx_timeout)
 	sctp_xmit_t status;
 	int error = 0;
 	int start_timer = 0;
-	sctp_ulpevent_t *event;
 
 	/* These transports have chunks to send. */
 	struct list_head transport_list;
@@ -795,10 +787,8 @@ int sctp_flush_outqueue(sctp_outqueue_t *q, int rtx_timeout)
 			(*q->config_output)(packet, vtag,
 					    ecn_capable, ecne_handler);
 		retran:
-			error = sctp_flush_retran_queue(q,
-							packet,
-							rtx_timeout,
-							&start_timer);
+			error = sctp_outq_flush_rtx(q, packet,
+						    rtx_timeout, &start_timer);
 
 			if (start_timer)
 				sctp_transport_reset_timers(transport);
@@ -825,15 +815,14 @@ int sctp_flush_outqueue(sctp_outqueue_t *q, int rtx_timeout)
 			 */
 			if (chunk->sinfo.sinfo_stream >=
 			    asoc->c.sinit_num_ostreams) {
+				struct sctp_ulpevent *ev;
+
 				/* Generate a SEND FAILED event. */
-				event = sctp_ulpevent_make_send_failed(asoc,
-						chunk, SCTP_DATA_UNSENT,
-						SCTP_ERROR_INV_STRM,
-						GFP_ATOMIC);
-				if (event) {
-					sctp_ulpqueue_tail_event(&asoc->ulpq,
-								 event);
-				}
+				ev = sctp_ulpevent_make_send_failed(asoc,
+					    chunk, SCTP_DATA_UNSENT,
+					    SCTP_ERROR_INV_STRM, GFP_ATOMIC);
+				if (ev)
+					sctp_ulpq_tail_event(&asoc->ulpq, ev);
 
 				/* Free the chunk. This chunk is not on any
 				 * list yet, just free it.
@@ -841,6 +830,12 @@ int sctp_flush_outqueue(sctp_outqueue_t *q, int rtx_timeout)
 				sctp_free_chunk(chunk);
 				continue;
 			}
+
+			/* Now do delayed assignment of SSN.  This will
+			 * probably change again when we start supporting
+			 * large (> approximately 2^16) size messages.
+			 */
+			sctp_chunk_assign_ssn(chunk);
 
 			/* If there is a specified transport, use it.
 			 * Otherwise, we want to use the active path.
@@ -890,7 +885,7 @@ int sctp_flush_outqueue(sctp_outqueue_t *q, int rtx_timeout)
 				/* We could not append this chunk, so put
 				 * the chunk back on the output queue.
 				 */
-				SCTP_DEBUG_PRINTK("sctp_flush_outqueue: could "
+				SCTP_DEBUG_PRINTK("sctp_outq_flush: could "
 					"not transmit TSN: 0x%x, status: %d\n",
 					ntohl(chunk->subh.data_hdr->tsn),
 					status);
@@ -978,12 +973,12 @@ sctp_flush_out:
 }
 
 /* Set the various output handling callbacks.  */
-int sctp_outqueue_set_output_handlers(sctp_outqueue_t *q,
-				      sctp_outqueue_ohandler_init_t init,
-				      sctp_outqueue_ohandler_config_t config,
-				      sctp_outqueue_ohandler_t append,
-				      sctp_outqueue_ohandler_t build,
-				      sctp_outqueue_ohandler_force_t force)
+int sctp_outq_set_output_handlers(struct sctp_outq *q,
+				      sctp_outq_ohandler_init_t init,
+				      sctp_outq_ohandler_config_t config,
+				      sctp_outq_ohandler_t append,
+				      sctp_outq_ohandler_t build,
+				      sctp_outq_ohandler_force_t force)
 {
 	q->init_output = init;
 	q->config_output = config;
@@ -1044,10 +1039,10 @@ static __u32 sctp_highest_new_tsn(sctp_sackhdr_t *sack,
 
 /* This is where we REALLY process a SACK.
  *
- * Process the sack against the outqueue.  Mostly, this just frees
+ * Process the SACK against the outqueue.  Mostly, this just frees
  * things off the transmitted queue.
  */
-int sctp_sack_outqueue(sctp_outqueue_t *q, sctp_sackhdr_t *sack)
+int sctp_outq_sack(struct sctp_outq *q, sctp_sackhdr_t *sack)
 {
 	sctp_association_t *asoc = q->asoc;
 	sctp_transport_t *transport;
@@ -1151,7 +1146,7 @@ finish:
 }
 
 /* Is the outqueue empty?  */
-int sctp_outqueue_is_empty(const sctp_outqueue_t *q)
+int sctp_outq_is_empty(const struct sctp_outq *q)
 {
 	return q->empty;
 }
@@ -1173,7 +1168,7 @@ int sctp_outqueue_is_empty(const sctp_outqueue_t *q)
  * transmitted_queue, we print a range: SACKED: TSN1-TSN2, TSN3, TSN4-TSN5.
  * KEPT TSN6-TSN7, etc.
  */
-static void sctp_check_transmitted(sctp_outqueue_t *q,
+static void sctp_check_transmitted(struct sctp_outq *q,
 				   struct list_head *transmitted_queue,
 				   sctp_transport_t *transport,
 				   sctp_sackhdr_t *sack,

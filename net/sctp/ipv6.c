@@ -113,14 +113,14 @@ static inline int sctp_v6_xmit(struct sk_buff *skb)
 
 	/* FIXME: Currently, ip6_route_output() doesn't fill in the source
 	 * address in the returned route entry. So we call ipv6_get_saddr()
-	 * to get an appropriate source address. It is possible that this address
-	 * may not be part of the bind address list of the association.
+	 * to get an appropriate source address. It is possible that this
+	 * address may not be part of the bind address list of the association.
 	 * Once ip6_route_ouput() is fixed so that it returns a route entry
 	 * with an appropriate source address, the following if condition can
-	 * be removed. With ip6_route_output() returning a source address filled
-	 * route entry, sctp_transport_route() can do real source address 
-	 * selection for v6.
-	 */ 
+	 * be removed. With ip6_route_output() returning a source address
+	 * filled route entry, sctp_transport_route() can do real source
+	 * address selection for v6.
+	 */
 	if (ipv6_addr_any(&rt6->rt6i_src.addr)) {
 		err = ipv6_get_saddr(dst, fl.fl6_dst, &saddr);
 
@@ -130,7 +130,6 @@ static inline int sctp_v6_xmit(struct sk_buff *skb)
 			       __FUNCTION__, NIP6(fl.fl6_src));
 			return err;
 		}
-
 		fl.fl6_src = &saddr;
 	} else {
 		fl.fl6_src = &rt6->rt6i_src.addr;
@@ -572,7 +571,7 @@ int sctp_v6_init(void)
 	/* Register the SCTP specfic AF_INET6 functions. */
 	sctp_register_af(&sctp_ipv6_specific);
 
-	/* Register notifier for inet6 address additions/deletions. */ 
+	/* Register notifier for inet6 address additions/deletions. */
 	register_inet6addr_notifier(&sctp_inetaddr_notifier);
 
 	return 0;

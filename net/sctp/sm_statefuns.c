@@ -191,7 +191,7 @@ sctp_disposition_t sctp_sf_do_5_1B_init(const sctp_endpoint_t *ep,
 	int len;
 
 	/* If the packet is an OOTB packet which is temporarily on the
-	 * control endpoint, responding with an ABORT.
+	 * control endpoint, respond with an ABORT.
 	 */
 	if (ep == sctp_sk((sctp_get_ctl_sock()))->ep)
 		return sctp_sf_ootb(ep, asoc, type, arg, commands);
@@ -506,7 +506,7 @@ sctp_disposition_t sctp_sf_do_5_1D_ce(const sctp_endpoint_t *ep,
 	sctp_chunk_t *err_chk_p;
 
 	/* If the packet is an OOTB packet which is temporarily on the
-	 * control endpoint, responding with an ABORT.
+	 * control endpoint, respond with an ABORT.
 	 */
 	if (ep == sctp_sk((sctp_get_ctl_sock()))->ep)
 		return sctp_sf_ootb(ep, asoc, type, arg, commands);
@@ -1337,7 +1337,7 @@ sctp_disposition_t sctp_sf_do_5_2_2_dupinit(const sctp_endpoint_t *ep,
 
 
 
-/* Unexpected COOKIE-ECHO handlerfor peer restart (Table 2, action 'A')
+/* Unexpected COOKIE-ECHO handler for peer restart (Table 2, action 'A')
  *
  * Section 5.2.4
  *  A)  In this case, the peer may have restarted.
@@ -2030,7 +2030,7 @@ sctp_disposition_t sctp_sf_do_9_2_shutdown(const sctp_endpoint_t *ep,
 			SCTP_STATE(SCTP_STATE_SHUTDOWN_RECEIVED));
 	disposition = SCTP_DISPOSITION_CONSUME;
 
-	if (sctp_outqueue_is_empty(&asoc->outqueue)) {
+	if (sctp_outq_is_empty(&asoc->outqueue)) {
 		disposition = sctp_sf_do_9_2_shutdown_ack(ep, asoc, type,
 							  arg, commands);
 	}
@@ -3429,7 +3429,7 @@ sctp_disposition_t sctp_sf_do_9_2_prm_shutdown(const sctp_endpoint_t *ep,
 			SCTP_TO(SCTP_EVENT_TIMEOUT_T5_SHUTDOWN_GUARD));
 
 	disposition = SCTP_DISPOSITION_CONSUME;
-	if (sctp_outqueue_is_empty(&asoc->outqueue)) {
+	if (sctp_outq_is_empty(&asoc->outqueue)) {
 		disposition = sctp_sf_do_9_2_start_shutdown(ep, asoc, type,
 							    arg, commands);
 	}
@@ -4203,7 +4203,7 @@ sctp_disposition_t sctp_sf_autoclose_timer_expire(const sctp_endpoint_t *ep,
 	sctp_add_cmd_sf(commands, SCTP_CMD_TIMER_START,
 			SCTP_TO(SCTP_EVENT_TIMEOUT_T5_SHUTDOWN_GUARD));
 	disposition = SCTP_DISPOSITION_CONSUME;
-	if (sctp_outqueue_is_empty(&asoc->outqueue)) {
+	if (sctp_outq_is_empty(&asoc->outqueue)) {
 		disposition = sctp_sf_do_9_2_start_shutdown(ep, asoc, type,
 							    arg, commands);
 	}
