@@ -78,8 +78,8 @@ STATIC int
 xfs_lock_for_rename(
 	xfs_inode_t	*dp1,	/* old (source) directory inode */
 	xfs_inode_t	*dp2,	/* new (target) directory inode */
-	struct dentry	*dentry1, /* old entry name */
-	struct dentry	*dentry2, /* new entry name */
+	vname_t		*dentry1, /* old entry name */
+	vname_t		*dentry2, /* new entry name */
 	xfs_inode_t	**ipp1, /* inode of old entry */
 	xfs_inode_t	**ipp2, /* inode of new entry, if it
 				   already exists, NULL otherwise. */
@@ -224,9 +224,9 @@ int xfs_renames;
 int
 xfs_rename(
 	bhv_desc_t	*src_dir_bdp,
-	struct dentry	*src_dentry,
+	vname_t		*src_dentry,
 	vnode_t		*target_dir_vp,
-	struct dentry	*target_dentry,
+	vname_t		*target_dentry,
 	cred_t		*credp)
 {
 	xfs_trans_t	*tp;
@@ -246,8 +246,8 @@ xfs_rename(
 	int		spaceres;
 	int		target_link_zero = 0;
 	int		num_inodes;
-	char		*src_name = (char *)src_dentry->d_name.name;
-	char		*target_name = (char *)target_dentry->d_name.name;
+	char		*src_name = VNAME(src_dentry);
+	char		*target_name = VNAME(target_dentry);
 	int		src_namelen;
 	int		target_namelen;
 #ifdef DEBUG
@@ -268,10 +268,10 @@ xfs_rename(
 	if (target_dir_bdp == NULL) {
 		return XFS_ERROR(EXDEV);
 	}
-	src_namelen = src_dentry->d_name.len;
+	src_namelen = VNAMELEN(src_dentry);
 	if (src_namelen >= MAXNAMELEN)
 		return XFS_ERROR(ENAMETOOLONG);
-	target_namelen = target_dentry->d_name.len;
+	target_namelen = VNAMELEN(target_dentry);
 	if (target_namelen >= MAXNAMELEN)
 		return XFS_ERROR(ENAMETOOLONG);
 	src_dp = XFS_BHVTOI(src_dir_bdp);

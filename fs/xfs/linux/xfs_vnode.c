@@ -35,8 +35,7 @@
 
 
 uint64_t vn_generation;		/* vnode generation number */
-
-spinlock_t	vnumber_lock = SPIN_LOCK_UNLOCKED;
+spinlock_t vnumber_lock = SPIN_LOCK_UNLOCKED;
 
 /*
  * Dedicated vnode inactive/reclaim sync semaphores.
@@ -59,9 +58,6 @@ u_short vttoif_tab[] = {
 	0, S_IFREG, S_IFDIR, S_IFBLK, S_IFCHR, S_IFLNK, S_IFIFO, 0, S_IFSOCK
 };
 
-#define VN_LOCK(vp)		spin_lock(&(vp)->v_lock)
-#define VN_UNLOCK(vp)		spin_unlock(&(vp)->v_lock)
-
 
 void
 vn_init(void)
@@ -73,14 +69,13 @@ vn_init(void)
 		init_sv(svp, SV_DEFAULT, "vsy", i);
 }
 
-
 /*
  * Clean a vnode of filesystem-specific data and prepare it for reuse.
  */
 STATIC int
 vn_reclaim(struct vnode *vp)
 {
-	int error;
+	int	error;
 
 	XFS_STATS_INC(xfsstats.vn_reclaim);
 
@@ -98,7 +93,6 @@ vn_reclaim(struct vnode *vp)
 	ASSERT(vp->v_fbhv == NULL);
 
 	VN_LOCK(vp);
-
 	vp->v_flag &= (VRECLM|VWAIT);
 	VN_UNLOCK(vp);
 
@@ -189,7 +183,7 @@ vn_get(struct vnode *vp, vmap_t *vmap)
 }
 
 /*
- * "revalidate" the linux inode.
+ * Revalidate the Linux inode from the vnode.
  */
 int
 vn_revalidate(struct vnode *vp)
@@ -199,17 +193,12 @@ vn_revalidate(struct vnode *vp)
 	vattr_t		va;
 
 	vn_trace_entry(vp, "vn_revalidate", (inst_t *)__return_address);
+	ASSERT(vp->v_fbhv != NULL);
 
 	va.va_mask = XFS_AT_STAT|XFS_AT_GENCOUNT;
-
-	ASSERT(vp->v_bh.bh_first != NULL);
-
 	VOP_GETATTR(vp, &va, 0, NULL, error);
-
-	if (! error) {
+	if (!error) {
 		inode = LINVFS_GET_IP(vp);
-		ASSERT(inode);
-
 		inode->i_mode	    = VTTOIF(va.va_type) | va.va_mode;
 		inode->i_nlink	    = va.va_nlink;
 		inode->i_uid	    = va.va_uid;
@@ -224,10 +213,8 @@ vn_revalidate(struct vnode *vp)
 		inode->i_atime.tv_nsec	    = va.va_atime.tv_nsec;
 		VUNMODIFY(vp);
 	}
-
 	return -error;
 }
-
 
 /*
  * purge a vnode from the cache
@@ -317,11 +304,9 @@ void
 vn_rele(struct vnode *vp)
 {
 	int	vcnt;
-	/* REFERENCED */
-	int cache;
+	int	cache;
 
 	XFS_STATS_INC(xfsstats.vn_rele);
-
 
 	VN_LOCK(vp);
 
@@ -364,7 +349,6 @@ vn_rele(struct vnode *vp)
 
 	vn_trace_exit(vp, "vn_rele", (inst_t *)__return_address);
 }
-
 
 /*
  * Finish the removal of a vnode.

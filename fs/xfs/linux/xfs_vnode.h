@@ -32,6 +32,12 @@
 #ifndef __XFS_VNODE_H__
 #define __XFS_VNODE_H__
 
+struct uio;
+struct file;
+struct vattr;
+struct page_buf_bmap_s;
+struct attrlist_cursor_kern;
+
 /*
  * Vnode types (unrelated to on-disk inodes).  VNON means no type.
  */
@@ -47,12 +53,9 @@ typedef enum vtype {
 	VSOCK	= 8
 } vtype_t;
 
-typedef __u64	vnumber_t;
-
-/*
- * Define the type of behavior head used by vnodes.
- */
-#define vn_bhv_head_t	bhv_head_t
+typedef xfs_ino_t vnumber_t;
+typedef struct dentry vname_t;
+typedef bhv_head_t vn_bhv_head_t;
 
 /*
  * MP locking protocols:
@@ -61,17 +64,49 @@ typedef __u64	vnumber_t;
  */
 typedef struct vnode {
 	__u32		v_flag;			/* vnode flags (see below) */
-	enum vtype	v_type;			/* vnode type		*/
-	struct vfs	*v_vfsp;		/* ptr to containing VFS*/
+	enum vtype	v_type;			/* vnode type */
+	struct vfs	*v_vfsp;		/* ptr to containing VFS */
 	vnumber_t	v_number;		/* in-core vnode number */
 	vn_bhv_head_t	v_bh;			/* behavior head */
-
-	spinlock_t	v_lock;			/* don't use VLOCK on Linux */
-	struct inode	v_inode;		/* linux inode */
+	spinlock_t	v_lock;			/* VN_LOCK/VN_UNLOCK */
+	struct inode	v_inode;		/* Linux inode */
 #ifdef CONFIG_XFS_VNODE_TRACING
 	struct ktrace	*v_trace;		/* trace header structure    */
 #endif
 } vnode_t;
+
+#define v_fbhv			v_bh.bh_first	       /* first behavior */
+#define v_fops			v_bh.bh_first->bd_ops  /* first behavior ops */
+
+#define VNODE_POSITION_BASE	BHV_POSITION_BASE	/* chain bottom */
+#define VNODE_POSITION_TOP	BHV_POSITION_TOP	/* chain top */
+#define VNODE_POSITION_INVALID	BHV_POSITION_INVALID	/* invalid pos. num */
+
+typedef enum {
+	VN_BHV_UNKNOWN,		/* not specified */
+	VN_BHV_XFS,		/* xfs */
+	VN_BHV_END		/* housekeeping end-of-range */
+} vn_bhv_t;
+
+#define VNODE_POSITION_XFS	(VNODE_POSITION_BASE)
+
+/*
+ * Macros for dealing with the behavior descriptor inside of the vnode.
+ */
+#define BHV_TO_VNODE(bdp)	((vnode_t *)BHV_VOBJ(bdp))
+#define BHV_TO_VNODE_NULL(bdp)	((vnode_t *)BHV_VOBJNULL(bdp))
+
+#define VNODE_TO_FIRST_BHV(vp)		(BHV_HEAD_FIRST(&(vp)->v_bh))
+#define VN_BHV_HEAD(vp)			((bhv_head_t *)(&((vp)->v_bh)))
+#define VN_BHV_READ_LOCK(bhp)		BHV_READ_LOCK(bhp)
+#define VN_BHV_READ_UNLOCK(bhp)		BHV_READ_UNLOCK(bhp)
+#define VN_BHV_WRITE_LOCK(bhp)		BHV_WRITE_LOCK(bhp)
+#define VN_BHV_NOT_READ_LOCKED(bhp)	BHV_NOT_READ_LOCKED(bhp)
+#define VN_BHV_NOT_WRITE_LOCKED(bhp)	BHV_NOT_WRITE_LOCKED(bhp)
+#define vn_bhv_head_init(bhp,name)	bhv_head_init(bhp,name)
+#define vn_bhv_remove(bhp,bdp)		bhv_remove(bhp,bdp)
+#define vn_bhv_lookup(bhp,ops)		bhv_lookup(bhp,ops)
+#define vn_bhv_lookup_unlocked(bhp,ops) bhv_lookup_unlocked(bhp,ops)
 
 /*
  * Vnode to Linux inode mapping.
@@ -91,23 +126,12 @@ extern ushort		vttoif_tab[];
 
 /*
  * Vnode flags.
- *
- * The vnode flags fall into two categories:
- * 1) Local only -
- *    Flags that are relevant only to a particular cell
- * 2) Single system image -
- *    Flags that must be maintained coherent across all cells
  */
- /* Local only flags */
 #define VINACT		       0x1	/* vnode is being inactivated	*/
 #define VRECLM		       0x2	/* vnode is being reclaimed	*/
-#define VWAIT		       0x4	/* waiting for VINACT
-					   or VRECLM to finish */
-#define VMODIFIED	       0x8	/* xfs inode state possibly different
-					 * from linux inode state.
-					 */
-
-/* Single system image flags */
+#define VWAIT		       0x4	/* waiting for VINACT/VRECLM to end */
+#define VMODIFIED	       0x8	/* XFS inode state possibly differs */
+					/* to the Linux inode state.	*/
 #define VROOT		  0x100000	/* root of its file system	*/
 #define VNOSWAP		  0x200000	/* cannot be used as virt swap device */
 #define VISSWAP		  0x400000	/* vnode is part of virt swap device */
@@ -115,7 +139,6 @@ extern ushort		vttoif_tab[];
 #define VNONREPLICABLE	 0x1000000	/* Vnode has writers. Don't replicate */
 #define VDOCMP		 0x2000000	/* Vnode has special VOP_CMP impl. */
 #define VSHARE		 0x4000000	/* vnode part of global cache	*/
-					/* VSHARE applies to local cell only */
 #define VFRLOCKS	 0x8000000	/* vnode has FR locks applied	*/
 #define VENF_LOCKING	0x10000000	/* enf. mode FR locking in effect */
 #define VOPLOCK		0x20000000	/* oplock set on the vnode	*/
@@ -143,35 +166,6 @@ typedef enum vchange {
 	VCHANGE_FLAGS_IOEXCL_COUNT	= 4
 } vchange_t;
 
-/*
- * Macros for dealing with the behavior descriptor inside of the vnode.
- */
-#define BHV_TO_VNODE(bdp)	((vnode_t *)BHV_VOBJ(bdp))
-#define BHV_TO_VNODE_NULL(bdp)	((vnode_t *)BHV_VOBJNULL(bdp))
-
-#define VNODE_TO_FIRST_BHV(vp)		(BHV_HEAD_FIRST(&(vp)->v_bh))
-#define VN_BHV_HEAD(vp)			((vn_bhv_head_t *)(&((vp)->v_bh)))
-#define VN_BHV_READ_LOCK(bhp)		BHV_READ_LOCK(bhp)
-#define VN_BHV_READ_UNLOCK(bhp)		BHV_READ_UNLOCK(bhp)
-#define VN_BHV_WRITE_LOCK(bhp)		BHV_WRITE_LOCK(bhp)
-#define VN_BHV_NOT_READ_LOCKED(bhp)	BHV_NOT_READ_LOCKED(bhp)
-#define VN_BHV_NOT_WRITE_LOCKED(bhp)	BHV_NOT_WRITE_LOCKED(bhp)
-#define vn_bhv_head_init(bhp,name)	bhv_head_init(bhp,name)
-#define vn_bhv_head_reinit(bhp)		bhv_head_reinit(bhp)
-#define vn_bhv_insert_initial(bhp,bdp)	bhv_insert_initial(bhp,bdp)
-#define vn_bhv_remove(bhp,bdp)		bhv_remove(bhp,bdp)
-#define vn_bhv_lookup(bhp,ops)		bhv_lookup(bhp,ops)
-#define vn_bhv_lookup_unlocked(bhp,ops) bhv_lookup_unlocked(bhp,ops)
-
-#define v_fbhv		v_bh.bh_first	       /* first behavior */
-#define v_fops		v_bh.bh_first->bd_ops  /* ops for first behavior */
-
-
-struct uio;
-struct file;
-struct vattr;
-struct page_buf_bmap_s;
-struct attrlist_cursor_kern;
 
 typedef int	(*vop_open_t)(bhv_desc_t *, struct cred *);
 typedef ssize_t (*vop_read_t)(bhv_desc_t *, struct file *,
@@ -183,37 +177,39 @@ typedef ssize_t (*vop_write_t)(bhv_desc_t *, struct file *,
 typedef ssize_t (*vop_sendfile_t)(bhv_desc_t *, struct file *,
 				loff_t *, size_t, read_actor_t,
 				void *, struct cred *);
-typedef int	(*vop_ioctl_t)(bhv_desc_t *, struct inode *, struct file *, unsigned int, unsigned long);
+typedef int	(*vop_ioctl_t)(bhv_desc_t *, struct inode *, struct file *,
+				unsigned int, unsigned long);
 typedef int	(*vop_getattr_t)(bhv_desc_t *, struct vattr *, int,
 				struct cred *);
 typedef int	(*vop_setattr_t)(bhv_desc_t *, struct vattr *, int,
 				struct cred *);
 typedef int	(*vop_access_t)(bhv_desc_t *, int, struct cred *);
-typedef int	(*vop_lookup_t)(bhv_desc_t *, struct dentry *, vnode_t **,
+typedef int	(*vop_lookup_t)(bhv_desc_t *, vname_t *, vnode_t **,
 				int, vnode_t *, struct cred *);
-typedef int	(*vop_create_t)(bhv_desc_t *, struct dentry *, struct vattr *,
+typedef int	(*vop_create_t)(bhv_desc_t *, vname_t *, struct vattr *,
 				vnode_t **, struct cred *);
-typedef int	(*vop_remove_t)(bhv_desc_t *, struct dentry *, struct cred *);
-typedef int	(*vop_link_t)(bhv_desc_t *, vnode_t *, struct dentry *,
+typedef int	(*vop_remove_t)(bhv_desc_t *, vname_t *, struct cred *);
+typedef int	(*vop_link_t)(bhv_desc_t *, vnode_t *, vname_t *,
 				struct cred *);
-typedef int	(*vop_rename_t)(bhv_desc_t *, struct dentry *, vnode_t *,
-				struct dentry *, struct cred *);
-typedef int	(*vop_mkdir_t)(bhv_desc_t *, struct dentry *, struct vattr *,
+typedef int	(*vop_rename_t)(bhv_desc_t *, vname_t *, vnode_t *, vname_t *,
+				struct cred *);
+typedef int	(*vop_mkdir_t)(bhv_desc_t *, vname_t *, struct vattr *,
 				vnode_t **, struct cred *);
-typedef	int	(*vop_rmdir_t)(bhv_desc_t *, struct dentry *, struct cred *);
+typedef int	(*vop_rmdir_t)(bhv_desc_t *, vname_t *, struct cred *);
 typedef int	(*vop_readdir_t)(bhv_desc_t *, struct uio *, struct cred *,
 				int *);
-typedef int	(*vop_symlink_t)(bhv_desc_t *, struct dentry *,
-				struct vattr *, char *,
-				vnode_t **, struct cred *);
+typedef int	(*vop_symlink_t)(bhv_desc_t *, vname_t *, struct vattr *,
+				char *, vnode_t **, struct cred *);
 typedef int	(*vop_readlink_t)(bhv_desc_t *, struct uio *, struct cred *);
-typedef int	(*vop_fsync_t)(bhv_desc_t *, int, struct cred *, xfs_off_t, xfs_off_t);
+typedef int	(*vop_fsync_t)(bhv_desc_t *, int, struct cred *,
+				xfs_off_t, xfs_off_t);
 typedef int	(*vop_inactive_t)(bhv_desc_t *, struct cred *);
 typedef int	(*vop_fid2_t)(bhv_desc_t *, struct fid *);
 typedef int	(*vop_release_t)(bhv_desc_t *);
 typedef int	(*vop_rwlock_t)(bhv_desc_t *, vrwlock_t);
 typedef void	(*vop_rwunlock_t)(bhv_desc_t *, vrwlock_t);
-typedef int	(*vop_bmap_t)(bhv_desc_t *, xfs_off_t, ssize_t, int, struct page_buf_bmap_s *, int *);
+typedef int	(*vop_bmap_t)(bhv_desc_t *, xfs_off_t, ssize_t, int,
+				struct page_buf_bmap_s *, int *);
 typedef int	(*vop_reclaim_t)(bhv_desc_t *);
 typedef int	(*vop_attr_get_t)(bhv_desc_t *, char *, char *, int *, int,
 				struct cred *);
@@ -226,7 +222,8 @@ typedef void	(*vop_link_removed_t)(bhv_desc_t *, vnode_t *, int);
 typedef void	(*vop_vnode_change_t)(bhv_desc_t *, vchange_t, __psint_t);
 typedef void	(*vop_ptossvp_t)(bhv_desc_t *, xfs_off_t, xfs_off_t, int);
 typedef void	(*vop_pflushinvalvp_t)(bhv_desc_t *, xfs_off_t, xfs_off_t, int);
-typedef int	(*vop_pflushvp_t)(bhv_desc_t *, xfs_off_t, xfs_off_t, uint64_t, int);
+typedef int	(*vop_pflushvp_t)(bhv_desc_t *, xfs_off_t, xfs_off_t,
+				uint64_t, int);
 typedef int	(*vop_iflush_t)(bhv_desc_t *, int);
 
 
@@ -677,8 +674,16 @@ extern void	vn_rele(struct vnode *);
 #endif	/* ! (defined(CONFIG_XFS_VNODE_TRACING) */
 
 /*
+ * Vname handling macros.
+ */
+#define VNAME(dentry)		((char *) (dentry)->d_name.name)
+#define VNAMELEN(dentry)	((dentry)->d_name.len)
+
+/*
  * Vnode spinlock manipulation.
  */
+#define VN_LOCK(vp)		spin_lock(&(vp)->v_lock)
+#define VN_UNLOCK(vp)		spin_unlock(&(vp)->v_lock)
 #define VN_FLAGSET(vp,b)	vn_flagset(vp,b)
 #define VN_FLAGCLR(vp,b)	vn_flagclr(vp,b)
 

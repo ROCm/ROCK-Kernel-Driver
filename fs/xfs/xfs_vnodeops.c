@@ -60,7 +60,6 @@ xfs_ctrunc_trace(
  * fifo vnodes are "wrapped" by specfs and fifofs vnodes, respectively,
  * when a new vnode is first looked up or created.
  */
-/*ARGSUSED*/
 STATIC int
 xfs_open(
 	bhv_desc_t	*bdp,
@@ -92,7 +91,6 @@ xfs_open(
 /*
  * xfs_getattr
  */
-/*ARGSUSED*/
 int
 xfs_getattr(
 	bhv_desc_t	*bdp,
@@ -105,8 +103,7 @@ xfs_getattr(
 	vnode_t		*vp;
 
 	vp  = BHV_TO_VNODE(bdp);
-
-	vn_trace_entry(vp, "xfs_getattr", (inst_t *)__return_address);
+	vn_trace_entry(vp, __FUNCTION__, (inst_t *)__return_address);
 
 	ip = XFS_BHVTOI(bdp);
 	mp = ip->i_mount;
@@ -284,12 +281,12 @@ xfs_setattr(
 	int		privileged;
 	int		mandlock_before, mandlock_after;
 	uint		qflags;
-	struct xfs_dquot *udqp, *gdqp, *olddquot1, *olddquot2;
+	xfs_dquot_t	*udqp, *gdqp, *olddquot1, *olddquot2;
 	int		file_owner;
 
 	vp = BHV_TO_VNODE(bdp);
+	vn_trace_entry(vp, __FUNCTION__, (inst_t *)__return_address);
 
-	vn_trace_entry(vp, "xfs_setattr", (inst_t *)__return_address);
 	/*
 	 * Cannot set certain attributes.
 	 */
@@ -914,14 +911,13 @@ xfs_setattr(
 		xfs_iunlock(ip, lock_flags);
 	}
 	return code;
-} /* xfs_setattr */
+}
 
 
 /*
  * xfs_access
  * Null conversion from vnode mode bits to inode mode bits, as in efs.
  */
-/*ARGSUSED*/
 STATIC int
 xfs_access(
 	bhv_desc_t	*bdp,
@@ -931,7 +927,7 @@ xfs_access(
 	xfs_inode_t	*ip;
 	int		error;
 
-	vn_trace_entry(BHV_TO_VNODE(bdp), "xfs_access",
+	vn_trace_entry(BHV_TO_VNODE(bdp), __FUNCTION__,
 					       (inst_t *)__return_address);
 
 	ip = XFS_BHVTOI(bdp);
@@ -946,7 +942,6 @@ xfs_access(
  * xfs_readlink
  *
  */
-/*ARGSUSED*/
 STATIC int
 xfs_readlink(
 	bhv_desc_t	*bdp,
@@ -968,8 +963,7 @@ xfs_readlink(
 	xfs_buf_t	*bp;
 
 	vp = BHV_TO_VNODE(bdp);
-
-	vn_trace_entry(vp, "xfs_readlink", (inst_t *)__return_address);
+	vn_trace_entry(vp, __FUNCTION__, (inst_t *)__return_address);
 
 	ip = XFS_BHVTOI(bdp);
 	mp = ip->i_mount;
@@ -1049,6 +1043,7 @@ error_return:
 	return error;
 }
 
+
 /*
  * xfs_fsync
  *
@@ -1058,7 +1053,6 @@ error_return:
  * be held while flushing the data, so acquire after we're done
  * with that.
  */
-/*ARGSUSED*/
 STATIC int
 xfs_fsync(
 	bhv_desc_t	*bdp,
@@ -1069,16 +1063,13 @@ xfs_fsync(
 {
 	xfs_inode_t	*ip;
 	int		error;
-	/* REFERENCED */
 	int		error2;
-					/* REFERENCED */
 	int		syncall;
 	vnode_t		*vp;
 	xfs_trans_t	*tp;
 
 	vp = BHV_TO_VNODE(bdp);
-
-	vn_trace_entry(vp, "xfs_fsync", (inst_t *)__return_address);
+	vn_trace_entry(vp, __FUNCTION__, (inst_t *)__return_address);
 
 	ip = XFS_BHVTOI(bdp);
 
@@ -1528,6 +1519,7 @@ xfs_inactive_symlink_local(
 	xfs_trans_t	**tpp)
 {
 	int		error;
+
 	ASSERT(ip->i_d.di_size <= XFS_IFORK_DSIZE(ip));
 	/*
 	 * We're freeing a symlink which fit into
@@ -1610,7 +1602,6 @@ xfs_inactive_attrs(
 	return (0);
 }
 
-/*ARGSUSED*/
 STATIC int
 xfs_release(
 	bhv_desc_t	*bdp)
@@ -1657,14 +1648,12 @@ xfs_release(
  * now be truncated.  Also, we clear all of the read-ahead state
  * kept for the inode here since the file is now closed.
  */
-/*ARGSUSED*/
 STATIC int
 xfs_inactive(
 	bhv_desc_t	*bdp,
 	cred_t		*credp)
 {
 	xfs_inode_t	*ip;
-			/* REFERENCED */
 	vnode_t		*vp;
 	xfs_trans_t	*tp;
 	xfs_mount_t	*mp;
@@ -1673,8 +1662,7 @@ xfs_inactive(
 	int		truncate;
 
 	vp = BHV_TO_VNODE(bdp);
-
-	vn_trace_entry(vp, "xfs_inactive", (inst_t *)__return_address);
+	vn_trace_entry(vp, __FUNCTION__, (inst_t *)__return_address);
 
 	ip = XFS_BHVTOI(bdp);
 
@@ -1882,15 +1870,14 @@ xfs_inactive(
 /*
  * xfs_lookup
  */
-/*ARGSUSED*/
 STATIC int
 xfs_lookup(
-	bhv_desc_t	*dir_bdp,
-	struct dentry	*dentry,
-	vnode_t		**vpp,
-	int		flags,
-	vnode_t		*rdir,
-	cred_t		*credp)
+	bhv_desc_t		*dir_bdp,
+	vname_t			*dentry,
+	vnode_t			**vpp,
+	int			flags,
+	vnode_t			*rdir,
+	cred_t			*credp)
 {
 	xfs_inode_t		*dp, *ip;
 	struct vnode		*vp;
@@ -1900,8 +1887,7 @@ xfs_lookup(
 	vnode_t			*dir_vp;
 
 	dir_vp = BHV_TO_VNODE(dir_bdp);
-
-	vn_trace_entry(dir_vp, "xfs_lookup", (inst_t *)__return_address);
+	vn_trace_entry(dir_vp, __FUNCTION__, (inst_t *)__return_address);
 
 	dp = XFS_BHVTOI(dir_bdp);
 
@@ -1965,13 +1951,13 @@ xfs_ctrunc_trace(
  */
 STATIC int
 xfs_create(
-	bhv_desc_t	*dir_bdp,
-	struct dentry	*dentry,
-	vattr_t		*vap,
-	vnode_t		**vpp,
-	cred_t		*credp)
+	bhv_desc_t		*dir_bdp,
+	vname_t			*dentry,
+	vattr_t			*vap,
+	vnode_t			**vpp,
+	cred_t			*credp)
 {
-	char			*name = (char *)dentry->d_name.name;
+	char			*name = VNAME(dentry);
 	vnode_t			*dir_vp;
 	xfs_inode_t		*dp, *ip;
 	vnode_t			*vp=NULL;
@@ -1986,19 +1972,19 @@ xfs_create(
 	uint			cancel_flags;
 	int			committed;
 	xfs_prid_t		prid;
-	struct xfs_dquot	*udqp, *gdqp;
+	xfs_dquot_t		*udqp, *gdqp;
 	uint			resblks;
 	int			dm_di_mode;
 	int			namelen;
 
 	ASSERT(!*vpp);
 	dir_vp = BHV_TO_VNODE(dir_bdp);
+	vn_trace_entry(dir_vp, __FUNCTION__, (inst_t *)__return_address);
+
 	dp = XFS_BHVTOI(dir_bdp);
 
-	vn_trace_entry(dir_vp, "xfs_create", (inst_t *)__return_address);
-
 	dm_di_mode = vap->va_mode|VTTOIF(vap->va_type);
-	namelen = dentry->d_name.len;
+	namelen = VNAMELEN(dentry);
 	if (namelen >= MAXNAMELEN)
 		return XFS_ERROR(ENAMETOOLONG);
 
@@ -2222,7 +2208,6 @@ std_return:
 }
 
 #ifdef DEBUG
-
 /*
  * Some counters to see if (and how often) we are hitting some deadlock
  * prevention code paths.
@@ -2263,14 +2248,14 @@ int xfs_rm_attempts;
 STATIC int
 xfs_lock_dir_and_entry(
 	xfs_inode_t	*dp,
-	struct dentry	*dentry,
+	vname_t		*dentry,
 	xfs_inode_t	*ip,	/* inode of entry 'name' */
 	int		*entry_changed)
 {
-	int			attempts;
-	xfs_ino_t		e_inum;
-	xfs_inode_t		*ips[2];
-	xfs_log_item_t		*lp;
+	int		attempts;
+	xfs_ino_t	e_inum;
+	xfs_inode_t	*ips[2];
+	xfs_log_item_t	*lp;
 
 #ifdef DEBUG
 	xfs_rm_locks++;
@@ -2359,12 +2344,13 @@ int xfs_lock_delays;
  * in the log.
  */
 void
-xfs_lock_inodes (xfs_inode_t **ips,
-	int inodes,
-	int first_locked,
-	uint lock_mode)
+xfs_lock_inodes(
+	xfs_inode_t	**ips,
+	int		inodes,
+	int		first_locked,
+	uint		lock_mode)
 {
-	int attempts = 0, i, j, try_lock;
+	int		attempts = 0, i, j, try_lock;
 	xfs_log_item_t	*lp;
 
 	ASSERT(ips && (inodes >= 2)); /* we need at least two */
@@ -2470,18 +2456,19 @@ int remove_which_error_return = 0;
 #define REMOVE_DEBUG_TRACE(x)
 #endif	/* ! DEBUG */
 
+
 /*
  * xfs_remove
  *
  */
 STATIC int
 xfs_remove(
-	bhv_desc_t	*dir_bdp,
-	struct dentry	*dentry,
-	cred_t		*credp)
+	bhv_desc_t		*dir_bdp,
+	vname_t			*dentry,
+	cred_t			*credp)
 {
 	vnode_t			*dir_vp;
-	char			*name = (char *) dentry->d_name.name;
+	char			*name = VNAME(dentry);
 	xfs_inode_t		*dp, *ip;
 	xfs_trans_t		*tp = NULL;
 	xfs_mount_t		*mp;
@@ -2495,11 +2482,9 @@ xfs_remove(
 	int			link_zero;
 	uint			resblks;
 	int			namelen;
-/*	bhv_desc_t		*bdp; */
 
 	dir_vp = BHV_TO_VNODE(dir_bdp);
-
-	vn_trace_entry(dir_vp, "xfs_remove", (inst_t *)__return_address);
+	vn_trace_entry(dir_vp, __FUNCTION__, (inst_t *)__return_address);
 
 	dp = XFS_BHVTOI(dir_bdp);
 	mp = dp->i_mount;
@@ -2507,7 +2492,7 @@ xfs_remove(
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
 
-	namelen = dentry->d_name.len;
+	namelen = VNAMELEN(dentry);
 	if (namelen >= MAXNAMELEN)
 		return XFS_ERROR(ENAMETOOLONG);
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_EVENT_REMOVE)) {
@@ -2542,7 +2527,7 @@ xfs_remove(
 
 	dm_di_mode = ip->i_d.di_mode;
 
-	vn_trace_entry(XFS_ITOV(ip), "xfs_remove", (inst_t *)__return_address);
+	vn_trace_entry(XFS_ITOV(ip), __FUNCTION__, (inst_t *)__return_address);
 
 	ITRACE(ip);
 
@@ -2701,8 +2686,7 @@ xfs_remove(
 		goto std_return;
 	}
 
-	vn_trace_exit(XFS_ITOV(ip), "xfs_remove",
-						(inst_t *)__return_address);
+	vn_trace_exit(XFS_ITOV(ip), __FUNCTION__, (inst_t *)__return_address);
 
 	/*
 	 * Let interposed file systems know about removed links.
@@ -2754,10 +2738,10 @@ std_return:
  */
 STATIC int
 xfs_link(
-	bhv_desc_t	*target_dir_bdp,
-	vnode_t		*src_vp,
-	struct dentry	*dentry,
-	cred_t		*credp)
+	bhv_desc_t		*target_dir_bdp,
+	vnode_t			*src_vp,
+	vname_t			*dentry,
+	cred_t			*credp)
 {
 	xfs_inode_t		*tdp, *sip;
 	xfs_trans_t		*tp;
@@ -2771,18 +2755,18 @@ xfs_link(
 	vnode_t			*target_dir_vp;
 	bhv_desc_t		*src_bdp;
 	int			resblks;
-	char			*target_name = (char *)dentry->d_name.name;
+	char			*target_name = VNAME(dentry);
 	int			target_namelen;
 
 	target_dir_vp = BHV_TO_VNODE(target_dir_bdp);
+	vn_trace_entry(target_dir_vp, __FUNCTION__, (inst_t *)__return_address);
+	vn_trace_entry(src_vp, __FUNCTION__, (inst_t *)__return_address);
 
-	vn_trace_entry(target_dir_vp, "xfs_link", (inst_t *)__return_address);
-
-	target_namelen = dentry->d_name.len;
+	target_namelen = VNAMELEN(dentry);
 	if (target_namelen >= MAXNAMELEN)
 		return XFS_ERROR(ENAMETOOLONG);
-
-	vn_trace_entry(src_vp, "xfs_link", (inst_t *)__return_address);
+	if (src_vp->v_type == VDIR)
+		return XFS_ERROR(EPERM);
 
 	/*
 	 * For now, manually find the XFS behavior descriptor for
@@ -2927,21 +2911,19 @@ std_return:
 }
 
 
-
-
 /*
  * xfs_mkdir
  *
  */
 STATIC int
 xfs_mkdir(
-	bhv_desc_t	*dir_bdp,
-	struct dentry	*dentry,
-	vattr_t		*vap,
-	vnode_t		**vpp,
-	cred_t		*credp)
+	bhv_desc_t		*dir_bdp,
+	vname_t			*dentry,
+	vattr_t			*vap,
+	vnode_t			**vpp,
+	cred_t			*credp)
 {
-	char			*dir_name = (char *)dentry->d_name.name;
+	char			*dir_name = VNAME(dentry);
 	xfs_inode_t		*dp;
 	xfs_inode_t		*cdp;	/* inode of created dir */
 	vnode_t			*cvp;	/* vnode of created dir */
@@ -2958,7 +2940,7 @@ xfs_mkdir(
 	boolean_t		created = B_FALSE;
 	int			dm_event_sent = 0;
 	xfs_prid_t		prid;
-	struct xfs_dquot	*udqp, *gdqp;
+	xfs_dquot_t		*udqp, *gdqp;
 	uint			resblks;
 	int			dm_di_mode;
 	int			dir_namelen;
@@ -2970,7 +2952,7 @@ xfs_mkdir(
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
 
-	dir_namelen = dentry->d_name.len;
+	dir_namelen = VNAMELEN(dentry);
 	if (dir_namelen >= MAXNAMELEN)
 		return XFS_ERROR(ENAMETOOLONG);
 
@@ -2987,7 +2969,7 @@ xfs_mkdir(
 
 	/* Return through std_return after this point. */
 
-	vn_trace_entry(dir_vp, "xfs_mkdir", (inst_t *)__return_address);
+	vn_trace_entry(dir_vp, __FUNCTION__, (inst_t *)__return_address);
 
 	mp = dp->i_mount;
 	udqp = gdqp = NULL;
@@ -3184,16 +3166,15 @@ std_return:
  */
 STATIC int
 xfs_rmdir(
-	bhv_desc_t	*dir_bdp,
-	struct dentry	*dentry,
-	cred_t		*credp)
+	bhv_desc_t		*dir_bdp,
+	vname_t			*dentry,
+	cred_t			*credp)
 {
-	char			*name = (char *)dentry->d_name.name;
+	char			*name = VNAME(dentry);
 	xfs_inode_t		*dp;
 	xfs_inode_t		*cdp;	/* child directory */
 	xfs_trans_t		*tp;
 	xfs_mount_t		*mp;
-/*	bhv_desc_t		*bdp;*/
 	int			error;
 	xfs_bmap_free_t		free_list;
 	xfs_fsblock_t		first_block;
@@ -3209,11 +3190,11 @@ xfs_rmdir(
 	dir_vp = BHV_TO_VNODE(dir_bdp);
 	dp = XFS_BHVTOI(dir_bdp);
 
-	vn_trace_entry(dir_vp, "xfs_rmdir", (inst_t *)__return_address);
+	vn_trace_entry(dir_vp, __FUNCTION__, (inst_t *)__return_address);
 
 	if (XFS_FORCED_SHUTDOWN(XFS_BHVTOI(dir_bdp)->i_mount))
 		return XFS_ERROR(EIO);
-	namelen = dentry->d_name.len;
+	namelen = VNAMELEN(dentry);
 	if (namelen >= MAXNAMELEN)
 		return XFS_ERROR(ENAMETOOLONG);
 
@@ -3446,14 +3427,12 @@ std_return:
 }
 
 
-
 /*
  * xfs_readdir
  *
  * Read dp's entries starting at uiop->uio_offset and translate them into
  * bufsize bytes worth of struct dirents starting at bufbase.
  */
-/*ARGSUSED*/
 STATIC int
 xfs_readdir(
 	bhv_desc_t	*dir_bdp,
@@ -3461,13 +3440,13 @@ xfs_readdir(
 	cred_t		*credp,
 	int		*eofp)
 {
-	xfs_inode_t		*dp;
-	xfs_trans_t		*tp = NULL;
-	int			error = 0;
-	uint			lock_mode;
-	xfs_off_t		start_offset;
+	xfs_inode_t	*dp;
+	xfs_trans_t	*tp = NULL;
+	int		error = 0;
+	uint		lock_mode;
+	xfs_off_t	start_offset;
 
-	vn_trace_entry(BHV_TO_VNODE(dir_bdp), "xfs_readdir",
+	vn_trace_entry(BHV_TO_VNODE(dir_bdp), __FUNCTION__,
 					       (inst_t *)__return_address);
 	dp = XFS_BHVTOI(dir_bdp);
 
@@ -3493,18 +3472,19 @@ xfs_readdir(
 	return error;
 }
 
+
 /*
  * xfs_symlink
  *
  */
 STATIC int
 xfs_symlink(
-	bhv_desc_t	*dir_bdp,
-	struct dentry	*dentry,
-	vattr_t		*vap,
-	char		*target_path,
-	vnode_t		**vpp,
-	cred_t		*credp)
+	bhv_desc_t		*dir_bdp,
+	vname_t			*dentry,
+	vattr_t			*vap,
+	char			*target_path,
+	vnode_t			**vpp,
+	cred_t			*credp)
 {
 	xfs_trans_t		*tp;
 	xfs_mount_t		*mp;
@@ -3529,9 +3509,9 @@ xfs_symlink(
 	int			n;
 	xfs_buf_t		*bp;
 	xfs_prid_t		prid;
-	struct xfs_dquot	*udqp, *gdqp;
+	xfs_dquot_t		*udqp, *gdqp;
 	uint			resblks;
-	char			*link_name = (char *)dentry->d_name.name;
+	char			*link_name = VNAME(dentry);
 	int			link_namelen;
 
 	*vpp = NULL;
@@ -3542,14 +3522,14 @@ xfs_symlink(
 	ip = NULL;
 	tp = NULL;
 
-	vn_trace_entry(dir_vp, "xfs_symlink", (inst_t *)__return_address);
+	vn_trace_entry(dir_vp, __FUNCTION__, (inst_t *)__return_address);
 
 	mp = dp->i_mount;
 
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
 
-	link_namelen = dentry->d_name.len;
+	link_namelen = VNAMELEN(dentry);
 	if (link_namelen >= MAXNAMELEN)
 		return XFS_ERROR(ENAMETOOLONG);
 	/*
@@ -3841,8 +3821,8 @@ xfs_fid2(
 	xfs_inode_t	*ip;
 	xfs_fid2_t	*xfid;
 
-	vn_trace_entry(BHV_TO_VNODE(bdp), "xfs_fid2",
-		       (inst_t *)__return_address);
+	vn_trace_entry(BHV_TO_VNODE(bdp), __FUNCTION__,
+				       (inst_t *)__return_address);
 	ASSERT(sizeof(fid_t) >= sizeof(xfs_fid2_t));
 
 	xfid = (xfs_fid2_t *)fidp;
@@ -3917,8 +3897,9 @@ xfs_rwunlock(
 }
 
 STATIC int
-xfs_inode_flush(bhv_desc_t	*bdp,
-		int		flags)
+xfs_inode_flush(
+	bhv_desc_t	*bdp,
+	int		flags)
 {
 	xfs_inode_t	*ip;
 	xfs_dinode_t	*dip;
@@ -4063,7 +4044,7 @@ xfs_reclaim(
 
 	vp = BHV_TO_VNODE(bdp);
 
-	vn_trace_entry(vp, "xfs_reclaim", (inst_t *)__return_address);
+	vn_trace_entry(vp, __FUNCTION__, (inst_t *)__return_address);
 
 	ASSERT(!VN_MAPPED(vp));
 	ip = XFS_BHVTOI(bdp);
@@ -4251,8 +4232,7 @@ xfs_alloc_file_space(
 	xfs_trans_t		*tp;
 	int			xfs_bmapi_flags;
 
-	vn_trace_entry(XFS_ITOV(ip), "xfs_alloc_file_space",
-					       (inst_t *)__return_address);
+	vn_trace_entry(XFS_ITOV(ip), __FUNCTION__, (inst_t *)__return_address);
 	mp = ip->i_mount;
 
 	if (XFS_FORCED_SHUTDOWN(mp))
@@ -4410,7 +4390,7 @@ dmapi_enospc_check:
 				NULL, NULL, 0, 0, 0); /* Delay flag intentionally unused */
 		if (error == 0)
 			goto retry;	/* Maybe DMAPI app. has made space */
-		/* else fall through with error = xfs_dm_send_data_event result. */
+		/* else fall through with error from xfs_dm_send_data_event */
 	}
 
 	return error;
@@ -4534,8 +4514,7 @@ xfs_free_file_space(
 	xfs_fileoff_t		startoffset_fsb;
 	xfs_trans_t		*tp;
 
-	vn_trace_entry(XFS_ITOV(ip), "xfs_free_file_space",
-					       (inst_t *)__return_address);
+	vn_trace_entry(XFS_ITOV(ip), __FUNCTION__, (inst_t *)__return_address);
 	mp = ip->i_mount;
 
 	if (XFS_IS_QUOTA_ON(mp)) {
@@ -4738,9 +4717,8 @@ xfs_change_file_space(
 	vnode_t		*vp;
 
 	vp = BHV_TO_VNODE(bdp);
+	vn_trace_entry(vp, __FUNCTION__, (inst_t *)__return_address);
 
-	vn_trace_entry(vp, "xfs_change_file_space",
-						(inst_t *)__return_address);
 	ip = XFS_BHVTOI(bdp);
 	mp = ip->i_mount;
 
@@ -4889,6 +4867,7 @@ xfs_change_file_space(
 }
 
 vnodeops_t xfs_vnodeops = {
+	BHV_IDENTITY_INIT(VN_BHV_XFS,VNODE_POSITION_XFS),
 	.vop_open		= xfs_open,
 	.vop_read		= xfs_read,
 	.vop_write		= xfs_write,
