@@ -1658,9 +1658,14 @@ static long read_tape(Scsi_Tape *STp, long count, Scsi_Request ** aSRpnt)
 
 				if (SRpnt->sr_sense_buffer[2] & 0x20) {	/* ILI */
 					if (STp->block_size == 0) {
-						if (transfer < 0) {
+						if (transfer <= 0) {
+							if (transfer < 0)
+								printk(KERN_NOTICE
+								       "%s: Failed to read %d byte block with %d byte transfer.\n",
+								       name, bytes - transfer, bytes);
 							if (STps->drv_block >= 0)
 								STps->drv_block += 1;
+							STbp->buffer_bytes = 0;
 							return (-ENOMEM);
 						}
 						STbp->buffer_bytes = bytes - transfer;
@@ -1727,6 +1732,9 @@ static long read_tape(Scsi_Tape *STp, long count, Scsi_Request ** aSRpnt)
 				} else	/* Some other extended sense code */
 					retval = (-EIO);
 			}
+
+			if (STbp->buffer_bytes < 0)  /* Caused by bogus sense data */
+				STbp->buffer_bytes = 0;
 		}
 		/* End of extended sense test */ 
 		else {		/* Non-extended sense */
@@ -2136,8 +2144,8 @@ static int read_mode_page(Scsi_Tape *STp, int page, int omit_block_descs)
 
 
 /* Send the mode page in the tape buffer to the drive. Assumes that the mode data
-   in the buffer is correctly formatted. */
-static int write_mode_page(Scsi_Tape *STp, int page)
+   in the buffer is correctly formatted. The long timeout is used if slow is non-zero. */
+static int write_mode_page(Scsi_Tape *STp, int page, int slow)
 {
 	int pgo;
 	unsigned char cmd[MAX_COMMAND_SIZE];
@@ -2156,7 +2164,7 @@ static int write_mode_page(Scsi_Tape *STp, int page)
 	(STp->buffer)->b_data[pgo + MP_OFF_PAGE_NBR] &= MP_MSK_PAGE_NBR;
 
 	SRpnt = st_do_scsi(SRpnt, STp, cmd, cmd[4], SCSI_DATA_WRITE,
-			   STp->timeout, 0, TRUE);
+			   (slow ? STp->long_timeout : STp->timeout), 0, TRUE);
 	if (SRpnt == NULL)
 		return (STp->buffer)->syscall_result;
 
@@ -2223,7 +2231,7 @@ static int st_compression(Scsi_Tape * STp, int state)
 			b_data[mpoffs + CP_OFF_C_ALGO] = 0; /* no compression */
 	}
 
-	retval = write_mode_page(STp, COMPRESSION_PAGE);
+	retval = write_mode_page(STp, COMPRESSION_PAGE, FALSE);
 	if (retval) {
                 DEBC(printk(ST_DEB_MSG "%s: Compression change failed.\n", name));
 		return (-EIO);
@@ -3022,7 +3030,7 @@ static int partition_tape(Scsi_Tape *STp, int size)
 	bp[pgo + PP_OFF_RESERVED] = 0;
 	bp[pgo + PP_OFF_FLAGS] = PP_BIT_IDP | PP_MSK_PSUM_MB;
 
-	result = write_mode_page(STp, PART_PAGE);
+	result = write_mode_page(STp, PART_PAGE, TRUE);
 	if (result) {
 		printk(KERN_INFO "%s: Partitioning of tape failed.\n", name);
 		result = (-EIO);
