@@ -46,7 +46,6 @@
 #include <linux/reboot.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>
-#include <linux/smp_lock.h>
 
 static int eurwdt_is_open;
 static spinlock_t eurwdt_lock;
