@@ -1103,7 +1103,7 @@ xprt_write_space(struct sock *sk)
 		goto out;
 
 	spin_lock_bh(&xprt->sock_lock);
-	if (xprt->snd_task && xprt->snd_task->tk_rpcwait == &xprt->pending)
+	if (xprt->snd_task)
 		rpc_wake_up_task(xprt->snd_task);
 	spin_unlock_bh(&xprt->sock_lock);
 out:
