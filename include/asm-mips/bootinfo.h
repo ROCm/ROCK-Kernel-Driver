@@ -195,6 +195,7 @@
 #define  MACH_CASIO_E55		5	/* CASIO CASSIOPEIA E-10/15/55/65 */
 #define  MACH_TANBAC_TB0226	6	/* TANBAC TB0226 (Mbase) */
 #define  MACH_TANBAC_TB0229	7	/* TANBAC TB0229 (VR4131DIMM) */
+#define  MACH_NEC_CMBVR4133	8	/* CMB VR4133 Board */
 
 #define MACH_GROUP_HP_LJ	20	/* Hewlett Packard LaserJet	*/
 #define  MACH_HP_LASERJET	1

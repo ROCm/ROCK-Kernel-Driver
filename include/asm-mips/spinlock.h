@@ -9,6 +9,7 @@
 #ifndef _ASM_SPINLOCK_H
 #define _ASM_SPINLOCK_H
 
+#include <linux/config.h>
 #include <asm/war.h>
 
 /*

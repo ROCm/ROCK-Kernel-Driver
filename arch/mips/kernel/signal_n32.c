@@ -35,9 +35,12 @@
 #include <asm/ucontext.h>
 #include <asm/system.h>
 #include <asm/fpu.h>
+#include <asm/cpu-features.h>
+
+#include "signal-common.h"
 
 /*
- * Including <asm/unistd.h would give use the 64-bit syscall numbers ...
+ * Including <asm/unistd.h> would give use the 64-bit syscall numbers ...
  */
 #define __NR_N32_rt_sigreturn		6211
 #define __NR_N32_restart_syscall	6214
@@ -59,17 +62,22 @@ struct ucontextn32 {
 	sigset_t            uc_sigmask;   /* mask last for extensibility */
 };
 
+#if PLAT_TRAMPOLINE_STUFF_LINE
+#define __tramp __attribute__((aligned(PLAT_TRAMPOLINE_STUFF_LINE)))
+#else
+#define __tramp
+#endif
+
 struct rt_sigframe_n32 {
 	u32 rs_ass[4];			/* argument save space for o32 */
-	u32 rs_code[2];			/* signal trampoline */
-	struct siginfo rs_info;
+	u32 rs_code[2] __tramp;		/* signal trampoline */
+	struct siginfo rs_info __tramp;
 	struct ucontextn32 rs_uc;
 };
 
-extern asmlinkage int restore_sigcontext(struct pt_regs *regs, struct sigcontext *sc);
-extern int inline setup_sigcontext(struct pt_regs *regs, struct sigcontext *sc);
-
-asmlinkage void sysn32_rt_sigreturn(nabi_no_regargs struct pt_regs regs)
+save_static_function(sysn32_rt_sigreturn);
+__attribute_used__ noinline static void
+_sysn32_rt_sigreturn(nabi_no_regargs struct pt_regs regs)
 {
 	struct rt_sigframe_n32 *frame;
 	sigset_t set;
@@ -118,31 +126,6 @@ badframe:
 	force_sig(SIGSEGV, current);
 }
 
-/*
- * Determine which stack to use..
- */
-static inline void *get_sigframe(struct k_sigaction *ka, struct pt_regs *regs,
-	size_t frame_size)
-{
-	unsigned long sp;
-
-	/* Default to using normal stack */
-	sp = regs->regs[29];
-
-	/*
- 	 * FPU emulator may have it's own trampoline active just
- 	 * above the user stack, 16-bytes before the next lowest
- 	 * 16 byte boundary.  Try to avoid trashing it.
- 	 */
- 	sp -= 32;
-
-	/* This is the X/Open sanctioned signal stack switching.  */
-	if ((ka->sa.sa_flags & SA_ONSTACK) && (sas_ss_flags (sp) == 0))
-		sp = current->sas_ss_sp + current->sas_ss_size;
-
-	return (void *)((sp - frame_size) & ALMASK);
-}
-
 void setup_rt_frame_n32(struct k_sigaction * ka,
 	struct pt_regs *regs, int signr, sigset_t *set, siginfo_t *info)
 {
@@ -160,8 +143,10 @@ void setup_rt_frame_n32(struct k_sigaction * ka,
 	 *         li      v0, __NR_rt_sigreturn
 	 *         syscall
 	 */
+	if (PLAT_TRAMPOLINE_STUFF_LINE)
+		__clear_user(frame->rs_code, PLAT_TRAMPOLINE_STUFF_LINE);
 	err |= __put_user(0x24020000 + __NR_N32_rt_sigreturn, frame->rs_code + 0);
-	err |= __put_user(0x0000000c                    , frame->rs_code + 1);
+	err |= __put_user(0x0000000c                        , frame->rs_code + 1);
 	flush_cache_sigtramp((unsigned long) frame->rs_code);
 
 	/* Create siginfo.  */

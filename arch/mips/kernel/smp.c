@@ -18,7 +18,6 @@
  * Copyright (C) 2000, 2001 Silicon Graphics, Inc.
  * Copyright (C) 2000, 2001, 2003 Broadcom Corporation
  */
-#include <linux/config.h>
 #include <linux/cache.h>
 #include <linux/delay.h>
 #include <linux/init.h>
@@ -94,6 +93,7 @@ static void smp_tune_scheduling (void)
 }
 
 extern void __init calibrate_delay(void);
+extern ATTRIB_NORET void cpu_idle(void);
 
 /*
  * First C code run on the secondary CPUs after being started up by
@@ -123,7 +123,7 @@ asmlinkage void start_secondary(void)
 	cpu_idle();
 }
 
-spinlock_t smp_call_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(smp_call_lock);
 
 struct call_data_struct *call_data;
 

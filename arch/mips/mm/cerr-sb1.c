@@ -251,14 +251,14 @@ static const uint8_t parity[256] = {
 
 /* Masks to select bits for Hamming parity, mask_72_64[i] for bit[i] */
 static const uint64_t mask_72_64[8] = {
-	0x0738C808099264FFL,
-	0x38C808099264FF07L,
-	0xC808099264FF0738L,
-	0x08099264FF0738C8L,
-	0x099264FF0738C808L,
-	0x9264FF0738C80809L,
-	0x64FF0738C8080992L,
-	0xFF0738C808099264L
+	0x0738C808099264FFULL,
+	0x38C808099264FF07ULL,
+	0xC808099264FF0738ULL,
+	0x08099264FF0738C8ULL,
+	0x099264FF0738C808ULL,
+	0x9264FF0738C80809ULL,
+	0x64FF0738C8080992ULL,
+	0xFF0738C808099264ULL
 };
 
 /* Calculate the parity on a range of bits */
@@ -330,9 +330,9 @@ static uint32_t extract_ic(unsigned short addr, int data)
 				    ((lru >> 4) & 0x3),
 				    ((lru >> 6) & 0x3));
 		}
-		va = (taglo & 0xC0000FFFFFFFE000) | addr;
+		va = (taglo & 0xC0000FFFFFFFE000ULL) | addr;
 		if ((taglo & (1 << 31)) && (((taglo >> 62) & 0x3) == 3))
-			va |= 0x3FFFF00000000000;
+			va |= 0x3FFFF00000000000ULL;
 		valid = ((taghi >> 29) & 1);
 		if (valid) {
 			tlo_tmp = taglo & 0xfff3ff;
@@ -473,7 +473,7 @@ static uint32_t extract_dc(unsigned short addr, int data)
 		: "r" ((way << 13) | addr));
 
 		taglo = ((unsigned long long)taglohi << 32) | taglolo;
-		pa = (taglo & 0xFFFFFFE000) | addr;
+		pa = (taglo & 0xFFFFFFE000ULL) | addr;
 		if (way == 0) {
 			lru = (taghi >> 14) & 0xff;
 			prom_printf("[Bank %d Set 0x%02x]  LRU > %d %d %d %d > MRU\n",
