@@ -2000,36 +2000,36 @@ static void fbcon_free_font(struct display *p)
 	p->userfont = 0;
 }
 
-static int fbcon_get_font(struct vc_data *vc, struct console_font_op *op)
+static int fbcon_get_font(struct vc_data *vc, struct console_font *font)
 {
 	u8 *fontdata = vc->vc_font.data;
-	u8 *data = op->data;
+	u8 *data = font->data;
 	int i, j;
 
-	op->width = vc->vc_font.width;
-	op->height = vc->vc_font.height;
-	op->charcount = vc->vc_hi_font_mask ? 512 : 256;
-	if (!op->data)
+	font->width = vc->vc_font.width;
+	font->height = vc->vc_font.height;
+	font->charcount = vc->vc_hi_font_mask ? 512 : 256;
+	if (!font->data)
 		return 0;
 
-	if (op->width <= 8) {
+	if (font->width <= 8) {
 		j = vc->vc_font.height;
-		for (i = 0; i < op->charcount; i++) {
+		for (i = 0; i < font->charcount; i++) {
 			memcpy(data, fontdata, j);
 			memset(data + j, 0, 32 - j);
 			data += 32;
 			fontdata += j;
 		}
-	} else if (op->width <= 16) {
+	} else if (font->width <= 16) {
 		j = vc->vc_font.height * 2;
-		for (i = 0; i < op->charcount; i++) {
+		for (i = 0; i < font->charcount; i++) {
 			memcpy(data, fontdata, j);
 			memset(data + j, 0, 64 - j);
 			data += 64;
 			fontdata += j;
 		}
-	} else if (op->width <= 24) {
-		for (i = 0; i < op->charcount; i++) {
+	} else if (font->width <= 24) {
+		for (i = 0; i < font->charcount; i++) {
 			for (j = 0; j < vc->vc_font.height; j++) {
 				*data++ = fontdata[0];
 				*data++ = fontdata[1];
@@ -2041,7 +2041,7 @@ static int fbcon_get_font(struct vc_data *vc, struct console_font_op *op)
 		}
 	} else {
 		j = vc->vc_font.height * 4;
-		for (i = 0; i < op->charcount; i++) {
+		for (i = 0; i < font->charcount; i++) {
 			memcpy(data, fontdata, j);
 			memset(data + j, 0, 128 - j);
 			data += 128;

@@ -927,17 +927,17 @@ static int vgacon_font_set(struct vc_data *c, struct console_font *font, unsigne
 	return rc;
 }
 
-static int vgacon_font_get(struct vc_data *c, struct console_font_op *op)
+static int vgacon_font_get(struct vc_data *c, struct console_font *font)
 {
 	if (vga_video_type < VIDEO_TYPE_EGAM)
 		return -EINVAL;
 
-	op->width = 8;
-	op->height = c->vc_font.height;
-	op->charcount = vga_512_chars ? 512 : 256;
-	if (!op->data)
+	font->width = 8;
+	font->height = c->vc_font.height;
+	font->charcount = vga_512_chars ? 512 : 256;
+	if (!font->data)
 		return 0;
-	return vgacon_do_font_op(&state, op->data, 0, 0);
+	return vgacon_do_font_op(&state, font->data, 0, 0);
 }
 
 #else
