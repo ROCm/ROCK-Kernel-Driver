@@ -29,13 +29,17 @@ huge_pte_alloc (struct mm_struct *mm, unsigned long addr)
 {
 	unsigned long taddr = htlbpage_to_page(addr);
 	pgd_t *pgd;
+	pud_t *pud;
 	pmd_t *pmd;
 	pte_t *pte = NULL;
 
 	pgd = pgd_offset(mm, taddr);
-	pmd = pmd_alloc(mm, pgd, taddr);
-	if (pmd)
-		pte = pte_alloc_map(mm, pmd, taddr);
+	pud = pud_alloc(mm, pgd, taddr);
+	if (pud) {
+		pmd = pmd_alloc(mm, pud, taddr);
+		if (pmd)
+			pte = pte_alloc_map(mm, pmd, taddr);
+	}
 	return pte;
 }
 
@@ -44,14 +48,18 @@ huge_pte_offset (struct mm_struct *mm, unsigned long addr)
 {
 	unsigned long taddr = htlbpage_to_page(addr);
 	pgd_t *pgd;
+	pud_t *pud;
 	pmd_t *pmd;
 	pte_t *pte = NULL;
 
 	pgd = pgd_offset(mm, taddr);
 	if (pgd_present(*pgd)) {
-		pmd = pmd_offset(pgd, taddr);
-		if (pmd_present(*pmd))
-			pte = pte_offset_map(pmd, taddr);
+		pud = pud_offset(pgd, taddr);
+		if (pud_present(*pud)) {
+			pmd = pmd_offset(pud, taddr);
+			if (pmd_present(*pmd))
+				pte = pte_offset_map(pmd, taddr);
+		}
 	}
 
 	return pte;

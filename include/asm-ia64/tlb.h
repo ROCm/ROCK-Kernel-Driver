@@ -236,4 +236,10 @@ do {							\
 	__pmd_free_tlb(tlb, ptep);			\
 } while (0)
 
+#define pud_free_tlb(tlb, pudp)				\
+do {							\
+	tlb->need_flush = 1;				\
+	__pud_free_tlb(tlb, pudp);			\
+} while (0)
+
 #endif /* _ASM_IA64_TLB_H */
