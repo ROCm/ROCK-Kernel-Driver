@@ -293,7 +293,8 @@ static int dma_mmap(struct device *dev, struct vm_area_struct *vma,
 			vma->vm_flags |= VM_RESERVED;
 			ret = remap_pfn_range(vma, vma->vm_start,
 					      page_to_pfn(c->vm_pages) + off,
-					      user_size, vma->vm_page_prot);
+					      user_size << PAGE_SHIFT,
+					      vma->vm_page_prot);
 		}
 	}
 
