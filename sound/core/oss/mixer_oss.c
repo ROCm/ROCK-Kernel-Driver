@@ -968,8 +968,10 @@ static int snd_mixer_oss_build_input(snd_mixer_oss_t *mixer, struct snd_mixer_os
 		snd_ctl_elem_info_t uinfo;
 
 		memset(&uinfo, 0, sizeof(uinfo));
-		if (kctl->info(kctl, &uinfo))
+		if (kctl->info(kctl, &uinfo)) {
+			up_read(&mixer->card->controls_rwsem);
 			return 0;
+		}
 		strcpy(str, ptr->name);
 		if (!strcmp(str, "Master"))
 			strcpy(str, "Mix");
