@@ -9,7 +9,6 @@
 #include <linux/errno.h>
 #include <linux/sched.h>
 #include <linux/mm.h>
-#include <linux/hugetlb.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 #include <linux/sem.h>
@@ -251,73 +250,3 @@ asmlinkage int sys_olduname(struct oldold_utsname * name)
 
 	return error;
 }
-
-#ifdef CONFIG_HUGETLB_PAGE
-/* get_addr function gets the currently unused virtaul range in
- * current process's address space.  It returns the HPAGE_SIZE
- * aligned address (in cases of success).  Other kernel generic
- * routines only could gurantee that allocated address is PAGE_SIZE aligned.
- */
-static unsigned long get_addr(unsigned long addr, unsigned long len)
-{
-	struct vm_area_struct *vma;
-	if (addr) {
-		addr = (addr + HPAGE_SIZE - 1) & HPAGE_MASK;
-		vma = find_vma(current->mm, addr);
-		if (TASK_SIZE > addr + len && !(vma && addr + len >= vma->vm_start))
-			goto found_addr;
-	}
-	addr = TASK_UNMAPPED_BASE;
-	for (vma = find_vma(current->mm, addr); TASK_SIZE > addr + len; vma = vma->vm_next) {
-		if (!vma || addr + len < vma->vm_start)
-			goto found_addr;
-		addr = (vma->vm_end + HPAGE_SIZE - 1) & HPAGE_MASK;
-	}
-	return -ENOMEM;
-found_addr:
-	return addr;
-}
-
-asmlinkage unsigned long sys_alloc_hugepages(int key, unsigned long addr, unsigned long len, int prot, int flag)
-{
-	struct mm_struct *mm = current->mm;
-	unsigned long   raddr;
-	int     retval = 0;
-	extern int alloc_hugetlb_pages(int, unsigned long, unsigned long, int, int);
-	if (!cpu_has_pse || key < 0 || len & ~HPAGE_MASK)
-		return -EINVAL;
-	down_write(&mm->mmap_sem);
-	raddr = get_addr(addr, len);
-	if (raddr != -ENOMEM)
-		retval = alloc_hugetlb_pages(key, raddr, len, prot, flag);
-	up_write(&mm->mmap_sem);
-	return (retval < 0) ? (unsigned long)retval : raddr;
-}
-
-asmlinkage int sys_free_hugepages(unsigned long addr)
-{
-	struct mm_struct *mm = current->mm;
-	struct vm_area_struct *vma;
-	int retval;
-
-	down_write(&mm->mmap_sem);
-	vma = find_vma(current->mm, addr);
-	if (!vma || !(vma->vm_flags & VM_HUGETLB) || vma->vm_start != addr) {
-		retval = -EINVAL;
-		goto out;
-	}
-	retval = do_munmap(vma->vm_mm, addr, vma->vm_end - addr);
-out:
-	up_write(&mm->mmap_sem);
-	return retval;
-}
-#else
-asmlinkage unsigned long sys_alloc_hugepages(int key, unsigned long addr, size_t len, int prot, int flag)
-{
-	return -ENOSYS;
-}
-asmlinkage int sys_free_hugepages(unsigned long addr)
-{
-	return -ENOSYS;
-}
-#endif
