@@ -309,16 +309,19 @@ struct nvram {
 	} cntr_flags_1;		/* 5 */
 
 	struct {
-		uint16_t boot_lun_number:5;
-		uint16_t scsi_bus_number:1;
-		uint16_t unused_6:1;
-		uint16_t unused_7:1;
-		uint16_t boot_target_number:4;
-		uint16_t unused_12:1;
-		uint16_t unused_13:1;
-		uint16_t unused_14:1;
-		uint16_t unused_15:1;
-	} cntr_flags_2;		/* 6, 7 */
+		uint8_t boot_lun_number:5;
+		uint8_t scsi_bus_number:1;
+		uint8_t unused_6:1;
+		uint8_t unused_7:1;
+	} cntr_flags_2l;	/* 7 */
+
+	struct {
+		uint8_t boot_target_number:4;
+		uint8_t unused_12:1;
+		uint8_t unused_13:1;
+		uint8_t unused_14:1;
+		uint8_t unused_15:1;
+	} cntr_flags_2h;	/* 8 */
 
 	uint16_t unused_8;	/* 8, 9 */
 	uint16_t unused_10;	/* 10, 11 */
