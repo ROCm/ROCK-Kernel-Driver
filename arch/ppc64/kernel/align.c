@@ -215,7 +215,8 @@ fix_alignment(struct pt_regs *regs)
 	unsigned long i;
 	int ret;
 	unsigned dsisr;
-	unsigned char *addr, *p;
+	unsigned char __user *addr;
+	unsigned char __user *p;
 	unsigned long *lp;
 	union {
 		long ll;
@@ -257,7 +258,7 @@ fix_alignment(struct pt_regs *regs)
 	flags = aligninfo[instr].flags;
 
 	/* DAR has the operand effective address */
-	addr = (unsigned char *)regs->dar;
+	addr = (unsigned char __user *)regs->dar;
 
 	/* A size of 0 indicates an instruction we don't support */
 	/* we also don't support the multiples (lmw, stmw, lmd, stmd) */
@@ -270,7 +271,7 @@ fix_alignment(struct pt_regs *regs)
 	 * storage
 	 */
 	if (instr == DCBZ)
-		addr = (unsigned char *) ((unsigned long)addr & -L1_CACHE_BYTES);
+		addr = (unsigned char __user *) ((unsigned long)addr & -L1_CACHE_BYTES);
 
 	/* Verify the address of the operand */
 	if (user_mode(regs)) {
