@@ -74,6 +74,7 @@ static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
 static int ac97_clock[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
 static int ac97_quirk[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = AC97_TUNE_DEFAULT};
+static int buggy_irq[SNDRV_CARDS];
 #ifdef SUPPORT_JOYSTICK
 static int joystick[SNDRV_CARDS];
 #endif
@@ -92,6 +93,8 @@ module_param_array(ac97_clock, int, boot_devs, 0444);
 MODULE_PARM_DESC(ac97_clock, "AC'97 codec clock (0 = auto-detect).");
 module_param_array(ac97_quirk, int, boot_devs, 0444);
 MODULE_PARM_DESC(ac97_quirk, "AC'97 workaround for strange hardware.");
+module_param_array(buggy_irq, bool, boot_devs, 0444);
+MODULE_PARM_DESC(buggy_irq, "Enable workaround for buggy interrupts on some motherboards.");
 #ifdef SUPPORT_JOYSTICK
 module_param_array(joystick, bool, boot_devs, 0444);
 MODULE_PARM_DESC(joystick, "Enable joystick for Intel i8x0 soundcard.");
@@ -421,6 +424,7 @@ struct _snd_intel8x0 {
 	int in_ac97_init: 1,
 	    in_sdin_init: 1;
 	int fix_nocache: 1; /* workaround for 440MX */
+	int buggy_irq: 1; /* workaround for buggy mobos */
 
 	ac97_bus_t *ac97_bus;
 	ac97_t *ac97[3];
@@ -837,18 +841,8 @@ static irqreturn_t snd_intel8x0_interrupt(int irq, void *dev_id, struct pt_regs 
 		if (status) {
 			/* ack */
 			iputdword(chip, chip->int_sta_reg, status);
-			/* FIXME: on some ICH5 board shows the same
-			 *        problem.  So we return IRQ_HANDLED
-			 *        in any cases.
-			 * (or, maybe add a new module param to control this?)
-			 */
-#if 0
-			/* some Nforce[2] boards have problems when
-			   IRQ_NONE is returned here.
-			*/
-			if (chip->device_type != DEVICE_NFORCE)
+			if (! chip->buggy_irq)
 				status = 0;
-#endif
 		}
 		return IRQ_RETVAL(status);
 	}
@@ -2465,6 +2459,12 @@ static int __devinit snd_intel8x0_create(snd_card_t * card,
 	    pci->device == PCI_DEVICE_ID_INTEL_440MX)
 		chip->fix_nocache = 1; /* enable workaround */
 
+	/* some Nforce[2] and ICH boards have problems with IRQ handling.
+	 * Needs to return IRQ_HANDLED for unknown irqs.
+	 */
+	if (device_type == DEVICE_NFORCE)
+		chip->buggy_irq = 1;
+
 	if ((err = pci_request_regions(pci, card->shortname)) < 0) {
 		kfree(chip);
 		return err;
@@ -2656,6 +2656,8 @@ static int __devinit snd_intel8x0_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		return err;
 	}
+	if (buggy_irq[dev])
+		chip->buggy_irq = 1;
 
 	if ((err = snd_intel8x0_mixer(chip, ac97_clock[dev], ac97_quirk[dev])) < 0) {
 		snd_card_free(card);

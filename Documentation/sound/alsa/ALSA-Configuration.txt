@@ -670,6 +670,8 @@ Module parameters
                      2 = swap headphone and master controls
                      3 = for AD1985, turn on OMS bit and use headphone
                      4 = for ALC65x, turn on the jack sense mode
+    buggy_irq      - Enable workaround for buggy interrupts on some
+                     motherboards (default off)
 
     Module supports autoprobe and multiple bus-master chips (max 8).
 
