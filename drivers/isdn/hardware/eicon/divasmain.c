@@ -1,4 +1,4 @@
-/* $Id: divasmain.c,v 1.39 2003/09/09 07:42:05 schindler Exp $
+/* $Id: divasmain.c,v 1.40 2003/09/10 08:02:33 schindler Exp $
  *
  * Low level driver for Eicon DIVA Server ISDN cards.
  *
@@ -43,7 +43,7 @@
 #include "diva_dma.h"
 #include "diva_pci.h"
 
-static char *main_revision = "$Revision: 1.39 $";
+static char *main_revision = "$Revision: 1.40 $";
 
 int errno = 0;
 static int major;
@@ -70,8 +70,6 @@ extern void remove_divas_proc(void);
 extern void diva_get_vserial_number(PISDN_ADAPTER IoAdapter, char *buf);
 extern int divasfunc_init(int dbgmask);
 extern void divasfunc_exit(void);
-
-static devfs_handle_t devfs_handle;
 
 typedef struct _diva_os_thread_dpc {
 	struct tasklet_struct divas_task;
@@ -123,7 +121,7 @@ typedef struct _diva_os_thread_dpc {
 /*
   This table should be sorted by PCI device ID
   */
-static struct pci_device_id divas_pci_tbl[] __devinitdata = {
+static struct pci_device_id divas_pci_tbl[] = {
 /* Diva Server BRI-2M PCI 0xE010 */
 	{PCI_VENDOR_ID_EICON, PCI_DEVICE_ID_EICON_MAESTRA,
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, CARDTYPE_MAESTRA_PCI},

@@ -654,28 +654,21 @@ static struct mtd_partition simpad_partitions[] = {
 	}, {
 		.name		= "SIMpad kernel",
 		.size		= 0x00100000,
-		.offset		= 0x00080000,
+		.offset		= MTDPART_OFS_APPEND,
 	}, {
-#ifdef CONFIG_JFFS2_FS
+#ifdef CONFIG_ROOT_CRAMFS
+		.name		= "SIMpad root cramfs",
+		.size	     	=0x00D80000,
+		.offset		= MTDPART_OFS_APPEND
+
+	}, {
+		.name		= "SIMpad local jffs2",
+		.size		= MTDPART_SIZ_FULL,
+		.offset		= MTDPART_OFS_APPEND
+#else
 		.name		= "SIMpad root jffs2",
 		.size		= MTDPART_SIZ_FULL,
-		.offset		= 0x00180000,
-#else
-		.name		= "SIMpad initrd",
-		.size		= 0x00300000,
-		.offset		= 0x00180000,
-	}, {
-		.name		= "SIMpad root cramfs",
-		.size		= 0x00300000,
-		.offset		= 0x00480000,
-	}, {
-		.name		= "SIMpad usr cramfs",
-		.size		= 0x005c0000,
-		.offset		= 0x00780000,
-	}, {
-		.name		= "SIMpad usr local",
-		.size		= MTDPART_SIZ_FULL,
-		.offset		= 0x00d40000,
+		.offset		= MTDPART_OFS_APPEND
 #endif
 	}
 };
@@ -1244,8 +1237,10 @@ static int __init sa1100_locate_flash(void)
 	}
 	if (machine_is_simpad()) {
 		info[0].base = SA1100_CS0_PHYS;
-		info[0].size = SZ_32M;
-		nr = 1;
+		info[0].size = SZ_16M;
+		info[1].base = SA1100_CS1_PHYS;
+		info[1].size = SZ_16M;
+		nr = 2;
 	}
 	if (machine_is_stork()) {
 		info[0].base = SA1100_CS0_PHYS;

@@ -307,24 +307,6 @@ static int smc_link_ok(struct net_device *dev);
 
 /*======================================================================
 
-    This bit of code is used to avoid unregistering network devices
-    at inappropriate times.  2.2 and later kernels are fairly picky
-    about when this can happen.
-
-======================================================================*/
-
-static void flush_stale_links(void)
-{
-    dev_link_t *link, *next;
-    for (link = dev_list; link; link = next) {
-	next = link->next;
-	if (link->state & DEV_STALE_LINK)
-	    smc91c92_detach(link);
-    }
-}
-
-/*======================================================================
-
   smc91c92_attach() creates an "instance" of the driver, allocating
   local data structures for one device.  The device is registered
   with Card Services.
@@ -340,7 +322,6 @@ static dev_link_t *smc91c92_attach(void)
     int i, ret;
 
     DEBUG(0, "smc91c92_attach()\n");
-    flush_stale_links();
 
     /* Create new ethernet device */
     dev = alloc_etherdev(sizeof(struct smc_private));
@@ -432,10 +413,8 @@ static void smc91c92_detach(dev_link_t *link)
 
     if (link->state & DEV_CONFIG) {
 	smc91c92_release(link);
-	if (link->state & DEV_STALE_CONFIG) {
-	    link->state |= DEV_STALE_LINK;
+	if (link->state & DEV_STALE_CONFIG)
 	    return;
-	}
     }
 
     if (link->handle)
@@ -1103,7 +1082,9 @@ static void smc91c92_release(dev_link_t *link)
 
     link->state &= ~DEV_CONFIG;
 
-} /* smc91c92_release */
+    if (link->state & DEV_STALE_CONFIG)
+	    smc91c92_detach(link);
+}
 
 /*======================================================================
 

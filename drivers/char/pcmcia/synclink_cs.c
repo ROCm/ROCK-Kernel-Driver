@@ -725,14 +725,6 @@ static void mgslpc_release(u_long arg)
     if (debug_level >= DEBUG_LEVEL_INFO)
 	    printk("mgslpc_release(0x%p)\n", link);
 
-    if (link->open) {
-	    if (debug_level >= DEBUG_LEVEL_INFO)
-		    printk("synclink_cs: release postponed, '%s' still open\n",
-			   link->dev->dev_name);
-	    link->state |= DEV_STALE_CONFIG;
-	    return;
-    }
-
     /* Unlink the device chain */
     link->dev = NULL;
     link->state &= ~DEV_CONFIG;

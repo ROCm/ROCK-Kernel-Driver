@@ -153,24 +153,6 @@ orinoco_cs_error(client_handle_t handle, int func, int ret)
 	CardServices(ReportError, handle, &err);
 }
 
-
-/* Remove zombie instances (card removed, detach pending) */
-static void
-flush_stale_links(void)
-{
-	dev_link_t *link, *next;
-
-	TRACE_ENTER("");
-
-	for (link = dev_list; link; link = next) {
-		next = link->next;
-		if (link->state & DEV_STALE_LINK) {
-			orinoco_cs_detach(link);
-		}
-	}
-	TRACE_EXIT("");
-}
-
 /*
  * This creates an "instance" of the driver, allocating local data
  * structures for one device.  The device is registered with Card
@@ -188,9 +170,6 @@ orinoco_cs_attach(void)
 	dev_link_t *link;
 	client_reg_t client_reg;
 	int ret, i;
-
-	/* A bit of cleanup */
-	flush_stale_links();
 
 	dev = alloc_orinocodev(sizeof(*card), orinoco_cs_hard_reset);
 	if (! dev)
@@ -266,13 +245,8 @@ orinoco_cs_detach(dev_link_t * link)
 		return;
 	}
 
-	if (link->state & DEV_CONFIG) {
+	if (link->state & DEV_CONFIG)
 		orinoco_cs_release(link);
-		if (link->state & DEV_CONFIG) {
-			link->state |= DEV_STALE_LINK;
-			return;
-		}
-	}
 
 	/* Break the link with Card Services */
 	if (link->handle)

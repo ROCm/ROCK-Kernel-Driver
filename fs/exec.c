@@ -56,7 +56,7 @@
 
 int core_uses_pid;
 char core_pattern[65] = "core";
-/* The maximal length of core_pattern is also specified in sysctl.c */ 
+/* The maximal length of core_pattern is also specified in sysctl.c */
 
 static struct linux_binfmt *formats;
 static rwlock_t binfmt_lock = RW_LOCK_UNLOCKED;
@@ -190,7 +190,7 @@ static int count(char __user * __user * argv, int max)
  * memory to free pages in kernel mem. These are in a format ready
  * to be put directly into the top of new user memory.
  */
-int copy_strings(int argc,char __user * __user * argv, struct linux_binprm *bprm) 
+int copy_strings(int argc,char __user * __user * argv, struct linux_binprm *bprm)
 {
 	struct page *kmapped_page = NULL;
 	char *kaddr = NULL;
@@ -213,7 +213,7 @@ int copy_strings(int argc,char __user * __user * argv, struct linux_binprm *bprm
 		}
 
 		bprm->p -= len;
-		/* XXX: add architecture specific overflow check here. */ 
+		/* XXX: add architecture specific overflow check here. */
 		pos = bprm->p;
 
 		while (len > 0) {
@@ -275,10 +275,10 @@ int copy_strings_kernel(int argc,char ** argv, struct linux_binprm *bprm)
 {
 	int r;
 	mm_segment_t oldfs = get_fs();
-	set_fs(KERNEL_DS); 
+	set_fs(KERNEL_DS);
 	r = copy_strings(argc, (char __user * __user *)argv, bprm);
 	set_fs(oldfs);
-	return r; 
+	return r;
 }
 
 #ifdef CONFIG_MMU
@@ -374,7 +374,13 @@ int setup_arg_pages(struct linux_binprm *bprm)
 
 	/* Adjust bprm->p to point to the end of the strings. */
 	bprm->p = PAGE_SIZE * i - offset;
-	stack_base = STACK_TOP - current->rlim[RLIMIT_STACK].rlim_max;
+
+	/* Limit stack size to 1GB */
+	stack_base = current->rlim[RLIMIT_STACK].rlim_max;
+	if (stack_base > (1 << 30))
+		stack_base = 1 << 30;
+	stack_base = PAGE_ALIGN(STACK_TOP - stack_base);
+
 	mm->arg_start = stack_base;
 	arg_size = i << PAGE_SHIFT;
 
@@ -421,7 +427,7 @@ int setup_arg_pages(struct linux_binprm *bprm)
 		mpnt->vm_private_data = (void *) 0;
 		insert_vm_struct(mm, mpnt);
 		mm->total_vm = (mpnt->vm_end - mpnt->vm_start) >> PAGE_SHIFT;
-	} 
+	}
 
 	for (i = 0 ; i < MAX_ARG_PAGES ; i++) {
 		struct page *page = bprm->page[i];
@@ -803,7 +809,7 @@ int flush_old_exec(struct linux_binprm * bprm)
 
 	/* An exec changes our domain. We are no longer part of the thread
 	   group */
-	   
+
 	current->self_exec_id++;
 			
 	flush_signal_handlers(current, 0);
@@ -887,7 +893,7 @@ int prepare_binprm(struct linux_binprm *bprm)
  *
  */
 
-void compute_creds(struct linux_binprm *bprm) 
+void compute_creds(struct linux_binprm *bprm)
 {
 	task_lock(current);
 	if (bprm->e_uid != current->uid || bprm->e_gid != current->gid) {
@@ -1052,7 +1058,7 @@ int do_execve(char * filename,
 		return retval;
 
 	bprm.p = PAGE_SIZE*MAX_ARG_PAGES-sizeof(void *);
-	memset(bprm.page, 0, MAX_ARG_PAGES*sizeof(bprm.page[0])); 
+	memset(bprm.page, 0, MAX_ARG_PAGES*sizeof(bprm.page[0]));
 
 	bprm.file = file;
 	bprm.filename = filename;
@@ -1083,21 +1089,21 @@ int do_execve(char * filename,
 		goto out;
 
 	retval = prepare_binprm(&bprm);
-	if (retval < 0) 
-		goto out; 
+	if (retval < 0)
+		goto out;
 
 	retval = copy_strings_kernel(1, &bprm.filename, &bprm);
-	if (retval < 0) 
-		goto out; 
+	if (retval < 0)
+		goto out;
 
 	bprm.exec = bprm.p;
 	retval = copy_strings(bprm.envc, envp, &bprm);
-	if (retval < 0) 
-		goto out; 
+	if (retval < 0)
+		goto out;
 
 	retval = copy_strings(bprm.argc, argv, &bprm);
-	if (retval < 0) 
-		goto out; 
+	if (retval < 0)
+		goto out;
 
 	retval = search_binary_handler(&bprm,regs);
 	if (retval >= 0) {
