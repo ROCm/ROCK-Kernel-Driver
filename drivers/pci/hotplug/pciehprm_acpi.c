@@ -1188,6 +1188,9 @@ static void free_a_bridge( struct acpi_bridge	*ab)
 
 static void pciehprm_free_bridges ( struct acpi_bridge	*ab)
 {
+	if (!ab)
+		return;
+
 	if (ab->child)
 		pciehprm_free_bridges (ab->child);
 
