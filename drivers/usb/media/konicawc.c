@@ -860,7 +860,7 @@ static int konicawc_probe(struct usb_interface *intf, const struct usb_device_id
 	MOD_DEC_USE_COUNT;
 
 	if (uvd) {
-		dev_set_drvdata (&intf->dev, uvd);
+		usb_set_intfdata (intf, uvd);
 		return 0;
 	}
 	return -EIO;

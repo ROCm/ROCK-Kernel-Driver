@@ -1036,7 +1036,7 @@ static int storage_probe(struct usb_interface *intf,
 	       "USB Mass Storage device found at %d\n", dev->devnum);
 
 	/* save a pointer to our structure */
-	dev_set_drvdata (&intf->dev, ss);
+	usb_set_intfdata(intf, ss);
 	return 0;
 
 	/* we come here if there are any problems */
@@ -1053,11 +1053,11 @@ static int storage_probe(struct usb_interface *intf,
 /* Handle a disconnect event from the USB core */
 static void storage_disconnect(struct usb_interface *intf)
 {
-	struct us_data *ss = dev_get_drvdata (&intf->dev);
+	struct us_data *ss = usb_get_intfdata(intf);
 
 	US_DEBUGP("storage_disconnect() called\n");
 
-	dev_set_drvdata (&intf->dev, NULL);
+	usb_set_intfdata(intf, NULL);
 
 	/* this is the odd case -- we disconnected but weren't using it */
 	if (!ss) {

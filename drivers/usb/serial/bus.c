@@ -66,7 +66,7 @@ static int usb_serial_device_probe (struct device *dev)
 	driver = port->serial->type;
 	if (driver->port_probe) {
 		if (!try_module_get(driver->owner)) {
-			err ("module get failed, exiting");
+			dev_err(*dev, "module get failed, exiting\n");
 			retval = -EIO;
 			goto exit;
 		}
@@ -79,8 +79,8 @@ static int usb_serial_device_probe (struct device *dev)
 	minor = port->number;
 
 	tty_register_devfs (&usb_serial_tty_driver, 0, minor);
-	info("%s converter now attached to ttyUSB%d (or usb/tts/%d for devfs)",
-	     driver->name, minor, minor);
+	dev_info(*dev, "%s converter now attached to ttyUSB%d (or usb/tts/%d for devfs)\n",
+		 driver->name, minor, minor);
 
 exit:
 	return retval;
@@ -101,7 +101,7 @@ static int usb_serial_device_remove (struct device *dev)
 	driver = port->serial->type;
 	if (driver->port_remove) {
 		if (!try_module_get(driver->owner)) {
-			err ("module get failed, exiting");
+			dev_err(*dev, "module get failed, exiting\n");
 			retval = -EIO;
 			goto exit;
 		}
@@ -111,8 +111,8 @@ static int usb_serial_device_remove (struct device *dev)
 exit:
 	minor = port->number;
 	tty_unregister_devfs (&usb_serial_tty_driver, minor);
-	info("%s converter now disconnected from ttyUSB%d",
-	     driver->name, minor);
+	dev_info(*dev, "%s converter now disconnected from ttyUSB%d\n",
+		 driver->name, minor);
 
 	return retval;
 }

@@ -114,7 +114,7 @@ static int probe_st5481(struct usb_interface *intf,
 	hisax_register(&adapter->hisax_d_if, b_if, "st5481_usb", protocol);
 	st5481_start(adapter);
 
-	dev_set_drvdata(&intf->dev, adapter);
+	usb_set_intfdata(intf, adapter);
 	return 0;
 
  err_b:
@@ -133,11 +133,11 @@ static int probe_st5481(struct usb_interface *intf,
  */
 static void disconnect_st5481(struct usb_interface *intf)
 {
-	struct st5481_adapter *adapter = dev_get_drvdata(&intf->dev);
+	struct st5481_adapter *adapter = usb_get_intfdata(intf);
 
 	DBG(1,"");
 
-	dev_set_drvdata(&intf->dev, NULL);
+	usb_set_intfdata(intf, NULL);
 	if (!adapter)
 		return;
 

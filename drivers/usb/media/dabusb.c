@@ -761,7 +761,7 @@ static int dabusb_probe (struct usb_interface *intf,
 	dbg("bound to interface: %d", ifnum);
 	up (&s->mutex);
 	MOD_INC_USE_COUNT;
-	dev_set_drvdata (&intf->dev, s);
+	usb_set_intfdata (intf, s);
 	return 0;
 
       reject:
@@ -772,11 +772,11 @@ static int dabusb_probe (struct usb_interface *intf,
 
 static void dabusb_disconnect (struct usb_interface *intf)
 {
-	pdabusb_t s = dev_get_drvdata (&intf->dev);
+	pdabusb_t s = usb_get_intfdata (intf);
 
 	dbg("dabusb_disconnect");
 
-	dev_set_drvdata (&intf->dev, NULL);
+	usb_set_intfdata (intf, NULL);
 	if (s) {
 		usb_deregister_dev (1, s->devnum);
 		s->remove_pending = 1;

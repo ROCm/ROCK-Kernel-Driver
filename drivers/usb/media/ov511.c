@@ -6247,7 +6247,7 @@ ov51x_probe(struct usb_interface *intf,
 
 	create_proc_ov511_cam(ov);
 
-	dev_set_drvdata (&intf->dev, ov);
+	usb_set_intfdata (intf, ov);
 	return 0;
 
 error:
@@ -6274,12 +6274,12 @@ error_out:
 static void
 ov51x_disconnect(struct usb_interface *intf)
 {
-	struct usb_ov511 *ov = dev_get_drvdata (&intf->dev);
+	struct usb_ov511 *ov = usb_get_intfdata (intf);
 	int n;
 
 	PDEBUG(3, "");
 
-	dev_set_drvdata (&intf->dev, NULL);
+	usb_set_intfdata (intf, NULL);
 	if (!ov)
 		return;
 

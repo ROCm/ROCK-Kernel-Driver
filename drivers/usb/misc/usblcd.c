@@ -290,15 +290,15 @@ static int probe_lcd(struct usb_interface *intf, const struct usb_device_id *id)
 	}
 	dbg("probe_lcd: ibuf address:%p", lcd->ibuf);
 
-	dev_set_drvdata (&intf->dev, lcd);
+	usb_set_intfdata (intf, lcd);
 	return 0;
 }
 
 static void disconnect_lcd(struct usb_interface *intf)
 {
-	struct lcd_usb_data *lcd = dev_get_drvdata (&intf->dev);
+	struct lcd_usb_data *lcd = usb_get_intfdata (intf);
 
-	dev_set_drvdata (&intf->dev, NULL);
+	usb_set_intfdata (intf, NULL);
 	if (lcd) {
 		usb_deregister_dev(1, lcd->minor);
 

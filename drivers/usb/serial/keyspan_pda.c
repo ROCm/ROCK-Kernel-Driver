@@ -231,7 +231,7 @@ static void keyspan_pda_rx_interrupt (struct urb *urb, struct pt_regs *regs)
 	int i;
 	int status;
 	struct keyspan_pda_private *priv;
-	priv = (struct keyspan_pda_private *)(port->private);
+	priv = usb_get_serial_port_data(port);
 
 	switch (urb->status) {
 	case 0:
@@ -532,7 +532,7 @@ static int keyspan_pda_write(struct usb_serial_port *port, int from_user,
 	int rc = 0;
 	struct keyspan_pda_private *priv;
 
-	priv = (struct keyspan_pda_private *)(port->private);
+	priv = usb_get_serial_port_data(port);
 	/* guess how much room is left in the device's ring buffer, and if we
 	   want to send more than that, check first, updating our notion of
 	   what is left. If our write will result in no room left, ask the
@@ -643,7 +643,7 @@ static void keyspan_pda_write_bulk_callback (struct urb *urb, struct pt_regs *re
 	struct usb_serial *serial;
 	struct keyspan_pda_private *priv;
 
-	priv = (struct keyspan_pda_private *)(port->private);
+	priv = usb_get_serial_port_data(port);
 
 	if (port_paranoia_check (port, "keyspan_pda_rx_interrupt")) {
 		return;
@@ -662,7 +662,8 @@ static void keyspan_pda_write_bulk_callback (struct urb *urb, struct pt_regs *re
 static int keyspan_pda_write_room (struct usb_serial_port *port)
 {
 	struct keyspan_pda_private *priv;
-	priv = (struct keyspan_pda_private *)(port->private);
+
+	priv = usb_get_serial_port_data(port);
 
 	/* used by n_tty.c for processing of tabs and such. Giving it our
 	   conservative guess is probably good enough, but needs testing by
@@ -675,7 +676,8 @@ static int keyspan_pda_write_room (struct usb_serial_port *port)
 static int keyspan_pda_chars_in_buffer (struct usb_serial_port *port)
 {
 	struct keyspan_pda_private *priv;
-	priv = (struct keyspan_pda_private *)(port->private);
+	
+	priv = usb_get_serial_port_data(port);
 	
 	/* when throttled, return at least WAKEUP_CHARS to tell select() (via
 	   n_tty.c:normal_poll() ) that we're not writeable. */
@@ -711,7 +713,7 @@ static int keyspan_pda_open (struct usb_serial_port *port, struct file *filp)
 		rc = -EIO;
 		goto error;
 	}
-	priv = (struct keyspan_pda_private *)(port->private);
+	priv = usb_get_serial_port_data(port);
 	priv->tx_room = room;
 	priv->tx_throttled = room ? 0 : 1;
 
@@ -803,10 +805,10 @@ static int keyspan_pda_startup (struct usb_serial *serial)
 	/* allocate the private data structures for all ports. Well, for all
 	   one ports. */
 
-	priv = serial->port[0].private
-		= kmalloc(sizeof(struct keyspan_pda_private), GFP_KERNEL);
+	priv = kmalloc(sizeof(struct keyspan_pda_private), GFP_KERNEL);
 	if (!priv)
 		return (1); /* error */
+	usb_set_serial_port_data(&serial->port[0], priv);
 	init_waitqueue_head(&serial->port[0].write_wait);
 	INIT_WORK(&priv->wakeup_work, (void *)keyspan_pda_wakeup_write,
 			(void *)(&serial->port[0]));
@@ -820,7 +822,7 @@ static void keyspan_pda_shutdown (struct usb_serial *serial)
 {
 	dbg("%s", __FUNCTION__);
 	
-	kfree(serial->port[0].private);
+	kfree(usb_get_serial_port_data(&serial->port[0]));
 }
 
 #ifdef KEYSPAN
