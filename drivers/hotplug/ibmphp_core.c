@@ -846,22 +846,24 @@ static int ibm_configure_device (struct pci_func *func)
 {
 	unsigned char bus;
 	struct pci_bus *child;
-	int rc = 0;
+	int num;
 	int flag = 0;	/* this is to make sure we don't double scan the bus, for bridged devices primarily */
 
 	if (!(bus_structure_fixup (func->busno)))
 		flag = 1;
 	if (func->dev == NULL)
-		func->dev = pci_find_slot (func->busno, (func->device << 3) | (func->function & 0x7));
+		func->dev = pci_find_slot (func->busno, PCI_DEVFN(func->device, func->function));
 
 	if (func->dev == NULL) {
 		struct pci_bus *bus = ibmphp_find_bus (func->busno);
 		if (!bus)
 			return 0;
 
-		func->dev = pci_scan_slot(bus,
-				 (func->device << 3) + (func->function & 0x7));
+		num = pci_scan_slot(bus, PCI_DEVFN(func->device, func->function));
+		if (num)
+			pci_bus_add_devices(bus);
 
+		func->dev = pci_find_slot(func->busno, PCI_DEVFN(func->device, func->function));
 		if (func->dev == NULL) {
 			err ("ERROR... : pci_dev still NULL \n");
 			return 0;
@@ -873,7 +875,7 @@ static int ibm_configure_device (struct pci_func *func)
 		pci_do_scan_bus (child);
 	}
 
-	return rc;
+	return 0;
 }
 
 /*******************************************************
