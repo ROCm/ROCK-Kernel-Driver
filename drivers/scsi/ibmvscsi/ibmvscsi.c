@@ -85,7 +85,7 @@ static int max_channel = 3;
 static int init_timeout = 5;
 static int max_requests = 50;
 
-#define IBMVSCSI_VERSION "1.3"
+#define IBMVSCSI_VERSION "1.3.2"
 
 MODULE_DESCRIPTION("IBM Virtual SCSI");
 MODULE_AUTHOR("Dave Boutcher");
@@ -486,8 +486,11 @@ static int ibmvscsi_send_srp_event(struct srp_event_struct *evt_struct,
 	    (atomic_dec_if_positive(&hostdata->request_limit) < 0)) {
 		/* See if the adapter is disabled */
 		if (atomic_read(&hostdata->request_limit) < 0) {
-			cmnd->result = DID_ERROR << 16;
-			evt_struct->cmnd_done(cmnd);
+			if (cmnd)
+				cmnd->result = DID_ERROR << 16;
+			if (cmnd && evt_struct->cmnd_done)
+					evt_struct->cmnd_done(cmnd);
+			
 			unmap_cmd_data(&evt_struct->evt->srp.cmd, hostdata->dev);
 			ibmvscsi_free_event_struct(&hostdata->pool, evt_struct);
 			return 0;
@@ -510,10 +513,16 @@ static int ibmvscsi_send_srp_event(struct srp_event_struct *evt_struct,
 
 		cmnd = evt_struct->cmnd;
 		printk(KERN_ERR "ibmvscsi: failed to send event struct\n");
+
+		if (cmnd)
+			cmnd->result = DID_ERROR << 16;
+		if (cmnd && evt_struct->cmnd_done)
+			evt_struct->cmnd_done(cmnd);
+		else if (evt_struct->done)
+			evt_struct->done(evt_struct);
+
 		unmap_cmd_data(&evt_struct->evt->srp.cmd, hostdata->dev);
 		ibmvscsi_free_event_struct(&hostdata->pool, evt_struct);
-		cmnd->result = DID_ERROR << 16;
-		evt_struct->cmnd_done(cmnd);
 	}
 
 	return 0;
@@ -981,9 +990,9 @@ static void purge_requests(struct ibmvscsi_host_data *hostdata)
 
 	spin_lock_irqsave(hostdata->host->host_lock, flags);
 	list_for_each_entry_safe(tmp_evt, pos, &hostdata->sent, list) {
+		list_del(&tmp_evt->list);
 		if (tmp_evt->cmnd) {
 			tmp_evt->cmnd->result = (DID_ERROR << 16);
-			list_del(&tmp_evt->list);
 			unmap_cmd_data(&tmp_evt->cmd, tmp_evt->hostdata->dev);
 			if (tmp_evt->cmnd_done)
 				tmp_evt->cmnd_done(tmp_evt->cmnd);
@@ -1099,6 +1108,8 @@ static int ibmvscsi_do_host_config(struct ibmvscsi_host_data *hostdata,
 	host_config.common.length = length;
 	host_config.buffer = dma_map_single(hostdata->dev, buffer, length,
 					    DMA_BIDIRECTIONAL);
+
+	buffer[0] = 0x00;
 
 	if (dma_mapping_error(host_config.buffer)) {
 		printk(KERN_ERR
