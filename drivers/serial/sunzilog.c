@@ -1030,7 +1030,7 @@ static struct uart_driver sunzilog_reg = {
 	.owner		=	THIS_MODULE,
 	.driver_name	=	"ttyS",
 #ifdef CONFIG_DEVFS_FS
-	.dev_name	=	"ttyS%d",
+	.dev_name	=	"tts/%d",
 #else
 	.dev_name	=	"ttyS%d",
 #endif
@@ -1484,7 +1484,7 @@ static void __init sunzilog_prepare(void)
 	/*
 	 * Temporary fix.
 	 */
-	for (channel = 0; channel < NUM_CHANNELS - 1; channel++)
+	for (channel = 0; channel < NUM_CHANNELS; channel++)
 		spin_lock_init(&sunzilog_port_table[channel].port.lock);
 
 	sunzilog_irq_chain = up = &sunzilog_port_table[0];
