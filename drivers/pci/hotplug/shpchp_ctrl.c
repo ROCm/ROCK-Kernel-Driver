@@ -2516,7 +2516,7 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 			kfree(hold_mem_node);
 			kfree(hold_p_mem_node);
 
-			return(1);
+			return 1;
 		}
 
 		memcpy(hold_bus_node, bus_node, sizeof(struct pci_resource));
@@ -2535,11 +2535,11 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 			/* set IO base and Limit registers */
 			RES_CHECK(io_node->base, 8);
 			temp_byte = (u8)(io_node->base >> 8);
-			rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_IO_BASE, temp_byte);
+			rc = pci_bus_write_config_byte(pci_bus, devfn, PCI_IO_BASE, temp_byte);
 
 			RES_CHECK(io_node->base + io_node->length - 1, 8);
 			temp_byte = (u8)((io_node->base + io_node->length - 1) >> 8);
-			rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_IO_LIMIT, temp_byte);
+			rc = pci_bus_write_config_byte(pci_bus, devfn, PCI_IO_LIMIT, temp_byte);
 		} else {
 			kfree(hold_IO_node);
 			hold_IO_node = NULL;
@@ -2556,17 +2556,17 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 			/* set Mem base and Limit registers */
 			RES_CHECK(mem_node->base, 16);
 			temp_word = (u32)(mem_node->base >> 16);
-			rc = pci_bus_write_config_word (pci_bus, devfn, PCI_MEMORY_BASE, temp_word);
+			rc = pci_bus_write_config_word(pci_bus, devfn, PCI_MEMORY_BASE, temp_word);
 
 			RES_CHECK(mem_node->base + mem_node->length - 1, 16);
 			temp_word = (u32)((mem_node->base + mem_node->length - 1) >> 16);
-			rc = pci_bus_write_config_word (pci_bus, devfn, PCI_MEMORY_LIMIT, temp_word);
+			rc = pci_bus_write_config_word(pci_bus, devfn, PCI_MEMORY_LIMIT, temp_word);
 		} else {
 			temp_word = 0xFFFF;
-			rc = pci_bus_write_config_word (pci_bus, devfn, PCI_MEMORY_BASE, temp_word);
+			rc = pci_bus_write_config_word(pci_bus, devfn, PCI_MEMORY_BASE, temp_word);
 
 			temp_word = 0x0000;
-			rc = pci_bus_write_config_word (pci_bus, devfn, PCI_MEMORY_LIMIT, temp_word);
+			rc = pci_bus_write_config_word(pci_bus, devfn, PCI_MEMORY_LIMIT, temp_word);
 
 			kfree(hold_mem_node);
 			hold_mem_node = NULL;
@@ -2583,17 +2583,17 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 			/* set Pre Mem base and Limit registers */
 			RES_CHECK(p_mem_node->base, 16);
 			temp_word = (u32)(p_mem_node->base >> 16);
-			rc = pci_bus_write_config_word (pci_bus, devfn, PCI_PREF_MEMORY_BASE, temp_word);
+			rc = pci_bus_write_config_word(pci_bus, devfn, PCI_PREF_MEMORY_BASE, temp_word);
 
 			RES_CHECK(p_mem_node->base + p_mem_node->length - 1, 16);
 			temp_word = (u32)((p_mem_node->base + p_mem_node->length - 1) >> 16);
-			rc = pci_bus_write_config_word (pci_bus, devfn, PCI_PREF_MEMORY_LIMIT, temp_word);
+			rc = pci_bus_write_config_word(pci_bus, devfn, PCI_PREF_MEMORY_LIMIT, temp_word);
 		} else {
 			temp_word = 0xFFFF;
-			rc = pci_bus_write_config_word (pci_bus, devfn, PCI_PREF_MEMORY_BASE, temp_word);
+			rc = pci_bus_write_config_word(pci_bus, devfn, PCI_PREF_MEMORY_BASE, temp_word);
 
 			temp_word = 0x0000;
-			rc = pci_bus_write_config_word (pci_bus, devfn, PCI_PREF_MEMORY_LIMIT, temp_word);
+			rc = pci_bus_write_config_word(pci_bus, devfn, PCI_PREF_MEMORY_LIMIT, temp_word);
 
 			kfree(hold_p_mem_node);
 			hold_p_mem_node = NULL;
@@ -2610,7 +2610,8 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 
 			ID = 0xFFFFFFFF;
 			pci_bus->number = hold_bus_node->base;
-			pci_bus_read_config_dword (pci_bus, PCI_DEVFN(device, 0), PCI_VENDOR_ID, &ID);
+			pci_bus_read_config_dword(pci_bus, PCI_DEVFN(device, 0),
+					PCI_VENDOR_ID, &ID);
 			pci_bus->number = func->bus;
 
 			if (ID != 0xFFFFFFFF) {	  /*  device Present */
