@@ -125,10 +125,30 @@ static void snd_seq_device_info(snd_info_entry_t *entry, snd_info_buffer_t * buf
  * load all registered drivers (called from seq_clientmgr.c)
  */
 
+#ifdef CONFIG_KMOD
+/* avoid auto-loading during module_init() */
+static int snd_seq_in_init;
+void snd_seq_autoload_lock(void)
+{
+	snd_seq_in_init++;
+}
+
+void snd_seq_autoload_unlock(void)
+{
+	snd_seq_in_init--;
+}
+#endif
+
 void snd_seq_device_load_drivers(void)
 {
 #ifdef CONFIG_KMOD
 	struct list_head *head;
+
+	/* Calling request_module during module_init()
+	 * may cause blocking.
+	 */
+	if (snd_seq_in_init)
+		return;
 
 	if (! current->fs->root)
 		return;
@@ -309,12 +329,16 @@ int snd_seq_device_register_driver(char *id, snd_seq_dev_ops_t *entry, int argsi
 	    entry->init_device == NULL || entry->free_device == NULL)
 		return -EINVAL;
 
+	snd_seq_autoload_lock();
 	ops = find_driver(id, 1);
-	if (ops == NULL)
+	if (ops == NULL) {
+		snd_seq_autoload_unlock();
 		return -ENOMEM;
+	}
 	if (ops->driver & DRIVER_LOADED) {
 		snd_printk(KERN_WARNING "driver_register: driver '%s' already exists\n", id);
 		unlock_driver(ops);
+		snd_seq_autoload_unlock();
 		return -EBUSY;
 	}
 
@@ -332,6 +356,7 @@ int snd_seq_device_register_driver(char *id, snd_seq_dev_ops_t *entry, int argsi
 	up(&ops->reg_mutex);
 
 	unlock_driver(ops);
+	snd_seq_autoload_unlock();
 
 	return 0;
 }
@@ -543,3 +568,7 @@ EXPORT_SYMBOL(snd_seq_device_load_drivers);
 EXPORT_SYMBOL(snd_seq_device_new);
 EXPORT_SYMBOL(snd_seq_device_register_driver);
 EXPORT_SYMBOL(snd_seq_device_unregister_driver);
+#ifdef CONFIG_KMOD
+EXPORT_SYMBOL(snd_seq_autoload_lock);
+EXPORT_SYMBOL(snd_seq_autoload_unlock);
+#endif

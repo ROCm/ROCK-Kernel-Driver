@@ -71,39 +71,37 @@ MODULE_PARM_DESC(seq_default_timer_resolution, "The default timer resolution in 
  *  INIT PART
  */
 
-int snd_seq_in_init;
-
 static int __init alsa_seq_init(void)
 {
 	int err;
 
-	snd_seq_in_init = 1;
-
+	snd_seq_autoload_lock();
 	if ((err = client_init_data()) < 0)
-		return err;
+		goto error;
 
 	/* init memory, room for selected events */
 	if ((err = snd_sequencer_memory_init()) < 0)
-		return err;
+		goto error;
 
 	/* init event queues */
 	if ((err = snd_seq_queues_init()) < 0)
-		return err;
+		goto error;
 
 	/* register sequencer device */
 	if ((err = snd_sequencer_device_init()) < 0)
-		return err;
+		goto error;
 
 	/* register proc interface */
 	if ((err = snd_seq_info_init()) < 0)
-		return err;
+		goto error;
 
 	/* register our internal client */
 	if ((err = snd_seq_system_client_init()) < 0)
-		return err;
+		goto error;
 
-	snd_seq_in_init = 0;
-	return 0;
+ error:
+	snd_seq_autoload_unlock();
+	return err;
 }
 
 static void __exit alsa_seq_exit(void)
