@@ -3,7 +3,7 @@
 #
 
 menu "Bluetooth support"
-	depends on NET
+	depends on NET && !S390
 
 config BT
 	tristate "Bluetooth subsystem support"

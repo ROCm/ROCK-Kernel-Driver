@@ -3,7 +3,7 @@
 #
 
 menu "IrDA (infrared) support"
-	depends on NET
+	depends on NET && !S390
 
 config IRDA
 	tristate "IrDA subsystem support"

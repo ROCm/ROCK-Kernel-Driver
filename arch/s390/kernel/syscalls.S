@@ -251,25 +251,25 @@ SYSCALL(sys_sched_setaffinity,sys_sched_setaffinity,sys32_sched_setaffinity_wrap
 SYSCALL(sys_sched_getaffinity,sys_sched_getaffinity,sys32_sched_getaffinity_wrapper)	/* 240 */
 SYSCALL(sys_tgkill,sys_tgkill,sys_tgkill)
 NI_SYSCALL							/* reserved for TUX */
-SYSCALL(sys_io_setup,sys_io_setup,sys_ni_syscall)
-SYSCALL(sys_io_destroy,sys_io_destroy,sys_ni_syscall)
-SYSCALL(sys_io_getevents,sys_io_getevents,sys_ni_syscall)	/* 245 */
-SYSCALL(sys_io_submit,sys_io_submit,sys_ni_syscall)
-SYSCALL(sys_io_cancel,sys_io_cancel,sys_ni_syscall)
+SYSCALL(sys_io_setup,sys_io_setup,sys32_io_setup_wrapper)
+SYSCALL(sys_io_destroy,sys_io_destroy,sys32_io_destroy_wrapper)
+SYSCALL(sys_io_getevents,sys_io_getevents,sys32_io_getevents_wrapper)	/* 245 */
+SYSCALL(sys_io_submit,sys_io_submit,sys32_io_submit_wrapper)
+SYSCALL(sys_io_cancel,sys_io_cancel,sys32_io_cancel_wrapper)
 SYSCALL(sys_exit_group,sys_exit_group,sys32_exit_group_wrapper)
 SYSCALL(sys_epoll_create,sys_epoll_create,sys_epoll_create_wrapper)
 SYSCALL(sys_epoll_ctl,sys_epoll_ctl,sys_epoll_ctl_wrapper)	/* 250 */
 SYSCALL(sys_epoll_wait,sys_epoll_wait,sys_epoll_wait_wrapper)
 SYSCALL(sys_set_tid_address,sys_set_tid_address,sys32_set_tid_address_wrapper)
-SYSCALL(s390_fadvise64,sys_fadvise64_64,sys_ni_syscall)
-SYSCALL(sys_timer_create,sys_timer_create,sys_ni_syscall)
-SYSCALL(sys_timer_settime,sys_timer_settime,sys_ni_syscall)	/* 255 */
-SYSCALL(sys_timer_gettime,sys_timer_gettime,sys_ni_syscall)
-SYSCALL(sys_timer_getoverrun,sys_timer_getoverrun,sys_ni_syscall)
-SYSCALL(sys_timer_delete,sys_timer_delete,sys_ni_syscall)
-SYSCALL(sys_clock_settime,sys_clock_settime,sys_ni_syscall)
-SYSCALL(sys_clock_gettime,sys_clock_gettime,sys_ni_syscall)	/* 260 */
-SYSCALL(sys_clock_getres,sys_clock_getres,sys_ni_syscall)
-SYSCALL(sys_clock_nanosleep,sys_clock_nanosleep,sys_ni_syscall)
+SYSCALL(s390_fadvise64,sys_fadvise64_64,sys32_fadvise64_wrapper)
+SYSCALL(sys_timer_create,sys_timer_create,sys32_timer_create_wrapper)
+SYSCALL(sys_timer_settime,sys_timer_settime,sys32_timer_settime_wrapper)	/* 255 */
+SYSCALL(sys_timer_gettime,sys_timer_gettime,sys32_timer_gettime_wrapper)
+SYSCALL(sys_timer_getoverrun,sys_timer_getoverrun,sys32_timer_getoverrun_wrapper)
+SYSCALL(sys_timer_delete,sys_timer_delete,sys32_timer_delete_wrapper)
+SYSCALL(sys_clock_settime,sys_clock_settime,sys32_clock_settime_wrapper)
+SYSCALL(sys_clock_gettime,sys_clock_gettime,sys32_clock_gettime_wrapper)	/* 260 */
+SYSCALL(sys_clock_getres,sys_clock_getres,sys32_clock_getres_wrapper)
+SYSCALL(sys_clock_nanosleep,sys_clock_nanosleep,sys32_clock_nanosleep_wrapper)
 NI_SYSCALL							/* reserved for vserver */
-SYSCALL(s390_fadvise64_64,sys_fadvise64_64,sys_ni_syscall)
+SYSCALL(s390_fadvise64_64,sys_fadvise64_64,sys32_fadvise64_64_wrapper)

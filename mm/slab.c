@@ -119,7 +119,17 @@
 
 
 /* Shouldn't this be in a header file somewhere? */
+#if defined(__s390__) && defined(CONFIG_DEBUG_SLAB)
+/*
+ * s390 has some instructions that require 8 byte alignment
+ * on their operands. Without CONFIG_DEBUG_SLAB kmalloc
+ * does return 8 byte aligned memory, with CONFIG_DEBUG_SLAB
+ * it doesn't.
+ */
+#define BYTES_PER_WORD		8
+#else
 #define	BYTES_PER_WORD		sizeof(void *)
+#endif
 
 /* Legal flag mask for kmem_cache_create(). */
 #if DEBUG
