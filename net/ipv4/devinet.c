@@ -1151,11 +1151,11 @@ void inet_forward_change(void)
 
 static int devinet_sysctl_forward(ctl_table *ctl, int write,
 				  struct file* filp, void __user *buffer,
-				  size_t *lenp)
+				  size_t *lenp, loff_t *ppos)
 {
 	int *valp = ctl->data;
 	int val = *valp;
-	int ret = proc_dointvec(ctl, write, filp, buffer, lenp);
+	int ret = proc_dointvec(ctl, write, filp, buffer, lenp, ppos);
 
 	if (write && *valp != val) {
 		if (valp == &ipv4_devconf.forwarding)
@@ -1169,11 +1169,11 @@ static int devinet_sysctl_forward(ctl_table *ctl, int write,
 
 int ipv4_doint_and_flush(ctl_table *ctl, int write,
 			 struct file* filp, void __user *buffer,
-			 size_t *lenp)
+			 size_t *lenp, loff_t *ppos)
 {
 	int *valp = ctl->data;
 	int val = *valp;
-	int ret = proc_dointvec(ctl, write, filp, buffer, lenp);
+	int ret = proc_dointvec(ctl, write, filp, buffer, lenp, ppos);
 
 	if (write && *valp != val)
 		rt_cache_flush(0);

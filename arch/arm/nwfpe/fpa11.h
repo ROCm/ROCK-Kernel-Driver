@@ -29,7 +29,7 @@
  * stack+task struct.  Use the same method as 'current' uses to
  * reach them.
  */
-register unsigned int *user_registers asm("sl");
+register unsigned long *user_registers asm("sl");
 
 #define GET_USERREG() (user_registers)
 

@@ -49,6 +49,7 @@ static int nowayout = 0;
  */
 static int sa1100dog_open(struct inode *inode, struct file *file)
 {
+	nonseekable_open(inode, file);
 	if (test_and_set_bit(1,&sa1100wdt_users))
 		return -EBUSY;
 
@@ -84,10 +85,6 @@ static int sa1100dog_release(struct inode *inode, struct file *file)
 
 static ssize_t sa1100dog_write(struct file *file, const char *data, size_t len, loff_t *ppos)
 {
-	/* Can't seek (pwrite) on this device  */
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
-
 	if (len) {
 		if (!nowayout) {
 			size_t i;

@@ -113,10 +113,6 @@ static void acq_stop(void)
 
 static ssize_t acq_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
 {
-	/*  Can't seek (pwrite) on this device  */
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
-
 	/* See if we got the magic character 'V' and reload the timer */
 	if(count) {
 		if (!nowayout) {
@@ -206,7 +202,7 @@ static int acq_open(struct inode *inode, struct file *file)
 
 	/* Activate */
 	acq_keepalive();
-	return 0;
+	return nonseekable_open(inode, file);
 }
 
 static int acq_close(struct inode *inode, struct file *file)

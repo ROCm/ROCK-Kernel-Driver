@@ -598,10 +598,6 @@ static ssize_t ipmi_write(struct file *file,
 {
 	int rv;
 
-	/*  Can't seek (pwrite) on this device  */
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
-
 	if (len) {
 		rv = ipmi_heartbeat();
 		if (rv)
@@ -618,10 +614,6 @@ static ssize_t ipmi_read(struct file *file,
 {
 	int          rv = 0;
 	wait_queue_t wait;
-
-	/*  Can't seek (pread) on this device  */
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
 
 	if (count <= 0)
 		return 0;
@@ -678,7 +670,7 @@ static int ipmi_open(struct inode *ino, struct file *filep)
 		    /* Don't start the timer now, let it start on the
 		       first heartbeat. */
 		    ipmi_start_timer_on_heartbeat = 1;
-                    return(0);
+                    return nonseekable_open(ino, filep);
 
                 default:
                     return (-ENODEV);

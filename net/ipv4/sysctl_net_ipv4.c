@@ -62,12 +62,12 @@ extern ctl_table ipv4_route_table[];
 
 static
 int ipv4_sysctl_forward(ctl_table *ctl, int write, struct file * filp,
-			void __user *buffer, size_t *lenp)
+			void __user *buffer, size_t *lenp, loff_t *ppos)
 {
 	int val = ipv4_devconf.forwarding;
 	int ret;
 
-	ret = proc_dointvec(ctl, write, filp, buffer, lenp);
+	ret = proc_dointvec(ctl, write, filp, buffer, lenp, ppos);
 
 	if (write && ipv4_devconf.forwarding != val)
 		inet_forward_change();

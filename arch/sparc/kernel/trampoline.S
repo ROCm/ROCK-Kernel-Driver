@@ -88,8 +88,6 @@ cpu3_startup:
 	.align	4
 
 smp_do_cpu_idle:
-	call	init_idle
-	 nop
 	call	cpu_idle
 	 mov	0, %o0
 

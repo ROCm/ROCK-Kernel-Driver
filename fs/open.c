@@ -781,7 +781,7 @@ struct file *dentry_open(struct dentry *dentry, struct vfsmount *mnt, int flags)
 	if (!f)
 		goto cleanup_dentry;
 	f->f_flags = flags;
-	f->f_mode = (flags+1) & O_ACCMODE;
+	f->f_mode = ((flags+1) & O_ACCMODE) | FMODE_LSEEK | FMODE_PREAD | FMODE_PWRITE;
 	inode = dentry->d_inode;
 	if (f->f_mode & FMODE_WRITE) {
 		error = get_write_access(inode);
@@ -1070,3 +1070,15 @@ int generic_file_open(struct inode * inode, struct file * filp)
 }
 
 EXPORT_SYMBOL(generic_file_open);
+
+/*
+ * This is used by subsystems that don't want seekable
+ * file descriptors
+ */
+int nonseekable_open(struct inode *inode, struct file *filp)
+{
+	filp->f_mode &= ~(FMODE_LSEEK | FMODE_PREAD | FMODE_PWRITE);
+	return 0;
+}
+
+EXPORT_SYMBOL(nonseekable_open);

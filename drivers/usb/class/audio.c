@@ -1974,7 +1974,7 @@ static int usb_audio_open_mixdev(struct inode *inode, struct file *file)
 	s->count++;
 
 	up(&open_sem);
-	return 0;
+	return nonseekable_open(inode, file);
 }
 
 static int usb_audio_release_mixdev(struct inode *inode, struct file *file)
@@ -2147,8 +2147,6 @@ static ssize_t usb_audio_read(struct file *file, char __user *buffer, size_t cou
 	unsigned int ptr;
 	int cnt, err;
 
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
 	if (as->usbin.dma.mapped)
 		return -ENXIO;
 	if (!as->usbin.dma.ready && (ret = prog_dmabuf_in(as)))
@@ -2216,8 +2214,6 @@ static ssize_t usb_audio_write(struct file *file, const char __user *buffer, siz
 	unsigned int start_thr;
 	int cnt, err;
 
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
 	if (as->usbout.dma.mapped)
 		return -ENXIO;
 	if (!as->usbout.dma.ready && (ret = prog_dmabuf_out(as)))
@@ -2688,7 +2684,7 @@ static int usb_audio_open(struct inode *inode, struct file *file)
 	as->open_mode |= file->f_mode & (FMODE_READ | FMODE_WRITE);
 	s->count++;
 	up(&open_sem);
-	return 0;
+	return nonseekable_open(inode, file);
 }
 
 static int usb_audio_release(struct inode *inode, struct file *file)

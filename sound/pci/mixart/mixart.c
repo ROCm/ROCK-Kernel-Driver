@@ -1154,18 +1154,18 @@ static long long snd_mixart_BA1_llseek(snd_info_entry_t *entry,
   mixart_BA0 proc interface for BAR 0 - read callback
  */
 static long snd_mixart_BA0_read(snd_info_entry_t *entry, void *file_private_data,
-				struct file *file, char __user *buf, long count)
+				struct file *file, char __user *buf,
+				unsigned long count, unsigned long pos)
 {
 	mixart_mgr_t *mgr = snd_magic_cast(mixart_mgr_t, entry->private_data, return -ENXIO);
 
 	count = count & ~3; /* make sure the read size is a multiple of 4 bytes */
 	if(count <= 0)
 		return 0;
-	if(file->f_pos + count > MIXART_BA0_SIZE)
-		count = (long)(MIXART_BA0_SIZE - file->f_pos);
-	if(copy_to_user_fromio(buf, MIXART_MEM( mgr, file->f_pos ), count))
+	if(pos + count > MIXART_BA0_SIZE)
+		count = (long)(MIXART_BA0_SIZE - pos);
+	if(copy_to_user_fromio(buf, MIXART_MEM( mgr, pos ), count))
 		return -EFAULT;
-	file->f_pos += count;
 	return count;
 }
 
@@ -1173,18 +1173,18 @@ static long snd_mixart_BA0_read(snd_info_entry_t *entry, void *file_private_data
   mixart_BA1 proc interface for BAR 1 - read callback
  */
 static long snd_mixart_BA1_read(snd_info_entry_t *entry, void *file_private_data,
-				struct file *file, char __user *buf, long count)
+				struct file *file, char __user *buf,
+				unsigned long count, unsigned long pos)
 {
 	mixart_mgr_t *mgr = snd_magic_cast(mixart_mgr_t, entry->private_data, return -ENXIO);
 
 	count = count & ~3; /* make sure the read size is a multiple of 4 bytes */
 	if(count <= 0)
 		return 0;
-	if(file->f_pos + count > MIXART_BA1_SIZE)
-		count = (long)(MIXART_BA1_SIZE - file->f_pos);
-	if(copy_to_user_fromio(buf, MIXART_REG( mgr, file->f_pos ), count))
+	if(pos + count > MIXART_BA1_SIZE)
+		count = (long)(MIXART_BA1_SIZE - pos);
+	if(copy_to_user_fromio(buf, MIXART_REG( mgr, pos ), count))
 		return -EFAULT;
-	file->f_pos += count;
 	return count;
 }
 

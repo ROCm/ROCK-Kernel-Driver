@@ -345,18 +345,12 @@ EXPORT_SYMBOL(tty_check_change);
 static ssize_t hung_up_tty_read(struct file * file, char __user * buf,
 				size_t count, loff_t *ppos)
 {
-	/* Can't seek (pread) on ttys.  */
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
 	return 0;
 }
 
 static ssize_t hung_up_tty_write(struct file * file, const char __user * buf,
 				 size_t count, loff_t *ppos)
 {
-	/* Can't seek (pwrite) on ttys.  */
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
 	return -EIO;
 }
 
@@ -648,10 +642,6 @@ static ssize_t tty_read(struct file * file, char __user * buf, size_t count,
 	struct tty_struct * tty;
 	struct inode *inode;
 
-	/* Can't seek (pread) on ttys.  */
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
-
 	tty = (struct tty_struct *)file->private_data;
 	inode = file->f_dentry->d_inode;
 	if (tty_paranoia_check(tty, inode, "tty_read"))
@@ -726,10 +716,6 @@ static ssize_t tty_write(struct file * file, const char __user * buf, size_t cou
 	struct tty_struct * tty;
 	struct inode *inode = file->f_dentry->d_inode;
 
-	/* Can't seek (pwrite) on ttys.  */
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
-
 	tty = (struct tty_struct *)file->private_data;
 	if (tty_paranoia_check(tty, inode, "tty_write"))
 		return -EIO;
@@ -755,9 +741,6 @@ ssize_t redirected_tty_write(struct file * file, const char __user * buf, size_t
 
 	if (p) {
 		ssize_t res;
-		/* Can't seek (pwrite) on ttys.  */
-		if (ppos != &file->f_pos)
-			return -ESPIPE;
 		res = vfs_write(p, buf, count, &p->f_pos);
 		fput(p);
 		return res;
@@ -1339,6 +1322,7 @@ static int tty_open(struct inode * inode, struct file * filp)
 	dev_t device = inode->i_rdev;
 	unsigned short saved_flags = filp->f_flags;
 
+	nonseekable_open(inode, filp);
 retry_open:
 	noctty = filp->f_flags & O_NOCTTY;
 	index  = -1;

@@ -8,6 +8,7 @@
 #include <linux/module.h>
 #include <linux/proc_fs.h>
 #include <linux/time.h>
+#include <linux/seq_file.h>
 #include <asm/uaccess.h>
 #include <linux/atmmpc.h>
 #include <linux/atm.h>
@@ -30,30 +31,23 @@
 extern struct mpoa_client *mpcs;
 extern struct proc_dir_entry *atm_proc_root;  /* from proc.c. */
 
-static ssize_t proc_mpc_read(struct file *file, char __user *buff,
-			     size_t count, loff_t *pos);
-
+static int proc_mpc_open(struct inode *inode, struct file *file);
 static ssize_t proc_mpc_write(struct file *file, const char __user *buff,
                               size_t nbytes, loff_t *ppos);
 
-static int parse_qos(const char *buff, int len);
+static int parse_qos(const char *buff);
 
 /*
  *   Define allowed FILE OPERATIONS
  */
 static struct file_operations mpc_file_operations = {
 	.owner =	THIS_MODULE,
-	.read =		proc_mpc_read,
+	.open =		proc_mpc_open,
+	.read =		seq_read,
+	.llseek =	seq_lseek,
 	.write =	proc_mpc_write,
+	.release =	seq_release,
 };
-
-static int print_header(char *buff,struct mpoa_client *mpc){
-        if(mpc != NULL){
-	        return sprintf(buff,"\nInterface %d:\n\n",mpc->dev_num);  
-	  
-	}
-	return 0;
-}
 
 /*
  * Returns the state of an ingress cache entry as a string
@@ -97,210 +91,173 @@ static const char *egress_state_string(int state){
 }
 
 /*
+ * FIXME: mpcs (and per-mpc lists) have no locking whatsoever.
+ */
+
+static void *mpc_start(struct seq_file *m, loff_t *pos)
+{
+	loff_t l = *pos;
+	struct mpoa_client *mpc;
+
+	if (!l--)
+		return SEQ_START_TOKEN;
+	for (mpc = mpcs; mpc; mpc = mpc->next)
+		if (!l--)
+			return mpc;
+	return NULL;
+}
+
+static void *mpc_next(struct seq_file *m, void *v, loff_t *pos)
+{
+	struct mpoa_client *p = v;
+	(*pos)++;
+	return v == SEQ_START_TOKEN ? mpcs : p->next;
+}
+
+static void mpc_stop(struct seq_file *m, void *v)
+{
+}
+
+/*
  * READING function - called when the /proc/atm/mpoa file is read from.
  */
-static ssize_t proc_mpc_read(struct file *file, char __user *buff,
-			     size_t count, loff_t *pos){
-        unsigned long page = 0;
+static ssize_t mpc_show(struct seq_file *m, void *v)
+{
+	struct mpoa_client *mpc = v;
 	unsigned char *temp;
-        ssize_t length = 0;
-	int i = 0;
-	struct mpoa_client *mpc = mpcs;
+	int i;
 	in_cache_entry *in_entry;
 	eg_cache_entry *eg_entry;
 	struct timeval now;
 	unsigned char ip_string[16];
-	if(count == 0)
-	        return 0;
-	page = get_zeroed_page(GFP_KERNEL);
-	if(!page)
-	        return -ENOMEM;
-	atm_mpoa_disp_qos((char *)page, &length);
-	while(mpc != NULL){
-	        length += print_header((char *)page + length, mpc);
-		length += sprintf((char *)page + length,"Ingress Entries:\nIP address      State      Holding time  Packets fwded  VPI  VCI\n");
-		in_entry = mpc->in_cache;
-		do_gettimeofday(&now);
-		while(in_entry != NULL){
-		        temp = (unsigned char *)&in_entry->ctrl_info.in_dst_ip;                        sprintf(ip_string,"%d.%d.%d.%d", temp[0], temp[1], temp[2], temp[3]);
-		        length += sprintf((char *)page + length,"%-16s%s%-14lu%-12u", ip_string, ingress_state_string(in_entry->entry_state), (in_entry->ctrl_info.holding_time-(now.tv_sec-in_entry->tv.tv_sec)), in_entry->packets_fwded);
-			if(in_entry->shortcut)
-			        length += sprintf((char *)page + length,"   %-3d  %-3d",in_entry->shortcut->vpi,in_entry->shortcut->vci);
-			length += sprintf((char *)page + length,"\n");
-			in_entry = in_entry->next;
-		}
-		length += sprintf((char *)page + length,"\n");
-		eg_entry = mpc->eg_cache;
-		length += sprintf((char *)page + length,"Egress Entries:\nIngress MPC ATM addr\nCache-id        State      Holding time  Packets recvd  Latest IP addr   VPI VCI\n");
-		while(eg_entry != NULL){
-		  for(i=0;i<ATM_ESA_LEN;i++){
-		          length += sprintf((char *)page + length,"%02x",eg_entry->ctrl_info.in_MPC_data_ATM_addr[i]);}  
-		        length += sprintf((char *)page + length,"\n%-16lu%s%-14lu%-15u",(unsigned long) ntohl(eg_entry->ctrl_info.cache_id), egress_state_string(eg_entry->entry_state), (eg_entry->ctrl_info.holding_time-(now.tv_sec-eg_entry->tv.tv_sec)), eg_entry->packets_rcvd);
-			
-			/* latest IP address */
-			temp = (unsigned char *)&eg_entry->latest_ip_addr;
-			sprintf(ip_string, "%d.%d.%d.%d", temp[0], temp[1], temp[2], temp[3]);
-			length += sprintf((char *)page + length, "%-16s", ip_string);
 
-			if(eg_entry->shortcut)
-			        length += sprintf((char *)page + length," %-3d %-3d",eg_entry->shortcut->vpi,eg_entry->shortcut->vci);
-			length += sprintf((char *)page + length,"\n");
-			eg_entry = eg_entry->next;
-		}
-		length += sprintf((char *)page + length,"\n");
-		mpc = mpc->next;
+	if (v == SEQ_START_TOKEN) {
+		atm_mpoa_disp_qos(m);
+		return 0;
 	}
 
-	if (*pos >= length) length = 0;
-	else {
-	  if ((count + *pos) > length) count = length - *pos;
-	  if (copy_to_user(buff, (char *)page , count)) {
- 		  free_page(page);
-		  return -EFAULT;
-          }
-	  *pos += count;
+	seq_printf(m, "\nInterface %d:\n\n", mpc->dev_num);  
+	seq_printf(m, "Ingress Entries:\nIP address      State      Holding time  Packets fwded  VPI  VCI\n");
+	do_gettimeofday(&now);
+
+	for (in_entry = mpc->in_cache; in_entry; in_entry = in_entry->next) {
+		temp = (unsigned char *)&in_entry->ctrl_info.in_dst_ip;
+		sprintf(ip_string,"%d.%d.%d.%d", temp[0], temp[1], temp[2], temp[3]);
+		seq_printf(m, "%-16s%s%-14lu%-12u",
+			      ip_string,
+			      ingress_state_string(in_entry->entry_state),
+			      in_entry->ctrl_info.holding_time-(now.tv_sec-in_entry->tv.tv_sec),
+			      in_entry->packets_fwded);
+		if (in_entry->shortcut)
+			seq_printf(m, "   %-3d  %-3d",in_entry->shortcut->vpi,in_entry->shortcut->vci);
+		seq_printf(m, "\n");
 	}
 
- 	free_page(page);
-        return length;
+	seq_printf(m, "\n");
+	seq_printf(m, "Egress Entries:\nIngress MPC ATM addr\nCache-id        State      Holding time  Packets recvd  Latest IP addr   VPI VCI\n");
+	for (eg_entry = mpc->eg_cache; eg_entry; eg_entry = eg_entry->next) {
+		unsigned char *p = eg_entry->ctrl_info.in_MPC_data_ATM_addr;
+		for(i = 0; i < ATM_ESA_LEN; i++)
+			seq_printf(m, "%02x", p[i]);
+		seq_printf(m, "\n%-16lu%s%-14lu%-15u",
+			   (unsigned long)ntohl(eg_entry->ctrl_info.cache_id),
+			   egress_state_string(eg_entry->entry_state),
+			   (eg_entry->ctrl_info.holding_time-(now.tv_sec-eg_entry->tv.tv_sec)),
+			   eg_entry->packets_rcvd);
+		
+		/* latest IP address */
+		temp = (unsigned char *)&eg_entry->latest_ip_addr;
+		sprintf(ip_string, "%d.%d.%d.%d", temp[0], temp[1], temp[2], temp[3]);
+		seq_printf(m, "%-16s", ip_string);
+
+		if (eg_entry->shortcut)
+			seq_printf(m, " %-3d %-3d",eg_entry->shortcut->vpi,eg_entry->shortcut->vci);
+		seq_printf(m, "\n");
+	}
+	seq_printf(m, "\n");
+	return 0;
+}
+
+static struct seq_operations mpc_op = {
+	.start =	mpc_start,
+	.next =		mpc_next,
+	.stop =		mpc_stop,
+	.show =		mpc_show
+};
+
+static int proc_mpc_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &mpc_op);
 }
 
 static ssize_t proc_mpc_write(struct file *file, const char __user *buff,
                               size_t nbytes, loff_t *ppos)
 {
-        int incoming, error, retval;
-        char *page, c;
-        const char __user *tmp;
+        char *page, *p;
+	unsigned len;
 
-        if (nbytes == 0) return 0;
-        if (nbytes >= PAGE_SIZE) nbytes = PAGE_SIZE-1;
+        if (nbytes == 0)
+		return 0;
 
-        error = verify_area(VERIFY_READ, buff, nbytes);
-        if (error) return error;
+        if (nbytes >= PAGE_SIZE)
+		nbytes = PAGE_SIZE-1;
 
         page = (char *)__get_free_page(GFP_KERNEL);
-        if (page == NULL) return -ENOMEM;
+        if (!page)
+		return -ENOMEM;
 
-        incoming = 0;
-        tmp = buff;
-        while(incoming < nbytes){
-                if (get_user(c, tmp++)) return -EFAULT;
-                incoming++;
-                if (c == '\0' || c == '\n')
+        for (p = page, len = 0; len < nbytes; p++, len++) {
+                if (get_user(*p, buff++)) {
+			free_page((unsigned long)page);
+			return -EFAULT;
+		}
+                if (*p == '\0' || *p == '\n')
                         break;
         }
 
-        retval = copy_from_user(page, buff, incoming);
-        if (retval != 0) {
-                printk("mpoa: proc_mpc_write: copy_from_user() failed\n");
-                return -EFAULT;
-        }
+        *p = '\0';
 
-        *ppos += incoming;
-
-        page[incoming] = '\0';
-	retval = parse_qos(page, incoming);
-        if (retval == 0)
+	if (!parse_qos(page))
                 printk("mpoa: proc_mpc_write: could not parse '%s'\n", page);
 
         free_page((unsigned long)page);
         
-        return nbytes;
+        return len;
 }
 
-static int parse_qos(const char *buff, int len)
+static int parse_qos(const char *buff)
 {
         /* possible lines look like this
          * add 130.230.54.142 tx=max_pcr,max_sdu rx=max_pcr,max_sdu
          */
-        
-        int pos, i;
-        uint32_t ipaddr;
         unsigned char ip[4]; 
-        char cmd[4], temp[256];
-        const char *tmp, *prev;
+	int tx_pcr, tx_sdu, rx_pcr, rx_sdu;
+        uint32_t ipaddr;
 	struct atm_qos qos; 
-	int value[5];
         
         memset(&qos, 0, sizeof(struct atm_qos));
-        strlcpy(cmd, buff, sizeof(cmd));
-        if( strncmp(cmd,"add", 3) &&  strncmp(cmd,"del", 3))
-	        return 0;  /* not add or del */
 
-	pos = 4;
-        /* next parse ip */
-        prev = buff + pos;
-        for (i = 0; i < 3; i++) {
-                tmp = strchr(prev, '.');
-                if (tmp == NULL) return 0;
-                memset(temp, '\0', 256);
-                memcpy(temp, prev, tmp-prev);
-                ip[i] = (char)simple_strtoul(temp, NULL, 0);
-		tmp ++; 
-		prev = tmp;
-        }
-	tmp = strchr(prev, ' ');
-        if (tmp == NULL) return 0;
-        memset(temp, '\0', 256);
-        memcpy(temp, prev, tmp-prev);
-        ip[i] = (char)simple_strtoul(temp, NULL, 0);
-        ipaddr = *(uint32_t *)ip;
-                
-	if(!strncmp(cmd, "del", 3))
-	         return atm_mpoa_delete_qos(atm_mpoa_search_qos(ipaddr));
-
-        /* next transmit values */
-	tmp = strstr(buff, "tx=");
-	if(tmp == NULL) return 0;
-	tmp += 3;
-	prev = tmp;
-	for( i = 0; i < 1; i++){
-	         tmp = strchr(prev, ',');
-		 if (tmp == NULL) return 0;
-		 memset(temp, '\0', 256);
-		 memcpy(temp, prev, tmp-prev);
-		 value[i] = (int)simple_strtoul(temp, NULL, 0);
-		 tmp ++; 
-		 prev = tmp;
+	if (sscanf(buff, "del %hhu.%hhu.%hhu.%hhu",
+			ip, ip+1, ip+2, ip+3) == 4) {
+		ipaddr = *(uint32_t *)ip;
+		return atm_mpoa_delete_qos(atm_mpoa_search_qos(ipaddr));
 	}
-	tmp = strchr(prev, ' ');
-        if (tmp == NULL) return 0;
-	memset(temp, '\0', 256);
-        memcpy(temp, prev, tmp-prev);
-        value[i] = (int)simple_strtoul(temp, NULL, 0);
-	qos.txtp.traffic_class = ATM_CBR;
-	qos.txtp.max_pcr = value[0];
-	qos.txtp.max_sdu = value[1];
 
-        /* next receive values */
-	tmp = strstr(buff, "rx=");
-	if(tmp == NULL) return 0;
-        if (strstr(buff, "rx=tx")) { /* rx == tx */
-                qos.rxtp.traffic_class = qos.txtp.traffic_class;
-                qos.rxtp.max_pcr = qos.txtp.max_pcr;
-                qos.rxtp.max_cdv = qos.txtp.max_cdv;
-                qos.rxtp.max_sdu = qos.txtp.max_sdu;
-        } else {
-                tmp += 3;
-                prev = tmp;
-                for( i = 0; i < 1; i++){
-                        tmp = strchr(prev, ',');
-                        if (tmp == NULL) return 0;
-                        memset(temp, '\0', 256);
-                        memcpy(temp, prev, tmp-prev);
-                        value[i] = (int)simple_strtoul(temp, NULL, 0);
-                        tmp ++; 
-                        prev = tmp;
-                }
-                tmp = strchr(prev, '\0');
-                if (tmp == NULL) return 0;
-                memset(temp, '\0', 256);
-                memcpy(temp, prev, tmp-prev);
-                value[i] = (int)simple_strtoul(temp, NULL, 0);
-                qos.rxtp.traffic_class = ATM_CBR;
-                qos.rxtp.max_pcr = value[0];
-                qos.rxtp.max_sdu = value[1];
-        }
+	if (sscanf(buff, "add %hhu.%hhu.%hhu.%hhu tx=%d,%d rx=tx",
+			ip, ip+1, ip+2, ip+3, &tx_pcr, &tx_sdu) == 6) {
+		rx_pcr = tx_pcr;
+		rx_sdu = tx_sdu;
+	} else if (sscanf(buff, "add %hhu.%hhu.%hhu.%hhu tx=%d,%d rx=%d,%d",
+		ip, ip+1, ip+2, ip+3, &tx_pcr, &tx_sdu, &rx_pcr, &rx_sdu) != 8)
+		return 0;
+
+        ipaddr = *(uint32_t *)ip;
+	qos.txtp.traffic_class = ATM_CBR;
+	qos.txtp.max_pcr = tx_pcr;
+	qos.txtp.max_sdu = tx_sdu;
+	qos.rxtp.traffic_class = ATM_CBR;
+	qos.rxtp.max_pcr = rx_pcr;
+	qos.rxtp.max_sdu = rx_sdu;
         qos.aal = ATM_AAL5;
 	dprintk("mpoa: mpoa_proc.c: parse_qos(): setting qos paramameters to tx=%d,%d rx=%d,%d\n",
 		qos.txtp.max_pcr,

@@ -959,7 +959,7 @@ static int hal2_open_mixdev(struct inode *inode, struct file *file)
 
 	if (hal2) {
 		file->private_data = hal2;
-		return 0;
+		return nonseekable_open(inode, file);
 	}
 	return -ENODEV;
 }
@@ -1178,8 +1178,6 @@ static ssize_t hal2_read(struct file *file, char *buffer,
 
 	if (!count)
 		return 0;
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
 	if (down_interruptible(&adc->sem))
 		return -EINTR;
 	if (file->f_flags & O_NONBLOCK) {
@@ -1234,8 +1232,6 @@ static ssize_t hal2_write(struct file *file, const char *buffer,
 
 	if (!count)
 		return 0;
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
 	if (down_interruptible(&dac->sem))
 		return -EINTR;
 	if (file->f_flags & O_NONBLOCK) {
@@ -1350,7 +1346,7 @@ static int hal2_open(struct inode *inode, struct file *file)
 		dac->usecount++;
 	}
 
-	return 0;
+	return nonseekable_open(inode, file);
 }
 
 static int hal2_release(struct inode *inode, struct file *file)

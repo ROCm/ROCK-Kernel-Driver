@@ -2866,18 +2866,18 @@ void __devinit snd_cs46xx_gameport(cs46xx_t *chip)
  */
 
 static long snd_cs46xx_io_read(snd_info_entry_t *entry, void *file_private_data,
-			       struct file *file, char __user *buf, long count)
+			       struct file *file, char __user *buf,
+			       unsigned long count, unsigned long pos)
 {
 	long size;
 	snd_cs46xx_region_t *region = (snd_cs46xx_region_t *)entry->private_data;
 	
 	size = count;
-	if (file->f_pos + (size_t)size > region->size)
-		size = region->size - file->f_pos;
+	if (pos + (size_t)size > region->size)
+		size = region->size - pos;
 	if (size > 0) {
-		if (copy_to_user_fromio(buf, region->remap_addr + file->f_pos, size))
+		if (copy_to_user_fromio(buf, region->remap_addr + pos, size))
 			return -EFAULT;
-		file->f_pos += size;
 	}
 	return size;
 }

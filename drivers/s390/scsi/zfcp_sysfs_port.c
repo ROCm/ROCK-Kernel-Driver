@@ -26,7 +26,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#define ZFCP_SYSFS_PORT_C_REVISION "$Revision: 1.40 $"
+#define ZFCP_SYSFS_PORT_C_REVISION "$Revision: 1.41 $"
 
 #include "zfcp_ext.h"
 
@@ -125,7 +125,7 @@ zfcp_sysfs_unit_remove_store(struct device *dev, const char *buf, size_t count)
 	struct zfcp_unit *unit;
 	fcp_lun_t fcp_lun;
 	char *endp;
-	int retval = -EINVAL;
+	int retval = 0;
 
 	down(&zfcp_data.config_sema);
 
@@ -136,8 +136,10 @@ zfcp_sysfs_unit_remove_store(struct device *dev, const char *buf, size_t count)
 	}
 
 	fcp_lun = simple_strtoull(buf, &endp, 0);
-	if ((endp + 1) < (buf + count))
+	if ((endp + 1) < (buf + count)) {
+		retval = -EINVAL;
 		goto out;
+	}
 
 	write_lock_irq(&zfcp_data.config_lock);
 	unit = zfcp_get_unit_by_lun(port, fcp_lun);

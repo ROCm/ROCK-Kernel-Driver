@@ -19,22 +19,17 @@ fmask=###     -- The permission mask for files.
 
 codepage=###  -- Sets the codepage number for converting to shortname
 		 characters on FAT filesystem.
-
-		 NOTE: If this option was not specified, the file name
-		 may not be read/written rightly, also filesystem is
-		 mounted as read-only.
+		 By default, FAT_DEFAULT_CODEPAGE setting is used.
 
 iocharset=name -- Character set to use for converting between the
 		 encoding is used for user visible filename and 16 bit
 		 Unicode characters. Long filenames are stored on disk
 		 in Unicode format, but Unix for the most part doesn't
 		 know how to deal with Unicode.
+		 By default, FAT_DEFAULT_IOCHARSET setting is used.
+
 		 There is also an option of doing UTF8 translations
 		 with the utf8 option.
-
-		 NOTE: If this option was not specified, the file name
-		 may not be read/written rightly, also filesystem is
-		 mounted as read-only.
 
 		 NOTE: "iocharset=utf8" is not recommended. If unsure,
 		 you should consider the following option instead.

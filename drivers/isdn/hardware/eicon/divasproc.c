@@ -63,8 +63,6 @@ divas_read(struct file *file, char __user *buf, size_t count, loff_t * off)
 
 	if (*off)
 		return 0;
-	if (off != &file->f_pos)
-		return -ESPIPE;
 
 	divas_get_version(tmpbuf);
 	if (copy_to_user(buf + len, &tmpbuf, strlen(tmpbuf)))
@@ -107,7 +105,7 @@ static unsigned int divas_poll(struct file *file, poll_table * wait)
 
 static int divas_open(struct inode *inode, struct file *file)
 {
-	return (0);
+	return nonseekable_open(inode, file);
 }
 
 static int divas_close(struct inode *inode, struct file *file)

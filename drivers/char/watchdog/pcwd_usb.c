@@ -329,10 +329,6 @@ static int usb_pcwd_get_temperature(struct usb_pcwd_private *usb_pcwd, int *temp
 static ssize_t usb_pcwd_write(struct file *file, const char __user *data,
 			      size_t len, loff_t *ppos)
 {
-	/* Can't seek (pwrite) on this device  */
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
-
 	/* See if we got the magic character 'V' and reload the timer */
 	if (len) {
 		if (!nowayout) {
@@ -445,7 +441,7 @@ static int usb_pcwd_open(struct inode *inode, struct file *file)
 	/* Activate */
 	usb_pcwd_start(usb_pcwd_device);
 	usb_pcwd_keepalive(usb_pcwd_device);
-	return 0;
+	return nonseekable_open(inode, file);
 }
 
 static int usb_pcwd_release(struct inode *inode, struct file *file)
@@ -473,10 +469,6 @@ static ssize_t usb_pcwd_temperature_read(struct file *file, char __user *data,
 {
 	int temperature;
 
-	/* Can't seek (pwrite) on this device  */
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
-
 	if (usb_pcwd_get_temperature(usb_pcwd_device, &temperature))
 		return -EFAULT;
 
@@ -488,7 +480,7 @@ static ssize_t usb_pcwd_temperature_read(struct file *file, char __user *data,
 
 static int usb_pcwd_temperature_open(struct inode *inode, struct file *file)
 {
-	return 0;
+	return nonseekable_open(inode, file);
 }
 
 static int usb_pcwd_temperature_release(struct inode *inode, struct file *file)

@@ -127,10 +127,15 @@ extern int cio_set_options (struct subchannel *, int);
 extern int cio_get_options (struct subchannel *);
 extern int cio_modify (struct subchannel *);
 /* Use with care. */
+#ifdef CONFIG_CCW_CONSOLE
 extern struct subchannel *cio_probe_console(void);
 extern void cio_release_console(void);
 extern int cio_is_console(int irq);
 extern struct subchannel *cio_get_console_subchannel(void);
+#else
+#define cio_is_console(irq) 0
+#define cio_get_console_subchannel() NULL
+#endif
 
 extern int cio_show_msg;
 

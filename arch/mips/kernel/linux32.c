@@ -477,6 +477,9 @@ asmlinkage ssize_t sys32_pread(unsigned int fd, char * buf,
 		goto out;
 	if (pos < 0)
 		goto out;
+	ret = -ESPIPE;
+	if (!(file->f_mode & FMODE_PREAD))
+		goto out;
 	ret = read(file, buf, count, &pos);
 	if (ret > 0)
 		dnotify_parent(file->f_dentry, DN_ACCESS);
@@ -509,6 +512,10 @@ asmlinkage ssize_t sys32_pwrite(unsigned int fd, const char * buf,
 	if (!file->f_op || !(write = file->f_op->write))
 		goto out;
 	if (pos < 0)
+		goto out;
+
+	ret = -ESPIPE;
+	if (!(file->f_mode & FMODE_PWRITE))
 		goto out;
 
 	ret = write(file, buf, count, &pos);

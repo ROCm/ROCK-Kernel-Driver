@@ -886,7 +886,7 @@ static loff_t au1000_llseek(struct file *file, loff_t offset, int origin)
 static int au1000_open_mixdev(struct inode *inode, struct file *file)
 {
 	file->private_data = &au1000_state;
-	return 0;
+	return nonseekable_open(inode, file);
 }
 
 static int au1000_release_mixdev(struct inode *inode, struct file *file)
@@ -1120,8 +1120,6 @@ static ssize_t au1000_read(struct file *file, char *buffer,
 	unsigned long   flags;
 	int             cnt, usercnt, avail;
 
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
 	if (db->mapped)
 		return -ENXIO;
 	if (!access_ok(VERIFY_WRITE, buffer, count))
@@ -1204,8 +1202,6 @@ static ssize_t au1000_write(struct file *file, const char *buffer,
 	dbg("write: count=%d", count);
 #endif
 
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
 	if (db->mapped)
 		return -ENXIO;
 	if (!access_ok(VERIFY_READ, buffer, count))
@@ -1907,7 +1903,7 @@ static int  au1000_open(struct inode *inode, struct file *file)
 	s->open_mode |= file->f_mode & (FMODE_READ | FMODE_WRITE);
 	up(&s->open_sem);
 	init_MUTEX(&s->sem);
-	return 0;
+	return nonseekable_open(inode, file);
 }
 
 static int au1000_release(struct inode *inode, struct file *file)

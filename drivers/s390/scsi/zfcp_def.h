@@ -33,7 +33,7 @@
 #define ZFCP_DEF_H
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_DEF_REVISION "$Revision: 1.78 $"
+#define ZFCP_DEF_REVISION "$Revision: 1.81 $"
 
 /*************************** INCLUDES *****************************************/
 
@@ -42,6 +42,7 @@
 #include <linux/miscdevice.h>
 #include <linux/major.h>
 #include <linux/blkdev.h>
+#include <linux/delay.h>
 #include <scsi/scsi.h>
 #include <scsi/scsi_tcq.h>
 #include <scsi/scsi_cmnd.h>
@@ -55,7 +56,6 @@
 #include <asm/qdio.h>
 #include <asm/debug.h>
 #include <asm/ebcdic.h>
-#include <linux/reboot.h>
 #include <linux/mempool.h>
 #include <linux/syscalls.h>
 #include <linux/ioctl.h>
@@ -70,7 +70,7 @@
 /********************* GENERAL DEFINES *********************************/
 
 /* zfcp version number, it consists of major, minor, and patch-level number */
-#define ZFCP_VERSION		"4.0.0"
+#define ZFCP_VERSION		"4.1.3"
 
 static inline void *
 zfcp_sg_to_address(struct scatterlist *list)
@@ -1074,8 +1074,6 @@ struct zfcp_data {
 						       lists */
 	struct semaphore        config_sema;        /* serialises configuration
 						       changes */
-	struct notifier_block	reboot_notifier;     /* used to register cleanup
-							functions */
 	atomic_t		loglevel;            /* current loglevel */
 	char                    init_busid[BUS_ID_SIZE];
 	wwn_t                   init_wwpn;

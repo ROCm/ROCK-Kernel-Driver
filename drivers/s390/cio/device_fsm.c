@@ -244,6 +244,7 @@ ccw_device_recog_done(struct ccw_device *cdev, int state)
 		};
 		if (notify) {
 			/* Get device online again. */
+			cdev->private->state = DEV_STATE_OFFLINE;
 			ccw_device_online(cdev);
 			wake_up(&cdev->private->wait_q);
 			return;

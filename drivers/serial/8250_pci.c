@@ -574,8 +574,7 @@ titan_400l_800l_setup(struct pci_dev *dev, struct pci_board *board,
 
 static int __devinit pci_xircom_init(struct pci_dev *dev)
 {
-	__set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(HZ/10);
+	msleep(100);
 	return 0;
 }
 
