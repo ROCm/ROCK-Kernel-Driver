@@ -247,7 +247,7 @@ static int ea_write(struct inode *ip, struct jfs_ea_list *ealist, int size,
 
 	/* Free up INLINE area */
 	if (ji->ea.flag & DXD_INLINE)
-		ip->i_mode |= INLINEEA;
+		ji->mode2 |= INLINEEA;
 
 	return 0;
 
@@ -577,10 +577,9 @@ static int ea_put(struct inode *inode, struct ea_buffer *ea_buf, int new_size)
 	return rc;
 }
 
-int jfs_setxattr(struct dentry *dentry, const char *name,
-		 void *value, size_t value_len, int flags)
+int __jfs_setxattr(struct inode *inode, const char *name, void *value,
+		   size_t value_len, int flags)
 {
-	struct inode *inode = dentry->d_inode;
 	struct jfs_ea_list *ealist;
 	struct jfs_ea *ea, *old_ea = NULL, *next_ea = NULL;
 	struct ea_buffer ea_buf;
@@ -592,15 +591,10 @@ int jfs_setxattr(struct dentry *dentry, const char *name,
 	int rc = 0;
 	int length;
 
-	if (!value)
-		value_len = 0;
-
-	IWRITE_LOCK(inode);
-
 	xattr_size = ea_get(inode, &ea_buf, 0);
 	if (xattr_size < 0) {
 		rc = xattr_size;
-		goto unlock;
+		goto out;
 	}
 
       again:
@@ -630,12 +624,12 @@ int jfs_setxattr(struct dentry *dentry, const char *name,
 			rc = -ENODATA;
 			goto release;
 		}
-		if (value_len == 0) {
+		if (value == NULL) {
 			rc = 0;
 			goto release;
 		}
 	}
-	if (value_len)
+	if (value)
 		new_size += sizeof (struct jfs_ea) + namelen + 1 + value_len;
 
 	if (new_size > ea_buf.max_size) {
@@ -647,7 +641,7 @@ int jfs_setxattr(struct dentry *dentry, const char *name,
 		xattr_size = ea_get(inode, &ea_buf, new_size);
 		if (xattr_size < 0) {
 			rc = xattr_size;
-			goto unlock;
+			goto out;
 		}
 		goto again;
 	}
@@ -662,7 +656,7 @@ int jfs_setxattr(struct dentry *dentry, const char *name,
 	}
 
 	/* Add new entry to the end */
-	if (value_len) {
+	if (value) {
 		if (xattr_size == 0)
 			/* Completely new ea list */
 			xattr_size = sizeof (struct jfs_ea_list);
@@ -673,7 +667,8 @@ int jfs_setxattr(struct dentry *dentry, const char *name,
 		ea->valuelen = (cpu_to_le16(value_len));
 		memcpy(ea->name, name, namelen);
 		ea->name[namelen] = 0;
-		memcpy(&ea->name[namelen + 1], value, value_len);
+		if (value_len)
+			memcpy(&ea->name[namelen + 1], value, value_len);
 		xattr_size += EA_SIZE(ea);
 	}
 
@@ -683,26 +678,41 @@ int jfs_setxattr(struct dentry *dentry, const char *name,
 		       "jfs_xsetattr: xattr_size = %d, new_size = %d\n",
 		       xattr_size, new_size);
 
-		rc = EINVAL;
+		rc = -EINVAL;
 		goto release;
 	}
+
+	/*
+	 * If we're left with an empty list, there's no ea
+	 */
+	if (new_size == sizeof (struct jfs_ea_list))
+		new_size = 0;
 
 	ealist->size = cpu_to_le32(new_size);
 
 	rc = ea_put(inode, &ea_buf, new_size);
 
-	goto unlock;
+	goto out;
       release:
 	ea_release(inode, &ea_buf);
-      unlock:
-	IWRITE_UNLOCK(inode);
+      out:
 	return rc;
 }
 
-ssize_t jfs_getxattr(struct dentry * dentry, const char *name,
-		     void *data, size_t buf_size)
+int jfs_setxattr(struct dentry *dentry, const char *name, void *value,
+		 size_t value_len, int flags)
 {
-	struct inode *inode = dentry->d_inode;
+	if (value == NULL) {	/* empty EA, do not remove */
+		value = "";
+		value_len = 0;
+	}
+
+	return __jfs_setxattr(dentry->d_inode, name, value, value_len, flags);
+}
+
+ssize_t __jfs_getxattr(struct inode *inode, const char *name, void *data,
+		       size_t buf_size)
+{
 	struct jfs_ea_list *ealist;
 	struct jfs_ea *ea;
 	struct ea_buffer ea_buf;
@@ -711,18 +721,14 @@ ssize_t jfs_getxattr(struct dentry * dentry, const char *name,
 	int namelen = strlen(name);
 	char *value;
 
-	IREAD_LOCK(inode);
-
 	xattr_size = ea_get(inode, &ea_buf, 0);
 	if (xattr_size < 0) {
 		size = xattr_size;
-		goto unlock;
+		goto out;
 	}
 
-	if (xattr_size == 0) {
-		size = 0;
-		goto release;
-	}
+	if (xattr_size == 0)
+		goto not_found;
 
 	ealist = (struct jfs_ea_list *) ea_buf.xattr;
 
@@ -742,14 +748,19 @@ ssize_t jfs_getxattr(struct dentry * dentry, const char *name,
 			memcpy(data, value, size);
 			goto release;
 		}
-	/* not found */
+      not_found:
 	size = -ENODATA;
       release:
 	ea_release(inode, &ea_buf);
-      unlock:
-	IREAD_UNLOCK(inode);
+      out:
 
 	return size;
+}
+
+ssize_t jfs_getxattr(struct dentry *dentry, const char *name, void *data,
+		     size_t buf_size)
+{
+	return __jfs_getxattr(dentry->d_inode, name, data, buf_size);
 }
 
 ssize_t jfs_listxattr(struct dentry * dentry, char *data, size_t buf_size)
@@ -762,12 +773,10 @@ ssize_t jfs_listxattr(struct dentry * dentry, char *data, size_t buf_size)
 	struct jfs_ea *ea;
 	struct ea_buffer ea_buf;
 
-	IREAD_LOCK(inode);
-
 	xattr_size = ea_get(inode, &ea_buf, 0);
 	if (xattr_size < 0) {
 		size = xattr_size;
-		goto unlock;
+		goto out;
 	}
 
 	if (xattr_size == 0)
@@ -797,12 +806,11 @@ ssize_t jfs_listxattr(struct dentry * dentry, char *data, size_t buf_size)
 
       release:
 	ea_release(inode, &ea_buf);
-      unlock:
-	IREAD_UNLOCK(inode);
+      out:
 	return size;
 }
 
 int jfs_removexattr(struct dentry *dentry, const char *name)
 {
-	return jfs_setxattr(dentry, name, 0, 0, XATTR_REPLACE);
+	return __jfs_setxattr(dentry->d_inode, name, 0, 0, XATTR_REPLACE);
 }
