@@ -253,29 +253,66 @@ acpi_parse_hpet (
 
 #ifdef CONFIG_ACPI_BUS
 /*
- * Set specified PIC IRQ to level triggered mode.
+ * "acpi_pic_sci=level" (current default)
+ * programs the PIC-mode SCI to Level Trigger.
+ * (NO-OP if the BIOS set Level Trigger already)
+ *
+ * If a PIC-mode SCI is not recogznied or gives spurious IRQ7's
+ * it may require Edge Trigger -- use "acpi_pic_sci=edge"
+ * (NO-OP if the BIOS set Edge Trigger already)
  *
  * Port 0x4d0-4d1 are ECLR1 and ECLR2, the Edge/Level Control Registers
  * for the 8259 PIC.  bit[n] = 1 means irq[n] is Level, otherwise Edge.
  * ECLR1 is IRQ's 0-7 (IRQ 0, 1, 2 must be 0)
  * ECLR2 is IRQ's 8-15 (IRQ 8, 13 must be 0)
- *
- * As the BIOS should have done this for us,
- * print a warning if the IRQ wasn't already set to level.
  */
 
-void acpi_pic_set_level_irq(unsigned int irq)
+static __initdata	acpi_pic_sci_trigger;	/* 0: level, 1: edge */
+
+void __init
+acpi_pic_sci_set_trigger(unsigned int irq)
 {
 	unsigned char mask = 1 << (irq & 7);
 	unsigned int port = 0x4d0 + (irq >> 3);
 	unsigned char val = inb(port);
 
+	
+	printk(PREFIX "IRQ%d SCI:", irq);
 	if (!(val & mask)) {
-		printk(KERN_WARNING PREFIX "IRQ %d was Edge Triggered, "
-			"setting to Level Triggerd\n", irq);
-		outb(val | mask, port);
+		printk(" Edge");
+
+		if (!acpi_pic_sci_trigger) {
+			printk(" set to Level");
+			outb(val | mask, port);
+		}
+	} else {
+		printk(" Level");
+
+		if (acpi_pic_sci_trigger) {
+			printk(" set to Edge");
+			outb(val | mask, port);
+		}
 	}
+	printk(" Trigger.\n");
 }
+
+int __init
+acpi_pic_sci_setup(char *str)
+{
+	while (str && *str) {
+		if (strncmp(str, "level", 5) == 0)
+			acpi_pic_sci_trigger = 0;	/* force level trigger */
+		if (strncmp(str, "edge", 4) == 0)
+			acpi_pic_sci_trigger = 1;	/* force edge trigger */
+		str = strchr(str, ',');
+		if (str)
+			str += strspn(str, ", \t");
+	}
+	return 1;
+}
+
+__setup("acpi_pic_sci=", acpi_pic_sci_setup);
+
 #endif /* CONFIG_ACPI_BUS */
 
 static unsigned long __init
