@@ -45,4 +45,6 @@ static inline cycles_t get_cycles (void)
 #endif
 }
 
+extern unsigned long cpu_khz;
+
 #endif

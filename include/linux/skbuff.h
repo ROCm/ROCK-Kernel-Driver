@@ -1082,7 +1082,7 @@ skb_cow(struct sk_buff *skb, unsigned int headroom)
 /**
  *	skb_linearize - convert paged skb to linear one
  *	@skb: buffer to linarize
- *	@gfp_mask: allocation mode
+ *	@gfp: allocation mode
  *
  *	If there is no free memory -ENOMEM is returned, otherwise zero
  *	is returned and the old skb data released.  */

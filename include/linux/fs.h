@@ -182,7 +182,9 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 /* This was here just to show that the number is taken -
    probably all these _IO(0x12,*) ioctls should be moved to blkpg.h. */
 #endif
-
+/* A jump here: 108-111 have been used for various private purposes. */
+#define BLKBSZGET  _IOR(0x12,112,sizeof(int))
+#define BLKBSZSET  _IOW(0x12,113,sizeof(int))
 
 #define BMAP_IOCTL 1		/* obsolete - kept for compatibility */
 #define FIBMAP	   _IO(0x00,1)	/* bmap access */

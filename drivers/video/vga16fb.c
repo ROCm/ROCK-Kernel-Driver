@@ -33,7 +33,7 @@
 #define dac_val	(0x3c9)
 
 #define VGA_FB_PHYS 0xA0000
-#define VGA_FB_PHYS_LEN 65535
+#define VGA_FB_PHYS_LEN 65536
 
 /* --------------------------------------------------------------------- */
 

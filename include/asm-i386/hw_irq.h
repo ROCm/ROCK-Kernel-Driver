@@ -130,7 +130,7 @@ asmlinkage void call_##x(void); \
 __asm__( \
 "\n"__ALIGN_STR"\n" \
 SYMBOL_NAME_STR(x) ":\n\t" \
-	"pushl $"#v"\n\t" \
+	"pushl $"#v"-256\n\t" \
 	SAVE_ALL \
 	SYMBOL_NAME_STR(call_##x)":\n\t" \
 	"call "SYMBOL_NAME_STR(smp_##x)"\n\t" \
@@ -143,7 +143,7 @@ asmlinkage void call_##x(void); \
 __asm__( \
 "\n"__ALIGN_STR"\n" \
 SYMBOL_NAME_STR(x) ":\n\t" \
-	"pushl $"#v"\n\t" \
+	"pushl $"#v"-256\n\t" \
 	SAVE_ALL \
 	"movl %esp,%eax\n\t" \
 	"pushl %eax\n\t" \

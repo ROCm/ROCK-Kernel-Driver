@@ -7,6 +7,9 @@
  */
 
 #include <linux/config.h>
+
+#define PMU_DRIVER_VERSION	2
+
 /*
  * PMU commands
  */
@@ -23,6 +26,7 @@
 #define PMU_GET_VOLBUTTON	0x48	/* get volume up/down position */
 #define PMU_PCEJECT		0x4c	/* eject PC-card from slot */
 #define PMU_BATTERY_STATE	0x6b	/* report battery state etc. */
+#define PMU_SMART_BATTERY_STATE	0x6f	/* report battery state (new way) */
 #define PMU_SET_INTR_MASK	0x70	/* set PMU interrupt mask */
 #define PMU_INT_ACK		0x78	/* read interrupt bits */
 #define PMU_SHUTDOWN		0x7e	/* turn power off */
@@ -32,6 +36,7 @@
 #define PMU_GET_BRIGHTBUTTON	0xd9	/* report brightness up/down pos */
 #define PMU_GET_COVER		0xdc	/* report cover open/closed */
 #define PMU_SYSTEM_READY	0xdf	/* tell PMU we are awake */
+#define PMU_GET_VERSION		0xea	/* read the PMU version */
 
 /* Bits to use with the PMU_POWER_CTRL0 command */
 #define PMU_POW0_ON		0x80	/* OR this to power ON the device */
@@ -46,15 +51,22 @@
 #define PMU_POW_IRLED		0x04	/* IR led power (on wallstreet) */
 #define PMU_POW_MEDIABAY	0x08	/* media bay power (wallstreet/lombard ?) */
 
-
 /* Bits in PMU interrupt and interrupt mask bytes */
-#define PMU_INT_ADB_AUTO	0x04	/* ADB autopoll, when PMU_INT_ADB */
 #define PMU_INT_PCEJECT		0x04	/* PC-card eject buttons */
 #define PMU_INT_SNDBRT		0x08	/* sound/brightness up/down buttons */
 #define PMU_INT_ADB		0x10	/* ADB autopoll or reply data */
-#define PMU_INT_BATTERY		0x20
-#define PMU_INT_WAKEUP		0x40
+#define PMU_INT_BATTERY		0x20	/* Battery state change */
+#define PMU_INT_ENVIRONMENT	0x40	/* Environment interrupts */
 #define PMU_INT_TICK		0x80	/* 1-second tick interrupt */
+
+/* Other bits in PMU interrupt valid when PMU_INT_ADB is set */
+#define PMU_INT_ADB_AUTO	0x04	/* ADB autopoll, when PMU_INT_ADB */
+#define PMU_INT_WAITING_CHARGER	0x01	/* ??? */
+#define PMU_INT_AUTO_SRQ_POLL	0x02	/* ??? */
+
+/* Bits in the environement message (either obtained via PMU_GET_COVER,
+ * or via PMU_INT_ENVIRONMENT on core99 */
+#define PMU_ENV_LID_CLOSED	0x01	/* The lid is closed */
 
 /* Kind of PMU (model) */
 enum {
@@ -99,6 +111,8 @@ enum {
 #define PMU_IOC_GET_MODEL	_IOR('B', 3, sizeof(__u32*))
 /* out param: u32*	has_adb: 0 or 1 */
 #define PMU_IOC_HAS_ADB		_IOR('B', 4, sizeof(__u32*)) 
+/* out param: u32*	can_sleep: 0 or 1 */
+#define PMU_IOC_CAN_SLEEP	_IOR('B', 5, sizeof(__u32*)) 
 
 #ifdef __KERNEL__
 
@@ -160,7 +174,7 @@ struct pmu_sleep_notifier
 #define SLEEP_LEVEL_NET		60	/* bmac */
 #define SLEEP_LEVEL_ADB		50	/* ADB */
 #define SLEEP_LEVEL_MISC	30	/* Anything */
-#define SLEEP_LEVEL_LAST	0	/* Anything */
+#define SLEEP_LEVEL_LAST	0	/* Reserved for apm_emu */
 
 /* special register notifier functions */
 int pmu_register_sleep_notifier(struct pmu_sleep_notifier* notifier);

@@ -162,7 +162,7 @@ static struct raid1_bh *raid1_alloc_r1bh(raid1_conf_t *conf)
 			conf->freer1 = r1_bh->next_r1;
 			conf->freer1_cnt--;
 			r1_bh->next_r1 = NULL;
-			r1_bh->state = 0;
+			r1_bh->state = (1 << R1BH_PreAlloc);
 			r1_bh->bh_req.b_state = 0;
 		}
 		md_spin_unlock_irq(&conf->device_lock);

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.chrp_setup.c 1.32 08/20/01 22:58:32 paulus
+ * BK Id: SCCS/s.chrp_setup.c 1.34 08/29/01 10:07:29 paulus
  */
 /*
  *  linux/arch/ppc/kernel/setup.c
@@ -78,7 +78,6 @@ extern int pckbd_translate(unsigned char scancode, unsigned char *keycode,
 			   char raw_mode);
 extern char pckbd_unexpected_up(unsigned char keycode);
 extern void pckbd_leds(unsigned char leds);
-extern int pckbd_rate(struct kbd_repeat *rep);
 extern void pckbd_init_hw(void);
 extern unsigned char pckbd_sysrq_xlate[128];
 extern void select_adb_keyboard(void);
@@ -546,7 +545,6 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.kbd_translate     = pckbd_translate;
 	ppc_md.kbd_unexpected_up = pckbd_unexpected_up;
 	ppc_md.kbd_leds          = pckbd_leds;
-	ppc_md.kbd_rate_fn	 = pckbd_rate;
 	ppc_md.kbd_init_hw       = pckbd_init_hw;
 #ifdef CONFIG_MAGIC_SYSRQ
 	ppc_md.ppc_kbd_sysrq_xlate	 = pckbd_sysrq_xlate;

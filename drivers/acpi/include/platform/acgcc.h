@@ -39,7 +39,6 @@
 #define BREAKPOINT3
 #define disable() __cli()
 #define enable()  __sti()
-#define wbinvd()
 
 /*! [Begin] no source code translation */
 
@@ -101,7 +100,6 @@
 #define disable() __cli()
 #define enable()  __sti()
 #define halt()    __asm__ __volatile__ ("sti; hlt":::"memory")
-#define wbinvd()
 
 /*! [Begin] no source code translation
  *

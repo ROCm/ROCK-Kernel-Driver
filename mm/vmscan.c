@@ -818,9 +818,11 @@ int inactive_shortage(void)
 #define GENERAL_SHORTAGE 4
 static int do_try_to_free_pages(unsigned int gfp_mask, int user)
 {
-	/* Always walk at least the active queue when called */
-	int shortage = INACTIVE_SHORTAGE;
+	int shortage = 0;
 	int maxtry;
+
+	/* Always walk at least the active queue when called */
+	refill_inactive_scan(DEF_PRIORITY);
 
 	maxtry = 1 << DEF_PRIORITY;
 	do {
@@ -872,7 +874,8 @@ static int do_try_to_free_pages(unsigned int gfp_mask, int user)
 			break;
 	} while (shortage);
 
-	return !shortage;
+	/* Return success if we're not "totally short" */
+	return shortage != (FREE_SHORTAGE | INACTIVE_SHORTAGE | GENERAL_SHORTAGE);
 }
 
 DECLARE_WAIT_QUEUE_HEAD(kswapd_wait);

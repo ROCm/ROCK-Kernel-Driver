@@ -1266,6 +1266,8 @@ static int ida_ioctl(struct inode *inode, struct file *filep, unsigned int cmd, 
 	}	
 
 	case BLKFLSBUF:
+	case BLKBSZSET:
+	case BLKBSZGET:
 	case BLKROSET:
 	case BLKROGET:
 	case BLKRASET:

@@ -1,5 +1,5 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
+ * BK Id: SCCS/s.keyboard.h 1.11 08/29/01 10:07:29 paulus
  */
 /*
  *  linux/include/asm-ppc/keyboard.h
@@ -75,7 +75,6 @@ static inline void kbd_init_hw(void)
 		ppc_md.kbd_init_hw();
 }
 
-#define kbd_rate	(ppc_md.kbd_rate_fn)
 #define kbd_sysrq_xlate	(ppc_md.ppc_kbd_sysrq_xlate)
 
 extern unsigned long SYSRQ_KEY;

@@ -96,7 +96,7 @@ UNUSUAL_DEV(  0x04e6, 0x0003, 0x0000, 0x9999,
 #endif
 
 /* This entry is from Andries.Brouwer@cwi.nl */
-UNUSUAL_DEV(  0x04e6, 0x0005, 0x0100, 0x0205, 
+UNUSUAL_DEV(  0x04e6, 0x0005, 0x0100, 0x0208,
 		"SCM Microsystems",
 		"eUSB SmartMedia / CompactFlash Adapter",
 		US_SC_SCSI, US_PR_DPCM_USB, NULL, 

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.machdep.h 1.19 08/18/01 18:16:33 paulus
+ * BK Id: SCCS/s.machdep.h 1.21 08/29/01 10:07:29 paulus
  */
 #ifdef __KERNEL__
 #ifndef _PPC_MACHDEP_H
@@ -14,7 +14,6 @@
 struct pt_regs;
 struct pci_bus;	
 struct pci_dev;
-struct kbd_repeat;
 
 struct machdep_calls {
 	void		(*setup_arch)(void);
@@ -61,7 +60,6 @@ struct machdep_calls {
 				char raw_mode);
 	char		(*kbd_unexpected_up)(unsigned char keycode);
 	void		(*kbd_leds)(unsigned char leds);
-	int		(*kbd_rate_fn)(struct kbd_repeat *rep);
 	void		(*kbd_init_hw)(void);
 #ifdef CONFIG_MAGIC_SYSRQ
 	unsigned char 	*ppc_kbd_sysrq_xlate;
@@ -74,6 +72,10 @@ struct machdep_calls {
 	/* Called after scanning the bus, before allocating resources */
 	void (*pcibios_fixup)(void);
 
+	/* Called after PPC generic resource fixup to perform
+	   machine specific fixups */
+	void (*pcibios_fixup_resources)(struct pci_dev *);
+
 	/* Called for each PCI bus in the system when it's probed */
 	void (*pcibios_fixup_bus)(struct pci_bus *);
 
@@ -81,6 +83,13 @@ struct machdep_calls {
 	 * when a device with no assigned resource is found (initial=1).
 	 * Returns 0 to allow assignment/enabling of the device. */
 	int  (*pcibios_enable_device_hook)(struct pci_dev *, int initial);
+
+	/* For interrupt routing */
+	unsigned char (*pci_swizzle)(struct pci_dev *, unsigned char *);
+	int (*pci_map_irq)(struct pci_dev *, unsigned char, unsigned char);
+
+	/* Called in indirect_* to avoid touching devices */
+	int (*pci_exclude_device)(unsigned char, unsigned char);
 
 	/* Called at then very end of pcibios_init() */
 	void (*pcibios_after_init)(void);

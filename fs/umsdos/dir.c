@@ -651,13 +651,13 @@ char * umsdos_d_path(struct dentry *dentry, char * buffer, int len)
 	old_root = dget(current->fs->root);
 	read_unlock(&current->fs->lock);
 	spin_lock(&dcache_lock);
-	path = __d_path(dentry, NULL, dentry->d_sb->s_root, NULL, buffer, len);
+	path = __d_path(dentry, current->fs->rootmnt, dentry->d_sb->s_root, current->fs->rootmnt, buffer, len); /* FIXME: current->fs->rootmnt */
 	spin_unlock(&dcache_lock);
 
 	if (*path == '/')
 		path++; /* skip leading '/' */
 
-	if (old_root->d_inode == pseudo_root)
+	if (current->fs->root->d_inode == pseudo_root)
 	{
 		*(path-1) = '/';
 		path -= (UMSDOS_PSDROOT_LEN+1);

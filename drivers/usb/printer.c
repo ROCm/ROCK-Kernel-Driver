@@ -269,6 +269,7 @@ static int usblp_release(struct inode *inode, struct file *file)
 	struct usblp *usblp = file->private_data;
 
 	down (&usblp->sem);
+	lock_kernel();
 	usblp->used = 0;
 	if (usblp->dev) {
 		if (usblp->bidir)
@@ -277,6 +278,7 @@ static int usblp_release(struct inode *inode, struct file *file)
 		up(&usblp->sem);
 	} else 		/* finish cleanup from disconnect */
 		usblp_cleanup (usblp);
+	unlock_kernel();
 	return 0;
 }
 
@@ -685,11 +687,9 @@ static void usblp_disconnect(struct usb_device *dev, void *ptr)
 		BUG ();
 	}
 
-
 	down (&usblp->sem);
 	lock_kernel();
 	usblp->dev = NULL;
-	unlock_kernel();
 
 	usb_unlink_urb(&usblp->writeurb);
 	if (usblp->bidir)
@@ -699,6 +699,7 @@ static void usblp_disconnect(struct usb_device *dev, void *ptr)
 		usblp_cleanup (usblp);
 	else 	/* cleanup later, on close */
 		up (&usblp->sem);
+	unlock_kernel();
 }
 
 static struct usb_device_id usblp_ids [] = {

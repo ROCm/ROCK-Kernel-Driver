@@ -11690,19 +11690,6 @@ CONFIG_USB_USBNET
   The module will be called usbnet.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
 
-PLUSB driver
-CONFIG_USB_PLUSB
-  A driver for the Prolific PL-2302 USB-to-USB network device. This
-  'USB cable' connects two hosts via a point-to-point network with
-  bandwidth of 5 Mbit/s. Configure this driver after connecting the
-  USB cable via ifconfig plusb0 10.0.0.1 pointopoint 10.0.0.2 (and
-  vice versa on the other host).
-
-  This code is also available as a module ( = code which can be
-  inserted in and removed from the running kernel whenever you want).
-  The module will be called plusb.o. If you want to compile it as a
-  module, say M here and read Documentation/modules.txt.
-
 USB Diamond Rio500 support
 CONFIG_USB_RIO500
   Say Y here if you want to connect a USB Rio500 mp3 player to your

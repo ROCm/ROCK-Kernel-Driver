@@ -307,8 +307,8 @@ pci_set_power_state(struct pci_dev *dev, int state)
 
 /**
  * pci_save_state - save the PCI configuration space of a device before suspending
- * @dev - PCI device that we're dealing with
- * @buffer - buffer to hold config space context
+ * @dev: - PCI device that we're dealing with
+ * @buffer: - buffer to hold config space context
  *
  * @buffer must be large enough to hold the entire PCI 2.2 config space 
  * (>= 64 bytes).
@@ -327,8 +327,8 @@ pci_save_state(struct pci_dev *dev, u32 *buffer)
 
 /** 
  * pci_restore_state - Restore the saved state of a PCI device
- * @dev - PCI device that we're dealing with
- * @buffer - saved PCI config space
+ * @dev: - PCI device that we're dealing with
+ * @buffer: - saved PCI config space
  *
  */
 int 
@@ -489,6 +489,7 @@ void pci_release_regions(struct pci_dev *pdev)
 /**
  *	pci_request_regions - Reserved PCI I/O and memory resources
  *	@pdev: PCI device whose resources are to be reserved
+ *	@res_name: Name to be associated with resource.
  *
  *	Mark all PCI regions associated with PCI device @pdev as
  *	being reserved by owner @res_name.  Do not access any

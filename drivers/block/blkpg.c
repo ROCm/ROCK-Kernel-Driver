@@ -274,6 +274,29 @@ int blk_ioctl(kdev_t dev, unsigned int cmd, unsigned long arg)
 			return blkelvset_ioctl(&blk_get_queue(dev)->elevator,
 					       (blkelv_ioctl_arg_t *) arg);
 
+		case BLKBSZGET:
+			/* get the logical block size (cf. BLKSSZGET) */
+			intval = BLOCK_SIZE;
+			if (blksize_size[MAJOR(dev)])
+				intval = blksize_size[MAJOR(dev)][MINOR(dev)];
+			return put_user (intval, (int *) arg);
+
+		case BLKBSZSET:
+			/* set the logical block size */
+			if (!capable (CAP_SYS_ADMIN))
+				return -EACCES;
+			if (!dev || !arg)
+				return -EINVAL;
+			if (get_user (intval, (int *) arg))
+				return -EFAULT;
+			if (intval > PAGE_SIZE || intval < 512 ||
+			    (intval & (intval - 1)))
+				return -EINVAL;
+			if (is_mounted (dev) || is_swap_partition (dev))
+				return -EBUSY;
+			set_blocksize (dev, intval);
+			return 0;
+
 		default:
 			return -EINVAL;
 	}

@@ -702,6 +702,12 @@ static void yenta_allocate_res(pci_socket_t *socket, int nr, unsigned type)
 	u32 start, end;
 	u32 align, size, min, max;
 	unsigned offset;
+	unsigned mask;
+
+	/* The granularity of the memory limit is 4kB, on IO it's 4 bytes */
+	mask = ~0xfff;
+	if (type & IORESOURCE_IO)
+		mask = ~3;
 
 	offset = 0x1c + 8*nr;
 	bus = socket->dev->subordinate;
@@ -715,8 +721,8 @@ static void yenta_allocate_res(pci_socket_t *socket, int nr, unsigned type)
 	if (!root)
 		return;
 
-	start = config_readl(socket, offset);
-	end = config_readl(socket, offset+4) | 0xfff;
+	start = config_readl(socket, offset) & mask;
+	end = config_readl(socket, offset+4) | ~mask;
 	if (start && end > start) {
 		res->start = start;
 		res->end = end;

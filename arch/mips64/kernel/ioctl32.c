@@ -770,6 +770,8 @@ static struct ioctl32_list ioctl32_handler_table[] = {
 	IOCTL32_HANDLER(BLKPG, blkpg_ioctl_trans),
 	IOCTL32_DEFAULT(BLKELVGET),
 	IOCTL32_DEFAULT(BLKELVSET),
+	IOCTL32_DEFAULT(BLKBSZGET),
+	IOCTL32_DEFAULT(BLKBSZSET),
 
 #ifdef CONFIG_MD
 	/* status */

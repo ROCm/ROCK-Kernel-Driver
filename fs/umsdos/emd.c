@@ -18,7 +18,21 @@
 #include <linux/pagemap.h>
 #include <linux/delay.h>
 
-static void copy_entry(struct umsdos_dirent *p, struct umsdos_dirent *q)
+void put_entry (struct umsdos_dirent *p, struct umsdos_dirent *q)
+{
+	p->name_len = q->name_len;
+	p->flags = q->flags;
+	p->nlink = cpu_to_le16(q->nlink);
+	p->uid = cpu_to_le16(q->uid);
+	p->gid = cpu_to_le16(q->gid);
+	p->atime = cpu_to_le32(q->atime);
+	p->mtime = cpu_to_le32(q->mtime);
+	p->ctime = cpu_to_le32(q->ctime);
+	p->rdev = cpu_to_le16(q->rdev);
+	p->mode = cpu_to_le16(q->mode);
+}
+
+static void get_entry(struct umsdos_dirent *p, struct umsdos_dirent *q)
 {
 	p->name_len = q->name_len;
 	p->name[p->name_len]='\0';
@@ -136,6 +150,7 @@ int umsdos_emd_dir_readentry (struct dentry *demd, loff_t *pos, struct umsdos_di
 		printk (KERN_WARNING "Ignoring invalid EMD entry with size %d\n", entry->name_len);
 		p->name_len = 0; 
 		ret = -ENAMETOOLONG; /* notify umssync(8) code that something is wrong */
+		/* FIXME: does not work if we did 'ls -l' before 'udosctl uls' ?! */
 	}
 
 	recsize = umsdos_evalrecsize(p->name_len);
@@ -163,7 +178,7 @@ int umsdos_emd_dir_readentry (struct dentry *demd, loff_t *pos, struct umsdos_di
 		page_cache_release(page2);
 	} else
 		memcpy(entry->spare,p->spare,((char*)p+recsize)-p->spare);
-	copy_entry(entry, p);
+	get_entry(entry, p);
 	kunmap(page);
 	page_cache_release(page);
 	*pos += recsize;
@@ -249,16 +264,7 @@ int umsdos_writeentry (struct dentry *parent, struct umsdos_info *info,
 					offs+info->recsize-PAGE_CACHE_SIZE);
 		if (ret)
 			goto out_unlock3;
-		p->name_len = entry->name_len;
-		p->flags = entry->flags;
-		p->nlink = cpu_to_le16(entry->nlink);
-		p->uid = cpu_to_le16(entry->uid);
-		p->gid = cpu_to_le16(entry->gid);
-		p->atime = cpu_to_le32(entry->atime);
-		p->mtime = cpu_to_le32(entry->mtime);
-		p->ctime = cpu_to_le32(entry->ctime);
-		p->rdev = cpu_to_le16(entry->rdev);
-		p->mode = cpu_to_le16(entry->mode);
+		put_entry (p, entry);
 		memcpy(p->spare,entry->spare,
 			(char *)(page_address(page) + PAGE_CACHE_SIZE) - p->spare);
 		memcpy(page_address(page2),
@@ -279,16 +285,7 @@ int umsdos_writeentry (struct dentry *parent, struct umsdos_info *info,
 					offs + info->recsize);
 		if (ret)
 			goto out_unlock;
-		p->name_len = entry->name_len;
-		p->flags = entry->flags;
-		p->nlink = cpu_to_le16(entry->nlink);
-		p->uid = cpu_to_le16(entry->uid);
-		p->gid = cpu_to_le16(entry->gid);
-		p->atime = cpu_to_le32(entry->atime);
-		p->mtime = cpu_to_le32(entry->mtime);
-		p->ctime = cpu_to_le32(entry->ctime);
-		p->rdev = cpu_to_le16(entry->rdev);
-		p->mode = cpu_to_le16(entry->mode);
+		put_entry (p, entry);
 		memcpy(p->spare,entry->spare,((char*)p+info->recsize)-p->spare);
 		ret = mapping->a_ops->commit_write(NULL,page,offs,
 					offs + info->recsize);
@@ -463,7 +460,7 @@ static int umsdos_find (struct dentry *demd, struct umsdos_info *info)
 			goto skip_it;
 
 		info->f_pos = pos;
-		copy_entry(entry, rentry);
+		get_entry(entry, rentry);
 		ret = 0;
 		break;
 skip_it:

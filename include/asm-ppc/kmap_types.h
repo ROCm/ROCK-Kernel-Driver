@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.kmap_types.h 1.6 05/17/01 18:14:24 cort
+ * BK Id: SCCS/s.kmap_types.h 1.9 08/29/01 14:03:05 paulus
  */
 #ifdef __KERNEL__
 #ifndef _ASM_KMAP_TYPES_H
@@ -10,6 +10,8 @@ enum km_type {
 	KM_BOUNCE_WRITE,
 	KM_SKB_DATA,
 	KM_SKB_DATA_SOFTIRQ,
+	KM_USER0,
+	KM_USER1,
 	KM_TYPE_NR
 };
 

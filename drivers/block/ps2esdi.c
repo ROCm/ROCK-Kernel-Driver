@@ -1127,6 +1127,8 @@ static int ps2esdi_ioctl(struct inode *inode,
 		case BLKRASET:
 		case BLKRAGET:
 		case BLKFLSBUF:
+		case BLKBSZGET:
+		case BLKBSZSET:
 		case BLKPG:
 			return blk_ioctl(inode->i_rdev, cmd, arg);
 		}

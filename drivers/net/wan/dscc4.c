@@ -348,7 +348,7 @@ void inline try_get_rx_skb(struct dscc4_dev_priv *priv, int cur, struct net_devi
 {
 	struct sk_buff *skb;
 
-	skb = dev_alloc_skb(RX_MAX(dev->mtu+2));
+	skb = dev_alloc_skb(RX_MAX(HDLC_MAX_MRU+2));
 	priv->rx_skbuff[cur] = skb;
 	if (!skb) {
 		priv->rx_fd[cur--].data = (u32) NULL;
@@ -428,9 +428,9 @@ static __inline__ void dscc4_rx_skb(struct dscc4_dev_priv *dpriv, int cur,
 	int pkt_len;
 
 	skb = dpriv->rx_skbuff[cur];
-	pkt_len = TO_SIZE(rx_fd->state2);
-	pci_dma_sync_single(pdev, rx_fd->data, pkt_len, PCI_DMA_FROMDEVICE);
-	if((skb->data[pkt_len - 1] & FrameOk) == FrameOk) {
+	pkt_len = TO_SIZE(rx_fd->state2) - 1;
+	pci_dma_sync_single(pdev, rx_fd->data, pkt_len + 1, PCI_DMA_FROMDEVICE);
+	if((skb->data[pkt_len] & FrameOk) == FrameOk) {
 		pci_unmap_single(pdev, rx_fd->data, skb->len, PCI_DMA_FROMDEVICE);
 		dpriv->stats.rx_packets++;
 		dpriv->stats.rx_bytes += pkt_len;
@@ -442,11 +442,11 @@ static __inline__ void dscc4_rx_skb(struct dscc4_dev_priv *dpriv, int cur,
 			netif_rx(skb);
 		try_get_rx_skb(dpriv, cur, dev);
 	} else {
-		if(skb->data[pkt_len - 1] & FrameRdo)
+		if(skb->data[pkt_len] & FrameRdo)
 			dpriv->stats.rx_fifo_errors++;
-		else if(!(skb->data[pkt_len - 1] | ~FrameCrc))
+		else if(!(skb->data[pkt_len] | ~FrameCrc))
 			dpriv->stats.rx_crc_errors++;
-		else if(!(skb->data[pkt_len - 1] | ~FrameVfr))
+		else if(!(skb->data[pkt_len] | ~FrameVfr))
 			dpriv->stats.rx_length_errors++;
 		else
 			dpriv->stats.rx_errors++;
@@ -760,7 +760,7 @@ static int dscc4_open(struct net_device *dev)
 	/* FIXME: VIS */
 	writel(readl(ioaddr + CCR0) | 0x80001000, ioaddr + CCR0);
 
-	writel(LengthCheck | (dev->mtu >> 5), ioaddr + RLCR);
+	writel(LengthCheck | (HDLC_MAX_MRU >> 5), ioaddr + RLCR);
 
 	/* no address recognition/crc-CCITT/cts enabled */
 	writel(readl(ioaddr + CCR1) | 0x021c8000, ioaddr + CCR1);
@@ -1224,7 +1224,7 @@ try:
 		       dev->name, SOURCE_ID(state), state );
 		return;
 	}
-	if (state & 0x0df80c01) {
+	if (state & 0x0df80c00) {
 		printk(KERN_DEBUG "%s (Tx): state=%08x (UFO alert)\n",
 		       dev->name, state);
 		return;
@@ -1377,7 +1377,7 @@ try:
 		       dev->name, SOURCE_ID(state), state);
 		goto try;
 	}
-	if (state & 0x0df80c01) {
+	if (state & 0x0df80c00) {
 		printk(KERN_DEBUG "%s (Rx): state=%08x (UFO alert)\n",
 		       dev->name, state);
 		goto try;
@@ -1609,7 +1609,7 @@ static int dscc4_init_ring(struct net_device *dev)
 	        rx_fd->state1 = HiDesc; /* Hi, no Hold */
 	        rx_fd->state2 = 0x00000000;
 	        rx_fd->end = 0xbabeface;
-	        rx_fd->state1 |= ((u32)(dev->mtu & RxSizeMax)) << 16;
+	        rx_fd->state1 |= ((u32)(HDLC_MAX_MRU & RxSizeMax)) << 16;
 		try_get_rx_skb(dpriv, i, dev);
 		i++;
 		rx_fd->next = (u32)(dpriv->rx_fd_dma + i*sizeof(struct RxFD));
@@ -1720,7 +1720,7 @@ static int dscc4_attach_hdlc_device(struct net_device *dev)
 	hdlc = &dpriv->hdlc;
 	/* XXX: Don't look at the next line */
 	hdlc->netdev.base_addr = (unsigned long)dev;
-	// FIXME: set hdlc->set_mode ?
+	hdlc->set_mode = NULL;
 	hdlc->open = dscc4_hdlc_open;
 	hdlc->close = dscc4_hdlc_close;
 	hdlc->ioctl = dscc4_hdlc_ioctl;

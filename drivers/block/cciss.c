@@ -406,6 +406,8 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 	case BLKRRPART:
 		return revalidate_logvol(inode->i_rdev, 1);
 	case BLKFLSBUF:
+	case BLKBSZSET:
+	case BLKBSZGET:
 	case BLKROSET:
 	case BLKROGET:
 	case BLKRASET:

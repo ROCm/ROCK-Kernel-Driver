@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.pmac_setup.c 1.35 08/20/01 22:37:37 paulus
+ * BK Id: SCCS/s.pmac_setup.c 1.37 08/29/01 10:07:29 paulus
  */
 /*
  *  linux/arch/ppc/kernel/setup.c
@@ -728,7 +728,6 @@ select_adb_keyboard(void)
 	ppc_md.kbd_setkeycode    = 0;
 	ppc_md.kbd_getkeycode    = 0;
 	ppc_md.kbd_leds		 = 0;
-	ppc_md.kbd_rate_fn	 = 0;
 #ifdef CONFIG_MAGIC_SYSRQ
 #ifdef CONFIG_MAC_ADBKEYCODES
 	if (!keyboard_sends_linux_keycodes) {
@@ -747,7 +746,6 @@ select_adb_keyboard(void)
 	ppc_md.kbd_translate        = mackbd_translate;
 	ppc_md.kbd_unexpected_up    = mackbd_unexpected_up;
 	ppc_md.kbd_leds             = mackbd_leds;
-	ppc_md.kbd_rate_fn	    = NULL;
 	ppc_md.kbd_init_hw          = mackbd_init_hw;
 #ifdef CONFIG_MAGIC_SYSRQ
 	ppc_md.ppc_kbd_sysrq_xlate  = mackbd_sysrq_xlate;

@@ -110,9 +110,22 @@ static inline unsigned long _get_base(char * addr)
 })
 #define write_cr0(x) \
 	__asm__("movl %0,%%cr0": :"r" (x));
+
+#define read_cr4() ({ \
+	unsigned int __dummy; \
+	__asm__( \
+		"movl %%cr4,%0\n\t" \
+		:"=r" (__dummy)); \
+	__dummy; \
+})
+#define write_cr4(x) \
+	__asm__("movl %0,%%cr4": :"r" (x));
 #define stts() write_cr0(8 | read_cr0())
 
 #endif	/* __KERNEL__ */
+
+#define wbinvd() \
+	__asm__ __volatile__ ("wbinvd": : :"memory");
 
 static inline unsigned long get_limit(unsigned long segment)
 {

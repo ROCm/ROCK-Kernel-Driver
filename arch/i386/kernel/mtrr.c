@@ -389,21 +389,19 @@ static void set_mtrr_prepare (struct set_mtrr_context *ctxt)
 	 return;
 
     /*  Save value of CR4 and clear Page Global Enable (bit 7)  */
-    if ( test_bit(X86_FEATURE_PGE, &boot_cpu_data.x86_capability) )
-	asm volatile ("movl  %%cr4, %0\n\t"
-		      "movl  %0, %1\n\t"
-		      "andb  $0x7f, %b1\n\t"
-		      "movl  %1, %%cr4\n\t"
-		      : "=r" (ctxt->cr4val), "=q" (tmp) : : "memory");
+    if ( test_bit(X86_FEATURE_PGE, &boot_cpu_data.x86_capability) ) {
+	ctxt->cr4val = read_cr4();
+	write_cr4(ctxt->cr4val & (unsigned char) ~(1<<7));
+    }
 
     /*  Disable and flush caches. Note that wbinvd flushes the TLBs as
 	a side-effect  */
-    asm volatile ("movl  %%cr0, %0\n\t"
-		  "orl   $0x40000000, %0\n\t"
-		  "wbinvd\n\t"
-		  "movl  %0, %%cr0\n\t"
-		  "wbinvd\n\t"
-		  : "=r" (tmp) : : "memory");
+    {
+	unsigned int cr0 = read_cr0() | 0x40000000;
+	wbinvd();
+	write_cr0( cr0 );
+	wbinvd();
+    }
 
     if ( mtrr_if == MTRR_IF_INTEL ) {
 	/*  Disable MTRRs, and set the default type to uncached  */
@@ -420,15 +418,13 @@ static void set_mtrr_prepare (struct set_mtrr_context *ctxt)
 /*  Restore the processor after a set_mtrr_prepare  */
 static void set_mtrr_done (struct set_mtrr_context *ctxt)
 {
-    unsigned long tmp;
-
     if ( mtrr_if != MTRR_IF_INTEL && mtrr_if != MTRR_IF_CYRIX_ARR ) {
 	 __restore_flags (ctxt->flags);
 	 return;
     }
 
     /*  Flush caches and TLBs  */
-    asm volatile ("wbinvd" : : : "memory" );
+    wbinvd();
 
     /*  Restore MTRRdefType  */
     if ( mtrr_if == MTRR_IF_INTEL ) {
@@ -440,15 +436,11 @@ static void set_mtrr_done (struct set_mtrr_context *ctxt)
     }
 
     /*  Enable caches  */
-    asm volatile ("movl  %%cr0, %0\n\t"
-		  "andl  $0xbfffffff, %0\n\t"
-		  "movl  %0, %%cr0\n\t"
-		  : "=r" (tmp) : : "memory");
+    write_cr0( read_cr0() & 0xbfffffff );
 
     /*  Restore value of CR4  */
     if ( test_bit(X86_FEATURE_PGE, &boot_cpu_data.x86_capability) )
-	asm volatile ("movl  %0, %%cr4"
-		      : : "r" (ctxt->cr4val) : "memory");
+	write_cr4(ctxt->cr4val);
 
     /*  Re-enable interrupts locally (if enabled previously)  */
     __restore_flags (ctxt->flags);
@@ -607,7 +599,7 @@ static void amd_get_mtrr (unsigned int reg, unsigned long *base,
 {
     unsigned long low, high;
 
-    rdmsr (0xC0000085, low, high);
+    rdmsr (MSR_K6_UWCCR, low, high);
     /*  Upper dword is region 1, lower is region 0  */
     if (reg == 1) low = high;
     /*  The base masks off on the right alignment  */
@@ -771,7 +763,7 @@ static void amd_set_mtrr_up (unsigned int reg, unsigned long base,
     /*
      *	Low is MTRR0 , High MTRR 1
      */
-    rdmsr (0xC0000085, regs[0], regs[1]);
+    rdmsr (MSR_K6_UWCCR, regs[0], regs[1]);
     /*
      *	Blank to disable
      */
@@ -792,8 +784,8 @@ static void amd_set_mtrr_up (unsigned int reg, unsigned long base,
      *	The writeback rule is quite specific. See the manual. Its
      *	disable local interrupts, write back the cache, set the mtrr
      */
-    __asm__ __volatile__ ("wbinvd" : : : "memory");
-    wrmsr (0xC0000085, regs[0], regs[1]);
+	wbinvd();
+	wrmsr (MSR_K6_UWCCR, regs[0], regs[1]);
     if (do_safe) set_mtrr_done (&ctxt);
 }   /*  End Function amd_set_mtrr_up  */
 
@@ -826,7 +818,7 @@ static void centaur_set_mcr_up (unsigned int reg, unsigned long base,
     }
     centaur_mcr[reg].high = high;
     centaur_mcr[reg].low = low;
-    wrmsr (0x110 + reg, low, high);
+    wrmsr (MSR_IDT_MCR0 + reg, low, high);
     if (do_safe) set_mtrr_done( &ctxt );
 }   /*  End Function centaur_set_mtrr_up  */
 
@@ -2012,12 +2004,12 @@ static void __init centaur_mcr1_init(void)
      * find out what the bios might have done.
      */
      
-    rdmsr(0x120, lo, hi);
+    rdmsr(MSR_IDT_MCR_CTRL, lo, hi);
     if(((lo>>17)&7)==1)		/* Type 1 Winchip2 MCR */
     {
     	lo&= ~0x1C0;		/* clear key */
     	lo|= 0x040;		/* set key to 1 */
-	wrmsr(0x120, lo, hi);	/* unlock MCR */
+	wrmsr(MSR_IDT_MCR_CTRL, lo, hi);	/* unlock MCR */
     }    
     
     centaur_mcr_type = 1;
@@ -2031,7 +2023,7 @@ static void __init centaur_mcr1_init(void)
     	if(centaur_mcr[i]. high == 0 && centaur_mcr[i].low == 0)
     	{
     		if(!(lo & (1<<(9+i))))
-			wrmsr (0x110 + i , 0, 0);
+			wrmsr (MSR_IDT_MCR0 + i , 0, 0);
 		else
 			/*
 			 *	If the BIOS set up an MCR we cannot see it
@@ -2047,7 +2039,7 @@ static void __init centaur_mcr1_init(void)
      */
 
     lo |= 15;			/* Write combine enables */
-    wrmsr(0x120, lo, hi);
+    wrmsr(MSR_IDT_MCR_CTRL, lo, hi);
 }   /*  End Function centaur_mcr1_init  */
 
 /*
@@ -2071,10 +2063,10 @@ static void __init centaur_mcr0_init(void)
     for (i = 0; i < 8; ++i)
     {
     	if(centaur_mcr[i]. high == 0 && centaur_mcr[i].low == 0)
-		wrmsr (0x110 + i , 0, 0);
+		wrmsr (MSR_IDT_MCR0 + i , 0, 0);
     }
 
-    wrmsr(0x120, 0x01F0001F, 0);	/* Write only */
+    wrmsr(MSR_IDT_MCR_CTRL, 0x01F0001F, 0);	/* Write only */
 }   /*  End Function centaur_mcr0_init  */
 
 /*
@@ -2230,6 +2222,8 @@ void __init mtrr_init_secondary_cpu(void)
 	 *  :-)
 	 */
 	cyrix_arr_init_secondary ();
+	break;
+    case MTRR_IF_NONE:
 	break;
     default:
 	/* I see no MTRRs I can support in SMP mode... */

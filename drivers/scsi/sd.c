@@ -238,8 +238,10 @@ static int sd_ioctl(struct inode * inode, struct file * file, unsigned int cmd, 
 		case BLKFLSBUF:
 		case BLKSSZGET:
 		case BLKPG:
-                case BLKELVGET:
-                case BLKELVSET:
+		case BLKELVGET:
+		case BLKELVSET:
+		case BLKBSZGET:
+		case BLKBSZSET:
 			return blk_ioctl(inode->i_rdev, cmd, arg);
 
 		case BLKRRPART: /* Re-read partition tables */

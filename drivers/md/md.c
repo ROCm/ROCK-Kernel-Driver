@@ -921,17 +921,19 @@ static int write_disk_sb(mdk_rdev_t * rdev)
 	dev = rdev->dev;
 	sb_offset = calc_dev_sboffset(dev, rdev->mddev, 1);
 	if (rdev->sb_offset != sb_offset) {
-		printk("%s's sb offset has changed from %ld to %ld, skipping\n", partition_name(dev), rdev->sb_offset, sb_offset);
+		printk("%s's sb offset has changed from %ld to %ld, skipping\n",
+		       partition_name(dev), rdev->sb_offset, sb_offset);
 		goto skip;
 	}
 	/*
 	 * If the disk went offline meanwhile and it's just a spare, then
-	 * it's size has changed to zero silently, and the MD code does
+	 * its size has changed to zero silently, and the MD code does
 	 * not yet know that it's faulty.
 	 */
 	size = calc_dev_size(dev, rdev->mddev, 1);
 	if (size != rdev->size) {
-		printk("%s's size has changed from %ld to %ld since import, skipping\n", partition_name(dev), rdev->size, size);
+		printk("%s's size has changed from %ld to %ld since import, skipping\n",
+		       partition_name(dev), rdev->size, size);
 		goto skip;
 	}
 
@@ -2488,27 +2490,14 @@ static int md_ioctl (struct inode *inode, struct file *file,
 						(long *) arg);
 			goto done;
 
-		case BLKFLSBUF:
-			fsync_dev(dev);
-			invalidate_buffers(dev);
-			goto done;
-
-		case BLKRASET:
-			if (arg > 0xff) {
-				err = -EINVAL;
-				goto abort;
-			}
-			read_ahead[MAJOR(dev)] = arg;
-			goto done;
-
 		case BLKRAGET:
-			if (!arg) {
-				err = -EINVAL;
-				goto abort;
-			}
-			err = md_put_user (read_ahead[
-				MAJOR(dev)], (long *) arg);
-			goto done;
+		case BLKRASET:
+		case BLKFLSBUF:
+		case BLKBSZGET:
+		case BLKBSZSET:
+			err = blk_ioctl (dev, cmd, arg);
+			goto abort;
+
 		default:;
 	}
 

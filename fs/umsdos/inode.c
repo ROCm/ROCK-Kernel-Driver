@@ -38,7 +38,7 @@ void UMSDOS_put_inode (struct inode *inode)
 		 ,atomic_read(&inode->i_count)));
 
 	if (inode == pseudo_root) {
-		printk (KERN_ERR "Umsdos: debug: releasing pseudo_root - ino=%lu count=%d\n", inode->i_ino, atomic_read(&inode->i_count));
+		Printk ((KERN_ERR "Umsdos: debug: releasing pseudo_root - ino=%lu count=%d\n", inode->i_ino, atomic_read(&inode->i_count)));
 	}
 
 	if (atomic_read(&inode->i_count) == 1)
@@ -49,7 +49,7 @@ void UMSDOS_put_inode (struct inode *inode)
 void UMSDOS_put_super (struct super_block *sb)
 {
 	Printk ((KERN_DEBUG "UMSDOS_put_super: entering\n"));
-	if (saved_root) {
+	if (saved_root && pseudo_root && sb->s_dev == ROOT_DEV) {
 		shrink_dcache_parent(saved_root);
 		dput(saved_root);
 		saved_root = NULL;
@@ -153,15 +153,55 @@ dentry, f_pos));
 }
 
 
-int umsdos_notify_change_locked(struct dentry *, struct iattr *);
 /*
  * lock the parent dir before starting ...
+ * also handles hardlink converting
  */
 int UMSDOS_notify_change (struct dentry *dentry, struct iattr *attr)
 {
-	struct inode *dir = dentry->d_parent->d_inode;
-	struct inode *inode = dentry->d_inode;
+	struct inode *dir, *inode;
+	struct umsdos_info info;
+	struct dentry *temp, *old_dentry = NULL;
 	int ret;
+
+	ret = umsdos_parse (dentry->d_name.name, dentry->d_name.len,
+				&info);
+	if (ret)
+		goto out;
+	ret = umsdos_findentry (dentry->d_parent, &info, 0);
+	if (ret) {
+printk("UMSDOS_notify_change: %s/%s not in EMD, ret=%d\n",
+dentry->d_parent->d_name.name, dentry->d_name.name, ret);
+		goto out;
+	}
+
+	if (info.entry.flags & UMSDOS_HLINK) {
+		/*
+		 * In order to get the correct (real) inode, we just drop
+		 * the original dentry.
+		 */ 
+		d_drop(dentry);
+Printk(("UMSDOS_notify_change: hard link %s/%s, fake=%s\n",
+dentry->d_parent->d_name.name, dentry->d_name.name, info.fake.fname));
+	
+		/* Do a real lookup to get the short name dentry */
+		temp = umsdos_covered(dentry->d_parent, info.fake.fname,
+						info.fake.len);
+		ret = PTR_ERR(temp);
+		if (IS_ERR(temp))
+			goto out;
+	
+		/* now resolve the link ... */
+		temp = umsdos_solve_hlink(temp);
+		ret = PTR_ERR(temp);
+		if (IS_ERR(temp))
+			goto out;
+		old_dentry = dentry;
+		dentry = temp;	/* so umsdos_notify_change_locked will operate on that */
+	}
+
+	dir = dentry->d_parent->d_inode;
+	inode = dentry->d_inode;
 
 	ret = inode_change_ok (inode, attr);
 	if (ret)
@@ -173,8 +213,11 @@ int UMSDOS_notify_change (struct dentry *dentry, struct iattr *attr)
 	if (ret == 0)
 		inode_setattr (inode, attr);
 out:
+	if (old_dentry)
+		dput (dentry);	/* if we had to use fake dentry for hardlinks, dput() it now */
 	return ret;
 }
+
 
 /*
  * Must be called with the parent lock held.
@@ -316,16 +359,16 @@ struct super_block *UMSDOS_read_super (struct super_block *sb, void *data,
 	struct super_block *res;
 	struct dentry *new_root;
 
-	MSDOS_SB(sb)->options.isvfat = 0;
 	/*
 	 * Call msdos-fs to mount the disk.
 	 * Note: this returns res == sb or NULL
 	 */
 	res = msdos_read_super (sb, data, silent);
+
 	if (!res)
 		goto out_fail;
 
-	printk (KERN_INFO "UMSDOS 0.86i "
+	printk (KERN_INFO "UMSDOS 0.86k "
 		"(compatibility level %d.%d, fast msdos)\n", 
 		UMSDOS_VERSION, UMSDOS_RELEASE);
 
@@ -334,6 +377,7 @@ struct super_block *UMSDOS_read_super (struct super_block *sb, void *data,
 
 	/* install our dentry operations ... */
 	sb->s_root->d_op = &umsdos_dentry_operations;
+
 	umsdos_patch_dentry_inode(sb->s_root, 0);
 
 	/* Check whether to change to the /linux root */
@@ -345,10 +389,9 @@ struct super_block *UMSDOS_read_super (struct super_block *sb, void *data,
 			printk("umsdos_read_super: pseudo-root wrong ops!\n");
 
 		pseudo_root = new_root->d_inode;
-
 		saved_root = sb->s_root;
-		sb->s_root = new_root;
 		printk(KERN_INFO "UMSDOS: changed to alternate root\n");
+		dget (sb->s_root); sb->s_root = dget(new_root);
 	}
 	return sb;
 
@@ -381,10 +424,12 @@ static struct dentry *check_pseudo_root(struct super_block *sb)
 	root = lookup_one_len(UMSDOS_PSDROOT_NAME, sb->s_root,UMSDOS_PSDROOT_LEN); 
 	if (IS_ERR(root))
 		goto out_noroot;
+		
 	if (!root->d_inode || !S_ISDIR(root->d_inode->i_mode))
 		goto out_dput;
 
-	printk(KERN_INFO "check_pseudo_root: found %s/%s\n", root->d_parent->d_name.name, root->d_name.name);
+printk(KERN_INFO "check_pseudo_root: found %s/%s\n",
+root->d_parent->d_name.name, root->d_name.name);
 
 	/* look for /sbin/init */
 	sbin = lookup_one_len("sbin", root, 4);

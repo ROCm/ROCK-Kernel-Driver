@@ -742,7 +742,7 @@ CONFIG_USB_STORAGE=y
 # CONFIG_USB_PEGASUS is not set
 # CONFIG_USB_CATC is not set
 # CONFIG_USB_KAWETH is not set
-# CONFIG_USB_NET1080 is not set
+# CONFIG_USB_USBNET is not set
 
 #
 # USB port drivers

@@ -405,8 +405,15 @@ static int umsdos_rename_f (struct inode *old_dir, struct dentry *old_dentry,
 		goto out_unlock;
 	/* make sure it's the same inode! */
 	ret = -ENOENT;
-	if (old->d_inode != old_inode)
-		goto out_dput;
+	/*
+	 * note: for hardlinks they will be different!
+	 *  old_inode will contain inode of .LINKxxx file containing data, and
+	 *  old->d_inode will contain inode of file containing path to .LINKxxx file
+	 */
+	if (!(old_info.entry.flags & UMSDOS_HLINK)) {
+	 	if (old->d_inode != old_inode)
+ 			goto out_dput;
+	}
 
 	new = umsdos_covered(new_dentry->d_parent, new_info.fake.fname, 
 					new_info.fake.len);
@@ -531,7 +538,7 @@ int UMSDOS_link (struct dentry *olddentry, struct inode *dir,
 	struct umsdos_info hid_info;
 
 #ifdef UMSDOS_DEBUG_VERBOSE
-printk("umsdos_link: new %s%s -> %s/%s\n",
+printk("umsdos_link: new %s/%s -> %s/%s\n",
 dentry->d_parent->d_name.name, dentry->d_name.name, 
 olddentry->d_parent->d_name.name, olddentry->d_name.name);
 #endif
@@ -698,17 +705,36 @@ out_unlock:
 	if (ret == 0) {
 		struct iattr newattrs;
 
+		/* Do a real lookup to get the short name dentry */
+		temp = umsdos_covered(olddentry->d_parent,
+					old_info.fake.fname,
+					old_info.fake.len);
+		ret = PTR_ERR(temp);
+		if (IS_ERR(temp))
+			goto out_unlock2;
+
+		/* now resolve the link ... */
+		temp = umsdos_solve_hlink(temp);
+		ret = PTR_ERR(temp);
+		if (IS_ERR(temp))
+			goto out_unlock2;
+
+
 #ifdef UMSDOS_PARANOIA
 if (!oldinode->u.umsdos_i.i_is_hlink)
 printk("UMSDOS_link: %s/%s, ino=%ld, not marked as hlink!\n",
 olddentry->d_parent->d_name.name, olddentry->d_name.name, oldinode->i_ino);
 #endif
-		oldinode->i_nlink++;
+		temp->d_inode->i_nlink++;
 Printk(("UMSDOS_link: linked %s/%s, ino=%ld, nlink=%d\n",
 olddentry->d_parent->d_name.name, olddentry->d_name.name,
 oldinode->i_ino, oldinode->i_nlink));
 		newattrs.ia_valid = 0;
-		ret = umsdos_notify_change_locked(olddentry, &newattrs);
+		ret = umsdos_notify_change_locked(temp, &newattrs);
+ 		if (ret == 0)
+			mark_inode_dirty(temp->d_inode);
+		dput(temp);
+out_unlock2:	
 		if (ret == 0)
 			mark_inode_dirty(olddentry->d_inode);
 	}

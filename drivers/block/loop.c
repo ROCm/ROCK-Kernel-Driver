@@ -62,6 +62,7 @@
 #include <linux/major.h>
 #include <linux/wait.h>
 #include <linux/blk.h>
+#include <linux/blkpg.h>
 #include <linux/init.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/smp_lock.h>
@@ -853,6 +854,10 @@ static int lo_ioctl(struct inode * inode, struct file * file,
 			break;
 		}
 		err = put_user(loop_sizes[lo->lo_number] << 1, (long *) arg);
+		break;
+	case BLKBSZGET:
+	case BLKBSZSET:
+		err = blk_ioctl(inode->i_rdev, cmd, arg);
 		break;
 	default:
 		err = lo->ioctl ? lo->ioctl(lo, cmd, arg) : -EINVAL;

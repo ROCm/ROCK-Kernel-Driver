@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.head_8xx.S 1.19 08/16/01 23:00:17 paulus
+ * BK Id: SCCS/s.head_8xx.S 1.21 08/28/01 16:27:27 trini
  */
 /*
  *  arch/ppc/kernel/except_8xx.S
@@ -823,8 +823,8 @@ initial_mmu:
 	mtspr	DC_CST, r8
 	lis	r8, IDC_ENABLE@h
 	mtspr	DC_CST, r8
-	blr
 #endif
+	blr
 
 
 /*

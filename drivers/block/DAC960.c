@@ -31,6 +31,7 @@
 #include <linux/completion.h>
 #include <linux/delay.h>
 #include <linux/hdreg.h>
+#include <linux/blkpg.h>
 #include <linux/interrupt.h>
 #include <linux/ioport.h>
 #include <linux/locks.h>
@@ -5094,21 +5095,12 @@ static int DAC960_IOCTL(Inode_T *Inode, File_T *File,
 						 .nr_sects,
 		      (long *) Argument);
     case BLKRAGET:
-      /* Get Read-Ahead. */
-      if ((long *) Argument == NULL) return -EINVAL;
-      return put_user(read_ahead[MAJOR(Inode->i_rdev)], (long *) Argument);
     case BLKRASET:
-      /* Set Read-Ahead. */
-      if (!capable(CAP_SYS_ADMIN)) return -EACCES;
-      if (Argument > 256) return -EINVAL;
-      read_ahead[MAJOR(Inode->i_rdev)] = Argument;
-      return 0;
     case BLKFLSBUF:
-      /* Flush Buffers. */
-      if (!capable(CAP_SYS_ADMIN)) return -EACCES;
-      fsync_dev(Inode->i_rdev);
-      invalidate_buffers(Inode->i_rdev);
-      return 0;
+    case BLKBSZGET:
+    case BLKBSZSET:
+      return blk_ioctl (Inode->i_rdev, Request, Argument);
+
     case BLKRRPART:
       /* Re-Read Partition Table. */
       if (!capable(CAP_SYS_ADMIN)) return -EACCES;

@@ -135,8 +135,9 @@ int __init macsonic_init(struct net_device* dev)
 		unsigned long desc_base, desc_top;
 		if ((lp->sonic_desc = 
 		     kmalloc(SIZEOF_SONIC_DESC
-			     * SONIC_BUS_SCALE(lp->dma_bitmode), GFP_DMA)) == NULL) {
+			     * SONIC_BUS_SCALE(lp->dma_bitmode), GFP_KERNEL | GFP_DMA)) == NULL) {
 			printk(KERN_ERR "%s: couldn't allocate descriptor buffers\n", dev->name);
+			return -ENOMEM;
 		}
 		desc_base = (unsigned long) lp->sonic_desc;
 		desc_top = desc_base + SIZEOF_SONIC_DESC * SONIC_BUS_SCALE(lp->dma_bitmode);
@@ -165,7 +166,7 @@ int __init macsonic_init(struct net_device* dev)
 
 	/* FIXME, maybe we should use skbs */
 	if ((lp->rba = (char *)
-	     kmalloc(SONIC_NUM_RRS * SONIC_RBSIZE, GFP_DMA)) == NULL) {
+	     kmalloc(SONIC_NUM_RRS * SONIC_RBSIZE, GFP_KERNEL | GFP_DMA)) == NULL) {
 		printk(KERN_ERR "%s: couldn't allocate receive buffers\n", dev->name);
 		return -ENOMEM;
 	}
