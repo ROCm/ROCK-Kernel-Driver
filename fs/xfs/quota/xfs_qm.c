@@ -1756,7 +1756,10 @@ xfs_qm_dqusage_adjust(
 	xfs_trans_t	*tp,		/* transaction pointer - NULL */
 	xfs_ino_t	ino,		/* inode number to get data for */
 	void		*buffer,	/* not used */
+	int		ubsize,		/* not used */
+	void		*private_data,	/* not used */
 	xfs_daddr_t	bno,		/* starting block of inode cluster */
+	int		*ubused,	/* not used */
 	void		*dip,		/* on-disk inode pointer (not used) */
 	int		*res)		/* result code value */
 {
@@ -1920,7 +1923,7 @@ xfs_qm_quotacheck(
 		 * adjusting the corresponding dquot counters in core.
 		 */
 		if ((error = xfs_bulkstat(mp, NULL, &lastino, &count,
-				     xfs_qm_dqusage_adjust,
+				     xfs_qm_dqusage_adjust, NULL,
 				     structsz, NULL,
 				     BULKSTAT_FG_IGET|BULKSTAT_FG_VFSLOCKED,
 				     &done)))

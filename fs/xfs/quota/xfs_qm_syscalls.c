@@ -1301,7 +1301,10 @@ xfs_qm_internalqcheck_adjust(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_ino_t	ino,		/* inode number to get data for */
 	void		*buffer,	/* not used */
+	int		ubsize,		/* not used */
+	void		*private_data,	/* not used */
 	xfs_daddr_t	bno,		/* starting block of inode cluster */
+	int		*ubused,	/* not used */
 	void		*dip,		/* not used */
 	int		*res)		/* bulkstat result code */
 {
@@ -1403,7 +1406,7 @@ xfs_qm_internalqcheck(
 		 * adjusting the corresponding dquot counters
 		 */
 		if ((error = xfs_bulkstat(mp, NULL, &lastino, &count,
-				 xfs_qm_internalqcheck_adjust,
+				 xfs_qm_internalqcheck_adjust, NULL,
 				 0, NULL, BULKSTAT_FG_IGET, &done))) {
 			break;
 		}

@@ -65,7 +65,10 @@ xfs_bulkstat_one(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_ino_t	ino,		/* inode number to get data for */
 	void		*buffer,	/* buffer to place output in */
+	int		ubsize,		/* size of buffer */
+	void		*private_data,	/* my private data */
 	xfs_daddr_t	bno,		/* starting bno of inode cluster */
+	int		*ubused,	/* bytes used by me */
 	void		*dibuff,	/* on-disk inode buffer */
 	int		*stat)		/* BULKSTAT_RV_... */
 {
@@ -85,6 +88,10 @@ xfs_bulkstat_one(
 	     (ino == mp->m_sb.sb_uquotino || ino == mp->m_sb.sb_gquotino))) {
 		*stat = BULKSTAT_RV_NOTHING;
 		return XFS_ERROR(EINVAL);
+	}
+	if (ubsize < sizeof(*buf)) {
+		*stat = BULKSTAT_RV_NOTHING;
+		return XFS_ERROR(ENOMEM);
 	}
 
 	if (dip == NULL) {
@@ -218,6 +225,8 @@ xfs_bulkstat_one(
 	}
 
 	*stat = BULKSTAT_RV_DIDONE;
+	if (ubused)
+		*ubused = sizeof(*buf);
 	return 0;
 }
 
@@ -231,6 +240,7 @@ xfs_bulkstat(
 	xfs_ino_t		*lastinop, /* last inode returned */
 	int			*ubcountp, /* size of buffer/count returned */
 	bulkstat_one_pf		formatter, /* func that'd fill a single buf */
+	void			*private_data,/* private data for formatter */
 	size_t			statstruct_size, /* sizeof struct filling */
 	xfs_caddr_t		ubuffer, /* buffer with inode stats */
 	int			flags,	/* defined in xfs_itable.h */
@@ -265,8 +275,10 @@ xfs_bulkstat(
 	int			rval;	/* return value error code */
 	int			tmp;	/* result value from btree calls */
 	int			ubcount; /* size of user's buffer */
-	int			ubleft;	/* spaces left in user's buffer */
+	int			ubleft;	/* bytes left in user's buffer */
 	xfs_caddr_t		ubufp;	/* current pointer into user's buffer */
+	int			ubelem;	/* spaces used in user's buffer */
+	int			ubused;	/* bytes used by formatter */
 	xfs_buf_t		*bp;	/* ptr to on-disk inode cluster buf */
 	xfs_dinode_t		*dip;	/* ptr into bp for specific inode */
 	xfs_inode_t		*ip;	/* ptr to in-core inode struct */
@@ -284,8 +296,9 @@ xfs_bulkstat(
 		*ubcountp = 0;
 		return 0;
 	}
-	ubcount = ubleft = *ubcountp;
-	*ubcountp = 0;
+	ubcount = *ubcountp; /* statstruct's */
+	ubleft = ubcount * statstruct_size; /* bytes */
+	*ubcountp = ubelem = 0;
 	*done = 0;
 	fmterror = 0;
 	ubufp = ubuffer;
@@ -317,7 +330,7 @@ xfs_bulkstat(
 	 * inode returned; 0 means start of the allocation group.
 	 */
 	rval = 0;
-	while (ubleft > 0 && agno < mp->m_sb.sb_agcount) {
+	while ((ubleft/statstruct_size) > 0 && agno < mp->m_sb.sb_agcount) {
 		bp = NULL;
 		down_read(&mp->m_peraglock);
 		error = xfs_ialloc_read_agi(mp, tp, agno, &agbp);
@@ -402,7 +415,7 @@ xfs_bulkstat(
 		 * Loop through inode btree records in this ag,
 		 * until we run out of inodes or space in the buffer.
 		 */
-		while (irbp < irbufend && icount < ubcount) {
+		while (irbp < irbufend && icount < (ubleft/statstruct_size)) {
 			/*
 			 * Loop as long as we're unable to read the
 			 * inode btree.
@@ -453,7 +466,8 @@ xfs_bulkstat(
 		 * Now format all the good inodes into the user's buffer.
 		 */
 		irbufend = irbp;
-		for (irbp = irbuf; irbp < irbufend && ubleft > 0; irbp++) {
+		for (irbp = irbuf;
+		     irbp < irbufend && (ubleft/statstruct_size) > 0; irbp++) {
 			/*
 			 * Read-ahead the next chunk's worth of inodes.
 			 */
@@ -561,14 +575,19 @@ xfs_bulkstat(
 				 * Get the inode and fill in a single buffer.
 				 * BULKSTAT_FG_QUICK uses dip to fill it in.
 				 * BULKSTAT_FG_IGET uses igets.
-				 * See: xfs_bulkstat_one & dm_bulkstat_one.
+				 * See: xfs_bulkstat_one & xfs_dm_bulkstat_one.
 				 * This is also used to count inodes/blks, etc
 				 * in xfs_qm_quotacheck.
 				 */
-				error = formatter(mp, tp, ino, ubufp, bno, dip,
-					&fmterror);
-				if (fmterror == BULKSTAT_RV_NOTHING)
+				ubused = statstruct_size;
+				error = formatter(mp, tp, ino, ubufp,
+						ubleft, private_data,
+						bno, &ubused, dip, &fmterror);
+				if (fmterror == BULKSTAT_RV_NOTHING) {
+					if (error == ENOMEM)
+						ubleft = 0;
 					continue;
+				}
 				if (fmterror == BULKSTAT_RV_GIVEUP) {
 					ubleft = 0;
 					ASSERT(error);
@@ -576,8 +595,9 @@ xfs_bulkstat(
 					break;
 				}
 				if (ubufp)
-					ubufp += statstruct_size;
-				ubleft--;
+					ubufp += ubused;
+				ubleft -= ubused;
+				ubelem++;
 				lastino = ino;
 			}
 		}
@@ -605,7 +625,7 @@ xfs_bulkstat(
 	if (ubuffer)
 		unuseracc(ubuffer, ubcount * statstruct_size, (B_READ|B_PHYS));
 #endif
-	*ubcountp = ubcount - ubleft;
+	*ubcountp = ubelem;
 	if (agno >= mp->m_sb.sb_agcount) {
 		/*
 		 * If we ran out of filesystem, mark lastino as off
@@ -647,7 +667,8 @@ xfs_bulkstat_single(
 	 */
 
 	ino = (xfs_ino_t)*lastinop;
-	error = xfs_bulkstat_one(mp, NULL, ino, &bstat, 0, 0, &res);
+	error = xfs_bulkstat_one(mp, NULL, ino, &bstat, sizeof(bstat),
+				 NULL, 0, NULL, NULL, &res);
 	if (error) {
 		/*
 		 * Special case way failed, do it the "long" way
@@ -656,6 +677,7 @@ xfs_bulkstat_single(
 		(*lastinop)--;
 		count = 1;
 		if (xfs_bulkstat(mp, NULL, lastinop, &count, xfs_bulkstat_one,
+				NULL,
 				sizeof(bstat), buffer, BULKSTAT_FG_IGET, done))
 			return error;
 		if (count == 0 || (xfs_ino_t)*lastinop != ino)
