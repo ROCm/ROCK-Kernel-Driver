@@ -525,7 +525,6 @@ extern struct bus_type pci_bus_type;
 extern struct list_head pci_root_buses;	/* list of all known PCI buses */
 extern struct list_head pci_devices;	/* list of all devices */
 
-int pci_present(void);
 void pcibios_fixup_bus(struct pci_bus *);
 int pcibios_enable_device(struct pci_dev *, int mask);
 char *pcibios_setup (char *str);
@@ -667,8 +666,6 @@ extern struct pci_dev *isa_bridge;
  */
 
 #ifndef CONFIG_PCI
-static inline int pci_present(void) { return 0; }
-
 #define _PCI_NOP(o,s,t) \
 	static inline int pci_##o##_config_##s (struct pci_dev *dev, int where, t val) \
 		{ return PCIBIOS_FUNC_NOT_SUPPORTED; }
