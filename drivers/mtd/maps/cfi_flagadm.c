@@ -1,7 +1,7 @@
 /*
  *  Copyright © 2001 Flaga hf. Medical Devices, Kári Davíðsson <kd@flaga.is>
  *
- *  $Id: cfi_flagadm.c,v 1.7 2001/10/02 15:05:13 dwmw2 Exp $
+ *  $Id: cfi_flagadm.c,v 1.11 2003/05/21 12:45:18 dwmw2 Exp $
  *  
  *  This program is free software; you can redistribute  it and/or modify it
  *  under  the terms of  the GNU General  Public License as published by the
@@ -27,6 +27,7 @@
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
+#include <linux/init.h>
 #include <asm/io.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/map.h>
@@ -55,83 +56,33 @@
 #define FLASH_PARTITION3_ADDR 0x00240000
 #define FLASH_PARTITION3_SIZE 0x001C0000
 
-__u8 flagadm_read8(struct map_info *map, unsigned long ofs)
-{
-	return __raw_readb(map->map_priv_1 + ofs);
-}
-
-__u16 flagadm_read16(struct map_info *map, unsigned long ofs)
-{
-	return __raw_readw(map->map_priv_1 + ofs);
-}
-
-__u32 flagadm_read32(struct map_info *map, unsigned long ofs)
-{
-	return __raw_readl(map->map_priv_1 + ofs);
-}
-
-void flagadm_copy_from(struct map_info *map, void *to, unsigned long from, ssize_t len)
-{
-	memcpy_fromio(to, map->map_priv_1 + from, len);
-}
-
-void flagadm_write8(struct map_info *map, __u8 d, unsigned long adr)
-{
-	__raw_writeb(d, map->map_priv_1 + adr);
-	mb();
-}
-
-void flagadm_write16(struct map_info *map, __u16 d, unsigned long adr)
-{
-	__raw_writew(d, map->map_priv_1 + adr);
-	mb();
-}
-
-void flagadm_write32(struct map_info *map, __u32 d, unsigned long adr)
-{
-	__raw_writel(d, map->map_priv_1 + adr);
-	mb();
-}
-
-void flagadm_copy_to(struct map_info *map, unsigned long to, const void *from, ssize_t len)
-{
-	memcpy_toio(map->map_priv_1 + to, from, len);
-}
 
 struct map_info flagadm_map = {
-	.name		= "FlagaDM flash device",
-	.size		= FLASH_SIZE,
-	.buswidth	= 2,
-	.read8		= flagadm_read8,
-	.read16		= flagadm_read16,
-	.read32		= flagadm_read32,
-	.copy_from	= flagadm_copy_from,
-	.write8		= flagadm_write8,
-	.write16	= flagadm_write16,
-	.write32	= flagadm_write32,
-	.copy_to	= flagadm_copy_to
+		.name =		"FlagaDM flash device",
+		.size =		FLASH_SIZE,
+		.buswidth =	2,
 };
 
 struct mtd_partition flagadm_parts[] = {
 	{
-		.name	= "Bootloader",
-		.offset	= FLASH_PARTITION0_ADDR,
-		.size	= FLASH_PARTITION0_SIZE
+		.name =		"Bootloader",
+		.offset	=	FLASH_PARTITION0_ADDR,
+		.size =		FLASH_PARTITION0_SIZE
 	},
 	{
-		.name	= "Kernel image",
-		.offset	= FLASH_PARTITION1_ADDR,
-		.size	= FLASH_PARTITION1_SIZE
+		.name =		"Kernel image",
+		.offset =	FLASH_PARTITION1_ADDR,
+		.size =		FLASH_PARTITION1_SIZE
 	},
 	{
-		.name	= "Initial ramdisk image",
-		.offset	= FLASH_PARTITION2_ADDR,
-		.size	= FLASH_PARTITION2_SIZE
+		.name =		"Initial ramdisk image",
+		.offset =	FLASH_PARTITION2_ADDR,
+		.size =		FLASH_PARTITION2_SIZE
 	},
 	{	
-		.name	= "Persistant storage",
-		.offset	= FLASH_PARTITION3_ADDR,
-		.size	= FLASH_PARTITION3_SIZE
+		.name =		"Persistant storage",
+		.offset =	FLASH_PARTITION3_ADDR,
+		.size =		FLASH_PARTITION3_SIZE
 	}
 };
 
@@ -144,22 +95,26 @@ int __init init_flagadm(void)
 	printk(KERN_NOTICE "FlagaDM flash device: %x at %x\n",
 			FLASH_SIZE, FLASH_PHYS_ADDR);
 	
-	flagadm_map.map_priv_1 = (unsigned long)ioremap(FLASH_PHYS_ADDR,
+	flagadm_map.phys = FLASH_PHYS_ADDR;
+	flagadm_map.virt = (unsigned long)ioremap(FLASH_PHYS_ADDR,
 					FLASH_SIZE);
 
-	if (!flagadm_map.map_priv_1) {
+	if (!flagadm_map.virt) {
 		printk("Failed to ioremap\n");
 		return -EIO;
 	}
+
+	simple_map_init(&flagadm_map);
+
 	mymtd = do_map_probe("cfi_probe", &flagadm_map);
 	if (mymtd) {
-		mymtd->module = THIS_MODULE;
+		mymtd->owner = THIS_MODULE;
 		add_mtd_partitions(mymtd, flagadm_parts, PARTITION_COUNT);
 		printk(KERN_NOTICE "FlagaDM flash device initialized\n");
 		return 0;
 	}
 
-	iounmap((void *)flagadm_map.map_priv_1);
+	iounmap((void *)flagadm_map.virt);
 	return -ENXIO;
 }
 
@@ -169,9 +124,9 @@ static void __exit cleanup_flagadm(void)
 		del_mtd_partitions(mymtd);
 		map_destroy(mymtd);
 	}
-	if (flagadm_map.map_priv_1) {
-		iounmap((void *)flagadm_map.map_priv_1);
-		flagadm_map.map_priv_1 = 0;
+	if (flagadm_map.virt) {
+		iounmap((void *)flagadm_map.virt);
+		flagadm_map.virt = 0;
 	}
 }
 

@@ -4,7 +4,7 @@
  * Copyright 2000,2001 David A. Schleef <ds@schleef.org>
  *           2000,2001 Lineo, Inc.
  *
- * $Id: sharp.c,v 1.6 2001/10/02 15:05:12 dwmw2 Exp $
+ * $Id: sharp.c,v 1.12 2003/05/28 15:39:52 dwmw2 Exp $
  *
  * Devices supported:
  *   LH28F016SCT Symmetrical block flash memory, 2Mx8
@@ -28,6 +28,7 @@
 #include <linux/errno.h>
 #include <linux/interrupt.h>
 #include <linux/mtd/map.h>
+#include <linux/mtd/mtd.h>
 #include <linux/mtd/cfi.h>
 #include <linux/delay.h>
 
@@ -165,12 +166,12 @@ static int sharp_probe_map(struct map_info *map,struct mtd_info *mtd)
 	u32 read0, read4;
 	int width = 4;
 
-	tmp = map->read32(map, base+0);
+	tmp = map_read32(map, base+0);
 
-	map->write32(map, CMD_READ_ID, base+0);
+	map_write32(map, CMD_READ_ID, base+0);
 
-	read0=map->read32(map, base+0);
-	read4=map->read32(map, base+4);
+	read0=map_read32(map, base+0);
+	read4=map_read32(map, base+4);
 	if(read0 == 0x89898989){
 		printk("Looks like sharp flash\n");
 		switch(read4){
@@ -198,10 +199,10 @@ static int sharp_probe_map(struct map_info *map,struct mtd_info *mtd)
 			printk("Sort-of looks like sharp flash, 0x%08x 0x%08x\n",
 				read0,read4);
 		}
-	}else if((map->read32(map, base+0) == CMD_READ_ID)){
+	}else if((map_read32(map, base+0) == CMD_READ_ID)){
 		/* RAM, probably */
 		printk("Looks like RAM\n");
-		map->write32(map, tmp, base+0);
+		map_write32(map, tmp, base+0);
 	}else{
 		printk("Doesn't look like sharp flash, 0x%08x 0x%08x\n",
 			read0,read4);
@@ -223,10 +224,10 @@ retry:
 
 	switch(chip->state){
 	case FL_READY:
-		map->write32(map,CMD_READ_STATUS,adr);
+		map_write32(map,CMD_READ_STATUS,adr);
 		chip->state = FL_STATUS;
 	case FL_STATUS:
-		status = map->read32(map,adr);
+		status = map_read32(map,adr);
 //printk("status=%08x\n",status);
 
 		udelay(100);
@@ -254,7 +255,7 @@ retry:
 		goto retry;
 	}
 
-	map->write32(map,CMD_RESET, adr);
+	map_write32(map,CMD_RESET, adr);
 
 	chip->state = FL_READY;
 
@@ -295,7 +296,7 @@ static int sharp_read(struct mtd_info *mtd, loff_t from, size_t len,
 		if(ret<0)
 			break;
 
-		map->copy_from(map,buf,ofs,thislen);
+		map_copy_from(map,buf,ofs,thislen);
 
 		sharp_release(&sharp->chips[chipnum]);
 
@@ -356,17 +357,17 @@ static int sharp_write_oneword(struct map_info *map, struct flchip *chip,
 	ret = sharp_wait(map,chip);
 
 	for(try=0;try<10;try++){
-		map->write32(map,CMD_BYTE_WRITE,adr);
+		map_write32(map,CMD_BYTE_WRITE,adr);
 		/* cpu_to_le32 -> hack to fix the writel be->le conversion */
-		map->write32(map,cpu_to_le32(datum),adr);
+		map_write32(map,cpu_to_le32(datum),adr);
 
 		chip->state = FL_WRITING;
 
 		timeo = jiffies + (HZ/2);
 
-		map->write32(map,CMD_READ_STATUS,adr);
+		map_write32(map,CMD_READ_STATUS,adr);
 		for(i=0;i<100;i++){
-			status = map->read32(map,adr);
+			status = map_read32(map,adr);
 			if((status & SR_READY)==SR_READY)
 				break;
 		}
@@ -379,9 +380,9 @@ static int sharp_write_oneword(struct map_info *map, struct flchip *chip,
 
 		printk("sharp: error writing byte at addr=%08lx status=%08x\n",adr,status);
 
-		map->write32(map,CMD_CLEAR_STATUS,adr);
+		map_write32(map,CMD_CLEAR_STATUS,adr);
 	}
-	map->write32(map,CMD_RESET,adr);
+	map_write32(map,CMD_RESET,adr);
 	chip->state = FL_READY;
 
 	wake_up(&chip->wq);
@@ -423,6 +424,7 @@ static int sharp_erase(struct mtd_info *mtd, struct erase_info *instr)
 		}
 	}
 
+	instr->state = MTD_ERASE_DONE;
 	if(instr->callback)
 		instr->callback(instr);
 
@@ -433,18 +435,18 @@ static int sharp_do_wait_for_ready(struct map_info *map, struct flchip *chip,
 	unsigned long adr)
 {
 	int ret;
-	unsigned long timeo;
+	int timeo;
 	int status;
 	DECLARE_WAITQUEUE(wait, current);
 
-	map->write32(map,CMD_READ_STATUS,adr);
-	status = map->read32(map,adr);
+	map_write32(map,CMD_READ_STATUS,adr);
+	status = map_read32(map,adr);
 
 	timeo = jiffies + HZ;
 
 	while(time_before(jiffies, timeo)){
-		map->write32(map,CMD_READ_STATUS,adr);
-		status = map->read32(map,adr);
+		map_write32(map,CMD_READ_STATUS,adr);
+		status = map_read32(map,adr);
 		if((status & SR_READY)==SR_READY){
 			ret = 0;
 			goto out;
@@ -486,26 +488,26 @@ static int sharp_erase_oneblock(struct map_info *map, struct flchip *chip,
 	sharp_unlock_oneblock(map,chip,adr);
 #endif
 
-	map->write32(map,CMD_BLOCK_ERASE_1,adr);
-	map->write32(map,CMD_BLOCK_ERASE_2,adr);
+	map_write32(map,CMD_BLOCK_ERASE_1,adr);
+	map_write32(map,CMD_BLOCK_ERASE_2,adr);
 
 	chip->state = FL_ERASING;
 
 	ret = sharp_do_wait_for_ready(map,chip,adr);
 	if(ret<0)return ret;
 
-	map->write32(map,CMD_READ_STATUS,adr);
-	status = map->read32(map,adr);
+	map_write32(map,CMD_READ_STATUS,adr);
+	status = map_read32(map,adr);
 
 	if(!(status&SR_ERRORS)){
-		map->write32(map,CMD_RESET,adr);
+		map_write32(map,CMD_RESET,adr);
 		chip->state = FL_READY;
 		//spin_unlock_bh(chip->mutex);
 		return 0;
 	}
 
 	printk("sharp: error erasing block at addr=%08lx status=%08x\n",adr,status);
-	map->write32(map,CMD_CLEAR_STATUS,adr);
+	map_write32(map,CMD_CLEAR_STATUS,adr);
 
 	//spin_unlock_bh(chip->mutex);
 
@@ -519,17 +521,17 @@ static void sharp_unlock_oneblock(struct map_info *map, struct flchip *chip,
 	int i;
 	int status;
 
-	map->write32(map,CMD_CLEAR_BLOCK_LOCKS_1,adr);
-	map->write32(map,CMD_CLEAR_BLOCK_LOCKS_2,adr);
+	map_write32(map,CMD_CLEAR_BLOCK_LOCKS_1,adr);
+	map_write32(map,CMD_CLEAR_BLOCK_LOCKS_2,adr);
 
 	udelay(100);
 
-	status = map->read32(map,adr);
+	status = map_read32(map,adr);
 	printk("status=%08x\n",status);
 
 	for(i=0;i<1000;i++){
-		//map->write32(map,CMD_READ_STATUS,adr);
-		status = map->read32(map,adr);
+		//map_write32(map,CMD_READ_STATUS,adr);
+		status = map_read32(map,adr);
 		if((status & SR_READY)==SR_READY)
 			break;
 		udelay(100);
@@ -539,13 +541,13 @@ static void sharp_unlock_oneblock(struct map_info *map, struct flchip *chip,
 	}
 
 	if(!(status&SR_ERRORS)){
-		map->write32(map,CMD_RESET,adr);
+		map_write32(map,CMD_RESET,adr);
 		chip->state = FL_READY;
 		return;
 	}
 
 	printk("sharp: error unlocking block at addr=%08lx status=%08x\n",adr,status);
-	map->write32(map,CMD_CLEAR_STATUS,adr);
+	map_write32(map,CMD_CLEAR_STATUS,adr);
 }
 #endif
 

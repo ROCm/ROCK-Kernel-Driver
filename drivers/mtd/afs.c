@@ -21,7 +21,7 @@
    This is access code for flashes using ARM's flash partitioning 
    standards.
 
-   $Id: afs.c,v 1.8 2002/05/04 08:49:09 rmk Exp $
+   $Id: afs.c,v 1.11 2003/05/16 17:08:24 dwmw2 Exp $
 
 ======================================================================*/
 
@@ -125,7 +125,9 @@ afs_read_iis(struct mtd_info *mtd, struct image_info_struct *iis, u_int ptr)
 	return ret;
 }
 
-int parse_afs_partitions(struct mtd_info *mtd, struct mtd_partition **pparts)
+static int parse_afs_partitions(struct mtd_info *mtd, 
+                         struct mtd_partition **pparts,
+                         unsigned long origin)
 {
 	struct mtd_partition *parts;
 	u_int mask, off, idx, sz;
@@ -227,7 +229,25 @@ int parse_afs_partitions(struct mtd_info *mtd, struct mtd_partition **pparts)
 	return idx ? idx : ret;
 }
 
-EXPORT_SYMBOL(parse_afs_partitions);
+static struct mtd_part_parser afs_parser = {
+	.owner = THIS_MODULE,
+	.parse_fn = parse_afs_partitions,
+	.name = "afs",
+};
+
+static int __init afs_parser_init(void)
+{
+	return register_mtd_parser(&afs_parser);
+}
+
+static void __exit afs_parser_exit(void)
+{
+	deregister_mtd_parser(&afs_parser);
+}
+
+module_init(afs_parser_init);
+module_exit(afs_parser_exit);
+
 
 MODULE_AUTHOR("ARM Ltd");
 MODULE_DESCRIPTION("ARM Firmware Suite partition parser");

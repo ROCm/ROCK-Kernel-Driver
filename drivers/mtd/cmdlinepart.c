@@ -1,5 +1,5 @@
 /*
- * $Id: cmdline.c,v 1.5 2002/11/06 22:40:04 rmk Exp $
+ * $Id: cmdlinepart.c,v 1.9 2003/05/16 17:08:24 dwmw2 Exp $
  *
  * Read flash partition table from command line
  *
@@ -92,11 +92,6 @@ static struct mtd_partition * newpart(char *s,
 	else
 	{
 		size = memparse(s, &s);
-		if (!size)
-		{
-			printk(KERN_ERR ERRP "couldn't parse number from input string\n");
-			return 0;
-		}
 		if (size < PAGE_SIZE)
 		{
 			printk(KERN_ERR ERRP "partition size too small (%lx)\n", size);
@@ -112,17 +107,13 @@ static struct mtd_partition * newpart(char *s,
 	{
                 s++;
                 offset = memparse(s, &s);
-		if (!offset)
-		{
-			printk(KERN_ERR ERRP "couldn't parse number from input string\n");
-			return 0;
-		}
         }
         /* now look for name */
 	if (*s == '(')
 	{
 		delim = ')';
 	}
+		
 	if (delim)
 	{
 		char *p;
@@ -295,17 +286,19 @@ static int mtdpart_setup_real(char *s)
  * Main function to be called from the MTD mapping driver/device to
  * obtain the partitioning information. At this point the command line
  * arguments will actually be parsed and turned to struct mtd_partition
- * information.
+ * information. It returns partitions for the requested mtd device, or
+ * the first one in the chain if a NULL mtd_id is passed in.
  */
-int parse_cmdline_partitions(struct mtd_info *master, 
+static int parse_cmdline_partitions(struct mtd_info *master, 
                              struct mtd_partition **pparts,
-                             const char *mtd_id)
+                             unsigned long origin)
 {
 	unsigned long offset;
 	int i;
 	struct cmdline_mtd_partition *part;
+	char *mtd_id = master->name;
 
-	if (!cmdline)
+	if(!cmdline)
 		return -EINVAL;
 
 	/* parse command line */
@@ -314,7 +307,7 @@ int parse_cmdline_partitions(struct mtd_info *master,
 
 	for(part = partitions; part; part = part->next)
 	{
-		if (!strcmp(part->mtd_id, mtd_id))
+		if ((!mtd_id) || (!strcmp(part->mtd_id, mtd_id)))
 		{
 			for(i = 0, offset = 0; i < part->num_parts; i++)
 			{
@@ -328,7 +321,7 @@ int parse_cmdline_partitions(struct mtd_info *master,
 				{
 					printk(KERN_WARNING ERRP 
 					       "%s: partitioning exceeds flash size, truncating\n",
-					       mtd_id);
+					       part->mtd_id);
 					part->parts[i].size = master->size - offset;
 					part->num_parts = i;
 				}
@@ -355,7 +348,25 @@ static int __init mtdpart_setup(char *s)
 
 __setup("mtdparts=", mtdpart_setup);
 
-EXPORT_SYMBOL(parse_cmdline_partitions);
+static struct mtd_part_parser cmdline_parser = {
+	.owner = THIS_MODULE,
+	.parse_fn = parse_cmdline_partitions,
+	.name = "cmdlinepart",
+};
+
+static int __init cmdline_parser_init(void)
+{
+	return register_mtd_parser(&cmdline_parser);
+}
+
+static void __exit cmdline_parser_exit(void)
+{
+	deregister_mtd_parser(&cmdline_parser);
+}
+
+module_init(cmdline_parser_init);
+module_exit(cmdline_parser_exit);
+
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Marius Groeger <mag@sysgo.de>");

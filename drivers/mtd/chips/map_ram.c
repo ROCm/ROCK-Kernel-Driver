@@ -1,7 +1,7 @@
 /*
  * Common code to handle map devices which are simple RAM
  * (C) 2000 Red Hat. GPL'd.
- * $Id: map_ram.c,v 1.14 2001/10/02 15:05:12 dwmw2 Exp $
+ * $Id: map_ram.c,v 1.17 2003/05/28 12:51:49 dwmw2 Exp $
  */
 
 #include <linux/module.h>
@@ -11,8 +11,10 @@
 #include <asm/byteorder.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
-
+#include <linux/init.h>
+#include <linux/mtd/mtd.h>
 #include <linux/mtd/map.h>
+#include <linux/mtd/compatmac.h>
 
 
 static int mapram_read (struct mtd_info *, loff_t, size_t, size_t *, u_char *);
@@ -34,21 +36,21 @@ static struct mtd_info *map_ram_probe(struct map_info *map)
 
 	/* Check the first byte is RAM */
 #if 0
-	map->write8(map, 0x55, 0);
-	if (map->read8(map, 0) != 0x55)
+	map_write8(map, 0x55, 0);
+	if (map_read8(map, 0) != 0x55)
 		return NULL;
 
-	map->write8(map, 0xAA, 0);
-	if (map->read8(map, 0) != 0xAA)
+	map_write8(map, 0xAA, 0);
+	if (map_read8(map, 0) != 0xAA)
 		return NULL;
 
 	/* Check the last byte is RAM */
-	map->write8(map, 0x55, map->size-1);
-	if (map->read8(map, map->size-1) != 0x55)
+	map_write8(map, 0x55, map->size-1);
+	if (map_read8(map, map->size-1) != 0x55)
 		return NULL;
 
-	map->write8(map, 0xAA, map->size-1);
-	if (map->read8(map, map->size-1) != 0xAA)
+	map_write8(map, 0xAA, map->size-1);
+	if (map_read8(map, map->size-1) != 0xAA)
 		return NULL;
 #endif
 	/* OK. It seems to be RAM. */
@@ -74,7 +76,7 @@ static struct mtd_info *map_ram_probe(struct map_info *map)
  	while(mtd->size & (mtd->erasesize - 1))
 		mtd->erasesize >>= 1;
 
-	MOD_INC_USE_COUNT;
+	__module_get(THIS_MODULE);
 	return mtd;
 }
 
@@ -83,7 +85,7 @@ static int mapram_read (struct mtd_info *mtd, loff_t from, size_t len, size_t *r
 {
 	struct map_info *map = (struct map_info *)mtd->priv;
 
-	map->copy_from(map, buf, from, len);
+	map_copy_from(map, buf, from, len);
 	*retlen = len;
 	return 0;
 }
@@ -92,7 +94,7 @@ static int mapram_write (struct mtd_info *mtd, loff_t to, size_t len, size_t *re
 {
 	struct map_info *map = (struct map_info *)mtd->priv;
 
-	map->copy_to(map, to, buf, len);
+	map_copy_to(map, to, buf, len);
 	*retlen = len;
 	return 0;
 }
@@ -105,7 +107,7 @@ static int mapram_erase (struct mtd_info *mtd, struct erase_info *instr)
 	unsigned long i;
 
 	for (i=0; i<instr->len; i++)
-		map->write8(map, 0xFF, instr->addr + i);
+		map_write8(map, 0xFF, instr->addr + i);
 
 	if (instr->callback)
 		instr->callback(instr);
