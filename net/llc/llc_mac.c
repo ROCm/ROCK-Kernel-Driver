@@ -31,18 +31,24 @@
 static int fix_up_incoming_skb(struct sk_buff *skb);
 static void llc_station_rcv(struct sk_buff *skb);
 
-extern void llc_sap_handler(struct llc_sap *sap, struct sk_buff *skb);
-extern void llc_conn_handler(struct llc_sap *sap, struct sk_buff *skb);
-
 /*
  * Packet handlers for LLC_DEST_SAP and LLC_DEST_CONN.
- * FIXME: There will be a registration service in next changesets.
  */
 static void (*llc_type_handlers[2])(struct llc_sap *sap,
-				 struct sk_buff *skb) = {
-	[LLC_DEST_SAP - 1]  = llc_sap_handler,
-	[LLC_DEST_CONN - 1] = llc_conn_handler,
-};
+				 struct sk_buff *skb);
+
+void llc_add_pack(int type, void (*handler)(struct llc_sap *sap,
+					    struct sk_buff *skb))
+{
+	if (type == LLC_DEST_SAP || type == LLC_DEST_CONN)
+		llc_type_handlers[type] = handler;
+}
+
+void llc_remove_pack(int type)
+{
+	if (type == LLC_DEST_SAP || type == LLC_DEST_CONN)
+		llc_type_handlers[type] = NULL;
+}
 
 /**
  *	llc_pdu_type - returns which LLC component must handle for PDU
@@ -240,3 +246,7 @@ u16 lan_hdrs_init(struct sk_buff *skb, u8 *sa, u8 *da)
 	}
 	return rc;
 }
+
+EXPORT_SYMBOL(llc_add_pack);
+EXPORT_SYMBOL(llc_remove_pack);
+EXPORT_SYMBOL(lan_hdrs_init);

@@ -69,6 +69,16 @@ struct llc_opt {
 
 #define llc_sk(__sk) ((struct llc_opt *)(__sk)->sk_protinfo)
 
+static __inline__ void llc_set_backlog_type(struct sk_buff *skb, char type)
+{
+	skb->cb[sizeof(skb->cb) - 1] = type;
+}
+
+static __inline__ char llc_backlog_type(struct sk_buff *skb)
+{
+	return skb->cb[sizeof(skb->cb) - 1];
+}
+
 extern struct sock *llc_sk_alloc(int family, int priority);
 extern void llc_sk_free(struct sock *sk);
 
@@ -90,9 +100,10 @@ extern struct sock *llc_lookup_established(struct llc_sap *sap,
 					   struct llc_addr *laddr);
 extern struct sock *llc_lookup_listener(struct llc_sap *sap,
 					struct llc_addr *laddr);
-extern struct sock *llc_lookup_dgram(struct llc_sap *sap,
-				     struct llc_addr *laddr);
-extern void llc_save_primitive(struct sk_buff* skb, u8 prim);
+extern void llc_sap_add_socket(struct llc_sap *sap, struct sock *sk);
+extern void llc_sap_remove_socket(struct llc_sap *sap, struct sock *sk);
+
 extern u8 llc_data_accept_state(u8 state);
 extern void llc_build_offset_table(void);
+extern int llc_release_sockets(struct llc_sap *sap);
 #endif /* LLC_CONN_H */

@@ -16,7 +16,6 @@
 #include <linux/skbuff.h>
 #include <net/datalink.h>
 #include <net/psnap.h>
-#include <net/llc_if.h>
 #include <net/llc_sap.h>
 #include <linux/mm.h>
 #include <linux/in.h>

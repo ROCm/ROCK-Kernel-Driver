@@ -20,13 +20,10 @@ extern int llc_rcv(struct sk_buff *skb, struct net_device *dev,
 		   struct packet_type *pt);
 extern u16 lan_hdrs_init(struct sk_buff *skb, u8 *sa, u8 *da);
 
-static __inline__ void llc_set_backlog_type(struct sk_buff *skb, char type)
-{
-	skb->cb[sizeof(skb->cb) - 1] = type;
-}
+struct llc_sap;
+struct sk_buff;
 
-static __inline__ char llc_backlog_type(struct sk_buff *skb)
-{
-	return skb->cb[sizeof(skb->cb) - 1];
-}
+extern void llc_add_pack(int type, void (*handler)(struct llc_sap *sap,
+						   struct sk_buff *skb));
+extern void llc_remove_pack(int type);
 #endif /* LLC_MAC_H */

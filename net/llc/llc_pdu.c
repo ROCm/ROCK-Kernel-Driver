@@ -18,27 +18,7 @@
 #include <net/llc_main.h>
 
 static void llc_pdu_decode_pdu_type(struct sk_buff *skb, u8 *type);
-static __inline__ int llc_get_hdr_len(u8 pdu_type);
 static u8 llc_pdu_get_pf_bit(struct llc_pdu_sn *pdu);
-
-/**
- *	llc_pdu_header_init - initializes pdu header
- *	@skb: input skb that header must be set into it.
- *	@type: type of PDU (U, I or S).
- *	@ssap: source sap.
- *	@dsap: destination sap.
- *	@cr: command/response bit (0 or 1).
- *
- *	This function sets DSAP, SSAP and command/Response bit in LLC header.
- */
-void llc_pdu_header_init(struct sk_buff *skb, u8 type, u8 ssap, u8 dsap, u8 cr)
-{
-	struct llc_pdu_un *pdu =
-		     llc_set_pdu_hdr(skb, skb_push(skb, llc_get_hdr_len(type)));
-	pdu->dsap = dsap;
-	pdu->ssap = ssap;
-	pdu->ssap |= cr;
-}
 
 void llc_pdu_set_cmd_rsp(struct sk_buff *skb, u8 pdu_type)
 {
@@ -112,114 +92,6 @@ void llc_pdu_decode_pf_bit(struct sk_buff *skb, u8 *pf_bit)
 void llc_pdu_decode_cr_bit(struct sk_buff *skb, u8 *cr_bit)
 {
 	*cr_bit = llc_pdu_un_hdr(skb)->ssap & LLC_PDU_CMD_RSP_MASK;
-}
-
-/**
- *	llc_pdu_decode_sa - extracs source address (MAC) of input frame
- *	@skb: input skb that source address must be extracted from it.
- *	@sa: pointer to source address (6 byte array).
- *
- *	This function extracts source address(MAC) of input frame.
- */
-void llc_pdu_decode_sa(struct sk_buff *skb, u8 *sa)
-{
-	if (skb->protocol == ntohs(ETH_P_802_2))
-		memcpy(sa, ((struct ethhdr *)skb->mac.raw)->h_source, ETH_ALEN);
-	else if (skb->protocol == ntohs(ETH_P_TR_802_2))
-		memcpy(sa, ((struct trh_hdr *)skb->mac.raw)->saddr, ETH_ALEN);
-}
-
-/**
- *	llc_pdu_decode_da - extracts dest address of input frame
- *	@skb: input skb that destination address must be extracted from it
- *	@sa: pointer to destination address (6 byte array).
- *
- *	This function extracts destination address(MAC) of input frame.
- */
-void llc_pdu_decode_da(struct sk_buff *skb, u8 *da)
-{
-	if (skb->protocol == ntohs(ETH_P_802_2))
-		memcpy(da, ((struct ethhdr *)skb->mac.raw)->h_dest, ETH_ALEN);
-	else if (skb->protocol == ntohs(ETH_P_TR_802_2))
-		memcpy(da, ((struct trh_hdr *)skb->mac.raw)->daddr, ETH_ALEN);
-}
-
-/**
- *	llc_pdu_decode_dsap - extracts dest SAP of input frame
- *	@skb: input skb that destination SAP must be extracted from it.
- *	@dsap: destination SAP (output argument).
- *
- *	This function extracts destination SAP of input frame. right bit of
- *	DSAP designates individual/group SAP.
- */
-void llc_pdu_decode_dsap(struct sk_buff *skb, u8 *dsap)
-{
-	*dsap = llc_pdu_un_hdr(skb)->dsap & 0xFE;
-}
-
-/**
- *	llc_pdu_decode_ssap - extracts source SAP of input frame
- *	@skb: input skb that source SAP must be extracted from it.
- *	@ssap: source SAP (output argument).
- *
- *	This function extracts source SAP of input frame. Right bit of SSAP is
- *	command/response bit.
- */
-void llc_pdu_decode_ssap(struct sk_buff *skb, u8 *ssap)
-{
-	*ssap = llc_pdu_un_hdr(skb)->ssap & 0xFE;
-}
-
-/**
- *	llc_pdu_init_as_ui_cmd - sets LLC header as UI PDU
- *	@skb: input skb that header must be set into it.
- *
- *	This function sets third byte of LLC header as a UI PDU.
- */
-void llc_pdu_init_as_ui_cmd(struct sk_buff *skb)
-{
-	struct llc_pdu_un *pdu = llc_pdu_un_hdr(skb);
-
-	pdu->ctrl_1  = LLC_PDU_TYPE_U;
-	pdu->ctrl_1 |= LLC_1_PDU_CMD_UI;
-}
-
-/**
- *	llc_pdu_init_as_xid_cmd - sets bytes 3, 4 & 5 of LLC header as XID
- *	@skb: input skb that header must be set into it.
- *
- *	This function sets third,fourth,fifth and sixth bytes of LLC header as
- *	a XID PDU.
- */
-void llc_pdu_init_as_xid_cmd(struct sk_buff *skb, u8 svcs_supported,
-			     u8 rx_window)
-{
-	struct llc_xid_info *xid_info;
-	struct llc_pdu_un *pdu = llc_pdu_un_hdr(skb);
-
-	pdu->ctrl_1	 = LLC_PDU_TYPE_U;
-	pdu->ctrl_1	|= LLC_1_PDU_CMD_XID;
-	pdu->ctrl_1	|= LLC_U_PF_BIT_MASK;
-	xid_info	 = (struct llc_xid_info *)(((u8 *)&pdu->ctrl_1) + 1);
-	xid_info->fmt_id = LLC_XID_FMT_ID;	/* 0x81 */
-	xid_info->type	 = svcs_supported;
-	xid_info->rw	 = rx_window << 1;	/* size of receive window */
-	skb_put(skb, 3);
-}
-
-/**
- *	llc_pdu_init_as_test_cmd - sets PDU as TEST
- *	@skb - Address of the skb to build
- *
- * 	Sets a PDU as TEST
- */
-void llc_pdu_init_as_test_cmd(struct sk_buff *skb)
-{
-	struct llc_pdu_un *pdu = llc_pdu_un_hdr(skb);
-
-	pdu->ctrl_1  = LLC_PDU_TYPE_U;
-	pdu->ctrl_1 |= LLC_1_PDU_CMD_TEST;
-	pdu->ctrl_1 |= LLC_U_PF_BIT_MASK;
 }
 
 /**
@@ -347,55 +219,6 @@ void llc_pdu_init_as_dm_rsp(struct sk_buff *skb, u8 f_bit)
 	pdu->ctrl_1  = LLC_PDU_TYPE_U;
 	pdu->ctrl_1 |= LLC_2_PDU_RSP_DM;
 	pdu->ctrl_1 |= ((f_bit & 1) << 4) & LLC_U_PF_BIT_MASK;
-}
-
-/**
- *	llc_pdu_init_as_xid_rsp - builds XID response PDU
- *	@skb: Address of the skb to build
- *	@svcs_supported: The class of the LLC (I or II)
- *	@rx_window: The size of the receive window of the LLC
- *
- *	Builds a pdu frame as an XID response.
- */
-void llc_pdu_init_as_xid_rsp(struct sk_buff *skb, u8 svcs_supported,
-			     u8 rx_window)
-{
-	struct llc_xid_info *xid_info;
-	struct llc_pdu_un *pdu = llc_pdu_un_hdr(skb);
-
-	pdu->ctrl_1	 = LLC_PDU_TYPE_U;
-	pdu->ctrl_1	|= LLC_1_PDU_CMD_XID;
-	pdu->ctrl_1	|= LLC_U_PF_BIT_MASK;
-
-	xid_info	 = (struct llc_xid_info *)(((u8 *)&pdu->ctrl_1) + 1);
-	xid_info->fmt_id = LLC_XID_FMT_ID;
-	xid_info->type	 = svcs_supported;
-	xid_info->rw	 = rx_window << 1;
-	skb_put(skb, 3);
-}
-
-/**
- *	llc_pdu_init_as_test_rsp - build TEST response PDU
- *	@skb: Address of the skb to build
- *	@ev_skb: The received TEST command PDU frame
- *
- *	Builds a pdu frame as a TEST response.
- */
-void llc_pdu_init_as_test_rsp(struct sk_buff *skb, struct sk_buff *ev_skb)
-{
-	int dsize;
-	struct llc_pdu_un *pdu = llc_pdu_un_hdr(skb);
-
-	pdu->ctrl_1  = LLC_PDU_TYPE_U;
-	pdu->ctrl_1 |= LLC_1_PDU_CMD_TEST;
-	pdu->ctrl_1 |= LLC_U_PF_BIT_MASK;
-	if (ev_skb->protocol == ntohs(ETH_P_802_2)) {
-		struct llc_pdu_un *ev_pdu = llc_pdu_un_hdr(ev_skb);
-
-		dsize = ntohs(((struct ethhdr *)ev_skb->mac.raw)->h_proto) - 3;
-		memcpy(((u8 *)pdu) + 3, ((u8 *)ev_pdu) + 3, dsize);
-		skb_put(skb, dsize);
-	}
 }
 
 /**
@@ -530,24 +353,6 @@ static void llc_pdu_decode_pdu_type(struct sk_buff *skb, u8 *type)
 			*type = LLC_PDU_TYPE_S;
 	} else
 		*type = LLC_PDU_TYPE_I;
-}
-
-/**
- *	llc_get_hdr_len - designates LLC header length
- *	@type: type of PDU.
- *
- *	This function designates LLC header length of PDU. header length for I
- *	and S PDU is 4 and for U is 3 bytes. Returns the length of header.
- */
-static __inline__ int llc_get_hdr_len(u8 type)
-{
-	static int hdr_len[] = {
-		[LLC_PDU_TYPE_U] = 3,
-		[LLC_PDU_TYPE_I] = 4,
-		[LLC_PDU_TYPE_S] = 4,
-	};
-
-	return hdr_len[type];
 }
 
 /**
