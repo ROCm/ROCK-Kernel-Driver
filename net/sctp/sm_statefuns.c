@@ -4671,14 +4671,8 @@ struct sctp_packet *sctp_ootb_pkt_new(const struct sctp_association *asoc,
 
 	/* Make a transport for the bucket, Eliza... */
 	transport = sctp_transport_new(sctp_source(chunk), GFP_ATOMIC);
-
 	if (!transport)
 		goto nomem;
-
-	/* Allocate a new packet for sending the response. */
-	packet = t_new(struct sctp_packet, GFP_ATOMIC);
-	if (!packet)
-		goto nomem_packet;
 
 	/* Cache a route for the transport with the chunk's destination as
 	 * the source address.
@@ -4686,13 +4680,11 @@ struct sctp_packet *sctp_ootb_pkt_new(const struct sctp_association *asoc,
 	sctp_transport_route(transport, (union sctp_addr *)&chunk->dest,
 			     sctp_sk(sctp_get_ctl_sock()));
 
-	packet = sctp_packet_init(packet, transport, sport, dport);
-	packet = sctp_packet_config(packet, vtag, 0, NULL);
+	packet = sctp_packet_init(&transport->packet, transport, sport, dport);
+	packet = sctp_packet_config(packet, vtag, 0);
 
 	return packet;
 
-nomem_packet:
-	sctp_transport_free(transport);
 nomem:
 	return NULL;
 }
@@ -4701,7 +4693,6 @@ nomem:
 void sctp_ootb_pkt_free(struct sctp_packet *packet)
 {
 	sctp_transport_free(packet->transport);
-	sctp_packet_free(packet);
 }
 
 /* Send a stale cookie error when a invalid COOKIE ECHO chunk is found  */

@@ -62,27 +62,35 @@
 #include <net/sctp/sm.h>
 
 /* Forward declarations for private helpers. */
-static void sctp_packet_reset(struct sctp_packet *packet);
 static sctp_xmit_t sctp_packet_append_data(struct sctp_packet *packet,
 					   struct sctp_chunk *chunk);
 
 /* Config a packet.
- * This appears to be a followup set of initializations.)
+ * This appears to be a followup set of initializations.
  */
 struct sctp_packet *sctp_packet_config(struct sctp_packet *packet,
-				       __u32 vtag, int ecn_capable,
-				       sctp_packet_phandler_t *prepend_handler)
+				       __u32 vtag, int ecn_capable)
 {
+	struct sctp_chunk *chunk = NULL;
+
+	SCTP_DEBUG_PRINTK("%s: packet:%p vtag:0x%x\n", __FUNCTION__,
+			  packet, vtag);
+
 	packet->vtag = vtag;
-	packet->ecn_capable = ecn_capable;
-	packet->get_prepend_chunk = prepend_handler;
 	packet->has_cookie_echo = 0;
 	packet->has_sack = 0;
 	packet->ipfragok = 0;
 
-	/* We might need to call the prepend_handler right away.  */
-	if (sctp_packet_empty(packet))
-		sctp_packet_reset(packet);
+	if (ecn_capable && sctp_packet_empty(packet)) {
+		chunk = sctp_get_ecne_prepend(packet->transport->asoc);
+
+		/* If there a is a prepend chunk stick it on the list before
+	 	 * any other chunks get appended.
+	 	 */
+		if (chunk)
+			sctp_packet_append_chunk(packet, chunk);
+	}
+
 	return packet;
 }
 
@@ -93,6 +101,9 @@ struct sctp_packet *sctp_packet_init(struct sctp_packet *packet,
 {
 	struct sctp_association *asoc = transport->asoc;
 	size_t overhead;
+
+	SCTP_DEBUG_PRINTK("%s: packet:%p transport:%p\n", __FUNCTION__,
+			  packet, transport);
 
 	packet->transport = transport;
 	packet->source_port = sport;
@@ -108,13 +119,10 @@ struct sctp_packet *sctp_packet_init(struct sctp_packet *packet,
 	packet->overhead = overhead;
 	packet->size = overhead;
 	packet->vtag = 0;
-	packet->ecn_capable = 0;
-	packet->get_prepend_chunk = NULL;
 	packet->has_cookie_echo = 0;
 	packet->has_sack = 0;
 	packet->ipfragok = 0;
 	packet->malloced = 0;
-	sctp_packet_reset(packet);
 	return packet;
 }
 
@@ -122,6 +130,8 @@ struct sctp_packet *sctp_packet_init(struct sctp_packet *packet,
 void sctp_packet_free(struct sctp_packet *packet)
 {
 	struct sctp_chunk *chunk;
+
+	SCTP_DEBUG_PRINTK("%s: packet:%p\n", __FUNCTION__, packet);
 
         while ((chunk = (struct sctp_chunk *)__skb_dequeue(&packet->chunks)))
 		sctp_chunk_free(chunk);
@@ -143,6 +153,9 @@ sctp_xmit_t sctp_packet_transmit_chunk(struct sctp_packet *packet,
 	sctp_xmit_t retval;
 	int error = 0;
 
+	SCTP_DEBUG_PRINTK("%s: packet:%p chunk:%p\n", __FUNCTION__,
+			  packet, chunk);
+
 	switch ((retval = (sctp_packet_append_chunk(packet, chunk)))) {
 	case SCTP_XMIT_PMTU_FULL:
 		if (!packet->has_cookie_echo) {
@@ -157,7 +170,6 @@ sctp_xmit_t sctp_packet_transmit_chunk(struct sctp_packet *packet,
 		}
 		break;
 
-	case SCTP_XMIT_MUST_FRAG:
 	case SCTP_XMIT_RWND_FULL:
 	case SCTP_XMIT_OK:
 	case SCTP_XMIT_NAGLE_DELAY:
@@ -210,6 +222,9 @@ sctp_xmit_t sctp_packet_append_chunk(struct sctp_packet *packet,
 	size_t pmtu;
 	int too_big;
 
+	SCTP_DEBUG_PRINTK("%s: packet:%p chunk:%p\n", __FUNCTION__, packet,
+			  chunk);
+
 	retval = sctp_packet_bundle_sack(packet, chunk);
 	psize = packet->size;
 
@@ -239,9 +254,6 @@ sctp_xmit_t sctp_packet_append_chunk(struct sctp_packet *packet,
 			retval = SCTP_XMIT_PMTU_FULL;
 			goto finish;
 		}
-	} else {
-		/* The chunk fits in the packet.  */
-		goto append;
 	}
 
 append:
@@ -288,6 +300,8 @@ int sctp_packet_transmit(struct sctp_packet *packet)
 	int padding;		/* How much padding do we need?  */
 	__u8 has_data = 0;
 	struct dst_entry *dst;
+
+	SCTP_DEBUG_PRINTK("%s: packet:%p\n", __FUNCTION__, packet);
 
 	/* Do NOT generate a chunkless packet. */
 	chunk = (struct sctp_chunk *)skb_peek(&packet->chunks);
@@ -509,25 +523,6 @@ nomem:
 /********************************************************************
  * 2nd Level Abstractions
  ********************************************************************/
-
-/*
- * This private function resets the packet to a fresh state.
- */
-static void sctp_packet_reset(struct sctp_packet *packet)
-{
-	struct sctp_chunk *chunk = NULL;
-
-	packet->size = packet->overhead;
-
-	if (packet->get_prepend_chunk)
-		chunk = packet->get_prepend_chunk(packet->transport->asoc);
-
-	/* If there a is a prepend chunk stick it on the list before
-	 * any other chunks get appended.
-	 */
-	if (chunk)
-		sctp_packet_append_chunk(packet, chunk);
-}
 
 /* This private function handles the specifics of appending DATA chunks.  */
 static sctp_xmit_t sctp_packet_append_data(struct sctp_packet *packet,

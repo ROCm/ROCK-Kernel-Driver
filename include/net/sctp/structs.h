@@ -679,16 +679,6 @@ struct sctp_packet {
 	 */
 	struct sctp_transport *transport;
 
-	/* Allow a callback for getting a high priority chunk
-	 * bundled early into the packet (This is used for ECNE).
-	 */
-	sctp_packet_phandler_t *get_prepend_chunk;
-
-	/* This packet should advertise ECN capability to the network
-	 * via the ECT bit.
-	 */
-	char ecn_capable;
-
 	/* This packet contains a COOKIE-ECHO chunk. */
 	char has_cookie_echo;
 
@@ -701,27 +691,15 @@ struct sctp_packet {
 	int malloced;
 };
 
-typedef int (sctp_outq_thandler_t)(struct sctp_outq *, void *);
-typedef int (sctp_outq_ehandler_t)(struct sctp_outq *);
-typedef struct sctp_packet *(sctp_outq_ohandler_init_t)
-	(struct sctp_packet *,
-	 struct sctp_transport *,
-	 __u16 sport,
-	 __u16 dport);
-typedef struct sctp_packet *(sctp_outq_ohandler_config_t)
-	(struct sctp_packet *,
-	 __u32 vtag,
-	 int ecn_capable,
-	 sctp_packet_phandler_t *get_prepend_chunk);
-typedef sctp_xmit_t (sctp_outq_ohandler_t)(struct sctp_packet *,
-					       struct sctp_chunk *);
-typedef int (sctp_outq_ohandler_force_t)(struct sctp_packet *);
-
-sctp_outq_ohandler_init_t    sctp_packet_init;
-sctp_outq_ohandler_config_t  sctp_packet_config;
-sctp_outq_ohandler_t	     sctp_packet_append_chunk;
-sctp_outq_ohandler_t	     sctp_packet_transmit_chunk;
-sctp_outq_ohandler_force_t   sctp_packet_transmit;
+struct sctp_packet *sctp_packet_init(struct sctp_packet *,
+				     struct sctp_transport *,
+				     __u16 sport, __u16 dport);
+struct sctp_packet *sctp_packet_config(struct sctp_packet *, __u32 vtag, int);
+sctp_xmit_t sctp_packet_transmit_chunk(struct sctp_packet *,
+                                       struct sctp_chunk *);
+sctp_xmit_t sctp_packet_append_chunk(struct sctp_packet *,
+                                     struct sctp_chunk *);
+int sctp_packet_transmit(struct sctp_packet *);
 void sctp_packet_free(struct sctp_packet *);
 
 static inline int sctp_packet_empty(struct sctp_packet *packet)
@@ -1015,16 +993,6 @@ struct sctp_outq {
 	 */
 	struct list_head retransmit;
 
-	/* Call these functions to send chunks down to the next lower
-	 * layer.  This is always sctp_packet, but we separate the two
-	 * structures to make testing simpler.
-	 */
-	sctp_outq_ohandler_init_t	*init_output;
-	sctp_outq_ohandler_config_t	*config_output;
-	sctp_outq_ohandler_t	*append_output;
-	sctp_outq_ohandler_t	*build_output;
-	sctp_outq_ohandler_force_t	*force_output;
-
 	/* How many unackd bytes do we have in-flight?	*/
 	__u32 outstanding_bytes;
 
@@ -1046,12 +1014,6 @@ int sctp_outq_tail(struct sctp_outq *, struct sctp_chunk *chunk);
 int sctp_outq_flush(struct sctp_outq *, int);
 int sctp_outq_sack(struct sctp_outq *, struct sctp_sackhdr *);
 int sctp_outq_is_empty(const struct sctp_outq *);
-int sctp_outq_set_output_handlers(struct sctp_outq *,
-				  sctp_outq_ohandler_init_t init,
-				  sctp_outq_ohandler_config_t config,
-				  sctp_outq_ohandler_t append,
-				  sctp_outq_ohandler_t build,
-				  sctp_outq_ohandler_force_t force);
 void sctp_outq_restart(struct sctp_outq *);
 
 void sctp_retransmit(struct sctp_outq *, struct sctp_transport *,

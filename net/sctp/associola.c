@@ -261,12 +261,6 @@ struct sctp_association *sctp_association_init(struct sctp_association *asoc,
 
 	/* Create an output queue.  */
 	sctp_outq_init(asoc, &asoc->outqueue);
-	sctp_outq_set_output_handlers(&asoc->outqueue,
-				      sctp_packet_init,
-				      sctp_packet_config,
-				      sctp_packet_append_chunk,
-				      sctp_packet_transmit_chunk,
-				      sctp_packet_transmit);
 
 	if (!sctp_ulpq_init(&asoc->ulpq, asoc))
 		goto fail_init;
@@ -482,10 +476,8 @@ struct sctp_transport *sctp_assoc_add_peer(struct sctp_association *asoc,
 	/* The asoc->peer.port might not be meaningful yet, but
 	 * initialize the packet structure anyway.
 	 */
-	(asoc->outqueue.init_output)(&peer->packet,
-				     peer,
-				     asoc->base.bind_addr.port,
-				     asoc->peer.port);
+	sctp_packet_init(&peer->packet, peer, asoc->base.bind_addr.port,
+			 asoc->peer.port);
 
 	/* 7.2.1 Slow-Start
 	 *

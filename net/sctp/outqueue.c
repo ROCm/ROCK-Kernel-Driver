@@ -223,12 +223,6 @@ void sctp_outq_init(struct sctp_association *asoc, struct sctp_outq *q)
 	INIT_LIST_HEAD(&q->retransmit);
 	INIT_LIST_HEAD(&q->sacked);
 
-	q->init_output = NULL;
-	q->config_output = NULL;
-	q->append_output = NULL;
-	q->build_output = NULL;
-	q->force_output = NULL;
-
 	q->outstanding_bytes = 0;
 	q->empty = 1;
 	q->cork  = 0;
@@ -552,12 +546,12 @@ static int sctp_outq_flush_rtx(struct sctp_outq *q, struct sctp_packet *pkt,
 		}
 
 		/* Attempt to append this chunk to the packet. */
-		status = (*q->append_output)(pkt, chunk);
+		status = sctp_packet_append_chunk(pkt, chunk);
 
 		switch (status) {
 		case SCTP_XMIT_PMTU_FULL:
 			/* Send this packet.  */
-			if ((error = (*q->force_output)(pkt)) == 0)
+			if ((error = sctp_packet_transmit(pkt)) == 0)
 				*start_timer = 1;
 
 			/* If we are retransmitting, we should only
@@ -573,12 +567,22 @@ static int sctp_outq_flush_rtx(struct sctp_outq *q, struct sctp_packet *pkt,
 
 		case SCTP_XMIT_RWND_FULL:
 		        /* Send this packet. */
-			if ((error = (*q->force_output)(pkt)) == 0)
+			if ((error = sctp_packet_transmit(pkt)) == 0)
 				*start_timer = 1;
 
 			/* Stop sending DATA as there is no more room
 			 * at the receiver.
 			 */
+			list_add(lchunk, lqueue);
+			lchunk = NULL;
+			break;
+
+		case SCTP_XMIT_NAGLE_DELAY:
+		        /* Send this packet. */
+			if ((error = sctp_packet_transmit(pkt)) == 0)
+				*start_timer = 1;
+
+			/* Stop sending DATA because of nagle delay. */
 			list_add(lchunk, lqueue);
 			lchunk = NULL;
 			break;
@@ -625,13 +629,9 @@ int sctp_outq_flush(struct sctp_outq *q, int rtx_timeout)
 	struct sctp_packet *packet;
 	struct sctp_packet singleton;
 	struct sctp_association *asoc = q->asoc;
-	int ecn_capable = asoc->peer.ecn_capable;
 	__u16 sport = asoc->base.bind_addr.port;
 	__u16 dport = asoc->peer.port;
 	__u32 vtag = asoc->peer.i.init_tag;
-	/* This is the ECNE handler for singleton packets.  */
-	sctp_packet_phandler_t *s_ecne_handler = NULL;
-	sctp_packet_phandler_t *ecne_handler = NULL;
 	struct sk_buff_head *queue;
 	struct sctp_transport *transport = NULL;
 	struct sctp_transport *new_transport;
@@ -656,10 +656,6 @@ int sctp_outq_flush(struct sctp_outq *q, int rtx_timeout)
 	 *   within a SCTP packet in increasing order of TSN.
 	 *   ...
 	 */
-	if (ecn_capable) {
-		s_ecne_handler = &sctp_get_no_prepend;
-		ecne_handler = &sctp_get_ecne_prepend;
-	}
 
 	queue = &q->control;
 	while ((chunk = (struct sctp_chunk *)skb_dequeue(queue))) {
@@ -686,8 +682,8 @@ int sctp_outq_flush(struct sctp_outq *q, int rtx_timeout)
 					      &transport_list);
 			}
 			packet = &transport->packet;
-			(*q->config_output)(packet, vtag,
-					    ecn_capable, ecne_handler);
+			sctp_packet_config(packet, vtag,
+					   asoc->peer.ecn_capable);
 		}
 
 		switch (chunk->chunk_hdr->type) {
@@ -700,11 +696,10 @@ int sctp_outq_flush(struct sctp_outq *q, int rtx_timeout)
 		case SCTP_CID_INIT:
 		case SCTP_CID_INIT_ACK:
 		case SCTP_CID_SHUTDOWN_COMPLETE:
-			(*q->init_output)(&singleton, transport, sport, dport);
-			(*q->config_output)(&singleton, vtag, ecn_capable,
-					    s_ecne_handler);
-			(void) (*q->build_output)(&singleton, chunk);
-			error = (*q->force_output)(&singleton);
+			sctp_packet_init(&singleton, transport, sport, dport);
+			sctp_packet_config(&singleton, vtag, 0);
+			sctp_packet_append_chunk(&singleton, chunk);
+			error = sctp_packet_transmit(&singleton);
 			if (error < 0)
 				return error;
 			break;
@@ -720,12 +715,9 @@ int sctp_outq_flush(struct sctp_outq *q, int rtx_timeout)
 		case SCTP_CID_COOKIE_ACK:
 		case SCTP_CID_ECN_ECNE:
 		case SCTP_CID_ECN_CWR:
-			(void) (*q->build_output)(packet, chunk);
-			break;
-
 		case SCTP_CID_ASCONF:
 		case SCTP_CID_ASCONF_ACK:
-			(void) (*q->build_output)(packet, chunk);
+			sctp_packet_transmit_chunk(packet, chunk);
 			break;
 
 		default:
@@ -770,8 +762,8 @@ int sctp_outq_flush(struct sctp_outq *q, int rtx_timeout)
 			}
 
 			packet = &transport->packet;
-			(*q->config_output)(packet, vtag,
-					    ecn_capable, ecne_handler);
+			sctp_packet_config(packet, vtag,
+					   asoc->peer.ecn_capable);
 		retran:
 			error = sctp_outq_flush_rtx(q, packet,
 						    rtx_timeout, &start_timer);
@@ -836,11 +828,11 @@ int sctp_outq_flush(struct sctp_outq *q, int rtx_timeout)
 				}
 
 				packet = &transport->packet;
-				(*q->config_output)(packet, vtag,
-						    ecn_capable, ecne_handler);
+				sctp_packet_config(packet, vtag,
+						   asoc->peer.ecn_capable);
 			}
 
-			SCTP_DEBUG_PRINTK("sctp_transmit_packet(%p, %p[%s]), ",
+			SCTP_DEBUG_PRINTK("sctp_outq_flush(%p, %p[%s]), ",
 					  q, chunk,
 					  chunk && chunk->chunk_hdr ?
 					  sctp_cname(SCTP_ST_CHUNK(
@@ -855,7 +847,7 @@ int sctp_outq_flush(struct sctp_outq *q, int rtx_timeout)
 					atomic_read(&chunk->skb->users) : -1);
 
 			/* Add the chunk to the packet.  */
-			status = (*q->build_output)(packet, chunk);
+			status = sctp_packet_transmit_chunk(packet, chunk);
 
 			switch (status) {
 			case SCTP_XMIT_PMTU_FULL:
@@ -879,7 +871,7 @@ int sctp_outq_flush(struct sctp_outq *q, int rtx_timeout)
 				BUG();
 			}
 
-			/* BUG: We assume that the (*q->force_output())
+			/* BUG: We assume that the sctp_packet_transmit() 
 			 * call below will succeed all the time and add the
 			 * chunk to the transmitted list and restart the
 			 * timers.
@@ -922,31 +914,12 @@ sctp_flush_out:
 		struct sctp_transport *t = list_entry(ltransport,
 						      struct sctp_transport,
 						      send_ready);
-		if (t != transport)
-			transport = t;
-
-		packet = &transport->packet;
+		packet = &t->packet;
 		if (!sctp_packet_empty(packet))
-			error = (*q->force_output)(packet);
+			error = sctp_packet_transmit(packet);
 	}
 
 	return error;
-}
-
-/* Set the various output handling callbacks.  */
-int sctp_outq_set_output_handlers(struct sctp_outq *q,
-				      sctp_outq_ohandler_init_t init,
-				      sctp_outq_ohandler_config_t config,
-				      sctp_outq_ohandler_t append,
-				      sctp_outq_ohandler_t build,
-				      sctp_outq_ohandler_force_t force)
-{
-	q->init_output = init;
-	q->config_output = config;
-	q->append_output = append;
-	q->build_output = build;
-	q->force_output = force;
-	return 0;
 }
 
 /* Update unack_data based on the incoming SACK chunk */
