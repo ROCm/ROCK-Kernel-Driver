@@ -530,6 +530,7 @@ int dtl1_open(dtl1_info_t *info)
 	/* Register HCI device */
 	if (hci_register_dev(hdev) < 0) {
 		BT_ERR("Can't register HCI device");
+		info->hdev = NULL;
 		hci_free_dev(hdev);
 		return -ENODEV;
 	}
@@ -543,6 +544,9 @@ int dtl1_close(dtl1_info_t *info)
 	unsigned long flags;
 	unsigned int iobase = info->link.io.BasePort1;
 	struct hci_dev *hdev = info->hdev;
+
+	if (!hdev)
+		return -ENODEV;
 
 	dtl1_hci_close(hdev);
 
