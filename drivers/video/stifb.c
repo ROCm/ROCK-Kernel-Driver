@@ -1277,7 +1277,6 @@ stifb_init_fb(struct sti_struct *sti, int force_bpp)
 	var->bits_per_pixel = bpp;
 
 	strcpy(fix->id, "stifb");
-	info->node = NODEV;
 	info->fbops = &stifb_ops;
 	info->screen_base = (void*) REGION_BASE(fb,1);
 	info->flags = FBINFO_FLAG_DEFAULT;
@@ -1306,7 +1305,7 @@ stifb_init_fb(struct sti_struct *sti, int force_bpp)
 
 	printk(KERN_INFO 
 	    "fb%d: %s %dx%d-%d frame buffer device, id: %04x, mmio: 0x%04lx\n",
-		minor(fb->info.node), 
+		fb->info.node, 
 		fix->id,
 		var->xres, 
 		var->yres,

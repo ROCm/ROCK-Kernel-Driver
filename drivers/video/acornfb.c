@@ -979,7 +979,6 @@ static void __init acornfb_init_fbinfo(void)
 		return;
 	first = 0;
 
-	fb_info.node		= NODEV;
 	fb_info.fbops		= &acornfb_ops;
 	fb_info.flags		= FBINFO_FLAG_DEFAULT;
 

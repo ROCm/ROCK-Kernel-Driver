@@ -138,7 +138,6 @@ int __init pmagbafb_init_one(int slot)
 	/*
 	 *      Let there be consoles..
 	 */
-	info->node = NODEV;
 	info->fbops = &pmagbafb_ops;
 	info->var = pmagbafb_defined;
 	info->fix = pmagbafb_fix; 

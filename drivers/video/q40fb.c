@@ -105,7 +105,6 @@ int q40fb_init(void)
 	
 	fb_info.var = q40fb_var;
 	fb_info.fix = q40fb_fix;
-	fb_info.node = NODEV;
 	fb_info.fbops = &q40fb_ops;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;  /* not as module for now */
 	fb_info.pseudo_palette = pseudo_palette;	
@@ -121,7 +120,7 @@ int q40fb_init(void)
 	}
 
         printk(KERN_INFO "fb%d: Q40 frame buffer alive and kicking !\n",
-	       minor(fb_info.node));
+	       fb_info.node);
 	return 0;
 }
 

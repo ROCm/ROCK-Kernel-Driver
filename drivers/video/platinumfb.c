@@ -327,7 +327,6 @@ static void __init platinum_init_info(struct fb_info *info, struct fb_info_plati
 {
 	/* Fill fb_info */
 	info->par = &p->par;
-	info->node = NODEV;
 	info->fbops = &platinumfb_ops;
 	info->pseudo_palette = p->pseudo_palette;
         info->flags = FBINFO_FLAG_DEFAULT;
@@ -409,7 +408,7 @@ try_again:
 		return 0;
 
 	printk(KERN_INFO "fb%d: platinum frame buffer device\n",
-	       minor(p->info.node));
+	       p->info.node);
 
 	return 1;
 }

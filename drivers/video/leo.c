@@ -510,7 +510,6 @@ static void leo_init_one(struct sbus_dev *sdev)
 		sbus_ioremap(&sdev->resource[0], LEO_OFF_LX_CURSOR,
 			     sizeof(struct leo_cursor), "leolx cursor");
 
-	all->info.node = NODEV;
 	all->info.flags = FBINFO_FLAG_DEFAULT;
 	all->info.fbops = &leo_ops;
 	all->info.currcon = -1;

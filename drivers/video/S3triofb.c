@@ -520,7 +520,6 @@ static void __init s3triofb_of_init(struct device_node *dp)
 
     strcpy(fb_info.modename, "Trio64 ");
     strncat(fb_info.modename, dp->full_name, sizeof(fb_info.modename));
-    fb_info.node = NODEV;
     fb_info.currcon = -1;
     fb_info.fbops = &s3trio_ops;
     fb_info.screen_base = s3trio_base;	
@@ -542,7 +541,7 @@ static void __init s3triofb_of_init(struct device_node *dp)
 	return;
 
     printk("fb%d: S3 Trio frame buffer device on %s\n",
-	   minor(fb_info.node), dp->full_name);
+	   fb_info.node, dp->full_name);
 }
 
 
