@@ -237,7 +237,8 @@ struct sctp_protocol {
  * (i.e. things that depend on the address family.)
  */
 struct sctp_af {
-	int		(*queue_xmit)	(struct sk_buff *skb,
+	int		(*sctp_xmit)	(struct sk_buff *skb,
+					 struct sctp_transport *,
 					 int ipfragok);
 	int 		(*setsockopt)	(struct sock *sk,
 					 int level,
@@ -249,8 +250,13 @@ struct sctp_af {
 					 int optname,
 					 char *optval,
 					 int *optlen);
-	struct dst_entry *(*get_dst)	(union sctp_addr *daddr,
+	struct dst_entry *(*get_dst)	(sctp_association_t *asoc,
+					 union sctp_addr *daddr,
 					 union sctp_addr *saddr);
+	void 		(*get_saddr)	(sctp_association_t *asoc,
+					 struct dst_entry *dst,
+					 union sctp_addr *daddr,
+				 	 union sctp_addr *saddr);	 
 	void            (*copy_addrlist) (struct list_head *,
 					  struct net_device *);
 	void            (*dst_saddr)    (union sctp_addr *saddr,
@@ -738,6 +744,8 @@ struct sctp_transport {
 
 	/* Destination */
 	struct dst_entry *dst;
+	/* Source address. */
+	union sctp_addr saddr;
 
 	/* When was the last time(in jiffies) that a data packet was sent on
 	 * this transport?  This is used to adjust the cwnd when the transport
@@ -823,6 +831,7 @@ struct sctp_transport *sctp_transport_init(struct sctp_transport *,
 void sctp_transport_set_owner(struct sctp_transport *, sctp_association_t *);
 void sctp_transport_route(struct sctp_transport *, union sctp_addr *,
 			  struct sctp_opt *);
+void sctp_transport_pmtu(struct sctp_transport *);
 void sctp_transport_free(struct sctp_transport *);
 void sctp_transport_destroy(struct sctp_transport *);
 void sctp_transport_reset_timers(struct sctp_transport *);

@@ -390,8 +390,8 @@ struct sctp_transport *sctp_assoc_add_peer(sctp_association_t *asoc,
 
 	sctp_transport_set_owner(peer, asoc);
 
-	/* Cache a route for the transport. */
-	sctp_transport_route(peer, NULL, sctp_sk(asoc->base.sk));
+	/* Initialize the pmtu of the transport. */
+	sctp_transport_pmtu(peer);
 
 	/* If this is the first transport addr on this association,
 	 * initialize the association PMTU to the peer's PMTU.
