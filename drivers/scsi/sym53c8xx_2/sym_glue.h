@@ -70,10 +70,6 @@
 #include <scsi/scsi_host.h>
 #include "../scsi.h"		/* XXX: DID_* */
 
-#ifndef bcopy
-#define bcopy(s, d, n)	memcpy((d), (s), (n))
-#endif
-
 #ifndef bzero
 #define bzero(d, n)	memset((d), 0, (n))
 #endif

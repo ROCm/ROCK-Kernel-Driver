@@ -136,10 +136,6 @@ extern void mca_unregister_driver(struct mca_driver *drv);
 /* WARNING: only called by the boot time device setup */
 extern int mca_register_device(int bus, struct mca_device *mca_dev);
 
-#ifdef CONFIG_MCA_LEGACY
-#include <linux/mca-legacy.h>
-#endif
-
 #ifdef CONFIG_MCA_PROC_FS
 extern void mca_do_proc_init(void);
 extern void mca_set_adapter_procfn(int slot, MCA_ProcFn, void* dev);

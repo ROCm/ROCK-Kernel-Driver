@@ -20,7 +20,7 @@
 static const char version[] = "madgemc.c: v0.91 23/01/2000 by Adam Fritzler\n";
 
 #include <linux/module.h>
-#include <linux/mca.h>
+#include <linux/mca-legacy.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/pci.h>

@@ -18,6 +18,7 @@
  */
 
 #include <linux/mm.h>
+#include <linux/module.h>
 #include <linux/nmi.h>
 #include <linux/init.h>
 #include <asm/uaccess.h>
@@ -2573,6 +2574,7 @@ int set_cpus_allowed(task_t *p, cpumask_t new_mask)
 	wait_for_completion(&req.done);
 	return 0;
 }
+EXPORT_SYMBOL(set_cpus_allowed);
 
 /* Move (not current) task off this cpu, onto dest cpu. */
 static void move_task_away(struct task_struct *p, int dest_cpu)
@@ -2861,4 +2863,33 @@ void __preempt_write_lock(rwlock_t *lock)
 		preempt_disable();
 	} while (!_raw_write_trylock(lock));
 }
+#endif
+
+EXPORT_SYMBOL(__cond_resched);
+EXPORT_SYMBOL(__wake_up);
+EXPORT_SYMBOL(__wake_up_sync);
+EXPORT_SYMBOL(complete);
+EXPORT_SYMBOL(default_wake_function);
+EXPORT_SYMBOL(idle_cpu);
+EXPORT_SYMBOL(interruptible_sleep_on);
+EXPORT_SYMBOL(interruptible_sleep_on_timeout);
+EXPORT_SYMBOL(io_schedule);
+EXPORT_SYMBOL(schedule);
+EXPORT_SYMBOL(set_user_nice);
+EXPORT_SYMBOL(sleep_on);
+EXPORT_SYMBOL(sleep_on_timeout);
+EXPORT_SYMBOL(task_nice);
+EXPORT_SYMBOL(wait_for_completion);
+EXPORT_SYMBOL(wake_up_process);
+EXPORT_SYMBOL(yield);
+
+#ifdef CONFIG_DEBUG_SPINLOCK_SLEEP
+EXPORT_SYMBOL(__might_sleep);
+#endif
+#ifdef CONFIG_PREEMPT
+#ifdef CONFIG_SMP
+EXPORT_SYMBOL(__preempt_spin_lock);
+EXPORT_SYMBOL(__preempt_write_lock);
+#endif
+EXPORT_SYMBOL(preempt_schedule);
 #endif

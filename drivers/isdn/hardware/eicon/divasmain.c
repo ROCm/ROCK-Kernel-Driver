@@ -1,4 +1,4 @@
-/* $Id: divasmain.c,v 1.40 2003/09/10 08:02:33 schindler Exp $
+/* $Id: divasmain.c,v 1.43 2003/09/22 08:57:31 schindler Exp $
  *
  * Low level driver for Eicon DIVA Server ISDN cards.
  *
@@ -9,13 +9,11 @@
  * of the GNU General Public License, incorporated herein by reference.
  */
 
-#define __KERNEL_SYSCALLS__
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
-#include <linux/unistd.h>
 #include <linux/devfs_fs_kernel.h>
 #include <asm/uaccess.h>
 #include <asm/io.h>
@@ -43,7 +41,7 @@
 #include "diva_dma.h"
 #include "diva_pci.h"
 
-static char *main_revision = "$Revision: 1.40 $";
+static char *main_revision = "$Revision: 1.43 $";
 
 static int major;
 

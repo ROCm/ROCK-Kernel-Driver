@@ -31,6 +31,7 @@
 #include <linux/delay.h>
 #include <linux/fd.h>
 #include <linux/ioctl.h>
+#include <linux/blkdev.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
 #include <asm/mac_iop.h>

@@ -1,4 +1,4 @@
-/* $Id: platform.h,v 1.31 2003/09/08 15:15:22 schindler Exp $
+/* $Id: platform.h,v 1.32 2003/09/18 06:59:59 schindler Exp $
  *
  * platform.h
  * 
@@ -19,7 +19,6 @@
 #endif
 
 #include <linux/config.h>
-#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/kernel.h>

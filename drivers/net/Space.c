@@ -67,7 +67,6 @@ extern int elplus_probe(struct net_device *);
 extern int ac3200_probe(struct net_device *);
 extern int es_probe(struct net_device *);
 extern int lne390_probe(struct net_device *);
-extern int ne3210_probe(struct net_device *);
 extern int e2100_probe(struct net_device *);
 extern int ni5010_probe(struct net_device *);
 extern int ni52_probe(struct net_device *);
@@ -154,9 +153,6 @@ static struct devprobe eisa_probes[] __initdata = {
 #endif
 #ifdef CONFIG_LNE390
 	{lne390_probe, 0},
-#endif
-#ifdef CONFIG_NE3210
-	{ne3210_probe, 0},
 #endif
 	{NULL, 0},
 };

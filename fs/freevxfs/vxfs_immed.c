@@ -39,7 +39,7 @@
 #include "vxfs_inode.h"
 
 
-static int	vxfs_immed_readlink(struct dentry *, char *, int);
+static int	vxfs_immed_readlink(struct dentry *, char __user *, int);
 static int	vxfs_immed_follow_link(struct dentry *, struct nameidata *);
 
 static int	vxfs_immed_readpage(struct file *, struct page *);
@@ -77,7 +77,7 @@ struct address_space_operations vxfs_immed_aops = {
  *   Number of bytes successfully copied to userspace.
  */
 static int
-vxfs_immed_readlink(struct dentry *dp, char *bp, int buflen)
+vxfs_immed_readlink(struct dentry *dp, char __user *bp, int buflen)
 {
 	struct vxfs_inode_info		*vip = VXFS_INO(dp->d_inode);
 

@@ -25,31 +25,20 @@
 #define DMA(ptr) ((a2091_scsiregs *)((ptr)->base))
 #define HDATA(ptr) ((struct WD33C93_hostdata *)((ptr)->hostdata))
 
-static struct Scsi_Host *first_instance = NULL;
-static Scsi_Host_Template *a2091_template;
-
-static irqreturn_t a2091_intr (int irq, void *dummy, struct pt_regs *fp)
+static irqreturn_t a2091_intr (int irq, void *_instance, struct pt_regs *fp)
 {
     unsigned long flags;
     unsigned int status;
-    struct Scsi_Host *instance;
-    int handled = 0;
+    struct Scsi_Host *instance = (struct Scsi_Host *)_instance;
 
-    for (instance = first_instance; instance &&
-	 instance->hostt == a2091_template; instance = instance->next)
-    {
-	status = DMA(instance)->ISTR;
-	if (!(status & (ISTR_INT_F|ISTR_INT_P)))
-		continue;
+    status = DMA(instance)->ISTR;
+    if (!(status & (ISTR_INT_F|ISTR_INT_P)) || !(status & ISTR_INTS))
+	return IRQ_NONE;
 
-	if (status & ISTR_INTS) {
-		spin_lock_irqsave(instance->host_lock, flags);
-		wd33c93_intr (instance);
-		spin_unlock_irqrestore(instance->host_lock, flags);
-		handled = 1;
-	}
-    }
-    return IRQ_RETVAL(handled);
+    spin_lock_irqsave(instance->host_lock, flags);
+    wd33c93_intr(instance);
+    spin_unlock_irqrestore(instance->host_lock, flags);
+    return IRQ_HANDLED;
 }
 
 static int dma_setup (Scsi_Cmnd *cmd, int dir_in)
@@ -184,8 +173,6 @@ static void dma_stop (struct Scsi_Host *instance, Scsi_Cmnd *SCpnt,
     }
 }
 
-static int num_a2091 = 0;
-
 int __init a2091_detect(Scsi_Host_Template *tpnt)
 {
     static unsigned char called = 0;
@@ -193,6 +180,7 @@ int __init a2091_detect(Scsi_Host_Template *tpnt)
     unsigned long address;
     struct zorro_dev *z = NULL;
     wd33c93_regs regs;
+    int num_a2091 = 0;
 
     if (!MACH_IS_AMIGA || called)
 	return 0;
@@ -221,13 +209,10 @@ int __init a2091_detect(Scsi_Host_Template *tpnt)
 	regs.SASR = &(DMA(instance)->SASR);
 	regs.SCMD = &(DMA(instance)->SCMD);
 	wd33c93_init(instance, regs, dma_setup, dma_stop, WD33C93_FS_8_10);
-	if (num_a2091++ == 0) {
-	    first_instance = instance;
-	    a2091_template = instance->hostt;
-	    request_irq(IRQ_AMIGA_PORTS, a2091_intr, SA_SHIRQ, "A2091 SCSI",
-			a2091_intr);
-	}
+	request_irq(IRQ_AMIGA_PORTS, a2091_intr, SA_SHIRQ, "A2091 SCSI",
+		    instance);
 	DMA(instance)->CNTR = CNTR_PDMD | CNTR_INTEN;
+	num_a2091++;
     }
 
     return num_a2091;
@@ -266,8 +251,7 @@ int a2091_release(struct Scsi_Host *instance)
 #ifdef MODULE
 	DMA(instance)->CNTR = 0;
 	release_mem_region(ZTWO_PADDR(instance->base), 256);
-	if (--num_a2091 == 0)
-		free_irq(IRQ_AMIGA_PORTS, a2091_intr);
+	free_irq(IRQ_AMIGA_PORTS, instance);
 	wd33c93_release();
 #endif
 	return 1;
