@@ -45,7 +45,6 @@ cpuinfo_sparc cpu_data[NR_CPUS];
 
 /* Please don't make this stuff initdata!!!  --DaveM */
 static unsigned char boot_cpu_id;
-static int smp_activated;
 
 /* Kernel spinlock */
 spinlock_t kernel_flag __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
@@ -223,85 +222,46 @@ extern unsigned long sparc64_cpu_startup;
  */
 static struct thread_info *cpu_new_thread = NULL;
 
-static void __init smp_boot_cpus(unsigned int max_cpus)
+static int __devinit smp_boot_one_cpu(unsigned int cpu)
 {
-	int cpucount = 0, i;
+	unsigned long entry =
+		(unsigned long)(&sparc64_cpu_startup);
+	unsigned long cookie =
+		(unsigned long)(&cpu_new_thread);
+	struct task_struct *p;
+	int timeout, no, ret;
 
-	printk("Entering UltraSMPenguin Mode...\n");
-	local_irq_enable();
-	smp_store_cpu_info(boot_cpu_id);
+	kernel_thread(NULL, NULL, CLONE_IDLETASK);
 
-	if (linux_num_cpus == 1)
-		return;
+	p = prev_task(&init_task);
 
-	for (i = 0; i < NR_CPUS; i++) {
-		if (i == boot_cpu_id)
-			continue;
+	init_idle(p, cpu);
 
-		if ((cpucount + 1) == max_cpus)
-			goto ignorecpu;
-		if (test_bit(i, &phys_cpu_present_map)) {
-			unsigned long entry =
-				(unsigned long)(&sparc64_cpu_startup);
-			unsigned long cookie =
-				(unsigned long)(&cpu_new_thread);
-			struct task_struct *p;
-			int timeout;
-			int no;
+	unhash_process(p);
 
-			prom_printf("Starting CPU %d... ", i);
-			kernel_thread(NULL, NULL, CLONE_IDLETASK);
-			cpucount++;
-
-			p = prev_task(&init_task);
-
-			init_idle(p, i);
-
-			unhash_process(p);
-
-			callin_flag = 0;
-			for (no = 0; no < linux_num_cpus; no++)
-				if (linux_cpus[no].mid == i)
-					break;
-			cpu_new_thread = p->thread_info;
-			set_bit(i, &cpu_callout_map);
-			prom_startcpu(linux_cpus[no].prom_node,
-				      entry, cookie);
-			for (timeout = 0; timeout < 5000000; timeout++) {
-				if (callin_flag)
-					break;
-				udelay(100);
-			}
-			if (callin_flag) {
-				prom_cpu_nodes[i] = linux_cpus[no].prom_node;
-				prom_printf("OK\n");
-			} else {
-				cpucount--;
-				printk("Processor %d is stuck.\n", i);
-				prom_printf("FAILED\n");
-				clear_bit(i, &cpu_callout_map);
-			}
-ignorecpu:
-		}
+	callin_flag = 0;
+	for (no = 0; no < linux_num_cpus; no++)
+		if (linux_cpus[no].mid == cpu)
+			break;
+	cpu_new_thread = p->thread_info;
+	set_bit(cpu, &cpu_callout_map);
+	prom_startcpu(linux_cpus[no].prom_node, entry, cookie);
+	for (timeout = 0; timeout < 5000000; timeout++) {
+		if (callin_flag)
+			break;
+		udelay(100);
+	}
+	if (callin_flag) {
+		prom_cpu_nodes[cpu] = linux_cpus[no].prom_node;
+		ret = 0;
+	} else {
+		printk("Processor %d is stuck.\n", cpu);
+		clear_bit(cpu, &cpu_callout_map);
+		ret = -ENODEV;
 	}
 	cpu_new_thread = NULL;
-	if (cpucount == 0) {
-		if (max_cpus != 1)
-			printk("Error: only one processor found.\n");
-	} else {
-		unsigned long bogosum = 0;
 
-		for (i = 0; i < NR_CPUS; i++) {
-			if (cpu_online(i))
-				bogosum += cpu_data[i].udelay_val;
-		}
-		printk("Total of %d processors activated "
-		       "(%lu.%02lu BogoMIPS).\n",
-		       cpucount + 1,
-		       bogosum/(500000/HZ),
-		       (bogosum/(5000/HZ))%100);
-		smp_activated = 1;
-	}
+	return ret;
 }
 
 static void spitfire_xcall_helper(u64 data0, u64 data1, u64 data2, u64 pstate, unsigned long cpu)
@@ -1119,8 +1079,6 @@ static void __init smp_setup_percpu_timer(void)
 
 void __init smp_tick_init(void)
 {
-	int i;
-	
 	boot_cpu_id = hard_smp_processor_id();
 	current_tick_offset = timer_tick_offset;
 
@@ -1129,19 +1087,10 @@ void __init smp_tick_init(void)
 		prom_halt();
 	}
 
-	atomic_set(&sparc64_num_cpus_online, 1);
-	memset(&cpu_online_map, 0, sizeof(cpu_online_map));
+	atomic_inc(&sparc64_num_cpus_online);
 	set_bit(boot_cpu_id, &cpu_online_map);
 	prom_cpu_nodes[boot_cpu_id] = linux_cpus[0].prom_node;
 	prof_counter(boot_cpu_id) = prof_multiplier(boot_cpu_id) = 1;
-
-	for (i = 0; i < linux_num_cpus; i++) {
-		if (linux_cpus[i].mid < NR_CPUS) {
-			set_bit(linux_cpus[i].mid,
-				&phys_cpu_present_map);
-			atomic_inc(&sparc64_num_cpus_possible);
-		}
-	}
 }
 
 cycles_t cacheflush_time;
@@ -1272,19 +1221,59 @@ int setup_profiling_timer(unsigned int multiplier)
 
 void __init smp_prepare_cpus(unsigned int max_cpus)
 {
-	smp_boot_cpus(max_cpus);
+	int i;
+
+	for (i = 0; i < linux_num_cpus; i++) {
+		if (linux_cpus[i].mid < max_cpus) {
+			set_bit(linux_cpus[i].mid,
+				&phys_cpu_present_map);
+			atomic_inc(&sparc64_num_cpus_possible);
+		}
+	}
+	if (atomic_read(&sparc64_num_cpus_possible) > max_cpus) {
+		for (i = linux_num_cpus - 1; i >= 0; i--) {
+			if (linux_cpus[i].mid != boot_cpu_id) {
+				clear_bit(linux_cpus[i].mid,
+					  &phys_cpu_present_map);
+				atomic_dec(&sparc64_num_cpus_possible);
+				if (atomic_read(&sparc64_num_cpus_possible) <= max_cpus)
+					break;
+			}
+		}
+	}
+
+	smp_store_cpu_info(boot_cpu_id);
 }
 
 int __devinit __cpu_up(unsigned int cpu)
 {
-	set_bit(cpu, &smp_commenced_mask);
-	while (!test_bit(cpu, &cpu_online_map))
-		mb();
-	return 0;
+	int ret = smp_boot_one_cpu(cpu);
+
+	if (!ret) {
+		set_bit(cpu, &smp_commenced_mask);
+		while (!test_bit(cpu, &cpu_online_map))
+			mb();
+		if (!test_bit(cpu, &cpu_online_map))
+			ret = -ENODEV;
+	}
+	return ret;
 }
 
 void __init smp_cpus_done(unsigned int max_cpus)
 {
+	unsigned long bogosum = 0;
+	int i;
+
+	for (i = 0; i < NR_CPUS; i++) {
+		if (cpu_online(i))
+			bogosum += cpu_data[i].udelay_val;
+	}
+	printk("Total of %d processors activated "
+	       "(%lu.%02lu BogoMIPS).\n",
+	       num_online_cpus(),
+	       bogosum/(500000/HZ),
+	       (bogosum/(5000/HZ))%100);
+
 	/* We want to run this with all the other cpus spinning
 	 * in the kernel.
 	 */

@@ -270,7 +270,7 @@ dequeue_signal(sigset_t *mask, siginfo_t *info)
 	int sig = 0;
 
 #if DEBUG_SIG
-printk("SIG dequeue (%s:%d): %d ", current->comm, current->pid,
+printk(KERN_DEBUG "SIG dequeue (%s:%d): %d ", current->comm, current->pid,
 	signal_pending(current));
 #endif
 
@@ -294,7 +294,7 @@ printk("SIG dequeue (%s:%d): %d ", current->comm, current->pid,
 	recalc_sigpending();
 
 #if DEBUG_SIG
-printk(" %d -> %d\n", signal_pending(current), sig);
+printk(KERN_DEBUG " %d -> %d\n", signal_pending(current), sig);
 #endif
 
 	return sig;
@@ -536,7 +536,7 @@ send_sig_info(int sig, struct siginfo *info, struct task_struct *t)
 
 
 #if DEBUG_SIG
-printk("SIG queue (%s:%d): %d ", t->comm, t->pid, sig);
+printk(KERN_DEBUG "SIG queue (%s:%d): %d ", t->comm, t->pid, sig);
 #endif
 
 	ret = -EINVAL;
@@ -577,7 +577,7 @@ out:
 	spin_unlock_irqrestore(&t->sigmask_lock, flags);
 out_nolock:
 #if DEBUG_SIG
-printk(" %d -> %d\n", signal_pending(t), ret);
+printk(KERN_DEBUG " %d -> %d\n", signal_pending(t), ret);
 #endif
 
 	return ret;

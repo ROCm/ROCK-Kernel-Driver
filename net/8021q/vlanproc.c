@@ -187,14 +187,14 @@ int vlan_proc_add_dev (struct net_device *vlandev)
 int vlan_proc_rem_dev(struct net_device *vlandev)
 {
 	if (!vlandev) {
-		printk(VLAN_ERR __FUNCTION__ ": invalid argument: %p\n",
-		       vlandev);
+		printk(VLAN_ERR "%s: invalid argument: %p\n",
+			__FUNCTION__, vlandev);
 		return -EINVAL;
 	}
 
 	if (!(vlandev->priv_flags & IFF_802_1Q_VLAN)) {
-		printk(VLAN_DBG __FUNCTION__ ": invalid argument, device: %s is not a VLAN device, priv_flags: 0x%4hX.\n",
-		       vlandev->name, vlandev->priv_flags);
+		printk(VLAN_DBG "%s: invalid argument, device: %s is not a VLAN device, priv_flags: 0x%4hX.\n",
+			__FUNCTION__, vlandev->name, vlandev->priv_flags);
 		return -EINVAL;
 	}
 

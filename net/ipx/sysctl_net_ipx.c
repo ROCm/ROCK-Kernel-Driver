@@ -17,21 +17,36 @@
 /* From af_ipx.c */
 extern int sysctl_ipx_pprop_broadcasting;
 
-ctl_table ipx_table[] = {
-	{ NET_IPX_PPROP_BROADCASTING, "ipx_pprop_broadcasting",
-	  &sysctl_ipx_pprop_broadcasting, sizeof(int), 0644, NULL,
-	  &proc_dointvec },
-	{ 0 }
+static struct ctl_table ipx_table[] = {
+	{
+		.ctl_name	= NET_IPX_PPROP_BROADCASTING,
+		.procname	= "ipx_pprop_broadcasting",
+		.data		= &sysctl_ipx_pprop_broadcasting,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{ 0 },
 };
 
-static ctl_table ipx_dir_table[] = {
-	{ NET_IPX, "ipx", NULL, 0, 0555, ipx_table },
-	{ 0 }
+static struct ctl_table ipx_dir_table[] = {
+	{
+		.ctl_name	= NET_IPX,
+		.procname	= "ipx",
+		.mode		= 0555,
+		.child		= ipx_table,
+       	},
+	{ 0 },
 };
 
-static ctl_table ipx_root_table[] = {
-	{ CTL_NET, "net", NULL, 0, 0555, ipx_dir_table },
-	{ 0 }
+static struct ctl_table ipx_root_table[] = {
+	{
+		.ctl_name	= CTL_NET,
+		.procname	= "net",
+		.mode		= 0555,
+		.child		= ipx_dir_table,
+	},
+	{ 0 },
 };
 
 static struct ctl_table_header *ipx_table_header;

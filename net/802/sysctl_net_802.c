@@ -14,15 +14,20 @@
 #include <linux/sysctl.h>
 #include <linux/config.h>
 
-ctl_table e802_table[] = {
-	{0}
-};
-
 #ifdef CONFIG_TR
 extern int sysctl_tr_rif_timeout;
-ctl_table tr_table[] = {
-	{NET_TR_RIF_TIMEOUT, "rif_timeout", &sysctl_tr_rif_timeout, sizeof(int),
-	 0644, NULL, &proc_dointvec},
-	{0}
-};
 #endif
+
+struct ctl_table tr_table[] = {
+#ifdef CONFIG_TR
+	{
+		.ctl_name	= NET_TR_RIF_TIMEOUT,
+		.procname	= "rif_timeout",
+		.data		= &sysctl_tr_rif_timeout,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec
+	},
+#endif /* CONFIG_TR */
+	{ 0 },
+};

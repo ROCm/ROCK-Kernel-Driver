@@ -755,7 +755,7 @@ static void ns83820_cleanup_rx(struct ns83820 *dev)
 
 	/* synchronize with the interrupt handler and kill it */
 	dev->rx_info.up = 0;
-	synchronize_irq();
+	synchronize_irq(dev->pci_dev->irq);
 
 	/* touch the pci bus... */
 	readl(dev->base + IMR);
@@ -1296,11 +1296,11 @@ static int ns83820_stop(struct net_device *_dev)
 	readl(dev->base + IER);
 
 	dev->rx_info.up = 0;
-	synchronize_irq();
+	synchronize_irq(dev->pci_dev->irq);
 
 	ns83820_do_reset(dev, CR_RST);
 
-	synchronize_irq();
+	synchronize_irq(dev->pci_dev->irq);
 
 	dev->IMR_cache &= ~(ISR_TXURN | ISR_TXIDLE | ISR_TXERR | ISR_TXDESC | ISR_TXOK);
 	ns83820_cleanup_rx(dev);

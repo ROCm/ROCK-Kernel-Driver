@@ -111,7 +111,7 @@ void llc_sap_send_ev(struct llc_sap *sap, struct llc_sap_state_ev *ev)
 void llc_sap_rtn_pdu(struct llc_sap *sap, struct sk_buff *skb,
 		     struct llc_sap_state_ev *ev)
 {
-	llc_pdu_un_t *pdu;
+	struct llc_pdu_un *pdu;
 	struct llc_prim_if_block *prim = &llc_ind_prim;
 	union llc_u_prim_data *prim_data = llc_ind_prim.data;
 	u8 lfb;
@@ -122,7 +122,7 @@ void llc_sap_rtn_pdu(struct llc_sap *sap, struct sk_buff *skb,
 	llc_pdu_decode_ssap(skb, &prim_data->udata.saddr.lsap);
 	prim_data->udata.pri = 0;
 	prim_data->udata.skb = skb;
-	pdu = (llc_pdu_un_t *)skb->nh.raw;
+	pdu = (struct llc_pdu_un *)skb->nh.raw;
 	switch (LLC_U_PDU_RSP(pdu)) {
 		case LLC_1_PDU_CMD_TEST:
 			prim->prim = LLC_TEST_PRIM;
@@ -170,7 +170,8 @@ void llc_sap_send_pdu(struct llc_sap *sap, struct sk_buff *skb)
 static void llc_sap_free_ev(struct llc_sap *sap, struct llc_sap_state_ev *ev)
 {
 	if (ev->type == LLC_SAP_EV_TYPE_PDU) {
-		llc_pdu_un_t *pdu = (llc_pdu_un_t *)ev->data.pdu.skb->nh.raw;
+		struct llc_pdu_un *pdu =
+				(struct llc_pdu_un *)ev->data.pdu.skb->nh.raw;
 
 		if (LLC_U_PDU_CMD(pdu) != LLC_1_PDU_CMD_UI)
 			kfree_skb(ev->data.pdu.skb);

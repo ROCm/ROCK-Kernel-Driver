@@ -91,9 +91,9 @@ static int __init vlan_proto_init(void)
 	/* proc file system initialization */
 	err = vlan_proc_init();
 	if (err < 0) {
-		printk(KERN_ERR __FUNCTION__
-		       "%s: can't create entry in proc filesystem!\n",
-		       VLAN_NAME);
+		printk(KERN_ERR 
+		       "%s %s: can't create entry in proc filesystem!\n",
+		       __FUNCTION__, VLAN_NAME);
 		return 1;
 	}
 
@@ -203,7 +203,7 @@ static int unregister_vlan_dev(struct net_device *real_dev,
 	int i, ret;
 
 #ifdef VLAN_DEBUG
-	printk(VLAN_DBG __FUNCTION__ ": VID: %i\n", vlan_id);
+	printk(VLAN_DBG "%s: VID: %i\n", __FUNCTION__, vlan_id);
 #endif
 
 	/* sanity check */
@@ -289,16 +289,16 @@ static int unregister_vlan_device(const char *vlan_IF_name)
 			if (ret == 1)
 				ret = 0;
 		} else {
-			printk(VLAN_ERR __FUNCTION__
-			       ": ERROR:	Tried to remove a non-vlan device "
+			printk(VLAN_ERR 
+			       "%s: ERROR:	Tried to remove a non-vlan device "
 			       "with VLAN code, name: %s  priv_flags: %hX\n",
-			       dev->name, dev->priv_flags);
+			       __FUNCTION__, dev->name, dev->priv_flags);
 			dev_put(dev);
 			ret = -EPERM;
 		}
 	} else {
 #ifdef VLAN_DEBUG
-		printk(VLAN_DBG __FUNCTION__ ": WARNING: Could not find dev.\n");
+		printk(VLAN_DBG "%s: WARNING: Could not find dev.\n", __FUNCTION__);
 #endif
 		ret = -EINVAL;
 	}
@@ -320,8 +320,8 @@ static struct net_device *register_vlan_device(const char *eth_IF_name,
 	int r;
 
 #ifdef VLAN_DEBUG
-	printk(VLAN_DBG __FUNCTION__ ": if_name -:%s:-	vid: %i\n",
-	       eth_IF_name, VLAN_ID);
+	printk(VLAN_DBG "%s: if_name -:%s:-	vid: %i\n",
+		__FUNCTION__, eth_IF_name, VLAN_ID);
 #endif
 
 	if (VLAN_ID >= VLAN_VID_MASK)
@@ -333,24 +333,24 @@ static struct net_device *register_vlan_device(const char *eth_IF_name,
 		goto out_ret_null;
 
 	if (real_dev->features & NETIF_F_VLAN_CHALLENGED) {
-		printk(VLAN_DBG __FUNCTION__ ": VLANs not supported on %s.\n",
-		       real_dev->name);
+		printk(VLAN_DBG "%s: VLANs not supported on %s.\n",
+			__FUNCTION__, real_dev->name);
 		goto out_put_dev;
 	}
 
 	if ((real_dev->features & NETIF_F_HW_VLAN_RX) &&
 	    (real_dev->vlan_rx_register == NULL ||
 	     real_dev->vlan_rx_kill_vid == NULL)) {
-		printk(VLAN_DBG __FUNCTION__ ": Device %s has buggy VLAN hw accel.\n",
-		       real_dev->name);
+		printk(VLAN_DBG "%s: Device %s has buggy VLAN hw accel.\n",
+			__FUNCTION__, real_dev->name);
 		goto out_put_dev;
 	}
 
 	if ((real_dev->features & NETIF_F_HW_VLAN_FILTER) &&
 	    (real_dev->vlan_rx_add_vid == NULL ||
 	     real_dev->vlan_rx_kill_vid == NULL)) {
-		printk(VLAN_DBG __FUNCTION__ ": Device %s has buggy VLAN hw accel.\n",
-		       real_dev->name);
+		printk(VLAN_DBG "%s: Device %s has buggy VLAN hw accel.\n",
+			__FUNCTION__, real_dev->name);
 		goto out_put_dev;
 	}
 
@@ -371,7 +371,7 @@ static struct net_device *register_vlan_device(const char *eth_IF_name,
 
 	if (r) {
 		/* was already registered. */
-		printk(VLAN_DBG __FUNCTION__ ": ALREADY had VLAN registered\n");
+		printk(VLAN_DBG "%s: ALREADY had VLAN registered\n", __FUNCTION__);
 		goto out_unlock;
 	}
 
@@ -665,7 +665,7 @@ int vlan_ioctl_handler(unsigned long arg)
 	args.u.device2[23] = 0;
 
 #ifdef VLAN_DEBUG
-	printk(VLAN_DBG __FUNCTION__ ": args.cmd: %x\n", args.cmd);
+	printk(VLAN_DBG "%s: args.cmd: %x\n", __FUNCTION__, args.cmd);
 #endif
 
 	switch (args.cmd) {
@@ -728,8 +728,8 @@ int vlan_ioctl_handler(unsigned long arg)
 
 	default:
 		/* pass on to underlying device instead?? */
-		printk(VLAN_DBG __FUNCTION__ ": Unknown VLAN CMD: %x \n",
-		       args.cmd);
+		printk(VLAN_DBG "%s: Unknown VLAN CMD: %x \n",
+			__FUNCTION__, args.cmd);
 		return -EINVAL;
 	};
 

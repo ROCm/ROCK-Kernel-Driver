@@ -182,7 +182,6 @@ struct sk_buff {
 		struct icmphdr	*icmph;
 		struct igmphdr	*igmph;
 		struct iphdr	*ipiph;
-		struct spxhdr	*spxh;
 		unsigned char	*raw;
 	} h;
 
@@ -190,7 +189,6 @@ struct sk_buff {
 		struct iphdr	*iph;
 		struct ipv6hdr	*ipv6h;
 		struct arphdr	*arph;
-		struct ipxhdr	*ipxh;
 		unsigned char	*raw;
 	} nh;
 
