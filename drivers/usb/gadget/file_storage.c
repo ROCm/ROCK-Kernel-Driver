@@ -234,6 +234,7 @@
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/string.h>
+#include <linux/suspend.h>
 #include <linux/uts.h>
 #include <linux/version.h>
 #include <linux/wait.h>
@@ -1540,6 +1541,8 @@ static int sleep_thread(struct fsg_dev *fsg)
 	rc = wait_event_interruptible(fsg->thread_wqh,
 			fsg->thread_wakeup_needed);
 	fsg->thread_wakeup_needed = 0;
+	if (current->flags & PF_FREEZE)
+		refrigerator(PF_FREEZE);
 	return (rc ? -EINTR : 0);
 }
 
