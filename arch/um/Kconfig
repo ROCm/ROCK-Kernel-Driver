@@ -285,7 +285,10 @@ if BROKEN
 endif
 
 config INPUT
-	bool
+	bool "Dummy option"
+	depends BROKEN
 	default n
+	help
+	This is a dummy option to get rid of warnings.
 
 source "arch/um/Kconfig.debug"
