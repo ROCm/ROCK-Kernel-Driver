@@ -8,10 +8,14 @@
 #define DEBUG 0
 
 #include <linux/device.h>
-#include <linux/module.h>
-#include <linux/slab.h>
 #include <linux/err.h>
 #include <linux/init.h>
+#include <linux/module.h>
+#include <linux/slab.h>
+#include <linux/string.h>
+
+#include <asm/semaphore.h>
+
 #include "base.h"
 
 LIST_HEAD(global_device_list);
