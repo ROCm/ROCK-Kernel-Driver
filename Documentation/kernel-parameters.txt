@@ -170,8 +170,6 @@ running once the system is up.
 	aic79xx=	[HW,SCSI]
 			See Documentation/scsi/aic79xx.txt.
 
-	allowdma0	[ISAPNP]
-
 	AM53C974=	[HW,SCSI]
 			Format: <host-scsi-id>,<target-scsi-id>,<max-rate>,<max-offset>
 			See also header of drivers/scsi/AM53C974.c.
