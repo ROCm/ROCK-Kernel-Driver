@@ -17,6 +17,8 @@
 
 #define NCP_DEFAULT_OPTIONS 0		/* 2 for packet signatures */
 
+struct sock;
+
 struct ncp_server {
 
 	struct ncp_mount_data_kernel m;	/* Nearly all of the mount data is of
