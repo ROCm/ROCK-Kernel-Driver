@@ -517,6 +517,11 @@ struct nfs4_create_res {
 	struct nfs4_change_info		dir_cinfo;
 };
 
+struct nfs4_fsinfo_arg {
+	const struct nfs_fh *		fh;
+	const u32 *			bitmask;
+};
+
 struct nfs4_getattr_arg {
 	const struct nfs_fh *		fh;
 	const u32 *			bitmask;

@@ -72,7 +72,7 @@ static inline int nfs4_map_errors(int err)
 /*
  * This is our standard bitmap for GETATTR requests.
  */
-u32 nfs4_fattr_bitmap[2] = {
+const u32 nfs4_fattr_bitmap[2] = {
 	FATTR4_WORD0_TYPE
 	| FATTR4_WORD0_CHANGE
 	| FATTR4_WORD0_SIZE
@@ -89,7 +89,7 @@ u32 nfs4_fattr_bitmap[2] = {
 	| FATTR4_WORD1_TIME_MODIFY
 };
 
-u32 nfs4_statfs_bitmap[2] = {
+const u32 nfs4_statfs_bitmap[2] = {
 	FATTR4_WORD0_FILES_AVAIL
 	| FATTR4_WORD0_FILES_FREE
 	| FATTR4_WORD0_FILES_TOTAL,
@@ -102,6 +102,13 @@ u32 nfs4_pathconf_bitmap[2] = {
 	FATTR4_WORD0_MAXLINK
 	| FATTR4_WORD0_MAXNAME,
 	0
+};
+
+const u32 nfs4_fsinfo_bitmap[2] = { FATTR4_WORD0_MAXFILESIZE
+			| FATTR4_WORD0_MAXREAD
+			| FATTR4_WORD0_MAXWRITE
+			| FATTR4_WORD0_LEASE_TIME,
+			0
 };
 
 static void nfs4_setup_readdir(u64 cookie, u32 *verifier, struct dentry *dentry,
@@ -1198,9 +1205,13 @@ static int nfs4_proc_statfs(struct nfs_server *server, struct nfs_fh *fhandle,
 static int nfs4_do_fsinfo(struct nfs_server *server, struct nfs_fh *fhandle,
 		struct nfs_fsinfo *fsinfo)
 {
+	struct nfs4_fsinfo_arg args = {
+		.fh = fhandle,
+		.bitmask = nfs4_fsinfo_bitmap,
+	};
 	struct rpc_message msg = {
 		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_FSINFO],
-		.rpc_argp = fhandle,
+		.rpc_argp = &args,
 		.rpc_resp = fsinfo,
 	};
 
