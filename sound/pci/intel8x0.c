@@ -406,6 +406,7 @@ struct _snd_intel8x0 {
 	    smp20bit: 1;
 	int in_ac97_init: 1,
 	    in_sdin_init: 1;
+	int in_measurement: 1; /* during ac97 clock measurement */
 	int fix_nocache: 1; /* workaround for 440MX */
 	int buggy_irq: 1; /* workaround for buggy mobos */
 	int xbox: 1;	  /* workaround for Xbox AC'97 detection */
@@ -789,7 +790,8 @@ static inline void snd_intel8x0_update(intel8x0_t *chip, ichdev_t *ichdev)
 	}
 
 	ichdev->position += step * ichdev->fragsize1;
-	ichdev->position %= ichdev->size;
+	if (! chip->in_measurement)
+		ichdev->position %= ichdev->size;
 	ichdev->lvi += step;
 	ichdev->lvi &= ICH_REG_LVI_MASK;
 	iputbyte(chip, port + ICH_REG_OFF_LVI, ichdev->lvi);
@@ -2334,6 +2336,7 @@ static void __devinit intel8x0_measure_ac97_clock(intel8x0_t *chip)
 	snd_intel8x0_setup_periods(chip, ichdev);
 	port = ichdev->reg_offset;
 	spin_lock_irq(&chip->reg_lock);
+	chip->in_measurement = 1;
 	/* trigger */
 	if (chip->device_type != DEVICE_ALI)
 		iputbyte(chip, port + ICH_REG_OFF_CR, ICH_IOCE | ICH_STARTBM);
@@ -2343,18 +2346,14 @@ static void __devinit intel8x0_measure_ac97_clock(intel8x0_t *chip)
 	}
 	do_gettimeofday(&start_time);
 	spin_unlock_irq(&chip->reg_lock);
-#if 0
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout(HZ / 20);
-#else
-	/* FIXME: schedule() can take too long time and overlap the boundary.. */
-	mdelay(50);
-#endif
 	spin_lock_irq(&chip->reg_lock);
 	/* check the position */
 	pos = ichdev->fragsize1;
 	pos -= igetword(chip, ichdev->reg_offset + ichdev->roff_picb) << ichdev->pos_shift;
 	pos += ichdev->position;
+	chip->in_measurement = 0;
 	do_gettimeofday(&stop_time);
 	/* stop */
 	if (chip->device_type == DEVICE_ALI) {
