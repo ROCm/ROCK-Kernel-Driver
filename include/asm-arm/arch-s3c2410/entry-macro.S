@@ -17,8 +17,6 @@
 		teq	\irqnr, #4
 		teqne	\irqnr, #5
 		beq	1002f				@ external irq reg
-		teq	\irqnr, #16
-		beq	1003f				@ lcd controller
 
 		@ debug check to see if interrupt reported is the same
 		@ as the offset....
@@ -51,7 +49,7 @@
 		ldmfd	r13!, { r0 - r4 , r8-r12, r14 }
 #endif
 
-		@ try working out interript number for ourselves
+		@ try working out interrupt number for ourselves
 		mov	\irqnr, #0
 		ldr	\irqstat, [ \tmp, #0x10 ]	@ INTPND
 10021:
@@ -102,19 +100,6 @@
 
 		@ found no interrupt, set Z flag and leave
 		movs	\irqnr, #0
-		b	1001f
-
-1003:
-		@ lcd interrupt has been asserted...
-		add	\tmp, \tmp, #S3C2410_VA_LCD - S3C2410_VA_IRQ
-		ldr	\irqstat, [ \tmp, # 0x54 ]	@ lcd int pending
-
-		tst	\irqstat, #2
-		movne	\irqnr, #IRQ_LCD_FRAME
-		tst	\irqstat, #1
-		movne	\irqnr, #IRQ_LCD_FIFO
-
-		@ fall through to exit with flags updated
 
 1004:		@ ensure Z flag clear in case our MOVS shifted out the last bit
 		teq	\irqnr, #0
