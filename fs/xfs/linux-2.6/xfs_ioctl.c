@@ -73,14 +73,6 @@
 #include <linux/pagemap.h>
 
 /*
- * ioctl commands that are used by Linux filesystems
- */
-#define XFS_IOC_GETXFLAGS	_IOR('f', 1, long)
-#define XFS_IOC_SETXFLAGS	_IOW('f', 2, long)
-#define XFS_IOC_GETVERSION	_IOR('v', 1, long)
-
-
-/*
  * xfs_find_handle maps from userspace xfs_fsop_handlereq structure to
  * a file or fs handle.
  *

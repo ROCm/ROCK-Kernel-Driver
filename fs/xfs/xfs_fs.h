@@ -446,6 +446,13 @@ typedef struct xfs_handle {
 #define XFS_FSOP_GOING_FLAGS_NOLOGFLUSH		0x2	/* don't flush log nor data */
 
 /*
+ * ioctl commands that are used by Linux filesystems
+ */
+#define XFS_IOC_GETXFLAGS	_IOR('f', 1, long)
+#define XFS_IOC_SETXFLAGS	_IOW('f', 2, long)
+#define XFS_IOC_GETVERSION	_IOR('v', 1, long)
+
+/*
  * ioctl commands that replace IRIX fcntl()'s
  * For 'documentation' purposed more than anything else,
  * the "cmd #" field reflects the IRIX fcntl number.
