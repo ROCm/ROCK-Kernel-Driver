@@ -470,9 +470,4 @@ static inline void put_dev_sector(Sector p)
 #endif 
  
 
-
-extern atomic_t nr_iowait_tasks;
-void io_schedule(void);
-void io_schedule_timeout(long timeout);
-
 #endif

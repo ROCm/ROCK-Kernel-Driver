@@ -88,6 +88,7 @@ extern int nr_threads;
 extern int last_pid;
 extern unsigned long nr_running(void);
 extern unsigned long nr_uninterruptible(void);
+extern unsigned long nr_iowait(void);
 
 #include <linux/time.h>
 #include <linux/param.h>
@@ -147,6 +148,8 @@ extern void show_trace(unsigned long *stack);
 extern void show_stack(unsigned long *stack);
 extern void show_regs(struct pt_regs *);
 
+void io_schedule(void);
+void io_schedule_timeout(long timeout);
 
 extern void cpu_init (void);
 extern void trap_init(void);

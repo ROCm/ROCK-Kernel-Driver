@@ -372,7 +372,7 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 			jiffies_to_clock_t(kstat_cpu(i).cpustat.nice),
 			jiffies_to_clock_t(kstat_cpu(i).cpustat.system),
 			jiffies_to_clock_t(kstat_cpu(i).cpustat.idle),
-			jiffies_to_clock_t(kstat_cpu(i).cpustat.idle));
+			jiffies_to_clock_t(kstat_cpu(i).cpustat.iowait));
 	}
 	len += sprintf(page + len, "intr %u", sum);
 
@@ -406,12 +406,12 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 		"btime %lu\n"
 		"processes %lu\n"
 		"procs_running %lu\n"
-		"procs_blocked %u\n",
+		"procs_blocked %lu\n",
 		nr_context_switches(),
 		xtime.tv_sec - jif / HZ,
 		total_forks,
 		nr_running(),
-		atomic_read(&nr_iowait_tasks));
+		nr_iowait());
 
 	return proc_calc_metrics(page, start, off, count, eof, len);
 }
