@@ -58,6 +58,7 @@
 #define OMAP_GPIO_RISING_EDGE	  0x02
 #define OMAP_GPIO_BOTH_EDGES	  0x03
 
+extern int omap_gpio_init(void);	/* Call from board init only */
 extern int omap_request_gpio(int gpio);
 extern void omap_free_gpio(int gpio);
 extern void omap_set_gpio_direction(int gpio, int is_input);
