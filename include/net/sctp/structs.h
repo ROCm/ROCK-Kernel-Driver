@@ -289,6 +289,10 @@ struct sctp_opt {
 	/* Various Socket Options.  */
 	__u16 default_stream;
 	__u32 default_ppid;
+	__u16 default_flags;
+	__u32 default_context;
+	__u32 default_timetolive;
+
 	struct sctp_initmsg initmsg;
 	struct sctp_rtoinfo rtoinfo;
 	struct sctp_paddrparams paddrparam;
@@ -1492,13 +1496,12 @@ struct sctp_association {
 	 */
 	int counters[SCTP_NUMBER_COUNTERS];
 
-	struct {
-		__u16 stream;
-		__u16 flags;
-		__u32 ppid;
-		__u32 context;
-		__u32 timetolive;
-	} defaults;
+	/* Default send parameters. */
+	__u16 default_stream;
+	__u16 default_flags;
+	__u32 default_ppid;
+	__u32 default_context;
+	__u32 default_timetolive;
 
 	/* This tracks outbound ssn for a given stream.  */
 	struct sctp_ssnmap *ssnmap;

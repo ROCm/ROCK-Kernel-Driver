@@ -277,6 +277,12 @@ struct sctp_association *sctp_association_init(struct sctp_association *asoc,
 
 	asoc->autoclose = sp->autoclose;
 
+	asoc->default_stream = sp->default_stream;
+	asoc->default_ppid = sp->default_ppid;
+	asoc->default_flags = sp->default_flags;
+	asoc->default_context = sp->default_context;
+	asoc->default_timetolive = sp->default_timetolive;
+	
 	return asoc;
 
 fail_init:
