@@ -21,7 +21,7 @@ ToDo/Notes:
 	- Enable the code for setting the NT4 compatibility flag when we start
 	  making NTFS 1.2 specific modifications.
 
-2.1.18-WIP
+2.1.18 - Fix scheduling latencies at mount time as well as an endianness bug.
 
 	- Remove vol->nr_mft_records as it was pretty meaningless and optimize
 	  the calculation of total/free inodes as used by statfs().
@@ -54,6 +54,7 @@ ToDo/Notes:
 	  anywhere other than attrib.c.  Update ntfs_attr_lookup() and all
 	  callers of ntfs_{external,}attr_{find,lookup}() for the new return
 	  values.
+	- Minor cleanup of fs/ntfs/inode.c::ntfs_init_locked_inode().
 
 2.1.17 - Fix bugs in mount time error code paths and other updates.
 

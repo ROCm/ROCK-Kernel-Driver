@@ -105,8 +105,11 @@ static int ntfs_init_locked_inode(struct inode *vi, ntfs_attr *na)
 	ni->name_len = na->name_len;
 
 	/* If initializing a normal inode, we are done. */
-	if (likely(na->type == AT_UNUSED))
+	if (likely(na->type == AT_UNUSED)) {
+		BUG_ON(na->name);
+		BUG_ON(na->name_len);
 		return 0;
+	}
 
 	/* It is a fake inode. */
 	NInoSetAttr(ni);
@@ -118,15 +121,16 @@ static int ntfs_init_locked_inode(struct inode *vi, ntfs_attr *na)
 	 * thus the fraction of named attributes with name != I30 is actually
 	 * absolutely tiny.
 	 */
-	if (na->name && na->name_len && na->name != I30) {
+	if (na->name_len && na->name != I30) {
 		unsigned int i;
 
+		BUG_ON(!na->name);
 		i = na->name_len * sizeof(ntfschar);
 		ni->name = (ntfschar*)kmalloc(i + sizeof(ntfschar), GFP_ATOMIC);
 		if (!ni->name)
 			return -ENOMEM;
 		memcpy(ni->name, na->name, i);
-		ni->name[i] = cpu_to_le16('\0');
+		ni->name[i] = cpu_to_le16(L'\0');
 	}
 	return 0;
 }
