@@ -624,6 +624,17 @@ int xmon_fault_handler(struct pt_regs *regs)
 	return 0;
 }
 
+/* On systems with a hypervisor, we can't set the DABR
+   (data address breakpoint register) directly. */
+static void set_controlled_dabr(unsigned long val)
+{
+	if (systemcfg->platform == PLATFORM_PSERIES_LPAR) {
+		int rc = plpar_hcall_norets(H_SET_DABR, val);
+		if (rc != H_Success)
+			xmon_printf("Warning: setting DABR failed (%d)\n", rc);
+	} else
+		set_dabr(val);
+}
 
 static struct bpt *at_breakpoint(unsigned long pc)
 {
@@ -711,7 +722,7 @@ static void insert_bpts(void)
 static void insert_cpu_bpts(void)
 {
 	if (dabr.enabled)
-		set_dabr(dabr.address | (dabr.enabled & 7));
+		set_controlled_dabr(dabr.address | (dabr.enabled & 7));
 	if (iabr && (cur_cpu_spec->cpu_features & CPU_FTR_IABR))
 		set_iabr(iabr->address
 			 | (iabr->enabled & (BP_IABR|BP_IABR_TE)));
@@ -739,7 +750,7 @@ static void remove_bpts(void)
 
 static void remove_cpu_bpts(void)
 {
-	set_dabr(0);
+	set_controlled_dabr(0);
 	if ((cur_cpu_spec->cpu_features & CPU_FTR_IABR))
 		set_iabr(0);
 }
@@ -1049,8 +1060,8 @@ static char *breakpoint_help_string =
     "b <addr> [cnt]   set breakpoint at given instr addr\n"
     "bc               clear all breakpoints\n"
     "bc <n/addr>      clear breakpoint number n or at addr\n"
-    "bi <addr> [cnt]  set hardware instr breakpoint (broken?)\n"
-    "bd <addr> [cnt]  set hardware data breakpoint (broken?)\n"
+    "bi <addr> [cnt]  set hardware instr breakpoint (POWER3/RS64 only)\n"
+    "bd <addr> [cnt]  set hardware data breakpoint\n"
     "";
 
 static void
