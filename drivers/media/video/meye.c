@@ -937,6 +937,10 @@ static int meye_do_ioctl(struct inode *inode, struct file *file,
 			up(&meye.lock);
 			return -EINVAL;
 		case MEYE_BUF_USING:
+			if (file->f_flags & O_NONBLOCK) {
+				up(&meye.lock);
+				return -EAGAIN;
+			}
 			if (wait_event_interruptible(meye.proc_list,
 						     (meye.grab_buffer[*i].state != MEYE_BUF_USING))) {
 				up(&meye.lock);
@@ -1072,6 +1076,10 @@ static int meye_do_ioctl(struct inode *inode, struct file *file,
 			up(&meye.lock);
 			return -EINVAL;
 		case MEYE_BUF_USING:
+			if (file->f_flags & O_NONBLOCK) {
+				up(&meye.lock);
+				return -EAGAIN;
+			}
 			if (wait_event_interruptible(meye.proc_list,
 						     (meye.grab_buffer[*i].state != MEYE_BUF_USING))) {
 				up(&meye.lock);
@@ -1137,6 +1145,18 @@ static int meye_ioctl(struct inode *inode, struct file *file,
 	return video_usercopy(inode, file, cmd, arg, meye_do_ioctl);
 }
 
+static unsigned int meye_poll(struct file *file, poll_table *wait)
+{
+	unsigned int res = 0;
+
+	down(&meye.lock);
+	poll_wait(file, &meye.proc_list, wait);
+	if (kfifo_len(meye.doneq))
+		res = POLLIN | POLLRDNORM;
+	up(&meye.lock);
+	return res;
+}
+
 static int meye_mmap(struct file *file, struct vm_area_struct *vma) {
 	unsigned long start = vma->vm_start;
 	unsigned long size  = vma->vm_end - vma->vm_start;
@@ -1178,6 +1198,7 @@ static struct file_operations meye_fops = {
 	.release	= meye_release,
 	.mmap		= meye_mmap,
 	.ioctl		= meye_ioctl,
+	.poll		= meye_poll,
 	.llseek		= no_llseek,
 };
 
