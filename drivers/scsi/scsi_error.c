@@ -1948,3 +1948,96 @@ int scsi_command_normalize_sense(struct scsi_cmnd *cmd,
 			sizeof(cmd->sense_buffer), sshdr);
 }
 EXPORT_SYMBOL(scsi_command_normalize_sense);
+
+/**
+ * scsi_sense_desc_find - search for a given descriptor type in
+ *			descriptor sense data format.
+ *
+ * @sense_buffer:	byte array of descriptor format sense data
+ * @sb_len:		number of valid bytes in sense_buffer
+ * @desc_type:		value of descriptor type to find
+ *			(e.g. 0 -> information)
+ *
+ * Notes:
+ *	only valid when sense data is in descriptor format
+ *
+ * Return value:
+ *	pointer to start of (first) descriptor if found else NULL
+ **/
+const u8 * scsi_sense_desc_find(const u8 * sense_buffer, int sb_len,
+				int desc_type)
+{
+	int add_sen_len, add_len, desc_len, k;
+	const u8 * descp;
+
+	if ((sb_len < 8) || (0 == (add_sen_len = sense_buffer[7])))
+		return NULL;
+	if ((sense_buffer[0] < 0x72) || (sense_buffer[0] > 0x73))
+		return NULL;
+	add_sen_len = (add_sen_len < (sb_len - 8)) ?
+			add_sen_len : (sb_len - 8);
+	descp = &sense_buffer[8];
+	for (desc_len = 0, k = 0; k < add_sen_len; k += desc_len) {
+		descp += desc_len;
+		add_len = (k < (add_sen_len - 1)) ? descp[1]: -1;
+		desc_len = add_len + 2;
+		if (descp[0] == desc_type)
+			return descp;
+		if (add_len < 0) // short descriptor ??
+			break;
+	}
+	return NULL;
+}
+EXPORT_SYMBOL(scsi_sense_desc_find);
+
+/**
+ * scsi_get_sense_info_fld - attempts to get information field from
+ *			sense data (either fixed or descriptor format)
+ *
+ * @sense_buffer:	byte array of sense data
+ * @sb_len:		number of valid bytes in sense_buffer
+ * @info_out:		pointer to 64 integer where 8 or 4 byte information
+ *			field will be placed if found.
+ *
+ * Return value:
+ *	1 if information field found, 0 if not found.
+ **/
+int scsi_get_sense_info_fld(const u8 * sense_buffer, int sb_len,
+			    u64 * info_out)
+{
+	int j;
+	const u8 * ucp;
+	u64 ull;
+
+	if (sb_len < 7)
+		return 0;
+	switch (sense_buffer[0] & 0x7f) {
+	case 0x70:
+	case 0x71:
+		if (sense_buffer[0] & 0x80) {
+			*info_out = (sense_buffer[3] << 24) +
+				    (sense_buffer[4] << 16) +
+				    (sense_buffer[5] << 8) + sense_buffer[6];
+			return 1;
+		} else
+			return 0;
+	case 0x72:
+	case 0x73:
+		ucp = scsi_sense_desc_find(sense_buffer, sb_len,
+					   0 /* info desc */);
+		if (ucp && (0xa == ucp[1])) {
+			ull = 0;
+			for (j = 0; j < 8; ++j) {
+				if (j > 0)
+					ull <<= 8;
+				ull |= ucp[4 + j];
+			}
+			*info_out = ull;
+			return 1;
+		} else
+			return 0;
+	default:
+		return 0;
+	}
+}
+EXPORT_SYMBOL(scsi_get_sense_info_fld);
