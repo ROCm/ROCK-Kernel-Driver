@@ -724,14 +724,13 @@ sa1100_pcmcia_set_mem_map(unsigned int sock, struct pccard_mem_map *map)
 
   }
 
-  start = (map->flags & MAP_ATTRIB) ? skt->phys_attr : skt->phys_mem;
-
   if (map->sys_stop == 0)
     map->sys_stop = PAGE_SIZE-1;
 
+  start = (map->flags & MAP_ATTRIB) ? skt->phys_attr : skt->phys_mem;
   map->sys_stop -= map->sys_start;
-  map->sys_stop += start;
-  map->sys_start = start;
+  map->sys_stop += start + map->card_start;
+  map->sys_start = start + map->card_start;
 
   skt->pc_mem_map[map->map] = *map;
 
