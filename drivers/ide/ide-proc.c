@@ -454,6 +454,7 @@ int proc_ide_read_settings
 	char		*out = page;
 	int		len, rc, mul_factor, div_factor;
 
+	down(&ide_setting_sem);
 	out += sprintf(out, "name\t\t\tvalue\t\tmin\t\tmax\t\tmode\n");
 	out += sprintf(out, "----\t\t\t-----\t\t---\t\t---\t\t----\n");
 	while(setting) {
@@ -473,6 +474,7 @@ int proc_ide_read_settings
 		setting = setting->next;
 	}
 	len = out - page;
+	up(&ide_setting_sem);
 	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
 }
 
@@ -541,12 +543,17 @@ int proc_ide_write_settings
 				--n;
 				++p;
 			}
+			
+			down(&ide_setting_sem);
 			setting = ide_find_setting_by_name(drive, name);
 			if (!setting)
+			{
+				up(&ide_setting_sem);
 				goto parse_error;
-
+			}
 			if (for_real)
 				ide_write_setting(drive, setting, val * setting->div_factor / setting->mul_factor);
+			up(&ide_setting_sem);
 		}
 	} while (!for_real++);
 	return count;
