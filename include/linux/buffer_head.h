@@ -151,10 +151,6 @@ void create_empty_buffers(struct page *, unsigned long,
 void end_buffer_io_sync(struct buffer_head *bh, int uptodate);
 void buffer_insert_list(spinlock_t *lock,
 			struct buffer_head *, struct list_head *);
-struct buffer_head *get_hash_table(kdev_t dev, sector_t block, int size);
-struct buffer_head *getblk(kdev_t dev, sector_t block, int size);
-struct buffer_head *bread(kdev_t dev, int block, int size);
-
 
 /* reiserfs_writepage needs this */
 void set_buffer_async_io(struct buffer_head *bh);

@@ -439,21 +439,6 @@ out:
 	return ret;
 }
 
-struct buffer_head *get_hash_table(kdev_t dev, sector_t block, int size)
-{
-	struct block_device *bdev;
-	struct buffer_head *bh;
-	bdev = bdget(kdev_t_to_nr(dev));
-	if (!bdev) {
-		printk("No block device for %s\n", __bdevname(dev));
-		BUG();
-	}
-	bh = __get_hash_table(bdev, block, size);
-	atomic_dec(&bdev->bd_count);
-	return bh;
-}
-EXPORT_SYMBOL(get_hash_table);
-
 void buffer_insert_list(spinlock_t *lock,
 		struct buffer_head *bh, struct list_head *list)
 {
@@ -988,21 +973,6 @@ __getblk(struct block_device *bdev, sector_t block, int size)
 	}
 }
 
-struct buffer_head *getblk(kdev_t dev, sector_t block, int size)
-{
-	struct block_device *bdev;
-	struct buffer_head *bh;
-	bdev = bdget(kdev_t_to_nr(dev));
-	if (!bdev) {
-		printk("No block device for %s\n", __bdevname(dev));
-		BUG();
-	}
-	bh = __getblk(bdev, block, size);
-	atomic_dec(&bdev->bd_count);
-	return bh;
-}
-EXPORT_SYMBOL(getblk);
-
 /*
  * The relationship between dirty buffers and dirty pages:
  *
@@ -1071,7 +1041,7 @@ void __bforget(struct buffer_head * buf)
 }
 
 /**
- *  bread() - reads a specified block and returns the bh
+ *  __bread() - reads a specified block and returns the bh
  *  @block: number of block
  *  @size: size (in bytes) to read
  * 
@@ -1101,21 +1071,6 @@ struct buffer_head * __bread(struct block_device *bdev, int block, int size)
 	brelse(bh);
 	return NULL;
 }
-
-struct buffer_head *bread(kdev_t dev, int block, int size)
-{
-	struct block_device *bdev;
-	struct buffer_head *bh;
-	bdev = bdget(kdev_t_to_nr(dev));
-	if (!bdev) {
-		printk("No block device for %s\n", __bdevname(dev));
-		BUG();
-	}
-	bh = __bread(bdev, block, size);
-	atomic_dec(&bdev->bd_count);
-	return bh;
-}
-EXPORT_SYMBOL(bread);
 
 void set_bh_page(struct buffer_head *bh,
 		struct page *page, unsigned long offset)
