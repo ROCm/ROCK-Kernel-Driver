@@ -304,7 +304,6 @@ static int setup_pci_hotplug_slot_info(struct slot *slot)
 	if (slot->hotplug_slot->info->adapter_status == NOT_VALID) {
 		dbg("%s: NOT_VALID: skip dn->full_name=%s\n",
 		    __FUNCTION__, slot->dn->full_name);
-		dealloc_slot_struct(slot);
 		return (-1);
 	}
 	return (0);
