@@ -451,9 +451,6 @@ static int DRM(takedown)( drm_device_t *dev )
 #if __HAVE_DMA_QUEUE || __HAVE_MULTIPLE_DMA_QUEUES
 	if ( dev->queuelist ) {
 		for ( i = 0 ; i < dev->queue_count ; i++ ) {
-#if __HAVE_DMA_WAITLIST
-			DRM(waitlist_destroy)( &dev->queuelist[i]->waitlist );
-#endif
 			if ( dev->queuelist[i] ) {
 				DRM(free)( dev->queuelist[i],
 					  sizeof(*dev->queuelist[0]),
