@@ -68,6 +68,7 @@ static volatile unsigned long go[SLAVE + 1];
 
 extern void __init calibrate_delay(void);
 extern void start_ap(void);
+extern unsigned long ia64_iobase;
 
 int cpucount;
 task_t *task_for_booting_cpu;
