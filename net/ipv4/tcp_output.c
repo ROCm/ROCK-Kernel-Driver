@@ -39,6 +39,7 @@
 #include <net/tcp.h>
 
 #include <linux/compiler.h>
+#include <linux/module.h>
 #include <linux/smp_lock.h>
 
 /* People can turn this off for buggy TCP's found in printers etc. */
@@ -1542,3 +1543,14 @@ void tcp_send_probe0(struct sock *sk)
 				      min(tp->rto << tp->backoff, TCP_RESOURCE_PROBE_INTERVAL));
 	}
 }
+
+EXPORT_SYMBOL(tcp_acceptable_seq);
+EXPORT_SYMBOL(tcp_connect);
+EXPORT_SYMBOL(tcp_connect_init);
+EXPORT_SYMBOL(tcp_make_synack);
+EXPORT_SYMBOL(tcp_send_synack);
+EXPORT_SYMBOL(tcp_simple_retransmit);
+EXPORT_SYMBOL(tcp_sync_mss);
+EXPORT_SYMBOL(tcp_transmit_skb);
+EXPORT_SYMBOL(tcp_write_wakeup);
+EXPORT_SYMBOL(tcp_write_xmit);

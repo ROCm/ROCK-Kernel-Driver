@@ -285,3 +285,5 @@ void __init files_init(unsigned long mempages)
 		files_stat.max_files = NR_FILE;
 } 
 
+/* Needed by unix.o */
+EXPORT_SYMBOL(files_stat);

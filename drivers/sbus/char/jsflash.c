@@ -37,6 +37,7 @@
 #include <linux/string.h>
 #include <linux/smp_lock.h>
 #include <linux/genhd.h>
+#include <linux/blkdev.h>
 
 #define MAJOR_NR	JSFD_MAJOR
 
@@ -187,7 +188,7 @@ static void jsfd_read(char *buf, unsigned long p, size_t togo) {
 static void jsfd_do_request(request_queue_t *q)
 {
 	struct request *req;
-	
+
 	while ((req = elv_next_request(q)) != NULL) {
 		struct jsfd_part *jdp = req->rq_disk->private_data;
 		unsigned long offset = req->sector << 9;
@@ -198,13 +199,8 @@ static void jsfd_do_request(request_queue_t *q)
 			continue;
 		}
 
-		if (req->cmd == WRITE) {
+		if (rq_data_dir(req) != READ) {
 			printk(KERN_ERR "jsfd: write\n");
-			end_request(req, 0);
-			continue;
-		}
-		if (req->cmd != READ) {
-			printk(KERN_ERR "jsfd: bad req->cmd %d\n", req->cmd);
 			end_request(req, 0);
 			continue;
 		}
@@ -215,7 +211,6 @@ static void jsfd_do_request(request_queue_t *q)
 			continue;
 		}
 
-/* printk("%s: read buf %p off %x len %x\n", req->rq_disk->disk_name, req->buffer, (int)offset, (int)len); */ /* P3 */
 		jsfd_read(req->buffer, jdp->dbase + offset, len);
 
 		end_request(req, 1);
@@ -265,9 +260,6 @@ static ssize_t jsf_read(struct file * file, char * buf,
 		unsigned int n;
 	} b;
 
-	if (verify_area(VERIFY_WRITE, buf, togo))
-		return -EFAULT; 
-
 	if (p < JSF_BASE_ALL || p >= JSF_BASE_TOP) {
 		return 0;
 	}
@@ -298,7 +290,8 @@ static ssize_t jsf_read(struct file * file, char * buf,
 	while (togo >= 4) {
 		togo -= 4;
 		b.n = jsf_inl(p);
-		copy_to_user(tmp, b.s, 4);
+		if (copy_to_user(tmp, b.s, 4))
+			return -EFAULT;
 		tmp += 4;
 		p += 4;
 	}
@@ -374,19 +367,17 @@ static int jsf_ioctl_program(unsigned long arg)
 		char s[4];
 	} b;
 
-	if (verify_area(VERIFY_READ, (void *)arg, JSFPRGSZ))
+	if (copy_from_user(&abuf, (char *)arg, JSFPRGSZ))
 		return -EFAULT; 
-	copy_from_user(&abuf, (char *)arg, JSFPRGSZ);
 	p = abuf.off;
 	togo = abuf.size;
 	if ((togo & 3) || (p & 3)) return -EINVAL;
 
 	uptr = (char *) (unsigned long) abuf.data;
-	if (verify_area(VERIFY_READ, uptr, togo))
-		return -EFAULT;
 	while (togo != 0) {
 		togo -= 4;
-		copy_from_user(&b.s[0], uptr, 4);
+		if (copy_from_user(&b.s[0], uptr, 4))
+			return -EFAULT;
 		jsf_write4(p, b.n);
 		p += 4;
 		uptr += 4;
@@ -404,10 +395,8 @@ static int jsf_ioctl(struct inode *inode, struct file *f, unsigned int cmd,
 		return -EPERM;
 	switch (cmd) {
 	case JSFLASH_IDENT:
-		if (verify_area(VERIFY_WRITE, (void *)arg, JSFIDSZ))
-			return -EFAULT; 
-		copy_to_user(arg, &jsf0.id, JSFIDSZ);
-		error = 0;
+		if (copy_to_user((void *)arg, &jsf0.id, JSFIDSZ))
+			return -EFAULT;
 		break;
 	case JSFLASH_ERASE:
 		error = jsf_ioctl_erase(arg);

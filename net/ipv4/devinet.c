@@ -32,6 +32,7 @@
 #include <asm/uaccess.h>
 #include <asm/system.h>
 #include <asm/bitops.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -1354,3 +1355,11 @@ void __init devinet_init(void)
 	devinet_sysctl_register(NULL, &ipv4_devconf_dflt);
 #endif
 }
+
+EXPORT_SYMBOL(devinet_ioctl);
+EXPORT_SYMBOL(in_dev_finish_destroy);
+EXPORT_SYMBOL(inet_select_addr);
+EXPORT_SYMBOL(inetdev_by_index);
+EXPORT_SYMBOL(inetdev_lock);
+EXPORT_SYMBOL(register_inetaddr_notifier);
+EXPORT_SYMBOL(unregister_inetaddr_notifier);

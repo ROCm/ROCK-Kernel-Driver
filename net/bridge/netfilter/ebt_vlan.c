@@ -48,7 +48,7 @@ ebt_filter_vlan(const struct sk_buff *skb,
 		const void *data, unsigned int datalen)
 {
 	struct ebt_vlan_info *info = (struct ebt_vlan_info *) data;
-	struct vlan_ethhdr frame;
+	struct vlan_hdr frame;
 
 	unsigned short TCI;	/* Whole TCI, given from parsed frame */
 	unsigned short id;	/* VLAN ID, given from frame TCI */

@@ -8,6 +8,7 @@
  *  Authors:	Andrey V. Savochkin <saw@msu.ru>
  */
 
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/slab.h>
 #include <linux/interrupt.h>
@@ -452,3 +453,5 @@ static void peer_check_expire(unsigned long dummy)
 			peer_total / inet_peer_threshold * HZ;
 	add_timer(&peer_periodic_timer);
 }
+
+EXPORT_SYMBOL(inet_peer_idlock);
