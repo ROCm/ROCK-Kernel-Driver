@@ -637,7 +637,7 @@ clean:	archclean
 
 mrproper: clean archmrproper
 	@echo 'Making mrproper'
-	@find . \( -size 0 -o -name .depend -o -name .\*.cmd \) \
+	@find . \( -name .depend -o -name .\*.cmd \) \
 		   -type f -print | xargs rm -f
 	@rm -f $(MRPROPER_FILES)
 	@rm -rf $(MRPROPER_DIRS)
