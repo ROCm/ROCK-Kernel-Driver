@@ -156,6 +156,13 @@ void k2_setup_hoses(void)
 	__raw_writel(0x00000080, K2_PCI32_BAR+PSBAR);	/* Base@0x80 */
 	__raw_writel(0x00000000, K2_PCI32_BAR+PPBAR);
 
+	__raw_writel(0xc0000000, K2_PCI32_BAR+BPMDLK);
+	__raw_writel(0xd0000000, K2_PCI32_BAR+TPMDLK);
+	__raw_writel(0x80000000, K2_PCI32_BAR+BIODLK);
+	__raw_writel(0x80100000, K2_PCI32_BAR+TIODLK);
+	__raw_writel(0xe0008000, K2_PCI32_BAR+DLKCTRL);
+	__raw_writel(0xffffffff, K2_PCI32_BAR+DLKDEV);
+	
 	/* PCI64 mappings */
 	__raw_writel(0x00100000, K2_PCI64_BAR+PIBAR);	/* PCI I/O base */
 	__raw_writel(0x10000000, K2_PCI64_BAR+PMBAR);	/* PCI Mem base */
