@@ -16,9 +16,9 @@
 KERNELLOAD	=0xc000000000000000
 
 LDFLAGS		:= -m elf64ppc
-ARCHBLOBLFLAGS	:= -I binary -O elf64-powerpc -B powerpc
 LDFLAGS_vmlinux	= -Bstatic \
 		-e $(KERNELLOAD) -Ttext $(KERNELLOAD)
+LDFLAGS_BLOB	:= --format binary --oformat elf64-powerpc
 CFLAGS		:= $(CFLAGS) -msoft-float -pipe \
 		-Wno-uninitialized -mminimal-toc -mtraceback=full \
 		-finline-limit-2000 -mcpu=power4

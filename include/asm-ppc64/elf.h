@@ -57,9 +57,9 @@ typedef elf_fpreg_t elf_fpregset_t[ELF_NFPREG];
 #define ELF_ET_DYN_BASE         (0x08000000)
 
 /* Common routine for both 32-bit and 64-bit processes */
-#define ELF_CORE_COPY_REGS(gregs, regs) elf_core_copy_regs(gregs, regs);
+#define ELF_CORE_COPY_REGS(gregs, regs) ppc64_elf_core_copy_regs(gregs, regs);
 static inline void
-elf_core_copy_regs(elf_gregset_t dstRegs, struct pt_regs* srcRegs)
+ppc64_elf_core_copy_regs(elf_gregset_t dstRegs, struct pt_regs* srcRegs)
 {
 	int i;
 
