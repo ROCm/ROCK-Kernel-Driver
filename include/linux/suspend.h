@@ -10,7 +10,6 @@
 #include <linux/init.h>
 #include <linux/pm.h>
 
-#ifdef CONFIG_PM
 /* page backup entry */
 typedef struct pbe {
 	unsigned long address;		/* address of the copy */
@@ -33,6 +32,7 @@ extern int shrink_mem(void);
 extern void drain_local_pages(void);
 extern void mark_free_pages(struct zone *zone);
 
+#ifdef CONFIG_PM
 /* kernel/power/swsusp.c */
 extern int software_suspend(void);
 
