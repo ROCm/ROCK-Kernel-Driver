@@ -29,8 +29,6 @@ const char *lli_revision = "$Revision: 2.51.6.6 $";
 
 extern struct IsdnCard cards[];
 extern int nrcards;
-extern void HiSax_mod_dec_use_count(struct IsdnCardState *cs);
-extern void HiSax_mod_inc_use_count(struct IsdnCardState *cs);
 
 static int init_b_st(struct Channel *chanp, int incoming);
 static void release_b_st(struct Channel *chanp);
@@ -1583,22 +1581,6 @@ HiSax_command(isdn_ctrl * ic)
 				default:
 					break;
 			}
-			break;
-		case (ISDN_CMD_LOCK):
-			HiSax_mod_inc_use_count(csta);
-#ifdef MODULE
-			if (csta->channel[0].debug & 0x400)
-				HiSax_putstatus(csta, "   LOCK ", "modcnt %lx",
-					MOD_USE_COUNT);
-#endif				/* MODULE */
-			break;
-		case (ISDN_CMD_UNLOCK):
-			HiSax_mod_dec_use_count(csta);
-#ifdef MODULE
-			if (csta->channel[0].debug & 0x400)
-				HiSax_putstatus(csta, " UNLOCK ", "modcnt %lx",
-					MOD_USE_COUNT);
-#endif				/* MODULE */
 			break;
 		case (ISDN_CMD_IOCTL):
 			switch (ic->arg) {

@@ -1787,20 +1787,6 @@ static int capidrv_command(isdn_ctrl * c, capidrv_contr * card)
 		bchan->msn[0] = 0;
 		return 0;
 
-	case ISDN_CMD_LOCK:
-		if (debugmode > 1)
-			printk(KERN_DEBUG "capidrv-%d: ISDN_CMD_LOCK (%ld)\n", card->contrnr, c->arg);
-		MOD_INC_USE_COUNT;
-		break;
-
-	case ISDN_CMD_UNLOCK:
-		if (debugmode > 1)
-			printk(KERN_DEBUG "capidrv-%d: ISDN_CMD_UNLOCK (%ld)\n",
-					card->contrnr, c->arg);
-		MOD_DEC_USE_COUNT;
-		break;
-
-/* never called */
 	case ISDN_CMD_GETL2:
 		if (debugmode)
 			printk(KERN_DEBUG "capidrv-%d: ISDN_CMD_GETL2\n",

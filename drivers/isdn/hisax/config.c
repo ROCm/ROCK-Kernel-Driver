@@ -942,6 +942,7 @@ static int __devinit checkcard(int cardnr, char *id, int *busy_flag)
 	cs->status_write = cs->status_buf;
 	cs->status_end = cs->status_buf + HISAX_STATUS_BUFSIZE - 1;
 	cs->typ = card->typ;
+	SET_MODULE_OWNER(&cs->iif);
 	strcpy(cs->iif.id, id);
 	cs->iif.channels = 2;
 	cs->iif.maxbufsize = MAX_DATA_SIZE;
@@ -1769,6 +1770,7 @@ int hisax_register(struct hisax_d_if *hisax_d_if, struct hisax_b_if *b_if[],
 	hisax_d_if->cs = cs;
 	cs->hw.hisax_d_if = hisax_d_if;
 	cs->cardmsg = hisax_cardmsg;
+	cs->iif.owner = hisax_d_if->owner; // FIXME should be done before registering
 	INIT_WORK(&cs->work, hisax_bh, cs);
 	cs->channel[0].d_st->l1.l2l1 = hisax_d_l2l1;
 	for (i = 0; i < 2; i++) {
@@ -2050,33 +2052,6 @@ static void EChannel_proc_rcv(struct hisax_d_if *d_if)
 						skb->len);
 		}
 		dev_kfree_skb_any(skb);
-	}
-}
-
-void HiSax_mod_dec_use_count(struct IsdnCardState *cs)
-{
-	struct module *mod;
-
-	if (cs && cs->cardmsg == hisax_cardmsg) {
-		mod = cs->hw.hisax_d_if->owner;
-		if (mod)
-			__MOD_DEC_USE_COUNT(mod);
-	} else {
-		MOD_DEC_USE_COUNT;
-	}
-}
-
-void HiSax_mod_inc_use_count(struct IsdnCardState *cs)
-{
-	struct module *mod;
-
-	if (cs && cs->cardmsg == hisax_cardmsg) {
-		mod = cs->hw.hisax_d_if->owner;
-		if (mod)
-		// hope we do win the race...
-			try_inc_mod_count(mod);
-	} else {
-		MOD_INC_USE_COUNT;
 	}
 }
 

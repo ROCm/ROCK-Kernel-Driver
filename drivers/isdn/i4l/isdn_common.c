@@ -429,7 +429,6 @@ struct isdn_driver {
 	atomic_t            refcnt;
 	unsigned long       flags;            /* Misc driver Flags           */
 	unsigned long       features;
-	int                 locks;            /* Number of locks             */
 	int                 channels;         /* Number of channels          */
 	wait_queue_head_t   st_waitq;         /* Wait-Queue for status-reads */
 	int                 maxbufsize;       /* Maximum Buffersize supported*/
@@ -630,14 +629,6 @@ drv_stat_unload(struct fsm_inst *fi, int pr, void *arg)
 	spin_unlock_irqrestore(&drivers_lock, flags);
 	put_drv(drv);
 
-	while (drv->locks > 0) {
-		isdn_ctrl cmd;
-		cmd.driver = drv->di;
-		cmd.arg = 0;
-		cmd.command = ISDN_CMD_UNLOCK;
-		__drv_command(drv, &cmd);
-		drv->locks--;
-	}
 	for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
 		if (slots[i].di == drv->di) {
  			slots[i].di = -1;
@@ -993,23 +984,14 @@ static int isdn_wildmat(char *s, char *p);
 static void
 isdn_lock_driver(struct isdn_driver *drv)
 {
-	isdn_ctrl cmd;
-
-	cmd.driver = drv->di;
-	cmd.arg = 0;
-	cmd.command = ISDN_CMD_LOCK;
-	__drv_command(drv, &cmd);
+	// FIXME don't ignore return value
+	try_module_get(drv->interface->owner);
 }
 
 static void
 isdn_unlock_driver(struct isdn_driver *drv)
 {
-	isdn_ctrl cmd;
-
-	cmd.driver = drv->di;
-	cmd.arg = 0;
-	cmd.command = ISDN_CMD_UNLOCK;
-	__drv_command(drv, &cmd);
+	module_put(drv->interface->owner);
 }
 
 #if defined(ISDN_DEBUG_NET_DUMP) || defined(ISDN_DEBUG_MODEM_DUMP)
@@ -1135,10 +1117,6 @@ __drv_command(struct isdn_driver *drv, isdn_ctrl *c)
 {
 #ifdef ISDN_DEBUG_COMMAND
 	switch (c->command) {
-	case ISDN_CMD_LOCK: 
-		printk(KERN_DEBUG "ISDN_CMD_LOCK %d/%ld\n", c->driver, c->arg & 0xff); break;
-	case ISDN_CMD_UNLOCK: 
-		printk(KERN_DEBUG "ISDN_CMD_UNLOCK %d/%ld\n", c->driver, c->arg & 0xff); break;
 	case ISDN_CMD_SETL2: 
 		printk(KERN_DEBUG "ISDN_CMD_SETL2 %d/%ld\n", c->driver, c->arg & 0xff); break;
 	case ISDN_CMD_SETL3: 

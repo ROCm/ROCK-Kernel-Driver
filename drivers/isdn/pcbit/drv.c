@@ -171,9 +171,10 @@ int pcbit_init_dev(int board, int mem_base, int irq)
 
 	dev->dev_if = dev_if;
 
+	SET_MODULE_OWNER(dev_if);
+
 	dev_if->channels = 2;
-
-
+	
 	dev_if->features = (ISDN_FEATURE_P_EURO  | ISDN_FEATURE_L3_TRANS | 
 			    ISDN_FEATURE_L2_HDLC | ISDN_FEATURE_L2_TRANS );
 
@@ -278,12 +279,6 @@ int pcbit_command(isdn_ctrl* ctl)
 		break;
 	case ISDN_CMD_GETL2:
 		return chan->proto;
-		break;
-	case ISDN_CMD_LOCK:
-		MOD_INC_USE_COUNT;
-		break;
-	case ISDN_CMD_UNLOCK:
-		MOD_DEC_USE_COUNT;
 		break;
 	case ISDN_CMD_CLREAZ:
 		pcbit_clear_msn(dev);

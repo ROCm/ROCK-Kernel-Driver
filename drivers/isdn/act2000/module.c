@@ -436,12 +436,6 @@ act2000_command(act2000_card * card, isdn_ctrl * c)
 				return -ENODEV;
 			printk(KERN_DEBUG "act2000 CMD_GETSIL not implemented\n");
 			return 0;
-		case ISDN_CMD_LOCK:
-			MOD_INC_USE_COUNT;
-			return 0;
-		case ISDN_CMD_UNLOCK:
-			MOD_DEC_USE_COUNT;
-			return 0;
         }
 	
         return -EINVAL;
@@ -620,6 +614,7 @@ act2000_alloccard(int bus, int port, int irq, char *id)
 	INIT_WORK(&card->rcv_tq, (void *) (void *) actcapi_dispatch, card);
 	INIT_WORK(&card->poll_tq, (void *) (void *) act2000_receive, card);
 	init_timer(&card->ptimer);
+	SET_MODULE_OWNER(&card->interface);
         card->interface.channels = ACT2000_BCH;
         card->interface.maxbufsize = 4000;
         card->interface.command = if_command;

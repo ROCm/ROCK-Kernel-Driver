@@ -569,12 +569,6 @@ eicon_command(eicon_card * card, isdn_ctrl * c)
 				return -ENODEV;
 			eicon_log(card, 1, "eicon CMD_GETSIL not implemented\n");
 			return 0;
-		case ISDN_CMD_LOCK:
-			MOD_INC_USE_COUNT;
-			return 0;
-		case ISDN_CMD_UNLOCK:
-			MOD_DEC_USE_COUNT;
-			return 0;
 #ifdef CONFIG_ISDN_TTY_FAX
 		case ISDN_CMD_FAXCMD:
 			if (!card->flags & EICON_FLAGS_RUNNING)
@@ -877,6 +871,7 @@ eicon_alloccard(int Type, int membase, int irq, char *id, int card_id)
 		tasklet_init(&card->snd_tq, eicon_transmit, (unsigned long)card);
 		tasklet_init(&card->rcv_tq, eicon_rcv_dispatch, (unsigned long)card);
 		tasklet_init(&card->ack_tq, eicon_ack_dispatch, (unsigned long)card);
+		SET_MODULE_OWNER(&card->interface);
 		card->interface.maxbufsize = 4000;
 		card->interface.command = if_command;
 		card->interface.writebuf_skb = if_sendbuf;

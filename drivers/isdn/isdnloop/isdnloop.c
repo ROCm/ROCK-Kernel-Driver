@@ -1375,12 +1375,6 @@ isdnloop_command(isdn_ctrl * c, isdnloop_card * card)
 				if (!card->flags & ISDNLOOP_FLAGS_RUNNING)
 					return -ENODEV;
 				break;
-		case ISDN_CMD_LOCK:
-				MOD_INC_USE_COUNT;
-				break;
-		case ISDN_CMD_UNLOCK:
-				MOD_DEC_USE_COUNT;
-				break;
 		default:
 				return -EINVAL;
 			}
@@ -1482,6 +1476,7 @@ isdnloop_initcard(char *id)
 		return (isdnloop_card *) 0;
 	}
 	memset((char *) card, 0, sizeof(isdnloop_card));
+	SET_MODULE_OWNER(&card->interface);
 	card->interface.channels = ISDNLOOP_BCH;
 	card->interface.hl_hdrlen  = 1; /* scratch area for storing ack flag*/ 
 	card->interface.maxbufsize = 4000;

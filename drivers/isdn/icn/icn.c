@@ -1471,12 +1471,6 @@ icn_command(isdn_ctrl * c, icn_card * card)
 			if (!card->flags & ICN_FLAGS_RUNNING)
 				return -ENODEV;
 			break;
-		case ISDN_CMD_LOCK:
-			MOD_INC_USE_COUNT;
-			break;
-		case ISDN_CMD_UNLOCK:
-			MOD_DEC_USE_COUNT;
-			break;
 		default:
 			return -EINVAL;
 	}
@@ -1577,6 +1571,7 @@ icn_initcard(int port, char *id)
 	}
 	memset((char *) card, 0, sizeof(icn_card));
 	card->port = port;
+	SET_MODULE_OWNER(&card->interface);
 	card->interface.hl_hdrlen = 1;
 	card->interface.channels = ICN_BCH;
 	card->interface.maxbufsize = 4000;

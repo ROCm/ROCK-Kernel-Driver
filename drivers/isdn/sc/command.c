@@ -34,8 +34,6 @@ int setl2(int card, unsigned long arg);
 int getl2(int card, unsigned long arg);
 int setl3(int card, unsigned long arg);
 int getl3(int card, unsigned long arg);
-int lock(void);
-int unlock(void);
 int acceptb(int card, unsigned long channel);
 
 extern int cinst;
@@ -70,8 +68,8 @@ static char *commands[] = { "ISDN_CMD_IOCTL",
 			    "ISDN_CMD_GETL2",
 			    "ISDN_CMD_SETL3",
 			    "ISDN_CMD_GETL3",
-			    "ISDN_CMD_LOCK",
-			    "ISDN_CMD_UNLOCK",
+			    NULL,
+			    NULL,
 			    "ISDN_CMD_SUSPEND",
 			    "ISDN_CMD_RESUME" };
 
@@ -158,10 +156,6 @@ int command(isdn_ctrl *cmd)
 		return setl3(card, cmd->arg);
 	case ISDN_CMD_GETL3:
 		return getl3(card, cmd->arg);
-	case ISDN_CMD_LOCK:
-		return lock();
-	case ISDN_CMD_UNLOCK:
-		return unlock();
 	default:
 		return -EINVAL;
 	}
@@ -496,19 +490,6 @@ int getsil(int card, unsigned long arg, char *num)
 	pr_debug("%s: SIL for channel %d reported: %s\n",
 		adapter[card]->devicename, arg+1,
 		adapter[card]->channel[arg].sillist);
-	return 0;
-}
-
-
-int lock()
-{
-	MOD_INC_USE_COUNT;
-	return 0;
-}
-
-int unlock()
-{
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 

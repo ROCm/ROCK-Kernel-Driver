@@ -95,12 +95,6 @@ int tpam_command(isdn_ctrl *c) {
 						  c->arg >> 8);
 		case ISDN_CMD_GETL2:
 			return tpam_command_getl2(card, c->arg);
-		case ISDN_CMD_LOCK:
-			MOD_INC_USE_COUNT;
-			return 0;
-		case ISDN_CMD_UNLOCK:
-			MOD_DEC_USE_COUNT;
-			return 0;
 		case ISDN_CMD_PROCEED:
 			return tpam_command_proceed(card, c->arg);
 		default:
