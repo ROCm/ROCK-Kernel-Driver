@@ -83,7 +83,7 @@ L_underflow:
 	/* Convert the exponent to 80x87 form. */
 	addw	EXTENDED_Ebias,EXP(%ebx)
 	push	%ebx
-	call	SYMBOL_NAME(arith_underflow)
+	call	arith_underflow
 	pop	%ebx
 	jmp	L_exit
 
@@ -91,7 +91,7 @@ L_overflow:
 	/* Convert the exponent to 80x87 form. */
 	addw	EXTENDED_Ebias,EXP(%ebx)
 	push	%ebx
-	call	SYMBOL_NAME(arith_overflow)
+	call	arith_overflow
 	pop	%ebx
 	jmp	L_exit
 

@@ -145,6 +145,13 @@ CONFIG_SCSI_MULTI_LUN
   so most people can say N here and should in fact do so, because it
   is safer.
 
+CONFIG_SCSI_REPORT_LUNS
+  If you want to build with SCSI REPORT LUNS support in the kernel, say Y here.
+  The REPORT LUNS command is useful for devices (such as disk arrays) with
+  large numbers of LUNs where the LUN values are not contiguous (sparse LUN).
+  REPORT LUNS scanning is done only for SCSI-3 devices. Most users can safely
+  answer N here.
+
 CONFIG_SCSI_CONSTANTS
   The error messages regarding your SCSI hardware will be easier to
   understand if you say Y here; it will enlarge your kernel by about

@@ -52,6 +52,7 @@ MODULE_DESCRIPTION("Driver for Compaq Smart2 Array Controllers");
 MODULE_LICENSE("GPL");
 
 #define MAJOR_NR COMPAQ_SMART2_MAJOR
+#define LOCAL_END_REQUEST
 #include <linux/blk.h>
 #include <linux/blkdev.h>
 #include <linux/genhd.h>

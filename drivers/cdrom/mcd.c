@@ -1073,7 +1073,7 @@ int __init mcd_init(void)
 	}
 
 	blksize_size[MAJOR_NR] = mcd_blocksizes;
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST,
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_mcd_request,
 		       &mcd_spinlock);
 
 	/* check for card */

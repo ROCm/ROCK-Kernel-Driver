@@ -21,7 +21,7 @@ if [ "$CONFIG_SND_OSSEMUL" = "y" ]; then
     dep_tristate '    OSS Sequencer API' CONFIG_SND_SEQUENCER_OSS $CONFIG_SND_SEQUENCER
   fi
 fi
-dep_tristate '  RTC Timer support' CONFIG_SND_RTCTIMER $CONFIG_SND
+dep_tristate '  RTC Timer support' CONFIG_SND_RTCTIMER $CONFIG_SND $CONFIG_RTC
 bool '  Verbose printk' CONFIG_SND_VERBOSE_PRINTK
 bool '  Debug' CONFIG_SND_DEBUG
 if [ "$CONFIG_SND_DEBUG" = "y" ]; then

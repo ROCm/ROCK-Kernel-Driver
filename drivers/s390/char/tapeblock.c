@@ -75,7 +75,6 @@ void
 tapeblock_setup(tape_info_t* ti) {
     blk_size[tapeblock_major][ti->blk_minor]=0; // this will be detected
     blksize_size[tapeblock_major][ti->blk_minor]=2048; // blocks are 2k by default.
-    hardsect_size[tapeblock_major][ti->blk_minor]=512;
     blk_init_queue (&ti->request_queue, tape_request_fn); 
 #ifdef CONFIG_DEVFS_FS
     tapeblock_mkdevfstree(ti);
@@ -106,8 +105,6 @@ tapeblock_init(void) {
     memset(blk_size[tapeblock_major],0,256*sizeof(int));
     blksize_size[tapeblock_major] = (int*) kmalloc (256*sizeof(int),GFP_ATOMIC);
     memset(blksize_size[tapeblock_major],0,256*sizeof(int));
-    hardsect_size[tapeblock_major] = (int*) kmalloc (256*sizeof(int),GFP_ATOMIC);
-    memset(hardsect_size[tapeblock_major],0,256*sizeof(int));
     max_sectors[tapeblock_major] = (int*) kmalloc (256*sizeof(int),GFP_ATOMIC);
     memset(max_sectors[tapeblock_major],0,256*sizeof(int));
     blkfront = kmalloc(sizeof(tape_frontend_t),GFP_KERNEL);

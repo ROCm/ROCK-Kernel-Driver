@@ -231,6 +231,7 @@
 #define A_IOCFG			0x18		/* GPIO on Audigy card (16bits)			*/
 #define A_GPINPUT_MASK		0xff00
 #define A_GPOUTPUT_MASK		0x00ff
+#define A_IOCFG_GPOUT0		0x0040		/* analog/digital? */
 
 #define TIMER			0x1a		/* Timer terminal count register		*/
 						/* NOTE: After the rate is changed, a maximum	*/
@@ -937,7 +938,7 @@ struct _snd_emu10k1 {
 	int max_cache_pages;			/* max memory size / PAGE_SIZE */
 	void *silent_page;			/* silent page */
 	dma_addr_t silent_page_dmaaddr;
-	volatile unsigned int *ptb_pages;	/* page table pages */
+	volatile u32 *ptb_pages;		/* page table pages */
 	dma_addr_t ptb_pages_dmaaddr;
 	snd_util_memhdr_t *memhdr;		/* page allocation list */
 	emu10k1_memblk_t *reserved_page;	/* reserved page */

@@ -6,11 +6,7 @@
 #include <linux/module.h>
 
 #include <linux/string.h>
-#undef memset
-extern void *memset (void *, int, size_t);
 EXPORT_SYMBOL_NOVERS(memset);			/* gcc generates direct calls to memset()... */
-EXPORT_SYMBOL_NOVERS(__memset_generic);
-EXPORT_SYMBOL_NOVERS(__bzero);
 EXPORT_SYMBOL(memchr);
 EXPORT_SYMBOL(memcmp);
 EXPORT_SYMBOL_NOVERS(memcpy);

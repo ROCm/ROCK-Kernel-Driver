@@ -51,16 +51,19 @@ MODULE_PARM_SYNTAX(enable_loopback, SNDRV_BOOLEAN_FALSE_DESC);
 static void snd_ac97_proc_init(snd_card_t * card, ac97_t * ac97);
 static void snd_ac97_proc_done(ac97_t * ac97);
 
-static int patch_wolfson(ac97_t * ac97);
-
+static int patch_wolfson00(ac97_t * ac97);
+static int patch_wolfson03(ac97_t * ac97);
+static int patch_wolfson04(ac97_t * ac97);
 static int patch_tritech_tr28028(ac97_t * ac97);
 static int patch_sigmatel_stac9708(ac97_t * ac97);
 static int patch_sigmatel_stac9721(ac97_t * ac97);
 static int patch_sigmatel_stac9744(ac97_t * ac97);
 static int patch_sigmatel_stac9756(ac97_t * ac97);
 static int patch_cirrus_cs4299(ac97_t * ac97);
+static int patch_cirrus_cs4205(ac97_t * ac97);
 static int patch_ad1819(ac97_t * ac97);
 static int patch_ad1881(ac97_t * ac97);
+static int patch_ad1886(ac97_t * ac97);
 
 typedef struct {
 	unsigned int id;
@@ -82,7 +85,7 @@ static const ac97_codec_id_t snd_ac97_codec_id_vendors[] = {
 { 0x54524100, 0xffffff00, "TriTech",		NULL },
 { 0x54584e00, 0xffffff00, "Texas Instruments",	NULL },
 { 0x57454300, 0xffffff00, "Winbond",		NULL },
-{ 0x574d4c00, 0xffffff00, "Wolfson",		patch_wolfson },
+{ 0x574d4c00, 0xffffff00, "Wolfson",		NULL },
 { 0x594d4800, 0xffffff00, "Yamaha",		NULL },
 { 0x83847600, 0xffffff00, "SigmaTel",		NULL },
 { 0x45838300, 0xffffff00, "ESS Technology",	NULL },
@@ -99,7 +102,7 @@ static const ac97_codec_id_t snd_ac97_codec_ids[] = {
 { 0x41445340, 0xffffffff, "AD1881",		patch_ad1881 },
 { 0x41445348, 0xffffffff, "AD1881A",		patch_ad1881 },
 { 0x41445360, 0xffffffff, "AD1885",		patch_ad1881 },
-{ 0x41445361, 0xffffffff, "AD1886",		patch_ad1881 },
+{ 0x41445361, 0xffffffff, "AD1886",		patch_ad1886 },
 { 0x41445362, 0xffffffff, "AD1887",		patch_ad1881 },
 { 0x414c4300, 0xfffffff0, "RL5306",	 	NULL },
 { 0x414c4310, 0xfffffff0, "RL5382", 		NULL },
@@ -111,7 +114,7 @@ static const ac97_codec_id_t snd_ac97_codec_ids[] = {
 { 0x42525928, 0xfffffff8, "CS4294",		NULL },
 { 0x43525930, 0xfffffff8, "CS4299",		patch_cirrus_cs4299 },
 { 0x43525948, 0xfffffff8, "CS4201",		NULL },
-{ 0x43525958, 0xfffffff8, "CS4205",		NULL },
+{ 0x43525958, 0xfffffff8, "CS4205",		patch_cirrus_cs4205 },
 { 0x43525960, 0xfffffff8, "CS4291",		NULL },
 { 0x48525300, 0xffffff00, "HMP9701",		NULL },
 { 0x49434501, 0xffffffff, "ICE1230",		NULL },
@@ -124,9 +127,9 @@ static const ac97_codec_id_t snd_ac97_codec_ids[] = {
 { 0x54524123, 0xffffffff, "TR28602",		NULL }, // only guess --jk [TR28023 = eMicro EM28023 (new CT1297)]
 { 0x54584e20, 0xffffffff, "TLC320AD9xC",	NULL },
 { 0x57454301, 0xffffffff, "W83971D",		NULL },
-{ 0x574d4c00, 0xffffffff, "WM9701A",		NULL },
-{ 0x574d4c03, 0xffffffff, "WM9703/9704",	NULL },
-{ 0x574d4c04, 0xffffffff, "WM9704 (quad)",	NULL },
+{ 0x574d4c00, 0xffffffff, "WM9701A",		patch_wolfson00 },
+{ 0x574d4c03, 0xffffffff, "WM9703/9707",	patch_wolfson03 },
+{ 0x574d4c04, 0xffffffff, "WM9704 (quad)",	patch_wolfson04 },
 { 0x594d4800, 0xffffffff, "YMF743",		NULL },
 { 0x83847600, 0xffffffff, "STAC9700/83/84",	NULL },
 { 0x83847604, 0xffffffff, "STAC9701/3/4/5",	NULL },
@@ -155,6 +158,9 @@ static const ac97_codec_id_t snd_ac97_codec_ids[] = {
 #define AC97_ID_STAC9721	0x83847609
 #define AC97_ID_STAC9744	0x83847644
 #define AC97_ID_STAC9756	0x83847656
+
+#define SPDIF_CS4205            0x68
+#define MODE_CS4205            0x5e
 
 static const char *snd_ac97_stereo_enhancements[] =
 {
@@ -722,8 +728,8 @@ static int snd_ac97_spdif_default_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_val
 		new |= ucontrol->value.iec958.status[0] & (IEC958_AES0_PRO_FS|IEC958_AES0_PRO_EMPHASIS_5015);
 		switch (new & IEC958_AES0_PRO_FS) {
 		case IEC958_AES0_PRO_FS_44100: val |= 0<<12; break;
-		case IEC958_AES0_PRO_FS_32000: val |= 2<<12; break;
-		case IEC958_AES0_PRO_FS_48000: val |= 1<<12; break;
+		case IEC958_AES0_PRO_FS_48000: val |= 2<<12; break;
+		case IEC958_AES0_PRO_FS_32000: val |= 3<<12; break;
 		default:		       val |= 1<<12; break;
 		}
 		if ((new & IEC958_AES0_PRO_EMPHASIS) == IEC958_AES0_PRO_EMPHASIS_5015)
@@ -731,7 +737,7 @@ static int snd_ac97_spdif_default_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_val
 	} else {
 		new |= ucontrol->value.iec958.status[0] & (IEC958_AES0_CON_EMPHASIS_5015|IEC958_AES0_CON_NOT_COPYRIGHT);
 		new |= ((ucontrol->value.iec958.status[1] & (IEC958_AES1_CON_CATEGORY|IEC958_AES1_CON_ORIGINAL)) << 8);
-		new |= ((ucontrol->value.iec958.status[3] & IEC958_AES3_CON_FS) << 8);
+		new |= ((ucontrol->value.iec958.status[3] & IEC958_AES3_CON_FS) << 24);
 		if ((new & IEC958_AES0_CON_EMPHASIS) == IEC958_AES0_CON_EMPHASIS_5015)
 			val |= 1<<3;
 		if (!(new & IEC958_AES0_CON_NOT_COPYRIGHT))
@@ -744,7 +750,21 @@ static int snd_ac97_spdif_default_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_val
 		default:		       val |= 1<<12; break;
 		}
 	}
-	change = snd_ac97_update_bits(ac97, AC97_SPDIF, 0x3fff, val);
+
+	
+
+	if (ac97->flags & AC97_CS_SPDIF) {
+		int x = (val >> 12) & 0x03;
+		switch (x) {
+		case 0: x = 1; break;  // 44.1
+		case 2: x = 0; break;  // 48.0
+		default: x = 0; break; // illegal.
+		}
+		change = snd_ac97_update_bits(ac97, SPDIF_CS4205, 0x3fff, ((val & 0xcfff) | (x << 12)));
+	} else {
+		change = snd_ac97_update_bits(ac97, AC97_SPDIF, 0x3fff, val);
+	}
+
 	change |= ac97->spdif_status != new;
 	ac97->spdif_status = new;
 	spin_unlock(&ac97->reg_lock);
@@ -773,8 +793,14 @@ static const snd_kcontrol_new_t snd_ac97_controls_spdif[5] = {
 		get: snd_ac97_spdif_default_get,
 		put: snd_ac97_spdif_default_put,
 	},
+
 	AC97_SINGLE(SNDRV_CTL_NAME_IEC958("",PLAYBACK,SWITCH),AC97_EXTENDED_STATUS, 2, 1, 0),
 	AC97_SINGLE(SNDRV_CTL_NAME_IEC958("",PLAYBACK,NONE) "AC97-SPSA",AC97_EXTENDED_STATUS, 4, 3, 0)
+};
+
+static const snd_kcontrol_new_t snd_ac97_cs4205_controls_spdif[2] = {
+    AC97_SINGLE(SNDRV_CTL_NAME_IEC958("",PLAYBACK,SWITCH),SPDIF_CS4205, 15, 1, 0),
+    AC97_SINGLE(SNDRV_CTL_NAME_IEC958("",PLAYBACK,NONE) "AC97-SPSA",MODE_CS4205, 0, 3, 0)
 };
 
 #define AD18XX_PCM_BITS(xname, codec, shift, mask) \
@@ -1270,12 +1296,27 @@ static int snd_ac97_mixer_build(snd_card_t * card, ac97_t * ac97)
 	}
 	
 	/* build S/PDIF controls */
-	if (ac97->ext_id & 0x0004) {
-		for (idx = 0; idx < 5; idx++)
-			if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_controls_spdif[idx], ac97))) < 0)
-				return err;
-		/* consumer,PCM audio,no copyright,no preemphasis,PCM coder,original */
-		snd_ac97_write_cache(ac97, AC97_SPDIF, 0x2a20);
+	if (ac97->ext_id & AC97_EA_SPDIF) {
+		if (ac97->flags & AC97_CS_SPDIF) {
+			for (idx = 0; idx < 3; idx++)
+				if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_controls_spdif[idx], ac97))) < 0)
+					return err;
+			for (idx = 0; idx < 2; idx++)
+				if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_cs4205_controls_spdif[idx], ac97))) < 0)
+					return err;
+		} else {
+			for (idx = 0; idx < 5; idx++)
+				if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_controls_spdif[idx], ac97))) < 0)
+					return err;
+		}
+
+		/* set default PCM S/PDIF params */
+		/* consumer,PCM audio,no copyright,no preemphasis,PCM coder,original,48000Hz */
+	        if (ac97->flags & AC97_CS_SPDIF)
+			snd_ac97_write_cache(ac97, SPDIF_CS4205, 0x0a20);
+		else 
+			snd_ac97_write_cache(ac97, AC97_SPDIF, 0x2a20);
+
 		ac97->spdif_status = SNDRV_PCM_DEFAULT_CON_SPDIF;
 	}
 	
@@ -1511,6 +1552,7 @@ static void snd_ac97_proc_read_main(ac97_t *ac97, snd_info_buffer_t * buffer, in
 	unsigned short val, tmp, ext;
 	static const char *spdif_slots[4] = { " SPDIF=3/4", " SPDIF=7/8", " SPDIF=6/9", " SPDIF=res" };
 	static const char *spdif_rates[4] = { " Rate=44.1kHz", " Rate=res", " Rate=48kHz", " Rate=32kHz" };
+	static const char *spdif_rates_cs4205[4] = { " Rate=48kHz", " Rate=44.1kHz", " Rate=res", " Rate=res" };
 
 	id = snd_ac97_read(ac97, AC97_VENDOR_ID1) << 16;
 	id |= snd_ac97_read(ac97, AC97_VENDOR_ID2);
@@ -1557,6 +1599,7 @@ static void snd_ac97_proc_read_main(ac97_t *ac97, snd_info_buffer_t * buffer, in
 		    val & 0x0100 ? "Mic2" : "Mic1",
 		    val & 0x0080 ? "on" : "off");
 	ext = snd_ac97_read(ac97, AC97_EXTENDED_ID);
+
 	if (ext == 0)
 		return;
 	snd_iprintf(buffer, "Extended ID      : codec=%i rev=%i%s%s%s%s DSA=%i%s%s%s%s\n",
@@ -1605,8 +1648,12 @@ static void snd_ac97_proc_read_main(ac97_t *ac97, snd_info_buffer_t * buffer, in
 		val = snd_ac97_read(ac97, AC97_PCM_MIC_ADC_RATE);
 		snd_iprintf(buffer, "PCM MIC ADC      : %iHz\n", val);
 	}
-	if (ext & 0x0004) {
-		val = snd_ac97_read(ac97, AC97_SPDIF);
+	if ((ext & 0x0004) || (ac97->flags & AC97_CS_SPDIF)) {
+	        if (ac97->flags & AC97_CS_SPDIF)
+			val = snd_ac97_read(ac97, SPDIF_CS4205);
+		else
+			val = snd_ac97_read(ac97, AC97_SPDIF);
+
 		snd_iprintf(buffer, "SPDIF Control    :%s%s%s%s Category=0x%x Generation=%i%s%s%s\n",
 			val & 0x0001 ? " PRO" : " Consumer",
 			val & 0x0002 ? " Non-audio" : " PCM",
@@ -1614,9 +1661,15 @@ static void snd_ac97_proc_read_main(ac97_t *ac97, snd_info_buffer_t * buffer, in
 			val & 0x0008 ? " Preemph50/15" : "",
 			(val & 0x07f0) >> 4,
 			(val & 0x0800) >> 11,
-			spdif_rates[(val & 0x3000) >> 12],
-			val & 0x4000 ? " DRS" : "",
-			val & 0x8000 ? " Validity" : "");
+			(ac97->flags & AC97_CS_SPDIF) ?
+			    spdif_rates_cs4205[(val & 0x3000) >> 12] :
+			    spdif_rates[(val & 0x3000) >> 12],
+			(ac97->flags & AC97_CS_SPDIF) ?
+			    (val & 0x4000 ? " Validity" : "") :
+			    (val & 0x4000 ? " DRS" : ""),
+			(ac97->flags & AC97_CS_SPDIF) ?
+			    (val & 0x8000 ? " Enabled" : "") :
+			    (val & 0x8000 ? " Validity" : ""));
 	}
 }
 
@@ -1668,6 +1721,7 @@ static void snd_ac97_proc_regs_read(snd_info_entry_t *entry,
 	ac97_t *ac97 = snd_magic_cast(ac97_t, entry->private_data, return);
 
 	if ((ac97->id & 0xffffff40) == AC97_ID_AD1881) {	// Analog Devices AD1881/85/86
+
 		int idx;
 		down(&ac97->spec.ad18xx.mutex);
 		for (idx = 0; idx < 3; idx++)
@@ -1733,9 +1787,42 @@ static void snd_ac97_proc_done(ac97_t * ac97)
  *  Chip specific initialization
  */
 
-static int patch_wolfson(ac97_t * ac97)
+static int patch_wolfson00(ac97_t * ac97)
 {
-	// for all wolfson codecs (is this correct? --jk)
+	/* This sequence is suspect because it was designed for
+	   the WM9704, and is known to fail when applied to the
+	   WM9707.  If you're having trouble initializing a
+	   WM9700, this is the place to start looking.
+	   Randolph Bentson <bentson@holmsjoen.com> */
+
+	// WM9701A
+	snd_ac97_write_cache(ac97, 0x72, 0x0808);
+	snd_ac97_write_cache(ac97, 0x74, 0x0808);
+
+	// patch for DVD noise
+	snd_ac97_write_cache(ac97, 0x5a, 0x0200);
+
+	// init vol
+	snd_ac97_write_cache(ac97, 0x70, 0x0808);
+
+	snd_ac97_write_cache(ac97, AC97_SURROUND_MASTER, 0x0000);
+	return 0;
+}
+
+static int patch_wolfson03(ac97_t * ac97)
+{
+	/* This is known to work for the ViewSonic ViewPad 1000
+	   Randolph Bentson <bentson@holmsjoen.com> */
+
+	// WM9703/9707
+	snd_ac97_write_cache(ac97, 0x72, 0x0808);
+	snd_ac97_write_cache(ac97, 0x20, 0x8000);
+	return 0;
+}
+
+static int patch_wolfson04(ac97_t * ac97)
+{
+	// WM9704
 	snd_ac97_write_cache(ac97, 0x72, 0x0808);
 	snd_ac97_write_cache(ac97, 0x74, 0x0808);
 
@@ -1819,6 +1906,26 @@ static int patch_sigmatel_stac9756(ac97_t * ac97)
 static int patch_cirrus_cs4299(ac97_t * ac97)
 {
 	ac97->flags |= AC97_HAS_PC_BEEP;	/* force the detection of PC Beep */
+	
+	return 0;
+}
+
+static int patch_cirrus_cs4205(ac97_t * ac97)
+{
+  /* Basically, the cs4205 has non-standard sp/dif registers.
+     WHY CAN'T ANYONE FOLLOW THE BLOODY SPEC?  *sigh*
+      - sp/dif EA ID is not set, but sp/dif is always present.
+        - enable/disable is spdif register bit 15.
+      - sp/dif control register is 0x68.  differs from AC97:
+        - valid is bit 14 (vs 15)
+	- no DRS
+	- only 44.1/48k [00 = 48, 01=44,1] (AC97 is 00=44.1, 10=48)
+      - sp/dif ssource select is in 0x5e bits 0,1.
+  */
+
+	ac97->flags |= AC97_CS_SPDIF; 
+        ac97->ext_id |= AC97_EA_SPDIF;	/* force the detection of spdif */
+	snd_ac97_write_cache(ac97, MODE_CS4205, 0x0080);
 	return 0;
 }
 
@@ -1936,6 +2043,15 @@ static int patch_ad1881(ac97_t * ac97)
 	return 0;
 }
 
+static int patch_ad1886(ac97_t * ac97)
+{
+	patch_ad1881(ac97);
+	/* Presario700 workaround */
+	/* for Jack Sense/SPDIF Register misetting causing */
+	snd_ac97_write_cache(ac97, AC97_AD_JACK_SPDIF, 0x0010);
+	return 0;
+}
+
 /*
  *  PCM support
  */
@@ -1978,6 +2094,7 @@ int snd_ac97_set_rate(ac97_t *ac97, int reg, unsigned short rate)
 	} while (end_time - (signed long)jiffies >= 0);
 	snd_ac97_update(ac97, reg, tmp & 0xffff);
 	udelay(10);
+	// XXXX update spdif rate here too?
 	snd_ac97_update_bits(ac97, AC97_POWERDOWN, mask, 0);
 	end_time = jiffies + (HZ / 50);
 	do {

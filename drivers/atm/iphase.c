@@ -54,7 +54,6 @@
 #include <linux/sonet.h>  
 #include <linux/skbuff.h>  
 #include <linux/time.h>  
-#include <linux/sched.h> /* for xtime */  
 #include <linux/delay.h>  
 #include <linux/uio.h>  
 #include <linux/init.h>  
@@ -1777,8 +1776,9 @@ static int open_tx(struct atm_vcc *vcc)
         memset((caddr_t)ia_vcc, 0, sizeof(*ia_vcc));
         if (vcc->qos.txtp.max_sdu > 
                          (iadev->tx_buf_sz - sizeof(struct cpcs_trailer))){
-           printk("IA:  SDU size over the configured SDU size %d\n",
-                                                          iadev->tx_buf_sz);
+           printk("IA:  SDU size over (%d) the configured SDU size %d\n",
+		  vcc->qos.txtp.max_sdu,iadev->tx_buf_sz);
+	   INPH_IA_VCC(vcc) = NULL;  
            kfree(ia_vcc);
            return -EINVAL; 
         }

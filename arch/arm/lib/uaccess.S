@@ -544,7 +544,7 @@ USER(		ldrgtbt	r3, [r1], #1)			@ May fault
 		ldr	r1, [sp], #4			@ unsigned long count
 		subs	r4, r1, r2			@ bytes left to copy
 		movne	r1, r4
-		blne	SYMBOL_NAME(__memzero)
+		blne	__memzero
 		mov	r0, r4
 		LOADREGS(fd,sp!, {r4 - r7, pc})
 		.previous

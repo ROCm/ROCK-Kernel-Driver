@@ -559,7 +559,7 @@ ia64_do_signal (sigset_t *oldset, struct sigscratch *scr, long in_syscall)
 				continue;
 
 			switch (signr) {
-			      case SIGCONT: case SIGCHLD: case SIGWINCH:
+			      case SIGCONT: case SIGCHLD: case SIGWINCH: case SIGURG:
 				continue;
 
 			      case SIGTSTP: case SIGTTIN: case SIGTTOU:

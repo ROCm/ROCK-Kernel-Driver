@@ -176,7 +176,8 @@ int __init ps2esdi_init(void)
 		return -1;
 	}
 	/* set up some global information - indicating device specific info */
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST, &ps2esdi_lock);
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_ps2esdi_request,
+			&ps2esdi_lock);
 
 	/* some minor housekeeping - setup the global gendisk structure */
 	add_gendisk(&ps2esdi_gendisk);

@@ -125,11 +125,7 @@ ibm_partition(struct gendisk *hd, struct block_device *bdev,
 		return 0;
 	if (ioctl_by_bdev(bdev, HDIO_GETGEO, (unsigned long)geo);
 		return 0;
-	blocksize = hardsect_size[major(dev)][minor(dev)];
-	if ( blocksize <= 0 ) {
-		return 0;
-	}
-	blocksize >>= 9;
+	blocksize = bdev_hardsect_size(bdev) >> 9;
 	
 	data = read_dev_sector(bdev, inode->label_block*blocksize, &sect);
 	if (!data)

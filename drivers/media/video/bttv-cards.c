@@ -1190,6 +1190,16 @@ struct tvcard bttv_tvcards[] = {
         no_msp34xx:     1,
         pll:            PLL_28,
         tuner_type:     -1,
+},{
+	/* http://www.aopen.com/products/video/va1000.htm */
+	name:           "AOPEN VA1000",
+	video_inputs:   3, /* coax, AV, s-vid */
+	audio_inputs:   1,
+	tuner:          0,
+	tuner_type:     TUNER_LG_PAL, /* actually TP18PSB12P (PAL B/G) */
+	audiomux:       { 2, 0, 0, 0 },
+	muxsel:         { 2, 3, 1, 0 },
+	pll:            PLL_28,
 }};
 
 const int bttv_num_tvcards = (sizeof(bttv_tvcards)/sizeof(struct tvcard));

@@ -1,14 +1,12 @@
-/**************************************************************************
- *                                                                        *
- *  Copyright (C) 2001 Silicon Graphics, Inc. All rights reserved.        *
- *                                                                        *
- *  These coded instructions, statements, and computer programs  contain  *
- *  unpublished  proprietary  information of Silicon Graphics, Inc., and  *
- *  are protected by Federal copyright law.  They  may  not be disclosed  *
- *  to  third  parties  or copied or duplicated in any form, in whole or  *
- *  in part, without the prior written consent of Silicon Graphics, Inc.  *
- *                                                                        *
- **************************************************************************/
+/*
+ *
+ * This file is subject to the terms and conditions of the GNU General Public
+ * License.  See the file "COPYING" in the main directory of this archive
+ * for more details.
+ *
+ * Copyright (c) 2001, 2002 Silicon Graphics, Inc.  All rights reserved.
+ */
+
 
 #ifndef _SHUB_MD_H
 #define _SHUB_MD_H

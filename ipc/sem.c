@@ -1176,8 +1176,10 @@ void sem_exit (void)
 	}
 
 	undo_list = current->sysvsem.undo_list;
-	if ((undo_list == NULL) || (atomic_read(&undo_list->refcnt) != 1))
+	if ((undo_list == NULL) || (atomic_read(&undo_list->refcnt) != 1)) {
+		unlock_kernel();
 		return;
+	}
 
 	/* There's no need to hold the semundo list lock, as current
          * is the last task exiting for this undo list.

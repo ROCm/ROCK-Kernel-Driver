@@ -732,15 +732,12 @@ static struct ioctl32_list ioctl32_handler_table[] = {
 	IOCTL32_HANDLER(HDIO_GETGEO, hdio_getgeo),	/* hdreg.h ioctls  */
 	IOCTL32_HANDLER(HDIO_GET_UNMASKINTR, hdio_ioctl_trans),
 	IOCTL32_HANDLER(HDIO_GET_MULTCOUNT, hdio_ioctl_trans),
-	// HDIO_OBSOLETE_IDENTITY
 	IOCTL32_HANDLER(HDIO_GET_KEEPSETTINGS, hdio_ioctl_trans),
 	IOCTL32_HANDLER(HDIO_GET_32BIT, hdio_ioctl_trans),
 	IOCTL32_HANDLER(HDIO_GET_NOWERR, hdio_ioctl_trans),
 	IOCTL32_HANDLER(HDIO_GET_DMA, hdio_ioctl_trans),
 	IOCTL32_HANDLER(HDIO_GET_NICE, hdio_ioctl_trans),
 	IOCTL32_DEFAULT(HDIO_GET_IDENTITY),
-	// HDIO_TRISTATE_HWIF				/* not implemented */
-	// HDIO_DRIVE_TASK				/* To do, need specs */
 	IOCTL32_DEFAULT(HDIO_DRIVE_CMD),
 	IOCTL32_DEFAULT(HDIO_SET_MULTCOUNT),
 	IOCTL32_DEFAULT(HDIO_SET_UNMASKINTR),

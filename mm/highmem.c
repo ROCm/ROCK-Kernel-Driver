@@ -423,7 +423,7 @@ void create_bounce(unsigned long pfn, int gfp, struct bio **bio_orig)
 		}
 	}
 
-	bio->bi_dev = (*bio_orig)->bi_dev;
+	bio->bi_bdev = (*bio_orig)->bi_bdev;
 	bio->bi_sector = (*bio_orig)->bi_sector;
 	bio->bi_rw = (*bio_orig)->bi_rw;
 

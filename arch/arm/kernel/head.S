@@ -35,8 +35,8 @@
 #error TEXTADDR must start at 0xXXXX8000
 #endif
 
-		.globl	SYMBOL_NAME(swapper_pg_dir)
-		.equ	SYMBOL_NAME(swapper_pg_dir), TEXTADDR - 0x4000
+		.globl	swapper_pg_dir
+		.equ	swapper_pg_dir, TEXTADDR - 0x4000
 
 		.macro	pgtbl, reg, rambase
 		adr	\reg, stext
@@ -144,13 +144,13 @@ __entry:
 
 		.type	__switch_data, %object
 __switch_data:	.long	__mmap_switched
-		.long	SYMBOL_NAME(compat)
-		.long	SYMBOL_NAME(__bss_start)
-		.long	SYMBOL_NAME(_end)
-		.long	SYMBOL_NAME(processor_id)
-		.long	SYMBOL_NAME(__machine_arch_type)
-		.long	SYMBOL_NAME(cr_alignment)
-		.long	SYMBOL_NAME(init_thread_union)+8192
+		.long	compat
+		.long	__bss_start
+		.long	_end
+		.long	processor_id
+		.long	__machine_arch_type
+		.long	cr_alignment
+		.long	init_thread_union+8192
 
 		.type	__ret, %function
 __ret:		ldr	lr, __switch_data
@@ -187,7 +187,7 @@ __mmap_switched:
 #endif
 		bic	r2, r0, #2			@ Clear 'A' bit
 		stmia	r8, {r0, r2}			@ Save control register values
-		b	SYMBOL_NAME(start_kernel)
+		b	start_kernel
 
 
 

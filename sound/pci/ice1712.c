@@ -30,6 +30,7 @@
 #include <linux/delay.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
+#include <linux/pci.h>
 #include <linux/slab.h>
 #include <sound/core.h>
 #include <sound/control.h>
@@ -1158,6 +1159,7 @@ static int snd_ice1712_cs8427_set_input_clock(ice1712_t *ice, int spdif_clock)
 	else
 		nval |= 0x04;
 	if (val != nval) {
+		reg[1] = nval;
 		if (snd_i2c_sendbytes(ice->cs8427, reg, 2) != 2) {
 			snd_i2c_unlock(ice->i2c);
 			return -EREMOTE;

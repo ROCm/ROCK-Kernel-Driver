@@ -11,6 +11,9 @@
  * Copyright (C) 1999, 2001-2002 Hewlett-Packard Co
  *	Stephane Eranian <eranian@hpl.hp.com>
  *
+ * 02/04/22	Ken Chen <kenneth.w.chen@intel.com>
+ *		Data locality study on the checksum buffer.
+ *		More optimization cleanup - remove excessive stop bits.
  * 02/04/08	David Mosberger <davidm@hpl.hp.com>
  *		More cleanup and tuning.
  * 01/04/18	Jun Nakajima <jun.nakajima@intel.com>
@@ -80,6 +83,12 @@
 //	  type of packet or alignment we get. Like the ip_fast_csum() routine
 //	  where we know we have at least 20bytes worth of data to checksum.
 //	- Do a better job of handling small packets.
+//	- Note on prefetching: it was found that under various load, i.e. ftp read/write,
+//	  nfs read/write, the L1 cache hit rate is at 60% and L2 cache hit rate is at 99.8%
+//	  on the data that buffer points to (partly because the checksum is often preceded by
+//	  a copy_from_user()).  This finding indiate that lfetch will not be beneficial since
+//	  the data is already in the cache.
+//
 
 #define saved_pfs	r11
 #define hmask		r16
@@ -117,7 +126,7 @@
 GLOBAL_ENTRY(do_csum)
 	.prologue
 	.save ar.pfs, saved_pfs
-	alloc saved_pfs=ar.pfs,2,16,1,16
+	alloc saved_pfs=ar.pfs,2,16,0,16
 	.rotr word1[4], word2[4],result1[LOAD_LATENCY+2],result2[LOAD_LATENCY+2]
 	.rotp p[PIPE_DEPTH], pC1[2], pC2[2]
 	mov ret0=r0		// in case we have zero length
@@ -164,7 +173,7 @@ GLOBAL_ENTRY(do_csum)
 
 (p8)	and hmask=hmask,tmask	// apply tail mask to head mask if 1 word only
 (p9)	and word2[0]=lastval,tmask	// mask last it as appropriate
-	shr.u count=count,3	// we do 8 bytes per loop (count)
+	shr.u count=count,3	// how many 8-byte?
 	;;
 	// If count is odd, finish this 8-byte word so that we can
 	// load two back-to-back 8-byte words per loop thereafter.
@@ -175,6 +184,7 @@ GLOBAL_ENTRY(do_csum)
 (p9)	add result1[0]=word1[0],word2[0]
 	;;
 	cmp.ltu p6,p0=result1[0],word1[0]	// check the carry
+	cmp.eq.or.andcm p8,p0=0,count		// exit if zero 8-byte
 	;;
 (p6)	adds result1[0]=1,result1[0]
 (p8)	br.cond.dptk .do_csum_exit	// if (within an 8-byte word)
@@ -197,23 +207,19 @@ GLOBAL_ENTRY(do_csum)
 	// Calculate the checksum loading two 8-byte words per loop.
 	//
 .do_csum16:
-	mov saved_lc=ar.lc
+	add first2=8,first1
 	shr.u count=count,1	// we do 16 bytes per loop
 	;;
-	cmp.eq p9,p10=r0,count	// if (count == 0)
 	adds count=-1,count
+	mov carry1=r0
+	mov carry2=r0
 	brp.loop.imp 1f,2f
 	;;
 	mov ar.ec=PIPE_DEPTH
 	mov ar.lc=count	// set lc
-
+	mov pr.rot=1<<16
 	// result1[0] must be initialized in advance.
 	mov result2[0]=r0
-	mov pr.rot=1<<16
-	mov carry1=r0
-	mov carry2=r0
-	add first2=8,first1
-(p9)	br.cond.sptk .do_csum_exit
 	;;
 	.align 32
 1:
@@ -223,7 +229,7 @@ GLOBAL_ENTRY(do_csum)
 (pC2[1])adds carry2=1,carry2
 (ELD)	add result1[LOAD_LATENCY-1]=result1[LOAD_LATENCY],word1[LOAD_LATENCY]
 (ELD)	add result2[LOAD_LATENCY-1]=result2[LOAD_LATENCY],word2[LOAD_LATENCY]
-[2:]
+2:
 (p[0])	ld8 word1[0]=[first1],16
 (p[0])	ld8 word2[0]=[first2],16
 	br.ctop.sptk 1b

@@ -52,6 +52,16 @@ MODULE_DEVICES("{{ALSA,Dummy soundcard}}");
 #define USE_PERIODS_MAX		2
 #endif
 
+#if 0 /* UDA1341 emulation */
+#define MAX_BUFFER_SIZE		(16380)
+#define USE_FORMATS		SNDRV_PCM_FMTBIT_S16_LE
+#define USE_CHANNELS_MIN	2
+#define USE_CHANNELS_MAX	2
+#define USE_PERIODS_MIN		2
+#define USE_PERIODS_MAX		255
+#endif
+
+
 /* defaults */
 #ifndef MAX_BUFFER_SIZE
 #define MAX_BUFFER_SIZE		(64*1024)

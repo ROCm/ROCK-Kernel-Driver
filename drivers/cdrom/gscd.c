@@ -1020,7 +1020,7 @@ int __init my_gscd_init(void)
 	devfs_register(NULL, "gscd", DEVFS_FL_DEFAULT, MAJOR_NR, 0,
 		       S_IFBLK | S_IRUGO | S_IWUGO, &gscd_fops, NULL);
 
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST, &gscd_lock);
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_gscd_request, &gscd_lock);
 	blksize_size[MAJOR_NR] = gscd_blocksizes;
 
 	disk_state = 0;

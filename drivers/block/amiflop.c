@@ -1857,7 +1857,7 @@ int __init amiga_floppy_init(void)
 	post_write_timer.data = 0;
 	post_write_timer.function = post_write;
   
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST, &amiflop_lock);
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_fd_request, &amiflop_lock);
 	blksize_size[MAJOR_NR] = floppy_blocksizes;
 	blk_size[MAJOR_NR] = floppy_sizes;
 

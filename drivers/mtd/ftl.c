@@ -95,8 +95,6 @@ MODULE_PARM(shuffle_freq, "i");
 /* Funky stuff for setting up a block device */
 #define MAJOR_NR		FTL_MAJOR
 #define DEVICE_NAME		"ftl"
-#define DEVICE_REQUEST		do_ftl_request
-#define DEVICE_ON(device)
 #define DEVICE_OFF(device)
 
 #define DEVICE_NR(minor)	((minor)>>5)

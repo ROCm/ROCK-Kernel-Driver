@@ -558,10 +558,6 @@ static void cdrom_end_request(ide_drive_t *drive, int uptodate)
 	if ((rq->flags & REQ_CMD) && !rq->current_nr_sectors)
 		uptodate = 1;
 
-#if 0
-	/* FIXME --mdcki */
-	HWGROUP(drive)->rq->special = NULL;
-#endif
 	ide_end_request(drive, uptodate);
 }
 
@@ -1166,11 +1162,12 @@ static ide_startstop_t cdrom_seek_intr (ide_drive_t *drive)
 	return ide_stopped;
 }
 
-static ide_startstop_t cdrom_start_seek_continuation (ide_drive_t *drive)
+static ide_startstop_t cdrom_start_seek_continuation(struct ata_device *drive)
 {
 	unsigned char cmd[CDROM_PACKET_SIZE];
 	struct request *rq = HWGROUP(drive)->rq;
-	int sector, frame, nskip;
+	sector_t sector;
+	int frame, nskip;
 
 	sector = rq->sector;
 	nskip = (sector % SECTORS_PER_FRAME);
@@ -1185,14 +1182,14 @@ static ide_startstop_t cdrom_start_seek_continuation (ide_drive_t *drive)
 	return cdrom_transfer_packet_command(drive, cmd, WAIT_CMD, &cdrom_seek_intr);
 }
 
-static ide_startstop_t cdrom_start_seek (ide_drive_t *drive, unsigned int block)
+static ide_startstop_t cdrom_start_seek(struct ata_device *drive, sector_t block)
 {
 	struct cdrom_info *info = drive->driver_data;
 
 	info->dma = 0;
 	info->cmd = 0;
 	info->start_seek = jiffies;
-	return cdrom_start_packet_command (drive, 0, cdrom_start_seek_continuation);
+	return cdrom_start_packet_command(drive, 0, cdrom_start_seek_continuation);
 }
 
 /*
@@ -1203,7 +1200,7 @@ static ide_startstop_t cdrom_start_seek (ide_drive_t *drive, unsigned int block)
 static void restore_request (struct request *rq)
 {
 	if (rq->buffer != bio_data(rq->bio)) {
-		int n = (rq->buffer - (char *) bio_data(rq->bio)) / SECTOR_SIZE;
+		sector_t n = (rq->buffer - (char *) bio_data(rq->bio)) / SECTOR_SIZE;
 		rq->buffer = bio_data(rq->bio);
 		rq->nr_sectors += n;
 		rq->sector -= n;
@@ -1217,21 +1214,12 @@ static void restore_request (struct request *rq)
 /*
  * Start a read request from the CD-ROM.
  */
-static ide_startstop_t cdrom_start_read(struct ata_device *drive, struct ata_request *ar, unsigned int block)
+static ide_startstop_t cdrom_start_read(struct ata_device *drive, sector_t block)
 {
 	struct cdrom_info *info = drive->driver_data;
-	struct request *rq = ar->ar_rq;
-
-	if (ar->ar_flags & ATA_AR_QUEUED) {
-//		spin_lock_irqsave(DRIVE_LOCK(drive), flags);
-		blkdev_dequeue_request(rq);
-//		spin_unlock_irqrestore(DRIVE_LOCK(drive), flags);
-	}
-
+	struct request *rq = HWGROUP(drive)->rq;
 
 	restore_request(rq);
-
-	rq->special = ar;
 
 	/* Satisfy whatever we can of this request from our cached sector. */
 	if (cdrom_read_from_buffer(drive))
@@ -1647,8 +1635,6 @@ ide_cdrom_do_request(struct ata_device *drive, struct request *rq, sector_t bloc
 	struct cdrom_info *info = drive->driver_data;
 
 	if (rq->flags & REQ_CMD) {
-	
-
 		if (CDROM_CONFIG_FLAGS(drive)->seeking) {
 			unsigned long elpased = jiffies - info->start_seek;
 			int stat = GET_STAT();
@@ -1663,32 +1649,10 @@ ide_cdrom_do_request(struct ata_device *drive, struct request *rq, sector_t bloc
 			CDROM_CONFIG_FLAGS(drive)->seeking = 0;
 		}
 		if (IDE_LARGE_SEEK(info->last_block, block, IDECD_SEEK_THRESHOLD) && drive->dsc_overlap)
-			action = cdrom_start_seek (drive, block);
+			action = cdrom_start_seek(drive, block);
 		else {
-			unsigned long flags;
-			struct ata_request *ar;
-
-			/*
-			 * get a new command (push ar further down to avoid grabbing lock here
-			 */
-			spin_lock_irqsave(DRIVE_LOCK(drive), flags);
-
-			ar = ata_ar_get(drive);
-
-			/*
-			 * we've reached maximum queue depth, bail
-			 */
-			if (!ar) {
-				spin_unlock_irqrestore(DRIVE_LOCK(drive), flags);
-
-				return ide_started;
-			}
-
-			ar->ar_rq = rq;
-			spin_unlock_irqrestore(DRIVE_LOCK(drive), flags);
-
 			if (rq_data_dir(rq) == READ)
-				action = cdrom_start_read(drive, ar, block);
+				action = cdrom_start_read(drive, block);
 			else
 				action = cdrom_start_write(drive, rq);
 		}
@@ -1872,7 +1836,7 @@ static int cdrom_eject(ide_drive_t *drive, int ejectflag,
 	return cdrom_queue_packet_command(drive, cmd, sense, &pc);
 }
 
-static int cdrom_read_capacity(ide_drive_t *drive, unsigned long *capacity,
+static int cdrom_read_capacity(ide_drive_t *drive, u32 *capacity,
 			       struct request_sense *sense)
 {
 	struct {
@@ -2062,7 +2026,8 @@ static int cdrom_read_toc(ide_drive_t *drive, struct request_sense *sense)
 	/* Now try to get the total cdrom capacity. */
 	minor = (drive->select.b.unit) << PARTN_BITS;
 	dev = mk_kdev(drive->channel->major, minor);
-	stat = cdrom_get_last_written(dev, &toc->capacity);
+	/* FIXME: This is making worng assumptions about register layout. */
+	stat = cdrom_get_last_written(dev, (unsigned long *) &toc->capacity);
 	if (stat)
 		stat = cdrom_read_capacity(drive, &toc->capacity, sense);
 	if (stat)
@@ -2721,7 +2686,7 @@ static void ide_cdrom_add_settings(ide_drive_t *drive)
 }
 
 static
-int ide_cdrom_setup (ide_drive_t *drive)
+int ide_cdrom_setup(ide_drive_t *drive)
 {
 	struct cdrom_info *info = drive->driver_data;
 	struct cdrom_device_info *cdi = &info->devinfo;
@@ -2737,7 +2702,6 @@ int ide_cdrom_setup (ide_drive_t *drive)
 
 	blk_queue_prep_rq(&drive->queue, ll_10byte_cmd_build);
 
-	drive->special.all	= 0;
 	drive->ready_stat	= 0;
 
 	CDROM_STATE_FLAGS (drive)->media_changed = 1;
@@ -2926,10 +2890,9 @@ void ide_cdrom_revalidate (ide_drive_t *drive)
 	set_blocksize(mk_kdev(drive->channel->major, minor), CD_FRAMESIZE);
 }
 
-static
-unsigned long ide_cdrom_capacity (ide_drive_t *drive)
+static sector_t ide_cdrom_capacity(struct ata_device *drive)
 {
-	unsigned long capacity;
+	u32 capacity;
 
 	if (cdrom_read_capacity(drive, &capacity, NULL))
 		return 0;
@@ -2969,9 +2932,7 @@ static struct ata_operations ide_cdrom_driver = {
 	release:		ide_cdrom_release,
 	check_media_change:	ide_cdrom_check_media_change,
 	revalidate:		ide_cdrom_revalidate,
-	pre_reset:		NULL,
 	capacity:		ide_cdrom_capacity,
-	special:		NULL,
 	proc:			NULL
 };
 

@@ -119,20 +119,6 @@ typedef union {
 #undef SUPPORT_SLOW_DATA_PORTS
 #define SUPPORT_SLOW_DATA_PORTS	0
 
-/* request and free a normal interrupt */
-
-#define ide_request_irq(irq,hand,flg,dev,id)	request_irq((irq),(hand),(flg),(dev),(id))
-#define ide_free_irq(irq,dev_id)		free_irq((irq), (dev_id))
-
-/* ide-probe.c calls ide_request_region and stuff on the io_ports defined,
- * but since they are not actually memory-mapped in the ETRAX driver, we don't
- * do anything.
- */
-
-#define ide_check_region(from,extent)		(0)
-#define ide_request_region(from,extent,name)	do {} while(0)
-#define ide_release_region(from,extent)		do {} while(0)
-
 /*
  * The following are not needed for the non-m68k ports
  */

@@ -1,0 +1,10 @@
+# ALSA ARM drivers
+
+mainmenu_option next_comment
+comment 'ALSA ARM devices'
+
+if [ "$CONFIG_ARCH_SA1100" = "y" ]; then
+  dep_tristate 'SA11xx UDA1341TS driver (H3600)' CONFIG_SND_SA11XX_UDA1341 $CONFIG_SND $CONFIG_L3
+fi
+
+endmenu

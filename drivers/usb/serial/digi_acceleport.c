@@ -732,7 +732,7 @@ count );
 	while( count > 0 && ret == 0 ) {
 
 		while( (port->write_urb->status == -EINPROGRESS
-		|| priv->dp_write_urb_in_use) && jiffies < timeout ) {
+		|| priv->dp_write_urb_in_use) && time_before(jiffies, timeout)) {
 			cond_wait_interruptible_timeout_irqrestore(
 				&port->write_wait, DIGI_RETRY_TIMEOUT,
 				&priv->dp_port_lock, flags );
@@ -897,7 +897,7 @@ static int digi_transmit_idle( struct usb_serial_port *port,
 
 	spin_lock_irqsave( &priv->dp_port_lock, flags );
 
-	while( jiffies < timeout && !priv->dp_transmit_idle ) {
+	while( time_before(jiffies, timeout) && !priv->dp_transmit_idle ) {
 		cond_wait_interruptible_timeout_irqrestore(
 			&priv->dp_transmit_idle_wait, DIGI_RETRY_TIMEOUT,
 			&priv->dp_port_lock, flags );

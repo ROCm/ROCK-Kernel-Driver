@@ -395,7 +395,7 @@ show_cpuinfo (struct seq_file *m, void *v)
 
 	switch (c->family) {
 	      case 0x07:	memcpy(family, "Itanium", 8); break;
-	      case 0x1f:	memcpy(family, "McKinley", 9); break;
+	      case 0x1f:	memcpy(family, "Itanium 2", 9); break;
 	      default:		sprintf(family, "%u", c->family); break;
 	}
 

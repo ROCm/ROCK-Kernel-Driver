@@ -72,8 +72,8 @@ extern bd_t m8xx_board_info;
 #define _IO_BASE_SIZE 0x1000
 
 #ifdef CONFIG_IDE
-#define MAX_HWIFS 1
-#define ide_request_irq(irq,hand,flg,dev,id)    request_8xxirq((irq),(hand),(flg),(dev),(id))
+# define MAX_HWIFS 1
+# define request_irq(irq,hand,flg,dev,id)    request_8xxirq((irq),(hand),(flg),(dev),(id))
 #endif
 
 /* We don't use the 8259.

@@ -22,6 +22,10 @@ CONFIG_SND_RME96
   Say 'Y' or 'M' to include support for RME Digi96, Digi96/8 and
   Digi96/8 PRO/PAD/PST.
 
+CONFIG_SND_RME32
+  Say 'Y' or 'M' to include support for RME Digi32, Digi32/8 and
+  Digi32 PRO audio devices.
+
 CONFIG_SND_RME9652
   Say 'Y' or 'M' to include support for RME Hammerfall (RME Digi9652 /
   Digi9636) soundcards.

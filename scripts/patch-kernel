@@ -46,6 +46,15 @@ sourcedir=${1-/usr/src/linux}
 patchdir=${2-.}
 stopvers=${3-imnotaversion}
 
+if [ "$1" = -h -o "$1" = --help -o ! -r "$sourcedir/Makefile" ]; then
+cat << USAGE
+usage: patch-kernel [-h] [ sourcedir [ patchdir [ stopversion ] [ -acxx ] ] ]
+  The source directory defaults to /usr/src/linux, and
+  the patch directory defaults to the current directory.
+USAGE
+exit 1
+fi
+
 # See if we have any -ac options
 for PARM in $*
 do

@@ -256,29 +256,6 @@ ppc4xx_progress(char *s, unsigned short hex)
  * IDE stuff.
  * should be generic for every IDE PCI chipset
  */
-#if defined(CONFIG_BLK_DEV_IDE)
-static int
-ppc4xx_ide_check_region(ide_ioreg_t from, unsigned int extent)
-{
-	return check_region(from, extent);
-}
-
-static void
-ppc4xx_ide_request_region(ide_ioreg_t from, unsigned int extent,
-			  const char *name)
-{
-	request_region(from, extent, name);
-	return;
-}
-
-static void
-ppc4xx_ide_release_region(ide_ioreg_t from, unsigned int extent)
-{
-	release_region(from, extent);
-	return;
-}
-#endif
-
 #if defined(CONFIG_BLK_DEV_IDEPCI)
 static void
 ppc4xx_ide_init_hwif_ports(hw_regs_t * hw, ide_ioreg_t data_port,
@@ -398,16 +375,13 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 **   m8xx_setup.c, prep_setup.c use
 **     defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
 */
-#if defined (CONFIG_IDE)
-	ppc_ide_md.ide_request_region = ppc4xx_ide_request_region;
-	ppc_ide_md.ide_release_region = ppc4xx_ide_release_region;
-	ppc_ide_md.ide_check_region = ppc4xx_ide_check_region;
-#if defined(CONFIG_BLK_DEV_IDEPCI)
+#ifdef CONFIG_IDE
+# if defined(CONFIG_BLK_DEV_IDEPCI)
 	ppc_ide_md.ide_init_hwif = ppc4xx_ide_init_hwif_ports;
-#elif defined (CONFIG_DMA_NONPCI)	/* ON board IDE */
+# elif defined (CONFIG_DMA_NONPCI)	/* ON board IDE */
 	ppc_ide_md.default_irq = nonpci_ide_default_irq;
 	ppc_ide_md.ide_init_hwif = nonpci_ide_init_hwif_ports;
-#endif
+# endif
 #endif
 	board_init();
 

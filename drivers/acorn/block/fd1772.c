@@ -373,6 +373,7 @@ static int fd_test_drive_present(int drive);
 static void config_types(void);
 static int floppy_open(struct inode *inode, struct file *filp);
 static int floppy_release(struct inode *inode, struct file *filp);
+static void do_fd_request(request_queue_t *);
 
 /************************* End of Prototypes **************************/
 
@@ -1302,7 +1303,7 @@ static void fd1772_checkint(void)
 	}
 }
 
-void do_fd_request(request_queue_t* q)
+static void do_fd_request(request_queue_t* q)
 {
 	unsigned long flags;
 
@@ -1614,7 +1615,7 @@ int fd1772_init(void)
 
 	blk_size[MAJOR_NR] = floppy_sizes;
 	blksize_size[MAJOR_NR] = floppy_blocksizes;
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST);
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_fd_request);
 
 	config_types();
 

@@ -167,7 +167,8 @@ EXPORT_SYMBOL(d_splice_alias);
 EXPORT_SYMBOL(d_lookup);
 EXPORT_SYMBOL(__d_path);
 EXPORT_SYMBOL(mark_buffer_dirty);
-EXPORT_SYMBOL(set_buffer_async_io); /* for reiserfs_writepage */
+EXPORT_SYMBOL(end_buffer_io_sync);
+EXPORT_SYMBOL(set_buffer_async_io);
 EXPORT_SYMBOL(__mark_buffer_dirty);
 EXPORT_SYMBOL(__mark_inode_dirty);
 EXPORT_SYMBOL(get_empty_filp);
@@ -498,7 +499,7 @@ EXPORT_SYMBOL(vsprintf);
 EXPORT_SYMBOL(vsnprintf);
 EXPORT_SYMBOL(vsscanf);
 EXPORT_SYMBOL(kdevname);
-EXPORT_SYMBOL(bdevname);
+EXPORT_SYMBOL(__bdevname);
 EXPORT_SYMBOL(cdevname);
 EXPORT_SYMBOL(simple_strtoul);
 EXPORT_SYMBOL(system_utsname);	/* UTS data */
