@@ -86,7 +86,7 @@ void psmouse_set_resolution(struct psmouse *psmouse, unsigned int resolution);
 ssize_t psmouse_attr_show_helper(struct device *dev, char *buf,
 			ssize_t (*handler)(struct psmouse *, char *));
 ssize_t psmouse_attr_set_helper(struct device *dev, const char *buf, size_t count,
-			int (*handler)(struct psmouse *, const char *, size_t));
+			ssize_t (*handler)(struct psmouse *, const char *, size_t));
 
 #define PSMOUSE_DEFINE_ATTR(_name)						\
 static ssize_t psmouse_attr_show_##_name(struct psmouse *, char *);		\

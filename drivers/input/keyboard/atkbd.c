@@ -207,7 +207,7 @@ struct atkbd {
 static ssize_t atkbd_attr_show_helper(struct device *dev, char *buf,
 				ssize_t (*handler)(struct atkbd *, char *));
 static ssize_t atkbd_attr_set_helper(struct device *dev, const char *buf, size_t count,
-				int (*handler)(struct atkbd *, const char *, size_t));
+				ssize_t (*handler)(struct atkbd *, const char *, size_t));
 #define ATKBD_DEFINE_ATTR(_name)						\
 static ssize_t atkbd_show_##_name(struct atkbd *, char *);			\
 static ssize_t atkbd_set_##_name(struct atkbd *, const char *, size_t);		\
@@ -926,7 +926,7 @@ out:
 }
 
 static ssize_t atkbd_attr_set_helper(struct device *dev, const char *buf, size_t count,
-				int (*handler)(struct atkbd *, const char *, size_t))
+				ssize_t (*handler)(struct atkbd *, const char *, size_t))
 {
 	struct serio *serio = to_serio_port(dev);
 	struct atkbd *atkbd;
