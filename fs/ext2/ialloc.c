@@ -273,8 +273,6 @@ static int find_group_dir(struct super_block *sb, struct inode *parent)
 	if (!best_desc)
 		return -1;
 
-	ext2_reserve_inode(sb, best_group, 1);
-
 	return best_group;
 }
 
@@ -419,7 +417,6 @@ fallback:
 	return -1;
 
 found:
-	ext2_reserve_inode(sb, group, 1);
 	return group;
 }
 
@@ -481,8 +478,6 @@ static int find_group_other(struct super_block *sb, struct inode *parent)
 	return -1;
 
 found:
-	ext2_reserve_inode(sb, group, 0);
-
 	return group;
 }
 
@@ -508,7 +503,6 @@ struct inode *ext2_new_inode(struct inode *dir, int mode)
 	ei = EXT2_I(inode);
 	sbi = EXT2_SB(sb);
 	es = sbi->s_es;
-repeat:
 	if (S_ISDIR(mode)) {
 		if (test_opt(sb, OLDALLOC))
 			group = find_group_dir(sb, dir);
@@ -528,12 +522,14 @@ repeat:
 		bitmap_bh = read_inode_bitmap(sb, group);
 		if (!bitmap_bh) {
 			err = -EIO;
-			goto fail2;
+			goto fail;
 		}
+		ino = 0;
 
-		i = ext2_find_first_zero_bit((unsigned long *)bitmap_bh->b_data,
-					      EXT2_INODES_PER_GROUP(sb));
-		if (i >= EXT2_INODES_PER_GROUP(sb)) {
+repeat_in_this_group:
+		ino = ext2_find_next_zero_bit((unsigned long *)bitmap_bh->b_data,
+					      EXT2_INODES_PER_GROUP(sb), ino);
+		if (ino >= EXT2_INODES_PER_GROUP(sb)) {
 			/*
 			 * Rare race: find_group_xx() decided that there were
 			 * free inodes in this group, but by the time we tried
@@ -547,11 +543,16 @@ repeat:
 			continue;
 		}
 		if (ext2_set_bit_atomic(sb_bgl_lock(EXT2_SB(sb), group),
-						i, bitmap_bh->b_data)) {
-			brelse(bitmap_bh);
-			bitmap_bh = NULL;
-			ext2_release_inode(sb, group, S_ISDIR(mode));
-			goto repeat;
+						ino, bitmap_bh->b_data)) {
+			/* we lost this inode */
+			if (++ino >= EXT2_INODES_PER_GROUP(sb)) {
+				/* this group is exhausted, try next group */
+				if (++group == sbi->s_groups_count)
+					group = 0;
+				continue;
+			}
+			/* try to find free inode in the same group */
+			goto repeat_in_this_group;
 		}
 		goto got;
 	}
@@ -560,29 +561,35 @@ repeat:
 	 * Scanned all blockgroups.
 	 */
 	err = -ENOSPC;
-	goto fail2;
+	goto fail;
 got:
 	mark_buffer_dirty(bitmap_bh);
 	if (sb->s_flags & MS_SYNCHRONOUS)
 		sync_dirty_buffer(bitmap_bh);
 	brelse(bitmap_bh);
 
-	ino = group * EXT2_INODES_PER_GROUP(sb) + i + 1;
+	ino += group * EXT2_INODES_PER_GROUP(sb) + 1;
 	if (ino < EXT2_FIRST_INO(sb) || ino > le32_to_cpu(es->s_inodes_count)) {
 		ext2_error (sb, "ext2_new_inode",
 			    "reserved inode or inode > inodes count - "
 			    "block_group = %d,inode=%lu", group,
 			    (unsigned long) ino);
 		err = -EIO;
-		goto fail2;
+		goto fail;
 	}
 
 	percpu_counter_mod(&EXT2_SB(sb)->s_freeinodes_counter, -1);
+	if (S_ISDIR(mode))
+		percpu_counter_inc(&EXT2_SB(sb)->s_dirs_counter);
 
 	spin_lock(sb_bgl_lock(EXT2_SB(sb), group));
+	gdp->bg_free_inodes_count =
+                cpu_to_le16(le16_to_cpu(gdp->bg_free_inodes_count) - 1);
 	if (S_ISDIR(mode)) {
 		if (EXT2_SB(sb)->s_debts[group] < 255)
 			EXT2_SB(sb)->s_debts[group]++;
+		gdp->bg_used_dirs_count =
+			cpu_to_le16(le16_to_cpu(gdp->bg_used_dirs_count) + 1);
 	} else {
 		if (EXT2_SB(sb)->s_debts[group])
 			EXT2_SB(sb)->s_debts[group]--;
@@ -590,6 +597,7 @@ got:
 	spin_unlock(sb_bgl_lock(EXT2_SB(sb), group));
 
 	sb->s_dirt = 1;
+	mark_buffer_dirty(bh2);
 	inode->i_uid = current->fsuid;
 	if (test_opt (sb, GRPID))
 		inode->i_gid = dir->i_gid;
@@ -632,26 +640,24 @@ got:
 	if (DQUOT_ALLOC_INODE(inode)) {
 		DQUOT_DROP(inode);
 		err = -ENOSPC;
-		goto fail3;
+		goto fail2;
 	}
 	err = ext2_init_acl(inode, dir);
 	if (err) {
 		DQUOT_FREE_INODE(inode);
-		goto fail3;
+		goto fail2;
 	}
 	mark_inode_dirty(inode);
 	ext2_debug("allocating inode %lu\n", inode->i_ino);
 	ext2_preread_inode(inode);
 	return inode;
 
-fail3:
+fail2:
 	inode->i_flags |= S_NOQUOTA;
 	inode->i_nlink = 0;
 	iput(inode);
 	return ERR_PTR(err);
 
-fail2:
-	ext2_release_inode(sb, group, S_ISDIR(mode));
 fail:
 	make_bad_inode(inode);
 	iput(inode);
