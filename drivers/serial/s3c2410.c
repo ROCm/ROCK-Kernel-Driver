@@ -48,7 +48,6 @@
 #endif
 
 #include <linux/module.h>
-#include <linux/tty.h>
 #include <linux/ioport.h>
 #include <linux/device.h>
 #include <linux/init.h>
