@@ -414,6 +414,7 @@ static Indirect *ext3_get_branch(struct inode *inode, int depth, int *offsets,
 	return NULL;
 
 changed:
+	brelse(bh);
 	*err = -EAGAIN;
 	goto no_block;
 failure:

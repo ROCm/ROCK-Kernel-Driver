@@ -187,6 +187,7 @@ static struct usb_driver skel_driver = {
 	disconnect:	skel_disconnect,
 	fops:		&skel_fops,
 	minor:		USB_SKEL_MINOR_BASE,
+	num_minors:	MAX_DEVICES,
 	id_table:	skel_table,
 };
 

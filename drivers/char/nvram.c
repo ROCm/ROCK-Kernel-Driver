@@ -325,7 +325,7 @@ static int nvram_ioctl( struct inode *inode, struct file *file,
 		return( 0 );
 
 	  default:
-		return( -EINVAL );
+		return( -ENOTTY );
 	}
 }
 

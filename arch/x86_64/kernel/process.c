@@ -19,9 +19,9 @@
 #define __KERNEL_SYSCALLS__
 #include <stdarg.h>
 
+#include <linux/compiler.h>
 #include <linux/errno.h>
 #include <linux/sched.h>
-#include <linux/fs.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
 #include <linux/smp.h>
@@ -38,6 +38,7 @@
 #include <linux/delay.h>
 #include <linux/reboot.h>
 #include <linux/init.h>
+#include <linux/ctype.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -47,11 +48,12 @@
 #include <asm/processor.h>
 #include <asm/i387.h>
 #include <asm/desc.h>
+#include <asm/mmu_context.h>
 #include <asm/pda.h>
 #include <asm/prctl.h>
+#include <asm/kdebug.h>
 
 #include <linux/irq.h>
-#include <linux/err.h>
 
 asmlinkage extern void ret_from_fork(void);
 
@@ -81,7 +83,7 @@ void enable_hlt(void)
  * We use this if we don't have any better
  * idle routine..
  */
-static void default_idle(void)
+void default_idle(void)
 {
 	if (!hlt_counter) {
 		__cli();
@@ -157,13 +159,10 @@ __setup("idle=", idle_setup);
 
 static long no_idt[3];
 static int reboot_mode;
-int reboot_thru_bios;
 
 #ifdef CONFIG_SMP
 int reboot_smp = 0;
 static int reboot_cpu = -1;
-/* shamelessly grabbed from lib/vsprintf.c for readability */
-#define is_digit(c)	((c) >= '0' && (c) <= '9')
 #endif
 static int __init reboot_setup(char *str)
 {
@@ -175,20 +174,13 @@ static int __init reboot_setup(char *str)
 		case 'c': /* "cold" reboot (with memory testing etc) */
 			reboot_mode = 0x0;
 			break;
-		case 'b': /* "bios" reboot by jumping through the BIOS */
-			reboot_thru_bios = 1;
-			break;
-		case 'h': /* "hard" reboot by toggling RESET and/or crashing the CPU */
-			reboot_thru_bios = 0;
-			break;
 #ifdef CONFIG_SMP
 		case 's': /* "smp" reboot by executing reset on BSP or other CPU*/
 			reboot_smp = 1;
-			if (is_digit(*(str+1))) {
-				reboot_cpu = (int) (*(str+1) - '0');
-				if (is_digit(*(str+2))) 
-					reboot_cpu = reboot_cpu*10 + (int)(*(str+2) - '0');
-			}
+			if (isdigit(str[1]))
+				sscanf(str+1, "%d", &reboot_cpu);		
+			else if (!strncmp(str,"smp",3))
+				sscanf(str+3, "%d", &reboot_cpu); 
 				/* we will leave sorting out the final value 
 				when we are ready to reboot, since we might not
  				have set up boot_cpu_id or smp_num_cpu */
@@ -212,23 +204,6 @@ static inline void kb_wait(void)
 	for (i=0; i<0x10000; i++)
 		if ((inb_p(0x64) & 0x02) == 0)
 			break;
-}
-
-/*
- * Switch to real mode and then execute the code
- * specified by the code and length parameters.
- * We assume that length will aways be less that 100!
- */
-void machine_real_restart(unsigned char *code, int length)
-{
-	cli();
-
-	/* This will have to be rewritten for sledgehammer. It would
-	   help if sledgehammer have simple option to reset itself.
-	*/
-
-	panic( "real_restart is hard to do.\n" );
-	while(1);
 }
 
 void machine_restart(char * __unused)
@@ -266,16 +241,16 @@ void machine_restart(char * __unused)
 	 * Stop all CPUs and turn off local APICs and the IO-APIC, so
 	 * other OSs see a clean IRQ state.
 	 */
+	if (notify_die(DIE_STOP,"cpustop",0,0) != NOTIFY_BAD)
 	smp_send_stop();
 	disable_IO_APIC();
 #endif
 
-
-	if(!reboot_thru_bios) {
 		/* rebooting needs to touch the page at absolute addr 0 */
 		*((unsigned short *)__va(0x472)) = reboot_mode;
 		for (;;) {
 			int i;
+		/* First fondle with the keyboard controller. */ 
 			for (i=0; i<100; i++) {
 				kb_wait();
 				udelay(50);
@@ -286,10 +261,8 @@ void machine_restart(char * __unused)
 			__asm__ __volatile__("lidt %0": :"m" (no_idt));
 			__asm__ __volatile__("int3");
 		}
-	}
 
-	printk("no bios restart currently\n"); 
-	for (;;); 
+	/* Could do reset through the northbridge of Hammer here. */
 }
 
 void machine_halt(void)
@@ -305,7 +278,7 @@ void machine_power_off(void)
 /* Prints also some state that isn't saved in the pt_regs */ 
 void show_regs(struct pt_regs * regs)
 {
-	unsigned long cr0 = 0L, cr2 = 0L, cr3 = 0L, cr4 = 0L, fs, gs;
+	unsigned long cr0 = 0L, cr2 = 0L, cr3 = 0L, cr4 = 0L, fs, gs, shadowgs;
 	unsigned int fsindex,gsindex;
 	unsigned int ds,cs,es; 
 
@@ -317,7 +290,7 @@ void show_regs(struct pt_regs * regs)
 	       regs->rax, regs->rbx, regs->rcx);
 	printk("RDX: %016lx RSI: %016lx RDI: %016lx\n",
 	       regs->rdx, regs->rsi, regs->rdi); 
-	printk("RBP: %016lx R08: %016lx R09: %08lx\n",
+	printk("RBP: %016lx R08: %016lx R09: %016lx\n",
 	       regs->rbp, regs->r8, regs->r9); 
 	printk("R10: %016lx R11: %016lx R12: %016lx\n",
 	       regs->r10, regs->r11, regs->r12); 
@@ -325,21 +298,23 @@ void show_regs(struct pt_regs * regs)
 	       regs->r13, regs->r14, regs->r15); 
 
 	asm("movl %%ds,%0" : "=r" (ds)); 
-	asm("movl %%es,%0" : "=r" (es)); 
 	asm("movl %%cs,%0" : "=r" (cs)); 
+	asm("movl %%es,%0" : "=r" (es)); 
 	asm("movl %%fs,%0" : "=r" (fsindex));
 	asm("movl %%gs,%0" : "=r" (gsindex));
 
-	rdmsrl(0xc0000100, fs);
-	rdmsrl(0xc0000101, gs); 
+	rdmsrl(MSR_FS_BASE, fs);
+	rdmsrl(MSR_GS_BASE, gs); 
+	rdmsrl(MSR_KERNEL_GS_BASE, shadowgs); 
 
 	asm("movq %%cr0, %0": "=r" (cr0));
 	asm("movq %%cr2, %0": "=r" (cr2));
 	asm("movq %%cr3, %0": "=r" (cr3));
 	asm("movq %%cr4, %0": "=r" (cr4));
 
-	printk("FS: %016lx(%04x) GS:%016lx(%04x)\n", fs,fsindex,gs,gsindex); 
-	printk("CS: %04x DS:%04x ES:%04x CR0: %016lx\n", cs, ds, es, cr0); 
+	printk("FS:  %016lx(%04x) GS:%016lx(%04x) knlGS:%016lx\n", 
+	       fs,fsindex,gs,gsindex,shadowgs); 
+	printk("CS:  %04x DS: %04x ES: %04x CR0: %016lx\n", cs, ds, es, cr0); 
 	printk("CR2: %016lx CR3: %016lx CR4: %016lx\n", cr2, cr3, cr4);
 }
 
@@ -360,6 +335,24 @@ void release_segments(struct mm_struct *mm)
 	}
 }
 
+void load_gs_index(unsigned gs)
+{
+	int access; 
+	/* should load gs in syscall exit after swapgs instead */ 
+	/* XXX need to add LDT locking for SMP to protect against parallel changes */ 
+	asm volatile("pushf\n\t" 
+		     "cli\n\t"
+		     "swapgs\n\t"
+		     "lar %1,%0\n\t"
+		     "jnz 1f\n\t"
+		     "movl %1,%%eax\n\t"
+		     "movl %%eax,%%gs\n\t"
+		     "jmp 2f\n\t"
+		     "1: movl %2,%%gs\n\t"
+		     "2: swapgs\n\t"
+		     "popf" : "=g" (access) : "g" (gs), "r" (0) : "rax"); 
+}
+	
 #define __STR(x) #x
 #define __STR2(x) __STR(x)
 
@@ -461,54 +454,6 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long rsp,
 }
 
 /*
- * fill in the user structure for a core dump..
- */
-void dump_thread(struct pt_regs * regs, struct user * dump)
-{
-	int i;
-
-/* changed the size calculations - should hopefully work better. lbt */
-	dump->magic = CMAGIC;
-	dump->start_code = 0;
-	dump->start_stack = regs->rsp & ~(PAGE_SIZE - 1);
-	dump->u_tsize = ((unsigned long) current->mm->end_code) >> PAGE_SHIFT;
-	dump->u_dsize = ((unsigned long) (current->mm->brk + (PAGE_SIZE-1))) >> PAGE_SHIFT;
-	dump->u_dsize -= dump->u_tsize;
-	dump->u_ssize = 0;
-	for (i = 0; i < 8; i++)
-		dump->u_debugreg[i] = current->thread.debugreg[i];  
-
-	if (dump->start_stack < TASK_SIZE)
-		dump->u_ssize = ((unsigned long) (TASK_SIZE - dump->start_stack)) >> PAGE_SHIFT;
-
-#define SAVE(reg) dump->regs.reg = regs->reg
-	SAVE(rax);
-	SAVE(rbx);
-	SAVE(rcx);
-	SAVE(rdx);
-	SAVE(rsi);
-	SAVE(rdi);
-	SAVE(rbp);
-	SAVE(r8);
-	SAVE(r9);
-	SAVE(r10);
-	SAVE(r11);
-	SAVE(r12);
-	SAVE(r13);
-	SAVE(r14);
-	SAVE(r15);
-	SAVE(orig_rax); 
-	SAVE(rip); 
-#undef SAVE
-
-	/* FIXME: Should use symbolic names for msr-s! */
-	rdmsrl(0xc0000100, dump->regs.fs_base);
-	rdmsrl(0xc0000101, dump->regs.kernel_gs_base); 
-
-	dump->u_fpvalid = dump_fpu (regs, &dump->i387);
-}
-
-/*
  * This special macro can be used to load a debugging register
  */
 #define loaddebug(thread,register) \
@@ -531,6 +476,7 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 				 *next = &next_p->thread;
 	struct tss_struct *tss = init_tss + smp_processor_id();
 
+
 	unlazy_fpu(prev_p);
 
 	/*
@@ -540,50 +486,40 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 
 	/* 
 	 * Switch DS and ES.
-	 * XXX: check if this is safe on SMP
 	 */
 	asm volatile("movl %%es,%0" : "=m" (prev->es)); 
-	if (unlikely(next->es != prev->es))
+	if (unlikely(next->es | prev->es))
 		loadsegment(es, next->es); 
 	
 	asm volatile ("movl %%ds,%0" : "=m" (prev->ds)); 
-	if (unlikely(next->ds != prev->ds))
+	if (unlikely(next->ds | prev->ds))
 		loadsegment(ds, next->ds);
 
 	/* 
 	 * Switch FS and GS.
+	 * XXX Check if this is safe on SMP (!= -> |)
 	 */
 	{ 
 		unsigned int fsindex;
 
 		asm volatile("movl %%fs,%0" : "=g" (fsindex)); 
+		if (unlikely(fsindex != next->fsindex)) /* or likely? */
+			loadsegment(fs, next->fsindex);
 		if (unlikely(fsindex != prev->fsindex))
 			prev->fs = 0;				
-		if (unlikely((fsindex | next->fsindex) || prev->fs))
-			loadsegment(fs, next->fsindex);
-		/* Should use a shortcut via a GDT entry if next->fs is 32bit */
-		if (fsindex != prev->fsindex || next->fs != prev->fs)
+		if ((fsindex != prev->fsindex) || (prev->fs != next->fs))
 			wrmsrl(MSR_FS_BASE, next->fs); 
 		prev->fsindex = fsindex;
 	}
-
 	{
 		unsigned int gsindex;
 
 		asm volatile("movl %%gs,%0" : "=g" (gsindex)); 
+		if (unlikely(gsindex != next->gsindex))
+			load_gs_index(next->gs); 
 		if (unlikely(gsindex != prev->gsindex)) 
 			prev->gs = 0;				
-		if (unlikely((gsindex | next->gsindex) || prev->gs)) { 
-			unsigned long flags; 
-			/* could load gs in syscall exit after swapgs instead */ 
-			int nr = smp_processor_id(); 
-			__save_flags(flags); 
-			__cli(); 
-			loadsegment(gs, next->gsindex); 
-			wrmsrl(MSR_GS_BASE, cpu_pda+nr); 
-			__restore_flags(flags); 
-		}
-		if (gsindex != prev->gsindex || (prev->gs | next->gs))
+		if (gsindex != prev->gsindex || prev->gs != next->gs)
 			wrmsrl(MSR_KERNEL_GS_BASE, next->gs); 
 		prev->gsindex = gsindex;
 	}
@@ -594,8 +530,7 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 	prev->userrsp = read_pda(oldrsp); 
 	write_pda(oldrsp, next->userrsp); 
 	write_pda(pcurrent, next_p); 
-	write_pda(kernelstack, 
-		  (unsigned long)next_p->thread_info + THREAD_SIZE - PDA_STACKOFFSET);
+	write_pda(kernelstack, (unsigned long)next_p->thread_info + THREAD_SIZE - PDA_STACKOFFSET);
 
 	/*
 	 * Now maybe reload the debug registers
@@ -614,7 +549,7 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 	/* 
 	 * Handle the IO bitmap 
 	 */ 
-	if (unlikely(prev->ioperm | next->ioperm)) {
+	if (unlikely(prev->ioperm || next->ioperm)) {
 		if (next->ioperm) {
 			/*
 			 * 4 cachelines copy ... not good, but not that
@@ -706,15 +641,25 @@ extern void scheduling_functions_end_here(void);
 #define first_sched	((unsigned long) scheduling_functions_start_here)
 #define last_sched	((unsigned long) scheduling_functions_end_here)
 
-/* 
- * Do a traceback through the scheduler to find where a process sleeps.
- * 
- * Currently sched.c is compiled with -fno-omit-frame-pointer, so we
- * just go through the stack frames. 
- */
 unsigned long get_wchan(struct task_struct *p)
 {
-	return -1;
+	u64 fp,rip;
+	int count = 0;
+
+	if (!p || p == current || p->state==TASK_RUNNING)
+		return 0; 
+	if (p->thread.rsp < (u64)p || p->thread.rsp > (u64)p + THREAD_SIZE)
+		return 0;
+	fp = *(u64 *)(p->thread.rsp);
+	do { 
+		if (fp < (unsigned long)p || fp > (unsigned long)p+THREAD_SIZE)
+			return 0; 
+		rip = *(u64 *)(fp+8); 
+		if (rip < first_sched || rip >= last_sched)
+			return rip; 
+		fp = *(u64 *)fp; 
+	} while (count++ < 16); 
+	return 0;
 }
 #undef last_sched
 #undef first_sched
@@ -723,13 +668,20 @@ asmlinkage int sys_arch_prctl(int code, unsigned long addr)
 { 
 	int ret = 0; 
 	unsigned long tmp; 
+
 	switch (code) { 
 	case ARCH_SET_GS:
+		if (addr >= TASK_SIZE) 
+			return -EPERM; 
 		asm volatile("movw %%gs,%0" : "=g" (current->thread.gsindex)); 
 		current->thread.gs = addr;
 		ret = checking_wrmsrl(MSR_KERNEL_GS_BASE, addr); 
 		break;
 	case ARCH_SET_FS:
+		/* Not strictly needed for fs, but do it for symmetry
+		   with gs */
+		if (addr >= TASK_SIZE)
+			return -EPERM; 
 		asm volatile("movw %%fs,%0" : "=g" (current->thread.fsindex)); 
 		current->thread.fs = addr;
 		ret = checking_wrmsrl(MSR_FS_BASE, addr); 

@@ -122,11 +122,6 @@ static char *serial_revdate = "2001-07-08";
 #define ENABLE_SERIAL_ACPI
 #endif
 
-#ifdef __ISAPNP__
-#ifndef ENABLE_SERIAL_PNP
-#define ENABLE_SERIAL_PNP
-#endif
-#endif
 
 /* Set of debugging defines */
 
@@ -211,9 +206,14 @@ static char *serial_revdate = "2001-07-08";
 #ifdef ENABLE_SERIAL_PCI
 #include <linux/pci.h>
 #endif
-#ifdef ENABLE_SERIAL_PNP
+
 #include <linux/isapnp.h>
+#ifdef __ISAPNP__
+#ifndef ENABLE_SERIAL_PNP
+#define ENABLE_SERIAL_PNP
 #endif
+#endif
+
 #ifdef CONFIG_MAGIC_SYSRQ
 #include <linux/sysrq.h>
 #endif

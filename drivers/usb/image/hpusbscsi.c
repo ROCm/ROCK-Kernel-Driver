@@ -155,6 +155,7 @@ static struct usb_device_id hpusbscsi_usb_ids[] = {
 	{USB_DEVICE (0x03f0, 0x0701)},	/* HP 53xx */
 	{USB_DEVICE (0x03f0, 0x0801)},	/* HP 7400 */
 	{USB_DEVICE (0x0638, 0x026a)},	/*Scan Dual II */
+	{USB_DEVICE (0x0686, 0x4004)},  /*Minolta Elite II */
 	{}			/* Terminating entry */
 };
 
@@ -595,4 +596,5 @@ static void issue_request_sense (struct hpusbscsi *hpusbscsi)
 		handle_usb_error(hpusbscsi);
 	}
 }
+
 

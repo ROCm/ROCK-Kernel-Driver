@@ -13,7 +13,7 @@
 		/* This branch is taken if the CPU memory width matches the
 		   actual device in use.  The default at power on is 16 bits
 		   so we must be prepared for a mismatch. */
-		.section ".start", #alloc, #execinstr
+		.section ".start", "ax"
 2:
 		b	1f
 		.word	0xffff

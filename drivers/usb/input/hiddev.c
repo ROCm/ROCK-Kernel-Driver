@@ -678,10 +678,11 @@ static void *hiddev_usbd_probe(struct usb_device *dev, unsigned int ifnum,
 
 
 static /* const */ struct usb_driver hiddev_driver = {
-	name:	"hiddev",
-	probe:	hiddev_usbd_probe,
-	fops:	&hiddev_fops,
-	minor:	HIDDEV_MINOR_BASE
+	name:		"hiddev",
+	probe:		hiddev_usbd_probe,
+	fops:		&hiddev_fops,
+	minor:		HIDDEV_MINOR_BASE,
+	num_minors:	HIDDEV_MINORS,
 };
 
 int __init hiddev_init(void)

@@ -2,7 +2,7 @@
 # Makefile for the USB input drivers
 #
 
-O_TARGET	:= usb-input.o
+O_TARGET	:= input.o
 
 # Multipart objects.
 hid-objs	:= hid-core.o

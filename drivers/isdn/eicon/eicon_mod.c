@@ -33,7 +33,7 @@
 
 #include "eicon.h"
 
-#include "../avmb1/capicmd.h"  /* this should be moved in a common place */
+#include <linux/isdn/capicmd.h>
 
 #undef N_DATA
 #include "adapter.h"

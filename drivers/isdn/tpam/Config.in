@@ -1,0 +1,7 @@
+#
+# Config.in for Auvertech TurboPAM ISDN driver
+#
+
+if [ "$CONFIG_EXPERIMENTAL" != "n" ]; then
+   dep_tristate    'Auvertech TurboPAM support' CONFIG_ISDN_DRV_TPAM $CONFIG_ISDN $CONFIG_PCI
+fi

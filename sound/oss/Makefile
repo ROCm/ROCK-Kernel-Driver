@@ -97,9 +97,6 @@ endif
 
 # Declare multi-part drivers.
 
-list-multi	:= sound.o gus.o pas2.o sb.o sb_lib.o vidc_mod.o \
-    wavefront.o
-
 sound-objs	:= 							\
     dev_table.o soundcard.o sound_syms.o		\
     audio.o audio_syms.o dmabuf.o					\
@@ -117,31 +114,6 @@ wavefront-objs  := wavfront.o wf_midi.o yss225.o
 O_TARGET	:= sounddrivers.o
 
 include $(TOPDIR)/Rules.make
-
-
-
-# Link rules for multi-part drivers.
-
-sound.o: $(sound-objs)
-	$(LD) -r -o $@ $(sound-objs)
-
-gus.o: $(gus-objs)
-	$(LD) -r -o $@ $(gus-objs)
-
-pas2.o: $(pas2-objs)
-	$(LD) -r -o $@ $(pas2-objs)
-
-sb.o: $(sb-objs)
-	$(LD) -r -o $@ $(sb-objs)
-
-sb_lib.o: $(sb_lib-objs)
-	$(LD) -r -o $@ $(sb_lib-objs)
-
-vidc_mod.o: $(vidc_mod-objs)
-	$(LD) -r -o $@ $(vidc_mod-objs)
-
-wavefront.o: $(wavefront-objs)
-	$(LD) -r -o $@ $(wavefront-objs)
 
 # Firmware files that need translation
 #

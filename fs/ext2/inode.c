@@ -261,6 +261,7 @@ static Indirect *ext2_get_branch(struct inode *inode,
 
 changed:
 	read_unlock(&EXT2_I(inode)->i_meta_lock);
+	brelse(bh);
 	*err = -EAGAIN;
 	goto no_block;
 failure:

@@ -16,9 +16,11 @@
  *  $Id: hw_irq.h,v 1.24 2001/09/14 20:55:03 vojtech Exp $
  */
 
+#ifndef __ASSEMBLY__
 #include <linux/config.h>
 #include <asm/atomic.h>
 #include <asm/irq.h>
+#endif
 
 /*
  * IDT vectors usable for external interrupt sources start
@@ -48,6 +50,10 @@
 #define RESCHEDULE_VECTOR	0xfc
 #define TASK_MIGRATION_VECTOR	0xfb
 #define CALL_FUNCTION_VECTOR	0xfa
+#define KDB_VECTOR	0xf9
+
+#define THERMAL_APIC_VECTOR	0xf0
+
 
 /*
  * Local APIC timer IRQ vector is on a different priority level,
@@ -64,6 +70,8 @@
 #define FIRST_DEVICE_VECTOR	0x31
 #define FIRST_SYSTEM_VECTOR	0xef
 
+
+#ifndef __ASSEMBLY__
 extern int irq_vector[NR_IRQS];
 #define IO_APIC_VECTOR(irq)	irq_vector[irq]
 
@@ -103,36 +111,6 @@ extern char _stext, _etext;
 
 #include <asm/ptrace.h>
 
-#ifdef CONFIG_PREEMPT
-#define PREEMPT_LOCK \
-"	movq %rsp,%rdx ;"				\
-"	andq $-8192,%rdx ;"				\
-"	incl " __STR(threadinfo_preempt_count)"(%rdx) ;"
-#else
-#define PREEMPT_LOCK
-#endif
-
-/* IF:off, stack contains irq number on origrax */ 
-#define IRQ_ENTER								\
-"	cld ;"									\
-"	pushq %rdi ;"								\
-"	pushq %rsi ;"								\
-"	pushq %rdx ;"								\
-"	pushq %rcx ;"								\
-"	pushq %rax ;"								\
-"	pushq %r8 ;"								\
-"	pushq %r9 ;"								\
-"	pushq %r10 ;"								\
-"	pushq %r11 ;"								\
-	PREEMPT_LOCK								\
-"	leaq -48(%rsp),%rdi	# arg1 for handler ;"				\
-"	cmpq $ " __STR(__KERNEL_CS) ",88(%rsp)	# CS - ARGOFFSET ;"		\
-"	je 1f ;"								\
-"	swapgs ;"								\
-"1:	addl $1,%gs: " __STR(pda_irqcount) ";"					\
-"	movq %gs: " __STR(pda_irqstackptr) ",%rax ;"				\
-"	cmoveq %rax,%rsp ;"	
-
 #define IRQ_NAME2(nr) nr##_interrupt(void)
 #define IRQ_NAME(nr) IRQ_NAME2(IRQ##nr)
 
@@ -140,28 +118,11 @@ extern char _stext, _etext;
  *	SMP has a few special interrupts for IPI messages
  */
 
-	/* there is a second layer of macro just to get the symbolic
-	   name for the vector evaluated. This change is for RTLinux */
-#define BUILD_SMP_INTERRUPT(x,v) XBUILD_SMP_INTERRUPT(x,v)
-#define XBUILD_SMP_INTERRUPT(x,v)\
-asmlinkage void x(void); \
-asmlinkage void call_##x(void); \
-__asm__( \
-"\n"__ALIGN_STR"\n" \
-SYMBOL_NAME_STR(x) ":\n\t" \
-	"push $" #v "-256;" \
-	IRQ_ENTER \
-	"pushq %rdi ; " \
-	"call " SYMBOL_NAME_STR(smp_##x) " ; " \
-	"jmp ret_from_intr")
-
-#define BUILD_COMMON_IRQ()
-
 #define BUILD_IRQ(nr) \
 asmlinkage void IRQ_NAME(nr); \
 __asm__( \
-"\n"__ALIGN_STR "\n" \
-SYMBOL_NAME_STR(IRQ) #nr "_interrupt:\n\t" \
+"\n.p2align\n" \
+"IRQ" #nr "_interrupt:\n\t" \
 	"push $" #nr "-256 ; " \
 	"jmp common_interrupt");
 
@@ -205,6 +166,8 @@ static inline void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i) {
 }
 #else
 static inline void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i) {}
+#endif
+
 #endif
 
 #endif /* _ASM_HW_IRQ_H */

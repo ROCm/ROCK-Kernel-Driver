@@ -8,8 +8,6 @@ O_TARGET     := synth.o
 subdir-y     := emux
 subdir-m     := $(subdir-y)
 
-list-multi   := snd-util-mem.o
-
 export-objs  := util_mem.o
 
 snd-util-mem-objs := util_mem.o
@@ -22,6 +20,3 @@ ifeq ($(subst m,y,$(CONFIG_SND_SEQUENCER)),y)
 endif
 
 include $(TOPDIR)/Rules.make
-
-snd-util-mem.o: $(snd-util-mem-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-util-mem-objs)

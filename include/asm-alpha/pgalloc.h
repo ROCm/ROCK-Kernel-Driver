@@ -12,7 +12,7 @@
 static inline void
 pmd_populate(struct mm_struct *mm, pmd_t *pmd, struct page *pte)
 {
-	pmd_set(pmd, (pte_t *)((pte - mem_map) << PAGE_SHIFT));
+	pmd_set(pmd, (pte_t *)(((pte - mem_map) << PAGE_SHIFT) + PAGE_OFFSET));
 }
 
 static inline void

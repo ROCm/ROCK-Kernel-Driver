@@ -121,6 +121,21 @@ struct sem_undo {
 	short *			semadj;		/* array of adjustments, one per semaphore */
 };
 
+/* sem_undo_list controls shared access to the list of sem_undo structures
+ * that may be shared among all a CLONE_SYSVSEM task group.
+ */ 
+struct sem_undo_list {
+	atomic_t	refcnt;
+	spinlock_t	lock;
+	volatile unsigned long	add_count;
+	struct sem_undo	*proc_list;
+};
+
+struct sysv_sem {
+	struct sem_undo_list *undo_list;
+	struct sem_queue *sleep_list;
+};
+
 asmlinkage long sys_semget (key_t key, int nsems, int semflg);
 asmlinkage long sys_semop (int semid, struct sembuf *sops, unsigned nsops);
 asmlinkage long sys_semctl (int semid, int semnum, int cmd, union semun arg);

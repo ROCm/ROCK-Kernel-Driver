@@ -978,8 +978,7 @@ int do_coredump(long signr, struct pt_regs * regs)
 	if (current->rlim[RLIMIT_CORE].rlim_cur < binfmt->min_coredump)
 		goto fail;
 
-	memcpy(corename,"core.", 5);
-	corename[4] = '\0';
+	memcpy(corename,"core", 5); /* include trailing \0 */
  	if (core_uses_pid || atomic_read(&current->mm->mm_users) != 1)
  		sprintf(&corename[4], ".%d", current->pid);
 	file = filp_open(corename, O_CREAT | 2 | O_NOFOLLOW, 0600);

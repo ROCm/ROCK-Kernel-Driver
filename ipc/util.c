@@ -340,6 +340,17 @@ int ipc_parse_version (int *cmd)
  * Dummy functions when SYSV IPC isn't configured
  */
 
+int copy_semundo(unsigned long clone_flags, struct task_struct *tsk)
+{
+	return 0;
+}
+
+void exit_semundo(struct task_struct *tsk)
+{
+	return;
+}
+
+
 void sem_exit (void)
 {
     return;

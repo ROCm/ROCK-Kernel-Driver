@@ -250,11 +250,9 @@ int __init setup_pdc4030(struct ata_channel *hwif)
 	memcpy(hwif2->io_ports, hwif->hw.io_ports, sizeof(hwif2->io_ports));
 	hwif2->irq = hwif->irq;
 	hwif2->hw.irq = hwif->hw.irq = hwif->irq;
+	hwif->io_32bit = 3;
+	hwif2->io_32bit = 3;
 	for (i=0; i<2 ; i++) {
-		hwif->drives[i].io_32bit = 3;
-		hwif2->drives[i].io_32bit = 3;
-		hwif->drives[i].keep_settings = 1;
-		hwif2->drives[i].keep_settings = 1;
 		if (!ident.current_tm[i].cyl)
 			hwif->drives[i].noprobe = 1;
 		if (!ident.current_tm[i+2].cyl)
@@ -634,7 +632,7 @@ ide_startstop_t do_pdc4030_io(ide_drive_t *drive, struct ata_taskfile *task)
 			       "PROMISE_WRITE\n", drive->name);
 			return startstop;
 		}
-		if (!drive->unmask)
+		if (!drive->channel->unmask)
 			__cli();	/* local CPU only */
 		HWGROUP(drive)->wrq = *rq; /* scratchpad */
 		return promise_write(drive);

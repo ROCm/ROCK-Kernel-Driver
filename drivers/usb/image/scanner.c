@@ -1100,6 +1100,7 @@ usb_driver scanner_driver = {
 	disconnect:	disconnect_scanner,
 	fops:		&usb_scanner_fops,
 	minor:		SCN_BASE_MNR,
+	num_minors:	SCN_MAX_MNR,
 	id_table:	NULL, /* This would be scanner_device_ids, but we
 				 need to check every USB device, in case
 				 we match a user defined vendor/product ID. */

@@ -1,27 +1,71 @@
-/* Some macros to handle stack frames */ 
+/* 
+ * Some macros to handle stack frames in assembly.
+ */ 
 
-	.macro SAVE_ARGS	
-	pushq %rdi
-	pushq %rsi
-	pushq %rdx
-	pushq %rcx
-	pushq %rax
-	pushq %r8
-	pushq %r9
-	pushq %r10
-	pushq %r11
+#include <linux/config.h>
+
+#define R15 0
+#define R14 8
+#define R13 16
+#define R12 24
+#define RBP 36
+#define RBX 40
+/* arguments: interrupts/non tracing syscalls only save upto here*/
+#define R11 48
+#define R10 56	
+#define R9 64
+#define R8 72
+#define RAX 80
+#define RCX 88
+#define RDX 96
+#define RSI 104
+#define RDI 112
+#define ORIG_RAX 120       /* + error_code */ 
+/* end of arguments */ 	
+/* cpu exception frame or undefined in case of fast syscall. */
+#define RIP 128
+#define CS 136
+#define EFLAGS 144
+#define RSP 152
+#define SS 160
+#define ARGOFFSET R11
+
+	.macro SAVE_ARGS addskip=0,norcx=0 	
+	subq  $9*8+\addskip,%rsp
+	movq  %rdi,8*8(%rsp) 
+	movq  %rsi,7*8(%rsp) 
+	movq  %rdx,6*8(%rsp)
+	.if \norcx
+	.else
+	movq  %rcx,5*8(%rsp)
+	.endif
+	movq  %rax,4*8(%rsp) 
+	movq  %r8,3*8(%rsp) 
+	movq  %r9,2*8(%rsp) 
+	movq  %r10,1*8(%rsp) 
+	movq  %r11,(%rsp) 
 	.endm
 
-	.macro RESTORE_ARGS
-	popq %r11
-	popq %r10
-	popq %r9
-	popq %r8
-	popq %rax
-	popq %rcx	
-	popq %rdx	
-	popq %rsi	
-	popq %rdi	
+#define ARG_SKIP 9*8
+	.macro RESTORE_ARGS skiprax=0,addskip=0,skiprcx=0
+	movq (%rsp),%r11
+	movq 1*8(%rsp),%r10
+	movq 2*8(%rsp),%r9
+	movq 3*8(%rsp),%r8
+	.if \skiprax
+	.else
+	movq 4*8(%rsp),%rax
+	.endif
+	.if \skiprcx
+	.else
+	movq 5*8(%rsp),%rcx
+	.endif
+	movq 6*8(%rsp),%rdx
+	movq 7*8(%rsp),%rsi
+	movq 8*8(%rsp),%rdi
+	.if ARG_SKIP+\addskip > 0
+	addq $ARG_SKIP+\addskip,%rsp
+	.endif
 	.endm	
 
 	.macro LOAD_ARGS offset
@@ -37,21 +81,24 @@
 	.endm
 			
 	.macro SAVE_REST
-	pushq %rbx
-	pushq %rbp
-	pushq %r12
-	pushq %r13
-	pushq %r14
-	pushq %r15
+	subq $6*8,%rsp
+	movq %rbx,5*8(%rsp) 
+	movq %rbp,4*8(%rsp) 
+	movq %r12,3*8(%rsp) 
+	movq %r13,2*8(%rsp) 
+	movq %r14,1*8(%rsp) 
+	movq %r15,(%rsp) 
 	.endm		
 
+#define REST_SKIP 6*8
 	.macro RESTORE_REST
-	popq %r15
-	popq %r14
-	popq %r13
-	popq %r12
-	popq %rbp
-	popq %rbx
+	movq (%rsp),%r15
+	movq 1*8(%rsp),%r14
+	movq 2*8(%rsp),%r13
+	movq 3*8(%rsp),%r12
+	movq 4*8(%rsp),%rbp
+	movq 5*8(%rsp),%rbx
+	addq $REST_SKIP,%rsp
 	.endm
 		
 	.macro SAVE_ALL
@@ -59,42 +106,35 @@
 	SAVE_REST
 	.endm
 		
-	.macro RESTORE_ALL
+	.macro RESTORE_ALL addskip=0
 	RESTORE_REST
-	RESTORE_ARGS
+	RESTORE_ARGS 0,\addskip
 	.endm
 
-
-R15 = 0
-R14 = 8
-R13 = 16
-R12 = 24
-RBP = 36
-RBX = 40
-/* arguments: interrupts/non tracing syscalls only save upto here*/
-R11 = 48
-R10 = 56	
-R9 = 64
-R8 = 72
-RAX = 80
-RCX = 88
-RDX = 96
-RSI = 104
-RDI = 112
-ORIG_RAX = 120       /* = ERROR */ 
-/* end of arguments */ 	
-/* cpu exception frame or undefined in case of fast syscall. */
-RIP = 128
-CS = 136
-EFLAGS = 144
-RSP = 152
-SS = 160
-ARGOFFSET = R11
-
-	.macro SYSRET32
-	.byte 0x0f,0x07
+	/* push in order ss, rsp, eflags, cs, rip */
+	.macro FAKE_STACK_FRAME child_rip
+	xorl %eax,%eax
+	subq $6*8,%rsp
+	movq %rax,5*8(%rsp)  /* ss */
+	movq %rax,4*8(%rsp)  /* rsp */
+	movq %rax,3*8(%rsp)  /* eflags */
+	movq $__KERNEL_CS,2*8(%rsp) /* cs */
+	movq \child_rip,1*8(%rsp)  /* rip */ 
+	movq %rax,(%rsp)   /* orig_rax */ 
 	.endm
 
-	.macro SYSRET64
-	.byte 0x48,0x0f,0x07
+	.macro UNFAKE_STACK_FRAME
+	addq $8*6, %rsp
 	.endm
+
+	.macro icebp
+	.byte 0xf1
+	.endm
+
+#ifdef CONFIG_FRAME_POINTER
+#define ENTER enter
+#define LEAVE leave
+#else
+#define ENTER
+#define LEAVE
+#endif

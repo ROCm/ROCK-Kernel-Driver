@@ -128,7 +128,7 @@ MODULE PARAMETERS:
         programs that expect RGB data (e.g. gqcam) to work with this driver. If
         your colors look VERY wrong, you may want to change this.
 
-  NAME: buf_timeout
+  NAME: buf_timeout (Temporarily disabled. Memory is deallocated immediately)
   TYPE: integer
   DEFAULT: 5 (seconds)
   DESC: Number of seconds before unused frame buffers are deallocated.
@@ -293,7 +293,14 @@ MODULE PARAMETERS:
 	will compensate for the blocks of corruption that can appear when the
 	camera cannot keep up with the speed of the USB bus (eg. at low frame
 	resolutions). This feature is always enabled when compression is on.
- 
+
+  NAME: mirror
+  TYPE: integer (Boolean)
+  DEFAULT: 0 (off)
+  DESC: Setting this to 1 will reverse ("mirror") the image horizontally. This
+	might be necessary if your camera has a custom lens assembly. This has
+	no effect with video capture devices.
+
 WORKING FEATURES:
  o Color streaming/capture at most widths and heights that are multiples of 8.
  o RGB24, RGB565, YUV420/YUV420P, YUV422/YUYV, and YUV422P color
@@ -305,6 +312,7 @@ WORKING FEATURES:
  o Compression support
 
 EXPERIMENTAL FEATURES:
+ o OV518/OV518+ support
  o OV6630 sensor support
  o Banding filter
  o SMP compatibility
@@ -314,8 +322,6 @@ TO-DO:
  o Setting of hue not working with OV7620
  o Setting of contrast and hue not working with OV7620AE
  o OV8600 sensor support (Not used in anything yet)
- o OV518/OV518+ support (all that's needed is the decompressor)
- o cams >= 3 not working
 
 HOW TO CONTACT ME:
 

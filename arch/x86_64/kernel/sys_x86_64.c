@@ -69,13 +69,15 @@ unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr, unsi
 	struct vm_area_struct *vma;
 	unsigned long end = TASK_SIZE;
 
+	if (test_thread_flag(TIF_IA32))
+		flags |= MAP_32BIT; 
 	if (flags & MAP_32BIT) 
-		end = 0xffffffff;
-	if (len > TASK_SIZE)
+		end = 0xffffffff-1;
+	if (len > end)
 		return -ENOMEM;
 	if (!addr) { 
 		addr = TASK_UNMAPPED_64;
-		if (test_thread_flag(TIF_IA32) || (flags & MAP_32BIT)) {
+		if (flags & MAP_32BIT) {
 			addr = TASK_UNMAPPED_32;
 		}
 	} 
@@ -83,7 +85,7 @@ unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr, unsi
 
 	for (vma = find_vma(current->mm, addr); ; vma = vma->vm_next) {
 		/* At this point:  (!vma || addr < vma->vm_end). */
-		if (TASK_SIZE - len < addr)
+		if (end - len < addr)
 			return -ENOMEM;
 		if (!vma || addr + len <= vma->vm_start)
 			return addr;
@@ -111,3 +113,9 @@ asmlinkage long sys_pause(void)
 	schedule();
 	return -ERESTARTNOHAND;
 }
+
+asmlinkage long wrap_sys_shmat(int shmid, char *shmaddr, int shmflg)
+{
+	unsigned long raddr;
+	return sys_shmat(shmid,shmaddr,shmflg,&raddr) ?: raddr;
+} 

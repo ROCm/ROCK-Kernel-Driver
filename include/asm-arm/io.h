@@ -272,7 +272,7 @@ extern void consistent_sync(void *vaddr, size_t size, int rw);
 /*
  * Change "struct page" to physical address.
  */
-#ifdef CONFIG_DISCONTIG
+#ifdef CONFIG_DISCONTIGMEM
 #define page_to_phys(page)					  \
 	((((page) - page_zone(page)->zone_mem_map) << PAGE_SHIFT) \
 		  + page_zone(page)->zone_start_paddr)

@@ -479,22 +479,18 @@ static void ata_pre_reset(ide_drive_t *drive)
 	if (ata_ops(drive) && ata_ops(drive)->pre_reset)
 		ata_ops(drive)->pre_reset(drive);
 
-	if (!drive->keep_settings && !drive->using_dma) {
-		drive->unmask = 0;
-		drive->io_32bit = 0;
-	}
+	if (!drive->using_dma)
+	    return;
 
-	if (drive->using_dma) {
-		/* check the DMA crc count */
-		if (drive->crc_count) {
-			drive->channel->dmaproc(ide_dma_off_quietly, drive);
-			if ((drive->channel->speedproc) != NULL)
-				drive->channel->speedproc(drive, ide_auto_reduce_xfer(drive));
-			if (drive->current_speed >= XFER_SW_DMA_0)
-				drive->channel->dmaproc(ide_dma_on, drive);
-		} else
-			drive->channel->dmaproc(ide_dma_off, drive);
-	}
+	/* check the DMA crc count */
+	if (drive->crc_count) {
+		drive->channel->dmaproc(ide_dma_off_quietly, drive);
+		if ((drive->channel->speedproc) != NULL)
+		        drive->channel->speedproc(drive, ide_auto_reduce_xfer(drive));
+		if (drive->current_speed >= XFER_SW_DMA_0)
+			drive->channel->dmaproc(ide_dma_on, drive);
+	} else
+		drive->channel->dmaproc(ide_dma_off, drive);
 }
 
 /*
@@ -807,8 +803,7 @@ void ide_end_drive_cmd(ide_drive_t *drive, byte stat, byte err)
 				args->hobfile.high_cylinder = IN_BYTE(IDE_HCYL_REG);
 			}
 		}
-		if (ar->ar_flags & ATA_AR_RETURN)
-			ata_ar_put(drive, ar);
+		ata_ar_put(drive, ar);
 	}
 
 	blkdev_dequeue_request(rq);
@@ -905,17 +900,15 @@ byte ide_dump_status (ide_drive_t *drive, const char *msg, byte stat)
  */
 static void try_to_flush_leftover_data (ide_drive_t *drive)
 {
-	int i = (drive->mult_count ? drive->mult_count : 1);
+	int i;
 
 	if (drive->type != ATA_DISK)
 		return;
 
-	while (i > 0) {
+	for (i = (drive->mult_count ? drive->mult_count : 1); i > 0; --i) {
 		u32 buffer[SECTOR_WORDS];
-		unsigned int count = (i > 1) ? 1 : i;
 
-		ata_read(drive, buffer, count * SECTOR_WORDS);
-		i -= count;
+		ata_read(drive, buffer, SECTOR_WORDS);
 	}
 }
 
@@ -999,7 +992,7 @@ void ide_cmd(ide_drive_t *drive, byte cmd, byte nsect, ide_handler_t *handler)
 /*
  * Invoked on completion of a special DRIVE_CMD.
  */
-static ide_startstop_t drive_cmd_intr (ide_drive_t *drive)
+static ide_startstop_t drive_cmd_intr(ide_drive_t *drive)
 {
 	struct request *rq = HWGROUP(drive)->rq;
 	u8 *args = rq->buffer;
@@ -1008,11 +1001,7 @@ static ide_startstop_t drive_cmd_intr (ide_drive_t *drive)
 
 	ide__sti();	/* local CPU only */
 	if ((stat & DRQ_STAT) && args && args[3]) {
-		int io_32bit = drive->io_32bit;
-
-		drive->io_32bit = 0;
 		ata_read(drive, &args[4], args[3] * SECTOR_WORDS);
-		drive->io_32bit = io_32bit;
 
 		while (((stat = GET_STAT()) & BUSY_STAT) && retries--)
 			udelay(100);
@@ -1328,12 +1317,6 @@ static ide_drive_t *choose_drive(ide_hwgroup_t *hwgroup)
 	return NULL;
 }
 
-#ifdef CONFIG_BLK_DEV_IDE_TCQ
-ide_startstop_t ide_check_service(ide_drive_t *drive);
-#else
-#define ide_check_service(drive)	(ide_stopped)
-#endif
-
 /*
  * feed commands to a drive until it barfs. used to be part of ide_do_request.
  * called with ide_lock/DRIVE_LOCK held and busy hwgroup
@@ -1343,7 +1326,6 @@ static void ide_queue_commands(ide_drive_t *drive, int masked_irq)
 	ide_hwgroup_t *hwgroup = HWGROUP(drive);
 	ide_startstop_t startstop = -1;
 	struct request *rq;
-	int do_service = 0;
 
 	do {
 		rq = NULL;
@@ -1399,7 +1381,6 @@ static void ide_queue_commands(ide_drive_t *drive, int masked_irq)
 
 		hwgroup->rq = rq;
 
-service:
 		/*
 		 * Some systems have trouble with IDE IRQs arriving while
 		 * the driver is still setting things up.  So, here we disable
@@ -1414,10 +1395,7 @@ service:
 
 		spin_unlock(&ide_lock);
 		ide__sti();	/* allow other IRQs while we start this request */
-		if (!do_service)
-			startstop = start_request(drive, rq);
-		else
-			startstop = ide_check_service(drive);
+		startstop = start_request(drive, rq);
 
 		spin_lock_irq(&ide_lock);
 		if (masked_irq && HWIF(drive)->irq != masked_irq)
@@ -1444,9 +1422,6 @@ service:
 
 	if (startstop == ide_started)
 		return;
-
-	if ((do_service = drive->service_pending))
-		goto service;
 }
 
 /*
@@ -1824,7 +1799,7 @@ void ide_intr(int irq, void *dev_id, struct pt_regs *regs)
 	del_timer(&hwgroup->timer);
 	spin_unlock(&ide_lock);
 
-	if (drive->unmask)
+	if (hwif->unmask)
 		ide__sti();	/* local CPU only */
 	startstop = handler(drive);		/* service this interrupt, may set handler for next interrupt */
 	spin_lock_irq(&ide_lock);
@@ -2572,14 +2547,10 @@ int ide_write_setting (ide_drive_t *drive, ide_settings_t *setting, int val)
 
 static int set_io_32bit(struct ata_device *drive, int arg)
 {
-	if (drive->no_io_32bit)
+	if (drive->channel->no_io_32bit)
 		return -EIO;
 
-	drive->io_32bit = arg;
-#ifdef CONFIG_BLK_DEV_DTC2278
-	if (drive->channel->chipset == ide_dtc2278)
-		drive->channel->drives[!drive->select.b.unit].io_32bit = arg;
-#endif
+	drive->channel->io_32bit = arg;
 
 	return 0;
 }
@@ -2613,11 +2584,10 @@ static int set_pio_mode (ide_drive_t *drive, int arg)
 void ide_add_generic_settings (ide_drive_t *drive)
 {
 /*			drive	setting name		read/write access				read ioctl		write ioctl		data type	min	max				mul_factor	div_factor	data pointer			set function */
-	ide_add_setting(drive,	"io_32bit",		drive->no_io_32bit ? SETTING_READ : SETTING_RW,	HDIO_GET_32BIT,		HDIO_SET_32BIT,		TYPE_BYTE,	0,	1 + (SUPPORT_VLB_SYNC << 1),	1,		1,		&drive->io_32bit,		set_io_32bit);
-	ide_add_setting(drive,	"keepsettings",		SETTING_RW,					HDIO_GET_KEEPSETTINGS,	HDIO_SET_KEEPSETTINGS,	TYPE_BYTE,	0,	1,				1,		1,		&drive->keep_settings,		NULL);
+	ide_add_setting(drive,	"io_32bit",		drive->channel->no_io_32bit ? SETTING_READ : SETTING_RW,	HDIO_GET_32BIT,		HDIO_SET_32BIT,		TYPE_BYTE,	0,	1 + (SUPPORT_VLB_SYNC << 1),	1,		1,		&drive->channel->io_32bit,		set_io_32bit);
 	ide_add_setting(drive,	"pio_mode",		SETTING_WRITE,					-1,			HDIO_SET_PIO_MODE,	TYPE_BYTE,	0,	255,				1,		1,		NULL,				set_pio_mode);
-	ide_add_setting(drive,	"slow",			SETTING_RW,					-1,			-1,			TYPE_BYTE,	0,	1,				1,		1,		&drive->slow,			NULL);
-	ide_add_setting(drive,	"unmaskirq",		drive->no_unmask ? SETTING_READ : SETTING_RW,	HDIO_GET_UNMASKINTR,	HDIO_SET_UNMASKINTR,	TYPE_BYTE,	0,	1,				1,		1,		&drive->unmask,			NULL);
+	ide_add_setting(drive,	"slow",			SETTING_RW,					-1,			-1,			TYPE_BYTE,	0,	1,				1,		1,		&drive->channel->slow,			NULL);
+	ide_add_setting(drive,	"unmaskirq",		drive->channel->no_unmask ? SETTING_READ : SETTING_RW,	HDIO_GET_UNMASKINTR,	HDIO_SET_UNMASKINTR,	TYPE_BYTE,	0,	1,				1,		1,		&drive->channel->unmask,			NULL);
 	ide_add_setting(drive,	"using_dma",		SETTING_RW,					HDIO_GET_DMA,		HDIO_SET_DMA,		TYPE_BYTE,	0,	1,				1,		1,		&drive->using_dma,		set_using_dma);
 	ide_add_setting(drive,	"ide_scsi",		SETTING_RW,					-1,			-1,			TYPE_BYTE,	0,	1,				1,		1,		&drive->scsi,			NULL);
 	ide_add_setting(drive,	"init_speed",		SETTING_RW,					-1,			-1,			TYPE_BYTE,	0,	69,				1,		1,		&drive->init_speed,		NULL);
@@ -3182,7 +3152,7 @@ int __init ide_setup (char *s)
 				drive->autotune = 2;
 				goto done;
 			case -8: /* "slow" */
-				drive->slow = 1;
+				hwif->slow = 1;
 				goto done;
 			case -9: /* "flash" */
 				drive->ata_flash = 1;

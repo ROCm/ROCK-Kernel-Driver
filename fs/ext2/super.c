@@ -25,6 +25,7 @@
 #include <linux/locks.h>
 #include <linux/blkdev.h>
 #include <linux/random.h>
+#include <linux/smp_lock.h>
 #include <asm/uaccess.h>
 
 
@@ -754,7 +755,7 @@ static void ext2_sync_super(struct super_block *sb, struct ext2_super_block *es)
 void ext2_write_super (struct super_block * sb)
 {
 	struct ext2_super_block * es;
-
+	lock_kernel();
 	if (!(sb->s_flags & MS_RDONLY)) {
 		es = EXT2_SB(sb)->s_es;
 
@@ -768,6 +769,7 @@ void ext2_write_super (struct super_block * sb)
 			ext2_commit_super (sb, es);
 	}
 	sb->s_dirt = 0;
+	unlock_kernel();
 }
 
 int ext2_remount (struct super_block * sb, int * flags, char * data)

@@ -78,11 +78,11 @@ static inline void free_area_pmd(pgd_t * dir, unsigned long address, unsigned lo
 	} while (address < end);
 }
 
-void vmfree_area_pages(unsigned long address, unsigned long size)
+void vmfree_area_pages(unsigned long start, unsigned long size)
 {
 	pgd_t * dir;
-	unsigned long start = address;
-	unsigned long end = address + size;
+	unsigned long address = start;
+	unsigned long end = start + size;
 
 	dir = pgd_offset_k(address);
 	flush_cache_all();

@@ -1746,8 +1746,9 @@ void
 jffs_write_super(struct super_block *sb)
 {
 	struct jffs_control *c = (struct jffs_control *)sb->u.generic_sbp;
-
+	lock_kernel();
 	jffs_garbage_collect_trigger(c);
+	unlock_kernel();
 }
 
 static struct super_operations jffs_ops =

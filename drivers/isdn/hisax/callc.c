@@ -20,7 +20,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include "hisax.h"
-#include "../avmb1/capicmd.h"  /* this should be moved in a common place */
+#include <linux/isdn/capicmd.h>
 
 #ifdef MODULE
 #define MOD_USE_COUNT ( GET_USE_COUNT (&__this_module))

@@ -76,7 +76,7 @@ __SYSCALL(__NR_madvise, sys_madvise)
 #define __NR_shmget                             29
 __SYSCALL(__NR_shmget, sys_shmget)
 #define __NR_shmat                              30
-__SYSCALL(__NR_shmat, sys_shmat)
+__SYSCALL(__NR_shmat, wrap_sys_shmat)
 #define __NR_shmctl                             31
 __SYSCALL(__NR_shmctl, sys_shmctl)
 
@@ -460,12 +460,21 @@ __SYSCALL(__NR_lremovexattr, sys_lremovexattr)
 __SYSCALL(__NR_fremovexattr, sys_fremovexattr) 
 #define __NR_tkill	200
 __SYSCALL(__NR_tkill, sys_tkill) 
+#define __NR_time      201
+__SYSCALL(__NR_time, sys_time)
+#define __NR_futex     202
+__SYSCALL(__NR_futex, sys_futex)
+#define __NR_sched_setaffinity    203
+__SYSCALL(__NR_sched_setaffinity, sys_sched_setaffinity)
+#define __NR_sched_getaffinity     204
+__SYSCALL(__NR_sched_getaffinity, sys_sched_getaffinity)
 
-#define __NR_syscall_max __NR_tkill
+
+#define __NR_syscall_max __NR_sched_getaffinity
 
 #ifndef __NO_STUBS
 
-/* user-visible error numbers are in the range -1 - -124: see <asm-i386/errno.h> */
+/* user-visible error numbers are in the range -1 - -4095 */
 
 #define __syscall_clobber "r11","rcx","memory" 
 

@@ -70,6 +70,8 @@
  *
  * HISTORY:
  *
+ * 2002-04-19	Control/bulk/interrupt submit no longer uses giveback() on
+ *	errors in submit path.  Bugfixes to interrupt scheduling/processing.
  * 2002-03-05	Initial high-speed ISO support; reduce ITD memory; shift
  *	more checking to generic hcd framework (db).  Make it work with
  *	Philips EHCI; reduce PCI traffic; shorten IRQ path (Rory Bolt).
@@ -81,7 +83,7 @@
  * 2001-June	Works with usb-storage and NEC EHCI on 2.4
  */
 
-#define DRIVER_VERSION "$Revision: 0.27 $"
+#define DRIVER_VERSION "$Revision: 0.31 $"
 #define DRIVER_AUTHOR "David Brownell"
 #define DRIVER_DESC "USB 2.0 'Enhanced' Host Controller (EHCI) Driver"
 
@@ -512,8 +514,7 @@ static int ehci_urb_enqueue (
 	case PIPE_BULK:
 		if (!qh_urb_transaction (ehci, urb, &qtd_list, mem_flags))
 			return -ENOMEM;
-		submit_async (ehci, urb, &qtd_list, mem_flags);
-		break;
+		return submit_async (ehci, urb, &qtd_list, mem_flags);
 
 	case PIPE_INTERRUPT:
 		if (!qh_urb_transaction (ehci, urb, &qtd_list, mem_flags))
@@ -531,8 +532,9 @@ static int ehci_urb_enqueue (
 		return -ENOSYS;
 #endif /* have_split_iso */
 
+	default:	/* can't happen */
+		return -ENOSYS;
 	}
-	return 0;
 }
 
 /* remove from hardware lists
@@ -587,7 +589,7 @@ dbg ("wait for dequeue: state %d, reclaim %p, hcd state %d",
 		// itd or sitd ...
 
 		// wait till next completion, do it then.
-		// completion irqs can wait up to 128 msec,
+		// completion irqs can wait up to 1024 msec,
 		urb->transfer_flags |= EHCI_STATE_UNLINK;
 		return 0;
 	}
@@ -614,10 +616,7 @@ static void ehci_free_config (struct usb_hcd *hcd, struct usb_device *udev)
 		if (dev->ep [i]) {
 			struct ehci_qh		*qh;
 
-			// FIXME:  this might be an itd/sitd too ...
-			// or an interrupt urb (not on async list)
-			// can use "union ehci_shadow"
-
+			/* dev->ep never has ITDs or SITDs */
 			qh = (struct ehci_qh *) dev->ep [i];
 			vdbg ("free_config, ep 0x%02x qh %p", i, qh);
 			if (!list_empty (&qh->qtd_list)) {

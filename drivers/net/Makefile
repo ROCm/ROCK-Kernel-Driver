@@ -18,7 +18,6 @@ O_TARGET := net.o
 export-objs     :=	8390.o arlan.o aironet4500_core.o aironet4500_card.o \
 			ppp_async.o ppp_generic.o slhc.o pppox.o auto_irq.o \
 			net_init.o mii.o
-list-multi	:=	rcpci.o
 rcpci-objs	:=	rcpci45.o rclanmtl.o
 
 ifeq ($(CONFIG_E100),y)
@@ -236,7 +235,3 @@ include $(TOPDIR)/Rules.make
 
 clean:
 	rm -f core *.o *.a *.s
-
-rcpci.o: $(rcpci-objs)
-	$(LD) -r -o $@ $(rcpci-objs)
-

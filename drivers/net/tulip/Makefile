@@ -23,14 +23,9 @@ obj-$(CONFIG_TULIP)		+= tulip.o
 obj-$(CONFIG_DE4X5)		+= de4x5.o
 
 # Declare multi-part drivers.
-list-multi			:= tulip.o
 
 tulip-objs			:= eeprom.o interrupt.o media.o \
 				   timer.o tulip_core.o		\
 				   21142.o pnic.o pnic2.o
 
 include $(TOPDIR)/Rules.make
-
-# Link rules for multi-part drivers.
-tulip.o: $(tulip-objs)
-	$(LD) -r -o $@ $(tulip-objs)

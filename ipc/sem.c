@@ -789,12 +789,75 @@ asmlinkage long sys_semctl (int semid, int semnum, int cmd, union semun arg)
 	}
 }
 
-static struct sem_undo* freeundos(struct sem_array *sma, struct sem_undo* un)
+static inline void lock_semundo(void)
+{
+	struct sem_undo_list *undo_list;
+
+	undo_list = current->sysvsem.undo_list;
+	if ((undo_list != NULL) && (atomic_read(&undo_list->refcnt) != 1))
+		spin_lock(&undo_list->lock);
+}
+
+/* This code has an interaction with copy_semundo().
+ * Consider; two tasks are sharing the undo_list. task1
+ * acquires the undo_list lock in lock_semundo().  If task2 now
+ * exits before task1 releases the lock (by calling
+ * unlock_semundo()), then task1 will never call spin_unlock().
+ * This leave the sem_undo_list in a locked state.  If task1 now creats task3
+ * and once again shares the sem_undo_list, the sem_undo_list will still be
+ * locked, and future SEM_UNDO operations will deadlock.  This case is
+ * dealt with in copy_semundo() by having it reinitialize the spin lock when 
+ * the refcnt goes from 1 to 2.
+ */
+static inline void unlock_semundo(void)
+{
+	struct sem_undo_list *undo_list;
+
+	undo_list = current->sysvsem.undo_list;
+	if ((undo_list != NULL) && (atomic_read(&undo_list->refcnt) != 1))
+		spin_unlock(&undo_list->lock);
+}
+
+
+/* If the task doesn't already have a undo_list, then allocate one
+ * here.  We guarantee there is only one thread using this undo list,
+ * and current is THE ONE
+ *
+ * If this allocation and assignment succeeds, but later
+ * portions of this code fail, there is no need to free the sem_undo_list.
+ * Just let it stay associated with the task, and it'll be freed later
+ * at exit time.
+ *
+ * This can block, so callers must hold no locks.
+ */
+static inline int get_undo_list(struct sem_undo_list **undo_listp)
+{
+	struct sem_undo_list *undo_list;
+	int size;
+
+	undo_list = current->sysvsem.undo_list;
+	if (!undo_list) {
+		size = sizeof(struct sem_undo_list);
+		undo_list = (struct sem_undo_list *) kmalloc(size, GFP_KERNEL);
+		if (undo_list == NULL)
+			return -ENOMEM;
+		memset(undo_list, 0, size);
+		/* don't initialize unodhd->lock here.  It's done
+		 * in copy_semundo() instead.
+		 */
+		atomic_set(&undo_list->refcnt, 1);
+		current->sysvsem.undo_list = undo_list;
+	}
+	*undo_listp = undo_list;
+	return 0;
+}
+
+static struct sem_undo* freeundos(struct sem_undo* un)
 {
 	struct sem_undo* u;
 	struct sem_undo** up;
 
-	for(up = &current->semundo;(u=*up);up=&u->proc_next) {
+	for(up = &current->sysvsem.undo_list->proc_list;(u=*up);up=&u->proc_next) {
 		if(un==u) {
 			un=u->proc_next;
 			*up=un;
@@ -806,33 +869,87 @@ static struct sem_undo* freeundos(struct sem_array *sma, struct sem_undo* un)
 	return un->proc_next;
 }
 
-/* returns without sem_lock on error! */
+static inline struct sem_undo *find_undo(int semid)
+{
+	struct sem_undo *un;
+
+	un = NULL;
+	if (current->sysvsem.undo_list != NULL) {
+		un = current->sysvsem.undo_list->proc_list;
+	}
+	while(un != NULL) {
+		if(un->semid==semid)
+			break;
+		if(un->semid==-1)
+			un=freeundos(un);
+		 else
+			un=un->proc_next;
+	}
+	return un;
+}
+
+/* returns without sem_lock and semundo list locks on error! */
 static int alloc_undo(struct sem_array *sma, struct sem_undo** unp, int semid, int alter)
 {
 	int size, nsems, error;
-	struct sem_undo *un;
+	struct sem_undo *un, *new_un;
+	struct sem_undo_list *undo_list;
+	unsigned long	saved_add_count;
+
 
 	nsems = sma->sem_nsems;
-	size = sizeof(struct sem_undo) + sizeof(short)*nsems;
+	saved_add_count = 0;
+	if (current->sysvsem.undo_list != NULL)
+		saved_add_count = current->sysvsem.undo_list->add_count;
 	sem_unlock(semid);
+	unlock_semundo();
 
+	error = get_undo_list(&undo_list);
+	if (error)
+		return error;
+
+	size = sizeof(struct sem_undo) + sizeof(short)*nsems;
 	un = (struct sem_undo *) kmalloc(size, GFP_KERNEL);
 	if (!un)
 		return -ENOMEM;
 
 	memset(un, 0, size);
+	lock_semundo();
 	error = sem_revalidate(semid, sma, nsems, alter ? S_IWUGO : S_IRUGO);
 	if(error) {
+		unlock_semundo();
 		kfree(un);
 		return error;
 	}
 
-	un->semadj = (short *) &un[1];
-	un->semid = semid;
-	un->proc_next = current->semundo;
-	current->semundo = un;
-	un->id_next = sma->undo;
-	sma->undo = un;
+
+	/* alloc_undo has just
+	 * released all locks and reacquired them. 
+	 * But, another thread may have
+	 * added the semundo we were looking for
+	 * during that time.
+	 * So, we check for it again.
+	 * only initialize and add the new one
+	 * if we don't discover one.
+	 */
+	new_un = NULL;
+	if (current->sysvsem.undo_list->add_count != saved_add_count)
+		new_un = find_undo(semid);
+
+	if (new_un != NULL) {
+		if (sma->undo != new_un)
+			BUG();
+		kfree(un);
+		un = new_un;
+	} else {
+		current->sysvsem.undo_list->add_count++;
+		un->semadj = (short *) &un[1];
+		un->semid = semid;
+		un->proc_next = undo_list->proc_list;
+		undo_list->proc_list = un;
+		un->id_next = sma->undo;
+		sma->undo = un;
+	}
 	*unp = un;
 	return 0;
 }
@@ -847,6 +964,7 @@ asmlinkage long sys_semop (int semid, struct sembuf *tsops, unsigned nsops)
 	int undos = 0, decrease = 0, alter = 0;
 	struct sem_queue queue;
 
+
 	if (nsops < 1 || semid < 0)
 		return -EINVAL;
 	if (nsops > sc_semopm)
@@ -860,17 +978,18 @@ asmlinkage long sys_semop (int semid, struct sembuf *tsops, unsigned nsops)
 		error=-EFAULT;
 		goto out_free;
 	}
+	lock_semundo();
 	sma = sem_lock(semid);
 	error=-EINVAL;
 	if(sma==NULL)
-		goto out_free;
+		goto out_semundo_free;
 	error = -EIDRM;
 	if (sem_checkid(sma,semid))
-		goto out_unlock_free;
+		goto out_unlock_semundo_free;
 	error = -EFBIG;
 	for (sop = sops; sop < sops + nsops; sop++) {
 		if (sop->sem_num >= sma->sem_nsems)
-			goto out_unlock_free;
+			goto out_unlock_semundo_free;
 		if (sop->sem_flg & SEM_UNDO)
 			undos++;
 		if (sop->sem_op < 0)
@@ -882,24 +1001,18 @@ asmlinkage long sys_semop (int semid, struct sembuf *tsops, unsigned nsops)
 
 	error = -EACCES;
 	if (ipcperms(&sma->sem_perm, alter ? S_IWUGO : S_IRUGO))
-		goto out_unlock_free;
+		goto out_unlock_semundo_free;
 	if (undos) {
 		/* Make sure we have an undo structure
 		 * for this process and this semaphore set.
 		 */
-		un=current->semundo;
-		while(un != NULL) {
-			if(un->semid==semid)
-				break;
-			if(un->semid==-1)
-				un=freeundos(sma,un);
-			 else
-				un=un->proc_next;
-		}
+		
+		un = find_undo(semid);
 		if (!un) {
 			error = alloc_undo(sma,&un,semid,alter);
-			if(error)
+			if (error)
 				goto out_free;
+
 		}
 	} else
 		un = NULL;
@@ -923,7 +1036,7 @@ asmlinkage long sys_semop (int semid, struct sembuf *tsops, unsigned nsops)
 		append_to_queue(sma ,&queue);
 	else
 		prepend_to_queue(sma ,&queue);
-	current->semsleeping = &queue;
+	current->sysvsem.sleep_list = &queue;
 
 	for (;;) {
 		struct sem_array* tmp;
@@ -931,16 +1044,18 @@ asmlinkage long sys_semop (int semid, struct sembuf *tsops, unsigned nsops)
 		queue.sleeper = current;
 		current->state = TASK_INTERRUPTIBLE;
 		sem_unlock(semid);
+		unlock_semundo();
 
 		schedule();
 
+		lock_semundo();
 		tmp = sem_lock(semid);
 		if(tmp==NULL) {
 			if(queue.prev != NULL)
 				BUG();
-			current->semsleeping = NULL;
+			current->sysvsem.sleep_list = NULL;
 			error = -EIDRM;
-			goto out_free;
+			goto out_semundo_free;
 		}
 		/*
 		 * If queue.status == 1 we where woken up and
@@ -960,21 +1075,65 @@ asmlinkage long sys_semop (int semid, struct sembuf *tsops, unsigned nsops)
 			if (queue.prev) /* got Interrupt */
 				break;
 			/* Everything done by update_queue */
-			current->semsleeping = NULL;
-			goto out_unlock_free;
+			current->sysvsem.sleep_list = NULL;
+			goto out_unlock_semundo_free;
 		}
 	}
-	current->semsleeping = NULL;
+	current->sysvsem.sleep_list = NULL;
 	remove_from_queue(sma,&queue);
 update:
 	if (alter)
 		update_queue (sma);
-out_unlock_free:
+out_unlock_semundo_free:
 	sem_unlock(semid);
+out_semundo_free:
+	unlock_semundo();
 out_free:
 	if(sops != fast_sops)
 		kfree(sops);
 	return error;
+}
+
+/* If CLONE_SYSVSEM is set, establish sharing of SEM_UNDO state between
+ * parent and child tasks.
+ *
+ * See the notes above unlock_semundo() regarding the spin_lock_init()
+ * in this code.  Initialize the undo_list->lock here instead of get_undo_list()
+ * because of the reasoning in the comment above unlock_semundo.
+ */
+
+int copy_semundo(unsigned long clone_flags, struct task_struct *tsk)
+{
+	struct sem_undo_list *undo_list;
+	int error;
+
+	if (clone_flags & CLONE_SYSVSEM) {
+		error = get_undo_list(&undo_list);
+		if (error)
+			return error;
+		if (atomic_read(&undo_list->refcnt) == 1)
+			spin_lock_init(&undo_list->lock);
+		atomic_inc(&undo_list->refcnt);
+		tsk->sysvsem.undo_list = undo_list;
+	} else 
+		tsk->sysvsem.undo_list = NULL;
+
+	return 0;
+}
+
+static inline void __exit_semundo(struct task_struct *tsk)
+{
+	struct sem_undo_list *undo_list;
+
+	undo_list = tsk->sysvsem.undo_list;
+	if (!atomic_dec_and_test(&undo_list->refcnt))
+		kfree(undo_list);
+}
+
+void exit_semundo(struct task_struct *tsk)
+{
+	if (tsk->sysvsem.undo_list != NULL)
+		__exit_semundo(tsk);
 }
 
 /*
@@ -994,6 +1153,7 @@ void sem_exit (void)
 	struct sem_queue *q;
 	struct sem_undo *u, *un = NULL, **up, **unp;
 	struct sem_array *sma;
+	struct sem_undo_list *undo_list;
 	int nsems, i;
 
 	lock_kernel();
@@ -1001,10 +1161,10 @@ void sem_exit (void)
 	/* If the current process was sleeping for a semaphore,
 	 * remove it from the queue.
 	 */
-	if ((q = current->semsleeping)) {
+	if ((q = current->sysvsem.sleep_list)) {
 		int semid = q->id;
 		sma = sem_lock(semid);
-		current->semsleeping = NULL;
+		current->sysvsem.sleep_list = NULL;
 
 		if (q->prev) {
 			if(sma==NULL)
@@ -1015,7 +1175,14 @@ void sem_exit (void)
 			sem_unlock(semid);
 	}
 
-	for (up = &current->semundo; (u = *up); *up = u->proc_next, kfree(u)) {
+	undo_list = current->sysvsem.undo_list;
+	if ((undo_list == NULL) || (atomic_read(&undo_list->refcnt) != 1))
+		return;
+
+	/* There's no need to hold the semundo list lock, as current
+         * is the last task exiting for this undo list.
+	 */
+	for (up = &undo_list->proc_list; (u = *up); *up = u->proc_next, kfree(u)) {
 		int semid = u->semid;
 		if(semid == -1)
 			continue;
@@ -1053,7 +1220,7 @@ found:
 next_entry:
 		sem_unlock(semid);
 	}
-	current->semundo = NULL;
+	__exit_semundo(current);
 
 	unlock_kernel();
 }

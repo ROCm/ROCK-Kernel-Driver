@@ -25,8 +25,8 @@ enum vsyscall_num {
 /* vsyscall space (readonly) */
 extern long __vxtime_sequence[2];
 extern int __delay_at_last_interrupt;
-extern unsigned long __last_tsc_low;
-extern unsigned long __fast_gettimeoffset_quotient;
+extern unsigned int __last_tsc_low;
+extern unsigned int __fast_gettimeoffset_quotient;
 extern struct timeval __xtime;
 extern volatile unsigned long __jiffies;
 extern unsigned long __wall_jiffies;
@@ -35,7 +35,7 @@ extern struct timezone __sys_tz;
 /* kernel space (writeable) */
 extern unsigned long last_tsc_low;
 extern int delay_at_last_interrupt;
-extern unsigned long fast_gettimeoffset_quotient;
+extern unsigned int fast_gettimeoffset_quotient;
 extern unsigned long wall_jiffies;
 extern struct timezone sys_tz;
 extern long vxtime_sequence[2];

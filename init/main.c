@@ -272,9 +272,7 @@ static void __init smp_init(void)
 #define smp_init()	do { } while (0)
 #endif
 
-static inline void setup_per_cpu_areas(void)
-{
-}
+static inline void setup_per_cpu_areas(void) { }
 
 #else
 

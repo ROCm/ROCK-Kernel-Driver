@@ -549,8 +549,11 @@ int ide_start_dma(struct ata_channel *hwif, ide_drive_t *drive, ide_dma_action_t
 	/* This can happen with drivers abusing the special request field.
 	 */
 
-	if (!ar)
+	if (!ar) {
+		printk(KERN_ERR "DMA without ATA request\n");
+
 		return 1;
+	}
 
 	if (rq_data_dir(ar->ar_rq) == READ)
 		reading = 1 << 3;
@@ -599,13 +602,19 @@ int ide_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 			printk("%s: DMA disabled\n", drive->name);
 		case ide_dma_off_quietly:
 			set_high = 0;
-			drive->using_tcq = 0;
 			outb(inb(dma_base+2) & ~(1<<(5+unit)), dma_base+2);
+#ifdef CONFIG_BLK_DEV_IDE_TCQ
+			hwif->dmaproc(ide_dma_queued_off, drive);
+#endif
 		case ide_dma_on:
 			ide_toggle_bounce(drive, set_high);
 			drive->using_dma = (func == ide_dma_on);
-			if (drive->using_dma)
+			if (drive->using_dma) {
 				outb(inb(dma_base+2)|(1<<(5+unit)), dma_base+2);
+#ifdef CONFIG_BLK_DEV_IDE_TCQ_DEFAULT
+				hwif->dmaproc(ide_dma_queued_on, drive);
+#endif
+			}
 			return 0;
 		case ide_dma_check:
 			return config_drive_for_dma (drive);

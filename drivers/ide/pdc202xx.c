@@ -1268,11 +1268,8 @@ void __init ide_init_pdc202xx(struct ata_channel *hwif)
 
 #undef CONFIG_PDC202XX_32_UNMASK
 #ifdef CONFIG_PDC202XX_32_UNMASK
-	hwif->drives[0].io_32bit = 1;
-	hwif->drives[1].io_32bit = 1;
-
-	hwif->drives[0].unmask = 1;
-	hwif->drives[1].unmask = 1;
+	hwif->io_32bit = 1;
+	hwif->unmask = 1;
 #endif
 
 #ifdef CONFIG_BLK_DEV_IDEDMA

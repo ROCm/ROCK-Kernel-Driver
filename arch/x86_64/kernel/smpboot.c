@@ -47,6 +47,8 @@
 #include <asm/mtrr.h>
 #include <asm/pgalloc.h>
 #include <asm/desc.h>
+#include <asm/kdebug.h>
+#include <asm/tlbflush.h>
 
 /* Set if we find a B stepping CPU			*/
 static int smp_b_stepping;
@@ -117,8 +119,8 @@ static unsigned char *trampoline_base;
 
 static unsigned long __init setup_trampoline(void)
 {
-	extern __u32 tramp_gdt_ptr; 
-	tramp_gdt_ptr = (__u32)virt_to_phys(&gdt_table); 
+	extern volatile __u32 tramp_gdt_ptr; 
+	tramp_gdt_ptr = __pa_symbol(&gdt_table); 
 	memcpy(trampoline_base, trampoline_data, trampoline_end - trampoline_data);
 	return virt_to_phys(trampoline_base);
 }
@@ -199,34 +201,11 @@ static unsigned long long tsc_values[NR_CPUS];
 
 #define NR_LOOPS 5
 
-extern unsigned long fast_gettimeoffset_quotient;
+extern unsigned int fast_gettimeoffset_quotient;
 
-/*
- * accurate 64-bit/32-bit division, expanded to 32-bit divisions and 64-bit
- * multiplication. Not terribly optimized but we need it at boot time only
- * anyway.
- *
- * result == a / b
- *	== (a1 + a2*(2^32)) / b
- *	== a1/b + a2*(2^32/b)
- *	== a1/b + a2*((2^32-1)/b) + a2/b + (a2*((2^32-1) % b))/b
- *		    ^---- (this multiplication can overflow)
- */
-
-static unsigned long long div64 (unsigned long long a, unsigned long b0)
+static inline unsigned long long div64 (unsigned long long a, unsigned long b)
 {
-	unsigned int a1, a2;
-	unsigned long long res;
-
-	a1 = ((unsigned int*)&a)[0];
-	a2 = ((unsigned int*)&a)[1];
-
-	res = a1/b0 +
-		(unsigned long long)a2 * (unsigned long long)(0xffffffff/b0) +
-		a2 / b0 +
-		(a2 * (0xffffffff % b0)) / b0;
-
-	return res;
+	return a/b;
 }
 
 static void __init synchronize_tsc_bp (void)
@@ -308,14 +287,14 @@ static void __init synchronize_tsc_bp (void)
 			if (tsc_values[i] < avg)
 				realdelta = -realdelta;
 
-			printk("BIOS BUG: CPU#%d improperly initialized, has %ld usecs TSC skew! FIXED.\n", i, realdelta);
+			printk("BIOS BUG: CPU#%d improperly initialized, has %ld usecs TSC skew! FIXED.\n",
+				i, realdelta);
 		}
 
 		sum += delta;
 	}
 	if (!buggy)
 		printk("passed.\n");
-		;
 }
 
 static void __init synchronize_tsc_ap (void)
@@ -428,7 +407,8 @@ void __init smp_callin(void)
 	 */
  	smp_store_cpu_info(cpuid);
 
-	disable_APIC_timer();
+	notify_die(DIE_CPUINIT, "cpuinit", NULL, 0);
+
 	/*
 	 * Allow the master to continue.
 	 */
@@ -450,6 +430,9 @@ extern int cpu_idle(void);
  */
 int __init start_secondary(void *unused)
 {
+	int var;
+	printk("rsp %p\n",&var);
+
 	/*
 	 * Dont put anything before smp_callin(), SMP
 	 * booting is too fragile that we want to limit the
@@ -459,7 +442,6 @@ int __init start_secondary(void *unused)
 	smp_callin();
 	while (!atomic_read(&smp_commenced))
 		rep_nop();
-	enable_APIC_timer();
 	/*
 	 * low-memory mappings have been cleared, flush them from
 	 * the local TLBs too.
@@ -477,6 +459,8 @@ int __init start_secondary(void *unused)
  */
 void __init initialize_secondary(void)
 {
+	struct task_struct *me = stack_current();
+
 	/*
 	 * We don't actually need to load the full TSS,
 	 * basically just the stack pointer and the eip.
@@ -486,17 +470,17 @@ void __init initialize_secondary(void)
 		"movq %0,%%rsp\n\t"
 		"jmp *%1"
 		:
-		:"r" (current->thread.rsp),"r" (current->thread.rip));
+		:"r" (me->thread.rsp),"r" (me->thread.rip));
 }
 
-extern void *init_rsp; 
+extern volatile unsigned long init_rsp; 
 extern void (*initial_code)(void);
 
 static int __init fork_by_hand(void)
 {
 	struct pt_regs regs;
 	/*
-	 * don't care about the eip and regs settings since
+	 * don't care about the rip and regs settings since
 	 * we'll never reschedule the forked task.
 	 */
 	return do_fork(CLONE_VM|CLONE_PID, 0, &regs, 0);
@@ -547,6 +531,8 @@ static void __init do_boot_cpu (int apicid)
 	int timeout, num_starts, j, cpu;
 	unsigned long start_eip;
 
+	printk("do_boot_cpu cpucount = %d\n", cpucount); 
+
 	cpu = ++cpucount;
 	/*
 	 * We can't use kernel_thread since we must avoid to
@@ -567,21 +553,21 @@ static void __init do_boot_cpu (int apicid)
 
 	x86_cpu_to_apicid[cpu] = apicid;
 	x86_apicid_to_cpu[apicid] = cpu;
-	idle->thread.rip = (unsigned long) start_secondary;
-
-	init_rsp = (void *) (THREAD_SIZE + (char *)idle->thread_info);
+	idle->thread.rip = (unsigned long)start_secondary;
+//	idle->thread.rsp = (unsigned long)idle->thread_info + THREAD_SIZE - 512;
 
 	unhash_process(idle);
+
 	cpu_pda[cpu].pcurrent = idle;
-	cpu_pda[cpu].kernelstack = init_rsp - PDA_STACKOFFSET; 
 
 	/* start_eip had better be page-aligned! */
 	start_eip = setup_trampoline();
 
-	/* So we see what's up   */
-	printk("Booting processor %d/%d eip %lx\n", cpu, apicid, start_eip);
-
+	init_rsp = (unsigned long)idle->thread_info + PAGE_SIZE + 1024;
 	initial_code = initialize_secondary;
+
+	printk("Booting processor %d/%d rip %lx rsp %lx rsp2 %lx\n", cpu, apicid, 
+	       start_eip, idle->thread.rsp, init_rsp);
 
 	/*
 	 * This grunge runs the startup process for

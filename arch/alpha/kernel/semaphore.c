@@ -5,8 +5,8 @@
  * (C) Copyright 1999, 2000 Richard Henderson
  */
 
+#include <linux/errno.h>
 #include <linux/sched.h>
-
 
 /*
  * Semaphores are implemented using a two-way counter:

@@ -15,26 +15,13 @@
 #ifdef __KERNEL__
 #ifndef __ASSEMBLY__
 
-#include <linux/config.h>
-
-#ifdef CONFIG_X86_USE_3DNOW
-
+#if 0 
 #include <asm/mmx.h>
-
 #define clear_page(page)	mmx_clear_page((void *)(page))
 #define copy_page(to,from)	mmx_copy_page(to,from)
-
 #else
-
-/*
- *	On older X86 processors its not a win to use MMX here it seems.
- *	Maybe the K6-III ?
- */
-
 #define clear_page(page)	memset((void *)(page), 0, PAGE_SIZE)
-
 #define copy_page(to,from)	memcpy((void *)(to), (void *)(from), PAGE_SIZE)
-
 #endif
 
 #define clear_user_page(page, vaddr)	clear_page(page)
@@ -46,7 +33,7 @@
 typedef struct { unsigned long pte; } pte_t;
 typedef struct { unsigned long pmd; } pmd_t;
 typedef struct { unsigned long pgd; } pgd_t;
-typedef struct { unsigned long level4; } level4_t;
+typedef struct { unsigned long pml4; } pml4_t;
 #define PTE_MASK	PAGE_MASK
 
 typedef struct { unsigned long pgprot; } pgprot_t;
@@ -54,7 +41,7 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 #define pte_val(x)	((x).pte)
 #define pmd_val(x)	((x).pmd)
 #define pgd_val(x)	((x).pgd)
-#define level4_val(x)	((x).level4)
+#define pml4_val(x)	((x).pml4)
 #define pgprot_val(x)	((x).pgprot)
 
 #define __pte(x) ((pte_t) { (x) } )
@@ -68,25 +55,24 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 /* to align the pointer to the (next) page boundary */
 #define PAGE_ALIGN(addr)	(((addr)+PAGE_SIZE-1)&PAGE_MASK)
 
-
+/* See Documentation/x86_64/mm.txt for a description of the layout. */
 #define __START_KERNEL		0xffffffff80100000
 #define __START_KERNEL_map	0xffffffff80000000
-#define __PAGE_OFFSET           0xffff800000000000
+#define __PAGE_OFFSET           0x0000010000000000
 
 #ifndef __ASSEMBLY__
 
 /*
- * Tell the user there is some problem.
+ * Tell the user there is some problem.  The exception handler decodes this frame.
  */ 
-
 struct bug_frame { 
-	unsigned short ud2;          
+       unsigned char ud2[2];          
 	char *filename;    /* should use 32bit offset instead, but the assembler doesn't like it */ 
 	unsigned short line; 
 } __attribute__((packed)); 
-
 #define BUG() asm volatile("ud2 ; .quad %c1 ; .short %c0" :: "i"(__LINE__), "i" (__FILE__))
-#define PAGE_BUG(page) BUG(); 
+#define PAGE_BUG(page) BUG()
+void out_of_line_bug(void);
 
 /* Pure 2^n version of get_order */
 extern __inline__ int get_order(unsigned long size)
@@ -102,15 +88,24 @@ extern __inline__ int get_order(unsigned long size)
 	return order;
 }
 
-static unsigned long start_kernel_map __attribute__((unused)) = __START_KERNEL_map; /* FIXME: workaround gcc bug */
-
 #endif /* __ASSEMBLY__ */
 
 #define PAGE_OFFSET		((unsigned long)__PAGE_OFFSET)
-#define __pa(x)			(((unsigned long)(x)>=start_kernel_map)?(unsigned long)(x) - (unsigned long)start_kernel_map:(unsigned long)(x) - PAGE_OFFSET)
+
+/* Note: __pa(&symbol_visible_to_c) should be always replaced with __pa_symbol.
+   Otherwise you risk miscompilation. */ 
+#define __pa(x)			(((unsigned long)(x)>=__START_KERNEL_map)?(unsigned long)(x) - (unsigned long)__START_KERNEL_map:(unsigned long)(x) - PAGE_OFFSET)
+/* __pa_symbol should be used for C visible symbols.
+   This seems to be the official gcc blessed way to do such arithmetic. */ 
+#define __pa_symbol(x)		\
+	({unsigned long v;  \
+	  asm("" : "=r" (v) : "0" (x)); \
+	  __pa(v); })
+
 #define __va(x)			((void *)((unsigned long)(x)+PAGE_OFFSET))
 #define virt_to_page(kaddr)	(mem_map + (__pa(kaddr) >> PAGE_SHIFT))
 #define VALID_PAGE(page)	((page - mem_map) < max_mapnr)
+
 
 #define VM_DATA_DEFAULT_FLAGS  (VM_READ | VM_WRITE | VM_EXEC | \
                                 VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC)

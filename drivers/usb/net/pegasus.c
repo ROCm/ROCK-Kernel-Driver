@@ -469,20 +469,11 @@ static inline int reset_mac(pegasus_t * pegasus)
 
 static int enable_net_traffic(struct net_device *dev, struct usb_device *usb)
 {
-	__u16 linkpart, bmsr;
+	__u16 linkpart;
 	__u8 data[4];
 	pegasus_t *pegasus = dev->priv;
 
-	read_mii_word(pegasus, pegasus->phy, MII_BMSR, &bmsr);
-	read_mii_word(pegasus, pegasus->phy, MII_BMSR, &bmsr);
-	if (!(bmsr & BMSR_LSTATUS) && !loopback)
-		warn("%s: link NOT established (%04x) - check the cable.",
-		     dev->name, bmsr);
-	if (read_mii_word(pegasus, pegasus->phy, MII_LPA, &linkpart))
-		return 2;
-	if (!(linkpart & 1))
-		warn("link partner stat %x", linkpart);
-
+	read_mii_word(pegasus, pegasus->phy, MII_LPA, &linkpart);
 	data[0] = 0xc9;
 	data[1] = 0;
 	if (linkpart & (ADVERTISE_100FULL | ADVERTISE_10FULL))
@@ -529,6 +520,8 @@ static void read_bulk_callback(struct urb *urb)
 		dbg("reset MAC");
 		pegasus->flags &= ~PEGASUS_RX_BUSY;
 		break;
+	case -ENOENT:
+		return;
 	default:
 		dbg("%s: RX status %d", net->name, urb->status);
 		goto goon;
@@ -551,10 +544,8 @@ static void read_bulk_callback(struct urb *urb)
 	}
 	pkt_len = (rx_status & 0xfff) - 8;
 
-	tasklet_schedule(&pegasus->rx_tl);
-
 	if (!pegasus->rx_skb)
-		return;
+		goto tl_sched;
 
 	skb_put(pegasus->rx_skb, pkt_len);
 	pegasus->rx_skb->protocol = eth_type_trans(pegasus->rx_skb, net);
@@ -562,7 +553,7 @@ static void read_bulk_callback(struct urb *urb)
 
 	if (!(skb = dev_alloc_skb(PEGASUS_MTU + 2))) {
 		pegasus->rx_skb = NULL;
-		return;
+		goto tl_sched;
 	}
 	
 	skb->dev = net;
@@ -575,10 +566,17 @@ goon:
 		      usb_rcvbulkpipe(pegasus->usb, 1),
 		      pegasus->rx_skb->data, PEGASUS_MTU + 8,
 		      read_bulk_callback, pegasus);
-	if (usb_submit_urb(pegasus->rx_urb, GFP_ATOMIC))
+	if (usb_submit_urb(pegasus->rx_urb, GFP_ATOMIC)) {
 		pegasus->flags |= PEGASUS_RX_URB_FAIL;
-	else
+		goto tl_sched;
+	} else {
 		pegasus->flags &= ~PEGASUS_RX_URB_FAIL;
+	}
+	
+	return;
+	
+tl_sched:
+	tasklet_schedule(&pegasus->rx_tl);
 }
 
 static void rx_fixup(unsigned long data)
@@ -587,11 +585,10 @@ static void rx_fixup(unsigned long data)
 
 	pegasus = (pegasus_t *)data;
 
-	if (pegasus->flags & PEGASUS_RX_URB_FAIL) {
-		goto try_again;
-	}
-	if (pegasus->rx_skb)
-		return;
+	if (pegasus->flags & PEGASUS_RX_URB_FAIL)
+		if (pegasus->rx_skb)
+			goto try_again;
+
 	if (!(pegasus->rx_skb = dev_alloc_skb(PEGASUS_MTU + 2))) {
 		tasklet_schedule(&pegasus->rx_tl);
 		return;
@@ -655,8 +652,12 @@ static void intr_callback(struct urb *urb)
 			pegasus->stats.tx_aborted_errors++;
 		if (d[0] & LATE_COL)
 			pegasus->stats.tx_window_errors++;
-		if (d[0] & (NO_CARRIER | LOSS_CARRIER))
+		if (d[0] & (NO_CARRIER | LOSS_CARRIER)) {
 			pegasus->stats.tx_carrier_errors++;
+			netif_carrier_off(net);
+		} else {
+			netif_carrier_on(net);
+		}
 	}
 }
 #endif

@@ -35,29 +35,26 @@ SECTIONS
 
   _etext = .;
 
-  .data : {
-    *(.data)
-  }
-
+  _got_start = .;
+  .got			: { *(.got) }
+  _got_end = .;
+  .got.plt		: { *(.got.plt) }
+  .data			: { *(.data) }
   _edata = .;
 
   . = BSS_START;
   __bss_start = .;
-  .bss : {
-    *(.bss)
-  }
+  .bss			: { *(.bss) }
   _end = .;
 
-  .stack : {
-    *(.stack)
-  }
+  .stack (NOLOAD)	: { *(.stack) }
 
-  .stab 0 : { *(.stab) }
-  .stabstr 0 : { *(.stabstr) }
-  .stab.excl 0 : { *(.stab.excl) }
-  .stab.exclstr 0 : { *(.stab.exclstr) }
-  .stab.index 0 : { *(.stab.index) }
-  .stab.indexstr 0 : { *(.stab.indexstr) }
-  .comment 0 : { *(.comment) }
+  .stab 0		: { *(.stab) }
+  .stabstr 0		: { *(.stabstr) }
+  .stab.excl 0		: { *(.stab.excl) }
+  .stab.exclstr 0	: { *(.stab.exclstr) }
+  .stab.index 0		: { *(.stab.index) }
+  .stab.indexstr 0	: { *(.stab.indexstr) }
+  .comment 0		: { *(.comment) }
 }
 

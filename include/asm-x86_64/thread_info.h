@@ -51,23 +51,19 @@ struct thread_info {
 
 /* how to get the thread information struct from C */
 
-#ifdef CONFIG_PREEMPT 
-/* Preemptive kernels need to access this from interrupt context too. */ 
 static inline struct thread_info *current_thread_info(void)
 { 
 	struct thread_info *ti;
 	ti = (void *)read_pda(kernelstack) + PDA_STACKOFFSET - THREAD_SIZE;
 	return ti; 
 } 
-#else
-/* On others go for a minimally cheaper way. */
-static inline struct thread_info *current_thread_info(void)
+
+static inline struct thread_info *stack_thread_info(void)
 {
 	struct thread_info *ti;
 	__asm__("andq %%rsp,%0; ":"=r" (ti) : "0" (~8191UL));
 	return ti;
 }
-#endif
 
 /* thread information allocation */
 #define THREAD_SIZE (2*PAGE_SIZE)
@@ -96,7 +92,7 @@ static inline struct thread_info *current_thread_info(void)
 #define TIF_NOTIFY_RESUME	1	/* resumption notification requested */
 #define TIF_SIGPENDING		2	/* signal pending */
 #define TIF_NEED_RESCHED	3	/* rescheduling necessary */
-#define TIF_USEDFPU		16	/* FPU was used by this task this quantum (SMP) */
+#define TIF_USEDFPU		16	/* FPU was used by this task this quantum */
 #define TIF_POLLING_NRFLAG	17	/* true if poll_idle() is polling TIF_NEED_RESCHED */
 #define TIF_IA32		18	/* 32bit process */ 
 
@@ -110,6 +106,8 @@ static inline struct thread_info *current_thread_info(void)
 
 #define _TIF_WORK_MASK		0x0000FFFE	/* work to do on interrupt/exception return */
 #define _TIF_ALLWORK_MASK	0x0000FFFF	/* work to do on any return to u-space */
+
+#define PREEMPT_ACTIVE     0x4000000
 
 #endif /* __KERNEL__ */
 
