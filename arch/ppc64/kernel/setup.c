@@ -244,7 +244,21 @@ static void __init setup_cpu_maps(void)
 
 	systemcfg->processorCount = num_present_cpus();
 }
+
 #endif /* !defined(CONFIG_PPC_ISERIES) && defined(CONFIG_SMP) */
+
+#ifdef CONFIG_XMON
+static int __init early_xmon(char *p)
+{
+	/* ensure xmon is enabled */
+	xmon_init();
+	debugger(0);
+
+	return 0;
+}
+early_param("xmon", early_xmon);
+#endif
+
 /*
  * Do some initial setup of the system.  The parameters are those which 
  * were passed in from the bootloader.
@@ -254,10 +268,6 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 {
 #if defined(CONFIG_SMP) && defined(CONFIG_PPC_PSERIES)
 	int ret, i;
-#endif
-
-#ifdef CONFIG_XMON_DEFAULT
-	xmon_init();
 #endif
 
 #ifdef CONFIG_PPC_ISERIES
@@ -290,6 +300,9 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 #endif /* CONFIG_PPC_PMAC */
 	}
 
+#ifdef CONFIG_XMON_DEFAULT
+	xmon_init();
+#endif
 	/* If we were passed an initrd, set the ROOT_DEV properly if the values
 	 * look sensible. If not, clear initrd reference.
 	 */
@@ -330,6 +343,11 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 	iSeries_parse_cmdline();
 #endif
 
+	/* Save unparsed command line copy for /proc/cmdline */
+	strlcpy(saved_command_line, cmd_line, COMMAND_LINE_SIZE);
+
+	parse_early_param();
+
 #ifdef CONFIG_SMP
 #ifndef CONFIG_PPC_ISERIES
 	/*
@@ -351,6 +369,10 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 				  i);
 		}
 	}
+
+	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR)
+		vpa_init(boot_cpuid);
+
 #endif /* CONFIG_PPC_PSERIES */
 #endif /* CONFIG_SMP */
 
@@ -380,15 +402,6 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 	printk("-----------------------------------------------------\n");
 
 	mm_init_ppc64();
-
-#if defined(CONFIG_SMP) && defined(CONFIG_PPC_PSERIES)
-	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR) {
-		vpa_init(boot_cpuid);
-	}
-#endif
-
-	/* Select the correct idle loop for the platform. */
-	idle_setup();
 }
 
 void machine_restart(char *cmd)
@@ -512,30 +525,20 @@ struct seq_operations cpuinfo_op = {
 	.show =	show_cpuinfo,
 };
 
-#endif
+#if 0 /* XXX not currently used */
+unsigned long memory_limit;
 
-	/* Look for mem= option on command line */
-	if (strstr(cmd_line, "mem=")) {
-		char *p, *q;
-		unsigned long maxmem = 0;
-		extern unsigned long __max_memory;
+static int __init early_parsemem(char *p)
+{
+	if (!p)
+		return 0;
 
-		for (q = cmd_line; (p = strstr(q, "mem=")) != 0; ) {
-			q = p + 4;
-			if (p > cmd_line && p[-1] != ' ')
-				continue;
-			maxmem = simple_strtoul(q, &q, 0);
-			if (*q == 'k' || *q == 'K') {
-				maxmem <<= 10;
-				++q;
-			} else if (*q == 'm' || *q == 'M') {
-				maxmem <<= 20;
-				++q;
-			}
-		}
-		__max_memory = maxmem;
-	}
+	memory_limit = memparse(p, &p);
+
+	return 0;
 }
+early_param("mem", early_parsemem);
+#endif
 
 #ifdef CONFIG_PPC_PSERIES
 static int __init set_preferred_console(void)
@@ -681,16 +684,10 @@ void __init setup_arch(char **cmdline_p)
 	extern int panic_timeout;
 	extern void do_init_bootmem(void);
 
-
 	ppc64_boot_msg(0x12, "Setup Arch");
 
-#ifdef CONFIG_XMON
-	if (strstr(cmd_line, "xmon")) {
-		/* ensure xmon is enabled */
-		xmon_init();
-		debugger(0);
-	}
-#endif /* CONFIG_XMON */
+	*cmdline_p = cmd_line;
+
 
 	/*
 	 * Set cache line size based on type of cpu as a default.
@@ -711,15 +708,14 @@ void __init setup_arch(char **cmdline_p)
 	init_mm.end_data = (unsigned long) _edata;
 	init_mm.brk = klimit;
 	
-	/* Save unparsed command line copy for /proc/cmdline */
-	strlcpy(saved_command_line, cmd_line, COMMAND_LINE_SIZE);
-	*cmdline_p = cmd_line;
-
 	irqstack_early_init();
 	emergency_stack_init();
 
 	/* set up the bootmem stuff with available memory */
 	do_init_bootmem();
+
+	/* Select the correct idle loop for the platform. */
+	idle_setup();
 
 	ppc_md.setup_arch();
 

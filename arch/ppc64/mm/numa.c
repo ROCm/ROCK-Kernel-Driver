@@ -18,6 +18,8 @@
 #include <asm/machdep.h>
 #include <asm/abs_addr.h>
 
+static int numa_enabled = 1;
+
 static int numa_debug;
 #define dbg(args...) if (numa_debug) { printk(KERN_INFO args); }
 
@@ -189,10 +191,7 @@ static int __init parse_numa_properties(void)
 	long entries = lmb_end_of_DRAM() >> MEMORY_INCREMENT_SHIFT;
 	unsigned long i;
 
-	if (strstr(saved_command_line, "numa=debug"))
-		numa_debug = 1;
-
-	if (strstr(saved_command_line, "numa=off")) {
+	if (numa_enabled == 0) {
 		printk(KERN_WARNING "NUMA disabled by user\n");
 		return -1;
 	}
@@ -587,3 +586,18 @@ void __init paging_init(void)
 							start_pfn, zholes_size);
 	}
 }
+
+static int __init early_numa(char *p)
+{
+	if (!p)
+		return 0;
+
+	if (strstr(p, "off"))
+		numa_enabled = 0;
+
+	if (strstr(p, "debug"))
+		numa_debug = 1;
+
+	return 0;
+}
+early_param("numa", early_numa);
