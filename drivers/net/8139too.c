@@ -1339,23 +1339,12 @@ static int rtl8139_open (struct net_device *dev)
 }
 
 
-static void rtl_check_media (struct net_device *dev)
+static void rtl_check_media (struct net_device *dev, unsigned int init_media)
 {
 	struct rtl8139_private *tp = dev->priv;
 
 	if (tp->phys[0] >= 0) {
-		u16 mii_lpa = mdio_read(dev, tp->phys[0], MII_LPA);
-		if (mii_lpa == 0xffff)
-			;					/* Not there */
-		else if ((mii_lpa & LPA_100FULL) == LPA_100FULL
-				 || (mii_lpa & 0x00C0) == LPA_10FULL)
-			tp->mii.full_duplex = 1;
-
-		printk (KERN_INFO"%s: Setting %s%s-duplex based on"
-				" auto-negotiated partner ability %4.4x.\n",
-		        dev->name, mii_lpa == 0 ? "" :
-				(mii_lpa & 0x0180) ? "100mbps " : "10mbps ",
-			tp->mii.full_duplex ? "full" : "half", mii_lpa);
+		mii_check_media(&tp->mii, 1, init_media);
 	}
 }
 
@@ -1390,7 +1379,7 @@ static void rtl8139_hw_start (struct net_device *dev)
 
 	tp->cur_rx = 0;
 
-	rtl_check_media (dev);
+	rtl_check_media (dev, 1);
 
 	if (tp->chipset >= CH_8139B) {
 		/* Disable magic packet scanning, which is enabled
@@ -1999,18 +1988,7 @@ static void rtl8139_weird_interrupt (struct net_device *dev,
 
 	if ((status & RxUnderrun) && link_changed &&
 	    (tp->drv_flags & HAS_LNK_CHNG)) {
-		/* Really link-change on new chips. */
-		int lpar = RTL_R16 (NWayLPAR);
-		int duplex = (lpar & LPA_100FULL) || (lpar & 0x01C0) == 0x0040
-				|| tp->mii.force_media;
-		if (tp->mii.full_duplex != duplex) {
-			tp->mii.full_duplex = duplex;
-#if 0
-			RTL_W8 (Cfg9346, Cfg9346_Unlock);
-			RTL_W8 (Config1, tp->mii.full_duplex ? 0x60 : 0x20);
-			RTL_W8 (Cfg9346, Cfg9346_Lock);
-#endif
-		}
+		rtl_check_media(dev, 0);
 		status &= ~RxUnderrun;
 	}
 
