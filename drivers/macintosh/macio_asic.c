@@ -539,6 +539,9 @@ static int __devinit macio_pci_probe(struct pci_dev *pdev, const struct pci_devi
 	if (np == NULL)
 		return -ENODEV;
 
+	/* This assumption is wrong, fix that here for now until I fix the arch */
+	of_node_get(np);
+
 	/* We also assume that pmac_feature will have done a get() on nodes stored
 	 * in the macio chips array
 	 */

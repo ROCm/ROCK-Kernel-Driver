@@ -2,7 +2,7 @@
 # Makefile for USB Core files and filesystem
 #
 
-usbcore-objs	:= usb.o usb-debug.o hub.o hcd.o urb.o message.o \
+usbcore-objs	:= usb.o hub.o hcd.o urb.o message.o \
 			config.o file.o buffer.o driverfs.o
 
 ifeq ($(CONFIG_PCI),y)

@@ -35,9 +35,9 @@ struct nfs_server {
 	char			ip_addr[16];
 	char *			mnt_path;
 	struct nfs4_client *	nfs4_state;	/* all NFSv4 state starts here */
-	unsigned long		lease_time;	/* in jiffies */
-	unsigned long		last_renewal;	/* in jiffies */
-	void                   *idmap;
+	struct list_head	nfs4_siblings;	/* List of other nfs_server structs
+						 * that share the same clientid
+						 */
 #endif
 };
 

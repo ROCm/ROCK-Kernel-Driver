@@ -2198,7 +2198,7 @@ static ide_startstop_t idetape_pc_intr (ide_drive_t *drive)
 		printk(KERN_ERR "ide-tape: The tape wants to issue more "
 				"interrupts in DMA mode\n");
 		printk(KERN_ERR "ide-tape: DMA disabled, reverting to PIO\n");
-		(void) HWIF(drive)->ide_dma_off(drive);
+		(void)__ide_dma_off(drive);
 		return ide_do_reset(drive);
 	}
 	/* Get the number of bytes to transfer on this interrupt. */
@@ -2411,7 +2411,7 @@ static ide_startstop_t idetape_issue_packet_command (ide_drive_t *drive, idetape
 	if (test_and_clear_bit(PC_DMA_ERROR, &pc->flags)) {
 		printk(KERN_WARNING "ide-tape: DMA disabled, "
 				"reverting to PIO\n");
-		(void) HWIF(drive)->ide_dma_off(drive);
+		(void)__ide_dma_off(drive);
 	}
 	if (test_bit(PC_DMA_RECOMMENDED, &pc->flags) && drive->using_dma) {
 		if (test_bit(PC_WRITING, &pc->flags))
@@ -3212,7 +3212,7 @@ static void idetape_wait_for_request (ide_drive_t *drive, struct request *rq)
 #endif /* IDETAPE_DEBUG_BUGS */
 	rq->waiting = &wait;
 	tape->waiting = &wait;
-	spin_unlock(&tape->spinlock);
+	spin_unlock_irq(&tape->spinlock);
 	wait_for_completion(&wait);
 	/* The stage and its struct request have been deallocated */
 	tape->waiting = NULL;
@@ -6442,12 +6442,12 @@ static int idetape_attach (ide_drive_t *drive)
 		goto failed;
 	}
 	if (drive->scsi) {
-		if (strstr(drive->id->model, "OnStream DI-")) {
-			printk("ide-tape: ide-scsi emulation is not supported for %s.\n", drive->id->model);
-		} else {
-			printk("ide-tape: passing drive %s to ide-scsi emulation.\n", drive->name);
-			goto failed;
-		}
+		printk("ide-tape: passing drive %s to ide-scsi emulation.\n", drive->name);
+		goto failed;
+	}
+	if (strstr(drive->id->model, "OnStream DI-")) {
+		printk(KERN_WARNING "ide-tape: Use drive %s with ide-scsi emulation and osst.\n", drive->name);
+		printk(KERN_WARNING "ide-tape: OnStream support will be removed soon from ide-tape!\n");
 	}
 	tape = (idetape_tape_t *) kmalloc (sizeof (idetape_tape_t), GFP_KERNEL);
 	if (tape == NULL) {

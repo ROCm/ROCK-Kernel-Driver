@@ -490,7 +490,7 @@ static int siimage_config_drive_for_dma (ide_drive_t *drive)
 
 	if ((id->capability & 1) != 0 && drive->autodma) {
 		/* Consult the list of known "bad" drives */
-		if (hwif->ide_dma_bad_drive(drive))
+		if (__ide_dma_bad_drive(drive))
 			goto fast_ata_pio;
 
 		if ((id->field_valid & 4) && siimage_ratemask(drive)) {
@@ -508,7 +508,7 @@ try_dma_modes:
 				if (!config_chipset_for_dma(drive))
 					goto no_dma_set;
 			}
-		} else if (hwif->ide_dma_good_drive(drive) &&
+		} else if (__ide_dma_good_drive(drive) &&
 			   (id->eide_dma_time < 150)) {
 			/* Consult the list of known "good" drives */
 			if (!config_chipset_for_dma(drive))
@@ -545,6 +545,7 @@ static int siimage_io_ide_dma_test_irq (ide_drive_t *drive)
 	return 0;
 }
 
+#if 0
 /**
  *	siimage_mmio_ide_dma_count	-	DMA bytes done
  *	@drive
@@ -572,6 +573,7 @@ static int siimage_mmio_ide_dma_count (ide_drive_t *drive)
 #endif /* SIIMAGE_VIRTUAL_DMAPIO */
 	return __ide_dma_count(drive);
 }
+#endif
 
 /**
  *	siimage_mmio_ide_dma_test_irq	-	check we caused an IRQ
@@ -1133,7 +1135,6 @@ static void __init init_hwif_siimage (ide_hwif_t *hwif)
 		hwif->udma_four = ata66_siimage(hwif);
 
 	if (hwif->mmio) {
-		hwif->ide_dma_count = &siimage_mmio_ide_dma_count;
 		hwif->ide_dma_test_irq = &siimage_mmio_ide_dma_test_irq;
 		hwif->ide_dma_verbose = &siimage_mmio_ide_dma_verbose;
 	} else {
@@ -1168,7 +1169,6 @@ static int __devinit siimage_init_one(struct pci_dev *dev, const struct pci_devi
 	if (dev->device != d->device)
 		BUG();
 	ide_setup_pci_device(dev, d);
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -1190,13 +1190,7 @@ static int siimage_ide_init(void)
 	return ide_pci_register_driver(&driver);
 }
 
-static void siimage_ide_exit(void)
-{
-	ide_pci_unregister_driver(&driver);
-}
-
 module_init(siimage_ide_init);
-module_exit(siimage_ide_exit);
 
 MODULE_AUTHOR("Andre Hedrick, Alan Cox");
 MODULE_DESCRIPTION("PCI driver module for SiI IDE");

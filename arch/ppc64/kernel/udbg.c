@@ -22,6 +22,9 @@
 #include <asm/naca.h>
 #include <asm/uaccess.h>
 #include <asm/machdep.h>
+#include <asm/io.h>
+#include <asm/prom.h>
+#include <asm/pmac_feature.h>
 
 struct NS16550 {
 	/* this struct must be packed */
@@ -69,6 +72,61 @@ udbg_init_uart(void *comport)
 	}
 }
 
+#ifdef CONFIG_PPC_PMAC
+
+#define	SCC_TXRDY	4
+#define SCC_RXRDY	1
+
+static volatile u8 *sccc, *sccd;
+
+static unsigned char scc_inittab[] = {
+    13, 0,		/* set baud rate divisor */
+    12, 0,
+    14, 1,		/* baud rate gen enable, src=rtxc */
+    11, 0x50,		/* clocks = br gen */
+    5,  0xea,		/* tx 8 bits, assert DTR & RTS */
+    4,  0x46,		/* x16 clock, 1 stop */
+    3,  0xc1,		/* rx enable, 8 bits */
+};
+
+void
+udbg_init_scc(struct device_node *np)
+{
+	unsigned long addr;
+	int i, x;
+
+	if (np == NULL)
+		np = of_find_node_by_name(NULL, "escc");
+	if (np == NULL)
+		return;
+	
+	/* Lock-enable the SCC channel */
+	pmac_call_feature(PMAC_FTR_SCC_ENABLE, np, PMAC_SCC_ASYNC | PMAC_SCC_FLAG_XMON, 1);
+
+	/* Setup for 57600 8N1 */
+	addr = np->addrs[0].address + 0x20;
+	sccc = (volatile u8 *) ioremap(addr & PAGE_MASK, PAGE_SIZE) ;
+	sccc += addr & ~PAGE_MASK;
+	sccd = sccc + 0x10;
+
+	for (i = 20000; i != 0; --i)
+		x = *sccc; eieio();
+	*sccc = 9; eieio();		/* reset A or B side */
+	*sccc = 0xc0; eieio();
+	for (i = 0; i < sizeof(scc_inittab); ++i) {
+		*sccc = scc_inittab[i];
+		eieio();
+	}
+
+	ppc_md.udbg_putc = udbg_putc;
+	ppc_md.udbg_getc = udbg_getc;
+	ppc_md.udbg_getc_poll = udbg_getc_poll;
+
+	udbg_puts("Hello World !\n");
+}
+
+#endif /* CONFIG_PPC_PMAC */
+
 void
 udbg_putc(unsigned char c)
 {
@@ -83,6 +141,16 @@ udbg_putc(unsigned char c)
 			udbg_comport->thr = '\r'; eieio();
 		}
 	}
+#ifdef CONFIG_PPC_PMAC
+	else if (sccc) {
+		while ((*sccc & SCC_TXRDY) == 0)
+			eieio();
+		*sccd = c;		
+		eieio();
+		if (c == '\n')
+			udbg_putc('\r');
+	}
+#endif /* CONFIG_PPC_PMAC */
 }
 
 int udbg_getc_poll(void)
@@ -93,6 +161,15 @@ int udbg_getc_poll(void)
 		else
 			return -1;
 	}
+#ifdef CONFIG_PPC_PMAC
+	else if (sccc) {
+		eieio();
+		if ((*sccc & SCC_RXRDY) != 0)
+			return *sccd;
+		else
+			return -1;
+	}
+#endif /* CONFIG_PPC_PMAC */
 	return -1;
 }
 
@@ -104,6 +181,14 @@ udbg_getc(void)
 			/* wait for char */;
 		return udbg_comport->rbr;
 	}
+#ifdef CONFIG_PPC_PMAC
+	else if (sccc) {
+		eieio();
+		while ((*sccc & SCC_RXRDY) == 0)
+			eieio();
+		return *sccd;
+	}
+#endif /* CONFIG_PPC_PMAC */
 	return 0;
 }
 
@@ -149,6 +234,8 @@ udbg_read(char *buf, int buflen) {
 		do {
 			c = ppc_md.udbg_getc();
 		} while (c == 0x11 || c == 0x13);
+		if (c == 0)
+			break;
 		*p++ = c;
 	}
 	return i;

@@ -202,7 +202,7 @@ static int it8172_config_drive_xfer_rate (ide_drive_t *drive)
 
 	if (id && (id->capability & 1) && drive->autodma) {
 		/* Consult the list of known "bad" drives */
-		if (hwif->ide_dma_bad_drive(drive))
+		if (__ide_dma_bad_drive(drive))
 			goto fast_ata_pio;
 		if (id->field_valid & 4) {
 			if (id->dma_ultra & hwif->ultra_mask) {
@@ -219,7 +219,7 @@ try_dma_modes:
 				if (!it8172_config_chipset_for_dma(drive))
 					goto no_dma_set;
 			}
-		} else if (hwif->ide_dma_good_drive(drive) &&
+		} else if (__ide_dma_good_drive(drive) &&
 			   (id->eide_dma_time < 150)) {
 			/* Consult the list of known "good" drives */
 			if (!it8172_config_chipset_for_dma(drive))
@@ -295,7 +295,6 @@ static int __devinit it8172_init_one(struct pci_dev *dev, const struct pci_devic
             (!((dev->class >> 8) == PCI_CLASS_STORAGE_IDE))))
                 return 1; /* IT8172 is more than only a IDE controller */
 	ide_setup_pci_device(dev, d);
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -315,13 +314,7 @@ static int it8172_ide_init(void)
 	return ide_pci_register_driver(&driver);
 }
 
-static void it8172_ide_exit(void)
-{
-	ide_pci_unregister_driver(&driver);
-}
-
 module_init(it8172_ide_init);
-module_exit(it8172_ide_exit);
 
 MODULE_AUTHOR("SteveL@mvista.com");
 MODULE_DESCRIPTION("PCI driver module for ITE 8172 IDE");

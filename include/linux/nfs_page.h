@@ -26,6 +26,7 @@ struct nfs_page {
 	struct list_head	wb_list,	/* Defines state of page: */
 				*wb_list_head;	/*      read/write/commit */
 	struct file		*wb_file;
+	fl_owner_t		wb_lockowner;
 	struct inode		*wb_inode;
 	struct rpc_cred		*wb_cred;
 	struct nfs4_state	*wb_state;

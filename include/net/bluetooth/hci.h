@@ -253,6 +253,17 @@ struct hci_cp_write_dev_class {
 	__u8     dev_class[3];
 } __attribute__ ((packed));
 
+#define OCF_READ_VOICE_SETTING	0x0025
+struct hci_rp_read_voice_setting {
+	__u8	status;
+	__u16	voice_setting;
+} __attribute__ ((packed));
+
+#define OCF_WRITE_VOICE_SETTING	0x0026
+struct hci_cp_write_voice_setting {
+	__u16	voice_setting;
+} __attribute__ ((packed));
+
 #define OCF_HOST_BUFFER_SIZE	0x0033
 struct hci_cp_host_buffer_size {
 	__u16    acl_mtu;

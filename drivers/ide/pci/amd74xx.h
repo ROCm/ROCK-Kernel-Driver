@@ -15,7 +15,7 @@ static u8 amd74xx_proc;
 
 static int amd74xx_get_info(char *, char **, off_t, int);
 
-static ide_pci_host_proc_t amd74xx_procs[] __initdata = {
+static ide_pci_host_proc_t amd74xx_procs[] = {
 	{
 		.name		= "amd74xx",
 		.set		= 1,

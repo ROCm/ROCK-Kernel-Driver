@@ -4,7 +4,7 @@ menu "Macintosh device drivers"
 # we want to change this to something like CONFIG_SYSCTRL_CUDA/PMU
 config ADB_CUDA
 	bool "Support for CUDA based PowerMacs"
-	depends on PPC_PMAC && !POWER4
+	depends on PPC_PMAC && !PPC_PMAC64
 	help
 	  This provides support for CUDA based Power Macintosh systems.  This
 	  includes most OldWorld PowerMacs, the first generation iMacs, the
@@ -69,7 +69,7 @@ config PMAC_BACKLIGHT
 
 config MAC_FLOPPY
 	bool "Support for PowerMac floppy"
-	depends on PPC_PMAC && !POWER4
+	depends on PPC_PMAC && !PPC_PMAC64
 	help
 	  If you have a SWIM-3 (Super Woz Integrated Machine 3; from Apple)
 	  floppy controller, say Y here. Most commonly found in PowerMacs.
@@ -93,7 +93,7 @@ config ADB
 
 config ADB_MACIO
 	bool "Include MacIO (CHRP) ADB driver"
-	depends on ADB && !POWER4
+	depends on ADB && PPC_PMAC && !PPC_PMAC64
 	help
 	  Say Y here to include direct support for the ADB controller in the
 	  Hydra chip used on PowerPC Macintoshes of the CHRP type.  (The Hydra
@@ -129,14 +129,14 @@ config MAC_EMUMOUSEBTN
 
 config THERM_WINDTUNNEL
 	tristate "Support for thermal management on Windtunnel G4s"
-	depends on I2C && I2C_KEYWEST && !POWER4
+	depends on I2C && I2C_KEYWEST && PPC_PMAC && !PPC_PMAC64
 	help
 	  This driver provides some thermostat and fan control for the desktop
 	  G4 "Windtunnel"
 
 config THERM_ADT7467
 	tristate "Support for thermal mgmnt on laptops with ADT 7467 chipset"
-	depends on I2C && I2C_KEYWEST && !POWER4
+	depends on I2C && I2C_KEYWEST && PPC_PMAC && !PPC_PMAC64
 	help
 	  This driver provides some thermostat and fan control for the
           iBook G4, and the ATI based aluminium PowerBooks, allowing slighlty
@@ -144,7 +144,7 @@ config THERM_ADT7467
 
 config THERM_PM72
 	tristate "Support for thermal management on PowerMac G5"
-	depends on I2C && I2C_KEYWEST && POWER4
+	depends on I2C && I2C_KEYWEST && PPC_PMAC64
 	help
 	  This driver provides thermostat and fan control for the desktop
 	  G5 machines. 

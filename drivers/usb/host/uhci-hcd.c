@@ -1,7 +1,7 @@
 /*
  * Universal Host Controller Interface driver for USB.
  *
- * Maintainer: Johannes Erdfelt <johannes@erdfelt.com>
+ * Maintainer: Alan Stern <stern@rowland.harvard.edu>
  *
  * (C) Copyright 1999 Linus Torvalds
  * (C) Copyright 1999-2002 Johannes Erdfelt, johannes@erdfelt.com
@@ -668,7 +668,6 @@ static struct urb_priv *uhci_alloc_urb_priv(struct uhci_hcd *uhci, struct urb *u
 	urbp->inserttime = jiffies;
 	urbp->fsbrtime = jiffies;
 	urbp->urb = urb;
-	urbp->dev = urb->dev;
 	
 	INIT_LIST_HEAD(&urbp->td_list);
 	INIT_LIST_HEAD(&urbp->queue_list);
@@ -1909,7 +1908,7 @@ static void uhci_remove_pending_qhs(struct uhci_hcd *uhci)
 	spin_unlock_irqrestore(&uhci->urb_remove_list_lock, flags);
 }
 
-static void uhci_irq(struct usb_hcd *hcd, struct pt_regs *regs)
+static irqreturn_t uhci_irq(struct usb_hcd *hcd, struct pt_regs *regs)
 {
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
 	unsigned int io_addr = uhci->io_addr;
@@ -1922,7 +1921,7 @@ static void uhci_irq(struct usb_hcd *hcd, struct pt_regs *regs)
 	 */
 	status = inw(io_addr + USBSTS);
 	if (!status)	/* shared interrupt, not mine */
-		return;
+		return IRQ_NONE;
 	outw(status, io_addr + USBSTS);		/* Clear it */
 
 	if (status & ~(USBSTS_USBINT | USBSTS_ERROR | USBSTS_RD)) {
@@ -1963,6 +1962,7 @@ static void uhci_irq(struct usb_hcd *hcd, struct pt_regs *regs)
 	spin_unlock(&uhci->urb_list_lock);
 
 	uhci_finish_completion(hcd, regs);
+	return IRQ_HANDLED;
 }
 
 static void reset_hc(struct uhci_hcd *uhci)
@@ -2315,7 +2315,7 @@ static int uhci_start(struct usb_hcd *hcd)
 
 	uhci->rh_numports = port;
 
-	hcd->self.root_hub = udev = usb_alloc_dev(NULL, &hcd->self);
+	hcd->self.root_hub = udev = usb_alloc_dev(NULL, &hcd->self, 0);
 	if (!udev) {
 		err("unable to allocate root hub");
 		goto err_alloc_root_hub;

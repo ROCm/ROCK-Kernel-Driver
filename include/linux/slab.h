@@ -101,6 +101,7 @@ extern void kfree(const void *);
 extern unsigned int ksize(const void *);
 
 extern int FASTCALL(kmem_cache_reap(int));
+extern int FASTCALL(kmem_ptr_validate(kmem_cache_t *cachep, void *ptr));
 
 /* System wide caches */
 extern kmem_cache_t	*vm_area_cachep;

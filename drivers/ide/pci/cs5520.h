@@ -15,7 +15,7 @@ static u8 cs5520_proc;
 
 static int cs5520_get_info(char *, char **, off_t, int);
 
-static ide_pci_host_proc_t cs5520_procs[] __initdata = {
+static ide_pci_host_proc_t cs5520_procs[] = {
 	{
 		.name		= "cs5520",
 		.set		= 1,

@@ -12,13 +12,12 @@
 #include <linux/device.h>
 #include <linux/list.h>
 #include <linux/errno.h>
+#include <linux/mod_devicetable.h>
 
 #define PNP_MAX_PORT		8
 #define PNP_MAX_MEM		4
 #define PNP_MAX_IRQ		2
 #define PNP_MAX_DMA		2
-#define PNP_MAX_DEVICES		8
-#define PNP_ID_LEN		8
 #define PNP_NAME_LEN		50
 
 struct pnp_protocol;
@@ -33,7 +32,9 @@ struct pnp_dev;
 #define pnp_port_start(dev,bar)   ((dev)->res.port_resource[(bar)].start)
 #define pnp_port_end(dev,bar)     ((dev)->res.port_resource[(bar)].end)
 #define pnp_port_flags(dev,bar)   ((dev)->res.port_resource[(bar)].flags)
-#define pnp_port_valid(dev,bar)   (pnp_port_flags((dev),(bar)) & IORESOURCE_IO)
+#define pnp_port_valid(dev,bar) \
+	((pnp_port_flags((dev),(bar)) & (IORESOURCE_IO | IORESOURCE_UNSET)) \
+		== IORESOURCE_IO)
 #define pnp_port_len(dev,bar) \
 	((pnp_port_start((dev),(bar)) == 0 &&	\
 	  pnp_port_end((dev),(bar)) ==		\
@@ -45,7 +46,9 @@ struct pnp_dev;
 #define pnp_mem_start(dev,bar)   ((dev)->res.mem_resource[(bar)].start)
 #define pnp_mem_end(dev,bar)     ((dev)->res.mem_resource[(bar)].end)
 #define pnp_mem_flags(dev,bar)   ((dev)->res.mem_resource[(bar)].flags)
-#define pnp_mem_valid(dev,bar)   (pnp_mem_flags((dev),(bar)) & IORESOURCE_MEM)
+#define pnp_mem_valid(dev,bar) \
+	((pnp_mem_flags((dev),(bar)) & (IORESOURCE_MEM | IORESOURCE_UNSET)) \
+		== IORESOURCE_MEM)
 #define pnp_mem_len(dev,bar) \
 	((pnp_mem_start((dev),(bar)) == 0 &&	\
 	  pnp_mem_end((dev),(bar)) ==		\
@@ -56,11 +59,15 @@ struct pnp_dev;
 
 #define pnp_irq(dev,bar)	 ((dev)->res.irq_resource[(bar)].start)
 #define pnp_irq_flags(dev,bar)	 ((dev)->res.irq_resource[(bar)].flags)
-#define pnp_irq_valid(dev,bar)   (pnp_irq_flags((dev),(bar)) & IORESOURCE_IRQ)
+#define pnp_irq_valid(dev,bar) \
+	((pnp_irq_flags((dev),(bar)) & (IORESOURCE_IRQ | IORESOURCE_UNSET)) \
+		== IORESOURCE_IRQ)
 
 #define pnp_dma(dev,bar)	 ((dev)->res.dma_resource[(bar)].start)
 #define pnp_dma_flags(dev,bar)	 ((dev)->res.dma_resource[(bar)].flags)
-#define pnp_dma_valid(dev,bar)   (pnp_dma_flags((dev),(bar)) & IORESOURCE_DMA)
+#define pnp_dma_valid(dev,bar) \
+	((pnp_dma_flags((dev),(bar)) & (IORESOURCE_DMA | IORESOURCE_UNSET)) \
+		== IORESOURCE_DMA)
 
 #define PNP_PORT_FLAG_16BITADDR	(1<<0)
 #define PNP_PORT_FLAG_FIXED	(1<<1)
@@ -277,19 +284,6 @@ extern struct pnp_protocol pnpbios_protocol;
 struct pnp_id {
 	char id[PNP_ID_LEN];
 	struct pnp_id * next;
-};
-
-struct pnp_device_id {
-	char id[PNP_ID_LEN];
-	unsigned long driver_data;	/* data private to the driver */
-};
-
-struct pnp_card_device_id {
-	char id[PNP_ID_LEN];
-	unsigned long driver_data;	/* data private to the driver */
-	struct {
-		char id[PNP_ID_LEN];
-	} devs[PNP_MAX_DEVICES];	/* logical devices */
 };
 
 struct pnp_driver {

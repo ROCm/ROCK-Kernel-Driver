@@ -391,6 +391,14 @@ static void irlmp_state_active(struct lap_cb *self, IRLMP_EVENT event,
 		IRDA_DEBUG(4, "%s(), LS_CONNECT_REQUEST\n", __FUNCTION__);
 
 		/*
+		 * IrLAP may have a pending disconnect. We tried to close
+		 * IrLAP, but it was postponed because the link was
+		 * busy or we were still sending packets. As we now
+		 * need it, make sure it stays on. Jean II
+		 */
+		irlap_clear_disconnect(self->irlap);
+
+		/*
 		 *  LAP connection already active, just bounce back! Since we
 		 *  don't know which LSAP that tried to do this, we have to
 		 *  notify all LSAPs using this LAP, but that should be safe to

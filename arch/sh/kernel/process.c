@@ -1,4 +1,4 @@
-/* $Id: process.c,v 1.24 2003/11/28 23:05:43 kkojima Exp $
+/* $Id: process.c,v 1.25 2004/01/13 05:52:11 kkojima Exp $
  *
  *  linux/arch/sh/kernel/process.c
  *
@@ -174,9 +174,13 @@ void flush_thread(void)
 {
 #if defined(CONFIG_CPU_SH4)
 	struct task_struct *tsk = current;
+	struct pt_regs *regs = (struct pt_regs *)
+				((unsigned long)tsk->thread_info
+				 + THREAD_SIZE - sizeof(struct pt_regs)
+				 - sizeof(unsigned long));
 
 	/* Forget lazy FPU state */
-	clear_fpu(tsk);
+	clear_fpu(tsk, regs);
 	tsk->used_math = 0;
 #endif
 }
@@ -196,7 +200,7 @@ int dump_fpu(struct pt_regs *regs, elf_fpregset_t *fpu)
 
 	fpvalid = tsk->used_math;
 	if (fpvalid) {
-		unlazy_fpu(tsk);
+		unlazy_fpu(tsk, regs);
 		memcpy(fpu, &tsk->thread.fpu.hard, sizeof(*fpu));
 	}
 #endif
@@ -212,7 +216,8 @@ int dump_task_regs(struct task_struct *tsk, elf_gregset_t *regs)
 	struct pt_regs ptregs;
 	
 	ptregs = *(struct pt_regs *)
-		((unsigned long)tsk->thread_info+THREAD_SIZE - sizeof(ptregs)
+		((unsigned long)tsk->thread_info + THREAD_SIZE
+		 - sizeof(struct pt_regs)
 #ifdef CONFIG_SH_DSP
 		 - sizeof(struct pt_dspregs)
 #endif
@@ -230,7 +235,11 @@ dump_task_fpu (struct task_struct *tsk, elf_fpregset_t *fpu)
 #if defined(CONFIG_CPU_SH4)
 	fpvalid = tsk->used_math;
 	if (fpvalid) {
-		unlazy_fpu(tsk);
+		struct pt_regs *regs = (struct pt_regs *)
+					((unsigned long)tsk->thread_info
+					 + THREAD_SIZE - sizeof(struct pt_regs)
+					 - sizeof(unsigned long));
+		unlazy_fpu(tsk, regs);
 		memcpy(fpu, &tsk->thread.fpu.hard, sizeof(*fpu));
 	}
 #endif
@@ -257,13 +266,12 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	if (user_mode(regs)) {
 		childregs->regs[15] = usp;
 	} else {
-		childregs->regs[15] = (unsigned long)p->thread_info+THREAD_SIZE;
+		childregs->regs[15] = (unsigned long)p->thread_info + THREAD_SIZE;
 	}
         if (clone_flags & CLONE_SETTLS) {
 		childregs->gbr = childregs->regs[0];
 	}
 	childregs->regs[0] = 0; /* Set return value for child */
-	childregs->sr |= SR_FD; /* Invalidate FPU flag */
 	p->set_child_tid = p->clear_child_tid = NULL;
 
 	p->thread.sp = (unsigned long) childregs;
@@ -275,7 +283,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	{
 		struct task_struct *tsk = current;
 
-		unlazy_fpu(tsk);
+		unlazy_fpu(tsk, regs);
 		p->thread.fpu = tsk->thread.fpu;
 		p->used_math = tsk->used_math;
 		clear_ti_thread_flag(p->thread_info, TIF_USEDFPU);
@@ -332,8 +340,39 @@ ubc_set_tracing(int asid, unsigned long pc)
 struct task_struct *__switch_to(struct task_struct *prev, struct task_struct *next)
 {
 #if defined(CONFIG_CPU_SH4)
-	unlazy_fpu(prev);
+	struct pt_regs *regs = (struct pt_regs *)
+				((unsigned long)prev->thread_info
+				 + THREAD_SIZE - sizeof(struct pt_regs)
+				 - sizeof(unsigned long));
+	unlazy_fpu(prev, regs);
 #endif
+
+#ifdef CONFIG_PREEMPT
+	{
+		unsigned long flags;
+		struct pt_regs *regs;
+
+		local_irq_save(flags);
+		regs = (struct pt_regs *)
+			((unsigned long)prev->thread_info
+			 + THREAD_SIZE - sizeof(struct pt_regs)
+#ifdef CONFIG_SH_DSP
+			 - sizeof(struct pt_dspregs)
+#endif
+			 - sizeof(unsigned long));
+		if (user_mode(regs) && regs->regs[15] >= 0xc0000000) {
+			int offset = (int)regs->regs[15];
+
+			/* Reset stack pointer: clear critical region mark */
+			regs->regs[15] = regs->regs[1];
+			if (regs->pc < regs->regs[0])
+				/* Go to rewind point */
+				regs->pc = regs->regs[0] + offset;
+		}
+		local_irq_restore(flags);
+	}
+#endif
+
 	/*
 	 * Restore the kernel mode register
 	 *   	k7 (r7_bank1)

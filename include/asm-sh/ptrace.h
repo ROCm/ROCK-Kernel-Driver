@@ -1,7 +1,6 @@
 #ifndef __ASM_SH_PTRACE_H
 #define __ASM_SH_PTRACE_H
 
-#include <asm/processor.h>
 #include <asm/ubc.h>
 
 /*

@@ -35,11 +35,37 @@
 #define SPRUCE_MEM_SIZE		0x04000000
 #define SPRUCE_BUS_SPEED	66666667
 
-#define SPRUCE_SERIAL_1_ADDR	0xff600300
-#define SPRUCE_SERIAL_2_ADDR	0xff600400
-
 #define SPRUCE_NVRAM_BASE_ADDR	0xff800000
 #define SPRUCE_RTC_BASE_ADDR	SPRUCE_NVRAM_BASE_ADDR
+
+/*
+ * Serial port defines
+ */
+#define SPRUCE_FPGA_REG_A	0xff820000
+#define SPRUCE_UARTCLK_33M	0x02
+#define SPRUCE_UARTCLK_IS_33M(reg)	(reg & SPRUCE_UARTCLK_33M)
+
+#define UART0_IO_BASE	0xff600300
+#define UART1_IO_BASE	0xff600400
+
+#define RS_TABLE_SIZE	2
+
+#define SPRUCE_BAUD_33M	(33000000/64)
+#define SPRUCE_BAUD_30M	(30000000/64)
+#define BASE_BAUD	SPRUCE_BAUD_33M
+
+#define UART0_INT	3
+#define UART1_INT	4
+
+#define STD_UART_OP(num)				\
+	{ 0, BASE_BAUD, 0, UART##num##_INT,		\
+		ASYNC_BOOT_AUTOCONF,			\
+		iomem_base: UART##num##_IO_BASE,	\
+		io_type: SERIAL_IO_MEM},
+
+#define SERIAL_PORT_DFNS	\
+	STD_UART_OP(0)		\
+	STD_UART_OP(1)
 
 #endif /* __ASM_SPRUCE_H__ */
 #endif /* __KERNEL__ */

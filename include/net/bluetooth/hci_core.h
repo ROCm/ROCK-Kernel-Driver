@@ -71,11 +71,12 @@ struct hci_dev {
 	__u8	 	type;
 	bdaddr_t	bdaddr;
 	__u8		features[8];
+	__u16		voice_setting;
 
 	__u16		pkt_type;
 	__u16		link_policy;
 	__u16		link_mode;
-	
+
 	atomic_t 	cmd_cnt;
 	unsigned int 	acl_cnt;
 	unsigned int 	sco_cnt;
@@ -88,7 +89,7 @@ struct hci_dev {
 	unsigned long   cmd_last_tx;
 	unsigned long   acl_last_tx;
 	unsigned long   sco_last_tx;
-	
+
 	struct tasklet_struct 	cmd_task;
 	struct tasklet_struct	rx_task;
 	struct tasklet_struct 	tx_task;
@@ -119,7 +120,7 @@ struct hci_dev {
 #endif
 
 	struct module           *owner;
-	
+
 	int (*open)(struct hci_dev *hdev);
 	int (*close)(struct hci_dev *hdev);
 	int (*flush)(struct hci_dev *hdev);

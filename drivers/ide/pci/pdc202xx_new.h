@@ -172,7 +172,7 @@ static u8 pdcnew_proc;
 
 static int pdcnew_get_info(char *, char **, off_t, int);
 
-static ide_pci_host_proc_t pdcnew_procs[] __initdata = {
+static ide_pci_host_proc_t pdcnew_procs[] = {
 	{
 		.name		= "pdcnew",
 		.set		= 1,

@@ -220,7 +220,7 @@ EXPORT_SYMBOL(bitmap_snprintf);
 int bitmap_parse(const char __user *ubuf, unsigned int ubuflen,
         unsigned long *maskp, int nmaskbits)
 {
-	int i, c, old_c, totaldigits, ndigits, nchunks, nbits;
+	int c, old_c, totaldigits, ndigits, nchunks, nbits;
 	u32 chunk;
 
 	bitmap_clear(maskp, nmaskbits);
@@ -270,9 +270,7 @@ int bitmap_parse(const char __user *ubuf, unsigned int ubuflen,
 			continue;
 
 		bitmap_shift_right(maskp, maskp, CHUNKSZ, nmaskbits);
-		for (i = 0; i < CHUNKSZ; i++)
-			if (chunk & (1 << i))
-				set_bit(i, maskp);
+		*maskp |= chunk;
 		nchunks++;
 		nbits += (nchunks == 1) ? nbits_to_hold_value(chunk) : CHUNKSZ;
 		if (nbits > nmaskbits)

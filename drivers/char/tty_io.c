@@ -2264,7 +2264,6 @@ int tty_unregister_driver(struct tty_driver *driver)
 	if (driver->refcount)
 		return -EBUSY;
 
-	cdev_unmap(MKDEV(driver->major, driver->minor_start), driver->num);
 	unregister_chrdev_region(MKDEV(driver->major, driver->minor_start),
 				driver->num);
 

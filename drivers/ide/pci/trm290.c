@@ -225,7 +225,7 @@ static int trm290_ide_dma_write (ide_drive_t *drive /*, struct request *rq */)
 #endif
 	/* issue cmd to drive */
 	hwif->OUTB(command, IDE_COMMAND_REG);
-	return HWIF(drive)->ide_dma_count(drive);
+	return hwif->ide_dma_begin(drive);
 }
 
 static int trm290_ide_dma_read (ide_drive_t *drive  /*, struct request *rq */)
@@ -269,7 +269,7 @@ static int trm290_ide_dma_read (ide_drive_t *drive  /*, struct request *rq */)
 #endif
 	/* issue cmd to drive */
 	hwif->OUTB(command, IDE_COMMAND_REG);
-	return HWIF(drive)->ide_dma_count(drive);
+	return hwif->ide_dma_begin(drive);
 }
 
 static int trm290_ide_dma_begin (ide_drive_t *drive)
@@ -403,7 +403,6 @@ static int __devinit trm290_init_one(struct pci_dev *dev, const struct pci_devic
 	if (dev->device != d->device)
 		BUG();
 	ide_setup_pci_device(dev, d);
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -423,13 +422,7 @@ static int trm290_ide_init(void)
 	return ide_pci_register_driver(&driver);
 }
 
-static void trm290_ide_exit(void)
-{
-	ide_pci_unregister_driver(&driver);
-}
-
 module_init(trm290_ide_init);
-module_exit(trm290_ide_exit);
 
 MODULE_AUTHOR("Mark Lord");
 MODULE_DESCRIPTION("PCI driver module for Tekram TRM290 IDE");

@@ -1320,6 +1320,16 @@ _GLOBAL(__start_initialization_iSeries)
 #endif
 
 #ifdef CONFIG_PPC_PSERIES
+
+_STATIC(mmu_off)
+	mfmsr	r3
+	andi.	r0,r3,MSR_IR|MSR_DR
+	beqlr
+	andc	r3,r3,r0
+	mtspr	SRR0,r4
+	mtspr	SRR1,r3
+	sync
+	rfid
 _GLOBAL(__start_initialization_pSeries)
 	mr	r31,r3			/* save parameters */
 	mr	r30,r4
@@ -1339,32 +1349,26 @@ _GLOBAL(__start_initialization_pSeries)
 	/* Relocate the TOC from a virt addr to a real addr */
 	sub	r2,r2,r3
 
-	/* DRENG / PPPBBB Fix the following comment!!! -Peter */
-	/* The following copies the first 0x100 bytes of code from the    */
-	/* load addr to physical addr 0x0.  This code causes secondary    */
-	/* processors to spin until a flag in the PACA is set.  This      */
-	/* is done at this time rather than with the entire kernel        */
-	/* relocation which is done below because we need to cause the    */
-	/* processors to spin on code that is not going to move while OF  */
-	/* is still alive. Although the spin code is not actually run on  */
-	/* a uniprocessor, we always do this copy.                        */
-	SET_REG_TO_CONST(r4, KERNELBASE)/* Src addr                       */
-	sub	r4,r4,r3  		/* current address of __start     */
-			                /*        the source addr         */
-	li	r3,0                    /* Dest addr                      */
-	li	r5,0x100 		/* # bytes of memory to copy      */
-	li	r6,0			/* Destination offset             */
-	bl	.copy_and_flush		/* copy the first 0x100 bytes     */
-
+	/* Save parameters */
 	mr	r3,r31
 	mr	r4,r30
 	mr	r5,r29
 	mr	r6,r28
 	mr	r7,r27
 
+	/* Do all of the interaction with OF client interface */
 	bl	.prom_init
+	mr	r23,r3			/* Save phys address we are running at */
+
+	/* Setup some critical 970 SPRs before switching MMU off */
+	bl	.__power4_cpu_preinit
 
 	li	r24,0			/* cpu # */
+
+	/* Switch off MMU if not already */
+	LOADADDR(r4, .__after_prom_start - KERNELBASE)
+	add	r4,r4,r23
+	bl	.mmu_off	
 
 /*
  * At this point, r3 contains the physical address we are running at,
@@ -1390,6 +1394,7 @@ _STATIC(__after_prom_start)
 
 	li	r3,0                    /* target addr */
 
+	// XXX FIXME: Use phys returned by OF (r23)
 	sub	r4,r27,r26 		/* source addr */
 					/* current address of _start   */
 			                /*   i.e. where we are running */
@@ -1425,7 +1430,7 @@ _STATIC(__after_prom_start)
  *
  * Note: this routine *only* clobbers r0, r6 and lr
  */
-_STATIC(copy_and_flush)
+_GLOBAL(copy_and_flush)
 	addi	r5,r5,-8
 	addi	r6,r6,-8
 4:	li	r0,16                   /* Use the least common      */
@@ -1675,6 +1680,58 @@ _GLOBAL(giveup_altivec)
 #endif /* CONFIG_ALTIVEC */
 
 #ifdef CONFIG_SMP
+#ifdef CONFIG_PPC_PMAC
+/*
+ * On PowerMac, secondary processors starts from the reset vector, which
+ * is temporarily turned into a call to one of the functions below.
+ */
+	.section ".text";
+	.align 2 ;
+
+	.globl	pmac_secondary_start_1	
+pmac_secondary_start_1:	
+	li	r24, 1
+	b	.pmac_secondary_start
+	
+	.globl pmac_secondary_start_2
+pmac_secondary_start_2:	
+	li	r24, 2
+	b	.pmac_secondary_start
+	
+	.globl pmac_secondary_start_3
+pmac_secondary_start_3:
+	li	r24, 3
+	b	.pmac_secondary_start
+	
+_GLOBAL(pmac_secondary_start)
+	/* turn on 64-bit mode */
+	bl	.enable_64b_mode
+	isync
+
+	/* Copy some CPU settings from CPU 0 */
+	bl	.__restore_cpu_setup
+
+	/* pSeries do that early though I don't think we really need it */
+	mfmsr	r3
+	ori	r3,r3,MSR_RI
+	mtmsrd	r3			/* RI on */
+
+	/* Set up a paca value for this processor. */
+	LOADADDR(r4, paca) 		 /* Get base vaddr of paca array  */
+	mulli	r13,r24,PACA_SIZE	 /* Calculate vaddr of right paca */
+	add	r13,r13,r4               /* for this processor.           */
+	mtspr	SPRG3,r13		 /* Save vaddr of paca in SPRG3   */
+
+        /* Create a temp kernel stack for use before relocation is on.    */
+        mr      r1,r13
+        addi    r1,r1,PACAGUARD
+        addi    r1,r1,0x1000
+        subi    r1,r1,STACK_FRAME_OVERHEAD
+
+	b	.__secondary_start
+
+#endif /* CONFIG_PPC_PMAC */
+
 /*
  * This function is called after the master CPU has released the
  * secondary processors.  The execution environment is relocation off.
@@ -1870,18 +1927,18 @@ _STATIC(start_here_pSeries)
 	li	r0,0
 	stdu	r0,-STACK_FRAME_OVERHEAD(r1)
 
+		/* set up the TOC (physical address) */
+	LOADADDR(r2,__toc_start)
+	addi    r2,r2,0x4000
+	addi    r2,r2,0x4000
+	sub	r2,r2,r26
+
 	LOADADDR(r3,cpu_specs)
 	sub	r3,r3,r26
 	LOADADDR(r4,cur_cpu_spec)
 	sub	r4,r4,r26
 	mr	r5,r26
 	bl	.identify_cpu
-
-	/* set up the TOC (physical address) */
-	LOADADDR(r2,__toc_start)
-	addi    r2,r2,0x4000
-	addi    r2,r2,0x4000
-	sub	r2,r2,r26
 
 	/* Get the pointer to the segment table which is used by           */
 	/* stab_initialize                                                 */
@@ -1926,7 +1983,8 @@ _STATIC(start_here_pSeries)
 
 	li	r3,SYSTEMCFG_PHYS_ADDR	/* r3 = ptr to systemcfg */
 	lwz	r3,PLATFORM(r3)		/* r3 = platform flags */
-	cmpldi r3,PLATFORM_PSERIES
+	/* Test if bit 0 is set (LPAR bit) */
+	andi.	r3,r3,0x1
 	bne    98f
 	LOADADDR(r6,_SDR1)		/* Only if NOT LPAR */
 	sub	r6,r6,r26
@@ -1938,11 +1996,12 @@ _STATIC(start_here_pSeries)
 	mtspr	SRR0,r3
 	mtspr	SRR1,r4
 	rfid
-#endif	/* CONFIG_PPC_PSERIES */
-
+#endif /* CONFIG_PPC_PSERIES */
+	
 	/* This is where all platforms converge execution */
 _STATIC(start_here_common)
-	
+	/* relocation is on at this point */
+
 	/* The following code sets up the SP and TOC now that we are */
 	/* running with translation enabled. */
 
@@ -2012,8 +2071,6 @@ _STATIC(start_here_common)
 	bl .start_kernel
 
 _GLOBAL(__setup_cpu_power3)
-	blr
-_GLOBAL(__setup_cpu_power4)
 	blr
 
 _GLOBAL(hmt_init)

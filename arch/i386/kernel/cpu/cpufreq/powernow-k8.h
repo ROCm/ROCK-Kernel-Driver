@@ -120,7 +120,3 @@ struct pst_s {
 static inline int core_voltage_pre_transition(u32 reqvid);
 static inline int core_voltage_post_transition(u32 reqvid);
 static inline int core_frequency_transition(u32 reqfid);
-static int powernowk8_verify(struct cpufreq_policy *pol);
-static int powernowk8_target(struct cpufreq_policy *pol, unsigned targfreq,
-		      unsigned relation);
-static int __init powernowk8_cpu_init(struct cpufreq_policy *pol);

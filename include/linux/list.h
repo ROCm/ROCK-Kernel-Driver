@@ -344,6 +344,16 @@ static inline void list_splice_init(struct list_head *list,
 		     prefetch(pos->member.prev))
 
 /**
+ * list_prepare_entry - prepare a pos entry for use as a start point in
+ *			list_for_each_entry_continue
+ * @pos:	the type * to use as a start point
+ * @head:	the head of the list
+ * @member:	the name of the list_struct within the struct.
+ */
+#define list_prepare_entry(pos, head, member) \
+	((pos) ? : list_entry(head, typeof(*pos), member))
+
+/**
  * list_for_each_entry_continue -	iterate over list of given type
  *			continuing after existing point
  * @pos:	the type * to use as a loop counter.

@@ -34,6 +34,7 @@
 #include <asm/ppcdebug.h>
 #include <asm/naca.h>
 #include <asm/pci_dma.h>
+#include <asm/machdep.h>
 
 #include "pci.h"
 
@@ -58,11 +59,15 @@ void pcibios_name_device(struct pci_dev* dev);
 void pcibios_final_fixup(void);
 static void fixup_broken_pcnet32(struct pci_dev* dev);
 static void fixup_windbond_82c105(struct pci_dev* dev);
+extern void fixup_k2_sata(struct pci_dev* dev);
 
 void iSeries_pcibios_init(void);
 
 struct pci_controller *hose_head;
 struct pci_controller **hose_tail = &hose_head;
+
+struct pci_dma_ops pci_dma_ops;
+EXPORT_SYMBOL(pci_dma_ops);
 
 int global_phb_number;		/* Global phb counter */
 
@@ -70,9 +75,16 @@ int global_phb_number;		/* Global phb counter */
 struct pci_dev *ppc64_isabridge_dev = NULL;
 
 struct pci_fixup pcibios_fixups[] = {
-	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_TRIDENT,	PCI_ANY_ID, fixup_broken_pcnet32 },
-	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_WINBOND,	PCI_DEVICE_ID_WINBOND_82C105, fixup_windbond_82c105 },
-	{ PCI_FIXUP_HEADER, PCI_ANY_ID,	PCI_ANY_ID, pcibios_name_device },
+	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_TRIDENT,		PCI_ANY_ID,
+	  fixup_broken_pcnet32 },
+	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_WINBOND,		PCI_DEVICE_ID_WINBOND_82C105,
+	  fixup_windbond_82c105 },
+	{ PCI_FIXUP_HEADER,	PCI_ANY_ID,    			PCI_ANY_ID,
+	  pcibios_name_device },
+#ifdef CONFIG_PPC_PMAC
+	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_SERVERWORKS,	0x0240,
+	  fixup_k2_sata },
+#endif
 	{ 0 }
 };
 
@@ -250,6 +262,9 @@ pci_alloc_pci_controller(enum phb_types controller_type)
 	case phb_type_winnipeg:
 		model = "PHB WP";
 		break;
+	case phb_type_apple:
+		model = "PHB APPLE";
+		break;
 	default:
 		model = "PHB UK";
 		break;
@@ -332,8 +347,9 @@ static int __init pcibios_init(void)
 		pci_assign_unassigned_resources();
 #endif
 
-	/* Call machine dependent fixup */
-	pcibios_final_fixup();
+	/* Call machine dependent final fixup */
+	if (ppc_md.pcibios_fixup)
+		ppc_md.pcibios_fixup();
 
 	/* Cache the location of the ISA bridge (if we have one) */
 	ppc64_isabridge_dev = pci_find_class(PCI_CLASS_BRIDGE_ISA << 8, NULL);
@@ -539,4 +555,26 @@ int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
 			       vma->vm_end - vma->vm_start, vma->vm_page_prot);
 
 	return ret;
+}
+
+#ifdef CONFIG_PPC_PSERIES
+static ssize_t pci_show_devspec(struct device *dev, char *buf)
+{
+	struct pci_dev *pdev;
+	struct device_node *np;
+
+	pdev = to_pci_dev (dev);
+	np = pci_device_to_OF_node(pdev);
+	if (np == NULL || np->full_name == NULL)
+		return 0;
+	return sprintf(buf, "%s", np->full_name);
+}
+static DEVICE_ATTR(devspec, S_IRUGO, pci_show_devspec, NULL);
+#endif /* CONFIG_PPC_PSERIES */
+
+void pcibios_add_platform_entries(struct pci_dev *pdev)
+{
+#ifdef CONFIG_PPC_PSERIES
+	device_create_file(&pdev->dev, &dev_attr_devspec);
+#endif /* CONFIG_PPC_PSERIES */
 }

@@ -361,7 +361,6 @@ static int __devinit opti621_init_one(struct pci_dev *dev, const struct pci_devi
 	if (dev->device != d->device)
 		BUG();
 	ide_setup_pci_device(dev, d);
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -382,13 +381,7 @@ static int opti621_ide_init(void)
 	return ide_pci_register_driver(&driver);
 }
 
-static void opti621_ide_exit(void)
-{
-	ide_pci_unregister_driver(&driver);
-}
-
 module_init(opti621_ide_init);
-module_exit(opti621_ide_exit);
 
 MODULE_AUTHOR("Jaromir Koutek, Jan Harkes, Mark Lord");
 MODULE_DESCRIPTION("PCI driver module for Opti621 IDE");

@@ -49,6 +49,7 @@
 #include <asm/machdep.h>
 #include <asm/xics.h>
 #include <asm/cputable.h>
+#include <asm/system.h>
 
 int smp_threads_ready;
 unsigned long cache_decay_ticks;
@@ -62,7 +63,7 @@ cpumask_t cpu_present_at_boot = CPU_MASK_NONE;
 EXPORT_SYMBOL(cpu_online_map);
 EXPORT_SYMBOL(cpu_possible_map);
 
-static struct smp_ops_t *smp_ops;
+struct smp_ops_t *smp_ops;
 
 static volatile unsigned int cpu_callin_map[NR_CPUS];
 
@@ -76,13 +77,8 @@ extern long register_vpa(unsigned long flags, unsigned long proc,
 
 #define smp_message_pass(t,m,d,w) smp_ops->message_pass((t),(m),(d),(w))
 
-static inline void set_tb(unsigned int upper, unsigned int lower)
-{
-	mttbl(0);
-	mttbu(upper);
-	mttbl(lower);
-}
-
+/* Low level assembly function used to backup CPU 0 state */
+extern void __save_cpu_setup(void);
 #ifdef CONFIG_PPC_ISERIES
 static unsigned long iSeries_smp_message[NR_CPUS];
 
@@ -182,21 +178,23 @@ static void __devinit smp_iSeries_setup_cpu(int nr)
 {
 }
 
+static struct smp_ops_t iSeries_smp_ops = {
+	.message_pass = smp_iSeries_message_pass,
+	.probe        = smp_iSeries_probe,
+	.kick_cpu     = smp_iSeries_kick_cpu,
+	.setup_cpu    = smp_iSeries_setup_cpu,
+};
+
 /* This is called very early. */
 void __init smp_init_iSeries(void)
 {
-	smp_ops = &ppc_md.smp_ops;
-	smp_ops->message_pass = smp_iSeries_message_pass;
-	smp_ops->probe        = smp_iSeries_probe;
-	smp_ops->kick_cpu     = smp_iSeries_kick_cpu;
-	smp_ops->setup_cpu    = smp_iSeries_setup_cpu;
+	smp_ops = &iSeries_smp_ops;
 	systemcfg->processorCount	= smp_iSeries_numProcs();
 }
 #endif
 
 #ifdef CONFIG_PPC_PSERIES
-static void
-smp_openpic_message_pass(int target, int msg, unsigned long data, int wait)
+void smp_openpic_message_pass(int target, int msg, unsigned long data, int wait)
 {
 	/* make sure we're sending something that translates to an IPI */
 	if ( msg > 0x3 ){
@@ -240,8 +238,7 @@ static void __devinit smp_openpic_setup_cpu(int cpu)
 	do_openpic_setup_cpu();
 }
 
-static void
-smp_kick_cpu(int nr)
+static void smp_pSeries_kick_cpu(int nr)
 {
 	/* Verify we have a Paca for processor nr */
 	if ( ( nr <= 0 ) ||
@@ -290,8 +287,7 @@ void vpa_init(int cpu)
 	register_vpa(flags, cpu, __pa((unsigned long)&(paca[cpu].xLpPaca))); 
 }
 
-static void
-smp_xics_message_pass(int target, int msg, unsigned long data, int wait)
+static void smp_xics_message_pass(int target, int msg, unsigned long data, int wait)
 {
 	int i;
 
@@ -358,27 +354,34 @@ static void __devinit pSeries_take_timebase(void)
 	spin_unlock(&timebase_lock);
 }
 
+static struct smp_ops_t pSeries_openpic_smp_ops = {
+	.message_pass	= smp_openpic_message_pass,
+	.probe		= smp_openpic_probe,
+	.kick_cpu	= smp_pSeries_kick_cpu,
+	.setup_cpu	= smp_openpic_setup_cpu,
+};
+
+static struct smp_ops_t pSeries_xics_smp_ops = {
+	.message_pass	= smp_xics_message_pass,
+	.probe		= smp_xics_probe,
+	.kick_cpu	= smp_pSeries_kick_cpu,
+	.setup_cpu	= smp_xics_setup_cpu,
+};
+
 /* This is called very early */
 void __init smp_init_pSeries(void)
 {
-	smp_ops = &ppc_md.smp_ops;
 
-	if (naca->interrupt_controller == IC_OPEN_PIC) {
-		smp_ops->message_pass	= smp_openpic_message_pass;
-		smp_ops->probe		= smp_openpic_probe;
-		smp_ops->setup_cpu	= smp_openpic_setup_cpu;
-	} else {
-		smp_ops->message_pass	= smp_xics_message_pass;
-		smp_ops->probe		= smp_xics_probe;
-		smp_ops->setup_cpu	= smp_xics_setup_cpu;
-	}
+	if (naca->interrupt_controller == IC_OPEN_PIC)
+		smp_ops = &pSeries_openpic_smp_ops;
+	else
+		smp_ops = &pSeries_xics_smp_ops;
 
+	/* Non-lpar has additional take/give timebase */
 	if (systemcfg->platform == PLATFORM_PSERIES) {
 		smp_ops->give_timebase = pSeries_give_timebase;
 		smp_ops->take_timebase = pSeries_take_timebase;
 	}
-
-	smp_ops->kick_cpu = smp_kick_cpu;
 }
 #endif
 
@@ -392,7 +395,7 @@ void smp_local_timer_interrupt(struct pt_regs * regs)
 
 void smp_message_recv(int msg, struct pt_regs *regs)
 {
-	switch( msg ) {
+	switch(msg) {
 	case PPC_MSG_CALL_FUNCTION:
 		smp_call_function_interrupt();
 		break;
@@ -405,11 +408,11 @@ void smp_message_recv(int msg, struct pt_regs *regs)
 		/* spare */
 		break;
 #endif
-#ifdef CONFIG_XMON
-	case PPC_MSG_XMON_BREAK:
-		xmon(regs);
+#ifdef CONFIG_DEBUGGER
+	case PPC_MSG_DEBUGGER_BREAK:
+		debugger(regs);
 		break;
-#endif /* CONFIG_XMON */
+#endif
 	default:
 		printk("SMP %d: smp_message_recv(): unknown msg %d\n",
 		       smp_processor_id(), msg);
@@ -422,12 +425,12 @@ void smp_send_reschedule(int cpu)
 	smp_message_pass(cpu, PPC_MSG_RESCHEDULE, 0, 0);
 }
 
-#ifdef CONFIG_XMON
-void smp_send_xmon_break(int cpu)
+#ifdef CONFIG_DEBUGGER
+void smp_send_debugger_break(int cpu)
 {
-	smp_message_pass(cpu, PPC_MSG_XMON_BREAK, 0, 0);
+	smp_message_pass(cpu, PPC_MSG_DEBUGGER_BREAK, 0, 0);
 }
-#endif /* CONFIG_XMON */
+#endif
 
 static void stop_this_cpu(void *dummy)
 {
@@ -505,10 +508,7 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 			printk("smp_call_function on cpu %d: other cpus not "
 			       "responding (%d)\n", smp_processor_id(),
 			       atomic_read(&data.started));
-#ifdef CONFIG_DEBUG_KERNEL
-			if (debugger)
-				debugger(0);
-#endif
+			debugger(0);
 			goto out;
 		}
 	}
@@ -523,10 +523,7 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 				       smp_processor_id(),
 				       atomic_read(&data.finished),
 				       atomic_read(&data.started));
-#ifdef CONFIG_DEBUG_KERNEL
-				if (debugger)
-					debugger(0);
-#endif
+				debugger(0);
 				goto out;
 			}
 		}
@@ -613,6 +610,10 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 #endif
 
 	max_cpus = smp_ops->probe();
+ 
+	/* Backup CPU 0 state if necessary */
+	__save_cpu_setup();
+
 	smp_space_timers(max_cpus);
 }
 

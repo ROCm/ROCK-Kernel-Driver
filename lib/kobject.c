@@ -630,6 +630,9 @@ EXPORT_SYMBOL(kobject_register);
 EXPORT_SYMBOL(kobject_unregister);
 EXPORT_SYMBOL(kobject_get);
 EXPORT_SYMBOL(kobject_put);
+EXPORT_SYMBOL(kobject_add);
+EXPORT_SYMBOL(kobject_del);
+EXPORT_SYMBOL(kobject_rename);
 EXPORT_SYMBOL(kobject_hotplug);
 
 EXPORT_SYMBOL(kset_register);

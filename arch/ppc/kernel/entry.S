@@ -689,8 +689,8 @@ ret_from_crit_exc:
 	mtspr	SPRN_ESR,r10
 	lwz	r11,_NIP(r1)
 	lwz	r12,_MSR(r1)
-	mtspr	SRR2,r11
-	mtspr	SRR3,r12
+	mtspr	CSRR0,r11
+	mtspr	CSRR1,r12
 	lwz	r9,GPR9(r1)
 	lwz	r12,GPR12(r1)
 	lwz	r10,crit_sprg0@l(0)

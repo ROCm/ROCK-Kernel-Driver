@@ -15,7 +15,7 @@ static u8 sis_proc;
 
 static int sis_get_info(char *, char **, off_t, int);
 
-static ide_pci_host_proc_t sis_procs[] __initdata = {
+static ide_pci_host_proc_t sis_procs[] = {
 {
 		.name		= "sis",
 		.set		= 1,

@@ -790,14 +790,10 @@ typedef struct ide_dma_ops_s {
 	int (*ide_dma_end)(ide_drive_t *drive);
 	int (*ide_dma_check)(ide_drive_t *drive);
 	int (*ide_dma_on)(ide_drive_t *drive);
-	int (*ide_dma_off)(ide_drive_t *drive);
 	int (*ide_dma_off_quietly)(ide_drive_t *drive);
 	int (*ide_dma_test_irq)(ide_drive_t *drive);
 	int (*ide_dma_host_on)(ide_drive_t *drive);
 	int (*ide_dma_host_off)(ide_drive_t *drive);
-	int (*ide_dma_bad_drive)(ide_drive_t *drive);
-	int (*ide_dma_good_drive)(ide_drive_t *drive);
-	int (*ide_dma_count)(ide_drive_t *drive);
 	int (*ide_dma_verbose)(ide_drive_t *drive);
 	int (*ide_dma_lostirq)(ide_drive_t *drive);
 	int (*ide_dma_timeout)(ide_drive_t *drive);
@@ -929,14 +925,10 @@ typedef struct hwif_s {
 	int (*ide_dma_end)(ide_drive_t *drive);
 	int (*ide_dma_check)(ide_drive_t *drive);
 	int (*ide_dma_on)(ide_drive_t *drive);
-	int (*ide_dma_off)(ide_drive_t *drive);
 	int (*ide_dma_off_quietly)(ide_drive_t *drive);
 	int (*ide_dma_test_irq)(ide_drive_t *drive);
 	int (*ide_dma_host_on)(ide_drive_t *drive);
 	int (*ide_dma_host_off)(ide_drive_t *drive);
-	int (*ide_dma_bad_drive)(ide_drive_t *drive);
-	int (*ide_dma_good_drive)(ide_drive_t *drive);
-	int (*ide_dma_count)(ide_drive_t *drive);
 	int (*ide_dma_verbose)(ide_drive_t *drive);
 	int (*ide_dma_lostirq)(ide_drive_t *drive);
 	int (*ide_dma_timeout)(ide_drive_t *drive);
@@ -1597,6 +1589,11 @@ extern void ide_setup_pci_devices(struct pci_dev *, struct pci_dev *, ide_pci_de
 #define BAD_DMA_DRIVE		0
 #define GOOD_DMA_DRIVE		1
 
+#ifdef CONFIG_BLK_DEV_IDEDMA
+int __ide_dma_bad_drive(ide_drive_t *);
+int __ide_dma_good_drive(ide_drive_t *);
+int __ide_dma_off(ide_drive_t *);
+
 #ifdef CONFIG_BLK_DEV_IDEDMA_PCI
 extern int ide_build_sglist(ide_drive_t *, struct request *);
 extern int ide_raw_build_sglist(ide_drive_t *, struct request *);
@@ -1609,7 +1606,6 @@ extern int ide_start_dma(ide_hwif_t *, ide_drive_t *, int);
 
 extern int __ide_dma_host_off(ide_drive_t *);
 extern int __ide_dma_off_quietly(ide_drive_t *);
-extern int __ide_dma_off(ide_drive_t *);
 extern int __ide_dma_host_on(ide_drive_t *);
 extern int __ide_dma_on(ide_drive_t *);
 extern int __ide_dma_check(ide_drive_t *);
@@ -1618,12 +1614,10 @@ extern int __ide_dma_write(ide_drive_t *);
 extern int __ide_dma_begin(ide_drive_t *);
 extern int __ide_dma_end(ide_drive_t *);
 extern int __ide_dma_test_irq(ide_drive_t *);
-extern int __ide_dma_bad_drive(ide_drive_t *);
-extern int __ide_dma_good_drive(ide_drive_t *);
-extern int __ide_dma_count(ide_drive_t *);
 extern int __ide_dma_verbose(ide_drive_t *);
 extern int __ide_dma_lostirq(ide_drive_t *);
 extern int __ide_dma_timeout(ide_drive_t *);
+#endif /* CONFIG_BLK_DEV_IDEDMA_PCI */
 
 #ifdef CONFIG_BLK_DEV_IDE_TCQ
 extern int __ide_dma_queued_on(ide_drive_t *drive);
@@ -1634,6 +1628,10 @@ extern ide_startstop_t __ide_dma_queued_start(ide_drive_t *drive);
 #endif
 
 #else
+static inline int __ide_dma_off(ide_drive_t *drive) { return 0; }
+#endif /* CONFIG_BLK_DEV_IDEDMA */
+
+#ifndef CONFIG_BLK_DEV_IDEDMA_PCI
 static inline void ide_release_dma(ide_hwif_t *drive) {;}
 #endif
 

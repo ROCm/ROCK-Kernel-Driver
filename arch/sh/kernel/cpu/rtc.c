@@ -23,10 +23,12 @@
 
 void sh_rtc_gettimeofday(struct timespec *ts)
 {
-	unsigned int sec128, sec, min, hr, wk, day, mon, yr, yr100;
+	unsigned int sec128, sec, sec2, min, hr, wk, day, mon, yr, yr100, cf_bit;
+	unsigned long flags;
 
  again:
 	do {
+		local_irq_save(flags);
 		ctrl_outb(0, RCR1);  /* Clear CF-bit */
 		sec128 = ctrl_inb(R64CNT);
 		sec = ctrl_inb(RSECCNT);
@@ -43,15 +45,10 @@ void sh_rtc_gettimeofday(struct timespec *ts)
 		yr  = ctrl_inb(RYRCNT);
 		yr100 = (yr == 0x99) ? 0x19 : 0x20;
 #endif
-	} while ((ctrl_inb(RCR1) & RCR1_CF) != 0);
-
-#if RTC_BIT_INVERTED != 0
-	/* Work around to avoid reading incorrect value. */
-	if (sec128 == RTC_BIT_INVERTED) {
-		schedule_timeout(1);
-		goto again;
-	}
-#endif
+		sec2 = ctrl_inb(R64CNT);
+		cf_bit = ctrl_inb(RCR1) & RCR1_CF;
+		local_irq_restore(flags);
+	} while (cf_bit != 0 || ((sec128 ^ sec2) & RTC_BIT_INVERTED) != 0);
 
 	BCD_TO_BIN(yr100);
 	BCD_TO_BIN(yr);
@@ -65,6 +62,7 @@ void sh_rtc_gettimeofday(struct timespec *ts)
 	    hr > 23 || min > 59 || sec > 59) {
 		printk(KERN_ERR
 		       "SH RTC: invalid value, resetting to 1 Jan 2000\n");
+		local_irq_save(flags);
 		ctrl_outb(RCR2_RESET, RCR2);  /* Reset & Stop */
 		ctrl_outb(0, RSECCNT);
 		ctrl_outb(0, RMINCNT);
@@ -99,7 +97,9 @@ int sh_rtc_settimeofday(const time_t secs)
 {
 	int retval = 0;
 	int real_seconds, real_minutes, cmos_minutes;
+	unsigned long flags;
 
+	local_irq_save(flags);
 	ctrl_outb(RCR2_RESET, RCR2);  /* Reset pre-scaler & stop RTC */
 
 	cmos_minutes = ctrl_inb(RMINCNT);
@@ -130,6 +130,7 @@ int sh_rtc_settimeofday(const time_t secs)
 	}
 
 	ctrl_outb(RCR2_RTCEN|RCR2_START, RCR2);  /* Start RTC */
+	local_irq_restore(flags);
 
 	return retval;
 }

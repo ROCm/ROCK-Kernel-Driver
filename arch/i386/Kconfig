@@ -701,7 +701,7 @@ config X86_PAE
 # Common NUMA Features
 config NUMA
 	bool "Numa Memory Allocation Support"
-	depends on SMP && HIGHMEM64G && (X86_PC || X86_NUMAQ || X86_GENERICARCH || (X86_SUMMIT && ACPI && !ACPI_HT_ONLY))
+	depends on SMP && HIGHMEM64G && (X86_PC || X86_NUMAQ || X86_GENERICARCH || (X86_SUMMIT && ACPI))
 	default n if X86_PC
 	default y if (X86_NUMAQ || X86_SUMMIT)
 
@@ -709,8 +709,8 @@ config NUMA
 comment "NUMA (NUMA-Q) requires SMP, 64GB highmem support"
 	depends on X86_NUMAQ && (!HIGHMEM64G || !SMP)
 
-comment "NUMA (Summit) requires SMP, 64GB highmem support, full ACPI"
-	depends on X86_SUMMIT && (!HIGHMEM64G || !ACPI || ACPI_HT_ONLY)
+comment "NUMA (Summit) requires SMP, 64GB highmem support, ACPI"
+	depends on X86_SUMMIT && (!HIGHMEM64G || !ACPI)
 
 config DISCONTIGMEM
 	bool
