@@ -1916,6 +1916,10 @@ static int atalk_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 static struct net_proto_family atalk_family_ops = {
 	.family		= PF_APPLETALK,
 	.create		= atalk_create,
+};
+
+static struct proto_ops SOCKOPS_WRAPPED(atalk_dgram_ops) = {
+	.family		= PF_APPLETALK,
 	.release	= atalk_release,
 	.bind		= atalk_bind,
 	.connect	= atalk_connect,
