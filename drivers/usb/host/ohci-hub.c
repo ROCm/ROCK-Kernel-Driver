@@ -487,7 +487,7 @@ static void start_hnp(struct ohci_hcd *ohci);
 /* called from some task, normally khubd */
 static inline void root_port_reset (struct ohci_hcd *ohci, unsigned port)
 {
-	u32	*portstat = &ohci->regs->roothub.portstatus [port];
+	u32 __iomem *portstat = &ohci->regs->roothub.portstatus [port];
 	u32	temp;
 	u16	now = readl(&ohci->regs->fmnumber);
 	u16	reset_done = now + PORT_RESET_MSEC;

@@ -77,7 +77,7 @@ struct usb_hcd {	/* usb_bus.hcpriv points to this */
 	unsigned		can_wakeup:1;	/* hw supports wakeup? */
 	unsigned		remote_wakeup:1;/* sw should use wakeup? */
 	int			irq;		/* irq allocated */
-	void			*regs;		/* device memory/io */
+	void __iomem		*regs;		/* device memory/io */
 
 #ifdef	CONFIG_PCI
 	int			region;		/* pci region for regs */
