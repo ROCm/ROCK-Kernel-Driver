@@ -31,6 +31,7 @@
 #include "pci-sh7751.h"
 
 static unsigned int pci_probe = PCI_PROBE_CONF1;
+extern int pci_fixup_pcic(void);
 
 /*
  * Direct access to PCI hardware...
@@ -74,7 +75,8 @@ static int sh7751_pci_read(struct pci_bus *bus, unsigned int devfn,
 }
 
 /* 
- * Since SH7751 only does 32bit access we'll have to do a read,mask,write operation.  
+ * Since SH7751 only does 32bit access we'll have to do a read,
+ * mask,write operation.
  * We'll allow an odd byte offset, though it should be illegal.
  */ 
 static int sh7751_pci_write(struct pci_bus *bus, unsigned int devfn,
@@ -156,6 +158,7 @@ static int __init pci_check_direct(void)
  *  Handle bus scanning and fixups ....
  */
 
+#if !defined(CONFIG_SH_HS7751RVOIP) && !defined(CONFIG_SH_RTS7751R2D)
 static void __init pci_fixup_ide_bases(struct pci_dev *d)
 {
 	int i;
@@ -174,11 +177,13 @@ static void __init pci_fixup_ide_bases(struct pci_dev *d)
 		}
 	}
 }
-
+#endif
 
 /* Add future fixups here... */
 struct pci_fixup pcibios_fixups[] = {
+#if !defined(CONFIG_SH_HS7751RVOIP) && !defined(CONFIG_SH_RTS7751R2D)
 	{ PCI_FIXUP_HEADER,	PCI_ANY_ID,	PCI_ANY_ID,	pci_fixup_ide_bases },
+#endif
 	{ 0 }
 };
 
@@ -261,19 +266,19 @@ int __init sh7751_pcic_init(struct sh7751_pci_address_map *map)
 	outl(word, PCI_REG(SH7751_PCICLKR));
 
 	/*
-	 * XXX: This code is unused for the SnapGear boards as it is done in
-	 * the bootloader and doing it here means the MAC addresses loaded by
-	 * the bootloader get lost.
+	 * This code is unused for some boards as it is done in the
+	 * bootloader and doing it here means the MAC addresses loaded
+	 * by the bootloader get lost.
 	 */
-#ifndef CONFIG_SH_SECUREEDGE5410
-	/* toggle PCI reset pin */
-	word = SH7751_PCICR_PREFIX | SH7751_PCICR_PRST;
-	outl(word,PCI_REG(SH7751_PCICR));    
-	/* Wait for a long time... not 1 sec. but long enough */
-	mdelay(100);
-	word = SH7751_PCICR_PREFIX;
-	outl(word,PCI_REG(SH7751_PCICR)); 
-#endif
+	if (!(map->flags & SH7751_PCIC_NO_RESET)) {
+		/* toggle PCI reset pin */
+		word = SH7751_PCICR_PREFIX | SH7751_PCICR_PRST;
+		outl(word,PCI_REG(SH7751_PCICR));
+		/* Wait for a long time... not 1 sec. but long enough */
+		mdelay(100);
+		word = SH7751_PCICR_PREFIX;
+		outl(word,PCI_REG(SH7751_PCICR));
+	}
 	
 	/* set the command/status bits to:
 	 * Wait Cycle Control + Parity Enable + Bus Master +
@@ -364,6 +369,10 @@ int __init sh7751_pcic_init(struct sh7751_pci_address_map *map)
 	 * DMA interrupts...
 	 */
 	 
+#ifdef CONFIG_SH_RTS7751R2D
+	pci_fixup_pcic();
+#endif
+
 	/* SH7751 init done, set central function init complete */
 	/* use round robin mode to stop a device starving/overruning */
 	word = SH7751_PCICR_PREFIX | SH7751_PCICR_CFIN | SH7751_PCICR_ARBM;
