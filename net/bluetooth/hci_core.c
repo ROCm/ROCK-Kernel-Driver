@@ -93,33 +93,6 @@ void hci_notify(struct hci_dev *hdev, int event)
 	notifier_call_chain(&hci_notifier, event, hdev);
 }
 
-/* ---- HCI hotplug support ---- */
-
-#ifdef CONFIG_HOTPLUG
-
-static int hci_run_hotplug(char *dev, char *action)
-{
-	char *argv[3], *envp[5], dstr[20], astr[32];
-
-	sprintf(dstr, "DEVICE=%s", dev);
-	sprintf(astr, "ACTION=%s", action);
-
-        argv[0] = hotplug_path;
-        argv[1] = "bluetooth";
-        argv[2] = NULL;
-
-	envp[0] = "HOME=/";
-	envp[1] = "PATH=/sbin:/bin:/usr/sbin:/usr/bin";
-	envp[2] = dstr;
-	envp[3] = astr;
-	envp[4] = NULL;
-	
-	return call_usermodehelper(argv[0], argv, envp, 0);
-}
-#else
-#define hci_run_hotplug(A...)
-#endif
-
 /* ---- HCI requests ---- */
 
 void hci_req_complete(struct hci_dev *hdev, int result)
@@ -841,10 +814,9 @@ int hci_register_dev(struct hci_dev *hdev)
 		
 	write_unlock_bh(&hci_dev_list_lock);
 
-	hci_dev_proc_init(hdev);
+	hci_register_sysfs(hdev);
 
 	hci_notify(hdev, HCI_DEV_REG);
-	hci_run_hotplug(hdev->name, "register");
 
 	return id;
 }
@@ -854,7 +826,7 @@ int hci_unregister_dev(struct hci_dev *hdev)
 {
 	BT_DBG("%p name %s type %d", hdev, hdev->name, hdev->type);
 
-	hci_dev_proc_cleanup(hdev);
+	hci_unregister_sysfs(hdev);
 
 	write_lock_bh(&hci_dev_list_lock);
 	list_del(&hdev->list);
@@ -863,8 +835,7 @@ int hci_unregister_dev(struct hci_dev *hdev)
 	hci_dev_do_close(hdev);
 
 	hci_notify(hdev, HCI_DEV_UNREG);
-	hci_run_hotplug(hdev->name, "unregister");
-	
+
 	__hci_dev_put(hdev);
 	return 0;
 }
@@ -873,7 +844,6 @@ int hci_unregister_dev(struct hci_dev *hdev)
 int hci_suspend_dev(struct hci_dev *hdev)
 {
 	hci_notify(hdev, HCI_DEV_SUSPEND);
-	hci_run_hotplug(hdev->name, "suspend");
 	return 0;
 }
 
@@ -881,7 +851,6 @@ int hci_suspend_dev(struct hci_dev *hdev)
 int hci_resume_dev(struct hci_dev *hdev)
 {
 	hci_notify(hdev, HCI_DEV_RESUME);
-	hci_run_hotplug(hdev->name, "resume");
 	return 0;
 }       
 

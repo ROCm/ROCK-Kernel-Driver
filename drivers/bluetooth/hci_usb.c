@@ -908,6 +908,7 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 
 	hdev->type  = HCI_USB;
 	hdev->driver_data = husb;
+	SET_HCIDEV_DEV(hdev, &intf->dev);
 
 	hdev->open  = hci_usb_open;
 	hdev->close = hci_usb_close;
