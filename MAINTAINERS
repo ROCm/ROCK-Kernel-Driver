@@ -222,6 +222,13 @@ P:	Dave Gilbert
 M:	linux@treblig.org
 S:	Maintained
 
+ARM/PT DIGITAL BOARD PORT
+P:	Stefan Eletzhofer
+M:	stefan.eletzhofer@eletztrick.de
+L:	linux-arm-kernel@lists.arm.linux.org.uk
+W:	http://www.arm.linux.org.uk/
+S:	Maintained
+
 ARM/SHARK MACHINE SUPPORT
 P:	Alexander Schulz
 M:	alex@shark-linux.de
@@ -1428,7 +1435,7 @@ S:	Supported
 SA1100 SUPPORT
 P:	Nicolas Pitre
 M:	nico@cam.org
-L:	sa1100-linux@pa.dec.com
+L:	linux-arm@lists.arm.linux.org.uk
 S:	Maintained
 
 SBPCD CDROM DRIVER

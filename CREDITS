@@ -753,6 +753,14 @@ S: One Dell Way
 S: Round Rock, TX  78682
 S: USA
 
+N: John G Dorsey
+E: john+@cs.cmu.edu
+D: ARM Linux ports to Assabet/Neponset, Spot
+S: Department of Electrical and Computer Engineering
+S: Carnegie Mellon University
+S: Pittsburgh, PA  15213
+S: USA
+
 N: Eddie C. Dost
 E: ecd@skynet.be
 D: Linux/Sparc kernel hacker
@@ -2278,6 +2286,15 @@ S: 521 Pleasant Valley Road
 S: Potsdam, New York 13676
 S: USA
 
+N: Dave Neuer
+E: dneuer@innovation-charter.com
+E: mr_fred_smoothie@yahoo.com
+D: Helped implement support for Compaq's H31xx series iPAQs
+D: Other mostly minor tweaks & bugfixes
+S: 325 E. Main St., Suite 3
+S: Carnegie, PA 15105
+S: USA
+
 N: Michael Neuffer
 E: mike@i-Connect.Net
 E: neuffer@goofy.zdv.uni-mainz.de
@@ -2442,6 +2459,7 @@ S: ask per mail for current address
 N: Nicolas Pitre
 E: nico@cam.org
 D: StrongARM SA1100 support integrator & hacker
+D: Xscale PXA architecture
 S: Montreal, Quebec, Canada
 
 N: Ken Pizzini
@@ -2712,6 +2730,12 @@ D: Original compressed boot image support.
 S: Valurink. 4A11
 S: 03600 Karkkila
 S: Finland
+
+N: Deepak Saxena
+E: deepak@csociety.purdue.edu
+D: I2O kernel layer (config, block, core, pci, net). I2O disk support for LILO
+D: XScale(IOP310) porting
+S: Tempe, Arizona
 
 N: Eric Schenk
 E: Eric.Schenk@dna.lth.se
