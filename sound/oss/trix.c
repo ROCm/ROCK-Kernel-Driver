@@ -276,6 +276,8 @@ static int __init probe_trix_sb(struct address_info *hw_config)
 
 	int tmp;
 	unsigned char conf;
+	extern int sb_be_quiet;
+	int old_quiet;
 	static signed char irq_translate[] = {
 		-1, -1, -1, 0, 1, 2, -1, 3
 	};
@@ -289,11 +291,6 @@ static int __init probe_trix_sb(struct address_info *hw_config)
 	if (sb_initialized)
 		return 0;
 
-	if (check_region(hw_config->io_base, 16))
-	{
-		printk(KERN_ERR "AudioTrix: SB I/O port conflict (%x)\n", hw_config->io_base);
-		return 0;
-	}
 	if ((hw_config->io_base & 0xffffff8f) != 0x200)
 		return 0;
 
@@ -307,6 +304,11 @@ static int __init probe_trix_sb(struct address_info *hw_config)
 	if (tmp != 1 && tmp != 3)
 		return 0;
 
+	if (!request_region(hw_config->io_base, 16, "soundblaster")) {
+		printk(KERN_ERR "AudioTrix: SB I/O port conflict (%x)\n", hw_config->io_base);
+		return 0;
+	}
+
 	conf = 0x84;		/* DMA and IRQ enable */
 	conf |= hw_config->io_base & 0x70;	/* I/O address bits */
 	conf |= irq_translate[hw_config->irq];
@@ -318,13 +320,10 @@ static int __init probe_trix_sb(struct address_info *hw_config)
 	sb_initialized = 1;
 
 	hw_config->name = "AudioTrix SB";
-	return sb_dsp_detect(hw_config, 0, 0, NULL);
-}
-
-static void __init attach_trix_sb(struct address_info *hw_config)
-{
-	extern int sb_be_quiet;
-	int old_quiet;
+	if (!sb_dsp_detect(hw_config, 0, 0, NULL)) {
+		release_region(hw_config->io_base, 16);
+		return 0;
+	}
 
 	hw_config->driver_use_1 = SB_NO_MIDI | SB_NO_MIXER | SB_NO_RECORDING;
 
@@ -335,6 +334,7 @@ static void __init attach_trix_sb(struct address_info *hw_config)
 	sb_dsp_init(hw_config, THIS_MODULE);
 
 	sb_be_quiet = old_quiet;
+	return 1;
 }
 
 static int __init probe_trix_mpu(struct address_info *hw_config)
@@ -496,8 +496,6 @@ static int __init init_trix(void)
 
 	if (cfg2.io_base != -1) {
 		sb = probe_trix_sb(&cfg2);
-		if (sb)
-			attach_trix_sb(&cfg2);
 	}
 	
 	if (cfg_mpu.io_base != -1)

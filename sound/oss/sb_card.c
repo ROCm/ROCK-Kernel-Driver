@@ -100,7 +100,14 @@ MODULE_PARM_DESC(uart401,  "When set to 1, will attempt to detect and enable"\
 /* OSS subsystem card registration shared by PnP and legacy routines */
 static int sb_register_oss(struct sb_card_config *scc, struct sb_module_options *sbmo)
 {
-	if(!sb_dsp_detect(&scc->conf, 0, 0, sbmo)) {
+	if (!request_region(scc->conf.io_base, 16, "soundblaster")) {
+		printk(KERN_ERR "sb: ports busy.\n");
+		kfree(scc);
+		return -EBUSY;
+	}
+
+	if (!sb_dsp_detect(&scc->conf, 0, 0, sbmo)) {
+		release_region(scc->conf.io_base, 16);
 		printk(KERN_ERR "sb: Failed DSP Detect.\n");
 		kfree(scc);
 		return -ENODEV;

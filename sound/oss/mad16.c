@@ -732,8 +732,12 @@ static int __init probe_mad16_mpu(struct address_info *hw_config)
 
 		mad_write(MC3_PORT, tmp | 0x04);
 		hw_config->driver_use_1 = SB_MIDI_ONLY;
-		if (!sb_dsp_detect(hw_config, 0, 0, NULL))
+		if (!request_region(hw_config->io_base, 16, "soundblaster"))
 			return 0;
+		if (!sb_dsp_detect(hw_config, 0, 0, NULL)) {
+			release_region(hw_config->io_base, 16);
+			return 0;
+		}
 
 		if (mad_read(MC1_PORT) & 0x20)
 			hw_config->io_base = 0x240;
