@@ -93,9 +93,6 @@ EXPORT_SYMBOL(enable_irq);
 EXPORT_SYMBOL(disable_irq);
 EXPORT_SYMBOL(disable_irq_nosync);
 EXPORT_SYMBOL(probe_irq_mask);
-#ifdef CONFIG_SMP
-EXPORT_SYMBOL(kernel_flag);
-#endif /* CONFIG_SMP */
 
 EXPORT_SYMBOL(ISA_DMA_THRESHOLD);
 EXPORT_SYMBOL_NOVERS(DMA_MODE_READ);

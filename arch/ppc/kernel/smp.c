@@ -47,7 +47,6 @@ struct cpuinfo_PPC cpu_data[NR_CPUS];
 struct klock_info_struct klock_info = { KLOCK_CLEAR, 0 };
 atomic_t ipi_recv;
 atomic_t ipi_sent;
-spinlock_t kernel_flag __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 unsigned int prof_multiplier[NR_CPUS] = { [1 ... NR_CPUS-1] = 1 };
 unsigned int prof_counter[NR_CPUS] = { [1 ... NR_CPUS-1] = 1 };
 unsigned long cache_decay_ticks = HZ/100;

@@ -540,11 +540,6 @@ if [ "$CONFIG_ALL_PPC" = "y" ]; then
          bool '     Support for mouse button 2+3 emulation' CONFIG_MAC_EMUMOUSEBTN
       fi
    fi
-   # This is for drivers/macintosh/mac_hid.o, which is needed if the input
-   # layer is used.
-   if [ "$CONFIG_INPUT" != "n" ]; then
-      define_bool CONFIG_MAC_HID y
-   fi
    if [ "$CONFIG_ADB_CUDA" != "n" ]; then
       bool 'Support for ANS LCD display' CONFIG_ANSLCD
    fi

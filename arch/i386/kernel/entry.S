@@ -754,6 +754,11 @@ ENTRY(sys_call_table)
 	.long sys_sched_getaffinity
 	.long sys_set_thread_area
 	.long sys_get_thread_area
+	.long sys_io_setup	/* 245 */
+	.long sys_io_destroy
+	.long sys_io_getevents
+	.long sys_io_submit
+	.long sys_io_cancel
 
 	.rept NR_syscalls-(.-sys_call_table)/4
 		.long sys_ni_syscall

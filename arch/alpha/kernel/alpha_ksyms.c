@@ -40,7 +40,6 @@
 extern struct hwrpb_struct *hwrpb;
 extern void dump_thread(struct pt_regs *, struct user *);
 extern int dump_fpu(struct pt_regs *, elf_fpregset_t *);
-extern spinlock_t kernel_flag;
 extern spinlock_t rtc_lock;
 
 /* these are C runtime functions with special calling conventions: */
@@ -207,7 +206,6 @@ EXPORT_SYMBOL(up);
  */
 
 #ifdef CONFIG_SMP
-EXPORT_SYMBOL(kernel_flag);
 EXPORT_SYMBOL(synchronize_irq);
 EXPORT_SYMBOL(flush_tlb_all);
 EXPORT_SYMBOL(flush_tlb_mm);

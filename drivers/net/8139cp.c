@@ -188,8 +188,8 @@ enum {
 	NormalTxPoll	= (1 << 6),  /* One or more normal Tx packets to send */
 	PID1		= (1 << 17), /* 2 protocol id bits:  0==non-IP, */
 	PID0		= (1 << 16), /* 1==UDP/IP, 2==TCP/IP, 3==IP */
-	RxProtoTCP	= 2,
-	RxProtoUDP	= 1,
+	RxProtoTCP	= 1,
+	RxProtoUDP	= 2,
 	RxProtoIP	= 3,
 	TxFIFOUnder	= (1 << 25), /* Tx FIFO underrun */
 	TxOWC		= (1 << 22), /* Tx Out-of-window collision */

@@ -22,9 +22,6 @@
 #include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
 
-/* The 'big kernel lock' */
-spinlock_t kernel_flag __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
-
 /*
  * the following functions deal with sending IPIs between CPUs.
  *

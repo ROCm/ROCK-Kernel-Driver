@@ -33,6 +33,15 @@
  * Changelog
  * ~~~~~~~~~
  *
+ * Thu, 22 Aug 2002 15:10:43 +0200
+ * 	- Update Config.help entry. I got a number of emails asking
+ * 	  me to tell their senders if they could make use of this
+ * 	  piece of code... So: "SRM is something like BIOS for your
+ * 	  Alpha"
+ * 	- Update code formatting a bit to better conform CodingStyle
+ * 	  rules.
+ * 	- So this is v0.0.5, with no changes (except formatting)
+ * 	
  * Wed, 22 May 2002 00:11:21 +0200
  * 	- Fix typo on comment (SRC -> SRM)
  * 	- Call this "Version 0.0.4"
@@ -59,7 +68,7 @@
 #define BASE_DIR	"srm_environment"	/* Subdir in /proc/		*/
 #define NAMED_DIR	"named_variables"	/* Subdir for known variables	*/
 #define NUMBERED_DIR	"numbered_variables"	/* Subdir for all variables	*/
-#define VERSION		"0.0.4"			/* Module version		*/
+#define VERSION		"0.0.5"			/* Module version		*/
 #define NAME		"srm_env"		/* Module name			*/
 
 MODULE_AUTHOR("Jan-Benedict Glaw <jbglaw@lug-owl.de>");
@@ -97,9 +106,12 @@ static srm_env_t	srm_named_entries[] = {
 };
 static srm_env_t	srm_numbered_entries[256];
 
+
+
 static int
 srm_env_read(char *page, char **start, off_t off, int count, int *eof,
-		void *data) {
+		void *data)
+{
 	int		nbytes;
 	unsigned long	ret;
 	srm_env_t	*entry;
@@ -111,11 +123,11 @@ srm_env_read(char *page, char **start, off_t off, int count, int *eof,
 		return -EFAULT;
 	}
 
-	entry	= (srm_env_t *)data;
+	entry	= (srm_env_t *) data;
 	ret	= callback_getenv(entry->id, page, count);
 
 	if((ret >> 61) == 0)
-		nbytes = (int)ret;
+		nbytes = (int) ret;
 	else
 		nbytes = -EFAULT;
 
@@ -124,9 +136,11 @@ srm_env_read(char *page, char **start, off_t off, int count, int *eof,
 	return nbytes;
 }
 
+
 static int
 srm_env_write(struct file *file, const char *buffer, unsigned long count,
-		void *data) {
+		void *data)
+{
 #define BUFLEN	512
 	int		nbytes;
 	srm_env_t	*entry;
@@ -156,7 +170,7 @@ srm_env_write(struct file *file, const char *buffer, unsigned long count,
 		do 
 			ret2 = callback_save_env();
 		while((ret2 >> 61) == 1);
-		nbytes = (int)ret1;
+		nbytes = (int) ret1;
 	} else
 		nbytes = -EFAULT;
 
@@ -165,8 +179,10 @@ srm_env_write(struct file *file, const char *buffer, unsigned long count,
 	return nbytes;
 }
 
+
 static void
-srm_env_cleanup(void) {
+srm_env_cleanup(void)
+{
 	srm_env_t	*entry;
 	unsigned long	var_num;
 
@@ -210,8 +226,10 @@ srm_env_cleanup(void) {
 	return;
 }
 
+
 static int __init
-srm_env_init(void) {
+srm_env_init(void)
+{
 	srm_env_t	*entry;
 	unsigned long	var_num;
 
@@ -220,7 +238,9 @@ srm_env_init(void) {
 	 */
 	if(!alpha_using_srm) {
 		printk(KERN_INFO "%s: This Alpha system doesn't "
-				"know about SRM...\n", __FUNCTION__);
+				"know about SRM (or you've booted "
+				"SRM->MILO->Linux, which gets "
+				"misdetected)...\n", __FUNCTION__);
 		return -ENODEV;
 	}
 
@@ -274,7 +294,7 @@ srm_env_init(void) {
 		if(entry->proc_entry == NULL)
 			goto cleanup;
 
-		entry->proc_entry->data		= (void *)entry;
+		entry->proc_entry->data		= (void *) entry;
 		entry->proc_entry->owner	= THIS_MODULE;
 		entry->proc_entry->read_proc	= srm_env_read;
 		entry->proc_entry->write_proc	= srm_env_write;
@@ -295,7 +315,7 @@ srm_env_init(void) {
 			goto cleanup;
 
 		entry->id			= var_num;
-		entry->proc_entry->data		= (void *)entry;
+		entry->proc_entry->data		= (void *) entry;
 		entry->proc_entry->owner	= THIS_MODULE;
 		entry->proc_entry->read_proc	= srm_env_read;
 		entry->proc_entry->write_proc	= srm_env_write;
@@ -303,19 +323,25 @@ srm_env_init(void) {
 
 	printk(KERN_INFO "%s: version %s loaded successfully\n", NAME,
 			VERSION);
+
 	return 0;
 
 cleanup:
 	srm_env_cleanup();
+
 	return -ENOMEM;
 }
 
+
 static void __exit
-srm_env_exit(void) {
+srm_env_exit(void)
+{
 	srm_env_cleanup();
 	printk(KERN_INFO "%s: unloaded successfully\n", NAME);
+
 	return;
 }
+
 
 module_init(srm_env_init);
 module_exit(srm_env_exit);
