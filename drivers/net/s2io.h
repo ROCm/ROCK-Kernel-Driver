@@ -348,9 +348,9 @@ typedef struct rx_ring_config {
 	u8 ring_priority;	/*Specifies service priority of ring */
 	/* OSM should not set any two rings with same priority */
 	u8 ring_org;		/*Organization of ring */
-#define RING_ORG_BUFF1           0x01
-#define RX_RING_ORG_BUFF3           0x03
-#define RX_RING_ORG_BUFF5           0x05
+#define RING_ORG_BUFF1		0x01
+#define RX_RING_ORG_BUFF3	0x03
+#define RX_RING_ORG_BUFF5	0x05
 
 	u8 f_no_snoop;
 #define NO_SNOOP_RXD                0x01
