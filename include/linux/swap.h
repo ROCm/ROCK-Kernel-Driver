@@ -227,12 +227,17 @@ do {						\
 		BUG();				\
 } while (0)
 
+#define __add_page_to_active_list(page)		\
+do {						\
+	list_add(&(page)->lru, &active_list);	\
+	inc_page_state(nr_active);		\
+} while (0)
+
 #define add_page_to_active_list(page)		\
 do {						\
 	DEBUG_LRU_PAGE(page);			\
 	SetPageActive(page);			\
-	list_add(&(page)->lru, &active_list);	\
-	inc_page_state(nr_active);		\
+	__add_page_to_active_list(page);	\
 } while (0)
 
 #define add_page_to_inactive_list(page)		\

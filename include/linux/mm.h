@@ -195,6 +195,7 @@ struct page {
  */
 #define get_page(p)		atomic_inc(&(p)->count)
 #define put_page(p)		__free_page(p)
+#define __put_page(p)		atomic_dec(&(p)->count)
 #define put_page_testzero(p) 	atomic_dec_and_test(&(p)->count)
 #define page_count(p)		atomic_read(&(p)->count)
 #define set_page_count(p,v) 	atomic_set(&(p)->count, v)

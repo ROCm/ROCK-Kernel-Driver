@@ -545,7 +545,8 @@ int add_to_page_cache(struct page *page,
 		page_cache_get(page);
 	}
 	write_unlock(&mapping->page_lock);
-	if (!error)
+	/* Anon pages are already on the LRU */
+	if (!error && !PageSwapCache(page))
 		lru_cache_add(page);
 	return error;
 }
