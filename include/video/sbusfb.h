@@ -85,8 +85,6 @@ struct sbus_mmap_map {
 
 struct fb_info_sbusfb {
 	struct fb_info info;
-	struct fb_fix_screeninfo fix;
-	struct fb_var_screeninfo var;
 	struct display disp;
 	struct display_switch dispsw;
 	struct fbtype type;

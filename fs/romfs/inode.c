@@ -144,7 +144,7 @@ static int romfs_fill_super(struct super_block *s, void *data, int silent)
 	}
 
 	s->s_magic = ROMFS_MAGIC;
-	s->u.generic_sbp = (void *)sz;
+	s->u.generic_sbp = (void *)(long)sz;
 
 	s->s_flags |= MS_RDONLY;
 

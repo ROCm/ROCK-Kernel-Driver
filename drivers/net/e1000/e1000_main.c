@@ -427,6 +427,11 @@ e1000_probe(struct pci_dev *pdev,
 		netdev->features = NETIF_F_SG;
 	}
 
+#ifdef NETIF_F_TSO
+	if(adapter->hw.mac_type >= e1000_82544)
+		netdev->features |= NETIF_F_TSO;
+#endif
+ 
 	if(pci_using_dac)
 		netdev->features |= NETIF_F_HIGHDMA;
 
@@ -1284,8 +1289,61 @@ e1000_watchdog(unsigned long data)
 
 #define E1000_TX_FLAGS_CSUM		0x00000001
 #define E1000_TX_FLAGS_VLAN		0x00000002
+#define E1000_TX_FLAGS_TSO		0x00000004
 #define E1000_TX_FLAGS_VLAN_MASK	0xffff0000
 #define E1000_TX_FLAGS_VLAN_SHIFT	16
+
+static inline boolean_t
+e1000_tso(struct e1000_adapter *adapter, struct sk_buff *skb, int tx_flags)
+{
+#ifdef NETIF_F_TSO
+	struct e1000_context_desc *context_desc;
+	int i;
+	uint8_t ipcss, ipcso, tucss, tucso, hdr_len;
+	uint16_t ipcse, tucse, mss;
+	
+	if(skb_shinfo(skb)->tso_size) {
+		hdr_len = ((skb->h.raw - skb->data) + (skb->h.th->doff << 2));
+		mss = skb_shinfo(skb)->tso_size;
+		skb->nh.iph->tot_len = 0;
+		skb->nh.iph->check = 0;
+		skb->h.th->check = ~csum_tcpudp_magic(skb->nh.iph->saddr,
+		                                      skb->nh.iph->daddr,
+		                                      0,
+		                                      IPPROTO_TCP,
+		                                      0);
+		ipcss = skb->nh.raw - skb->data;
+		ipcso = (void *)&(skb->nh.iph->check) - (void *)skb->data;
+		ipcse = skb->h.raw - skb->data - 1;
+		tucss = skb->h.raw - skb->data;
+		tucso = (void *)&(skb->h.th->check) - (void *)skb->data;
+		tucse = 0;
+
+		i = adapter->tx_ring.next_to_use;
+		context_desc = E1000_CONTEXT_DESC(adapter->tx_ring, i);
+		
+		context_desc->lower_setup.ip_fields.ipcss  = ipcss;
+		context_desc->lower_setup.ip_fields.ipcso  = ipcso;
+		context_desc->lower_setup.ip_fields.ipcse  = cpu_to_le16(ipcse);
+		context_desc->upper_setup.tcp_fields.tucss = tucss;
+		context_desc->upper_setup.tcp_fields.tucso = tucso;
+		context_desc->upper_setup.tcp_fields.tucse = cpu_to_le16(tucse);
+		context_desc->tcp_seg_setup.fields.mss     = cpu_to_le16(mss);
+		context_desc->tcp_seg_setup.fields.hdr_len = hdr_len;
+		context_desc->cmd_and_length = cpu_to_le32(adapter->txd_cmd |
+			E1000_TXD_CMD_DEXT | E1000_TXD_CMD_TSE |
+			E1000_TXD_CMD_IP | E1000_TXD_CMD_TCP |
+			(skb->len - (hdr_len)));
+
+		i = (i + 1) % adapter->tx_ring.count;
+		adapter->tx_ring.next_to_use = i;
+
+		return TRUE;
+	}
+#endif
+	
+	return FALSE;
+}
 
 static inline boolean_t
 e1000_tx_csum(struct e1000_adapter *adapter, struct sk_buff *skb)
@@ -1386,6 +1444,12 @@ e1000_tx_queue(struct e1000_adapter *adapter, int count, int tx_flags)
 	txd_upper = 0;
 	txd_lower = adapter->txd_cmd;
 
+	if(tx_flags & E1000_TX_FLAGS_TSO) {
+		txd_lower |= E1000_TXD_CMD_DEXT | E1000_TXD_DTYP_D |
+		             E1000_TXD_CMD_TSE;
+		txd_upper |= (E1000_TXD_POPTS_IXSM | E1000_TXD_POPTS_TXSM) << 8;
+	}
+
 	if(tx_flags & E1000_TX_FLAGS_CSUM) {
 		txd_lower |= E1000_TXD_CMD_DEXT | E1000_TXD_DTYP_D;
 		txd_upper |= E1000_TXD_POPTS_TXSM << 8;
@@ -1435,21 +1499,28 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 	for(f = 0; f < skb_shinfo(skb)->nr_frags; f++)
 		count += TXD_USE_COUNT(skb_shinfo(skb)->frags[f].size,
 		                       adapter->max_data_per_txd);
+#ifdef NETIF_F_TSO
+	if((skb_shinfo(skb)->tso_size) || (skb->ip_summed == CHECKSUM_HW))
+		count++;
+#else
 	if(skb->ip_summed == CHECKSUM_HW)
 		count++;
+#endif
 
 	if(E1000_DESC_UNUSED(&adapter->tx_ring) < count) {
 		netif_stop_queue(netdev);
 		return 1;
 	}
 
-	if(e1000_tx_csum(adapter, skb))
-		tx_flags |= E1000_TX_FLAGS_CSUM;
-
 	if(adapter->vlgrp && vlan_tx_tag_present(skb)) {
 		tx_flags |= E1000_TX_FLAGS_VLAN;
 		tx_flags |= (vlan_tx_tag_get(skb) << E1000_TX_FLAGS_VLAN_SHIFT);
 	}
+
+	if(e1000_tso(adapter, skb, tx_flags))
+		tx_flags |= E1000_TX_FLAGS_TSO;
+	else if(e1000_tx_csum(adapter, skb))
+		tx_flags |= E1000_TX_FLAGS_CSUM;
 
 	count = e1000_tx_map(adapter, skb);
 

@@ -729,7 +729,7 @@ static void ip_select_fb_ident(struct iphdr *iph)
 	spin_unlock_bh(&ip_fb_id_lock);
 }
 
-void __ip_select_ident(struct iphdr *iph, struct dst_entry *dst)
+void __ip_select_ident(struct iphdr *iph, struct dst_entry *dst, int more)
 {
 	struct rtable *rt = (struct rtable *) dst;
 
@@ -741,7 +741,7 @@ void __ip_select_ident(struct iphdr *iph, struct dst_entry *dst)
 		   so that we need not to grab a lock to dereference it.
 		 */
 		if (rt->peer) {
-			iph->id = htons(inet_getid(rt->peer));
+			iph->id = htons(inet_getid(rt->peer, more));
 			return;
 		}
 	} else

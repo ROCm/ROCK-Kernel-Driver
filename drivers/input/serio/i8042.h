@@ -15,6 +15,8 @@
 
 #if defined(CONFIG_PPC)
 #include "i8042-ppcio.h"
+#elif defined(CONFIG_SPARC32) || defined(CONFIG_SPARC64)
+#include "i8042-sparcio.h"
 #else
 #include "i8042-io.h"
 #endif

@@ -224,14 +224,14 @@ static struct sbus_mmap_map cg6_mmap_map[] = {
 
 static void cg6_setup(struct display *p)
 {
-	p->next_line = sbusfbinfo(p->fb_info)->var.xres_virtual;
+	p->next_line = p->fb_info->var.xres_virtual;
 	p->next_plane = 0;
 }
 
 static void cg6_clear(struct vc_data *conp, struct display *p, int sy, int sx,
 		      int height, int width)
 {
-	struct fb_info_sbusfb *fb = (struct fb_info_sbusfb *)p->fb_info;
+	struct fb_info_sbusfb *fb = sbusfbinfo(p->fb_info);
 	register struct cg6_fbc *fbc = fb->s.cg6.fbc;
 	unsigned long flags;
 	int x, y, w, h;
@@ -302,7 +302,7 @@ static void cg6_fill(struct fb_info_sbusfb *fb, struct display *p, int s,
 
 static void cg6_putc(struct vc_data *conp, struct display *p, int c, int yy, int xx)
 {
-	struct fb_info_sbusfb *fb = (struct fb_info_sbusfb *)p->fb_info;
+	struct fb_info_sbusfb *fb = sbusfbinfo(p->fb_info);
 	register struct cg6_fbc *fbc = fb->s.cg6.fbc;
 	unsigned long flags;
 	int i, x, y;
@@ -359,7 +359,7 @@ static void cg6_putc(struct vc_data *conp, struct display *p, int c, int yy, int
 static void cg6_putcs(struct vc_data *conp, struct display *p, const unsigned short *s,
 		      int count, int yy, int xx)
 {
-	struct fb_info_sbusfb *fb = (struct fb_info_sbusfb *)p->fb_info;
+	struct fb_info_sbusfb *fb = sbusfbinfo(p->fb_info);
 	register struct cg6_fbc *fbc = fb->s.cg6.fbc;
 	unsigned long flags;
 	int i, x, y;
@@ -692,8 +692,8 @@ static char idstring[70] __initdata = { 0 };
 
 char __init *cgsixfb_init(struct fb_info_sbusfb *fb)
 {
-	struct fb_fix_screeninfo *fix = &fb->fix;
-	struct fb_var_screeninfo *var = &fb->var;
+	struct fb_fix_screeninfo *fix = &fb->info.fix;
+	struct fb_var_screeninfo *var = &fb->info.var;
 	struct display *disp = &fb->disp;
 	struct fbtype *type = &fb->type;
 	struct sbus_dev *sdev = fb->sbdp;
@@ -717,7 +717,7 @@ char __init *cgsixfb_init(struct fb_info_sbusfb *fb)
 		fix->smem_len *= 4;
 	}
 
-	fix->line_length = fb->var.xres_virtual;
+	fix->line_length = fb->info.var.xres_virtual;
 	fix->accel = FB_ACCEL_SUN_CGSIX;
 	
 	var->accel_flags = FB_ACCELF_TEXT;

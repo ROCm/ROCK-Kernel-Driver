@@ -130,7 +130,7 @@ struct sock {
 				bsdism;
 	unsigned char		debug;
 	unsigned char		rcvtstamp;
-	/* Hole of 1 byte. Try to pack. */
+	unsigned char		no_largesend;
 	int			route_caps;
 	int			proc;
 	unsigned long	        lingertime;

@@ -531,7 +531,21 @@ int tcp_sync_mss(struct sock *sk, u32 pmtu)
 
 	/* And store cached results */
 	tp->pmtu_cookie = pmtu;
-	tp->mss_cache = mss_now;
+	tp->mss_cache = tp->mss_cache_std = mss_now;
+
+	if (sk->route_caps&NETIF_F_TSO) {
+		int large_mss;
+
+		large_mss = 65535 - tp->af_specific->net_header_len -
+			tp->ext_header_len - tp->tcp_header_len;
+
+		if (tp->max_window && large_mss > (tp->max_window>>1))
+			large_mss = max((tp->max_window>>1), 68U - tp->tcp_header_len);
+
+		/* Always keep large mss multiple of real mss. */
+		tp->mss_cache = mss_now*(large_mss/mss_now);
+	}
+
 	return mss_now;
 }
 
@@ -561,7 +575,7 @@ int tcp_write_xmit(struct sock *sk, int nonagle)
 		 * We also handle things correctly when the user adds some
 		 * IP options mid-stream.  Silly to do, but cover it.
 		 */
-		mss_now = tcp_current_mss(sk); 
+		mss_now = tcp_current_mss(sk, 1);
 
 		while((skb = tp->send_head) &&
 		      tcp_snd_test(tp, skb, mss_now, tcp_skb_is_last(sk, skb) ? nonagle : 1)) {
@@ -767,7 +781,7 @@ void tcp_simple_retransmit(struct sock *sk)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
 	struct sk_buff *skb;
-	unsigned int mss = tcp_current_mss(sk);
+	unsigned int mss = tcp_current_mss(sk, 0);
 	int lost = 0;
 
 	for_retrans_queue(skb, sk, tp) {
@@ -812,7 +826,7 @@ void tcp_simple_retransmit(struct sock *sk)
 int tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
-	unsigned int cur_mss = tcp_current_mss(sk);
+ 	unsigned int cur_mss = tcp_current_mss(sk, 0);
 	int err;
 
 	/* Do not sent more than we queued. 1/4 is reserved for possible
@@ -820,6 +834,27 @@ int tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb)
 	 */
 	if (atomic_read(&sk->wmem_alloc) > min(sk->wmem_queued+(sk->wmem_queued>>2),sk->sndbuf))
 		return -EAGAIN;
+
+	if (before(TCP_SKB_CB(skb)->seq, tp->snd_una)) {
+		struct sk_buff *skb2;
+
+		if (before(TCP_SKB_CB(skb)->end_seq, tp->snd_una))
+			BUG();
+
+		if (sk->route_caps&NETIF_F_TSO) {
+			sk->route_caps &= ~NETIF_F_TSO;
+			sk->no_largesend = 1;
+			tp->mss_cache = tp->mss_cache_std;
+		}
+
+		if(tcp_fragment(sk, skb, tp->snd_una - TCP_SKB_CB(skb)->seq))
+			return -ENOMEM;
+
+		skb2 = skb->next;
+		__skb_unlink(skb, skb->list);
+		tcp_free_skb(sk, skb);
+		skb = skb2;
+	}
 
 	/* If receiver has shrunk his window, and skb is out of
 	 * new window, do not retransmit it. The exception is the
@@ -998,7 +1033,7 @@ void tcp_send_fin(struct sock *sk)
 	 * unsent frames.  But be careful about outgoing SACKS
 	 * and IP options.
 	 */
-	mss_now = tcp_current_mss(sk); 
+	mss_now = tcp_current_mss(sk, 1); 
 
 	if(tp->send_head != NULL) {
 		TCP_SKB_CB(skb)->flags |= TCPCB_FLAG_FIN;
@@ -1121,6 +1156,8 @@ struct sk_buff * tcp_make_synack(struct sock *sk, struct dst_entry *dst,
 	memset(th, 0, sizeof(struct tcphdr));
 	th->syn = 1;
 	th->ack = 1;
+	if (dst->dev->features&NETIF_F_TSO)
+		req->ecn_ok = 0;
 	TCP_ECN_make_synack(req, th);
 	th->source = inet_sk(sk)->sport;
 	th->dest = req->rmt_port;
@@ -1224,7 +1261,7 @@ int tcp_connect(struct sock *sk)
 	skb_reserve(buff, MAX_TCP_HEADER);
 
 	TCP_SKB_CB(buff)->flags = TCPCB_FLAG_SYN;
-	TCP_ECN_send_syn(tp, buff);
+	TCP_ECN_send_syn(sk, tp, buff);
 	TCP_SKB_CB(buff)->sacked = 0;
 	buff->csum = 0;
 	TCP_SKB_CB(buff)->seq = tp->write_seq++;
@@ -1379,7 +1416,7 @@ int tcp_write_wakeup(struct sock *sk)
 		if ((skb = tp->send_head) != NULL &&
 		    before(TCP_SKB_CB(skb)->seq, tp->snd_una+tp->snd_wnd)) {
 			int err;
-			int mss = tcp_current_mss(sk);
+			int mss = tcp_current_mss(sk, 0);
 			int seg_size = tp->snd_una+tp->snd_wnd-TCP_SKB_CB(skb)->seq;
 
 			if (before(tp->pushed_seq, TCP_SKB_CB(skb)->end_seq))
@@ -1395,6 +1432,13 @@ int tcp_write_wakeup(struct sock *sk)
 				TCP_SKB_CB(skb)->flags |= TCPCB_FLAG_PSH;
 				if (tcp_fragment(sk, skb, seg_size))
 					return -1;
+				/* SWS override triggered forced fragmentation.
+				 * Disable TSO, the connection is too sick. */
+				if (sk->route_caps&NETIF_F_TSO) {
+					sk->no_largesend = 1;
+					sk->route_caps &= ~NETIF_F_TSO;
+					tp->mss_cache = tp->mss_cache_std;
+				}
 			}
 			TCP_SKB_CB(skb)->flags |= TCPCB_FLAG_PSH;
 			TCP_SKB_CB(skb)->when = tcp_time_stamp;

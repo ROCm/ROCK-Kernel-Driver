@@ -43,6 +43,14 @@ extern void			inet_sock_release(struct sock *sk);
 extern void			inet_sock_destruct(struct sock *sk);
 extern atomic_t			inet_sock_nr;
 
+extern int			inet_bind(struct socket *sock, 
+					  struct sockaddr *uaddr, int addr_len);
+extern int			inet_getname(struct socket *sock, 
+					     struct sockaddr *uaddr, 
+					     int *uaddr_len, int peer);
+extern int			inet_ioctl(struct socket *sock, 
+					   unsigned int cmd, unsigned long arg);
+
 #endif
 
 
