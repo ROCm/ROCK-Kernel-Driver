@@ -57,7 +57,7 @@ static struct platform_device sa1111_device = {
 	.name		= "sa1111",
 	.id		= 0,
 	.dev		= {
-		.dma_mask = &sa1111_dmamask;
+		.dma_mask = &sa1111_dmamask,
 		.coherent_dma_mask = 0xffffffff,
 	},
 	.num_resources	= ARRAY_SIZE(sa1111_resources),
@@ -212,8 +212,7 @@ static int __init badge4_init(void)
 	/* maybe turn on 5v0 from the start */
 	badge4_set_5V(BADGE4_5V_INITIALLY, five_v_on);
 
-	sa11x0_set_flash_data(badge4_flash_data, badge4_flash_resources,
-			      ARRAY_SIZE(badge4_flash_resources);
+	sa11x0_set_flash_data(&badge4_flash_data, &badge4_flash_resource, 1);
 
 	return 0;
 }
