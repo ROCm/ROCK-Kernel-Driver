@@ -13,6 +13,8 @@
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
+#include <linux/console.h>
+#include <linux/tty.h>
 #include <linux/errno.h>
 #include <linux/string.h>
 #include <linux/init.h>
@@ -212,7 +214,7 @@ int suncore_mouse_baud_detection(unsigned char ch, int is_break)
 	}
 	if (mouse_got_break) {
 		ctr++;
-		if (c == 0x87) {
+		if (ch == 0x87) {
 			/* Correct baud rate determined. */
 			mouse_got_break = 0;
 		}
