@@ -578,6 +578,7 @@ static unsigned int __init init_chipset_ali15x3 (struct pci_dev *dev, const char
 {
 	unsigned long flags;
 	u8 tmpbyte;
+	struct pci_dev *north = pci_find_slot(0, PCI_DEVFN(0,0));
 
 	pci_read_config_byte(dev, PCI_REVISION_ID, &m5229_revision);
 
@@ -624,9 +625,11 @@ static unsigned int __init init_chipset_ali15x3 (struct pci_dev *dev, const char
 
 	/*
 	 * We should only tune the 1533 enable if we are using an ALi
-	 * south bridge.
+	 * North bridge. We might have no north found on some zany
+	 * box without a device at 0:0.0. The ALi bridge will be at
+	 * 0:0.0 so if we didn't find one we know what is cooking.
 	 */
-	if (!isa_dev) {
+	if (!isa_dev || (north && north->vendor != PCI_VENDOR_ID_AL)) {
 		local_irq_restore(flags);
 	        return 0;
 	}
