@@ -176,6 +176,20 @@ config ACPI_ASUS
           something works not quite as expected, please use the mailing list
           available on the above page (acpi4asus-user@lists.sourceforge.net)
           
+config ACPI_IBM
+	tristate "IBM ThinkPad Laptop Extras"
+	depends on X86
+	depends on ACPI_INTERPRETER
+	default m
+	---help---
+	  This is a Linux ACPI driver for the IBM ThinkPad laptops. It adds
+	  support for Fn-Fx key combinations, Bluetooth control, video
+	  output switching, ThinkLight control, UltraBay eject and more.
+	  For more information about this driver see Documentation/ibm-acpi.txt
+	  and http://ibm-acpi.sf.net/ .
+
+	  If you have an IBM ThinkPad laptop, say Y or M here.
+
 config ACPI_TOSHIBA
 	tristate "Toshiba Laptop Extras"
 	depends on X86
