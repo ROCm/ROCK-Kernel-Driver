@@ -50,6 +50,7 @@
 #include <asm/dma.h>
 #include <asm/io.h>
 #include <asm/hardware.h>       /* for register_module() */
+#include <asm/parisc-device.h>
 
 /* 
 ** Choose "ccio" since that's what HP-UX calls it.
@@ -599,15 +600,13 @@ ccio_mark_invalid(struct ioc *ioc, dma_addr_t iova, size_t byte_cnt)
  * This function implements the pci_dma_supported function.
  */
 static int 
-ccio_dma_supported(struct pci_dev *dev, u64 mask)
+ccio_dma_supported(struct device *dev, u64 mask)
 {
 	if(dev == NULL) {
 		printk(KERN_ERR MODULE_NAME ": EISA/ISA/et al not supported\n");
 		BUG();
 		return 0;
 	}
-
-	dev->dma_mask = mask;   /* save it */
 
 	/* only support 32-bit devices (ie PCI/GSC) */
 	return (int)(mask == 0xffffffffUL);
@@ -623,7 +622,8 @@ ccio_dma_supported(struct pci_dev *dev, u64 mask)
  * This function implements the pci_map_single function.
  */
 static dma_addr_t 
-ccio_map_single(struct pci_dev *dev, void *addr, size_t size, int direction)
+ccio_map_single(struct device *dev, void *addr, size_t size,
+		enum dma_data_direction direction)
 {
 	int idx;
 	struct ioc *ioc;
@@ -631,11 +631,9 @@ ccio_map_single(struct pci_dev *dev, void *addr, size_t size, int direction)
 	dma_addr_t iovp;
 	dma_addr_t offset;
 	u64 *pdir_start;
-	unsigned long hint = hint_lookup[direction];
+	unsigned long hint = hint_lookup[(int)direction];
 
-	ASSERT(dev);
-	ASSERT(dev->sysdata);
-	ASSERT(HBA_DATA(dev->sysdata)->iommu);
+	BUG_ON(!dev);
 	ioc = GET_IOC(dev);
 
 	ASSERT(size > 0);
@@ -692,16 +690,14 @@ ccio_map_single(struct pci_dev *dev, void *addr, size_t size, int direction)
  * This function implements the pci_unmap_single function.
  */
 static void 
-ccio_unmap_single(struct pci_dev *dev, dma_addr_t iova, size_t size, 
-		  int direction)
+ccio_unmap_single(struct device *dev, dma_addr_t iova, size_t size, 
+		  enum dma_data_direction direction)
 {
 	struct ioc *ioc;
 	unsigned long flags; 
 	dma_addr_t offset = iova & ~IOVP_MASK;
 	
-	ASSERT(dev);
-	ASSERT(dev->sysdata);
-	ASSERT(HBA_DATA(dev->sysdata)->iommu);
+	BUG_ON(!dev);
 	ioc = GET_IOC(dev);
 
 	DBG_RUN("%s() iovp 0x%lx/%x\n",
@@ -732,7 +728,7 @@ ccio_unmap_single(struct pci_dev *dev, dma_addr_t iova, size_t size,
  * This function implements the pci_alloc_consistent function.
  */
 static void * 
-ccio_alloc_consistent(struct pci_dev *dev, size_t size, dma_addr_t *dma_handle)
+ccio_alloc_consistent(struct device *dev, size_t size, dma_addr_t *dma_handle)
 {
       void *ret;
 #if 0
@@ -765,7 +761,7 @@ ccio_alloc_consistent(struct pci_dev *dev, size_t size, dma_addr_t *dma_handle)
  * This function implements the pci_free_consistent function.
  */
 static void 
-ccio_free_consistent(struct pci_dev *dev, size_t size, void *cpu_addr, 
+ccio_free_consistent(struct device *dev, size_t size, void *cpu_addr, 
 		     dma_addr_t dma_handle)
 {
 	ccio_unmap_single(dev, dma_handle, size, 0);
@@ -964,17 +960,15 @@ ccio_coalesce_chunks(struct ioc *ioc, struct scatterlist *startsg, int nents)
  * This function implements the pci_map_sg function.
  */
 static int
-ccio_map_sg(struct pci_dev *dev, struct scatterlist *sglist, int nents, 
-	    int direction)
+ccio_map_sg(struct device *dev, struct scatterlist *sglist, int nents, 
+	    enum dma_data_direction direction)
 {
 	struct ioc *ioc;
 	int coalesced, filled = 0;
 	unsigned long flags;
-	unsigned long hint = hint_lookup[direction];
+	unsigned long hint = hint_lookup[(int)direction];
 	
-	ASSERT(dev);
-	ASSERT(dev->sysdata);
-	ASSERT(HBA_DATA(dev->sysdata)->iommu);
+	BUG_ON(!dev);
 	ioc = GET_IOC(dev);
 	
 	DBG_RUN_SG("%s() START %d entries\n", __FUNCTION__, nents);
@@ -1032,14 +1026,12 @@ ccio_map_sg(struct pci_dev *dev, struct scatterlist *sglist, int nents,
  * This function implements the pci_unmap_sg function.
  */
 static void 
-ccio_unmap_sg(struct pci_dev *dev, struct scatterlist *sglist, int nents, 
-	      int direction)
+ccio_unmap_sg(struct device *dev, struct scatterlist *sglist, int nents, 
+	      enum dma_data_direction direction)
 {
 	struct ioc *ioc;
 
-	ASSERT(dev);
-	ASSERT(dev->sysdata);
-	ASSERT(HBA_DATA(dev->sysdata)->iommu);
+	BUG_ON(!dev);
 	ioc = GET_IOC(dev);
 
 	DBG_RUN_SG("%s() START %d entries,  %08lx,%x\n",
@@ -1062,16 +1054,17 @@ ccio_unmap_sg(struct pci_dev *dev, struct scatterlist *sglist, int nents,
 	DBG_RUN_SG("%s() DONE (nents %d)\n", __FUNCTION__, nents);
 }
 
-static struct pci_dma_ops ccio_ops = {
-	ccio_dma_supported,
-	ccio_alloc_consistent,
-	ccio_free_consistent,
-	ccio_map_single,
-	ccio_unmap_single,
-	ccio_map_sg,
-	ccio_unmap_sg,
-	NULL,                   /* dma_sync_single : NOP for U2/Uturn */
-	NULL,                   /* dma_sync_sg     : ditto */
+static struct hppa_dma_ops ccio_ops = {
+	.dma_supported =	ccio_dma_supported,
+	.alloc_consistent =	ccio_alloc_consistent,
+	.alloc_noncoherent =	ccio_alloc_consistent,
+	.free_consistent =	ccio_free_consistent,
+	.map_single =		ccio_map_single,
+	.unmap_single =		ccio_unmap_single,
+	.map_sg = 		ccio_map_sg,
+	.unmap_sg = 		ccio_unmap_sg,
+	.dma_sync_single =	NULL,	/* NOP for U2/Uturn */
+	.dma_sync_sg =		NULL,	/* ditto */
 };
 
 #ifdef CONFIG_PROC_FS
@@ -1529,6 +1522,7 @@ static int ccio_probe(struct parisc_device *dev)
 	memset(ioc, 0, sizeof(struct ioc));
 
 	ioc->name = dev->id.hversion == U2_IOA_RUNWAY ? "U2" : "UTurn";
+	strncpy(dev->dev.name, ioc->name, sizeof(dev->dev.name));
 
 	printk(KERN_INFO "Found %s at 0x%lx\n", ioc->name, dev->hpa);
 
@@ -1542,6 +1536,12 @@ static int ccio_probe(struct parisc_device *dev)
 	ccio_ioc_init(ioc);
 	ccio_init_resources(ioc);
 	hppa_dma_ops = &ccio_ops;
+	dev->dev.platform_data = kmalloc(sizeof(struct pci_hba_data), GFP_KERNEL);
+
+	/* if this fails, no I/O cards will work, so may as well bug */
+	BUG_ON(dev->dev.platform_data == NULL);
+	HBA_DATA(dev->dev.platform_data)->iommu = ioc;
+	
 
 	if (ioc_count == 0) {
 		/* XXX: Create separate entries for each ioc */
@@ -1577,13 +1577,13 @@ struct pci_dev * ccio_get_fake(const struct parisc_device *dev)
 	}
 	memset(ioc->fake_pci_dev, 0, sizeof(struct pci_dev));
 
-	ioc->fake_pci_dev->sysdata = kmalloc(sizeof(struct pci_hba_data), GFP_KERNEL);
-	if(ioc->fake_pci_dev->sysdata == NULL) {
+	ioc->fake_pci_dev->dev.platform_data = kmalloc(sizeof(struct pci_hba_data), GFP_KERNEL);
+	if(ioc->fake_pci_dev->dev.platform_data == NULL) {
 		printk(KERN_ERR MODULE_NAME ": memory allocation failure\n");
 		return NULL;
 	}
 
-	HBA_DATA(ioc->fake_pci_dev->sysdata)->iommu = ioc;
+	HBA_DATA(ioc->fake_pci_dev->dev.platform_data)->iommu = ioc;
 	return ioc->fake_pci_dev;
 }
 
@@ -1595,7 +1595,7 @@ static struct parisc_device_id ccio_tbl[] = {
 };
 
 static struct parisc_driver ccio_driver = {
-	.name =		"U2/Uturn",
+	.name =		"U2:Uturn",
 	.id_table =	ccio_tbl,
 	.probe =	ccio_probe,
 };

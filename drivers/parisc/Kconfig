@@ -10,6 +10,13 @@ config GSC
 	  are not found in B1000, C3000, J5000, A500, L1000, N4000 and upwards.
 	  If in doubt, say "Y".
 
+config HPPB
+	bool "HP-PB bus support"
+	depends on GSC
+	help
+	  The HP-PB bus was used in the Nova class and K-class servers.
+	  If in doubt, say "Y"
+
 config IOMMU_CCIO
 	bool "U2/Uturn I/O MMU"
 	depends on GSC
@@ -60,6 +67,8 @@ config PCI
 	  Beware that some GSC cards have a Dino onboard and PCI inside them,
 	  so it may be safest to say "Y" anyway.
 
+source "drivers/pci/Kconfig"
+
 config GSC_DINO
 	bool "GSCtoPCI/Dino PCI support"
 	depends on PCI && GSC
@@ -82,22 +91,21 @@ config PCI_LBA
 config IOSAPIC
 	bool
 	depends on PCI_LBA
-	default y
+	default PCI_LBA
 
 config IOMMU_SBA
 	bool
 	depends on PCI_LBA
-	default y
-
-source "drivers/pci/Kconfig"
+	default PCI_LBA
 
 #config PCI_EPIC
 #	bool "EPIC/SAGA PCI support"
 #	depends on PCI
 
 config SUPERIO
-	bool
+	bool "SuperIO (SuckyIO) support"
 	depends on PCI
+	default y
 	help
 	  Say Y here to support the SuperIO chip found in Bxxxx, C3xxx and
 	  J5xxx+ machines. This enables IDE, Floppy, Parallel Port, and
@@ -105,6 +113,7 @@ config SUPERIO
 
 config CHASSIS_LCD_LED
 	bool "Chassis LCD and LED support"
+	default y
 	help
 	  Say Y here if you want to enable support for the Heartbeat,
 	  Disk/Network activities LEDs on some PA-RISC machines,

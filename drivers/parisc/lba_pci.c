@@ -48,6 +48,7 @@
 #include <asm/system.h>
 
 #include <asm/hardware.h>	/* for register_parisc_driver() stuff */
+#include <asm/parisc-device.h>
 #include <asm/iosapic.h>	/* for iosapic_register() */
 #include <asm/io.h>		/* read/write stuff */
 
@@ -507,7 +508,7 @@ lba_rd_cfg(struct lba_device *d, u32 tok, u8 reg, u32 size)
 
 static int lba_cfg_read(struct pci_bus *bus, unsigned int devfn, int pos, int size, u32 *data)
 {
-	struct lba_device *d = LBA_DEV(bus->sysdata);
+	struct lba_device *d = LBA_DEV(parisc_walk_tree(bus->dev));
 	u32 local_bus = (bus->parent == NULL) ? 0 : bus->secondary;
 	u32 tok = LBA_CFG_TOK(local_bus, devfn);
 
@@ -591,7 +592,7 @@ lba_wr_cfg( struct lba_device *d, u32 tok, u8 reg, u32 data, u32 size)
 
 static int lba_cfg_write(struct pci_bus *bus, unsigned int devfn, int pos, int size, u32 data)
 {
-	struct lba_device *d = LBA_DEV(bus->sysdata);
+	struct lba_device *d = LBA_DEV(parisc_walk_tree(bus->dev));
 	u32 local_bus = (bus->parent == NULL) ? 0 : bus->secondary;
 	u32 tok = LBA_CFG_TOK(local_bus,devfn);
 
@@ -697,11 +698,11 @@ lba_fixup_bus(struct pci_bus *bus)
 	u16 fbb_enable = PCI_STATUS_FAST_BACK;
 	u16 status;
 #endif
-	struct lba_device *ldev = LBA_DEV(bus->sysdata);
+	struct lba_device *ldev = LBA_DEV(parisc_walk_tree(bus->dev));
 	int lba_portbase = HBA_PORT_BASE(ldev->hba.hba_num);
 
 	DBG("lba_fixup_bus(0x%p) bus %d sysdata 0x%p\n",
-		bus, bus->secondary, bus->sysdata);
+		bus, bus->secondary, bus->dev->platform_data);
 
 	/*
 	** Properly Setup MMIO resources for this bus.
@@ -1357,6 +1358,8 @@ lba_driver_callback(struct parisc_device *dev)
 
 	printk(KERN_INFO "%s version %s (0x%x) found at 0x%lx\n",
 		MODULE_NAME, version, func_class & 0xf, dev->hpa);
+	snprintf(dev->dev.name, sizeof(dev->dev.name), "%s version %s",
+		 MODULE_NAME, version);
 
 	/* Just in case we find some prototypes... */
 	if (func_class < 2) {
@@ -1425,14 +1428,16 @@ lba_driver_callback(struct parisc_device *dev)
 	** Tell PCI support another PCI bus was found.
 	** Walks PCI bus for us too.
 	*/
+	dev->dev.platform_data = lba_dev;
 	lba_bus = lba_dev->hba.hba_bus =
-		pci_scan_bus(lba_dev->hba.bus_num.start, &lba_cfg_ops, (void *) lba_dev);
+		pci_scan_bus_parented(&dev->dev, lba_dev->hba.bus_num.start,
+				      &lba_cfg_ops, NULL);
 
 #ifdef __LP64__
 	if (is_pdc_pat()) {
 		/* assign resources to un-initialized devices */
-		DBG_PAT("LBA pcibios_assign_unassigned_resources()\n");
-		pcibios_assign_unassigned_resources(lba_bus);
+		DBG_PAT("LBA pci_bus_assign_resources()\n");
+		pci_bus_assign_resources(lba_bus);
 
 #ifdef DEBUG_LBA_PAT
 		DBG_PAT("\nLBA PIOP resource tree\n");
@@ -1464,7 +1469,7 @@ static struct parisc_device_id lba_tbl[] = {
 static struct parisc_driver lba_driver = {
 	.name =		MODULE_NAME,
 	.id_table =	lba_tbl,
-	.probe =	lba_driver_callback
+	.probe =	lba_driver_callback,
 };
 
 /*

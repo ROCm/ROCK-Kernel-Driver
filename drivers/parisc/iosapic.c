@@ -641,7 +641,7 @@ iosapic_fixup_irq(void *isi_obj, struct pci_dev *pcidev)
 
 	if (NULL == isi) {
 		printk(KERN_WARNING MODULE_NAME ": hpa not registered for %s\n",
-			pcidev->name);
+			pcidev->dev.name);
 		return(-1);
 	}
 
