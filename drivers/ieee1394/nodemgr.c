@@ -1303,8 +1303,9 @@ static void nodemgr_update_node(struct node_entry *ne, quadlet_t busoptions,
 		snprintf(ne->device.name, DEVICE_NAME_SIZE,
 			 "IEEE-1394 device %d-" NODE_BUS_FMT,
 			 hi->host->id, NODE_BUS_ARGS(ne->nodeid));
-		HPSB_DEBUG("Node " NODE_BUS_FMT " changed to " NODE_BUS_FMT,
-			   NODE_BUS_ARGS(ne->nodeid), NODE_BUS_ARGS(nodeid));
+		HPSB_DEBUG("Node changed: %d-" NODE_BUS_FMT " -> %d-" NODE_BUS_FMT,
+			   ne->host->id, NODE_BUS_ARGS(ne->nodeid),
+			   ne->host->id, NODE_BUS_ARGS(nodeid));
 		ne->nodeid = nodeid;
 
 		update_ud_names++;
@@ -1507,8 +1508,8 @@ static void nodemgr_node_probe(struct host_info *hi, int generation)
 					nodemgr_remove_node)) {
 			struct node_entry *ne = cleanup.ne;
 
-			HPSB_DEBUG("Device removed: ID:BUS[" NODE_BUS_FMT "]  GUID[%016Lx]",
-				   NODE_BUS_ARGS(ne->nodeid), (unsigned long long)ne->guid);
+			HPSB_DEBUG("Node removed: ID:BUS[%d-" NODE_BUS_FMT "]  GUID[%016Lx]",
+				   host->id, NODE_BUS_ARGS(ne->nodeid), (unsigned long long)ne->guid);
 
 			nodemgr_remove_ne(ne);
 		}
@@ -1782,7 +1783,7 @@ static void nodemgr_host_reset(struct hpsb_host *host)
 
 	if (hi != NULL) {
 #ifdef CONFIG_IEEE1394_VERBOSEDEBUG
-		HPSB_DEBUG ("NodeMgr: Processing host reset for %s", host->driver->name);
+		HPSB_DEBUG ("NodeMgr: Processing host reset for %s", hi->daemon_name);
 #endif
 		up(&hi->reset_sem);
 	} else

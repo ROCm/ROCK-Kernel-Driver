@@ -164,7 +164,7 @@ printk(level "%s: " fmt "\n" , OHCI1394_DRIVER_NAME , ## args)
 printk(level "%s_%d: " fmt "\n" , OHCI1394_DRIVER_NAME, card , ## args)
 
 static char version[] __devinitdata =
-	"$Rev: 952 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 986 $ Ben Collins <bcollins@debian.org>";
 
 /* Module Parameters */
 static int phys_dma = 1;
@@ -810,8 +810,7 @@ static int dma_trm_flush(struct ti_ohci *ohci, struct dma_trm_ctx *d)
 	}
 
 	if (d->free_prgs == 0)
-		PRINT(KERN_INFO, ohci->id, 
-		      "Transmit DMA FIFO ctx=%d is full... waiting",d->ctx);
+		DBGMSG(ohci->id, "Transmit DMA FIFO ctx=%d is full... waiting", d->ctx);
 
 	/* Is the context running ? (should be unless it is 
 	   the first packet to be sent in this context) */
