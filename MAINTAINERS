@@ -172,7 +172,7 @@ ACPI
 P:	Len Brown
 M:	len.brown@intel.com
 L:	acpi-devel@lists.sourceforge.net
-W:	http://sf.net/projects/acpi/
+W:	http://acpi.sourceforge.net/
 S:	Maintained
 
 AD1816 SOUND DRIVER

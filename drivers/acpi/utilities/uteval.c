@@ -562,3 +562,63 @@ acpi_ut_execute_STA (
 	acpi_ut_remove_reference (obj_desc);
 	return_ACPI_STATUS (status);
 }
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    acpi_ut_execute_Sxds
+ *
+ * PARAMETERS:  device_node         - Node for the device
+ *              *Flags              - Where the status flags are returned
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Executes _STA for selected device and stores results in
+ *              *Flags.
+ *
+ *              NOTE: Internal function, no parameter validation
+ *
+ ******************************************************************************/
+
+acpi_status
+acpi_ut_execute_sxds (
+	struct acpi_namespace_node      *device_node,
+	u8                              *highest)
+{
+	union acpi_operand_object       *obj_desc;
+	acpi_status                     status;
+	u32                             i;
+
+
+	ACPI_FUNCTION_TRACE ("ut_execute_Sxds");
+
+
+	for (i = 0; i < 4; i++) {
+		highest[i] = 0xFF;
+		status = acpi_ut_evaluate_object (device_node,
+				 (char *) acpi_gbl_highest_dstate_names[i],
+				 ACPI_BTYPE_INTEGER, &obj_desc);
+		if (ACPI_FAILURE (status)) {
+			if (status != AE_NOT_FOUND) {
+				ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
+					"%s on Device %4.4s, %s\n",
+					(char *) acpi_gbl_highest_dstate_names[i],
+					acpi_ut_get_node_name (device_node),
+					acpi_format_exception (status)));
+
+				return_ACPI_STATUS (status);
+			}
+		}
+		else {
+			/* Extract the Dstate value */
+
+			highest[i] = (u8) obj_desc->integer.value;
+
+			/* Delete the return object */
+
+			acpi_ut_remove_reference (obj_desc);
+		}
+	}
+
+	return_ACPI_STATUS (AE_OK);
+}
