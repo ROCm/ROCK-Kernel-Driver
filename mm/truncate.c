@@ -260,9 +260,10 @@ void invalidate_inode_pages2(struct address_space *mapping)
 			if (page->mapping == mapping) {	/* truncate race? */
 				wait_on_page_writeback(page);
 				next = page->index + 1;
-				if (page_mapped(page))
+				if (page_mapped(page)) {
+					ClearPageUptodate(page);
 					clear_page_dirty(page);
-				else
+				} else
 					invalidate_complete_page(mapping, page);
 			}
 			unlock_page(page);
