@@ -795,7 +795,7 @@ qla2x00_queuecommand(struct scsi_cmnd *cmd, void (*fn)(struct scsi_cmnd *))
 	 *	Either PORT_DOWN_TIMER OR LINK_DOWN_TIMER Expired.
 	 */
 	if (atomic_read(&fcport->state) == FCS_DEVICE_DEAD ||
-	    atomic_read(&ha->loop_state) == LOOP_DEAD) {
+	    atomic_read(&ha2->loop_state) == LOOP_DEAD) {
 		/*
 		 * Add the command to the done-queue for later failover
 		 * processing
@@ -3209,7 +3209,7 @@ qla2x00_do_dpc(void *data)
 
 				if (atomic_read(&fcport->state) ==
 				    FCS_DEVICE_DEAD ||
-				    atomic_read(&ha->loop_state) == LOOP_DEAD) {
+				    atomic_read(&fcport->ha->loop_state) == LOOP_DEAD) {
 
 					__del_from_retry_queue(ha, sp);
 					sp->cmd->result = DID_NO_CONNECT << 16;
@@ -3900,7 +3900,7 @@ qla2x00_cmd_timeout(srb_t *sp)
 		 * DID_BUS_BUSY to let the OS  retry this cmd.
 		 */
 		if (atomic_read(&fcport->state) == FCS_DEVICE_DEAD ||
-		    atomic_read(&vis_ha->loop_state) == LOOP_DEAD) {
+		    atomic_read(&fcport->ha->loop_state) == LOOP_DEAD) {
 			cmd->result = DID_NO_CONNECT << 16;
 			if (atomic_read(&fcport->ha->loop_state) == LOOP_DOWN) 
 				sp->err_id = SRB_ERR_LOOP;
