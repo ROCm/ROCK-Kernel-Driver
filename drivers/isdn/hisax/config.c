@@ -2138,7 +2138,7 @@ request_mmio(struct resources *rs, unsigned long start, int len,
 }
 
 void
-hisax_resources_release(struct IsdnCardState *cs)
+hisax_release_resources(struct IsdnCardState *cs)
 {
 	resources_release(&cs->rs);
 }
