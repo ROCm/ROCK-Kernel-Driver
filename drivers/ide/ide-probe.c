@@ -192,19 +192,16 @@ static inline void do_identify (ide_drive_t *drive, byte cmd)
 	/*
 	 * it's an ata drive, build command list
 	 */
-#ifndef CONFIG_BLK_DEV_IDE_TCQ
 	drive->queue_depth = 1;
+#ifdef CONFIG_BLK_DEV_IDE_TCQ_DEPTH
+	drive->queue_depth = CONFIG_BLK_DEV_IDE_TCQ_DEPTH;
 #else
-# ifndef CONFIG_BLK_DEV_IDE_TCQ_DEPTH
-#  define CONFIG_BLK_DEV_IDE_TCQ_DEPTH 1
-# endif
 	drive->queue_depth = drive->id->queue_depth + 1;
-	if (drive->queue_depth > CONFIG_BLK_DEV_IDE_TCQ_DEPTH)
-		drive->queue_depth = CONFIG_BLK_DEV_IDE_TCQ_DEPTH;
+#endif
 	if (drive->queue_depth < 1 || drive->queue_depth > IDE_MAX_TAG)
 		drive->queue_depth = IDE_MAX_TAG;
-#endif
-	if (ide_build_commandlist(drive))
+
+	if (ide_init_commandlist(drive))
 		goto err_misc;
 
 	return;

@@ -107,10 +107,7 @@ static u8 get_command(ide_drive_t *drive, int cmd)
 	 * 48-bit commands are pretty sanely laid out
 	 */
 	if (lba48bit) {
-		if (cmd == READ)
-			command = WIN_READ_EXT;
-		else
-			command = WIN_WRITE_EXT;
+		command = cmd == READ ? WIN_READ_EXT : WIN_WRITE_EXT;
 
 		if (drive->using_dma) {
 			command++;		/* WIN_*DMA_EXT */
@@ -118,31 +115,33 @@ static u8 get_command(ide_drive_t *drive, int cmd)
 				command++;	/* WIN_*DMA_QUEUED_EXT */
 		} else if (drive->mult_count)
 			command += 5;		/* WIN_MULT*_EXT */
+
+		return command;
+	}
+
+	/*
+	 * 28-bit commands seem not to be, though...
+	 */
+	if (cmd == READ) {
+		if (drive->using_dma) {
+			if (drive->using_tcq)
+				command = WIN_READDMA_QUEUED;
+			else
+				command = WIN_READDMA;
+		} else if (drive->mult_count)
+			command = WIN_MULTREAD;
+		else
+			command = WIN_READ;
 	} else {
-		/*
-		 * 28-bit commands seem not to be, though...
-		 */
-		if (cmd == READ) {
-			if (drive->using_dma) {
-				if (drive->using_tcq)
-					command = WIN_READDMA_QUEUED;
-				else
-					command = WIN_READDMA;
-			} else if (drive->mult_count)
-				command = WIN_MULTREAD;
+		if (drive->using_dma) {
+			if (drive->using_tcq)
+				command = WIN_WRITEDMA_QUEUED;
 			else
-				command = WIN_READ;
-		} else {
-			if (drive->using_dma) {
-				if (drive->using_tcq)
-					command = WIN_WRITEDMA_QUEUED;
-				else
-					command = WIN_WRITEDMA;
-			} else if (drive->mult_count)
-				command = WIN_MULTWRITE;
-			else
-				command = WIN_WRITE;
-		}
+				command = WIN_WRITEDMA;
+		} else if (drive->mult_count)
+			command = WIN_MULTWRITE;
+		else
+			command = WIN_WRITE;
 	}
 
 	return command;
@@ -895,24 +894,24 @@ static int proc_idedisk_read_tcq
 
 		__set_bit(i, &tag_mask);
 		len += sprintf(out+len, "%d, ", i);
-		if (ar->ar_time > max_jif)
-			max_jif = ar->ar_time;
+		if (cur_jif - ar->ar_time > max_jif)
+			max_jif = cur_jif - ar->ar_time;
 		cmds++;
 	}
 	len += sprintf(out+len, "]\n");
 
+	len += sprintf(out+len, "Queue:\t\t\treleased [ %d ] - started [ %d ]\n", drive->tcq->immed_rel, drive->tcq->immed_comp);
+
 	if (drive->tcq->queued != cmds)
-		len += sprintf(out+len, "pending request and queue count mismatch (%d)\n", cmds);
+		len += sprintf(out+len, "pending request and queue count mismatch (counted: %d)\n", cmds);
 
 	if (tag_mask != drive->tcq->tag_mask)
 		len += sprintf(out+len, "tag masks differ (counted %lx != %lx\n", tag_mask, drive->tcq->tag_mask);
 
 	len += sprintf(out+len, "DMA status:\t\t%srunning\n", test_bit(IDE_DMA, &HWGROUP(drive)->flags) ? "" : "not ");
 
-	if (max_jif)
-		len += sprintf(out+len, "Oldest command:\t\t%lu\n", cur_jif - max_jif);
-
-	len += sprintf(out+len, "immed rel %d, immed comp %d\n", drive->tcq->immed_rel, drive->tcq->immed_comp);
+	len += sprintf(out+len, "Oldest command:\t\t%lu jiffies\n", max_jif);
+	len += sprintf(out+len, "Oldest command ever:\t%lu\n", drive->tcq->oldest_command);
 
 	drive->tcq->max_last_depth = 0;
 
@@ -1017,8 +1016,10 @@ static int set_using_tcq(ide_drive_t *drive, int arg)
 		return -EPERM;
 	if (!drive->channel->dmaproc)
 		return -EPERM;
+	if (arg == drive->queue_depth && drive->using_tcq)
+		return 0;
 
-	drive->using_tcq = arg;
+	drive->queue_depth = arg ? arg : 1;
 	if (drive->channel->dmaproc(arg ? ide_dma_queued_on : ide_dma_queued_off, drive))
 		return -EIO;
 

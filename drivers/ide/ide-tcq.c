@@ -29,9 +29,11 @@
 #include <asm/delay.h>
 
 /*
- * warning: it will be _very_ verbose if set to 1
+ * warning: it will be _very_ verbose if defined
  */
-#if 0
+#undef IDE_TCQ_DEBUG
+
+#ifdef IDE_TCQ_DEBUG
 #define TCQ_PRINTK printk
 #else
 #define TCQ_PRINTK(x...)
@@ -49,13 +51,18 @@
  */
 #undef IDE_TCQ_FIDDLE_SI
 
-int ide_tcq_end(ide_drive_t *drive);
+/*
+ * wait for data phase before starting DMA or not
+ */
+#undef IDE_TCQ_WAIT_DATAPHASE
+
 ide_startstop_t ide_dmaq_intr(ide_drive_t *drive);
+ide_startstop_t ide_service(ide_drive_t *drive);
 
 static inline void drive_ctl_nien(ide_drive_t *drive, int clear)
 {
 #ifdef IDE_TCQ_NIEN
-	int mask = clear ? 0 : 2;
+	int mask = clear ? 0x00 : 0x02;
 
 	if (IDE_CONTROL_REG)
 		OUT_BYTE(drive->ctl | mask, IDE_CONTROL_REG);
@@ -142,7 +149,7 @@ void ide_tcq_intr_timeout(unsigned long data)
 
 	spin_lock_irqsave(&ide_lock, flags);
 
-	if (test_bit(IDE_BUSY, &hwgroup->flags))
+	if (test_and_set_bit(IDE_BUSY, &hwgroup->flags))
 		printk("ide_tcq_intr_timeout: hwgroup not busy\n");
 	if (hwgroup->handler == NULL)
 		printk("ide_tcq_intr_timeout: missing isr!\n");
@@ -150,6 +157,13 @@ void ide_tcq_intr_timeout(unsigned long data)
 		printk("ide_tcq_intr_timeout: missing drive!\n");
 
 	spin_unlock_irqrestore(&ide_lock, flags);
+
+	/*
+	 * if pending commands, try service before giving up
+	 */
+	if (ide_pending_commands(drive) && (GET_STAT() & SERVICE_STAT))
+		if (ide_service(drive) == ide_started)
+			return;
 
 	if (drive)
 		ide_tcq_invalidate_queue(drive);
@@ -192,6 +206,7 @@ int ide_tcq_wait_altstat(ide_drive_t *drive, byte *stat, byte busy_mask)
 
 		if (unlikely(i++ > IDE_TCQ_WAIT))
 			return 1;
+
 	} while ((*stat = GET_ALTSTAT()) & busy_mask);
 
 	return 0;
@@ -206,7 +221,12 @@ int ide_tcq_wait_altstat(ide_drive_t *drive, byte *stat, byte busy_mask)
 ide_startstop_t ide_service(ide_drive_t *drive)
 {
 	struct ata_request *ar;
-	byte feat, tag, stat;
+	byte feat, stat;
+	int tag;
+
+	TCQ_PRINTK("%s: started service\n", drive->name);
+
+	drive->service_pending = 0;
 
 	if (test_bit(IDE_DMA, &HWGROUP(drive)->flags))
 		printk("ide_service: DMA in progress\n");
@@ -238,9 +258,9 @@ ide_startstop_t ide_service(ide_drive_t *drive)
 	 * FIXME, invalidate queue
 	 */
 	if (stat & ERR_STAT) {
-		printk("%s: error SERVICING drive (%x)\n", drive->name, stat);
 		ide_dump_status(drive, "ide_service", stat);
-		return ide_tcq_end(drive);
+		ide_tcq_invalidate_queue(drive);
+		return ide_stopped;
 	}
 
 	/*
@@ -248,7 +268,7 @@ ide_startstop_t ide_service(ide_drive_t *drive)
 	 */
 	if ((feat = GET_FEAT()) & NSEC_REL) {
 		printk("%s: release in service\n", drive->name);
-		IDE_SET_CUR_TAG(drive, -1);
+		IDE_SET_CUR_TAG(drive, IDE_INACTIVE_TAG);
 		return ide_stopped;
 	}
 
@@ -264,6 +284,8 @@ ide_startstop_t ide_service(ide_drive_t *drive)
 		printk("ide_service: missing request for tag %d\n", tag);
 		return ide_stopped;
 	}
+
+	HWGROUP(drive)->rq = ar->ar_rq;
 
 	/*
 	 * we'll start a dma read or write, device will trigger
@@ -287,6 +309,8 @@ ide_startstop_t ide_check_service(ide_drive_t *drive)
 {
 	byte stat;
 
+	TCQ_PRINTK("%s: ide_check_service\n", drive->name);
+
 	if (!ide_pending_commands(drive))
 		return ide_stopped;
 
@@ -300,40 +324,14 @@ ide_startstop_t ide_check_service(ide_drive_t *drive)
 	return ide_started;
 }
 
-int ide_tcq_end(ide_drive_t *drive)
-{
-	byte stat = GET_STAT();
-
-	if (stat & ERR_STAT) {
-		ide_dump_status(drive, "ide_tcq_end", stat);
-		ide_tcq_invalidate_queue(drive);
-		return ide_stopped;
-	} else if (stat & SERVICE_STAT) {
-		TCQ_PRINTK("ide_tcq_end: serv stat=%x\n", stat);
-		return ide_service(drive);
-	}
-
-	TCQ_PRINTK("ide_tcq_end: stat=%x, feat=%x\n", stat, GET_FEAT());
-	return ide_stopped;
-}
-
 ide_startstop_t ide_dmaq_complete(ide_drive_t *drive, byte stat)
 {
-	struct ata_request *ar;
+	struct ata_request *ar = IDE_CUR_TAG(drive);
 	byte dma_stat;
-
-#if 0
-	byte feat = GET_FEAT();
-
-	if ((feat & (NSEC_CD | NSEC_IO)) != (NSEC_CD | NSEC_IO))
-		printk("%s: C/D | I/O not set\n", drive->name);
-#endif
 
 	/*
 	 * transfer was in progress, stop DMA engine
 	 */
-	ar = IDE_CUR_TAG(drive);
-
 	dma_stat = drive->channel->dmaproc(ide_dma_end, drive);
 
 	/*
@@ -352,7 +350,23 @@ ide_startstop_t ide_dmaq_complete(ide_drive_t *drive, byte stat)
 	TCQ_PRINTK("ide_dmaq_intr: ending %p, tag %d\n", ar, ar->ar_tag);
 	ide_end_queued_request(drive, !dma_stat, ar->ar_rq);
 
-	IDE_SET_CUR_TAG(drive, -1);
+	IDE_SET_CUR_TAG(drive, IDE_INACTIVE_TAG);
+
+	/*
+	 * keep the queue full, or honor SERVICE? note that this may race
+	 * and no new command will be started, in which case idedisk_do_request
+	 * will notice and do the service check
+	 */
+#if CONFIG_BLK_DEV_IDE_TCQ_FULL
+	if (!drive->service_pending && (ide_pending_commands(drive) > 1)) {
+		if (!blk_queue_empty(&drive->queue)) {
+			drive->service_pending = 1;
+			ide_tcq_set_intr(HWGROUP(drive), ide_dmaq_intr);
+			return ide_released;
+		}
+	}
+#endif
+
 	return ide_check_service(drive);
 }
 
@@ -376,7 +390,7 @@ ide_startstop_t ide_dmaq_intr(ide_drive_t *drive)
 	 * if a command completion interrupt is pending, do that first and
 	 * check service afterwards
 	 */
-	if (drive->tcq->active_tag != -1)
+	if (drive->tcq->active_tag != IDE_INACTIVE_TAG)
 		return ide_dmaq_complete(drive, stat);
 
 	/*
@@ -403,10 +417,8 @@ static int ide_tcq_configure(ide_drive_t *drive)
 	 * bit 14 and 1 must be set in word 83 of the device id to indicate
 	 * support for dma queued protocol
 	 */
-	if ((drive->id->command_set_2 & tcq_supp) != tcq_supp) {
-		printk("%s: queued feature set not supported\n", drive->name);
-		return 1;
-	}
+	if ((drive->id->command_set_2 & tcq_supp) != tcq_supp)
+		return -EIO;
 
 	memset(&args, 0, sizeof(args));
 	args.taskfile.feature = SETFEATURES_EN_WCACHE;
@@ -446,6 +458,16 @@ static int ide_tcq_configure(ide_drive_t *drive)
 		return 1;
 	}
 #endif
+
+	if (!drive->tcq) {
+		drive->tcq = kmalloc(sizeof(ide_tag_info_t), GFP_ATOMIC);
+		if (!drive->tcq)
+			return -ENOMEM;
+
+		memset(drive->tcq, 0, sizeof(ide_tag_info_t));
+		drive->tcq->active_tag = IDE_INACTIVE_TAG;
+	}
+
 	return 0;
 }
 
@@ -461,26 +483,33 @@ static int ide_enable_queued(ide_drive_t *drive, int on)
 	if (!on) {
 		printk("%s: TCQ disabled\n", drive->name);
 		drive->using_tcq = 0;
-
 		return 0;
-	} else if (drive->using_tcq) {
-		drive->queue_depth = drive->using_tcq;
-
-		goto out;
 	}
 
 	if (ide_tcq_configure(drive)) {
 		drive->using_tcq = 0;
-
 		return 1;
 	}
 
-out:
-	drive->tcq->max_depth = 0;
+	if (ide_build_commandlist(drive))
+		return 1;
 
 	printk("%s: tagged command queueing enabled, command queue depth %d\n", drive->name, drive->queue_depth);
 	drive->using_tcq = 1;
+	drive->tcq->max_depth = 0;
+	return 0;
+}
 
+int ide_tcq_wait_dataphase(ide_drive_t *drive)
+{
+#ifdef IDE_TCQ_WAIT_DATAPHASE
+	ide_startstop_t foo;
+
+	if (ide_wait_stat(&startstop, drive, READY_STAT | DRQ_STAT, BUSY_STAT, WAIT_READY)) {
+		printk("%s: timeout waiting for data phase\n", drive->name);
+		return 1;
+	}
+#endif
 	return 0;
 }
 
@@ -488,7 +517,6 @@ int ide_tcq_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 {
 	struct ata_channel *hwif = drive->channel;
 	unsigned int reading = 0, enable_tcq = 1;
-	ide_startstop_t startstop;
 	struct ata_request *ar;
 	byte stat, feat;
 
@@ -501,15 +529,13 @@ int ide_tcq_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 			reading = 1 << 3;
 		case ide_dma_write_queued:
 			TCQ_PRINTK("ide_dma: setting up queued %d\n", drive->tcq->active_tag);
-			BUG_ON(drive->tcq->active_tag == -1);
+			BUG_ON(drive->tcq->active_tag == IDE_INACTIVE_TAG);
 
 			if (!test_bit(IDE_BUSY, &HWGROUP(drive)->flags))
 				printk("queued_rw: IDE_BUSY not set\n");
 
-			if (ide_wait_stat(&startstop, drive, READY_STAT | DRQ_STAT, BUSY_STAT, WAIT_READY)) {
-				printk("%s: timeout waiting for data phase\n", drive->name);
-				return startstop;
-			}
+			if (ide_tcq_wait_dataphase(drive))
+				return ide_stopped;
 
 			if (ide_start_dma(hwif, drive, func))
 				return 1;
@@ -521,7 +547,7 @@ int ide_tcq_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 			 * start a queued command from scratch
 			 */
 		case ide_dma_queued_start:
-			BUG_ON(drive->tcq->active_tag == -1);
+			BUG_ON(drive->tcq->active_tag == IDE_INACTIVE_TAG);
 			ar = IDE_CUR_TAG(drive);
 
 			/*
@@ -540,14 +566,19 @@ int ide_tcq_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 			drive_ctl_nien(drive, 0);
 
 			if (stat & ERR_STAT) {
-				printk("ide_dma_queued_start: abort (stat=%x)\n", stat);
+				ide_dump_status(drive, "tcq_start", stat);
 				return ide_stopped;
 			}
 
+			/*
+			 * drive released the bus, clear active tag and
+			 * check for service
+			 */
 			if ((feat = GET_FEAT()) & NSEC_REL) {
+				IDE_SET_CUR_TAG(drive, IDE_INACTIVE_TAG);
 				drive->tcq->immed_rel++;
+
 				TCQ_PRINTK("REL in queued_start\n");
-				IDE_SET_CUR_TAG(drive, -1);
 
 				if ((stat = GET_STAT()) & SERVICE_STAT)
 					return ide_service(drive);
@@ -558,13 +589,17 @@ int ide_tcq_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 
 			drive->tcq->immed_comp++;
 
-			if (ide_wait_stat(&startstop, drive, READY_STAT | DRQ_STAT, BUSY_STAT, WAIT_READY)) {
-				printk("%s: timeout waiting for data phase\n", drive->name);
-				return startstop;
-			}
+			if (ide_tcq_wait_dataphase(drive))
+				return ide_stopped;
 
 			if (ide_start_dma(hwif, drive, func))
 				return ide_stopped;
+
+			/*
+			 * need to arm handler before starting dma engine,
+			 * transfer could complete right away
+			 */
+			ide_tcq_set_intr(HWGROUP(drive), ide_dmaq_intr);
 
 			if (hwif->dmaproc(ide_dma_begin, drive))
 				return ide_stopped;
@@ -572,7 +607,6 @@ int ide_tcq_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 			/*
 			 * wait for SERVICE or completion interrupt
 			 */
-			ide_tcq_set_intr(HWGROUP(drive), ide_dmaq_intr);
 			return ide_started;
 
 		case ide_dma_queued_off:
@@ -590,6 +624,10 @@ int ide_build_sglist (struct ata_channel *hwif, struct request *rq);
 ide_startstop_t ide_start_tag(ide_dma_action_t func, ide_drive_t *drive,
 			      struct ata_request *ar)
 {
+	ide_startstop_t startstop;
+
+	TCQ_PRINTK("%s: ide_start_tag: begin tag %p/%d, rq %p\n", drive->name,ar,ar->ar_tag, ar->ar_rq);
+
 	/*
 	 * do this now, no need to run that with interrupts disabled
 	 */
@@ -597,5 +635,14 @@ ide_startstop_t ide_start_tag(ide_dma_action_t func, ide_drive_t *drive,
 		return ide_stopped;
 
 	IDE_SET_CUR_TAG(drive, ar->ar_tag);
-	return ide_tcq_dmaproc(func, drive);
+	HWGROUP(drive)->rq = ar->ar_rq;
+
+	startstop = ide_tcq_dmaproc(func, drive);
+
+	if (unlikely(startstop == ide_stopped)) {
+		IDE_SET_CUR_TAG(drive, IDE_INACTIVE_TAG);
+		HWGROUP(drive)->rq = NULL;
+	}
+
+	return startstop;
 }

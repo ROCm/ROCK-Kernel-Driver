@@ -273,19 +273,22 @@ typedef union {
 	} b;
 } special_t;
 
-#define IDE_MAX_TAG	32		/* spec says 32 max */
+#define IDE_MAX_TAG		(32)		/* spec says 32 max */
+#define IDE_INACTIVE_TAG	(-1)
 
 struct ata_request;
 typedef struct ide_tag_info_s {
 	unsigned long tag_mask;			/* next tag bit mask */
 	struct ata_request *ar[IDE_MAX_TAG];	/* in-progress requests */
 	int active_tag;				/* current active tag */
+
 	int queued;				/* current depth */
 
 	/*
 	 * stats ->
 	 */
 	int max_depth;				/* max depth ever */
+
 	int max_last_depth;			/* max since last check */
 
 	/*
@@ -295,14 +298,19 @@ typedef struct ide_tag_info_s {
 	 */
 	int immed_rel;
 	int immed_comp;
+	unsigned long oldest_command;
 } ide_tag_info_t;
 
 #define IDE_GET_AR(drive, tag)	((drive)->tcq->ar[(tag)])
 #define IDE_CUR_TAG(drive)	(IDE_GET_AR((drive), (drive)->tcq->active_tag))
-#define IDE_SET_CUR_TAG(drive, tag)	((drive)->tcq->active_tag = (tag))
+#define IDE_SET_CUR_TAG(drive, tag)	\
+	do {						\
+		((drive)->tcq->active_tag = (tag));	\
+		if ((tag) == IDE_INACTIVE_TAG)		\
+			HWGROUP((drive))->rq = NULL;	\
+	} while (0);
 
-#define IDE_CUR_AR(drive)	\
-	((drive)->using_tcq ? IDE_CUR_TAG((drive)) : HWGROUP((drive))->rq->special)
+#define IDE_CUR_AR(drive)	(HWGROUP((drive))->rq->special)
 
 struct ide_settings_s;
 
@@ -359,6 +367,7 @@ typedef struct ide_drive_s {
 	unsigned autotune	: 2;	/* 1=autotune, 2=noautotune, 0=default */
 	unsigned remap_0_to_1	: 2;	/* 0=remap if ezdrive, 1=remap, 2=noremap */
 	unsigned ata_flash	: 1;	/* 1=present, 0=default */
+	unsigned service_pending: 1;
 	unsigned	addressing;	/* : 2; 0=28-bit, 1=48-bit, 2=64-bit */
 	byte		scsi;		/* 0=default, 1=skip current ide-subdriver for ide-scsi emulation */
 	select_t	select;		/* basic drive/head select reg value */
@@ -546,7 +555,7 @@ extern void ide_unregister(struct ata_channel *hwif);
 typedef enum {
 	ide_stopped,	/* no drive operation was started */
 	ide_started,	/* a drive operation was started, and a handler was set */
-	ide_released	/* started and released bus */
+	ide_released,	/* started, handler set, bus released */
 } ide_startstop_t;
 
 /*
@@ -980,6 +989,11 @@ extern void revalidate_drives(void);
 #define ATA_AR_SETUP	2
 #define ATA_AR_RETURN	4
 
+/*
+ * if turn-around time is longer than this, halve queue depth
+ */
+#define ATA_AR_MAX_TURNAROUND	(3 * HZ)
+
 #define list_ata_entry(entry) list_entry((entry), struct ata_request, ar_queue)
 
 static inline void ata_ar_init(ide_drive_t *drive, struct ata_request *ar)
@@ -1026,7 +1040,7 @@ static inline void ata_ar_put(ide_drive_t *drive, struct ata_request *ar)
 	ar->ar_rq = NULL;
 }
 
-extern inline int ide_get_tag(ide_drive_t *drive)
+static inline int ide_get_tag(ide_drive_t *drive)
 {
 	int tag = ffz(drive->tcq->tag_mask);
 
@@ -1043,12 +1057,28 @@ extern inline int ide_get_tag(ide_drive_t *drive)
 }
 
 #ifdef CONFIG_BLK_DEV_IDE_TCQ
-# define ide_pending_commands(drive)	((drive)->using_tcq && (drive)->tcq->queued)
+static inline int ide_pending_commands(ide_drive_t *drive)
+{
+	if (!drive->tcq)
+		return 0;
+
+	return drive->tcq->queued;
+}
+
+static inline int ide_can_queue(ide_drive_t *drive)
+{
+	if (!drive->tcq)
+		return 1;
+
+	return drive->tcq->queued < drive->queue_depth;
+}
 #else
-# define ide_pending_commands(drive)	0
+#define ide_pending_commands(drive)	(0)
+#define ide_can_queue(drive)		(1)
 #endif
 
 int ide_build_commandlist(ide_drive_t *);
+int ide_init_commandlist(ide_drive_t *);
 void ide_teardown_commandlist(ide_drive_t *);
 int ide_tcq_dmaproc(ide_dma_action_t, ide_drive_t *);
 ide_startstop_t ide_start_tag(ide_dma_action_t, ide_drive_t *, struct ata_request *);
