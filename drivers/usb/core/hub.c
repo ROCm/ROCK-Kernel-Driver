@@ -373,12 +373,13 @@ static void hub_power_on(struct usb_hub *hub)
 	struct usb_device *dev;
 	int i;
 
-	/* Enable power to the ports */
-	dev_dbg(hubdev(interface_to_usbdev(hub->intf)),
-		"enabling power on all ports\n");
-	dev = interface_to_usbdev(hub->intf);
-	for (i = 0; i < hub->descriptor->bNbrPorts; i++)
-		set_port_feature(dev, i + 1, USB_PORT_FEAT_POWER);
+	/* if hub supports power switching, enable power on each port */
+	if ((hub->descriptor->wHubCharacteristics & HUB_CHAR_LPSM) < 2) {
+		dev_dbg(&hub->intf->dev, "enabling power on all ports\n");
+		dev = interface_to_usbdev(hub->intf);
+		for (i = 0; i < hub->descriptor->bNbrPorts; i++)
+			set_port_feature(dev, i + 1, USB_PORT_FEAT_POWER);
+	}
 
 	/* Wait for power to be enabled */
 	wait_ms(hub->descriptor->bPwrOn2PwrGood * 2);
@@ -545,8 +546,25 @@ static int hub_configure(struct usb_hub *hub,
 
 	dev_dbg(hub_dev, "power on to power good time: %dms\n",
 		hub->descriptor->bPwrOn2PwrGood * 2);
-	dev_dbg(hub_dev, "hub controller current requirement: %dmA\n",
-		hub->descriptor->bHubContrCurrent);
+
+	/* power budgeting mostly matters with bus-powered hubs,
+	 * and battery-powered root hubs (may provide just 8 mA).
+	 */
+	ret = usb_get_status(dev, USB_RECIP_DEVICE, 0, &hubstatus);
+	if (ret < 0) {
+		message = "can't get hubdev status";
+		goto fail;
+	}
+	cpu_to_le16s(&hubstatus);
+	if ((hubstatus & (1 << USB_DEVICE_SELF_POWERED)) == 0) {
+		dev_dbg(hub_dev, "hub controller current requirement: %dmA\n",
+			hub->descriptor->bHubContrCurrent);
+		hub->power_budget = (501 - hub->descriptor->bHubContrCurrent)
+					/ 2;
+		dev_dbg(hub_dev, "%dmA bus power budget for children\n",
+			hub->power_budget * 2);
+	}
+
 
 	ret = hub_hub_status(hub, &hubstatus, &hubchange);
 	if (ret < 0) {
@@ -554,12 +572,11 @@ static int hub_configure(struct usb_hub *hub,
 		goto fail;
 	}
 
-	/* FIXME implement per-port power budgeting;
-	 * enable it for bus-powered hubs.
-	 */
-	dev_dbg(hub_dev, "local power source is %s\n",
-		(hubstatus & HUB_STATUS_LOCAL_POWER)
-		? "lost (inactive)" : "good");
+	/* local power status reports aren't always correct */
+	if (dev->actconfig->desc.bmAttributes & USB_CONFIG_ATT_SELFPOWER)
+		dev_dbg(hub_dev, "local power source is %s\n",
+			(hubstatus & HUB_STATUS_LOCAL_POWER)
+			? "lost (inactive)" : "good");
 
 	if ((hub->descriptor->wHubCharacteristics & HUB_CHAR_OCPM) == 0)
 		dev_dbg(hub_dev, "%sover-current condition exists\n",
@@ -611,6 +628,8 @@ fail:
 	return ret;
 }
 
+static unsigned highspeed_hubs;
+
 static void hub_disconnect(struct usb_interface *intf)
 {
 	struct usb_hub *hub = usb_get_intfdata (intf);
@@ -619,6 +638,9 @@ static void hub_disconnect(struct usb_interface *intf)
 
 	if (!hub)
 		return;
+
+	if (interface_to_usbdev(intf)->speed == USB_SPEED_HIGH)
+		highspeed_hubs--;
 
 	usb_set_intfdata (intf, NULL);
 	spin_lock_irqsave(&hub_event_lock, flags);
@@ -730,6 +752,9 @@ descriptor_error:
 	spin_unlock_irqrestore(&hub_event_lock, flags);
 
 	usb_set_intfdata (intf, hub);
+
+	if (dev->speed == USB_SPEED_HIGH)
+		highspeed_hubs++;
 
 	if (hub_configure(hub, endpoint) >= 0)
 		return 0;
@@ -1178,6 +1203,63 @@ hub_port_init (struct usb_device *hub, struct usb_device *dev, int port)
 	return 0;
 }
 
+static void
+check_highspeed (struct usb_hub *hub, struct usb_device *dev, int port)
+{
+	struct usb_qualifier_descriptor	*qual;
+	int				status;
+
+	qual = kmalloc (sizeof *qual, SLAB_KERNEL);
+	if (qual == 0)
+		return;
+
+	status = usb_get_descriptor (dev, USB_DT_DEVICE_QUALIFIER, 0,
+			qual, sizeof *qual);
+	if (status == sizeof *qual) {
+		dev_info(&dev->dev, "not running at top speed; "
+			"connect to a high speed hub\n");
+		/* hub LEDs are probably harder to miss than syslog */
+		if (hub->has_indicators) {
+			hub->indicator[port] = INDICATOR_GREEN_BLINK;
+			schedule_work (&hub->leds);
+		}
+	}
+	kfree (qual);
+}
+
+static unsigned
+hub_power_remaining (struct usb_hub *hubstate, struct usb_device *hub)
+{
+	int remaining;
+	unsigned i;
+
+	remaining = hubstate->power_budget;
+	if (!remaining)		/* self-powered */
+		return 0;
+
+	for (i = 0; i < hub->maxchild; i++) {
+		struct usb_device	*dev = hub->children[i];
+		int			delta;
+
+		if (!dev)
+			continue;
+
+		if (dev->actconfig)
+			delta = dev->actconfig->desc.bMaxPower;
+		else
+			delta = 50;
+		// dev_dbg(&dev->dev, "budgeted %dmA\n", 2 * delta);
+		remaining -= delta;
+	}
+	if (remaining < 0) {
+		dev_warn(&hubstate->intf->dev,
+			"%dmA over power budget!\n",
+			-2 * remaining);
+		remaining = 0;
+	}
+	return remaining;
+}
+ 
 static void hub_port_connect_change(struct usb_hub *hubstate, int port,
 					u16 portstatus, u16 portchange)
 {
@@ -1241,17 +1323,63 @@ static void hub_port_connect_change(struct usb_hub *hubstate, int port,
 			break;
 		if (status < 0)
 			continue;
+
+		/* consecutive bus-powered hubs aren't reliable; they can
+		 * violate the voltage drop budget.  if the new child has
+		 * a "powered" LED, users should notice we didn't enable it
+		 * (without reading syslog), even without per-port LEDs
+		 * on the parent.
+		 */
+		if (dev->descriptor.bDeviceClass == USB_CLASS_HUB
+				&& hubstate->power_budget) {
+			u16	devstat;
+
+			status = usb_get_status(dev, USB_RECIP_DEVICE, 0,
+					&devstat);
+			if (status < 0) {
+				dev_dbg(&dev->dev, "get status %d ?\n", status);
+				continue;
+			}
+			cpu_to_le16s(&hubstatus);
+			if ((devstat & (1 << USB_DEVICE_SELF_POWERED)) == 0) {
+				dev_err(&dev->dev,
+					"can't connect bus-powered hub "
+					"to this port\n");
+				if (hubstate->has_indicators) {
+					hubstate->indicator[port] =
+						INDICATOR_AMBER_BLINK;
+					schedule_work (&hubstate->leds);
+				}
+				hub->children[port] = NULL;
+				usb_put_dev(dev);
+				hub_port_disable(hub, port);
+				return;
+			}
+		}
  
+		/* check for devices running slower than they could */
+		if (dev->descriptor.bcdUSB >= 0x0200
+				&& dev->speed == USB_SPEED_FULL
+				&& highspeed_hubs != 0)
+			check_highspeed (hubstate, dev, port);
+
 		/* Run it through the hoops (find a driver, etc) */
 		status = usb_new_device(dev);
 		if (status != 0) {
 			hub->children[port] = NULL;
 			continue;
 		}
-
 		up (&dev->serialize);
+
+		status = hub_power_remaining(hubstate, hub);
+		if (status)
+			dev_dbg(&hubstate->intf->dev,
+				"%dmA power budget left\n",
+				2 * status);
+
 		return;
 	}
+ 
 done:
 	hub_port_disable(hub, port);
 }
