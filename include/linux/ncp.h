@@ -30,6 +30,7 @@ struct ncp_request_header {
 };
 
 #define NCP_REPLY                (0x3333)
+#define NCP_WATCHDOG		 (0x3E3E)
 #define NCP_POSITIVE_ACK         (0x9999)
 
 struct ncp_reply_header {

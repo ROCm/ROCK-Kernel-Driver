@@ -13,6 +13,8 @@
 
 #ifdef __KERNEL__
 
+#include <linux/tqueue.h>
+
 #define NCP_DEFAULT_OPTIONS 0		/* 2 for packet signatures */
 
 struct ncp_server {
@@ -24,6 +26,9 @@ struct ncp_server {
 	__u8 name_space[NCP_NUMBER_OF_VOLUMES + 2];
 
 	struct file *ncp_filp;	/* File pointer to ncp socket */
+	struct socket *ncp_sock;/* ncp socket */
+	struct file *info_filp;
+	struct socket *info_sock;
 
 	u8 sequence;
 	u8 task;
@@ -79,7 +84,53 @@ struct ncp_server {
 
 	/* miscellaneous */
 	unsigned int flags;
+
+	spinlock_t requests_lock;	/* Lock accesses to tx.requests, tx.creq and rcv.creq when STREAM mode */
+
+	void (*data_ready)(struct sock* sk, int len);
+	void (*error_report)(struct sock* sk);
+	void (*write_space)(struct sock* sk);	/* STREAM mode only */
+	struct {
+		struct tq_struct tq;		/* STREAM/DGRAM: data/error ready */
+		struct ncp_request_reply* creq;	/* STREAM/DGRAM: awaiting reply from this request */
+		struct semaphore creq_sem;	/* DGRAM only: lock accesses to rcv.creq */
+
+		unsigned int state;		/* STREAM only: receiver state */
+		struct {
+			__u32 magic __attribute__((packed));
+			__u32 len __attribute__((packed));
+			__u16 type __attribute__((packed));
+			__u16 p1 __attribute__((packed));
+			__u16 p2 __attribute__((packed));
+			__u16 p3 __attribute__((packed));
+			__u16 type2 __attribute__((packed));
+		} buf;				/* STREAM only: temporary buffer */
+		unsigned char* ptr;		/* STREAM only: pointer to data */
+		size_t len;			/* STREAM only: length of data to receive */
+	} rcv;
+	struct {
+		struct list_head requests;	/* STREAM only: queued requests */
+		struct tq_struct tq;		/* STREAM only: transmitter ready */
+		struct ncp_request_reply* creq;	/* STREAM only: currently transmitted entry */
+	} tx;
+	struct timer_list timeout_tm;		/* DGRAM only: timeout timer */
+	struct tq_struct timeout_tq;		/* DGRAM only: associated queue, we run timers from process context */
+	int timeout_last;			/* DGRAM only: current timeout length */
+	int timeout_retries;			/* DGRAM only: retries left */
+	struct {
+		size_t len;
+		__u8 data[128];
+	} unexpected_packet;
 };
+
+extern void ncp_tcp_rcv_proc(void *server);
+extern void ncp_tcp_tx_proc(void *server);
+extern void ncpdgram_rcv_proc(void *server);
+extern void ncpdgram_timeout_proc(void *server);
+extern void ncpdgram_timeout_call(unsigned long server);
+extern void ncp_tcp_data_ready(struct sock* sk, int len);
+extern void ncp_tcp_write_space(struct sock* sk);
+extern void ncp_tcp_error_report(struct sock* sk);
 
 #define NCP_FLAG_UTF8	1
 
