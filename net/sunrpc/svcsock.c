@@ -564,16 +564,39 @@ svc_udp_recvfrom(struct svc_rqst *rqstp)
 	set_bit(SK_DATA, &svsk->sk_flags); /* there may be more data... */
 
 	len  = skb->len - sizeof(struct udphdr);
+	rqstp->rq_arg.len = len;
 
-	if (csum_partial_copy_to_xdr(&rqstp->rq_arg, skb)) {
-		/* checksum error */
-		skb_free_datagram(svsk->sk_sk, skb);
-		svc_sock_received(svsk);
-		return 0;
+	rqstp->rq_prot        = IPPROTO_UDP;
+
+	/* Get sender address */
+	rqstp->rq_addr.sin_family = AF_INET;
+	rqstp->rq_addr.sin_port = skb->h.uh->source;
+	rqstp->rq_addr.sin_addr.s_addr = skb->nh.iph->saddr;
+
+	if (skb_is_nonlinear(skb)) {
+		/* we have to copy */
+		if (csum_partial_copy_to_xdr(&rqstp->rq_arg, skb)) {
+			/* checksum error */
+			skb_free_datagram(svsk->sk_sk, skb);
+			svc_sock_received(svsk);
+			return 0;
+		}
+		skb_free_datagram(svsk->sk_sk, skb); 
+	} else {
+		/* we can use it in-place */
+		rqstp->rq_arg.head[0].iov_base = skb->data + sizeof(struct udphdr);
+		rqstp->rq_arg.head[0].iov_len = len;
+		if (skb->ip_summed != CHECKSUM_UNNECESSARY) {
+			if ((unsigned short)csum_fold(skb_checksum(skb, 0, skb->len, skb->csum))) {
+				skb_free_datagram(svsk->sk_sk, skb);
+				svc_sock_received(svsk);
+				return 0;
+			}
+			skb->ip_summed = CHECKSUM_UNNECESSARY;
+		}
+		rqstp->rq_skbuff = skb;
 	}
 
-
-	rqstp->rq_arg.len = len;
 	rqstp->rq_arg.page_base = 0;
 	if (len <= rqstp->rq_arg.head[0].iov_len) {
 		rqstp->rq_arg.head[0].iov_len = len;
@@ -582,14 +605,6 @@ svc_udp_recvfrom(struct svc_rqst *rqstp)
 		rqstp->rq_arg.page_len = len - rqstp->rq_arg.head[0].iov_len;
 		rqstp->rq_argused += (rqstp->rq_arg.page_len + PAGE_SIZE - 1)/ PAGE_SIZE;
 	}
-	rqstp->rq_prot        = IPPROTO_UDP;
-
-	/* Get sender address */
-	rqstp->rq_addr.sin_family = AF_INET;
-	rqstp->rq_addr.sin_port = skb->h.uh->source;
-	rqstp->rq_addr.sin_addr.s_addr = skb->nh.iph->saddr;
-
-	skb_free_datagram(svsk->sk_sk, skb);
 
 	if (serv->sv_stats)
 		serv->sv_stats->netudpcnt++;
