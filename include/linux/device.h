@@ -394,8 +394,19 @@ extern int firmware_register(struct subsystem *);
 extern void firmware_unregister(struct subsystem *);
 
 /* debugging and troubleshooting/diagnostic helpers. */
+#ifdef CONFIG_EVLOG
+#include <linux/evlog.h>
+#define dev_printk(level, dev, format, arg...)	\
+    do { \
+	const char *name = (dev)->driver? (dev)->driver->name : "";
+	printk(level "%s %s: " format , name , (dev)->bus_id , ## arg); \
+	evl_printk((dev)->driver->name , 0, (level[1]-'0') , \
+	    "%s %s: " format , name , (dev)->bus_id , ## arg); \
+    } while (0)
+#else
 #define dev_printk(level, dev, format, arg...)	\
 	printk(level "%s %s: " format , (dev)->driver ? (dev)->driver->name : "" , (dev)->bus_id , ## arg)
+#endif
 
 #ifdef DEBUG
 #define dev_dbg(dev, format, arg...)		\

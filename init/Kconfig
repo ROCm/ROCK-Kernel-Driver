@@ -197,6 +197,28 @@ config HOTPLUG
 	  agent" (/sbin/hotplug) to load modules and set up software needed
 	  to use devices as you hotplug them.
 
+config EVLOG
+	bool "Event logging support"
+	---help---
+	  This enables support for event logging based upon the draft
+	  POSIX 1003.25 standard.  Enabling this feature does not
+	  affect the operation of the klog/syslog package in any way.
+	  In order to fully utilize this feature, user must also install
+	  the companion evlog package in user-space.
+
+	  For more information see http://evlog.sourceforge.net
+
+	  If you don't know what to do here, say N.
+
+config EVLOG_FWPRINTK
+	bool "Forward printk messages to event log"
+	depends on EVLOG
+	help
+	  This option forwards printk log messages to the event log.
+	  Printk messages are still logged to /var/log/messages.
+
+	  If you don't know what to do here, say N.
+
 config IKCONFIG
 	bool "Kernel .config support"
 	---help---
