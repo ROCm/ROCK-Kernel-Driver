@@ -31,6 +31,9 @@
 
 /* Change Log
  *
+ *   o Feature: merged in modified NAPI patch from Robert Olsson
+ *     <Robert.Olsson@its.uu.se> Uppsala Univeristy, Sweden.
+ *
  * 4.3.15      8/9/02
  *   o Converted from Dual BSD/GPL license to GPL license.
  *   o Clean up: use pci_[clear|set]_mwi rather than direct calls to
@@ -156,7 +159,11 @@ static inline void e1000_irq_disable(struct e1000_adapter *adapter);
 static inline void e1000_irq_enable(struct e1000_adapter *adapter);
 static void e1000_intr(int irq, void *data, struct pt_regs *regs);
 static void e1000_clean_tx_irq(struct e1000_adapter *adapter);
+#ifdef CONFIG_E1000_NAPI
+static int e1000_poll(struct net_device *netdev, int *budget);
+#else
 static void e1000_clean_rx_irq(struct e1000_adapter *adapter);
+#endif
 static void e1000_alloc_rx_buffers(struct e1000_adapter *adapter);
 static int e1000_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd);
 static void e1000_enter_82542_rst(struct e1000_adapter *adapter);
@@ -391,6 +398,10 @@ e1000_probe(struct pci_dev *pdev,
 	netdev->do_ioctl = &e1000_ioctl;
 	netdev->tx_timeout = &e1000_tx_timeout;
 	netdev->watchdog_timeo = HZ;
+#ifdef CONFIG_E1000_NAPI
+	netdev->poll = &e1000_poll;
+	netdev->weight = 64;
+#endif
 	netdev->vlan_rx_register = e1000_vlan_rx_register;
 	netdev->vlan_rx_add_vid = e1000_vlan_rx_add_vid;
 	netdev->vlan_rx_kill_vid = e1000_vlan_rx_kill_vid;
@@ -1715,6 +1726,13 @@ e1000_intr(int irq, void *data, struct pt_regs *regs)
 {
 	struct net_device *netdev = data;
 	struct e1000_adapter *adapter = netdev->priv;
+	
+#ifdef CONFIG_E1000_NAPI
+	if (netif_rx_schedule_prep(netdev)) {
+		e1000_irq_disable(adapter);
+		__netif_rx_schedule(netdev);
+	}
+#else
 	uint32_t icr;
 	int i = E1000_MAX_INTR;
 
@@ -1730,7 +1748,37 @@ e1000_intr(int irq, void *data, struct pt_regs *regs)
 		i--;
 
 	}
+#endif
 }
+
+#ifdef CONFIG_E1000_NAPI
+static int
+e1000_process_intr(struct net_device *netdev)
+{
+	struct e1000_adapter *adapter = netdev->priv;
+	uint32_t icr;
+	int i = E1000_MAX_INTR;
+	int hasReceived = 0;
+
+	while(i && (icr = E1000_READ_REG(&adapter->hw, ICR))) {
+		if (icr & E1000_ICR_RXT0)
+			hasReceived = 1;
+ 
+		if (!(icr & ~(E1000_ICR_RXT0)))
+			break;
+    
+		if (icr & (E1000_ICR_RXSEQ | E1000_ICR_LSC)) {
+			adapter->hw.get_link_status = 1;
+			mod_timer(&adapter->watchdog_timer, jiffies);
+		}
+ 
+		e1000_clean_tx_irq(adapter);
+		i--;
+	}
+
+	return hasReceived;
+}
+#endif
 
 /**
  * e1000_clean_tx_irq - Reclaim resources after transmit completes
@@ -1783,6 +1831,136 @@ e1000_clean_tx_irq(struct e1000_adapter *adapter)
 	}
 }
 
+#ifdef CONFIG_E1000_NAPI
+static int
+e1000_poll(struct net_device *netdev, int *budget)
+{
+	struct e1000_adapter *adapter = netdev->priv;
+	struct e1000_desc_ring *rx_ring = &adapter->rx_ring;
+	struct pci_dev *pdev = adapter->pdev;
+	struct e1000_rx_desc *rx_desc;
+	struct sk_buff *skb;
+	unsigned long flags;
+	uint32_t length;
+	uint8_t last_byte;
+	int i;
+	int received = 0;
+	int rx_work_limit = *budget;
+
+	if(rx_work_limit > netdev->quota)
+		rx_work_limit = netdev->quota;
+
+	e1000_process_intr(netdev);
+
+	i = rx_ring->next_to_clean;
+	rx_desc = E1000_RX_DESC(*rx_ring, i);
+
+	while(rx_desc->status & E1000_RXD_STAT_DD) {
+		if(--rx_work_limit < 0)
+			goto not_done;
+
+		pci_unmap_single(pdev,
+		                 rx_ring->buffer_info[i].dma,
+		                 rx_ring->buffer_info[i].length,
+		                 PCI_DMA_FROMDEVICE);
+
+		skb = rx_ring->buffer_info[i].skb;
+		length = le16_to_cpu(rx_desc->length);
+
+		if(!(rx_desc->status & E1000_RXD_STAT_EOP)) {
+
+			/* All receives must fit into a single buffer */
+
+			E1000_DBG("Receive packet consumed multiple buffers\n");
+
+			dev_kfree_skb_irq(skb);
+			rx_desc->status = 0;
+			rx_ring->buffer_info[i].skb = NULL;
+
+			i = (i + 1) % rx_ring->count;
+
+			rx_desc = E1000_RX_DESC(*rx_ring, i);
+			continue;
+		}
+
+		if(rx_desc->errors & E1000_RXD_ERR_FRAME_ERR_MASK) {
+
+			last_byte = *(skb->data + length - 1);
+
+			if(TBI_ACCEPT(&adapter->hw, rx_desc->status,
+			              rx_desc->errors, length, last_byte)) {
+
+				spin_lock_irqsave(&adapter->stats_lock, flags);
+
+				e1000_tbi_adjust_stats(&adapter->hw,
+				                       &adapter->stats,
+				                       length, skb->data);
+
+				spin_unlock_irqrestore(&adapter->stats_lock,
+				                       flags);
+				length--;
+			} else {
+
+				dev_kfree_skb_irq(skb);
+				rx_desc->status = 0;
+				rx_ring->buffer_info[i].skb = NULL;
+
+				i = (i + 1) % rx_ring->count;
+
+				rx_desc = E1000_RX_DESC(*rx_ring, i);
+				continue;
+			}
+		}
+
+		/* Good Receive */
+		skb_put(skb, length - ETHERNET_FCS_SIZE);
+
+		/* Receive Checksum Offload */
+		e1000_rx_checksum(adapter, rx_desc, skb);
+
+		skb->protocol = eth_type_trans(skb, netdev);
+		if(adapter->vlgrp && (rx_desc->status & E1000_RXD_STAT_VP)) {
+			vlan_hwaccel_rx(skb, adapter->vlgrp,
+				(rx_desc->special & E1000_RXD_SPC_VLAN_MASK));
+		} else {
+			netif_receive_skb(skb);
+		}
+		netdev->last_rx = jiffies;
+
+		rx_desc->status = 0;
+		rx_ring->buffer_info[i].skb = NULL;
+
+		i = (i + 1) % rx_ring->count;
+
+		rx_desc = E1000_RX_DESC(*rx_ring, i);
+		received++;
+	}
+
+	if(!received)
+		received = 1;
+
+	e1000_alloc_rx_buffers(adapter);
+	
+	rx_ring->next_to_clean = i;
+	netdev->quota -= received;
+	*budget -= received;
+
+	netif_rx_complete(netdev);
+
+	e1000_irq_enable(adapter);
+	return 0;
+
+not_done:
+
+	e1000_alloc_rx_buffers(adapter);
+	
+	rx_ring->next_to_clean = i;
+	netdev->quota -= received;
+	*budget -= received;
+
+	return 1;
+}
+#else
 /**
  * e1000_clean_rx_irq - Send received data up the network stack,
  * @adapter: board private structure
@@ -1886,6 +2064,7 @@ e1000_clean_rx_irq(struct e1000_adapter *adapter)
 
 	e1000_alloc_rx_buffers(adapter);
 }
+#endif
 
 /**
  * e1000_alloc_rx_buffers - Replace used receive buffers
