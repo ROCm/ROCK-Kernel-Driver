@@ -164,6 +164,9 @@ struct hfsc_class
 					   adjustment */
 	u64	cl_vtoff;		/* inter-period cumulative vt offset */
 	u64	cl_cvtmax;		/* max child's vt in the last period */
+	u64	cl_cvtoff;		/* cumulative cvtmax of all periods */
+	u64	cl_pcvtoff;		/* parent's cvtoff at initalization
+					   time */
 
 	struct internal_sc cl_rsc;	/* internal real-time service curve */
 	struct internal_sc cl_fsc;	/* internal fair service curve */
@@ -720,7 +723,7 @@ update_cfmin(struct hfsc_class *cl)
 static void
 init_vf(struct hfsc_class *cl, unsigned int len)
 {
-	struct hfsc_class *max_cl, *p;
+	struct hfsc_class *max_cl;
 	struct rb_node *n;
 	u64 vt, f, cur_time;
 	int go_active;
@@ -752,18 +755,19 @@ init_vf(struct hfsc_class *cl, unsigned int len)
 			} else {
 				/*
 				 * first child for a new parent backlog period.
-				 * add parent's cvtmax to vtoff of children
-				 * to make a new vt (vtoff + vt) larger than
-				 * the vt in the last period for all children.
+				 * add parent's cvtmax to cvtoff to make a new
+				 * vt (vtoff + vt) larger than the vt in the
+				 * last period for all children.
 				 */
 				vt = cl->cl_parent->cl_cvtmax;
-				list_for_each_entry(p, &cl->cl_parent->children,
-				                                       siblings)
-					p->cl_vtoff += vt;
-				cl->cl_vt = 0;
+				cl->cl_parent->cl_cvtoff += vt;
 				cl->cl_parent->cl_cvtmax = 0;
 				cl->cl_parent->cl_cvtmin = 0;
+				cl->cl_vt = 0;
 			}
+
+			cl->cl_vtoff = cl->cl_parent->cl_cvtoff -
+							cl->cl_pcvtoff;
 
 			/* update the virtual curve */
 			vt = cl->cl_vt + cl->cl_vtoff;
@@ -1151,6 +1155,7 @@ hfsc_change_class(struct Qdisc *sch, u32 classid, u32 parentid,
 	if (parent->level == 0)
 		hfsc_purge_queue(sch, parent);
 	hfsc_adjust_levels(parent);
+	cl->cl_pcvtoff = parent->cl_cvtoff;
 	sch_tree_unlock(sch);
 
 #ifdef CONFIG_NET_ESTIMATOR
@@ -1584,6 +1589,8 @@ hfsc_reset_class(struct hfsc_class *cl)
 	cl->cl_vtoff        = 0;
 	cl->cl_cvtmin       = 0;
 	cl->cl_cvtmax       = 0;
+	cl->cl_cvtoff       = 0;
+	cl->cl_pcvtoff      = 0;
 	cl->cl_vtperiod     = 0;
 	cl->cl_parentperiod = 0;
 	cl->cl_f            = 0;
