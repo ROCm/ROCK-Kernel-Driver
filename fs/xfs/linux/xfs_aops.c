@@ -718,9 +718,10 @@ xfs_page_state_convert(
 {
 	struct buffer_head	*bh_arr[MAX_BUF_PER_PAGE], *bh, *head;
 	xfs_iomap_t		*iomp, iomap;
+	unsigned long		p_offset = 0;
 	pgoff_t			end_index;
-	unsigned long		end_index;
 	loff_t			offset;
+	unsigned long long	end_offset;
 	int			len, err, i, cnt = 0, uptodate = 1;
 	int			flags = startio ? 0 : BMAPI_TRYLOCK;
 	int			page_dirty = 1;

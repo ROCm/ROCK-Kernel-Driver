@@ -50,7 +50,7 @@ unsigned long xfs_physmem;
  */
 
 xfs_param_t xfs_params = {
-			  /*	MIN	DFLT	MAX	*/
+			  /*	MIN		DFLT		MAX	*/
 	.restrict_chown	= {	0,		1,		1	},
 	.sgid_inherit	= {	0,		0,		1	},
 	.symlink_mode	= {	0,		0,		1	},
