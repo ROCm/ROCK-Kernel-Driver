@@ -53,7 +53,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.h#114 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.h#115 $
  *
  */
 #ifndef _AIC7XXX_LINUX_H_
@@ -72,7 +72,6 @@
 #endif
 #include <linux/module.h>
 #include <asm/byteorder.h>
-#include <asm/io.h>
 
 #ifndef KERNEL_VERSION
 #define KERNEL_VERSION(x,y,z) (((x)<<16)+((y)<<8)+(z))
@@ -472,10 +471,11 @@ struct ahc_linux_target {
 	/*
 	 * The next "fallback" period to use for narrow/wide transfers.
 	 */
-	u_int			  dv_next_narrow_period;
-	u_int			  dv_next_wide_period;
-	u_int			  dv_max_ppr_options;
-	u_int			  dv_last_ppr_options;
+	uint8_t			  dv_next_narrow_period;
+	uint8_t			  dv_next_wide_period;
+	uint8_t			  dv_max_width;
+	uint8_t			  dv_max_ppr_options;
+	uint8_t			  dv_last_ppr_options;
 	u_int			  dv_echo_size;
 	ahc_dv_state		  dv_state;
 	u_int			  dv_state_retry;

@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.c#105 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.c#107 $
  *
  * $FreeBSD$
  */
@@ -4602,7 +4602,8 @@ ahc_init(struct ahc_softc *ahc)
 			       /*lowaddr*/BUS_SPACE_MAXADDR,
 			       /*highaddr*/BUS_SPACE_MAXADDR,
 			       /*filter*/NULL, /*filterarg*/NULL,
-			       /*maxsize*/MAXBSIZE, /*nsegments*/AHC_NSEG,
+			       /*maxsize*/(AHC_NSEG - 1) * PAGE_SIZE,
+			       /*nsegments*/AHC_NSEG,
 			       /*maxsegsz*/AHC_MAXTRANSFER_SIZE,
 			       /*flags*/BUS_DMA_ALLOCNOW,
 			       &ahc->buffer_dmat) != 0) {
@@ -6275,7 +6276,8 @@ ahc_calc_residual(struct ahc_softc *ahc, struct scb *scb)
 #ifdef AHC_DEBUG
 	if ((ahc_debug & AHC_SHOW_MISC) != 0) {
 		ahc_print_path(ahc, scb);
-		printf("Handled Residual of %d bytes\n", resid);
+		printf("Handled %sResidual of %d bytes\n",
+		       (scb->flags & SCB_SENSE) ? "Sense " : "", resid);
 	}
 #endif
 }

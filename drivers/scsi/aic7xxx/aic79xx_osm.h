@@ -36,7 +36,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.h#99 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.h#100 $
  *
  */
 #ifndef _AIC79XX_LINUX_H_
@@ -458,10 +458,11 @@ struct ahd_linux_target {
 	/*
 	 * The next "fallback" period to use for narrow/wide transfers.
 	 */
-	u_int			  dv_next_narrow_period;
-	u_int			  dv_next_wide_period;
-	u_int			  dv_max_ppr_options;
-	u_int			  dv_last_ppr_options;
+	uint8_t			  dv_next_narrow_period;
+	uint8_t			  dv_next_wide_period;
+	uint8_t			  dv_max_width;
+	uint8_t			  dv_max_ppr_options;
+	uint8_t			  dv_last_ppr_options;
 	u_int			  dv_echo_size;
 	ahd_dv_state		  dv_state;
 	u_int			  dv_state_retry;
