@@ -228,10 +228,8 @@ static void orinoco_cs_detach(dev_link_t *link)
 	for (linkp = &dev_list; *linkp; linkp = &(*linkp)->next)
 		if (*linkp == link)
 			break;
-	if (*linkp == NULL) {
-		BUG();
-		return;
-	}
+
+	BUG_ON(*linkp == NULL);
 
 	if (link->state & DEV_CONFIG)
 		orinoco_cs_release(link);

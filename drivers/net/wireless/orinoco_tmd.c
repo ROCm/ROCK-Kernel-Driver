@@ -172,8 +172,7 @@ static void __devexit orinoco_tmd_remove_one(struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
 
-	if (! dev)
-		BUG();
+	BUG_ON(! dev);
 
 	unregister_netdev(dev);
 		

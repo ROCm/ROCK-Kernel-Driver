@@ -1770,11 +1770,10 @@ __orinoco_set_multicast_list(struct net_device *dev)
 		int i;
 
 		for (i = 0; i < mc_count; i++) {
-			/* Paranoia: */
-			if (! p)
-				BUG(); /* Multicast list shorter than mc_count */
-			if (p->dmi_addrlen != ETH_ALEN)
-				BUG(); /* Bad address size in multicast list */
+			/* paranoia: is list shorter than mc_count? */
+			BUG_ON(! p);
+			/* paranoia: bad address size in list? */
+			BUG_ON(p->dmi_addrlen != ETH_ALEN);
 			
 			memcpy(mclist.addr[i], p->dmi_addr, ETH_ALEN);
 			p = p->next;
@@ -3185,8 +3184,7 @@ static int orinoco_ioctl_getrate(struct net_device *dev, struct iw_param *rrq)
 
 	ratemode = priv->bitratemode;
 
-	if ( (ratemode < 0) || (ratemode >= BITRATE_TABLE_SIZE) )
-		BUG();
+	BUG_ON((ratemode < 0) || (ratemode >= BITRATE_TABLE_SIZE));
 
 	rrq->value = bitrate_table[ratemode].bitrate * 100000;
 	rrq->fixed = ! bitrate_table[ratemode].automatic;
