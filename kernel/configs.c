@@ -64,7 +64,8 @@ ikconfig_output_current(struct file *file, char *buf,
 	limit = (ikconfig_current_size > len) ? len : ikconfig_current_size;
 	for (i = file->f_pos, cnt = 0;
 	     i < ikconfig_current_size && cnt < limit; i++, cnt++) {
-		put_user(ikconfig_config[i], buf + cnt);
+		if (put_user(ikconfig_config[i], buf + cnt))
+			return -EFAULT;
 	}
 	file->f_pos = i;
 	return cnt;
