@@ -176,6 +176,16 @@ struct scsi_request *scsi_allocate_request(struct scsi_device *sdev)
 	return sreq;
 }
 
+void __scsi_release_request(struct scsi_request *sreq)
+{
+	if (likely(sreq->sr_command != NULL)) {
+		struct scsi_cmnd *cmd = sreq->sr_command;
+
+		sreq->sr_command = NULL;
+		scsi_next_command(cmd);
+	}
+}
+
 /*
  * Function:    scsi_release_request
  *

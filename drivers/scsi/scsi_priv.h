@@ -73,6 +73,7 @@ extern int scsi_get_device_flags(unsigned char *vendor, unsigned char *model);
 extern int scsi_insert_special_req(struct scsi_request *sreq, int);
 extern void scsi_init_cmd_from_req(struct scsi_cmnd *cmd,
 		struct scsi_request *sreq);
+extern void __scsi_release_request(struct scsi_request *sreq);
 
 /* scsi_error.c */
 extern void scsi_times_out(struct scsi_cmnd *cmd);
@@ -84,8 +85,8 @@ extern int scsi_eh_scmd_add(struct scsi_cmnd *, int);
 extern int scsi_maybe_unblock_host(struct scsi_device *sdev);
 extern void scsi_setup_cmd_retry(struct scsi_cmnd *cmd);
 extern int scsi_queue_insert(struct scsi_cmnd *cmd, int reason);
-extern void scsi_queue_next_request(struct request_queue *q,
-			struct scsi_cmnd *cmd);
+extern void scsi_next_command(struct scsi_cmnd *cmd);
+extern void scsi_run_host_queues(struct Scsi_Host *shost);
 extern struct request_queue *scsi_alloc_queue(struct scsi_device *sdev);
 extern void scsi_free_queue(struct request_queue *q);
 extern int scsi_init_queue(void);
