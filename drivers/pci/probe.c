@@ -478,6 +478,9 @@ static int pci_setup_device(struct pci_dev * dev)
 	/* "Unknown power state" */
 	dev->current_state = 4;
 
+	/* Early fixups, before probing the BARs */
+	pci_fixup_device(pci_fixup_early, dev);
+
 	switch (dev->hdr_type) {		    /* header type */
 	case PCI_HEADER_TYPE_NORMAL:		    /* standard header */
 		if (class == PCI_CLASS_BRIDGE_PCI)
