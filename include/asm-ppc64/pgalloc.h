@@ -55,11 +55,12 @@ pmd_free(pmd_t *pmd)
 	free_page((unsigned long)pmd);
 }
 
-#define pmd_populate(mm, pmd, pte)	pmd_set(pmd, pte)
 #define pmd_populate_kernel(mm, pmd, pte) pmd_set(pmd, pte)
+#define pmd_populate(mm, pmd, pte_page) \
+	pmd_populate_kernel(mm, pmd, page_address(pte_page))
 
 static inline pte_t *
-pte_alloc_one(struct mm_struct *mm, unsigned long addr)
+pte_alloc_one_kernel(struct mm_struct *mm, unsigned long addr)
 {
 	int count = 0;
 	pte_t *pte;
@@ -77,15 +78,16 @@ pte_alloc_one(struct mm_struct *mm, unsigned long addr)
 	return pte;
 }
 
-#define pte_alloc_one_kernel(mm, address)	pte_alloc_one((mm), (address))
+#define pte_alloc_one(mm, address) \
+	virt_to_page(pte_alloc_one_kernel((mm), (address)))
 
 static inline void
-pte_free(pte_t *pte)
+pte_free_kernel(pte_t *pte)
 {
 	free_page((unsigned long)pte);
 }
 
-#define pte_free_kernel(pte)	pte_free(pte)
+#define pte_free(pte_page)	pte_free_kernel(page_address(pte_page))
 
 #define check_pgt_cache()	do { } while (0)
 
