@@ -312,6 +312,8 @@ struct ipr_error_table_t ipr_error_table[] = {
 	"9041: Array protection temporarily suspended"},
 	{0x066B0200, 0, 1,
 	"9030: Array no longer protected due to missing or failed disk unit"},
+	{0x066B8200, 0, 1,
+	"9042: Corrupt array parity detected on specified device"},
 	{0x07270000, 0, 0,
 	"Failure due to other device"},
 	{0x07278000, 0, 1,
