@@ -434,6 +434,15 @@ static int encode_compound_hdr(struct xdr_stream *xdr, struct compound_hdr *hdr)
 	return 0;
 }
 
+static void encode_nfs4_verifier(struct xdr_stream *xdr, const nfs4_verifier *verf)
+{
+	uint32_t *p;
+
+	p = xdr_reserve_space(xdr, NFS4_VERIFIER_SIZE);
+	BUG_ON(p == NULL);
+	xdr_encode_opaque_fixed(p, verf->data, NFS4_VERIFIER_SIZE);
+}
+
 static int encode_attrs(struct xdr_stream *xdr, const struct iattr *iap, const struct nfs_server *server)
 {
 	char owner_name[IDMAP_NAMESZ];
@@ -774,19 +783,12 @@ static int encode_lookup(struct xdr_stream *xdr, const struct qstr *name)
 	return 0;
 }
 
-static int encode_open(struct xdr_stream *xdr, const struct nfs_openargs *arg)
+static void encode_share_access(struct xdr_stream *xdr, int open_flags)
 {
-	int status;
 	uint32_t *p;
 
- /*
- * opcode 4, seqid 4, share_access 4, share_deny 4, clientid 8, ownerlen 4,
- * owner 4, opentype 4 = 36
- */
-	RESERVE_SPACE(36);
-	WRITE32(OP_OPEN);
-	WRITE32(arg->seqid);
-	switch (arg->share_access) {
+	RESERVE_SPACE(8);
+	switch (open_flags & (FMODE_READ|FMODE_WRITE)) {
 		case FMODE_READ:
 			WRITE32(NFS4_SHARE_ACCESS_READ);
 			break;
@@ -799,37 +801,123 @@ static int encode_open(struct xdr_stream *xdr, const struct nfs_openargs *arg)
 		default:
 			BUG();
 	}
-	WRITE32(0);                  /* for linux, share_deny = 0 always */
+	WRITE32(0);		/* for linux, share_deny = 0 always */
+}
+
+static inline void encode_openhdr(struct xdr_stream *xdr, const struct nfs_openargs *arg)
+{
+	uint32_t *p;
+ /*
+ * opcode 4, seqid 4, share_access 4, share_deny 4, clientid 8, ownerlen 4,
+ * owner 4 = 32
+ */
+	RESERVE_SPACE(8);
+	WRITE32(OP_OPEN);
+	WRITE32(arg->seqid);
+	encode_share_access(xdr, arg->open_flags);
+	RESERVE_SPACE(16);
 	WRITE64(arg->clientid);
 	WRITE32(4);
 	WRITE32(arg->id);
-	WRITE32(arg->opentype);
+}
 
-	if (arg->opentype == NFS4_OPEN_CREATE) {
-		if (arg->createmode == NFS4_CREATE_EXCLUSIVE) {
-			RESERVE_SPACE(12);
-			WRITE32(arg->createmode);
-			WRITEMEM(arg->u.verifier.data, sizeof(arg->u.verifier.data));
-		}
-		else if (arg->u.attrs) {
-			RESERVE_SPACE(4);
-			WRITE32(arg->createmode);
-			if ((status = encode_attrs(xdr, arg->u.attrs, arg->server)))
-				return status;
-		}
-		else {
-			RESERVE_SPACE(12);
-			WRITE32(arg->createmode);
-			WRITE32(0);
-			WRITE32(0);
-		}
+static inline void encode_createmode(struct xdr_stream *xdr, const struct nfs_openargs *arg)
+{
+	uint32_t *p;
+
+	RESERVE_SPACE(4);
+	switch(arg->open_flags & O_EXCL) {
+		case 0:
+			WRITE32(NFS4_CREATE_UNCHECKED);
+			encode_attrs(xdr, arg->u.attrs, arg->server);
+			break;
+		default:
+			WRITE32(NFS4_CREATE_EXCLUSIVE);
+			encode_nfs4_verifier(xdr, &arg->u.verifier);
 	}
+}
 
-	RESERVE_SPACE(8 + arg->name->len);
+static void encode_opentype(struct xdr_stream *xdr, const struct nfs_openargs *arg)
+{
+	uint32_t *p;
+
+	RESERVE_SPACE(4);
+	switch (arg->open_flags & O_CREAT) {
+		case 0:
+			WRITE32(NFS4_OPEN_NOCREATE);
+			break;
+		default:
+			BUG_ON(arg->claim != NFS4_OPEN_CLAIM_NULL);
+			WRITE32(NFS4_OPEN_CREATE);
+			encode_createmode(xdr, arg);
+	}
+}
+
+static inline void encode_delegation_type(struct xdr_stream *xdr, int delegation_type)
+{
+	uint32_t *p;
+
+	RESERVE_SPACE(4);
+	switch (delegation_type) {
+		case 0:
+			WRITE32(NFS4_OPEN_DELEGATE_NONE);
+			break;
+		case FMODE_READ:
+			WRITE32(NFS4_OPEN_DELEGATE_READ);
+			break;
+		case FMODE_WRITE|FMODE_READ:
+			WRITE32(NFS4_OPEN_DELEGATE_WRITE);
+			break;
+		default:
+			BUG();
+	}
+}
+
+static inline void encode_claim_null(struct xdr_stream *xdr, const struct qstr *name)
+{
+	uint32_t *p;
+
+	RESERVE_SPACE(4);
 	WRITE32(NFS4_OPEN_CLAIM_NULL);
-	WRITE32(arg->name->len);
-	WRITEMEM(arg->name->name, arg->name->len);
+	encode_string(xdr, name->len, name->name);
+}
 
+static inline void encode_claim_previous(struct xdr_stream *xdr, int type)
+{
+	uint32_t *p;
+
+	RESERVE_SPACE(4);
+	WRITE32(NFS4_OPEN_CLAIM_PREVIOUS);
+	encode_delegation_type(xdr, type);
+}
+
+static inline void encode_claim_delegate_cur(struct xdr_stream *xdr, const struct qstr *name, const nfs4_stateid *stateid)
+{
+	uint32_t *p;
+
+	RESERVE_SPACE(4+sizeof(stateid->data));
+	WRITE32(NFS4_OPEN_CLAIM_DELEGATE_CUR);
+	WRITEMEM(stateid->data, sizeof(stateid->data));
+	encode_string(xdr, name->len, name->name);
+}
+
+static int encode_open(struct xdr_stream *xdr, const struct nfs_openargs *arg)
+{
+	encode_openhdr(xdr, arg);
+	encode_opentype(xdr, arg);
+	switch (arg->claim) {
+		case NFS4_OPEN_CLAIM_NULL:
+			encode_claim_null(xdr, arg->name);
+			break;
+		case NFS4_OPEN_CLAIM_PREVIOUS:
+			encode_claim_previous(xdr, arg->u.delegation_type);
+			break;
+		case NFS4_OPEN_CLAIM_DELEGATE_CUR:
+			encode_claim_delegate_cur(xdr, arg->name, &arg->u.delegation);
+			break;
+		default:
+			BUG();
+	}
 	return 0;
 }
 
@@ -845,53 +933,15 @@ static int encode_open_confirm(struct xdr_stream *xdr, const struct nfs_open_con
 	return 0;
 }
 
-
-static int encode_open_reclaim(struct xdr_stream *xdr, const struct nfs_open_reclaimargs *arg)
-{
-	uint32_t *p;
-
- /*
- * opcode 4, seqid 4, share_access 4, share_deny 4, clientid 8, ownerlen 4,
- * owner 4, opentype 4, claim 4, delegation_type 4 = 44
- */
-	RESERVE_SPACE(44);
-	WRITE32(OP_OPEN);
-	WRITE32(arg->seqid);
-	switch (arg->share_access) {
-		case FMODE_READ:
-			WRITE32(NFS4_SHARE_ACCESS_READ);
-			break;
-		case FMODE_WRITE:
-			WRITE32(NFS4_SHARE_ACCESS_WRITE);
-			break;
-		case FMODE_READ|FMODE_WRITE:
-			WRITE32(NFS4_SHARE_ACCESS_BOTH);
-			break;
-		default:
-			BUG();
-	}
-	WRITE32(0);                  /* for linux, share_deny = 0 always */
-	WRITE64(arg->clientid);
-	WRITE32(4);
-	WRITE32(arg->id);
-	WRITE32(NFS4_OPEN_NOCREATE);
-	WRITE32(NFS4_OPEN_CLAIM_PREVIOUS);
-	WRITE32(NFS4_OPEN_DELEGATE_NONE);
-	return 0;
-}
-
 static int encode_open_downgrade(struct xdr_stream *xdr, const struct nfs_closeargs *arg)
 {
 	uint32_t *p;
 
-	RESERVE_SPACE(16+sizeof(arg->stateid.data));
+	RESERVE_SPACE(8+sizeof(arg->stateid.data));
 	WRITE32(OP_OPEN_DOWNGRADE);
 	WRITEMEM(arg->stateid.data, sizeof(arg->stateid.data));
 	WRITE32(arg->seqid);
-	WRITE32(arg->share_access);
-	/* No deny modes */
-	WRITE32(0);
-
+	encode_share_access(xdr, arg->open_flags);
 	return 0;
 }
 
@@ -1377,7 +1427,7 @@ out:
 /*
  * Encode an OPEN request
  */
-static int nfs4_xdr_enc_open_reclaim(struct rpc_rqst *req, uint32_t *p, struct nfs_open_reclaimargs *args)
+static int nfs4_xdr_enc_open_reclaim(struct rpc_rqst *req, uint32_t *p, struct nfs_openargs *args)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
@@ -1390,7 +1440,7 @@ static int nfs4_xdr_enc_open_reclaim(struct rpc_rqst *req, uint32_t *p, struct n
 	status = encode_putfh(&xdr, args->fh);
 	if (status)
 		goto out;
-	status = encode_open_reclaim(&xdr, args);
+	status = encode_open(&xdr, args);
 	if (status)
 		goto out;
 	status = encode_getfattr(&xdr, args->bitmask);

@@ -199,11 +199,11 @@ static int _nfs4_open_reclaim(struct nfs4_state_owner *sp, struct nfs4_state *st
 	struct nfs_fattr fattr = {
 		.valid = 0,
 	};
-	struct nfs_open_reclaimargs o_arg = {
+	struct nfs_openargs o_arg = {
 		.fh = NFS_FH(inode),
 		.seqid = sp->so_seqid,
 		.id = sp->so_id,
-		.share_access = state->state,
+		.open_flags = state->state,
 		.clientid = server->nfs4_state->cl_clientid,
 		.claim = NFS4_OPEN_CLAIM_PREVIOUS,
 		.bitmask = server->attr_bitmask,
@@ -264,12 +264,11 @@ static int _nfs4_do_open(struct inode *dir, struct qstr *name, int flags, struct
 	};
 	struct nfs_openargs o_arg = {
 		.fh             = NFS_FH(dir),
-		.share_access   = flags & (FMODE_READ|FMODE_WRITE),
-		.opentype       = (flags & O_CREAT) ? NFS4_OPEN_CREATE : NFS4_OPEN_NOCREATE,
-		.createmode     = (flags & O_EXCL) ? NFS4_CREATE_EXCLUSIVE : NFS4_CREATE_UNCHECKED,
+		.open_flags	= flags,
 		.name           = name,
 		.server         = server,
 		.bitmask = server->attr_bitmask,
+		.claim = NFS4_OPEN_CLAIM_NULL,
 	};
 	struct nfs_openres o_res = {
 		.f_attr         = &f_attr,
@@ -289,13 +288,12 @@ static int _nfs4_do_open(struct inode *dir, struct qstr *name, int flags, struct
 		dprintk("nfs4_do_open: nfs4_get_state_owner failed!\n");
 		goto out_err;
 	}
-	if (o_arg.createmode & NFS4_CREATE_EXCLUSIVE){
+	if (flags & O_EXCL) {
 		u32 *p = (u32 *) o_arg.u.verifier.data;
 		p[0] = jiffies;
 		p[1] = current->pid;
-	} else if (o_arg.createmode == NFS4_CREATE_UNCHECKED) {
+	} else
 		o_arg.u.attrs = sattr;
-	}
 	/* Serialization for the sequence id */
 	down(&sp->so_sema);
 	o_arg.seqid = sp->so_seqid;
@@ -516,7 +514,7 @@ static int _nfs4_do_downgrade(struct inode *inode, struct nfs4_state *state, mod
 	struct nfs_closeargs arg = {
 		.fh		= NFS_FH(inode),
 		.seqid		= sp->so_seqid,
-		.share_access	= mode,
+		.open_flags	= mode,
 	};
 	struct nfs_closeres res;
 	struct rpc_message msg = {

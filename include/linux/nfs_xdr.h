@@ -99,20 +99,21 @@ struct nfs4_change_info {
  * Arguments to the open call.
  */
 struct nfs_openargs {
-	struct nfs_fh *         fh;
+	const struct nfs_fh *	fh;
 	__u32                   seqid;
-	__u32                   share_access;
+	int			open_flags;
 	__u64                   clientid;
 	__u32                   id;
-	__u32                   opentype;
-	__u32                   createmode;
 	union {
 		struct iattr *  attrs;    /* UNCHECKED, GUARDED */
 		nfs4_verifier   verifier; /* EXCLUSIVE */
+		nfs4_stateid	delegation;		/* CLAIM_DELEGATE_CUR */
+		int		delegation_type;	/* CLAIM_PREVIOUS */
 	} u;
 	const struct qstr *	name;
 	const struct nfs_server *server;	 /* Needed for ID mapping */
 	const u32 *		bitmask;
+	__u32			claim;
 };
 
 struct nfs_openres {
@@ -132,7 +133,7 @@ struct nfs_openres {
  * Arguments to the open_confirm call.
  */
 struct nfs_open_confirmargs {
-	struct nfs_fh *         fh;
+	const struct nfs_fh *	fh;
 	nfs4_stateid            stateid;
 	__u32                   seqid;
 };
@@ -142,26 +143,13 @@ struct nfs_open_confirmres {
 };
 
 /*
- * Arguments to the open_reclaim call.
- */
-struct nfs_open_reclaimargs {
-	struct nfs_fh *		fh;
-	__u64			clientid;
-	__u32			seqid;
-	__u32			id;
-	__u32			share_access;
-	__u32			claim;
-	const __u32 *		bitmask;
-};
-
-/*
  * Arguments to the close call.
  */
 struct nfs_closeargs {
 	struct nfs_fh *         fh;
 	nfs4_stateid            stateid;
 	__u32                   seqid;
-	__u32			share_access;
+	int			open_flags;
 };
 
 struct nfs_closeres {
