@@ -8,8 +8,6 @@
 #include <linux/agp_backend.h>
 #include "agp.h"
 
-static int agp_try_unsupported __initdata = 0;
-
 struct serverworks_page_map {
 	unsigned long *real;
 	unsigned long *remapped;
@@ -457,9 +455,9 @@ static int __init agp_serverworks_probe(struct pci_dev *pdev,
 	case 0x0007:
 		break;
 	default:
-		if (!agp_try_unsupported)
-			return -ENODEV;
-		break;
+		printk(KERN_ERR PFX "Unsupported Serverworks chipset "
+				"(device id: %04x)\n", pdev->device);
+		return -ENODEV;
 	}
 
 	serverworks_private.svrwrks_dev = bridge_dev;
@@ -542,6 +540,5 @@ static void __exit agp_serverworks_cleanup(void)
 module_init(agp_serverworks_init);
 module_exit(agp_serverworks_cleanup);
 
-MODULE_PARM(agp_try_unsupported, "1i");
 MODULE_LICENSE("GPL and additional rights");
 
