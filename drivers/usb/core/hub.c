@@ -447,13 +447,13 @@ fail:
 
 static void hub_disconnect(struct usb_interface *intf)
 {
-	struct usb_hub *hub = dev_get_drvdata (&intf->dev);
+	struct usb_hub *hub = usb_get_intfdata (intf);
 	unsigned long flags;
 
 	if (!hub)
 		return;
 
-	dev_set_drvdata (&intf->dev, NULL);
+	usb_set_intfdata (intf, NULL);
 	spin_lock_irqsave(&hub_event_lock, flags);
 
 	/* Delete it and then reset it */
@@ -546,7 +546,7 @@ descriptor_error:
 	list_add(&hub->hub_list, &hub_list);
 	spin_unlock_irqrestore(&hub_event_lock, flags);
 
-	dev_set_drvdata (&intf->dev, hub);
+	usb_set_intfdata (intf, hub);
 
 	if (usb_hub_configure(hub, endpoint) >= 0) {
 		strcpy (intf->dev.name, "Hub");
