@@ -74,7 +74,6 @@ void balance_dirty_pages(struct address_space *mapping)
 	if (dirty_and_writeback > sync_thresh) {
 		int nr_to_write = 1500;
 
-		printk("sync thresh\n");
 		writeback_unlocked_inodes(&nr_to_write, WB_SYNC_LAST, NULL);
 		get_page_state(&ps);
 		dirty_and_writeback = ps.nr_dirty + ps.nr_writeback;
