@@ -40,9 +40,6 @@
  */
 #define node_to_first_cpu(node) (__ffs(node_to_cpumask(node)))
 
-/* Cross-node load balancing interval. */
-#define NODE_BALANCE_RATE 10
-
 void build_cpu_to_node_map(void);
 
 /* sched_domains SD_NODE_INIT for IA64 NUMA machines */

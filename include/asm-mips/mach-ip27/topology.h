@@ -12,7 +12,4 @@
 extern int node_distance(nasid_t nasid_a, nasid_t nasid_b);
 #define node_distance(from, to)	node_distance(from, to)
 
-/* Cross-node load balancing interval. */
-#define NODE_BALANCE_RATE	10
-
 #endif /* _ASM_MACH_TOPOLOGY_H */

@@ -69,9 +69,6 @@ static inline cpumask_t pcibus_to_cpumask(int bus)
 /* Node-to-Node distance */
 #define node_distance(from, to) ((from) != (to))
 
-/* Cross-node load balancing interval. */
-#define NODE_BALANCE_RATE 100
-
 /* sched_domains SD_NODE_INIT for NUMAQ machines */
 #define SD_NODE_INIT (struct sched_domain) {		\
 	.span			= CPU_MASK_NONE,	\

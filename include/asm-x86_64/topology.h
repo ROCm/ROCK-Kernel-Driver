@@ -32,8 +32,6 @@ static inline cpumask_t __pcibus_to_cpumask(int bus)
 /* broken generic file uses #ifndef later on this */
 #define pcibus_to_cpumask(bus) __pcibus_to_cpumask(bus)
 
-#define NODE_BALANCE_RATE 30	/* CHECKME */ 
-
 #ifdef CONFIG_NUMA
 /* sched_domains SD_NODE_INIT for x86_64 machines */
 #define SD_NODE_INIT (struct sched_domain) {		\

@@ -37,9 +37,6 @@ static inline int node_to_first_cpu(int node)
 
 #define nr_cpus_node(node)	(nr_cpus_in_node[node])
 
-/* Cross-node load balancing interval. */
-#define NODE_BALANCE_RATE 10
-
 /* sched_domains SD_NODE_INIT for PPC64 machines */
 #define SD_NODE_INIT (struct sched_domain) {		\
 	.span			= CPU_MASK_NONE,	\
