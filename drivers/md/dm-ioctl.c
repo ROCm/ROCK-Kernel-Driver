@@ -850,7 +850,6 @@ static int dev_wait(struct dm_ioctl *param, size_t param_size)
 	int r;
 	struct mapped_device *md;
 	struct dm_table *table;
-	DECLARE_WAITQUEUE(wq, current);
 
 	md = find_device(param);
 	if (!md)
@@ -859,12 +858,10 @@ static int dev_wait(struct dm_ioctl *param, size_t param_size)
 	/*
 	 * Wait for a notification event
 	 */
-	set_current_state(TASK_INTERRUPTIBLE);
-	if (!dm_add_wait_queue(md, &wq, param->event_nr)) {
-		schedule();
-		dm_remove_wait_queue(md, &wq);
+	if (dm_wait_event(md, param->event_nr)) {
+		r = -ERESTARTSYS;
+		goto out;
 	}
- 	set_current_state(TASK_RUNNING);
 
 	/*
 	 * The userland program is going to want to know what
