@@ -37,7 +37,7 @@ BOOL ntfs_mark_quotas_out_of_date(ntfs_volume *vol)
 {
 	ntfs_index_context *ictx;
 	QUOTA_CONTROL_ENTRY *qce;
-	const u32 qid = QUOTA_DEFAULTS_ID;
+	const le32 qid = QUOTA_DEFAULTS_ID;
 	int err;
 
 	ntfs_debug("Entering.");

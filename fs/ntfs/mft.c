@@ -44,7 +44,7 @@ static void __format_mft_record(MFT_RECORD *m, const int size,
 	m->usa_ofs = cpu_to_le16((sizeof(MFT_RECORD) + 1) & ~1);
 	m->usa_count = cpu_to_le16(size / NTFS_BLOCK_SIZE + 1);
 	/* Set the update sequence number to 1. */
-	*(u16*)((char*)m + ((sizeof(MFT_RECORD) + 1) & ~1)) = cpu_to_le16(1);
+	*(le16*)((char*)m + ((sizeof(MFT_RECORD) + 1) & ~1)) = cpu_to_le16(1);
 	m->lsn = cpu_to_le64(0LL);
 	m->sequence_number = cpu_to_le16(1);
 	m->link_count = cpu_to_le16(0);
@@ -311,11 +311,11 @@ void unmap_mft_record(ntfs_inode *ni)
 /**
  * map_extent_mft_record - load an extent inode and attach it to its base
  * @base_ni:	base ntfs inode
- * @mref:	mft reference of the extent inode to load (in little endian)
+ * @mref:	mft reference of the extent inode to load
  * @ntfs_ino:	on successful return, pointer to the ntfs_inode structure
  *
  * Load the extent mft record @mref and attach it to its base inode @base_ni.
- * Return the mapped extent mft record if IS_ERR(result) is false. Otherwise
+ * Return the mapped extent mft record if IS_ERR(result) is false.  Otherwise
  * PTR_ERR(result) gives the negative error code.
  *
  * On successful return, @ntfs_ino contains a pointer to the ntfs_inode
@@ -328,8 +328,8 @@ MFT_RECORD *map_extent_mft_record(ntfs_inode *base_ni, MFT_REF mref,
 	ntfs_inode *ni = NULL;
 	ntfs_inode **extent_nis = NULL;
 	int i;
-	unsigned long mft_no = MREF_LE(mref);
-	u16 seq_no = MSEQNO_LE(mref);
+	unsigned long mft_no = MREF(mref);
+	u16 seq_no = MSEQNO(mref);
 	BOOL destroy_ni = FALSE;
 
 	ntfs_debug("Mapping extent mft record 0x%lx (base mft record 0x%lx).",

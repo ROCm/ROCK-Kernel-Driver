@@ -67,7 +67,7 @@
 typedef struct {
 /*Ofs*/
 /*  0	NTFS_RECORD; -- Unfolded here as gcc doesn't like unnamed structs. */
-/*  0*/	NTFS_RECORD_TYPES magic;/* The magic is "RSTR". */
+/*  0*/	NTFS_RECORD_TYPE magic;	/* The magic is "RSTR". */
 /*  4*/	le16 usa_ofs;		/* See NTFS_RECORD definition in layout.h.
 				   When creating, set this to be immediately
 				   after this header structure (without any
