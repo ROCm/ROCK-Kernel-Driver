@@ -525,9 +525,6 @@
 
 #ifndef __ASSEMBLY__
 
-#define CAUSE_EXCCODE(x) ((CAUSEF_EXCCODE & (x->cp0_cause)) >> CAUSEB_EXCCODE)
-#define CAUSE_EPC(x) (x->cp0_epc + (((x->cp0_cause & CAUSEF_BD) >> CAUSEB_BD) << 2))
-
 /*
  * Functions to access the r10k performance counter and control registers
  */

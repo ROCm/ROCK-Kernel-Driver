@@ -20,7 +20,6 @@
 #include <linux/smp_lock.h>
 #include <linux/spinlock.h>
 #include <linux/kallsyms.h>
-#include <linux/trigevent_hooks.h>
 
 #include <asm/bootinfo.h>
 #include <asm/branch.h>
@@ -37,7 +36,6 @@
 #include <asm/mmu_context.h>
 #include <asm/watch.h>
 #include <asm/types.h>
-#include <asm/unistd.h>
 
 extern asmlinkage void handle_mod(void);
 extern asmlinkage void handle_tlbl(void);
@@ -342,7 +340,6 @@ asmlinkage void do_be(struct pt_regs *regs)
 	int data = regs->cp0_cause & 4;
 	int action = MIPS_BE_FATAL;
 
-	TRIG_EVENT(trap_entry_hook, CAUSE_EXCCODE(regs), CAUSE_EPC(regs));
 	/* XXX For now.  Fixme, this searches the wrong table ...  */
 	if (data && !user_mode(regs))
 		fixup = search_dbe_tables(exception_epc(regs));
@@ -355,12 +352,10 @@ asmlinkage void do_be(struct pt_regs *regs)
 
 	switch (action) {
 	case MIPS_BE_DISCARD:
-		TRIG_EVENT(trap_exit_hook);
 		return;
 	case MIPS_BE_FIXUP:
 		if (fixup) {
 			regs->cp0_epc = fixup->nextinsn;
-			TRIG_EVENT(trap_exit_hook);
 			return;
 		}
 		break;
@@ -376,7 +371,6 @@ asmlinkage void do_be(struct pt_regs *regs)
 	       field, regs->cp0_epc, field, regs->regs[31]);
 	die_if_kernel("Oops", regs);
 	force_sig(SIGBUS, current);
-	TRIG_EVENT(trap_exit_hook);
 }
 
 static inline int get_insn_opcode(struct pt_regs *regs, unsigned int *opcode)
@@ -527,13 +521,11 @@ asmlinkage void do_ov(struct pt_regs *regs)
 {
 	siginfo_t info;
 
-	TRIG_EVENT(trap_entry_hook, CAUSE_EXCCODE(regs), CAUSE_EPC(regs));
 	info.si_code = FPE_INTOVF;
 	info.si_signo = SIGFPE;
 	info.si_errno = 0;
 	info.si_addr = (void *)regs->cp0_epc;
 	force_sig_info(SIGFPE, &info, current);
-	TRIG_EVENT(trap_exit_hook);
 }
 
 /*
@@ -541,7 +533,6 @@ asmlinkage void do_ov(struct pt_regs *regs)
  */
 asmlinkage void do_fpe(struct pt_regs *regs, unsigned long fcr31)
 {
-	TRIG_EVENT(trap_entry_hook, CAUSE_EXCCODE(regs), CAUSE_EPC(regs));
 	if (fcr31 & FPU_CSR_UNI_X) {
 		int sig;
 
@@ -574,12 +565,10 @@ asmlinkage void do_fpe(struct pt_regs *regs, unsigned long fcr31)
 		if (sig)
 			force_sig(sig, current);
 
-		TRIG_EVENT(trap_exit_hook);
 		return;
 	}
 
 	force_sig(SIGFPE, current);
-	TRIG_EVENT(trap_exit_hook);
 }
 
 asmlinkage void do_bp(struct pt_regs *regs)
@@ -589,12 +578,9 @@ asmlinkage void do_bp(struct pt_regs *regs)
 
 	die_if_kernel("Break instruction in kernel code", regs);
 
-	TRIG_EVENT(trap_entry_hook, CAUSE_EXCCODE(regs), CAUSE_EPC(regs));
-
-	if (get_insn_opcode(regs, &opcode)) {
-		TRIG_EVENT(trap_exit_hook);
+	if (get_insn_opcode(regs, &opcode))
 		return;
-	}
+
 	/*
 	 * There is the ancient bug in the MIPS assemblers that the break
 	 * code starts left to bit 16 instead to bit 6 in the opcode.
@@ -623,7 +609,6 @@ asmlinkage void do_bp(struct pt_regs *regs)
 	default:
 		force_sig(SIGTRAP, current);
 	}
-	TRIG_EVENT(trap_exit_hook);
 }
 
 asmlinkage void do_tr(struct pt_regs *regs)
@@ -633,12 +618,8 @@ asmlinkage void do_tr(struct pt_regs *regs)
 
 	die_if_kernel("Trap instruction in kernel code", regs);
 
-	TRIG_EVENT(trap_entry_hook, CAUSE_EXCCODE(regs), CAUSE_EPC(regs));
-
-	if (get_insn_opcode(regs, &opcode)) {
-		TRIG_EVENT(trap_exit_hook);
+	if (get_insn_opcode(regs, &opcode))
 		return;
-	}
 
 	/* Immediate versions don't provide a code.  */
 	if (!(opcode & OPCODE))
@@ -665,22 +646,17 @@ asmlinkage void do_tr(struct pt_regs *regs)
 	default:
 		force_sig(SIGTRAP, current);
 	}
-	TRIG_EVENT(trap_exit_hook);
 }
 
 asmlinkage void do_ri(struct pt_regs *regs)
 {
 	die_if_kernel("Reserved instruction in kernel code", regs);
 
-	TRIG_EVENT(trap_entry_hook, CAUSE_EXCCODE(regs), CAUSE_EPC(regs));
 	if (!cpu_has_llsc)
-		if (!simulate_llsc(regs)) {
-			TRIG_EVENT(trap_exit_hook);
+		if (!simulate_llsc(regs))
 			return;
-		}
 
 	force_sig(SIGILL, current);
-	TRIG_EVENT(trap_exit_hook);
 }
 
 asmlinkage void do_cpu(struct pt_regs *regs)
@@ -689,7 +665,6 @@ asmlinkage void do_cpu(struct pt_regs *regs)
 
 	die_if_kernel("do_cpu invoked from kernel context!", regs);
 
-	TRIG_EVENT(trap_entry_hook, CAUSE_EXCCODE(regs), CAUSE_EPC(regs));
 	cpid = (regs->cp0_cause >> CAUSEB_CE) & 3;
 
 	switch (cpid) {
@@ -697,10 +672,8 @@ asmlinkage void do_cpu(struct pt_regs *regs)
 		if (cpu_has_llsc)
 			break;
 
-		if (!simulate_llsc(regs)) {
-			TRIG_EVENT(trap_exit_hook);
+		if (!simulate_llsc(regs))
 			return;
-		}
 		break;
 
 	case 1:
@@ -719,7 +692,6 @@ asmlinkage void do_cpu(struct pt_regs *regs)
 				force_sig(sig, current);
 		}
 
-		TRIG_EVENT(trap_exit_hook);
 		return;
 
 	case 2:
@@ -728,7 +700,6 @@ asmlinkage void do_cpu(struct pt_regs *regs)
 	}
 
 	force_sig(SIGILL, current);
-	TRIG_EVENT(trap_exit_hook);
 }
 
 asmlinkage void do_mdmx(struct pt_regs *regs)
@@ -738,23 +709,19 @@ asmlinkage void do_mdmx(struct pt_regs *regs)
 
 asmlinkage void do_watch(struct pt_regs *regs)
 {
-	TRIG_EVENT(trap_entry_hook, CAUSE_EXCCODE(regs), CAUSE_EPC(regs));
 	/*
 	 * We use the watch exception where available to detect stack
 	 * overflows.
 	 */
 	dump_tlb_all();
 	show_regs(regs);
-	TRIG_EVENT(trap_exit_hook);
 	panic("Caught WATCH exception - probably caused by stack overflow.");
 }
 
 asmlinkage void do_mcheck(struct pt_regs *regs)
 {
-	TRIG_EVENT(trap_entry_hook, CAUSE_EXCCODE(regs), CAUSE_EPC(regs));
 	show_regs(regs);
 	dump_tlb_all();
-	TRIG_EVENT(trap_exit_hook);
 	/*
 	 * Some chips may have other causes of machine check (e.g. SB1
 	 * graduation timer)
@@ -792,7 +759,6 @@ static inline void parity_protection_init(void)
 	default:
 		break;
 	}
-	TRIG_EVENT(trap_exit_hook);
 }
 
 asmlinkage void cache_parity_error(void)

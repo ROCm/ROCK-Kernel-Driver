@@ -28,7 +28,6 @@
 #include <linux/interrupt.h>
 #include <linux/highmem.h>
 #include <linux/module.h>
-#include <linux/trigevent_hooks.h>
 
 #include <asm/page.h>
 #include <asm/pgtable.h>
@@ -122,26 +121,21 @@ int do_page_fault(struct pt_regs *regs, unsigned long address,
 		is_write = error_code & 0x02000000;
 #endif /* CONFIG_4xx */
 
-	TRIG_EVENT(trap_entry_hook, regs->trap, instruction_pointer(regs));
 #if defined(CONFIG_XMON) || defined(CONFIG_KGDB)
 	if (debugger_fault_handler && TRAP(regs) == 0x300) {
 		debugger_fault_handler(regs);
-		TRIG_EVENT(trap_exit_hook);
 		return 0;
 	}
 #if !defined(CONFIG_4xx)
 	if (error_code & 0x00400000) {
 		/* DABR match */
-		if (debugger_dabr_match(regs)) {
-			TRIG_EVENT(trap_exit_hook);
+		if (debugger_dabr_match(regs))
 			return 0;
-		}
 	}
 #endif /* !CONFIG_4xx */
 #endif /* CONFIG_XMON || CONFIG_KGDB */
 
 	if (in_atomic() || mm == NULL) {
-		TRIG_EVENT(trap_exit_hook);
 		return SIGSEGV;
 	}
 
@@ -283,7 +277,6 @@ good_area:
 	 * -- Cort
 	 */
 	pte_misses++;
-	TRIG_EVENT(trap_exit_hook);
 	return 0;
 
 bad_area:
@@ -297,11 +290,9 @@ bad_area:
 		info.si_code = code;
 		info.si_addr = (void *) address;
 		force_sig_info(SIGSEGV, &info, current);
-		TRIG_EVENT(trap_exit_hook);
 		return 0;
 	}
 
-	TRIG_EVENT(trap_exit_hook);
 	return SIGSEGV;
 
 /*
@@ -318,7 +309,6 @@ out_of_memory:
 	printk("VM: killing process %s\n", current->comm);
 	if (user_mode(regs))
 		do_exit(SIGKILL);
-	TRIG_EVENT(trap_exit_hook);
 	return SIGKILL;
 
 do_sigbus:
@@ -329,11 +319,9 @@ do_sigbus:
 	info.si_addr = (void *)address;
 	force_sig_info (SIGBUS, &info, current);
 	if (!user_mode(regs)) {
-		TRIG_EVENT(trap_exit_hook);
 		return SIGBUS;
 	}
 
-	TRIG_EVENT(trap_exit_hook);
 	return 0;
 }
 

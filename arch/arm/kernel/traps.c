@@ -26,7 +26,6 @@
 #include <linux/interrupt.h>
 #include <linux/kallsyms.h>
 #include <linux/init.h>
-#include <linux/trigevent_hooks.h>
 
 #include <asm/atomic.h>
 #include <asm/io.h>
@@ -314,10 +313,8 @@ asmlinkage void do_undefinstr(struct pt_regs *regs)
 	info.si_code  = ILL_ILLOPC;
 	info.si_addr  = pc;
 
-	TRIG_EVENT(trap_entry_hook, current->thread.trap_no, (uint32_t)pc);
 	force_sig_info(SIGILL, &info, current);
 
-	TRIG_EVENT(trap_exit_hook);
 	die_if_kernel("Oops - undefined instruction", regs, 0);
 }
 
@@ -430,9 +427,7 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
 
 	case NR(breakpoint): /* SWI BREAK_POINT */
 		regs->ARM_pc -= thumb_mode(regs) ? 2 : 4;
-		TRIG_EVENT(trap_entry_hook, 1, (uint32_t)regs->ARM_pc);
 		ptrace_break(current, regs);
-		TRIG_EVENT(trap_exit_hook);
 		return regs->ARM_r0;
 
 	/*
@@ -531,9 +526,7 @@ baddataabort(int code, unsigned long instr, struct pt_regs *regs)
 	info.si_code  = ILL_ILLOPC;
 	info.si_addr  = (void *)addr;
 
-	TRIG_EVENT(trap_entry_hook, 18, addr);	/* machine check */
 	force_sig_info(SIGILL, &info, current);
-	TRIG_EVENT(trap_exit_hook);
 	die_if_kernel("unknown data abort code", regs, instr);
 }
 

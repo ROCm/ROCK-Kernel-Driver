@@ -20,7 +20,6 @@
 #include <linux/efi.h>
 #include <linux/profile.h>
 #include <linux/timex.h>
-#include <linux/trigevent_hooks.h>
 
 #include <asm/machvec.h>
 #include <asm/delay.h>
@@ -262,7 +261,6 @@ timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 		 * fixing that would require updates to all
 		 * platforms.
 		 */
-		TRIG_EVENT(timer_hook, regs);
 		update_process_times(user_mode(regs));
 #endif
 		new_itm += local_cpu_data->itm_delta;

@@ -1168,7 +1168,7 @@ linvfs_writepage(
 	 * then mark the page dirty again and leave the page
 	 * as is.
 	 */
-	if (PFLAGS_TEST_FSTRANS() && need_trans)
+	if (PFLAGS_NO_RECURSION() && need_trans)
 		goto out_fail;
 
 	/*
@@ -1242,7 +1242,7 @@ linvfs_release_page(
 	/* If we are already inside a transaction or the thread cannot
 	 * do I/O, we cannot release this page.
 	 */
-	if (PFLAGS_TEST_FSTRANS())
+	if (PFLAGS_NO_RECURSION())
 		return 0;
 
 	/*

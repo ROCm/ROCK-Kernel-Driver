@@ -273,20 +273,11 @@ typedef struct _trace_syscall_entry {
 } LTT_PACKED_STRUCT trace_syscall_entry;
 
 /*  TRACE_TRAP_ENTRY */
-#ifndef __s390__
 typedef struct _trace_trap_entry {
 	u16 trap_id;		/* Trap number */
 	u32 address;		/* Address where trap occured */
 } LTT_PACKED_STRUCT trace_trap_entry;
 static inline void TRACE_TRAP_ENTRY(u16 trap_id, u32 address)
-#else
-typedef u64 trapid_t;
-typedef struct _trace_trap_entry {
-	trapid_t trap_id;	/* Trap number */
-	u32 address;		/* Address where trap occured */
-} LTT_PACKED_STRUCT trace_trap_entry;
-static inline void TRACE_TRAP_ENTRY(trapid_t trap_id, u32 address)
-#endif
 {
 	trace_trap_entry trap_event;
 

@@ -35,7 +35,6 @@
 #include <linux/init_task.h>
 #include <linux/module.h>
 #include <linux/kallsyms.h>
-#include <linux/trigevent_hooks.h>
 
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
@@ -307,19 +306,6 @@ void show_regs(struct pt_regs * regs)
 	show_stack(current, (unsigned long *) regs->gpr[1]);
 }
 
-#ifdef CONFIG_TRIGEVENT_SYSCALL_HOOK 
-long original_kernel_thread(int (*fn) (void *), void* arg, unsigned long flags);
-long kernel_thread(int (*fn) (void *), void* arg, unsigned long flags)
-{
-	long   retval;
-
-	retval = original_kernel_thread(fn, arg, flags);
-	if (retval > 0)
-		TRIG_EVENT(kthread_hook, retval, (int) fn);
-	return retval;
-}
-#endif /* CONFIG_TRIGEVENT_SYSCALL_HOOK */
- 
 void exit_thread(void)
 {
 	if (last_task_used_math == current)

@@ -97,9 +97,4 @@ extern void disable_post_syscall(void);
 #define TRIG_EVENT(name, ...)
 #endif /* CONFIG_TRIGEVENT_HOOKS */
 
-/* this needs to be done properly */
-#ifdef __s390__
-typedef uint64_t trapid_t;
-#endif
-
 #endif /* __LINUX_TRIGEVENT_HOOKS_H */
