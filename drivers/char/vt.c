@@ -1313,6 +1313,9 @@ static void setterm_command(int currcons)
 		case 14: /* set vesa powerdown interval */
 			vesa_off_interval = ((par[1] < 60) ? par[1] : 60) * 60 * HZ;
 			break;
+		case 15:	/* Activate the previous console */
+			set_console(last_console);
+			break;
 	}
 }
 
@@ -2210,6 +2213,7 @@ struct console vt_console_driver = {
 int tioclinux(struct tty_struct *tty, unsigned long arg)
 {
 	char type, data;
+	int lines;
 	int ret;
 
 	if (tty->driver.type != TTY_DRIVER_TYPE_CONSOLE)
@@ -2265,6 +2269,14 @@ int tioclinux(struct tty_struct *tty, unsigned long arg)
 			break;
 		case 12:	/* get fg_console */
 			ret = fg_console;
+			break;
+		case 13:	/* scroll console */
+			if (get_user(lines, (char *)arg+1)) {
+				ret = -EFAULT;
+			} else {
+				scrollfront(lines);
+				ret = 0;
+			}
 			break;
 		default:
 			ret = -EINVAL;
