@@ -39,6 +39,16 @@ extern int e1000_up(struct e1000_adapter *adapter);
 extern void e1000_down(struct e1000_adapter *adapter);
 extern void e1000_reset(struct e1000_adapter *adapter);
 
+static char e1000_gstrings_stats[][ETH_GSTRING_LEN] = {
+	"rx_packets", "tx_packets", "rx_bytes", "tx_bytes", "rx_errors",
+	"tx_errors", "rx_dropped", "tx_dropped", "multicast", "collisions",
+	"rx_length_errors", "rx_over_errors", "rx_crc_errors",
+	"rx_frame_errors", "rx_fifo_errors", "rx_missed_errors",
+	"tx_aborted_errors", "tx_carrier_errors", "tx_fifo_errors",
+	"tx_heartbeat_errors", "tx_window_errors",
+};
+#define E1000_STATS_LEN	sizeof(e1000_gstrings_stats) / ETH_GSTRING_LEN
+
 static void
 e1000_ethtool_gset(struct e1000_adapter *adapter, struct ethtool_cmd *ecmd)
 {
@@ -173,6 +183,7 @@ e1000_ethtool_gdrvinfo(struct e1000_adapter *adapter,
 	strncpy(drvinfo->version, e1000_driver_version, 32);
 	strncpy(drvinfo->fw_version, "N/A", 32);
 	strncpy(drvinfo->bus_info, adapter->pdev->slot_name, 32);
+	drvinfo->n_stats = E1000_STATS_LEN;
 #define E1000_REGS_LEN 32
 	drvinfo->regdump_len  = E1000_REGS_LEN * sizeof(uint32_t);
 	drvinfo->eedump_len  = e1000_eeprom_size(&adapter->hw);
@@ -454,6 +465,28 @@ e1000_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
 			return -EFAULT;
 		return 0;
 	}
+	case ETHTOOL_GSTRINGS: {
+		struct ethtool_gstrings gstrings = { ETHTOOL_GSTRINGS };
+		char *strings = NULL;
+
+		if(copy_from_user(&gstrings, addr, sizeof(gstrings)))
+			return -EFAULT;
+		switch(gstrings.string_set) {
+		case ETH_SS_STATS:
+			gstrings.len = E1000_STATS_LEN;
+			strings = *e1000_gstrings_stats;
+			break;
+		default:
+			return -EOPNOTSUPP;
+		}
+		if(copy_to_user(addr, &gstrings, sizeof(gstrings)))
+			return -EFAULT;
+		addr += offsetof(struct ethtool_gstrings, data);
+		if(copy_to_user(addr, strings,
+		   gstrings.len * ETH_GSTRING_LEN))
+			return -EFAULT;
+		return 0;
+	}
 	case ETHTOOL_GREGS: {
 		struct ethtool_regs regs = {ETHTOOL_GREGS};
 		uint32_t regs_buff[E1000_REGS_LEN];
@@ -555,6 +588,20 @@ err_geeprom_ioctl:
 
 		addr += offsetof(struct ethtool_eeprom, data);
 		return e1000_ethtool_seeprom(adapter, &eeprom, addr);
+	}
+	case ETHTOOL_GSTATS: {
+		struct {
+			struct ethtool_stats cmd;
+			uint64_t data[E1000_STATS_LEN];
+		} stats = { {ETHTOOL_GSTATS, E1000_STATS_LEN} };
+		int i;
+
+		for(i = 0; i < E1000_STATS_LEN; i++)
+			stats.data[i] =
+				((unsigned long *)&adapter->net_stats)[i];
+		if(copy_to_user(addr, &stats, sizeof(stats)))
+			return -EFAULT;
+		return 0;
 	}
 	default:
 		return -EOPNOTSUPP;
