@@ -184,11 +184,10 @@ static int nfs_writepage_sync(struct nfs_open_context *ctx, struct inode *inode,
 	int		result, written = 0;
 	struct nfs_write_data *wdata;
 
-	wdata = kmalloc(sizeof(*wdata), GFP_NOFS);
+	wdata = nfs_writedata_alloc();
 	if (!wdata)
 		return -ENOMEM;
 
-	memset(wdata, 0, sizeof(*wdata));
 	wdata->flags = how;
 	wdata->cred = ctx->cred;
 	wdata->inode = inode;
@@ -238,8 +237,7 @@ static int nfs_writepage_sync(struct nfs_open_context *ctx, struct inode *inode,
 
 io_error:
 	nfs_end_data_update_defer(inode);
-
-	kfree(wdata);
+	nfs_writedata_free(wdata);
 	return written ? written : result;
 }
 
