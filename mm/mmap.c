@@ -866,7 +866,7 @@ unsigned long __do_mmap_pgoff(struct mm_struct *mm,
 	if (!file && (((flags & MAP_HUGETLB) && kernel_map_hugetlb) ||
 			(hugetlb_implicit = mmap_hugetlb_implicit(len)))) {
 		if ((flags & MAP_HUGETLB) && !(warn2++))
-			printk("MAP_HUGETLB is deprecated and will go away!\n");
+			printk(KERN_CRIT "MAP_HUGETLB is deprecated and will go away!\n");
 		file = hugetlb_file = hugetlb_zero_setup(len);
 		if (IS_ERR(file)) {
 			if (!hugetlb_implicit)
