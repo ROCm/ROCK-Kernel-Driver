@@ -607,14 +607,11 @@ sys32_rt_sigtimedwait (sigset32_t *uthese, siginfo_t32 *uinfo,
 
 	if (copy_from_user(&s.sig, uthese, sizeof(sigset32_t)))
 		return -EFAULT;
-	if (uts) {
-		ret = get_user(t.tv_sec, &uts->tv_sec);
-		ret |= get_user(t.tv_nsec, &uts->tv_nsec);
-		if (ret)
-			return -EFAULT;
-	}
+	if (uts && get_compat_timespec(&t, uts))
+		return -EFAULT;
 	set_fs(KERNEL_DS);
-	ret = sys_rt_sigtimedwait(&s, &info, &t, sigsetsize);
+	ret = sys_rt_sigtimedwait(&s, uinfo ? &info : NULL, uts ? &t : NULL,
+			sigsetsize);
 	set_fs(old_fs);
 	if (ret >= 0 && uinfo) {
 		if (copy_siginfo_to_user32(uinfo, &info))

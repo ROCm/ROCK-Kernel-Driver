@@ -3540,7 +3540,7 @@ sys32_sched_rr_get_interval (pid_t pid, struct compat_timespec *interval)
 	set_fs(KERNEL_DS);
 	ret = sys_sched_rr_get_interval(pid, &t);
 	set_fs(old_fs);
-	if (put_user (t.tv_sec, &interval->tv_sec) || put_user (t.tv_nsec, &interval->tv_nsec))
+	if (put_compat_timespec(&t, interval))
 		return -EFAULT;
 	return ret;
 }
