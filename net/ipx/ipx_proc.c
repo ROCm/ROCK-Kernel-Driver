@@ -168,22 +168,25 @@ out:
 static __inline__ struct sock *ipx_get_socket_idx(loff_t pos)
 {
 	struct sock *s = NULL;
+	struct hlist_node *node;
 	struct ipx_interface *i;
 
 	list_for_each_entry(i, &ipx_interfaces, node) {
-		if (!pos)
-			break;
 		spin_lock_bh(&i->if_sklist_lock);
-		for (s = i->if_sklist; pos && s; s = s->sk_next)
+		sk_for_each(s, node, &i->if_sklist) {
+			if (!pos)
+				break;
 			--pos;
-		if (!pos) {
-			if (!s)
-				spin_unlock_bh(&i->if_sklist_lock);
-			break;
 		}
 		spin_unlock_bh(&i->if_sklist_lock);
+		if (!pos) {
+			if (node)
+				goto found;
+			break;
+		}
 	}
-
+	s = NULL;
+found:
 	return s;
 }
 
@@ -197,7 +200,7 @@ static void *ipx_seq_socket_start(struct seq_file *seq, loff_t *pos)
 
 static void *ipx_seq_socket_next(struct seq_file *seq, void *v, loff_t *pos)
 {
-	struct sock* sk;
+	struct sock* sk, *next;
 	struct ipx_interface *i;
 	struct ipx_opt *ipxs;
 
@@ -207,14 +210,15 @@ static void *ipx_seq_socket_next(struct seq_file *seq, void *v, loff_t *pos)
 		i = ipx_interfaces_head();
 		if (!i)
 			goto out;
-		sk = i->if_sklist;
+		sk = sk_head(&i->if_sklist);
 		if (sk)
 			spin_lock_bh(&i->if_sklist_lock);
 		goto out;
 	}
 	sk = v;
-	if (sk->sk_next) {
-		sk = sk->sk_next;
+	next = sk_next(sk);
+	if (next) {
+		sk = next;
 		goto out;
 	}
 	ipxs = ipx_sk(sk);
@@ -226,8 +230,8 @@ static void *ipx_seq_socket_next(struct seq_file *seq, void *v, loff_t *pos)
 		if (!i)
 			break;
 		spin_lock_bh(&i->if_sklist_lock);
-		if (i->if_sklist) {
-			sk = i->if_sklist;
+		if (!hlist_empty(&i->if_sklist)) {
+			sk = sk_head(&i->if_sklist);
 			break;
 		}
 		spin_unlock_bh(&i->if_sklist_lock);

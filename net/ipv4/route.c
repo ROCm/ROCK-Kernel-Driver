@@ -111,7 +111,7 @@ int ip_rt_max_delay		= 10 * HZ;
 int ip_rt_max_size;
 int ip_rt_gc_timeout		= RT_GC_TIMEOUT;
 int ip_rt_gc_interval		= 60 * HZ;
-int ip_rt_gc_min_interval	= 5 * HZ;
+int ip_rt_gc_min_interval	= HZ / 2;
 int ip_rt_redirect_number	= 9;
 int ip_rt_redirect_load		= HZ / 50;
 int ip_rt_redirect_silence	= ((HZ / 50) << (9 + 1));
@@ -456,6 +456,25 @@ static int rt_may_expire(struct rtable *rth, unsigned long tmo1, unsigned long t
 out:	return ret;
 }
 
+/* Bits of score are:
+ * 31: very valuable
+ * 30: not quite useless
+ * 29..0: usage counter
+ */
+static inline u32 rt_score(struct rtable *rt)
+{
+	u32 score = rt->u.dst.__use;
+
+	if (rt_valuable(rt))
+		score |= (1<<31);
+
+	if (!rt->fl.iif ||
+	    !(rt->rt_flags & (RTCF_BROADCAST|RTCF_MULTICAST|RTCF_LOCAL)))
+		score |= (1<<30);
+
+	return score;
+}
+
 /* This runs via a timer and thus is always in BH context. */
 static void rt_check_expire(unsigned long dummy)
 {
@@ -720,10 +739,19 @@ static inline int compare_keys(struct flowi *fl1, struct flowi *fl2)
 static int rt_intern_hash(unsigned hash, struct rtable *rt, struct rtable **rp)
 {
 	struct rtable	*rth, **rthp;
-	unsigned long	now = jiffies;
+	unsigned long	now;
+	struct rtable *cand, **candp;
+	u32 		min_score;
+	int		chain_length;
 	int attempts = !in_softirq();
 
 restart:
+	chain_length = 0;
+	min_score = ~(u32)0;
+	cand = NULL;
+	candp = NULL;
+	now = jiffies;
+
 	rthp = &rt_hash_table[hash].chain;
 
 	spin_lock_bh(&rt_hash_table[hash].lock);
@@ -755,7 +783,33 @@ restart:
 			return 0;
 		}
 
+		if (!atomic_read(&rth->u.dst.__refcnt)) {
+			u32 score = rt_score(rth);
+
+			if (score <= min_score) {
+				cand = rth;
+				candp = rthp;
+				min_score = score;
+			}
+		}
+
+		chain_length++;
+
 		rthp = &rth->u.rt_next;
+	}
+
+	if (cand) {
+		/* ip_rt_gc_elasticity used to be average length of chain
+		 * length, when exceeded gc becomes really aggressive.
+		 *
+		 * The second limit is less certain. At the moment it allows
+		 * only 2 entries per bucket. We will see.
+		 */
+		if (chain_length > ip_rt_gc_elasticity ||
+		    (chain_length > 1 && !(min_score & (1<<31)))) {
+			*candp = cand->u.rt_next;
+			rt_free(cand);
+		}
 	}
 
 	/* Try to bind route to arp only if it is output

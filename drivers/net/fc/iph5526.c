@@ -239,19 +239,7 @@ int __init iph5526_probe(struct net_device *dev)
 
 static int __init iph5526_probe_pci(struct net_device *dev)
 {
-#ifdef MODULE
 	struct fc_info *fi = (struct fc_info *)dev->priv;
-#else
-	struct fc_info *fi = fc[count];
-	static int count;
-	int err;
- 
-	if (!fi)
-		return -ENODEV;
-
-	fc_setup(dev);
-	count++;
-#endif
 	fi->dev = dev;
 	dev->base_addr = fi->base_addr;
 	dev->irq = fi->irq;
@@ -4479,8 +4467,6 @@ static char buf[80];
 	return buf;
 }
 
-#ifdef MODULE
-
 #define NAMELEN		8	/* # of chars for storing dev->name */
 
 static struct net_device *dev_fc[MAX_FC_CARDS];
@@ -4491,7 +4477,7 @@ static int bad;	/* 0xbad = bad sig or no reset ack */
 static int scsi_registered;
 
 
-int init_module(void)
+static int __init iph5526_init(void)
 {
 	int i = 0;
 
@@ -4530,7 +4516,7 @@ int init_module(void)
 	return 0;
 }
 
-void cleanup_module(void)
+static void __exit iph5526_exit(void)
 {
 	int i = 0;
 	while(fc[i] != NULL) {
@@ -4549,7 +4535,9 @@ void cleanup_module(void)
 	if (scsi_registered == TRUE)
 		scsi_unregister_host(&driver_template); 
 }
-#endif /* MODULE */
+
+module_init(iph5526_init);
+module_exit(iph5526_exit);
 
 void clean_up_memory(struct fc_info *fi)
 {

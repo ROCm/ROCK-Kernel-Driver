@@ -64,6 +64,7 @@
 #include <linux/dirent.h>
 #include <linux/ctype.h>
 #include <linux/ioctl32.h>
+#include <linux/ncp_fs.h>
 
 #include <net/sock.h>          /* siocdevprivate_ioctl */
 #include <net/bluetooth/bluetooth.h>

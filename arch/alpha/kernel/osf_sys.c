@@ -822,7 +822,6 @@ osf_setsysinfo(unsigned long op, void *buffer, unsigned long nbytes,
    affects all sorts of things, like timeval and itimerval.  */
 
 extern struct timezone sys_tz;
-extern int do_sys_settimeofday(struct timeval *tv, struct timezone *tz);
 extern int do_getitimer(int which, struct itimerval *value);
 extern int do_setitimer(int which, struct itimerval *, struct itimerval *);
 extern asmlinkage int sys_utimes(char *, struct timeval *);
@@ -901,11 +900,11 @@ osf_gettimeofday(struct timeval32 *tv, struct timezone *tz)
 asmlinkage int
 osf_settimeofday(struct timeval32 *tv, struct timezone *tz)
 {
-	struct timeval ktv;
+	struct timespec kts;
 	struct timezone ktz;
 
  	if (tv) {
-		if (get_tv32(&ktv, tv))
+		if (get_tv32((struct timeval *)&kts, tv))
 			return -EFAULT;
 	}
 	if (tz) {
@@ -913,7 +912,9 @@ osf_settimeofday(struct timeval32 *tv, struct timezone *tz)
 			return -EFAULT;
 	}
 
-	return do_sys_settimeofday(tv ? &ktv : NULL, tz ? &ktz : NULL);
+	kts.tv_nsec *= 1000;
+
+	return do_sys_settimeofday(tv ? &kts : NULL, tz ? &ktz : NULL);
 }
 
 asmlinkage int

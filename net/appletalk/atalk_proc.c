@@ -143,10 +143,13 @@ out:
 static __inline__ struct sock *atalk_get_socket_idx(loff_t pos)
 {
 	struct sock *s;
+	struct hlist_node *node;
 
-	for (s = atalk_sockets; pos && s; s = s->sk_next)
-		--pos;
-
+	sk_for_each(s, node, &atalk_sockets)
+		if (!pos--)
+			goto found;
+	s = NULL;
+found:
 	return s;
 }
 
@@ -164,13 +167,10 @@ static void *atalk_seq_socket_next(struct seq_file *seq, void *v, loff_t *pos)
 
 	++*pos;
 	if (v == (void *)1) {
-		i = NULL;
-		if (atalk_sockets)
-			i = atalk_sockets;
+		i = sk_head(&atalk_sockets);
 		goto out;
 	}
-	i = v;
-	i = i->sk_next;
+	i = sk_next(v);
 out:
 	return i;
 }

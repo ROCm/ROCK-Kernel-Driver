@@ -38,6 +38,8 @@ possible future tuning:
 #include <asm/pgtable.h>
 #include <asm/proto.h>
 #include <asm/cacheflush.h>
+#include <asm/kdebug.h>
+#include <asm/proto.h>
 
 unsigned long iommu_bus_base;	/* GART remapping area (physical) */
 static unsigned long iommu_size; 	/* size of remapping area bytes */
@@ -52,9 +54,6 @@ int force_mmu = 1;
 #else
 int force_mmu = 0;
 #endif
-
-extern int fallback_aper_order;
-extern int fallback_aper_force;
 
 /* Allocation bitmap for the remapping area */ 
 static spinlock_t iommu_bitmap_lock = SPIN_LOCK_UNLOCKED;
@@ -135,10 +134,19 @@ void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
 	void *memory;
 	int gfp = GFP_ATOMIC;
 	int i;
-	unsigned long iommu_page;
 	int flush = 0;
+	unsigned long iommu_page;
+	unsigned long dma_mask;
 
-	if (hwdev == NULL || hwdev->dma_mask < 0xffffffff || no_iommu)
+	if (hwdev == NULL) {
+		gfp |= GFP_DMA; 
+		dma_mask = 0xffffffff; 
+	} else {
+		dma_mask = hwdev->consistent_dma_mask; 
+	}
+	if (dma_mask == 0) 
+		dma_mask = 0xffffffff; 
+	if (dma_mask < 0xffffffff || no_iommu)
 		gfp |= GFP_DMA;
 
 	/* 
@@ -151,7 +159,7 @@ void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
 		return NULL; 
 	} else {
 		int high = 0, mmu;
-		if (((unsigned long)virt_to_bus(memory) + size) > 0xffffffffUL)
+		if (((unsigned long)virt_to_bus(memory) + size) > dma_mask)
 			high = 1;
 		mmu = 1;
 		if (force_mmu && !(gfp & GFP_DMA)) 
@@ -222,7 +230,6 @@ void pci_free_consistent(struct pci_dev *hwdev, size_t size,
 static void **iommu_leak_tab; 
 static int leak_trace;
 int iommu_leak_pages = 20; 
-extern unsigned long printk_address(unsigned long);
 void dump_leak(void)
 {
 	int i;
@@ -459,7 +466,7 @@ static __init int init_k8_gatt(struct agp_kern_info *info)
 
 extern int agp_amdk8_init(void);
 
-void __init pci_iommu_init(void)
+int __init pci_iommu_init(void)
 { 
 	struct agp_kern_info info;
 	unsigned long aper_size;
@@ -468,6 +475,7 @@ void __init pci_iommu_init(void)
 #ifndef CONFIG_AGP_AMD_8151
 	no_agp = 1; 
 #else
+	/* Makefile puts PCI initialization via subsys_initcall first. */
 	/* Add other K8 AGP bridge drivers here */
 	no_agp = no_agp || 
 		(agp_amdk8_init() < 0) || 
@@ -477,7 +485,7 @@ void __init pci_iommu_init(void)
 	if (no_iommu || (!force_mmu && end_pfn < 0xffffffff>>PAGE_SHIFT)) { 
 		printk(KERN_INFO "PCI-DMA: Disabling IOMMU.\n"); 
 		no_iommu = 1;
-		return;
+		return -1;
 	}
 
 	if (no_agp) { 
@@ -489,7 +497,7 @@ void __init pci_iommu_init(void)
 		if (err < 0) { 
 			printk(KERN_INFO "PCI-DMA: Disabling IOMMU.\n"); 
 			no_iommu = 1;
-			return;
+			return -1;
 		}
 	} 
 	
@@ -540,7 +548,12 @@ void __init pci_iommu_init(void)
 	clear_kernel_mapping((unsigned long)__va(iommu_bus_base), iommu_size);
 
 	flush_gart();
+
+	return 0;
 } 
+
+/* Must execute after PCI subsystem */
+fs_initcall(pci_iommu_init);
 
 /* iommu=[size][,noagp][,off][,force][,noforce][,leak][,memaper[=order]]
    size  set size of iommu (in bytes) 
@@ -589,4 +602,3 @@ __init int iommu_setup(char *opt)
     }
     return 1;
 } 
-

@@ -38,21 +38,27 @@ static struct sock *llc_get_sk_idx(loff_t pos)
 {
 	struct list_head *sap_entry;
 	struct llc_sap *sap;
+	struct hlist_node *node;
 	struct sock *sk = NULL;
 
 	list_for_each(sap_entry, &llc_main_station.sap_list.list) {
 		sap = list_entry(sap_entry, struct llc_sap, node);
 
 		read_lock_bh(&sap->sk_list.lock);
-		for (sk = sap->sk_list.list; sk; sk = sk->sk_next)
-			if (!pos--) {
-				if (!sk)
-					read_unlock_bh(&sap->sk_list.lock);
-				goto out;
-			}
+		sk_for_each(sk, node, &sap->sk_list.list) {
+			if (!pos)
+				break;
+			--pos;
+		}
 		read_unlock_bh(&sap->sk_list.lock);
+		if (!pos) {
+			if (node)
+				goto found;
+			break;
+		}
 	}
-out:
+	sk = NULL;
+found:
 	return sk;
 }
 
@@ -66,7 +72,7 @@ static void *llc_seq_start(struct seq_file *seq, loff_t *pos)
 
 static void *llc_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
-	struct sock* sk;
+	struct sock* sk, *next;
 	struct llc_opt *llc;
 	struct llc_sap *sap;
 
@@ -76,8 +82,9 @@ static void *llc_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 		goto out;
 	}
 	sk = v;
-	if (sk->sk_next) {
-		sk = sk->sk_next;
+	next = sk_next(sk);
+	if (next) {
+		sk = next;
 		goto out;
 	}
 	llc = llc_sk(sk);
@@ -89,8 +96,8 @@ static void *llc_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 			break;
 		sap = list_entry(sap->node.next, struct llc_sap, node);
 		read_lock_bh(&sap->sk_list.lock);
-		if (sap->sk_list.list) {
-			sk = sap->sk_list.list;
+		if (!hlist_empty(&sap->sk_list.list)) {
+			sk = sk_head(&sap->sk_list.list);
 			break;
 		}
 		read_unlock_bh(&sap->sk_list.lock);

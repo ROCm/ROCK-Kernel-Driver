@@ -132,7 +132,6 @@ static int ipxcfg_get_config_data(struct ipx_config_data *arg)
 
 static void ipx_remove_socket(struct sock *sk)
 {
-	struct sock *s;
 	/* Determine interface with which socket is associated */
 	struct ipx_interface *intrfc = ipx_sk(sk)->intrfc;
 
@@ -141,20 +140,7 @@ static void ipx_remove_socket(struct sock *sk)
 
 	ipxitf_hold(intrfc);
 	spin_lock_bh(&intrfc->if_sklist_lock);
-	s = intrfc->if_sklist;
-	if (s == sk) {
-		intrfc->if_sklist = s->sk_next;
-		goto out_unlock;
-	}
-
-	while (s && s->sk_next) {
-		if (s->sk_next == sk) {
-			s->sk_next = sk->sk_next;
-			goto out_unlock;
-		}
-		s = s->sk_next;
-	}
-out_unlock:
+	sk_del_node_init(sk);
 	spin_unlock_bh(&intrfc->if_sklist_lock);
 	sock_put(sk);
 	ipxitf_put(intrfc);
@@ -246,15 +232,7 @@ static void ipxitf_insert_socket(struct ipx_interface *intrfc, struct sock *sk)
 	sock_hold(sk);
 	spin_lock_bh(&intrfc->if_sklist_lock);
 	ipx_sk(sk)->intrfc = intrfc;
-	sk->sk_next = NULL;
-	if (!intrfc->if_sklist)
-		intrfc->if_sklist = sk;
-	else {
-		struct sock *s = intrfc->if_sklist;
-		while (s->sk_next)
-			s = s->sk_next;
-		s->sk_next = sk;
-	}
+	sk_add_node(sk, &intrfc->if_sklist);
 	spin_unlock_bh(&intrfc->if_sklist_lock);
 	ipxitf_put(intrfc);
 }
@@ -263,11 +241,14 @@ static void ipxitf_insert_socket(struct ipx_interface *intrfc, struct sock *sk)
 static struct sock *__ipxitf_find_socket(struct ipx_interface *intrfc,
 					 unsigned short port)
 {
-	struct sock *s = intrfc->if_sklist;
+	struct sock *s;
+	struct hlist_node *node;
 
-	while (s && ipx_sk(s)->port != port)
-	     s = s->sk_next;
-
+	sk_for_each(s, node, &intrfc->if_sklist)
+		if (ipx_sk(s)->port == port)
+			goto found;
+	s = NULL;
+found:
 	return s;
 }
 
@@ -292,36 +273,37 @@ static struct sock *ipxitf_find_internal_socket(struct ipx_interface *intrfc,
 						unsigned short port)
 {
 	struct sock *s;
+	struct hlist_node *node;
 
 	ipxitf_hold(intrfc);
 	spin_lock_bh(&intrfc->if_sklist_lock);
-	s = intrfc->if_sklist;
 
-	while (s) {
+	sk_for_each(s, node, &intrfc->if_sklist) {
 		struct ipx_opt *ipxs = ipx_sk(s);
 
 		if (ipxs->port == port &&
 		    !memcmp(node, ipxs->node, IPX_NODE_LEN))
-			break;
-		s = s->sk_next;
+			goto found;
 	}
+	s = NULL;
+found:
 	spin_unlock_bh(&intrfc->if_sklist_lock);
 	ipxitf_put(intrfc);
-
 	return s;
 }
 #endif
 
 void __ipxitf_down(struct ipx_interface *intrfc)
 {
-	struct sock *s, *t;
+	struct sock *s;
+	struct hlist_node *node, *t;
 
 	/* Delete all routes associated with this interface */
 	ipxrtr_del_routes(intrfc);
 
 	spin_lock_bh(&intrfc->if_sklist_lock);
 	/* error sockets */
-	for (s = intrfc->if_sklist; s;) {
+	sk_for_each_safe(s, node, t, &intrfc->if_sklist) {
 		struct ipx_opt *ipxs = ipx_sk(s);
 
 		s->sk_err = ENOLINK;
@@ -329,11 +311,9 @@ void __ipxitf_down(struct ipx_interface *intrfc)
 		ipxs->intrfc = NULL;
 		ipxs->port   = 0;
 		s->sk_zapped = 1;	/* Indicates it is no longer bound */
-		t = s;
-		s = s->sk_next;
-		t->sk_next = NULL;
+		sk_del_node_init(s);
 	}
-	intrfc->if_sklist = NULL;
+	INIT_HLIST_HEAD(&intrfc->if_sklist);
 	spin_unlock_bh(&intrfc->if_sklist_lock);
 
 	/* remove this interface from list */
@@ -400,12 +380,12 @@ static int ipxitf_demux_socket(struct ipx_interface *intrfc,
 	int is_broadcast = !memcmp(ipx->ipx_dest.node, ipx_broadcast_node,
 				   IPX_NODE_LEN);
 	struct sock *s;
+	struct hlist_node *node;
 	int rc;
 
 	spin_lock_bh(&intrfc->if_sklist_lock);
-	s = intrfc->if_sklist;
 
-	while (s) {
+	sk_for_each(s, node, &intrfc->if_sklist) {
 		struct ipx_opt *ipxs = ipx_sk(s);
 
 		if (ipxs->port == ipx->ipx_dest.sock &&
@@ -429,7 +409,6 @@ static int ipxitf_demux_socket(struct ipx_interface *intrfc,
 			if (intrfc != ipx_internal_net)
 				break;
 		}
-		s = s->sk_next;
 	}
 
 	/* skb was solely for us, and we did not make a copy, so free it. */
@@ -462,15 +441,18 @@ static struct sock *ncp_connection_hack(struct ipx_interface *intrfc,
 		connection = (((int) *(ncphdr + 9)) << 8) | (int) *(ncphdr + 8);
 
 	if (connection) {
+		struct hlist_node *node;
 		/* Now we have to look for a special NCP connection handling
 		 * socket. Only these sockets have ipx_ncp_conn != 0, set by
 		 * SIOCIPXNCPCONN. */
 		spin_lock_bh(&intrfc->if_sklist_lock);
-		for (sk = intrfc->if_sklist;
-		     sk && ipx_sk(sk)->ipx_ncp_conn != connection;
-		     sk = sk->sk_next);
-		if (sk)
-			sock_hold(sk);
+		sk_for_each(sk, node, &intrfc->if_sklist)
+			if (ipx_sk(sk)->ipx_ncp_conn == connection) {
+				sock_hold(sk);
+				goto found;
+			}
+		sk = NULL;
+	found:
 		spin_unlock_bh(&intrfc->if_sklist_lock);
 	}
 	return sk;
@@ -905,7 +887,7 @@ static struct ipx_interface *ipxitf_alloc(struct net_device *dev, __u32 netnum,
 		intrfc->if_internal 	= internal;
 		intrfc->if_ipx_offset 	= ipx_offset;
 		intrfc->if_sknum 	= IPX_MIN_EPHEMERAL_SOCKET;
-		intrfc->if_sklist 	= NULL;
+		INIT_HLIST_HEAD(&intrfc->if_sklist);
 		atomic_set(&intrfc->refcnt, 1);
 		spin_lock_init(&intrfc->if_sklist_lock);
 		__module_get(THIS_MODULE);

@@ -142,24 +142,16 @@ struct sock *bt_sock_alloc(struct socket *sock, int proto, int pi_size, int prio
 void bt_sock_link(struct bt_sock_list *l, struct sock *sk)
 {
 	write_lock_bh(&l->lock);
-	sk->sk_next = l->head;
-	l->head = sk;
+	sk_add_node(sk, &l->head);
 	sock_hold(sk);
 	write_unlock_bh(&l->lock);
 }
 
 void bt_sock_unlink(struct bt_sock_list *l, struct sock *sk)
 {
-	struct sock **skp;
-
 	write_lock_bh(&l->lock);
-	for (skp = &l->head; *skp; skp = &((*skp)->sk_next)) {
-		if (*skp == sk) {
-			*skp = sk->sk_next;
-			__sock_put(sk);
-			break;
-		}
-	}
+	if (sk_del_node_init(sk))
+		__sock_put(sk);
 	write_unlock_bh(&l->lock);
 }
 

@@ -76,6 +76,8 @@ extern unsigned long vm_force_exec32;
 #define __PAGE_OFFSET           0x0000010000000000	/* 1 << 40 */
 #define __PHYSICAL_MASK_SHIFT	40
 #define __PHYSICAL_MASK		((1UL << __PHYSICAL_MASK_SHIFT) - 1)
+#define __VIRTUAL_MASK_SHIFT	48
+#define __VIRTUAL_MASK		((1UL << __VIRTUAL_MASK_SHIFT) - 1)
 
 #define KERNEL_TEXT_SIZE  (40UL*1024*1024)
 #define KERNEL_TEXT_START 0xffffffff80000000UL 

@@ -45,7 +45,6 @@ int pcibios_set_irq_routing(struct pci_dev *dev, int pin, int irq);
 struct pci_dev;
 
 extern int iommu_setup(char *opt);
-extern void pci_iommu_init(void);
 
 /* Allocate and map kernel buffer using consistent mode DMA for a device.
  * hwdev should be valid struct pci_dev pointer for PCI devices,

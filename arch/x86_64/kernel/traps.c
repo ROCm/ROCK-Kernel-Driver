@@ -41,12 +41,9 @@
 #include <asm/smp.h>
 #include <asm/pgalloc.h>
 #include <asm/pda.h>
+#include <asm/proto.h>
 
 #include <linux/irq.h>
-
-asmlinkage int system_call(void);
-asmlinkage int kernel_syscall(void);
-extern void ia32_syscall(void);
 
 extern struct gate_struct idt_table[256]; 
 
@@ -72,8 +69,6 @@ asmlinkage void alignment_check(void);
 asmlinkage void machine_check(void);
 asmlinkage void spurious_interrupt_bug(void);
 asmlinkage void call_debug(void);
-
-extern int exception_trace;
 
 struct notifier_block *die_chain;
 
@@ -456,8 +451,6 @@ DO_ERROR(11, SIGBUS,  "segment not present", segment_not_present)
 DO_ERROR(12, SIGBUS,  "stack segment", stack_segment)
 DO_ERROR_INFO(17, SIGBUS, "alignment check", alignment_check, BUS_ADRALN, get_cr2())
 DO_ERROR(18, SIGSEGV, "reserved", reserved)
-
-extern void dump_pagetable(unsigned long);
 
 asmlinkage void do_general_protection(struct pt_regs * regs, long error_code)
 {

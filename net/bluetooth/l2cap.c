@@ -186,10 +186,12 @@ static inline void l2cap_chan_add(struct l2cap_conn *conn, struct sock *sk, stru
 static struct sock *__l2cap_get_sock_by_addr(u16 psm, bdaddr_t *src)
 {
 	struct sock *sk;
-	for (sk = l2cap_sk_list.head; sk; sk = sk->sk_next) {
+	struct hlist_node *node;
+	sk_for_each(sk, node, &l2cap_sk_list.head)
 		if (l2cap_pi(sk)->sport == psm && !bacmp(&bt_sk(sk)->src, src))
-			break;
-	}
+			goto found;
+	sk = NULL;
+found:
 	return sk;
 }
 
@@ -199,8 +201,9 @@ static struct sock *__l2cap_get_sock_by_addr(u16 psm, bdaddr_t *src)
 static struct sock *__l2cap_get_sock_by_psm(int state, u16 psm, bdaddr_t *src)
 {
 	struct sock *sk, *sk1 = NULL;
+	struct hlist_node *node;
 
-	for (sk = l2cap_sk_list.head; sk; sk = sk->sk_next) {
+	sk_for_each(sk, node, &l2cap_sk_list.head) {
 		if (state && sk->sk_state != state)
 			continue;
 
@@ -214,7 +217,7 @@ static struct sock *__l2cap_get_sock_by_psm(int state, u16 psm, bdaddr_t *src)
 				sk1 = sk;
 		}
 	}
-	return sk ? sk : sk1;
+	return node ? sk : sk1;
 }
 
 /* Find socket with given address (psm, src).
@@ -1773,6 +1776,7 @@ static int l2cap_connect_ind(struct hci_dev *hdev, bdaddr_t *bdaddr, u8 type)
 {
 	int exact = 0, lm1 = 0, lm2 = 0;
 	register struct sock *sk;
+	struct hlist_node *node;
 
 	if (type != ACL_LINK)
 		return 0;
@@ -1781,7 +1785,7 @@ static int l2cap_connect_ind(struct hci_dev *hdev, bdaddr_t *bdaddr, u8 type)
 
 	/* Find listening sockets and check their link_mode */
 	read_lock(&l2cap_sk_list.lock);
-	for (sk = l2cap_sk_list.head; sk; sk = sk->sk_next) {
+	sk_for_each(sk, node, &l2cap_sk_list.head) {
 		if (sk->sk_state != BT_LISTEN)
 			continue;
 
@@ -2004,21 +2008,23 @@ drop:
 static void *l2cap_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	struct sock *sk;
+	struct hlist_node *node;
 	loff_t l = *pos;
 
 	read_lock_bh(&l2cap_sk_list.lock);
 
-	for (sk = l2cap_sk_list.head; sk; sk = sk->sk_next)
+	sk_for_each(sk, node, &l2cap_sk_list.head)
 		if (!l--)
-			return sk;
-	return NULL;
+			goto found;
+	sk = NULL;
+found:
+	return sk;
 }
 
 static void *l2cap_seq_next(struct seq_file *seq, void *e, loff_t *pos)
 {
-	struct sock *sk = e;
 	(*pos)++;
-	return sk->sk_next;
+	return sk_next(e);
 }
 
 static void l2cap_seq_stop(struct seq_file *seq, void *e)

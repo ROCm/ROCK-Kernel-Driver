@@ -2,34 +2,34 @@
 #define __LINUX_NET_AFUNIX_H
 extern void unix_inflight(struct file *fp);
 extern void unix_notinflight(struct file *fp);
-typedef struct sock unix_socket;
 extern void unix_gc(void);
 
 #define UNIX_HASH_SIZE	256
 
-extern unix_socket *unix_socket_table[UNIX_HASH_SIZE+1];
+extern struct hlist_head unix_socket_table[UNIX_HASH_SIZE + 1];
 extern rwlock_t unix_table_lock;
 
 extern atomic_t unix_tot_inflight;
 
-static inline unix_socket *first_unix_socket(int *i)
+static inline struct sock *first_unix_socket(int *i)
 {
 	for (*i = 0; *i <= UNIX_HASH_SIZE; (*i)++) {
-		if (unix_socket_table[*i])
-			return unix_socket_table[*i];
+		if (!hlist_empty(&unix_socket_table[*i]))
+			return __sk_head(&unix_socket_table[*i]);
 	}
 	return NULL;
 }
 
-static inline unix_socket *next_unix_socket(int *i, unix_socket *s)
+static inline struct sock *next_unix_socket(int *i, struct sock *s)
 {
+	struct sock *next = sk_next(s);
 	/* More in this chain? */
-	if (s->sk_next)
-		return s->sk_next;
+	if (next)
+		return next;
 	/* Look for next non-empty chain. */
 	for ((*i)++; *i <= UNIX_HASH_SIZE; (*i)++) {
-		if (unix_socket_table[*i])
-			return unix_socket_table[*i];
+		if (!hlist_empty(&unix_socket_table[*i]))
+			return __sk_head(&unix_socket_table[*i]);
 	}
 	return NULL;
 }
@@ -69,7 +69,6 @@ struct unix_sock {
         struct vfsmount		*mnt;
         struct semaphore        readsem;
         struct sock		*other;
-        struct sock		**list;
         struct sock		*gc_tree;
         atomic_t                inflight;
         rwlock_t                lock;

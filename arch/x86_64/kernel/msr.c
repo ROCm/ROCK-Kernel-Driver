@@ -1,4 +1,4 @@
-#ident "$Id: msr.c,v 1.6 2001/10/24 23:58:53 ak Exp $"
+#ident "$Id$"
 /* ----------------------------------------------------------------------- *
  *   
  *   Copyright 2000 H. Peter Anvin - All Rights Reserved
@@ -22,9 +22,6 @@
  *
  * This driver uses /dev/cpu/%d/msr where %d is the minor number, and on
  * an SMP box will direct the access to CPU %d.
-
-RED-PEN: need to get power management for S3 restore
-
  */
 
 #include <linux/module.h>
@@ -44,7 +41,6 @@ RED-PEN: need to get power management for S3 restore
 #include <asm/msr.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
-#include <asm/cpufeature.h>
 
 /* Note: "err" is handled in a funny way below.  Otherwise one version
    of gcc or another breaks. */
@@ -119,12 +115,11 @@ static void msr_smp_rdmsr(void *cmd_block)
 static inline int do_wrmsr(int cpu, u32 reg, u32 eax, u32 edx)
 {
   struct msr_command cmd;
+  int ret;
 
   preempt_disable();
   if ( cpu == smp_processor_id() ) {
-    int ret = wrmsr_eio(reg, eax, edx);
-    preempt_enable();
-    return ret;
+    ret = wrmsr_eio(reg, eax, edx);
   } else {
     cmd.cpu = cpu;
     cmd.reg = reg;
@@ -132,17 +127,20 @@ static inline int do_wrmsr(int cpu, u32 reg, u32 eax, u32 edx)
     cmd.data[1] = edx;
     
     smp_call_function(msr_smp_wrmsr, &cmd, 1, 1);
-    preempt_enable();
-    return cmd.err;
+    ret = cmd.err;
   }
+  preempt_enable();
+  return ret;
 }
 
 static inline int do_rdmsr(int cpu, u32 reg, u32 *eax, u32 *edx)
 {
   struct msr_command cmd;
+  int ret;
 
+  preempt_disable();
   if ( cpu == smp_processor_id() ) {
-    return rdmsr_eio(reg, eax, edx);
+    ret = rdmsr_eio(reg, eax, edx);
   } else {
     cmd.cpu = cpu;
     cmd.reg = reg;
@@ -152,8 +150,10 @@ static inline int do_rdmsr(int cpu, u32 reg, u32 *eax, u32 *edx)
     *eax = cmd.data[0];
     *edx = cmd.data[1];
 
-    return cmd.err;
+    ret = cmd.err;
   }
+  preempt_enable();
+  return ret;
 }
 
 #else /* ! CONFIG_SMP */

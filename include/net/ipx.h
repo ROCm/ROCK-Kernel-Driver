@@ -59,7 +59,7 @@ struct ipx_interface {
 
 	/* socket support */
 	unsigned short		if_sknum;
-	struct sock		*if_sklist;
+	struct hlist_head	if_sklist;
 	spinlock_t		if_sklist_lock;
 
 	/* administrative overhead */

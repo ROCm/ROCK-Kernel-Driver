@@ -35,7 +35,7 @@ __kernel_sigreturn:
 
 	.section .text.rtsigreturn,"ax"
 	.balign 32
-	.globl __kernel_rt_sigreturn,"ax"
+	.globl __kernel_rt_sigreturn
 	.type __kernel_rt_sigreturn,@function
 __kernel_rt_sigreturn:
 .LSTART_rt_sigreturn:

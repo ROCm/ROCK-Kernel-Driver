@@ -275,8 +275,9 @@ struct sock *ax25_addr_match(ax25_address *addr)
 void ax25_send_to_raw(struct sock *sk, struct sk_buff *skb, int proto)
 {
 	struct sk_buff *copy;
+	struct hlist_node *node;
 
-	while (sk != NULL) {
+	sk_for_each_from(sk, node)
 		if (sk->sk_type == SOCK_RAW &&
 		    sk->sk_protocol == proto &&
 		    atomic_read(&sk->sk_rmem_alloc) <= sk->sk_rcvbuf) {
@@ -286,9 +287,6 @@ void ax25_send_to_raw(struct sock *sk, struct sk_buff *skb, int proto)
 			if (sock_queue_rcv_skb(sk, copy) != 0)
 				kfree_skb(copy);
 		}
-
-		sk = sk->sk_next;
-	}
 }
 
 /*

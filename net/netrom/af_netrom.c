@@ -57,7 +57,7 @@ int sysctl_netrom_link_fails_count                = NR_DEFAULT_FAILS;
 
 static unsigned short circuit = 0x101;
 
-static struct sock *nr_list;
+HLIST_HEAD(nr_list);
 static spinlock_t nr_list_lock;
 
 static struct proto_ops nr_proto_ops;
@@ -89,26 +89,8 @@ frees:
  */
 static void nr_remove_socket(struct sock *sk)
 {
-	struct sock *s;
-
 	spin_lock_bh(&nr_list_lock);
-
-	if ((s = nr_list) == sk) {
-		nr_list = s->sk_next;
-		spin_unlock_bh(&nr_list_lock);
-		return;
-	}
-
-	while (s && s->sk_next) {
-		if (s->sk_next == sk) {
-			s->sk_next = sk->sk_next;
-			spin_unlock_bh(&nr_list_lock);
-			return;
-		}
-
-		s = s->sk_next;
-	}
-
+	sk_del_node_init(sk);
 	spin_unlock_bh(&nr_list_lock);
 }
 
@@ -118,12 +100,12 @@ static void nr_remove_socket(struct sock *sk)
 static void nr_kill_by_device(struct net_device *dev)
 {
 	struct sock *s;
+	struct hlist_node *node;
 
 	spin_lock_bh(&nr_list_lock);
-	for (s = nr_list; s; s = s->sk_next) {
+	sk_for_each(s, node, &nr_list)
 		if (nr_sk(s)->device == dev)
 			nr_disconnect(s, ENETUNREACH);
-	}
 	spin_unlock_bh(&nr_list_lock);
 }
 
@@ -149,8 +131,7 @@ static int nr_device_event(struct notifier_block *this, unsigned long event, voi
 static void nr_insert_socket(struct sock *sk)
 {
 	spin_lock_bh(&nr_list_lock);
-	sk->sk_next = nr_list;
-	nr_list  = sk;
+	sk_add_node(sk, &nr_list);
 	spin_unlock_bh(&nr_list_lock);
 }
 
@@ -161,18 +142,17 @@ static void nr_insert_socket(struct sock *sk)
 static struct sock *nr_find_listener(ax25_address *addr)
 {
 	struct sock *s;
+	struct hlist_node *node;
 
 	spin_lock_bh(&nr_list_lock);
-	for (s = nr_list; s; s = s->sk_next) {
+	sk_for_each(s, node, &nr_list)
 		if (!ax25cmp(&nr_sk(s)->source_addr, addr) &&
-		    s->sk_state == TCP_LISTEN) {
-			spin_unlock_bh(&nr_list_lock);
-			return s;
-		}
-	}
+		    s->sk_state == TCP_LISTEN)
+			goto found;
+	s = NULL;
+found:
 	spin_unlock_bh(&nr_list_lock);
-
-	return NULL;
+	return s;
 }
 
 /*
@@ -181,19 +161,19 @@ static struct sock *nr_find_listener(ax25_address *addr)
 static struct sock *nr_find_socket(unsigned char index, unsigned char id)
 {
 	struct sock *s;
+	struct hlist_node *node;
 
 	spin_lock_bh(&nr_list_lock);
-	for (s = nr_list; s; s = s->sk_next) {
+	sk_for_each(s, node, &nr_list) {
 		nr_cb *nr = nr_sk(s);
 		
-		if (nr->my_index == index && nr->my_id == id) {
-			spin_unlock_bh(&nr_list_lock);
-			return s;
-		}
+		if (nr->my_index == index && nr->my_id == id)
+			goto found;
 	}
+	s = NULL;
+found:
 	spin_unlock_bh(&nr_list_lock);
-
-	return NULL;
+	return s;
 }
 
 /*
@@ -203,20 +183,20 @@ static struct sock *nr_find_peer(unsigned char index, unsigned char id,
 	ax25_address *dest)
 {
 	struct sock *s;
+	struct hlist_node *node;
 
 	spin_lock_bh(&nr_list_lock);
-	for (s = nr_list; s; s = s->sk_next) {
+	sk_for_each(s, node, &nr_list) {
 		nr_cb *nr = nr_sk(s);
 		
 		if (nr->your_index == index && nr->your_id == id &&
-		    !ax25cmp(&nr->dest_addr, dest)) {
-			spin_unlock_bh(&nr_list_lock);
-			return s;
-		}
+		    !ax25cmp(&nr->dest_addr, dest))
+			goto found;
 	}
+	s = NULL;
+found:
 	spin_unlock_bh(&nr_list_lock);
-
-	return NULL;
+	return s;
 }
 
 /*
@@ -1152,6 +1132,7 @@ static int nr_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 static int nr_get_info(char *buffer, char **start, off_t offset, int length)
 {
 	struct sock *s;
+	struct hlist_node *node;
 	struct net_device *dev;
 	const char *devname;
 	int len = 0;
@@ -1162,7 +1143,7 @@ static int nr_get_info(char *buffer, char **start, off_t offset, int length)
 
 	len += sprintf(buffer, "user_addr dest_node src_node  dev    my  your  st  vs  vr  va    t1     t2     t4      idle   n2  wnd Snd-Q Rcv-Q inode\n");
 
-	for (s = nr_list; s; s = s->sk_next) {
+	sk_for_each(s, node, &nr_list) {
 		nr_cb *nr = nr_sk(s);
 
 		if ((dev = nr->device) == NULL)

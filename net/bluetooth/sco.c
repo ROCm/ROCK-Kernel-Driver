@@ -298,12 +298,13 @@ drop:
 static struct sock *__sco_get_sock_by_addr(bdaddr_t *ba)
 {
 	struct sock *sk;
+	struct hlist_node *node;
 
-	for (sk = sco_sk_list.head; sk; sk = sk->sk_next) {
+	sk_for_each(sk, node, &sco_sk_list.head)
 		if (!bacmp(&bt_sk(sk)->src, ba))
-			break;
-	}
-
+			goto found;
+	sk = NULL;
+found:
 	return sk;
 }
 
@@ -312,11 +313,12 @@ static struct sock *__sco_get_sock_by_addr(bdaddr_t *ba)
  */
 static struct sock *sco_get_sock_listen(bdaddr_t *src)
 {
-	struct sock *sk, *sk1 = NULL;
+	struct sock *sk = NULL, *sk1 = NULL;
+	struct hlist_node *node;
 
 	read_lock(&sco_sk_list.lock);
 
-	for (sk = sco_sk_list.head; sk; sk = sk->sk_next) {
+	sk_for_each(sk, node, &sco_sk_list.head) {
 		if (sk->sk_state != BT_LISTEN)
 			continue;
 
@@ -331,7 +333,7 @@ static struct sock *sco_get_sock_listen(bdaddr_t *src)
 
 	read_unlock(&sco_sk_list.lock);
 
-	return sk ? sk : sk1;
+	return node ? sk : sk1;
 }
 
 static void sco_sock_destruct(struct sock *sk)
@@ -884,21 +886,24 @@ drop:
 static void *sco_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	struct sock *sk;
+	struct hlist_node *node;
 	loff_t l = *pos;
 
 	read_lock_bh(&sco_sk_list.lock);
 
-	for (sk = sco_sk_list.head; sk; sk = sk->sk_next)
+	sk_for_each(sk, node, &sco_sk_list.head)
 		if (!l--)
-			return sk;
-	return NULL;
+			goto found;
+	sk = NULL;
+found:
+	return sk;
 }
 
 static void *sco_seq_next(struct seq_file *seq, void *e, loff_t *pos)
 {
 	struct sock *sk = e;
 	(*pos)++;
-	return sk->sk_next;
+	return sk_next(sk);
 }
 
 static void sco_seq_stop(struct seq_file *seq, void *e)
