@@ -38,7 +38,6 @@ extern struct smp_boot_data {
 
 extern char no_int_routing __devinitdata;
 
-extern cpumask_t phys_cpu_present_map;
 extern cpumask_t cpu_online_map;
 extern unsigned long ipi_base_addr;
 extern unsigned char smp_int_redirect;
@@ -47,8 +46,6 @@ extern volatile int ia64_cpu_to_sapicid[];
 #define cpu_physical_id(i)	ia64_cpu_to_sapicid[i]
 
 extern unsigned long ap_wakeup_vector;
-
-#define cpu_possible_map phys_cpu_present_map
 
 /*
  * Function to map hard smp processor id to logical id.  Slow, so don't use this in
