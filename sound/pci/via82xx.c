@@ -393,8 +393,6 @@ struct _snd_via82xx {
 	spinlock_t ac97_lock;
 	snd_info_entry_t *proc_entry;
 
-	struct snd_dma_device dma_dev;
-
 #ifdef SUPPORT_JOYSTICK
 	struct gameport gameport;
 	struct resource *res_joystick;
@@ -429,7 +427,9 @@ static int build_via_table(viadev_t *dev, snd_pcm_substream_t *substream,
 		/* the start of each lists must be aligned to 8 bytes,
 		 * but the kernel pages are much bigger, so we don't care
 		 */
-		if (snd_dma_alloc_pages(&chip->dma_dev, PAGE_ALIGN(VIA_TABLE_SIZE * 2 * 8), &dev->table) < 0)
+		if (snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(chip->pci),
+					PAGE_ALIGN(VIA_TABLE_SIZE * 2 * 8),
+					&dev->table) < 0)
 			return -ENOMEM;
 	}
 	if (! dev->idx_table) {
@@ -485,9 +485,8 @@ static int build_via_table(viadev_t *dev, snd_pcm_substream_t *substream,
 static int clean_via_table(viadev_t *dev, snd_pcm_substream_t *substream,
 			   struct pci_dev *pci)
 {
-	via82xx_t *chip = snd_pcm_substream_chip(substream);
 	if (dev->table.area) {
-		snd_dma_free_pages(&chip->dma_dev, &dev->table);
+		snd_dma_free_pages(&dev->table);
 		dev->table.area = NULL;
 	}
 	if (dev->idx_table) {
@@ -2015,10 +2014,6 @@ static int __devinit snd_via82xx_create(snd_card_t * card,
 	chip->card = card;
 	chip->pci = pci;
 	chip->irq = -1;
-
-	memset(&chip->dma_dev, 0, sizeof(chip->dma_dev));
-	chip->dma_dev.type = SNDRV_DMA_TYPE_DEV;
-	chip->dma_dev.dev = snd_dma_pci_data(pci);
 
 	pci_read_config_byte(pci, VIA_FUNC_ENABLE, &chip->old_legacy);
 	pci_read_config_byte(pci, VIA_PNP_CONTROL, &chip->old_legacy_cfg);

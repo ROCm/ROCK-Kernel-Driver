@@ -1308,7 +1308,8 @@ static int _cs46xx_playback_open_channel (snd_pcm_substream_t * substream,int pc
 	cpcm = kcalloc(1, sizeof(*cpcm), GFP_KERNEL);
 	if (cpcm == NULL)
 		return -ENOMEM;
-	if (snd_dma_alloc_pages(&chip->dma_dev, PAGE_SIZE, &cpcm->hw_buf) < 0) {
+	if (snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(chip->pci),
+				PAGE_SIZE, &cpcm->hw_buf) < 0) {
 		kfree(cpcm);
 		return -ENOMEM;
 	}
@@ -1397,7 +1398,8 @@ static int snd_cs46xx_capture_open(snd_pcm_substream_t * substream)
 {
 	cs46xx_t *chip = snd_pcm_substream_chip(substream);
 
-	if (snd_dma_alloc_pages(&chip->dma_dev, PAGE_SIZE, &chip->capt.hw_buf) < 0)
+	if (snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(chip->pci),
+				PAGE_SIZE, &chip->capt.hw_buf) < 0)
 		return -ENOMEM;
 	chip->capt.substream = substream;
 	substream->runtime->hw = snd_cs46xx_capture;
@@ -1438,7 +1440,7 @@ static int snd_cs46xx_playback_close(snd_pcm_substream_t * substream)
 #endif
 
 	cpcm->substream = NULL;
-	snd_dma_free_pages(&chip->dma_dev, &cpcm->hw_buf);
+	snd_dma_free_pages(&cpcm->hw_buf);
 	chip->active_ctrl(chip, -1);
 
 	return 0;
@@ -1449,7 +1451,7 @@ static int snd_cs46xx_capture_close(snd_pcm_substream_t * substream)
 	cs46xx_t *chip = snd_pcm_substream_chip(substream);
 
 	chip->capt.substream = NULL;
-	snd_dma_free_pages(&chip->dma_dev, &chip->capt.hw_buf);
+	snd_dma_free_pages(&chip->capt.hw_buf);
 	chip->active_ctrl(chip, -1);
 
 	return 0;
@@ -3820,10 +3822,6 @@ int __devinit snd_cs46xx_create(snd_card_t * card,
 	strcpy(region->name, "CS46xx_BA1_reg");
 	region->base = chip->ba1_addr + BA1_SP_REG;
 	region->size = CS46XX_BA1_REG_SIZE;
-
-	memset(&chip->dma_dev, 0, sizeof(chip->dma_dev));
-	chip->dma_dev.type = SNDRV_DMA_TYPE_DEV;
-	chip->dma_dev.dev = snd_dma_pci_data(pci);
 
 	/* set up amp and clkrun hack */
 	pci_read_config_word(pci, PCI_SUBSYSTEM_VENDOR_ID, &ss_vendor);

@@ -408,8 +408,6 @@ struct _snd_intel8x0 {
 	unsigned long bmaddr;
 	unsigned long remap_bmaddr;
 
-	struct snd_dma_device dma_dev;
-
 	struct pci_dev *pci;
 	snd_card_t *card;
 
@@ -2194,7 +2192,7 @@ static int snd_intel8x0_free(intel8x0_t *chip)
 	if (chip->bdbars.area) {
 		if (chip->fix_nocache)
 			fill_nocache(chip->bdbars.area, chip->bdbars.bytes, 0);
-		snd_dma_free_pages(&chip->dma_dev, &chip->bdbars);
+		snd_dma_free_pages(&chip->bdbars);
 	}
 	if (chip->irq >= 0)
 		free_irq(chip->irq, (void *)chip);
@@ -2535,13 +2533,11 @@ static int __devinit snd_intel8x0_create(snd_card_t * card,
 		ichdev->pos_shift = (device_type == DEVICE_SIS) ? 0 : 1;
 	}
 
-	memset(&chip->dma_dev, 0, sizeof(chip->dma_dev));
-	chip->dma_dev.type = SNDRV_DMA_TYPE_DEV;
-	chip->dma_dev.dev = snd_dma_pci_data(pci);
-
 	/* allocate buffer descriptor lists */
 	/* the start of each lists must be aligned to 8 bytes */
-	if (snd_dma_alloc_pages(&chip->dma_dev, chip->bdbars_count * sizeof(u32) * ICH_MAX_FRAGS * 2, &chip->bdbars) < 0) {
+	if (snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(pci),
+				chip->bdbars_count * sizeof(u32) * ICH_MAX_FRAGS * 2,
+				&chip->bdbars) < 0) {
 		snd_intel8x0_free(chip);
 		snd_printk(KERN_ERR "intel8x0: cannot allocate buffer descriptors\n");
 		return -ENOMEM;

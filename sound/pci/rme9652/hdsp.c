@@ -456,12 +456,12 @@ struct _hdsp {
 	unsigned char	      qs_out_channels;	    
 	unsigned char         ds_out_channels;
 	unsigned char         ss_out_channels;
-	void                 *capture_buffer_unaligned;	 /* original buffer addresses */
-	void                 *playback_buffer_unaligned; /* original buffer addresses */
+
+	struct snd_dma_buffer capture_dma_buf;
+	struct snd_dma_buffer playback_dma_buf;
 	unsigned char        *capture_buffer;	    /* suitably aligned address */
 	unsigned char        *playback_buffer;	    /* suitably aligned address */
-	dma_addr_t            capture_buffer_addr;
-	dma_addr_t            playback_buffer_addr;
+
 	pid_t                 capture_pid;
 	pid_t                 playback_pid;
 	int                   running;
@@ -554,50 +554,24 @@ static char channel_map_H9632_qs[HDSP_MAX_CHANNELS] = {
 	-1, -1
 };
 
-#define HDSP_PREALLOCATE_MEMORY	/* via module snd-hdsp_mem */
-
-#ifdef HDSP_PREALLOCATE_MEMORY
-static void *snd_hammerfall_get_buffer(struct pci_dev *pci, size_t size, dma_addr_t *addrp, int capture)
+static int snd_hammerfall_get_buffer(struct pci_dev *pci, struct snd_dma_buffer *dmab, size_t size)
 {
-	struct snd_dma_device pdev;
-	struct snd_dma_buffer dmbuf;
-
-	memset(&pdev, 0, sizeof(pdev));
-	pdev.type = SNDRV_DMA_TYPE_DEV;
-	pdev.dev = snd_dma_pci_data(pci);
-	pdev.id = capture;
-	dmbuf.bytes = 0;
-	if (! snd_dma_get_reserved(&pdev, &dmbuf)) {
-		if (snd_dma_alloc_pages(&pdev, size, &dmbuf) < 0)
-			return NULL;
-		snd_dma_set_reserved(&pdev, &dmbuf);
+	dmab->dev.type = SNDRV_DMA_TYPE_DEV;
+	dmab->dev.dev = snd_dma_pci_data(pci);
+	if (! snd_dma_get_reserved_buf(dmab, snd_dma_pci_buf_id(pci))) {
+		if (snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(pci),
+					size, dmab) < 0)
+			return -ENOMEM;
 	}
-	*addrp = dmbuf.addr;
-	return dmbuf.area;
+	return 0;
 }
 
-static void snd_hammerfall_free_buffer(struct pci_dev *pci, size_t size, void *ptr, dma_addr_t addr, int capture)
+static void snd_hammerfall_free_buffer(struct snd_dma_buffer *dmab, struct pci_dev *pci)
 {
-	struct snd_dma_device pdev;
-
-	memset(&pdev, 0, sizeof(pdev));
-	pdev.type = SNDRV_DMA_TYPE_DEV;
-	pdev.dev = snd_dma_pci_data(pci);
-	pdev.id = capture;
-	snd_dma_free_reserved(&pdev);
+	if (dmab->area)
+		snd_dma_reserve_buf(dmab, snd_dma_pci_buf_id(pci));
 }
 
-#else
-static void *snd_hammerfall_get_buffer(struct pci_dev *pci, size_t size, dma_addr_t *addrp, int capture)
-{
-	return snd_malloc_pci_pages(pci, size, addrp);
-}
-
-static void snd_hammerfall_free_buffer(struct pci_dev *pci, size_t size, void *ptr, dma_addr_t addr, int capture)
-{
-	snd_free_pci_pages(pci, size, ptr, addr);
-}
-#endif
 
 static struct pci_device_id snd_hdsp_ids[] = {
 	{
@@ -3548,59 +3522,34 @@ static void __devinit snd_hdsp_proc_init(hdsp_t *hdsp)
 
 static void snd_hdsp_free_buffers(hdsp_t *hdsp)
 {
-	if (hdsp->capture_buffer_unaligned) {
-		snd_hammerfall_free_buffer(hdsp->pci, HDSP_DMA_AREA_BYTES,
-					   hdsp->capture_buffer_unaligned,
-					   hdsp->capture_buffer_addr, 1);
-	}
-
-	if (hdsp->playback_buffer_unaligned) {
-		snd_hammerfall_free_buffer(hdsp->pci, HDSP_DMA_AREA_BYTES,
-					   hdsp->playback_buffer_unaligned,
-					   hdsp->playback_buffer_addr, 0);
-	}
+	snd_hammerfall_free_buffer(&hdsp->capture_dma_buf, hdsp->pci);
+	snd_hammerfall_free_buffer(&hdsp->playback_dma_buf, hdsp->pci);
 }
 
 static int __devinit snd_hdsp_initialize_memory(hdsp_t *hdsp)
 {
-	void *pb, *cb;
-	dma_addr_t pb_addr, cb_addr;
 	unsigned long pb_bus, cb_bus;
 
-	cb = snd_hammerfall_get_buffer(hdsp->pci, HDSP_DMA_AREA_BYTES, &cb_addr, 1);
-	pb = snd_hammerfall_get_buffer(hdsp->pci, HDSP_DMA_AREA_BYTES, &pb_addr, 0);
-
-	if (cb == 0 || pb == 0) {
-		if (cb) {
-			snd_hammerfall_free_buffer(hdsp->pci, HDSP_DMA_AREA_BYTES, cb, cb_addr, 1);
-		}
-		if (pb) {
-			snd_hammerfall_free_buffer(hdsp->pci, HDSP_DMA_AREA_BYTES, pb, pb_addr, 0);
-		}
-
+	if (snd_hammerfall_get_buffer(hdsp->pci, &hdsp->capture_dma_buf, HDSP_DMA_AREA_BYTES) < 0 ||
+	    snd_hammerfall_get_buffer(hdsp->pci, &hdsp->playback_dma_buf, HDSP_DMA_AREA_BYTES) < 0) {
+		if (hdsp->capture_dma_buf.area)
+			snd_dma_free_pages(&hdsp->capture_dma_buf);
 		printk(KERN_ERR "%s: no buffers available\n", hdsp->card_name);
 		return -ENOMEM;
 	}
 
-	/* save raw addresses for use when freeing memory later */
-
-	hdsp->capture_buffer_unaligned = cb;
-	hdsp->playback_buffer_unaligned = pb;
-	hdsp->capture_buffer_addr = cb_addr;
-	hdsp->playback_buffer_addr = pb_addr;
-
 	/* Align to bus-space 64K boundary */
 
-	cb_bus = (cb_addr + 0xFFFF) & ~0xFFFFl;
-	pb_bus = (pb_addr + 0xFFFF) & ~0xFFFFl;
+	cb_bus = (hdsp->capture_dma_buf.addr + 0xFFFF) & ~0xFFFFl;
+	pb_bus = (hdsp->playback_dma_buf.addr + 0xFFFF) & ~0xFFFFl;
 
 	/* Tell the card where it is */
 
 	hdsp_write(hdsp, HDSP_inputBufferAddress, cb_bus);
 	hdsp_write(hdsp, HDSP_outputBufferAddress, pb_bus);
 
-	hdsp->capture_buffer = cb + (cb_bus - cb_addr);
-	hdsp->playback_buffer = pb + (pb_bus - pb_addr);
+	hdsp->capture_buffer = hdsp->capture_dma_buf.area + (cb_bus - hdsp->capture_dma_buf.addr);
+	hdsp->playback_buffer = hdsp->playback_dma_buf.area + (pb_bus - hdsp->playback_dma_buf.addr);
 
 	return 0;
 }

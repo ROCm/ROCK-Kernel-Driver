@@ -161,7 +161,6 @@ struct snd_bt87x {
 	long opened;
 	snd_pcm_substream_t *substream;
 
-	struct snd_dma_device dma_dev;
 	struct snd_dma_buffer dma_risc;
 	unsigned int line_bytes;
 	unsigned int lines;
@@ -190,10 +189,8 @@ static int snd_bt87x_create_risc(bt87x_t *chip, snd_pcm_substream_t *substream,
 	u32 *risc;
 
 	if (chip->dma_risc.area == NULL) {
-		memset(&chip->dma_dev, 0, sizeof(chip->dma_dev));
-		chip->dma_dev.type = SNDRV_DMA_TYPE_DEV;
-		chip->dma_dev.dev = snd_dma_pci_data(chip->pci);
-		if (snd_dma_alloc_pages(&chip->dma_dev, PAGE_ALIGN(MAX_RISC_SIZE), &chip->dma_risc) < 0)
+		if (snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(chip->pci),
+					PAGE_ALIGN(MAX_RISC_SIZE), &chip->dma_risc) < 0)
 			return -ENOMEM;
 	}
 	risc = (u32 *)chip->dma_risc.area;
@@ -237,7 +234,7 @@ static int snd_bt87x_create_risc(bt87x_t *chip, snd_pcm_substream_t *substream,
 static void snd_bt87x_free_risc(bt87x_t *chip)
 {
 	if (chip->dma_risc.area) {
-		snd_dma_free_pages(&chip->dma_dev, &chip->dma_risc);
+		snd_dma_free_pages(&chip->dma_risc);
 		chip->dma_risc.area = NULL;
 	}
 }

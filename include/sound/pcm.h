@@ -373,8 +373,8 @@ struct _snd_pcm_substream {
 	char name[32];			/* substream name */
 	int stream;			/* stream (direction) */
 	size_t buffer_bytes_max;	/* limit ring buffer size */
-	struct snd_dma_device dma_device;
 	struct snd_dma_buffer dma_buffer;
+	unsigned int dma_buf_id;
 	size_t dma_max;
 	/* -- hardware operations -- */
 	unsigned int open_flag: 1;	/* lowlevel device has been opened */

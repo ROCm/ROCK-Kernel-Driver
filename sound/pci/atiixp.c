@@ -240,7 +240,6 @@ struct snd_atiixp_dma_ops {
  */
 struct snd_atiixp_dma {
 	const atiixp_dma_ops_t *ops;
-	struct snd_dma_device desc_dev;
 	struct snd_dma_buffer desc_buf;
 	snd_pcm_substream_t *substream;	/* assigned PCM substream */
 	unsigned int buf_addr, buf_bytes;	/* DMA buffer address, bytes */
@@ -363,10 +362,8 @@ static int atiixp_build_dma_packets(atiixp_t *chip, atiixp_dma_t *dma,
 		return -ENOMEM;
 
 	if (dma->desc_buf.area == NULL) {
-		memset(&dma->desc_dev, 0, sizeof(dma->desc_dev));
-		dma->desc_dev.type = SNDRV_DMA_TYPE_DEV;
-		dma->desc_dev.dev = snd_dma_pci_data(chip->pci);
-		if (snd_dma_alloc_pages(&dma->desc_dev, ATI_DESC_LIST_SIZE, &dma->desc_buf) < 0)
+		if (snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(chip->pci),
+					ATI_DESC_LIST_SIZE, &dma->desc_buf) < 0)
 			return -ENOMEM;
 		dma->period_bytes = dma->periods = 0; /* clear */
 	}
@@ -413,7 +410,7 @@ static void atiixp_clear_dma_packets(atiixp_t *chip, atiixp_dma_t *dma, snd_pcm_
 {
 	if (dma->desc_buf.area) {
 		writel(0, chip->remap_addr + dma->ops->llp_offset);
-		snd_dma_free_pages(&dma->desc_dev, &dma->desc_buf);
+		snd_dma_free_pages(&dma->desc_buf);
 		dma->desc_buf.area = NULL;
 	}
 }

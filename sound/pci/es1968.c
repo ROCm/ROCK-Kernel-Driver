@@ -558,7 +558,6 @@ struct snd_es1968 {
 	unsigned int clock;		/* clock */
 
 	/* buffer */
-	struct snd_dma_device dma_dev;
 	struct snd_dma_buffer dma;
 
 	/* Resources... */
@@ -1469,7 +1468,7 @@ static void snd_es1968_free_dmabuf(es1968_t *chip)
 
 	if (! chip->dma.area)
 		return;
-	snd_dma_free_reserved(&chip->dma_dev);
+	snd_dma_reserve_buf(&chip->dma, snd_dma_pci_buf_id(chip->pci));
 	while ((p = chip->buf_list.next) != &chip->buf_list) {
 		esm_memory_t *chunk = list_entry(p, esm_memory_t, list);
 		list_del(p);
@@ -1483,22 +1482,22 @@ snd_es1968_init_dmabuf(es1968_t *chip)
 	int err;
 	esm_memory_t *chunk;
 
-	chip->dma_dev.type = SNDRV_DMA_TYPE_DEV;
-	chip->dma_dev.dev = snd_dma_pci_data(chip->pci);
-	chip->dma_dev.id = 0;
-	if (! snd_dma_get_reserved(&chip->dma_dev, &chip->dma)) {
-		err = snd_dma_alloc_pages_fallback(&chip->dma_dev, chip->total_bufsize, &chip->dma);
+	chip->dma.dev.type = SNDRV_DMA_TYPE_DEV;
+	chip->dma.dev.dev = snd_dma_pci_data(chip->pci);
+	if (! snd_dma_get_reserved_buf(&chip->dma, snd_dma_pci_buf_id(chip->pci))) {
+		err = snd_dma_alloc_pages_fallback(SNDRV_DMA_TYPE_DEV,
+						   snd_dma_pci_data(chip->pci),
+						   chip->total_bufsize, &chip->dma);
 		if (err < 0 || ! chip->dma.area) {
 			snd_printk("es1968: can't allocate dma pages for size %d\n",
 				   chip->total_bufsize);
 			return -ENOMEM;
 		}
 		if ((chip->dma.addr + chip->dma.bytes - 1) & ~((1 << 28) - 1)) {
-			snd_dma_free_pages(&chip->dma_dev, &chip->dma);
+			snd_dma_free_pages(&chip->dma);
 			snd_printk("es1968: DMA buffer beyond 256MB.\n");
 			return -ENOMEM;
 		}
-		snd_dma_set_reserved(&chip->dma_dev, &chip->dma);
 	}
 
 	INIT_LIST_HEAD(&chip->buf_list);
@@ -1619,8 +1618,6 @@ static int snd_es1968_playback_open(snd_pcm_substream_t *substream)
 	es->substream = substream;
 	es->mode = ESM_MODE_PLAY;
 
-	substream->dma_device = chip->dma_dev; /* for mmap */
-
 	runtime->private_data = es;
 	runtime->hw = snd_es1968_playback;
 	runtime->hw.buffer_bytes_max = runtime->hw.period_bytes_max =
@@ -1679,8 +1676,6 @@ static int snd_es1968_capture_open(snd_pcm_substream_t *substream)
                 return -ENOMEM;
         }
 	memset(es->mixbuf->buf.area, 0, ESM_MIXBUF_SIZE);
-
-	substream->dma_device = chip->dma_dev; /* for mmap */
 
 	runtime->private_data = es;
 	runtime->hw = snd_es1968_capture;

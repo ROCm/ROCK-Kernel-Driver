@@ -3339,7 +3339,8 @@ static int __devinit snd_trident_tlb_alloc(trident_t *trident)
 	/* TLB array must be aligned to 16kB !!! so we allocate
 	   32kB region and correct offset when necessary */
 
-	if (snd_dma_alloc_pages(&trident->dma_dev, 2 * SNDRV_TRIDENT_MAX_PAGES * 4, &trident->tlb.buffer) < 0) {
+	if (snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(trident->pci),
+				2 * SNDRV_TRIDENT_MAX_PAGES * 4, &trident->tlb.buffer) < 0) {
 		snd_printk(KERN_ERR "trident: unable to allocate TLB buffer\n");
 		return -ENOMEM;
 	}
@@ -3352,7 +3353,8 @@ static int __devinit snd_trident_tlb_alloc(trident_t *trident)
 		return -ENOMEM;
 	}
 	/* allocate and setup silent page and initialise TLB entries */
-	if (snd_dma_alloc_pages(&trident->dma_dev, SNDRV_TRIDENT_PAGE_SIZE, &trident->tlb.silent_page) < 0) {
+	if (snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(trident->pci),
+				SNDRV_TRIDENT_PAGE_SIZE, &trident->tlb.silent_page) < 0) {
 		snd_printk(KERN_ERR "trident: unable to allocate silent page\n");
 		return -ENOMEM;
 	}
@@ -3573,10 +3575,6 @@ int __devinit snd_trident_create(snd_card_t * card,
 	}
 	trident->irq = pci->irq;
 
-	memset(&trident->dma_dev, 0, sizeof(trident->dma_dev));
-	trident->dma_dev.type = SNDRV_DMA_TYPE_DEV;
-	trident->dma_dev.dev = snd_dma_pci_data(pci);
-
 	/* allocate 16k-aligned TLB for NX cards */
 	trident->tlb.entries = NULL;
 	trident->tlb.buffer.area = NULL;
@@ -3676,10 +3674,10 @@ int snd_trident_free(trident_t *trident)
 		if (trident->tlb.memhdr)
 			snd_util_memhdr_free(trident->tlb.memhdr);
 		if (trident->tlb.silent_page.area)
-			snd_dma_free_pages(&trident->dma_dev, &trident->tlb.silent_page);
+			snd_dma_free_pages(&trident->tlb.silent_page);
 		if (trident->tlb.shadow_entries)
 			vfree(trident->tlb.shadow_entries);
-		snd_dma_free_pages(&trident->dma_dev, &trident->tlb.buffer);
+		snd_dma_free_pages(&trident->tlb.buffer);
 	}
 	if (trident->irq >= 0)
 		free_irq(trident->irq, (void *)trident);

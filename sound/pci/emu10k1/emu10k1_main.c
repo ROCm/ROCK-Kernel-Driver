@@ -550,9 +550,9 @@ static int snd_emu10k1_free(emu10k1_t *emu)
 	if (emu->memhdr)
 		snd_util_memhdr_free(emu->memhdr);
 	if (emu->silent_page.area)
-		snd_dma_free_pages(&emu->dma_dev, &emu->silent_page);
+		snd_dma_free_pages(&emu->silent_page);
 	if (emu->ptb_pages.area)
-		snd_dma_free_pages(&emu->dma_dev, &emu->ptb_pages);
+		snd_dma_free_pages(&emu->ptb_pages);
 	if (emu->page_ptr_table)
 		vfree(emu->page_ptr_table);
 	if (emu->page_addr_table)
@@ -639,12 +639,9 @@ int __devinit snd_emu10k1_create(snd_card_t * card,
 	}
 	emu->irq = pci->irq;
 
-	memset(&emu->dma_dev, 0, sizeof(emu->dma_dev));
-	emu->dma_dev.type = SNDRV_DMA_TYPE_DEV;
-	emu->dma_dev.dev = snd_dma_pci_data(pci);
-
 	emu->max_cache_pages = max_cache_bytes >> PAGE_SHIFT;
-	if (snd_dma_alloc_pages(&emu->dma_dev, 32 * 1024, &emu->ptb_pages) < 0) {
+	if (snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(pci),
+				32 * 1024, &emu->ptb_pages) < 0) {
 		snd_emu10k1_free(emu);
 		return -ENOMEM;
 	}
@@ -656,7 +653,8 @@ int __devinit snd_emu10k1_create(snd_card_t * card,
 		return -ENOMEM;
 	}
 
-	if (snd_dma_alloc_pages(&emu->dma_dev, EMUPAGESIZE, &emu->silent_page) < 0) {
+	if (snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(pci),
+				EMUPAGESIZE, &emu->silent_page) < 0) {
 		snd_emu10k1_free(emu);
 		return -ENOMEM;
 	}

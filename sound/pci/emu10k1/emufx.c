@@ -1953,13 +1953,14 @@ int snd_emu10k1_fx8010_tram_setup(emu10k1_t *emu, u32 size)
 	snd_emu10k1_ptr_write(emu, TCB, 0, 0);
 	snd_emu10k1_ptr_write(emu, TCBS, 0, 0);
 	if (emu->fx8010.etram_pages.area != NULL) {
-		snd_dma_free_pages(&emu->dma_dev, &emu->fx8010.etram_pages);
+		snd_dma_free_pages(&emu->fx8010.etram_pages);
 		emu->fx8010.etram_pages.area = NULL;
 		emu->fx8010.etram_pages.bytes = 0;
 	}
 
 	if (size > 0) {
-		if (snd_dma_alloc_pages(&emu->dma_dev, size * 2, &emu->fx8010.etram_pages) < 0)
+		if (snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(emu->pci),
+					size * 2, &emu->fx8010.etram_pages) < 0)
 			return -ENOMEM;
 		memset(emu->fx8010.etram_pages.area, 0, size * 2);
 		snd_emu10k1_ptr_write(emu, TCB, 0, emu->fx8010.etram_pages.addr);

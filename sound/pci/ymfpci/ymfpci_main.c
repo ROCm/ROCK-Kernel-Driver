@@ -539,7 +539,8 @@ static void snd_ymfpci_pcm_init_voice(ymfpci_voice_t *voice, int stereo,
 
 static int __devinit snd_ymfpci_ac3_init(ymfpci_t *chip)
 {
-	if (snd_dma_alloc_pages(&chip->dma_dev, 4096, &chip->ac3_tmp_base) < 0)
+	if (snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(chip->pci),
+				4096, &chip->ac3_tmp_base) < 0)
 		return -ENOMEM;
 
 	chip->bank_effect[3][0]->base =
@@ -566,7 +567,7 @@ static int snd_ymfpci_ac3_done(ymfpci_t *chip)
 	spin_unlock_irq(&chip->reg_lock);
 	// snd_ymfpci_irq_wait(chip);
 	if (chip->ac3_tmp_base.area) {
-		snd_dma_free_pages(&chip->dma_dev, &chip->ac3_tmp_base);
+		snd_dma_free_pages(&chip->ac3_tmp_base);
 		chip->ac3_tmp_base.area = NULL;
 	}
 	return 0;
@@ -1954,7 +1955,8 @@ static int __devinit snd_ymfpci_memalloc(ymfpci_t *chip)
 	       chip->work_size;
 	/* work_ptr must be aligned to 256 bytes, but it's already
 	   covered with the kernel page allocation mechanism */
-	if (snd_dma_alloc_pages(&chip->dma_dev, size, &chip->work_ptr) < 0) 
+	if (snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(chip->pci),
+				size, &chip->work_ptr) < 0) 
 		return -ENOMEM;
 	ptr = chip->work_ptr.area;
 	ptr_addr = chip->work_ptr.addr;
@@ -2085,7 +2087,7 @@ static int snd_ymfpci_free(ymfpci_t *chip)
 	if (chip->reg_area_virt)
 		iounmap((void *)chip->reg_area_virt);
 	if (chip->work_ptr.area)
-		snd_dma_free_pages(&chip->dma_dev, &chip->work_ptr);
+		snd_dma_free_pages(&chip->work_ptr);
 	
 	if (chip->irq >= 0)
 		free_irq(chip->irq, (void *)chip);
@@ -2229,10 +2231,6 @@ int __devinit snd_ymfpci_create(snd_card_t * card,
 		return -EBUSY;
 	}
 	chip->irq = pci->irq;
-
-	memset(&chip->dma_dev, 0, sizeof(chip->dma_dev));
-	chip->dma_dev.type = SNDRV_DMA_TYPE_DEV;
-	chip->dma_dev.dev = snd_dma_pci_data(pci);
 
 	snd_ymfpci_aclink_reset(pci);
 	if (snd_ymfpci_codec_ready(chip, 0) < 0) {

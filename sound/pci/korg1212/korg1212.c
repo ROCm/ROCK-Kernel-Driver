@@ -343,8 +343,6 @@ struct _snd_korg1212 {
         unsigned long inIRQ;
         unsigned long iobase;
 
-	struct snd_dma_device dma_dev;
-
 	struct snd_dma_buffer dma_dsp;
         struct snd_dma_buffer dma_play;
         struct snd_dma_buffer dma_rec;
@@ -1406,8 +1404,6 @@ static int snd_korg1212_playback_open(snd_pcm_substream_t *substream)
 		K1212_DEBUG_PRINTK("K1212_DEBUG: snd_korg1212_playback_open [%s]\n", stateName[korg1212->cardState]);
 #endif
 
-	substream->dma_device = korg1212->dma_dev; /* set for mmap */
-
         snd_pcm_set_sync(substream);    // ???
 
 	snd_korg1212_OpenCard(korg1212);
@@ -1437,8 +1433,6 @@ static int snd_korg1212_capture_open(snd_pcm_substream_t *substream)
 #if K1212_DEBUG_LEVEL > 0
 		K1212_DEBUG_PRINTK("K1212_DEBUG: snd_korg1212_capture_open [%s]\n", stateName[korg1212->cardState]);
 #endif
-
-	substream->dma_device = korg1212->dma_dev; /* set for mmap */
 
         snd_pcm_set_sync(substream);    // ???
 
@@ -2108,7 +2102,7 @@ snd_korg1212_free(korg1212_t *korg1212)
         // free up memory resources used for the DSP download.
         // ----------------------------------------------------
         if (korg1212->dma_dsp.area) {
-        	snd_dma_free_pages(&korg1212->dma_dev, &korg1212->dma_dsp);
+        	snd_dma_free_pages(&korg1212->dma_dsp);
         	korg1212->dma_dsp.area = NULL;
         }
 
@@ -2118,12 +2112,12 @@ snd_korg1212_free(korg1212_t *korg1212)
         // free up memory resources used for the Play/Rec Buffers
         // ------------------------------------------------------
 	if (korg1212->dma_play.area) {
-		snd_dma_free_pages(&korg1212->dma_dev, &korg1212->dma_play);
+		snd_dma_free_pages(&korg1212->dma_play);
 		korg1212->dma_play.area = NULL;
         }
 
 	if (korg1212->dma_rec.area) {
-		snd_dma_free_pages(&korg1212->dma_dev, &korg1212->dma_rec);
+		snd_dma_free_pages(&korg1212->dma_rec);
 		korg1212->dma_rec.area = NULL;
         }
 
@@ -2133,7 +2127,7 @@ snd_korg1212_free(korg1212_t *korg1212)
         // free up memory resources used for the Shared Buffers
         // ----------------------------------------------------
 	if (korg1212->dma_shared.area) {
-		snd_dma_free_pages(&korg1212->dma_dev, &korg1212->dma_shared);
+		snd_dma_free_pages(&korg1212->dma_shared);
 		korg1212->dma_shared.area = NULL;
         }
         
@@ -2279,11 +2273,8 @@ static int __devinit snd_korg1212_create(snd_card_t * card, struct pci_dev *pci,
 		   stateName[korg1212->cardState]);
 #endif
 
-	memset(&korg1212->dma_dev, 0, sizeof(korg1212->dma_dev));
-	korg1212->dma_dev.type = SNDRV_DMA_TYPE_DEV;
-	korg1212->dma_dev.dev = snd_dma_pci_data(korg1212->pci);
-
-	if (snd_dma_alloc_pages(&korg1212->dma_dev, sizeof(KorgSharedBuffer), &korg1212->dma_shared) < 0) {
+	if (snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(pci),
+				sizeof(KorgSharedBuffer), &korg1212->dma_shared) < 0) {
 		snd_printk(KERN_ERR "can not allocate shared buffer memory (%Zd bytes)\n", sizeof(KorgSharedBuffer));
                 return -ENOMEM;
         }
@@ -2298,7 +2289,8 @@ static int __devinit snd_korg1212_create(snd_card_t * card, struct pci_dev *pci,
 
         korg1212->DataBufsSize = sizeof(KorgAudioBuffer) * kNumBuffers;
 
-	if (snd_dma_alloc_pages(&korg1212->dma_dev, korg1212->DataBufsSize, &korg1212->dma_play) < 0) {
+	if (snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(pci),
+				korg1212->DataBufsSize, &korg1212->dma_play) < 0) {
 		snd_printk(KERN_ERR "can not allocate play data buffer memory (%d bytes)\n", korg1212->DataBufsSize);
                 return -ENOMEM;
         }
@@ -2310,7 +2302,8 @@ static int __devinit snd_korg1212_create(snd_card_t * card, struct pci_dev *pci,
 		korg1212->playDataBufsPtr, korg1212->PlayDataPhy, korg1212->DataBufsSize);
 #endif
 
-	if (snd_dma_alloc_pages(&korg1212->dma_dev, korg1212->DataBufsSize, &korg1212->dma_rec) < 0) {
+	if (snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(pci),
+				korg1212->DataBufsSize, &korg1212->dma_rec) < 0) {
 		snd_printk(KERN_ERR "can not allocate record data buffer memory (%d bytes)\n", korg1212->DataBufsSize);
                 return -ENOMEM;
         }
@@ -2340,7 +2333,8 @@ static int __devinit snd_korg1212_create(snd_card_t * card, struct pci_dev *pci,
         korg1212->AdatTimeCodePhy = korg1212->sharedBufferPhy +
 		offsetof(KorgSharedBuffer, AdatTimeCode);
 
-	if (snd_dma_alloc_pages(&korg1212->dma_dev, korg1212->dspCodeSize, &korg1212->dma_dsp) < 0) {
+	if (snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(pci),
+				korg1212->dspCodeSize, &korg1212->dma_dsp) < 0) {
 		snd_printk(KERN_ERR "can not allocate dsp code memory (%d bytes)\n", korg1212->dspCodeSize);
                 return -ENOMEM;
         }

@@ -22,6 +22,7 @@
  */
 
 #include <sound/driver.h>
+#include <linux/pci.h>
 #include <linux/time.h>
 #include <sound/core.h>
 #include <sound/emu10k1.h>
@@ -441,10 +442,11 @@ static int synth_alloc_pages(emu10k1_t *emu, emu10k1_memblk_t *blk)
 	get_single_page_range(emu->memhdr, blk, &first_page, &last_page);
 	/* allocate kernel pages */
 	for (page = first_page; page <= last_page; page++) {
-		if (snd_dma_alloc_pages(&emu->dma_dev, PAGE_SIZE, &dmab) < 0)
+		if (snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(emu->pci),
+					PAGE_SIZE, &dmab) < 0)
 			goto __fail;
 		if (! is_valid_page(emu, dmab.addr)) {
-			snd_dma_free_pages(&emu->dma_dev, &dmab);
+			snd_dma_free_pages(&dmab);
 			goto __fail;
 		}
 		emu->page_addr_table[page] = dmab.addr;
@@ -459,7 +461,7 @@ __fail:
 		dmab.area = emu->page_ptr_table[page];
 		dmab.addr = emu->page_addr_table[page];
 		dmab.bytes = PAGE_SIZE;
-		snd_dma_free_pages(&emu->dma_dev, &dmab);
+		snd_dma_free_pages(&dmab);
 		emu->page_addr_table[page] = 0;
 		emu->page_ptr_table[page] = NULL;
 	}
@@ -476,13 +478,15 @@ static int synth_free_pages(emu10k1_t *emu, emu10k1_memblk_t *blk)
 	struct snd_dma_buffer dmab;
 
 	get_single_page_range(emu->memhdr, blk, &first_page, &last_page);
+	dmab.dev.type = SNDRV_DMA_TYPE_DEV;
+	dmab.dev.dev = snd_dma_pci_data(emu->pci);
 	for (page = first_page; page <= last_page; page++) {
 		if (emu->page_ptr_table[page] == NULL)
 			continue;
 		dmab.area = emu->page_ptr_table[page];
 		dmab.addr = emu->page_addr_table[page];
 		dmab.bytes = PAGE_SIZE;
-		snd_dma_free_pages(&emu->dma_dev, &dmab);
+		snd_dma_free_pages(&dmab);
 		emu->page_addr_table[page] = 0;
 		emu->page_ptr_table[page] = NULL;
 	}

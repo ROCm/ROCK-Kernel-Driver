@@ -426,7 +426,6 @@ struct _snd_ensoniq {
 	unsigned int spdif_stream;
 
 #ifdef CHIP1370
-	struct snd_dma_device dma_dev;
 	struct snd_dma_buffer dma_bug;
 #endif
 
@@ -1818,7 +1817,7 @@ static int snd_ensoniq_free(ensoniq_t *ensoniq)
       __hw_end:
 #ifdef CHIP1370
 	if (ensoniq->dma_bug.area)
-		snd_dma_free_pages(&ensoniq->dma_dev, &ensoniq->dma_bug);
+		snd_dma_free_pages(&ensoniq->dma_bug);
 #endif
 	if (ensoniq->irq >= 0)
 		free_irq(ensoniq->irq, (void *)ensoniq);
@@ -1895,10 +1894,8 @@ static int __devinit snd_ensoniq_create(snd_card_t * card,
 	}
 	ensoniq->irq = pci->irq;
 #ifdef CHIP1370
-	memset(&ensoniq->dma_dev, 0, sizeof(ensoniq->dma_dev));
-	ensoniq->dma_dev.type = SNDRV_DMA_TYPE_DEV;
-	ensoniq->dma_dev.dev = snd_dma_pci_data(pci);
-	if (snd_dma_alloc_pages(&ensoniq->dma_dev, 16, &ensoniq->dma_bug) < 0) {
+	if (snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(pci),
+				16, &ensoniq->dma_bug) < 0) {
 		snd_printk("unable to allocate space for phantom area - dma_bug\n");
 		snd_ensoniq_free(ensoniq);
 		return -EBUSY;

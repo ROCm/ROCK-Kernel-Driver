@@ -901,6 +901,7 @@ static snd_pcm_ops_t snd_mixart_capture_ops = {
 
 static void preallocate_buffers(mixart_t *chip, snd_pcm_t *pcm)
 {
+#if 0
 	snd_pcm_substream_t *subs;
 	int stream;
 
@@ -912,6 +913,7 @@ static void preallocate_buffers(mixart_t *chip, snd_pcm_t *pcm)
 				subs->stream << 8 | (subs->number + 1) |
 				(chip->chip_idx + 1) << 24;
 	}
+#endif
 	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
 					      snd_dma_pci_data(chip->mgr->pci), 32*1024, 32*1024);
 }
@@ -1079,12 +1081,12 @@ static int snd_mixart_free(mixart_mgr_t *mgr)
 
 	/* free flowarray */
 	if(mgr->flowinfo.area) {
-		snd_dma_free_pages(&mgr->dma_dev, &mgr->flowinfo);
+		snd_dma_free_pages(&mgr->flowinfo);
 		mgr->flowinfo.area = NULL;
 	}
 	/* free bufferarray */
 	if(mgr->bufferinfo.area) {
-		snd_dma_free_pages(&mgr->dma_dev, &mgr->bufferinfo);
+		snd_dma_free_pages(&mgr->bufferinfo);
 		mgr->bufferinfo.area = NULL;
 	}
 
@@ -1383,13 +1385,10 @@ static int __devinit snd_mixart_probe(struct pci_dev *pci,
 	/* init firmware status (mgr->hwdep->dsp_loaded reset in hwdep_new) */
 	mgr->board_type = MIXART_DAUGHTER_TYPE_NONE;
 
-	memset(&mgr->dma_dev, 0, sizeof(mgr->dma_dev));
-	mgr->dma_dev.type = SNDRV_DMA_TYPE_DEV;
-	mgr->dma_dev.dev = snd_dma_pci_data(mgr->pci);
-
 	/* create array of streaminfo */
 	size = PAGE_ALIGN( (MIXART_MAX_STREAM_PER_CARD * MIXART_MAX_CARDS * sizeof(mixart_flowinfo_t)) );
-	if (snd_dma_alloc_pages(&mgr->dma_dev, size, &mgr->flowinfo) < 0) {
+	if (snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(pci),
+				size, &mgr->flowinfo) < 0) {
 		snd_mixart_free(mgr);
 		return -ENOMEM;
 	}
@@ -1398,7 +1397,8 @@ static int __devinit snd_mixart_probe(struct pci_dev *pci,
 
 	/* create array of bufferinfo */
 	size = PAGE_ALIGN( (MIXART_MAX_STREAM_PER_CARD * MIXART_MAX_CARDS * sizeof(mixart_bufferinfo_t)) );
-	if (snd_dma_alloc_pages(&mgr->dma_dev, size, &mgr->bufferinfo) < 0) {
+	if (snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(pci),
+				size, &mgr->bufferinfo) < 0) {
 		snd_mixart_free(mgr);
 		return -ENOMEM;
 	}
