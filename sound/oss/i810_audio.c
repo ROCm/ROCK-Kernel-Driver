@@ -2406,9 +2406,9 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 				i810_set_dac_channels ( state, channels );
 
 				/* check that they really got turned on */
-				if ( !state->card->ac97_status & SURR_ON )
+				if (!(state->card->ac97_status & SURR_ON))
 					val &= ~DSP_BIND_SURR;
-				if ( !state->card->ac97_status & CENTER_LFE_ON )
+				if (!(state->card->ac97_status & CENTER_LFE_ON))
 					val &= ~DSP_BIND_CENTER_LFE;
 			}
 		}
