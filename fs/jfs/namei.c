@@ -1,6 +1,6 @@
 /*
- *   Copyright (c) International Business Machines Corp., 2000-2002
- *   Portions Copyright (c) Christoph Hellwig, 2001-2002
+ *   Copyright (C) International Business Machines Corp., 2000-2003
+ *   Portions Copyright (C) Christoph Hellwig, 2001-2002
  *
  *   This program is free software;  you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -19,6 +19,7 @@
 
 #include <linux/fs.h>
 #include "jfs_incore.h"
+#include "jfs_superblock.h"
 #include "jfs_inode.h"
 #include "jfs_dinode.h"
 #include "jfs_dmap.h"
@@ -1138,7 +1139,17 @@ int jfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 		new_ip->i_nlink--;
 		if (S_ISDIR(new_ip->i_mode)) {
 			new_ip->i_nlink--;
-			assert(new_ip->i_nlink == 0);
+			if (new_ip->i_nlink) {
+				up(&JFS_IP(new_dir)->commit_sem);
+				up(&JFS_IP(old_ip)->commit_sem);
+				if (old_dir != new_dir)
+					up(&JFS_IP(old_dir)->commit_sem);
+				if (!S_ISDIR(old_ip->i_mode) && new_ip)
+					IWRITE_UNLOCK(new_ip);
+				jfs_error(new_ip->i_sb,
+					  "jfs_rename: new_ip->i_nlink != 0");
+				return -EIO;
+			}
 			tblk = tid_to_tblock(tid);
 			tblk->xflag |= COMMIT_DELETE;
 			tblk->ip = new_ip;

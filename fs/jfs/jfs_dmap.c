@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) International Business Machines Corp., 2000-2002
+ *   Copyright (C) International Business Machines Corp., 2000-2003
  *
  *   This program is free software;  you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -18,6 +18,7 @@
 
 #include <linux/fs.h>
 #include "jfs_incore.h"
+#include "jfs_superblock.h"
 #include "jfs_dmap.h"
 #include "jfs_imap.h"
 #include "jfs_lock.h"
@@ -134,7 +135,6 @@ static int dbFreeDmap(struct bmap * bmp, struct dmap * dp, s64 blkno,
 static int dbMaxBud(u8 * cp);
 s64 dbMapFileSizeToMapSize(struct inode *ipbmap);
 int blkstol2(s64 nb);
-void fsDirty(void);
 
 int cntlz(u32 value);
 int cnttz(u32 word);
@@ -382,7 +382,15 @@ int dbFree(struct inode *ip, s64 blkno, s64 nblocks)
 	IREAD_LOCK(ipbmap);
 
 	/* block to be freed better be within the mapsize. */
-	assert(blkno + nblocks <= bmp->db_mapsize);
+	if (blkno + nblocks > bmp->db_mapsize) {
+		IREAD_UNLOCK(ipbmap);
+		printk(KERN_ERR "blkno = %Lx, nblocks = %Lx\n",
+		       (unsigned long long) blkno,
+		       (unsigned long long) nblocks);
+		jfs_error(ip->i_sb,
+			  "dbFree: block to be freed is outside the map");
+		return -EIO;
+	}
 
 	/*
 	 * free the blocks a dmap at a time.
@@ -465,7 +473,14 @@ dbUpdatePMap(struct inode *ipbmap,
 	int lsn, difft, diffp;
 
 	/* the blocks better be within the mapsize. */
-	assert(blkno + nblocks <= bmp->db_mapsize);
+	if (blkno + nblocks > bmp->db_mapsize) {
+		printk(KERN_ERR "blkno = %Lx, nblocks = %Lx\n",
+		       (unsigned long long) blkno,
+		       (unsigned long long) nblocks);
+		jfs_error(ipbmap->i_sb,
+			  "dbUpdatePMap: blocks are outside the map");
+		return -EIO;
+	}
 
 	/* compute delta of transaction lsn from log syncpt */
 	lsn = tblk->lsn;
@@ -757,7 +772,10 @@ int dbAlloc(struct inode *ip, s64 hint, s64 nblocks, s64 * results)
 	mapSize = bmp->db_mapsize;
 
 	/* the hint should be within the map */
-	assert(hint < mapSize);
+	if (hint >= mapSize) {
+		jfs_error(ip->i_sb, "dbAlloc: the hint is outside the map");
+		return -EIO;
+	}
 
 	/* if the number of blocks to be allocated is greater than the
 	 * allocation group size, try to allocate anywhere.
@@ -1104,7 +1122,12 @@ int dbExtend(struct inode *ip, s64 blkno, s64 nblocks, s64 addnblocks)
 
 	/* better be within the file system */
 	bmp = sbi->bmap;
-	assert(lastblkno >= 0 && lastblkno < bmp->db_mapsize);
+	if (lastblkno < 0 || lastblkno >= bmp->db_mapsize) {
+		IREAD_UNLOCK(ipbmap);
+		jfs_error(ip->i_sb,
+			  "dbExtend: the block is outside the filesystem");
+		return -EIO;
+	}
 
 	/* we'll attempt to extend the current allocation in place by
 	 * allocating the additional blocks as the blocks immediately
@@ -1145,11 +1168,10 @@ int dbExtend(struct inode *ip, s64 blkno, s64 nblocks, s64 addnblocks)
 		DBALLOC(bmp->db_DBmap, bmp->db_mapsize, extblkno,
 			addnblocks);
 		write_metapage(mp);
-	} else {
+	} else
 		/* we were not successful */
 		release_metapage(mp);
-		assert(rc == -ENOSPC || rc == -EIO);
-	}
+
 
 	return (rc);
 }
@@ -1414,7 +1436,12 @@ dbAllocAG(struct bmap * bmp, int agno, s64 nblocks, int l2nb, s64 * results)
 	/* allocation request should not be for more than the
 	 * allocation group size.
 	 */
-	assert(l2nb <= bmp->db_agl2size);
+	if (l2nb > bmp->db_agl2size) {
+		jfs_error(bmp->db_ipbmap->i_sb,
+			  "dbAllocAG: allocation request is larger than the "
+			  "allocation group size");
+		return -EIO;
+	}
 
 	/* determine the starting block number of the allocation
 	 * group.
@@ -1441,13 +1468,13 @@ dbAllocAG(struct bmap * bmp, int agno, s64 nblocks, int l2nb, s64 * results)
 	if (bmp->db_agsize == BPERDMAP
 	    || bmp->db_agfree[agno] == bmp->db_agsize) {
 		rc = dbAllocCtl(bmp, nblocks, l2nb, blkno, results);
-		/* assert(!(rc == -ENOSPC && bmp->db_agfree[agno] == bmp->db_agsize)); */
 		if ((rc == -ENOSPC) &&
 		    (bmp->db_agfree[agno] == bmp->db_agsize)) {
-			jfs_err("dbAllocAG: removed assert, but still need to "
-				"debug here\nblkno = 0x%Lx, nblocks = 0x%Lx",
-				(unsigned long long) blkno,
-				(unsigned long long) nblocks);
+			printk(KERN_ERR "blkno = %Lx, blocks = %Lx\n",
+			       (unsigned long long) blkno,
+			       (unsigned long long) nblocks);
+			jfs_error(bmp->db_ipbmap->i_sb,
+				  "dbAllocAG: dbAllocCtl failed in free AG");
 		}
 		return (rc);
 	}
@@ -1496,7 +1523,11 @@ dbAllocAG(struct bmap * bmp, int agno, s64 nblocks, int l2nb, s64 * results)
 					break;
 				}
 			}
-			assert(n < 4);
+			if (n == 4) {
+				jfs_error(bmp->db_ipbmap->i_sb,
+					  "dbAllocAG: failed descending stree");
+				return -EIO;
+			}
 		}
 
 		/* determine the block number within the file system
@@ -1531,7 +1562,12 @@ dbAllocAG(struct bmap * bmp, int agno, s64 nblocks, int l2nb, s64 * results)
 			if ((rc =
 			     dbFindCtl(bmp, l2nb, bmp->db_aglevel - 1,
 				       &blkno))) {
-				assert(rc != -ENOSPC);
+				if (rc == -ENOSPC) {
+					jfs_error(bmp->db_ipbmap->i_sb,
+						  "dbAllocAG: control page "
+						  "inconsistent");
+					return -EIO;
+				}
 				return (rc);
 			}
 		}
@@ -1539,7 +1575,11 @@ dbAllocAG(struct bmap * bmp, int agno, s64 nblocks, int l2nb, s64 * results)
 		/* allocate the blocks.
 		 */
 		rc = dbAllocCtl(bmp, nblocks, l2nb, blkno, results);
-		assert(rc != -ENOSPC);
+		if (rc == -ENOSPC) {
+			jfs_error(bmp->db_ipbmap->i_sb,
+				  "dbAllocAG: unable to allocate blocks");
+			rc = -EIO;
+		}
 		return (rc);
 	}
 
@@ -1595,7 +1635,11 @@ static int dbAllocAny(struct bmap * bmp, s64 nblocks, int l2nb, s64 * results)
 	/* allocate the blocks.
 	 */
 	rc = dbAllocCtl(bmp, nblocks, l2nb, blkno, results);
-	assert(rc != -ENOSPC);
+	if (rc == -ENOSPC) {
+		jfs_error(bmp->db_ipbmap->i_sb,
+			  "dbAllocAny: unable to allocate blocks");
+		return -EIO;
+	}
 	return (rc);
 }
 
@@ -1666,7 +1710,11 @@ static int dbFindCtl(struct bmap * bmp, int l2nb, int level, s64 * blkno)
 		/* space found ?
 		 */
 		if (rc) {
-			assert(lev == level);
+			if (lev != level) {
+				jfs_error(bmp->db_ipbmap->i_sb,
+					  "dbFindCtl: dmap inconsistent");
+				return -EIO;
+			}
 			return -ENOSPC;
 		}
 
@@ -1785,7 +1833,13 @@ dbAllocCtl(struct bmap * bmp, s64 nblocks, int l2nb, s64 blkno, s64 * results)
 
 		/* the dmap better be all free.
 		 */
-		assert(dp->tree.stree[ROOT] == L2BPERDMAP);
+		if (dp->tree.stree[ROOT] != L2BPERDMAP) {
+			release_metapage(mp);
+			jfs_error(bmp->db_ipbmap->i_sb,
+				  "dbAllocCtl: the dmap is not all free");
+			rc = -EIO;
+			goto backout;
+		}
 
 		/* determine how many blocks to allocate from this dmap.
 		 */
@@ -1828,8 +1882,8 @@ dbAllocCtl(struct bmap * bmp, s64 nblocks, int l2nb, s64 blkno, s64 * results)
 			/* could not back out.  mark the file system
 			 * to indicate that we have leaked blocks.
 			 */
-			fsDirty();	/* !!! */
-			jfs_err("dbAllocCtl: I/O Error: Block Leakage.");
+			jfs_error(bmp->db_ipbmap->i_sb,
+				  "dbAllocCtl: I/O Error: Block Leakage.");
 			continue;
 		}
 		dp = (struct dmap *) mp->data;
@@ -1841,8 +1895,8 @@ dbAllocCtl(struct bmap * bmp, s64 nblocks, int l2nb, s64 blkno, s64 * results)
 			 * to indicate that we have leaked blocks.
 			 */
 			release_metapage(mp);
-			fsDirty();	/* !!! */
-			jfs_err("dbAllocCtl: Block Leakage.");
+			jfs_error(bmp->db_ipbmap->i_sb,
+				  "dbAllocCtl: Block Leakage.");
 			continue;
 		}
 
@@ -2137,7 +2191,12 @@ static void dbAllocBits(struct bmap * bmp, struct dmap * dp, s64 blkno,
 			 * the allocated words.
 			 */
 			for (; nwords > 0; nwords -= nw) {
-				assert(leaf[word] >= BUDMIN);
+			        if (leaf[word] < BUDMIN) {
+					jfs_error(bmp->db_ipbmap->i_sb,
+						  "dbAllocBits: leaf page "
+						  "corrupt");
+					break;
+				}
 
 				/* determine what the leaf value should be
 				 * updated to as the minimum of the l2 number
@@ -2489,7 +2548,11 @@ dbAdjCtl(struct bmap * bmp, s64 blkno, int newval, int alloc, int level)
 			 * of the maximum free buddy system.
 			 */
 			assert(level == bmp->db_maxlevel);
-			assert(bmp->db_maxfreebud == oldroot);
+			if (bmp->db_maxfreebud != oldroot) {
+				jfs_error(bmp->db_ipbmap->i_sb,
+					  "dbAdjCtl: the maximum free buddy is "
+					  "not the old root");
+			}
 			bmp->db_maxfreebud = dcp->stree[ROOT];
 		}
 	}
@@ -3040,24 +3103,6 @@ int blkstol2(s64 nb)
 
 
 /*
- * NAME:	fsDirty()
- *
- * FUNCTION:    xxx
- *
- * PARAMETERS:
- *      ipmnt	- mount inode
- *
- * RETURN VALUES:
- *      none
- */
-void fsDirty(void)
-{
-	printk("fsDirty(): bye-bye\n");
-	assert(0);
-}
-
-
-/*
  * NAME:    	dbAllocBottomUp()
  *
  * FUNCTION:	alloc the specified block range from the working block
@@ -3343,7 +3388,10 @@ int dbExtendFS(struct inode *ipbmap, s64 blkno,	s64 nblocks)
 	/* get L2 page */
 	p = BMAPBLKNO + nbperpage;	/* L2 page */
 	l2mp = read_metapage(ipbmap, p, PSIZE, 0);
-	assert(l2mp);
+	if (!l2mp) {
+		jfs_error(ipbmap->i_sb, "dbExtendFS: L2 page could not be read");
+		return -EIO;
+	}
 	l2dcp = (struct dmapctl *) l2mp->data;
 
 	/* compute start L1 */
@@ -3504,7 +3552,9 @@ int dbExtendFS(struct inode *ipbmap, s64 blkno,	s64 nblocks)
 		}
 	}			/* for each L1 in a L2 */
 
-	assert(0);
+	jfs_error(ipbmap->i_sb,
+		  "dbExtendFS: function has not returned as expected");
+	return -EIO;
 
 	/*
 	 *      finalize bmap control page
@@ -3568,7 +3618,10 @@ void dbFinalizeBmap(struct inode *ipbmap)
 			if (bmp->db_agfree[bmp->db_agpref] >= avgfree)
 				break;
 		}
-		assert(bmp->db_agpref < bmp->db_numag);
+		if (bmp->db_agpref >= bmp->db_numag) {
+			jfs_error(ipbmap->i_sb,
+				  "cannot find ag with average freespace");
+		}
 	}
 
 	/*
@@ -3589,10 +3642,6 @@ void dbFinalizeBmap(struct inode *ipbmap)
 		n <<= 2;
 	}
 
-/*
-printk("bmap: agpref:%d aglevel:%d agheigth:%d agwidth:%d\n",
-	bmp->db_agpref, bmp->db_aglevel, bmp->db_agheigth, bmp->db_agwidth);
-*/
 }
 
 
@@ -3616,9 +3665,6 @@ printk("bmap: agpref:%d aglevel:%d agheigth:%d agwidth:%d\n",
 static int dbInitDmap(struct dmap * dp, s64 Blkno, int nblocks)
 {
 	int blkno, w, b, r, nw, nb, i;
-/*
-printk("sbh_dmap:  in dbInitDmap blkno:%Ld nblocks:%ld\n", Blkno, nblocks); 
-*/
 
 	/* starting block number within the dmap */
 	blkno = Blkno & (BPERDMAP - 1);
@@ -3678,10 +3724,6 @@ printk("sbh_dmap:  in dbInitDmap blkno:%Ld nblocks:%ld\n", Blkno, nblocks);
 	 * mark bits following the range to be freed (non-existing 
 	 * blocks) as allocated (ONES)
 	 */
-/*
-printk("sbh_dmap:  in dbInitDmap, preparing to mark unbacked, blkno:%ld nblocks:%ld\n",
-		blkno, nblocks); 
-*/
 
 	if (blkno == BPERDMAP)
 		goto initTree;
@@ -3691,9 +3733,6 @@ printk("sbh_dmap:  in dbInitDmap, preparing to mark unbacked, blkno:%ld nblocks:
 
 	/* does nblocks fall on a 32-bit boundary ? */
 	b = blkno & (DBWORD - 1);
-/*
-printk("sbh_dmap:  in dbInitDmap, b:%ld w:%ld mask: %lx\n", b, w, (ONES>>b)); 
-*/
 	if (b) {
 		/* mark a partial word allocated */
 		dp->wmap[w] = dp->pmap[w] = cpu_to_le32(ONES >> b);
@@ -3990,7 +4029,7 @@ static void DBinitmap(s64 size, struct inode *ipbmap, u32 ** results)
 
 	dbmap = (u32 *) xmalloc(npages * 4096, L2PSIZE, kernel_heap);
 	if (dbmap == NULL)
-		assert(0);
+		BUG();	/* Not robust since this is only unused debug code */
 
 	for (n = 0, d = dbmap; n < npages; n++, d += 1024)
 		bzero(d, 4096);
@@ -4004,7 +4043,9 @@ static void DBinitmap(s64 size, struct inode *ipbmap, u32 ** results)
 				   db_l2nbperpage);
 		mp = read_metapage(ipbmap, lblkno, PSIZE, 0);
 		if (mp == NULL) {
-			assert(0);
+			jfs_error(ipbmap->i_sb,
+				  "DBinitmap: could not read disk map page");
+			continue;
 		}
 		dp = (struct dmap *) mp->data;
 

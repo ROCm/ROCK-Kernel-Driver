@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) International Business Machines Corp., 2000-2002
+ *   Copyright (C) International Business Machines Corp., 2000-2003
  *
  *   This program is free software;  you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -60,21 +60,21 @@
 #define XT_PAGE(IP, MP) BT_PAGE(IP, MP, xtpage_t, i_xtroot)
 
 /* get page buffer for specified block address */
+/* ToDo: Replace this ugly macro with a function */
 #define XT_GETPAGE(IP, BN, MP, SIZE, P, RC)\
 {\
-        BT_GETPAGE(IP, BN, MP, xtpage_t, SIZE, P, RC, i_xtroot)\
-        if (!(RC))\
-        {\
-                if ((le16_to_cpu((P)->header.nextindex) < XTENTRYSTART) ||\
-                    (le16_to_cpu((P)->header.nextindex) > le16_to_cpu((P)->header.maxentry)) ||\
-                    (le16_to_cpu((P)->header.maxentry) > (((BN)==0)?XTROOTMAXSLOT:PSIZE>>L2XTSLOTSIZE)))\
-                {\
-                        jfs_err("XT_GETPAGE: xtree page corrupt");\
+	BT_GETPAGE(IP, BN, MP, xtpage_t, SIZE, P, RC, i_xtroot)\
+	if (!(RC))\
+	{\
+		if ((le16_to_cpu((P)->header.nextindex) < XTENTRYSTART) ||\
+		    (le16_to_cpu((P)->header.nextindex) > le16_to_cpu((P)->header.maxentry)) ||\
+		    (le16_to_cpu((P)->header.maxentry) > (((BN)==0)?XTROOTMAXSLOT:PSIZE>>L2XTSLOTSIZE)))\
+		{\
+			jfs_error((IP)->i_sb, "XT_GETPAGE: xtree page corrupt");\
 			BT_PUTPAGE(MP);\
-			updateSuper((IP)->i_sb, FM_DIRTY);\
 			MP = NULL;\
-                        RC = -EIO;\
-                }\
+			RC = -EIO;\
+		}\
         }\
 }
 
@@ -1611,14 +1611,21 @@ int xtExtend(tid_t tid,		/* transaction id */
 	/* there must exist extent to be extended */
 	if ((rc = xtSearch(ip, xoff - 1, &cmp, &btstack, XT_INSERT)))
 		return rc;
-	assert(cmp == 0);
+	if (cmp != 0) {
+		jfs_error(ip->i_sb, "xtExtend: xtSearch did not find extent");
+		return -EIO;
+	}
 
 	/* retrieve search result */
 	XT_GETSEARCH(ip, btstack.top, bn, mp, p, index);
 
 	/* extension must be contiguous */
 	xad = &p->xad[index];
-	assert((offsetXAD(xad) + lengthXAD(xad)) == xoff);
+	if ((offsetXAD(xad) + lengthXAD(xad)) != xoff) {
+		XT_PUTPAGE(mp);
+		jfs_error(ip->i_sb, "xtExtend: extension is not contiguous");
+		return -EIO;
+	}
 
 	/*
 	 * acquire a transaction lock on the leaf page;
@@ -1771,14 +1778,22 @@ printf("xtTailgate: nxoff:0x%lx nxlen:0x%x nxaddr:0x%lx\n",
 	/* there must exist extent to be tailgated */
 	if ((rc = xtSearch(ip, xoff, &cmp, &btstack, XT_INSERT)))
 		return rc;
-	assert(cmp == 0);
+	if (cmp != 0) {
+		jfs_error(ip->i_sb, "xtTailgate: couldn't find extent");
+		return -EIO;
+	}
 
 	/* retrieve search result */
 	XT_GETSEARCH(ip, btstack.top, bn, mp, p, index);
 
 	/* entry found must be last entry */
 	nextindex = le16_to_cpu(p->header.nextindex);
-	assert(index == nextindex - 1);
+	if (index != nextindex - 1) {
+		XT_PUTPAGE(mp);
+		jfs_error(ip->i_sb,
+			  "xtTailgate: the entry found is not the last entry");
+		return -EIO;
+	}
 
 	BT_MARK_DIRTY(mp, ip);
 	/*
@@ -1941,13 +1956,14 @@ int xtUpdate(tid_t tid, struct inode *ip, xad_t * nxad)
 	nxoff = offsetXAD(nxad);
 	nxlen = lengthXAD(nxad);
 	nxaddr = addressXAD(nxad);
-/*
-printf("xtUpdate: nxflag:0x%x nxoff:0x%lx nxlen:0x%x nxaddr:0x%lx\n",
-        nxad->flag, (ulong)nxoff, nxlen, (ulong)nxaddr);
-*/
+
 	if ((rc = xtSearch(ip, nxoff, &cmp, &btstack, XT_INSERT)))
 		return rc;
-	assert(cmp == 0);
+
+	if (cmp != 0) {
+		jfs_error(ip->i_sb, "xtUpdate: Could not find extent");
+		return -EIO;
+	}
 
 	/* retrieve search result */
 	XT_GETSEARCH(ip, btstack.top, bn, mp, p, index0);
@@ -1966,14 +1982,15 @@ printf("xtUpdate: nxflag:0x%x nxoff:0x%lx nxlen:0x%x nxaddr:0x%lx\n",
 	xoff = offsetXAD(xad);
 	xlen = lengthXAD(xad);
 	xaddr = addressXAD(xad);
-/*
-printf("xtUpdate: xflag:0x%x xoff:0x%lx xlen:0x%x xaddr:0x%lx\n",
-        xflag, (ulong)xoff, xlen, (ulong)xaddr);
-*/
 
 	/* nXAD must be completely contained within XAD */
-	assert(xoff <= nxoff);
-	assert(nxoff + nxlen <= xoff + xlen);
+	if ((xoff > nxoff) ||
+	    (nxoff + nxlen > xoff + xlen)) {
+		XT_PUTPAGE(mp);
+		jfs_error(ip->i_sb,
+			  "xtUpdate: nXAD in not completely contained within XAD");
+		return -EIO;
+	}
 
 	index = index0;
 	newindex = index + 1;
@@ -2118,7 +2135,11 @@ printf("xtUpdate: xflag:0x%x xoff:0x%lx xlen:0x%x xaddr:0x%lx\n",
 	} else if (xoff == nxoff)
 		goto out;
 
-	assert(xoff < nxoff);
+	if (xoff >= nxoff) {
+		XT_PUTPAGE(mp);
+		jfs_error(ip->i_sb, "xtUpdate: xoff >= nxoff");
+		return -EIO;
+	}
 /* #endif _JFS_WIP_COALESCE */
 
 	/*
@@ -2135,9 +2156,6 @@ printf("xtUpdate: xflag:0x%x xoff:0x%lx xlen:0x%x xaddr:0x%lx\n",
 
 	/* insert nXAD:recorded */
 	if (nextindex == le16_to_cpu(p->header.maxentry)) {
-/*
-printf("xtUpdate.updateRight.split p:0x%p\n", p);
-*/
 		rootsplit = p->header.flag & BT_ROOT;
 
 		/* xtSpliUp() unpins leaf pages */
@@ -2248,18 +2266,23 @@ printf("xtUpdate.updateRight.split p:0x%p\n", p);
 
 	/* recompute split pages */
 	if (nextindex == le16_to_cpu(p->header.maxentry)) {
-/*
-printf("xtUpdate: updateRight+Left recompute split pages: p:0x%p\n", p);
-*/
 		XT_PUTPAGE(mp);
 
 		if ((rc = xtSearch(ip, nxoff, &cmp, &btstack, XT_INSERT)))
 			return rc;
-		assert(cmp == 0);
+		if (cmp != 0) {
+			jfs_error(ip->i_sb, "xtUpdate: xtSearch failed");
+			return -EIO;
+		}
 
 		/* retrieve search result */
 		XT_GETSEARCH(ip, btstack.top, bn, mp, p, index0);
-		assert(index0 == index);
+		if (index0 != index) {
+			XT_PUTPAGE(mp);
+			jfs_error(ip->i_sb,
+				  "xtUpdate: unexpected value of index");
+			return -EIO;
+		}
 	}
 
 	/*
@@ -2755,6 +2778,7 @@ xtDeleteUp(tid_t tid, struct inode *ip,
  *              txCommit() to commit all the allocation before call
  *              this routine.
  */
+int
 xtRelocate(tid_t tid, struct inode * ip, xad_t * oxad,	/* old XAD */
 	   s64 nxaddr,		/* new xaddr */
 	   int xtype)
@@ -3925,7 +3949,11 @@ s64 xtTruncate_pmap(tid_t tid, struct inode *ip, s64 committed_size)
 		rc = xtSearch(ip, xoff, &cmp, &btstack, 0);
 		if (rc)
 			return rc;
-		assert(cmp == 0);
+		if (cmp != 0) {
+			jfs_error(ip->i_sb,
+				  "xtTruncate_pmap: did not find extent");
+			return -EIO;
+		}
 		XT_GETSEARCH(ip, btstack.top, bn, mp, p, index);
 	} else {
 		/*
