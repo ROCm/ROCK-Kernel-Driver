@@ -43,22 +43,6 @@
 #include "pci_impl.h"
 
 /*
- * Initial task structure. Make this a per-architecture thing,
- * because different architectures tend to have different
- * alignment requirements and potentially different initial
- * setup.
- */
-
-unsigned long init_user_stack[1024] = { STACK_MAGIC, };
-static struct fs_struct init_fs = INIT_FS;
-static struct files_struct init_files = INIT_FILES;
-static struct signal_struct init_signals = INIT_SIGNALS;
-struct mm_struct init_mm = INIT_MM(init_mm);
-
-union task_union init_task_union __attribute__((section("init_task")))
-	 = { task: INIT_TASK(init_task_union.task) };
-
-/*
  * No need to acquire the kernel lock, we're entirely local..
  */
 asmlinkage int
@@ -73,18 +57,12 @@ sys_sethae(unsigned long hae, unsigned long a1, unsigned long a2,
 void
 cpu_idle(void)
 {
-	/* An endless idle loop with no priority at all.  */
-	current->nice = 20;
-
 	while (1) {
 		/* FIXME -- EV6 and LCA45 know how to power down
 		   the CPU.  */
 
-		/* Although we are an idle CPU, we do not want to 
-		   get into the scheduler unnecessarily.  */
-		long oldval = xchg(&current->work.need_resched, -1UL);
-		if (!oldval)
-			while (current->work.need_resched < 0);
+		while (!need_resched())
+			barrier();
 		schedule();
 		check_pgt_cache();
 	}
@@ -152,7 +130,7 @@ common_shutdown_1(void *generic_ptr)
 		barrier();
 #endif
 
-        /* If booted from SRM, reset some of the original environment. */
+	/* If booted from SRM, reset some of the original environment. */
 	if (alpha_using_srm) {
 #ifdef CONFIG_DUMMY_CONSOLE
 		/* This has the effect of resetting the VGA video origin.  */
@@ -255,7 +233,7 @@ flush_thread(void)
 {
 	/* Arrange for each exec'ed process to start off with a clean slate
 	   with respect to the FPU.  This is all exceptions disabled.  */
-	current->thread.flags &= ~IEEE_SW_MASK;
+	current_thread_info()->ieee_state = 0;
 	wrfpcr(FPCR_DYN_NORMAL | ieee_swcr_to_fpcr(0));
 }
 
@@ -294,8 +272,8 @@ alpha_vfork(struct switch_stack * swstack)
  *
  * Note the "stack_offset" stuff: when returning to kernel mode, we need
  * to have some extra stack-space for the kernel stack that still exists
- * after the "ret_from_sys_call". When returning to user mode, we only
- * want the space needed by the syscall stack frame (ie "struct pt_regs").
+ * after the "ret_from_fork".  When returning to user mode, we only want
+ * the space needed by the syscall stack frame (ie "struct pt_regs").
  * Use the passed "regs" pointer to determine how much space we need
  * for a kernel fork().
  */
@@ -305,9 +283,9 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	    unsigned long unused,
 	    struct task_struct * p, struct pt_regs * regs)
 {
-	extern void ret_from_sys_call(void);
 	extern void ret_from_fork(void);
 
+	struct thread_info *childti = p->thread_info;
 	struct pt_regs * childregs;
 	struct switch_stack * childstack, *stack;
 	unsigned long stack_offset;
@@ -315,7 +293,8 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	stack_offset = PAGE_SIZE - sizeof(struct pt_regs);
 	if (!(regs->ps & 8))
 		stack_offset = (PAGE_SIZE-1) & (unsigned long) regs;
-	childregs = (struct pt_regs *) (stack_offset + PAGE_SIZE + (long)p);
+	childregs = (struct pt_regs *)
+	  (stack_offset + PAGE_SIZE + (long) childti);
 		
 	*childregs = *regs;
 	childregs->r0 = 0;
@@ -326,10 +305,9 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	childstack = ((struct switch_stack *) childregs) - 1;
 	*childstack = *stack;
 	childstack->r26 = (unsigned long) ret_from_fork;
-	p->thread.usp = usp;
-	p->thread.ksp = (unsigned long) childstack;
-	p->thread.pal_flags = 1;	/* set FEN, clear everything else */
-	p->thread.flags = current->thread.flags;
+	childti->pcb.usp = usp;
+	childti->pcb.ksp = (unsigned long) childstack;
+	childti->pcb.flags = 1;	/* set FEN, clear everything else */
 
 	return 0;
 }
@@ -433,6 +411,35 @@ out:
 }
 
 /*
+ * Return saved PC of a blocked thread.  This assumes the frame
+ * pointer is the 6th saved long on the kernel stack and that the
+ * saved return address is the first long in the frame.  This all
+ * holds provided the thread blocked through a call to schedule() ($15
+ * is the frame pointer in schedule() and $15 is saved at offset 48 by
+ * entry.S:do_switch_stack).
+ *
+ * Under heavy swap load I've seen this lose in an ugly way.  So do
+ * some extra sanity checking on the ranges we expect these pointers
+ * to be in so that we can fail gracefully.  This is just for ps after
+ * all.  -- r~
+ */
+
+unsigned long
+thread_saved_pc(task_t *t)
+{
+	unsigned long base = (unsigned long)t->thread_info;
+	unsigned long fp, sp = t->thread_info->pcb.ksp;
+
+	if (sp > base && sp+6*8 < base + 16*1024) {
+		fp = ((unsigned long*)sp)[6];
+		if (fp > sp && fp < base + 16*1024)
+			return *(unsigned long *)fp;
+	}
+
+	return 0;
+}
+
+/*
  * These bracket the sleeping functions..
  */
 extern void scheduling_functions_start_here(void);
@@ -457,9 +464,9 @@ get_wchan(struct task_struct *p)
 	 * after all...
 	 */
 
-	pc = thread_saved_pc(&p->thread);
+	pc = thread_saved_pc(p);
 	if (pc >= first_sched && pc < last_sched) {
-		schedule_frame = ((unsigned long *)p->thread.ksp)[6];
+		schedule_frame = ((unsigned long *)p->thread_info->pcb.ksp)[6];
 		return ((unsigned long *)schedule_frame)[12];
 	}
 	return pc;

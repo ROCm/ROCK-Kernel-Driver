@@ -29,8 +29,8 @@
 
 #ifdef __KERNEL__
 
-/* This is the shift that is applied to the UAC bits as stored in the 
-   per-thread flags.  */
+/* This is the shift that is applied to the UAC bits as stored in the
+   per-thread flags.  See thread_info.h.  */
 #define UAC_SHIFT			6
 
 #endif

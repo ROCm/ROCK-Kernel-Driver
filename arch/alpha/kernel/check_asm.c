@@ -3,30 +3,28 @@
 #include <linux/sched.h>
 #include <asm/io.h>
 
-int main()
+#define OUT(x) \
+  asm ("\nxyzzy " x)
+#define DEF(name, val) \
+  asm volatile ("\nxyzzy #define " name " %0" : : "i"(val))
+
+void foo(void)
 {
-	printf("#ifndef __ASM_OFFSETS_H__\n#define __ASM_OFFSETS_H__\n");
+	OUT("#ifndef __ASM_OFFSETS_H__");
+	OUT("#define __ASM_OFFSETS_H__");
+	OUT("");
 
-	printf("#define TASK_STATE %ld\n",
-	       (long)offsetof(struct task_struct, state));
-	printf("#define TASK_FLAGS %ld\n",
-	       (long)offsetof(struct task_struct, flags));
-	printf("#define TASK_SIGPENDING %ld\n",
-#error	       (long)offsetof(struct task_struct, sigpending));
-	printf("#define TASK_ADDR_LIMIT %ld\n",
-	       (long)offsetof(struct task_struct, addr_limit));
-	printf("#define TASK_EXEC_DOMAIN %ld\n",
-	       (long)offsetof(struct task_struct, exec_domain));
-	printf("#define TASK_NEED_RESCHED %ld\n",
-#error	       (long)offsetof(struct task_struct, work.need_resched));
-	printf("#define TASK_SIZE %ld\n", sizeof(struct task_struct));
-	printf("#define STACK_SIZE %ld\n", sizeof(union task_union));
+	DEF("TI_TASK", offsetof(struct thread_info, task));
+	DEF("TI_FLAGS", offsetof(struct thread_info, flags));
+	DEF("TI_CPU", offsetof(struct thread_info, cpu));
 
-	printf("#define HAE_CACHE %ld\n",
-	       (long)offsetof(struct alpha_machine_vector, hae_cache));
-	printf("#define HAE_REG %ld\n",
-	       (long)offsetof(struct alpha_machine_vector, hae_register));
+	DEF("PT_PTRACED", PT_PTRACED);
+	DEF("CLONE_VM", CLONE_VM);
+	DEF("SIGCHLD", SIGCHLD);
 
-	printf("#endif /* __ASM_OFFSETS_H__ */\n");
-	return 0;
+	DEF("HAE_CACHE", offsetof(struct alpha_machine_vector, hae_cache));
+	DEF("HAE_REG", offsetof(struct alpha_machine_vector, hae_register));
+
+	OUT("");
+	OUT("#endif /* __ASM_OFFSETS_H__ */");
 }

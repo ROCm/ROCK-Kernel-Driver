@@ -117,11 +117,13 @@ srmboot:
 archclean:
 	@$(MAKE) -C arch/alpha/kernel clean
 	@$(MAKEBOOT) clean
-	rm -f arch/alpha/vmlinux.lds
 
 archmrproper:
+	rm -f arch/alpha/vmlinux.lds
+	rm -f include/asm-alpha/asm_offsets.h
 
 archdep:
+	$(MAKE) -C arch/alpha/kernel asm_offsets
 	@$(MAKEBOOT) dep
 
 vmlinux: arch/alpha/vmlinux.lds
