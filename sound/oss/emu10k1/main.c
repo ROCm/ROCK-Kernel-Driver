@@ -213,7 +213,7 @@ err_dev:
 	return -ENODEV;
 }
 
-static void __devinit emu10k1_audio_cleanup(struct emu10k1_card *card)
+static void emu10k1_audio_cleanup(struct emu10k1_card *card)
 {
 	unregister_sound_dsp(card->audio_dev1);
 	unregister_sound_dsp(card->audio_dev);
@@ -298,7 +298,7 @@ static int __devinit emu10k1_mixer_init(struct emu10k1_card *card)
 	return -EIO;
 }
 
-static void __devinit emu10k1_mixer_cleanup(struct emu10k1_card *card)
+static void emu10k1_mixer_cleanup(struct emu10k1_card *card)
 {
 	char s[32];
 
@@ -402,7 +402,7 @@ err_out1:
 	return ret;
 }
 
-static void __devinit emu10k1_midi_cleanup(struct emu10k1_card *card)
+static void emu10k1_midi_cleanup(struct emu10k1_card *card)
 {
 	tasklet_kill(&card->mpuout->tasklet);
 	kfree(card->mpuout);
@@ -450,7 +450,7 @@ static void __devinit addxmgr_init(struct emu10k1_card *card)
 	card->emupagetable[1] = MAXPAGES - 1;
 }
 
-static void __devinit fx_cleanup(struct patch_manager *mgr)
+static void fx_cleanup(struct patch_manager *mgr)
 {
 	int i;
 	for(i = 0; i < mgr->current_pages; i++)
@@ -967,7 +967,7 @@ static int __devinit emu10k1_init(struct emu10k1_card *card)
 	return 0;
 }
 
-static void __devinit emu10k1_cleanup(struct emu10k1_card *card)
+static void emu10k1_cleanup(struct emu10k1_card *card)
 {
 	int ch;
 
