@@ -19,13 +19,11 @@ obj-y    := entry.o traps.o process.o init_task.o osf_sys.o irq.o \
 obj-y	 += irq_i8259.o irq_srm.o \
 	    es1888.o smc37c669.o smc37c93x.o ns87312.o
 
-ifdef CONFIG_VGA_HOSE
-obj-y	 += console.o
-endif
-
-obj-$(CONFIG_SMP)    += smp.o
-obj-$(CONFIG_PCI)    += pci.o pci_iommu.o
+obj-$(CONFIG_VGA_HOSE)	+= console.o
+obj-$(CONFIG_SMP)	+= smp.o
+obj-$(CONFIG_PCI)	+= pci.o pci_iommu.o
 obj-$(CONFIG_SRM_ENV)	+= srm_env.o
+obj-$(CONFIG_MODULES)	+= module.o
 
 ifdef CONFIG_ALPHA_GENERIC
 
