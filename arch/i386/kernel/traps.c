@@ -526,12 +526,17 @@ static nmi_callback_t nmi_callback = dummy_nmi_callback;
  
 asmlinkage void do_nmi(struct pt_regs * regs, long error_code)
 {
-	int cpu = smp_processor_id();
+	int cpu;
 
+	nmi_enter();
+
+	cpu = smp_processor_id();
 	++nmi_count(cpu);
 
 	if (!nmi_callback(regs, cpu))
 		default_do_nmi(regs);
+
+	nmi_exit();
 }
 
 void set_nmi_callback(nmi_callback_t callback)
