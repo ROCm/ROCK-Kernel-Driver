@@ -162,6 +162,8 @@ EXPORT_SYMBOL(d_invalidate);	/* May be it will be better in dcache.h? */
 EXPORT_SYMBOL(d_move);
 EXPORT_SYMBOL(d_instantiate);
 EXPORT_SYMBOL(d_alloc);
+EXPORT_SYMBOL(d_alloc_anon);
+EXPORT_SYMBOL(d_splice_alias);
 EXPORT_SYMBOL(d_lookup);
 EXPORT_SYMBOL(__d_path);
 EXPORT_SYMBOL(mark_buffer_dirty);
@@ -240,6 +242,7 @@ EXPORT_SYMBOL(d_prune_aliases);
 EXPORT_SYMBOL(prune_dcache);
 EXPORT_SYMBOL(shrink_dcache_sb);
 EXPORT_SYMBOL(shrink_dcache_parent);
+EXPORT_SYMBOL(shrink_dcache_anon);
 EXPORT_SYMBOL(find_inode_number);
 EXPORT_SYMBOL(is_subdir);
 EXPORT_SYMBOL(get_unused_fd);

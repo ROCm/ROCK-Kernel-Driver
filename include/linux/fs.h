@@ -711,6 +711,7 @@ struct super_block {
 
 	struct list_head	s_dirty;	/* dirty inodes */
 	struct list_head	s_locked_inodes;/* inodes being synced */
+	struct list_head	s_anon;		/* anonymous dentries for (nfs) exporting */
 	struct list_head	s_files;
 
 	struct block_device	*s_bdev;
@@ -879,7 +880,7 @@ struct super_operations {
 	 *   and must return a dentry for the referenced object or, if "parent" is
 	 *   set, a dentry for the parent of the object.
 	 *   If a dentry cannot be found, a "root" dentry should be created and
-	 *   flaged as DCACHE_NFSD_DISCONNECTED. nfsd_iget is an example implementation.
+	 *   flaged as DCACHE_DISCONNECTED. nfsd_iget is an example implementation.
 	 *
 	 * dentry_to_fh is given a dentry and must generate the filesys specific
 	 *   part of the file handle.  Available length is passed in *lenp and used

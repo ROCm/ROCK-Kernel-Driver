@@ -117,7 +117,7 @@ d_iput:		no		no		yes
 					 * renamed" and has to be
 					 * deleted on the last dput()
 					 */
-#define	DCACHE_NFSD_DISCONNECTED 0x0004	/* This dentry is not currently connected to the
+#define	DCACHE_DISCONNECTED 0x0004	/* This dentry is not currently connected to the
 					 * dcache tree. Its parent will either be itself,
 					 * or will have this flag as well.
 					 * If this dentry points to a directory, then
@@ -166,8 +166,11 @@ extern void d_delete(struct dentry *);
 
 /* allocate/de-allocate */
 extern struct dentry * d_alloc(struct dentry *, const struct qstr *);
+extern struct dentry * d_alloc_anon(struct inode *);
+extern struct dentry * d_splice_alias(struct inode *, struct dentry *);
 extern void shrink_dcache_sb(struct super_block *);
 extern void shrink_dcache_parent(struct dentry *);
+extern void shrink_dcache_anon(struct list_head *);
 extern int d_invalidate(struct dentry *);
 
 #define shrink_dcache() prune_dcache(0)

@@ -136,7 +136,6 @@ static struct dentry *nfsd_iget(struct super_block *sb, unsigned long ino, __u32
 	 * of 0 means "accept any"
 	 */
 	struct inode *inode;
-	struct list_head *lp;
 	struct dentry *result;
 	if (ino == 0)
 		return ERR_PTR(-ESTALE);
@@ -159,24 +158,12 @@ static struct dentry *nfsd_iget(struct super_block *sb, unsigned long ino, __u32
 	/* now to find a dentry.
 	 * If possible, get a well-connected one
 	 */
-	spin_lock(&dcache_lock);
-	list_for_each(lp, &inode->i_dentry) {
-		result = list_entry(lp,struct dentry, d_alias);
-		if (! (result->d_flags & DCACHE_NFSD_DISCONNECTED)) {
-			dget_locked(result);
-			result->d_vfs_flags |= DCACHE_REFERENCED;
-			spin_unlock(&dcache_lock);
-			iput(inode);
-			return result;
-		}
-	}
-	spin_unlock(&dcache_lock);
-	result = d_alloc_root(inode);
-	if (result == NULL) {
+	result = d_alloc_anon(inode);
+	if (!result) {
 		iput(inode);
 		return ERR_PTR(-ENOMEM);
 	}
-	result->d_flags |= DCACHE_NFSD_DISCONNECTED;
+	result->d_vfs_flags |= DCACHE_REFERENCED;
 	return result;
 }
 
@@ -215,7 +202,7 @@ int d_splice(struct dentry *target, struct dentry *parent, struct qstr *name)
 #ifdef NFSD_PARANOIA
 	if (!IS_ROOT(target))
 		printk("nfsd: d_splice with no-root target: %s/%s\n", parent->d_name.name, name->name);
-	if (!(target->d_flags & DCACHE_NFSD_DISCONNECTED))
+	if (!(target->d_flags & DCACHE_DISCONNECTED))
 		printk("nfsd: d_splice with non-DISCONNECTED target: %s/%s\n", parent->d_name.name, name->name);
 #endif
 	tdentry = d_alloc(parent, name);
@@ -223,13 +210,6 @@ int d_splice(struct dentry *target, struct dentry *parent, struct qstr *name)
 		return -ENOMEM;
 	d_move(target, tdentry);
 
-	/* tdentry will have been made a "child" of target (the parent of target)
-	 * make it an IS_ROOT instead
-	 */
-	spin_lock(&dcache_lock);
-	list_del_init(&tdentry->d_child);
-	tdentry->d_parent = tdentry;
-	spin_unlock(&dcache_lock);
 	d_rehash(target);
 	dput(tdentry);
 
@@ -237,9 +217,9 @@ int d_splice(struct dentry *target, struct dentry *parent, struct qstr *name)
 	 * the children are connected, but it must be a singluar (non-forking)
 	 * branch
 	 */
-	if (!(parent->d_flags & DCACHE_NFSD_DISCONNECTED)) {
+	if (!(parent->d_flags & DCACHE_DISCONNECTED)) {
 		while (target) {
-			target->d_flags &= ~DCACHE_NFSD_DISCONNECTED;
+			target->d_flags &= ~DCACHE_DISCONNECTED;
 			parent = target;
 			spin_lock(&dcache_lock);
 			if (list_empty(&parent->d_subdirs))
@@ -249,9 +229,12 @@ int d_splice(struct dentry *target, struct dentry *parent, struct qstr *name)
 #ifdef NFSD_PARANOIA
 				/* must be only child */
 				if (target->d_child.next != &parent->d_subdirs
-				    || target->d_child.prev != &parent->d_subdirs)
+				    || target->d_child.prev != &parent->d_subdirs) {
 					printk("nfsd: d_splice found non-singular disconnected branch: %s/%s\n",
 					       parent->d_name.name, target->d_name.name);
+					spin_unlock(&dcache_lock);
+					return 0;
+				}
 #endif
 			}
 			spin_unlock(&dcache_lock);
@@ -305,7 +288,7 @@ struct dentry *nfsd_findparent(struct dentry *child)
 			pdentry = d_alloc_root(tdentry->d_inode);
 			if (pdentry) {
 				igrab(tdentry->d_inode);
-				pdentry->d_flags |= DCACHE_NFSD_DISCONNECTED;
+				pdentry->d_flags |= DCACHE_DISCONNECTED;
 			}
 		}
 		if (pdentry == NULL)
@@ -412,14 +395,14 @@ find_fh_dentry(struct super_block *sb, __u32 *datap, int len, int fhtype, int ne
 	down(&sb->s_nfsd_free_path_sem);
 	result = nfsd_get_dentry(sb, datap, len, fhtype, 0);
 	if (IS_ERR(result)
-	    || !(result->d_flags & DCACHE_NFSD_DISCONNECTED)
+	    || !(result->d_flags & DCACHE_DISCONNECTED)
 	    || (!S_ISDIR(result->d_inode->i_mode) && ! needpath)) {
 		up(&sb->s_nfsd_free_path_sem);
 	    
 		err = PTR_ERR(result);
 		if (IS_ERR(result))
 			goto err_out;
-		if ((result->d_flags & DCACHE_NFSD_DISCONNECTED))
+		if ((result->d_flags & DCACHE_DISCONNECTED))
 			nfsdstats.fh_anon++;
 		return result;
 	}
@@ -457,7 +440,7 @@ find_fh_dentry(struct super_block *sb, __u32 *datap, int len, int fhtype, int ne
 		dentry = dget(result);
 	}
 
-	while(dentry->d_flags & DCACHE_NFSD_DISCONNECTED) {
+	while(dentry->d_flags & DCACHE_DISCONNECTED) {
 		/* LOOP INVARIANT */
 		/* haven't found a place in the tree yet, but we do have a free path
 		 * from dentry down to result, and dentry is a directory.
@@ -654,7 +637,7 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 		}
 #ifdef NFSD_PARANOIA
 		if (S_ISDIR(dentry->d_inode->i_mode) &&
-		    (dentry->d_flags & DCACHE_NFSD_DISCONNECTED)) {
+		    (dentry->d_flags & DCACHE_DISCONNECTED)) {
 			printk("nfsd: find_fh_dentry returned a DISCONNECTED directory: %s/%s\n",
 			       dentry->d_parent->d_name.name, dentry->d_name.name);
 		}
