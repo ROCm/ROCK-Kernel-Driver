@@ -647,6 +647,7 @@ int usb_stor_bulk_transfer_buf(struct us_data *us, unsigned int pipe,
 
 	/* no error code, so we must have transferred some data, 
 	 * just not all of it */
+	US_DEBUGP("-- transferred only %d bytes\n", partial);
 	return USB_STOR_XFER_SHORT;
 }
 
@@ -654,15 +655,15 @@ int usb_stor_bulk_transfer_buf(struct us_data *us, unsigned int pipe,
  * Transfer an entire SCSI command's worth of data payload over the bulk
  * pipe.
  *
- * Note that this uses usb_stor_transfer_buf to achieve its goals -- this
- * function simply determines if we're going to use scatter-gather or not,
- * and acts appropriately.  For now, it also re-interprets the error codes.
+ * Note that this uses usb_stor_bulk_transfer_buf to achieve its goals --
+ * this function simply determines if we're going to use scatter-gather or not,
+ * and acts appropriately.
  */
 int usb_stor_bulk_transfer_sg(struct us_data* us, unsigned int pipe,
 		char *buf, unsigned int length_left, int use_sg, int *residual)
 {
 	int i;
-	int result = -1;
+	int result = USB_STOR_XFER_ERROR;
 	struct scatterlist *sg;
 	unsigned int amount;
 	unsigned int partial;
@@ -1046,9 +1047,11 @@ int usb_stor_CBI_transport(Scsi_Cmnd *srb, struct us_data *us)
 
 	/* DATA STAGE */
 	/* transfer the data payload for this command, if one exists*/
-	if (transfer_length > 0) {
-		result = usb_stor_bulk_transfer_srb(us, us->send_bulk_pipe,
-				srb, transfer_length);
+	if (transfer_length) {
+		unsigned int pipe = srb->sc_data_direction == SCSI_DATA_READ ? 
+				us->recv_bulk_pipe : us->send_bulk_pipe;
+		result = usb_stor_bulk_transfer_srb(us, pipe, srb,
+					transfer_length);
 		US_DEBUGP("CBI data stage result is 0x%x\n", result);
 
 		/* report any errors */
@@ -1140,6 +1143,7 @@ int usb_stor_CB_transport(Scsi_Cmnd *srb, struct us_data *us)
 	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
 		US_DEBUGP("usb_stor_CB_transport(): transfer aborted\n");
 		return USB_STOR_TRANSPORT_ABORTED;
+	}
 
 	if (result != USB_STOR_XFER_GOOD) {
 		/* Uh oh... serious problem here */
@@ -1148,9 +1152,11 @@ int usb_stor_CB_transport(Scsi_Cmnd *srb, struct us_data *us)
 
 	/* DATA STAGE */
 	/* transfer the data payload for this command, if one exists*/
-	if (transfer_length)
-		result = usb_stor_bulk_transfer_srb(us, us->send_bulk_pipe,
-				srb, transfer_length);
+	if (transfer_length) {
+		unsigned int pipe = srb->sc_data_direction == SCSI_DATA_READ ? 
+				us->recv_bulk_pipe : us->send_bulk_pipe;
+		result = usb_stor_bulk_transfer_srb(us, pipe, srb,
+					transfer_length);
 		US_DEBUGP("CB data stage result is 0x%x\n", result);
 
 		/* report any errors */

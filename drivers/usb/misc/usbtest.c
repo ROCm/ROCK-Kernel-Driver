@@ -109,7 +109,7 @@ static struct urb *simple_alloc_urb (
 	usb_fill_bulk_urb (urb, udev, pipe, 0, bytes, simple_callback, 0);
 	urb->interval = (udev->speed == USB_SPEED_HIGH)
 			? (INTERRUPT_RATE << 3)
-			: INTERRUPT_RATE,
+			: INTERRUPT_RATE;
 	urb->transfer_flags = URB_NO_DMA_MAP;
 	if (usb_pipein (pipe))
 		urb->transfer_flags |= URB_SHORT_NOT_OK;
@@ -142,7 +142,7 @@ static int simple_io (
 	int			retval = 0;
 
 	urb->context = &completion;
-	while (iterations-- > 0 && retval == 0) {
+	while (retval == 0 && iterations-- > 0) {
 		init_completion (&completion);
 		if ((retval = usb_submit_urb (urb, SLAB_KERNEL)) != 0)
 			break;
@@ -155,7 +155,7 @@ static int simple_io (
 		if (vary) {
 			int	len = urb->transfer_buffer_length;
 
-			len += max;
+			len += vary;
 			len %= max;
 			if (len == 0)
 				len = (vary < max) ? vary : max;
@@ -347,7 +347,7 @@ static int set_altsetting (struct usbtest_dev *dev, int alternate)
 		ep &= USB_ENDPOINT_NUMBER_MASK;
 		usb_settoggle (udev, ep, out, 0);
 		(out ? udev->epmaxpacketout : udev->epmaxpacketin ) [ep]
-			= iface_as->endpoint [ep].wMaxPacketSize;
+			= iface_as->endpoint [i].wMaxPacketSize;
 	}
 
 	return 0;
@@ -659,7 +659,7 @@ static int usbtest_ioctl (struct usb_interface *intf, unsigned int code, void *b
 			break;
 		dbg ("%s TEST 4:  read/%d 0..%d bytes %u times", dev->id,
 				param->vary, param->length, param->iterations);
-		urb = simple_alloc_urb (udev, dev->out_pipe, param->length);
+		urb = simple_alloc_urb (udev, dev->in_pipe, param->length);
 		if (!urb) {
 			retval = -ENOMEM;
 			break;
@@ -907,6 +907,14 @@ static struct usbtest_info ez2_info = {
 	.alt		= 1,
 };
 
+/* ezusb family device with dedicated usb test firmware*/
+static struct usbtest_info fw_info = {
+	.name		= "usb test device",
+	.ep_in		= 2,
+	.ep_out		= 2,
+	.alt		= 0,
+};
+
 #ifdef IBOT2
 /* this is a nice source of high speed bulk data;
  * uses an FX2, with firmware provided in the device
@@ -960,6 +968,11 @@ static struct usb_device_id id_table [] = {
 	/* generic EZ-USB FX2 controller (or development board) */
 	{ USB_DEVICE (0x04b4, 0x8613),
 		.driver_info = (unsigned long) &ez2_info,
+		},
+
+	/* re-enumerated usb test device firmware */
+	{ USB_DEVICE (0xfff0, 0xfff0),
+		.driver_info = (unsigned long) &fw_info,
 		},
 
 #ifdef KEYSPAN_19Qi
