@@ -704,6 +704,7 @@ int nfs_is_exclusive_create(struct inode *dir, struct nameidata *nd)
 
 static struct dentry *nfs_lookup(struct inode *dir, struct dentry * dentry, struct nameidata *nd)
 {
+	struct dentry *res;
 	struct inode *inode = NULL;
 	int error;
 	struct nfs_fh fhandle;
@@ -712,11 +713,11 @@ static struct dentry *nfs_lookup(struct inode *dir, struct dentry * dentry, stru
 	dfprintk(VFS, "NFS: lookup(%s/%s)\n",
 		dentry->d_parent->d_name.name, dentry->d_name.name);
 
-	error = -ENAMETOOLONG;
+	res = ERR_PTR(-ENAMETOOLONG);
 	if (dentry->d_name.len > NFS_SERVER(dir)->namelen)
 		goto out;
 
-	error = -ENOMEM;
+	res = ERR_PTR(-ENOMEM);
 	dentry->d_op = NFS_PROTO(dir)->dentry_ops;
 
 	lock_kernel();
@@ -730,22 +731,24 @@ static struct dentry *nfs_lookup(struct inode *dir, struct dentry * dentry, stru
 	error = NFS_PROTO(dir)->lookup(dir, &dentry->d_name, &fhandle, &fattr);
 	if (error == -ENOENT)
 		goto no_entry;
-	if (error != 0)
+	if (error < 0) {
+		res = ERR_PTR(error);
 		goto out_unlock;
-	error = -EACCES;
+	}
+	res = ERR_PTR(-EACCES);
 	inode = nfs_fhget(dentry->d_sb, &fhandle, &fattr);
 	if (!inode)
 		goto out_unlock;
 no_entry:
-	error = 0;
-	d_add(dentry, inode);
+	res = d_add_unique(dentry, inode);
+	if (res != NULL)
+		dentry = res;
 	nfs_renew_times(dentry);
 	nfs_set_verifier(dentry, nfs_save_change_attribute(dir));
 out_unlock:
 	unlock_kernel();
 out:
-	BUG_ON(error > 0);
-	return ERR_PTR(error);
+	return res;
 }
 
 #ifdef CONFIG_NFS_V4
@@ -775,15 +778,15 @@ static int is_atomic_open(struct inode *dir, struct nameidata *nd)
 
 static struct dentry *nfs_atomic_lookup(struct inode *dir, struct dentry *dentry, struct nameidata *nd)
 {
+	struct dentry *res = NULL;
 	struct inode *inode = NULL;
-	int error = 0;
 
 	/* Check that we are indeed trying to open this file */
 	if (!is_atomic_open(dir, nd))
 		goto no_open;
 
 	if (dentry->d_name.len > NFS_SERVER(dir)->namelen) {
-		error = -ENAMETOOLONG;
+		res = ERR_PTR(-ENAMETOOLONG);
 		goto out;
 	}
 	dentry->d_op = NFS_PROTO(dir)->dentry_ops;
@@ -805,7 +808,7 @@ static struct dentry *nfs_atomic_lookup(struct inode *dir, struct dentry *dentry
 		inode = nfs4_atomic_open(dir, dentry, nd);
 	unlock_kernel();
 	if (IS_ERR(inode)) {
-		error = PTR_ERR(inode);
+		int error = PTR_ERR(inode);
 		switch (error) {
 			/* Make a negative dentry */
 			case -ENOENT:
@@ -818,16 +821,18 @@ static struct dentry *nfs_atomic_lookup(struct inode *dir, struct dentry *dentry
 			/* case -EISDIR: */
 			/* case -EINVAL: */
 			default:
+				res = ERR_PTR(error);
 				goto out;
 		}
 	}
 no_entry:
-	d_add(dentry, inode);
+	res = d_add_unique(dentry, inode);
+	if (res != NULL)
+		dentry = res;
 	nfs_renew_times(dentry);
 	nfs_set_verifier(dentry, nfs_save_change_attribute(dir));
 out:
-	BUG_ON(error > 0);
-	return ERR_PTR(error);
+	return res;
 no_open:
 	return nfs_lookup(dir, dentry, nd);
 }
@@ -888,7 +893,7 @@ static struct dentry *nfs_readdir_lookup(nfs_readdir_descriptor_t *desc)
 	struct dentry *parent = desc->file->f_dentry;
 	struct inode *dir = parent->d_inode;
 	struct nfs_entry *entry = desc->entry;
-	struct dentry *dentry;
+	struct dentry *dentry, *alias;
 	struct qstr name = {
 		.name = entry->name,
 		.len = entry->len,
@@ -920,7 +925,11 @@ static struct dentry *nfs_readdir_lookup(nfs_readdir_descriptor_t *desc)
 		dput(dentry);
 		return NULL;
 	}
-	d_add(dentry, inode);
+	alias = d_add_unique(dentry, inode);
+	if (alias != NULL) {
+		dput(dentry);
+		dentry = alias;
+	}
 	nfs_renew_times(dentry);
 	nfs_set_verifier(dentry, nfs_save_change_attribute(dir));
 	return dentry;
