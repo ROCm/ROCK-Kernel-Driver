@@ -6,6 +6,8 @@
 #ifndef __SKAS_UACCESS_H
 #define __SKAS_UACCESS_H
 
+#include "asm/errno.h"
+
 #define access_ok_skas(type, addr, size) \
 	((segment_eq(get_fs(), KERNEL_DS)) || \
 	 (((unsigned long) (addr) < TASK_SIZE) && \

@@ -17,4 +17,4 @@ LD_SCRIPT_SKAS = dyn.lds.s
 GEN_HEADERS += $(TOPDIR)/$(ARCH_DIR)/include/skas_ptregs.h
 
 $(TOPDIR)/$(ARCH_DIR)/include/skas_ptregs.h :
-	$(call descend,$(ARCH_DIR)/kernel/skas,$@)
+	$(Q)$(MAKE) $(build)=$(ARCH_DIR)/kernel/skas $@

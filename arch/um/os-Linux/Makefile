@@ -9,7 +9,3 @@ USER_OBJS := $(foreach file,file.o process.o tty.o,$(obj)/$(file))
 
 $(USER_OBJS) : %.o: %.c
 	$(CC) $(CFLAGS_$(notdir $@)) $(USER_CFLAGS) -c -o $@ $<
-
-clean :
-
-archmrproper:

@@ -9,5 +9,3 @@ USER_OBJS := $(foreach file,$(obj-y),$(src)/$(file))
 
 $(USER_OBJS) : %.o: %.c
 	$(CC) $(CFLAGS_$(notdir $@)) $(USER_CFLAGS) -c -o $@ $<
-
-clean:

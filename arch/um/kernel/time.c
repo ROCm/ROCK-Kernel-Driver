@@ -120,6 +120,8 @@ static unsigned long long get_host_hz(void)
 
 unsigned long long host_hz = 0;
 
+extern int do_posix_clock_monotonic_gettime(struct timespec *tp);
+
 void time_init(void)
 {
 	struct timespec now;

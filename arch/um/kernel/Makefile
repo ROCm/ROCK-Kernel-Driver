@@ -21,8 +21,6 @@ obj-$(CONFIG_TTY_LOG)	+= tty_log.o
 obj-$(CONFIG_MODE_TT) += tt/
 obj-$(CONFIG_MODE_SKAS) += skas/
 
-clean-files	:= config.c
-
 user-objs-$(CONFIG_TTY_LOG) += tty_log.o
 
 USER_OBJS := $(filter %_user.o,$(obj-y))  $(user-objs-y) config.o helper.o \
@@ -38,27 +36,22 @@ CFLAGS_user_syms.o = -D__AUTOCONF_INCLUDED__ $(DMODULES-y) $(DMODVERSIONS-y) \
 
 CFLAGS_frame.o := $(patsubst -fomit-frame-pointer,,$(USER_CFLAGS))
 
-$(USER_OBJS) : %.o: %.c
-	$(CC) $(CFLAGS_$(notdir $@)) $(USER_CFLAGS) -c -o $@ $<
-
 # This has to be separate because it needs be compiled with frame pointers
 # regardless of how the rest of the kernel is built.
 
 $(obj)/frame.o: $(src)/frame.c
 	$(CC) $(CFLAGS_$(notdir $@)) -c -o $@ $<
 
-QUOTE = 'my $$config=`cat $(TOPDIR)/.config`; $$config =~ s/"/\\"/g ; $$config =~ s/\n/\\n"\n"/g ; while(<STDIN>) { $$_ =~ s/CONFIG/$$config/; print $$_ }'
+$(USER_OBJS) : %.o: %.c
+	$(CC) $(CFLAGS_$(notdir $@)) $(USER_CFLAGS) -c -o $@ $<
 
-$(obj)/config.c : $(src)/config.c.in $(TOPDIR)/.config
-	$(PERL) -e $(QUOTE) < $(src)/config.c.in > $@
+QUOTE = 'my $$config=`cat $(TOPDIR)/.config`; $$config =~ s/"/\\"/g ; $$config =~ s/\n/\\n"\n"/g ; while(<STDIN>) { $$_ =~ s/CONFIG/$$config/; print $$_ }'
 
 $(obj)/config.o : $(obj)/config.c
 
-modules:
+quiet_cmd_quote = QUOTE $@
+cmd_quote = $(PERL) -e $(QUOTE) < $< > $@
 
-fastdep:
-
-dep:
-
-archmrproper: clean
-
+targets += config.c
+$(obj)/config.c : $(src)/config.c.in $(TOPDIR)/.config FORCE
+	$(call if_changed,quote)

@@ -61,7 +61,7 @@ int real_wait_return(struct debugger *debugger)
 	pid = debugger->pid;
 
 	ip = ptrace(PTRACE_PEEKUSER, pid, PT_IP_OFFSET, 0);
-	ip = IP_RESTART_SYSCALL(ip);
+	IP_RESTART_SYSCALL(ip);
 
 	if(ptrace(PTRACE_POKEUSER, pid, PT_IP_OFFSET, ip) < 0)
 		tracer_panic("real_wait_return : Failed to restart system "

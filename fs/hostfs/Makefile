@@ -24,13 +24,3 @@ USER_CFLAGS += -DSTAT64_INO_FIELD=$(STAT64_INO_FIELD)
 
 $(USER_OBJS) : %.o: %.c
 	$(CC) $(CFLAGS_$(notdir $@)) $(USER_CFLAGS) -c -o $@ $<
-
-clean:
-
-modules:
-
-fastdep:
-
-dep:
-
-archmrproper: clean

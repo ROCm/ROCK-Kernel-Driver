@@ -12,8 +12,6 @@
 #include "asm/page.h"
 #include "asm/fixmap.h"
 
-extern pgd_t swapper_pg_dir[1024];
-
 extern void *um_virt_to_phys(struct task_struct *task, unsigned long virt,
 			     pte_t *pte_out);
 
@@ -48,6 +46,8 @@ extern unsigned long *empty_zero_page;
         printk("%s:%d: bad pmd %08lx.\n", __FILE__, __LINE__, pmd_val(e))
 #define pgd_ERROR(e) \
         printk("%s:%d: bad pgd %08lx.\n", __FILE__, __LINE__, pgd_val(e))
+
+extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
 
 /*
  * pgd entries used up by user/kernel:

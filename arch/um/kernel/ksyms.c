@@ -69,6 +69,7 @@ EXPORT_SYMBOL(os_read_file);
 EXPORT_SYMBOL(os_write_file);
 EXPORT_SYMBOL(os_seek_file);
 EXPORT_SYMBOL(os_lock_file);
+EXPORT_SYMBOL(os_ioctl_generic);
 EXPORT_SYMBOL(os_pipe);
 EXPORT_SYMBOL(os_file_type);
 EXPORT_SYMBOL(os_file_mode);

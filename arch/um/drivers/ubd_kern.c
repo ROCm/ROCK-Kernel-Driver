@@ -480,10 +480,14 @@ static int ubd_file_size(struct ubd *dev, __u64 *size_out)
 
 static void ubd_close(struct ubd *dev)
 {
+	if(ubd_do_mmap)
+		physmem_forget_descriptor(dev->fd);
 	os_close_file(dev->fd);
 	if(dev->cow.file == NULL)
 		return;
 
+	if(ubd_do_mmap)
+		physmem_forget_descriptor(dev->cow.fd);
 	os_close_file(dev->cow.fd);
 	vfree(dev->cow.bitmap);
 	dev->cow.bitmap = NULL;
@@ -1034,7 +1038,7 @@ static void do_ubd_request(request_queue_t *q)
 	int err, n;
 
 	if(thread_fd == -1){
-		while(!list_empty(&q->queue_head)){
+		while(!elv_queue_empty(q)){
 			req = elv_next_request(q);
 			err = prepare_request(req, &io_req);
 			if(!err){
@@ -1044,7 +1048,8 @@ static void do_ubd_request(request_queue_t *q)
 		}
 	}
 	else {
-		if(do_ubd || list_empty(&q->queue_head)) return;
+		if(do_ubd || elv_queue_empty(q))
+			return;
 		req = elv_next_request(q);
 		err = prepare_request(req, &io_req);
 		if(!err){

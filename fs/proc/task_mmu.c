@@ -1,7 +1,6 @@
 #include <linux/mm.h>
 #include <linux/hugetlb.h>
 #include <linux/seq_file.h>
-#include <linux/init.h>
 #include <asm/elf.h>
 #include <asm/uaccess.h>
 

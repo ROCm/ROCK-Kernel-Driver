@@ -169,15 +169,11 @@ static struct tty_operations console_ops = {
 	.write_room		= line_write_room,
 };
 
-extern int tty_init(void);
-
 int stdio_init(void)
 {
 	char *new_title;
 
 	printk(KERN_INFO "Initializing stdio console driver\n");
-
-	tty_init();
 
 	console_driver = line_register_devfs(&console_lines, &driver,
 					     &console_ops, vts,
@@ -193,7 +189,7 @@ int stdio_init(void)
 	return(0);
 }
 
-__initcall(stdio_init);
+late_initcall(stdio_init);
 
 static void console_write(struct console *console, const char *string, 
 			  unsigned len)

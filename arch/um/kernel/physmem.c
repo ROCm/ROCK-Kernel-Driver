@@ -19,6 +19,28 @@
 #include "kern.h"
 #include "init.h"
 
+#if 0
+static pgd_t physmem_pgd[PTRS_PER_PGD];
+
+static struct phys_desc *lookup_mapping(void *addr)
+{
+	pgd = &physmem_pgd[pgd_index(addr)];
+	if(pgd_none(pgd))
+		return(NULL);
+
+	pmd = pmd_offset(pgd, addr);
+	if(pmd_none(pmd))
+		return(NULL);
+
+	pte = pte_offset_kernel(pmd, addr);
+	return((struct phys_desc *) pte_val(pte));
+}
+
+static struct add_mapping(void *addr, struct phys_desc *new)
+{
+}
+#endif
+
 #define PHYS_HASHSIZE (8192)
 
 struct phys_desc;
@@ -31,6 +53,7 @@ struct phys_desc {
 	__u64 offset;
 	void *virt;
 	unsigned long phys;
+	struct list_head list;
 };
 
 struct virtmem_table virtmem_hash;
@@ -49,16 +72,59 @@ static int virt_hash(void *virt)
 DEF_HASH(static, virtmem, struct phys_desc, virt_ptrs, void *, virt, virt_cmp, 
 	 virt_hash);
 
+LIST_HEAD(descriptor_mappings);
+
+struct desc_mapping {
+	int fd;
+	struct list_head list;
+	struct list_head pages;
+};
+
+static struct desc_mapping *find_mapping(int fd)
+{
+	struct desc_mapping *desc;
+	struct list_head *ele;
+
+	list_for_each(ele, &descriptor_mappings){
+		desc = list_entry(ele, struct desc_mapping, list);
+		if(desc->fd == fd)
+			return(desc);
+	}
+
+	return(NULL);
+}
+
+static struct desc_mapping *descriptor_mapping(int fd)
+{
+	struct desc_mapping *desc;
+
+	desc = find_mapping(fd);
+	if(desc != NULL)
+		return(desc);
+
+	desc = kmalloc(sizeof(*desc), GFP_ATOMIC);
+	if(desc == NULL)
+		return(NULL);
+
+	*desc = ((struct desc_mapping) 
+		{ .fd =		fd,
+		  .list =	LIST_HEAD_INIT(desc->list),
+		  .pages =	LIST_HEAD_INIT(desc->pages) });
+	list_add(&desc->list, &descriptor_mappings);
+
+	return(desc);
+}
+
 int physmem_subst_mapping(void *virt, int fd, __u64 offset, int w)
 {
+	struct desc_mapping *fd_maps;
 	struct phys_desc *desc;
 	unsigned long phys;
 	int err;
 
-	virt = (void *) ((unsigned long) virt & PAGE_MASK);
-	err = os_map_memory(virt, fd, offset, PAGE_SIZE, 1, w, 0);
-	if(err)
-		goto out;
+	fd_maps = descriptor_mapping(fd);
+	if(fd_maps == NULL)
+		return(-ENOMEM);
 
 	phys = __pa(virt);
 	if(find_virtmem_hash(&virtmem_hash, virt) != NULL)
@@ -69,37 +135,90 @@ int physmem_subst_mapping(void *virt, int fd, __u64 offset, int w)
 	if(desc == NULL)
 		goto out;
 
-	*desc = ((struct phys_desc) { .virt_ptrs =	{ NULL, NULL },
-				      .fd =		fd,
-				      .offset =		offset,
-				      .virt =		virt,
-				      .phys =		__pa(virt) });
+	*desc = ((struct phys_desc) 
+		{ .virt_ptrs =	{ NULL, NULL },
+		  .fd =		fd,
+		  .offset =		offset,
+		  .virt =		virt,
+		  .phys =		__pa(virt),
+		  .list = 		LIST_HEAD_INIT(desc->list) });
 	insert_virtmem_hash(&virtmem_hash, desc);
-	err = 0;
+
+	list_add(&desc->list, &fd_maps->pages);
+
+	virt = (void *) ((unsigned long) virt & PAGE_MASK);
+	err = os_map_memory(virt, fd, offset, PAGE_SIZE, 1, w, 0);
+	if(!err)
+		goto out;
+
+	remove_virtmem_hash(&virtmem_hash, desc);
+	kfree(desc);
  out:
 	return(err);
 }
 
 static int physmem_fd = -1;
 
-int physmem_remove_mapping(void *virt)
+static void remove_mapping(struct phys_desc *desc)
 {
-	struct phys_desc *desc;
+	void *virt = desc->virt;
 	int err;
 
-	virt = (void *) ((unsigned long) virt & PAGE_MASK);
-	desc = find_virtmem_hash(&virtmem_hash, virt);
-	if(desc == NULL)
-		return(0);
-
 	remove_virtmem_hash(&virtmem_hash, desc);
+	list_del(&desc->list);
 	kfree(desc);
 
 	err = os_map_memory(virt, physmem_fd, __pa(virt), PAGE_SIZE, 1, 1, 0);
 	if(err)
 		panic("Failed to unmap block device page from physical memory, "
 		      "errno = %d", -err);
+}
+
+int physmem_remove_mapping(void *virt)
+{
+	struct phys_desc *desc;
+
+	virt = (void *) ((unsigned long) virt & PAGE_MASK);
+	desc = find_virtmem_hash(&virtmem_hash, virt);
+	if(desc == NULL)
+		return(0);
+
+	remove_mapping(desc);
 	return(1);
+}
+
+void physmem_forget_descriptor(int fd)
+{
+	struct desc_mapping *desc;
+	struct phys_desc *page;
+	struct list_head *ele, *next;
+	__u64 offset;
+	void *addr;
+	int err;
+
+	desc = find_mapping(fd);
+	if(desc == NULL)
+		return;
+
+	list_for_each_safe(ele, next, &desc->pages){
+		page = list_entry(ele, struct phys_desc, list);
+		offset = page->offset;
+		addr = page->virt;
+		remove_mapping(page);
+		err = os_seek_file(fd, offset);
+		if(err)
+			panic("physmem_forget_descriptor - failed to seek "
+			      "to %lld in fd %d, error = %d\n",
+			      offset, fd, -err);
+		err = os_read_file(fd, addr, PAGE_SIZE);
+		if(err < 0)
+			panic("physmem_forget_descriptor - failed to read "
+			      "from fd %d to 0x%p, error = %d\n",
+			      fd, addr, -err);
+	}
+
+	list_del(&desc->list);
+	kfree(desc);
 }
 
 void arch_free_page(struct page *page, int order)
@@ -107,7 +226,7 @@ void arch_free_page(struct page *page, int order)
 	void *virt;
 	int i;
 
-	for(i = 0; i < 1 << order; i++){
+	for(i = 0; i < (1 << order); i++){
 		virt = __va(page_to_phys(page + i));
 		physmem_remove_mapping(virt);
 	}

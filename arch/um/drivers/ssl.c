@@ -217,8 +217,6 @@ static struct tty_operations ssl_ops = {
  */
 static int ssl_init_done = 0;
 
-extern int tty_init(void);
-
 static void ssl_console_write(struct console *c, const char *string, 
 			      unsigned len)
 {
@@ -257,8 +255,6 @@ int ssl_init(void)
 	printk(KERN_INFO "Initializing software serial port version %d\n", 
 	       ssl_version);
 
-	tty_init();
-
 	ssl_driver = line_register_devfs(&lines, &driver, &ssl_ops,
 		serial_lines, sizeof(serial_lines)/sizeof(serial_lines[0]));
 
@@ -272,7 +268,7 @@ int ssl_init(void)
 	return(0);
 }
 
-__initcall(ssl_init);
+late_initcall(ssl_init);
 
 static int ssl_chan_setup(char *str)
 {

@@ -17,7 +17,8 @@
  */
 
 /* Had to update this: this changed in late 2.5 to add CRC and other beasts
- * and was never updated here- 13 Dec 2003-Blaisorblade*/
+ * and was never updated here- 13 Dec 2003-Blaisorblade
+ */
 
 /* v850 toolchain uses a `_' prefix for all user symbols */
 #ifndef MODULE_SYMBOL_PREFIX
@@ -70,49 +71,6 @@ struct kernel_symbol
 /* We don't mangle the actual symbol anymore, so no need for
  * special casing EXPORT_SYMBOL_NOVERS.  FIXME: Deprecated */
 #define EXPORT_SYMBOL_NOVERS(sym) EXPORT_SYMBOL(sym)
-#endif
-#if 0
-struct module_symbol
-{
-	unsigned long value;
-	const char *name;
-};
-
-/* Indirect stringification.  */
-
-#define __MODULE_STRING_1(x)	#x
-#define __MODULE_STRING(x)	__MODULE_STRING_1(x)
-
-#if !defined(AUTOCONF_INCLUDED)
-
-#define __EXPORT_SYMBOL(sym,str)   error config_must_be_included_before_module
-#define EXPORT_SYMBOL(var)	   error config_must_be_included_before_module
-#define EXPORT_SYMBOL_NOVERS(var)  error config_must_be_included_before_module
-
-#elif !defined(UML_CONFIG_MODULES)
-
-#define __EXPORT_SYMBOL(sym,str)
-#define EXPORT_SYMBOL(var)
-#define EXPORT_SYMBOL_NOVERS(var)
-
-#else
-
-#define __EXPORT_SYMBOL(sym, str)			\
-const char __kstrtab_##sym[]				\
-__attribute__((section(".kstrtab"))) = str;		\
-const struct module_symbol __ksymtab_##sym 		\
-__attribute__((section("__ksymtab"))) =			\
-{ (unsigned long)&sym, __kstrtab_##sym }
-
-#if defined(__MODVERSIONS__) || !defined(UML_CONFIG_MODVERSIONS)
-#define EXPORT_SYMBOL(var)  __EXPORT_SYMBOL(var, __MODULE_STRING(var))
-#else
-#define EXPORT_SYMBOL(var)  __EXPORT_SYMBOL(var, __MODULE_STRING(__VERSIONED_SYMBOL(var)))
-#endif
-
-#define EXPORT_SYMBOL_NOVERS(var)  __EXPORT_SYMBOL(var, __MODULE_STRING(var))
-
-#endif
 #endif
 
 EXPORT_SYMBOL(__errno_location);
@@ -170,3 +128,14 @@ EXPORT_SYMBOL(printf);
 EXPORT_SYMBOL(strlen);
 
 EXPORT_SYMBOL(find_iomem);
+
+/*
+ * Overrides for Emacs so that we follow Linus's tabbing style.
+ * Emacs will notice this stuff at the end of the file and automatically
+ * adjust the settings for this buffer only.  This must remain at the end
+ * of the file.
+ * ---------------------------------------------------------------------------
+ * Local variables:
+ * c-file-style: "linux"
+ * End:
+ */

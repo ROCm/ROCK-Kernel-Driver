@@ -22,15 +22,17 @@ core-y			+= $(ARCH_DIR)/kernel/		 \
 			   $(ARCH_DIR)/sys-$(SUBARCH)/
 
 # Have to precede the include because the included Makefiles reference them.
-SYMLINK_HEADERS = include/asm-um/archparam.h include/asm-um/system.h \
-	include/asm-um/sigcontext.h include/asm-um/processor.h \
-	include/asm-um/ptrace.h include/asm-um/arch-signal.h \
-	include/asm-um/module.h
+SYMLINK_HEADERS = archparam.h system.h sigcontext.h processor.h ptrace.h \
+	arch-signal.h module.h
+SYMLINK_HEADERS := $(foreach header,$(SYMLINK_HEADERS),include/asm-um/$(header))
 
 ARCH_SYMLINKS = include/asm-um/arch $(ARCH_DIR)/include/sysdep $(ARCH_DIR)/os \
 	$(SYMLINK_HEADERS) $(ARCH_DIR)/include/uml-config.h
 
 GEN_HEADERS += $(ARCH_DIR)/include/task.h $(ARCH_DIR)/include/kern_constants.h
+
+# This target adds dependencies to "prepare". They are defined in the included
+# Makefiles (see Makefile-i386).
 
 .PHONY: sys_prepare
 sys_prepare:
@@ -134,36 +136,40 @@ USER_CFLAGS := $(patsubst -D__KERNEL__,,$(USER_CFLAGS)) $(ARCH_INCLUDE) \
 # To get a definition of F_SETSIG
 USER_CFLAGS += -D_GNU_SOURCE
 
+# From main Makefile, these options are set after including the ARCH makefile.
+# So copy them here.
+
+ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
+USER_CFLAGS		+= -Os
+else
+USER_CFLAGS		+= -O2
+endif
+
+ifndef CONFIG_FRAME_POINTER
+USER_CFLAGS		+= -fomit-frame-pointer
+endif
+
 ifdef CONFIG_DEBUG_INFO
-USER_CFLAGS          += -g
+USER_CFLAGS		+= -g
 endif
 
 CLEAN_FILES += linux x.i gmon.out $(ARCH_DIR)/uml.lds.s \
 	$(ARCH_DIR)/dyn_link.ld.s $(ARCH_DIR)/include/uml-config.h \
 	$(GEN_HEADERS)
 
+MRPROPER_FILES += $(SYMLINK_HEADERS) $(ARCH_SYMLINKS) \
+	$(addprefix $(ARCH_DIR)/kernel/,$(KERN_SYMLINKS))
+
 $(ARCH_DIR)/main.o: $(ARCH_DIR)/main.c sys_prepare
-	$(CC) $(USER_CFLAGS) $(EXTRA_CFLAGS) -c -o $@ $<
+	@ echo '  MAIN    $@'
+	@ $(CC) $(USER_CFLAGS) $(EXTRA_CFLAGS) -c -o $@ $<
 
 archmrproper:
-	for d in $(ARCH_SUBDIRS) $(ARCH_DIR)/util; \
-	do \
-		$(MAKE) -C $$d archmrproper; \
-	done
-	rm -f $(CLEAN_FILES) $(SYMLINK_HEADERS) $(ARCH_SYMLINKS) include/asm \
-		$(addprefix $(ARCH_DIR)/kernel/,$(KERN_SYMLINKS))
+	@:
 
-archclean: sysclean
-	for d in $(ARCH_SUBDIRS) $(ARCH_DIR)/util; \
-	do \
-		$(MAKE) -C $$d clean; \
-	done
-	find . \( -name '*.bb' -o -name '*.bbg' -o -name '*.da' \
+archclean:
+	@find . \( -name '*.bb' -o -name '*.bbg' -o -name '*.da' \
 		-o -name '*.gcov' \) -type f -print | xargs rm -f
-	rm -f linux x.i gmon.out $(ARCH_DIR)/link.ld $(GEN_HEADERS)
-
-archdep: 
-	for d in $(ARCH_SUBDIRS); do $(MAKE) -C $$d fastdep; done
 
 $(SYMLINK_HEADERS):
 	cd $(TOPDIR)/$(dir $@) ; \
@@ -178,23 +184,26 @@ $(ARCH_DIR)/include/sysdep:
 $(ARCH_DIR)/os:
 	cd $(ARCH_DIR) && ln -sf os-$(OS) os
 
-$(ARCH_DIR)/include/uml-config.h : $(TOPDIR)/include/linux/autoconf.h
-	sed 's/ CONFIG/ UML_CONFIG/' $(TOPDIR)/include/linux/autoconf.h > $@
+# Generated files
+define filechk_umlconfig
+	sed 's/ CONFIG/ UML_CONFIG/'
+endef
 
-filechk_$(ARCH_DIR)/include/task.h := $(ARCH_DIR)/util/mk_task
+$(ARCH_DIR)/include/uml-config.h : $(TOPDIR)/include/linux/autoconf.h
+	$(call filechk,umlconfig)
+
+filechk_gen_header = $<
 
 $(ARCH_DIR)/include/task.h : $(ARCH_DIR)/util/mk_task
-	$(call filechk,$@)
-
-filechk_$(ARCH_DIR)/include/kern_constants.h := $(ARCH_DIR)/util/mk_constants
+	$(call filechk,gen_header)
 
 $(ARCH_DIR)/include/kern_constants.h : $(ARCH_DIR)/util/mk_constants
-	$(call filechk,$@)
+	$(call filechk,gen_header)
 
 $(ARCH_DIR)/util/mk_task $(ARCH_DIR)/util/mk_constants : $(ARCH_DIR)/util \
 	sys_prepare FORCE ;
 
 $(ARCH_DIR)/util: FORCE
-	$(MAKE) -f scripts/Makefile.build obj=$@
+	$(Q)$(MAKE) $(build)=$@
 
 export SUBARCH USER_CFLAGS OS 

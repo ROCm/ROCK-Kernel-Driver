@@ -66,13 +66,4 @@ misc.o: misc.S ppc_defs.h
 	$(CC) $(EXTRA_AFLAGS) $(AFLAGS) -D__ASSEMBLY__ -D__UM_PPC__ -c $< -o $*.o
 	rm -f asm
 
-clean:
-	rm -f $(OBJS)
-	rm -f ppc_defs.h
-	rm -f checksum.S semaphore.c mk_defs.c
-
-fastdep:
-
-dep:
-
-modules:
+clean-files := $(OBJS) ppc_defs.h checksum.S semaphore.c mk_defs.c

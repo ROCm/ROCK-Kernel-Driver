@@ -27,5 +27,3 @@ $(obj)/unmap.o: $(src)/unmap.c
 
 $(obj)/unmap_fin.o : $(src)/unmap.o
 	ld -r -o $@ $< -lc -L/usr/lib
-
-clean :
