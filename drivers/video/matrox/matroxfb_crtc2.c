@@ -679,7 +679,7 @@ static int matroxfb_dh_ioctl(struct inode* inode,
 				return 0;
 			}
 	}
-	return -EINVAL;
+	return -ENOTTY;
 #undef m2info
 }
 

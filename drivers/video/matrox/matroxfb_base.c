@@ -1168,7 +1168,7 @@ static int matroxfb_ioctl(struct inode *inode, struct file *file,
 				return 0;
 			}
 	}
-	return -EINVAL;
+	return -ENOTTY;
 #undef minfo
 }
 
