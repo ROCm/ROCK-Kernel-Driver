@@ -339,11 +339,6 @@ __audit_copy_from_user(struct aud_syscall_data *sc, const struct sysarg *sysarg,
 	target->at_flags = sysarg->sa_flags;
 	switch (target->at_type = sysarg->sa_type) {
 	case AUDIT_ARG_IMMEDIATE:
-		/* Sign extend argument to 64bit if necessary */
-		if ((sysarg->sa_flags & AUD_ARG_SIGNED)
-		 && (audit_syscall_word_size(sc) == 32
-		  || (audit_syscall_word_size(sc) == 64 && sysarg->sa_size == 4)))
-			value = (__s32)(value & 0xFFFFFFFFUL);
 		target->at_intval = value;
 		return 0;
 	case AUDIT_ARG_FILEDESC:

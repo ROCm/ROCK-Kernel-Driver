@@ -1204,7 +1204,7 @@ long do_fork(unsigned long clone_flags,
 	 */
 	pid = IS_ERR(p) ? PTR_ERR(p) : p->pid;
 
-	audit_lresult(pid);
+	(void)audit_lresult(pid);
 
 	if (!IS_ERR(p)) {
 		struct completion vfork;

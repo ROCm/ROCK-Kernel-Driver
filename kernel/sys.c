@@ -913,7 +913,7 @@ asmlinkage long sys_setfsuid(uid_t uid)
 
 	old_fsuid = current->fsuid;
 	if (security_task_setuid(uid, (uid_t)-1, (uid_t)-1, LSM_SETID_FS))
-		return audit_result(-EPERM), old_fsuid;
+		return (void)audit_result(-EPERM), old_fsuid;
 
 	if (uid == current->uid || uid == current->euid ||
 	    uid == current->suid || uid == current->fsuid || 
@@ -945,7 +945,7 @@ asmlinkage long sys_setfsgid(gid_t gid)
 
 	old_fsgid = current->fsgid;
 	if (security_task_setgid(gid, (gid_t)-1, (gid_t)-1, LSM_SETID_FS))
-		return audit_result(-EPERM), old_fsgid;
+		return (void)audit_result(-EPERM), old_fsgid;
 
 	if (gid == current->gid || gid == current->egid ||
 	    gid == current->sgid || gid == current->fsgid || 

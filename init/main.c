@@ -92,7 +92,7 @@ extern void buffer_init(void);
 #ifdef CONFIG_FSHOOKS
 extern void fshooks_init(void);
 #else
-#define fshooks_init ((void)0)
+#define fshooks_init() ((void)0)
 #endif
 extern void pidhash_init(void);
 extern void pidmap_init(void);

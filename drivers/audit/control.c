@@ -322,13 +322,13 @@ auditf_read(struct file *filp, char *buf, size_t count, loff_t *off)
 		}
 
 		if (msgh->body.msg_size > count - copied) {
-			printk(KERN_NOTICE "auditf_read: truncated audit message (%u > %u; max_len=%u)\n",
+			printk(KERN_NOTICE "auditf_read: truncated audit message (%zu > %zu; max_len=%zu)\n",
 				msgh->body.msg_size, count - copied, max_len);
 			msgh->body.msg_size = count - copied;
 		}
 
 		if (audit_debug > 1) {
-			DPRINTF("copying msg %d type %d size %u\n",
+			DPRINTF("copying msg %u type %d size %zu\n",
 				msgh->body.msg_seqnr, msgh->body.msg_type, msgh->body.msg_size);
 		}
 		if (copy_to_user(buf + copied, &msgh->body, msgh->body.msg_size)) {
@@ -344,7 +344,7 @@ auditf_read(struct file *filp, char *buf, size_t count, loff_t *off)
 		nmsgs++;
 	}
 
-	DPRINTF("copied %d messages, %u bytes total\n", nmsgs, copied);
+	DPRINTF("copied %d messages, %zu bytes total\n", nmsgs, copied);
 	return copied;
 }
 

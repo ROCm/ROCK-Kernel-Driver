@@ -118,7 +118,7 @@ void fshook_run_post(fshook_info_t info, member_type(struct fshook_generic_info,
 
 #define FSHOOK_BEGIN(type, result, args...) {
 
-#define FSHOOK_END(type, result) ((void)0);}
+#define FSHOOK_END(type, result, errcode...) ((void)0);}
 
 #define FSHOOK_BEGIN_USER_WALK(type, err, path, flags, nd, field, args...) \
 	if (!(err = __user_walk(path, flags, &nd, 0))) {

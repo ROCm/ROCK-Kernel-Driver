@@ -102,8 +102,8 @@ do_audit_usermsg_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg,
 	aum.msg_type = copy.msg_type;
 	for (i = 0; i < AUD_MAX_EVNAME; i++) 
 		aum.msg_evname[i] = copy.msg_evname[i];
-	aum.msg_data = (void *) copy.msg_data;
-	aum.msg_size = (size_t) copy.msg_size;
+	aum.msg_data = (void *)(unsigned long) copy.msg_data;
+	aum.msg_size = copy.msg_size;
 
 	/* Make sure the pointer is good. */
 	if (!access_ok(VERIFY_READ, aum.msg_data, aum.msg_size))
@@ -160,7 +160,7 @@ do_audit_filter_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg,
 		break;
 	case AUD_FILT_OP_STREQ:
 	case AUD_FILT_OP_PREFIX:
-		auf.u.string.value = (char *) copy.u.string.value;
+		auf.u.string.value = (char *)(unsigned long) copy.u.string.value;
 		break;
 	default:
 		break;

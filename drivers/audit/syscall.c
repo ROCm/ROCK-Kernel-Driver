@@ -38,10 +38,6 @@
 #include <linux/if_frad.h>
 #include <linux/route.h>
 
-#include <linux/ipc.h>
-#include <linux/msg.h>
-#include <linux/shm.h>
-
 #include <asm/uaccess.h>
 #include <asm/semaphore.h>
 
@@ -75,8 +71,6 @@ static int		audit_get_ioctlargs(struct aud_syscall_data *);
 #define T_pid_t		T_immediate(pid_t)
 #define T_uid_t		T_immediate(uid_t)
 #define T_gid_t		T_immediate(gid_t)
-#define T_s16_t		T_immediate(int16_t)
-#define T_u16_t		T_immediate(uint16_t)
 #define T_s32_t		T_immediate(int32_t)
 #define T_u32_t		T_immediate(uint32_t)
 #define T_s64_t		T_immediate(int64_t)
@@ -140,7 +134,7 @@ f(setsid,	T_void),
 /*
  * Calls related to global machine state
  */
-f(settimeofday,	T_pointer(struct timeval), T_pointer(struct timezone)),
+f(settimeofday,	T_pointer(struct timespec), T_pointer(struct timezone)),
 f(adjtimex,	T_pointer_rw(struct timex)),
 f(sethostname,	T_array(char, 1, __NEW_UTS_LEN), T_size_t),
 f(setdomainname, T_array(char, 1, __NEW_UTS_LEN), T_size_t),
@@ -195,7 +189,7 @@ f(socket,	T_int, T_int, T_int),
  * SysV IPC
  */
 f(shmget,	T_int, T_int, T_int),
-f(shmat,	T_int, U_any_ptr, T_int, T_pointer(unsigned long)),
+f(shmat,	T_int, U_any_ptr, T_int),
 f(shmdt,	U_any_ptr),
 f(shmctl,	T_int, T_int, U_any_ptr),
 f(semget,	T_int, T_int, T_int),
@@ -507,11 +501,11 @@ audit_get_args(enum audit_call code, va_list varg, struct aud_syscall_data *sc)
 			}
 			else {
 				switch (entry->sy_args[i].sa_size) {
-				case sizeof(int):
+				case sizeof(unsigned int):
 					sc->raw_args[i] = va_arg(varg, unsigned int);
 					continue;
 #ifndef __ILP64__
-				case sizeof(int64_t):
+				case sizeof(uint64_t):
 					sc->raw_args[i] = va_arg(varg, uint64_t);
 					continue;
 #endif
