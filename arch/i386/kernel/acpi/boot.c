@@ -263,7 +263,7 @@ acpi_parse_nmi_src (
  * ECLR2 is IRQ's 8-15 (IRQ 8, 13 must be 0)
  */
 
-static __initdata	acpi_pic_sci_trigger;	/* 0: level, 1: edge */
+static int __initdata	acpi_pic_sci_trigger;	/* 0: level, 1: edge */
 
 void __init
 acpi_pic_sci_set_trigger(unsigned int irq)
