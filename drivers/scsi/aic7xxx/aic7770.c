@@ -50,6 +50,7 @@
 #define ID_AHA_274x	0x04907771
 #define ID_AHA_284xB	0x04907756 /* BIOS enabled */
 #define ID_AHA_284x	0x04907757 /* BIOS disabled*/
+#define ID_AIC_7782	0x04907782
 
 static void aha2840_load_seeprom(struct ahc_softc *ahc);
 static ahc_device_setup_t ahc_aic7770_VL_setup;
@@ -76,6 +77,13 @@ struct aic7770_identity aic7770_ident_table [] =
 		ID_AIC7770,
 		0xFFFFFFFF,
 		"Adaptec aic7770 SCSI adapter",
+		ahc_aic7770_EISA_setup
+	},
+	{
+		/* (Olivetti 2 channel EISA) */
+		ID_AIC_7782,
+		0xFFFFFFFF,
+		"Adaptec aic7782 SCSI adapter",
 		ahc_aic7770_EISA_setup
 	}
 };
