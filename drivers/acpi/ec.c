@@ -719,7 +719,7 @@ acpi_ec_start (
 	 * Install GPE handler
 	 */
 	status = acpi_install_gpe_handler(NULL, ec->gpe_bit,
-		ACPI_EVENT_EDGE_TRIGGERED, &acpi_ec_gpe_handler, ec);
+		ACPI_GPE_EDGE_TRIGGERED, &acpi_ec_gpe_handler, ec);
 	if (ACPI_FAILURE(status)) {
 		return_VALUE(-ENODEV);
 	}
@@ -803,7 +803,7 @@ acpi_ec_ecdt_probe (void)
 	 * Install GPE handler
 	 */
 	status = acpi_install_gpe_handler(NULL, ec_ecdt->gpe_bit,
-		ACPI_EVENT_EDGE_TRIGGERED, &acpi_ec_gpe_handler,
+		ACPI_GPE_EDGE_TRIGGERED, &acpi_ec_gpe_handler,
 		ec_ecdt);
 	if (ACPI_FAILURE(status)) {
 		goto error;
