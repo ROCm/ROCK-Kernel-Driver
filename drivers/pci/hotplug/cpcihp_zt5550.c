@@ -69,11 +69,11 @@ static struct pci_bus *bus0;
 static struct pci_dev *hc_dev;
 
 /* Host controller register addresses */
-static void *hc_registers;
-static void *csr_hc_index;
-static void *csr_hc_data;
-static void *csr_int_status;
-static void *csr_int_mask;
+static void __iomem *hc_registers;
+static void __iomem *csr_hc_index;
+static void __iomem *csr_hc_data;
+static void __iomem *csr_int_status;
+static void __iomem *csr_int_mask;
 
 
 static int zt5550_hc_config(struct pci_dev *pdev)

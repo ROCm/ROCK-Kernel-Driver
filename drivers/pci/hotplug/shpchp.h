@@ -311,7 +311,7 @@ struct php_ctlr_state_s {
 	php_intr_callback_t presence_change_callback;
 	php_intr_callback_t power_fault_callback;
 	void *callback_instance_id;
-	void *creg;				/* Ptr to controller register space */
+	void __iomem *creg;			/* Ptr to controller register space */
 };
 /* Inline functions */
 
