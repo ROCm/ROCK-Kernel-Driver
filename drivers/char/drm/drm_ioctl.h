@@ -204,7 +204,7 @@ int DRM(getmap)( struct inode *inode, struct file *filp,
 	i = 0;
 	list_for_each(list, &dev->maplist->head) {
 		if(i == idx) {
-			r_list = (drm_map_list_t *)list;
+			r_list = list_entry(list, drm_map_list_t, head);
 			break;
 		}
 		i++;
