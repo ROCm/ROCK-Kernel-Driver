@@ -897,20 +897,22 @@ static struct snd_ac97_build_ops patch_alc650_ops = {
 
 int patch_alc650(ac97_t * ac97)
 {
-	unsigned short val;
+	unsigned short val, reg;
 	int spdif = 0;
 
-	/* FIXME: set the below 1 if we can detect the chip rev.E correctly.
-	 *        this is used for switching mic and center/lfe, which needs
-	 *        resetting GPIO0 level on the older revision.
-	 */
 	ac97->build_ops = &patch_alc650_ops;
-	ac97->spec.dev_flags = 0;
+
+	/* revision E or F */
+	/* FIXME: what about revision D ? */
+	ac97->spec.dev_flags = (ac97->id == 0x414c4722 ||
+				ac97->id == 0x414c4723);
 
 	/* check spdif (should be only on rev.E) */
-	val = snd_ac97_read(ac97, AC97_EXTENDED_STATUS);
-	if (val & AC97_EA_SPCV)
-		spdif = 1;
+	if (ac97->spec.dev_flags) {
+		val = snd_ac97_read(ac97, AC97_EXTENDED_STATUS);
+		if (val & AC97_EA_SPCV)
+			spdif = 1;
+	}
 
 	if (spdif) {
 		/* enable spdif in */

@@ -217,6 +217,7 @@
 #define AC97_ALC650_SURR_DAC_VOL	0x64
 #define AC97_ALC650_LFE_DAC_VOL		0x66
 #define AC97_ALC650_MULTICH	0x6a
+#define AC97_ALC650_REVISION    0x6e
 #define AC97_ALC650_CLOCK	0x7a
 
 /* specific - Yamaha YMF753 */

@@ -64,7 +64,7 @@ static const ac97_codec_id_t snd_ac97_codec_id_vendors[] = {
 { 0x414b4d00, 0xffffff00, "Asahi Kasei",	NULL,	NULL },
 { 0x41445300, 0xffffff00, "Analog Devices",	NULL,	NULL },
 { 0x414c4300, 0xffffff00, "Realtek",		NULL,	NULL },
-{ 0x414c4700, 0xffffff00, "Avance Logic",	NULL,	NULL },
+{ 0x414c4700, 0xffffff00, "Realtek",		NULL,	NULL },
 { 0x434d4900, 0xffffff00, "C-Media Electronics", NULL,	NULL },
 { 0x43525900, 0xffffff00, "Cirrus Logic",	NULL,	NULL },
 { 0x43585400, 0xffffff00, "Conexant",           NULL,	NULL },
@@ -109,6 +109,9 @@ static const ac97_codec_id_t snd_ac97_codec_ids[] = {
 { 0x414c4320, 0xfffffff0, "RL5383", 		NULL,		NULL },
 { 0x414c4710, 0xfffffff0, "ALC200/200P",	NULL,		NULL },
 { 0x414c4720, 0xfffffff0, "ALC650",		patch_alc650,	NULL },
+{ 0x414c4721, 0xfffffff0, "ALC650D",		patch_alc650,	NULL },
+{ 0x414c4722, 0xfffffff0, "ALC650E",		patch_alc650,	NULL },
+{ 0x414c4723, 0xfffffff0, "ALC650F",		patch_alc650,	NULL },
 { 0x414c4730, 0xffffffff, "ALC101",		NULL,		NULL },
 { 0x414c4740, 0xfffffff0, "ALC202",		NULL,		NULL },
 { 0x414c4750, 0xfffffff0, "ALC250",		NULL,		NULL },
@@ -1125,7 +1128,19 @@ snd_kcontrol_t *snd_ac97_cnew(const snd_kcontrol_new_t *_template, ac97_t * ac97
 static int snd_ac97_cmute_new(snd_card_t *card, char *name, int reg, ac97_t *ac97)
 {
 	snd_kcontrol_t *kctl;
+	int stereo = 0;
+
 	if (ac97->flags & AC97_STEREO_MUTES) {
+		/* check whether both mute bits work */
+		unsigned short val, val1;
+		val = snd_ac97_read(ac97, reg);
+		val1 = val | 0x8080;
+		snd_ac97_write(ac97, reg, val1);
+		if (val1 == snd_ac97_read(ac97, reg))
+			stereo = 1;
+		snd_ac97_write(ac97, reg, val);
+	}
+	if (stereo) {
 		snd_kcontrol_new_t tmp = AC97_DOUBLE(name, reg, 15, 7, 1, 1);
 		tmp.index = ac97->num;
 		kctl = snd_ctl_new1(&tmp, ac97);
@@ -1622,6 +1637,7 @@ int snd_ac97_mixer(snd_card_t * card, ac97_t * _ac97, ac97_t ** rac97)
 	ac97_t *ac97;
 	char name[64];
 	unsigned long end_time;
+	unsigned int reg;
 	static snd_device_ops_t ops = {
 		.dev_free =	snd_ac97_dev_free,
 	};
@@ -1665,6 +1681,20 @@ int snd_ac97_mixer(snd_card_t * card, ac97_t * _ac97, ac97_t ** rac97)
 		snd_ac97_free(ac97);
 		return -EIO;
 	}
+	/* AC97 audio codec chip revision detection. */
+	/* Currently only Realtek ALC650 detection implemented. */
+	switch(ac97->id & 0xfffffff0) {
+	case 0x414c4720:        /* ALC650 */
+		reg = snd_ac97_read(ac97, AC97_ALC650_REVISION);
+		if (((reg & 0x3f) >= 0) && ((reg & 0x3f) < 3))
+			ac97->id = 0x414c4720;          /* Old version */
+		else if (((reg & 0x3f) >= 3) && ((reg & 0x3f) < 0x10))
+			ac97->id = 0x414c4721;          /* D version */
+		else if ((reg&0x30) == 0x10)
+			ac97->id = 0x414c4722;          /* E version */
+		else if ((reg&0x30) == 0x20)
+			ac97->id = 0x414c4723;          /* F version */
+        }
 	
 	/* test for AC'97 */
 	if (! (ac97->scaps & AC97_SCAP_AUDIO)) {
