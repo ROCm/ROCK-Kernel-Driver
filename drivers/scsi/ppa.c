@@ -34,12 +34,10 @@ typedef struct {
 	unsigned wanted:1;	/* Parport sharing busy flag    */
 	wait_queue_head_t *waiting;
 	struct Scsi_Host *host;
+	struct list_head list;
 } ppa_struct;
 
 #include  "ppa.h"
-
-#define NO_HOSTS 4
-static ppa_struct ppa_hosts[NO_HOSTS];
 
 static inline ppa_struct *ppa_dev(struct Scsi_Host *host)
 {
@@ -103,124 +101,9 @@ static inline void ppa_pb_release(ppa_struct *dev)
 	parport_release(dev->dev);
 }
 
-/***************************************************************************
- *                   Parallel port probing routines                        *
- ***************************************************************************/
-
 /*
  * Start of Chipset kludges
  */
-static Scsi_Host_Template ppa_template;
-
-static int ppa_probe(ppa_struct *dev, struct parport *pb)
-{
-	struct Scsi_Host *host;
-	DECLARE_WAIT_QUEUE_HEAD(waiting);
-	DEFINE_WAIT(wait);
-	int ports;
-	int err;
-	int modes, ppb, ppb_hi;
-
-	memset(dev, 0, sizeof(dev));
-	dev->base = -1;
-	dev->mode = PPA_AUTODETECT;
-	dev->recon_tmo = PPA_RECON_TMO;
-	init_waitqueue_head(&waiting);
-	dev->dev = parport_register_device(pb, "ppa", NULL, ppa_wakeup,
-					    NULL, 0, dev);
-
-	if (!dev->dev)
-		return -ENOMEM;
-
-	/* Claim the bus so it remembers what we do to the control
-	 * registers. [ CTR and ECP ]
-	 */
-	err = -EBUSY;
-	dev->waiting = &waiting;
-	prepare_to_wait(&waiting, &wait, TASK_UNINTERRUPTIBLE);
-	if (ppa_pb_claim(dev))
-		schedule_timeout(3 * HZ);
-	if (dev->wanted) {
-		printk(KERN_ERR "ppa%d: failed to claim parport because "
-				"a pardevice is owning the port for too long "
-				"time!\n", dev - ppa_hosts);
-		ppa_pb_dismiss(dev);
-		dev->waiting = NULL;
-		finish_wait(&waiting, &wait);
-		goto out;
-	}
-	dev->waiting = NULL;
-	finish_wait(&waiting, &wait);
-	ppb = dev->base = dev->dev->port->base;
-	ppb_hi = dev->dev->port->base_hi;
-	w_ctr(ppb, 0x0c);
-	modes = dev->dev->port->modes;
-
-	/* Mode detection works up the chain of speed
-	 * This avoids a nasty if-then-else-if-... tree
-	 */
-	dev->mode = PPA_NIBBLE;
-
-	if (modes & PARPORT_MODE_TRISTATE)
-		dev->mode = PPA_PS2;
-
-	if (modes & PARPORT_MODE_ECP) {
-		w_ecr(ppb_hi, 0x20);
-		dev->mode = PPA_PS2;
-	}
-	if ((modes & PARPORT_MODE_EPP) && (modes & PARPORT_MODE_ECP))
-		w_ecr(ppb_hi, 0x80);
-
-	/* Done configuration */
-
-	err = ppa_init(dev);
-	ppa_pb_release(dev);
-
-	if (err)
-		goto out;
-
-	/* now the glue ... */
-	switch (dev->mode) {
-	case PPA_NIBBLE:
-		ports = 3;
-		break;
-	case PPA_PS2:
-		ports = 3;
-		break;
-	case PPA_EPP_8:
-	case PPA_EPP_16:
-	case PPA_EPP_32:
-		ports = 8;
-		break;
-	default:	/* Never gets here */
-		BUG();
-	}
-
-	INIT_WORK(&dev->ppa_tq, ppa_interrupt, dev);
-
-	err = -ENOMEM;
-	host = scsi_host_alloc(&ppa_template, sizeof(ppa_struct *));
-	if (!host)
-		goto out;
-	list_add_tail(&host->sht_legacy_list, &ppa_template.legacy_hosts);
-	host->io_port = pb->base;
-	host->n_io_port = ports;
-	host->dma_channel = -1;
-	host->unique_id = dev - ppa_hosts;
-	*(ppa_struct **)&host->hostdata = dev;
-	dev->host = host;
-	err = scsi_add_host(host, NULL);
-	if (err)
-		goto out1;
-	scsi_scan_host(host);
-	return 0;
-out1:
-	list_del(&host->sht_legacy_list);
-	scsi_host_put(host);
-out:
-	parport_unregister_device(dev->dev);
-	return err;
-}
 
 /* This is to give the ppa driver a way to modify the timings (and other
  * parameters) by writing to the /proc/scsi/ppa/0 file.
@@ -1112,43 +995,163 @@ static Scsi_Host_Template ppa_template = {
 	.can_queue		= 1,
 };
 
+/***************************************************************************
+ *                   Parallel port probing routines                        *
+ ***************************************************************************/
+
+static LIST_HEAD(ppa_hosts);
+
+static int __ppa_attach(struct parport *pb)
+{
+	struct Scsi_Host *host;
+	DECLARE_WAIT_QUEUE_HEAD(waiting);
+	DEFINE_WAIT(wait);
+	ppa_struct *dev;
+	int ports;
+	int modes, ppb, ppb_hi;
+	int err = -ENOMEM;
+
+	dev = kmalloc(sizeof(ppa_struct), GFP_KERNEL);
+	if (!dev)
+		return -ENOMEM;
+	memset(dev, 0, sizeof(dev));
+	dev->base = -1;
+	dev->mode = PPA_AUTODETECT;
+	dev->recon_tmo = PPA_RECON_TMO;
+	init_waitqueue_head(&waiting);
+	dev->dev = parport_register_device(pb, "ppa", NULL, ppa_wakeup,
+					    NULL, 0, dev);
+
+	if (!dev->dev)
+		goto out;
+
+	/* Claim the bus so it remembers what we do to the control
+	 * registers. [ CTR and ECP ]
+	 */
+	err = -EBUSY;
+	dev->waiting = &waiting;
+	prepare_to_wait(&waiting, &wait, TASK_UNINTERRUPTIBLE);
+	if (ppa_pb_claim(dev))
+		schedule_timeout(3 * HZ);
+	if (dev->wanted) {
+		printk(KERN_ERR "ppa%d: failed to claim parport because "
+				"a pardevice is owning the port for too long "
+				"time!\n", pb->number);
+		ppa_pb_dismiss(dev);
+		dev->waiting = NULL;
+		finish_wait(&waiting, &wait);
+		goto out1;
+	}
+	dev->waiting = NULL;
+	finish_wait(&waiting, &wait);
+	ppb = dev->base = dev->dev->port->base;
+	ppb_hi = dev->dev->port->base_hi;
+	w_ctr(ppb, 0x0c);
+	modes = dev->dev->port->modes;
+
+	/* Mode detection works up the chain of speed
+	 * This avoids a nasty if-then-else-if-... tree
+	 */
+	dev->mode = PPA_NIBBLE;
+
+	if (modes & PARPORT_MODE_TRISTATE)
+		dev->mode = PPA_PS2;
+
+	if (modes & PARPORT_MODE_ECP) {
+		w_ecr(ppb_hi, 0x20);
+		dev->mode = PPA_PS2;
+	}
+	if ((modes & PARPORT_MODE_EPP) && (modes & PARPORT_MODE_ECP))
+		w_ecr(ppb_hi, 0x80);
+
+	/* Done configuration */
+
+	err = ppa_init(dev);
+	ppa_pb_release(dev);
+
+	if (err)
+		goto out1;
+
+	/* now the glue ... */
+	switch (dev->mode) {
+	case PPA_NIBBLE:
+		ports = 3;
+		break;
+	case PPA_PS2:
+		ports = 3;
+		break;
+	case PPA_EPP_8:
+	case PPA_EPP_16:
+	case PPA_EPP_32:
+		ports = 8;
+		break;
+	default:	/* Never gets here */
+		BUG();
+	}
+
+	INIT_WORK(&dev->ppa_tq, ppa_interrupt, dev);
+
+	err = -ENOMEM;
+	host = scsi_host_alloc(&ppa_template, sizeof(ppa_struct *));
+	if (!host)
+		goto out1;
+	host->io_port = pb->base;
+	host->n_io_port = ports;
+	host->dma_channel = -1;
+	host->unique_id = pb->number;
+	*(ppa_struct **)&host->hostdata = dev;
+	dev->host = host;
+	list_add_tail(&dev->list, &ppa_hosts);
+	err = scsi_add_host(host, NULL);
+	if (err)
+		goto out2;
+	scsi_scan_host(host);
+	return 0;
+out2:
+	list_del_init(&dev->list);
+	scsi_host_put(host);
+out1:
+	parport_unregister_device(dev->dev);
+out:
+	kfree(dev);
+	return err;
+}
+
+static void ppa_attach(struct parport *pb)
+{
+	__ppa_attach(pb);
+}
+
+static void ppa_detach(struct parport *pb)
+{
+	ppa_struct *dev;
+	list_for_each_entry(dev, &ppa_hosts, list) {
+		if (dev->dev->port == pb) {
+			list_del_init(&dev->list);
+			scsi_remove_host(dev->host);
+			scsi_host_put(dev->host);
+			parport_unregister_device(dev->dev);
+			kfree(dev);
+			break;
+		}
+	}
+}
+
+static struct parport_driver ppa_driver = {
+	.name	= "ppa",
+	.attach	= ppa_attach,
+	.detach	= ppa_detach,
+};
+
 static int __init ppa_driver_init(void)
 {
-	struct parport *pb = parport_enumerate();
-	int i, nhosts;
-
-	INIT_LIST_HEAD(&ppa_template.legacy_hosts);
-
 	printk("ppa: Version %s\n", PPA_VERSION);
-	nhosts = 0;
-
-	if (!pb) {
-		printk("ppa: parport reports no devices.\n");
-		return 0;
-	}
-
-	for (i = 0; pb; i++, pb = pb->next) {
-		ppa_struct *dev = &ppa_hosts[i];
-		if (ppa_probe(dev, pb))
-			nhosts++;
-	}
-
-	return nhosts ? 0 : -ENODEV;
+	return parport_register_driver(&ppa_driver);
 }
 
 static void __exit ppa_driver_exit(void)
 {
-	struct scsi_host_template *sht = &ppa_template;
-	struct Scsi_Host *host, *s;
-
-	list_for_each_entry(host, &sht->legacy_hosts, sht_legacy_list)
-		scsi_remove_host(host);
-	list_for_each_entry_safe(host, s, &sht->legacy_hosts, sht_legacy_list) {
-		ppa_struct *dev = ppa_dev(host);
-		list_del(&host->sht_legacy_list);
-		scsi_host_put(host);
-		parport_unregister_device(dev->dev);
-	}
+	parport_unregister_driver(&ppa_driver);
 }
 
 module_init(ppa_driver_init);

@@ -147,7 +147,5 @@ static char *PPA_MODE_STRING[] =
 #endif
 
 static int ppa_engine(ppa_struct *, Scsi_Cmnd *);
-static int ppa_init(ppa_struct *);
-static void ppa_interrupt(void *);
 
 #endif				/* _PPA_H */
