@@ -65,6 +65,8 @@
  *
  * HISTORY:
  *
+ * 2002-08-06	Handling for bulk and interrupt transfers is mostly shared;
+ *	only scheduling is different, no arbitrary limitations.
  * 2002-07-25	Sanity check PCI reads, mostly for better cardbus support,
  * 	clean up HC run state handshaking.
  * 2002-05-24	Preliminary FS/LS interrupts, using scheduling shortcuts
@@ -85,13 +87,15 @@
  * 2001-June	Works with usb-storage and NEC EHCI on 2.4
  */
 
-#define DRIVER_VERSION "2002-Jul-25"
+#define DRIVER_VERSION "2002-Aug-06"
 #define DRIVER_AUTHOR "David Brownell"
 #define DRIVER_DESC "USB 2.0 'Enhanced' Host Controller (EHCI) Driver"
 
 
 // #define EHCI_VERBOSE_DEBUG
 // #define have_split_iso
+
+#define INTR_AUTOMAGIC		/* to be removed later in 2.5 */
 
 /* magic numbers that can affect system performance */
 #define	EHCI_TUNE_CERR		3	/* 0-3 qtd retries; 0 == don't stop */
@@ -376,6 +380,8 @@ done2:
 		return -ENOMEM;
 	}
 
+	create_debug_files (ehci);
+
 	/*
 	 * Start, enabling full USB 2.0 functionality ... usb 1.1 devices
 	 * are explicitly handed to companion controller(s), so no TT is
@@ -428,6 +434,8 @@ static void ehci_stop (struct usb_hcd *hcd)
 	if (hcd->state == USB_STATE_RUNNING)
 		ehci_ready (ehci);
 	ehci_reset (ehci);
+
+	remove_debug_files (ehci);
 
 	/* root hub is shut down separately (first, when possible) */
 	tasklet_disable (&ehci->tasklet);
@@ -614,7 +622,8 @@ dead:
  *
  * hcd-specific init for hcpriv hasn't been done yet
  *
- * NOTE:  EHCI queues control and bulk requests transparently, like OHCI.
+ * NOTE:  control, bulk, and interrupt share the same code to append TDs
+ * to a (possibly active) QH, and the same QH scanning code.
  */
 static int ehci_urb_enqueue (
 	struct usb_hcd	*hcd,
@@ -626,10 +635,11 @@ static int ehci_urb_enqueue (
 
 	urb->transfer_flags &= ~EHCI_STATE_UNLINK;
 	INIT_LIST_HEAD (&qtd_list);
-	switch (usb_pipetype (urb->pipe)) {
 
-	case PIPE_CONTROL:
-	case PIPE_BULK:
+	switch (usb_pipetype (urb->pipe)) {
+	// case PIPE_CONTROL:
+	// case PIPE_BULK:
+	default:
 		if (!qh_urb_transaction (ehci, urb, &qtd_list, mem_flags))
 			return -ENOMEM;
 		return submit_async (ehci, urb, &qtd_list, mem_flags);
@@ -649,9 +659,6 @@ static int ehci_urb_enqueue (
 		dbg ("no split iso support yet");
 		return -ENOSYS;
 #endif /* have_split_iso */
-
-	default:	/* can't happen */
-		return -ENOSYS;
 	}
 }
 
@@ -665,15 +672,16 @@ static int ehci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
 	struct ehci_qh		*qh = (struct ehci_qh *) urb->hcpriv;
 	unsigned long		flags;
 
-	dbg ("%s urb_dequeue %p qh state %d",
-		hcd->self.bus_name, urb, qh->qh_state);
+	dbg ("%s urb_dequeue %p qh %p state %d",
+		hcd->self.bus_name, urb, qh, qh->qh_state);
 
 	switch (usb_pipetype (urb->pipe)) {
-	case PIPE_CONTROL:
-	case PIPE_BULK:
+	// case PIPE_CONTROL:
+	// case PIPE_BULK:
+	default:
 		spin_lock_irqsave (&ehci->lock, flags);
 		if (ehci->reclaim) {
-dbg ("dq: reclaim busy, %s", RUN_CONTEXT);
+			dbg ("dq: reclaim busy, %s", RUN_CONTEXT);
 			if (in_interrupt ()) {
 				spin_unlock_irqrestore (&ehci->lock, flags);
 				return -EAGAIN;
@@ -683,28 +691,43 @@ dbg ("dq: reclaim busy, %s", RUN_CONTEXT);
 					&& ehci->hcd.state != USB_STATE_HALT
 					) {
 				spin_unlock_irqrestore (&ehci->lock, flags);
-// yeech ... this could spin for up to two frames!
-dbg ("wait for dequeue: state %d, reclaim %p, hcd state %d",
-    qh->qh_state, ehci->reclaim, ehci->hcd.state
-);
-				udelay (100);
+				/* let pending unlinks complete */
+				wait_ms (1);
 				spin_lock_irqsave (&ehci->lock, flags);
 			}
 		}
 		if (qh->qh_state == QH_STATE_LINKED)
 			start_unlink_async (ehci, qh);
 		spin_unlock_irqrestore (&ehci->lock, flags);
-		return 0;
+		break;
 
 	case PIPE_INTERRUPT:
-		intr_deschedule (ehci, urb->start_frame, qh,
-			(urb->dev->speed == USB_SPEED_HIGH)
-			    ? urb->interval
-			    : (urb->interval << 3));
-		if (ehci->hcd.state == USB_STATE_HALT)
-			urb->status = -ESHUTDOWN;
-		qh_completions (ehci, qh, 1);
-		return 0;
+		if (qh->qh_state == QH_STATE_LINKED) {
+			/* messy, can spin or block a microframe ... */
+			intr_deschedule (ehci, qh, 1);
+			/* qh_state == IDLE */
+		}
+		qh_completions (ehci, qh);
+
+		/* reschedule QH iff another request is queued */
+		if (!list_empty (&qh->qtd_list)
+				&& HCD_IS_RUNNING (ehci->hcd.state)) {
+			int status;
+
+			spin_lock_irqsave (&ehci->lock, flags);
+			status = qh_schedule (ehci, qh);
+			spin_unlock_irqrestore (&ehci->lock, flags);
+
+			if (status != 0) {
+				// shouldn't happen often, but ...
+				// FIXME kill those tds' urbs
+				err ("can't reschedule qh %p, err %d",
+					qh, status);
+			}
+			return status;
+		}
+
+		break;
 
 	case PIPE_ISOCHRONOUS:
 		// itd or sitd ...
@@ -712,9 +735,9 @@ dbg ("wait for dequeue: state %d, reclaim %p, hcd state %d",
 		// wait till next completion, do it then.
 		// completion irqs can wait up to 1024 msec,
 		urb->transfer_flags |= EHCI_STATE_UNLINK;
-		return 0;
+		break;
 	}
-	return -EINVAL;
+	return 0;
 }
 
 /*-------------------------------------------------------------------------*/
@@ -728,6 +751,7 @@ static void ehci_free_config (struct usb_hcd *hcd, struct usb_device *udev)
 	int			i;
 	unsigned long		flags;
 
+	/* ASSERT:  no requests/urbs are still linked (so no TDs) */
 	/* ASSERT:  nobody can be submitting urbs for this any more */
 
 	dbg ("%s: free_config devnum %d", hcd->self.bus_name, udev->devnum);
@@ -736,34 +760,57 @@ static void ehci_free_config (struct usb_hcd *hcd, struct usb_device *udev)
 	for (i = 0; i < 32; i++) {
 		if (dev->ep [i]) {
 			struct ehci_qh		*qh;
+			char			*why;
 
 			/* dev->ep never has ITDs or SITDs */
 			qh = (struct ehci_qh *) dev->ep [i];
-			vdbg ("free_config, ep 0x%02x qh %p", i, qh);
-			if (!list_empty (&qh->qtd_list)) {
-				dbg ("ep 0x%02x qh %p not empty!", i, qh);
+
+			/* detect/report non-recoverable errors */
+			if (in_interrupt ()) 
+				why = "disconnect() didn't";
+			else if ((qh->hw_info2 & cpu_to_le32 (0xffff)) != 0
+					&& qh->qh_state != QH_STATE_IDLE)
+				why = "(active periodic)";
+			else
+				why = 0;
+			if (why) {
+				err ("dev %s-%s ep %d-%s error: %s",
+					hcd->self.bus_name, udev->devpath,
+					i & 0xf, (i & 0x10) ? "IN" : "OUT",
+					why);
 				BUG ();
 			}
-			dev->ep [i] = 0;
 
-			/* wait_ms() won't spin here -- we're a thread */
+			dev->ep [i] = 0;
+			if (qh->qh_state == QH_STATE_IDLE)
+				goto idle;
+			dbg ("free_config, async ep 0x%02x qh %p", i, qh);
+
+			/* scan_async() empties the ring as it does its work,
+			 * using IAA, but doesn't (yet?) turn it off.  if it
+			 * doesn't empty this qh, likely it's the last entry.
+			 */
 			while (qh->qh_state == QH_STATE_LINKED
 					&& ehci->reclaim
 					&& ehci->hcd.state != USB_STATE_HALT
 					) {
 				spin_unlock_irqrestore (&ehci->lock, flags);
+				/* wait_ms() won't spin, we're a thread;
+				 * and we know IRQ+tasklet can progress
+				 */
 				wait_ms (1);
 				spin_lock_irqsave (&ehci->lock, flags);
 			}
-			if (qh->qh_state == QH_STATE_LINKED) {
+			if (qh->qh_state == QH_STATE_LINKED)
 				start_unlink_async (ehci, qh);
-				while (qh->qh_state != QH_STATE_IDLE) {
-					spin_unlock_irqrestore (&ehci->lock,
-						flags);
-					wait_ms (1);
-					spin_lock_irqsave (&ehci->lock, flags);
-				}
+			while (qh->qh_state != QH_STATE_IDLE
+					&& ehci->hcd.state != USB_STATE_HALT) {
+				spin_unlock_irqrestore (&ehci->lock,
+					flags);
+				wait_ms (1);
+				spin_lock_irqsave (&ehci->lock, flags);
 			}
+idle:
 			qh_put (ehci, qh);
 		}
 	}
