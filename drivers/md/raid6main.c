@@ -54,7 +54,7 @@
  * This macro is used to determine the 'next' bio in the list, given the sector
  * of the current stripe+device
  */
-#define r5_next_bio(bio, sect) ( ( bio->bi_sector + (bio->bi_size>>9) < sect + STRIPE_SECTORS) ? bio->bi_next : NULL)
+#define r5_next_bio(bio, sect) ( ( (bio)->bi_sector + ((bio)->bi_size>>9) < sect + STRIPE_SECTORS) ? (bio)->bi_next : NULL)
 /*
  * The following can be used to debug the driver
  */
@@ -735,6 +735,10 @@ static void compute_parity(struct stripe_head *sh, int method)
 			if ( i != pd_idx && i != qd_idx && sh->dev[i].towrite ) {
 				chosen = sh->dev[i].towrite;
 				sh->dev[i].towrite = NULL;
+
+				if (test_and_clear_bit(R5_Overlap, &sh->dev[i].flags))
+					wake_up(&conf->wait_for_overlap);
+
 				if (sh->dev[i].written) BUG();
 				sh->dev[i].written = chosen;
 			}
@@ -897,7 +901,7 @@ static void compute_block_2(struct stripe_head *sh, int dd_idx1, int dd_idx2)
  * toread/towrite point to the first in a chain.
  * The bi_next chain must be in order.
  */
-static void add_stripe_bio (struct stripe_head *sh, struct bio *bi, int dd_idx, int forwrite)
+static int add_stripe_bio(struct stripe_head *sh, struct bio *bi, int dd_idx, int forwrite)
 {
 	struct bio **bip;
 	raid6_conf_t *conf = sh->raid_conf;
@@ -914,10 +918,13 @@ static void add_stripe_bio (struct stripe_head *sh, struct bio *bi, int dd_idx, 
 	else
 		bip = &sh->dev[dd_idx].toread;
 	while (*bip && (*bip)->bi_sector < bi->bi_sector) {
-		BUG_ON((*bip)->bi_sector + ((*bip)->bi_size >> 9) > bi->bi_sector);
-		bip = & (*bip)->bi_next;
+		if ((*bip)->bi_sector + ((*bip)->bi_size >> 9) > bi->bi_sector)
+			goto overlap;
+		bip = &(*bip)->bi_next;
 	}
-/* FIXME do I need to worry about overlapping bion */
+	if (*bip && (*bip)->bi_sector < bi->bi_sector + ((bi->bi_size)>>9))
+		goto overlap;
+
 	if (*bip && bi->bi_next && (*bip) != bi->bi_next)
 		BUG();
 	if (*bip)
@@ -932,7 +939,7 @@ static void add_stripe_bio (struct stripe_head *sh, struct bio *bi, int dd_idx, 
 		(unsigned long long)sh->sector, dd_idx);
 
 	if (forwrite) {
-		/* check if page is coverred */
+		/* check if page is covered */
 		sector_t sector = sh->dev[dd_idx].sector;
 		for (bi=sh->dev[dd_idx].towrite;
 		     sector < sh->dev[dd_idx].sector + STRIPE_SECTORS &&
@@ -944,6 +951,13 @@ static void add_stripe_bio (struct stripe_head *sh, struct bio *bi, int dd_idx, 
 		if (sector >= sh->dev[dd_idx].sector + STRIPE_SECTORS)
 			set_bit(R5_OVERWRITE, &sh->dev[dd_idx].flags);
 	}
+	return 1;
+
+ overlap:
+	set_bit(R5_Overlap, &sh->dev[dd_idx].flags);
+	spin_unlock_irq(&conf->device_lock);
+	spin_unlock(&sh->lock);
+	return 0;
 }
 
 
@@ -1007,6 +1021,8 @@ static void handle_stripe(struct stripe_head *sh)
 			spin_lock_irq(&conf->device_lock);
 			rbi = dev->toread;
 			dev->toread = NULL;
+			if (test_and_clear_bit(R5_Overlap, &dev->flags))
+				wake_up(&conf->wait_for_overlap);
 			spin_unlock_irq(&conf->device_lock);
 			while (rbi && rbi->bi_sector < dev->sector + STRIPE_SECTORS) {
 				copy_data(0, rbi, dev->page, dev->sector);
@@ -1056,6 +1072,9 @@ static void handle_stripe(struct stripe_head *sh)
 			sh->dev[i].towrite = NULL;
 			if (bi) to_write--;
 
+			if (test_and_clear_bit(R5_Overlap, &sh->dev[i].flags))
+				wake_up(&conf->wait_for_overlap);
+
 			while (bi && bi->bi_sector < sh->dev[i].sector + STRIPE_SECTORS){
 				struct bio *nextbi = r5_next_bio(bi, sh->dev[i].sector);
 				clear_bit(BIO_UPTODATE, &bi->bi_flags);
@@ -1084,6 +1103,8 @@ static void handle_stripe(struct stripe_head *sh)
 			if (!test_bit(R5_Insync, &sh->dev[i].flags)) {
 				bi = sh->dev[i].toread;
 				sh->dev[i].toread = NULL;
+				if (test_and_clear_bit(R5_Overlap, &sh->dev[i].flags))
+					wake_up(&conf->wait_for_overlap);
 				if (bi) to_read--;
 				while (bi && bi->bi_sector < sh->dev[i].sector + STRIPE_SECTORS){
 					struct bio *nextbi = r5_next_bio(bi, sh->dev[i].sector);
@@ -1563,6 +1584,7 @@ static int make_request (request_queue_t *q, struct bio * bi)
 	if ( bio_data_dir(bi) == WRITE )
 		md_write_start(mddev);
 	for (;logical_sector < last_sector; logical_sector += STRIPE_SECTORS) {
+		DEFINE_WAIT(w);
 
 		new_sector = raid6_compute_sector(logical_sector,
 						  raid_disks, data_disks, &dd_idx, &pd_idx, conf);
@@ -1571,17 +1593,27 @@ static int make_request (request_queue_t *q, struct bio * bi)
 		       (unsigned long long)new_sector,
 		       (unsigned long long)logical_sector);
 
+	retry:
+		prepare_to_wait(&conf->wait_for_overlap, &w, TASK_UNINTERRUPTIBLE);
 		sh = get_active_stripe(conf, new_sector, pd_idx, (bi->bi_rw&RWA_MASK));
 		if (sh) {
-
-			add_stripe_bio(sh, bi, dd_idx, (bi->bi_rw&RW_MASK));
-
+			if (!add_stripe_bio(sh, bi, dd_idx, (bi->bi_rw&RW_MASK))) {
+				/* Add failed due to overlap.  Flush everything
+				 * and wait a while
+				 */
+				raid6_unplug_device(mddev->queue);
+				release_stripe(sh);
+				schedule();
+				goto retry;
+			}
+			finish_wait(&conf->wait_for_overlap, &w);
 			raid6_plug_device(conf);
 			handle_stripe(sh);
 			release_stripe(sh);
 		} else {
 			/* cannot get stripe for read-ahead, just give-up */
 			clear_bit(BIO_UPTODATE, &bi->bi_flags);
+			finish_wait(&conf->wait_for_overlap, &w);
 			break;
 		}
 
@@ -1729,6 +1761,7 @@ static int run (mddev_t *mddev)
 
 	spin_lock_init(&conf->device_lock);
 	init_waitqueue_head(&conf->wait_for_stripe);
+	init_waitqueue_head(&conf->wait_for_overlap);
 	INIT_LIST_HEAD(&conf->handle_list);
 	INIT_LIST_HEAD(&conf->delayed_list);
 	INIT_LIST_HEAD(&conf->inactive_list);

@@ -152,6 +152,7 @@ struct stripe_head {
 #define	R5_Wantread	4	/* want to schedule a read */
 #define	R5_Wantwrite	5
 #define	R5_Syncio	6	/* this io need to be accounted as resync io */
+#define	R5_Overlap	7	/* There is a pending overlapping request on this block */
 
 /*
  * Write method
@@ -219,6 +220,7 @@ struct raid5_private_data {
 	atomic_t		active_stripes;
 	struct list_head	inactive_list;
 	wait_queue_head_t	wait_for_stripe;
+	wait_queue_head_t	wait_for_overlap;
 	int			inactive_blocked;	/* release of inactive stripes blocked,
 							 * waiting for 25% to be free
 							 */        
