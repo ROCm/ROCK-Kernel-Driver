@@ -264,6 +264,12 @@ MODULE_LICENSE("Dual BSD/GPL");
 /*-------------------------------------------------------------------------*/
 
 /*
+ * This driver assumes self-powered hardware and has no way for users to
+ * trigger remote wakeup.
+ */
+
+
+/*
  * Hardware-specific configuration, controlled by which device
  * controller driver was configured.
  *
@@ -273,9 +279,6 @@ MODULE_LICENSE("Dual BSD/GPL");
  * EP_*_NUM ... numbers for them (often limited by hardware)
  * FS_BULK_IN_MAXPACKET ... maxpacket value for full-speed bulk-in ep
  * FS_BULK_OUT_MAXPACKET ... maxpacket value for full-speed bulk-out ep
- * HIGHSPEED ... define if ep0 and descriptors need high speed support
- * MAX_USB_POWER ... define if we use other than 100 mA bus current
- * SELFPOWER ... if we can run on bus power, zero
  * NO_BULK_STALL ... bulk endpoint halts don't work well so avoid them
  */
 
@@ -298,7 +301,6 @@ static const char EP_BULK_OUT_NAME[] = "ep-b";
 #define FS_BULK_OUT_MAXPACKET	64
 static const char EP_INTR_IN_NAME[] = "ep-e";
 #define EP_INTR_IN_NUM		5
-#define HIGHSPEED
 #endif
 
 
@@ -319,7 +321,6 @@ static const char EP_BULK_OUT_NAME[] = "ep-b";
 #define FS_BULK_OUT_MAXPACKET	64
 static const char EP_INTR_IN_NAME[] = "ep-e";
 #define EP_INTR_IN_NUM		5
-#define HIGHSPEED
 #endif
 
 
@@ -395,25 +396,6 @@ static const char EP_INTR_IN_NAME [] = "ep3-bulk";
 #ifndef CHIP
 #	error Configure some USB peripheral controller driver!
 #endif
-
-/* Power usage is config specific.
- * Hardware that supports remote wakeup defaults to disabling it.
- */
-#ifndef	SELFPOWER
-/* default: say we're self-powered */
-#define SELFPOWER USB_CONFIG_ATT_SELFPOWER
-/* else:
- * - SELFPOWER value must be zero
- * - MAX_USB_POWER may be nonzero.
- */
-#endif
-
-#ifndef	MAX_USB_POWER
-/* Any hub supports this steady state bus power consumption */
-#define MAX_USB_POWER	100	/* mA */
-#endif
-
-/* We don't support remote wake-up */
 
 #ifdef NO_BULK_STALL
 #define CAN_STALL	0
@@ -1015,11 +997,11 @@ config_desc = {
 	.bLength =		sizeof config_desc,
 	.bDescriptorType =	USB_DT_CONFIG,
 
-	/* wTotalLength adjusted during bind() */
+	/* wTotalLength computed by usb_gadget_config_buf() */
 	.bNumInterfaces =	1,
 	.bConfigurationValue =	CONFIG_VALUE,
-	.bmAttributes =		USB_CONFIG_ATT_ONE | SELFPOWER,
-	.bMaxPower =		(MAX_USB_POWER + 1) / 2,
+	.bmAttributes =		USB_CONFIG_ATT_ONE | USB_CONFIG_ATT_SELFPOWER,
+	.bMaxPower =		1,	// self-powered
 };
 
 /* There is only one interface. */
@@ -1069,7 +1051,16 @@ fs_intr_in_desc = {
 	.bInterval =		32,	// frames -> 32 ms
 };
 
-#ifdef	HIGHSPEED
+static const struct usb_descriptor_header *fs_function[] = {
+	(struct usb_descriptor_header *) &intf_desc,
+	(struct usb_descriptor_header *) &fs_bulk_in_desc,
+	(struct usb_descriptor_header *) &fs_bulk_out_desc,
+	(struct usb_descriptor_header *) &fs_intr_in_desc,
+	NULL,
+};
+
+
+#ifdef	CONFIG_USB_GADGET_DUALSPEED
 
 /*
  * USB 2.0 devices need to expose both high speed and full speed
@@ -1079,38 +1070,6 @@ fs_intr_in_desc = {
  * and a "device qualifier" ... plus more construction options
  * for the config descriptor.
  */
-static const struct usb_endpoint_descriptor
-hs_bulk_in_desc = {
-	.bLength =		USB_DT_ENDPOINT_SIZE,
-	.bDescriptorType =	USB_DT_ENDPOINT,
-
-	.bEndpointAddress =	EP_BULK_IN_NUM | USB_DIR_IN,
-	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
-	.wMaxPacketSize =	__constant_cpu_to_le16(512),
-};
-
-static const struct usb_endpoint_descriptor
-hs_bulk_out_desc = {
-	.bLength =		USB_DT_ENDPOINT_SIZE,
-	.bDescriptorType =	USB_DT_ENDPOINT,
-
-	.bEndpointAddress =	EP_BULK_OUT_NUM,
-	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
-	.wMaxPacketSize =	__constant_cpu_to_le16(512),
-	.bInterval =		1,	// NAK every 1 uframe
-};
-
-static const struct usb_endpoint_descriptor
-hs_intr_in_desc = {
-	.bLength =		USB_DT_ENDPOINT_SIZE,
-	.bDescriptorType =	USB_DT_ENDPOINT,
-
-	.bEndpointAddress =	EP_INTR_IN_NUM | USB_DIR_IN,
-	.bmAttributes =		USB_ENDPOINT_XFER_INT,
-	.wMaxPacketSize =	__constant_cpu_to_le16(2),
-	.bInterval =		9,	// 2**(9-1) = 256 uframes -> 32 ms
-};
-
 static struct usb_qualifier_descriptor
 dev_qualifier = {
 	.bLength =		sizeof dev_qualifier,
@@ -1122,27 +1081,65 @@ dev_qualifier = {
 	.bNumConfigurations =	1,
 };
 
+static struct usb_endpoint_descriptor
+hs_bulk_in_desc = {
+	.bLength =		USB_DT_ENDPOINT_SIZE,
+	.bDescriptorType =	USB_DT_ENDPOINT,
+
+	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
+	.wMaxPacketSize =	__constant_cpu_to_le16(512),
+};
+
+static struct usb_endpoint_descriptor
+hs_bulk_out_desc = {
+	.bLength =		USB_DT_ENDPOINT_SIZE,
+	.bDescriptorType =	USB_DT_ENDPOINT,
+
+	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
+	.wMaxPacketSize =	__constant_cpu_to_le16(512),
+	.bInterval =		1,	// NAK every 1 uframe
+};
+
+static struct usb_endpoint_descriptor
+hs_intr_in_desc = {
+	.bLength =		USB_DT_ENDPOINT_SIZE,
+	.bDescriptorType =	USB_DT_ENDPOINT,
+
+	.bmAttributes =		USB_ENDPOINT_XFER_INT,
+	.wMaxPacketSize =	__constant_cpu_to_le16(2),
+	.bInterval =		9,	// 2**(9-1) = 256 uframes -> 32 ms
+};
+
+static const struct usb_descriptor_header *hs_function[] = {
+	(struct usb_descriptor_header *) &intf_desc,
+	(struct usb_descriptor_header *) &hs_bulk_in_desc,
+	(struct usb_descriptor_header *) &hs_bulk_out_desc,
+	(struct usb_descriptor_header *) &hs_intr_in_desc,
+	NULL,
+};
+
 /* Maxpacket and other transfer characteristics vary by speed. */
 #define ep_desc(g,fs,hs)	(((g)->speed==USB_SPEED_HIGH) ? (hs) : (fs))
 
 #else
 
-/* If there's no high speed support, maxpacket doesn't change. */
+/* If there's no high speed support, always use the full-speed descriptor. */
 #define ep_desc(g,fs,hs)	fs
 
-#endif	/* !HIGHSPEED */
+#endif	/* !CONFIG_USB_GADGET_DUALSPEED */
 
 
 /* The CBI specification limits the serial string to 12 uppercase hexadecimal
  * characters. */
+static char				manufacturer[40];
 static char				serial[13];
 
-/* Static strings, in ISO 8859/1 */
+/* Static strings, in UTF-8 (for simplicity we use only ASCII characters) */
 static struct usb_string		strings[] = {
-	{ STRING_MANUFACTURER, UTS_SYSNAME " " UTS_RELEASE " with " CHIP, },
-	{ STRING_PRODUCT, longname, },
-	{ STRING_SERIAL, serial, },
-	{ }			// end of list
+	{STRING_MANUFACTURER,	manufacturer},
+	{STRING_PRODUCT,	longname},
+	{STRING_SERIAL,		serial},
+	{}
 };
 
 static struct usb_gadget_strings	stringtab = {
@@ -1152,61 +1149,33 @@ static struct usb_gadget_strings	stringtab = {
 
 
 /*
- * Config descriptors are handcrafted.  They must agree with the code
- * that sets configurations and with code managing interfaces and their
- * altsettings.  They must also handle different speeds and other-speed
- * requests.
+ * Config descriptors must agree with the code that sets configurations
+ * and with code managing interfaces and their altsettings.  They must
+ * also handle different speeds and other-speed requests.
  */
 static int populate_config_buf(enum usb_device_speed speed,
-		u8 *buf0, u8 type, unsigned index)
+		u8 *buf, u8 type, unsigned index)
 {
-	u8	*buf = buf0;
-#ifdef HIGHSPEED
-	int	hs;
-#endif
+	int					len;
+	const struct usb_descriptor_header	**function;
 
 	if (index > 0)
 		return -EINVAL;
-	if (config_desc.wTotalLength  > EP0_BUFSIZE)
-		return -EDOM;
 
-	/* Config (or other speed config) */
-	memcpy(buf, &config_desc, USB_DT_CONFIG_SIZE);
-	buf[1] = type;
-	buf += USB_DT_CONFIG_SIZE;
-
-	/* Interface */
-	memcpy(buf, &intf_desc, USB_DT_INTERFACE_SIZE);
-	buf += USB_DT_INTERFACE_SIZE;
-
-	/* The endpoints in the interface (at that speed) */
-#ifdef HIGHSPEED
-	hs = (speed == USB_SPEED_HIGH);
+#ifdef CONFIG_USB_GADGET_DUALSPEED
 	if (type == USB_DT_OTHER_SPEED_CONFIG)
-		hs = !hs;
-	if (hs) {
-		memcpy(buf, &hs_bulk_in_desc, USB_DT_ENDPOINT_SIZE);
-		buf += USB_DT_ENDPOINT_SIZE;
-		memcpy(buf, &hs_bulk_out_desc, USB_DT_ENDPOINT_SIZE);
-		buf += USB_DT_ENDPOINT_SIZE;
-		if (transport_is_cbi()) {
-			memcpy(buf, &hs_intr_in_desc, USB_DT_ENDPOINT_SIZE);
-			buf += USB_DT_ENDPOINT_SIZE;
-		}
-	} else
+		speed = (USB_SPEED_FULL + USB_SPEED_HIGH) - speed;
+	if (speed == USB_SPEED_HIGH)
+		function = hs_function;
+	else
 #endif
-	{
-		memcpy(buf, &fs_bulk_in_desc, USB_DT_ENDPOINT_SIZE);
-		buf += USB_DT_ENDPOINT_SIZE;
-		memcpy(buf, &fs_bulk_out_desc, USB_DT_ENDPOINT_SIZE);
-		buf += USB_DT_ENDPOINT_SIZE;
-		if (transport_is_cbi()) {
-			memcpy(buf, &fs_intr_in_desc, USB_DT_ENDPOINT_SIZE);
-			buf += USB_DT_ENDPOINT_SIZE;
-		}
-	}
+		function = fs_function;
 
-	return buf - buf0;
+	len = usb_gadget_config_buf(&config_desc, buf, EP0_BUFSIZE, function);
+	if (len < 0)
+		return len;
+	((struct usb_config_descriptor *) buf)->bDescriptorType = type;
+	return len;
 }
 
 
@@ -1505,22 +1474,26 @@ static int standard_setup_req(struct fsg_dev *fsg,
 			value = min(ctrl->wLength, (u16) sizeof device_desc);
 			memcpy(req->buf, &device_desc, value);
 			break;
-#ifdef HIGHSPEED
+#ifdef CONFIG_USB_GADGET_DUALSPEED
 		case USB_DT_DEVICE_QUALIFIER:
 			VDBG(fsg, "get device qualifier\n");
+			if (!fsg->gadget->is_dualspeed)
+				break;
 			value = min(ctrl->wLength, (u16) sizeof dev_qualifier);
 			memcpy(req->buf, &dev_qualifier, value);
 			break;
 
 		case USB_DT_OTHER_SPEED_CONFIG:
 			VDBG(fsg, "get other-speed config descriptor\n");
+			if (!fsg->gadget->is_dualspeed)
+				break;
 			goto get_config;
-#endif /* HIGHSPEED */
+#endif
 		case USB_DT_CONFIG:
 			VDBG(fsg, "get configuration descriptor\n");
-#ifdef HIGHSPEED
+#ifdef CONFIG_USB_GADGET_DUALSPEED
 		get_config:
-#endif /* HIGHSPEED */
+#endif
 			value = populate_config_buf(fsg->gadget->speed,
 					req->buf,
 					ctrl->wValue >> 8,
@@ -3258,6 +3231,7 @@ reset:
 	if ((rc = enable_endpoint(fsg, fsg->bulk_out, d)) != 0)
 		goto reset;
 	fsg->bulk_out_enabled = 1;
+	fsg->bulk_out_maxpacket = d->wMaxPacketSize;
 
 	if (transport_is_cbi()) {
 		d = ep_desc(fsg->gadget, &fs_intr_in_desc, &hs_intr_in_desc);
@@ -3964,19 +3938,27 @@ static int __init fsg_bind(struct usb_gadget *gadget)
 
 	/* Fix up the descriptors */
 	device_desc.bMaxPacketSize0 = fsg->ep0->maxpacket;
-#ifdef HIGHSPEED
-	dev_qualifier.bMaxPacketSize0 = fsg->ep0->maxpacket;		// ???
-#endif
 	device_desc.idVendor = cpu_to_le16(mod_data.vendor);
 	device_desc.idProduct = cpu_to_le16(mod_data.product);
 	device_desc.bcdDevice = cpu_to_le16(mod_data.release);
 
 	i = (transport_is_cbi() ? 3 : 2);	// Number of endpoints
-	config_desc.wTotalLength = USB_DT_CONFIG_SIZE + USB_DT_INTERFACE_SIZE
-			+ USB_DT_ENDPOINT_SIZE * i;
 	intf_desc.bNumEndpoints = i;
 	intf_desc.bInterfaceSubClass = mod_data.protocol_type;
 	intf_desc.bInterfaceProtocol = mod_data.transport_type;
+	fs_function[i+1] = NULL;
+
+#ifdef CONFIG_USB_GADGET_DUALSPEED
+	hs_function[i+1] = NULL;
+
+	/* Assume ep0 uses the same maxpacket value for both speeds */
+	dev_qualifier.bMaxPacketSize0 = fsg->ep0->maxpacket;
+
+	/* Assume that all endpoint addresses are the same for both speeds */
+	hs_bulk_in_desc.bEndpointAddress = fs_bulk_in_desc.bEndpointAddress;
+	hs_bulk_out_desc.bEndpointAddress = fs_bulk_out_desc.bEndpointAddress;
+	hs_intr_in_desc.bEndpointAddress = fs_intr_in_desc.bEndpointAddress;
+#endif
 
 	/* Find all the endpoints we will use */
 	gadget_for_each_ep(ep, gadget) {
@@ -3993,8 +3975,6 @@ static int __init fsg_bind(struct usb_gadget *gadget)
 		rc = -ENOTSUPP;
 		goto out;
 	}
-	fsg->bulk_out_maxpacket = (gadget->speed == USB_SPEED_HIGH ? 512 :
-			FS_BULK_OUT_MAXPACKET);
 
 	rc = -ENOMEM;
 
@@ -4022,6 +4002,10 @@ static int __init fsg_bind(struct usb_gadget *gadget)
 
 	/* This should reflect the actual gadget power source */
 	usb_gadget_set_selfpowered(gadget);
+
+	snprintf(manufacturer, sizeof manufacturer,
+			UTS_SYSNAME " " UTS_RELEASE " with %s",
+			gadget->name);
 
 	/* On a real device, serial[] would be loaded from permanent
 	 * storage.  We just encode it from the driver version string. */
@@ -4082,7 +4066,7 @@ out:
 /*-------------------------------------------------------------------------*/
 
 static struct usb_gadget_driver		fsg_driver = {
-#ifdef HIGHSPEED
+#ifdef CONFIG_USB_GADGET_DUALSPEED
 	.speed		= USB_SPEED_HIGH,
 #else
 	.speed		= USB_SPEED_FULL,
