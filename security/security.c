@@ -20,34 +20,6 @@
 
 #define SECURITY_FRAMEWORK_VERSION	"1.0.0"
 
-/* garloff@suse.de, 2004-05-21:
- * lsm causes a performance problem, if compiled in, due to various
- * non-inlined indirect function calls.
- * This can be avoided by putting a branch in the inlined security
- * stubs in include/linux/security.h, calling directly into the cap_
- * functions from commoncap.
- * This has some consequences:
- * - If no security module is loaded, default will be the capability
- *   security fns, not the dummy ones.
- * - If a security module is loaded, it will override the defaults;
- *   this module might be capability itself, overriding itself, 
- *   only causing a slowdown. This means that capability should NOT 
- *   be compiled into the kernel.
- * - Another module can be loaded, and capability, being a module again,
- *   might be stacked as secondary module.
- * - Unfortunately, we can't get rid of dummy, as we don't want to
- *   change the default behaviour if a security module is loaded and
- *   some stubs are not implemented in which case these default to
- *   dummy (which behaves differently to capability fori a few stubs).
- * - If no security module is loaded, we set security_ops to point
- *   to capability_security_ops; it will not normally be used except for 
- *   one situation: When a security module is unloaded; the value of 
- *   security_enabled may still be evaluated to 1 when the security_ops 
- *   is already changed. The behaviour is consistent here, as we do
- *   change security_ops back to point to capability_security_ops.
- * - commoncaps needs to be compiled in unconditionally.
- */ 
-
 /* things that live in dummy.c */
 extern void security_fixup_ops (struct security_operations *ops);
 /* default security ops */
