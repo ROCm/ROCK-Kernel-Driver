@@ -209,7 +209,6 @@ void packet_sock_destruct(struct sock *sk)
 #ifdef PACKET_REFCNT_DEBUG
 	printk(KERN_DEBUG "PACKET socket %p is free, %d are alive\n", sk, atomic_read(&packet_socks_nr));
 #endif
-	MOD_DEC_USE_COUNT;
 }
 
 
@@ -939,7 +938,6 @@ static int packet_create(struct socket *sock, int protocol)
 		return -ESOCKTNOSUPPORT;
 
 	sock->state = SS_UNCONNECTED;
-	MOD_INC_USE_COUNT;
 
 	err = -ENOBUFS;
 	sk = sk_alloc(PF_PACKET, GFP_KERNEL, 1, NULL);
@@ -992,7 +990,6 @@ static int packet_create(struct socket *sock, int protocol)
 out_free:
 	sk_free(sk);
 out:
-	MOD_DEC_USE_COUNT;
 	return err;
 }
 
@@ -1752,6 +1749,7 @@ struct proto_ops packet_ops = {
 static struct net_proto_family packet_family_ops = {
 	.family =	PF_PACKET,
 	.create =	packet_create,
+	.owner	=	THIS_MODULE,
 };
 
 static struct notifier_block packet_netdev_notifier = {

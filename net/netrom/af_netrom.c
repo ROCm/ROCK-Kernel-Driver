@@ -62,34 +62,25 @@ static spinlock_t nr_list_lock;
 
 static struct proto_ops nr_proto_ops;
 
-static void nr_free_sock(struct sock *sk)
-{
-	sk_free(sk);
-
-	MOD_DEC_USE_COUNT;
-}
-
 static struct sock *nr_alloc_sock(void)
 {
-	struct sock *sk;
 	nr_cb *nr;
+	struct sock *sk = sk_alloc(PF_NETROM, GFP_ATOMIC, 1, NULL);
 
-	MOD_INC_USE_COUNT;
-	if ((sk = sk_alloc(PF_NETROM, GFP_ATOMIC, 1, NULL)) == NULL)
-		goto decmod;
+	if (!sk)
+		goto out;
 
 	nr = nr_sk(sk) = kmalloc(sizeof(*nr), GFP_ATOMIC);
 	if (!nr)
 		goto frees;
 
 	memset(nr, 0x00, sizeof(*nr));
-
 	nr->sk = sk;
-
-out:	return sk;
-frees:	sk_free(sk);
+out:
+	return sk;
+frees:
+	sk_free(sk);
 	sk = NULL;
-decmod:	MOD_DEC_USE_COUNT;
 	goto out;
 }
 
@@ -300,9 +291,8 @@ void nr_destroy_socket(struct sock *sk)
 		sk->timer.function = nr_destroy_timer;
 		sk->timer.data     = (unsigned long)sk;
 		add_timer(&sk->timer);
-	} else {
-		nr_free_sock(sk);
-	}
+	} else
+		sk_free(sk);
 }
 
 /*
@@ -1232,6 +1222,7 @@ static int nr_get_info(char *buffer, char **start, off_t offset, int length)
 static struct net_proto_family nr_family_ops = {
 	.family		=	PF_NETROM,
 	.create		=	nr_create,
+	.owner		=	THIS_MODULE,
 };
 
 static struct proto_ops nr_proto_ops = {
