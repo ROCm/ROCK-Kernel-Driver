@@ -236,12 +236,14 @@ Networking
 General changes
 ---------------
 
-The IP firewalling and NAT code has been replaced again.  The new
-netfilter software (including ipfwadm and ipchains backwards-
-compatible modules) is currently distributed separately.
-
 If you have advanced network configuration needs, you should probably
 consider using the network tools from ip-route2.
+
+Packet Filter / NAT
+-------------------
+The packet filtering and NAT code uses the same tools like the previous 2.4.x
+kernel series (iptables).  It still includes backwards-compatibility modules
+for 2.2.x-style ipchains and 2.0.x-style ipfwadm.
 
 PPP
 ---
@@ -399,11 +401,9 @@ NFS-utils
 ---------
 o  <http://sourceforge.net/project/showfiles.php?group_id=14>
 
-Netfilter
----------
-o  <http://netfilter.filewatcher.org/iptables-1.2.tar.bz2>
-o  <http://netfilter.samba.org/iptables-1.2.tar.bz2>
-o  <http://netfilter.kernelnotes.org/iptables-1.2.tar.bz2>
+Iptables
+--------
+o  <http://www.iptables.org/downloads.html>
 
 Ip-route2
 ---------

@@ -313,7 +313,7 @@ static void __tcp_put_port(struct sock *sk)
 	spin_unlock(&head->lock);
 }
 
-inline void tcp_put_port(struct sock *sk)
+void tcp_put_port(struct sock *sk)
 {
 	local_bh_disable();
 	__tcp_put_port(sk);

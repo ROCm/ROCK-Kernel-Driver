@@ -5850,10 +5850,12 @@ static int tg3_get_regs_len(struct net_device *dev)
 	return TG3_REGDUMP_LEN;
 }
 
-static void tg3_get_regs(struct net_device *dev, struct ethtool_regs *regs, void *p)
+static void tg3_get_regs(struct net_device *dev,
+		struct ethtool_regs *regs, void *_p)
 {
+	u32 *p = _p;
 	struct tg3 *tp = dev->priv;
-	u8 *orig_p = p;
+	u8 *orig_p = _p;
 	int i;
 
 	regs->version = 0;
@@ -5863,15 +5865,15 @@ static void tg3_get_regs(struct net_device *dev, struct ethtool_regs *regs, void
 	spin_lock_irq(&tp->lock);
 	spin_lock(&tp->tx_lock);
 
-#define __GET_REG32(reg)	(*((u32 *)(p))++ = tr32(reg))
+#define __GET_REG32(reg)	(*(p)++ = tr32(reg))
 #define GET_REG32_LOOP(base,len)		\
-do {	p = orig_p + (base);			\
+do {	p = (u32 *)(orig_p + (base));		\
 	for (i = 0; i < len; i += 4)		\
 		__GET_REG32((base) + i);	\
 } while (0)
-#define GET_REG32_1(reg)	\
-do {	p = orig_p + (reg);	\
-	__GET_REG32((reg));	\
+#define GET_REG32_1(reg)			\
+do {	p = (u32 *)(orig_p + (reg));		\
+	__GET_REG32((reg));			\
 } while (0)
 
 	GET_REG32_LOOP(TG3PCI_VENDOR, 0xb0);

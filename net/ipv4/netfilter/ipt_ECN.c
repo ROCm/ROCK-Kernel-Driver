@@ -1,9 +1,11 @@
 /* iptables module for the IPv4 and TCP ECN bits, Version 1.5
  *
- * (C) 2002 by Harald Welte <laforge@gnumonks.org>
+ * (C) 2002 by Harald Welte <laforge@netfilter.org>
  * 
- * This software is distributed under GNU GPL v2, 1991
- * 
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as 
+ * published by the Free Software Foundation.
+ *
  * ipt_ECN.c,v 1.5 2002/08/18 19:36:51 laforge Exp
 */
 
@@ -155,10 +157,7 @@ static struct ipt_target ipt_ecn_reg = {
 
 static int __init init(void)
 {
-	if (ipt_register_target(&ipt_ecn_reg))
-		return -EINVAL;
-
-	return 0;
+	return ipt_register_target(&ipt_ecn_reg);
 }
 
 static void __exit fini(void)
