@@ -20,6 +20,7 @@
 #ifdef CONFIG_40x
 #include <asm/io.h>
 #endif
+extern unsigned long timebase_period_ns;
 
 /* For those boards that don't provide one.
 */
@@ -768,6 +769,7 @@ embed_config(bd_t **bdp)
 #if defined(CONFIG_REDWOOD_5) || defined (CONFIG_REDWOOD_6)
 	bd->bi_tbfreq = 27 * 1000 * 1000;
 #endif
+	timebase_period_ns = 1000000000 / bd->bi_tbfreq;
 }
 #endif /* CONFIG_BEECH */
 #endif /* CONFIG_IBM_OPENBIOS */
