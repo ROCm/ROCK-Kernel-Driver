@@ -636,67 +636,6 @@ static void tcp_listen_stop (struct sock *sk)
 	BUG_TRAP(!sk->sk_ack_backlog);
 }
 
-/*
- *	Wait for more memory for a socket
- */
-static int wait_for_tcp_memory(struct sock *sk, long *timeo)
-{
-	int err = 0;
-	long vm_wait = 0;
-	long current_timeo = *timeo;
-	DEFINE_WAIT(wait);
-
-	if (sk_stream_memory_free(sk))
-		current_timeo = vm_wait = (net_random() % (HZ / 5)) + 2;
-
-	for (;;) {
-		set_bit(SOCK_ASYNC_NOSPACE, &sk->sk_socket->flags);
-
-		prepare_to_wait(sk->sk_sleep, &wait, TASK_INTERRUPTIBLE);
-
-		if (sk->sk_err || (sk->sk_shutdown & SEND_SHUTDOWN))
-			goto do_error;
-		if (!*timeo)
-			goto do_nonblock;
-		if (signal_pending(current))
-			goto do_interrupted;
-		clear_bit(SOCK_ASYNC_NOSPACE, &sk->sk_socket->flags);
-		if (sk_stream_memory_free(sk) && !vm_wait)
-			break;
-
-		set_bit(SOCK_NOSPACE, &sk->sk_socket->flags);
-		sk->sk_write_pending++;
-		release_sock(sk);
-		if (!sk_stream_memory_free(sk) || vm_wait)
-			current_timeo = schedule_timeout(current_timeo);
-		lock_sock(sk);
-		sk->sk_write_pending--;
-
-		if (vm_wait) {
-			vm_wait -= current_timeo;
-			current_timeo = *timeo;
-			if (current_timeo != MAX_SCHEDULE_TIMEOUT &&
-			    (current_timeo -= vm_wait) < 0)
-				current_timeo = 0;
-			vm_wait = 0;
-		}
-		*timeo = current_timeo;
-	}
-out:
-	finish_wait(sk->sk_sleep, &wait);
-	return err;
-
-do_error:
-	err = -EPIPE;
-	goto out;
-do_nonblock:
-	err = -EAGAIN;
-	goto out;
-do_interrupted:
-	err = sock_intr_errno(*timeo);
-	goto out;
-}
-
 static inline void fill_page_desc(struct sk_buff *skb, int i,
 				  struct page *page, int off, int size)
 {
@@ -854,7 +793,7 @@ wait_for_memory:
 		if (copied)
 			tcp_push(sk, tp, flags & ~MSG_MORE, mss_now, TCP_NAGLE_PUSH);
 
-		if ((err = wait_for_tcp_memory(sk, &timeo)) != 0)
+		if ((err = sk_stream_wait_memory(sk, &timeo)) != 0)
 			goto do_error;
 
 		mss_now = tcp_current_mss(sk, !(flags&MSG_OOB));
@@ -1097,7 +1036,7 @@ wait_for_memory:
 			if (copied)
 				tcp_push(sk, tp, flags & ~MSG_MORE, mss_now, TCP_NAGLE_PUSH);
 
-			if ((err = wait_for_tcp_memory(sk, &timeo)) != 0)
+			if ((err = sk_stream_wait_memory(sk, &timeo)) != 0)
 				goto do_error;
 
 			mss_now = tcp_current_mss(sk, !(flags&MSG_OOB));
