@@ -166,10 +166,12 @@ static void decode_registers (byte registers, byte value)
 
 #endif /* PDC202XX_DECODE_REGISTER_INFO */
 
-int check_in_drive_lists(struct ata_device *drive) {
-	const char *pdc_quirk_drives[] = {
+int check_in_drive_lists(struct ata_device *drive)
+{
+	static const char *pdc_quirk_drives[] = {
 		"QUANTUM FIREBALLlct08 08",
 		"QUANTUM FIREBALLP KA6.4",
+		"QUANTUM FIREBALLP KA9.1",
 		"QUANTUM FIREBALLP LM20.4",
 		"QUANTUM FIREBALLP KX20.5",
 		"QUANTUM FIREBALLP KX27.3",

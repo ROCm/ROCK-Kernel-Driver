@@ -40,9 +40,6 @@
 
 /* Right now this is only needed by a promise controlled.
  */
-#ifndef DISK_RECOVERY_TIME		/* off=0; on=access_delay_time */
-# define DISK_RECOVERY_TIME	0	/*  for hardware that needs it */
-#endif
 #ifndef OK_TO_RESET_CONTROLLER		/* 1 needed for good error recovery */
 # define OK_TO_RESET_CONTROLLER	0	/* 0 for use with AH2372A/B interface */
 #endif
@@ -202,7 +199,8 @@ typedef enum {
 	ide_cmd646,
 	ide_cy82c693,
 	ide_pmac,
-	ide_etrax100
+	ide_etrax100,
+	ide_acorn
 } hwif_chipset_t;
 
 
@@ -547,10 +545,6 @@ struct ata_channel {
 	unsigned slow		: 1;	/* flag: slow data port */
 	unsigned io_32bit	: 1;	/* 0=16-bit, 1=32-bit */
 	unsigned char bus_state;	/* power state of the IDE bus */
-
-#if (DISK_RECOVERY_TIME > 0)
-	unsigned long last_time;	/* time when previous rq was done */
-#endif
 };
 
 /*
@@ -860,6 +854,15 @@ static inline void udma_irq_lost(struct ata_device *drive)
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
+
+void udma_pci_enable(struct ata_device *drive, int on, int verbose);
+int udma_pci_start(struct ata_device *drive, struct request *rq);
+int udma_pci_stop(struct ata_device *drive);
+int udma_pci_read(struct ata_device *drive, struct request *rq);
+int udma_pci_write(struct ata_device *drive, struct request *rq);
+int udma_pci_irq_status(struct ata_device *drive);
+void udma_pci_timeout(struct ata_device *drive);
+void udma_pci_irq_lost(struct ata_device *);
 
 extern int udma_new_table(struct ata_channel *, struct request *);
 extern void udma_destroy_table(struct ata_channel *);

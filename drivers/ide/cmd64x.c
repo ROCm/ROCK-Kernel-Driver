@@ -305,7 +305,7 @@ static void cmd64x_tuneproc(struct ata_device *drive, byte mode_wanted)
 	 */
 
 	recovery_time = t->cycle - (t->setup + t->active);
-	clock_time = 1000 / system_bus_speed;
+	clock_time = 1000000 / system_bus_speed;
 	cycle_count = (t->cycle + clock_time - 1) / clock_time;
 	setup_count = (t->setup + clock_time - 1) / clock_time;
 	active_count = (t->active + clock_time - 1) / clock_time;

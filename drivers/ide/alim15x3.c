@@ -261,18 +261,18 @@ static void ali15x3_tune_drive(struct ata_device *drive, byte pio)
 
 	s_time = t->setup;
 	a_time = t->active;
-	if ((s_clc = (s_time * system_bus_speed + 999) / 1000) >= 8)
+	if ((s_clc = (s_time * system_bus_speed + 999999) / 1000000) >= 8)
 		s_clc = 0;
-	if ((a_clc = (a_time * system_bus_speed + 999) / 1000) >= 8)
+	if ((a_clc = (a_time * system_bus_speed + 999999) / 1000000) >= 8)
 		a_clc = 0;
 	c_time = t->cycle;
 
 #if 0
-	if ((r_clc = ((c_time - s_time - a_time) * system_bus_speed + 999) / 1000) >= 16)
+	if ((r_clc = ((c_time - s_time - a_time) * system_bus_speed + 999999) / 1000000) >= 16)
 		r_clc = 0;
 #endif
 
-	if (!(r_clc = (c_time * system_bus_speed + 999) / 1000 - a_clc - s_clc)) {
+	if (!(r_clc = (c_time * system_bus_speed + 999999) / 1000000 - a_clc - s_clc)) {
 		r_clc = 1;
 	} else {
 		if (r_clc >= 16)

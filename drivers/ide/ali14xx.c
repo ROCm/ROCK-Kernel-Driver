@@ -124,8 +124,8 @@ static void ali14xx_tune_drive(struct ata_device *drive, u8 pio)
 	/* calculate timing, according to PIO mode */
 	time1 = t->cycle;
 	time2 = t->active;
-	param3 = param1 = (time2 * system_bus_speed + 999) / 1000;
-	param4 = param2 = (time1 * system_bus_speed + 999) / 1000 - param1;
+	param3 = param1 = (time2 * system_bus_speed + 999999) / 1000000;
+	param4 = param2 = (time1 * system_bus_speed + 999999) / 1000000 - param1;
 	if (pio < XFER_PIO_3) {
 		param3 += 8;
 		param4 += 8;

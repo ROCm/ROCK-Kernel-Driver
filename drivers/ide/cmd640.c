@@ -603,7 +603,7 @@ static void cmd640_set_mode (unsigned int index, u8 pio_mode, unsigned int cycle
 	u8 cycle_count;
 
 	recovery_time = cycle_time - (setup_time + active_time);
-	clock_time = 1000 / system_bus_speed;
+	clock_time = 1000000 / system_bus_speed;
 	cycle_count = (cycle_time + clock_time - 1) / clock_time;
 
 	setup_count = (setup_time + clock_time - 1) / clock_time;
