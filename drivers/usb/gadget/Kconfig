@@ -135,6 +135,18 @@ config USB_SA1100
 	depends on USB_GADGET_SA1100
 	default USB_GADGET
 
+config USB_GADGET_LH7A40X
+	boolean "LH7A40X"
+	depends on ARCH_LH7A40X
+	help
+    This driver provides USB Device Controller driver for LH7A40x
+
+config USB_LH7A40X
+	tristate
+	depends on USB_GADGET_LH7A40X
+	default USB_GADGET
+
+
 config USB_GADGET_DUMMY_HCD
 	boolean "Dummy HCD (DEVELOPMENT)"
 	depends on USB && EXPERIMENTAL
