@@ -137,17 +137,6 @@ static const struct pnp_device_id sb1000_pnp_ids[] = {
 };
 MODULE_DEVICE_TABLE(pnp, sb1000_pnp_ids);
 
-static void
-sb1000_setup(struct net_device *dev)
-{
-	dev->type		= ARPHRD_ETHER;
-	dev->mtu		= 1500;
-	dev->addr_len		= ETH_ALEN;
-
-	/* New-style flags. */
-	dev->flags		= IFF_POINTOPOINT|IFF_NOARP;
-}
-
 static int
 sb1000_probe_one(struct pnp_dev *pdev, const struct pnp_device_id *id)
 {
@@ -188,11 +177,18 @@ sb1000_probe_one(struct pnp_dev *pdev, const struct pnp_device_id *id)
 			"S/N %#8.8x, IRQ %d.\n", dev->name, dev->base_addr,
 			dev->mem_start, serial_number, dev->irq);
 
-	dev = alloc_netdev(sizeof(struct sb1000_private), "cm%d", sb1000_setup);
+	dev = alloc_etherdev(sizeof(struct sb1000_private));
 	if (!dev) {
 		error = -ENOMEM;
 		goto out_release_regions;
 	}
+
+	/*
+	 * The SB1000 is an rx-only cable modem device.  The uplink is a modem
+	 * and we do not want to arp on it.
+	 */
+	dev->flags = IFF_POINTOPOINT|IFF_NOARP;
+
 	SET_MODULE_OWNER(dev);
 
 	if (sb1000_debug > 0)

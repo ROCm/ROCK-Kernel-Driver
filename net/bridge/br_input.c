@@ -64,7 +64,7 @@ int br_handle_frame_finish(struct sk_buff *skb)
 	smp_read_barrier_depends();
 
 	if (p == NULL || p->state == BR_STATE_DISABLED) {
-		kfree(skb);
+		kfree_skb(skb);
 		goto out;
 	}
 
