@@ -1,3 +1,12 @@
+Version 0.79
+------------
+Fix mount options for ro (readonly) ,uid, gid and file and directory mode. 
+
+Version 0.78
+------------
+Fix errors displayed on failed mounts to be more understandable.
+Fixed various incorrect or misleading smb to posix error code mappings.
+
 Version 0.77
 ------------
 Fix display of NTFS DFS junctions to display as symlinks.

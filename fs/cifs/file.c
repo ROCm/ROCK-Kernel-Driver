@@ -877,6 +877,8 @@ fill_in_inode(struct inode *tmp_inode,
 	      FILE_DIRECTORY_INFO * pfindData, int *pobject_type)
 {
 	struct cifsInodeInfo *cifsInfo = CIFS_I(tmp_inode);
+	struct cifs_sb_info *cifs_sb = CIFS_SB(tmp_inode->i_sb);
+
 	pfindData->ExtFileAttributes =
 	    le32_to_cpu(pfindData->ExtFileAttributes);
 	pfindData->AllocationSize = le64_to_cpu(pfindData->AllocationSize);
@@ -894,7 +896,13 @@ fill_in_inode(struct inode *tmp_inode,
 	    cifs_NTtimeToUnix(le64_to_cpu(pfindData->ChangeTime));
 	/* treat dos attribute of read-only as read-only mode bit e.g. 555? */
 	/* 2767 perms - indicate mandatory locking */
-	tmp_inode->i_mode = S_IALLUGO & ~(S_ISUID | S_IXGRP);
+		/* BB fill in uid and gid here? with help from winbind? 
+			or retrieve from NTFS stream extended attribute */
+	tmp_inode->i_uid = cifs_sb->mnt_uid;
+	tmp_inode->i_gid = cifs_sb->mnt_gid;
+	/* set default mode. will override for dirs below */
+	tmp_inode->i_mode = cifs_sb->mnt_file_mode;
+
 	cFYI(0,
 	     ("CIFS FFIRST: Attributes came in as 0x%x",
 	      pfindData->ExtFileAttributes));
@@ -905,7 +913,7 @@ fill_in_inode(struct inode *tmp_inode,
 	} else if (pfindData->ExtFileAttributes & ATTR_DIRECTORY) {
 		*pobject_type = DT_DIR;
 		/* override default perms since we do not lock dirs */
-		tmp_inode->i_mode = S_IRWXUGO;
+		tmp_inode->i_mode = cifs_sb->mnt_dir_mode;
 		tmp_inode->i_mode |= S_IFDIR;
 	} else {
 		*pobject_type = DT_REG;
