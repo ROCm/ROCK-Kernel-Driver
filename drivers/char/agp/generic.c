@@ -562,9 +562,6 @@ void agp_generic_enable(u32 mode)
 	command = agp_collect_device_status(mode, command);
 	command |= AGPSTAT_AGP_ENABLE;
 
-	pci_write_config_dword(agp_bridge->dev,
-		       agp_bridge->capndx + PCI_AGP_COMMAND, command);
-
 	/* Do AGP version specific frobbing. */
 	if(agp_bridge->major_version >= 3) {
 		pci_read_config_dword(agp_bridge->dev,
