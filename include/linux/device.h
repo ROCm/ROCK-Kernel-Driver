@@ -82,6 +82,7 @@ extern void bus_unregister(struct bus_type * bus);
 extern struct bus_type * get_bus(struct bus_type * bus);
 extern void put_bus(struct bus_type * bus);
 
+extern struct bus_type * find_bus(char * name);
 
 /* iterator helpers for buses */
 

@@ -477,6 +477,21 @@ void put_bus(struct bus_type * bus)
 	subsys_put(&bus->subsys);
 }
 
+
+/**
+ *	find_bus - locate bus by name.
+ *	@name:	name of bus.
+ *
+ *	Call kset_find_obj() to iterate over list of buses to
+ *	find a bus by name. Return bus if found.
+ */
+
+struct bus_type * find_bus(char * name)
+{
+	struct kobject * k = kset_find_obj(&bus_subsys.kset,name);
+	return k ? to_bus(k) : NULL;
+}
+
 /**
  *	bus_register - register a bus with the system.
  *	@bus:	bus.
@@ -539,6 +554,7 @@ EXPORT_SYMBOL(bus_register);
 EXPORT_SYMBOL(bus_unregister);
 EXPORT_SYMBOL(get_bus);
 EXPORT_SYMBOL(put_bus);
+EXPORT_SYMBOL(find_bus);
 
 EXPORT_SYMBOL(bus_create_file);
 EXPORT_SYMBOL(bus_remove_file);
