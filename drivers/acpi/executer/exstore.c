@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exstore - AML Interpreter object store support
- *              $Revision: 169 $
+ *              $Revision: 171 $
  *
  *****************************************************************************/
 
@@ -103,7 +103,7 @@ acpi_ex_store (
 			return_ACPI_STATUS (AE_OK);
 		}
 
-		/*lint: -fallthrough */
+		/*lint -fallthrough */
 
 	default:
 
@@ -286,6 +286,12 @@ acpi_ex_store_object_to_index (
 		if (new_desc != obj_desc) {
 			acpi_ut_remove_reference (obj_desc);
 			*(index_desc->reference.where) = new_desc;
+
+			/* If same as the original source, add a reference */
+
+			if (new_desc == source_desc) {
+				acpi_ut_add_reference (new_desc);
+			}
 		}
 		break;
 

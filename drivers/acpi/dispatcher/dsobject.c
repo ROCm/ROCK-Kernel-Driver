@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dsobject - Dispatcher object management routines
- *              $Revision: 106 $
+ *              $Revision: 107 $
  *
  *****************************************************************************/
 
@@ -746,9 +746,10 @@ acpi_ds_init_object_from_op (
 
 			obj_desc->reference.opcode = AML_LOCAL_OP;
 			obj_desc->reference.offset = opcode - AML_LOCAL_OP;
+
 #ifndef ACPI_NO_METHOD_EXECUTION
-			acpi_ds_method_data_get_node (AML_LOCAL_OP, obj_desc->reference.offset,
-				walk_state, (acpi_namespace_node **) &obj_desc->reference.object);
+			status = acpi_ds_method_data_get_node (AML_LOCAL_OP, obj_desc->reference.offset,
+					 walk_state, (acpi_namespace_node **) &obj_desc->reference.object);
 #endif
 			break;
 

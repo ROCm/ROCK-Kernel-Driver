@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exresop - AML Interpreter operand/object resolution
- *              $Revision: 55 $
+ *              $Revision: 57 $
  *
  *****************************************************************************/
 
@@ -29,7 +29,6 @@
 #include "amlcode.h"
 #include "acparser.h"
 #include "acinterp.h"
-#include "acnamesp.h"
 
 
 #define _COMPONENT          ACPI_EXECUTER
@@ -463,11 +462,12 @@ acpi_ex_resolve_operands (
 		case ARGI_DATAOBJECT:
 			/*
 			 * ARGI_DATAOBJECT is only used by the Size_of operator.
-			 * Need a buffer, string, package, or Node reference.
+			 * Need a buffer, string, package, or Ref_of reference.
 			 *
 			 * The only reference allowed here is a direct reference to
 			 * a namespace node.
 			 */
+#if 0
 			if (ACPI_GET_OBJECT_TYPE (*stack_ptr) == INTERNAL_TYPE_REFERENCE) {
 				if (!(*stack_ptr)->reference.node) {
 					ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
@@ -497,13 +497,14 @@ acpi_ex_resolve_operands (
 				acpi_ut_remove_reference (*stack_ptr);
 				(*stack_ptr) = temp_node;
 			}
-
+#endif
 			/* Need a buffer, string, package */
 
 			switch (ACPI_GET_OBJECT_TYPE (*stack_ptr)) {
 			case ACPI_TYPE_PACKAGE:
 			case ACPI_TYPE_STRING:
 			case ACPI_TYPE_BUFFER:
+			case INTERNAL_TYPE_REFERENCE:
 
 				/* Valid operand */
 				break;

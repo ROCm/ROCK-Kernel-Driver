@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: utmisc - common utility procedures
- *              $Revision: 80 $
+ *              $Revision: 81 $
  *
  ******************************************************************************/
 
@@ -26,8 +26,6 @@
 
 #include "acpi.h"
 #include "acnamesp.h"
-#include "amlcode.h"
-#include "acinterp.h"
 
 
 #define _COMPONENT          ACPI_UTILITIES

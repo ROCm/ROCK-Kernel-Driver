@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exconvrt - Object conversion routines
- *              $Revision: 37 $
+ *              $Revision: 38 $
  *
  *****************************************************************************/
 
@@ -230,7 +230,33 @@ acpi_ex_convert_to_buffer (
 
 
 	case ACPI_TYPE_STRING:
-		*result_desc = obj_desc;
+		/*
+		 * Create a new Buffer object
+		 */
+		ret_desc = acpi_ut_create_internal_object (ACPI_TYPE_BUFFER);
+		if (!ret_desc) {
+			return_ACPI_STATUS (AE_NO_MEMORY);
+		}
+
+		/* Need enough space for one integer */
+
+		new_buf = ACPI_MEM_CALLOCATE (obj_desc->string.length);
+		if (!new_buf) {
+			ACPI_REPORT_ERROR
+				(("Ex_convert_to_buffer: Buffer allocation failure\n"));
+			acpi_ut_remove_reference (ret_desc);
+			return_ACPI_STATUS (AE_NO_MEMORY);
+		}
+
+		ACPI_STRNCPY ((char *) new_buf, (char *) obj_desc->string.pointer, obj_desc->string.length);
+		ret_desc->buffer.flags |= AOPOBJ_DATA_VALID;
+		ret_desc->buffer.pointer = new_buf;
+		ret_desc->buffer.length = obj_desc->string.length;
+
+		/* Return the new buffer descriptor */
+
+		*result_desc = ret_desc;
+
 		break;
 
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acutils.h -- prototypes for the common (subsystem-wide) procedures
- *       $Revision: 143 $
+ *       $Revision: 144 $
  *
  *****************************************************************************/
 
@@ -138,7 +138,7 @@ acpi_ut_allocate_owner_id (
 
 #ifndef ACPI_USE_SYSTEM_CLIBRARY
 
-u32
+ACPI_SIZE
 acpi_ut_strlen (
 	const NATIVE_CHAR       *string);
 
@@ -151,15 +151,15 @@ NATIVE_CHAR *
 acpi_ut_strncpy (
 	NATIVE_CHAR             *dst_string,
 	const NATIVE_CHAR       *src_string,
-	NATIVE_UINT             count);
+	ACPI_SIZE               count);
 
 int
 acpi_ut_strncmp (
 	const NATIVE_CHAR       *string1,
 	const NATIVE_CHAR       *string2,
-	NATIVE_UINT             count);
+	ACPI_SIZE               count);
 
-u32
+int
 acpi_ut_strcmp (
 	const NATIVE_CHAR       *string1,
 	const NATIVE_CHAR       *string2);
@@ -173,7 +173,7 @@ NATIVE_CHAR *
 acpi_ut_strncat (
 	NATIVE_CHAR             *dst_string,
 	const NATIVE_CHAR       *src_string,
-	NATIVE_UINT             count);
+	ACPI_SIZE               count);
 
 u32
 acpi_ut_strtoul (
@@ -190,13 +190,13 @@ void *
 acpi_ut_memcpy (
 	void                    *dest,
 	const void              *src,
-	NATIVE_UINT             count);
+	ACPI_SIZE               count);
 
 void *
 acpi_ut_memset (
 	void                    *dest,
 	NATIVE_UINT             value,
-	NATIVE_UINT             count);
+	ACPI_SIZE               count);
 
 int
 acpi_ut_to_upper (

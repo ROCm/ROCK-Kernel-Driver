@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exoparg1 - AML execution - opcodes with 1 argument
- *              $Revision: 142 $
+ *              $Revision: 143 $
  *
  *****************************************************************************/
 
@@ -58,7 +58,6 @@
  * The AcpiExOpcode* functions are called via the Dispatcher component with
  * fully resolved operands.
 !*/
-
 
 /*******************************************************************************
  *
@@ -561,73 +560,11 @@ acpi_ex_opcode_1A_0T_1R (
 
 	case AML_TYPE_OP:               /* Object_type (Source_object) */
 
-		if (ACPI_GET_OBJECT_TYPE (operand[0]) == INTERNAL_TYPE_REFERENCE) {
-			/*
-			 * Not a Name -- an indirect name pointer would have
-			 * been converted to a direct name pointer in Resolve_operands
-			 */
-			switch (operand[0]->reference.opcode) {
-			case AML_DEBUG_OP:
+		/* Get the type of the base object */
 
-				/* The Debug Object is of type "Debug_object" */
-
-				type = ACPI_TYPE_DEBUG_OBJECT;
-				break;
-
-
-			case AML_INDEX_OP:
-
-				/* Get the type of this reference (index into another object) */
-
-				type = operand[0]->reference.target_type;
-				if (type == ACPI_TYPE_PACKAGE) {
-					/*
-					 * The main object is a package, we want to get the type
-					 * of the individual package element that is referenced by
-					 * the index.
-					 */
-					type = ACPI_GET_OBJECT_TYPE (*(operand[0]->reference.where));
-				}
-				break;
-
-
-			case AML_LOCAL_OP:
-			case AML_ARG_OP:
-
-				type = acpi_ds_method_data_get_type (operand[0]->reference.opcode,
-						  operand[0]->reference.offset, walk_state);
-				break;
-
-
-			default:
-
-				ACPI_REPORT_ERROR (("Acpi_ex_opcode_1A_0T_1R/Type_op: Unknown Reference subtype %X\n",
-					operand[0]->reference.opcode));
-				status = AE_AML_INTERNAL;
-				goto cleanup;
-			}
-		}
-		else {
-			/*
-			 * It's not a Reference, so it must be a direct name pointer.
-			 */
-			type = acpi_ns_get_type ((acpi_namespace_node *) operand[0]);
-
-			/* Convert internal types to external types */
-
-			switch (type) {
-			case INTERNAL_TYPE_REGION_FIELD:
-			case INTERNAL_TYPE_BANK_FIELD:
-			case INTERNAL_TYPE_INDEX_FIELD:
-
-				type = ACPI_TYPE_FIELD_UNIT;
-				break;
-
-			default:
-				/* No change to Type required */
-				break;
-			}
-
+		status = acpi_ex_resolve_multiple (walk_state, operand[0], &type, NULL);
+		if (ACPI_FAILURE (status)) {
+			goto cleanup;
 		}
 
 		/* Allocate a descriptor to hold the type. */
@@ -644,39 +581,36 @@ acpi_ex_opcode_1A_0T_1R (
 
 	case AML_SIZE_OF_OP:            /* Size_of (Source_object) */
 
-		temp_desc = operand[0];
-		if (ACPI_GET_DESCRIPTOR_TYPE (operand[0]) == ACPI_DESC_TYPE_NAMED) {
-			temp_desc = acpi_ns_get_attached_object ((acpi_namespace_node *) operand[0]);
+		/* Get the base object */
+
+		status = acpi_ex_resolve_multiple (walk_state, operand[0], &type, &temp_desc);
+		if (ACPI_FAILURE (status)) {
+			goto cleanup;
 		}
 
-		if (!temp_desc) {
-			value = 0;
-		}
-		else {
-			/*
-			 * Type is guaranteed to be a buffer, string, or package at this
-			 * point (even if the original operand was an object reference, it
-			 * will be resolved and typechecked during operand resolution.)
-			 */
-			switch (ACPI_GET_OBJECT_TYPE (temp_desc)) {
-			case ACPI_TYPE_BUFFER:
-				value = temp_desc->buffer.length;
-				break;
+		/*
+		 * Type is guaranteed to be a buffer, string, or package at this
+		 * point (even if the original operand was an object reference, it
+		 * will be resolved and typechecked during operand resolution.)
+		 */
+		switch (type) {
+		case ACPI_TYPE_BUFFER:
+			value = temp_desc->buffer.length;
+			break;
 
-			case ACPI_TYPE_STRING:
-				value = temp_desc->string.length;
-				break;
+		case ACPI_TYPE_STRING:
+			value = temp_desc->string.length;
+			break;
 
-			case ACPI_TYPE_PACKAGE:
-				value = temp_desc->package.count;
-				break;
+		case ACPI_TYPE_PACKAGE:
+			value = temp_desc->package.count;
+			break;
 
-			default:
-				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Size_of, Not Buf/Str/Pkg - found type %s\n",
-					acpi_ut_get_object_type_name (temp_desc)));
-				status = AE_AML_OPERAND_TYPE;
-				goto cleanup;
-			}
+		default:
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Size_of, Not Buf/Str/Pkg - found type %s\n",
+				acpi_ut_get_type_name (type)));
+			status = AE_AML_OPERAND_TYPE;
+			goto cleanup;
 		}
 
 		/*

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utcopy - Internal to external object translation utilities
- *              $Revision: 103 $
+ *              $Revision: 104 $
  *
  *****************************************************************************/
 
@@ -25,7 +25,6 @@
 
 
 #include "acpi.h"
-#include "acnamesp.h"
 #include "amlcode.h"
 
 

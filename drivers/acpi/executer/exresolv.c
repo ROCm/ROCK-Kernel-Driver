@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exresolv - AML Interpreter object resolution
- *              $Revision: 115 $
+ *              $Revision: 116 $
  *
  *****************************************************************************/
 
@@ -29,6 +29,7 @@
 #include "amlcode.h"
 #include "acdispat.h"
 #include "acinterp.h"
+#include "acnamesp.h"
 
 
 #define _COMPONENT          ACPI_EXECUTER
@@ -277,6 +278,172 @@ acpi_ex_resolve_object_to_value (
 	}
 
 	return_ACPI_STATUS (status);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_ex_resolve_multiple
+ *
+ * PARAMETERS:  Walk_state          - Current state (contains AML opcode)
+ *              Operand             - Starting point for resolution
+ *              Return_type         - Where the object type is returned
+ *              Return_desc         - Where the resolved object is returned
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Return the base object and type.  Traverse a reference list if
+ *              necessary to get to the base object.
+ *
+ ******************************************************************************/
+
+acpi_status
+acpi_ex_resolve_multiple (
+	acpi_walk_state         *walk_state,
+	acpi_operand_object     *operand,
+	acpi_object_type        *return_type,
+	acpi_operand_object     **return_desc)
+{
+	acpi_operand_object     *obj_desc = (void *) operand;
+	acpi_namespace_node     *node;
+	acpi_object_type        type;
+
+
+	ACPI_FUNCTION_TRACE ("Ex_get_object_type");
+
+
+	/*
+	 * For reference objects created via the Ref_of or Index operators,
+	 * we need to get to the base object (as per the ACPI specification
+	 * of the Object_type and Size_of operators). This means traversing
+	 * the list of possibly many nested references.
+	 */
+	while (ACPI_GET_OBJECT_TYPE (obj_desc) == INTERNAL_TYPE_REFERENCE) {
+		switch (obj_desc->reference.opcode) {
+		case AML_REF_OF_OP:
+
+			/* Dereference the reference pointer */
+
+			node = obj_desc->reference.object;
+
+			/* All "References" point to a NS node */
+
+			if (ACPI_GET_DESCRIPTOR_TYPE (node) != ACPI_DESC_TYPE_NAMED) {
+				return_ACPI_STATUS (AE_AML_INTERNAL);
+			}
+
+			/* Get the attached object */
+
+			obj_desc = acpi_ns_get_attached_object (node);
+			if (!obj_desc) {
+				/* No object, use the NS node type */
+
+				type = acpi_ns_get_type (node);
+				goto exit;
+			}
+
+			/* Check for circular references */
+
+			if (obj_desc == operand) {
+				return_ACPI_STATUS (AE_AML_CIRCULAR_REFERENCE);
+			}
+			break;
+
+
+		case AML_INDEX_OP:
+
+			/* Get the type of this reference (index into another object) */
+
+			type = obj_desc->reference.target_type;
+			if (type != ACPI_TYPE_PACKAGE) {
+				goto exit;
+			}
+
+			/*
+			 * The main object is a package, we want to get the type
+			 * of the individual package element that is referenced by
+			 * the index.
+			 *
+			 * This could of course in turn be another reference object.
+			 */
+			obj_desc = *(obj_desc->reference.where);
+			break;
+
+
+		case AML_INT_NAMEPATH_OP:
+
+			/* Dereference the reference pointer */
+
+			node = obj_desc->reference.node;
+
+			/* All "References" point to a NS node */
+
+			if (ACPI_GET_DESCRIPTOR_TYPE (node) != ACPI_DESC_TYPE_NAMED) {
+				return_ACPI_STATUS (AE_AML_INTERNAL);
+			}
+
+			/* Get the attached object */
+
+			obj_desc = acpi_ns_get_attached_object (node);
+			if (!obj_desc) {
+				/* No object, use the NS node type */
+
+				type = acpi_ns_get_type (node);
+				goto exit;
+			}
+
+			/* Check for circular references */
+
+			if (obj_desc == operand) {
+				return_ACPI_STATUS (AE_AML_CIRCULAR_REFERENCE);
+			}
+			break;
+
+
+		case AML_DEBUG_OP:
+
+			/* The Debug Object is of type "Debug_object" */
+
+			type = ACPI_TYPE_DEBUG_OBJECT;
+			goto exit;
+
+
+		default:
+
+			ACPI_REPORT_ERROR (("Acpi_ex_resolve_multiple: Unknown Reference subtype %X\n",
+				obj_desc->reference.opcode));
+			return_ACPI_STATUS (AE_AML_INTERNAL);
+		}
+	}
+
+	/*
+	 * Now we are guaranteed to have an object that has not been created
+	 * via the Ref_of or Index operators.
+	 */
+	type = ACPI_GET_OBJECT_TYPE (obj_desc);
+
+
+exit:
+	/* Convert internal types to external types */
+
+	switch (type) {
+	case INTERNAL_TYPE_REGION_FIELD:
+	case INTERNAL_TYPE_BANK_FIELD:
+	case INTERNAL_TYPE_INDEX_FIELD:
+
+		type = ACPI_TYPE_FIELD_UNIT;
+		break;
+
+	default:
+		/* No change to Type required */
+		break;
+	}
+
+	*return_type = type;
+	if (return_desc) {
+		*return_desc = obj_desc;
+	}
+	return_ACPI_STATUS (AE_OK);
 }
 
 

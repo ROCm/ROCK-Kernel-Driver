@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acdebug.h - ACPI/AML debugger
- *       $Revision: 63 $
+ *       $Revision: 64 $
  *
  *****************************************************************************/
 
@@ -196,6 +196,10 @@ void
 acpi_db_decode_and_display_object (
 	NATIVE_CHAR             *target,
 	NATIVE_CHAR             *output_type);
+
+void
+acpi_db_decode_node (
+	acpi_namespace_node     *node);
 
 void
 acpi_db_display_result_object (

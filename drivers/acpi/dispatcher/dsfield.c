@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dsfield - Dispatcher field routines
- *              $Revision: 66 $
+ *              $Revision: 67 $
  *
  *****************************************************************************/
 
@@ -250,7 +250,7 @@ acpi_ds_get_field_names (
 				}
 
 				ACPI_REPORT_ERROR (("Field name [%4.4s] already exists in current scope\n",
-						  &arg->named.name));
+						(char *) &arg->named.name));
 			}
 			else {
 				arg->common.node = info->field_node;
@@ -271,7 +271,7 @@ acpi_ds_get_field_names (
 
 			if (position > ACPI_UINT32_MAX) {
 				ACPI_REPORT_ERROR (("Field [%4.4s] bit offset too large (> 0xFFFFFFFF)\n",
-					&info->field_node->name));
+						(char *) &info->field_node->name));
 				return_ACPI_STATUS (AE_SUPPORT);
 			}
 
@@ -417,7 +417,7 @@ acpi_ds_init_field_objects (
 				}
 
 				ACPI_REPORT_ERROR (("Field name [%4.4s] already exists in current scope\n",
-						  &arg->named.name));
+						(char *) &arg->named.name));
 
 				/* Name already exists, just ignore this error */
 

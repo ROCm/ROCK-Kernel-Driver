@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utglobal - Global variables for the ACPI subsystem
- *              $Revision: 170 $
+ *              $Revision: 171 $
  *
  *****************************************************************************/
 
@@ -27,7 +27,6 @@
 
 #include "acpi.h"
 #include "acnamesp.h"
-#include "amlcode.h"
 
 #define _COMPONENT          ACPI_UTILITIES
 	 ACPI_MODULE_NAME    ("utglobal")

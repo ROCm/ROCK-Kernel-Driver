@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utdebug - Debug print routines
- *              $Revision: 104 $
+ *              $Revision: 105 $
  *
  *****************************************************************************/
 
@@ -152,7 +152,7 @@ acpi_ut_debug_print (
 	acpi_os_printf ("%8s-%04ld ", dbg_info->module_name, line_number);
 
 	if (ACPI_LV_THREADS & acpi_dbg_level) {
-		acpi_os_printf ("[%04lX] ", thread_id, acpi_gbl_nesting_level, dbg_info->proc_name);
+		acpi_os_printf ("[%04lX] ", thread_id);
 	}
 
 	acpi_os_printf ("[%02ld] %-22.22s: ", acpi_gbl_nesting_level, dbg_info->proc_name);
@@ -516,7 +516,7 @@ acpi_ut_dump_buffer (
 	while (i < count) {
 		/* Print current offset */
 
-		acpi_os_printf ("%05X  ", i);
+		acpi_os_printf ("%05X  ", (u32) i);
 
 		/* Print 16 hex chars */
 

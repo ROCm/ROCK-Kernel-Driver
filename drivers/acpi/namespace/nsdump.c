@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: nsdump - table dumping routines for debug
- *              $Revision: 139 $
+ *              $Revision: 140 $
  *
  *****************************************************************************/
 
@@ -116,7 +116,7 @@ acpi_ns_dump_pathname (
 
 	status = acpi_ns_handle_to_pathname (handle, &buffer);
 	if (ACPI_SUCCESS (status)) {
-		acpi_os_printf ("%s %s (Node %p)\n", msg, buffer.pointer, handle);
+		acpi_os_printf ("%s %s (Node %p)\n", msg, (char *) buffer.pointer, handle);
 		ACPI_MEM_FREE (buffer.pointer);
 	}
 
@@ -254,10 +254,10 @@ acpi_ns_dump_one_object (
 		switch (type) {
 		case ACPI_TYPE_PROCESSOR:
 
-			acpi_os_printf (" ID %hd Addr %.4X Len %.4X\n",
+			acpi_os_printf (" ID %X Len %.4X Addr %p\n",
 					 obj_desc->processor.proc_id,
-					 obj_desc->processor.address,
-					 obj_desc->processor.length);
+					 obj_desc->processor.length,
+					 (char *) obj_desc->processor.address);
 			break;
 
 
@@ -269,8 +269,8 @@ acpi_ns_dump_one_object (
 
 		case ACPI_TYPE_METHOD:
 
-			acpi_os_printf (" Args %hd Len %.4X Aml %p \n",
-					 obj_desc->method.param_count,
+			acpi_os_printf (" Args %X Len %.4X Aml %p\n",
+					 (u32) obj_desc->method.param_count,
 					 obj_desc->method.aml_length,
 					 obj_desc->method.aml_start);
 			break;

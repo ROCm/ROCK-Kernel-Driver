@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: nsdump - table dumping routines for debug
- *              $Revision: 3 $
+ *              $Revision: 4 $
  *
  *****************************************************************************/
 
@@ -26,7 +26,6 @@
 
 #include "acpi.h"
 #include "acnamesp.h"
-#include "acparser.h"
 
 
 #define _COMPONENT          ACPI_NAMESPACE

@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exresnte - AML Interpreter object resolution
- *              $Revision: 57 $
+ *              $Revision: 58 $
  *
  *****************************************************************************/
 
@@ -26,7 +26,6 @@
 
 
 #include "acpi.h"
-#include "amlcode.h"
 #include "acdispat.h"
 #include "acinterp.h"
 #include "acnamesp.h"

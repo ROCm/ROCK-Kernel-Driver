@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acinterp.h - Interpreter subcomponent prototypes and defines
- *       $Revision: 138 $
+ *       $Revision: 139 $
  *
  *****************************************************************************/
 
@@ -193,6 +193,13 @@ acpi_ex_get_object_reference (
 	acpi_operand_object     *obj_desc,
 	acpi_operand_object     **return_desc,
 	acpi_walk_state         *walk_state);
+
+acpi_status
+acpi_ex_resolve_multiple (
+	acpi_walk_state         *walk_state,
+	acpi_operand_object     *operand,
+	acpi_object_type        *return_type,
+	acpi_operand_object     **return_desc);
 
 acpi_status
 acpi_ex_concat_template (

@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rsdump - Functions to display the resource structures.
- *              $Revision: 33 $
+ *              $Revision: 34 $
  *
  ******************************************************************************/
 
@@ -865,20 +865,25 @@ acpi_rs_dump_address64 (
 			 ACPI_ADDRESS_FIXED == address64_data->max_address_fixed ?
 			 "" : "not ");
 
-	acpi_os_printf ("  Granularity: %16X\n",
-			 address64_data->granularity);
+	acpi_os_printf ("  Granularity: %8.8X%8.8X\n",
+			 ACPI_HIDWORD (address64_data->granularity),
+			 ACPI_LODWORD (address64_data->granularity));
 
-	acpi_os_printf ("  Address range min: %16X\n",
-			 address64_data->min_address_range);
+	acpi_os_printf ("  Address range min: %8.8X%8.8X\n",
+			 ACPI_HIDWORD (address64_data->min_address_range),
+			 ACPI_HIDWORD (address64_data->min_address_range));
 
-	acpi_os_printf ("  Address range max: %16X\n",
-			 address64_data->max_address_range);
+	acpi_os_printf ("  Address range max: %8.8X%8.8X\n",
+			 ACPI_HIDWORD (address64_data->max_address_range),
+			 ACPI_HIDWORD (address64_data->max_address_range));
 
-	acpi_os_printf ("  Address translation offset: %16X\n",
-			 address64_data->address_translation_offset);
+	acpi_os_printf ("  Address translation offset: %8.8X%8.8X\n",
+			 ACPI_HIDWORD (address64_data->address_translation_offset),
+			 ACPI_HIDWORD (address64_data->address_translation_offset));
 
-	acpi_os_printf ("  Address Length: %16X\n",
-			 address64_data->address_length);
+	acpi_os_printf ("  Address Length: %8.8X%8.8X\n",
+			 ACPI_HIDWORD (address64_data->address_length),
+			 ACPI_HIDWORD (address64_data->address_length));
 
 	if(0xFF != address64_data->resource_source.index) {
 		acpi_os_printf ("  Resource Source Index: %X\n",
