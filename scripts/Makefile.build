@@ -85,10 +85,10 @@ __build: $(if $(KBUILD_BUILTIN),$(builtin-target) $(lib-target) $(extra-y)) \
 ifneq ($(KBUILD_CHECKSRC),0)
   ifeq ($(KBUILD_CHECKSRC),2)
     quiet_cmd_force_checksrc = CHECK   $<
-          cmd_force_checksrc = $(CHECK) $(c_flags) $< ;
+          cmd_force_checksrc = $(CHECK) $(CHECKFLAGS) $(c_flags) $< ;
   else
       quiet_cmd_checksrc     = CHECK   $<
-            cmd_checksrc     = $(CHECK) $(c_flags) $< ;
+            cmd_checksrc     = $(CHECK) $(CHECKFLAGS) $(c_flags) $< ;
   endif
 endif
 

@@ -37,7 +37,7 @@ LDFLAGS		:= -m elf_x86_64
 OBJCOPYFLAGS	:= -O binary -R .note -R .comment -S
 LDFLAGS_vmlinux := -e stext
 
-CHECK           := $(CHECK) -D__x86_64__=1
+CHECKFLAGS      += -D__x86_64__=1
 
 cflags-$(CONFIG_MK8) += $(call check_gcc,-march=k8,)
 cflags-$(CONFIG_MPSC) += $(call check_gcc,-march=nocona,)

@@ -22,7 +22,7 @@ LD              := $(LD) -m elf64ppc
 CC		:= $(CC) -m64
 endif
 
-CHECK		:= $(CHECK) -m64 -D__powerpc__=1
+CHECKFLAGS	+= -m64 -D__powerpc__=1
 
 LDFLAGS		:= -m elf64ppc
 LDFLAGS_vmlinux	:= -Bstatic -e $(KERNELLOAD) -Ttext $(KERNELLOAD)
