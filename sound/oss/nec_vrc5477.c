@@ -61,7 +61,6 @@
  *    02.08.2001  0.1   Initial release
  */
 
-#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/string.h>
 #include <linux/kernel.h>
@@ -896,11 +895,11 @@ static int vrc5477_ac97_ioctl_mixdev(struct inode *inode, struct file *file,
 }
 
 static /*const*/ struct file_operations vrc5477_ac97_mixer_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	ioctl:		vrc5477_ac97_ioctl_mixdev,
-	open:		vrc5477_ac97_open_mixdev,
-	release:	vrc5477_ac97_release_mixdev,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.ioctl		= vrc5477_ac97_ioctl_mixdev,
+	.open		= vrc5477_ac97_open_mixdev,
+	.release	= vrc5477_ac97_release_mixdev,
 };
 
 /* --------------------------------------------------------------------- */
@@ -1658,15 +1657,15 @@ static int vrc5477_ac97_release(struct inode *inode, struct file *file)
 }
 
 static /*const*/ struct file_operations vrc5477_ac97_audio_fops = {
-	owner:	THIS_MODULE,
-	llseek:		no_llseek,
-	read:		vrc5477_ac97_read,
-	write:		vrc5477_ac97_write,
-	poll:		vrc5477_ac97_poll,
-	ioctl:		vrc5477_ac97_ioctl,
-	// mmap:	vrc5477_ac97_mmap,
-	open:		vrc5477_ac97_open,
-	release:	vrc5477_ac97_release,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.read		= vrc5477_ac97_read,
+	.write		= vrc5477_ac97_write,
+	.poll		= vrc5477_ac97_poll,
+	.ioctl		= vrc5477_ac97_ioctl,
+	// .mmap	= vrc5477_ac97_mmap,
+	.open		= vrc5477_ac97_open,
+	.release	= vrc5477_ac97_release,
 };
 
 
