@@ -173,8 +173,6 @@ extern struct cpuinfo_ia64 {
 	__u64 ipi_count;
 	__u64 prof_counter;
 	__u64 prof_multiplier;
-	__u32 pfm_syst_wide;
-	__u32 pfm_dcr_pp;
 #endif
 } cpu_info __per_cpu_data;
 
