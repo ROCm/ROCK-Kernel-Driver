@@ -436,58 +436,6 @@ static inline void avc_print_ipv4_addr(struct audit_buffer *ab, u32 addr,
 		audit_log_format(ab, " %s=%d", name2, ntohs(port));
 }
 
-/*
- * Copied from net/core/utils.c:net_ratelimit and modified for
- * use by the AVC audit facility.
- */
-#define AVC_MSG_COST	5*HZ
-#define AVC_MSG_BURST	10*5*HZ
-
-/*
- * This enforces a rate limit: not more than one kernel message
- * every 5secs to make a denial-of-service attack impossible.
- */
-static int avc_ratelimit(void)
-{
-	static spinlock_t ratelimit_lock = SPIN_LOCK_UNLOCKED;
-	static unsigned long toks = 10*5*HZ;
-	static unsigned long last_msg;
-	static int missed, rc = 0;
-	unsigned long flags;
-	unsigned long now = jiffies;
-
-	spin_lock_irqsave(&ratelimit_lock, flags);
-	toks += now - last_msg;
-	last_msg = now;
-	if (toks > AVC_MSG_BURST)
-		toks = AVC_MSG_BURST;
-	if (toks >= AVC_MSG_COST) {
-		int lost = missed;
-		missed = 0;
-		toks -= AVC_MSG_COST;
-		spin_unlock_irqrestore(&ratelimit_lock, flags);
-		if (lost)
-			printk(KERN_WARNING "AVC: %d messages suppressed.\n",
-			       lost);
-		rc = 1;
-		goto out;
-	}
-	missed++;
-	spin_unlock_irqrestore(&ratelimit_lock, flags);
-out:
-	return rc;
-}
-
-static inline int check_avc_ratelimit(void)
-{
-	if (selinux_enforcing)
-		return avc_ratelimit();
-	else {
-		/* If permissive, then never suppress messages. */
-		return 1;
-	}
-}
-
 /**
  * avc_audit - Audit the granting or denial of permissions.
  * @ssid: source security identifier
@@ -528,9 +476,6 @@ void avc_audit(u32 ssid, u32 tsid,
 		if (!(audited & avd->auditallow))
 			return;
 	}
-
-	if (!check_avc_ratelimit())
-		return;
 
 	ab = audit_log_start(current->audit_context);
 	if (!ab)
