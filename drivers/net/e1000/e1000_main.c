@@ -2248,8 +2248,6 @@ e1000_clean_tx_irq(struct e1000_adapter *adapter)
 			tx_desc = E1000_TX_DESC(*tx_ring, i);
 			buffer_info = &tx_ring->buffer_info[i];
 
-			mb();
-
 			if(buffer_info->dma) {
 
 				pci_unmap_page(pdev,
