@@ -11,6 +11,7 @@
 
 #include <linux/vmalloc.h>
 #include <linux/errno.h>
+#include <linux/module.h>
 #include <asm/io.h>
 #include <asm/pgalloc.h>
 
@@ -94,6 +95,30 @@ static int remap_area_pages(unsigned long address, unsigned long phys_addr,
 }
 #endif /* USE_HPPA_IOREMAP */
 
+#ifdef CONFIG_DEBUG_IOREMAP
+static unsigned long last = 0;
+
+void gsc_bad_addr(unsigned long addr)
+{
+	if (time_after(jiffies, last + HZ*10)) {
+		printk("gsc_foo() called with bad address 0x%lx\n", addr);
+		dump_stack();
+		last = jiffies;
+	}
+}
+EXPORT_SYMBOL(gsc_bad_addr);
+
+void __raw_bad_addr(const volatile void __iomem *addr)
+{
+	if (time_after(jiffies, last + HZ*10)) {
+		printk("__raw_foo() called with bad address 0x%p\n", addr);
+		dump_stack();
+		last = jiffies;
+	}
+}
+EXPORT_SYMBOL(__raw_bad_addr);
+#endif
+
 /*
  * Generic mapping function (not visible outside):
  */
@@ -107,7 +132,7 @@ static int remap_area_pages(unsigned long address, unsigned long phys_addr,
  * have to convert them into an offset in a page-aligned mapping, but the
  * caller shouldn't need to know that small detail.
  */
-void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flags)
+void __iomem * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flags)
 {
 #if !(USE_HPPA_IOREMAP)
 
@@ -118,7 +143,11 @@ void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flag
 		phys_addr |= 0xfc000000;
 	}
 
-	return (void *)phys_addr;
+#ifdef CONFIG_DEBUG_IOREMAP
+	return (void __iomem *)(phys_addr - (0x1UL << NYBBLE_SHIFT));
+#else
+	return (void __iomem *)phys_addr;
+#endif
 
 #else
 	void * addr;
@@ -163,16 +192,16 @@ void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flag
 		vfree(addr);
 		return NULL;
 	}
-	return (void *) (offset + (char *)addr);
+	return (void __iomem *) (offset + (char *)addr);
 #endif
 }
 
-void iounmap(void *addr)
+void iounmap(void __iomem *addr)
 {
 #if !(USE_HPPA_IOREMAP)
 	return;
 #else
 	if (addr > high_memory)
-		return vfree((void *) (PAGE_MASK & (unsigned long) addr));
+		return vfree((void *) (PAGE_MASK & (unsigned long __force) addr));
 #endif
 }
