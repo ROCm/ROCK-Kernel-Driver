@@ -1610,7 +1610,7 @@ void setup_per_zone_pages_min(void)
  *	changes.
  */
 int min_free_kbytes_sysctl_handler(ctl_table *table, int write, 
-		struct file *file, void *buffer, size_t *length)
+		struct file *file, void __user *buffer, size_t *length)
 {
 	proc_dointvec(table, write, file, buffer, length);
 	setup_per_zone_pages_min();
