@@ -788,7 +788,7 @@ static int ffb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 {
 	struct ffb_par *par = (struct ffb_par *) info->par;
 
-	return sbusfb_ioctl_helper(cmd, info,
+	return sbusfb_ioctl_helper(cmd, arg, info,
 				   FBTYPE_CREATOR, 24, par->fbsize);
 }
 

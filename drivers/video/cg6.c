@@ -506,7 +506,7 @@ static int cg6_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 {
 	struct cg6_par *par = (struct cg6_par *) info->par;
 
-	return sbusfb_ioctl_helper(cmd, info,
+	return sbusfb_ioctl_helper(cmd, arg, info,
 				   FBTYPE_SUNFAST_COLOR, 8, par->fbsize);
 }
 

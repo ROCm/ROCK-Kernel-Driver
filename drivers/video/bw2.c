@@ -183,7 +183,7 @@ static int bw2_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 {
 	struct bw2_par *par = (struct bw2_par *) info->par;
 
-	return sbusfb_ioctl_helper(cmd, info,
+	return sbusfb_ioctl_helper(cmd, arg, info,
 				   FBTYPE_SUN2BW, 1, par->fbsize);
 }
 

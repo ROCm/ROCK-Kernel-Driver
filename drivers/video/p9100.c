@@ -237,7 +237,7 @@ static int p9100_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	struct p9100_par *par = (struct p9100_par *) info->par;
 
 	/* Make it look like a cg3. */
-	return sbusfb_ioctl_helper(cmd, info,
+	return sbusfb_ioctl_helper(cmd, arg, info,
 				   FBTYPE_SUN3COLOR, 8, par->fbsize);
 }
 

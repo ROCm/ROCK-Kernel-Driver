@@ -240,7 +240,7 @@ static int cg3_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 {
 	struct cg3_par *par = (struct cg3_par *) info->par;
 
-	return sbusfb_ioctl_helper(cmd, info,
+	return sbusfb_ioctl_helper(cmd, arg, info,
 				   FBTYPE_SUN3COLOR, 8, par->fbsize);
 }
 

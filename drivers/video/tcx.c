@@ -269,7 +269,7 @@ static int tcx_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 {
 	struct tcx_par *par = (struct tcx_par *) info->par;
 
-	return sbusfb_ioctl_helper(cmd, info,
+	return sbusfb_ioctl_helper(cmd, arg, info,
 				   FBTYPE_TCXCOLOR,
 				   (par->lowdepth ? 8 : 24),
 				   par->fbsize);

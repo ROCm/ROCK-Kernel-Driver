@@ -9,6 +9,7 @@
 #include <linux/fb.h>
 
 #include <asm/oplib.h>
+#include <asm/fbio.h>
 
 #include "sbuslib.h"
 
@@ -85,7 +86,8 @@ int sbusfb_mmap_helper(struct sbus_mmap_map *map,
 }
 EXPORT_SYMBOL(sbusfb_mmap_helper);
 
-int sbusfb_ioctl_helper(unsigned long cmd, struct fb_info *info,
+int sbusfb_ioctl_helper(unsigned long cmd, unsigned long arg,
+			struct fb_info *info,
 			int type, int fb_depth, unsigned long fb_size)
 {
 	switch(cmd) {
@@ -106,7 +108,7 @@ int sbusfb_ioctl_helper(unsigned long cmd, struct fb_info *info,
 		struct fb_cmap cmap;
 		u16 red, green, blue;
 		unsigned char *ured, *ugreen, *ublue;
-		int index, count, i, err;
+		int index, count, i;
 
 		if (get_user(index, &c->index) ||
 		    __get_user(count, &c->count) ||
@@ -120,6 +122,8 @@ int sbusfb_ioctl_helper(unsigned long cmd, struct fb_info *info,
 		cmap.green = &green;
 		cmap.blue = &blue;
 		for (i = 0; i < count; i++) {
+			int err;
+
 			if (get_user(red, &ured[i]) ||
 			    get_user(green, &ugreen[i]) ||
 			    get_user(blue, &ublue[i]))
@@ -128,15 +132,15 @@ int sbusfb_ioctl_helper(unsigned long cmd, struct fb_info *info,
 			cmap.start = index + i;
 			err = fb_set_cmap(&cmap, 0, info);
 			if (err)
-				break;
+				return err;
 		}
-		return err;
+		return 0;
 	}
 	case FBIOGETCMAP_SPARC: {
 		struct fbcmap *c = (struct fbcmap *) arg;
 		unsigned char *ured, *ugreen, *ublue;
 		struct fb_cmap *cmap = &info->cmap;
-		int index, count, i, err;
+		int index, count, i;
 
 		if (get_user(index, &c->index) ||
 		    __get_user(count, &c->count) ||
@@ -154,7 +158,7 @@ int sbusfb_ioctl_helper(unsigned long cmd, struct fb_info *info,
 			    put_user(cmap->blue[index + i], &ublue[i]))
 				return -EFAULT;
 		}
-		return err;
+		return 0;
 	}
 	default:
 		return -EINVAL;
