@@ -369,9 +369,8 @@ static void __init taint_real_pages(void)
 		end = start + sp_banks[i].num_bytes;
 
 		while (start < end) {
-			set_bit (start >> 20,
-				sparc_valid_addr_bitmap);
-				start += PAGE_SIZE;
+			set_bit(start >> 20, sparc_valid_addr_bitmap);
+			start += PAGE_SIZE;
 		}
 	}
 }
