@@ -142,6 +142,21 @@ void machine_halt(void)
 	panic("Halt failed!");
 }
 
+void machine_alt_power_off(void)
+{
+	sti();
+	mdelay(8);
+	cli();
+#ifdef CONFIG_SUN_CONSOLE
+	if (!serial_console && prom_palette)
+		prom_palette(1);
+#endif
+	if (prom_keyboard)
+		prom_keyboard();
+	prom_halt_power_off();
+	panic("Power-off failed!");
+}
+
 void machine_restart(char * cmd)
 {
 	char *p;
