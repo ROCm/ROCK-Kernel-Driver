@@ -146,7 +146,7 @@ void inet_sock_destruct(struct sock *sk)
 		       sk);
 		return;
 	}
-	if (!test_bit(SOCK_DEAD, &sk->flags)) {
+	if (!sock_flag(sk, SOCK_DEAD)) {
 		printk("Attempt to release alive inet socket %p\n", sk);
 		return;
 	}
@@ -456,8 +456,8 @@ int inet_release(struct socket *sock)
 		 * linger..
 		 */
 		timeout = 0;
-		if (test_bit(SOCK_LINGER, &sk->flags) &&
-				!(current->flags & PF_EXITING))
+		if (sock_flag(sk, SOCK_LINGER) &&
+		    !(current->flags & PF_EXITING))
 			timeout = sk->lingertime;
 		sock->sk = NULL;
 		sk->prot->close(sk, timeout);

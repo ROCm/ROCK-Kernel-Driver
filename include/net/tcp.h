@@ -1426,7 +1426,7 @@ static __inline__ void tcp_done(struct sock *sk)
 
 	sk->shutdown = SHUTDOWN_MASK;
 
-	if (!test_bit(SOCK_DEAD, &sk->flags))
+	if (!sock_flag(sk, SOCK_DEAD))
 		sk->state_change(sk);
 	else
 		tcp_destroy_sock(sk);

@@ -177,10 +177,9 @@ int sock_setsockopt(struct socket *sock, int level, int optname,
 	 */
 
 #ifdef SO_DONTLINGER		/* Compatibility item... */
-	switch(optname)
-	{
+	switch (optname) {
 		case SO_DONTLINGER:
-			__clear_bit(SOCK_LINGER, &sk->flags);
+			sock_reset_flag(sk, SOCK_LINGER);
 			return 0;
 	}
 #endif	
@@ -291,16 +290,16 @@ int sock_setsockopt(struct socket *sock, int level, int optname,
 				ret = -EFAULT;
 				break;
 			}
-			if(ling.l_onoff==0) {
-				__clear_bit(SOCK_LINGER, &sk->flags);
-			} else {
+			if (!ling.l_onoff)
+				sock_reset_flag(sk, SOCK_LINGER);
+			else {
 #if (BITS_PER_LONG == 32)
 				if (ling.l_linger >= MAX_SCHEDULE_TIMEOUT/HZ)
 					sk->lingertime=MAX_SCHEDULE_TIMEOUT;
 				else
 #endif
 					sk->lingertime=ling.l_linger*HZ;
-				__set_bit(SOCK_LINGER, &sk->flags);
+				sock_set_flag(sk, SOCK_LINGER);
 			}
 			break;
 
@@ -444,7 +443,7 @@ int sock_getsockopt(struct socket *sock, int level, int optname,
 			break;
 		
 		case SO_BROADCAST:
-			v.val= test_bit(SOCK_BROADCAST, &sk->flags);
+			v.val = !!sock_flag(sk, SOCK_BROADCAST);
 			break;
 
 		case SO_SNDBUF:
@@ -460,7 +459,7 @@ int sock_getsockopt(struct socket *sock, int level, int optname,
 			break;
 
 		case SO_KEEPALIVE:
-			v.val = test_bit(SOCK_KEEPOPEN, &sk->flags);
+			v.val = !!sock_flag(sk, SOCK_KEEPOPEN);
 			break;
 
 		case SO_TYPE:
@@ -474,7 +473,7 @@ int sock_getsockopt(struct socket *sock, int level, int optname,
 			break;
 
 		case SO_OOBINLINE:
-			v.val = test_bit(SOCK_URGINLINE, &sk->flags);
+			v.val = !!sock_flag(sk, SOCK_URGINLINE);
 			break;
 	
 		case SO_NO_CHECK:
@@ -486,9 +485,9 @@ int sock_getsockopt(struct socket *sock, int level, int optname,
 			break;
 		
 		case SO_LINGER:	
-			lv=sizeof(v.ling);
-			v.ling.l_onoff = test_bit(SOCK_LINGER, &sk->flags);
- 			v.ling.l_linger=sk->lingertime/HZ;
+			lv		= sizeof(v.ling);
+			v.ling.l_onoff	= !!sock_flag(sk, SOCK_LINGER);
+ 			v.ling.l_linger	= sk->lingertime / HZ;
 			break;
 					
 		case SO_BSDCOMPAT:

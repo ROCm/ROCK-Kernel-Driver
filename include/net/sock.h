@@ -59,17 +59,6 @@
  * the other protocols.
  */
 
-/* Sock flags */
-enum {
-	SOCK_DEAD,
-	SOCK_DONE,
-	SOCK_URGINLINE,
-	SOCK_KEEPOPEN,
-	SOCK_LINGER,
-	SOCK_DESTROY,
-	SOCK_BROADCAST,
-};
-
 /* Define this to get the sk->debug debugging facility. */
 #define SOCK_DEBUGGING
 #ifdef SOCK_DEBUGGING
@@ -247,6 +236,32 @@ struct sock {
 						struct sk_buff *skb);  
 	void                    (*destruct)(struct sock *sk);
 };
+
+/* Sock flags */
+enum sock_flags {
+	SOCK_DEAD,
+	SOCK_DONE,
+	SOCK_URGINLINE,
+	SOCK_KEEPOPEN,
+	SOCK_LINGER,
+	SOCK_DESTROY,
+	SOCK_BROADCAST,
+};
+
+static inline void sock_set_flag(struct sock *sk, enum sock_flags flag)
+{
+	__set_bit(flag, &sk->flags);
+}
+
+static inline void sock_reset_flag(struct sock *sk, enum sock_flags flag)
+{
+	__clear_bit(flag, &sk->flags);
+}
+
+static inline int sock_flag(struct sock *sk, enum sock_flags flag)
+{
+	return test_bit(flag, &sk->flags);
+}
 
 /* The per-socket spinlock must be held here. */
 #define sk_add_backlog(__sk, __skb)			\
@@ -639,7 +654,7 @@ static inline void sock_put(struct sock *sk)
 static inline void sock_orphan(struct sock *sk)
 {
 	write_lock_bh(&sk->callback_lock);
-	__set_bit(SOCK_DEAD, &sk->flags);
+	sock_set_flag(sk, SOCK_DEAD);
 	sk->socket = NULL;
 	sk->sleep = NULL;
 	write_unlock_bh(&sk->callback_lock);
@@ -803,7 +818,7 @@ static inline int sock_queue_rcv_skb(struct sock *sk, struct sk_buff *skb)
 	skb->dev = NULL;
 	skb_set_owner_r(skb, sk);
 	skb_queue_tail(&sk->receive_queue, skb);
-	if (!test_bit(SOCK_DEAD, &sk->flags))
+	if (!sock_flag(sk, SOCK_DEAD))
 		sk->data_ready(sk,skb->len);
 out:
 	return err;
@@ -818,7 +833,7 @@ static inline int sock_queue_err_skb(struct sock *sk, struct sk_buff *skb)
 		return -ENOMEM;
 	skb_set_owner_r(skb, sk);
 	skb_queue_tail(&sk->error_queue,skb);
-	if (!test_bit(SOCK_DEAD, &sk->flags))
+	if (!sock_flag(sk, SOCK_DEAD))
 		sk->data_ready(sk,skb->len);
 	return 0;
 }
@@ -936,9 +951,9 @@ sock_recv_timestamp(struct msghdr *msg, struct sock *sk, struct sk_buff *skb)
 static inline void sock_valbool_flag(struct sock *sk, int bit, int valbool)
 {
 	if (valbool)
-		__set_bit(bit, &sk->flags);
+		sock_set_flag(sk, bit);
 	else
-		__clear_bit(bit, &sk->flags);
+		sock_reset_flag(sk, bit);
 }
 
 extern __u32 sysctl_wmem_max;
