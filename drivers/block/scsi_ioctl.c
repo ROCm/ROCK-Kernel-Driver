@@ -115,6 +115,8 @@ static int sg_io(request_queue_t *q, struct gendisk *bd_disk,
 	char sense[SCSI_SENSE_BUFFERSIZE];
 	unsigned char cmd[BLK_MAX_CDB];
 
+	if (!capable(CAP_SYS_RAWIO))
+		return -EPERM;
 	if (hdr->interface_id != 'S')
 		return -EINVAL;
 	if (hdr->cmd_len > BLK_MAX_CDB)
@@ -233,6 +235,8 @@ static int sg_scsi_ioctl(request_queue_t *q, struct gendisk *bd_disk,
 	int err, in_len, out_len, bytes, opcode, cmdlen;
 	char *buffer = NULL, sense[SCSI_SENSE_BUFFERSIZE];
 
+	if (!capable(CAP_SYS_RAWIO))
+		return -EPERM;
 	/*
 	 * get in an out lengths, verify they don't exceed a page worth of data
 	 */
