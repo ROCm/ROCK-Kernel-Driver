@@ -395,7 +395,7 @@ int chan_out_fd(struct list_head *chans)
 	return(-1);
 }
 
-void chan_interrupt(struct list_head *chans, struct tq_struct *task,
+void chan_interrupt(struct list_head *chans, struct work_struct *task,
 		    struct tty_struct *tty, int irq, void *dev)
 {
 	struct list_head *ele, *next;
@@ -409,7 +409,7 @@ void chan_interrupt(struct list_head *chans, struct tq_struct *task,
 		do {
 			if((tty != NULL) && 
 			   (tty->flip.count >= TTY_FLIPBUF_SIZE)){
-				schedule_task(task);
+				schedule_work(task);
 				goto out;
 			}
 			err = chan->ops->read(chan->fd, &c, chan->data);

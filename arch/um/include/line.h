@@ -7,7 +7,7 @@
 #define __LINE_H__
 
 #include "linux/list.h"
-#include "linux/tqueue.h"
+#include "linux/workqueue.h"
 #include "linux/tty.h"
 #include "asm/semaphore.h"
 #include "chan_user.h"
@@ -39,7 +39,7 @@ struct line {
 	char *head;
 	char *tail;
 	int sigio;
-	struct tq_struct task;
+	struct work_struct task;
 	struct line_driver *driver;
 	int have_irq;
 };

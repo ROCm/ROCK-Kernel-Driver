@@ -22,7 +22,7 @@ struct chan {
 	void *data;
 };
 
-extern void chan_interrupt(struct list_head *chans, struct tq_struct *task,
+extern void chan_interrupt(struct list_head *chans, struct work_struct *task,
 			   struct tty_struct *tty, int irq, void *dev);
 extern int parse_chan_pair(char *str, struct list_head *chans, int pri, 
 			   int device, struct chan_opts *opts);

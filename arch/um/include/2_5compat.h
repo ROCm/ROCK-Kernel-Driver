@@ -22,9 +22,6 @@
 
 #define INIT_QUEUE(queue, request, lock) blk_init_queue(queue, request, lock)
 
-#define ELV_NOOP elevator_noop
-#define INIT_ELV(queue, elv) elevator_init(queue, elv, ELV_NOOP)
-
 #define INIT_HARDSECT(arr, maj, sizes)
 
 #define SET_PRI(task) do ; while(0)

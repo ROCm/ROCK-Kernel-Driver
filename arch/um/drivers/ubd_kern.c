@@ -398,7 +398,7 @@ static int ubd_add(int n)
  	devfs_handle_t real, fake;
 	char name[sizeof("nnnnnn\0")];
 	struct ubd *dev = &ubd_dev[n];
-	struct gendisk *disk, *fake_disk;
+	struct gendisk *disk, *fake_disk = NULL;
 	u64 size;
 
 	if (!dev->file)
@@ -410,7 +410,7 @@ static int ubd_add(int n)
 	disk->major = MAJOR_NR;
 	disk->first_minor = n << UBD_SHIFT;
 	disk->minor_shift = UBD_SHIFT;
-	disk->fops = &ubd_fops;
+	disk->fops = &ubd_blops;
 	if (fakehd_set)
 		sprintf(disk->disk_name, "hd%c", n + 'a');
 	else
@@ -425,7 +425,7 @@ static int ubd_add(int n)
 		fake_disk->major = fake_major;
 		fake_disk->first_minor = n << UBD_SHIFT;
 		fake_disk->minor_shift = UBD_SHIFT;
-		fake_disk->fops = &ubd_fops;
+		fake_disk->fops = &ubd_blops;
 		sprintf(fake_disk->disk_name, "ubd%d", n);
 		fake_gendisk[n] = fake_disk;
 	}
@@ -434,7 +434,8 @@ static int ubd_add(int n)
 
 	if (!dev->is_dir && ubd_file_size(dev, &size) == 0) {
 		set_capacity(disk, size/512);
-		set_capacity(fake_disk, size/512);
+		if (fake_major)
+			set_capacity(fake_disk, size/512);
 	}
  
 	sprintf(name, "%d", n);
@@ -541,7 +542,7 @@ int ubd_init(void)
 	}
 	ubd_queue = BLK_DEFAULT_QUEUE(MAJOR_NR);
 	INIT_QUEUE(ubd_queue, do_ubd_request, &ubd_lock);
-	INIT_ELV(ubd_queue, &ubd_queue->elevator);
+	elevator_init(ubd_queue, &elevator_noop);
 	if(fake_major != 0){
 		char name[sizeof("ubd_nnn\0")];
 
