@@ -839,7 +839,8 @@ repeat:
 			SetPageUptodate(filepage);
 			set_page_dirty(filepage);
 			swap_free(swap);
-		} else if (move_from_swap_cache(swappage, idx, mapping) == 0) {
+		} else if (!(error = move_from_swap_cache(
+				swappage, idx, mapping))) {
 			shmem_swp_set(info, entry, 0);
 			shmem_swp_unmap(entry);
 			spin_unlock(&info->lock);
@@ -850,8 +851,10 @@ repeat:
 			spin_unlock(&info->lock);
 			unlock_page(swappage);
 			page_cache_release(swappage);
-			/* let kswapd refresh zone for GFP_ATOMICs */
-			blk_congestion_wait(WRITE, HZ/50);
+			if (error == -ENOMEM) {
+				/* let kswapd refresh zone for GFP_ATOMICs */
+				blk_congestion_wait(WRITE, HZ/50);
+			}
 			goto repeat;
 		}
 	} else if (sgp == SGP_READ && !filepage) {
@@ -905,8 +908,6 @@ repeat:
 				filepage = NULL;
 				if (error)
 					goto failed;
-				/* let kswapd refresh zone for GFP_ATOMICs */
-				blk_congestion_wait(WRITE, HZ / 50);
 				goto repeat;
 			}
 		}
