@@ -86,9 +86,9 @@ typedef struct ifbond {
 typedef struct ifslave
 {
 	__s32 slave_id; /* Used as an IN param to the BOND_SLAVE_INFO_QUERY ioctl */
-	char slave_name[IFNAMSIZ];
-	char link;
-	char state;
+	__s8 slave_name[IFNAMSIZ];
+	__s8 link;
+	__s8 state;
 	__u32  link_failure_count;
 } ifslave;
 

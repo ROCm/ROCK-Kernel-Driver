@@ -363,9 +363,9 @@ mode
 		2. Base driver support for setting the hw address of a
 		device also when it is open. This is required so that there
 		will always be one slave in the team using the bond hw
-		address (the current_slave) while having a unique hw
-		address for each slave in the bond. If the current_slave
-		fails it's hw address is swapped with the new current_slave
+		address (the curr_active_slave) while having a unique hw
+		address for each slave in the bond. If the curr_active_slave
+		fails it's hw address is swapped with the new curr_active_slave
 		that was chosen.
 
 primary

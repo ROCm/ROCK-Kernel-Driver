@@ -248,7 +248,7 @@
  *
  * 2002/11/16 - Laurent Deniel <laurent.deniel at free.fr>
  *     - fix multicast handling in activebackup_arp_monitor
- *     - remove one unnecessary and confusing current_slave == slave test 
+ *     - remove one unnecessary and confusing curr_active_slave == slave test 
  *	 in activebackup_arp_monitor
  *
  *  2002/11/17 - Laurent Deniel <laurent.deniel at free.fr>
@@ -330,7 +330,7 @@
  *	  new/old ifenslave and new/old bonding.
  *
  * 2003/05/01 - Shmulik Hen <shmulik.hen at intel dot com>
- *	- Fixed bug in bond_release_all(): save old value of current_slave
+ *	- Fixed bug in bond_release_all(): save old value of curr_active_slave
  *	  before setting it to NULL.
  *	- Changed driver versioning scheme to include version number instead
  *	  of release date (that is already in another field). There are 3
@@ -358,7 +358,7 @@
  *
  * 2003/05/01 - Shmulik Hen <shmulik.hen at intel dot com>
  *	- Added support for Transmit load balancing mode.
- *	- Concentrate all assignments of current_slave to a single point
+ *	- Concentrate all assignments of curr_active_slave to a single point
  *	  so specific modes can take actions when the primary adapter is
  *	  changed.
  *	- Take the updelay parameter into consideration during bond_enslave
@@ -846,7 +846,7 @@ static void bond_register_lacpdu(struct bonding *bond)
 
 	/* initialize packet type */
 	pk_type->type = PKT_TYPE_LACPDU;
-	pk_type->dev = bond->device;
+	pk_type->dev = bond->dev;
 	pk_type->func = bond_3ad_lacpdu_recv;
 
 	dev_add_pack(pk_type);
@@ -1017,8 +1017,8 @@ static void bond_mc_add(struct bonding *bond, void *addr, int alen)
 { 
 	if (USES_PRIMARY(bond_mode)) {
 		/* write lock already acquired */
-		if (bond->current_slave != NULL)
-			dev_mc_add(bond->current_slave->dev, addr, alen, 0);
+		if (bond->curr_active_slave != NULL)
+			dev_mc_add(bond->curr_active_slave->dev, addr, alen, 0);
 	} else { 
 		struct slave *slave;
 		int i;
@@ -1036,8 +1036,8 @@ static void bond_mc_delete(struct bonding *bond, void *addr, int alen)
 { 
 	if (USES_PRIMARY(bond_mode)) {
 		/* write lock already acquired */
-		if (bond->current_slave != NULL)
-			dev_mc_delete(bond->current_slave->dev, addr, alen, 0);
+		if (bond->curr_active_slave != NULL)
+			dev_mc_delete(bond->curr_active_slave->dev, addr, alen, 0);
 	} else { 
 		struct slave *slave;
 		int i;
@@ -1088,8 +1088,8 @@ static void bond_set_promiscuity(struct bonding *bond, int inc)
 { 
 	if (USES_PRIMARY(bond_mode)) {
 		/* write lock already acquired */
-		if (bond->current_slave) {
-			dev_set_promiscuity(bond->current_slave->dev, inc);
+		if (bond->curr_active_slave) {
+			dev_set_promiscuity(bond->curr_active_slave->dev, inc);
 		}
 
 	} else { 
@@ -1108,8 +1108,8 @@ static void bond_set_allmulti(struct bonding *bond, int inc)
 { 
 	if (USES_PRIMARY(bond_mode)) {
 		/* write lock already acquired */
-		if (bond->current_slave != NULL)
-			dev_set_allmulti(bond->current_slave->dev, inc);
+		if (bond->curr_active_slave != NULL)
+			dev_set_allmulti(bond->curr_active_slave->dev, inc);
 	} else { 
 		struct slave *slave;
 		int i;
@@ -1196,25 +1196,25 @@ static void bond_mc_swap(struct bonding *bond, struct slave *new_active, struct 
 	}
 
 	if (old_active) {
-		if (bond->device->flags & IFF_PROMISC) {
+		if (bond->dev->flags & IFF_PROMISC) {
 			dev_set_promiscuity(old_active->dev, -1);
 		}
-		if (bond->device->flags & IFF_ALLMULTI) {
+		if (bond->dev->flags & IFF_ALLMULTI) {
 			dev_set_allmulti(old_active->dev, -1);
 		}
-		for (dmi = bond->device->mc_list; dmi != NULL; dmi = dmi->next) {
+		for (dmi = bond->dev->mc_list; dmi != NULL; dmi = dmi->next) {
 			dev_mc_delete(old_active->dev, dmi->dmi_addr, dmi->dmi_addrlen, 0);
 		}
 	}
 
 	if (new_active) {
-		if (bond->device->flags & IFF_PROMISC) {
+		if (bond->dev->flags & IFF_PROMISC) {
 			dev_set_promiscuity(new_active->dev, 1);
 		}
-		if (bond->device->flags & IFF_ALLMULTI) {
+		if (bond->dev->flags & IFF_ALLMULTI) {
 			dev_set_allmulti(new_active->dev, 1);
 		}
-		for (dmi = bond->device->mc_list; dmi != NULL; dmi = dmi->next) {
+		for (dmi = bond->dev->mc_list; dmi != NULL; dmi = dmi->next) {
 			dev_mc_add(new_active->dev, dmi->dmi_addr, dmi->dmi_addrlen, 0);
 		}
 	}
@@ -1354,7 +1354,7 @@ static int bond_enslave(struct net_device *bond_dev, struct net_device *slave_de
 
 	/* If the mode USES_PRIMARY, then the new slave gets the
 	 * master's promisc (and mc) settings only if it becomes the
-	 * current_slave, and that is taken care of later when calling
+	 * curr_active_slave, and that is taken care of later when calling
 	 * bond_change_active()
 	 */
 	if (!USES_PRIMARY(bond_mode)) {
@@ -1466,11 +1466,11 @@ static int bond_enslave(struct net_device *bond_dev, struct net_device *slave_de
 		 * interface. The backup interfaces will have their NOARP flag set
 		 * because we need them to be completely deaf and not to respond to
 		 * any ARP request on the network to avoid fooling a switch. Thus,
-		 * since we guarantee that current_slave always point to the last
+		 * since we guarantee that curr_active_slave always point to the last
 		 * usable interface, we just have to verify this interface's flag.
 		 */
-		if (((bond->current_slave == NULL)
-			|| (bond->current_slave->dev->flags & IFF_NOARP))
+		if (((bond->curr_active_slave == NULL)
+			|| (bond->curr_active_slave->dev->flags & IFF_NOARP))
 			&& (new_slave->link != BOND_LINK_DOWN)) {
 			dprintk("This is the first active slave\n");
 			/* first slave or no active slave yet, and this link
@@ -1506,7 +1506,7 @@ static int bond_enslave(struct net_device *bond_dev, struct net_device *slave_de
 	case BOND_MODE_TLB:
 	case BOND_MODE_ALB:
 		new_slave->state = BOND_STATE_ACTIVE;
-		if ((bond->current_slave == NULL) && (new_slave->link != BOND_LINK_DOWN)) {
+		if ((bond->curr_active_slave == NULL) && (new_slave->link != BOND_LINK_DOWN)) {
 			/* first slave or no active slave yet, and this link
 			 * is OK, so make this interface the active one
 			 */
@@ -1518,12 +1518,12 @@ static int bond_enslave(struct net_device *bond_dev, struct net_device *slave_de
 		/* always active in trunk mode */
 		new_slave->state = BOND_STATE_ACTIVE;
 
-		/* In trunking mode there is little meaning to current_slave
+		/* In trunking mode there is little meaning to curr_active_slave
 		 * anyway (it holds no special properties of the bond device),
 		 * so we can change it without calling change_active_interface()
 		 */
-		if (bond->current_slave == NULL) 
-			bond->current_slave = new_slave;
+		if (bond->curr_active_slave == NULL) 
+			bond->curr_active_slave = new_slave;
 
 		break;
 	} /* switch(bond_mode) */
@@ -1615,7 +1615,7 @@ static int bond_ioctl_change_active(struct net_device *bond_dev, struct net_devi
 
 	write_lock_bh(&bond->lock);
 
-	old_active = bond->current_slave;
+	old_active = bond->curr_active_slave;
 	new_active = bond_get_slave_by_dev(bond, slave_dev); 
 
 	/*
@@ -1642,7 +1642,7 @@ static int bond_ioctl_change_active(struct net_device *bond_dev, struct net_devi
  * find_best_interface - select the best available slave to be the active one
  * @bond: our bonding struct
  *
- * Warning: Caller must hold ptrlock for writing.
+ * Warning: Caller must hold curr_slave_lock for writing.
  */
 static struct slave *bond_find_best_slave(struct bonding *bond)
 {
@@ -1651,7 +1651,7 @@ static struct slave *bond_find_best_slave(struct bonding *bond)
 	int mintime;
 	int i;
 
-	new_active = old_active = bond->current_slave;
+	new_active = old_active = bond->curr_active_slave;
 
 	if (new_active == NULL) { /* there were no active slaves left */
 		if (bond->slave_cnt > 0) {  /* found one slave */
@@ -1664,8 +1664,8 @@ static struct slave *bond_find_best_slave(struct bonding *bond)
 	mintime = updelay;
 
 	/* first try the primary link; if arping, a link must tx/rx traffic 
-	 * before it can be considered the current_slave - also, we would skip 
-	 * slaves between the current_slave and primary_slave that may be up 
+	 * before it can be considered the curr_active_slave - also, we would skip 
+	 * slaves between the curr_active_slave and primary_slave that may be up 
 	 * and able to arp
 	 */
 	if ((bond->primary_slave != NULL) && (arp_interval == 0)) {
@@ -1700,18 +1700,18 @@ static struct slave *bond_find_best_slave(struct bonding *bond)
  * @new: the new slave to make the active one
  * 
  * Set the new slave to the bond's settings and unset them on the old
- * current_slave.
+ * curr_active_slave.
  * Setting include flags, mc-list, promiscuity, allmulti, etc.
  *
  * If @new's link state is %BOND_LINK_BACK we'll set it to %BOND_LINK_UP,
  * because it is apparently the best available slave we have, even though its
  * updelay hasn't timed out yet.
  *
- * Warning: Caller must hold ptrlock for writing.
+ * Warning: Caller must hold curr_slave_lock for writing.
  */
 static void bond_change_active_slave(struct bonding *bond, struct slave *new_active)
 {
-	struct slave *old_active = bond->current_slave;
+	struct slave *old_active = bond->curr_active_slave;
 
 	if (old_active == new_active) {
 		return;
@@ -1723,7 +1723,7 @@ static void bond_change_active_slave(struct bonding *bond, struct slave *new_act
 				printk(KERN_INFO DRV_NAME
 				       ": %s: making interface %s the new "
 				       "active one %d ms earlier.\n",
-				       bond->device->name, new_active->dev->name,
+				       bond->dev->name, new_active->dev->name,
 				       (updelay - new_active->delay) * miimon);
 			}
 
@@ -1744,7 +1744,7 @@ static void bond_change_active_slave(struct bonding *bond, struct slave *new_act
 				printk(KERN_INFO DRV_NAME
 				       ": %s: making interface %s the new "
 				       "active one.\n",
-				       bond->device->name, new_active->dev->name);
+				       bond->dev->name, new_active->dev->name);
 			}
 		}
 	}
@@ -1767,7 +1767,7 @@ static void bond_change_active_slave(struct bonding *bond, struct slave *new_act
 	    (bond_mode == BOND_MODE_ALB)) {
 		bond_alb_handle_active_change(bond, new_active);
 	} else {
-		bond->current_slave = new_active;
+		bond->curr_active_slave = new_active;
 	}
 }
 
@@ -1776,11 +1776,11 @@ static void bond_change_active_slave(struct bonding *bond, struct slave *new_act
  * @bond: our bonding struct
  *
  * This functions shoud be called when one of the following occurs:
- * - The old current_slave has been released or lost its link.
+ * - The old curr_active_slave has been released or lost its link.
  * - The primary_slave has got its link back.
- * - A slave has got its link back and there's no old current_slave.
+ * - A slave has got its link back and there's no old curr_active_slave.
  *
- * Warning: Caller must hold ptrlock for writing.
+ * Warning: Caller must hold curr_slave_lock for writing.
  */
 static void bond_select_active_slave(struct bonding *bond)
 {
@@ -1788,14 +1788,14 @@ static void bond_select_active_slave(struct bonding *bond)
 
 	best_slave = bond_find_best_slave(bond);
 
-	if (best_slave != bond->current_slave) {
+	if (best_slave != bond->curr_active_slave) {
 		bond_change_active_slave(bond, best_slave);
 	}
 }
 
 /*
  * Try to release the slave device <slave> from the bond device <master>
- * It is legal to access current_slave without a lock because all the function
+ * It is legal to access curr_active_slave without a lock because all the function
  * is write-locked.
  *
  * The rules for slave state should be:
@@ -1831,7 +1831,7 @@ static int bond_release(struct net_device *bond_dev, struct net_device *slave_de
 		return -EINVAL;
 	}
 
-	mac_addr_differ = memcmp(bond->device->dev_addr,
+	mac_addr_differ = memcmp(bond_dev->dev_addr,
 				 slave->perm_hwaddr,
 				 ETH_ALEN);
 	if (!mac_addr_differ && (bond->slave_cnt > 1)) {
@@ -1848,7 +1848,7 @@ static int bond_release(struct net_device *bond_dev, struct net_device *slave_de
 		       slave->perm_hwaddr[3],
 		       slave->perm_hwaddr[4],
 		       slave->perm_hwaddr[5],
-		       bond->device->name,
+		       bond_dev->name,
 		       slave_dev->name);
 	}
 
@@ -1876,12 +1876,12 @@ static int bond_release(struct net_device *bond_dev, struct net_device *slave_de
 		bond->primary_slave = NULL;
 	}
 
-	if (bond->current_slave == slave) {
+	if (bond->curr_active_slave == slave) {
 		bond_change_active_slave(bond, NULL);
 		bond_select_active_slave(bond);
 	}
 
-	if (bond->current_slave == NULL) {
+	if (bond->curr_active_slave == NULL) {
 		printk(KERN_INFO DRV_NAME
 		       ": %s: now running without any active "
 		       "interface !\n",
@@ -1891,7 +1891,7 @@ static int bond_release(struct net_device *bond_dev, struct net_device *slave_de
 	if ((bond_mode == BOND_MODE_TLB) ||
 	    (bond_mode == BOND_MODE_ALB)) {
 		/* must be called only after the slave has been
-		 * detached from the list and the current_slave
+		 * detached from the list and the curr_active_slave
 		 * has been replaced (if our_slave == old_current)
 		 */
 		bond_alb_deinit_slave(bond, slave);
@@ -1900,7 +1900,7 @@ static int bond_release(struct net_device *bond_dev, struct net_device *slave_de
 	write_unlock_bh(&bond->lock);
 	
 	/* If the mode USES_PRIMARY, then we should only remove its
-	 * promisc and mc settings if it was the current_slave, but that was
+	 * promisc and mc settings if it was the curr_active_slave, but that was
 	 * already taken care of above when we detached the slave
 	 */
 	if (!USES_PRIMARY(bond_mode)) {
@@ -1996,7 +1996,7 @@ static int bond_release_all(struct net_device *bond_dev)
 		write_unlock_bh(&bond->lock);
 
 		/* If the mode USES_PRIMARY, then we should only remove its
-		 * promisc and mc settings if it was the current_slave, but that was
+		 * promisc and mc settings if it was the curr_active_slave, but that was
 		 * already taken care of above when we detached the slave
 		 */
 		if (!USES_PRIMARY(bond_mode)) {
@@ -2079,9 +2079,9 @@ static void bond_mii_monitor(struct net_device *bond_dev)
 	 * program could monitor the link itself if needed.
 	 */
 
-	read_lock(&bond->ptrlock);
-	oldcurrent = bond->current_slave;
-	read_unlock(&bond->ptrlock);
+	read_lock(&bond->curr_slave_lock);
+	oldcurrent = bond->curr_active_slave;
+	read_unlock(&bond->curr_slave_lock);
 
 	bond_for_each_slave(bond, slave, i) {
 		struct net_device *slave_dev = slave->dev;
@@ -2266,17 +2266,17 @@ static void bond_mii_monitor(struct net_device *bond_dev)
 	} /* end of for */
 
 	if (do_failover) {
-		write_lock(&bond->ptrlock);
+		write_lock(&bond->curr_slave_lock);
 
 		bond_select_active_slave(bond);
-		if (oldcurrent && !bond->current_slave) {
+		if (oldcurrent && !bond->curr_active_slave) {
 			printk(KERN_INFO DRV_NAME
 			       ": %s: now running without any active "
 			       "interface !\n",
 			       bond_dev->name);
 		}
 
-		write_unlock(&bond->ptrlock);
+		write_unlock(&bond->curr_slave_lock);
 	}
 
 re_arm:
@@ -2310,12 +2310,12 @@ static void bond_loadbalance_arp_mon(struct net_device *bond_dev)
 		goto re_arm;
 	}
 
-	read_lock(&bond->ptrlock);
-	oldcurrent = bond->current_slave;
-	read_unlock(&bond->ptrlock);
+	read_lock(&bond->curr_slave_lock);
+	oldcurrent = bond->curr_active_slave;
+	read_unlock(&bond->curr_slave_lock);
 
 	/* see if any of the previous devices are up now (i.e. they have
-	 * xmt and rcv traffic). the current_slave does not come into
+	 * xmt and rcv traffic). the curr_active_slave does not come into
 	 * the picture unless it is null. also, slave->jiffies is not needed
 	 * here because we send an arp on each slave and give a slave as
 	 * long as it needs to get the tx/rx within the delta.
@@ -2336,7 +2336,7 @@ static void bond_loadbalance_arp_mon(struct net_device *bond_dev)
 
 				/* primary_slave has no meaning in round-robin
 				 * mode. the window of a slave being up and 
-				 * current_slave being null after enslaving
+				 * curr_active_slave being null after enslaving
 				 * is closed.
 				 */
 				if (oldcurrent == NULL) {
@@ -2393,17 +2393,17 @@ static void bond_loadbalance_arp_mon(struct net_device *bond_dev)
 	}
 
 	if (do_failover) {
-		write_lock(&bond->ptrlock);
+		write_lock(&bond->curr_slave_lock);
 
 		bond_select_active_slave(bond);
-		if (oldcurrent && !bond->current_slave) {
+		if (oldcurrent && !bond->curr_active_slave) {
 			printk(KERN_INFO DRV_NAME
 			       ": %s: now running without any active "
 			       "interface !\n",
 			       bond_dev->name);
 		}
 
-		write_unlock(&bond->ptrlock);
+		write_unlock(&bond->curr_slave_lock);
 	}
 
 re_arm:
@@ -2456,13 +2456,13 @@ static void bond_activebackup_arp_mon(struct net_device *bond_dev)
 			    delta_in_ticks) {
 
 				slave->link = BOND_LINK_UP;
-				write_lock(&bond->ptrlock);
-				if ((bond->current_slave == NULL) &&
+				write_lock(&bond->curr_slave_lock);
+				if ((bond->curr_active_slave == NULL) &&
 				    ((jiffies - slave->dev->trans_start) <=
 				     delta_in_ticks)) {
 					bond_change_active_slave(bond, slave);
 					bond->current_arp_slave = NULL;
-				} else if (bond->current_slave != slave) {
+				} else if (bond->curr_active_slave != slave) {
 					/* this slave has just come up but we 
 					 * already have a current slave; this
 					 * can also happen if bond_enslave adds
@@ -2473,7 +2473,7 @@ static void bond_activebackup_arp_mon(struct net_device *bond_dev)
 					bond->current_arp_slave = NULL;
 				}
 
-				if (slave == bond->current_slave) {
+				if (slave == bond->curr_active_slave) {
 					printk(KERN_INFO DRV_NAME
 					       ": %s: %s is up and now the "
 					       "active interface\n",
@@ -2487,11 +2487,11 @@ static void bond_activebackup_arp_mon(struct net_device *bond_dev)
 					       slave->dev->name);
 				}
 
-				write_unlock(&bond->ptrlock);
+				write_unlock(&bond->curr_slave_lock);
 			}
 		} else {
-			read_lock(&bond->ptrlock);
-			if ((slave != bond->current_slave) &&
+			read_lock(&bond->curr_slave_lock);
+			if ((slave != bond->curr_active_slave) &&
 			    (bond->current_arp_slave == NULL) &&
 			    (((jiffies - slave->dev->last_rx) >=
 			     3*delta_in_ticks) && (my_ip != 0))) {
@@ -2499,13 +2499,13 @@ static void bond_activebackup_arp_mon(struct net_device *bond_dev)
 				 * the delta allows the current slave to be 
 				 * taken out before the backup slave.
 				 * note: a non-null current_arp_slave indicates
-				 * the current_slave went down and we are 
+				 * the curr_active_slave went down and we are 
 				 * searching for a new one; under this 
-				 * condition we only take the current_slave 
+				 * condition we only take the curr_active_slave 
 				 * down - this gives each slave a chance to 
 				 * tx/rx traffic before being taken out
 				 */
-				read_unlock(&bond->ptrlock);
+				read_unlock(&bond->curr_slave_lock);
 				slave->link  = BOND_LINK_DOWN;
 				if (slave->link_failure_count < UINT_MAX) {
 					slave->link_failure_count++;
@@ -2516,24 +2516,24 @@ static void bond_activebackup_arp_mon(struct net_device *bond_dev)
 				       bond_dev->name,
 				       slave->dev->name);
 			} else {
-				read_unlock(&bond->ptrlock);
+				read_unlock(&bond->curr_slave_lock);
 			}
 		}
 	}
 
-	read_lock(&bond->ptrlock);
-	slave = bond->current_slave;
-	read_unlock(&bond->ptrlock);
+	read_lock(&bond->curr_slave_lock);
+	slave = bond->curr_active_slave;
+	read_unlock(&bond->curr_slave_lock);
 
 	if (slave != NULL) {
 
 		/* if we have sent traffic in the past 2*arp_intervals but
 		 * haven't xmit and rx traffic in that time interval, select 
 		 * a different slave. slave->jiffies is only updated when
-		 * a slave first becomes the current_slave - not necessarily
+		 * a slave first becomes the curr_active_slave - not necessarily
 		 * after every arp; this ensures the slave has a full 2*delta 
 		 * before being taken out. if a primary is being used, check 
-		 * if it is up and needs to take over as the current_slave
+		 * if it is up and needs to take over as the curr_active_slave
 		 */
 		if ((((jiffies - slave->dev->trans_start) >= 
 		       (2*delta_in_ticks)) ||
@@ -2550,10 +2550,10 @@ static void bond_activebackup_arp_mon(struct net_device *bond_dev)
 			       "%s, disabling it",
 			       bond_dev->name,
 			       slave->dev->name);
-			write_lock(&bond->ptrlock);
+			write_lock(&bond->curr_slave_lock);
 			bond_select_active_slave(bond);
-			slave = bond->current_slave;
-			write_unlock(&bond->ptrlock);
+			slave = bond->curr_active_slave;
+			write_unlock(&bond->curr_slave_lock);
 			bond->current_arp_slave = slave;
 			if (slave != NULL) {
 				slave->jiffies = jiffies;
@@ -2562,7 +2562,7 @@ static void bond_activebackup_arp_mon(struct net_device *bond_dev)
 		} else if ((bond->primary_slave != NULL) && 
 			   (bond->primary_slave != slave) && 
 			   (bond->primary_slave->link == BOND_LINK_UP)) {
-			/* at this point, slave is the current_slave */
+			/* at this point, slave is the curr_active_slave */
 			printk(KERN_INFO DRV_NAME
 			       ": %s: changing from interface %s to primary "
 			       "interface %s\n",
@@ -2571,9 +2571,9 @@ static void bond_activebackup_arp_mon(struct net_device *bond_dev)
 			       bond->primary_slave->dev->name);
 			       
 			/* primary is up so switch to it */
-			write_lock(&bond->ptrlock);
+			write_lock(&bond->curr_slave_lock);
 			bond_change_active_slave(bond, bond->primary_slave);
-			write_unlock(&bond->ptrlock);
+			write_unlock(&bond->curr_slave_lock);
 			slave = bond->primary_slave;
 			slave->jiffies = jiffies;
 		} else {
@@ -2588,9 +2588,9 @@ static void bond_activebackup_arp_mon(struct net_device *bond_dev)
 		}
 	}
 
-	/* if we don't have a current_slave, search for the next available 
+	/* if we don't have a curr_active_slave, search for the next available 
 	 * backup slave from the current_arp_slave and make it the candidate 
-	 * for becoming the current_slave
+	 * for becoming the curr_active_slave
 	 */
 	if (slave == NULL) { 
 
@@ -2786,11 +2786,11 @@ static int bond_do_ioctl(struct net_device *bond_dev, struct ifreq *ifr, int cmd
 			struct bonding *bond = (struct bonding *)bond_dev->priv;
 			mii->val_out = 0;
 			read_lock_bh(&bond->lock);
-			read_lock(&bond->ptrlock);
-			if (bond->current_slave) {
+			read_lock(&bond->curr_slave_lock);
+			if (bond->curr_active_slave) {
 				mii->val_out = BMSR_LSTATUS;
 			}
-			read_unlock(&bond->ptrlock);
+			read_unlock(&bond->curr_slave_lock);
 			read_unlock_bh(&bond->lock);
 		}
 		return 0;
@@ -2912,9 +2912,9 @@ static int bond_xmit_broadcast(struct sk_buff *skb, struct net_device *bond_dev)
 
 	read_lock(&bond->lock);
 
-	read_lock(&bond->ptrlock);
-	start_at = bond->current_slave;
-	read_unlock(&bond->ptrlock);
+	read_lock(&bond->curr_slave_lock);
+	start_at = bond->curr_active_slave;
+	read_unlock(&bond->curr_slave_lock);
 
 	if (start_at == NULL) { /* we're at the root, get the first slave */
 		/* no suitable interface, frame not sent */
@@ -2969,9 +2969,9 @@ static int bond_xmit_roundrobin(struct sk_buff *skb, struct net_device *bond_dev
 
 	read_lock(&bond->lock);
 
-	read_lock(&bond->ptrlock);
-	slave = start_at = bond->current_slave;
-	read_unlock(&bond->ptrlock);
+	read_lock(&bond->curr_slave_lock);
+	slave = start_at = bond->curr_active_slave;
+	read_unlock(&bond->curr_slave_lock);
 
 	if (slave == NULL) { /* we're at the root, get the first slave */
 		/* no suitable interface, frame not sent */
@@ -2989,9 +2989,9 @@ static int bond_xmit_roundrobin(struct sk_buff *skb, struct net_device *bond_dev
 			skb->priority = 1;
 			dev_queue_xmit(skb);
 
-			write_lock(&bond->ptrlock);
-			bond->current_slave = slave->next;
-			write_unlock(&bond->ptrlock);
+			write_lock(&bond->curr_slave_lock);
+			bond->curr_active_slave = slave->next;
+			write_unlock(&bond->curr_slave_lock);
 
 			read_unlock(&bond->lock);
 			return 0;
@@ -3031,7 +3031,7 @@ static int bond_xmit_xor(struct sk_buff *skb, struct net_device *bond_dev)
 		return 0;
 	}
 
-	slave_no = (data->h_dest[5]^bond->device->dev_addr[5]) % bond->slave_cnt;
+	slave_no = (data->h_dest[5]^bond_dev->dev_addr[5]) % bond->slave_cnt;
 
 	bond_for_each_slave(bond, slave, i) {
 		slave_no--;
@@ -3063,7 +3063,7 @@ static int bond_xmit_xor(struct sk_buff *skb, struct net_device *bond_dev)
 }
 
 /* 
- * in active-backup mode, we know that bond->current_slave is always valid if
+ * in active-backup mode, we know that bond->curr_active_slave is always valid if
  * the bond has a usable interface.
  */
 static int bond_xmit_activebackup(struct sk_buff *skb, struct net_device *bond_dev)
@@ -3089,17 +3089,17 @@ static int bond_xmit_activebackup(struct sk_buff *skb, struct net_device *bond_d
 
 	read_lock(&bond->lock);
 
-	read_lock(&bond->ptrlock);
-	if (bond->current_slave != NULL) { /* one usable interface */
-		skb->dev = bond->current_slave->dev;
-		read_unlock(&bond->ptrlock);
+	read_lock(&bond->curr_slave_lock);
+	if (bond->curr_active_slave != NULL) { /* one usable interface */
+		skb->dev = bond->curr_active_slave->dev;
+		read_unlock(&bond->curr_slave_lock);
 		skb->priority = 1;
 		ret = dev_queue_xmit(skb);
 		read_unlock(&bond->lock);
 		return 0;
 	}
 	else {
-		read_unlock(&bond->ptrlock);
+		read_unlock(&bond->curr_slave_lock);
 	}
 
 	/* no suitable interface, frame not sent */
@@ -3210,9 +3210,9 @@ static void bond_info_show_master(struct seq_file *seq, struct bonding *bond)
 {
 	struct slave *curr;
 
-	read_lock(&bond->ptrlock);
-	curr = bond->current_slave;
-	read_unlock(&bond->ptrlock);
+	read_lock(&bond->curr_slave_lock);
+	curr = bond->curr_active_slave;
+	read_unlock(&bond->curr_slave_lock);
 
 	seq_printf(seq, "Bonding Mode: %s\n", bond_mode_name());
 
@@ -3236,7 +3236,7 @@ static void bond_info_show_master(struct seq_file *seq, struct bonding *bond)
 
 		if (bond_3ad_get_active_agg_info(bond, &ad_info)) {
 			seq_printf(seq, "bond %s has no active aggregator\n",
-				   bond->device->name);
+				   bond->dev->name);
 		} else {
 			seq_printf(seq, "Active Aggregator Info:\n");
 
@@ -3336,21 +3336,21 @@ static struct file_operations bond_info_fops = {
 
 static int bond_create_proc_entry(struct bonding *bond)
 {
-	struct net_device *bond_dev = bond->device;
+	struct net_device *bond_dev = bond->dev;
 
 	if (bond_proc_dir) {
-		bond->bond_proc_file = create_proc_entry(bond_dev->name,
-							 S_IRUGO, 
-							 bond_proc_dir);
-		if (bond->bond_proc_file == NULL) {
+		bond->proc_entry = create_proc_entry(bond_dev->name,
+						     S_IRUGO,
+						     bond_proc_dir);
+		if (bond->proc_entry == NULL) {
 			printk(KERN_WARNING DRV_NAME
 			       ": Warning: Cannot create /proc/net/bonding/%s\n",
 			       bond_dev->name);
 		} else {
-			bond->bond_proc_file->data = bond;
-			bond->bond_proc_file->proc_fops = &bond_info_fops;
-			bond->bond_proc_file->owner = THIS_MODULE;
-			memcpy(bond->procdir_name, bond_dev->name, IFNAMSIZ);
+			bond->proc_entry->data = bond;
+			bond->proc_entry->proc_fops = &bond_info_fops;
+			bond->proc_entry->owner = THIS_MODULE;
+			memcpy(bond->proc_file_name, bond_dev->name, IFNAMSIZ);
 		}
 	}
 
@@ -3359,10 +3359,10 @@ static int bond_create_proc_entry(struct bonding *bond)
 
 static void bond_remove_proc_entry(struct bonding *bond)
 {
-	if (bond_proc_dir && bond->bond_proc_file) {
-		remove_proc_entry(bond->procdir_name, bond_proc_dir);
-		memset(bond->procdir_name, 0, IFNAMSIZ);
-		bond->bond_proc_file = NULL;
+	if (bond_proc_dir && bond->proc_entry) {
+		remove_proc_entry(bond->proc_file_name, bond_proc_dir);
+		memset(bond->proc_file_name, 0, IFNAMSIZ);
+		bond->proc_entry = NULL;
 	}
 }
 
@@ -3708,7 +3708,7 @@ static void bond_free_all(void)
 	struct bonding *bond, *nxt;
 
 	list_for_each_entry_safe(bond, nxt, &bond_dev_list, bond_list) {
-		struct net_device *bond_dev = bond->device;
+		struct net_device *bond_dev = bond->dev;
 
 		unregister_netdevice(bond_dev);
 		bond_deinit(bond_dev);
@@ -3732,14 +3732,14 @@ static int __init bond_init(struct net_device *bond_dev)
 
 	/* initialize rwlocks */
 	rwlock_init(&bond->lock);
-	rwlock_init(&bond->ptrlock);
+	rwlock_init(&bond->curr_slave_lock);
 
 	/* Initialize pointers */
 	bond->first_slave = NULL;
-	bond->current_slave = NULL;
+	bond->curr_active_slave = NULL;
 	bond->current_arp_slave = NULL;
 	bond->primary_slave = NULL;
-	bond->device = bond_dev;
+	bond->dev = bond_dev;
 
 	/* Initialize the device structure. */
 	bond_dev->set_mac_address = bond_set_mac_address;

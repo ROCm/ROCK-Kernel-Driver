@@ -1890,13 +1890,13 @@ static u16 aggregator_identifier;
 void bond_3ad_initialize(struct bonding *bond, u16 tick_resolution, int lacp_fast)
 {                         
 	// check that the bond is not initialized yet
-	if (MAC_ADDRESS_COMPARE(&(BOND_AD_INFO(bond).system.sys_mac_addr), &(bond->device->dev_addr))) {
+	if (MAC_ADDRESS_COMPARE(&(BOND_AD_INFO(bond).system.sys_mac_addr), &(bond->dev->dev_addr))) {
 
 		aggregator_identifier = 0;
 
 		BOND_AD_INFO(bond).lacp_fast = lacp_fast;
 		BOND_AD_INFO(bond).system.sys_priority = 0xFFFF;
-		BOND_AD_INFO(bond).system.sys_mac_addr = *((struct mac_addr *)bond->device->dev_addr);
+		BOND_AD_INFO(bond).system.sys_mac_addr = *((struct mac_addr *)bond->dev->dev_addr);
 
 		// initialize how many times this module is called in one second(should be about every 100ms)
 		ad_ticks_per_sec = tick_resolution;
@@ -1964,7 +1964,7 @@ int bond_3ad_bind_slave(struct slave *slave)
 
 		ad_initialize_agg(aggregator);
 
-		aggregator->aggregator_mac_address = *((struct mac_addr *)bond->device->dev_addr);
+		aggregator->aggregator_mac_address = *((struct mac_addr *)bond->dev->dev_addr);
 		aggregator->aggregator_identifier = (++aggregator_identifier);
 		aggregator->slave = slave;
 		aggregator->is_active = 0;
@@ -2399,7 +2399,7 @@ int bond_3ad_xmit_xor(struct sk_buff *skb, struct net_device *dev)
 		return 0;
 	}
 
-	slave_agg_no = (data->h_dest[5]^bond->device->dev_addr[5]) % slaves_in_agg;
+	slave_agg_no = (data->h_dest[5]^bond->dev->dev_addr[5]) % slaves_in_agg;
 
 	bond_for_each_slave(bond, slave, i) {
 		struct aggregator *agg = SLAVE_AD_INFO(slave).port.aggregator;

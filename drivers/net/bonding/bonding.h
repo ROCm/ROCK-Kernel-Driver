@@ -62,15 +62,15 @@
 
 
 struct slave {
+	struct net_device *dev; /* first - usefull for panic debug */
 	struct slave *next;
 	struct slave *prev;
-	struct net_device *dev;
-	short  delay;
-	unsigned long jiffies;
-	char   link;    /* one of BOND_LINK_XXXX */
-	char   state;   /* one of BOND_STATE_XXXX */
-	unsigned short original_flags;
-	u32 link_failure_count;
+	s16    delay;
+	u32    jiffies;
+	s8     link;    /* one of BOND_LINK_XXXX */
+	s8     state;   /* one of BOND_STATE_XXXX */
+	u32    original_flags;
+	u32    link_failure_count;
 	u16    speed;
 	u8     duplex;
 	u8     perm_hwaddr[ETH_ALEN];
@@ -82,33 +82,33 @@ struct slave {
  * Here are the locking policies for the two bonding locks:
  *
  * 1) Get bond->lock when reading/writing slave list.
- * 2) Get bond->ptrlock when reading/writing bond->current_slave.
+ * 2) Get bond->curr_slave_lock when reading/writing bond->curr_active_slave.
  *    (It is unnecessary when the write-lock is put with bond->lock.)
- * 3) When we lock with bond->ptrlock, we must lock with bond->lock
+ * 3) When we lock with bond->curr_slave_lock, we must lock with bond->lock
  *    beforehand.
  */
 struct bonding {
-	struct slave *first_slave;
-	struct slave *current_slave;
-	struct slave *primary_slave;
-	struct slave *current_arp_slave;
-	int slave_cnt; /* never change this value outside the attach/detach wrappers */
+	struct   net_device *dev; /* first - usefull for panic debug */
+	struct   slave *first_slave;
+	struct   slave *curr_active_slave;
+	struct   slave *current_arp_slave;
+	struct   slave *primary_slave;
+	s32      slave_cnt; /* never change this value outside the attach/detach wrappers */
 	rwlock_t lock;
-	rwlock_t ptrlock;
-	struct timer_list mii_timer;
-	struct timer_list arp_timer;
-	int kill_timers;
-	struct net_device_stats stats;
+	rwlock_t curr_slave_lock;
+	struct   timer_list mii_timer;
+	struct   timer_list arp_timer;
+	s8       kill_timers;
+	struct   net_device_stats stats;
 #ifdef CONFIG_PROC_FS
-	struct proc_dir_entry *bond_proc_file;
-	char procdir_name[IFNAMSIZ];
+	struct   proc_dir_entry *proc_entry;
+	char     proc_file_name[IFNAMSIZ];
 #endif /* CONFIG_PROC_FS */
-	struct list_head bond_list;
-	struct net_device *device;
-	struct dev_mc_list *mc_list;
-	unsigned short flags;
-	struct ad_bond_info ad_info;
-	struct alb_bond_info alb_info;
+	struct   list_head bond_list;
+	struct   dev_mc_list *mc_list;
+	u16      flags;
+	struct   ad_bond_info ad_info;
+	struct   alb_bond_info alb_info;
 };
 
 /**
