@@ -2,7 +2,7 @@
 # Kernel configuration targets
 # These targets are used from top-level makefile
 
-.PHONY: oldconfig xconfig gconfig menuconfig config silentoldconfig check-meta check-meta
+.PHONY: oldconfig xconfig gconfig menuconfig config silentoldconfig check-meta
 
 check-meta:
 	@if [ -e .config ] && \
