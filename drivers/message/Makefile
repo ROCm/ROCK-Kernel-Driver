@@ -4,7 +4,7 @@
 
 O_TARGET := message.o
 
-mod-subdirs := message/i2o message/fusion 
+mod-subdirs := i2o fusion 
 
 subdir-$(CONFIG_I2O)		+= i2o
 ifeq($(CONFIG_I2O),y)
