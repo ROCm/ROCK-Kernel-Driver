@@ -5882,6 +5882,16 @@ static int tg3_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 	    tp->link_config.phy_is_low_power)
 		return -EAGAIN;
 
+	if (tp->phy_id == PHY_ID_SERDES) {
+		/* These are the only valid advertisement bits allowed.  */
+		if (cmd->autoned == AUTONEG_ENABLE &&
+		    (cmd->advertising & ~(ADVERTISED_1000baseT_Half |
+					  ADVERTISED_1000baseT_Full |
+					  ADVERTISED_Autoneg |
+					  ADVERTISED_FIBRE)))
+			return -EINVAL;
+	}
+
 	spin_lock_irq(&tp->lock);
 	spin_lock(&tp->tx_lock);
 
@@ -5891,6 +5901,7 @@ static int tg3_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 		tp->link_config.speed = SPEED_INVALID;
 		tp->link_config.duplex = DUPLEX_INVALID;
 	} else {
+		tp->link_config.advertising = 0;
 		tp->link_config.speed = cmd->speed;
 		tp->link_config.duplex = cmd->duplex;
   	}
