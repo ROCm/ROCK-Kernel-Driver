@@ -48,7 +48,7 @@ svc_authenticate(struct svc_rqst *rqstp, u32 *statp, u32 *authp)
 	*statp = rpc_success;
 	*authp = rpc_auth_ok;
 
-	svc_getlong(&rqstp->rq_argbuf, flavor);
+	svc_getu32(&rqstp->rq_argbuf, flavor);
 	flavor = ntohl(flavor);
 
 	dprintk("svc: svc_authenticate (%d)\n", flavor);
@@ -105,8 +105,8 @@ svcauth_null(struct svc_rqst *rqstp, u32 *statp, u32 *authp)
 
 	/* Put NULL verifier */
 	rqstp->rq_verfed = 1;
-	svc_putlong(resp, RPC_AUTH_NULL);
-	svc_putlong(resp, 0);
+	svc_putu32(resp, RPC_AUTH_NULL);
+	svc_putu32(resp, 0);
 }
 
 static void
@@ -152,8 +152,8 @@ svcauth_unix(struct svc_rqst *rqstp, u32 *statp, u32 *authp)
 
 	/* Put NULL verifier */
 	rqstp->rq_verfed = 1;
-	svc_putlong(resp, RPC_AUTH_NULL);
-	svc_putlong(resp, 0);
+	svc_putu32(resp, RPC_AUTH_NULL);
+	svc_putu32(resp, 0);
 
 	return;
 
