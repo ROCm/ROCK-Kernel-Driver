@@ -103,6 +103,16 @@ static unsigned int cluster_cpu_mask_to_apicid(cpumask_t cpumask)
 		return BAD_APICID;
 }
 
+/* cpuid returns the value latched in the HW at reset, not the APIC ID
+ * register's value.  For any box whose BIOS changes APIC IDs, like
+ * clustered APIC systems, we must use hard_smp_processor_id.
+ *
+ * See Intel's IA-32 SW Dev's Manual Vol2 under CPUID.
+ */
+static unsigned int phys_pkg_id(int index_msb)
+{
+	return hard_smp_processor_id() >> index_msb;
+}
 
 struct genapic apic_cluster = {
 	.name = "clustered",
@@ -116,4 +126,5 @@ struct genapic apic_cluster = {
 	.send_IPI_allbutself = cluster_send_IPI_allbutself,
 	.send_IPI_mask = cluster_send_IPI_mask,
 	.cpu_mask_to_apicid = cluster_cpu_mask_to_apicid,
+	.phys_pkg_id = phys_pkg_id,
 };

@@ -56,6 +56,7 @@
 #include <asm/smp.h>
 #include <asm/proto.h>
 #include <asm/setup.h>
+#include <asm/mach_apic.h>
 
 /*
  * Machine setup..
@@ -710,7 +711,6 @@ static void __init detect_ht(struct cpuinfo_x86 *c)
 #ifdef CONFIG_SMP
 	u32 	eax, ebx, ecx, edx;
 	int 	index_lsb, index_msb, tmp;
-	int	initial_apic_id;
 	int 	cpu = smp_processor_id();
 	
 	if (!cpu_has(c, X86_FEATURE_HT))
@@ -745,8 +745,7 @@ static void __init detect_ht(struct cpuinfo_x86 *c)
 		}
 		if (index_lsb != index_msb )
 			index_msb++;
-		initial_apic_id = hard_smp_processor_id();
-		phys_proc_id[cpu] = initial_apic_id >> index_msb;
+		phys_proc_id[cpu] = phys_pkg_id(index_msb);
 		
 		printk(KERN_INFO  "CPU: Physical Processor ID: %d\n",
 		       phys_proc_id[cpu]);
