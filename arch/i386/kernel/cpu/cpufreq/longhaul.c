@@ -194,6 +194,7 @@ static int guess_fsb(int maxmult)
 
 static int __init longhaul_get_ranges (void)
 {
+	struct cpuinfo_x86 *c = cpu_data;
 	unsigned long invalue;
 	unsigned int minmult=0, maxmult=0;
 	unsigned int multipliers[32]= {
@@ -212,7 +213,10 @@ static int __init longhaul_get_ranges (void)
 		maxmult = longhaul_get_cpu_mult();
 		rdmsr (MSR_IA32_EBL_CR_POWERON, lo, hi);
 		invalue = (lo & (1<<18|1<<19)) >>18;
-		fsb = eblcr_fsb_table[invalue];
+		if (c->x86_model==6)
+			fsb = eblcr_fsb_table[invalue];
+		else
+			fsb = guess_fsb(maxmult);
 		break;
 
 	case 2:
