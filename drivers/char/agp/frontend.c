@@ -584,14 +584,12 @@ static int agp_mmap(struct file *file, struct vm_area_struct *vma)
 
 	AGP_LOCK();
 
-	if (agp_fe.backend_acquired != TRUE) {
-		AGP_UNLOCK();
-		return -EPERM;
-	}
-	if (!(test_bit(AGP_FF_IS_VALID, &priv->access_flags))) {
-		AGP_UNLOCK();
-		return -EPERM;
-	}
+	if (agp_fe.backend_acquired != TRUE)
+		goto out_eperm;
+
+	if (!(test_bit(AGP_FF_IS_VALID, &priv->access_flags)))
+		goto out_eperm;
+
 	agp_copy_info(&kerninfo);
 	size = vma->vm_end - vma->vm_start;
 	current_size = kerninfo.aper_size;
@@ -599,45 +597,48 @@ static int agp_mmap(struct file *file, struct vm_area_struct *vma)
 	offset = vma->vm_pgoff << PAGE_SHIFT;
 
 	if (test_bit(AGP_FF_IS_CLIENT, &priv->access_flags)) {
-		if ((size + offset) > current_size) {
-			AGP_UNLOCK();
-			return -EINVAL;
-		}
+		if ((size + offset) > current_size)
+			goto out_inval;
+
 		client = agp_find_client_by_pid(current->pid);
 
-		if (client == NULL) {
-			AGP_UNLOCK();
-			return -EPERM;
-		}
-		if (!agp_find_seg_in_client(client, offset,
-					    size, vma->vm_page_prot)) {
-			AGP_UNLOCK();
-			return -EINVAL;
-		}
-		if (remap_page_range(vma, vma->vm_start,
-				     (kerninfo.aper_base + offset),
+		if (client == NULL)
+			goto out_eperm;
+
+		if (!agp_find_seg_in_client(client, offset, size, vma->vm_page_prot))
+			goto out_inval;
+
+		if (remap_page_range(vma, vma->vm_start, (kerninfo.aper_base + offset),
 				     size, vma->vm_page_prot)) {
-			AGP_UNLOCK();
-			return -EAGAIN;
+			goto out_again;
 		}
 		AGP_UNLOCK();
 		return 0;
 	}
+
 	if (test_bit(AGP_FF_IS_CONTROLLER, &priv->access_flags)) {
-		if (size != current_size) {
-			AGP_UNLOCK();
-			return -EINVAL;
-		}
+		if (size != current_size)
+			goto out_inval;
+
 		if (remap_page_range(vma, vma->vm_start, kerninfo.aper_base,
 				     size, vma->vm_page_prot)) {
-			AGP_UNLOCK();
-			return -EAGAIN;
+			goto out_again;
 		}
 		AGP_UNLOCK();
 		return 0;
 	}
+
+out_eperm:
 	AGP_UNLOCK();
 	return -EPERM;
+
+out_inval:
+	AGP_UNLOCK();
+	return -EINVAL;
+
+out_again:
+	AGP_UNLOCK();
+	return -EAGAIN;
 }
 
 static int agp_release(struct inode *inode, struct file *file)
