@@ -66,7 +66,7 @@ drivers-$(CONFIG_OPROFILE)		+= arch/i386/oprofile/
 CFLAGS += -Iarch/i386/$(MACHINE)
 AFLAGS += -Iarch/i386/$(MACHINE)
 
-makeboot = $(call descend,arch/i386/boot,$(1))
+makeboot =$(Q)$(MAKE) -f scripts/Makefile.build obj=arch/i386/boot $(1)
 
 .PHONY: zImage bzImage compressed zlilo bzlilo zdisk bzdisk install \
 		clean archclean archmrproper
@@ -77,20 +77,20 @@ BOOTIMAGE=arch/i386/boot/bzImage
 zImage zlilo zdisk: BOOTIMAGE=arch/i386/boot/zImage
 
 zImage bzImage: vmlinux
-	+@$(call makeboot,$(BOOTIMAGE))
+	$(call makeboot,$(BOOTIMAGE))
 
 compressed: zImage
 
 zlilo bzlilo: vmlinux
-	+@$(call makeboot,BOOTIMAGE=$(BOOTIMAGE) zlilo)
+	$(call makeboot,BOOTIMAGE=$(BOOTIMAGE) zlilo)
 
 zdisk bzdisk: vmlinux
-	+@$(call makeboot,BOOTIMAGE=$(BOOTIMAGE) zdisk)
+	$(call makeboot,BOOTIMAGE=$(BOOTIMAGE) zdisk)
 
 install: vmlinux
-	+@$(call makeboot,BOOTIMAGE=$(BOOTIMAGE) install)
+	$(call makeboot,BOOTIMAGE=$(BOOTIMAGE) install)
 
 archclean:
-	@$(MAKE) -f scripts/Makefile.clean obj=arch/i386/boot
+	$(Q)$(MAKE) -f scripts/Makefile.clean obj=arch/i386/boot
 
 archmrproper:
