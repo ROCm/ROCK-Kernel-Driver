@@ -145,7 +145,7 @@ static struct net_bridge_port *new_nbp(struct net_bridge *br, struct net_device 
 	int i;
 	struct net_bridge_port *p;
 
-	p = kmalloc(sizeof(*p), GFP_KERNEL);
+	p = kmalloc(sizeof(*p), GFP_ATOMIC);
 	if (p == NULL)
 		return p;
 
