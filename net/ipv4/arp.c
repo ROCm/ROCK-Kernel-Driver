@@ -325,15 +325,40 @@ static void arp_error_report(struct neighbour *neigh, struct sk_buff *skb)
 
 static void arp_solicit(struct neighbour *neigh, struct sk_buff *skb)
 {
-	u32 saddr;
+	u32 saddr = 0;
 	u8  *dst_ha = NULL;
 	struct net_device *dev = neigh->dev;
 	u32 target = *(u32*)neigh->primary_key;
 	int probes = atomic_read(&neigh->probes);
+	struct in_device *in_dev = in_dev_get(dev);
 
-	if (skb && inet_addr_type(skb->nh.iph->saddr) == RTN_LOCAL)
+	if (!in_dev)
+		return;
+
+	switch (IN_DEV_ARP_ANNOUNCE(in_dev)) {
+	default:
+	case 0:		/* By default announce any local IP */
+		if (skb && inet_addr_type(skb->nh.iph->saddr) == RTN_LOCAL)
+			saddr = skb->nh.iph->saddr;
+		break;
+	case 1:		/* Restrict announcements of saddr in same subnet */
+		if (!skb)
+			break;
 		saddr = skb->nh.iph->saddr;
-	else
+		if (inet_addr_type(saddr) == RTN_LOCAL) {
+			/* saddr should be known to target */
+			if (inet_addr_onlink(in_dev, target, saddr))
+				break;
+		}
+		saddr = 0;
+		break;
+	case 2:		/* Avoid secondary IPs, get a primary/preferred one */
+		break;
+	}
+
+	if (in_dev)
+		in_dev_put(in_dev);
+	if (!saddr)
 		saddr = inet_select_addr(dev, target, RT_SCOPE_LINK);
 
 	if ((probes -= neigh->parms->ucast_probes) < 0) {

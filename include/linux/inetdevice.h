@@ -18,6 +18,7 @@ struct ipv4_devconf
 	int	mc_forwarding;
 	int	tag;
 	int     arp_filter;
+	int	arp_announce;
 	int	medium_id;
 	int	no_xfrm;
 	int	no_policy;
@@ -71,6 +72,7 @@ struct in_device
 	  (ipv4_devconf.accept_redirects || (in_dev)->cnf.accept_redirects)))
 
 #define IN_DEV_ARPFILTER(in_dev)	(ipv4_devconf.arp_filter || (in_dev)->cnf.arp_filter)
+#define IN_DEV_ARP_ANNOUNCE(in_dev)	(max(ipv4_devconf.arp_announce, (in_dev)->cnf.arp_announce))
 
 struct in_ifaddr
 {
