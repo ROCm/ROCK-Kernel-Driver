@@ -196,10 +196,8 @@ UCHAR		status;
 
 UCHAR		SRBCount;
 UCHAR		AdapterIndex;	/*; nth Adapter this driver */
-UCHAR		DeviceCnt;
 UCHAR		DCBCnt;
 
-/* 0x10: */
 UCHAR		TagMaxNum;
 UCHAR		ACBFlag;
 UCHAR		Gmode2;
@@ -213,13 +211,11 @@ PDCB		pActiveDCB;
 PSRB		pFreeSRB;
 PSRB		pTmpSRB;
 
-/* 0x2c: */
 UCHAR		msgin123[4];
 UCHAR		DCBmap[MAX_SCSI_ID];
 UCHAR		Connected;
 UCHAR		pad;
 
-/* 0x30: */
 #if defined(USE_SPINLOCKS) && USE_SPINLOCKS > 1 && (defined(CONFIG_SMP) || DEBUG_SPINLOCKS > 0)
 spinlock_t	lock;
 #endif
@@ -230,20 +226,17 @@ UCHAR		MsgLen;
 UCHAR		Ignore_IRQ;	/* Not used */
 
 PDEVDECL1;			/* Pointer to PCI cfg. space */
-/* 0x40/0x3c: */
+
 ULONG		Cmds;
 UINT		SelLost;
 UINT		SelConn;
 UINT		CmdInQ;
 UINT		CmdOutOfSRB;
 	
-/* 0x54/0x50: */
 struct timer_list	Waiting_Timer;
-/* 0x68/0x64: */
+
 DC390_SRB	TmpSRB;
-/* 0xcc/0xc8: */
 DC390_SRB	SRB_array[MAX_SRB_CNT]; 	/* 50 SRBs */
-/* 0xfa4/0xfa0: */
 };
 
 typedef  struct  _ACB	 DC390_ACB, *PACB;

@@ -1734,7 +1734,6 @@ static void __init dc390_initACB (PSH psh, ULONG io_port, UCHAR Irq, UCHAR index
     pACB->AdapterIndex = index;
     pACB->status = 0;
     psh->this_id = dc390_eepromBuf[index][EE_ADAPT_SCSI_ID];
-    pACB->DeviceCnt = 0;
     pACB->DCBCnt = 0;
     pACB->TagMaxNum = 2 << dc390_eepromBuf[index][EE_TAG_CMD_NUM];
     pACB->ACBFlag = 0;
@@ -2089,7 +2088,7 @@ static int DC390_proc_info (struct Scsi_Host *shpnt, char *buffer, char **start,
   SPRINTF("            Lost arbitrations %i, Sel. connected %i, Connected: %s\n", 
 	  pACB->SelLost, pACB->SelConn, pACB->Connected? "Yes": "No");
    
-  SPRINTF("Nr of attached devices: %i, Nr of DCBs: %i\n", pACB->DeviceCnt, pACB->DCBCnt);
+  SPRINTF("Nr of DCBs: %i\n", pACB->DCBCnt);
   SPRINTF("Map of attached LUNs: %02x %02x %02x %02x %02x %02x %02x %02x\n",
 	  pACB->DCBmap[0], pACB->DCBmap[1], pACB->DCBmap[2], pACB->DCBmap[3], 
 	  pACB->DCBmap[4], pACB->DCBmap[5], pACB->DCBmap[6], pACB->DCBmap[7]);

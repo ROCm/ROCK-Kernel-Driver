@@ -1302,7 +1302,6 @@ dc390_remove_dev (PACB pACB, PDCB pDCB)
    if (pDCB == pACB->pDCBRunRobin) pACB->pDCBRunRobin = pDCB->pNextDCB;
    kfree (pDCB); 
    pACB->DCBCnt--;
-   /* pACB->DeviceCnt--; */
 };
 
 
@@ -1590,7 +1589,6 @@ ckc_e:
 	  {
 	     /* device found: add */ 
 	     dc390_add_dev (pACB, pDCB, ptr);
-	     if (pACB->scan_devices) pACB->DeviceCnt++;
 	  }
 	if( (pcmd->device->id == pACB->pScsiHost->max_id - 1) &&
 	    (pcmd->device->lun == pACB->pScsiHost->max_lun - 1) )
