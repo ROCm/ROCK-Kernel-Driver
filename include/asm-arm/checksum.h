@@ -38,10 +38,10 @@ unsigned int
 csum_partial_copy_from_user(const char *src, char *dst, int len, int sum, int *err_ptr);
 
 /*
- * These are the old (and unsafe) way of doing checksums, a warning message will be
- * printed if they are used and an exception occurs.
+ * This is the old (and unsafe) way of doing checksums, a warning message will
+ * be printed if it is used and an exception occurs.
  *
- * these functions should go away after some time.
+ * this functions should go away after some time.
  */
 #define csum_partial_copy(src,dst,len,sum)	csum_partial_copy_nocheck(src,dst,len,sum)
 

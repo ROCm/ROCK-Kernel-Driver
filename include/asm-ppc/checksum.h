@@ -39,11 +39,10 @@ extern unsigned int csum_partial_copy_generic(const char *src, char *dst,
 #define csum_partial_copy_nocheck(src, dst, len, sum)	\
 	csum_partial_copy_generic((src), (dst), (len), (sum), 0, 0)     
 /*
- * Old versions which ignore errors.
+ * Old version which ignore errors.
+ * it will go away soon.
  */
 #define csum_partial_copy(src, dst, len, sum)	\
-	csum_partial_copy_generic((src), (dst), (len), (sum), 0, 0)
-#define csum_partial_copy_fromuser(src, dst, len, sum)	\
 	csum_partial_copy_generic((src), (dst), (len), (sum), 0, 0)
 
 

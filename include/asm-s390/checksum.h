@@ -67,6 +67,8 @@ csum_partial_inline(const unsigned char * buff, int len, unsigned int sum)
  *
  * here even more important to align src and dst on a 32-bit (or even
  * better 64-bit) boundary
+ *
+ * this will go away soon.
  */
 
 static inline unsigned int 

@@ -63,7 +63,6 @@ extern inline unsigned int csum_and_copy_to_user (const char *src, char *dst,
  *
  * this is obsolete and will go away.
  */
-#define csum_partial_copy_fromuser csum_partial_copy
 unsigned int csum_partial_copy(const char *src, char *dst, int len,
 			       unsigned int sum);
 

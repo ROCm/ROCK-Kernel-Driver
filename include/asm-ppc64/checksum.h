@@ -43,6 +43,8 @@ extern unsigned int csum_partial(const unsigned char * buff, int len,
 /*
  * the same as csum_partial, but copies from src to dst while it
  * checksums
+ *
+ * csum_partial_copy will go away soon.
  */
 unsigned int csum_partial_copy(const char *src, char *dst, 
 			       int len, unsigned int sum);
@@ -51,14 +53,9 @@ extern unsigned int csum_partial_copy_generic(const char *src, char *dst,
 					      int len, unsigned int sum,
 					      int *src_err, int *dst_err);
 /*
- * the same as csum_partial, but copies from user space.
+ * the same as csum_partial, but copies from src to dst while it
+ * checksums.
  */
-
-unsigned int csum_partial_copy_fromuser(const char *src, 
-					char *dst, 
-					int len, 
-					unsigned int sum,
-					int *src_err);
 
 unsigned int csum_partial_copy_nocheck(const char *src, 
 				       char *dst, 
