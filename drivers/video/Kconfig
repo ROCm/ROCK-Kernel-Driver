@@ -1094,5 +1094,9 @@ if FB || SGI_NEWPORT_CONSOLE
 	source "drivers/video/logo/Kconfig"
 endif
 
+if SYSFS
+	source "drivers/video/backlight/Kconfig"
+endif
+
 endmenu
 
