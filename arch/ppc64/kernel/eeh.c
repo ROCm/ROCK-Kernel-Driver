@@ -222,6 +222,7 @@ pci_addr_cache_insert(struct pci_dev *dev, unsigned long alo,
 static void __pci_addr_cache_insert_device(struct pci_dev *dev)
 {
 	struct device_node *dn;
+	int really_did_insert = 0;
 	int i;
 
 	dn = pci_device_to_OF_node(dev);
@@ -240,7 +241,6 @@ static void __pci_addr_cache_insert_device(struct pci_dev *dev)
 #endif
 		return;
 	}
-	pci_dev_get(dev);
 
 	/* Walk resources on this device, poke them into the tree */
 	for (i = 0; i < DEVICE_COUNT_RESOURCE; i++) {
@@ -254,6 +254,11 @@ static void __pci_addr_cache_insert_device(struct pci_dev *dev)
 		if (start == 0 || ~start == 0 || end == 0 || ~end == 0)
 			 continue;
 		pci_addr_cache_insert(dev, start, end, flags);
+		really_did_insert = 1;
+	}
+
+	if (really_did_insert) {
+		pci_dev_get (dev);
 	}
 }
 
@@ -277,6 +282,7 @@ void pci_addr_cache_insert_device(struct pci_dev *dev)
 static inline void __pci_addr_cache_remove_device(struct pci_dev *dev)
 {
 	struct rb_node *n;
+	int really_did_remove = 0;
 
 restart:
 	n = rb_first(&pci_io_addr_cache_root.rb_root);
@@ -287,11 +293,14 @@ restart:
 		if (piar->pcidev == dev) {
 			rb_erase(n, &pci_io_addr_cache_root.rb_root);
 			kfree(piar);
+			really_did_remove = 1;
 			goto restart;
 		}
 		n = rb_next(n);
 	}
-	pci_dev_put(dev);
+	if (really_did_remove) {
+	   pci_dev_put(dev);
+	}
 }
 
 /**
