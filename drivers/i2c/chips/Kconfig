@@ -37,4 +37,17 @@ config SENSORS_LM75
 	  in the lm_sensors package, which you can download at 
 	  http://www.lm-sensors.nu
 
+config SENSORS_VIA686A
+	tristate "  VIA686A"
+	depends on I2C && I2C_PROC
+	help
+	  support for via686a
+	  If you say yes here you get support for the integrated sensors in
+	  Via 686A/B South Bridges. This can also be built as a module
+	  which can be inserted and removed while the kernel is running.
+
+	  You will also need the latest user-space utilties: you can find them
+	  in the lm_sensors package, which you can download at
+	  http://www.lm-sensors.nu
+
 endmenu
