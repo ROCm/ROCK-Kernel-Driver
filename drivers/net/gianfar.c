@@ -8,7 +8,7 @@
  * Author: Andy Fleming
  * Maintainer: Kumar Gala (kumar.gala@freescale.com)
  *
- * Copyright 2004 Freescale Semiconductor, Inc
+ * Copyright (c) 2002-2004 Freescale Semiconductor, Inc.
  *
  * This program is free software; you can redistribute  it and/or modify it
  * under  the terms of  the GNU General  Public License as published by the
@@ -96,15 +96,6 @@
 
 #include "gianfar.h"
 #include "gianfar_phy.h"
-#ifdef CONFIG_NET_FASTROUTE
-#include <linux/if_arp.h>
-#include <net/ip.h>
-#endif
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,41)
-#define irqreturn_t void
-#define IRQ_HANDLED 
-#endif
 
 #define TX_TIMEOUT      (1*HZ)
 #define SKB_ALLOC_TIMEOUT 1000000
@@ -117,9 +108,8 @@
 #define RECEIVE(x) netif_rx(x)
 #endif
 
-#define DEVICE_NAME "%s: Gianfar Ethernet Controller Version 1.0, "
-char gfar_driver_name[] = "Gianfar Ethernet";
-char gfar_driver_version[] = "1.0";
+const char gfar_driver_name[] = "Gianfar Ethernet";
+const char gfar_driver_version[] = "1.1";
 
 int startup_gfar(struct net_device *dev);
 static int gfar_enet_open(struct net_device *dev);
@@ -148,24 +138,11 @@ static void gfar_set_hash_for_addr(struct net_device *dev, u8 *addr);
 #ifdef CONFIG_GFAR_NAPI
 static int gfar_poll(struct net_device *dev, int *budget);
 #endif
-#ifdef CONFIG_NET_FASTROUTE
-static int gfar_accept_fastpath(struct net_device *dev, struct dst_entry *dst);
-#endif
-static inline int try_fastroute(struct sk_buff *skb, struct net_device *dev, int length);
-#ifdef CONFIG_GFAR_NAPI
 static int gfar_clean_rx_ring(struct net_device *dev, int rx_work_limit);
-#else
-static int gfar_clean_rx_ring(struct net_device *dev);
-#endif
 static int gfar_process_frame(struct net_device *dev, struct sk_buff *skb, int length);
+static void gfar_phy_startup_timer(unsigned long data);
 
 extern struct ethtool_ops gfar_ethtool_ops;
-extern void gfar_gstrings_normon(struct net_device *dev, u32 stringset, 
-		u8 * buf);
-extern void gfar_fill_stats_normon(struct net_device *dev, 
-		struct ethtool_stats *dummy, u64 * buf);
-extern int gfar_stats_count_normon(struct net_device *dev);
-
 
 MODULE_AUTHOR("Freescale Semiconductor, Inc");
 MODULE_DESCRIPTION("Gianfar Ethernet Driver");
@@ -183,7 +160,7 @@ static int gfar_probe(struct ocp_device *ocpdev)
 	struct ocp_gfar_data *einfo;
 	int idx;
 	int err = 0;
-	struct ethtool_ops *dev_ethtool_ops;
+	int dev_ethtool_ops = 0;
 
 	einfo = (struct ocp_gfar_data *) ocpdev->def->additions;
 
@@ -197,7 +174,8 @@ static int gfar_probe(struct ocp_device *ocpdev)
 	/* get a pointer to the register memory which can
 	 * configure the PHYs.  If it's different from this set,
 	 * get the device which has those regs */
-	if ((einfo->phyregidx >= 0) && (einfo->phyregidx != ocpdev->def->index)) {
+	if ((einfo->phyregidx >= 0) && 
+			(einfo->phyregidx != ocpdev->def->index)) {
 		mdiodev = ocp_find_device(OCP_ANY_ID,
 					  OCP_FUNC_GFAR, einfo->phyregidx);
 
@@ -222,7 +200,7 @@ static int gfar_probe(struct ocp_device *ocpdev)
 
 	/* get a pointer to the register memory */
 	priv->regs = (struct gfar *)
-	    ioremap(ocpdev->def->paddr, sizeof (struct gfar));
+		ioremap(ocpdev->def->paddr, sizeof (struct gfar));
 
 	if (priv->regs == NULL) {
 		err = -ENOMEM;
@@ -237,6 +215,8 @@ static int gfar_probe(struct ocp_device *ocpdev)
 		err = -ENOMEM;
 		goto phy_regs_fail;
 	}
+
+	spin_lock_init(&priv->lock);
 
 	ocp_set_drvdata(ocpdev, dev);
 
@@ -269,15 +249,13 @@ static int gfar_probe(struct ocp_device *ocpdev)
 	gfar_write(&priv->regs->ecntrl, ECNTRL_INIT_SETTINGS);
 
 	/* Copy the station address into the dev structure, */
-	/* and into the address registers MAC_STNADDR1,2. */
-	/* Backwards, because little endian MACs are dumb. */
-	/* Don't set the regs if the firmware already did */
 	memcpy(dev->dev_addr, einfo->mac_addr, MAC_ADDR_LEN);
 
 	/* Set the dev->base_addr to the gfar reg region */
 	dev->base_addr = (unsigned long) (priv->regs);
 
 	SET_MODULE_OWNER(dev);
+	SET_NETDEV_DEV(dev, &ocpdev->dev);
 
 	/* Fill in the dev structure */
 	dev->open = gfar_enet_open;
@@ -293,37 +271,16 @@ static int gfar_probe(struct ocp_device *ocpdev)
 	dev->change_mtu = gfar_change_mtu;
 	dev->mtu = 1500;
 	dev->set_multicast_list = gfar_set_multi;
-	dev->flags |= IFF_MULTICAST;
 
-	dev_ethtool_ops = 
-		(struct ethtool_ops *)kmalloc(sizeof(struct ethtool_ops), 
-					      GFP_KERNEL);
+	/* Index into the array of possible ethtool
+	 * ops to catch all 4 possibilities */
+	if((priv->einfo->flags & GFAR_HAS_RMON) == 0)
+		dev_ethtool_ops += 1;
 
-	if(dev_ethtool_ops == NULL) {
-		err = -ENOMEM;
-		goto ethtool_fail;
-	}
+	if((priv->einfo->flags & GFAR_HAS_COALESCE) == 0)
+		dev_ethtool_ops += 2;
 
-	memcpy(dev_ethtool_ops, &gfar_ethtool_ops, sizeof(gfar_ethtool_ops));
-
-	/* If there is no RMON support in this device, we don't
-	 * want to expose non-existant statistics */
-	if((priv->einfo->flags & GFAR_HAS_RMON) == 0) {
-		dev_ethtool_ops->get_strings = gfar_gstrings_normon;
-		dev_ethtool_ops->get_stats_count = gfar_stats_count_normon;
-		dev_ethtool_ops->get_ethtool_stats = gfar_fill_stats_normon;
-	}
-
-	if((priv->einfo->flags & GFAR_HAS_COALESCE) == 0) {
-		dev_ethtool_ops->set_coalesce = NULL;
-		dev_ethtool_ops->get_coalesce = NULL;
-	}
-
-	dev->ethtool_ops = dev_ethtool_ops;
-
-#ifdef CONFIG_NET_FASTROUTE
-	dev->accept_fastpath = gfar_accept_fastpath;
-#endif
+	dev->ethtool_ops = gfar_op_array[dev_ethtool_ops];
 
 	priv->rx_buffer_size = DEFAULT_RX_BUFFER_SIZE;
 #ifdef CONFIG_GFAR_BUFSTASH
@@ -332,27 +289,26 @@ static int gfar_probe(struct ocp_device *ocpdev)
 	priv->tx_ring_size = DEFAULT_TX_RING_SIZE;
 	priv->rx_ring_size = DEFAULT_RX_RING_SIZE;
 
-	/* Initially, coalescing is disabled */
-	priv->txcoalescing = 0;
-	priv->txcount = 0;
-	priv->txtime = 0;
-	priv->rxcoalescing = 0;
-	priv->rxcount = 0;
-	priv->rxtime = 0;
+	priv->txcoalescing = DEFAULT_TX_COALESCE;
+	priv->txcount = DEFAULT_TXCOUNT;
+	priv->txtime = DEFAULT_TXTIME;
+	priv->rxcoalescing = DEFAULT_RX_COALESCE;
+	priv->rxcount = DEFAULT_RXCOUNT;
+	priv->rxtime = DEFAULT_RXTIME;
 
 	err = register_netdev(dev);
 
 	if (err) {
 		printk(KERN_ERR "%s: Cannot register net device, aborting.\n",
-		       dev->name);
+				dev->name);
 		goto register_fail;
 	}
 
 	/* Print out the device info */
-	printk(DEVICE_NAME, dev->name);
+	printk(KERN_INFO DEVICE_NAME, dev->name);
 	for (idx = 0; idx < 6; idx++)
-		printk("%2.2x%c", dev->dev_addr[idx], idx == 5 ? ' ' : ':');
-	printk("\n");
+		printk(KERN_INFO "%2.2x%c", dev->dev_addr[idx], idx == 5 ? ' ' : ':');
+	printk(KERN_INFO "\n");
 
 	/* Even more device info helps when determining which kernel */
 	/* provided which set of benchmarks.  Since this is global for all */
@@ -367,10 +323,7 @@ static int gfar_probe(struct ocp_device *ocpdev)
 
 	return 0;
 
-
 register_fail:
-	kfree(dev_ethtool_ops);
-ethtool_fail:
 	iounmap((void *) priv->phyregs);
 phy_regs_fail:
 	iounmap((void *) priv->regs);
@@ -386,7 +339,6 @@ static void gfar_remove(struct ocp_device *ocpdev)
 
 	ocp_set_drvdata(ocpdev, NULL);
 
-	kfree(dev->ethtool_ops);
 	iounmap((void *) priv->regs);
 	iounmap((void *) priv->phyregs);
 	free_netdev(dev);
@@ -399,26 +351,90 @@ static int init_phy(struct net_device *dev)
 {
 	struct gfar_private *priv = netdev_priv(dev);
 	struct phy_info *curphy;
+	unsigned int timeout = PHY_INIT_TIMEOUT;
+	struct gfar *phyregs = priv->phyregs;
+	struct gfar_mii_info *mii_info;
+	int err;
 
-	priv->link = 1;
 	priv->oldlink = 0;
 	priv->oldspeed = 0;
-	priv->olddplx = -1;
+	priv->oldduplex = -1;
+
+	mii_info = kmalloc(sizeof(struct gfar_mii_info),
+			GFP_KERNEL);
+
+	if(NULL == mii_info) {
+		printk(KERN_ERR "%s: Could not allocate mii_info\n", 
+				dev->name);
+		return -ENOMEM;
+	}
+
+	mii_info->speed = SPEED_1000;
+	mii_info->duplex = DUPLEX_FULL;
+	mii_info->pause = 0;
+	mii_info->link = 1;
+
+	mii_info->advertising = (ADVERTISED_10baseT_Half |
+			ADVERTISED_10baseT_Full |
+			ADVERTISED_100baseT_Half |
+			ADVERTISED_100baseT_Full |
+			ADVERTISED_1000baseT_Full);
+	mii_info->autoneg = 1;
+
+	mii_info->mii_id = priv->einfo->phyid;
+
+	mii_info->dev = dev;
+
+	mii_info->mdio_read = &read_phy_reg;
+	mii_info->mdio_write = &write_phy_reg;
+
+	priv->mii_info = mii_info;
+
+	/* Reset the management interface */
+	gfar_write(&phyregs->miimcfg, MIIMCFG_RESET);
+
+	/* Setup the MII Mgmt clock speed */
+	gfar_write(&phyregs->miimcfg, MIIMCFG_INIT_VALUE);
+
+	/* Wait until the bus is free */
+	while ((gfar_read(&phyregs->miimind) & MIIMIND_BUSY) &&
+			timeout--)
+		cpu_relax();
+
+	if(timeout <= 0) {
+		printk(KERN_ERR "%s: The MII Bus is stuck!\n",
+				dev->name);
+		err = -1;
+		goto bus_fail;
+	}
 
 	/* get info for this PHY */
-	curphy = get_phy_info(dev);
+	curphy = get_phy_info(priv->mii_info);
 
 	if (curphy == NULL) {
 		printk(KERN_ERR "%s: No PHY found\n", dev->name);
-		return -1;
+		err = -1;
+		goto no_phy;
 	}
 
-	priv->phyinfo = curphy;
+	mii_info->phyinfo = curphy;
 
-	/* Run the commands which configure the PHY */
-	phy_run_commands(dev, curphy->config);
+	/* Run the commands which initialize the PHY */
+	if(curphy->init) {
+		err = curphy->init(priv->mii_info);
+
+		if (err) 
+			goto phy_init_fail;
+	}
 
 	return 0;
+
+phy_init_fail:
+no_phy:
+bus_fail:
+	kfree(mii_info);
+
+	return err;
 }
 
 static void init_registers(struct net_device *dev)
@@ -494,7 +510,7 @@ void stop_gfar(struct net_device *dev)
 	spin_lock_irqsave(&priv->lock, flags);
 
 	/* Tell the kernel the link is down */
-	priv->link = 0;
+	priv->mii_info->link = 0;
 	adjust_link(dev);
 
 	/* Mask all interrupts */
@@ -521,7 +537,12 @@ void stop_gfar(struct net_device *dev)
 	gfar_write(&regs->maccfg1, tempval);
 
 	if (priv->einfo->flags & GFAR_HAS_PHY_INTR) {
-		phy_run_commands(dev, priv->phyinfo->shutdown);
+		/* Clear any pending interrupts */
+		mii_clear_phy_interrupt(priv->mii_info);
+
+		/* Disable PHY Interrupts */
+		mii_configure_phy_interrupt(priv->mii_info, 
+				MII_INTERRUPT_DISABLED);
 	}
 
 	spin_unlock_irqrestore(&priv->lock, flags);
@@ -543,15 +564,11 @@ void stop_gfar(struct net_device *dev)
 
 	free_skb_resources(priv);
 
-	dma_unmap_single(NULL, gfar_read(&regs->tbase),
-			sizeof(struct txbd)*priv->tx_ring_size,
-			DMA_BIDIRECTIONAL);
-	dma_unmap_single(NULL, gfar_read(&regs->rbase),
-			sizeof(struct rxbd)*priv->rx_ring_size,
-			DMA_BIDIRECTIONAL);
-
-	/* Free the buffer descriptors */
-	kfree(priv->tx_bd_base);
+	dma_free_coherent(NULL,
+			sizeof(struct txbd8)*priv->tx_ring_size
+			+ sizeof(struct rxbd8)*priv->rx_ring_size,
+			priv->tx_bd_base,
+			gfar_read(&regs->tbase));
 }
 
 /* If there are any tx skbs or rx skbs still around, free them.
@@ -610,7 +627,8 @@ int startup_gfar(struct net_device *dev)
 {
 	struct txbd8 *txbdp;
 	struct rxbd8 *rxbdp;
-	unsigned long addr;
+	dma_addr_t addr;
+	unsigned long vaddr;
 	int i;
 	struct gfar_private *priv = netdev_priv(dev);
 	struct gfar *regs = priv->regs;
@@ -620,32 +638,27 @@ int startup_gfar(struct net_device *dev)
 	gfar_write(&regs->imask, IMASK_INIT_CLEAR);
 
 	/* Allocate memory for the buffer descriptors */
-	addr =
-	    (unsigned int) kmalloc(sizeof (struct txbd8) * priv->tx_ring_size +
-				   sizeof (struct rxbd8) * priv->rx_ring_size,
-				   GFP_KERNEL);
+	vaddr = (unsigned long) dma_alloc_coherent(NULL, 
+			sizeof (struct txbd8) * priv->tx_ring_size +
+			sizeof (struct rxbd8) * priv->rx_ring_size,
+			&addr, GFP_KERNEL);
 
-	if (addr == 0) {
+	if (vaddr == 0) {
 		printk(KERN_ERR "%s: Could not allocate buffer descriptors!\n",
 		       dev->name);
 		return -ENOMEM;
 	}
 
-	priv->tx_bd_base = (struct txbd8 *) addr;
+	priv->tx_bd_base = (struct txbd8 *) vaddr;
 
 	/* enet DMA only understands physical addresses */
-	gfar_write(&regs->tbase, 
-			dma_map_single(NULL, (void *)addr, 
-				sizeof(struct txbd8) * priv->tx_ring_size,
-				DMA_BIDIRECTIONAL));
+	gfar_write(&regs->tbase, addr);
 
 	/* Start the rx descriptor ring where the tx ring leaves off */
 	addr = addr + sizeof (struct txbd8) * priv->tx_ring_size;
-	priv->rx_bd_base = (struct rxbd8 *) addr;
-	gfar_write(&regs->rbase, 
-			dma_map_single(NULL, (void *)addr, 
-				sizeof(struct rxbd8) * priv->rx_ring_size,
-				DMA_BIDIRECTIONAL));
+	vaddr = vaddr + sizeof (struct txbd8) * priv->tx_ring_size;
+	priv->rx_bd_base = (struct rxbd8 *) vaddr;
+	gfar_write(&regs->rbase, addr);
 
 	/* Setup the skbuff rings */
 	priv->tx_skbuff =
@@ -755,39 +768,13 @@ int startup_gfar(struct net_device *dev)
 		}
 	}
 
-	/* Grab the PHY interrupt */
-	if (priv->einfo->flags & GFAR_HAS_PHY_INTR) {
-		if (request_irq(priv->einfo->interruptPHY, phy_interrupt,
-				SA_SHIRQ, "phy_interrupt", dev) < 0) {
-			printk(KERN_ERR "%s: Can't get IRQ %d (PHY)\n",
-			       dev->name, priv->einfo->interruptPHY);
+	/* Set up the PHY change work queue */
+	INIT_WORK(&priv->tq, gfar_phy_change, dev);
 
-			err = -1;
-
-			if (priv->einfo->flags & GFAR_HAS_MULTI_INTR)
-				goto phy_irq_fail;
-			else
-				goto tx_irq_fail;
-		}
-	} else {
-		init_timer(&priv->phy_info_timer);
-		priv->phy_info_timer.function = &gfar_phy_timer;
-		priv->phy_info_timer.data = (unsigned long) dev;
-		mod_timer(&priv->phy_info_timer, jiffies + 2 * HZ);
-	}
-
-	/* Set up the bottom half queue */
-	INIT_WORK(&priv->tq, (void (*)(void *))gfar_phy_change, dev);
-
-	/* Configure the PHY interrupt */
-	phy_run_commands(dev, priv->phyinfo->startup);
-
-	/* Tell the kernel the link is up, and determine the
-	 * negotiated features (speed, duplex) */
-	adjust_link(dev);
-
-	if (priv->link == 0)
-		printk(KERN_INFO "%s: No link detected\n", dev->name);
+	init_timer(&priv->phy_info_timer);
+	priv->phy_info_timer.function = &gfar_phy_startup_timer;
+	priv->phy_info_timer.data = (unsigned long) priv->mii_info;
+	mod_timer(&priv->phy_info_timer, jiffies + HZ);
 
 	/* Configure the coalescing support */
 	if (priv->txcoalescing)
@@ -827,8 +814,6 @@ int startup_gfar(struct net_device *dev)
 
 	return 0;
 
-phy_irq_fail:
-	free_irq(priv->einfo->interruptReceive, dev);
 rx_irq_fail:
 	free_irq(priv->einfo->interruptTransmit, dev);
 tx_irq_fail:
@@ -837,7 +822,17 @@ err_irq_fail:
 rx_skb_fail:
 	free_skb_resources(priv);
 tx_skb_fail:
-	kfree(priv->tx_bd_base);
+	dma_free_coherent(NULL,
+			sizeof(struct txbd8)*priv->tx_ring_size
+			+ sizeof(struct rxbd8)*priv->rx_ring_size,
+			priv->tx_bd_base,
+			gfar_read(&regs->tbase));
+
+	if (priv->mii_info->phyinfo->close)
+		priv->mii_info->phyinfo->close(priv->mii_info);
+
+	kfree(priv->mii_info);
+
 	return err;
 }
 
@@ -854,7 +849,7 @@ static int gfar_enet_open(struct net_device *dev)
 
 	err = init_phy(dev);
 
-	if (err)
+	if(err)
 		return err;
 
 	err = startup_gfar(dev);
@@ -934,7 +929,14 @@ static int gfar_start_xmit(struct sk_buff *skb, struct net_device *dev)
 /* Stops the kernel queue, and halts the controller */
 static int gfar_close(struct net_device *dev)
 {
+	struct gfar_private *priv = netdev_priv(dev);
 	stop_gfar(dev);
+
+	/* Shutdown the PHY */
+	if (priv->mii_info->phyinfo->close)
+		priv->mii_info->phyinfo->close(priv->mii_info);
+
+	kfree(priv->mii_info);
 
 	netif_stop_queue(dev);
 
@@ -971,121 +973,6 @@ int gfar_set_mac_address(struct net_device *dev)
 	return 0;
 }
 
-/**********************************************************************
- * gfar_accept_fastpath
- *
- * Used to authenticate to the kernel that a fast path entry can be
- * added to device's routing table cache
- *
- * Input : pointer to ethernet interface network device structure and
- *         a pointer to the designated entry to be added to the cache.
- * Output : zero upon success, negative upon failure
- **********************************************************************/
-#ifdef CONFIG_NET_FASTROUTE
-static int gfar_accept_fastpath(struct net_device *dev, struct dst_entry *dst)
-{
-	struct net_device *odev = dst->dev;
-
-	if ((dst->ops->protocol != __constant_htons(ETH_P_IP))
-			|| (odev->type != ARPHRD_ETHER) 
-			|| (odev->accept_fastpath == NULL)) {
-		return -1;
-	}
-
-	return 0;
-}
-#endif
-
-/* try_fastroute() -- Checks the fastroute cache to see if a given packet
- *   can be routed immediately to another device.  If it can, we send it.
- *   If we used a fastroute, we return 1.  Otherwise, we return 0.
- *   Returns 0 if CONFIG_NET_FASTROUTE is not on
- */
-static inline int try_fastroute(struct sk_buff *skb, struct net_device *dev, int length)
-{
-#ifdef CONFIG_NET_FASTROUTE
-	struct ethhdr *eth;
-	struct iphdr *iph;
-	unsigned int hash;
-	struct rtable *rt;
-	struct net_device *odev;
-	struct gfar_private *priv = netdev_priv(dev);
-	unsigned int CPU_ID = smp_processor_id();
-
-	eth = (struct ethhdr *) (skb->data);
-
-	/* Only route ethernet IP packets */
-	if (eth->h_proto == __constant_htons(ETH_P_IP)) {
-		iph = (struct iphdr *) (skb->data + ETH_HLEN);
-
-		/* Generate the hash value */
-		hash = ((*(u8 *) &iph->daddr) ^ (*(u8 *) & iph->saddr)) & NETDEV_FASTROUTE_HMASK;
-
-		rt = (struct rtable *) (dev->fastpath[hash]);
-		if (rt != NULL 
-				&& ((*(u32 *) &iph->daddr) == (*(u32 *) &rt->key.dst))
-				&& ((*(u32 *) &iph->saddr) == (*(u32 *) &rt->key.src))
-				&& !(rt->u.dst.obsolete)) {
-			odev = rt->u.dst.dev;
-			netdev_rx_stat[CPU_ID].fastroute_hit++;
-
-			/* Make sure the packet is:
-			 * 1) IPv4
-			 * 2) without any options (header length of 5)
-			 * 3) Not a multicast packet
-			 * 4) going to a valid destination
-			 * 5) Not out of time-to-live
-			 */
-			if (iph->version == 4 
-					&& iph->ihl == 5 
-					&& (!(eth->h_dest[0] & 0x01)) 
-					&& neigh_is_valid(rt->u.dst.neighbour) 
-					&& iph->ttl > 1) {
-
-				/* Fast Route Path: Taken if the outgoing device is ready to transmit the packet now */
-				if ((!netif_queue_stopped(odev)) 
-						&& (!spin_is_locked(odev->xmit_lock)) 
-						&& (skb->len <= (odev->mtu + ETH_HLEN + 2 + 4))) {
-
-					skb->pkt_type = PACKET_FASTROUTE;
-					skb->protocol = __constant_htons(ETH_P_IP);
-					ip_decrease_ttl(iph);
-					memcpy(eth->h_source, odev->dev_addr, MAC_ADDR_LEN);
-					memcpy(eth->h_dest, rt->u.dst.neighbour->ha, MAC_ADDR_LEN);
-					skb->dev = odev;
-
-					/* Prep the skb for the packet */
-					skb_put(skb, length);
-
-					if (odev->hard_start_xmit(skb, odev) != 0) {
-						panic("%s: FastRoute path corrupted", dev->name);
-					}
-					netdev_rx_stat[CPU_ID].fastroute_success++;
-				}
-
-				/* Semi Fast Route Path: Mark the packet as needing fast routing, but let the
-				 * stack handle getting it to the device */
-				else {
-					skb->pkt_type = PACKET_FASTROUTE;
-					skb->nh.raw = skb->data + ETH_HLEN;
-					skb->protocol = __constant_htons(ETH_P_IP);
-					netdev_rx_stat[CPU_ID].fastroute_defer++;
-
-					/* Prep the skb for the packet */
-					skb_put(skb, length);
-
-					if(RECEIVE(skb) == NET_RX_DROP) {
-						priv->extra_stats.kernel_dropped++;
-					}
-				}
-
-				return 1;
-			}
-		}
-	}
-#endif /* CONFIG_NET_FASTROUTE */
-	return 0;
-}
 
 static int gfar_change_mtu(struct net_device *dev, int new_mtu)
 {
@@ -1148,8 +1035,7 @@ static void gfar_timeout(struct net_device *dev)
 		startup_gfar(dev);
 	}
 
-	if (!netif_queue_stopped(dev))
-		netif_schedule(dev);
+	netif_schedule(dev);
 }
 
 /* Interrupt Handler for Transmit complete */
@@ -1315,7 +1201,7 @@ irqreturn_t gfar_receive(int irq, void *dev_id, struct pt_regs *regs)
 #else
 
 	spin_lock(&priv->lock);
-	gfar_clean_rx_ring(dev);
+	gfar_clean_rx_ring(dev, priv->rx_ring_size);
 
 	/* If we are coalescing interrupts, update the timer */
 	/* Otherwise, clear it */
@@ -1336,7 +1222,7 @@ irqreturn_t gfar_receive(int irq, void *dev_id, struct pt_regs *regs)
 
 
 /* gfar_process_frame() -- handle one incoming packet if skb
- * isn't NULL.  Try the fastroute before using the stack */
+ * isn't NULL.  */
 static int gfar_process_frame(struct net_device *dev, struct sk_buff *skb,
 		int length)
 {
@@ -1350,17 +1236,15 @@ static int gfar_process_frame(struct net_device *dev, struct sk_buff *skb,
 		priv->stats.rx_dropped++;
 		priv->extra_stats.rx_skbmissing++;
 	} else {
-		if(try_fastroute(skb, dev, length) == 0) {
-			/* Prep the skb for the packet */
-			skb_put(skb, length);
+		/* Prep the skb for the packet */
+		skb_put(skb, length);
 
-			/* Tell the skb what kind of packet this is */
-			skb->protocol = eth_type_trans(skb, dev);
+		/* Tell the skb what kind of packet this is */
+		skb->protocol = eth_type_trans(skb, dev);
 
-			/* Send the packet up the stack */
-			if (RECEIVE(skb) == NET_RX_DROP) {
-				priv->extra_stats.kernel_dropped++;
-			}
+		/* Send the packet up the stack */
+		if (RECEIVE(skb) == NET_RX_DROP) {
+			priv->extra_stats.kernel_dropped++;
 		}
 	}
 
@@ -1368,14 +1252,10 @@ static int gfar_process_frame(struct net_device *dev, struct sk_buff *skb,
 }
 
 /* gfar_clean_rx_ring() -- Processes each frame in the rx ring
- *   until all are gone (or, in the case of NAPI, the budget/quota
- *   has been reached). Returns the number of frames handled
+ *   until the budget/quota has been reached. Returns the number 
+ *   of frames handled
  */
-#ifdef CONFIG_GFAR_NAPI
 static int gfar_clean_rx_ring(struct net_device *dev, int rx_work_limit)
-#else
-static int gfar_clean_rx_ring(struct net_device *dev)
-#endif
 {
 	struct rxbd8 *bdp;
 	struct sk_buff *skb;
@@ -1386,12 +1266,7 @@ static int gfar_clean_rx_ring(struct net_device *dev)
 	/* Get the first full descriptor */
 	bdp = priv->cur_rx;
 
-#ifdef CONFIG_GFAR_NAPI
-#define GFAR_RXDONE() ((bdp->status & RXBD_EMPTY) || (--rx_work_limit < 0))
-#else
-#define GFAR_RXDONE() (bdp->status & RXBD_EMPTY)
-#endif
-	while (!GFAR_RXDONE()) {
+	while (!((bdp->status & RXBD_EMPTY) || (--rx_work_limit < 0))) {
 		skb = priv->rx_skbuff[priv->skb_currx];
 
 		if (!(bdp->status &
@@ -1407,7 +1282,6 @@ static int gfar_clean_rx_ring(struct net_device *dev)
 			gfar_process_frame(dev, skb, pkt_len);
 
 			priv->stats.rx_bytes += pkt_len;
-
 		} else {
 			count_errors(bdp->status, priv);
 
@@ -1462,7 +1336,6 @@ static int gfar_poll(struct net_device *dev, int *budget)
 	if (rx_work_limit > dev->quota)
 		rx_work_limit = dev->quota;
 
-	spin_lock(&priv->lock);
 	howmany = gfar_clean_rx_ring(dev, rx_work_limit);
 
 	dev->quota -= howmany;
@@ -1488,8 +1361,6 @@ static int gfar_poll(struct net_device *dev, int *budget)
 		/* Signal to the ring size changer that it's safe to go */
 		priv->rxclean = 1;
 	}
-
-	spin_unlock(priv->lock);
 
 	return (rx_work_limit < 0) ? 1 : 0;
 }
@@ -1586,10 +1457,14 @@ static irqreturn_t phy_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	struct net_device *dev = (struct net_device *) dev_id;
 	struct gfar_private *priv = netdev_priv(dev);
 
-	/* Run the commands which acknowledge the interrupt */
-	phy_run_commands(dev, priv->phyinfo->ack_int);
+	/* Clear the interrupt */
+	mii_clear_phy_interrupt(priv->mii_info);
 
-	/* Schedule the bottom half */
+	/* Disable PHY interrupts */
+	mii_configure_phy_interrupt(priv->mii_info,
+			MII_INTERRUPT_DISABLED);
+
+	/* Schedule the phy change */
 	schedule_work(&priv->tq);
 
 	return IRQ_HANDLED;
@@ -1600,18 +1475,24 @@ static void gfar_phy_change(void *data)
 {
 	struct net_device *dev = (struct net_device *) data;
 	struct gfar_private *priv = netdev_priv(dev);
-	int timeout = HZ / 1000 + 1;
+	int result = 0;
 
 	/* Delay to give the PHY a chance to change the
 	 * register state */
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(timeout);
+	msleep(1);
 
-	/* Run the commands which check the link state */
-	phy_run_commands(dev, priv->phyinfo->handle_int);
+	/* Update the link, speed, duplex */
+	result = priv->mii_info->phyinfo->read_status(priv->mii_info);
 
-	/* React to the change in state */
-	adjust_link(dev);
+	/* Adjust the known status as long as the link
+	 * isn't still coming up */
+	if((0 == result) || (priv->mii_info->link == 0))
+		adjust_link(dev);
+
+	/* Reenable interrupts, if needed */
+	if (priv->einfo->flags & GFAR_HAS_PHY_INTR)
+		mii_configure_phy_interrupt(priv->mii_info,
+				MII_INTERRUPT_ENABLED);
 }
 
 /* Called every so often on systems that don't interrupt
@@ -1623,7 +1504,72 @@ static void gfar_phy_timer(unsigned long data)
 
 	schedule_work(&priv->tq);
 
-	mod_timer(&priv->phy_info_timer, jiffies + 2 * HZ);
+	mod_timer(&priv->phy_info_timer, jiffies +
+			GFAR_PHY_CHANGE_TIME * HZ);
+}
+
+/* Keep trying aneg for some time
+ * If, after GFAR_AN_TIMEOUT seconds, it has not
+ * finished, we switch to forced.
+ * Either way, once the process has completed, we either
+ * request the interrupt, or switch the timer over to 
+ * using gfar_phy_timer to check status */
+static void gfar_phy_startup_timer(unsigned long data)
+{
+	int result;
+	static int secondary = GFAR_AN_TIMEOUT;
+	struct gfar_mii_info *mii_info = (struct gfar_mii_info *)data;
+	struct gfar_private *priv = netdev_priv(mii_info->dev);
+
+	/* Configure the Auto-negotiation */
+	result = mii_info->phyinfo->config_aneg(mii_info);
+
+	/* If autonegotiation failed to start, and
+	 * we haven't timed out, reset the timer, and return */
+	if (result && secondary--) {
+		mod_timer(&priv->phy_info_timer, jiffies + HZ);
+		return;
+	} else if (result) {
+		/* Couldn't start autonegotiation.
+		 * Try switching to forced */
+		mii_info->autoneg = 0;
+		result = mii_info->phyinfo->config_aneg(mii_info);
+
+		/* Forcing failed!  Give up */
+		if(result) {
+			printk(KERN_ERR "%s: Forcing failed!\n",
+					mii_info->dev->name);
+			return;
+		}
+	}
+
+	/* Kill the timer so it can be restarted */
+	del_timer_sync(&priv->phy_info_timer);
+
+	/* Grab the PHY interrupt, if necessary/possible */
+	if (priv->einfo->flags & GFAR_HAS_PHY_INTR) {
+		if (request_irq(priv->einfo->interruptPHY, 
+					phy_interrupt,
+					SA_SHIRQ, 
+					"phy_interrupt", 
+					mii_info->dev) < 0) {
+			printk(KERN_ERR "%s: Can't get IRQ %d (PHY)\n",
+					mii_info->dev->name,
+					priv->einfo->interruptPHY);
+		} else {
+			mii_configure_phy_interrupt(priv->mii_info, 
+					MII_INTERRUPT_ENABLED);
+			return;
+		}
+	}
+
+	/* Start the timer again, this time in order to
+	 * handle a change in status */
+	init_timer(&priv->phy_info_timer);
+	priv->phy_info_timer.function = &gfar_phy_timer;
+	priv->phy_info_timer.data = (unsigned long) mii_info->dev;
+	mod_timer(&priv->phy_info_timer, jiffies +
+			GFAR_PHY_CHANGE_TIME * HZ);
 }
 
 /* Called every time the controller might need to be made
@@ -1637,12 +1583,13 @@ static void adjust_link(struct net_device *dev)
 	struct gfar_private *priv = netdev_priv(dev);
 	struct gfar *regs = priv->regs;
 	u32 tempval;
+	struct gfar_mii_info *mii_info = priv->mii_info;
 
-	if (priv->link) {
+	if (mii_info->link) {
 		/* Now we make sure that we can be in full duplex mode.
 		 * If not, we operate in half-duplex mode. */
-		if (priv->duplexity != priv->olddplx) {
-			if (!(priv->duplexity)) {
+		if (mii_info->duplex != priv->oldduplex) {
+			if (!(mii_info->duplex)) {
 				tempval = gfar_read(&regs->maccfg2);
 				tempval &= ~(MACCFG2_FULL_DUPLEX);
 				gfar_write(&regs->maccfg2, tempval);
@@ -1658,11 +1605,11 @@ static void adjust_link(struct net_device *dev)
 				       dev->name);
 			}
 
-			priv->olddplx = priv->duplexity;
+			priv->oldduplex = mii_info->duplex;
 		}
 
-		if (priv->speed != priv->oldspeed) {
-			switch (priv->speed) {
+		if (mii_info->speed != priv->oldspeed) {
+			switch (mii_info->speed) {
 			case 1000:
 				tempval = gfar_read(&regs->maccfg2);
 				tempval =
@@ -1679,14 +1626,14 @@ static void adjust_link(struct net_device *dev)
 			default:
 				printk(KERN_WARNING
 				       "%s: Ack!  Speed (%d) is not 10/100/1000!\n",
-				       dev->name, priv->speed);
+				       dev->name, mii_info->speed);
 				break;
 			}
 
 			printk(KERN_INFO "%s: Speed %dBT\n", dev->name,
-			       priv->speed);
+			       mii_info->speed);
 
-			priv->oldspeed = priv->speed;
+			priv->oldspeed = mii_info->speed;
 		}
 
 		if (!priv->oldlink) {
@@ -1700,7 +1647,7 @@ static void adjust_link(struct net_device *dev)
 			printk(KERN_INFO "%s: Link is down\n", dev->name);
 			priv->oldlink = 0;
 			priv->oldspeed = 0;
-			priv->olddplx = -1;
+			priv->oldduplex = -1;
 			netif_carrier_off(dev);
 		}
 	}
@@ -1900,11 +1847,7 @@ static int __init gfar_init(void)
 	int rc;
 
 	rc = ocp_register_driver(&gfar_driver);
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,41)
 	if (rc != 0) {
-#else
-	if (rc == 0) {
-#endif
 		ocp_unregister_driver(&gfar_driver);
 		return -ENODEV;
 	}

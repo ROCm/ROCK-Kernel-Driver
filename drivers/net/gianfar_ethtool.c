@@ -1,18 +1,18 @@
 /*
- * drivers/net/gianfar_ethtool.c
+ *  drivers/net/gianfar_ethtool.c
  *
- * Gianfar Ethernet Driver
- * Ethtool support for Gianfar Enet
- * Based on e1000 ethtool support
+ *  Gianfar Ethernet Driver
+ *  Ethtool support for Gianfar Enet
+ *  Based on e1000 ethtool support
  *
- * Author: Andy Fleming
- * Maintainer: Kumar Gala (kumar.gala@freescale.com)
+ *  Author: Andy Fleming
+ *  Maintainer: Kumar Gala (kumar.gala@freescale.com)
  *
- * Copyright 2004 Freescale Semiconductor, Inc
+ *  Copyright (c) 2003,2004 Freescale Semiconductor, Inc.
  *
- * This software may be used and distributed according to 
- * the terms of the GNU Public License, Version 2, incorporated herein 
- * by reference.
+ *  This software may be used and distributed according to 
+ *  the terms of the GNU Public License, Version 2, incorporated herein 
+ *  by reference.
  */
 
 #include <linux/config.h>
@@ -58,64 +58,64 @@ int gfar_sringparam(struct net_device *dev, struct ethtool_ringparam *rvals);
 void gfar_gdrvinfo(struct net_device *dev, struct ethtool_drvinfo *drvinfo);
 
 static char stat_gstrings[][ETH_GSTRING_LEN] = {
-	"RX Dropped by Kernel",
-	"RX Large Frame Errors",
-	"RX Short Frame Errors",
-	"RX Non-Octet Errors",
-	"RX CRC Errors",
-	"RX Overrun Errors",
-	"RX Busy Errors",
-	"RX Babbling Errors",
-	"RX Truncated Frames",
-	"Ethernet Bus Error",
-	"TX Babbling Errors",
-	"TX Underrun Errors",
-	"RX SKB Missing Errors",
-	"TX Timeout Errors",
-	"tx&rx 64B frames",
-	"tx&rx 65-127B frames",
-	"tx&rx 128-255B frames",
-	"tx&rx 256-511B frames",
-	"tx&rx 512-1023B frames",
-	"tx&rx 1024-1518B frames",
-	"tx&rx 1519-1522B Good VLAN",
-	"RX bytes",
-	"RX Packets",
-	"RX FCS Errors",
-	"Receive Multicast Packet",
-	"Receive Broadcast Packet",
-	"RX Control Frame Packets",
-	"RX Pause Frame Packets",
-	"RX Unknown OP Code",
-	"RX Alignment Error",
-	"RX Frame Length Error",
-	"RX Code Error",
-	"RX Carrier Sense Error",
-	"RX Undersize Packets",
-	"RX Oversize Packets",
-	"RX Fragmented Frames",
-	"RX Jabber Frames",
-	"RX Dropped Frames",
-	"TX Byte Counter",
-	"TX Packets",
-	"TX Multicast Packets",
-	"TX Broadcast Packets",
-	"TX Pause Control Frames",
-	"TX Deferral Packets",
-	"TX Excessive Deferral Packets",
-	"TX Single Collision Packets",
-	"TX Multiple Collision Packets",
-	"TX Late Collision Packets",
-	"TX Excessive Collision Packets",
-	"TX Total Collision",
-	"RESERVED",
-	"TX Dropped Frames",
-	"TX Jabber Frames",
-	"TX FCS Errors",
-	"TX Control Frames",
-	"TX Oversize Frames",
-	"TX Undersize Frames",
-	"TX Fragmented Frames",
+	"rx-dropped-by-kernel",
+	"rx-large-frame-errors",
+	"rx-short-frame-errors",
+	"rx-non-octet-errors",
+	"rx-crc-errors",
+	"rx-overrun-errors",
+	"rx-busy-errors",
+	"rx-babbling-errors",
+	"rx-truncated-frames",
+	"ethernet-bus-error",
+	"tx-babbling-errors",
+	"tx-underrun-errors",
+	"rx-skb-missing-errors",
+	"tx-timeout-errors",
+	"tx-rx-64-frames",
+	"tx-rx-65-127-frames",
+	"tx-rx-128-255-frames",
+	"tx-rx-256-511-frames",
+	"tx-rx-512-1023-frames",
+	"tx-rx-1024-1518-frames",
+	"tx-rx-1519-1522-good-vlan",
+	"rx-bytes",
+	"rx-packets",
+	"rx-fcs-errors",
+	"receive-multicast-packet",
+	"receive-broadcast-packet",
+	"rx-control-frame-packets",
+	"rx-pause-frame-packets",
+	"rx-unknown-op-code",
+	"rx-alignment-error",
+	"rx-frame-length-error",
+	"rx-code-error",
+	"rx-carrier-sense-error",
+	"rx-undersize-packets",
+	"rx-oversize-packets",
+	"rx-fragmented-frames",
+	"rx-jabber-frames",
+	"rx-dropped-frames",
+	"tx-byte-counter",
+	"tx-packets",
+	"tx-multicast-packets",
+	"tx-broadcast-packets",
+	"tx-pause-control-frames",
+	"tx-deferral-packets",
+	"tx-excessive-deferral-packets",
+	"tx-single-collision-packets",
+	"tx-multiple-collision-packets",
+	"tx-late-collision-packets",
+	"tx-excessive-collision-packets",
+	"tx-total-collision",
+	"reserved",
+	"tx-dropped-frames",
+	"tx-jabber-frames",
+	"tx-fcs-errors",
+	"tx-control-frames",
+	"tx-oversize-frames",
+	"tx-undersize-frames",
+	"tx-fragmented-frames",
 };
 
 /* Fill in an array of 64-bit statistics from various sources.
@@ -125,7 +125,7 @@ static char stat_gstrings[][ETH_GSTRING_LEN] = {
 void gfar_fill_stats(struct net_device *dev, struct ethtool_stats *dummy, u64 * buf)
 {
 	int i;
-	struct gfar_private *priv = (struct gfar_private *) dev->priv;
+	struct gfar_private *priv = netdev_priv(dev);
 	u32 *rmon = (u32 *) & priv->regs->rmon;
 	u64 *extra = (u64 *) & priv->extra_stats;
 	struct gfar_stats *stats = (struct gfar_stats *) buf;
@@ -154,7 +154,7 @@ void gfar_fill_stats_normon(struct net_device *dev,
 		struct ethtool_stats *dummy, u64 * buf)
 {
 	int i;
-	struct gfar_private *priv = (struct gfar_private *) dev->priv;
+	struct gfar_private *priv = netdev_priv(dev);
 	u64 *extra = (u64 *) & priv->extra_stats;
 
 	for (i = 0; i < GFAR_EXTRA_STATS_LEN; i++) {
@@ -171,7 +171,7 @@ int gfar_stats_count_normon(struct net_device *dev)
 void gfar_gdrvinfo(struct net_device *dev, struct
 	      ethtool_drvinfo *drvinfo)
 {
-	strncpy(drvinfo->driver, gfar_driver_name, GFAR_INFOSTR_LEN);
+	strncpy(drvinfo->driver, DRV_NAME, GFAR_INFOSTR_LEN);
 	strncpy(drvinfo->version, gfar_driver_version, GFAR_INFOSTR_LEN);
 	strncpy(drvinfo->fw_version, "N/A", GFAR_INFOSTR_LEN);
 	strncpy(drvinfo->bus_info, "N/A", GFAR_INFOSTR_LEN);
@@ -184,7 +184,7 @@ void gfar_gdrvinfo(struct net_device *dev, struct
 /* Return the current settings in the ethtool_cmd structure */
 int gfar_gsettings(struct net_device *dev, struct ethtool_cmd *cmd)
 {
-	struct gfar_private *priv = (struct gfar_private *) dev->priv;
+	struct gfar_private *priv = netdev_priv(dev);
 	uint gigabit_support = 
 		priv->einfo->flags & GFAR_HAS_GIGABIT ? SUPPORTED_1000baseT_Full : 0;
 	uint gigabit_advert = 
@@ -201,10 +201,10 @@ int gfar_gsettings(struct net_device *dev, struct ethtool_cmd *cmd)
 			    | ADVERTISED_100baseT_Full
 			    | gigabit_advert | ADVERTISED_Autoneg);
 
-	cmd->speed = priv->speed;
-	cmd->duplex = priv->duplexity;
+	cmd->speed = priv->mii_info->speed;
+	cmd->duplex = priv->mii_info->duplex;
 	cmd->port = PORT_MII;
-	cmd->phy_address = priv->einfo->phyid;
+	cmd->phy_address = priv->mii_info->mii_id;
 	cmd->transceiver = XCVR_EXTERNAL;
 	cmd->autoneg = AUTONEG_ENABLE;
 	cmd->maxtxpkt = priv->txcount;
@@ -223,19 +223,12 @@ int gfar_reglen(struct net_device *dev)
 void gfar_get_regs(struct net_device *dev, struct ethtool_regs *regs, void *regbuf)
 {
 	int i;
-	struct gfar_private *priv = (struct gfar_private *) dev->priv;
+	struct gfar_private *priv = netdev_priv(dev);
 	u32 *theregs = (u32 *) priv->regs;
 	u32 *buf = (u32 *) regbuf;
 
 	for (i = 0; i < sizeof (struct gfar) / sizeof (u32); i++)
 		buf[i] = theregs[i];
-}
-
-/* Return the link state 1 is up, 0 is down */
-u32 gfar_get_link(struct net_device *dev)
-{
-	struct gfar_private *priv = (struct gfar_private *) dev->priv;
-	return (u32) priv->link;
 }
 
 /* Fill in a buffer with the strings which correspond to the
@@ -252,7 +245,7 @@ static unsigned int gfar_usecs2ticks(struct gfar_private *priv, unsigned int use
 	unsigned int count;
 
 	/* The timer is different, depending on the interface speed */
-	switch (priv->speed) {
+	switch (priv->mii_info->speed) {
 	case 1000:
 		count = GFAR_GBIT_TIME;
 		break;
@@ -276,7 +269,7 @@ static unsigned int gfar_ticks2usecs(struct gfar_private *priv, unsigned int tic
 	unsigned int count;
 
 	/* The timer is different, depending on the interface speed */
-	switch (priv->speed) {
+	switch (priv->mii_info->speed) {
 	case 1000:
 		count = GFAR_GBIT_TIME;
 		break;
@@ -298,7 +291,7 @@ static unsigned int gfar_ticks2usecs(struct gfar_private *priv, unsigned int tic
  * structure.  */
 int gfar_gcoalesce(struct net_device *dev, struct ethtool_coalesce *cvals)
 {
-	struct gfar_private *priv = (struct gfar_private *) dev->priv;
+	struct gfar_private *priv = netdev_priv(dev);
 
 	cvals->rx_coalesce_usecs = gfar_ticks2usecs(priv, priv->rxtime);
 	cvals->rx_max_coalesced_frames = priv->rxcount;
@@ -344,7 +337,7 @@ int gfar_gcoalesce(struct net_device *dev, struct ethtool_coalesce *cvals)
  */
 int gfar_scoalesce(struct net_device *dev, struct ethtool_coalesce *cvals)
 {
-	struct gfar_private *priv = (struct gfar_private *) dev->priv;
+	struct gfar_private *priv = netdev_priv(dev);
 
 	/* Set up rx coalescing */
 	if ((cvals->rx_coalesce_usecs == 0) ||
@@ -386,7 +379,7 @@ int gfar_scoalesce(struct net_device *dev, struct ethtool_coalesce *cvals)
  * jumbo are ignored by the driver */
 void gfar_gringparam(struct net_device *dev, struct ethtool_ringparam *rvals)
 {
-	struct gfar_private *priv = (struct gfar_private *) dev->priv;
+	struct gfar_private *priv = netdev_priv(dev);
 
 	rvals->rx_max_pending = GFAR_RX_MAX_RING_SIZE;
 	rvals->rx_mini_max_pending = GFAR_RX_MAX_RING_SIZE;
@@ -409,7 +402,7 @@ void gfar_gringparam(struct net_device *dev, struct ethtool_ringparam *rvals)
 int gfar_sringparam(struct net_device *dev, struct ethtool_ringparam *rvals)
 {
 	u32 tempval;
-	struct gfar_private *priv = (struct gfar_private *) dev->priv;
+	struct gfar_private *priv = netdev_priv(dev);
 	int err = 0;
 
 	if (rvals->rx_pending > GFAR_RX_MAX_RING_SIZE)
@@ -473,7 +466,7 @@ struct ethtool_ops gfar_ethtool_ops = {
 	.get_drvinfo = gfar_gdrvinfo,
 	.get_regs_len = gfar_reglen,
 	.get_regs = gfar_get_regs,
-	.get_link = gfar_get_link,
+	.get_link = ethtool_op_get_link,
 	.get_coalesce = gfar_gcoalesce,
 	.set_coalesce = gfar_scoalesce,
 	.get_ringparam = gfar_gringparam,
@@ -481,4 +474,52 @@ struct ethtool_ops gfar_ethtool_ops = {
 	.get_strings = gfar_gstrings,
 	.get_stats_count = gfar_stats_count,
 	.get_ethtool_stats = gfar_fill_stats,
+};
+
+struct ethtool_ops gfar_normon_nocoalesce_ethtool_ops = {
+	.get_settings = gfar_gsettings,
+	.get_drvinfo = gfar_gdrvinfo,
+	.get_regs_len = gfar_reglen,
+	.get_regs = gfar_get_regs,
+	.get_link = ethtool_op_get_link,
+	.get_ringparam = gfar_gringparam,
+	.set_ringparam = gfar_sringparam,
+	.get_strings = gfar_gstrings_normon,
+	.get_stats_count = gfar_stats_count_normon,
+	.get_ethtool_stats = gfar_fill_stats_normon,
+};
+
+struct ethtool_ops gfar_nocoalesce_ethtool_ops = {
+	.get_settings = gfar_gsettings,
+	.get_drvinfo = gfar_gdrvinfo,
+	.get_regs_len = gfar_reglen,
+	.get_regs = gfar_get_regs,
+	.get_link = ethtool_op_get_link,
+	.get_ringparam = gfar_gringparam,
+	.set_ringparam = gfar_sringparam,
+	.get_strings = gfar_gstrings,
+	.get_stats_count = gfar_stats_count,
+	.get_ethtool_stats = gfar_fill_stats,
+};
+
+struct ethtool_ops gfar_normon_ethtool_ops = {
+	.get_settings = gfar_gsettings,
+	.get_drvinfo = gfar_gdrvinfo,
+	.get_regs_len = gfar_reglen,
+	.get_regs = gfar_get_regs,
+	.get_link = ethtool_op_get_link,
+	.get_coalesce = gfar_gcoalesce,
+	.set_coalesce = gfar_scoalesce,
+	.get_ringparam = gfar_gringparam,
+	.set_ringparam = gfar_sringparam,
+	.get_strings = gfar_gstrings_normon,
+	.get_stats_count = gfar_stats_count_normon,
+	.get_ethtool_stats = gfar_fill_stats_normon,
+};
+
+struct ethtool_ops *gfar_op_array[] = {
+	&gfar_ethtool_ops,
+	&gfar_normon_ethtool_ops,
+	&gfar_nocoalesce_ethtool_ops,
+	&gfar_normon_nocoalesce_ethtool_ops
 };

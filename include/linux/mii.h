@@ -33,7 +33,8 @@
 #define MII_NCONFIG         0x1c        /* Network interface config    */
 
 /* Basic mode control register. */
-#define BMCR_RESV               0x007f  /* Unused...                   */
+#define BMCR_RESV               0x003f  /* Unused...                   */
+#define BMCR_SPEED1000		0x0040  /* MSB of Speed (1000)         */
 #define BMCR_CTST               0x0080  /* Collision test              */
 #define BMCR_FULLDPLX           0x0100  /* Full duplex                 */
 #define BMCR_ANRESTART          0x0200  /* Auto negotiation restart    */

@@ -8,7 +8,7 @@
  * Author: Andy Fleming
  * Maintainer: Kumar Gala (kumar.gala@freescale.com)
  *
- * Copyright 2004 Freescale Semiconductor, Inc
+ * Copyright (c) 2002-2004 Freescale Semiconductor, Inc.
  *
  * This program is free software; you can redistribute  it and/or modify it
  * under  the terms of  the GNU General  Public License as published by the
@@ -17,6 +17,8 @@
  *
  *  Still left to do:
  *      -Add support for module parameters
+ *	-Add support for ethtool -s
+ *	-Add patch for ethtool phys id
  */
 #ifndef __GIANFAR_H
 #define __GIANFAR_H
@@ -42,15 +44,7 @@
 #include <linux/module.h>
 #include <linux/version.h>
 #include <linux/crc32.h>
-
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,41)
 #include <linux/workqueue.h>
-#else
-#include <linux/tqueue.h>
-#define work_struct tq_struct
-#define schedule_work schedule_task
-#endif
-
 #include <linux/ethtool.h>
 #include <linux/netdevice.h>
 #include <asm/ocp.h>
@@ -70,8 +64,13 @@
 
 #define MAC_ADDR_LEN 6
 
-extern char gfar_driver_name[];
-extern char gfar_driver_version[];
+#define PHY_INIT_TIMEOUT 100000
+#define GFAR_PHY_CHANGE_TIME 2
+
+#define DEVICE_NAME "%s: Gianfar Ethernet Controller Version 1.1, "
+#define DRV_NAME "gfar-enet"
+extern const char gfar_driver_name[];
+extern const char gfar_driver_version[];
 
 /* These need to be powers of 2 for this driver */
 #ifdef CONFIG_GFAR_NAPI
@@ -105,11 +104,13 @@ extern char gfar_driver_version[];
 #define GFAR_100_TIME   2560
 #define GFAR_10_TIME    25600
 
+#define DEFAULT_TX_COALESCE 1
 #define DEFAULT_TXCOUNT	16
-#define DEFAULT_TXTIME	32768
+#define DEFAULT_TXTIME	400
 
+#define DEFAULT_RX_COALESCE 1
 #define DEFAULT_RXCOUNT	16
-#define DEFAULT_RXTIME	32768
+#define DEFAULT_RXTIME	400
 
 #define TBIPA_VALUE		0x1f
 #define MIIMCFG_INIT_VALUE	0x00000007
@@ -467,8 +468,7 @@ struct gfar {
  * empty and completely full conditions.  The empty/ready indicator in
  * the buffer descriptor determines the actual condition.
  */
-struct gfar_private
-{
+struct gfar_private {
 	/* pointers to arrays of skbuffs for tx and rx */
 	struct sk_buff ** tx_skbuff;
 	struct sk_buff ** rx_skbuff;
@@ -496,7 +496,6 @@ struct gfar_private
 	struct txbd8 *cur_tx;	        /* Next free ring entry */
 	struct txbd8 *dirty_tx;		/* The Ring entry to be freed. */
 	struct gfar *regs;	/* Pointer to the GFAR memory mapped Registers */
-	struct phy_info *phyinfo;
 	struct gfar *phyregs;
 	struct work_struct tq;
 	struct timer_list phy_info_timer;
@@ -509,15 +508,14 @@ struct gfar_private
 	unsigned int rx_ring_size;
 	wait_queue_head_t rxcleanupq;
 	unsigned int rxclean;
-	int link;	/* current link state */
-	int oldlink;
-	int duplexity; /* Indicates negotiated duplex state */
-	int olddplx;
-	int speed;	/* Indicates negotiated speed */
-	int oldspeed;
-	
+
 	/* Info structure initialized by board setup code */
 	struct ocp_gfar_data *einfo;
+
+	struct gfar_mii_info *mii_info;
+	int oldspeed;
+	int oldduplex;
+	int oldlink;
 };
 
 extern inline u32 gfar_read(volatile unsigned *addr)
@@ -532,6 +530,6 @@ extern inline void gfar_write(volatile unsigned *addr, u32 val)
 	out_be32(addr, val);
 }
 
-
+extern struct ethtool_ops *gfar_op_array[];
 
 #endif /* __GIANFAR_H */
