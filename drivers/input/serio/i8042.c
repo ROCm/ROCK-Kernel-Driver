@@ -283,7 +283,7 @@ activate_fail:
 
 irq_fail:
 	values->exists = 0;
-	serio_unregister_port(port);
+	serio_unregister_port_delayed(port);
 
 	return -1;
 }

@@ -49,8 +49,10 @@ MODULE_LICENSE("GPL");
 
 EXPORT_SYMBOL(serio_interrupt);
 EXPORT_SYMBOL(serio_register_port);
+EXPORT_SYMBOL(serio_register_port_delayed);
 EXPORT_SYMBOL(__serio_register_port);
 EXPORT_SYMBOL(serio_unregister_port);
+EXPORT_SYMBOL(serio_unregister_port_delayed);
 EXPORT_SYMBOL(__serio_unregister_port);
 EXPORT_SYMBOL(serio_register_device);
 EXPORT_SYMBOL(serio_unregister_device);
@@ -83,8 +85,10 @@ static void serio_find_dev(struct serio *serio)
 	}
 }
 
-#define SERIO_RESCAN	1
-#define SERIO_RECONNECT	2
+#define SERIO_RESCAN		1
+#define SERIO_RECONNECT		2
+#define SERIO_REGISTER_PORT	3
+#define SERIO_UNREGISTER_PORT	4
 
 static DECLARE_WAIT_QUEUE_HEAD(serio_wait);
 static DECLARE_COMPLETION(serio_exited);
@@ -111,6 +115,14 @@ void serio_handle_events(void)
 			goto event_done;
 
 		switch (event->type) {
+			case SERIO_REGISTER_PORT :
+				__serio_register_port(event->serio);
+				break;
+
+			case SERIO_UNREGISTER_PORT :
+				__serio_unregister_port(event->serio);
+				break;
+
 			case SERIO_RECONNECT :
 				if (event->serio->dev && event->serio->dev->reconnect)
 					if (event->serio->dev->reconnect(event->serio) == 0)
@@ -198,6 +210,16 @@ void serio_register_port(struct serio *serio)
 }
 
 /*
+ * Submits register request to kseriod for subsequent execution.
+ * Can be used when it is not obvious whether the serio_sem is
+ * taken or not and when delayed execution is feasible.
+ */
+void serio_register_port_delayed(struct serio *serio)
+{
+	serio_queue_event(serio, SERIO_REGISTER_PORT);
+}
+
+/*
  * Should only be called directly if serio_sem has already been taken,
  * for example when unregistering a serio from other input device's
  * connect() function.
@@ -213,6 +235,16 @@ void serio_unregister_port(struct serio *serio)
 	down(&serio_sem);
 	__serio_unregister_port(serio);
 	up(&serio_sem);
+}
+
+/*
+ * Submits unregister request to kseriod for subsequent execution.
+ * Can be used when it is not obvious whether the serio_sem is
+ * taken or not and when delayed execution is feasible.
+ */
+void serio_unregister_port_delayed(struct serio *serio)
+{
+	serio_queue_event(serio, SERIO_UNREGISTER_PORT);
 }
 
 /*
