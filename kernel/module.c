@@ -52,7 +52,7 @@ EXPORT_SYMBOL(__stop___kallsyms);
 struct module kernel_module =
 {
 	.size_of_struct		= sizeof(struct module),
-	.name 			= NULL,
+	.name 			= "",
 	.uc	 		= {ATOMIC_INIT(1)},
 	.flags			= MOD_RUNNING,
 	.syms			= __start___ksymtab,
@@ -1353,7 +1353,7 @@ print_symbol(const char *fmt, unsigned long address)
 	}
 
 	if (sym_start) {
-		if (mod_name)
+		if (*mod_name)
 		    snprintf(buffer, MAX_SYMBOL_SIZE - 1, "%s%s+%#x/%#x [%s]",
 			 tag, sym_name,
 			 (unsigned int)(address - sym_start),
