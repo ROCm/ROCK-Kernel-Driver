@@ -322,10 +322,10 @@ int pcmcia_register_socket(struct class_device *class_dev)
 
 	DEBUG(0, "cs: pcmcia_register_socket(0x%p)\n", cls_d->ops);
 
-	s_info = kmalloc(cls_d->nsock * sizeof(struct socket_info_t), GFP_KERNEL);
+	s_info = kmalloc(cls_d->nsock * sizeof(struct pcmcia_socket), GFP_KERNEL);
 	if (!s_info)
 		return -ENOMEM;
-	memset(s_info, 0, cls_d->nsock * sizeof(socket_info_t));
+	memset(s_info, 0, cls_d->nsock * sizeof(struct pcmcia_socket));
 
 	cls_d->s_info = s_info;
 	ret = 0;

@@ -31,6 +31,8 @@
 #define _LINUX_SS_H
 
 #include <pcmcia/cs_types.h>
+#include <pcmcia/cs.h>
+#include <pcmcia/bulkmem.h>
 #include <linux/device.h>
 
 /* Definitions for card status flags for GetStatus */
@@ -141,13 +143,14 @@ struct pccard_operations {
 /*
  *  Calls to set up low-level "Socket Services" drivers
  */
+struct pcmcia_socket;
 
 struct pcmcia_socket_class_data {
 	unsigned int nsock;			/* number of sockets */
 	unsigned int sock_offset;		/* socket # (which is
 	 * returned to driver) = sock_offset + (0, 1, .. , (nsock-1) */
 	struct pccard_operations *ops;		/* see above */
-	void *s_info;				/* socket_info_t */
+	struct pcmcia_socket *s_info;
 	struct class_device class_dev;		/* generic class structure */
 };
 
@@ -156,5 +159,94 @@ extern struct class pcmcia_socket_class;
 /* socket drivers are expected to use these callbacks in their .drv struct */
 extern int pcmcia_socket_dev_suspend(struct pcmcia_socket_class_data *cls_d, u32 state, u32 level);
 extern int pcmcia_socket_dev_resume(struct pcmcia_socket_class_data *cls_d, u32 level);
+
+
+typedef struct erase_busy_t {
+	eraseq_entry_t		*erase;
+	client_handle_t		client;
+	struct timer_list	timeout;
+	struct erase_busy_t	*prev, *next;
+} erase_busy_t;
+
+typedef struct io_window_t {
+	u_int			Attributes;
+	ioaddr_t		BasePort, NumPorts;
+	ioaddr_t		InUse, Config;
+} io_window_t;
+
+#define WINDOW_MAGIC	0xB35C
+typedef struct window_t {
+	u_short			magic;
+	u_short			index;
+	client_handle_t		handle;
+	struct pcmcia_socket 	*sock;
+	u_long			base;
+	u_long			size;
+	pccard_mem_map		ctl;
+} window_t;
+
+/* Maximum number of IO windows per socket */
+#define MAX_IO_WIN 2
+
+/* Maximum number of memory windows per socket */
+#define MAX_WIN 4
+
+struct config_t;
+struct region_t;
+
+/* in parts of drivers/pcmcia/ this is still known as 
+ * socket_info_t 
+ */
+
+struct pcmcia_socket {
+	spinlock_t			lock;
+	struct pccard_operations *	ss_entry;
+	u_int				sock;
+	socket_state_t			socket;
+	socket_cap_t			cap;
+	u_int				state;
+	u_short				functions;
+	u_short				lock_count;
+	client_handle_t			clients;
+	u_int				real_clients;
+	pccard_mem_map			cis_mem;
+	u_char				*cis_virt;
+	struct config_t			*config;
+	struct {
+		u_int			AssignedIRQ;
+		u_int			Config;
+	} irq;
+	io_window_t			io[MAX_IO_WIN];
+	window_t			win[MAX_WIN];
+	struct region_t			*c_region, *a_region;
+	erase_busy_t			erase_busy;
+	struct list_head		cis_cache;
+	u_int				fake_cis_len;
+	char				*fake_cis;
+
+	/* deprecated */
+#ifdef CONFIG_PROC_FS
+	struct proc_dir_entry		*proc;
+#endif
+
+	/* state thread */
+	struct semaphore		skt_sem;	/* protects socket h/w state */
+
+	struct task_struct		*thread;
+	struct completion		thread_done;
+	wait_queue_head_t		thread_wait;
+	spinlock_t			thread_lock;	/* protects thread_events */
+	unsigned int			thread_events;
+
+	/* pcmcia (16-bit) */
+
+
+	/* cardbus (32-bit) */
+#ifdef CONFIG_CARDBUS
+	struct resource *		cb_cis_res;
+	u_char				*cb_cis_virt;
+#endif
+};
+
 
 #endif /* _LINUX_SS_H */

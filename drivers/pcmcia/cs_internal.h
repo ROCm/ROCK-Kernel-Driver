@@ -21,13 +21,6 @@
 
 #include <linux/config.h>
 
-typedef struct erase_busy_t {
-    eraseq_entry_t	*erase;
-    client_handle_t	client;
-    struct timer_list	timeout;
-    struct erase_busy_t	*prev, *next;
-} erase_busy_t;
-
 #define ERASEQ_MAGIC	0xFA67
 typedef struct eraseq_t {
     u_short		eraseq_magic;
@@ -63,23 +56,6 @@ typedef struct client_t {
 #define CLIENT_WIN_REQ(i)	(0x20<<(i))
 #define CLIENT_CARDBUS		0x8000
 
-typedef struct io_window_t {
-    u_int		Attributes;
-    ioaddr_t		BasePort, NumPorts;
-    ioaddr_t		InUse, Config;
-} io_window_t;
-
-#define WINDOW_MAGIC	0xB35C
-typedef struct window_t {
-    u_short		magic;
-    u_short		index;
-    client_handle_t	handle;
-    struct socket_info_t *sock;
-    u_long		base;
-    u_long		size;
-    pccard_mem_map	ctl;
-} window_t;
-
 #define REGION_MAGIC	0xE3C9
 typedef struct region_t {
     u_short		region_magic;
@@ -108,12 +84,6 @@ typedef struct config_t {
     } irq;
 } config_t;
 
-/* Maximum number of IO windows per socket */
-#define MAX_IO_WIN 2
-
-/* Maximum number of memory windows per socket */
-#define MAX_WIN 4
-
 struct cis_cache_entry {
 	struct list_head	node;
 	unsigned int		addr;
@@ -122,47 +92,8 @@ struct cis_cache_entry {
 	unsigned char		cache[0];
 };
 
-typedef struct socket_info_t {
-    spinlock_t			lock;
-    struct pccard_operations *	ss_entry;
-    u_int			sock;
-    socket_state_t		socket;
-    socket_cap_t		cap;
-    u_int			state;
-    u_short			functions;
-    u_short			lock_count;
-    client_handle_t		clients;
-    u_int			real_clients;
-    pccard_mem_map		cis_mem;
-    u_char			*cis_virt;
-    config_t			*config;
-#ifdef CONFIG_CARDBUS
-    struct resource *		cb_cis_res;
-    u_char			*cb_cis_virt;
-#endif
-    struct {
-	u_int			AssignedIRQ;
-	u_int			Config;
-    } irq;
-    io_window_t			io[MAX_IO_WIN];
-    window_t			win[MAX_WIN];
-    region_t			*c_region, *a_region;
-    erase_busy_t		erase_busy;
-    struct list_head		cis_cache;
-    u_int			fake_cis_len;
-    char			*fake_cis;
-#ifdef CONFIG_PROC_FS
-    struct proc_dir_entry	*proc;
-#endif
-
-    struct semaphore		skt_sem;	/* protects socket h/w state */
-
-    struct task_struct		*thread;
-    struct completion		thread_done;
-    wait_queue_head_t		thread_wait;
-    spinlock_t			thread_lock;	/* protects thread_events */
-    unsigned int		thread_events;
-} socket_info_t;
+/* deprecated - use struct pcmcia_socket instead */
+typedef struct pcmcia_socket socket_info_t;
 
 /* Flags in config state */
 #define CONFIG_LOCKED		0x01
