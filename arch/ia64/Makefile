@@ -70,6 +70,8 @@ boot := arch/ia64/hp/sim/boot
 
 .PHONY: boot compressed check
 
+all: compressed
+
 compressed: vmlinux.gz
 
 vmlinux.gz: vmlinux
@@ -100,6 +102,6 @@ boot:	lib/lib.a vmlinux
 
 
 define archhelp
-  echo '  compressed	- Build compressed kernel image'
+  echo '* compressed	- Build compressed kernel image'
   echo '  boot		- Build vmlinux and bootloader for Ski simulator'
 endef
