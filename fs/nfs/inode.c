@@ -781,7 +781,7 @@ printk("nfs_setattr: revalidate failed, error=%d\n", error);
 	if (error)
 		goto out;
 
-	error = NFS_PROTO(inode)->setattr(inode, &fattr, attr);
+	error = NFS_PROTO(inode)->setattr(dentry, &fattr, attr);
 	if (error)
 		goto out;
 	/*
