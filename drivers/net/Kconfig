@@ -2225,6 +2225,17 @@ config MV643XX_ETH_2
 	  This enables support for Port 2 of the Marvell MV643XX Gigabit
 	  Ethernet.
 
+config NET_BROADCOM
+	tristate "Broadcom bcm5700 support"
+	depends on PCI
+	help
+	  This driver supports Broadcom based gigabit Ethernet cards.
+
+	  If you want to compile this driver as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want),
+	  say M here and read <file:Documentation/modules.txt>.  This is
+	  recommended.  The module will be called bcm5700.
+
 endmenu
 
 #
