@@ -39,10 +39,6 @@
 
 #define DEBUG
 
-MODULE_AUTHOR("Rodrigo Damazio <rdamazio@lsi.usp.br>");
-MODULE_DESCRIPTION("USB PID(Physical Interface Device) Driver");
-MODULE_LICENSE("GPL");
-
 #define CHECK_OWNERSHIP(i, hid_pid)	\
 	((i) < FF_EFFECTS_MAX && i >= 0 && \
 	test_bit(FF_PID_FLAGS_USED, &hid_pid->effects[(i)].flags) && \
@@ -313,18 +309,3 @@ int hid_pid_init(struct hid_device *hid)
     
     return 0;    
 }
-
-static int __init hid_pid_modinit(void)
-{
-    return 0;
-}
-
-static void __exit hid_pid_modexit(void)
-{
-
-}
-
-module_init(hid_pid_modinit);
-module_exit(hid_pid_modexit);
-
-
