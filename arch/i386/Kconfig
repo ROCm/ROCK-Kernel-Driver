@@ -637,16 +637,7 @@ config X86_CPUID
 	  with major 203 and minors 0 to 31 for /dev/cpu/0/cpuid to
 	  /dev/cpu/31/cpuid.
 
-config EDD
-	tristate "BIOS Enhanced Disk Drive calls determine boot disk (EXPERIMENTAL)"
-	depends on EXPERIMENTAL
-	help
-	  Say Y or M here if you want to enable BIOS Enhanced Disk Drive
-	  Services real mode BIOS calls to determine which disk
-	  BIOS tries boot from.  This information is then exported via driverfs.
-
-	  This option is experimental, but believed to be safe,
-	  and most disk controller BIOS vendors do not yet implement this feature.
+source "drivers/firmware/Kconfig"
 
 choice
 	prompt "High Memory Support"
