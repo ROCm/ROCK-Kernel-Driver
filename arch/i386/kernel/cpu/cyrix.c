@@ -2,8 +2,6 @@
 #include <linux/bitops.h>
 #include <linux/delay.h>
 #include <linux/pci.h>
-#include <linux/pci_ids.h>
-
 #include <asm/dma.h>
 #include <asm/io.h>
 #include <asm/processor.h>

@@ -24,6 +24,7 @@
  */
 
 #include <linux/slab.h>
+#include <linux/pagemap.h>
 #include <linux/stringify.h>
 #include "ldm.h"
 #include "check.h"

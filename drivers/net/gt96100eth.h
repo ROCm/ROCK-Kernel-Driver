@@ -27,6 +27,7 @@
 #ifndef _GT96100ETH_H
 #define _GT96100ETH_H
 
+#include <linux/config.h>
 #include <asm/galileo-boards/gt96100.h>
 
 #define dbg(lvl, format, arg...) \

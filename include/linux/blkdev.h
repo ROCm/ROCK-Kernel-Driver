@@ -7,6 +7,7 @@
 #include <linux/list.h>
 #include <linux/pagemap.h>
 #include <linux/backing-dev.h>
+#include <linux/wait.h>
 
 #include <asm/scatterlist.h>
 

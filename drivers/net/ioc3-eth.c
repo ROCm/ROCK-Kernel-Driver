@@ -26,6 +26,7 @@
  *    which workarounds are required for them?  Do we ever have Lucent's?
  *  o For the 2.5 branch kill the mii-tool ioctls.
  */
+#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/kernel.h>

@@ -18,7 +18,6 @@
 #include <asm/dma.h>
 #include <asm/io.h>
 #include <asm/param.h>
-#include <linux/ptrace.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/ioport.h>

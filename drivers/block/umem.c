@@ -48,6 +48,7 @@
 #include <linux/smp_lock.h>
 #include <linux/timer.h>
 #include <linux/pci.h>
+#include <linux/slab.h>
 
 #include <linux/fcntl.h>        /* O_ACCMODE */
 #include <linux/hdreg.h>  /* HDIO_GETGEO */
@@ -55,6 +56,7 @@
 #include <linux/umem.h>
 
 #include <asm/uaccess.h>
+#include <asm/io.h>
 
 #define PRINTK(x...) do {} while (0)
 #define dprintk(x...) do {} while (0)

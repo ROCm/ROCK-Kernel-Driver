@@ -9,6 +9,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/mm.h>
 #include <linux/vmalloc.h>
 #include <linux/string.h>
 #include <linux/errno.h>

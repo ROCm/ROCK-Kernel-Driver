@@ -29,6 +29,7 @@
 #include <linux/file.h>
 #include <linux/quotaops.h>
 #include <linux/iobuf.h>
+#include <linux/highmem.h>
 #include <linux/module.h>
 #include <linux/writeback.h>
 #include <linux/mempool.h>

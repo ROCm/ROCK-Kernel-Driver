@@ -47,7 +47,6 @@
 #include <linux/smp.h>
 
 #include <asm/uaccess.h>
-#include <asm/system.h>
 #include <asm/io.h>
 
 #define MAJOR_NR SCSI_DISK0_MAJOR
