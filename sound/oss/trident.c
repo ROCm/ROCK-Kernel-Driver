@@ -19,6 +19,7 @@
  *	Ching-Ling Lee <cling-li@ali.com.tw> ALi 5451 Audio Core Support 
  *	Matt Wu <mattwu@acersoftech.com.cn> ALi 5451 Audio Core Support
  *	Peter Wächtler <pwaechtler@loewe-komp.de> CyberPro5050 support
+ *      Muli Ben-Yehuda <mulix@mulix.org>
  *
  *
  *	This program is free software; you can redistribute it and/or modify
