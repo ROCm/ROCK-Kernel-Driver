@@ -16,6 +16,7 @@
 #ifdef __KERNEL__
 #include <linux/slab.h>
 #include <linux/interrupt.h>
+#include <linux/sched.h>
 #include <linux/workqueue.h>
 #include <asm/unaligned.h>
 #include <linux/bitops.h>
