@@ -145,7 +145,6 @@ struct htb_class
     struct gnet_stats_basic bstats;
     struct gnet_stats_queue qstats;
     struct gnet_stats_rate_est rate_est;
-    spinlock_t		*stats_lock;
     struct tc_htb_xstats xstats;/* our special stats */
     int refcnt;			/* usage count of this class */
 
@@ -1468,9 +1467,6 @@ static void htb_destroy_class(struct Qdisc* sch,struct htb_class *cl)
 	qdisc_put_rtab(cl->rate);
 	qdisc_put_rtab(cl->ceil);
 	
-#ifdef CONFIG_NET_ESTIMATOR
-	qdisc_kill_estimator(&cl->stats);
-#endif
 	htb_destroy_filters (&cl->filter_list);
 	
 	while (!list_empty(&cl->children)) 
