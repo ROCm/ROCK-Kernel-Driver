@@ -1130,11 +1130,8 @@ static inline void __generic_unplug_device(request_queue_t *q)
 	if (test_bit(QUEUE_FLAG_STOPPED, &q->queue_flags))
 		return;
 
-	/*
-	 * always call down, since we can race now with setting the plugged
-	 * bit outside of the queue lock
-	 */
-	(void) blk_remove_plug(q);
+	if (!blk_remove_plug(q))
+		return;
 
 	/*
 	 * was plugged, fire request_fn if queue has stuff to do

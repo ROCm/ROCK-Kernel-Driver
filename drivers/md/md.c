@@ -181,6 +181,7 @@ static void md_unplug_all(request_queue_t *q)
 {
 	mddev_t *mddev = q->queuedata;
 
+	clear_bit(QUEUE_FLAG_PLUGGED, &q->queue_flags);
 	md_unplug_mddev(mddev);
 }
 
