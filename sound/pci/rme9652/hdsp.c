@@ -4982,6 +4982,16 @@ static int __devinit snd_hdsp_create(snd_card_t *card,
 	tasklet_init(&hdsp->midi_tasklet, hdsp_midi_tasklet, (unsigned long)hdsp);
 	
 	pci_read_config_word(hdsp->pci, PCI_CLASS_REVISION, &hdsp->firmware_rev);
+	
+	/* From Martin Bjoernsen :
+	    "It is important that the card's latency timer register in
+	    the PCI configuration space is set to a value much larger
+	    than 0 by the computer's BIOS or the driver.
+	    The windows driver always sets this 8 bit register [...]
+	    to its maximum 255 to avoid problems with some computers."
+	*/
+	pci_write_config_byte(hdsp->pci, PCI_LATENCY_TIMER, 0xFF);
+	
 	strcpy(card->driver, "H-DSP");
 	strcpy(card->mixername, "Xilinx FPGA");
 
