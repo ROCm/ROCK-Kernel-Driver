@@ -233,6 +233,7 @@ xprt_sendmsg(struct rpc_xprt *xprt, struct rpc_rqst *req)
 	msg.msg_controllen = 0;
 
 	oldfs = get_fs(); set_fs(get_ds());
+	clear_bit(SOCK_ASYNC_NOSPACE, &sock->flags);
 	result = sock_sendmsg(sock, &msg, slen);
 	set_fs(oldfs);
 
@@ -248,10 +249,7 @@ xprt_sendmsg(struct rpc_xprt *xprt, struct rpc_rqst *req)
 		/* When the server has died, an ICMP port unreachable message
 		 * prompts ECONNREFUSED.
 		 */
-		break;
 	case -EAGAIN:
-		if (test_bit(SOCK_NOSPACE, &sock->flags))
-			result = -ENOMEM;
 		break;
 	case -ENOTCONN:
 	case -EPIPE:
@@ -965,19 +963,15 @@ xprt_write_space(struct sock *sk)
 	if (!sock_writeable(sk))
 		return;
 
-	if (!xprt_test_and_set_wspace(xprt)) {
-		spin_lock_bh(&xprt->sock_lock);
-		if (xprt->snd_task && xprt->snd_task->tk_rpcwait == &xprt->pending)
-			rpc_wake_up_task(xprt->snd_task);
-		spin_unlock_bh(&xprt->sock_lock);
-	}
+	if (!test_and_clear_bit(SOCK_NOSPACE, &sock->flags))
+		return;
 
-	if (test_bit(SOCK_NOSPACE, &sock->flags)) {
-		if (sk->sleep && waitqueue_active(sk->sleep)) {
-			clear_bit(SOCK_NOSPACE, &sock->flags);
-			wake_up_interruptible(sk->sleep);
-		}
-	}
+	spin_lock_bh(&xprt->sock_lock);
+	if (xprt->snd_task && xprt->snd_task->tk_rpcwait == &xprt->pending)
+		rpc_wake_up_task(xprt->snd_task);
+	spin_unlock_bh(&xprt->sock_lock);
+	if (sk->sleep && waitqueue_active(sk->sleep))
+		wake_up_interruptible(sk->sleep);
 }
 
 /*
@@ -1083,7 +1077,6 @@ do_xprt_transmit(struct rpc_task *task)
 	 * called xprt_sendmsg().
 	 */
 	while (1) {
-		xprt_clear_wspace(xprt);
 		req->rq_xtime = jiffies;
 		status = xprt_sendmsg(xprt, req);
 
@@ -1098,7 +1091,7 @@ do_xprt_transmit(struct rpc_task *task)
 		} else {
 			if (status >= req->rq_slen)
 				goto out_receive;
-			status = -ENOMEM;
+			status = -EAGAIN;
 			break;
 		}
 
@@ -1121,16 +1114,17 @@ do_xprt_transmit(struct rpc_task *task)
 	task->tk_status = status;
 
 	switch (status) {
-	case -ENOMEM:
-		/* Protect against (udp|tcp)_write_space */
-		spin_lock_bh(&xprt->sock_lock);
-		if (!xprt_wspace(xprt)) {
-			task->tk_timeout = req->rq_timeout.to_current;
-			rpc_sleep_on(&xprt->pending, task, NULL, NULL);
-		}
-		spin_unlock_bh(&xprt->sock_lock);
-		return;
 	case -EAGAIN:
+		if (test_bit(SOCK_ASYNC_NOSPACE, &xprt->sock->flags)) {
+			/* Protect against races with xprt_write_space */
+			spin_lock_bh(&xprt->sock_lock);
+			if (test_bit(SOCK_NOSPACE, &xprt->sock->flags)) {
+				task->tk_timeout = req->rq_timeout.to_current;
+				rpc_sleep_on(&xprt->pending, task, NULL, NULL);
+			}
+			spin_unlock_bh(&xprt->sock_lock);
+			return;
+		}
 		/* Keep holding the socket if it is blocked */
 		rpc_delay(task, HZ>>4);
 		return;
