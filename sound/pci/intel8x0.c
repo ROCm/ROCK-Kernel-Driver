@@ -1020,7 +1020,9 @@ static void snd_intel8x0_setup_pcm_out(intel8x0_t *chip,
 			 */
 			if (cnt & ICH_PCM_246_MASK) {
 				iputdword(chip, ICHREG(GLOB_CNT), cnt & ~ICH_PCM_246_MASK);
+				spin_unlock_irq(&chip->reg_lock);
 				msleep(50); /* grrr... */
+				spin_lock_irq(&chip->reg_lock);
 			}
 		} else if (chip->device_type == DEVICE_INTEL_ICH4) {
 			if (runtime->sample_bits > 16)
