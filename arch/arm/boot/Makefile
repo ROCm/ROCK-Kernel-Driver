@@ -47,9 +47,9 @@ endif
    zreladdr-$(CONFIG_ARCH_PXA)		:= 0xa0008000
    zreladdr-$(CONFIG_ARCH_ANAKIN)	:= 0x20008000
    zreladdr-$(CONFIG_ARCH_IOP3XX)	:= 0xa0008000
-params-phys-$(CONFIG_ARCH_IOP3XX)	:= 0xa0000100
+params_phys-$(CONFIG_ARCH_IOP3XX)	:= 0xa0000100
    zreladdr-$(CONFIG_ARCH_ADIFCC)	:= 0xc0008000
-params-phys-$(CONFIG_ARCH_ADIFCC)	:= 0xc0000100
+params_phys-$(CONFIG_ARCH_ADIFCC)	:= 0xc0000100
 
 ZRELADDR    := $(zreladdr-y)
 ZTEXTADDR   := $(ztextaddr-y)
