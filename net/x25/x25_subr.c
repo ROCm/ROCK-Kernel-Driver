@@ -21,25 +21,11 @@
  *	jun/24/01	Arnaldo C. Melo	  use skb_queue_purge, cleanups
  */
 
-#include <linux/errno.h>
-#include <linux/types.h>
-#include <linux/socket.h>
-#include <linux/in.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
-#include <linux/timer.h>
 #include <linux/string.h>
-#include <linux/sockios.h>
-#include <linux/net.h>
-#include <linux/inet.h>
-#include <linux/netdevice.h>
 #include <linux/skbuff.h>
 #include <net/sock.h>
 #include <net/tcp.h>
-#include <asm/system.h>
-#include <linux/fcntl.h>
-#include <linux/mm.h>
-#include <linux/interrupt.h>
 #include <net/x25.h>
 
 /*
@@ -367,3 +353,22 @@ void x25_check_rbuf(struct sock *sk)
 		x25_stop_timer(sk);
 	}
 }
+
+/*
+ * Compare 2 calluserdata structures, used to find correct listening sockets
+ * when call user data is used.
+ */
+int x25_check_calluserdata(struct x25_calluserdata *ours, struct x25_calluserdata *theirs)
+{
+	int i;
+	if (ours->cudlength != theirs->cudlength)
+		return 0;
+
+	for (i=0;i<ours->cudlength;i++) {
+		if (ours->cuddata[i] != theirs->cuddata[i]) {
+			return 0;
+		}
+	}
+	return 1;
+}
+

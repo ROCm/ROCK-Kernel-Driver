@@ -55,8 +55,9 @@ static void print_MAC(unsigned char *p)
 }
 
 #define myNIPQUAD(a) a[0], a[1], a[2], a[3]
-static void ebt_log(const struct sk_buff *skb, const struct net_device *in,
-   const struct net_device *out, const void *data, unsigned int datalen)
+static void ebt_log(const struct sk_buff *skb, unsigned int hooknr,
+   const struct net_device *in, const struct net_device *out,
+   const void *data, unsigned int datalen)
 {
 	struct ebt_log_info *info = (struct ebt_log_info *)data;
 	char level_string[4] = "< >";
