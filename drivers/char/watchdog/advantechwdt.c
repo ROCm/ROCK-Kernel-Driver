@@ -44,6 +44,7 @@
 #include <asm/system.h>
 
 #define WATCHDOG_NAME "Advantech WDT"
+#define PFX WATCHDOG_NAME ": "
 #define WATCHDOG_TIMEOUT 60		/* 60 sec default timeout */
 
 static unsigned long advwdt_is_open;
@@ -70,7 +71,7 @@ MODULE_PARM_DESC(wdt_start, "Advantech WDT 'start' io port (default 0x443)");
 
 static int timeout = WATCHDOG_TIMEOUT;	/* in seconds */
 module_param(timeout, int, 0);
-MODULE_PARM_DESC(timeout, "Watchdog timeout in seconds. 1<= timeout <=63, default=60.");
+MODULE_PARM_DESC(timeout, "Watchdog timeout in seconds. 1<= timeout <=63, default=" __MODULE_STRING(WATCHDOG_TIMEOUT) ".");
 
 #ifdef CONFIG_WATCHDOG_NOWAYOUT
 static int nowayout = 1;
@@ -206,7 +207,7 @@ advwdt_close(struct inode *inode, struct file *file)
 	if (adv_expect_close == 42) {
 		advwdt_disable();
 	} else {
-		printk(KERN_CRIT WATCHDOG_NAME ": Unexpected close, not stopping watchdog!\n");
+		printk(KERN_CRIT PFX "Unexpected close, not stopping watchdog!\n");
 		advwdt_ping();
 	}
 	clear_bit(0, &advwdt_is_open);
@@ -268,13 +269,13 @@ advwdt_init(void)
 
 	if (timeout < 1 || timeout > 63) {
 		timeout = WATCHDOG_TIMEOUT;
-		printk (KERN_INFO WATCHDOG_NAME ": timeout value must be 1<=x<=63, using %d\n",
+		printk (KERN_INFO PFX "timeout value must be 1<=x<=63, using %d\n",
 			timeout);
 	}
 
 	if (wdt_stop != wdt_start) {
 		if (!request_region(wdt_stop, 1, WATCHDOG_NAME)) {
-			printk (KERN_ERR WATCHDOG_NAME ": I/O address 0x%04x already in use\n",
+			printk (KERN_ERR PFX "I/O address 0x%04x already in use\n",
 				wdt_stop);
 			ret = -EIO;
 			goto out;
@@ -282,7 +283,7 @@ advwdt_init(void)
 	}
 
 	if (!request_region(wdt_start, 1, WATCHDOG_NAME)) {
-		printk (KERN_ERR WATCHDOG_NAME ": I/O address 0x%04x already in use\n",
+		printk (KERN_ERR PFX "I/O address 0x%04x already in use\n",
 			wdt_start);
 		ret = -EIO;
 		goto unreg_stop;
@@ -290,19 +291,19 @@ advwdt_init(void)
 
 	ret = register_reboot_notifier(&advwdt_notifier);
 	if (ret != 0) {
-		printk (KERN_ERR WATCHDOG_NAME ": cannot register reboot notifier (err=%d)\n",
+		printk (KERN_ERR PFX "cannot register reboot notifier (err=%d)\n",
 			ret);
 		goto unreg_regions;
 	}
 
 	ret = misc_register(&advwdt_miscdev);
 	if (ret != 0) {
-		printk (KERN_ERR WATCHDOG_NAME ": cannot register miscdev on minor=%d (err=%d)\n",
+		printk (KERN_ERR PFX "cannot register miscdev on minor=%d (err=%d)\n",
 			WATCHDOG_MINOR, ret);
 		goto unreg_reboot;
 	}
 
-	printk (KERN_INFO WATCHDOG_NAME ": initialized. timeout=%d sec (nowayout=%d)\n",
+	printk (KERN_INFO PFX "initialized. timeout=%d sec (nowayout=%d)\n",
 		timeout, nowayout);
 
 out:

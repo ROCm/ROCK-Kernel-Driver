@@ -658,7 +658,7 @@ static int __devinit st5481_setup_d_out(struct st5481_adapter *adapter)
 
 	DBG(2,"");
 
-	altsetting = &(dev->config->interface[0].altsetting[3]);
+	altsetting = &(dev->config->interface[0]->altsetting[3]);
 
 	// Allocate URBs and buffers for the D channel out
 	endpoint = &altsetting->endpoint[EP_D_OUT-1];
