@@ -1,7 +1,7 @@
 #
 # Makefile for the Linux aic7xxx SCSI driver.
 #
-# $Id: //depot/linux-aic79xx-2.5.0/drivers/scsi/aic7xxx/Makefile#3 $
+# $Id: //depot/linux-aic79xx-2.5.0/drivers/scsi/aic7xxx/Makefile#5 $
 #
 
 # Let kbuild descend into aicasm when cleaning
@@ -44,40 +44,39 @@ clean-files += aic79xx_seq.h aic79xx_reg.h aic79xx_reg_print.c
 
 $(obj)/aic7xxx_core.o: $(obj)/aic7xxx_seq.h
 $(obj)/aic79xx_core.o: $(obj)/aic79xx_seq.h
+$(obj)/aic79xx_reg_print.c: $(src)/aic79xx_reg_print.c_shipped
+$(obj)/aic7xxx_reg_print.c: $(src)/aic7xxx_reg_print.c_shipped
 
 $(addprefix $(obj)/,$(aic7xxx-y)): $(obj)/aic7xxx_reg.h
 $(addprefix $(obj)/,$(aic79xx-y)): $(obj)/aic79xx_reg.h
 
+aic7xxx-gen-$(CONFIG_AIC7XXX_BUILD_FIRMWARE)	:= $(obj)/aic7xxx_seq.h \
+						   $(obj)/aic7xxx_reg.h
+aic7xxx-gen-$(CONFIG_AIC7XXX_REG_PRETTY_PRINT)	+= $(obj)/aic7xxx_reg_print.c
+
+aicasm-7xxx-opts-$(CONFIG_AIC7XXX_REG_PRETTY_PRINT) := \
+	-p $(obj)/aic7xxx_reg_print.c -i aic7xxx_osm.h
+
 ifeq ($(CONFIG_AIC7XXX_BUILD_FIRMWARE),y)
-aic7xxx_gen = $(obj)/aic7xxx_seq.h $(obj)/aic7xxx_reg.h
-ifeq ($(CONFIG_AIC7XXX_REG_PRETTY_PRINT),y)
-aic7xxx_gen += $(obj)/aic7xxx_reg_print.c
-aic7xxx_asm_cmd = $(obj)/aicasm/aicasm -I$(src) -r $(obj)/aic7xxx_reg.h \
-		 -p $(obj)/aic7xxx_reg_print.c -i aic7xxx_osm.h	   \
-		 -o $(obj)/aic7xxx_seq.h $(src)/aic7xxx.seq
-else
-aic7xxx_asm_cmd = $(obj)/aicasm/aicasm -I$(src) -r $(obj)/aic7xxx_reg.h \
-		 -o $(obj)/aic7xxx_seq.h $(src)/aic7xxx.seq
+$(aic7xxx-gen-y): $(src)/aic7xxx.seq $(src)/aic7xxx.reg $(obj)/aicasm/aicasm
+	$(obj)/aicasm/aicasm -I$(src) -r $(obj)/aic7xxx_reg.h \
+			      $(aicasm-7xxx-opts-y) -o $(obj)/aic7xxx_seq.h \
+			      $(src)/aic7xxx.seq
 endif
 
-$(aic7xxx_gen): $(src)/aic7xxx.seq $(src)/aic7xxx.reg $(obj)/aicasm/aicasm
-	$(aic7xxx_asm_cmd)
-endif
+aic79xx-gen-$(CONFIG_AIC79XX_BUILD_FIRMWARE)	:= $(obj)/aic79xx_seq.h \
+						   $(obj)/aic79xx_reg.h
+aic79xx-gen-$(CONFIG_AIC79XX_REG_PRETTY_PRINT)	+= $(obj)/aic79xx_reg_print.c
+
+aicasm-79xx-opts-$(CONFIG_AIC79XX_REG_PRETTY_PRINT) := \
+	-p $(obj)/aic79xx_reg_print.c -i aic79xx_osm.h
 
 ifeq ($(CONFIG_AIC79XX_BUILD_FIRMWARE),y)
-aic79xx_gen = $(obj)/aic79xx_seq.h $(obj)/aic79xx_reg.h
-ifeq ($(CONFIG_AIC79XX_REG_PRETTY_PRINT),y)
-aic79xx_gen += $(obj)/aic79xx_reg_print.c
-aic79xx_asm_cmd = $(obj)/aicasm/aicasm -I$(src) -r $(obj)/aic79xx_reg.h \
-		 -p $(obj)/aic79xx_reg_print.c -i aic79xx_osm.h	   \
-		 -o $(obj)/aic79xx_seq.h $(src)/aic79xx.seq
-else
-aic79xx_asm_cmd = $(obj)/aicasm/aicasm -I$(src) -r $(obj)/aic79xx_reg.h \
-		 -o $(obj)/aic79xx_seq.h $(src)/aic79xx.seq
+$(aic79xx-gen-y): $(src)/aic79xx.seq $(src)/aic79xx.reg $(obj)/aicasm/aicasm
+	$(obj)/aicasm/aicasm -I$(src) -r $(obj)/aic79xx_reg.h \
+			      $(aicasm-79xx-opts-y) -o $(obj)/aic79xx_seq.h \
+			      $(src)/aic79xx.seq
 endif
-$(aic79xx_gen): $(src)/aic79xx.seq $(src)/aic79xx.reg $(obj)/aicasm/aicasm
-	$(aic79xx_asm_cmd)
-endif 
 
 $(obj)/aicasm/aicasm: $(src)/aicasm/*.[chyl]
 	$(MAKE) -C $(src)/aicasm
