@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC7xxx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#206 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#210 $
  *
  * Copyright (c) 1994 John Aycock
  *   The University of Calgary Department of Computer Science.
@@ -1082,7 +1082,8 @@ ahc_linux_slave_destroy(Scsi_Device *device)
 	 && (dev->flags & AHC_DEV_SLAVE_CONFIGURED) != 0) {
 		dev->flags |= AHC_DEV_UNCONFIGURED;
 		if (TAILQ_EMPTY(&dev->busyq)
-		 && dev->active == 0)
+		 && dev->active == 0
+	 	 && (dev->flags & AHC_DEV_TIMER_ACTIVE) == 0)
 			ahc_linux_free_device(ahc, dev);
 	}
 	ahc_midlayer_entrypoint_unlock(ahc, &flags);
@@ -1346,35 +1347,6 @@ ahc_runq_tasklet(unsigned long data)
 #endif
 }
 
-/************************ Shutdown/halt/reboot hook ***************************/
-#include <linux/notifier.h>
-#include <linux/reboot.h>
-
-static struct notifier_block ahc_linux_notifier = {
-	ahc_linux_halt, NULL, 0
-};
-
-static int ahc_linux_halt(struct notifier_block *nb, u_long event, void *buf)
-{
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	struct ahc_softc *ahc;
-
-	/*
-	 * In 2.5.X, this is called prior to the filesystems
-	 * being synced and the SCSI layer being properly
-	 * shutdown.  A different API is required there,
-	 * but the device hooks for this don't quite look
-	 * right.
-	 */
-	if (event == SYS_DOWN || event == SYS_HALT) {
-		TAILQ_FOREACH(ahc, &ahc_tailq, links) {
-			ahc_shutdown(ahc);
-		}
-	}
-#endif
-	return (NOTIFY_OK);
-}
-
 /******************************** Macros **************************************/
 #define BUILD_SCSIID(ahc, cmd)						    \
 	((((cmd)->device->id << TID_SHIFT) & TID)			    \
@@ -1613,7 +1585,7 @@ ahc_linux_setup_tag_info_global(char *p)
 }
 
 static void
-ahc_linux_setup_tag_info(void *arg, int instance, int targ, int32_t value)
+ahc_linux_setup_tag_info(u_long arg, int instance, int targ, int32_t value)
 {
 
 	if ((instance >= 0) && (targ >= 0)
@@ -1626,7 +1598,7 @@ ahc_linux_setup_tag_info(void *arg, int instance, int targ, int32_t value)
 }
 
 static void
-ahc_linux_setup_dv(void *arg, int instance, int targ, int32_t value)
+ahc_linux_setup_dv(u_long arg, int instance, int targ, int32_t value)
 {
 
 	if ((instance >= 0)
@@ -1694,10 +1666,10 @@ aic7xxx_setup(char *s)
 			ahc_linux_setup_tag_info_global(p + n);
 		} else if (strncmp(p, "tag_info", n) == 0) {
 			s = aic_parse_brace_option("tag_info", p + n, end,
-			    2, ahc_linux_setup_tag_info, NULL);
+			    2, ahc_linux_setup_tag_info, 0);
 		} else if (strncmp(p, "dv", n) == 0) {
 			s = aic_parse_brace_option("dv", p + n, end, 1,
-			    ahc_linux_setup_dv, NULL);
+			    ahc_linux_setup_dv, 0);
 		} else if (p[n] == ':') {
 			*(options[i].flag) = simple_strtoul(p + n + 1, NULL, 0);
 		} else if (strncmp(p, "verbose", n) == 0) {
@@ -1953,8 +1925,6 @@ ahc_platform_alloc(struct ahc_softc *ahc, void *platform_arg)
 	if (aic7xxx_pci_parity == 0)
 		ahc->flags |= AHC_DISABLE_PCI_PERR;
 
-	if (TAILQ_EMPTY(&ahc_tailq))
-		register_reboot_notifier(&ahc_linux_notifier);
 	return (0);
 }
 
@@ -1966,6 +1936,7 @@ ahc_platform_free(struct ahc_softc *ahc)
 	int i, j;
 
 	if (ahc->platform_data != NULL) {
+		del_timer_sync(&ahc->platform_data->completeq_timer);
 		ahc_linux_kill_dv_thread(ahc);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 		tasklet_kill(&ahc->platform_data->runq_tasklet);
@@ -1981,17 +1952,22 @@ ahc_platform_free(struct ahc_softc *ahc)
 		for (i = 0; i < AHC_NUM_TARGETS; i++) {
 			targ = ahc->platform_data->targets[i];
 			if (targ != NULL) {
+				/* Keep target around through the loop. */
+				targ->refcount++;
 				for (j = 0; j < AHC_NUM_LUNS; j++) {
-					if (targ->devices[j] != NULL) {
-						dev = targ->devices[j];
-						ahc_linux_free_device(ahc, dev);
-					}
-					if (ahc->platform_data->targets[i] ==
-					    NULL)
-						break;
+
+					if (targ->devices[j] == NULL)
+						continue;
+					dev = targ->devices[j];
+					ahc_linux_free_device(ahc, dev);
 				}
-			}
-		}
+				/*
+				 * Forcibly free the target now that
+				 * all devices are gone.
+				 */
+				ahc_linux_free_target(ahc, targ);
+ 			}
+ 		}
 
 		if (ahc->platform_data->irq != AHC_LINUX_NOIRQ)
 			free_irq(ahc->platform_data->irq, ahc);
@@ -2575,10 +2551,14 @@ out:
 	}
 
 	ahc_lock(ahc, &s);
-	if (targ->dv_buffer != NULL)
+	if (targ->dv_buffer != NULL) {
 		free(targ->dv_buffer, M_DEVBUF);
-	if (targ->dv_buffer1 != NULL)
+		targ->dv_buffer = NULL;
+	}
+	if (targ->dv_buffer1 != NULL) {
 		free(targ->dv_buffer1, M_DEVBUF);
+		targ->dv_buffer1 = NULL;
+	}
 	targ->flags &= ~AHC_DV_REQUIRED;
 	if (targ->refcount == 0)
 		ahc_linux_free_target(ahc, targ);
@@ -3998,7 +3978,7 @@ ahc_linux_free_device(struct ahc_softc *ahc, struct ahc_linux_device *dev)
 {
 	struct ahc_linux_target *targ;
 
-	del_timer(&dev->timer);
+	del_timer_sync(&dev->timer);
 	targ = dev->target;
 	targ->devices[dev->lun] = NULL;
 	free(dev, M_DEVBUF);
@@ -4227,7 +4207,8 @@ ahc_done(struct ahc_softc *ahc, struct scb *scb)
 
 	if (TAILQ_EMPTY(&dev->busyq)) {
 		if ((dev->flags & AHC_DEV_UNCONFIGURED) != 0
-		 && dev->active == 0)
+		 && dev->active == 0
+	 	 && (dev->flags & AHC_DEV_TIMER_ACTIVE) == 0)
 			ahc_linux_free_device(ahc, dev);
 	} else if ((dev->flags & AHC_DEV_ON_RUN_LIST) == 0) {
 		TAILQ_INSERT_TAIL(&ahc->platform_data->device_runq, dev, links);
@@ -4707,6 +4688,9 @@ ahc_linux_dev_timed_unfreeze(u_long arg)
 	if (dev->qfrozen == 0
 	 && (dev->flags & AHC_DEV_ON_RUN_LIST) == 0)
 		ahc_linux_run_device_queue(ahc, dev);
+	if (TAILQ_EMPTY(&dev->busyq)
+	 && dev->active == 0)
+		ahc_linux_free_device(ahc, dev);
 	ahc_unlock(ahc, &s);
 }
 
@@ -5024,7 +5008,7 @@ done:
 		printf("Recovery code sleeping\n");
 		down(&ahc->platform_data->eh_sem);
 		printf("Recovery code awake\n");
-        	ret = del_timer(&timer);
+        	ret = del_timer_sync(&timer);
 		if (ret == 0) {
 			printf("Timer Expired\n");
 			retval = FAILED;
@@ -5138,8 +5122,6 @@ ahc_linux_exit(void)
 	 */
 	ahc_linux_pci_exit();
 #endif
-
-	unregister_reboot_notifier(&ahc_linux_notifier);
 }
 
 module_init(ahc_linux_init);
