@@ -1270,6 +1270,7 @@ static int aic7xxx_verbose = VERBOSE_NORMAL | VERBOSE_NEGOTIATION |
  *
  ***************************************************************************/
 
+static int aic7xxx_release(struct Scsi_Host *host);
 static void aic7xxx_set_syncrate(struct aic7xxx_host *p, 
 		struct aic7xxx_syncrate *syncrate, int target, int channel,
 		unsigned int period, unsigned int offset, unsigned char options,
@@ -8361,7 +8362,7 @@ aic7xxx_register(Scsi_Host_Template *template, struct aic7xxx_host *p,
  *   Perform a chip reset on the aic7xxx SCSI controller.  The controller
  *   is paused upon return.
  *-F*************************************************************************/
-int
+static int
 aic7xxx_chip_reset(struct aic7xxx_host *p)
 {
   unsigned char sblkctl;
@@ -8996,7 +8997,7 @@ aic7xxx_configure_bugs(struct aic7xxx_host *p)
  *       one do-it-all function.  This may be useful when (and if) the
  *       mid-level SCSI code is overhauled.
  *-F*************************************************************************/
-int
+static int
 aic7xxx_detect(Scsi_Host_Template *template)
 {
   struct aic7xxx_host *temp_p = NULL;
@@ -10293,7 +10294,7 @@ aic7xxx_buildscb(struct aic7xxx_host *p, Scsi_Cmnd *cmd,
  * Description:
  *   Queue a SCB to the controller.
  *-F*************************************************************************/
-int
+static int
 aic7xxx_queue(Scsi_Cmnd *cmd, void (*fn)(Scsi_Cmnd *))
 {
   struct aic7xxx_host *p;
@@ -10364,7 +10365,7 @@ aic7xxx_queue(Scsi_Cmnd *cmd, void (*fn)(Scsi_Cmnd *))
  *   aborted, then we will reset the channel and have all devices renegotiate.
  *   Returns an enumerated type that indicates the status of the operation.
  *-F*************************************************************************/
-int
+static int
 aic7xxx_bus_device_reset(Scsi_Cmnd *cmd)
 {
   struct aic7xxx_host  *p;
@@ -10566,7 +10567,7 @@ aic7xxx_bus_device_reset(Scsi_Cmnd *cmd)
  * Description:
  *   Abort the current SCSI command(s).
  *-F*************************************************************************/
-void
+static void
 aic7xxx_panic_abort(struct aic7xxx_host *p, Scsi_Cmnd *cmd)
 {
 
@@ -10592,7 +10593,7 @@ aic7xxx_panic_abort(struct aic7xxx_host *p, Scsi_Cmnd *cmd)
  * Description:
  *   Abort the current SCSI command(s).
  *-F*************************************************************************/
-int
+static int
 aic7xxx_abort(Scsi_Cmnd *cmd)
 {
   struct aic7xxx_scb  *scb = NULL;
@@ -10820,7 +10821,7 @@ success:
  *   DEVICE RESET message - on the offending target before pulling
  *   the SCSI bus reset line.
  *-F*************************************************************************/
-int
+static int
 aic7xxx_reset(Scsi_Cmnd *cmd)
 {
   struct aic7xxx_scb *scb;
@@ -10905,7 +10906,7 @@ aic7xxx_reset(Scsi_Cmnd *cmd)
  *   This function is broken for today's really large drives and needs
  *   fixed.
  *-F*************************************************************************/
-int
+static int
 aic7xxx_biosparam(struct scsi_device *sdev, struct block_device *bdev,
 		sector_t capacity, int geom[])
 {
@@ -10955,7 +10956,7 @@ aic7xxx_biosparam(struct scsi_device *sdev, struct block_device *bdev,
  *   Free the passed in Scsi_Host memory structures prior to unloading the
  *   module.
  *-F*************************************************************************/
-int
+static int
 aic7xxx_release(struct Scsi_Host *host)
 {
   struct aic7xxx_host *p = (struct aic7xxx_host *) host->hostdata;
@@ -11141,8 +11142,25 @@ aic7xxx_print_scratch_ram(struct aic7xxx_host *p)
 MODULE_LICENSE("Dual BSD/GPL");
 
 
-/* Eventually this will go into an include file, but this will be later */
-static Scsi_Host_Template driver_template = AIC7XXX;
+static Scsi_Host_Template driver_template = {
+	.proc_info		= aic7xxx_proc_info,
+	.detect			= aic7xxx_detect,
+	.release		= aic7xxx_release,
+	.info			= aic7xxx_info,	
+	.queuecommand		= aic7xxx_queue,
+	.slave_alloc		= aic7xxx_slave_alloc,
+	.slave_configure	= aic7xxx_slave_configure,
+	.slave_destroy		= aic7xxx_slave_destroy,
+	.bios_param		= aic7xxx_biosparam,
+	.eh_abort_handler	= aic7xxx_abort,
+	.eh_device_reset_handler	= aic7xxx_bus_device_reset,
+	.eh_host_reset_handler	= aic7xxx_reset,
+	.can_queue		= 255,
+	.this_id		= -1,
+	.max_sectors		= 2048,
+	.cmd_per_lun		= 3,
+	.use_clustering		= ENABLE_CLUSTERING,
+};
 
 #include "scsi_module.c"
 
