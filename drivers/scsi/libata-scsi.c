@@ -97,7 +97,7 @@ int ata_scsi_ioctl(struct scsi_device *scsidev, int cmd, void __user *arg)
 		return 0;
 
 	default:
-		rc = -EOPNOTSUPP;
+		rc = -ENOTTY;
 		break;
 	}
 
