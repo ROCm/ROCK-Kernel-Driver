@@ -11,6 +11,7 @@
  */
 
 #include <stdio.h>
+#include <string.h>
 
 #define PL(x) printf("%c%c%c%c", ((x)>>24)&0xff, ((x)>>16)&0xff, ((x)>>8)&0xff, (x)&0xff );
 
