@@ -176,7 +176,6 @@ static inline struct nfs_inode *NFS_I(struct inode *inode)
 #define NFS_SERVER(inode)		(NFS_SB(inode->i_sb))
 #define NFS_CLIENT(inode)		(NFS_SERVER(inode)->client)
 #define NFS_PROTO(inode)		(NFS_SERVER(inode)->rpc_ops)
-#define NFS_REQUESTLIST(inode)		(NFS_SERVER(inode)->rw_requests)
 #define NFS_ADDR(inode)			(RPC_PEERADDR(NFS_CLIENT(inode)))
 #define NFS_COOKIEVERF(inode)		(NFS_I(inode)->cookieverf)
 #define NFS_READTIME(inode)		(NFS_I(inode)->read_cache_jiffies)
@@ -312,13 +311,9 @@ extern void nfs_commit_done(struct rpc_task *);
 extern int  nfs_sync_file(struct inode *, struct file *, unsigned long, unsigned int, int);
 extern int  nfs_flush_file(struct inode *, struct file *, unsigned long, unsigned int, int);
 extern int  nfs_flush_list(struct list_head *, int, int);
-extern int  nfs_scan_lru_dirty(struct nfs_server *, struct list_head *);
-extern int  nfs_scan_lru_dirty_timeout(struct nfs_server *, struct list_head *);
 #if defined(CONFIG_NFS_V3) || defined(CONFIG_NFS_V4)
 extern int  nfs_commit_file(struct inode *, struct file *, unsigned long, unsigned int, int);
 extern int  nfs_commit_list(struct list_head *, int);
-extern int  nfs_scan_lru_commit(struct nfs_server *, struct list_head *);
-extern int  nfs_scan_lru_commit_timeout(struct nfs_server *, struct list_head *);
 #else
 static inline int
 nfs_commit_file(struct inode *inode, struct file *file, unsigned long offset,

@@ -23,15 +23,13 @@
 #define PG_BUSY			0
 
 struct nfs_page {
-	struct list_head	wb_lru,		/* superblock lru list */
-				wb_list,	/* Defines state of page: */
+	struct list_head	wb_list,	/* Defines state of page: */
 				*wb_list_head;	/*      read/write/commit */
 	struct file		*wb_file;
 	struct inode		*wb_inode;
 	struct rpc_cred		*wb_cred;
 	struct page		*wb_page;	/* page to read in/write out */
 	wait_queue_head_t	wb_wait;	/* wait queue */
-	unsigned long		wb_timeout;	/* when to read/write/commit */
 	unsigned long		wb_index;	/* Offset within mapping */
 	unsigned int		wb_offset,	/* Offset within page */
 				wb_bytes,	/* Length of request */
@@ -52,8 +50,6 @@ extern	void nfs_release_list(struct list_head *list);
 
 extern	void nfs_list_add_request(struct nfs_page *, struct list_head *);
 
-extern	int nfs_scan_lru(struct list_head *, struct list_head *, int);
-extern	int nfs_scan_lru_timeout(struct list_head *, struct list_head *, int);
 extern	int nfs_scan_list(struct list_head *, struct list_head *,
 			  struct file *, unsigned long, unsigned int);
 extern	int nfs_coalesce_requests(struct list_head *, struct list_head *,
@@ -122,26 +118,6 @@ static inline struct nfs_page *
 nfs_list_entry(struct list_head *head)
 {
 	return list_entry(head, struct nfs_page, wb_list);
-}
-
-static inline void
-__nfs_add_lru(struct list_head *head, struct nfs_page *req)
-{
-	list_add_tail(&req->wb_lru, head);
-}
-
-static inline void
-__nfs_del_lru(struct nfs_page *req)
-{
-	if (list_empty(&req->wb_lru))
-		return;
-	list_del_init(&req->wb_lru);
-}
-
-static inline struct nfs_page *
-nfs_lru_entry(struct list_head *head)
-{
-        return list_entry(head, struct nfs_page, wb_lru);
 }
 
 #endif /* _LINUX_NFS_PAGE_H */

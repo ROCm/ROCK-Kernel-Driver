@@ -29,7 +29,6 @@
 #include <linux/nfs_fs.h>
 #include <linux/nfs_mount.h>
 #include <linux/nfs4_mount.h>
-#include <linux/nfs_flushd.h>
 #include <linux/lockd/bind.h>
 #include <linux/smp_lock.h>
 #include <linux/seq_file.h>
@@ -146,17 +145,8 @@ nfs_put_super(struct super_block *sb)
 	struct nfs_server *server = NFS_SB(sb);
 	struct rpc_clnt	*rpc;
 
-	/*
-	 * First get rid of the request flushing daemon.
-	 * Relies on rpc_shutdown_client() waiting on all
-	 * client tasks to finish.
-	 */
-	nfs_reqlist_exit(server);
-
 	if ((rpc = server->client) != NULL)
 		rpc_shutdown_client(rpc);
-
-	nfs_reqlist_free(server);
 
 	if (!(server->flags & NFS_MOUNT_NONLM))
 		lockd_down();	/* release rpc.lockd */
@@ -261,10 +251,6 @@ int nfs_sb_init(struct super_block *sb)
 
 	sb->s_magic      = NFS_SUPER_MAGIC;
 	sb->s_op         = &nfs_sops;
-	INIT_LIST_HEAD(&server->lru_read);
-	INIT_LIST_HEAD(&server->lru_dirty);
-	INIT_LIST_HEAD(&server->lru_commit);
-	INIT_LIST_HEAD(&server->lru_busy);
 
 	/* Did getting the root inode fail? */
 	root_inode = nfs_get_root(sb, &server->fh);
@@ -332,22 +318,13 @@ int nfs_sb_init(struct super_block *sb)
 	if (sb->s_maxbytes > MAX_LFS_FILESIZE) 
 		sb->s_maxbytes = MAX_LFS_FILESIZE; 
 
-	/* Fire up the writeback cache */
-	if (nfs_reqlist_alloc(server) < 0) {
-		printk(KERN_NOTICE "NFS: cannot initialize writeback cache.\n");
-		goto failure_kill_reqlist;
-	}
-
 	/* We're airborne Set socket buffersize */
 	rpc_setbufsize(server->client, server->wsize + 100, server->rsize + 100);
 	return 0;
 	/* Yargs. It didn't work out. */
-failure_kill_reqlist:
-	nfs_reqlist_exit(server);
 out_free_all:
 	if (root_inode)
 		iput(root_inode);
-	nfs_reqlist_free(server);
 	return -EINVAL;
 out_no_root:
 	printk("nfs_read_super: get root inode failed\n");
