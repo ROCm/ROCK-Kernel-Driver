@@ -542,16 +542,10 @@ linvfs_setattr(
 #endif
 
 	VOP_SETATTR(vp, &vattr, flags, NULL, error);
-	if (error)
-		return(-error);	/* Positive error up from XFS */
-	if (ia_valid & ATTR_SIZE) {
-		error = vmtruncate(inode, attr->ia_size);
-	}
-
-	if (!error) {
+	if (!error)
 		vn_revalidate(vp);
-	}
-	return error;
+
+	return -error;
 }
 
 STATIC void
