@@ -364,7 +364,7 @@ z2_init( void )
 	    }
     }    
    
-    blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUES, &z2ram_lock);
+    blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST, &z2ram_lock);
     blk_size[ MAJOR_NR ] = z2_sizes;
 
     return 0;
