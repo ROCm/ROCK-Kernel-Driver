@@ -129,7 +129,7 @@ struct sctp_endpoint *sctp_endpoint_init(struct sctp_endpoint *ep,
 	ep->timeouts[SCTP_EVENT_TIMEOUT_T1_INIT] =
 		SCTP_DEFAULT_TIMEOUT_T1_INIT;
 	ep->timeouts[SCTP_EVENT_TIMEOUT_T2_SHUTDOWN] =
-		sp->rtoinfo.srto_initial;
+		sp->rtoinfo.srto_initial * HZ / 1000;
 	ep->timeouts[SCTP_EVENT_TIMEOUT_T3_RTX] = 0;
 
 	/* sctpimpguide-05 Section 2.12.2
@@ -137,7 +137,7 @@ struct sctp_endpoint *sctp_endpoint_init(struct sctp_endpoint *ep,
 	 * recommended value of 5 times 'RTO.Max'.
 	 */
         ep->timeouts[SCTP_EVENT_TIMEOUT_T5_SHUTDOWN_GUARD]
-		= 5 * sp->rtoinfo.srto_max;
+		= 5 * (sp->rtoinfo.srto_max * HZ / 1000);
 
 	ep->timeouts[SCTP_EVENT_TIMEOUT_HEARTBEAT] =
 		SCTP_DEFAULT_TIMEOUT_HEARTBEAT;
@@ -313,13 +313,13 @@ int sctp_endpoint_is_peeled_off(struct sctp_endpoint *ep,
 				const union sctp_addr *paddr)
 {
 	struct list_head *pos;
-	struct sockaddr_storage_list *addr;
+	struct sctp_sockaddr_entry *addr;
 	struct sctp_bind_addr *bp;
 
 	sctp_read_lock(&ep->base.addr_lock);
 	bp = &ep->base.bind_addr;
 	list_for_each(pos, &bp->address_list) {
-		addr = list_entry(pos, struct sockaddr_storage_list, list);
+		addr = list_entry(pos, struct sctp_sockaddr_entry, list);
 		if (sctp_has_association(&addr->a, paddr)) {
 			sctp_read_unlock(&ep->base.addr_lock);
 			return 1;

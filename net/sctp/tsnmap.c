@@ -1,7 +1,7 @@
 /* SCTP kernel reference Implementation
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001 International Business Machines, Corp.
+ * Copyright (c) 2001-2003 International Business Machines, Corp.
  * Copyright (c) 2001 Intel Corp.
  *
  * This file is part of the SCTP kernel reference Implementation
@@ -46,7 +46,6 @@
 #include <net/sctp/sm.h>
 
 static void sctp_tsnmap_update(struct sctp_tsnmap *map);
-static void sctp_tsnmap_update_pending_data(struct sctp_tsnmap *map);
 static void sctp_tsnmap_find_gap_ack(__u8 *map, __u16 off,
 				     __u16 len, __u16 base,
 				     int *started, __u16 *start,
@@ -92,7 +91,6 @@ struct sctp_tsnmap *sctp_tsnmap_init(struct sctp_tsnmap *map, __u16 len,
 	map->cumulative_tsn_ack_point = initial_tsn - 1;
 	map->max_tsn_seen = map->cumulative_tsn_ack_point;
 	map->malloced = 0;
-	map->pending_data = 0;
 	map->num_dup_tsns = 0;
 
 	return map;
@@ -135,14 +133,6 @@ out:
 	return dup;
 }
 
-/* Is there a gap in the TSN map?  */
-int sctp_tsnmap_has_gap(const struct sctp_tsnmap *map)
-{
-	int has_gap;
-
-	has_gap = (map->cumulative_tsn_ack_point != map->max_tsn_seen);
-	return has_gap;
-}
 
 /* Mark this TSN as seen.  */
 void sctp_tsnmap_mark(struct sctp_tsnmap *map, __u32 tsn)
@@ -176,21 +166,6 @@ void sctp_tsnmap_mark(struct sctp_tsnmap *map, __u32 tsn)
 	sctp_tsnmap_update(map);
 }
 
-void sctp_tsnmap_report_dup(struct sctp_tsnmap *map, __u32 tsn)
-{
-}
-
-/* Retrieve the Cumulative TSN Ack Point. */
-__u32 sctp_tsnmap_get_ctsn(const struct sctp_tsnmap *map)
-{
-	return map->cumulative_tsn_ack_point;
-}
-
-/* Retrieve the highest TSN we've seen.  */
-__u32 sctp_tsnmap_get_max_tsn_seen(const struct sctp_tsnmap *map)
-{
-	return map->max_tsn_seen;
-}
 
 /* Dispose of a tsnmap.  */
 void sctp_tsnmap_free(struct sctp_tsnmap *map)
@@ -218,6 +193,10 @@ int sctp_tsnmap_next_gap_ack(const struct sctp_tsnmap *map,
 
 	/* We haven't found a gap yet.  */
 	started = ended = 0;
+
+	/* If there are no more gap acks possible, get out fast.  */
+	if (TSN_lte(map->max_tsn_seen, iter->start))
+		return 0;
 
 	/* Search the first mapping array.  */
 	if (iter->start - map->base_tsn < map->len) {
@@ -304,10 +283,11 @@ static void sctp_tsnmap_update(struct sctp_tsnmap *map)
 	} while (map->tsn_map[ctsn - map->base_tsn]);
 
 	map->cumulative_tsn_ack_point = ctsn - 1; /* Back up one. */
-	sctp_tsnmap_update_pending_data(map);
 }
 
-static void sctp_tsnmap_update_pending_data(struct sctp_tsnmap *map)
+/* How many data chunks  are we missing from our peer?
+ */
+__u16 sctp_tsnmap_pending(struct sctp_tsnmap *map)
 {
 	__u32 cum_tsn = map->cumulative_tsn_ack_point;
 	__u32 max_tsn = map->max_tsn_seen;
@@ -339,7 +319,7 @@ static void sctp_tsnmap_update_pending_data(struct sctp_tsnmap *map)
 	}
 
 out:
-	map->pending_data = pending_data;
+	return pending_data;
 }
 
 /* This is a private helper for finding Gap Ack Blocks.  It searches a
@@ -358,6 +338,8 @@ static void sctp_tsnmap_find_gap_ack(__u8 *map, __u16 off,
 	/* Look through the entire array, but break out
 	 * early if we have found the end of the Gap Ack Block.
 	 */
+
+	/* Also, stop looking past the maximum TSN seen. */
 
 	/* Look for the start. */
 	if (!(*started)) {
@@ -403,4 +385,27 @@ void sctp_tsnmap_renege(struct sctp_tsnmap *map, __u32 tsn)
 		map->tsn_map[gap] = 0;
 	else
 		map->overflow_map[gap - map->len] = 0;
+}
+
+/* How many gap ack blocks do we have recorded? */
+__u16 sctp_tsnmap_num_gabs(struct sctp_tsnmap *map)
+{
+	struct sctp_tsnmap_iter iter;
+	int gabs = 0;
+
+	/* Refresh the gap ack information. */
+	if (sctp_tsnmap_has_gap(map)) {
+		sctp_tsnmap_iter_init(map, &iter);
+		while (sctp_tsnmap_next_gap_ack(map, &iter,
+						&map->gabs[gabs].start,
+						&map->gabs[gabs].end)) {
+
+			map->gabs[gabs].start = htons(map->gabs[gabs].start);
+			map->gabs[gabs].end = htons(map->gabs[gabs].end);
+			gabs++;
+			if (gabs >= SCTP_MAX_GABS)
+				break;
+		}
+	}
+	return gabs;
 }

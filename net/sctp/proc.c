@@ -133,12 +133,12 @@ void sctp_snmp_proc_exit(void)
 static void sctp_seq_dump_local_addrs(struct seq_file *seq, struct sctp_ep_common *epb)
 {
 	struct list_head *pos;
-	struct sockaddr_storage_list *laddr;
+	struct sctp_sockaddr_entry *laddr;
 	union sctp_addr *addr;
 	struct sctp_af *af;
 
 	list_for_each(pos, &epb->bind_addr.address_list) {
-		laddr = list_entry(pos, struct sockaddr_storage_list, list);
+		laddr = list_entry(pos, struct sctp_sockaddr_entry, list);
 		addr = (union sctp_addr *)&laddr->a;
 		af = sctp_get_af_specific(addr->sa.sa_family);
 		af->seq_dump_addr(seq, addr);

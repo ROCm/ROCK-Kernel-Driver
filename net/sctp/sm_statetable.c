@@ -49,7 +49,7 @@
 #include <net/sctp/sctp.h>
 #include <net/sctp/sm.h>
 
-static sctp_sm_table_entry_t bug = {
+static const sctp_sm_table_entry_t bug = {
 	.fn = sctp_sf_bug, 
 	.name = "sctp_sf_bug"
 };
@@ -64,9 +64,9 @@ static sctp_sm_table_entry_t bug = {
 	} \
 	return &_table[event_subtype._type][(int)state];
 
-sctp_sm_table_entry_t *sctp_sm_lookup_event(sctp_event_t event_type,
-					    sctp_state_t state,
-					    sctp_subtype_t event_subtype)
+const sctp_sm_table_entry_t *sctp_sm_lookup_event(sctp_event_t event_type,
+						  sctp_state_t state,
+						  sctp_subtype_t event_subtype)
 {
 	switch (event_type) {
 	case SCTP_EVENT_T_CHUNK:
@@ -418,7 +418,7 @@ sctp_sm_table_entry_t *sctp_sm_lookup_event(sctp_event_t event_type,
  *
  * For base protocol (RFC 2960).
  */
-sctp_sm_table_entry_t chunk_event_table[SCTP_NUM_BASE_CHUNK_TYPES][SCTP_STATE_NUM_STATES] = {
+const sctp_sm_table_entry_t chunk_event_table[SCTP_NUM_BASE_CHUNK_TYPES][SCTP_STATE_NUM_STATES] = {
 	TYPE_SCTP_DATA,
 	TYPE_SCTP_INIT,
 	TYPE_SCTP_INIT_ACK,
@@ -437,7 +437,7 @@ sctp_sm_table_entry_t chunk_event_table[SCTP_NUM_BASE_CHUNK_TYPES][SCTP_STATE_NU
 }; /* state_fn_t chunk_event_table[][] */
 
 
-static sctp_sm_table_entry_t
+static const sctp_sm_table_entry_t
 chunk_event_table_unknown[SCTP_STATE_NUM_STATES] = {
 	/* SCTP_STATE_EMPTY */
 	{.fn = sctp_sf_ootb, .name = "sctp_sf_ootb"},
@@ -586,7 +586,7 @@ chunk_event_table_unknown[SCTP_STATE_NUM_STATES] = {
 /* The primary index for this table is the primitive type.
  * The secondary index for this table is the state.
  */
-sctp_sm_table_entry_t primitive_event_table[SCTP_NUM_PRIMITIVE_TYPES][SCTP_STATE_NUM_STATES] = {
+const sctp_sm_table_entry_t primitive_event_table[SCTP_NUM_PRIMITIVE_TYPES][SCTP_STATE_NUM_STATES] = {
 	TYPE_SCTP_PRIMITIVE_ASSOCIATE,
 	TYPE_SCTP_PRIMITIVE_SHUTDOWN,
 	TYPE_SCTP_PRIMITIVE_ABORT,
@@ -617,7 +617,7 @@ sctp_sm_table_entry_t primitive_event_table[SCTP_NUM_PRIMITIVE_TYPES][SCTP_STATE
 	{.fn = sctp_sf_ignore_other, .name = "sctp_sf_ignore_other"}, \
 }
 
-sctp_sm_table_entry_t other_event_table[SCTP_NUM_OTHER_TYPES][SCTP_STATE_NUM_STATES] = {
+const sctp_sm_table_entry_t other_event_table[SCTP_NUM_OTHER_TYPES][SCTP_STATE_NUM_STATES] = {
 	TYPE_SCTP_OTHER_NO_PENDING_TSN,
 };
 
@@ -811,7 +811,7 @@ sctp_sm_table_entry_t other_event_table[SCTP_NUM_OTHER_TYPES][SCTP_STATE_NUM_STA
 	{.fn = sctp_sf_timer_ignore, .name = "sctp_sf_timer_ignore"}, \
 }
 
-sctp_sm_table_entry_t timeout_event_table[SCTP_NUM_TIMEOUT_TYPES][SCTP_STATE_NUM_STATES] = {
+const sctp_sm_table_entry_t timeout_event_table[SCTP_NUM_TIMEOUT_TYPES][SCTP_STATE_NUM_STATES] = {
 	TYPE_SCTP_EVENT_TIMEOUT_NONE,
 	TYPE_SCTP_EVENT_TIMEOUT_T1_COOKIE,
 	TYPE_SCTP_EVENT_TIMEOUT_T1_INIT,
@@ -823,7 +823,8 @@ sctp_sm_table_entry_t timeout_event_table[SCTP_NUM_TIMEOUT_TYPES][SCTP_STATE_NUM
 	TYPE_SCTP_EVENT_TIMEOUT_AUTOCLOSE,
 };
 
-sctp_sm_table_entry_t *sctp_chunk_event_lookup(sctp_cid_t cid, sctp_state_t state)
+const sctp_sm_table_entry_t *sctp_chunk_event_lookup(sctp_cid_t cid, 
+						     sctp_state_t state)
 {
 	if (state > SCTP_STATE_MAX)
 		return &bug;

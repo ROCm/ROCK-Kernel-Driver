@@ -1,5 +1,8 @@
-/* SCTP kernel reference Implementation Copyright (C) 1999-2001
- * Cisco, Motorola, Intel, and International Business Machines Corp.
+/* SCTP kernel reference Implementation
+ * Copyright (c) 1999-2000 Cisco, Inc.
+ * Copyright (c) 1999-2001 Motorola, Inc.
+ * Copyright (c) 2001-2003 International Business Machines, Corp.
+ * Copyright (c) 2001 Intel Corp.
  *
  * This file is part of the SCTP kernel reference Implementation
  *
@@ -97,12 +100,15 @@ struct sctp_tsnmap {
 	/* Data chunks pending receipt. used by SCTP_STATUS sockopt */
 	__u16 pending_data;
 
-	/* We record duplicate TSNs here.  We clear this after
+	/* Record duplicate TSNs here.  We clear this after
 	 * every SACK.  Store up to SCTP_MAX_DUP_TSNS worth of
 	 * information.
 	 */
 	__u32 dup_tsns[SCTP_MAX_DUP_TSNS];
 	__u16 num_dup_tsns;
+
+	/* Record gap ack block information here.  */
+	struct sctp_gap_ack_block gabs[SCTP_MAX_GABS];
 
 	int malloced;
 
@@ -140,12 +146,18 @@ int sctp_tsnmap_check(const struct sctp_tsnmap *, __u32 tsn);
 void sctp_tsnmap_mark(struct sctp_tsnmap *, __u32 tsn);
 
 /* Retrieve the Cumulative TSN ACK Point.  */
-__u32 sctp_tsnmap_get_ctsn(const struct sctp_tsnmap *);
+static inline __u32 sctp_tsnmap_get_ctsn(const struct sctp_tsnmap *map)
+{
+	return map->cumulative_tsn_ack_point;
+}
 
 /* Retrieve the highest TSN we've seen.  */
-__u32 sctp_tsnmap_get_max_tsn_seen(const struct sctp_tsnmap *);
+static inline __u32 sctp_tsnmap_get_max_tsn_seen(const struct sctp_tsnmap *map)
+{
+	return map->max_tsn_seen;
+}
 
-/* How many Duplicate TSNs are stored? */
+/* How many duplicate TSNs are stored? */
 static inline __u16 sctp_tsnmap_num_dups(struct sctp_tsnmap *map)
 {
 	return map->num_dup_tsns;
@@ -156,6 +168,27 @@ static inline __u32 *sctp_tsnmap_get_dups(struct sctp_tsnmap *map)
 {
 	map->num_dup_tsns = 0;
 	return map->dup_tsns;
+}
+
+/* How many gap ack blocks do we have recorded? */
+__u16 sctp_tsnmap_num_gabs(struct sctp_tsnmap *map);
+
+/* Refresh the count on pending data. */
+__u16 sctp_tsnmap_pending(struct sctp_tsnmap *map);
+
+/* Return pointer to gap ack blocks as needed by SACK. */
+static inline struct sctp_gap_ack_block *sctp_tsnmap_get_gabs(struct sctp_tsnmap *map)
+{
+	return map->gabs;
+}
+
+/* Is there a gap in the TSN map?  */
+static inline int sctp_tsnmap_has_gap(const struct sctp_tsnmap *map)
+{
+	int has_gap;
+
+	has_gap = (map->cumulative_tsn_ack_point != map->max_tsn_seen);
+	return has_gap;
 }
 
 /* Mark a duplicate TSN.  Note:  limit the storage of duplicate TSN
