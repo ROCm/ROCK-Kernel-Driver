@@ -1811,7 +1811,7 @@ static int __devinit riva_set_fbinfo(struct rivafb_info *rinfo)
 	info = &rinfo->info;
 
 	strcpy(info->modename, rinfo->drvr_name);
-	info->node = -1;
+	info->node = NODEV;
 	info->flags = FBINFO_FLAG_DEFAULT;
 	info->fbops = &riva_fb_ops;
 
