@@ -141,7 +141,7 @@ static int smp_iSeries_probe(void)
 	for (i=0; i < NR_CPUS; ++i) {
 		lpPaca = paca[i].xLpPacaPtr;
 		if (lpPaca->xDynProcStatus < 2) {
-			paca[i].active = 1;
+			/*paca[i].active = 1;*/
 			++np;
 		}
 	}
@@ -187,7 +187,6 @@ void __init smp_init_iSeries(void)
 	smp_ops->probe        = smp_iSeries_probe;
 	smp_ops->kick_cpu     = smp_iSeries_kick_cpu;
 	smp_ops->setup_cpu    = smp_iSeries_setup_cpu;
-#warning fix for iseries
 	systemcfg->processorCount	= smp_iSeries_numProcs();
 }
 #endif
@@ -689,9 +688,11 @@ int __devinit start_secondary(void *unused)
 
 	get_paca()->yielded = 0;
 
+#ifdef CONFIG_PPC_PSERIES
 	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR) {
 		vpa_init(cpu); 
 	}
+#endif
 
 	local_irq_enable();
 

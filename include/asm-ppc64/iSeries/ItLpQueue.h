@@ -16,6 +16,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
+#ifndef _ITLPQUEUE_H
+#define _ITLPQUEUE_H
 
 //=============================================================================
 //
@@ -24,17 +26,10 @@
 //	events to an LP.  
 //    
 
-#ifndef _PPC_TYPES_H
 #include <asm/types.h>
-#endif
 #include <asm/ptrace.h>
 
-
 struct HvLpEvent;
-
-
-#ifndef _ITLPQUEUE_H
-#define _ITLPQUEUE_H
 
 #define ITMaxLpQueues 8
 
@@ -94,6 +89,4 @@ static __inline__ void process_iSeries_events( void )
 	: : : "r0", "r3" );	
 }
 
-
-//=============================================================================
-#endif // _ITLPQUEUE_H
+#endif /* _ITLPQUEUE_H */

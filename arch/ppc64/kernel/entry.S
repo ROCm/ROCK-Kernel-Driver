@@ -275,21 +275,21 @@ _GLOBAL(_switch)
 	addi	r6,r4,-THREAD	/* Convert THREAD to 'current' */
 	std	r6,PACACURRENT(r13)	/* Set new 'current' */
 
-#ifdef CONFIG_PPC_ISERIES
-#error fixme
-	ld	r7,TI_FLAGS(r4)	/* Get run light flag */
-	mfspr	r9,CTRLF
-	srdi	r7,r7,1		/* Align to run light bit in CTRL reg */
-	insrdi	r9,r7,1,63	/* Insert run light into CTRL */
-	mtspr	CTRLT,r9
-#endif
-
 	ld	r1,KSP(r4)	/* Load new stack pointer */
 	ld	r6,_CCR(r1)
 	mtcrf	0xFF,r6
 	/* r3-r13 are destroyed -- Cort */
 	REST_8GPRS(14, r1)
 	REST_10GPRS(22, r1)
+
+#ifdef CONFIG_PPC_ISERIES
+	clrrdi	r7,r1,THREAD_SHIFT	/* get current_thread_info() */
+	ld	r7,TI_FLAGS(r7)		/* Get run light flag */
+	mfspr	r9,CTRLF
+	srdi	r7,r7,TIF_RUN_LIGHT
+	insrdi	r9,r7,1,63		/* Insert run light into CTRL */
+	mtspr	CTRLT,r9
+#endif
 
 	/* convert old thread to its task_struct for return value */
 	addi	r3,r3,-THREAD
@@ -308,39 +308,16 @@ _GLOBAL(ret_from_fork)
 	b	.ret_from_except
 
 _GLOBAL(ret_from_except)
-#ifdef CONFIG_PPC_ISERIES
-	ld	r5,SOFTE(r1)
-	cmpdi	0,r5,0
-	beq	4f
-irq_recheck:
-	/* Check for pending interrupts (iSeries) */
-	CHECKANYINT(r3,r4)
-	beq+	4f	/* skip do_IRQ if no interrupts */
-
-#warning FIX ISERIES
-	mfspr	r5,SPRG3
-	li	r3,0
-	stb	r3,PACAPROCENABLED(r5)	/* ensure we are disabled */
-	addi	r3,r1,STACK_FRAME_OVERHEAD
-	bl	.do_IRQ
-	b	irq_recheck	/* loop back and handle more */
-4:
-#endif
 	/*
 	 * Disable interrupts so that current_thread_info()->flags
 	 * can't change between when we test it and when we return
 	 * from the interrupt.
 	 */
-recheck:
 	mfmsr	r10		/* Get current interrupt state */
 	li	r4,0
 	ori	r4,r4,MSR_EE
-	andc	r10,r10,r4	/* clear MSR_EE */
-	mtmsrd	r10,1		/* Update machine state */
-
-#ifdef CONFIG_PPC_ISERIES
-#error fix iSeries soft disable
-#endif
+	andc	r9,r10,r4	/* clear MSR_EE */
+	mtmsrd	r9,1		/* Update machine state */
 
 	ld	r3,_MSR(r1)	/* Returning to user mode? */
 	andi.	r3,r3,MSR_PR
@@ -364,6 +341,28 @@ recheck:
 	REST_GPR(13,r1)
 
 restore:
+#ifdef CONFIG_PPC_ISERIES
+	ld	r5,SOFTE(r1)
+	mfspr	r4,SPRG3		/* get paca address */
+	cmpdi	0,r5,0
+	beq	4f
+	/* Check for pending interrupts (iSeries) */
+	/* this is CHECKANYINT except that we already have the paca address */
+	ld	r3,PACALPPACA+LPPACAANYINT(r4)
+	cmpdi	r3,0
+	beq+	4f			/* skip do_IRQ if no interrupts */
+
+	mfspr	r13,SPRG3		/* get paca pointer back */
+	li	r3,0
+	stb	r3,PACAPROCENABLED(r13)	/* ensure we are soft-disabled */
+	mtmsrd	r10			/* hard-enable again */
+	addi	r3,r1,STACK_FRAME_OVERHEAD
+	bl	.do_IRQ
+	b	.ret_from_except		/* loop back and handle more */
+
+4:	stb	r5,PACAPROCENABLED(r4)
+#endif
+
 	ld	r3,_CTR(r1)
 	ld	r0,_LINK(r1)
 	mtctr	r3
@@ -376,12 +375,6 @@ restore:
 	REST_8GPRS(24, r1)
 
 	stdcx.	r0,0,r1		/* to clear the reservation */
-
-#ifdef DO_SOFT_DISABLE
-	/* XXX do this in do_work, r13 isnt valid here */
-	ld	r0,SOFTE(r1)
-	stb	r0,PACAPROCENABLED(r13)
-#endif
 
 	mfmsr	r0
 	li	r2, MSR_RI
@@ -407,21 +400,21 @@ restore:
 /* Note: this must change if we start using the  TIF_NOTIFY_RESUME bit */
 do_work:
 	/* Enable interrupts */
-	ori	r10,r10,MSR_EE
 	mtmsrd	r10,1
 
 	andi.	r0,r3,_TIF_NEED_RESCHED
 	beq	1f
 	bl	.schedule
-	b	recheck
+	b	.ret_from_except
 
 1:	andi.	r0,r3,_TIF_SIGPENDING
-	beq	recheck
+	beq	.ret_from_except
 	li	r3,0
 	addi	r4,r1,STACK_FRAME_OVERHEAD
 	bl	.do_signal
-	b	recheck
+	b	.ret_from_except
 
+#ifdef CONFIG_PPC_PSERIES
 /*
  * On CHRP, the Run-Time Abstraction Services (RTAS) have to be
  * called with the MMU off.
@@ -632,3 +625,4 @@ _GLOBAL(enter_prom)
 
 	mtlr    r0
         blr				/* return to caller */
+#endif	/* defined(CONFIG_PPC_PSERIES) */

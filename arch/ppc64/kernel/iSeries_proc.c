@@ -27,9 +27,8 @@
 #include <asm/iSeries/iSeries_proc.h>
 #endif
 
-
-static struct proc_dir_entry * iSeries_proc_root = NULL;
-static int iSeries_proc_initializationDone = 0;
+static struct proc_dir_entry *iSeries_proc_root;
+static int iSeries_proc_initializationDone;
 static spinlock_t iSeries_proc_lock;
 
 struct iSeries_proc_registration
@@ -96,21 +95,22 @@ void iSeries_proc_create(void)
 {
 	unsigned long flags;
 	struct iSeries_proc_registration *reg = NULL;
-	spin_lock_irqsave(&iSeries_proc_lock, flags);
+
 	printk("iSeries_proc: Creating /proc/iSeries\n");
 
+	spin_lock_irqsave(&iSeries_proc_lock, flags);
 	iSeries_proc_root = proc_mkdir("iSeries", 0);
-	if (!iSeries_proc_root) return;
+	if (!iSeries_proc_root)
+		goto out;
 
 	MYQUEUEDEQ(&iSeries_queued, reg);
-
 	while (reg != NULL) {
 		(*(reg->functionMember))(iSeries_proc_root);
-
 		MYQUEUEDEQ(&iSeries_queued, reg);
 	}
 
 	iSeries_proc_initializationDone = 1;
+out:
 	spin_unlock_irqrestore(&iSeries_proc_lock, flags);
 }
 

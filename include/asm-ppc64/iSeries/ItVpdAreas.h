@@ -16,6 +16,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
+#ifndef _ITVPDAREAS_H
+#define _ITVPDAREAS_H
 
 //=====================================================================================
 //
@@ -23,13 +25,7 @@
 //	the OS from PLIC (most of which start from the SP).
 //
 
-#ifndef _PPC_TYPES_H
-#include        <asm/types.h>
-#endif
-
-
-#ifndef _ITVPDAREAS_H
-#define _ITVPDAREAS_H
+#include <asm/types.h>
 
 // VPD Entry index is carved in stone - cannot be changed (easily).
 #define ItVpdCecVpd				   0
@@ -97,4 +93,4 @@ struct	ItVpdAreas
 	void * xSlicVpdAdrs[ItVpdMaxEntries];// Array of VPD buffers	130-1EF
 };
 
-#endif // _ITVPDAREAS_H
+#endif /* _ITVPDAREAS_H */

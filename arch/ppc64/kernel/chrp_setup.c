@@ -65,8 +65,6 @@
 #include <asm/ppcdebug.h>
 #include <asm/cputable.h>
 
-extern volatile unsigned char *chrp_int_ack_special;
-
 void chrp_progress(char *, unsigned short);
 
 extern void openpic_init_IRQ(void);

@@ -31,6 +31,8 @@
 //	drive the hypervisor from SLIC.
 //
 //============================================================================
+#ifndef _HVCALLPCI_H
+#define _HVCALLPCI_H
 
 //-------------------------------------------------------------------
 // Forward declarations 
@@ -39,24 +41,12 @@
 //-------------------------------------------------------------------
 // Standard Includes
 //-------------------------------------------------------------------
-#ifndef  _HVCALLSC_H
-#include "HvCallSc.h"
-#endif
-
-#ifndef  _HVTYPES_H
+#include <asm/iSeries/HvCallSc.h>
 #include <asm/iSeries/HvTypes.h>
-#endif
-
-//-------------------------------------------------------------------
-// Other Includes
-//-------------------------------------------------------------------
-
 
 //-----------------------------------------------------------------------------
 // Constants
 //-----------------------------------------------------------------------------
-#ifndef _HVCALLPCI_H
-#define _HVCALLPCI_H
 
 struct HvCallPci_DsaAddr { // make sure this struct size is 64-bits total
 	u16		busNumber;
@@ -694,4 +684,4 @@ static inline int HvCallPci_getBusAdapterVpd(u16 busNumParm, u64 destParm, u16 s
 	return xRetSize;
 }
 //============================================================================
-#endif // _HVCALLPCI_H
+#endif /* _HVCALLPCI_H */

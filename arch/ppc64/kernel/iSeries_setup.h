@@ -19,25 +19,24 @@
 #ifndef	__ISERIES_SETUP_H__
 #define	__ISERIES_SETUP_H__
 
-extern void		 iSeries_init_early(void);
-extern void		 iSeries_init(unsigned long r3,
-			            unsigned long ird_start,
-				    unsigned long ird_end,
-				    unsigned long cline_start,
-				    unsigned long cline_end);
-extern void		 iSeries_setup_arch(void);
-extern void		 iSeries_setup_residual(struct seq_file *m);
-extern void		 iSeries_get_cpuinfo(struct seq_file *m);
-extern void		 iSeries_init_IRQ(void);
-extern int		 iSeries_get_irq(struct pt_regs *regs);
-extern void		 iSeries_restart(char *cmd);
-extern void		 iSeries_power_off(void);
-extern void		 iSeries_halt(void);
-extern void		 iSeries_time_init(void);
-extern void      iSeries_get_boot_time(struct rtc_time *tm);
-extern int		 iSeries_set_rtc_time(unsigned long now);
-extern unsigned long	 iSeries_get_rtc_time(void);
-extern void		 iSeries_calibrate_decr(void);
-extern void 	 iSeries_progress( char *, unsigned short );
+extern void iSeries_init_early(void);
+extern void iSeries_init(unsigned long r3, unsigned long ird_start,
+		unsigned long ird_end, unsigned long cline_start,
+		unsigned long cline_end);
+extern void iSeries_setup_arch(void);
+extern void iSeries_setup_residual(struct seq_file *m, int cpu_id);
+extern void iSeries_get_cpuinfo(struct seq_file *m);
+extern void iSeries_init_IRQ(void);
+extern void iSeries_init_irq_desc(irq_desc_t *);
+extern int iSeries_get_irq(struct pt_regs *regs);
+extern void iSeries_restart(char *cmd);
+extern void iSeries_power_off(void);
+extern void iSeries_halt(void);
+extern void iSeries_time_init(void);
+extern void iSeries_get_boot_time(struct rtc_time *tm);
+extern int iSeries_set_rtc_time(struct rtc_time *tm);
+extern void iSeries_get_rtc_time(struct rtc_time *tm);
+extern void iSeries_calibrate_decr(void);
+extern void iSeries_progress( char *, unsigned short );
 
 #endif /* __ISERIES_SETUP_H__ */
