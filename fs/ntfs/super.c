@@ -441,7 +441,7 @@ static struct buffer_head *read_ntfs_boot_sector(struct super_block *sb,
 			ntfs_error(sb, "Primary boot sector is invalid.");
 	} else if (!silent)
 		ntfs_error(sb, read_err_str, "primary");
-	if (NTFS_SB(sb)->on_errors & ~ON_ERRORS_RECOVER) {
+	if (!(NTFS_SB(sb)->on_errors & ON_ERRORS_RECOVER)) {
 		if (bh_primary)
 			brelse(bh_primary);
 		if (!silent)
