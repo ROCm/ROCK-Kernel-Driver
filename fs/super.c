@@ -48,6 +48,7 @@ static struct super_block *alloc_super(void)
 	if (s) {
 		memset(s, 0, sizeof(struct super_block));
 		INIT_LIST_HEAD(&s->s_dirty);
+		INIT_LIST_HEAD(&s->s_io);
 		INIT_LIST_HEAD(&s->s_locked_inodes);
 		INIT_LIST_HEAD(&s->s_files);
 		INIT_LIST_HEAD(&s->s_instances);
@@ -154,6 +155,9 @@ static int grab_super(struct super_block *s)
  *
  *	Associates superblock with fs type and puts it on per-type and global
  *	superblocks' lists.  Should be called with sb_lock held; drops it.
+ *
+ *	NOTE: the super_blocks ordering here is important: writeback wants
+ *	the blockdev superblock to be at super_blocks.next.
  */
 static void insert_super(struct super_block *s, struct file_system_type *type)
 {

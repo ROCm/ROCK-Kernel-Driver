@@ -29,6 +29,7 @@ enum bh_state_bits {
 struct page;
 struct kiobuf;
 struct buffer_head;
+struct address_space;
 typedef void (bh_end_io_t)(struct buffer_head *bh, int uptodate);
 
 /*
@@ -145,14 +146,19 @@ int try_to_free_buffers(struct page *);
 void create_empty_buffers(struct page *, unsigned long,
 			unsigned long b_state);
 void end_buffer_io_sync(struct buffer_head *bh, int uptodate);
+
+/* Things to do with buffers at mapping->private_list */
 void buffer_insert_list(spinlock_t *lock,
 			struct buffer_head *, struct list_head *);
-int sync_mapping_buffers(struct address_space *mapping);
 void mark_buffer_dirty_inode(struct buffer_head *bh, struct inode *inode);
+int write_mapping_buffers(struct address_space *mapping);
+int inode_has_buffers(struct inode *);
+void invalidate_inode_buffers(struct inode *);
+int fsync_buffers_list(spinlock_t *lock, struct list_head *);
+int sync_mapping_buffers(struct address_space *mapping);
 
 void mark_buffer_async_read(struct buffer_head *bh);
 void mark_buffer_async_write(struct buffer_head *bh);
-void invalidate_inode_buffers(struct inode *);
 void invalidate_bdev(struct block_device *, int);
 void __invalidate_buffers(kdev_t dev, int);
 int sync_blockdev(struct block_device *bdev);
@@ -163,8 +169,6 @@ int fsync_dev(kdev_t);
 int fsync_bdev(struct block_device *);
 int fsync_super(struct super_block *);
 int fsync_no_super(struct block_device *);
-int fsync_buffers_list(spinlock_t *lock, struct list_head *);
-int inode_has_buffers(struct inode *);
 struct buffer_head *__get_hash_table(struct block_device *, sector_t, int);
 struct buffer_head * __getblk(struct block_device *, sector_t, int);
 void __brelse(struct buffer_head *);

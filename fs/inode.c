@@ -311,6 +311,7 @@ int invalidate_inodes(struct super_block * sb)
 	busy = invalidate_list(&inode_in_use, sb, &throw_away);
 	busy |= invalidate_list(&inode_unused, sb, &throw_away);
 	busy |= invalidate_list(&sb->s_dirty, sb, &throw_away);
+	busy |= invalidate_list(&sb->s_io, sb, &throw_away);
 	busy |= invalidate_list(&sb->s_locked_inodes, sb, &throw_away);
 	spin_unlock(&inode_lock);
 
@@ -892,6 +893,11 @@ void remove_dquot_ref(struct super_block *sb, short type)
 			remove_inode_dquot_ref(inode, type, &tofree_head);
 	}
 	list_for_each(act_head, &sb->s_dirty) {
+		inode = list_entry(act_head, struct inode, i_list);
+		if (IS_QUOTAINIT(inode))
+			remove_inode_dquot_ref(inode, type, &tofree_head);
+	}
+	list_for_each(act_head, &sb->s_io) {
 		inode = list_entry(act_head, struct inode, i_list);
 		if (IS_QUOTAINIT(inode))
 			remove_inode_dquot_ref(inode, type, &tofree_head);

@@ -210,10 +210,7 @@ int sync_blockdev(struct block_device *bdev)
 	if (bdev) {
 		int err;
 
-		ret = filemap_fdatawait(bdev->bd_inode->i_mapping);
-		err = filemap_fdatawrite(bdev->bd_inode->i_mapping);
-		if (!ret)
-			ret = err;
+		ret = filemap_fdatawrite(bdev->bd_inode->i_mapping);
 		err = filemap_fdatawait(bdev->bd_inode->i_mapping);
 		if (!ret)
 			ret = err;
@@ -229,12 +226,14 @@ EXPORT_SYMBOL(sync_blockdev);
  */
 int fsync_super(struct super_block *sb)
 {
-	sync_inodes_sb(sb);	/* All the inodes */
+	sync_inodes_sb(sb, 0);
 	DQUOT_SYNC(sb);
 	lock_super(sb);
 	if (sb->s_dirt && sb->s_op && sb->s_op->write_super)
 		sb->s_op->write_super(sb);
 	unlock_super(sb);
+	sync_blockdev(sb->s_bdev);
+	sync_inodes_sb(sb, 1);
 
 	return sync_blockdev(sb->s_bdev);
 }
@@ -276,10 +275,10 @@ int fsync_dev(kdev_t dev)
  */
 asmlinkage long sys_sync(void)
 {
-	sync_inodes();	/* All mappings and inodes, including block devices */
+	sync_inodes(0);	/* All mappings and inodes, including block devices */
 	DQUOT_SYNC(NULL);
 	sync_supers();	/* Write the superblocks */
-	sync_inodes();	/* All the mappings and inodes, again. */
+	sync_inodes(1);	/* All the mappings and inodes, again. */
 	return 0;
 }
 
@@ -774,6 +773,80 @@ int sync_mapping_buffers(struct address_space *mapping)
 					&mapping->private_list);
 }
 EXPORT_SYMBOL(sync_mapping_buffers);
+
+/**
+ * write_mapping_buffers - Start writeout of a mapping's "associated" buffers.
+ * @mapping - the mapping which wants those buffers written.
+ *
+ * Starts I/O against dirty buffers which are on @mapping->private_list.
+ * Those buffers must be backed by @mapping->assoc_mapping.
+ *
+ * The private_list buffers generally contain filesystem indirect blocks.
+ * The idea is that the filesystem can start I/O against the indirects at
+ * the same time as running generic_writeback_mapping(), so the indirect's
+ * I/O will be merged with the data.
+ *
+ * We sneakliy write the buffers in probable tail-to-head order.  This is
+ * because generic_writeback_mapping writes in probable head-to-tail
+ * order.  If the file is so huge that the data or the indirects overflow
+ * the request queue we will at least get some merging this way.
+ *
+ * Any clean+unlocked buffers are de-listed.  clean/locked buffers must be
+ * left on the list for an fsync() to wait on.
+ *
+ * Couldn't think of a smart way of avoiding livelock, so chose the dumb
+ * way instead.
+ *
+ * FIXME: duplicates fsync_inode_buffers() functionality a bit.
+ */
+int write_mapping_buffers(struct address_space *mapping)
+{
+	spinlock_t *lock;
+	struct address_space *buffer_mapping;
+	unsigned nr_to_write;	/* livelock avoidance */
+	struct list_head *lh;
+	int ret = 0;
+
+	if (list_empty(&mapping->private_list))
+		goto out;
+
+	buffer_mapping = mapping->assoc_mapping;
+	lock = &buffer_mapping->private_lock;
+	spin_lock(lock);
+	nr_to_write = 0;
+	lh = mapping->private_list.next;
+	while (lh != &mapping->private_list) {
+		lh = lh->next;
+		nr_to_write++;
+	}
+	nr_to_write *= 2;	/* Allow for some late additions */
+
+	while (nr_to_write-- && !list_empty(&mapping->private_list)) {
+		struct buffer_head *bh;
+
+		bh = BH_ENTRY(mapping->private_list.prev);
+		list_del_init(&bh->b_assoc_buffers);
+		if (!buffer_dirty(bh) && !buffer_locked(bh))
+			continue;
+		/* Stick it on the far end of the list. Order is preserved. */
+		list_add(&bh->b_assoc_buffers, &mapping->private_list);
+		if (test_set_buffer_locked(bh))
+			continue;
+		get_bh(bh);
+		spin_unlock(lock);
+		if (test_clear_buffer_dirty(bh)) {
+			bh->b_end_io = end_buffer_io_sync;
+			submit_bh(WRITE, bh);
+		} else {
+			unlock_buffer(bh);
+			put_bh(bh);
+		}
+		spin_lock(lock);
+	}
+	spin_unlock(lock);
+out:
+	return ret;
+}
 
 void mark_buffer_dirty_inode(struct buffer_head *bh, struct inode *inode)
 {

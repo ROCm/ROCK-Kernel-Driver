@@ -618,7 +618,6 @@ struct super_block {
 	kdev_t			s_dev;
 	unsigned long		s_blocksize;
 	unsigned long		s_old_blocksize;
-	unsigned short		s_writeback_gen;/* To avoid writeback livelock */
 	unsigned char		s_blocksize_bits;
 	unsigned char		s_dirt;
 	unsigned long long	s_maxbytes;	/* Max file size */
@@ -632,9 +631,11 @@ struct super_block {
 	struct rw_semaphore	s_umount;
 	struct semaphore	s_lock;
 	int			s_count;
+	int			s_syncing;
 	atomic_t		s_active;
 
 	struct list_head	s_dirty;	/* dirty inodes */
+	struct list_head	s_io;		/* parked for writeback */
 	struct list_head	s_locked_inodes;/* inodes being synced */
 	struct list_head	s_anon;		/* anonymous dentries for (nfs) exporting */
 	struct list_head	s_files;
@@ -1116,7 +1117,6 @@ extern int invalidate_device(kdev_t, int);
 extern void invalidate_inode_pages(struct inode *);
 extern void invalidate_inode_pages2(struct address_space *);
 extern void write_inode_now(struct inode *, int);
-extern void sync_inodes_sb(struct super_block *);
 extern int filemap_fdatawrite(struct address_space *);
 extern int filemap_fdatawait(struct address_space *);
 extern void sync_supers(void);
