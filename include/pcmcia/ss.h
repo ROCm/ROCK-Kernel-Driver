@@ -126,6 +126,7 @@ typedef struct cb_bridge_map {
  * Socket operations.
  */
 struct pccard_operations {
+	struct module *owner;
 	int (*init)(unsigned int sock);
 	int (*suspend)(unsigned int sock);
 	int (*register_callback)(unsigned int sock, void (*handler)(void *, unsigned int), void * info);

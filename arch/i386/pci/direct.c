@@ -196,21 +196,35 @@ static struct pci_ops pci_direct_conf2 = {
 static int __devinit pci_sanity_check(struct pci_ops *o)
 {
 	u32 x = 0;
-	struct pci_bus bus;		/* Fake bus and device */
-	struct pci_dev dev;
+	int retval = 0;
+	struct pci_bus *bus;		/* Fake bus and device */
+	struct pci_dev *dev;
 
 	if (pci_probe & PCI_NO_CHECKS)
 		return 1;
-	bus.number = 0;
-	dev.bus = &bus;
-	for(dev.devfn=0; dev.devfn < 0x100; dev.devfn++)
-		if ((!o->read(&bus, dev.devfn, PCI_CLASS_DEVICE, 2, &x) &&
+
+	bus = kmalloc(sizeof(*bus), GFP_ATOMIC);
+	dev = kmalloc(sizeof(*dev), GFP_ATOMIC);
+	if (!bus || !dev) {
+		printk(KERN_ERR "Out of memory in %s\n", __FUNCTION__);
+		goto exit;
+	}
+
+	bus->number = 0;
+	dev->bus = bus;
+	for(dev->devfn=0; dev->devfn < 0x100; dev->devfn++)
+		if ((!o->read(bus, dev->devfn, PCI_CLASS_DEVICE, 2, &x) &&
 		     (x == PCI_CLASS_BRIDGE_HOST || x == PCI_CLASS_DISPLAY_VGA)) ||
-		    (!o->read(&bus, dev.devfn, PCI_VENDOR_ID, 2, &x) &&
-		     (x == PCI_VENDOR_ID_INTEL || x == PCI_VENDOR_ID_COMPAQ)))
-			return 1;
+		    (!o->read(bus, dev->devfn, PCI_VENDOR_ID, 2, &x) &&
+		     (x == PCI_VENDOR_ID_INTEL || x == PCI_VENDOR_ID_COMPAQ))) {
+			retval = 1;
+			goto exit;
+		}
 	DBG("PCI: Sanity check failed\n");
-	return 0;
+exit:
+	kfree(dev);
+	kfree(bus);
+	return retval;
 }
 
 static int __init pci_direct_init(void)

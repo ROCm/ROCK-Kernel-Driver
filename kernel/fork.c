@@ -76,7 +76,17 @@ void __put_task_struct(struct task_struct *tsk)
 {
 	WARN_ON(!(tsk->state & (TASK_DEAD | TASK_ZOMBIE)));
 	WARN_ON(atomic_read(&tsk->usage));
+	WARN_ON(tsk == current);
 
+	security_task_free(tsk);
+	free_uid(tsk->user);
+
+	/*
+	 * The task cache is effectively disabled right now.
+	 * Do we want it? The slab cache already has per-cpu
+	 * stuff, but the thread info (usually a order-1 page
+	 * allocation) doesn't.
+	 */
 	if (tsk != current) {
 		free_thread_info(tsk->thread_info);
 		kmem_cache_free(task_struct_cachep,tsk);

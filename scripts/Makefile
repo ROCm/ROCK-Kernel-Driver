@@ -14,6 +14,8 @@ build-targets := $(host-progs) empty.o
 
 modpost-objs  := modpost.o file2alias.o
 
+clean-files := elfconfig.h
+
 # Let clean descend into subdirs
 subdir-	:= lxdialog kconfig
 

@@ -1705,6 +1705,7 @@ static inline void ide_release_dma(ide_hwif_t *drive) {;}
 #endif
 
 extern void hwif_unregister(ide_hwif_t *);
+extern void ide_unregister (unsigned int index);
 
 extern void export_ide_init_queue(ide_drive_t *);
 extern u8 export_probe_for_drive(ide_drive_t *);

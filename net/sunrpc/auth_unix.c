@@ -8,6 +8,7 @@
 
 #include <linux/types.h>
 #include <linux/sched.h>
+#include <linux/module.h>
 #include <linux/socket.h>
 #include <linux/in.h>
 #include <linux/sunrpc/clnt.h>
@@ -60,7 +61,6 @@ unx_destroy(struct rpc_auth *auth)
 {
 	dprintk("RPC: destroying UNIX authenticator %p\n", auth);
 	rpcauth_free_credcache(auth);
-	kfree(auth);
 }
 
 static struct rpc_cred *
@@ -219,6 +219,7 @@ unx_validate(struct rpc_task *task, u32 *p)
 }
 
 struct rpc_authops	authunix_ops = {
+	.owner		= THIS_MODULE,
 	.au_flavor	= RPC_AUTH_UNIX,
 #ifdef RPC_DEBUG
 	.au_name	= "UNIX",
