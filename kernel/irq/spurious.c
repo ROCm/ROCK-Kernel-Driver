@@ -85,7 +85,7 @@ void note_interrupt(unsigned int irq, irq_desc_t *desc, irqreturn_t action_ret)
 
 int noirqdebug;
 
-static int __init noirqdebug_setup(char *str)
+int __init noirqdebug_setup(char *str)
 {
 	noirqdebug = 1;
 	printk(KERN_INFO "IRQ lockup detection disabled\n");

@@ -76,6 +76,8 @@ extern int setup_irq(unsigned int irq, struct irqaction * new);
 
 #ifdef CONFIG_GENERIC_HARDIRQS
 extern cpumask_t irq_affinity[NR_IRQS];
+extern int no_irq_affinity;
+extern int noirqdebug_setup(char *str);
 
 extern asmlinkage int handle_IRQ_event(unsigned int irq, struct pt_regs *regs,
 				       struct irqaction *action);

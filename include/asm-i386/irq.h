@@ -34,4 +34,8 @@ extern void release_vm86_irqs(struct task_struct *);
 # define irq_ctx_init(cpu) do { } while (0)
 #endif
 
+#ifdef CONFIG_IRQBALANCE
+extern int irqbalance_disable(char *str);
+#endif
+
 #endif /* _ASM_IRQ_H */
