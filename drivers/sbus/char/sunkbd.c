@@ -115,12 +115,12 @@ static int dead_key_next;
  * return the value. I chose the former way.
  */
 #ifndef CONFIG_PCI
-/*static*/ int shift_state;
+int shift_state;
+struct kbd_struct kbd_table[MAX_NR_CONSOLES];
 #endif
 static int npadch = -1;			/* -1 or number assembled on pad */
 static unsigned char diacr;
 static char rep;			/* flag telling character repeat */
-struct kbd_struct kbd_table[MAX_NR_CONSOLES];
 static struct tty_struct **ttytab;
 static struct kbd_struct * kbd = kbd_table;
 static struct tty_struct * tty;
@@ -789,7 +789,12 @@ static void compose(void)
 	set_leds();
 }
 
+#ifdef CONFIG_PCI
+extern int spawnpid, spawnsig;
+#else
 int spawnpid, spawnsig;
+#endif
+
 
 static void spawn_console(void)
 {

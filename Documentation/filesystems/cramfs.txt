@@ -47,6 +47,21 @@ you can just change the #define in mkcramfs.c, so long as you don't
 mind the filesystem becoming unreadable to future kernels.
 
 
+For /usr/share/magic
+------------------
+
+0	long	0x28cd3d45	Linux cramfs
+>4	long	x		size %d
+>8	long	x		flags 0x%x
+>12	long	x		future 0x%x
+>16	string	>\0		signature "%.16s"
+>32	long	x		fsid.crc 0x%x
+>36	long	x		fsid.edition %d
+>40	long	x		fsid.blocks %d
+>44	long	x		fsid.files %d
+>48	string	>\0		name "%.16s"
+
+
 Hacker Notes
 ------------
 

@@ -70,6 +70,8 @@ struct hpsb_packet {
 
         /* Store jiffies for implementing bus timeouts. */
         unsigned long sendtime;
+
+        quadlet_t embedded_header[5];
 };
 
 
@@ -107,7 +109,7 @@ int hpsb_send_packet(struct hpsb_packet *packet);
 
 /* Initiate bus reset on the given host.  Returns 1 if bus reset already in
  * progress, 0 otherwise. */
-int hpsb_reset_bus(struct hpsb_host *host);
+int hpsb_reset_bus(struct hpsb_host *host, int type);
 
 /*
  * The following functions are exported for host driver module usage.  All of

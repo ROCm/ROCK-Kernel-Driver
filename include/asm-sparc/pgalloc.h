@@ -1,4 +1,4 @@
-/* $Id: pgalloc.h,v 1.12 2001/04/26 02:36:35 davem Exp $ */
+/* $Id: pgalloc.h,v 1.13 2001/07/17 16:17:33 anton Exp $ */
 #ifndef _SPARC_PGALLOC_H
 #define _SPARC_PGALLOC_H
 
@@ -104,39 +104,42 @@ extern struct pgtable_cache_struct {
 BTFIXUPDEF_CALL(int,	 do_check_pgt_cache, int, int)
 #define do_check_pgt_cache(low,high) BTFIXUP_CALL(do_check_pgt_cache)(low,high)
 
-/*
- * Allocate and free page tables. The xxx_kernel() versions are
- * used to allocate a kernel page table - this turns on ASN bits
- * if any, and marks the page tables reserved.
- */
-BTFIXUPDEF_CALL(void,    pte_free_kernel, pte_t *)
-BTFIXUPDEF_CALL(pte_t *, pte_alloc_kernel, pmd_t *, unsigned long)
+BTFIXUPDEF_CALL(pgd_t *, get_pgd_fast, void)
+#define get_pgd_fast()		BTFIXUP_CALL(get_pgd_fast)()
 
-#define pte_free_kernel(pte) BTFIXUP_CALL(pte_free_kernel)(pte)
-#define pte_alloc_kernel(pmd,addr) BTFIXUP_CALL(pte_alloc_kernel)(pmd,addr)
+BTFIXUPDEF_CALL(void, free_pgd_fast, pgd_t *)
+#define free_pgd_fast(pgd)	BTFIXUP_CALL(free_pgd_fast)(pgd)
 
-BTFIXUPDEF_CALL(void,    pmd_free_kernel, pmd_t *)
-BTFIXUPDEF_CALL(pmd_t *, pmd_alloc_kernel, pgd_t *, unsigned long)
+#define pgd_free(pgd)	free_pgd_fast(pgd)
+#define pgd_alloc(mm)	get_pgd_fast()
 
-#define pmd_free_kernel(pmd) BTFIXUP_CALL(pmd_free_kernel)(pmd)
-#define pmd_alloc_kernel(pgd,addr) BTFIXUP_CALL(pmd_alloc_kernel)(pgd,addr)
+#define pgd_populate(MM, PGD, PMD)      pgd_set(PGD, PMD)
 
-BTFIXUPDEF_CALL(void,    pte_free, pte_t *)
-BTFIXUPDEF_CALL(pte_t *, pte_alloc, pmd_t *, unsigned long)
+static __inline__ pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long address)
+{
+	BUG();
+	return 0;
+}
 
-#define pte_free(pte) BTFIXUP_CALL(pte_free)(pte)
-#define pte_alloc(pmd,addr) BTFIXUP_CALL(pte_alloc)(pmd,addr)
+BTFIXUPDEF_CALL(pmd_t *, pmd_alloc_one_fast, struct mm_struct *, unsigned long)
+#define pmd_alloc_one_fast(mm, address)	BTFIXUP_CALL(pmd_alloc_one_fast)(mm, address)
 
-BTFIXUPDEF_CALL(void,    pmd_free, pmd_t *)
-BTFIXUPDEF_CALL(pmd_t *, pmd_alloc, pgd_t *, unsigned long)
+BTFIXUPDEF_CALL(void, free_pmd_fast, pmd_t *)
+#define free_pmd_fast(pmd)	BTFIXUP_CALL(free_pmd_fast)(pmd)
 
-#define pmd_free(pmd) BTFIXUP_CALL(pmd_free)(pmd)
-#define pmd_alloc(pgd,addr) BTFIXUP_CALL(pmd_alloc)(pgd,addr)
+#define pmd_free(pmd)           free_pmd_fast(pmd)
 
-BTFIXUPDEF_CALL(void,    pgd_free, pgd_t *)
-BTFIXUPDEF_CALL(pgd_t *, pgd_alloc, void)
+#define pmd_populate(MM, PMD, PTE)      pmd_set(PMD, PTE)
 
-#define pgd_free(pgd) BTFIXUP_CALL(pgd_free)(pgd)
-#define pgd_alloc(mm) BTFIXUP_CALL(pgd_alloc)()
+BTFIXUPDEF_CALL(pte_t *, pte_alloc_one, struct mm_struct *, unsigned long)
+#define pte_alloc_one(mm, address)	BTFIXUP_CALL(pte_alloc_one)(mm, address)
 
-#endif /* _SPARC64_PGALLOC_H */
+BTFIXUPDEF_CALL(pte_t *, pte_alloc_one_fast, struct mm_struct *, unsigned long)
+#define pte_alloc_one_fast(mm, address)	BTFIXUP_CALL(pte_alloc_one_fast)(mm, address)
+
+BTFIXUPDEF_CALL(void, free_pte_fast, pte_t *)
+#define free_pte_fast(pte)	BTFIXUP_CALL(free_pte_fast)(pte)
+
+#define pte_free(pte)		free_pte_fast(pte)
+
+#endif /* _SPARC_PGALLOC_H */

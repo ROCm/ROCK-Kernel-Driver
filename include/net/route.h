@@ -14,6 +14,7 @@
  *		Alan Cox	:	Support for TCP parameters.
  *		Alexey Kuznetsov:	Major changes for new routing code.
  *		Mike McLagan    :	Routing by source
+ *		Robert Olsson   :	Added rt_cache statistics
  *
  *		This program is free software; you can redistribute it and/or
  *		modify it under the terms of the GNU General Public License
@@ -90,6 +91,20 @@ struct ip_rt_acct
 	__u32 	o_packets;
 	__u32 	i_bytes;
 	__u32 	i_packets;
+};
+
+struct rt_cache_stat 
+{
+        unsigned int in_hit;
+        unsigned int in_slow_tot;
+        unsigned int in_slow_mc;
+        unsigned int in_no_route;
+        unsigned int in_brd;
+        unsigned int in_martian_dst;
+        unsigned int in_martian_src;
+        unsigned int out_hit;
+        unsigned int out_slow_tot;
+        unsigned int out_slow_mc;
 };
 
 extern struct ip_rt_acct *ip_rt_acct;

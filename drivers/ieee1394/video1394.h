@@ -1,6 +1,7 @@
 /*
  * video1394.h - driver for OHCI 1394 boards
  * Copyright (C)1999,2000 Sebastien Rougeaux <sebastien.rougeaux@anu.edu.au>
+ *                        Peter Schlaile <udbz@rz.uni-karlsruhe.de>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -41,22 +42,32 @@ enum {
 	VIDEO1394_TALK_WAIT_BUFFER
 };
 
-#define VIDEO1394_SYNC_FRAMES         0x00000001
-#define VIDEO1394_INCLUDE_ISO_HEADERS 0x00000002
+#define VIDEO1394_SYNC_FRAMES          0x00000001
+#define VIDEO1394_INCLUDE_ISO_HEADERS  0x00000002
+#define VIDEO1394_VARIABLE_PACKET_SIZE 0x00000004
 
 struct video1394_mmap {
-	int channel;
-	int sync_tag;
-	int nb_buffers;
-	int buf_size;
-	int packet_size;
-	int fps;
-	int flags;
+	unsigned int channel;
+	unsigned int sync_tag;
+	unsigned int nb_buffers;
+	unsigned int buf_size;
+	unsigned int packet_size; /* For VARIABLE_PACKET_SIZE: 
+				     Maximum packet size */
+	unsigned int fps;
+	unsigned int flags;
+};
+
+/* For TALK_QUEUE_BUFFER with VIDEO1394_VARIABLE_PACKET_SIZE use */
+struct video1394_queue_variable {
+	unsigned int channel;
+	unsigned int buffer;
+	unsigned int* packet_sizes; /* Buffer of size:  
+				       buf_size / packet_size  */
 };
 
 struct video1394_wait {
-	int channel;
-	int buffer;
+	unsigned int channel;
+	unsigned int buffer;
 };
 
 

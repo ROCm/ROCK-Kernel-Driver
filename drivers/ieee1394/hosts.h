@@ -56,6 +56,7 @@ struct hpsb_host {
 /* fields readable and writeable by the hosts */
 
         void *hostdata;
+	struct pci_dev *pdev;
         int embedded_hostdata[0];
 };
 
@@ -94,6 +95,16 @@ enum devctl_cmd {
          * listen on unrequested channels. */
         ISO_LISTEN_CHANNEL,
         ISO_UNLISTEN_CHANNEL
+};
+
+enum reset_types {
+        /* 166 microsecond reset -- only type of reset available on
+           non-1394a capable IEEE 1394 controllers */
+        LONG_RESET,
+
+        /* Short (arbitrated) reset -- only available on 1394a capable
+           IEEE 1394 capable controllers */
+        SHORT_RESET
 };
 
 struct hpsb_host_template {

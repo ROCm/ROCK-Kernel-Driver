@@ -54,6 +54,7 @@
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/smp_lock.h>
+#include <linux/completion.h>
 
 #define __KERNEL_SYSCALLS__
 
@@ -218,8 +219,8 @@ static void scsi_wait_done(Scsi_Cmnd * SCpnt)
 	req = &SCpnt->request;
 	req->rq_status = RQ_SCSI_DONE;	/* Busy, but indicate request done */
 
-	if (req->sem != NULL) {
-		up(req->sem);
+	if (req->waiting != NULL) {
+		complete(req->waiting);
 	}
 }
 
@@ -465,7 +466,7 @@ Scsi_Cmnd *scsi_allocate_device(Scsi_Device * device, int wait,
 	}
 
 	SCpnt->request.rq_status = RQ_SCSI_BUSY;
-	SCpnt->request.sem = NULL;	/* And no one is waiting for this
+	SCpnt->request.waiting = NULL;	/* And no one is waiting for this
 					 * to complete */
 	atomic_inc(&SCpnt->host->host_active);
 	atomic_inc(&SCpnt->device->device_active);
@@ -730,14 +731,14 @@ void scsi_wait_req (Scsi_Request * SRpnt, const void *cmnd ,
  		  void *buffer, unsigned bufflen, 
  		  int timeout, int retries)
 {
-	DECLARE_MUTEX_LOCKED(sem);
+	DECLARE_COMPLETION(wait);
 	
-	SRpnt->sr_request.sem = &sem;
+	SRpnt->sr_request.waiting = &wait;
 	SRpnt->sr_request.rq_status = RQ_SCSI_BUSY;
 	scsi_do_req (SRpnt, (void *) cmnd,
 		buffer, bufflen, scsi_wait_done, timeout, retries);
-	down (&sem);
-	SRpnt->sr_request.sem = NULL;
+	wait_for_completion(&wait);
+	SRpnt->sr_request.waiting = NULL;
 	if( SRpnt->sr_command != NULL )
 	{
 		scsi_release_command(SRpnt->sr_command);

@@ -418,7 +418,7 @@ static int __init root_nfs_ports(void)
 			"as nfsd port\n", port);
 	}
 
-	if ((port = root_nfs_getport(NFS_MNT_PROGRAM, nfsd_ver, proto)) < 0) {
+	if ((port = root_nfs_getport(NFS_MNT_PROGRAM, mountd_ver, proto)) < 0) {
 		printk(KERN_ERR "Root-NFS: Unable to get mountd port "
 				"number from server, using default\n");
 		port = mountd_port;

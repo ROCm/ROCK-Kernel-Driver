@@ -226,6 +226,8 @@ struct mm_struct {
 	unsigned long cpu_vm_mask;
 	unsigned long swap_address;
 
+	unsigned dumpable:1;
+
 	/* Architecture-specific MM context */
 	mm_context_t context;
 };
@@ -324,7 +326,6 @@ struct task_struct {
 	int pdeath_signal;  /*  The signal sent when the parent dies  */
 	/* ??? */
 	unsigned long personality;
-	int dumpable:1;
 	int did_exec:1;
 	pid_t pid;
 	pid_t pgrp;

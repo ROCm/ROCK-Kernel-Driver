@@ -5,7 +5,7 @@
  * PPPoE --- PPP over Ethernet (RFC 2516)
  *
  *
- * Version:    0.6.6
+ * Version:    0.6.8
  *
  * 030700 :     Fixed connect logic to allow for disconnect.
  * 270700 :	Fixed potential SMP problems; we must protect against
@@ -20,10 +20,20 @@
  * 111100 :	Fix recvmsg.
  * 050101 :	Fix PADT procesing.
  * 140501 :	Use pppoe_rcv_core to handle all backlog. (Alexey)
+ * 170701 :	Do not lock_sock with rwlock held. (DaveM)
+ *		Ignore discovery frames if user has socket
+ *		locked. (DaveM)
+ *		Ignore return value of dev_queue_xmit in __pppoe_xmit
+ *		or else we may kfree an SKB twice. (DaveM)
+ * 190701 :	When doing copies of skb's in __pppoe_xmit, always delete
+ *		the original skb that was passed in on success, never on
+ *		failure.  Delete the copy of the skb on failure to avoid
+ *		a memory leak.
  *
- * Author:	Michal Ostrowski <mostrows@styx.uwaterloo.ca>
+ * Author:	Michal Ostrowski <mostrows@speakeasy.net>
  * Contributors:
  * 		Arnaldo Carvalho de Melo <acme@xconectiva.com.br>
+ *		David S. Miller (davem@redhat.com)
  *
  * License:
  *		This program is free software; you can redistribute it and/or
@@ -100,10 +110,11 @@ static inline int cmp_addr(struct pppoe_addr *a, unsigned long sid, char *addr)
 
 static int hash_item(unsigned long sid, unsigned char *addr)
 {
-	char hash=0;
-	int i,j;
-	for (i = 0; i < ETH_ALEN ; ++i){
-		for (j = 0; j < 8/PPPOE_HASH_BITS ; ++j){
+	char hash = 0;
+	int i, j;
+
+	for (i = 0; i < ETH_ALEN ; ++i) {
+		for (j = 0; j < 8/PPPOE_HASH_BITS ; ++j) {
 			hash ^= addr[i] >> ( j * PPPOE_HASH_BITS );
 		}
 	}
@@ -188,7 +199,7 @@ static inline struct pppox_opt *get_item(unsigned long sid,
 
 	read_lock_bh(&pppoe_hash_lock);
 	po = __get_item(sid, addr);
-	if(po)
+	if (po)
 		sock_hold(po->sk);
 	read_unlock_bh(&pppoe_hash_lock);
 
@@ -233,62 +244,83 @@ static inline struct pppox_opt *delete_item(unsigned long sid, char *addr)
  *  Certain device events require that sockets be unconnected.
  *
  **************************************************************************/
+
+static void pppoe_flush_dev(struct net_device *dev)
+{
+	int hash;
+
+	if (dev == NULL)
+		BUG();
+
+	read_lock_bh(&pppoe_hash_lock);
+	for (hash = 0; hash < PPPOE_HASH_SIZE; hash++) {
+		struct pppox_opt *po = item_hash_table[hash];
+
+		while (po != NULL) {
+			if (po->pppoe_dev == dev) {
+				struct sock *sk = po->sk;
+
+				sock_hold(sk);
+				po->pppoe_dev = NULL;
+
+				/* We hold a reference to SK, now drop the
+				 * hash table lock so that we may attempt
+				 * to lock the socket (which can sleep).
+				 */
+				read_unlock_bh(&pppoe_hash_lock);
+
+				lock_sock(sk);
+
+				if (sk->state & (PPPOX_CONNECTED | PPPOX_BOUND)) {
+					pppox_unbind_sock(sk);
+					dev_put(dev);
+					sk->state = PPPOX_DEAD;
+					sk->state_change(sk);
+				}
+
+				release_sock(sk);
+
+				sock_put(sk);
+
+				read_lock_bh(&pppoe_hash_lock);
+
+				/* Now restart from the beginning of this
+				 * hash chain.  We always NULL out pppoe_dev
+				 * so we are guarenteed to make forward
+				 * progress.
+				 */
+				po = item_hash_table[hash];
+				continue;
+			}
+			po = po->next;
+		}
+	}
+	read_unlock_bh(&pppoe_hash_lock);
+}
+
 static int pppoe_device_event(struct notifier_block *this,
 			      unsigned long event, void *ptr)
 {
-	int error = NOTIFY_DONE;
 	struct net_device *dev = (struct net_device *) ptr;
-	struct pppox_opt *po = NULL;
-	int hash = 0;
 
 	/* Only look at sockets that are using this specific device. */
 	switch (event) {
 	case NETDEV_CHANGEMTU:
-	    /* A change in mtu is a bad thing, requiring
-	     * LCP re-negotiation.
-	     */
+		/* A change in mtu is a bad thing, requiring
+		 * LCP re-negotiation.
+		 */
+
 	case NETDEV_GOING_DOWN:
 	case NETDEV_DOWN:
-
 		/* Find every socket on this device and kill it. */
-		read_lock_bh(&pppoe_hash_lock);
-
-		while (!po && hash < PPPOE_HASH_SIZE){
-			po = item_hash_table[hash];
-			++hash;
-		}
-
-		while (po && hash < PPPOE_HASH_SIZE){
-			if(po->pppoe_dev == dev){
-				lock_sock(po->sk);
-				if (po->sk->state & (PPPOX_CONNECTED|PPPOX_BOUND)){
-					pppox_unbind_sock(po->sk);
-
-					dev_put(po->pppoe_dev);
-					po->pppoe_dev = NULL;
-
-					po->sk->state = PPPOX_DEAD;
-					po->sk->state_change(po->sk);
-				}
- 				release_sock(po->sk);
-			}
-			if (po->next) {
-				po = po->next;
-			} else {
-				po = NULL;
-				while (!po && hash < PPPOE_HASH_SIZE){
-					po = item_hash_table[hash];
-					++hash;
-				}
-			}
-		}
-		read_unlock_bh(&pppoe_hash_lock);
+		pppoe_flush_dev(dev);
 		break;
+
 	default:
 		break;
 	};
 
-	return error;
+	return NOTIFY_DONE;
 }
 
 
@@ -304,40 +336,39 @@ static struct notifier_block pppoe_notifier = {
  * Do the real work of receiving a PPPoE Session frame.
  *
  ***********************************************************************/
-int pppoe_rcv_core(struct sock *sk, struct sk_buff *skb){
-	struct pppox_opt  *po=sk->protinfo.pppox;
+int pppoe_rcv_core(struct sock *sk, struct sk_buff *skb)
+{
+	struct pppox_opt *po = sk->protinfo.pppox;
 	struct pppox_opt *relay_po = NULL;
 
 	if (sk->state & PPPOX_BOUND) {
 		skb_pull(skb, sizeof(struct pppoe_hdr));
-
 		ppp_input(&po->chan, skb);
-	} else if( sk->state & PPPOX_RELAY ){
+	} else if (sk->state & PPPOX_RELAY) {
+		relay_po = get_item_by_addr(&po->pppoe_relay);
 
-		relay_po = get_item_by_addr( &po->pppoe_relay );
-
-		if( relay_po == NULL  ||
-		    !( relay_po->sk->state & PPPOX_CONNECTED ) ){
-			goto abort;
-		}
+		if (relay_po == NULL)
+			goto abort_kfree;
+			
+		if ((relay_po->sk->state & PPPOX_CONNECTED) == 0)
+			goto abort_put;
 
 		skb_pull(skb, sizeof(struct pppoe_hdr));
-		if( !__pppoe_xmit( relay_po->sk , skb) ){
-			goto abort;
-		}
+		if (!__pppoe_xmit( relay_po->sk , skb))
+			goto abort_put;
 	} else {
 		sock_queue_rcv_skb(sk, skb);
 	}
-	return 1;
-abort:
-	if(relay_po)
-		sock_put(relay_po->sk);
-	return 0;
 
+	return NET_RX_SUCCESS;
+
+abort_put:
+	sock_put(relay_po->sk);
+
+abort_kfree:
+	kfree_skb(skb);
+	return NET_RX_DROP;
 }
-
-
-
 
 /************************************************************************
  *
@@ -356,24 +387,25 @@ static int pppoe_rcv(struct sk_buff *skb,
 
 	po = get_item((unsigned long) ph->sid, skb->mac.ethernet->h_source);
 
-	if(!po){
+	if (!po) {
 		kfree_skb(skb);
-		return 0;
+		return NET_RX_DROP;
 	}
 
 	sk = po->sk;
         bh_lock_sock(sk);
 
 	/* Socket state is unknown, must put skb into backlog. */
-	if( sk->lock.users != 0 ){
-		sk_add_backlog( sk, skb);
-		ret = 1;
-	}else{
+	if (sk->lock.users != 0) {
+		sk_add_backlog(sk, skb);
+		ret = NET_RX_SUCCESS;
+	} else {
 		ret = pppoe_rcv_core(sk, skb);
 	}
 
 	bh_unlock_sock(sk);
 	sock_put(sk);
+
 	return ret;
 }
 
@@ -390,24 +422,31 @@ static int pppoe_disc_rcv(struct sk_buff *skb,
 {
 	struct pppoe_hdr *ph = (struct pppoe_hdr *) skb->nh.raw;
 	struct pppox_opt *po;
-	struct sock *sk = NULL;
 
 	if (ph->code != PADT_CODE)
 		goto abort;
 
 	po = get_item((unsigned long) ph->sid, skb->mac.ethernet->h_source);
+	if (po) {
+		struct sock *sk = po->sk;
 
-	if (!po)
-		goto abort;
+		bh_lock_sock(sk);
 
-	sk = po->sk;
+		/* If the user has locked the socket, just ignore
+		 * the packet.  With the way two rcv protocols hook into
+		 * one socket family type, we cannot (easily) distinguish
+		 * what kind of SKB it is during backlog rcv.
+		 */
+		if (sk->lock.users == 0)
+			pppox_unbind_sock(sk);
 
-	pppox_unbind_sock(sk);
+		bh_unlock_sock(sk);
+		sock_put(sk);
+	}
 
-	sock_put(sk);
- abort:
+abort:
 	kfree_skb(skb);
-	return 0;
+	return NET_RX_SUCCESS; /* Lies... :-) */
 }
 
 struct packet_type pppoes_ptype = {
@@ -524,7 +563,7 @@ int pppoe_connect(struct socket *sock, struct sockaddr *uservaddr,
 	struct sock *sk = sock->sk;
 	struct net_device *dev = NULL;
 	struct sockaddr_pppox *sp = (struct sockaddr_pppox *) uservaddr;
-	struct pppox_opt  *po=sk->protinfo.pppox;
+	struct pppox_opt *po = sk->protinfo.pppox;
 	int error;
 
 	lock_sock(sk);
@@ -569,8 +608,9 @@ int pppoe_connect(struct socket *sock, struct sockaddr *uservaddr,
 
 		po->pppoe_dev = dev;
 
-		if( ! (dev->flags & IFF_UP) )
+		if (!(dev->flags & IFF_UP))
 			goto err_put;
+
 		memcpy(&po->pppoe_pa,
 		       &sp->sa_addr.pppoe,
 		       sizeof(struct pppoe_addr));
@@ -687,7 +727,7 @@ int pppoe_ioctl(struct socket *sock, unsigned int cmd,
 		/* PPPoE address from the user specifies an outbound
 		   PPPoE address to which frames are forwarded to */
 		err = -EFAULT;
-		if( copy_from_user(&po->pppoe_relay,
+		if (copy_from_user(&po->pppoe_relay,
 				   (void*)arg,
 				   sizeof(struct sockaddr_pppox)))
 			break;
@@ -752,7 +792,7 @@ int pppoe_sendmsg(struct socket *sock, struct msghdr *m,
 	dev = sk->protinfo.pppox->pppoe_dev;
 
 	error = -EMSGSIZE;
- 	if(total_len > dev->mtu+dev->hard_header_len)
+ 	if (total_len > (dev->mtu + dev->hard_header_len))
 		goto end;
 
 
@@ -775,7 +815,7 @@ int pppoe_sendmsg(struct socket *sock, struct msghdr *m,
 	ph = (struct pppoe_hdr *) skb_put(skb, total_len + sizeof(struct pppoe_hdr));
 	start = (char *) &ph->tag[0];
 
-	error = memcpy_fromiovec( start, m->msg_iov, total_len);
+	error = memcpy_fromiovec(start, m->msg_iov, total_len);
 
 	if (error < 0) {
 		kfree_skb(skb);
@@ -793,10 +833,11 @@ int pppoe_sendmsg(struct socket *sock, struct msghdr *m,
 
 	dev_queue_xmit(skb);
 
- end:
+end:
 	release_sock(sk);
 	return error;
 }
+
 
 /************************************************************************
  *
@@ -810,10 +851,10 @@ int __pppoe_xmit(struct sock *sk, struct sk_buff *skb)
 	struct pppoe_hdr *ph;
 	int headroom = skb_headroom(skb);
 	int data_len = skb->len;
+	struct sk_buff *skb2;
 
-	if (sk->dead  || !(sk->state & PPPOX_CONNECTED)) {
+	if (sk->dead  || !(sk->state & PPPOX_CONNECTED))
 		goto abort;
-	}
 
 	hdr.ver	= 1;
 	hdr.type = 1;
@@ -821,14 +862,11 @@ int __pppoe_xmit(struct sock *sk, struct sk_buff *skb)
 	hdr.sid	= sk->num;
 	hdr.length = htons(skb->len);
 
-	if (!dev) {
+	if (!dev)
 		goto abort;
-	}
 
 	/* Copy the skb if there is no space for the header. */
 	if (headroom < (sizeof(struct pppoe_hdr) + dev->hard_header_len)) {
-		struct sk_buff *skb2;
-
 		skb2 = dev_alloc_skb(32+skb->len +
 				     sizeof(struct pppoe_hdr) +
 				     dev->hard_header_len);
@@ -838,29 +876,38 @@ int __pppoe_xmit(struct sock *sk, struct sk_buff *skb)
 
 		skb_reserve(skb2, dev->hard_header_len + sizeof(struct pppoe_hdr));
 		memcpy(skb_put(skb2, skb->len), skb->data, skb->len);
-
-		skb_unlink(skb);
-		kfree_skb(skb);
-		skb = skb2;
+	} else {
+		/* Make a clone so as to not disturb the original skb,
+		 * give dev_queue_xmit something it can free.
+		 */
+		skb2 = skb_clone(skb, GFP_ATOMIC);
 	}
 
-	ph = (struct pppoe_hdr *) skb_push(skb, sizeof(struct pppoe_hdr));
+	ph = (struct pppoe_hdr *) skb_push(skb2, sizeof(struct pppoe_hdr));
 	memcpy(ph, &hdr, sizeof(struct pppoe_hdr));
-	skb->protocol = __constant_htons(ETH_P_PPP_SES);
+	skb2->protocol = __constant_htons(ETH_P_PPP_SES);
 
-	skb->nh.raw = skb->data;
+	skb2->nh.raw = skb2->data;
 
-	skb->dev = dev;
+	skb2->dev = dev;
 
-	dev->hard_header(skb, dev, ETH_P_PPP_SES,
+	dev->hard_header(skb2, dev, ETH_P_PPP_SES,
 			 sk->protinfo.pppox->pppoe_pa.remote,
 			 NULL, data_len);
 
-	if (dev_queue_xmit(skb) < 0)
+	/* We're transmitting skb2, and assuming that dev_queue_xmit
+	 * will free it.  The generic ppp layer however, is expecting
+	 * that we give back 'skb' (not 'skb2') in case of failure,
+	 * but free it in case of success.
+	 */
+
+	if (dev_queue_xmit(skb2) < 0)
 		goto abort;
 
+	kfree_skb(skb);
 	return 1;
- abort:
+
+abort:
 	return 0;
 }
 
@@ -1007,8 +1054,6 @@ int __init pppoe_init(void)
  	int err = register_pppox_proto(PX_PROTO_OE, &pppoe_proto);
 
 	if (err == 0) {
-		printk(KERN_INFO "Registered PPPoE v0.6.5\n");
-
 		dev_add_pack(&pppoes_ptype);
 		dev_add_pack(&pppoed_ptype);
 		register_netdevice_notifier(&pppoe_notifier);

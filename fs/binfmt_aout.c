@@ -73,7 +73,7 @@ if (file->f_op->llseek) { \
  * Currently only a stub-function.
  *
  * Note that setuid/setgid files won't make a core-dump if the uid/gid
- * changed due to the set[u|g]id. It's enforced by the "current->dumpable"
+ * changed due to the set[u|g]id. It's enforced by the "current->mm->dumpable"
  * field, which also makes sure the core-dumps won't be recursive if the
  * dumping of the process results in another error..
  */

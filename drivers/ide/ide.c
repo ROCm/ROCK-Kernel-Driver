@@ -148,6 +148,7 @@
 #include <linux/delay.h>
 #include <linux/ide.h>
 #include <linux/devfs_fs_kernel.h>
+#include <linux/completion.h>
 
 #include <asm/byteorder.h>
 #include <asm/irq.h>
@@ -1700,7 +1701,7 @@ int ide_do_drive_cmd (ide_drive_t *drive, struct request *rq, ide_action_t actio
 	ide_hwgroup_t *hwgroup = HWGROUP(drive);
 	unsigned int major = HWIF(drive)->major;
 	struct list_head *queue_head = &drive->queue.queue_head;
-	DECLARE_MUTEX_LOCKED(sem);
+	DECLARE_COMPLETION(wait);
 
 #ifdef CONFIG_BLK_DEV_PDC4030
 	if (HWIF(drive)->chipset == ide_pdc4030 && rq->buffer != NULL)
@@ -1710,7 +1711,7 @@ int ide_do_drive_cmd (ide_drive_t *drive, struct request *rq, ide_action_t actio
 	rq->rq_status = RQ_ACTIVE;
 	rq->rq_dev = MKDEV(major,(drive->select.b.unit)<<PARTN_BITS);
 	if (action == ide_wait)
-		rq->sem = &sem;
+		rq->waiting = &wait;
 	spin_lock_irqsave(&io_request_lock, flags);
 	if (list_empty(queue_head) || action == ide_preempt) {
 		if (action == ide_preempt)
@@ -1725,7 +1726,7 @@ int ide_do_drive_cmd (ide_drive_t *drive, struct request *rq, ide_action_t actio
 	ide_do_request(hwgroup, 0);
 	spin_unlock_irqrestore(&io_request_lock, flags);
 	if (action == ide_wait) {
-		down(&sem);			/* wait for it to be serviced */
+		wait_for_completion(&wait);	/* wait for it to be serviced */
 		return rq->errors ? -EIO : 0;	/* return -EIO if errors */
 	}
 	return 0;

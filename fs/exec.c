@@ -548,7 +548,7 @@ int flush_old_exec(struct linux_binprm * bprm)
 	current->sas_ss_sp = current->sas_ss_size = 0;
 
 	if (current->euid == current->uid && current->egid == current->gid)
-		current->dumpable = 1;
+		current->mm->dumpable = 1;
 	name = bprm->filename;
 	for (i=0; (ch = *(name++)) != '\0';) {
 		if (ch == '/')
@@ -565,7 +565,7 @@ int flush_old_exec(struct linux_binprm * bprm)
 
 	if (bprm->e_uid != current->euid || bprm->e_gid != current->egid || 
 	    permission(bprm->file->f_dentry->d_inode,MAY_READ))
-		current->dumpable = 0;
+		current->mm->dumpable = 0;
 
 	/* An exec changes our domain. We are no longer part of the thread
 	   group */
@@ -683,7 +683,7 @@ void compute_creds(struct linux_binprm *bprm)
 
 	if (bprm->e_uid != current->uid || bprm->e_gid != current->gid ||
 	    !cap_issubset(new_permitted, current->cap_permitted)) {
-                current->dumpable = 0;
+                current->mm->dumpable = 0;
 		
 		lock_kernel();
 		if (must_not_trace_exec(current)
@@ -933,9 +933,9 @@ int do_coredump(long signr, struct pt_regs * regs)
 	binfmt = current->binfmt;
 	if (!binfmt || !binfmt->core_dump)
 		goto fail;
-	if (!current->dumpable)
+	if (!current->mm->dumpable)
 		goto fail;
-	current->dumpable = 0;
+	current->mm->dumpable = 0;
 	if (current->rlim[RLIMIT_CORE].rlim_cur < binfmt->min_coredump)
 		goto fail;
 

@@ -64,7 +64,7 @@ struct divert_blk;
 
 #endif
 
-#define MAX_ADDR_LEN	7		/* Largest hardware address length */
+#define MAX_ADDR_LEN	8		/* Largest hardware address length */
 
 /*
  *	Compute the worst case header length according to the protocols

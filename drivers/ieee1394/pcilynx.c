@@ -25,6 +25,7 @@
 #include <linux/wait.h>
 #include <linux/errno.h>
 #include <linux/module.h>
+#include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/fs.h>
 #include <linux/poll.h>
@@ -359,7 +360,7 @@ static void handle_selfid(struct ti_lynx *lynx, struct hpsb_host *host)
                 }
 
                 if (q[0] == ~q[1]) {
-                        PRINT(KERN_DEBUG, lynx->id, "selfid packet 0x%x rcvd",
+                        PRINT(KERN_DEBUG, lynx->id, "SelfID packet 0x%x rcvd",
                               q[0]);
                         hpsb_selfid_received(host, q[0]);
                 } else {
@@ -598,7 +599,7 @@ static int lynx_transmit(struct hpsb_host *host, struct hpsb_packet *packet)
         unsigned long flags;
 
         if (packet->data_size >= 4096) {
-                PRINT(KERN_ERR, lynx->id, "transmit packet data too big (%d)",
+                PRINT(KERN_ERR, lynx->id, "transmit packet data too big (%Zd)",
                       packet->data_size);
                 return 0;
         }
@@ -770,7 +771,7 @@ static ssize_t mem_write(struct file*, const char*, size_t, loff_t*);
 
 
 static struct file_operations aux_ops = {
-        OWNER_THIS_MODULE
+	owner:		THIS_MODULE,
         read:           mem_read,
         write:          mem_write,
         poll:           aux_poll,
@@ -795,23 +796,18 @@ static int mem_open(struct inode *inode, struct file *file)
         enum { t_rom, t_aux, t_ram } type;
         struct memdata *md;
         
-        V22_COMPAT_MOD_INC_USE_COUNT;
-
         if (cid < PCILYNX_MINOR_AUX_START) {
                 /* just for completeness */
-                V22_COMPAT_MOD_DEC_USE_COUNT;
                 return -ENXIO;
         } else if (cid < PCILYNX_MINOR_ROM_START) {
                 cid -= PCILYNX_MINOR_AUX_START;
                 if (cid >= num_of_cards || !cards[cid].aux_port) {
-                        V22_COMPAT_MOD_DEC_USE_COUNT;
                         return -ENXIO;
                 }
                 type = t_aux;
         } else if (cid < PCILYNX_MINOR_RAM_START) {
                 cid -= PCILYNX_MINOR_ROM_START;
                 if (cid >= num_of_cards || !cards[cid].local_rom) {
-                        V22_COMPAT_MOD_DEC_USE_COUNT;
                         return -ENXIO;
                 }
                 type = t_rom;
@@ -820,17 +816,16 @@ static int mem_open(struct inode *inode, struct file *file)
                  * It is currently used inside the driver! */
                 cid -= PCILYNX_MINOR_RAM_START;
                 if (cid >= num_of_cards || !cards[cid].local_ram) {
-                        V22_COMPAT_MOD_DEC_USE_COUNT;
                         return -ENXIO;
                 }
                 type = t_ram;
         }
 
         md = (struct memdata *)kmalloc(sizeof(struct memdata), SLAB_KERNEL);
-        if (md == NULL) {
-                V22_COMPAT_MOD_DEC_USE_COUNT;
+        if (md == NULL)
                 return -ENOMEM;
-        }
+
+	MOD_INC_USE_COUNT;
 
         md->lynx = &cards[cid];
         md->cid = cid;
@@ -860,7 +855,7 @@ static int mem_release(struct inode *inode, struct file *file)
 
         kfree(md);
 
-        V22_COMPAT_MOD_DEC_USE_COUNT;
+	MOD_DEC_USE_COUNT;
         return 0;
 }
 
@@ -1107,6 +1102,8 @@ static void lynx_irq_handler(int irq, void *dev_id,
 
         PRINTD(KERN_DEBUG, lynx->id, "interrupt: 0x%08x / 0x%08x", intmask,
                linkint);
+
+        if (!(intmask & PCI_INT_INT_PEND)) return;
 
         reg_write(lynx, LINK_INT_STATUS, linkint);
         reg_write(lynx, PCI_INT_STATUS, intmask);
@@ -1466,9 +1463,8 @@ static int add_card(struct pci_dev *dev)
         init_waitqueue_head(&lynx->aux_intr_wait);
 #endif
 
-        INIT_TQ_LINK(lynx->iso_rcv.tq);
-        lynx->iso_rcv.tq.routine = (void (*)(void*))iso_rcv_bh;
-        lynx->iso_rcv.tq.data = lynx;
+	INIT_TQUEUE(&lynx->iso_rcv.tq, (void (*)(void*))iso_rcv_bh, lynx);
+
         lynx->iso_rcv.lock = SPIN_LOCK_UNLOCKED;
 
         lynx->async.queue_lock = SPIN_LOCK_UNLOCKED;
@@ -1596,21 +1592,17 @@ struct hpsb_host_template *get_lynx_template(void)
 }
 
 
-#ifdef MODULE
-
-/* EXPORT_NO_SYMBOLS; */
-
 MODULE_AUTHOR("Andreas E. Bombe <andreas.bombe@munich.netsurf.de>");
 MODULE_DESCRIPTION("driver for Texas Instruments PCI Lynx IEEE-1394 controller");
 MODULE_SUPPORTED_DEVICE("pcilynx");
 
-void cleanup_module(void)
+static void __exit pcilynx_cleanup(void)
 {
         hpsb_unregister_lowlevel(get_lynx_template());
         PRINT_G(KERN_INFO, "removed " PCILYNX_DRIVER_NAME " module");
 }
 
-int init_module(void)
+static int __init pcilynx_init(void)
 {
         if (hpsb_register_lowlevel(get_lynx_template())) {
                 PRINT_G(KERN_ERR, "registering failed");
@@ -1620,4 +1612,5 @@ int init_module(void)
         }
 }
 
-#endif /* MODULE */
+module_init(pcilynx_init);
+module_exit(pcilynx_cleanup);

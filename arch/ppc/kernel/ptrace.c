@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.ptrace.c 1.5 05/17/01 18:14:22 cort
+ * BK Id: SCCS/s.ptrace.c 1.8 07/07/01 17:00:08 paulus
  */
 /*
  *  linux/arch/ppc/kernel/ptrace.c
@@ -49,7 +49,8 @@
  */
 static inline unsigned long get_reg(struct task_struct *task, int regno)
 {
-	if (regno < sizeof(struct pt_regs) / sizeof(unsigned long))
+	if (regno < sizeof(struct pt_regs) / sizeof(unsigned long)
+	    && task->thread.regs != NULL)
 		return ((unsigned long *)task->thread.regs)[regno];
 	return (0);
 }
@@ -60,7 +61,7 @@ static inline unsigned long get_reg(struct task_struct *task, int regno)
 static inline int put_reg(struct task_struct *task, int regno,
 			  unsigned long data)
 {
-	if (regno <= PT_MQ) {
+	if (regno <= PT_MQ && task->thread.regs != NULL) {
 		if (regno == PT_MSR)
 			data = (data & MSR_DEBUGCHANGE)
 				| (task->thread.regs->msr & ~MSR_DEBUGCHANGE);
@@ -74,14 +75,18 @@ static inline void
 set_single_step(struct task_struct *task)
 {
 	struct pt_regs *regs = task->thread.regs;
-	regs->msr |= MSR_SE;
+
+	if (regs != NULL)
+		regs->msr |= MSR_SE;
 }
 
 static inline void
 clear_single_step(struct task_struct *task)
 {
 	struct pt_regs *regs = task->thread.regs;
-	regs->msr &= ~MSR_SE;
+
+	if (regs != NULL)
+		regs->msr &= ~MSR_SE;
 }
 
 int sys_ptrace(long request, long pid, long addr, long data)
@@ -115,7 +120,7 @@ int sys_ptrace(long request, long pid, long addr, long data)
 	if (request == PTRACE_ATTACH) {
 		if (child == current)
 			goto out_tsk;
-		if ((!child->dumpable ||
+		if ((!child->mm->dumpable ||
 		    (current->uid != child->euid) ||
 		    (current->uid != child->suid) ||
 		    (current->uid != child->uid) ||
@@ -181,7 +186,8 @@ int sys_ptrace(long request, long pid, long addr, long data)
 		if (index < PT_FPR0) {
 			tmp = get_reg(child, (int) index);
 		} else {
-			if (child->thread.regs->msr & MSR_FP)
+			if (child->thread.regs != NULL
+			    && child->thread.regs->msr & MSR_FP)
 				giveup_fpu(child);
 			tmp = ((unsigned long *)child->thread.fpr)[index - PT_FPR0];
 		}
@@ -214,7 +220,8 @@ int sys_ptrace(long request, long pid, long addr, long data)
 		if (index < PT_FPR0) {
 			ret = put_reg(child, index, data);
 		} else {
-			if (child->thread.regs->msr & MSR_FP)
+			if (child->thread.regs != NULL
+			    && child->thread.regs->msr & MSR_FP)
 				giveup_fpu(child);
 			((unsigned long *)child->thread.fpr)[index - PT_FPR0] = data;
 			ret = 0;

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.ppc_asm.h 1.10 05/17/01 18:14:21 cort
+ * BK Id: SCCS/s.ppc_asm.h 1.14 07/02/01 22:08:05 paulus
  */
 /*
  * arch/ppc/kernel/ppc_asm.h
@@ -76,6 +76,14 @@
 #else
 #define	SYNC
 #endif
+
+#ifndef CONFIG_SMP
+#define TLBSYNC
+#else /* CONFIG_SMP */
+#define TLBSYNC				\
+	tlbsync;			\
+	sync
+#endif /* CONFIG_SMP */
 
 /*
  * This instruction is not implemented on the PPC 603 or 601; however, on

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.entry.S 1.17 06/19/01 22:40:51 paulus
+ * BK Id: SCCS/s.entry.S 1.20 07/19/01 23:02:48 paulus
  */
 /*
  *  PowerPC version 
@@ -191,15 +191,15 @@ ret_from_syscall_2:
  * state of one is saved on its kernel stack.  Then the state
  * of the other is restored from its kernel stack.  The memory
  * management hardware is updated to the second process's state.
- * Finally, we can return to the second process, via ret_from_except.
+ * Finally, we can return to the second process.
  * On entry, r3 points to the THREAD for the current task, r4
  * points to the THREAD for the new task.
  *
  * Note: there are two ways to get to the "going out" portion
  * of this code; either by coming in via the entry (_switch)
  * or via "fork" which must set up an environment equivalent
- * to the "_switch" path.  If you change this (or in particular, the
- * SAVE_REGS macro), you'll have to change the fork code also.
+ * to the "_switch" path.  If you change this , you'll have to
+ * change the fork code also.
  *
  * The code which creates the new task context is in 'copy_thread'
  * in arch/ppc/kernel/process.c
@@ -220,6 +220,8 @@ _GLOBAL(_switch)
 	oris	r0,r0,MSR_VEC@h
 #endif /* CONFIG_ALTIVEC */
 	andc	r22,r22,r0
+	mtmsr	r22
+	isync
 	stw	r20,_NIP(r1)
 	stw	r22,_MSR(r1)
 	stw	r20,_LINK(r1)
@@ -232,6 +234,7 @@ _GLOBAL(_switch)
 	li	r0,0x0ff0
 	stw	r0,TRAP(r1)
 	stw	r1,KSP(r3)	/* Set old stack pointer */
+
 	tophys(r0,r4)
 	CLR_TOP32(r0)
 	mtspr	SPRG3,r0	/* Update current THREAD phys addr */
@@ -254,51 +257,24 @@ _GLOBAL(_switch)
 	/* save the old current 'last' for return value */
 	mr	r3,r2
 	addi	r2,r4,-THREAD	/* Update current */
-	lwz	r9,_MSR(r1)	/* Returning to user mode? */
-	andi.	r9,r9,MSR_PR
-	beq+	10f		/* if not, don't adjust kernel stack */
-8:	addi	r4,r1,INT_FRAME_SIZE	/* size of frame */
-	stw	r4,THREAD+KSP(r2)	/* save kernel stack pointer */
-	tophys(r9,r1)
-	CLR_TOP32(r9)
-	mtspr	SPRG2,r9	/* phys exception stack pointer */
-10:	lwz	r2,_CTR(r1)
-	lwz	r0,_LINK(r1)
-	mtctr	r2
-	mtlr	r0
-	lwz	r2,_XER(r1)
 	lwz	r0,_CCR(r1)
-	mtspr	XER,r2
 	mtcrf	0xFF,r0
 	/* r3-r13 are destroyed -- Cort */
-	REST_GPR(14, r1)
-	REST_8GPRS(15, r1)
-	REST_8GPRS(23, r1)
-	REST_GPR(31, r1)
-	lwz	r2,_NIP(r1)	/* Restore environment */
-	/* 
-	 * We need to hard disable here even if RTL is active since
-	 * being interrupted after here trashes SRR{0,1}
-	 *  -- Cort
-	 */ 
-	mfmsr	r0		/* Get current interrupt state */
-	rlwinm	r0,r0,0,17,15	/* clear MSR_EE in r0 */
-	SYNC			/* Some chip revs have problems here... */
-	mtmsr	r0		/* Update machine state */
-	
-	lwz	r0,_MSR(r1)
-	mtspr	SRR0,r2
-	FIX_SRR1(r0,r2)
-	mtspr	SRR1,r0
-	lwz	r0,GPR0(r1)
-	lwz	r2,GPR2(r1)
-	lwz	r1,GPR1(r1)
-	SYNC
-	RFI
+	REST_2GPRS(14, r1)
+	REST_8GPRS(16, r1)
+	REST_8GPRS(24, r1)
+
+	lwz	r4,_NIP(r1)	/* Return to _switch caller in new task */
+	mtlr	r4
+	addi	r1,r1,INT_FRAME_SIZE
+	blr
 
 	.globl	ret_from_fork
 ret_from_fork:
 	bl	schedule_tail
+	lwz	r0,TASK_PTRACE(r2)
+	andi.	r0,r0,PT_TRACESYS
+	bnel-	syscall_trace
 	b	ret_from_except
 
 	.globl	ret_from_intercept

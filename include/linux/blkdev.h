@@ -15,8 +15,8 @@ typedef struct elevator_s elevator_t;
 /*
  * Ok, this is an expanded form so that we can use the same
  * request for paging requests when that is implemented. In
- * paging, 'bh' is NULL, and the semaphore is used to wait
- * for read/write completion.
+ * paging, 'bh' is NULL, and the completion is used to wait
+ * for the IO to be ready.
  */
 struct request {
 	struct list_head queue;
@@ -41,7 +41,7 @@ struct request {
 	unsigned long current_nr_sectors;
 	void * special;
 	char * buffer;
-	struct semaphore * sem;
+	struct completion * waiting;
 	struct buffer_head * bh;
 	struct buffer_head * bhtail;
 	request_queue_t *q;

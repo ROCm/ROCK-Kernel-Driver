@@ -92,7 +92,7 @@ int elevator_linus_merge(request_queue_t *q, struct request **req,
 		if (__rq->elevator_sequence-- <= 0)
 			break;
 
-		if (__rq->sem)
+		if (__rq->waiting)
 			continue;
 		if (__rq->rq_dev != bh->b_rdev)
 			continue;
@@ -162,7 +162,7 @@ int elevator_noop_merge(request_queue_t *q, struct request **req,
 			continue;
 		if (__rq->nr_sectors + count > max_sectors)
 			continue;
-		if (__rq->sem)
+		if (__rq->waiting)
 			continue;
 		if (__rq->sector + __rq->nr_sectors == bh->b_rsector) {
 			*req = __rq;

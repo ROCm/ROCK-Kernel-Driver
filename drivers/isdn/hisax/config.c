@@ -673,7 +673,7 @@ int HiSax_readstatus(u_char * buf, int len, int user, int id, int channel)
 	}
 }
 
-static inline int jiftime(char *s, long mark)
+int jiftime(char *s, long mark)
 {
 	s += 8;
 

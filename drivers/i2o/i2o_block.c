@@ -1012,7 +1012,7 @@ static void i2ob_request(request_queue_t *q)
 		 */
 		req->errors = 0;
 		blkdev_dequeue_request(req);	
-		req->sem = NULL;
+		req->waiting = NULL;
 		
 		ireq = i2ob_queues[dev->unit]->i2ob_qhead;
 		i2ob_queues[dev->unit]->i2ob_qhead = ireq->next;

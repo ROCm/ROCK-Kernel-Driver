@@ -10,6 +10,7 @@
  * directory of the kernel sources for details.
  */
 
+#include <linux/module.h>
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/list.h>
@@ -72,24 +73,18 @@ static void dump_packet(const char *text, quadlet_t *data, int size)
 struct hpsb_packet *alloc_hpsb_packet(size_t data_size)
 {
         struct hpsb_packet *packet = NULL;
-        void *header = NULL, *data = NULL;
+        void *data = NULL;
         int kmflags = in_interrupt() ? GFP_ATOMIC : GFP_KERNEL;
 
         packet = kmalloc(sizeof(struct hpsb_packet), kmflags);
-        header = kmalloc(5 * 4, kmflags);
-        if (header == NULL || packet == NULL) {
-                kfree(header);
-                kfree(packet);
-                return NULL;
-        }
+        if (!packet) return NULL;
 
         memset(packet, 0, sizeof(struct hpsb_packet));
-        packet->header = header;
+        packet->header = packet->embedded_header;
 
         if (data_size) {
                 data = kmalloc(data_size + 8, kmflags);
-                if (data == NULL) {
-                        kfree(header);
+                if (!data) {
                         kfree(packet);
                         return NULL;
                 }
@@ -98,7 +93,7 @@ struct hpsb_packet *alloc_hpsb_packet(size_t data_size)
                 packet->data_size = data_size;
         }
 
-        INIT_TQ_HEAD(packet->complete_tq);
+        INIT_LIST_HEAD(&packet->complete_tq);
         INIT_LIST_HEAD(&packet->list);
         sema_init(&packet->state_change, 0);
         packet->state = unused;
@@ -118,24 +113,21 @@ struct hpsb_packet *alloc_hpsb_packet(size_t data_size)
  */
 void free_hpsb_packet(struct hpsb_packet *packet)
 {
-        if (packet == NULL) {
-                return;
-        }
+        if (!packet) return;
 
         kfree(packet->data);
-        kfree(packet->header);
         kfree(packet);
 }
 
 
-int hpsb_reset_bus(struct hpsb_host *host)
+int hpsb_reset_bus(struct hpsb_host *host, int type)
 {
         if (!host->initialized) {
                 return 1;
         }
 
         if (!hpsb_bus_reset(host)) {
-                host->template->devctl(host, RESET_BUS, 0);
+                host->template->devctl(host, RESET_BUS, type);
                 return 0;
         } else {
                 return 1;
@@ -297,14 +289,16 @@ static void build_speed_map(struct hpsb_host *host, int nodecount)
         }
 }
 
+
 void hpsb_selfid_received(struct hpsb_host *host, quadlet_t sid)
 {
         if (host->in_bus_reset) {
-                HPSB_DEBUG("including selfid 0x%x", sid);
+                HPSB_DEBUG("Including SelfID 0x%x", sid);
                 host->topology_map[host->selfid_count++] = sid;
         } else {
                 /* FIXME - info on which host */
-                HPSB_NOTICE("spurious selfid packet (0x%8.8x) received", sid);
+                HPSB_NOTICE("Spurious SelfID packet (0x%08x) received from %s",
+			    sid, host->template->name);
         }
 }
 
@@ -318,13 +312,12 @@ void hpsb_selfid_complete(struct hpsb_host *host, int phyid, int isroot)
         if (!host->node_count) {
                 if (host->reset_retries++ < 20) {
                         /* selfid stage did not complete without error */
-                        HPSB_NOTICE("error in SelfID stage - resetting");
-                        hpsb_reset_bus(host);
+                        HPSB_NOTICE("Error in SelfID stage, resetting");
+                        hpsb_reset_bus(host, LONG_RESET);
                         return;
                 } else {
-                        HPSB_NOTICE("stopping out-of-control reset loop");
-                        HPSB_NOTICE("warning - topology map and speed map will "
-                                    "therefore not be valid");
+                        HPSB_NOTICE("Stopping out-of-control reset loop");
+                        HPSB_NOTICE("Warning - topology map and speed map will not be valid");
                 }
         } else {
                 build_speed_map(host, host->node_count);
@@ -459,7 +452,7 @@ void handle_packet_response(struct hpsb_host *host, int tcode, quadlet_t *data,
         }
 
         if (lh == &host->pending_packets) {
-                HPSB_INFO("unsolicited response packet received - np");
+                HPSB_DEBUG("unsolicited response packet received - np");
                 dump_packet("contents:", data, 16);
                 spin_unlock_irqrestore(&host->pending_pkt_lock, flags);
                 return;
@@ -554,7 +547,8 @@ void handle_incoming_packet(struct hpsb_host *host, int tcode, quadlet_t *data,
 {
         struct hpsb_packet *packet;
         int length, rcode, extcode;
-        int source = data[1] >> 16;
+        nodeid_t source = data[1] >> 16;
+	nodeid_t dest = data[0] >> 16;
         u64 addr;
 
         /* big FIXME - no error checking is done for an out of bounds length */
@@ -562,7 +556,8 @@ void handle_incoming_packet(struct hpsb_host *host, int tcode, quadlet_t *data,
         switch (tcode) {
         case TCODE_WRITEQ:
                 addr = (((u64)(data[1] & 0xffff)) << 32) | data[2];
-                rcode = highlevel_write(host, source, data+3, addr, 4);
+                rcode = highlevel_write(host, source, dest, data+3,
+					addr, 4);
 
                 if (!write_acked
                     && ((data[0] >> 16) & NODE_MASK) != NODE_MASK) {
@@ -575,8 +570,8 @@ void handle_incoming_packet(struct hpsb_host *host, int tcode, quadlet_t *data,
 
         case TCODE_WRITEB:
                 addr = (((u64)(data[1] & 0xffff)) << 32) | data[2];
-                rcode = highlevel_write(host, source, data+4, addr,
-                                        data[3]>>16);
+                rcode = highlevel_write(host, source, dest, data+4,
+					addr, data[3]>>16);
 
                 if (!write_acked
                     && ((data[0] >> 16) & NODE_MASK) != NODE_MASK) {
@@ -783,31 +778,19 @@ void abort_timedouts(struct hpsb_host *host)
 }
 
 
-#ifndef MODULE
-
-void __init ieee1394_init(void)
-{
-        register_builtin_lowlevels();
-        init_hpsb_highlevel();
-        init_csr();
-        init_ieee1394_guid();
-}
-
-#else
-
-int init_module(void)
+static int __init ieee1394_init(void)
 {
         init_hpsb_highlevel();
         init_csr();
         init_ieee1394_guid();
-
-        return 0;
+	return 0;
 }
 
-void cleanup_module(void)
+static void __exit ieee1394_cleanup(void)
 {
         cleanup_ieee1394_guid();
         cleanup_csr();
 }
 
-#endif
+module_init(ieee1394_init);
+module_exit(ieee1394_cleanup);

@@ -41,10 +41,13 @@ struct guid_entry {
 };
 
 struct guid_req {
-        struct hpsb_packet *pkt;
-        struct tq_struct tq;
+	struct hpsb_packet *pkt;
+	int retry;
+	unsigned int hdr_size;
+	int hdr_ptr;
+	u32 bus_info[5];
+	struct tq_struct tq;
 };
-
 
 static struct guid_entry *create_guid_entry(void)
 {
@@ -88,9 +91,11 @@ static void associate_guid(struct hpsb_host *host, nodeid_t nodeid, u64 guid)
         struct guid_entry *ge;
         unsigned long flags;
 
-        HPSB_DEBUG("node %d on host 0x%p has GUID 0x%08x%08x",
-                   nodeid & NODE_MASK, host, (unsigned int)(guid >> 32),
-                   (unsigned int)(guid & 0xffffffff));
+        HPSB_DEBUG("Node %d on %s host: GUID %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x",
+                   nodeid & NODE_MASK, host->template->name, ((u8 *)&guid)[0],
+		   ((u8 *)&guid)[1], ((u8 *)&guid)[2], ((u8 *)&guid)[3],
+		   ((u8 *)&guid)[4], ((u8 *)&guid)[5], ((u8 *)&guid)[6],
+		   ((u8 *)&guid)[7]);
 
         read_lock_irqsave(&guid_lock, flags);
         ge = find_entry(guid);
@@ -109,29 +114,87 @@ static void associate_guid(struct hpsb_host *host, nodeid_t nodeid, u64 guid)
 static void pkt_complete(struct guid_req *req)
 {
         struct hpsb_packet *pkt = req->pkt;
-        int rcode = (pkt->header[1] >> 12) & 0xf;
+	struct hpsb_host *host = pkt->host;
+	nodeid_t nodeid = pkt->node_id;
 
-        if (pkt->ack_code == ACK_PENDING && rcode == RCODE_COMPLETE) {
-                if (*(char *)pkt->data > 1) {
-                        associate_guid(pkt->host, pkt->node_id,
-                                       ((u64)be32_to_cpu(pkt->data[3]) << 32)
-                                       | be32_to_cpu(pkt->data[4]));
-                } else {
-                        HPSB_DEBUG("minimal ROM on node %d",
-                                   pkt->node_id & NODE_MASK);
-                }
-        } else {
-                HPSB_DEBUG("guid transaction error: ack %d, rcode %d",
-                           pkt->ack_code, rcode);
+	if (hpsb_packet_success (pkt)) {
+		HPSB_ERR("GUID quadlet transaction error for %d, retry: %d", nodeid,
+			 req->retry);
+		req->retry++;
+		if (req->retry > 3)
+			goto finish;
+		else
+			goto retry;
         }
 
-        free_tlabel(pkt->host, pkt->node_id, pkt->tlabel);
-        free_hpsb_packet(pkt);
-        kfree(req);
+	/* Copy our received quadlet */
+	req->bus_info[req->hdr_ptr++] = be32_to_cpu(pkt->header[3]);
 
-        if (atomic_dec_and_test(&outstanding_requests)) {
-                /* FIXME: free unreferenced and inactive GUID entries. */
-        }
+	/* First quadlet, let's get some info */
+	if (req->hdr_ptr == 1) {
+		/* Get the bus_info_length from first quadlet */
+		req->hdr_size = req->bus_info[0] >> 24;
+
+		/* Make sure this isn't one of those minimal proprietary
+		 * ROMs. IMO, we should just barf all over them. We need
+		 * atleast four bus_info quads to get our EUI-64.  */
+		if (req->hdr_size < 4) {
+			HPSB_INFO("Node %d on %s host has non-standard ROM format (%d quads), "
+				  "cannot parse", nodeid, host->template->name, req->hdr_size);
+			goto finish;
+		}
+
+		/* Make sure we don't overflow. We have one quad for this
+		 * first bus info block, the other 4 should be part of the
+		 * bus info itself.  */
+		if (req->hdr_size > (sizeof (req->bus_info) >> 2) - 1)
+			req->hdr_size = (sizeof (req->bus_info) >> 2) - 1;
+	}
+
+	/* We've got all the info we need, so let's check the EUI-64, and
+	 * add it to our list.  */
+	if (req->hdr_ptr >= req->hdr_size + 1) {
+		associate_guid(pkt->host, pkt->node_id,
+			((u64)req->bus_info[3] << 32) | req->bus_info[4]);
+		goto finish;
+	}
+
+retry:
+
+	/* Here, we either retry a failed retrieve, or we have incremented
+	 * our counter, to get the next quad in our header.  */
+	free_tlabel(pkt->host, pkt->node_id, pkt->tlabel);
+	free_hpsb_packet(pkt);
+	pkt = hpsb_make_readqpacket(host, nodeid, CSR_REGISTER_BASE +
+				    CSR_CONFIG_ROM + (req->hdr_ptr<<2));
+	if (!pkt) {
+		kfree(req);
+		HPSB_ERR("Out of memory in GUID processing");
+		return;
+	}
+
+	req->pkt = pkt;
+	req->retry = 0;
+
+	queue_task(&req->tq, &pkt->complete_tq);
+	if (!hpsb_send_packet(pkt)) {
+		HPSB_NOTICE("Failed to send GUID request to node %d", nodeid);
+		goto finish;
+	}
+
+	return;
+
+finish:
+
+	free_tlabel(pkt->host, nodeid, pkt->tlabel);
+	free_hpsb_packet(pkt);
+	kfree(req);
+
+	if (atomic_dec_and_test(&outstanding_requests)) {
+		/* Do something useful */
+	}
+
+	return;
 }
 
 
@@ -144,29 +207,33 @@ static void host_reset(struct hpsb_host *host)
         nodeid_t nodeid = LOCAL_BUS;
 
         for (; nodecount; nodecount--, nodeid++, sid++) {
-                while (sid->extended) sid++;
-                if (!sid->link_active) continue;
-                if (nodeid == host->node_id) continue;
+                while (sid->extended)
+			sid++;
+                if (!sid->link_active)
+			continue;
+		if (nodeid == host->node_id)
+			continue;
 
                 greq = kmalloc(sizeof(struct guid_req), SLAB_ATOMIC);
                 if (!greq) {
-                        HPSB_ERR("out of memory in GUID processing");
+                        HPSB_ERR("Out of memory in GUID processing");
                         return;
                 }
 
-                pkt = hpsb_make_readbpacket(host, nodeid,
-                                            CSR_REGISTER_BASE + CSR_CONFIG_ROM,
-                                            20);
+		pkt = hpsb_make_readqpacket(host, nodeid, CSR_REGISTER_BASE +
+					    CSR_CONFIG_ROM);
+
                 if (!pkt) {
                         kfree(greq);
-                        HPSB_ERR("out of memory in GUID processing");
+                        HPSB_ERR("Out of memory in GUID processing");
                         return;
                 }
 
-                INIT_TQ_LINK(greq->tq);
-                greq->tq.sync = 0;
-                greq->tq.routine = (void (*)(void*))pkt_complete;
-                greq->tq.data = greq;
+		INIT_TQUEUE(&greq->tq, (void (*)(void*))pkt_complete, greq);
+
+		greq->hdr_size = 4;
+		greq->hdr_ptr = 0;
+		greq->retry = 0;
                 greq->pkt = pkt;
 
                 queue_task(&greq->tq, &pkt->complete_tq);
@@ -175,10 +242,11 @@ static void host_reset(struct hpsb_host *host)
                         free_tlabel(pkt->host, pkt->node_id, pkt->tlabel);
                         free_hpsb_packet(pkt);
                         kfree(greq);
-                        HPSB_NOTICE("failed to send packet in GUID processing");
+                        HPSB_NOTICE("Failed to send GUID request to node %d", nodeid);
                 }
 
-                HPSB_INFO("GUID request sent to node %d", nodeid & NODE_MASK);
+		HPSB_DEBUG("GUID request sent to node %d", nodeid & NODE_MASK);
+
                 atomic_inc(&outstanding_requests);
         }
 }

@@ -22,6 +22,7 @@ void fill_async_lock_resp(struct hpsb_packet *packet, int rcode, int extcode,
                           int length);
 void fill_iso_packet(struct hpsb_packet *packet, int length, int channel,
                      int tag, int sync);
+void fill_phy_packet(struct hpsb_packet *packet, quadlet_t data);
 
 /*
  * Get and free transaction labels.
@@ -41,6 +42,8 @@ struct hpsb_packet *hpsb_make_writebpacket(struct hpsb_host *host,
                                            size_t length);
 struct hpsb_packet *hpsb_make_lockpacket(struct hpsb_host *host, nodeid_t node,
                                          u64 addr, int extcode);
+struct hpsb_packet *hpsb_make_phypacket(struct hpsb_host *host,
+                                        quadlet_t data) ;
 
 
 /*
@@ -68,5 +71,10 @@ int hpsb_write(struct hpsb_host *host, nodeid_t node, u64 addr,
                quadlet_t *buffer, size_t length);
 int hpsb_lock(struct hpsb_host *host, nodeid_t node, u64 addr, int extcode,
               quadlet_t *data, quadlet_t arg);
+
+/* Generic packet creation. Used by hpsb_write. Also useful for protocol
+ * drivers that want to implement their own hpsb_write replacement.  */
+struct hpsb_packet *hpsb_make_packet (struct hpsb_host *host, nodeid_t node,
+				      u64 addr, quadlet_t *buffer, size_t length);
 
 #endif /* _IEEE1394_TRANSACTIONS_H */

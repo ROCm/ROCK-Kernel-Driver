@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.misc.S 1.19 06/15/01 13:56:56 paulus
+ * BK Id: SCCS/s.misc.S 1.21 07/07/01 17:00:08 paulus
  */
 /*
  * This file contains miscellaneous low-level functions.
@@ -1093,6 +1093,8 @@ _GLOBAL(kernel_thread)
 	bnelr			/* return if parent */
 	li	r0,0		/* clear out p->thread.regs */
 	stw	r0,THREAD+PT_REGS(r2)	/* since we don't have user ctx */
+	addi	r1,r2,TASK_UNION_SIZE-STACK_FRAME_OVERHEAD
+	stw	r0,0(r1)
 	mtlr	r6              /* fn addr in lr */
 	mr	r3,r4	        /* load arg and call fn */
 	blrl

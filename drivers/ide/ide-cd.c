@@ -307,6 +307,7 @@
 #include <linux/errno.h>
 #include <linux/cdrom.h>
 #include <linux/ide.h>
+#include <linux/completion.h>
 
 #include <asm/irq.h>
 #include <asm/io.h>
@@ -512,7 +513,7 @@ void cdrom_analyze_sense_data(ide_drive_t *drive,
 }
 
 static void cdrom_queue_request_sense(ide_drive_t *drive, 
-				      struct semaphore *sem,
+				      struct completion *wait,
 				      struct request_sense *sense,
 				      struct packet_command *failed_command)
 {
@@ -534,7 +535,7 @@ static void cdrom_queue_request_sense(ide_drive_t *drive,
 	ide_init_drive_cmd(rq);
 	rq->cmd = REQUEST_SENSE_COMMAND;
 	rq->buffer = (char *) pc;
-	rq->sem = sem;
+	rq->waiting = wait;
 	(void) ide_do_drive_cmd(drive, rq, ide_preempt);
 }
 
@@ -596,7 +597,7 @@ static int cdrom_decode_status (ide_startstop_t *startstop, ide_drive_t *drive,
 
 	} else if (rq->cmd == PACKET_COMMAND) {
 		/* All other functions, except for READ. */
-		struct semaphore *sem = NULL;
+		struct completion *wait = NULL;
 		pc = (struct packet_command *) rq->buffer;
 
 		/* Check for tray open. */
@@ -622,15 +623,15 @@ static int cdrom_decode_status (ide_startstop_t *startstop, ide_drive_t *drive,
 		   command request to the request sense request. */
 
 		if ((stat & ERR_STAT) != 0) {
-			sem = rq->sem;
-			rq->sem = NULL;
+			wait = rq->waiting;
+			rq->waiting = NULL;
 		}
 
 		pc->stat = 1;
 		cdrom_end_request (1, drive);
 
 		if ((stat & ERR_STAT) != 0)
-			cdrom_queue_request_sense(drive, sem, pc->sense, pc);
+			cdrom_queue_request_sense(drive, wait, pc->sense, pc);
 	} else {
 		/* Handle errors from READ and WRITE requests. */
 

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.irq.c 1.28 06/28/01 16:15:56 paulus
+ * BK Id: SCCS/s.irq.c 1.30 07/19/01 16:51:32 paulus
  */
 /*
  *  arch/ppc/kernel/irq.c
@@ -65,8 +65,8 @@
 
 #include "local_irq.h"
 
-atomic_t ipi_recv;
-atomic_t ipi_sent;
+extern atomic_t ipi_recv;
+extern atomic_t ipi_sent;
 void enable_irq(unsigned int irq_nr);
 void disable_irq(unsigned int irq_nr);
 

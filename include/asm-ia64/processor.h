@@ -379,9 +379,9 @@ struct thread_struct {
 	regs->ar_bspstore = IA64_RBS_BOT;							\
 	regs->ar_fpsr = FPSR_DEFAULT;								\
 	regs->loadrs = 0;									\
-	regs->r8 = current->dumpable;	/* set "don't zap registers" flag */			\
+	regs->r8 = current->mm->dumpable;	/* set "don't zap registers" flag */		\
 	regs->r12 = new_sp - 16;	/* allocate 16 byte scratch area */			\
-	if (!__builtin_expect (current->dumpable, 1)) {						\
+	if (!__builtin_expect (current->mm->dumpable, 1)) {					\
 		/*										\
 		 * Zap scratch regs to avoid leaking bits between processes with different	\
 		 * uid/privileges.								\

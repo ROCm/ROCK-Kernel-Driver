@@ -14,11 +14,11 @@ ever do swabbing.  (See section `Block Size' below.)
 	<directory_structure>
 	<data>
 
-<superblock>: struct cramfs_super (see cramfs.h).
+<superblock>: struct cramfs_super (see cramfs_fs.h).
 
 <directory_structure>:
 	For each file:
-		struct cramfs_inode (see cramfs.h).
+		struct cramfs_inode (see cramfs_fs.h).
 		Filename.  Not generally null-terminated, but it is
 		 null-padded to a multiple of 4 bytes.
 

@@ -1,4 +1,4 @@
-/* $Id: ethtool.h,v 1.2 2000/11/12 10:05:57 davem Exp $
+/*
  * ethtool.h: Defines for Linux ethtool.
  *
  * Copyright (C) 1998 David S. Miller (davem@redhat.com)
@@ -34,13 +34,15 @@ struct ethtool_drvinfo {
 	char	bus_info[32];	/* Bus info for this interface.  For PCI
 				 * devices, use pci_dev->slot_name. */
 	char	reserved1[32];
-	char	reserved2[32];
+	char	reserved2[28];
+	u32	regdump_len;	/* Amount of data from ETHTOOL_GREGS */
 };
 
 /* CMDs currently supported */
 #define ETHTOOL_GSET		0x00000001 /* Get settings. */
 #define ETHTOOL_SSET		0x00000002 /* Set settings, privileged. */
 #define ETHTOOL_GDRVINFO	0x00000003 /* Get driver info. */
+#define ETHTOOL_GREGS		0x00000004 /* Get NIC registers, privileged. */
 
 /* compatibility with older code */
 #define SPARC_ETH_GSET		ETHTOOL_GSET

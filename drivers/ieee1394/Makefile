@@ -1,12 +1,6 @@
 #
 # Makefile for the Linux IEEE 1394 implementation
 #
-# Note! Dependencies are done automagically by 'make dep', which also
-# removes any old dependencies. DON'T put your own dependencies here
-# unless it's something special (not a .c file).
-#
-# Note 2! The CFLAGS definitions are now in the main makefile.
-#
 
 O_TARGET := ieee1394drv.o
 
@@ -18,10 +12,12 @@ ieee1394-objs := ieee1394_core.o ieee1394_transactions.o hosts.o \
 
 obj-$(CONFIG_IEEE1394) += ieee1394.o
 obj-$(CONFIG_IEEE1394_PCILYNX) += pcilynx.o
-obj-$(CONFIG_IEEE1394_AIC5800) += aic5800.o
 obj-$(CONFIG_IEEE1394_OHCI1394) += ohci1394.o
 obj-$(CONFIG_IEEE1394_VIDEO1394) += video1394.o
 obj-$(CONFIG_IEEE1394_RAWIO) += raw1394.o
+obj-$(CONFIG_IEEE1394_SBP2) += sbp2.o
+obj-$(CONFIG_IEEE1394_ETH1394) += eth1394.o
+obj-$(CONFIG_IEEE1394_IP1394) += ip1394.o
 
 include $(TOPDIR)/Rules.make
 

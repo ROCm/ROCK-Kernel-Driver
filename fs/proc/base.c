@@ -670,7 +670,7 @@ static struct inode *proc_pid_make_inode(struct super_block * sb, struct task_st
 	inode->u.proc_i.task = task;
 	inode->i_uid = 0;
 	inode->i_gid = 0;
-	if (ino == PROC_PID_INO || task->dumpable) {
+	if (ino == PROC_PID_INO || task->mm->dumpable) {
 		inode->i_uid = task->euid;
 		inode->i_gid = task->egid;
 	}

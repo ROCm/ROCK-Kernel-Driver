@@ -207,6 +207,7 @@ static int full_duplex[MAX_UNITS] = {0, };
 #include <linux/delay.h>
 #include <asm/processor.h>		/* Processor type for cache alignment. */
 #include <asm/uaccess.h>
+#include <asm/io.h>
 
 #ifdef HAS_FIRMWARE
 #include "starfire_firmware.h"

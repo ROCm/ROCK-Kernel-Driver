@@ -235,7 +235,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 	{
 		if (child == current)
 			goto out;
-		if ((!child->dumpable ||
+		if ((!child->mm->dumpable ||
 		     (current->uid != child->euid) ||
 		     (current->uid != child->suid) ||
 		     (current->uid != child->uid) ||

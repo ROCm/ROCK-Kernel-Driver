@@ -5,7 +5,7 @@
  *
  *		ROUTE - implementation of the IP router.
  *
- * Version:	$Id: route.c,v 1.94 2001/05/05 01:01:02 davem Exp $
+ * Version:	$Id: route.c,v 1.95 2001/07/10 22:32:51 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -52,6 +52,7 @@
  *	Tobias Ringstrom	:	Uninitialized res.type in ip_route_output_slow.
  *	Vladimir V. Ivanov	:	IP rule info (flowid) is really useful.
  *		Marc Boucher	:	routing by fwmark
+ *	Robert Olsson		:	Added rt_cache statistics
  *
  *		This program is free software; you can redistribute it and/or
  *		modify it under the terms of the GNU General Public License
@@ -198,6 +199,8 @@ static struct rt_hash_bucket 	*rt_hash_table;
 static unsigned			rt_hash_mask;
 static int			rt_hash_log;
 
+struct rt_cache_stat rt_cache_stat[NR_CPUS];
+
 static int rt_intern_hash(unsigned hash, struct rtable *rth,
 				struct rtable **res);
 
@@ -275,6 +278,41 @@ done:
   	len = pos - offset;
   	if (len > length)
   		len = length;
+  	return len;
+}
+
+static int rt_cache_stat_get_info(char *buffer, char **start, off_t offset, int length)
+{
+	unsigned int dst_entries = atomic_read(&ipv4_dst_ops.entries);
+	int i, lcpu;
+	int len = 0;
+
+        for (lcpu = 0; lcpu < smp_num_cpus; lcpu++) {
+                i = cpu_logical_map(lcpu);
+
+		len += sprintf(buffer+len, "%08x  %08x %08x %08x %08x %08x %08x %08x  %08x %08x %08x\n",
+			       dst_entries,		       
+			       rt_cache_stat[i].in_hit,
+			       rt_cache_stat[i].in_slow_tot,
+			       rt_cache_stat[i].in_slow_mc,
+			       rt_cache_stat[i].in_no_route,
+			       rt_cache_stat[i].in_brd,
+			       rt_cache_stat[i].in_martian_dst,
+			       rt_cache_stat[i].in_martian_src,
+
+			       rt_cache_stat[i].out_hit,
+			       rt_cache_stat[i].out_slow_tot,
+			       rt_cache_stat[i].out_slow_mc
+			);
+	}
+	len -= offset;
+
+	if (len > length)
+		len = length;
+	if (len < 0)
+		len = 0;
+
+	*start = buffer + offset;
   	return len;
 }
   
@@ -1250,6 +1288,7 @@ static int ip_route_input_mc(struct sk_buff *skb, u32 daddr, u32 saddr,
 	if (!LOCAL_MCAST(daddr) && IN_DEV_MFORWARD(in_dev))
 		rth->u.dst.input = ip_mr_input;
 #endif
+	rt_cache_stat[smp_processor_id()].in_slow_mc++;
 
 	in_dev_put(in_dev);
 	hash = rt_hash_code(daddr, saddr ^ (dev->ifindex << 5), tos);
@@ -1334,6 +1373,8 @@ int ip_route_input_slow(struct sk_buff *skb, u32 daddr, u32 saddr,
 		goto no_route;
 	}
 	free_res = 1;
+
+	rt_cache_stat[smp_processor_id()].in_slow_tot++;
 
 #ifdef CONFIG_IP_ROUTE_NAT
 	/* Policy is applied before mapping destination,
@@ -1486,6 +1527,7 @@ brd_input:
 	}
 	flags |= RTCF_BROADCAST;
 	res.type = RTN_BROADCAST;
+	rt_cache_stat[smp_processor_id()].in_brd++;
 
 local_input:
 	rth = dst_alloc(&ipv4_dst_ops);
@@ -1529,6 +1571,7 @@ local_input:
 	goto intern;
 
 no_route:
+	rt_cache_stat[smp_processor_id()].in_no_route++;
 	spec_dst = inet_select_addr(dev, 0, RT_SCOPE_UNIVERSE);
 	res.type = RTN_UNREACHABLE;
 	goto local_input;
@@ -1537,6 +1580,7 @@ no_route:
 	 *	Do not cache martian addresses: they should be logged (RFC1812)
 	 */
 martian_destination:
+	rt_cache_stat[smp_processor_id()].in_martian_dst++;
 #ifdef CONFIG_IP_ROUTE_VERBOSE
 	if (IN_DEV_LOG_MARTIANS(in_dev) && net_ratelimit())
 		printk(KERN_WARNING "martian destination %u.%u.%u.%u from "
@@ -1552,6 +1596,8 @@ e_nobufs:
 	goto done;
 
 martian_source:
+
+	rt_cache_stat[smp_processor_id()].in_martian_src++;
 #ifdef CONFIG_IP_ROUTE_VERBOSE
 	if (IN_DEV_LOG_MARTIANS(in_dev) && net_ratelimit()) {
 		/*
@@ -1600,6 +1646,7 @@ int ip_route_input(struct sk_buff *skb, u32 daddr, u32 saddr,
 			rth->u.dst.lastuse = jiffies;
 			dst_hold(&rth->u.dst);
 			rth->u.dst.__use++;
+			rt_cache_stat[smp_processor_id()].in_hit++;
 			read_unlock(&rt_hash_table[hash].lock);
 			skb->dst = (struct dst_entry*)rth;
 			return 0;
@@ -1890,14 +1937,18 @@ make_route:
 
 	rth->u.dst.output=ip_output;
 
+	rt_cache_stat[smp_processor_id()].out_slow_tot++;
+
 	if (flags & RTCF_LOCAL) {
 		rth->u.dst.input = ip_local_deliver;
 		rth->rt_spec_dst = key.dst;
 	}
 	if (flags & (RTCF_BROADCAST | RTCF_MULTICAST)) {
 		rth->rt_spec_dst = key.src;
-		if (flags & RTCF_LOCAL && !(dev_out->flags & IFF_LOOPBACK))
+		if (flags & RTCF_LOCAL && !(dev_out->flags & IFF_LOOPBACK)) {
 			rth->u.dst.output = ip_mc_output;
+			rt_cache_stat[smp_processor_id()].out_slow_mc++;
+		}
 #ifdef CONFIG_IP_MROUTE
 		if (res.type == RTN_MULTICAST) {
 			struct in_device *in_dev = in_dev_get(dev_out);
@@ -1957,6 +2008,7 @@ int ip_route_output_key(struct rtable **rp, const struct rt_key *key)
 			rth->u.dst.lastuse = jiffies;
 			dst_hold(&rth->u.dst);
 			rth->u.dst.__use++;
+			rt_cache_stat[smp_processor_id()].out_hit++;
 			read_unlock_bh(&rt_hash_table[hash].lock);
 			*rp = rth;
 			return 0;
@@ -2474,6 +2526,7 @@ void __init ip_rt_init(void)
 	add_timer(&rt_periodic_timer);
 
 	proc_net_create ("rt_cache", 0, rt_cache_get_info);
+	proc_net_create ("rt_cache_stat", 0, rt_cache_stat_get_info);
 #ifdef CONFIG_NET_CLS_ROUTE
 	create_proc_read_entry("net/rt_acct", 0, 0, ip_rt_acct_read, NULL);
 #endif

@@ -1,7 +1,8 @@
-CFLAGS = -Wall -O2
-CPPFLAGS = -I../../fs/cramfs
+CC = gcc
+CFLAGS = -W -Wall -O2 -g
+CPPFLAGS = -I../../include
 LDLIBS = -lz
-PROGS = mkcramfs
+PROGS = mkcramfs cramfsck
 
 all: $(PROGS)
 

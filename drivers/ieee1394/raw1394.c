@@ -16,13 +16,12 @@
 #include <linux/fs.h>
 #include <linux/poll.h>
 #include <linux/module.h>
+#include <linux/init.h>
 #include <linux/version.h>
 #include <linux/smp_lock.h>
 #include <asm/uaccess.h>
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,3,0)
 #include <linux/devfs_fs_kernel.h>
-#endif
 
 #include "ieee1394.h"
 #include "ieee1394_types.h"
@@ -64,8 +63,7 @@ static struct pending_request *__alloc_pending_request(int flags)
         if (req != NULL) {
                 memset(req, 0, sizeof(struct pending_request));
                 INIT_LIST_HEAD(&req->list);
-                INIT_TQ_LINK(req->tq);
-                req->tq.routine = (void(*)(void*))queue_complete_cb;
+		INIT_TQUEUE(&req->tq, (void(*)(void*))queue_complete_cb, NULL);
         }
 
         return req;
@@ -605,7 +603,7 @@ static int handle_local_request(struct file_info *fi,
                         break;
                 }
 
-                req->req.error = highlevel_write(fi->host, node, req->data,
+                req->req.error = highlevel_write(fi->host, node, node, req->data,
                                                  addr, req->req.length);
                 req->req.length = 0;
                 break;
@@ -650,8 +648,11 @@ static int handle_local_request(struct file_info *fi,
                 req->req.error = RAW1394_ERROR_STATE_ORDER;
         }
 
-        if (req->req.error) req->req.length = 0;
-        req->req.error |= 0x00100000;
+        if (req->req.error)
+                req->req.length = 0;
+        if (req->req.error >= 0)
+                req->req.error |= ACK_PENDING << 16;
+
         queue_complete_req(req);
         return sizeof(struct raw1394_request);
 }
@@ -827,7 +828,7 @@ static int state_connected(struct file_info *fi, struct pending_request *req)
                 return sizeof(struct raw1394_request);
 
         case RAW1394_REQ_RESET_BUS:
-                hpsb_reset_bus(fi->host);
+                hpsb_reset_bus(fi->host, LONG_RESET);
                 return sizeof(struct raw1394_request);
         }
 
@@ -912,14 +913,14 @@ static int dev_open(struct inode *inode, struct file *file)
                 return -ENXIO;
         }
 
-        V22_COMPAT_MOD_INC_USE_COUNT;
+	MOD_INC_USE_COUNT;
 
         fi = kmalloc(sizeof(struct file_info), SLAB_KERNEL);
         if (fi == NULL) {
-                V22_COMPAT_MOD_DEC_USE_COUNT;
+		MOD_DEC_USE_COUNT;
                 return -ENOMEM;
         }
-        
+
         memset(fi, 0, sizeof(struct file_info));
 
         INIT_LIST_HEAD(&fi->list);
@@ -986,7 +987,7 @@ static int dev_release(struct inode *inode, struct file *file)
 
         kfree(fi);
 
-        V22_COMPAT_MOD_DEC_USE_COUNT;
+        MOD_DEC_USE_COUNT;
         unlock_kernel();
         return 0;
 }
@@ -1000,7 +1001,7 @@ static struct hpsb_highlevel_ops hl_ops = {
 };
 
 static struct file_operations file_ops = {
-        OWNER_THIS_MODULE
+	owner:    THIS_MODULE,
         read:     dev_read, 
         write:    dev_write, 
         poll:     dev_poll, 
@@ -1008,7 +1009,7 @@ static struct file_operations file_ops = {
         release:  dev_release, 
 };
 
-int init_raw1394(void)
+static int __init init_raw1394(void)
 {
         hl_handle = hpsb_register_highlevel(RAW1394_DEVICE_NAME, &hl_ops);
         if (hl_handle == NULL) {
@@ -1030,23 +1031,12 @@ int init_raw1394(void)
         return 0;
 }
 
-void cleanup_raw1394(void)
+static void __exit cleanup_raw1394(void)
 {
         devfs_unregister_chrdev(RAW1394_DEVICE_MAJOR, RAW1394_DEVICE_NAME);
 	devfs_unregister(devfs_handle);
         hpsb_unregister_highlevel(hl_handle);
 }
 
-#ifdef MODULE
-
-int init_module(void)
-{
-        return init_raw1394();
-}
-
-void cleanup_module(void)
-{
-        return cleanup_raw1394();
-}
-
-#endif
+module_init(init_raw1394);
+module_exit(cleanup_raw1394);

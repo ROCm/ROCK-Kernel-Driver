@@ -9,6 +9,7 @@
 #include "scsi.h"
 #endif
 #include <linux/devfs_fs_kernel.h>
+#include <linux/completion.h>
 
 /* The tape buffer descriptor. */
 typedef struct {
@@ -67,7 +68,7 @@ typedef struct {
 	kdev_t devt;
 	Scsi_Device *device;
 	struct semaphore lock;	/* For serialization */
-	struct semaphore sem;	/* For SCSI commands */
+	struct completion wait;	/* For SCSI commands */
 	ST_buffer *buffer;
 
 	/* Drive characteristics */

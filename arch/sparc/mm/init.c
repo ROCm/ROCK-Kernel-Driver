@@ -1,4 +1,4 @@
-/*  $Id: init.c,v 1.98 2001/04/14 21:13:45 davem Exp $
+/*  $Id: init.c,v 1.99 2001/07/17 16:17:33 anton Exp $
  *  linux/arch/sparc/mm/init.c
  *
  *  Copyright (C) 1995 David S. Miller (davem@caip.rutgers.edu)
@@ -54,32 +54,6 @@ extern unsigned int sparc_ramdisk_size;
 unsigned long highstart_pfn, highend_pfn;
 unsigned long totalram_pages;
 unsigned long totalhigh_pages;
-
-/*
- * BAD_PAGE is the page that is used for page faults when linux
- * is out-of-memory. Older versions of linux just did a
- * do_exit(), but using this instead means there is less risk
- * for a process dying in kernel mode, possibly leaving an inode
- * unused etc..
- *
- * BAD_PAGETABLE is the accompanying page-table: it is initialized
- * to point to BAD_PAGE entries.
- *
- * ZERO_PAGE is a special page that is used for zero-initialized
- * data and COW.
- */
-pte_t *__bad_pagetable(void)
-{
-	memset((void *) &empty_bad_page_table, 0, PAGE_SIZE);
-	return (pte_t *) &empty_bad_page_table;
-}
-
-pte_t __bad_page(void)
-{
-	memset((void *) &empty_bad_page, 0, PAGE_SIZE);
-	return pte_mkdirty(mk_pte_phys((unsigned long)__pa(&empty_bad_page) + phys_base,
-				       PAGE_SHARED));
-}
 
 pte_t *kmap_pte;
 pgprot_t kmap_prot;

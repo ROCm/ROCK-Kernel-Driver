@@ -328,7 +328,7 @@ static void st_sleep_done(Scsi_Cmnd * SCpnt)
 		(STp->buffer)->last_SRpnt = SCpnt->sc_request;
 		DEB( STp->write_pending = 0; )
 
-		up(SCpnt->request.sem);
+		complete(SCpnt->request.waiting);
 	}
         DEB(
 	else if (debugging)
@@ -361,7 +361,7 @@ static Scsi_Request *
 
 	if (SRpnt->sr_device->scsi_level <= SCSI_2)
 		cmd[1] |= (SRpnt->sr_device->lun << 5) & 0xe0;
-	init_MUTEX_LOCKED(&STp->sem);
+	init_completion(&STp->wait);
 	SRpnt->sr_use_sg = (bytes > (STp->buffer)->sg[0].length) ?
 	    (STp->buffer)->use_sg : 0;
 	if (SRpnt->sr_use_sg) {
@@ -372,7 +372,7 @@ static Scsi_Request *
 		bp = (STp->buffer)->b_data;
 	SRpnt->sr_data_direction = direction;
 	SRpnt->sr_cmd_len = 0;
-	SRpnt->sr_request.sem = &(STp->sem);
+	SRpnt->sr_request.waiting = &(STp->wait);
 	SRpnt->sr_request.rq_status = RQ_SCSI_BUSY;
 	SRpnt->sr_request.rq_dev = STp->devt;
 
@@ -380,8 +380,8 @@ static Scsi_Request *
 		    st_sleep_done, timeout, retries);
 
 	if (do_wait) {
-		down(SRpnt->sr_request.sem);
-		SRpnt->sr_request.sem = NULL;
+		wait_for_completion(SRpnt->sr_request.waiting);
+		SRpnt->sr_request.waiting = NULL;
 		(STp->buffer)->syscall_result = st_chk_result(STp, SRpnt);
 	}
 	return SRpnt;
@@ -403,8 +403,8 @@ static void write_behind_check(Scsi_Tape * STp)
 		STp->nbr_finished++;
         ) /* end DEB */
 
-	down(&(STp->sem));
-	(STp->buffer)->last_SRpnt->sr_request.sem = NULL;
+	wait_for_completion(&(STp->wait));
+	(STp->buffer)->last_SRpnt->sr_request.waiting = NULL;
 
 	(STp->buffer)->syscall_result = st_chk_result(STp, (STp->buffer)->last_SRpnt);
 	scsi_release_request((STp->buffer)->last_SRpnt);

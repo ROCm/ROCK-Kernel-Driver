@@ -68,7 +68,7 @@ ENTRY(ia64_execve)
 
 	/*
 	 * In theory, we'd have to zap this state only to prevent leaking of
-	 * security sensitive state (e.g., if current->dumpable is zero).  However,
+	 * security sensitive state (e.g., if current->mm->dumpable is zero).  However,
 	 * this executes in less than 20 cycles even on Itanium, so it's not worth
 	 * optimizing for...).
 	 */

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.head.S 1.23 06/28/01 15:50:16 paulus
+ * BK Id: SCCS/s.head.S 1.25 07/07/01 17:08:44 paulus
  */
 /*
  *  PowerPC version 
@@ -1307,6 +1307,7 @@ __secondary_start:
 	mtspr	SPRG3,r4
 	li	r3,0
 	mtspr	SPRG2,r3	/* 0 => r1 has kernel sp */
+	stw	r3,PT_REGS(r4)	/* set thread.regs to 0 for kernel thread */
 
 	/* enable MMU and jump to start_secondary */
 	li	r4,MSR_KERNEL

@@ -184,7 +184,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 	 	    (tsk->gid != child->gid)) && !capable(CAP_SYS_PTRACE))
 			goto out_tsk;
 		rmb();
-		if (!child->dumpable && !capable(CAP_SYS_PTRACE))
+		if (!child->mm->dumpable && !capable(CAP_SYS_PTRACE))
 			goto out_tsk;
 		/* the same process cannot be attached many times */
 		if (child->ptrace & PT_PTRACED)

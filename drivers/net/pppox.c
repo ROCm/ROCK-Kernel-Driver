@@ -148,10 +148,6 @@ static int __init pppox_init(void)
 
 	err = sock_register(&pppox_proto_family);
 
-	if (err == 0) {
-		printk(KERN_INFO "Registered PPPoX v0.5\n");
-	}
-
 	return err;
 }
 

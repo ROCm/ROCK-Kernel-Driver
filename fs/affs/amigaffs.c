@@ -284,7 +284,7 @@ affs_remove_header(struct dentry *dentry)
 
 	pr_debug("AFFS: remove_header(key=%ld)\n", inode->i_ino);
 	retval = -EIO;
-	bh = affs_bread(sb, (u32)dentry->d_fsdata);
+	bh = affs_bread(sb, (u32)(long)dentry->d_fsdata);
 	if (!bh)
 		goto done;
 

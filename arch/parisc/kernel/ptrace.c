@@ -63,7 +63,7 @@ long sys_ptrace(long request, pid_t pid, long addr, long data)
 	if (request == PTRACE_ATTACH) {
 		if (child == current)
 			goto out_tsk;
-		if ((!child->dumpable ||
+		if ((!child->mm->dumpable ||
 		    (current->uid != child->euid) ||
 		    (current->uid != child->suid) ||
 		    (current->uid != child->uid) ||

@@ -841,8 +841,10 @@ int sock_create(int family, int type, int protocol, struct socket **res)
 	/*
 	 *	Check protocol is in range
 	 */
-	if(family<0 || family>=NPROTO)
+	if (family < 0 || family >= NPROTO)
 		return -EAFNOSUPPORT;
+	if (type < 0 || type >= SOCK_MAX)
+		return -EINVAL;
 
 	/* Compatibility.
 

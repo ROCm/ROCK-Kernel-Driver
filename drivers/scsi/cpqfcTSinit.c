@@ -41,6 +41,7 @@
 #include <linux/timer.h>
 #include <linux/ioport.h>  // request_region() prototype
 #include <linux/vmalloc.h> // ioremap()
+#include <linux/completion.h>
 #ifdef __alpha__
 #define __KERNEL_SYSCALLS__
 #endif
@@ -435,8 +436,8 @@ static void my_ioctl_done (Scsi_Cmnd * SCpnt)
     req = &SCpnt->request;
     req->rq_status = RQ_SCSI_DONE; /* Busy, but indicate request done */
   
-    if (req->sem != NULL) {
-	up(req->sem);
+    if (req->waiting != NULL) {
+	complete(req->waiting);
     }
 }   
 
@@ -560,8 +561,8 @@ int cpqfcTS_ioctl( Scsi_Device *ScsiDev, int Cmnd, void *arg)
 	
         spin_lock_irqsave(&io_request_lock, flags);
         {
-          DECLARE_MUTEX_LOCKED(sem);
-          ScsiPassThruCmnd->request.sem = &sem;
+          DECLARE_COMPLETION(wait);
+          ScsiPassThruCmnd->request.waiting = &wait;
           // eventually gets us to our own _quecommand routine
           scsi_do_cmd( ScsiPassThruCmnd, &vendor_cmd->cdb[0], 
 	       buf, 
@@ -571,9 +572,9 @@ int cpqfcTS_ioctl( Scsi_Device *ScsiDev, int Cmnd, void *arg)
           spin_unlock_irqrestore(&io_request_lock, flags);
           // Other I/Os can now resume; we wait for our ioctl
 	  // command to complete
-	  down(&sem);
+	  wait_for_completion(&wait);
           spin_lock_irqsave(&io_request_lock, flags);
-          ScsiPassThruCmnd->request.sem = NULL;
+          ScsiPassThruCmnd->request.waiting = NULL;
         }
 	
         result = ScsiPassThruCmnd->result;

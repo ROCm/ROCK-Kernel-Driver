@@ -1,4 +1,4 @@
-# BK Id: SCCS/s.Makefile 1.10 06/05/01 20:22:51 paulus
+# BK Id: SCCS/s.Makefile 1.12 07/19/01 09:11:28 trini
 #
 # Makefile for making XCOFF bootable images for booting on PowerMacs
 # using Open Firmware.
@@ -16,6 +16,8 @@ COMMONOBJS = start.o misc.o ../common/string.o image.o
 COFFOBJS = ../common/coffcrt0.o $(COMMONOBJS) coffmain.o
 CHRPOBJS = ../common/crt0.o $(COMMONOBJS) chrpmain.o
 LIBS = $(TOPDIR)/lib/lib.a ../lib/zlib.a
+
+CFLAGS += -fno-builtin
 
 MKNOTE := ../utils/mknote
 SIZE := ../utils/size

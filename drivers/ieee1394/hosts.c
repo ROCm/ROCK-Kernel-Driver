@@ -106,9 +106,7 @@ struct hpsb_host *hpsb_get_host(struct hpsb_host_template *tmpl,
         sema_init(&h->tlabel_count, 64);
         spin_lock_init(&h->tlabel_lock);
 
-        INIT_TQ_LINK(h->timeout_tq);
-        h->timeout_tq.routine = (void (*)(void*))abort_timedouts;
-        h->timeout_tq.data = h;
+	INIT_TQUEUE(&h->timeout_tq, (void (*)(void*))abort_timedouts, h);
 
         h->topology_map = h->csr.topology_map + 3;
         h->speed_map = (u8 *)(h->csr.speed_map + 2);
@@ -149,6 +147,10 @@ static void init_hosts(struct hpsb_host_template *tmpl)
         int count;
         struct hpsb_host *host;
 
+	/* PCI cards should register one host at a time */
+	if (tmpl->detect_hosts == NULL)
+		return;
+
         count = tmpl->detect_hosts(tmpl);
 
         for (host = tmpl->hosts; host != NULL; host = host->next) {
@@ -156,13 +158,13 @@ static void init_hosts(struct hpsb_host_template *tmpl)
                         host->initialized = 1;
 
                         highlevel_add_host(host);
-                        hpsb_reset_bus(host);
+                        hpsb_reset_bus(host, LONG_RESET);
                 }
         }
 
         tmpl->number_of_hosts = count;
-        HPSB_INFO("detected %d %s adapter%c", count, tmpl->name,
-                  (count != 1 ? 's' : ' '));
+        HPSB_INFO("detected %d %s adapter%s", count, tmpl->name,
+                  (count != 1 ? "s" : ""));
 }
 
 static void shutdown_hosts(struct hpsb_host_template *tmpl)
@@ -252,7 +254,7 @@ static int remove_template(struct hpsb_host_template *tmpl)
 int hpsb_register_lowlevel(struct hpsb_host_template *tmpl)
 {
         add_template(tmpl);
-        HPSB_INFO("registered %s driver, initializing now", tmpl->name);
+        HPSB_DEBUG("Registered %s driver, initializing now", tmpl->name);
         init_hosts(tmpl);
 
         return 0;
@@ -266,56 +268,3 @@ void hpsb_unregister_lowlevel(struct hpsb_host_template *tmpl)
                 HPSB_PANIC("remove_template failed on %s", tmpl->name);
         }
 }
-
-
-
-#ifndef MODULE
-
-/*
- * This is the init function for builtin lowlevel drivers.  To add new drivers
- * put their setup code (get and register template) here.  Module only
- * drivers don't need to touch this.
- */
-
-#define SETUP_TEMPLATE(name, visname) \
-do {                                                                       \
-        extern struct hpsb_host_template *get_ ## name ## _template(void); \
-        t = get_ ## name ## _template();                                   \
-                                                                           \
-        if (t != NULL) {                                                   \
-                if(!hpsb_register_lowlevel(t)) {                           \
-                        count++;                                           \
-                }                                                          \
-        } else {                                                           \
-                HPSB_WARN(visname " driver returned no host template");    \
-        }                                                                  \
-} while (0)
-
-void __init register_builtin_lowlevels()
-{
-        struct hpsb_host_template *t;
-        int count = 0;
-
-        /* Touch t to avoid warning if no drivers are configured to
-         * be built directly into the kernel. */
-        t = NULL;
-
-#ifdef CONFIG_IEEE1394_PCILYNX
-        SETUP_TEMPLATE(lynx, "Lynx");
-#endif
-
-#ifdef CONFIG_IEEE1394_AIC5800
-        SETUP_TEMPLATE(aic, "AIC-5800");
-#endif
- 
-#ifdef CONFIG_IEEE1394_OHCI1394
-        SETUP_TEMPLATE(ohci, "OHCI-1394");
-#endif
-
-        HPSB_INFO("%d host adapter%s initialized", count,
-                  (count != 1 ? "s" : ""));
-}
-
-#undef SETUP_TEMPLATE
-
-#endif /* !MODULE */

@@ -6879,7 +6879,7 @@ CONFIG_IEEE1394
 
 TI PCILynx IEEE 1394 support
 CONFIG_IEEE1394_PCILYNX
-  Say Y here if you have a IEEE-1394 controller with the Texas
+  Say Y here if you have an IEEE-1394 controller with the Texas
   Instruments PCILynx chip.  Note: this driver is written for revision
   2 of this chip and may not work with revision 0.
 
@@ -6913,28 +6913,29 @@ CONFIG_IEEE1394_PCILYNX_PORTS
   
   If unsure, say N.
 
-Adaptec AIC-5800 IEEE 1394 support
-CONFIG_IEEE1394_AIC5800
-  Say Y here if you have a IEEE 1394 controller using the Adaptec
-  AIC-5800 chip. All Adaptec host adapters (89xx series) use this
-  chip, as well as miro's DV boards.
-
-  If you want to compile this as a module ( = code which can be
-  inserted in and removed from the running kernel whenever you want),
-  say M here and read Documentation/modules.txt. The module will be
-  called aic5800.o.
-
-OHCI (Open Host Controller Interface) support
+OHCI-1394 support
 CONFIG_IEEE1394_OHCI1394
-  Say Y here if you have a IEEE 1394 controller based on OHCI.
-  The current driver was only tested with OHCI chipsets made
-  by Texas Instruments. However, most third-party vendors use
-  TI chips.
+  Enable this driver if you have an IEEE 1394 controller based on the
+  OHCI-1394 specification. The current driver is only tested with OHCI
+  chipsets made by Texas Instruments and NEC. Most third-party vendors
+  use one of these chipsets. It should work with any OHCI-1394 compliant
+  card, however.
 
   If you want to compile this as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want),
   say M here and read Documentation/modules.txt. The module will be
   called ohci1394.o.
+
+OHCI-1394 Video support
+CONFIG_IEEE1394_VIDEO1394
+  This option enables video device usage for OHCI-1394 cards. Enable this
+  option only if you have an IEEE 1394 video device connected to an
+  OHCI-1394 card.
+
+SBP-2 support (Harddisks etc.)
+CONFIG_IEEE1394_SBP2
+  This option enables you to use SBP-2 devices connected to your IEEE 1394
+  bus. SBP-2 devices include harddrives and DVD devices.
 
 Raw IEEE 1394 I/O support
 CONFIG_IEEE1394_RAWIO

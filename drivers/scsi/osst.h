@@ -4,6 +4,7 @@
 
 #include <asm/byteorder.h>
 #include <linux/config.h>
+#include <linux/completion.h>
 #ifdef CONFIG_DEVFS_FS
 #include <linux/devfs_fs_kernel.h>
 #endif
@@ -535,7 +536,7 @@ typedef struct {
   unsigned capacity;
   Scsi_Device* device;
   struct semaphore lock;       /* for serialization */
-  struct semaphore sem;        /* for SCSI commands */
+  struct completion wait;      /* for SCSI commands */
   OSST_buffer * buffer;
 
   /* Drive characteristics */

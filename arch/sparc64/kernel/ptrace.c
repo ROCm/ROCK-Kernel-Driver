@@ -177,7 +177,7 @@ asmlinkage void do_ptrace(struct pt_regs *regs)
 			pt_error_return(regs, EPERM);
 			goto out_tsk;
 		}
-		if ((!child->dumpable ||
+		if ((!child->mm->dumpable ||
 		     (current->uid != child->euid) ||
 		     (current->uid != child->uid) ||
 		     (current->uid != child->suid) ||

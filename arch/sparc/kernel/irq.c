@@ -1,4 +1,4 @@
-/*  $Id: irq.c,v 1.112 2001/04/27 07:02:42 davem Exp $
+/*  $Id: irq.c,v 1.113 2001/07/17 16:17:33 anton Exp $
  *  arch/sparc/kernel/irq.c:  Interrupt request handling routines. On the
  *                            Sparc the IRQ's are basically 'cast in stone'
  *                            and you are supposed to probe the prom's device
@@ -424,6 +424,8 @@ void handler_irq(int irq, struct pt_regs * regs)
 	} while (action);
 	enable_pil_irq(irq);
 	irq_exit(cpu, irq);
+	if (softirq_pending(cpu))
+		do_softirq();
 }
 
 #ifdef CONFIG_BLK_DEV_FD
@@ -439,6 +441,8 @@ void sparc_floppy_irq(int irq, void *dev_id, struct pt_regs *regs)
 	floppy_interrupt(irq, dev_id, regs);
 	irq_exit(cpu, irq);
 	enable_pil_irq(irq);
+	if (softirq_pending(cpu))
+		do_softirq();
 }
 #endif
 

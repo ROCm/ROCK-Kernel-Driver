@@ -1,4 +1,4 @@
-/* $Id: sun4c.c,v 1.206 2001/04/14 21:13:45 davem Exp $
+/* $Id: sun4c.c,v 1.207 2001/07/17 16:17:33 anton Exp $
  * sun4c.c: Doing in software what should be done in hardware.
  *
  * Copyright (C) 1996 David S. Miller (davem@caip.rutgers.edu)
@@ -2178,7 +2178,7 @@ static unsigned long sun4c_pgd_page(pgd_t pgd)
 }
 
 /* to find an entry in a page-table-directory */
-extern inline pgd_t *sun4c_pgd_offset(struct mm_struct * mm, unsigned long address)
+static inline pgd_t *sun4c_pgd_offset(struct mm_struct * mm, unsigned long address)
 {
 	return mm->pgd + (address >> SUN4C_PGDIR_SHIFT);
 }
@@ -2195,41 +2195,6 @@ pte_t *sun4c_pte_offset(pmd_t * dir, unsigned long address)
 	return (pte_t *) sun4c_pmd_page(*dir) +	((address >> PAGE_SHIFT) & (SUN4C_PTRS_PER_PTE - 1));
 }
 
-/* Please take special note on the foo_kernel() routines below, our
- * fast in window fault handler wants to get at the pte's for vmalloc
- * area with traps off, therefore they _MUST_ be locked down to prevent
- * a watchdog from happening.  It only takes 4 pages of pte's to lock
- * down the maximum vmalloc space possible on sun4c so we statically
- * allocate these page table pieces in the kernel image.  Therefore
- * we should never have to really allocate or free any kernel page
- * table information.
- */
-
-/* Allocate and free page tables. The xxx_kernel() versions are
- * used to allocate a kernel page table - this turns on ASN bits
- * if any, and marks the page tables reserved.
- */
-static void sun4c_pte_free_kernel(pte_t *pte)
-{
-	/* This should never get called. */
-	panic("sun4c_pte_free_kernel called, can't happen...");
-}
-
-static pte_t *sun4c_pte_alloc_kernel(pmd_t *pmd, unsigned long address)
-{
-	if (address >= SUN4C_LOCK_VADDR)
-		return NULL;
-	address = (address >> PAGE_SHIFT) & (SUN4C_PTRS_PER_PTE - 1);
-	if (sun4c_pmd_none(*pmd))
-		panic("sun4c_pmd_none for kernel pmd, can't happen...");
-	if (sun4c_pmd_bad(*pmd)) {
-		printk("Bad pmd in pte_alloc_kernel: %08lx\n", pmd_val(*pmd));
-		*pmd = __pmd(PGD_TABLE | (unsigned long) BAD_PAGETABLE);
-		return NULL;
-	}
-	return (pte_t *) sun4c_pmd_page(*pmd) + address;
-}
-
 static void sun4c_free_pte_slow(pte_t *pte)
 {
 	free_page((unsigned long)pte);
@@ -2240,20 +2205,7 @@ static void sun4c_free_pgd_slow(pgd_t *pgd)
 	free_page((unsigned long)pgd);
 }
 
-/*
- * allocating and freeing a pmd is trivial: the 1-entry pmd is
- * inside the pgd, so has no extra memory associated with it.
- */
-static void sun4c_pmd_free_kernel(pmd_t *pmd)
-{
-}
-
-static pmd_t *sun4c_pmd_alloc_kernel(pgd_t *pgd, unsigned long address)
-{
-	return (pmd_t *) pgd;
-}
-
-extern __inline__ pgd_t *sun4c_get_pgd_fast(void)
+static pgd_t *sun4c_get_pgd_fast(void)
 {
 	unsigned long *ret;
 
@@ -2273,14 +2225,22 @@ extern __inline__ pgd_t *sun4c_get_pgd_fast(void)
 	return (pgd_t *)ret;
 }
 
-extern __inline__ void sun4c_free_pgd_fast(pgd_t *pgd)
+static void sun4c_free_pgd_fast(pgd_t *pgd)
 {
 	*(unsigned long *)pgd = (unsigned long) pgd_quicklist;
 	pgd_quicklist = (unsigned long *) pgd;
 	pgtable_cache_size++;
 }
 
-extern __inline__ pte_t *sun4c_get_pte_fast(void)
+static pte_t *sun4c_pte_alloc_one(struct mm_struct *mm, unsigned long address)
+{
+	pte_t *pte = (pte_t *)__get_free_page(GFP_KERNEL);
+	if (pte)
+		memset(pte, 0, PAGE_SIZE);
+	return pte;
+}
+
+pte_t *sun4c_pte_alloc_one_fast(struct mm_struct *mm, unsigned long address)
 {
 	unsigned long *ret;
 
@@ -2292,68 +2252,25 @@ extern __inline__ pte_t *sun4c_get_pte_fast(void)
 	return (pte_t *)ret;
 }
 
-extern __inline__ void sun4c_free_pte_fast(pte_t *pte)
+static __inline__ void sun4c_free_pte_fast(pte_t *pte)
 {
 	*(unsigned long *)pte = (unsigned long) pte_quicklist;
 	pte_quicklist = (unsigned long *) pte;
 	pgtable_cache_size++;
 }
 
-static void sun4c_pte_free(pte_t *pte)
-{
-	sun4c_free_pte_fast(pte);
-}
-
-static pte_t *sun4c_pte_alloc(pmd_t * pmd, unsigned long address)
-{
-	address = (address >> PAGE_SHIFT) & (SUN4C_PTRS_PER_PTE - 1);
-	if (sun4c_pmd_none(*pmd)) {
-		pte_t *page = (pte_t *) sun4c_get_pte_fast();
-		
-		if (page) {
-			*pmd = __pmd(PGD_TABLE | (unsigned long) page);
-			return page + address;
-		}
-		page = (pte_t *) get_free_page(GFP_KERNEL);
-		if (sun4c_pmd_none(*pmd)) {
-			if (page) {
-				*pmd = __pmd(PGD_TABLE | (unsigned long) page);
-				return page + address;
-			}
-			*pmd = __pmd(PGD_TABLE | (unsigned long) BAD_PAGETABLE);
-			return NULL;
-		}
-		free_page((unsigned long) page);
-	}
-	if (sun4c_pmd_bad(*pmd)) {
-		printk("Bad pmd in pte_alloc: %08lx\n", pmd_val(*pmd));
-		*pmd = __pmd(PGD_TABLE | (unsigned long) BAD_PAGETABLE);
-		return NULL;
-	}
-	return (pte_t *) sun4c_pmd_page(*pmd) + address;
-}
-
 /*
  * allocating and freeing a pmd is trivial: the 1-entry pmd is
  * inside the pgd, so has no extra memory associated with it.
  */
-static void sun4c_pmd_free(pmd_t * pmd)
+static pmd_t *sun4c_pmd_alloc_one_fast(struct mm_struct *mm, unsigned long address)
 {
+	BUG();
+	return NULL;
 }
 
-static pmd_t *sun4c_pmd_alloc(pgd_t * pgd, unsigned long address)
+static void sun4c_free_pmd_fast(pmd_t * pmd)
 {
-	return (pmd_t *) pgd;
-}
-
-static void sun4c_pgd_free(pgd_t *pgd)
-{
-	sun4c_free_pgd_fast(pgd);
-}
-
-static pgd_t *sun4c_pgd_alloc(void)
-{
-	return sun4c_get_pgd_fast();
 }
 
 static int sun4c_check_pgt_cache(int low, int high)
@@ -2363,13 +2280,8 @@ static int sun4c_check_pgt_cache(int low, int high)
 		do {
 			if (pgd_quicklist)
 				sun4c_free_pgd_slow(sun4c_get_pgd_fast()), freed++;
-	/* Only two level page tables at the moment, sun4 3 level mmu is not supported - Anton */
-#if 0
-			if (pmd_quicklist)
-				sun4c_free_pmd_slow(sun4c_get_pmd_fast()), freed++;
-#endif
 			if (pte_quicklist)
-				sun4c_free_pte_slow(sun4c_get_pte_fast()), freed++;
+				sun4c_free_pte_slow(sun4c_pte_alloc_one_fast(NULL, 0)), freed++;
 		} while (pgtable_cache_size > low);
 	}
 	return freed;
@@ -2615,16 +2527,13 @@ void __init ld_mmu_sun4c(void)
 	BTFIXUPSET_INT(pte_modify_mask, _SUN4C_PAGE_CHG_MASK);
 	BTFIXUPSET_CALL(pmd_offset, sun4c_pmd_offset, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(pte_offset, sun4c_pte_offset, BTFIXUPCALL_NORM);
-	BTFIXUPSET_CALL(pte_free_kernel, sun4c_pte_free_kernel, BTFIXUPCALL_NORM);
-	BTFIXUPSET_CALL(pmd_free_kernel, sun4c_pmd_free_kernel, BTFIXUPCALL_NOP);
-	BTFIXUPSET_CALL(pte_alloc_kernel, sun4c_pte_alloc_kernel, BTFIXUPCALL_NORM);
-	BTFIXUPSET_CALL(pmd_alloc_kernel, sun4c_pmd_alloc_kernel, BTFIXUPCALL_RETO0);
-	BTFIXUPSET_CALL(pte_free, sun4c_pte_free, BTFIXUPCALL_NORM);
-	BTFIXUPSET_CALL(pte_alloc, sun4c_pte_alloc, BTFIXUPCALL_NORM);
-	BTFIXUPSET_CALL(pmd_free, sun4c_pmd_free, BTFIXUPCALL_NOP);
-	BTFIXUPSET_CALL(pmd_alloc, sun4c_pmd_alloc, BTFIXUPCALL_RETO0);
-	BTFIXUPSET_CALL(pgd_free, sun4c_pgd_free, BTFIXUPCALL_NORM);
-	BTFIXUPSET_CALL(pgd_alloc, sun4c_pgd_alloc, BTFIXUPCALL_NORM);
+	BTFIXUPSET_CALL(free_pte_fast, sun4c_free_pte_fast, BTFIXUPCALL_NORM);
+	BTFIXUPSET_CALL(pte_alloc_one, sun4c_pte_alloc_one, BTFIXUPCALL_NORM);
+	BTFIXUPSET_CALL(pte_alloc_one_fast, sun4c_pte_alloc_one_fast, BTFIXUPCALL_NORM);
+	BTFIXUPSET_CALL(free_pmd_fast, sun4c_free_pmd_fast, BTFIXUPCALL_NOP);
+	BTFIXUPSET_CALL(pmd_alloc_one_fast, sun4c_pmd_alloc_one_fast, BTFIXUPCALL_RETO0);
+	BTFIXUPSET_CALL(free_pgd_fast, sun4c_free_pgd_fast, BTFIXUPCALL_NORM);
+	BTFIXUPSET_CALL(get_pgd_fast, sun4c_get_pgd_fast, BTFIXUPCALL_NORM);
 
 	BTFIXUPSET_HALF(pte_writei, _SUN4C_PAGE_WRITE);
 	BTFIXUPSET_HALF(pte_dirtyi, _SUN4C_PAGE_MODIFIED);

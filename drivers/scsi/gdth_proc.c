@@ -3,6 +3,7 @@
  */
 
 #include "gdth_ioctl.h"
+#include <linux/completion.h>
 
 int gdth_proc_info(char *buffer,char **start,off_t offset,int length,   
                    int hostno,int inout)
@@ -1229,11 +1230,7 @@ static void gdth_do_cmd(Scsi_Cmnd *scp, gdth_cmd_str *gdtcmd,
                         char *cmnd, int timeout)
 {
     unsigned bufflen;
-#if LINUX_VERSION_CODE >= 0x020322
-    DECLARE_MUTEX_LOCKED(sem);
-#else
-    struct semaphore sem = MUTEX_LOCKED;
-#endif
+    DECLARE_COMPLETION(wait);
 
     TRACE2(("gdth_do_cmd()\n"));
     if (gdtcmd != NULL) { 
@@ -1244,7 +1241,7 @@ static void gdth_do_cmd(Scsi_Cmnd *scp, gdth_cmd_str *gdtcmd,
         bufflen = 0;
     }
     scp->request.rq_status = RQ_SCSI_BUSY;
-    scp->request.sem = &sem;
+    scp->request.waiting = &wait;
 #if LINUX_VERSION_CODE >= 0x020322
     scsi_do_cmd(scp, cmnd, gdtcmd, bufflen, gdth_scsi_done, timeout*HZ, 1);
 #else
@@ -1252,7 +1249,7 @@ static void gdth_do_cmd(Scsi_Cmnd *scp, gdth_cmd_str *gdtcmd,
     scsi_do_cmd(scp, cmnd, gdtcmd, bufflen, gdth_scsi_done, timeout*HZ, 1);
     GDTH_UNLOCK_SCSI_DOCMD();
 #endif
-    down(&sem);
+    wait_for_completion(&wait);
 }
 
 void gdth_scsi_done(Scsi_Cmnd *scp)
@@ -1261,8 +1258,8 @@ void gdth_scsi_done(Scsi_Cmnd *scp)
 
     scp->request.rq_status = RQ_SCSI_DONE;
 
-    if (scp->request.sem != NULL)
-        up(scp->request.sem);
+    if (scp->request.waiting != NULL)
+        complete(scp->request.waiting);
 }
 
 static int gdth_ioctl_alloc(int hanum, ushort size)

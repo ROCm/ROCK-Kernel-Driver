@@ -660,6 +660,7 @@ struct quota_mount_options
 #include <linux/udf_fs_sb.h>
 #include <linux/ncp_fs_sb.h>
 #include <linux/usbdev_fs_sb.h>
+#include <linux/cramfs_fs_sb.h>
 
 extern struct list_head super_blocks;
 
@@ -711,6 +712,7 @@ struct super_block {
 		struct udf_sb_info	udf_sb;
 		struct ncp_sb_info	ncpfs_sb;
 		struct usbdev_sb_info   usbdevfs_sb;
+		struct cramfs_sb_info	cramfs_sb;
 		void			*generic_sbp;
 	} u;
 	/*

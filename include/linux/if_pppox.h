@@ -97,8 +97,15 @@ struct pppoe_tag {
 #define PTT_GEN_ERR  	__constant_htons(0x0203)
 
 struct pppoe_hdr {
+#if defined(__LITTLE_ENDIAN_BITFIELD)
 	__u8 ver : 4;
 	__u8 type : 4;
+#elif defined(__BIG_ENDIAN_BITFIELD)
+	__u8 type : 4;
+	__u8 ver : 4;
+#else
+#error	"Please fix <asm/byteorder.h>"
+#endif
 	__u8 code;
 	__u16 sid;
 	__u16 length;
