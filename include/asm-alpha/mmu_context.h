@@ -24,13 +24,10 @@
 /* ??? This does not belong here.  */
 /*
  * Every architecture must define this function. It's the fastest
- * way of searching a 168-bit bitmap where the first 128 bits are
- * unlikely to be set. It's guaranteed that at least one of the 168
- * bits is set.
+ * way of searching a 140-bit bitmap where the first 100 bits are
+ * unlikely to be set. It's guaranteed that at least one of the 140
+ * bits is cleared.
  */
-#if MAX_RT_PRIO != 128 || MAX_PRIO > 192
-# error update this function.
-#endif
 
 static inline int
 sched_find_first_bit(unsigned long *b)
