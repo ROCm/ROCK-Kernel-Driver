@@ -1101,6 +1101,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 					seq_printf(m, " [%d]", i);
 			}
 	}
+	seq_printf(m, "\n");
 
 	if (c->x86_num_cores > 1)
 		seq_printf(m, "cpu cores\t: %d\n", c->x86_num_cores);
