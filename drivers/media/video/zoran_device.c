@@ -80,6 +80,9 @@ MODULE_PARM(lml33dpath, "i");
 MODULE_PARM_DESC(lml33dpath,
 		 "Use digital path capture mode (on LML33 cards)");
 
+static void
+zr36057_init_vfe (struct zoran *zr);
+
 /*
  * General Purpose I/O and Guest bus access
  */
@@ -1722,7 +1725,7 @@ zr36057_restart (struct zoran *zr)
  * initialize video front end
  */
 
-void
+static void
 zr36057_init_vfe (struct zoran *zr)
 {
 	u32 reg;
