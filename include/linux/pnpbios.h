@@ -85,8 +85,8 @@
 #define PNPBIOS_BOOTABLE		0x0010
 #define PNPBIOS_DOCK			0x0020
 #define PNPBIOS_REMOVABLE		0x0040
-#define pnpbios_is_static(x) ((x)->flags & 0x0100) == 0x0000
-#define pnpbios_is_dynamic(x) (x)->flags & 0x0080
+#define pnpbios_is_static(x) (((x)->flags & 0x0100) == 0x0000)
+#define pnpbios_is_dynamic(x) ((x)->flags & 0x0080)
 
 /* 0x8000 through 0xffff are OEM defined */
 

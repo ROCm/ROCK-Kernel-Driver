@@ -67,7 +67,8 @@ struct cpufreq_policy {
         unsigned int            policy; /* see above */
 	struct cpufreq_governor *governor; /* see below */
 	struct cpufreq_cpuinfo  cpuinfo;     /* see above */
-	struct intf_data        intf;   /* interface data */
+	struct device		* dev;
+	struct kobject		kobj;
 };
 
 #define CPUFREQ_ADJUST          (0)

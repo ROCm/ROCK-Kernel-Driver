@@ -27,9 +27,9 @@
 #include <linux/ioport.h>
 #include <linux/kobject.h>
 #include <linux/list.h>
-#include <linux/sched.h>
 #include <linux/spinlock.h>
 #include <linux/types.h>
+#include <asm/semaphore.h>
 #include <asm/atomic.h>
 
 #define DEVICE_NAME_SIZE	50
@@ -207,8 +207,6 @@ extern void devclass_remove_file(struct device_class *, struct devclass_attribut
  * it supports the device.
  */
 
-struct intf_data;
-
 struct device_interface {
 	char			* name;
 	struct device_class	* devclass;
@@ -217,32 +215,11 @@ struct device_interface {
 	u32			devnum;
 
 	int (*add_device)	(struct device *);
-	int (*remove_device)	(struct intf_data *);
+	int (*remove_device)	(struct device *);
 };
 
 extern int interface_register(struct device_interface *);
 extern void interface_unregister(struct device_interface *);
-
-
-/*
- * intf_data - per-device data for an interface
- * Each interface typically has a per-device data structure 
- * that it allocates. It should embed one of these structures 
- * in that structure and call interface_add_data() to add it
- * to the device's list.
- * That will also enumerate the device within the interface
- * and create a driverfs symlink for it.
- */
-struct intf_data {
-	struct device_interface	* intf;
-	struct device		* dev;
-	u32			intf_num;
-	struct list_head	dev_entry;
-	struct kobject		kobj;
-};
-
-extern int interface_add_data(struct intf_data *);
-
 
 
 struct device {
@@ -251,7 +228,6 @@ struct device {
 	struct list_head class_list;
 	struct list_head driver_list;
 	struct list_head children;
-	struct list_head intf_list;
 	struct device 	* parent;
 
 	struct kobject kobj;
