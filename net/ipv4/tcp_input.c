@@ -2373,7 +2373,7 @@ static void tcp_fin(struct sk_buff *skb, struct sock *sk, struct tcphdr *th)
 	tcp_schedule_ack(tp);
 
 	sk->sk_shutdown |= RCV_SHUTDOWN;
-	sock_reset_flag(sk, SOCK_DONE);
+	sock_set_flag(sk, SOCK_DONE);
 
 	switch (sk->sk_state) {
 		case TCP_SYN_RECV:
