@@ -1402,6 +1402,7 @@ cyberpro_alloc_fb_info(unsigned int id, char *name)
 	cfb->fb.updatevar	= cyber2000fb_updatevar;
 	cfb->fb.blank		= cyber2000fb_blank;
 	cfb->fb.flags		= FBINFO_FLAG_DEFAULT;
+	cfb->fb.node		= NODEV;
 	cfb->fb.disp		= (struct display *)(cfb + 1);
 	cfb->fb.pseudo_palette	= (void *)(cfb->fb.disp + 1);
 
@@ -1819,7 +1820,7 @@ static struct pci_driver cyberpro_driver = {
  */
 int __init cyber2000fb_init(void)
 {
-	int ret = -1, err = 0;
+	int ret = -1, err = -ENODEV;
 #ifdef CONFIG_ARCH_SHARK
 	err = cyberpro_vl_probe();
 	if (!err) {
@@ -1827,19 +1828,16 @@ int __init cyber2000fb_init(void)
 		MOD_INC_USE_COUNT;
 	}
 #endif
-#ifdef CONFIG_PCI
 	err = pci_module_init(&cyberpro_driver);
 	if (!err)
 		ret = err;
-#endif
+
 	return ret ? err : 0;
 }
 
 static void __exit cyberpro_exit(void)
 {
-#ifdef CONFIG_PCI
 	pci_unregister_driver(&cyberpro_driver);
-#endif
 }
 
 #ifdef MODULE
