@@ -148,15 +148,8 @@ static void __inline__ _raw_spin_lock_flags(spinlock_t *lock, unsigned long flag
 
 #define rwlock_init(x)		do { *(x) = RW_LOCK_UNLOCKED; } while(0)
 
-static __inline__ int is_read_locked(rwlock_t *rw)
-{
-	return rw->lock > 0;
-}
-
-static __inline__ int is_write_locked(rwlock_t *rw)
-{
-	return rw->lock < 0;
-}
+#define read_can_lock(rw)	((rw)->lock >= 0)
+#define write_can_lock(rw)	(!(rw)->lock)
 
 static __inline__ void _raw_write_unlock(rwlock_t *rw)
 {
