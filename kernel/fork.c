@@ -377,7 +377,7 @@ void mm_release(void)
 		 * We dont check the error code - if userspace has
 		 * not set up a proper pointer then tough luck.
 		 */
-		put_user(0UL, tsk->user_tid);
+		put_user(0, tsk->user_tid);
 		sys_futex(tsk->user_tid, FUTEX_WAKE, 1, NULL);
 	}
 }

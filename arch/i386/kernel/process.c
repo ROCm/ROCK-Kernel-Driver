@@ -625,7 +625,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 	 * Does the userspace VM want the TID cleared on mm_release()?
 	 */
 	if (clone_flags & CLONE_CLEARTID)
-		p->user_tid = (long *) childregs->edx;
+		p->user_tid = (int *) childregs->edx;
 	return 0;
 }
 
