@@ -31,8 +31,7 @@ static const char ID_sccs[] = "@(#)queue.c	2.9 97/08/04 (C) SK " ;
 /*
  * init event queue management
  */
-void ev_init(smc)
-struct s_smc *smc ;
+void ev_init(struct s_smc *smc)
 {
 	smc->q.ev_put = smc->q.ev_get = smc->q.ev_queue ;
 }
@@ -40,10 +39,7 @@ struct s_smc *smc ;
 /*
  * add event to queue
  */
-void queue_event(smc,class,event)
-struct s_smc *smc ;
-int class ;
-int event ;
+void queue_event(struct s_smc *smc, int class, int event)
 {
 	PRINTF("queue class %d event %d\n",class,event) ;
 	smc->q.ev_put->class = class ;
@@ -59,9 +55,7 @@ int event ;
 /*
  * timer_event is called from HW timer package.
  */
-void timer_event(smc,token)
-struct s_smc *smc ;
-u_long token ;
+void timer_event(struct s_smc *smc, u_long token)
 {
 	PRINTF("timer event class %d token %d\n",
 		EV_T_CLASS(token),
@@ -76,8 +70,7 @@ u_long token ;
  *		send command to state machine
  *	end
  */
-void ev_dispatcher(smc)
-struct s_smc *smc ;
+void ev_dispatcher(struct s_smc *smc)
 {
 	struct event_queue *ev ;	/* pointer into queue */
 	int		class ;
@@ -131,9 +124,7 @@ struct s_smc *smc ;
  *	on	0	disconnect
  *	on	1	connect
  */
-u_short smt_online(smc,on)
-struct s_smc *smc ;
-int on ;
+u_short smt_online(struct s_smc *smc, int on)
 {
 	queue_event(smc,EVENT_ECM,on ? EC_CONNECT : EC_DISCONNECT) ;
 	ev_dispatcher(smc) ;
@@ -147,10 +138,7 @@ int on ;
  * dump current flag setting
  */
 #ifdef	CONCENTRATOR
-void do_smt_flag(smc,flag,value)
-struct s_smc *smc ;
-char *flag ;
-int value ;
+void do_smt_flag(struct s_smc *smc, char *flag, int value)
 {
 #ifdef	DEBUG
 	struct smt_debug	*deb;

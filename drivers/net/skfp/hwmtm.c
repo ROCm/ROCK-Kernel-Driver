@@ -75,15 +75,17 @@ extern	u_char	force_irq_pending ;
 	-------------------------------------------------------------
 */
 
-static	void	queue_llc_rx(),		smt_to_llc(),
-		init_txd_ring(),	init_rxd_ring(),
-		queue_txd_mb() ;
-
-static	u_long	init_descr_ring(),	repair_txd_ring(),
-		repair_rxd_ring() ;
-
-static	SMbuf	*get_llc_rx(),		*get_txd_mb() ;
-
+static void queue_llc_rx(struct s_smc *smc, SMbuf *mb);
+static void smt_to_llc(struct s_smc *smc, SMbuf *mb);
+static void init_txd_ring(struct s_smc *smc);
+static void init_rxd_ring(struct s_smc *smc);
+static void queue_txd_mb(struct s_smc *smc, SMbuf *mb);
+static u_long init_descr_ring(struct s_smc *smc, union s_fp_descr volatile *start,
+			      int count);
+static u_long repair_txd_ring(struct s_smc *smc, struct s_smt_tx_queue *queue);
+static u_long repair_rxd_ring(struct s_smc *smc, struct s_smt_rx_queue *queue);
+static SMbuf* get_llc_rx(struct s_smc *smc);
+static SMbuf* get_txd_mb(struct s_smc *smc);
 
 /*
 	-------------------------------------------------------------
@@ -92,55 +94,81 @@ static	SMbuf	*get_llc_rx(),		*get_txd_mb() ;
 */
 /*	The external SMT functions are listed in cmtdef.h */
 
-extern	void	*mac_drv_get_space(),	*mac_drv_get_desc_mem(),
-		init_board(),		mac_drv_fill_rxd(),
-		plc1_irq(),		mac_drv_tx_complete(),
-		plc2_irq(),		mac1_irq(),
-		mac2_irq(),		mac3_irq(),
-		timer_irq(),		mac_drv_rx_complete(),
-		mac_drv_requeue_rxd(),	init_plc(),
-		mac_drv_clear_rxd(),	llc_restart_tx(),
-		ev_dispatcher(),	smt_force_irq() ;
+extern void* mac_drv_get_space(struct s_smc *smc, unsigned int size);
+extern void* mac_drv_get_desc_mem(struct s_smc *smc, unsigned int size);
+extern void init_board(struct s_smc *smc, u_char *mac_addr);
+extern void mac_drv_fill_rxd(struct s_smc *smc);
+extern void plc1_irq(struct s_smc *smc);
+extern void mac_drv_tx_complete(struct s_smc *smc,
+				volatile struct s_smt_fp_txd *txd);
+extern void plc2_irq(struct s_smc *smc);
+extern void mac1_irq(struct s_smc *smc, u_short stu, u_short stl);
+extern void mac2_irq(struct s_smc *smc, u_short code_s2u, u_short code_s2l);
+extern void mac3_irq(struct s_smc *smc, u_short code_s3u, u_short code_s3l);
+extern void timer_irq(struct s_smc *smc);
+extern void mac_drv_rx_complete(struct s_smc *smc,
+				volatile struct s_smt_fp_rxd *rxd,
+				int frag_count, int len);
+extern void mac_drv_requeue_rxd(struct s_smc *smc, 
+				volatile struct s_smt_fp_rxd *rxd,
+				int frag_count);
+extern void init_plc(struct s_smc *smc);
+extern void mac_drv_clear_rxd(struct s_smc *smc,
+			      volatile struct s_smt_fp_rxd *rxd, int frag_count);
 
 #ifdef	USE_OS_CPY
-extern	void	hwm_cpy_rxd2mb(),	hwm_cpy_txd2mb() ;
-#endif
-#ifdef	ALL_RX_COMPLETE
-extern	void	mac_drv_all_receives_complete() ;
+extern void hwm_cpy_rxd2mb(void);
+extern void hwm_cpy_txd2mb(void);
 #endif
 
-extern	u_long	mac_drv_virt2phys(),	dma_master() ;
+#ifdef	ALL_RX_COMPLETE
+extern void mac_drv_all_receives_complete(void);
+#endif
+
+extern u_long mac_drv_virt2phys(struct s_smc *smc, void *virt);
+extern u_long dma_master(struct s_smc *smc, void *virt, int len, int flag);
 
 #ifdef	NDIS_OS2
-extern	void	post_proc() ;
+extern void post_proc(void);
 #else
-extern	void	dma_complete() ;
+extern void dma_complete(struct s_smc *smc, volatile union s_fp_descr *descr,
+			 int flag);
 #endif
 
-extern	int	init_fplus(),		mac_drv_rx_init() ;
+extern int init_fplus(struct s_smc *smc);
+extern int mac_drv_rx_init(struct s_smc *smc, int len, int fc, char *look_ahead,
+			   int la_len);
 
 /*
 	-------------------------------------------------------------
 	PUBLIC FUNCTIONS:
 	-------------------------------------------------------------
 */
-	void	process_receive(),	smt_send_mbuf(),
-		fddi_isr(),		mac_drv_clear_txd(),
-		smt_free_mbuf(),	init_driver_fplus(),
-		mac_drv_rx_mode(),	init_fddi_driver(),
-		mac_drv_clear_tx_queue(),
-		mac_drv_clear_rx_queue(),
-		hwm_tx_frag(),		hwm_rx_frag() ;
+void process_receive(struct s_smc *smc);
+void fddi_isr(struct s_smc *smc);
+void mac_drv_clear_txd(struct s_smc *smc);
+void smt_free_mbuf(struct s_smc *smc, SMbuf *mb);
+void init_driver_fplus(struct s_smc *smc);
+void mac_drv_rx_mode(struct s_smc *smc, int mode);
+void init_fddi_driver(struct s_smc *smc, u_char *mac_addr);
+void mac_drv_clear_tx_queue(struct s_smc *smc);
+void mac_drv_clear_rx_queue(struct s_smc *smc);
+void hwm_tx_frag(struct s_smc *smc, char far *virt, u_long phys, int len,
+		 int frame_status);
+void hwm_rx_frag(struct s_smc *smc, char far *virt, u_long phys, int len,
+		 int frame_status);
 
-	int	mac_drv_rx_frag(),	mac_drv_init(),
-		hwm_tx_init() ;
+int mac_drv_rx_frag(struct s_smc *smc, void far *virt, int len);
+int mac_drv_init(struct s_smc *smc);
+int hwm_tx_init(struct s_smc *smc, u_char fc, int frag_count, int frame_len,
+		int frame_status);
 
-	u_int	mac_drv_check_space() ;
+u_int mac_drv_check_space(void);
 
-	SMbuf 	*smt_get_mbuf() ;
+SMbuf* smt_get_mbuf(struct s_smc *smc);
 
 #ifdef DEBUG
-	void	mac_drv_debug_lev() ;
+	void mac_drv_debug_lev(void);
 #endif
 
 /*
@@ -208,7 +236,7 @@ extern	int	init_fplus(),		mac_drv_rx_init() ;
  *
  *	END_MANUAL_ENTRY
  */
-u_int mac_drv_check_space()
+u_int mac_drv_check_space(void)
 {
 #ifdef	MB_OUTSIDE_SMC
 #ifdef	COMMON_MB_POOL
@@ -238,8 +266,7 @@ u_int mac_drv_check_space()
  *			mac_drv_init once, after the adatper is detected.
  *	END_MANUAL_ENTRY
  */
-int mac_drv_init(smc)
-struct s_smc *smc ;
+int mac_drv_init(struct s_smc *smc)
 {
 	if (sizeof(struct s_smt_fp_rxd) % 16) {
 		SMT_PANIC(smc,HWM_E0001,HWM_E0001_MSG) ;
@@ -289,8 +316,7 @@ struct s_smc *smc ;
  *	 least significant byte etc.)
  *	END_MANUAL_ENTRY
  */
-void init_driver_fplus(smc)
-struct s_smc *smc ;
+void init_driver_fplus(struct s_smc *smc)
 {
 	smc->hw.fp.mdr2init = FM_LSB | FM_BMMODE | FM_ENNPRQ | FM_ENHSRQ | 3 ;
 
@@ -305,10 +331,9 @@ struct s_smc *smc ;
 #endif
 }
 
-static u_long init_descr_ring(smc,start,count)
-struct s_smc *smc ;
-union s_fp_descr volatile *start;
-int count ;
+static u_long init_descr_ring(struct s_smc *smc,
+			      union s_fp_descr volatile *start,
+			      int count)
 {
 	int i ;
 	union s_fp_descr volatile *d1 ;
@@ -337,8 +362,7 @@ int count ;
 	return(phys) ;
 }
 
-static void init_txd_ring(smc)
-struct s_smc *smc ;
+static void init_txd_ring(struct s_smc *smc)
 {
 	struct s_smt_fp_txd volatile *ds ;
 	struct s_smt_tx_queue *queue ;
@@ -375,8 +399,7 @@ struct s_smc *smc ;
 	outpd(ADDR(B5_XS_DA),phys) ;
 }
 
-static void init_rxd_ring(smc)
-struct s_smc *smc ;
+static void init_rxd_ring(struct s_smc *smc)
 {
 	struct s_smt_fp_rxd volatile *ds ;
 	struct s_smt_rx_queue *queue ;
@@ -406,9 +429,7 @@ struct s_smc *smc ;
  *
  *	END_MANUAL_ENTRY
  */
-void init_fddi_driver(smc,mac_addr)
-struct	s_smc	*smc ;
-u_char		*mac_addr ;	/* canonical address */
+void init_fddi_driver(struct s_smc *smc, u_char *mac_addr)
 {
 	SMbuf	*mb ;
 	int	i ;
@@ -472,8 +493,7 @@ u_char		*mac_addr ;	/* canonical address */
 }
 
 
-SMbuf *smt_get_mbuf(smc)
-struct s_smc *smc ;
+SMbuf *smt_get_mbuf(struct s_smc *smc)
 {
 	register SMbuf	*mb ;
 
@@ -495,9 +515,7 @@ struct s_smc *smc ;
 	return (mb) ;	/* May be NULL */
 }
 
-void smt_free_mbuf(smc, mb)
-struct s_smc	*smc ;
-SMbuf		*mb;
+void smt_free_mbuf(struct s_smc *smc, SMbuf *mb)
 {
 
 	if (mb) {
@@ -543,8 +561,7 @@ SMbuf		*mb;
  *
  *	END_MANUAL_ENTRY
  */
-void mac_drv_repair_descr(smc)
-struct s_smc *smc ;
+void mac_drv_repair_descr(struct s_smc *smc)
 {
 	u_long	phys ;
 
@@ -576,9 +593,7 @@ struct s_smc *smc ;
 	outpd(ADDR(B0_R1_CSR),CSR_START) ;
 }
 
-static u_long repair_txd_ring(smc,queue)
-struct s_smc *smc ;
-struct s_smt_tx_queue *queue ;
+static u_long repair_txd_ring(struct s_smc *smc, struct s_smt_tx_queue *queue)
 {
 	int i ;
 	int tx_used ;
@@ -630,9 +645,7 @@ struct s_smt_tx_queue *queue ;
  *	  RxDs with an OWN bit set but with a reset STF bit should be
  *	  skipped and owned by the driver (OWN = 0). 
  */
-static u_long repair_rxd_ring(smc,queue)
-struct s_smc *smc ;
-struct s_smt_rx_queue *queue ;
+static u_long repair_rxd_ring(struct s_smc *smc, struct s_smt_rx_queue *queue)
 {
 	int i ;
 	int rx_used ;
@@ -703,8 +716,7 @@ struct s_smt_rx_queue *queue ;
  *
  *	END_MANUAL_ENTRY
  */
-void fddi_isr(smc)
-struct s_smc *smc ;
+void fddi_isr(struct s_smc *smc)
 {
 	u_long		is ;		/* ISR source */
 	u_short		stu, stl ;
@@ -987,9 +999,7 @@ struct s_smc *smc ;
  *
  *	END_MANUAL_ENTRY
  */
-void mac_drv_rx_mode(smc,mode)
-struct s_smc *smc ;
-int mode ;
+void mac_drv_rx_mode(struct s_smc *smc, int mode)
 {
 	switch(mode) {
 	case RX_ENABLE_PASS_SMT:
@@ -1038,8 +1048,7 @@ int mode ;
 /*
  * process receive queue
  */
-void process_receive(smc)
-struct s_smc *smc ;
+void process_receive(struct s_smc *smc)
 {
 	int i ;
 	int n ;
@@ -1379,9 +1388,7 @@ rx_end:
 	return ;	/* lint bug: needs return detect end of function */
 }
 
-static void smt_to_llc(smc,mb)
-struct s_smc *smc ;
-SMbuf *mb ;
+static void smt_to_llc(struct s_smc *smc, SMbuf *mb)
 {
 	u_char	fc ;
 
@@ -1416,12 +1423,8 @@ SMbuf *mb ;
  *
  *	END_MANUAL_ENTRY
  */
-void hwm_rx_frag(smc,virt,phys,len,frame_status)
-struct s_smc *smc ;
-char far *virt ;
-u_long phys ;
-int len ;
-int frame_status ;
+void hwm_rx_frag(struct s_smc *smc, char far *virt, u_long phys, int len,
+		 int frame_status)
 {
 	struct s_smt_fp_rxd volatile *r ;
 	u_int	rbctrl ;
@@ -1460,10 +1463,7 @@ int frame_status ;
  *
  *	END_MANUAL_ENTRY
  */
-int mac_drv_rx_frag(smc,virt,len)
-struct s_smc *smc ;
-void far *virt ;
-int len ;
+int mac_drv_rx_frag(struct s_smc *smc, void far *virt, int len)
 {
 	NDD_TRACE("RHSB",virt,len,smc->os.hwm.r.mb_pos) ;
 
@@ -1500,8 +1500,7 @@ int len ;
  *
  *	END_MANUAL_ENTRY
  */
-void mac_drv_clear_rx_queue(smc)
-struct s_smc *smc ;
+void mac_drv_clear_rx_queue(struct s_smc *smc)
 {
 	struct s_smt_fp_rxd volatile *r ;
 	struct s_smt_fp_rxd volatile *next_rxd ;
@@ -1588,12 +1587,8 @@ struct s_smc *smc ;
  *
  *	END_MANUAL_ENTRY
  */
-int hwm_tx_init(smc,fc,frag_count,frame_len,frame_status)
-struct	s_smc *smc ;
-u_char fc ;
-int frag_count ;
-int frame_len ;
-int frame_status ;
+int hwm_tx_init(struct s_smc *smc, u_char fc, int frag_count, int frame_len,
+		int frame_status)
 {
 	NDD_TRACE("THiB",fc,frag_count,frame_len) ;
 	smc->os.hwm.tx_p = smc->hw.fp.tx[frame_status & QUEUE_A0] ;
@@ -1670,12 +1665,8 @@ int frame_status ;
  *
  *	END_MANUAL_ENTRY
  */
-void hwm_tx_frag(smc,virt,phys,len,frame_status)
-struct	s_smc *smc ;
-char far *virt ;
-u_long phys ;
-int len ;
-int frame_status ;
+void hwm_tx_frag(struct s_smc *smc, char far *virt, u_long phys, int len,
+		 int frame_status)
 {
 	struct s_smt_fp_txd volatile *t ;
 	struct s_smt_tx_queue *queue ;
@@ -1780,9 +1771,7 @@ int frame_status ;
 /*
  * queues a receive for later send
  */
-static void queue_llc_rx(smc,mb)
-struct	s_smc *smc ;
-SMbuf	*mb ;
+static void queue_llc_rx(struct s_smc *smc, SMbuf *mb)
 {
 	DB_GEN("queue_llc_rx: mb = %x",(void *)mb,0,4) ;
 	smc->os.hwm.queued_rx_frames++ ;
@@ -1806,8 +1795,7 @@ SMbuf	*mb ;
 /*
  * get a SMbuf from the llc_rx_queue
  */
-static SMbuf *get_llc_rx(smc)
-struct	s_smc *smc ;
+static SMbuf *get_llc_rx(struct s_smc *smc)
 {
 	SMbuf	*mb ;
 
@@ -1823,9 +1811,7 @@ struct	s_smc *smc ;
  * queues a transmit SMT MBuf during the time were the MBuf is
  * queued the TxD ring
  */
-static void queue_txd_mb(smc,mb)
-struct	s_smc *smc ;
-SMbuf	*mb ;
+static void queue_txd_mb(struct s_smc *smc, SMbuf *mb)
 {
 	DB_GEN("_rx: queue_txd_mb = %x",(void *)mb,0,4) ;
 	smc->os.hwm.queued_txd_mb++ ;
@@ -1842,8 +1828,7 @@ SMbuf	*mb ;
 /*
  * get a SMbuf from the txd_tx_queue
  */
-static SMbuf *get_txd_mb(smc)
-struct	s_smc *smc ;
+static SMbuf *get_txd_mb(struct s_smc *smc)
 {
 	SMbuf *mb ;
 
@@ -1858,10 +1843,7 @@ struct	s_smc *smc ;
 /*
  *	SMT Send function
  */
-void smt_send_mbuf(smc,mb,fc)
-struct s_smc	*smc;
-SMbuf		*mb;
-int		fc;
+void smt_send_mbuf(struct s_smc *smc, SMbuf *mb, int fc)
 {
 	char far *data ;
 	int	len ;
@@ -1995,8 +1977,7 @@ int		fc;
  *
  *	END_MANUAL_ENTRY
  */
-void mac_drv_clear_txd(smc)
-struct s_smc *smc ;
+void mac_drv_clear_txd(struct s_smc *smc)
 {
 	struct s_smt_tx_queue *queue ;
 	struct s_smt_fp_txd volatile *t1 ;
@@ -2087,8 +2068,7 @@ free_next_queue: ;
  *
  *	END_MANUAL_ENTRY
  */
-void mac_drv_clear_tx_queue(smc)
-struct s_smc *smc ;
+void mac_drv_clear_tx_queue(struct s_smc *smc)
 {
 	struct s_smt_fp_txd volatile *t ;
 	struct s_smt_tx_queue *queue ;
@@ -2180,10 +2160,7 @@ struct s_smc *smc ;
  *
  *	END_MANUAL_ENTRY
  */
-void mac_drv_debug_lev(smc,flag,lev)
-struct s_smc *smc ;
-int flag ;
-int lev ;
+void mac_drv_debug_lev(struct s_smc *smc, int flag, int lev)
 {
 	switch(flag) {
 	case (int)NULL:
