@@ -203,7 +203,7 @@ static void cg14_margins (struct fb_info_sbusfb *fb, struct display *p,
 			  int x_margin, int y_margin)
 {
 	fb->info.screen_base += (y_margin - fb->y_margin) *
-		p->line_length + (x_margin - fb->x_margin);
+		fb->info.fix.line_length + (x_margin - fb->x_margin);
 }
 
 static void cg14_setcursormap (struct fb_info_sbusfb *fb, u8 *red, u8 *green, u8 *blue)
