@@ -749,6 +749,14 @@ csz_reset(struct Qdisc* sch)
 static void
 csz_destroy(struct Qdisc* sch)
 {
+	struct csz_sched_data *q = (struct csz_sched_data *)sch->data;
+	struct tcf_proto *tp;
+
+	while ((tp = q->filter_list) != NULL) {
+		q->filter_list = tp->next;
+		tp->ops->destroy(tp);
+	}
+
 	MOD_DEC_USE_COUNT;
 }
 

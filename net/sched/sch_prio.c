@@ -158,6 +158,12 @@ prio_destroy(struct Qdisc* sch)
 {
 	int prio;
 	struct prio_sched_data *q = (struct prio_sched_data *)sch->data;
+	struct tcf_proto *tp;
+
+	while ((tp = q->filter_list) != NULL) {
+		q->filter_list = tp->next;
+		tp->ops->destroy(tp);
+	}
 
 	for (prio=0; prio<q->bands; prio++) {
 		qdisc_destroy(q->queues[prio]);

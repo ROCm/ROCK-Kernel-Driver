@@ -273,6 +273,8 @@ static void remove_expectations(struct ip_conntrack *ct)
 		 * the un-established ones only */
 		if (exp->sibling) {
 			DEBUGP("remove_expectations: skipping established %p of %p\n", exp->sibling, ct);
+			/* Indicate that this expectations parent is dead */
+			exp->expectant = NULL;
 			continue;
 		}
 
@@ -324,6 +326,9 @@ destroy_conntrack(struct nf_conntrack *nfct)
 		ip_conntrack_destroyed(ct);
 
 	WRITE_LOCK(&ip_conntrack_lock);
+	/* Delete us from our own list to prevent corruption later */
+	list_del(&ct->sibling_list);
+
 	/* Delete our master expectation */
 	if (ct->master) {
 		/* can't call __unexpect_related here,

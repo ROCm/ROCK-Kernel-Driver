@@ -48,6 +48,9 @@ int xfrm4_rcv_encap(struct sk_buff *skb, __u16 encap_type)
 		if (x->props.replay_window && xfrm_replay_check(x, seq))
 			goto drop_unlock;
 
+		if (xfrm_state_check_expire(x))
+			goto drop_unlock;
+
 		xfrm_vec[xfrm_nr].decap.decap_type = encap_type;
 		if (x->type->input(x, &(xfrm_vec[xfrm_nr].decap), skb))
 			goto drop_unlock;

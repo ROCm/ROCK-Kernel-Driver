@@ -101,7 +101,7 @@ struct __fdb_entry
 struct net_bridge;
 struct net_bridge_port;
 
-extern int (*br_ioctl_hook)(unsigned long arg);
+extern void brioctl_set(int (*ioctl_hook)(unsigned long));
 extern int (*br_handle_frame_hook)(struct sk_buff *skb);
 extern int (*br_should_route_hook)(struct sk_buff **pskb);
 

@@ -201,6 +201,13 @@ _decode_session4(struct sk_buff *skb, struct flowi *fl)
 			}
 			break;
 
+		case IPPROTO_COMP:
+			if (pskb_may_pull(skb, xprth + 4 - skb->data)) {
+				u16 *ipcomp_hdr = (u16 *)xprth;
+
+				fl->uli_u.spi = ntohl(ntohs(ipcomp_hdr[1]));
+			}
+			break;
 		default:
 			fl->uli_u.spi = 0;
 			break;
