@@ -400,6 +400,7 @@ struct task_struct {
 	struct backing_dev_info *backing_dev_info;
 
 	unsigned long ptrace_message;
+	siginfo_t *last_siginfo; /* For ptrace use.  */
 };
 
 extern void __put_task_struct(struct task_struct *tsk);

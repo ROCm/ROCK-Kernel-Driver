@@ -1244,9 +1244,12 @@ int get_signal_to_deliver(siginfo_t *info, struct pt_regs *regs)
 		if ((current->ptrace & PT_PTRACED) && signr != SIGKILL) {
 			/* Let the debugger run.  */
 			current->exit_code = signr;
+			current->last_siginfo = info;
 			set_current_state(TASK_STOPPED);
 			notify_parent(current, SIGCHLD);
 			schedule();
+
+			current->last_siginfo = NULL;
 
 			/* We're back.  Did the debugger cancel the sig?  */
 			signr = current->exit_code;
@@ -1258,7 +1261,10 @@ int get_signal_to_deliver(siginfo_t *info, struct pt_regs *regs)
 			if (signr == SIGSTOP)
 				continue;
 
-			/* Update the siginfo structure.  Is this good?  */
+			/* Update the siginfo structure if the signal has
+			   changed.  If the debugger wanted something
+			   specific in the siginfo structure then it should
+			   have updated *info via PTRACE_SETSIGINFO.  */
 			if (signr != info->si_signo) {
 				info->si_signo = signr;
 				info->si_errno = 0;

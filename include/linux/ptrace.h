@@ -26,6 +26,8 @@
 /* 0x4200-0x4300 are reserved for architecture-independent additions.  */
 #define PTRACE_SETOPTIONS	0x4200
 #define PTRACE_GETEVENTMSG	0x4201
+#define PTRACE_GETSIGINFO	0x4202
+#define PTRACE_SETSIGINFO	0x4203
 
 /* options set using PTRACE_SETOPTIONS */
 #define PTRACE_O_TRACESYSGOOD	0x00000001
