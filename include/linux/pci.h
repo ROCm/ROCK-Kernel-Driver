@@ -558,8 +558,16 @@ void pcibios_fixup_pbus_ranges(struct pci_bus *, struct pbus_set_ranges_data *);
 /* Generic PCI functions used internally */
 
 int pci_bus_exists(const struct list_head *list, int nr);
-struct pci_bus *pci_scan_bus(int bus, struct pci_ops *ops, void *sysdata);
-struct pci_bus *pci_alloc_primary_bus(int bus);
+struct pci_bus *pci_scan_bus_parented(struct device *parent, int bus, struct pci_ops *ops, void *sysdata);
+static inline struct pci_bus *pci_scan_bus(int bus, struct pci_ops *ops, void *sysdata)
+{
+	return pci_scan_bus_parented(NULL, bus, ops, sysdata);
+}
+struct pci_bus *pci_alloc_primary_bus_parented(struct device * parent, int bus);
+static inline struct pci_bus *pci_alloc_primary_bus(int bus)
+{
+	return pci_alloc_primary_bus_parented(NULL, bus);
+}
 struct pci_dev *pci_scan_slot(struct pci_dev *temp);
 int pci_proc_attach_device(struct pci_dev *dev);
 int pci_proc_detach_device(struct pci_dev *dev);
