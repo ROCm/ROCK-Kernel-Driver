@@ -66,7 +66,7 @@ struct seq_oss_synth_t {
 /*
  * device table
  */
-static int max_synth_devs = 0;
+static int max_synth_devs;
 static seq_oss_synth_t *synth_devs[SNDRV_SEQ_OSS_MAX_SYNTH_DEVS];
 static seq_oss_synth_t midi_synth_dev = {
 	-1, /* seq_device */

@@ -25,7 +25,6 @@ struct fat_mount_options {
 		 posixfs:1,       /* Allow names like makefile and Makefile to coexist */
 		 numtail:1,       /* Does first alias have a numeric '~1' type tail? */
 		 atari:1,         /* Use Atari GEMDOS variation of MS-DOS fs */
-		 fat32:1,	  /* Is this a FAT32 partition? */
 		 nocase:1;	  /* Does this need case conversion? 0=need case conversion*/
 };
 

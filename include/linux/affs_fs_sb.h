@@ -50,6 +50,9 @@ struct affs_sb_info {
 #define SF_READONLY	0x1000		/* Don't allow to remount rw */
 
 /* short cut to get to the affs specific sb data */
-#define AFFS_SB		(&sb->u.affs_sb)
+static inline struct affs_sb_info *AFFS_SB(struct super_block *sb)
+{
+	return sb->u.generic_sbp;
+}
 
 #endif

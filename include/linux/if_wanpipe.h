@@ -122,6 +122,7 @@ struct wanpipe_opt
 	unsigned poll_cnt;
 	unsigned char force;	/* Used to force sock release */
 	atomic_t packet_sent;   
+	unsigned short num; 
 };
 
 #define wp_sk(__sk) ((struct wanpipe_opt *)(__sk)->protinfo)

@@ -110,14 +110,11 @@ if [ "$CONFIG_PCI" = "y" ]; then
   if [ "$CONFIG_IDE" != "n" ]; then
     source drivers/ide/Config.in
   else
-    define_bool CONFIG_BLK_DEV_IDE_MODES n
     define_bool CONFIG_BLK_DEV_HD n
   fi
   endmenu
 else
-
   define_bool CONFIG_IDE n
-  define_bool CONFIG_BLK_DEV_IDE_MODES n
   define_bool CONFIG_BLK_DEV_HD n
 fi
 

@@ -35,13 +35,6 @@
 #include <sound/control.h>
 #include <sound/initval.h>
 
-#if 0
-MODULE_AUTHOR("Takashi Iwai, Steve Ratcliffe");
-MODULE_DESCRIPTION("Routines for control of EMU8000 chip");
-MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-#endif
-
 /*
  * emu8000 register controls
  */
@@ -136,7 +129,7 @@ snd_emu8000_dma_chan(emu8000_t *emu, int ch, int mode)
 
 /*
  */
-static void /*__init*/
+static void __init
 snd_emu8000_read_wait(emu8000_t *emu)
 {
 	while ((EMU8000_SMALR_READ(emu) & 0x80000000) != 0) {
@@ -149,7 +142,7 @@ snd_emu8000_read_wait(emu8000_t *emu)
 
 /*
  */
-static void /*__init*/
+static void __init
 snd_emu8000_write_wait(emu8000_t *emu)
 {
 	while ((EMU8000_SMALW_READ(emu) & 0x80000000) != 0) {
@@ -163,7 +156,7 @@ snd_emu8000_write_wait(emu8000_t *emu)
 /*
  * detect a card at the given port
  */
-static int /*__init*/
+static int __init
 snd_emu8000_detect(emu8000_t *emu)
 {
 	/* Initialise */
@@ -189,7 +182,7 @@ snd_emu8000_detect(emu8000_t *emu)
 /*
  * intiailize audio channels
  */
-static void /*__init*/
+static void __init
 init_audio(emu8000_t *emu)
 {
 	int ch;
@@ -230,7 +223,7 @@ init_audio(emu8000_t *emu)
 /*
  * initialize DMA address
  */
-static void /*__init*/
+static void __init
 init_dma(emu8000_t *emu)
 {
 	EMU8000_SMALR_WRITE(emu, 0);
@@ -334,7 +327,7 @@ static unsigned short init4[128] /*__devinitdata*/ = {
  * Taken from the oss driver, not obvious from the doc how this
  * is meant to work
  */
-static void /*__init*/
+static void __init
 send_array(emu8000_t *emu, unsigned short *data, int size)
 {
 	int i;
@@ -358,7 +351,7 @@ send_array(emu8000_t *emu, unsigned short *data, int size)
  * Send initialization arrays to start up, this just follows the
  * initialisation sequence in the adip.
  */
-static void /*__init*/
+static void __init
 init_arrays(emu8000_t *emu)
 {
 	send_array(emu, init1, NELEM(init1)/4);
@@ -385,7 +378,7 @@ init_arrays(emu8000_t *emu)
  * seems that the only way to do this is to use the one channel and keep
  * reallocating between read and write.
  */
-static void /*__init*/
+static void __init
 size_dram(emu8000_t *emu)
 {
 	int i, size;
@@ -511,7 +504,7 @@ snd_emu8000_init_fm(emu8000_t *emu)
 /*
  * The main initialization routine.
  */
-static void /*__init*/
+static void __init
 snd_emu8000_init_hw(emu8000_t *emu)
 {
 	int i;
@@ -665,7 +658,7 @@ snd_emu8000_load_chorus_fx(emu8000_t *emu, int mode, const void *buf, long len)
 {
 	soundfont_chorus_fx_t rec;
 	if (mode < SNDRV_EMU8000_CHORUS_PREDEFINED || mode >= SNDRV_EMU8000_CHORUS_NUMBERS) {
-		snd_printk("illegal chorus mode %d for uploading\n", mode);
+		snd_printk(KERN_WARNING "illegal chorus mode %d for uploading\n", mode);
 		return -EINVAL;
 	}
 	if (len < sizeof(rec) || copy_from_user(&rec, buf, sizeof(rec)))
@@ -793,7 +786,7 @@ snd_emu8000_load_reverb_fx(emu8000_t *emu, int mode, const void *buf, long len)
 	soundfont_reverb_fx_t rec;
 
 	if (mode < SNDRV_EMU8000_REVERB_PREDEFINED || mode >= SNDRV_EMU8000_REVERB_NUMBERS) {
-		snd_printk("illegal reverb mode %d for uploading\n", mode);
+		snd_printk(KERN_WARNING "illegal reverb mode %d for uploading\n", mode);
 		return -EINVAL;
 	}
 	if (len < sizeof(rec) || copy_from_user(&rec, buf, sizeof(rec)))
@@ -1032,7 +1025,7 @@ static snd_kcontrol_new_t *mixer_defs[EMU8000_NUM_CONTROLS] = {
 /*
  * create and attach mixer elements for WaveTable treble/bass controls
  */
-static int /*__init*/
+static int __init
 snd_emu8000_create_mixer(snd_card_t *card, emu8000_t *emu)
 {
 	int i, err = 0;
@@ -1089,7 +1082,7 @@ static int snd_emu8000_dev_free(snd_device_t *device)
 /*
  * initialize and register emu8000 synth device.
  */
-/*exported*/ int
+int __init
 snd_emu8000_new(snd_card_t *card, int index, long port, int seq_ports, snd_seq_device_t **awe_ret)
 {
 	snd_seq_device_t *awe;
@@ -1160,7 +1153,6 @@ snd_emu8000_new(snd_card_t *card, int index, long port, int seq_ports, snd_seq_d
  * exported stuff
  */
 
-EXPORT_SYMBOL(snd_emu8000_new);
 EXPORT_SYMBOL(snd_emu8000_poke);
 EXPORT_SYMBOL(snd_emu8000_peek);
 EXPORT_SYMBOL(snd_emu8000_poke_dw);
@@ -1172,21 +1164,3 @@ EXPORT_SYMBOL(snd_emu8000_load_reverb_fx);
 EXPORT_SYMBOL(snd_emu8000_update_chorus_mode);
 EXPORT_SYMBOL(snd_emu8000_update_reverb_mode);
 EXPORT_SYMBOL(snd_emu8000_update_equalizer);
-
-#if 0
-/*
- *  INIT part
- */
-
-static int __init alsa_emu8000_init(void)
-{
-	return 0;
-}
-
-static void __exit alsa_emu8000_exit(void)
-{
-}
-
-module_init(alsa_emu8000_init)
-module_exit(alsa_emu8000_exit)
-#endif

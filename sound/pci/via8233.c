@@ -1,8 +1,8 @@
 /*
  *   ALSA driver for VIA VT8233 (South Bridge)
  *
- *	Copyright (c) 2000 Jaroslav Kysela <perex@suse.cz>,
- *                         Tjeerd.Mulder@fujitsu-siemens.com
+ *	Copyright (c) 2000 Tjeerd.Mulder@fujitsu-siemens.com
+ *	This driver is based on VIA686 code by Jaroslav Kysela <perex@suse.cz>
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -175,7 +175,6 @@ struct _snd_via8233 {
 	unsigned int ac97_clock;
 
 	spinlock_t reg_lock;
-	spinlock_t update_lock;
 	snd_info_entry_t *proc_entry;
 
 	void *tables;
@@ -417,8 +416,6 @@ static int snd_via8233_playback_prepare(snd_pcm_substream_t * substream)
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	unsigned long tmp;
 
-	if (inb(VIAREG(chip, PLAYBACK_STATUS)) & VIA_REG_STAT_ACTIVE)
-		return 0;
 	snd_ac97_set_rate(chip->ac97, AC97_PCM_FRONT_DAC_RATE, runtime->rate);
 	snd_via8233_setup_periods(chip, &chip->playback, substream);
 	/* I don't understand this stuff but its from the documentation and this way it works */
@@ -746,7 +743,6 @@ static int __devinit snd_via8233_create(snd_card_t * card,
 		return -ENOMEM;
 
 	spin_lock_init(&chip->reg_lock);
-	spin_lock_init(&chip->update_lock);
 	chip->card = card;
 	chip->pci = pci;
 	chip->irq = -1;
@@ -808,7 +804,7 @@ static int __devinit snd_via8233_create(snd_card_t * card,
 static int __devinit snd_via8233_probe(struct pci_dev *pci,
 				       const struct pci_device_id *id)
 {
-	static int dev = 0;
+	static int dev;
 	snd_card_t *card;
 	via8233_t *chip;
 	int pcm_dev = 0;

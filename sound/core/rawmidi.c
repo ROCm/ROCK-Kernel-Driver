@@ -143,6 +143,7 @@ int snd_rawmidi_drain_output(snd_rawmidi_substream_t * substream)
 			break;
 		}
 		if (runtime->avail < runtime->buffer_size && !timeout) {
+			snd_printk(KERN_WARNING "rawmidi drain error (avail = %li, buffer_size = %li)\n", runtime->avail, runtime->buffer_size);
 			err = -EIO;
 			break;
 		}
@@ -335,10 +336,14 @@ int snd_rawmidi_kernel_open(int cardnum, int device, int subdevice,
 	return 0;
 
       __error:
-	if (input != NULL)
+	if (input != NULL) {
+		snd_rawmidi_done_buffer(input);
 		kfree(input);
-	if (output != NULL)
+	}
+	if (output != NULL) {
+		snd_rawmidi_done_buffer(output);
 		kfree(output);
+	}
 	dec_mod_count(rmidi->card->module);
 	up(&rmidi->open_mutex);
       __error1:
@@ -820,7 +825,7 @@ void snd_rawmidi_receive_reset(snd_rawmidi_substream_t * substream)
 	/* TODO: reset current state */
 }
 
-int snd_rawmidi_receive(snd_rawmidi_substream_t * substream, unsigned char *buffer, int count)
+int snd_rawmidi_receive(snd_rawmidi_substream_t * substream, const unsigned char *buffer, int count)
 {
 	unsigned long flags;
 	int result = 0, count1;
@@ -1100,8 +1105,10 @@ static long snd_rawmidi_kernel_write1(snd_rawmidi_substream_t * substream, const
       __end:
 	if (result > 0)
 		runtime->trigger = 1;
+	count1 = runtime->avail < runtime->buffer_size;
 	spin_unlock_irqrestore(&runtime->lock, flags);
-	substream->ops->trigger(substream, 1);
+	if (count1)
+		substream->ops->trigger(substream, 1);
 	return result;
 }
 

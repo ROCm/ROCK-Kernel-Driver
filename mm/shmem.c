@@ -28,6 +28,7 @@
 #include <linux/locks.h>
 #include <linux/slab.h>
 #include <linux/smp_lock.h>
+#include <linux/shmem_fs.h>
 
 #include <asm/uaccess.h>
 
@@ -36,7 +37,10 @@
 
 #define ENTRIES_PER_PAGE (PAGE_CACHE_SIZE/sizeof(unsigned long))
 
-#define SHMEM_SB(sb) (&sb->u.shmem_sb)
+static inline struct shmem_sb_info *SHMEM_SB(struct super_block *sb)
+{
+	return sb->u.generic_sbp;
+}
 
 static struct super_operations shmem_ops;
 static struct address_space_operations shmem_aops;
@@ -1261,7 +1265,7 @@ bad_val:
 
 static int shmem_remount_fs (struct super_block *sb, int *flags, char *data)
 {
-	struct shmem_sb_info *sbinfo = &sb->u.shmem_sb;
+	struct shmem_sb_info *sbinfo = SHMEM_SB(sb);
 	unsigned long max_blocks = sbinfo->max_blocks;
 	unsigned long max_inodes = sbinfo->max_inodes;
 
@@ -1284,8 +1288,15 @@ static int shmem_fill_super(struct super_block * sb, void * data, int silent)
 	int mode   = S_IRWXUGO | S_ISVTX;
 	uid_t uid = current->fsuid;
 	gid_t gid = current->fsgid;
-	struct shmem_sb_info *sbinfo = SHMEM_SB(sb);
+	struct shmem_sb_info *sbinfo;
 	struct sysinfo si;
+	int err;
+
+	sbinfo = kmalloc(sizeof(struct shmem_sb_info), GFP_KERNEL);
+	if (!sbinfo)
+		return -ENOMEM;
+	sb->u.generic_sbp = sbinfo;
+	memset(sbinfo, 0, sizeof(struct shmem_sb_info));
 
 	/*
 	 * Per default we only allow half of the physical ram per
@@ -1295,8 +1306,10 @@ static int shmem_fill_super(struct super_block * sb, void * data, int silent)
 	blocks = inodes = si.totalram / 2;
 
 #ifdef CONFIG_TMPFS
-	if (shmem_parse_options (data, &mode, &uid, &gid, &blocks, &inodes))
-		return -EINVAL;
+	if (shmem_parse_options (data, &mode, &uid, &gid, &blocks, &inodes)) {
+		err = -EINVAL;
+		goto failed;
+	}
 #endif
 
 	spin_lock_init (&sbinfo->stat_lock);
@@ -1310,18 +1323,33 @@ static int shmem_fill_super(struct super_block * sb, void * data, int silent)
 	sb->s_magic = TMPFS_MAGIC;
 	sb->s_op = &shmem_ops;
 	inode = shmem_get_inode(sb, S_IFDIR | mode, 0);
-	if (!inode)
-		return -ENOMEM;
+	if (!inode) {
+		err = -ENOMEM;
+		goto failed;
+	}
 
 	inode->i_uid = uid;
 	inode->i_gid = gid;
 	root = d_alloc_root(inode);
 	if (!root) {
-		iput(inode);
-		return -ENOMEM;
+		err = -ENOMEM;
+		goto failed_iput;
 	}
 	sb->s_root = root;
 	return 0;
+
+failed_iput:
+	iput(inode);
+failed:
+	kfree(sbinfo);
+	sb->u.generic_sbp = NULL;
+	return err;
+}
+
+static void shmem_put_super(struct super_block *sb)
+{
+	kfree(sb->u.generic_sbp);
+	sb->u.generic_sbp = NULL;
 }
 
 static kmem_cache_t * shmem_inode_cachep;
@@ -1407,6 +1435,7 @@ static struct super_operations shmem_ops = {
 #endif
 	delete_inode:	shmem_delete_inode,
 	put_inode:	force_delete,	
+	put_super:	shmem_put_super,
 };
 
 static struct vm_operations_struct shmem_vm_ops = {

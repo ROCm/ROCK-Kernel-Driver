@@ -352,19 +352,10 @@ CONFIG_WDC_ALI15X3
   SAY N!
 
 CONFIG_BLK_DEV_AMD74XX
-  This driver ensures (U)DMA support for the AMD756/760 Viper
-  chipsets.
-
-  If you say Y here, you also need to say Y to "Use DMA by default
-  when available", above.
-  Please read the comments at the top of <file:drivers/ide/amd74xx.c>.
-
-  If unsure, say N.
-
-CONFIG_AMD74XX_OVERRIDE
-  This option auto-forces the ata66 flag.
-  This effect can be also invoked by calling "idex=ata66"
-  If unsure, say N.
+  This driver adds explicit support for AMD-7xx and AMD-8111 chips
+  and also for the nVidia nForce chip.  This allows the kernel to
+  change PIO, DMA and UDMA speeds and to configure the chip to
+  optimum performance.
 
 CONFIG_BLK_DEV_CMD64X
   Say Y here if you have an IDE controller which uses any of these
@@ -435,28 +426,10 @@ CONFIG_BLK_DEV_SVWKS
   chipsets.
 
 CONFIG_BLK_DEV_PIIX
-  This driver adds PIO mode setting and tuning for all PIIX IDE
-  controllers by Intel.  Since the BIOS can sometimes improperly tune
-  PIO 0-4 mode settings, this allows dynamic tuning of the chipset
-  via the standard end-user tool 'hdparm'.
-
-  Please read the comments at the top of <file:drivers/ide/piix.c>.
-
-  If you say Y here, you should also say Y to "PIIXn Tuning support",
-  below.
-
-  If unsure, say N.
-
-CONFIG_PIIX_TUNING
-  This driver extension adds DMA mode setting and tuning for all PIIX
-  IDE controllers by Intel. Since the BIOS can sometimes improperly
-  set up the device/adapter combination and speed limits, it has
-  become a necessity to back/forward speed devices as needed.
-
-  Case 430HX/440FX PIIX3 need speed limits to reduce UDMA to DMA mode
-  2 if the BIOS can not perform this task at initialization.
-
-  If unsure, say N.
+  This driver adds explicit support for Intel PIIX and ICH chips
+  and also for the Efar Victory66 (slc90e66) chip.  This allows
+  the kernel to change PIO, DMA and UDMA speeds and to configure
+  the chip to optimum performance.
 
 CONFIG_BLK_DEV_PDC202XX
   Promise Ultra33 or PDC20246
@@ -513,19 +486,6 @@ CONFIG_BLK_DEV_SIS5513
 
   Please read the comments at the top of <file:drivers/ide/sis5513.c>.
 
-CONFIG_BLK_DEV_SLC90E66
-  This driver ensures (U)DMA support for Victroy66 SouthBridges for
-  SMsC with Intel NorthBridges.  This is an Ultra66 based chipset.
-  The nice thing about it is that you can mix Ultra/DMA/PIO devices
-  and it will handle timing cycles.  Since this is an improved
-  look-a-like to the PIIX4 it should be a nice addition.
-
-  If you say Y here, you need to say Y to "Use DMA by default when
-  available" as well.
-
-  Please read the comments at the top of
-  <file:drivers/ide/slc90e66.c>.
-
 CONFIG_BLK_DEV_SL82C105
   If you have a Winbond SL82c105 IDE controller, say Y here to enable
   special configuration for this chip. This is common on various CHRP
@@ -538,20 +498,9 @@ CONFIG_BLK_DEV_TRM290
   Please read the comments at the top of <file:drivers/ide/trm290.c>.
 
 CONFIG_BLK_DEV_VIA82CXXX
-  This allows you to configure your chipset for a better use while
-  running PIO/(U)DMA, it will allow you to enable efficiently the
-  second channel dma usage, as it may not be set by BIOS.  It will try
-  to set fifo configuration at its best.  It will allow you to get
-  information from /proc/ide/via provided you enabled "/proc file
-  system" support.
-
-  Please read the comments at the top of
-  <file:drivers/ide/via82cxxx.c>.
-
-  If you say Y here, then say Y to "Use DMA by default when available"
-  as well.
-
-  If unsure, say N.
+  This driver adds explicit support for VIA BusMastering IDE chips.
+  This allows the kernel to change PIO, DMA and UDMA speeds and to
+  configure the chip to optimum performance.
 
 CONFIG_BLK_DEV_IDE_RAPIDE
   Say Y here if you want to support the Yellowstone RapIDE controller

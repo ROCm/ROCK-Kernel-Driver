@@ -2663,7 +2663,7 @@ static void snd_rme9652_card_free(snd_card_t *card)
 static int __devinit snd_rme9652_probe(struct pci_dev *pci,
 				       const struct pci_device_id *id)
 {
-	static int dev = 0;
+	static int dev;
 	rme9652_t *rme9652;
 	snd_card_t *card;
 	int err;

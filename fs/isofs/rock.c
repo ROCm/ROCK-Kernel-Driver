@@ -32,7 +32,7 @@
 #define CHECK_SP(FAIL)	       			\
       if(rr->u.SP.magic[0] != 0xbe) FAIL;	\
       if(rr->u.SP.magic[1] != 0xef) FAIL;       \
-      inode->i_sb->u.isofs_sb.s_rock_offset=rr->u.SP.skip;
+      ISOFS_SB(inode->i_sb)->s_rock_offset=rr->u.SP.skip;
 /* We define a series of macros because each function must do exactly the
    same thing in certain places.  We use the macros to ensure that everything
    is done correctly */
@@ -51,10 +51,10 @@
   if(LEN & 1) LEN++;						\
   CHR = ((unsigned char *) DE) + LEN;				\
   LEN = *((unsigned char *) DE) - LEN;                          \
-  if (inode->i_sb->u.isofs_sb.s_rock_offset!=-1)                \
+  if (ISOFS_SB(inode->i_sb)->s_rock_offset!=-1)                \
   {                                                             \
-     LEN-=inode->i_sb->u.isofs_sb.s_rock_offset;                \
-     CHR+=inode->i_sb->u.isofs_sb.s_rock_offset;                \
+     LEN-=ISOFS_SB(inode->i_sb)->s_rock_offset;                \
+     CHR+=ISOFS_SB(inode->i_sb)->s_rock_offset;                \
      if (LEN<0) LEN=0;                                          \
   }                                                             \
 }                                     
@@ -102,7 +102,7 @@ int find_rock_ridge_relocation(struct iso_directory_record * de,
   /* Return value if we do not find appropriate record. */
   retval = isonum_733 (de->extent);
   
-  if (!inode->i_sb->u.isofs_sb.s_rock) return retval;
+  if (!ISOFS_SB(inode->i_sb)->s_rock) return retval;
 
   SETUP_ROCK_RIDGE(de, chr, len);
  repeat:
@@ -162,7 +162,7 @@ int get_rock_ridge_filename(struct iso_directory_record * de,
   CONTINUE_DECLS;
   int retnamlen = 0, truncate=0;
  
-  if (!inode->i_sb->u.isofs_sb.s_rock) return 0;
+  if (!ISOFS_SB(inode->i_sb)->s_rock) return 0;
   *retname = 0;
 
   SETUP_ROCK_RIDGE(de, chr, len);
@@ -234,7 +234,7 @@ int parse_rock_ridge_inode_internal(struct iso_directory_record * de,
   int symlink_len = 0;
   CONTINUE_DECLS;
 
-  if (!inode->i_sb->u.isofs_sb.s_rock) return 0;
+  if (!ISOFS_SB(inode->i_sb)->s_rock) return 0;
 
   SETUP_ROCK_RIDGE(de, chr, len);
   if (regard_xa)
@@ -272,7 +272,7 @@ int parse_rock_ridge_inode_internal(struct iso_directory_record * de,
 	CHECK_CE;
 	break;
       case SIG('E','R'):
-	inode->i_sb->u.isofs_sb.s_rock = 1;
+	ISOFS_SB(inode->i_sb)->s_rock = 1;
 	printk(KERN_DEBUG "ISO 9660 Extensions: ");
 	{ int p;
 	  for(p=0;p<rr->u.ER.len_id;p++) printk("%c",rr->u.ER.data[p]);
@@ -368,7 +368,7 @@ int parse_rock_ridge_inode_internal(struct iso_directory_record * de,
 	ISOFS_I(inode)->i_first_extent = isonum_733(rr->u.CL.location);
 	reloc = iget(inode->i_sb,
 		     (ISOFS_I(inode)->i_first_extent <<
-		      inode -> i_sb -> u.isofs_sb.s_log_zone_size));
+		      ISOFS_SB(inode->i_sb)->s_log_zone_size));
 	if (!reloc)
 		goto out;
 	inode->i_mode = reloc->i_mode;
@@ -385,7 +385,7 @@ int parse_rock_ridge_inode_internal(struct iso_directory_record * de,
 	break;
 #ifdef CONFIG_ZISOFS
       case SIG('Z','F'):
-	      if ( !inode->i_sb->u.isofs_sb.s_nocompress ) {
+	      if ( !ISOFS_SB(inode->i_sb)->s_nocompress ) {
 		      int algo;
 		      algo = isonum_721(rr->u.ZF.algorithm);
 		      if ( algo == SIG('p','z') ) {
@@ -478,8 +478,8 @@ int parse_rock_ridge_inode(struct iso_directory_record * de,
    int result=parse_rock_ridge_inode_internal(de,inode,0);
    /* if rockridge flag was reset and we didn't look for attributes
     * behind eventual XA attributes, have a look there */
-   if ((inode->i_sb->u.isofs_sb.s_rock_offset==-1)
-       &&(inode->i_sb->u.isofs_sb.s_rock==2))
+   if ((ISOFS_SB(inode->i_sb)->s_rock_offset==-1)
+       &&(ISOFS_SB(inode->i_sb)->s_rock==2))
      {
 	result=parse_rock_ridge_inode_internal(de,inode,14);
      };
@@ -506,7 +506,7 @@ static int rock_ridge_symlink_readpage(struct file *file, struct page *page)
 	unsigned char *chr;
 	struct rock_ridge *rr;
 
-	if (!inode->i_sb->u.isofs_sb.s_rock)
+	if (!ISOFS_SB(inode->i_sb)->s_rock)
 		panic ("Cannot have symlink with high sierra variant of iso filesystem\n");
 
 	block = inode->i_ino >> bufbits;

@@ -38,21 +38,25 @@ static int affs_remount (struct super_block *sb, int *flags, char *data);
 static void
 affs_put_super(struct super_block *sb)
 {
+	struct affs_sb_info *sbi = AFFS_SB(sb);
+
 	pr_debug("AFFS: put_super()\n");
 
 	if (!(sb->s_flags & MS_RDONLY)) {
-		AFFS_ROOT_TAIL(sb, AFFS_SB->s_root_bh)->bm_flag = be32_to_cpu(1);
+		AFFS_ROOT_TAIL(sb, sbi->s_root_bh)->bm_flag = be32_to_cpu(1);
 		secs_to_datestamp(CURRENT_TIME,
-				  &AFFS_ROOT_TAIL(sb, AFFS_SB->s_root_bh)->disk_change);
-		affs_fix_checksum(sb, AFFS_SB->s_root_bh);
-		mark_buffer_dirty(AFFS_SB->s_root_bh);
+				  &AFFS_ROOT_TAIL(sb, sbi->s_root_bh)->disk_change);
+		affs_fix_checksum(sb, sbi->s_root_bh);
+		mark_buffer_dirty(sbi->s_root_bh);
 	}
 
-	affs_brelse(AFFS_SB->s_bmap_bh);
-	if (AFFS_SB->s_prefix)
-		kfree(AFFS_SB->s_prefix);
-	kfree(AFFS_SB->s_bitmap);
-	affs_brelse(AFFS_SB->s_root_bh);
+	affs_brelse(sbi->s_bmap_bh);
+	if (sbi->s_prefix)
+		kfree(sbi->s_prefix);
+	kfree(sbi->s_bitmap);
+	affs_brelse(sbi->s_root_bh);
+	kfree(sbi);
+	sb->u.generic_sbp = NULL;
 
 	return;
 }
@@ -61,16 +65,17 @@ static void
 affs_write_super(struct super_block *sb)
 {
 	int clean = 2;
+	struct affs_sb_info *sbi = AFFS_SB(sb);
 
 	if (!(sb->s_flags & MS_RDONLY)) {
-		//	if (AFFS_SB->s_bitmap[i].bm_bh) {
-		//		if (buffer_dirty(AFFS_SB->s_bitmap[i].bm_bh)) {
+		//	if (sbi->s_bitmap[i].bm_bh) {
+		//		if (buffer_dirty(sbi->s_bitmap[i].bm_bh)) {
 		//			clean = 0;
-		AFFS_ROOT_TAIL(sb, AFFS_SB->s_root_bh)->bm_flag = be32_to_cpu(clean);
+		AFFS_ROOT_TAIL(sb, sbi->s_root_bh)->bm_flag = be32_to_cpu(clean);
 		secs_to_datestamp(CURRENT_TIME,
-				  &AFFS_ROOT_TAIL(sb, AFFS_SB->s_root_bh)->disk_change);
-		affs_fix_checksum(sb, AFFS_SB->s_root_bh);
-		mark_buffer_dirty(AFFS_SB->s_root_bh);
+				  &AFFS_ROOT_TAIL(sb, sbi->s_root_bh)->disk_change);
+		affs_fix_checksum(sb, sbi->s_root_bh);
+		mark_buffer_dirty(sbi->s_root_bh);
 		sb->s_dirt = !clean;	/* redo until bitmap synced */
 	} else
 		sb->s_dirt = 0;
@@ -267,6 +272,7 @@ out_inv_arg:
 
 static int affs_fill_super(struct super_block *sb, void *data, int silent)
 {
+	struct affs_sb_info	*sbi;
 	struct buffer_head	*root_bh = NULL;
 	struct buffer_head	*boot_bh;
 	struct inode		*root_inode = NULL;
@@ -285,22 +291,27 @@ static int affs_fill_super(struct super_block *sb, void *data, int silent)
 
 	sb->s_magic             = AFFS_SUPER_MAGIC;
 	sb->s_op                = &affs_sops;
-	memset(AFFS_SB, 0, sizeof(struct affs_sb_info));
-	init_MUTEX(&AFFS_SB->s_bmlock);
+	
+	sbi = kmalloc(sizeof(struct affs_sb_info), GFP_KERNEL);
+	if (!sbi)
+		return -ENOMEM;
+	sb->u.generic_sbp = sbi;
+	memset(sbi, 0, sizeof(struct affs_sb_info));
+	init_MUTEX(&sbi->s_bmlock);
 
 	if (!parse_options(data,&uid,&gid,&i,&reserved,&root_block,
-				&blocksize,&AFFS_SB->s_prefix,
-				AFFS_SB->s_volume, &mount_flags)) {
+				&blocksize,&sbi->s_prefix,
+				sbi->s_volume, &mount_flags)) {
 		printk(KERN_ERR "AFFS: Error parsing options\n");
 		return -EINVAL;
 	}
 	/* N.B. after this point s_prefix must be released */
 
-	AFFS_SB->s_flags   = mount_flags;
-	AFFS_SB->s_mode    = i;
-	AFFS_SB->s_uid     = uid;
-	AFFS_SB->s_gid     = gid;
-	AFFS_SB->s_reserved= reserved;
+	sbi->s_flags   = mount_flags;
+	sbi->s_mode    = i;
+	sbi->s_uid     = uid;
+	sbi->s_gid     = gid;
+	sbi->s_reserved= reserved;
 
 	/* Get the size of the device in 512-byte blocks.
 	 * If we later see that the partition uses bigger
@@ -320,12 +331,12 @@ static int affs_fill_super(struct super_block *sb, void *data, int silent)
 		size = size / (blocksize / 512);
 	}
 	for (blocksize = i, key = 0; blocksize <= j; blocksize <<= 1, size >>= 1) {
-		AFFS_SB->s_root_block = root_block;
+		sbi->s_root_block = root_block;
 		if (root_block < 0)
-			AFFS_SB->s_root_block = (reserved + size - 1) / 2;
+			sbi->s_root_block = (reserved + size - 1) / 2;
 		pr_debug("AFFS: setting blocksize to %d\n", blocksize);
 		affs_set_blocksize(sb, blocksize);
-		AFFS_SB->s_partition_size = size;
+		sbi->s_partition_size = size;
 
 		/* The root block location that was calculated above is not
 		 * correct if the partition size is an odd number of 512-
@@ -341,16 +352,16 @@ static int affs_fill_super(struct super_block *sb, void *data, int silent)
 			pr_debug("AFFS: Dev %s, trying root=%u, bs=%d, "
 				"size=%d, reserved=%d\n",
 				sb->s_id,
-				AFFS_SB->s_root_block + num_bm,
+				sbi->s_root_block + num_bm,
 				blocksize, size, reserved);
-			root_bh = affs_bread(sb, AFFS_SB->s_root_block + num_bm);
+			root_bh = affs_bread(sb, sbi->s_root_block + num_bm);
 			if (!root_bh)
 				continue;
 			if (!affs_checksum_block(sb, root_bh) &&
 			    be32_to_cpu(AFFS_ROOT_HEAD(root_bh)->ptype) == T_SHORT &&
 			    be32_to_cpu(AFFS_ROOT_TAIL(sb, root_bh)->stype) == ST_ROOT) {
-				AFFS_SB->s_hashsize    = blocksize / 4 - 56;
-				AFFS_SB->s_root_block += num_bm;
+				sbi->s_hashsize    = blocksize / 4 - 56;
+				sbi->s_root_block += num_bm;
 				key                        = 1;
 				goto got_root;
 			}
@@ -365,7 +376,7 @@ static int affs_fill_super(struct super_block *sb, void *data, int silent)
 
 	/* N.B. after this point bh must be released */
 got_root:
-	root_block = AFFS_SB->s_root_block;
+	root_block = sbi->s_root_block;
 
 	/* Find out which kind of FS we have */
 	boot_bh = sb_bread(sb, 0);
@@ -385,36 +396,36 @@ got_root:
 		printk(KERN_NOTICE "AFFS: Dircache FS - mounting %s read only\n",
 			sb->s_id);
 		sb->s_flags |= MS_RDONLY;
-		AFFS_SB->s_flags |= SF_READONLY;
+		sbi->s_flags |= SF_READONLY;
 	}
 	switch (chksum) {
 		case MUFS_FS:
 		case MUFS_INTLFFS:
 		case MUFS_DCFFS:
-			AFFS_SB->s_flags |= SF_MUFS;
+			sbi->s_flags |= SF_MUFS;
 			/* fall thru */
 		case FS_INTLFFS:
 		case FS_DCFFS:
-			AFFS_SB->s_flags |= SF_INTL;
+			sbi->s_flags |= SF_INTL;
 			break;
 		case MUFS_FFS:
-			AFFS_SB->s_flags |= SF_MUFS;
+			sbi->s_flags |= SF_MUFS;
 			break;
 		case FS_FFS:
 			break;
 		case MUFS_OFS:
-			AFFS_SB->s_flags |= SF_MUFS;
+			sbi->s_flags |= SF_MUFS;
 			/* fall thru */
 		case FS_OFS:
-			AFFS_SB->s_flags |= SF_OFS;
+			sbi->s_flags |= SF_OFS;
 			sb->s_flags |= MS_NOEXEC;
 			break;
 		case MUFS_DCOFS:
 		case MUFS_INTLOFS:
-			AFFS_SB->s_flags |= SF_MUFS;
+			sbi->s_flags |= SF_MUFS;
 		case FS_DCOFS:
 		case FS_INTLOFS:
-			AFFS_SB->s_flags |= SF_INTL | SF_OFS;
+			sbi->s_flags |= SF_INTL | SF_OFS;
 			sb->s_flags |= MS_NOEXEC;
 			break;
 		default:
@@ -433,12 +444,12 @@ got_root:
 
 	sb->s_flags |= MS_NODEV | MS_NOSUID;
 
-	AFFS_SB->s_data_blksize = sb->s_blocksize;
-	if (AFFS_SB->s_flags & SF_OFS)
-		AFFS_SB->s_data_blksize -= 24;
+	sbi->s_data_blksize = sb->s_blocksize;
+	if (sbi->s_flags & SF_OFS)
+		sbi->s_data_blksize -= 24;
 
 	/* Keep super block in cache */
-	AFFS_SB->s_root_bh = root_bh;
+	sbi->s_root_bh = root_bh;
 	/* N.B. after this point s_root_bh must be released */
 
 	if (affs_init_bitmap(sb))
@@ -463,17 +474,20 @@ got_root:
 out_error:
 	if (root_inode)
 		iput(root_inode);
-	if (AFFS_SB->s_bitmap)
-		kfree(AFFS_SB->s_bitmap);
+	if (sbi->s_bitmap)
+		kfree(sbi->s_bitmap);
 	affs_brelse(root_bh);
-	if (AFFS_SB->s_prefix)
-		kfree(AFFS_SB->s_prefix);
+	if (sbi->s_prefix)
+		kfree(sbi->s_prefix);
+	kfree(sbi);
+	sb->u.generic_sbp = NULL;
 	return -EINVAL;
 }
 
 static int
 affs_remount(struct super_block *sb, int *flags, char *data)
 {
+	struct affs_sb_info	*sbi = AFFS_SB(sb);
 	int			 blocksize;
 	uid_t			 uid;
 	gid_t			 gid;
@@ -481,17 +495,17 @@ affs_remount(struct super_block *sb, int *flags, char *data)
 	int			 reserved;
 	int			 root_block;
 	unsigned long		 mount_flags;
-	unsigned long		 read_only = AFFS_SB->s_flags & SF_READONLY;
+	unsigned long		 read_only = sbi->s_flags & SF_READONLY;
 
 	pr_debug("AFFS: remount(flags=0x%x,opts=\"%s\")\n",*flags,data);
 
 	if (!parse_options(data,&uid,&gid,&mode,&reserved,&root_block,
-	    &blocksize,&AFFS_SB->s_prefix,AFFS_SB->s_volume,&mount_flags))
+	    &blocksize,&sbi->s_prefix,sbi->s_volume,&mount_flags))
 		return -EINVAL;
-	AFFS_SB->s_flags = mount_flags | read_only;
-	AFFS_SB->s_mode  = mode;
-	AFFS_SB->s_uid   = uid;
-	AFFS_SB->s_gid   = gid;
+	sbi->s_flags = mount_flags | read_only;
+	sbi->s_mode  = mode;
+	sbi->s_uid   = uid;
+	sbi->s_gid   = gid;
 
 	if ((*flags & MS_RDONLY) == (sb->s_flags & MS_RDONLY))
 		return 0;
@@ -500,7 +514,7 @@ affs_remount(struct super_block *sb, int *flags, char *data)
 		while (sb->s_dirt)
 			affs_write_super(sb);
 		sb->s_flags |= MS_RDONLY;
-	} else if (!(AFFS_SB->s_flags & SF_READONLY)) {
+	} else if (!(sbi->s_flags & SF_READONLY)) {
 		sb->s_flags &= ~MS_RDONLY;
 	} else {
 		affs_warning(sb,"remount","Cannot remount fs read/write because of errors");
@@ -514,13 +528,13 @@ affs_statfs(struct super_block *sb, struct statfs *buf)
 {
 	int		 free;
 
-	pr_debug("AFFS: statfs() partsize=%d, reserved=%d\n",AFFS_SB->s_partition_size,
-	     AFFS_SB->s_reserved);
+	pr_debug("AFFS: statfs() partsize=%d, reserved=%d\n",AFFS_SB(sb)->s_partition_size,
+	     AFFS_SB(sb)->s_reserved);
 
 	free          = affs_count_free_blocks(sb);
 	buf->f_type    = AFFS_SUPER_MAGIC;
 	buf->f_bsize   = sb->s_blocksize;
-	buf->f_blocks  = AFFS_SB->s_partition_size - AFFS_SB->s_reserved;
+	buf->f_blocks  = AFFS_SB(sb)->s_partition_size - AFFS_SB(sb)->s_reserved;
 	buf->f_bfree   = free;
 	buf->f_bavail  = free;
 	return 0;

@@ -53,14 +53,14 @@ affs_count_free_blocks(struct super_block *sb)
 	if (sb->s_flags & MS_RDONLY)
 		return 0;
 
-	down(&AFFS_SB->s_bmlock);
+	down(&AFFS_SB(sb)->s_bmlock);
 
-	bm = AFFS_SB->s_bitmap;
+	bm = AFFS_SB(sb)->s_bitmap;
 	free = 0;
-	for (i = AFFS_SB->s_bmap_count; i > 0; bm++, i--)
+	for (i = AFFS_SB(sb)->s_bmap_count; i > 0; bm++, i--)
 		free += bm->bm_free;
 
-	up(&AFFS_SB->s_bmlock);
+	up(&AFFS_SB(sb)->s_bmlock);
 
 	return free;
 }
@@ -68,6 +68,7 @@ affs_count_free_blocks(struct super_block *sb)
 void
 affs_free_block(struct super_block *sb, u32 block)
 {
+	struct affs_sb_info *sbi = AFFS_SB(sb);
 	struct affs_bm_info *bm;
 	struct buffer_head *bh;
 	u32 blk, bmap, bit, mask, tmp;
@@ -75,24 +76,24 @@ affs_free_block(struct super_block *sb, u32 block)
 
 	pr_debug("AFFS: free_block(%u)\n", block);
 
-	if (block > AFFS_SB->s_partition_size)
+	if (block > sbi->s_partition_size)
 		goto err_range;
 
-	blk     = block - AFFS_SB->s_reserved;
-	bmap    = blk / AFFS_SB->s_bmap_bits;
-	bit     = blk % AFFS_SB->s_bmap_bits;
-	bm      = &AFFS_SB->s_bitmap[bmap];
+	blk     = block - sbi->s_reserved;
+	bmap    = blk / sbi->s_bmap_bits;
+	bit     = blk % sbi->s_bmap_bits;
+	bm      = &sbi->s_bitmap[bmap];
 
-	down(&AFFS_SB->s_bmlock);
+	down(&sbi->s_bmlock);
 
-	bh = AFFS_SB->s_bmap_bh;
-	if (AFFS_SB->s_last_bmap != bmap) {
+	bh = sbi->s_bmap_bh;
+	if (sbi->s_last_bmap != bmap) {
 		affs_brelse(bh);
 		bh = affs_bread(sb, bm->bm_key);
 		if (!bh)
 			goto err_bh_read;
-		AFFS_SB->s_bmap_bh = bh;
-		AFFS_SB->s_last_bmap = bmap;
+		sbi->s_bmap_bh = bh;
+		sbi->s_last_bmap = bmap;
 	}
 
 	mask = 1 << (bit & 31);
@@ -112,19 +113,19 @@ affs_free_block(struct super_block *sb, u32 block)
 	sb->s_dirt = 1;
 	bm->bm_free++;
 
-	up(&AFFS_SB->s_bmlock);
+	up(&sbi->s_bmlock);
 	return;
 
 err_free:
 	affs_warning(sb,"affs_free_block","Trying to free block %u which is already free", block);
-	up(&AFFS_SB->s_bmlock);
+	up(&sbi->s_bmlock);
 	return;
 
 err_bh_read:
 	affs_error(sb,"affs_free_block","Cannot read bitmap block %u", bm->bm_key);
-	AFFS_SB->s_bmap_bh = NULL;
-	AFFS_SB->s_last_bmap = ~0;
-	up(&AFFS_SB->s_bmlock);
+	sbi->s_bmap_bh = NULL;
+	sbi->s_last_bmap = ~0;
+	up(&sbi->s_bmlock);
 	return;
 
 err_range:
@@ -145,6 +146,7 @@ u32
 affs_alloc_block(struct inode *inode, u32 goal)
 {
 	struct super_block *sb;
+	struct affs_sb_info *sbi;
 	struct affs_bm_info *bm;
 	struct buffer_head *bh;
 	u32 *data, *enddata;
@@ -152,6 +154,7 @@ affs_alloc_block(struct inode *inode, u32 goal)
 	int i;
 
 	sb = inode->i_sb;
+	sbi = AFFS_SB(sb);
 
 	pr_debug("AFFS: balloc(inode=%lu,goal=%u): ", inode->i_ino, goal);
 
@@ -161,53 +164,53 @@ affs_alloc_block(struct inode *inode, u32 goal)
 		return ++AFFS_I(inode)->i_lastalloc;
 	}
 
-	if (!goal || goal > AFFS_SB->s_partition_size) {
+	if (!goal || goal > sbi->s_partition_size) {
 		if (goal)
 			affs_warning(sb, "affs_balloc", "invalid goal %d", goal);
 		//if (!AFFS_I(inode)->i_last_block)
 		//	affs_warning(sb, "affs_balloc", "no last alloc block");
-		goal = AFFS_SB->s_reserved;
+		goal = sbi->s_reserved;
 	}
 
-	blk = goal - AFFS_SB->s_reserved;
-	bmap = blk / AFFS_SB->s_bmap_bits;
-	bm = &AFFS_SB->s_bitmap[bmap];
+	blk = goal - sbi->s_reserved;
+	bmap = blk / sbi->s_bmap_bits;
+	bm = &sbi->s_bitmap[bmap];
 
-	down(&AFFS_SB->s_bmlock);
+	down(&sbi->s_bmlock);
 
 	if (bm->bm_free)
 		goto find_bmap_bit;
 
 find_bmap:
 	/* search for the next bmap buffer with free bits */
-	i = AFFS_SB->s_bmap_count;
+	i = sbi->s_bmap_count;
 	do {
 		bmap++;
 		bm++;
-		if (bmap < AFFS_SB->s_bmap_count)
+		if (bmap < sbi->s_bmap_count)
 			continue;
 		/* restart search at zero */
 		bmap = 0;
-		bm = AFFS_SB->s_bitmap;
+		bm = sbi->s_bitmap;
 		if (--i <= 0)
 			goto err_full;
 	} while (!bm->bm_free);
-	blk = bmap * AFFS_SB->s_bmap_bits;
+	blk = bmap * sbi->s_bmap_bits;
 
 find_bmap_bit:
 
-	bh = AFFS_SB->s_bmap_bh;
-	if (AFFS_SB->s_last_bmap != bmap) {
+	bh = sbi->s_bmap_bh;
+	if (sbi->s_last_bmap != bmap) {
 		affs_brelse(bh);
 		bh = affs_bread(sb, bm->bm_key);
 		if (!bh)
 			goto err_bh_read;
-		AFFS_SB->s_bmap_bh = bh;
-		AFFS_SB->s_last_bmap = bmap;
+		sbi->s_bmap_bh = bh;
+		sbi->s_last_bmap = bmap;
 	}
 
 	/* find an unused block in this bitmap block */
-	bit = blk % AFFS_SB->s_bmap_bits;
+	bit = blk % sbi->s_bmap_bits;
 	data = (u32 *)bh->b_data + bit / 32 + 1;
 	enddata = (u32 *)((u8 *)bh->b_data + sb->s_blocksize);
 	mask = ~0UL << (bit & 31);
@@ -231,7 +234,7 @@ find_bmap_bit:
 find_bit:
 	/* finally look for a free bit in the word */
 	bit = ffs(tmp) - 1;
-	blk += bit + AFFS_SB->s_reserved;
+	blk += bit + sbi->s_reserved;
 	mask2 = mask = 1 << (bit & 31);
 	AFFS_I(inode)->i_lastalloc = blk;
 
@@ -253,18 +256,18 @@ find_bit:
 	mark_buffer_dirty(bh);
 	sb->s_dirt = 1;
 
-	up(&AFFS_SB->s_bmlock);
+	up(&sbi->s_bmlock);
 
 	pr_debug("%d\n", blk);
 	return blk;
 
 err_bh_read:
 	affs_error(sb,"affs_read_block","Cannot read bitmap block %u", bm->bm_key);
-	AFFS_SB->s_bmap_bh = NULL;
-	AFFS_SB->s_last_bmap = ~0;
+	sbi->s_bmap_bh = NULL;
+	sbi->s_last_bmap = ~0;
 err_full:
 	pr_debug("failed\n");
-	up(&AFFS_SB->s_bmlock);
+	up(&sbi->s_bmlock);
 	return 0;
 }
 
@@ -276,35 +279,36 @@ affs_init_bitmap(struct super_block *sb)
 	u32 *bmap_blk;
 	u32 size, blk, end, offset, mask;
 	int i, res = 0;
+	struct affs_sb_info *sbi = AFFS_SB(sb);
 
 	if (sb->s_flags & MS_RDONLY)
 		return 0;
 
-	if (!AFFS_ROOT_TAIL(sb, AFFS_SB->s_root_bh)->bm_flag) {
+	if (!AFFS_ROOT_TAIL(sb, sbi->s_root_bh)->bm_flag) {
 		printk(KERN_NOTICE "AFFS: Bitmap invalid - mounting %s read only\n",
 			sb->s_id);
 		sb->s_flags |= MS_RDONLY;
 		return 0;
 	}
 
-	AFFS_SB->s_last_bmap = ~0;
-	AFFS_SB->s_bmap_bh = NULL;
-	AFFS_SB->s_bmap_bits = sb->s_blocksize * 8 - 32;
-	AFFS_SB->s_bmap_count = (AFFS_SB->s_partition_size - AFFS_SB->s_reserved +
-				 AFFS_SB->s_bmap_bits - 1) / AFFS_SB->s_bmap_bits;
-	size = AFFS_SB->s_bmap_count * sizeof(struct affs_bm_info);
-	bm = AFFS_SB->s_bitmap = kmalloc(size, GFP_KERNEL);
-	if (!AFFS_SB->s_bitmap) {
+	sbi->s_last_bmap = ~0;
+	sbi->s_bmap_bh = NULL;
+	sbi->s_bmap_bits = sb->s_blocksize * 8 - 32;
+	sbi->s_bmap_count = (sbi->s_partition_size - sbi->s_reserved +
+				 sbi->s_bmap_bits - 1) / sbi->s_bmap_bits;
+	size = sbi->s_bmap_count * sizeof(struct affs_bm_info);
+	bm = sbi->s_bitmap = kmalloc(size, GFP_KERNEL);
+	if (!sbi->s_bitmap) {
 		printk(KERN_ERR "AFFS: Bitmap allocation failed\n");
 		return 1;
 	}
-	memset(AFFS_SB->s_bitmap, 0, size);
+	memset(sbi->s_bitmap, 0, size);
 
-	bmap_blk = (u32 *)AFFS_SB->s_root_bh->b_data;
+	bmap_blk = (u32 *)sbi->s_root_bh->b_data;
 	blk = sb->s_blocksize / 4 - 49;
 	end = blk + 25;
 
-	for (i = AFFS_SB->s_bmap_count; i > 0; bm++, i--) {
+	for (i = sbi->s_bmap_count; i > 0; bm++, i--) {
 		affs_brelse(bh);
 
 		bm->bm_key = be32_to_cpu(bmap_blk[blk]);
@@ -341,7 +345,7 @@ affs_init_bitmap(struct super_block *sb)
 		end = sb->s_blocksize / 4 - 1;
 	}
 
-	offset = (AFFS_SB->s_partition_size - AFFS_SB->s_reserved) % AFFS_SB->s_bmap_bits;
+	offset = (sbi->s_partition_size - sbi->s_reserved) % sbi->s_bmap_bits;
 	mask = ~(0xFFFFFFFFU << (offset & 31));
 	pr_debug("last word: %d %d %d\n", offset, offset / 32 + 1, mask);
 	offset = offset / 32 + 1;

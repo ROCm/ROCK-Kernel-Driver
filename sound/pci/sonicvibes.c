@@ -1453,7 +1453,7 @@ static int __devinit snd_sonicvibes_midi(sonicvibes_t * sonic, snd_rawmidi_t * r
 static int __devinit snd_sonic_probe(struct pci_dev *pci,
 				     const struct pci_device_id *id)
 {
-	static int dev = 0;
+	static int dev;
 	snd_card_t *card;
 	sonicvibes_t *sonic;
 	snd_rawmidi_t *midi_uart;

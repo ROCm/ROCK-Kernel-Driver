@@ -347,7 +347,7 @@ static int __init snd_card_als100_probe(int dev)
 static int __init snd_als100_isapnp_detect(struct isapnp_card *card,
 					   const struct isapnp_card_id *id)
 {
-	static int dev = 0;
+	static int dev;
 	int res;
 
 	for ( ; dev < SNDRV_CARDS; dev++) {

@@ -38,6 +38,8 @@
 #define DTF(x...)
 #endif
 
+#define SUPPORT_VLB_SYNC 1
+
 /*
  * for now, taskfile requests are special :/
  */
@@ -56,7 +58,7 @@ static inline void ide_unmap_rq(struct request *rq, char *to,
 	    bio_kunmap_irq(to, flags);
 }
 
-static void ata_bswap_data (void *buffer, int wcount)
+static void bswap_data (void *buffer, int wcount)
 {
 	u16 *p = buffer;
 
@@ -74,18 +76,20 @@ static void ata_bswap_data (void *buffer, int wcount)
  * of the sector count register location, with interrupts disabled
  * to ensure that the reads all happen together.
  */
-static inline void task_vlb_sync(ide_ioreg_t port)
+static inline void task_vlb_sync(ide_drive_t *drive)
 {
-	IN_BYTE (port);
-	IN_BYTE (port);
-	IN_BYTE (port);
+	ide_ioreg_t port = IDE_NSECTOR_REG;
+
+	IN_BYTE(port);
+	IN_BYTE(port);
+	IN_BYTE(port);
 }
 #endif
 
 /*
  * This is used for most PIO data transfers *from* the IDE interface
  */
-void ata_input_data (ide_drive_t *drive, void *buffer, unsigned int wcount)
+void ata_input_data(ide_drive_t *drive, void *buffer, unsigned int wcount)
 {
 	byte io_32bit;
 
@@ -107,7 +111,7 @@ void ata_input_data (ide_drive_t *drive, void *buffer, unsigned int wcount)
 			unsigned long flags;
 			__save_flags(flags);	/* local CPU only */
 			__cli();		/* local CPU only */
-			task_vlb_sync(IDE_NSECTOR_REG);
+			task_vlb_sync(drive);
 			insl(IDE_DATA_REG, buffer, wcount);
 			__restore_flags(flags);	/* local CPU only */
 		} else
@@ -130,7 +134,7 @@ void ata_input_data (ide_drive_t *drive, void *buffer, unsigned int wcount)
 /*
  * This is used for most PIO data transfers *to* the IDE interface
  */
-void ata_output_data (ide_drive_t *drive, void *buffer, unsigned int wcount)
+void ata_output_data(ide_drive_t *drive, void *buffer, unsigned int wcount)
 {
 	byte io_32bit;
 
@@ -147,7 +151,7 @@ void ata_output_data (ide_drive_t *drive, void *buffer, unsigned int wcount)
 			unsigned long flags;
 			__save_flags(flags);	/* local CPU only */
 			__cli();		/* local CPU only */
-			task_vlb_sync(IDE_NSECTOR_REG);
+			task_vlb_sync(drive);
 			outsl(IDE_DATA_REG, buffer, wcount);
 			__restore_flags(flags);	/* local CPU only */
 		} else
@@ -188,7 +192,7 @@ void atapi_input_bytes (ide_drive_t *drive, void *buffer, unsigned int bytecount
 		insw_swapw(IDE_DATA_REG, buffer, bytecount / 2);
 		return;
 	}
-#endif /* CONFIG_ATARI */
+#endif
 	ata_input_data (drive, buffer, bytecount / 4);
 	if ((bytecount & 0x03) >= 2)
 		insw (IDE_DATA_REG, ((byte *)buffer) + (bytecount & ~0x03), 1);
@@ -208,25 +212,25 @@ void atapi_output_bytes (ide_drive_t *drive, void *buffer, unsigned int bytecoun
 		outsw_swapw(IDE_DATA_REG, buffer, bytecount / 2);
 		return;
 	}
-#endif /* CONFIG_ATARI */
+#endif
 	ata_output_data (drive, buffer, bytecount / 4);
 	if ((bytecount & 0x03) >= 2)
-		outsw (IDE_DATA_REG, ((byte *)buffer) + (bytecount & ~0x03), 1);
+		outsw(IDE_DATA_REG, ((byte *)buffer) + (bytecount & ~0x03), 1);
 }
 
-void taskfile_input_data (ide_drive_t *drive, void *buffer, unsigned int wcount)
+void taskfile_input_data(ide_drive_t *drive, void *buffer, unsigned int wcount)
 {
 	ata_input_data(drive, buffer, wcount);
 	if (drive->bswap)
-		ata_bswap_data(buffer, wcount);
+		bswap_data(buffer, wcount);
 }
 
-void taskfile_output_data (ide_drive_t *drive, void *buffer, unsigned int wcount)
+void taskfile_output_data(ide_drive_t *drive, void *buffer, unsigned int wcount)
 {
 	if (drive->bswap) {
-		ata_bswap_data(buffer, wcount);
+		bswap_data(buffer, wcount);
 		ata_output_data(drive, buffer, wcount);
-		ata_bswap_data(buffer, wcount);
+		bswap_data(buffer, wcount);
 	} else {
 		ata_output_data(drive, buffer, wcount);
 	}
@@ -235,7 +239,7 @@ void taskfile_output_data (ide_drive_t *drive, void *buffer, unsigned int wcount
 /*
  * Needed for PCI irq sharing
  */
-int drive_is_ready (ide_drive_t *drive)
+int drive_is_ready(ide_drive_t *drive)
 {
 	byte stat = 0;
 	if (drive->waiting_for_dma)
@@ -255,7 +259,7 @@ int drive_is_ready (ide_drive_t *drive)
 	if (IDE_CONTROL_REG)
 		stat = GET_ALTSTAT();
 	else
-#endif /* CONFIG_IDEPCI_SHARE_IRQ */
+#endif
 	stat = GET_STAT();	/* Note: this may clear a pending IRQ!! */
 
 	if (stat & BUSY_STAT)
@@ -291,7 +295,7 @@ static ide_startstop_t bio_mulout_intr(ide_drive_t *drive);
  * Called directly from execute_drive_cmd for the first bunch of sectors,
  * afterwards only by the ISR
  */
-static ide_startstop_t task_mulout_intr (ide_drive_t *drive)
+static ide_startstop_t task_mulout_intr(ide_drive_t *drive)
 {
 	unsigned int		msect, nsect;
 	byte stat		= GET_STAT();
@@ -314,6 +318,7 @@ static ide_startstop_t task_mulout_intr (ide_drive_t *drive)
 		 * necessary
 		 */
 		ide_end_request(drive, 1);
+
 		return ide_stopped;
 	}
 
@@ -341,13 +346,14 @@ static ide_startstop_t task_mulout_intr (ide_drive_t *drive)
 	ide_unmap_rq(rq, pBuf, &flags);
 	drive->io_32bit = io_32bit;
 	rq->errors = 0;
+	/* Are we sure that this as all been already transfered? */
 	rq->current_nr_sectors -= nsect;
 	if (hwgroup->handler == NULL)
 		ide_set_handler(drive, &task_mulout_intr, WAIT_CMD, NULL);
 	return ide_started;
 }
 
-ide_startstop_t do_rw_taskfile (ide_drive_t *drive, ide_task_t *task)
+ide_startstop_t do_rw_taskfile(ide_drive_t *drive, ide_task_t *task)
 {
 	task_struct_t *taskfile = (task_struct_t *) task->tfRegister;
 	hob_struct_t *hobfile = (hob_struct_t *) task->hobRegister;
@@ -399,7 +405,9 @@ ide_startstop_t do_rw_taskfile (ide_drive_t *drive, ide_task_t *task)
 	return ide_started;
 }
 
-void do_taskfile (ide_drive_t *drive, struct hd_drive_task_hdr *taskfile, struct hd_drive_hob_hdr *hobfile, ide_handler_t *handler)
+void do_taskfile(ide_drive_t *drive, struct hd_drive_task_hdr *taskfile,
+		struct hd_drive_hob_hdr *hobfile,
+		ide_handler_t *handler)
 {
 	struct hd_driveid *id = drive->id;
 	byte HIHI = (drive->addressing) ? 0xE0 : 0xEF;
@@ -440,10 +448,6 @@ void do_taskfile (ide_drive_t *drive, struct hd_drive_task_hdr *taskfile, struct
 }
 
 /*
- * Handler for special commands without a data phase from ide-disk
- */
-
-/*
  * This is invoked on completion of a WIN_SETMULT cmd.
  */
 ide_startstop_t set_multmode_intr (ide_drive_t *drive)
@@ -463,7 +467,7 @@ ide_startstop_t set_multmode_intr (ide_drive_t *drive)
 /*
  * This is invoked on completion of a WIN_SPECIFY cmd.
  */
-static ide_startstop_t set_geometry_intr (ide_drive_t *drive)
+ide_startstop_t set_geometry_intr (ide_drive_t *drive)
 {
 	byte stat;
 
@@ -480,7 +484,7 @@ static ide_startstop_t set_geometry_intr (ide_drive_t *drive)
 /*
  * This is invoked on completion of a WIN_RESTORE (recalibrate) cmd.
  */
-static ide_startstop_t recal_intr (ide_drive_t *drive)
+ide_startstop_t recal_intr(ide_drive_t *drive)
 {
 	byte stat = GET_STAT();
 
@@ -713,37 +717,6 @@ static ide_startstop_t bio_mulout_intr (ide_drive_t *drive)
 	return ide_started;
 }
 
-/* Called by internal to feature out type of command being called */
-ide_pre_handler_t * ide_pre_handler_parser (struct hd_drive_task_hdr *taskfile, struct hd_drive_hob_hdr *hobfile)
-{
-	switch(taskfile->command) {
-				/* IDE_DRIVE_TASK_RAW_WRITE */
-				/* IDE_DRIVE_TASK_OUT */
-		case WIN_WRITE:
-		case WIN_WRITE_EXT:
-		case WIN_WRITE_VERIFY:
-		case WIN_WRITE_BUFFER:
-		case CFA_WRITE_SECT_WO_ERASE:
-		case WIN_DOWNLOAD_MICROCODE:
-			return &pre_task_out_intr;
-		case CFA_WRITE_MULTI_WO_ERASE:
-		case WIN_MULTWRITE:
-		case WIN_MULTWRITE_EXT:
-			return &pre_bio_out_intr;
-		case WIN_SMART:
-			if (taskfile->feature == SMART_WRITE_LOG_SECTOR)
-				return &pre_task_out_intr;
-		case WIN_WRITEDMA:
-		case WIN_WRITEDMA_QUEUED:
-		case WIN_WRITEDMA_EXT:
-		case WIN_WRITEDMA_QUEUED_EXT:
-				/* IDE_DRIVE_TASK_OUT */
-		default:
-			break;
-	}
-	return(NULL);
-}
-
 /*
  * Handler for command with Read Multiple
  */
@@ -798,154 +771,85 @@ static ide_startstop_t task_mulin_intr(ide_drive_t *drive)
 	return ide_started;
 }
 
-/* Called by internal to feature out type of command being called */
-ide_handler_t * ide_handler_parser (struct hd_drive_task_hdr *taskfile, struct hd_drive_hob_hdr *hobfile)
-{
-	switch(taskfile->command) {
-		case WIN_IDENTIFY:
-		case WIN_PIDENTIFY:
-		case CFA_TRANSLATE_SECTOR:
-		case WIN_READ_BUFFER:
-		case WIN_READ:
-		case WIN_READ_EXT:
-			return &task_in_intr;
-		case WIN_SECURITY_DISABLE:
-		case WIN_SECURITY_ERASE_UNIT:
-		case WIN_SECURITY_SET_PASS:
-		case WIN_SECURITY_UNLOCK:
-		case WIN_DOWNLOAD_MICROCODE:
-		case CFA_WRITE_SECT_WO_ERASE:
-		case WIN_WRITE_BUFFER:
-		case WIN_WRITE_VERIFY:
-		case WIN_WRITE:
-		case WIN_WRITE_EXT:
-			return &task_out_intr;
-		case WIN_MULTREAD:
-		case WIN_MULTREAD_EXT:
-			return &task_mulin_intr;
-		case CFA_WRITE_MULTI_WO_ERASE:
-		case WIN_MULTWRITE:
-		case WIN_MULTWRITE_EXT:
-			return &bio_mulout_intr;
-		case WIN_SMART:
-			switch(taskfile->feature) {
-				case SMART_READ_VALUES:
-				case SMART_READ_THRESHOLDS:
-				case SMART_READ_LOG_SECTOR:
-					return &task_in_intr;
-				case SMART_WRITE_LOG_SECTOR:
-					return &task_out_intr;
-				default:
-					return &task_no_data_intr;
-			}
-		case CFA_REQ_EXT_ERROR_CODE:
-		case CFA_ERASE_SECTORS:
-		case WIN_VERIFY:
-		case WIN_VERIFY_EXT:
-		case WIN_SEEK:
-			return &task_no_data_intr;
-		case WIN_SPECIFY:
-			return &set_geometry_intr;
-		case WIN_RESTORE:
-			return &recal_intr;
-		case WIN_DIAGNOSE:
-		case WIN_FLUSH_CACHE:
-		case WIN_FLUSH_CACHE_EXT:
-		case WIN_STANDBYNOW1:
-		case WIN_STANDBYNOW2:
-		case WIN_SLEEPNOW1:
-		case WIN_SLEEPNOW2:
-		case WIN_SETIDLE1:
-		case WIN_CHECKPOWERMODE1:
-		case WIN_CHECKPOWERMODE2:
-		case WIN_GETMEDIASTATUS:
-		case WIN_MEDIAEJECT:
-			return &task_no_data_intr;
-		case WIN_SETMULT:
-			return &set_multmode_intr;
-		case WIN_READ_NATIVE_MAX:
-		case WIN_SET_MAX:
-		case WIN_READ_NATIVE_MAX_EXT:
-		case WIN_SET_MAX_EXT:
-		case WIN_SECURITY_ERASE_PREPARE:
-		case WIN_SECURITY_FREEZE_LOCK:
-		case WIN_DOORLOCK:
-		case WIN_DOORUNLOCK:
-		case WIN_SETFEATURES:
-			return &task_no_data_intr;
-		case DISABLE_SEAGATE:
-		case EXABYTE_ENABLE_NEST:
-			return &task_no_data_intr;
-#ifdef CONFIG_BLK_DEV_IDEDMA
-		case WIN_READDMA:
-		case WIN_IDENTIFY_DMA:
-		case WIN_READDMA_QUEUED:
-		case WIN_READDMA_EXT:
-		case WIN_READDMA_QUEUED_EXT:
-		case WIN_WRITEDMA:
-		case WIN_WRITEDMA_QUEUED:
-		case WIN_WRITEDMA_EXT:
-		case WIN_WRITEDMA_QUEUED_EXT:
-#endif
-		case WIN_FORMAT:
-		case WIN_INIT:
-		case WIN_DEVICE_RESET:
-		case WIN_QUEUED_SERVICE:
-		case WIN_PACKETCMD:
-		default:
-			return NULL;
-	}
-}
-
 /* Called by ioctl to feature out type of command being called */
-int ide_cmd_type_parser (ide_task_t *args)
+void ide_cmd_type_parser(ide_task_t *args)
 {
 	struct hd_drive_task_hdr *taskfile = (struct hd_drive_task_hdr *) args->tfRegister;
-	struct hd_drive_hob_hdr *hobfile = (struct hd_drive_hob_hdr *) args->hobRegister;
 
-	args->prehandler = ide_pre_handler_parser(taskfile, hobfile);
-	args->handler = ide_handler_parser(taskfile, hobfile);
+	args->prehandler = NULL;
+	args->handler = NULL;
 
 	switch(args->tfRegister[IDE_COMMAND_OFFSET]) {
 		case WIN_IDENTIFY:
 		case WIN_PIDENTIFY:
-			return IDE_DRIVE_TASK_IN;
+			args->handler = task_in_intr;
+			args->command_type = IDE_DRIVE_TASK_IN;
+			return;
+
 		case CFA_TRANSLATE_SECTOR:
 		case WIN_READ:
 		case WIN_READ_EXT:
 		case WIN_READ_BUFFER:
-			return IDE_DRIVE_TASK_IN;
+			args->handler = task_in_intr;
+			args->command_type = IDE_DRIVE_TASK_IN;
+			return;
+
 		case WIN_WRITE:
 		case WIN_WRITE_EXT:
 		case WIN_WRITE_VERIFY:
 		case WIN_WRITE_BUFFER:
 		case CFA_WRITE_SECT_WO_ERASE:
 		case WIN_DOWNLOAD_MICROCODE:
-			return IDE_DRIVE_TASK_RAW_WRITE;
+			args->prehandler = pre_task_out_intr;
+			args->handler = task_out_intr;
+			args->command_type = IDE_DRIVE_TASK_RAW_WRITE;
+			return;
+
 		case WIN_MULTREAD:
 		case WIN_MULTREAD_EXT:
-			return IDE_DRIVE_TASK_IN;
+			args->handler = task_mulin_intr;
+			args->command_type = IDE_DRIVE_TASK_IN;
+			return;
+
 		case CFA_WRITE_MULTI_WO_ERASE:
 		case WIN_MULTWRITE:
 		case WIN_MULTWRITE_EXT:
-			return IDE_DRIVE_TASK_RAW_WRITE;
+			args->prehandler = pre_bio_out_intr;
+			args->handler = bio_mulout_intr;
+			args->command_type = IDE_DRIVE_TASK_RAW_WRITE;
+			return;
+
 		case WIN_SECURITY_DISABLE:
 		case WIN_SECURITY_ERASE_UNIT:
 		case WIN_SECURITY_SET_PASS:
 		case WIN_SECURITY_UNLOCK:
-			return IDE_DRIVE_TASK_OUT;
+			args->handler = task_out_intr;
+			args->command_type = IDE_DRIVE_TASK_OUT;
+			return;
+
 		case WIN_SMART:
+			if (taskfile->feature == SMART_WRITE_LOG_SECTOR)
+				args->prehandler = pre_task_out_intr;
 			args->tfRegister[IDE_LCYL_OFFSET] = SMART_LCYL_PASS;
 			args->tfRegister[IDE_HCYL_OFFSET] = SMART_HCYL_PASS;
 			switch(args->tfRegister[IDE_FEATURE_OFFSET]) {
 				case SMART_READ_VALUES:
 				case SMART_READ_THRESHOLDS:
 				case SMART_READ_LOG_SECTOR:
-					return IDE_DRIVE_TASK_IN;
+					args->handler = task_in_intr;
+					args->command_type = IDE_DRIVE_TASK_IN;
+					return;
+
 				case SMART_WRITE_LOG_SECTOR:
-					return IDE_DRIVE_TASK_OUT;
+					args->handler = task_out_intr;
+					args->command_type = IDE_DRIVE_TASK_OUT;
+					return;
+
 				default:
-					return IDE_DRIVE_TASK_NO_DATA;
+					args->handler = task_no_data_intr;
+					args->command_type = IDE_DRIVE_TASK_NO_DATA;
+					return;
+
 			}
 #ifdef CONFIG_BLK_DEV_IDEDMA
 		case WIN_READDMA:
@@ -953,17 +857,23 @@ int ide_cmd_type_parser (ide_task_t *args)
 		case WIN_READDMA_QUEUED:
 		case WIN_READDMA_EXT:
 		case WIN_READDMA_QUEUED_EXT:
-			return IDE_DRIVE_TASK_IN;
+			args->command_type = IDE_DRIVE_TASK_IN;
+			return;
+
 		case WIN_WRITEDMA:
 		case WIN_WRITEDMA_QUEUED:
 		case WIN_WRITEDMA_EXT:
 		case WIN_WRITEDMA_QUEUED_EXT:
-			return IDE_DRIVE_TASK_RAW_WRITE;
+			args->command_type = IDE_DRIVE_TASK_RAW_WRITE;
+			return;
+
 #endif
 		case WIN_SETFEATURES:
+			args->handler = task_no_data_intr;
 			switch(args->tfRegister[IDE_FEATURE_OFFSET]) {
 				case SETFEATURES_XFER:
-					return IDE_DRIVE_TASK_SET_XFER;
+					args->command_type = IDE_DRIVE_TASK_SET_XFER;
+					return;
 				case SETFEATURES_DIS_DEFECT:
 				case SETFEATURES_EN_APM:
 				case SETFEATURES_DIS_MSN:
@@ -980,16 +890,20 @@ int ide_cmd_type_parser (ide_task_t *args)
 				case SETFEATURES_DIS_RI:
 				case SETFEATURES_DIS_SI:
 				default:
-					return IDE_DRIVE_TASK_NO_DATA;
+					args->command_type = IDE_DRIVE_TASK_NO_DATA;
+					return;
 			}
-		case WIN_NOP:
-		case CFA_REQ_EXT_ERROR_CODE:
-		case CFA_ERASE_SECTORS:
-		case WIN_VERIFY:
-		case WIN_VERIFY_EXT:
-		case WIN_SEEK:
+
 		case WIN_SPECIFY:
+			args->handler = set_geometry_intr;
+			args->command_type = IDE_DRIVE_TASK_NO_DATA;
+			return;
+
 		case WIN_RESTORE:
+			args->handler = recal_intr;
+			args->command_type = IDE_DRIVE_TASK_NO_DATA;
+			return;
+
 		case WIN_DIAGNOSE:
 		case WIN_FLUSH_CACHE:
 		case WIN_FLUSH_CACHE_EXT:
@@ -998,29 +912,48 @@ int ide_cmd_type_parser (ide_task_t *args)
 		case WIN_SLEEPNOW1:
 		case WIN_SLEEPNOW2:
 		case WIN_SETIDLE1:
-		case DISABLE_SEAGATE:
 		case WIN_CHECKPOWERMODE1:
 		case WIN_CHECKPOWERMODE2:
 		case WIN_GETMEDIASTATUS:
 		case WIN_MEDIAEJECT:
-		case WIN_SETMULT:
+		case CFA_REQ_EXT_ERROR_CODE:
+		case CFA_ERASE_SECTORS:
+		case WIN_VERIFY:
+		case WIN_VERIFY_EXT:
+		case WIN_SEEK:
 		case WIN_READ_NATIVE_MAX:
 		case WIN_SET_MAX:
 		case WIN_READ_NATIVE_MAX_EXT:
 		case WIN_SET_MAX_EXT:
 		case WIN_SECURITY_ERASE_PREPARE:
 		case WIN_SECURITY_FREEZE_LOCK:
-		case EXABYTE_ENABLE_NEST:
 		case WIN_DOORLOCK:
 		case WIN_DOORUNLOCK:
-			return IDE_DRIVE_TASK_NO_DATA;
+		case DISABLE_SEAGATE:
+		case EXABYTE_ENABLE_NEST:
+
+			args->handler = task_no_data_intr;
+			args->command_type = IDE_DRIVE_TASK_NO_DATA;
+			return;
+
+		case WIN_SETMULT:
+			args->handler = set_multmode_intr;
+			args->command_type = IDE_DRIVE_TASK_NO_DATA;
+			return;
+
+		case WIN_NOP:
+
+			args->command_type = IDE_DRIVE_TASK_NO_DATA;
+			return;
+
 		case WIN_FORMAT:
 		case WIN_INIT:
 		case WIN_DEVICE_RESET:
 		case WIN_QUEUED_SERVICE:
 		case WIN_PACKETCMD:
 		default:
-			return IDE_DRIVE_TASK_INVALID;
+			args->command_type = IDE_DRIVE_TASK_INVALID;
+			return;
 	}
 }
 
@@ -1067,7 +1000,7 @@ int ide_wait_taskfile(ide_drive_t *drive, struct hd_drive_task_hdr *taskfile, st
 
 	ide_init_drive_taskfile(&rq);
 	/* This is kept for internal use only !!! */
-	args.command_type = ide_cmd_type_parser (&args);
+	ide_cmd_type_parser(&args);
 	if (args.command_type != IDE_DRIVE_TASK_NO_DATA)
 		rq.current_nr_sectors = rq.nr_sectors = (hobfile->sector_count << 8) | taskfile->sector_count;
 
@@ -1232,14 +1165,13 @@ EXPORT_SYMBOL(taskfile_output_data);
 EXPORT_SYMBOL(do_rw_taskfile);
 EXPORT_SYMBOL(do_taskfile);
 
+EXPORT_SYMBOL(recal_intr);
+EXPORT_SYMBOL(set_geometry_intr);
 EXPORT_SYMBOL(set_multmode_intr);
-
 EXPORT_SYMBOL(task_no_data_intr);
 
 EXPORT_SYMBOL(ide_wait_taskfile);
 EXPORT_SYMBOL(ide_raw_taskfile);
-EXPORT_SYMBOL(ide_pre_handler_parser);
-EXPORT_SYMBOL(ide_handler_parser);
 EXPORT_SYMBOL(ide_cmd_type_parser);
 EXPORT_SYMBOL(ide_cmd_ioctl);
 EXPORT_SYMBOL(ide_task_ioctl);

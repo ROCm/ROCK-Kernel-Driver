@@ -899,7 +899,7 @@ static int generic_write (struct usb_serial_port *port, int from_user, const uns
 				     generic_write_bulk_callback), port);
 
 		/* send the data out the bulk port */
-		result = usb_submit_urb(port->write_urb, GFP_KERNEL);
+		result = usb_submit_urb(port->write_urb, GFP_ATOMIC);
 		if (result)
 			err(__FUNCTION__ " - failed submitting write urb, error %d", result);
 		else
@@ -989,7 +989,7 @@ static void generic_read_bulk_callback (struct urb *urb)
 			   ((serial->type->read_bulk_callback) ? 
 			     serial->type->read_bulk_callback : 
 			     generic_read_bulk_callback), port);
-	result = usb_submit_urb(port->read_urb, GFP_KERNEL);
+	result = usb_submit_urb(port->read_urb, GFP_ATOMIC);
 	if (result)
 		err(__FUNCTION__ " - failed resubmitting read urb, error %d", result);
 }

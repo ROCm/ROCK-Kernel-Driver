@@ -405,7 +405,7 @@ static int ir_write (struct usb_serial_port *port, int from_user, const unsigned
 		= USB_QUEUE_BULK
 		| USB_ZERO_PACKET;
 
-	result = usb_submit_urb (port->write_urb, GFP_KERNEL);
+	result = usb_submit_urb (port->write_urb, GFP_ATOMIC);
 	if (result)
 		err("%s - failed submitting write urb, error %d", __FUNCTION__, result);
 	else
@@ -515,7 +515,7 @@ static void ir_read_bulk_callback (struct urb *urb)
 
 			port->read_urb->transfer_flags = USB_QUEUE_BULK;
 
-			result = usb_submit_urb(port->read_urb, GFP_KERNEL);
+			result = usb_submit_urb(port->read_urb, GFP_ATOMIC);
 
 			if (result)
 				err("%s - failed resubmitting read urb, error %d",

@@ -110,14 +110,13 @@ static int do_isofs_readdir(struct inode *inode, struct file *filp,
 	struct buffer_head *bh = NULL;
 	int len;
 	int map;
-	int high_sierra;
 	int first_de = 1;
 	char *p = NULL;		/* Quiet GCC */
 	struct iso_directory_record *de;
+	struct isofs_sb_info *sbi = ISOFS_SB(inode->i_sb);
 
 	offset = filp->f_pos & (bufsize - 1);
 	block = filp->f_pos >> bufbits;
-	high_sierra = inode->i_sb->u.isofs_sb.s_high_sierra;
 
 	while (filp->f_pos < inode->i_size) {
 		int de_len;
@@ -166,7 +165,7 @@ static int do_isofs_readdir(struct inode *inode, struct file *filp,
 			de = tmpde;
 		}
 
-		if (de->flags[-high_sierra] & 0x80) {
+		if (de->flags[-sbi->s_high_sierra] & 0x80) {
 			first_de = 0;
 			filp->f_pos += de_len;
 			continue;
@@ -194,16 +193,16 @@ static int do_isofs_readdir(struct inode *inode, struct file *filp,
 
 		/* Handle everything else.  Do name translation if there
 		   is no Rock Ridge NM field. */
-		if (inode->i_sb->u.isofs_sb.s_unhide == 'n') {
+		if (sbi->s_unhide == 'n') {
 			/* Do not report hidden or associated files */
-			if (de->flags[-high_sierra] & 5) {
+			if (de->flags[-sbi->s_high_sierra] & 5) {
 				filp->f_pos += de_len;
 				continue;
 			}
 		}
 
 		map = 1;
-		if (inode->i_sb->u.isofs_sb.s_rock) {
+		if (sbi->s_rock) {
 			len = get_rock_ridge_filename(de, tmpname, inode);
 			if (len != 0) {		/* may be -1 */
 				p = tmpname;
@@ -212,16 +211,16 @@ static int do_isofs_readdir(struct inode *inode, struct file *filp,
 		}
 		if (map) {
 #ifdef CONFIG_JOLIET
-			if (inode->i_sb->u.isofs_sb.s_joliet_level) {
+			if (sbi->s_joliet_level) {
 				len = get_joliet_filename(de, tmpname, inode);
 				p = tmpname;
 			} else
 #endif
-			if (inode->i_sb->u.isofs_sb.s_mapping == 'a') {
+			if (sbi->s_mapping == 'a') {
 				len = get_acorn_filename(de, tmpname, inode);
 				p = tmpname;
 			} else
-			if (inode->i_sb->u.isofs_sb.s_mapping == 'n') {
+			if (sbi->s_mapping == 'n') {
 				len = isofs_name_translate(de, tmpname, inode);
 				p = tmpname;
 			} else {

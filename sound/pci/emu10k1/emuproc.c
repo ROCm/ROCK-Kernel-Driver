@@ -107,6 +107,7 @@ static void snd_emu10k1_proc_read(snd_info_entry_t *entry,
 	};
 	emu10k1_t *emu = snd_magic_cast(emu10k1_t, entry->private_data, return);
 	unsigned int val;
+	int nefx = emu->audigy ? 64 : 32;
 	int idx;
 	
 	snd_iprintf(buffer, "EMU10K1\n\n");
@@ -132,9 +133,9 @@ static void snd_emu10k1_proc_read(snd_info_entry_t *entry,
 			    (val >> 28) & 0x0f);
 	}
 	snd_iprintf(buffer, "\nCaptured FX Outputs   :\n");
-	for (idx = 0; idx < 32; idx++) {
-		if (emu->efx_voices_mask & (1 << idx))
-			snd_iprintf(buffer, "  Output %02i [%s]\n", idx, outputs[idx]);
+	for (idx = 0; idx < nefx; idx++) {
+		if (emu->efx_voices_mask[idx/32] & (1 << (idx%32)))
+			snd_iprintf(buffer, "  Output %02i [%s]\n", idx, outputs[idx%32]);
 	}
 	snd_iprintf(buffer, "\nAll FX Outputs        :\n");
 	for (idx = 0; idx < 32; idx++)

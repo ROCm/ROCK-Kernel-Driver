@@ -40,7 +40,7 @@ static int affs_symlink_readpage(struct file *file, struct page *page)
 	j  = 0;
 	lf = (struct slink_front *)bh->b_data;
 	lc = 0;
-	pf = inode->i_sb->u.affs_sb.s_prefix ? inode->i_sb->u.affs_sb.s_prefix : "/";
+	pf = AFFS_SB(inode->i_sb)->s_prefix ? AFFS_SB(inode->i_sb)->s_prefix : "/";
 
 	if (strchr(lf->symname,':')) {	/* Handle assign or volume name */
 		while (i < 1023 && (c = pf[i]))

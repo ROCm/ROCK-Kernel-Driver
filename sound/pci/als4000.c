@@ -558,7 +558,7 @@ static void snd_card_als4k_free( snd_card_t *card )
 static int __devinit snd_card_als4k_probe(struct pci_dev *pci,
 					  const struct pci_device_id *id)
 {
-	static int dev = 0;
+	static int dev;
 	snd_card_t *card;
 	snd_card_als4000_t *acard;
 	unsigned long gcr;

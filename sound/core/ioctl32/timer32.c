@@ -79,13 +79,18 @@ DEFINE_ALSA_IOCTL(timer_status);
 
 #define AP(x) snd_ioctl32_##x
 
+enum {
+	SNDRV_TIMER_IOCTL_INFO32 = _IOR('T', 0x11, struct sndrv_timer_info32),
+	SNDRV_TIMER_IOCTL_STATUS32 = _IOW('T', 0x14, struct sndrv_timer_status32),
+};
+
 struct ioctl32_mapper timer_mappers[] = {
 	{ SNDRV_TIMER_IOCTL_PVERSION, NULL },
 	{ SNDRV_TIMER_IOCTL_NEXT_DEVICE, NULL },
 	{ SNDRV_TIMER_IOCTL_SELECT, NULL },
-	{ SNDRV_TIMER_IOCTL_INFO, AP(timer_info) },
+	{ SNDRV_TIMER_IOCTL_INFO32, AP(timer_info) },
 	{ SNDRV_TIMER_IOCTL_PARAMS, NULL },
-	{ SNDRV_TIMER_IOCTL_STATUS, AP(timer_status) },
+	{ SNDRV_TIMER_IOCTL_STATUS32, AP(timer_status) },
 	{ SNDRV_TIMER_IOCTL_START, NULL },
 	{ SNDRV_TIMER_IOCTL_STOP, NULL },
 	{ SNDRV_TIMER_IOCTL_CONTINUE, NULL },

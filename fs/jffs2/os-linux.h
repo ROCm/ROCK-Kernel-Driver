@@ -31,7 +31,7 @@
  * provisions above, a recipient may use your version of this file
  * under either the RHEPL or the GPL.
  *
- * $Id: os-linux.h,v 1.15 2002/03/08 11:31:48 dwmw2 Exp $
+ * $Id: os-linux.h,v 1.16 2002/03/17 10:18:42 dwmw2 Exp $
  *
  */
 
@@ -42,8 +42,8 @@
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,2)
 #define JFFS2_INODE_INFO(i) (list_entry(i, struct jffs2_inode_info, vfs_inode))
 #define OFNI_EDONI_2SFFJ(f)  (&(f)->vfs_inode)
-#define JFFS2_SB_INFO(sb) (&sb->u.jffs2_sb)
-#define OFNI_BS_2SFFJ(c)  ((struct super_block *) ( ((char *)c) - ((char *)(&((struct super_block *)NULL)->u)) ) )
+#define JFFS2_SB_INFO(sb) (sb->u.generic_sbp)
+#define OFNI_BS_2SFFJ(c)  ((struct super_block *)c->os_priv)
 #elif defined(JFFS2_OUT_OF_KERNEL)
 #define JFFS2_INODE_INFO(i) ((struct jffs2_inode_info *) &(i)->u)
 #define OFNI_EDONI_2SFFJ(f)  ((struct inode *) ( ((char *)f) - ((char *)(&((struct inode *)NULL)->u)) ) )

@@ -122,7 +122,7 @@ affs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		goto inside;
 	hash_pos++;
 
-	for (; hash_pos < AFFS_SB->s_hashsize; hash_pos++) {
+	for (; hash_pos < AFFS_SB(sb)->s_hashsize; hash_pos++) {
 		ino = be32_to_cpu(AFFS_HEAD(dir_bh)->table[hash_pos]);
 		if (!ino)
 			continue;

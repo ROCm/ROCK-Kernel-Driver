@@ -30,6 +30,11 @@
 #define UDF_PART_FLAG_REWRITABLE	0x0040
 #define UDF_PART_FLAG_OVERWRITABLE	0x0080
 
+static inline struct udf_sb_info *UDF_SB(struct super_block *sb)
+{
+	return sb->u.generic_sbp;
+}
+
 #define UDF_SB_FREE(X)\
 {\
 	if (UDF_SB(X))\
@@ -39,7 +44,6 @@
 		UDF_SB_PARTMAPS(X) = NULL;\
 	}\
 }
-#define UDF_SB(X)	(&((X)->u.udf_sb))
 
 #define UDF_SB_ALLOC_PARTMAPS(X,Y)\
 {\

@@ -350,8 +350,8 @@ affs_get_block(struct inode *inode, sector_t block, struct buffer_head *bh_resul
 	//lock cache
 	affs_lock_ext(inode);
 
-	ext = block / AFFS_SB->s_hashsize;
-	block -= ext * AFFS_SB->s_hashsize;
+	ext = block / AFFS_SB(sb)->s_hashsize;
+	block -= ext * AFFS_SB(sb)->s_hashsize;
 	ext_bh = affs_get_extblock(inode, ext);
 	if (IS_ERR(ext_bh))
 		goto err_ext;
@@ -362,7 +362,7 @@ affs_get_block(struct inode *inode, sector_t block, struct buffer_head *bh_resul
 		if (!blocknr)
 			goto err_alloc;
 		bh_result->b_state |= (1UL << BH_New);
-		AFFS_I(inode)->mmu_private += AFFS_SB->s_data_blksize;
+		AFFS_I(inode)->mmu_private += AFFS_SB(sb)->s_data_blksize;
 		AFFS_I(inode)->i_blkcnt++;
 
 		/* store new block */
@@ -516,7 +516,7 @@ affs_do_readpage_ofs(struct file *file, struct page *page, unsigned from, unsign
 
 	pr_debug("AFFS: read_page(%u, %ld, %d, %d)\n", (u32)inode->i_ino, page->index, from, to);
 	data = page_address(page);
-	bsize = AFFS_SB->s_data_blksize;
+	bsize = AFFS_SB(sb)->s_data_blksize;
 	tmp = (page->index << PAGE_CACHE_SHIFT) + from;
 	bidx = tmp / bsize;
 	boff = tmp % bsize;
@@ -546,7 +546,7 @@ affs_extent_file_ofs(struct file *file, u32 newsize)
 	u32 tmp;
 
 	pr_debug("AFFS: extent_file(%u, %d)\n", (u32)inode->i_ino, newsize);
-	bsize = AFFS_SB->s_data_blksize;
+	bsize = AFFS_SB(sb)->s_data_blksize;
 	bh = NULL;
 	size = inode->i_size;
 	bidx = size / bsize;
@@ -670,7 +670,7 @@ static int affs_commit_write_ofs(struct file *file, struct page *page, unsigned 
 	int written;
 
 	pr_debug("AFFS: commit_write(%u, %ld, %d, %d)\n", (u32)inode->i_ino, page->index, from, to);
-	bsize = AFFS_SB->s_data_blksize;
+	bsize = AFFS_SB(sb)->s_data_blksize;
 	data = page_address(page);
 
 	bh = NULL;
@@ -811,8 +811,8 @@ affs_truncate(struct inode *inode)
 	last_blk = 0;
 	ext = 0;
 	if (inode->i_size) {
-		last_blk = ((u32)inode->i_size - 1) / AFFS_SB->s_data_blksize;
-		ext = last_blk / AFFS_SB->s_hashsize;
+		last_blk = ((u32)inode->i_size - 1) / AFFS_SB(sb)->s_data_blksize;
+		ext = last_blk / AFFS_SB(sb)->s_hashsize;
 	}
 
 	if (inode->i_size > AFFS_I(inode)->mmu_private) {
@@ -857,11 +857,11 @@ affs_truncate(struct inode *inode)
 	i = 0;
 	blk = last_blk;
 	if (inode->i_size) {
-		i = last_blk % AFFS_SB->s_hashsize + 1;
+		i = last_blk % AFFS_SB(sb)->s_hashsize + 1;
 		blk++;
 	} else
 		AFFS_HEAD(ext_bh)->first_data = 0;
-	size = AFFS_SB->s_hashsize;
+	size = AFFS_SB(sb)->s_hashsize;
 	if (size > blkcnt - blk + i)
 		size = blkcnt - blk + i;
 	for (; i < size; i++, blk++) {
@@ -885,7 +885,7 @@ affs_truncate(struct inode *inode)
 
 	while (ext_key) {
 		ext_bh = affs_bread(sb, ext_key);
-		size = AFFS_SB->s_hashsize;
+		size = AFFS_SB(sb)->s_hashsize;
 		if (size > blkcnt - blk)
 			size = blkcnt - blk;
 		for (i = 0; i < size; i++, blk++)

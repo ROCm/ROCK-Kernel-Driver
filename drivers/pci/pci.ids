@@ -526,8 +526,10 @@
 	2040  79c974
 	7006  AMD-751 [Irongate] System Controller
 	7007  AMD-751 [Irongate] AGP Bridge
-	700e  AMD-760 [Irongate] System Controller
-	700f  AMD-760 [Irongate] AGP Bridge
+	700c  AMD-760 MP [IGD4-2P] System Controller
+	700d  AMD-760 MP [IGD4-2P] AGP Bridge
+	700e  AMD-760 [IGD4-1P] System Controller
+	700f  AMD-760 [IGD4-1P] AGP Bridge
 	7400  AMD-755 [Cobra] ISA
 	7401  AMD-755 [Cobra] IDE
 	7403  AMD-755 [Cobra] ACPI
@@ -540,11 +542,21 @@
 	7411  AMD-765 [Viper] IDE
 	7413  AMD-765 [Viper] ACPI
 	7414  AMD-765 [Viper] USB
-	7440  AMD-768 [??] ISA
-	7441  AMD-768 [??] IDE
-	7443  AMD-768 [??] ACPI
-	7448  AMD-768 [??] PCI
-	7449  AMD-768 [??] USB
+	7440  AMD-768 [Opus] ISA
+	7441  AMD-768 [Opus] IDE
+	7443  AMD-768 [Opus] ACPI
+	7448  AMD-768 [Opus] PCI
+	7449  AMD-768 [Opus] USB
+	7454  AMD-8151 System Controller
+	7455  AMD-8151 AGP Bridge
+	7460  AMD-8111 PCI
+	7461  AMD-8111 USB
+	7462  AMD-8111 Ethernet
+	7468  AMD-8111 LPC
+	7469  AMD-8111 IDE
+	746a  AMD-8111 SMBus 2.0
+	746b  AMD-8111 ACPI
+	746d  AMD-8111 AC97 Audio
 1023  Trident Microsystems
 	0194  82C194
 	2000  4DWave DX
@@ -1055,11 +1067,11 @@
 1052  ?Young Micro Systems
 1053  Young Micro Systems
 1054  Hitachi, Ltd
-1055  EFAR Microsystems
-	9130  EIDE Controller
-	9460  PCI to ISA Bridge
-	9462  USB Universal Host Controller [OHCI]
-	9463  Power Management Controller [Bridge]
+1055  Efar Microsystems
+	9130  slc90e66 [Victory66] IDE
+	9460  slc90e66 [Victory66] ISA
+	9462  slc90e66 [Victory66] USB
+	9463  slc90e66 [Victory66] ACPI
 1056  ICL
 # Motorola made a mistake and used 1507 instead of 1057 in some chips. Please look at the 1507 entry as well when updating this.
 1057  Motorola
@@ -1925,6 +1937,7 @@
 	0151  NV15 DDR (GeForce2 GTS)
 	0152  NV15 Bladerunner (GeForce2 Ultra)
 	0153  NV15 GL (Quadro2 Pro)
+	01bc  nForce IDE
 	0200  NV20 (GeForce3)
 	0203  Quadro DCC
 10df  Emulex Corporation
@@ -5066,6 +5079,8 @@
 	244c  82820 820 (Camino 2) Chipset ISA Bridge (ICH2-M)
 	244e  82820 820 (Camino 2) Chipset PCI
 	2485  AC'97 Audio Controller
+	248a  82801CAM ICH3-M IDE
+	248b  82801CA ICH3 IDE
 	2500  82820 820 (Camino) Chipset Host Bridge (MCH)
 		1043 801c  P3C-2000 system chipset
 	2501  82820 820 (Camino) Chipset Host Bridge (MCH)
@@ -5118,10 +5133,10 @@
 	71a0  440GX - 82443GX Host bridge
 	71a1  440GX - 82443GX AGP bridge
 	71a2  440GX - 82443GX Host bridge (AGP disabled)
-	7600  82372FB PCI to ISA Bridge
-	7601  82372FB PIIX4 IDE
-	7602  82372FB [PCI-to-USB UHCI]
-	7603  82372FB System Management Bus Controller
+	7600  82372FB PIIX5 ISA
+	7601  82372FB PIIX5 IDE
+	7602  82372FB PIIX5 USB
+	7603  82372FB PIIX5 SMBus
 	7800  i740
 		1092 0100  Stealth II G460
 		8086 0100  Intel740 Graphics Accelerator

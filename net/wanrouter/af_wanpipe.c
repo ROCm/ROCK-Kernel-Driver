@@ -19,6 +19,7 @@
 *                                      Alan Cox.
 *               X25 socket Author: Jonathan Naylor.
 * ============================================================================
+* Mar 15, 2002  Arnaldo C. Melo  o Use wp_sk()->num, as it isnt anymore in sock
 * Apr 25, 2000  Nenad Corbic     o Added the ability to send zero length packets.
 * Mar 13, 2000  Nenad Corbic	 o Added a tx buffer check via ioctl call.
 * Mar 06, 2000  Nenad Corbic     o Fixed the corrupt sock lcn problem.
@@ -164,11 +165,11 @@ static void dbg_kfree(void * v, int line) {
 
 
 /* List of all wanpipe sockets. */
-struct sock * wanpipe_sklist = NULL;
+struct sock* wanpipe_sklist;
 static rwlock_t wanpipe_sklist_lock = RW_LOCK_UNLOCKED;
 
 atomic_t wanpipe_socks_nr;
-static unsigned long wanpipe_tx_critical=0;
+static unsigned long wanpipe_tx_critical;
 
 #if 0
 /* Private wanpipe socket structures. */
@@ -187,9 +188,9 @@ struct wanpipe_opt
 };
 #endif
 
-static int sk_count=0;
+static int sk_count;
 extern struct proto_ops wanpipe_ops;
-static unsigned long find_free_critical=0;
+static unsigned long find_free_critical;
 
 static void wanpipe_unlink_driver (struct sock *);
 static void wanpipe_link_driver (netdevice_t *,struct sock *sk);
@@ -400,9 +401,9 @@ static int wanpipe_listen_rcv (struct sk_buff *skb,  struct sock *sk)
 	card->u.x.svc_to_dev_map[(chan->lcn%MAX_X25_LCN)] = dev;
 
 	newsk->zapped=0;
-	newsk->num = htons(X25_PROT);
+	newwp->num = htons(X25_PROT);
 
-	if (wanpipe_do_bind(newsk,dev,newsk->num)){
+	if (wanpipe_do_bind(newsk, dev, newwp->num)) {
 		wanpipe_kill_sock_irq (newsk);
 		release_device(dev);
 		return -EINVAL;
@@ -470,7 +471,7 @@ static struct sock *wanpipe_make_new(struct sock *osk)
 	sk->socket      = osk->socket;
 	sk->priority    = osk->priority;
 	sk->protocol    = osk->protocol;
-	sk->num		= osk->num;
+	wp_sk(sk)->num	= wp_sk(osk)->num;
 	sk->rcvbuf      = osk->rcvbuf;
 	sk->sndbuf      = osk->sndbuf;
 	sk->debug       = osk->debug;
@@ -566,9 +567,11 @@ static int wanpipe_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 	if (len < sizeof(x25api_hdr_t))
 		return -EINVAL;
 
+	wp = wp_sk(sk);
+
 	if (saddr == NULL) {
 		ifindex	= sk->bound_dev_if;
-		proto	= sk->num;
+		proto	= wp->num;
 		addr	= NULL;
 
 	}else{
@@ -648,7 +651,6 @@ static int wanpipe_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 	}
 
 	skb_queue_tail(&sk->write_queue,skb);
-	wp = wp_sk(sk);
 	atomic_inc(&wp->packet_sent);
 
 	if (!(test_and_set_bit(0, &wp->timer))){
@@ -998,7 +1000,8 @@ static int wanpipe_release(struct socket *sock, struct socket *peersock)
 	 *	Unhook packet receive handler.
 	 */
 
-	if (sk->num == htons(X25_PROT) && sk->state != WANSOCK_DISCONNECTED && sk->zapped){
+	if (wp->num == htons(X25_PROT) &&
+	    sk->state != WANSOCK_DISCONNECTED && sk->zapped) {
 		netdevice_t *dev = dev_get_by_index(sk->bound_dev_if);
 		wanpipe_common_t *chan;
 		if (dev){
@@ -1206,7 +1209,8 @@ static void wanpipe_kill_sock_timer (unsigned long data)
 	write_unlock(&wanpipe_sklist_lock);
 
 
-	if (sk->num == htons(X25_PROT) && sk->state != WANSOCK_DISCONNECTED){
+	if (wp_sk(sk)->num == htons(X25_PROT) &&
+	    sk->state != WANSOCK_DISCONNECTED){
 		netdevice_t *dev = dev_get_by_index(sk->bound_dev_if);
 		wanpipe_common_t *chan;
 		if (dev){
@@ -1352,6 +1356,7 @@ static void wanpipe_kill_sock_irq (struct sock *sk)
 
 static int wanpipe_do_bind(struct sock *sk, netdevice_t *dev, int protocol)
 {
+	wanpipe_opt *wp = wp_sk(sk);
 	wanpipe_common_t *chan=NULL;
 	int err=0;
 
@@ -1360,7 +1365,7 @@ static int wanpipe_do_bind(struct sock *sk, netdevice_t *dev, int protocol)
 		goto bind_unlock_exit;
 	}
 
-	sk->num = protocol;
+	wp->num = protocol;
 
 	if (protocol == 0){
 		release_device(dev);
@@ -1373,7 +1378,7 @@ static int wanpipe_do_bind(struct sock *sk, netdevice_t *dev, int protocol)
 			chan=dev->priv;
 			sk->state = chan->state;
 
-			if (sk->num == htons(X25_PROT) && 
+			if (wp->num == htons(X25_PROT) && 
 			    sk->state != WANSOCK_DISCONNECTED && 
 			    sk->state != WANSOCK_CONNECTING){
 				DBG_PRINTK(KERN_INFO 
@@ -1388,7 +1393,7 @@ static int wanpipe_do_bind(struct sock *sk, netdevice_t *dev, int protocol)
 			sk->bound_dev_if = dev->ifindex;
 
 			/* X25 Specific option */
-			if (sk->num == htons(X25_PROT))
+			if (wp->num == htons(X25_PROT))
 				wp_sk(sk)->svc = chan->svc;
 
 		} else {
@@ -1421,6 +1426,7 @@ static int wanpipe_bind(struct socket *sock, struct sockaddr *uaddr, int addr_le
 {
 	struct wan_sockaddr_ll *sll = (struct wan_sockaddr_ll*)uaddr;
 	struct sock *sk=sock->sk;
+	wanpipe_opt *wp = wp_sk(sk);
 	netdevice_t *dev = NULL;
 	sdla_t *card=NULL;
 	char name[15];
@@ -1462,7 +1468,7 @@ static int wanpipe_bind(struct socket *sock, struct sockaddr *uaddr, int addr_le
 			return err;
 
 		if (sll->sll_protocol)
-			sk->num = sll->sll_protocol;
+			wp->num = sll->sll_protocol;
 		sk->state = WANSOCK_BIND_LISTEN;
 		return 0;
 
@@ -1509,7 +1515,7 @@ static int wanpipe_bind(struct socket *sock, struct sockaddr *uaddr, int addr_le
 			return -EINVAL;
 	}
 
-	return wanpipe_do_bind(sk, dev, sll->sll_protocol ? : sk->num);
+	return wanpipe_do_bind(sk, dev, sll->sll_protocol ? : wp->num);
 }
 
 /*============================================================
@@ -1613,7 +1619,7 @@ static int wanpipe_create(struct socket *sock, int protocol)
 
 	sk->zapped=0;
 	sk->family = PF_WANPIPE;
-	sk->num = protocol;
+	wp_sk(sk)->num = protocol;
 	sk->state = WANSOCK_DISCONNECTED;
 	sk->ack_backlog = 0;
 	sk->bound_dev_if=0;
@@ -1774,7 +1780,7 @@ static int wanpipe_getname(struct socket *sock, struct sockaddr *uaddr,
 
 	sll->sll_family = AF_WANPIPE;
 	sll->sll_ifindex = sk->bound_dev_if;
-	sll->sll_protocol = sk->num;
+	sll->sll_protocol = wp_sk(sk)->num;
 	dev = dev_get_by_index(sk->bound_dev_if);
 	if (dev) {
 		sll->sll_hatype = dev->type;
@@ -1836,7 +1842,8 @@ static int wanpipe_notifier(struct notifier_block *this, unsigned long msg, void
 			}
 			break;
 		case NETDEV_UP:
-			if (dev->ifindex == sk->bound_dev_if && sk->num && !sk->zapped) {
+			if (dev->ifindex == sk->bound_dev_if &&
+			    po->num && !sk->zapped) {
 				printk(KERN_INFO "wansock: Registering Device: %s\n",
 						dev->name);
 				wanpipe_link_driver(dev,sk);
@@ -2242,7 +2249,7 @@ unsigned int wanpipe_poll(struct file * file, struct socket *sock, poll_table *w
          * where multiple packets can be pending in the socket 
          * transmit queue */
 
-	if (sk->num == htons(X25_PROT)){
+	if (wp_sk(sk)->num == htons(X25_PROT)) {
 		if (atomic_read(&wp_sk(sk)->packet_sent))
 			return mask;
 	}
@@ -2274,7 +2281,7 @@ static int wanpipe_listen(struct socket *sock, int backlog)
 
  	/* This is x25 specific area if protocol doesn't
          * match, return error */
-	if (sk->num != htons(X25_PROT))
+	if (wp_sk(sk)->num != htons(X25_PROT))
 		return -EINVAL;
 
 	if (sk->state == WANSOCK_BIND_LISTEN) {
@@ -2352,7 +2359,7 @@ static int wanpipe_exec_cmd(struct sock *sk, int cmd, unsigned int flags)
 	
 	/* This is x25 specific area if protocol doesn't
          * match, return error */
-	if (sk->num != htons(X25_PROT))
+	if (wp->num != htons(X25_PROT))
 		return -EINVAL;
 
 
@@ -2535,7 +2542,7 @@ static int wanpipe_accept(struct socket *sock, struct socket *newsock, int flags
 	if (sk->state != WANSOCK_LISTEN)
 		return -EINVAL;
 
-	if (sk->num != htons(X25_PROT))
+	if (wp_sk(sk)->num != htons(X25_PROT))
 		return -EINVAL;
 
 	add_wait_queue(sk->sleep,&wait);
@@ -2628,7 +2635,7 @@ static int wanpipe_connect(struct socket *sock, struct sockaddr *uaddr, int addr
 	netdevice_t *dev;
 	int err;
 
-	if (sk->num != htons(X25_PROT))
+	if (wp_sk(sk)->num != htons(X25_PROT))
 		return -EINVAL;
 
 	if (sk->state == WANSOCK_CONNECTED)

@@ -40,7 +40,7 @@ static int system_client = -1; /* ALSA sequencer client number */
 static int system_port = -1;
 
 int maxqlen = SNDRV_SEQ_OSS_MAX_QLEN;
-static int num_clients = 0;
+static int num_clients;
 static seq_oss_devinfo_t *client_table[SNDRV_SEQ_OSS_MAX_CLIENTS];
 
 

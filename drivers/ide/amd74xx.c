@@ -1,5 +1,5 @@
 /*
- * $Id: amd74xx.c,v 2.7 2002/09/01 17:37:00 vojtech Exp $
+ * $Id: amd74xx.c,v 2.8 2002/03/14 11:52:20 vojtech Exp $
  *
  *  Copyright (c) 2000-2002 Vojtech Pavlik
  *
@@ -46,13 +46,13 @@
 
 #include "ata-timing.h"
 
-#define AMD_IDE_ENABLE		0x40
-#define AMD_IDE_CONFIG		0x41
-#define AMD_CABLE_DETECT	0x42
-#define AMD_DRIVE_TIMING	0x48
-#define AMD_8BIT_TIMING		0x4e
-#define AMD_ADDRESS_SETUP	0x4c
-#define AMD_UDMA_TIMING		0x50
+#define AMD_IDE_ENABLE		(0x00 + amd_config->base)
+#define AMD_IDE_CONFIG		(0x01 + amd_config->base)
+#define AMD_CABLE_DETECT	(0x02 + amd_config->base)
+#define AMD_DRIVE_TIMING	(0x08 + amd_config->base)
+#define AMD_8BIT_TIMING		(0x0e + amd_config->base)
+#define AMD_ADDRESS_SETUP	(0x0c + amd_config->base)
+#define AMD_UDMA_TIMING		(0x10 + amd_config->base)
 
 #define AMD_UDMA		0x07
 #define AMD_UDMA_33		0x01
@@ -66,18 +66,19 @@
  */
 
 static struct amd_ide_chip {
-	char *name;
 	unsigned short id;
 	unsigned char rev;
+	unsigned int base;
 	unsigned char flags;
 } amd_ide_chips[] = {
-	{ "8111",		PCI_DEVICE_ID_AMD_8111_IDE,  0x00, AMD_UDMA_100 },
-	{ "768 Opus",		PCI_DEVICE_ID_AMD_OPUS_7441, 0x00, AMD_UDMA_100 },
-	{ "766 Viper",		PCI_DEVICE_ID_AMD_VIPER_7411, 0x00, AMD_UDMA_100 | AMD_BAD_FIFO },
-	{ "756/c4+ Viper",	PCI_DEVICE_ID_AMD_VIPER_7409, 0x07, AMD_UDMA_66 },
-	{ "756 Viper",		PCI_DEVICE_ID_AMD_VIPER_7409, 0x00, AMD_UDMA_66 | AMD_BAD_SWDMA },
-	{ "755 Cobra",		PCI_DEVICE_ID_AMD_COBRA_7401, 0x00, AMD_UDMA_33 | AMD_BAD_SWDMA },
-	{ NULL }
+	{ PCI_DEVICE_ID_AMD_8111_IDE,  0x00, 0x40, AMD_UDMA_100 },			/* AMD-8111 */
+	{ PCI_DEVICE_ID_AMD_OPUS_7441, 0x00, 0x40, AMD_UDMA_100 },			/* AMD-768 Opus */
+	{ PCI_DEVICE_ID_AMD_VIPER_7411, 0x00, 0x40, AMD_UDMA_100 | AMD_BAD_FIFO },	/* AMD-766 Viper */
+	{ PCI_DEVICE_ID_AMD_VIPER_7409, 0x07, 0x40, AMD_UDMA_66 },			/* AMD-756/c4+ Viper */
+	{ PCI_DEVICE_ID_AMD_VIPER_7409, 0x00, 0x40, AMD_UDMA_66 | AMD_BAD_SWDMA },	/* AMD-756 Viper */
+	{ PCI_DEVICE_ID_AMD_COBRA_7401, 0x00, 0x40, AMD_UDMA_33 | AMD_BAD_SWDMA },	/* AMD-755 Cobra */
+	{ PCI_DEVICE_ID_NVIDIA_NFORCE_IDE, 0x00, 0x50, AMD_UDMA_100 },			/* nVidia nForce */
+	{ 0 }
 };
 
 static struct amd_ide_chip *amd_config;
@@ -119,8 +120,8 @@ static int amd_get_info(char *buffer, char **addr, off_t offset, int count)
 
 	amd_print("----------AMD BusMastering IDE Configuration----------------");
 
-	amd_print("Driver Version:                     2.7");
-	amd_print("South Bridge:                       AMD-%s", amd_config->name);
+	amd_print("Driver Version:                     2.8");
+	amd_print("South Bridge:                       %s", bmide_dev->name);
 
 	pci_read_config_byte(dev, PCI_REVISION_ID, &t);
 	amd_print("Revision:                           IDE %#x", t);
@@ -389,8 +390,8 @@ unsigned int __init pci_init_amd74xx(struct pci_dev *dev, const char *name)
  */
 
 	pci_read_config_byte(dev, PCI_REVISION_ID, &t);
-	printk(KERN_INFO "AMD_IDE: AMD-%s (rev %02x) IDE %s controller on pci%s\n",
-		amd_config->name, t, amd_dma[amd_config->flags & AMD_UDMA], dev->slot_name);
+	printk(KERN_INFO "AMD_IDE: %s (rev %02x) %s controller on pci%s\n",
+		dev->name, t, amd_dma[amd_config->flags & AMD_UDMA], dev->slot_name);
 
 /*
  * Register /proc/ide/amd74xx entry

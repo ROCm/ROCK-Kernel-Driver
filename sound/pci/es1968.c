@@ -1939,11 +1939,11 @@ static void snd_es1968_update_pcm(es1968_t *chip, esschan_t *es)
 	es->hwptr = hwptr;
 	es->count += diff;
 
-	while (es->count > es->frag_size) {
+	if (es->count > es->frag_size) {
 		spin_unlock(&chip->substream_lock);
 		snd_pcm_period_elapsed(subs);
 		spin_lock(&chip->substream_lock);
-		es->count -= es->frag_size;
+		es->count %= es->frag_size;
 	}
 }
 
@@ -2663,7 +2663,7 @@ static snd_kcontrol_new_t snd_es1968_control_switches[] __devinitdata = {
 static int __devinit snd_es1968_probe(struct pci_dev *pci,
 				      const struct pci_device_id *id)
 {
-	static int dev = 0;
+	static int dev;
 	snd_card_t *card;
 	es1968_t *chip;
 	int i, err;
