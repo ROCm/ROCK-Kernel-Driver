@@ -4,16 +4,25 @@
  * PCMCIA implementation routines for Flexanet.
  * by Jordi Colomer, 09/05/2001
  *
- * Yet to be defined.
  */
 
 #include <linux/kernel.h>
 #include <linux/sched.h>
+#include <linux/init.h>
 
 #include <asm/hardware.h>
 #include <asm/irq.h>
-#include <asm/arch/pcmcia.h>
+#include "sa1100_generic.h"
 
+static struct {
+  int irq;
+  const char *name;
+} irqs[] = {
+  { IRQ_GPIO_CF1_CD,   "CF1_CD"   },
+  { IRQ_GPIO_CF1_BVD1, "CF1_BVD1" },
+  { IRQ_GPIO_CF2_CD,   "CF2_CD"   },
+  { IRQ_GPIO_CF2_BVD1, "CF2_BVD1" }
+};
 
 /*
  * Socket initialization.
@@ -22,9 +31,37 @@
  * Must return the number of slots.
  *
  */
-static int flexanet_pcmcia_init(struct pcmcia_init *init){
+static int flexanet_pcmcia_init(struct pcmcia_init *init)
+{
+  int i, res;
 
-  return 0;
+  /* Configure the GPIOs as inputs (BVD2 is not implemented) */
+  GPDR &= ~(GPIO_CF1_NCD | GPIO_CF1_BVD1 | GPIO_CF1_IRQ |
+            GPIO_CF2_NCD | GPIO_CF2_BVD1 | GPIO_CF2_IRQ );
+
+  /* Set IRQ edge */
+  set_irq_type(IRQ_GPIO_CF1_IRQ, IRQT_FALLING);
+  set_irq_type(IRQ_GPIO_CF2_IRQ, IRQT_FALLING);
+
+  /* Register the socket interrupts (not the card interrupts) */
+  for (i = 0; i < ARRAY_SIZE(irqs); i++) {
+    set_irq_type(irqs[i].irq, IRQT_NOEDGE);
+    res = request_irq(irqs[i].irq, init->handler, SA_INTERRUPT,
+		      irqs[i].name, NULL);
+    if (res < 0)
+      break;
+  }
+
+  /* If we failed, then free all interrupts requested thus far. */
+  if (res < 0) {
+    printk(KERN_ERR "%s: request for IRQ%d failed: %d\n",
+	   __FUNCTION__, irqs[i].irq, res);
+    while (i--)
+      free_irq(irqs[i].irq, NULL);
+    return res;
+  }
+
+  return 2;
 }
 
 
@@ -34,6 +71,12 @@ static int flexanet_pcmcia_init(struct pcmcia_init *init){
  */
 static int flexanet_pcmcia_shutdown(void)
 {
+  int i;
+
+  /* disable IRQs */
+  for (i = 0; i < ARRAY_SIZE(irqs); i++)
+    free_irq(irqs[i].irq, NULL);
+
   return 0;
 }
 
@@ -46,7 +89,33 @@ static int flexanet_pcmcia_shutdown(void)
  */
 static int flexanet_pcmcia_socket_state(struct pcmcia_state_array
 				       *state_array){
-  return -1;
+  unsigned long levels;
+
+  if (state_array->size < 2)
+    return -1;
+
+  /* Sense the GPIOs, asynchronously */
+  levels = GPLR;
+
+  /* Socket 0 */
+  state_array->state[0].detect = ((levels & GPIO_CF1_NCD)==0)?1:0;
+  state_array->state[0].ready  = (levels & GPIO_CF1_IRQ)?1:0;
+  state_array->state[0].bvd1   = (levels & GPIO_CF1_BVD1)?1:0;
+  state_array->state[0].bvd2   = 1;
+  state_array->state[0].wrprot = 0;
+  state_array->state[0].vs_3v  = 1;
+  state_array->state[0].vs_Xv  = 0;
+
+  /* Socket 1 */
+  state_array->state[1].detect = ((levels & GPIO_CF2_NCD)==0)?1:0;
+  state_array->state[1].ready  = (levels & GPIO_CF2_IRQ)?1:0;
+  state_array->state[1].bvd1   = (levels & GPIO_CF2_BVD1)?1:0;
+  state_array->state[1].bvd2   = 1;
+  state_array->state[1].wrprot = 0;
+  state_array->state[1].vs_3v  = 1;
+  state_array->state[1].vs_Xv  = 0;
+
+  return 1;
 }
 
 
@@ -56,7 +125,16 @@ static int flexanet_pcmcia_socket_state(struct pcmcia_state_array
  */
 static int flexanet_pcmcia_get_irq_info(struct pcmcia_irq_info *info){
 
-  return -1;
+  /* check the socket index */
+  if (info->sock > 1)
+    return -1;
+
+  if (info->sock == 0)
+    info->irq = IRQ_GPIO_CF1_IRQ;
+  else if (info->sock == 1)
+    info->irq = IRQ_GPIO_CF2_IRQ;
+
+  return 0;
 }
 
 
@@ -66,19 +144,105 @@ static int flexanet_pcmcia_get_irq_info(struct pcmcia_irq_info *info){
 static int flexanet_pcmcia_configure_socket(const struct pcmcia_configure
 					   *configure)
 {
-  return -1;
+  unsigned long value, flags, mask;
+
+
+  if (configure->sock > 1)
+    return -1;
+
+  /* Ignore the VCC level since it is 3.3V and always on */
+  switch (configure->vcc)
+  {
+    case 0:
+      printk(KERN_WARNING "%s(): CS asked to power off.\n", __FUNCTION__);
+      break;
+
+    case 50:
+      printk(KERN_WARNING "%s(): CS asked for 5V, applying 3.3V...\n",
+  	   __FUNCTION__);
+
+    case 33:
+      break;
+
+    default:
+      printk(KERN_ERR "%s(): unrecognized Vcc %u\n", __FUNCTION__,
+  	   configure->vcc);
+      return -1;
+  }
+
+  /* Reset the slot(s) using the controls in the BCR */
+  mask = 0;
+
+  switch (configure->sock)
+  {
+    case 0 : mask = FHH_BCR_CF1_RST; break;
+    case 1 : mask = FHH_BCR_CF2_RST; break;
+  }
+
+  local_irq_save(flags);
+
+  value = flexanet_BCR;
+  value = (configure->reset) ? (value | mask) : (value & ~mask);
+  FHH_BCR = flexanet_BCR = value;
+
+  local_irq_restore(flags);
+
+  return 0;
 }
 
+static int flexanet_pcmcia_socket_init(int sock)
+{
+  if (sock == 0) {
+    set_irq_type(IRQ_GPIO_CF1_CD, IRQT_BOTHEDGE);
+    set_irq_type(IRQ_GPIO_CF1_BVD1, IRQT_BOTHEDGE);
+  } else if (sock == 1) {
+    set_irq_type(IRQ_GPIO_CF2_CD, IRQT_BOTHEDGE);
+    set_irq_type(IRQ_GPIO_CF2_BVD1, IRQT_BOTHEDGE);
+  }
+
+  return 0;
+}
+
+static int flexanet_pcmcia_socket_suspend(int sock)
+{
+  if (sock == 0) {
+    set_irq_type(IRQ_GPIO_CF1_CD, IRQT_NOEDGE);
+    set_irq_type(IRQ_GPIO_CF1_BVD1, IRQT_NOEDGE);
+  } else if (sock == 1) {
+    set_irq_type(IRQ_GPIO_CF2_CD, IRQT_NOEDGE);
+    set_irq_type(IRQ_GPIO_CF2_BVD1, IRQT_NOEDGE);
+  }
+
+  return 0;
+}
 
 /*
  * The set of socket operations
  *
  */
-struct pcmcia_low_level flexanet_pcmcia_ops = {
-  flexanet_pcmcia_init,
-  flexanet_pcmcia_shutdown,
-  flexanet_pcmcia_socket_state,
-  flexanet_pcmcia_get_irq_info,
-  flexanet_pcmcia_configure_socket
+static struct pcmcia_low_level flexanet_pcmcia_ops = {
+  init:			flexanet_pcmcia_init,
+  shutdown:		flexanet_pcmcia_shutdown,
+  socket_state:		flexanet_pcmcia_socket_state,
+  get_irq_info:		flexanet_pcmcia_get_irq_info,
+  configure_socket:	flexanet_pcmcia_configure_socket,
+
+  socket_init:		flexanet_pcmcia_socket_init,
+  socket_suspend:	flexanet_pcmcia_socket_suspend,
 };
+
+int __init pcmcia_flexanet_init(void)
+{
+	int ret = -ENODEV;
+
+	if (machine_is_flexanet())
+		ret = sa1100_register_pcmcia(&flexanet_pcmcia_ops);
+
+	return ret;
+}
+
+void __exit pcmcia_flexanet_exit(void)
+{
+	sa1100_unregister_pcmcia(&flexanet_pcmcia_ops);
+}
 

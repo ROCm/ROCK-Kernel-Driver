@@ -125,7 +125,7 @@ static inline pmd_t __mk_pmd(pte_t *ptep, unsigned long prot)
 	return pmd;
 }
 
-static inline unsigned long pmd_page(pmd_t pmd)
+static inline unsigned long __pmd_page(pmd_t pmd)
 {
 	unsigned long ptr;
 

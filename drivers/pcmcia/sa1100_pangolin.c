@@ -4,48 +4,45 @@
  * PCMCIA implementation routines for Pangolin
  *
  */
+#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
+#include <linux/init.h>
 
 #include <asm/hardware.h>
 #include <asm/irq.h>
-#include <asm/arch/pcmcia.h>
+#include "sa1100_generic.h"
 
 static int pangolin_pcmcia_init(struct pcmcia_init *init){
-  int irq, res;
+  int res;
 
-  /* set GPIO_PCMCIA_CD & GPIO_PCMCIA_IRQ as inputs */
-  GPDR &= ~(GPIO_PCMCIA_CD|GPIO_PCMCIA_IRQ);
 #ifndef CONFIG_SA1100_PANGOLIN_PCMCIA_IDE
-  /* set GPIO pins GPIO_PCMCIA_BUS_ON & GPIO_PCMCIA_RESET as output */
-  GPDR |= (GPIO_PCMCIA_BUS_ON|GPIO_PCMCIA_RESET);
   /* Enable PCMCIA bus: */
   GPCR = GPIO_PCMCIA_BUS_ON;
-#else
-  /* set GPIO pin GPIO_PCMCIA_RESET as output */
-  GPDR |= GPIO_PCMCIA_RESET;
 #endif
+
   /* Set transition detect */
-  set_GPIO_IRQ_edge( GPIO_PCMCIA_CD, GPIO_BOTH_EDGES );
-  set_GPIO_IRQ_edge( GPIO_PCMCIA_IRQ, GPIO_FALLING_EDGE );
+  set_irq_type(IRQ_PCMCIA_CD, IRQT_NOEDGE);
+  set_irq_type(IRQ_PCMCIA_IRQ, IRQT_FALLING);
 
   /* Register interrupts */
-  irq = IRQ_PCMCIA_CD;
-  res = request_irq( irq, init->handler, SA_INTERRUPT, "PCMCIA_CD", NULL );
-  if( res < 0 ) goto irq_err;
-
-  /* There's only one slot, but it's "Slot 1": */
-  return 2;
+  res = request_irq(IRQ_PCMCIA_CD, init->handler, SA_INTERRUPT,
+		    "PCMCIA_CD", NULL);
+  if (res >= 0)
+    /* There's only one slot, but it's "Slot 1": */
+    return 2;
 
 irq_err:
-  printk( KERN_ERR "%s: Request for IRQ %lu failed\n", __FUNCTION__, irq );
-  return -1;
+  printk(KERN_ERR "%s: request for IRQ%d failed (%d)\n",
+	 __FUNCTION__, IRQ_PCMCIA_CD, res);
+
+  return res;
 }
 
 static int pangolin_pcmcia_shutdown(void)
 {
   /* disable IRQs */
-  free_irq( IRQ_PCMCIA_CD, NULL );
+  free_irq(IRQ_PCMCIA_CD, NULL);
 #ifndef CONFIG_SA1100_PANGOLIN_PCMCIA_IDE
     /* Disable PCMCIA bus: */
     GPSR = GPIO_PCMCIA_BUS_ON;
@@ -105,7 +102,7 @@ static int pangolin_pcmcia_configure_socket(const struct pcmcia_configure
 #ifndef CONFIG_SA1100_PANGOLIN_PCMCIA_IDE
   if(configure->sock==0) return 0;
 #endif
-  save_flags_cli(flags);
+  local_irq_save(flags);
 
   /* Murphy: BUS_ON different from POWER ? */
 
@@ -129,7 +126,7 @@ static int pangolin_pcmcia_configure_socket(const struct pcmcia_configure
   default:
     printk(KERN_ERR "%s(): unrecognized Vcc %u\n", __FUNCTION__,
 	   configure->vcc);
-    restore_flags(flags);
+    local_irq_restore(flags);
     return -1;
   }
 #ifdef CONFIG_SA1100_PANGOLIN_PCMCIA_IDE
@@ -143,15 +140,47 @@ static int pangolin_pcmcia_configure_socket(const struct pcmcia_configure
   }
 #endif
   /* Silently ignore Vpp, output enable, speaker enable. */
-  restore_flags(flags);
+  local_irq_restore(flags);
   return 0;
 }
 
-struct pcmcia_low_level pangolin_pcmcia_ops = { 
-  pangolin_pcmcia_init,
-  pangolin_pcmcia_shutdown,
-  pangolin_pcmcia_socket_state,
-  pangolin_pcmcia_get_irq_info,
-  pangolin_pcmcia_configure_socket
+static int pangolin_pcmcia_socket_init(int sock)
+{
+  if (sock == 1)
+    set_irq_type(IRQ_PCmCIA_CD, IRQT_BOTHEDGE);
+  return 0;
+}
+
+static int pangolin_pcmcia_socket_suspend(int sock)
+{
+  if (sock == 1)
+    set_irq_type(IRQ_PCmCIA_CD, IRQT_NOEDGE);
+  return 0;
+}
+
+static struct pcmcia_low_level pangolin_pcmcia_ops = { 
+  init:			pangolin_pcmcia_init,
+  shutdown:		pangolin_pcmcia_shutdown,
+  socket_state:		pangolin_pcmcia_socket_state,
+  get_irq_info:		pangolin_pcmcia_get_irq_info,
+  configure_socket:	pangolin_pcmcia_configure_socket,
+
+  socket_init:		pangolin_pcmcia_socket_init,
+  socket_suspend,	pangolin_pcmcia_socket_suspend,
 };
+
+int __init pcmcia_pangolin_init(void)
+{
+	int ret = -ENODEV;
+
+	if (machine_is_pangolin())
+		ret = sa1100_register_pcmcia(&pangolin_pcmcia_ops);
+
+	return ret;
+}
+
+void __exit pcmcia_pangolin_exit(void)
+{
+	sa1100_unregister_pcmcia(&pangolin_pcmcia_ops);
+}
 
