@@ -19,7 +19,7 @@ struct ed {
 #define ED_SKIP		__constant_cpu_to_le32(1 << 14)
 #define ED_LOWSPEED	__constant_cpu_to_le32(1 << 13)
 #define ED_OUT		__constant_cpu_to_le32(0x01 << 11)
-#define ED_IN		__constant_cpu_to_le32(0x10 << 11)
+#define ED_IN		__constant_cpu_to_le32(0x02 << 11)
 	__u32			hwTailP;	/* tail of TD list */
 	__u32			hwHeadP;	/* head of TD list */
 #define ED_C		__constant_cpu_to_le32(0x02)	/* toggle carry */
@@ -30,23 +30,23 @@ struct ed {
 	dma_addr_t		dma;		/* addr of ED */
 	struct ed		*ed_prev;	/* for non-interrupt EDs */
 	struct td		*dummy;
-
-	u8			type; 		/* PIPE_{BULK,...} */
-	u8			interval;	/* interrupt, isochronous */
-	union {
-		struct intr_info {		/* interrupt */
-			u8	int_period;
-			u8	int_branch;
-			u8	int_load; 
-		} intr_info;
-		u16		last_iso;	/* isochronous */
-	} intriso;
+	struct list_head	td_list;	/* "shadow list" of our TDs */
 
 	u8			state;		/* ED_{NEW,UNLINK,OPER} */
 #define ED_NEW 		0x00		/* unused, no dummy td */
 #define ED_UNLINK 	0x01		/* dummy td, maybe linked to hc */
 #define ED_OPER		0x02		/* dummy td, _is_ linked to hc */
 #define ED_URB_DEL  	0x08		/* for unlinking; masked in */
+
+	u8			type; 		/* PIPE_{BULK,...} */
+	u16			interval;	/* interrupt, isochronous */
+	union {
+		struct intr_info {		/* interrupt */
+			u8	int_branch;
+			u8	int_load; 
+		} intr_info;
+		u16		last_iso;	/* isochronous */
+	} intriso;
 
 	/* HC may see EDs on rm_list until next frame (frame_no == tick) */
 	u16			tick;
@@ -108,6 +108,8 @@ struct td {
 
 	dma_addr_t	td_dma;		/* addr of this TD */
 	dma_addr_t	data_dma;	/* addr of data it points to */
+
+	struct list_head td_list;	/* "shadow list", TDs on same ED */
 } __attribute__ ((aligned(32)));	/* c/b/i need 16; only iso needs 32 */
 
 #define TD_MASK	((u32)~0x1f)		/* strip hw status in low addr bits */
