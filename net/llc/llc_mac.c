@@ -294,27 +294,3 @@ u16 lan_hdrs_init(struct sk_buff *skb, u8 *sa, u8 *da)
 	}
 	return rc;
 }
-
-/**
- *	mac_dev_peer - search the appropriate dev to send packets to peer
- *	@current_dev - Current device suggested by upper layer
- *	@type - hardware type
- *	@mac - mac address
- *
- *	Check if the we should use loopback to send packets, i.e., if the
- *	dmac belongs to one of the local interfaces, returning the pointer
- *	to the loopback &net_device struct or the current_dev if it is not
- *	local.
- */
-struct net_device *mac_dev_peer(struct net_device *current_dev, int type,
-				u8 *mac)
-{
-	struct net_device *dev;
-
-        rtnl_lock();
-        dev = dev_getbyhwaddr(type, mac);
-        if (dev)
-                dev = __dev_get_by_name("lo");
-        rtnl_unlock();
-	return dev ? : current_dev;
-}

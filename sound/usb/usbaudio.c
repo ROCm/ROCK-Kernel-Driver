@@ -1292,9 +1292,15 @@ void *snd_usb_find_csint_desc(void *buffer, int buflen, void *after, u8 dsubtype
  * entry point for linux usb interface
  */
 
-static void * usb_audio_probe(struct usb_device *dev, unsigned int ifnum,
+#ifndef OLD_USB
+static int usb_audio_probe(struct usb_interface *intf,
+			   const struct usb_device_id *id);
+static void usb_audio_disconnect(struct usb_interface *intf);
+#else
+static void * usb_audio_probe(usb_device *dev, unsigned int ifnum,
 			      const struct usb_device_id *id);
 static void usb_audio_disconnect(struct usb_device *dev, void *ptr);
+#endif
 
 static struct usb_device_id usb_audio_ids [] = {
 #include "usbquirks.h"
@@ -1310,7 +1316,9 @@ static struct usb_driver usb_audio_driver = {
 	.name =		"snd-usb-audio",
 	.probe =	usb_audio_probe,
 	.disconnect =	usb_audio_disconnect,
+#ifdef OLD_USB
 	.driver_list =	LIST_HEAD_INIT(usb_audio_driver.driver_list), 
+#endif
 	.id_table =	usb_audio_ids,
 };
 
@@ -2042,9 +2050,18 @@ static int alloc_desc_buffer(struct usb_device *dev, int index, unsigned char **
  * only at the first time.  the successive calls of this function will
  * append the pcm interface to the corresponding card.
  */
+#ifndef OLD_USB
+static int usb_audio_probe(struct usb_interface *intf,
+			   const struct usb_device_id *id)
+#else
 static void *usb_audio_probe(struct usb_device *dev, unsigned int ifnum,
 			     const struct usb_device_id *id)
+#endif
 {
+#ifndef OLD_USB
+	struct usb_device *dev = interface_to_usbdev(intf);
+	int ifnum = intf->altsetting->bInterfaceNumber;
+#endif
 	struct usb_config_descriptor *config = dev->actconfig;	
 	const snd_usb_audio_quirk_t *quirk = (const snd_usb_audio_quirk_t *)id->driver_info;
 	unsigned char *buffer;
@@ -2054,17 +2071,17 @@ static void *usb_audio_probe(struct usb_device *dev, unsigned int ifnum,
 	snd_usb_audio_t *chip;
 
 	if (quirk && ifnum != quirk->ifnum)
-		return NULL;
+		goto __err_val;
 
 	if (usb_set_configuration(dev, config->bConfigurationValue) < 0) {
 		snd_printk(KERN_ERR "cannot set configuration (value 0x%x)\n", config->bConfigurationValue);
-		return NULL;
+		goto __err_val;
 	}
 
 	index = dev->actconfig - config;
 	buflen = alloc_desc_buffer(dev, index, &buffer);
 	if (buflen <= 0)
-		return NULL;
+		goto __err_val;
 
 	/*
 	 * found a config.  now register to ALSA
@@ -2126,12 +2143,21 @@ static void *usb_audio_probe(struct usb_device *dev, unsigned int ifnum,
 	chip->num_interfaces++;
 	up(&register_mutex);
 	kfree(buffer);
+#ifndef OLD_USB
+	return 0;
+#else
 	return chip;
+#endif
 
  __error:
 	up(&register_mutex);
 	kfree(buffer);
+ __err_val:
+#ifndef OLD_USB
+	return -EIO;
+#else
 	return NULL;
+#endif
 }
 
 
@@ -2139,8 +2165,15 @@ static void *usb_audio_probe(struct usb_device *dev, unsigned int ifnum,
  * we need to take care of counter, since disconnection can be called also
  * many times as well as usb_audio_probe(). 
  */
+#ifndef OLD_USB
+static void usb_audio_disconnect(struct usb_interface *intf)
+#else
 static void usb_audio_disconnect(struct usb_device *dev, void *ptr)
+#endif
 {
+#ifndef OLD_USB
+	void *ptr = dev_get_drvdata(&intf->dev);
+#endif
 	snd_usb_audio_t *chip;
 
 	if (ptr == (void *)-1)

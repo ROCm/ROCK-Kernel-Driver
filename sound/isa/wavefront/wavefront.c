@@ -495,6 +495,7 @@ snd_wavefront_probe (int dev)
 	}
 	acard = (snd_wavefront_card_t *)card->private_data;
 	acard->wavefront.irq = -1;
+	spin_lock_init(&acard->wavefront.irq_lock);
 	init_waitqueue_head(&acard->wavefront.interrupt_sleeper);
 	spin_lock_init(&acard->wavefront.midi.open);
 	spin_lock_init(&acard->wavefront.midi.virtual);

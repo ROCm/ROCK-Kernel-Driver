@@ -13,6 +13,17 @@
  *      2 of the License, or (at your option) any later version.
  */
 
+/*	Changes:
+ *
+ *	YOSHIFUJI Hideaki @USAGI
+ *		reworked default router selection.
+ *		- respect outgoing interface
+ *		- select from (probably) reachable routers (i.e.
+ *		routers in REACHABLE, STALE, DELAY or PROBE states).
+ *		- always select the same router if it is (probably)
+ *		reachable.  otherwise, round-robin the list.
+ */
+
 #include <linux/config.h>
 #include <linux/errno.h>
 #include <linux/types.h>
@@ -168,6 +179,7 @@ static __inline__ struct rt6_info *rt6_device_match(struct rt6_info *rt,
 static struct rt6_info *rt6_dflt_pointer = NULL;
 static spinlock_t rt6_dflt_lock = SPIN_LOCK_UNLOCKED;
 
+/* Default Router Selection (RFC 2461 6.3.6) */
 static struct rt6_info *rt6_best_dflt(struct rt6_info *rt, int oif)
 {
 	struct rt6_info *match = NULL;
@@ -176,63 +188,116 @@ static struct rt6_info *rt6_best_dflt(struct rt6_info *rt, int oif)
 
 	for (sprt = rt; sprt; sprt = sprt->u.next) {
 		struct neighbour *neigh;
+		int m = 0;
+
+		if (!oif ||
+		    (sprt->rt6i_dev &&
+		     sprt->rt6i_dev->ifindex == oif))
+			m += 8;
+
+		if (sprt == rt6_dflt_pointer)
+			m += 4;
 
 		if ((neigh = sprt->rt6i_nexthop) != NULL) {
-			int m = -1;
-
+			read_lock_bh(&neigh->lock);
 			switch (neigh->nud_state) {
 			case NUD_REACHABLE:
-				if (sprt != rt6_dflt_pointer) {
-					rt = sprt;
-					goto out;
-				}
-				m = 2;
-				break;
-
-			case NUD_DELAY:
-				m = 1;
+				m += 3;
 				break;
 
 			case NUD_STALE:
-				m = 1;
-				break;
-			};
-
-			if (oif && sprt->rt6i_dev->ifindex == oif) {
+			case NUD_DELAY:
+			case NUD_PROBE:
 				m += 2;
-			}
+				break;
 
-			if (m >= mpri) {
-				mpri = m;
-				match = sprt;
+			case NUD_NOARP:
+			case NUD_PERMANENT:
+				m += 1;
+				break;
+
+			case NUD_INCOMPLETE:
+			default:
+				read_unlock_bh(&neigh->lock);
+				continue;
+			}
+			read_unlock_bh(&neigh->lock);
+		} else {
+			continue;
+		}
+
+		if (m > mpri || m >= 12) {
+			match = sprt;
+			mpri = m;
+			if (m >= 12) {
+				/* we choose the lastest default router if it
+				 * is in (probably) reachable state.
+				 * If route changed, we should do pmtu
+				 * discovery. --yoshfuji
+				 */
+				break;
+			}
+		}
+	}
+
+	spin_lock(&rt6_dflt_lock);
+	if (!match) {
+		/*
+		 *	No default routers are known to be reachable.
+		 *	SHOULD round robin
+		 */
+		if (rt6_dflt_pointer) {
+			for (sprt = rt6_dflt_pointer->u.next;
+			     sprt; sprt = sprt->u.next) {
+				if (sprt->u.dst.obsolete <= 0 &&
+				    sprt->u.dst.error == 0) {
+					match = sprt;
+					break;
+				}
+			}
+			for (sprt = rt;
+			     !match && sprt && sprt != rt6_dflt_pointer; 
+			     sprt = sprt->u.next) {
+				if (sprt->u.dst.obsolete <= 0 &&
+				    sprt->u.dst.error == 0) {
+					match = sprt;
+					break;
+				}
 			}
 		}
 	}
 
 	if (match) {
-		rt = match;
-	} else {
-		/*
-		 *	No default routers are known to be reachable.
-		 *	SHOULD round robin
-		 */
-		spin_lock(&rt6_dflt_lock);
-		if (rt6_dflt_pointer) {
-			struct rt6_info *next;
+		if (rt6_dflt_pointer != match)
+			RT6_TRACE("changed default router: %p->%p\n",
+				  rt6_dflt_pointer, match);
+		rt6_dflt_pointer = match;
+	}
+	spin_unlock(&rt6_dflt_lock);
 
-			if ((next = rt6_dflt_pointer->u.next) != NULL &&
-			    next->u.dst.obsolete <= 0 &&
-			    next->u.dst.error == 0)
-				rt = next;
+	if (!match) {
+		/*
+		 * Last Resort: if no default routers found, 
+		 * use addrconf default route.
+		 * We don't record this route.
+		 */
+		for (sprt = ip6_routing_table.leaf;
+		     sprt; sprt = sprt->u.next) {
+			if ((sprt->rt6i_flags & RTF_DEFAULT) &&
+			    (!oif ||
+			     (sprt->rt6i_dev &&
+			      sprt->rt6i_dev->ifindex == oif))) {
+				match = sprt;
+				break;
+			}
 		}
-		spin_unlock(&rt6_dflt_lock);
+		if (!match) {
+			/* no default route.  give up. */
+			match = &ip6_null_entry;
+		}
 	}
 
-out:
-	spin_lock(&rt6_dflt_lock);
-	rt6_dflt_pointer = rt;
-	spin_unlock(&rt6_dflt_lock);
-	return rt;
+	return match;
 }
 
 struct rt6_info *rt6_lookup(struct in6_addr *daddr, struct in6_addr *saddr,

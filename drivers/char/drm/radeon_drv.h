@@ -139,9 +139,9 @@ typedef struct drm_radeon_private {
 	struct mem_block *agp_heap;
 	struct mem_block *fb_heap;
 
-   	wait_queue_head_t irq_queue;
-   	atomic_t irq_received;
-   	atomic_t irq_emitted;
+	/* SW interrupt */
+   	wait_queue_head_t swi_queue;
+   	atomic_t swi_emitted;
 
 } drm_radeon_private_t;
 
@@ -187,11 +187,12 @@ extern int radeon_mem_init_heap( DRM_IOCTL_ARGS );
 extern void radeon_mem_takedown( struct mem_block **heap );
 extern void radeon_mem_release( struct mem_block *heap );
 
+				/* radeon_irq.c */
 extern int radeon_irq_emit( DRM_IOCTL_ARGS );
 extern int radeon_irq_wait( DRM_IOCTL_ARGS );
 
 extern int radeon_emit_and_wait_irq(drm_device_t *dev);
-extern int radeon_wait_irq(drm_device_t *dev, int irq_nr);
+extern int radeon_wait_irq(drm_device_t *dev, int swi_nr);
 extern int radeon_emit_irq(drm_device_t *dev);
 
 
@@ -271,11 +272,15 @@ extern int radeon_emit_irq(drm_device_t *dev);
 
 
 #define RADEON_GEN_INT_CNTL		0x0040
+#	define RADEON_CRTC_VBLANK_MASK		(1 << 0)
 #	define RADEON_GUI_IDLE_INT_ENABLE	(1 << 19)
 #	define RADEON_SW_INT_ENABLE		(1 << 25)
 
 #define RADEON_GEN_INT_STATUS		0x0044
+#	define RADEON_CRTC_VBLANK_STAT		(1 << 0)
+#	define RADEON_CRTC_VBLANK_STAT_ACK   	(1 << 0)
 #	define RADEON_GUI_IDLE_INT_TEST_ACK     (1 << 19)
+#	define RADEON_SW_INT_TEST		(1 << 25)
 #	define RADEON_SW_INT_TEST_ACK   	(1 << 25)
 #	define RADEON_SW_INT_FIRE		(1 << 26)
 
@@ -632,6 +637,7 @@ extern int radeon_emit_irq(drm_device_t *dev);
 #define RADEON_LAST_FRAME_REG		RADEON_SCRATCH_REG0
 #define RADEON_LAST_DISPATCH_REG	RADEON_SCRATCH_REG1
 #define RADEON_LAST_CLEAR_REG		RADEON_SCRATCH_REG2
+#define RADEON_LAST_SWI_REG		RADEON_SCRATCH_REG3
 #define RADEON_LAST_DISPATCH		1
 
 #define RADEON_MAX_VB_AGE		0x7fffffff

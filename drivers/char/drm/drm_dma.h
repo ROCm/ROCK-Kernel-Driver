@@ -535,8 +535,12 @@ int DRM(irq_install)( drm_device_t *dev, int irq )
 	INIT_WORK(&dev->work, DRM(dma_immediate_bh), dev);
 #endif
 
+#if __HAVE_VBL_IRQ
+	init_waitqueue_head(&dev->vbl_queue);
+#endif
+
 				/* Before installing handler */
-	DRIVER_PREINSTALL();
+	DRM(driver_irq_preinstall)(dev);
 
 				/* Install handler */
 	ret = request_irq( dev->irq, DRM(dma_service),
@@ -549,7 +553,7 @@ int DRM(irq_install)( drm_device_t *dev, int irq )
 	}
 
 				/* After installing handler */
-	DRIVER_POSTINSTALL();
+	DRM(driver_irq_postinstall)(dev);
 
 	return 0;
 }
@@ -568,7 +572,7 @@ int DRM(irq_uninstall)( drm_device_t *dev )
 
 	DRM_DEBUG( "%s: irq=%d\n", __FUNCTION__, irq );
 
-	DRIVER_UNINSTALL();
+	DRM(driver_irq_uninstall)( dev );
 
 	free_irq( irq, dev );
 
@@ -594,6 +598,40 @@ int DRM(control)( struct inode *inode, struct file *filp,
 		return -EINVAL;
 	}
 }
+
+#if __HAVE_VBL_IRQ
+
+int DRM(wait_vblank)( DRM_IOCTL_ARGS )
+{
+	drm_file_t *priv = filp->private_data;
+	drm_device_t *dev = priv->dev;
+	drm_wait_vblank_t vblwait;
+	struct timeval now;
+	int ret;
+
+	if (!dev->irq)
+		return -EINVAL;
+
+	DRM_COPY_FROM_USER_IOCTL( vblwait, (drm_wait_vblank_t *)data,
+				  sizeof(vblwait) );
+
+	if ( vblwait.type == _DRM_VBLANK_RELATIVE ) {
+		vblwait.sequence += atomic_read( &dev->vbl_received );
+	}
+
+	ret = DRM(vblank_wait)( dev, &vblwait.sequence );
+
+	do_gettimeofday( &now );
+	vblwait.tval_sec = now.tv_sec;
+	vblwait.tval_usec = now.tv_usec;
+
+	DRM_COPY_TO_USER_IOCTL( (drm_wait_vblank_t *)data, vblwait,
+				sizeof(vblwait) );
+
+	return ret;
+}
+
+#endif	/* __HAVE_VBL_IRQ */
 
 #else
 
