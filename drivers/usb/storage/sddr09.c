@@ -1377,18 +1377,17 @@ int sddr09_transport(Scsi_Cmnd *srb, struct us_data *us)
 	static unsigned char sensekey = 0, sensecode = 0;
 	static unsigned char havefakesense = 0;
 	int result, i;
-	unsigned char *ptr;
+	unsigned char *ptr = us->iobuf;
 	unsigned long capacity;
 	unsigned int page, pages;
-	char string[64];
 
 	struct sddr09_card_info *info;
 
-	unsigned char inquiry_response[36] = {
+	static unsigned char inquiry_response[8] = {
 		0x00, 0x80, 0x00, 0x02, 0x1F, 0x00, 0x00, 0x00
 	};
 
-	unsigned char mode_page_01[16] = {
+	static unsigned char mode_page_01[16] = {
 		0x0F, 0x00, 0, 0x00,
 		0x01, 0x0A,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
@@ -1403,18 +1402,14 @@ int sddr09_transport(Scsi_Cmnd *srb, struct us_data *us)
 			return USB_STOR_TRANSPORT_ERROR;
 	}
 
-	ptr = (unsigned char *)srb->request_buffer;
-
 	if (srb->cmnd[0] == REQUEST_SENSE && havefakesense) {
 		/* for a faked command, we have to follow with a faked sense */
-		memset(ptr, 0, srb->request_bufflen);
-		if (srb->request_bufflen > 7) {
-			ptr[0] = 0x70;
-			ptr[2] = sensekey;
-			ptr[7] = srb->request_bufflen - 7;
-		}
-		if (srb->request_bufflen > 12)
-			ptr[12] = sensecode;
+		memset(ptr, 0, 18);
+		ptr[0] = 0x70;
+		ptr[2] = sensekey;
+		ptr[7] = 11;
+		ptr[12] = sensecode;
+		usb_stor_set_xfer_buf(ptr, 18, srb);
 		sensekey = sensecode = havefakesense = 0;
 		return USB_STOR_TRANSPORT_GOOD;
 	}
@@ -1425,8 +1420,8 @@ int sddr09_transport(Scsi_Cmnd *srb, struct us_data *us)
 	   respond to INQUIRY commands */
 
 	if (srb->cmnd[0] == INQUIRY) {
-		memset(inquiry_response+8, 0, 28);
-		fill_inquiry_response(us, inquiry_response, 36);
+		memcpy(ptr, inquiry_response, 8);
+		fill_inquiry_response(us, ptr, 36);
 		return USB_STOR_TRANSPORT_GOOD;
 	}
 
@@ -1461,43 +1456,30 @@ int sddr09_transport(Scsi_Cmnd *srb, struct us_data *us)
 
 		capacity = (info->lbact << info->blockshift) - 1;
 
-		ptr[0] = MSB_of(capacity>>16);
-		ptr[1] = LSB_of(capacity>>16);
-		ptr[2] = MSB_of(capacity&0xFFFF);
-		ptr[3] = LSB_of(capacity&0xFFFF);
+		((u32 *) ptr)[0] = cpu_to_be32(capacity);
 
 		// Report page size
 
-		ptr[4] = MSB_of(info->pagesize>>16);
-		ptr[5] = LSB_of(info->pagesize>>16);
-		ptr[6] = MSB_of(info->pagesize&0xFFFF);
-		ptr[7] = LSB_of(info->pagesize&0xFFFF);
+		((u32 *) ptr)[1] = cpu_to_be32(info->pagesize);
+		usb_stor_set_xfer_buf(ptr, 8, srb);
 
 		return USB_STOR_TRANSPORT_GOOD;
 	}
 
-	if (srb->cmnd[0] == MODE_SENSE || srb->cmnd[0] == MODE_SENSE_10) {
+	if (srb->cmnd[0] == MODE_SENSE) {
 		int modepage = (srb->cmnd[2] & 0x3F);
-		int len;
 
 		/* They ask for the Read/Write error recovery page,
-		   or for all pages. Give as much as they have room for. */
+		   or for all pages. */
 		/* %% We should check DBD %% */
 		if (modepage == 0x01 || modepage == 0x3F) {
-
 			US_DEBUGP("SDDR09: Dummy up request for "
 				  "mode page 0x%x\n", modepage);
 
-			if (ptr == NULL)
-				return USB_STOR_TRANSPORT_ERROR;
-
-			len = srb->request_bufflen;
-			if (len > sizeof(mode_page_01))
-				len = sizeof(mode_page_01);
-
-			mode_page_01[0] = sizeof(mode_page_01) - 1;
-			mode_page_01[2] = (info->flags & SDDR09_WP) ? 0x80 : 0;
-			memcpy(ptr, mode_page_01, len);
+			memcpy(ptr, mode_page_01, sizeof(mode_page_01));
+			ptr[0] = sizeof(mode_page_01) - 1;
+			ptr[2] = (info->flags & SDDR09_WP) ? 0x80 : 0;
+			usb_stor_set_xfer_buf(ptr, sizeof(mode_page_01), srb);
 			return USB_STOR_TRANSPORT_GOOD;
 		}
 
@@ -1552,11 +1534,11 @@ int sddr09_transport(Scsi_Cmnd *srb, struct us_data *us)
 
 	srb->cmnd[1] = LUNBITS;
 
-	string[0] = 0;
+	ptr[0] = 0;
 	for (i=0; i<12; i++)
-		sprintf(string+strlen(string), "%02X ", srb->cmnd[i]);
+		sprintf(ptr+strlen(ptr), "%02X ", srb->cmnd[i]);
 
-	US_DEBUGP("SDDR09: Send control for command %s\n", string);
+	US_DEBUGP("SDDR09: Send control for command %s\n", ptr);
 
 	result = sddr09_send_scsi_command(us, srb->cmnd, 12);
 	if (result != USB_STOR_TRANSPORT_GOOD) {
