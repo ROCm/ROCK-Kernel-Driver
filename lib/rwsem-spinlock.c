@@ -29,7 +29,7 @@ void rwsemtrace(struct rw_semaphore *sem, const char *str)
 /*
  * initialise the semaphore
  */
-void init_rwsem(struct rw_semaphore *sem)
+void fastcall init_rwsem(struct rw_semaphore *sem)
 {
 	sem->activity = 0;
 	spin_lock_init(&sem->wait_lock);
@@ -117,7 +117,7 @@ static inline struct rw_semaphore *__rwsem_wake_one_writer(struct rw_semaphore *
 /*
  * get a read lock on the semaphore
  */
-void __down_read(struct rw_semaphore *sem)
+void fastcall __down_read(struct rw_semaphore *sem)
 {
 	struct rwsem_waiter waiter;
 	struct task_struct *tsk;
@@ -162,7 +162,7 @@ void __down_read(struct rw_semaphore *sem)
 /*
  * trylock for reading -- returns 1 if successful, 0 if contention
  */
-int __down_read_trylock(struct rw_semaphore *sem)
+int fastcall __down_read_trylock(struct rw_semaphore *sem)
 {
 	int ret = 0;
 	rwsemtrace(sem,"Entering __down_read_trylock");
@@ -185,7 +185,7 @@ int __down_read_trylock(struct rw_semaphore *sem)
  * get a write lock on the semaphore
  * - note that we increment the waiting count anyway to indicate an exclusive lock
  */
-void __down_write(struct rw_semaphore *sem)
+void fastcall __down_write(struct rw_semaphore *sem)
 {
 	struct rwsem_waiter waiter;
 	struct task_struct *tsk;
@@ -230,7 +230,7 @@ void __down_write(struct rw_semaphore *sem)
 /*
  * trylock for writing -- returns 1 if successful, 0 if contention
  */
-int __down_write_trylock(struct rw_semaphore *sem)
+int fastcall __down_write_trylock(struct rw_semaphore *sem)
 {
 	int ret = 0;
 	rwsemtrace(sem,"Entering __down_write_trylock");
@@ -252,7 +252,7 @@ int __down_write_trylock(struct rw_semaphore *sem)
 /*
  * release a read lock on the semaphore
  */
-void __up_read(struct rw_semaphore *sem)
+void fastcall __up_read(struct rw_semaphore *sem)
 {
 	rwsemtrace(sem,"Entering __up_read");
 
@@ -269,7 +269,7 @@ void __up_read(struct rw_semaphore *sem)
 /*
  * release a write lock on the semaphore
  */
-void __up_write(struct rw_semaphore *sem)
+void fastcall __up_write(struct rw_semaphore *sem)
 {
 	rwsemtrace(sem,"Entering __up_write");
 
@@ -288,7 +288,7 @@ void __up_write(struct rw_semaphore *sem)
  * downgrade a write lock into a read lock
  * - just wake up any readers at the front of the queue
  */
-void __downgrade_write(struct rw_semaphore *sem)
+void fastcall __downgrade_write(struct rw_semaphore *sem)
 {
 	rwsemtrace(sem,"Entering __downgrade_write");
 

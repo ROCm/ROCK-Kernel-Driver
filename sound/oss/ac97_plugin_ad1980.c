@@ -123,3 +123,4 @@ static int ad1980_init(void)
 
 module_init(ad1980_init);
 module_exit(ad1980_exit);
+MODULE_LICENSE("GPL");

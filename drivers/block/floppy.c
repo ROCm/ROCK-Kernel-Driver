@@ -4242,6 +4242,15 @@ int __init floppy_init(void)
 		disks[i] = alloc_disk(1);
 		if (!disks[i])
 			goto Enomem;
+
+		disks[i]->major = FLOPPY_MAJOR;
+		disks[i]->first_minor = TOMINOR(i);
+		disks[i]->fops = &floppy_fops;
+		sprintf(disks[i]->disk_name, "fd%d", i);
+
+		init_timer(&motor_off_timer[i]);
+		motor_off_timer[i].data = i;
+		motor_off_timer[i].function = motor_off_callback;
 	}
 
 	devfs_mk_dir ("floppy");
@@ -4253,13 +4262,6 @@ int __init floppy_init(void)
 	if (!floppy_queue) {
 		err = -ENOMEM;
 		goto fail_queue;
-	}
-
-	for (i=0; i<N_DRIVE; i++) {
-		disks[i]->major = FLOPPY_MAJOR;
-		disks[i]->first_minor = TOMINOR(i);
-		disks[i]->fops = &floppy_fops;
-		sprintf(disks[i]->disk_name, "fd%d", i);
 	}
 
 	blk_register_region(MKDEV(FLOPPY_MAJOR, 0), 256, THIS_MODULE,
@@ -4366,9 +4368,6 @@ int __init floppy_init(void)
 	}
 	
 	for (drive = 0; drive < N_DRIVE; drive++) {
-		init_timer(&motor_off_timer[drive]);
-		motor_off_timer[drive].data = drive;
-		motor_off_timer[drive].function = motor_off_callback;
 		if (!(allowed_drive_mask & (1 << drive)))
 			continue;
 		if (fdc_state[FDC(drive)].version == FDC_NONE)
