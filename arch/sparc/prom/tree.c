@@ -176,8 +176,11 @@ void prom_getstring(int node, char *prop, char *user_buf, int ubuf_size)
  */
 int prom_nodematch(int node, char *name)
 {
+	int error;
+
 	static char namebuf[128];
-	prom_getproperty(node, "name", namebuf, sizeof(namebuf));
+	error = prom_getproperty(node, "name", namebuf, sizeof(namebuf));
+	if (error == -1) return 0;
 	if(strcmp(namebuf, name) == 0) return 1;
 	return 0;
 }

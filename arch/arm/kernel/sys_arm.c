@@ -242,8 +242,8 @@ asmlinkage int sys_fork(struct pt_regs *regs)
  * This is called indirectly via a small wrapper
  */
 asmlinkage int sys_clone(unsigned long clone_flags, unsigned long newsp,
-			 int *parent_tidptr, int tls_val, int *child_tidptr,
-			 struct pt_regs *regs)
+			 int __user *parent_tidptr, int tls_val,
+			 int __user *child_tidptr, struct pt_regs *regs)
 {
 	if (!newsp)
 		newsp = regs->ARM_sp;

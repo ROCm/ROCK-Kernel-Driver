@@ -53,7 +53,8 @@ void __init auxio_probe(void)
 #endif
 		}
 	}
-	prom_getproperty(auxio_nd, "reg", (char *) auxregs, sizeof(auxregs));
+	if(prom_getproperty(auxio_nd, "reg", (char *) auxregs, sizeof(auxregs)) <= 0)
+		return;
 	prom_apply_obio_ranges(auxregs, 0x1);
 	/* Map the register both read and write */
 	r.flags = auxregs[0].which_io & 0xF;
@@ -121,7 +122,8 @@ void __init auxio_power_probe(void)
 		return;
 
 	/* Map the power control register. */
-	prom_getproperty(node, "reg", (char *)&regs, sizeof(regs));
+	if (prom_getproperty(node, "reg", (char *)&regs, sizeof(regs)) <= 0)
+		return;
 	prom_apply_obio_ranges(&regs, 1);
 	memset(&r, 0, sizeof(r));
 	r.flags = regs.which_io & 0xF;

@@ -186,8 +186,8 @@ extern void ia64_elf_core_copy_regs (struct pt_regs *src, elf_gregset_t dst);
 
 #ifdef __KERNEL__
 #define SET_PERSONALITY(ex, ibcs2)	set_personality(PER_LINUX)
-#define elf_read_implies_exec(ex, have_pt_gnu_stack)					\
-	(!(have_pt_gnu_stack) && ((ex).e_flags & EF_IA_64_LINUX_EXECUTABLE_STACK) != 0)
+#define elf_read_implies_exec(ex, executable_stack)					\
+	((executable_stack!=EXSTACK_DISABLE_X) && ((ex).e_flags & EF_IA_64_LINUX_EXECUTABLE_STACK) != 0)
 
 struct task_struct;
 

@@ -301,7 +301,7 @@ static struct platform_device ixp46x_i2c_controller = {
 	.name		= "IOP3xx-I2C",
 	.id		= 0,
 	.num_resources	= 2,
-	.resource	= &ixp46x_i2c_resources
+	.resource	= ixp46x_i2c_resources
 };
 
 static struct platform_device *ixp46x_devices[] __initdata = {

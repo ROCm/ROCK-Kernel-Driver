@@ -1382,6 +1382,9 @@ static int hub_port_reset(struct usb_hub *hub, int port1,
 		/* return on disconnect or reset */
 		switch (status) {
 		case 0:
+			/* TRSTRCY = 10 ms */
+			msleep(10);
+			/* FALL THROUGH */
 		case -ENOTCONN:
 		case -ENODEV:
 			clear_port_feature(hub->hdev,

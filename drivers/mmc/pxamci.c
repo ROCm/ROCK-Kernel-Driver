@@ -52,7 +52,7 @@ struct pxamci_host {
 	struct mmc_host		*mmc;
 	spinlock_t		lock;
 	struct resource		*res;
-	void			*base;
+	void __iomem		*base;
 	int			irq;
 	int			dma;
 	unsigned int		clkrt;
