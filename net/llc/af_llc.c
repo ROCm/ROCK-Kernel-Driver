@@ -425,6 +425,7 @@ static int llc_ui_connect(struct socket *sock, struct sockaddr *uaddr,
 		if (!dev)
 			goto out;
 		llc->dev = dev;
+		memcpy(llc->laddr.mac, llc->dev->dev_addr, IFHWADDRLEN);
 	} else
 		dev = llc->dev;
 	if (sk->sk_type != SOCK_STREAM)
