@@ -165,14 +165,15 @@ isdn_ppp_bind(isdn_net_local * lp)
 	save_flags(flags);
 	cli();
 	if (lp->pppbind < 0) {  /* device bounded to ippp device ? */
-		isdn_net_dev *net_dev = dev->netdev;
+		struct list_head *l;
 		char exclusive[ISDN_MAX_CHANNELS];	/* exclusive flags */
 		memset(exclusive, 0, ISDN_MAX_CHANNELS);
-		while (net_dev) {	/* step through net devices to find exclusive minors */
-			isdn_net_local *lp = net_dev->local;
+		/* step through net devices to find exclusive minors */
+		list_for_each(l, &isdn_net_devs) {
+			isdn_net_dev *p = list_entry(l, isdn_net_dev, global_list);
+			isdn_net_local *lp = &p->local;
 			if (lp->pppbind >= 0)
 				exclusive[lp->pppbind] = 1;
-			net_dev = net_dev->next;
 		}
 		/*
 		 * search a free device / slot
@@ -804,11 +805,11 @@ isdn_ppp_write(struct file *file, const char *buf, size_t count, loff_t *off)
 		if (proto != PPP_LCP)
 			lp->huptimer = 0;
 
-		if (lp->isdn_device < 0 || lp->isdn_channel < 0) {
+		if (lp->isdn_slot < 0) {
 			retval = 0;
 			goto out;
 		}
-		if ((dev->drv[lp->isdn_device]->flags & DRV_FLAG_RUNNING) &&
+		if ((dev->drv[isdn_slot_driver(lp->isdn_slot)]->flags & DRV_FLAG_RUNNING) &&
 			lp->dialstate == 0 &&
 		    (lp->flags & ISDN_NET_CONNECTED)) {
 			unsigned short hl;
@@ -818,7 +819,7 @@ isdn_ppp_write(struct file *file, const char *buf, size_t count, loff_t *off)
 			 * sk_buff. old call to dev_alloc_skb only reserved
 			 * 16 bytes, now we are looking what the driver want
 			 */
-			hl = dev->drv[lp->isdn_device]->interface->hl_hdrlen;
+			hl = isdn_slot_hdrlen(lp->isdn_slot);
 			skb = alloc_skb(hl+count, GFP_ATOMIC);
 			if (!skb) {
 				printk(KERN_WARNING "isdn_ppp_write: out of memory!\n");
@@ -974,7 +975,7 @@ void isdn_ppp_receive(isdn_net_dev * net_dev, isdn_net_local * lp, struct sk_buf
 	int slot;
 	int proto;
 
-	if (net_dev->local->master)
+	if (net_dev->local.master)
 		BUG(); // we're called with the master device always
 
 	slot = lp->ppp_slot;
@@ -1077,12 +1078,12 @@ isdn_ppp_push_higher(isdn_net_dev * net_dev, isdn_net_local * lp, struct sk_buff
 		case PPP_VJC_UNCOMP:
 			if (is->debug & 0x20)
 				printk(KERN_DEBUG "isdn_ppp: VJC_UNCOMP\n");
-			if (net_dev->local->ppp_slot < 0) {
+			if (net_dev->local.ppp_slot < 0) {
 				printk(KERN_ERR __FUNCTION__": net_dev->local->ppp_slot(%d) out of range\n",
-					net_dev->local->ppp_slot);
+					net_dev->local.ppp_slot);
 				goto drop_packet;
 			}
-			if (slhc_remember(ippp_table[net_dev->local->ppp_slot]->slcomp, skb->data, skb->len) <= 0) {
+			if (slhc_remember(ippp_table[net_dev->local.ppp_slot]->slcomp, skb->data, skb->len) <= 0) {
 				printk(KERN_WARNING "isdn_ppp: received illegal VJC_UNCOMP frame!\n");
 				goto drop_packet;
 			}
@@ -1103,12 +1104,12 @@ isdn_ppp_push_higher(isdn_net_dev * net_dev, isdn_net_local * lp, struct sk_buff
 				}
 				skb_put(skb, skb_old->len + 128);
 				memcpy(skb->data, skb_old->data, skb_old->len);
-				if (net_dev->local->ppp_slot < 0) {
+				if (net_dev->local.ppp_slot < 0) {
 					printk(KERN_ERR __FUNCTION__": net_dev->local->ppp_slot(%d) out of range\n",
-						net_dev->local->ppp_slot);
+						net_dev->local.ppp_slot);
 					goto drop_packet;
 				}
-				pkt_len = slhc_uncompress(ippp_table[net_dev->local->ppp_slot]->slcomp,
+				pkt_len = slhc_uncompress(ippp_table[net_dev->local.ppp_slot]->slcomp,
 						skb->data, skb_old->len);
 				kfree_skb(skb_old);
 				if (pkt_len < 0)
@@ -1144,7 +1145,7 @@ isdn_ppp_push_higher(isdn_net_dev * net_dev, isdn_net_local * lp, struct sk_buff
 	return;
 
  drop_packet:
-	net_dev->local->stats.rx_dropped++;
+	net_dev->local.stats.rx_dropped++;
 	kfree_skb(skb);
 }
 
@@ -1263,7 +1264,7 @@ isdn_ppp_xmit(struct sk_buff *skb, struct net_device *netdev)
 		 * sk_buff. old call to dev_alloc_skb only reserved
 		 * 16 bytes, now we are looking what the driver want.
 		 */
-		hl = dev->drv[lp->isdn_device]->interface->hl_hdrlen + IPPP_MAX_HEADER;
+		hl = isdn_slot_hdrlen(lp->isdn_slot) + IPPP_MAX_HEADER;;
 		/* 
 		 * Note: hl might still be insufficient because the method
 		 * above does not account for a possibible MPPP slave channel
@@ -1976,7 +1977,7 @@ isdn_ppp_dial_slave(char *name)
 
 	if (!(ndev = isdn_net_findif(name)))
 		return 1;
-	lp = ndev->local;
+	lp = &ndev->local;
 	if (!(lp->flags & ISDN_NET_CONNECTED))
 		return 5;
 
@@ -2007,7 +2008,7 @@ isdn_ppp_hangup_slave(char *name)
 
 	if (!(ndev = isdn_net_findif(name)))
 		return 1;
-	lp = ndev->local;
+	lp = &ndev->local;
 	if (!(lp->flags & ISDN_NET_CONNECTED))
 		return 5;
 
@@ -2094,7 +2095,7 @@ static void isdn_ppp_ccp_xmit_reset(struct ippp_struct *is, int proto,
 	isdn_net_local *lp = is->lp;
 
 	/* Alloc large enough skb */
-	hl = dev->drv[lp->isdn_device]->interface->hl_hdrlen;
+	hl = isdn_slot_hdrlen(lp->isdn_slot);
 	skb = alloc_skb(len + hl + 16,GFP_ATOMIC);
 	if(!skb) {
 		printk(KERN_WARNING
