@@ -30,8 +30,7 @@ static int ebt_target_dnat(struct sk_buff **pskb, unsigned int hooknr,
 		kfree_skb(*pskb);
 		*pskb = nskb;
 	}
-	memcpy(((**pskb).mac.ethernet)->h_dest, info->mac,
-	   ETH_ALEN * sizeof(unsigned char));
+	memcpy(eth_hdr(*pskb)->h_dest, info->mac, ETH_ALEN);
 	return info->target;
 }
 

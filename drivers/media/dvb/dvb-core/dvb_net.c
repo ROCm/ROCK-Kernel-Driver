@@ -142,7 +142,7 @@ static unsigned short dvb_net_eth_type_trans(struct sk_buff *skb,
 	
 	skb->mac.raw=skb->data;
 	skb_pull(skb,dev->hard_header_len);
-	eth= skb->mac.ethernet;
+	eth = eth_hdr(skb);
 	
 	if (*eth->h_dest & 1) {
 		if(memcmp(eth->h_dest,dev->broadcast, ETH_ALEN)==0)

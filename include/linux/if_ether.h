@@ -96,11 +96,19 @@
  *	This is an Ethernet frame header.
  */
  
-struct ethhdr 
-{
+struct ethhdr {
 	unsigned char	h_dest[ETH_ALEN];	/* destination eth addr	*/
 	unsigned char	h_source[ETH_ALEN];	/* source ether addr	*/
 	unsigned short	h_proto;		/* packet type ID field	*/
 } __attribute__((packed));
+
+#ifdef __KERNEL__
+#include <linux/skbuff.h>
+
+static inline struct ethhdr *eth_hdr(const struct sk_buff *skb)
+{
+	return (struct ethhdr *)skb->mac.raw;
+}
+#endif
 
 #endif	/* _LINUX_IF_ETHER_H */

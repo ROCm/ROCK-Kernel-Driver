@@ -399,7 +399,7 @@ int dn_neigh_router_hello(struct sk_buff *skb)
 			neigh->updated = jiffies;
 
 			if (neigh->dev->type == ARPHRD_ETHER)
-				memcpy(neigh->ha, &skb->mac.ethernet->h_source, ETH_ALEN);
+				memcpy(neigh->ha, &eth_hdr(skb)->h_source, ETH_ALEN);
 
 			dn->blksize  = dn_ntohs(msg->blksize);
 			dn->priority = msg->priority;
@@ -455,7 +455,7 @@ int dn_neigh_endnode_hello(struct sk_buff *skb)
 			neigh->updated = jiffies;
 
 			if (neigh->dev->type == ARPHRD_ETHER)
-				memcpy(neigh->ha, &skb->mac.ethernet->h_source, ETH_ALEN);
+				memcpy(neigh->ha, &eth_hdr(skb)->h_source, ETH_ALEN);
 			dn->flags   &= ~(DN_NDFLAG_R1 | DN_NDFLAG_R2);
 			dn->blksize  = dn_ntohs(msg->blksize);
 			dn->priority = 0;
