@@ -17,6 +17,62 @@
 
 extern struct device_attribute * device_default_files[];
 
+#define to_dev_attr(_attr) container_of(_attr,struct device_attribute,attr)
+
+#define to_device(d) container_of(d, struct device, dir)
+
+
+/* driverfs ops for device attribute files */
+
+static int
+dev_attr_open(struct driver_dir_entry * dir)
+{
+	struct device * dev = to_device(dir);
+	get_device(dev);
+	return 0;
+}
+
+static int
+dev_attr_close(struct driver_dir_entry * dir)
+{
+	struct device * dev = to_device(dir);
+	put_device(dev);
+	return 0;
+}
+
+static ssize_t
+dev_attr_show(struct driver_dir_entry * dir, struct attribute * attr,
+	      char * buf, size_t count, loff_t off)
+{
+	struct device_attribute * dev_attr = to_dev_attr(attr);
+	struct device * dev = to_device(dir);
+	ssize_t ret = 0;
+
+	if (dev_attr->show)
+		ret = dev_attr->show(dev,buf,count,off);
+	return ret;
+}
+
+static ssize_t
+dev_attr_store(struct driver_dir_entry * dir, struct attribute * attr,
+	       const char * buf, size_t count, loff_t off)
+{
+	struct device_attribute * dev_attr = to_dev_attr(attr);
+	struct device * dev = to_device(dir);
+	ssize_t ret = 0;
+
+	if (dev_attr->store)
+		ret = dev_attr->store(dev,buf,count,off);
+	return ret;
+}
+
+static struct driverfs_ops dev_attr_ops = {
+	open:	dev_attr_open,
+	close:	dev_attr_close,
+	show:	dev_attr_show,
+	store:	dev_attr_store,
+};
+
 /**
  * device_create_file - create a driverfs file for a device
  * @dev:	device requesting file
@@ -159,6 +215,7 @@ int device_make_dir(struct device * dev)
 	if (dev->parent)
 		parent = &dev->parent->dir;
 	dev->dir.name = dev->bus_id;
+	dev->dir.ops = &dev_attr_ops;
 
 	if ((error = device_create_dir(&dev->dir,parent)))
 		return error;

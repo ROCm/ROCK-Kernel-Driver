@@ -26,33 +26,27 @@
 #ifndef _DRIVER_FS_H_
 #define _DRIVER_FS_H_
 
+struct driver_dir_entry;
+struct attribute;
+
+struct driverfs_ops {
+	int	(*open)(struct driver_dir_entry *);
+	int	(*close)(struct driver_dir_entry *);
+	ssize_t	(*show)(struct driver_dir_entry *, struct attribute *,char *, size_t, loff_t);
+	ssize_t	(*store)(struct driver_dir_entry *,struct attribute *,const char *, size_t, loff_t);
+};
+
 struct driver_dir_entry {
 	char			* name;
 	struct dentry		* dentry;
 	mode_t			mode;
+	struct driverfs_ops	* ops;
 };
 
 struct attribute {
 	char			* name;
 	mode_t			mode;
 };
-
-struct device;
-
-struct device_attribute {
-	struct attribute	attr;
-	ssize_t (*show)(struct device * dev, char * buf, size_t count, loff_t off);
-	ssize_t (*store)(struct device * dev, const char * buf, size_t count, loff_t off);
-};
-
-#define DEVICE_ATTR(_name,_str,_mode,_show,_store)	\
-struct device_attribute dev_attr_##_name = { 		\
-	.attr = {.name	= _str,	.mode	= _mode },	\
-	.show	= _show,				\
-	.store	= _store,				\
-};
-
-#define to_dev_attr(_attr) container_of(_attr,struct device_attribute,attr)
 
 extern int
 driverfs_create_dir(struct driver_dir_entry *, struct driver_dir_entry *);

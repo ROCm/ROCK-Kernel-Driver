@@ -32,7 +32,7 @@
 #include <linux/namei.h>
 #include <linux/module.h>
 #include <linux/slab.h>
-#include <linux/device.h>
+#include <linux/driverfs_fs.h>
 
 #include <asm/uaccess.h>
 
@@ -275,25 +275,17 @@ static int driverfs_rmdir(struct inode *dir, struct dentry *dentry)
 static ssize_t
 driverfs_read_file(struct file *file, char *buf, size_t count, loff_t *ppos)
 {
-	struct device_attribute * entry;
+	struct attribute * attr = file->f_dentry->d_fsdata;
 	struct driver_dir_entry * dir;
 	unsigned char *page;
 	ssize_t retval = 0;
-	struct device * dev;
 
 	dir = file->f_dentry->d_parent->d_fsdata;
-	entry = to_dev_attr(file->f_dentry->d_fsdata);
-	if (!entry) {
-		DBG("%s: file entry is NULL\n",__FUNCTION__);
-		return -ENOENT;
-	}
-	if (!entry->show)
+	if (!dir->ops->show)
 		return 0;
 
 	if (count > PAGE_SIZE)
 		count = PAGE_SIZE;
-
-	dev = to_device(dir);
 
 	page = (unsigned char*)__get_free_page(GFP_KERNEL);
 	if (!page)
@@ -302,7 +294,7 @@ driverfs_read_file(struct file *file, char *buf, size_t count, loff_t *ppos)
 	while (count > 0) {
 		ssize_t len;
 
-		len = entry->show(dev,page,count,*ppos);
+		len = dir->ops->show(dir,attr,page,count,*ppos);
 
 		if (len <= 0) {
 			if (len < 0)
@@ -341,23 +333,12 @@ driverfs_read_file(struct file *file, char *buf, size_t count, loff_t *ppos)
 static ssize_t
 driverfs_write_file(struct file *file, const char *buf, size_t count, loff_t *ppos)
 {
-	struct device_attribute * entry;
+	struct attribute * attr = file->f_dentry->d_fsdata;
 	struct driver_dir_entry * dir;
-	struct device * dev;
 	ssize_t retval = 0;
 	char * page;
 
 	dir = file->f_dentry->d_parent->d_fsdata;
-
-	entry = to_dev_attr(file->f_dentry->d_fsdata);
-	if (!entry) {
-		DBG("%s: file entry is NULL\n",__FUNCTION__);
-		return -ENOENT;
-	}
-	if (!entry->store)
-		return 0;
-
-	dev = to_device(dir);
 
 	page = (char *)__get_free_page(GFP_KERNEL);
 	if (!page)
@@ -372,7 +353,7 @@ driverfs_write_file(struct file *file, const char *buf, size_t count, loff_t *pp
 	while (count > 0) {
 		ssize_t len;
 
-		len = entry->store(dev,page + retval,count,*ppos);
+		len = dir->ops->store(dir,attr,page + retval,count,*ppos);
 
 		if (len <= 0) {
 			if (len < 0)
@@ -418,24 +399,28 @@ driverfs_file_lseek(struct file *file, loff_t offset, int orig)
 static int driverfs_open_file(struct inode * inode, struct file * filp)
 {
 	struct driver_dir_entry * dir;
-	struct device * dev;
+	int error = 0;
 
 	dir = (struct driver_dir_entry *)filp->f_dentry->d_parent->d_fsdata;
-	if (!dir)
-		return -EFAULT;
-	dev = to_device(dir);
-	get_device(dev);
-	return 0;
+	if (dir) {
+		struct attribute * attr = filp->f_dentry->d_fsdata;
+		if (attr && dir->ops) {
+			if (dir->ops->open)
+				error = dir->ops->open(dir);
+			goto Done;
+		}
+	}
+	error = -EINVAL;
+ Done:
+	return error;
 }
 
 static int driverfs_release(struct inode * inode, struct file * filp)
 {
 	struct driver_dir_entry * dir;
-	struct device * dev;
-
 	dir = (struct driver_dir_entry *)filp->f_dentry->d_parent->d_fsdata;
-	dev = to_device(dir);
-	put_device(dev);
+	if (dir->ops->close)
+		dir->ops->close(dir);
 	return 0;
 }
 
