@@ -358,5 +358,5 @@ static inline unsigned nblocks(loff_t size)
 		res += blocks;
 		direct = 1;
 	}
-	return blocks;
+	return res;
 }
