@@ -578,7 +578,7 @@ static int saveable(struct zone * zone, unsigned long * zone_pfn)
 		return 0;
 	}
 	if ((chunk_size = is_head_of_free_region(page))) {
-		zone_pfn += chunk_size - 1;
+		*zone_pfn += chunk_size - 1;
 		return 0;
 	}
 
@@ -601,11 +601,11 @@ static void count_data_pages(void)
 }
 
 
-static void copy_data_pages(struct pbe * pbe)
+static void copy_data_pages(void)
 {
 	struct zone *zone;
 	unsigned long zone_pfn;
-
+	struct pbe * pbe = pagedir_nosave;
 	
 	for_each_zone(zone) {
 		if (!is_highmem(zone))
@@ -807,9 +807,9 @@ int suspend_prepare_image(void)
 	printk(", ");
 #endif
 
-	printk("counting pages to copy" );
 	drain_local_pages();
 	count_data_pages();
+	printk("swsusp: Need to copy %u pages\n",nr_copy_pages);
 	nr_needed_pages = nr_copy_pages + PAGES_FOR_IO;
 
 	swsusp_alloc();
@@ -818,7 +818,7 @@ int suspend_prepare_image(void)
 	 * Kill them.
 	 */
 	drain_local_pages();
-	copy_data_pages(pagedir_nosave);
+	copy_data_pages();
 
 	/*
 	 * End of critical section. From now on, we can write to memory,
