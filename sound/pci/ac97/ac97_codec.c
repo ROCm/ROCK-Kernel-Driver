@@ -1526,38 +1526,40 @@ static int snd_ac97_modem_build(snd_card_t * card, ac97_t * ac97)
 	return 0;
 }
 
-static int snd_ac97_test_rate(ac97_t *ac97, int reg, int rate)
+static int snd_ac97_test_rate(ac97_t *ac97, int reg, int shadow_reg, int rate)
 {
 	unsigned short val;
 	unsigned int tmp;
 
 	tmp = ((unsigned int)rate * ac97->bus->clock) / 48000;
 	snd_ac97_write_cache(ac97, reg, tmp & 0xffff);
+	if (shadow_reg)
+		snd_ac97_write_cache(ac97, shadow_reg, tmp & 0xffff);
 	val = snd_ac97_read(ac97, reg);
 	return val == (tmp & 0xffff);
 }
 
-static void snd_ac97_determine_rates(ac97_t *ac97, int reg, unsigned int *r_result)
+static void snd_ac97_determine_rates(ac97_t *ac97, int reg, int shadow_reg, unsigned int *r_result)
 {
 	unsigned int result = 0;
 
 	/* test a non-standard rate */
-	if (snd_ac97_test_rate(ac97, reg, 11000))
+	if (snd_ac97_test_rate(ac97, reg, shadow_reg, 11000))
 		result |= SNDRV_PCM_RATE_CONTINUOUS;
 	/* let's try to obtain standard rates */
-	if (snd_ac97_test_rate(ac97, reg, 8000))
+	if (snd_ac97_test_rate(ac97, reg, shadow_reg, 8000))
 		result |= SNDRV_PCM_RATE_8000;
-	if (snd_ac97_test_rate(ac97, reg, 11025))
+	if (snd_ac97_test_rate(ac97, reg, shadow_reg, 11025))
 		result |= SNDRV_PCM_RATE_11025;
-	if (snd_ac97_test_rate(ac97, reg, 16000))
+	if (snd_ac97_test_rate(ac97, reg, shadow_reg, 16000))
 		result |= SNDRV_PCM_RATE_16000;
-	if (snd_ac97_test_rate(ac97, reg, 22050))
+	if (snd_ac97_test_rate(ac97, reg, shadow_reg, 22050))
 		result |= SNDRV_PCM_RATE_22050;
-	if (snd_ac97_test_rate(ac97, reg, 32000))
+	if (snd_ac97_test_rate(ac97, reg, shadow_reg, 32000))
 		result |= SNDRV_PCM_RATE_32000;
-	if (snd_ac97_test_rate(ac97, reg, 44100))
+	if (snd_ac97_test_rate(ac97, reg, shadow_reg, 44100))
 		result |= SNDRV_PCM_RATE_44100;
-	if (snd_ac97_test_rate(ac97, reg, 48000))
+	if (snd_ac97_test_rate(ac97, reg, shadow_reg, 48000))
 		result |= SNDRV_PCM_RATE_48000;
 	*r_result = result;
 }
@@ -1866,8 +1868,8 @@ int snd_ac97_mixer(ac97_bus_t * bus, ac97_t * _ac97, ac97_t ** rac97)
 	if (ac97->ext_id & 0x0189)	/* L/R, MIC, SDAC, LDAC VRA support */
 		snd_ac97_write_cache(ac97, AC97_EXTENDED_STATUS, ac97->ext_id & 0x0189);
 	if (ac97->ext_id & AC97_EI_VRA) {	/* VRA support */
-		snd_ac97_determine_rates(ac97, AC97_PCM_FRONT_DAC_RATE, &ac97->rates[AC97_RATES_FRONT_DAC]);
-		snd_ac97_determine_rates(ac97, AC97_PCM_LR_ADC_RATE, &ac97->rates[AC97_RATES_ADC]);
+		snd_ac97_determine_rates(ac97, AC97_PCM_FRONT_DAC_RATE, 0, &ac97->rates[AC97_RATES_FRONT_DAC]);
+		snd_ac97_determine_rates(ac97, AC97_PCM_LR_ADC_RATE, 0, &ac97->rates[AC97_RATES_ADC]);
 	} else {
 		ac97->rates[AC97_RATES_FRONT_DAC] = SNDRV_PCM_RATE_48000;
 		ac97->rates[AC97_RATES_ADC] = SNDRV_PCM_RATE_48000;
@@ -1884,16 +1886,16 @@ int snd_ac97_mixer(ac97_bus_t * bus, ac97_t * _ac97, ac97_t ** rac97)
 						SNDRV_PCM_RATE_32000;
 	}
 	if (ac97->ext_id & AC97_EI_VRM) {	/* MIC VRA support */
-		snd_ac97_determine_rates(ac97, AC97_PCM_MIC_ADC_RATE, &ac97->rates[AC97_RATES_MIC_ADC]);
+		snd_ac97_determine_rates(ac97, AC97_PCM_MIC_ADC_RATE, 0, &ac97->rates[AC97_RATES_MIC_ADC]);
 	} else {
 		ac97->rates[AC97_RATES_MIC_ADC] = SNDRV_PCM_RATE_48000;
 	}
 	if (ac97->ext_id & AC97_EI_SDAC) {	/* SDAC support */
-		snd_ac97_determine_rates(ac97, AC97_PCM_SURR_DAC_RATE, &ac97->rates[AC97_RATES_SURR_DAC]);
+		snd_ac97_determine_rates(ac97, AC97_PCM_SURR_DAC_RATE, AC97_PCM_FRONT_DAC_RATE, &ac97->rates[AC97_RATES_SURR_DAC]);
 		ac97->scaps |= AC97_SCAP_SURROUND_DAC;
 	}
 	if (ac97->ext_id & AC97_EI_LDAC) {	/* LDAC support */
-		snd_ac97_determine_rates(ac97, AC97_PCM_LFE_DAC_RATE, &ac97->rates[AC97_RATES_LFE_DAC]);
+		snd_ac97_determine_rates(ac97, AC97_PCM_LFE_DAC_RATE, AC97_PCM_FRONT_DAC_RATE, &ac97->rates[AC97_RATES_LFE_DAC]);
 		ac97->scaps |= AC97_SCAP_CENTER_LFE_DAC;
 	}
 	/* additional initializations */
