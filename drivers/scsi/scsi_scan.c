@@ -1862,6 +1862,69 @@ static int scsi_report_lun_scan(Scsi_Device *sdevscan)
 
 }
 
+int scsi_add_single_device(uint host, uint channel, uint id, uint lun)
+{
+	struct scsi_device *sdevscan, *sdev;
+	struct Scsi_Host *shost;
+	int error = -ENODEV;
+
+	shost = scsi_host_hn_get(host);
+	if (!shost)
+		return -ENODEV;
+	sdev = scsi_find_device(shost, channel, id, lun);
+	if (!sdev)
+		goto out;
+
+	error = -ENOMEM;
+	sdevscan = scsi_alloc_sdev(shost, channel, id, lun);
+	if (!sdevscan)
+		goto out;
+
+	sdevscan->scsi_level = scsi_find_scsi_level(channel, id, shost);
+	error = scsi_probe_and_add_lun(sdevscan, &sdev, NULL);
+	scsi_free_sdev(sdevscan);
+
+	error = -ENODEV;
+	if (error != SCSI_SCAN_LUN_PRESENT) 
+		goto out;
+
+	scsi_attach_device(sdev);
+	error = 0;
+
+out:
+	scsi_host_put(shost);
+	return error;
+}
+
+int scsi_remove_single_device(uint host, uint channel, uint id, uint lun)
+{
+	struct scsi_device *sdev;
+	struct Scsi_Host *shost;
+	int error = -ENODEV;
+
+	shost = scsi_host_hn_get(host);
+	if (!shost)
+		return -ENODEV;
+	sdev = scsi_find_device(shost, channel, id, lun);
+	if (!sdev)
+		goto out;
+
+	error = -EBUSY;
+	if (sdev->access_count)
+		goto out;
+	scsi_detach_device(sdev);
+	if (sdev->attached)
+		goto out;
+
+	devfs_unregister(sdev->de);
+	scsi_free_sdev(sdev);
+	error = 0;
+
+out:
+	scsi_host_put(shost);
+	return error;
+}
+
 /**
  * scsi_scan_target - scan a target id, possibly including all LUNs on the
  *     target.

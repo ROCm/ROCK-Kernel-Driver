@@ -521,6 +521,8 @@ static inline void scsi_proc_host_rm(struct Scsi_Host *);
 extern struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *,
 			uint, uint, uint);
 extern void scsi_free_sdev(struct scsi_device *);
+extern int scsi_add_single_device(uint, uint, uint, uint);
+extern int scsi_remove_single_device(uint, uint, uint, uint);
 
 /*
  * Prototypes for functions in constants.c
