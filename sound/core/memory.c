@@ -131,10 +131,8 @@ void snd_hidden_kfree(const void *obj)
 {
 	unsigned long flags;
 	struct snd_alloc_track *t;
-	if (obj == NULL) {
-		snd_printk(KERN_WARNING "null kfree (called from %p)\n", __builtin_return_address(0));
+	if (obj == NULL)
 		return;
-	}
 	t = snd_alloc_track_entry(obj);
 	if (t->magic != KMALLOC_MAGIC) {
 		snd_printk(KERN_WARNING "bad kfree (called from %p)\n", __builtin_return_address(0));
@@ -170,10 +168,8 @@ void *snd_hidden_vmalloc(unsigned long size)
 void snd_hidden_vfree(void *obj)
 {
 	struct snd_alloc_track *t;
-	if (obj == NULL) {
-		snd_printk(KERN_WARNING "null vfree (called from %p)\n", __builtin_return_address(0));
+	if (obj == NULL)
 		return;
-	}
 	t = snd_alloc_track_entry(obj);
 	if (t->magic != VMALLOC_MAGIC) {
 		snd_printk(KERN_ERR "bad vfree (called from %p)\n", __builtin_return_address(0));
