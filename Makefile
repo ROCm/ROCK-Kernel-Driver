@@ -589,8 +589,9 @@ CLEAN_FILES += \
 	drivers/scsi/53c700_d.h drivers/scsi/sim710_d.h \
 	drivers/scsi/53c7xx_d.h drivers/scsi/53c7xx_u.h \
 	drivers/scsi/53c8xx_d.h drivers/scsi/53c8xx_u.h \
-	net/khttpd/make_times_h \
-	net/khttpd/times.h \
+	net/802/cl2llc.c net/802/transit/pdutr.h net/802/transit/timertr.h \
+	net/802/pseudo/pseudocode.h \
+	net/khttpd/make_times_h net/khttpd/times.h \
 	submenu*
 
 # 	files removed with 'make mrproper'
