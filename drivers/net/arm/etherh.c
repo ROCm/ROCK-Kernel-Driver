@@ -59,12 +59,11 @@
 static unsigned int net_debug = NET_DEBUG;
 
 struct etherh_priv {
-	struct ei_device eidev;
 	void		*ioc_fast;
 	void		*memc;
 	unsigned int	id;
 	void		*ctrl_port;
-	unsigned int	ctrl;
+	unsigned char	ctrl;
 };
 
 struct etherh_data {
@@ -116,16 +115,21 @@ static char version[] __initdata =
 
 /* ------------------------------------------------------------------------ */
 
-static inline void etherh_set_ctrl(struct etherh_priv *eh, unsigned int mask)
+#define etherh_priv(dev) \
+ ((struct etherh_priv *)(((char *)netdev_priv(dev)) + sizeof(struct ei_device)))
+
+static inline void etherh_set_ctrl(struct etherh_priv *eh, unsigned char mask)
 {
-	eh->ctrl |= mask;
-	writeb(eh->ctrl, eh->ctrl_port);
+	unsigned char ctrl = eh->ctrl | mask;
+	eh->ctrl = ctrl;
+	writeb(ctrl, eh->ctrl_port);
 }
 
-static inline void etherh_clr_ctrl(struct etherh_priv *eh, unsigned int mask)
+static inline void etherh_clr_ctrl(struct etherh_priv *eh, unsigned char mask)
 {
-	eh->ctrl &= ~mask;
-	writeb(eh->ctrl, eh->ctrl_port);
+	unsigned char ctrl = eh->ctrl & ~mask;
+	eh->ctrl = ctrl;
+	writeb(ctrl, eh->ctrl_port);
 }
 
 static inline unsigned int etherh_get_stat(struct etherh_priv *eh)
@@ -161,14 +165,13 @@ static expansioncard_ops_t etherh_ops = {
 static void
 etherh_setif(struct net_device *dev)
 {
-	struct etherh_priv *eh = netdev_priv(dev);
-	struct ei_device *ei_local = &eh->eidev;
+	struct ei_device *ei_local = netdev_priv(dev);
 	unsigned long addr, flags;
 
 	local_irq_save(flags);
 
 	/* set the interface type */
-	switch (eh->id) {
+	switch (etherh_priv(dev)->id) {
 	case PROD_I3_ETHERLAN600:
 	case PROD_I3_ETHERLAN600A:
 		addr = dev->base_addr + EN0_RCNTHI;
@@ -186,11 +189,11 @@ etherh_setif(struct net_device *dev)
 	case PROD_I3_ETHERLAN500:
 		switch (dev->if_port) {
 		case IF_PORT_10BASE2:
-			etherh_clr_ctrl(eh, ETHERH_CP_IF);
+			etherh_clr_ctrl(etherh_priv(dev), ETHERH_CP_IF);
 			break;
 
 		case IF_PORT_10BASET:
-			etherh_set_ctrl(eh, ETHERH_CP_IF);
+			etherh_set_ctrl(etherh_priv(dev), ETHERH_CP_IF);
 			break;
 		}
 		break;
@@ -205,11 +208,10 @@ etherh_setif(struct net_device *dev)
 static int
 etherh_getifstat(struct net_device *dev)
 {
-	struct etherh_priv *eh = netdev_priv(dev);
-	struct ei_device *ei_local = &eh->eidev;
+	struct ei_device *ei_local = netdev_priv(dev);
 	int stat = 0;
 
-	switch (eh->id) {
+	switch (etherh_priv(dev)->id) {
 	case PROD_I3_ETHERLAN600:
 	case PROD_I3_ETHERLAN600A:
 		switch (dev->if_port) {
@@ -228,7 +230,7 @@ etherh_getifstat(struct net_device *dev)
 			stat = 1;
 			break;
 		case IF_PORT_10BASET:
-			stat = etherh_get_stat(eh) & ETHERH_CP_HEARTBEAT;
+			stat = etherh_get_stat(etherh_priv(dev)) & ETHERH_CP_HEARTBEAT;
 			break;
 		}
 		break;
@@ -578,10 +580,6 @@ etherh_probe(struct expansion_card *ec, const struct ecard_id *id)
 		goto release;
 	}
 
-	eh = netdev_priv(dev);
-
-	spin_lock_init(&eh->eidev.page_lock);
-
 	SET_MODULE_OWNER(dev);
 	SET_NETDEV_DEV(dev, &ec->dev);
 
@@ -592,6 +590,7 @@ etherh_probe(struct expansion_card *ec, const struct ecard_id *id)
 	dev->if_port		= data->if_port;
 	dev->flags		|= data->flags;
 
+	eh = etherh_priv(dev);
 	eh->ctrl		= 0;
 	eh->id			= ec->cid.product;
 	eh->memc		= ioremap(ecard_resource_start(ec, ECARD_RES_MEMC), PAGE_SIZE);
@@ -627,7 +626,9 @@ etherh_probe(struct expansion_card *ec, const struct ecard_id *id)
 		etherh_set_ctrl(eh, ETHERH_CP_IE);
 	}
 
-	ei_local = &eh->eidev;
+	ei_local = netdev_priv(dev);
+	spin_lock_init(&ei_local->page_lock);
+
 	if (ec->cid.product == PROD_ANT_ETHERM) {
 		etherm_addr(dev->dev_addr);
 		ei_local->reg_offset = etherm_regoffsets;
@@ -679,18 +680,19 @@ etherh_probe(struct expansion_card *ec, const struct ecard_id *id)
 static void __devexit etherh_remove(struct expansion_card *ec)
 {
 	struct net_device *dev = ecard_get_drvdata(ec);
-	struct etherh_priv *eh = netdev_priv(dev);
+	struct etherh_priv *eh = etherh_priv(dev);
 
 	ecard_set_drvdata(ec, NULL);
 
 	unregister_netdev(dev);
+	ec->ops = NULL;
+
 	if (eh->ioc_fast)
 		iounmap(eh->ioc_fast);
 	iounmap(eh->memc);
+
 	free_netdev(dev);
 
-	ec->ops = NULL;
-	kfree(ec->irq_data);
 	ecard_release_resources(ec);
 }
 
