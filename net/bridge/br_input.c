@@ -19,7 +19,7 @@
 #include <linux/netfilter_bridge.h>
 #include "br_private.h"
 
-unsigned char bridge_ula[6] = { 0x01, 0x80, 0xc2, 0x00, 0x00, 0x00 };
+const unsigned char bridge_ula[6] = { 0x01, 0x80, 0xc2, 0x00, 0x00, 0x00 };
 
 static int br_pass_frame_up_finish(struct sk_buff *skb)
 {

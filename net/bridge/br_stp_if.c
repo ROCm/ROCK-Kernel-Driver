@@ -110,7 +110,8 @@ void br_stp_disable_port(struct net_bridge_port *p)
 }
 
 /* called under bridge lock */
-static void br_stp_change_bridge_id(struct net_bridge *br, unsigned char *addr)
+static void br_stp_change_bridge_id(struct net_bridge *br, 
+				    const unsigned char *addr)
 {
 	unsigned char oldaddr[6];
 	struct net_bridge_port *p;
@@ -137,15 +138,13 @@ static void br_stp_change_bridge_id(struct net_bridge *br, unsigned char *addr)
 		br_become_root_bridge(br);
 }
 
-static unsigned char br_mac_zero[6];
+static const unsigned char br_mac_zero[6];
 
 /* called under bridge lock */
 void br_stp_recalculate_bridge_id(struct net_bridge *br)
 {
-	unsigned char *addr;
+	const unsigned char *addr = br_mac_zero;
 	struct net_bridge_port *p;
-
-	addr = br_mac_zero;
 
 	list_for_each_entry(p, &br->port_list, list) {
 		if (addr == br_mac_zero ||

@@ -111,7 +111,7 @@ struct net_bridge
 };
 
 extern struct notifier_block br_device_notifier;
-extern unsigned char bridge_ula[6];
+extern const unsigned char bridge_ula[6];
 
 /* called under bridge lock */
 static inline int br_is_root_bridge(const struct net_bridge *br)
