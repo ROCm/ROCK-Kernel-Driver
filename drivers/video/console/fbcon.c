@@ -2671,10 +2671,39 @@ static void fbcon_modechanged(struct fb_info *info)
 	}
 }
 
+static void fbcon_mode_deleted(struct fb_info *info,
+			       struct fb_videomode *mode)
+{
+	struct fb_info *fb_info;
+	struct display *p;
+	int i, j, found = 0;
+
+	/* before deletion, ensure that mode is not in use */
+	for (i = first_fb_vc; i <= last_fb_vc; i++) {
+		j = (int) con2fb_map[i];
+		if (j == -1)
+			continue;
+		fb_info = registered_fb[j];
+		if (fb_info != info)
+			continue;
+		p = &fb_display[i];
+		if (!p || !p->mode)
+			continue;
+		if (fb_mode_is_equal(p->mode, mode)) {
+			found = 1;
+			break;
+		}
+	}
+	if (!found)
+		fb_delete_videomode(mode, &info->monspecs.modelist);
+}
+
 static int fbcon_event_notify(struct notifier_block *self, 
 			      unsigned long action, void *data)
 {
-	struct fb_info *info = (struct fb_info *) data;
+	struct fb_event *event = (struct fb_event *) data;
+	struct fb_info *info = event->info;
+	struct fb_videomode *mode;
 
 	switch(action) {
 	case FB_EVENT_SUSPEND:
@@ -2685,6 +2714,10 @@ static int fbcon_event_notify(struct notifier_block *self,
 		break;
 	case FB_EVENT_MODE_CHANGE:
 		fbcon_modechanged(info);
+		break;
+	case FB_EVENT_MODE_DELETE:
+		mode = (struct fb_videomode *) event->data;
+		fbcon_mode_deleted(info, mode);
 		break;
 	}
 

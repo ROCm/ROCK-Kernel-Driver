@@ -1087,6 +1087,22 @@ fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var)
 {
 	int err;
 
+	if (var->activate & FB_ACTIVATE_INV_MODE) {
+		struct fb_videomode mode1, mode2;
+		struct fb_event event;
+
+		fb_var_to_videomode(&mode1, var);
+		fb_var_to_videomode(&mode2, &info->var);
+		/* make sure we don't delete the videomode of current var */
+		if (fb_mode_is_equal(&mode1, &mode2))
+			return -EINVAL;
+		event.info = info;
+		event.data = &mode1;
+		notifier_call_chain(&fb_notifier_list, FB_EVENT_MODE_DELETE,
+				    &event);
+		return 0;
+	}
+
 	if ((var->activate & FB_ACTIVATE_FORCE) ||
 	    memcmp(&info->var, var, sizeof(struct fb_var_screeninfo))) {
 		if (!info->fbops->fb_check_var) {
@@ -1112,9 +1128,12 @@ fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var)
 			fb_add_videomode(&mode, &info->monspecs.modelist);
 
 			if (info->flags & FBINFO_MISC_MODECHANGEUSER) {
+				struct fb_event event;
+
 				info->flags &= ~FBINFO_MISC_MODECHANGEUSER;
+				event.info = info;
 				notifier_call_chain(&fb_notifier_list,
-						    FB_EVENT_MODE_CHANGE, info);
+						    FB_EVENT_MODE_CHANGE, &event);
 			}
 		}
 	}
@@ -1524,12 +1543,15 @@ int fb_unregister_client(struct notifier_block *nb)
  */
 void fb_set_suspend(struct fb_info *info, int state)
 {
+	struct fb_event event;
+
+	event.info = info;
 	if (state) {
-		notifier_call_chain(&fb_notifier_list, FB_EVENT_SUSPEND, info);
+		notifier_call_chain(&fb_notifier_list, FB_EVENT_SUSPEND, &event);
 		info->state = FBINFO_STATE_SUSPENDED;
 	} else {
 		info->state = FBINFO_STATE_RUNNING;
-		notifier_call_chain(&fb_notifier_list, FB_EVENT_RESUME, info);
+		notifier_call_chain(&fb_notifier_list, FB_EVENT_RESUME, &event);
 	}
 }
 
