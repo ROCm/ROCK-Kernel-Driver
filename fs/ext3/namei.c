@@ -220,9 +220,48 @@ static struct dentry *ext3_lookup(struct inode * dir, struct dentry *dentry)
 		}
 	}
 	unlock_kernel();
+	if (inode)
+		return d_splice_alias(inode, dentry);
 	d_add(dentry, inode);
 	return NULL;
 }
+
+
+struct dentry *ext3_get_parent(struct dentry *child)
+{
+	unsigned long ino;
+	struct dentry *parent;
+	struct inode *inode;
+	struct dentry dotdot;
+	struct ext3_dir_entry_2 * de;
+	struct buffer_head *bh;
+
+	dotdot.d_name.name = "..";
+	dotdot.d_name.len = 2;
+	dotdot.d_parent = child; /* confusing, isn't it! */
+
+	lock_kernel();
+	bh = ext3_find_entry(&dotdot, &de);
+	inode = NULL;
+	if (!bh) {
+		unlock_kernel();
+		return ERR_PTR(-ENOENT);
+	}
+	ino = le32_to_cpu(de->inode);
+	brelse(bh);
+	inode = iget(child->d_inode->i_sb, ino);
+	unlock_kernel();
+
+	if (!inode)
+		return ERR_PTR(-EACCES);
+
+	parent = d_alloc_anon(inode);
+	if (!parent) {
+		iput(inode);
+		parent = ERR_PTR(-ENOMEM);
+	}
+	return parent;
+} 
 
 #define S_SHIFT 12
 static unsigned char ext3_type_by_mode[S_IFMT >> S_SHIFT] = {

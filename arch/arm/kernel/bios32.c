@@ -346,20 +346,7 @@ pbus_assign_bus_resources(struct pci_bus *bus, struct pci_sys_data *root)
 	struct pci_dev *dev = bus->self;
 	int i;
 
-	if (dev) {
-		for (i = 0; i < 3; i++) {
-			if (root->resource[i]) {
-				bus->resource[i] = &dev->resource[PCI_BRIDGE_RESOURCES+i];
-				bus->resource[i]->end  = root->resource[i]->end;
-				bus->resource[i]->name = bus->name;
-			}
-		}
-		bus->resource[0]->flags |= pci_bridge_check_io(dev);
-		bus->resource[1]->flags |= IORESOURCE_MEM;
-
-		if (bus->resource[2] && root->resource[2])
-			bus->resource[2]->flags = root->resource[2]->flags;
-	} else {
+	if (!dev) {
 		/*
 		 * Assign root bus resources.
 		 */
@@ -662,7 +649,8 @@ char * __init pcibios_setup(char *str)
  * but we want to try to avoid allocating at 0x2900-0x2bff
  * which might be mirrored at 0x0100-0x03ff..
  */
-void pcibios_align_resource(void *data, struct resource *res, unsigned long size)
+void pcibios_align_resource(void *data, struct resource *res,
+			    unsigned long size, unsigned long align)
 {
 	if (res->flags & IORESOURCE_IO) {
 		unsigned long start = res->start;

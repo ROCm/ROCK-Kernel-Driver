@@ -221,8 +221,18 @@ static int __init acq_init(void)
 	spin_lock_init(&acq_lock);
 	if (misc_register(&acq_miscdev))
 		return -ENODEV;
-	request_region(WDT_STOP, 1, "Acquire WDT");
-	request_region(WDT_START, 1, "Acquire WDT");
+	if (!request_region(WDT_STOP, 1, "Acquire WDT"))
+		{
+		misc_deregister(&acq_miscdev);
+		return -EIO;
+		}
+	if (!request_region(WDT_START, 1, "Acquire WDT"))
+		{
+		release_region(WDT_STOP, 1);
+		misc_deregister(&acq_miscdev);
+		return -EIO;
+		}
+
 	register_reboot_notifier(&acq_notifier);
 	return 0;
 }

@@ -43,22 +43,23 @@ struct Scsi_Host *sgiwd93_host = NULL;
 struct Scsi_Host *sgiwd93_host1 = NULL;
 
 /* Wuff wuff, wuff, wd33c93.c, wuff wuff, object oriented, bow wow. */
-static inline void write_wd33c93_count(wd33c93_regs *regp, unsigned long value)
+static inline void write_wd33c93_count(const wd33c93_regs regs,
+				       unsigned long value)
 {
-	regp->SASR = WD_TRANSFER_COUNT_MSB;
-	regp->SCMD = ((value >> 16) & 0xff);
-	regp->SCMD = ((value >>  8) & 0xff);
-	regp->SCMD = ((value >>  0) & 0xff);
+	*regs.SASR = WD_TRANSFER_COUNT_MSB;
+	*regs.SCMD = ((value >> 16) & 0xff);
+	*regs.SCMD = ((value >>  8) & 0xff);
+	*regs.SCMD = ((value >>  0) & 0xff);
 }
 
-static inline unsigned long read_wd33c93_count(wd33c93_regs *regp)
+static inline unsigned long read_wd33c93_count(const wd33c93_regs regs)
 {
 	unsigned long value;
 
-	regp->SASR = WD_TRANSFER_COUNT_MSB;
-	value =  ((regp->SCMD & 0xff) << 16);
-	value |= ((regp->SCMD & 0xff) <<  8);
-	value |= ((regp->SCMD & 0xff) <<  0);
+	*regs.SASR = WD_TRANSFER_COUNT_MSB;
+	value =  (*regs.SCMD << 16);
+	value |= (*regs.SCMD <<  8);
+	value |= (*regs.SCMD <<  0);
 	return value;
 }
 
@@ -100,7 +101,7 @@ void fill_hpc_entries (struct hpc_chunk **hcp, char *addr, unsigned long len)
 static int dma_setup(Scsi_Cmnd *cmd, int datainp)
 {
 	struct WD33C93_hostdata *hdata = (struct WD33C93_hostdata *)cmd->host->hostdata;
-	wd33c93_regs *regp = hdata->regp;
+	const wd33c93_regs regs = hdata->regs;
 	struct hpc3_scsiregs *hregs = (struct hpc3_scsiregs *) cmd->host->base;
 	struct hpc_chunk *hcp = (struct hpc_chunk *) hdata->dma_bounce_buffer;
 
@@ -133,7 +134,7 @@ static int dma_setup(Scsi_Cmnd *cmd, int datainp)
 		printk(">tlen<%d>", totlen);
 #endif
 		hdata->dma_bounce_len = totlen; /* a trick... */
-		write_wd33c93_count(regp, totlen);
+		write_wd33c93_count(regs, totlen);
 	} else {
 		/* Non-scattered dma. */
 #ifdef DEBUG_DMA
@@ -149,7 +150,7 @@ static int dma_setup(Scsi_Cmnd *cmd, int datainp)
 		if (cmd->SCp.ptr == NULL)
 			return 1;
 		fill_hpc_entries (&hcp, cmd->SCp.ptr,cmd->SCp.this_residual);
-		write_wd33c93_count(regp, cmd->SCp.this_residual);
+		write_wd33c93_count(regs, cmd->SCp.this_residual);
 	}
 
 	/* To make sure, if we trip an HPC bug, that we transfer
@@ -176,7 +177,7 @@ static void dma_stop(struct Scsi_Host *instance, Scsi_Cmnd *SCpnt,
 		     int status)
 {
 	struct WD33C93_hostdata *hdata = (struct WD33C93_hostdata *)instance->hostdata;
-	wd33c93_regs *regp = hdata->regp;
+	const wd33c93_regs regs = hdata->regs;
 	struct hpc3_scsiregs *hregs;
 
 	if (!SCpnt)
@@ -203,7 +204,7 @@ static void dma_stop(struct Scsi_Host *instance, Scsi_Cmnd *SCpnt,
 
 		/* Yep, we were doing the scatterlist thang. */
 		totlen = hdata->dma_bounce_len;
-		wd93_residual = read_wd33c93_count(regp);
+		wd93_residual = read_wd33c93_count(regs);
 		transferred = totlen - wd93_residual;
 
 #ifdef DEBUG_DMA
@@ -273,6 +274,7 @@ int __init sgiwd93_detect(Scsi_Host_Template *SGIblows)
 	struct WD33C93_hostdata *hdata;
 	struct WD33C93_hostdata *hdata1;
 	uchar *buf;
+	wd33c93_regs regs;
 	
 	if(called)
 		return 0; /* Should bitch on the console about this... */
@@ -294,8 +296,9 @@ int __init sgiwd93_detect(Scsi_Host_Template *SGIblows)
 	init_hpc_chain(buf);
 	dma_cache_wback_inv((unsigned long) buf, PAGE_SIZE);
 	/* HPC_SCSI_REG0 | 0x03 | KSEG1 */
-	wd33c93_init(sgiwd93_host, (wd33c93_regs *) KSEG1ADDR (0x1fbc0003),
-		     dma_setup, dma_stop, WD33C93_FS_16_20);
+	regs.SASR = (volatile unsigned char *)KSEG1ADDR (0x1fbc0003);
+	regs.SCMD = (volatile unsigned char *)KSEG1ADDR (0x1fbc0007);
+	wd33c93_init(sgiwd93_host, regs, dma_setup, dma_stop, WD33C93_FS_16_20);
 
 	hdata = (struct WD33C93_hostdata *)sgiwd93_host->hostdata;
 	hdata->no_sync = 0;
@@ -328,8 +331,10 @@ int __init sgiwd93_detect(Scsi_Host_Template *SGIblows)
 			init_hpc_chain(buf);
 			dma_cache_wback_inv((unsigned long) buf, PAGE_SIZE);
 			/* HPC_SCSI_REG1 | 0x03 | KSEG1 */
-			wd33c93_init(sgiwd93_host1, (wd33c93_regs *) KSEG1ADDR (0x1fbc8003),
-				     dma_setup, dma_stop, WD33C93_FS_16_20);
+			regs.SASR = (volatile unsigned char *)KSEG1ADDR (0x1fbc8003);
+			regs.SCMD = (volatile unsigned char *)KSEG1ADDR (0x1fbc8007);
+			wd33c93_init(sgiwd93_host1, regs, dma_setup, dma_stop,
+				     WD33C93_FS_16_20);
 	
 			hdata1 = (struct WD33C93_hostdata *)sgiwd93_host1->hostdata;
 			hdata1->no_sync = 0;

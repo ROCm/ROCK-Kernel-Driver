@@ -1665,7 +1665,7 @@ EXPORT_SYMBOL(usb_serial_deregister);
 #if 0
 static kdev_t usb_console_device(struct console *co)
 {
-	return MKDEV(SERIAL_TTY_MAJOR, co->index);	/* TBD */
+	return mk_kdev(SERIAL_TTY_MAJOR, co->index);	/* TBD */
 }
 #endif
 

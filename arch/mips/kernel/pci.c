@@ -161,7 +161,8 @@ char *pcibios_setup(char *str)
 }
 
 void
-pcibios_align_resource(void *data, struct resource *res, unsigned long size)
+pcibios_align_resource(void *data, struct resource *res,
+		       unsigned long size, unsigned long align)
 {
 	/* this should not be called */
 }

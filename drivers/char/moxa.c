@@ -2799,7 +2799,7 @@ static int moxa_set_serial_info(struct moxa_str *info,
 	    (new_serial.baud_base != 921600))
 		return (-EPERM);
 
-	if (!suser()) {
+	if (!capable(CAP_SYS_ADMIN)) {
 		if (((new_serial.flags & ~ASYNC_USR_MASK) !=
 		     (info->asyncflags & ~ASYNC_USR_MASK)))
 			return (-EPERM);

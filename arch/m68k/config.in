@@ -14,7 +14,6 @@ source init/Config.in
 mainmenu_option next_comment
 comment 'Platform dependent setup'
 
-define_bool CONFIG_ISA n
 define_bool CONFIG_EISA n
 define_bool CONFIG_MCA n
 define_bool CONFIG_PCMCIA n
@@ -130,11 +129,18 @@ if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
    fi
 fi
 
+if [ "$CONFIG_Q40" = "y" -o "$CONFIG_AMIGA_PCMCIA" = "y" \
+      -o "$CONFIG_GG2" = "y" ]; then
+   define_bool CONFIG_ISA y
+else
+   define_bool CONFIG_ISA n
+fi
+
 source drivers/pci/Config.in
 source drivers/zorro/Config.in
 
 if [ "$CONFIG_Q40" = "y" ]; then
-source drivers/pnp/Config.in
+   source drivers/pnp/Config.in
 fi
 
 endmenu
@@ -251,7 +257,7 @@ if [ "$CONFIG_SCSI" != "n" ]; then
    fi
 
    if [ "$CONFIG_SUN3" = "y" ]; then
-	dep_tristate 'Sun3 NCR5380 OBIO SCSI' CONFIG_SUN3_SCSI $CONFIG_SCSI
+	dep_tristate 'Sun3 NCR5380 SCSI' CONFIG_SUN3_SCSI $CONFIG_SCSI
    fi
 
    if [ "$CONFIG_SUN3X" = "y" ]; then
@@ -280,9 +286,17 @@ if [ "$CONFIG_NET" = "y" ]; then
 	 bool '    Keepalive and linefill' CONFIG_SLIP_SMART
 	 bool '    Six bit SLIP encapsulation' CONFIG_SLIP_MODE_SLIP6
       fi
-      tristate '  PPP (point-to-point) support' CONFIG_PPP
+      tristate 'PPP (point-to-point protocol) support' CONFIG_PPP
       if [ ! "$CONFIG_PPP" = "n" ]; then
-	 comment 'CCP compressors for PPP are only built as modules.'
+         dep_bool '  PPP multilink support (EXPERIMENTAL)' CONFIG_PPP_MULTILINK $CONFIG_EXPERIMENTAL
+         dep_bool '  PPP filtering' CONFIG_PPP_FILTER $CONFIG_FILTER
+         dep_tristate '  PPP support for async serial ports' CONFIG_PPP_ASYNC $CONFIG_PPP
+         dep_tristate '  PPP support for sync tty ports' CONFIG_PPP_SYNC_TTY $CONFIG_PPP
+         dep_tristate '  PPP Deflate compression' CONFIG_PPP_DEFLATE $CONFIG_PPP
+         dep_tristate '  PPP BSD-Compress compression' CONFIG_PPP_BSDCOMP $CONFIG_PPP
+         if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
+             dep_tristate '  PPP over Ethernet (EXPERIMENTAL)' CONFIG_PPPOE $CONFIG_PPP
+         fi
       fi
       tristate '  EQL (serial line load balancing) support' CONFIG_EQUALIZER
       if [ "$CONFIG_ZORRO" = "y" ]; then
@@ -335,7 +349,7 @@ if [ "$CONFIG_NET" = "y" ]; then
          if [  "$CONFIG_PARPORT" != "n" ]; then
 	    dep_tristate '  PLIP (parallel port) support' CONFIG_PLIP $CONFIG_PARPORT
 	 fi
-         tristate 'NE2000/NE1000 support' CONFIG_NE2000
+         dep_tristate 'NE2000/NE1000 support' CONFIG_NE2000 m
       fi
    fi
    endmenu
@@ -350,7 +364,6 @@ if [ "$CONFIG_Q40" = "y" ]; then
 fi
 
 if [ "$CONFIG_SERIAL" = "y" ]; then
-   bool '  Support for console on serial port' CONFIG_SERIAL_CONSOLE
    bool '  Extended dumb serial driver options' CONFIG_SERIAL_EXTENDED
 fi
 
@@ -460,7 +473,8 @@ if [ "$CONFIG_AMIGA" = "y" -o "$CONFIG_ATARI" = "y" -o \
         "$CONFIG_ATARI_MIDI" = "y" -o "$CONFIG_MAC_SCC" = "y" -o \
         "$CONFIG_AMIGA_BUILTIN_SERIAL" = "y" -o \
         "$CONFIG_GVPIOEXT" = "y" -o "$CONFIG_MULTIFACE_III_TTY" = "y" -o \
-        "$CONFIG_HPDCA" = "y" -o "$CONFIG_SUN3X_ZS" = "y" ]; then
+        "$CONFIG_HPDCA" = "y" -o "$CONFIG_SUN3X_ZS" = "y" -o \
+        "$CONFIG_SERIAL" = "y" ]; then
       bool 'Support for serial port console' CONFIG_SERIAL_CONSOLE
    fi
 fi
@@ -495,7 +509,7 @@ else
    if [ "$CONFIG_SUN3" = "y" ]; then
       define_bool CONFIG_GEN_RTC y
    else
-      bool 'Generic /dev/rtc emulation' CONFIG_GEN_RTC
+      tristate 'Generic /dev/rtc emulation' CONFIG_GEN_RTC
    fi
 fi
 bool 'Unix98 PTY support' CONFIG_UNIX98_PTYS
@@ -526,8 +540,13 @@ fi
 mainmenu_option next_comment
 comment 'Kernel hacking'
 
-#bool 'Debug kmalloc/kfree' CONFIG_DEBUG_MALLOC
-bool 'Magic SysRq key' CONFIG_MAGIC_SYSRQ
+bool 'Kernel debugging' CONFIG_DEBUG_KERNEL
+if [ "$CONFIG_DEBUG_KERNEL" != "n" ]; then
+   bool '  Magic SysRq key' CONFIG_MAGIC_SYSRQ
+   bool '  Debug memory allocations' CONFIG_DEBUG_SLAB
+   bool '  Verbose BUG() reporting' CONFIG_DEBUG_BUGVERBOSE
+fi
+
 endmenu
 
 source lib/Config.in

@@ -1020,6 +1020,14 @@ error:
 	unlock_kernel();
 	dentry->d_op = &vfat_dentry_ops[table];
 	dentry->d_time = dentry->d_parent->d_inode->i_version;
+	if (inode) {
+		dentry = d_splice_alias(inode, dentry);
+		if (dentry) {
+			dentry->d_op = &vfat_dentry_ops[table];
+			dentry->d_time = dentry->d_parent->d_inode->i_version;
+		}
+		return dentry;
+	}
 	d_add(dentry,inode);
 	return NULL;
 }
@@ -1305,11 +1313,11 @@ int vfat_fill_super(struct super_block *sb, void *data, int silent)
 		if (sbi->options.posixfs) {
 			sbi->options.name_check = 's';
 		}
-		if (sbi->options.name_check != 's') {
-			sb->s_root->d_op = &vfat_dentry_ops[0];
-		} else {
-			sb->s_root->d_op = &vfat_dentry_ops[2];
-		}
+	}
+	if (sbi->options.name_check != 's') {
+		sb->s_root->d_op = &vfat_dentry_ops[0];
+	} else {
+		sb->s_root->d_op = &vfat_dentry_ops[2];
 	}
 	return 0;
 }

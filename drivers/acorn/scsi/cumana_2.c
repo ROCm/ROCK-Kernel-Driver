@@ -382,8 +382,13 @@ cumanascsi_2_detect(Scsi_Host_Template *tpnt)
 		ecs[count]->irq_data	= (void *)info->alatch;
 		ecs[count]->ops		= (expansioncard_ops_t *)&cumanascsi_2_ops;
 
-		request_region(host->io_port + CUMANASCSI2_FAS216_OFFSET,
-			       16 << CUMANASCSI2_FAS216_SHIFT, "cumanascsi2-fas");
+		if (!request_region(host->io_port + CUMANASCSI2_FAS216_OFFSET,
+			       16 << CUMANASCSI2_FAS216_SHIFT, "cumanascsi2-fas")) {
+			scsi_unregister(host);
+			ecard_release(ecs[count]);
+			break;
+		}
+			
 
 		if (host->irq != NO_IRQ &&
 		    request_irq(host->irq, cumanascsi_2_intr,

@@ -77,12 +77,13 @@ acpi_os_initialize(void)
 	 * Initialize PCI configuration space access, as we'll need to access
 	 * it while walking the namespace (bus 0 and root bridges w/ _BBNs).
 	 */
+#if 0
 	pcibios_config_init();
 	if (!pci_config_read || !pci_config_write) {
 		printk(KERN_ERR PREFIX "Access to PCI configuration space unavailable\n");
 		return AE_NULL_ENTRY;
 	}
-
+#endif
 	return AE_OK;
 }
 

@@ -2032,19 +2032,6 @@ static int idefloppy_cleanup (ide_drive_t *drive)
 	return 0;
 }
 
-#ifdef CONFIG_PROC_FS
-
-static ide_proc_entry_t idefloppy_proc[] = {
-	{ "geometry",	S_IFREG|S_IRUGO,	proc_ide_read_geometry,	NULL },
-	{ NULL, 0, NULL, NULL }
-};
-
-#else
-
-#define	idefloppy_proc	NULL
-
-#endif	/* CONFIG_PROC_FS */
-
 /*
  *	IDE subdriver functions, registered with ide.c
  */
@@ -2060,7 +2047,6 @@ static struct ata_operations idefloppy_driver = {
 	check_media_change:	idefloppy_check_media_change,
 	revalidate:		NULL, /* use default method */
 	capacity:		idefloppy_capacity,
-	proc:			idefloppy_proc
 };
 
 MODULE_DESCRIPTION("ATAPI FLOPPY Driver");
@@ -2075,13 +2061,6 @@ static void __exit idefloppy_exit (void)
 			printk ("%s: cleanup_module() called while still busy\n", drive->name);
 			failed++;
 		}
-
-#ifdef CONFIG_PROC_FS
-		/* We must remove proc entries defined in this module.
-		   Otherwise we oops while accessing these entries */
-		if (drive->proc)
-			ide_remove_proc_entries(drive->proc, idefloppy_proc);
-#endif
 	}
 }
 

@@ -256,7 +256,7 @@ ppc4xx_progress(char *s, unsigned short hex)
  * IDE stuff.
  * should be generic for every IDE PCI chipset
  */
-#if defined(CONFIG_BLK_DEV_IDEPCI)
+#ifdef  CONFIG_PCI
 static void
 ppc4xx_ide_init_hwif_ports(hw_regs_t * hw, ide_ioreg_t data_port,
 			   ide_ioreg_t ctrl_port, int *irq)
@@ -376,7 +376,7 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 **     defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
 */
 #ifdef CONFIG_IDE
-# if defined(CONFIG_BLK_DEV_IDEPCI)
+# if defined(CONFIG_PCI)
 	ppc_ide_md.ide_init_hwif = ppc4xx_ide_init_hwif_ports;
 # elif defined (CONFIG_DMA_NONPCI)	/* ON board IDE */
 	ppc_ide_md.default_irq = nonpci_ide_default_irq;

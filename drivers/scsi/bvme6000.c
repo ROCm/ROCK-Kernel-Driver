@@ -24,7 +24,7 @@
 #include<linux/stat.h>
 
 extern ncr53c7xx_init (Scsi_Host_Template *tpnt, int board, int chip,
-			u32 base, int io_port, int irq, int dma,
+			unsigned long base, int io_port, int irq, int dma,
 			long long options, int clock);
 
 int bvme6000_scsi_detect(Scsi_Host_Template *tpnt)
@@ -44,7 +44,7 @@ int bvme6000_scsi_detect(Scsi_Host_Template *tpnt)
 
     clock = 40000000;	/* 66MHz SCSI Clock */
 
-    ncr53c7xx_init(tpnt, 0, 710, (u32)BVME_NCR53C710_BASE,
+    ncr53c7xx_init(tpnt, 0, 710, (unsigned long)BVME_NCR53C710_BASE,
 			0, BVME_IRQ_SCSI, DMA_NONE,
 			options, clock);
     called = 1;

@@ -35,10 +35,6 @@ MODULE_LICENSE("GPL");
 
 /* ------------------------------------------------------------- */
 
-static struct capi_driver_interface *di;
-
-/* ------------------------------------------------------------- */
-
 static int hema_irq_table[16] =
 {0,
  0,
@@ -199,7 +195,7 @@ static void t1isa_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 
 			if (NCCI != 0xffffffff)
 				ctrl->free_ncci(ctrl, ApplId, NCCI);
-			else ctrl->appl_released(ctrl, ApplId);
+
 			break;
 
 		case RECEIVE_START:
@@ -331,7 +327,7 @@ static void t1isa_remove_ctr(struct capi_ctr *ctrl)
 	b1_reset(port);
 	t1_reset(port);
 
-	di->detach_ctr(ctrl);
+	detach_capi_ctr(ctrl);
 	free_irq(card->irq, card);
 	release_region(card->port, AVMB1_PORTLEN);
 	b1_free_card(card);
@@ -344,6 +340,7 @@ static void t1isa_remove_ctr(struct capi_ctr *ctrl)
 static int t1isa_add_card(struct capi_driver *driver, struct capicardparams *p)
 {
 	struct capi_ctr *ctrl;
+	struct list_head *l;
 	avmctrl_info *cinfo;
 	avmcard *card;
 	int retval;
@@ -376,8 +373,11 @@ static int t1isa_add_card(struct capi_driver *driver, struct capicardparams *p)
 		retval = -EINVAL;
 		goto err_free;
 	}
-	for (ctrl = driver->controller; ctrl; ctrl = ctrl->next) {
-	        avmcard *cardp = ((avmctrl_info *)(ctrl->driverdata))->card;
+	list_for_each(l, &driver->contr_head) {
+	        avmcard *cardp;
+
+		ctrl = list_entry(l, struct capi_ctr, driver_list);
+		cardp = ((avmctrl_info *)(ctrl->driverdata))->card;
 		if (cardp->cardnr == card->cardnr) {
 			printk(KERN_WARNING "%s: card with number %d already installed at 0x%x.\n",
 					driver->name, card->cardnr, cardp->port);
@@ -408,7 +408,7 @@ static int t1isa_add_card(struct capi_driver *driver, struct capicardparams *p)
 	t1_disable_irq(card->port);
 	b1_reset(card->port);
 
-	cinfo->capi_ctrl = di->attach_ctr(driver, card->name, cinfo);
+	cinfo->capi_ctrl = attach_capi_ctr(driver, card->name, cinfo);
 	if (!cinfo->capi_ctrl) {
 		printk(KERN_ERR "%s: attach controller failed.\n",
 				driver->name);
@@ -479,20 +479,21 @@ static char *t1isa_procinfo(struct capi_ctr *ctrl)
 /* ------------------------------------------------------------- */
 
 static struct capi_driver t1isa_driver = {
-    name: "t1isa",
-    revision: "0.0",
-    load_firmware: t1isa_load_firmware,
-    reset_ctr: t1isa_reset_ctr,
-    remove_ctr: t1isa_remove_ctr,
-    register_appl: b1_register_appl,
-    release_appl: b1_release_appl,
-    send_message: t1isa_send_message,
-
-    procinfo: t1isa_procinfo,
-    ctr_read_proc: b1ctl_read_proc,
-    driver_read_proc: 0,	/* use standard driver_read_proc */
-
-    add_card: t1isa_add_card,
+	owner: THIS_MODULE,
+	name: "t1isa",
+	revision: "0.0",
+	load_firmware: t1isa_load_firmware,
+	reset_ctr: t1isa_reset_ctr,
+	remove_ctr: t1isa_remove_ctr,
+	register_appl: b1_register_appl,
+	release_appl: b1_release_appl,
+	send_message: t1isa_send_message,
+	
+	procinfo: t1isa_procinfo,
+	ctr_read_proc: b1ctl_read_proc,
+	driver_read_proc: 0,	/* use standard driver_read_proc */
+	
+	add_card: t1isa_add_card,
 };
 
 static int __init t1isa_init(void)
@@ -512,13 +513,7 @@ static int __init t1isa_init(void)
 
 	printk(KERN_INFO "%s: revision %s\n", driver->name, driver->revision);
 
-        di = attach_capi_driver(driver);
-
-	if (!di) {
-		printk(KERN_ERR "%s: failed to attach capi_driver\n",
-				driver->name);
-		retval = -EIO;
-	}
+        attach_capi_driver(driver);
 
 	MOD_DEC_USE_COUNT;
 	return retval;

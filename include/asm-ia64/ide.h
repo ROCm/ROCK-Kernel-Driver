@@ -18,7 +18,7 @@
 #include <linux/irq.h>
 
 #ifndef MAX_HWIFS
-# ifdef CONFIG_BLK_DEV_IDEPCI
+# ifdef CONFIG_PCI
 #define MAX_HWIFS	10
 # else
 #define MAX_HWIFS	6
@@ -80,7 +80,7 @@ ide_init_hwif_ports (hw_regs_t *hw, ide_ioreg_t data_port, ide_ioreg_t ctrl_port
 static __inline__ void
 ide_init_default_hwifs (void)
 {
-#ifndef CONFIG_BLK_DEV_IDEPCI
+#ifndef CONFIG_PCI
 	hw_regs_t hw;
 	int index;
 
@@ -89,37 +89,10 @@ ide_init_default_hwifs (void)
 		hw.irq = ide_default_irq(ide_default_io_base(index));
 		ide_register_hw(&hw, NULL);
 	}
-#endif /* CONFIG_BLK_DEV_IDEPCI */
+#endif
 }
 
-typedef union {
-	unsigned all			: 8;	/* all of the bits together */
-	struct {
-		unsigned head		: 4;	/* always zeros here */
-		unsigned unit		: 1;	/* drive select number, 0 or 1 */
-		unsigned bit5		: 1;	/* always 1 */
-		unsigned lba		: 1;	/* using LBA instead of CHS */
-		unsigned bit7		: 1;	/* always 1 */
-	} b;
-} select_t;
-
-typedef union {
-	unsigned all			: 8;	/* all of the bits together */
-	struct {
-		unsigned bit0		: 1;
-		unsigned nIEN		: 1;	/* device INTRQ to host */
-		unsigned SRST		: 1;	/* host soft reset bit */
-		unsigned bit3		: 1;	/* ATA-2 thingy */
-		unsigned reserved456	: 3;
-		unsigned HOB		: 1;	/* 48-bit address ordering */
-	} b;
-} control_t;
-
-/*
- * The following are not needed for the non-m68k ports
- */
 #define ide_ack_intr(hwif)		(1)
-#define ide_fix_driveid(id)		do {} while (0)
 #define ide_release_lock(lock)		do {} while (0)
 #define ide_get_lock(lock, hdlr, data)	do {} while (0)
 

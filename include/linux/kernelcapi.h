@@ -10,6 +10,8 @@
 #ifndef __KERNELCAPI_H__
 #define __KERNELCAPI_H__
 
+#include <linux/list.h>
+
 #define CAPI_MAXAPPL	128	/* maximum number of applications  */
 #define CAPI_MAXCONTR	16	/* maximum number of controller    */
 #define CAPI_MAXDATAWINDOW	8
@@ -67,21 +69,14 @@ struct capi_interface {
 
 };
 
-struct capi_ncciinfo {
-	__u16 applid;
-	__u32 ncci;
-};
-
 #define	KCI_CONTRUP	0	/* struct capi_profile */
 #define	KCI_CONTRDOWN	1	/* NULL */
-#define	KCI_NCCIUP	2	/* struct capi_ncciinfo */
-#define	KCI_NCCIDOWN	3	/* struct capi_ncciinfo */
 
 struct capi_interface_user {
 	char name[20];
 	void (*callback) (unsigned int cmd, __u32 contr, void *data);
 	/* internal */
-	struct capi_interface_user *next;
+	struct list_head user_list;
 };
 
 struct capi_interface *attach_capi_interface(struct capi_interface_user *);

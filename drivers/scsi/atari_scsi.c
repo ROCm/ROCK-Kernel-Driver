@@ -1144,3 +1144,5 @@ static void atari_scsi_falcon_reg_write( unsigned char reg, unsigned char value 
 
 static Scsi_Host_Template driver_template = ATARI_SCSI;
 #include "scsi_module.c"
+
+MODULE_LICENSE("GPL");

@@ -489,7 +489,8 @@ void ide_setup_dma(struct ata_channel *ch, unsigned long dma_base, unsigned int 
 		goto dma_alloc_failure;
 	}
 
-	ch->XXX_udma = XXX_ide_dmaproc;
+	if (!ch->XXX_udma)
+		ch->XXX_udma = XXX_ide_dmaproc;
 
 	if (ch->chipset != ide_trm290) {
 		u8 dma_stat = inb(dma_base+2);
@@ -532,8 +533,20 @@ void udma_enable(struct ata_device *drive, int on, int verbose)
 {
 	struct ata_channel *ch = drive->channel;
 	int set_high = 1;
-	u8 unit = (drive->select.b.unit & 0x01);
-	u64 addr = BLK_BOUNCE_HIGH;
+	u8 unit;
+	u64 addr;
+
+
+	/* Method overloaded by host chip specific code. */
+	if (ch->udma_enable) {
+		ch->udma_enable(drive, on, verbose);
+
+		return;
+	}
+
+	/* Fall back to the default implementation. */
+	unit = (drive->select.b.unit & 0x01);
+	addr = BLK_BOUNCE_HIGH;
 
 	if (!on) {
 		if (verbose)

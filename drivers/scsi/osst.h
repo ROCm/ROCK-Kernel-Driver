@@ -1,5 +1,5 @@
 /*
- *	$Header: /home/cvsroot/Driver/osst.h,v 1.11 2001/01/26 01:54:49 riede Exp $
+ *	$Header: /home/cvsroot/Driver/osst.h,v 1.12 2001/10/11 00:30:15 riede Exp $
  */
 
 #include <asm/byteorder.h>
@@ -638,3 +638,5 @@ typedef struct {
 #define OS_WRITE_HEADER    4
 #define OS_WRITE_FILLER    5
 
+/* Additional rw state */
+#define OS_WRITING_COMPLETE 3

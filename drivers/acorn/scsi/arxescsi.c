@@ -304,8 +304,18 @@ int arxescsi_detect(Scsi_Host_Template *tpnt)
 		ecs[count]->irqaddr = (unsigned char *)BUS_ADDR(host->io_port);
 		ecs[count]->irqmask = CSTATUS_IRQ;
 
-		request_region(host->io_port      , 120, "arxescsi-fas");
-		request_region(host->io_port + 128, 384, "arxescsi-dma");
+		if (!request_region(host->io_port, 120, "arxescsi-fas")) {
+			ecard_release(ecs[count]);
+			scsi_unregister(host);
+			break;
+		}
+			
+		if (!request_region(host->io_port + 128, 384, "arxescsi-dma")) {
+			ecard_release(ecs[count]);
+			release_region(host->io_port, 120);
+			scsi_unregister(host);
+			break;
+		}
 
 		printk("scsi%d: Has no interrupts - using polling mode\n",
 		       host->host_no);

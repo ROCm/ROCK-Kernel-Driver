@@ -508,6 +508,12 @@ static struct super_operations ext3_sops = {
 	remount_fs:	ext3_remount,		/* BKL held */
 };
 
+struct dentry *ext3_get_parent(struct dentry *child);
+static struct export_operations ext3_export_ops = {
+	get_parent: ext3_get_parent,
+};
+
+
 static int want_value(char *value, char *option)
 {
 	if (!value || !*value) {
@@ -1157,6 +1163,7 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 	 * set up enough so that it can read an inode
 	 */
 	sb->s_op = &ext3_sops;
+	sb->s_export_op = &ext3_export_ops;
 	INIT_LIST_HEAD(&sbi->s_orphan); /* unlinked but open files */
 
 	sb->s_root = 0;

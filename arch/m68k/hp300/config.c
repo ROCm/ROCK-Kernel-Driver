@@ -73,9 +73,6 @@ void __init config_hp300(void)
   mach_get_irq_list    = show_hp300_interrupts;
   mach_gettimeoffset   = hp300_gettimeoffset;
   mach_default_handler = &hp300_default_handler;
-#if 0
-  mach_gettod          = hp300_gettod;
-#endif
   mach_reset           = hp300_reset;
 #ifdef CONFIG_HEARTBEAT
   mach_heartbeat       = hp300_pulse;

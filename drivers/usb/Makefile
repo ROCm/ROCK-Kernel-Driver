@@ -17,7 +17,7 @@ subdir-$(CONFIG_USB_UHCI)	+= host
 
 subdir-$(CONFIG_USB_ACM)	+= class
 subdir-$(CONFIG_USB_AUDIO)	+= class
-subdir-$(CONFIG_USB_BLUETOOTH)	+= class
+subdir-$(CONFIG_USB_BLUETOOTH_TTY)	+= class
 subdir-$(CONFIG_USB_PRINTER)	+= class
 
 subdir-$(CONFIG_USB_STORAGE)	+= storage

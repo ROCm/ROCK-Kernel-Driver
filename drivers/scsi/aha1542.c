@@ -168,6 +168,7 @@ struct aha1542_hostdata {
 
 static struct Scsi_Host *aha_host[7];	/* One for each IRQ level (9-15) */
 
+static spinlock_t aha1542_lock = SPIN_LOCK_UNLOCKED;
 
 
 
@@ -218,31 +219,34 @@ static void aha1542_stat(void)
 static int aha1542_out(unsigned int base, unchar * cmdp, int len)
 {
 	unsigned long flags = 0;
+	int got_lock;
 
-	save_flags(flags);
 	if (len == 1) {
+		got_lock = 0;
 		while (1 == 1) {
 			WAIT(STATUS(base), CDF, 0, CDF);
-			cli();
+			spin_lock_irqsave(&aha1542_lock, flags);
 			if (inb(STATUS(base)) & CDF) {
-				restore_flags(flags);
+				spin_unlock_irqrestore(&aha1542_lock, flags);
 				continue;
 			}
 			outb(*cmdp, DATA(base));
-			restore_flags(flags);
+			spin_unlock_irqrestore(&aha1542_lock, flags);
 			return 0;
 		}
 	} else {
-		cli();
+		spin_lock_irqsave(&aha1542_lock, flags);
+		got_lock = 1;
 		while (len--) {
 			WAIT(STATUS(base), CDF, 0, CDF);
 			outb(*cmdp++, DATA(base));
 		}
-		restore_flags(flags);
+		spin_unlock_irqrestore(&aha1542_lock, flags);
 	}
 	return 0;
 fail:
-	restore_flags(flags);
+	if (got_lock)
+		spin_unlock_irqrestore(&aha1542_lock, flags);
 	printk(KERN_ERR "aha1542_out failed(%d): ", len + 1);
 	aha1542_stat();
 	return 1;
@@ -255,16 +259,15 @@ static int __init aha1542_in(unsigned int base, unchar * cmdp, int len)
 {
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&aha1542_lock, flags);
 	while (len--) {
 		WAIT(STATUS(base), DF, DF, 0);
 		*cmdp++ = inb(DATA(base));
 	}
-	restore_flags(flags);
+	spin_unlock_irqrestore(&aha1542_lock, flags);
 	return 0;
 fail:
-	restore_flags(flags);
+	spin_unlock_irqrestore(&aha1542_lock, flags);
 	printk(KERN_ERR "aha1542_in failed(%d): ", len + 1);
 	aha1542_stat();
 	return 1;
@@ -277,16 +280,15 @@ static int __init aha1542_in1(unsigned int base, unchar * cmdp, int len)
 {
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&aha1542_lock, flags);
 	while (len--) {
 		WAITd(STATUS(base), DF, DF, 0, 100);
 		*cmdp++ = inb(DATA(base));
 	}
-	restore_flags(flags);
+	spin_unlock_irqrestore(&aha1542_lock, flags);
 	return 0;
 fail:
-	restore_flags(flags);
+	spin_unlock_irqrestore(&aha1542_lock, flags);
 	return 1;
 }
 
@@ -484,8 +486,7 @@ static void aha1542_intr_handle(struct Scsi_Host *shost, void *dev_id, struct pt
 		}
 		aha1542_intr_reset(shost->io_port);
 
-		save_flags(flags);
-		cli();
+		spin_lock_irqsave(&aha1542_lock, flags);
 		mbi = HOSTDATA(shost)->aha1542_last_mbi_used + 1;
 		if (mbi >= 2 * AHA1542_MAILBOXES)
 			mbi = AHA1542_MAILBOXES;
@@ -499,7 +500,7 @@ static void aha1542_intr_handle(struct Scsi_Host *shost, void *dev_id, struct pt
 		} while (mbi != HOSTDATA(shost)->aha1542_last_mbi_used);
 
 		if (mb[mbi].status == 0) {
-			restore_flags(flags);
+			spin_unlock_irqrestore(&aha1542_lock, flags);
 			/* Hmm, no mail.  Must have read it the last time around */
 			if (!number_serviced && !needs_restart)
 				printk(KERN_WARNING "aha1542.c: interrupt received, but no mail.\n");
@@ -514,7 +515,7 @@ static void aha1542_intr_handle(struct Scsi_Host *shost, void *dev_id, struct pt
 		mbistatus = mb[mbi].status;
 		mb[mbi].status = 0;
 		HOSTDATA(shost)->aha1542_last_mbi_used = mbi;
-		restore_flags(flags);
+		spin_unlock_irqrestore(&aha1542_lock, flags);
 
 #ifdef DEBUG
 		{
@@ -653,8 +654,7 @@ static int aha1542_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 	/* Use the outgoing mailboxes in a round-robin fashion, because this
 	   is how the host adapter will scan for them */
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&aha1542_lock, flags);
 	mbo = HOSTDATA(SCpnt->host)->aha1542_last_mbo_used + 1;
 	if (mbo >= AHA1542_MAILBOXES)
 		mbo = 0;
@@ -674,7 +674,7 @@ static int aha1542_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 							   screwing with this cdb. */
 
 	HOSTDATA(SCpnt->host)->aha1542_last_mbo_used = mbo;
-	restore_flags(flags);
+	spin_unlock_irqrestore(&aha1542_lock, flags);
 
 #ifdef DEBUG
 	printk(KERN_DEBUG "Sending command (%d %x)...", mbo, done);
@@ -1179,12 +1179,14 @@ static int __init aha1542_detect(Scsi_Host_Template * tpnt)
 		}
 	}
 	for (indx = 0; indx < sizeof(bases) / sizeof(bases[0]); indx++)
-		if (bases[indx] != 0 && !check_region(bases[indx], 4)) {
+		if (bases[indx] != 0 && request_region(bases[indx], 4, "aha1542")) {
 			shpnt = scsi_register(tpnt,
 					sizeof(struct aha1542_hostdata));
 
-			if(shpnt==NULL)
+			if(shpnt==NULL) {
+				release_region(bases[indx], 4);
 				continue;
+			}
 			/* For now we do this - until kmalloc is more intelligent
 			   we are resigned to stupid hacks like this */
 			if (SCSI_BUF_PA(shpnt) >= ISA_DMA_THRESHOLD) {
@@ -1242,18 +1244,17 @@ fail:
 			DEB(aha1542_stat());
 
 			DEB(printk("aha1542_detect: enable interrupt channel %d\n", irq_level));
-			save_flags(flags);
-			cli();
+			spin_lock_irqsave(&aha1542_lock, flags);
 			if (request_irq(irq_level, do_aha1542_intr_handle, 0, "aha1542", NULL)) {
 				printk(KERN_ERR "Unable to allocate IRQ for adaptec controller.\n");
-				restore_flags(flags);
+				spin_unlock_irqrestore(&aha1542_lock, flags);
 				goto unregister;
 			}
 			if (dma_chan != 0xFF) {
 				if (request_dma(dma_chan, "aha1542")) {
 					printk(KERN_ERR "Unable to allocate DMA channel for Adaptec.\n");
 					free_irq(irq_level, NULL);
-					restore_flags(flags);
+					spin_unlock_irqrestore(&aha1542_lock, flags);
 					goto unregister;
 				}
 				if (dma_chan == 0 || dma_chan >= 5) {
@@ -1274,7 +1275,7 @@ fail:
 			HOSTDATA(shpnt)->aha1542_last_mbi_used = (2 * AHA1542_MAILBOXES - 1);
 			HOSTDATA(shpnt)->aha1542_last_mbo_used = (AHA1542_MAILBOXES - 1);
 			memset(HOSTDATA(shpnt)->SCint, 0, sizeof(HOSTDATA(shpnt)->SCint));
-			restore_flags(flags);
+			spin_unlock_irqrestore(&aha1542_lock, flags);
 #if 0
 			DEB(printk(" *** READ CAPACITY ***\n"));
 
@@ -1308,10 +1309,10 @@ fail:
 				aha1542_command(0, cmd, buffer, 512);
 			}
 #endif
-			request_region(bases[indx], 4, "aha1542");	/* Register the IO ports that we use */
 			count++;
 			continue;
 unregister:
+			release_region(bases[indx], 4);
 			scsi_unregister(shpnt);
 			continue;
 
@@ -1376,8 +1377,7 @@ static int aha1542_dev_reset(Scsi_Cmnd * SCpnt)
 	ccb = HOSTDATA(SCpnt->host)->ccb;
 	mb = HOSTDATA(SCpnt->host)->mb;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&aha1542_lock, flags);
 	mbo = HOSTDATA(SCpnt->host)->aha1542_last_mbo_used + 1;
 	if (mbo >= AHA1542_MAILBOXES)
 		mbo = 0;
@@ -1398,7 +1398,7 @@ static int aha1542_dev_reset(Scsi_Cmnd * SCpnt)
 							   screwing with this cdb. */
 
 	HOSTDATA(SCpnt->host)->aha1542_last_mbo_used = mbo;
-	restore_flags(flags);
+	spin_unlock_irqrestore(&aha1542_lock, flags);
 
 	any2scsi(mb[mbo].ccbptr, SCSI_BUF_PA(&ccb[mbo]));	/* This gets trashed for some reason */
 
@@ -1590,6 +1590,7 @@ fail:
 	return FAILED;
 }
 
+#if 0
 /*
  * These are the old error handling routines.  They are only temporarily
  * here while we play with the new error handling code.
@@ -1606,8 +1607,7 @@ static int aha1542_old_abort(Scsi_Cmnd * SCpnt)
 	       inb(STATUS(SCpnt->host->io_port)),
 	       inb(INTRFLAGS(SCpnt->host->io_port)));
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&aha1542_lock, flags);
 	mb = HOSTDATA(SCpnt->host)->mb;
 	mbi = HOSTDATA(SCpnt->host)->aha1542_last_mbi_used + 1;
 	if (mbi >= 2 * AHA1542_MAILBOXES)
@@ -1620,7 +1620,7 @@ static int aha1542_old_abort(Scsi_Cmnd * SCpnt)
 		if (mbi >= 2 * AHA1542_MAILBOXES)
 			mbi = AHA1542_MAILBOXES;
 	} while (mbi != HOSTDATA(SCpnt->host)->aha1542_last_mbi_used);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&aha1542_lock, flags);
 
 	if (mb[mbi].status) {
 		printk(KERN_ERR "Lost interrupt discovered on irq %d - attempting to recover\n",
@@ -1648,15 +1648,17 @@ static int aha1542_old_abort(Scsi_Cmnd * SCpnt)
 
 	DEB(printk("aha1542_abort\n"));
 #if 0
-	save_flags(flags);
-	cli();
-	for (mbo = 0; mbo < AHA1542_MAILBOXES; mbo++)
+	spin_lock_irqsave(&aha1542_lock, flags);
+	for (mbo = 0; mbo < AHA1542_MAILBOXES; mbo++) {
 		if (SCpnt == HOSTDATA(SCpnt->host)->SCint[mbo]) {
 			mb[mbo].status = 2;	/* Abort command */
 			aha1542_out(SCpnt->host->io_port, &ahacmd, 1);	/* start scsi command */
-			restore_flags(flags);
+			spin_unlock_irqrestore(&aha1542_lock, flags);
 			break;
-		};
+		}
+	}
+	if (AHA1542_MAILBOXES == mbo)
+		spin_unlock_irqrestore(&aha1542_lock, flags);
 #endif
 	return SCSI_ABORT_SNOOZE;
 }
@@ -1777,6 +1779,7 @@ fail:
 	   to request sense information in order to decide what to do next. */
 	return SCSI_RESET_PUNT;
 }
+#endif    /* end of big comment block around old_abort + old_reset */
 
 #include "sd.h"
 

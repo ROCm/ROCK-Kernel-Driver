@@ -4,7 +4,7 @@
 #	Maintained by Geert Uytterhoeven <zorro@linux-m68k.org>
 #	If you have any new entries, please send them to the maintainer.
 #
-#	$Id: zorro.ids,v 1.16 2000/09/28 18:45:47 geert Exp $
+#	$Id: zorro.ids,v 1.17 2001/10/25 08:21:39 geert Exp $
 #
 
 # Manufacturers and Products. Please keep sorted.
@@ -229,6 +229,7 @@
 	0a00  Impact Series II [RAM Expansion]
 081e  Interworks Network
 0820  Hardital Synthesis
+	0100  Super Big Bang [Accelerator, SCSI Host Adapter and RAM Expansion]
 	1400  TQM 68030+68882 [Accelerator]
 0828  Applied Engineering
 	1000  DL2000 [Modem]
@@ -383,7 +384,7 @@
 	ff00  Pixel64 RAM [Graphics Card]
 1212  Individual Computers
 	0000  Buddha [IDE Interface]
-	1700  X-Surf [Ethernet Card]
+	1700  X-Surf [Ethernet Card and IDE Interface]
 	2a00  Catweasel [IDE Interface and Floppy Controller]
 1248  Kupke
 	0100  Golem HD 3000 [HD Controller]

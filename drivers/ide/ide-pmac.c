@@ -256,7 +256,15 @@ struct {
 #define IDE_WAKEUP_DELAY_MS	2000
 
 static void pmac_ide_setup_dma(struct device_node *np, int ix);
-static int pmac_ide_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request *rq);
+
+static void pmac_udma_enable(struct ata_device *drive, int on, int verbose);
+static int pmac_udma_start(struct ata_device *drive, struct request *rq);
+static int pmac_udma_stop(struct ata_device *drive);
+static int pmac_do_udma(unsigned int reading, struct ata_device *drive, struct request *rq);
+static int pmac_udma_read(struct ata_device *drive, struct request *rq);
+static int pmac_udma_write(struct ata_device *drive, struct request *rq);
+static int pmac_udma_irq_status(struct ata_device *drive);
+static int pmac_ide_dmaproc(struct ata_device *drive);
 static int pmac_ide_build_dmatable(struct ata_device *drive, struct request *rq, int ix, int wr);
 static int pmac_ide_tune_chipset(struct ata_device *drive, byte speed);
 static void pmac_ide_tuneproc(struct ata_device *drive, byte pio);
@@ -323,7 +331,13 @@ pmac_ide_init_hwif_ports(hw_regs_t *hw,
 	ide_hwifs[ix].selectproc = pmac_ide_selectproc;
 	ide_hwifs[ix].speedproc = &pmac_ide_tune_chipset;
 	if (pmac_ide[ix].dma_regs && pmac_ide[ix].dma_table_cpu) {
-		ide_hwifs[ix].udma = pmac_ide_dmaproc;
+		ide_hwifs[ix].udma_enable = pmac_udma_enable;
+		ide_hwifs[ix].udma_start = pmac_udma_start;
+		ide_hwifs[ix].udma_stop = pmac_udma_stop;
+		ide_hwifs[ix].udma_read = pmac_udma_read;
+		ide_hwifs[ix].udma_write = pmac_udma_write;
+		ide_hwifs[ix].udma_irq_status = pmac_udma_irq_status;
+		ide_hwifs[ix].XXX_udma = pmac_ide_dmaproc;
 #ifdef CONFIG_BLK_DEV_IDEDMA_PMAC_AUTO
 		if (!noautodma)
 			ide_hwifs[ix].autodma = 1;
@@ -1025,7 +1039,13 @@ pmac_ide_setup_dma(struct device_node *np, int ix)
 				    	pmif->dma_table_cpu, pmif->dma_table_dma);
 		return;
 	}
-	ide_hwifs[ix].udma = pmac_ide_dmaproc;
+	ide_hwifs[ix].udma_enable = pmac_udma_enable;
+	ide_hwifs[ix].udma_start = pmac_udma_start;
+	ide_hwifs[ix].udma_stop = pmac_udma_stop;
+	ide_hwifs[ix].udma_read = pmac_udma_read;
+	ide_hwifs[ix].udma_write = pmac_udma_write;
+	ide_hwifs[ix].udma_irq_status = pmac_udma_irq_status;
+	ide_hwifs[ix].XXX_udma = pmac_ide_dmaproc;
 #ifdef CONFIG_BLK_DEV_IDEDMA_PMAC_AUTO
 	if (!noautodma)
 		ide_hwifs[ix].autodma = 1;
@@ -1336,130 +1356,178 @@ static void ide_toggle_bounce(ide_drive_t *drive, int on)
 	blk_queue_bounce_limit(&drive->queue, addr);
 }
 
-static int pmac_ide_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request *rq)
+static void pmac_udma_enable(struct ata_device *drive, int on, int verbose)
 {
-	int ix, dstat, reading, ata4;
+	if (verbose) {
+		printk(KERN_INFO "%s: DMA disabled\n", drive->name);
+	}
+
+	drive->using_dma = 0;
+	ide_toggle_bounce(drive, 0);
+}
+
+static int pmac_udma_start(struct ata_device *drive, struct request *rq)
+{
+	int ix, ata4;
 	volatile struct dbdma_regs *dma;
-	byte unit = (drive->select.b.unit & 0x01);
-	
+
 	/* Can we stuff a pointer to our intf structure in config_data
 	 * or select_data in hwif ?
 	 */
 	ix = pmac_ide_find(drive);
 	if (ix < 0)
-		return 0;		
+		return 0;
 	dma = pmac_ide[ix].dma_regs;
 	ata4 = (pmac_ide[ix].kind == controller_kl_ata4 ||
 		pmac_ide[ix].kind == controller_kl_ata4_80);
-	
-	switch (func) {
-	case ide_dma_off:
-		printk(KERN_INFO "%s: DMA disabled\n", drive->name);
-	case ide_dma_off_quietly:
-		drive->using_dma = 0;
-		ide_toggle_bounce(drive, 0);
-		break;
-	case ide_dma_on:
-	case ide_dma_check:
-		/* Change this to better match ide-dma.c */
-		pmac_ide_check_dma(drive);
-		ide_toggle_bounce(drive, drive->using_dma);
-		break;
-	case ide_dma_read:
-	case ide_dma_write:
-		reading = (func == ide_dma_read);
-		if (!pmac_ide_build_dmatable(drive, rq, ix, !reading))
-			return 1;
-		/* Apple adds 60ns to wrDataSetup on reads */
-		if (ata4 && (pmac_ide[ix].timings[unit] & TR_66_UDMA_EN)) {
-			out_le32((unsigned *)(IDE_DATA_REG + IDE_TIMING_CONFIG + _IO_BASE),
-				pmac_ide[ix].timings[unit] + 
-				((func == ide_dma_read) ? 0x00800000UL : 0));
-			(void)in_le32((unsigned *)(IDE_DATA_REG + IDE_TIMING_CONFIG + _IO_BASE));
-		}
-		drive->waiting_for_dma = 1;
-		if (drive->type != ATA_DISK)
-			return 0;
-		ide_set_handler(drive, ide_dma_intr, WAIT_CMD, NULL);
-		if ((rq->flags & REQ_DRIVE_ACB) &&
-		    (drive->addressing == 1)) {
-			struct ata_taskfile *args = rq->special;
-			OUT_BYTE(args->taskfile.command, IDE_COMMAND_REG);
-		} else if (drive->addressing) {
-			OUT_BYTE(reading ? WIN_READDMA_EXT : WIN_WRITEDMA_EXT, IDE_COMMAND_REG);
-		} else {
-			OUT_BYTE(reading ? WIN_READDMA : WIN_WRITEDMA, IDE_COMMAND_REG);
-		}
-		/* fall through */
-	case ide_dma_begin:
-		out_le32(&dma->control, (RUN << 16) | RUN);
-		/* Make sure it gets to the controller right now */
-		(void)in_le32(&dma->control);
-		break;
-	case ide_dma_end: /* returns 1 on error, 0 otherwise */
-		drive->waiting_for_dma = 0;
-		dstat = in_le32(&dma->status);
-		out_le32(&dma->control, ((RUN|WAKE|DEAD) << 16));
-		pmac_ide_destroy_dmatable(drive->channel, ix);
-		/* verify good dma status */
-		return (dstat & (RUN|DEAD|ACTIVE)) != RUN;
-	case ide_dma_test_irq: /* returns 1 if dma irq issued, 0 otherwise */
-		/* We have to things to deal with here:
-		 * 
-		 * - The dbdma won't stop if the command was started
-		 * but completed with an error without transfering all
-		 * datas. This happens when bad blocks are met during
-		 * a multi-block transfer.
-		 * 
-		 * - The dbdma fifo hasn't yet finished flushing to
-		 * to system memory when the disk interrupt occurs.
-		 * 
-		 * The trick here is to increment drive->waiting_for_dma,
-		 * and return as if no interrupt occured. If the counter
-		 * reach a certain timeout value, we then return 1. If
-		 * we really got the interrupt, it will happen right away
-		 * again.
-		 * Apple's solution here may be more elegant. They issue
-		 * a DMA channel interrupt (a separate irq line) via a DBDMA
-		 * NOP command just before the STOP, and wait for both the
-		 * disk and DBDMA interrupts to have completed.
-		 */
-		 
-		/* If ACTIVE is cleared, the STOP command have passed and
-		 * transfer is complete.
-		 */
-		if (!(in_le32(&dma->status) & ACTIVE))
-			return 1;
-		if (!drive->waiting_for_dma)
-			printk(KERN_WARNING "ide%d, ide_dma_test_irq \
-				called while not waiting\n", ix);
 
-		/* If dbdma didn't execute the STOP command yet, the
-		 * active bit is still set */
-		drive->waiting_for_dma++;
-		if (drive->waiting_for_dma >= DMA_WAIT_TIMEOUT) {
-			printk(KERN_WARNING "ide%d, timeout waiting \
-				for dbdma command stop\n", ix);
-			return 1;
-		}
-		udelay(1);
-		return 0;
-
-		/* Let's implement tose just in case someone wants them */
-	case ide_dma_bad_drive:
-	case ide_dma_good_drive:
-		return check_drive_lists(drive, (func == ide_dma_good_drive));
-	case ide_dma_lostirq:
-	case ide_dma_timeout:
-		printk(KERN_WARNING "ide_pmac_dmaproc: chipset supported func only: %d\n", func);
-		return 1;
-	default:
-		printk(KERN_WARNING "ide_pmac_dmaproc: unsupported func: %d\n", func);
-		return 1;
-	}
+	out_le32(&dma->control, (RUN << 16) | RUN);
+	/* Make sure it gets to the controller right now */
+	(void)in_le32(&dma->control);
 	return 0;
 }
-#endif /* CONFIG_BLK_DEV_IDEDMA_PMAC */
+
+static int pmac_udma_stop(struct ata_device *drive)
+{
+	int ix, dstat, ata4;
+	volatile struct dbdma_regs *dma;
+
+	/* Can we stuff a pointer to our intf structure in config_data
+	 * or select_data in hwif ?
+	 */
+	ix = pmac_ide_find(drive);
+	if (ix < 0)
+		return 0;
+	dma = pmac_ide[ix].dma_regs;
+	ata4 = (pmac_ide[ix].kind == controller_kl_ata4 ||
+		pmac_ide[ix].kind == controller_kl_ata4_80);
+
+	drive->waiting_for_dma = 0;
+	dstat = in_le32(&dma->status);
+	out_le32(&dma->control, ((RUN|WAKE|DEAD) << 16));
+	pmac_ide_destroy_dmatable(drive->channel, ix);
+	/* verify good dma status */
+	return (dstat & (RUN|DEAD|ACTIVE)) != RUN;
+}
+
+static int pmac_do_udma(unsigned int reading, struct ata_device *drive, struct request *rq)
+{
+	int ix, ata4;
+	volatile struct dbdma_regs *dma;
+	byte unit = (drive->select.b.unit & 0x01);
+
+	/* Can we stuff a pointer to our intf structure in config_data
+	 * or select_data in hwif ?
+	 */
+	ix = pmac_ide_find(drive);
+	if (ix < 0)
+		return 0;
+	dma = pmac_ide[ix].dma_regs;
+	ata4 = (pmac_ide[ix].kind == controller_kl_ata4 ||
+		pmac_ide[ix].kind == controller_kl_ata4_80);
+
+	if (!pmac_ide_build_dmatable(drive, rq, ix, !reading))
+		return 1;
+	/* Apple adds 60ns to wrDataSetup on reads */
+	if (ata4 && (pmac_ide[ix].timings[unit] & TR_66_UDMA_EN)) {
+		out_le32((unsigned *)(IDE_DATA_REG + IDE_TIMING_CONFIG + _IO_BASE),
+			pmac_ide[ix].timings[unit] + 
+			((reading) ? 0x00800000UL : 0));
+		(void)in_le32((unsigned *)(IDE_DATA_REG + IDE_TIMING_CONFIG + _IO_BASE));
+	}
+	drive->waiting_for_dma = 1;
+	if (drive->type != ATA_DISK)
+		return 0;
+	ide_set_handler(drive, ide_dma_intr, WAIT_CMD, NULL);
+	if ((rq->flags & REQ_DRIVE_ACB) &&
+		(drive->addressing == 1)) {
+		struct ata_taskfile *args = rq->special;
+		OUT_BYTE(args->taskfile.command, IDE_COMMAND_REG);
+	} else if (drive->addressing) {
+		OUT_BYTE(reading ? WIN_READDMA_EXT : WIN_WRITEDMA_EXT, IDE_COMMAND_REG);
+	} else {
+		OUT_BYTE(reading ? WIN_READDMA : WIN_WRITEDMA, IDE_COMMAND_REG);
+	}
+
+	return udma_start(drive, rq);
+}
+
+static int pmac_udma_read(struct ata_device *drive, struct request *rq)
+{
+	return pmac_do_udma(1, drive, rq);
+}
+
+static int pmac_udma_write(struct ata_device *drive, struct request *rq)
+{
+	return pmac_do_udma(0, drive, rq);
+}
+
+/*
+ * FIXME: This should be attached to a channel as we can see now!
+ */
+static int pmac_udma_irq_status(struct ata_device *drive)
+{
+	int ix, ata4;
+	volatile struct dbdma_regs *dma;
+
+	/* Can we stuff a pointer to our intf structure in config_data
+	 * or select_data in hwif ?
+	 */
+	ix = pmac_ide_find(drive);
+	if (ix < 0)
+		return 0;
+	dma = pmac_ide[ix].dma_regs;
+	ata4 = (pmac_ide[ix].kind == controller_kl_ata4 ||
+		pmac_ide[ix].kind == controller_kl_ata4_80);
+
+	/* We have to things to deal with here:
+	 *
+	 * - The dbdma won't stop if the command was started but completed with
+	 * an error without transfering all datas. This happens when bad blocks
+	 * are met during a multi-block transfer.
+	 *
+	 * - The dbdma fifo hasn't yet finished flushing to to system memory
+	 * when the disk interrupt occurs.
+	 *
+	 * The trick here is to increment drive->waiting_for_dma, and return as
+	 * if no interrupt occured. If the counter reach a certain timeout
+	 * value, we then return 1. If we really got the interrupt, it will
+	 * happen right away again.  Apple's solution here may be more elegant.
+	 * They issue a DMA channel interrupt (a separate irq line) via a DBDMA
+	 * NOP command just before the STOP, and wait for both the disk and
+	 * DBDMA interrupts to have completed.
+	 */
+
+	/* If ACTIVE is cleared, the STOP command have passed and
+	 * transfer is complete.
+	 */
+	if (!(in_le32(&dma->status) & ACTIVE))
+		return 1;
+	if (!drive->waiting_for_dma)
+		printk(KERN_WARNING "ide%d, ide_dma_test_irq \
+				called while not waiting\n", ix);
+
+	/* If dbdma didn't execute the STOP command yet, the
+	 * active bit is still set */
+	drive->waiting_for_dma++;
+	if (drive->waiting_for_dma >= DMA_WAIT_TIMEOUT) {
+		printk(KERN_WARNING "ide%d, timeout waiting \
+				for dbdma command stop\n", ix);
+		return 1;
+	}
+	udelay(1);
+	return 0;
+}
+
+static int pmac_ide_dmaproc(struct ata_device *drive)
+{
+	/* Change this to better match ide-dma.c */
+	pmac_ide_check_dma(drive);
+	ide_toggle_bounce(drive, drive->using_dma);
+
+	return 0;
+}
+#endif
 
 static void idepmac_sleep_device(ide_drive_t *drive, int i, unsigned base)
 {

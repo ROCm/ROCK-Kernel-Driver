@@ -45,7 +45,7 @@ ide-obj-$(CONFIG_BLK_DEV_HT6560B)	+= ht6560b.o
 ide-obj-$(CONFIG_BLK_DEV_IDE_ICSIDE)	+= icside.o
 ide-obj-$(CONFIG_BLK_DEV_IDEDMA_PCI)	+= ide-dma.o
 ide-obj-$(CONFIG_BLK_DEV_IDE_TCQ)	+= tcq.o
-ide-obj-$(CONFIG_BLK_DEV_IDEPCI)	+= ide-pci.o
+ide-obj-$(CONFIG_PCI)			+= ide-pci.o
 ide-obj-$(CONFIG_BLK_DEV_ISAPNP)	+= ide-pnp.o
 ide-obj-$(CONFIG_BLK_DEV_IDE_PMAC)	+= ide-pmac.o
 ide-obj-$(CONFIG_BLK_DEV_MAC_IDE)	+= macide.o
@@ -71,8 +71,6 @@ ide-obj-$(CONFIG_BLK_DEV_MPC8xx_IDE)	+= ide-m8xx.o
 obj-$(CONFIG_BLK_DEV_ATARAID)		+= ataraid.o
 obj-$(CONFIG_BLK_DEV_ATARAID_PDC)	+= pdcraid.o
 obj-$(CONFIG_BLK_DEV_ATARAID_HPT)	+= hptraid.o
-
-ide-obj-$(CONFIG_PROC_FS)		+= ide-proc.o
 
 ide-mod-objs		:= ide-taskfile.o ide.o ide-probe.o ide-geometry.o ide-features.o ata-timing.o $(ide-obj-y)
 

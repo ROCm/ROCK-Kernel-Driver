@@ -46,9 +46,7 @@ extern void mvme147_sched_init(void (*handler)(int, void *, struct pt_regs *));
 extern int mvme147_keyb_init(void);
 extern int mvme147_kbdrate (struct kbd_repeat *);
 extern unsigned long mvme147_gettimeoffset (void);
-extern void mvme147_gettod (int *year, int *mon, int *day, int *hour,
-                           int *min, int *sec);
-extern int mvme147_hwclk (int, struct hwclk_time *);
+extern int mvme147_hwclk (int, struct rtc_time *);
 extern int mvme147_set_clock_mmss (unsigned long);
 extern void mvme147_check_partition (struct gendisk *hd, unsigned int dev);
 extern void mvme147_reset (void);
@@ -107,7 +105,6 @@ void __init config_mvme147(void)
 	mach_kbdrate		= mvme147_kbdrate;
 	mach_init_IRQ		= mvme147_init_IRQ;
 	mach_gettimeoffset	= mvme147_gettimeoffset;
-	mach_gettod		= mvme147_gettod;
 	mach_hwclk		= mvme147_hwclk;
 	mach_set_clock_mmss	= mvme147_set_clock_mmss;
 	mach_reset		= mvme147_reset;
@@ -166,26 +163,24 @@ unsigned long mvme147_gettimeoffset (void)
 	return (unsigned long)n * 25 / 4;
 }
 
-extern void mvme147_gettod (int *year, int *mon, int *day, int *hour,
-                           int *min, int *sec)
-{
-	m147_rtc->ctrl = RTC_READ;
-	*year = bcd2int (m147_rtc->bcd_year);
-	*mon = bcd2int (m147_rtc->bcd_mth);
-	*day = bcd2int (m147_rtc->bcd_dom);
-	*hour = bcd2int (m147_rtc->bcd_hr);
-	*min = bcd2int (m147_rtc->bcd_min);
-	*sec = bcd2int (m147_rtc->bcd_sec);
-	m147_rtc->ctrl = 0;
-}
-
 static int bcd2int (unsigned char b)
 {
 	return ((b>>4)*10 + (b&15));
 }
 
-int mvme147_hwclk(int op, struct hwclk_time *t)
+int mvme147_hwclk(int op, struct rtc_time *t)
 {
+#warning check me!
+	if (!op) {
+		m147_rtc->ctrl = RTC_READ;
+		t->tm_year = bcd2int (m147_rtc->bcd_year);
+		t->tm_mon  = bcd2int (m147_rtc->bcd_mth);
+		t->tm_mday = bcd2int (m147_rtc->bcd_dom);
+		t->tm_hour = bcd2int (m147_rtc->bcd_hr);
+		t->tm_min  = bcd2int (m147_rtc->bcd_min);
+		t->tm_sec  = bcd2int (m147_rtc->bcd_sec);
+		m147_rtc->ctrl = 0;
+	}
 	return 0;
 }
 

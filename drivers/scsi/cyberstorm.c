@@ -320,3 +320,5 @@ int cyber_esp_release(struct Scsi_Host *instance)
 #endif
 	return 1;
 }
+
+MODULE_LICENSE("GPL");

@@ -1291,11 +1291,7 @@ int zoran_ioctl(struct video_device* dev, unsigned int cmd, void *arg)
 	 case VIDIOCSFBUF:
 	 {
 		struct video_buffer v;
-#if LINUX_VERSION_CODE >= 0x020100
-			if(!capable(CAP_SYS_ADMIN) && !capable(CAP_SYS_ADMIN))
-#else
-			if(!suser())
-#endif
+		if(!capable(CAP_SYS_ADMIN))
 			return -EPERM;
 		if (copy_from_user(&v, arg,sizeof(v)))
 			return -EFAULT;

@@ -9,6 +9,7 @@
  */
 
 #include <linux/list.h>
+#include <linux/compiler.h>	/* likely()/unlikely() */
 
 /*
  * Hub request types

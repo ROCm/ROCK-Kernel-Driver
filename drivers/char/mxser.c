@@ -2199,7 +2199,7 @@ static int mxser_set_serial_info(struct mxser_struct *info,
 
 	flags = info->flags & ASYNC_SPD_MASK;
 
-	if (!suser()) {
+	if (!capable(CAP_SYS_ADMIN)) {
 		if ((new_serial.baud_base != info->baud_base) ||
 		    (new_serial.close_delay != info->close_delay) ||
 		    ((new_serial.flags & ~ASYNC_USR_MASK) !=

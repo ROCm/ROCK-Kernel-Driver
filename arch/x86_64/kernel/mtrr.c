@@ -983,7 +983,7 @@ static ssize_t mtrr_write (struct file *file, const char *buf,
     char *ptr;
     char line[LINE_SIZE];
 
-	if (!suser ())
+	if (!capable (CAP_SYS_ADMIN))
 		return -EPERM;
 
     /*  Can't seek (pwrite) on this device  */
@@ -1071,7 +1071,7 @@ static int mtrr_ioctl (struct inode *inode, struct file *file,
 	return -ENOIOCTLCMD;
 
       case MTRRIOC_ADD_ENTRY:
-		if (!suser ())
+		if (!capable (CAP_SYS_ADMIN))
 			return -EPERM;
 		if (copy_from_user (&sentry, (void *) arg, sizeof sentry))
 	    return -EFAULT;
@@ -1083,7 +1083,7 @@ static int mtrr_ioctl (struct inode *inode, struct file *file,
 	break;
 
       case MTRRIOC_SET_ENTRY:
-		if (!suser ())
+		if (!capable (CAP_SYS_ADMIN))
 			return -EPERM;
 		if (copy_from_user (&sentry, (void *) arg, sizeof sentry))
 	    return -EFAULT;
@@ -1093,7 +1093,7 @@ static int mtrr_ioctl (struct inode *inode, struct file *file,
 	break;
 
       case MTRRIOC_DEL_ENTRY:
-		if (!suser ())
+		if (!capable (CAP_SYS_ADMIN))
 			return -EPERM;
 		if (copy_from_user (&sentry, (void *) arg, sizeof sentry))
 	    return -EFAULT;
@@ -1103,7 +1103,7 @@ static int mtrr_ioctl (struct inode *inode, struct file *file,
 	break;
 
       case MTRRIOC_KILL_ENTRY:
-		if (!suser ())
+		if (!capable (CAP_SYS_ADMIN))
 			return -EPERM;
 		if (copy_from_user (&sentry, (void *) arg, sizeof sentry))
 	    return -EFAULT;
@@ -1134,7 +1134,7 @@ static int mtrr_ioctl (struct inode *inode, struct file *file,
 	break;
 
       case MTRRIOC_ADD_PAGE_ENTRY:
-		if (!suser ())
+		if (!capable (CAP_SYS_ADMIN))
 			return -EPERM;
 		if (copy_from_user (&sentry, (void *) arg, sizeof sentry))
 	    return -EFAULT;
@@ -1146,7 +1146,7 @@ static int mtrr_ioctl (struct inode *inode, struct file *file,
 	break;
 
       case MTRRIOC_SET_PAGE_ENTRY:
-		if (!suser ())
+		if (!capable (CAP_SYS_ADMIN))
 			return -EPERM;
 		if (copy_from_user (&sentry, (void *) arg, sizeof sentry))
 	    return -EFAULT;
@@ -1156,7 +1156,7 @@ static int mtrr_ioctl (struct inode *inode, struct file *file,
 	break;
 
       case MTRRIOC_DEL_PAGE_ENTRY:
-		if (!suser ())
+		if (!capable (CAP_SYS_ADMIN))
 			return -EPERM;
 		if (copy_from_user (&sentry, (void *) arg, sizeof sentry))
 	    return -EFAULT;
@@ -1166,7 +1166,7 @@ static int mtrr_ioctl (struct inode *inode, struct file *file,
 	break;
 
       case MTRRIOC_KILL_PAGE_ENTRY:
-		if (!suser ())
+		if (!capable (CAP_SYS_ADMIN))
 			return -EPERM;
 		if (copy_from_user (&sentry, (void *) arg, sizeof sentry))
 	    return -EFAULT;

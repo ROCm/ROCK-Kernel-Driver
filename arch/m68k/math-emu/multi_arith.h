@@ -376,7 +376,7 @@ extern inline void fp_submant(struct fp_ext *dest, struct fp_ext *src1, struct f
 	asm ("divu.l %2,%1:%0" : "=d" (quot), "=d" (rem)		\
 		: "dm" (div), "1" (srch), "0" (srcl))
 #define fp_add64(dest1, dest2, src1, src2) ({				\
-	asm ("add.l %1,%0" : "=d,=dm" (dest2)				\
+	asm ("add.l %1,%0" : "=d,dm" (dest2)				\
 		: "dm,d" (src2), "0,0" (dest2));			\
 	asm ("addx.l %1,%0" : "=d" (dest1)				\
 		: "d" (src1), "0" (dest1));				\
@@ -391,14 +391,14 @@ extern inline void fp_submant(struct fp_ext *dest, struct fp_ext *src1, struct f
 		: "d" (0), "0" (dest->m32[0]));				\
 })
 #define fp_sub64(dest, src) ({						\
-	asm ("sub.l %1,%0" : "=d,=dm" (dest.m32[1])			\
+	asm ("sub.l %1,%0" : "=d,dm" (dest.m32[1])			\
 		: "dm,d" (src.m32[1]), "0,0" (dest.m32[1]));		\
 	asm ("subx.l %1,%0" : "=d" (dest.m32[0])			\
 		: "d" (src.m32[0]), "0" (dest.m32[0]));			\
 })
 #define fp_sub96c(dest, srch, srcm, srcl) ({				\
 	char carry;							\
-	asm ("sub.l %1,%0" : "=d,=dm" (dest.m32[2])			\
+	asm ("sub.l %1,%0" : "=d,dm" (dest.m32[2])			\
 		: "dm,d" (srcl), "0,0" (dest.m32[2]));			\
 	asm ("subx.l %1,%0" : "=d" (dest.m32[1])			\
 		: "d" (srcm), "0" (dest.m32[1]));			\

@@ -19,7 +19,7 @@
  */
 #include <linux/config.h>
 #ifdef CONFIG_PROC_FS
- static char * sg_version_str = "Version: 3.5.25 (20020425)";
+ static char * sg_version_str = "Version: 3.5.25 (20020504)";
 #endif
  static int sg_version_num = 30525; /* 2 digits for each component */
 /*
@@ -1640,7 +1640,7 @@ static void sg_unmap_and(Sg_scatter_hold * schp, int free_also)
 static int sg_build_dir(Sg_request * srp, Sg_fd * sfp, int dxfer_len)
 {
 #ifdef SG_ALLOW_DIO_CODE
-    int res, k, split, offset, num, mx_sc_elems, rem_sz;
+    int res, k, j, split, offset, num, mx_sc_elems, rem_sz;
     struct kiobuf * kp;
     char * mem_src_arr;
     struct scatterlist * sclp;
@@ -1648,6 +1648,8 @@ static int sg_build_dir(Sg_request * srp, Sg_fd * sfp, int dxfer_len)
     sg_io_hdr_t * hp = &srp->header;
     Sg_scatter_hold * schp = &srp->data;
     int sg_tablesize = sfp->parentdp->sg_tablesize;
+    unsigned char * pg_addr;
+    unsigned char * hold_pg_addr = NULL;
     int nbhs = 0;
 
     res = sg_alloc_kiovec(1, &schp->kiobp, &nbhs);
@@ -1690,24 +1692,28 @@ static int sg_build_dir(Sg_request * srp, Sg_fd * sfp, int dxfer_len)
 	return 1;
     }
     mem_src_arr = schp->buffer + (mx_sc_elems * sizeof(struct scatterlist));
-    for (k = 0, sclp = schp->buffer, rem_sz = dxfer_len;
-	 (rem_sz > 0) && (k < mx_sc_elems);
-	 ++k, ++sclp) {
+    for (k = 0, j = 0, sclp = schp->buffer, rem_sz = dxfer_len;
+	 (rem_sz > 0) && (j < mx_sc_elems); ++k) {
 	offset = (0 == k) ? kp->offset : 0;
 	num = (rem_sz > (PAGE_SIZE - offset)) ? (PAGE_SIZE - offset) :
 						rem_sz;
-	sclp->page = kp->maplist[k];
-	sclp->offset = offset;
-	sclp->length = num;
-	mem_src_arr[k] = SG_USER_MEM;
+	pg_addr = page_address(kp->maplist[k]);
+	if ((k > 0) && ((hold_pg_addr + PAGE_SIZE) == pg_addr))
+	    (sclp - 1)->length += num;
+	else {
+	    sclp->page = kp->maplist[k];
+	    sclp->offset = offset;
+	    sclp->length = num;
+	    mem_src_arr[j] = SG_USER_MEM;
+	    ++j;
+	    ++sclp;
+	}
+        hold_pg_addr = pg_addr;
 	rem_sz -= num;
-	SCSI_LOG_TIMEOUT(5,
-	    printk("sg_build_dir: k=%d, a=0x%p, len=%d, ms=%d\n",
-	    k, sg_scatg2virt(sclp), num, mem_src_arr[k]));
     }
-    schp->k_use_sg = k;
-    SCSI_LOG_TIMEOUT(5,
-	printk("sg_build_dir: k_use_sg=%d, rem_sz=%d\n", k, rem_sz));
+    schp->k_use_sg = j;
+    SCSI_LOG_TIMEOUT(5, printk("sg_build_dir: k_use_sg=%d, k=%d, rem_sz=%d\n",
+		     j, k, rem_sz));
     schp->bufflen = dxfer_len;
     if (rem_sz > 0) {   /* must have failed */
 	sg_unmap_and(schp, 1);
@@ -1854,16 +1860,18 @@ static int sg_write_xfer(Sg_request * srp)
     else {      /* kernel using scatter gather list */
 	struct scatterlist * sclp = (struct scatterlist *)schp->buffer;
 	char * mem_src_arr = sg_get_sgat_msa(schp);
+
 	ksglen = (int)sclp->length;
 	p = sg_scatg2virt(sclp);
-
 	for (j = 0, k = 0; j < onum; ++j) {
 	    res = sg_u_iovec(hp, iovec_count, j, 1, &usglen, &up);
 	    if (res) return res;
 
-	    for (; (k < schp->k_use_sg) && p;
-		 ++k, ++sclp, ksglen = (int)sclp->length, 
-		 	p = sg_scatg2virt(sclp)) {
+	    for (; k < schp->k_use_sg; ++k, ++sclp) {
+		ksglen = (int)sclp->length; 
+		p = sg_scatg2virt(sclp);
+		if (NULL == p)
+		    break;
 		ok = (SG_USER_MEM != mem_src_arr[k]);
 		if (usglen <= 0)
 		    break;
@@ -1990,7 +1998,6 @@ static int sg_read_xfer(Sg_request * srp)
 
     if (0 == schp->k_use_sg) {  /* kernel has single buffer */
 	if (SG_USER_MEM != schp->buffer_mem_src) { /* else nothing to do */
-
 	    for (j = 0, p = schp->buffer; j < onum; ++j) {
 		res = sg_u_iovec(hp, iovec_count, j, 0, &usglen, &up);
 		if (res) return res;
@@ -2006,16 +2013,18 @@ static int sg_read_xfer(Sg_request * srp)
     else {      /* kernel using scatter gather list */
 	struct scatterlist * sclp = (struct scatterlist *)schp->buffer;
 	char * mem_src_arr = sg_get_sgat_msa(schp);
+
 	ksglen = (int)sclp->length;
 	p = sg_scatg2virt(sclp);
-
 	for (j = 0, k = 0; j < onum; ++j) {
 	    res = sg_u_iovec(hp, iovec_count, j, 0, &usglen, &up);
 	    if (res) return res;
 
-	    for (; (k < schp->k_use_sg) && p;
-		 ++k, ++sclp, ksglen = (int)sclp->length, 
-		 	p = sg_scatg2virt(sclp)) {
+	    for (; k < schp->k_use_sg; ++k, ++sclp) {
+		ksglen = (int)sclp->length; 
+		p = sg_scatg2virt(sclp);
+		if (NULL == p)
+		    break;
 		ok = (SG_USER_MEM != mem_src_arr[k]);
 		if (usglen <= 0)
 		    break;

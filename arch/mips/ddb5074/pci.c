@@ -319,10 +319,6 @@ void __init pcibios_update_irq(struct pci_dev *dev, int irq)
 void __init pcibios_fixup_pbus_ranges(struct pci_bus *bus,
 				      struct pbus_set_ranges_data *ranges)
 {
-	ranges->io_start -= bus->resource[0]->start;
-	ranges->io_end -= bus->resource[0]->start;
-	ranges->mem_start -= bus->resource[1]->start;
-	ranges->mem_end -= bus->resource[1]->start;
 }
 
 int pcibios_enable_resources(struct pci_dev *dev)
@@ -396,7 +392,7 @@ void pcibios_update_resource(struct pci_dev *dev, struct resource *root,
 }
 
 void pcibios_align_resource(void *data, struct resource *res,
-			    unsigned long size)
+			    unsigned long size, unsigned long align)
 {
 	struct pci_dev *dev = data;
 

@@ -496,10 +496,14 @@ struct super_operations reiserfs_sops =
   statfs: reiserfs_statfs,
   remount_fs: reiserfs_remount,
 
-  fh_to_dentry: reiserfs_fh_to_dentry,
-  dentry_to_fh: reiserfs_dentry_to_fh,
-
 };
+
+static struct export_operations reiserfs_export_ops = {
+  encode_fh: reiserfs_encode_fh,
+  decode_fh: reiserfs_decode_fh,
+  get_parent: reiserfs_get_parent,
+  get_dentry: reiserfs_get_dentry,
+} ;
 
 /* this was (ext2)parse_options */
 static int parse_options (char * options, unsigned long * mount_options, unsigned long * blocks, char **jdev_name)
@@ -799,6 +803,7 @@ static int read_super_block (struct super_block * s, int offset)
 	      is_reiserfs_3_5 (rs) ? "3.5" : "3.6");
 
     s->s_op = &reiserfs_sops;
+    s->s_export_op = &reiserfs_export_ops;
 
     /* new format is limited by the 32 bit wide i_blocks field, want to
     ** be one full block below that.

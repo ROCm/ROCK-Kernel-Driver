@@ -769,7 +769,7 @@ static int ida_open(struct inode *inode, struct file *filep)
 	if (ctlr > MAX_CTLR || hba[ctlr] == NULL)
 		return -ENXIO;
 
-	if (!suser() && ida_sizes[(ctlr << CTLR_SHIFT) +
+	if (!capable(CAP_SYS_RAWIO) && ida_sizes[(ctlr << CTLR_SHIFT) +
 						minor(inode->i_rdev)] == 0)
 		return -ENXIO;
 
@@ -779,7 +779,7 @@ static int ida_open(struct inode *inode, struct file *filep)
 	 * but I'm already using way to many device nodes to claim another one
 	 * for "raw controller".
 	 */
-	if (suser()
+	if (capable(CAP_SYS_ADMIN)
 		&& ida_sizes[(ctlr << CTLR_SHIFT) + minor(inode->i_rdev)] == 0 
 		&& minor(inode->i_rdev) != 0)
 		return -ENXIO;
@@ -1121,7 +1121,7 @@ static int ida_ioctl(struct inode *inode, struct file *filep, unsigned int cmd, 
 	case BLKRRPART:
 		return revalidate_logvol(inode->i_rdev, 1);
 	case IDAPASSTHRU:
-		if (!suser()) return -EPERM;
+		if (!capable(CAP_SYS_RAWIO)) return -EPERM;
 		error = copy_from_user(&my_io, io, sizeof(my_io));
 		if (error) return error;
 		error = ida_ctlr_ioctl(ctlr, dsk, &my_io);
