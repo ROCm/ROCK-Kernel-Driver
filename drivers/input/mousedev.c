@@ -15,6 +15,7 @@
 #include <linux/slab.h>
 #include <linux/poll.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/input.h>
 #include <linux/config.h>
@@ -37,6 +38,14 @@ MODULE_LICENSE("GPL");
 #ifndef CONFIG_INPUT_MOUSEDEV_SCREEN_Y
 #define CONFIG_INPUT_MOUSEDEV_SCREEN_Y	768
 #endif
+
+static int xres = CONFIG_INPUT_MOUSEDEV_SCREEN_X;
+module_param(xres, uint, 0);
+MODULE_PARM_DESC(xres, "Horizontal screen resolution");
+
+static int yres = CONFIG_INPUT_MOUSEDEV_SCREEN_Y;
+module_param(yres, uint, 0);
+MODULE_PARM_DESC(yres, "Vertical screen resolution");
 
 struct mousedev {
 	int exist;
@@ -72,9 +81,6 @@ static struct input_handler mousedev_handler;
 
 static struct mousedev *mousedev_table[MOUSEDEV_MINORS];
 static struct mousedev mousedev_mix;
-
-static int xres = CONFIG_INPUT_MOUSEDEV_SCREEN_X;
-static int yres = CONFIG_INPUT_MOUSEDEV_SCREEN_Y;
 
 #define fx(i)  (list->old_x[(list->pkt_count - (i)) & 03])
 #define fy(i)  (list->old_y[(list->pkt_count - (i)) & 03])
@@ -582,8 +588,3 @@ static void __exit mousedev_exit(void)
 
 module_init(mousedev_init);
 module_exit(mousedev_exit);
-
-MODULE_PARM(xres, "i");
-MODULE_PARM_DESC(xres, "Horizontal screen resolution");
-MODULE_PARM(yres, "i");
-MODULE_PARM_DESC(yres, "Vertical screen resolution");

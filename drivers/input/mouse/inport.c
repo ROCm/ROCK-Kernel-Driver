@@ -35,6 +35,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/config.h>
 #include <linux/ioport.h>
 #include <linux/init.h>
@@ -80,10 +81,11 @@ MODULE_LICENSE("GPL");
 
 #define INPORT_IRQ		5
 
-MODULE_PARM(inport_irq, "i");
-
 static int inport_irq = INPORT_IRQ;
-static int inport_used = 0;
+module_param_named(irq, inport_irq, uint, 0);
+MODULE_PARM_DESC(irq, "IRQ number (5=default)");
+
+static int inport_used;
 
 static irqreturn_t inport_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 
@@ -152,17 +154,6 @@ static irqreturn_t inport_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	input_sync(&inport_dev);
 	return IRQ_HANDLED;
 }
-
-#ifndef MODULE
-static int __init inport_setup(char *str)
-{
-        int ints[4];
-        str = get_options(str, ARRAY_SIZE(ints), ints);
-        if (ints[0] > 0) inport_irq = ints[1];
-        return 1;
-}
-__setup("inport_irq=", inport_setup);
-#endif
 
 static int __init inport_init(void)
 {

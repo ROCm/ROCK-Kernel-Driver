@@ -85,6 +85,9 @@ running once the system is up.
 			See header of drivers/scsi/53c7xx.c.
 			See also Documentation/scsi/ncr53c7xx.txt.
 
+	98busmouse.irq=	[HW,MOUSE] PC-9801 Bus Mouse Driver
+			Format: <irq>, default is 13
+
 	acpi=		[HW,ACPI] Advanced Configuration and Power Interface 
 			Format: { force | off | ht }
 			force -- enables ACPI for systems with default off
@@ -417,7 +420,7 @@ running once the system is up.
 
 	initrd=		[BOOT] Specify the location of the initial ramdisk
 
-	inport_irq=	[HW] Inport (ATI XL and Microsoft) busmouse driver
+	inport.irq=	[HW] Inport (ATI XL and Microsoft) busmouse driver
 			Format: <irq>
 
 	inttest=	[IA64]
@@ -465,7 +468,7 @@ running once the system is up.
 
 	lockd.tcpport=	[NFS]
 
-	logibm_irq=	[HW,MOUSE] Logitech Bus Mouse Driver
+	logibm.irq=	[HW,MOUSE] Logitech Bus Mouse Driver
 			Format: <irq>
 
 	log_buf_len=n	Sets the size of the printk ring buffer, in bytes.
@@ -564,6 +567,11 @@ running once the system is up.
 			See Documentation/video4linux/meye.txt.
 
 	mga=		[HW,DRM]
+
+	mousedev.xres	[MOUSE] Horizontal screen resolution, used for devices
+			reporting absolute coordinates, such as tablets
+	mousedev.yres	[MOUSE] Vertical screen resolution, used for devices
+			reporting absolute coordinates, such as tablets
 
 	mpu401=		[HW,OSS]
 			Format: <io>,<irq>

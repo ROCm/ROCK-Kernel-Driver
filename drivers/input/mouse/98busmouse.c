@@ -33,6 +33,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/delay.h>
 #include <linux/ioport.h>
 #include <linux/init.h>
@@ -69,9 +70,10 @@ MODULE_LICENSE("GPL");
 
 #define PC98BM_IRQ		13
 
-MODULE_PARM(pc98bm_irq, "i");
-
 static int pc98bm_irq = PC98BM_IRQ;
+module_param_named(irq, pc98bm_irq, uint, 0);
+MODULE_PARM_DESC(irq, "IRQ number (13=default)");
+
 static int pc98bm_used = 0;
 
 static irqreturn_t pc98bm_interrupt(int irq, void *dev_id, struct pt_regs *regs);
@@ -140,17 +142,6 @@ static irqreturn_t pc98bm_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	return IRQ_HANDLED;
 }
-
-#ifndef MODULE
-static int __init pc98bm_setup(char *str)
-{
-        int ints[4];
-        str = get_options(str, ARRAY_SIZE(ints), ints);
-        if (ints[0] > 0) pc98bm_irq = ints[1];
-        return 1;
-}
-__setup("pc98bm_irq=", pc98bm_setup);
-#endif
 
 static int __init pc98bm_init(void)
 {
