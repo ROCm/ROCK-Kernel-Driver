@@ -13,6 +13,7 @@
 #include <linux/sched.h>
 #include <linux/tty.h>
 #include <linux/vt_kern.h>		/* For unblank_screen() */
+#include <linux/module.h>       /* for EXPORT_SYMBOL */
 
 #include <asm/fpswa.h>
 #include <asm/hardirq.h>
@@ -47,6 +48,7 @@ register double f30 asm ("f30"); register double f31 asm ("f31");
 extern spinlock_t timerlist_lock;
 
 fpswa_interface_t *fpswa_interface;
+EXPORT_SYMBOL(fpswa_interface);
 
 void __init
 trap_init (void)
