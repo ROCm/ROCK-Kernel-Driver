@@ -367,6 +367,45 @@ void __init init_ISA_irqs (void)
 	}
 }
 
+static void setup_timer(void)
+{
+	outb_p(0x34,0x43);		/* binary, mode 2, LSB/MSB, ch 0 */
+	udelay(10);
+	outb_p(LATCH & 0xff , 0x40);	/* LSB */
+	udelay(10);
+	outb(LATCH >> 8 , 0x40);	/* MSB */
+}
+
+static int timer_resume(struct device *dev, u32 level)
+{
+	if (level == RESUME_POWER_ON)
+		setup_timer();
+	return 0;
+}
+
+static struct device_driver timer_driver = {
+	.name		= "timer",
+	.bus		= &system_bus_type,
+	.resume		= timer_resume,
+};
+
+static struct sys_device device_timer = {
+	.name		= "timer",
+	.id		= 0,
+	.dev		= {
+		.name	= "timer",
+		.driver	= &timer_driver,
+	},
+};
+
+static int __init init_timer_devicefs(void)
+{
+	driver_register(&timer_driver);
+	return sys_device_register(&device_timer);
+}
+
+device_initcall(init_timer_devicefs);
+
 void __init init_IRQ(void)
 {
 	int i;
@@ -386,16 +425,15 @@ void __init init_IRQ(void)
 	}
 
 	/* setup after call gates are initialised (usually add in
-	 * the architecture specific gates */
+	 * the architecture specific gates)
+	 */
 	intr_init_hook();
 
 	/*
 	 * Set the clock to HZ Hz, we already have a valid
 	 * vector now:
 	 */
-	outb_p(0x34,0x43);		/* binary, mode 2, LSB/MSB, ch 0 */
-	outb_p(LATCH & 0xff , 0x40);	/* LSB */
-	outb(LATCH >> 8 , 0x40);	/* MSB */
+	setup_timer();
 
 	/*
 	 * External FPU? Set up irq13 if so, for
