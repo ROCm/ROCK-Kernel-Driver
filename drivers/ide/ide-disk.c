@@ -1103,13 +1103,10 @@ static inline int idedisk_supports_host_protected_area(ide_drive_t *drive)
 static void init_idedisk_capacity (ide_drive_t  *drive)
 {
 	struct hd_driveid *id = drive->id;
-	unsigned long capacity = drive->cyl * drive->head * drive->sect;
-	unsigned long set_max = idedisk_read_native_max_address(drive);
-	unsigned long long capacity_2 = capacity;
-	unsigned long long set_max_ext;
+	unsigned long capacity, set_max;
+	unsigned long long capacity_2, set_max_ext;
 
-	drive->capacity48 = 0;
-	drive->select.b.lba = 0;
+	capacity_2 = capacity = drive->cyl * drive->head * drive->sect;
 
 	(void) idedisk_supports_host_protected_area(drive);
 
@@ -1117,19 +1114,13 @@ static void init_idedisk_capacity (ide_drive_t  *drive)
 		capacity_2 = id->lba_capacity_2;
 		drive->head		= drive->bios_head = 255;
 		drive->sect		= drive->bios_sect = 63;
-		drive->cyl = (unsigned int) capacity_2 / (drive->head * drive->sect);
 		drive->select.b.lba	= 1;
 		set_max_ext = idedisk_read_native_max_address_ext(drive);
 		if (set_max_ext > capacity_2 && capacity_2 > IDE_STROKE_LIMIT) {
 #ifdef CONFIG_IDEDISK_STROKE
-			set_max_ext = idedisk_read_native_max_address_ext(drive);
 			set_max_ext = idedisk_set_max_address_ext(drive, set_max_ext);
-			if (set_max_ext) {
-				drive->capacity48 = capacity_2 = set_max_ext;
-				drive->cyl = (unsigned int) set_max_ext / (drive->head * drive->sect);
-				drive->select.b.lba = 1;
-				drive->id->lba_capacity_2 = capacity_2;
-                        }
+			if (set_max_ext)
+				id->lba_capacity_2 = capacity_2 = set_max_ext;
 #else /* !CONFIG_IDEDISK_STROKE */
 			printk(KERN_INFO "%s: setmax_ext LBA %llu, native  %llu\n",
 				drive->name, set_max_ext, capacity_2);
@@ -1145,11 +1136,14 @@ static void init_idedisk_capacity (ide_drive_t  *drive)
 		capacity = id->lba_capacity;
 		drive->cyl = capacity / (drive->head * drive->sect);
 		drive->select.b.lba = 1;
+	} else {
+		drive->capacity = capacity;
+		return;
 	}
 
+	set_max = idedisk_read_native_max_address(drive);
 	if (set_max > capacity && capacity > IDE_STROKE_LIMIT) {
 #ifdef CONFIG_IDEDISK_STROKE
-		set_max = idedisk_read_native_max_address(drive);
 		set_max = idedisk_set_max_address(drive, set_max);
 		if (set_max) {
 			drive->capacity = capacity = set_max;
@@ -1162,15 +1156,7 @@ static void init_idedisk_capacity (ide_drive_t  *drive)
 			drive->name, set_max, capacity);
 #endif /* CONFIG_IDEDISK_STROKE */
 	}
-
 	drive->capacity = capacity;
-
-	if ((id->command_set_2 & 0x0400) && (id->cfs_enable_2 & 0x0400)) {
-		drive->capacity48 = id->lba_capacity_2;
-		drive->head = 255;
-		drive->sect = 63;
-		drive->cyl = (unsigned long)(drive->capacity48) / (drive->head * drive->sect);
-	}
 }
 
 static sector_t idedisk_capacity (ide_drive_t *drive)
