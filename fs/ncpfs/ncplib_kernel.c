@@ -125,9 +125,9 @@ static inline __u16 WVAL_LH(void* data)
 }
 
 static __u16
- ncp_reply_word(struct ncp_server *server, int offset)
+ ncp_reply_le16(struct ncp_server *server, int offset)
 {
-	return get_unaligned((__u16 *) ncp_reply_data(server, offset));
+	return le16_to_cpu(get_unaligned((__le16 *) ncp_reply_data(server, offset)));
 }
 
 static __u16
@@ -496,7 +496,7 @@ ncp_get_known_namespace(struct ncp_server *server, __u8 volume)
 	}
 
 	result = NW_NS_DOS;
-	no_namespaces = le16_to_cpu(ncp_reply_word(server, 0));
+	no_namespaces = ncp_reply_le16(server, 0);
 	namespace = ncp_reply_data(server, 2);
 
 	while (no_namespaces > 0) {
@@ -758,11 +758,12 @@ ncp_del_file_or_subdir(struct ncp_server *server,
  		return ncp_DeleteNSEntry(server, 1, volnum, dirent, name, server->name_space[volnum], cpu_to_le16(0x8006));
 }
 
-static inline void ConvertToNWfromDWORD(__u32 sfd, __u8 ret[6])
+static inline void ConvertToNWfromDWORD(__u16 v0, __u16 v1, __u8 ret[6])
 {
-	__u16 *dest = (__u16 *) ret;
-	memcpy(ret + 2, &sfd, 4);
-	dest[0] = cpu_to_le16((le16_to_cpu(dest[1]) + le16_to_cpu(1)));
+	__le16 *dest = (__le16 *) ret;
+	dest[1] = cpu_to_le16(v0);
+	dest[2] = cpu_to_le16(v1);
+	dest[0] = cpu_to_le16(v0 + 1);
 	return;
 }
 
@@ -806,7 +807,9 @@ int ncp_open_create_file_or_subdir(struct ncp_server *server,
 	/* in target there's a new finfo to fill */
 	ncp_extract_file_info(ncp_reply_data(server, 6), &(target->i));
 	target->volume = target->i.volNumber;
-	ConvertToNWfromDWORD(ncp_reply_dword(server, 0), target->file_handle);
+	ConvertToNWfromDWORD(ncp_reply_le16(server, 0),
+			     ncp_reply_le16(server, 2),
+			     target->file_handle);
 	
 	ncp_unlock_server(server);
 
