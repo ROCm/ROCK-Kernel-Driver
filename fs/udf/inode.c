@@ -54,7 +54,10 @@ MODULE_LICENSE("GPL");
 static mode_t udf_convert_permissions(struct fileEntry *);
 static int udf_update_inode(struct inode *, int);
 static void udf_fill_inode(struct inode *, struct buffer_head *);
-static struct buffer_head *inode_getblk(struct inode *, long, int *, long *, int *);
+static struct buffer_head *inode_getblk(struct inode *, long, int *,
+	long *, int *);
+static int8_t udf_insert_aext(struct inode *, lb_addr, int,
+	lb_addr, uint32_t, struct buffer_head *);
 static void udf_split_extents(struct inode *, int *, int, int,
 	long_ad [EXTENT_MERGE_SIZE], int *);
 static void udf_prealloc_extents(struct inode *, int, int,
@@ -349,8 +352,8 @@ abort_negative:
 	goto abort;
 }
 
-struct buffer_head * udf_getblk(struct inode * inode, long block,
-	int create, int * err)
+static struct buffer_head *
+udf_getblk(struct inode *inode, long block, int create, int *err)
 {
 	struct buffer_head dummy;
 
@@ -941,7 +944,7 @@ udf_read_inode(struct inode *inode)
 	memset(&UDF_I_LOCATION(inode), 0xFF, sizeof(lb_addr));
 }
 
-void
+static void
 __udf_read_inode(struct inode *inode)
 {
 	struct buffer_head *bh = NULL;
@@ -1901,8 +1904,9 @@ int8_t udf_current_aext(struct inode *inode, lb_addr *bloc, int *extoffset,
 	return etype;
 }
 
-int8_t udf_insert_aext(struct inode *inode, lb_addr bloc, int extoffset,
-	lb_addr neloc, uint32_t nelen, struct buffer_head *bh)
+static int8_t
+udf_insert_aext(struct inode *inode, lb_addr bloc, int extoffset,
+		lb_addr neloc, uint32_t nelen, struct buffer_head *bh)
 {
 	lb_addr oeloc;
 	uint32_t oelen;

@@ -93,7 +93,6 @@ extern struct inode *udf_iget(struct super_block *, lb_addr);
 extern int udf_sync_inode(struct inode *);
 extern void udf_expand_file_adinicb(struct inode *, int, int *);
 extern struct buffer_head * udf_expand_dir_adinicb(struct inode *, int *, int *);
-extern struct buffer_head * udf_getblk(struct inode *, long, int, int *);
 extern struct buffer_head * udf_bread(struct inode *, int, int, int *);
 extern void udf_truncate(struct inode *);
 extern void udf_read_inode(struct inode *);
@@ -105,7 +104,6 @@ extern long udf_block_map(struct inode *, long);
 extern int8_t inode_bmap(struct inode *, int, lb_addr *, uint32_t *, lb_addr *, uint32_t *, uint32_t *, struct buffer_head **);
 extern int8_t udf_add_aext(struct inode *, lb_addr *, int *, lb_addr, uint32_t, struct buffer_head **, int);
 extern int8_t udf_write_aext(struct inode *, lb_addr, int *, lb_addr, uint32_t, struct buffer_head *, int);
-extern int8_t udf_insert_aext(struct inode *, lb_addr, int, lb_addr, uint32_t, struct buffer_head *);
 extern int8_t udf_delete_aext(struct inode *, lb_addr, int, lb_addr, uint32_t, struct buffer_head *);
 extern int8_t udf_next_aext(struct inode *, lb_addr *, int *, lb_addr *, uint32_t *, struct buffer_head **, int);
 extern int8_t udf_current_aext(struct inode *, lb_addr *, int *, lb_addr *, uint32_t *, struct buffer_head **, int);
@@ -153,13 +151,10 @@ extern int udf_new_block(struct super_block *, struct inode *, uint16_t, uint32_
 
 /* fsync.c */
 extern int udf_fsync_file(struct file *, struct dentry *, int);
-extern int udf_fsync_inode(struct inode *, int);
 
 /* directory.c */
-extern uint8_t * udf_filead_read(struct inode *, uint8_t *, uint8_t, lb_addr, int *, int *, struct buffer_head **, int *);
 extern struct fileIdentDesc * udf_fileident_read(struct inode *, loff_t *, struct udf_fileident_bh *, struct fileIdentDesc *, lb_addr *, uint32_t *, lb_addr *, uint32_t *, uint32_t *, struct buffer_head **);
 extern struct fileIdentDesc * udf_get_fileident(void * buffer, int bufsize, int * offset);
-extern extent_ad * udf_get_fileextent(void * buffer, int bufsize, int * offset);
 extern long_ad * udf_get_filelongad(uint8_t *, int, int *, int);
 extern short_ad * udf_get_fileshortad(uint8_t *, int, int *, int);
 
