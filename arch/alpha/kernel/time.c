@@ -94,7 +94,7 @@ static inline __u32 rpcc(void)
  * timer_interrupt() needs to keep up the real-time clock,
  * as well as call the "do_timer()" routine every clocktick
  */
-void timer_interrupt(int irq, void *dev, struct pt_regs * regs)
+irqreturn_t timer_interrupt(int irq, void *dev, struct pt_regs * regs)
 {
 	unsigned long delta;
 	__u32 now;
@@ -139,6 +139,7 @@ void timer_interrupt(int irq, void *dev, struct pt_regs * regs)
 	}
 
 	write_sequnlock(&xtime_lock);
+	return IRQ_HANDLED;
 }
 
 void

@@ -1,4 +1,5 @@
 #include <linux/config.h>
+#include <linux/interrupt.h>
 
 
 /* Prototypes of functions used across modules here in this directory.  */
@@ -128,7 +129,7 @@ extern void smp_percpu_timer_interrupt(struct pt_regs *);
 /* extern void reset_for_srm(void); */
 
 /* time.c */
-extern void timer_interrupt(int irq, void *dev, struct pt_regs * regs);
+extern irqreturn_t timer_interrupt(int irq, void *dev, struct pt_regs * regs);
 extern void common_init_rtc(void);
 extern unsigned long est_cycle_freq;
 
