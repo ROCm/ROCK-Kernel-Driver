@@ -520,7 +520,7 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 			acpi_disabled = 1;
 
 		/* "acpismp=force" turns on ACPI again */
-		else if (!memcmp(from, "acpismp=force", 14))
+		if (c == ' ' && !memcmp(from, "acpismp=force", 13))
 			acpi_disabled = 0;
 
 		/*
@@ -977,7 +977,7 @@ void __init setup_arch(char **cmdline_p)
 	generic_apic_probe(*cmdline_p);
 #endif	
 
-#ifdef CONFIG_ACPI_BOOT
+#ifdef CONFIG_ACPI
 	/*
 	 * Parse the ACPI tables for possible boot-time SMP configuration.
 	 */
