@@ -30,6 +30,8 @@
 #include <asm/pgtable.h>
 #include <asm/oplib.h>
 #include <asm/hardirq.h>
+#include <asm/cacheflush.h>
+#include <asm/tlbflush.h>
 
 #define __KERNEL_SYSCALLS__
 #include <linux/unistd.h>
@@ -261,6 +263,9 @@ unsigned int prof_multiplier[NR_CPUS];
 unsigned int prof_counter[NR_CPUS];
 extern unsigned int lvl14_resolution;
 
+/* /proc/profile writes can call this, don't __init it please. */
+static spinlock_t prof_setup_lock = SPIN_LOCK_UNLOCKED;
+
 int setup_profiling_timer(unsigned int multiplier)
 {
 	int i;
@@ -270,14 +275,14 @@ int setup_profiling_timer(unsigned int multiplier)
 	if((!multiplier) || (lvl14_resolution / multiplier) < 500)
 		return -EINVAL;
 
-	save_and_cli(flags);
+	spin_lock_irqsave(&prof_setup_lock, flags);
 	for(i = 0; i < NR_CPUS; i++) {
 		if(cpu_present_map & (1 << i)) {
 			load_profile_irq(mid_xlate[i], lvl14_resolution / multiplier);
 			prof_multiplier[i] = multiplier;
 		}
 	}
-	restore_flags(flags);
+	spin_unlock_irqrestore(&prof_setup_lock, flags);
 
 	return 0;
 }
