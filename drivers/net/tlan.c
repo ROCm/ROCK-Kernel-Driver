@@ -1707,10 +1707,9 @@ u32 TLan_HandleStatusCheck( struct net_device *dev, u16 host_int )
 		printk( "TLAN:  %s: Adaptor Error = 0x%x\n", dev->name, error );
 		TLan_ReadAndClearStats( dev, TLAN_RECORD );
 		outl( TLAN_HC_AD_RST, dev->base_addr + TLAN_HOST_CMD );
-		
-		queue_task(&priv->tlan_tqueue, &tq_immediate);
-		mark_bh(IMMEDIATE_BH);
-		
+
+		schedule_task(&priv->tlan_tqueue);
+
 		netif_wake_queue(dev);
 		ack = 0;
 	} else {
