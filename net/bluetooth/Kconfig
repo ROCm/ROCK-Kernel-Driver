@@ -2,10 +2,8 @@
 # Bluetooth subsystem configuration
 #
 
-menu "Bluetooth support"
+menuconfig BT
 	depends on NET
-
-config BT
 	tristate "Bluetooth subsystem support"
 	help
 	  Bluetooth is low-cost, low-power, short-range wireless technology.
@@ -61,6 +59,4 @@ source "net/bluetooth/bnep/Kconfig"
 source "net/bluetooth/cmtp/Kconfig"
 
 source "drivers/bluetooth/Kconfig"
-
-endmenu
 

@@ -24,6 +24,9 @@
 #include <asm/uaccess.h>
 #include "br_private.h"
 
+/* Limited to 256 ports because of STP protocol pdu */
+#define  BR_MAX_PORTS	256
+
 static int br_initial_port_cost(struct net_device *dev)
 {
 	if (!strncmp(dev->name, "lec", 3))
@@ -126,34 +129,46 @@ static struct net_bridge *new_nb(const char *name)
 	return br;
 }
 
+static int free_port(struct net_bridge *br)
+{
+	int index;
+	struct net_bridge_port *p;
+	long inuse[BR_MAX_PORTS/(sizeof(long)*8)];
+
+	/* find free port number */
+	memset(inuse, 0, sizeof(inuse));
+	list_for_each_entry(p, &br->port_list, list) {
+		set_bit(p->port_no, inuse);
+	}
+
+	index = find_first_zero_bit(inuse, BR_MAX_PORTS);
+	if (index >= BR_MAX_PORTS)
+		return -EXFULL;
+
+	return index;
+}
+
 /* called under bridge lock */
 static struct net_bridge_port *new_nbp(struct net_bridge *br, struct net_device *dev)
 {
-	int i;
+	int index;
 	struct net_bridge_port *p;
+	
+	index = free_port(br);
+	if (index < 0)
+		return ERR_PTR(index);
 
 	p = kmalloc(sizeof(*p), GFP_ATOMIC);
 	if (p == NULL)
-		return p;
+		return ERR_PTR(-ENOMEM);
 
 	memset(p, 0, sizeof(*p));
 	p->br = br;
 	p->dev = dev;
 	p->path_cost = br_initial_port_cost(dev);
 	p->priority = 0x80;
-
-	for (i=1;i<255;i++)
-		if (br_get_port(br, i) == NULL)
-			break;
-
-	if (i == 255) {
-		kfree(p);
-		return NULL;
-	}
-
 	dev->br_port = p;
-
-	p->port_no = i;
+	p->port_no = index;
 	br_init_port(p);
 	p->state = BR_STATE_DISABLED;
 
@@ -218,10 +233,10 @@ int br_add_if(struct net_bridge *br, struct net_device *dev)
 		return -ELOOP;
 
 	dev_hold(dev);
-	if ((p = new_nbp(br, dev)) == NULL) {
-		spin_unlock_bh(&br->lock);
+	p = new_nbp(br, dev);
+	if (IS_ERR(p)) {
 		dev_put(dev);
-		return -EXFULL;
+		return PTR_ERR(p);
 	}
 
 	dev_set_promiscuity(dev, 1);
@@ -262,13 +277,14 @@ int br_get_bridge_ifindices(int *indices, int num)
 	return i;
 }
 
-void br_get_port_ifindices(struct net_bridge *br, int *ifindices)
+void br_get_port_ifindices(struct net_bridge *br, int *ifindices, int num)
 {
 	struct net_bridge_port *p;
 
 	rcu_read_lock();
 	list_for_each_entry_rcu(p, &br->port_list, list) {
-		ifindices[p->port_no] = p->dev->ifindex;
+		if (p->port_no < num)
+			ifindices[p->port_no] = p->dev->ifindex;
 	}
 	rcu_read_unlock();
 }
